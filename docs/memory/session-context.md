@@ -1,5 +1,263 @@
 # 세션 컨텍스트
 
+## ▶▶ 재개 포인트 (2026-09-18 — GOP 서버 API 계약 동기화 · Track C · **✅ 구현 + 실연동 검증 완료 / ❌ 실기 UI · 운영 쓰기 미검증 / ⛔ 미커밋**)
+
+### ★ 최신 회차: 실연동 검증(Phase 3) — 2026-09-18
+
+사용자 지시: **"실제 실행해서 어디까지 연동이 되는지 확인해라"**
+
+라이브러리 **실물**(모의 없음)을 살아있는 서버에 붙여 실행 →
+정본: [`docs/tests/gop-api-contract-sync-live-verification.md`](../tests/gop-api-contract-sync-live-verification.md)
+
+| 결과 | 값 |
+|---|---|
+| 관문 | **104개 중 OK 96 · 비결함 FAIL 2 · SKIP/INFO 6** |
+| 판본 판정 | 로컬 `V8_0/8.0.1` · 원격 `V6_3/6.3.2` — **같은 바이너리가 갈라냄** |
+| 이벤트 어휘 | `Alert` POST(201)→GET→`MessageType=Alert(160)` · 변환 예외 0 · 잔존 0 |
+| 장비 쓰기 | **7종 전면** Create/Patch/Delete 통과(`type_device` 미전송, 422 없음) |
+| 권한 | 전체 교체 왕복 **16종 무손실**(원본 ∪ 카탈로그 예측 적중) |
+| NATS | 개폐 발행 브로커 도달 · `cmd=GATE_DOOR_SET` · `requested_at` aware ISO-8601 · `global.>` 실수신 |
+| 서버 상태 | **프로브 잔존 0 · 억제창 2→2 원복 · 권한 16종 유지** |
+
+**실측으로 발견해 수정한 결함 2건** (`IMPL-28` · `IMPL-29`)
+1. `SensorDeviceDto` — 희소 PATCH 가 `controller_id:0` 을 실어 **404**. → `ShouldSerializeControllerId() => > 0`.
+   (호출부는 현재 테스트뿐이라 사용자 노출 버그는 아니었음 — 잠재 함정 제거)
+2. `DeviceApiService` — `limit` 서버 상한(100) **미클램프** → `limit=200` 이 422 후 **빈 목록**으로 보임(침묵 실패).
+   → `ClampLimit` 신설, 목록 **7곳** 적용. `limit=250` 이 클램프되어 정상 조회로 재검증.
+
+**서버팀 전달 신규 2건** (조율 문서 반영)
+- **S-L1** 억제 스케줄 #97 은 서버 자신의 PATCH 검증을 통과 못 해 **영구 수정 불가**(생성 허용 ≠ 수정 허용)
+- **S-L2** 억제 응답이 `data` 없이 `success:true` — 스웨거에 그 형태가 없어 "id=0 생성"으로 오독됨
+
+**남은 미검증(명시)**: 실기 WPF 화면 · 운영 6.3.2 인증 경로 · FR-24 `unit_id` 실주입 쓰기 ·
+`Devices.Api` 통합테스트 86건(`http://localhost:8000` 하드코딩 vs 서버 HTTPS → 네트워크 503, **이 세션 이전 기준선 미측정**)
+
+**⛔ 커밋 상태**: 여전히 **미커밋**. 타 세션 미커밋 작업과 섞여 있어 선별 스테이징 필요. 롤백 태그 `before-api-8.0-sync` = `3bb9a8fa`.
+
+---
+
+## (이전) 재개 포인트 — 구현·헤드리스 검증 완료 시점
+
+- **사용자 지시**: "명세서와 스웨거로 바뀐 메시지 구조를 다 파악해 안 맞는 것을 API 기준으로 업데이트. 정말 정밀하게. Agent 최대한 동원해 분석하고 PRD 쓰고 바로 진행. 미리 승인."
+- **롤백 지점**: 태그 `before-api-8.0-sync` = `3bb9a8fa`
+- **산출물**: [`gop-api-contract-sync-analysis.md`](../analyses/gop-api-contract-sync-analysis.md)(§0-B 최종 결과) · [`gop-api-contract-sync-prd.md`](../prds/gop-api-contract-sync-prd.md) **v2.0 Completed** · [`gop-api-contract-sync-prd-plan.md`](../plans/gop-api-contract-sync-prd-plan.md) · 원본 보고 7종 222KB(`scratchpad/apisync/`)
+
+### ✅ 최종 검증 (사실만 — 2026-09-18)
+
+| 항목 | 결과 |
+|---|---|
+| 솔루션 전체 빌드 | **오류 0** |
+| `Messages` | **198 / 198 통과** |
+| `Events.Ui` | **691 통과 / 15 실패** — 15는 **HEAD 기준선과 동일**(**신규 회귀 0**) |
+| `Accounts.Api` | **144 / 144 통과** |
+| `x:Name` 변경 · mojibake | **0건 · 0** |
+
+기존 실패 15건 = 줌/FOV 수식 **6** · `created_at` `Z`↔`+00:00` 표기 드리프트 **4** · XAML 바인딩 **4** · NATS DeviceType **1**
+(착수 전부터 실패 · 이 작업과 무관).
+
+### ✅ 2차 라운드 (2026-09-18 — **FR-21~27 승격**, PRD **v3.0**)
+
+v2.0 이 *"여전히 범위 밖"* 으로 남긴 것 중 근거가 확정된 것을 같은 릴리스에 넣었다.
+
+| ID | 내용 |
+|---|---|
+| **FR-21** | **F-03 해소** — 이벤트 장비가 전부 '센서'로 폴백하던 것. 판본별 `device` shape 실측 확정(운영 **6.3.2 = 전문 객체 + `type_device` required** / 개발 **8.0.1 = `DeviceReference` `{id, category_device}` 두 키**). 복원 순서 **`type_device` → `category_device` → '알 수 없음'**. ⚠ **`sensor` 카테고리는 의도적 미매핑**(Fence·Multi·PIR·SmartSensor 가 다 들어 있어 하나를 고르면 틀린 종류를 단정) |
+| **FR-22** | **F-22 해소 — 탐지·장애 서버측 필터**. `result`·`reason` 무게이트(양 판본), `type_event` 는 `>= V8_0`. 어휘 검증 + 숫자 문자열 거부. **Moq 표현식 28곳**을 팩토리 1파일로 → 다음 변경 시 **28 → 5곳** |
+| **FR-23** | **장비 API 통로 신설** — `by-component`(문 상태 일괄) · 제거필터 대체명 전수 · `group_id`/`server_id`/`unit_id`/`include_descendants` · `component-status` PATCH · `/config` 3종 · `/spec` 카탈로그 2종 · `version`→`hardware_spec.firmware` |
+| **FR-24** | **`unit_id` 값 주입** — `GroupNats`(부대 코드) → `/api/units` 매칭 → id 캐시(`IUnitScopeService`) + 쓰기 **14곳 단일 관문** `UnitScopeGate.StampAsync`. `>= V8_0` 아니면 **네트워크에 나가지도 않는다** |
+| **FR-25** | **공통 에러 출구 마감** — 날 JSON 차단(원문은 로그 보존) · `HTTP 0:` 오표기 제거 · 출구 2곳(`AccountSetupPanelViewModel`·`EventProviderService`) |
+| **FR-26** | **사문 프로젝트 `Api.Messages`** — `Details` → `JToken?`(배열 수신 시 폭발 차단). **삭제하지 않음**: 메인 `.sln:98` 멤버십 + **worktree 56곳 사본**이 머지로 되살린다. 제거 3단계는 `.csproj` 주석 |
+| **FR-27** | 권한 신규 4종 게이팅 기반 `DevicePermissionGate.CanViewUnits()`. `PermissionUiPolicy` **수정 불필요**(키 문자열 통과) |
+
+#### 🔴 2차 라운드 발견 3건 (재발 가능성 높음)
+
+1. **`ShouldSerialize` 가 아니라 "인터페이스 파라미터 목록 정확 일치"** — *"optional 파라미터면 목이 안 깨진다"* 는 지시가 **틀렸다.**
+   C# 은 구현에서 파라미터 목록이 **정확히 일치**해야 해 **기본값 추가도 목을 깬다** → **15종 멤버 복구**.
+2. 🔴 **검증 방법 자체의 구멍** — `dotnet build`(솔루션 전체)가 **WPF 임시 프로젝트를 타지 않아** `Devices.Ui/Tests` 의 `CS0535` 를
+   **여러 차례 놓쳤다.** "솔루션 빌드 오류 0"을 반복 보고했는데 **실제로는 깨져 있었다.**
+   ⇒ **검증은 `--no-dependencies` 없이 프로젝트별로.**
+3. **과잉 게이트** — `group_id`·`server_id` 가 **운영 6.3.2 에도 존재**하는데 `>= V7_0` 게이트 뒤에 있어
+   **운영에서 멀쩡한 필터를 잃고 있었다**(무증상). `group_id` = 6.3.2 `controllers`·`sensors`·`cameras` / `server_id` = `speakers`.
+   해당 **4곳만** `AddLegacySafeFilter`(무게이트)로 분리. ⇒ **게이트는 "신설 여부"가 아니라 "판본별 실존"으로 판정.**
+
+#### ✅ 2차 라운드 최종 검증 (사실만)
+
+- **빌드**: 의존성 포함 **프로젝트별 15개 전부 오류 0** —
+  `Messages`·`Enums`·`Api`·`Nats`·`Devices.Api`·`Devices.Ui`·`Events.Api`·`Events.Ui`·`Accounts.Api`·`Accounts.Ui`·`Reports.Api`·`Reports.Ui`·`GMaps.Ui`·`ViewModel`·`Api.Messages`
+- **테스트**: **1225 통과 / 20 실패(전부 기준선)** — `Messages` 198/198 · `Devices.Ui` 122/122 · `Accounts.Api` 144/144 ·
+  `Accounts.Ui.Tests` 50/50 · `Events.Ui` 691P/**15F**(HEAD 기준선 동일) · `Nats` 20P/**5F**(실서버 필요 E2E, flaky 4~5 변동)
+- ⚠ 위 발견 2 때문에 **이 블록 상단의 "솔루션 전체 빌드 오류 0"은 근거로 쓰지 않는다.**
+
+#### ❌ 2차 라운드 미검증 (통과로 적지 않는다)
+
+- **쓰기 왕복 0건**(변함없음) — 규칙상 GET 만. 422 해소·409·원자성·FR-23/24 통로 전부 **스키마·소스 근거**.
+- **8.0.1 `DeviceReference` 실물 미관측** — dev DB 에 device 물린 이벤트 **0건**.
+- **실기 UI 미검증** — `view=full` 회복 · 권한 **16행** · 문 상태 표시 · **이벤트 장비 종류**.
+- **운영 6.3.2 실호출 대조 없음** — `AddLegacySafeFilter` 4곳의 실동작 포함.
+
+#### 미착수 (2차 라운드 후 재작성)
+
+**신규 화면 3종** — 필터 UI · 조치보고 문구 관리 UI · **부대 편제 UI**(전부 신규 화면이고 드래그 정렬 포함이라
+`drag-first-ux` 규칙상 **PRD 급**) · `DeviceGroupDto` **`unit_id` 칸 부재**로 장비그룹 2곳 미배선 ·
+**장비 모델에 `unit_id` 축 부재**(다부대 전개 시 선행 필요) · `EventProviderService` 의 `throw {Error?.Message}` **8곳 침묵 가능**.
+
+#### 메모리 처리 (2차 라운드)
+
+- **신규 1건**: `project_interface_widening_mocks_and_build_blindspot`(파라미터 정확 일치 · 솔루션 빌드 맹점 · Moq 팩토리 28→5).
+- **갱신 5건**: `api_spec_ahead_of_deployment`(**과잉 게이트** ①-b + `IUnitScopeService`/`UnitScopeGate`/`AddLegacySafeFilter` + 검증 수치) ·
+  `branch_wiring_must_be_verified`(검증 도구 자체의 구멍) · `device_six_axes_and_component_catalog`(FR-23 통로 신설) ·
+  `malfunction_card_controller_sensor_display`(FR-21 판본별 `device` shape) · `library_deployment_path`(사문 프로젝트 삭제 금지).
+
+### ▶ 다음에 이어서 할 일 (우선순위 순)
+
+1. **쓰기 왕복 검증**(Phase 4) — 개발 8.0.1 로 장비 생성·수정·권한 저장·매핑 409·`/reorder` 원자성. **운영 쓰기는 금지.**
+2. **실기 UI 검증** — `view=full` 이 화면에서 3D 하우징·부품 상태·임계치·FOV 를 회복시키는지 · 권한 매트릭스 **16행** · 문 상태 표시 · FR-19 문 개폐 NATS 왕복(매니저 구독·구동).
+3. **UI 하네스**(`-Category UiSmoke`) — 데스크톱 독점 필요(`quser` STATE=Active 확인).
+4. 통과 후 **CHANGELOG + 완료 리포트**(`docs/reports/`). 그 전엔 "완전 완료"로 적지 않는다.
+5. ~~미착수 별건: **F-03** · **F-22** · `Api.Messages` 사문 프로젝트~~ → **2차 라운드에서 FR-21·22·26 으로 해소**(위 「2차 라운드」 절).
+   남은 미착수 = **신규 화면 3종**(필터 UI · 조치보고 문구 관리 UI · 부대 편제 UI — 드래그 정렬 포함이라 `drag-first-ux` 규칙상 **PRD 급**) ·
+   `DeviceGroupDto` `unit_id` 칸 부재(장비그룹 2곳) · 장비 모델 `unit_id` 축 부재 · `EventProviderService` `throw {Error?.Message}` 8곳.
+
+### 🔴 질문 자체가 바뀐 발견 — 맞출 대상이 셋이다
+
+| | 원격 **운영** | 로컬 개발 | 명세서 |
+|---|---|---|---|
+| 버전 | **6.3.2** | **7.0.1** | **v8.0** |
+| 권한 모듈 | **12종** | 15종 | 16종 |
+| `EnumEventType` | **8종** | 10종 | — |
+| `unit_id`·`/api/units` | 0 | **0** | 있음 |
+
+**우리 12종 카탈로그는 "낡은" 게 아니라 운영 6.3.2와 정확히 일치한다.** 서버 swagger 가 우리를 *"카탈로그가 낡은 클라(GIS 12모듈)"* 로 지목하지만 그건 7.0.1 기준이다.
+⇒ **"API 기준에 맞춘다"를 그대로 실행하면 운영이 파손된다.** 에이전트 6기 전원에 전제를 교정 송신하고 `P-Future`(명세 선행·미배포) 등급을 신설해 분리 보고하게 했다.
+
+### 구조적 사실 — 장비 쓰기는 한 본문으로 양립 불가
+`CameraCreate` required: 6.3.2 = `type_device`·`status`·`mode`·… / 7.0.1 = `type_camera`·`connection`(+ `additionalProperties:false` 로 `type_device` **금지**). ⇒ **런타임 버전 분기 필수**(PRD A-1, 권고안 C 채택).
+
+### 권한 저장 — 세 처방이 모두 422 (직접 검증)
+라이브 그룹 3건 전수: 보유 12종인데 **우리와 다른 12종**(서버엔 `action_report_templates`·`files`·`integrations`, 우리엔 `broadcast`·`setup_system`·`setup_feature`).
+우리 카탈로그 조립 → 422 · **서버 문서가 처방한 "GET 원본에 병합"** → 422 · GET 결과만 → 422.
+⇒ 유일 해법 **원본 ∪ 카탈로그**(12∪12=15=서버 enum 전체). `/api/auth/me/permissions` 는 ADMIN 에게 `modules:{}` 라 카탈로그 원천이 못 된다(실측).
+
+### ✅ Phase 1 진행분 (빌드 오류 0)
+- **FR-01** `EnumEventType` +`Alert`·`Operation`, `Enum.Parse` 10곳 → 관용 파서(`ParseOrDefault`). **`Alert` 는 detection 카테고리로 실려 와 탐지 목록 로딩 자체를 죽이던 것**. 브로커 명세가 *"미지 값 폴백을 두십시오"* 라고 직접 처방.
+- **FR-02** `action_reported` 를 bool·string 양쪽 수용(4곳). Newtonsoft 가 `false`→소문자 `"false"` 로 넘겨 `== "True"` 가 어느 쪽과도 안 맞아 **전 이벤트가 '미조치'로 굳어 있던 것**.
+- **FR-03** 권한 저장을 **원본 ∪ 편집분** 병합으로(`BuildMergedModules`).
+- 잔여 Phase 1: FR-04(EnumGopCommand no-op) · FR-05(NATS `sensorway.global.>` 구독) · FR-06(에러 표시 폴백) · FR-07(`reports/status` DTO).
+
+### ▷ 🔧 구현 진행 (2026-09-18) — 에이전트 8기 병렬, 파일 소유권 분할
+
+**완료 FR**: 01(EnumEventType 관용 파싱) · 02(action_reported) · 03(권한 병합) · 04(전역 cmd 3종) · 05(NATS `global` 구독) · 06(에러 표시) · 07(reports/status DTO) · 08(버전 프로브) · 09(장비 쓰기 분기) · 10/11(목록 쿼리·묘비 게이트) · 12(metrics 데이터 손상)
+
+**회귀 테스트 32건 전량 통과.** 기존 Events.Ui 실패 15건은 HEAD 기준선과 일치(신규 회귀 0).
+
+#### 🔴 이번 통합에서 잡은 "죽은 코드" 2건 — 이게 이 작업의 최대 교훈
+
+버전 분기를 3기가 각자 정확히 만들었는데, **아무도 사슬 전체를 보지 않아** 전부 발동하지 않는 상태였다.
+
+| # | 결함 | 증상 | 조치 |
+|---|---|---|---|
+| 1 | **`IServerContractProbe.ResolveAsync()` 호출부 0건** | 캐시가 영원히 비어 `Contract` 가 `V6_3` 폴백 고정 | 전용 에이전트 배정 |
+| 2 | **`DeviceApiModule.cs:64-79` 가 프로브를 생성자에 안 넘김** | 두 서비스가 `null` 수령 → 영구 6.3 경로 | 메인 세션이 옵셔널 해석 2단으로 직접 연결(빌드 0) |
+
+⇒ **교훈: 분기 코드를 만들었으면 "그 분기가 실제로 켜지는가"를 끝까지 따라가야 한다.** 빌드도 통과하고 테스트도 통과하는데 기능만 죽는다.
+
+#### ⚠ 서버가 세션 중에 또 올라갔다 (7.0.1 → 8.0.1)
+
+`/api/units` 3경로 실재 · `unit_id` 127회 · 권한 **16종**. 원격 운영은 **6.3.2 그대로**.
+⇒ **분기 비교는 `== 특정버전` 이 아니라 `>=` 만 쓴다.** 동치 비교면 서버 한 판 올라갈 때 조용히 구경로로 떨어져 그 분기가 막으려던 결함이 되살아난다.
+⇒ **`unit_id` 는 "금지" → "`>= V8_0` 조건부 전송"** 으로 재분류.
+
+#### ✅ 설계가 실증으로 검증됨
+서버가 그룹에 `units` 백필 → 저장분 12→**13종**. **원본(13) ∪ 카탈로그(12) = 16종** 으로 새 enum 과 정확히 일치.
+**하드코딩을 15종으로 늘려 고쳤다면 오늘 깨졌다.**
+
+#### 🔴 내 분석서가 두 번 정정됐다 (에이전트가 근거를 들고 뒤집음 — 정정 쪽이 맞음)
+1. **"서버 쓰기 100% 422"는 7.0.1 기준이고 운영 6.3.2 에서는 거짓.** `ServerDto` 는 6.3.2 스키마와 정확히 일치하고 6.3.2 는 extra 를 허용한다 ⇒ 7.0+ 형태로 재작성하면 **운영이 회귀**한다. `ServerDto` 재작성 미착수(별도 과제).
+2. **문 개폐는 버전 분기 사안이 아니라 지금 깨져 있는 기능.** REST `/control` 이 배포된 판은 **존재한 적이 없다**(6.3.16~17 개발판에만, 같은 날 제거). 운영엔 `/gates*` 경로 0건, 개발은 410. **우리 호출은 운영 404 / 개발 410 — 어느 쪽에서도 문이 안 열린다.** 정본은 NATS `GATE_DOOR_SET`. 채널 전환이라 **별도 FR 승격 필요**(플랜 D-1).
+
+#### 🔲 사용자 결정 대기 (에이전트가 추측을 피해 보류한 것)
+- **`type_camera` 폴백** — 6.3 `NONE`/`FISHEYES`/`THERMAL` 에 7.0 대응값이 없는데 필수 필드. 현재 `FIXED` 로 낙착 — **승인 필요**
+- **`type_sensor`** — 우리 `Cable`·`IoController` 가 7.0 enum 에 없다. 임의 매핑은 센서 종류를 조용히 바꾸므로 **무보정 통과**(서버 422 로 표면화) 선택
+- **함체 임계치 7.0 이관 미구현** — `device_config.thresholds` 부품 키 어휘 미확인. 추측 매핑 금지로 보류
+- **문 개폐 채널 전환**(위 2번) — 별도 FR 승격 여부
+
+#### ✅ 위 결정 대기의 낙착 (구현 중 확정)
+- **`type_camera`** — 유령값 폴백을 **철회**(FR-15).
+- **`type_sensor`** — **무보정 통과** 유지(임의 매핑은 센서 종류를 조용히 바꾼다. 서버 422 로 표면화).
+- **함체 임계치** — **7경계 매핑 구현**(FR-15). 근거는 서버 백필 SQL `v98` — 추측 아님.
+- **문 개폐 채널 전환** — **FR-19 로 승격·구현**(REST → NATS `GATE_DOOR_SET`). ⚠ 실기 미검증.
+
+#### 추가로 같은 릴리스에 들어간 것 (FR-13~20, v1.0 이 "범위 밖/별건"으로 남겼던 것)
+공통 계약(에러코드 **16종**·`warnings[]`·`meta.view/sections`·`EffectiveTotal`/`IsTotalMissing` 목록 절단 감지·`ApiStatusHelper` 409/410/202·빈 쿼리값 제거) ·
+계정·권한(`PUT /users/{id}` 의 `login_id` 제거로 **무조건 422 해소** · **100명 절단 제거** · `client_id` · `photo_url` 접두 정정(**프로필 사진 영구 미전송**이던 것) · 아이디 중복확인 실구현(**항상 false** 였다) · 권한 카탈로그 권위를 **서버로 이관** + 기존 오류 3건 정정: `devices`/`users` 의 `control`, `broadcast` 의 `edit` 누락) ·
+장비 DTO(함체 임계치 7경계 · `type_camera` 유령값 철회 · 축 역투영 · `DoorStateEffective` = 함체 `components.door` / 통문 `components.actuator`) ·
+장비 UI(`view=full` **14곳** · 에러 표시 15곳 · `?? "CLOSED"` 제거) ·
+이벤트(쓰기 422 2종 · `type_event` 정규화 · 운영 이벤트 조회 3종 · 매핑 **409 분기 9곳** · 취소 스케줄 오표시) ·
+보고서(조치보고 템플릿 **7경로 신설**, `/reorder` 포함 · `?status=` 닫힌 어휘 · 생성이력 18키) ·
+부대(`/api/units` 클라 **7경로**, `>= V8_0` 게이트) ·
+인프라(`IServerContractProbe` + `ServerContractProbe` + `ServerContractBootService` **Order -1000**).
+
+#### 🔴 통합에서만 보인 결함 — 잠복 버그 2건 추가
+- **`StatusCode` 가 성공 경로에 미충전** → **202 가 201 과 구별 불가**했다(수정).
+- **`ObjectCreationHandling.Replace` 누락** → **축 역투영이 전부 조용히 버려지던 것**(수정).
+- **`ShouldSerializeDevice() => false` 가 NATS 본문까지 껐다** — REST 422 는 막았는데 **ACTION_REPORT 브로커 본문이 깨졌다**(같은 DTO 를 태운다).
+  경로별 차단은 **플래그 게이트**(`SuppressDeviceOnRestWrite`, 선례 `BaseDeviceDto.UseAxisWrite`). **회귀 테스트 2건이 잡았다.**
+
+#### ❌ 잔여 검증 (미검증으로 명시 — 통과로 적지 않는다)
+- **쓰기 왕복 전부 미검증** — 규칙상 **GET 만** 했다. 422 해소·409·`/reorder` 원자성은 **스키마·소스 근거이고 실호출이 아니다**.
+- **실기 UI 미검증** · **원격 운영 6.3.2 실호출 대조 없음**(정적 스키마 대조뿐) · **UI 하네스 미실시**.
+- 보고서별 미확인 **48건**은 플랜 문서에 집계(대부분 그대로 열려 있다).
+
+### ✅ 메모리 처리 완료 (최종 회차)
+- **갱신 4건**: `door_control_command_path`(REST→NATS 전환 **구현됨**으로 갱신) · `gis_app_uses_remote_api_server`(프로브가 판정 주체) · `api_spec_ahead_of_deployment`(인프라 실체 + 배선 검증) · `permission_save_full_replacement_422`(권위 서버 이관 + 카탈로그 오류 3건).
+- **신규 2건**: `project_branch_wiring_must_be_verified`(분기를 만들었으면 실제로 켜지는지 끝까지) · `project_shouldserialize_is_global_use_flag_gate`(`ShouldSerialize` 전역 적용 + 플래그 게이트 관용구).
+
+### 부수
+`session_concurrency_policy = allow` 실측(로컬) — *"admin 로그인이 앱 세션을 축출한다"* 제약 해제. 원격은 6.3.2라 별도.
+
+---
+
+
+## ▶▶ 재개 포인트 (2026-09-18 — GOP API v8.0.1 반영 창 구조 재기획 · Track A 분석, 코드 무수정 · **사용자 결정 A-D1~12 대기**)
+
+- **요구(사용자)**: "현재 GOP API 문서에 변경된 사항을 반영하여 우리 창의 구조도 바꿔야 될 것 같다. `C:\workspace_python\api-test-server\GOP_Restful_Api_연동설계.md` 참고해서 창을 어떻게 다시 바꿀지 기획해줘."
+- **산출물**: [`docs/analyses/gop-api-v8-window-impact-analysis.md`](../analyses/gop-api-v8-window-impact-analysis.md)
+- **판본 상황**: 운영 6.3.2 / 개발 7.0.1 / 명세 **8.0.1**(3.0MB, 16,519행, 09-18). v7.0 은 병행 기간 없는 파괴 릴리즈, v8.0 은 부대(Unit) 1급화, v8.0.1 은 API 표면 불변.
+- **핵심 변경(조사 5갈래 · 에이전트)**: ① `type_device` 폐지 → `category_device`(7) + `type_<category>`(카테고리별) 2축 · 장비 id **전 카테고리 단일 시퀀스** ② 표현 3종 분리 — 형상 `hardware_spec` / 의도 `device_config` / 관측 `device_status`(편집 폼에 실으면 422 `OBSERVED_FIELD`) ③ **부품(component)** 1급화 + `PATCH …/component-status`, 카탈로그 `GET /api/devices/spec` 이 정본(`SYNC_CATALOG` 시 판 비교 없이 전량 재조회) ④ 문·통문 스칼라 폐지 → `DOOR_SENSOR`/`DOOR_ACTUATOR` 부품 state(**`RUNNING` 신설**), `/control` 2경로 **410**(명령은 클라→NATS `GATE_DOOR_SET`·`ENCLOSURE_DOOR_SET` 직행) ⑤ 카메라 `/settings` 3경로 410 ⑥ `server_id`·`unit_id`·`group_ids` ⑦ 이벤트·연동·그룹의 장비는 **참조 2키**(`{id, category_device}`), 삭제 장비는 스냅샷 문자열(파싱 금지), `action_reported` boolean ⑧ 권한 **16종** 전체 교체(`units` 신설, 누락 422) ⑨ datetime `+09:00` **마이크로초 6자리**(관측 시각은 오프셋 필수) ⑩ 엄격 쓰기 422 9코드 · `error.message` 항상 문자열 · 기계 판독은 `error.details`.
+- **이벤트 콘솔 영향(직전 기획 대비)**: 통계 계약 **불변**이라 개요 4카드 유지. 보정 3건 = `summary.total` 은 운영 제외 6종 합 · 추이 **0건 버킷 생략(0 채움 필요)** · 장비별에 **함체·통문 추가**. 신설 = **운영 이벤트(4번째 카테고리)** 레일 탭. **일괄 조치보고 API 없음**(건별 반복 → 서버 벌크 요청 A-D5) · 연결 이벤트는 `/connections/{id}/actions` 없음 → `?from_event_id=` 통일 · AI 객체 집계 API 없음(E-D15 "제안" 유지).
+- **우리 코드 현황**: `EnumServerContract`(V6_3/V7_0/V8_0) 분기·종류축 3종·`connection.urls`·권한 전체교체 병합은 **이미 구현**. **없는 것** = `category_device` 0건 · `device_status` DTO · `component-status` 호출 · `/spec` 카탈로그 · 권한 카탈로그 12종(16 필요) · datetime `fff`(6자리 필요) · 카메라 `/settings` 호출 3종 잔존 · 이벤트 DTO 가 장비 풀필드 · 문 개폐 REST 호출(`MapViewModel.cs:1836-1859`).
+- **신규 창**: **부대 콘솔**(편제 트리 + 관계도(계층·인접 간선 2종) + 장비·서버·그룹 소속 픽커). 부대 코드는 NATS 토큰이라 **등록 후 불변**, 제대 5단계 닫힌 값, 부대 필터는 **조회 조건이지 접근 통제 아님**(기본값 = 내 부대+예하, A-D7).
+- **목업(2026-09-18 추가)**: [`docs/design/gop-api-v8-console-wireframe.html`](../design/gop-api-v8-console-wireframe.html) — 와이어프레임+스토리보드 합본, **WPF 적용 규약 3표**(색 토큰→`DynamicResource`(BgBrush·SurfaceBrush·…·ChartSeries1~8Brush) · 컨트롤 대응(DataGrid·ItemsControl+DataTemplate·TreeView·Canvas+Path·mah:ToggleSwitch·md:Flipper) · 웹 전용 기법 대체(color-mix→토큰 2벌 · 빗금→DrawingBrush · 파선 `{6,4}`(4,3/5,3 은 선점) · 스켈레톤→Storyboard · grid-areas→Grid 고정 DIU · backdrop-filter 미사용)). 조작 목업 2종 = **장비 콘솔**(카테고리 7 레일+부품으로 찾기 · 종류 2축 · 상세 6축 9섹션 · 부품 동적 목록 18유형 · 변경 미리보기 T4·M · 관측 읽기전용 · 권한 없는 계정 토글)과 **부대 콘솔**(편제 트리 + 관계도(계층 실선/인접 파선) + 코드 자물쇠). 브라우저 1회 확인(스크립트 오류 0, favicon 404뿐) · 툴바 줄바꿈·상세 가로 스크롤 2건 수정.
+- **➕ 전 창 확장(2026-09-18, 사용자 "모든 창 — Map OverlayWindow만 빼고")**: 정본 = 레이아웃 분석 **§12** + 목업 절 `#acct`·`#report`·`#setup`·`#server`·`#unitc`·`#evmap`·`#dlg`·`#shell`(백업 `storyboard_backup_before_allwindows.html`·`_before_evmap.html`). 실측 정정 3건 — 설정 **9탭**(10 오기, 계정 VM 4종 고아) · **서버 모니터 UI 0건**(신설) · 제어기 추가 **빈 스텁**. 계정=탭6→레일6+상세 칸 신설(편집·잠금·비번 초기화 흡수), 권한 매트릭스=세 뷰 교체→목록+상세+**16종 경고 배너**, 보고서=미리보기 오버레이→오른쪽 칸 380, 다이얼로그 7규격→**S400/M560/L720**, 진행 팝업 **취소 버튼 필수**, 셸 드로어 300 vs 250 불일치. 결정 **L-D7~L-D14** 추가.
+- **➕ 타 세션 확정도 반영**: `event-mapping-unit-console-storyboard.html` · `-wireframe.html`(2026-09-18, Track C)가 **부대 콘솔·이벤트 맵핑 워크벤치의 정본** — 내 목업은 자리·연결만 정의(정본 중복 금지). 승계 사실: 치수 규약 동일(40/40/38/32/340/1280×760/S400·M560·L720) · 부대 트리 드래그=`PATCH parent_id` 1회 · 형제 순서 API 없음(순서 UI 제공 금지) · 인접=전체 집합 교체 · 삭제 409에 개수 · 이벤트맵핑=3-Pane+Draft 커밋, 재정렬 API 없음, 장비 이름 없어 **캐시 선행**, 권한 `events`→`integrations`, **VM·View 전무 + DTO 결함**(착수는 수선 후).
+- **⚠ 판본 상충**: 확정도는 서버 **v8.0.1 라이브 교체 완료**(PM 지시)라 하고, 메모리·분석은 운영 **6.3.2** — **확인 필요**. 확인 전까지 계약 세대 게이팅(A-D1) 유지.
+- **➕ API 요구 정리(2026-09-18)**: v8 분석 **§8** 신설 — 창→입구 매트릭스 12행 · **서버 요청 S-1~S-10**(1순위 = 조치보고 벌크 `POST /api/events/actions/bulk`, 매핑 우선순위 `reorder`. 선례 = 문구 정렬 reorder 수락) · **확인 U-1~U-8**(특히 U-7 서버 판본 6.3.2 vs v8.0.1 라이브) · 클라 제작 목록(DTO `category_device`·`device_status`·부품 카탈로그 / 서비스 `component-status`·`by-component`·`/units` / 캐시 무효화 / 시각 6자리 · `error.details` · 권한 16종 / 세대 게이팅 / 맵핑 DTO `id` 수선) · 호출 규약 체크리스트 7항(PATCH 바뀐 키만 · 422 코드 9종 · `meta.sections` · 계정 목록 100 · 정렬 UI 금지 · 관측 시각 오프셋 필수 · 판 비교 금지).
+- **➕ 전 창 드래그 와이어프레임(2026-09-18, 사용자 "되도록 드래그 드롭 · 모든 창 한번에 · WPF 감안")**: [`docs/design/all-windows-drag-wireframe.html`](../design/all-windows-drag-wireframe.html) — 18카드 한눈에 + 드래그 카탈로그 18행 + 금지 7행 + **조작 데모 4종**. **판정 규칙 = 서버 호출 횟수**: 1회로 끝나면 즉시 전송(부대 상위 이동 `PATCH parent_id`, 문구 `POST /reorder`), N회로 번지면 **Draft + [적용]**(장비 소속 배정·조치보고 일괄·구성원 배정). **만들지 않는 것**: 이벤트 내역 행 정렬(가상화+무한스크롤) · 열 재정렬 · **서버 순서 필드 없는 정렬**(부대 형제·보고서 구성) · 지도 위 드래그 · 삭제 드롭존. 시각은 색이 아니라 **형태**(파선 윤곽 vs 사선 해치 — 라이트에서 Primary=Selection=Focus 동일색). 데모는 Playwright 실드래그로 검증(트리 이동·순서 정렬 모두 통과).
+- **➕ DeviceSetup 제어기·센서 + 결선맵 기획(2026-09-18, 사용자 "2개 파트 · 중학생도 설정 가능")**: [`docs/design/device-setup-wiring-storyboard.html`](../design/device-setup-wiring-storyboard.html). **실측**: 표 셀 편집·다중선택 일괄 편집(공통값/`null` + `?? item.X`)·Draft→[저장하기] 봉투(`BaseDataGridMultiPanelViewModel`)는 **이미 있음**; 엑셀 붙여넣기·연속 번호·**결선 UI 전부 없음**; 접속 축(`ConnectionAxisDto`)이 모델에 **미매핑**; `AddControllerDialogView` **빈 스텁**; `AddSensorDialogView` 는 범위 생성 UI 가 있으나 **VM 없어 미연결**. **약점 2**: 다중선택 시 값 상이하면 빈 칸으로 보여 "빈 값"과 구분 불가 → "— 여러 값 —" 표기; 그룹 적용이 **전체 덮어쓰기** → 변화분만으로 수정(W-D6). **결선 저장 자리 없음**(센서는 `controller_id` + `connection.channel` 뿐, 회선·순번 필드 0, 제어기 회선 필드 0) → **A안 `hardware_spec.spec.wiring={line,order}` 즉시 + B안 서버 필드 요청(S-11)**, C안(channel 인코딩) 거부(버스 주소 충돌). 결정 W-D1~8, 확인 4건(고장 구간 4정수가 순번인지 주소인지 · channel 중복 가능성 · 센서 `unit_id` 쓰기 규칙 · AddSensorDialog 의도).
+- **🔲 다음**: 결정 A-D1~12 · L-D7~14 · W-D1~8 → 미확인 U-1~8 실측(`GET /openapi.json` 대조) → 서버 요청 S-1·S-2 협의(특히 U-1 탐지·장애·연결의 `unit_id` 문서 모순, U-3 권한 15 vs 16) → 레이아웃 분석 §1 인벤토리에 부대 콘솔·서버 모니터 편입 → 목업 반영 → PRD.
+
+## ▶▶ 재개 포인트 (2026-09-14 — 전 창 레이아웃·디자인 재설계 · Track A 분석/목업, 코드 무수정 · **사용자 결정 L-D1~6 대기**)
+
+- **요구(사용자)**: "창 레이어 개선을 모든 창에 대해 검토. Map OverlayWindow 도 분석해서 필요하면 2차로. 창 디자인도 바꾸고 장비 선택 정보를 오른쪽으로 빼서 상세정보가 나오는 형태(선택탭 | DataGrid+추가·삭제·갱신 | 상세 속성, 첨부 이미지). 모던하고 세련된 디자인·레이아웃."
+- **⚠ 지시 변경**: 2026-09-06 "overlaywindow 는 건드는 거 아니다" → 2026-09-14 "분석해서 필요하면 2차로". Surface Kernel PRD §12 불가침 경계는 **1차 범위에서 유지**, 2차에서 재정의.
+- **산출물**: 분석 [`docs/analyses/window-layout-redesign-analysis.md`](../analyses/window-layout-redesign-analysis.md) · 목업 [`docs/design/window-layout-system-storyboard.html`](../design/window-layout-system-storyboard.html)
+- **핵심 실측**: 장비 창 = `DeviceDashboardView.xaml:39-42` 행 [280, Auto] · **선택 편집기(`SelectedItemEditor`)가 요약 카드와 같은 `Grid.Row="0"`(:584)을 `IsSelected` 로 번갈아 점유** → 행 고르면 요약이 사라짐 · TabControl `Height=390` 레일(:605-614) · `CameraDevicePanelView` DataGrid `Height=260`(:154) · 툴바 골격 `[250|1*|1*|70·10…]` 장비 7종+계정관리 복사 · 편집기 선택마다 `new XSelectionViewModel(selectedItems)`(`DeviceDashboardViewModel.cs:119/135`). 그리드 실제 헤더 9~12열(앞서 "36열"은 태그 원시수 오기 — 정정함). 편집기 섹션 순서 6종 동일: 장비 공통→장비별 속성→위치 정보→그룹→부가(함체 임계값·카메라 상세보기). 네비 축: 장비·설정=좌 레일 / 계정 6·보고서 3=상단 탭 / 이벤트=상단 탭×레일 이중축. 맵 오버레이 창형 14종 모서리 3·4·4·5·7·8·10×7·13(표준 10 은 7종).
+- **제안**: 템플릿 6종 — T1 목록+상세(15창) · T2 설정(5) · T3 분석(2) · T4 작업 다이얼로그(10, 폭 400/560/720) · T5 시스템 알림 · T6 맵 오버레이(2차). T1 = 레일 184/56 · 목록 가변 · 상세 340(300–480) · 상태 6 · 열 우선순위 · 반응형(≥1280 도킹/960–1279 서랍/<960 레일 접힘) · 스플리터 드래그 폴백 6종(drag-first-ux 규칙). 상세 패널엔 시안 헤더 금지(라이브러리 내부 제목 중복 교훈 e583f59).
+- **🔲 결정 대기**: L-D1 기본 크기 1050×700→1280×760 · L-D2 목록 핵심 6열 · L-D3 요약 띠 폐지(레일 배지 흡수) · L-D4 계정 편집·삭제·잠금 다이얼로그→상세 패널 · L-D5 이벤트 센서/카메라 탭→필터 칩 · L-D6 오버레이 2차 분리.
+- **➕ 이벤트 창 묶음 추가(2026-09-14, 사용자 "이벤트 쪽 창까지 함께 묶어서 기획")**: 분석 §11 + 목업 이벤트 콘솔(조작 가능).
+  - **실측**: `EventDashboardView.xaml:45-46` 요약 탭(센서/카메라 이벤트 차트) `Grid.Row="0" Height=200` ↔ `:75-76` 선택 편집기 `Grid.Row="0" Height=265` = **장비 D-1 과 같은 결함** · Row1 기간 바(시작·종료+검색·취소) · Row2 레일 5(차트보기·탐지·장애·연결·조치) · 목록 4종 Height 260~280 · `SelectionMode=Extended` · 무한 스크롤(`DataGridScrollEndBehavior Threshold=50`) · 편집기 4종 라벨(탐지: 유형·구역·종류·장비·번호·상태·결과·신호·AI·추론·프레임·객체 / 장애: …·사유·고장 구간 1차·2차 / 연결: 구역·종류·장비·번호 / 조치: 원본·구역·장비·번호·발생·결과·신호·사유·사용자·내용) · 조치 연결은 `ActionEventViewModel.OriginEvent` 단방향, **RowDetails 0건**(스토리보드 1탐지→N조치 미구현) · 드로어 일괄 버튼 `ToolTip="전체 조치보고"` + `TrashCanOutline` 한 블록(렌더 미확인) · 권한 `CanEdit("events") ?? true` 4패널.
+  - **정정 2건**: ① 이벤트 상단 탭은 "목록 이중 축"이 아니라 **요약 차트 전환** ② 억제 스케줄 확정 폼(좌 408+우 356 ≈780px)은 340~480 상세 칸에 **안 들어감** → 읽기 칸 + 같은 창 안 780px 서랍("폼은 목록과 같은 패널 내" 확정 준수).
+  - **틀과 호스팅 분리**: Surface Kernel 은 조치보고=Float 1순위, 레이아웃은 T4 로 배정해 어긋났음 → T4=모양, 모달/Float=카탈로그. 조치보고=T4+Float · 탐지 신호 이력=T3+**팝업 다이얼로그 유지**(사용자 결정 v2 — Surface Kernel Float 2순위 철회 제안).
+  - **지킨 확정 설계**: 장비 CRUD B모델 · 이벤트 카드 220×200 뒤집기 · 조치보고 원본 썸네일 150×110 · 문구 PRD v1.1(840×640·드래그 정렬·빈 목록+직접입력) · 탐지 신호 이력 우클릭 2종+팝업 · 억제 반복 요약 문구·진행중≠억제중 · 자동 조치 타이머(Path A/B) 범위 밖.
+  - **🔲 이벤트 결정 E-D1~8**: 요약 탭+차트보기→개요 · 기간 바→칩 · 추가·저장→⋯ 메뉴(주 액션 조치보고) · 조치 기록 칸 신설(조회 범위 서버 확인) · 조치보고 Float · 탐지 신호 이력 팝업 유지 · 억제 스케줄 레일 편입+서랍 · 드로어 일괄 버튼 아이콘.
+- **➕ 이벤트 2차 보강(2026-09-14, 사용자 지적 "Datachart 제어기 파트·도넛 사라짐 / 카드 탐지 스냅샷 누락" + "속성 수정 가능/불가 구분 · 중복 조치보고 묶음 · 우클릭 조치내역 보기 · 이벤트는 수정 말고 추가")**:
+  - **차트 실측 정정**: 센서 이벤트 탭 `EventInfoView.xaml` = 제어기별 `ColumnSeries`(X=`by_device.controllers[].ControllerName`) + 유형 `PieChart`(InnerRadius 없음) · 카메라 탭 = KPI 3 · `차트보기` = trend 라인 5계열(`ChartHelper.cs:149-151`). 앞 판 E-3 "같은 추이 두 벌"은 오기. `by_device.cameras[]` 는 응답에 오지만 미사용.
+  - **조치 1:N 실측(Explore 에이전트)**: 중복 조치 허용됨(`DetectionHistoryDialogViewModel.cs:675-678` 08-06 차단 제거) · `GET /events/{detections|malfunctions}/{id}/actions` 존재·미사용(`EventApiService.cs:686-712`) · 우클릭 = `조치보고` 하나 · 저장 DTO allow-list(`DtoToModelHelper.cs:183-260`)에 탐지 `상태` 없음 → 콤보 수정 무반영 · 신호/AI/고장 구간/조치 사용자 수정 가능.
+  - **반영**: 분석 E-3·E-4 재작성 + E-9 신설 · §11-3 개요 4카드 표 · §11-9 편집 경계표 · §11-10 조치 1→N · 결정 E-D9~13. 목업: 개요 4카드(호버·드릴다운·로딩) · 드로어 카드 v3(스냅샷 칸) · 목록 미니 스냅샷 · 상세 편집 상자+변경 막대 · 조치 타임라인 · 우클릭 메뉴 · 조치 내역 Float · `#ev-edit` 절. 백업 = 스크래치 `storyboard_backup_before_evcharts.html`.
+- **정정(2026-09-14, 사용자)**: 장애 **고장 구간 = 제어기 루프 선 위 지점**(RS485/IP 2가닥, 1차로 나가 2차로 들어옴), 시각 아님. 목업 예시값을 정수 위치(1차 4→5 · 2차 11→12, 0=해당 없음)로 바꾸고 상세를 위치 막대로, 분석 §11-9 행 + 주석 수정. 미확인: 2차 번호 기준 · 루프 길이 출처.
+- **➕ 카메라 탐지 융합(2026-09-14, 사용자 "카메라 탐지 이벤트까지 차트에 잘 융화")**: 실측 — 카메라 탐지=AI 탐지(`CameraStatsDto` "카메라별 AI 탐지 집계", 객체 label person/vehicle/animal·confidence), 서버 summary/trend/daily_averages/active_devices 는 sensor/camera 분리 제공, by_device 는 controllers(카메라 탐지 없음)·cameras(카메라 탐지만), 앱은 별도 탭 KPI 3 + 파이 합산 + 추이 빨강 독립선. 설계 — 5계열(센서·카메라·장애·연결·조치), 카메라=주황+빗금(선 점선), 칩 "탐지" 묶음, 도넛 5조각+탐지 묶음 호, 장비별 [제어기|카메라] 탭, 탐지 출처 비교 카드(카메라 열=KPI 3), 목록 출처 칩+AI 꼬리표+신뢰도, 객체 분류 "제안". 분석 §11-3 규칙 절 + E-D14·15, 목업 패치(백업 `storyboard_backup_before_camera.html`).
+- **🔲 다음**: 결정(L-D1~6 · E-D1~15) → Surface Kernel PRD 에 레이아웃 층 FR 편입(또는 별건 PRD) → plan. 미확인: 요약 카드 라벨 `멀티센서`/`복합센서` 불일치(:131/152) · 선언값 합 742 > 카드 700 실제 렌더 잘림 여부.
+
 ## ▶▶ 재개 포인트 (2026-09-09 — DeviceType↔SensorType 분화 분석 완료, **정책 확정 대기**)
 
 **정본**: [`docs/analyses/devicetype-sensortype-split-scenario-analysis.md`](../analyses/devicetype-sensortype-split-scenario-analysis.md)
@@ -75,8 +333,149 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - **🔲 미결 M-1~M-7**: 형상 파싱 폴백 정책(`NONE` 대체) · 팔레트 그룹 진입점 · `IoController`가 Controller냐 Enclosure냐(서버 `EnclosureCreate` 기본값이 `IoController`) ·
   `OpticalCable` 폴백 아이콘 · JSONB 형태 통일/모델 승격 · 장비 축 3값 제거 서버 협의 · `Gate` 서버 카테고리 부재(서버 `EnumDeviceCategory` 6값에 `gate` 없음).
 
-- **🔲 다음**: 정책공백 **G-1~G-9 확정**(특히 G-1 분화방식 · G-2 `IoController` 축 · G-4 `Fence_Group` · G-6 `Cable`) →
-  `openapi.json` 재수집 → PRD → Plan.
+
+### ▷ 📤 부록 C 추가 (2026-09-09, v1.3) — **`type_device` = 카테고리 재정의 · 서버팀 전달용 제안서**
+
+사용자 지시: *"`type_device`에 우리 API의 Device 카테고리로 묶고, 각 장비 종류를 동일 파일명 규칙의 다른 Enum 타입으로 정의 — 서버에 전달할 거니까(서버도 엄청 변경 중)"*
+
+- **판정: 타당하고, 클라가 이미 그 방향으로 드리프트해 있다.** `DeviceProviderService.FetchDeviceByIdAsync:273-291`은
+  이름과 달리 **카테고리 라우터**이고, `"Sensor"`·`"Speaker"`는 **`EnumDeviceType` 멤버가 아니다**(카테고리 문자열 공간에서 동작).
+  `NormalizeTypeDevice:1160-1172`(`"CAMERA"→"IpCamera"`)는 **두 축이 한 필드에 섞인 직접 증거**. 재정의하면 20-case → 7-case.
+- **NATS 실측**: `DetectionNatsSyncService.cs:113-118` `Enum.TryParse<EnumDeviceType>` **실패 시 이벤트를 통째로 버린다**(`return`).
+  파싱 결과 소비처 3곳 중 `DoorStateMachine.HasDoor`·심볼매칭은 **카테고리로 충분/더 정확**하나,
+  **이벤트 카드 한글 라벨은 종류가 필요** → NATS 페이로드에 `type_<category>` **동봉 필수**.
+- **제안 스펙**: 축1 `type_device` = `Controller/Sensor/Camera/Speaker/Enclosure/Lamp/Gate` ·
+  축2 `type_sensor`/`type_camera`/`type_speaker`/`type_controller`/`type_enclosure`/`type_lamp`/`type_gate`
+  (클라 `EnumSensorType.cs` 등 동일 파일명 규칙). 🔴 **`category`→`type_camera` 리네임 중요**(카테고리 축과 이름 충돌).
+  `mode`(EnumCameraMode)는 연결 프로토콜이라 **별개 유지**. 제조사 차이는 **JSONB**(선례 이미 다수).
+- **서버 요청 10건 · 리스크 R-1~R-6**. 🔴 **R-1 전환 순서 고정: ① 클라 이중수용 선배포 → ② 서버 전환 → ③ 레거시 정리.
+  서버 선행 시 탐지 이벤트 전량 소실.**
+- **Q "심볼 Type과 디바이스 Type 분리 문제되나?" → 문제없음.** 끊을 접점 4곳:
+  `PidsSymbolModel.DeviceType`→`Shape` · DP `typeof(EnumDeviceType)`+XAML 36 · `DeviceFilterHelper` 브릿지화 · 복합키.
+  **최대 이득: 서버가 대폭 변경 중인 지금 심볼 도메인이 장비 계약에서 완전 격리된다.**
+
+
+### ▷ 📡 부록 D 추가 (2026-09-09, v1.4) — **NATS 계약 변화 전수**
+
+- **주제(subject)·`cmd` 불변.** 주제는 `{domain}.{group}.{subsystem}.>` + `{domain}.{group}.all.>` 로 **장비 타입이 안 들어간다**
+  (`NatsSetupModel.cs:44-49`, `NatsService.cs:42,90`). 변하는 건 **`body.device` 필드 2개뿐**:
+  `"type_device":"Fence"` → `"type_device":"Sensor", "type_sensor":"Fence"`.
+  `SYNC_DEVICE`는 `resource_id`로 재조회하므로 **종류 불필요**(카테고리만).
+- **파싱 지점 7곳** — 🔴 폐기 2곳(`DetectionNatsSyncService.cs:114`, `MalfunctionNatsSyncService.cs:95` → `return`) ·
+  🟠 1곳(`OperationEventNatsSyncService.cs:77`) · 🟢 4곳(Id 폴백/이미 카테고리 스위치).
+  `Events.Ui/DtoToModelHelper.cs:387-395`는 **이미 카테고리 스위치**(`_ => SensorDeviceModel`) — 단 Speaker/Lamp/Enclosure가
+  SensorDeviceModel 되는 **기존 결함** → 7분기 확장 필요.
+- **신·구 구분 불가 4값**: `Controller`·`Enclosure`·`Lamp`·`Gate`가 구 종류값에도 같은 이름으로 존재.
+  **해석이 같아 무해**하지만 **종류 정보는 손실** → `type_<category>` 동봉이 더 중요. 어댑터는 **카테고리 파싱을 먼저** 시도해야 함.
+- **어댑터**: `TryReadDeviceAxes(JToken device, out EnumDeviceCategory, out string? subType)` 단일 진입점으로 7곳 통합.
+  동반: 복합키 `(Id,Type)`→`(Id,Category)` · `DoorStateMachine.HasDoor`도 카테고리로 · 한글맵 2벌(카테고리축·종류축) 재편.
+- **전환 3단계**: ① 클라 어댑터 배포 → ② 서버 전환(로그 `"DeviceType 파싱 실패"` 0건 확인) → ③ 레거시 제거. **서버 선행 금지.**
+- ⚠ **D-6 즉시 확인 항목**: `BaseDeviceDto.cs:28` 주석이 discriminator로 `"Sensor"`를 들고 `FetchDeviceByIdAsync`가 이미
+  `"Sensor"`·`"Speaker"`를 처리한다 → **서버가 이미 일부 경로에서 카테고리 값을 보내고 있다면 지금도 이벤트가 폐기 중**.
+  운영 로그에서 `DETECTION: DeviceType 파싱 실패` / `MALFUNCTION: DeviceType 파싱 실패` 검색 필요.
+
+
+### ▷ ✅ D-B5 확정 (2026-09-09, v1.5) — **`Enclosure ≠ IoController`**
+
+사용자: *"IoController는 센서웨이의 **접점제어기**다. 여러 접점센서 신호를 받는 제어기 센서. PIR 같은 거 여러 대 연결할 때. 요즘은 잘 안 씀."*
+
+- **`IoController` = Sensor 카테고리**(`type_sensor: "IoController"`), `Enclosure`와 **무관**.
+- **클라 코드는 이미 일치** — `DeviceProviderService.FetchDeviceByIdAsync:279-282`가 `"IoController"`를 **센서 엔드포인트**로 라우팅.
+- 🔴 **서버 `EnclosureCreate.type_device` 기본값 `"IoController"`는 설계 의도가 아니라 결함** → C-4 **요청 11** 신설.
+  설계서 §5.6 L5170(`"Enclosure"`)이 **맞고** §5.5 전체 + openapi 기본값이 틀렸다. A-1-3 함정 1의 성격 정정.
+- **미결 M-3 해소.** 동반 정정: A-1-3 · B-6(형상 브릿지) · B-7 · C-3-3 매핑표.
+
+
+### ▷ 📋 부록 E 추가 (2026-09-09, v1.6) — **카테고리별 종류 enum 값 정리안**
+
+사용자 지시: *"`type_camera`를 Fixed/PTZ/SpeedDome 이렇게 잡고, **이미 식별된 것은 그대로** 하고 각자 정리해봐."*
+(원문 `type_speaker`로 적혔으나 카메라 형상이라 `type_camera`로 해석)
+
+- **확정 22값 — 지금 바로 확정 가능**: Sensor 14(`Multi`…`SmartMultisensor2`+**`IoController`**) · Camera 3(`NONE`/`FIXED`/`PTZ`) · Speaker 4(`NORMAL`/`ADMIN`/`MONITOR`/`DEV`)
+- **신규 1값**: **`SPEED_DOME`** — 선례 있음(dead `Framework\Enums\EnumCameraType.cs:14` **`SPEED_DOM`**, 심볼 `ModelVariant`에 `"Dome"`). 표기는 `SPEED_DOME` 권장
+- 🔴 **제안 10값은 레포·서버 근거 0** — Controller(`SmartController`) · Enclosure(Outdoor/Indoor/Pole) · Lamp(Light/Buzzer/LightBuzzer) · Gate(Swing/Slide/Barrier). **전부 확인 선행 필요**
+- **미결 E-4a**: `IoController`가 Sensor로 가면서 Controller 확정값이 **`Controller` 1개뿐** → **이 축이 지금 필요한지** 서버팀 확인
+  (설계서의 `"MainController"` 유령값 2곳이 과거 구분 수요의 흔적)
+- **미결 E-1a**: `CameraDeviceDto.cs:57-61` 주석의 `FISHEYES`/`THERMAL`이 enum에 없어 **조용히 NONE** → 채택/삭제 확정 필요
+- **미결 E-2a**: 레거시 `Api.Messages\...\SpeakerDeviceDto.cs:65` 주석이 `DIRECTIONAL`/`HORN` — 현행과 정면 모순, 폐기 확인
+- **미결 E-5a/6a/7a**: 함체는 실제 구분축이 환경/방식/크기 중 무엇인지 · 경광등은 **부저 유무**가 축일 가능성(`EnumBuzzerSound` 5종 존재) · 통문은 `link_info` JSONB가 제조사차를 이미 흡수해 **형상축과 역할 중복 여부** 먼저 판정
+- **E-8a 표기 정책**: 카테고리·`type_sensor`는 **Pascal**, `type_camera`/`type_speaker`는 **UPPER_SNAKE** 로 **혼재 수용** + `ignoreCase` 파싱을 계약으로 명문화(전면 통일은 서버 DB 백필 유발)
+- **E-8b**: 종류축과 형상축은 **N:1** — `SmartSensor|SmartSensor2|SmartCompound` 3종류 → 형상 1개(`pids.sensor`), `Cable`/`OpticalCable`은 형상 없음
+
+
+### ▷ 🎯 부록 F 추가 (2026-09-09, v1.7) — **종류축의 정의 + D-B6 `IoController`=Controller 확정**
+
+사용자 질문: *"`type_<장비>`는 같은 카테고리에서 **형상이 다른 모델**을 뜻한다. 카메라가 고정/PTZ/스피드돔이듯 스피커도 혼·필라가 있을 거잖아. 내 분류가 주관적인가? 객관적으로 답해줘."*
+
+- **판정: 주관적이지 않다. 오히려 현행이 무기준이다.** 센서 14값에 **4축이 혼재** — 감지원리(PIR/Laser/Radar/Contact) · 설치매체(Fence/Underground/Cable/OpticalCable) · **제품세대**(SmartSensor/2/Compound/Multisensor2) · 역할(IoController).
+- **4문 판정 기준** 제시: ①동작 분기 ②화면 표현 ③불변(바뀌면 설정이지 종류 아님) ④제조사 독립(아니면 JSONB). **①② 중 1+ 및 ③④ 모두** 통과해야 적격.
+- **채점 결과 핵심 2건**:
+  🔴 **`speaker_type` 4값(NORMAL/ADMIN/MONITOR/DEV)은 형상이 아니라 역할축** — 3D 형상 1개 공유 + 서버 `SpeakerUpdate`로 **변경 가능**(불변성 탈락). 출처가 NATS `EnumBcastDeviceType`.
+  🔴 **`SmartSensor`·`SmartSensor2`·`SmartCompound`는 형상이 동일** — `HousingModels.cs:20`이 셋을 `"sensor"` 하나로 접는다 → 형상 기준으로 **구분 불가**, 제품 세대축.
+- **권고: 3층 분리** — ①형상·기능=`type_<category>` ②역할=별도 필드(`speaker_role`로 현행 4값 이동) ③제조사·세대=**JSONB**.
+  기존 값을 **버리지 않고 제 축으로 옮기므로** "이미 식별된 건 그대로"와 양립. `SmartSensor` 계열은 **이름 제거가 즉시 파손**이라 당장 유지, 장기 정리 후보.
+- **F-6 스피커 형상 후보(💡)**: `Horn`(혼) · `Column`(필라) · `Ceiling` · `Wall` · `Cabinet` — 사용자가 든 "혼, 필라"가 정확히 이 축.
+- **✅ D-B6 (사용자 지시, D-B5 번복)**: **`IoController` = `Controller` 카테고리** (`type_controller: "IoController"`).
+  → 센서 enum의 **역할축 오염 해소**(14→13값) · **미결 E-4a 해소**(Controller 값 1→2로 축 성립).
+  🔴 **이관 5건 발생(라벨 변경 아님)**: ①클라 라우팅 `FetchDeviceByIdAsync:279-282`가 지금 **센서 엔드포인트**로 보냄 → 제어기로
+  ②서버 엔드포인트·데이터 이관 ③`SensorDeviceModel`→`ControllerDeviceModel` ④`DeviceFilterHelper` 후보 목록 ⑤하위 센서 목록 필드 필요 여부.
+  ⚠ ①②는 **동시 전환 필수**(한쪽만 바꾸면 404 또는 오엔드포인트). 부록 D와 같은 **폴백 선배포** 원칙 적용.
+
+
+### ▷ 🤝 서버 협의 5왕복 완료 (2026-09-09, v1.8 부록 G) — **계약 확정 + 신규 결함 2건**
+
+문서 체인(서버 레포 `C:\workspace_python\api-test-server\docs\coordinations\`):
+`REQUEST`(GIS) → `RESPONSE`(서버) → `GIS_REPLY`(GIS) → `RESPONSE2`(서버) → `GIS_REPLY2`(GIS)
+
+- 🔴 **본문 정정 3건**: ① `EnumDeviceCategory` "참조 0건 = 방치"는 **틀림** — 서버가 `SPEC-6.1`로 응답에서 뺐던 것(DB엔 NOT NULL 실재).
+  **"클라 참조 0건"은 "쓸모없다"가 아니라 "받은 적이 없다"일 수 있다** ② 축1 = **선택지 A(`category_device` 정본)** 확정
+  ③ `Gate` 카테고리·`SmartMultisensor2` **이미 서버에 있음** — **openapi 스냅샷(6/22)이 낡았던 것**(현재 6.3.9)
+- 🔴 **신규 결함 2건**:
+  **DF-G1** `SYNC_DEVICE DELETED`+Speaker → `normalized "Speaker"` ≠ `DeviceType.ToString() "IpSpeaker"` → **유령 장비 잔존**.
+  ⚠ 서버가 "센서가 더 나쁘다(1:12)"고 했으나 **재현 안 됨** — `DeviceProviderService.cs:1109` **`"Sensor"` 전용 분기**(Id+`ISensorDeviceModel`)가 이미 있음.
+  → 수정은 **Id 단독 매칭**으로(`devices.id`가 단일 시퀀스라 전역 유일).
+  **DF-G2** 🔴 **`OPERATION_EVENT` 100% 유실 중** — 서버 payload에 `device` 블록이 없어 `type_device`가 `""` → TryParse 실패 → 전량 폐기
+  (`OperationEventNatsSyncService.cs:74-77`). `device_id`는 폴백으로 정상. `type_event="Operation"`은 **이 서비스가 파싱 안 해서 무해**.
+  피해=**심볼 개폐 서버 권위 채널 사망**, `DETECTION` 접점 폴백이 대신 수렴해 **증상이 가려져 있었음**.
+- **확정 계약**: `category_device`(소문자, 정본) × `type_<category>`(파스칼) / 과도기 `type_device`는 **종류값**(→DF-G1 자동 해소) /
+  종류축 **7종 전부 신설** — 센서12·카메라(+`SPEED_DOME`)·제어기(`Controller`·`SmartController`·`IoController`)·`speaker_role`4·`type_speaker`(`Horn`·`Pillar`)·함체(`Outdoor`·`Indoor`)·램프(`Beacon`·`Strobe`·`LedBar`)·통문(`Sliding`·`Swing`·`Barrier`)
+- ★ **배타축만 enum, 가산축은 `hardware_spec`** — `FISHEYE`·`THERMAL`은 enum 아님(**열상 PTZ 실재**). `type_device`가 두 축 겸했던 실수의 일반화된 재발방지책
+- ✅ **GIS 영향 0 확정**: 목록필터 5종 전부 미사용(호출부가 `page`/`limit`만) · `EnumOperationType` 참조 0건(`DoorStateMachine`이 **접미사 `_OPEN`/`_CLOSED`로만** 판정) · `group_device` 0건 · `cameras.mode` **흡수 철회**(ONVIF 게이팅 보존)
+- 🔴 **GIS 영향 확정**: 함체 임계치 6키(`temp_high`…) 다이얼로그 직격 · 통문 `link_info` **상세창 표시 중** · 계정 필드 **카메라·램프 XAML 노출** · `camera_settings` 실사용
+- **GIS 작업**: **G-1(Speaker 삭제 → Id 단독 매칭) 서버 의존 없이 즉시 착수 가능** · G-2 어댑터 · G-6 형상축 분리(서버 Phase 3 안전마진)
+
+- **🔲 다음**: 정책공백 **G-1~G-9 확정**(특히 G-1 분화방식 · ~~G-2 `IoController` 축~~ **해소(D-B6)** · G-4 `Fence_Group` · G-6 `Cable`) →
+  ~~`openapi.json` 재수집~~ **완료(서버 회신)** → PRD → Plan.
+- **🔲 PM 확인 필요**: G-1~G-6 배포 일정 · **스피커 형상 실물**(`Horn`/`Pillar`) · **어안/열화상 실물**
+
+### ▷ ⏸ 대비 분석 완료 + **착수 보류** (2026-09-10) — 사용자: *"일단 서버 다 완료되고 그거 명세서 보고 하자"*
+
+**정본**: [`docs/analyses/server-contract-drift-resilience-analysis.md`](../analyses/server-contract-drift-resilience-analysis.md) v1.0
+(계기: 협의 중 발견한 결함 2건이 **둘 다 무음**이었고 **둘 다 서버가 물어봐서** 발견됨)
+
+- **취약점 34건** — 🔴무음 24 / 🟠예외삼킴 6 / 🟡표면화 4. **표면화되는 건 4건뿐**이다.
+- 🔴 **최우선 = 자기유발 결함**: `FetchDeviceByIdAsync:277-291` 에 **`"IpSpeaker"` 케이스가 없다**
+  (`NormalizeTypeDevice` 도 `"IPSPEAKER"` 미매핑 → 원문 통과 → `_ => null`). 누락 3종: `IpSpeaker`·`SmartMultisensor2`·`Fence_Group`.
+  **우리가 동의한 S-4(과도기 `type_device`를 종류값으로)가 `SYNC_DEVICE`에 적용되는 순간 스피커 동기화 100% 중단**된다.
+  현재는 트리거가 카테고리(`"Speaker"`)를 보내 무사. `OPERATION_EVENT`는 이미 종류값이나 `Enclosure`/`Gate`는 케이스가 있어 무사.
+- 🔴 **`Enum.Parse` 10곳**(`Events.Ui\DtoToModelHelper.cs:32,34,55,57,75,277,279,302,304,324`) — TryParse 아님.
+  **이미 터진 전례**(`NatsEventPublisher.cs:108` 2026-09-07 실측). 예외를 `NatsDomainService.cs:201/235/445` 가 삼켜
+  → **탐지 카드 미생성 + 탐지음 미재생 + RTSP EventCall 미발송**(침입이 화면·소리 모두 조용).
+- 🔴 **`?? "CLOSED"` 3곳**(`Devices.Ui\DtoToModelHelper.cs:397,420,443`) — `null`을 확정 "닫힘"으로 바꿔
+  **"모르면 덮지 않는다" 가드 3곳**(`NatsDomainService.cs:896,907`·`MapViewModel.cs:443`·`SymbolEventManager.cs:88`)을 **전부 통과시킴** → 열린 문을 닫힘으로 덮어씀.
+- **구조적 뿌리**: `ApiMessageHelper.cs:18` **`MissingMemberHandling.Ignore` 전역** → 필드 리네임 경고 0건. 미지값 **Error 로그는 전 코드 2곳뿐**.
+- 기타 주요: `DeviceModelListConverter.cs:53-57`(1건 실패→**배열 전체 null**→심볼 0개) · `user_password` `?? string.Empty` PUT(**서버 자격증명 소거 가능**) ·
+  `PermissionsFlattener.cs:19`(**전례 있음**, 비ADMIN 전 차단) · cmd/subject 리터럴 8종(불일치=무로그 `return`) ·
+  `SpeakerType` 한글변환 **한 번도 동작한 적 없음**(모델이 string이라 `UiKoreanMap` default 낙하, 현재진행형).
+
+**⏸ 결정(2026-09-10)**: **지금 코드 손대지 않는다.** 서버가 Phase 2·3까지 마치고 **명세서를 확정한 뒤** 그 문서를 보고 착수한다.
+
+**▶ 재개 조건 / 재개 시 첫 작업**
+1. 서버 완료 통지 + **갱신된 명세서**(`GOP_Restful_Api_연동설계.md` · `Gop_Message_Broker_연동설계` · `openapi.json`) 수령
+   — ⚠ **`openapi.json` 파일 mtime 반드시 확인**(3개월 낡은 스냅샷으로 오판한 전례)
+2. 명세 확정본과 위 34건을 **대조**해 실제 발생 항목만 추림
+3. 우선순위 1~5(즉시군: `IpSpeaker` 케이스 · Id 단독 매칭 · `Enum.Parse`→TryParse · `?? "CLOSED"` 제거 · 로그 추가) → PRD → Plan → dev
+4. 서버 통지 보류분: *"`SYNC_DEVICE` 종류값 전환 전 GIS 배포 선행 필요"* — 착수 시점에 함께 전달
 - **미완 작업**: 사용자 요청 "장비정보에서 유형 제거"(함체·경광등 포함) — **아직 파일 미수정**.
   6개 패널 그리드 `Header="유형"` + 5개 `*SelectionView` 읽기전용 필드가 대상이고,
   ⚠ `SpeakerSelectionView.xaml:189`의 "유형"은 `SpeakerType`이라 **유지**해야 한다.
@@ -3344,9 +3743,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-47404
+- **현재 세션 ID**: ppid-89612
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-47404
+- **활성 세션 목록**: ppid-89612
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
@@ -4101,3 +4500,164 @@ SIM-O 계열 시나리오 재작성 · 서버팀 회신 4건.
 탐지 이력은 탭이 아니라 **액션 바 버튼**으로 연결(감지센서 한정, 기존 컨텍스트 메뉴와 같은 메서드).
 
 **테스트 936 green**(GMaps.Ui 737 · Housing 152 · PropertyPanel 20 · 개폐배선 27) · 3개 솔루션 빌드 오류 0.
+
+---
+
+### [2026-09-18] 장비 창·이벤트 창 속성 전수 반영 — Swagger + 명세서 교차 검증 (Track A, 코드 무수정)
+
+**사용자 요구**: "특히 장비 관리 창이나 이벤트 창에 속성들이 제대로 표현이 안 되면 안 된다.
+뭐든 내용은 속성 표현이 누락되면 안 되고 실제 그 속성이 API로부터 오는지 명세서와 Swagger를 확인하라."
+
+**Swagger 원본을 새로 확보한 방법** — 앞으로도 이 경로를 쓴다:
+- 리포 `docs/analyses/_openapi_{live,prev,enc,geo,server,snapshot}.json` 6개는 **2026-06-22 자 v6 판**이다 → 대조에 쓰면 안 된다.
+- API 서버의 `contract/v8.0` 에도 OpenAPI 스냅샷이 **없다**(README·manifest·examples 뿐).
+- **FastAPI 앱에서 직접 생성**하는 것이 정본이다:
+  `cd C:\workspace_python\api-test-server && PYTHONUTF8=1 python -X utf8 -c "from app.main import app; app.openapi()"`
+  → **info.version 8.0.1 · paths 153 · schemas 457**. (fastapi 0.137.2 / pydantic 2.13.4 가 전역에 설치돼 있어 venv 불필요.
+  `email-validator` 미설치 경고·`JWT_SECRET_KEY` 기본값 경고는 무해.)
+- 평탄화 인벤토리(597행)를 만들어 `$ref` 를 재귀 해석해 속성·형·필수·설명을 전부 뽑았다.
+
+**대조에서 새로 드러난 사실 5 (앞 기획을 정정한다)**
+1. 통계 계열은 **5개가 아니라 7개** — `sensor_detection`·`camera_detection`·**`alert`(사전 경보/접근)**·`malfunction`·`connection`·`action`·**`operation`**. 사전 경보는 기존 기획 어디에도 없었다.
+2. `summary.total` = **6종 합**(alert 포함, **operation 제외**) — 명세서 §6.7.
+3. 탐지 분류 우선순위는 **`type_event="Alert"` → `alert` 이 카테고리보다 우선** → **카메라가 낸 Alert 은 `camera_detection` 이 아니다**.
+4. `by-device` 는 **4묶음**(`controllers[]`·`cameras[]`·`enclosures[]`·`gates[]`) — 운영 이벤트는 함체·통문 묶음에만 실린다.
+5. 스피커만 종류축이 **2개**(`type_speaker` 형상 + **`speaker_role`** 역할) — `CategorySpecWithExtraAxes.extra_axes` 보유 카테고리는 스피커뿐.
+
+**정본 목업에 반영**(`docs/design/window-layout-system-storyboard.html`, 2,907행 · 적용 전 판본은 `docs/archive/window-layout-system-storyboard-before-v8props-2026-09-18.html`)
+- **이벤트 창**: 계열 5→7(사전 경보 점선+점무늬 · 운영 일점쇄선) · **운영 탭 신설**(사유 11값·심각도 3값·상세 개폐/임계치·관측시각 마이크로초 6자리) · 총계 6종 합 각주 · 탐지 출처 3열 · 장비별 4탭 · 일평균 7 · 탐지 `유형` 열 + `result` enum · **연결 탭은 조치 자리 없앰**(`action_reported` 필드가 응답에 없다).
+- **장비 창**: **통문 카테고리 신설**(v8 7종 중 유일하게 없었다) · 종류축 `AX` 메타데이터(Swagger enum 실값) + `speaker_role` · 상세 **9절**(공통·접속·형상·부품표·상태표·위치·그룹·**설정(맨 밑)**·부가) · `meta.sections` 칩 + `meta.view` · **미수신 파선 박스** · 문 위치 = 부품 상태(`RUNNING` 포함) · 제거 필드 3개 새 자리 이전(`category`→`type_camera`, `mode`→`connection.protocol`, `is_record`→`device_config.modes`) · `by-component` 진입.
+
+**적용 중 발견해 같이 고친 기존 결함 2건**
+- **B-1**: 개요 도넛 범례의 카메라 비율(`13%`)이 둘째 줄로 밀려 **잘려 있었다**. 원인은 수정자 `.lgd.cam` 이 카메라 목록 컴포넌트 `.cam` 에 그리드를 덮인 것 — **특이도가 같고 `.cam` 이 더 뒤에 선언돼 이긴다**. `.lgd.lcam` 으로 개칭.
+  → **교훈**: 이 목업에서 짧은 공통어(`cam`·`wf`·`ctx`)를 수정자 이름으로 쓰면 반드시 충돌한다. 새 클래스는 고유 접두어로 짓는다(이번 것: `ctbl`·`stbl`·`urow`·`metab`·`nores`·`lgx`).
+- **B-2**: 총계에 없는 계열(운영)을 총계 대비 비율로 표시 → 비율 대신 **`제외`** 표기 + 파선 구분선.
+
+**검증**: Playwright 실측(라이트·다크 · 상세 340/480 폭 · 7 카테고리 전부) — **JS 오류 0 · 잘린 텍스트 0 · 패널 가로 넘침 0** ·
+`총계 267 = 128+34+19+9+21+56`(운영 27 제외) ✔ · 추이 polyline 7 · 상세 9절 · 미수신 표본 `GAT-0203` 에서 `meta.view=basic` + 파선 박스 3개.
+부품·상태 표는 상세 **L(480)** 폭에서 5열 전부 들어가고, S/M 에서는 **표 자기 칸 안에서만** 가로 스크롤한다(패널 본문은 안 밀린다).
+
+**문서**: 대조표 정본 = `docs/analyses/gop-api-v8-window-impact-analysis.md` **§9**(9-1~9-9, 608행) ·
+결정·정정 = `docs/analyses/window-layout-redesign-analysis.md` **§13**(E-D16~E-D19 · L-D15~L-D18, 626행) · INDEX 3행 갱신.
+
+**다음**: 결정 승인 대기(A-D1~12 · L-D1~L-D18 · E-D1~E-D19 · W-D1~8) · 검증 대기 U-1~U-8(특히 **U-7 서버 판본** 운영 6.3.2 vs 라이브 8.0.1) · 서버 요청 S-1~S-11.
+
+#### [2026-09-18 정정] `category_device` 는 축이 아니라 **폴리모픽 판별자**
+
+사용자 지적: *"Category Device의 의미를 제대로 모르는 거 같은데 polymorphic용 식별 타입이야."* — **맞다. 내 기술이 틀렸다.**
+직전 작업에서 `category_device` 를 `type_<category>` 와 나란한 **"1축"(사용자가 고르는 선택 축)** 으로 적었다.
+
+**재확인한 근거 3중**
+- **Swagger** `EnumDeviceCategory.description` — *"Device category enumeration (**Polymorphic Discriminator**) / Used for **Joined Table Inheritance** discriminator in Device model. / PRD_Device_Inheritance_Structure_Refactoring.md §8.1"*
+- **Swagger** `{Cat}Create`·`{Cat}Update`·`{Cat}Replace`.`category_device` **7×3 = 21개 전부** — *"**응답 전용** — **경로가 정본**이다. 경로와 같은 값이면 무시하고 `warnings[].READ_ONLY_IGNORED`, 다르면 422 `IMMUTABLE_FIELD`"* (required=False)
+- **명세서** §4.2(*"요청 본문에 실을 필요가 없습니다 — 경로가 정합니다"*) · §3.6:410(*"경로와 다른 값이면 경고가 아니라 422 `IMMUTABLE_FIELD`"*) · §4.2.1:935·§5:1913(*"판별자는 `category_device` 하나이고, 그 안의 제품 종류는 카테고리마다 다른 이름의 축"*) · §3.6 장비 `READ_ONLY_IGNORED` 닫힌 목록 6개에 **"경로와 같은 값의 `category_device`"** 포함(`app/schemas/device.py:DEVICE_READ_ONLY_KEYS`)
+
+**무엇이 달라지는가 (화면 설계)**
+| | 판별자 `category_device` | 종류축 `type_<category>` |
+|---|---|---|
+| 정체 | 그 행이 **어느 타입(테이블)** 인가 | 그 타입 **안의 제품 종류**(속성) |
+| 값 출처 | **URL 경로** (`/api/devices/gates` → `gate`) | 요청 본문 |
+| 쓰기 | 보낼 필요 없음 · 같은 값=무시+경고 · 다른 값=**422 `IMMUTABLE_FIELD`** | POST·PUT **필수**, PATCH `null`=422 |
+| 변경 | **불변** — 카테고리 변경 편집 경로 **없음**(지우고 다시 만듦) | 편집 가능 |
+| 목록 필터 | **없음**(경로가 고정 → 한 목록 모든 행이 같은 값) | 있음 |
+| 쓰임 | 리소스 선택 · 참조 `{id, category_device}`의 **되물을 경로** · `SYNC_DEVICE` **라우팅** · `DeviceGroupMapping` | 목록 열·필터·상세 콤보 |
+| UI | **콤보 금지 · 읽기 전용 배지** | 콤보(값=`/spec`) |
+
+→ **고르는 종류축은 `type_<category>` 하나**다(스피커만 역할축 `speaker_role` 하나 더).
+**같은 성질의 판별자 셋**: `category_device` · `category_event`(`from_event` **Union 판별자** `discriminator='category_event'` — ⚠ **강타입 파싱 금지**, `operation` 추가 시 즉시 예외·라이브 파손 이력, 조치 응답엔 이 키 **없음**) · `category_server`(불변).
+
+**반영**
+- 목업: 판별자 줄을 **읽기 전용 배지 + 계약 문구**로(경로 표시 + 무시/422 규칙 + 되물을 경로·`SYNC_DEVICE` 용도) · 목록에 판별자 열 없앰 · 모델·셀·절 주석 4곳 정정.
+- 문서: 대조표 **§9-1a 신설**(근거 6줄 표 + 판별자/축 대비표 + 판별자 3종) · 결론 **P-6** · 9-1 표 2·3행 · M-7 2곳 · §0 결론 3 · `window-layout-redesign-analysis.md` **13-F** · L-D15 문구.
+- 메모리 `project_device_six_axes_and_component_catalog` 정정(description 포함) — "종류 축이 둘" → "판별자 + 종류축".
+
+**같이 잡은 실제 누수**: 카메라 표본이 **제거된** 옛 필드 `category`(`감시`·`출입`·`통제구역`)를 `cat` 키로 갖고 있어
+**판별자 자리에 `감시` 가 찍히고 있었다**(M-15 의 실사례). 판별자는 **경로에서만** 채우도록 무조건 덮어썼다.
+
+**검증**: Playwright 재실측 — JS 오류 0(패치 중 낸 여는 짝 없는 `)` 1건 즉시 수정) · 7 카테고리 전부 판별자 값 = 경로 값 일치
+(`controller…gate` ↔ `/api/devices/{…}s`) · 상세 9절 유지 · 잘림 0 · 함체/통문 문 위치 부품 상태 불변(`CLOSED`/`OPEN FAULT`/`RUNNING DEGRADED`/`미수신`).
+
+### [2026-09-18] 부품 조립기 · 프리셋 · 프리셋 기반 생성 기획 (Track A, 코드 무수정)
+
+요구: *"제어기 같은 것은 부품을 조립하는 창도 있고 그것을 프리셋으로 정하는 창도 있으면 좋겠다. 그 프리셋을 기반으로 제어기 생성을 하면
+그 구조의 제어기 DTO 혹은 MODEL을 등록할 수 있고 센서도 다른 장비도 마찬가지다."* + *"제어기 속에 부품 조립할 때는 드래그 드롭."*
+
+산출물: `docs/design/device-component-assembly-preset-storyboard.html` (744행, 조립기·프리셋이 **실제로 끌린다**)
+문서: `docs/analyses/window-layout-redesign-analysis.md` **§14**(14-1~14-8, 740행) · INDEX 행 추가 1 + 갱신 1
+
+**API 선확인 4 — 셋은 유리하고 하나는 없다**
+1. ✅ `POST /api/devices/{cat}s` 가 `hardware_spec`(=`components[]`) + `device_config`(=`component_overrides`) 를 **같은 본문에** 받는다
+   → **프리셋 적용 = POST 1건**. 배치 엔드포인트 신설 요청 **불필요**, 실패 시 **부분 생성 없음**.
+2. ✅ 팔레트 원천 = `GET /api/devices/spec` **부품 유형 32종**(`applies_to`·`states`·`commands`·`produces`·`override_params`·`spec`).
+3. ✅ 드래그 중 서버 왕복 **0건**(Draft → 마지막 [등록] 1회) → 드래그 규칙의 "배치 엔드포인트 선확보"가 **구조적으로 충족**.
+4. ❌ **장비 부품 프리셋(템플릿) 리소스가 서버에 0건.** `/api/devices/cameras/{id}/presets` 는 **PTZ 프리셋**(전혀 다른 것)이고,
+   명세서 §87 이 **"서버 부품 조립은 이번 범위 밖"** 이라고 명시 → **클라 보관(D-A1) + S-12 요청**(적용 API 는 불필요 — 기존 POST 로 충분).
+
+**설계를 지배하는 제약 3**
+- **유형 공통 사실 8개는 요청에 실으면 전부 422** — `states`·`commands`·`command_params`·`readable`·`controllable`·`produces`·`critical`·`enabled`(§2415).
+  → 조립기는 카탈로그에서 읽어 **회색 읽기 전용**으로만 보여준다(**입력 컨트롤 자체를 두지 않는다** — 두면 바인딩이 되보낸다).
+  **프리셋도 담지 않는다**(담으면 그 프리셋으로 만든 장비가 전부 첫 POST 에서 422).
+- `key` = `^[a-z][a-z0-9_]*$` · **장비 내 유일**(중복 422) · **계약이 아니라 그 장비의 사실**(함체 `door` vs 통문 `actuator`)
+  → 제안하되 편집 가능, 중복은 즉시 경고 + **등록 차단**, 조회는 늘 `component_type` 으로.
+- `type` 은 `applies_to` 검증(422) → **팔레트를 카테고리로 걸러** 애초에 못 고르게.
+
+**★ 카테고리별 가능 부품이 전혀 다르다 — 제어기는 2종뿐**
+제어기 **2**(`CONTACT_INPUT`·`NETWORK_INTERFACE`) / 센서 8 / 카메라 12 / **함체 15** / 통문 6 / 스피커 3 / 경광등 3.
+사용자 기대와 어긋나는 지점 — **센서는 제어기의 부품이 아니라 별개 장비**(`sensor.controller_id`)다.
+그래서 제어기 조립기가 하는 일은 **접점 채널 N개 + NIC** 배치이고 이게 **결선맵의 접점 채널**과 맞물린다.
+→ **제어기 프리셋의 값은 부품 종류가 아니라 채널 수·번호 규칙**(IO 16채널 = `ci_01`..`ci_16`, `channel` 1..16)
+→ **반복 펼치기**를 조립기 1급 기능으로(16번 끌게 하지 않는다). 드래그는 **위치가 의미를 갖는 조작**에 쓰고,
+   **규칙적 대량 생성**은 펼치기로 — 펼친 결과는 동일한 드래그 대상이라 방침과 충돌하지 않는다(D-A5).
+
+**`enabled` 함정**: `components[].enabled` 는 **422**, `device_config.component_overrides.<key>.enabled` 는 **정본**.
+같은 낱말이 한쪽은 금지·다른 쪽은 정본 → 조립기가 **부품 칸(형상)** 과 **재정의 칸(의도)** 을 화면에서부터 갈라 놓는다.
+
+**결정 D-A1~D-A8**: 클라 보관 · 프리셋은 `category_device`+종류축에 묶음 · 유형 공통/관측 미포함(필수) ·
+**부품 순서는 표시용**(서버 순서 계약 없음 → 정렬만 바꾼 건 미저장 변경으로 세지 않음, **확인 필요**) · 반복 펼치기 ·
+key 제안+편집 가능(필수) · 조립기를 편집에도 재사용하되 **`PATCH` 고정**(`PUT` 은 축 통째 교체라 부품이 조용히 사라진다) ·
+저장 전 **변경 미리보기**(추가·제거 부품 · **함께 지워질 관측** · 바뀔 재정의)(필수).
+
+**검증**(Playwright, 라이트·다크 · 1680/400 폭): JS 오류 **0** · 400px 가로 밀림 **0**(긴 `code` 토큰 줄바꿈 처리) ·
+팔레트 카테고리 필터 정확(2/8/12/15/6/3/3) · 슬롯 드래그 정렬 동작(고스트·삽입선 잔존 0, 미저장 변경 0=D-A4) ·
+팔레트→보드 드롭이 **지정 자리** 삽입 · key 중복 즉시 경고 + 등록 차단 · 반복 펼치기 4→12(`ci_04`..`ci_11`) ·
+프리셋 5종 · 보낼 JSON **금지 필드 0건**.
+
+**다음**: D-A1~D-A8 승인 대기(특히 **D-A4 순서 영속**) · S-12 요청 여부 결정 · 착수 시 결선맵 파트(`device-setup-wiring-storyboard.html`)와 접점 채널 연결.
+
+#### [2026-09-18] 프리셋 리소스 서버 요청 전달 — R-16 · 그리고 §14 누락 보완
+
+요구: *"프리셋 리소스 없다고 서버에게 요청해라."*
+
+**전달 방식**: 별도 문서를 만들지 않고 **기존 러닝 요청 문서에 편입**했다 —
+`docs/coordination/GIS_API_REQUESTS_to_server.md`(오늘 자, 15건 → **16건**). 관례가 이미 있다
+(`GOP_Server_API_<주제>_REQUEST.md` 단발 + `GIS_API_REQUESTS_to_server.md` 러닝 리스트).
+제목 건수·우선순위 표(16행 + FE절차 행)·"확인하지 못한 것"·맺음말까지 함께 갱신했다.
+
+**요청을 쓰다가 요청의 성격이 바뀌었다 — 명세서 §5.0.1(89행)에 두 문장이 있었다.**
+1. *"**프리셋 묶음 저장과 데이터뱅크는 후속 태그다**"* → 서버팀이 **이미 후속 작업으로 잡아 둔 항목**이다.
+   그래서 R-16 은 **신설 제안이 아니라 "예정 형태·일정 확인"**으로 썼다. 14-1 A-4 문구도
+   "없다" → **"아직 없다(예정됨)"** 으로 정정했다.
+2. *"**FE 적용 절차**"* 전문 — 프리셋을 **기존 장비에 적용**할 때 서버가 요구하는 절차가 이미 규정돼 있었다.
+   **§14 초안이 이걸 빠뜨렸다**(신규 생성만 다뤘다). → **14-9 신설**로 보완.
+
+**14-9 — 빠뜨렸던 FE 적용 절차 7항(F-1~F-7)**
+- F-1 짝 맞추기: key 먼저 → 같은 `type` 이 **유일할 때만** 자동 → 여러 개면 **사용자가 짝을 고른다**(없었음)
+- F-2 **가산 적용** = 언급 안 한 부품·설정·관측 **보존**(없었음)
+- F-3 **교체 적용** = 제거할 부품의 **override `null` 을 같은 본문에**(없었음 — 빼면 주인 없는 override 가 남는다)
+- F-4 `connection` 은 **객체 병합**(프리셋이 접속을 안 담아 일치)
+- F-5 필수 입력은 **채운 값만**, 비면 **생략하고 `null` 금지**(`PATCH` 의 null = 삭제라 의미가 정반대)
+- F-6 저장 전 미리보기 — 기존 **D-A8 과 일치** ✅
+- F-7 **같은 값 재적용은 SYNC·감사 0건**(멱등) → 재적용 버튼을 **막지 않는다**(없었음)
+
+**새 결정 2**: **D-A9** 적용 모드 2종 명시([가산]/[교체], 기본 가산) · **D-A10** 짝 맞추기 단계(같은 type 다수면 자동 대응 금지, 드래그로 잇기).
+→ **D-A7(편집 재사용)을 채택하면 F-1~F-3·F-7 은 선택이 아니라 필수**다.
+Q1 미확정 동안에는 **편집 경로를 `PATCH` 로 고정하고 교체 적용을 잠가 둔다** — `PUT` 의 소실 범위를 모르는 채
+교체를 열면 부품이 조용히 사라진다.
+
+**R-16 ⑤ 로 서버에 확인 요청한 2건**(프리셋과 무관하게 지금 필요)
+- Q1 가산=`PATCH` / 교체=`PUT` 인가, 아니면 `PATCH` 안에서 override 명시 `null` 로 교체를 표현하는가.
+  **`PUT` 으로 `hardware_spec` 을 보내면 언급 안 한 부품이 사라지는가**가 핵심.
+- Q2 같은 `type` 이 여러 개일 때 짝 선택 결과로 보내는 것이 **`key` 뿐**인가(= `channel`·`position` 이 달라도 key 가 같으면 같은 부품).
+
+**교훈**: 명세서 §5.0.1 은 산문 단락이라 표·스키마만 훑으면 놓친다. **후속 태그·FE 절차 같은 계약이 단락 안에 박혀 있다** —
+새 기능 기획 전에 그 절의 산문을 끝까지 읽어야 한다(이번에 프리셋 요청서를 쓰다가 우연히 발견했다).

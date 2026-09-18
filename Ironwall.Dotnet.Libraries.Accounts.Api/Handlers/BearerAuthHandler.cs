@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -140,7 +140,8 @@ public class BearerAuthHandler : DelegatingHandler
             if (result.Success && !string.IsNullOrEmpty(result.Data?.AccessToken))
             {
                 // 강제 로그아웃(Clear)이 refresh 진행 중 끼어들었으면(세대 변경) 폐기 세션 부활 차단 → 종단 처리
-                if (_store.SetTokensIfGeneration(gen, result.Data.AccessToken, result.Data.RefreshToken))
+                // session_id 는 refresh 로 회전하지 않는다(§9.2.4) — 서버가 응답에 실어 주면 그 값을 명시 승계한다(없으면 null → 기존 값 유지).
+                if (_store.SetTokensIfGeneration(gen, result.Data.AccessToken, result.Data.RefreshToken, result.Data.SessionId))
                     return RefreshOutcome.Renewed;
                 _log?.Warning("[BearerAuthHandler] refresh 성공했으나 세션 폐기됨(generation 변경) — 부활 차단");
                 return RefreshOutcome.Terminal;

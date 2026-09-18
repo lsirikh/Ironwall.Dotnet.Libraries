@@ -37,10 +37,19 @@ public static class ApiMessageHelper
             if (response.IsSuccessStatusCode)
             {
                 var result = JsonConvert.DeserializeObject<ApiResponse<T>>(content, _jsonSettings);
-                return result ?? ApiResponse<T>.CreateError(
-                    "PARSE_ERROR",
-                    "Failed to parse API response",
-                    "Response deserialization returned null");
+                if (result == null)
+                {
+                    var parseFail = ApiResponse<T>.CreateError(
+                        ApiErrorCodes.ParseError,
+                        "Failed to parse API response",
+                        "Response deserialization returned null");
+                    parseFail.StatusCode = (int)response.StatusCode;
+                    return parseFail;
+                }
+
+                // (§3.3) 성공 경로도 상태코드를 싣는다 — 201(생성됨)과 202(접수·억제)를 가를 유일한 근거다.
+                result.StatusCode = (int)response.StatusCode;
+                return result;
             }
             else
             {
@@ -67,10 +76,13 @@ public static class ApiMessageHelper
         }
         catch (Exception ex)
         {
-            return ApiResponse<T>.CreateError(
-                "INTERNAL_ERROR",
+            // 상태코드는 알 수 있으면 보존한다 — 본문 읽기/역직렬화 예외라도 '무슨 상태였는지'는 분기 근거다.
+            var crash = ApiResponse<T>.CreateError(
+                ApiErrorCodes.InternalError,
                 "Failed to process API response",
                 ex.Message);
+            crash.StatusCode = (int)response.StatusCode;
+            return crash;
         }
     }
 
@@ -87,10 +99,19 @@ public static class ApiMessageHelper
             if (response.IsSuccessStatusCode)
             {
                 var result = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
-                return result ?? ApiListResponse<T>.CreateError(
-                    "PARSE_ERROR",
-                    "Failed to parse API list response",
-                    "Response deserialization returned null");
+                if (result == null)
+                {
+                    var parseFail = ApiListResponse<T>.CreateError(
+                        ApiErrorCodes.ParseError,
+                        "Failed to parse API list response",
+                        "Response deserialization returned null");
+                    parseFail.StatusCode = (int)response.StatusCode;
+                    return parseFail;
+                }
+
+                // (§3.3) 성공 경로도 상태코드를 싣는다.
+                result.StatusCode = (int)response.StatusCode;
+                return result;
             }
             else
             {
@@ -115,10 +136,12 @@ public static class ApiMessageHelper
         }
         catch (Exception ex)
         {
-            return ApiListResponse<T>.CreateError(
-                "INTERNAL_ERROR",
+            var crash = ApiListResponse<T>.CreateError(
+                ApiErrorCodes.InternalError,
                 "Failed to process API list response",
                 ex.Message);
+            crash.StatusCode = (int)response.StatusCode;
+            return crash;
         }
     }
 
@@ -149,7 +172,8 @@ public static class ApiMessageHelper
                     Success = success,
                     Message = message,
                     Data = items,
-                    Pagination = new Defines.Apis.PaginationDto { Total = total }
+                    Pagination = new Defines.Apis.PaginationDto { Total = total },
+                    StatusCode = (int)response.StatusCode   // (§3.3) 성공 경로도 상태코드를 싣는다.
                 };
             }
             else
@@ -175,10 +199,12 @@ public static class ApiMessageHelper
         }
         catch (Exception ex)
         {
-            return ApiListResponse<T>.CreateError(
-                "INTERNAL_ERROR",
+            var crash = ApiListResponse<T>.CreateError(
+                ApiErrorCodes.InternalError,
                 "Failed to process API items list response",
                 ex.Message);
+            crash.StatusCode = (int)response.StatusCode;
+            return crash;
         }
     }
     #endregion
@@ -221,23 +247,51 @@ public static class ApiMessageHelper
 
     #region - 헬퍼 메서드 -
     /// <summary>
-    /// HTTP 상태 코드 → 에러 코드 변환
+    /// HTTP 상태 코드 → 에러 코드 변환 — <b>서버 닫힌 16종</b>(명세 §12.2) 안에서만 고른다.
+    /// <para>
+    /// ⚠ 이 폴백은 <b>봉투가 없는 응답</b>에만 쓰인다(프록시 502, 우리 쪽 타임아웃 합성 504, 비표준 본문).
+    /// 서버 봉투가 오면 <c>error.code</c> 원본이 그대로 쓰인다.
+    /// </para>
+    /// <para>
+    /// <b>종전 결함</b>(실측 2026-09-18, 배포 8.0.1 Swagger <c>ApiErrorResponse.error.code.enum</c> 대조):
+    /// <list type="bullet">
+    ///   <item><b>조어 3개</b> — 422→<c>UNPROCESSABLE_ENTITY</c>(서버는 <c>VALIDATION_ERROR</c>) ·
+    ///         500→<c>INTERNAL_SERVER_ERROR</c>(서버는 <c>INTERNAL_ERROR</c>) · 504→<c>GATEWAY_TIMEOUT</c>(서버 어휘 없음)</item>
+    ///   <item><b>누락 4개</b> — 405·410·413·502 가 전부 <c>UNKNOWN_ERROR</c> 로 떨어져
+    ///         묘비 경로(410 <c>ENDPOINT_REMOVED</c>)를 "모르는 오류"로 표시했다</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <b>410 은 두 코드가 온다</b>(§12.2) — 봉투 없는 410 에는 <c>ENDPOINT_REMOVED</c>(제거된 경로)를 쓴다.
+    /// 배포 실측에서 410 은 전부 <c>ENDPOINT_REMOVED</c> 였고, <c>GONE</c>(보고서 PDF 소실)은
+    /// 서버가 <b>봉투로만</b> 보낸다. 두 코드의 구분은 <see cref="ApiStatusHelper.IsGone"/> /
+    /// <see cref="ApiStatusHelper.IsEndpointRemoved"/> 로 한다.
+    /// </para>
+    /// <para>
+    /// <b>504 만 예외로 클라 로컬 코드</b>(<see cref="ApiErrorCodes.ClientTimeout"/> = <c>"GATEWAY_TIMEOUT"</c>)를 유지한다 —
+    /// 504 는 서버가 아니라 <c>ApiService.BuildExceptionResponse</c> 가 타임아웃에 붙이는 합성 상태이고,
+    /// 로그인 패널이 이 코드로 "요청 시간이 초과되었습니다."를 띄운다(지우면 자격오류 문구로 오표시된다).
+    /// </para>
     /// </summary>
     private static string GetErrorCode(HttpStatusCode statusCode)
     {
         return statusCode switch
         {
-            HttpStatusCode.BadRequest => "BAD_REQUEST",
-            HttpStatusCode.Unauthorized => "UNAUTHORIZED",
-            HttpStatusCode.Forbidden => "FORBIDDEN",
-            HttpStatusCode.NotFound => "NOT_FOUND",
-            HttpStatusCode.Conflict => "CONFLICT",
-            HttpStatusCode.UnprocessableEntity => "UNPROCESSABLE_ENTITY",
-            HttpStatusCode.InternalServerError => "INTERNAL_SERVER_ERROR",
-            HttpStatusCode.ServiceUnavailable => "SERVICE_UNAVAILABLE",
-            HttpStatusCode.GatewayTimeout => "GATEWAY_TIMEOUT",
-            HttpStatusCode.TooManyRequests => "TOO_MANY_REQUESTS",
-            _ => "UNKNOWN_ERROR"
+            HttpStatusCode.BadRequest => ApiErrorCodes.BadRequest,                     // 400
+            HttpStatusCode.Unauthorized => ApiErrorCodes.Unauthorized,                 // 401 (SESSION_REVOKED 는 봉투로만 온다)
+            HttpStatusCode.Forbidden => ApiErrorCodes.Forbidden,                       // 403
+            HttpStatusCode.NotFound => ApiErrorCodes.NotFound,                         // 404
+            HttpStatusCode.MethodNotAllowed => ApiErrorCodes.MethodNotAllowed,         // 405
+            HttpStatusCode.Conflict => ApiErrorCodes.Conflict,                         // 409
+            HttpStatusCode.Gone => ApiErrorCodes.EndpointRemoved,                      // 410 (GONE 은 봉투로만 온다)
+            HttpStatusCode.RequestEntityTooLarge => ApiErrorCodes.PayloadTooLarge,     // 413
+            HttpStatusCode.UnprocessableEntity => ApiErrorCodes.ValidationError,       // 422
+            HttpStatusCode.TooManyRequests => ApiErrorCodes.TooManyRequests,           // 429
+            HttpStatusCode.InternalServerError => ApiErrorCodes.InternalError,         // 500
+            HttpStatusCode.BadGateway => ApiErrorCodes.BadGateway,                     // 502
+            HttpStatusCode.ServiceUnavailable => ApiErrorCodes.ServiceUnavailable,     // 503
+            HttpStatusCode.GatewayTimeout => ApiErrorCodes.ClientTimeout,              // 504 — 클라 로컬(서버 어휘 아님)
+            _ => ApiErrorCodes.UnknownError
         };
     }
     #endregion

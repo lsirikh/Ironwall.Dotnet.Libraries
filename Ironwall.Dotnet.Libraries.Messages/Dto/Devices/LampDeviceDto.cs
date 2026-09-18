@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 
@@ -41,4 +41,61 @@ public class LampDeviceDto : BaseDeviceDto
     /// </summary>
     [JsonProperty("description", Order = 15)]
     public string? Description { get; set; }
+
+    #region - 7.0 축(axis) 쓰기 투영 (FR-09) -
+    /// <summary>
+    /// 7.0 필수 <c>connection</c> — 6.3 평면 <c>ip_address</c>·<c>ip_port</c>·<c>user_name</c>·
+    /// <c>user_password</c> 의 새 자리(<c>LampCreate.required=[number_device,name_device,connection]</c>).
+    /// </summary>
+    /// <remarks>
+    /// setter 는 <b>7.0+ 응답 역투영</b>이다(A-devices D-24) — 응답에 평면 키가 없으므로
+    /// 이 되돌림이 없으면 경광등 IP·포트·계정이 빈 껍데기가 된다.
+    /// </remarks>
+    [JsonProperty("connection", Order = 30, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public ConnectionAxisDto? ConnectionAxis
+    {
+        get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort, UserName, UserPassword);
+        set
+        {
+            if (value == null) return;
+            if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
+            if (value.IpPort is > 0) IpPort = value.IpPort.Value;
+            if (DeviceAxisWrite.NullIfEmpty(value.Credentials?.UserName) is { } u) UserName = u;
+            if (DeviceAxisWrite.NullIfEmpty(value.Credentials?.UserPassword) is { } p) UserPassword = p;
+        }
+    }
+
+    public bool ShouldSerializeConnectionAxis() => UseAxisWrite;
+
+    /// <summary>
+    /// 7.0 <c>type_lamp</c>(<c>EnumLampType</c> = Beacon·Strobe·LedBar·Unknown) — <b>발광 방식</b> 축.
+    /// </summary>
+    /// <remarks>
+    /// 6.3 에 대응 필드가 없어(경광등 고유 컬럼이 색·경보음·점등 동작 enum 3종뿐) 모르면 보내지 않고
+    /// 서버 기본값 <c>Unknown</c> 에 맡긴다. 부저 유무는 여기가 아니라
+    /// <c>hardware_spec.components</c> 의 <c>BUZZER</c> 보유로 표현한다(중복 금지).
+    /// </remarks>
+    [JsonProperty("type_lamp", Order = 31, NullValueHandling = NullValueHandling.Ignore)]
+    public string? TypeLamp { get; set; }
+
+    public bool ShouldSerializeTypeLamp() => UseAxisWrite && TypeLamp != null;
+
+    /// <summary>7.0+ <c>hardware_spec</c> — 6.3 쓰기 스키마에 없어 축 모드에서만 전송한다(펌웨어 읽기 경로).</summary>
+    [JsonProperty("hardware_spec", Order = 32, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public HardwareSpecDto? HardwareSpec
+    {
+        get => HardwareSpecCore;
+        set => HardwareSpecCore = value;
+    }
+
+    public bool ShouldSerializeHardwareSpec() => ShouldSerializeHardwareSpecCore();
+
+    // ── 7.0 에서 제거된 평면 키 ──
+    public bool ShouldSerializeIpAddress() => !UseAxisWrite;
+    public bool ShouldSerializeIpPort() => !UseAxisWrite;
+    public bool ShouldSerializeUserName() => !UseAxisWrite;
+    public bool ShouldSerializeUserPassword() => !UseAxisWrite;
+    #endregion
 }

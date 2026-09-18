@@ -20,6 +20,21 @@ internal static class DevicePermissionGate
     internal static bool CanDelete() => PermissionUiPolicy.Allowed(Resolve(), "devices", EnumPermissionVerb.Delete);
 
     /// <summary>
+    /// 부대 편제 조회 가능 여부 (<c>units:view</c> — 서버 8.0 신설 모듈). 미등록 → true(전체허용).
+    /// </summary>
+    /// <remarks>
+    /// <para>장비 쓰기에 실을 <c>unit_id</c> 를 얻으려면 <c>GET /api/units</c> 를 호출해야 하고 그 표면은
+    /// <c>units:view</c> 로 보호된다. 권한이 없으면 <b>호출 전에</b> 접고(403 왕복 절약) 경고를 남긴다 —
+    /// 그러면 <c>unit_id</c> 가 생략되고 서버가 기본 부대로 귀속시킨다.</para>
+    /// <para>모듈 키는 <see cref="PermissionCatalog.ServerKey(EnumPermissionModule)"/> 로 얻는다(문자열 리터럴 중복 금지).
+    /// 서버 백필이 <c>devices:view</c> 보유 그룹에 <c>units:view</c> 를 함께 켰으므로 정상 배포에서는 통과한다.</para>
+    /// </remarks>
+    internal static bool CanViewUnits()
+        => PermissionUiPolicy.Allowed(Resolve(),
+                                      PermissionCatalog.ServerKey(EnumPermissionModule.Units),
+                                      EnumPermissionVerb.View);
+
+    /// <summary>
     /// IPermissionService IoC lazy 해석. 미등록(오프라인/테스트/DI 미설정) 시 null 반환.
     /// 참고: GMaps.Ui MapViewModel.ResolvePermissionService() 패턴 미러.
     /// </summary>

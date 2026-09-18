@@ -1,7 +1,8 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 
@@ -95,10 +96,14 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 string explain;
                 if (res.Error?.Code == "FORBIDDEN" || res.StatusCode == 403)
                     explain = "권한이 없습니다 — 세션 설정 저장은 ADMIN 전용입니다.";
+                // (FR-06) 날 JSON 대신 정본 포맷터가 만든 사람이 읽는 문장.
+                //   종전 `res.Error?.Details`(압축 JSON 뷰)를 그대로 실어 운영자에게 `[{"field":…}]` 가 노출됐다.
+                //   422 다필드는 전건을 줄바꿈으로, 그 외는 details[].message→error.message→top-level message 순서.
                 else if (res.StatusCode == 422)
-                    explain = $"입력값 제약 위반: {res.Error?.Details ?? res.Error?.Message ?? "값 범위를 확인하세요."}";
+                    explain = $"입력값 제약 위반: {ApiErrorTextHelper.FromFieldErrorsMultiline(res.Error)
+                        ?? ApiErrorTextHelper.Resolve(res.Error, res.Message, "값 범위를 확인하세요.")}";
                 else
-                    explain = $"저장 실패: {res.Error?.Message ?? res.Error?.Code ?? "서버 거부"}";
+                    explain = $"저장 실패: {ApiErrorTextHelper.Resolve(res.Error, res.Message, res.Error?.Code ?? "서버 거부")}";
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "세션 정책", Explain = explain });
             }
@@ -131,7 +136,9 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 AuthMode = d.AuthMode ?? "-";
                 JwtAlgorithm = d.JwtAlgorithm ?? "-";
                 // v6.3 동시성 5키 — 구버전 서버(키 없음)는 기본값 폴백
-                ConcurrencyPolicy = d.SessionConcurrencyPolicy ?? "evict_all";
+                // 서버 기본값은 v6.3 부터 allow(다중 공존)다 — 키 없는 구서버 폴백도 allow 로 둔다.
+                // evict_all 로 폴백하면 조회 실패/구버전에서 화면이 "단일"을 사실처럼 표시해 운영자가 정책을 오인한다.
+                ConcurrencyPolicy = d.SessionConcurrencyPolicy ?? "allow";
                 MaxConcurrentSessions = d.MaxConcurrentSessions ?? 0;
                 SessionSelfReplaceEnabled = d.SessionSelfReplaceEnabled ?? false;
                 SessionHistoryRetentionDays = d.SessionHistoryRetentionDays ?? 0;
@@ -164,7 +171,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     {
         TimeoutHours = 24; RefreshDays = 7; LockoutThreshold = 5; LockoutDurationMinutes = 30; SessionPolicyEnabled = true;
         AuthMode = "(서버 조회 필요)"; JwtAlgorithm = "-";
-        ConcurrencyPolicy = "evict_all"; MaxConcurrentSessions = 0; SessionSelfReplaceEnabled = false;
+        ConcurrencyPolicy = "allow"; MaxConcurrentSessions = 0; SessionSelfReplaceEnabled = false;   // 서버 기본값(v6.3+)
         SessionHistoryRetentionDays = 0; LoginAnomalyEventEnabled = false;
         ServerSettingsAvailable = false;
         ServerStatus = status;
@@ -197,7 +204,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     public bool SessionPolicyEnabled { get => _sessionPolicyEnabled; set { _sessionPolicyEnabled = value; NotifyOfPropertyChange(() => SessionPolicyEnabled); } }
 
     // ── v6.3 동시성 5키 ──
-    private string _concurrencyPolicy = "evict_all";
+    private string _concurrencyPolicy = "allow";   // 서버 기본값(v6.3+ session_default_allow)
     public string ConcurrencyPolicy { get => _concurrencyPolicy; set { _concurrencyPolicy = value; NotifyOfPropertyChange(() => ConcurrencyPolicy); NotifyOfPropertyChange(() => IsAllowPolicy); } }
 
     private int _maxConcurrentSessions;

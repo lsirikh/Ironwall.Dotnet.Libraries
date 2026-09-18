@@ -1,5 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    DEPRECATED (사문 프로젝트) — 이 어셈블리의 타입을 using 하는 .cs 는 레포에 0건이다.
+    Events.Ui.csproj 가 프로젝트 참조만 남겨 두었고(코드 사용 없음), 메인 솔루션
+    Dotnet.Monitoring.Solution.sln 이 솔루션 멤버로 나열한다.
+    정본: Ironwall.Dotnet.Libraries.Messages (봉투 = Defines/Apis, 문구 = Helpers/ApiErrorTextHelper).
+    신규 코드는 정본만 쓴다. 제거 절차(권고): ① Events.Ui.csproj 참조 삭제
+    ② Dotnet.Monitoring.Solution.sln 프로젝트 항목 삭제 ③ 폴더 삭제.
+  -->
+
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>

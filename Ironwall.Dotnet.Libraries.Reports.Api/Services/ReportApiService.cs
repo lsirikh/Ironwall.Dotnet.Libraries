@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
@@ -155,7 +155,25 @@ public class ReportApiService : IReportApiService
         try
         {
             var p = new Dictionary<string, string> { ["page"] = page.ToString(), ["limit"] = limit.ToString() };
-            if (!string.IsNullOrEmpty(status)) p["status"] = status;
+
+            // status 는 v8.0 부터 닫힌 어휘 5종이다(실측 8.0.1: ?status= · ?status=completed · ?status=BOGUS 전부 422).
+            //   ① 빈 값·null 은 "필터 없음" → 파라미터를 붙이지 않는다(빈 문자열은 필터 없음이 아니라 422 다)
+            //   ② 소문자는 대문자로 올려 보낸다(서버는 대소문자를 관용하지 않는다)
+            //   ③ 어휘 밖이면 왕복 없이 실패로 돌려준다 — 조용히 전체 목록을 주면 "필터가 걸린 줄" 알고 오판한다
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var normalized = ReportGenerationStatus.Normalize(status);
+                if (normalized is null)
+                {
+                    _log?.Warning($"[{nameof(GetGenerationsAsync)}] 허용되지 않는 status='{status}' — 요청을 보내지 않았다(허용: {string.Join(", ", ReportGenerationStatus.All)}).");
+                    return ApiListResponse<ReportGenerationDto>.CreateError(
+                        "VALUE_NOT_ALLOWED",
+                        $"상태 필터 값이 올바르지 않습니다(허용: {string.Join(", ", ReportGenerationStatus.All)}).",
+                        $"status='{status}'");
+                }
+                p["status"] = normalized;
+            }
+
             var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations", p);
             return await res.ToApiListResponseAsync<ReportGenerationDto>();
         }
@@ -208,17 +226,24 @@ public class ReportApiService : IReportApiService
         }
     }
 
-    public async Task<ApiResponse<object>> CancelGenerationAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<ReportCancelResultDto>> CancelGenerationAsync(int id, CancellationToken token = default)
     {
         try
         {
             var res = await _apiService.PostRequestAsync($"{_setupModel.Url}/reports/generations/{id}/cancel", new { });
-            return await res.ToApiResponseAsync<object>();
+            var parsed = await res.ToApiResponseAsync<ReportCancelResultDto>();
+
+            // 400 = 이미 종결된 생성(COMPLETED/FAILED/CANCELLED)을 취소하려 한 경우(§10.4.7).
+            //   서버 사유가 error.message 에만 실리므로 문구는 ApiErrorTextHelper 가 결정한다 — 여기서는 로그만 분화.
+            if (!parsed.Success && (int)res.StatusCode == 400)
+                _log?.Warning($"[{nameof(CancelGenerationAsync)}] 400 — 이미 종료된 생성이라 취소할 수 없다(id={id}): {parsed.ErrorText()}");
+
+            return parsed;
         }
         catch (Exception ex)
         {
             _log?.Error($"[{nameof(CancelGenerationAsync)}] {ex.Message}");
-            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"생성 취소 실패(id={id})", ex.Message);
+            return ApiResponse<ReportCancelResultDto>.CreateError("INTERNAL_ERROR", $"생성 취소 실패(id={id})", ex.Message);
         }
     }
 
@@ -249,15 +274,30 @@ public class ReportApiService : IReportApiService
             var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations/{id}/download");
             if (!res.IsSuccessStatusCode)
             {
-                // v6.0: 410 파일 소실 / 404 없음 / 400 미완료 분화 (NOTIFY §1-2)
-                var msg = (int)res.StatusCode switch
+                // 파일 엔드포인트지만 실패 본문은 표준 오류 봉투다 → 파싱해서 사유를 살린다.
+                var err = await res.ToApiResponseAsync<object>();
+                var code = (int)res.StatusCode;
+
+                // 410 은 "레코드는 있는데 PDF 파일만 사라짐" — 재생성이 유일한 해결이다.
+                //   기계 판독은 error.details.error_code(v8.0) 또는 error.message.error_code(v7.0 객체 판본).
+                //   ApiError.DetailsErrorCode 가 그 두 자리를 순서대로 본다 → 판본 무관 분기.
+                var subCode = err.Error?.DetailsErrorCode;
+                if (code == 410 || string.Equals(subCode, ReportErrorCode.PdfFileMissing, StringComparison.Ordinal))
                 {
-                    410 => "PDF가 서버에서 소실되었습니다. 보고서를 다시 생성해 주세요.",
-                    404 => "PDF 파일이 없습니다. 보고서를 다시 생성해 주세요.",
+                    _log?.Warning($"[{nameof(DownloadPdfAsync)}] {code} {ReportErrorCode.PdfFileMissing} — PDF 파일 소실(id={id}): {err.ErrorText()}");
+                    return ReportPdfResult.Fail("PDF 파일이 서버 저장소에서 사라졌습니다. 보고서를 다시 생성해 주세요.");
+                }
+
+                // v6.0: 404 없음 / 400 미완료 분화 (NOTIFY §1-2). 404 는 두 사유(레코드 없음 / PDF 경로 없음)를
+                //   서버가 문장으로 구분하므로 서버 문구를 우선 노출한다.
+                var fallback = code switch
+                {
+                    404 => "보고서를 찾을 수 없거나 PDF 파일이 없습니다. 목록을 갱신하거나 다시 생성해 주세요.",
                     400 => "아직 생성이 완료되지 않았습니다. 완료 후 다시 시도하세요.",
-                    _ => $"다운로드 실패(HTTP {(int)res.StatusCode})."
+                    403 => "다운로드 권한이 없습니다(reports:view).",
+                    _ => $"다운로드 실패(HTTP {code})."
                 };
-                return ReportPdfResult.Fail(msg);
+                return ReportPdfResult.Fail(err.ErrorText(fallback));
             }
 
             var bytes = await res.Content.ReadAsByteArrayAsync(token);
@@ -276,24 +316,39 @@ public class ReportApiService : IReportApiService
 
     public async Task<ReportPdfResult> DownloadDetailCsvAsync(int id, string type, CancellationToken token = default)
     {
+        // 어휘 8종 선검증 — 어휘 밖이면 서버가 400 을 주지만, 왕복할 이유가 없다.
+        var csvType = ReportDetailCsvType.Normalize(type);
+        if (csvType is null)
+        {
+            _log?.Warning($"[{nameof(DownloadDetailCsvAsync)}] 지원하지 않는 CSV 유형 '{type}' — 요청을 보내지 않았다(허용: {string.Join(", ", ReportDetailCsvType.All)}).");
+            return ReportPdfResult.Fail("지원하지 않는 CSV 유형입니다.");
+        }
+
         try
         {
-            var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations/{id}/detail.csv?type={type}");
+            // 쿼리는 문자열 보간이 아니라 파라미터 사전으로 넘긴다(인코딩은 ApiService 가 한다 — §2.4).
+            var p = new Dictionary<string, string> { ["type"] = csvType };
+            var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations/{id}/detail.csv", p);
             if (!res.IsSuccessStatusCode)
             {
-                var msg = (int)res.StatusCode switch
+                var err = await res.ToApiResponseAsync<object>();
+                // 실측(8.0.1): 잘못된 type → 400 BAD_REQUEST("Unknown type 'x'. Valid: [...]") ·
+                //              type 누락 → 422 MISSING_FIELD(query.type) · 미완료 → 400("Report is not COMPLETED yet").
+                //   400 의 두 사유는 서버 문장으로만 구분되므로 서버 문구를 그대로 노출한다(종전 "생성 미완료" 고정 오안내 제거).
+                var fallback = (int)res.StatusCode switch
                 {
-                    400 => "아직 생성이 완료되지 않았습니다.",
+                    400 => "CSV 를 내려받을 수 없습니다. 보고서 상태와 유형을 확인하세요.",
                     404 => "보고서를 찾을 수 없습니다.",
-                    422 => "지원하지 않는 CSV 유형입니다.",
+                    422 => "요청 파라미터가 누락됐습니다(CSV 유형).",
+                    403 => "CSV 다운로드 권한이 없습니다(reports:view).",
                     _ => $"CSV 다운로드 실패(HTTP {(int)res.StatusCode})."
                 };
-                return ReportPdfResult.Fail(msg);
+                return ReportPdfResult.Fail(err.ErrorText(fallback));
             }
             var bytes = await res.Content.ReadAsByteArrayAsync(token);
             var cd = res.Content.Headers.ContentDisposition;
             var name = (cd?.FileNameStar ?? cd?.FileName)?.Trim('"');
-            if (string.IsNullOrWhiteSpace(name)) name = $"report_{id}_{type}.csv";
+            if (string.IsNullOrWhiteSpace(name)) name = $"report_{id}_{csvType}.csv";
             return ReportPdfResult.Ok(bytes, name);
         }
         catch (Exception ex)

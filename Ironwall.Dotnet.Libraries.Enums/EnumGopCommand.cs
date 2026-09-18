@@ -71,6 +71,17 @@ public enum EnumGopCommand
     // 처리=라이브러리 EventSuppressionSyncNatsService(cmd 문자열 이름매칭, 폴링 가속 전용).
     // 정수는 유일성만. 메인 라우터 Unknown 경고 회피용.
     SYNC_EVENT_SUPPRESSION = 30,
+    // ── 전역(global) 자원 동기화 — 서버 GLOBAL_CMDS ────────────────────────────
+    //  ⚠ 아래 3종은 `sensorway.global.…` 으로 발행된다(부대 토큰이 아님).
+    //     서버 `db_monitor/main.py:64` GLOBAL_CMDS = {SYNC_CATALOG, SYNC_CATEGORY,
+    //     SYNC_ACTION_REPORT_TEMPLATE, SYNC_FILE_GROUP, SYNC_UNIT}.
+    //     정수는 유일성만 갖는다(SYNC_* 라우팅은 이름 기반). 메인 라우터 Unknown 경고 회피용.
+    // 카탈로그(장비유형·카테고리 등) 동기화.
+    SYNC_CATALOG = 31,
+    // 조치보고 문구 템플릿 동기화 (API 6.3 후속 — /reorder 포함).
+    SYNC_ACTION_REPORT_TEMPLATE = 32,
+    // 부대 편제 동기화 (API v8.0 — 배포 대기. 지금은 수신 시 조용히 무시하기 위한 정의).
+    SYNC_UNIT = 33,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

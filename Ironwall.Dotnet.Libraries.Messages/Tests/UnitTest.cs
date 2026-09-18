@@ -2675,8 +2675,25 @@ public class EventDtoRestructureTests
 
         var json = JsonConvert.SerializeObject(dto);
 
-        Assert.Contains("\"device\":{", json);
-        Assert.Contains("\"name_device\":\"센서_1\"", json);
+        // F-01(정정): 계약은 "**모든** 직렬화에서 제외"가 아니라 **"REST 쓰기 경로에서만 제외"** 다.
+        //   처음에 `ShouldSerializeDevice() => false` 로 영구히 껐더니 **NATS 브로커 본문까지 깨졌다** —
+        //   ACTION_REPORT 발행이 같은 DTO 를 태우는데 GIS.md v1.5 는 `from_event.device` 의
+        //   `device_groups`·`geolocation`·`status`·`version`·`controller_id` 를 요구한다.
+        //   ⇒ `SuppressDeviceOnRestWrite` 플래그를 API 서비스가 켜는 방식으로 바꿨다.
+        //   여기서는 플래그를 켜고/끄고 **양쪽**을 단언한다.
+        Assert.Contains("\"device\":{", json);          // 기본(NATS·읽기) — 실린다
+        Assert.Contains("\"name_device\"", json);
+
+        dto.SuppressDeviceOnRestWrite = true;
+        var restJson = JsonConvert.SerializeObject(dto);
+        Assert.DoesNotContain("\"device\":{", restJson);  // REST 쓰기 — 빠진다
+        Assert.DoesNotContain("\"name_device\"", restJson);
+        dto.SuppressDeviceOnRestWrite = false;
+
+        // 객체 모델(읽기 경로)에는 그대로 남아 있다 — ShouldSerialize 는 직렬화만 막는다.
+        Assert.NotNull(dto.Device);
+        Assert.Equal("센서_1", dto.Device!.NameDevice);
+
         Assert.Contains("\"device_description\":\"1구역 센서 2번\"", json);
         Assert.Contains("\"result\":\"THERMAL_SENSOR\"", json);
 
@@ -2760,7 +2777,16 @@ public class EventDtoRestructureTests
         };
 
         var json = JsonConvert.SerializeObject(dto);
+
+        // F-01(정정): "모든 직렬화 제외"가 아니라 **"REST 쓰기 경로에서만 제외"** 다.
+        //   영구히 끄면 NATS 브로커 본문(ACTION_REPORT 의 from_event.device)까지 깨진다.
+        //   `SuppressDeviceOnRestWrite` 플래그를 API 서비스가 켠다 — 양쪽을 단언한다.
         Assert.Contains("\"device\":{", json);
+        dto.SuppressDeviceOnRestWrite = true;
+        Assert.DoesNotContain("\"device\":{", JsonConvert.SerializeObject(dto));
+        dto.SuppressDeviceOnRestWrite = false;
+        Assert.NotNull(dto.Device);   // 객체 모델(읽기 경로)에는 남는다.
+
         Assert.Contains("\"device_description\":\"3구역 센서 1번\"", json);
         Assert.Contains("\"reason\":\"FAULT_FENCE\"", json);
         Assert.Contains("\"detail\":{", json);
@@ -2808,7 +2834,16 @@ public class EventDtoRestructureTests
         };
 
         var json = JsonConvert.SerializeObject(dto);
+
+        // F-01(정정): "모든 직렬화 제외"가 아니라 **"REST 쓰기 경로에서만 제외"** 다.
+        //   영구히 끄면 NATS 브로커 본문(ACTION_REPORT 의 from_event.device)까지 깨진다.
+        //   `SuppressDeviceOnRestWrite` 플래그를 API 서비스가 켠다 — 양쪽을 단언한다.
         Assert.Contains("\"device\":{", json);
+        dto.SuppressDeviceOnRestWrite = true;
+        Assert.DoesNotContain("\"device\":{", JsonConvert.SerializeObject(dto));
+        dto.SuppressDeviceOnRestWrite = false;
+        Assert.NotNull(dto.Device);   // 객체 모델(읽기 경로)에는 남는다.
+
         Assert.Contains("\"device_description\":\"정문 컨트롤러\"", json);
         Assert.DoesNotContain("\"group_event\"", json);
         Assert.DoesNotContain("\"controller\":", json);
@@ -2899,6 +2934,121 @@ public class EventDtoRestructureTests
 
         var malfunction = (MalfunctionEventDto)result.Data.FromEvent;
         Assert.Equal("FAULT_CONTROLLER", malfunction.Reason);
+    }
+
+    // ── F-07: 판별자(category_event) 기반 분기 ─────────────────────────────────
+    //   명세 §6.4 "★ from_event 는 네 이벤트의 Union 이고 판별자는 category_event 입니다"
+    //   (서버 `app/schemas/event.py:860` discriminator='category_event').
+
+    [Fact(DisplayName = "A6.7-3: 판별자 operation → OperationEventDto (reason 만 있어도 장애로 오분류되지 않는다)")]
+    [Trait("Category", "Event")]
+    public void FromEventConverter_ShouldResolveOperation_WhenCategoryEventIsOperation()
+    {
+        // severity 를 일부러 빼서 '구조 추론'으로는 장애가 되도록 만든 입력.
+        //   판별자가 구조를 이겨야 한다.
+        var json = @"{
+            ""id"": 300,
+            ""type_event"": ""Action"",
+            ""content"": ""개폐 확인"",
+            ""user"": ""op1"",
+            ""from_event"": {
+                ""id"": 400,
+                ""category_event"": ""operation"",
+                ""type_event"": ""Operation"",
+                ""reason"": ""GATE_OPEN""
+            }
+        }";
+
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
+
+        Assert.NotNull(dto?.FromEvent);
+        var operation = Assert.IsType<OperationEventDto>(dto!.FromEvent);
+        Assert.Equal("GATE_OPEN", operation.Reason);
+    }
+
+    [Fact(DisplayName = "A6.7-4: 판별자 connection → ConnectionEventDto")]
+    [Trait("Category", "Event")]
+    public void FromEventConverter_ShouldResolveConnection_WhenCategoryEventIsConnection()
+    {
+        var json = @"{
+            ""id"": 301,
+            ""type_event"": ""Action"",
+            ""from_event"": {
+                ""id"": 401,
+                ""category_event"": ""connection"",
+                ""type_event"": ""Connection"",
+                ""device"": { ""id"": 7, ""type_device"": ""Controller"" }
+            }
+        }";
+
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
+
+        Assert.NotNull(dto?.FromEvent);
+        var connection = Assert.IsType<ConnectionEventDto>(dto!.FromEvent);
+        Assert.Equal(401, connection.Id);
+    }
+
+    [Fact(DisplayName = "A6.7-5: 미지 판별자 → 예외 없이 구조 폴백 (VER-03)")]
+    [Trait("Category", "Event")]
+    public void FromEventConverter_ShouldFallBackToShape_WhenCategoryEventIsUnknown()
+    {
+        // 서버가 카테고리 어휘를 늘렸을 때(예: 장래 "systemevent") 목록 로딩이 끊기지 않아야 한다.
+        var json = @"{
+            ""id"": 302,
+            ""type_event"": ""Action"",
+            ""from_event"": {
+                ""id"": 402,
+                ""category_event"": ""future_category_we_do_not_know"",
+                ""type_event"": ""Intrusion"",
+                ""result"": ""RADAR_DETECT""
+            }
+        }";
+
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
+
+        Assert.NotNull(dto?.FromEvent);
+        var detection = Assert.IsType<DetectionEventDto>(dto!.FromEvent);
+        Assert.Equal("RADAR_DETECT", detection.Result);
+    }
+
+    [Fact(DisplayName = "A6.7-6: 판별자 없음(6.3.2) + reason·severity → OperationEventDto")]
+    [Trait("Category", "Event")]
+    public void FromEventConverter_ShouldPreferOperationOverMalfunction_WhenSeverityPresent()
+    {
+        // 운영 6.3.2 응답에는 category_event 키가 없다(원격 스웨거 실측) → 구조 폴백 경로.
+        //   운영은 reason + severity 를 함께 싣는 유일한 카테고리다.
+        var json = @"{
+            ""id"": 303,
+            ""type_event"": ""Action"",
+            ""from_event"": {
+                ""id"": 403,
+                ""type_event"": ""Operation"",
+                ""reason"": ""ENCLOSURE_TEMP_HIGH"",
+                ""severity"": ""WARNING""
+            }
+        }";
+
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
+
+        Assert.NotNull(dto?.FromEvent);
+        var operation = Assert.IsType<OperationEventDto>(dto!.FromEvent);
+        Assert.Equal("WARNING", operation.Severity);
+    }
+
+    [Fact(DisplayName = "A6.7-7: 판별자·구조·type_event 모두 미지 → null (예외 없음)")]
+    [Trait("Category", "Event")]
+    public void FromEventConverter_ShouldReturnNull_WhenNothingIdentifiesTheCategory()
+    {
+        var json = @"{
+            ""id"": 304,
+            ""type_event"": ""Action"",
+            ""from_event"": { ""id"": 404, ""type_event"": ""SomethingBrandNew"" }
+        }";
+
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json);
+
+        Assert.NotNull(dto);
+        Assert.Null(dto!.FromEvent);   // 조치 1건 원본만 미해석 — 목록 전체가 끊기지 않는다.
     }
     #endregion
 }
@@ -4376,6 +4526,11 @@ public class FromEventConverterTests
     public void FromEventConverter_UnknownTypeEvent_ReturnsNull()
     {
         // Arrange — from_event에 알 수 없는 type_event
+        //   ⚠ 표본 변경(F-07): 종전 표본은 "Connection" 이었다. 그러나 명세 §6.4 기준
+        //     `from_event` 는 탐지·장애·**연결**·운영 네 이벤트의 Union 이므로 "Connection" 은
+        //     더 이상 '미지'가 아니다(→ ConnectionEventDto, A6.7-4 에서 단언).
+        //     이 테스트의 의도("모르는 어휘에서도 throw 하지 않고 null")는 그대로 두고
+        //     표본만 실제로 알 수 없는 값으로 바꿨다.
         var json = """
         {
             "id": 2,
@@ -4384,13 +4539,13 @@ public class FromEventConverterTests
             "user": "admin",
             "from_event": {
                 "id": 200,
-                "type_event": "Connection",
+                "type_event": "SomeFutureTypeEvent",
                 "created_at": "2025-01-01T00:00:00Z"
             }
         }
         """;
 
-        // Act — "Connection"은 매핑 대상이 아니지만 throw 하지 않음
+        // Act — 알 수 없는 어휘라도 throw 하지 않음
         var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
 
         // Assert

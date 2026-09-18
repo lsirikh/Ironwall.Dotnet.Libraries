@@ -1,5 +1,6 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -68,7 +69,7 @@ public class ReportPreviewViewModel : BasePanelViewModel
                 _log?.Warning($"[ReportPreview] 다운로드 실패: {result.Error}");
                 // WebView2(네이티브 HwndHost)는 airspace로 같은 창의 WPF 팝업 위에 그려진다 → 앱 InfoPopup이 미리보기 뒤로 깔림.
                 // 미리보기에선 팝업 대신 툴바 인라인 상태로 안내(레이어 충돌 회피). 목록 다운로드는 WebView2 없어 팝업 유지.
-                DownloadStatus = "다운로드 실패 — " + (result.Error ?? "다운로드하지 못했습니다.");
+                DownloadStatus = "다운로드 실패 — " + ApiErrorTextHelper.Or(result.Error, "다운로드하지 못했습니다.");
                 return;
             }
             var dlg = new Microsoft.Win32.SaveFileDialog
@@ -97,7 +98,7 @@ public class ReportPreviewViewModel : BasePanelViewModel
             if (!result.Success || result.Bytes is null)
             {
                 _log?.Warning($"[ReportPreview] CSV 실패: {result.Error}");
-                DownloadStatus = "CSV 실패 — " + (result.Error ?? "다운로드하지 못했습니다.");
+                DownloadStatus = "CSV 실패 — " + ApiErrorTextHelper.Or(result.Error, "다운로드하지 못했습니다.");
                 return;
             }
             var dlg = new Microsoft.Win32.SaveFileDialog

@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
@@ -56,6 +56,22 @@ public class ReportApiModule : Module
                     ctx.ResolveNamed<ApiSetupModel>(_name)
                 ))
                 .Named<IReportApiService>(_name)
+                .AsImplementedInterfaces()
+                .SingleInstance()
+                .WithMetadata("Order", _count);
+
+            // 4. 조치보고 문구 템플릿 API(/api/events/action-report-templates 7경로) 등록.
+            //    ⚠ 보고서(/api/reports/*)가 아니라 이벤트 하위 경로지만, 같은 ApiSetupModel(…/api)과
+            //      같은 Bearer 파이프라인을 쓰므로 여기 함께 올린다(별도 모듈을 만들면 핸들러가 이중 등록된다).
+            //    프로브는 선택 주입 — 미등록이어도 동작하고, 지원 여부 판정은 실제 404 로만 한다.
+            builder.Register(ctx => new ActionReportTemplateApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
+                ))
+                .Named<IActionReportTemplateApiService>(_name)
                 .AsImplementedInterfaces()
                 .SingleInstance()
                 .WithMetadata("Order", _count);

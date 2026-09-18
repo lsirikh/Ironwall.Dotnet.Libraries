@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using Moq;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -440,15 +440,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(
@@ -499,15 +491,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .SetupSequence(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .SetupSequence(EventApiQuery.AnyDetection())
             .ReturnsAsync(page1Response)
             .ReturnsAsync(page2Response);
 
@@ -541,15 +525,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -579,15 +555,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -618,15 +586,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -676,14 +636,7 @@ public class EventProviderServiceTests
         };
 
         mockApiService
-            .Setup(x => x.GetMalfunctionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyMalfunction())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -4435,15 +4388,7 @@ public class InfiniteScrollPaginationTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<int?>(),
-                It.IsAny<int?>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(
@@ -4492,10 +4437,7 @@ public class InfiniteScrollPaginationTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -4524,10 +4466,7 @@ public class InfiniteScrollPaginationTests
         };
 
         mockApiService
-            .Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -4591,10 +4530,7 @@ public class InfiniteScrollPaginationTests
         };
 
         mockApiService
-            .Setup(x => x.GetMalfunctionEventsAsync(
-                It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<int?>(), It.IsAny<int?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(EventApiQuery.AnyMalfunction())
             .ReturnsAsync(apiResponse);
 
         var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
@@ -4864,10 +4800,7 @@ public class EventPanelCancelTokenTests
             () => vm.LoadNextPageAsync(cts.Token));
 
         mockApiService.Verify(
-            s => s.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(),
-                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            EventApiQuery.AnyDetection(),
             Times.Never());
     }
 
@@ -4911,10 +4844,7 @@ public class EventPanelCancelTokenTests
 
         // Assert — cancelled token이면 API 호출이 없어야 함
         mockApiService.Verify(
-            s => s.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(),
-                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            EventApiQuery.AnyDetection(),
             Times.Never());
     }
 
@@ -5008,10 +4938,7 @@ public class EventInfoViewModelCancelTests
 
         // Assert — cancelled token이면 어떤 Fetch API도 호출되지 않아야 함
         mockApiService.Verify(
-            s => s.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(),
-                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            EventApiQuery.AnyDetection(),
             Times.Never());
     }
 

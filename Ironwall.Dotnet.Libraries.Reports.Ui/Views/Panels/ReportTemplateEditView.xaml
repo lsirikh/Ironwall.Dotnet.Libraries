@@ -46,11 +46,16 @@
                     <ItemsControl x:Name="Components">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding Enabled}" Margin="2,3" Foreground="{DynamicResource TextPrimaryBrush}">
+                                <CheckBox IsChecked="{Binding Enabled}" Margin="2,3" Foreground="{DynamicResource TextPrimaryBrush}"
+                                          ToolTip="{Binding Description}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Display}" Foreground="{DynamicResource TextPrimaryBrush}" />
                                         <TextBlock Text="{Binding Category, StringFormat=  ({0})}"
                                                    Foreground="{DynamicResource TextMutedBrush}" />
+                                        <!-- 종류(서버 chart_type) — 같은 이름의 원형/막대/추이를 구분한다 -->
+                                        <TextBlock Text="{Binding ChartTypeLabel, StringFormat=  · {0}}"
+                                                   Foreground="{DynamicResource TextMutedBrush}" FontSize="11"
+                                                   VerticalAlignment="Center" />
                                     </StackPanel>
                                 </CheckBox>
                             </DataTemplate>

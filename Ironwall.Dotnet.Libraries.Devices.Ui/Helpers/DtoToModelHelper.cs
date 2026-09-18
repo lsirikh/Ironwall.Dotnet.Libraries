@@ -112,6 +112,24 @@ public static class DtoToModelHelper
     }
 
     /// <summary>
+    /// 문 위치 스칼라(<c>gate_status</c>·<c>door_status</c>) 정규화 — <b>모르는 것을 <c>CLOSED</c> 로 덮지 않는다</b>.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜</b> — 서버 v2.0 이 문 위치를 스칼라에서 <b>부품 상태</b>로 옮겼다. 8.0.1 라이브 응답 실측
+    /// (2026-09-18, <c>GET /api/devices/gates|enclosures?view=full</c>): <c>gate_status</c>·<c>door_status</c> 키가
+    /// <b>응답에 아예 없다</b>. 값의 새 자리는 <c>device_status.components.&lt;key&gt;.state</c> 이고
+    /// <b>key 는 종류마다 다르다</b> — 함체 <c>door</c>(<c>DOOR_SENSOR</c>) · 통문 <c>actuator</c>(<c>DOOR_ACTUATOR</c>).
+    /// 없는 값을 <c>CLOSED</c> 로 채우면 <b>문이 열려 있어도 화면은 닫힘</b>이고, 개폐 명령이 NATS 로 전환된 지금
+    /// 운용자가 두 번 누른다. 422 도 예외도 없는 조용한 거짓이다.</para>
+    /// <para><b>무엇을 돌려주나</b> — 값이 없으면 <c>CLOSED</c> 가 아니라 <b>빈 문자열</b>(= 모름)이다.
+    /// 모델 프로퍼티가 non-nullable <c>string</c> 이라 null 대신 빈 값으로 표현하며,
+    /// <c>DoorStateMachine.FromServer("")</c> 는 <see cref="Ironwall.Dotnet.Libraries.Enums.EnumDoorState"/>.Unknown 을
+    /// 돌려주므로 지도·3D 개폐 형태는 "닫힘 형태 + '?' 라벨"로 정직하게 그려진다(설계된 경로).</para>
+    /// </remarks>
+    private static string NormalizeDoorScalar(string? raw)
+        => string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
+
+    /// <summary>
     /// String → EnumCameraMode 변환
     /// <para>"ONVIF" → EnumCameraMode.ONVIF</para>
     /// </summary>
@@ -394,7 +412,10 @@ public static class DtoToModelHelper
             DeviceType = ParseDeviceType(dto.TypeDevice),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
-            GateStatus = dto.GateStatus ?? "CLOSED",
+            // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
+            // ⚠ 아직 스칼라만 읽는다. GateDeviceDto 에 device_status(축) 프로퍼티가 없어
+            //   components.actuator.state 를 읽을 통로가 Devices.Ui 에 없다 → DTO 뷰 생기면 우선순위 배선 필요.
+            GateStatus = NormalizeDoorScalar(dto.GateStatus),
             UrlsJson = dto.Urls?.ToString(Newtonsoft.Json.Formatting.None),
             LinkInfoJson = dto.LinkInfo?.ToString(Newtonsoft.Json.Formatting.None),
         };
@@ -417,7 +438,10 @@ public static class DtoToModelHelper
             DeviceType = ParseDeviceType(dto.TypeDevice),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
-            DoorStatus = dto.DoorStatus ?? "CLOSED",
+            // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
+            // ⚠ 스칼라만 읽는다. EnclosureDeviceDto 에 device_status(축) 프로퍼티가 없어
+            //   components.door.state 를 읽을 통로가 Devices.Ui 에 없다 → DTO 뷰 생기면 우선순위 배선 필요.
+            DoorStatus = NormalizeDoorScalar(dto.DoorStatus),
             HeaterEnabled = dto.HeaterEnabled,
             FanEnabled = dto.FanEnabled
         };
@@ -440,7 +464,10 @@ public static class DtoToModelHelper
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
-            DoorStatus = model.DoorStatus ?? "CLOSED",
+            // (쓰기 경로) 6.3 평면 키는 닫힌 어휘(CLOSED·OPEN)라 빈 값은 422 다 — 미상이면 CLOSED 로 채운다.
+            // 읽기와 달리 여기서 CLOSED 를 넣어도 화면 거짓말이 되지 않는다(표시는 모델이 담당).
+            // 7.0+ 에서는 DeviceApiService 가 UseAxisWrite=true 로 켜 이 키 자체를 직렬화하지 않는다.
+            DoorStatus = string.IsNullOrWhiteSpace(model.DoorStatus) ? "CLOSED" : model.DoorStatus,
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled
         };

@@ -239,8 +239,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         startDate = endDate.AddDays(-7);
                     }
 
-                    var detectionTask = _providerService.FetchDetectionEventsAsync(startDate, endDate, cancellationToken);
-                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(startDate, endDate, cancellationToken);
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(startDate, endDate, token: cancellationToken);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(startDate, endDate, token: cancellationToken);
                     var connectionTask = _providerService.FetchConnectionEventsAsync(startDate, endDate, cancellationToken);
                     var actionTask = _providerService.FetchActionEventsAsync(startDate, endDate, cancellationToken);
 

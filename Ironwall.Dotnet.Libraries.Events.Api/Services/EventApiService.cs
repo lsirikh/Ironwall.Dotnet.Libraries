@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Ironwall.Dotnet.Libraries.Api.Models;
@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.Events.Api.Services;
 /****************************************************************************
@@ -37,15 +38,38 @@ public class EventApiService : IEventApiService
     /// <param name="log">로그 서비스</param>
     /// <param name="apiService">HTTP API 클라이언트 서비스</param>
     /// <param name="setupModel">Event API 설정 모델</param>
+    /// <param name="contractProbe">
+    /// 서버 계약 세대 프로브. <c>null</c>(미등록)이면 <see cref="EnumServerContract.V6_3"/> 로 간주한다 —
+    /// 운영이 6.3.2 이므로 틀렸을 때 손해가 가장 작은 쪽이다.
+    /// <para>⚠ <b>동치 비교(==) 금지, 항상 &gt;= 로 판정</b>한다. 판본은 앞으로도 올라간다.</para>
+    /// </param>
     public EventApiService(
         ILogService log,
         IApiService apiService,
-        ApiSetupModel setupModel)
+        ApiSetupModel setupModel,
+        IServerContractProbe? contractProbe = null)
     {
         _log = log;
         _apiService = apiService;
         _setupModel = setupModel;
+        _contractProbe = contractProbe;
     }
+
+    /// <summary>현재 서버 계약 세대. 프로브가 없거나 미확보면 <see cref="EnumServerContract.V6_3"/>.</summary>
+    private EnumServerContract Contract => _contractProbe?.Contract ?? EnumServerContract.V6_3;
+
+    /// <summary>운영 이벤트 카테고리(<c>/api/events/operations</c>)가 있는 판본인가 — 7.0 이상.</summary>
+    private bool HasOperationEvents => Contract >= EnumServerContract.V7_0;
+
+    /// <summary>부대 편제 축(<c>unit_id</c>·<c>include_descendants</c>)이 있는 판본인가 — 8.0 이상.</summary>
+    private bool IsUnitScopedContract => Contract >= EnumServerContract.V8_0;
+
+    /// <summary>
+    /// 탐지 목록에 <c>type_event</c> 쿼리가 있는 판본인가 — <b>8.0 이상</b>(F-22).
+    /// <para>⚠ 부대 축(<see cref="IsUnitScopedContract"/>)과 판정값이 같지만 <b>근거가 다른 축</b>이다 —
+    /// 서버가 둘 중 하나만 옮기면 같이 틀리므로 이름을 분리해 둔다.</para>
+    /// </summary>
+    private bool HasEventTypeFilter => Contract >= EnumServerContract.V8_0;
     #endregion
 
     #region - Implementation of Interface -
@@ -84,7 +108,9 @@ public class EventApiService : IEventApiService
     /// <param name="endDate">종료 일시 (ISO 8601 형식) (선택)</param>
     /// <param name="controller">Controller ID 필터 (선택)</param>
     /// <param name="sensor">Sensor ID 필터 (선택)</param>
-    /// <param name="status">상태 필터 (선택)</param>
+    /// <param name="status">상태 필터 (선택) — 서버 <c>action_reported</c>(bool) 로 매핑된다.</param>
+    /// <param name="result">탐지 결과 필터(<c>EnumDetectionType</c> 어휘). 6.3.2·8.0.1 양쪽 지원.</param>
+    /// <param name="typeEvent">이벤트 종류 필터(<c>EnumEventType</c> 어휘). <b>서버 8.0 이상 전용</b>.</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
@@ -95,10 +121,30 @@ public class EventApiService : IEventApiService
         int? controller = null,
         int? sensor = null,
         string? status = null,
+        string? result = null,
+        string? typeEvent = null,
         int page = 1,
         int limit = 20,
         CancellationToken token = default)
     {
+        // F-22: 닫힌 어휘 파라미터는 **전송 전에** 검증한다 — 서버가 어휘 밖 값에 422 를 내므로
+        //   왕복을 만들 이유가 없고, 실패 사유를 여기서 남겨야 원인이 드러난다.
+        if (!TryNormalizeVocabulary<EnumDetectionType>(result, nameof(result), out var resultQuery, out var resultError))
+            return ApiListResponse<DetectionEventDto>.CreateError("INVALID_ARGUMENT", resultError!, $"result={result}");
+        if (!TryNormalizeVocabulary<EnumEventType>(typeEvent, nameof(typeEvent), out var typeEventQuery, out var typeEventError))
+            return ApiListResponse<DetectionEventDto>.CreateError("INVALID_ARGUMENT", typeEventError!, $"type_event={typeEvent}");
+        // ⚠ `type_event` 는 8.0 신설이다. 6.3.2 로 보내면 FastAPI 가 **조용히 무시**해
+        //   "필터가 걸린 줄 알았는데 전건" 이라는 최악의 침묵 실패가 된다.
+        //   unit_id 선례(경고 후 미전송)와 달리 **여기서는 요청 자체를 실패**시킨다 —
+        //   호출부가 이 필터를 명시했다면 전건 응답은 정답이 아니기 때문이다.
+        if (typeEventQuery != null && !HasEventTypeFilter)
+        {
+            _log?.Warning($"[{nameof(GetDetectionEventsAsync)}] type_event 는 서버 8.0 이상 전용 — 현재 {Contract} 라 요청을 보내지 않음(전건 오인 방지)");
+            return ApiListResponse<DetectionEventDto>.CreateError(
+                "NOT_SUPPORTED",
+                "이벤트 종류(type_event) 필터는 서버 8.0 이상에서만 제공됩니다.",
+                $"contract={Contract}, type_event={typeEventQuery}");
+        }
         try
         {
             var parameters = new Dictionary<string, string>();
@@ -107,8 +153,22 @@ public class EventApiService : IEventApiService
             // PRD v2.1 서버 계약: 장치 필터 = device_id 단일(구 controller/sensor/type_device 제거 — detections.py:213).
             // 구명 "sensor"는 FastAPI가 조용히 무시해 전체 데이터가 반환되던 실버그(2026-08-06 그룹 탐지 이력 B2/B3 근원).
             if (sensor.HasValue) parameters.Add("device_id", sensor.Value.ToString());
-            // controller/status는 현 서버에 대응 파라미터가 없음(status의 서버측 이름은 result/action_reported).
-            // 죽은 파라미터를 보내지 않도록 제거 — 재도입 시 서버 계약명으로 매핑할 것.
+            // F-22: `status` 인자를 서버 계약명 `action_reported` 로 **매핑**한다(종전에는 받고 버렸다).
+            //   근거 — 이 도메인에서 이벤트의 "status" 는 `EnumTrueFalse` 로 표현되는 **조치보고 여부**다
+            //   (`DetectionEventModel.Status`). 서버는 `action_reported: Optional[bool]` 로 받고
+            //   **6.3.2·8.0.1 양쪽 모두** 이 쿼리를 지원한다(스웨거 실측) — 판본 분기가 필요 없다.
+            //   ⚠ bool 로 확정되지 않는 값은 **보내지 않는다**(서버가 422 를 낸다).
+            if (TryToServerBool(status, out var actionReportedFlag))
+                parameters.Add("action_reported", actionReportedFlag);
+            else if (!string.IsNullOrWhiteSpace(status))
+                _log?.Warning($"[{nameof(GetDetectionEventsAsync)}] status 값을 action_reported(bool)로 해석할 수 없어 전송하지 않음");
+            // F-22: 탐지 결과 필터. **6.3.2·8.0.1 양쪽 지원**(스웨거 실측) — 판본 게이트 없음.
+            //   ⚠ 빈 값은 붙이지 않는다(서버 어휘가 닫히는 중이라 빈 문자열은 422).
+            if (resultQuery != null) parameters.Add("result", resultQuery);
+            // F-22: 이벤트 종류 필터 — 위에서 8.0 게이트를 통과한 경우에만 값이 존재한다.
+            if (typeEventQuery != null) parameters.Add("type_event", typeEventQuery);
+            // controller: 서버에 대응 파라미터가 없다(v7.0 에서 장치 필터가 device_id 단일로 통합됐다).
+            //   죽은 파라미터는 보내지 않는다 — FastAPI 가 조용히 무시해 "필터가 걸린 줄 알았는데 전건"이 된다.
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
@@ -155,8 +215,17 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/detections", dto);
-            return await response.ToApiResponseAsync<DetectionEventDto>();
+            // ⚠ REST 본문에서만 응답 전용 `device` 를 뺀다(F-01).
+            //    ShouldSerialize 로 영구히 끄면 **NATS 발행 본문까지** 깨진다 —
+            //    ACTION_REPORT 가 같은 DTO 를 태우고 GIS.md 는 from_event.device 를 요구한다.
+            //    같은 객체가 이후 발행에 재사용될 수 있으므로 finally 로 반드시 되돌린다.
+            if (dto != null) dto.SuppressDeviceOnRestWrite = true;
+            try
+            {
+                var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/detections", dto);
+                return MapMissingDevice(await response.ToApiResponseAsync<DetectionEventDto>(), dto?.DeviceId ?? 0);
+            }
+            finally { if (dto != null) dto.SuppressDeviceOnRestWrite = false; }
         }
         catch (Exception ex)
         {
@@ -241,6 +310,7 @@ public class EventApiService : IEventApiService
     /// <param name="endDate">종료 일시 (ISO 8601 형식) (선택)</param>
     /// <param name="controller">Controller ID 필터 (선택)</param>
     /// <param name="sensor">Sensor ID 필터 (선택)</param>
+    /// <param name="reason">장애 사유 필터(<c>EnumFaultType</c> 어휘). 6.3.2·8.0.1 양쪽 지원.</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
@@ -250,10 +320,14 @@ public class EventApiService : IEventApiService
         string? endDate = null,
         int? controller = null,
         int? sensor = null,
+        string? reason = null,
         int page = 1,
         int limit = 20,
         CancellationToken token = default)
     {
+        // F-22: 닫힌 어휘(`EnumFaultType`)를 전송 전에 검증한다 — 어휘 밖이면 왕복 없이 실패.
+        if (!TryNormalizeVocabulary<EnumFaultType>(reason, nameof(reason), out var reasonQuery, out var reasonError))
+            return ApiListResponse<MalfunctionEventDto>.CreateError("INVALID_ARGUMENT", reasonError!, $"reason={reason}");
         try
         {
             var parameters = new Dictionary<string, string>();
@@ -261,6 +335,9 @@ public class EventApiService : IEventApiService
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
             // PRD v2.1 서버 계약: 장치 필터 = device_id 단일(malfunctions.py:208) — detections 동일 계열 잠복 함정 정리(버그헌트 E4)
             if (sensor.HasValue) parameters.Add("device_id", sensor.Value.ToString());
+            // F-22: 장애 사유 필터. **6.3.2·8.0.1 양쪽 지원**(스웨거 실측) — 판본 게이트 없음.
+            //   ⚠ 빈 값은 붙이지 않는다(서버 422 방지).
+            if (reasonQuery != null) parameters.Add("reason", reasonQuery);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
@@ -307,8 +384,17 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/malfunctions", dto);
-            return await response.ToApiResponseAsync<MalfunctionEventDto>();
+            // ⚠ REST 본문에서만 응답 전용 `device` 를 뺀다(F-01).
+            //    ShouldSerialize 로 영구히 끄면 **NATS 발행 본문까지** 깨진다 —
+            //    ACTION_REPORT 가 같은 DTO 를 태우고 GIS.md 는 from_event.device 를 요구한다.
+            //    같은 객체가 이후 발행에 재사용될 수 있으므로 finally 로 반드시 되돌린다.
+            if (dto != null) dto.SuppressDeviceOnRestWrite = true;
+            try
+            {
+                var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/malfunctions", dto);
+                return MapMissingDevice(await response.ToApiResponseAsync<MalfunctionEventDto>(), dto?.DeviceId ?? 0);
+            }
+            finally { if (dto != null) dto.SuppressDeviceOnRestWrite = false; }
         }
         catch (Exception ex)
         {
@@ -438,8 +524,17 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/connections", dto);
-            return await response.ToApiResponseAsync<ConnectionEventDto>();
+            // ⚠ REST 본문에서만 응답 전용 `device` 를 뺀다(F-01).
+            //    ShouldSerialize 로 영구히 끄면 **NATS 발행 본문까지** 깨진다 —
+            //    ACTION_REPORT 가 같은 DTO 를 태우고 GIS.md 는 from_event.device 를 요구한다.
+            //    같은 객체가 이후 발행에 재사용될 수 있으므로 finally 로 반드시 되돌린다.
+            if (dto != null) dto.SuppressDeviceOnRestWrite = true;
+            try
+            {
+                var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/connections", dto);
+                return MapMissingDevice(await response.ToApiResponseAsync<ConnectionEventDto>(), dto?.DeviceId ?? 0);
+            }
+            finally { if (dto != null) dto.SuppressDeviceOnRestWrite = false; }
         }
         catch (Exception ex)
         {
@@ -713,11 +808,16 @@ public class EventApiService : IEventApiService
     #endregion
 
     #region - Detection Log -
-    public async Task<ApiListResponse<DetectionEventDto>> GetDetectionLogsAsync(
+    public async Task<ApiListResponse<DetectionLogDto>> GetDetectionLogsAsync(
         string? startDate = null,
         string? endDate = null,
         int page = 1,
         int limit = 20,
+        int? deviceId = null,
+        bool? actionReported = null,
+        string? result = null,
+        int? unitId = null,
+        bool? includeDescendants = null,
         CancellationToken token = default)
     {
         try
@@ -725,31 +825,225 @@ public class EventApiService : IEventApiService
             var parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
+            // F-18: 서버가 **6.3.2 부터** 받는 필터 3종 — 종전에는 전건을 받아 클라에서 후필터했다.
+            if (deviceId.HasValue) parameters.Add("device_id", deviceId.Value.ToString());
+            // ⚠ 소문자 bool 로 보낸다(서버 Optional[bool] — 다른 표기는 422).
+            if (actionReported.HasValue) parameters.Add("action_reported", actionReported.Value ? "true" : "false");
+            if (!string.IsNullOrWhiteSpace(result)) parameters.Add("result", result);
+            // ⚠ 부대 축은 **8.0 이상에서만 전송**한다. 6.3.2·7.0.1 에는 이 쿼리가 없어
+            //    조용히 무시되고 "부대로 걸렀는데 전건" 이라는 최악의 침묵 실패가 된다.
+            if (IsUnitScopedContract)
+            {
+                if (unitId.HasValue) parameters.Add("unit_id", unitId.Value.ToString());
+                if (includeDescendants.HasValue) parameters.Add("include_descendants", includeDescendants.Value ? "true" : "false");
+            }
+            else if (unitId.HasValue || includeDescendants.HasValue)
+            {
+                _log?.Warning($"[{nameof(GetDetectionLogsAsync)}] unit_id/include_descendants 는 서버 8.0 이상 전용 — 현재 {Contract} 라 전송하지 않음");
+            }
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/detection-logs", parameters);
-            return await response.ToApiListResponseAsync<DetectionEventDto>();
+            // F-19: 이 엔드포인트만 actions[] 를 함께 준다 — DetectionEventDto 로 받으면 조용히 버렸다.
+            return await response.ToApiListResponseAsync<DetectionLogDto>();
         }
         catch (Exception ex)
         {
             _log?.Error($"[{nameof(GetDetectionLogsAsync)}] Error: {ex.Message}");
-            return ApiListResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", "Failed to get detection logs", ex.Message);
+            return ApiListResponse<DetectionLogDto>.CreateError("INTERNAL_ERROR", "Failed to get detection logs", ex.Message);
         }
     }
 
-    public async Task<ApiResponse<DetectionEventDto>> GetDetectionLogByIdAsync(int eventId, CancellationToken token = default)
+    public async Task<ApiResponse<DetectionLogDto>> GetDetectionLogByIdAsync(int eventId, CancellationToken token = default)
     {
         try
         {
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/detection-logs/{eventId}");
-            return await response.ToApiResponseAsync<DetectionEventDto>();
+            return await response.ToApiResponseAsync<DetectionLogDto>();
         }
         catch (Exception ex)
         {
             _log?.Error($"[{nameof(GetDetectionLogByIdAsync)}] Error: {ex.Message}");
-            return ApiResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get detection log {eventId}", ex.Message);
+            return ApiResponse<DetectionLogDto>.CreateError("INTERNAL_ERROR", $"Failed to get detection log {eventId}", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// 서버가 받는 소문자 bool 문자열로 변환한다(<c>"true"</c>/<c>"false"</c>).
+    /// <para>느슨한 입력("True"/"1")은 받되 <b>bool 로 확정되지 않으면 전송하지 않는다</b> —
+    /// 서버 <c>Optional[bool]</c> 쿼리는 다른 값에 422 를 낸다.</para>
+    /// </summary>
+    private static bool TryToServerBool(string? text, out string value)
+    {
+        value = string.Empty;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var t = text.Trim();
+        if (bool.TryParse(t, out var b)) { value = b ? "true" : "false"; return true; }
+        if (t == "1") { value = "true"; return true; }
+        if (t == "0") { value = "false"; return true; }
+        return false;
+    }
+
+    /// <summary>
+    /// 닫힌 어휘(서버 enum) 쿼리 값을 **전송 전에** 검증하고 서버 표기(정본 enum 이름)로 정규화한다(F-22).
+    /// </summary>
+    /// <typeparam name="TEnum">서버 어휘와 이름이 1:1 대응하는 클라 enum.</typeparam>
+    /// <param name="text">호출부가 준 원시 값. <c>null</c>/공백이면 "필터 없음" 으로 통과시키고 <paramref name="query"/> 는 <c>null</c> 이 된다.</param>
+    /// <param name="parameterName">실패 메시지에 쓸 파라미터 이름.</param>
+    /// <param name="query">전송할 값(정본 enum 이름). 필터가 없으면 <c>null</c>.</param>
+    /// <param name="error">어휘 밖일 때의 한글 실패 사유.</param>
+    /// <returns>전송 가능하면 <c>true</c>. 어휘 밖이면 <c>false</c> — 호출부는 <b>왕복 없이</b> 실패시켜야 한다.</returns>
+    /// <remarks>
+    /// ⚠ 대소문자만 다른 입력은 받아 **정본 표기로 교정**해 보낸다(서버는 정확한 표기만 받는다).
+    /// 숫자 문자열(<c>"5"</c>)은 받지 않는다 — 서버가 문자열 어휘로만 주고받으므로 숫자를 조용히
+    /// enum 으로 승격시키면 호출부의 오타가 "성공한 다른 필터" 로 위장한다.
+    /// </remarks>
+    private bool TryNormalizeVocabulary<TEnum>(
+        string? text, string parameterName, out string? query, out string? error)
+        where TEnum : struct, Enum
+    {
+        query = null;
+        error = null;
+        // 빈 값은 쿼리에 아예 붙이지 않는다 — 서버가 닫힌 어휘로 가는 중이라 빈 값은 422 다.
+        if (string.IsNullOrWhiteSpace(text)) return true;
+
+        var candidate = text.Trim();
+        foreach (var name in Enum.GetNames<TEnum>())
+        {
+            if (!string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase)) continue;
+            query = name;   // 정본 표기로 교정해 전송
+            return true;
+        }
+
+        error = $"'{parameterName}' 값 '{candidate}' 은 서버 어휘({typeof(TEnum).Name}) 밖입니다.";
+        _log?.Error($"[{nameof(TryNormalizeVocabulary)}] {error} 허용값: {string.Join(", ", Enum.GetNames<TEnum>())}");
+        return false;
+    }
+    #endregion
+
+    #region - Operation Event (조회 전용) -
+    /// <inheritdoc/>
+    public async Task<ApiListResponse<OperationEventDto>> GetOperationEventsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int? deviceId = null,
+        string? reason = null,
+        string? severity = null,
+        bool? actionReported = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        if (!HasOperationEvents)
+            return ApiListResponse<OperationEventDto>.CreateError(
+                "NOT_SUPPORTED",
+                "운영 이벤트는 서버 7.0 이상에서만 제공됩니다.",
+                $"contract={Contract}");
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
+            if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
+            if (deviceId.HasValue) parameters.Add("device_id", deviceId.Value.ToString());
+            if (!string.IsNullOrWhiteSpace(reason)) parameters.Add("reason", reason);
+            if (!string.IsNullOrWhiteSpace(severity)) parameters.Add("severity", severity);
+            if (actionReported.HasValue) parameters.Add("action_reported", actionReported.Value ? "true" : "false");
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/operations", parameters);
+            return await response.ToApiListResponseAsync<OperationEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetOperationEventsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<OperationEventDto>.CreateError("INTERNAL_ERROR", "Failed to get operation events", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<OperationEventDto>> GetOperationEventByIdAsync(int id, CancellationToken token = default)
+    {
+        if (!HasOperationEvents)
+            return ApiResponse<OperationEventDto>.CreateError(
+                "NOT_SUPPORTED", "운영 이벤트는 서버 7.0 이상에서만 제공됩니다.", $"contract={Contract}");
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/operations/{id}");
+            return await response.ToApiResponseAsync<OperationEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetOperationEventByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<OperationEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get operation event {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiListResponse<ActionEventDto>> GetOperationActionsAsync(int operationId, CancellationToken token = default)
+    {
+        if (!HasOperationEvents)
+            return ApiListResponse<ActionEventDto>.CreateError(
+                "NOT_SUPPORTED", "운영 이벤트는 서버 7.0 이상에서만 제공됩니다.", $"contract={Contract}");
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/operations/{operationId}/actions");
+            return await response.ToApiListResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetOperationActionsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get actions of operation {operationId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Event Mapping 중복(409) 처리 -
+    /// <summary>
+    /// 이벤트매핑 구성 쓰기의 <b>409 CONFLICT</b> 를 사용자 문구로 바꾼다.
+    /// <para><b>왜</b> — 서버 8.0.1 은 카메라·스피커·경광등 단건 <c>POST</c>/<c>PATCH</c>/<c>PUT</c> 에
+    /// 중복 가드(409)를 넣었다(6.3.2 에는 <c>409</c> 선언이 없어 201 로 중복 행이 생겼다).
+    /// 실패로는 잡히지만(<c>IsSuccessStatusCode</c>) 운영자에게는 서버 영문 원문
+    /// ("Camera 7 is already mapped to event mapping 3 (config id 12)...")이 그대로 노출됐다.</para>
+    /// <para><b>무회귀</b> — 409 가 아니면 응답을 손대지 않는다. 6.3.2 에서는 이 분기가 절대 타지 않는다.</para>
+    /// <para>서버 원문은 <c>Error.Details</c> 에 보존해 진단을 잃지 않는다.</para>
+    /// </summary>
+    private static ApiResponse<T> MapMappingDuplicate<T>(ApiResponse<T> response, string deviceLabel)
+    {
+        if (response.StatusCode != 409) return response;
+
+        var origin = response.Error?.Message;
+        response.Error ??= new ApiError();
+        response.Error.Code = "CONFLICT";
+        response.Error.Message =
+            $"이미 이 이벤트매핑에 연동된 {deviceLabel}입니다. 새로 추가하는 대신 기존 구성을 편집하십시오.";
+        if (!string.IsNullOrWhiteSpace(origin) && string.IsNullOrWhiteSpace(response.Error.Details))
+            response.Error.Details = origin;   // 서버 원문(중복 config id 포함) 보존 — 진단용
+        return response;
+    }
+
+    /// <summary>
+    /// 이벤트 쓰기의 <b>400 BAD REQUEST</b>(= 서버에 없는 <c>device_id</c>)를 사용자 문구로 바꾼다. (F-21)
+    /// <para><b>왜</b> — 이 경로들의 400 은 사유가 하나다: <c>"Device with id {id} not found"</c>
+    /// (본문 검증 실패는 422 로 나온다). 종전에는 이 영문 원문이 운영자에게 그대로 노출됐고,
+    /// 더 나쁜 것은 <b>재시도 가능한 실패로 오인</b>된 점이다 — 장비가 서버에서 지워진 상태라
+    /// 몇 번을 보내도 400 이다.</para>
+    /// <para><b>무회귀</b> — 400 이 아니면 응답을 손대지 않는다. 서버 원문은 <c>Error.Details</c> 에 보존한다.</para>
+    /// </summary>
+    private static ApiResponse<T> MapMissingDevice<T>(ApiResponse<T> response, int deviceId)
+    {
+        if (response.StatusCode != 400) return response;
+
+        var origin = response.Error?.Message;
+        response.Error ??= new ApiError();
+        response.Error.Code = "DEVICE_NOT_FOUND";
+        response.Error.Message = deviceId > 0
+            ? $"서버에 없는 장비입니다(device_id={deviceId}). 재시도해도 같은 결과이니 장비 목록을 다시 동기화한 뒤 진행하십시오."
+            : "서버에 없는 장비입니다. 재시도해도 같은 결과이니 장비 목록을 다시 동기화한 뒤 진행하십시오.";
+        if (!string.IsNullOrWhiteSpace(origin) && string.IsNullOrWhiteSpace(response.Error.Details))
+            response.Error.Details = origin;
+        return response;
     }
     #endregion
 
@@ -884,7 +1178,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras", dto);
-            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
         {
@@ -898,7 +1192,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
         {
@@ -912,7 +1206,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingCameraDto>(), "카메라");
         }
         catch (Exception ex)
         {
@@ -970,7 +1264,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers", dto);
-            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)
         {
@@ -984,7 +1278,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)
         {
@@ -998,7 +1292,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)
         {
@@ -1056,7 +1350,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps", dto);
-            return await response.ToApiResponseAsync<EventMappingLampDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)
         {
@@ -1070,7 +1364,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingLampDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)
         {
@@ -1084,7 +1378,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
-            return await response.ToApiResponseAsync<EventMappingLampDto>();
+            return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingLampDto>(), "경광등");
         }
         catch (Exception ex)
         {
@@ -1202,5 +1496,6 @@ public class EventApiService : IEventApiService
     private readonly ILogService _log;
     private readonly IApiService _apiService;
     private readonly ApiSetupModel _setupModel;
+    private readonly IServerContractProbe? _contractProbe;
     #endregion
 }

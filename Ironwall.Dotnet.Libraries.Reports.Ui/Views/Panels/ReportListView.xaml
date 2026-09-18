@@ -128,7 +128,8 @@
                      Foreground="{DynamicResource PrimaryBrush}"
                      Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+        <!-- 건수 — 서버 pagination.total(v8.0 부터 실제 총계)을 알면 "N건 중 M건 표시"로 절단을 드러낸다 -->
         <TextBlock Grid.Row="2" Margin="2,8,0,0" Foreground="{DynamicResource TextMutedBrush}"
-                   Text="{Binding Items.Count, StringFormat=로드 {0}건}" AutomationProperties.AutomationId="Reports.List.CountText" />
+                   Text="{Binding CountText}" AutomationProperties.AutomationId="Reports.List.CountText" />
     </Grid>
 </UserControl>

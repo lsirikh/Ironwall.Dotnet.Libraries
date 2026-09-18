@@ -1828,28 +1828,34 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 개폐 <b>명령</b>을 서버로 보낸다 — <c>POST /api/devices/{gates|enclosures}/{id}/control</c>.
-    /// <para><b>응답으로 화면 상태를 바꾸지 않는다</b>: 서버는 명령을 NATS 로 전파만 하고 상태는 그대로 둔다.
-    /// 실제 전이는 담당 매니저가 <c>PATCH /{id}/status</c> 로 보고할 때 <c>OPERATION_EVENT</c> 로 돌아온다
-    /// (operation-event PRD v1.5 FR-15). 낙관적으로 열림 처리하면 구동 실패 시 화면이 거짓말을 한다.</para>
+    /// 개폐 <b>명령</b>을 브로커로 직접 발행한다 — NATS <c>GATE_DOOR_SET</c> / <c>ENCLOSURE_DOOR_SET</c>
+    /// (subject <c>{domain}.{부대ID}.all.gate-door</c> / <c>.all.enclosure-door</c>).
+    /// <para>옛 경로 <c>POST /api/devices/{gates|enclosures}/{id}/control</c> 은 <b>서버에서 제거</b>됐다 —
+    /// 운영 6.3.2 는 통문 리소스 자체가 없어 404, 개발 7.0.1/8.0.1 은 410 <c>ENDPOINT_REMOVED</c> 묘비다.
+    /// 브로커 연동설계 v1.6 §7 에 따라 명령은 서버를 거치지 않고 클라 → 구동 담당 매니저 직행이다.</para>
+    /// <para><b>발행 성공으로 화면 상태를 바꾸지 않는다</b>: 명령은 상태를 바꾸지 않는다.
+    /// 실제 전이는 담당 매니저가 <c>PATCH /{id}/component-status</c> 로 보고할 때
+    /// <c>OPERATION_EVENT</c> 로 돌아온다. 낙관적으로 열림 처리하면 구동 실패 시 화면이 거짓말을 한다.</para>
     /// </summary>
     private async Task<bool> SendDoorCommandAsync(int deviceId, EnumDeviceType deviceType, string command)
     {
         if (deviceId <= 0) return false;
         if (!CanControlDevice()) { _log?.Warning($"[RBAC] devices:control 없음 — 개폐 명령 차단: {deviceType}({deviceId})"); return false; }
 
-        var api = ResolveDeviceApiService();
-        if (api is null) { _log?.Warning("[개폐] IDeviceApiService 미해석 — 명령 전송 불가"); return false; }
+        var door = ResolveDoorControlService();
+        if (door is null) { _log?.Warning("[개폐] IDoorControlService 미해석 — 명령 전송 불가"); return false; }
 
         try
         {
-            var ok = deviceType switch
-            {
-                EnumDeviceType.Gate => (await api.ControlGateAsync(deviceId, command)).Success,
-                EnumDeviceType.Enclosure => (await api.ControlEnclosureAsync(deviceId, command)).Success,
-                _ => false,
-            };
-            _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "전송" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
+            // device_description: 명세 필수 필드. 추가 조회 없이 DeviceProvider 스냅샷에서만 만든다(없으면 카테고리 폴백).
+            var dev = DeviceProvider?.FirstOrDefault(d => d.Id == deviceId);
+            var description = Services.DoorControlService.BuildDescription(
+                deviceId, deviceType, dev?.DeviceName, dev?.DeviceNumber ?? 0);
+
+            var ok = await door.PublishDoorCommandAsync(deviceId, deviceType, command,
+                                                        description, CurrentRequestedBy(),
+                                                        _cts?.Token ?? CancellationToken.None);
+            _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "발행" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
             return ok;
         }
         catch (Exception ex)
@@ -1857,6 +1863,17 @@ public partial class MapViewModel : BasePanelViewModel,
             _log?.Error($"[개폐] {deviceType}({deviceId}) {command} 예외: {ex.Message}");
             return false;
         }
+    }
+
+    private Services.IDoorControlService? _doorControlService;
+    private bool _doorControlResolved;
+    private Services.IDoorControlService? ResolveDoorControlService()
+    {
+        if (_doorControlResolved) return _doorControlService;
+        _doorControlResolved = true;
+        try { _doorControlService = IoC.Get<Services.IDoorControlService>(); }
+        catch (Exception ex) { _log?.Warning($"[개폐] IDoorControlService 해석 실패(미등록 가능): {ex.Message}"); }
+        return _doorControlService;
     }
 
     private void ShowDoorIssueInfo(string message)

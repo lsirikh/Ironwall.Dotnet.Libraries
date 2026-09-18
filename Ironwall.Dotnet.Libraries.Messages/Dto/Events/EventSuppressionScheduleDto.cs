@@ -28,6 +28,13 @@ public class EventSuppressionScheduleDto : BaseDto   // id / created_at / update
     [JsonProperty("description", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// 소속 부대 id. 서버 <b>8.0+ 응답에서 <c>required</c></b>, 6.3.2·7.0.1 응답에는 없어 <c>null</c> 이다(읽기 전용).
+    /// <para>8.0 부터 <c>target_type=all</c> 의 사정거리가 "그 부대 + 예하" 로 바뀌므로 UI 문구는 이 값을 참조한다.</para>
+    /// </summary>
+    [JsonProperty("unit_id", Order = 25, NullValueHandling = NullValueHandling.Ignore)]
+    public int? UnitId { get; set; }
+
     /// <summary>대상 모드(배타): device / group / all</summary>
     [JsonProperty("target_type", Order = 4)]
     public string TargetType { get; set; } = "device";
@@ -144,6 +151,16 @@ public sealed class EventSuppressionScheduleUpdateDto
     [JsonProperty("description", Order = 2, NullValueHandling = NullValueHandling.Ignore)]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// 소속 부대 id. <b>서버 8.0 이상에서만 존재하는 키</b>다.
+    /// <para>⚠ <b>계약 세대가 <c>&gt;= EnumServerContract.V8_0</c> 일 때만 값을 넣는다.</b>
+    /// 6.3.2·7.0.1 쓰기 스키마는 <c>extra="forbid"</c> 라 이 키가 실리는 순간 422 <c>extra_forbidden</c> 이고
+    /// 억제 생성·수정이 통째로 죽는다(실측). <c>null</c> 이면 <c>NullValueHandling.Ignore</c> 로 전송되지 않는다 —
+    /// <b>기본값 유지가 곧 6.3.2 무회귀</b>다.</para>
+    /// </summary>
+    [JsonProperty("unit_id", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    public int? UnitId { get; set; }
+
     [JsonProperty("target_type", Order = 3)]
     public string TargetType { get; set; } = "device";
 
@@ -183,6 +200,16 @@ public sealed class EventSuppressionScheduleCreateDto
 
     [JsonProperty("description", Order = 2, NullValueHandling = NullValueHandling.Ignore)]
     public string? Description { get; set; }
+
+    /// <summary>
+    /// 소속 부대 id. <b>서버 8.0 이상에서만 존재하는 키</b>다.
+    /// <para>⚠ <b>계약 세대가 <c>&gt;= EnumServerContract.V8_0</c> 일 때만 값을 넣는다.</b>
+    /// 6.3.2·7.0.1 쓰기 스키마는 <c>extra="forbid"</c> 라 이 키가 실리는 순간 422 <c>extra_forbidden</c> 이고
+    /// 억제 생성·수정이 통째로 죽는다(실측). <c>null</c> 이면 <c>NullValueHandling.Ignore</c> 로 전송되지 않는다 —
+    /// <b>기본값 유지가 곧 6.3.2 무회귀</b>다.</para>
+    /// </summary>
+    [JsonProperty("unit_id", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    public int? UnitId { get; set; }
 
     [JsonProperty("target_type", Order = 3)]
     public string TargetType { get; set; } = "device";

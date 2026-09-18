@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Newtonsoft.Json;
@@ -21,6 +21,15 @@ public class ActionEventDto : BaseDto
     /// </summary>
     [JsonProperty("type_event", Order = 2, NullValueHandling = NullValueHandling.Ignore)]
     public string? TypeEvent { get; set; }
+
+    /// <summary>
+    /// 소속 부대 id(서버 8.0+ 응답 <c>required</c>). 6.3.2·7.0.1 응답에는 없어 <c>null</c> 이다. <b>읽기 전용</b>.
+    /// </summary>
+    [JsonProperty("unit_id", Order = 6, NullValueHandling = NullValueHandling.Ignore)]
+    public int? UnitId { get; set; }
+
+    /// <summary>요청 미전송 보증 — 조치 쓰기 스키마에 이 키가 없다(보내면 422 <c>extra_forbidden</c>).</summary>
+    public bool ShouldSerializeUnitId() => false;
 
     /// <summary>
     /// 조치 세부 내용

@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -46,7 +47,8 @@ public class ReportTemplateViewModel : BasePanelViewModel
             }
             else
             {
-                _log?.Warning($"[ReportTemplate] 조회 실패: {res.Message}");
+                // 사유는 ApiErrorTextHelper 로 — 배포본 400·404 봉투에는 top-level message 가 없다.
+                _log?.Warning($"[ReportTemplate] 조회 실패: {res.ErrorText()}");
                 LoadError = "서버에 연결하지 못했습니다. 잠시 후 [새로고침]을 눌러 다시 시도하세요.";
             }
             NotifyOfPropertyChange(nameof(IsEmpty));
@@ -86,7 +88,7 @@ public class ReportTemplateViewModel : BasePanelViewModel
             }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "템플릿을 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.Message ?? "삭제하지 못했습니다." };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.ErrorText("삭제하지 못했습니다.") };
         }
         catch (Exception ex)
         {

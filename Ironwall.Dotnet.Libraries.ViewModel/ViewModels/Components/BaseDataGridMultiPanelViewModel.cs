@@ -288,7 +288,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { _log?.Error($"[{_className}] ExecuteCreateAsync 예외: {ex.Message}"); res = new ApiResultLite(false, 0, ex.Message); }
             if (res.Success) onCommitted(row);                     // 커밋 처리(타입드 Remove 등)
-            else failures.Add($"{rowLabel(row)} — HTTP {res.StatusCode}: {SanitizeDetails(res.Details)}");
+            else failures.Add(FormatFailureLine(rowLabel(row), res));
         }
         return held;
     }
@@ -309,7 +309,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { _log?.Error($"[{_className}] ExecuteSaveUpdatesAsync 예외: {ex.Message}"); res = new ApiResultLite(false, 0, ex.Message); }
             if (!res.Success)
-                failures.Add($"{rowLabel(row)} — HTTP {res.StatusCode}: {SanitizeDetails(res.Details)}");
+                failures.Add(FormatFailureLine(rowLabel(row), res));
         }
     }
 
@@ -332,14 +332,48 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
         }, ct);
     }
 
+    /// <summary>
+    /// 저장 실패 1건 → 운영자가 읽을 한 줄(공통 출구).
+    /// <para>호출부(각 장비 패널)는 <see cref="ApiResultLite.Details"/> 에 정본 포맷터
+    /// <c>Messages.Helpers.ApiErrorTextHelper</c> 로 만든 <b>사람이 읽는 문장</b>을 담아 보낸다.
+    /// 그 문장은 <b>손대지 않는다</b>(여기서 다시 가공하면 서버 사유가 뭉개진다).</para>
+    /// <para>이 함수가 막는 것은 두 가지뿐이다:</para>
+    /// <list type="number">
+    ///   <item><b>날 JSON 노출</b> — 정본 포맷터도 서버가 <c>error.message</c>·<c>details</c> 를
+    ///   <i>문장 없는 객체</i>로 보내면 압축 JSON(<c>ToString(Formatting.None)</c>)을 돌려준다(정본 계약).
+    ///   그 JSON 이 팝업에 그대로 실리면 운영자는 읽을 수 없다 → 원문은 <b>로그로만</b> 남기고 화면은 안내 문구로 바꾼다.</item>
+    ///   <item><b>"HTTP 0:" 오표기</b> — 로컬 예외 경로는 상태코드가 없다(<c>new ApiResultLite(false, 0, ex.Message)</c>).
+    ///   0 을 HTTP 코드처럼 붙이면 서버가 0 을 돌려준 것처럼 읽힌다 → 코드가 없으면 접두사를 생략한다.</item>
+    /// </list>
+    /// </summary>
+    protected string FormatFailureLine(string rowLabel, ApiResultLite res)
+    {
+        var raw = res.Details;
+        if (!string.IsNullOrWhiteSpace(raw) && LooksLikeJson(raw!.Trim()))
+            _log?.Error($"[{_className}] {rowLabel} 저장 실패 응답 원문(HTTP {res.StatusCode}): {raw}");
+
+        var reason = SanitizeDetails(raw);
+        return res.StatusCode > 0
+            ? $"{rowLabel} — HTTP {res.StatusCode}: {reason}"
+            : $"{rowLabel} — {reason}";
+    }
+
+    /// <summary>문장이 아니라 JSON 덩어리인지 — 사람이 읽는 사유 문장은 중괄호/대괄호로 시작·끝나지 않는다.</summary>
+    private static bool LooksLikeJson(string text)
+        => (text.StartsWith("{") && text.EndsWith("}"))
+        || (text.StartsWith("[") && text.EndsWith("]"));
+
     /// <summary>(보안) 서버 422 응답 본문에서 민감 필드경로 노출 차단 — UI 표출 전 마스킹.</summary>
     protected static string SanitizeDetails(string? raw)
     {
-        if (string.IsNullOrEmpty(raw)) return "(상세 없음)";
+        if (string.IsNullOrWhiteSpace(raw)) return "(상세 없음)";
+        var text = raw!.Trim();
         foreach (var k in new[] { "password", "passwd", "token", "secret", "credential" })
-            if (raw.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (text.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
                 return "(민감정보 포함 응답 — 상세는 로그 확인)";
-        return raw.Length > 400 ? raw.Substring(0, 400) + "…" : raw;
+        // 날 JSON 은 운영자 화면에 싣지 않는다(원문은 FormatFailureLine 이 로그에 남긴다).
+        if (LooksLikeJson(text)) return "(서버 응답을 해석할 수 없습니다 — 상세는 로그 확인)";
+        return text.Length > 400 ? text.Substring(0, 400) + "…" : text;
     }
 
     /// <summary>(Draft 격리 불변식) Id≤0 Draft는 공유/타입드 provider 투영 금지 — CollectionChanged.Add 가드용.</summary>

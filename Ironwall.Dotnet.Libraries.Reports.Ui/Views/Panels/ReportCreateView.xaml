@@ -65,6 +65,29 @@
             </StackPanel>
         </StackPanel>
 
+        <!-- 심각도 필터(시스템 이벤트 계열에만 적용 · 미선택=전 심각도) -->
+        <StackPanel Grid.Row="3" VerticalAlignment="Top" Margin="0,12,0,0">
+            <TextBlock Text="심각도 필터" Style="{StaticResource PanelFieldLabel}" Margin="0,0,0,2" />
+            <ItemsControl ItemsSource="{Binding Severities}"
+                          AutomationProperties.AutomationId="Reports.Create.SeverityList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding Display}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
+                                  Margin="0,0,16,0"
+                                  AutomationProperties.AutomationId="{Binding Value, StringFormat=Reports.Create.Severity.{0}}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                       Text="{Binding SeveritySummary, StringFormat=※ 시스템 이벤트 집계·표·CSV 에만 적용됩니다 — 현재: {0}}" />
+        </StackPanel>
+
         <!-- 생성 -->
         <StackPanel Grid.Row="4" Margin="0,12,0,0">
             <StackPanel Orientation="Horizontal">

@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -358,7 +359,11 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             const int limit = 100, maxPages = 100;
             for (int page = 1; page <= maxPages; page++)
             {
-                var response = await _apiService.GetControllersAsync(page: page, limit: limit, token: token);
+                var response = await _apiService.GetControllersAsync(
+                    page: page,
+                    limit: limit,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
                 if (!response.Success || response.Data == null)
                 {
                     _log?.Error($"Failed to fetch controllers (page {page}): {response.Error?.Message}");
@@ -382,8 +387,14 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     {
         try
         {
-            var r = await _apiService.CreateControllerAsync(model.ToControllerDeviceDto(), token);
-            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
+            var dto = model.ToControllerDeviceDto();
+            // (8.0 unit_id) 쓰기 직전 소속 부대를 싣는다 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
+            await UnitScopeGate.StampAsync(dto, nameof(CreateControllerAsync), _log, token);
+            var r = await _apiService.CreateControllerAsync(dto, token);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "제어기 등록에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"CreateControllerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
@@ -393,8 +404,14 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     {
         try
         {
-            var r = await _apiService.UpdateControllerAsync(model.Id, model.ToControllerDeviceDto(), token);
-            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
+            var dto = model.ToControllerDeviceDto();
+            // (8.0 unit_id) 쓰기 직전 소속 부대를 싣는다 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
+            await UnitScopeGate.StampAsync(dto, nameof(UpdateControllerAsync), _log, token);
+            var r = await _apiService.UpdateControllerAsync(model.Id, dto, token);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "제어기 수정에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"UpdateControllerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
@@ -496,6 +513,8 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     #endregion
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
+    /// <summary>(FR-10) 서버 계약 세대별 쿼리 조립 — 프로브 없으면 6.3(현행 운영) 동작.</summary>
+    private readonly DeviceQueryPolicy _queryPolicy = DeviceQueryPolicy.Resolve();
     private readonly ControllerDeviceProvider _deviceProvider;
     private readonly IDeviceProviderService _deviceProviderService;
     private bool _isSyncingFromProvider;   // (FR-D1) 순방향↔역방향 상호 재진입 가드(UI 스레드 전용)

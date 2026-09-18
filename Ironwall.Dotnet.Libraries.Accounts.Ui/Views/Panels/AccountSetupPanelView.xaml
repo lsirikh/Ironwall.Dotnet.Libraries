@@ -133,8 +133,9 @@
 					<ComboBox Grid.Row="0" Grid.Column="1"
 						SelectedValuePath="Tag"
 						SelectedValue="{Binding ConcurrencyPolicy, Mode=TwoWay}">
-						<ComboBoxItem Tag="evict_all" Content="단일 (evict_all)" />
+						<!--  서버 기본값이 allow(다중 공존)라 첫 항목도 allow — 목록 순서가 기본값을 오인시키지 않게 한다.  -->
 						<ComboBoxItem Tag="allow" Content="다중 (allow)" />
+						<ComboBoxItem Tag="evict_all" Content="단일 (evict_all)" />
 					</ComboBox>
 
 					<!--  ② 최대 동시 세션 수 — allow일 때만 활성  -->

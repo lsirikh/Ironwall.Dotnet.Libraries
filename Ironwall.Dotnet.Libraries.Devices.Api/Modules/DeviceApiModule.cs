@@ -64,7 +64,13 @@ public class DeviceApiModule : Module
             builder.Register(ctx => new DeviceApiService(
                     _log,
                     ctx.ResolveNamed<IApiService>($"{_name}"),
-                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    // ⚠ 이 인자를 빠뜨리면 버전 분기가 통째로 죽은 코드가 된다.
+                    //    프로브가 null 이면 서비스는 영구히 V6_3(운영 판본) 경로로만 동작해
+                    //    7.0/8.0 서버를 상대로도 구계약 본문을 보낸다 — 422 인데 원인이 안 보인다.
+                    //    등록이 없는 호스트(Aligo 단독 등)에서도 죽지 않도록 옵셔널 해석 2단.
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
                 ))
                 .Named<IDeviceApiService>(_name)
                 .AsImplementedInterfaces()
@@ -75,12 +81,34 @@ public class DeviceApiModule : Module
             builder.Register(ctx => new ServerApiService(
                     _log,
                     ctx.ResolveNamed<IApiService>($"{_name}"),
-                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    // ⚠ 이 인자를 빠뜨리면 버전 분기가 통째로 죽은 코드가 된다.
+                    //    프로브가 null 이면 서비스는 영구히 V6_3(운영 판본) 경로로만 동작해
+                    //    7.0/8.0 서버를 상대로도 구계약 본문을 보낸다 — 422 인데 원인이 안 보인다.
+                    //    등록이 없는 호스트(Aligo 단독 등)에서도 죽지 않도록 옵셔널 해석 2단.
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
                 ))
                 .Named<IServerApiService>(_name)
                 .AsImplementedInterfaces()
                 .SingleInstance()
                 .WithMetadata("Order", _count + 1);
+
+            // 5. UnitApiService 등록 (부대 편제 /api/units — API 8.0 신설 표면)
+            //    ⚠ 프로브가 필수적인 이유가 다른 서비스들과 다르다: 부대 표면은 8.0 에서 '생겼다'.
+            //    프로브가 null 이면 V6_3 으로 간주되어 모든 부대 호출이 네트워크 전에 차단된다(의도된 안전 방향).
+            //    운영 6.3.2 에는 /api/units 가 0건이라, 차단하지 않으면 404 폭격이 되고 원인이 안 보인다.
+            builder.Register(ctx => new UnitApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
+                ))
+                .Named<IUnitApiService>(_name)
+                .AsImplementedInterfaces()
+                .SingleInstance()
+                .WithMetadata("Order", _count + 2);
 
             _log?.Info($"[{nameof(DeviceApiModule)}] Module loaded successfully with name: {_name}");
         }

@@ -26,6 +26,12 @@ public class ReportCreateViewModel : BasePanelViewModel
         SelectedPeriod = Periods[0];
         EndDate = DateTime.Today;
         StartDate = DateTime.Today.AddDays(-7);
+        // 심각도 필터(서버 닫힌 어휘 4종) — 전부 해제 = 전 심각도(파라미터 미전송).
+        //   ⚠ 어휘는 ReportSeverity 하나에서만 만든다. 서버는 이 필터를 시스템 이벤트 계열의
+        //     집계·그리드·CSV 까지 전파한다(탐지/장애/조치 이벤트는 대상 아님).
+        Severities = new ObservableCollection<SeverityPick>(
+            ReportSeverity.All.Select(s => new SeverityPick(s, SeverityDisplay(s))));
+        foreach (var s in Severities) s.PropertyChanged += (_, __) => NotifyOfPropertyChange(nameof(SeveritySummary));
     }
     #endregion
 
@@ -91,9 +97,14 @@ public class ReportCreateViewModel : BasePanelViewModel
                 // aware(+09:00) 자정 경계 — 서버가 end 자정을 23:59:59로 확장해 끝일 포함([start,end] 닫힌구간, 서버팀 확인 2026-07-31)
                 StartDate = IsCustomRange ? KoreaTimeHelper.ToServerIso8601(StartDate?.Date) : null,
                 EndDate = IsCustomRange ? KoreaTimeHelper.ToServerIso8601(EndDate?.Date) : null,
+                // 어휘 밖 값·중복을 걸러 넣는다. 아무것도 안 고르면 null → 키 자체를 안 보낸다(= 전 심각도).
+                //   운영 6.3.2 도 array[string] 로 받으므로 대문자 4종만 보내면 양쪽 안전하다(openapi 실측).
+                SeverityFilter = ReportSeverity.Sanitize(Severities.Where(s => s.IsSelected).Select(s => s.Value)),
             };
             var genRes = await _api.GenerateAsync(req);
-            if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.Message}"; IsGenerating = false; return; }
+            // 사유는 ApiErrorTextHelper 로 — 배포본 400·404 봉투에는 top-level message 가 없고(error.message 에만 있다)
+            // 빈 문자열은 ?? 를 통과해 "생성 요청 실패: " 로 끝나 버린다.
+            if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.ErrorText("서버가 요청을 거부했습니다.")}"; IsGenerating = false; return; }
 
             var id = genRes.Data.Id;
             StatusText = "생성 중… (GENERATING)";
@@ -126,19 +137,50 @@ public class ReportCreateViewModel : BasePanelViewModel
         return null;
     }
 
-    /// <summary>서버 error_message → 사용자 안내 문구 분화(v6.0).</summary>
+    /// <summary>
+    /// 서버 error_message → 사용자 안내 문구 분화(v6.0).
+    /// <para>⚠ 배포본(8.0.1 재확인 2026-09-18) 생성 이력 응답에는 <c>error_message</c> 키가 <b>아예 없다</b>(18키 실측).
+    /// 즉 이 인자는 현재 <b>항상 null</b> 이고 폴백 문구만 보인다 — 서버가 키를 노출하기 전까지는
+    /// "사유 미제공"을 <b>명시</b>해 운영자가 목록·로그로 유도되게 한다(공백으로 뭉개지 않는다).</para>
+    /// </summary>
     private static string FailReason(string? msg)
     {
-        if (string.IsNullOrWhiteSpace(msg)) return "생성 실패";
+        if (string.IsNullOrWhiteSpace(msg)) return "생성 실패 — 서버가 사유를 제공하지 않았습니다(잠시 후 재생성하세요).";
         if (msg.Contains("server restarted")) return "서버 재시작으로 실패 — 재생성하세요";
         if (msg.Contains("stalled")) return "생성 지연으로 중단 — 재시도하세요";
         if (msg.Contains("Cancelled")) return "취소됨";
         return msg;
     }
+
+    /// <summary>심각도 코드 → 화면 문구(서버로는 코드를 보낸다).</summary>
+    private static string SeverityDisplay(string code) => code switch
+    {
+        ReportSeverity.Info => "정보",
+        ReportSeverity.Warning => "경고",
+        ReportSeverity.Error => "오류",
+        ReportSeverity.Critical => "심각",
+        _ => code
+    };
     #endregion
 
     #region - Properties -
     public ObservableCollection<PeriodOption> Periods { get; }
+
+    /// <summary>
+    /// 심각도 필터 후보(닫힌 어휘 4종). <b>아무것도 선택하지 않으면 전 심각도</b>(서버에 키를 보내지 않는다).
+    /// 시스템 이벤트 계열 집계·그리드·CSV 에만 적용된다.
+    /// </summary>
+    public ObservableCollection<SeverityPick> Severities { get; }
+
+    /// <summary>선택 요약 — 화면 안내용.</summary>
+    public string SeveritySummary
+    {
+        get
+        {
+            var picked = Severities.Where(s => s.IsSelected).Select(s => s.Display).ToList();
+            return picked.Count == 0 ? "전 심각도" : string.Join(", ", picked);
+        }
+    }
     public ObservableCollection<ReportTemplateDto> Templates { get; } = new();
     public bool HasTemplates => Templates.Count > 0;
 
@@ -208,6 +250,19 @@ public class ReportCreateViewModel : BasePanelViewModel
 /// <summary>기간 선택 옵션(표시명/값).</summary>
 public sealed record PeriodOption(string Display, string Value);
 
+/// <summary>
+/// 심각도 필터 체크 항목 — <see cref="Value"/> 는 <b>서버 어휘</b>(대문자), <see cref="Display"/> 는 화면 문구.
+/// </summary>
+public sealed class SeverityPick : PropertyChangedBase
+{
+    public SeverityPick(string value, string display) { Value = value; Display = display; }
+    /// <summary>서버로 보내는 코드(INFO·WARNING·ERROR·CRITICAL).</summary>
+    public string Value { get; }
+    public string Display { get; }
+    private bool _isSelected;
+    public bool IsSelected { get => _isSelected; set { _isSelected = value; NotifyOfPropertyChange(); } }
+}
+
 /// <summary>템플릿 컴포넌트 선택 항목(템플릿 편집 다이얼로그에서 사용).</summary>
 public sealed class ComponentPick : PropertyChangedBase
 {
@@ -215,6 +270,23 @@ public sealed class ComponentPick : PropertyChangedBase
     public string Id { get; }
     public string Display { get; }
     public string? Category { get; }
+
+    /// <summary>차트 종류(서버 <c>chart_type</c>) — <c>PIE</c>·<c>BAR</c>·<c>LINE</c>, 그리드·요약카드는 null.</summary>
+    public string? ChartType { get; init; }
+
+    /// <summary>서버 설명문(<c>description</c>) — 툴팁용.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>종류 한국어 라벨 — null(그리드·요약)은 "표/요약".</summary>
+    public string ChartTypeLabel => ChartType switch
+    {
+        "PIE" => "원형",
+        "BAR" => "막대",
+        "LINE" => "추이",
+        null or "" => "표/요약",
+        _ => ChartType!
+    };
+
     private bool _enabled;
     public bool Enabled { get => _enabled; set { _enabled = value; NotifyOfPropertyChange(); } }
 }

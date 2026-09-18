@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -31,12 +32,15 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                                         , SensorDeviceProvider deviceProvider
                                         , ControllerDeviceProvider controllerDeviceProvider
                                         , IDeviceProviderService deviceProviderService
+                                        , DeviceQueryPolicy? queryPolicy = null
                                         ) : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceProvider = deviceProvider;
         _controllerProvider = controllerDeviceProvider;
         _deviceProviderService = deviceProviderService;
+        // FR-10: 쿼리 조립 분기는 정책 1곳. 미주입이면 6.3(현행 운영) 기본값.
+        _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
         HistoryCommand = new Models.SimpleParamCommand(ShowDetectionHistoryAsync);
     }
     #endregion
@@ -386,7 +390,15 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
             const int limit = 100, maxPages = 100;
             for (int page = 1; page <= maxPages; page++)
             {
-                var response = await _apiService.GetSensorsAsync(page: page, limit: limit, includeController: true, token: token);
+                // (FR-10) include_controller 는 7.0 에서 제거된 키 — 실으면 422 → 센서 목록 0건.
+                // 패널은 제어기 콤보를 ControllerDeviceProvider 에서 받고 센서에선 Controller.Id 만 쓰므로
+                // 중첩 객체 없이 controller_id(FK) seed 만으로 동작이 동일하다.
+                var response = await _apiService.GetSensorsAsync(
+                    page: page,
+                    limit: limit,
+                    includeController: _queryPolicy.CanUseIncludeControllerFlag,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
                 if (!response.Success || response.Data == null)
                 {
                     _log?.Error($"Failed to fetch sensors (page {page}): {response.Error?.Message}");
@@ -410,8 +422,14 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     {
         try
         {
-            var r = await _apiService.CreateSensorAsync(model.ToSensorDeviceDto(), token);
-            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
+            var dto = model.ToSensorDeviceDto();
+            // (8.0 unit_id) 쓰기 직전 소속 부대를 싣는다 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
+            await UnitScopeGate.StampAsync(dto, nameof(CreateSensorAsync), _log, token);
+            var r = await _apiService.CreateSensorAsync(dto, token);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "센서 등록에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"CreateSensorAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
@@ -421,8 +439,14 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     {
         try
         {
-            var r = await _apiService.UpdateSensorAsync(model.Id, model.ToSensorDeviceDto(), token);
-            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
+            var dto = model.ToSensorDeviceDto();
+            // (8.0 unit_id) 쓰기 직전 소속 부대를 싣는다 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
+            await UnitScopeGate.StampAsync(dto, nameof(UpdateSensorAsync), _log, token);
+            var r = await _apiService.UpdateSensorAsync(model.Id, dto, token);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "센서 수정에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"UpdateSensorAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
@@ -524,6 +548,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     private readonly IDeviceApiService _apiService;
     private readonly SensorDeviceProvider _deviceProvider;
     private readonly IDeviceProviderService _deviceProviderService;
+    private readonly DeviceQueryPolicy _queryPolicy;   // (FR-10) 서버 계약 세대별 쿼리 조립
     private bool _isSyncingFromProvider;   // (FR-D1) 순방향↔역방향 상호 재진입 가드(UI 스레드 전용)
     #endregion
 }

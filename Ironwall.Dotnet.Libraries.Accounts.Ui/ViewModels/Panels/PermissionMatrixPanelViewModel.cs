@@ -1,5 +1,6 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -25,6 +26,12 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDeleteGroupMessageModel>
 {
     private readonly IAccountApiService _api;
+    /// <summary>서버 계약 세대 프로브(선택 주입 — 미등록이면 <c>null</c>).</summary>
+    private readonly IServerContractProbe? _contractProbe;
+    /// <summary>
+    /// 확보된 서버 계약 세대. 미확보·프로브 없음이면 <see cref="EnumServerContract.V6_3"/>(현 운영 판본 — 틀렸을 때 손해가 가장 작다).
+    /// </summary>
+    private EnumServerContract _contract = EnumServerContract.V6_3;
     private List<UserGroupDto> _raw = new();
 
     // v5.4 Role Simplification(서버 v57): ADMIN/GUEST 등급그룹 DROP + 나머지 'Preset - X'로 rename + 편집 허용(NOTIFY §8.2).
@@ -32,8 +39,18 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     private const string PresetPrefix = "Preset";
     private static bool IsPresetGroup(string name) => name.StartsWith(PresetPrefix, StringComparison.OrdinalIgnoreCase);
 
+    // Autofac: (IServerContractProbe) 가 해소되면 4인자 생성자, 아니면 3인자로 우아하게 폴백(PermissionService 선례).
+    //   → DI 모듈(AccountUiModule `RegisterType<PermissionMatrixPanelViewModel>()`) 수정 없이 주입된다.
     public PermissionMatrixPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api)
-        : base(eventAggregator, log) => _api = api;
+        : this(eventAggregator, log, api, null) { }
+
+    public PermissionMatrixPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api,
+                                         IServerContractProbe? contractProbe)
+        : base(eventAggregator, log)
+    {
+        _api = api;
+        _contractProbe = contractProbe;
+    }
 
     #region - Properties -
     /// <summary>그룹 목록(요약). DataGrid ItemsSource(목록 화면).</summary>
@@ -42,6 +59,18 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     public ObservableCollection<ModulePermRowViewModel> Modules { get; } = new();
     /// <summary>구성원 화면 — 선택 그룹 소속 계정.</summary>
     public ObservableCollection<AuthUserDto> Members { get; } = new();
+
+    /// <summary>
+    /// 서버가 내려준 <b>원본</b> 모듈 권한(GET 결과). 저장 시 **덮어쓰지 않고 합친다.**
+    /// <para>⚠ 권한 저장은 <b>전체 교체</b>라 ① 서버 모듈이 하나라도 빠지면 <b>422 MISSING_FIELD</b>(v7.0+)
+    /// 또는 <b>조용한 권한 삭제</b>(v6.3.17 이하)이고, ② 그 서버가 모르는 키를 보내면 <b>422</b> 다
+    /// (<c>PermissionsSchema.modules.propertyNames = EnumPermissionModule</c> — 운영 6.3.2 스웨거도 동일).</para>
+    /// <para>그래서 전송 집합은 <b>원본 ∪ (이 서버 세대가 아는 사전 모듈)</b> 하나뿐이다. 실측 대조:
+    /// 개발 8.0.1 = 원본 13 ∪ 사전 16 = <b>16</b>(완전·미지 키 0) / 운영 6.3.2 = 원본 12 ∪ 사전 12종 = <b>12</b>(신규 4종 미전송).
+    /// 화면 행 집합도 같은 식이라 저장은 행 집합의 결과로 자동 정합된다.</para>
+    /// </summary>
+    private IReadOnlyDictionary<string, ModulePermissionDto> _originModules
+        = new Dictionary<string, ModulePermissionDto>();
     /// <summary>구성원 화면 — 추가 후보(미소속 계정).</summary>
     public ObservableCollection<AuthUserDto> AddableAccounts { get; } = new();
 
@@ -128,12 +157,41 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         if (row is null) return;
         var g = _raw.FirstOrDefault(x => x.Id == row.GroupId);
         var mods = g?.Permissions?.Modules ?? new Dictionary<string, ModulePermissionDto>();
+        // 저장 때 합치기 위해 서버 원본을 그대로 보관한다(우리 카탈로그에 없는 모듈 포함).
+        _originModules = new Dictionary<string, ModulePermissionDto>(mods);
         _detailGroupId = row.GroupId;
         _detailDeviceGroups = g?.Permissions?.DeviceGroups;
+        BuildMatrixRows(mods);
+        DetailGroupName = row.GroupName;
+        SetMode(PanelMode.Matrix);
+    }
+
+    /// <summary>
+    /// 매트릭스 행 집합을 만든다 — <b>서버가 권위</b>다.
+    /// <para>행 = <b>이 그룹의 원본 키</b> ∪ <b>이 서버 세대가 아는 사전 모듈</b>.
+    /// <list type="number">
+    /// <item>사전 모듈은 세대 어휘(<see cref="PermissionCatalog.ModulesForGeneration"/>)거나 원본에 실재하면 띄운다 —
+    ///   그래서 서버가 모르는 모듈을 화면에 띄워 저장에서 422 를 만드는 일이 없다(운영 6.3.2 무회귀).</item>
+    /// <item>사전에 <b>없는</b> 서버 키는 버리지 않고 <b>키 문자열 그대로</b> 행으로 띄운다(4동작 전부 활성) —
+    ///   서버가 어휘를 17종으로 늘려도 <b>운영자가 켤 수 있다</b>. 종전 코드는 이걸 조용히 버려서
+    ///   <c>action_report_templates</c>·<c>files</c>·<c>integrations</c>·<c>units</c> 가 <b>영구 403</b> 이었다.</item>
+    /// </list></para>
+    /// <para>세대 판정이 폴백(V6_3)으로 틀려도 원본 합집합이 메운다 — 8.0.1 실측 원본 13종이
+    /// 사전 12종과 합쳐 16종이 되어 저장이 성립한다. 반대(6.3 서버를 8.0 으로 오판)는 프로브가
+    /// 구조적으로 V6_3 쪽으로만 틀리므로 발생하지 않는다.</para>
+    /// </summary>
+    private void BuildMatrixRows(IReadOnlyDictionary<string, ModulePermissionDto> mods)
+    {
+        var generation = GenerationOf(_contract);
         Modules.Clear();
+
+        var shown = new HashSet<string>(StringComparer.Ordinal);
         foreach (var m in PermissionCatalog.Modules)
         {
             var key = PermissionCatalog.ServerKey(m);
+            // 이 서버 세대가 아는 모듈이거나, 이 그룹 저장분에 실재하는 모듈만 띄운다.
+            if (PermissionCatalog.MinGeneration(m) > generation && !mods.ContainsKey(key)) continue;
+
             mods.TryGetValue(key, out var mp);
             Modules.Add(new ModulePermRowViewModel
             {
@@ -148,10 +206,39 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                 DeleteEnabled = PermissionCatalog.IsVerbAllowed(m, EnumPermissionVerb.Delete),
                 ControlEnabled = PermissionCatalog.IsVerbAllowed(m, EnumPermissionVerb.Control),
             });
+            shown.Add(key);
         }
-        DetailGroupName = row.GroupName;
-        SetMode(PanelMode.Matrix);
+
+        // 사전 밖(= 우리가 표시명·동작 적용성을 모르는) 서버 어휘 — 키 그대로, 4동작 전부 활성.
+        //   동작 적용성을 모르니 막지 않는다. 서버 스키마는 어느 모듈에도 4동작을 다 받으므로 전송은 안전하다.
+        foreach (var kv in mods.OrderBy(x => x.Key, StringComparer.Ordinal))
+        {
+            if (shown.Contains(kv.Key)) continue;
+            Modules.Add(new ModulePermRowViewModel
+            {
+                ModuleKey = kv.Key,
+                ModuleDisplay = kv.Key,
+                View = kv.Value?.View ?? false,
+                Edit = kv.Value?.Edit ?? false,
+                Delete = kv.Value?.Delete ?? false,
+                Control = kv.Value?.Control ?? false,
+                ViewEnabled = true,
+                EditEnabled = true,
+                DeleteEnabled = true,
+                ControlEnabled = true,
+                IsUnknownModule = true,
+            });
+            _log?.Warning($"[PermGroup] 사전에 없는 권한 모듈 키 '{kv.Key}' — 키 그대로 노출한다(표시명·동작 적용성 미확인).");
+        }
     }
+
+    /// <summary>
+    /// 계약 세대 → <see cref="PermissionCatalog"/> 세대 정수. <b><c>&gt;=</c> 비교만</b> 쓴다(동치 비교 금지 — 새 판본이 나와도 안전).
+    /// </summary>
+    private static int GenerationOf(EnumServerContract contract)
+        => contract >= EnumServerContract.V8_0 ? PermissionCatalog.GEN_V8_0
+         : contract >= EnumServerContract.V7_0 ? PermissionCatalog.GEN_V7_0
+         : PermissionCatalog.GEN_V6_3;
 
     public void ClickBackToList() { IsGroupFormOpen = false; SetMode(PanelMode.List); }
 
@@ -189,12 +276,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             if (_formGroupId > 0)
             {
                 var res = await _api.UpdateUserGroupAsync(_formGroupId, new UserGroupUpdateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info($"수정 실패: {res.Error?.Message ?? res.Message}"); return; }
+                if (!res.Success) { await Info($"수정 실패: {Explain(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName)}"); return; }
             }
             else
             {
                 var res = await _api.CreateUserGroupAsync(new UserGroupCreateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info($"생성 실패: {res.Error?.Message ?? res.Message}"); return; }
+                if (!res.Success) { await Info($"생성 실패: {Explain(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName)}"); return; }
             }
             IsGroupFormOpen = false;
             await Info(_formGroupId > 0 ? "그룹 정보를 수정했습니다." : "새 권한 그룹을 생성했습니다.");   // 성공 피드백(grant 생성 패턴 정합·진단)
@@ -235,6 +322,23 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     }
     #endregion
 
+    /// <summary>
+    /// 저장 본문의 모듈 사전을 만든다 — <b>서버 원본에 화면 편집분을 덮어쓴다</b>(원본 ∪ 행 집합).
+    /// <para>행 집합이 <c>BuildMatrixRows</c> 에서 "원본 ∪ 이 서버 세대 어휘"로 구성되므로,
+    /// 결과는 ① 그 서버가 아는 모듈을 <b>빠짐없이</b> 담고(전체 교체 계약 충족) ② <b>모르는 키를 담지 않는다</b>.
+    /// 원본에만 있고 사전에 없는 키도 값 그대로 실려 나가 사라지지 않는다.</para>
+    /// </summary>
+    private Dictionary<string, ModulePermissionDto> BuildMergedModules()
+    {
+        var merged = new Dictionary<string, ModulePermissionDto>(StringComparer.Ordinal);
+        foreach (var kv in _originModules)          // ① 서버가 아는 것 전부 보존
+            merged[kv.Key] = kv.Value;
+        foreach (var m in Modules)                  // ② 화면에서 편집한 것으로 덮어쓰기
+            merged[m.ModuleKey] = new ModulePermissionDto
+            { View = m.View, Edit = m.Edit, Delete = m.Delete, Control = m.Control };
+        return merged;
+    }
+
     #region - Binding: 매트릭스 저장 -
     /// <summary>현재 매트릭스 그룹의 권한(모듈×동작)을 서버에 저장(ADMIN). POST /user-groups/{id}/permissions.</summary>
     public async Task OnClickSave()
@@ -246,9 +350,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var dto = new PermissionsDto
             {
                 DeviceGroups = _detailDeviceGroups,
-                Modules = Modules.ToDictionary(
-                    m => m.ModuleKey,
-                    m => new ModulePermissionDto { View = m.View, Edit = m.Edit, Delete = m.Delete, Control = m.Control }),
+                // 원본 ∪ 화면 편집분 — 우리가 모르는 모듈을 떨어뜨리면 422(전체 교체 계약).
+                Modules = BuildMergedModules(),
             };
             var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto);
             if (res.Success)
@@ -319,7 +422,9 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         {
             IsGroupFormOpen = false;
             SetMode(PanelMode.List);
-            var res = await _api.GetUserGroupsAsync(ct);
+            // 행/전송 집합이 서버 어휘에 따라 달라진다 → 목록 로드마다 세대를 확보한다(멱등 — 확보 후엔 필드 읽기 수준).
+            _contract = await _contractProbe.GetContractAsync(ct).ConfigureAwait(true);
+            var res = await _api.GetAllUserGroupsAsync(ct);   // 그룹도 limit 상한 100 — page 순회로 전량(100개 초과 무증상 절단 제거)
             if (!res.Success || res.Data is null)   // (MC-PM-1/INV-13) swap-on-success — 실패 시 Groups.Clear 전 return(기존 목록 보존, 화면 공백 방지)
             {
                 await Info($"불러오기 실패: {res.Error?.Message ?? res.Message}");
@@ -327,8 +432,9 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             }
             _raw = res.Data;
 
-            // ⚠ 서버 /users limit 상한=100(le=100). 그룹별 사용자 수 = group_id 소속 계정 수(상시 배정).
-            var usersRes = await _api.GetUsersAsync(1, 100, ct);
+            // 그룹별 사용자 수 = group_id 소속 계정 수(상시 배정). 서버 limit 상한=100 이라 전량은 page 순회로만 얻는다
+            // (단일 호출이면 101번째 계정부터 집계에서 빠져 인원수가 조용히 작게 표시됐다).
+            var usersRes = await _api.GetAllUsersAsync(ct);
             var users = (usersRes.Success && usersRes.Data is not null) ? usersRes.Data : new List<AuthUserDto>();
             var countByGroupId = users.Where(u => u.GroupId.HasValue)
                                       .GroupBy(u => u.GroupId!.Value)
@@ -381,9 +487,9 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             Members.Clear();
             foreach (var u in members) Members.Add(u);
 
-            // 추가 후보 = 전체 계정 − 현재 구성원
+            // 추가 후보 = 전체 계정 − 현재 구성원 (전량 순회 — 단일 페이지면 101번째부터 후보에서 사라진다)
             AddableAccounts.Clear();
-            var allRes = await _api.GetUsersAsync(1, 100);
+            var allRes = await _api.GetAllUsersAsync();
             if (allRes.Success && allRes.Data is not null)
             {
                 var memberIds = new HashSet<int>(members.Select(m => m.Id));
@@ -396,6 +502,19 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
 
     private Task Info(string msg) =>
         _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "권한 그룹", Explain = msg });
+
+    /// <summary>그룹 이름 중복 409 안내 — 서버 <c>POST/PUT /api/user-groups</c> 409 "같은 name 의 그룹이 이미 있음".</summary>
+    private const string DuplicateGroupName = "같은 이름의 권한 그룹이 이미 있습니다. 다른 이름을 입력해 주세요.";
+
+    /// <summary>
+    /// 서버 실패를 사용자 문구로 바꾼다 — 409(<c>CONFLICT</c>)는 영문 원문 대신 <paramref name="conflict"/> 안내를 쓴다.
+    /// <para>409 는 배포 8.0.1 에서 계정·그룹·세션 경로에 실제로 선언돼 있다(그룹 이름 중복, 마지막 ADMIN 보호,
+    /// 자기 계정 삭제 등). 운영 6.3.2 는 선언이 없으므로 이 분기에 도달하지 않고 종전 문구가 그대로 쓰인다(무회귀).</para>
+    /// </summary>
+    private static string Explain(int statusCode, string? code, string? serverMessage, string conflict)
+        => (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
+            ? conflict
+            : (serverMessage ?? "서버가 요청을 거부했습니다.");
     #endregion
 }
 

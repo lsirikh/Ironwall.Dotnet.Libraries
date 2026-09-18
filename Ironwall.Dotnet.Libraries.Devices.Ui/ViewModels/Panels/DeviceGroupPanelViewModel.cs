@@ -1,7 +1,8 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -259,7 +260,10 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
             var r = await _apiService.CreateDeviceGroupAsync(model.ToDeviceGroupDto(), token);
             if (r.Success && r.Data != null)
                 model.Id = r.Data.ToDeviceGroupModel().Id;   // (R2/H2) 서버 Id write-back — 선택 에디터의 stale Id(0) 방지 → CanAddAssign 정상화
-            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "장비 그룹 등록에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"CreateDeviceGroupLite: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
@@ -270,7 +274,10 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
         try
         {
             var r = await _apiService.UpdateDeviceGroupAsync(model.Id, model.ToDeviceGroupDto(), token);
-            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.
+            return new ApiResultLite(r.Success, r.StatusCode,
+                ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                    ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "장비 그룹 수정에 실패했습니다."));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _log?.Error($"UpdateDeviceGroupLite: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }

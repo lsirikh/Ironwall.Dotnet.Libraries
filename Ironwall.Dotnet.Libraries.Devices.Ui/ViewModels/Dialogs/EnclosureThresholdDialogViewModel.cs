@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -51,7 +51,10 @@ public class EnclosureThresholdDialogViewModel : Conductor<BasePanelViewModel>.C
             concrete.ThresholdConfig = _working;   // 작업 복사본 → 모델 반영
 
             var api = IoC.Get<IDeviceApiService>();
-            var resp = await api.UpdateEnclosureAsync(concrete.Id, concrete.ToEnclosureDeviceDto(), token);
+            var eDto = concrete.ToEnclosureDeviceDto();
+            // (8.0 unit_id) PUT 은 전체 교체다 — 부대를 싣지 않으면 8.0 서버가 기본 부대로 재귀속시킨다(응답에 신호 없음).
+            await UnitScopeGate.StampAsync(eDto, nameof(EnclosureThresholdDialogViewModel), token: token);
+            var resp = await api.UpdateEnclosureAsync(concrete.Id, eDto, token);
             if (resp == null || !resp.Success)
                 return false;
 

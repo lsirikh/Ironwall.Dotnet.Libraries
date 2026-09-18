@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Models;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -1060,7 +1061,8 @@ public class MockDeviceApiService : IDeviceApiService
         bool includeSensors = false,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default, string? view = null, string? include = null,
+        string? typeController = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetControllersCalled = true;
         ControllerPageRequested = page; // Track the most recent page requested
@@ -1076,7 +1078,7 @@ public class MockDeviceApiService : IDeviceApiService
         return Task.FromResult(ApiListResponse<ControllerDeviceDto>.CreateSuccess(new List<ControllerDeviceDto>()));
     }
 
-    public Task<ApiResponse<ControllerDeviceDto>> GetControllerByIdAsync(int id, bool includeSensors = false, CancellationToken token = default)
+    public Task<ApiResponse<ControllerDeviceDto>> GetControllerByIdAsync(int id, bool includeSensors = false, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<ControllerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     public Task<ApiResponse<ControllerDeviceDto>> CreateControllerAsync(ControllerDeviceDto dto, CancellationToken token = default)
@@ -1098,7 +1100,8 @@ public class MockDeviceApiService : IDeviceApiService
         bool includeController = false,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default, string? view = null, string? include = null,
+        string? typeSensor = null, int? groupId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetSensorsCalled = true;
         SensorPageRequested = page;
@@ -1113,7 +1116,7 @@ public class MockDeviceApiService : IDeviceApiService
     }
 
     public SensorDeviceDto? SensorByIdDto { get; set; }
-    public Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(int id, bool includeController = false, CancellationToken token = default)
+    public Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(int id, bool includeController = false, CancellationToken token = default, string? view = null, string? include = null)
     {
         if (SensorByIdDto != null)
             return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(SensorByIdDto));
@@ -1138,7 +1141,8 @@ public class MockDeviceApiService : IDeviceApiService
         string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default, string? view = null, string? include = null,
+        string? typeCamera = null, string? protocol = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetCamerasCalled = true;
         CameraPageRequested = page;
@@ -1152,7 +1156,7 @@ public class MockDeviceApiService : IDeviceApiService
         return Task.FromResult(ApiListResponse<CameraDeviceDto>.CreateSuccess(new List<CameraDeviceDto>()));
     }
 
-    public Task<ApiResponse<CameraDeviceDto>> GetCameraByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<CameraDeviceDto>> GetCameraByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<CameraDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     public Task<ApiResponse<CameraDeviceDto>> CreateCameraAsync(CameraDeviceDto dto, CancellationToken token = default)
@@ -1180,9 +1184,9 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<CameraSettingDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     // ──────────────────────────── Speakers ────────────────────────────
-    public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? speakerRole = null, string? typeSpeaker = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
         => Task.FromResult(ApiListResponse<SpeakerDeviceDto>.CreateSuccess(new List<SpeakerDeviceDto>()));
-    public Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<SpeakerDeviceDto>> CreateSpeakerAsync(SpeakerDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1194,9 +1198,9 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Enclosures ────────────────────────────
-    public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeEnclosure = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
         => Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateSuccess(new List<EnclosureDeviceDto>()));
-    public Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(EnclosureDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1208,9 +1212,9 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ── Gate(통문, 서버 v6.3) — symbol-detail-and-door-control FR-09/10 ──
-    public Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(string? gateStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(string? gateStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeGate = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
         => Task.FromResult(ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>()));
-    public Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1220,9 +1224,9 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Lamps ────────────────────────────
-    public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeLamp = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
         => Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>()));
-    public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<LampDeviceDto>> CreateLampAsync(LampDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1305,6 +1309,21 @@ public class MockDeviceApiService : IDeviceApiService
     public Task<ApiResponse<MetricDeleteResultDto>> DeleteEnclosureMetricsAsync(int enclosureId, string? beforeDate = null, CancellationToken token = default)
         => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
+    public Task<ApiListResponse<ComponentStateRowDto>> GetDevicesByComponentAsync(string? componentType = null, string? component = null, string? state = null, string? health = null, string? deviceType = null, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<ComponentStateRowDto>.CreateSuccess(new List<ComponentStateRowDto>()));
+    public Task<ApiResponse<DeviceStatusWriteDataDto>> PatchComponentStatusAsync(string deviceTypePath, int deviceId, IDictionary<string, ComponentStatusDto> components, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceStatusWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceConfigWriteDataDto>> GetDeviceConfigAsync(string deviceTypePath, int deviceId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceConfigWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceConfigWriteDataDto>> PatchDeviceConfigAsync(string deviceTypePath, int deviceId, DeviceConfigAxisDto config, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceConfigWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceConfigWriteDataDto>> UpdateDeviceConfigAsync(string deviceTypePath, int deviceId, DeviceConfigAxisDto config, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceConfigWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceSpecCatalogDto>> GetDeviceSpecCatalogAsync(bool includeInactive = false, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceSpecCatalogDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceTypeSpecDto>> GetDeviceTypeSpecAsync(string deviceTypePath, bool includeInactive = false, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceTypeSpecDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
     // ──────────────────────────── IService ────────────────────────────
     public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
@@ -1319,7 +1338,7 @@ public class MockServerApiService : IServerApiService
     public bool GetServersCalled { get; private set; }
     public List<ServerDto> Servers { get; } = new();
 
-    public Task<ApiListResponse<ServerDto>> GetServersAsync(int? categoryId = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<ServerDto>> GetServersAsync(int? categoryId = null, string? status = null, int page = 1, int limit = 20, string? view = null, string? include = null, CancellationToken token = default, string? categoryServer = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetServersCalled = true;
         // 단일 페이지로 전체 반환(2페이지부터 빈 목록 → 페이지 루프 종료)
@@ -1339,7 +1358,7 @@ public class MockServerApiService : IServerApiService
     public Task<ApiResponse<object>> DeleteCategoryAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
-    public Task<ApiResponse<ServerDto>> GetServerByIdAsync(int id, CancellationToken token = default)
+    public Task<ApiResponse<ServerDto>> GetServerByIdAsync(int id, string? view = null, string? include = null, CancellationToken token = default)
         => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<ServerDto>> CreateServerAsync(ServerDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1356,8 +1375,21 @@ public class MockServerApiService : IServerApiService
         => Task.FromResult(ApiListResponse<ServerMetricDto>.CreateSuccess(new List<ServerMetricDto>()));
     public Task<ApiResponse<ServerMetricLatestDto>> GetServerMetricLatestAsync(int serverId, CancellationToken token = default)
         => Task.FromResult(ApiResponse<ServerMetricLatestDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    /// <summary>정본 시그니처(<c>older_than_days</c>) — 서버가 실제로 받는 파라미터다.</summary>
+    public Task<ApiResponse<MetricDeleteResultDto>> DeleteServerMetricsAsync(int serverId, int olderThanDays, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    /// <summary>
+    /// 폐기된 <c>before_date</c> 오버로드 — 인터페이스에 남아 있어 구현만 해 둔다.
+    /// <b>호출하지 말 것</b>(서버에 없는 파라미터라 의도와 무관하게 기본 30일치가 실제 삭제된다).
+    /// </summary>
+    [Obsolete("before_date 는 서버에 없는 파라미터다. DeleteServerMetricsAsync(serverId, olderThanDays) 를 사용하라.", error: false)]
     public Task<ApiResponse<MetricDeleteResultDto>> DeleteServerMetricsAsync(int serverId, string? beforeDate = null, CancellationToken token = default)
         => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    /// <summary>서버 상태 보고(API 7.0+ 전용) — 이 테스트들은 쓰지 않아 최소 구현.</summary>
+    public Task<ApiResponse<ServerStatusReportDto>> ReportServerStatusAsync(int serverId, string status, DateTimeOffset? observedAt = null, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerStatusReportDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     public Task<ApiResponse<ProxySettingDto>> GetProxySettingsAsync(int serverId, CancellationToken token = default)
         => Task.FromResult(ApiResponse<ProxySettingDto>.CreateError("NOT_IMPLEMENTED", "Mock"));

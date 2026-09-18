@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System.Collections.Generic;
@@ -73,12 +74,14 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             if (res.Success && res.Data != null)
                 foreach (var cat in res.Data)
                 {
-                    var items = cat.Components ?? cat.Items;
-                    if (items == null) continue;
-                    foreach (var it in items)
-                        Components.Add(new ComponentPick(it.Id, it.Title ?? it.Name ?? it.Id, cat.Label ?? cat.Category)
+                    // 서버 항목 4키 = {id, name, description, chart_type}. 표시명은 name(title 은 서버가 안 준다),
+                    // 종류는 chart_type(PIE/BAR/LINE, 그리드·요약카드는 null)이다.
+                    foreach (var it in cat.Entries)
+                        Components.Add(new ComponentPick(it.Id, it.Name ?? it.Id, cat.Label ?? cat.Category)
                         {
                             Enabled = enabledIds.Contains(it.Id),
+                            ChartType = it.ChartType,
+                            Description = it.Description,
                         });
                 }
         }
@@ -112,7 +115,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                 };
                 var res = await _api.CreateTemplateAsync(dto);
                 if (res.Success && res.Data != null) { StatusText = "생성됨."; Saved?.Invoke(res.Data.Id); }
-                else { StatusText = $"생성 실패: {res.Message}"; _log?.Warning($"[ReportTemplateEdit] 생성 실패: {res.Message}"); }
+                // 사유는 ApiErrorTextHelper 로 — top-level message 없는 400·404 봉투에서 res.Message 는 빈 문자열이다.
+                else { var why = res.ErrorText("서버가 생성을 거부했습니다."); StatusText = $"생성 실패: {why}"; _log?.Warning($"[ReportTemplateEdit] 생성 실패: {why}"); }
             }
             else
             {
@@ -129,7 +133,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                 };
                 var res = await _api.UpdateTemplateAsync(_templateId, dto);
                 if (res.Success) { StatusText = "저장됨."; Saved?.Invoke(_templateId); }
-                else { StatusText = $"저장 실패: {res.Message}"; _log?.Warning($"[ReportTemplateEdit] 저장 실패: {res.Message}"); }
+                else { var why = res.ErrorText("서버가 저장을 거부했습니다."); StatusText = $"저장 실패: {why}"; _log?.Warning($"[ReportTemplateEdit] 저장 실패: {why}"); }
             }
         }
         catch (Exception ex) { _log?.Error($"[ReportTemplateEdit] Save: {ex.Message}"); StatusText = $"오류: {ex.Message}"; }

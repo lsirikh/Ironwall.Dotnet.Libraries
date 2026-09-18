@@ -1,10 +1,12 @@
 ﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Api.Models;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
@@ -44,6 +46,29 @@ public class DeviceUiModule : Module
             // IDeviceApiService(위 DeviceApiModule 등록)에 의존. GMaps.Ui가 lazy 해석.
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Services.DeviceLocationGateway>()
                    .As<Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceLocationGateway>().SingleInstance();
+            // FR-10 · FR-11: 장비 조회 쿼리를 서버 계약 세대별로 조립하는 단일 분기점.
+            // IServerContractProbe 는 ResolveOptional — 미등록(구성 이전 단계)이면 null → 정책이 6.3(현행 운영)으로 동작한다.
+            builder.Register(c => new DeviceQueryPolicy(
+                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<DeviceQueryPolicy>()
+                   .SingleInstance();
+
+            // 서버 8.0 부대 편제(unit_id) — GroupNats(부대 코드) → unit_id(정수) 해석 1회 + 캐시.
+            // 의존 3종 모두 ResolveOptional: 프로브 미등록이면 V6_3 으로 간주되어 해석·전송이 전부 꺼진다(운영 6.3.2 무회귀).
+            // INatsSetupModel 미등록(DB/오프라인 모드)이면 해석할 코드가 없어 경고 1회 후 unit_id 생략.
+            builder.Register(c => new UnitScopeService(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Api.Services.IUnitApiService>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
+                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
+                   // Order 는 DeviceProviderService 와 같은 값을 쓴다(_count 를 증가시키지 않는다) —
+                   // 기존 서비스들의 Order 값을 한 칸씩 밀면 다른 모듈 서비스와의 상대 순서가 바뀐다.
+                   // ParentBootstrapper 의 OrderBy 는 안정 정렬이라 같은 값이면 등록 순서가 유지돼
+                   // 이 서비스가 DeviceProviderService 보다 먼저 시작한다(장비 적재 전에 부대 해석).
+                   .As<IUnitScopeService>().As<IService>()
+                   .SingleInstance().WithMetadata("Order", _count);
+
             builder.RegisterType<DeviceProviderService>().As<IDeviceProviderService>().As<IService>()
                 .SingleInstance().WithMetadata("Order", _count);
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();

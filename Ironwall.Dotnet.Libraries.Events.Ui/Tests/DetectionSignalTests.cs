@@ -260,10 +260,8 @@ public class DetectionSignalTests
     {
         var apiMock = new Mock<IEventApiService>();
         int calls = 0;
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string? s, string? e, int? c, int? sensor, string? st, int page, int limit, CancellationToken ct) =>
+        apiMock.Setup(EventApiQuery.AnyDetection())
+            .ReturnsAsync((string? s, string? e, int? c, int? sensor, string? st, string? res, string? tev, int page, int limit, CancellationToken ct) =>
             {
                 calls++;
                 // 매 페이지 만건 응답(100건) — 무한 데이터 시뮬레이션
@@ -287,9 +285,7 @@ public class DetectionSignalTests
     public async Task should_keep_empty_state_when_api_fails()
     {
         var apiMock = new Mock<IEventApiService>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(new ApiListResponse { Success = false, Message = "server down" });
 
         var vm = CreateVm(apiMock, out var eaMock);
@@ -320,9 +316,7 @@ public class DetectionSignalTests
             BuildDto(5, 0, actioned: false, result: "AI_DETECT"),
         };
         var apiMock = new Mock<IEventApiService>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
-                It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(new ApiListResponse { Success = true, Data = data });
         return apiMock;
     }

@@ -15,6 +15,20 @@
 ## [Unreleased]
 
 ### Added
+- **GOP 서버 API 계약 동기화 (6.3.2 / 8.0.1 동시 대응)** (Track C · [PRD](docs/prds/gop-api-contract-sync-prd.md) v3.0 · [Plan](docs/plans/gop-api-contract-sync-prd-plan.md) · [분석](docs/analyses/gop-api-contract-sync-analysis.md) · [실연동 검증](docs/tests/gop-api-contract-sync-live-verification.md) · 사용자 사전 승인 2026-09-18)
+  - **판본 런타임 분기**(`IServerContractProbe` + `ServerContractBootService`, `Order = -1000`) — 맞출 대상이 **셋**이다(운영 `6.3.2` · 개발 `8.0.1` · 명세 `v8.0`). 장비 쓰기는 `type_device`(6.3 **필수**) vs `additionalProperties:false`(7.0+ **금지**)로 **한 본문 양립 불가**라 페이로드 성형만으로는 못 맞춘다. `GET {root}/openapi.json` 의 `info.version` 을 1회 확보해 캐시하고, **판정 실패 시 `V6_3` 폴백**(운영이 6.3.2라 틀렸을 때 손해가 가장 작다). 비교는 **항상 `>=`** — 세션 중 로컬이 `7.0.1 → 8.0.1` 로 올라간 것이 `==` 분기의 위험을 실증했다.
+  - **장비 축(axis) 전환** — `type_controller`/`type_sensor`/`type_camera`/`type_speaker`/`type_enclosure` + `connection`/`hardware_spec`/`device_config`. DTO 를 판본마다 복제하지 않고 `UseAxisWrite` 플래그 + `ShouldSerializeXxx()` 조건 직렬화로 **한 DTO 가 두 계약을 표현**한다. `version` → `hardware_spec.firmware` 역투영도 쓰기 방향으로 이었다(종전엔 드롭만 돼 펌웨어 수정이 서버에 전달되지 않았다).
+  - **목록 계약 전환** — `include_sensors`/`include_controller` → `?include=` · `?view=full`(14곳). ⚠ **제거된 필터를 판본별 실존으로 판정**: 운영 6.3.2 에도 있는 `group_id`(제어기·센서·카메라)·`server_id`(스피커) **4곳**은 게이트에서 빼 `AddLegacySafeFilter` 로 분리했다(명세 변경이력만 보고 게이트를 걸어 멀쩡한 운영 필터를 무증상으로 잃고 있었다).
+  - **권한 저장 = 전체 교체** — 세 집합이 전부 다르고(서버 enum 15/16 ≠ 우리 카탈로그 12 ≠ 그룹 저장분 12) **서버 문서의 처방("GET 원본에 병합")도 422** 다. `원본 ∪ 카탈로그`(`BuildMergedModules`)가 유일 해법이며, 세션 중 서버가 `units` 를 backfill 해 **13 ∪ 12 = 16** 으로 정확히 맞아떨어졌다. 권한 권위는 서버로 이관하고 하드코딩 오류 3건(`devices`/`users` control, `broadcast` edit)을 제거.
+  - **부대 편제(`/api/units` 7경로, `>= V8_0` 한정)** — `unit_id` 를 조건 없이 보내면 6.3/7.0 쓰기 스키마가 `extra="forbid"` 라 **즉시 422**. `IUnitScopeService` + `UnitScopeGate` 로 쓰기 **14곳을 단일 관문**에 모았다. 부대 코드 정규식(`^[a-z0-9][a-z0-9_-]{0,31}$`, NATS subject 토큰)·`include` 어휘·계층/인접 규칙은 `UnitRules` 에서 **서버 왕복 전에** 검증한다.
+  - **이벤트 어휘 내성** — 서버는 어휘를 **늘린다**. `Enum.Parse` 10곳을 `TryParse` 폴백(`ParseOrDefault`)으로 바꿨다. 종전에는 신설값 `Alert` 하나가 **탐지 목록 로딩 전체를 죽였다**. `EnumEventType` 에 서버 확장 어휘 `Alert`(160)·`Operation`(161) 추가 — **PIDS 프로토콜 바이트가 아니다**. `action_reported` 도 `== "True"` 문자열 비교에서 관용 bool 판정으로.
+  - **문 개폐 채널 전환(REST → NATS)** — `POST .../control` 은 6.3.16 에서 제거되고 7.0/8.0 에서 **410 묘비**다. 회피만 하면 기능이 사라지므로 클라 → 매니저 `GATE_DOOR_SET` 직행으로 전환(`DoorControlService`). 통문 `…all.gate-door` / 함체 `…all.enclosure-door`. **명령은 상태를 바꾸지 않는다.**
+  - **NATS 전역 자원 구독** — 전역 카탈로그류는 부대 토큰이 아니라 **`global`** 로 발행된다(`SYNC_CATALOG`/`SYNC_CATEGORY`/`SYNC_ACTION_REPORT_TEMPLATE`/`SYNC_FILE_GROUP`/`SYNC_UNIT`). `{domain}.global.>` 를 추가 구독 — 종전에는 부대 와일드카드로도 **못 받았다**.
+  - **공통 계약 출구** — 에러코드 16종(`ApiErrorCodes`)·`ApiStatusHelper`(409/410/422/401/403 분기)·`ApiErrorTextHelper`(운영자가 읽는 한 줄, 날 JSON·`HTTP 0:` 오표기 차단)·목록 절단 감지(`limit` 상한 100 초과 페이지 순회)·`ResponseWarningDto`.
+  - **조치보고 문구 템플릿 7경로 + `/reorder`**(단일 트랜잭션) · **보고서 구성 개수**는 목록 응답이 `components` 를 안 싣고 `component_count` 만 줘서 `EffectiveComponentCount` 로 둘을 흡수(종전엔 전 템플릿이 0개로 보였다).
+  - **장비 부품 축 1급화** — `by-component`(문 상태 일괄) · `component-status` PATCH · `/config` 3종 · `/spec` 카탈로그 2종. `component` 와 `component_type` 배타는 지역 검사로 **422 선제 차단**.
+  - **세션 식별자 명시 전달** — `session_id` 를 응답 본문 값으로 전달(종전엔 JWT `sid` 클레임 포착에만 의존해 서버가 클레임을 빼면 '내 세션' 판정이 계정 근사 폴백으로 조용히 격하됐다).
+  - **실연동 검증**(2026-09-18, 라이브러리 실물 · 모의 0) — 관문 **104개 중 OK 96**. 판본 판정이 같은 바이너리에서 로컬 `V8_0/8.0.1` · 운영 `V6_3/6.3.2` 로 갈림 · `Alert` POST(201)→GET→`MessageType=Alert(160)` · **장비 7종 쓰기 전면 통과**(422 없음) · 권한 전체 교체 16종 무손실 · NATS `GATE_DOOR_SET` 브로커 도달 + `global.>` 실수신 + `requested_at` aware ISO-8601. ❌ **실기 WPF 화면 · 운영 6.3.2 인증 경로 · FR-24 `unit_id` 실주입 쓰기는 미검증**.
 - **PIDS 심볼 상세 보기 + 통문·함체 개폐 제어** (Track C · [PRD](docs/prds/symbol-detail-and-door-control-prd.md) · [Plan](docs/plans/symbol-detail-and-door-control-prd-plan.md) · [리포트](docs/reports/symbol-detail-and-door-control-report.md) · 사용자 승인 2026-09-08)
   - **속성창 개폐 UI** — 접점 체크박스 제거 → `문 상태` 세그먼트(열림/닫힘/**명령 대기 중**/상태 미수신). **명령은 상태를 바꾸지 않는다** — 확정 상태는 `OPERATION_EVENT` 보고로만 전이한다(낙관적 갱신 시 구동 실패하면 화면이 거짓말을 한다). 타임아웃도 상태를 지어내지 않는다.
   - **상세 보기 창** — 운영 모드 우클릭 맨 위 진입. 좌측 3D 프리뷰(**45°×8단 자동 회전**, 드래그 자유 회전 + 점선 구 가이드, 놓으면 1.5초 뒤 재개) / 우측 정보 탭 / 하단 액션 바.
@@ -26,6 +40,14 @@
   - **마이크 PTT** — 배선 완료 후 `IsMicCommandSupported=false` 하나로 잠금. 서버 규격 회신([요청서](docs/coordination/server-broadcast-mic-request-2026-09-08.md)) 후 상수만 바꾸면 열린다.
 
 ### Fixed
+- **신설 이벤트 어휘가 탐지 목록 전체를 죽임** — `Enum.Parse` 가 미지 문자열에 `ArgumentException` 을 던져, 서버가 `Alert` 를 detection 카테고리로 보내기 시작하자 목록 로딩이 통째로 실패했다. 관용 파싱(`TryParse` + default 폴백)으로 교체 — **어휘가 늘어도 화면이 죽지 않는다.**
+- **`ShouldSerializeDevice() => false` 가 NATS 본문을 파손** — REST 쓰기 422 를 막으려 `device` 직렬화를 끈 것이 **`ACTION_REPORT` 의 `from_event.device` 까지 지웠다**(`ShouldSerializeXxx` 는 경로가 아니라 **타입 전역**에 적용된다). 경로별 차단은 플래그 게이트(`SuppressDeviceOnRestWrite`, REST 쓰기 구간에서만 켜고 `finally` 로 복원)로 해결. 회귀 테스트 2건으로 고정.
+- **분기를 만들어 놓고 실제로 켜지지 않던 죽은 코드 2건** — `ResolveAsync()` 호출부가 **0건**이었고, Autofac 팩토리가 프로브를 **전달하지 않아** 모든 판본 분기가 무력했다. 빌드·테스트는 전부 통과하는 상태로 숨어 있었다.
+- **이벤트 장비가 전부 '센서'로 폴백** — 판본별 `device` shape 차이(운영 6.3.2 = 전문 객체 + `type_device` / 개발 8.0.1 = `DeviceReference` `{id, category_device}` 두 키)를 반영해 복원 순서를 `type_device` → `category_device` → `'알 수 없음'` 으로. ⚠ `sensor` 카테고리는 **의도적 미매핑**(Fence·Multi·PIR·SmartSensor 가 모두 들어 있어 하나를 고르면 틀린 종류를 단정한다).
+- **함체 임계치 경계 오판** — 7개 경계를 서버 실측값에 맞춤.
+- **희소 DTO 로 부분 수정(PATCH) 시 `controller_id: 0` 전송 → 404** — `SensorDeviceDto.ControllerId` 는 생성 필수라 비-nullable `int` 로 재선언돼 있어 값형 기본값 `0` 이 그대로 나가고, 서버가 `NOT_FOUND "Controller with id 0 not found"` 를 돌려줬다. `ShouldSerializeControllerId() => ControllerId > 0` 로 게이트(0 은 어느 판본에서도 유효하지 않아 드롭이 항상 안전 · 전체 교체 PUT 무영향). **실연동 와이어 로그로 발견**. ⚠ `number_device`/`status`/`is_enable` 도 희소 PATCH 에서 함께 실리므로 **부분 수정에는 완전한 DTO 를 넘긴다**는 계약을 문서로 남겼다.
+- **목록 `limit` 서버 상한(100) 미클램프로 침묵 실패** — `limit=200` 을 그대로 흘려 서버가 422 로 거절하면 목록이 **빈 응답**으로 보여 "데이터 없음"으로 오진됐다. `DeviceApiService.ClampLimit` 신설, 목록 **7곳**(제어기·센서·카메라·스피커·함체·통문·경광등)에 적용 + 범위 밖이면 경고 로그. **실연동에서 발견**.
+- **계정 목록 101번째부터 조용히 절단** — 서버 `limit` 상한 100 이라 단일 호출로는 전량을 못 받는다 → page 순회.
 - **통문(Gate) 부팅 벌크 로드 누락** — `DeviceProviderService.FetchAllDevicesAsync` 가 제어기·센서·카메라·스피커·함체·경광등은 가져오는데 **통문만 빠져 있었다**. 단건 조회는 `SYNC_DEVICE` 전용이라 부팅을 못 덮어, 통문 심볼의 `LinkedDevice` 가 영원히 null → **개폐 버튼 항상 잠김 + 부팅 시 문 상태 복원 무력**. 실기 로그로 확인(`Gates loaded: 2 items` — 서버에 있었는데 안 불러오고 있었다).
 - **장비 객체가 없는데 "연결됨"으로 표시** — `LinkedDeviceId > 0` 로 판정해 장비 목록에 그 장비가 없어도 탭이 전부 활성이고 값만 전부 `—` 였다. **객체 유무**로 판정하고 사유를 두 갈래로 구분(`연결되지 않음` / `장비(#id) 정보를 찾지 못함`).
 - **명령류 권한 fail-closed 누락** — `cameras:control` 이 `?? true` 로 남아 있었다. 정책을 `PermissionGate` 한 곳으로 모아 **명령류만 fail-closed / 조회·편집은 fail-open** 비대칭을 테스트로 고정.

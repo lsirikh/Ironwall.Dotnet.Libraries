@@ -73,7 +73,7 @@ public class ApiAccountGatewayCrudTests
 
         public Task<ApiResponse<AuthUserDto>> UpdateUserAsync(int id, UserUpdateDto dto, CancellationToken ct = default)
             => Task.FromResult(ApiResponse<AuthUserDto>.CreateSuccess(
-                new AuthUserDto { Id = id, LoginId = dto.LoginId ?? "x", Role = dto.Role, IsActive = true }));
+                new AuthUserDto { Id = id, LoginId = "x", Role = dto.Role, IsActive = true }));
 
         public Task<ApiResponse<object>> DeleteUserAsync(int id, CancellationToken ct = default)
             => Task.FromResult(ApiResponse<object>.CreateSuccess(new object()));

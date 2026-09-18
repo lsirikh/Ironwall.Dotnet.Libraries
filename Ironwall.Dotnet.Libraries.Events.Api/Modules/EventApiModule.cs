@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
@@ -61,7 +61,14 @@ public class EventApiModule : Module
             builder.Register(ctx => new EventApiService(
                     _log,
                     ctx.ResolveNamed<IApiService>($"{_name}"),
-                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    // ⚠ 이 인자를 빠뜨리면 버전 분기가 통째로 죽은 코드가 된다.
+                    //    프로브가 null 이면 서비스는 영구히 V6_3(운영 판본)로 간주해
+                    //    운영 이벤트 조회가 항상 "서버 7.0 이상 전용" 으로 막히고
+                    //    unit_id/include_descendants 쿼리도 영구히 전송되지 않는다.
+                    //    등록이 없는 호스트에서도 죽지 않도록 옵셔널 해석 2단(DeviceApiModule 과 동일 관용구).
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
                 ))
                 .Named<IEventApiService>(_name)
                 .AsImplementedInterfaces()

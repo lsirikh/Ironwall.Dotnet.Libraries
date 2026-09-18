@@ -63,6 +63,9 @@ public class GMapUiModule: Module
         builder.RegisterType<CameraAimControlService>().As<ICameraAimControlService>().SingleInstance();
         // 경광등 제어 4종 REQ 발행(LAMP_CLEAR/OFF/COLOR_SET/BUZZER_SET) — UI 미배선, 로직 계층 선행(PRD FR-07)
         builder.RegisterType<LampControlService>().As<ILampControlService>().SingleInstance();
+        // 통문·함체 문 개폐 명령 PUB 발행(GATE_DOOR_SET/ENCLOSURE_DOOR_SET → all.gate-door/all.enclosure-door)
+        //  — 브로커 v1.6 §7: 서버 REST /control 제거로 클라→매니저 직행이 정본 채널이다.
+        builder.RegisterType<DoorControlService>().As<IDoorControlService>().SingleInstance();
 
         builder.RegisterType<MarkerFactory>().SingleInstance();
         builder.RegisterType<PropertyPanelFactory>().SingleInstance();

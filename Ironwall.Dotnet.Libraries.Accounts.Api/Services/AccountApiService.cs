@@ -1,3 +1,4 @@
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
@@ -28,7 +29,10 @@ public class AccountApiService : IAccountApiService
     {
         try
         {
-            var res = await _api.PostRequestAsync("auth/login", new LoginRequestDto { LoginId = loginId, Password = password })
+            // client_id: 커넥션 식별값(§9.2.2). allow 정책에서 세션 주체 구분 + self-replace 축.
+            // 패턴 위반값은 서버가 무시(로그인 차단 없음)하고, 키 자체를 생략해도 로그인은 성공한다 → 무회귀.
+            var res = await _api.PostRequestAsync("auth/login",
+                                    new LoginRequestDto { LoginId = loginId, Password = password, ClientId = ClientIdentity.Current })
                                 .ConfigureAwait(false);
             var parsed = await res.ToApiResponseAsync<LoginResponseDataDto>().ConfigureAwait(false);
 
@@ -109,6 +113,67 @@ public class AccountApiService : IAccountApiService
             return await res.ToApiListResponseAsync<AuthUserDto>().ConfigureAwait(false);
         }
         catch (Exception ex) { return ApiListResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    /// <summary>
+    /// GET /api/users 전량 조회 — <c>page</c> 를 올려가며 <b>서버가 더 줄 게 없을 때까지</b> 순회한다(§9.3.2).
+    /// <para>서버 <c>limit</c> 상한이 100(초과 지정은 422)이라 단일 호출은 101번째 계정부터 <b>조용히 잘렸다</b>.
+    /// 운영 6.3.2 봉투에는 <c>pagination</c> 이 없어 "더 있다"를 알 방법조차 없었으므로, 판본과 무관하게 성립하는
+    /// 종료조건을 쓴다 — ① 빈 페이지 ② 반환 수 &lt; limit ③ (<c>pagination</c> 이 있으면) <c>page &gt;= total_pages</c>.
+    /// 그래서 8.0.1(pagination 있음)·6.3.2(없음) 양쪽에서 같은 코드로 끝까지 가져온다.</para>
+    /// </summary>
+    public async Task<ApiListResponse<AuthUserDto>> GetAllUsersAsync(CancellationToken ct = default)
+        => await GetAllPagesAsync<AuthUserDto>("users", "limit", ct).ConfigureAwait(false);
+
+    /// <summary>
+    /// GET /api/user-groups 전량 조회 — 그룹 목록도 <c>page</c>/<c>limit</c>(기본·상한 100)을 받는다.
+    /// 종전 호출은 파라미터를 아예 보내지 않아 그룹이 100개를 넘으면 잘렸다(무증상). 종료조건은 users 와 동일.
+    /// </summary>
+    public async Task<ApiListResponse<UserGroupDto>> GetAllUserGroupsAsync(CancellationToken ct = default)
+        => await GetAllPagesAsync<UserGroupDto>("user-groups", "limit", ct).ConfigureAwait(false);
+
+    /// <summary>서버 페이지 상한(users·user-groups·user-sessions·audit-logs 공통 <c>le=100</c>).</summary>
+    private const int MAX_PAGE_SIZE = 100;
+    /// <summary>순회 안전 상한(= 최대 10,000행). 서버가 같은 페이지를 반복 반환하는 병리적 상황에서 무한루프 방지.</summary>
+    private const int MAX_PAGES = 100;
+
+    /// <summary>page 를 1 부터 올려가며 목록을 이어붙인다. 첫 페이지가 실패하면 그 실패 응답을 그대로 반환(호출부 swap-on-success 유지).</summary>
+    private async Task<ApiListResponse<T>> GetAllPagesAsync<T>(string path, string limitKey, CancellationToken ct)
+    {
+        try
+        {
+            var all = new List<T>();
+            ApiListResponse<T>? last = null;
+            for (var page = 1; page <= MAX_PAGES; page++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var query = new Dictionary<string, string> { ["page"] = page.ToString(), [limitKey] = MAX_PAGE_SIZE.ToString() };
+                var http = await _api.GetRequestAsync(path, query).ConfigureAwait(false);
+                var res = await http.ToApiListResponseAsync<T>().ConfigureAwait(false);
+
+                if (!res.Success || res.Data is null)
+                    return page == 1 ? res : Finish(all, last);   // 중간 페이지 실패: 여기까지를 성공으로 넘기되 last 로 표시
+                last = res;
+                all.AddRange(res.Data);
+
+                if (res.Data.Count < MAX_PAGE_SIZE) break;                                  // 마지막 페이지(부분 채움)
+                if (res.Pagination is { } p && p.TotalPages > 0 && page >= p.TotalPages) break;  // pagination 제공 서버(8.0+)
+            }
+            return Finish(all, last);
+        }
+        catch (OperationCanceledException) { return ApiListResponse<T>.CreateError("CANCELED", "요청이 취소되었습니다."); }
+        catch (Exception ex) { return ApiListResponse<T>.CreateError("INTERNAL_ERROR", ex.Message); }
+
+        static ApiListResponse<T> Finish(List<T> all, ApiListResponse<T>? last)
+        {
+            // pagination 은 '마지막 페이지' 기준이라 그대로 싣으면 전량 결과를 잘못 설명한다 → 합본 기준으로 재작성.
+            var merged = ApiListResponse<T>.CreateSuccess(all,
+                new PaginationDto { Page = 1, Limit = all.Count, Total = all.Count, TotalPages = 1 },
+                last?.Message);
+            merged.Total = all.Count;   // 봉투가 total 을 안 주는 판본에서도 호출부가 전체 건수를 읽을 수 있게 채운다
+            merged.StatusCode = last?.StatusCode ?? 200;
+            return merged;
+        }
     }
 
     // ── 세션 설정 (GOP_Session_Settings_Admin FR-SS-C1) — 서버 API 미배포 시 404 → res.Success=false (클라 graceful) ──
@@ -221,6 +286,8 @@ public class AccountApiService : IAccountApiService
             var query = new Dictionary<string, string> { ["page"] = page.ToString(), ["size"] = size.ToString() };
             if (userId.HasValue) query["user_id"] = userId.Value.ToString();
             if (groupId.HasValue) query["group_id"] = groupId.Value.ToString();
+            // ⚠ status 는 '비어있지 않을 때만' 보낸다 — 서버 어휘가 닫혀 있어(ACTIVE/EXPIRED/PENDING/REVOKED)
+            //   빈 문자열을 "전체"로 여겨 `?status=` 로 조립하면 422 가 된다(라이브 실측: status=bogus → 422).
             if (!string.IsNullOrEmpty(status)) query["status"] = status;
             if (activeOnly) query["active_only"] = "true";
             var res = await _api.GetRequestAsync("grants", query).ConfigureAwait(false);

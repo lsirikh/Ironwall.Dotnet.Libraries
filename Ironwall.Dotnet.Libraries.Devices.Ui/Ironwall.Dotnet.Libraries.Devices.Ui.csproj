@@ -35,6 +35,9 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
     <!-- FR-EN-09/11: 장비 CRUD 권한 게이팅 — IPermissionService (순환 없음 확인됨) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <!-- 서버 8.0 unit_id 주입: INatsSetupModel.GroupNats 가 우리 부대 '코드'의 유일한 출처.
+         Nats 프로젝트는 Base 하나만 참조하므로 순환 없음(선례: Events.Ui 도 직접 참조). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
   </ItemGroup>
 
   <ItemGroup>

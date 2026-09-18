@@ -26,6 +26,11 @@ public static class EnumKoreanMap
         [EnumEventType.Action]     = "조치보고",
         [EnumEventType.Fault]      = "장애",
         [EnumEventType.WindyMode]  = "풍량모드",
+        // API 7.0 신설 2값 — 라벨이 없으면 폴백으로 영문 원문("Alert"/"Operation")이 화면에 노출된다.
+        //   `Alert` 는 **탐지(detection) 카테고리에 실려 온다**(서버 ALLOWED_TYPE_EVENT_BY_CATEGORY),
+        //   `Operation` 은 함체·통문 개폐와 임계치(온·습도·전압·전류·진동·UPS) 운영 이벤트다.
+        [EnumEventType.Alert]      = "경고",
+        [EnumEventType.Operation]  = "운영",
     };
 
     // ── 탐지 결과 (Result) ────────────────────────────────────────────────
@@ -40,6 +45,8 @@ public static class EnumKoreanMap
         [EnumDetectionType.CONTACT_SENSOR]   = "접점 감지",
         [EnumDetectionType.DISTANCE_SENSOR]  = "거리 감지",
         [EnumDetectionType.AI_DETECT]        = "AI 탐지",
+        // API 8.0 신설 — 라벨이 없으면 폴백으로 영문 원문("RADAR_DETECT")이 화면에 노출된다.
+        [EnumDetectionType.RADAR_DETECT]     = "레이더 탐지",
     };
 
     // ── 장애 원인 (Reason) ────────────────────────────────────────────────

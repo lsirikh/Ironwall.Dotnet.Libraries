@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Common;
 using Ironwall.Dotnet.Libraries.Base.Models;
@@ -84,7 +84,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 강제로그아웃 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중(401→teardown)이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = $"강제 로그아웃 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "세션 관리", Explain = $"강제 로그아웃 실패: {ExplainFailure(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message)}" });
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 강제로그아웃 실패: {ex.Message}"); }
     }
@@ -117,7 +117,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 전체종료 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = $"전체 세션 종료 실패: {res.Error?.Message ?? res.Message}" });   // (R-2) 409 ADMIN 락아웃 메시지 표면화
+                { Title = "세션 관리", Explain = $"전체 세션 종료 실패: {ExplainFailure(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message)}" });   // (R-2) 409 ADMIN 락아웃 안내
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 전체세션 종료 실패: {ex.Message}"); }
     }
@@ -241,7 +241,13 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     }
 
     #region - Properties -
-    /// <summary>활성 세션만 조회 여부(기본 true=활성만, 서버 회신 반영 — 비활성 DUPLICATE 착시 제거). 변경 시 첫 페이지부터 재조회.</summary>
+    /// <summary>
+    /// 활성 세션만 조회 여부(기본 true=활성만). 변경 시 첫 페이지부터 재조회.
+    /// <para>종전 근거는 "evict_all 에서 생기는 비활성 DUPLICATE 행 착시 제거"였는데, 서버 기본 정책이 <c>allow</c>(축출 없음)로
+    /// 바뀌어 그 행 자체가 더는 생기지 않는다. 그래도 기본 true 를 유지하는 이유는 <b>이력 누적</b>이다 —
+    /// <c>session_history_retention_days=0</c>(정리 안 함)이면 비활성 이력이 무한히 쌓여(실측 2,600행+ / 100건 페이지 기준 수십 페이지)
+    /// 전체 조회가 실용적이지 않다. 끄고 보려면 보존일 설정을 함께 운영해야 한다.</para>
+    /// </summary>
     public bool IsActiveOnly
     {
         get => _isActiveOnly;
@@ -269,6 +275,16 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     /// <summary>스크롤 하단 도달 시 발화(DataGridScrollEndBehavior 바인딩).</summary>
     public ICommand LoadMoreCommand { get; }
     #endregion
+    /// <summary>
+    /// 세션 강제 종료 실패 문구 — 409(<c>CONFLICT</c>)는 서버 영문 대신 한글 안내로 바꾼다.
+    /// <para>배포 8.0.1 은 <c>DELETE /api/user-sessions/{session_id}</c>·<c>/user/{user_id}</c> 양쪽에 409 를 선언한다
+    /// ("마지막 활성 ADMIN 세션은 강제 로그아웃할 수 없음"). 운영 6.3.2 는 선언이 없어 이 분기에 닿지 않는다(무회귀).</para>
+    /// </summary>
+    private static string ExplainFailure(int statusCode, string? code, string? serverMessage)
+        => (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
+            ? "마지막으로 남은 활성 관리자(ADMIN) 세션은 종료할 수 없습니다. 다른 관리자가 로그인한 뒤 다시 시도해 주세요."
+            : (serverMessage ?? "서버가 요청을 거부했습니다.");
+
     #region - Attributes -
     private const int PAGE_SIZE = 100;   // 서버 limit 최대치
     private const int AUTO_REFRESH_INTERVAL_MS = 20_000;   // 자동 갱신 주기(~20s)
@@ -276,7 +292,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     private int _totalPages = 1;
     private int _totalCount;
     private bool _isLoadingMore;
-    private bool _isActiveOnly = true;   // 기본 활성만(true, 서버 회신 2026-08-03) — evict_all 비활성 DUPLICATE 착시 제거. is_active=true 전송.
+    private bool _isActiveOnly = true;   // 기본 활성만(is_active=true 전송) — allow 정책에선 '이력 무한 누적' 회피가 주 근거(IsActiveOnly 주석 참조).
     private Timer? _autoRefreshTimer;   // 주기 자동 갱신(활성 중만). OnActivate 시작 / OnDeactivate 폐기.
     #endregion
 }

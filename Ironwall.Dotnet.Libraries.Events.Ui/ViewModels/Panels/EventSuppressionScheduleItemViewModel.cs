@@ -146,6 +146,16 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
     /// </summary>
     private static string BuildOccurrenceText(EventSuppressionScheduleDto dto)
     {
+        // ⚠ 취소·종료된 창은 회차를 **표시하지 않는다**.
+        //    배포본(6.3.2·7.0.1)은 취소 스케줄에도 next_occurrence_start 로 **미래 시각을 계속 보고**한다
+        //    (revoked_at 게이트가 서버에 없다). 그러면 같은 행에서 배지는 "취소"인데 "다음 09-20 08:00" 이 떠
+        //    운용자가 "취소한 정비 창이 다시 열린다"고 읽는다 — 화면 안에서 모순이다.
+        //    명세 §6.8 은 "취소면 next_occurrence_start 는 항상 null" 로 바꿨지만,
+        //    **클라 게이트가 정본**이어야 한다 — 표시가 서버 배포 시점에 의존하면 안 된다.
+        //    IsSuppressingNow(:46)·IsDeletable(:48) 은 이미 cancelled 를 분기하는데 이 함수만 빠져 있었다.
+        if (dto.Status is "cancelled" or "expired") return string.Empty;
+        if (!string.IsNullOrEmpty(dto.RevokedAt)) return string.Empty;   // status 파생이 늦은 서버 대비 2중 게이트
+
         if (dto.OccurrenceEnd is { } oe && DateTime.TryParse(oe, out var end))
             return $"~{end:HH:mm} 까지";
         if (dto.NextOccurrenceStart is { } ns && DateTime.TryParse(ns, out var next))

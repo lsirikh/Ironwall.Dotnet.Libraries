@@ -83,9 +83,7 @@ public class GroupDetectionHistoryTests
         // 중첩 device.id만 채운다(검증 NEW-1 — 후필터 2절(실경로) 검증, 1절(DeviceId)은 사문)
         foreach (var dto in dtos)
             dto.Device ??= new BaseDeviceDto { Id = sensorId };
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), null, sensorId, null,
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.DetectionForSensor(sensorId))
             .ReturnsAsync(Ok(dtos));
     }
 
@@ -138,10 +136,8 @@ public class GroupDetectionHistoryTests
         var baseTime = new DateTime(2026, 8, 6, 0, 0, 0);
         foreach (var (sensorId, offsetSec) in new[] { (11, 0), (12, 1) })
         {
-            apiMock.Setup(x => x.GetDetectionEventsAsync(
-                    It.IsAny<string?>(), It.IsAny<string?>(), null, sensorId, null,
-                    It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, int page, int limit, CancellationToken ct)
+            apiMock.Setup(EventApiQuery.DetectionForSensor(sensorId))
+                .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, string? res, string? tev, int page, int limit, CancellationToken ct)
                     => page <= 3
                         ? Ok(Enumerable.Range((page - 1) * 100, 100)
                             .Select(n =>
@@ -176,9 +172,7 @@ public class GroupDetectionHistoryTests
         vm.Initialize(GroupMsg());
         await ActivateAsync(vm);
 
-        apiMock.Verify(x => x.GetDetectionEventsAsync(
-            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        apiMock.Verify(EventApiQuery.AnyDetection(), Times.Never);
         Assert.Empty(vm.FilteredItems);
         Assert.False(vm.HasLoadError);
     }
@@ -188,9 +182,7 @@ public class GroupDetectionHistoryTests
     {
         var apiMock = new Mock<IEventApiService>();
         SetupSensor(apiMock, 11, BuildDto(1, 1000, "2026-08-06T10:00:00"), BuildDto(2, 2000, "2026-08-06T11:00:00"));
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), null, 12, null,
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.DetectionForSensor(12))
             .ReturnsAsync(new ApiListResponse { Success = false, Message = "server error" });
         var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
 
@@ -208,9 +200,7 @@ public class GroupDetectionHistoryTests
     public async Task should_raise_error_when_all_sensors_fail()
     {
         var apiMock = new Mock<IEventApiService>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(new ApiListResponse { Success = false, Message = "server down" });
         var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
 
@@ -227,10 +217,8 @@ public class GroupDetectionHistoryTests
         // 첫 로드(그룹)는 CT 취소까지 영구 대기 → 재-Initialize(단일)가 공용 CTS 취소를 전파해야 한다(NFR-02 핵심 계약)
         var apiMock = new Mock<IEventApiService>();
         var capturedTokens = new List<CancellationToken>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), null, It.Is<int?>(s => s == 11 || s == 12), null,
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string? s, string? e, int? c, int? sen, string? st, int page, int limit, CancellationToken ct)
+        apiMock.Setup(EventApiQuery.DetectionForAnyOf(11, 12))
+            .Returns(async (string? s, string? e, int? c, int? sen, string? st, string? res, string? tev, int page, int limit, CancellationToken ct)
                 => { lock (capturedTokens) capturedTokens.Add(ct); await Task.Delay(-1, ct); return Ok(); });
         SetupSensor(apiMock, 99, BuildDto(9, 900, "2026-08-06T09:00:00"));
         var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
@@ -318,9 +306,7 @@ public class GroupDetectionHistoryTests
         var e2 = BuildDto(2, 2000, "2026-08-06T11:00:00"); e2.Device = new BaseDeviceDto { Id = 12 };
         var e3 = BuildDto(3, 1500, "2026-08-06T12:00:00"); e3.Device = new BaseDeviceDto { Id = 11 };
         var apiMock = new Mock<IEventApiService>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        apiMock.Setup(EventApiQuery.AnyDetection())
             .ReturnsAsync(Ok(e1, e2, e3));   // 필터 무시 — 항상 동일 전체 집합
         var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
 
@@ -344,10 +330,8 @@ public class GroupDetectionHistoryTests
         var baseTime = new DateTime(2026, 8, 6, 0, 0, 0);
         DetectionEventDto Row(int id) { var d = BuildDto(id, 100 + id, baseTime.AddMinutes(id).ToString("yyyy-MM-ddTHH:mm:ss")); d.Device = new BaseDeviceDto { Id = 99 }; return d; }
         var apiMock = new Mock<IEventApiService>();
-        apiMock.Setup(x => x.GetDetectionEventsAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), null, 99, null,
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, int page, int limit, CancellationToken ct)
+        apiMock.Setup(EventApiQuery.DetectionForSensor(99))
+            .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, string? res, string? tev, int page, int limit, CancellationToken ct)
                 => page == 1
                     ? Ok(Enumerable.Range(1, 100).Select(Row).ToArray())
                     : Ok(Enumerable.Range(100, 50).Select(Row).ToArray()));   // id=100이 페이지 경계에서 중복

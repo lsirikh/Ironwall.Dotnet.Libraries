@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -71,7 +72,10 @@ public class DeviceLocationGateway : IDeviceLocationGateway
                 return true;
             }
 
-            _log?.Warning($"[DeviceLocation] 저장 실패 응답 — {kind}/{device.Id}: {r.Error?.Details}");
+            // (FR-06) 날 JSON 대신 사람이 읽는 문장(422 다필드는 줄바꿈 전건).
+            var reason = ApiErrorTextHelper.FromFieldErrorsMultiline(r.Error)
+                         ?? ApiErrorTextHelper.Resolve(r.Error, r.Message, "좌표 저장에 실패했습니다.");
+            _log?.Warning($"[DeviceLocation] 저장 실패 응답 — {kind}/{device.Id}: {reason}");
             return false;
         }
         catch (OperationCanceledException)

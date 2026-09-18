@@ -1,6 +1,7 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -22,8 +23,11 @@ public class ReportListViewModel : BasePanelViewModel
         : base(eventAggregator, log)
     {
         _api = api;
-        StatusFilters = new ObservableCollection<string> { "전체", "COMPLETED", "GENERATING", "PENDING", "FAILED", "CANCELLED" };
-        SelectedStatusFilter = "전체";
+        // 상태 어휘는 서버 닫힌 어휘(ReportGenerationStatus.All) 하나에서만 만든다 —
+        //   ⚠ 여기에 소문자·한글·빈 문자열을 넣으면 v8.0 서버가 그 자리에서 422 로 거부한다(실측).
+        //   "전체"는 화면 전용 표지이고 API 에는 파라미터 자체를 보내지 않는다(빈 값 ≠ 필터 없음).
+        StatusFilters = new ObservableCollection<string>(new[] { AllFilterLabel }.Concat(ReportGenerationStatus.All));
+        SelectedStatusFilter = AllFilterLabel;
     }
     #endregion
 
@@ -43,22 +47,30 @@ public class ReportListViewModel : BasePanelViewModel
         try
         {
             IsBusy = true;
-            var status = SelectedStatusFilter is "전체" or null ? null : SelectedStatusFilter;
-            var res = await _api.GetGenerationsAsync(page: 1, limit: 100, status: status);
+            // "전체"(화면 표지)는 null 로 — 서비스가 파라미터 자체를 붙이지 않는다.
+            var status = SelectedStatusFilter is AllFilterLabel or null ? null : SelectedStatusFilter;
+            var res = await _api.GetGenerationsAsync(page: 1, limit: PageLimit, status: status);
             Items.Clear();
             if (res.Success && res.Data != null)
             {
                 foreach (var it in res.Data) Items.Add(it);
                 LoadError = null;
+                // v8.0 배포본은 pagination 을 실제 총계로 채운다(실측). 구 판본은 null → 화면 건수로 대체한다.
+                TotalCount = res.Pagination?.Total ?? res.Total;
             }
             else
             {
-                _log?.Warning($"[ReportList] 이력 조회 실패: {res.Message}");
-                LoadError = "서버에 연결하지 못했습니다. 잠시 후 [갱신]을 눌러 다시 시도하세요.";
+                // 사유는 res.Message 가 아니라 ApiErrorTextHelper 로 읽는다 — 배포본 400·404 봉투에는 top-level message 가 없다.
+                _log?.Warning($"[ReportList] 이력 조회 실패: {res.ErrorText()}");
+                TotalCount = null;
+                LoadError = res.Error?.Code == "VALUE_NOT_ALLOWED"
+                    ? "상태 필터 값이 올바르지 않습니다. 목록에서 다시 선택하세요."
+                    : "서버에 연결하지 못했습니다. 잠시 후 [갱신]을 눌러 다시 시도하세요.";
             }
             NotifyOfPropertyChange(nameof(IsEmpty));
+            NotifyOfPropertyChange(nameof(CountText));
             var completed = 0; foreach (var it in Items) if (it.IsCompleted) completed++;
-            _log?.Info($"[ReportList] 목록 로드 — 총 {Items.Count}건(완료 {completed}건, 필터={status ?? "전체"})");
+            _log?.Info($"[ReportList] 목록 로드 — 표시 {Items.Count}건 / 총 {TotalCount?.ToString() ?? "미제공"}(완료 {completed}건, 필터={status ?? AllFilterLabel})");
         }
         catch (Exception ex) { _log?.Error($"[ReportList] LoadAsync: {ex.Message}"); }
         finally { IsBusy = false; }
@@ -81,7 +93,7 @@ public class ReportListViewModel : BasePanelViewModel
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "다운로드 실패",
-                    Explain = result.Error ?? "다운로드하지 못했습니다."
+                    Explain = ApiErrorTextHelper.Or(result.Error, "다운로드하지 못했습니다.")
                 });
                 return;
             }
@@ -152,9 +164,17 @@ public class ReportListViewModel : BasePanelViewModel
         {
             var res = await _api.CancelGenerationAsync(item.Id, cancellationToken);
             await LoadAsync();   // CANCELLED 반영
+            // task_cancelled=false 는 "DB 상태만 CANCELLED 로 마킹"이다(진행 태스크를 못 끊음) — 단정하지 않는다.
+            var taskCancelled = res.Data?.TaskCancelled;
             result = res.Success
-                ? new OpenInfoPopupMessageModel { Title = "생성 취소", Explain = "보고서 생성을 취소했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "취소 실패", Explain = res.Message ?? "취소하지 못했습니다." };
+                ? new OpenInfoPopupMessageModel
+                {
+                    Title = "생성 취소",
+                    Explain = taskCancelled == false
+                        ? "취소로 표시했습니다. 진행 중이던 작업이 곧바로 멈추지 않을 수 있어 목록에서 상태를 확인하세요."
+                        : "보고서 생성을 취소했습니다."
+                }
+                : new OpenInfoPopupMessageModel { Title = "취소 실패", Explain = res.ErrorText("취소하지 못했습니다.") };
         }
         catch (Exception ex)
         {
@@ -179,7 +199,7 @@ public class ReportListViewModel : BasePanelViewModel
             if (res.Success) { Items.Remove(item); NotifyOfPropertyChange(nameof(IsEmpty)); }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "보고서를 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.Message ?? "삭제하지 못했습니다." };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.ErrorText("삭제하지 못했습니다.") };
         }
         catch (Exception ex)
         {
@@ -195,6 +215,23 @@ public class ReportListViewModel : BasePanelViewModel
     public ObservableCollection<ReportGenerationDto> Items { get; } = new();
     public ObservableCollection<string> StatusFilters { get; }
     public bool IsEmpty => Items.Count == 0 && !IsBusy;
+
+    private int? _totalCount;
+    /// <summary>서버가 알려준 전체 건수(현재 필터 적용). 구 판본은 pagination 이 null 이라 <c>null</c>.</summary>
+    public int? TotalCount
+    {
+        get => _totalCount;
+        private set { _totalCount = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CountText)); NotifyOfPropertyChange(nameof(HasMore)); }
+    }
+
+    /// <summary>표시 건수가 전체보다 적은가 — 한 페이지(<see cref="PageLimit"/>)를 넘긴 이력이 있다는 뜻.</summary>
+    public bool HasMore => TotalCount.HasValue && TotalCount.Value > Items.Count;
+
+    /// <summary>건수 표시 — 총계를 아는 경우에만 "N건 중 M건".</summary>
+    public string CountText
+        => TotalCount.HasValue
+            ? (HasMore ? $"{TotalCount.Value}건 중 {Items.Count}건 표시(최근 {PageLimit}건)" : $"{Items.Count}건")
+            : $"{Items.Count}건";
 
     private string? _loadError;
     /// <summary>목록 조회 실패 사유(SSL/연결 실패 등) — 빈 목록을 "보고서 없음"과 구분해 안내.</summary>
@@ -232,6 +269,11 @@ public class ReportListViewModel : BasePanelViewModel
     #endregion
 
     #region - Attributes -
+    /// <summary>상태 필터 콤보의 "필터 없음" 표지 — <b>서버 어휘가 아니다</b>(API 에는 null 로 전달).</summary>
+    public const string AllFilterLabel = "전체";
+    /// <summary>한 번에 가져오는 이력 수(서버 limit 최대 100).</summary>
+    public const int PageLimit = 100;
+
     private readonly IReportApiService _api;
     /// <summary>인라인 x 취소 대상 — 확인 팝업 왕복 동안 대상 행 보관(SelectedItem 비의존).</summary>
     private ReportGenerationDto? _pendingCancelItem;

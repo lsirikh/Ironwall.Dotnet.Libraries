@@ -478,7 +478,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 try
                 {
                     firstPage = await _providerService.FetchDetectionEventsPageAsync(
-                        StartDate, EndDate, 1, 100, cancellationToken);
+                        StartDate, EndDate, 1, 100, token: cancellationToken);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -555,7 +555,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         try
         {
             var result = await _providerService.FetchDetectionEventsPageAsync(
-                StartDate, EndDate, _currentPage + 1, 100, token);
+                StartDate, EndDate, _currentPage + 1, 100, token: token);
 
             if (token.IsCancellationRequested) return;
 

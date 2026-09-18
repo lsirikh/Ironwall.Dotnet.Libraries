@@ -53,8 +53,12 @@ public class DeviceProviderService : IDeviceProviderService
         CameraDeviceProvider cameraProvider,
         DeviceGroupProvider deviceGroupProvider,
         IServerApiService serverApiService,
-        ServerProvider serverProvider)
+        ServerProvider serverProvider,
+        DeviceQueryPolicy? queryPolicy = null)
     {
+        // FR-10 · FR-11: 쿼리 조립 분기는 정책 1곳에서만 판단한다.
+        // 미주입(테스트·과거 호출부)이면 6.3 기본 정책 — 현행 운영 동작이 그대로 유지된다.
+        _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
         _log = logService;
         _eventAggregator = eventAggregator;
         _apiService = apiService;
@@ -345,7 +349,12 @@ public class DeviceProviderService : IDeviceProviderService
 
     private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
     {
-        var resp = await _apiService.GetSensorByIdAsync(id, includeController: true, token: token);
+        // (FR-10) 단건도 동일 — 7.0 에서 include_controller 는 422. 중첩 객체가 없어도
+        // FetchDeviceByIdAsync 가 Controller.Id 로 Provider 실제 인스턴스를 재연결한다.
+        var resp = await _apiService.GetSensorByIdAsync(
+            id,
+            includeController: _queryPolicy.CanUseIncludeControllerFlag,
+            token: token);
         return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel() : null;
     }
 
@@ -442,6 +451,7 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _serverApiService.GetServersAsync(
                     page: currentPage,
                     limit: pageSize,
+                    view: _queryPolicy.View,     // (FR-10) 7.0+ 목록 기본은 view=basic → server_config 키째 누락
                     token: token);
 
                 if (!response.Success)
@@ -557,11 +567,16 @@ public class DeviceProviderService : IDeviceProviderService
 
             while (true)
             {
+                // (FR-10) include_sensors 는 7.0 에서 제거된 키다 — 실으면 422 REMOVED_FIELD →
+                // response.Success=false → break → 제어기 전량 0건(장비 부트스트랩 전멸).
+                // 6.3 에서는 현행대로 true. 7.0 에서는 안 싣고, 센서 연결은 FetchSensorsAsync 의
+                // NavigationMappingHelper(controller_id FK 기준 양방향 재링크)가 그대로 담당한다.
                 var response = await _apiService.GetControllersAsync(
                     page: currentPage,
                     limit: pageSize,
-                    includeSensors: true,
-                    token: token);
+                    includeSensors: _queryPolicy.CanUseIncludeSensorsFlag,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -617,11 +632,15 @@ public class DeviceProviderService : IDeviceProviderService
 
             while (true)
             {
+                // (FR-10) include_controller 도 7.0 에서 제거된 키 — 실으면 422 → 센서 전량 0건.
+                // 중첩 controller 객체가 없어도 ToSensorDeviceModel 이 controller_id(FK)로 Id 만 seed 하고,
+                // 아래 NavigationMappingHelper 가 controllerDict 의 실제 인스턴스로 재링크한다(동작 동일).
                 var response = await _apiService.GetSensorsAsync(
                     page: currentPage,
                     limit: pageSize,
-                    includeController: true,
-                    token: token);
+                    includeController: _queryPolicy.CanUseIncludeControllerFlag,
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -683,7 +702,8 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetCamerasAsync(
                     page: currentPage,
                     limit: pageSize,
-                    token: token);
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -739,7 +759,8 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetSpeakersAsync(
                     page: currentPage,
                     limit: pageSize,
-                    token: token);
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -794,7 +815,8 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetEnclosuresAsync(
                     page: currentPage,
                     limit: pageSize,
-                    token: token);
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -850,7 +872,8 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetGatesAsync(
                     page: currentPage,
                     limit: pageSize,
-                    token: token);
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -905,7 +928,8 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetLampsAsync(
                     page: currentPage,
                     limit: pageSize,
-                    token: token);
+                    token: token,
+                    view: _queryPolicy.View);    // (FR-10) 7.0+ 목록 기본은 view=basic → device_config·device_status·hardware_spec 누락
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
@@ -1181,6 +1205,9 @@ public class DeviceProviderService : IDeviceProviderService
     private readonly DeviceGroupProvider _deviceGroupProvider;
     private readonly IServerApiService _serverApiService;
     private readonly ServerProvider _serverProvider;
+
+    /// <summary>FR-10 · FR-11 — 서버 계약 세대별 쿼리 조립 정책(유일 분기점).</summary>
+    private readonly DeviceQueryPolicy _queryPolicy;
 
     // 로그인 게이팅(Login_Gated_GIS_Init) — fetch 트리거/취소용 CTS (다중 스레드 접근: UI 트리거 + 배경 ForceLogout → _fetchGate lock)
     private readonly object _fetchGate = new();

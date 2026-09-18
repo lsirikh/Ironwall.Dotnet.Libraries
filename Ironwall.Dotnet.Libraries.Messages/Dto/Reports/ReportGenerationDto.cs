@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
+﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
@@ -6,7 +6,15 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 
 /// <summary>
 /// 보고서 생성 이력 DTO — GET /api/reports/generations[/{id}] 응답.
-/// 서버 report_generations 레코드 스냅샷.
+/// 서버 report_generations 레코드 스냅샷. 목록·단건이 <b>같은 모양</b>이다.
+/// <para><b>서버가 싣는 키 집합</b>(실측 8.0.1, 18키 — 명세 §10.4.3 의 "17키" 는 <c>severity_filter</c> 추가 전 표기):
+/// <c>id · report_type · template_id · title · period_type · start_date · end_date · generator_id ·
+/// generator_name · status · created_at · completed_at · severity_filter · progress_pct · progress_stage ·
+/// progress_updated_at · preview_html_url · pdf_download_url</c>.</para>
+/// <para><b>서버가 싣지 않는 키</b> — <c>error_message</c>(DB 에는 있으나 어느 엔드포인트로도 노출되지 않는다) ·
+/// <c>pdf_file_size</c> · <c>updated_at</c>. 아래 해당 프로퍼티는 <b>항상 null</b> 이다.</para>
+/// <para><c>preview_html_url</c> 은 <b>항상 문자열</b>이고 <c>pdf_download_url</c> 은 <b><c>string|null</c></b> 로
+/// 키가 늘 실린다 — "키가 있으면 받을 수 있다"가 아니라 <b>값이 null 인지</b>로 분기한다(§10.4.3).</para>
 /// </summary>
 public class ReportGenerationDto : BaseDto
 {
@@ -41,33 +49,56 @@ public class ReportGenerationDto : BaseDto
     [JsonProperty("status", Order = 10)]
     public string Status { get; set; } = "PENDING";
 
+    /// <summary>
+    /// 실패 사유. ⚠ <b>서버가 응답에 싣지 않는다</b>(실측 — DB `_write_terminal_state` 에는 기록되지만
+    /// 어느 읽기 엔드포인트도 노출하지 않는다). 즉 <b>항상 null</b> 이며 FAILED 사유는 현재
+    /// <b>클라에서 볼 수 없다</b> — 폴백 문구로 "사유 미제공"을 명시해야 한다(공백으로 뭉개면 안 된다).
+    /// 서버가 키를 노출하면 이 프로퍼티가 그대로 살아난다.
+    /// </summary>
     [JsonProperty("error_message", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
     public string? ErrorMessage { get; set; }
 
     [JsonProperty("completed_at", Order = 12, NullValueHandling = NullValueHandling.Ignore)]
     public string? CompletedAt { get; set; }
 
-    [JsonProperty("pdf_file_size", Order = 13, NullValueHandling = NullValueHandling.Ignore)]
+    /// <summary>
+    /// 생성 시 적용된 심각도 필터(<see cref="ReportSeverity"/> 4종). 전 심각도면 null.
+    /// <para>운영 6.3.2 응답에는 <b>키가 없어</b> null 로 남는다(무해) — 개발 8.0.1 에서 실측 확인.</para>
+    /// </summary>
+    [JsonProperty("severity_filter", Order = 13, NullValueHandling = NullValueHandling.Ignore)]
+    public List<string>? SeverityFilter { get; set; }
+
+    /// <summary>
+    /// ⚠ <b>서버 미제공</b>(사장 필드 — 응답 키에 없다). "파일 크기" 표시 기능을 만들면 빈칸이 된다.
+    /// 호출부 호환을 위해 남기되 <b>UI 에 싣지 않는다</b>.
+    /// </summary>
+    [JsonProperty("pdf_file_size", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
     public long? PdfFileSize { get; set; }
 
     /// <summary>항상 존재(/reports/preview/{id}). ※서버 HTML 페이지는 현재 비인증 개방.</summary>
-    [JsonProperty("preview_html_url", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("preview_html_url", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
     public string? PreviewHtmlUrl { get; set; }
 
-    /// <summary>COMPLETED + 파일 존재 시에만(/api/reports/generations/{id}/download).</summary>
-    [JsonProperty("pdf_download_url", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    /// <summary>
+    /// COMPLETED + 파일 존재 시에만 경로, 그 밖에는 <b>키는 있고 값이 null</b>
+    /// (/api/reports/generations/{id}/download). 분기는 <see cref="HasPdf"/> 로 한다.
+    /// </summary>
+    [JsonProperty("pdf_download_url", Order = 16, NullValueHandling = NullValueHandling.Ignore)]
     public string? PdfDownloadUrl { get; set; }
 
     /// <summary>진행률 %(0~100) — v6.0-report_progress_perf. GET /generations/{id} 응답.</summary>
-    [JsonProperty("progress_pct", Order = 16, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("progress_pct", Order = 17, NullValueHandling = NullValueHandling.Ignore)]
     public int ProgressPct { get; set; }
 
     /// <summary>진행 단계: start(5)/setup(10)/master_data(60)/html(80)/pdf(95)/done(100).</summary>
-    [JsonProperty("progress_stage", Order = 17, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("progress_stage", Order = 18, NullValueHandling = NullValueHandling.Ignore)]
     public string? ProgressStage { get; set; }
 
-    [JsonProperty("progress_updated_at", Order = 18, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("progress_updated_at", Order = 19, NullValueHandling = NullValueHandling.Ignore)]
     public string? ProgressUpdatedAt { get; set; }
+
+    /// <summary>다운로드 가능한 PDF 가 실제로 있는가 — <c>pdf_download_url</c> 이 <b>null 이 아닌지</b>로 판정.</summary>
+    [JsonIgnore] public bool HasPdf => !string.IsNullOrWhiteSpace(PdfDownloadUrl);
 
     [JsonIgnore] public bool IsCompleted => string.Equals(Status, "COMPLETED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsFailed => string.Equals(Status, "FAILED", System.StringComparison.OrdinalIgnoreCase);
@@ -118,7 +149,13 @@ public class ReportGenerateRequestDto
     [JsonProperty("template_id", NullValueHandling = NullValueHandling.Ignore)]
     public int? TemplateId { get; set; }
 
-    /// <summary>예 ["CRITICAL","WARNING"]. ※서버 저장만·쿼리 미사용(현재 미적용).</summary>
+    /// <summary>
+    /// 심각도 필터 — <b>닫힌 어휘 4종</b>(<see cref="ReportSeverity"/>: INFO·WARNING·ERROR·CRITICAL).
+    /// 생략(null)하면 전 심각도.
+    /// <para>서버는 이 필터를 <b>시스템 이벤트 계열</b>의 집계·그리드·<b>CSV 까지</b> 전파한다(탐지/장애/조치는 대상 아님).
+    /// 운영 6.3.2 는 <c>array[string]</c>, 개발 8.0.1 은 enum 으로 받으므로 <b>대문자 4종만</b> 보내면 양쪽 안전하다 —
+    /// 조립은 <see cref="ReportSeverity.Sanitize(System.Collections.Generic.IEnumerable{string})"/> 를 쓴다.</para>
+    /// </summary>
     [JsonProperty("severity_filter", NullValueHandling = NullValueHandling.Ignore)]
     public List<string>? SeverityFilter { get; set; }
 }

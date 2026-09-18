@@ -93,6 +93,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             EnumDeviceType.Enclosure => "함체",
             EnumDeviceType.Lamp => "경고등",
             EnumDeviceType.Gate => "통문",
+            // 종류축 미복원(NONE) — '센서'로 단정하지 않는다(F-03).
+            // 서버 8.0.1 의 `device` 는 참조 프로필 `{id, category_device}` 라 종류축이 없다.
+            // 카테고리가 '센서'라고만 알려준 경우엔 센서 껍데기(ISensorDeviceModel)로 오므로 '센서',
+            // 카테고리조차 모르면 BaseDeviceModel 로 와서 '알 수 없음'이 된다
+            // (껍데기 선택은 `DtoToModelHelper.CreateDeviceShell`).
+            EnumDeviceType.NONE => Device is ISensorDeviceModel ? "센서" : "알 수 없음",
             not null => "센서",
             null => null
         };

@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using NATS.Client.Core;
 
@@ -42,6 +42,19 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 var broadcastSubject = $"{setupModel.DomainNats}.{setupModel.GroupNats}.all.>";
                 if (broadcastSubject != _defaultSubject)
                     _additionalSubjects.Add(broadcastSubject);
+
+                // ⚠ 전역 자원은 **부대 토큰이 아니라 `global`** 로 발행된다.
+                //    서버 `db_monitor/main.py:61,64,89` — GLOBAL_UNIT_TOKEN="global",
+                //    GLOBAL_CMDS = {SYNC_CATALOG, SYNC_CATEGORY, SYNC_ACTION_REPORT_TEMPLATE,
+                //                   SYNC_FILE_GROUP, SYNC_UNIT}.
+                //    우리 기본 구독은 `{도메인}.{부대}.{서브시스템}.>` 리터럴이라 두 번째 토큰이
+                //    `global` 인 메시지를 **와일드카드로도 받지 못한다.**
+                //    명세가 "단일 부대 배포는 무변화"라고 했지만 이 5종은 예외다 —
+                //    구독하지 않으면 배포 당일 카테고리·카탈로그 갱신이 **조용히** 끊긴다.
+                //    (소비 훅은 no-op 이 아니다: NatsDomainService.OnServerTopologyChanged 재정의 실재)
+                var globalSubject = $"{setupModel.DomainNats}.global.>";
+                if (globalSubject != _defaultSubject && !_additionalSubjects.Contains(globalSubject))
+                    _additionalSubjects.Add(globalSubject);
             }
 
             var opts = NatsOpts.Default with
@@ -90,6 +103,19 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 var broadcastSubject = $"{setupModel.DomainNats}.{setupModel.GroupNats}.all.>";
                 if (broadcastSubject != _defaultSubject)
                     _additionalSubjects.Add(broadcastSubject);
+
+                // ⚠ 전역 자원은 **부대 토큰이 아니라 `global`** 로 발행된다.
+                //    서버 `db_monitor/main.py:61,64,89` — GLOBAL_UNIT_TOKEN="global",
+                //    GLOBAL_CMDS = {SYNC_CATALOG, SYNC_CATEGORY, SYNC_ACTION_REPORT_TEMPLATE,
+                //                   SYNC_FILE_GROUP, SYNC_UNIT}.
+                //    우리 기본 구독은 `{도메인}.{부대}.{서브시스템}.>` 리터럴이라 두 번째 토큰이
+                //    `global` 인 메시지를 **와일드카드로도 받지 못한다.**
+                //    명세가 "단일 부대 배포는 무변화"라고 했지만 이 5종은 예외다 —
+                //    구독하지 않으면 배포 당일 카테고리·카탈로그 갱신이 **조용히** 끊긴다.
+                //    (소비 훅은 no-op 이 아니다: NatsDomainService.OnServerTopologyChanged 재정의 실재)
+                var globalSubject = $"{setupModel.DomainNats}.global.>";
+                if (globalSubject != _defaultSubject && !_additionalSubjects.Contains(globalSubject))
+                    _additionalSubjects.Add(globalSubject);
             }
 
             var opts = NatsOpts.Default with

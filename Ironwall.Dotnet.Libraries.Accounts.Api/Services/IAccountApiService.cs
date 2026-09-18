@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Services;
@@ -28,8 +28,12 @@ public interface IAccountApiService
         => throw new NotImplementedException();
 
     // ── User CRUD (FR-19) ──
-    /// <summary>GET /api/users — 계정 목록(pagination meta 없을 수 있음, B-8).</summary>
+    /// <summary>GET /api/users — 계정 목록 <b>한 페이지</b>(limit 상한 100, 운영 6.3.2 봉투엔 pagination 없음).</summary>
     Task<ApiListResponse<AuthUserDto>> GetUsersAsync(int page = 1, int limit = 100, CancellationToken ct = default);
+    /// <summary>GET /api/users — <b>전량</b>(page 순회). 계정이 100명을 넘으면 단일 호출은 조용히 잘린다(§9.3.2).
+    /// 기본구현=한 페이지 폴백(테스트 스텁 무수정) — 실제 순회는 AccountApiService.</summary>
+    Task<ApiListResponse<AuthUserDto>> GetAllUsersAsync(CancellationToken ct = default)
+        => GetUsersAsync(1, 100, ct);
     /// <summary>POST /api/users — 계정 생성. 중복 login_id 면 400(B-4 우회).</summary>
     Task<ApiResponse<AuthUserDto>> CreateUserAsync(UserCreateDto dto, CancellationToken ct = default);
     /// <summary>PUT /api/users/{id} — 부분수정(PATCH 미구현).</summary>
@@ -62,8 +66,12 @@ public interface IAccountApiService
     Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
 
     // ── 관리 화면용 조회 (FR-19, 후속 GOP-05 UI) ──
-    /// <summary>GET /api/user-groups — 그룹 목록(권한 nested {modules,device_groups}).</summary>
+    /// <summary>GET /api/user-groups — 그룹 목록 <b>한 페이지</b>(권한 nested {modules,device_groups}). 서버 기본·상한 limit=100.</summary>
     Task<ApiListResponse<UserGroupDto>> GetUserGroupsAsync(CancellationToken ct = default);
+    /// <summary>GET /api/user-groups — <b>전량</b>(page 순회). 그룹이 100개를 넘으면 단일 호출은 조용히 잘린다.
+    /// 기본구현=한 페이지 폴백(테스트 스텁 무수정) — 실제 순회는 AccountApiService.</summary>
+    Task<ApiListResponse<UserGroupDto>> GetAllUserGroupsAsync(CancellationToken ct = default)
+        => GetUserGroupsAsync(ct);
     /// <summary>POST /api/user-groups/{id}/permissions — 그룹 권한(모듈×동작) 수정(ADMIN 전용, PRD-GOP-01 IMPL-06/서버 v5.0).
     /// 일반 PUT 은 권한상승 방지로 permissions 차단 → 이 전용 경로로만 변경. 기본구현=미지원(테스트 스텁 무수정 목적).</summary>
     Task<ApiResponse<UserGroupDto>> UpdateGroupPermissionsAsync(int groupId, PermissionsDto permissions, CancellationToken ct = default)

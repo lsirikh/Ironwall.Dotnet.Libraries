@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
+﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
@@ -25,6 +25,11 @@ public class ReportComponentConfigDto
 
 /// <summary>
 /// 보고서 템플릿 DTO — GET /api/reports/templates[/{id}] 응답.
+/// <para>⚠ <b>목록과 상세의 모양이 다르다</b>(실측 8.0.1). 목록(<c>GET /templates</c>)은 <b>경량</b>이고
+/// <c>{id,name,description,report_type,owner_id,is_public,component_count,default_period,created_at}</c> 9키다 —
+/// <b><see cref="Components"/> 와 <c>updated_at</c> 이 없다</b>. 구성은 <b>상세</b>(<c>GET /templates/{id}</c>)에만 실린다.
+/// 그래서 목록의 <c>Components.Count == 0</c> 은 "구성 없음"이 아니라 <b>"안 실린 것"</b>이고,
+/// 개수를 보여줄 근거는 <see cref="ComponentCount"/> 뿐이다.</para>
 /// </summary>
 public class ReportTemplateDto : BaseDto
 {
@@ -46,8 +51,22 @@ public class ReportTemplateDto : BaseDto
     [JsonProperty("default_period", Order = 7)]
     public string DefaultPeriod { get; set; } = "7d";
 
-    [JsonProperty("components", Order = 8)]
+    /// <summary>
+    /// 구성 컴포넌트 수 — <b>목록 응답 전용</b>(상세에는 없다). 목록에서 "컴포넌트 N개"를 표시할 유일한 근거.
+    /// 상세 응답에서는 null 이므로 그때는 <c>Components.Count</c> 를 쓴다(<see cref="EffectiveComponentCount"/>).
+    /// </summary>
+    [JsonProperty("component_count", Order = 8, NullValueHandling = NullValueHandling.Ignore)]
+    public int? ComponentCount { get; set; }
+
+    /// <summary>
+    /// 구성 컴포넌트 — <b>상세 응답 전용</b>(<c>GET /templates/{id}</c>). 목록 응답에는 키가 없어 <b>항상 빈 리스트</b>다.
+    /// </summary>
+    [JsonProperty("components", Order = 9)]
     public List<ReportComponentConfigDto> Components { get; set; } = new();
+
+    /// <summary>표시용 컴포넌트 수 — 목록이면 <c>component_count</c>, 상세면 <c>components.Count</c>.</summary>
+    [JsonIgnore]
+    public int EffectiveComponentCount => ComponentCount ?? Components.Count;
 }
 
 /// <summary>

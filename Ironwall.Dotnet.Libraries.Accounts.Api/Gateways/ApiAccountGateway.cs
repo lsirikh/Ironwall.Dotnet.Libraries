@@ -62,7 +62,9 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         var user = data.User!;
 
         // R1: access+refresh 를 게이트웨이가 직접 TokenStorage 에 보관(VM 엔 access 만 노출)
-        _tokenStore.SetTokens(data.AccessToken, data.RefreshToken);
+        // session_id 는 응답 본문의 값을 '명시' 전달한다(§9.2.2 required). 종전엔 JWT sid 클레임 포착에만 의존해,
+        // 서버가 클레임만 빼도 세션 목록의 '내 세션' 판정이 계정 근사 폴백으로 조용히 격하됐다(allow 정책에서 과다표시).
+        _tokenStore.SetTokens(data.AccessToken, data.RefreshToken, data.SessionId);
         // ★ V-PG-01 §7: 로그인 시 권한엔진 적용. 이전엔 Apply() 호출이 0건이라 role/permissions 영구 미적용 →
         //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
         _permission.Apply(user);
@@ -120,9 +122,10 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
 
     // ──────────────── IUserDirectoryGateway (FR-19) ────────────────
 
+    /// <summary>계정 목록 전량. 서버 limit 상한이 100 이라 단일 호출은 101번째부터 조용히 잘린다 → page 순회(§9.3.2).</summary>
     public async Task<List<IAccountModel>?> GetAllAccountsAsync(CancellationToken ct = default)
     {
-        var res = await _api.GetUsersAsync(1, 100, ct).ConfigureAwait(false);
+        var res = await _api.GetAllUsersAsync(ct).ConfigureAwait(false);
         if (!res.Success || res.Data is null) return null;
         return res.Data.Select(d => (IAccountModel)AccountDtoMapper.ToAccountModel(d)).ToList();
     }
@@ -146,11 +149,30 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success;
     }
 
-    /// <summary>B-4(v4.10) 사전 중복확인 엔드포인트 없음 — 낙관 false 후 Create 시 400 처리(§2.4.4).</summary>
-    public Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default)
+    /// <summary>
+    /// 아이디 중복 확인. 전용 엔드포인트는 서버에 없으므로 <c>GET /api/users</c> <b>전량</b>에서 <c>login_id</c> 를 대조한다.
+    /// <para>중복 생성은 서버가 <b>400</b>("중복된 login_id", 409 아님)으로 거부하는데, 종전 구현이 항상 <c>false</c> 를
+    /// 돌려줘 사용자에게 "사용 가능한 아이디입니다" 라고 <b>거짓 안내</b>한 뒤 저장 단계에서 영문 400 을 그대로 노출했다.
+    /// 조회 실패(권한·네트워크)면 종전대로 <c>false</c>(낙관) — 서버 400 이 최종 방어다.</para>
+    /// </summary>
+    public async Task<bool> IsUsernameTakenAsync(string username, CancellationToken ct = default)
     {
-        _log?.Info("[ApiAccountGateway] IsUsernameTaken: 서버 사전확인 미지원(B-4/v4.10) — 낙관 false");
-        return Task.FromResult(false);
+        if (string.IsNullOrWhiteSpace(username)) return false;
+        try
+        {
+            var res = await _api.GetAllUsersAsync(ct).ConfigureAwait(false);
+            if (!res.Success || res.Data is null)
+            {
+                _log?.Warning($"[ApiAccountGateway] IsUsernameTaken: 계정 목록 조회 실패 — 낙관 false({res.Error?.Code ?? "UNKNOWN"})");
+                return false;
+            }
+            return res.Data.Any(u => string.Equals(u.LoginId, username.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[ApiAccountGateway] IsUsernameTaken 확인 실패 — 낙관 false: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task<IAccountModel?> ResetAccountPasswordAsync(IAccountModel acc, string newPassword, CancellationToken ct = default)

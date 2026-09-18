@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
@@ -20,6 +20,11 @@ public enum EnumUiGate
 /// (사용자 결정 2026-07-02: 권한 없으면 <b>기본 Disabled(회색)</b>, 특정 화면만 Hidden).</para>
 /// <para>미등록 <see cref="IPermissionService"/>(오프라인/테스트/DB모드) → <c>Enabled</c> 폴백(전체허용). 실제 차단은 서버 응답이 최종(ADR v5.2).</para>
 /// <para>모듈 키는 <see cref="PermissionCatalog.ServerKey(EnumPermissionModule)"/> 또는 문자열("devices","events"…). ADMIN 은 IPermissionService 내부 bypass.</para>
+/// <para><b>모듈 목록을 여기 두지 않는다</b>(2026-09-18 확인) — 게이트는 <b>키 문자열 통과</b>이고 판정은
+/// <see cref="IPermissionService"/> 가 서버 스냅샷(<c>/api/auth/me/permissions</c>)을 flatten 한 토큰 집합으로 한다.
+/// 그래서 서버가 어휘를 늘려도(8.0.1 = 16종: <c>action_report_templates</c>·<c>integrations</c>·<c>files</c>·<c>units</c> 포함)
+/// <b>이 파일은 손댈 필요가 없다</b>. 새 모듈의 게이팅은 호출부에서 그 키를 넘기면 즉시 동작한다.
+/// 동작 적용성(어떤 verb 가 의미 있는지)은 <see cref="PermissionCatalog.IsVerbAllowed"/> 가 유일한 사전이다.</para>
 /// </summary>
 public static class PermissionUiPolicy
 {

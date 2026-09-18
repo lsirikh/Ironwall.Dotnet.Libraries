@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Panels.EnclosureDevicePanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -315,7 +315,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding DoorStatus, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
+								Text="{Binding DoorStatusDisplay, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -323,7 +323,7 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
-								Text="{Binding DoorStatus, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
+								Text="{Binding DoorStatusDisplay, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>

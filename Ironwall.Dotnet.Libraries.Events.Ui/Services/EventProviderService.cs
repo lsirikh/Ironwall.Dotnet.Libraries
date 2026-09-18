@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -37,10 +37,19 @@ public class EventProviderService
     /// </summary>
     /// <param name="startDate">시작 날짜 (필수)</param>
     /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="result">
+    /// 탐지 결과 서버측 필터(<c>EnumDetectionType</c> 어휘, 선택 — F-22).
+    /// <para>지정하면 <b>서버가</b> 걸러 준다(클라 후필터 아님). 어휘 밖이면 API 계층이 왕복 없이 실패시킨다.</para>
+    /// </param>
+    /// <param name="typeEvent">
+    /// 이벤트 종류 서버측 필터(<c>EnumEventType</c> 어휘, 선택 — F-22). <b>서버 8.0 이상 전용</b>.
+    /// </param>
     /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IDetectionEventModel>> FetchDetectionEventsAsync(
         DateTime startDate,
         DateTime endDate,
+        string? result = null,
+        string? typeEvent = null,
         CancellationToken token = default)
     {
         var allEvents = new List<IDetectionEventModel>();
@@ -56,6 +65,9 @@ public class EventProviderService
                 var response = await _apiService.GetDetectionEventsAsync(
                     startDate: KoreaTimeHelper.ToServerIso8601(startDate),
                     endDate: KoreaTimeHelper.ToServerIso8601(endDate),
+                    // F-22: 값이 null/공백이면 API 계층이 쿼리에 붙이지 않는다(서버 422 방지) — 여기서도 그대로 흘린다.
+                    result: result,
+                    typeEvent: typeEvent,
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -99,10 +111,15 @@ public class EventProviderService
     /// </summary>
     /// <param name="startDate">시작 날짜 (필수)</param>
     /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="reason">
+    /// 장애 사유 서버측 필터(<c>EnumFaultType</c> 어휘, 선택 — F-22).
+    /// <para>지정하면 <b>서버가</b> 걸러 준다. 어휘 밖이면 API 계층이 왕복 없이 실패시킨다.</para>
+    /// </param>
     /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IMalfunctionEventModel>> FetchMalfunctionEventsAsync(
         DateTime startDate,
         DateTime endDate,
+        string? reason = null,
         CancellationToken token = default)
     {
         var allEvents = new List<IMalfunctionEventModel>();
@@ -118,6 +135,8 @@ public class EventProviderService
                 var response = await _apiService.GetMalfunctionEventsAsync(
                     startDate: KoreaTimeHelper.ToServerIso8601(startDate),
                     endDate: KoreaTimeHelper.ToServerIso8601(endDate),
+                    // F-22: null/공백이면 쿼리에 붙지 않는다(서버 422 방지).
+                    reason: reason,
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -278,9 +297,12 @@ public class EventProviderService
     // Single Page Fetch (Infinite Scroll 용)
     // ═══════════════════════════════════════════════════════════════════════════════
 
+    /// <param name="result">탐지 결과 서버측 필터(<c>EnumDetectionType</c> 어휘, 선택 — F-22).</param>
+    /// <param name="typeEvent">이벤트 종류 서버측 필터(<c>EnumEventType</c> 어휘, 선택 — F-22). 서버 8.0 이상 전용.</param>
     public async Task<PagedResult<IDetectionEventModel>> FetchDetectionEventsPageAsync(
         DateTime startDate, DateTime endDate,
         int page = 1, int limit = 100,
+        string? result = null, string? typeEvent = null,
         CancellationToken token = default)
     {
         try
@@ -288,6 +310,7 @@ public class EventProviderService
             var response = await _apiService.GetDetectionEventsAsync(
                 startDate: KoreaTimeHelper.ToServerIso8601(startDate),
                 endDate: KoreaTimeHelper.ToServerIso8601(endDate),
+                result: result, typeEvent: typeEvent,
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -324,9 +347,11 @@ public class EventProviderService
         }
     }
 
+    /// <param name="reason">장애 사유 서버측 필터(<c>EnumFaultType</c> 어휘, 선택 — F-22).</param>
     public async Task<PagedResult<IMalfunctionEventModel>> FetchMalfunctionEventsPageAsync(
         DateTime startDate, DateTime endDate,
         int page = 1, int limit = 100,
+        string? reason = null,
         CancellationToken token = default)
     {
         try
@@ -334,6 +359,7 @@ public class EventProviderService
             var response = await _apiService.GetMalfunctionEventsAsync(
                 startDate: KoreaTimeHelper.ToServerIso8601(startDate),
                 endDate: KoreaTimeHelper.ToServerIso8601(endDate),
+                reason: reason,
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -429,7 +455,12 @@ public class EventProviderService
             if (!response.Success || response.Data == null || response.Data.Count == 0)
             {
                 if (!response.Success)
-                    _log?.Error($"FetchActionEventsPageAsync failed at page {page}: [{response.Error?.Code}] {response.Error?.Message} | {response.Error?.Details}");
+                    // (FR-06) 사유 문구는 정본 포맷터 경유 — `Error?.Message` 단독은 서버가 사유를
+                    //   details[] 로 옮긴 판본에서 빈 문자열이 되어 로그가 조용히 침묵한다.
+                    //   원문 details 는 진단용으로만 뒤에 덧붙인다(로그 전용 — UI 로는 나가지 않는다).
+                    _log?.Error($"FetchActionEventsPageAsync failed at page {page}: " +
+                                $"[{response.Error?.Code}] {response.ErrorText("조치 이벤트 조회에 실패했습니다.")} " +
+                                $"| raw={response.Error?.Details}");
 
                 return new PagedResult<IActionEventModel>
                 {

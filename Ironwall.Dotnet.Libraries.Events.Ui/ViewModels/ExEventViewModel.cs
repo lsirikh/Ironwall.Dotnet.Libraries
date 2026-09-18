@@ -84,6 +84,10 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
         EnumDeviceType.Enclosure => "함체",
         EnumDeviceType.Lamp => "경고등",
         EnumDeviceType.Gate => "통문",
+        // 종류축 미복원(NONE) — '센서'로 단정하지 않는다(F-03).
+        // 근거·껍데기 선택 규칙은 EventCardViewModel.DeviceTypeName 주석 및
+        // DtoToModelHelper.CreateDeviceShell 참조.
+        EnumDeviceType.NONE => Device is ISensorDeviceModel ? "센서" : "알 수 없음",
         not null => "센서",
         null => null
     };

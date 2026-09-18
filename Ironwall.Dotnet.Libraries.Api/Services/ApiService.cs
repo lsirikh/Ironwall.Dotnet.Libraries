@@ -19,7 +19,17 @@ namespace Ironwall.Dotnet.Libraries.Api.Services;
 public class ApiService : IApiService
 {
     // 요청 body 직렬화 공통 설정 — DateTime 필드를 aware ISO8601로 내보낸다(Unspecified/Local → 로컬 KST offset 부착).
-    // 서버 datetime 규약(입력 aware 권장) 준수. 설정 없는 SerializeObject는 Unspecified를 offset 없이 naive로 내보내던 결함을 차단.
+    //
+    // 명세 §3.4 대조 (2026-09-18):
+    //  · D19(오프셋 + 마이크로초 6자리 고정)는 **응답** 규칙이다. 실측 확인: meta.timestamp =
+    //    "2026-09-18T09:42:53.104788+09:00". 우리는 MetaDto.Timestamp 를 string 으로 받고
+    //    DateParseHandling.None 이라 소수부 자릿수에 영향받지 않는다.
+    //  · **입력**은 "offset 포함 aware 권장"이고, 관측 시각 계열(observed_at·installed_at·replaced_at)만
+    //    **오프셋 필수**(없으면 422). DateTimeZoneHandling.Local 이 DateTime 전부에 오프셋을 붙이므로 이 요구를 만족한다.
+    //    설정 없는 SerializeObject 는 Unspecified 를 offset 없이 naive 로 내보내 422 를 유발한다 — 그래서 이 설정이 필요하다.
+    //  · 소수부 자릿수·"Z" vs "+00:00" 는 **입력에서 자유**다(실측: 7자리·6자리·1자리·naive·date-only 전부 200).
+    //    Newtonsoft 는 DateTimeOffset 의 0 오프셋을 "Z" 가 아니라 "+00:00" 으로 쓴다 — 명세가 양쪽을 받으므로 정합이다.
+    //    ("...Z" 를 기대하는 기존 단위테스트 4건은 **테스트 기대치 드리프트**이고 계약 위반이 아니다.)
     private static readonly JsonSerializerSettings _jsonSettings = new()
     {
         DateFormatHandling = DateFormatHandling.IsoDateFormat,
@@ -110,14 +120,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var url = endpoint;
-
-            // QueryString 추가
-            if (parameters != null)
-            {
-                var queryString = await new FormUrlEncodedContent(parameters).ReadAsStringAsync().ConfigureAwait(false);
-                url += "?" + queryString;
-            }
+            var url = await BuildUrlAsync(endpoint, parameters).ConfigureAwait(false);
 
             return await _client.GetAsync(url);
         }
@@ -126,6 +129,46 @@ public class ApiService : IApiService
             _log?.Error($"[ApiService] GET 요청 실패: {ex.Message}");
             return BuildExceptionResponse(ex);
         }
+    }
+
+    /// <summary>
+    /// 엔드포인트 + 쿼리 파라미터 → 최종 URL. <b>쿼리 조립의 단일 지점</b>이다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>① 빈 값은 키째 뺀다</b>(명세 §12.1.1 <c>EMPTY_STRING</c> — "값이 없으면 키를 빼십시오").
+    /// <see cref="FormUrlEncodedContent"/> 는 빈 값을 드롭하지 <b>않아서</b> 딕셔너리에 <c>""</c> 가 한 번 들어가면
+    /// <c>?status=</c> 가 그대로 나가고 서버는 <b>422</b> 를 낸다(실측: <c>?status=</c> ·
+    /// <c>?status=+</c>(공백) 모두 <c>VALUE_NOT_ALLOWED</c>/<c>CONSTRAINT</c>).
+    /// 호출부 가드가 지금까지 유일한 방어선이었고 전 지점이 <c>IsNullOrEmpty</c> 라 <b>공백 한 칸을 통과</b>시켰다 —
+    /// 여기서 <see cref="string.IsNullOrWhiteSpace"/> 기준으로 일괄 차단한다. 드롭은 경고 로그로 남긴다(조용히 사라지지 않게).</para>
+    /// <para><b>② 결합자를 검사한다</b> — 엔드포인트에 이미 <c>?</c> 가 있으면 <c>&amp;</c> 로 잇는다.
+    /// 종전에는 무조건 <c>"?"</c> 를 붙여 <c>…?a=1?b=2</c> 가 될 수 있었다(현재 호출부 0건 · 신규 1건으로 실현).</para>
+    /// <para>값이 전부 비어 드롭되면 쿼리 자체를 붙이지 않는다(<c>…?</c> 꼬리 방지).</para>
+    /// </remarks>
+    private async Task<string> BuildUrlAsync(string endpoint, Dictionary<string, string>? parameters)
+    {
+        if (parameters == null || parameters.Count == 0) return endpoint;
+
+        var effective = new Dictionary<string, string>(parameters.Count);
+        foreach (var kv in parameters)
+        {
+            if (string.IsNullOrWhiteSpace(kv.Key)) continue;
+
+            if (string.IsNullOrWhiteSpace(kv.Value))
+            {
+                // 서버는 빈 문자열을 '값'으로 보지 않는다 — 실어 보내면 422 다. 키를 뺀다.
+                _log?.Warning($"[ApiService] 빈 쿼리 값이라 키를 제외했습니다(422 방지): '{kv.Key}' → {endpoint}");
+                continue;
+            }
+
+            effective[kv.Key] = kv.Value;
+        }
+
+        if (effective.Count == 0) return endpoint;
+
+        var queryString = await new FormUrlEncodedContent(effective).ReadAsStringAsync().ConfigureAwait(false);
+        var separator = endpoint.Contains('?') ? "&" : "?";
+        return endpoint + separator + queryString;
     }
 
     /// <summary>

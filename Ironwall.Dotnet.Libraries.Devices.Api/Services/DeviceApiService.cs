@@ -6,6 +6,8 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+using Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Api.Models;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Api.Services;
 /****************************************************************************
@@ -37,14 +39,247 @@ public class DeviceApiService : IDeviceApiService
     /// <param name="log">로그 서비스</param>
     /// <param name="apiService">HTTP API 클라이언트 서비스</param>
     /// <param name="setupModel">API 설정 모델</param>
+    /// <param name="contractProbe">
+    /// 서버 계약 세대 프로브(FR-09). <c>null</c>(미등록)이면 <see cref="EnumServerContract.V6_3"/> 로 간주한다 —
+    /// 운영이 6.3.2 이므로 틀렸을 때 손해가 가장 작은 쪽이다.
+    /// </param>
     public DeviceApiService(
         ILogService? log,
         IApiService apiService,
-        ApiSetupModel setupModel)
+        ApiSetupModel setupModel,
+        IServerContractProbe? contractProbe = null)
     {
         _log = log;
         _apiService = apiService;
         _setupModel = setupModel;
+        _contractProbe = contractProbe;
+    }
+    #endregion
+
+    #region - 서버 계약 세대 분기 (FR-09) -
+    /// <summary>현재 서버 계약 세대. 프로브가 없거나 미확보면 <see cref="EnumServerContract.V6_3"/>.</summary>
+    private EnumServerContract Contract => _contractProbe?.Contract ?? EnumServerContract.V6_3;
+
+    /// <summary>
+    /// 축(axis) 계약(7.0 <b>이상</b>)인가.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>동치 비교(<c>== V7_0</c>)를 쓰면 안 된다</b> — 8.0 서버에서 조용히 6.3 경로로 떨어져
+    /// <c>type_device</c> 를 보내고 즉시 422 다. 열거값은 <c>V6_3=0 &lt; V7_0=1 &lt; V8_0=2</c> 로
+    /// 순서가 보장돼 있어 <c>&gt;=</c> 비교가 안전하다.
+    /// </remarks>
+    private bool IsAxisContract => Contract >= EnumServerContract.V7_0;
+
+    /// <summary>부대 편제 축(<c>unit_id</c>)을 실을 수 있는 계약인가. 8.0 이상에서만 <c>true</c>.</summary>
+    private bool IsUnitScopedContract => Contract >= EnumServerContract.V8_0;
+
+    /// <summary>
+    /// 쓰기 직전에 DTO 의 직렬화 계약을 현재 서버 세대로 맞춘다(POST·PATCH·PUT 공통 진입점).
+    /// </summary>
+    /// <remarks>
+    /// <para>DTO 를 버전마다 복제하지 않고 <c>ShouldSerializeXxx()</c> 조건 직렬화로 한 DTO 가 두 계약을
+    /// 모두 표현하게 했다. 여기서 켜는 스위치가 <b>그 유일한 분기점</b>이다.</para>
+    /// <para><c>unit_id</c> 는 8.0 미만에서는 값 자체를 지운다 — 6.3·7.0 쓰기 스키마에 없는 키라
+    /// 실리면 즉시 422 다(7.0 은 <c>additionalProperties:false</c>).</para>
+    /// </remarks>
+    /// <summary>
+    /// 서버 <c>limit</c> 상한(<b>100</b>) — 스웨거 <c>maximum: 100</c> 실측(6.3.2 · 8.0.1 공통).
+    /// </summary>
+    private const int LIMIT_MAX = 100;
+
+    /// <summary>
+    /// 페이지 크기를 서버 허용 범위(<c>1..100</c>)로 접는다.
+    /// <para>🔴 <b>실측 근거</b>(2026-09-18) — <c>limit=200</c> 을 그대로 흘리면 서버가 <c>422</c> 로 거절하고
+    /// 목록이 <b>빈 응답</b>으로 보인다("데이터가 없다"로 오진되는 침묵 실패). 상한을 아는 쪽에서 접는다.</para>
+    /// </summary>
+    private int ClampLimit(int limit, string caller)
+    {
+        if (limit >= 1 && limit <= LIMIT_MAX) return limit;
+        var clamped = limit < 1 ? 1 : LIMIT_MAX;
+        _log?.Warning($"[{caller}] limit={limit} 은 서버 허용범위(1..{LIMIT_MAX}) 밖이라 {clamped} 로 접었습니다.");
+        return clamped;
+    }
+
+    private T ShapeWrite<T>(T dto) where T : BaseDeviceDto
+    {
+        if (dto == null) return dto!;
+        dto.UseAxisWrite = IsAxisContract;
+        if (!IsUnitScopedContract) dto.UnitId = null;
+        if (IsAxisContract) LinkVersionToFirmware(dto);
+        return dto;
+    }
+
+    /// <summary>
+    /// 축 모드 쓰기에서 <c>version</c> 을 <c>hardware_spec.firmware</c> 로 잇는다(§5 머리 이관표, 쓰기 방향).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>읽기는 이미 이어져 있었다</b> — <c>BaseDeviceDto.HardwareSpecCore</c> setter 가
+    /// 응답의 <c>firmware</c> 를 <c>Version</c> 으로 역투영한다. 반대 방향이 비어 있어서
+    /// 축 모드에서 <c>version</c> 은 <c>ShouldSerializeVersion() =&gt; !UseAxisWrite</c> 로 <b>드롭만</b> 됐고,
+    /// 사용자가 펌웨어를 고쳐도 서버에 전달되지 않았다.</para>
+    ///
+    /// <para><b>없는 축을 만들지 않는다</b> — <c>hardware_spec</c> 이 <c>null</c> 이면 그대로 둔다.
+    /// 여기서 새 객체를 만들면 <c>PUT</c> 이 서버의 <c>hardware_spec</c>(특히 <c>components[]</c> 부품 선언)을
+    /// <b>통째 교체</b>해 형상 선언이 사라진다 — 문 위치 부품이 사라지면 문 상태를 영영 못 읽는다.
+    /// 그래서 <b>기존 축이 있을 때만</b> 채운다.</para>
+    ///
+    /// <para><b>기존 값을 덮지 않는다</b> — <c>firmware</c> 에 이미 값이 있으면 그것이 서버 정본이다
+    /// (읽기 역투영 때문에 <c>Version</c> 과 같을 뿐이다).</para>
+    ///
+    /// <para><b>길이 초과는 채우지 않는다</b> — 축 <c>firmware</c> 는 50자 상한이라 넘기면 422 로
+    /// <b>저장 전체가 실패</b>한다. 잘라 보내면 사용자가 모르는 값이 저장되므로, 경고만 남기고 생략한다.</para>
+    /// </remarks>
+    private void LinkVersionToFirmware(BaseDeviceDto dto)
+    {
+        var version = dto.Version;
+        if (string.IsNullOrWhiteSpace(version)) return;
+
+        var spec = ResolveHardwareSpec(dto);
+        if (spec == null) return;                                  // 없는 축을 만들지 않는다
+        if (!string.IsNullOrWhiteSpace(spec.Firmware)) return;     // 서버 정본을 덮지 않는다
+
+        var trimmed = version.Trim();
+        if (trimmed.Length > HardwareSpecDto.AXIS_FIRMWARE_MAX_LENGTH)
+        {
+            _log?.Warning(
+                $"[{nameof(DeviceApiService)}] version({trimmed.Length}자) 이 hardware_spec.firmware 상한" +
+                $"({HardwareSpecDto.AXIS_FIRMWARE_MAX_LENGTH})을 넘어 전송을 생략한다 — 422 로 저장 전체가 실패하는 것을 피한다.");
+            return;
+        }
+
+        spec.Firmware = trimmed;
+    }
+
+    /// <summary>
+    /// 장비 DTO 의 <c>hardware_spec</c> 을 꺼낸다. 배후 저장소가 <c>protected</c> 라 파생 타입으로 갈라 읽는다.
+    /// </summary>
+    /// <remarks>모르는 타입이면 <c>null</c> — 추측으로 리플렉션하지 않는다(새 카테고리가 생기면 여기 추가).</remarks>
+    private static HardwareSpecDto? ResolveHardwareSpec(BaseDeviceDto dto) => dto switch
+    {
+        CameraDeviceDto camera => camera.HardwareSpec,
+        ControllerDeviceDto controller => controller.HardwareSpec,
+        SensorDeviceDto sensor => sensor.HardwareSpec,
+        SpeakerDeviceDto speaker => speaker.HardwareSpec,
+        EnclosureDeviceDto enclosure => enclosure.HardwareSpec,
+        GateDeviceDto gate => gate.HardwareSpec,
+        LampDeviceDto lamp => lamp.HardwareSpec,
+        _ => null,
+    };
+    #endregion
+
+    #region - 조회 쿼리 공통 -
+    /// <summary>
+    /// 7.0 이상의 응답 프로필 파라미터(<c>?view=</c>·<c>?include=</c>)를 쿼리에 붙인다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>버전 판단은 여기서 하지 않는다</b> — 호출부(<c>Devices.Ui</c> 의 <c>DeviceQueryPolicy</c>)가
+    /// 계약 세대를 보고 값을 넣거나 <c>null</c> 로 둔다. API 계층이 또 분기하면 결정 지점이 둘이 된다.</para>
+    /// <para><c>null</c>·공백이면 <b>키 자체를 붙이지 않는다</b> — 서버 어휘가 닫힌 집합으로 가는 중이라
+    /// 빈 문자열은 422 위험이다.</para>
+    /// </remarks>
+    private static void AddViewInclude(Dictionary<string, string> parameters, string? view, string? include)
+    {
+        if (!string.IsNullOrWhiteSpace(view)) parameters["view"] = view!.Trim();
+        if (!string.IsNullOrWhiteSpace(include)) parameters["include"] = include!.Trim();
+    }
+
+    /// <summary>
+    /// 7.0 에서 신설된 목록 필터(종류축·<c>protocol</c>·<c>group_id</c>·<c>server_id</c> 등)를 붙인다.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>null</c>·공백이면 <b>키를 붙이지 않는다</b>.</para>
+    /// <para>6.3 계약에서는 <b>보내지 않고 경고만 남긴다</b> — 6.3 은 선언하지 않은 쿼리를
+    /// <b>조용히 무시</b>하므로 그냥 보내면 "걸렀는데 전건이 온다"는 침묵 실패가 된다.
+    /// 필터가 안 걸린 결과를 걸린 것처럼 쓰는 쪽이 더 위험해 로그로 표면화한다.</para>
+    /// </remarks>
+    /// <summary>
+    /// <b>운영 6.3.2 에도 존재하는</b> 필터를 붙인다 — 게이트 없이 전 판본 전송.
+    /// <para>⚠ <see cref="AddAxisFilter(Dictionary{string,string},string,string?,string)"/> 로 보내면
+    /// <b>6.3 에서 멀쩡한 필터를 잃는다</b>(경고만 남기고 생략된다). 실측(2026-09-18, 배포 스웨거 대조):</para>
+    /// <list type="bullet">
+    ///   <item><c>group_id</c> — 6.3.2 의 <b>controllers · sensors · cameras</b> 에 존재</item>
+    ///   <item><c>server_id</c> — 6.3.2 의 <b>speakers</b> 에 존재</item>
+    /// </list>
+    /// <para>그 밖의 조합(예: enclosures 의 <c>group_id</c>)은 6.3.2 에 <b>없으므로</b>
+    /// <see cref="AddAxisFilter(Dictionary{string,string},string,int?,string)"/> 를 쓴다.</para>
+    /// </summary>
+    private void AddLegacySafeFilter(Dictionary<string, string> parameters, string key, int? value, string caller)
+    {
+        if (!value.HasValue) return;
+        parameters[key] = value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private void AddAxisFilter(Dictionary<string, string> parameters, string key, string? value, string caller)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!IsAxisContract)
+        {
+            _log?.Warning($"[{caller}] contract={Contract} 에는 '{key}' 필터가 없다(미지 쿼리는 조용히 무시된다) — 전송 생략. value=\"{value}\"");
+            return;
+        }
+        parameters[key] = value.Trim();
+    }
+
+    /// <inheritdoc cref="AddAxisFilter(Dictionary{string,string},string,string?,string)"/>
+    private void AddAxisFilter(Dictionary<string, string> parameters, string key, int? value, string caller)
+    {
+        if (!value.HasValue) return;
+        AddAxisFilter(parameters, key, value.Value.ToString(), caller);
+    }
+
+    /// <summary>
+    /// 부대 편제 축(<c>unit_id</c>·<c>include_descendants</c>)을 붙인다 — <b>8.0 이상에서만</b>.
+    /// </summary>
+    /// <remarks>
+    /// <para>⚠ 이 게이트가 <b>이 파일에서 가장 중요한 침묵 실패 방지선</b>이다. 6.3·7.0 은 미지 쿼리를
+    /// 조용히 무시하므로 게이트 없이 보내면 <b>"부대로 걸렀는데 전건이 온다"</b>. 화면에는 다른 부대 장비가
+    /// 섞여 나오는데 오류는 하나도 없어, 운영에서 사람이 오판하기 딱 좋은 형태다.</para>
+    /// <para><c>include_descendants</c> 는 <c>unit_id</c> 와 <b>함께만</b> 의미가 있다 —
+    /// 단독으로 주면 보내지 않고 경고한다.</para>
+    /// </remarks>
+    private void AddUnitScope(Dictionary<string, string> parameters, int? unitId, bool? includeDescendants, string caller)
+    {
+        if (!unitId.HasValue && !includeDescendants.HasValue) return;
+
+        if (!IsUnitScopedContract)
+        {
+            _log?.Warning(
+                $"[{caller}] contract={Contract} 에는 unit_id·include_descendants 가 없다 — 전송 생략. " +
+                $"(6.3·7.0 은 미지 쿼리를 조용히 무시해 '부대로 걸렀는데 전건' 이 된다)");
+            return;
+        }
+
+        if (!unitId.HasValue)
+        {
+            _log?.Warning($"[{caller}] include_descendants 는 unit_id 와 함께만 유효하다 — 단독 지정이라 전송 생략.");
+            return;
+        }
+
+        parameters["unit_id"] = unitId.Value.ToString();
+        if (includeDescendants.HasValue)
+            parameters["include_descendants"] = includeDescendants.Value ? "true" : "false";
+    }
+
+    /// <summary>
+    /// 이 계약에 존재하지 않는 축 경로 호출을 <b>네트워크에 나가기 전에</b> 차단한다.
+    /// </summary>
+    /// <remarks>
+    /// 6.3 은 404, 7.0+ 는 경로가 있다. 실제로 호출하면 404 가 <c>NOT_FOUND</c> 로 매핑돼
+    /// "그 장비가 없다"와 구분되지 않는다 — 원인을 사람에게 보여주려고 전용 코드로 돌려준다.
+    /// </remarks>
+    private ApiResponse<T> AxisEndpointUnavailable<T>(string what, string replacement)
+    {
+        var message = $"{what} 은(는) 현재 서버 계약({Contract})에 존재하지 않습니다. 대체: {replacement}";
+        _log?.Error($"[{nameof(DeviceApiService)}] ENDPOINT_UNAVAILABLE {message}");
+        return ApiResponse<T>.CreateError("ENDPOINT_UNAVAILABLE", message, replacement);
+    }
+
+    /// <inheritdoc cref="AxisEndpointUnavailable{T}(string,string)"/>
+    private ApiListResponse<T> AxisEndpointUnavailableList<T>(string what, string replacement)
+    {
+        var message = $"{what} 은(는) 현재 서버 계약({Contract})에 존재하지 않습니다. 대체: {replacement}";
+        _log?.Error($"[{nameof(DeviceApiService)}] ENDPOINT_UNAVAILABLE {message}");
+        return ApiListResponse<T>.CreateError("ENDPOINT_UNAVAILABLE", message, replacement);
     }
     #endregion
 
@@ -88,14 +323,27 @@ public class DeviceApiService : IDeviceApiService
         bool includeSensors = false,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeController = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             if (includeSensors) parameters.Add("include_sensors", "true");
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetControllersAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "type_controller", typeController, nameof(GetControllersAsync));
+            AddLegacySafeFilter(parameters, "group_id", groupId, nameof(GetControllersAsync));
+            AddAxisFilter(parameters, "server_id", serverId, nameof(GetControllersAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetControllersAsync));
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/controllers", parameters);
             return await response.ToApiListResponseAsync<ControllerDeviceDto>();
@@ -118,12 +366,16 @@ public class DeviceApiService : IDeviceApiService
     public async Task<ApiResponse<ControllerDeviceDto>> GetControllerByIdAsync(
         int id,
         bool includeSensors = false,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();
             if (includeSensors) parameters.Add("include_sensors", "true");
+
+            AddViewInclude(parameters, view, include);
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", parameters);
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
@@ -148,7 +400,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/controllers", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/controllers", ShapeWrite(dto));
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -174,7 +426,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -200,7 +452,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -252,7 +504,13 @@ public class DeviceApiService : IDeviceApiService
         bool includeController = false,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeSensor = null,
+        int? groupId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
@@ -261,7 +519,14 @@ public class DeviceApiService : IDeviceApiService
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             if (includeController) parameters.Add("include_controller", "true");
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetSensorsAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "type_sensor", typeSensor, nameof(GetSensorsAsync));
+            AddLegacySafeFilter(parameters, "group_id", groupId, nameof(GetSensorsAsync));
+            // ⚠ 센서에는 server_id 를 싣지 않는다 — 8.0 에서 센서의 서버 축이 사라져 deprecated(422)이고
+            //   상위 축은 controller_id 다. 그래서 파라미터 자체를 만들지 않았다.
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetSensorsAsync));
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/sensors", parameters);
             return await response.ToApiListResponseAsync<SensorDeviceDto>();
@@ -284,12 +549,16 @@ public class DeviceApiService : IDeviceApiService
     public async Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(
         int id,
         bool includeController = false,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();
             if (includeController) parameters.Add("include_controller", "true");
+
+            AddViewInclude(parameters, view, include);
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", parameters);
             return await response.ToApiResponseAsync<SensorDeviceDto>();
@@ -312,7 +581,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/sensors", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/sensors", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -335,7 +604,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -358,7 +627,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -406,7 +675,15 @@ public class DeviceApiService : IDeviceApiService
         string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeCamera = null,
+        string? protocol = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
@@ -414,7 +691,14 @@ public class DeviceApiService : IDeviceApiService
             if (!string.IsNullOrEmpty(category)) parameters.Add("category", category);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetCamerasAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "type_camera", typeCamera, nameof(GetCamerasAsync));   // 옛 category
+            AddAxisFilter(parameters, "protocol", protocol, nameof(GetCamerasAsync));        // 옛 mode
+            AddLegacySafeFilter(parameters, "group_id", groupId, nameof(GetCamerasAsync));
+            AddAxisFilter(parameters, "server_id", serverId, nameof(GetCamerasAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetCamerasAsync));
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras", parameters);
             return await response.ToApiListResponseAsync<CameraDeviceDto>();
@@ -433,11 +717,16 @@ public class DeviceApiService : IDeviceApiService
     /// <param name="id">Camera ID</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Camera DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<CameraDeviceDto>> GetCameraByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<CameraDeviceDto>> GetCameraByIdAsync(int id, CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{id}");
+            var parameters = new Dictionary<string, string>();
+            AddViewInclude(parameters, view, include);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", parameters);
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -458,7 +747,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/cameras", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/cameras", ShapeWrite(dto));
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -481,7 +770,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -521,6 +810,9 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
+            // FR-09: 7.0 이상에서는 hardware_spec 키가 갈렸다(name·location·hardware·device_id 제거,
+            // device_id→serial · hardware→hardware_rev). 단독 전송이라 여기서 직접 계약을 맞춘다.
+            if (hardwareSpec != null) hardwareSpec.UseAxisWrite = IsAxisContract;
             var body = new { hardware_spec = hardwareSpec };
             var url = $"{_setupModel.Url}/devices/cameras/{id}";
             _log?.Info($"[PatchHardwareSpecAsync] PATCH {url} body={Newtonsoft.Json.JsonConvert.SerializeObject(body)}");
@@ -548,7 +840,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -867,14 +1159,29 @@ public class DeviceApiService : IDeviceApiService
         string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? speakerRole = null,
+        string? typeSpeaker = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(speakerType)) parameters.Add("speaker_type", speakerType);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetSpeakersAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "speaker_role", speakerRole, nameof(GetSpeakersAsync));   // 옛 speaker_type(역할)
+            AddAxisFilter(parameters, "type_speaker", typeSpeaker, nameof(GetSpeakersAsync));   // 형상 — 역할과 다른 축
+            AddAxisFilter(parameters, "group_id", groupId, nameof(GetSpeakersAsync));
+            AddLegacySafeFilter(parameters, "server_id", serverId, nameof(GetSpeakersAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetSpeakersAsync));
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/speakers", parameters);
             return await response.ToApiListResponseAsync<SpeakerDeviceDto>();
@@ -886,11 +1193,16 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
-    public async Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/speakers/{id}");
+            var parameters = new Dictionary<string, string>();
+            AddViewInclude(parameters, view, include);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", parameters);
             return await response.ToApiResponseAsync<SpeakerDeviceDto>();
         }
         catch (Exception ex)
@@ -904,7 +1216,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/speakers", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/speakers", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SpeakerDeviceDto>();
         }
         catch (Exception ex)
@@ -918,7 +1230,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SpeakerDeviceDto>();
         }
         catch (Exception ex)
@@ -932,7 +1244,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SpeakerDeviceDto>();
         }
         catch (Exception ex)
@@ -962,14 +1274,28 @@ public class DeviceApiService : IDeviceApiService
         string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeEnclosure = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetEnclosuresAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "type_enclosure", typeEnclosure, nameof(GetEnclosuresAsync));
+            AddAxisFilter(parameters, "group_id", groupId, nameof(GetEnclosuresAsync));
+            AddAxisFilter(parameters, "server_id", serverId, nameof(GetEnclosuresAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetEnclosuresAsync));
+            // door_status 의 7.0+ 대체는 이 목록이 아니라 GetDevicesByComponentAsync(DOOR_SENSOR) 다.
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures", parameters);
             return await response.ToApiListResponseAsync<EnclosureDeviceDto>();
@@ -981,11 +1307,16 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
-    public async Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}");
+            var parameters = new Dictionary<string, string>();
+            AddViewInclude(parameters, view, include);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", parameters);
             return await response.ToApiResponseAsync<EnclosureDeviceDto>();
         }
         catch (Exception ex)
@@ -999,7 +1330,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/enclosures", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/enclosures", ShapeWrite(dto));
             return await response.ToApiResponseAsync<EnclosureDeviceDto>();
         }
         catch (Exception ex)
@@ -1013,7 +1344,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<EnclosureDeviceDto>();
         }
         catch (Exception ex)
@@ -1027,7 +1358,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<EnclosureDeviceDto>();
         }
         catch (Exception ex)
@@ -1058,7 +1389,14 @@ public class DeviceApiService : IDeviceApiService
         string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeGate = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
@@ -1066,7 +1404,14 @@ public class DeviceApiService : IDeviceApiService
             if (!string.IsNullOrEmpty(gateStatus)) parameters.Add("gate_status", gateStatus);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());     // 서버 ge=1 — 0 은 VALIDATION_ERROR(2026-09-08 실측)
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetGatesAsync)).ToString());
+            AddAxisFilter(parameters, "type_gate", typeGate, nameof(GetGatesAsync));
+            AddAxisFilter(parameters, "group_id", groupId, nameof(GetGatesAsync));
+            AddAxisFilter(parameters, "server_id", serverId, nameof(GetGatesAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetGatesAsync));
+            // gate_status 의 7.0+ 대체는 이 목록이 아니라 GetDevicesByComponentAsync(DOOR_ACTUATOR) 다.
+
+            AddViewInclude(parameters, view, include);
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/gates", parameters);
             return await response.ToApiListResponseAsync<GateDeviceDto>();
@@ -1078,11 +1423,16 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
-    public async Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/gates/{id}");
+            var parameters = new Dictionary<string, string>();
+            AddViewInclude(parameters, view, include);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/gates/{id}", parameters);
             return await response.ToApiResponseAsync<GateDeviceDto>();
         }
         catch (Exception ex)
@@ -1096,7 +1446,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/gates/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/gates/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<GateDeviceDto>();
         }
         catch (Exception ex)
@@ -1107,35 +1457,29 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <inheritdoc/>
-    public async Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
-    {
-        try
-        {
-            var response = await _apiService.PostRequestAsync(
-                $"{_setupModel.Url}/devices/gates/{id}/control", new DoorControlRequestDto(doorCommand));
-            return await response.ToApiResponseAsync<GateDeviceDto>();
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"[{nameof(ControlGateAsync)}] Error: {ex.Message}");
-            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to control gate {id}", ex.Message);
-        }
-    }
+    public Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
+        => Task.FromResult(DoorControlRemoved<GateDeviceDto>(nameof(ControlGateAsync), "gates", id, "GATE_DOOR_SET"));
 
     /// <inheritdoc/>
-    public async Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(int id, string doorCommand, CancellationToken token = default)
+    public Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(int id, string doorCommand, CancellationToken token = default)
+        => Task.FromResult(DoorControlRemoved<EnclosureDeviceDto>(nameof(ControlEnclosureAsync), "enclosures", id, "ENCLOSURE_DOOR_SET"));
+
+    /// <summary>
+    /// 개폐 REST 경로 무력화 — <b>호출 전에 차단</b>한다.
+    /// <para>운영 6.3.2 는 <c>/devices/gates*</c> 리소스가 없어 404, 개발 7.0.1·8.0.1 은
+    /// <c>/control</c> 두 개가 모두 410 <c>ENDPOINT_REMOVED</c> 묘비(서버 <c>gates.py</c>·<c>enclosures.py</c>
+    /// <c>raise_endpoint_removed</c>)다. 그대로 호출하면 사용자에게 엉뚱한 서버 오류가 보이므로
+    /// 왕복을 만들지 않고 사유를 그대로 돌려준다.</para>
+    /// <para>정본 채널은 NATS <c>GATE_DOOR_SET</c>·<c>ENCLOSURE_DOOR_SET</c>
+    /// (subject <c>{domain}.{부대ID}.all.gate-door</c> / <c>.all.enclosure-door</c>, 발신 Central/GIS) —
+    /// GIS 는 <c>GMaps.Ui</c> 의 <c>IDoorControlService</c> 로 발행한다(브로커 연동설계 v1.6 §7).</para>
+    /// </summary>
+    private ApiResponse<T> DoorControlRemoved<T>(string caller, string resource, int id, string natsCommand) where T : class
     {
-        try
-        {
-            var response = await _apiService.PostRequestAsync(
-                $"{_setupModel.Url}/devices/enclosures/{id}/control", new DoorControlRequestDto(doorCommand));
-            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"[{nameof(ControlEnclosureAsync)}] Error: {ex.Message}");
-            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to control enclosure {id}", ex.Message);
-        }
+        var message = $"'POST /api/devices/{resource}/{{id}}/control' 는 서버에서 제거됐습니다 — NATS {natsCommand} 로 발행하십시오.";
+        _log?.Warning($"[{caller}] 차단 — {resource}/{id}: {message}");
+        return ApiResponse<T>.CreateError("ENDPOINT_REMOVED", message,
+            "REST 개폐 경로는 운영 404 / 개발 410 입니다. 개폐 명령은 클라 → 구동 담당 매니저 NATS 직행입니다.");
     }
     #endregion
 
@@ -1143,13 +1487,26 @@ public class DeviceApiService : IDeviceApiService
     public async Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(        string? status = null,
         int page = 1,
         int limit = 20,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        string? view = null,
+        string? include = null,
+        string? typeLamp = null,
+        int? groupId = null,
+        int? serverId = null,
+        int? unitId = null,
+        bool? includeDescendants = null)
     {
         try
         {
             var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
-            parameters.Add("limit", limit.ToString());
+            parameters.Add("limit", ClampLimit(limit, nameof(GetLampsAsync)).ToString());
+
+            AddViewInclude(parameters, view, include);
+            AddAxisFilter(parameters, "type_lamp", typeLamp, nameof(GetLampsAsync));
+            AddAxisFilter(parameters, "group_id", groupId, nameof(GetLampsAsync));
+            AddAxisFilter(parameters, "server_id", serverId, nameof(GetLampsAsync));
+            AddUnitScope(parameters, unitId, includeDescendants, nameof(GetLampsAsync));
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/lamps", parameters);
             return await response.ToApiListResponseAsync<LampDeviceDto>();
@@ -1161,11 +1518,16 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
-    public async Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default,
+        string? view = null,
+        string? include = null)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/lamps/{id}");
+            var parameters = new Dictionary<string, string>();
+            AddViewInclude(parameters, view, include);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", parameters);
             return await response.ToApiResponseAsync<LampDeviceDto>();
         }
         catch (Exception ex)
@@ -1179,7 +1541,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/lamps", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/lamps", ShapeWrite(dto));
             return await response.ToApiResponseAsync<LampDeviceDto>();
         }
         catch (Exception ex)
@@ -1193,7 +1555,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<LampDeviceDto>();
         }
         catch (Exception ex)
@@ -1207,7 +1569,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<LampDeviceDto>();
         }
         catch (Exception ex)
@@ -1232,12 +1594,336 @@ public class DeviceApiService : IDeviceApiService
     }
     #endregion
 
+    #region - 부품 상태 일괄 조회 · 보고 · 설정 축 · 카탈로그 (A-devices D-3 · D-30~32) -
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.GetDevicesByComponentAsync" path="/summary"/>
+    /// </summary>
+    /// <remarks>
+    /// <para>나가기 전 검문 두 가지 — ① <c>component</c>/<c>component_type</c> 중 <b>정확히 하나</b>,
+    /// ② 계약 <c>&gt;= V7_0</c>. 둘 다 서버가 각각 422·404 로 답하지만, 그 답이
+    /// "필터 값이 틀렸다"·"장비가 없다"와 구분되지 않아 진단이 막힌다.</para>
+    /// <para><b>page·limit 를 붙이지 않는다</b> — 8.0.1 스웨거에 이 경로의 페이징 쿼리가 <b>선언되어 있지 않다</b>
+    /// (응답 봉투에는 <c>pagination</c> 키가 있다). 선언 없는 쿼리를 보내면 FastAPI 가 조용히 버리므로
+    /// 페이징을 임의로 만들지 않고 서버 기본 동작을 그대로 쓴다. 필요해지면 스웨거를 다시 확인한 뒤 추가한다.</para>
+    /// </remarks>
+    public async Task<ApiListResponse<ComponentStateRowDto>> GetDevicesByComponentAsync(
+        string? componentType = null,
+        string? component = null,
+        string? state = null,
+        string? health = null,
+        string? deviceType = null,
+        CancellationToken token = default)
+    {
+        var hasType = !string.IsNullOrWhiteSpace(componentType);
+        var hasKey = !string.IsNullOrWhiteSpace(component);
+
+        if (hasType == hasKey)
+        {
+            var reason = hasType
+                ? "component 와 component_type 을 함께 보낼 수 없습니다(서버 422)."
+                : "component 또는 component_type 중 하나는 반드시 필요합니다(서버 422).";
+            _log?.Error($"[{nameof(GetDevicesByComponentAsync)}] 차단 — {reason}");
+            return ApiListResponse<ComponentStateRowDto>.CreateError("VALIDATION_ERROR", reason,
+                "정확히 하나만 지정하십시오 — 유형으로 찾으려면 component_type(DOOR_SENSOR 등), 부품 key 로 찾으려면 component(door 등).");
+        }
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailableList<ComponentStateRowDto>(
+                "GET /api/devices/by-component",
+                "6.3 에서는 GET /api/devices/enclosures?door_status= · GET /api/devices/gates?gate_status= 를 사용하십시오.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(deviceType) && !DeviceTypePaths.IsValid(deviceType))
+        {
+            var reason = $"device_type=\"{deviceType}\" 은 허용 어휘가 아닙니다(서버 404). 허용: {string.Join(" · ", DeviceTypePaths.All)}";
+            _log?.Error($"[{nameof(GetDevicesByComponentAsync)}] 차단 — {reason}");
+            return ApiListResponse<ComponentStateRowDto>.CreateError("VALIDATION_ERROR", reason, "URL 복수형만 허용됩니다(enclosure 가 아니라 enclosures).");
+        }
+
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (hasType) parameters["component_type"] = componentType!.Trim();
+            // ⚠ component(key) 는 대소문자·공백을 그대로 비교한다 — Trim 하지 않는다.
+            if (hasKey) parameters["component"] = component!;
+            if (!string.IsNullOrWhiteSpace(state)) parameters["state"] = state!.Trim();
+            if (!string.IsNullOrWhiteSpace(health)) parameters["health"] = health!.Trim();
+            if (!string.IsNullOrWhiteSpace(deviceType)) parameters["device_type"] = deviceType!.Trim();
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/by-component", parameters);
+            return await response.ToApiListResponseAsync<ComponentStateRowDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDevicesByComponentAsync)}] Error: {ex.Message}");
+            return ApiListResponse<ComponentStateRowDto>.CreateError("INTERNAL_ERROR", "Failed to get devices by component", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.PatchComponentStatusAsync" path="/summary"/>
+    /// </summary>
+    public async Task<ApiResponse<DeviceStatusWriteDataDto>> PatchComponentStatusAsync(
+        string deviceTypePath,
+        int deviceId,
+        IDictionary<string, ComponentStatusDto> components,
+        CancellationToken token = default)
+    {
+        if (!DeviceTypePaths.IsValid(deviceTypePath))
+        {
+            return InvalidDeviceTypePath<DeviceStatusWriteDataDto>(nameof(PatchComponentStatusAsync), deviceTypePath);
+        }
+
+        if (components == null || components.Count == 0)
+        {
+            const string reason = "보고할 부품이 없습니다 — component-status 는 항목 1개 이상이 필수입니다(서버 minProperties=1).";
+            _log?.Error($"[{nameof(PatchComponentStatusAsync)}] 차단 — {reason}");
+            return ApiResponse<DeviceStatusWriteDataDto>.CreateError("VALIDATION_ERROR", reason, null);
+        }
+
+        // observed_at·health 는 항목마다 필수다(ST-1). 빠뜨리면 서버 422 인데, 응답만 보면
+        // 어느 부품이 문제인지 알기 어려워 여기서 부품 key 를 짚어 돌려준다.
+        foreach (var pair in components)
+        {
+            var value = pair.Value;
+            if (value == null
+                || string.IsNullOrWhiteSpace(value.ObservedAt)
+                || string.IsNullOrWhiteSpace(value.Health))
+            {
+                var reason = $"부품 '{pair.Key}' 보고에 observed_at·health 가 모두 필요합니다(항목마다 필수 — ST-1).";
+                _log?.Error($"[{nameof(PatchComponentStatusAsync)}] 차단 — {reason}");
+                return ApiResponse<DeviceStatusWriteDataDto>.CreateError("VALIDATION_ERROR", reason,
+                    "observed_at 은 오프셋 포함 ISO 8601, health 는 OK·DEGRADED·FAULT·UNKNOWN 입니다.");
+            }
+        }
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<DeviceStatusWriteDataDto>(
+                $"PATCH /api/devices/{deviceTypePath}/{{id}}/component-status",
+                "6.3 에는 부품 상태 축이 없습니다(문 위치가 장비 스칼라 필드였습니다).");
+        }
+
+        try
+        {
+            var path = deviceTypePath.Trim().ToLowerInvariant();
+            var response = await _apiService.PatchRequestAsync(
+                $"{_setupModel.Url}/devices/{path}/{deviceId}/component-status", components);
+            return await response.ToApiResponseAsync<DeviceStatusWriteDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchComponentStatusAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceStatusWriteDataDto>.CreateError(
+                "INTERNAL_ERROR", $"Failed to report component status for {deviceTypePath}/{deviceId}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.GetDeviceConfigAsync" path="/summary"/>
+    /// </summary>
+    public async Task<ApiResponse<DeviceConfigWriteDataDto>> GetDeviceConfigAsync(
+        string deviceTypePath,
+        int deviceId,
+        CancellationToken token = default)
+    {
+        if (!DeviceTypePaths.IsValid(deviceTypePath))
+            return InvalidDeviceTypePath<DeviceConfigWriteDataDto>(nameof(GetDeviceConfigAsync), deviceTypePath);
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<DeviceConfigWriteDataDto>(
+                $"GET /api/devices/{deviceTypePath}/{{id}}/config",
+                "6.3 에서는 장비 본문의 threshold_config·heater_enabled·fan_enabled·is_record(카메라는 /settings)를 사용하십시오.");
+        }
+
+        try
+        {
+            var path = deviceTypePath.Trim().ToLowerInvariant();
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/{path}/{deviceId}/config");
+            return await response.ToApiResponseAsync<DeviceConfigWriteDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDeviceConfigAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceConfigWriteDataDto>.CreateError(
+                "INTERNAL_ERROR", $"Failed to get device config for {deviceTypePath}/{deviceId}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.PatchDeviceConfigAsync" path="/summary"/>
+    /// </summary>
+    public Task<ApiResponse<DeviceConfigWriteDataDto>> PatchDeviceConfigAsync(
+        string deviceTypePath,
+        int deviceId,
+        DeviceConfigAxisDto config,
+        CancellationToken token = default)
+        => WriteDeviceConfigAsync(deviceTypePath, deviceId, config, replace: false, nameof(PatchDeviceConfigAsync));
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.UpdateDeviceConfigAsync" path="/summary"/>
+    /// </summary>
+    public Task<ApiResponse<DeviceConfigWriteDataDto>> UpdateDeviceConfigAsync(
+        string deviceTypePath,
+        int deviceId,
+        DeviceConfigAxisDto config,
+        CancellationToken token = default)
+        => WriteDeviceConfigAsync(deviceTypePath, deviceId, config, replace: true, nameof(UpdateDeviceConfigAsync));
+
+    /// <summary>PATCH·PUT <c>/config</c> 공통 경로 — 검문과 오류 문구를 한 곳에 둔다.</summary>
+    private async Task<ApiResponse<DeviceConfigWriteDataDto>> WriteDeviceConfigAsync(
+        string deviceTypePath,
+        int deviceId,
+        DeviceConfigAxisDto config,
+        bool replace,
+        string caller)
+    {
+        if (!DeviceTypePaths.IsValid(deviceTypePath))
+            return InvalidDeviceTypePath<DeviceConfigWriteDataDto>(caller, deviceTypePath);
+
+        if (config == null)
+        {
+            const string reason = "device_config 본문이 null 입니다.";
+            _log?.Error($"[{caller}] 차단 — {reason}");
+            return ApiResponse<DeviceConfigWriteDataDto>.CreateError("VALIDATION_ERROR", reason, null);
+        }
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<DeviceConfigWriteDataDto>(
+                $"{(replace ? "PUT" : "PATCH")} /api/devices/{deviceTypePath}/{{id}}/config",
+                "6.3 에는 device_config 축이 없습니다 — 장비 본문의 평면 필드를 사용하십시오.");
+        }
+
+        // 빈 본문은 PATCH 에서 아무 일도 하지 않고, PUT 에서는 축을 전부 지운다 —
+        // 후자는 사고라서 나가기 전에 막는다(임계치·모드·부품 의도가 한 번에 사라진다).
+        if (config.IsEmpty && replace)
+        {
+            const string reason = "PUT /config 에 빈 본문을 보내면 thresholds·modes·component_overrides 가 모두 삭제됩니다 — 차단했습니다.";
+            _log?.Error($"[{caller}] 차단 — {reason}");
+            return ApiResponse<DeviceConfigWriteDataDto>.CreateError("VALIDATION_ERROR", reason,
+                "한 값만 고치려면 PatchDeviceConfigAsync 를, 통째 교체가 의도라면 보존할 섹션을 GetDeviceConfigAsync 로 받아 함께 실으십시오.");
+        }
+
+        try
+        {
+            var path = deviceTypePath.Trim().ToLowerInvariant();
+            var endpoint = $"{_setupModel.Url}/devices/{path}/{deviceId}/config";
+
+            var response = replace
+                ? await _apiService.PutRequestAsync(endpoint, config)
+                : await _apiService.PatchRequestAsync(endpoint, config);
+
+            var result = await response.ToApiResponseAsync<DeviceConfigWriteDataDto>();
+
+            // UNMATCHED_THRESHOLD 처럼 "거부하지 않은 경고" 는 봉투에만 실려 조용히 사라진다 — 로그로 표면화한다.
+            if (result.Warnings != null)
+            {
+                foreach (var warning in result.Warnings)
+                    _log?.Warning($"[{caller}] 서버 경고 {warning.Code} ({warning.Field}): {warning.Message}");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{caller}] Error: {ex.Message}");
+            return ApiResponse<DeviceConfigWriteDataDto>.CreateError(
+                "INTERNAL_ERROR", $"Failed to write device config for {deviceTypePath}/{deviceId}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.GetDeviceSpecCatalogAsync" path="/summary"/>
+    /// </summary>
+    public async Task<ApiResponse<DeviceSpecCatalogDto>> GetDeviceSpecCatalogAsync(
+        bool includeInactive = false,
+        CancellationToken token = default)
+    {
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<DeviceSpecCatalogDto>(
+                "GET /api/devices/spec",
+                "6.3 에는 어휘 카탈로그가 없습니다 — 코드 상수(EnumDeviceType 등)가 정본입니다.");
+        }
+
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            // 기본값(false)일 때는 키를 붙이지 않는다 — 서버 기본과 같고, 쿼리를 짧게 유지한다.
+            if (includeInactive) parameters["include_inactive"] = "true";
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/spec", parameters);
+            return await response.ToApiResponseAsync<DeviceSpecCatalogDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDeviceSpecCatalogAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceSpecCatalogDto>.CreateError("INTERNAL_ERROR", "Failed to get device spec catalog", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.GetDeviceTypeSpecAsync" path="/summary"/>
+    /// </summary>
+    public async Task<ApiResponse<DeviceTypeSpecDto>> GetDeviceTypeSpecAsync(
+        string deviceTypePath,
+        bool includeInactive = false,
+        CancellationToken token = default)
+    {
+        if (!DeviceTypePaths.IsValid(deviceTypePath))
+            return InvalidDeviceTypePath<DeviceTypeSpecDto>(nameof(GetDeviceTypeSpecAsync), deviceTypePath);
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<DeviceTypeSpecDto>(
+                $"GET /api/devices/{deviceTypePath}/spec",
+                "6.3 에는 어휘 카탈로그가 없습니다 — 코드 상수가 정본입니다.");
+        }
+
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (includeInactive) parameters["include_inactive"] = "true";
+
+            var path = deviceTypePath.Trim().ToLowerInvariant();
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/{path}/spec", parameters);
+            return await response.ToApiResponseAsync<DeviceTypeSpecDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDeviceTypeSpecAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceTypeSpecDto>.CreateError(
+                "INTERNAL_ERROR", $"Failed to get device type spec for {deviceTypePath}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 축 경로의 <c>{device_type}</c> 세그먼트가 허용 어휘(URL 복수형 7종)가 아닐 때의 공통 오류.
+    /// </summary>
+    /// <remarks>
+    /// 서버는 404 로 답하는데, 그 404 가 "장비가 없다"와 구분되지 않는다 — 특히 응답의
+    /// <c>category_device</c>(<b>단수</b>)를 그대로 끼워 넣은 실수가 이 형태로 나타난다.
+    /// </remarks>
+    private ApiResponse<T> InvalidDeviceTypePath<T>(string caller, string? deviceTypePath)
+    {
+        var reason = $"device_type=\"{deviceTypePath}\" 은 허용 어휘가 아닙니다(서버 404). 허용: {string.Join(" · ", DeviceTypePaths.All)}";
+        _log?.Error($"[{caller}] 차단 — {reason}");
+        return ApiResponse<T>.CreateError("VALIDATION_ERROR", reason,
+            "URL 복수형만 허용됩니다. 응답의 category_device 는 단수(enclosure)라 DeviceTypePaths.FromCategory 로 바꿔야 합니다.");
+    }
+    #endregion
+
     #region - Enclosure Metrics API (§5.5.9~12) -
     public async Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(
         int enclosureId, EnclosureMetricDto dto, CancellationToken token = default)
     {
         try
         {
+            // FR-09: 7.0 이상 EnclosureMetricCreate 는 additionalProperties=false 이고
+            // id·created_at·updated_at·enclosure_id 가 properties 에 없다(함체 id 는 경로가 정한다).
+            dto?.ApplyWriteContract(IsAxisContract);
             var response = await _apiService.PostRequestAsync(
                 $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics", dto);
             var content = await response.Content.ReadAsStringAsync();
@@ -1457,5 +2143,8 @@ public class DeviceApiService : IDeviceApiService
     private readonly ILogService? _log;
     private readonly IApiService _apiService;
     private readonly ApiSetupModel _setupModel;
+
+    /// <summary>서버 계약 세대 프로브(FR-09). <c>null</c> 이면 6.3 으로 간주한다.</summary>
+    private readonly IServerContractProbe? _contractProbe;
     #endregion
 }

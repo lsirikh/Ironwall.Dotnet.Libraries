@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Common;
 using Ironwall.Dotnet.Libraries.Base.Models;
@@ -44,6 +44,9 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        // 시작 일시는 '폼을 열 때' 기준으로 되감는다 — ctor 1회 초기화라 패널이 장수명(탭 상주)이면 값이 낡아
+        // 며칠 전 시각이 그대로 전송된다(과거 valid_from 자체는 서버가 허용하지만 운영자 의도와 다르다).
+        ValidFrom = DateTime.Now;
         await LoadAccountsAndGroupsAsync(_cancellationTokenSource?.Token ?? cancellationToken);
         await LoadAllGrantsAsync(_cancellationTokenSource?.Token ?? cancellationToken);   // 탭 열자마자 전체 부여 현황 표시(계정 미선택에도 목록이 비지 않도록)
     }
@@ -56,7 +59,12 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         await LoadAllGrantsAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);
     }
 
-    /// <summary>부여 실행 — 클라 1차 경계검증(until>from) 후 POST. 서버 422가 최종.</summary>
+    /// <summary>
+    /// 부여 실행 — 클라 1차 경계검증 후 POST. 서버 422 가 최종.
+    /// <para>서버 검증은 <b>두 가지</b>다(배포 8.0.1·운영 6.3.2 공통 operation 설명: "<c>valid_from &lt; valid_until</c>,
+    /// <b>과거 valid_until 거부</b>"): ① <c>valid_until &lt;= valid_from</c> ② <c>valid_until</c> 이 <b>현재보다 과거</b>.
+    /// ②를 클라가 막지 않아 종료일을 오늘/과거로 고르면 영문 422 문구가 그대로 노출됐다. <c>valid_from</c> 은 과거여도 된다.</para>
+    /// </summary>
     public async Task ClickCreateGrant()
     {
         var acc = SelectedAccount; var grp = SelectedGroup;
@@ -65,6 +73,12 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
             { Title = "권한 부여", Explain = "종료 일시는 시작 일시보다 뒤여야 합니다." });
+            return;
+        }
+        if (ValidUntil.HasValue && ValidUntil.Value <= DateTime.Now)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "권한 부여", Explain = "종료 일시는 현재보다 미래여야 합니다. (서버가 과거 종료일을 거부합니다)" });
             return;
         }
         try
@@ -128,8 +142,9 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     {
         try
         {
-            // ⚠ 서버 /users limit 상한=100(le=100) — 초과 지정 시 422 → 계정 목록이 비어 콤보가 안 뜬다.
-            var usersRes = await _api.GetUsersAsync(1, 100, ct);
+            // ⚠ 서버 /users limit 상한=100(le=100, 초과 지정은 422) — 전량은 page 순회로만 얻는다.
+            //    단일 호출이면 101번째 계정부터 '부여 대상' 콤보에서 조용히 사라져 그 계정엔 권한을 줄 수 없었다.
+            var usersRes = await _api.GetAllUsersAsync(ct);
             Accounts.Clear();
             if (usersRes.Success && usersRes.Data is not null)
                 foreach (var u in usersRes.Data) Accounts.Add(u);
@@ -137,7 +152,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "권한 부여", Explain = $"계정 목록 불러오기 실패: {usersRes.Error?.Message ?? usersRes.Message}" });
 
-            var groupsRes = await _api.GetUserGroupsAsync(ct);
+            var groupsRes = await _api.GetAllUserGroupsAsync(ct);   // 그룹도 limit 상한 100 → page 순회
             Groups.Clear();
             if (groupsRes.Success && groupsRes.Data is not null)
                 foreach (var g in groupsRes.Data) Groups.Add(g);

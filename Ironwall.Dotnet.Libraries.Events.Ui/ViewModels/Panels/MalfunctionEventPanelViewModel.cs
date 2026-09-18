@@ -441,7 +441,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                 try
                 {
                     firstPage = await _providerService.FetchMalfunctionEventsPageAsync(
-                        StartDate, EndDate, 1, 100, cancellationToken);
+                        StartDate, EndDate, 1, 100, token: cancellationToken);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -517,7 +517,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         try
         {
             var result = await _providerService.FetchMalfunctionEventsPageAsync(
-                StartDate, EndDate, _currentPage + 1, 100, token);
+                StartDate, EndDate, _currentPage + 1, 100, token: token);
 
             if (token.IsCancellationRequested) return;
 
