@@ -1,6 +1,6 @@
 # 세션 컨텍스트
 
-## ▶▶ 재개 포인트 (2026-09-18 — GOP 서버 API 계약 동기화 · Track C · **✅ 구현 + 실연동 검증 완료 / ❌ 실기 UI · 운영 쓰기 미검증 / ⛔ 미커밋**)
+## ▶▶ 재개 포인트 (2026-09-18 — GOP 서버 API 계약 동기화 · Track C · **✅ 구현 + 실연동 검증 완료 / ❌ 실기 UI · 운영 쓰기 미검증 / ✅ 커밋 `d1801ee0`**)
 
 ### ★ 최신 회차: 실연동 검증(Phase 3) — 2026-09-18
 
@@ -32,7 +32,7 @@
 **남은 미검증(명시)**: 실기 WPF 화면 · 운영 6.3.2 인증 경로 · FR-24 `unit_id` 실주입 쓰기 ·
 `Devices.Api` 통합테스트 86건(`http://localhost:8000` 하드코딩 vs 서버 HTTPS → 네트워크 503, **이 세션 이전 기준선 미측정**)
 
-**⛔ 커밋 상태**: 여전히 **미커밋**. 타 세션 미커밋 작업과 섞여 있어 선별 스테이징 필요. 롤백 태그 `before-api-8.0-sync` = `3bb9a8fa`.
+**✅ 커밋 완료**: `d1801ee0` `feat(api): GOP 서버 API 계약 동기화 — 6.3.2/8.0.1 런타임 분기` — **168파일 / +12,965 −855**. 선별 스테이징(`Ironwall.Dotnet.Libraries.*` + `CHANGELOG.md` + `docs/INDEX.md` + `docs/memory/session-context.md`)으로 **타 세션 WIP 보존**(`tests/` · `scripts/` · `AGENTS.md` · `.gitignore` · `.playwright-mcp/` 미포함). CHANGELOG `[Unreleased]` Added/Fixed 반영. 롤백 태그 `before-api-8.0-sync` = `3bb9a8fa`.
 
 ---
 
