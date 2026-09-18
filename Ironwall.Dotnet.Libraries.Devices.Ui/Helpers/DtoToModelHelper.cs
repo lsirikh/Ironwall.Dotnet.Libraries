@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
@@ -27,7 +28,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
@@ -84,18 +85,12 @@ public static class DtoToModelHelper
     // ────────────────────────── Enum 파싱 헬퍼 ──────────────────────────
 
     /// <summary>
-    /// String → EnumDeviceType 변환
-    /// <para>"IpCamera" → EnumDeviceType.IpCamera</para>
+    /// 장비 DTO → 옛 종류(<see cref="EnumDeviceType"/>). 정본은 <see cref="DeviceTypeResolver"/> 다(Events.Ui 와 공용).
+    /// <para>① <c>type_device</c>(6.3 전문)가 읽히면 그것 — 6.3 결과는 종전과 같다.
+    /// ② 못 읽으면 판별자 <c>category_device</c> 로 복원(7.0+). sensor 는 의도적 미매핑 → <c>NONE</c>.</para>
     /// </summary>
-    private static EnumDeviceType ParseDeviceType(string? typeDevice)
-    {
-        if (string.IsNullOrEmpty(typeDevice))
-            return EnumDeviceType.NONE;
-
-        return Enum.TryParse<EnumDeviceType>(typeDevice, true, out var result)
-            ? result
-            : EnumDeviceType.NONE;
-    }
+    private static EnumDeviceType ParseDeviceType(BaseDeviceDto dto)
+        => DeviceTypeResolver.Resolve(dto) ?? EnumDeviceType.NONE;
 
     /// <summary>
     /// String → EnumDeviceStatus 변환
@@ -223,7 +218,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status)
         };
@@ -288,7 +283,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
@@ -333,7 +328,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             SpeakerType = dto.SpeakerType ?? "NORMAL",
@@ -409,7 +404,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
@@ -435,7 +430,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
@@ -639,7 +634,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
