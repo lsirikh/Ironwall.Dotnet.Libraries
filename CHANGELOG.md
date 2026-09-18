@@ -15,6 +15,9 @@
 ## [Unreleased]
 
 ### Added
+- **장비 관리 창 v8 축 전환 1차 — 판별자 7탭 · 종류축 카탈로그 콤보 · 상세 9절 · 통문 패널** (Track C · 브랜치 `v2.10.0` · [PRD](docs/prds/device-console-v8-prd.md) v1.0 Approved · [Plan](docs/plans/device-console-v8-prd-plan.md) · [시나리오 분석](docs/analyses/device-console-v8-scenario-analysis.md) v1.3 · 사용자 승인 2026-09-19 · 롤백 `before-device-console-v8`) — **진행 중**
+  - 기반(화면 무변경): 통문 Api CRUD 3종·`GateDeviceProvider` · 판별자 해석기 공용화 · 축 모델 4종 + 읽기 매핑 · `UpdateDeviceProperties` 축 복사 · 카탈로그 캐시(`SYNC_CATALOG`) · DB `Enum.Parse`→`TryParse` · 계약 게이팅 + 프로브 실패 배너.
+  - 화면: 형상·부품·상태·설정 절은 **읽기 전용**(서버 `PATCH` 가 `components` 를 통째 교체 — 쓰기 본문에 `components` 미포함 단언). 6.3.2 운영에서는 옛 화면 무변경.
 - **GOP 서버 API 계약 동기화 (6.3.2 / 8.0.1 동시 대응)** (Track C · [PRD](docs/prds/gop-api-contract-sync-prd.md) v3.0 · [Plan](docs/plans/gop-api-contract-sync-prd-plan.md) · [분석](docs/analyses/gop-api-contract-sync-analysis.md) · [실연동 검증](docs/tests/gop-api-contract-sync-live-verification.md) · 사용자 사전 승인 2026-09-18)
   - **판본 런타임 분기**(`IServerContractProbe` + `ServerContractBootService`, `Order = -1000`) — 맞출 대상이 **셋**이다(운영 `6.3.2` · 개발 `8.0.1` · 명세 `v8.0`). 장비 쓰기는 `type_device`(6.3 **필수**) vs `additionalProperties:false`(7.0+ **금지**)로 **한 본문 양립 불가**라 페이로드 성형만으로는 못 맞춘다. `GET {root}/openapi.json` 의 `info.version` 을 1회 확보해 캐시하고, **판정 실패 시 `V6_3` 폴백**(운영이 6.3.2라 틀렸을 때 손해가 가장 작다). 비교는 **항상 `>=`** — 세션 중 로컬이 `7.0.1 → 8.0.1` 로 올라간 것이 `==` 분기의 위험을 실증했다.
   - **장비 축(axis) 전환** — `type_controller`/`type_sensor`/`type_camera`/`type_speaker`/`type_enclosure` + `connection`/`hardware_spec`/`device_config`. DTO 를 판본마다 복제하지 않고 `UseAxisWrite` 플래그 + `ShouldSerializeXxx()` 조건 직렬화로 **한 DTO 가 두 계약을 표현**한다. `version` → `hardware_spec.firmware` 역투영도 쓰기 방향으로 이었다(종전엔 드롭만 돼 펌웨어 수정이 서버에 전달되지 않았다).

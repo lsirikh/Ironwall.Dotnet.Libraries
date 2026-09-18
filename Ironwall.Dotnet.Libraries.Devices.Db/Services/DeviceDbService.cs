@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Devices.Db.Helpers;
+using Caliburn.Micro;
 using Dapper;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -1072,9 +1073,9 @@ internal sealed class ControllerJoinSQL
         DeviceNumber = DeviceNumber,
         DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
-        DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
+        DeviceType = DeviceTypeText.ParseTypeOrNone(DeviceType),
         Version = Version,
-        Status = Enum.Parse<EnumDeviceStatus>(Status),
+        Status = DeviceTypeText.ParseStatusOrDeactivated(Status),
         IpAddress = IpAddress,
         Port = IpPort
     };
@@ -1097,9 +1098,9 @@ internal sealed class SensorJoinSQL
         DeviceNumber = DeviceNumber,
         DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
-        DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
+        DeviceType = DeviceTypeText.ParseTypeOrNone(DeviceType),
         Version = Version,
-        Status = Enum.Parse<EnumDeviceStatus>(Status)
+        Status = DeviceTypeText.ParseStatusOrDeactivated(Status)
     };
 }
 
@@ -1127,9 +1128,9 @@ internal sealed class CameraJoinSQL
         DeviceNumber = DeviceNumber,
         DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
-        DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
+        DeviceType = DeviceTypeText.ParseTypeOrNone(DeviceType),
         Version = Version,
-        Status = Enum.Parse<EnumDeviceStatus>(Status),
+        Status = DeviceTypeText.ParseStatusOrDeactivated(Status),
         IpAddress = IpAddress,
         IpPort = IpPort,
         UserName = Username,
