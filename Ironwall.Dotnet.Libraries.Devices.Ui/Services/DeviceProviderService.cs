@@ -338,13 +338,13 @@ public class DeviceProviderService : IDeviceProviderService
     private async Task<IBaseDeviceModel?> FetchSingleGateAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetGateByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetControllerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
@@ -355,31 +355,31 @@ public class DeviceProviderService : IDeviceProviderService
             id,
             includeController: _queryPolicy.CanUseIncludeControllerFlag,
             token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleCameraAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetCameraByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleSpeakerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetSpeakerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleEnclosureAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetEnclosureByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleLampAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetLampByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     /// <summary>
@@ -587,7 +587,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var controller = dto.ToControllerDeviceModel();
+                    var controller = dto.ToControllerDeviceModel().WithResponseMeta(response.Meta);
                     allControllers.Add(controller);
                     totalFetched++;
                 }
@@ -651,7 +651,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var sensor = dto.ToSensorDeviceModel();
+                    var sensor = dto.ToSensorDeviceModel().WithResponseMeta(response.Meta);
                     allSensors.Add(sensor);
                     totalFetched++;
                 }
@@ -714,7 +714,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var camera = dto.ToCameraDeviceModel();
+                    var camera = dto.ToCameraDeviceModel().WithResponseMeta(response.Meta);
                     allCameras.Add(camera);
                     totalFetched++;
                 }
@@ -771,7 +771,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var speaker = dto.ToSpeakerDeviceModel();
+                    var speaker = dto.ToSpeakerDeviceModel().WithResponseMeta(response.Meta);
                     allSpeakers.Add(speaker);
                     totalFetched++;
                 }
@@ -827,7 +827,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var enclosure = dto.ToEnclosureDeviceModel();
+                    var enclosure = dto.ToEnclosureDeviceModel().WithResponseMeta(response.Meta);
                     allEnclosures.Add(enclosure);
                     totalFetched++;
                 }
@@ -884,7 +884,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var gate = dto.ToGateDeviceModel();
+                    var gate = dto.ToGateDeviceModel().WithResponseMeta(response.Meta);
                     allGates.Add(gate);
                     totalFetched++;
                 }
@@ -940,7 +940,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var lamp = dto.ToLampDeviceModel();
+                    var lamp = dto.ToLampDeviceModel().WithResponseMeta(response.Meta);
                     allLamps.Add(lamp);
                     totalFetched++;
                 }

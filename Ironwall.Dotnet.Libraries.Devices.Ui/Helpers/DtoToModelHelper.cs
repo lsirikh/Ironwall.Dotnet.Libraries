@@ -41,6 +41,7 @@ public static class DtoToModelHelper
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Camera, dto.Category, dto.HardwareSpec);
 
         if (dto.HardwareSpec != null)
             model.HardwareSpec = ToCameraInfoModel(dto.HardwareSpec);
@@ -175,7 +176,7 @@ public static class DtoToModelHelper
             UserName = model.UserName ?? string.Empty,
             UserPassword = model.UserPassword ?? string.Empty,
             Mode = model.Mode.ToString(),
-            Category = model.Category.ToString(),
+            Category = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.Category),
             IsRecord = model.IsRecord
         };
         MapGeolocationToDto(model, dto);
@@ -224,6 +225,7 @@ public static class DtoToModelHelper
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Sensor, dto.TypeDevice, dto.HardwareSpec);
 
         // Controller 정보가 포함된 경우 변환.
         // 중첩 controller 객체가 없고 controller_id(FK)만 온 경우엔 Id만 seed →
@@ -253,7 +255,7 @@ public static class DtoToModelHelper
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
-            TypeDevice = model.DeviceType.ToString(),
+            TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             ControllerId = model.Controller?.Id ?? 0
@@ -290,6 +292,7 @@ public static class DtoToModelHelper
             Port = dto.IpPort
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Controller, dto.TypeDevice, dto.HardwareSpec);
         return model;
     }
 
@@ -306,7 +309,7 @@ public static class DtoToModelHelper
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
-            TypeDevice = model.DeviceType.ToString(),
+            TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             IpAddress = model.IpAddress ?? string.Empty,
@@ -336,6 +339,7 @@ public static class DtoToModelHelper
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Speaker, dto.TypeSpeaker, dto.HardwareSpec);
 
         if (dto.Server != null)
             model.Server = dto.Server.ToServerModel();
@@ -415,6 +419,7 @@ public static class DtoToModelHelper
             LinkInfoJson = dto.LinkInfo?.ToString(Newtonsoft.Json.Formatting.None),
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Gate, dto.TypeGate, dto.HardwareSpec);
         return model;
     }
 
@@ -443,6 +448,7 @@ public static class DtoToModelHelper
         // 임계값(threshold_config JObject) → 강타입 모델 (이전엔 드롭 → 재조회 시 임계값 소실)
         model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Enclosure, dto.TypeEnclosure, dto.HardwareSpec);
         return model;
     }
 
@@ -644,6 +650,7 @@ public static class DtoToModelHelper
             Description = dto.Description
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Lamp, dto.TypeLamp, dto.HardwareSpec);
         return model;
     }
 

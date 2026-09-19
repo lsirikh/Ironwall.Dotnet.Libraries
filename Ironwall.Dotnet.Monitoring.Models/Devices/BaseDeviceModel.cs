@@ -33,7 +33,30 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
         IsEnable = model.IsEnable;
         Heading = model.Heading;
         Altitude = model.Altitude;
+        CategoryDevice = model.CategoryDevice;
+        TypeAxisCode = model.TypeAxisCode;
+        UnitId = model.UnitId;
+        Axes = model.Axes;
     }
+
+    // ── v7.0+ 표현 모델 (device-console-v8 FR-03) ──
+    // 전부 [JsonIgnore] 다 — 이 모델은 NATS·조치보고 본문으로도 직렬화되므로 새 속성이 그 와이어에 새면 안 된다.
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public EnumDeviceCategory CategoryDevice { get; set; } = EnumDeviceCategory.None;
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public string? TypeAxisCode { get; set; }
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public int? UnitId { get; set; }
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public IDeviceAxesModel? Axes { get; set; }
 
     [JsonProperty("device_number", Order = 2)]
     public int DeviceNumber { get; set; }

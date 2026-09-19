@@ -58,6 +58,7 @@ public class LampDeviceDto : BaseDeviceDto
         get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort, UserName, UserPassword);
         set
         {
+            ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)
             if (value == null) return;
             if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
             if (value.IpPort is > 0) IpPort = value.IpPort.Value;

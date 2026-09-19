@@ -140,6 +140,7 @@ public class EnclosureDeviceDto : BaseDeviceDto
         }
         set
         {
+            ReceivedDeviceConfig = value;   // raw capture for read mapping (device-console-v8 FR-03)
             if (value == null) return;
 
             // 임계치 역투영 — 7.0+ 응답에 평면 threshold_config 가 없다(D-24).
