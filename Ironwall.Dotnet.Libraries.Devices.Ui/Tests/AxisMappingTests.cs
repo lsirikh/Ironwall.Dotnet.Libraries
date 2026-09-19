@@ -135,6 +135,25 @@ public class AxisMappingTests
         => AssertAxesReadAsReceived(Read<GateDeviceDto>(V8("gate", "\"type_gate\": \"Sliding\"")).ToGateDeviceModel(),
             EnumDeviceCategory.Gate, "Sliding");
 
+    [Theory]
+    [InlineData("gate", "\"type_gate\": \"Sliding\"", EnumDeviceType.Gate)]
+    [InlineData("lamp", "\"type_lamp\": \"Strobe\"", EnumDeviceType.Lamp)]
+    [InlineData("enclosure", "\"type_enclosure\": \"Outdoor\"", EnumDeviceType.Enclosure)]
+    public void should_derive_legacy_device_type_from_category_when_v8_response_has_no_type_device(string category, string typeAxisJson, EnumDeviceType expected)
+    {
+        // v7.0+ responses carry no type_device. DeviceType still drives map symbols, 3D housing and door control
+        // (DoorControlService refuses to publish for NONE), so it must be restored from the discriminator.
+        var json = V8(category, typeAxisJson);
+        IBaseDeviceModel model = category switch
+        {
+            "gate" => Read<GateDeviceDto>(json).ToGateDeviceModel(),
+            "lamp" => Read<LampDeviceDto>(json).ToLampDeviceModel(),
+            _ => Read<EnclosureDeviceDto>(json).ToEnclosureDeviceModel(),
+        };
+
+        Assert.Equal(expected, model.DeviceType);
+    }
+
     [Fact]
     public void should_preserve_type_axis_code_when_client_enum_cannot_parse_it()
     {
