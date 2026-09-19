@@ -65,6 +65,17 @@ public sealed class RegisterFromPresetViewModel : Screen
         Rebuild();
     }
 
+    /// <summary>
+    /// 카탈로그를 먼저 읽는다 — 안 읽힌 채면 "사라진 유형 · 이 카테고리에 못 다는 유형" 검사가 통째로 건너뛰어져,
+    /// 그런 프리셋이 그대로 나가 서버에서 422 로 죽는다(장비 창을 열자마자 이 창부터 열면 아직 아무도 카탈로그를 안 읽었다).
+    /// </summary>
+    protected override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        await _catalog.EnsureLoadedAsync(cancellationToken);
+        Rebuild();
+    }
+
     public DevicePreset? FixedPreset { get; }
     public bool ShowsPresetList => FixedPreset is null;
     public IReadOnlyList<EnumDeviceCategory> Categories { get; }

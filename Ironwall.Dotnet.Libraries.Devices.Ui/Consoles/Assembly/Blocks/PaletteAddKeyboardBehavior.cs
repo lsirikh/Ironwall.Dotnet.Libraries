@@ -34,9 +34,11 @@ public sealed class PaletteAddKeyboardBehavior : Behavior<Selector>
     /// </summary>
     /// <param name="key">눌린 키.</param>
     /// <param name="isTextInputFocused">글 입력기(텍스트 상자 · 콤보 …)가 포커스를 쥐고 있는가. 쥐고 있으면 양보한다.</param>
-    public static bool ShouldExecute(Key key, bool isTextInputFocused)
+    public static bool ShouldExecute(Key key, bool isTextInputFocused, ModifierKeys modifiers = ModifierKeys.None)
     {
         if (isTextInputFocused) return false;
+        // Ctrl+Space · Shift+Space 는 목록의 여러 개 고르기다 — 가로채면 키보드로는 여러 개를 고를 수 없다.
+        if (modifiers != ModifierKeys.None) return false;
         return key is Key.Enter or Key.Space;   // Key.Return 은 Key.Enter 와 같은 값이다
     }
 
@@ -61,7 +63,7 @@ public sealed class PaletteAddKeyboardBehavior : Behavior<Selector>
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Handled) return;
-        if (!ShouldExecute(e.Key, IsTextInputFocused(Keyboard.FocusedElement))) return;
+        if (!ShouldExecute(e.Key, IsTextInputFocused(Keyboard.FocusedElement), Keyboard.Modifiers)) return;
 
         if (TryExecute(ResolveItem())) e.Handled = true;   // 실행했을 때만 삼킨다
     }

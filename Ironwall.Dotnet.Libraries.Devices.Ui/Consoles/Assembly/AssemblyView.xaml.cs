@@ -73,6 +73,8 @@ public partial class AssemblyView : UserControl
     private void OnBoardPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Delete || e.OriginalSource is TextBox) return;
+        // 끄는 도중의 Delete 는 받지 않는다 — 끌던 블록이 사라지고 되돌리기 기록이 어긋난다.
+        if (Mouse.LeftButton == MouseButtonState.Pressed) return;
         if (ViewModel is not { CanRemoveSelected: true } vm) return;
         vm.RemoveSelected();
         e.Handled = true;

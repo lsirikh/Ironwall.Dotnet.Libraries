@@ -4,7 +4,8 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}">
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
 	<DockPanel Margin="16,14" LastChildFill="True">
 		<StackPanel
 			Margin="0,12,0,0"
@@ -16,11 +17,11 @@
 				AutomationProperties.AutomationId="Devices.Assembly.Confirm.Cancel"
 				Click="OnCancel"
 				Content="아니오"
-				IsCancel="True"
 				Style="{StaticResource MaterialDesignOutlinedButton}" />
 			<Button
 				MinWidth="88"
 				AutomationProperties.AutomationId="Devices.Assembly.Confirm.Accept"
+				IsDefault="True"
 				Click="OnAccept"
 				Content="예" />
 		</StackPanel>

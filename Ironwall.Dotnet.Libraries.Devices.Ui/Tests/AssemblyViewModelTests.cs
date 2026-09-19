@@ -26,7 +26,9 @@ public class AssemblyViewModelTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+        // 남은 핸들 때문에 못 지워도 테스트를 실패로 만들지 않는다 — 임시 폴더다.
+        try { if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true); }
+        catch (IOException) { }
     }
 
     private DevicePresetStore NewStore()
@@ -96,6 +98,66 @@ public class AssemblyViewModelTests : IDisposable
         Assert.Equal(new[] { "heater", "door" }, vm.BoardItems.Select(i => i.Slot.Key).ToArray());
         Assert.Contains("미저장 변경 0", vm.FooterText);         // 서버에 순서 계약이 없다 — 보기 순서일 뿐
         Assert.False(vm.CanCommit);
+    }
+
+    [Fact]
+    public async Task should_move_items_instead_of_resetting_the_list_when_slots_are_reordered()
+    {
+        // 목록을 비우고 다시 채우면 화면의 선택이 풀리고 속성 칸이 닫힌다 — 순서를 바꿀 때마다, 되돌릴 때마다.
+        var vm = await OpenAsync(AssemblyViewModel.Compose(EnumDeviceCategory.Enclosure, new FakeCatalog(), NewStore(), new FakeDialogs()));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "DOOR_SENSOR"));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "HEATER"));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "FAN"));
+        var heater = vm.BoardItems[1];
+        vm.OnBoardSelectionChanged(new[] { heater });
+        var actions = new List<System.Collections.Specialized.NotifyCollectionChangedAction>();
+        vm.BoardItems.CollectionChanged += (_, e) => actions.Add(e.Action);
+
+        vm.Drop(Payload(heater), new DropTarget(AssemblyViewModel.BoardZoneKey, null, 0));
+        vm.Undo();
+
+        Assert.DoesNotContain(System.Collections.Specialized.NotifyCollectionChangedAction.Reset, actions);
+        Assert.All(actions, a => Assert.Equal(System.Collections.Specialized.NotifyCollectionChangedAction.Move, a));
+        Assert.NotEmpty(actions);
+        Assert.Same(heater, vm.Inspected);                     // 고르던 부품의 속성 칸이 그대로 열려 있다
+    }
+
+    [Fact]
+    public async Task should_keep_the_old_channel_and_say_why_when_channel_text_is_not_a_number()
+    {
+        var vm = await OpenAsync(AssemblyViewModel.Compose(EnumDeviceCategory.Enclosure, new FakeCatalog(), NewStore(), new FakeDialogs()));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "DOOR_SENSOR"));
+        var item = vm.BoardItems.Single();
+
+        item.ChannelInput = "3";
+        item.ChannelInput = "3a";
+
+        Assert.Equal(3, item.Slot.Channel);                    // 나가는 값은 3 — 그러니 화면도 까닭을 말해야 한다
+        Assert.NotNull(item.ChannelError);
+        Assert.Equal("3a", item.ChannelInput);
+
+        item.ChannelInput = "";
+        Assert.Null(item.Slot.Channel);
+        Assert.Null(item.ChannelError);
+    }
+
+    [Fact]
+    public async Task should_carry_type_axis_modes_and_hardware_defaults_when_a_device_is_saved_as_a_preset()
+    {
+        var store = NewStore();
+        var axes = AxesWith(Part("door", "DOOR_SENSOR"));
+        ((HardwareSpecModel)axes.HardwareSpec!).Manufacturer = "Sensorway";
+        axes.DeviceConfig = new DeviceConfigModel { Modes = new JObject { ["night"] = "auto" }, Thresholds = new JObject { ["temp_high_c"] = 60 } };
+        var device = new EnclosureDeviceModel { Id = 7, DeviceNumber = 1, DeviceName = "함체", TypeAxisCode = "Outdoor", Axes = axes };
+        var vm = await OpenAsync(AssemblyViewModel.ForDevice(device, EnumDeviceCategory.Enclosure, new FakeCatalog(), store, NewApplyService(), new FakeDialogs { TextAnswer = "현장에서 굳힌 것" }));
+
+        await vm.SaveAsPresetAsync();
+
+        var saved = store.ForCategory(EnumDeviceCategory.Enclosure).Single(p => p.Name == "현장에서 굳힌 것");
+        Assert.Equal("Outdoor", saved.TypeAxisCode);
+        Assert.Equal("Sensorway", saved.Manufacturer);
+        Assert.Equal("auto", (string?)saved.Modes?["night"]);   // 안 가져가면 이 프리셋으로 만든 장비에 동작 모드가 없다
+        Assert.Equal(60, (int?)saved.Thresholds?["temp_high_c"]);
     }
 
     [Fact]

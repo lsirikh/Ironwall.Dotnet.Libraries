@@ -31,7 +31,7 @@ public class DeviceDashboardConsoleTests : IDisposable
 
     private static readonly string LampRail = DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Lamp);
 
-    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync(Func<LampDevicePanelViewModel, IDeviceConsoleSource>? lampSource = null)
+    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync(Func<LampDevicePanelViewModel, IDeviceConsoleSource>? lampSource = null, Lazy<Consoles.Assembly.IAssemblyLauncher>? launcher = null)
     {
         var log = new MockLogService();
         var events = new EventAggregator();
@@ -53,7 +53,7 @@ public class DeviceDashboardConsoleTests : IDisposable
             lamps,
             new GateDevicePanelViewModel(events, log, api, new GateDeviceProvider(log, devices), providerService),
             new DeviceGroupPanelViewModel(events, log, api, groups, devices),
-            devices, groups, controllers, new ServerProvider(log), api, new StubCatalog());
+            devices, groups, controllers, new ServerProvider(log), api, new StubCatalog(), null, launcher);
 
         if (lampSource is not null) console.UseSource(LampRail, lampSource(lamps));
 
@@ -218,6 +218,71 @@ public class DeviceDashboardConsoleTests : IDisposable
         Assert.Equal(ConsoleDetailState.None, console.Detail.State);
         Assert.Null(console.Rows);
     }
+
+    #region - 조립기 입구 (FR-17 · FR-18) -
+    [Fact]
+    public async Task should_hide_every_assembly_entry_when_the_server_has_no_component_model()
+    {
+        var launcher = new FakeLauncher { IsAvailable = false };        // 6.3 운영
+        var (console, _) = await OpenAsync(launcher: new Lazy<Consoles.Assembly.IAssemblyLauncher>(() => launcher));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(RowsOf(console).Take(1).ToList());
+
+        Assert.False(console.CanAssemble);
+        Assert.False(console.CanEditComponents);
+
+        await console.OpenAssemblyAsync();
+        await console.RegisterFromPresetAsync();
+        await console.ManagePresetsAsync();
+        await console.EditComponentsAsync();
+        Assert.Equal(0, launcher.Calls);                                 // 가려져 있어도 부르면 열리는 길이 없어야 한다
+    }
+
+    [Fact]
+    public async Task should_offer_component_editing_only_for_one_saved_device_without_pending_edits()
+    {
+        var launcher = new FakeLauncher { IsAvailable = true };
+        var (console, _) = await OpenAsync(launcher: new Lazy<Consoles.Assembly.IAssemblyLauncher>(() => launcher));
+        await console.SelectRailAsync(LampRail);
+        var rows = RowsOf(console);
+
+        Assert.True(console.CanAssemble);
+        Assert.False(console.CanEditComponents);                         // 고른 것이 없다
+
+        console.OnRowsSelected(rows.Take(1).ToList());
+        Assert.True(console.CanEditComponents);
+
+        console.OnRowsSelected(rows.Take(2).ToList());
+        Assert.False(console.CanEditComponents);                         // 부품 구성은 한 대씩
+
+        console.OnRowsSelected(rows.Take(1).ToList());
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "바꾼 이름";
+        Assert.False(console.CanEditComponents);                         // 미적용 변경을 두고 다른 창으로 가지 않는다
+    }
+
+    [Fact]
+    public async Task should_still_open_the_device_console_when_the_assembly_entry_cannot_be_built()
+    {
+        // 입구의 의존 하나가 컨테이너에서 안 풀려도 장비 창은 열려야 한다 — 입구만 감춘다(6.3 운영에서는 보이지도 않는 기능이다).
+        var broken = new Lazy<Consoles.Assembly.IAssemblyLauncher>(() => throw new InvalidOperationException("resolution failed"));
+
+        var (console, _) = await OpenAsync(launcher: broken);
+        await console.SelectRailAsync(LampRail);
+
+        Assert.False(console.CanAssemble);
+        Assert.Equal(2, RowsOf(console).Count);
+    }
+
+    private sealed class FakeLauncher : Consoles.Assembly.IAssemblyLauncher
+    {
+        public bool IsAvailable { get; set; }
+        public int Calls { get; private set; }
+        public Task<int?> ComposeAsync(EnumDeviceCategory category) { Calls++; return Task.FromResult<int?>(null); }
+        public Task<bool> EditDeviceAsync(IBaseDeviceModel device, EnumDeviceCategory category) { Calls++; return Task.FromResult(false); }
+        public Task<int?> RegisterFromPresetAsync(EnumDeviceCategory category) { Calls++; return Task.FromResult<int?>(null); }
+        public Task ManagePresetsAsync(EnumDeviceCategory category) { Calls++; return Task.CompletedTask; }
+    }
+    #endregion
 
     #region - 저장 · 등록이 끝난 뒤의 판정 (패널의 async void 경로 대신 각본대로 끝나는 원천을 쓴다) -
     private static LampDeviceViewModel Lamp(int id, string name) => new(new LampDeviceModel { Id = id, DeviceNumber = Math.Max(id, 1), DeviceName = name });

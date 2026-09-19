@@ -64,7 +64,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                                 , IDeviceApiService deviceApiService
                                 , ICatalogService catalogService
                                 , DeviceQueryPolicy? queryPolicy = null
-                                , IAssemblyLauncher? assemblyLauncher = null
+                                , Lazy<IAssemblyLauncher>? assemblyLauncher = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -110,7 +110,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Form = new DevicePropertyFormViewModel(Detail, this);
         _deviceApiService = deviceApiService;
         _catalogService = catalogService;
-        _assembly = assemblyLauncher;
+        _assemblyFactory = assemblyLauncher;
 
         // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
         // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
@@ -943,7 +943,27 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private readonly IDeviceApiService _deviceApiService;
     private readonly ICatalogService _catalogService;
     private readonly DeviceQueryPolicy _queryPolicy;
-    private readonly IAssemblyLauncher? _assembly;
+    private readonly Lazy<IAssemblyLauncher>? _assemblyFactory;
+    private bool _assemblyFailed;
+
+    /// <summary>
+    /// 조립기 입구 — <b>늦게</b> 만든다. 곧바로 주입받으면 입구의 의존 하나가 컨테이너에서 안 풀릴 때 이 뷰모델까지 못 만들어져
+    /// 장비 창 전체가 안 열린다(입구가 보이지도 않는 6.3 운영에서도). 늦게 풀고, 실패하면 입구만 감춘다.
+    /// </summary>
+    private IAssemblyLauncher? _assembly
+    {
+        get
+        {
+            if (_assemblyFactory is null || _assemblyFailed) return null;
+            try { return _assemblyFactory.Value; }
+            catch (Exception ex)
+            {
+                _assemblyFailed = true;
+                _log?.Error($"[DeviceConsole] 조립기 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
+    }
     private int? _selectAfterReload;
 
     private IDeviceConsoleSource? _current;

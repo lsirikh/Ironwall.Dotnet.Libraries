@@ -156,6 +156,8 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             var overrides = _board.ToOverrides();
             _board.Changed -= OnBoardChanged;
             _board.Slots.CollectionChanged -= OnSlotsChanged;
+            foreach (var item in _itemsBySlot.Values) item.Detach();
+            _itemsBySlot.Clear();
             _board = NewBoard(value);
             if (definitions.Count > 0) _board.ReplaceAll(definitions, overrides);
 
@@ -204,9 +206,15 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         return board;
     }
 
-    private void OnSlotsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildBoardItems();
+    // 슬롯 목록의 낱낱 변경(CollectionChanged)을 따라가지 않는다 — 되돌리기는 목록을 비웠다가 다시 채우는데, 그 중간 상태를
+    // 따라가면 화면 항목도 다 빠졌다 들어와 선택이 풀린다. 보드가 한 번의 조작을 끝내고 울리는 Changed 에서 한 번에 맞춘다.
+    private void OnSlotsChanged(object? sender, NotifyCollectionChangedEventArgs e) { }
 
-    private void OnBoardChanged(object? sender, EventArgs e) => RefreshAll();
+    private void OnBoardChanged(object? sender, EventArgs e)
+    {
+        RebuildBoardItems();
+        RefreshAll();
+    }
 
     // 슬롯마다 화면 항목 하나 — 창이 살아 있는 동안 보관한다. 뺐다가 [되돌리기] 로 돌아온 슬롯이 같은 항목으로 돌아와야
     // 화면의 선택 · 포커스가 이어진다(항목을 새로 만들면 목록이 그것을 처음 보는 행으로 다룬다).
@@ -228,10 +236,15 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             wanted.Add(item);
         }
 
-        if (!BoardItems.SequenceEqual(wanted))
+        // 비우고 다시 채우면 목록의 선택이 풀리고 속성 칸이 닫힌다(순서를 바꿀 때마다 · 되돌릴 때마다).
+        // 빠진 것만 빼고, 새 것만 끼우고, 자리가 바뀐 것은 옮긴다 — 목록은 Move 에서 선택을 지킨다.
+        foreach (var gone in BoardItems.Where(i => !wanted.Contains(i)).ToList()) BoardItems.Remove(gone);
+        for (var index = 0; index < wanted.Count; index++)
         {
-            BoardItems.Clear();
-            foreach (var item in wanted) BoardItems.Add(item);
+            if (index < BoardItems.Count && ReferenceEquals(BoardItems[index], wanted[index])) continue;
+            var from = BoardItems.IndexOf(wanted[index]);
+            if (from >= 0) BoardItems.Move(from, index);
+            else BoardItems.Insert(index, wanted[index]);
         }
 
         if (_inspected is not null && !BoardItems.Contains(_inspected)) Inspect(null);
@@ -439,7 +452,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         RefreshAll();
     }
 
-    private DevicePreset BuildPreset(string id, string name, DevicePreset? basis) => (basis ?? new DevicePreset { Id = id, Name = name, Category = _category }) with
+    private DevicePreset BuildPreset(string id, string name, DevicePreset? basis) => (basis ?? BasisFromDevice(id, name)) with
     {
         Id = id,
         Name = name,
@@ -448,6 +461,32 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         ComponentOverrides = StripNulls(_board.ToOverrides()),
         IsSeed = false,
     };
+
+    /// <summary>
+    /// 기존 장비에서 프리셋을 굳힐 때는 그 장비의 구조 값(종류 · 제원 기본값 · 임계치 · 동작 모드)도 같이 가져간다 —
+    /// 안 가져가면 그 프리셋으로 만든 카메라에 동작 모드가 없다. 일련번호 · MAC 같은 그 장비만의 것은 가져가지 않는다.
+    /// </summary>
+    private DevicePreset BasisFromDevice(string id, string name)
+    {
+        var device = EditingDevice;
+        var spec = device?.Axes?.HardwareSpec;
+        var config = device?.Axes?.DeviceConfig;
+        return new DevicePreset
+        {
+            Id = id,
+            Name = name,
+            Category = _category,
+            TypeAxisCode = device?.TypeAxisCode,
+            Manufacturer = spec?.Manufacturer,
+            Model = spec?.Model,
+            Firmware = spec?.Firmware,
+            HardwareRev = spec?.HardwareRev,
+            MaxDetectionRange = spec?.MaxDetectionRange,
+            OnvifVersion = spec?.OnvifVersion,
+            Thresholds = (JObject?)config?.Thresholds?.DeepClone(),
+            Modes = (JObject?)config?.Modes?.DeepClone(),
+        };
+    }
 
     /// <summary>프리셋에는 "뺀 key 의 null" 을 담지 않는다 — 그것은 기존 장비에 보낼 때만 뜻이 있다.</summary>
     private static JObject? StripNulls(JObject? overrides)

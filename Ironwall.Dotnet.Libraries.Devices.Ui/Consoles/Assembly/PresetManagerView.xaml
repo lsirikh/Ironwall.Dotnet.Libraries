@@ -5,7 +5,8 @@
 	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}">
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
 	<!--  프리셋 관리(FR-11 · 목업 L312-342). 프리셋은 이 컴퓨터의 파일에 산다 — 서버에 프리셋 리소스가 없다.  -->
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />

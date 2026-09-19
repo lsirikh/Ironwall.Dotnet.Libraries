@@ -79,6 +79,7 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
     #region - IAssemblyLauncher -
     public async Task<int?> ComposeAsync(EnumDeviceCategory category)
     {
+        if (!IsAvailable) return null;      // 6.3 에는 부품 모델이 없다 — 입구가 가려져 있어도 여기서 한 번 더 막는다
         var vm = AssemblyViewModel.Compose(category, _catalog, _store.Value, this);
         await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 760, resizable: true));
         return vm.RegisteredDeviceId;
@@ -86,12 +87,14 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
 
     public async Task<bool> EditDeviceAsync(IBaseDeviceModel device, EnumDeviceCategory category)
     {
+        if (!IsAvailable) return false;
         var vm = AssemblyViewModel.ForDevice(device, category, _catalog, _store.Value, new ComponentApplyService(_api, _providerService, _log), this);
         return await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 760, resizable: true)) == true;
     }
 
     public async Task<int?> RegisterFromPresetAsync(EnumDeviceCategory category)
     {
+        if (!IsAvailable) return null;
         var vm = NewRegister(category, null);
         await _windows.ShowDialogAsync(vm, null, WindowSettings(980, 680, resizable: true));
         return vm.RegisteredDeviceId;
@@ -102,10 +105,14 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
         var vm = new PresetManagerViewModel(_store.Value, _catalog, this, category);
         vm.OpenInAssemblyRequested += async (_, preset) =>
         {
-            var editor = AssemblyViewModel.ForPreset(preset, _catalog, _store.Value, this);
-            await _windows.ShowDialogAsync(editor, null, WindowSettings(1280, 760, resizable: true));
-            vm.Category = preset.Category;     // 목록을 다시 읽는다(같은 값이면 아래가 맡는다)
-            vm.Selected = _store.Value.Find(preset.Id);
+            // async void 처리기다 — 여기서 새는 예외는 앱을 죽인다. 잡아서 기록한다.
+            try
+            {
+                var editor = AssemblyViewModel.ForPreset(preset, _catalog, _store.Value, this);
+                await _windows.ShowDialogAsync(editor, null, WindowSettings(1280, 760, resizable: true));
+                vm.ReloadAndSelect(preset.Id);
+            }
+            catch (Exception ex) { _log?.Error($"[Assembly] 프리셋을 조립기로 열지 못했다 — {ex.Message}"); }
         };
         await _windows.ShowDialogAsync(vm, null, WindowSettings(720, 560, resizable: true));
     }
@@ -161,8 +168,8 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
             ["ShowInTaskbar"] = false,
         };
 
-        // 창의 바탕은 토큰에서 — 기본 흰 바탕이면 다크에서 글자가 안 보인다.
-        if (Application.Current?.TryFindResource("SurfaceBrush") is System.Windows.Media.Brush surface) settings["Background"] = surface;
+        // 창의 바탕은 여기서 정하지 않는다 — 한 번 찾아 넣은 브러시는 테마를 바꿔도 옛 색으로 굳는다.
+        // 뷰가 제 바탕을 DynamicResource 로 칠한다.
         return settings;
     }
 }

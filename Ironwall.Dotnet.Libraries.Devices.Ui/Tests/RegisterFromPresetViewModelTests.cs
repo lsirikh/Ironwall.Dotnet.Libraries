@@ -151,6 +151,33 @@ public class RegisterFromPresetViewModelTests : IDisposable
         Assert.False(vm.ShowsController);
     }
 
+    [Fact]
+    public async Task should_load_the_catalog_before_validating_when_the_window_opens()
+    {
+        // 장비 창을 열자마자 이 창부터 열면 아직 아무도 카탈로그를 안 읽었다 — 안 읽힌 채면 "사라진 유형" 검사가 통째로 건너뛰어진다.
+        var preset = LampPreset() with { Components = new[] { new ComponentDefinitionModel { Key = "old", Type = "RETIRED_TYPE" } } };
+        var catalog = new LazyCatalog();
+        var vm = new RegisterFromPresetViewModel(NewStore(preset), catalog,
+            new PresetRegistrar(new MockDeviceApiService(), new MockDeviceProviderService(), new MockLogService()),
+            Array.Empty<IControllerDeviceModel>(), _ => new HashSet<int>(), EnumDeviceCategory.Lamp);
+
+        await ((Caliburn.Micro.IActivate)vm).ActivateAsync();
+
+        Assert.Equal(1, catalog.LoadCalls);
+        Assert.True(vm.HasProblems);
+        Assert.False(vm.CanRegister);
+    }
+
+    private sealed class LazyCatalog : IComponentCatalog
+    {
+        public int LoadCalls { get; private set; }
+        public bool IsLoaded { get; private set; }
+        public event EventHandler? CatalogChanged { add { } remove { } }
+        public Task<bool> EnsureLoadedAsync(CancellationToken token = default) { LoadCalls++; IsLoaded = true; return Task.FromResult(true); }
+        public IReadOnlyList<ComponentTypeInfo> ComponentTypes(EnumDeviceCategory category, bool includeDeprecated = false) => Array.Empty<ComponentTypeInfo>();
+        public ComponentTypeInfo? Find(string? code) => null;
+    }
+
     private sealed class OneTypeCatalog : IComponentCatalog
     {
         public bool IsLoaded => true;

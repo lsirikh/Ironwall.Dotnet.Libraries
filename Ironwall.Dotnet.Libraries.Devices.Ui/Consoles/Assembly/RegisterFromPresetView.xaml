@@ -7,7 +7,8 @@
 	xmlns:pw="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}">
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
 	<!--
 		프리셋으로 장비 만들기(device-assembly-preset FR-12 ~ FR-14). 정본 목업 L312-351.
 		왼쪽: 프리셋 고르기 + 프리셋이 담지 않는 개체 정보만. 오른쪽: 보낼 내용 — 이대로 나간다(POST 1건).
@@ -67,6 +68,7 @@
 					<Button
 						MinWidth="96"
 						AutomationProperties.AutomationId="Devices.Assembly.Register.Submit"
+						IsDefault="True"
 						Click="OnRegister"
 						Content="등록"
 						IsEnabled="{Binding CanRegister}" />

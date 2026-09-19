@@ -5,7 +5,8 @@
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}">
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
 	<!--  반복 펼치기(FR-08 · 목업 L300-308) — 16채널을 16번 끌게 하지 않는다. 미리보기에서 겹치는 key 는 ⚠ 로 짚는다.  -->
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -85,6 +86,7 @@
 			<Button
 				MinWidth="96"
 				AutomationProperties.AutomationId="Devices.Assembly.Repeat.Expand"
+				IsDefault="True"
 				Click="OnExpand"
 				Content="펼치기"
 				IsEnabled="{Binding CanExpand}" />

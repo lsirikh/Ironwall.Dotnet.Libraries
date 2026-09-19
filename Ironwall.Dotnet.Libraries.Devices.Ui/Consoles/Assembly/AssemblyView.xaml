@@ -414,12 +414,15 @@
 											Style="{StaticResource Asm.TextBox}"
 											Text="{Binding Inspected.Slot.Label, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
-									<c:ConsoleField ApiName="channel" Header="채널">
+									<c:ConsoleField
+										ApiName="channel"
+										Header="채널"
+										Note="{Binding Inspected.ChannelError}">
 										<TextBox
 											AutomationProperties.AutomationId="Devices.Assembly.Field.channel"
 											FontFamily="Consolas"
 											Style="{StaticResource Asm.TextBox}"
-											Text="{Binding Inspected.Slot.Channel, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}" />
+											Text="{Binding Inspected.ChannelInput, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
 									<c:ConsoleField ApiName="position" Header="위치">
 										<TextBox

@@ -56,6 +56,26 @@ public sealed class BoardSlotViewModel : PropertyChangedBase
     public bool HasError => Slot.HasKeyError || IsUnknownType;
     public string? ErrorText => Slot.KeyError ?? (IsUnknownType ? $"'{Slot.TypeCode}' 는 카탈로그에 없는 유형이다" : null);
 
+    /// <summary>
+    /// 채널 입력 — 글로 받는다. 정수 칸에 곧바로 묶으면 "1a" 같은 글은 변환에 실패한 채 화면에만 남고
+    /// 모델은 옛 값을 쥔다(사용자는 1a 를 보는데 나가는 것은 1). 못 읽는 글은 까닭을 보이고 값을 바꾸지 않는다.
+    /// </summary>
+    public string ChannelInput
+    {
+        get => _channelInput ?? Slot.Channel?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        set
+        {
+            var text = (value ?? string.Empty).Trim();
+            if (text.Length == 0) { _channelInput = null; ChannelError = null; Slot.Channel = null; }
+            else if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var channel)) { _channelInput = null; ChannelError = null; Slot.Channel = channel; }
+            else { _channelInput = text; ChannelError = "채널은 0 이상의 정수다 — 값은 바꾸지 않았다"; }
+            Refresh();
+        }
+    }
+
+    public string? ChannelError { get; private set; }
+    private string? _channelInput;
+
     public bool IsSelected
     {
         get => _isSelected;

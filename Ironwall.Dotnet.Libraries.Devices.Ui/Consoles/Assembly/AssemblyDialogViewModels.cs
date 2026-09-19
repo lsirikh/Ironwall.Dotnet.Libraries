@@ -262,6 +262,13 @@ public sealed class PresetManagerViewModel : Screen
 
     public Task CloseAsync() => TryCloseAsync(true);
 
+    /// <summary>조립기에서 프리셋을 고치고 돌아왔다 — 목록을 다시 읽고 그것을 고른다.</summary>
+    public void ReloadAndSelect(string presetId)
+    {
+        Refresh();
+        Selected = Presets.FirstOrDefault(p => p.Id == presetId) ?? Presets.FirstOrDefault();
+    }
+
     private void Report(PresetStoreResult result, string success, string? selectId)
     {
         Message = result.IsSuccess ? (string.IsNullOrEmpty(result.Message) ? success : result.Message!) : result.Message ?? "하지 못했다";
