@@ -1457,6 +1457,51 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <inheritdoc/>
+    public async Task<ApiResponse<GateDeviceDto>> CreateGateAsync(GateDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/gates", ShapeWrite(dto));
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to create gate", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<GateDeviceDto>> UpdateGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/gates/{id}", ShapeWrite(dto));
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to update gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<bool>> DeleteGateAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/gates/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
     public Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
         => Task.FromResult(DoorControlRemoved<GateDeviceDto>(nameof(ControlGateAsync), "gates", id, "GATE_DOOR_SET"));
 

@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
@@ -278,25 +279,27 @@ public class DeviceProviderService : IDeviceProviderService
     {
         try
         {
-            var normalized = NormalizeTypeDevice(typeDevice);
-            IBaseDeviceModel? updated = normalized switch
+            // 어느 경로로 재조회할지는 "종류"가 아니라 "카테고리"가 정한다.
+            //   종전엔 옛 종류 이름을 하나하나 나열한 문자열 switch 였고 SmartMultisensor2·Fence_Group 이 빠져 있어
+            //   그 센서의 SYNC_DEVICE 가 조용히 무시됐다(device-console-v8 ISSUE-19). 해석은 공용 정본에 맡긴다.
+            var category = ResolveSyncCategory(typeDevice);
+            IBaseDeviceModel? updated = category switch
             {
-                "Controller" => await FetchSingleControllerAsync(resourceId, token),
-                "Sensor" or "Fence" or "Underground" or "Multi" or "Contact" or "PIR"
-                    or "IoController" or "Laser" or "Cable" or "SmartSensor"
-                    or "SmartSensor2" or "SmartCompound" or "Radar" or "OpticalCable"
-                    => await FetchSingleSensorAsync(resourceId, token),
-                "IpCamera" => await FetchSingleCameraAsync(resourceId, token),
-                "Speaker" => await FetchSingleSpeakerAsync(resourceId, token),
-                "Enclosure" => await FetchSingleEnclosureAsync(resourceId, token),
-                "Gate" => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
-                "Lamp" => await FetchSingleLampAsync(resourceId, token),
+                EnumDeviceCategory.Controller => await FetchSingleControllerAsync(resourceId, token),
+                EnumDeviceCategory.Sensor => await FetchSingleSensorAsync(resourceId, token),
+                EnumDeviceCategory.Camera => await FetchSingleCameraAsync(resourceId, token),
+                EnumDeviceCategory.Speaker => await FetchSingleSpeakerAsync(resourceId, token),
+                EnumDeviceCategory.Enclosure => await FetchSingleEnclosureAsync(resourceId, token),
+                EnumDeviceCategory.Gate => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
+                EnumDeviceCategory.Lamp => await FetchSingleLampAsync(resourceId, token),
                 _ => null
             };
 
             if (updated != null)
             {
-                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d.DeviceType == updated.DeviceType);
+                // (Id, 판별자) 로 찾는다 — (Id, DeviceType) 은 종류축이 바뀐 장비를 못 찾아 중복으로 추가했다(FR-04 와 같은 키).
+                var updatedKey = CategoryKeyOf(updated);
+                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == updatedKey);
                 if (existing is IBaseDeviceModel e)
                 {
                     UpdateDeviceProperties(e, updated);
@@ -1174,10 +1177,12 @@ public class DeviceProviderService : IDeviceProviderService
         try
         {
             var normalized = NormalizeTypeDevice(typeDevice);
-            // "Sensor" is a generic type_device — DeviceType is always a specific sub-type (Fence, Multi, etc.)
-            // so match by ID only when the generic "Sensor" type is received.
-            var device = normalized == "Sensor"
-                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d is ISensorDeviceModel)
+            // (Id, 판별자) 로 찾는다. 종전엔 DeviceType 이름을 정규화 문자열과 비교했는데
+            //   "Speaker" ≠ IpSpeaker 라 스피커 삭제 통지가 영영 매칭되지 않았고, 종류축이 클라 enum 밖(SmartController)이면
+            //   어떤 장비도 못 찾았다. 카테고리를 못 읽는 통지만 옛 이름 비교로 떨어진다.
+            var category = ResolveSyncCategory(typeDevice);
+            var device = category != EnumDeviceCategory.None
+                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == category)
                 : _deviceProvider.FirstOrDefault(d => d.Id == resourceId
                     && d.DeviceType.ToString().Equals(normalized, StringComparison.OrdinalIgnoreCase));
             if (device != null)
@@ -1223,6 +1228,16 @@ public class DeviceProviderService : IDeviceProviderService
             group.DeviceCount = Math.Max(0, group.DeviceCount - 1);
         }
     }
+
+    /// <summary>
+    /// NATS <c>SYNC_DEVICE</c> 의 <c>type_device</c> 문자열 → 장비 카테고리.
+    /// 통지는 발신자마다 표기가 다르다 — DBApi 는 카테고리를 대문자로(<c>"CAMERA"</c>·<c>"SENSOR"</c>·<c>"GATE"</c>),
+    /// API 는 옛 종류 이름으로(<c>"IpCamera"</c>·<c>"Fence"</c>·<c>"SmartMultisensor2"</c>) 보낸다.
+    /// 둘 다 공용 정본(<see cref="DeviceTypeResolver"/>)으로 읽는다: 카테고리로 먼저, 안 되면 옛 종류에서 유도.
+    /// 어느 쪽으로도 못 읽으면 <see cref="EnumDeviceCategory.None"/> — 호출부가 통지를 무시한다.
+    /// </summary>
+    internal static EnumDeviceCategory ResolveSyncCategory(string? typeDevice)
+        => DeviceTypeResolver.ResolveCategory(typeDevice, typeDevice);
 
     private static string NormalizeTypeDevice(string typeDevice) =>
         typeDevice.ToUpperInvariant() switch

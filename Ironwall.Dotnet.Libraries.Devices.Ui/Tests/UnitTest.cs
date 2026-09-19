@@ -1167,8 +1167,17 @@ public class MockDeviceApiService : IDeviceApiService
     public Task<ApiResponse<CameraDeviceDto>> PatchCameraAsync(int id, CameraDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<CameraDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
+    public string? LastGeolocationKindPath { get; private set; }
+    public int LastGeolocationId { get; private set; }
+    public bool GeolocationPatchSucceeds { get; set; }
     public Task<ApiResponse<object>> PatchGeolocationAsync(string deviceKindPath, int id, GeolocationDto geolocation, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+    {
+        LastGeolocationKindPath = deviceKindPath;
+        LastGeolocationId = id;
+        return Task.FromResult(GeolocationPatchSucceeds
+            ? ApiResponse<object>.CreateSuccess(new object())
+            : ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+    }
 
     public Task<ApiResponse<object>> PatchHardwareSpecAsync(int id, HardwareSpecDto hardwareSpec, CancellationToken token = default)
         => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
@@ -1222,6 +1231,12 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<GateDeviceDto>> CreateGateAsync(GateDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<GateDeviceDto>> UpdateGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeleteGateAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(int id, string doorCommand, CancellationToken token = default)

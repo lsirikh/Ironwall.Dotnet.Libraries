@@ -43,6 +43,8 @@ public class DeviceModule : Module
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<LampDeviceProvider>().As<LampDeviceProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<GateDeviceProvider>().As<GateDeviceProvider>()
+                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<DeviceGroupProvider>().As<DeviceGroupProvider>()
                 .SingleInstance().WithMetadata("Order", _count++);
             // 방송서버 캐시(스피커 드롭다운) — ILoadable 미부착(빈 캐시 동결 방지), FetchServersAsync로 적재
