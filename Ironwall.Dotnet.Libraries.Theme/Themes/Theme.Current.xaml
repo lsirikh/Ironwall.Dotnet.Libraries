@@ -19,6 +19,8 @@
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Controls.xaml" />
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Containers.xaml" />
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Nav.xaml" />
+        <!--  console-kernel: 콘솔(T1) 목록 · 배지 공용 스타일 — 전부 "Console." 키, 암시적 스타일 0  -->
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Console.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
 </ResourceDictionary>

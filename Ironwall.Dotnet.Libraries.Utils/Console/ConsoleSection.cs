@@ -1,0 +1,96 @@
+﻿using System.Windows;
+using System.Windows.Controls;
+
+namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
+
+/// <summary>섹션 머리의 꼬리표 — 색이 아니라 글자로 뜻을 전한다.</summary>
+public enum ConsoleSectionTag
+{
+    None,
+    /// <summary>관측 · 읽기 전용(회색) — 저장 본문에 실으면 서버가 거부한다.</summary>
+    Observed,
+    /// <summary>의도 · 쓰기 가능(주색).</summary>
+    Intent,
+    /// <summary>창이 정한 글자(<see cref="ConsoleSection.TagText"/>).</summary>
+    Custom,
+}
+
+/// <summary>
+/// 상세 칸의 한 절 — 제목 + 축 이름(<c>connection</c> 등) + 꼬리표 + 개수 + 본문. <c>GroupBox</c> 가 아니라 라벨과 구분선이다.
+/// </summary>
+public class ConsoleSection : HeaderedContentControl
+{
+    static ConsoleSection()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(ConsoleSection), new FrameworkPropertyMetadata(typeof(ConsoleSection)));
+        FocusableProperty.OverrideMetadata(typeof(ConsoleSection), new FrameworkPropertyMetadata(false));
+    }
+
+    public static readonly DependencyProperty AxisNameProperty = Reg(nameof(AxisName), string.Empty);
+    /// <summary>API 축 이름 — 제목 옆에 고정폭 글꼴로.</summary>
+    public string AxisName { get => (string)GetValue(AxisNameProperty); set => SetValue(AxisNameProperty, value); }
+
+    public static readonly DependencyProperty TagKindProperty = Reg(nameof(TagKind), ConsoleSectionTag.None);
+    public ConsoleSectionTag TagKind { get => (ConsoleSectionTag)GetValue(TagKindProperty); set => SetValue(TagKindProperty, value); }
+
+    public static readonly DependencyProperty TagTextProperty = Reg(nameof(TagText), string.Empty);
+    public string TagText { get => (string)GetValue(TagTextProperty); set => SetValue(TagTextProperty, value); }
+
+    public static readonly DependencyProperty CountTextProperty = Reg(nameof(CountText), string.Empty);
+    /// <summary>제목 옆 개수 배지(부품 수 등). 비우면 숨는다.</summary>
+    public string CountText { get => (string)GetValue(CountTextProperty); set => SetValue(CountTextProperty, value); }
+
+    private static DependencyProperty Reg<T>(string name, T defaultValue)
+        => DependencyProperty.Register(name, typeof(T), typeof(ConsoleSection), new PropertyMetadata(defaultValue));
+}
+
+/// <summary>
+/// 상세 칸의 한 칸 — 라벨(102) + 값. API 필드명은 라벨 <b>아랫줄</b>에 둔다(라벨 칸을 가로로 늘리지 않는다).
+/// </summary>
+public class ConsoleField : HeaderedContentControl
+{
+    static ConsoleField()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(ConsoleField), new FrameworkPropertyMetadata(typeof(ConsoleField)));
+        FocusableProperty.OverrideMetadata(typeof(ConsoleField), new FrameworkPropertyMetadata(false));
+    }
+
+    public static readonly DependencyProperty ApiNameProperty = Reg(nameof(ApiName), string.Empty);
+    public string ApiName { get => (string)GetValue(ApiNameProperty); set => SetValue(ApiNameProperty, value); }
+
+    public static readonly DependencyProperty IsTouchedProperty = Reg(nameof(IsTouched), false);
+    /// <summary>손댄 칸 — 좌측에 경고색 3px 표시(형태).</summary>
+    public bool IsTouched { get => (bool)GetValue(IsTouchedProperty); set => SetValue(IsTouchedProperty, value); }
+
+    public static readonly DependencyProperty NoteProperty = Reg(nameof(Note), string.Empty);
+    /// <summary>값 아래 작은 주석 — "생성 시 확정", "센서에는 server_id 가 없습니다".</summary>
+    public string Note { get => (string)GetValue(NoteProperty); set => SetValue(NoteProperty, value); }
+
+    public static readonly DependencyProperty IsLockedProperty = Reg(nameof(IsLocked), false);
+    /// <summary>잠긴 칸 — 자물쇠 글리프를 붙인다.</summary>
+    public bool IsLocked { get => (bool)GetValue(IsLockedProperty); set => SetValue(IsLockedProperty, value); }
+
+    private static DependencyProperty Reg<T>(string name, T defaultValue)
+        => DependencyProperty.Register(name, typeof(T), typeof(ConsoleField), new PropertyMetadata(defaultValue));
+}
+
+/// <summary>
+/// 미수신 상자 — 파선 테두리. <b>빈 값과 다르다</b>: 서버가 이번 응답에 그 절을 싣지 않았다는 뜻이다.
+/// </summary>
+public class NotReceivedBox : Control
+{
+    static NotReceivedBox()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(NotReceivedBox), new FrameworkPropertyMetadata(typeof(NotReceivedBox)));
+        FocusableProperty.OverrideMetadata(typeof(NotReceivedBox), new FrameworkPropertyMetadata(false));
+    }
+
+    public static readonly DependencyProperty SectionNameProperty = DependencyProperty.Register(
+        nameof(SectionName), typeof(string), typeof(NotReceivedBox), new PropertyMetadata(string.Empty));
+    public string SectionName { get => (string)GetValue(SectionNameProperty); set => SetValue(SectionNameProperty, value); }
+
+    public static readonly DependencyProperty ReloadHintProperty = DependencyProperty.Register(
+        nameof(ReloadHint), typeof(string), typeof(NotReceivedBox), new PropertyMetadata(string.Empty));
+    /// <summary>어떻게 다시 불러오는지 — 예: <c>GET …/cameras/12</c>. 비우면 생략.</summary>
+    public string ReloadHint { get => (string)GetValue(ReloadHintProperty); set => SetValue(ReloadHintProperty, value); }
+}

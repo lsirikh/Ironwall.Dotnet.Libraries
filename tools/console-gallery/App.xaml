@@ -1,0 +1,16 @@
+﻿<Application
+	x:Class="ConsoleGallery.App"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	Startup="OnStartup">
+	<Application.Resources>
+		<ResourceDictionary>
+			<!--  토큰만 병합한다(불변 + 라이트). 다크 전환은 MainWindow 가 마지막 사전을 바꿔 끼운다.  -->
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Shared.xaml" />
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Console.xaml" />
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Light.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</Application.Resources>
+</Application>

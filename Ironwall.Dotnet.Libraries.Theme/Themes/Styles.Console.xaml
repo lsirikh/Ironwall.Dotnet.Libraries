@@ -1,0 +1,227 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<!--
+		콘솔(T1) 목록 · 배지 공용 스타일 (console-kernel PRD · IMPL-05).
+		· 키는 전부 "Console." 접두. 암시적 스타일(키 없는 TargetType) 0 — 기존 그리드 · 버튼을 건드리지 않는다.
+		· 색은 DynamicResource 토큰만. 테마 스왑에 동참한다.
+		· 선택 = 좌측 3px 세로 바(색이 아니라 형태). 드롭 위치의 가로 삽입선과 축이 직교한다.
+		· 정렬 · 열 재정렬을 끈다 — 화면 순서와 저장 순서가 어긋나면 의미와 자동화 단언이 같이 무너진다.
+		치수 정본: docs/design/window-layout-system-storyboard.html (행 38 · 머리글 12.5px · 셀 패딩 12).
+	-->
+
+	<Style x:Key="Console.DataGrid.ColumnHeader" TargetType="DataGridColumnHeader">
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+		<Setter Property="FontSize" Value="12.5" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="HorizontalContentAlignment" Value="Left" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="DataGridColumnHeader">
+					<Grid>
+						<Border
+							Padding="12,8"
+							Background="{TemplateBinding Background}"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="0,0,0,1">
+							<ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+						</Border>
+						<Thumb
+							x:Name="PART_LeftHeaderGripper"
+							Width="6"
+							HorizontalAlignment="Left"
+							Cursor="SizeWE">
+							<Thumb.Template>
+								<ControlTemplate TargetType="Thumb">
+									<Border Background="Transparent" />
+								</ControlTemplate>
+							</Thumb.Template>
+						</Thumb>
+						<Thumb
+							x:Name="PART_RightHeaderGripper"
+							Width="6"
+							HorizontalAlignment="Right"
+							Cursor="SizeWE">
+							<Thumb.Template>
+								<ControlTemplate TargetType="Thumb">
+									<Border Background="Transparent">
+										<Rectangle
+											Width="1"
+											Margin="0,8"
+											HorizontalAlignment="Right"
+											Fill="{DynamicResource DividerBrush}" />
+									</Border>
+								</ControlTemplate>
+							</Thumb.Template>
+						</Thumb>
+					</Grid>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Console.DataGrid.Cell" TargetType="DataGridCell">
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="FontSize" Value="13" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="DataGridCell">
+					<Border Padding="12,0" Background="{TemplateBinding Background}">
+						<ContentPresenter VerticalAlignment="Center" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!--  핸들 열처럼 안쪽 여백이 없어야 하는 셀  -->
+	<Style
+		x:Key="Console.DataGrid.Cell.Flush"
+		BasedOn="{StaticResource Console.DataGrid.Cell}"
+		TargetType="DataGridCell">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="DataGridCell">
+					<Border Background="{TemplateBinding Background}">
+						<ContentPresenter />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Console.DataGrid.Row" TargetType="DataGridRow">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="DataGridRow">
+					<Border
+						x:Name="DGR_Border"
+						Background="{TemplateBinding Background}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,0,0,1">
+						<SelectiveScrollingGrid>
+							<SelectiveScrollingGrid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="*" />
+							</SelectiveScrollingGrid.ColumnDefinitions>
+							<DataGridCellsPresenter Grid.Column="1" ItemsPanel="{TemplateBinding ItemsPanel}" />
+							<!--  선택 = 좌측 3px 바. 가로로 굴려도 제자리에 남는다.  -->
+							<Rectangle
+								x:Name="Bar"
+								Grid.ColumnSpan="2"
+								Width="3"
+								HorizontalAlignment="Left"
+								Fill="{DynamicResource PrimaryBrush}"
+								IsHitTestVisible="False"
+								SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical"
+								Visibility="Collapsed" />
+						</SelectiveScrollingGrid>
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="DGR_Border" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+						</Trigger>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="DGR_Border" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+							<Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Console.DataGrid" TargetType="DataGrid">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="RowHeight" Value="38" />
+		<Setter Property="HeadersVisibility" Value="Column" />
+		<Setter Property="GridLinesVisibility" Value="None" />
+		<Setter Property="AutoGenerateColumns" Value="False" />
+		<Setter Property="CanUserAddRows" Value="False" />
+		<Setter Property="CanUserDeleteRows" Value="False" />
+		<Setter Property="CanUserResizeRows" Value="False" />
+		<Setter Property="CanUserSortColumns" Value="False" />
+		<Setter Property="CanUserReorderColumns" Value="False" />
+		<Setter Property="SelectionMode" Value="Extended" />
+		<Setter Property="SelectionUnit" Value="FullRow" />
+		<Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+		<Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+		<Setter Property="ColumnHeaderStyle" Value="{StaticResource Console.DataGrid.ColumnHeader}" />
+		<Setter Property="CellStyle" Value="{StaticResource Console.DataGrid.Cell}" />
+		<Setter Property="RowStyle" Value="{StaticResource Console.DataGrid.Row}" />
+	</Style>
+
+	<!--  순서 드래그 대상 목록 — 가상화를 끈다(화면 밖 행은 드롭 자리가 될 수 없다). 전량 로딩이 전제.  -->
+	<Style x:Key="Console.ReorderList" TargetType="ListBox">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="VirtualizingPanel.IsVirtualizing" Value="False" />
+		<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+		<Setter Property="ScrollViewer.CanContentScroll" Value="False" />
+		<Setter Property="ItemContainerStyle">
+			<Setter.Value>
+				<Style TargetType="ListBoxItem">
+					<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+					<Setter Property="Template">
+						<Setter.Value>
+							<ControlTemplate TargetType="ListBoxItem">
+								<Grid>
+									<Border
+										x:Name="Bd"
+										Background="Transparent"
+										BorderBrush="{DynamicResource DividerBrush}"
+										BorderThickness="0,0,0,1" />
+									<Rectangle
+										x:Name="Bar"
+										Width="3"
+										HorizontalAlignment="Left"
+										Fill="{DynamicResource PrimaryBrush}"
+										Visibility="Collapsed" />
+									<Border
+										x:Name="Focus"
+										BorderBrush="{DynamicResource FocusRingBrush}"
+										BorderThickness="2"
+										Visibility="Collapsed" />
+									<ContentPresenter Margin="6,0" />
+								</Grid>
+								<ControlTemplate.Triggers>
+									<Trigger Property="IsMouseOver" Value="True">
+										<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+									</Trigger>
+									<Trigger Property="IsSelected" Value="True">
+										<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+										<Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+									</Trigger>
+									<Trigger Property="IsKeyboardFocused" Value="True">
+										<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+									</Trigger>
+								</ControlTemplate.Triggers>
+							</ControlTemplate>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!--  상태 배지 — 점(형태) + 글자. 색만으로 뜻을 전하지 않는다.  -->
+	<Style x:Key="Console.Pill" TargetType="Border">
+		<Setter Property="Padding" Value="7,1" />
+		<Setter Property="HorizontalAlignment" Value="Left" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="CornerRadius" Value="4" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+	</Style>
+</ResourceDictionary>

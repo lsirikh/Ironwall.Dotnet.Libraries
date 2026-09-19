@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    콘솔 커널 갤러리 (console-kernel PRD · IMPL-14) — 호스트 앱 없이 커널만 띄워 눈으로 확인한다.
+    가짜 데이터는 장비 콘솔 목업과 같은 모양(레일 8 · 6열 · 상세 절). 서버 호출 0.
+    실행:  tools/console-gallery 폴더에서 dotnet run
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ConsoleGallery</RootNamespace>
+    <AssemblyName>ConsoleGallery</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+  </ItemGroup>
+
+</Project>
