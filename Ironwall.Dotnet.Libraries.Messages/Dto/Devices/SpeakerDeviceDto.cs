@@ -82,6 +82,20 @@ public class SpeakerDeviceDto : BaseDeviceDto
 
     public bool ShouldSerializeHardwareSpec() => ShouldSerializeHardwareSpecCore();
 
+    /// <summary>
+    /// 7.0 <c>device_config</c> — 스피커도 계산해서 채울 축이 없다. <see cref="BaseDeviceDto.DeviceConfigWrite"/>
+    /// (호출자가 채운 조각)만 실린다(N-02 §3 공통 통로). 플래그가 꺼져 있으면(기본) 절대 나가지 않는다.
+    /// </summary>
+    [JsonProperty("device_config", Order = 33, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public DeviceConfigAxisDto? DeviceConfigAxis
+    {
+        get => ComposeDeviceConfigAxis(null);
+        set => ReceivedDeviceConfig = value;   // raw capture for read mapping (device-console-v8 FR-03)
+    }
+
+    public bool ShouldSerializeDeviceConfigAxis() => UseAxisWrite && AllowDeviceConfigWrite && DeviceConfigAxis != null;
+
     /// <summary>7.0 에서 <c>speaker_role</c> 로 이관된 키(<c>_legacy.py:99</c>) — 축 모드에선 미전송.</summary>
     public bool ShouldSerializeSpeakerType() => !UseAxisWrite;
     #endregion

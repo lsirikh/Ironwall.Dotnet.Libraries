@@ -205,6 +205,54 @@ public class BaseDeviceDto : BaseDto
     }
     #endregion
 
+    #region - device_config 공통 쓰기 통로 (device-console-n02 선행 작업, 분석 §3) -
+    /// <summary>
+    /// 호출자(부품 조립기 등)가 직접 채우는 <c>device_config</c> 축 조각 — 파생 DTO 가 계산하는 축과
+    /// <see cref="ComposeDeviceConfigAxis"/> 에서 <b>병합</b>돼 나간다.
+    /// 예: <c>component_overrides.heater: null</c>(부품 override 삭제), 함체·카메라가 다루지 않는
+    /// <c>component_overrides.buzzer</c> 같은 값.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜 필요한가</b>(분석 <c>docs/analyses/device-console-n02-n03-design-input-analysis.md</c> §3) —
+    /// <see cref="EnclosureDeviceDto"/> 는 히터·팬만, <see cref="CameraDeviceDto"/> 는 <c>modes</c> 만 계산해서
+    /// 만들고, 나머지 5종(Controller·Sensor·Speaker·Lamp·Gate)은 <c>device_config</c> 자체가 없었다.
+    /// "부품을 빼면 같은 본문에 <c>component_overrides.&lt;key&gt;: null</c> 을 함께 보낸다"(D-A12)는
+    /// 함체 히터·팬 말고는 보낼 통로가 없어 못 지켰다. 이 칸이 그 통로를 7종 공통으로 연다 —
+    /// <c>Messages</c> 계층이라 모든 패널·조립기에 닿는다.</para>
+    /// <para>병합 규칙은 <see cref="DeviceAxisWrite.MergeDeviceConfigAxis"/> — <b>이 값이 키마다 이긴다</b>.
+    /// <c>ComponentOverrides</c> 의 한 키에 <see cref="Newtonsoft.Json.Linq.JValue"/> 의 명시적
+    /// <c>null</c>(<c>JValue.CreateNull()</c>)을 넣으면 병합 후에도 그 키가 <c>null</c> 로 남아
+    /// JSON 에 그대로 나간다 — <see cref="DeviceConfigAxisDto.ComponentOverrides"/> 의
+    /// <c>NullValueHandling.Ignore</c> 는 <b>그 프로퍼티 자체가 null 일 때만</b> 적용되고, <see cref="JObject"/>
+    /// 안의 자식 프로퍼티 값이 <c>null</c> 인 것은 그대로 직렬화된다(Newtonsoft 는 <c>JObject</c> 를
+    /// 자신이 쥔 토큰 그대로 <c>WriteTo</c> 한다 — 부모의 <c>NullValueHandling</c> 은 자식까지 내려오지 않는다).</para>
+    /// </remarks>
+    [JsonIgnore]
+    public DeviceConfigAxisDto? DeviceConfigWrite { get; set; }
+
+    /// <summary>
+    /// <see cref="DeviceConfigWrite"/> 를 실제로 실어 보낼지 — <b>기본값 <c>false</c></b>.
+    /// </summary>
+    /// <remarks>
+    /// 플래그 게이트 선례(<see cref="UseAxisWrite"/> · <c>HardwareSpecDto.AllowComponentsWrite</c>)를 따른다 —
+    /// <c>ShouldSerializeXxx()</c> 하나만으로는 <b>이 DTO 의 모든 직렬화 경로</b>(REST 요청뿐 아니라
+    /// NATS 본문 재사용 등)에 함께 적용돼 버려서, 경로별로 켜고 끌 수 있는 별도 플래그가 필요하다
+    /// (레포 교훈: <c>ShouldSerialize</c> 는 그 DTO 의 모든 직렬화에 적용된다).
+    /// 꺼져 있으면(기본값) 파생 DTO 는 자기가 계산한 축을 그대로 돌려주므로 오늘 본문과
+    /// <b>바이트 단위로 동일</b>하다.
+    /// </remarks>
+    [JsonIgnore]
+    public bool AllowDeviceConfigWrite { get; set; }
+
+    /// <summary>
+    /// 파생 DTO 가 계산한 축(<paramref name="computed"/>, 계산할 것이 없으면 <c>null</c>)에
+    /// <see cref="DeviceConfigWrite"/> 를 병합한다. <see cref="AllowDeviceConfigWrite"/> 가 꺼져 있으면
+    /// <paramref name="computed"/> 를 그대로 돌려준다 — 무회귀를 <b>이 지점 하나</b>로 보장한다.
+    /// </summary>
+    protected DeviceConfigAxisDto? ComposeDeviceConfigAxis(DeviceConfigAxisDto? computed)
+        => AllowDeviceConfigWrite ? DeviceAxisWrite.MergeDeviceConfigAxis(computed, DeviceConfigWrite) : computed;
+    #endregion
+
     /// <summary>
     /// <c>hardware_spec</c> 의 공용 배후 저장소. 파생 DTO 가 자기 <c>Order</c> 로 노출한다
     /// (기반에 <c>[JsonProperty]</c> 를 두면 6.3 카메라 본문의 키 순서가 바뀐다 — 무회귀 위반).

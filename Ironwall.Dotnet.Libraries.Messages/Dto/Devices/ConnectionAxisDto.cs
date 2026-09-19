@@ -213,4 +213,51 @@ internal static class DeviceAxisWrite
             JObject jo => jo,
             _ => JObject.FromObject(value),
         };
+
+    /// <summary>
+    /// <paramref name="computed"/> 위에 <paramref name="carrier"/> 의 각 키를 <b>그대로 덮어쓴다</b>(carrier 우선).
+    /// </summary>
+    /// <remarks>
+    /// 값이 <see cref="JTokenType.Null"/> 인 키도 그대로 옮겨진다 — 부모 프로퍼티의
+    /// <c>NullValueHandling.Ignore</c> 는 <c>JObject</c> 전체가 <c>null</c> 일 때만 적용되고 그 안의
+    /// 자식 키 값에는 내려오지 않으므로, "이 부품 override 를 지운다"는 의도(명시적 <c>null</c>)가
+    /// 직렬화 결과에 <c>"key": null</c> 로 그대로 살아남는다(N-02 §3, <see cref="BaseDeviceDto.DeviceConfigWrite"/>).
+    /// </remarks>
+    public static JObject? MergeJObjectOverride(JObject? computed, JObject? carrier)
+    {
+        if (carrier == null || carrier.Count == 0) return computed;
+
+        var merged = computed != null ? (JObject)computed.DeepClone() : new JObject();
+        foreach (var prop in carrier.Properties())
+            merged[prop.Name] = prop.Value;
+
+        return merged.Count == 0 ? null : merged;
+    }
+
+    /// <summary>
+    /// 파생 DTO 가 계산한 <c>device_config</c> 축(<paramref name="computed"/>)과 호출자가 채운
+    /// <see cref="BaseDeviceDto.DeviceConfigWrite"/> 조각(<paramref name="carrier"/>)을 하나로 합친다.
+    /// </summary>
+    /// <remarks>
+    /// <c>thresholds</c> · <c>modes</c> · <c>component_overrides</c> 각각을
+    /// <see cref="MergeJObjectOverride"/> 로 독립 병합한다(<paramref name="carrier"/> 우선). 셋 다 비면
+    /// <c>null</c> 을 돌려준다 — 빈 <c>device_config: {}</c> 를 보내지 않기 위해서다.
+    /// </remarks>
+    public static DeviceConfigAxisDto? MergeDeviceConfigAxis(DeviceConfigAxisDto? computed, DeviceConfigAxisDto? carrier)
+    {
+        if (carrier == null || carrier.IsEmpty) return computed;
+
+        var thresholds = MergeJObjectOverride(computed?.Thresholds, carrier.Thresholds);
+        var modes = MergeJObjectOverride(computed?.Modes, carrier.Modes);
+        var overrides = MergeJObjectOverride(computed?.ComponentOverrides, carrier.ComponentOverrides);
+
+        if (thresholds == null && modes == null && overrides == null) return null;
+
+        return new DeviceConfigAxisDto
+        {
+            Thresholds = thresholds,
+            Modes = modes,
+            ComponentOverrides = overrides,
+        };
+    }
 }

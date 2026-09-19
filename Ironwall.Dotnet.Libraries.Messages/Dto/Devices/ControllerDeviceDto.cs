@@ -84,6 +84,22 @@ public class ControllerDeviceDto : BaseDeviceDto
 
     public bool ShouldSerializeHardwareSpec() => ShouldSerializeHardwareSpecCore();
 
+    /// <summary>
+    /// 7.0 <c>device_config</c> — 제어기 자체는 계산해서 채울 축이 없다(임계치·모드 대응 필드가 없음).
+    /// <see cref="BaseDeviceDto.DeviceConfigWrite"/>(호출자가 채운 조각, 예 부품 조립기의 override)만
+    /// 실린다(N-02 §3 공통 통로). <see cref="BaseDeviceDto.AllowDeviceConfigWrite"/> 가 꺼져 있으면
+    /// (기본) 절대 나가지 않는다 — 이 DTO 는 지금까지 이 키를 실은 적이 없어 무회귀는 자동이다.
+    /// </summary>
+    [JsonProperty("device_config", Order = 33, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public DeviceConfigAxisDto? DeviceConfigAxis
+    {
+        get => ComposeDeviceConfigAxis(null);
+        set => ReceivedDeviceConfig = value;   // raw capture for read mapping (device-console-v8 FR-03)
+    }
+
+    public bool ShouldSerializeDeviceConfigAxis() => UseAxisWrite && AllowDeviceConfigWrite && DeviceConfigAxis != null;
+
     // ── 7.0 에서 제거된 평면 키 ──
     public bool ShouldSerializeIpAddress() => !UseAxisWrite;
     public bool ShouldSerializeIpPort() => !UseAxisWrite;

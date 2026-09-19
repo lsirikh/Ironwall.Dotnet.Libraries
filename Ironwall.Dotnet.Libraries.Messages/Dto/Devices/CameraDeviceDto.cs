@@ -172,13 +172,21 @@ public class CameraDeviceDto : BaseDeviceDto
     {
         get
         {
-            if (!IsRecord.HasValue && DeviceConfigModes == null) return null;
+            DeviceConfigAxisDto? computed;
+            if (!IsRecord.HasValue && DeviceConfigModes == null)
+            {
+                computed = null;
+            }
+            else
+            {
+                var modes = DeviceConfigModes != null ? (JObject)DeviceConfigModes.DeepClone() : new JObject();
+                if (IsRecord.HasValue) modes["is_record"] = IsRecord.Value;
+                computed = modes.Count == 0 ? null : new DeviceConfigAxisDto { Modes = modes };
+            }
 
-            var modes = DeviceConfigModes != null ? (JObject)DeviceConfigModes.DeepClone() : new JObject();
-            if (IsRecord.HasValue) modes["is_record"] = IsRecord.Value;
-            if (modes.Count == 0) return null;
-
-            return new DeviceConfigAxisDto { Modes = modes };
+            // N-02 §3 공통 통로 — 호출자가 채운 조각(예: heater override, PTZ 한랭지 프리셋)을 병합한다.
+            // AllowDeviceConfigWrite 가 꺼져 있으면(기본) computed 그대로 — 오늘 본문과 바이트 단위 동일.
+            return ComposeDeviceConfigAxis(computed);
         }
         set
         {

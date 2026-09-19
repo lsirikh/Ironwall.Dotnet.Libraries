@@ -130,13 +130,18 @@ public class EnclosureDeviceDto : BaseDeviceDto
             SetEnabledIfPresent(overrides, ComponentTypeNames.Fan, FAN_KEY_FALLBACK, FanEnabled);
 
             var thresholds = DeviceThresholdAxis.ToAxis(ThresholdConfig);
-            if (thresholds == null && overrides.Count == 0) return null;
 
-            return new DeviceConfigAxisDto
-            {
-                Thresholds = thresholds,
-                ComponentOverrides = overrides.Count == 0 ? null : overrides,
-            };
+            var computed = (thresholds == null && overrides.Count == 0)
+                ? null
+                : new DeviceConfigAxisDto
+                {
+                    Thresholds = thresholds,
+                    ComponentOverrides = overrides.Count == 0 ? null : overrides,
+                };
+
+            // N-02 §3 공통 통로 — 호출자가 채운 조각(예: component_overrides.buzzer, 명시적 null 삭제)을 병합한다.
+            // AllowDeviceConfigWrite 가 꺼져 있으면(기본) computed 그대로 — 오늘 본문과 바이트 단위 동일.
+            return ComposeDeviceConfigAxis(computed);
         }
         set
         {

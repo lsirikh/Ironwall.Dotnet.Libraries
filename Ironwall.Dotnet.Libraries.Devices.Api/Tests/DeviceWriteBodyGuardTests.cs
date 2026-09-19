@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Threading.Tasks;
 using Xunit;
@@ -147,5 +148,46 @@ public class DeviceWriteBodyGuardTests
         spec.AllowComponentsWrite = true;
 
         Assert.Contains("\"components\"", JsonConvert.SerializeObject(spec));
+    }
+
+    /// <summary>
+    /// N-02 §3 공통 <c>device_config</c> 쓰기 통로(<see cref="Ironwall.Dotnet.Libraries.Messages.Dto.Devices.BaseDeviceDto.DeviceConfigWrite"/>)
+    /// 가 실제 <see cref="DeviceApiService"/> 왕복을 거쳐도 살아남는지의 종단 테스트 — 경광등은 함체·카메라처럼
+    /// 계산되는 축이 없어(분석 §3) 이 통로가 유일한 <c>device_config</c> 쓰기 자리다.
+    /// </summary>
+    [Fact]
+    public async Task should_send_null_component_override_when_updating_lamp_with_device_config_write_on_axis_contract()
+    {
+        var (service, http) = Create(EnumServerContract.V8_0);
+        var dto = Dto<LampDeviceDto>("lamp", "\"type_lamp\": \"Strobe\"");
+        dto.AllowDeviceConfigWrite = true;
+        dto.DeviceConfigWrite = new DeviceConfigAxisDto
+        {
+            ComponentOverrides = new JObject { ["buzzer"] = JValue.CreateNull() },
+        };
+
+        await service.UpdateLampAsync(41, dto);
+
+        Assert.Equal("PATCH", http.Method);
+        var raw = http.Body!.ToString(Formatting.None);
+        Assert.Contains("\"buzzer\":null", raw);
+        Assert.Equal(JTokenType.Null, http.Body!.SelectToken("device_config.component_overrides.buzzer")!.Type);
+    }
+
+    [Fact]
+    public async Task should_not_send_device_config_when_updating_lamp_with_device_config_write_on_legacy_contract()
+    {
+        var (service, http) = Create(EnumServerContract.V6_3);
+        var dto = Dto<LampDeviceDto>("lamp", "\"type_lamp\": \"Strobe\"");
+        dto.AllowDeviceConfigWrite = true;
+        dto.DeviceConfigWrite = new DeviceConfigAxisDto
+        {
+            ComponentOverrides = new JObject { ["buzzer"] = JValue.CreateNull() },
+        };
+
+        await service.UpdateLampAsync(41, dto);
+
+        Assert.Equal("PUT", http.Method);   // 6.3 은 종전 그대로 — 이 키 자체가 스키마에 없다
+        Assert.Null(http.Body!["device_config"]);
     }
 }

@@ -77,6 +77,20 @@ public class SensorDeviceDto : BaseDeviceDto
 
     public bool ShouldSerializeHardwareSpec() => ShouldSerializeHardwareSpecCore();
 
+    /// <summary>
+    /// 7.0 <c>device_config</c> — 센서도 계산해서 채울 축이 없다. <see cref="BaseDeviceDto.DeviceConfigWrite"/>
+    /// (호출자가 채운 조각)만 실린다(N-02 §3 공통 통로). 플래그가 꺼져 있으면(기본) 절대 나가지 않는다.
+    /// </summary>
+    [JsonProperty("device_config", Order = 32, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public DeviceConfigAxisDto? DeviceConfigAxis
+    {
+        get => ComposeDeviceConfigAxis(null);
+        set => ReceivedDeviceConfig = value;   // raw capture for read mapping (device-console-v8 FR-03)
+    }
+
+    public bool ShouldSerializeDeviceConfigAxis() => UseAxisWrite && AllowDeviceConfigWrite && DeviceConfigAxis != null;
+
     /// <summary>응답 전용 — 7.0 <c>SensorCreate</c> properties 에 없어 실으면 422(읽기는 <c>?include=controller</c>).</summary>
     public bool ShouldSerializeController() => !UseAxisWrite && Controller != null;
     #endregion
