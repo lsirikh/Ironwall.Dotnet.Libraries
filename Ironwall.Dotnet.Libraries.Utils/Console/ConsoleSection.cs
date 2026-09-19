@@ -70,8 +70,35 @@ public class ConsoleField : HeaderedContentControl
     /// <summary>잠긴 칸 — 자물쇠 글리프를 붙인다.</summary>
     public bool IsLocked { get => (bool)GetValue(IsLockedProperty); set => SetValue(IsLockedProperty, value); }
 
+    public static readonly DependencyProperty LabelWidthProperty = DependencyProperty.Register(
+        nameof(LabelWidth), typeof(double), typeof(ConsoleField),
+        new FrameworkPropertyMetadata(DefaultLabelWidth, FrameworkPropertyMetadataOptions.Inherits));
+    /// <summary>
+    /// 라벨 칸의 폭. 기본 <see cref="DefaultLabelWidth"/> — <b>상속</b>이라 폼 뿌리에 한 번만 주면
+    /// 그 아래 모든 칸이 따른다 — 설정 창처럼 <c>appsettings</c> 키가 긴 창은 더 넓게 준다.
+    /// </summary>
+    public double LabelWidth { get => (double)GetValue(LabelWidthProperty); set => SetValue(LabelWidthProperty, value); }
+
+    /// <summary>기본 라벨 폭 — 이 값이 바뀌면 모든 콘솔의 폼이 같이 움직인다.</summary>
+    public const double DefaultLabelWidth = 102d;
+
     private static DependencyProperty Reg<T>(string name, T defaultValue)
         => DependencyProperty.Register(name, typeof(T), typeof(ConsoleField), new PropertyMetadata(defaultValue));
+}
+
+/// <summary>
+/// 숫자 폭 → <see cref="GridLength"/>. <c>ColumnDefinition.Width</c> 는 <c>GridLength</c> 라
+/// <c>double</c> 의존 속성(<see cref="ConsoleField.LabelWidth"/>)을 그대로 묶지 못한다.
+/// </summary>
+public sealed class ConsoleLengthConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => value is double d && !double.IsNaN(d) && !double.IsInfinity(d) && d >= 0
+            ? new GridLength(d)
+            : new GridLength(ConsoleField.DefaultLabelWidth);
+
+    public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => System.Windows.Data.Binding.DoNothing;
 }
 
 /// <summary>

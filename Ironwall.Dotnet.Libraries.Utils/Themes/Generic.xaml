@@ -12,6 +12,7 @@
 	-->
 
 	<BooleanToVisibilityConverter x:Key="Console.BoolToVisibility" />
+	<c:ConsoleLengthConverter x:Key="Console.DoubleToGridLength" />
 
 	<!--  ───────── 버튼 (템플릿 안에서만 쓰는 명시 스타일)  ─────────  -->
 	<Style x:Key="Console.Button" TargetType="ButtonBase">
@@ -772,13 +773,19 @@
 								TextWrapping="Wrap" />
 						</Border>
 
+						<!--
+							여백은 <b>ScrollViewer 의 Padding 이 아니라 안쪽 Margin</b> 이다 — 앱 전역 MaterialDesign
+							ScrollViewer 암시 스타일이 Padding 을 삼켜 폼이 왼쪽으로 2px 붙어 버렸다(N-10 실측).
+						-->
 						<ScrollViewer
 							Grid.Row="2"
-							Padding="16,4,16,16"
 							Focusable="False"
 							HorizontalScrollBarVisibility="Disabled"
 							VerticalScrollBarVisibility="Auto">
-							<ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+							<ContentPresenter
+								Margin="16,4,16,16"
+								HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+								VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
 						</ScrollViewer>
 
 						<Border
@@ -937,7 +944,7 @@
 				<ControlTemplate TargetType="{x:Type c:ConsoleField}">
 					<Grid>
 						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="102" />
+							<ColumnDefinition Width="{Binding LabelWidth, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource Console.DoubleToGridLength}}" />
 							<ColumnDefinition Width="*" />
 						</Grid.ColumnDefinitions>
 						<StackPanel Margin="0,6,8,0" VerticalAlignment="Top">
@@ -958,13 +965,16 @@
 									Stretch="Fill"
 									Visibility="Collapsed" />
 							</StackPanel>
+							<!--  API 이름은 단어가 아니라 식별자다 — 중간에서 자르면(IsAutoEventDiscar/d) 뜻이 죽는다. 줄임표 + 전문은 ToolTip.  -->
 							<TextBlock
 								x:Name="Api"
 								FontFamily="{DynamicResource MonoFont}"
 								FontSize="10"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{TemplateBinding ApiName}"
-								TextWrapping="Wrap" />
+								TextTrimming="CharacterEllipsis"
+								TextWrapping="NoWrap"
+								ToolTip="{TemplateBinding ApiName}" />
 						</StackPanel>
 						<Grid Grid.Column="1">
 							<Grid.RowDefinitions>
