@@ -30,7 +30,7 @@
 		</Style>
 	</UserControl.Resources>
 
-	<DockPanel LastChildFill="True">
+	<DockPanel ClipToBounds="True" LastChildFill="True">
 		<!--
 			서버 판본을 끝내 확인하지 못해 6.3 으로 폴백했을 때만 뜬다.
 			색이 아니라 형태(좌측 세로 바 + 아이콘)로도 구분한다.
@@ -129,7 +129,7 @@
 			</c:ConsoleShell.Toolbar>
 
 			<c:ConsoleShell.List>
-				<Grid>
+				<Grid ClipToBounds="True">
 					<DataGrid
 						AutomationProperties.AutomationId="Console.Devices.Grid"
 						IsReadOnly="True"
@@ -210,64 +210,64 @@
 								FontSize="12"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="그룹" />
-							<TextBlock
-								VerticalAlignment="Center"
-								FontSize="12"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="그룹이 없다 — 레일의 '그룹' 에서 먼저 만든다">
-								<TextBlock.Style>
-									<Style TargetType="TextBlock">
-										<Setter Property="Visibility" Value="Collapsed" />
-										<Style.Triggers>
-											<DataTrigger Binding="{Binding HasGroupChips}" Value="False">
-												<Setter Property="Visibility" Value="Visible" />
-											</DataTrigger>
-										</Style.Triggers>
-									</Style>
-								</TextBlock.Style>
-							</TextBlock>
+							<Grid>
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="그룹이 없다 — 레일의 '그룹' 에서 먼저 만든다">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Visibility" Value="Collapsed" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasGroupChips}" Value="False">
+													<Setter Property="Visibility" Value="Visible" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+								<ItemsControl
+									Focusable="False"
+									ItemsSource="{Binding GroupChips}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<drag:DropZoneChrome
+												Margin="0,2,6,2"
+												drag:DropZone.Data="{Binding}"
+												drag:DropZone.Handler="{Binding DataContext.GroupDrop, RelativeSource={RelativeSource AncestorType=UserControl}}"
+												drag:DropZone.Key="device-group"
+												CornerRadius="12">
+												<!--  칩은 버튼이기도 하다 — 고른 장비를 이 그룹에 넣는다(끌기의 키보드 폴백)  -->
+												<Button
+													Padding="0"
+													AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Devices.GroupChip.{0}}"
+													Background="Transparent"
+													BorderThickness="0"
+													Click="OnGroupChipClick"
+													Cursor="Hand"
+													ToolTip="고른 장비를 이 그룹에 넣는다 — 목록의 핸들을 끌어 놓아도 된다">
+													<Button.Template>
+														<ControlTemplate TargetType="Button">
+															<Border Style="{StaticResource GroupChip}">
+																<TextBlock FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}">
+																	<Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DeviceCount, Mode=OneWay}" />
+																</TextBlock>
+															</Border>
+														</ControlTemplate>
+													</Button.Template>
+												</Button>
+											</drag:DropZoneChrome>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</Grid>
 						</DockPanel>
-						<ItemsControl
-							Margin="44,0,0,0"
-							Focusable="False"
-							ItemsSource="{Binding GroupChips}"
-							Visibility="{Binding CanDragToGroup, Converter={StaticResource BoolToVisibility}}">
-							<ItemsControl.ItemsPanel>
-								<ItemsPanelTemplate>
-									<WrapPanel />
-								</ItemsPanelTemplate>
-							</ItemsControl.ItemsPanel>
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<drag:DropZoneChrome
-										Margin="0,2,6,2"
-										drag:DropZone.Data="{Binding}"
-										drag:DropZone.Handler="{Binding DataContext.GroupDrop, RelativeSource={RelativeSource AncestorType=UserControl}}"
-										drag:DropZone.Key="device-group"
-										CornerRadius="12">
-										<!--  칩은 버튼이기도 하다 — 고른 장비를 이 그룹에 넣는다(끌기의 키보드 폴백)  -->
-										<Button
-											Padding="0"
-											AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Devices.GroupChip.{0}}"
-											Background="Transparent"
-											BorderThickness="0"
-											Click="OnGroupChipClick"
-											Cursor="Hand"
-											ToolTip="고른 장비를 이 그룹에 넣는다 — 목록의 핸들을 끌어 놓아도 된다">
-											<Button.Template>
-												<ControlTemplate TargetType="Button">
-													<Border Style="{StaticResource GroupChip}">
-														<TextBlock FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}">
-															<Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DeviceCount, Mode=OneWay}" />
-														</TextBlock>
-													</Border>
-												</ControlTemplate>
-											</Button.Template>
-										</Button>
-									</drag:DropZoneChrome>
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
 					</StackPanel>
 				</Border>
 			</c:ConsoleShell.StatusBar>

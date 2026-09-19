@@ -36,6 +36,9 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
     public DevicePropertySpec Spec { get; }
     public string Key => Spec.Key;
     public string Label => Spec.Label;
+
+    /// <summary>머리글 — 등록 때 꼭 채워야 하는 칸은 별표를 단다(색이 아니라 글자로).</summary>
+    public string HeaderText => IsRequired ? Spec.Label + " *" : Spec.Label;
     public string ApiPath => Spec.ApiPath;
     public string? Note => Spec.Note;
 

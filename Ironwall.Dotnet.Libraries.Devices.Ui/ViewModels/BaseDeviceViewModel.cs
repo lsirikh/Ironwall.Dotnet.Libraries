@@ -101,8 +101,11 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         }
     }
 
-    /// <summary>판별자(<c>category_device</c>) — 읽기 전용. 경로가 정하고 바뀌지 않는다.</summary>
-    public EnumDeviceCategory CategoryDevice => _model.CategoryDevice;
+    /// <summary>
+    /// 판별자(<c>category_device</c>) — 읽기 전용. 경로가 정하고 바뀌지 않는다.
+    /// 아직 서버에 가지 않은 Draft 는 판별자가 비어 있다 — 그때는 모델의 형에서 읽는다(상세 폼에 "None" 이 찍히지 않게).
+    /// </summary>
+    public EnumDeviceCategory CategoryDevice => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceAxesMapper.CategoryOf(_model);
 
     /// <summary>
     /// 종류축(<c>type_&lt;category&gt;</c>)의 서버 코드 — v7.0+ 축 화면의 콤보가 이 값을 바인딩한다(device-console-v8 FR-09).

@@ -150,10 +150,14 @@ public class DevicePropertyFormTests : IDisposable
         var form = NewForm(out var presenter);
         form.Load(new object[] { row }, EnumDeviceCategory.Controller, true, false, false);
 
-        Field(form, "name_device").Text = "B";
+        var name = Field(form, "name_device");
+        name.Text = "B";
+        bool? seenByView = null;   // 화면은 알림을 받은 순간의 값을 읽는다 — 그 순간에 아직 '손댄 칸'이면 표지가 남는다(미리보기에서 발견)
+        name.PropertyChanged += (_, e) => { if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(PropertyFieldViewModel.IsTouched)) seenByView = name.IsTouched; };
         form.Revert();
 
-        Assert.Equal("A", Field(form, "name_device").Text);
+        Assert.Equal("A", name.Text);
+        Assert.False(seenByView);
         Assert.Equal("A", row.DeviceName);
         Assert.Equal(0, presenter.Tracker.Count);
     }

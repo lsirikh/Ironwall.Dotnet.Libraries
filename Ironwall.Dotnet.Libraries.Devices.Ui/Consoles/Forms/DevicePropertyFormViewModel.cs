@@ -129,8 +129,9 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
     /// <summary>모든 칸을 원래 글로 돌려놓는다. 행은 건드린 적이 없으므로 복원할 것이 없다.</summary>
     public void Revert()
     {
-        foreach (var field in Fields) field.Revert();
+        // 추적기를 먼저 비운다 — 칸이 다시 그릴 때 "손댄 칸" 표지를 추적기에서 읽는다.
         Presenter.Tracker.Clear();
+        foreach (var field in Fields) field.Revert();
     }
 
     /// <summary>

@@ -245,7 +245,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         // 부품으로 찾기는 축 계약(7.0+)에서만 있는 조회다 — 6.3 에서는 항목 자체를 내지 않는다.
         if (ContractGate.IsAxisUi)
-            wanted.Add(new ConsoleRailEntry(ByComponentRailKey, "부품으로 찾기", "Magnify") { HasSeparatorAbove = true });
+            wanted.Add(new ConsoleRailEntry(ByComponentRailKey, "부품으로 찾기", "Magnify") { HasSeparatorAbove = true, ShowCount = false });
 
         if (RailEntries.Select(e => e.Key).SequenceEqual(wanted.Select(e => e.Key))) return;
 
@@ -644,7 +644,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     {
         var shown = (Rows as ListCollectionView)?.Count ?? 0;
         var total = _current?.RowCount ?? 0;
-        ListStatusText = IsByComponent ? ByComponent?.StatusText ?? string.Empty
+        // 부품으로 찾기는 제 화면 안에 결과 줄이 있다 — 같은 말을 두 번 하지 않는다.
+        ListStatusText = IsByComponent ? string.Empty
             : shown == total ? $"목록 {total}건 · 선택 {Form.Rows.Count}"
             : $"목록 {shown}건(전체 {total}) · 선택 {Form.Rows.Count}";
     }

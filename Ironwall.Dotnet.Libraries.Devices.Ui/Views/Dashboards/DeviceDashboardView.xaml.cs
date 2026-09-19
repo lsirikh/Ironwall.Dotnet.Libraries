@@ -104,11 +104,16 @@ public partial class DeviceDashboardView : UserControl
             });
         }
 
+        var cellStyle = TryFindResource("Console.DataGrid.Cell") as Style;
+
         foreach (var spec in _viewModel.Columns)
         {
             var column = CreateColumn(spec);
             column.Header = spec.Header;
             column.Width = spec.Width > 0 ? new DataGridLength(spec.Width) : new DataGridLength(1, DataGridLengthUnitType.Star);
+            // 열에 셀 스타일을 직접 건다 — 비워 두면 MDIX 가 코드로 추가된 열에 제 셀 스타일을 물려,
+            // 다크에서 선택 행이 회색 칸으로 갈라진다(미리보기 실측). 그리드의 CellStyle 은 그 뒤에 온다.
+            column.CellStyle = cellStyle;
             ConsoleColumns.SetKey(column, spec.Key);
             ConsoleColumns.SetIsDefault(column, spec.IsDefault);
             _grid.Columns.Add(column);
@@ -179,6 +184,8 @@ public partial class DeviceDashboardView : UserControl
         if (_grid is null) return;
         var prefs = ColumnPrefs();
         var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, prefs?.HiddenColumns);
+        // 열이 없는 화면(부품으로 찾기)에서는 "열 0/0" 단추를 내지 않는다 — 빈 글자면 툴바가 단추를 접는다.
+        if (_grid.Columns.All(c => string.IsNullOrEmpty(ConsoleColumns.GetKey(c)))) text = string.Empty;
         if (_toolbar is not null) _toolbar.ColumnsText = text;
     }
 

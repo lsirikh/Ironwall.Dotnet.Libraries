@@ -96,25 +96,15 @@
 				Foreground="{DynamicResource TextPrimaryBrush}" />
 		</DataTemplate>
 
-		<!--  읽기 전용 · 잠금 — 값 + 자물쇠. 까닭은 ConsoleField 의 Note 줄에 나온다  -->
+		<!--  읽기 전용 · 잠금 — 값만. 자물쇠와 까닭은 ConsoleField 가 그린다(두 번 그리지 않는다)  -->
 		<DataTemplate x:Key="Editor.ReadOnly">
-			<DockPanel LastChildFill="True">
-				<md:PackIcon
-					Width="14"
-					Height="14"
-					Margin="0,0,6,0"
-					VerticalAlignment="Center"
-					DockPanel.Dock="Left"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Kind="Lock" />
-				<TextBlock
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
-					FontSize="13"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="{Binding DisplayText}"
-					TextWrapping="Wrap" />
-			</DockPanel>
+			<TextBlock
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
+				FontSize="13"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding DisplayText}"
+				TextWrapping="Wrap" />
 		</DataTemplate>
 
 		<forms:PropertyEditorTemplateSelector
@@ -127,7 +117,10 @@
 			Text="{StaticResource Editor.Text}" />
 	</UserControl.Resources>
 
-	<ItemsControl Focusable="False" ItemsSource="{Binding Sections}">
+	<ItemsControl
+		Margin="16,4,14,16"
+		Focusable="False"
+		ItemsSource="{Binding Sections}">
 		<ItemsControl.ItemTemplate>
 			<DataTemplate>
 				<c:ConsoleSection AxisName="{Binding AxisName}" Header="{Binding Title}">
@@ -148,7 +141,7 @@
 								<DataTemplate>
 									<c:ConsoleField
 										ApiName="{Binding ApiPath}"
-										Header="{Binding Label}"
+										Header="{Binding HeaderText}"
 										IsLocked="{Binding IsLocked}"
 										IsTouched="{Binding IsTouched}"
 										Note="{Binding LockReason}">
