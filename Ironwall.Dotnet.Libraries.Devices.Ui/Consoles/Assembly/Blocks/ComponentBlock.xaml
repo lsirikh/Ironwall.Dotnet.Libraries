@@ -151,6 +151,29 @@
 							<Setter Property="Padding" Value="11,3,8,3" />
 						</Trigger>
 
+						<!--  글자는 윤곽 안에 — 육각 · 마름모는 양 끝이 좁아 안쪽으로 더 들인다(안 들이면 글자가 도형 밖으로 나간다)  -->
+						<Trigger Property="Family" Value="PowerEnvironment">
+							<Setter Property="Padding" Value="24,6,22,6" />
+						</Trigger>
+						<Trigger Property="Family" Value="Network">
+							<Setter Property="Padding" Value="78,6,78,6" />
+							<Setter Property="MinHeight" Value="72" />
+						</Trigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="IsCompact" Value="True" />
+								<Condition Property="Family" Value="PowerEnvironment" />
+							</MultiTrigger.Conditions>
+							<Setter Property="Padding" Value="20,3,18,3" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="IsCompact" Value="True" />
+								<Condition Property="Family" Value="Network" />
+							</MultiTrigger.Conditions>
+							<Setter Property="Padding" Value="40,3,40,3" />
+							<Setter Property="MinHeight" Value="36" />
+						</MultiTrigger>
 						<Trigger Property="ReportsState" Value="False">
 							<Setter TargetName="PART_NoState" Property="Visibility" Value="Visible" />
 						</Trigger>

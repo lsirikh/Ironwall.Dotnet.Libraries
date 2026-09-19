@@ -62,6 +62,7 @@ public class DeviceUiModule : Module
                         c.Resolve<DeviceQueryPolicy>(),
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.ICatalogService>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IComponentCatalog>()   // 같은 캐시가 부품 팔레트도 댄다(조립기)
                    .SingleInstance();
 
             // 서버 8.0 부대 편제(unit_id) — GroupNats(부대 코드) → unit_id(정수) 해석 1회 + 캐시.
@@ -81,6 +82,9 @@ public class DeviceUiModule : Module
 
             builder.RegisterType<DeviceProviderService>().As<IDeviceProviderService>().As<IService>()
                 .SingleInstance().WithMetadata("Order", _count);
+            // 조립기 · 프리셋 · 프리셋으로 등록 창을 여는 입구. 창 뷰모델은 싱글턴이 아니다 — 열 때마다 새로 만든다.
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.AssemblyLauncher>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>().SingleInstance();
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();

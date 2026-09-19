@@ -39,6 +39,14 @@ public partial class App : Application
         {
             var isAxis = !e.Args.Contains("--legacy");
             if (e.Args.Contains("--dark")) ApplyDark();
+
+            // 조립기 · 펼치기 · 프리셋 · 등록 창 — 콘솔과 따로 뜬다(--assembly [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--assembly"))
+            {
+                await RunAssemblyAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
             _viewModel = Build(isAxis);
 
             _view = new DeviceDashboardView { DataContext = _viewModel };
@@ -184,6 +192,46 @@ public partial class App : Application
         _window.Width = 900;
         await Settle();
         Save(directory, $"{prefix}-12-dark-compact-900");
+    }
+
+    private async Task RunAssemblyAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var work = directory ?? Path.Combine(Path.GetTempPath(), "ironwall-assembly-preview");
+        Directory.CreateDirectory(work);
+        var presetFile = Path.Combine(work, "preview-presets.json");
+        if (File.Exists(presetFile)) File.Delete(presetFile);
+
+        var preview = new AssemblyPreview(work);
+        _window = new Window { Title = "조립기 미리보기", Width = 1320, Height = 820, Background = (Brush)FindResource("SurfaceBrush") };
+        _window.Show();
+
+        async Task Show(FrameworkElement view, double width, double height, string name)
+        {
+            _window.Width = width + 40;
+            _window.Height = height + 60;
+            if (view.Parent is Border old) old.Child = null;     // 같은 뷰를 두 번 찍을 때 — 옛 부모에서 먼저 뗀다
+            _window.Content = new Border { Margin = new Thickness(12), Child = view };
+            await Settle();
+            if (directory is not null) Save(directory, $"assembly-{theme}-{name}");
+        }
+
+        var (composeView, composeVm) = await preview.ComposeAsync();
+        await Show(composeView, 1280, 760, "01-compose");
+        if (directory is null) return;      // 손으로 써 볼 때는 조립기만 띄워 둔다
+
+        preview.MakeKeyCollision(composeVm);
+        await Show(composeView, 1280, 760, "02-key-collision");
+        await Show(await preview.EditDeviceAsync(), 1280, 760, "03-edit-device-unknown-type");
+        await Show(preview.RepeatExpand(withConflict: false), 440, 600, "04-repeat-expand");
+        await Show(preview.RepeatExpand(withConflict: true), 440, 600, "05-repeat-expand-conflict");
+        await Show(preview.PresetManager(), 720, 560, "06-preset-manager");
+        await Show(preview.Register(withProblem: false), 980, 680, "07-register");
+        await Show(preview.Register(withProblem: true), 980, 680, "08-register-problems");
     }
 
     private void ApplyDark()

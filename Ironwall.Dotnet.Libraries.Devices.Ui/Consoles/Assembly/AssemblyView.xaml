@@ -1,0 +1,545 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.AssemblyView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
+	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:blocks="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Blocks"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		부품 조립기(device-assembly-preset FR-01 ~ FR-08). 정본 목업: docs/design/device-component-assembly-preset-storyboard.html L252-296.
+		팔레트(카탈로그) → 조립 보드(끌어다 놓고, 끌어서 순서 바꾼다) → 속성(장비별 사실만 · 카탈로그 사실은 회색 글자).
+		드래그는 콘솔 커널만 쓴다: 핸들(Thumb)에서만 시작 · 캡처 드래그 · 삽입선은 어도너 · Esc 제자리 복귀. 키보드: 팔레트 Enter = 끝에 달기 · 보드 Alt+↑↓ · Delete.
+		x:Name 은 쓰지 않는다 — 계측은 AutomationId(Devices.Assembly.*).
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<asm:CategoryTextConverter x:Key="CategoryText" />
+
+		<Style x:Key="Asm.PaneTitle" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+		<Style x:Key="Asm.Hint" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+		</Style>
+		<Style x:Key="Asm.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+		<!--  카탈로그 사실 — 회색 글자 상자. 입력 컨트롤을 두지 않는다(편집 칸으로 만들면 보내게 되고 그건 422 다)  -->
+		<Style x:Key="Asm.FactBox" TargetType="Border">
+			<Setter Property="Margin" Value="0,4,0,0" />
+			<Setter Property="Padding" Value="8,6" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="4" />
+		</Style>
+	</UserControl.Resources>
+
+	<DockPanel LastChildFill="True">
+		<!--  머리 — 무엇을 조립하나 · 카테고리 · 도구  -->
+		<Border
+			Padding="16,8"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="0,0,0,1"
+			DockPanel.Dock="Top">
+			<DockPanel LastChildFill="True">
+				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Devices.Assembly.RepeatExpand"
+						Click="OnRepeatExpand"
+						Content="반복 펼치기…"
+						Style="{StaticResource MaterialDesignOutlinedButton}" />
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Devices.Assembly.Renumber"
+						Click="OnRenumber"
+						Content="채널 다시 번호"
+						IsEnabled="{Binding CanRenumberChannels}"
+						Style="{StaticResource MaterialDesignOutlinedButton}" />
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Devices.Assembly.Undo"
+						Click="OnUndo"
+						Content="되돌리기"
+						IsEnabled="{Binding CanUndo}"
+						Style="{StaticResource MaterialDesignOutlinedButton}" />
+					<Button
+						AutomationProperties.AutomationId="Devices.Assembly.SaveAsPreset"
+						Click="OnSaveAsPreset"
+						Content="프리셋으로 저장"
+						IsEnabled="{Binding CanSaveAsPreset}"
+						Style="{StaticResource MaterialDesignOutlinedButton}" />
+				</StackPanel>
+				<StackPanel Orientation="Horizontal">
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="15"
+						FontWeight="Bold"
+						Text="부품 조립기" />
+					<TextBlock
+						Margin="10,0,16,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Devices.Assembly.Subject"
+						FontSize="13"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding Subject}" />
+					<ComboBox
+						Width="120"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Devices.Assembly.Category"
+						IsEnabled="{Binding CanChangeCategory}"
+						ItemsSource="{Binding Categories}"
+						SelectedItem="{Binding Category}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Converter={StaticResource CategoryText}}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+				</StackPanel>
+			</DockPanel>
+		</Border>
+
+		<!--  바닥 — 개수 · 문제 · 주 단추  -->
+		<Border
+			Padding="16,8"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="0,1,0,0"
+			DockPanel.Dock="Bottom">
+			<DockPanel LastChildFill="True">
+				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+					<TextBlock
+						Margin="0,0,10,0"
+						VerticalAlignment="Center"
+						Style="{StaticResource Asm.Hint}"
+						Text="{Binding PrimaryHint}" />
+					<Button
+						MinWidth="96"
+						AutomationProperties.AutomationId="Devices.Assembly.Commit"
+						Click="OnCommit"
+						Content="{Binding PrimaryText}"
+						IsEnabled="{Binding CanCommit}"
+						ToolTip="{Binding CommitBlockedReason}"
+						ToolTipService.ShowOnDisabled="True" />
+				</StackPanel>
+				<StackPanel>
+					<TextBlock FontSize="12.5">
+						<Run FontWeight="SemiBold" Text="{Binding FooterText, Mode=OneWay}" /><Run Text="  —  " /><Run Foreground="{DynamicResource TextMutedBrush}" Text="{Binding FooterNote, Mode=OneWay}" />
+					</TextBlock>
+					<TextBlock
+						Margin="0,2,0,0"
+						AutomationProperties.AutomationId="Devices.Assembly.Status"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding StatusText}"
+						TextTrimming="CharacterEllipsis" />
+				</StackPanel>
+			</DockPanel>
+		</Border>
+
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="280" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="340" />
+			</Grid.ColumnDefinitions>
+
+			<!--  ── 팔레트 ──  -->
+			<Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0">
+				<DockPanel Margin="12,10" LastChildFill="True">
+					<StackPanel DockPanel.Dock="Top">
+						<TextBlock Style="{StaticResource Asm.PaneTitle}" Text="부품 팔레트" />
+						<TextBlock
+							Margin="0,2,0,8"
+							Style="{StaticResource Asm.Hint}"
+							Text="카탈로그에서 이 카테고리에 달 수 있는 것만 · 핸들을 끌어 보드에 놓거나 Enter 로 끝에 단다" />
+						<Grid Margin="0,0,0,8">
+							<TextBox
+								AutomationProperties.AutomationId="Devices.Assembly.PaletteSearch"
+								Style="{StaticResource Asm.TextBox}"
+								Text="{Binding PaletteSearch, UpdateSourceTrigger=PropertyChanged}" />
+							<TextBlock
+								Margin="8,0,0,0"
+								VerticalAlignment="Center"
+								FontSize="12.5"
+								IsHitTestVisible="False"
+								Text="유형 · 이름 검색">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+										<Setter Property="Visibility" Value="Collapsed" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding PaletteSearch}" Value="">
+												<Setter Property="Visibility" Value="Visible" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Grid>
+					</StackPanel>
+					<Grid>
+						<TextBlock
+							Margin="4,8"
+							VerticalAlignment="Top"
+							Style="{StaticResource Asm.Hint}"
+							Text="{Binding PaletteEmptyText}"
+							Visibility="{Binding IsPaletteEmpty, Converter={StaticResource BoolToVisibility}}" />
+						<ListBox
+							AutomationProperties.AutomationId="Devices.Assembly.Palette"
+							ItemsSource="{Binding Palette}"
+							SelectionMode="Extended"
+							Style="{StaticResource Console.ReorderList}">
+							<b:Interaction.Behaviors>
+								<drag:CaptureDragBehavior
+									DisplayMemberPath="Display"
+									Handler="{Binding}"
+									KeyboardFallback="Enter = 보드 끝에 달기" />
+								<blocks:PaletteAddKeyboardBehavior Command="{Binding AddFromPaletteCommand}" />
+							</b:Interaction.Behaviors>
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<DockPanel Margin="0,2" LastChildFill="True">
+										<drag:DragHandle AutomationProperties.AutomationId="{Binding Code, StringFormat=Devices.Assembly.PaletteHandle.{0}}" DockPanel.Dock="Left" />
+										<blocks:ComponentBlock
+											Title="{Binding Label}"
+											Width="216"
+											Margin="4,0,0,0"
+											HorizontalAlignment="Left"
+											AutomationProperties.AutomationId="{Binding Code, StringFormat=Devices.Assembly.Palette.{0}}"
+											Family="{Binding Family}"
+											IsCompact="True"
+											ReportsState="{Binding ReportsState}"
+											Subtitle="{Binding Code}" />
+									</DockPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+					</Grid>
+				</DockPanel>
+			</Border>
+
+			<!--  ── 조립 보드 ──  -->
+			<DockPanel
+				Grid.Column="1"
+				Margin="14,10"
+				LastChildFill="True">
+				<StackPanel DockPanel.Dock="Top">
+					<TextBlock Style="{StaticResource Asm.PaneTitle}" Text="조립 보드" />
+					<TextBlock
+						Margin="0,2,0,8"
+						Style="{StaticResource Asm.Hint}"
+						Text="핸들 ⣿ 을 끌어 순서를 바꾼다 · 팔레트 블록을 끌어 놓으면 그 자리에 들어간다 · Alt+↑ Alt+↓ 로도 옮긴다 · Delete 로 뺀다 · 드래그 중 Esc 는 제자리 복귀" />
+				</StackPanel>
+
+				<!--  빼는 곳 — 늘 보인다(끄는 동안만 열면 드롭존 등록에서 빠진다)  -->
+				<drag:DropZoneChrome
+					Margin="0,8,0,0"
+					drag:DropZone.Handler="{Binding}"
+					drag:DropZone.Key="assembly-bin"
+					AutomationProperties.AutomationId="Devices.Assembly.Bin"
+					CornerRadius="6"
+					DockPanel.Dock="Bottom">
+					<Border
+						Padding="10,8"
+						Background="{DynamicResource SurfaceAltBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="6">
+						<DockPanel LastChildFill="True">
+							<Button
+								AutomationProperties.AutomationId="Devices.Assembly.RemoveSelected"
+								Click="OnRemoveSelected"
+								Content="고른 것 빼기"
+								DockPanel.Dock="Right"
+								IsEnabled="{Binding CanRemoveSelected}"
+								Style="{StaticResource MaterialDesignFlatButton}" />
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,8,0"
+								VerticalAlignment="Center"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Kind="TrayArrowDown" />
+							<TextBlock
+								VerticalAlignment="Center"
+								Style="{StaticResource Asm.Hint}"
+								Text="빼는 곳 — 보드의 블록을 여기에 끌어 놓으면 빠진다. [되돌리기] 로 도로 넣을 수 있다" />
+						</DockPanel>
+					</Border>
+				</drag:DropZoneChrome>
+
+				<!--  문제 — 등록 · 적용을 막는 것들  -->
+				<ItemsControl
+					Margin="0,8,0,0"
+					DockPanel.Dock="Bottom"
+					Focusable="False"
+					ItemsSource="{Binding Problems}"
+					Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<TextBlock
+								FontSize="12"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Text="{Binding StringFormat=⚠ {0}}"
+								TextWrapping="Wrap" />
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<Border
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="1"
+					CornerRadius="6">
+					<Grid>
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Style="{StaticResource Asm.Hint}"
+							Text="팔레트의 블록을 끌어 놓으세요 — 또는 팔레트에서 Enter"
+							Visibility="{Binding IsBoardEmpty, Converter={StaticResource BoolToVisibility}}" />
+						<ListBox
+							Margin="6"
+							drag:DropZone.Handler="{Binding}"
+							drag:DropZone.IsReorder="True"
+							drag:DropZone.Key="assembly-board"
+							AutomationProperties.AutomationId="Devices.Assembly.Board"
+							ItemsSource="{Binding BoardItems}"
+							PreviewKeyDown="OnBoardPreviewKeyDown"
+							SelectionChanged="OnBoardSelectionChanged"
+							SelectionMode="Extended"
+							Loaded="OnBoardLoaded"
+							Style="{StaticResource Console.ReorderList}">
+							<b:Interaction.Behaviors>
+								<drag:CaptureDragBehavior
+									DisplayMemberPath="Display"
+									Handler="{Binding}"
+									KeyboardFallback="Alt+↑↓ · Delete" />
+								<drag:ReorderKeyboardBehavior Handler="{Binding}" />
+							</b:Interaction.Behaviors>
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<DockPanel Margin="0,2" LastChildFill="True">
+										<drag:DragHandle AutomationProperties.AutomationId="{Binding Slot.Key, StringFormat=Devices.Assembly.SlotHandle.{0}}" DockPanel.Dock="Left" />
+										<blocks:ComponentBlock
+											Title="{Binding Title}"
+											Width="340"
+											Margin="4,0,0,0"
+											HorizontalAlignment="Left"
+											AutomationProperties.AutomationId="{Binding Slot.Key, StringFormat=Devices.Assembly.Slot.{0}}"
+											ChannelText="{Binding ChannelText}"
+											ErrorText="{Binding ErrorText}"
+											Family="{Binding Family}"
+											HasError="{Binding HasError}"
+											IsOutOfService="{Binding IsOutOfService}"
+											IsSelected="{Binding IsSelected}"
+											ReportsState="{Binding ReportsState}"
+											Subtitle="{Binding Subtitle}" />
+									</DockPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+					</Grid>
+				</Border>
+			</DockPanel>
+
+			<!--  ── 속성 ──  -->
+			<Border
+				Grid.Column="2"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="1,0,0,0">
+				<ScrollViewer VerticalScrollBarVisibility="Auto">
+					<StackPanel Margin="14,10">
+						<TextBlock Style="{StaticResource Asm.PaneTitle}" Text="속성" />
+
+						<TextBlock
+							Margin="0,8,0,0"
+							Style="{StaticResource Asm.Hint}"
+							Text="보드에서 블록 하나를 고르면 그 부품의 사실을 고칠 수 있다">
+							<TextBlock.Visibility>
+								<Binding Path="HasInspected">
+									<Binding.Converter>
+										<asm:InverseBoolToVisibilityConverter />
+									</Binding.Converter>
+								</Binding>
+							</TextBlock.Visibility>
+						</TextBlock>
+
+						<StackPanel Visibility="{Binding HasInspected, Converter={StaticResource BoolToVisibility}}">
+							<!--  부품 칸(형상) — 장비별 사실  -->
+							<c:ConsoleSection AxisName="hardware_spec.components[]" Header="이 부품의 사실">
+								<StackPanel>
+									<c:ConsoleField ApiName="key" Header="key" Note="{Binding Inspected.Slot.KeyError}">
+										<TextBox
+											AutomationProperties.AutomationId="Devices.Assembly.Field.key"
+											FontFamily="Consolas"
+											Style="{StaticResource Asm.TextBox}"
+											Text="{Binding Inspected.Slot.Key, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField
+										ApiName="type"
+										Header="유형"
+										IsLocked="True"
+										Note="유형을 바꾸려면 빼고 다시 단다">
+										<TextBlock
+											VerticalAlignment="Center"
+											FontFamily="Consolas"
+											FontSize="13"
+											Foreground="{DynamicResource TextSecondaryBrush}"
+											Text="{Binding Inspected.Slot.TypeCode}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="label" Header="이름">
+										<TextBox
+											AutomationProperties.AutomationId="Devices.Assembly.Field.label"
+											Style="{StaticResource Asm.TextBox}"
+											Text="{Binding Inspected.Slot.Label, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="channel" Header="채널">
+										<TextBox
+											AutomationProperties.AutomationId="Devices.Assembly.Field.channel"
+											FontFamily="Consolas"
+											Style="{StaticResource Asm.TextBox}"
+											Text="{Binding Inspected.Slot.Channel, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="position" Header="위치">
+										<TextBox
+											AutomationProperties.AutomationId="Devices.Assembly.Field.position"
+											Style="{StaticResource Asm.TextBox}"
+											Text="{Binding Inspected.Slot.Position, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="in_service" Header="가동">
+										<CheckBox
+											VerticalAlignment="Center"
+											AutomationProperties.AutomationId="Devices.Assembly.Field.in_service"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											IsChecked="{Binding Inspected.Slot.InService}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="manufacturer" Header="제조사">
+										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Manufacturer, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="model" Header="모델">
+										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Model, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField
+										ApiName="serial"
+										Header="일련번호"
+										Note="프리셋에는 담기지 않는다 — 그 장비만의 것">
+										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Serial, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+								</StackPanel>
+							</c:ConsoleSection>
+
+							<!--  재정의 칸(의도) — 부품 칸과 갈라 놓는다: enabled 는 부품에 실으면 422, 여기서만 정상  -->
+							<c:ConsoleSection
+								Header="이 부품의 재정의"
+								TagKind="Intent">
+								<StackPanel>
+									<TextBlock
+										Style="{StaticResource Asm.Hint}"
+										Text="비워 두면 유형의 기본값을 쓴다. 부품을 빼면 이 재정의도 null 로 같이 지운다."
+										Visibility="{Binding HasOverrideRows, Converter={StaticResource BoolToVisibility}}" />
+									<TextBlock Style="{StaticResource Asm.Hint}" Text="이 유형은 재정의할 수 있는 설정이 없다">
+										<TextBlock.Visibility>
+											<Binding Path="HasOverrideRows">
+												<Binding.Converter>
+													<asm:InverseBoolToVisibilityConverter />
+												</Binding.Converter>
+											</Binding>
+										</TextBlock.Visibility>
+									</TextBlock>
+									<ItemsControl Focusable="False" ItemsSource="{Binding OverrideRows}">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate>
+												<c:ConsoleField ApiName="{Binding Name}" Header="{Binding Name}">
+													<TextBox
+														AutomationProperties.AutomationId="{Binding Name, StringFormat=Devices.Assembly.Override.{0}}"
+														FontFamily="Consolas"
+														Style="{StaticResource Asm.TextBox}"
+														Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+												</c:ConsoleField>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</StackPanel>
+							</c:ConsoleSection>
+
+							<!--  카탈로그 사실 — 보여 주기만 한다  -->
+							<c:ConsoleSection Header="카탈로그 사실 (읽기 전용)" TagKind="Observed">
+								<StackPanel>
+									<TextBlock Style="{StaticResource Asm.Hint}" Text="유형 공통 값이다 — 장비마다 되풀이해 갖지 않는다. 요청에 실으면 서버가 422 로 거절한다." />
+									<Border Style="{StaticResource Asm.FactBox}">
+										<StackPanel>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="states    " /><Run Text="{Binding CatalogStates, Mode=OneWay}" /></TextBlock>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="commands  " /><Run Text="{Binding CatalogCommands, Mode=OneWay}" /></TextBlock>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="produces  " /><Run Text="{Binding CatalogProduces, Mode=OneWay}" /></TextBlock>
+										</StackPanel>
+									</Border>
+									<TextBlock
+										Margin="0,6,0,0"
+										Style="{StaticResource Asm.Hint}"
+										Text="{Binding CatalogNote}" />
+								</StackPanel>
+							</c:ConsoleSection>
+						</StackPanel>
+
+						<!--  프리셋 — 보드에 올리기  -->
+						<c:ConsoleSection Header="이 카테고리의 프리셋">
+							<StackPanel>
+								<TextBlock
+									Style="{StaticResource Asm.Hint}"
+									Text="{Binding PresetStoreMessage}"
+									Visibility="{Binding PresetStoreMessage, Converter={x:Static asm:NullToCollapsedConverter.Instance}}" />
+								<TextBlock Style="{StaticResource Asm.Hint}" Text="아직 없다 — 보드를 조립하고 [프리셋으로 저장]">
+									<TextBlock.Visibility>
+										<Binding Path="HasCategoryPresets">
+											<Binding.Converter>
+												<asm:InverseBoolToVisibilityConverter />
+											</Binding.Converter>
+										</Binding>
+									</TextBlock.Visibility>
+								</TextBlock>
+								<ItemsControl Focusable="False" ItemsSource="{Binding CategoryPresets}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Button
+												Margin="0,3,0,0"
+												HorizontalContentAlignment="Left"
+												AutomationProperties.AutomationId="{Binding Id, StringFormat=Devices.Assembly.Preset.{0}}"
+												Click="OnLoadPreset"
+												Style="{StaticResource MaterialDesignOutlinedButton}"
+												ToolTip="보드에 올린다(교체) — 되돌리기 한 번으로 돌아올 수 있다">
+												<TextBlock FontSize="12.5">
+													<Run Text="{Binding Name, Mode=OneWay}" /><Run Foreground="{DynamicResource TextMutedBrush}" Text="{Binding Components.Count, Mode=OneWay, StringFormat='  · 부품 {0}'}" />
+												</TextBlock>
+											</Button>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</StackPanel>
+						</c:ConsoleSection>
+					</StackPanel>
+				</ScrollViewer>
+			</Border>
+		</Grid>
+	</DockPanel>
+</UserControl>

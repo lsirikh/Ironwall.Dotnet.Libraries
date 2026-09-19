@@ -256,6 +256,26 @@ public partial class DeviceDashboardView : UserControl
     private void OnRevert(object sender, RoutedEventArgs e) => ViewModel?.Revert();
     private void OnRefreshContract(object sender, RoutedEventArgs e) => ViewModel?.OnClickRefreshContract();
 
+    private async void OnOpenAssembly(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.OpenAssemblyAsync();
+    }
+
+    private async void OnRegisterFromPreset(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.RegisterFromPresetAsync();
+    }
+
+    private async void OnManagePresets(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.ManagePresetsAsync();
+    }
+
+    private async void OnEditComponents(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.EditComponentsAsync();
+    }
+
     private async void OnUndoGroupDrop(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.UndoGroupDropAsync();

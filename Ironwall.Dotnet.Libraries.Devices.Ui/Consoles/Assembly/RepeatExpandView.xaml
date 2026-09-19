@@ -1,0 +1,126 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.RepeatExpandView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  반복 펼치기(FR-08 · 목업 L300-308) — 16채널을 16번 끌게 하지 않는다. 미리보기에서 겹치는 key 는 ⚠ 로 짚는다.  -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<Style x:Key="Rep.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontFamily" Value="Consolas" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+	</UserControl.Resources>
+
+	<DockPanel Margin="16,12" LastChildFill="True">
+		<StackPanel DockPanel.Dock="Top">
+			<TextBlock
+				FontSize="15"
+				FontWeight="Bold"
+				Text="반복 펼치기" />
+			<TextBlock
+				Margin="0,2,0,8"
+				FontSize="11.5"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="규칙적인 부품 여러 개를 한 번에 만든다. 결과는 보통 블록이라 이후 편집 · 정렬은 끌어서 한다."
+				TextWrapping="Wrap" />
+			<c:ConsoleField ApiName="type" Header="유형">
+				<ComboBox
+					AutomationProperties.AutomationId="Devices.Assembly.Repeat.Type"
+					DisplayMemberPath="Display"
+					ItemsSource="{Binding Types}"
+					SelectedItem="{Binding SelectedType}" />
+			</c:ConsoleField>
+			<c:ConsoleField Header="개수">
+				<TextBox
+					AutomationProperties.AutomationId="Devices.Assembly.Repeat.Count"
+					Style="{StaticResource Rep.TextBox}"
+					Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}" />
+			</c:ConsoleField>
+			<c:ConsoleField ApiName="channel" Header="시작 채널">
+				<TextBox
+					AutomationProperties.AutomationId="Devices.Assembly.Repeat.StartChannel"
+					Style="{StaticResource Rep.TextBox}"
+					Text="{Binding StartChannel, UpdateSourceTrigger=PropertyChanged}" />
+			</c:ConsoleField>
+			<c:ConsoleField
+				ApiName="key"
+				Header="key 규칙"
+				Note="{}{02d} = 두 자리 번호 · {d} = 그대로">
+				<TextBox
+					AutomationProperties.AutomationId="Devices.Assembly.Repeat.KeyFormat"
+					Style="{StaticResource Rep.TextBox}"
+					Text="{Binding KeyFormat, UpdateSourceTrigger=PropertyChanged}" />
+			</c:ConsoleField>
+			<TextBlock
+				Margin="0,4,0,0"
+				FontSize="12"
+				Foreground="{DynamicResource StatusCriticalBrush}"
+				Text="{Binding Error, StringFormat=⚠ {0}}"
+				TextWrapping="Wrap"
+				Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+		</StackPanel>
+
+		<StackPanel
+			Margin="0,10,0,0"
+			HorizontalAlignment="Right"
+			DockPanel.Dock="Bottom"
+			Orientation="Horizontal">
+			<Button
+				Margin="0,0,6,0"
+				AutomationProperties.AutomationId="Devices.Assembly.Repeat.Cancel"
+				Click="OnCancel"
+				Content="취소"
+				Style="{StaticResource MaterialDesignOutlinedButton}" />
+			<Button
+				MinWidth="96"
+				AutomationProperties.AutomationId="Devices.Assembly.Repeat.Expand"
+				Click="OnExpand"
+				Content="펼치기"
+				IsEnabled="{Binding CanExpand}" />
+		</StackPanel>
+
+		<Border
+			Margin="0,10,0,0"
+			Background="{DynamicResource SurfaceSunkenBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="1"
+			CornerRadius="4">
+			<ScrollViewer VerticalScrollBarVisibility="Auto">
+				<ItemsControl
+					Margin="8,6"
+					AutomationProperties.AutomationId="Devices.Assembly.Repeat.Preview"
+					Focusable="False"
+					ItemsSource="{Binding Preview}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<TextBlock FontFamily="Consolas" FontSize="12">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsConflict}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+								<Run Text="{Binding Key, Mode=OneWay}" /><Run Text="{Binding Channel, Mode=OneWay, StringFormat='   ch {0}'}" /><Run Text="{Binding Error, Mode=OneWay, StringFormat='   ⚠ {0}'}" />
+							</TextBlock>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</ScrollViewer>
+		</Border>
+	</DockPanel>
+</UserControl>

@@ -1,0 +1,145 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.PresetManagerView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  프리셋 관리(FR-11 · 목업 L312-342). 프리셋은 이 컴퓨터의 파일에 산다 — 서버에 프리셋 리소스가 없다.  -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<asm:CategoryTextConverter x:Key="CategoryText" />
+	</UserControl.Resources>
+
+	<DockPanel Margin="16,12" LastChildFill="True">
+		<StackPanel DockPanel.Dock="Top">
+			<TextBlock
+				FontSize="15"
+				FontWeight="Bold"
+				Text="프리셋 관리" />
+			<TextBlock
+				Margin="0,2,0,8"
+				FontSize="11.5"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="프리셋은 조립 결과의 구조(부품 · 설정)만 담는다. 번호 · 이름 · 접속 · 일련번호는 담지 않는다. 이 컴퓨터에만 저장된다 — 옮기려면 내보내기."
+				TextWrapping="Wrap" />
+			<!--  파일이 더 새 판이거나 깨져서 옮겼을 때 — 색이 아니라 세로 바 + 글로 알린다  -->
+			<Border
+				Margin="0,0,0,8"
+				Padding="10,6"
+				Background="{DynamicResource TintWarningBrush}"
+				BorderBrush="{DynamicResource StatusWarningBrush}"
+				BorderThickness="4,1,1,1"
+				CornerRadius="4"
+				Visibility="{Binding HasStoreMessage, Converter={StaticResource BoolToVisibility}}">
+				<TextBlock
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.StoreMessage"
+					FontSize="12"
+					Text="{Binding StoreMessage}"
+					TextWrapping="Wrap" />
+			</Border>
+			<ComboBox
+				Width="140"
+				HorizontalAlignment="Left"
+				AutomationProperties.AutomationId="Devices.Assembly.Presets.Category"
+				ItemsSource="{Binding Categories}"
+				SelectedItem="{Binding Category}">
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding Converter={StaticResource CategoryText}}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
+		</StackPanel>
+
+		<DockPanel
+			Margin="0,10,0,0"
+			DockPanel.Dock="Bottom"
+			LastChildFill="True">
+			<Button
+				AutomationProperties.AutomationId="Devices.Assembly.Presets.Close"
+				Click="OnClose"
+				Content="닫기"
+				DockPanel.Dock="Right"
+				Style="{StaticResource MaterialDesignOutlinedButton}" />
+			<TextBlock
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="Devices.Assembly.Presets.Message"
+				FontSize="12.5"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding Message}"
+				TextWrapping="Wrap" />
+		</DockPanel>
+
+		<Grid Margin="0,10,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="200" />
+			</Grid.ColumnDefinitions>
+
+			<DockPanel LastChildFill="True">
+				<StackPanel Margin="0,6,0,0" DockPanel.Dock="Bottom">
+					<TextBlock
+						FontSize="12.5"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding SelectedSummary}"
+						TextWrapping="Wrap" />
+					<TextBlock
+						Margin="0,2,0,0"
+						FontSize="12"
+						Foreground="{DynamicResource StatusCriticalBrush}"
+						Text="{Binding SelectedProblem, StringFormat=⚠ {0}}"
+						TextWrapping="Wrap"
+						Visibility="{Binding SelectedProblem, Converter={x:Static asm:NullToCollapsedConverter.Instance}}" />
+				</StackPanel>
+				<ListBox
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.List"
+					DisplayMemberPath="Name"
+					ItemsSource="{Binding Presets}"
+					SelectedItem="{Binding Selected}" />
+			</DockPanel>
+
+			<StackPanel Grid.Column="1" Margin="12,0,0,0">
+				<Button
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.OpenInAssembly"
+					Click="OnOpenInAssembly"
+					Content="조립기로 열기"
+					IsEnabled="{Binding HasSelected}" />
+				<Button
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.Rename"
+					Click="OnRename"
+					Content="이름 바꾸기"
+					IsEnabled="{Binding CanEditSelected}"
+					Style="{StaticResource MaterialDesignOutlinedButton}" />
+				<Button
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.Duplicate"
+					Click="OnDuplicate"
+					Content="복제"
+					IsEnabled="{Binding CanEditSelected}"
+					Style="{StaticResource MaterialDesignOutlinedButton}" />
+				<Button
+					Margin="0,0,0,14"
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.Delete"
+					Click="OnDelete"
+					Content="삭제"
+					IsEnabled="{Binding CanEditSelected}"
+					Style="{StaticResource MaterialDesignOutlinedButton}" />
+				<Button
+					Margin="0,0,0,6"
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.Export"
+					Click="OnExport"
+					Content="내보내기…"
+					Style="{StaticResource MaterialDesignOutlinedButton}" />
+				<Button
+					AutomationProperties.AutomationId="Devices.Assembly.Presets.Import"
+					Click="OnImport"
+					Content="가져오기…"
+					Style="{StaticResource MaterialDesignOutlinedButton}" />
+			</StackPanel>
+		</Grid>
+	</DockPanel>
+</UserControl>

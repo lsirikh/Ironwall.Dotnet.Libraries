@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Groups;
@@ -63,6 +64,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                                 , IDeviceApiService deviceApiService
                                 , ICatalogService catalogService
                                 , DeviceQueryPolicy? queryPolicy = null
+                                , IAssemblyLauncher? assemblyLauncher = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -108,6 +110,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Form = new DevicePropertyFormViewModel(Detail, this);
         _deviceApiService = deviceApiService;
         _catalogService = catalogService;
+        _assembly = assemblyLauncher;
 
         // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
         // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
@@ -435,6 +438,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CanDelete));
         NotifyOfPropertyChange(nameof(DeleteBlockedReason));
         NotifyOfPropertyChange(nameof(CanReload));
+        NotifyOfPropertyChange(nameof(CanAssemble));
+        NotifyOfPropertyChange(nameof(CanEditComponents));
     }
     #endregion
 
@@ -571,7 +576,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             }
 
             default:
-                Reselect(rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList(), "갱신했다");
+                // 조립기 · 등록 창이 서버에 쓰고 돌아온 재조회면 그 장비를 고르고, 상태 띠의 한 줄("등록했다")은 그대로 둔다.
+                var afterWindow = _selectAfterReload is not null;
+                _selectAfterReload = null;
+                Reselect(rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList(), afterWindow ? null : "갱신했다");
                 break;
         }
 
@@ -732,6 +740,57 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     }
     #endregion
 
+    #region - Assembly · presets (FR-17 · FR-18) -
+    /// <summary>조립기 · 프리셋 입구를 낼 것인가 — 부품 모델이 있는 서버(7.0+)의 장비 목록에서만. 6.3 에서는 통째로 감춘다.</summary>
+    public bool CanAssemble => _assembly?.IsAvailable == true && Category is not null && DevicePermissionGate.CanEdit();
+
+    /// <summary>고른 장비 하나의 부품 구성을 조립기로 바꿀 수 있는가(저장된 장비 · 미적용 변경 없음).</summary>
+    public bool CanEditComponents => CanAssemble && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    public async Task OpenAssemblyAsync()
+    {
+        if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+        SelectAfterReload(await _assembly!.ComposeAsync(category), "등록했다");
+    }
+
+    public async Task RegisterFromPresetAsync()
+    {
+        if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+        SelectAfterReload(await _assembly!.RegisterFromPresetAsync(category), "프리셋으로 등록했다");
+    }
+
+    public async Task ManagePresetsAsync()
+    {
+        if (_assembly?.IsAvailable != true) return;
+        await _assembly.ManagePresetsAsync(Category ?? DeviceRailCounter.RailOrder[0]);
+    }
+
+    public async Task EditComponentsAsync()
+    {
+        if (!CanEditComponents || Category is not { } category) return;
+        var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
+        if (model is null) return;
+
+        if (await _assembly!.EditDeviceAsync(model, category)) SelectAfterReload(model.Id, "부품 구성을 적용했다");
+    }
+
+    /// <summary>창이 서버에 쓰고 프로바이더를 다시 읽었다 — 이 목록도 다시 읽고 그 장비를 고른다.</summary>
+    private void SelectAfterReload(int? deviceId, string message)
+    {
+        if (deviceId is not { } id || _current is null) return;
+        StatusText = message;
+        _selectAfterReload = id;
+        if (_current.Reload())
+            _pending = new PendingOperation(PendingKind.Reload, 0, 0, new[] { id }, Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
+        else
+            _selectAfterReload = null;
+        RefreshToolbar();
+    }
+    #endregion
+
     #region - Selection narrowing -
     /// <summary>
     /// 화면이 되돌려 놓으려던 행 가운데 일부가 지금 그리드에 없다(검색에 가려졌다). 폼이 안 보이는 행을 쥔 채 남으면
@@ -884,6 +943,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private readonly IDeviceApiService _deviceApiService;
     private readonly ICatalogService _catalogService;
     private readonly DeviceQueryPolicy _queryPolicy;
+    private readonly IAssemblyLauncher? _assembly;
+    private int? _selectAfterReload;
 
     private IDeviceConsoleSource? _current;
     private INotifyCollectionChanged? _rowsChanged;
