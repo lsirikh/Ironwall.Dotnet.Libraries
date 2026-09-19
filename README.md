@@ -582,12 +582,14 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
-**장비 관리 창 v8 축 전환 1차** (device-console-v8 — 브랜치 `v2.10.0` · Phase 1(기반) v2.6 머지 `19c6eaae`, 2026-09-19 · Phase 2(화면) 진행 중 · 실기 미검증)
+**장비 관리 창 v8 축 전환 1차** (device-console-v8 — 브랜치 `v2.10.0` · Phase 1(기반) v2.6 머지 `19c6eaae`, 2026-09-19 · 화면 구현 완료 · 실기(화면) 미검증)
 - GOP API v7.0+ 표현 모델 수용: 판별자 `category_device`(경로가 정본) + 종류축 `type_<category>` 원값 보존(`TypeAxisCode`) + 표현 축 묶음 `IBaseDeviceModel.Axes`(접속·형상/부품·관측·의도 + `meta.view/sections`). 읽기는 DTO 재조립본이 아니라 **수신 원본**에서(`DeviceAxesMapper`)
 - **축 계약 저장은 `PATCH`** — 8.0.1 실측: `PUT` 은 축을 통째 교체해 `connection.type/channel` 과 카메라 `components` 를 무경고로 지운다. 6.3 은 종전 `PUT`(무회귀). `components` 는 `AllowComponentsWrite` 를 켠 호출부만 전송
 - 통문(gate): Api CRUD 3종 · `GateDeviceProvider` · 위치 저장 · 재조회/`SYNC_DEVICE` 판별자 라우팅(병합 키 `(Id, 판별자)`)
 - `ICatalogService`(어휘 카탈로그 `/api/devices/spec` 캐시 — 종류축 콤보의 단일 원천) · 계약 게이트 + "서버 판본 미확정" 배너 · 공용 `DeviceTypeResolver`(Events.Ui·Devices.Ui)
 - 6.3.2 운영 무회귀 스냅샷(`LegacyContractSnapshotTests`) · 쓰기 본문 가드(`DeviceWriteBodyGuardTests`)
+- 화면: 통문 패널(7번째 탭) · 7 패널 "종류" 열 + 카탈로그 필터 콤보(`TypeAxisPanelSupport`) · 상세 9절(`DeviceAxisSectionsViewModel` — 미수신과 빈 값을 구분, 전부 읽기 전용)
+- 이번에 열지 않은 것: 접속 방식·상위 장비·채널 편집, 부품 편집(서버가 `components` 를 통째 교체하므로 조립기 화면의 몫)
 - PRD: `docs/prds/device-console-v8-prd.md` · 실측: `docs/tests/device-console-v8-verification.md`
 
 **PidsGroup 우클릭 — 등록 센서 정보 오버레이 + 그룹 탐지 이력** (pidsgroup-rightclick — 구현 완료 · v2.6 머지 `6624d4d` + 메인솔루션 배선 `d0a19c1`, 2026-08-06 · 런타임 육안 미검증)
