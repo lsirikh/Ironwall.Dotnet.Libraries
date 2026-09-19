@@ -39,6 +39,7 @@ public class ConsoleShell : Control
     private bool _splitPressed;
     private bool _splitDragging;
     private double _widthBeforeDrag;
+    private double _pointerXAtPress;
 
     static ConsoleShell()
     {
@@ -187,19 +188,24 @@ public class ConsoleShell : Control
         _splitPressed = true;
         _splitDragging = false;
         _widthBeforeDrag = DetailWidth;
+        _pointerXAtPress = DragPointer.GetPosition(this).X;
     }
 
     private void OnSplitDelta(object sender, DragDeltaEventArgs e)
     {
         if (!_splitPressed) return;
+
+        // DragDeltaEventArgs.HorizontalChange 는 쓰지 않는다 — 그 값은 '손잡이 기준' 좌표라서, 경계 손잡이처럼 끄는 대로
+        // 같이 움직이는 Thumb 에서는 누적이 아니라 증분이 된다(폭이 되돌아가며 떨린다). 움직이지 않는 셸 기준으로 직접 잰다.
+        var moved = DragPointer.GetPosition(this).X - _pointerXAtPress;
         if (!_splitDragging)
         {
-            if (!DragMath.IsDrag(e.HorizontalChange, 0)) return;        // 데드존 — 그 전에는 클릭(더블클릭 복귀를 살린다)
+            if (!DragMath.IsDrag(moved, 0)) return;        // 데드존 — 그 전에는 클릭(더블클릭 복귀를 살린다)
             _splitDragging = true;
             PreviewKeyDown += OnPreviewKeyDownWhileSplitting;
             if (_splitLabel != null) _splitLabel.Visibility = Visibility.Visible;
         }
-        DetailWidth = ConsoleLayoutMath.DetailWidthAfterSplitterMove(_widthBeforeDrag, e.HorizontalChange);
+        DetailWidth = ConsoleLayoutMath.DetailWidthAfterSplitterMove(_widthBeforeDrag, moved);
         SetValue(SplitLabelTextKey, $"{DetailWidth:0}px");
     }
 

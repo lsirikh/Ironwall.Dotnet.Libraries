@@ -50,8 +50,10 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private DragGhostAdorner? _ghost;
     private AdornerLayer? _lineLayer;
     private InsertionLineAdorner? _line;
-    private IReadOnlyList<FrameworkElement> _zones = Array.Empty<FrameworkElement>();
+    // 끄는 동안 상태를 건드린 드롭존 전부 — 끝날 때 여기 있는 것을 빠짐없이 되돌린다.
+    // 시작할 때 한 번 찍어 둔 목록만 믿으면, 끄는 도중에 나타난 드롭존(스크롤 · 펼침)은 Hover 로 굳거나 영영 '불가'가 된다.
     private readonly Dictionary<FrameworkElement, bool> _zoneAccepts = new();
+    private Point _pressPoint;
     private FrameworkElement? _hoverZone;
     private int _hoverIndex = -1;
     private readonly EdgeAutoScroller _autoScroller = new();
@@ -134,6 +136,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _pressed = true;
         _handle = handle;
         _pressedItem = item;
+        _pressPoint = DragPointer.GetPosition(AssociatedObject);
         e.Handled = true;
     }
 
@@ -144,7 +147,10 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         if (!_dragging)
         {
-            if (!DragMath.IsDrag(e.HorizontalChange, e.VerticalChange)) return;
+            // DragDeltaEventArgs 의 이동량은 '손잡이 기준' 좌표다 — 목록이 굴러 손잡이가 움직이면 누적값이 아니게 된다.
+            // 움직이지 않는 목록 기준으로 직접 잰다.
+            var now = DragPointer.GetPosition(AssociatedObject);
+            if (!DragMath.IsDrag(now.X - _pressPoint.X, now.Y - _pressPoint.Y)) return;
             BeginDrag();
             if (!_dragging) return;
         }
@@ -171,16 +177,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _payload = new DragPayload(AssociatedObject, items, LabelOf(items[0]));
         _dragging = true;
 
-        _zones = DropZone.ZonesUnder(_root);
         _zoneAccepts.Clear();
-        foreach (var zone in _zones)
-        {
-            // 순서 드롭존은 인덱스마다 답이 다를 수 있다 — 여기서는 "어디든 하나"를 묻는다.
-            var probe = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? 0 : -1);
-            var accepts = HandlerFor(zone)?.CanDrop(_payload, probe) == true;
-            _zoneAccepts[zone] = accepts;
-            DropZone.SetState(zone, accepts ? DropZoneState.Available : DropZoneState.Blocked);
-        }
+        foreach (var zone in DropZone.ZonesUnder(_root)) Probe(zone);
 
         _ghostLayer = AdornerLayer.GetAdornerLayer(AssociatedObject);
         if (_ghostLayer != null)
@@ -207,7 +205,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         if (zone != null && DropZone.GetIsReorder(zone) && zone is ItemsControl list)
         {
             (index, lineY) = InsertionAt(list, hit);
-            var ok = index >= 0 && HandlerFor(zone)?.CanDrop(_payload, DropZone.TargetOf(zone, index)) == true;
+            Probe(zone);        // 끄는 도중에 나타난 목록도 상태 장부에 올린다
+            var ok = index >= 0 && SafeCanDrop(zone, DropZone.TargetOf(zone, index));
             if (!ok) { index = -1; lineY = double.NaN; }
             _autoScroller.Track(list);
         }
@@ -216,7 +215,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
             _autoScroller.Stop();
         }
 
-        var accepted = zone != null && (DropZone.GetIsReorder(zone) ? index >= 0 : _zoneAccepts.TryGetValue(zone, out var a) && a);
+        var accepted = zone != null && (DropZone.GetIsReorder(zone) ? index >= 0 : Probe(zone));
         var newHover = accepted ? zone : null;
 
         // 후보가 바뀔 때만 시각을 고친다 — 마우스 이동마다 다시 그리지 않는다(RDP 에서 증폭된다).
@@ -254,8 +253,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _pressedItem = null;
 
         // ② 시각 복원
-        foreach (var z in _zones) DropZone.SetState(z, DropZoneState.None);
-        _zones = Array.Empty<FrameworkElement>();
+        foreach (var z in _zoneAccepts.Keys) DropZone.SetState(z, DropZoneState.None);
         _zoneAccepts.Clear();
         if (_ghost != null) { _ghostLayer?.Remove(_ghost); _ghost = null; }
         _ghostLayer = null;
@@ -281,7 +279,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
         var handler = HandlerFor(zone);
-        if (handler?.CanDrop(payload, target) == true) handler.Drop(payload, target);
+        // 시각 · 구독은 위에서 이미 다 풀었다 — 담당(창)의 Drop 이 던져도 커널 상태는 깨끗하다. 예외는 삼키지 않는다.
+        if (handler != null && SafeCanDrop(handler, payload, target)) handler.Drop(payload, target);
     }
 
     private void OnRootPreviewKeyDown(object sender, KeyEventArgs e)
@@ -328,7 +327,43 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         if (AssociatedObject is Selector selector) selector.SelectedItem = item;
     }
 
+    /// <summary>
+    /// 드롭존의 담당. 드롭존에 <see cref="DropZone.HandlerProperty"/> 가 없으면 <b>끌기 시작한 목록의 담당</b>을 쓴다.
+    /// 한 창에 끌기 출발지가 둘 이상(팔레트 + 보드)이고 담당이 서로 다르면 드롭존마다 담당을 명시해야 한다.
+    /// </summary>
     private IDragDropHandler? HandlerFor(FrameworkElement zone) => DropZone.GetHandler(zone) ?? Handler;
+
+    /// <summary>드롭존을 상태 장부에 올리고(처음이면 판정해서) 받는지 돌려준다.</summary>
+    private bool Probe(FrameworkElement zone)
+    {
+        if (_zoneAccepts.TryGetValue(zone, out var known)) return known;
+
+        // 순서 드롭존은 인덱스마다 답이 다를 수 있다 — 여기서는 "어디든 하나"를 묻는다.
+        var accepts = SafeCanDrop(zone, DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? 0 : -1));
+        _zoneAccepts[zone] = accepts;
+        DropZone.SetState(zone, accepts ? DropZoneState.Available : DropZoneState.Blocked);
+        return accepts;
+    }
+
+    private bool SafeCanDrop(FrameworkElement zone, DropTarget target)
+        => _payload != null && HandlerFor(zone) is { } handler && SafeCanDrop(handler, _payload, target);
+
+    /// <summary>
+    /// 판정은 마우스를 움직일 때마다 불린다 — 창 쪽 구현이 던지면 캡처를 쥔 채 입력 처리 한가운데서 터진다.
+    /// 던진 판정은 "놓을 수 없음"으로 읽고 흔적을 남긴다(판정은 부수효과가 없어야 하므로 잃는 것이 없다).
+    /// </summary>
+    private static bool SafeCanDrop(IDragDropHandler handler, DragPayload payload, DropTarget target)
+    {
+        try
+        {
+            return handler.CanDrop(payload, target);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            Trace.TraceError($"[CaptureDragBehavior] CanDrop threw for zone '{target.ZoneKey}' — treated as not droppable: {ex}");
+            return false;
+        }
+    }
 
     private FrameworkElement? ZoneAt(Point pointInRoot, out DependencyObject? hit)
     {

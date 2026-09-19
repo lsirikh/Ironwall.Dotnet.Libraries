@@ -45,6 +45,9 @@ public sealed class ConsolePrefs
     /// <summary>파일을 읽다 실패했는가(진단용). 실패해도 기본값으로 동작한다.</summary>
     public bool WasCorrupt { get; private set; }
 
+    /// <summary>마지막 저장이 실패했다면 그 사유(진단용). 성공하면 null.</summary>
+    public string? LastSaveError { get; private set; }
+
     public ConsolePrefEntry Get(string consoleKey)
     {
         if (!_entries.TryGetValue(consoleKey, out var entry))
@@ -57,7 +60,8 @@ public sealed class ConsolePrefs
     /// <summary>저장한다. 실패하면 false — 표시 설정 때문에 창이 죽어서는 안 된다.</summary>
     public bool Save()
     {
-        var temp = _path + ".tmp";
+        // 임시 이름은 프로세스마다 다르게 — 앱이 둘 떠 있으면(개발본 + 배포본) 같은 .tmp 를 두고 다툰다.
+        var temp = $"{_path}.{Environment.ProcessId}.tmp";
         try
         {
             var directory = Path.GetDirectoryName(_path);
@@ -65,10 +69,12 @@ public sealed class ConsolePrefs
 
             File.WriteAllText(temp, JsonSerializer.Serialize(_entries, Json));
             File.Move(temp, _path, overwrite: true);          // 같은 볼륨 안의 교체 — 중간 상태가 보이지 않는다
+            LastSaveError = null;
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException or System.Security.SecurityException)
         {
+            LastSaveError = ex.Message;
             try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { /* 임시 파일은 다음 저장이 덮어쓴다 */ }
             return false;
         }
@@ -82,7 +88,7 @@ public sealed class ConsolePrefs
             var loaded = JsonSerializer.Deserialize<Dictionary<string, ConsolePrefEntry>>(File.ReadAllText(_path));
             if (loaded != null) _entries = new Dictionary<string, ConsolePrefEntry>(loaded.Where(p => p.Value != null), StringComparer.Ordinal);
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException or System.Security.SecurityException)
         {
             WasCorrupt = true;
             _entries = new Dictionary<string, ConsolePrefEntry>(StringComparer.Ordinal);

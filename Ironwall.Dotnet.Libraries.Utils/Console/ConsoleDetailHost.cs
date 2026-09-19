@@ -100,6 +100,7 @@ public class ConsoleDetailHost : ContentControl
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        Unhook();
         _footer = GetTemplateChild("PART_Footer") as FrameworkElement;
         Hook("PART_Apply", ApplyClickEvent);
         Hook("PART_Revert", RevertClickEvent);
@@ -122,17 +123,27 @@ public class ConsoleDetailHost : ContentControl
         shift.BeginAnimation(TranslateTransform.XProperty, animation);
     }
 
-    private void Hook(string part, RoutedEvent routed)
+    // 템플릿은 다시 적용될 수 있다(스타일 · 테마 교체). 옛 부품의 구독을 풀지 않고 람다를 또 얹으면 한 번 눌러 N번 울린다.
+    private readonly List<(ButtonBase Button, RoutedEventHandler Handler)> _hooks = new();
+
+    private void Unhook()
     {
-        if (GetTemplateChild(part) is ButtonBase button)
-            button.Click += (_, e) => { e.Handled = true; RaiseEvent(new RoutedEventArgs(routed, this)); };
+        foreach (var (button, handler) in _hooks) button.Click -= handler;
+        _hooks.Clear();
+    }
+
+    private void Hook(string part, RoutedEvent routed)
+        => Hook(part, (_, e) => { e.Handled = true; RaiseEvent(new RoutedEventArgs(routed, this)); });
+
+    private void Hook(string part, RoutedEventHandler handler)
+    {
+        if (GetTemplateChild(part) is not ButtonBase button) return;
+        button.Click += handler;
+        _hooks.Add((button, handler));
     }
 
     private void HookWidth(string part, double width)
-    {
-        if (GetTemplateChild(part) is ButtonBase button)
-            button.Click += (_, e) => { e.Handled = true; SetCurrentValue(DetailWidthProperty, width); };
-    }
+        => Hook(part, (_, e) => { e.Handled = true; SetCurrentValue(DetailWidthProperty, width); });
 
     private static RoutedEvent Ev(string name)
         => EventManager.RegisterRoutedEvent(name, RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(ConsoleDetailHost));

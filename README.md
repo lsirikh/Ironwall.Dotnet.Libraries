@@ -582,6 +582,12 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
+**콘솔 커널 — 전 창 재구성의 공용 토대** (봉투 all-windows-console-redesign N-01 · 브랜치 `v2.11.0` · 2026-09-19 · 기존 창 무변경 · 실제 입력 미검증)
+- 왜: 맵 OverlayWindow 를 뺀 전 창을 와이어프레임 구조(레일 · 목록 · 상세 + 드래그 관리)로 다시 짠다. 그 틀과 드래그 규약을 창마다 복사하지 않도록 먼저 공용 자산으로 세웠다
+- 틀: `Ironwall.Dotnet.Libraries.Utils.Consoles` — `ConsoleShell`(슬롯 Rail · Toolbar · List · StatusBar · Detail) · `ConsoleRail` · `ConsoleToolbar` · `ConsoleDetailHost` · `ConsoleSection` · `ConsoleField` · `NotReceivedBox` · `ConsoleColumns` · `ConsolePrefs` · `ConsoleLayoutMath`. 기본 템플릿은 `Utils/Themes/Generic.xaml`, 목록 스타일은 Theme 의 `Styles.Console.xaml`(`Console.DataGrid`)
+- 드래그: `Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag` — 목록에 `CaptureDragBehavior`, 행 안에 `DragHandle`, 놓을 곳에 `DropZone.Key`(+ `DropZoneChrome`), 순서 목록에는 `DropZone.IsReorder` + `ReorderKeyboardBehavior`. 판정 · 처리는 창이 `IDragDropHandler` 로. 호출 1회면 즉시, N회로 번지면 `DraftTrayViewModel` 에 쌓았다가 [적용]. **`KeyboardFallback` 이 비면 디버그 빌드에서 예외** — 드래그 전용 UI 는 만들지 않는다
+- 써 보기: `tools/console-gallery` 에서 `dotnet run`(가짜 데이터 · 서버 호출 0). `--snapshot <폴더>` 를 주면 입력 없이 상태별 PNG 와 드래그 재현 로그를 뜬다
+
 **장비 관리 창 v8 축 전환 1차** (device-console-v8 — 브랜치 `v2.10.0` · Phase 1(기반) v2.6 머지 `19c6eaae`, 2026-09-19 · 화면 구현 완료 · 실기(화면) 미검증)
 - GOP API v7.0+ 표현 모델 수용: 판별자 `category_device`(경로가 정본) + 종류축 `type_<category>` 원값 보존(`TypeAxisCode`) + 표현 축 묶음 `IBaseDeviceModel.Axes`(접속·형상/부품·관측·의도 + `meta.view/sections`). 읽기는 DTO 재조립본이 아니라 **수신 원본**에서(`DeviceAxesMapper`)
 - **축 계약 저장은 `PATCH`** — 8.0.1 실측: `PUT` 은 축을 통째 교체해 `connection.type/channel` 과 카메라 `components` 를 무경고로 지운다. 6.3 은 종전 `PUT`(무회귀). `components` 는 `AllowComponentsWrite` 를 켠 호출부만 전송

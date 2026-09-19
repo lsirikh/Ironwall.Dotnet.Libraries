@@ -120,5 +120,20 @@ public sealed class ConsoleDetailPresenter : PropertyChangedBase
         RaiseAll();
     }
 
+    /// <summary>
+    /// 창을 닫을 때 부른다. 콘솔 뷰모델은 싱글턴이라 다음에 열 때 옛 선택 · 미적용 변경이 남아 있으면 안 된다.
+    /// </summary>
+    public void Reset()
+    {
+        _selectedCount = 0;
+        _singleTitle = string.Empty;
+        _singleNumber = string.Empty;
+        _isCreating = false;
+        _lastMessage = null;
+        _isBlockedNoticeShown = false;
+        Tracker.Clear();
+        RaiseAll();
+    }
+
     private void RaiseAll() => Refresh();
 }

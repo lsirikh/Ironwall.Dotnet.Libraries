@@ -112,10 +112,21 @@
 								<ColumnDefinition Width="Auto" />
 								<ColumnDefinition Width="*" />
 							</SelectiveScrollingGrid.ColumnDefinitions>
+							<SelectiveScrollingGrid.RowDefinitions>
+								<RowDefinition Height="*" />
+								<RowDefinition Height="Auto" />
+							</SelectiveScrollingGrid.RowDefinitions>
 							<DataGridCellsPresenter Grid.Column="1" ItemsPanel="{TemplateBinding ItemsPanel}" />
+							<!--  RowDetailsTemplate 을 쓰는 창을 위해 — 없으면 상세가 조용히 안 뜬다  -->
+							<DataGridDetailsPresenter
+								Grid.Row="1"
+								Grid.Column="1"
+								SelectiveScrollingGrid.SelectiveScrollingOrientation="{Binding AreRowDetailsFrozen, ConverterParameter={x:Static SelectiveScrollingOrientation.Vertical}, Converter={x:Static DataGrid.RowDetailsScrollingConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+								Visibility="{TemplateBinding DetailsVisibility}" />
 							<!--  선택 = 좌측 3px 바. 가로로 굴려도 제자리에 남는다.  -->
 							<Rectangle
 								x:Name="Bar"
+								Grid.RowSpan="2"
 								Grid.ColumnSpan="2"
 								Width="3"
 								HorizontalAlignment="Left"

@@ -29,6 +29,14 @@
 ## [Unreleased]
 
 ### Added
+- **콘솔 커널 — 전 창 재구성의 공용 토대 (T1 틀 + 드래그 커널)** (봉투 [all-windows-console-redesign](docs/charters/all-windows-console-redesign-charter.md) N-01 · 브랜치 `v2.11.0` · [PRD](docs/prds/console-kernel-prd.md) · [Plan](docs/plans/console-kernel-prd-plan.md) · [분석](docs/analyses/all-windows-console-redesign-analysis.md) · [테스트](docs/tests/console-kernel-test-result.md) · 사용자 "봉투 승인" 2026-09-19 · 롤백 `before-console-kernel`) — **기존 창은 하나도 옮기지 않았다**(공용 자산만)
+  - 배경: 직전 사이클(device-console-v8)이 와이어프레임의 3단 구조 · 상세 여섯 상태 · 드래그를 빠뜨렸다는 사용자 평가. 목록 드래그 · 삽입선 · 드롭존 자산이 레포에 0건이라 창마다 만들면 툴바 복사 결함을 13번 되풀이한다 → 먼저 한 번만 세운다.
+  - 콘솔 틀(`Utils/Console` + `Themes/Generic.xaml`): `ConsoleShell`(레일 184/56 · 목록 · 상세 340, 300~480 · 폭별 도킹/서랍/접힘 · 경계 끌기) · `ConsoleRail`(개수/장애 배지 · 3px 선택 바) · `ConsoleToolbar`(꺼진 버튼은 늘 사유) · `ConsoleDetailHost`(여섯 상태 겉모습 + 고정 적용 막대) · `ConsoleSection`/`ConsoleField`/`NotReceivedBox` · `ConsoleColumns`("열" 메뉴 — 기본 6열 · 전체 열 · 계약 미지원 열 감춤) · `ConsolePrefs`(`appsettings.json` 밖 · 임시 파일에 쓰고 교체).
+  - 드래그 커널(`Utils/Behaviors/Drag`, OLE 미사용): `DragHandle`(Thumb) · `CaptureDragBehavior`(데드존 8 · 다중 선택 · 단일 종료 경로 · 끄는 도중 나타난 드롭존도 판정) · `DropZone`/`DropZoneChrome`(가능 = 파선 / 불가 = 사선 해치 / 호버 = 굵은 윤곽) · 고스트 · 가로 삽입선 · `ReorderKeyboardBehavior`(Alt+↑↓) · `DragMath`(순수 함수).
+  - 뷰모델(`ViewModel/ViewModels/Consoles`): 상세 상태기계 · `DirtyFieldTracker`(손댄 칸만) · `NavigationGuard`(미적용 이동 차단) · `DraftTrayViewModel`(N회 호출은 쌓았다가 [적용], 4분류 요약) · `ConsoleDetailPresenter`.
+  - 테마: `Styles.Console.xaml`(`Console.DataGrid` 등 — 전부 키 있는 스타일, 암시적 0). 갤러리 `tools/console-gallery`(가짜 데이터 · `--snapshot` 으로 입력 없이 PNG 20장 + 드래그 재현 로그).
+  - 적대 검토로 잡은 것: **`Thumb` 의 이동량은 손잡이 기준 좌표**라 경계 손잡이처럼 같이 움직이면 증분이 된다(폭이 되돌아가며 떨림) → 움직이지 않는 기준으로 직접 잰다 · 끌기 시작 때 찍은 드롭존 목록만 믿어 도중에 나타난 드롭존이 Hover 로 굳던 것 · 템플릿 재적용 때 클릭 구독이 쌓이던 것 · Alt+↓ 를 행 안 콤보에서 빼앗던 것.
+  - 검증: `Utils.Tests`(신설) 100/100 · `ViewModel.Tests` 52/52 · `Theme.Tests` 18/18 · 프로젝트별 14/14 빌드 · 호스트 빌드 오류 0 · 재현 16행 기대값 일치. **실제 마우스 입력 · 호스트 앱 안 동작 · RDP 는 미검증.**
 - **장비 관리 창 v8 축 전환 1차 — 판별자 7탭 · 종류축 카탈로그 콤보 · 상세 9절 · 통문 패널** (Track C · 브랜치 `v2.10.0` · [PRD](docs/prds/device-console-v8-prd.md) v1.2 Approved · [Plan](docs/plans/device-console-v8-prd-plan.md) · [시나리오 분석](docs/analyses/device-console-v8-scenario-analysis.md) v1.3 · [실측](docs/tests/device-console-v8-verification.md) · [Phase 1 게이트](docs/tests/device-console-v8-phase1-gate.md) · 사용자 승인 2026-09-19 · 롤백 `before-device-console-v8`) — **Phase 1(기반) 머지 `19c6eaae` · 화면 구현 완료 · 실기(화면) 미검증**
   - 기반(화면 무변경): 통문 Api CRUD 3종·`GateDeviceProvider`·삭제 메시지·위치 저장 · 판별자 해석기 공용화(`Messages/Helpers/DeviceTypeResolver`) · 축 묶음 모델(`IBaseDeviceModel.Axes` + `CategoryDevice`·`TypeAxisCode`·`UnitId`) + 수신 원본 읽기 매핑(`DeviceAxesMapper`) · 재조회 병합 키 `(Id, 판별자)` + 통문 분기 + 축 복사 · 카탈로그 캐시(`ICatalogService`) · 계약 게이트 + "판본 미확정" 배너 · DB `Enum.Parse`→비예외 헬퍼.
   - 화면 ① 통문 패널: 대시보드 7번째 탭·타일(`BoomGate`) + 목록/상세/추가 · Temp-state CRUD 정본 그대로.

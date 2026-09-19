@@ -14,6 +14,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 /// <remarks>
 /// WPF 에서 Alt+방향키는 <see cref="Key.System"/> 으로 도착하고 실제 키는 <see cref="KeyEventArgs.SystemKey"/> 에 있다.
 /// 게다가 DataGrid 가 버블 <c>KeyDown</c> 을 소비한다 — 그래서 <b>터널(<c>PreviewKeyDown</c>)</b> 에서 잡는다.
+/// <para>떨어진 행을 여럿 골랐으면(1번 · 3번) 옮긴 뒤에는 한 덩어리로 붙는다 — 마우스로 끌었을 때와 같은 결과다.</para>
 /// </remarks>
 public class ReorderKeyboardBehavior : Behavior<ItemsControl>
 {
@@ -44,6 +45,9 @@ public class ReorderKeyboardBehavior : Behavior<ItemsControl>
         if (e.Key != Key.System || (Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
         var direction = e.SystemKey switch { Key.Up => -1, Key.Down => 1, _ => 0 };
         if (direction == 0) return;
+
+        // 행 안의 편집기가 포커스를 쥐고 있으면 양보한다 — Alt+↓ 는 콤보를 여는 표준 키다.
+        if (Keyboard.FocusedElement is TextBoxBase or ComboBox or ComboBoxItem) return;
 
         e.Handled = true;       // Alt 메뉴 활성화로 새지 않게
         MoveSelection(direction);

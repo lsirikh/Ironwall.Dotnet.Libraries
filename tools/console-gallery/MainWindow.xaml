@@ -171,10 +171,12 @@
 						BorderThickness="0,1,0,0">
 						<StackPanel>
 							<!--  놓을 곳 — 끄는 동안 형태로 가능 · 불가를 보인다  -->
-							<StackPanel Orientation="Horizontal">
+							<DockPanel LastChildFill="True">
 								<TextBlock
 									Width="44"
-									VerticalAlignment="Center"
+									Margin="0,5,0,0"
+									VerticalAlignment="Top"
+									DockPanel.Dock="Left"
 									FontSize="12"
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="놓을 곳" />
@@ -187,7 +189,7 @@
 									<ItemsControl.ItemTemplate>
 										<DataTemplate>
 											<d:DropZoneChrome
-												Margin="0,0,6,0"
+												Margin="0,2,6,2"
 												d:DropZone.Key="{Binding ZoneKey}"
 												CornerRadius="12">
 												<Border Margin="0" Style="{StaticResource Chip}">
@@ -197,7 +199,7 @@
 										</DataTemplate>
 									</ItemsControl.ItemTemplate>
 								</ItemsControl>
-							</StackPanel>
+							</DockPanel>
 							<!--  Draft 트레이 — N회 호출은 쌓았다가 [적용]  -->
 							<DockPanel Margin="0,6,0,0" LastChildFill="True">
 								<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
