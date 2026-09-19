@@ -157,6 +157,9 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     public int SensorCount => _board.Rows.Count;
     public int UnplacedCount => _board.Unplaced.Count;
     public bool IsPaletteEmpty => Palette.Count == 0;
+
+    /// <summary>표가 비었는가 — 팔레트가 빈 것("전부 붙였다")과 뜻이 다르다.</summary>
+    public bool IsNoSensors => _board.Rows.Count == 0;
     public string PaletteEmptyText => _board.Rows.Count == 0 ? "센서가 없습니다 — [센서 여러 개 만들기] 로 먼저 만드세요." : "전부 선에 붙였습니다 ✓";
     public string ListStatusText => $"센서 {SensorCount} · 선택 {_selectedRows.Count} · 미배치 {UnplacedCount}";
     #endregion
@@ -215,6 +218,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
         foreach (var item in Rows) item.Refresh();
         NotifyOfPropertyChange(nameof(SensorCount));
+        NotifyOfPropertyChange(nameof(IsNoSensors));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
 
@@ -348,6 +352,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         _selectedRows = rows?.Where(r => r is not null).ToList() ?? (IReadOnlyList<SensorRowViewModel>)Array.Empty<SensorRowViewModel>();
         ResetEdit();
         NotifyOfPropertyChange(nameof(HasSelection));
+        NotifyOfPropertyChange(nameof(HasNoSelection));
         NotifyOfPropertyChange(nameof(SelectionCount));
         NotifyOfPropertyChange(nameof(IsMultiSelect));
         NotifyOfPropertyChange(nameof(SelectionTitle));
@@ -357,6 +362,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     }
 
     public bool HasSelection => _selectedRows.Count > 0;
+    public bool HasNoSelection => _selectedRows.Count == 0;
     public int SelectionCount => _selectedRows.Count;
     public bool IsMultiSelect => _selectedRows.Count > 1;
     public string SelectionKind => _selectedRows.Count > 1 ? $"센서 {_selectedRows.Count}줄" : "센서";

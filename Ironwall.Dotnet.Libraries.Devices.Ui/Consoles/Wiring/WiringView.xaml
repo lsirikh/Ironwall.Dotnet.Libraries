@@ -414,12 +414,12 @@
 
 					<Grid>
 						<TextBlock
-							Margin="16"
+							Margin="16,58,16,16"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Top"
 							Style="{StaticResource W.Hint}"
 							Text="이 제어기에 센서가 없습니다 — [＋ 센서 여러 개 만들기] 로 시작하세요."
-							Visibility="{Binding IsPaletteEmpty, Converter={StaticResource BoolToVisibility}}" />
+							Visibility="{Binding IsNoSensors, Converter={StaticResource BoolToVisibility}}" />
 						<DataGrid
 							AutomationProperties.AutomationId="Devices.Wiring.Grid"
 							ItemsSource="{Binding Rows}"
@@ -566,7 +566,15 @@
 						</Border>
 
 						<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-							<StackPanel Margin="13,0,13,12" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+							<Grid Margin="13,0,13,12">
+							<TextBlock
+								Margin="0,12,0,0"
+								VerticalAlignment="Top"
+								AutomationProperties.AutomationId="Devices.Wiring.NoSelectionHint"
+								Style="{StaticResource W.Hint}"
+								Text="한 줄을 고르면 그 줄을 고칩니다. Ctrl 로 여러 줄을 고르면 [한꺼번에 채우기] 가 됩니다 — 그때 값이 줄마다 다른 칸은 &quot;— 여러 값 —&quot; 으로 보이고, 건드리지 않은 칸은 줄마다 원래 값을 그대로 둡니다."
+								Visibility="{Binding HasNoSelection, Converter={StaticResource BoolToVisibility}}" />
+							<StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
 								<TextBlock Style="{StaticResource W.SectionHead}" Text="값" />
 								<Grid Margin="0,0,0,4">
 									<Grid.ColumnDefinitions>
@@ -731,6 +739,7 @@
 									Style="{StaticResource W.Hint}"
 									Text="값이 줄마다 다른 칸은 &quot;— 여러 값 —&quot; 으로 보입니다. 그 칸을 건드리지 않으면 줄마다 원래 값을 그대로 둡니다." />
 							</StackPanel>
+							</Grid>
 						</ScrollViewer>
 					</DockPanel>
 				</Border>
