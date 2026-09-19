@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Groups;
@@ -65,6 +66,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                                 , ICatalogService catalogService
                                 , DeviceQueryPolicy? queryPolicy = null
                                 , Lazy<IAssemblyLauncher>? assemblyLauncher = null
+                                , Lazy<IWiringLauncher>? wiringLauncher = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -111,6 +113,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _deviceApiService = deviceApiService;
         _catalogService = catalogService;
         _assemblyFactory = assemblyLauncher;
+        _wiringFactory = wiringLauncher;
 
         // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
         // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
@@ -440,6 +443,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CanReload));
         NotifyOfPropertyChange(nameof(CanAssemble));
         NotifyOfPropertyChange(nameof(CanEditComponents));
+        NotifyOfPropertyChange(nameof(CanOpenWiring));
+        NotifyOfPropertyChange(nameof(WiringBlockedReason));
     }
     #endregion
 
@@ -737,6 +742,52 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         ListStatusText = IsByComponent ? string.Empty
             : shown == total ? $"목록 {total}건 · 선택 {Form.Rows.Count}"
             : $"목록 {shown}건(전체 {total}) · 선택 {Form.Rows.Count}";
+    }
+    #endregion
+
+    #region - Wiring setup (device-wiring-setup N-04 FR-03 · FR-04) -
+    /// <summary>
+    /// 셋업 · 결선 입구를 낼 것인가 — 결선을 담을 자리가 있는 서버(7.0+)에서 <b>제어기 한 대</b>를 골랐을 때만.
+    /// </summary>
+    public bool CanOpenWiring => _wiring?.IsAvailable == true
+        && Category == EnumDeviceCategory.Controller
+        && DevicePermissionGate.CanEdit()
+        && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    public string? WiringBlockedReason => _wiring?.IsAvailable != true ? "이 서버 판본에는 결선을 담을 자리가 없습니다."
+        : Category != EnumDeviceCategory.Controller ? "제어기 목록에서 제어기 한 대를 고르세요."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : Form.Rows.Count == 1 ? null
+        : "제어기 한 대를 고르세요.";
+
+    /// <summary>고른 제어기의 센서 표 · 결선맵을 연다.</summary>
+    public async Task OpenWiringAsync()
+    {
+        if (!CanOpenWiring) return;
+        var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
+        if (model is null) return;
+
+        if (await _wiring!.OpenAsync(model)) SelectAfterReload(model.Id, "센서 · 결선을 저장했다");
+    }
+
+    private readonly Lazy<IWiringLauncher>? _wiringFactory;
+    private bool _wiringFailed;
+
+    /// <summary>조립기 입구와 같은 관용구 — 늦게 풀고, 못 만들면 그 입구만 감춘다(장비 창 전체가 안 열리는 일을 막는다).</summary>
+    private IWiringLauncher? _wiring
+    {
+        get
+        {
+            if (_wiringFactory is null || _wiringFailed) return null;
+            try { return _wiringFactory.Value; }
+            catch (Exception ex)
+            {
+                _wiringFailed = true;
+                _log?.Error($"[DeviceConsole] 셋업 · 결선 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
     }
     #endregion
 
