@@ -43,6 +43,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.W
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.SystemResources", "Ironwall.Dotnet.Libraries.SystemResources\Ironwall.Dotnet.Libraries.SystemResources.csproj", "{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.Utils.Tests", "Ironwall.Dotnet.Libraries.Utils.Tests\Ironwall.Dotnet.Libraries.Utils.Tests.csproj", "{619B5E46-0ACA-4F7C-87F6-47328F309D52}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -293,6 +295,18 @@ Global
 		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x64.Build.0 = Release|x64
 		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x86.ActiveCfg = Release|x86
 		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x86.Build.0 = Release|x86
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|x64.Build.0 = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Debug|x86.Build.0 = Debug|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|x64.ActiveCfg = Release|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|x64.Build.0 = Release|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|x86.ActiveCfg = Release|Any CPU
+		{619B5E46-0ACA-4F7C-87F6-47328F309D52}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
