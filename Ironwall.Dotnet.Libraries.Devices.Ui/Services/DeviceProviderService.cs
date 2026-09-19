@@ -1001,12 +1001,15 @@ public class DeviceProviderService : IDeviceProviderService
     private void UpdateOrAddDevices<T>(DeviceProvider provider, List<T> newDevices) where T : IBaseDeviceModel
     {
         var existingDevices = provider.OfType<T>().ToList();
-        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, d.DeviceType), d => d);
+        // 키는 (Id, 판별자) 다 — 종전 (Id, DeviceType) 은 다른 클라가 종류축만 바꿔도(Controller→IoController)
+        // 같은 장비를 "삭제 + 신규"로 봐 인스턴스를 갈아 끼웠고, 그 참조를 쥔 심볼·카드가 stale 해졌다.
+        // 판별자는 경로가 정하고 바뀌지 않는다(device-console-v8 FR-04).
+        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, CategoryKeyOf(d)), d => d);
 
         // 1. 기존 객체 업데이트 또는 삭제
         foreach (var existing in existingDevices)
         {
-            var key = (existing.Id, existing.DeviceType);
+            var key = (existing.Id, CategoryKeyOf(existing));
             if (newDeviceDict.TryGetValue(key, out var newDevice))
             {
                 UpdateDeviceProperties(existing, newDevice);  // 속성만 업데이트
@@ -1023,6 +1026,28 @@ public class DeviceProviderService : IDeviceProviderService
         {
             provider.Add(newDevice);
         }
+    }
+
+    /// <summary>
+    /// 캐시 병합 키의 판별자 성분. 모델에 판별자가 실려 있으면 그것, 없으면(이 변경 이전에 만들어진 캐시 항목 ·
+    /// Draft 등 매핑을 거치지 않은 객체) <b>모델의 CLR 형</b>으로 정한다 — 형은 경로(카테고리)와 1:1 이다.
+    /// </summary>
+    private static EnumDeviceCategory CategoryKeyOf(IBaseDeviceModel device)
+    {
+        if (device.CategoryDevice != EnumDeviceCategory.None)
+            return device.CategoryDevice;
+
+        return device switch
+        {
+            GateDeviceModel => EnumDeviceCategory.Gate,
+            ControllerDeviceModel => EnumDeviceCategory.Controller,
+            SensorDeviceModel => EnumDeviceCategory.Sensor,
+            CameraDeviceModel => EnumDeviceCategory.Camera,
+            SpeakerDeviceModel => EnumDeviceCategory.Speaker,
+            EnclosureDeviceModel => EnumDeviceCategory.Enclosure,
+            LampDeviceModel => EnumDeviceCategory.Lamp,
+            _ => EnumDeviceCategory.None,
+        };
     }
 
     /// <summary>
@@ -1052,8 +1077,26 @@ public class DeviceProviderService : IDeviceProviderService
         existing.Heading = newDevice.Heading;     // v4.4: 설치 방위각 — FetchAll 후 심볼 BaseBearing 갱신 반영(누락 버그)
         existing.Altitude = newDevice.Altitude;   // v4.4: 설치 고도
 
+        // v7.0+ 표현 모델 — 축은 한 묶음(Axes)이라 참조 하나로 통째 갈린다(낱개로 두면 새 축마다 한 줄씩 빠뜨린다).
+        //   새 응답이 축 없이 왔으면(판본 전환·프로필 축소) 옛 축도 버린다 — null 도 그대로 덮는다.
+        existing.CategoryDevice = newDevice.CategoryDevice;
+        existing.TypeAxisCode = newDevice.TypeAxisCode;
+        existing.UnitId = newDevice.UnitId;
+        existing.Axes = newDevice.Axes;
+
         // Type-Specific 속성 업데이트
-        if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
+        if (existing is GateDeviceModel existingGate && newDevice is GateDeviceModel newGate)
+        {
+            // 종전엔 이 분기가 없었다 — 통문의 문 상태·활성·위치가 첫 로드 값으로 굳었다(device-console-v8 ISSUE-17).
+            existingGate.GateStatus = newGate.GateStatus;
+            existingGate.UrlsJson = newGate.UrlsJson;
+            existingGate.LinkInfoJson = newGate.LinkInfoJson;
+            existingGate.IsEnable = newGate.IsEnable;
+            existingGate.Location = newGate.Location;
+            existingGate.Latitude = newGate.Latitude;
+            existingGate.Longitude = newGate.Longitude;
+        }
+        else if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
         {
             existingController.IpAddress = newController.IpAddress;
             existingController.Port = newController.Port;

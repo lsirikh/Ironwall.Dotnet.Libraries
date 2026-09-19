@@ -1051,6 +1051,8 @@ public class MockDeviceApiService : IDeviceApiService
     public List<ApiListResponse<ControllerDeviceDto>> ControllerResponses { get; } = new();
     public List<ApiListResponse<SensorDeviceDto>> SensorResponses { get; } = new();
     public List<ApiListResponse<CameraDeviceDto>> CameraResponses { get; } = new();
+    public List<ApiListResponse<GateDeviceDto>> GateResponses { get; } = new();
+    private int _gatePageIndex = 0;
 
     private int _controllerPageIndex = 0;
     private int _sensorPageIndex = 0;
@@ -1213,7 +1215,9 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ── Gate(통문, 서버 v6.3) — symbol-detail-and-door-control FR-09/10 ──
     public Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(string? gateStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeGate = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
-        => Task.FromResult(ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>()));
+        => Task.FromResult(_gatePageIndex < GateResponses.Count
+            ? GateResponses[_gatePageIndex++]
+            : ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>()));
     public Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
