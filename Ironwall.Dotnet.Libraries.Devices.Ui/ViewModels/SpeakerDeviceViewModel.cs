@@ -42,7 +42,11 @@ public class SpeakerDeviceViewModel : DeviceViewModel, ISpeakerDeviceViewModel
         {
             (_model as ISpeakerDeviceModel)!.Server = value;
             NotifyOfPropertyChange(() => Server);
+            NotifyOfPropertyChange(() => ServerDisplay);
         }
     }
+
+    /// <summary>콘솔 목록 "방송서버" 한 칸(device-console-v8 N02-B) — 소속 서버가 없으면 "—".</summary>
+    public string ServerDisplay => Server?.Name ?? "—";
     #endregion
 }

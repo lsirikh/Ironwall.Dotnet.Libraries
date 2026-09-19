@@ -174,8 +174,35 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.Status = value;
             NotifyOfPropertyChange(() => Status);
+            NotifyOfPropertyChange(() => StatusDisplay);
+            NotifyOfPropertyChange(() => IsFault);
         }
     }
+
+    /// <summary>
+    /// 콘솔 목록 상태 배지 문구 — <see cref="EnumDeviceStatus"/> 3값을 한글로 옮긴다(device-console-v8 N02-B).
+    /// </summary>
+    /// <remarks>
+    /// 라벨은 목업(<c>docs/design/window-layout-system-storyboard.html</c> <c>DEV_ST</c> 표)을 그대로
+    /// 따른다 — 화면마다 다른 말을 새로 짓지 않는다: <c>ACTIVATED</c>="운영", <c>ERROR</c>="오류",
+    /// <c>DEACTIVATED</c>="중지". enum 이 나중에 늘어나도 하네스가 조용히 빈칸을 내지 않도록,
+    /// 못 알아보는 값은 원문 이름을 그대로 보인다.
+    /// </remarks>
+    public string StatusDisplay => Status switch
+    {
+        EnumDeviceStatus.ACTIVATED => "운영",
+        EnumDeviceStatus.ERROR => "오류",
+        EnumDeviceStatus.DEACTIVATED => "중지",
+        _ => Status.ToString(),
+    };
+
+    /// <summary>
+    /// 장애 배지 판정 — <see cref="EnumDeviceStatus.ERROR"/> 하나만 장애다. 레일 카운터
+    /// (<see cref="Consoles.Lists.DeviceRailCounter.IsFault"/>)와 같은 규칙을 각자 독립적으로 계산한다 —
+    /// 행 하나의 판정과 레일 집계는 호출 경로가 달라(행은 바인딩, 레일은 목록 스냅샷) 억지로 한 호출로
+    /// 묶으면 결합만 늘고 얻는 것이 없다.
+    /// </summary>
+    public bool IsFault => Status == EnumDeviceStatus.ERROR;
 
     public string? Location
     {
@@ -214,8 +241,12 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.IsEnable = value;
             NotifyOfPropertyChange(() => IsEnable);
+            NotifyOfPropertyChange(() => IsEnableDisplay);
         }
     }
+
+    /// <summary>콘솔 목록 "활성화" 칸의 텍스트 폴백 — 체크 렌더가 아닌 곳(툴팁 등)에서 쓴다.</summary>
+    public string IsEnableDisplay => IsEnable ? "사용" : "사용 안 함";
 
     /// <summary>설치 방위각 0~360° (model.Heading, v4.4). 미설정 시 null. set 시 mod360 정규화(서버 0~360 검증 대응).</summary>
     public double? Bearing

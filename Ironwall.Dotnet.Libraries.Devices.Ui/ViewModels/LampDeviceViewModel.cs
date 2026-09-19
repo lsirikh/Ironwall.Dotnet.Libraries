@@ -21,6 +21,7 @@ public class LampDeviceViewModel : DeviceViewModel, ILampDeviceViewModel
         {
             (_model as ILampDeviceModel)!.IpAddress = value;
             NotifyOfPropertyChange(() => IpAddress);
+            NotifyOfPropertyChange(() => AddressDisplay);
         }
     }
 
@@ -31,6 +32,19 @@ public class LampDeviceViewModel : DeviceViewModel, ILampDeviceViewModel
         {
             (_model as ILampDeviceModel)!.IpPort = value;
             NotifyOfPropertyChange(() => IpPort);
+            NotifyOfPropertyChange(() => AddressDisplay);
+        }
+    }
+
+    /// <summary>
+    /// 콘솔 목록 "IP:포트" 한 칸(device-console-v8 N02-B) — IP 가 비면 "—", 포트가 0(미설정)이면 IP만 보인다.
+    /// </summary>
+    public string AddressDisplay
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(IpAddress)) return "—";
+            return IpPort == 0 ? IpAddress : $"{IpAddress}:{IpPort}";
         }
     }
 

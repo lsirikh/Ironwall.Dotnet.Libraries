@@ -36,6 +36,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             {
                 (_model as ICameraDeviceModel)!.IpAddress = value;
                 NotifyOfPropertyChange(() => IpAddress);
+                NotifyOfPropertyChange(() => AddressDisplay);
             }
         }
 
@@ -46,6 +47,20 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             {
                 (_model as ICameraDeviceModel)!.IpPort = value;
                 NotifyOfPropertyChange(() => IpPort);
+                NotifyOfPropertyChange(() => AddressDisplay);
+            }
+        }
+
+        /// <summary>
+        /// 콘솔 목록 "IP:포트" 한 칸(device-console-v8 N02-B) — IP 가 비면 "—", 포트가 0(미설정)이면
+        /// IP만 보인다. 제어기·경광등의 같은 이름 속성과 계약이 같다(<see cref="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists.DeviceColumnCatalog"/> 공용 바인딩 경로).
+        /// </summary>
+        public string AddressDisplay
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(IpAddress)) return "—";
+                return IpPort == 0 ? IpAddress : $"{IpAddress}:{IpPort}";
             }
         }
 
