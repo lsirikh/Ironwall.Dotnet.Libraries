@@ -1,0 +1,69 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.DeviceAxisTailView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	AutomationProperties.AutomationId="Devices.Detail.AxisTail"
+	Visibility="{Binding IsSingle, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"
+	mc:Ignorable="d">
+	<!--
+		상세 폼의 v7.0+ 축 절 (뒷부분): ⑧ 설정(device_config) · ⑨ 응답 프로필(meta.view / meta.sections) — device-console-v8 FR-11 · FR-13.
+		타입 특화 설정은 폼의 맨 뒤에 둔다. 읽기 전용. DataContext = DeviceAxisSectionsViewModel.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Devices.Ui;component/Views/DeviceAxisResources.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</UserControl.Resources>
+
+	<StackPanel>
+		<!--  ⑧ 설정 축  -->
+		<StackPanel Orientation="Horizontal">
+			<TextBlock Style="{StaticResource AxisTitle}" Text="설정 (device_config)" />
+			<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
+		</StackPanel>
+		<ContentControl
+			AutomationProperties.AutomationId="Devices.Detail.Section.DeviceConfig"
+			DataContext="{Binding DeviceConfig}"
+			Focusable="False"
+			Template="{StaticResource AxisSectionBody}" />
+
+		<!--  ⑨ 이 응답이 무엇을 실었는가 — 위 절들의 "미수신" 판정 근거  -->
+		<TextBlock Style="{StaticResource AxisTitle}" Text="응답 프로필 (meta)" />
+		<StackPanel Orientation="Horizontal">
+			<TextBlock Style="{StaticResource AxisCellMuted}" Text="view" />
+			<TextBlock
+				AutomationProperties.AutomationId="Devices.Detail.Meta.View"
+				FontFamily="Consolas"
+				Style="{StaticResource AxisCell}"
+				Text="{Binding MetaView}" />
+		</StackPanel>
+		<ItemsControl AutomationProperties.AutomationId="Devices.Detail.Meta.Sections" ItemsSource="{Binding MetaSections}">
+			<ItemsControl.ItemsPanel>
+				<ItemsPanelTemplate>
+					<WrapPanel />
+				</ItemsPanelTemplate>
+			</ItemsControl.ItemsPanel>
+			<ItemsControl.ItemTemplate>
+				<DataTemplate>
+					<Border
+						Margin="0,2,6,2"
+						Padding="8,1"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="1"
+						CornerRadius="9">
+						<TextBlock
+							FontFamily="Consolas"
+							FontSize="11"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding}" />
+					</Border>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+	</StackPanel>
+</UserControl>

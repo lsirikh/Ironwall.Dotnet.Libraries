@@ -213,6 +213,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         public SensorDevicePanelViewModel DevicePanelViewModel { get; }
         public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider.Where(c => c.Id > 0);   // (G6) Temp(미저장) 제어기는 센서 FK 후보 제외
         #endregion
+        /// <summary>v7.0+ 표현 축 절(접속·형상·부품·상태·설정·응답 프로필) — 읽기 전용. 6.3 계약이면 보이지 않는다(device-console-v8 FR-11).</summary>
+        public DeviceAxisSectionsViewModel AxisSections => _axisSections ??= DeviceAxisSectionsViewModel.From(_selection.Select(vm => vm.Model).ToList());
+        private DeviceAxisSectionsViewModel? _axisSections;
         #region - Attributes -
         private readonly ControllerDeviceProvider _controllerProvider;
         private readonly IList<SensorDeviceViewModel> _selection;

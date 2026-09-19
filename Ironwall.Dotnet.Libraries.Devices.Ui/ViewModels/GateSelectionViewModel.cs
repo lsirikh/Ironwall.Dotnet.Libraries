@@ -150,6 +150,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
         public GateDevicePanelViewModel DevicePanelViewModel { get; }
         #endregion
+        /// <summary>v7.0+ 표현 축 절(접속·형상·부품·상태·설정·응답 프로필) — 읽기 전용. 6.3 계약이면 보이지 않는다(device-console-v8 FR-11).</summary>
+        public DeviceAxisSectionsViewModel AxisSections => _axisSections ??= DeviceAxisSectionsViewModel.From(_selection.Select(vm => vm.Model).ToList());
+        private DeviceAxisSectionsViewModel? _axisSections;
         #region - Attributes -
         private readonly IList<GateDeviceViewModel> _selection;
         #endregion

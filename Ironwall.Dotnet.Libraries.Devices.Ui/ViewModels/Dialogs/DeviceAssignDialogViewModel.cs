@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -49,6 +49,10 @@ public class DeviceAssignDialogViewModel : Screen
                 Id = model.Id,
                 DeviceName = model.DeviceName,
                 DeviceType = model.DeviceType,
+                CategoryLabel = Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceAxesMapper.CategoryOf(model).ToString().ToLowerInvariant(),
+                TypeAxisLabel = string.IsNullOrWhiteSpace(model.TypeAxisCode)
+                    ? model.DeviceType.ToString()
+                    : Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.TypeAxisPanelSupport.DescribeFor(model),
                 DeviceNumber = model.DeviceNumber,
                 Status = model.Status,
                 IsEnable = model.IsEnable,

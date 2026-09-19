@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.SensorSelectionView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,6 +9,7 @@
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:axis="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:sys="clr-namespace:System;assembly=mscorlib"
 	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -220,6 +221,9 @@
 						</ComboBox>
 					</Grid>
 
+					<!--  v7.0+ axis sections (read-only): discriminator badge, connection, hardware_spec, components, device_status. Collapsed on a 6.3 contract.  -->
+					<axis:DeviceAxisHeadView DataContext="{Binding AxisSections}" />
+
 					<!--  ===== 구역③ 위치 정보 (Location/Lat/Lng + Alt/Bearing) =====  -->
 					<TextBlock Style="{StaticResource SectionTitle}" Text="위치 정보" />
 					<Grid>
@@ -322,6 +326,8 @@
 							</DataTemplate>
 						</ListBox.ItemTemplate>
 					</ListBox>
+					<!--  v7.0+ axis sections (read-only, last): device_config, response profile  -->
+					<axis:DeviceAxisTailView DataContext="{Binding AxisSections}" />
 				</StackPanel>
 			</ScrollViewer>
 
