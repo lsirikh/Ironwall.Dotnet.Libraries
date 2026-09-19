@@ -29,6 +29,16 @@
 ## [Unreleased]
 
 ### Added
+- **부품 조립기 · 프리셋 · 프리셋으로 등록 — 레고처럼 끌어 조립한다** (봉투 [all-windows-console-redesign](docs/charters/all-windows-console-redesign-charter.md) N-03 · 브랜치 `v2.13.0` · [PRD](docs/prds/device-assembly-preset-prd.md) · [Plan](docs/plans/device-assembly-preset-prd-plan.md) · [테스트](docs/tests/device-assembly-preset-test-result.md))
+  - 배경: 부품(`hardware_spec.components[]`)을 쓰는 제품 코드가 0건이었다 — 7.0+ 서버에서 부품 없이 만든 장비는 문 · 히터 · 접점 상태를 영영 못 받는다. 사용자 지시: "장비를 조립해서 프리셋을 만들고 그걸로 등록" · "각 부품을 레고처럼 드래그 드롭".
+  - **조립기**(`Consoles/Assembly`): 팔레트(카탈로그를 카테고리의 `applies_to` 로 거른다) → 조립 보드 → 속성. 팔레트 블록을 끌어 놓은 자리에 끼우고, 핸들로 순서를 바꾸고, "빼는 곳"에 끌어 빼고, 되돌린다. 키보드: 팔레트 Enter = 끝에 달기 · 보드 Alt+↑↓ · Delete. 블록은 **색이 아니라 형태로** 가족을 가른다(감지 = 홈 · 구동 = 잘린 모서리 · 전원/환경 = 육각 · 네트워크 = 마름모 · 광학 = 원 표지). 조립은 끝까지 Draft — 끌어 놓기 중 서버 호출 0.
+  - 보드 규칙(순수 모델 `Model/AssemblyBoard`): key 자동 제안(`door` → `door_2`) · 형식 · 중복 즉시 표시 · **순서만 바꾼 것은 미저장 변경으로 세지 않는다**(서버에 순서 계약이 없다) · 반복 펼치기(16채널을 16번 끌지 않는다) · 채널 다시 번호 · 되돌리기 · 차이(더함/뺌/고침).
+  - 속성 칸: 장비별 사실만 고친다. **카탈로그 사실(states · commands · produces)은 회색 글자** — 입력 칸으로 만들면 보내게 되고 그건 422 다. 재정의(`component_overrides`)는 부품 칸과 갈라 놓았다 — `enabled` 는 부품에 실으면 422, 재정의에서만 정상이다.
+  - **프리셋**(`Presets/DevicePresetStore`): `%LocalAppData%\Ironwall\device-assembly-presets.json` · 구조만 담는다(번호 · 이름 · 접속 · 일련번호는 안 담는다) · 임시 파일에 쓰고 교체 · 깨진 파일은 덮지 않고 옮긴다 · 더 새 판은 읽기 전용 · 모르는 카테고리의 항목은 그대로 되써 준다 · 내보내기/가져오기 · 목업의 본보기 5종.
+  - **프리셋으로 등록**(`Register`): 개체 정보만 넣고 → 나갈 본문을 그대로 보고 → **POST 1건**(`AllowComponentsWrite` — 빠지면 서버가 부품 없이 만들고 성공이라 답한다 → 이름 있는 회귀 테스트). **기존 장비의 부품 바꾸기**: 보내기 직전에 다시 받아 비교 → 바뀌었으면 멈춤 → PATCH 1건(배열 통째 + 뺀 key 의 재정의 `null`).
+  - 입구: 장비 콘솔 툴바 [조립기] · [프리셋으로 등록] · [프리셋…] + 상세 칸 [부품 구성 바꾸기]. **6.3 에서는 통째로 감춘다.** 창은 `IWindowManager` 로 라이브러리가 직접 연다(호스트 코드 변경 0).
+  - 적대 검토 3렌즈로 잡은 것: **적용 PATCH 가 스피커 · 경광등의 설명을 `null` 로 보내 지운다**(7 카테고리 전수 점검으로 접속 · 카메라 modes · 함체 thresholds 누락까지 찾아 고침) · 등록/적용 서비스에 판본 검사가 없어 6.3 에서 빈 본문이 나갈 수 있다 · 적용에 부대 찍기 누락 · 순서를 바꿀 때마다 선택과 속성 칸이 풀린다 · 조립기 입구의 의존이 안 풀리면 장비 창 전체가 안 열린다 → 전부 수정.
+  - 검증: `Devices.Ui` 778/778 · `Messages` 281/281(DTO 무변경) · 호스트 빌드 오류 0 · 미리보기 캡처 16장(`tools/device-console-preview -- --assembly`). **실제 마우스 끌어 놓기 · 호스트 앱에서 창 열기 · 살아 있는 서버 등록/적용은 미확인.**
 - **장비 콘솔 — 레일 · 목록 · 상세 3단 + 명세에서 만들어지는 속성 폼 + 장비 → 그룹 끌어 놓기** (봉투 [all-windows-console-redesign](docs/charters/all-windows-console-redesign-charter.md) N-02 · 브랜치 `v2.12.0` · [PRD](docs/prds/device-console-redesign-prd.md) · [Plan](docs/plans/device-console-redesign-prd-plan.md) · [테스트](docs/tests/device-console-redesign-test-result.md))
   - 배경: 직전 사이클(device-console-v8)은 데이터 항목만 옮기고 와이어프레임의 구조를 빠뜨렸다. 이번에는 PRD 의 요구사항마다 목업 줄 번호를 달고, 콘솔 커널(N-01) 위에 창을 다시 짰다.
   - 화면(`DeviceDashboardView`): 레일 8(그룹 + 제어기 · 센서 · 카메라 · 스피커 · 함체 · 경광등 · 통문, 축 계약이면 + 부품으로 찾기) · 배지 `▲장애 · 합계` · 툴바 [추가][삭제][갱신] + 검색 + [열 n/m] · 기본 6열 + 핸들 열 · 상태 띠(건수 + 그룹 칩) · 상세 고정 적용 막대. 요약 280 · 레일 390 · 목록 260 고정 높이와 패널마다 있던 [저장] 을 없앴다.

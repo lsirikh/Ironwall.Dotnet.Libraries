@@ -588,6 +588,14 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 - 드래그: `Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag` — 목록에 `CaptureDragBehavior`, 행 안에 `DragHandle`, 놓을 곳에 `DropZone.Key`(+ `DropZoneChrome`), 순서 목록에는 `DropZone.IsReorder` + `ReorderKeyboardBehavior`. 판정 · 처리는 창이 `IDragDropHandler` 로. 호출 1회면 즉시, N회로 번지면 `DraftTrayViewModel` 에 쌓았다가 [적용]. **`KeyboardFallback` 이 비면 디버그 빌드에서 예외** — 드래그 전용 UI 는 만들지 않는다
 - 써 보기: `tools/console-gallery` 에서 `dotnet run`(가짜 데이터 · 서버 호출 0). `--snapshot <폴더>` 를 주면 입력 없이 상태별 PNG 와 드래그 재현 로그를 뜬다
 
+**부품 조립기 · 프리셋 · 프리셋으로 등록** (device-assembly-preset — 봉투 N-03 · 브랜치 `v2.13.0`, 2026-09-19 · 실제 마우스 끌어 놓기 · 호스트에서 창 열기 · 서버 쓰기는 미확인)
+- 어디: `Devices.Ui/Consoles/Assembly/**` — `Model`(보드 · key 규칙 · 펼치기 · 차이, 순수) · `Catalog`(`IComponentCatalog` — `CatalogService` 가 같이 구현, 가족 규칙표) · `Blocks`(`ComponentBlock` 형태 5종) · `Presets`(파일 저장소) · `Register`(등록 POST 1건 · 적용 PATCH 1건) · 창 뷰모델/뷰 6쌍 · `AssemblyLauncher`(`IWindowManager` 로 연다)
+- 입구는 장비 콘솔에 있다(툴바 · 상세 칸). 7.0+ 서버에서만 보인다
+- 규칙 셋: ① 조립은 끝까지 Draft — 서버 호출은 마지막 한 번 ② 유형 공통 사실(states · commands …)은 보여 주기만, 본문에 절대 없다 ③ 부품을 빼면 그 key 의 재정의를 `null` 로 같이 보낸다
+- 새 부품 유형이 카탈로그에 생기면 코드 변경 없이 팔레트에 나온다. 블록 형태는 `ComponentFamilyRules` 의 규칙표가 정한다(모르면 기타)
+- 써 보기: `tools/device-console-preview` 에서 `dotnet run -- --assembly`
+- PRD: `docs/prds/device-assembly-preset-prd.md` · 결과: `docs/tests/device-assembly-preset-test-result.md`
+
 **장비 콘솔** (device-console-redesign — 봉투 N-02 · 브랜치 `v2.12.0`, 2026-09-19 · 호스트 앱 안 표시 · 실제 마우스 끌어 놓기 · 살아 있는 서버 쓰기는 미확인)
 - 화면: `DeviceDashboardView` 가 콘솔 커널(`ConsoleShell`) 위의 3단 — 레일(그룹 + 7 카테고리, 축 계약이면 + 부품으로 찾기 · 배지 `▲장애 · 합계`) · 목록(그리드 하나, 열은 `DeviceColumnCatalog` 에서 생성) · 상세(고정 적용 막대). 호스트는 그대로다(뷰모델 이름 유지)
 - **속성을 고치려면 명세에 한 줄**: `Consoles/Properties/DevicePropertyCatalog` — 키 · 라벨 · API 경로 · 절 · 편집기 · 쓰기 가능 여부(+ 못 쓰는 까닭) · 카테고리 · 계약 세대. 폼(`Consoles/Forms`)은 명세에서 만들어진다 — 장비 종류마다 폼을 손으로 짜지 않는다. 뷰모델 속성과 어긋나면 `DevicePropertyCatalogTests` 가 잡는다
