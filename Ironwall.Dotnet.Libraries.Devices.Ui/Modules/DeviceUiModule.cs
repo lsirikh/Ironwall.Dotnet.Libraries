@@ -89,6 +89,7 @@ public class DeviceUiModule : Module
             builder.RegisterType<SpeakerDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<EnclosureDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<LampDevicePanelViewModel>().SingleInstance();
+            builder.RegisterType<GateDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<DeviceGroupPanelViewModel>().SingleInstance();
             builder.RegisterType<ControllerDeviceViewModel>().SingleInstance();
             builder.RegisterType<SensorDevicePanelViewModel>().SingleInstance();

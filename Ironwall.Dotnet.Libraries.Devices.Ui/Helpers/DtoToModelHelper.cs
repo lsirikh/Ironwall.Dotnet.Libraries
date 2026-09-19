@@ -423,6 +423,40 @@ public static class DtoToModelHelper
         return model;
     }
 
+    /// <summary>
+    /// GateDeviceModel → 쓰기 DTO (device-console-v8 FR-08).
+    /// <para><b>문 위치(<c>gate_status</c>)는 싣지 않는다</b> — 관측값이다. 개폐 명령으로도 바뀌지 않고 매니저 보고로만 바뀐다.</para>
+    /// <para><c>type_gate</c> 는 값이 있을 때만 — 형상 축은 생략하면 서버가 <c>Unknown</c> 을 배정하고(8.0.1 실측),
+    /// <c>null</c> 을 실으면 422 다. 결선(<c>urls</c>·<c>link_info</c>)은 받은 원본 JSON 을 그대로 되돌린다.</para>
+    /// </summary>
+    public static GateDeviceDto ToGateDeviceDto(this GateDeviceModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        var dto = new GateDeviceDto
+        {
+            Id = model.Id,
+            NumberDevice = model.DeviceNumber,
+            GroupIds = model.DeviceGroups,
+            NameDevice = model.DeviceName ?? string.Empty,
+            TypeDevice = model.DeviceType.ToString(),
+            Version = model.Version ?? string.Empty,
+            Status = model.Status.ToString(),
+            TypeGate = string.IsNullOrWhiteSpace(model.TypeAxisCode) ? null : model.TypeAxisCode!.Trim(),
+            Urls = ParseJsonObjectOrNull(model.UrlsJson),
+            LinkInfo = ParseJsonObjectOrNull(model.LinkInfoJson),
+        };
+        MapGeolocationToDto(model, dto);
+        return dto;
+    }
+
+    private static Newtonsoft.Json.Linq.JObject? ParseJsonObjectOrNull(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return Newtonsoft.Json.Linq.JObject.Parse(json); }
+        catch (Newtonsoft.Json.JsonException) { return null; }   // 원본이 객체가 아니면 싣지 않는다(부분 PATCH 라 서버 값은 보존된다)
+    }
+
     // ────────────────────────── Enclosure ──────────────────────────
 
     public static EnclosureDeviceModel ToEnclosureDeviceModel(this EnclosureDeviceDto dto)

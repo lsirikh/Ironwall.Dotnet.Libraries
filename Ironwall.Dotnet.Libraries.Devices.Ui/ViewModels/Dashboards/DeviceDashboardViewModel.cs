@@ -31,6 +31,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
                                 , SpeakerDevicePanelViewModel speakerDevicePanelViewModel
                                 , EnclosureDevicePanelViewModel enclosureDevicePanelViewModel
                                 , LampDevicePanelViewModel lampDevicePanelViewModel
+                                , GateDevicePanelViewModel gateDevicePanelViewModel
                                 , DeviceGroupPanelViewModel deviceGroupPanelViewModel
                                 ) : base(eventAggregator, log)
     {
@@ -41,6 +42,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SpeakerPanelViewModel = speakerDevicePanelViewModel;
         EnclosurePanelViewModel = enclosureDevicePanelViewModel;
         LampPanelViewModel = lampDevicePanelViewModel;
+        GatePanelViewModel = gateDevicePanelViewModel;
         DeviceGroupPanelViewModel = deviceGroupPanelViewModel;
     }
     #endregion
@@ -63,6 +65,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         EnclosurePanelViewModel.UpdateAction += EnclosurePanelViewModel_UpdateAction;
         LampPanelViewModel.CheckSelectedItems += LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction += LampPanelViewModel_UpdateAction;
+        GatePanelViewModel.CheckSelectedItems += GatePanelViewModel_CheckSelectedItems;
+        GatePanelViewModel.UpdateAction += GatePanelViewModel_UpdateAction;
         DeviceGroupPanelViewModel.CheckSelectedItems += DeviceGroupPanelViewModel_CheckSelectedItems;
         DeviceGroupPanelViewModel.UpdateAction += DeviceGroupPanelViewModel_UpdateAction;
         await TabControlViewModel.ActivateAsync();
@@ -95,6 +99,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         EnclosurePanelViewModel.UpdateAction -= EnclosurePanelViewModel_UpdateAction;
         LampPanelViewModel.CheckSelectedItems -= LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction -= LampPanelViewModel_UpdateAction;
+        GatePanelViewModel.CheckSelectedItems -= GatePanelViewModel_CheckSelectedItems;
+        GatePanelViewModel.UpdateAction -= GatePanelViewModel_UpdateAction;
         DeviceGroupPanelViewModel.CheckSelectedItems -= DeviceGroupPanelViewModel_CheckSelectedItems;
         DeviceGroupPanelViewModel.UpdateAction -= DeviceGroupPanelViewModel_UpdateAction;
 
@@ -232,6 +238,26 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         await GetDeviceType();
     }
 
+    private void GatePanelViewModel_CheckSelectedItems(IList<GateDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new GateSelectionViewModel(selectedItems);
+            (SelectedItemEditor as GateSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private async void GatePanelViewModel_UpdateAction()
+    {
+        await GetDeviceType();
+    }
+
     private void DeviceGroupPanelViewModel_CheckSelectedItems(IList<DeviceGroupViewModel> selectedItems)
     {
         if (!(selectedItems.Count > 0))
@@ -314,6 +340,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel
                 case "LampDeviceViewModel":
                     await TabControlViewModel.ActivateItemAsync(LampPanelViewModel);
                     break;
+                case "GateDeviceViewModel":
+                    await TabControlViewModel.ActivateItemAsync(GatePanelViewModel);
+                    break;
 
                 default:
                     break;
@@ -349,6 +378,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         Speaker = 0;
         Enclosure = 0;
         Lamp = 0;
+        Gate = 0;
     }
 
     private Task GetDeviceType(CancellationToken cancellationToken = default)
@@ -380,6 +410,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
             Enclosure = DeviceProvider.OfType<IEnclosureDeviceModel>().Count();
             await Task.Delay(100, cancellationToken);
             Lamp = DeviceProvider.OfType<ILampDeviceModel>().Count();
+            Gate = DeviceProvider.OfType<IGateDeviceModel>().Count();
             await Task.Delay(100, cancellationToken);
         });
     }
@@ -554,10 +585,21 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         }
     }
 
+    public int Gate
+    {
+        get { return _gate; }
+        set
+        {
+            _gate = value;
+            NotifyOfPropertyChange(() => Gate);
+        }
+    }
+
     public DeviceProvider DeviceProvider { get; private set; }
     public SpeakerDevicePanelViewModel SpeakerPanelViewModel { get; }
     public EnclosureDevicePanelViewModel EnclosurePanelViewModel { get; }
     public LampDevicePanelViewModel LampPanelViewModel { get; }
+    public GateDevicePanelViewModel GatePanelViewModel { get; }
     public DeviceGroupPanelViewModel DeviceGroupPanelViewModel { get; }
     #endregion
     #region - Attributes -
@@ -574,6 +616,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     private int _speaker;
     private int _enclosure;
     private int _lamp;
+    private int _gate;
 
     private bool _isSelected;
     private BasePanelViewModel? _selectedItemEditor;

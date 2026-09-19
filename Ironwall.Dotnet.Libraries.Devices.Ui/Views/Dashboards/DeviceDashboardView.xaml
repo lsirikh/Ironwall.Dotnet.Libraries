@@ -628,6 +628,28 @@
 						TextAlignment="Center" />
 				</GroupBox>
 
+				<GroupBox
+					Grid.Row="2"
+					Grid.Column="3"
+					Margin="5"
+					AutomationProperties.AutomationId="Devices.Dashboard.GateTile"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
+							<md:PackIcon Kind="BoomGate" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="통문" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding Gate, FallbackValue=0}"
+						TextAlignment="Center" />
+				</GroupBox>
+
 			</Grid>
 		</Border>
 		<Border
@@ -773,6 +795,17 @@
 						<StackPanel>
 							<md:PackIcon Kind="LightbulbOn" Style="{StaticResource SetupContentIcon}" />
 							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="경광등 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="GateDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="BoomGate" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="통문 설정" />
 						</StackPanel>
 					</Border>
 				</TabItem.Header>
