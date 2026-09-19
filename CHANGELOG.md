@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [3.11.0] - 2026-09-19
+
+### Added
+- **device-console-v8 — 완료 리포트 (2026-09-19)** ([PRD](docs/prds/device-console-v8-prd.md) · [Plan](docs/plans/device-console-v8-prd-plan.md) · [Report](docs/reports/device-console-v8-report.md))
+
+
+
 ## [3.10.0] - 2026-09-18
 
 ### Added
