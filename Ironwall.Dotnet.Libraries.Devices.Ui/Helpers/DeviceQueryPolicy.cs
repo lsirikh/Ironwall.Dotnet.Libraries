@@ -81,6 +81,23 @@ public sealed class DeviceQueryPolicy
     /// <summary>7.0 <b>이상</b>(축 전환판 — 7.0 · 8.0 · 그 이후 전부 포함)인가.</summary>
     public bool IsAxisContract => Contract >= EnumServerContract.V7_0;
 
+    /// <summary>서버가 알려 준 판본 문자열 원문(<c>info.version</c>). 미확보면 <c>null</c>.</summary>
+    public string? RawVersion => _probe?.RawVersion;
+
+    /// <summary>
+    /// 프로브가 <b>있는데</b> 판본을 확보하지 못해 폴백(6.3)으로 동작 중인가 (device-console-v8 FR-07).
+    /// </summary>
+    /// <remarks>
+    /// 폴백은 안전한 기본값이지만 <b>조용해서는 안 된다</b> — 서버가 8.0 인데 프로브만 실패하면 클라는 6.3 쿼리를 보내
+    /// 422 → 장비 0건이 되고, 화면은 아무 말 없이 옛 모양으로 뜬다. 장비 창이 이 값으로 배너를 띄운다.
+    /// 프로브 자체가 등록되지 않은 호스트는 "실패"가 아니라 "기능 없음"이라 <c>false</c> 다.
+    /// </remarks>
+    public bool IsProbeFallback => _probe != null && !_probe.IsResolved;
+
+    /// <summary>판본을 다시 확인한다(사용자의 [다시 확인]). 프로브가 없으면 <c>false</c>.</summary>
+    public Task<bool> RefreshContractAsync(CancellationToken token = default)
+        => _probe?.RefreshAsync(token) ?? Task.FromResult(false);
+
     /// <summary>
     /// 제어기 목록·단건에 레거시 <c>?include_sensors=true</c> 를 실을 수 있는가(FR-10).
     /// 7.0 에서는 <b>제거된 키</b>라 실으면 즉시 422 → 제어기 전량 0건.

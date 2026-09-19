@@ -495,6 +495,31 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         set { _selectedItemEditor = value; NotifyOfPropertyChange(() => SelectedItemEditor); }
     }
 
+    /// <summary>
+    /// 서버 계약 게이트(device-console-v8 FR-07) — 축 UI 표시 여부와 "판본 미확정" 배너.
+    /// 생성자 시그니처를 넓히지 않으려고 여기서 만든다(정책은 컨테이너에서 해석, 미구성이면 6.3 기본값).
+    /// </summary>
+    public DeviceContractGateViewModel ContractGate { get; } = new();
+
+    /// <summary>배너의 [다시 확인] — 판본을 재확인하고, 세대가 바뀌었으면 장비를 그 계약으로 다시 읽는다.</summary>
+    public async void OnClickRefreshContract()
+    {
+        var wasAxis = ContractGate.IsAxisUi;
+        var ok = await ContractGate.RefreshContractAsync();
+        if (!ok || ContractGate.IsAxisUi == wasAxis) return;
+
+        try
+        {
+            // 6.3 쿼리로 읽어 둔 캐시는 새 계약에서 틀린 모양이다 — 전량 재조회.
+            var provider = IoC.Get<Ironwall.Dotnet.Libraries.Devices.Ui.Services.IDeviceProviderService>();
+            if (provider != null) await provider.FetchAllDevicesAsync();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceDashboard] 판본 전환 후 재조회 실패 — {ex.Message}");
+        }
+    }
+
     public DeviceTabControlViewModel TabControlViewModel { get; }
     public ControllerDevicePanelViewModel ControllerPanelViewModel { get; }
     public SensorDevicePanelViewModel SensorPanelViewModel { get; }

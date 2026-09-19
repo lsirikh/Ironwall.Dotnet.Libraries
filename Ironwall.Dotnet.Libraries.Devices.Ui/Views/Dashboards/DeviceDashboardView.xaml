@@ -37,11 +37,61 @@
 
 	<Grid>
 		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
 			<RowDefinition Height="280" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
+
+		<!--
+			서버 판본 미확정 배너 (device-console-v8 FR-07).
+			판본 확인에 실패하면 클라는 안전한 쪽(6.3)으로 동작한다 — 서버가 실제로는 7.0+ 이면 장비가 0건처럼 보이는데
+			화면은 아무 말이 없었다. 그 사실을 드러내고 [다시 확인] 을 준다.
+			평소(확정·프로브 없음)에는 Collapsed — Auto 행이라 높이 0, 옛 화면 배치와 픽셀 단위로 같다.
+			색이 아니라 형태(좌측 세로 바 + 아이콘)로도 구분한다.
+		-->
 		<Border
 			Grid.Row="0"
+			Margin="5,5,5,0"
+			Padding="0"
+			AutomationProperties.AutomationId="Devices.Dashboard.ProbeBanner"
+			Background="{DynamicResource TintWarningBrush}"
+			BorderBrush="{DynamicResource StatusWarningBrush}"
+			BorderThickness="4,1,1,1"
+			CornerRadius="4"
+			Visibility="{Binding ContractGate.IsProbeFallback, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+			<DockPanel Margin="10,6" LastChildFill="True">
+				<Button
+					Margin="10,0,0,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Dashboard.ProbeBanner.RefreshButton"
+					Content="다시 확인"
+					DockPanel.Dock="Right"
+					IsEnabled="{Binding ContractGate.CanRefreshContract}"
+					Style="{StaticResource MaterialDesignOutlinedButton}">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickRefreshContract" />
+					</i:Interaction.Behaviors>
+				</Button>
+				<md:PackIcon
+					Width="20"
+					Height="20"
+					Margin="0,0,8,0"
+					VerticalAlignment="Center"
+					DockPanel.Dock="Left"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Kind="AlertOutline" />
+				<TextBlock
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Dashboard.ProbeBanner.Text"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					TextWrapping="Wrap">
+					<Run Text="서버 판본을 확인하지 못했습니다 — 옛 화면(" /><Run Text="{Binding ContractGate.ContractText, Mode=OneWay}" /><Run Text=")으로 표시 중입니다. 서버가 새 판본이면 장비 목록이 비어 보일 수 있습니다." />
+				</TextBlock>
+			</DockPanel>
+		</Border>
+
+		<Border
+			Grid.Row="1"
 			Margin="5"
 			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
 			CornerRadius="8">
@@ -581,7 +631,7 @@
 			</Grid>
 		</Border>
 		<Border
-			Grid.Row="0"
+			Grid.Row="1"
 			Margin="5"
 			md:ThemeAssist.Theme="Inherit"
 			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
@@ -603,7 +653,7 @@
 
 
 		<TabControl
-			Grid.Row="1"
+			Grid.Row="2"
 			Height="390"
 			Margin="-15,0,15,0"
 			HorizontalAlignment="Stretch"
