@@ -588,6 +588,15 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 - 드래그: `Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag` — 목록에 `CaptureDragBehavior`, 행 안에 `DragHandle`, 놓을 곳에 `DropZone.Key`(+ `DropZoneChrome`), 순서 목록에는 `DropZone.IsReorder` + `ReorderKeyboardBehavior`. 판정 · 처리는 창이 `IDragDropHandler` 로. 호출 1회면 즉시, N회로 번지면 `DraftTrayViewModel` 에 쌓았다가 [적용]. **`KeyboardFallback` 이 비면 디버그 빌드에서 예외** — 드래그 전용 UI 는 만들지 않는다
 - 써 보기: `tools/console-gallery` 에서 `dotnet run`(가짜 데이터 · 서버 호출 0). `--snapshot <폴더>` 를 주면 입력 없이 상태별 PNG 와 드래그 재현 로그를 뜬다
 
+**장비 콘솔** (device-console-redesign — 봉투 N-02 · 브랜치 `v2.12.0`, 2026-09-19 · 호스트 앱 안 표시 · 실제 마우스 끌어 놓기 · 살아 있는 서버 쓰기는 미확인)
+- 화면: `DeviceDashboardView` 가 콘솔 커널(`ConsoleShell`) 위의 3단 — 레일(그룹 + 7 카테고리, 축 계약이면 + 부품으로 찾기 · 배지 `▲장애 · 합계`) · 목록(그리드 하나, 열은 `DeviceColumnCatalog` 에서 생성) · 상세(고정 적용 막대). 호스트는 그대로다(뷰모델 이름 유지)
+- **속성을 고치려면 명세에 한 줄**: `Consoles/Properties/DevicePropertyCatalog` — 키 · 라벨 · API 경로 · 절 · 편집기 · 쓰기 가능 여부(+ 못 쓰는 까닭) · 카테고리 · 계약 세대. 폼(`Consoles/Forms`)은 명세에서 만들어진다 — 장비 종류마다 폼을 손으로 짜지 않는다. 뷰모델 속성과 어긋나면 `DevicePropertyCatalogTests` 가 잡는다
+- 저장 경로는 하나: 콘솔은 전송하지 않는다. `IDeviceConsoleSource` 가 패널 뷰모델의 기존 저장 · 삭제 · 재조회를 부른다. 패널의 버튼 경로는 `async void` 라 **시작 여부**(`Save()` 의 반환)와 **끝남**(`BusyEnded`, UI 스레드로 옮겨 울림)만 믿는다
+- 드래그: 장비 → 그룹 칩(`Consoles/Groups` — 그룹당 호출 1회 · 되돌리기 · 칩 클릭이 키보드 폴백). 판정은 순수 함수 `DeviceGroupDrop.Plan`
+- 설정 축 쓰기 통로: DTO 의 `DeviceConfigWrite` + `AllowDeviceConfigWrite`(기본 꺼짐 — 꺼지면 본문이 글자 하나까지 같다)
+- 써 보기: `tools/device-console-preview` 에서 `dotnet run`(진짜 뷰 + 진짜 뷰모델 · 가짜 데이터 · 서버 호출 0). `--snapshot <폴더>` · `--legacy` · `--dark`
+- PRD: `docs/prds/device-console-redesign-prd.md` · 결과: `docs/tests/device-console-redesign-test-result.md`
+
 **장비 관리 창 v8 축 전환 1차** (device-console-v8 — 브랜치 `v2.10.0` · Phase 1(기반) v2.6 머지 `19c6eaae`, 2026-09-19 · 화면 구현 완료 · 실기(화면) 미검증)
 - GOP API v7.0+ 표현 모델 수용: 판별자 `category_device`(경로가 정본) + 종류축 `type_<category>` 원값 보존(`TypeAxisCode`) + 표현 축 묶음 `IBaseDeviceModel.Axes`(접속·형상/부품·관측·의도 + `meta.view/sections`). 읽기는 DTO 재조립본이 아니라 **수신 원본**에서(`DeviceAxesMapper`)
 - **축 계약 저장은 `PATCH`** — 8.0.1 실측: `PUT` 은 축을 통째 교체해 `connection.type/channel` 과 카메라 `components` 를 무경고로 지운다. 6.3 은 종전 `PUT`(무회귀). `components` 는 `AllowComponentsWrite` 를 켠 호출부만 전송

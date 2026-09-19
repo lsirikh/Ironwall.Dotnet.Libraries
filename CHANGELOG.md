@@ -29,6 +29,20 @@
 ## [Unreleased]
 
 ### Added
+- **장비 콘솔 — 레일 · 목록 · 상세 3단 + 명세에서 만들어지는 속성 폼 + 장비 → 그룹 끌어 놓기** (봉투 [all-windows-console-redesign](docs/charters/all-windows-console-redesign-charter.md) N-02 · 브랜치 `v2.12.0` · [PRD](docs/prds/device-console-redesign-prd.md) · [Plan](docs/plans/device-console-redesign-prd-plan.md) · [테스트](docs/tests/device-console-redesign-test-result.md))
+  - 배경: 직전 사이클(device-console-v8)은 데이터 항목만 옮기고 와이어프레임의 구조를 빠뜨렸다. 이번에는 PRD 의 요구사항마다 목업 줄 번호를 달고, 콘솔 커널(N-01) 위에 창을 다시 짰다.
+  - 화면(`DeviceDashboardView`): 레일 8(그룹 + 제어기 · 센서 · 카메라 · 스피커 · 함체 · 경광등 · 통문, 축 계약이면 + 부품으로 찾기) · 배지 `▲장애 · 합계` · 툴바 [추가][삭제][갱신] + 검색 + [열 n/m] · 기본 6열 + 핸들 열 · 상태 띠(건수 + 그룹 칩) · 상세 고정 적용 막대. 요약 280 · 레일 390 · 목록 260 고정 높이와 패널마다 있던 [저장] 을 없앴다.
+  - **정규화된 속성 명세**(`Consoles/Properties`): `DevicePropertyCatalog` — 속성 한 개 = 한 줄(키 · 라벨 · API 경로 · 절 · 편집기 · 쓰기 가능 여부 + **못 쓰는 까닭** · 카테고리 · 생성 시 필수 · 다중 편집 · 어휘 출처 · 계약 세대). 7 카테고리 전 속성. 뷰모델과 어긋나면 리플렉션 가드 테스트가 빌드 단계에서 잡는다.
+  - **만들어지는 폼**(`Consoles/Forms`): 명세 한 줄 = 칸 하나. 칸 입력은 행을 건드리지 않고 [적용] 때 **손댄 칸만** 쓴다. 검증에 하나라도 걸리면 아무 행에도 쓰지 않는다. 여러 개 = `— 여러 값 —` + 식별 칸 잠금. 그룹도 같은 폼으로 고친다.
+  - **전송 경로는 새로 만들지 않았다**(`IDeviceConsoleSource`): [적용] · [등록] · [삭제] · [갱신] 은 패널 뷰모델의 기존 경로(완전성 확인 · 종류 축 차단 · 부대 찍기 · 재조회)를 그대로 부른다. [추가] 의 Draft 는 [등록] 전까지 목록에서 떼어 둔다. 저장이 끝나면 같은 Id 의 새 행을 다시 고르고, 쓴 값과 서버 값을 맞춰 본다.
+  - 레일 배지는 프로바이더 변경을 구독해 즉시 갱신 — `Task.Delay(100)`×14 당겨 세기와 `Tag` 문자열 스위치(`OnActiveTab`)를 없앴다. 미적용 변경이 있으면 행 · 레일 이동을 막고 바닥 막대가 까닭을 말한다.
+  - **장비 → 그룹 끌어 놓기**(`Consoles/Groups`): 핸들로 N건을 끌어 그룹 칩에 놓는다 — 그룹당 호출 1회(`AssignDevicesToGroupAsync`), 서버가 넣었다고 답한 것만 로컬 반영, 저장 전 · 이미 속한 장비는 보내지 않고 결과를 한 줄로, [되돌리기](일괄 제거 1회). 칩을 누르는 것이 키보드 폴백(같은 경로).
+  - 열(`Consoles/Lists`): `DeviceColumnCatalog` 에서 생성 · "열" 메뉴 설정은 레일마다 따로 기억. 부품으로 찾기(`Consoles/ByComponent`, 읽기 전용 · 축 계약 전용).
+  - 설정 축 쓰기 통로(`Messages/Dto/Devices`): 7 DTO 공통 · 플래그 게이트(`AllowDeviceConfigWrite`) · **꺼지면 바이트 동일**. N-03(조립기)의 선행.
+  - 미리보기 `tools/device-console-preview`: 진짜 뷰 + 진짜 뷰모델을 가짜 데이터 위에(`--snapshot` · `--legacy` · `--dark`). 캡처를 보고 고친 것: 다크에서 선택 행이 회색 칸으로 갈라짐(코드로 추가한 열에 MDIX 가 제 셀 스타일을 물린다) · [되돌리기] 뒤 남는 "손댄 칸" 표지 · Draft 카테고리 `None`.
+  - 적대 검토 3렌즈(정확성 · 화면/드래그 · 회귀/테스트 정직성)로 잡은 것: **패널 7종은 삭제 완료를 작업 스레드에서 알린다**(재조회를 `ConfigureAwait(false)` 로 기다린 뒤 `UpdateAction`) → 콘솔이 그리드를 만지다 교차 스레드 예외로 죽고 진행 팝업이 안 닫힌다 → 어댑터가 끝남을 UI 스레드로 옮긴다 · **패널이 말없이 거절한 저장**(권한 없음 · 처리 중)이 다음 아무 끝남에서 "등록했다"로 읽힘 → 시작한 저장만 건다, 삭제는 아무것도 걸지 않는다 · 쓰는 도중 거절되면 반쯤 고친 행이 남음 → 전부 아니면 전무 · 레일 전환 재진입 → 직렬화 · 검색에 가려진 행을 쥔 채 [삭제] 가 켜짐 · 세 상태 체크박스 어긋남 · 그룹에 넣은 뒤 목록이 안 바뀜. 6.3 쓰기 본문은 글자 하나까지 같음을 확인(검토 + 테스트).
+  - 사문 다이얼로그 제거: `AddControllerDialogView` · `AddSensorDialogView`.
+  - 검증: `Devices.Ui` 468/468 · `Messages` 281/281 · 프로젝트별 빌드 8/8 · 호스트 빌드 오류 0 · `Devices.Api` 실패 86건은 기준선과 같은 집합(서버 필요). **호스트 앱 안 표시 · 실제 마우스 끌어 놓기 · 살아 있는 서버 쓰기는 미확인.**
 - **콘솔 커널 — 전 창 재구성의 공용 토대 (T1 틀 + 드래그 커널)** (봉투 [all-windows-console-redesign](docs/charters/all-windows-console-redesign-charter.md) N-01 · 브랜치 `v2.11.0` · [PRD](docs/prds/console-kernel-prd.md) · [Plan](docs/plans/console-kernel-prd-plan.md) · [분석](docs/analyses/all-windows-console-redesign-analysis.md) · [테스트](docs/tests/console-kernel-test-result.md) · 사용자 "봉투 승인" 2026-09-19 · 롤백 `before-console-kernel`) — **기존 창은 하나도 옮기지 않았다**(공용 자산만)
   - 배경: 직전 사이클(device-console-v8)이 와이어프레임의 3단 구조 · 상세 여섯 상태 · 드래그를 빠뜨렸다는 사용자 평가. 목록 드래그 · 삽입선 · 드롭존 자산이 레포에 0건이라 창마다 만들면 툴바 복사 결함을 13번 되풀이한다 → 먼저 한 번만 세운다.
   - 콘솔 틀(`Utils/Console` + `Themes/Generic.xaml`): `ConsoleShell`(레일 184/56 · 목록 · 상세 340, 300~480 · 폭별 도킹/서랍/접힘 · 경계 끌기) · `ConsoleRail`(개수/장애 배지 · 3px 선택 바) · `ConsoleToolbar`(꺼진 버튼은 늘 사유) · `ConsoleDetailHost`(여섯 상태 겉모습 + 고정 적용 막대) · `ConsoleSection`/`ConsoleField`/`NotReceivedBox` · `ConsoleColumns`("열" 메뉴 — 기본 6열 · 전체 열 · 계약 미지원 열 감춤) · `ConsolePrefs`(`appsettings.json` 밖 · 임시 파일에 쓰고 교체).
