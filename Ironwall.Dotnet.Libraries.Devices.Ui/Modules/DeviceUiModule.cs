@@ -54,6 +54,16 @@ public class DeviceUiModule : Module
                    .As<DeviceQueryPolicy>()
                    .SingleInstance();
 
+            // 장비 어휘 카탈로그(GET /api/devices/spec) 캐시 — 종류축 콤보·부품 어휘의 단일 원천(device-console-v8 FR-05).
+            // IService 가 아니다: 부팅 때 읽지 않고 장비 창이 처음 필요로 할 때 1회 읽는다(로그인 전에는 토큰이 없다).
+            // 6.3 이면 정책이 막아 서버를 부르지 않는다. SYNC_CATALOG 수신부(호스트 NatsBrokerService)가 RefreshAsync 를 부른다.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Services.CatalogService(
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService>(),
+                        c.Resolve<DeviceQueryPolicy>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.ICatalogService>()
+                   .SingleInstance();
+
             // 서버 8.0 부대 편제(unit_id) — GroupNats(부대 코드) → unit_id(정수) 해석 1회 + 캐시.
             // 의존 3종 모두 ResolveOptional: 프로브 미등록이면 V6_3 으로 간주되어 해석·전송이 전부 꺼진다(운영 6.3.2 무회귀).
             // INatsSetupModel 미등록(DB/오프라인 모드)이면 해석할 코드가 없어 경고 1회 후 unit_id 생략.

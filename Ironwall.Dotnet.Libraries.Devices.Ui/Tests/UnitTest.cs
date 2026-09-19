@@ -1338,8 +1338,17 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<DeviceConfigWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<DeviceConfigWriteDataDto>> UpdateDeviceConfigAsync(string deviceTypePath, int deviceId, DeviceConfigAxisDto config, CancellationToken token = default)
         => Task.FromResult(ApiResponse<DeviceConfigWriteDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
-    public Task<ApiResponse<DeviceSpecCatalogDto>> GetDeviceSpecCatalogAsync(bool includeInactive = false, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<DeviceSpecCatalogDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Func<ApiResponse<DeviceSpecCatalogDto>>? CatalogResponseFactory { get; set; }
+    public int CatalogCallCount;
+    public Task? CatalogGate { get; set; }   // held open by a test to overlap concurrent callers (no timed delays)
+    public async Task<ApiResponse<DeviceSpecCatalogDto>> GetDeviceSpecCatalogAsync(bool includeInactive = false, CancellationToken token = default)
+    {
+        System.Threading.Interlocked.Increment(ref CatalogCallCount);
+        if (CatalogGate != null) await CatalogGate;
+        return CatalogResponseFactory != null
+            ? CatalogResponseFactory()
+            : ApiResponse<DeviceSpecCatalogDto>.CreateError("NOT_IMPLEMENTED", "Mock");
+    }
     public Task<ApiResponse<DeviceTypeSpecDto>> GetDeviceTypeSpecAsync(string deviceTypePath, bool includeInactive = false, CancellationToken token = default)
         => Task.FromResult(ApiResponse<DeviceTypeSpecDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
