@@ -1,0 +1,118 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Forms.AccountDetailFormView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Forms">
+	<!--
+		명세(AccountFieldCatalog)에서 만들어지는 상세 폼. DataContext = AccountFormViewModel.
+		절 → ConsoleSection · 칸 → ConsoleField. 색이 아니라 형태로 구분한다:
+		잠금 = 자물쇠 + 까닭 · 오류 = 아래 한 줄 · 손댄 칸 = ConsoleField 의 좌측 표지.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+		<Style x:Key="Form.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<!--  비어 있을 때만 보이는 안내("— 여러 값 —"). 이름 없이 스타일 트리거로만 켠다.  -->
+		<Style x:Key="Form.Hint" TargetType="TextBlock">
+			<Setter Property="Margin" Value="8,0,0,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="IsHitTestVisible" Value="False" />
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding Text}" Value="">
+					<Setter Property="Visibility" Value="Visible" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<DataTemplate x:Key="Editor.Text">
+			<Grid>
+				<TextBox
+					AutomationProperties.AutomationId="{Binding Key, StringFormat=Accounts.Detail.Field.{0}}"
+					Style="{StaticResource Form.TextBox}"
+					Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Style="{StaticResource Form.Hint}" Text="{Binding Placeholder}" />
+			</Grid>
+		</DataTemplate>
+
+		<DataTemplate x:Key="Editor.Choice">
+			<ComboBox
+				Height="30"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Accounts.Detail.Field.{0}}"
+				FontSize="13"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				IsEditable="False"
+				ItemsSource="{Binding Options}"
+				SelectedItem="{Binding Text, Mode=TwoWay}" />
+		</DataTemplate>
+
+		<!--  읽기 전용 · 잠금 — 값만. 자물쇠와 까닭은 ConsoleField 가 그린다(두 번 그리지 않는다)  -->
+		<DataTemplate x:Key="Editor.ReadOnly">
+			<TextBlock
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="{Binding Key, StringFormat=Accounts.Detail.Field.{0}}"
+				FontSize="13"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding DisplayText}"
+				TextWrapping="Wrap" />
+		</DataTemplate>
+
+		<forms:AccountEditorTemplateSelector
+			x:Key="EditorSelector"
+			Choice="{StaticResource Editor.Choice}"
+			ReadOnly="{StaticResource Editor.ReadOnly}"
+			Text="{StaticResource Editor.Text}" />
+	</UserControl.Resources>
+
+	<ItemsControl
+		Margin="16,4,14,8"
+		Focusable="False"
+		ItemsSource="{Binding Sections}">
+		<ItemsControl.ItemTemplate>
+			<DataTemplate>
+				<c:ConsoleSection AxisName="{Binding AxisName}" Header="{Binding Title}">
+					<ItemsControl Focusable="False" ItemsSource="{Binding Fields}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<c:ConsoleField
+									ApiName="{Binding ApiPath}"
+									Header="{Binding HeaderText}"
+									IsLocked="{Binding IsLocked}"
+									IsTouched="{Binding IsTouched}"
+									Note="{Binding LockReason}">
+									<StackPanel>
+										<ContentControl
+											Content="{Binding}"
+											ContentTemplateSelector="{StaticResource EditorSelector}"
+											Focusable="False" />
+										<TextBlock
+											Margin="0,3,0,0"
+											AutomationProperties.AutomationId="{Binding Key, StringFormat=Accounts.Detail.Error.{0}}"
+											FontSize="11.5"
+											Foreground="{DynamicResource StatusCriticalBrush}"
+											Text="{Binding Error, StringFormat=⚠ {0}}"
+											TextWrapping="Wrap"
+											Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+									</StackPanel>
+								</c:ConsoleField>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</c:ConsoleSection>
+			</DataTemplate>
+		</ItemsControl.ItemTemplate>
+	</ItemsControl>
+</UserControl>

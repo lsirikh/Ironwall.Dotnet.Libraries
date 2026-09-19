@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Accounts console preview (N-06): shows the real AccountConsolePanelView + view model on fake data,
+    with no host app and no server. Run: dotnet run  |  snapshots: dotnet run (two dashes)snapshot <folder>
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AccountsConsolePreview</RootNamespace>
+    <AssemblyName>AccountsConsolePreview</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Accounts.Ui\Ironwall.Dotnet.Libraries.Accounts.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+  </ItemGroup>
+
+</Project>
