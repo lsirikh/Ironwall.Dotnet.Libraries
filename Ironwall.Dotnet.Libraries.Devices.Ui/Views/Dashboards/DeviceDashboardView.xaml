@@ -9,7 +9,7 @@
 	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		장비 콘솔(device-console-redesign) — 레일 · 목록 · 상세 3단. 정본 목업:
@@ -74,8 +74,7 @@
 
 		<c:ConsoleShell
 			Title="장비"
-			AutomationProperties.AutomationId="Console.Devices.Shell"
-			ConsoleKey="devices"
+			ConsoleKey="Devices"
 			IsDetailRequested="{Binding Detail.IsDetailRequested}"
 			Loaded="OnShellLoaded"
 			Subtitle="{Binding Detail.TypeName}">
@@ -84,17 +83,17 @@
 			<c:ConsoleShell.Rail>
 				<c:ConsoleRail
 					AutomationProperties.AutomationId="Console.Devices.Rail"
-					ConsoleKey="devices"
+					ConsoleKey="Devices"
 					IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 					ItemsSource="{Binding RailEntries}"
 					SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
 					<c:ConsoleRail.Resources>
-						<!--  레일 항목의 Icon 은 아이콘 이름(문자열)이다 — 싱글턴 뷰모델이 시각 요소를 쥐지 않게 여기서 그린다  -->
-						<DataTemplate DataType="{x:Type sys:String}">
+						<!--  레일 항목의 Icon 은 아이콘 이름을 쥔 토큰이다 — 싱글턴 뷰모델이 시각 요소를 쥐지 않게 여기서 그린다  -->
+						<DataTemplate DataType="{x:Type consoles:ConsoleIconToken}">
 							<md:PackIcon
 								Width="18"
 								Height="18"
-								Kind="{Binding Converter={StaticResource IconKind}}" />
+								Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
 						</DataTemplate>
 					</c:ConsoleRail.Resources>
 					<c:ConsoleRail.Footer>
@@ -113,12 +112,11 @@
 				<c:ConsoleToolbar
 					AddClick="OnAdd"
 					AddDisabledReason="{Binding AddBlockedReason}"
-					AutomationProperties.AutomationId="Console.Devices.Toolbar"
 					CanAdd="{Binding CanAdd}"
 					CanDelete="{Binding CanDelete}"
 					CanRefresh="{Binding CanReload}"
 					ColumnsClick="OnColumns"
-					ConsoleKey="devices"
+					ConsoleKey="Devices"
 					DeleteClick="OnDelete"
 					DeleteDisabledReason="{Binding DeleteBlockedReason}"
 					Loaded="OnToolbarLoaded"
@@ -277,11 +275,10 @@
 				<c:ConsoleDetailHost
 					ApplyClick="OnApply"
 					ApplyText="{Binding Detail.ApplyText}"
-					AutomationProperties.AutomationId="Console.Devices.Detail"
 					Banner="{Binding Detail.Banner}"
 					CanApply="{Binding Detail.CanApply}"
 					CanRevert="{Binding Detail.CanRevert}"
-					ConsoleKey="devices"
+					ConsoleKey="Devices"
 					DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
 					FooterText="{Binding Detail.FooterText}"
 					IsDirty="{Binding Detail.IsDirty}"

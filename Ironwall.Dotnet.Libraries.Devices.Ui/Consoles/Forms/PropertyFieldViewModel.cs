@@ -94,7 +94,14 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
     public bool? BoolValue
     {
         get => bool.TryParse(_text, out var parsed) ? parsed : null;
-        set { if (value.HasValue) Text = value.Value ? "true" : "false"; }
+        set
+        {
+            if (value.HasValue) { Text = value.Value ? "true" : "false"; return; }
+
+            // 여러 값일 때 상자는 세 상태다 — 사용자가 "가운데"로 돌리면 null 이 온다. 값으로 쓸 수 없으니 받지 않되,
+            // 알리지 않으면 상자만 가운데에 남고 칸은 옛 값을 쥔 채 어긋난다.
+            NotifyOfPropertyChange();
+        }
     }
 
     public PropertyOption? SelectedOption

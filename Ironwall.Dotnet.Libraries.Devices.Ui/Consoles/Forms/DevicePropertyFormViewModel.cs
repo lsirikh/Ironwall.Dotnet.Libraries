@@ -152,17 +152,41 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
 
         if (touched.Count == 0 && !IsCreating) return new PropertyFormCommit(false, 0, 0, "바꾼 칸이 없다");
 
-        // 2) 쓰기 — 검증을 지난 값이 여기서 거절되면 명세와 뷰모델이 어긋난 것이다. 그 칸에 까닭을 남기고 멈춘다.
+        // 2) 쓰기 — 전부 아니면 전무. 검증은 글자만 본다(빈 값을 받을 수 있는지는 속성의 형이 정한다)라서 쓰는 순간에야
+        //    거절되는 값이 있다. 그때 앞서 쓴 칸을 그대로 두면 반쯤 고친 행이 남아, 나중의 어떤 저장이든 그것을 서버로 보낸다.
+        var written = new List<(object Row, PropertyFieldViewModel Field, object? Original)>();
         foreach (var row in _rows)
         {
             foreach (var field in touched)
             {
-                if (!field.WriteTo(row))
-                    return new PropertyFormCommit(false, 0, 0, $"{field.Label}: {field.Error}");
+                var original = DevicePropertyAccessor.Read(row, field.Spec);
+                if (field.WriteTo(row))
+                {
+                    written.Add((row, field, original));
+                    continue;
+                }
+
+                foreach (var (writtenRow, writtenField, value) in Enumerable.Reverse(written)) Restore(writtenRow, writtenField.Spec, value);
+                return new PropertyFormCommit(false, 0, 0, $"{field.Label}: {field.Error}");
             }
         }
 
         return new PropertyFormCommit(true, _rows.Count, touched.Count, null);
+    }
+
+    /// <summary>행을 같은 Id 의 새 인스턴스로 바꿔 끼운다(재조회로 행이 새로 만들어졌을 때) — 칸의 글과 손댄 표지는 그대로 둔다.</summary>
+    public void RebindRows(IReadOnlyList<object> rows)
+    {
+        if (rows is null || rows.Count != _rows.Count) throw new ArgumentException("같은 수의 행으로만 바꿔 끼울 수 있다", nameof(rows));
+        _rows = rows;
+        NotifyOfPropertyChange(nameof(Rows));
+    }
+
+    private static void Restore(object row, DevicePropertySpec spec, object? original)
+    {
+        if (spec.ViewModelPath is null) return;
+        var property = row.GetType().GetProperty(spec.ViewModelPath);
+        if (property is { CanWrite: true }) property.SetValue(row, original);
     }
 
     private IReadOnlyList<PropertyOption> ResolveOptions(DevicePropertySpec spec, EnumDeviceCategory category)

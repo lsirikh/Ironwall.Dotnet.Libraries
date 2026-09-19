@@ -144,6 +144,25 @@ public class DevicePropertyFormTests : IDisposable
     }
 
     [Fact]
+    public void should_roll_back_earlier_fields_when_a_later_field_is_rejected_at_write_time()
+    {
+        // 빈 IP 는 글자 검증을 지난다(받을 수 있는지는 속성의 형이 정한다) — 쓰는 순간에 거절된다.
+        var a = Controller(1, 1, "A", ip: "10.0.0.1");
+        var b = Controller(2, 2, "A", ip: "10.0.0.1");
+        var form = NewForm(out _);
+        form.Load(new object[] { a, b }, EnumDeviceCategory.Controller, true, false, false);
+
+        Field(form, "name_device").Text = "B";
+        Field(form, "connection.ip_address").Text = "";
+        var commit = form.Commit();
+
+        Assert.False(commit.IsWritten);
+        Assert.Equal("A", a.DeviceName);       // 앞서 쓴 이름이 남으면 반쯤 고친 행이 다음 저장에 실려 나간다
+        Assert.Equal("A", b.DeviceName);
+        Assert.Equal("10.0.0.1", a.IpAddress);
+    }
+
+    [Fact]
     public void should_restore_texts_without_touching_row_when_reverted()
     {
         var row = Controller(1, 1, "A");
@@ -229,6 +248,26 @@ public class DevicePropertyFormTests : IDisposable
         form.Load(new object[] { Controller(1, 1, "A") }, EnumDeviceCategory.Controller, true, false, false);
 
         Assert.False(form.Commit().IsWritten);
+    }
+
+    [Fact]
+    public void should_renotify_bool_value_when_indeterminate_state_is_pushed_back()
+    {
+        // 여러 값이면 상자가 세 상태다 — 사용자가 "가운데"로 돌리면 null 이 온다. 받지 않되, 알려서 상자를 제자리로 돌린다.
+        var on = Controller(1, 1, "A"); on.IsEnable = true;
+        var off = Controller(2, 2, "B"); off.IsEnable = false;
+        var form = NewForm(out var presenter);
+        form.Load(new object[] { on, off }, EnumDeviceCategory.Controller, true, false, false);
+        var field = Field(form, "is_enable");
+        field.BoolValue = true;
+        var notified = 0;
+        field.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(PropertyFieldViewModel.BoolValue)) notified++; };
+
+        field.BoolValue = null;
+
+        Assert.Equal(1, notified);
+        Assert.True(field.BoolValue);
+        Assert.Equal(1, presenter.Tracker.Count);
     }
 
     [Fact]

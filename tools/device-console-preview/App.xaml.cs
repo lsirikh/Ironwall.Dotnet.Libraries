@@ -87,6 +87,9 @@ public partial class App : Application
         IoC.GetAllInstances = type => type == typeof(DeviceQueryPolicy) ? new object[] { policy } : Array.Empty<object>();
         IoC.BuildUp = _ => { };
 
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute.BeginOnUIThread 가 제자리(작업 스레드)에서 돌아 콘솔이 교차 스레드로 화면을 만진다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
         var devices = new DeviceProvider();
         var groups = new DeviceGroupProvider(log);
         var servers = new ServerProvider(log);

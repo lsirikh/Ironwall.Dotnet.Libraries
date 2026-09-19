@@ -40,7 +40,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 /// </remarks>
 public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptions
 {
-    public const string ConsoleKey = "devices";
+    public const string ConsoleKey = "Devices";
     public const string GroupsRailKey = "groups";
     public const string ByComponentRailKey = "by-component";
 
@@ -62,6 +62,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                                 , ServerProvider serverProvider
                                 , IDeviceApiService deviceApiService
                                 , ICatalogService catalogService
+                                , DeviceQueryPolicy? queryPolicy = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -107,6 +108,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Form = new DevicePropertyFormViewModel(Detail, this);
         _deviceApiService = deviceApiService;
         _catalogService = catalogService;
+
+        // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
+        // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
+        _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
+        ContractGate = new DeviceContractGateViewModel(_queryPolicy, log);
         GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
@@ -155,8 +161,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         StatusText = string.Empty;
         NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
 
+        // 먼저 닫고 나서 비운다 — 비우고 닫으면 활성 패널이 닫힘을 못 받아 다음에 열 때 구독이 겹친다(패널은 싱글턴).
+        if (TabControlViewModel.ActiveItem is not null)
+            await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
         TabControlViewModel.Items.Clear();
-        await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
         await TabControlViewModel.DeactivateAsync(true);
     }
     #endregion
@@ -166,7 +174,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     public async Task<bool> SelectRailAsync(string key)
     {
         if (string.Equals(key, _railKey, StringComparison.Ordinal)) return true;
-        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail)) { NotifyOfPropertyChange(nameof(SelectedRail)); return false; }
+
+        // 전환 중이거나 저장 · 재조회가 도는 중이면 받지 않는다 — 전환은 패널을 닫는다(목록 비우기 + 진행 중 요청 취소).
+        if (_isSwitching || IsOperationRunning || !Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
+        {
+            NotifyOfPropertyChange(nameof(SelectedRail));
+            return false;
+        }
 
         await SwitchRailAsync(key, force: false);
         return true;
@@ -186,12 +200,16 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     {
         if (!RailEntries.Any(e => e.Key == key)) key = GroupsRailKey;
         if (!force && key == _railKey) return;
+        if (_isSwitching) return;   // 두 전환이 await 사이에 끼어들면 목록은 C 인데 열은 B 인 화면이 된다
 
+        _isSwitching = true;
         try
         {
             DetachRows();
             _draft = null;
             _pending = null;
+            _lastGroupUndo = null;          // 되돌리기는 그 일이 있었던 목록에서만 뜻이 있다
+            NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
             Form.Clear();
             Detail.Reset();
 
@@ -213,7 +231,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 // 늦게 만든다 — 이 뷰모델은 계약 판정 전에 만들어질 수 있고, 조회 뷰모델은 만들 때의 계약으로 굳는다.
                 if (ByComponent is null || !ByComponent.IsAvailable)
                 {
-                    ByComponent = new ByComponentViewModel(_deviceApiService, _catalogService, _log);
+                    ByComponent = new ByComponentViewModel(_deviceApiService, _catalogService, _log, _queryPolicy);
                     NotifyOfPropertyChange(nameof(ByComponent));
                 }
             }
@@ -227,6 +245,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         {
             _log?.Error($"[DeviceConsole] 레일 전환 실패({key}) — {ex.Message}");
         }
+        finally { _isSwitching = false; }
 
         NotifyOfPropertyChange(nameof(SelectedRail));
         NotifyOfPropertyChange(nameof(IsByComponent));
@@ -239,13 +258,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
     private void BuildRail()
     {
-        var wanted = new List<ConsoleRailEntry> { new(GroupsRailKey, "그룹", "FolderMultipleOutline") { ShowCount = true } };
+        var wanted = new List<ConsoleRailEntry> { new(GroupsRailKey, "그룹", new ConsoleIconToken("FolderMultipleOutline")) { ShowCount = true } };
         foreach (var category in DeviceRailCounter.RailOrder)
-            wanted.Add(new ConsoleRailEntry(RailKeyOf(category), CategoryLabel(category), CategoryIcon(category)) { ShowCount = true, Tag = category, HasSeparatorAbove = category == DeviceRailCounter.RailOrder[0] });
+            wanted.Add(new ConsoleRailEntry(RailKeyOf(category), CategoryLabel(category), new ConsoleIconToken(CategoryIcon(category))) { ShowCount = true, Tag = category, HasSeparatorAbove = category == DeviceRailCounter.RailOrder[0] });
 
         // 부품으로 찾기는 축 계약(7.0+)에서만 있는 조회다 — 6.3 에서는 항목 자체를 내지 않는다.
         if (ContractGate.IsAxisUi)
-            wanted.Add(new ConsoleRailEntry(ByComponentRailKey, "부품으로 찾기", "Magnify") { HasSeparatorAbove = true, ShowCount = false });
+            wanted.Add(new ConsoleRailEntry(ByComponentRailKey, "부품으로 찾기", new ConsoleIconToken("Magnify")) { HasSeparatorAbove = true, ShowCount = false });
 
         if (RailEntries.Select(e => e.Key).SequenceEqual(wanted.Select(e => e.Key))) return;
 
@@ -295,6 +314,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var rows = selected?.Cast<object>().ToList() ?? new List<object>();
         if (SameRows(rows, Form.Rows) && !Detail.IsCreating) return true;
 
+        if (IsOperationRunning) return false;   // 저장이 행을 돌고 있다 — 패널의 선택을 바꾸면 안 된다
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return false;
 
         _draft = null;
@@ -331,6 +351,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     {
         if (_rowsChanged is not null) _rowsChanged.CollectionChanged -= OnRowsChanged;
         _rowsChanged = null;
+        (_rows as ListCollectionView)?.DetachFromSourceCollection();   // 안 떼면 버린 뷰가 패널의 목록에 매달려 남는다
         Rows = null;
     }
 
@@ -349,7 +370,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     #region - Toolbar -
     public void Add()
     {
-        if (_current is null || !CanAdd) return;
+        if (_current is null || !CanAdd || IsOperationRunning) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
 
         // Draft 는 목록에서 뗀 채로 폼에만 물린다 — [등록] 전에는 목록에 아무것도 남지 않는다(FR-12).
@@ -369,11 +390,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
     public void Delete()
     {
-        if (_current is null || !CanDelete) return;
+        if (_current is null || !CanDelete || IsOperationRunning) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
 
-        // 패널의 삭제는 확인 팝업을 띄우고, 확인되면 지운 뒤 UpdateAction 을 울린다 — 그때 BusyEnded 로 돌아온다.
-        _pending = new PendingOperation(PendingKind.Delete, Form.Rows.Count, 0, Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
+        // 패널의 삭제는 확인 팝업부터 띄운다 — 취소하면 아무 일도 없고 끝남도 오지 않는다. 그래서 여기서는 아무것도 걸어 두지 않는다.
+        // 지워졌다면 패널이 UpdateAction 을 울리고, 그때 Reconcile 이 사라진 행을 선택에서 뺀다.
         _current.Delete();
     }
 
@@ -384,23 +405,28 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             if (IsByComponent && ByComponent is not null) _ = ByComponent.SearchAsync();
             return;
         }
-        if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+        if (IsOperationRunning || !Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
 
-        _pending = new PendingOperation(PendingKind.Reload, 0, 0, RowIds(Form.Rows), Array.Empty<(DevicePropertySpec, string)>());
-        _current.Reload();
+        if (_current.Reload())
+            _pending = new PendingOperation(PendingKind.Reload, 0, 0, RowIds(Form.Rows), Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
+        else
+            StatusText = "지금은 갱신할 수 없다 — 다른 처리가 끝난 뒤 다시 누른다";
         RefreshToolbar();
     }
 
-    public bool CanAdd => _current is not null && !_current.IsBusy && DevicePermissionGate.CanEdit();
-    public string? AddBlockedReason => _current is null ? "이 화면에서는 추가할 수 없습니다." : !DevicePermissionGate.CanEdit() ? "권한이 없습니다." : _current.IsBusy ? "처리 중입니다." : null;
+    public bool CanAdd => _current is not null && !IsOperationRunning && DevicePermissionGate.CanEdit();
+    public string? AddBlockedReason => _current is null ? "이 화면에서는 추가할 수 없습니다." : !DevicePermissionGate.CanEdit() ? "권한이 없습니다." : IsOperationRunning ? "처리 중입니다." : null;
 
-    public bool CanDelete => _current is not null && !_current.IsBusy && Form.Rows.Count > 0 && !Detail.IsCreating && DevicePermissionGate.CanDelete();
+    public bool CanDelete => _current is not null && !IsOperationRunning && Form.Rows.Count > 0 && !Detail.IsCreating && DevicePermissionGate.CanDelete();
     public string? DeleteBlockedReason => _current is null ? "이 화면에서는 삭제할 수 없습니다."
         : !DevicePermissionGate.CanDelete() ? "권한이 없습니다."
         : Form.Rows.Count == 0 || Detail.IsCreating ? "삭제할 항목을 먼저 고르세요."
-        : _current.IsBusy ? "처리 중입니다." : null;
+        : IsOperationRunning ? "처리 중입니다." : null;
 
-    public bool CanReload => _current is null ? IsByComponent : !_current.IsBusy;
+    public bool CanReload => _current is null ? IsByComponent : !IsOperationRunning;
+
+    /// <summary>저장 · 재조회가 도는 중 — 걸어 둔 일이 있거나 패널이 바쁘다. 이 동안에는 이동도 명령도 받지 않는다.</summary>
+    public bool IsOperationRunning => _pending is not null || _current?.IsBusy == true;
 
     private void RefreshToolbar()
     {
@@ -416,7 +442,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     /// <summary>[적용] · [등록].</summary>
     public void Apply()
     {
-        if (_current is null || _current.IsBusy) return;
+        if (_current is null || IsOperationRunning) return;
 
         var creating = Detail.IsCreating;
         var commit = Form.Commit();
@@ -429,11 +455,21 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         // 저장이 끝난 뒤 서버 값과 맞춰 보려고 무엇을 썼는지 적어 둔다 — 패널의 저장은 성공 여부를 돌려주지 않는다.
         var written = Form.Fields.Where(f => f.IsTouched && !f.IsLocked).Select(f => (f.Spec, f.Text)).ToList();
 
+        var knownIds = RowIds(_current.Rows.Cast<object>());
         if (creating && _draft is not null) _current.AdoptDraft(_draft);
 
-        _pending = new PendingOperation(creating ? PendingKind.Create : PendingKind.Update, commit.RowCount, commit.FieldCount, RowIds(Form.Rows), written);
+        // 패널은 권한이 없거나 다른 일을 하는 중이면 말없이 돌아온다 — 그때는 끝남도 오지 않는다.
+        // 걸어 두고 기다리면 다음에 오는 아무 끝남이나 "등록했다"로 읽힌다. 시작한 것을 확인하고서야 건다.
+        if (!_current.Save())
+        {
+            if (creating && _draft is not null) _current.ReleaseDraft(_draft);
+            Detail.LastMessage = "지금은 저장할 수 없다 — 처리 중이거나 권한이 없다. 손댄 칸은 그대로 있다";
+            RefreshToolbar();
+            return;
+        }
+
+        _pending = new PendingOperation(creating ? PendingKind.Create : PendingKind.Update, commit.RowCount, commit.FieldCount, RowIds(Form.Rows), knownIds, written);
         Detail.Settle(creating ? "등록하는 중…" : "적용하는 중…");
-        _current.Save();
         RefreshToolbar();
     }
 
@@ -486,9 +522,16 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         var pending = _pending;
         _pending = null;
-        if (pending is null) { RefreshStatus(); return; }
-
         var rows = _current!.Rows.Cast<object>().ToList();
+
+        // 걸어 둔 일이 없는 끝남 — 첫 로딩 · 삭제 · 패널 스스로의 재조회. 행 인스턴스가 바뀌었거나 사라졌을 수 있다.
+        if (pending is null)
+        {
+            Reconcile(rows);
+            RefreshToolbar();
+            RefreshStatus();
+            return;
+        }
 
         switch (pending.Kind)
         {
@@ -503,9 +546,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                     break;
                 }
 
+                // 새로 생긴 행 = 저장 전에는 없던 Id. 가장 큰 Id 를 고르면 필터에 가려졌을 때 엉뚱한 장비를 "등록했다"며 고른다.
+                var number = _draft is null ? null : RowText(_draft, "DeviceNumber");
+                var fresh = rows.Where(r => RowId(r) > 0 && !pending.KnownIds.Contains(RowId(r))).ToList();
+                var created = fresh.FirstOrDefault(r => RowText(r, "DeviceNumber") == number) ?? fresh.FirstOrDefault();
                 _draft = null;
-                var created = rows.Where(r => RowId(r) > 0).OrderByDescending(RowId).FirstOrDefault();
-                Reselect(created is null ? Array.Empty<object>() : new[] { created }, "등록했다");
+                Reselect(created is null ? Array.Empty<object>() : new[] { created },
+                    created is null ? "등록했다 — 지금 목록의 필터에서는 보이지 않는다" : "등록했다");
                 break;
             }
 
@@ -523,16 +570,36 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 break;
             }
 
-            case PendingKind.Delete:
-                Reselect(rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList(), null);
-                break;
-
             default:
                 Reselect(rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList(), "갱신했다");
                 break;
         }
 
         RefreshStatus();
+    }
+
+    /// <summary>
+    /// 콘솔이 시킨 일이 아닌데 목록이 바뀌었다 — 폼이 쥔 행을 지금 목록의 같은 Id 행으로 맞춘다.
+    /// 손댄 칸이 있으면 글은 그대로 두고 행만 바꿔 끼운다(옛 인스턴스에 쓰면 저장 경로가 그 값을 못 본다).
+    /// </summary>
+    private void Reconcile(IReadOnlyList<object> rows)
+    {
+        if (Detail.IsCreating || Form.Rows.Count == 0) return;
+        if (Form.Rows.All(rows.Contains)) return;
+
+        var ids = RowIds(Form.Rows);
+        var again = rows.Where(r => ids.Contains(RowId(r))).ToList();
+
+        if (Detail.Tracker.IsDirty && again.Count == Form.Rows.Count)
+        {
+            Form.RebindRows(again);
+            _current?.Select(again);
+            SelectionRestoreRequested?.Invoke(this, again);
+            return;
+        }
+
+        var lost = Form.Rows.Count - again.Count;
+        Reselect(again, lost > 0 ? $"고르던 {lost}건이 목록에서 사라졌다" : null);
     }
 
     /// <summary>재조회로 행 인스턴스가 바뀐다 — 같은 Id 의 새 행을 다시 고른다.</summary>
@@ -565,11 +632,23 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     /// <summary>장비 목록에서만 그룹으로 끌 수 있다(그룹 목록 · 부품으로 찾기에서는 핸들을 내지 않는다).</summary>
     public bool CanDragToGroup => _current is not null && _railKey != GroupsRailKey && DevicePermissionGate.CanEdit();
 
-    private void OnGroupDropCompleted(string line, GroupDropUndo? undo)
+    private void OnGroupDropCompleted(GroupDropResult result)
     {
-        _lastGroupUndo = undo;
-        StatusText = line;
+        _lastGroupUndo = result.Undo;
+        StatusText = result.Line;
         NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
+
+        if (result.Delta != 0)
+        {
+            // 소속은 모델의 평범한 목록이라 바뀌어도 아무도 모른다 — 그 행들의 "그룹" 글자와 칩의 개수를 여기서 다시 그리게 한다.
+            var group = _groupProvider.CollectionEntity.FirstOrDefault(g => g.Id == result.GroupId);
+            if (group is not null) group.DeviceCount = Math.Max(0, group.DeviceCount + result.Delta);
+            RefreshGroupChips();
+
+            var changed = result.DeviceIds.ToHashSet();
+            foreach (var row in _current?.Rows.Cast<object>().Where(r => changed.Contains(RowId(r))) ?? Enumerable.Empty<object>())
+                (row as Caliburn.Micro.INotifyPropertyChangedEx)?.NotifyOfPropertyChange("DeviceGroupsText");
+        }
 
         // 그룹 칸은 읽기 전용 표시다 — 손댄 칸이 없을 때만 폼을 다시 읽는다(미적용 변경을 덮지 않는다).
         if (!Detail.Tracker.IsDirty && !Detail.IsCreating && Form.Rows.Count > 0) LoadForm(Form.Rows, isCreating: false);
@@ -595,7 +674,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                     : Array.Empty<PropertyOption>();
 
             case DevicePropertyOptionSource.Controllers:
+                // 저장 전 제어기(Id≤0)는 고를 수 없다 — 고르면 센서 등록이 말없이 보류된다(패널도 같은 필터를 쓴다).
                 return _controllerProvider.CollectionEntity
+                    .Where(c => c.Id > 0)
                     .Select(c => new PropertyOption($"{c.DeviceName} (#{c.DeviceNumber})", null, c))
                     .ToList();
 
@@ -614,7 +695,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     /// <summary>
     /// 서버 계약 게이트(device-console-v8 FR-07) — 축 UI 표시 여부와 "판본 미확정" 배너.
     /// </summary>
-    public DeviceContractGateViewModel ContractGate { get; } = new();
+    public DeviceContractGateViewModel ContractGate { get; }
 
     /// <summary>배너의 [다시 확인] — 판본을 재확인하고, 세대가 바뀌었으면 장비를 그 계약으로 다시 읽는다.</summary>
     public async void OnClickRefreshContract()
@@ -649,6 +730,33 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             : shown == total ? $"목록 {total}건 · 선택 {Form.Rows.Count}"
             : $"목록 {shown}건(전체 {total}) · 선택 {Form.Rows.Count}";
     }
+    #endregion
+
+    #region - Selection narrowing -
+    /// <summary>
+    /// 화면이 되돌려 놓으려던 행 가운데 일부가 지금 그리드에 없다(검색에 가려졌다). 폼이 안 보이는 행을 쥔 채 남으면
+    /// [삭제] 가 눈에 안 보이는 장비를 지운다 — 실제로 골라진 것에 맞춘다. 손댄 칸이 있으면 건드리지 않는다.
+    /// </summary>
+    public void NarrowSelectionTo(IList actuallySelected)
+    {
+        if (Detail.IsCreating || Detail.Tracker.IsDirty || IsOperationRunning) return;
+
+        var rows = actuallySelected?.Cast<object>().ToList() ?? new List<object>();
+        if (SameRows(rows, Form.Rows)) return;
+
+        _current?.Select(rows);
+        LoadForm(rows, isCreating: false);
+        RefreshToolbar();
+        RefreshStatus();
+    }
+    #endregion
+
+    #region - Test seam -
+    /// <summary>
+    /// 한 레일의 목록 원천을 바꿔 끼운다 — <b>열기 전에</b> 부른다. 저장 · 삭제가 끝난 뒤의 판정(재선택 · 서버 값 대조 · 남은 Draft)을
+    /// 진짜 패널의 async void 경로 없이 결정적으로 시험하려는 이음매다.
+    /// </summary>
+    internal void UseSource(string railKey, IDeviceConsoleSource source) => _sources[railKey] = source;
     #endregion
 
     #region - Helpers -
@@ -764,9 +872,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     #endregion
 
     #region - Attributes -
-    private enum PendingKind { Create, Update, Delete, Reload }
+    private enum PendingKind { Create, Update, Reload }
 
-    private sealed record PendingOperation(PendingKind Kind, int RowCount, int FieldCount, IReadOnlyList<int> RowIds, IReadOnlyList<(DevicePropertySpec Spec, string Text)> Written);
+    private sealed record PendingOperation(PendingKind Kind, int RowCount, int FieldCount, IReadOnlyList<int> RowIds, IReadOnlyList<int> KnownIds, IReadOnlyList<(DevicePropertySpec Spec, string Text)> Written);
 
     private readonly Dictionary<string, IDeviceConsoleSource> _sources;
     private readonly Dictionary<EnumDeviceCategory, TypeAxisPanelSupport> _typeAxis;
@@ -775,12 +883,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private readonly ServerProvider _serverProvider;
     private readonly IDeviceApiService _deviceApiService;
     private readonly ICatalogService _catalogService;
+    private readonly DeviceQueryPolicy _queryPolicy;
 
     private IDeviceConsoleSource? _current;
     private INotifyCollectionChanged? _rowsChanged;
     private ICollectionView? _rows;
     private IReadOnlyList<DeviceColumnSpec> _columns = Array.Empty<DeviceColumnSpec>();
     private string? _railKey;
+    private bool _isSwitching;
     private object? _draft;
     private PendingOperation? _pending;
     private GroupDropUndo? _lastGroupUndo;

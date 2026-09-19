@@ -197,11 +197,17 @@ public partial class DeviceDashboardView : UserControl
         foreach (var (key, header, isVisible, isDefault) in ConsoleColumns.Describe(_grid.Columns))
         {
             var item = new MenuItem { Header = isDefault ? header : $"{header} (추가 열)", IsCheckable = true, IsChecked = isVisible, StaysOpenOnClick = true };
+            item.Tag = key;
             item.Click += (_, _) =>
             {
                 ConsoleColumns.Toggle(_grid.Columns, prefs, key);
                 ApplyColumnPrefs();
                 _prefs?.Save();
+
+                // 메뉴는 열린 채로 남는다 — 한 열을 켜면 다른 열이 숨김 목록으로 갈 수 있으니 체크 표시를 전부 다시 맞춘다.
+                var visible = ConsoleColumns.Describe(_grid.Columns).ToDictionary(c => c.Key, c => c.IsVisible);
+                foreach (var other in menu.Items.OfType<MenuItem>())
+                    if (other.Tag is string otherKey && visible.TryGetValue(otherKey, out var isVisible)) other.IsChecked = isVisible;
             };
             menu.Items.Add(item);
         }
@@ -236,6 +242,9 @@ public partial class DeviceDashboardView : UserControl
             foreach (var row in rows.Where(r => _grid.Items.Contains(r))) _grid.SelectedItems.Add(row);
         }
         finally { _isSyncingSelection = false; }
+
+        // 되돌리려던 행이 검색에 가려져 그리드에 없을 수 있다 — 폼이 안 보이는 행을 쥔 채 남지 않게 뷰모델에 실제 선택을 알린다.
+        if (_grid.SelectedItems.Count != rows.Count) _viewModel?.NarrowSelectionTo(_grid.SelectedItems);
     }
     #endregion
 
@@ -260,11 +269,11 @@ public partial class DeviceDashboardView : UserControl
     #endregion
 }
 
-/// <summary>아이콘 이름(문자열) → <see cref="PackIconKind"/>. 없는 이름이면 빈 아이콘 — 화면이 깨지지 않는다.</summary>
+/// <summary>아이콘 이름(문자열) → <see cref="PackIconKind"/>. 없는 이름이면 작은 점 — 엉뚱한 기본 아이콘(열거형의 첫 값)이 뜨지 않게.</summary>
 public sealed class PackIconKindConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is string name && Enum.TryParse<PackIconKind>(name, ignoreCase: false, out var kind) ? kind : DependencyProperty.UnsetValue;
+        => value is string name && Enum.TryParse<PackIconKind>(name, ignoreCase: false, out var kind) ? kind : PackIconKind.CircleSmall;
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

@@ -69,6 +69,29 @@ public class DeviceConfigWriteChannelLegacyPinningTests
         Assert.DoesNotContain("device_config", json);
     }
 
+    // "키가 없다"만 보면 직렬화가 통째로 빈 객체가 돼도 통과한다 — 캐리어를 채운 본문이 안 채운 본문과 글자 하나까지 같은지 본다.
+    [Theory]
+    [MemberData(nameof(NoComputedAxisKinds))]
+    public void should_serialize_identically_with_and_without_carrier_when_flag_off(string kind)
+    {
+        foreach (var useAxisWrite in new[] { false, true })
+        {
+            var plain = Build(kind);
+            plain.UseAxisWrite = useAxisWrite;
+
+            var carrying = Build(kind);
+            carrying.UseAxisWrite = useAxisWrite;
+            carrying.DeviceConfigWrite = new DeviceConfigAxisDto
+            {
+                ComponentOverrides = new JObject { ["heater"] = JValue.CreateNull() },
+            };
+
+            var expected = JsonConvert.SerializeObject(plain);
+            Assert.True(expected.Length > 2, "본문이 비었다 — 비교가 공허하다");
+            Assert.Equal(expected, JsonConvert.SerializeObject(carrying));
+        }
+    }
+
     [Fact]
     public void should_keep_enclosure_body_unchanged_when_flag_off_and_axis_contract()
     {

@@ -26,6 +26,14 @@ public sealed record GroupDropPlan(int GroupId, IReadOnlyList<int> DeviceIds, in
 /// <summary>되돌리기에 필요한 것 — 방금 서버가 실제로 넣은 장비들.</summary>
 public sealed record GroupDropUndo(int GroupId, string GroupName, IReadOnlyList<int> DeviceIds);
 
+/// <summary>그룹 넣기 · 되돌리기 한 번의 결과.</summary>
+/// <param name="Line">상태 띠에 남길 한 줄.</param>
+/// <param name="Undo">되돌릴 수 있으면 그 정보.</param>
+/// <param name="GroupId">바뀐 그룹(바뀐 것이 없으면 0).</param>
+/// <param name="DeviceIds">소속이 바뀐 장비들 — 화면은 이 행들의 그룹 글자와 그 그룹의 개수를 다시 그린다.</param>
+/// <param name="Delta">그 그룹의 장비 수 변화(넣으면 +, 되돌리면 −).</param>
+public sealed record GroupDropResult(string Line, GroupDropUndo? Undo, int GroupId, IReadOnlyList<int> DeviceIds, int Delta);
+
 /// <summary>
 /// 장비 → 그룹 끌어 놓기의 판정(순수 함수). 화면 없이 단위 테스트한다.
 /// </summary>
@@ -83,8 +91,8 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         _log = log;
     }
 
-    /// <summary>끝났다 — 상태 띠에 남길 한 줄과, 되돌릴 수 있으면 그 정보.</summary>
-    public event Action<string, GroupDropUndo?>? Completed;
+    /// <summary>끝났다(성공이든 아니든) — 무엇이 바뀌었는지 담아 알린다.</summary>
+    public event Action<GroupDropResult>? Completed;
 
     public bool IsBusy { get; private set; }
 
@@ -120,7 +128,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             Reflect(groupId, assigned, add: true);
 
             var undo = assigned.Count > 0 ? new GroupDropUndo(groupId, groupName, assigned.ToList()) : null;
-            return Finish(DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped), undo);
+            return Finish(DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped), undo, groupId, assigned.ToList(), assigned.Count);
         }
         catch (OperationCanceledException) { return Finish("그룹 넣기를 취소했다", null); }
         catch (Exception ex)
@@ -144,7 +152,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             if (!response.Success) return Finish($"되돌리지 못했다 — {response.Message}", undo);
 
             Reflect(undo.GroupId, undo.DeviceIds, add: false);
-            return Finish($"'{undo.GroupName}' 에 넣은 {undo.DeviceIds.Count}대를 되돌렸다", null);
+            return Finish($"'{undo.GroupName}' 에 넣은 {undo.DeviceIds.Count}대를 되돌렸다", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
         }
         catch (OperationCanceledException) { return Finish("되돌리기를 취소했다", undo); }
         catch (Exception ex)
@@ -173,9 +181,9 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         }
     }
 
-    private string Finish(string line, GroupDropUndo? undo)
+    private string Finish(string line, GroupDropUndo? undo, int groupId = 0, IReadOnlyList<int>? deviceIds = null, int delta = 0)
     {
-        Completed?.Invoke(line, undo);
+        Completed?.Invoke(new GroupDropResult(line, undo, groupId, deviceIds ?? Array.Empty<int>(), delta));
         return line;
     }
 }

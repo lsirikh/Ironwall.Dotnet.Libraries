@@ -1,13 +1,18 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -26,7 +31,7 @@ public class DeviceDashboardConsoleTests : IDisposable
 
     private static readonly string LampRail = DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Lamp);
 
-    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync()
+    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync(Func<LampDevicePanelViewModel, IDeviceConsoleSource>? lampSource = null)
     {
         var log = new MockLogService();
         var events = new EventAggregator();
@@ -49,6 +54,8 @@ public class DeviceDashboardConsoleTests : IDisposable
             new GateDevicePanelViewModel(events, log, api, new GateDeviceProvider(log, devices), providerService),
             new DeviceGroupPanelViewModel(events, log, api, groups, devices),
             devices, groups, controllers, new ServerProvider(log), api, new StubCatalog());
+
+        if (lampSource is not null) console.UseSource(LampRail, lampSource(lamps));
 
         // 카테고리별 프로바이더는 만들어진 뒤의 추가만 따라간다.
         groups.Add(new DeviceGroupModel { Id = 1, Name = "정문" });
@@ -211,6 +218,241 @@ public class DeviceDashboardConsoleTests : IDisposable
         Assert.Equal(ConsoleDetailState.None, console.Detail.State);
         Assert.Null(console.Rows);
     }
+
+    #region - 저장 · 등록이 끝난 뒤의 판정 (패널의 async void 경로 대신 각본대로 끝나는 원천을 쓴다) -
+    private static LampDeviceViewModel Lamp(int id, string name) => new(new LampDeviceModel { Id = id, DeviceNumber = Math.Max(id, 1), DeviceName = name });
+
+    [Fact]
+    public async Task should_reselect_refetched_row_and_report_applied_when_server_kept_the_value()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "정문 경광등";
+
+        console.Apply();
+        Assert.Equal(1, source.SaveCalls);
+
+        var refetched = Lamp(11, "정문 경광등");             // 재조회는 행 인스턴스를 새로 만든다
+        source.ReplaceWith(refetched);
+        source.Finish();
+
+        Assert.Same(refetched, console.Form.Rows.Single());
+        Assert.Equal(ConsoleDetailStateMachine.AppliedMessage(1, 1), console.Detail.LastMessage);
+    }
+
+    [Fact]
+    public async Task should_name_the_field_when_refetched_value_differs_from_what_was_written()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "정문 경광등";
+        console.Apply();
+
+        source.ReplaceWith(Lamp(11, "경광등 1"));             // 서버가 거절했다 — 재조회한 값은 옛 이름이다
+        source.Finish();
+
+        Assert.Contains("이름", console.Detail.LastMessage);
+        Assert.Contains("서버 값과 다르다", console.Detail.LastMessage);
+    }
+
+    [Fact]
+    public async Task should_stay_in_create_state_when_draft_is_still_unsaved_after_save()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.Add();
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+
+        console.Apply();
+        Assert.Equal(2, source.Items.Count);                  // [등록] 때 비로소 목록에 들어간다
+        source.Finish();                                      // 패널은 실패한 Draft(Id≤0)를 목록에 남긴다
+
+        Assert.True(console.Detail.IsCreating);
+        Assert.Contains("등록되지 않았다", console.Detail.LastMessage);
+    }
+
+    [Fact]
+    public async Task should_select_the_new_row_when_draft_was_created_on_the_server()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.Add();
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Apply();
+
+        var created = Lamp(42, "새로 단 경광등");
+        source.ReplaceWith(Lamp(11, "경광등 1"), created);
+        source.Finish();
+
+        Assert.False(console.Detail.IsCreating);
+        Assert.Same(created, console.Form.Rows.Single());
+        Assert.Equal("등록했다", console.Detail.LastMessage);
+    }
+
+    [Fact]
+    public async Task should_ignore_completion_of_another_rail_when_it_arrives_late()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        await console.SelectRailAsync(DeviceDashboardViewModel.GroupsRailKey);
+
+        source.Finish();                                      // 떠난 레일의 끝남 — 지금 화면을 건드리면 안 된다
+
+        Assert.Equal(DeviceDashboardViewModel.GroupsRailKey, console.SelectedRail!.Key);
+        Assert.Empty(console.Form.Sections);
+    }
+
+    [Fact]
+    public async Task should_keep_changes_and_leave_no_orphan_draft_when_panel_refuses_to_save()
+    {
+        // 패널은 권한이 없거나 다른 일을 하는 중이면 말없이 돌아온다 — 끝남도 오지 않는다.
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")) { RefuseSave = true });
+        await console.SelectRailAsync(LampRail);
+        console.Add();
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+
+        console.Apply();
+
+        Assert.Single(source.Items);                           // 넣었던 Draft 를 도로 뺐다
+        Assert.True(console.Detail.IsCreating);
+        Assert.True(console.Detail.Tracker.IsDirty);           // 손댄 칸은 그대로
+        Assert.False(console.IsOperationRunning);              // 걸어 둔 일이 없다 — 다음 끝남이 "등록했다"로 읽히지 않는다
+
+        source.Finish();
+        Assert.True(console.Detail.IsCreating);
+        Assert.DoesNotContain("등록했다", console.Detail.LastMessage ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task should_not_wait_for_anything_when_delete_is_requested()
+    {
+        // 삭제는 확인 팝업부터 뜬다 — 취소하면 끝남이 영영 오지 않으므로 걸어 두면 안 된다.
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1"), Lamp(12, "경광등 2")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+
+        console.Delete();
+
+        Assert.Equal(1, source.DeleteCalls);
+        Assert.False(console.IsOperationRunning);
+        Assert.True(console.OnRowsSelected(new List<object> { source.Items[1] }));   // 취소한 뒤에도 콘솔은 평소대로 움직인다
+    }
+
+    [Fact]
+    public async Task should_drop_vanished_rows_from_selection_when_list_changes_without_a_pending_operation()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1"), Lamp(12, "경광등 2")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0], source.Items[1] });
+
+        var survivor = Lamp(12, "경광등 2");
+        source.ReplaceWith(survivor);                          // 확인된 삭제 → 패널이 다시 읽었다
+        source.Finish();
+
+        Assert.Same(survivor, console.Form.Rows.Single());
+        Assert.Contains("1건이 목록에서 사라졌다", console.Detail.LastMessage);
+    }
+
+    [Fact]
+    public async Task should_rebind_rows_and_keep_typed_text_when_list_is_refetched_while_dirty()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "쓰던 이름";
+
+        var refetched = Lamp(11, "경광등 1");
+        source.ReplaceWith(refetched);
+        source.Finish();
+
+        Assert.Same(refetched, console.Form.Rows.Single());    // 옛 인스턴스에 쓰면 저장 경로가 그 값을 못 본다
+        Assert.Equal("쓰던 이름", console.Form.Fields.Single(f => f.Key == "name_device").Text);
+        Assert.True(console.Detail.Tracker.IsDirty);
+    }
+
+    [Fact]
+    public async Task should_refuse_navigation_and_commands_when_an_operation_is_running()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1"), Lamp(12, "경광등 2")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "정문 경광등";
+        console.Apply();                                       // 끝남이 오기 전
+
+        Assert.True(console.IsOperationRunning);
+        Assert.False(console.OnRowsSelected(new List<object> { source.Items[1] }));
+        Assert.False(await console.SelectRailAsync(DeviceDashboardViewModel.GroupsRailKey));
+        Assert.False(console.CanAdd);
+        Assert.False(console.CanDelete);
+
+        console.Apply();
+        Assert.Equal(1, source.SaveCalls);                     // 두 번 누른다고 두 번 저장하지 않는다
+    }
+
+    [Fact]
+    public async Task should_follow_actual_grid_selection_when_restored_rows_are_hidden_by_search()
+    {
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1"), Lamp(12, "경광등 2")));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { source.Items[0] });
+
+        console.NarrowSelectionTo(new List<object>());         // 검색에 가려져 그리드에는 아무것도 안 골라졌다
+
+        Assert.Empty(console.Form.Rows);
+        Assert.False(console.CanDelete);                       // 눈에 안 보이는 장비를 지우지 않는다
+    }
+
+    /// <summary>끝남을 시험이 정한다 — 진짜 패널은 활성화 수명주기용으로만 물려 둔다.</summary>
+    private sealed class ScriptedSource : IDeviceConsoleSource
+    {
+        public ScriptedSource(BasePanelViewModel panel, params LampDeviceViewModel[] rows)
+        {
+            Panel = panel;
+            foreach (var row in rows) Items.Add(row);
+        }
+
+        public ObservableCollection<LampDeviceViewModel> Items { get; } = new();
+        public int SaveCalls { get; private set; }
+        public int DeleteCalls { get; private set; }
+        public bool RefuseSave { get; set; }
+
+        public BasePanelViewModel Panel { get; }
+        public IEnumerable Rows => Items;
+        public INotifyCollectionChanged RowsChanged => Items;
+        public int RowCount => Items.Count;
+        public bool IsBusy => false;
+        public event EventHandler? BusyEnded;
+
+        public void Select(IReadOnlyList<object> rows) { }
+        public object? CreateDraft() => new LampDeviceViewModel(new LampDeviceModel { DeviceNumber = 9, DeviceName = "새 경광등 9" });
+        public void AdoptDraft(object draft) => Items.Add((LampDeviceViewModel)draft);
+        public void ReleaseDraft(object draft) => Items.Remove((LampDeviceViewModel)draft);
+        public bool Save() { SaveCalls++; return !RefuseSave; }
+        public void Delete() => DeleteCalls++;
+        public bool Reload() => true;
+
+        public void ReplaceWith(params LampDeviceViewModel[] rows)
+        {
+            Items.Clear();
+            foreach (var row in rows) Items.Add(row);
+        }
+
+        public void Finish() => BusyEnded?.Invoke(this, EventArgs.Empty);
+    }
+    #endregion
 
     private sealed class StubCatalog : Ironwall.Dotnet.Libraries.Devices.Ui.Services.ICatalogService
     {

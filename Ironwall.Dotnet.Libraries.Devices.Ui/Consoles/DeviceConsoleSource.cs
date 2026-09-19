@@ -43,9 +43,20 @@ public interface IDeviceConsoleSource
     /// <summary>떼어 둔 Draft 를 목록에 넣는다([등록] 직전). 이후 <see cref="Save"/> 가 그것을 서버에 만든다.</summary>
     void AdoptDraft(object draft);
 
-    void Save();
+    /// <summary>넣었던 Draft 를 도로 뺀다(저장이 시작조차 못 했을 때 — 목록에 주인 없는 행이 남지 않게).</summary>
+    void ReleaseDraft(object draft);
+
+    /// <summary>
+    /// 패널의 저장을 부른다. <b>시작했으면 true</b> — 패널은 권한이 없거나 다른 일을 하는 중이면 아무 말 없이 돌아온다.
+    /// false 면 <see cref="BusyEnded"/> 는 오지 않는다(기다리면 안 된다).
+    /// </summary>
+    bool Save();
+
+    /// <summary>패널의 삭제를 부른다 — 확인 팝업이 뜨고, 취소하면 아무 일도 없다. 끝남은 <see cref="BusyEnded"/> 로만 안다.</summary>
     void Delete();
-    void Reload();
+
+    /// <summary>패널의 재조회를 부른다. 시작했으면 true.</summary>
+    bool Reload();
 }
 
 /// <summary>
@@ -67,7 +78,7 @@ public sealed class DeviceConsoleSource<T> : IDeviceConsoleSource where T : clas
         _panel.PropertyChanged += OnPanelPropertyChanged;
         // 패널은 활성화돼 목록을 다 읽기 전까지 [갱신] 이 꺼져 있다(= 바쁨). 그 첫 끝남도 알려야 콘솔이 툴바를 다시 켠다.
         _wasBusy = IsBusy;
-        hookUpdated?.Invoke(() => BusyEnded?.Invoke(this, EventArgs.Empty));
+        hookUpdated?.Invoke(RaiseBusyEnded);
     }
 
     public BasePanelViewModel Panel => _panel;
@@ -80,7 +91,16 @@ public sealed class DeviceConsoleSource<T> : IDeviceConsoleSource where T : clas
 
     public event EventHandler? BusyEnded;
 
-    public void Select(IReadOnlyList<object> rows) => _panel.OnSelectionChanged(rows.OfType<T>().ToList());
+    public void Select(IReadOnlyList<object> rows)
+    {
+        var selected = rows.OfType<T>().ToList();
+
+        // 패널은 고른 행에 IsSelected 를 켜기만 한다 — 고르지 않게 된 행을 끄는 것은 예전에는 그리드의 몫이었다.
+        foreach (var row in _panel.ViewModelProvider)
+            if (row.IsSelected && !selected.Contains(row)) row.IsSelected = false;
+
+        _panel.OnSelectionChanged(selected);
+    }
 
     public object? CreateDraft()
     {
@@ -98,16 +118,47 @@ public sealed class DeviceConsoleSource<T> : IDeviceConsoleSource where T : clas
         if (draft is T row && !_panel.ViewModelProvider.Contains(row)) _panel.ViewModelProvider.Add(row);
     }
 
-    public void Save() => _panel.OnClickSaveButton(this, new System.Windows.RoutedEventArgs());
+    public void ReleaseDraft(object draft)
+    {
+        if (draft is T row) _panel.ViewModelProvider.Remove(row);
+    }
+
+    public bool Save() => Started(() => _panel.OnClickSaveButton(this, new System.Windows.RoutedEventArgs()));
     public void Delete() => _panel.OnClickDeleteButton(this, new System.Windows.RoutedEventArgs());
-    public void Reload() => _panel.OnClickReloadButton(this, new System.Windows.RoutedEventArgs());
+    public bool Reload() => Started(() => _panel.OnClickReloadButton(this, new System.Windows.RoutedEventArgs()));
+
+    /// <summary>
+    /// 패널의 버튼 경로는 async void 다 — 받아들였는지 돌려주지 않는다. 받아들였다면 첫 await 전에(= 이 호출 안에서)
+    /// 바쁨 표지를 켠다. 그 순간을 본다(끝까지 동기로 끝나 표지가 도로 꺼져도 "켜졌던 적"은 남는다).
+    /// </summary>
+    private bool Started(System.Action call)
+    {
+        var started = false;
+        void Watch(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(_panel.IsSaving) or nameof(_panel.ReloadButtonEnable)) started |= IsBusy;
+        }
+
+        _panel.PropertyChanged += Watch;
+        try { call(); }
+        finally { _panel.PropertyChanged -= Watch; }
+        return started;
+    }
+
+    /// <summary>
+    /// 패널은 끝남을 <b>작업 스레드에서</b> 알릴 수 있다(재조회를 ConfigureAwait(false) 로 기다린 뒤 UpdateAction 을 울린다).
+    /// 콘솔은 이 신호로 그리드 선택과 폼을 만지므로 여기서 한 번 UI 스레드로 옮긴다 — 안 옮기면 삭제 완료가 교차 스레드 예외로 죽고
+    /// 패널의 진행 팝업이 닫히지 않는다.
+    /// </summary>
+    private void RaiseBusyEnded() => Caliburn.Micro.Execute.BeginOnUIThread(() => BusyEnded?.Invoke(this, EventArgs.Empty));
 
     private void OnPanelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not (nameof(_panel.IsSaving) or nameof(_panel.ReloadButtonEnable))) return;
 
         var busy = IsBusy;
-        if (_wasBusy && !busy) BusyEnded?.Invoke(this, EventArgs.Empty);
+        var ended = _wasBusy && !busy;
         _wasBusy = busy;
+        if (ended) RaiseBusyEnded();
     }
 }

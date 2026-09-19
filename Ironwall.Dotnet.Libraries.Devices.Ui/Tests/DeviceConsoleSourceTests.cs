@@ -69,6 +69,45 @@ public class DeviceConsoleSourceTests : IDisposable
     }
 
     [Fact]
+    public void should_report_started_only_when_panel_turns_busy_during_the_call()
+    {
+        // 패널의 버튼 경로는 async void 다 — 권한이 없거나 다른 일을 하는 중이면 말없이 돌아온다.
+        var accepting = new FakePanel { TurnsBusyOnSave = true };
+        var refusing = new FakePanel();
+
+        Assert.True(new DeviceConsoleSource<LampDeviceViewModel>(accepting).Save());
+        Assert.False(new DeviceConsoleSource<LampDeviceViewModel>(refusing).Save());
+    }
+
+    [Fact]
+    public void should_clear_selected_flag_on_rows_that_are_no_longer_selected()
+    {
+        var panel = new FakePanel();
+        var source = new DeviceConsoleSource<LampDeviceViewModel>(panel);
+        var first = new LampDeviceViewModel(new LampDeviceModel { Id = 1 }) { IsSelected = true };
+        var second = new LampDeviceViewModel(new LampDeviceModel { Id = 2 });
+        panel.ViewModelProvider.Add(first);
+        panel.ViewModelProvider.Add(second);
+
+        source.Select(new object[] { second });
+
+        Assert.False(first.IsSelected);
+    }
+
+    [Fact]
+    public void should_remove_adopted_draft_when_released()
+    {
+        var panel = new FakePanel();
+        var source = new DeviceConsoleSource<LampDeviceViewModel>(panel);
+        var draft = source.CreateDraft()!;
+        source.AdoptDraft(draft);
+
+        source.ReleaseDraft(draft);
+
+        Assert.Empty(panel.ViewModelProvider);
+    }
+
+    [Fact]
     public void should_forward_only_matching_rows_when_selection_is_given()
     {
         var panel = new FakePanel();
@@ -147,6 +186,7 @@ public class DeviceConsoleSourceTests : IDisposable
         public FakePanel(bool loaded = true) : base(new EventAggregator(), null!) { ReloadButtonEnable = loaded; }
 
         public bool RefuseInsert { get; set; }
+        public bool TurnsBusyOnSave { get; set; }
         public int InsertCalls { get; private set; }
         public int SaveCalls { get; private set; }
         public int DeleteCalls { get; private set; }
@@ -165,7 +205,13 @@ public class DeviceConsoleSourceTests : IDisposable
         public override void OnSelectionChanged(System.Collections.Generic.IList<LampDeviceViewModel> selectedItems) => SelectedItems = selectedItems;
 
         public override void OnClickDeleteButton(object sender, RoutedEventArgs e) => DeleteCalls++;
-        public override void OnClickSaveButton(object sender, RoutedEventArgs e) => SaveCalls++;
+        public override void OnClickSaveButton(object sender, RoutedEventArgs e)
+        {
+            SaveCalls++;
+            if (!TurnsBusyOnSave) return;
+            IsSaving = true;      // 진짜 패널은 첫 await 전에 켜고, 끝나면 끈다 — 동기로 끝나도 "켜졌던 적"은 남아야 한다
+            IsSaving = false;
+        }
         public override void OnClickReloadButton(object sender, RoutedEventArgs e) => ReloadCalls++;
     }
 }

@@ -197,4 +197,17 @@ public class DeviceRailCounterTests : IDisposable
 
         Assert.Equal(DeviceRailCounter.IsFault(status), vm.IsFault);
     }
+
+    // 위 비교는 두 구현이 같은 식이라 함께 틀리면 못 잡는다 — 값을 표로 박아 둔다(장애는 ERROR 하나, 중지는 장애가 아니다).
+    [Theory]
+    [InlineData(EnumDeviceStatus.ACTIVATED, false)]
+    [InlineData(EnumDeviceStatus.ERROR, true)]
+    [InlineData(EnumDeviceStatus.DEACTIVATED, false)]
+    public void should_flag_only_error_as_fault_when_status_given(EnumDeviceStatus status, bool expected)
+    {
+        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { Status = status });
+
+        Assert.Equal(expected, vm.IsFault);
+        Assert.Equal(expected, DeviceRailCounter.IsFault(status));
+    }
 }
