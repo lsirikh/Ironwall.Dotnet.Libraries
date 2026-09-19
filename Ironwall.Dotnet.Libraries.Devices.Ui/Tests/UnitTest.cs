@@ -1060,6 +1060,9 @@ public class MockDeviceApiService : IDeviceApiService
     public List<ApiListResponse<SensorDeviceDto>> SensorResponses { get; } = new();
     public List<ApiListResponse<CameraDeviceDto>> CameraResponses { get; } = new();
     public List<ApiListResponse<GateDeviceDto>> GateResponses { get; } = new();
+    /// <summary>One line per device list request, in call order - the query shape the client actually sent.</summary>
+    public List<string> ListRequests { get; } = new();
+    private T Rec<T>(string requestLine, T result) { lock (ListRequests) ListRequests.Add(requestLine); return result; }
     private int _gatePageIndex = 0;
 
     private int _controllerPageIndex = 0;
@@ -1075,6 +1078,7 @@ public class MockDeviceApiService : IDeviceApiService
         string? typeController = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetControllersCalled = true;
+        Rec($"controllers includeSensors={includeSensors} view={view ?? "-"} include={include ?? "-"} type={typeController ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", 0);
         ControllerPageRequested = page; // Track the most recent page requested
 
         if (ShouldFailControllers)
@@ -1114,6 +1118,7 @@ public class MockDeviceApiService : IDeviceApiService
         string? typeSensor = null, int? groupId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetSensorsCalled = true;
+        Rec($"sensors includeController={includeController} typeDevice={typeDevice ?? "-"} view={view ?? "-"} include={include ?? "-"} type={typeSensor ?? "-"} group={groupId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", 0);
         SensorPageRequested = page;
 
         if (ShouldFailSensors)
@@ -1155,6 +1160,7 @@ public class MockDeviceApiService : IDeviceApiService
         string? typeCamera = null, string? protocol = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
     {
         GetCamerasCalled = true;
+        Rec($"cameras mode={mode ?? "-"} category={category ?? "-"} protocol={protocol ?? "-"} view={view ?? "-"} include={include ?? "-"} type={typeCamera ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", 0);
         CameraPageRequested = page;
 
         if (ShouldFailCameras)
@@ -1204,7 +1210,7 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ──────────────────────────── Speakers ────────────────────────────
     public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? speakerRole = null, string? typeSpeaker = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
-        => Task.FromResult(ApiListResponse<SpeakerDeviceDto>.CreateSuccess(new List<SpeakerDeviceDto>()));
+        => Rec($"speakers role={speakerRole ?? "-"} view={view ?? "-"} include={include ?? "-"} type={typeSpeaker ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", Task.FromResult(ApiListResponse<SpeakerDeviceDto>.CreateSuccess(new List<SpeakerDeviceDto>())));
     public Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<SpeakerDeviceDto>> CreateSpeakerAsync(SpeakerDeviceDto dto, CancellationToken token = default)
@@ -1218,7 +1224,7 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ──────────────────────────── Enclosures ────────────────────────────
     public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeEnclosure = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
-        => Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateSuccess(new List<EnclosureDeviceDto>()));
+        => Rec($"enclosures view={view ?? "-"} include={include ?? "-"} type={typeEnclosure ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateSuccess(new List<EnclosureDeviceDto>())));
     public Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(EnclosureDeviceDto dto, CancellationToken token = default)
@@ -1232,9 +1238,9 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ── Gate(통문, 서버 v6.3) — symbol-detail-and-door-control FR-09/10 ──
     public Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(string? gateStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeGate = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
-        => Task.FromResult(_gatePageIndex < GateResponses.Count
+        => Rec($"gates view={view ?? "-"} include={include ?? "-"} type={typeGate ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", Task.FromResult(_gatePageIndex < GateResponses.Count
             ? GateResponses[_gatePageIndex++]
-            : ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>()));
+            : ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>())));
     public Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
@@ -1252,7 +1258,7 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ──────────────────────────── Lamps ────────────────────────────
     public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeLamp = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
-        => Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>()));
+        => Rec($"lamps view={view ?? "-"} include={include ?? "-"} type={typeLamp ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>())));
     public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
         => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<LampDeviceDto>> CreateLampAsync(LampDeviceDto dto, CancellationToken token = default)
