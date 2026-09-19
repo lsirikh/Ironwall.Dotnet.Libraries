@@ -1,0 +1,218 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent.ByComponentView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="600"
+	d:DesignWidth="900"
+	AutomationProperties.AutomationId="Console.Devices.ByComponent"
+	mc:Ignorable="d">
+	<!--
+		"부품으로 찾기" 탭 (FR-17) — 읽기 전용 조회 화면.
+		· 필터 3종(유형 콤보 · 상태 칩 · 건강 칩)은 전부 SelectionChanged 에서 SearchAsync 를 직접 부른다
+		  (ByComponentViewModel 의 프로퍼티 세터는 값만 바꾸고 스스로 서버를 부르지 않는다 — VM 의 remarks 참조).
+		· 칩은 색이 아니라 굵기 + 두꺼운 테두리로 선택을 표시한다(drag-first-ux.md 시각 규칙과 같은 취지).
+		· DataGrid 는 고정 높이를 주지 않는다 — 행 * 로 늘어난다.
+	-->
+	<UserControl.Resources>
+		<!--  칩 — 선택은 색이 아니라 두꺼운 테두리 + 굵은 글자로 표시한다.  -->
+		<Style x:Key="ByComponent.Chip" TargetType="ListBoxItem">
+			<Setter Property="Padding" Value="10,4" />
+			<Setter Property="Margin" Value="0,0,6,0" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ListBoxItem">
+						<Border
+							x:Name="Bd"
+							Padding="{TemplateBinding Padding}"
+							Background="{DynamicResource SurfaceAltBrush}"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="12">
+							<ContentPresenter
+								x:Name="Cp"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								TextElement.FontSize="12"
+								TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsSelected" Value="True">
+								<Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+	</UserControl.Resources>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!--  툴바 — 부품 유형 콤보 · 상태 칩 · 건강 칩  -->
+		<Border
+			Grid.Row="0"
+			Padding="12,8"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="0,0,0,1">
+			<WrapPanel Orientation="Horizontal">
+				<TextBlock
+					Margin="0,0,6,0"
+					VerticalAlignment="Center"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="부품" />
+				<ComboBox
+					Width="220"
+					Margin="0,0,18,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Console.Devices.ByComponent.Type"
+					DisplayMemberPath="Display"
+					ItemsSource="{Binding ComponentTypes}"
+					SelectedItem="{Binding SelectedComponentType, Mode=TwoWay}"
+					SelectionChanged="OnFilterSelectionChanged" />
+
+				<ListBox
+					Margin="0,0,18,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Console.Devices.ByComponent.States"
+					BorderThickness="0"
+					Background="Transparent"
+					ItemContainerStyle="{StaticResource ByComponent.Chip}"
+					ItemsSource="{Binding StateChips}"
+					SelectedItem="{Binding SelectedState, Mode=TwoWay}"
+					SelectionChanged="OnFilterSelectionChanged"
+					SelectionMode="Single">
+					<ListBox.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapPanel Orientation="Horizontal" />
+						</ItemsPanelTemplate>
+					</ListBox.ItemsPanel>
+				</ListBox>
+
+				<ListBox
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Console.Devices.ByComponent.Health"
+					BorderThickness="0"
+					Background="Transparent"
+					ItemContainerStyle="{StaticResource ByComponent.Chip}"
+					ItemsSource="{Binding HealthChips}"
+					SelectedItem="{Binding SelectedHealth, Mode=TwoWay}"
+					SelectionChanged="OnFilterSelectionChanged"
+					SelectionMode="Single">
+					<ListBox.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapPanel Orientation="Horizontal" />
+						</ItemsPanelTemplate>
+					</ListBox.ItemsPanel>
+				</ListBox>
+			</WrapPanel>
+		</Border>
+
+		<!--  결과 그리드 — 읽기 전용 6열. 정렬 · 열 재정렬은 Console.DataGrid 스타일이 이미 끈다.  -->
+		<DataGrid
+			Grid.Row="1"
+			AutomationProperties.AutomationId="Console.Devices.ByComponent.Grid"
+			IsReadOnly="True"
+			ItemsSource="{Binding Rows}"
+			Style="{StaticResource Console.DataGrid}">
+			<DataGrid.Columns>
+				<DataGridTemplateColumn Width="140" Header="장비">
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<TextBlock
+									VerticalAlignment="Center"
+									FontFamily="{DynamicResource MonoFont}"
+									Text="{Binding DeviceNumber}" />
+								<TextBlock
+									Margin="6,0,0,0"
+									VerticalAlignment="Center"
+									Text="{Binding DeviceName}" />
+							</StackPanel>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+				<DataGridTextColumn Width="90" Binding="{Binding CategoryText}" Header="카테고리" />
+				<DataGridTextColumn Width="130" Binding="{Binding ComponentKey}" Header="부품 key">
+					<DataGridTextColumn.ElementStyle>
+						<Style TargetType="TextBlock">
+							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+						</Style>
+					</DataGridTextColumn.ElementStyle>
+				</DataGridTextColumn>
+				<DataGridTextColumn Width="100" Binding="{Binding StateText}" Header="상태" />
+				<DataGridTemplateColumn Width="100" Header="건강">
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<Border Style="{StaticResource Console.Pill}">
+								<StackPanel Orientation="Horizontal">
+									<Ellipse
+										x:Name="Dot"
+										Width="7"
+										Height="7"
+										Margin="0,0,5,0"
+										VerticalAlignment="Center"
+										Fill="{DynamicResource TextMutedBrush}" />
+									<TextBlock
+										x:Name="Txt"
+										FontSize="12"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding HealthText}" />
+								</StackPanel>
+							</Border>
+							<DataTemplate.Triggers>
+								<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+								</DataTrigger>
+								<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+								</DataTrigger>
+								<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+								</DataTrigger>
+							</DataTemplate.Triggers>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+				<DataGridTextColumn Width="*" MinWidth="160" Binding="{Binding LastChangeText}" Header="마지막 변화">
+					<DataGridTextColumn.ElementStyle>
+						<Style TargetType="TextBlock">
+							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+						</Style>
+					</DataGridTextColumn.ElementStyle>
+				</DataGridTextColumn>
+			</DataGrid.Columns>
+		</DataGrid>
+
+		<!--  상태 줄 — "조건에 맞는 부품 N건" / "조건에 맞는 부품이 없습니다" / 오류 문장.  -->
+		<Border
+			Grid.Row="2"
+			Padding="12,6"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="0,1,0,0">
+			<TextBlock
+				AutomationProperties.AutomationId="Console.Devices.ByComponent.Status"
+				FontSize="12"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding StatusText}" />
+		</Border>
+	</Grid>
+</UserControl>
