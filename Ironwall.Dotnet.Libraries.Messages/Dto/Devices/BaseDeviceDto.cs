@@ -1,5 +1,8 @@
 ﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System.Runtime.Serialization;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 
@@ -157,6 +160,50 @@ public class BaseDeviceDto : BaseDto
     public DeviceStatusAxisDto? DeviceStatusAxis { get; set; }
 
     public bool ShouldSerializeDeviceStatusAxis() => false;
+
+    #region - 축 수신 원본 보존 (device-console-v8 FR-03) — 읽기 전용, 직렬화되지 않는다 -
+    /// <summary>
+    /// 응답으로 <b>받은 그대로의</b> <c>connection</c> 축. 없었으면 <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>파생 DTO 의 <c>ConnectionAxis</c> getter 는 평면 필드(IP·포트·계정…)에서 축을 <b>재조립</b>한다 —
+    /// 쓰기 본문을 만들기 위한 것이라 서버가 준 <c>type</c>·<c>parent_device_id</c>·<c>channel</c>·<c>schema</c> 가
+    /// 거기엔 없다. 화면이 "받은 값"을 보이려면 재조립본이 아니라 이 원본을 읽어야 한다.</para>
+    /// <para><c>connection</c> 을 선언하지 않은 DTO(센서·스피커·함체)는 <see cref="_unmappedKeys"/> 에서 건진다 —
+    /// 8.0.1 은 그 카테고리에도 <c>connection</c> 을 싣는다(실측 2026-09-19, <c>meta.sections</c> 에 포함).</para>
+    /// </remarks>
+    [JsonIgnore]
+    public ConnectionAxisDto? ReceivedConnection { get; set; }
+
+    /// <summary>
+    /// 응답으로 <b>받은 그대로의</b> <c>device_config</c> 축(임계치·모드·부품 덮어쓰기 세 묶음 전부). 없었으면 <c>null</c>.
+    /// </summary>
+    /// <remarks>파생 DTO 의 <c>DeviceConfigAxis</c> getter 는 자기가 쓸 묶음만 재조립한다(카메라=모드, 함체=임계치+덮어쓰기).</remarks>
+    [JsonIgnore]
+    public DeviceConfigAxisDto? ReceivedDeviceConfig { get; set; }
+
+    /// <summary>
+    /// 이 DTO 가 선언하지 않은 응답 키의 임시 보관소 — 역직렬화가 끝나면 필요한 축만 건지고 <b>비운다</b>.
+    /// <c>WriteData=false</c> 라 쓰기 본문에는 절대 나가지 않는다(7.0+ 쓰기 스키마는 <c>extra="forbid"</c>).
+    /// </summary>
+    [JsonExtensionData(WriteData = false)]
+    private IDictionary<string, JToken>? _unmappedKeys;
+
+    [OnDeserialized]
+    internal void CaptureUndeclaredAxes(StreamingContext context)
+    {
+        if (_unmappedKeys == null) return;
+
+        if (ReceivedConnection == null && _unmappedKeys.TryGetValue("connection", out var connection) && connection is JObject)
+            ReceivedConnection = connection.ToObject<ConnectionAxisDto>();
+
+        if (ReceivedDeviceConfig == null && _unmappedKeys.TryGetValue("device_config", out var config) && config is JObject)
+            ReceivedDeviceConfig = config.ToObject<DeviceConfigAxisDto>();
+
+        // 이벤트 본문의 nested device 로도 쓰이는 DTO 다 — 안 쓰는 키를 이벤트마다 쥐고 있지 않는다.
+        _unmappedKeys = null;
+    }
+    #endregion
 
     /// <summary>
     /// <c>hardware_spec</c> 의 공용 배후 저장소. 파생 DTO 가 자기 <c>Order</c> 로 노출한다

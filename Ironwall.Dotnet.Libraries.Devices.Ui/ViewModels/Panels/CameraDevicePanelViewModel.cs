@@ -339,7 +339,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
                     _log?.Error($"Failed to fetch cameras (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToCameraDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToCameraDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);
             }

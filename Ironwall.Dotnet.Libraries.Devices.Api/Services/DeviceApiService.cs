@@ -110,6 +110,29 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <summary>
+    /// 기존 장비 수정의 전송 — <b>축 계약(7.0+)이면 <c>PATCH</c>, 6.3 이면 종전대로 <c>PUT</c></b>.
+    /// 7 카테고리의 <c>Update*Async</c> 가 전부 이 한 곳을 지난다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜 축 계약에서 PUT 을 쓰지 않는가</b> — 서버의 <c>PUT</c> 은 본문에 실린 축 문서를 <b>통째 교체</b>한다.
+    /// 그런데 우리 DTO 의 축은 서버에서 받은 원본이 아니라 <b>평면 필드에서 재조립한 부분 집합</b>이다
+    /// (<c>connection</c> 은 IP·포트·계정·프로토콜뿐, <c>hardware_spec</c> 은 스칼라뿐). 8.0.1 실측(2026-09-19):</para>
+    /// <list type="bullet">
+    /// <item>재조립 <c>connection</c> 을 PUT → <c>type</c> 이 <c>IP_DIRECT</c> 로 초기화 · <c>channel</c>·<c>parent_device_id</c> 소실(200 · 경고 없음).</item>
+    /// <item><c>hardware_spec</c> 스칼라만 PUT → <c>components[]</c> 와 나머지 스칼라 전부 소실 — 부품이 지워지면 그 관측·설정도 함께 지워진다.</item>
+    /// <item>같은 본문을 PATCH → 축은 <b>객체 병합</b>이라 위 값이 전부 보존되고 보낸 필드만 갱신된다.</item>
+    /// </list>
+    /// <para>즉 8.0 서버에서는 패널의 저장 버튼 한 번이 접속 방식과 부품 선언을 조용히 지우고 있었다.
+    /// 6.3 은 축이 없어 PUT 이 안전하고, 그 서버의 PATCH 지원 범위를 가정하지 않기 위해 그대로 둔다(무회귀).</para>
+    /// <para>PATCH 도 <c>components</c> <b>배열</b>은 통째 교체한다 — 그쪽은
+    /// <see cref="HardwareSpecDto.AllowComponentsWrite"/> 게이트가 막는다.</para>
+    /// </remarks>
+    private Task<System.Net.Http.HttpResponseMessage> WriteExistingDeviceAsync<T>(string url, T dto) where T : BaseDeviceDto
+        => IsAxisContract
+            ? _apiService.PatchRequestAsync(url, dto)
+            : _apiService.PutRequestAsync(url, dto);
+
+    /// <summary>
     /// 축 모드 쓰기에서 <c>version</c> 을 <c>hardware_spec.firmware</c> 로 잇는다(§5 머리 이관표, 쓰기 방향).
     /// </summary>
     /// <remarks>
@@ -452,7 +475,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/controllers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -627,7 +650,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/sensors/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -840,7 +863,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/cameras/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -1244,7 +1267,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/speakers/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<SpeakerDeviceDto>();
         }
         catch (Exception ex)
@@ -1358,7 +1381,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/enclosures/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<EnclosureDeviceDto>();
         }
         catch (Exception ex)
@@ -1453,6 +1476,51 @@ public class DeviceApiService : IDeviceApiService
         {
             _log?.Error($"[{nameof(PatchGateAsync)}] Error: {ex.Message}");
             return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to patch gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<GateDeviceDto>> CreateGateAsync(GateDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/gates", ShapeWrite(dto));
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to create gate", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<GateDeviceDto>> UpdateGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/gates/{id}", ShapeWrite(dto));
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to update gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<bool>> DeleteGateAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/gates/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete gate {id}", ex.Message);
         }
     }
 
@@ -1569,7 +1637,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", ShapeWrite(dto));
+            var response = await WriteExistingDeviceAsync($"{_setupModel.Url}/devices/lamps/{id}", ShapeWrite(dto));
             return await response.ToApiResponseAsync<LampDeviceDto>();
         }
         catch (Exception ex)

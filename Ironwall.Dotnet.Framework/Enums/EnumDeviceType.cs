@@ -34,5 +34,6 @@ public enum EnumDeviceType
     Lamp = 18,
     Enclosure = 19,
     SmartMultisensor2 = 20,
+    Gate = 21, // keep in step with Ironwall.Dotnet.Libraries.Enums.EnumDeviceType (device-console-v8 G-6'(a))
 }
 

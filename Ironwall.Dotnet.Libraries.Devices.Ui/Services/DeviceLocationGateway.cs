@@ -100,6 +100,7 @@ public class DeviceLocationGateway : IDeviceLocationGateway
         SpeakerDeviceModel => "speakers",
         EnclosureDeviceModel => "enclosures",
         LampDeviceModel => "lamps",
+        GateDeviceModel => "gates",
         _ => null
     };
     #endregion

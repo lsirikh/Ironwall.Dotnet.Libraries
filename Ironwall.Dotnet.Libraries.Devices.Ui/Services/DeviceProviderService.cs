@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
@@ -278,25 +279,27 @@ public class DeviceProviderService : IDeviceProviderService
     {
         try
         {
-            var normalized = NormalizeTypeDevice(typeDevice);
-            IBaseDeviceModel? updated = normalized switch
+            // 어느 경로로 재조회할지는 "종류"가 아니라 "카테고리"가 정한다.
+            //   종전엔 옛 종류 이름을 하나하나 나열한 문자열 switch 였고 SmartMultisensor2·Fence_Group 이 빠져 있어
+            //   그 센서의 SYNC_DEVICE 가 조용히 무시됐다(device-console-v8 ISSUE-19). 해석은 공용 정본에 맡긴다.
+            var category = ResolveSyncCategory(typeDevice);
+            IBaseDeviceModel? updated = category switch
             {
-                "Controller" => await FetchSingleControllerAsync(resourceId, token),
-                "Sensor" or "Fence" or "Underground" or "Multi" or "Contact" or "PIR"
-                    or "IoController" or "Laser" or "Cable" or "SmartSensor"
-                    or "SmartSensor2" or "SmartCompound" or "Radar" or "OpticalCable"
-                    => await FetchSingleSensorAsync(resourceId, token),
-                "IpCamera" => await FetchSingleCameraAsync(resourceId, token),
-                "Speaker" => await FetchSingleSpeakerAsync(resourceId, token),
-                "Enclosure" => await FetchSingleEnclosureAsync(resourceId, token),
-                "Gate" => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
-                "Lamp" => await FetchSingleLampAsync(resourceId, token),
+                EnumDeviceCategory.Controller => await FetchSingleControllerAsync(resourceId, token),
+                EnumDeviceCategory.Sensor => await FetchSingleSensorAsync(resourceId, token),
+                EnumDeviceCategory.Camera => await FetchSingleCameraAsync(resourceId, token),
+                EnumDeviceCategory.Speaker => await FetchSingleSpeakerAsync(resourceId, token),
+                EnumDeviceCategory.Enclosure => await FetchSingleEnclosureAsync(resourceId, token),
+                EnumDeviceCategory.Gate => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
+                EnumDeviceCategory.Lamp => await FetchSingleLampAsync(resourceId, token),
                 _ => null
             };
 
             if (updated != null)
             {
-                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d.DeviceType == updated.DeviceType);
+                // (Id, 판별자) 로 찾는다 — (Id, DeviceType) 은 종류축이 바뀐 장비를 못 찾아 중복으로 추가했다(FR-04 와 같은 키).
+                var updatedKey = CategoryKeyOf(updated);
+                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == updatedKey);
                 if (existing is IBaseDeviceModel e)
                 {
                     UpdateDeviceProperties(e, updated);
@@ -338,13 +341,13 @@ public class DeviceProviderService : IDeviceProviderService
     private async Task<IBaseDeviceModel?> FetchSingleGateAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetGateByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetControllerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
@@ -355,31 +358,31 @@ public class DeviceProviderService : IDeviceProviderService
             id,
             includeController: _queryPolicy.CanUseIncludeControllerFlag,
             token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleCameraAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetCameraByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleSpeakerAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetSpeakerByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleEnclosureAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetEnclosureByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleLampAsync(int id, CancellationToken token)
     {
         var resp = await _apiService.GetLampByIdAsync(id, token: token);
-        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel() : null;
+        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel().WithResponseMeta(resp.Meta) : null;
     }
 
     /// <summary>
@@ -587,7 +590,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var controller = dto.ToControllerDeviceModel();
+                    var controller = dto.ToControllerDeviceModel().WithResponseMeta(response.Meta);
                     allControllers.Add(controller);
                     totalFetched++;
                 }
@@ -651,7 +654,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var sensor = dto.ToSensorDeviceModel();
+                    var sensor = dto.ToSensorDeviceModel().WithResponseMeta(response.Meta);
                     allSensors.Add(sensor);
                     totalFetched++;
                 }
@@ -714,7 +717,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var camera = dto.ToCameraDeviceModel();
+                    var camera = dto.ToCameraDeviceModel().WithResponseMeta(response.Meta);
                     allCameras.Add(camera);
                     totalFetched++;
                 }
@@ -771,7 +774,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var speaker = dto.ToSpeakerDeviceModel();
+                    var speaker = dto.ToSpeakerDeviceModel().WithResponseMeta(response.Meta);
                     allSpeakers.Add(speaker);
                     totalFetched++;
                 }
@@ -827,7 +830,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var enclosure = dto.ToEnclosureDeviceModel();
+                    var enclosure = dto.ToEnclosureDeviceModel().WithResponseMeta(response.Meta);
                     allEnclosures.Add(enclosure);
                     totalFetched++;
                 }
@@ -884,7 +887,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var gate = dto.ToGateDeviceModel();
+                    var gate = dto.ToGateDeviceModel().WithResponseMeta(response.Meta);
                     allGates.Add(gate);
                     totalFetched++;
                 }
@@ -940,7 +943,7 @@ public class DeviceProviderService : IDeviceProviderService
 
                 foreach (var dto in response.Data)
                 {
-                    var lamp = dto.ToLampDeviceModel();
+                    var lamp = dto.ToLampDeviceModel().WithResponseMeta(response.Meta);
                     allLamps.Add(lamp);
                     totalFetched++;
                 }
@@ -1001,12 +1004,15 @@ public class DeviceProviderService : IDeviceProviderService
     private void UpdateOrAddDevices<T>(DeviceProvider provider, List<T> newDevices) where T : IBaseDeviceModel
     {
         var existingDevices = provider.OfType<T>().ToList();
-        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, d.DeviceType), d => d);
+        // 키는 (Id, 판별자) 다 — 종전 (Id, DeviceType) 은 다른 클라가 종류축만 바꿔도(Controller→IoController)
+        // 같은 장비를 "삭제 + 신규"로 봐 인스턴스를 갈아 끼웠고, 그 참조를 쥔 심볼·카드가 stale 해졌다.
+        // 판별자는 경로가 정하고 바뀌지 않는다(device-console-v8 FR-04).
+        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, CategoryKeyOf(d)), d => d);
 
         // 1. 기존 객체 업데이트 또는 삭제
         foreach (var existing in existingDevices)
         {
-            var key = (existing.Id, existing.DeviceType);
+            var key = (existing.Id, CategoryKeyOf(existing));
             if (newDeviceDict.TryGetValue(key, out var newDevice))
             {
                 UpdateDeviceProperties(existing, newDevice);  // 속성만 업데이트
@@ -1023,6 +1029,28 @@ public class DeviceProviderService : IDeviceProviderService
         {
             provider.Add(newDevice);
         }
+    }
+
+    /// <summary>
+    /// 캐시 병합 키의 판별자 성분. 모델에 판별자가 실려 있으면 그것, 없으면(이 변경 이전에 만들어진 캐시 항목 ·
+    /// Draft 등 매핑을 거치지 않은 객체) <b>모델의 CLR 형</b>으로 정한다 — 형은 경로(카테고리)와 1:1 이다.
+    /// </summary>
+    private static EnumDeviceCategory CategoryKeyOf(IBaseDeviceModel device)
+    {
+        if (device.CategoryDevice != EnumDeviceCategory.None)
+            return device.CategoryDevice;
+
+        return device switch
+        {
+            GateDeviceModel => EnumDeviceCategory.Gate,
+            ControllerDeviceModel => EnumDeviceCategory.Controller,
+            SensorDeviceModel => EnumDeviceCategory.Sensor,
+            CameraDeviceModel => EnumDeviceCategory.Camera,
+            SpeakerDeviceModel => EnumDeviceCategory.Speaker,
+            EnclosureDeviceModel => EnumDeviceCategory.Enclosure,
+            LampDeviceModel => EnumDeviceCategory.Lamp,
+            _ => EnumDeviceCategory.None,
+        };
     }
 
     /// <summary>
@@ -1052,8 +1080,26 @@ public class DeviceProviderService : IDeviceProviderService
         existing.Heading = newDevice.Heading;     // v4.4: 설치 방위각 — FetchAll 후 심볼 BaseBearing 갱신 반영(누락 버그)
         existing.Altitude = newDevice.Altitude;   // v4.4: 설치 고도
 
+        // v7.0+ 표현 모델 — 축은 한 묶음(Axes)이라 참조 하나로 통째 갈린다(낱개로 두면 새 축마다 한 줄씩 빠뜨린다).
+        //   새 응답이 축 없이 왔으면(판본 전환·프로필 축소) 옛 축도 버린다 — null 도 그대로 덮는다.
+        existing.CategoryDevice = newDevice.CategoryDevice;
+        existing.TypeAxisCode = newDevice.TypeAxisCode;
+        existing.UnitId = newDevice.UnitId;
+        existing.Axes = newDevice.Axes;
+
         // Type-Specific 속성 업데이트
-        if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
+        if (existing is GateDeviceModel existingGate && newDevice is GateDeviceModel newGate)
+        {
+            // 종전엔 이 분기가 없었다 — 통문의 문 상태·활성·위치가 첫 로드 값으로 굳었다(device-console-v8 ISSUE-17).
+            existingGate.GateStatus = newGate.GateStatus;
+            existingGate.UrlsJson = newGate.UrlsJson;
+            existingGate.LinkInfoJson = newGate.LinkInfoJson;
+            existingGate.IsEnable = newGate.IsEnable;
+            existingGate.Location = newGate.Location;
+            existingGate.Latitude = newGate.Latitude;
+            existingGate.Longitude = newGate.Longitude;
+        }
+        else if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
         {
             existingController.IpAddress = newController.IpAddress;
             existingController.Port = newController.Port;
@@ -1131,10 +1177,12 @@ public class DeviceProviderService : IDeviceProviderService
         try
         {
             var normalized = NormalizeTypeDevice(typeDevice);
-            // "Sensor" is a generic type_device — DeviceType is always a specific sub-type (Fence, Multi, etc.)
-            // so match by ID only when the generic "Sensor" type is received.
-            var device = normalized == "Sensor"
-                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d is ISensorDeviceModel)
+            // (Id, 판별자) 로 찾는다. 종전엔 DeviceType 이름을 정규화 문자열과 비교했는데
+            //   "Speaker" ≠ IpSpeaker 라 스피커 삭제 통지가 영영 매칭되지 않았고, 종류축이 클라 enum 밖(SmartController)이면
+            //   어떤 장비도 못 찾았다. 카테고리를 못 읽는 통지만 옛 이름 비교로 떨어진다.
+            var category = ResolveSyncCategory(typeDevice);
+            var device = category != EnumDeviceCategory.None
+                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && CategoryKeyOf(d) == category)
                 : _deviceProvider.FirstOrDefault(d => d.Id == resourceId
                     && d.DeviceType.ToString().Equals(normalized, StringComparison.OrdinalIgnoreCase));
             if (device != null)
@@ -1180,6 +1228,16 @@ public class DeviceProviderService : IDeviceProviderService
             group.DeviceCount = Math.Max(0, group.DeviceCount - 1);
         }
     }
+
+    /// <summary>
+    /// NATS <c>SYNC_DEVICE</c> 의 <c>type_device</c> 문자열 → 장비 카테고리.
+    /// 통지는 발신자마다 표기가 다르다 — DBApi 는 카테고리를 대문자로(<c>"CAMERA"</c>·<c>"SENSOR"</c>·<c>"GATE"</c>),
+    /// API 는 옛 종류 이름으로(<c>"IpCamera"</c>·<c>"Fence"</c>·<c>"SmartMultisensor2"</c>) 보낸다.
+    /// 둘 다 공용 정본(<see cref="DeviceTypeResolver"/>)으로 읽는다: 카테고리로 먼저, 안 되면 옛 종류에서 유도.
+    /// 어느 쪽으로도 못 읽으면 <see cref="EnumDeviceCategory.None"/> — 호출부가 통지를 무시한다.
+    /// </summary>
+    internal static EnumDeviceCategory ResolveSyncCategory(string? typeDevice)
+        => DeviceTypeResolver.ResolveCategory(typeDevice, typeDevice);
 
     private static string NormalizeTypeDevice(string typeDevice) =>
         typeDevice.ToUpperInvariant() switch

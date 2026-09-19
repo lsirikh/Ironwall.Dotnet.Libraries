@@ -404,7 +404,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                     _log?.Error($"Failed to fetch sensors (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToSensorDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToSensorDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);
             }

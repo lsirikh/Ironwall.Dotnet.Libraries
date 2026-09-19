@@ -324,7 +324,7 @@ public class LampDevicePanelViewModel : BaseDataGridMultiPanelViewModel<LampDevi
                     _log?.Error($"Failed to fetch lamps (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToLampDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToLampDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);
             }

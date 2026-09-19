@@ -640,6 +640,30 @@ public interface IDeviceApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// 통문 생성 — <c>POST /api/devices/gates</c>. 형상 축 <c>type_gate</c> 는 생략하면 서버가 <c>Unknown</c> 을 배정한다
+    /// (8.0.1 실측 2026-09-19). 다른 6 카테고리의 Create 와 같은 쓰기 성형(<c>ShapeWrite</c>)을 거친다.
+    /// </summary>
+    Task<ApiResponse<GateDeviceDto>> CreateGateAsync(
+        GateDeviceDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// 통문 수정 — 6.3 은 <c>PUT /api/devices/gates/{id}</c>, <b>축 계약(7.0+)은 같은 경로에 <c>PATCH</c></b>.
+    /// <para>7 카테고리의 <c>Update*Async</c> 가 모두 같다. 7.0+ 의 <c>PUT</c> 은 본문의 축 문서를 <b>통째 교체</b>하는데
+    /// 우리 DTO 의 축은 평면 필드에서 재조립한 부분 집합이라, PUT 하면 <c>connection.type</c>·<c>channel</c> 과
+    /// <c>hardware_spec.components</c> 가 경고 없이 지워진다(8.0.1 실측 2026-09-19). PATCH 는 축을 객체 병합한다.</para>
+    /// </summary>
+    Task<ApiResponse<GateDeviceDto>> UpdateGateAsync(
+        int id,
+        GateDeviceDto dto,
+        CancellationToken token = default);
+
+    /// <summary>통문 삭제 — <c>DELETE /api/devices/gates/{id}</c>.</summary>
+    Task<ApiResponse<bool>> DeleteGateAsync(
+        int id,
+        CancellationToken token = default);
+
+    /// <summary>
     /// ⛔ <b>사용 중지</b> — 통문 개폐 REST 경로 <c>POST /api/devices/gates/{id}/control</c> 는 서버에서 제거됐다
     /// (운영 6.3.2 = 통문 리소스 부재로 404 · 개발 7.0.1·8.0.1 = 410 <c>ENDPOINT_REMOVED</c> 묘비).
     /// <para>구현은 <b>HTTP 왕복 없이</b> <c>ENDPOINT_REMOVED</c> 오류를 즉시 돌려준다(시그니처 호환 유지).

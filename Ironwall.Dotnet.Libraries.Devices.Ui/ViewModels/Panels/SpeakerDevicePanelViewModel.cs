@@ -336,7 +336,7 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
                     _log?.Error($"Failed to fetch speakers (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToSpeakerDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToSpeakerDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);   // 마지막 페이지 = 완전
             }

@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
@@ -27,7 +28,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
@@ -40,6 +41,7 @@ public static class DtoToModelHelper
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Camera, dto.Category, dto.HardwareSpec);
 
         if (dto.HardwareSpec != null)
             model.HardwareSpec = ToCameraInfoModel(dto.HardwareSpec);
@@ -84,18 +86,12 @@ public static class DtoToModelHelper
     // ────────────────────────── Enum 파싱 헬퍼 ──────────────────────────
 
     /// <summary>
-    /// String → EnumDeviceType 변환
-    /// <para>"IpCamera" → EnumDeviceType.IpCamera</para>
+    /// 장비 DTO → 옛 종류(<see cref="EnumDeviceType"/>). 정본은 <see cref="DeviceTypeResolver"/> 다(Events.Ui 와 공용).
+    /// <para>① <c>type_device</c>(6.3 전문)가 읽히면 그것 — 6.3 결과는 종전과 같다.
+    /// ② 못 읽으면 판별자 <c>category_device</c> 로 복원(7.0+). sensor 는 의도적 미매핑 → <c>NONE</c>.</para>
     /// </summary>
-    private static EnumDeviceType ParseDeviceType(string? typeDevice)
-    {
-        if (string.IsNullOrEmpty(typeDevice))
-            return EnumDeviceType.NONE;
-
-        return Enum.TryParse<EnumDeviceType>(typeDevice, true, out var result)
-            ? result
-            : EnumDeviceType.NONE;
-    }
+    private static EnumDeviceType ParseDeviceType(BaseDeviceDto dto)
+        => DeviceTypeResolver.Resolve(dto) ?? EnumDeviceType.NONE;
 
     /// <summary>
     /// String → EnumDeviceStatus 변환
@@ -180,7 +176,7 @@ public static class DtoToModelHelper
             UserName = model.UserName ?? string.Empty,
             UserPassword = model.UserPassword ?? string.Empty,
             Mode = model.Mode.ToString(),
-            Category = model.Category.ToString(),
+            Category = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.Category),
             IsRecord = model.IsRecord
         };
         MapGeolocationToDto(model, dto);
@@ -223,12 +219,13 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status)
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Sensor, dto.TypeDevice, dto.HardwareSpec);
 
         // Controller 정보가 포함된 경우 변환.
         // 중첩 controller 객체가 없고 controller_id(FK)만 온 경우엔 Id만 seed →
@@ -258,7 +255,7 @@ public static class DtoToModelHelper
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
-            TypeDevice = model.DeviceType.ToString(),
+            TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             ControllerId = model.Controller?.Id ?? 0
@@ -288,13 +285,14 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
             Port = dto.IpPort
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Controller, dto.TypeDevice, dto.HardwareSpec);
         return model;
     }
 
@@ -311,7 +309,7 @@ public static class DtoToModelHelper
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
-            TypeDevice = model.DeviceType.ToString(),
+            TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             IpAddress = model.IpAddress ?? string.Empty,
@@ -333,7 +331,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             SpeakerType = dto.SpeakerType ?? "NORMAL",
@@ -341,6 +339,7 @@ public static class DtoToModelHelper
         };
 
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Speaker, dto.TypeSpeaker, dto.HardwareSpec);
 
         if (dto.Server != null)
             model.Server = dto.Server.ToServerModel();
@@ -409,7 +408,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
@@ -420,6 +419,7 @@ public static class DtoToModelHelper
             LinkInfoJson = dto.LinkInfo?.ToString(Newtonsoft.Json.Formatting.None),
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Gate, dto.TypeGate, dto.HardwareSpec);
         return model;
     }
 
@@ -435,7 +435,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             // (문 위치) 미상은 CLOSED 가 아니다 — NormalizeDoorScalar remarks 참조.
@@ -448,6 +448,7 @@ public static class DtoToModelHelper
         // 임계값(threshold_config JObject) → 강타입 모델 (이전엔 드롭 → 재조회 시 임계값 소실)
         model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Enclosure, dto.TypeEnclosure, dto.HardwareSpec);
         return model;
     }
 
@@ -639,7 +640,7 @@ public static class DtoToModelHelper
             DeviceNumber = dto.NumberDevice,
             DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
-            DeviceType = ParseDeviceType(dto.TypeDevice),
+            DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
@@ -649,6 +650,7 @@ public static class DtoToModelHelper
             Description = dto.Description
         };
         MapGeolocationToModel(dto, model);
+        DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Lamp, dto.TypeLamp, dto.HardwareSpec);
         return model;
     }
 

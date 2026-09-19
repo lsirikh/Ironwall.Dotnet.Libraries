@@ -109,6 +109,7 @@ public class CallDeleteSensorDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteSpeakerDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteEnclosureDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteLampDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteGateDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteDeviceGroupProcessMessageModel : IMessageModel { }
 public class CallRemoveDeviceFromGroupProcessMessageModel : IMessageModel { }
 public class CallDeleteDetectionEventProcessMessageModel : IMessageModel { }

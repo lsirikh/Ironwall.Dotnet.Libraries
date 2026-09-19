@@ -369,7 +369,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                     _log?.Error($"Failed to fetch controllers (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToControllerDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToControllerDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);   // 마지막 페이지 = 완전
             }

@@ -104,6 +104,7 @@ public class GateDeviceDto : BaseDeviceDto
         }
         set
         {
+            ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)
             if (value == null) return;
 
             if (DeviceAxisWrite.AsJObject(value.Urls) is { } urls) Urls = urls;

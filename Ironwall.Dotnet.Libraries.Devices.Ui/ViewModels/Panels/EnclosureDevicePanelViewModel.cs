@@ -334,7 +334,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
                     _log?.Error($"Failed to fetch enclosures (page {page}): {response.Error?.Message}");
                     return (all, false);
                 }
-                var batch = response.Data.Select(dto => dto.ToEnclosureDeviceModel()).ToList();
+                var batch = response.Data.Select(dto => dto.ToEnclosureDeviceModel().WithResponseMeta(response.Meta)).ToList();
                 all.AddRange(batch);
                 if (batch.Count < limit) return (all, true);
             }

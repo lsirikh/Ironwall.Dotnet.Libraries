@@ -422,8 +422,8 @@ public static class DtoToModelHelper
             return null;
 
         // 종류축 복원 — 판본 관용(F-03). null 이면 "종류를 모른다"는 뜻이다.
-        var resolvedType = ResolveDeviceType(deviceDto);
-        var category = ParseOrDefault<EnumDeviceCategory>(deviceDto.CategoryDevice);
+        var resolvedType = DeviceTypeResolver.Resolve(deviceDto);
+        var category = DeviceTypeResolver.ParseCategory(deviceDto.CategoryDevice);
 
         // DeviceProvider가 있으면 ID + 종류로 실제 Device 조회
         if (deviceProvider != null)
@@ -470,46 +470,8 @@ public static class DtoToModelHelper
     // 표시단 switch 의 `not null => "센서"` 가 이를 삼켜 **카메라·통문·함체 이벤트까지
     // 전부 '센서'로 보였다**. 판본 분기 대신 관용 수용으로 양쪽을 함께 견딘다(읽기 경로).
 
-    /// <summary>
-    /// <c>device</c> 참조/전문에서 장비 종류축을 복원한다. 확정 못 하면 <c>null</c>(=모른다).
-    /// </summary>
-    /// <remarks>
-    /// ① <c>type_device</c>(6.3.2 전문) → ② <c>category_device</c>(8.0.1 참조) 순으로 본다.
-    /// 종류가 카테고리보다 좁으므로 전문이 있으면 전문이 이긴다.
-    /// 어느 쪽도 못 읽으면 <b>추측하지 않는다</b> — 미지 폴백이 '센서'로 굳는 것이 이 버그였다.
-    /// </remarks>
-    private static EnumDeviceType? ResolveDeviceType(BaseDeviceDto dto)
-    {
-        // ① 6.3.2 전문: type_device 는 필수 키다. 관용 파싱(대소문자 무시) + NONE 은 미복원 취급.
-        if (!string.IsNullOrWhiteSpace(dto.TypeDevice) &&
-            Enum.TryParse<EnumDeviceType>(dto.TypeDevice, ignoreCase: true, out var typed) &&
-            typed != EnumDeviceType.NONE)
-            return typed;
-
-        // ② 8.0.1 참조: {id, category_device} — 카테고리로 복원할 수 있는 것만 복원한다.
-        return CategoryToDeviceType(ParseOrDefault<EnumDeviceCategory>(dto.CategoryDevice));
-    }
-
-    /// <summary>
-    /// 카테고리 → 종류축 매핑. <b>1:1 로 확정되는 6개만</b> 옮기고 나머지는 <c>null</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para><c>sensor</c> 는 <b>의도적으로 매핑하지 않는다</b> — 그 카테고리 안에 Fence·Multi·PIR·
-    /// SmartSensor… 가 전부 들어 있어 어느 하나를 고르면 <b>틀린 종류를 단정</b>하는 것이 된다.
-    /// 대신 <see cref="CreateDeviceShell"/> 이 <c>SensorDeviceModel</c>(종류=NONE) 을 세워
-    /// "센서인 건 아는데 종류는 모른다"를 그대로 표현한다.</para>
-    /// <para><c>gate</c> 는 8.0.1 이 늘린 값이다(6.3.2 어휘엔 없음) — 관용 수용이라 양쪽 무해.</para>
-    /// </remarks>
-    private static EnumDeviceType? CategoryToDeviceType(EnumDeviceCategory category) => category switch
-    {
-        EnumDeviceCategory.Controller => EnumDeviceType.Controller,
-        EnumDeviceCategory.Camera     => EnumDeviceType.IpCamera,
-        EnumDeviceCategory.Speaker    => EnumDeviceType.IpSpeaker,
-        EnumDeviceCategory.Enclosure  => EnumDeviceType.Enclosure,
-        EnumDeviceCategory.Lamp       => EnumDeviceType.Lamp,
-        EnumDeviceCategory.Gate       => EnumDeviceType.Gate,
-        _ => null   // Sensor(종류 미상) · None(미지 어휘) · Etc
-    };
+    // 종류축 복원 규칙(① type_device → ② category_device, sensor 는 의도적 미매핑)의 정본은
+    // Messages/Helpers/DeviceTypeResolver 다 — Devices.Ui 와 같은 함수를 쓴다(device-console-v8 FR-02, 이관).
 
     /// <summary>
     /// 폴백 모델 껍데기를 고른다 — 종류가 있으면 종류로, 없으면 <b>카테고리로</b>.
