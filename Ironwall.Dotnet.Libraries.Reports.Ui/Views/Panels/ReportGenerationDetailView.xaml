@@ -1,0 +1,249 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportGenerationDetailView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+	<!--
+		생성 이력의 상세 칸 — 설계 정본 window-layout-system-storyboard.html L1267-1269.
+		차례: ① 미리보기 축소판 ② 메타(유형 · 기간 · 템플릿 · 요청자) ③ 진행(단계 + 퍼센트 + 갱신 시각)
+		      ④ 실패 사유 / 파일 유실 안내 ⑤ 동작 줄 [크게 보기][PDF 내려받기][상세 CSV] ⑥ 파괴적 동작 묶음(L1280).
+		안내는 팝업이 아니라 인라인이다 — 미리보기(WebView2)가 같은 창의 팝업을 가린다(L1290).
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+		<ResourceDictionary.MergedDictionaries>
+			<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Reports.Ui;component/Views/Panels/ReportStyles.xaml" />
+		</ResourceDictionary.MergedDictionaries>
+
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+		<Style x:Key="MetaLabel" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="Width" Value="56" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+		<Style x:Key="MetaValue" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+		</ResourceDictionary>
+	</UserControl.Resources>
+
+	<StackPanel Margin="16,6,14,16">
+		<!--  ① 미리보기 축소판(380 폭 — "미리보기라 넓게" L1271)  -->
+		<c:ConsoleSection Header="미리보기">
+			<StackPanel>
+				<ContentControl
+					Height="240"
+					Content="{Binding PreviewViewModel}"
+					Focusable="False">
+					<ContentControl.ContentTemplate>
+						<DataTemplate>
+							<local:ReportPreviewView />
+						</DataTemplate>
+					</ContentControl.ContentTemplate>
+				</ContentControl>
+
+				<!--  확대 · 축소 — 살아 있는 미리보기에서만 뜻이 있다  -->
+				<DockPanel
+					Margin="0,8,0,0"
+					LastChildFill="False"
+					Visibility="{Binding PreviewViewModel.IsSurfaceLive, Converter={StaticResource BoolToVisibility}}">
+					<TextBlock
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						FontSize="11.5"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="확대" />
+					<Button
+						Margin="8,0,0,0"
+						AutomationProperties.AutomationId="Reports.Preview.ZoomOutButton"
+						Click="OnZoomOut"
+						Content="−"
+						DockPanel.Dock="Left"
+						Style="{StaticResource ConsoleMiniButton}"
+						ToolTip="축소" />
+					<TextBlock
+						MinWidth="46"
+						Margin="4,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.Preview.ZoomText"
+						DockPanel.Dock="Left"
+						FontFamily="Consolas"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding PreviewViewModel.ZoomText}"
+						TextAlignment="Center" />
+					<Button
+						AutomationProperties.AutomationId="Reports.Preview.ZoomInButton"
+						Click="OnZoomIn"
+						Content="＋"
+						DockPanel.Dock="Left"
+						Style="{StaticResource ConsoleMiniButton}"
+						ToolTip="확대" />
+					<Button
+						Margin="8,0,0,0"
+						AutomationProperties.AutomationId="Reports.Preview.ZoomResetButton"
+						Click="OnZoomReset"
+						Content="100%"
+						DockPanel.Dock="Left"
+						Style="{StaticResource ConsoleMiniButton}"
+						ToolTip="원본 크기" />
+				</DockPanel>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  ② 메타 — 유형 · 기간 · 템플릿 · 요청자(L1268)  -->
+		<c:ConsoleSection Header="정보">
+			<StackPanel Visibility="{Binding PreviewViewModel.HasRow, Converter={StaticResource BoolToVisibility}}">
+				<DockPanel Margin="0,1">
+					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="유형" />
+					<TextBlock
+						AutomationProperties.AutomationId="Reports.Detail.Field.report_type"
+						Style="{StaticResource MetaValue}"
+						Text="{Binding PreviewViewModel.MetaTypeText}" />
+				</DockPanel>
+				<DockPanel Margin="0,1">
+					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="기간" />
+					<TextBlock
+						AutomationProperties.AutomationId="Reports.Detail.Field.period_type"
+						Style="{StaticResource MetaValue}"
+						Text="{Binding PreviewViewModel.MetaPeriodText}" />
+				</DockPanel>
+				<DockPanel Margin="0,1">
+					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="템플릿" />
+					<TextBlock
+						AutomationProperties.AutomationId="Reports.Detail.Field.template_id"
+						Style="{StaticResource MetaValue}"
+						Text="{Binding PreviewViewModel.MetaTemplateText}" />
+				</DockPanel>
+				<DockPanel Margin="0,1">
+					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="요청자" />
+					<TextBlock
+						AutomationProperties.AutomationId="Reports.Detail.Field.generator_name"
+						Style="{StaticResource MetaValue}"
+						Text="{Binding PreviewViewModel.MetaRequesterText}" />
+				</DockPanel>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  ③ 진행 — 단계 + 퍼센트 + 갱신 시각(L1291: 멈춘 것과 느린 것을 가른다)  -->
+		<Border
+			Margin="0,2,0,0"
+			Padding="10,7"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource BorderBrush}"
+			BorderThickness="1"
+			CornerRadius="4"
+			Visibility="{Binding PreviewViewModel.HasProgress, Converter={StaticResource BoolToVisibility}}">
+			<TextBlock
+				AutomationProperties.AutomationId="Reports.Detail.ProgressText"
+				FontSize="12"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				Text="{Binding PreviewViewModel.ProgressDetailText}"
+				TextWrapping="Wrap" />
+		</Border>
+
+		<!--  ④ 실패 사유 — 색이 아니라 형태(왼쪽 굵은 띠 + ▲)로도 구분한다  -->
+		<Border
+			Margin="0,6,0,0"
+			Padding="10,7"
+			Background="{DynamicResource TintWarningBrush}"
+			BorderBrush="{DynamicResource StatusWarningBrush}"
+			BorderThickness="4,1,1,1"
+			CornerRadius="4"
+			Visibility="{Binding PreviewViewModel.HasFailure, Converter={StaticResource BoolToVisibility}}">
+			<TextBlock
+				AutomationProperties.AutomationId="Reports.Detail.FailureText"
+				FontSize="12"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				TextWrapping="Wrap">
+				<Run Text="▲ " /><Run Text="{Binding PreviewViewModel.FailureText, Mode=OneWay}" />
+			</TextBlock>
+		</Border>
+
+		<!--  ⑤ 동작 줄 — [크게 보기] 만 별도 창, 나머지는 제자리(L1269 · L1278)  -->
+		<c:ConsoleSection Header="내려받기">
+			<StackPanel>
+				<WrapPanel>
+					<Button
+						Margin="0,0,6,6"
+						AutomationProperties.AutomationId="Reports.Detail.LargeViewButton"
+						Click="OnLargeView"
+						Content="크게 보기"
+						IsEnabled="{Binding PreviewViewModel.CanOpenLargeView}"
+						Style="{StaticResource ModernPrimaryButton}"
+						ToolTip="별도 창으로 크게 봅니다" />
+					<Button
+						Margin="0,0,6,6"
+						AutomationProperties.AutomationId="Reports.Detail.DownloadPdfButton"
+						Click="OnDownloadPdf"
+						Content="PDF 내려받기"
+						IsEnabled="{Binding CanDownloadPdf}"
+						Style="{StaticResource ModernSecondaryButton}" />
+					<ComboBox
+						Width="92"
+						Margin="0,0,6,6"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.Detail.CsvTypeComboBox"
+						DisplayMemberPath="Display"
+						FontSize="12"
+						ItemsSource="{Binding PreviewViewModel.CsvTypes}"
+						SelectedItem="{Binding PreviewViewModel.SelectedCsvType}"
+						ToolTip="상세 CSV 유형(8종)" />
+					<Button
+						Margin="0,0,6,6"
+						AutomationProperties.AutomationId="Reports.Detail.DownloadCsvButton"
+						Click="OnDownloadCsv"
+						Content="상세 CSV"
+						IsEnabled="{Binding CanDownloadPdf}"
+						Style="{StaticResource ModernSecondaryButton}" />
+				</WrapPanel>
+
+				<!--  결과 안내는 팝업이 아니라 인라인 — WebView2 가 팝업을 가린다(L1290)  -->
+				<TextBlock
+					Margin="0,2,0,0"
+					AutomationProperties.AutomationId="Reports.Detail.ActionStatusText"
+					FontSize="11.5"
+					Foreground="{DynamicResource StatusCriticalBrush}"
+					Text="{Binding ListViewModel.ActionStatus}"
+					TextWrapping="Wrap"
+					Visibility="{Binding ListViewModel.HasActionStatus, Converter={StaticResource BoolToVisibility}}" />
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  ⑥ 파괴적 동작 묶음 — 행 안 인라인 취소를 없애고 여기로 모았다(L1280)  -->
+		<c:ConsoleSection Header="되돌릴 수 없는 동작" TagKind="Custom" TagText="확인 후 실행">
+			<StackPanel>
+				<WrapPanel>
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Reports.List.CancelButton"
+						Click="OnCancelGeneration"
+						Content="생성 취소"
+						IsEnabled="{Binding CanCancelGeneration}"
+						Style="{StaticResource ModernSecondaryButton}"
+						ToolTip="대기 · 생성중인 보고서만 취소할 수 있습니다" />
+					<Button
+						AutomationProperties.AutomationId="Reports.List.DeleteButton"
+						Click="OnDeleteGeneration"
+						Content="삭제"
+						IsEnabled="{Binding CanDeleteGeneration}"
+						Style="{StaticResource ModernSecondaryButton}"
+						ToolTip="보고서 기록과 PDF 파일을 지웁니다" />
+				</WrapPanel>
+				<TextBlock
+					Margin="0,6,0,0"
+					FontSize="11"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="누르면 확인 창이 먼저 뜹니다. 그동안 미리보기는 잠시 내려갑니다."
+					TextWrapping="Wrap" />
+			</StackPanel>
+		</c:ConsoleSection>
+	</StackPanel>
+</UserControl>

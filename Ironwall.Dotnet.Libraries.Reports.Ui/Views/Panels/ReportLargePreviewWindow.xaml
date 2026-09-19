@@ -1,0 +1,88 @@
+﻿<Window
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportLargePreviewWindow"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	Width="880"
+	Height="720"
+	MinWidth="520"
+	MinHeight="420"
+	AutomationProperties.AutomationId="Reports.LargePreview.Window"
+	Background="{DynamicResource SurfaceBrush}"
+	ShowInTaskbar="False"
+	WindowStartupLocation="CenterOwner">
+	<!--
+		[크게 보기] — 설계 정본 L1269 · L1278("크게 보기만 모달").
+		★ 인-윈도우 다이얼로그가 아니라 <b>자체 HWND 를 갖는 최상위 창</b>이다. WebView2 는 네이티브 창이라
+		  같은 최상위 창 안에서는 WPF 를 그 위에 못 그린다 — 창을 나누는 것이 공역 문제의 근본 회피책이다.
+		  크기 기준은 목업의 다이얼로그 폭 사다리(S400 / M560 / L720)보다 큰 탐지 신호 이력(880) 을 따랐다.
+	-->
+	<Window.Resources>
+		<ResourceDictionary>
+		<ResourceDictionary.MergedDictionaries>
+			<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Reports.Ui;component/Views/Panels/ReportStyles.xaml" />
+		</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</Window.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+		</Grid.RowDefinitions>
+
+		<Border
+			Grid.Row="0"
+			Padding="14,8"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="0,0,0,1">
+			<DockPanel LastChildFill="True">
+				<Button
+					AutomationProperties.AutomationId="Reports.LargePreview.CloseButton"
+					Click="OnClose"
+					Content="닫기"
+					DockPanel.Dock="Right"
+					Style="{StaticResource ModernTextButton}" />
+				<Button
+					Margin="0,0,6,0"
+					AutomationProperties.AutomationId="Reports.LargePreview.ZoomResetButton"
+					Click="OnZoomReset"
+					Content="100%"
+					DockPanel.Dock="Right"
+					Style="{StaticResource ConsoleMiniButton}" />
+				<Button
+					Margin="0,0,4,0"
+					AutomationProperties.AutomationId="Reports.LargePreview.ZoomInButton"
+					Click="OnZoomIn"
+					Content="＋"
+					DockPanel.Dock="Right"
+					Style="{StaticResource ConsoleMiniButton}" />
+				<Button
+					Margin="0,0,4,0"
+					AutomationProperties.AutomationId="Reports.LargePreview.ZoomOutButton"
+					Click="OnZoomOut"
+					Content="−"
+					DockPanel.Dock="Right"
+					Style="{StaticResource ConsoleMiniButton}" />
+				<TextBlock
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Reports.LargePreview.TitleText"
+					FontSize="13"
+					FontWeight="Medium"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+					TextTrimming="CharacterEllipsis" />
+			</DockPanel>
+		</Border>
+
+		<Border
+			Grid.Row="1"
+			Margin="12"
+			Background="White"
+			BorderBrush="{DynamicResource BorderBrush}"
+			BorderThickness="1"
+			ClipToBounds="True"
+			CornerRadius="4"
+			Loaded="OnHostLoaded" />
+	</Grid>
+</Window>

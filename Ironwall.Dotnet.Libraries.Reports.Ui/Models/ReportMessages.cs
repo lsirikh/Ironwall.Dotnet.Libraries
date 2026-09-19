@@ -1,4 +1,4 @@
-namespace Ironwall.Dotnet.Libraries.Reports.Ui.Models;
+﻿namespace Ironwall.Dotnet.Libraries.Reports.Ui.Models;
 
 /// <summary>
 /// 보고서 관리 콘솔 열기 요청 — 외부 셸(메뉴)이 발행, 외부 컨덕터가 ReportConsoleViewModel을 창/모달로 표시.

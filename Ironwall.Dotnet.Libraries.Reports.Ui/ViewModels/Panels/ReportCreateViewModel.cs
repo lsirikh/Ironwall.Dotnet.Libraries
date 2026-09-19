@@ -152,6 +152,23 @@ public class ReportCreateViewModel : BasePanelViewModel
         return msg;
     }
 
+    /// <summary>
+    /// [비우기] — 폼을 처음 상태로 돌린다(서버 미호출). 상세 칸 고정 막대의 되돌리기 자리다(WL L1499 T2).
+    /// </summary>
+    public void Reset()
+    {
+        Title = null;
+        IsTemplateBased = false;
+        IsCustomRange = false;
+        SelectedPeriod = Periods[0];
+        EndDate = DateTime.Today;
+        StartDate = DateTime.Today.AddDays(-7);
+        foreach (var s in Severities) s.IsSelected = false;
+        StatusText = string.Empty;
+        GenProgress = 0;
+        NotifyOfPropertyChange(nameof(HasInput));
+    }
+
     /// <summary>심각도 코드 → 화면 문구(서버로는 코드를 보낸다).</summary>
     private static string SeverityDisplay(string code) => code switch
     {
@@ -211,7 +228,13 @@ public class ReportCreateViewModel : BasePanelViewModel
     }
 
     private string? _title;
-    public string? Title { get => _title; set { _title = value; NotifyOfPropertyChange(); } }
+    public string? Title { get => _title; set { _title = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasInput)); } }
+
+    /// <summary>
+    /// 무언가 채워졌는가 — 고정 막대의 [생성] · [비우기] 를 켤지 정한다.
+    /// 제목이 비면 서버가 받지 않으므로 그것 하나로 판정한다(검증 문구는 <see cref="Generate"/> 가 낸다).
+    /// </summary>
+    public bool HasInput => !string.IsNullOrWhiteSpace(_title);
 
     private PeriodOption _selectedPeriod = null!;
     public PeriodOption SelectedPeriod { get => _selectedPeriod; set { _selectedPeriod = value; NotifyOfPropertyChange(); } }
@@ -261,32 +284,4 @@ public sealed class SeverityPick : PropertyChangedBase
     public string Display { get; }
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set { _isSelected = value; NotifyOfPropertyChange(); } }
-}
-
-/// <summary>템플릿 컴포넌트 선택 항목(템플릿 편집 다이얼로그에서 사용).</summary>
-public sealed class ComponentPick : PropertyChangedBase
-{
-    public ComponentPick(string id, string display, string? category) { Id = id; Display = display; Category = category; }
-    public string Id { get; }
-    public string Display { get; }
-    public string? Category { get; }
-
-    /// <summary>차트 종류(서버 <c>chart_type</c>) — <c>PIE</c>·<c>BAR</c>·<c>LINE</c>, 그리드·요약카드는 null.</summary>
-    public string? ChartType { get; init; }
-
-    /// <summary>서버 설명문(<c>description</c>) — 툴팁용.</summary>
-    public string? Description { get; init; }
-
-    /// <summary>종류 한국어 라벨 — null(그리드·요약)은 "표/요약".</summary>
-    public string ChartTypeLabel => ChartType switch
-    {
-        "PIE" => "원형",
-        "BAR" => "막대",
-        "LINE" => "추이",
-        null or "" => "표/요약",
-        _ => ChartType!
-    };
-
-    private bool _enabled;
-    public bool Enabled { get => _enabled; set { _enabled = value; NotifyOfPropertyChange(); } }
 }

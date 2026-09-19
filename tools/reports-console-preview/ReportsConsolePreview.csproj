@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Reports console preview (N-09): shows the real ReportConsoleView + view models on fake data,
+    with no host app and no server.  Run: dotnet run  |  snapshots: dotnet run (two dashes)snapshot <folder>
+    The preview pane degrades to a labelled placeholder because WebView2 does not render off-screen -
+    that is also the correct runtime behaviour when the runtime is missing.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ReportsConsolePreview</RootNamespace>
+    <AssemblyName>ReportsConsolePreview</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Reports.Ui\Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+  </ItemGroup>
+
+</Project>

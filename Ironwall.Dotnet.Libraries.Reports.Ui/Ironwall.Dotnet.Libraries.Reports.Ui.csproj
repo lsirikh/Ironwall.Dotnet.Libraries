@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -16,6 +16,13 @@
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc5.4" />
     <!-- 미리보기 HTML embed — 서버 자립형 HTML(인라인 Chart.js) 렌더 (Report_Generation S5) -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <!-- 헤드리스 테스트는 Tests/ 안에 둔다(Devices.Ui 선례) — 별도 프로젝트를 만들지 않아 .sln 을 건드리지 않는다 -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
