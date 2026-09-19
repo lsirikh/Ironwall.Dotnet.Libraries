@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [3.10.0] - 2026-09-18
+
+### Added
+- **PidsGroup 우클릭 — 등록 센서 정보 오버레이 + 그룹 탐지 이력 PRD** ([PRD](docs/prds/pidsgroup-rightclick-prd.md) · [Plan](docs/plans/pidsgroup-rightclick-prd-plan.md))
+
+
+
 ## [2.7.1] - 2026-06-04
 
 ### Added
@@ -15,9 +22,9 @@
 ## [Unreleased]
 
 ### Added
-- **장비 관리 창 v8 축 전환 1차 — 판별자 7탭 · 종류축 카탈로그 콤보 · 상세 9절 · 통문 패널** (Track C · 브랜치 `v2.10.0` · [PRD](docs/prds/device-console-v8-prd.md) v1.0 Approved · [Plan](docs/plans/device-console-v8-prd-plan.md) · [시나리오 분석](docs/analyses/device-console-v8-scenario-analysis.md) v1.3 · 사용자 승인 2026-09-19 · 롤백 `before-device-console-v8`) — **진행 중**
-  - 기반(화면 무변경): 통문 Api CRUD 3종·`GateDeviceProvider` · 판별자 해석기 공용화 · 축 모델 4종 + 읽기 매핑 · `UpdateDeviceProperties` 축 복사 · 카탈로그 캐시(`SYNC_CATALOG`) · DB `Enum.Parse`→`TryParse` · 계약 게이팅 + 프로브 실패 배너.
-  - 화면: 형상·부품·상태·설정 절은 **읽기 전용**(서버 `PATCH` 가 `components` 를 통째 교체 — 쓰기 본문에 `components` 미포함 단언). 6.3.2 운영에서는 옛 화면 무변경.
+- **장비 관리 창 v8 축 전환 1차 — 판별자 7탭 · 종류축 카탈로그 콤보 · 상세 9절 · 통문 패널** (Track C · 브랜치 `v2.10.0` · [PRD](docs/prds/device-console-v8-prd.md) v1.1 Approved · [Plan](docs/plans/device-console-v8-prd-plan.md) · [시나리오 분석](docs/analyses/device-console-v8-scenario-analysis.md) v1.3 · [실측](docs/tests/device-console-v8-verification.md) · [Phase 1 게이트](docs/tests/device-console-v8-phase1-gate.md) · 사용자 승인 2026-09-19 · 롤백 `before-device-console-v8`) — **Phase 1(기반) 머지 `19c6eaae` · Phase 2(화면) 진행 중**
+  - 기반(화면 무변경): 통문 Api CRUD 3종·`GateDeviceProvider`·삭제 메시지·위치 저장 · 판별자 해석기 공용화(`Messages/Helpers/DeviceTypeResolver`) · 축 묶음 모델(`IBaseDeviceModel.Axes` + `CategoryDevice`·`TypeAxisCode`·`UnitId`) + 수신 원본 읽기 매핑(`DeviceAxesMapper`) · 재조회 병합 키 `(Id, 판별자)` + 통문 분기 + 축 복사 · 카탈로그 캐시(`ICatalogService`) · 계약 게이트 + "판본 미확정" 배너 · DB `Enum.Parse`→비예외 헬퍼.
+  - 화면: 형상·부품·상태·설정 절은 **읽기 전용**(서버가 `components` 를 통째 교체). 6.3.2 운영에서는 옛 화면 무변경(`LegacyContractSnapshotTests`).
 - **GOP 서버 API 계약 동기화 (6.3.2 / 8.0.1 동시 대응)** (Track C · [PRD](docs/prds/gop-api-contract-sync-prd.md) v3.0 · [Plan](docs/plans/gop-api-contract-sync-prd-plan.md) · [분석](docs/analyses/gop-api-contract-sync-analysis.md) · [실연동 검증](docs/tests/gop-api-contract-sync-live-verification.md) · 사용자 사전 승인 2026-09-18)
   - **판본 런타임 분기**(`IServerContractProbe` + `ServerContractBootService`, `Order = -1000`) — 맞출 대상이 **셋**이다(운영 `6.3.2` · 개발 `8.0.1` · 명세 `v8.0`). 장비 쓰기는 `type_device`(6.3 **필수**) vs `additionalProperties:false`(7.0+ **금지**)로 **한 본문 양립 불가**라 페이로드 성형만으로는 못 맞춘다. `GET {root}/openapi.json` 의 `info.version` 을 1회 확보해 캐시하고, **판정 실패 시 `V6_3` 폴백**(운영이 6.3.2라 틀렸을 때 손해가 가장 작다). 비교는 **항상 `>=`** — 세션 중 로컬이 `7.0.1 → 8.0.1` 로 올라간 것이 `==` 분기의 위험을 실증했다.
   - **장비 축(axis) 전환** — `type_controller`/`type_sensor`/`type_camera`/`type_speaker`/`type_enclosure` + `connection`/`hardware_spec`/`device_config`. DTO 를 판본마다 복제하지 않고 `UseAxisWrite` 플래그 + `ShouldSerializeXxx()` 조건 직렬화로 **한 DTO 가 두 계약을 표현**한다. `version` → `hardware_spec.firmware` 역투영도 쓰기 방향으로 이었다(종전엔 드롭만 돼 펌웨어 수정이 서버에 전달되지 않았다).
@@ -43,6 +50,10 @@
   - **마이크 PTT** — 배선 완료 후 `IsMicCommandSupported=false` 하나로 잠금. 서버 규격 회신([요청서](docs/coordination/server-broadcast-mic-request-2026-09-08.md)) 후 상수만 바꾸면 열린다.
 
 ### Fixed
+- **축 계약(7.0+)에서 장비 저장이 접속 축·부품을 무경고로 지우던 문제** — 8.0.1 실측: 서버 `PUT` 은 본문의 축 문서를 통째 교체하는데 클라 DTO 의 축은 평면 필드 재조립본이라, 패널 저장(전부 PUT) 한 번에 `connection.type`→`IP_DIRECT`·`channel` 소실, 카메라는 `components[]` 전부 소실(200·경고 없음). → `DeviceApiService.WriteExistingDeviceAsync`: 7.0+ 는 `PATCH`(객체 병합), 6.3 은 종전 `PUT`. + `HardwareSpecDto.AllowComponentsWrite`(기본 false). 운영 6.3.2 미발현. (device-console-v8 FR-15)
+- **재조회·`SYNC_DEVICE` 가 통문을 갱신하지 않고, 종류축이 바뀐 장비를 중복 추가하던 문제** — 병합 키 `(Id, DeviceType)`→`(Id, 판별자)`, 통문 분기 신설. `SmartMultisensor2` 통지 무시 · 스피커 삭제 통지 영구 미매칭(`"Speaker"≠IpSpeaker`)도 판별자 라우팅으로 해소.
+- **v7.0+ 통문의 개폐가 항상 거부되던 문제** — 응답에 `type_device` 가 없어 `DeviceType=NONE` 이 됐다. 판별자에서 복원.
+- **Devices.Ui 테스트 flaky 2건**(Caliburn `IoC` 정적 상태 실행 순서 의존) — `TestIoCScope` + 컬렉션 직렬화.
 - **신설 이벤트 어휘가 탐지 목록 전체를 죽임** — `Enum.Parse` 가 미지 문자열에 `ArgumentException` 을 던져, 서버가 `Alert` 를 detection 카테고리로 보내기 시작하자 목록 로딩이 통째로 실패했다. 관용 파싱(`TryParse` + default 폴백)으로 교체 — **어휘가 늘어도 화면이 죽지 않는다.**
 - **`ShouldSerializeDevice() => false` 가 NATS 본문을 파손** — REST 쓰기 422 를 막으려 `device` 직렬화를 끈 것이 **`ACTION_REPORT` 의 `from_event.device` 까지 지웠다**(`ShouldSerializeXxx` 는 경로가 아니라 **타입 전역**에 적용된다). 경로별 차단은 플래그 게이트(`SuppressDeviceOnRestWrite`, REST 쓰기 구간에서만 켜고 `finally` 로 복원)로 해결. 회귀 테스트 2건으로 고정.
 - **분기를 만들어 놓고 실제로 켜지지 않던 죽은 코드 2건** — `ResolveAsync()` 호출부가 **0건**이었고, Autofac 팩토리가 프로브를 **전달하지 않아** 모든 판본 분기가 무력했다. 빌드·테스트는 전부 통과하는 상태로 숨어 있었다.
