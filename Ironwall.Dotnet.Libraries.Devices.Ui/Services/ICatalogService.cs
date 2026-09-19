@@ -15,7 +15,10 @@ public sealed record CatalogOption(string Code, string Label, bool IsDeprecated 
     /// <summary>라벨이 코드와 같으면 코드를 따로 보일 필요가 없다(목업 규칙: "라벨+코드 병기, 같으면 코드 숨김").</summary>
     public bool HasDistinctLabel => !string.Equals(Code, Label, StringComparison.Ordinal);
 
-    public override string ToString() => HasDistinctLabel ? $"{Label} ({Code})" : Code;
+    /// <summary>Combo display text: "Label (Code)" when they differ, otherwise just the label (also covers the code-less "all" filter item).</summary>
+    public string Display => HasDistinctLabel && Code.Length > 0 ? $"{Label} ({Code})" : Label;
+
+    public override string ToString() => Display;
 }
 
 /// <summary>카테고리의 종류축(<c>type_&lt;category&gt;</c>) 규칙.</summary>

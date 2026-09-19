@@ -101,6 +101,61 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         }
     }
 
+    /// <summary>판별자(<c>category_device</c>) — 읽기 전용. 경로가 정하고 바뀌지 않는다.</summary>
+    public EnumDeviceCategory CategoryDevice => _model.CategoryDevice;
+
+    /// <summary>
+    /// 종류축(<c>type_&lt;category&gt;</c>)의 서버 코드 — v7.0+ 축 화면의 콤보가 이 값을 바인딩한다(device-console-v8 FR-09).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>빈 값은 받지 않는다.</b> WPF <c>ComboBox</c> 는 <c>ItemsSource</c> 가 바뀌어 현재 값이 목록에 없으면
+    /// <c>SelectedValue=null</c> 을 소스에 되쓴다 — 카탈로그 재조회 한 번에 모든 행의 종류축이 지워진다(ISSUE-25).
+    /// 콤보로는 어차피 "비우기"를 할 수 없으므로 빈 값 대입을 무시해도 잃는 기능이 없다.</para>
+    /// <para><b>클라 enum 을 함께 맞춘다.</b> 쓰기 매핑은 enum 이 표현할 수 있는 값이면 enum 을 쓴다
+    /// (<c>DeviceAxesMapper.TypeAxisForWrite</c>). 여기서 enum 을 옛 값으로 두면 콤보 편집이 저장에서 사라진다.
+    /// enum 이 표현하지 못하는 값(<c>SPEED_DOME</c>)은 enum 을 건드리지 않고 원값만 보존한다.</para>
+    /// </remarks>
+    public string? TypeAxisCode
+    {
+        get { return _model.TypeAxisCode; }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            var code = value.Trim();
+            if (string.Equals(_model.TypeAxisCode, code, StringComparison.Ordinal)) return;
+
+            _model.TypeAxisCode = code;
+            SyncClientEnum(code);
+            NotifyOfPropertyChange(() => TypeAxisCode);
+            NotifyOfPropertyChange(nameof(TypeAxisDisplay));
+            NotifyOfPropertyChange(() => DeviceType);
+        }
+    }
+
+    /// <summary>Grid text for the type axis: "Label (Code)", "미대응: X" for values the server catalog does not know, "선택 필요" when required and empty.</summary>
+    public string TypeAxisDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.TypeAxisPanelSupport.DescribeFor(_model);
+
+    private void SyncClientEnum(string code)
+    {
+        if (_model is ICameraDeviceModel camera)
+        {
+            if (Enum.TryParse<EnumCameraType>(code, ignoreCase: true, out var cameraType) && Enum.IsDefined(cameraType))
+            {
+                camera.Category = cameraType;
+                NotifyOfPropertyChange("Category");
+            }
+            return;
+        }
+
+        // 제어기·센서는 옛 DeviceType 이 곧 종류축이다. 형상 4축(스피커·함체·경광등·통문)은 DeviceType 과 무관 — 건드리지 않는다.
+        if (_model is IControllerDeviceModel or ISensorDeviceModel
+            && Enum.TryParse<EnumDeviceType>(code, ignoreCase: true, out var deviceType)
+            && Enum.IsDefined(deviceType) && deviceType != EnumDeviceType.NONE)
+        {
+            _model.DeviceType = deviceType;
+        }
+    }
+
 
     public string? Version
     {

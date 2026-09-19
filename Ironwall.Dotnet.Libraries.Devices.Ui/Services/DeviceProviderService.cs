@@ -1035,23 +1035,7 @@ public class DeviceProviderService : IDeviceProviderService
     /// 캐시 병합 키의 판별자 성분. 모델에 판별자가 실려 있으면 그것, 없으면(이 변경 이전에 만들어진 캐시 항목 ·
     /// Draft 등 매핑을 거치지 않은 객체) <b>모델의 CLR 형</b>으로 정한다 — 형은 경로(카테고리)와 1:1 이다.
     /// </summary>
-    private static EnumDeviceCategory CategoryKeyOf(IBaseDeviceModel device)
-    {
-        if (device.CategoryDevice != EnumDeviceCategory.None)
-            return device.CategoryDevice;
-
-        return device switch
-        {
-            GateDeviceModel => EnumDeviceCategory.Gate,
-            ControllerDeviceModel => EnumDeviceCategory.Controller,
-            SensorDeviceModel => EnumDeviceCategory.Sensor,
-            CameraDeviceModel => EnumDeviceCategory.Camera,
-            SpeakerDeviceModel => EnumDeviceCategory.Speaker,
-            EnclosureDeviceModel => EnumDeviceCategory.Enclosure,
-            LampDeviceModel => EnumDeviceCategory.Lamp,
-            _ => EnumDeviceCategory.None,
-        };
-    }
+    private static EnumDeviceCategory CategoryKeyOf(IBaseDeviceModel device) => DeviceAxesMapper.CategoryOf(device);
 
     /// <summary>
     /// 기존 Device 객체의 속성을 새 Device 데이터로 업데이트합니다.

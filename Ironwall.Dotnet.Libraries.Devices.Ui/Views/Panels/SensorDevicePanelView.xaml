@@ -47,6 +47,20 @@
 					<ColumnDefinition Width="10" />
 					<ColumnDefinition Width="70" />
 				</Grid.ColumnDefinitions>
+				<!--  Type-axis filter (v7.0+ only)  -->
+				<ComboBox
+					Grid.Column="0"
+					Width="200"
+					HorizontalAlignment="Left"
+					VerticalAlignment="Center"
+					md:HintAssist.Hint="종류 필터"
+					AutomationProperties.AutomationId="Devices.Sensor.TypeAxisFilter"
+					DisplayMemberPath="Display"
+					ItemsSource="{Binding TypeAxis.FilterOptions}"
+					SelectedValue="{Binding TypeAxis.SelectedFilterCode, Mode=TwoWay}"
+					SelectedValuePath="Code"
+					Visibility="{Binding TypeAxis.IsAxisUi, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="7"
@@ -150,6 +164,7 @@
 		</Grid>
 		<DataGrid
 			x:Name="DataGridUsers"
+			IsReadOnly="{Binding IsGridReadOnly}"
 			Grid.Row="1"
 			Height="260"
 			Background="Transparent"
@@ -244,7 +259,7 @@
 				<DataGridTemplateColumn
 					CanUserSort="True"
 					Header="장비명"
-					SortMemberPath="DeviceNumber">
+					SortMemberPath="DeviceName">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
@@ -273,7 +288,8 @@
 				<DataGridTemplateColumn
 					CanUserSort="True"
 					Header="유형"
-					SortMemberPath="DeviceType">
+					SortMemberPath="DeviceType"
+					Visibility="{Binding Data.TypeAxis.IsLegacyUi, Source={StaticResource proxy}, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
@@ -310,6 +326,40 @@
 									<Style TargetType="{x:Type ComboBoxItem}" />
 								</ComboBox.ItemContainerStyle>
 							</ComboBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  TypeAxis (v7.0+ type_<category>) - catalog strings, not the client enum (device-console-v8 FR-09)  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="종류"
+					SortMemberPath="TypeAxisCode"
+					Visibility="{Binding Data.TypeAxis.IsAxisUi, Source={StaticResource proxy}, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding TypeAxisDisplay, Mode=OneWay}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								DisplayMemberPath="Display"
+								IsEditable="False"
+								ItemsSource="{Binding Data.TypeAxis.Options, Source={StaticResource proxy}}"
+								SelectedValue="{Binding TypeAxisCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								SelectedValuePath="Code" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>

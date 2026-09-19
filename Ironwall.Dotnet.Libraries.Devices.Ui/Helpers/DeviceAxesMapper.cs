@@ -84,6 +84,28 @@ public static class DeviceAxesMapper
         return enumValue.ToString();
     }
 
+    /// <summary>
+    /// Discriminator of a model: the mapped <c>CategoryDevice</c> when present, otherwise derived from the CLR type
+    /// (drafts and cache entries created before mapping carry <c>None</c>; the model type is 1:1 with the endpoint path).
+    /// </summary>
+    public static EnumDeviceCategory CategoryOf(IBaseDeviceModel device)
+    {
+        if (device == null) return EnumDeviceCategory.None;
+        if (device.CategoryDevice != EnumDeviceCategory.None) return device.CategoryDevice;
+
+        return device switch
+        {
+            GateDeviceModel => EnumDeviceCategory.Gate,
+            ControllerDeviceModel => EnumDeviceCategory.Controller,
+            SensorDeviceModel => EnumDeviceCategory.Sensor,
+            CameraDeviceModel => EnumDeviceCategory.Camera,
+            SpeakerDeviceModel => EnumDeviceCategory.Speaker,
+            EnclosureDeviceModel => EnumDeviceCategory.Enclosure,
+            LampDeviceModel => EnumDeviceCategory.Lamp,
+            _ => EnumDeviceCategory.None,
+        };
+    }
+
     private static IDeviceAxesModel? BuildAxes(BaseDeviceDto dto, HardwareSpecDto? hardwareSpec)
     {
         var connection = ToConnection(dto.ReceivedConnection);

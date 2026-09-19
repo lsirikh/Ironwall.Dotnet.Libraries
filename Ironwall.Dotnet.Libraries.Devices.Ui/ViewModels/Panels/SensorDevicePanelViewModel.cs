@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -77,6 +78,9 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        // (device-console-v8 FR-09) type-axis combo/filter: options come from the catalog; no-op on a 6.3 contract.
+        TypeAxis.FilterChanged += OnTypeAxisFilterChanged;
+        await TypeAxis.EnsureAsync(cancellationToken);   // once per session (cached); never throws except on cancellation
         // (FR-EN-11) 역할강등 재평가 구독
         { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged += OnPermissionsChanged; }
         OnPermissionsChanged();   // (FR-EN-09 초기화 수정) 로그인 후 활성화 시 PermissionsChanged 이미 발화됨 → 초기 IsButtonEnable/SaveButtonEnable 권한 미반영(버튼 살아있는 버그). 활성화 시 1회 계산.
@@ -94,6 +98,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     {
         // (FR-EN-11) 역할강등 재평가 구독 해제
         { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged -= OnPermissionsChanged; }
+        TypeAxis.FilterChanged -= OnTypeAxisFilterChanged;
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         _deviceProvider.CollectionEntity.CollectionChanged -= DeviceProvider_CollectionChanged; // (FR-D1) 역방향 구독 해제
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
@@ -198,11 +203,15 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
             }
             var failures = new List<string>();
             var draftVMs = ViewModelProvider.Where(vm => vm.Model.Id <= 0).ToList();
+            // (device-console-v8 FR-10) rows whose type axis is empty/unknown to the server catalog are not sent (the server would answer 422).
+            var typeAxisBlocked = TypeAxis.FindBlocked(ViewModelProvider.ToList());
+            foreach (var blocked in typeAxisBlocked.Where(b => b.Model.Id <= 0))
+                failures.Add($"{blocked.Model.DeviceName}(신규): 종류를 선택해야 저장됩니다 — {TypeAxis.Describe(blocked.Model.TypeAxisCode)}");
             var committed = new List<SensorDeviceViewModel>();
 
             // 루프A: Draft 생성 (controller_id>0 필수 — 미선택 시 보류)
             int held = await ExecuteCreateAsync(
-                draftVMs,
+                draftVMs.Except(typeAxisBlocked).ToList(),
                 vm => { var c = ((ISensorDeviceModel)vm.Model).Controller; return c != null && c.Id > 0; },
                 (vm, ct) => CreateSensorAsync((SensorDeviceModel)vm.Model, ct),
                 vm => committed.Add(vm),
@@ -216,6 +225,9 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 var srv = serverList.FirstOrDefault(s => s.Id == vm.Model.Id);
                 return srv != null && !DeviceEquals((ISensorDeviceModel)vm.Model, srv);
             }).ToList();
+            foreach (var blocked in updateVMs.Intersect(typeAxisBlocked))
+                failures.Add($"{blocked.Model.DeviceName}(Id={blocked.Model.Id}): 종류를 선택해야 저장됩니다 — {TypeAxis.Describe(blocked.Model.TypeAxisCode)}");
+            updateVMs = updateVMs.Except(typeAxisBlocked).ToList();
             await ExecuteSaveUpdatesAsync(
                 updateVMs,
                 (vm, ct) => UpdateSensorAsync((SensorDeviceModel)vm.Model, ct),
@@ -356,6 +368,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         Execute.OnUIThread(() =>
         {
             IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
+            NotifyOfPropertyChange(nameof(IsGridReadOnly));
             // SaveButtonEnable 권한 세팅 제거 — 스피너는 IsSaving 전용, 저장버튼 활성은 IsButtonEnable이 담당(스피너 영구표시 버그 수정)
         });
     }
@@ -466,7 +479,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 _deviceProvider.CollectionEntity.CollectionChanged -= DeviceProvider_CollectionChanged; // (FR-D1) 재구성 구간 역방향 정지
                 await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
 
-                var items = _deviceProvider.OfType<ISensorDeviceModel>().ToList();
+                var items = _deviceProvider.OfType<ISensorDeviceModel>().Where(m => TypeAxis.Matches(m.TypeAxisCode)).ToList();
                 const int batchSize = 50;
                 for (int i = 0; i < items.Count; i += batchSize)
                 {
@@ -542,6 +555,31 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     #region - Properties -
     public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider.Where(c => c.Id > 0);   // (G6) Temp 제어기 제외
     public event System.Action? UpdateAction;
+    #endregion
+    #region - Type axis (device-console-v8 FR-09/FR-10) -
+    /// <summary>종류축 콤보·필터·저장 선차단. 6.3 계약이면 비활성(옛 화면 그대로).</summary>
+    public TypeAxisPanelSupport TypeAxis { get; } = TypeAxisPanelSupport.ForPanel(EnumDeviceCategory.Sensor);
+
+    /// <summary>그리드 편집 잠금 — 버튼만이 아니라 셀 편집까지 막는다(권한 없는 사용자가 값을 고쳐 놓고 저장만 못 하는 상태 방지).</summary>
+    public bool IsGridReadOnly => !DevicePermissionGate.CanEdit();
+
+    private async void OnTypeAxisFilterChanged(object? sender, EventArgs e)
+    {
+        // 목록을 다시 채우면 미저장 Draft 가 사라진다 — 있으면 필터를 적용하지 않고 알린다.
+        if (CountUnsavedDrafts() > 0)
+        {
+            await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "필터 보류",
+                Explain = "저장하지 않은 항목이 있어 필터를 적용하지 않았습니다. 먼저 저장하거나 갱신하세요."
+            });
+            return;
+        }
+        if (!await _processGate.WaitAsync(0)) return;
+        try { await DataInitialize(_pCancellationTokenSource?.Token ?? default); }
+        catch (Exception ex) { _log?.Error(ex.Message); }
+        finally { _processGate.Release(); }
+    }
     #endregion
     #region - Attributes -
     private readonly ControllerDeviceProvider _controllerProvider;
