@@ -1,0 +1,17 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<!--
+		Devices.Ui 의 lookless 컨트롤 기본 스타일 모음.
+
+		WPF 는 [assembly: ThemeInfo(None, SourceAssembly)] 가 선언된 어셈블리에서만 이 파일을 찾는다
+		(선언은 Consoles/Assembly/Blocks/ComponentBlock.cs 머리 — Utils/Console/ConsoleShell.cs 선례).
+		여기에는 병합 목록만 두고 실제 스타일은 컨트롤 옆 파일에 둔다 — 컨트롤과 그 생김새가 같이 움직이게.
+
+		★ 새 lookless 컨트롤을 더하는 사람에게: 이 파일은 공용이다. 아래 목록에 한 줄만 더하고
+		  스타일 본문은 자기 컨트롤 옆 .xaml 에 쓴다(이 파일 자체를 고치는 일이 없게).
+	-->
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Devices.Ui;component/Consoles/Assembly/Blocks/ComponentBlock.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

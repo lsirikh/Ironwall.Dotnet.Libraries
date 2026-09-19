@@ -1,6 +1,8 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Models;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Catalog;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -18,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /// 적재된 카탈로그는 <b>불변 스냅샷</b>이고 참조 하나를 통째 바꾼다 — 읽는 쪽은 락 없이 일관된 판을 본다.
 /// 진행 중 요청은 <see cref="_gate"/> 안에서 한 개로 합류시키고, 이벤트는 <b>락 밖에서</b> 발화한다.
 /// </remarks>
-public sealed class CatalogService : ICatalogService
+public sealed class CatalogService : ICatalogService, IComponentCatalog
 {
     #region - Ctors -
     public CatalogService(IDeviceApiService apiService, DeviceQueryPolicy? policy = null, ILogService? log = null)
@@ -69,6 +71,34 @@ public sealed class CatalogService : ICatalogService
 
     public string LabelOf(string vocabularyName, string? code)
         => Find(Vocabulary(vocabularyName, includeDeprecated: true), code)?.Label ?? code?.Trim() ?? string.Empty;
+    #endregion
+
+    #region - Implementation of IComponentCatalog (조립기 팔레트) -
+    // ICatalogService 를 넓히지 않고 두 번째 인터페이스로 붙인다 — 그 인터페이스에 멤버를 더하면
+    // 목/페이크 구현이 한꺼번에 깨진다(실증된 함정). 적재는 하나다: IsLoaded · EnsureLoadedAsync ·
+    // CatalogChanged 는 위쪽 구현을 그대로 쓴다(한 번 읽으면 두 인터페이스가 같이 산다).
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ComponentTypeInfo> ComponentTypes(EnumDeviceCategory category, bool includeDeprecated = false)
+    {
+        var snapshot = _snapshot;                                   // 지역으로 한 번만 집는다 — 중간에 판이 바뀌어도 일관
+        if (snapshot == null) return Array.Empty<ComponentTypeInfo>();
+
+        // 이미 가족 → 라벨 순으로 정렬된 목록이다(네트워크가 늘 맨 끝). 여기서는 거르기만 한다.
+        return snapshot.ComponentTypes
+            .Where(t => includeDeprecated || !t.IsDeprecated)
+            .Where(t => t.AppliesToCategory(category))
+            .ToArray();
+    }
+
+    /// <inheritdoc/>
+    public ComponentTypeInfo? Find(string? code)
+    {
+        var snapshot = _snapshot;
+        var text = code?.Trim();
+        if (snapshot == null || string.IsNullOrEmpty(text)) return null;
+        return snapshot.ComponentIndex.TryGetValue(text, out var info) ? info : null;
+    }
     #endregion
 
     #region - Processes -
@@ -165,6 +195,15 @@ public sealed class CatalogService : ICatalogService
         public required IReadOnlyDictionary<EnumDeviceCategory, IReadOnlyList<CatalogExtraAxis>> ExtraAxes { get; init; }
         public required IReadOnlyDictionary<string, IReadOnlyList<VocabularyEntry>> Vocabularies { get; init; }
 
+        /// <summary>
+        /// 조립기 팔레트용 부품 유형 — <c>component_type</c> 어휘의 <c>definition</c> 까지 읽은 것.
+        /// <b>가족 → 라벨</b> 순으로 미리 정렬해 둔다(네트워크가 늘 맨 끝). 폐기된 것도 담는다(거르기는 질의 때).
+        /// </summary>
+        public required IReadOnlyList<ComponentTypeInfo> ComponentTypes { get; init; }
+
+        /// <summary>코드(대소문자 무시) → 부품 유형. 폐기된 것도 찾힌다.</summary>
+        public required IReadOnlyDictionary<string, ComponentTypeInfo> ComponentIndex { get; init; }
+
         public static Snapshot From(DeviceSpecCatalogDto dto)
         {
             var typeAxes = new Dictionary<EnumDeviceCategory, CatalogTypeAxis>();
@@ -210,7 +249,42 @@ public sealed class CatalogService : ICatalogService
                 vocabularies[name] = ToOptions(entries).Select(o => new VocabularyEntry(o, null)).ToArray();
             }
 
-            return new Snapshot { TypeAxes = typeAxes, ExtraAxes = extraAxes, Vocabularies = vocabularies };
+            var components = ReadComponentTypes(dto);
+            var componentIndex = new Dictionary<string, ComponentTypeInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var info in components) componentIndex[info.Code] = info;
+
+            return new Snapshot
+            {
+                TypeAxes = typeAxes,
+                ExtraAxes = extraAxes,
+                Vocabularies = vocabularies,
+                ComponentTypes = components,
+                ComponentIndex = componentIndex,
+            };
+        }
+
+        /// <summary>
+        /// <c>component_type</c> 어휘 → 조립기 팔레트 목록. <b>가족 → 라벨 → 코드</b> 순으로 굳힌다 —
+        /// 정렬을 여기서 한 번만 하고, 질의(<c>ComponentTypes</c>)는 거르기만 한다.
+        /// </summary>
+        /// <remarks>
+        /// 라벨 비교는 <see cref="StringComparer.Ordinal"/> 이다 — 한글 음절은 코드포인트 순이 곧 가나다 순이고,
+        /// 문화권에 따라 팔레트 차례가 달라지면 화면 회귀 단언이 기계마다 갈린다.
+        /// </remarks>
+        private static IReadOnlyList<ComponentTypeInfo> ReadComponentTypes(DeviceSpecCatalogDto dto)
+        {
+            var entries = dto.FindVocabulary(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE);
+            if (entries == null || entries.Count == 0) return Array.Empty<ComponentTypeInfo>();
+
+            return entries
+                .Where(e => e != null && !string.IsNullOrWhiteSpace(e.Code))
+                .Select(ComponentCatalogReader.Read)
+                .GroupBy(t => t.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())                                   // 같은 코드가 두 번 오면 앞의 것(서버 순서)을 쓴다
+                .OrderBy(t => ComponentFamilyRules.PaletteOrder(t.Family))
+                .ThenBy(t => t.Label, StringComparer.Ordinal)
+                .ThenBy(t => t.Code, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static IReadOnlyList<CatalogOption> ToOptions(IEnumerable<EnumEntryDto>? entries)
