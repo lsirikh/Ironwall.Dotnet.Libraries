@@ -447,7 +447,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         if (!result.IsSuccess) return;
 
         if (Mode == AssemblyMode.EditPreset) EditingPreset = _presets.Find(preset.Id) ?? preset;
-        _board.Load(_board.ToDefinitions(), StripNulls(_board.ToOverrides()));     // 저장한 것이 새 기준이다
+        _board.MarkBaseline();     // 저장한 것이 새 기준이다 — 슬롯을 새로 만들지 않으니 선택과 속성 칸이 그대로 남는다
         RefreshPresets();
         RefreshAll();
     }
@@ -585,7 +585,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             if (result.IsSuccess)
             {
                 _deviceBaseline = _board.ToDefinitions();
-                _board.Load(_deviceBaseline, StripNulls(_board.ToOverrides()));
+                _board.MarkBaseline();
                 _closeWithoutAsking = true;
                 await TryCloseAsync(true);
             }
