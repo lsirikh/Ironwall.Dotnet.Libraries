@@ -52,14 +52,17 @@ public class GateDeviceApiTests
         Assert.Equal($"{BaseUrl}/devices/gates", http.Endpoint);
     }
 
-    [Fact]
-    public async Task should_put_to_gate_resource_when_updating_gate()
+    [Theory]
+    [InlineData(EnumServerContract.V6_3, "PUT")]     // legacy: unchanged
+    [InlineData(EnumServerContract.V7_0, "PATCH")]   // axis contract: PUT would replace axis documents wholesale
+    [InlineData(EnumServerContract.V8_0, "PATCH")]
+    public async Task should_write_gate_resource_with_contract_appropriate_verb_when_updating_gate(EnumServerContract contract, string expectedVerb)
     {
-        var (service, http) = Create(EnumServerContract.V8_0);
+        var (service, http) = Create(contract);
 
         await service.UpdateGateAsync(77, SampleGate());
 
-        Assert.Equal("PUT", http.Method);
+        Assert.Equal(expectedVerb, http.Method);
         Assert.Equal($"{BaseUrl}/devices/gates/77", http.Endpoint);
     }
 
@@ -111,56 +114,5 @@ public class GateDeviceApiTests
         Assert.False(created.Success);
         Assert.Equal("INTERNAL_ERROR", created.Error?.Code);
         Assert.False(deleted.Success);
-    }
-
-    // ── 테스트 대역 ──
-
-    private sealed class FixedContractProbe : IServerContractProbe
-    {
-        public FixedContractProbe(EnumServerContract contract) => Contract = contract;
-        public EnumServerContract Contract { get; }
-        public string? RawVersion => Contract.ToString();
-        public bool IsResolved => true;
-        public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
-        public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
-    }
-
-    private sealed class CapturingApiService : IApiService
-    {
-        public string? Method { get; private set; }
-        public string? Endpoint { get; private set; }
-        public JObject? Body { get; private set; }
-        public bool Throw { get; set; }
-
-        private Task<HttpResponseMessage> Capture(string method, string endpoint, object? body)
-        {
-            if (Throw) throw new HttpRequestException("simulated transport failure");
-
-            Method = method;
-            Endpoint = endpoint;
-            // 실제 ApiService 와 같은 직렬화기(Newtonsoft 기본)를 거쳐야 ShouldSerialize 게이트가 반영된다.
-            Body = body == null ? null : JObject.Parse(JsonConvert.SerializeObject(body));
-
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("{\"success\":true,\"data\":null,\"meta\":{}}", Encoding.UTF8, "application/json"),
-            });
-        }
-
-        public Task<HttpResponseMessage> DeleteRequestAsync(string endpoint) => Capture("DELETE", endpoint, null);
-        public Task<HttpResponseMessage> DeleteRequestAsync<T>(string endpoint, T body) => Capture("DELETE", endpoint, body);
-        public Task<HttpResponseMessage> GetRequestAsync(string endpoint, Dictionary<string, string>? parameters = null) => Capture("GET", endpoint, null);
-        public Task<HttpResponseMessage> PatchRequestAsync<T>(string endpoint, T body) => Capture("PATCH", endpoint, body);
-        public Task<HttpResponseMessage> PostFormDataRequestAsync(string endpoint, MultipartFormDataContent content) => Capture("POST", endpoint, null);
-        public Task<HttpResponseMessage> PostRequestAsync<T>(string endpoint, T body) => Capture("POST", endpoint, body);
-        public Task<HttpResponseMessage> PutRequestAsync<T>(string endpoint, T body) => Capture("PUT", endpoint, body);
-
-        public void Initialize() { }
-        public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
-        public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
-        public string Url => string.Empty;
-        public string ApiKey => string.Empty;
-        public string UserId => string.Empty;
-        public string Phone => string.Empty;
     }
 }

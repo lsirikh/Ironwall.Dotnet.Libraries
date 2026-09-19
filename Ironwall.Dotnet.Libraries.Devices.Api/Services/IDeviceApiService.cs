@@ -648,8 +648,10 @@ public interface IDeviceApiService : IService
         CancellationToken token = default);
 
     /// <summary>
-    /// 통문 전체 수정 — <c>PUT /api/devices/gates/{id}</c>.
-    /// ⚠ <c>PUT</c> 은 축 문서를 <b>통째 교체</b>한다(생략한 축만 보존). 부분 수정은 <see cref="PatchGateAsync"/> 를 쓴다.
+    /// 통문 수정 — 6.3 은 <c>PUT /api/devices/gates/{id}</c>, <b>축 계약(7.0+)은 같은 경로에 <c>PATCH</c></b>.
+    /// <para>7 카테고리의 <c>Update*Async</c> 가 모두 같다. 7.0+ 의 <c>PUT</c> 은 본문의 축 문서를 <b>통째 교체</b>하는데
+    /// 우리 DTO 의 축은 평면 필드에서 재조립한 부분 집합이라, PUT 하면 <c>connection.type</c>·<c>channel</c> 과
+    /// <c>hardware_spec.components</c> 가 경고 없이 지워진다(8.0.1 실측 2026-09-19). PATCH 는 축을 객체 병합한다.</para>
     /// </summary>
     Task<ApiResponse<GateDeviceDto>> UpdateGateAsync(
         int id,

@@ -129,7 +129,22 @@ public class HardwareSpecDto
     [JsonProperty("components", Order = 24, NullValueHandling = NullValueHandling.Ignore)]
     public List<ComponentDefinitionDto>? Components { get; set; }
 
-    public bool ShouldSerializeComponents() => UseAxisWrite && Components != null;
+    /// <summary>
+    /// <c>components</c> 를 쓰기 본문에 실어도 되는가 — <b>기본 <c>false</c></b>.
+    /// </summary>
+    /// <remarks>
+    /// <para>서버는 <c>PATCH</c> 에서도 <c>components</c> 배열을 <b>통째 교체</b>하고, 빠진 부품은 그 관측·설정과 함께
+    /// <b>경고 없이</b> 지운다(8.0.1 실측 2026-09-19: 2개 중 1개만 실어 보내면 200 · <c>warnings: []</c> · 나머지 삭제).
+    /// 서버에서 읽어 온 DTO 는 <see cref="Components"/> 가 채워져 있으므로, 그것을 그대로 되보내기만 해도
+    /// 그 사이 다른 클라가 추가한 부품을 지우게 된다.</para>
+    /// <para>그래서 <b>값이 있다는 것만으로는 싣지 않는다</b>. 부품 전체를 의도적으로 다시 쓰는 호출부
+    /// (부품 조립기 — 직전에 재조회한 배열 전체를 read-modify-write)만 이 값을 켠다.
+    /// 경로별 차단은 <c>ShouldSerialize</c> 단독이 아니라 플래그 게이트로 한다(선례 <see cref="UseAxisWrite"/>).</para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool AllowComponentsWrite { get; set; }
+
+    public bool ShouldSerializeComponents() => UseAxisWrite && AllowComponentsWrite && Components != null;
 
     /// <summary>7.0+ <c>firmware</c> 상한(50자)을 넘는가 — 넘으면 축 모드 쓰기가 422 다(절단하지 않는다).</summary>
     [JsonIgnore]
