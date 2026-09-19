@@ -825,8 +825,12 @@ public class DeviceProviderServiceTests
 
 #region Phase Camera-7: CameraUrlsViewModel Tests
 
-public class CameraUrlsViewModelTests
+[Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
+public class CameraUrlsViewModelTests : IDisposable
 {
+    private readonly TestIoCScope _ioc = new();   // BasePanelViewModel() reads Caliburn IoC
+    public void Dispose() => _ioc.Dispose();
+
     [Fact(DisplayName = "Test-7.1: CameraUrlsViewModel 6 properties passthrough")]
     public void CameraUrlsViewModel_AllProperties_Passthrough()
     {
@@ -859,8 +863,12 @@ public class CameraUrlsViewModelTests
 
 #region Phase Camera-8: CameraSettingViewModel Tests
 
-public class CameraSettingViewModelTests
+[Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
+public class CameraSettingViewModelTests : IDisposable
 {
+    private readonly TestIoCScope _ioc = new();   // BasePanelViewModel() reads Caliburn IoC
+    public void Dispose() => _ioc.Dispose();
+
     [Fact(DisplayName = "Test-8.1: CameraSettingViewModel 11 properties passthrough")]
     public void CameraSettingViewModel_AllProperties_Passthrough()
     {
@@ -1832,6 +1840,7 @@ public class DtoToModelHelperCameraTests
 /// <summary>
 /// Device Panel CRUD 완성 테스트 (Speaker/Enclosure/Lamp)
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class DevicePanelCrudCompletionTests : IDisposable
 {
     public DevicePanelCrudCompletionTests()
@@ -2087,6 +2096,7 @@ public class DevicePanelCrudCompletionTests : IDisposable
 /// SensorPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class SensorPanelCacheTests : IDisposable
 {
     public SensorPanelCacheTests()
