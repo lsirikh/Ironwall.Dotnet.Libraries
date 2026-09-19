@@ -1,0 +1,42 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringPromptView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
+	<!--  확인 · 저장 미리보기(WS L450, L772). 파괴적이지 않은 쪽(취소)이 기본이다.  -->
+	<DockPanel Margin="16,14" LastChildFill="True">
+		<StackPanel
+			Margin="0,12,0,0"
+			HorizontalAlignment="Right"
+			DockPanel.Dock="Bottom"
+			Orientation="Horizontal">
+			<Button
+				Margin="0,0,6,0"
+				AutomationProperties.AutomationId="Devices.Wiring.Prompt.Cancel"
+				Click="OnCancel"
+				Content="{Binding CancelText}"
+				Style="{StaticResource MaterialDesignOutlinedButton}" />
+			<Button
+				MinWidth="96"
+				AutomationProperties.AutomationId="Devices.Wiring.Prompt.Confirm"
+				Click="OnConfirm"
+				Content="{Binding ConfirmText}" />
+		</StackPanel>
+		<TextBlock
+			FontSize="15"
+			FontWeight="Bold"
+			DockPanel.Dock="Top"
+			Text="{Binding Title}" />
+		<ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+			<TextBlock
+				AutomationProperties.AutomationId="Devices.Wiring.Prompt.Message"
+				FontSize="13"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding Message}"
+				TextWrapping="Wrap" />
+		</ScrollViewer>
+	</DockPanel>
+</UserControl>
