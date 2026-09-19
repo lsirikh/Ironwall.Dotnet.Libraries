@@ -1,0 +1,104 @@
+﻿using Caliburn.Micro;
+using System.Collections.Generic;
+using System.Windows.Media;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
+
+/// <summary>
+/// 개요가 쓰는 계열 — 서버 요약/추이의 집계 키 그대로.
+/// </summary>
+/// <remarks>
+/// 정본 window-layout-system-storyboard.html L2317-2323. <b>색이 아니라 형태로</b> 구분한다 —
+/// 카메라 탐지는 같은 탐지 계열의 빗금/파선이다(라이트 테마에서 주색 · 선택색 · 포커스색이 같은 색이라 색으로는 못 가른다).
+/// </remarks>
+public sealed record EventSeriesSpec(string Key, string Name, string BrushKey, bool IsHatched, string? DashArray, bool InTotal)
+{
+    public static readonly EventSeriesSpec Sensor = new("sensor", "센서 탐지", "StatusWarningBrush", false, null, true);
+    public static readonly EventSeriesSpec Camera = new("camera", "카메라 탐지", "AccentBrush", true, "6 3", true);
+    public static readonly EventSeriesSpec Malfunction = new("mal", "장애", "StatusCriticalBrush", false, null, true);
+    public static readonly EventSeriesSpec Connection = new("con", "연결", "PrimaryBrush", false, null, true);
+    public static readonly EventSeriesSpec Action = new("act", "조치", "StatusNormalBrush", false, null, true);
+
+    /// <summary>표시 순서대로.</summary>
+    public static readonly IReadOnlyList<EventSeriesSpec> All = new[] { Sensor, Camera, Malfunction, Connection, Action };
+}
+
+/// <summary>도넛 한 조각 · 범례 한 줄.</summary>
+public sealed class EventSliceViewModel : PropertyChangedBase
+{
+    private bool _isOn = true;
+
+    public EventSliceViewModel(EventSeriesSpec spec, int count, double percent)
+    {
+        Spec = spec;
+        Count = count;
+        Percent = percent;
+    }
+
+    public EventSeriesSpec Spec { get; }
+    public string Name => Spec.Name;
+    public string BrushKey => Spec.BrushKey;
+    public bool IsHatched => Spec.IsHatched;
+    public int Count { get; }
+    public double Percent { get; }
+    public string PercentText => Count > 0 ? $"{Percent:0}%" : "—";
+
+    /// <summary>계열 칩으로 켜고 끈다.</summary>
+    public bool IsOn { get => _isOn; set { _isOn = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>가로 비중 막대의 폭 비율(0~1).</summary>
+    public double Ratio => Percent / 100.0;
+}
+
+/// <summary>장비별 막대 한 줄.</summary>
+public sealed class EventDeviceBarViewModel
+{
+    public EventDeviceBarViewModel(string id, string name, int total, IReadOnlyList<EventBarSegment> segments)
+    {
+        Id = id;
+        Name = name;
+        Total = total;
+        Segments = segments;
+    }
+
+    public string Id { get; }
+    public string Name { get; }
+    public int Total { get; }
+    public IReadOnlyList<EventBarSegment> Segments { get; }
+}
+
+/// <summary>막대 한 칸 — 계열 하나의 몫.</summary>
+public sealed record EventBarSegment(EventSeriesSpec Spec, int Value, double Ratio)
+{
+    public string BrushKey => Spec.BrushKey;
+    public bool IsHatched => Spec.IsHatched;
+}
+
+/// <summary>추이 선 하나.</summary>
+public sealed class EventTrendSeriesViewModel : PropertyChangedBase
+{
+    private PointCollection _points = new();
+    private PointCollection? _area;
+
+    public EventTrendSeriesViewModel(EventSeriesSpec spec, IReadOnlyList<int> values)
+    {
+        Spec = spec;
+        Values = values;
+    }
+
+    public EventSeriesSpec Spec { get; }
+    public IReadOnlyList<int> Values { get; }
+    public string Name => Spec.Name;
+    public string BrushKey => Spec.BrushKey;
+
+    /// <summary>파선 패턴(없으면 실선). 문자열이 아니라 컬렉션이어야 <c>Polyline.StrokeDashArray</c> 에 바로 물린다.</summary>
+    public DoubleCollection? Dashes => Spec.DashArray is null ? null : DoubleCollection.Parse(Spec.DashArray);
+
+    public PointCollection Points { get => _points; set { _points = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>센서 탐지만 면적을 깐다(정본 L2578).</summary>
+    public PointCollection? Area { get => _area; set { _area = value; NotifyOfPropertyChange(); } }
+}
+
+/// <summary>x 축 눈금 한 칸.</summary>
+public sealed record EventTrendLabel(double X, string Text);

@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.ActionEventPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -24,6 +24,7 @@
 		<!--  탐지/장애 패널과 동일 — enum 표시 한글화(표시 전용, ConvertBack 미지원). 저장/전송 값은 raw enum 유지.  -->
 		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
+	<!--  events-console FR-02: 목록을 가두던 고정 높이(바깥 Grid Width/Height · 안쪽 DataGrid Height)를 없았다 — 목록은 남는 높이를 전부 쓴다.  -->
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
@@ -200,11 +201,7 @@
 				</Button>
 			</Grid>
 		</StackPanel>
-		<Grid
-			Grid.Row="1"
-			Width="800"
-			VerticalAlignment="Top"
-			Height="280">
+		<Grid Grid.Row="1">
 			<ProgressBar
 				Width="50"
 				Height="50"
@@ -217,11 +214,9 @@
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="280"
 			Background="Transparent"
 			Margin="10 0"
 			BorderThickness="1"
-			VerticalAlignment="Top"
 			HeadersVisibility="Column"
 			RowHeaderWidth="0"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"

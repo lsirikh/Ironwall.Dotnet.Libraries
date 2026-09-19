@@ -1,0 +1,199 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles.ActionTrayView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:tray="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		조치 트레이 — 정본 all-windows-drag-wireframe.html L283(선택 → 조치 트레이) · L423(조치 생성 N회 → Draft + 진행률).
+		드롭은 서버를 부르지 않는다. [적용] 이 한 건씩 순차로 보내고 실패한 줄만 남는다.
+		접어 숨기지 않는다 — 끄는 중에 생기는 드롭존은 잡을 수 없다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<conv:InverseBoolToVisibilityConverter x:Key="NotBoolToVis" />
+	</UserControl.Resources>
+
+	<drag:DropZoneChrome
+		drag:DropZone.Handler="{Binding TrayDrop}"
+		drag:DropZone.Key="{x:Static tray:ActionTrayDrop.ZoneKey}"
+		AutomationProperties.AutomationId="Console.Events.Tray"
+		CornerRadius="6">
+		<Border
+			Padding="10,6"
+			Background="{DynamicResource SurfaceAltBrush}"
+			CornerRadius="6">
+			<StackPanel>
+				<DockPanel LastChildFill="False">
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Margin="0,0,6,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Kind="ClipboardArrowDownOutline" />
+					<TextBlock
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						FontSize="12.5"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="조치 트레이" />
+					<TextBlock
+						Margin="8,0,0,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Console.Events.Tray.Count"
+						DockPanel.Dock="Left"
+						FontFamily="Consolas"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}">
+						<Run Text="Draft " /><Run Text="{Binding Tray.Count, Mode=OneWay}" /><Run Text="건" />
+					</TextBlock>
+
+					<!--  적용 · 되돌리기 · 취소  -->
+					<Button
+						Margin="6,0,0,0"
+						Padding="12,2"
+						AutomationProperties.AutomationId="Console.Events.Tray.Apply"
+						Click="OnApply"
+						Content="적용"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						IsEnabled="{Binding Tray.CanApply}"
+						Style="{StaticResource MaterialDesignRaisedButton}"
+						ToolTip="고른 건마다 조치보고를 한 번씩 보냅니다 — 벌크 요청이 없어 N건이면 N회입니다"
+						Visibility="{Binding Tray.IsApplying, Converter={StaticResource NotBoolToVis}}" />
+					<Button
+						Margin="6,0,0,0"
+						Padding="10,2"
+						AutomationProperties.AutomationId="Console.Events.Tray.Revert"
+						Click="OnRevert"
+						Content="되돌리기"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						IsEnabled="{Binding Tray.CanRevert}"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="담은 것을 전부 버립니다 — 서버 호출 0"
+						Visibility="{Binding Tray.IsApplying, Converter={StaticResource NotBoolToVis}}" />
+					<Button
+						Margin="6,0,0,0"
+						Padding="10,2"
+						AutomationProperties.AutomationId="Console.Events.Tray.Cancel"
+						Click="OnCancel"
+						Content="중단"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="아직 보내지 않은 줄은 트레이에 남습니다"
+						Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVis}}" />
+				</DockPanel>
+
+				<!--  문구 — 조치보고 다이얼로그와 같은 목록  -->
+				<DockPanel Margin="0,7,0,0" LastChildFill="True">
+					<TextBlock
+						Width="44"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						FontSize="12"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="문구" />
+					<TextBox
+						Margin="6,0,0,0"
+						MinWidth="160"
+						AutomationProperties.AutomationId="Console.Events.Tray.Memo"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						md:HintAssist.Hint="기타 내용을 적으세요"
+						Text="{Binding Tray.Memo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+						Visibility="{Binding Tray.IsEtc, Converter={StaticResource BoolToVis}}" />
+					<ComboBox
+						AutomationProperties.AutomationId="Console.Events.Tray.Phrase"
+						FontSize="12"
+						IsEditable="False"
+						ItemsSource="{Binding Tray.PhraseOptions}"
+						SelectedItem="{Binding Tray.Phrase, Mode=TwoWay}" />
+				</DockPanel>
+
+				<!--  진행률 n/m  -->
+				<DockPanel
+					Margin="0,7,0,0"
+					LastChildFill="True"
+					Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVis}}">
+					<TextBlock
+						Margin="0,0,8,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Console.Events.Tray.Progress"
+						DockPanel.Dock="Right"
+						FontFamily="Consolas"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding Tray.ProgressText, Mode=OneWay}" />
+					<ProgressBar
+						Height="5"
+						VerticalAlignment="Center"
+						Maximum="{Binding Tray.ProgressTotal, Mode=OneWay}"
+						Minimum="0"
+						Value="{Binding Tray.ProgressDone, Mode=OneWay}" />
+				</DockPanel>
+
+				<!--  담은 줄들  -->
+				<ItemsControl
+					Margin="0,7,0,0"
+					MaxHeight="72"
+					AutomationProperties.AutomationId="Console.Events.Tray.List"
+					ItemsSource="{Binding Tray.Entries}"
+					Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVis}}">
+					<ItemsControl.Template>
+						<ControlTemplate TargetType="ItemsControl">
+							<ScrollViewer VerticalScrollBarVisibility="Auto">
+								<ItemsPresenter />
+							</ScrollViewer>
+						</ControlTemplate>
+					</ItemsControl.Template>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<DockPanel Margin="0,2" LastChildFill="True">
+								<TextBlock
+									Width="140"
+									VerticalAlignment="Center"
+									DockPanel.Dock="Right"
+									FontSize="11.5"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="{Binding FailureReason}"
+									TextTrimming="CharacterEllipsis"
+									ToolTip="{Binding FailureReason}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding Description}"
+									TextTrimming="CharacterEllipsis" />
+							</DockPanel>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<!--  비어 있을 때 — 끌어 담으라는 안내(드래그 전용이 아님을 함께 적는다)  -->
+				<TextBlock
+					Margin="0,6,0,0"
+					FontSize="11.5"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="탐지 · 장애 행의 손잡이를 끌어 여기에 놓으세요 — 같은 일은 툴바의 [조치보고] 버튼으로도 됩니다."
+					TextWrapping="Wrap"
+					Visibility="{Binding Tray.HasEntries, Converter={StaticResource NotBoolToVis}}" />
+
+				<TextBlock
+					Margin="0,6,0,0"
+					AutomationProperties.AutomationId="Console.Events.Tray.Status"
+					FontSize="11.5"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding Tray.StatusLine, Mode=OneWay}"
+					TextWrapping="Wrap" />
+			</StackPanel>
+		</Border>
+	</drag:DropZoneChrome>
+</UserControl>
