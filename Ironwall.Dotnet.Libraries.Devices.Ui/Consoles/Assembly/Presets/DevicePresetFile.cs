@@ -64,18 +64,74 @@ public sealed class DevicePresetFile
     [JsonProperty("presets")]
     public List<DevicePresetEntry>? Presets { get; set; }
 
+    /// <summary>
+    /// <b>우리가 읽지 못한 줄의 원문</b> — 모르는 카테고리라 <see cref="ToPresets(out int)"/> 가 건너뛴 것들.
+    /// </summary>
+    /// <remarks>
+    /// <para>건너뛰는 것 자체는 옳다(더 새 판이 더한 카테고리일 수 있다). 문제는 <b>그다음</b>이다 —
+    /// 읽을 때 버리고 저장할 때 안 쓰면, 사용자가 프리셋 하나만 고쳐도 <b>모르는 줄이 파일에서 사라진다</b>.
+    /// 그 줄은 그 판본에서 완전히 멀쩡한 프리셋이고, 우리가 못 읽는다는 사실이 지울 이유가 되지 않는다.</para>
+    /// <para>그래서 <see cref="JObject"/> <b>원문 그대로</b> 들고 있다가 되쓸 때 아는 줄 뒤에 그대로 붙인다.
+    /// 우리 모델로 한 번 굽히면(읽고 다시 쓰면) 모르는 칸이 그 자리에서 사라지므로 원문이어야 한다.</para>
+    /// </remarks>
+    [JsonIgnore]
+    public List<JObject> UnknownEntries { get; } = new();
+
     /// <summary>프리셋들을 봉투에 담는다.</summary>
-    public static DevicePresetFile Wrap(IEnumerable<DevicePreset> presets, DateTimeOffset savedAt)
+    /// <param name="unknownEntries">
+    /// 되쓸 때 그대로 붙일 원문 줄(<see cref="UnknownEntries"/>). 없으면 <c>null</c>.
+    /// </param>
+    public static DevicePresetFile Wrap(
+        IEnumerable<DevicePreset> presets,
+        DateTimeOffset savedAt,
+        IEnumerable<JObject>? unknownEntries = null)
     {
-        return new DevicePresetFile
+        var file = new DevicePresetFile
         {
             Schema = DevicePresetStore.CurrentSchema,
             SavedAt = savedAt.ToString("o", CultureInfo.InvariantCulture),
             Presets = (presets ?? Enumerable.Empty<DevicePreset>()).Select(DevicePresetEntry.From).ToList(),
         };
+
+        foreach (var entry in unknownEntries ?? Enumerable.Empty<JObject>())
+        {
+            if (entry is null) continue;
+            file.UnknownEntries.Add((JObject)entry.DeepClone());
+        }
+
+        return file;
     }
 
-    public string ToJson() => JsonConvert.SerializeObject(this, Settings);
+    /// <summary>
+    /// 봉투를 글로. <see cref="UnknownEntries"/> 가 있으면 <c>presets</c> 배열 <b>뒤에</b> 원문 그대로 붙인다.
+    /// </summary>
+    /// <remarks>
+    /// 직렬화한 뒤 토큰으로 한 번 더 손대는 까닭은, <see cref="Presets"/> 가 형식 있는 목록이라
+    /// <see cref="JObject"/> 를 섞어 담을 자리가 없기 때문이다. 다시 읽을 때도
+    /// <see cref="DateParseHandling.None"/> 을 써서 <c>spec</c> 안의 날짜꼴 문자열이 바뀌지 않게 한다.
+    /// </remarks>
+    public string ToJson()
+    {
+        var json = JsonConvert.SerializeObject(this, Settings);
+        if (UnknownEntries.Count == 0) return json;
+
+        JObject root;
+        using (var reader = new JsonTextReader(new StringReader(json)) { DateParseHandling = DateParseHandling.None })
+        {
+            root = JObject.Load(reader);
+        }
+
+        if (root["presets"] is not JArray array)
+        {
+            array = new JArray();
+            root["presets"] = array;
+        }
+
+        foreach (var entry in UnknownEntries)
+            array.Add(entry.DeepClone());
+
+        return root.ToString(Formatting.Indented);
+    }
 
     /// <summary>
     /// 글을 봉투로 읽는다. 봉투가 아니면 <see cref="JsonException"/> — 부르는 쪽이 "깨졌다"로 판정한다.
@@ -102,6 +158,9 @@ public sealed class DevicePresetFile
                    ?? throw new JsonException("봉투를 읽지 못했다.");
         if (file.Schema <= 0)
             throw new JsonException("schema 값이 1 보다 작다.");
+
+        // 건너뛴 줄을 되쓰려면 원문이 필요하다 — 형식 있는 목록과 자리가 1:1 로 맞는다.
+        file._raw = obj["presets"] as JArray;
         return file;
     }
 
@@ -110,18 +169,38 @@ public sealed class DevicePresetFile
     /// 그 줄만 빼고 <paramref name="skipped"/> 로 센다(다음 판이 더한 카테고리일 수 있다).
     /// </summary>
     public IReadOnlyList<DevicePreset> ToPresets(out int skipped)
+        => ToPresets(out skipped, out _);
+
+    /// <summary>
+    /// 위와 같되, 건너뛴 줄의 <b>원문</b>도 함께 돌려준다 — 되쓸 때 그대로 붙이기 위한 것이다.
+    /// </summary>
+    /// <param name="skippedEntries">
+    /// 건너뛴 줄 중 <see cref="JObject"/> 인 것들. 원문을 확보하지 못한 줄(배열에 객체가 아닌 값이 섞였거나
+    /// <see cref="Parse"/> 를 거치지 않고 만든 봉투)은 <paramref name="skipped"/> 에만 세고 여기엔 없다.
+    /// </param>
+    public IReadOnlyList<DevicePreset> ToPresets(out int skipped, out IReadOnlyList<JObject> skippedEntries)
     {
         skipped = 0;
-        var list = new List<DevicePreset>();
-        foreach (var entry in Presets ?? new List<DevicePresetEntry>())
+        var kept = new List<DevicePreset>();
+        var unknown = new List<JObject>();
+        var entries = Presets ?? new List<DevicePresetEntry>();
+
+        for (var i = 0; i < entries.Count; i++)
         {
-            if (entry is null) { skipped++; continue; }
-            var preset = entry.ToPreset();
-            if (preset is null) { skipped++; continue; }
-            list.Add(preset);
+            var preset = entries[i]?.ToPreset();
+            if (preset is not null) { kept.Add(preset); continue; }
+
+            skipped++;
+            if (_raw is not null && i < _raw.Count && _raw[i] is JObject raw)
+                unknown.Add((JObject)raw.DeepClone());
         }
-        return list;
+
+        skippedEntries = unknown;
+        return kept;
     }
+
+    /// <summary><see cref="Parse"/> 가 읽은 <c>presets</c> 배열 원문 — 자리로 <see cref="Presets"/> 와 맞춘다.</summary>
+    private JArray? _raw;
 }
 
 /// <summary>봉투 안의 프리셋 한 줄.</summary>

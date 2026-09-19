@@ -22,6 +22,18 @@ public static class RepeatExpand
 {
     public const int MaxCount = 64;
 
+    /// <summary>
+    /// <c>{0Nd}</c> 의 자리 수 상한. 최대 <see cref="MaxCount"/> 개(두 자리)를 펼치는 자리에
+    /// 여섯 자리면 충분하고도 남는다.
+    /// </summary>
+    /// <remarks>
+    /// 상한이 없으면 <c>{099999999999d}</c> 한 줄이 <see cref="int.Parse(string)"/> 에서
+    /// <see cref="OverflowException"/> 을 던지거나(자리 수가 <see cref="int"/> 를 넘을 때),
+    /// 넘지 않더라도 <see cref="string.PadLeft(int, char)"/> 가 <b>수억 글자짜리 key</b> 를 만들어
+    /// 미리보기 한 번에 메모리를 통째로 먹는다. 둘 다 사용자가 글자 몇 개를 더 친 결과여서는 안 된다.
+    /// </remarks>
+    public const int MaxKeyPadWidth = 6;
+
     /// <summary><c>{d}</c> · <c>{02d}</c> · <c>{03d}</c> … 자리.</summary>
     private static readonly Regex _placeholder = new(@"\{(?:0(\d+))?d\}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
@@ -33,6 +45,13 @@ public static class RepeatExpand
         if (spec.Count < 1 || spec.Count > MaxCount) return $"개수는 1 과 {MaxCount} 사이여야 한다";
         if (string.IsNullOrWhiteSpace(spec.KeyFormat)) return "key 규칙이 비어 있다";
         if (!_placeholder.IsMatch(spec.KeyFormat)) return "key 규칙에 {d} 또는 {02d} 같은 번호 자리가 있어야 한다";
+
+        foreach (Match match in _placeholder.Matches(spec.KeyFormat))
+        {
+            if (!TryReadWidth(match, out _))
+                return $"key 규칙의 자릿수는 1 과 {MaxKeyPadWidth} 사이여야 한다";
+        }
+
         if (spec.StartChannel < 0) return "시작 채널은 0 이상이어야 한다";
         return null;
     }
@@ -64,6 +83,11 @@ public static class RepeatExpand
     }
 
     /// <summary><c>ci_{02d}</c> + 7 → <c>ci_07</c>. 자리가 여럿이면 모두 같은 번호로 채운다.</summary>
+    /// <remarks>
+    /// <b>절대 던지지 않는다</b> — 미리보기는 사용자가 글자를 칠 때마다 돌고, 그 도중의 반쯤 쓴 규칙
+    /// (<c>{0999999999999d}</c> 처럼)에서 예외가 나면 입력 창이 통째로 죽는다. 쓸 수 없는 자릿수는
+    /// <b>채우지 않은 번호</b>로 떨어뜨리고, 거절은 <see cref="Validate"/> 가 문장으로 한다.
+    /// </remarks>
     public static string FormatKey(string keyFormat, int number)
     {
         if (string.IsNullOrEmpty(keyFormat)) return string.Empty;
@@ -71,12 +95,41 @@ public static class RepeatExpand
         return _placeholder.Replace(keyFormat, m =>
         {
             var text = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (!m.Groups[1].Success) return text;
+            if (!TryReadWidth(m, out var width) || width is null) return text;
 
-            var width = int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
             var negative = text.StartsWith('-');
             var digits = negative ? text[1..] : text;
-            return (negative ? "-" : string.Empty) + digits.PadLeft(width, '0');
+            return (negative ? "-" : string.Empty) + digits.PadLeft(width.Value, '0');
         });
     }
+
+    /// <summary>
+    /// 자리 하나의 자릿수를 읽는다 — <c>{d}</c>(채우지 않음) 는 <c>true</c> + <c>null</c>,
+    /// 1..<see cref="MaxKeyPadWidth"/> 는 <c>true</c> + 값, 그 밖(0 · 상한 초과 · <see cref="int"/> 초과)은 <c>false</c>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="int.TryParse(string, out int)"/> 를 쓴다 — 자리 수가 <see cref="int"/> 를 넘으면
+    /// <see cref="int.Parse(string)"/> 는 <see cref="OverflowException"/> 을 던지지만 TryParse 는
+    /// <c>false</c> 를 돌려준다. 글자 수부터 먼저 잘라 아주 긴 숫자에서 파싱 자체를 건너뛴다.
+    /// </remarks>
+    private static bool TryReadWidth(Match match, out int? width)
+    {
+        width = null;
+        if (!match.Groups[1].Success) return true;      // {d} — 그대로
+
+        var text = match.Groups[1].Value;
+        if (text.Length > MAX_WIDTH_DIGITS) return false;   // int 를 넘길 만큼 길다 — 파싱할 것도 없다
+
+        if (!int.TryParse(text, System.Globalization.NumberStyles.None,
+                          System.Globalization.CultureInfo.InvariantCulture, out var value))
+            return false;
+
+        if (value < 1 || value > MaxKeyPadWidth) return false;
+
+        width = value;
+        return true;
+    }
+
+    /// <summary><see cref="int"/> 가 담을 수 있는 자리 수 — 이보다 길면 파싱조차 하지 않는다.</summary>
+    private const int MAX_WIDTH_DIGITS = 9;
 }

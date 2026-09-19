@@ -345,6 +345,76 @@ public class AssemblyBoardTests
 
     #endregion
 
+    #region 새 원점 찍기 (MarkBaseline)
+
+    /// <summary>저장이 끝났으면 그 자리가 새 원점이다 — 미저장 개수 · 뺀 key 가 모두 비어야 한다.</summary>
+    [Fact]
+    public void should_report_no_unsaved_change_when_the_current_state_is_marked_as_the_baseline()
+    {
+        var board = Loaded("a", "b");
+        board.Add("DOOR_SENSOR");
+        board.Remove(new[] { board.Slots[0] });
+        board.Slots[0].Label = "북측 도어";
+        Assert.True(board.IsDirty);
+
+        board.MarkBaseline();
+
+        Assert.False(board.IsDirty);
+        Assert.Equal(0, board.UnsavedChangeCount);
+        Assert.Empty(board.RemovedKeys);
+        Assert.Empty(board.Diff().Added);
+        Assert.Empty(board.Diff().Removed);
+        Assert.Empty(board.Diff().Changed);
+    }
+
+    /// <summary>
+    /// <b>슬롯을 다시 만들지 않는다</b> — 저장 직후에 보드를 새로 채우면 사용자가 고르던 것 · 편집 중이던 칸이 날아간다.
+    /// </summary>
+    [Fact]
+    public void should_keep_the_same_slot_instances_in_order_when_the_baseline_is_marked()
+    {
+        var board = Loaded("a", "b", "c");
+        var before = board.Slots.ToList();
+
+        board.MarkBaseline();
+
+        Assert.Equal(3, board.Slots.Count);
+        Assert.Equal("a,b,c", Order(board));
+        for (var i = 0; i < before.Count; i++) Assert.Same(before[i], board.Slots[i]);
+    }
+
+    /// <summary>저장된 자리가 원점이면 그 이전으로 되돌릴 자리가 없다 — 스택을 비운다.</summary>
+    [Fact]
+    public void should_clear_the_undo_stack_when_the_baseline_is_marked()
+    {
+        var board = Loaded("a");
+        board.Add("DOOR_SENSOR");
+        Assert.True(board.CanUndo);
+
+        board.MarkBaseline();
+
+        Assert.False(board.CanUndo);
+        board.Undo();                       // 눌러도 아무 일이 없다
+        Assert.Equal(2, board.Slots.Count);
+    }
+
+    /// <summary>다음 편집부터는 <b>새</b> 원점과 견준다.</summary>
+    [Fact]
+    public void should_measure_the_next_edit_against_the_new_baseline_when_the_baseline_is_marked()
+    {
+        var board = Loaded("a", "b");
+        board.Remove(new[] { board.Slots[0] });
+        board.MarkBaseline();
+
+        board.Slots[0].Label = "북측 도어";
+
+        Assert.Equal(1, board.UnsavedChangeCount);
+        Assert.Equal("b", board.Diff().Changed.Single().Key);
+        Assert.Empty(board.RemovedKeys);     // 'a' 는 이제 원점에도 없다 — 지울 재정의가 아니다
+    }
+
+    #endregion
+
     #region 되돌리기
 
     [Fact]
@@ -480,6 +550,33 @@ public class AssemblyBoardTests
 
         var bad = RepeatExpand.Preview(new RepeatExpandSpec("CONTACT_INPUT", 2, 1, "CI_{02d}"), Array.Empty<string>());
         Assert.All(bad, r => Assert.True(r.IsConflict));
+    }
+
+    /// <summary>
+    /// 자릿수가 <see cref="int"/> 를 넘어가면 종전에는 <c>int.Parse</c> 가 <c>OverflowException</c> 을 던졌다 —
+    /// 미리보기는 글자를 칠 때마다 도는 자리라, 그 예외 하나가 창을 통째로 죽인다.
+    /// </summary>
+    [Theory]
+    [InlineData("ci_{099999999999d}")]   // int 를 넘긴다 — 종전 OverflowException
+    [InlineData("ci_{07d}")]             // 상한(6)을 넘긴다 — PadLeft 로 쓸데없이 긴 key
+    public void should_reject_the_spec_when_the_key_pad_width_is_out_of_range(string format)
+    {
+        var problem = RepeatExpand.Validate(new RepeatExpandSpec("CONTACT_INPUT", 4, 1, format));
+
+        Assert.NotNull(problem);
+        Assert.Contains("자릿수", problem);
+        Assert.Empty(RepeatExpand.Preview(new RepeatExpandSpec("CONTACT_INPUT", 4, 1, format), Array.Empty<string>()));
+    }
+
+    /// <summary>쓸 수 없는 자릿수라도 <b>던지지 않는다</b> — 채우지 않은 번호로 떨어뜨린다.</summary>
+    [Theory]
+    [InlineData("ci_{099999999999d}", 7, "ci_7")]
+    [InlineData("ci_{07d}", 7, "ci_7")]
+    [InlineData("ci_{06d}", 7, "ci_000007")]   // 상한 자체는 그대로 쓸 수 있다
+    public void should_fall_back_to_the_plain_number_when_the_key_pad_width_is_out_of_range(
+        string format, int number, string expected)
+    {
+        Assert.Equal(expected, RepeatExpand.FormatKey(format, number));
     }
 
     [Fact]

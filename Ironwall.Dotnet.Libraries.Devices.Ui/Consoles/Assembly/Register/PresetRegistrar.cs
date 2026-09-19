@@ -35,11 +35,20 @@ public sealed record PresetRegisterResult(bool IsSuccess, int? NewDeviceId, stri
 public sealed class PresetRegistrar
 {
     #region - Ctors -
-    public PresetRegistrar(IDeviceApiService api, IDeviceProviderService providerService, ILogService? log = null)
+    /// <param name="policy">
+    /// 서버 계약 정책. <c>null</c> 이면 <see cref="DeviceQueryPolicy.Resolve()"/> — 패널이 쓰는 그 방식 그대로다
+    /// (컨테이너가 없으면 6.3 폴백이라 <see cref="RegisterAsync"/> 가 보내지 않고 막힌다 — 안전한 방향).
+    /// </param>
+    public PresetRegistrar(
+        IDeviceApiService api,
+        IDeviceProviderService providerService,
+        ILogService? log = null,
+        DeviceQueryPolicy? policy = null)
     {
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _providerService = providerService ?? throw new ArgumentNullException(nameof(providerService));
         _log = log;
+        _policy = policy ?? DeviceQueryPolicy.Resolve();
     }
     #endregion
 
@@ -55,6 +64,14 @@ public sealed class PresetRegistrar
         try
         {
             token.ThrowIfCancellationRequested();
+
+            // 축 계약이 아니면 POST 조차 하지 않는다 — 6.3 으로 나가면 ShapeWrite 가 본문을 평면으로
+            // 되돌려 부품은 사라지고 채우지 않은 평면 칸만 기본값으로 실린다(AssemblyWriteGuard).
+            if (AssemblyWriteGuard.IsBlocked(_policy))
+            {
+                _log?.Warning($"[{nameof(RegisterAsync)}] 서버 계약 {_policy.Contract} — 프리셋 등록을 보내지 않았습니다.");
+                return new PresetRegisterResult(false, null, AssemblyWriteGuard.LEGACY_CONTRACT_MESSAGE);
+            }
 
             // (8.0 unit_id) 패널이 쓰는 그 관문 그대로 — 8.0 미만이면 관문이 키를 지운다(6.3/7.0 은 422).
             await UnitScopeGate.StampAsync(request.Dto, nameof(RegisterAsync), _log, token).ConfigureAwait(false);
@@ -129,5 +146,6 @@ public sealed class PresetRegistrar
     private readonly IDeviceApiService _api;
     private readonly IDeviceProviderService _providerService;
     private readonly ILogService? _log;
+    private readonly DeviceQueryPolicy _policy;
     #endregion
 }

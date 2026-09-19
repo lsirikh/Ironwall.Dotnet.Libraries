@@ -637,6 +637,111 @@ public class DevicePresetStoreTests : IDisposable
         Assert.Contains("건너뛰었다", store.StateMessage);
     }
 
+    /// <summary>
+    /// ★ 건너뛴 줄은 <b>다음 저장에서도 파일에 남아 있어야 한다</b>.
+    /// </summary>
+    /// <remarks>
+    /// 종전에는 읽을 때 버리고 쓸 때 안 써서, 사용자가 프리셋 하나를 저장하는 순간
+    /// 모르는 카테고리의 줄이 <b>영구히 사라졌다</b>. 그 줄은 더 새 판에서 멀쩡한 프리셋이고,
+    /// "이번 판이 못 읽는다"가 지울 이유가 되지 않는다.
+    /// </remarks>
+    [Fact]
+    public void should_keep_the_unknown_entry_in_the_file_when_another_preset_is_saved()
+    {
+        var unknown = JObject.Parse("""
+            {
+              "id": "b",
+              "name": "모르는 것",
+              "category": "Teleporter",
+              "type_axis": "Warp",
+              "components": [ { "key": "coil", "type": "WARP_COIL" } ],
+              "미래의칸": { "값": 1 }
+            }
+            """);
+
+        File.WriteAllText(_path, $$"""
+            {
+              "schema": 1,
+              "saved_at": "2026-09-19T22:15:00.0000000+09:00",
+              "presets": [
+                { "id": "a", "name": "아는 것", "category": "Camera", "components": [] },
+                {{unknown.ToString()}}
+              ]
+            }
+            """);
+
+        var store = NewStore();
+        store.Load();
+        Assert.Contains("건너뛰었다", store.StateMessage);
+
+        Assert.True(store.Save(BuildPreset("새로 만든 것", EnumDeviceCategory.Lamp)).IsSuccess);
+
+        var written = (JArray)JObject.Parse(File.ReadAllText(_path))["presets"]!;
+        var survivor = written.OfType<JObject>().Single(e => (string?)e["id"] == "b");
+        Assert.True(JToken.DeepEquals(unknown, survivor));   // 모르는 칸까지 글자 그대로
+
+        // 아는 줄도 그대로 있고, 새로 저장한 줄이 더해졌다.
+        Assert.Equal(3, written.Count);
+        Assert.Contains(written.OfType<JObject>(), e => (string?)e["name"] == "새로 만든 것");
+    }
+
+    /// <summary>지우기 · 이름 바꾸기도 같은 통로(<c>Persist</c>)를 지난다 — 한 번 더 못 박는다.</summary>
+    [Fact]
+    public void should_keep_the_unknown_entry_in_the_file_when_a_preset_is_renamed_or_deleted()
+    {
+        File.WriteAllText(_path, """
+            {
+              "schema": 1,
+              "saved_at": "2026-09-19T22:15:00.0000000+09:00",
+              "presets": [
+                { "id": "a", "name": "아는 것", "category": "Camera", "components": [] },
+                { "id": "b", "name": "모르는 것", "category": "Teleporter", "components": [] }
+              ]
+            }
+            """);
+
+        var store = NewStore();
+        store.Load();
+
+        Assert.True(store.Rename("a", "이름 바꾼 것").IsSuccess);
+        Assert.Contains("\"id\": \"b\"", File.ReadAllText(_path));
+
+        Assert.True(store.Delete("a").IsSuccess);
+        var written = (JArray)JObject.Parse(File.ReadAllText(_path))["presets"]!;
+        Assert.Equal("b", (string?)Assert.IsType<JObject>(Assert.Single(written))["id"]);
+    }
+
+    /// <summary>전부 내보낼 때도 같이 나간다 — 더 새 판 · 손상 때 건져 낼 유일한 통로라서다.</summary>
+    [Fact]
+    public void should_carry_the_unknown_entry_when_everything_is_exported()
+    {
+        File.WriteAllText(_path, """
+            {
+              "schema": 1,
+              "saved_at": "2026-09-19T22:15:00.0000000+09:00",
+              "presets": [
+                { "id": "a", "name": "아는 것", "category": "Camera", "components": [] },
+                { "id": "b", "name": "모르는 것", "category": "Teleporter", "components": [] }
+              ]
+            }
+            """);
+
+        var store = NewStore();
+        store.Load();
+
+        var target = Path.Combine(_dir, "내보낸 것.json");
+        Assert.True(store.Export(target).IsSuccess);
+
+        var written = (JArray)JObject.Parse(File.ReadAllText(target))["presets"]!;
+        Assert.Contains(written.OfType<JObject>(), e => (string?)e["id"] == "b");
+
+        // 고른 것만 내보낼 때는 고른 것만이다.
+        var only = Path.Combine(_dir, "고른 것.json");
+        Assert.True(store.Export(only, new[] { store.Presets[0].Id }).IsSuccess);
+        var chosen = (JArray)JObject.Parse(File.ReadAllText(only))["presets"]!;
+        Assert.DoesNotContain(chosen.OfType<JObject>(), e => (string?)e["id"] == "b");
+    }
+
     [Fact]
     public void should_leave_no_temp_file_when_save_succeeds()
     {

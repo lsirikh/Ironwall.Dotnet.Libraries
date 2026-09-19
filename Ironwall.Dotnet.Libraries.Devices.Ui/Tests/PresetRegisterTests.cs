@@ -1,6 +1,10 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -32,6 +36,11 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// 서버에 붙지 않는다 — DTO 직렬화와 가짜 API 왕복만으로 본문을 본다.
 /// 이 파일이 깨지면 그건 "서버가 부품을 조용히 빼고 성공하는" 경로가 열렸다는 뜻이다.
 /// </remarks>
+/// <remarks>
+/// <c>unit_id</c> 관문 시험이 Caliburn 의 <b>정적</b> <c>IoC</c> 델리게이트를 잠깐 갈아 끼우므로
+/// (<see cref="TestIoCScope"/> 와 같은 이유) 클래스 전체를 <c>[Collection("CaliburnIoC")]</c> 로 직렬화한다.
+/// </remarks>
+[Collection("CaliburnIoC")]
 public class PresetRegisterTests
 {
     #region - 등록 본문 -
@@ -363,13 +372,13 @@ public class PresetRegisterTests
     {
         var api = new FakeApi { EnclosureCreateResult = ApiResponse<EnclosureDeviceDto>.CreateSuccess(new EnclosureDeviceDto { Id = 77 }) };
         var provider = new FakeProvider();
-        var registrar = new PresetRegistrar(api, provider, new MockLogService());
+        var registrar = new PresetRegistrar(api, provider, new MockLogService(), AxisPolicy());
 
         var result = await registrar.RegisterAsync(PresetRequestBuilder.Build(EnclosurePreset(), Instance()));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(77, result.NewDeviceId);
-        Assert.Equal(1, api.EnclosureCreateCount);
+        Assert.Equal(1, api.CreateCount);
         Assert.Equal(1, provider.FetchCount);
     }
 
@@ -381,7 +390,7 @@ public class PresetRegisterTests
             EnclosureCreateResult = ApiResponse<EnclosureDeviceDto>.CreateError("VALIDATION_ERROR", "number_device: 이미 쓰는 번호입니다."),
         };
         var provider = new FakeProvider();
-        var registrar = new PresetRegistrar(api, provider, new MockLogService());
+        var registrar = new PresetRegistrar(api, provider, new MockLogService(), AxisPolicy());
 
         var result = await registrar.RegisterAsync(PresetRequestBuilder.Build(EnclosurePreset(), Instance()));
 
@@ -396,7 +405,7 @@ public class PresetRegisterTests
     {
         var api = new FakeApi();
         var provider = new FakeProvider();
-        var registrar = new PresetRegistrar(api, provider, new MockLogService());
+        var registrar = new PresetRegistrar(api, provider, new MockLogService(), AxisPolicy());
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -404,7 +413,86 @@ public class PresetRegisterTests
 
         Assert.False(result.IsSuccess);
         Assert.Contains("취소", result.Message, StringComparison.Ordinal);
-        Assert.Equal(0, api.EnclosureCreateCount);
+        Assert.Equal(0, api.CreateCount);
+    }
+    #endregion
+
+    #region - 계약 가드(6.3 에는 아무것도 보내지 않는다) -
+    /// <summary>
+    /// 6.3 서버에는 <b>POST 조차 하지 않는다</b> — 나가면 본문이 평면으로 재조립돼(ShapeWrite) 부품은 빠지고
+    /// 조립기가 채우지 않은 평면 칸만 기본값으로 실린다.
+    /// </summary>
+    [Fact]
+    public async Task should_send_nothing_and_fail_when_registering_against_a_legacy_contract()
+    {
+        var api = new FakeApi();
+        var provider = new FakeProvider();
+        var registrar = new PresetRegistrar(api, provider, new MockLogService(), LegacyPolicy());
+
+        var result = await registrar.RegisterAsync(PresetRequestBuilder.Build(EnclosurePreset(), Instance()));
+
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.NewDeviceId);
+        Assert.Contains("부품 모델이 없다", result.Message, StringComparison.Ordinal);
+        Assert.Equal(0, api.CallCount);          // 왕복 한 번도 없다
+        Assert.Equal(0, provider.FetchCount);
+    }
+
+    /// <summary>적용도 마찬가지 — <b>다시 받기조차 하지 않는다</b>(읽기가 안전해도 사용자에게 거짓 기대를 주지 않는다).</summary>
+    [Fact]
+    public async Task should_send_nothing_and_fail_when_applying_against_a_legacy_contract()
+    {
+        var api = new FakeApi { Fetched = FilledDto(EnumDeviceCategory.Enclosure, Component("door", "DOOR_SENSOR")) };
+        var provider = new FakeProvider();
+        var service = new ComponentApplyService(api, provider, new MockLogService(), LegacyPolicy());
+
+        var result = await service.ApplyAsync(
+            Device(),
+            baseline: new[] { Component("door", "DOOR_SENSOR") },
+            desired: new[] { Component("door", "DOOR_SENSOR") },
+            overridesToSend: null);
+
+        Assert.False(result.IsSuccess);
+        Assert.False(result.IsConflict);         // 경합이 아니라 판본 문제다 — 다시 받아도 달라지지 않는다
+        Assert.Contains("부품 모델이 없다", result.Message, StringComparison.Ordinal);
+        Assert.Equal(0, api.CallCount);
+        Assert.Equal(0, provider.FetchCount);
+    }
+    #endregion
+
+    #region - unit_id 관문 -
+    /// <summary>
+    /// 8.0 에서 <c>unit_id</c> 를 빼면 서버가 장비를 <b>기본 부대로 재귀속</b>시키고 응답에는 아무 신호도 남기지 않는다.
+    /// 등록은 관문을 지나고 있었고, 적용도 같은 자리를 지나야 한다.
+    /// </summary>
+    [Fact]
+    public async Task should_stamp_the_unit_the_gate_provides_when_registering()
+    {
+        using var scope = new UnitScope(unitId: 42);
+        var api = new FakeApi { EnclosureCreateResult = ApiResponse<EnclosureDeviceDto>.CreateSuccess(new EnclosureDeviceDto { Id = 77 }) };
+        var registrar = new PresetRegistrar(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await registrar.RegisterAsync(PresetRequestBuilder.Build(EnclosurePreset(), Instance()));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, (int?)JObject.Parse(Wire(api.Created!))["unit_id"]);
+    }
+
+    [Fact]
+    public async Task should_stamp_the_unit_the_gate_provides_when_applying()
+    {
+        using var scope = new UnitScope(unitId: 42);
+        var api = new FakeApi { Fetched = FilledDto(EnumDeviceCategory.Enclosure, Component("door", "DOOR_SENSOR")) };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(
+            Device(),
+            baseline: new[] { Component("door", "DOOR_SENSOR") },
+            desired: new[] { Component("door", "DOOR_SENSOR"), Component("temp", "TEMPERATURE_SENSOR") },
+            overridesToSend: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, (int?)JObject.Parse(Wire(api.Patched!))["unit_id"]);
     }
     #endregion
 
@@ -412,9 +500,9 @@ public class PresetRegisterTests
     [Fact]
     public async Task should_send_nothing_when_the_server_components_changed_since_the_board_opened()
     {
-        var api = new FakeApi { EnclosureById = Fetched(Component("door", "DOOR_SENSOR"), Component("fan", "FAN")) };
+        var api = new FakeApi { Fetched = Fetched(Component("door", "DOOR_SENSOR"), Component("fan", "FAN")) };
         var provider = new FakeProvider();
-        var service = new ComponentApplyService(api, provider, new MockLogService());
+        var service = new ComponentApplyService(api, provider, new MockLogService(), AxisPolicy());
 
         var result = await service.ApplyAsync(
             Device(),
@@ -424,16 +512,16 @@ public class PresetRegisterTests
 
         Assert.True(result.IsConflict);
         Assert.False(result.IsSuccess);
-        Assert.Equal(0, api.EnclosurePatchCount);
+        Assert.Equal(0, api.PatchCount);
         Assert.Equal(0, provider.FetchCount);
     }
 
     [Fact]
     public async Task should_patch_the_whole_component_array_once_when_nothing_changed_on_the_server()
     {
-        var api = new FakeApi { EnclosureById = Fetched(Component("door", "DOOR_SENSOR"), Component("fan", "FAN")) };
+        var api = new FakeApi { Fetched = Fetched(Component("door", "DOOR_SENSOR"), Component("fan", "FAN")) };
         var provider = new FakeProvider();
-        var service = new ComponentApplyService(api, provider, new MockLogService());
+        var service = new ComponentApplyService(api, provider, new MockLogService(), AxisPolicy());
 
         var result = await service.ApplyAsync(
             Device(),
@@ -443,10 +531,10 @@ public class PresetRegisterTests
 
         Assert.True(result.IsSuccess);
         Assert.False(result.IsConflict);
-        Assert.Equal(1, api.EnclosurePatchCount);
+        Assert.Equal(1, api.PatchCount);
         Assert.Equal(1, provider.FetchCount);
 
-        var body = JObject.Parse(Wire(api.EnclosurePatched!));
+        var body = JObject.Parse(Wire(api.Patched!));
         var components = (JArray)body.SelectToken("hardware_spec.components")!;
         Assert.Equal(new[] { "temp", "fan" }, components.Select(c => (string?)c["key"]));
 
@@ -458,6 +546,7 @@ public class PresetRegisterTests
         Assert.Null(body["group_ids"]);
         Assert.Null(body["id"]);
         Assert.Null(body.SelectToken("hardware_spec.manufacturer"));
+        // 받은 장비에 임계치가 없었으니 실을 것도 없다(있으면 그대로 실어야 한다 — 아래 전수 감사).
         Assert.Null(body.SelectToken("device_config.thresholds"));
         // 그 사이 이름·번호가 빈 값으로 덮이지 않는다.
         Assert.Equal("ENC-1", (string?)body["name_device"]);
@@ -469,11 +558,11 @@ public class PresetRegisterTests
     {
         var api = new FakeApi
         {
-            EnclosureById = Fetched(Component("door", "DOOR_SENSOR")),
-            EnclosurePatchResult = ApiResponse<EnclosureDeviceDto>.CreateError("VALIDATION_ERROR", "components[0].key: 중복된 key 입니다."),
+            Fetched = Fetched(Component("door", "DOOR_SENSOR")),
+            PatchError = ("VALIDATION_ERROR", "components[0].key: 중복된 key 입니다."),
         };
         var provider = new FakeProvider();
-        var service = new ComponentApplyService(api, provider, new MockLogService());
+        var service = new ComponentApplyService(api, provider, new MockLogService(), AxisPolicy());
 
         var result = await service.ApplyAsync(
             Device(),
@@ -485,6 +574,180 @@ public class PresetRegisterTests
         Assert.False(result.IsConflict);
         Assert.Equal("components[0].key: 중복된 key 입니다.", result.Message);
         Assert.Equal(0, provider.FetchCount);
+    }
+    #endregion
+
+    #region - 본문 전수 감사(일곱 카테고리) -
+    /// <summary>
+    /// ★ 카테고리 전수 — <b>본문에 null 이 하나도 없고</b>, 실린 키는 전부 <b>방금 받은 값과 같다</b>.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜 이렇게 검사하는가</b> — 받은 DTO 의 모든 스칼라를 기본값이 아닌 값으로 채워 두면,
+    /// 본문에 남은 <c>null</c> 하나하나가 <b>우리가 베끼지 않은 칸</b>이라는 증거가 된다.
+    /// <c>PATCH</c> 는 RFC 7396 병합이라 <c>null</c> 은 <b>그 키의 삭제</b>다 —
+    /// 스피커·경광등의 <c>description</c> 이 이 방식으로 지워지고 있었다.</para>
+    /// <para>실린 키가 "받은 값과 같은가"는 <b>받은 DTO 를 축 모드로 직렬화한 본문</b>과 견준다.
+    /// 그것이 곧 "아무것도 바꾸지 않는 본문"이기 때문이다. 싣지 <b>않은</b> 키는 견주지 않는다 —
+    /// 병합에서 안 보낸 키는 그대로 남고, 오히려 그게 가장 안전한 상태다(종류축 · id · geolocation).</para>
+    /// </remarks>
+    [Theory]
+    [InlineData(EnumDeviceCategory.Controller)]
+    [InlineData(EnumDeviceCategory.Sensor)]
+    [InlineData(EnumDeviceCategory.Camera)]
+    [InlineData(EnumDeviceCategory.Speaker)]
+    [InlineData(EnumDeviceCategory.Enclosure)]
+    [InlineData(EnumDeviceCategory.Lamp)]
+    [InlineData(EnumDeviceCategory.Gate)]
+    public async Task should_never_null_or_reset_a_fetched_value_in_the_apply_body(EnumDeviceCategory category)
+    {
+        var keep = Component("nic", "NETWORK_INTERFACE");
+        var drop = Component("old", "NETWORK_INTERFACE");
+        var fetched = FilledDto(category, keep, drop);
+
+        var api = new FakeApi { Fetched = fetched };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(
+            DeviceOf(category),
+            baseline: new[] { keep, drop },
+            desired: new[] { keep },
+            overridesToSend: new JObject { ["old"] = JValue.CreateNull() });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, api.PatchCount);
+
+        var body = JObject.Parse(Wire(api.Patched!));
+
+        // (a) 본문의 null 은 오로지 "이 부품 재정의를 지운다" 뿐이다.
+        foreach (var property in body.Descendants().OfType<JProperty>())
+        {
+            if (property.Value.Type != JTokenType.Null) continue;
+            Assert.StartsWith("device_config.component_overrides", property.Path, StringComparison.Ordinal);
+        }
+
+        // (b) 실린 최상위 키는 전부 "아무것도 바꾸지 않는 본문" 과 같다.
+        fetched.UseAxisWrite = true;
+        var unchanged = JObject.Parse(Wire(fetched));
+
+        foreach (var property in body.Properties())
+        {
+            if (property.Name is "hardware_spec" or "device_config" or "unit_id") continue;
+            Assert.True(JToken.DeepEquals(property.Value, unchanged[property.Name]),
+                        $"{category}.{property.Name}: {property.Value} ≠ {unchanged[property.Name]}");
+        }
+
+        // 부품 배열만 우리 것이다 — 뺀 부품은 사라지고 남긴 부품은 그대로다.
+        var components = (JArray)body.SelectToken("hardware_spec.components")!;
+        Assert.Equal(new[] { "nic" }, components.Select(c => (string?)c["key"]));
+
+        // device_config 는 (b) 에서 뺐지만, 같은 축의 다른 칸은 통째 교체 해석에서도 살아남아야 한다.
+        foreach (var section in new[] { "thresholds", "modes" })
+        {
+            Assert.True(
+                JToken.DeepEquals(body.SelectToken($"device_config.{section}"),
+                                  unchanged.SelectToken($"device_config.{section}")),
+                $"{category} device_config.{section}");
+        }
+    }
+
+    /// <summary>
+    /// 경광등 한 대의 <b>최종 본문</b> — 보고서에 붙이는 그 글자 그대로. 여기가 바뀌면 사람이 다시 봐야 한다.
+    /// </summary>
+    [Fact]
+    public async Task should_produce_the_expected_wire_body_when_applying_to_a_lamp()
+    {
+        var body = await ApplyAndCapture(EnumDeviceCategory.Lamp);
+
+        Assert.Equal("""
+            {
+              "number_device": 5,
+              "name_device": "DEV-5",
+              "status": "ACTIVATED",
+              "is_enable": true,
+              "description": "북측 9구간 경광등",
+              "connection": {
+                "schema": 1,
+                "type": "IP_DIRECT",
+                "ip_address": "10.0.0.13",
+                "ip_port": 4001,
+                "credentials": {
+                  "user_name": "op",
+                  "user_password": "lamp-pw"
+                }
+              },
+              "hardware_spec": {
+                "components": [
+                  {
+                    "key": "nic",
+                    "type": "NETWORK_INTERFACE"
+                  }
+                ]
+              },
+              "device_config": {
+                "schema": 1,
+                "component_overrides": {
+                  "old": null
+                }
+              }
+            }
+            """.Replace("\r\n", "\n"), body.ToString(Formatting.Indented).Replace("\r\n", "\n"));
+    }
+
+    /// <summary>함체 한 대의 <b>최종 본문</b> — 임계치가 같은 축에 실려 나가는 모습이 여기 있다.</summary>
+    [Fact]
+    public async Task should_produce_the_expected_wire_body_when_applying_to_an_enclosure()
+    {
+        var body = await ApplyAndCapture(EnumDeviceCategory.Enclosure);
+
+        Assert.Equal("""
+            {
+              "number_device": 5,
+              "name_device": "DEV-5",
+              "status": "ACTIVATED",
+              "is_enable": true,
+              "hardware_spec": {
+                "components": [
+                  {
+                    "key": "nic",
+                    "type": "NETWORK_INTERFACE"
+                  }
+                ]
+              },
+              "device_config": {
+                "schema": 1,
+                "thresholds": {
+                  "temperature": {
+                    "high": 45.0,
+                    "low": -10.0
+                  },
+                  "humidity": {
+                    "high": 80.0
+                  }
+                },
+                "component_overrides": {
+                  "old": null
+                }
+              }
+            }
+            """.Replace("\r\n", "\n"), body.ToString(Formatting.Indented).Replace("\r\n", "\n"));
+    }
+
+    /// <summary>한 카테고리를 적용하고 <b>보낸 본문</b>을 돌려준다(감사 · 붙박이 본문 공용).</summary>
+    private static async Task<JObject> ApplyAndCapture(EnumDeviceCategory category)
+    {
+        var keep = Component("nic", "NETWORK_INTERFACE");
+        var drop = Component("old", "NETWORK_INTERFACE");
+        var api = new FakeApi { Fetched = FilledDto(category, keep, drop) };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(
+            DeviceOf(category),
+            baseline: new[] { keep, drop },
+            desired: new[] { keep },
+            overridesToSend: new JObject { ["old"] = JValue.CreateNull() });
+
+        Assert.True(result.IsSuccess);
+        return JObject.Parse(Wire(api.Patched!));
     }
     #endregion
 
@@ -515,6 +778,203 @@ public class PresetRegisterTests
 
     private static EnclosureDeviceModel Device()
         => new() { Id = 41, DeviceNumber = 5, DeviceName = "ENC-1", CategoryDevice = EnumDeviceCategory.Enclosure };
+
+    /// <summary>카테고리마다의 대상 장비 — 콘솔 상세가 들고 있는 모델 자리다(Id 만 쓰인다).</summary>
+    private static IBaseDeviceModel DeviceOf(EnumDeviceCategory category)
+    {
+        IBaseDeviceModel device = category switch
+        {
+            EnumDeviceCategory.Controller => new ControllerDeviceModel(),
+            EnumDeviceCategory.Sensor => new SensorDeviceModel(),
+            EnumDeviceCategory.Camera => new CameraDeviceModel(),
+            EnumDeviceCategory.Speaker => new SpeakerDeviceModel(),
+            EnumDeviceCategory.Enclosure => new EnclosureDeviceModel(),
+            EnumDeviceCategory.Lamp => new LampDeviceModel(),
+            EnumDeviceCategory.Gate => new GateDeviceModel(),
+            _ => throw new ArgumentOutOfRangeException(nameof(category)),
+        };
+
+        device.Id = 41;
+        device.DeviceNumber = 5;
+        device.DeviceName = "DEV-5";
+        device.CategoryDevice = category;
+        return device;
+    }
+
+    /// <summary>
+    /// <b>스칼라가 하나도 비어 있지 않은</b> 응답 DTO — 전수 감사의 재료다.
+    /// </summary>
+    /// <remarks>
+    /// 빈 칸이 하나도 없어야 본문의 <c>null</c> 하나하나가 "우리가 안 베낀 칸"이라는 증거가 된다.
+    /// 값은 일부러 기본값과 다르게 둔다(<c>status</c> 는 <c>DEACTIVATED</c> 가 아니라 <c>ACTIVATED</c>,
+    /// 스피커 역할은 <c>NORMAL</c> 이 아니라 <c>ADMIN</c> …) — 기본값이면 "덮였는지" 를 구분할 수 없다.
+    /// </remarks>
+    private static BaseDeviceDto FilledDto(EnumDeviceCategory category, params ComponentDefinitionModel[] components)
+    {
+        var spec = new HardwareSpecDto
+        {
+            Schema = 1,
+            Manufacturer = "Sensorway",
+            Model = "M-100",
+            Firmware = "1.2.3",
+            MacAddress = "00:11:22:33:44:55",
+            OnvifVersion = "2.6",
+            MaxDetectionRange = 120.5,
+            Components = components.Select(PresetRequestBuilder.ToComponentDto).ToList(),
+        };
+
+        BaseDeviceDto dto = category switch
+        {
+            EnumDeviceCategory.Controller => new ControllerDeviceDto
+            {
+                TypeDevice = "IoController",
+                IpAddress = "10.0.0.11",
+                IpPort = 5001,
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Sensor => new SensorDeviceDto
+            {
+                TypeDevice = "Multi",
+                ControllerId = 12,
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Camera => new CameraDeviceDto
+            {
+                TypeDevice = "Camera",
+                IpAddress = "10.0.0.12",
+                IpPort = 80,
+                UserName = "admin",
+                UserPassword = "cam-pw",
+                RtspUri = "rtsp://10.0.0.12/1",
+                RtspPort = 554,
+                Mode = "ONVIF",
+                Category = "PTZ",
+                IsRecord = true,
+                Urls = FullCameraUrls(),
+                DeviceConfigModes = new JObject { ["day_night_mode"] = "AUTO", ["palette"] = "WHITE_HOT" },
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Speaker => new SpeakerDeviceDto
+            {
+                TypeDevice = "Speaker",
+                SpeakerType = "ADMIN",
+                Description = "북측 9구간 방송",
+                ServerId = 3,
+                TypeSpeaker = "Horn",
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Enclosure => new EnclosureDeviceDto
+            {
+                TypeDevice = "Enclosure",
+                TypeEnclosure = "Outdoor",
+                HeaterEnabled = true,
+                FanEnabled = true,
+                ThresholdConfig = new JObject { ["temp_high"] = 45, ["temp_low"] = -10, ["humidity_high"] = 80 },
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Lamp => new LampDeviceDto
+            {
+                TypeDevice = "Lamp",
+                TypeLamp = "Strobe",
+                IpAddress = "10.0.0.13",
+                IpPort = 4001,
+                UserName = "op",
+                UserPassword = "lamp-pw",
+                Description = "북측 9구간 경광등",
+                HardwareSpec = spec,
+            },
+            EnumDeviceCategory.Gate => new GateDeviceDto
+            {
+                TypeDevice = "Gate",
+                TypeGate = "Sliding",
+                Urls = new JObject { ["homepage"] = "http://10.0.0.14/" },
+                LinkInfo = new JObject { ["type"] = "RS485", ["channel"] = 2, ["parent_device_id"] = 9 },
+                HardwareSpec = spec,
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(category)),
+        };
+
+        dto.Id = 41;
+        dto.NumberDevice = 5;
+        dto.NameDevice = "DEV-5";
+        dto.Status = "ACTIVATED";
+        dto.IsEnable = true;
+        dto.Version = "6.3.2";
+        return dto;
+    }
+
+    /// <summary>카메라 링크 네 칸을 <b>전부</b> 채운다 — 한 칸이라도 비면 그 자리가 본문에서 null 이 된다.</summary>
+    private static CameraUrlsDto FullCameraUrls() => new()
+    {
+        Homepage = new CameraHomepageDto { Url = "http://10.0.0.12/" },
+        Onvif = new CameraOnvifDto { DeviceService = "http://10.0.0.12/onvif/device_service" },
+        Streams = new CameraStreamsDto
+        {
+            Rtsp = new CameraRtspDto { Main = "rtsp://10.0.0.12/1", Sub = "rtsp://10.0.0.12/2" },
+            Webrtc = new CameraWebrtcDto { Main = "webrtc://10.0.0.12/1" },
+        },
+        Snapshot = new CameraSnapshotDto { Ch1 = "http://10.0.0.12/snap1" },
+    };
+
+    /// <summary>축 계약(7.0+) — 조립 쓰기는 이 계약에서만 나간다.</summary>
+    private static DeviceQueryPolicy AxisPolicy() => new(new FixedProbe(EnumServerContract.V8_0));
+
+    /// <summary>6.3 계약 — 부품 모델이 아예 없는 판본.</summary>
+    private static DeviceQueryPolicy LegacyPolicy() => new(new FixedProbe(EnumServerContract.V6_3));
+
+    private sealed class FixedProbe : IServerContractProbe
+    {
+        public FixedProbe(EnumServerContract contract) => Contract = contract;
+        public EnumServerContract Contract { get; }
+        public string? RawVersion => Contract.ToString();
+        public bool IsResolved => true;
+        public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
+        public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// <see cref="UnitScopeGate"/> 가 보는 <b>정적</b> IoC 에 부대 서비스를 잠깐 끼워 넣고 끝나면 되돌린다.
+    /// </summary>
+    /// <remarks>관문이 정적 헬퍼라(패널·다이얼로그가 공유) 주입점이 없다 — <see cref="TestIoCScope"/> 와 같은 수법이다.</remarks>
+    private sealed class UnitScope : IDisposable
+    {
+        private readonly Func<Type, string, object> _getInstance;
+        private readonly Func<Type, IEnumerable<object>> _getAllInstances;
+        private readonly Action<object> _buildUp;
+
+        public UnitScope(int unitId)
+        {
+            _getInstance = IoC.GetInstance;
+            _getAllInstances = IoC.GetAllInstances;
+            _buildUp = IoC.BuildUp;
+
+            var scope = new FakeUnitScope(unitId);
+            IoC.GetInstance = (type, key) => type == typeof(IUnitScopeService) ? scope : null!;
+            IoC.GetAllInstances = type => Enumerable.Empty<object>();
+            IoC.BuildUp = obj => { };
+        }
+
+        public void Dispose()
+        {
+            IoC.GetInstance = _getInstance;
+            IoC.GetAllInstances = _getAllInstances;
+            IoC.BuildUp = _buildUp;
+        }
+
+        private sealed class FakeUnitScope : IUnitScopeService
+        {
+            private readonly int _unitId;
+            public FakeUnitScope(int unitId) => _unitId = unitId;
+
+            public bool IsUnitEra => true;
+            public string? UnitCode => "unit001";
+            public int? CurrentUnitId => _unitId;
+            public bool IsResolved => true;
+            public Task<int?> ResolveAsync(CancellationToken token = default) => Task.FromResult<int?>(_unitId);
+            public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
+            public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
+        }
+    }
 
     private static EnclosureDeviceDto Fetched(params ComponentDefinitionModel[] components)
         => new()
@@ -566,35 +1026,100 @@ public class PresetRegisterTests
     /// </summary>
     private sealed class FakeApi : MockDeviceApiService, Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService
     {
+        /// <summary>단건 조회가 돌려줄 DTO. 한 시험은 한 카테고리만 다루므로 자리 하나면 충분하다.</summary>
+        public BaseDeviceDto? Fetched { get; set; }
+
+        /// <summary>PATCH 가 받은 DTO <b>원본</b> — 본문 감사가 이것을 직렬화한다.</summary>
+        public BaseDeviceDto? Patched { get; private set; }
+
+        /// <summary>생성이 받은 DTO — <c>unit_id</c> 관문 시험이 본다.</summary>
+        public BaseDeviceDto? Created { get; private set; }
+
         public ApiResponse<EnclosureDeviceDto>? EnclosureCreateResult { get; set; }
-        public int EnclosureCreateCount { get; private set; }
 
-        public EnclosureDeviceDto? EnclosureById { get; set; }
+        /// <summary>PATCH 를 실패로 흉내 낼 때의 (코드, 문장). <c>null</c> 이면 성공.</summary>
+        public (string Code, string Message)? PatchError { get; set; }
 
-        public ApiResponse<EnclosureDeviceDto>? EnclosurePatchResult { get; set; }
-        public EnclosureDeviceDto? EnclosurePatched { get; private set; }
-        public int EnclosurePatchCount { get; private set; }
+        public int CreateCount { get; private set; }
+        public int PatchCount { get; private set; }
+        public int GetCount { get; private set; }
+
+        /// <summary>왕복 전부 — "아무것도 보내지 않았다" 는 이 값이 0 이라는 뜻이다.</summary>
+        public int CallCount => CreateCount + PatchCount + GetCount;
+
+        private Task<ApiResponse<T>> Get<T>() where T : BaseDeviceDto
+        {
+            GetCount++;
+            return Task.FromResult(Fetched is T typed
+                ? ApiResponse<T>.CreateSuccess(typed)
+                : ApiResponse<T>.CreateError("NOT_FOUND", "장비를 찾지 못했습니다."));
+        }
+
+        private Task<ApiResponse<T>> Patch<T>(T dto) where T : BaseDeviceDto
+        {
+            PatchCount++;
+            Patched = dto;
+            return Task.FromResult(PatchError is { } error
+                ? ApiResponse<T>.CreateError(error.Code, error.Message)
+                : ApiResponse<T>.CreateSuccess(dto));
+        }
 
         public new Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(EnclosureDeviceDto dto, CancellationToken token = default)
         {
-            EnclosureCreateCount++;
+            CreateCount++;
+            Created = dto;
             return Task.FromResult(EnclosureCreateResult
                 ?? ApiResponse<EnclosureDeviceDto>.CreateSuccess(new EnclosureDeviceDto { Id = 1 }));
         }
 
+        public new Task<ApiResponse<ControllerDeviceDto>> GetControllerByIdAsync(
+            int id, bool includeSensors = false, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<ControllerDeviceDto>();
+
+        public new Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(
+            int id, bool includeController = false, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<SensorDeviceDto>();
+
+        public new Task<ApiResponse<CameraDeviceDto>> GetCameraByIdAsync(
+            int id, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<CameraDeviceDto>();
+
+        public new Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(
+            int id, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<SpeakerDeviceDto>();
+
         public new Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(
             int id, CancellationToken token = default, string? view = null, string? include = null)
-            => Task.FromResult(EnclosureById != null
-                ? ApiResponse<EnclosureDeviceDto>.CreateSuccess(EnclosureById)
-                : ApiResponse<EnclosureDeviceDto>.CreateError("NOT_FOUND", "장비를 찾지 못했습니다."));
+            => Get<EnclosureDeviceDto>();
+
+        public new Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(
+            int id, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<LampDeviceDto>();
+
+        public new Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(
+            int id, CancellationToken token = default, string? view = null, string? include = null)
+            => Get<GateDeviceDto>();
+
+        public new Task<ApiResponse<ControllerDeviceDto>> PatchControllerAsync(int id, ControllerDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
+
+        public new Task<ApiResponse<SensorDeviceDto>> PatchSensorAsync(int id, SensorDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
+
+        public new Task<ApiResponse<CameraDeviceDto>> PatchCameraAsync(int id, CameraDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
+
+        public new Task<ApiResponse<SpeakerDeviceDto>> PatchSpeakerAsync(int id, SpeakerDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
 
         public new Task<ApiResponse<EnclosureDeviceDto>> PatchEnclosureAsync(int id, EnclosureDeviceDto dto, CancellationToken token = default)
-        {
-            EnclosurePatchCount++;
-            EnclosurePatched = dto;
-            return Task.FromResult(EnclosurePatchResult
-                ?? ApiResponse<EnclosureDeviceDto>.CreateSuccess(dto));
-        }
+            => Patch(dto);
+
+        public new Task<ApiResponse<LampDeviceDto>> PatchLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
+
+        public new Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+            => Patch(dto);
     }
 
     private sealed class FakeProvider : MockDeviceProviderService, Ironwall.Dotnet.Libraries.Devices.Ui.Services.IDeviceProviderService

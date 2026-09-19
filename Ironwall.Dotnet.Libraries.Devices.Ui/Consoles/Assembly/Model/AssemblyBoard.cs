@@ -57,6 +57,30 @@ public sealed class AssemblyBoard
         Raise();
     }
 
+    /// <summary>
+    /// <b>지금 보드를 새 baseline 으로 삼는다</b> — 저장이 끝난 자리가 새 원점이다(FR-16).
+    /// </summary>
+    /// <remarks>
+    /// <para><see cref="Load"/> 와 다르다 — 슬롯을 <b>다시 만들지 않는다</b>. 저장 직후에 보드를 다시 채우면
+    /// 화면의 선택 · 편집 중이던 칸 · 스크롤이 전부 날아가고, 방금 저장한 사람이 "내가 고르던 게 사라졌다"를 본다.
+    /// 여기서는 <see cref="Slots"/> 의 <b>같은 객체들이 같은 차례로</b> 그대로 남는다.</para>
+    /// <para>되돌리기 스택은 <b>비운다</b> — 저장된 자리가 원점이면 그 이전으로 되돌릴 자리가 없다.
+    /// 스택을 남겨 두면 Undo 한 번이 <b>서버에 이미 있는 것과 다른 상태</b>를 "안 고침"인 양 보여 준다.</para>
+    /// <para>이후 <see cref="IsDirty"/> 는 <c>false</c> · <see cref="RemovedKeys"/> 는 비고,
+    /// 다음 편집부터는 <b>새 baseline</b> 과 견준다.</para>
+    /// </remarks>
+    public void MarkBaseline()
+    {
+        _undo.Clear();
+
+        // Load 와 같은 방식으로 슬롯을 거쳐 나온 선언을 잡는다 — 정규화 차이가 미저장 변경으로 새지 않게.
+        _baseline = Slots.Select(s => s.ToDefinition()).ToList();
+        _baselineOverrides = CurrentOverrides();
+
+        // 미저장 개수 · 되돌리기 가능 여부가 같이 바뀌었으니 화면에 알린다.
+        Raise();
+    }
+
     /// <summary>프리셋 내용으로 통째 바꾼다(되돌리기 1칸). baseline 은 그대로 — 서버에 있는 것은 그대로이기 때문이다.</summary>
     public void ReplaceAll(IEnumerable<ComponentDefinitionModel> components, JObject? componentOverrides)
     {

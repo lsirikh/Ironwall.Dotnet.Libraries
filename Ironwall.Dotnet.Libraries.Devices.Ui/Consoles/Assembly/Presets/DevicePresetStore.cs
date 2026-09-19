@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -65,6 +66,17 @@ public sealed class DevicePresetStore
     private readonly string _path;
     private readonly Func<DateTimeOffset> _clock;
     private readonly List<DevicePreset> _presets = new();
+
+    /// <summary>
+    /// 읽을 때 건너뛴 줄의 <b>원문</b> — 되쓸 때 아는 줄 뒤에 그대로 붙인다.
+    /// </summary>
+    /// <remarks>
+    /// 이것이 없으면 "모르는 카테고리라 건너뛰었다" 가 <b>다음 저장 한 번에 영구 삭제</b>가 된다 —
+    /// 사용자는 프리셋 하나의 이름만 바꿨을 뿐인데 다른 줄이 파일에서 사라진다. 건너뛰기는
+    /// <b>이번에 못 읽었다</b>는 뜻이지 <b>버려도 된다</b>는 뜻이 아니다.
+    /// </remarks>
+    private readonly List<JObject> _unknownEntries = new();
+
     private IReadOnlyList<DevicePreset> _snapshot = Array.Empty<DevicePreset>();
 
     /// <param name="path">프리셋 파일 경로. 테스트는 임시 폴더를 넣는다.</param>
@@ -116,6 +128,7 @@ public sealed class DevicePresetStore
     public void Load()
     {
         _presets.Clear();
+        _unknownEntries.Clear();
         State = PresetStoreState.Ready;
         StateMessage = null;
 
@@ -149,7 +162,11 @@ public sealed class DevicePresetStore
                 return;
             }
 
-            var presets = file.ToPresets(out var skipped);
+            var presets = file.ToPresets(out var skipped, out var skippedEntries);
+
+            // 건너뛴 줄은 세고 알리되 버리지 않는다 — 다음 저장에서 원문 그대로 되쓴다.
+            _unknownEntries.AddRange(skippedEntries);
+
             var skippedNote = skipped > 0 ? $"프리셋 {skipped}건은 모르는 카테고리라 건너뛰었다" : null;
 
             if (file.Schema > CurrentSchema)
@@ -206,6 +223,8 @@ public sealed class DevicePresetStore
     private void SeedAndWrite(PresetStoreState state, string? note)
     {
         _presets.Clear();
+        // 씨앗은 파일이 없거나 깨졌을 때만 심는다 — 되쓸 원문이 애초에 없다.
+        _unknownEntries.Clear();
         _presets.AddRange(DevicePresetSeeds.All.Select(DevicePresetSanitizer.Sanitize));
         Publish();
 
@@ -344,7 +363,11 @@ public sealed class DevicePresetStore
         }
 
         var list = chosen.ToList();
-        var json = DevicePresetFile.Wrap(list, _clock()).ToJson();
+
+        // 전부 내보낼 때는 못 읽은 줄도 같이 내보낸다 — 더 새 판 · 손상 때 사용자가 건져 낼 유일한 통로라,
+        // 여기서 빠지면 "내보내 두고 지웠더니 그 줄만 없다" 가 된다. 고른 것만 내보낼 때는 뺀다.
+        var unknown = ids is null ? _unknownEntries : null;
+        var json = DevicePresetFile.Wrap(list, _clock(), unknown).ToJson();
         try
         {
             WriteAtomic(target!, json);
@@ -458,7 +481,7 @@ public sealed class DevicePresetStore
     {
         try
         {
-            WriteAtomic(_path, DevicePresetFile.Wrap(_snapshot, _clock()).ToJson());
+            WriteAtomic(_path, DevicePresetFile.Wrap(_snapshot, _clock(), _unknownEntries).ToJson());
             return null;
         }
         catch (Exception ex) when (IsIoFailure(ex))

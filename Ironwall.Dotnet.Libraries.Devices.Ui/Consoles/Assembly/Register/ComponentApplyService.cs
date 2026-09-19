@@ -41,17 +41,33 @@ public sealed record ComponentApplyResult(bool IsSuccess, bool IsConflict, strin
 /// <para><b>본문을 좁게 유지한다</b> — <c>hardware_spec.components</c> 와
 /// <c>device_config.component_overrides</c> 말고는 새로 싣지 않는다. 축은 <c>PATCH</c> 에서 <b>객체 병합</b>이라
 /// 안 보낸 키가 보존되지만 <b>배열은 교체</b>다. 다만 축 모드에서 조건 없이 직렬화되는 키
-/// (제어기·카메라·경광등의 <c>connection</c>, 함체의 <c>device_config</c>, 스피커의 <c>speaker_role</c>)는
-/// 뺄 수단이 없어 <b>방금 받은 값으로 채워</b> 되돌림이 아니라 제자리 유지가 되게 한다.</para>
+/// (제어기·카메라·경광등의 <c>connection</c>, 함체·카메라의 <c>device_config</c>, 스피커의 <c>speaker_role</c>,
+/// <b>스피커·경광등의 <c>description</c></b>)는 뺄 수단이 없어 <b>방금 받은 값으로 채워</b>
+/// 되돌림이 아니라 제자리 유지가 되게 한다.</para>
+/// <para><b>전수 감사(2026-09-19)</b> — 일곱 카테고리를 모두 훑어 "본문에 null 이 없고 실린 키가 받은 값과 같은가"를
+/// 못 박았다(<c>PresetRegisterTests.should_never_null_or_reset_a_fetched_value_in_the_apply_body</c>).
+/// 그때 다섯이 걸렸다 — 스피커·경광등 <c>description</c>(<b>null 전송 = 서버 삭제</b>) ·
+/// 제어기·카메라 <c>connection</c>(빈 껍데기) · 함체 <c>device_config.thresholds</c> ·
+/// 카메라 <c>device_config.modes</c>. 통문의 <c>connection</c> 은 null 이면 키째 빠져 병합에서는 무해했지만,
+/// 같은 이유로 받은 값을 채워 통째 교체 해석에도 견디게 했다.</para>
 /// </remarks>
 public sealed class ComponentApplyService
 {
     #region - Ctors -
-    public ComponentApplyService(IDeviceApiService api, IDeviceProviderService providerService, ILogService? log = null)
+    /// <param name="policy">
+    /// 서버 계약 정책. <c>null</c> 이면 <see cref="DeviceQueryPolicy.Resolve()"/> — 패널이 쓰는 그 방식 그대로다
+    /// (컨테이너가 없으면 6.3 폴백이라 <see cref="ApplyAsync"/> 가 보내지 않고 막힌다 — 안전한 방향).
+    /// </param>
+    public ComponentApplyService(
+        IDeviceApiService api,
+        IDeviceProviderService providerService,
+        ILogService? log = null,
+        DeviceQueryPolicy? policy = null)
     {
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _providerService = providerService ?? throw new ArgumentNullException(nameof(providerService));
         _log = log;
+        _policy = policy ?? DeviceQueryPolicy.Resolve();
     }
     #endregion
 
@@ -80,6 +96,13 @@ public sealed class ComponentApplyService
         try
         {
             token.ThrowIfCancellationRequested();
+
+            // 축 계약이 아니면 한 줄도 보내지 않는다 — 다시 받기조차 하지 않는다(AssemblyWriteGuard).
+            if (AssemblyWriteGuard.IsBlocked(_policy))
+            {
+                _log?.Warning($"[{nameof(ApplyAsync)}] 서버 계약 {_policy.Contract} — 부품 적용을 보내지 않았습니다.");
+                return new ComponentApplyResult(false, false, AssemblyWriteGuard.LEGACY_CONTRACT_MESSAGE);
+            }
 
             if (id <= 0)
                 return new ComponentApplyResult(false, false, "아직 서버에 없는 장비입니다 — 먼저 등록해야 부품을 바꿀 수 있습니다.");
@@ -207,10 +230,18 @@ public sealed class ComponentApplyService
     /// 원하는 배열 <b>전체</b> + 재정의를 PATCH 한 건으로 보낸다.
     /// </summary>
     /// <remarks>
-    /// 새 DTO 로 만든다 — 방금 받은 DTO 를 그대로 되보내면 <c>connection</c> 축이 <b>평면 필드에서 재조립</b>되어
-    /// <c>type</c> 이 <c>IP_DIRECT</c> 로 덮이고 <c>channel</c>·<c>parent_device_id</c> 가 사라진다
-    /// (<c>DeviceWriteBodyGuardTests</c> 의 실측). 대신 축 모드에서 <b>조건 없이 직렬화되는</b> 키만
-    /// 받은 값으로 채운다.
+    /// <para>새 DTO 로 만든다 — 방금 받은 DTO 를 그대로 되보내면 부품과 무관한 축까지 전부 본문에 실린다.
+    /// 대신 축 모드에서 <b>조건 없이 직렬화되는</b> 키만 받은 값으로 채운다.</para>
+    /// <para><b>"안 채우면 생략된다"가 아니다</b>(2026-09-19 감사) — 조건 없이 나가는 키는 두 부류다.
+    /// ① <c>speaker.description</c>·<c>lamp.description</c> 처럼 <c>NullValueHandling</c> 도
+    /// <c>ShouldSerialize</c> 도 없는 것은 <b><c>"description": null</c> 로 나가고</b>,
+    /// <c>PATCH</c> 는 RFC 7396 병합이라 <b>null 은 삭제</b>다 — 안 채우면 설명이 서버에서 지워진다.
+    /// ② <c>connection</c>·<c>device_config</c> 처럼 계산으로 조립되는 축은 <b>빈 껍데기</b>로 나간다.
+    /// 객체 병합이라 오늘은 살아남지만, 축 하나를 통째 교체로 읽는 경로(<c>PUT</c>)에서는 그대로 손실이다.
+    /// 그래서 <b>받은 값으로 채워</b> 어느 해석에서도 제자리 유지가 되게 한다.</para>
+    /// <para>남은 한계 — <c>connection</c> 은 평면 필드에서 <b>재조립</b>되므로 받은 원본 그대로는 실을 수 없다.
+    /// <c>type</c> 이 <c>IP_DIRECT</c> 로 고정되고 <c>channel</c>·<c>parent_device_id</c> 는 재현되지 않는다
+    /// (통문만 <c>link_info</c> 를 통해 살아난다). 고치려면 DTO 쪽에 "받은 축을 그대로 되싣는" 통로가 필요하다.</para>
     /// </remarks>
     private async Task<(bool Ok, string Message)> PatchAsync(
         EnumDeviceCategory category,
@@ -236,12 +267,16 @@ public sealed class ComponentApplyService
         {
             case EnumDeviceCategory.Controller:
             {
+                var origin = (ControllerDeviceDto)source;
                 var dto = new ControllerDeviceDto();
                 CopyCommon(source, dto, carrier);
                 // 기본 생성자가 넣은 "Controller" 를 지운다 — 안 지우면 IoController 의 종류가 덮인다.
                 dto.TypeDevice = string.Empty;
+                // connection 은 축 모드에서 무조건 나간다 — 평면 두 칸이 그 축의 유일한 재료다.
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchControllerAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchControllerAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Sensor:
@@ -250,29 +285,42 @@ public sealed class ComponentApplyService
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;   // type_sensor 는 값이 없으면 나가지 않는다
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchSensorAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchSensorAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Camera:
             {
+                var origin = (CameraDeviceDto)source;
                 var dto = new CameraDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;
                 // connection 은 축 모드에서 무조건 나가고 protocol 이 필수다 — 비우면 "NONE" 으로 덮인다.
-                dto.Mode = ((CameraDeviceDto)source).Mode;
+                dto.Mode = origin.Mode;
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
+                dto.UserName = origin.UserName;
+                dto.UserPassword = origin.UserPassword;
+                dto.Urls = origin.Urls;
+                // device_config 는 카메라만 AllowDeviceConfigWrite 없이도 나간다 — 모드 묶음이 같은 축이라
+                // 재정의만 담아 보내면 통째 교체 해석에서 day_night_mode 따위가 통째로 사라진다.
+                dto.IsRecord = origin.IsRecord;
+                dto.DeviceConfigModes = origin.DeviceConfigModes;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchCameraAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchCameraAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Speaker:
             {
+                var origin = (SpeakerDeviceDto)source;
                 var dto = new SpeakerDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;
                 // speaker_role 은 무조건 나가고 기본값이 "NORMAL" 이다 — 비우면 ADMIN 스피커가 NORMAL 로 덮인다.
-                dto.SpeakerType = ((SpeakerDeviceDto)source).SpeakerType;
+                dto.SpeakerType = origin.SpeakerType;
+                // description 은 조건이 하나도 없어 null 이면 "description": null 로 나간다 = 서버에서 삭제.
+                dto.Description = origin.Description;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchSpeakerAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchSpeakerAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Enclosure:
@@ -284,30 +332,52 @@ public sealed class ComponentApplyService
                 // device_config 는 축 모드에서 무조건 나간다 — 선언된 히터·팬의 의도를 받은 값 그대로 유지한다.
                 dto.HeaterEnabled = origin.HeaterEnabled;
                 dto.FanEnabled = origin.FanEnabled;
+                // 임계치도 같은 축이다 — 빼고 보내면 통째 교체 해석에서 온도·습도 임계치가 전부 사라진다.
+                dto.ThresholdConfig = origin.ThresholdConfig;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchEnclosureAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchEnclosureAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Lamp:
             {
+                var origin = (LampDeviceDto)source;
                 var dto = new LampDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;
+                // 스피커와 같은 이유 — 조건 없는 description 은 안 채우면 null 로 나가 서버에서 지워진다.
+                dto.Description = origin.Description;
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
+                dto.UserName = origin.UserName;
+                dto.UserPassword = origin.UserPassword;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchLampAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchLampAsync).ConfigureAwait(false);
             }
 
             case EnumDeviceCategory.Gate:
             {
+                var origin = (GateDeviceDto)source;
                 var dto = new GateDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;
+                // 통문의 connection 은 link_info·urls 에서 조립된다 — 둘 다 없으면 축이 통째로 빠진다.
+                dto.Urls = origin.Urls;
+                dto.LinkInfo = origin.LinkInfo;
                 dto.HardwareSpec = spec;
-                return Read(await _api.PatchGateAsync(id, dto, token).ConfigureAwait(false));
+                return await Send(dto, _api.PatchGateAsync).ConfigureAwait(false);
             }
 
             default:
                 throw new ArgumentException($"부품을 바꿀 수 없는 카테고리입니다: {category}", nameof(category));
+        }
+
+        // 보내기 직전 단 한 자리 — 등록(PresetRegistrar)과 같은 관문을 지나야 8.0 에서 부대가 바뀌지 않는다.
+        // unit_id 를 생략하면 서버가 장비를 기본 부대로 재귀속시키고 응답에는 아무 신호도 남기지 않는다.
+        async Task<(bool Ok, string Message)> Send<T>(
+            T dto, Func<int, T, CancellationToken, Task<ApiResponse<T>>> patch) where T : BaseDeviceDto
+        {
+            await UnitScopeGate.StampAsync(dto, nameof(ApplyAsync), _log, token).ConfigureAwait(false);
+            return Read(await patch(id, dto, token).ConfigureAwait(false));
         }
 
         static (bool, string) Read<T>(ApiResponse<T> response) where T : BaseDeviceDto
@@ -353,5 +423,6 @@ public sealed class ComponentApplyService
     private readonly IDeviceApiService _api;
     private readonly IDeviceProviderService _providerService;
     private readonly ILogService? _log;
+    private readonly DeviceQueryPolicy _policy;
     #endregion
 }
