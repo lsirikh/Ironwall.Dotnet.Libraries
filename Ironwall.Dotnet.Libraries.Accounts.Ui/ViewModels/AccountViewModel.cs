@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -238,5 +238,43 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
             NotifyOfPropertyChange(() => LockReason);
         }
     }
+    #endregion
+    #region - Console display (N-06) -
+    /// <summary>목록 '구분' 칸 — 역할 그대로. 색이 아니라 글자로 뜻을 전한다.</summary>
+    public string RoleText => Role.ToString();
+
+    /// <summary>목록 '상태' 칸.</summary>
+    public string UsedText => Used == EnumUsedType.USED ? "사용" : "미사용";
+
+    /// <summary>목록 '부서·직급' 칸 — 둘 중 하나가 비면 남은 것만 보인다(빈 가운뎃점을 남기지 않는다).</summary>
+    public string OrgText
+        => string.Join(" · ", new[] { Department, Position }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    /// <summary>
+    /// 이 계정의 권한 그룹 Id. <b>계정 모델에는 없는 값</b>이다(서버 <c>users.group_id</c>) — 콘솔이 조회해 채운다.
+    /// </summary>
+    public int? GroupId
+    {
+        get => _groupId;
+        set { _groupId = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>권한 그룹 이름(표시 전용). 콘솔이 채운다.</summary>
+    public string GroupText
+    {
+        get => _groupText;
+        set { _groupText = value ?? string.Empty; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>상세 칸 · 목록의 파생 표시를 한꺼번에 다시 읽게 한다(적용 · 재조회 뒤).</summary>
+    public void RefreshDisplay()
+    {
+        NotifyOfPropertyChange(nameof(RoleText));
+        NotifyOfPropertyChange(nameof(UsedText));
+        NotifyOfPropertyChange(nameof(OrgText));
+    }
+
+    private int? _groupId;
+    private string _groupText = string.Empty;
     #endregion
 }

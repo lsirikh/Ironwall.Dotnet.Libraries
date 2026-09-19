@@ -33,6 +33,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     /// </summary>
     private EnumServerContract _contract = EnumServerContract.V6_3;
     private List<UserGroupDto> _raw = new();
+    private string? _catalogWarning;
 
     // v5.4 Role Simplification(서버 v57): ADMIN/GUEST 등급그룹 DROP + 나머지 'Preset - X'로 rename + 편집 허용(NOTIFY §8.2).
     // → 예약 보호 없음(전 그룹 편집/삭제 가능). 'Preset' 접두는 표시/정렬용으로만 인식.
@@ -147,6 +148,50 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     }
     #endregion
 
+    #region - Console seam (N-06) -
+    /// <summary>
+    /// 저장 전 경고 — <b>전체 교체</b>라 화면이 싣지 못한 모듈이 있으면 저장 자체가 422 로 막힌다.
+    /// 비어 있으면 경고 없음. (설계 정본 window-layout-system-storyboard.html L1225 · L1238)
+    /// </summary>
+    public string? CatalogWarning
+    {
+        get => _catalogWarning;
+        private set { _catalogWarning = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasCatalogWarning)); }
+    }
+
+    public bool HasCatalogWarning => !string.IsNullOrEmpty(_catalogWarning);
+
+    /// <summary>상태 띠에 찍을 글 — "모듈 N · 표시 M".</summary>
+    public string ModuleCountText => $"모듈 {Modules.Count} · 표시 {Modules.Count}";
+
+    /// <summary>지금 매트릭스가 걸려 있는 그룹(0이면 없음).</summary>
+    public int DetailGroupId => _detailGroupId;
+
+    /// <summary>콘솔이 고른 그룹의 매트릭스를 연다(목록 화면의 더블클릭과 같은 경로).</summary>
+    public void LoadMatrixFor(PermissionGroupRowViewModel? row)
+    {
+        SelectedGroup = row;
+        if (row is null)
+        {
+            Modules.Clear();
+            CatalogWarning = null;
+            return;
+        }
+        OnClickGroupDetail();
+    }
+
+    /// <summary>콘솔이 고른 그룹의 구성원을 읽는다(구성원 칩과 같은 경로).</summary>
+    public async Task LoadMembersFor(PermissionGroupRowViewModel? row)
+    {
+        SelectedGroup = row;
+        if (row is null) { Members.Clear(); return; }
+        await OnClickManageMembers();
+    }
+
+    /// <summary>콘솔의 [갱신].</summary>
+    public Task ReloadForConsoleAsync(CancellationToken ct = default) => ReloadAsync(ct);
+    #endregion
+
     #region - Binding: 목록/CRUD -
     public async Task OnClickReloadButton() => await ReloadAsync(CancellationToken.None);
 
@@ -230,6 +275,26 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             });
             _log?.Warning($"[PermGroup] 사전에 없는 권한 모듈 키 '{kv.Key}' — 키 그대로 노출한다(표시명·동작 적용성 미확인).");
         }
+
+        CatalogWarning = BuildCatalogWarning();
+        NotifyOfPropertyChange(nameof(ModuleCountText));
+    }
+
+    /// <summary>
+    /// 저장이 막힐 수 있는 자리를 미리 말한다. 저장 본문은 <b>원본 ∪ 이 세대 어휘</b>라 여기서 볼 수 있는 위험은 둘뿐이다:
+    /// ① 판본을 확정하지 못해 어휘를 좁게 잡았을 수 있다 ② 사전에 없는 서버 키가 섞여 있다(표시명·동작 적용성 미확인).
+    /// </summary>
+    private string? BuildCatalogWarning()
+    {
+        var notes = new List<string>();
+        if (_contractProbe is null || !_contractProbe.IsResolved)
+            notes.Add("서버 판본을 확정하지 못했습니다 — 새 모듈이 빠지면 저장이 422 로 막힐 수 있습니다");
+
+        var unknown = Modules.Count(m => m.IsUnknownModule);
+        if (unknown > 0)
+            notes.Add($"사전에 없는 서버 모듈 {unknown}종을 키 그대로 싣습니다 — 표시명·동작 적용성은 확인되지 않았습니다");
+
+        return notes.Count == 0 ? null : string.Join(" · ", notes);
     }
 
     /// <summary>
