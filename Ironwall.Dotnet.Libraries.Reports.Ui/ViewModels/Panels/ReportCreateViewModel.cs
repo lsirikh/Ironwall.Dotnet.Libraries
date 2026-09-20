@@ -114,7 +114,12 @@ public class ReportCreateViewModel : BasePanelViewModel
             else if (completed != null && completed.IsFailed) StatusText = $"실패: {FailReason(completed.ErrorMessage)}";
             else StatusText = "시간 초과(폴링 중단). 목록에서 상태를 확인하세요.";
         }
-        catch (Exception ex) { _log?.Error($"[ReportCreate] Generate: {ex.Message}"); StatusText = $"오류: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            // 화면엔 고정 문장만 — 예외 본문은 로그로.
+            _log?.Error($"[ReportCreate] Generate: {ex}");
+            StatusText = "생성 요청 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.";
+        }
         finally { IsGenerating = false; }
     }
 

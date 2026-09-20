@@ -85,6 +85,29 @@ public sealed class ReportGenerationRow : PropertyChangedBase
         _ => period!,
     };
 
+    /// <summary>
+    /// 진행 단계 코드(<c>collecting</c> 등) 를 화면 글자로. 모르는 코드는 <b>괄호로 날값을 함께</b> 보인다
+    /// — 서버가 단계를 늘려도 화면이 거짓말하지 않게.
+    /// </summary>
+    public static string StageDisplay(string? stage, string? serverLabel = null)
+    {
+        if (!string.IsNullOrWhiteSpace(serverLabel) && !string.Equals(serverLabel, stage, StringComparison.Ordinal))
+            return serverLabel!;     // 서버가 이미 사람 말로 준 경우
+
+        return stage switch
+        {
+            null or "" => "진행 중",
+            "pending" => "대기 중",
+            "collecting" => "자료 모으는 중",
+            "aggregating" => "집계 중",
+            "rendering" => "그리는 중",
+            "generating" => "만드는 중",
+            "uploading" => "저장 중",
+            "finalizing" => "마무리 중",
+            _ => $"진행 중 ({stage})",
+        };
+    }
+
     public static string SeverityDisplay(string code) => code switch
     {
         ReportSeverity.Info => "정보",
@@ -100,7 +123,7 @@ public sealed class ReportGenerationRow : PropertyChangedBase
         get
         {
             if (!Dto.IsInProgress) return string.Empty;
-            var stage = string.IsNullOrEmpty(Dto.ProgressStageLabel) ? "진행 중" : Dto.ProgressStageLabel;
+            var stage = StageDisplay(Dto.ProgressStage, Dto.ProgressStageLabel);
             var updated = string.IsNullOrEmpty(Dto.ProgressUpdatedAt) ? "갱신 시각 미제공" : $"갱신 {Dto.ProgressUpdatedAt}";
             return $"{stage} · {Dto.ProgressPct}% · {updated}";
         }
