@@ -61,6 +61,9 @@ public interface IEventConsoleSource
 
     /// <summary>"불러온 12 / 340건" — 패널이 만든 글자 그대로.</summary>
     string LoadedCountText { get; }
+
+    /// <summary>서버에 더 불러올 쪽이 남았는가 — 거르기가 "불러온 범위 안" 임을 알리는 데 쓴다.</summary>
+    bool HasMorePages { get; }
 }
 
 /// <summary>
@@ -74,6 +77,7 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
     private readonly System.Action? _search;
     private readonly System.Action? _invalidate;
     private readonly Func<string>? _loadedText;
+    private readonly Func<bool>? _hasMore;
     private bool _wasBusy;
 
     /// <param name="panel">감쌀 패널.</param>
@@ -86,13 +90,15 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
                               System.Action<DateTime, DateTime>? setDate = null,
                               System.Action? search = null,
                               System.Action? invalidateCache = null,
-                              Func<string>? loadedCountText = null)
+                              Func<string>? loadedCountText = null,
+                              Func<bool>? hasMorePages = null)
     {
         _panel = panel ?? throw new ArgumentNullException(nameof(panel));
         _setDate = setDate;
         _search = search;
         _invalidate = invalidateCache;
         _loadedText = loadedCountText;
+        _hasMore = hasMorePages;
         _panel.PropertyChanged += OnPanelPropertyChanged;
         // 패널은 활성화돼 목록을 다 읽기 전까지 [갱신] 이 꺼져 있다(= 바쁨). 그 첫 끝남도 알려야 콘솔이 툴바를 다시 켠다.
         _wasBusy = IsBusy;
@@ -108,6 +114,8 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
     public bool IsBusy => _panel.IsSaving || !_panel.ReloadButtonEnable;
 
     public string LoadedCountText => _loadedText?.Invoke() ?? $"{RowCount}건";
+
+    public bool HasMorePages => _hasMore?.Invoke() ?? false;
 
     public event EventHandler? BusyEnded;
 

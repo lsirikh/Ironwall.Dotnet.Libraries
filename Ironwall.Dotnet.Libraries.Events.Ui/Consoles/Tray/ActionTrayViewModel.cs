@@ -39,6 +39,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     private readonly ActionReportSender _send;
     private readonly Dictionary<string, ActionTrayCandidate> _queued = new(StringComparer.Ordinal);
     private CancellationTokenSource? _cts;
+    private string? _inFlightKey;
     private string _phrase = Phrases[0];
     private string _memo = string.Empty;
     private string _statusLine = string.Empty;
@@ -128,7 +129,12 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
                 snapshot.TargetKey,
                 "POST /events/actions",
                 snapshot.Label,
-                token => _send(snapshot, EffectiveContent, token)));
+                token =>
+                {
+                    // 중단이 어느 줄에서 걸렸는지를 알아야 "결과 미확인" 을 표시할 수 있다.
+                    _inFlightKey = snapshot.TargetKey;
+                    return _send(snapshot, EffectiveContent, token);
+                }));
         }
 
         StatusLine = ActionTrayDrop.ResultLine(plan);
@@ -145,9 +151,12 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         _cts = new CancellationTokenSource();
         try
         {
+            _inFlightKey = null;
             var summary = await Draft.ApplyAsync(_cts.Token).ConfigureAwait(true);
             StatusLine = summary.ToMessage();
             if (summary.Failed > 0) StatusLine += " — 실패한 줄은 트레이에 남습니다. [적용] 을 다시 누르면 그것만 보냅니다.";
+            if (summary.WasCancelled && UnverifiedKey is not null)
+                StatusLine += " — ⚠ 중단 순간 보내는 중이던 1건은 결과 미확인입니다. 다시 [적용] 하면 중복될 수 있습니다.";
             RaiseAll();
             return summary;
         }
@@ -161,7 +170,11 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     /// <summary>적용을 멈춘다 — 아직 안 보낸 줄은 그대로 남는다(보낸 것은 되돌리지 않는다).</summary>
     public void Cancel()
     {
-        if (_cts is { IsCancellationRequested: false }) _cts.Cancel();
+        if (_cts is not { IsCancellationRequested: false }) return;
+        // 보내는 중이던 줄은 서버에 이미 닿았을 수 있다 — 미전송으로 남기지 않는다.
+        UnverifiedKey = _inFlightKey;
+        _cts.Cancel();
+        NotifyOfPropertyChange(nameof(UnverifiedKey));
     }
 
     /// <summary>전부 버린다 — 서버 호출 0.</summary>
@@ -170,9 +183,19 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         if (Draft.IsApplying) return;
         Draft.Revert();
         _queued.Clear();
+        UnverifiedKey = null;
         StatusLine = "조치 트레이를 비웠습니다 — 서버 호출 0";
         RaiseAll();
     }
+
+    /// <summary>
+    /// 중단 순간 <b>보내는 중이던</b> 줄의 대상 키. 서버에 이미 만들어졌을 수 있어
+    /// 다시 [적용] 하면 중복된다 — 화면에 "결과 미확인" 으로 낸다(N-07 R7).
+    /// </summary>
+    public string? UnverifiedKey { get; private set; }
+
+    /// <summary>이 줄이 "결과 미확인" 인가.</summary>
+    public bool IsUnverified(DraftEntry entry) => entry.TargetKey == UnverifiedKey;
 
     /// <summary>트레이에 이 대상이 있는가(같은 행을 두 번 담아도 줄이 늘지 않음을 화면에서 보이기 위해).</summary>
     public bool Contains(string targetKey) => Draft.Entries.Any(e => e.TargetKey == targetKey);

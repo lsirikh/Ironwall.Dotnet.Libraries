@@ -65,9 +65,24 @@ public sealed class EventDetailField : PropertyChangedBase
 
     internal Action<EventDetailField>? Touched { get; set; }
 
+    private string? _beforeSettle;
+
     internal void Settle()
     {
+        _beforeSettle = Original;
         Original = _text;
+        NotifyOfPropertyChange(nameof(IsChanged));
+    }
+
+    /// <summary>
+    /// <see cref="Settle"/> 를 되돌린다 — 저장이 실패했을 때 "이게 원래 값" 이 앞서 나가면
+    /// [되돌리기] 가 아무것도 못 되돌린다(R8).
+    /// </summary>
+    internal void Unsettle()
+    {
+        if (_beforeSettle is null) return;
+        Original = _beforeSettle;
+        _beforeSettle = null;
         NotifyOfPropertyChange(nameof(IsChanged));
     }
 
@@ -191,20 +206,45 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         RaiseAll();
     }
 
-    /// <summary>[적용] — 손댄 칸을 행 뷰모델에 쓴다. 쓴 칸 수를 돌려준다(0 이면 저장을 부르지 않는다).</summary>
-    public int WriteBack()
+    /// <summary>[적용] 이 손대진 칸을 행에 쓴 결과.</summary>
+    /// <param name="Written">실제로 쓴 칸 수(0 이면 저장을 부르지 않는다).</param>
+    /// <param name="Rejected">값을 읽지 못해 쓰지 못한 칸 이름들 — 조용히 삼키지 않는다(R8).</param>
+    public readonly record struct WriteBackResult(int Written, IReadOnlyList<string> Rejected);
+
+    /// <summary>[적용] — 손대진 칸을 행 뷰모델에 쓴다.</summary>
+    public WriteBackResult WriteBack()
     {
-        if (_rows.Count != 1 || !_canEdit) return 0;
+        _lastWritten.Clear();
+        if (_rows.Count != 1 || !_canEdit) return new WriteBackResult(0, Array.Empty<string>());
 
         var written = 0;
+        var rejected = new List<string>();
         foreach (var field in Sections.SelectMany(s => s.Fields).Where(f => f.IsChanged))
         {
-            if (!Write(_rows[0], field)) continue;
+            if (!Write(_rows[0], field))
+            {
+                // 값을 못 읽었다(목록에 없는 글자 등) — 그대로 알린다.
+                rejected.Add(field.Label);
+                continue;
+            }
+            _lastWritten.Add(field);
             field.Settle();
             written++;
         }
-        return written;
+        return new WriteBackResult(written, rejected);
     }
+
+    /// <summary>
+    /// 방금 쓴 칸을 다시 <b>손대진 것으로</b> 되돌린다 — 저장이 실패했을 때
+    /// Original 이 앞서 나가 버려 [되돌리기] 가 무력해지는 것을 막는다(R8).
+    /// </summary>
+    public void RollbackWriteBack()
+    {
+        foreach (var field in _lastWritten) field.Unsettle();
+        _lastWritten.Clear();
+    }
+
+    private readonly List<EventDetailField> _lastWritten = new();
 
     /// <summary>[되돌리기] — 화면만 되돌린다(서버 호출 0).</summary>
     public void RevertEdits()

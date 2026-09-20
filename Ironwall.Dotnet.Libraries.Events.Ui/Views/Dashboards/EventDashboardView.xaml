@@ -135,6 +135,32 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
+						<!--  필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다  -->
+						<ItemsControl
+							Margin="10,0,0,0"
+							AutomationProperties.AutomationId="Console.Events.Toolbar.Filters"
+							ItemsSource="{Binding FilterChips}"
+							Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Orientation="Horizontal" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<RadioButton
+										Margin="0,0,4,0"
+										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
+										Click="OnFilterChipClick"
+										Content="{Binding Label}"
+										FontSize="12"
+										GroupName="EventsFilter"
+										IsChecked="{Binding IsSelected, Mode=OneWay}"
+										Style="{StaticResource MaterialDesignTabRadioButton}" />
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+
 						<!--  직접 지정 — 드래그의 폴백이자 정확한 입력 수단  -->
 						<StackPanel Orientation="Horizontal" Visibility="{Binding IsCustomPeriod, Converter={StaticResource BoolToVis}}">
 							<mah:DateTimePicker
@@ -184,7 +210,7 @@
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
 					IsReadOnly="True"
-					ItemsSource="{Binding DetectionPanelViewModel.ViewModelProvider}"
+					ItemsSource="{Binding Rows}"
 					SelectionChanged="OnGridSelectionChanged"
 					SelectionMode="Extended"
 					Style="{StaticResource Console.DataGrid}"
@@ -289,7 +315,7 @@
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
 					IsReadOnly="True"
-					ItemsSource="{Binding MalfunctionPanelViewModel.ViewModelProvider}"
+					ItemsSource="{Binding Rows}"
 					SelectionChanged="OnGridSelectionChanged"
 					SelectionMode="Extended"
 					Style="{StaticResource Console.DataGrid}"
@@ -373,7 +399,7 @@
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
 					IsReadOnly="True"
-					ItemsSource="{Binding ConnectionPanelViewModel.ViewModelProvider}"
+					ItemsSource="{Binding Rows}"
 					RowStyle="{StaticResource EventRow}"
 					SelectionChanged="OnGridSelectionChanged"
 					SelectionMode="Extended"
@@ -408,7 +434,7 @@
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
 					IsReadOnly="True"
-					ItemsSource="{Binding ActionPanelViewModel.ViewModelProvider}"
+					ItemsSource="{Binding Rows}"
 					RowStyle="{StaticResource EventRow}"
 					SelectionChanged="OnGridSelectionChanged"
 					SelectionMode="Extended"
@@ -467,7 +493,7 @@
 
 					<views:ActionTrayView
 						Margin="0,6,0,0"
-						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
+						Visibility="{Binding IsTrayVisible, Converter={StaticResource BoolToVis}}" />
 				</StackPanel>
 			</Border>
 		</c:ConsoleShell.StatusBar>

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray;
@@ -57,6 +58,14 @@ public static class ActionTrayDrop
         => kind is KindDetection or KindMalfunction;
 
     public static TrayPlan Plan(IEnumerable<ActionTrayCandidate> rows, bool canControl)
+        => Plan(rows, canControl, alreadyQueued: 0);
+
+    /// <summary>
+    /// <paramref name="alreadyQueued"/> 는 이미 트레이에 들어 있는 줄 수다 —
+    /// 상한은 <b>한 번의 드롭이 아니라 트레이 전체</b>에 걸린다(N-07 R7).
+    /// 그렇지 않으면 50씩 세 번 떨구어 150번을 보낸다.
+    /// </summary>
+    public static TrayPlan Plan(IEnumerable<ActionTrayCandidate> rows, bool canControl, int alreadyQueued)
     {
         var list = rows?.ToList() ?? new List<ActionTrayCandidate>();
 
@@ -77,15 +86,18 @@ public static class ActionTrayDrop
         foreach (var row in saved)
             if (seen.Add(row.TargetKey)) unique.Add(row);
 
+        var room = Math.Max(0, MaxPerDrop - Math.Max(0, alreadyQueued));
         var overLimit = 0;
-        if (unique.Count > MaxPerDrop)
+        if (unique.Count > room)
         {
-            overLimit = unique.Count - MaxPerDrop;
-            unique = unique.Take(MaxPerDrop).ToList();
+            overLimit = unique.Count - room;
+            unique = unique.Take(room).ToList();
         }
 
         string? reason = null;
-        if (unique.Count == 0)
+        if (unique.Count == 0 && overLimit > 0)
+            reason = $"조치 트레이가 가득 찼습니다 — 한 번에 {MaxPerDrop}건까지입니다. [적용] 하거나 몇 건을 빼고 다시 담으세요.";
+        else if (unique.Count == 0)
             reason = wrongKind > 0 && reportable.Count == 0
                 ? "이 목록의 행은 조치보고 원본이 아닙니다 — 탐지 · 장애에서 고르세요."
                 : "저장되지 않은 이벤트입니다 — 저장 후 조치보고할 수 있습니다.";
@@ -103,7 +115,7 @@ public static class ActionTrayDrop
         if (already > 0) parts.Add($"이미 조치가 있는 {already}건에는 한 건씩 더 쌓입니다");
         if (plan.DraftExcluded > 0) parts.Add($"저장 전 {plan.DraftExcluded}건은 뺐습니다");
         if (plan.WrongKindExcluded > 0) parts.Add($"원본이 아닌 {plan.WrongKindExcluded}건은 뺐습니다");
-        if (plan.OverLimitExcluded > 0) parts.Add($"한 번에 {MaxPerDrop}건까지라 {plan.OverLimitExcluded}건은 남겼습니다");
+        if (plan.OverLimitExcluded > 0) parts.Add($"트레이는 모두 {MaxPerDrop}건까지라 {plan.OverLimitExcluded}건은 남겼습니다");
         return string.Join(" · ", parts);
     }
 }

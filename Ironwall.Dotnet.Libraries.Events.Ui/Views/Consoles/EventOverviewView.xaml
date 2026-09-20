@@ -163,10 +163,17 @@
 								Text="가로로 끌면 그 구간이 기간이 됩니다 · Esc 로 취소 · 기간 칩으로도 같은 일을 합니다" />
 						</DockPanel>
 
+						<!--  플롯 호스트 — Border 는 peer 가 없어 자동화가 못 본다. 밖을 peer 있는 GroupBox 로 감싼다(R13)  -->
+						<GroupBox
+							AutomationProperties.AutomationId="Console.Events.Overview.Trend"
+							BorderThickness="0"
+							Padding="0">
+						<GroupBox.Header>
+							<TextBlock Visibility="Collapsed" />
+						</GroupBox.Header>
 						<Border
 							x:Uid="TrendHost"
 							Height="220"
-							AutomationProperties.AutomationId="Console.Events.Overview.Trend"
 							Background="Transparent"
 							Cursor="SizeWE"
 							Loaded="OnTrendLoaded"
@@ -254,15 +261,21 @@
 									CornerRadius="4"
 									IsHitTestVisible="False"
 									Visibility="{Binding IsBandVisible, Converter={StaticResource BoolToVis}}">
-									<TextBlock
+									<!--  TextBlock 은 UIA 트리에 안 나온다 — 읽기 전용 TextBox 로 낸다(R13)  -->
+									<TextBox
 										AutomationProperties.AutomationId="Console.Events.Overview.RangeLabel"
+										Background="Transparent"
+										BorderThickness="0"
 										FontFamily="Consolas"
 										FontSize="12"
 										Foreground="{DynamicResource TextPrimaryBrush}"
+										IsReadOnly="True"
+										IsTabStop="False"
 										Text="{Binding BandLabel, Mode=OneWay}" />
 								</Border>
 							</Grid>
 						</Border>
+						</GroupBox>
 
 						<!--  계열 칩 — 켜고 끈다. 카메라는 빗금(색이 아니라 형태)  -->
 						<ItemsControl

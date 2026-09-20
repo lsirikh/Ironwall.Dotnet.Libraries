@@ -20,14 +20,30 @@
 	<drag:DropZoneChrome
 		drag:DropZone.Handler="{Binding TrayDrop}"
 		drag:DropZone.Key="{x:Static tray:ActionTrayDrop.ZoneKey}"
-		AutomationProperties.AutomationId="Console.Events.Tray"
 		CornerRadius="6">
+		<!--  DropZoneChrome · Border 는 peer 가 없다 — 드롭존 자체를 peer 있는 GroupBox 로 감싼다(R13)  -->
+		<GroupBox
+			AutomationProperties.AutomationId="Console.Events.Tray"
+			BorderThickness="0"
+			Padding="0">
+		<GroupBox.Header><TextBlock Visibility="Collapsed" /></GroupBox.Header>
 		<Border
 			Padding="10,6"
 			Background="{DynamicResource SurfaceAltBrush}"
 			CornerRadius="6">
 			<StackPanel>
-				<DockPanel LastChildFill="False">
+				<!--  끌 수 없는 레일에서는 줄이진 요약만 — 담은 것은 사라지지 않는다(R7)  -->
+				<TextBox
+					AutomationProperties.AutomationId="Console.Events.Tray.Summary"
+					Background="Transparent"
+					BorderThickness="0"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					IsReadOnly="True"
+					IsTabStop="False"
+					Text="{Binding TraySummaryText, Mode=OneWay}"
+					Visibility="{Binding IsTrayCollapsed, Converter={StaticResource BoolToVis}}" />
+				<DockPanel LastChildFill="False" Visibility="{Binding IsTrayCollapsed, Converter={StaticResource NotBoolToVis}}">
 					<md:PackIcon
 						Width="16"
 						Height="16"
@@ -43,16 +59,20 @@
 						FontWeight="SemiBold"
 						Foreground="{DynamicResource TextPrimaryBrush}"
 						Text="조치 트레이" />
-					<TextBlock
+					<!--  TextBlock 은 UIA peer 가 없어 자동화가 못 읽는다 — N건이 정말 갔는지의 유일한 증거라 읽기 전용 TextBox 로 낸다(R13)  -->
+					<TextBox
 						Margin="8,0,0,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Console.Events.Tray.Count"
+						Background="Transparent"
+						BorderThickness="0"
 						DockPanel.Dock="Left"
 						FontFamily="Consolas"
 						FontSize="12"
-						Foreground="{DynamicResource TextSecondaryBrush}">
-						<Run Text="Draft " /><Run Text="{Binding Tray.Count, Mode=OneWay}" /><Run Text="건" />
-					</TextBlock>
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						IsTabStop="False"
+						Text="{Binding Tray.Count, Mode=OneWay, StringFormat=Draft {0}건}" />
 
 					<!--  적용 · 되돌리기 · 취소  -->
 					<Button
@@ -93,7 +113,7 @@
 				</DockPanel>
 
 				<!--  문구 — 조치보고 다이얼로그와 같은 목록  -->
-				<DockPanel Margin="0,7,0,0" LastChildFill="True">
+				<DockPanel Margin="0,7,0,0" LastChildFill="True" Visibility="{Binding IsTrayCollapsed, Converter={StaticResource NotBoolToVis}}">
 					<TextBlock
 						Width="44"
 						VerticalAlignment="Center"
@@ -123,14 +143,18 @@
 					Margin="0,7,0,0"
 					LastChildFill="True"
 					Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVis}}">
-					<TextBlock
+					<TextBox
 						Margin="0,0,8,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Console.Events.Tray.Progress"
+						Background="Transparent"
+						BorderThickness="0"
 						DockPanel.Dock="Right"
 						FontFamily="Consolas"
 						FontSize="12"
 						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						IsTabStop="False"
 						Text="{Binding Tray.ProgressText, Mode=OneWay}" />
 					<ProgressBar
 						Height="5"
@@ -186,14 +210,19 @@
 					TextWrapping="Wrap"
 					Visibility="{Binding Tray.HasEntries, Converter={StaticResource NotBoolToVis}}" />
 
-				<TextBlock
+				<TextBox
 					Margin="0,6,0,0"
 					AutomationProperties.AutomationId="Console.Events.Tray.Status"
+					Background="Transparent"
+					BorderThickness="0"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextSecondaryBrush}"
+					IsReadOnly="True"
+					IsTabStop="False"
 					Text="{Binding Tray.StatusLine, Mode=OneWay}"
 					TextWrapping="Wrap" />
 			</StackPanel>
 		</Border>
+		</GroupBox>
 	</drag:DropZoneChrome>
 </UserControl>

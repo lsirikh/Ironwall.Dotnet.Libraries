@@ -21,13 +21,34 @@ public partial class EventDashboardView : UserControl
 
     private EventDashboardViewModel? Model => DataContext as EventDashboardViewModel;
 
+    private bool _restoringSelection;
+
     private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (sender is not DataGrid grid || Model is null) return;
         // 보이지 않는 그리드가 목록을 비우며 내는 선택 변경은 무시한다 — 다른 레일의 선택을 지운다.
         if (grid.Visibility != Visibility.Visible) return;
+        if (_restoringSelection) return;
 
-        Model.SetSelection(grid.SelectedItems.Cast<object>().ToList());
+        if (Model.SetSelection(grid.SelectedItems.Cast<object>().ToList())) return;
+
+        // (R6) 미적용 변경 때문에 거절됐다 — 그리드를 직전 선택으로 되돌린다.
+        // 장비 콘솔과 같은 방식 — 되돌리는 동안의 알림은 가드를 다시 물지 않는다.
+        _restoringSelection = true;
+        using (Model.SuppressSelectionGuard())
+        {
+            try
+            {
+                grid.SelectedItems.Clear();
+                foreach (var row in Model.SelectedRows) grid.SelectedItems.Add(row);
+            }
+            finally { _restoringSelection = false; }
+        }
+    }
+
+    private void OnFilterChipClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: EventFilterChipOption chip }) Model?.SelectFilterChip(chip.Key);
     }
 
     private void OnPeriodClick(object sender, RoutedEventArgs e)

@@ -1,5 +1,4 @@
 ﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
-using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,23 +9,23 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles;
 /// 개요(T3) — 추이 차트 위를 <b>좌우로 끌어 기간을 고른다</b>(정본 all-windows-drag-wireframe.html L299 · L427).
 /// </summary>
 /// <remarks>
-/// <para><b>캡처 드래그</b>다 — OLE <c>DoDragDrop</c> 은 쓰지 않는다. 데드존은 <see cref="DragMath.DeadZone"/>(8.0 DIU)
-/// 을 그대로 쓰고(새 상수를 만들지 않는다), 그 미만은 드래그가 아니라 클릭이다.</para>
-/// <para>종료는 <see cref="FinishRangeDrag"/> 하나로 모으고 <b>놓음 · 캡처 상실</b> 양쪽에서 부른다.
-/// 순서는 ①플래그 ②시각 복원 ③캡처 해제 ④커밋 — 캡처를 먼저 풀면 재진입한다.</para>
-/// <para>Esc 는 터널(<c>PreviewKeyDown</c>)에서 <b>끄는 중일 때만</b> 소비한다 — 무조건 소비하면 다른 Esc 동작이 깨진다.</para>
+/// <para><b>캡처 드래그</b>다 — OLE <c>DoDragDrop</c> 은 쓰지 않는다. 데드존 · 종료 순서 · ESC 판정은
+/// <see cref="TrendDragStateMachine"/>(순수)이 쥐고, 뷰는 그 지시를 실행만 한다.</para>
+/// <para>★ ESC 구독은 <b>창</b>(<c>Window.PreviewKeyDown</c>)에 건다. 누르는 대상이 포커스를 받지 않는
+/// <c>Border</c> 라 <c>CaptureMouse</c> 로는 키보드 포커스가 오지 않고, UserControl 에 건 터널은
+/// 그 경로를 지나가지 않아 <b>영원히 안 온다</b>(N-07 적대 검토 R3 — 커널 <c>CaptureDragBehavior</c> 와 같은 방식).</para>
+/// <para>구독은 <b>누를 때 걸고</b> 종료 단계 ③에서 뗀다 — 끌지 않는 동안 창의 ESC 를 넘겨다보지 않는다.</para>
 /// </remarks>
 public partial class EventOverviewView : UserControl
 {
-    private bool _pressed;
-    private bool _dragging;
-    private Point _pressPoint;
+    private readonly TrendDragStateMachine _drag = new();
     private FrameworkElement? _plot;
+    private Window? _keyHost;
 
     public EventOverviewView()
     {
         InitializeComponent();
-        PreviewKeyDown += OnPreviewKeyDown;
+        Unloaded += (_, _) => FinishDrag(_drag.LostCapture());
     }
 
     private EventOverviewViewModel? Model => DataContext as EventOverviewViewModel;
@@ -50,64 +49,63 @@ public partial class EventOverviewView : UserControl
     {
         if (_plot is null || Model is null) return;
 
-        _pressed = true;
-        _dragging = false;
-        _pressPoint = e.GetPosition(_plot);
+        var at = e.GetPosition(_plot);
+        if (!_drag.Press(at.X, at.Y)) return;
+
         _plot.CaptureMouse();
+        Subscribe();
     }
 
     private void OnTrendMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_pressed || _plot is null || Model is null) return;
+        if (_plot is null || Model is null) return;
 
-        var now = e.GetPosition(_plot);
-        if (!_dragging)
-        {
-            // 데드존을 넘기 전에는 클릭이다 — 띠를 그리지 않는다.
-            if (!DragMath.IsDrag(now.X - _pressPoint.X, now.Y - _pressPoint.Y)) return;
-            _dragging = true;
-        }
-
-        Model.UpdateBand(_pressPoint.X, now.X);
+        var at = e.GetPosition(_plot);
+        if (_drag.Move(at.X, at.Y)) Model.UpdateBand(_drag.PressX, at.X);
     }
 
     private void OnTrendReleased(object sender, MouseButtonEventArgs e)
     {
-        if (!_pressed || _plot is null) return;
-        var release = e.GetPosition(_plot).X;
-        FinishRangeDrag(commit: true, release);
+        if (_plot is null) return;
+        FinishDrag(_drag.Release(), e.GetPosition(_plot).X);
     }
 
-    private void OnTrendLostCapture(object sender, MouseEventArgs e)
+    private void OnTrendLostCapture(object sender, MouseEventArgs e) => FinishDrag(_drag.LostCapture());
+
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // 캡처를 잃으면 취소다 — 놓음과 같은 종료 경로를 탄다.
-        if (_pressed) FinishRangeDrag(commit: false, 0);
+        if (e.Key != Key.Escape) return;
+
+        var (handled, finish) = _drag.Escape();
+        if (!handled) return;               // 끄는 중이 아닐 때는 소비하지 않는다
+
+        FinishDrag(finish);
+        e.Handled = true;
     }
 
-    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    /// <summary>상태 기계가 내린 지시를 순서대로 실행한다 — ②시각 ③구독 ④캡처 ⑤커밋.</summary>
+    private void FinishDrag(TrendDragFinish finish, double releaseX = 0)
     {
-        if (e.Key != Key.Escape || !_dragging) return;
-        FinishRangeDrag(commit: false, 0);
-        e.Handled = true;       // 끄는 중일 때만 소비한다
+        if (finish is { ClearBand: false, ReleaseCapture: false, Unsubscribe: false, Commit: false }) return;
+
+        if (finish.ClearBand) Model?.ClearBand();
+        if (finish.Unsubscribe) Unsubscribe();
+        if (finish.ReleaseCapture && _plot?.IsMouseCaptured == true) _plot.ReleaseMouseCapture();
+        if (finish.Commit) Model?.CommitBand(_drag.PressX, releaseX);
     }
 
-    /// <summary>드래그 종료의 단일 경로 — 놓음 · 캡처 상실 · Esc 가 전부 여기로 온다.</summary>
-    private void FinishRangeDrag(bool commit, double releaseX)
+    private void Subscribe()
     {
-        var wasDragging = _dragging;
+        Unsubscribe();
+        _keyHost = Window.GetWindow(this);
+        if (_keyHost is not null) _keyHost.PreviewKeyDown += OnWindowPreviewKeyDown;
+    }
 
-        // ① 플래그
-        _pressed = false;
-        _dragging = false;
-
-        // ② 시각 복원
-        if (!commit || !wasDragging) Model?.ClearBand();
-
-        // ③ 캡처 해제
-        if (_plot?.IsMouseCaptured == true) _plot.ReleaseMouseCapture();
-
-        // ④ 커밋 통지 — 데드존을 넘지 못했으면 아무 일도 없다(서버 호출 0)
-        if (commit && wasDragging) Model?.CommitBand(_pressPoint.X, releaseX);
+    private void Unsubscribe()
+    {
+        if (_keyHost is null) return;
+        _keyHost.PreviewKeyDown -= OnWindowPreviewKeyDown;
+        _keyHost = null;
     }
 
     private void OnControllerGroup(object sender, RoutedEventArgs e)

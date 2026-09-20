@@ -66,7 +66,7 @@ public sealed class ActionTrayDropHandler : IDragDropHandler
     public bool CanDrop(DragPayload payload, DropTarget target)
     {
         if (target.ZoneKey != ActionTrayDrop.ZoneKey || _tray.IsApplying) return false;
-        return ActionTrayDrop.Plan(ActionTrayCandidateFactory.FromRows(payload.Items), _canControl()).CanQueue;
+        return ActionTrayDrop.Plan(ActionTrayCandidateFactory.FromRows(payload.Items), _canControl(), _tray.Count).CanQueue;
     }
 
     public void Drop(DragPayload payload, DropTarget target)
@@ -78,7 +78,7 @@ public sealed class ActionTrayDropHandler : IDragDropHandler
     /// <summary>드래그와 버튼이 함께 쓰는 단 하나의 담기 경로.</summary>
     public string Queue(IEnumerable<object> rows)
     {
-        var plan = ActionTrayDrop.Plan(ActionTrayCandidateFactory.FromRows(rows), _canControl());
+        var plan = ActionTrayDrop.Plan(ActionTrayCandidateFactory.FromRows(rows), _canControl(), _tray.Count);
         var line = _tray.Enqueue(plan);
         Completed?.Invoke(line);
         return line;
