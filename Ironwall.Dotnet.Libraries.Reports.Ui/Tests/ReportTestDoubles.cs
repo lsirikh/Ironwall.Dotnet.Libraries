@@ -89,10 +89,15 @@ public sealed class FakeReportApiService : IReportApiService
     public Task<ApiResponse<ReportStatusDto>> GetStatusAsync(CancellationToken token = default)
         => Task.FromResult(new ApiResponse<ReportStatusDto> { Success = true, Data = new ReportStatusDto() });
 
+    public int TemplateListCallCount { get; private set; }
+
     public Task<ApiListResponse<ReportTemplateDto>> GetTemplatesAsync(int page = 1, int limit = 20, CancellationToken token = default)
-        => Task.FromResult(FailList
+    {
+        TemplateListCallCount++;
+        return Task.FromResult(FailList
             ? new ApiListResponse<ReportTemplateDto> { Success = false }
             : new ApiListResponse<ReportTemplateDto> { Success = true, Data = Templates.ToList() });
+    }
 
     public Task<ApiResponse<ReportTemplateDto>> GetTemplateByIdAsync(int id, CancellationToken token = default)
         => Task.FromResult(new ApiResponse<ReportTemplateDto> { Success = true, Data = Templates.FirstOrDefault(t => t.Id == id) });

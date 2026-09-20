@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -21,11 +22,12 @@ public class ReportColumnCatalogTests
     [Fact]
     public void should_offer_the_rest_only_through_the_columns_menu_when_listing_generations()
     {
+        // 목업이 기본 6열이라고 못박았으므로(L1264) 나머지는 전부 메뉴 뒤에 있어야 한다.
+        var expectedExtra = new[] { "generator_name", "completed_at", "progress_pct", "template_id", "severity_filter" };
         var extra = ReportColumnCatalog.Generations.Where(c => !c.IsDefault).Select(c => c.Key).ToArray();
 
-        Assert.Contains("generator_name", extra);
-        Assert.Contains("progress_pct", extra);
-        Assert.DoesNotContain(extra, k => ReportColumnCatalog.Generations.First(c => c.Key == k).IsDefault);
+        Assert.Equal(expectedExtra, extra);
+        Assert.Equal(6, ReportColumnCatalog.Generations.Count(c => c.IsDefault));
     }
 
     [Fact]
@@ -231,8 +233,15 @@ public class ReportConsoleRailsTests
     }
 
     [Fact]
-    public void should_give_every_rail_a_named_icon()
+    public void should_name_icons_that_really_exist_in_material_design_icons()
     {
-        Assert.All(ReportConsoleRails.Order, key => Assert.False(string.IsNullOrEmpty(ReportConsoleRails.IconOf(key))));
+        // XAML 문자열-enum 은 오타가 나도 조용히 엉뚱한 아이콘이 된다 — 실재하는 PackIconKind 인지 본다.
+        foreach (var key in ReportConsoleRails.Order)
+        {
+            var name = ReportConsoleRails.IconOf(key);
+            Assert.False(string.IsNullOrEmpty(name));
+            Assert.True(Enum.TryParse<MaterialDesignThemes.Wpf.PackIconKind>(name, ignoreCase: false, out _),
+                $"레일 '{key}' 의 아이콘 이름 '{name}' 이 MaterialDesign 5.2.1 에 없다.");
+        }
     }
 }
