@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
+using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -43,6 +44,16 @@ public class ReportTemplateViewModel : BasePanelViewModel
     public async Task LoadAsync()
     {
         if (IsBusy) return;
+        if (!CanView)
+        {
+            Items.Clear();
+            Rows.Clear();
+            SelectedItem = null;
+            LoadError = NoViewPermissionText;
+            NotifyOfPropertyChange(nameof(IsEmpty));
+            NotifyOfPropertyChange(nameof(CountText));
+            return;
+        }
         try
         {
             IsBusy = true;
@@ -82,10 +93,11 @@ public class ReportTemplateViewModel : BasePanelViewModel
     public void ApplyFilter()
     {
         var keep = SelectedItem;
-        var pin = keep != null && (HasUnappliedChanges?.Invoke() ?? false);
+        // 고정은 Id 로 본다 - 재조회 뒤의 줄은 다른 인스턴스라 참조로 비교하면 고정이 헛돈다.
+        var pinId = keep != null && (HasUnappliedChanges?.Invoke() ?? false) ? keep.Id : (int?)null;
 
-        Rows.Clear();
-        foreach (var t in Items.Where(t => Matches(t) || (pin && ReferenceEquals(t, keep)))) Rows.Add(t);
+        // 별표: Clear() 하지 않는다 - 묶인 DataGrid 의 선택이 그 자리에서 풀린다.
+        ObservableReconcile.Apply(Rows, Items.Where(t => Matches(t) || (pinId.HasValue && t.Id == pinId.Value)).ToList());
 
         if (keep != null && !Rows.Contains(keep)) SelectedItem = null;
         NotifyOfPropertyChange(nameof(IsEmpty));
@@ -106,8 +118,10 @@ public class ReportTemplateViewModel : BasePanelViewModel
     {
         var item = SelectedItem;
         if (item is null) return;
+        // 확인 왕복 동안 대상을 고정한다 - 그 사이 선택이 바뀌어도 엉뚱한 템플릿을 지우지 않는다.
+        _pendingDeleteItem = item;
         // ★ 팝업 전에 미리보기를 내린다(WebView2 가 확인 창을 가린다).
-        _airspaceHold ??= Airspace.Block();
+        HoldAirspace();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = $"'{item.Name}' 템플릿을 삭제하시겠습니까?",
@@ -118,9 +132,11 @@ public class ReportTemplateViewModel : BasePanelViewModel
     /// <summary>삭제 확인됨 → DELETE /templates/{id} → 결과 안내.</summary>
     public async Task HandleAsync(CallDeleteReportTemplateProcessMessageModel message, CancellationToken cancellationToken)
     {
-        var item = SelectedItem;
+        var item = _pendingDeleteItem ?? SelectedItem;
+        _pendingDeleteItem = null;
         if (item is null) { ReleaseAirspace(); return; }
 
+        HoldAirspace();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
         OpenInfoPopupMessageModel result;
         try
@@ -129,7 +145,7 @@ public class ReportTemplateViewModel : BasePanelViewModel
             if (res.Success)
             {
                 Items.Remove(item);
-                SelectedItem = null;
+                if (ReferenceEquals(SelectedItem, item)) SelectedItem = null;
                 ApplyFilter();
                 TemplatesChanged?.Invoke();   // 생성 화면 목록에서도 빠지도록 — 안 하면 지운 템플릿으로 생성 가능
             }
@@ -143,18 +159,27 @@ public class ReportTemplateViewModel : BasePanelViewModel
             result = new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = "삭제 중 오류가 발생했습니다." };
         }
         await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        HoldAirspace();     // 곧바로 안내 팝업을 연다
         await _eventAggregator.PublishOnCurrentThreadAsync(result, cancellationToken);
-        ReleaseAirspace();
     }
 
     /// <summary>id 로 항목 재선택 — 저장 후 목록을 새로 받아도 선택을 지킨다.</summary>
-    public void SelectById(int id) => SelectedItem = Rows.FirstOrDefault(t => t.Id == id) ?? Items.FirstOrDefault(t => t.Id == id);
+    /// <remarks>
+    /// <b>보이는 줄 안에서만</b> 고른다. 목록에 없는 줄을 고르면 툴바 [삭제] 가 화면에 없는 템플릿을 겨눈다.
+    /// </remarks>
+    public void SelectById(int id) => SelectedItem = Rows.FirstOrDefault(t => t.Id == id);
 
-    private void ReleaseAirspace()
+    private void HoldAirspace() => _airspaceHold ??= Airspace.Block();
+
+    /// <summary>
+    /// 미리보기를 되돌린다. 콘솔이 팝업 닫힘에서 부른다 - 확인 창의 [취소] 는 우리 HandleAsync 를 부르지 않는다.
+    /// </summary>
+    public void ReleaseAirspace()
     {
         var hold = _airspaceHold;
         _airspaceHold = null;
         hold?.Dispose();
+        _pendingDeleteItem = null;
     }
     #endregion
 
@@ -209,10 +234,17 @@ public class ReportTemplateViewModel : BasePanelViewModel
     /// 오른쪽 칸에 미적용 변경이 있는가 — 콘솔이 꽂아 준다. 참이면 고치던 줄을 검색 결과에 붙잡아 둔다.
     /// </summary>
     public Func<bool>? HasUnappliedChanges { get; set; }
+
+    /// <summary>조회 권한 - 콘솔이 꽂아 준다.</summary>
+    public bool CanView { get; set; } = true;
+
+    internal const string NoViewPermissionText = "템플릿을 볼 권한이 없습니다.";
     #endregion
 
     #region - Attributes -
     private readonly IReportApiService _api;
     private IDisposable? _airspaceHold;
+    /// <summary>삭제 대상 - 확인 왕복 동안 고정.</summary>
+    private ReportTemplateDto? _pendingDeleteItem;
     #endregion
 }

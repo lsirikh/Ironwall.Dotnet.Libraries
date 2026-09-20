@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
+using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -54,6 +55,18 @@ public class ReportListViewModel : BasePanelViewModel
     public async Task LoadAsync()
     {
         if (IsBusy) return;
+        if (!CanView)
+        {
+            // 읽을 권한이 없으면 목록을 부르지 않는다 - 단추만 끄면 뷰모델/자동화 경로가 그대로 뚫린다.
+            Items.Clear();
+            Rows.Clear();
+            SelectedItem = null;
+            TotalCount = null;
+            LoadError = NoViewPermissionText;
+            NotifyOfPropertyChange(nameof(IsEmpty));
+            NotifyOfPropertyChange(nameof(CountText));
+            return;
+        }
         try
         {
             IsBusy = true;
@@ -100,8 +113,9 @@ public class ReportListViewModel : BasePanelViewModel
     public void ApplyFilter()
     {
         var keep = SelectedItem;
-        Rows.Clear();
-        foreach (var row in Items.Where(r => r.Matches(SearchText))) Rows.Add(row);
+
+        // 별표: Clear() 하지 않는다 - 묶인 DataGrid 의 선택이 그 자리에서 풀려 미리보기가 비워진다.
+        ObservableReconcile.Apply(Rows, Items.Where(r => r.Matches(SearchText)).ToList());
 
         // 고른 줄이 검색에 가려졌으면 선택을 놓는다 — 안 보이는 줄을 쥔 채로 [삭제] 가 눌리면 안 된다.
         if (keep != null && !Rows.Contains(keep)) SelectedItem = null;
@@ -112,14 +126,14 @@ public class ReportListViewModel : BasePanelViewModel
     }
 
     /// <summary>선택 보고서 다운로드(PDF) → SaveFileDialog → 저장.</summary>
-    public async Task DownloadAsync()
+    public async Task DownloadAsync(CancellationToken token = default)
     {
         var item = SelectedItem;
-        if (item is null || !item.IsCompleted) return;
+        if (item is null || !item.IsCompleted || !CanView) return;
         try
         {
             ActionStatus = null;
-            var result = await _api.DownloadPdfAsync(item.Id);
+            var result = await _api.DownloadPdfAsync(item.Id, token);
             if (!result.Success || result.Bytes is null)
             {
                 // ⚠ 팝업을 쓰지 않는다 — 상세 칸에 미리보기(WebView2)가 떠 있으면 팝업이 그 뒤로 깔린다.
@@ -131,7 +145,8 @@ public class ReportListViewModel : BasePanelViewModel
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
                 Filter = "PDF 파일 (*.pdf)|*.pdf",
-                FileName = string.IsNullOrWhiteSpace(result.FileName) ? $"{item.Title}.pdf" : result.FileName,
+                // 서버가 준 이름은 경계 밖 입력이다 - 경로 조각/장치 이름/금지 문자를 다듬는다.
+                FileName = SafeFileName.Sanitize(result.FileName, $"{item.Title}.pdf", ".pdf"),
                 RestoreDirectory = true,
             };
             if (dlg.ShowDialog() == true)
@@ -145,14 +160,14 @@ public class ReportListViewModel : BasePanelViewModel
     }
 
     /// <summary>상세 CSV 다운로드(선택 유형, 8종 닫힌 값 — WL L1283).</summary>
-    public async Task DownloadCsvAsync(string? type)
+    public async Task DownloadCsvAsync(string? type, CancellationToken token = default)
     {
         var item = SelectedItem;
-        if (item is null || !item.IsCompleted || string.IsNullOrEmpty(type)) return;
+        if (item is null || !item.IsCompleted || string.IsNullOrEmpty(type) || !CanView) return;
         try
         {
             ActionStatus = null;
-            var result = await _api.DownloadDetailCsvAsync(item.Id, type!);
+            var result = await _api.DownloadDetailCsvAsync(item.Id, type!, token);
             if (!result.Success || result.Bytes is null)
             {
                 _log?.Warning($"[ReportList] CSV 실패: {result.Error}");
@@ -162,7 +177,7 @@ public class ReportListViewModel : BasePanelViewModel
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
                 Filter = "CSV 파일 (*.csv)|*.csv",
-                FileName = string.IsNullOrWhiteSpace(result.FileName) ? $"report_{item.Id}_{type}.csv" : result.FileName,
+                FileName = SafeFileName.Sanitize(result.FileName, $"report_{item.Id}_{type}.csv", ".csv"),
                 RestoreDirectory = true,
             };
             if (dlg.ShowDialog() == true)
@@ -182,7 +197,9 @@ public class ReportListViewModel : BasePanelViewModel
         if (item is null) return;
         _log?.Info($"[ReportList] Delete 클릭 — id={item.Id}, 확인 팝업 발행");
         // ★ 팝업을 띄우기 전에 미리보기를 내린다 — 안 그러면 확인 창이 WebView2 뒤로 깔린다.
-        _airspaceHold ??= Airspace.Block();
+        // 확인 왕복 동안 대상 줄을 고정한다 - 그 사이 선택이 바뀌어도 엉뚱한 보고서를 지우지 않는다.
+        _pendingDeleteItem = item;
+        HoldAirspace();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = $"'{item.Title}' 보고서를 삭제하시겠습니까?",
@@ -197,7 +214,7 @@ public class ReportListViewModel : BasePanelViewModel
         if (item is null || !item.IsInProgress) return;
         _pendingCancelItem = item;
         _log?.Info($"[ReportList] Cancel 클릭 — id={item.Id}, status={item.Status}");
-        _airspaceHold ??= Airspace.Block();
+        HoldAirspace();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = $"'{item.Title}' 보고서 생성을 취소하시겠습니까?",
@@ -213,6 +230,7 @@ public class ReportListViewModel : BasePanelViewModel
         _pendingCancelItem = null;
         if (item is null) { ReleaseAirspace(); return; }
 
+        HoldAirspace();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
         OpenInfoPopupMessageModel result;
         try
@@ -237,14 +255,16 @@ public class ReportListViewModel : BasePanelViewModel
             result = new OpenInfoPopupMessageModel { Title = "취소 실패", Explain = "취소 중 오류가 발생했습니다." };
         }
         await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        HoldAirspace();     // 곧바로 안내 팝업을 연다 - 그 위로 미리보기가 올라오면 안 된다
         await _eventAggregator.PublishOnCurrentThreadAsync(result, cancellationToken);
-        ReleaseAirspace();
     }
 
     public async Task HandleAsync(CallDeleteReportGenerationProcessMessageModel message, CancellationToken cancellationToken)
     {
-        var item = SelectedItem;
+        var item = _pendingDeleteItem ?? SelectedItem;
+        _pendingDeleteItem = null;
         if (item is null) { ReleaseAirspace(); return; }
+        HoldAirspace();
         _log?.Info($"[ReportList] Delete 확인됨 → API 삭제(id={item.Id})");
 
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
@@ -255,7 +275,7 @@ public class ReportListViewModel : BasePanelViewModel
             if (res.Success)
             {
                 Items.Remove(item);
-                SelectedItem = null;
+                if (ReferenceEquals(SelectedItem, item)) SelectedItem = null;
                 ApplyFilter();
                 Deleted?.Invoke(item.Id);
             }
@@ -269,16 +289,25 @@ public class ReportListViewModel : BasePanelViewModel
             result = new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = "삭제 중 오류가 발생했습니다." };
         }
         await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        HoldAirspace();     // 곧바로 안내 팝업을 연다 - 그 위로 미리보기가 올라오면 안 된다
         await _eventAggregator.PublishOnCurrentThreadAsync(result, cancellationToken);
-        ReleaseAirspace();
     }
 
-    /// <summary>팝업 왕복이 끝났다 — 미리보기를 되돌린다. 취소로 끝나도 반드시 불린다.</summary>
-    private void ReleaseAirspace()
+    /// <summary>팝업을 띄우기 직전에 미리보기를 내린다(겹쳐 잠가도 안전하다).</summary>
+    private void HoldAirspace() => _airspaceHold ??= Airspace.Block();
+
+    /// <summary>
+    /// 미리보기를 되돌린다. <b>콘솔이 팝업 닫힘(ClosePopupMessageModel)에서 부른다</b> -
+    /// 확인 창에서 [취소] 를 누르면 우리 HandleAsync 는 <b>영영 불리지 않기</b> 때문이다
+    /// (호스트 확인 팝업은 [확인] 에서만 메시지를 낸다). 콘솔을 닫을 때도 부른다.
+    /// </summary>
+    public void ReleaseAirspace()
     {
         var hold = _airspaceHold;
         _airspaceHold = null;
         hold?.Dispose();
+        _pendingDeleteItem = null;
+        _pendingCancelItem = null;
     }
     #endregion
 
@@ -333,7 +362,19 @@ public class ReportListViewModel : BasePanelViewModel
     /// <summary>목록 조회 실패 사유 — 빈 목록을 "보고서 없음"과 구분해 안내.</summary>
     public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); } }
 
-    public string EmptyStateText => LoadError ?? (string.IsNullOrWhiteSpace(SearchText) ? "생성된 보고서가 없습니다." : "검색과 맞는 보고서가 없습니다.");
+    /// <summary>
+    /// 빈 상태 문구. 검색은 <b>받아 온 최근 100건 안에서만</b> 거르므로 "없습니다" 라고 단정하지 않는다
+    /// (더 오래된 보고서는 애초에 화면에 와 있지 않다).
+    /// </summary>
+    public string EmptyStateText => LoadError
+        ?? (string.IsNullOrWhiteSpace(SearchText)
+            ? "생성된 보고서가 없습니다."
+            : $"최근 {PageLimit}건 안에서 찾지 못했습니다. 더 오래된 보고서는 이 목록에 없습니다.");
+
+    /// <summary>조회 권한 - 콘솔이 꽂아 준다. 거짓이면 목록도 내려받기도 하지 않는다.</summary>
+    public bool CanView { get; set; } = true;
+
+    internal const string NoViewPermissionText = "보고서를 볼 권한이 없습니다.";
 
     private string? _actionStatus;
     /// <summary>
@@ -393,8 +434,10 @@ public class ReportListViewModel : BasePanelViewModel
     public const int PageLimit = 100;
 
     private readonly IReportApiService _api;
-    /// <summary>취소 대상 — 확인 팝업 왕복 동안 대상 줄 보관(SelectedItem 비의존).</summary>
+    /// <summary>취소 대상 - 확인 팝업 왕복 동안 대상 줄 보관(SelectedItem 비의존).</summary>
     private ReportGenerationRow? _pendingCancelItem;
+    /// <summary>삭제 대상 - 같은 까닭. 확인 사이에 선택이 바뀌어도 엉뚱한 줄을 지우지 않는다.</summary>
+    private ReportGenerationRow? _pendingDeleteItem;
     /// <summary>팝업이 떠 있는 동안 미리보기를 내려 두는 표.</summary>
     private IDisposable? _airspaceHold;
     #endregion
