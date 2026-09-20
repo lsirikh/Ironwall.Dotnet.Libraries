@@ -160,6 +160,9 @@ internal sealed class FakeAccountApi : IAccountApiService
     public HashSet<int> FailAssignForUsers { get; } = new();
     public bool IgnoreAssign { get; set; }
 
+    /// <summary>권한 저장을 거부한다(사유). null 이면 성공.</summary>
+    public string? FailPermissionSave { get; set; }
+
     public Task<ApiResponse<AuthUserDto>> AssignUserGroupAsync(int userId, int? groupId, CancellationToken ct = default)
     {
         AssignCalls.Add((userId, groupId));
@@ -173,6 +176,9 @@ internal sealed class FakeAccountApi : IAccountApiService
 
     public Task<ApiResponse<UserGroupDto>> UpdateGroupPermissionsAsync(int groupId, PermissionsDto permissions, CancellationToken ct = default)
     {
+        if (FailPermissionSave is not null)
+            return Task.FromResult(ApiResponse<UserGroupDto>.CreateError("FORBIDDEN", FailPermissionSave));
+
         PermissionSaves.Add((groupId, permissions));
         var group = Groups.FirstOrDefault(g => g.Id == groupId) ?? new UserGroupDto { Id = groupId };
         group.Permissions = permissions;

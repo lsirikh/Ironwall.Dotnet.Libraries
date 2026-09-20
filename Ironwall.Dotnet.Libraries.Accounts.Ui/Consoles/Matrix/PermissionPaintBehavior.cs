@@ -78,7 +78,10 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
     {
         if (Matrix is null || _pressed) return;
         if (CellAt(e.OriginalSource as DependencyObject) is not { } cell) return;
-        if (!Matrix.Painter.Begin(cell)) return;
+
+        bool began;
+        using (Matrix.BeginPaintBatch()) began = Matrix.Painter.Begin(cell);
+        if (!began) return;
 
         _pressed = true;
         _sweeping = false;
@@ -102,12 +105,17 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
             _sweeping = true;
         }
 
-        if (CellAt(HitTest(now)) is { } cell) Matrix.Painter.MoveTo(cell);
+        if (CellAt(HitTest(now)) is not { } cell) return;
+        using (Matrix.BeginPaintBatch()) Matrix.Painter.MoveTo(cell);
     }
 
     private void OnRelease(object sender, MouseButtonEventArgs e) => FinishPaint(commit: true);
 
-    private void OnLostCapture(object sender, MouseEventArgs e) => FinishPaint(commit: true);
+    /// <summary>
+    /// 캡처 상실 = <b>취소</b>다. 커널의 드래그 계약과 <see cref="PermissionPainter.Cancel"/> 의 문서가 그렇게 적혀 있고,
+    /// 모달·포커스 도둑질로 캡처를 잃었을 때 "칠한 대로 굳히는" 것은 사용자가 의도한 적 없는 변경이다.
+    /// </summary>
+    private void OnLostCapture(object sender, MouseEventArgs e) => FinishPaint(commit: false);
 
     private void OnRootPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -137,8 +145,12 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
         if (AssociatedObject.IsMouseCaptured) AssociatedObject.ReleaseMouseCapture();
 
         // ④ 통지
-        if (commit) Matrix?.Painter.Finish();
-        else Matrix?.Painter.Cancel();
+        if (Matrix is null) return;
+        using (Matrix.BeginPaintBatch())
+        {
+            if (commit) Matrix.Painter.Finish();
+            else Matrix.Painter.Cancel();
+        }
     }
 
     private DependencyObject? HitTest(Point point)

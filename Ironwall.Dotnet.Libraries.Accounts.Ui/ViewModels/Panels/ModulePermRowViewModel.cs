@@ -30,4 +30,10 @@ public class ModulePermRowViewModel : PropertyChangedBase
     public bool EditEnabled { get; init; } = true;
     public bool DeleteEnabled { get; init; } = true;
     public bool ControlEnabled { get; init; }
+
+    /// <summary>
+    /// 이 모듈의 <b>제어</b>를 서버가 실제로 집행하는가. 거짓이면 화면 게이팅용일 뿐이다 —
+    /// 목업이 "실집행" 꼬리표로 구분하는 그 사실이다(window-layout-system-storyboard.html L1210 · L1214 · L1231).
+    /// </summary>
+    public bool IsControlServerEnforced { get; init; }
 }

@@ -52,11 +52,20 @@ internal sealed class RecordingLog : ILogService
 }
 
 /// <summary>protected OnActivateAsync 를 테스트에 노출(부팅 로드 경로 검증).</summary>
+/// <summary>고정 시계 — "오늘"이 흘러가도 시나리오가 같은 답을 내게 한다.</summary>
+internal sealed class FakeClock : Ironwall.Dotnet.Libraries.Base.Services.IClock
+{
+    public FakeClock(DateTime now) { Now = now; }
+    public DateTime Now { get; set; }
+    public DateTime UtcNow => Now.ToUniversalTime();
+}
+
 internal sealed class TestGrantPanel : GrantManagementPanelViewModel
 {
     public TestGrantPanel(IEventAggregator ea, ILogService log,
-        Ironwall.Dotnet.Libraries.Accounts.Api.Services.IAccountApiService api)
-        : base(ea, log, api) { }
+        Ironwall.Dotnet.Libraries.Accounts.Api.Services.IAccountApiService api,
+        Ironwall.Dotnet.Libraries.Base.Services.IClock? clock = null)
+        : base(ea, log, api, clock) { }
 
     /// <summary>OnActivate(=base.OnActivate + LoadAccountsAndGroups + LoadAllGrants) 실행.</summary>
     public Task ActivateForTestAsync() => OnActivateAsync(CancellationToken.None);
@@ -115,7 +124,8 @@ internal static class GrantFixtures
     {
         var ea = new RecordingEventAggregator();
         var log = new RecordingLog();
-        var vm = new TestGrantPanel(ea, log, s);
+        // 고정 시계 — 시나리오의 T0 와 같은 "지금"을 뷰모델도 본다(그렇지 않으면 T0 가 과거가 되는 날 전부 깨진다).
+        var vm = new TestGrantPanel(ea, log, s, new FakeClock(s.Now));
         return (vm, ea, log);
     }
 

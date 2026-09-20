@@ -70,16 +70,18 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
 
         Detail = new ConsoleDetailPresenter { TypeName = "사용자" };
         Form = new AccountFormViewModel(Detail);
-        Matrix = new PermissionMatrixConsoleViewModel(permissionMatrix, () => CanEditUsers);
+        Matrix = new PermissionMatrixConsoleViewModel(permissionMatrix, () => CanEditUsers, log);
+        // 그룹 전환도 사용자 폼과 같은 문지기를 쓴다 — 칠해 둔 변경이 조용히 버려지면 안 된다.
+        Matrix.UseNavigationGuard(() => Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
         DraftTray = new DraftTrayViewModel();
-        GroupDrop = new UserGroupDropHandler(api, DraftTray, () => CanAssignGroup, log);
+        GroupDrop = new UserGroupDropHandler(api, DraftTray, () => CanAssignGroup, log, BuildDropContext);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         GroupChips = new ObservableCollection<AccountGroupChipViewModel>();
 
         _permission.PermissionsChanged += OnPermissionsChanged;
         // 매트릭스는 제 상태를 스스로 알린다 — 상세 칸의 머리 · 적용 막대는 콘솔이 그리므로 여기서 이어 준다.
-        Matrix.PropertyChanged += (_, _) => RaiseDetail();
+        Matrix.PropertyChanged += (_, _) => { SyncMatrixDirt(); RaiseDetail(); };
     }
     #endregion
 
@@ -171,7 +173,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         SelectedSession = null;
         SelectedAuditLog = null;
         SelectedGrant = null;
-        if (key != AccountConsoleKeys.Permissions) Matrix.SelectedGroup = null;
+        if (key != AccountConsoleKeys.Permissions) Matrix.ForceSelect(null);
 
         RaiseRailShape();
         RefreshStatus();
@@ -387,7 +389,17 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     /// <summary>[적용] — 레일마다 다른 곳으로 간다. 전송 경로는 전부 기존 것이다.</summary>
     public async Task ApplyAsync()
     {
-        if (IsPermissionsRail) { await Matrix.ApplyAsync(); RaiseDetail(); return; }
+        if (IsPermissionsRail)
+        {
+            _isApplying = true;
+            RaiseDetail();
+            _blockedNotice = false;
+            try { await Matrix.ApplyAsync(); }
+            finally { _isApplying = false; }
+            SyncMatrixDirt();
+            RaiseDetail();
+            return;
+        }
         if (!IsUsersRail) return;
 
         var commit = Form.Commit();
@@ -432,7 +444,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     /// <summary>[되돌리기] — 서버 호출 0.</summary>
     public void Revert()
     {
-        if (IsPermissionsRail) { Matrix.Revert(); RaiseDetail(); return; }
+        if (IsPermissionsRail) { _blockedNotice = false; Matrix.Revert(); RaiseDetail(); return; }
         if (!IsUsersRail) return;
         Form.Revert();
         Detail.Settle("되돌렸습니다");
@@ -468,7 +480,10 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         : IsUsersRail ? Detail.Banner : string.Empty;
 
     public string DetailFooter => IsPermissionsRail
-        ? (Matrix.IsDirty ? $"변경 {Matrix.DirtyCount}건 미적용" : "저장 = 전체 교체")
+        ? (_blockedNotice && Matrix.IsDirty ? ConsoleDetailStateMachine.BlockedNotice
+            : Matrix.IsDirty
+                ? $"변경 {Matrix.DirtyCount}건 미적용" + (string.IsNullOrEmpty(Matrix.LastMessage) ? string.Empty : $" — {Matrix.LastMessage}")
+                : Matrix.LastMessage ?? "저장 = 전체 교체")
         : IsUsersRail ? Detail.FooterText : string.Empty;
 
     public bool DetailIsDirty => IsPermissionsRail ? Matrix.IsDirty : IsUsersRail && Detail.IsDirty;
@@ -479,7 +494,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     public string DetailRevertText => "되돌리기";
     public bool DetailIsReadOnly => IsUsersRail && Detail.IsReadOnly;
     /// <summary>방금 한 일 · 막힌 까닭 한 줄(바닥 막대는 미적용 건수를 우선해 보인다).</summary>
-    public string? DetailMessage => Detail.LastMessage;
+    public string? DetailMessage => IsPermissionsRail ? Matrix.LastMessage : Detail.LastMessage;
     public int DetailShakeToken => Detail.ShakeToken;
     public bool IsDetailRequested => IsPermissionsRail ? Matrix.SelectedGroup is not null : Detail.IsDetailRequested;
 
@@ -506,11 +521,31 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(LockReasonText));
         NotifyOfPropertyChange(nameof(GrantSummaryText));
         NotifyOfPropertyChange(nameof(CanUnlockSelected));
+        NotifyOfPropertyChange(nameof(ForceLogoutAllIncludesMe));
+        NotifyOfPropertyChange(nameof(ForceLogoutAllText));
+        NotifyOfPropertyChange(nameof(CanOpenUserDialog));
+        NotifyOfPropertyChange(nameof(UserDialogBlockedReason));
         RefreshStatus();
     }
 
+    /// <summary>
+    /// 매트릭스의 미적용 변경을 상세 칸의 손댄-칸 장부에 한 줄로 태운다 — 커널의 <c>NavigationGuard</c> 는
+    /// 그 장부만 보므로, 이것이 없으면 칠해 둔 변경이 레일 · 행 · 갱신 이동에 조용히 버려진다.
+    /// 건수 표시는 콘솔이 <see cref="DetailFooter"/> 에서 따로 그린다(장부는 한 줄이면 된다).
+    /// </summary>
+    private void SyncMatrixDirt()
+    {
+        if (!Matrix.IsDirty) _blockedNotice = false;
+        var wanted = Matrix.IsDirty ? 1 : 0;
+        Detail.Tracker.Touch(MatrixDirtKey, 0, wanted);
+    }
+
+    private const string MatrixDirtKey = "__matrix__";
+
     private void OnNavigationBlocked(object? sender, ConsoleNavigation navigation)
     {
+        // 권한 설정 레일은 바닥 막대 문구를 콘솔이 그린다 — 커널의 "막힘" 안내가 거기까지 오지 않으므로 직접 켠다.
+        _blockedNotice = true;
         SelectionRestoreRequested?.Invoke(this, Form.Rows);
         RaiseDetail();
     }
@@ -560,6 +595,13 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
 
     public bool CanUnlockSelected => SingleUser?.IsLocked == true && CanControlUsers;
 
+    /// <summary>[이 사용자 전체 종료] 가 <b>내 세션까지</b> 끊는가 — 버튼 글에 그대로 적는다.</summary>
+    public bool ForceLogoutAllIncludesMe
+        => SelectedSession is { } session && string.Equals(session.LoginId, _permission.LoginId, StringComparison.OrdinalIgnoreCase);
+
+    public string ForceLogoutAllText
+        => ForceLogoutAllIncludesMe ? "이 사용자 전체 종료 (내 세션 포함)" : "이 사용자 전체 종료";
+
     /// <summary>상세 칸의 [잠금 해제] — 목록 첫 열의 "해제" 와 같은 경로(확인 팝업 → 서버).</summary>
     public async Task UnlockSelectedAsync()
     {
@@ -568,15 +610,31 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         await AccountManagerPanelViewModel.OnClickUnlock(user);
     }
 
-    /// <summary>상세 칸의 [비밀번호 초기화] — T4 다이얼로그를 연다(450×300 유지).</summary>
-    public async Task ResetPasswordAsync()
+    /// <summary>
+    /// 상세 칸의 [사용자 변경 창] — 비밀번호 초기화 · 사진은 그 창에만 있다(결정 L-D4 는 등록 · 비밀번호 재설정을 남겼다).
+    /// </summary>
+    /// <remarks>
+    /// 그 창은 <b>자기 사본</b>을 쥐고 따로 저장한다 — 여기 손댄 칸이 있는 채로 열면 두 저장이 서로를 덮는다.
+    /// 그래서 미적용 변경이 있으면 열지 않고 문지기가 까닭을 말한다. 비밀번호는 어디에도 글로 남기지 않는다.
+    /// </remarks>
+    public async Task OpenUserDialogAsync()
     {
         var user = SingleUser;
         if (user is null) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+
         AccountManagerPanelViewModel.SelectedItem = user;
         AccountManagerPanelViewModel.OnClickAccountDetail(this, new System.Windows.RoutedEventArgs());
         await Task.CompletedTask;
     }
+
+    /// <summary>[사용자 변경 창] 을 열 수 있는가 — 미적용 변경이 있으면 막는다(까닭은 툴팁).</summary>
+    public bool CanOpenUserDialog => HasSingleUser && CanEditUsers && !Detail.Tracker.IsDirty;
+
+    public string UserDialogBlockedReason
+        => !CanEditUsers ? "권한이 없습니다."
+         : Detail.Tracker.IsDirty ? "손댄 칸을 적용하거나 되돌린 뒤 여세요."
+         : string.Empty;
 
     /// <summary>상세 칸의 [삭제] — 확인 팝업(T5)을 거쳐 기존 삭제 경로로 간다.</summary>
     public Task DeleteSelectedAsync() => DeleteAsync();
@@ -605,6 +663,8 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     public async Task ApplyDraftAsync()
     {
         await GroupDrop.ApplyAsync();
+        // 칩의 인원은 손으로 ++ 하지 않는다 — 적용 뒤 지금 목록에서 다시 센다(원래 그룹의 -- 를 빠뜨리지 않게).
+        RefreshChipCounts();
         RefreshRailCounts();
         RaiseDetail();
     }
@@ -615,6 +675,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     {
         await GroupDrop.UndoAsync();
         await LoadGroupsAsync(CancellationToken.None);
+        RefreshChipCounts();
     }
 
     /// <summary>권한 그룹과 각 계정의 소속을 읽어 칩 · 목록 · 상세에 채운다(계정 모델에는 없는 값).</summary>
@@ -627,28 +688,27 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
             if (!groupsResponse.Success || groupsResponse.Data is null) return;
 
             var groups = groupsResponse.Data;
-            var nameById = groups.ToDictionary(g => g.Id, g => g.Name);
-            var groupOfUser = usersResponse.Success && usersResponse.Data is not null
+            _groupNameById = groups.ToDictionary(g => g.Id, g => g.Name);
+            _groupOfUser = usersResponse.Success && usersResponse.Data is not null
                 ? usersResponse.Data.Where(u => u.GroupId.HasValue).ToDictionary(u => u.Id, u => u.GroupId!.Value)
                 : new Dictionary<int, int>();
 
-            foreach (var row in AccountManagerPanelViewModel.ViewModelProvider)
-            {
-                row.GroupId = groupOfUser.TryGetValue(row.Id, out var gid) ? gid : null;
-                row.GroupText = row.GroupId is { } id && nameById.TryGetValue(id, out var name) ? name : string.Empty;
-            }
+            // 계정 관리(users:edit)를 쥔 그룹 — 마지막 구성원을 끌어내지 못하게 막는 근거.
+            _adminGroupId = groups
+                .Where(g => g.Permissions?.Modules is { } m && m.TryGetValue("users", out var users) && users.Edit)
+                .Select(g => g.Id)
+                .FirstOrDefault();
 
             // 목록을 통째로 갈아 끼우면 칩의 선택 · 드롭존 상태가 풀린다 — 있는 것은 고치고 없는 것만 더한다.
             foreach (var group in groups)
             {
-                var count = groupOfUser.Count(p => p.Value == group.Id);
                 var chip = GroupChips.FirstOrDefault(c => c.Id == group.Id);
-                if (chip is null) GroupChips.Add(new AccountGroupChipViewModel(group.Id, group.Name, count));
-                else chip.UserCount = count;
+                if (chip is null) GroupChips.Add(new AccountGroupChipViewModel(group.Id, group.Name, 0));
             }
             for (var i = GroupChips.Count - 1; i >= 0; i--)
                 if (groups.All(g => g.Id != GroupChips[i].Id)) GroupChips.RemoveAt(i);
 
+            StampGroups();
             NotifyOfPropertyChange(nameof(HasGroupChips));
             RaiseDetail();
         }
@@ -745,7 +805,6 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     public bool IsGrantsRail => _railKey == AccountConsoleKeys.Grants;
     public bool IsAuditRail => _railKey == AccountConsoleKeys.Audit;
     public bool IsSessionSetupRail => _railKey == AccountConsoleKeys.SessionSetup;
-    public bool ShowDetail => !IsSessionSetupRail;
     public bool ShowColumnsButton => IsUsersRail;
 
     private void RaiseRailShape()
@@ -757,7 +816,6 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(IsGrantsRail));
         NotifyOfPropertyChange(nameof(IsAuditRail));
         NotifyOfPropertyChange(nameof(IsSessionSetupRail));
-        NotifyOfPropertyChange(nameof(ShowDetail));
         NotifyOfPropertyChange(nameof(ShowColumnsButton));
         NotifyOfPropertyChange(nameof(ShowGroupChips));
         NotifyOfPropertyChange(nameof(ShowSearch));
@@ -849,9 +907,44 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
             }
         }
 
+        // 행 인스턴스가 새로 만들어지면 GroupId · GroupText 가 빈다(계정 모델에 없는 값이다).
+        // 다시 채우지 않으면 드롭 판정이 "아무도 그 그룹이 아니다" 로 보고 쓸데없는 N회를 담는다.
+        if (_groupOfUser.Count > 0) StampGroups();
+
         SearchChanged?.Invoke(this, EventArgs.Empty);
         RefreshStatus();
         RaiseDetail();
+    }
+
+    /// <summary>마지막으로 읽은 소속을 행에 찍는다.</summary>
+    private void StampGroups()
+    {
+        foreach (var row in AccountManagerPanelViewModel.ViewModelProvider)
+        {
+            row.GroupId = _groupOfUser.TryGetValue(row.Id, out var gid) ? gid : null;
+            row.GroupText = row.GroupId is { } id && _groupNameById.TryGetValue(id, out var name) ? name : string.Empty;
+        }
+        RefreshChipCounts();
+    }
+
+    /// <summary>칩의 인원은 <b>지금 목록</b>에서 다시 센다 — 배정 · 되돌리기마다 ++/-- 를 손으로 맞추면 어긋난다.</summary>
+    private void RefreshChipCounts()
+    {
+        foreach (var chip in GroupChips)
+            chip.UserCount = AccountManagerPanelViewModel.ViewModelProvider.Count(r => r.GroupId == chip.Id);
+    }
+
+    /// <summary>끌어 놓기 판정의 주변 사실 — 자기 계정과 계정 관리 그룹.</summary>
+    private GroupDropContext BuildDropContext()
+    {
+        var self = AccountManagerPanelViewModel.ViewModelProvider
+            .FirstOrDefault(r => string.Equals(r.Username, _permission.LoginId, StringComparison.OrdinalIgnoreCase))?.Id ?? 0;
+
+        var adminMembers = _adminGroupId > 0
+            ? AccountManagerPanelViewModel.ViewModelProvider.Count(r => r.GroupId == _adminGroupId)
+            : 0;
+
+        return new GroupDropContext(self, _adminGroupId, adminMembers);
     }
 
     /// <summary>고른 행과 그 Id 를 함께 기억한다 — 재조회가 행 인스턴스를 갈아 끼워도 같은 계정을 되찾는다.</summary>
@@ -893,8 +986,12 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private string _statusText = string.Empty;
     private string _listStatusText = string.Empty;
     private bool _isApplying;
+    private bool _blockedNotice;
     private IReadOnlyList<AccountViewModel> _selectedRows = Array.Empty<AccountViewModel>();
     private HashSet<int> _selectedIds = new();
+    private Dictionary<int, int> _groupOfUser = new();
+    private Dictionary<int, string> _groupNameById = new();
+    private int _adminGroupId;
     private UserSessionDto? _selectedSession;
     private AuditLogDto? _selectedAuditLog;
     private GrantDto? _selectedGrant;
