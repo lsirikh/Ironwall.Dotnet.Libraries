@@ -53,12 +53,15 @@ public static class WiringValidation
                     $"{board.Find(key)?.Display ?? $"센서 {key}"} 이(가) {line}차 선의 두 칸에 있습니다 — 한 칸에서 빼 주세요."));
         }
 
-        // ③ 1차에 센서가 있는데 2차가 비었다 — 루프가 닫히지 않는다
+        // ③ 한쪽 선에만 센서가 있다 — 루프가 닫히지 않는다(양쪽 대칭으로 본다 · C11)
         var first = board.Placed(WiringSpec.LINE_PRIMARY).Count;
         var second = board.Placed(WiringSpec.LINE_SECONDARY).Count;
         if (first > 0 && second == 0)
             issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_LOOP_OPEN,
                 "2차 선이 비어 있습니다 — 루프가 닫히지 않습니다. 제어기로 돌아오는 센서를 2차 선에 놓아 주세요."));
+        else if (second > 0 && first == 0)
+            issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_LOOP_OPEN,
+                "1차 선이 비어 있습니다 — 루프가 닫히지 않습니다. 제어기에서 나가는 센서를 1차 선에 놓아 주세요."));
 
         // ② 선 가운데의 빈 칸
         foreach (var line in new[] { WiringSpec.LINE_PRIMARY, WiringSpec.LINE_SECONDARY })
@@ -66,7 +69,7 @@ public static class WiringValidation
             var gap = FirstGap(board, line);
             if (gap is { } slot)
                 issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_GAP,
-                    $"{line}차 선 {slot}번 자리가 비어 있어요. 센서를 끌어다 놓거나 [번호 순으로 자동 배치] 로 순번을 다시 매겨 주세요."));
+                    $"{line}차 선 {slot}번 자리가 비어 있어요(순번 {slot} 번이 없습니다). 센서를 끌어다 놓거나 [번호 순으로 자동 배치] 로 빈 자리를 메워 주세요."));
         }
 
         // ① 아직 선에 안 붙인 센서

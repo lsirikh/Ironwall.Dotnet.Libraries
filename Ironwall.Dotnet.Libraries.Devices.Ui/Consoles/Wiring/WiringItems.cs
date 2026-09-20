@@ -25,18 +25,44 @@ public sealed class SensorRowViewModel : PropertyChangedBase
 
     public int Key => Row.Key;
 
+    private string? _numberDraft;
+
+    /// <summary>
+    /// 번호 칸. 숫자가 아니거나 범위 밖이면 <b>값을 버리지 않고</b> 친 글자를 그대로 두고 까닭을 보인다(C11).
+    /// </summary>
     public string NumberText
     {
-        get => Row.Facts.Number.ToString(CultureInfo.InvariantCulture);
+        get => _numberDraft ?? Row.Facts.Number.ToString(CultureInfo.InvariantCulture);
         set
         {
-            if (!int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number)) return;
-            if (number < 1 || number > SensorTableEdit.MAX_NUMBER) return;
-            if (number == Row.Facts.Number) return;
+            var text = (value ?? string.Empty).Trim();
+            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+            {
+                _numberDraft = text;
+                NumberError = $"번호는 숫자로 적어 주세요(1 ~ {SensorTableEdit.MAX_NUMBER}).";
+                Edited();
+                return;
+            }
+            if (number < 1 || number > SensorTableEdit.MAX_NUMBER)
+            {
+                _numberDraft = text;
+                NumberError = $"번호는 1 과 {SensorTableEdit.MAX_NUMBER} 사이여야 합니다.";
+                Edited();
+                return;
+            }
+
+            _numberDraft = null;
+            NumberError = null;
+            if (number == Row.Facts.Number) { Edited(); return; }
             Row.Facts = Row.Facts with { Number = number };
             Edited();
         }
     }
+
+    /// <summary>번호 칸의 까닭(없으면 <c>null</c>) — 저장은 이 줄을 건너뛰지 않는다. 고칠 때까지 옛 번호가 남는다.</summary>
+    public string? NumberError { get; private set; }
+
+    public bool HasNumberError => !string.IsNullOrEmpty(NumberError);
 
     public string Name
     {
@@ -100,6 +126,8 @@ public sealed class SensorRowViewModel : PropertyChangedBase
     public void Refresh()
     {
         NotifyOfPropertyChange(nameof(NumberText));
+        NotifyOfPropertyChange(nameof(NumberError));
+        NotifyOfPropertyChange(nameof(HasNumberError));
         NotifyOfPropertyChange(nameof(Name));
         NotifyOfPropertyChange(nameof(TypeText));
         NotifyOfPropertyChange(nameof(Zone));
@@ -156,7 +184,14 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     public int Order
     {
         get => _order;
-        internal set { _order = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(OrderText)); }
+        internal set
+        {
+            _order = value;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(OrderText));
+            NotifyOfPropertyChange(nameof(HasChannelMismatch));
+            NotifyOfPropertyChange(nameof(Tooltip));
+        }
     }
 
     public bool IsSelected
@@ -167,8 +202,36 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
 
     public bool IsFilled => _row is not null;
     public bool IsEmpty => _row is null;
+
+    /// <summary>2차 선인가 — 배지 모양을 가르는 값(형태로 선을 구분한다 · W4).</summary>
+    public bool IsSecondLine => Line == WiringSpec.LINE_SECONDARY;
+
     public string OrderText => _order > 0 ? _order.ToString(CultureInfo.InvariantCulture) : string.Empty;
     public string Title => _row?.Display ?? "빈 칸";
+
+    /// <summary>빈 칸에 적는 자리 번호 — 칸 번호가 곧 순번이다.</summary>
+    public string SlotLabel => $"{Index + 1}번 빈 칸";
+
+    /// <summary>좁은 칸(104)에서는 번호가 먼저다 — 이름은 잘리고 전체는 툴팁에 있다(W8).</summary>
+    public string NumberText => _row is null ? string.Empty : _row.Facts.Number.ToString(CultureInfo.InvariantCulture);
+
+    public string AddressText => _row?.Channel is { } channel ? $"주소 {channel}" : string.Empty;
+
+    /// <summary>칸에 마우스를 올리면 전부 보인다(좁은 칸에서 잘린 이름 · 주소 · 자리).</summary>
+    public string Tooltip
+    {
+        get
+        {
+            if (_row is null) return $"{Line}차 선 {Index + 1}번 자리 — 비어 있습니다";
+
+            var address = _row.Channel is { } channel ? $" · 버스 주소 {channel}" : string.Empty;
+            return string.Join(Environment.NewLine,
+                _row.Display,
+                $"번호 {_row.Facts.Number}{address}",
+                $"{Line}차 {Index + 1}번 자리");
+        }
+    }
+
     public string Subtitle => _row is null
         ? string.Empty
         : _row.Channel is { } channel ? $"{_row.Facts.Number} · 주소 {channel}" : $"{_row.Facts.Number}";
@@ -186,9 +249,63 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(IsEmpty));
         NotifyOfPropertyChange(nameof(Title));
         NotifyOfPropertyChange(nameof(Subtitle));
+        NotifyOfPropertyChange(nameof(NumberText));
+        NotifyOfPropertyChange(nameof(AddressText));
+        NotifyOfPropertyChange(nameof(Tooltip));
+        NotifyOfPropertyChange(nameof(SlotLabel));
         NotifyOfPropertyChange(nameof(HasChannelMismatch));
         NotifyOfPropertyChange(nameof(Display));
     }
 
     public override string ToString() => Display;
+}
+
+/// <summary>
+/// 그룹 3상태 칸 하나(WS L614-618) — 전부 · 하나도 · <b>줄마다 다름</b>.
+/// </summary>
+/// <remarks>섞인 칸은 <b>색이 아니라 글자</b>로도 말한다("줄마다 다름") — 색만으로 뜻을 전하지 않는다.</remarks>
+public sealed class WiringGroupCheckViewModel : PropertyChangedBase
+{
+    private GroupCheck _state = GroupCheck.None;
+    private bool _isTouched;
+
+    public WiringGroupCheckViewModel(WiringGroupInfo group)
+    {
+        Id = group.Id;
+        Name = group.Name;
+    }
+
+    public int Id { get; }
+    public string Name { get; }
+
+    public GroupCheck State => _state;
+
+    /// <summary>체크 모양 — 섞임은 <c>null</c>(3상태 체크박스).</summary>
+    public bool? IsChecked => _state switch
+    {
+        GroupCheck.All => true,
+        GroupCheck.None => false,
+        _ => null,
+    };
+
+    /// <summary>사람이 이 그룹을 건드렸는가 — 건드린 그룹만 저장 때 나간다.</summary>
+    public bool IsTouched => _isTouched;
+
+    public bool IsMixed => _state == GroupCheck.Mixed;
+
+    /// <summary>섞인 칸에 붙는 글자(WS L617).</summary>
+    public string MixedText => IsMixed ? "줄마다 다름" : string.Empty;
+
+    internal void Update(GroupCheck state, bool touched)
+    {
+        _state = state;
+        _isTouched = touched;
+        NotifyOfPropertyChange(nameof(State));
+        NotifyOfPropertyChange(nameof(IsChecked));
+        NotifyOfPropertyChange(nameof(IsTouched));
+        NotifyOfPropertyChange(nameof(IsMixed));
+        NotifyOfPropertyChange(nameof(MixedText));
+    }
+
+    public override string ToString() => Name;
 }
