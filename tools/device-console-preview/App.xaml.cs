@@ -40,6 +40,14 @@ public partial class App : Application
             var isAxis = !e.Args.Contains("--legacy");
             if (e.Args.Contains("--dark")) ApplyDark();
 
+            // 서버 모니터(N-12) — 콘솔과 따로 뜬다(--servers [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--servers"))
+            {
+                await RunServersAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
+
             // 조립기 · 펼치기 · 프리셋 · 등록 창 — 콘솔과 따로 뜬다(--assembly [--dark] [--snapshot <폴더>]).
             if (e.Args.Contains("--assembly"))
             {
@@ -232,6 +240,72 @@ public partial class App : Application
         await Show(preview.PresetManager(), 720, 560, "06-preset-manager");
         await Show(preview.Register(withProblem: false), 980, 680, "07-register");
         await Show(preview.Register(withProblem: true), 980, 680, "08-register-problems");
+    }
+
+    /// <summary>
+    /// 서버 모니터(N-12) 상태별 스냅숏 — 빈 화면 · 목록 · 선택+지표 · 보고 없음 · 미적용 변경 · 드롭 불가.
+    /// </summary>
+    private async Task RunServersAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute 가 작업 스레드에서 돌아 교차 스레드로 화면을 만진다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var preview = new ServersPreview();
+        var view = await preview.BuildAsync(withData: false);
+
+        _window = new Window
+        {
+            Title = "서버 모니터 미리보기",
+            Width = 1320,
+            Height = 820,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = view },
+        };
+        _window.Show();
+        await Settle();
+
+        if (directory is null) return;      // 손으로 써 볼 때는 띄워만 둔다
+
+        Directory.CreateDirectory(directory);
+        await Settle();                                   // 첫 장면은 배치가 한 번 더 도는 것을 기다린다
+        Save(directory, $"servers-{theme}-01-empty");
+
+        await preview.LoadAsync();
+        await Settle();
+        Save(directory, $"servers-{theme}-02-loaded");
+
+        preview.Select(preview.Row("방송서버-01"));       // 지표가 붙어 있는 행
+        await Settle();
+        Save(directory, $"servers-{theme}-03-selected-metrics");
+
+        preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행
+        await Settle();
+        ServersPreview.ScrollDetailToEnd(view);            // "상태(관측)" 절의 미수신 상자를 보이게 굴린다
+        await Settle();
+        Save(directory, $"servers-{theme}-04-never-reported");
+
+        preview.Select(preview.Row("방송서버-01"));
+        ServersPreview.ScrollDetailToTop(view);
+        preview.ViewModel.BeginEdit();
+        preview.ViewModel.NameText = "방송서버-01 (수정)";
+        preview.ViewModel.CpuWarningText = "65";
+        await Settle();
+        Save(directory, $"servers-{theme}-05-dirty");
+
+        preview.ViewModel.Revert();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+
+        // 드롭 불가 — 스피커를 NVR 행 위로 끌어 본다. 끝은 반드시 취소라 서버 호출이 0 이다.
+        using (preview.BeginRefusedDrag(view, preview.Row("NVR-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-06-drop-refused");
+        }
+        await Settle();
     }
 
     private void ApplyDark()

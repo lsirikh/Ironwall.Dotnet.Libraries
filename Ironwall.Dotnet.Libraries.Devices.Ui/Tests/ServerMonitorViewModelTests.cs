@@ -295,6 +295,19 @@ public class ServerMonitorViewModelTests
     }
 
     [Fact]
+    public async Task should_keep_add_disabled_with_a_reason_when_no_category_arrived()
+    {
+        var (vm, _, _, _) = Build();
+        await ActivateAsync(vm);
+
+        Assert.False(vm.CanAdd);
+        Assert.Contains("분류를 받지 못해", vm.AddBlockedReason);
+
+        vm.Add();
+        Assert.False(vm.Detail.IsCreating);      // 꺼진 단추는 아무 일도 하지 않는다
+    }
+
+    [Fact]
     public async Task should_send_a_create_request_when_the_form_is_applied()
     {
         var (vm, service, _, _) = Build();

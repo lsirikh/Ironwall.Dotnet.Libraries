@@ -116,7 +116,7 @@ public static class ServerMetricBand
         return new ServerMetricCell(
             NetworkKey, "네트워크",
             hasValue ? NetworkText(metric?.NetworkInMbps, metric?.NetworkOutMbps) : ServerStatusRules.NotReportedText,
-            string.Empty, null, badgeText, isCritical, hasValue);
+            hasValue ? "Mbps (수신 / 송신)" : string.Empty, null, badgeText, isCritical, hasValue);
     }
 
     private static (string? Text, bool IsCritical) Badge(string key, IReadOnlyDictionary<string, ServerThresholdExceededDto> badges)
@@ -135,7 +135,7 @@ public static class ServerMetricBand
     private static string NetworkText(double? inMbps, double? outMbps)
         => inMbps is null && outMbps is null
             ? ServerStatusRules.NotReportedText
-            : $"↓{Round(inMbps ?? 0)} / ↑{Round(outMbps ?? 0)} Mbps";
+            : $"↓{Round(inMbps ?? 0)} / ↑{Round(outMbps ?? 0)}";
 
     private static string Size(double? used, double? total)
         => used is null || total is null ? string.Empty : $"{Round(used.Value)} / {Round(total.Value)} GB";

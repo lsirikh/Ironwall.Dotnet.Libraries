@@ -339,6 +339,7 @@ public class ServerMonitorViewModel : Screen
             ApplyFilter();
             RefreshRailCounts();
             RefreshStatus();
+            NotifyOfPropertyChange(nameof(CanAdd));     // 분류가 들어와야 [추가] 가 켜진다
 
             StatusText = result.Message
                 ?? (result.IsTruncated ? "서버가 총계를 주지 않아 목록이 끊겼을 수 있습니다 — 첫 페이지만 보입니다" : StatusText);
@@ -462,7 +463,7 @@ public class ServerMonitorViewModel : Screen
             _draft.Port = parsed;
             Detail.Tracker.Touch(ServerRequestBuilder.PortKey, _detailDto?.Port, parsed);
             NotifyOfPropertyChange();
-            NotifyOfPropertyChange(nameof(ValidationText));
+            NotifyTouchFlags();
         }
     }
 
@@ -477,6 +478,7 @@ public class ServerMonitorViewModel : Screen
             _draft.NewPassword = string.IsNullOrEmpty(value) ? null : value;
             Detail.Tracker.Touch("user_password", null, _draft.NewPassword is null ? null : "(변경)", hasOriginal: false);
             NotifyOfPropertyChange(nameof(PasswordNote));
+            NotifyTouchFlags();
         }
     }
 
@@ -490,6 +492,14 @@ public class ServerMonitorViewModel : Screen
     public string DiskCriticalText { get => Threshold(_draft.DiskCritical, "disk", "critical"); set => SetThreshold(v => _draft.DiskCritical = v, value, "disk", "critical", nameof(DiskCriticalText)); }
     public string NetworkWarningText { get => Threshold(_draft.NetworkWarningMbps, "network", "warning_mbps"); set => SetThreshold(v => _draft.NetworkWarningMbps = v, value, "network", "warning_mbps", nameof(NetworkWarningText)); }
     public string NetworkCriticalText { get => Threshold(_draft.NetworkCriticalMbps, "network", "critical_mbps"); set => SetThreshold(v => _draft.NetworkCriticalMbps = v, value, "network", "critical_mbps", nameof(NetworkCriticalText)); }
+
+    /// <summary>손댄 칸 표지 — 칸 왼쪽에 경고색 줄이 선다(색이 아니라 <b>형태</b>).</summary>
+    public bool IsNameTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.NameKey);
+    public bool IsIpTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.IpKey);
+    public bool IsPortTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.PortKey);
+    public bool IsHostnameTouched => Detail.Tracker.IsTouched("hostname");
+    public bool IsUserNameTouched => Detail.Tracker.IsTouched("user_name");
+    public bool IsPasswordTouched => Detail.Tracker.IsTouched("user_password");
 
     /// <summary>운용 모드 — 6.3 이면 프록시 설정, 그 위면 "server_config 로 이관됐다" 는 안내.</summary>
     public string OperationModeText
@@ -525,7 +535,7 @@ public class ServerMonitorViewModel : Screen
         assign(value);
         Detail.Tracker.Touch(key, original ?? string.Empty, value ?? string.Empty);
         NotifyOfPropertyChange(propertyName);
-        NotifyOfPropertyChange(nameof(ValidationText));
+        NotifyTouchFlags();
     }
 
     private string Threshold(double? draft, string group, string key)
@@ -540,7 +550,18 @@ public class ServerMonitorViewModel : Screen
         assign(parsed);
         Detail.Tracker.Touch($"threshold.{group}.{key}", ServerRequestBuilder.ReadThreshold(_detailDto?.ThresholdConfig, group, key), parsed);
         NotifyOfPropertyChange(propertyName);
+        NotifyTouchFlags();
+    }
+
+    private void NotifyTouchFlags()
+    {
         NotifyOfPropertyChange(nameof(ValidationText));
+        NotifyOfPropertyChange(nameof(IsNameTouched));
+        NotifyOfPropertyChange(nameof(IsIpTouched));
+        NotifyOfPropertyChange(nameof(IsPortTouched));
+        NotifyOfPropertyChange(nameof(IsHostnameTouched));
+        NotifyOfPropertyChange(nameof(IsUserNameTouched));
+        NotifyOfPropertyChange(nameof(IsPasswordTouched));
     }
 
     private void NotifyAllFields()
@@ -551,7 +572,8 @@ public class ServerMonitorViewModel : Screen
             nameof(PasswordNote), nameof(CpuWarningText), nameof(CpuCriticalText), nameof(RamWarningText), nameof(RamCriticalText),
             nameof(DiskWarningText), nameof(DiskCriticalText), nameof(NetworkWarningText), nameof(NetworkCriticalText),
             nameof(ObservedStatusText), nameof(ObservedLastChangeText), nameof(IsStatusReceived), nameof(UnitSectionText),
-            nameof(ValidationText),
+            nameof(ValidationText), nameof(IsNameTouched), nameof(IsIpTouched), nameof(IsPortTouched),
+            nameof(IsHostnameTouched), nameof(IsUserNameTouched), nameof(IsPasswordTouched),
         }) NotifyOfPropertyChange(name);
     }
     #endregion
@@ -645,7 +667,6 @@ public class ServerMonitorViewModel : Screen
             if (!saved.IsSuccess) return;
 
             IsEditing = false;
-            Detail.IsReadOnly = true;
             Detail.Settle("설정을 저장했습니다");
             await LoadCoreAsync(token).ConfigureAwait(true);
             SelectAfterReload(row.Id);
@@ -675,7 +696,7 @@ public class ServerMonitorViewModel : Screen
         }
 
         IsEditing = false;
-        Detail.IsReadOnly = _selected.Count > 0;
+        Detail.IsReadOnly = false;          // 커널 ReadOnly 배너는 "권한 없음" 이라 여기서는 거짓말이 된다
         Detail.Settle("되돌렸습니다");
         NotifyAllFields();
     }

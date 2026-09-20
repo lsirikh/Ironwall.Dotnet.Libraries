@@ -99,6 +99,7 @@ public partial class ServerMonitorView : UserControl
         _grid.Columns.Clear();
         // 코드로 더한 열에는 셀 스타일을 직접 건다 — 비워 두면 MDIX 가 제 셀 스타일을 물려 다크에서 선택 행이 갈라진다.
         var cellStyle = TryFindResource("Console.DataGrid.Cell") as Style;
+        _grid.Columns.Add(CreateDropMarkerColumn(TryFindResource("Console.DataGrid.Cell.Flush") as Style));
 
         foreach (var spec in _viewModel.Columns)
         {
@@ -113,6 +114,27 @@ public partial class ServerMonitorView : UserControl
 
         ApplyColumnPrefs();
     }
+
+    /// <summary>
+    /// 맨 앞의 <b>놓을 곳 표시</b> 칸. 행의 드롭 상태(<c>DropZone.State</c>)는 <b>상속되는</b> 속성이라
+    /// 행 안의 <see cref="DropZoneChrome"/> 이 그대로 받아 커널의 어휘 그대로 그린다 —
+    /// 놓을 수 있음 = 파선 · 지금 그 위 = 굵은 실선 · 놓을 수 없음 = 사선 해치.
+    /// </summary>
+    /// <remarks>
+    /// 행 자체의 테두리로는 표현할 수 없다: <c>Console.DataGrid.Row</c> 의 템플릿이
+    /// <c>BorderThickness</c>·<c>BorderBrush</c> 를 <b>고정값</b>으로 그려 행에 건 설정이 닿지 않는다
+    /// (테마는 이 노드 범위 밖이다). 그래서 형태는 이 칸이 맡고, 행 배경의 해치는 보조 신호로 남긴다.
+    /// </remarks>
+    private static DataGridColumn CreateDropMarkerColumn(Style? cellStyle)
+        => new DataGridTemplateColumn
+        {
+            Width = 26,
+            CanUserResize = false,
+            CellStyle = cellStyle,
+            CellTemplate = ParseTemplate(
+                "<drag:DropZoneChrome Margin=\"2,4\" CornerRadius=\"3\" IsHitTestVisible=\"False\">"
+                + "<Border Width=\"14\" Height=\"22\" Background=\"Transparent\" /></drag:DropZoneChrome>"),
+        };
 
     private static DataGridColumn CreateColumn(ServerColumnSpec spec)
     {
@@ -151,7 +173,8 @@ public partial class ServerMonitorView : UserControl
 
     private static DataTemplate ParseTemplate(string body)
     {
-        const string header = "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">";
+        const string header = "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\""
+            + " xmlns:drag=\"clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils\">";
         return (DataTemplate)XamlReader.Parse(header + body + "</DataTemplate>");
     }
 
