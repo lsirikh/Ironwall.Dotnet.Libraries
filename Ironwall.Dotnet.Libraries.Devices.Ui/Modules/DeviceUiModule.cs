@@ -85,6 +85,25 @@ public class DeviceUiModule : Module
             // 조립기 · 프리셋 · 프리셋으로 등록 창을 여는 입구. 창 뷰모델은 싱글턴이 아니다 — 열 때마다 새로 만든다.
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.AssemblyLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>().SingleInstance();
+
+            // N-12 server monitor — 서버 모니터 콘솔(레일 · 목록 + 지표 띠 · 상세).
+            // IUnitApiService 는 Lazy 로만 잡는다: 8.0 미만이면 서비스가 부대를 아예 묻지 않는다(미등록이어도 죽지 않는다).
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerConsoleService(
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Services.IServerApiService>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService>(),
+                        c.Resolve<DeviceQueryPolicy>(),
+                        c.ResolveOptional<Lazy<Ironwall.Dotnet.Libraries.Devices.Api.Services.IUnitApiService>>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.IServerConsoleService>()
+                   .SingleInstance();
+            // 시계는 호스트가 이미 등록했으면 그것을, 아니면 여기서 채운다(서버 모니터의 "마지막 변화" 가 쓴다).
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Base.Services.SystemClock>()
+                   .As<Ironwall.Dotnet.Libraries.Base.Services.IClock>()
+                   .SingleInstance().PreserveExistingDefaults();
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerConsoleDialogs>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.IServerConsoleDialogs>().SingleInstance();
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerMonitorViewModel>().SingleInstance();
+
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();
