@@ -2,6 +2,8 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,8 +22,17 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 public interface ISensorWriteGateway
 {
     Task<ApiResponse<SensorDeviceDto>> GetAsync(int id, CancellationToken token = default);
+
+    /// <summary>그 제어기에 달린 센서 전부 — 만들고서 <c>id</c> 를 못 받았을 때 번호로 되찾는다(C7).</summary>
+    Task<ApiListResponse<SensorDeviceDto>> ListByControllerAsync(int controllerId, CancellationToken token = default);
     Task<ApiResponse<SensorDeviceDto>> CreateAsync(SensorDeviceDto dto, CancellationToken token = default);
     Task<ApiResponse<SensorDeviceDto>> PatchAsync(int id, SensorDeviceDto dto, CancellationToken token = default);
+
+    /// <summary>그룹에 장비를 한꺼번에 넣는다 — <b>그룹 하나에 호출 한 번</b>(W2).</summary>
+    Task<ApiResponse<DeviceGroupAssignResultDto>> AssignToGroupAsync(int groupId, IReadOnlyList<int> deviceIds, CancellationToken token = default);
+
+    /// <summary>그룹에서 장비를 한꺼번에 뺀다(body-DELETE 배치).</summary>
+    Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveFromGroupAsync(int groupId, IReadOnlyList<int> deviceIds, CancellationToken token = default);
 }
 
 /// <inheritdoc cref="ISensorWriteGateway"/>
@@ -38,9 +49,22 @@ public sealed class DeviceApiSensorGateway : ISensorWriteGateway
     public Task<ApiResponse<SensorDeviceDto>> GetAsync(int id, CancellationToken token = default)
         => _api.GetSensorByIdAsync(id, false, token);
 
+    /// <summary>한 제어기의 센서는 한 화면에 다 들어온다 — 넉넉한 한 쪽으로 받는다.</summary>
+    public Task<ApiListResponse<SensorDeviceDto>> ListByControllerAsync(int controllerId, CancellationToken token = default)
+        => _api.GetSensorsAsync(controllerId: controllerId, page: 1, limit: MAX_SENSORS_PER_CONTROLLER, token: token);
+
+    /// <summary>한 제어기가 가질 수 있는 센서 수의 상한 — 결선 칸 상한(선 2 × 64)보다 넉넉하게 잡는다.</summary>
+    private const int MAX_SENSORS_PER_CONTROLLER = 500;
+
     public Task<ApiResponse<SensorDeviceDto>> CreateAsync(SensorDeviceDto dto, CancellationToken token = default)
         => _api.CreateSensorAsync(dto, token);
 
     public Task<ApiResponse<SensorDeviceDto>> PatchAsync(int id, SensorDeviceDto dto, CancellationToken token = default)
         => _api.PatchSensorAsync(id, dto, token);
+
+    public Task<ApiResponse<DeviceGroupAssignResultDto>> AssignToGroupAsync(int groupId, IReadOnlyList<int> deviceIds, CancellationToken token = default)
+        => _api.AssignDevicesToGroupAsync(groupId, new DeviceGroupAssignRequestDto { DeviceIds = deviceIds.ToList() }, token);
+
+    public Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveFromGroupAsync(int groupId, IReadOnlyList<int> deviceIds, CancellationToken token = default)
+        => _api.RemoveDevicesFromGroupAsync(groupId, new DeviceGroupAssignRequestDto { DeviceIds = deviceIds.ToList() }, token);
 }

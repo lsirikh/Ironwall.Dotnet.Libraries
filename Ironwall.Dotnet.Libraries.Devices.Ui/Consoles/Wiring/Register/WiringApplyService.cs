@@ -16,14 +16,21 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 /// <summary>한 줄의 저장 결과 — 실패한 줄만 남기고 사유 한 줄(WS L450).</summary>
 public sealed record WiringRowResult(int Key, int Number, string Display, bool IsCreate, bool Ok, string Message, int? NewId = null);
 
+/// <summary>그룹 호출 한 건의 결과 — 그룹 하나 · 방향 하나(W2).</summary>
+public sealed record WiringGroupResult(int GroupId, bool Add, int DeviceCount, bool Ok, string Message);
+
 /// <summary>저장 한 번의 결과.</summary>
 public sealed record WiringApplyResult(
     bool IsSuccess,
     bool IsConflict,
     bool IsBlocked,
     string Message,
-    IReadOnlyList<WiringRowResult> Rows)
+    IReadOnlyList<WiringRowResult> Rows,
+    IReadOnlyList<WiringGroupResult>? GroupCalls = null)
 {
+    /// <summary>그룹 호출 결과(없으면 빈 목록).</summary>
+    public IReadOnlyList<WiringGroupResult> Groups { get; } = GroupCalls ?? Array.Empty<WiringGroupResult>();
+
     public int SentCount => Rows.Count;
     public int OkCount => Rows.Count(r => r.Ok);
     public int FailedCount => Rows.Count(r => !r.Ok);
@@ -103,10 +110,9 @@ public sealed class WiringApplyService
                     return WiringApplyResult.Stop($"{row.Display} 을(를) 다시 받지 못해 아무것도 보내지 않았습니다 — {Text(response, "다시 받기 실패")}");
 
                 var server = response.Data;
-                var serverPlacement = WiringSpec.Read(server.HardwareSpec?.Spec);
-                if (!WiringSpec.SamePlacement(serverPlacement, row.BaselinePlacement))
+                if (DriftOf(row, server) is { } drift)
                     return WiringApplyResult.Stop(
-                        $"다른 사람이 {row.Display} 의 자리를 바꿨습니다({Describe(row.BaselinePlacement)} → {Describe(serverPlacement)}) — 아무것도 보내지 않았습니다. 창을 닫고 다시 열어 확인하십시오.",
+                        $"다른 사람이 {row.Display} 의 {drift} — 아무것도 보내지 않았습니다. 창을 닫고 다시 열어 확인하십시오.",
                         conflict: true);
 
                 fetched[row.Key] = server;
@@ -130,8 +136,12 @@ public sealed class WiringApplyService
                 progress?.Report(new WiringProgress(done, total, row.Display));
             }
 
+            // ③-b 그룹 변화분 — 그룹 하나 · 방향 하나에 호출 한 번(센서 수와 무관). 막 만든 줄은 새 id 로 실린다.
+            var newIds = results.Where(r => r.Ok && r.NewId is > 0).ToDictionary(r => r.Key, r => r.NewId!.Value);
+            var groupResults = await ApplyGroupsAsync(board, newIds, token).ConfigureAwait(false);
+
             var ok = results.Count(r => r.Ok);
-            var failed = results.Count - ok;
+            var failed = results.Count - ok + groupResults.Count(g => !g.Ok);
 
             if (ok > 0 && _providerService is not null)
             {
@@ -140,11 +150,12 @@ public sealed class WiringApplyService
                 catch (Exception ex) { _log?.Warning($"[{nameof(WiringApplyService)}] 저장 뒤 재조회 실패: {ex.Message}"); }
             }
 
+            var groupNote = groupResults.Count == 0 ? string.Empty : $" · 그룹 호출 {groupResults.Count}회";
             var message = failed == 0
-                ? $"저장했습니다 — 센서 {ok}대(대당 1회) · 실패 0"
-                : $"센서 {ok}대를 저장하고 {failed}대는 실패했습니다 — 실패한 줄만 남겨 두었습니다.";
+                ? $"저장했습니다 — 센서 {ok}대(대당 1회){groupNote} · 실패 0"
+                : $"센서 {ok}대를 저장하고 {failed}건은 실패했습니다{groupNote} — 실패한 것만 남겨 두었습니다.";
 
-            return new WiringApplyResult(failed == 0, false, false, message, results);
+            return new WiringApplyResult(failed == 0, false, false, message, results, groupResults);
         }
         catch (OperationCanceledException)
         {
@@ -156,6 +167,45 @@ public sealed class WiringApplyService
             return WiringApplyResult.Stop(ex.Message);
         }
     }
+
+    #region - Groups (W2) -
+    /// <summary>
+    /// 그룹 변화분을 보낸다 — <b>그룹 하나 · 방향 하나에 배치 호출 한 번</b>. 성공한 그룹만 기준을 옮긴다.
+    /// </summary>
+    private async Task<IReadOnlyList<WiringGroupResult>> ApplyGroupsAsync(WiringBoard board, IReadOnlyDictionary<int, int> newIds, CancellationToken token)
+    {
+        var calls = SensorGroupEdit.Plan(board.Rows, row => row.Id > 0 ? row.Id : newIds.TryGetValue(row.Key, out var id) ? id : 0);
+        if (calls.Count == 0) return Array.Empty<WiringGroupResult>();
+
+        var results = new List<WiringGroupResult>(calls.Count);
+        foreach (var call in calls)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                if (call.Add)
+                {
+                    var response = await _gateway.AssignToGroupAsync(call.GroupId, call.DeviceIds, token).ConfigureAwait(false);
+                    results.Add(new WiringGroupResult(call.GroupId, true, call.DeviceIds.Count, response.Success,
+                        response.Success ? "그룹에 넣었습니다" : Text(response, "그룹에 넣지 못했습니다")));
+                }
+                else
+                {
+                    var response = await _gateway.RemoveFromGroupAsync(call.GroupId, call.DeviceIds, token).ConfigureAwait(false);
+                    results.Add(new WiringGroupResult(call.GroupId, false, call.DeviceIds.Count, response.Success,
+                        response.Success ? "그룹에서 뺐습니다" : Text(response, "그룹에서 빼지 못했습니다")));
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _log?.Error($"[{nameof(WiringApplyService)}] 그룹 {call.GroupId} 호출 실패: {ex.Message}");
+                results.Add(new WiringGroupResult(call.GroupId, call.Add, call.DeviceIds.Count, false, ex.Message));
+            }
+        }
+        return results;
+    }
+    #endregion
 
     #region - Bodies -
     /// <summary>새 센서 — 결선까지 한 본문에 실어 POST 1회.</summary>
@@ -181,9 +231,68 @@ public sealed class WiringApplyService
         await UnitScopeGate.StampAsync(dto, nameof(WiringApplyService), _log, token).ConfigureAwait(false);
         var response = await _gateway.CreateAsync(dto, token).ConfigureAwait(false);
 
-        return response.Success
-            ? new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, true, "만들었습니다", response.Data?.Id)
-            : new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, false, Text(response, "만들지 못했습니다"));
+        if (!response.Success)
+            return new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, false, Text(response, "만들지 못했습니다"));
+
+        var newId = response.Data?.Id ?? 0;
+        if (newId <= 0)
+        {
+            // 만들기는 됐는데 응답에 id 가 없다 — 번호로 되찾는다. 못 찾으면 <b>성공으로 세지 않는다</b>(C7):
+            // 그대로 두면 다음 저장이 같은 번호를 한 번 더 만든다.
+            newId = await FindByNumberAsync(controllerId, row.Facts.Number, token).ConfigureAwait(false);
+            if (newId <= 0)
+            {
+                _log?.Warning($"[{nameof(WiringApplyService)}] 번호 {row.Facts.Number} 센서를 만들었지만 id 를 확인하지 못했습니다.");
+                return new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, false,
+                    "저장됨 · 번호 확인 필요 — 서버가 id 를 알려 주지 않았습니다. [갱신] 뒤 이 줄이 있는지 확인하십시오(다시 저장하면 같은 번호가 두 번 만들어질 수 있습니다).");
+            }
+        }
+
+        return new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, true, "만들었습니다", newId);
+    }
+
+    /// <summary>그 제어기의 센서를 다시 받아 번호로 찾는다. 못 찾으면 <c>0</c>.</summary>
+    private async Task<int> FindByNumberAsync(int controllerId, int number, CancellationToken token)
+    {
+        try
+        {
+            var list = await _gateway.ListByControllerAsync(controllerId, token).ConfigureAwait(false);
+            if (list?.Success != true || list.Data is null) return 0;
+            var hit = list.Data.Where(d => d is not null && d.NumberDevice == number && d.Id > 0).ToList();
+            return hit.Count == 1 ? hit[0].Id : 0;      // 번호가 둘이면 어느 쪽이 우리 것인지 알 수 없다
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(WiringApplyService)}] id 확인 조회 실패: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// 그 사이 서버 쪽이 바뀌었는가 — <b>이 창이 쓰는 칸 전부</b>를 본다(C10). 안 바뀌었으면 <c>null</c>.
+    /// </summary>
+    /// <remarks><c>status</c>·<c>updated_at</c> 는 보지 않는다 — 우리가 쓰지 않고 장비가 스스로 바꾼다.</remarks>
+    private static string? DriftOf(WiringSensorRow row, SensorDeviceDto server)
+    {
+        var serverPlacement = WiringSpec.Read(server.HardwareSpec?.Spec);
+        if (!WiringSpec.SamePlacement(serverPlacement, row.BaselinePlacement))
+            return $"자리를 바꿨습니다({Describe(row.BaselinePlacement)} → {Describe(serverPlacement)})";
+
+        if (server.NumberDevice != row.Baseline.Number)
+            return $"번호를 바꿨습니다({row.Baseline.Number} → {server.NumberDevice})";
+
+        if (!string.Equals(server.NameDevice ?? string.Empty, row.Baseline.Name, StringComparison.Ordinal))
+            return $"이름을 바꿨습니다(\"{row.Baseline.Name}\" → \"{server.NameDevice}\")";
+
+        if (!string.Equals(server.TypeDevice ?? string.Empty, row.Baseline.TypeText, StringComparison.Ordinal))
+            return $"종류를 바꿨습니다({row.Baseline.TypeText} → {server.TypeDevice})";
+
+        var serverZone = server.Geolocation?.Location ?? string.Empty;
+        if (!string.Equals(serverZone, row.Baseline.Zone, StringComparison.Ordinal))
+            return $"구역을 바꿨습니다(\"{row.Baseline.Zone}\" → \"{serverZone}\")";
+
+        return null;
     }
 
     /// <summary>기존 센서 — 받은 값으로 되채운 뒤 바뀐 칸만 얹어 PATCH 1회.</summary>
@@ -233,7 +342,8 @@ public sealed class WiringApplyService
             {
                 UseAxisWrite = true,
                 // components 는 싣지 않는다 — 서버가 배열을 통째로 바꾼다(AllowComponentsWrite 기본 false).
-                Spec = WiringSpec.Apply(server.HardwareSpec?.Spec, placement),
+                // spec 은 우리 키 하나만 — 병합이라 나머지는 그대로 남고, 자리를 비울 때는 명시적 null 이 지운다.
+                Spec = WiringSpec.MergePatch(placement),
             };
         }
 

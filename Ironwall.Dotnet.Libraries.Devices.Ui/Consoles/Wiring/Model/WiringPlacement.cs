@@ -77,8 +77,8 @@ public static class WiringSpec
     }
 
     /// <summary>
-    /// 받은 <c>spec</c> 에 결선 자리를 얹은 <b>새 객체</b>. <paramref name="placement"/> 가 <c>null</c> 이면 키를 뺀다.
-    /// 나머지 키는 그대로 옮긴다.
+    /// 받은 <c>spec</c> 에 결선 자리를 얹은 <b>새 객체</b> — <b>만들기(POST)</b> 용이다.
+    /// <paramref name="placement"/> 가 <c>null</c> 이면 키를 뺀다. 나머지 키는 그대로 옮긴다.
     /// </summary>
     /// <remarks>원본을 고치지 않는다 — 재조회한 DTO 는 비교의 기준이라 손대면 충돌 판정이 거짓이 된다.</remarks>
     public static JObject Apply(JObject? spec, WiringPlacement? placement)
@@ -91,13 +91,33 @@ public static class WiringSpec
             return next;
         }
 
-        next[SPEC_KEY] = new JObject
-        {
-            [LINE_KEY] = placement.Line,
-            [ORDER_KEY] = placement.Order,
-        };
+        next[SPEC_KEY] = Node(placement);
         return next;
     }
+
+    /// <summary>
+    /// <b>고치기(PATCH)</b> 용 <c>spec</c> 조각 — 우리 키 <b>하나만</b> 담는다.
+    /// 자리를 비울 때는 키를 빼는 것이 아니라 <b>명시적 <c>null</c></b> 을 보낸다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>서버 실측(읽어서 확인 · 2026-09-20)</b> — 장비 PATCH 는 축을 <b>RFC 7396 으로 병합</b>한다:
+    /// <c>app/routers/sensors.py:241-261</c>("센서 부분 수정 — 축은 RFC 7396 병합") →
+    /// <c>app/services/device_axes_io.py:291-299 apply_on_patch</c>
+    /// (<c>json_merge_patch(기존 축, _dump(보낸 값, patch: true))</c>) →
+    /// <c>app/services/json_merge.py:25-37</c>: 중첩 dict 는 <b>재귀 병합</b>(L33-34) ·
+    /// 값이 <c>null</c> 인 키는 <b>삭제</b>(L31-32) · 그 밖은 덮어쓰기. 그리고
+    /// <c>_dump(..., patch: true)</c>(<c>device_axes_io.py:93-102</c>)는 PATCH 에서 명시적 null 을 <b>남긴다</b>.</para>
+    /// <para>그러므로 ① <b>안 보낸 키는 그대로 남고</b>(그래서 우리 키 하나만 보내면 벤더 키를 건드리지 않는다)
+    /// ② <b>키를 빼는 것으로는 지워지지 않는다</b> — 자리를 비우는 저장이 조용히 아무 일도 하지 않게 된다.</para>
+    /// </remarks>
+    public static JObject MergePatch(WiringPlacement? placement)
+        => new() { [SPEC_KEY] = placement is null ? JValue.CreateNull() : Node(placement) };
+
+    private static JObject Node(WiringPlacement placement) => new()
+    {
+        [LINE_KEY] = placement.Line,
+        [ORDER_KEY] = placement.Order,
+    };
 
     /// <summary>두 결선 자리가 같은가(둘 다 없어도 같다) — 재조회 충돌 판정.</summary>
     public static bool SamePlacement(WiringPlacement? a, WiringPlacement? b)
