@@ -151,10 +151,20 @@ public partial class App : Application
             await Settle();
             Save(directory, $"{theme}-05-users-draft");
             _viewModel.RevertDraft();
+
+            // ⑤-b 자기 계정을 끌면 막힌다(스쳐 고른 뒤 떨어뜨려 스스로 권한을 잃는 사고 방지)
+            grid.SelectedItems.Clear();
+            grid.SelectedItem = grid.Items.Cast<object>()
+                .First(r => ((Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.AccountViewModel)r).Username == "admin");
+            await Settle();
+            _viewModel.AssignSelectionToGroup(_viewModel.GroupChips.First(c => c.Name == "조회 전용"));
+            await Settle();
+            Save(directory, $"{theme}-05b-users-self-blocked");
+            _viewModel.RevertDraft();
             grid.SelectedItems.Clear();
             await Settle();
 
-            // ⑥ 권한 설정 — 목록 + 매트릭스(상세)
+            // ⑥ 권한 설정 — 가운데 칸 = 그룹 칩 + [그룹|구성원] + 매트릭스, 상세 300 = 요약 · 주의 · 저장(목업 L1205-L1234)
             await _viewModel.SelectRailAsync(AccountConsoleKeys.Permissions);
             await Settle();
             _viewModel.Matrix.SelectedGroup = _viewModel.Matrix.Groups.FirstOrDefault();
@@ -165,12 +175,17 @@ public partial class App : Application
             _viewModel.Matrix.ToggleRow(0);
             await Settle();
             Save(directory, $"{theme}-07-permissions-painted");
+
+            // ⑧ 미적용 변경 상태에서 다른 그룹을 누르면 막힌다(칠해 둔 것이 조용히 사라지지 않는다)
+            _viewModel.Matrix.SelectedGroup = _viewModel.Matrix.Groups.Last();
+            await Settle();
+            Save(directory, $"{theme}-08-permissions-blocked");
             _viewModel.Revert();
 
-            // ⑧ 구성원 칩
+            // ⑨ 구성원 칩
             _viewModel.Matrix.ShowMembers = true;
             await Settle();
-            Save(directory, $"{theme}-08-permissions-members");
+            Save(directory, $"{theme}-09-permissions-members");
             _viewModel.Matrix.ShowMembers = false;
 
             // ⑨ 세션 관리
@@ -179,12 +194,12 @@ public partial class App : Application
             var sessions = FindGrid("Console.Accounts.Grid.Sessions");
             if (sessions.Items.Count > 0) sessions.SelectedItem = sessions.Items[0];
             await Settle();
-            Save(directory, $"{theme}-09-sessions");
+            Save(directory, $"{theme}-10-sessions");
 
             // ⑩ 권한 부여
             await _viewModel.SelectRailAsync(AccountConsoleKeys.Grants);
             await Settle();
-            Save(directory, $"{theme}-10-grants");
+            Save(directory, $"{theme}-11-grants");
 
             // ⑪ 감사 로그
             await _viewModel.SelectRailAsync(AccountConsoleKeys.Audit);
@@ -192,12 +207,12 @@ public partial class App : Application
             var audit = FindGrid("Console.Accounts.Grid.Audit");
             if (audit.Items.Count > 0) audit.SelectedItem = audit.Items[0];
             await Settle();
-            Save(directory, $"{theme}-11-audit");
+            Save(directory, $"{theme}-12-audit");
 
             // ⑫ 세션 설정(상세 칸 없음)
             await _viewModel.SelectRailAsync(AccountConsoleKeys.SessionSetup);
             await Settle();
-            Save(directory, $"{theme}-12-session-setup");
+            Save(directory, $"{theme}-13-session-setup");
         }
 
         // 좁은 폭 — 서랍(960~1279) · 접힘(<960). 다크 상태 그대로.
@@ -209,11 +224,11 @@ public partial class App : Application
 
         _window.Width = 1150;
         await Settle();
-        Save(directory, "dark-13-drawer-1150");
+        Save(directory, "dark-14-drawer-1150");
 
         _window.Width = 900;
         await Settle();
-        Save(directory, "dark-14-compact-900");
+        Save(directory, "dark-15-compact-900");
     }
 
     private void ApplyDark()
@@ -249,15 +264,15 @@ public partial class App : Application
         if (width <= 0 || height <= 0) return;
 
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
+
+        // 바탕을 먼저 깔고(창 배경), 그 위에 시각 트리를 그대로 그린다.
+        // VisualBrush 로 옮겨 그리면 창 상태에 따라 아무것도 안 실릴 때가 있다(실측) — 직접 Render 가 안전하다.
+        var backdrop = new DrawingVisual();
+        using (var dc = backdrop.RenderOpen())
             dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            // Stretch.None 의 기본 정렬은 가운데다 — 자손 경계가 조금이라도 크면 위아래가 잘린다(머리글이 먹힌다).
-            var brush = new VisualBrush(content) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top };
-            dc.DrawRectangle(brush, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
+        bitmap.Render(backdrop);
+
+        bitmap.Render(content);
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));

@@ -53,7 +53,7 @@ public sealed class PreviewTokenStore : ITokenStorageService
     public bool IsAuthenticated => true;
     public string? Jti => null;
     public string? UserId => "1";
-    public string? SessionId => "9001";
+    public string? SessionId => "9000";
     public int Generation => 0;
     public void SetTokens(string accessToken, string? refreshToken = null, string? sessionId = null) { }
     public bool SetTokensIfGeneration(int expectedGeneration, string accessToken, string? refreshToken = null, string? sessionId = null) => true;
