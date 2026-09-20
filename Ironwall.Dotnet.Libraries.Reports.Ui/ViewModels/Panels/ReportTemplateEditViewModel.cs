@@ -225,7 +225,13 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                 return null;
             }
         }
-        catch (Exception ex) { _log?.Error($"[ReportTemplateEdit] Apply: {ex.Message}"); StatusText = $"오류: {ex.Message}"; return null; }
+        catch (Exception ex)
+        {
+            // 날 예외 문구에는 호스트 · URL · TLS 사정이 묻어 나온다 — 로그로만 남기고 화면엔 고정 문장.
+            _log?.Error($"[ReportTemplateEdit] Apply: {ex}");
+            StatusText = "저장 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.";
+            return null;
+        }
         finally { IsBusy = false; }
     }
 
@@ -339,7 +345,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     public string ComponentSummary => $"구성 {Board.EnabledCount}개 / 전체 {Board.Count}개";
 
     /// <summary>구성 순서를 끌어 바꿀 수 있다는 안내(키보드 폴백을 글로도 알린다).</summary>
-    public const string ReorderHint = "손잡이를 끌어 순서를 바꿉니다 · Alt+↑ / Alt+↓ 로도 같은 결과입니다";
+    public const string ReorderHint = "손잡이를 끌거나 Alt+↑ / Alt+↓";
     #endregion
 
     #region - Attributes -

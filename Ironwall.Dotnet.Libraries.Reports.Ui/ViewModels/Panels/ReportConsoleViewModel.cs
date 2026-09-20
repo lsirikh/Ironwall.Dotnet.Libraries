@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
@@ -32,7 +33,7 @@ namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 /// <see cref="IPreviewAirspaceGate"/> 를 구현해 팝업 · 크게 보기 창 · 좁은 폭에서 미리보기를 내린다.</para>
 /// <para>싱글턴이다 — 닫을 때 선택 · 미적용 변경 · 미리보기를 전부 내려놓는다.</para>
 /// </remarks>
-public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
+public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, IHandle<ClosePopupMessageModel>
 {
     public const string ConsoleKey = "Reports";
 
@@ -82,6 +83,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
     {
         await base.OnActivateAsync(cancellationToken);
         Subscribe();
+        // 런타임 유무는 화면 모드와 무관하게 한 번 묻는다 - 좁은 창에서는 시도 자체가 없어 영영 알 수 없다.
+        PreviewViewModel.ProbeRuntime();
         RefreshPermissions();
         await SelectRailAsync(ReportConsoleRails.List, force: true);
     }
@@ -95,10 +98,10 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
 
         // 싱글턴이라 다음에 열 때 옛 선택 · 미적용 변경 · 미리보기가 남아 있으면 안 된다.
         Detail.Reset();
+        ReleaseAllAirspaceHolds();     // 자식이 쥔 표까지 내려놓는다 - 남으면 다음 세션의 첫 확인 창이 안 잠긴다
         PreviewViewModel.Clear();
         EditViewModel.Clear();
-        _overlayDepth = 0;
-        PreviewViewModel.IsOverlayOpen = false;
+        _isSwitching = false;
 
         await base.OnDeactivateAsync(close, cancellationToken);
     }
@@ -153,7 +156,10 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
             if (value is null || ReferenceEquals(value, _selectedRail)) return;
             if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
             {
-                NotifyOfPropertyChange();   // 막았다 — 목록 선택을 지금 레일로 되돌린다
+                // 막았다 — 목록 선택을 지금 레일로 되돌린다. ListBox 가 자기 TwoWay 갱신 도중이라
+                // 그 자리의 알림만으로는 되돌아가지 않을 수 있어, 한 박자 뒤에 한 번 더 울린다.
+                NotifyOfPropertyChange();
+                Execute.BeginOnUIThread(() => NotifyOfPropertyChange(nameof(SelectedRail)));
                 return;
             }
             _ = SelectRailAsync(value.Key);
@@ -175,6 +181,11 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
         var entry = RailEntries.FirstOrDefault(r => string.Equals(r.Key, key, StringComparison.Ordinal));
         if (entry is null) return;
 
+        // 두 전환이 await 사이에 끼어들면 목록은 C 인데 열은 B 인 화면이 된다(장비 콘솔 선례).
+        if (_isSwitching) return;
+        _isSwitching = true;
+
+        ReleaseAllAirspaceHolds();     // 전환은 남은 팝업 표를 들고 가지 않는다
         _selectedRail = entry;
         Detail.Reset();
         Detail.TypeName = ReportConsoleRails.TypeNameOf(key);
@@ -191,24 +202,28 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
             switch (key)
             {
                 case ReportConsoleRails.List:
-                    await ScreenExtensions.TryActivateAsync(ListViewModel);
-                    await ListViewModel.LoadAsync();
+                    // 활성화가 이미 LoadAsync 를 부른다 - 여기서 또 부르면 첫 열기에 두 번 조회한다.
+                    // 이미 활성이면 활성화가 아무것도 안 하므로 그때만 직접 부른다.
+                    if (ListViewModel.IsActive) await ListViewModel.LoadAsync();
+                    else await ScreenExtensions.TryActivateAsync(ListViewModel);
                     break;
 
                 case ReportConsoleRails.Create:
                     // 템플릿 목록을 여기서 다시 받는다 — 레일 전환이 곧 활성화다.
-                    await ScreenExtensions.TryActivateAsync(CreateViewModel);
-                    await CreateViewModel.LoadTemplatesAsync();
-                    await ListViewModel.LoadAsync();    // 왼쪽 칸에 최근 생성 이력을 보인다
+                    if (!CreateViewModel.IsActive) await ScreenExtensions.TryActivateAsync(CreateViewModel);
+                    else await CreateViewModel.LoadTemplatesAsync();
+                    if (ListViewModel.IsActive) await ListViewModel.LoadAsync();   // 왼쪽 칸에 최근 생성 이력
+                    else await ScreenExtensions.TryActivateAsync(ListViewModel);
                     break;
 
                 case ReportConsoleRails.Template:
-                    await ScreenExtensions.TryActivateAsync(TemplateViewModel);
-                    await TemplateViewModel.LoadAsync();
+                    if (TemplateViewModel.IsActive) await TemplateViewModel.LoadAsync();
+                    else await ScreenExtensions.TryActivateAsync(TemplateViewModel);
                     break;
             }
         }
         catch (Exception ex) { _log?.Error($"[ReportConsole] 레일 전환({key}): {ex.Message}"); }
+        finally { _isSwitching = false; }
 
         RefreshRailCounts();
         RaiseAll();
@@ -221,10 +236,14 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
         listEntry.Count = ListViewModel.InProgressCount;
     }
 
+    /// <summary>머리 부제 — 짧게. 같은 문장을 레일 바닥 · 자리표시자와 겹쳐 놓지 않는다.</summary>
+    public string RailSubtitle => IsTemplateRail ? "템플릿" : IsCreateRail ? "새 보고서" : "생성 이력";
+
+    /// <summary>레일 바닥(184 폭) — 한 줄에 들어가는 길이로.</summary>
     public string RailFooterText => IsTemplateRail
-        ? "템플릿을 고르면 오른쪽 칸에서 바로 고칩니다"
-        : IsCreateRail ? "제목과 기간을 정하면 오른쪽 아래에서 생성합니다"
-        : "보고서를 고르면 오른쪽 칸에 미리보기가 나옵니다";
+        ? "오른쪽 칸에서 고칩니다"
+        : IsCreateRail ? "오른쪽 아래 [생성]"
+        : "고르면 오른쪽에 미리보기";
     #endregion
 
     #region - List slot -
@@ -304,9 +323,19 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
     }
 
     /// <summary>툴바 [삭제] — 지금 화면의 파괴적 동작. 상세 하단의 [삭제] 와 같은 길이다.</summary>
+    /// <summary>
+    /// 툴바 · 상세의 [삭제].
+    /// </summary>
+    /// <remarks>
+    /// ★ 삭제는 <b>선택을 없애는 이동</b>이다. 막지 않으면 미적용 변경이 있는 채로 지워져
+    /// 선택은 0 인데 장부는 더러운 상태가 되고, 그때부터 [적용] · [되돌리기] 는 꺼져 있는데
+    /// 이동은 전부 막히는 <b>막다른 골목</b>이 된다.
+    /// </remarks>
     public async Task DeleteAsync()
     {
         if (!CanDelete) return;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
+
         if (IsTemplateRail) await TemplateViewModel.Delete();
         else await ListViewModel.Delete();
     }
@@ -371,11 +400,14 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
     {
         if (IsCreateRail)
         {
+            if (!CanEditReports) { CreateViewModel.StatusText = "보고서를 만들 권한이 없습니다."; return; }
             await CreateViewModel.Generate();
             RaiseAll();
             return;
         }
         if (!IsTemplateRail) return;
+        // 단추를 끄는 것만으로는 부족하다 — 뷰모델 경로에서도 거절한다.
+        if (!CanEditReports) { EditViewModel.StatusText = "편집 권한이 없습니다."; return; }
 
         var wasCreate = EditViewModel.IsCreate;
         var id = await EditViewModel.ApplyAsync();
@@ -433,7 +465,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
 
     public Task CancelGenerationAsync() => ListViewModel.Cancel();
 
-    public Task DeleteGenerationAsync() => ListViewModel.Delete();
+    /// <summary>상세 하단의 [삭제] — 툴바와 같은 길(이동 차단 포함).</summary>
+    public Task DeleteGenerationAsync() => DeleteAsync();
 
     public bool CanCancelGeneration => CanEditReports && ListViewModel.CanCancel;
     public bool CanDeleteGeneration => CanEditReports && ListViewModel.CanDelete;
@@ -477,6 +510,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
     /// </summary>
     public void OpenLargePreview()
     {
+        if (PreviewViewModel.IsLargeViewOpen) { LargePreviewActivateRequested?.Invoke(); return; }
         if (!PreviewViewModel.CanOpenLargeView) return;
         PreviewViewModel.IsLargeViewOpen = true;
         LargePreviewRequested?.Invoke(PreviewViewModel);
@@ -492,6 +526,33 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
 
     /// <summary>뷰가 구독해 최상위 <c>Window</c> 를 연다.</summary>
     public event Action<ReportPreviewViewModel>? LargePreviewRequested;
+
+    /// <summary>이미 열려 있다 — 새로 만들지 말고 그 창을 앞으로 가져온다.</summary>
+    public event System.Action? LargePreviewActivateRequested;
+
+    /// <summary>
+    /// ★ 팝업이 닫혔다 — 자식이 쥔 공역 표를 내려놓는다.
+    /// </summary>
+    /// <remarks>
+    /// 호스트의 확인 팝업은 <b>[확인] 에서만</b> 우리 메시지를 낸다([취소] 는
+    /// <c>ClosePopupMessageModel</c> 만 낸다). 그래서 확인 왕복의 끝에서만 풀면 <b>[취소] 를 누른 순간
+    /// 미리보기가 세션 내내 자리표시자로 굳고</b>, 그 표가 남은 채 콘솔을 닫으면 다음 세션의 첫 확인 창이
+    /// 아예 안 잠긴다(원래 결함이 되살아난다). 닫힘 신호 하나로 항상 되돌린다.
+    /// </remarks>
+    public Task HandleAsync(ClosePopupMessageModel message, CancellationToken cancellationToken)
+    {
+        ReleaseAllAirspaceHolds();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>자식이 쥔 표와 깊이를 한꺼번에 내려놓는다.</summary>
+    private void ReleaseAllAirspaceHolds()
+    {
+        ListViewModel.ReleaseAirspace();
+        TemplateViewModel.ReleaseAirspace();
+        _overlayDepth = 0;
+        PreviewViewModel.IsOverlayOpen = false;
+    }
 
     private sealed class OverlayHold : IDisposable
     {
@@ -532,6 +593,9 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
         // 편집 권한이 없으면 상세 칸은 여섯 상태의 "읽기 전용"이다(WL L929).
         Detail.IsReadOnly = !CanEditReports;
         EditViewModel.CanEdit = CanEditReports;
+        // 조회 권한은 단추만 끄지 않는다 — 목록 · 미리보기 · 내려받기를 뷰모델에서 막는다.
+        ListViewModel.CanView = CanViewReports;
+        TemplateViewModel.CanView = CanViewReports;
         RaiseAll();
     }
 
@@ -634,6 +698,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
         NotifyOfPropertyChange(nameof(ListCaption));
         NotifyOfPropertyChange(nameof(HasListCaption));
         NotifyOfPropertyChange(nameof(RailFooterText));
+        NotifyOfPropertyChange(nameof(RailSubtitle));
         NotifyOfPropertyChange(nameof(SearchText));
         NotifyOfPropertyChange(nameof(ShowSearch));
         NotifyOfPropertyChange(nameof(AddText));
@@ -690,19 +755,18 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate
 
     public string PanelTitle => "보고서";
 
-    /// <summary>상세 칸 기본 폭 — 목업이 "380, 미리보기라 넓게" 라고 적었다(WL L1259 · L1271).</summary>
-    public double DefaultDetailWidth => 380;
-
     public Task Close() => TryCloseAsync();
     #endregion
 
     #region - Attributes -
-    internal const string CreateFormFooter = "[생성] 을 누르면 왼쪽 목록에 나타나고 진행 상황이 보입니다";
+    internal const string CreateFormFooter = "왼쪽 목록에서 진행됩니다";
     internal const string CreateFormBanner = "제목과 기간을 정하면 보고서를 만들 수 있습니다. 진행 상황은 왼쪽 목록에서 볼 수 있습니다.";
     internal const string TemplateCreateBanner = "이름과 구성 요소를 고르면 템플릿을 등록할 수 있습니다.";
 
     private readonly IPermissionService _permission;
     private int _overlayDepth;
+    /// <summary>레일 전환 재진입 가드.</summary>
+    private bool _isSwitching;
     #endregion
 }
 

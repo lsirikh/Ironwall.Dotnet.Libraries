@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
+using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Tests;
 using Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels;
@@ -96,7 +97,8 @@ public partial class App : Application
     private async Task RunSnapshotsAsync(string directory, string theme)
     {
         // WebView2 는 오프스크린에서 그려지지 않는다 — 런타임이 없을 때와 같은 길로 내려 자리표시자를 찍는다.
-        _viewModel.PreviewViewModel.IsRuntimeReady = false;
+        _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(false);
+        _viewModel.PreviewViewModel.ProbeRuntime();
 
         await Settle();
         Save(directory, $"{theme}-01-list-none");
@@ -164,15 +166,26 @@ public partial class App : Application
         // 실패하고(오프스크린) 런타임 문구로 되돌아간다.
         _window.Width = 1150;
         await Settle();
-        _viewModel.PreviewViewModel.IsRuntimeReady = true;
+        _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(true);
+        _viewModel.PreviewViewModel.ProbeRuntime();
         await Settle();
         Save(directory, $"{theme}-13-drawer-1150");
 
         _window.Width = 900;
         await Settle();
-        _viewModel.PreviewViewModel.IsRuntimeReady = true;
+        _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(true);
+        _viewModel.PreviewViewModel.ProbeRuntime();
         await Settle();
         Save(directory, $"{theme}-14-compact-900");
+
+        // 선택을 놓으면 서랍이 닫힌다 — 그래야 좁은 폭에서 툴바(상태 칩)와 목록이 실제로 어떻게 보이는지 안다.
+        _viewModel.OnRowSelected(null);
+        await Settle();
+        Save(directory, $"{theme}-15-compact-900-nodrawer");
+
+        _window.Width = 1150;
+        await Settle();
+        Save(directory, $"{theme}-16-drawer-1150-nodrawer");
     }
 
     private void ApplyDark()

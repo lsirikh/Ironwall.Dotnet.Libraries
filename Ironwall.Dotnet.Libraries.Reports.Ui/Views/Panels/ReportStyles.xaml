@@ -45,4 +45,19 @@
 			</Setter.Value>
 		</Setter>
 	</Style>
+	<!--
+		다크에서 ModernPrimaryButton 은 꺼져 있어도 켜진 것과 똑같이 그려진다(가득 찬 teal + 흰 글자).
+		그 스타일은 Theme 프로젝트에 있고 이 노드의 손대는 범위 밖이라, <b>여기서만</b> 흐리게 덮는다.
+		Theme 쪽 결함은 그대로 남아 있다 — 통합자에게 보고한다.
+	-->
+	<Style
+		x:Key="ConsolePrimaryButton"
+		BasedOn="{StaticResource ModernPrimaryButton}"
+		TargetType="Button">
+		<Style.Triggers>
+			<Trigger Property="IsEnabled" Value="False">
+				<Setter Property="Opacity" Value="0.42" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
 </ResourceDictionary>

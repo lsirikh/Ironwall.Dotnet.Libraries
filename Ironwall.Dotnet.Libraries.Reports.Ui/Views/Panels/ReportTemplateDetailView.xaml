@@ -91,16 +91,36 @@
 			CountText="{Binding EditViewModel.ComponentSummary}"
 			Header="구성 요소">
 			<StackPanel>
-				<TextBlock
-					Margin="0,0,0,6"
-					AutomationProperties.AutomationId="Reports.Detail.ReorderHint"
-					FontSize="11"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Text="{Binding ReorderHint}"
-					TextWrapping="Wrap" />
+				<!--  폴백은 목록 <b>위</b>에 둔다 — 아래에 두면 긴 목록에 밀려 화면 밖으로 나간다(자동화가 못 짚는다).  -->
+				<DockPanel Margin="0,0,0,6" LastChildFill="True">
+					<Button
+						Margin="4,0,0,0"
+						AutomationProperties.AutomationId="Reports.Detail.MoveDownButton"
+						Click="OnMoveDown"
+						Content="▼"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding EditViewModel.CanEdit}"
+						Style="{StaticResource ConsoleMiniButton}"
+						ToolTip="고른 줄을 아래로 (Alt+↓)" />
+					<Button
+						Margin="4,0,0,0"
+						AutomationProperties.AutomationId="Reports.Detail.MoveUpButton"
+						Click="OnMoveUp"
+						Content="▲"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding EditViewModel.CanEdit}"
+						Style="{StaticResource ConsoleMiniButton}"
+						ToolTip="고른 줄을 위로 (Alt+↑)" />
+					<TextBlock
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.Detail.ReorderHint"
+						FontSize="11"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding ReorderHint}"
+						TextWrapping="Wrap" />
+				</DockPanel>
 
 				<ListBox
-					MaxHeight="420"
 					drag:DropZone.Handler="{Binding EditViewModel.Drop}"
 					drag:DropZone.IsReorder="True"
 					drag:DropZone.Key="report-template-component"
@@ -163,26 +183,6 @@
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>
-
-				<!--  버튼 폴백 — 드래그도 Alt 키도 못 쓰는 환경을 위해(같은 담당을 부른다)  -->
-				<StackPanel
-					Margin="0,6,0,0"
-					HorizontalAlignment="Right"
-					Orientation="Horizontal">
-					<Button
-						Margin="0,0,6,0"
-						AutomationProperties.AutomationId="Reports.Detail.MoveUpButton"
-						Click="OnMoveUp"
-						Content="▲ 위로"
-						IsEnabled="{Binding EditViewModel.CanEdit}"
-						Style="{StaticResource ConsoleMiniButton}" />
-					<Button
-						AutomationProperties.AutomationId="Reports.Detail.MoveDownButton"
-						Click="OnMoveDown"
-						Content="▼ 아래로"
-						IsEnabled="{Binding EditViewModel.CanEdit}"
-						Style="{StaticResource ConsoleMiniButton}" />
-				</StackPanel>
 			</StackPanel>
 		</c:ConsoleSection>
 

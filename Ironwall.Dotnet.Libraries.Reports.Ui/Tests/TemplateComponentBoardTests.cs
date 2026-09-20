@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Templates;
+using Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System.Linq;
 using Xunit;
@@ -158,6 +159,75 @@ public class TemplateComponentBoardTests
 
         Assert.False(board.IsDirty);
         Assert.Equal("b,a", board.BaselineSignature);
+    }
+
+    [Fact]
+    public void should_move_one_row_down_through_the_shared_entry_point()
+    {
+        var edit = EditWith("a", "b", "c");
+        var second = edit.Board.Items[1];
+
+        Assert.True(edit.MoveComponent(second, 1));
+
+        Assert.Equal(new[] { "a", "c", "b" }, edit.Board.Items.Select(i => i.Id).ToArray());
+    }
+
+    [Fact]
+    public void should_move_one_row_up_through_the_shared_entry_point()
+    {
+        var edit = EditWith("a", "b", "c");
+        var second = edit.Board.Items[1];
+
+        Assert.True(edit.MoveComponent(second, -1));
+
+        Assert.Equal(new[] { "b", "a", "c" }, edit.Board.Items.Select(i => i.Id).ToArray());
+    }
+
+    [Fact]
+    public void should_do_nothing_when_the_first_row_is_moved_up()
+    {
+        var edit = EditWith("a", "b", "c");
+
+        Assert.False(edit.MoveComponent(edit.Board.Items[0], -1));
+        Assert.Equal(new[] { "a", "b", "c" }, edit.Board.Items.Select(i => i.Id).ToArray());
+    }
+
+    [Fact]
+    public void should_do_nothing_when_the_last_row_is_moved_down()
+    {
+        var edit = EditWith("a", "b", "c");
+
+        Assert.False(edit.MoveComponent(edit.Board.Items[^1], 1));
+        Assert.Equal(new[] { "a", "b", "c" }, edit.Board.Items.Select(i => i.Id).ToArray());
+    }
+
+    [Fact]
+    public void should_refuse_to_move_anything_when_editing_is_not_allowed()
+    {
+        var edit = EditWith("a", "b", "c");
+        edit.CanEdit = false;
+
+        Assert.False(edit.MoveComponent(edit.Board.Items[1], -1));
+        Assert.Equal(new[] { "a", "b", "c" }, edit.Board.Items.Select(i => i.Id).ToArray());
+    }
+
+    [Fact]
+    public void should_refuse_a_row_that_is_not_on_this_board()
+    {
+        var edit = EditWith("a", "b");
+
+        Assert.False(edit.MoveComponent(new TemplateComponentItem("x", "x", null), -1));
+    }
+
+    /// <summary>진짜 편집 뷰모델을 세운다 — ▲▼ · Alt 키 · 드래그가 <b>같은 진입점</b>을 쓰는지 보기 위해.</summary>
+    private static ReportTemplateEditViewModel EditWith(params string[] ids)
+    {
+        var api = new FakeReportApiService();
+        api.Components.AddRange(ReportSeed.Catalog(ids));
+        var edit = new ReportTemplateEditViewModel(new Caliburn.Micro.EventAggregator(), new FakeLogService(), api);
+        edit.Attach(new Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles.ConsoleDetailPresenter());
+        edit.LoadAsync(ReportSeed.Template(1, "t", ids)).GetAwaiter().GetResult();
+        return edit;
     }
 
     [Fact]

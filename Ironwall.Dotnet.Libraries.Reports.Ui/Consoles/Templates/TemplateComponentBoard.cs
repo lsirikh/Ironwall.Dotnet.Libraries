@@ -35,6 +35,13 @@ public sealed class TemplateComponentItem : PropertyChangedBase
     /// <summary>서버 설명문 — 툴팁.</summary>
     public string? Description { get; init; }
 
+    /// <summary>
+    /// 저장된 구성 한 줄을 <b>통째로</b> 들고 있는다 — 우리가 아는 필드만 골라 다시 만들면
+    /// 서버가 쥔 나머지(예: <c>title</c>)가 다음 저장 때 말없이 사라진다(배열은 통째로 교체된다).
+    /// 저장에 없던 항목이면 <c>null</c>.
+    /// </summary>
+    internal ReportComponentConfigDto? Saved { get; set; }
+
     /// <summary>종류 한국어 라벨 — null(그리드 · 요약)은 "표/요약".</summary>
     public string ChartTypeLabel => ChartType switch
     {
@@ -116,13 +123,16 @@ public sealed class TemplateComponentBoard
     /// </summary>
     public void Load(IEnumerable<ReportComponentCategoryDto>? catalog, IEnumerable<ReportComponentConfigDto>? saved)
     {
-        var savedList = (saved ?? Enumerable.Empty<ReportComponentConfigDto>())
-            .Where(c => c.Enabled)
+        // ★ enabled:false 로 저장된 줄도 <b>버리지 않는다</b>. 걸러 내면 다음 저장 때 서버 배열에서 사라진다
+        //    (PATCH 는 배열을 통째로 바꾼다 — 안 실으면 지우는 것과 같다).
+        var savedAll = (saved ?? Enumerable.Empty<ReportComponentConfigDto>())
+            .Where(c => !string.IsNullOrEmpty(c.Id))
             .OrderBy(c => c.Order)
-            .Select(c => c.Id)
-            .Where(id => !string.IsNullOrEmpty(id))
-            .Distinct(StringComparer.Ordinal)
+            .GroupBy(c => c.Id, StringComparer.Ordinal)
+            .Select(g => g.First())
             .ToList();
+        var savedById = savedAll.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        var savedList = savedAll.Select(c => c.Id).ToList();
         var savedRank = savedList.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i, StringComparer.Ordinal);
 
         var built = new List<TemplateComponentItem>();
@@ -137,19 +147,22 @@ public sealed class TemplateComponentBoard
                 {
                     ChartType = entry.ChartType,
                     Description = entry.Description,
+                    Saved = savedById.TryGetValue(entry.Id, out var savedEntry) ? savedEntry : null,
                 };
-                item.SetEnabledQuiet(savedRank.ContainsKey(entry.Id));
+                item.SetEnabledQuiet(savedEntryEnabled(entry.Id));
                 built.Add(item);
             }
         }
 
-        // 저장된 구성 중 카탈로그에 없는 것 — 말없이 빼면 [적용] 때 조용히 사라진다. 보이게 두고 켜 둔다.
+        // 저장된 구성 중 카탈로그에 없는 것 — 말없이 빼면 [적용] 때 조용히 사라진다. 보이게 두고 저장값 그대로 둔다.
         foreach (var id in savedList.Where(id => built.All(b => !string.Equals(b.Id, id, StringComparison.Ordinal))))
         {
-            var orphan = new TemplateComponentItem(id, id, "서버 카탈로그에 없음");
-            orphan.SetEnabledQuiet(true);
+            var orphan = new TemplateComponentItem(id, id, "서버 카탈로그에 없음") { Saved = savedById[id] };
+            orphan.SetEnabledQuiet(savedEntryEnabled(id));
             built.Add(orphan);
         }
+
+        bool savedEntryEnabled(string id) => savedById.TryGetValue(id, out var c) && c.Enabled;
 
         // 저장된 순서가 앞. 카탈로그 순서는 그 뒤에 원래 차례대로.
         var ordered = built
@@ -219,12 +232,41 @@ public sealed class TemplateComponentBoard
     }
 
     /// <summary>
-    /// 서버로 보낼 구성 — <b>켠 것만</b>, 목록 순서대로 <c>order</c> 를 0 부터 다시 매긴다.
+    /// 서버로 보낼 구성.
     /// </summary>
+    /// <remarks>
+    /// <para>켠 것을 목록 순서대로 앞에 두고 <c>order</c> 를 0 부터 다시 매긴다. <b>서버가 이미 쥐고 있던
+    /// 끈 줄</b>(<c>enabled:false</c>)은 그 뒤에 그대로 붙인다 — 배열이 통째로 교체되므로 안 실으면 지워진다.</para>
+    /// <para>우리가 화면에서 쓰지 않는 필드(예: <c>title</c>)는 저장된 값을 <b>그대로 날라</b> 준다.
+    /// 새로 고른 줄은 서버 기본값에 맡긴다.</para>
+    /// </remarks>
     public List<ReportComponentConfigDto> ToConfig()
-        => Items.Where(i => i.IsEnabled)
-                .Select((item, index) => new ReportComponentConfigDto { Id = item.Id, Order = index, Enabled = true })
-                .ToList();
+    {
+        var config = new List<ReportComponentConfigDto>();
+        var order = 0;
+
+        foreach (var item in Items.Where(i => i.IsEnabled))
+            config.Add(Emit(item, order++, enabled: true));
+
+        // 서버가 알고 있던 끈 줄은 사라지지 않게 뒤에 붙인다(새로 끈 것도 여기 포함된다).
+        foreach (var item in Items.Where(i => !i.IsEnabled && i.Saved is not null))
+            config.Add(Emit(item, order++, enabled: false));
+
+        return config;
+    }
+
+    /// <summary>저장된 줄의 나머지 필드를 그대로 나르고, 우리가 정하는 두 칸만 덮어쓴다.</summary>
+    private static ReportComponentConfigDto Emit(TemplateComponentItem item, int order, bool enabled)
+    {
+        var dto = item.Saved is { } saved
+            ? new ReportComponentConfigDto { Id = saved.Id, Order = saved.Order, Enabled = saved.Enabled, Title = saved.Title }
+            : new ReportComponentConfigDto { Id = item.Id };
+
+        dto.Id = item.Id;
+        dto.Order = order;
+        dto.Enabled = enabled;
+        return dto;
+    }
 
     private void OnItemEnabledChanged(object? sender, EventArgs e) => Changed?.Invoke(this, EventArgs.Empty);
 }

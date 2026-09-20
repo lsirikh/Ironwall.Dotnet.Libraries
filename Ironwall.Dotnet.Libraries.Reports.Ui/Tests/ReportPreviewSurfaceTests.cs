@@ -115,16 +115,28 @@ public class ReportPreviewSurfaceTests
     public void should_prefer_the_runtime_reason_when_several_blockers_apply_at_once()
     {
         // 런타임이 없으면 폭 · 팝업을 고쳐도 소용이 없다 — 가장 근본적인 까닭을 먼저 말한다.
+        // 이 조합은 실제로 일어난다: 프로브가 활성화 때 한 번 판정하므로 좁은 창에서도 runtime=false 가 온다.
         var surface = Resolve(layout: ConsoleLayoutMode.Compact, large: true, overlay: true, runtime: false);
 
         Assert.Equal(ReportPreviewSurfaceRules.RuntimeMissingReason, surface.Reason);
     }
 
     [Fact]
-    public void should_allow_the_large_window_even_when_the_console_is_narrow()
+    public void should_allow_the_large_window_for_a_finished_report_whatever_the_layout_is()
     {
         // 큰 창은 자체 HWND 라 공역 제약을 받지 않는다 — 그것이 이 창의 존재 이유다.
+        // (판정에 폭이 들어가지 않는다는 사실 자체가 요점이라, 폭별 표면 판정과 함께 본다.)
         Assert.True(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.Ready));
+
+        foreach (var layout in new[] { ConsoleLayoutMode.Docked, ConsoleLayoutMode.Drawer, ConsoleLayoutMode.Compact })
+            Assert.True(Resolve(layout).IsLive || Resolve(layout).IsPlaceholder);   // 언제나 판정이 나온다
+    }
+
+    [Fact]
+    public void should_refuse_the_large_window_while_it_is_still_loading()
+    {
+        // 다 받기 전에 열면 빈 창이 뜨고 상세 칸 미리보기까지 내려간다.
+        Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.Loading));
     }
 
     [Fact]
@@ -133,6 +145,7 @@ public class ReportPreviewSurfaceTests
         Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.InProgress));
         Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.Failed));
         Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.NoSelection));
+        Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(isRuntimeReady: true, ReportPreviewContent.Cancelled));
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using MaterialDesignThemes.Wpf;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
@@ -26,12 +27,24 @@ public partial class ReportConsoleView : UserControl
     private ConsoleShell? _shell;
     private ConsolePrefs? _prefs;
     private bool _isSyncingSelection;
+    /// <summary>열려 있는 [크게 보기] 창 — 두 번째를 만들지 않고 이것을 앞으로 가져온다.</summary>
+    private ReportLargePreviewWindow? _largePreview;
 
     public ReportConsoleView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        Unloaded += (_, _) => Detach();
+        Unloaded += OnUnloaded;
+    }
+
+    /// <summary>
+    /// 뗄 때 구독을 전부 내려놓는다 — <c>DependencyPropertyDescriptor</c> 는 붙인 쪽을 <b>강하게</b> 잡아
+    /// 떼지 않으면 <c>ConsoleShell</c> 과 이 뷰가 통째로 살아남는다(고전적인 DPD 누수).
+    /// </summary>
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        DetachShell();
+        Detach();
     }
 
     private ReportConsoleViewModel? ViewModel => DataContext as ReportConsoleViewModel;
@@ -45,6 +58,7 @@ public partial class ReportConsoleView : UserControl
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.LargePreviewRequested += OnLargePreviewRequested;
+        _viewModel.LargePreviewActivateRequested += OnLargePreviewActivateRequested;
         RebuildColumns();
         PushLayoutMode();
     }
@@ -54,17 +68,18 @@ public partial class ReportConsoleView : UserControl
         if (_viewModel is null) return;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.LargePreviewRequested -= OnLargePreviewRequested;
+        _viewModel.LargePreviewActivateRequested -= OnLargePreviewActivateRequested;
         _viewModel = null;
     }
 
     private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
+        DetachShell();
         _shell = (ConsoleShell)sender;
 
         // 폭 판정은 커널 한 곳이 한다 — 값이 바뀔 때마다 뷰모델(공역 게이트)에 알린다.
-        DependencyPropertyDescriptor
-            .FromProperty(ConsoleShell.LayoutModeProperty, typeof(ConsoleShell))
-            ?.AddValueChanged(_shell, OnLayoutModeChanged);
+        LayoutModeDescriptor?.AddValueChanged(_shell, OnLayoutModeChanged);
+        _shell.SizeChanged += OnShellSizeChanged;
 
         // Unloaded 에서 뗐다가 같은 뷰가 다시 붙는 경우(패널 재표시).
         if (_viewModel is null && ViewModel is { } vm)
@@ -73,7 +88,21 @@ public partial class ReportConsoleView : UserControl
         PushLayoutMode();
     }
 
+    private static DependencyPropertyDescriptor? LayoutModeDescriptor
+        => DependencyPropertyDescriptor.FromProperty(ConsoleShell.LayoutModeProperty, typeof(ConsoleShell));
+
+    private void DetachShell()
+    {
+        if (_shell is null) return;
+        LayoutModeDescriptor?.RemoveValueChanged(_shell, OnLayoutModeChanged);
+        _shell.SizeChanged -= OnShellSizeChanged;
+        _shell = null;
+    }
+
     private void OnLayoutModeChanged(object? sender, EventArgs e) => PushLayoutMode();
+
+    /// <summary>목록이 좁아지면 낮은 우선순위 열을 접는다 — 상태 칩은 끝까지 남긴다.</summary>
+    private void OnShellSizeChanged(object sender, SizeChangedEventArgs e) => ApplyColumnPrefs();
 
     /// <summary>★ 공역: 서랍 · 접힘에서는 살아 있는 WebView2 를 만들지 않는다(뷰모델이 판정한다).</summary>
     private void PushLayoutMode()
@@ -137,7 +166,8 @@ public partial class ReportConsoleView : UserControl
                         "<StackPanel Orientation=\"Horizontal\" VerticalAlignment=\"Center\">"
                         + "<Border Style=\"{DynamicResource Console.Pill}\"><StackPanel Orientation=\"Horizontal\">"
                         + "<TextBlock Margin=\"0,0,5,0\" FontSize=\"10\" VerticalAlignment=\"Center\" Foreground=\"{DynamicResource TextSecondaryBrush}\" Text=\"{Binding StatusGlyph, Mode=OneWay}\" />"
-                        + "<TextBlock FontSize=\"12\" VerticalAlignment=\"Center\" Foreground=\"{DynamicResource TextPrimaryBrush}\" Text=\"{Binding StatusLabel, Mode=OneWay}\" />"
+                        + "<TextBlock FontSize=\"12\" VerticalAlignment=\"Center\" Foreground=\"{DynamicResource TextPrimaryBrush}\" Text=\"{Binding StatusLabel, Mode=OneWay}\""
+                        + " AutomationProperties.AutomationId=\"{Binding Id, StringFormat=Reports.List.RowStatusText.{0}}\" />"
                         + "</StackPanel></Border>"
                         + "<TextBlock Margin=\"6,0,0,0\" FontFamily=\"Consolas\" FontSize=\"11.5\" VerticalAlignment=\"Center\" Foreground=\"{DynamicResource TextMutedBrush}\" Text=\"{Binding ProgressText, Mode=OneWay}\" />"
                         + "</StackPanel>"),
@@ -182,9 +212,17 @@ public partial class ReportConsoleView : UserControl
 
     private void ApplyColumnPrefs()
     {
-        if (_grid is null) return;
+        if (_grid is null || _viewModel is null) return;
+
         var prefs = ColumnPrefs();
-        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, prefs?.HiddenColumns);
+        var hidden = new List<string>(prefs?.HiddenColumns ?? new List<string>());
+
+        // 좁으면 낮은 우선순위부터 접는다 — 접어도 "상태" 는 남는다(FR-09 의 요점).
+        var width = _grid.ActualWidth > 0 ? _grid.ActualWidth : _shell?.ActualWidth ?? 0;
+        foreach (var key in ReportColumnPriority.CollapsedAt(width, _viewModel.Columns))
+            if (!hidden.Contains(key)) hidden.Add(key);
+
+        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, hidden);
         if (_toolbar is not null) _toolbar.ColumnsText = text;
     }
 
@@ -274,13 +312,29 @@ public partial class ReportConsoleView : UserControl
     /// </summary>
     private void OnLargePreviewRequested(ReportPreviewViewModel preview)
     {
-        var owner = Window.GetWindow(this);
+        if (_largePreview is not null) { OnLargePreviewActivateRequested(); return; }
+
+        // 닫힘 처리는 이 지역 변수에 기댄다 — Detach() 가 _viewModel 을 비워도 걸쇠는 반드시 풀려야 한다.
+        var console = _viewModel;
         var window = new ReportLargePreviewWindow(preview.Html, preview.Row?.Title ?? "미리보기")
         {
-            Owner = owner,
+            Owner = Window.GetWindow(this),
         };
-        window.Closed += (_, _) => _viewModel?.OnLargePreviewClosed();
+        _largePreview = window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_largePreview, window)) _largePreview = null;
+            console?.OnLargePreviewClosed();
+        };
         window.Show();
+    }
+
+    /// <summary>이미 열려 있다 — 새로 만들지 않고 그 창을 앞으로.</summary>
+    private void OnLargePreviewActivateRequested()
+    {
+        if (_largePreview is null) return;
+        if (_largePreview.WindowState == WindowState.Minimized) _largePreview.WindowState = WindowState.Normal;
+        _largePreview.Activate();
     }
     #endregion
 }

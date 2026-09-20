@@ -61,12 +61,14 @@ public class ReportConsoleTests : IDisposable
         public required EventAggregator Events { get; init; }
     }
 
-    private static async Task<Rig> OpenAsync(Action<FakeReportApiService>? seed = null, bool canEdit = true)
+    private static async Task<Rig> OpenAsync(Action<FakeReportApiService>? seed = null, bool canEdit = true,
+                                             Action<FakePermissionService>? permission_ = null)
     {
         var log = new FakeLogService();
         var events = new EventAggregator();
         var api = new FakeReportApiService();
         var permission = new FakePermissionService { Edit = canEdit };
+        permission_?.Invoke(permission);
 
         api.Generations.Add(ReportSeed.Generation(3, "9월 정기 보고서"));
         api.Generations.Add(ReportSeed.Generation(2, "장애 요약", "GENERATING", 40));
@@ -84,6 +86,7 @@ public class ReportConsoleTests : IDisposable
             new ReportPreviewViewModel(events, log, api),
             new ReportTemplateEditViewModel(events, log, api));
 
+        console.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(true);
         await ((IActivate)console).ActivateAsync();
         return new Rig { Console = console, Api = api, Permission = permission, Events = events };
     }
@@ -275,6 +278,38 @@ public class ReportConsoleTests : IDisposable
     }
 
     [Fact]
+    public async Task should_not_advertise_the_large_window_when_the_runtime_is_missing_even_in_a_narrow_console()
+    {
+        // 좁은 창에서는 살아 있는 WebView2 를 만들지 않으므로, 시도로는 런타임 유무를 영영 알 수 없다.
+        var rig = await OpenAsync();
+        rig.Console.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(false);
+        rig.Console.PreviewViewModel.ProbeRuntime();
+        rig.Console.LayoutMode = ConsoleLayoutMode.Compact;
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+
+        Assert.False(rig.Console.PreviewViewModel.CanOpenLargeView);
+        Assert.Equal(ReportPreviewSurfaceRules.RuntimeMissingReason, rig.Console.PreviewViewModel.SurfaceReason);
+    }
+
+    [Fact]
+    public async Task should_not_offer_a_second_large_window_while_one_is_open()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        var opened = 0;
+        var activated = 0;
+        rig.Console.LargePreviewRequested += _ => opened++;
+        rig.Console.LargePreviewActivateRequested += () => activated++;
+
+        rig.Console.OpenLargePreview();
+        rig.Console.OpenLargePreview();
+
+        Assert.Equal(1, opened);
+        Assert.Equal(1, activated);
+        Assert.False(rig.Console.PreviewViewModel.CanOpenLargeView);
+    }
+
+    [Fact]
     public async Task should_not_open_the_large_window_for_a_report_that_is_not_finished()
     {
         var rig = await OpenAsync();
@@ -327,7 +362,7 @@ public class ReportConsoleTests : IDisposable
     }
 
     [Fact]
-    public async Task should_delete_and_restore_the_airspace_when_the_confirmation_is_accepted()
+    public async Task should_delete_and_keep_the_airspace_blocked_until_the_result_popup_closes()
     {
         var rig = await OpenAsync();
         rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
@@ -337,7 +372,44 @@ public class ReportConsoleTests : IDisposable
 
         Assert.Equal(new[] { 3 }, rig.Api.DeletedGenerationIds.ToArray());
         Assert.DoesNotContain(rig.Console.ListViewModel.Items, r => r.Id == 3);
-        Assert.False(rig.Console.PreviewViewModel.IsOverlayOpen);   // 팝업 왕복이 끝나면 되돌린다
+        // 결과 안내 팝업이 아직 떠 있다 — 그 위로 미리보기가 올라오면 안 된다.
+        Assert.True(rig.Console.PreviewViewModel.IsOverlayOpen);
+
+        await rig.Events.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+        Assert.False(rig.Console.PreviewViewModel.IsOverlayOpen);
+    }
+
+    [Fact]
+    public async Task should_release_the_airspace_when_the_confirmation_is_cancelled()
+    {
+        // 호스트의 확인 팝업은 [확인] 에서만 우리 메시지를 낸다 — [취소] 는 ClosePopup 만 낸다.
+        // 그 길에서 풀지 않으면 미리보기가 세션 내내 자리표시자로 굳는다.
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        await rig.Console.DeleteGenerationAsync();
+        Assert.True(rig.Console.PreviewViewModel.IsOverlayOpen);
+
+        await rig.Events.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+
+        Assert.False(rig.Console.PreviewViewModel.IsOverlayOpen);
+        Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
+        Assert.Empty(rig.Api.DeletedGenerationIds);
+    }
+
+    [Fact]
+    public async Task should_block_the_airspace_again_in_a_second_session_after_a_cancelled_confirmation()
+    {
+        // 취소로 끝난 표가 남은 채 콘솔을 닫으면, 다음 세션의 첫 확인 창이 아예 안 잠긴다(원래 결함).
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        await rig.Console.DeleteGenerationAsync();
+        await ((IDeactivate)rig.Console).DeactivateAsync(close: true);
+
+        await ((IActivate)rig.Console).ActivateAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        await rig.Console.DeleteGenerationAsync();
+
+        Assert.True(rig.Console.PreviewViewModel.IsOverlayOpen);
     }
 
     [Fact]
@@ -347,10 +419,42 @@ public class ReportConsoleTests : IDisposable
         rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
         await rig.Console.DeleteGenerationAsync();
         rig.Console.ListViewModel.SelectedItem = null;
+        rig.Console.ListViewModel.ReleaseAirspace();   // 대상이 사라졌다 — 스스로 내려놓는다
 
         await rig.Console.ListViewModel.HandleAsync(new CallDeleteReportGenerationProcessMessageModel(), CancellationToken.None);
 
+        await rig.Events.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
         Assert.False(rig.Console.PreviewViewModel.IsOverlayOpen);
+    }
+
+    [Fact]
+    public async Task should_delete_the_report_that_was_shown_in_the_confirmation_not_the_newly_selected_one()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        await rig.Console.DeleteGenerationAsync();
+
+        // 확인 창이 떠 있는 동안 선택이 바뀌었다.
+        rig.Console.ListViewModel.SelectedItem = rig.Console.ListViewModel.Rows.First(r => r.Id == 1);
+        await rig.Console.ListViewModel.HandleAsync(new CallDeleteReportGenerationProcessMessageModel(), CancellationToken.None);
+
+        Assert.Equal(new[] { 3 }, rig.Api.DeletedGenerationIds.ToArray());
+    }
+
+    [Fact]
+    public async Task should_refuse_to_delete_while_the_template_form_has_unapplied_changes()
+    {
+        // 삭제는 선택을 없애는 이동이다 — 막지 않으면 장부만 더러운 채 선택이 0 이 되어 막다른 골목이 된다.
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        rig.Console.EditViewModel.Name = "고친 이름";
+
+        await rig.Console.DeleteAsync();
+
+        Assert.Empty(rig.Api.DeletedTemplateIds);
+        Assert.Equal(ConsoleDetailStateMachine.BlockedNotice, rig.Console.Detail.FooterText);
+        Assert.True(rig.Console.Detail.IsDirty);
     }
 
     [Fact]
@@ -756,6 +860,99 @@ public class ReportConsoleTests : IDisposable
 
         Assert.False(rig.Console.Detail.IsReadOnly);
         Assert.True(rig.Console.CanAdd);
+    }
+
+    [Fact]
+    public async Task should_not_load_or_download_anything_without_view_permission()
+    {
+        var rig = await OpenAsync(permission_: p => { p.View = false; p.Edit = false; });
+
+        Assert.Empty(rig.Console.ListViewModel.Items);
+        Assert.Equal(0, rig.Api.StatusFilterCallCount);
+        Assert.Contains("권한", rig.Console.ListViewModel.EmptyStateText);
+
+        await rig.Console.DownloadPdfAsync();
+        await rig.Console.DownloadCsvAsync();
+        // 내려받기 경로가 열리지 않았다 — 단추를 끄는 것만으로는 뷰모델 경로가 막히지 않는다.
+        Assert.Null(rig.Console.ListViewModel.ActionStatus);
+    }
+
+    [Fact]
+    public async Task should_refuse_to_apply_a_template_at_the_view_model_when_editing_is_not_allowed()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        rig.Console.EditViewModel.Name = "고친 이름";
+
+        rig.Permission.Edit = false;
+        rig.Permission.RaiseChanged();
+        await rig.Console.ApplyAsync();
+
+        Assert.Null(rig.Api.LastUpdate);
+        Assert.False(rig.Console.DetailCanApply);
+    }
+
+    [Fact]
+    public async Task should_let_the_rail_switch_through_when_only_the_create_form_is_filled()
+    {
+        // 생성 폼은 장부에 올리지 않는다 — 입력이 사라지지 않으므로 막을 까닭이 없다.
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        rig.Console.CreateViewModel.Title = "쓰던 제목";
+
+        await rig.Console.SelectRailAsync(ReportConsoleRails.List);
+
+        Assert.Equal(ReportConsoleRails.List, rig.Console.SelectedRailKey);
+        Assert.Equal("쓰던 제목", rig.Console.CreateViewModel.Title);
+    }
+
+    [Fact]
+    public async Task should_block_add_and_reload_while_the_template_form_is_dirty()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        rig.Console.EditViewModel.Name = "고친 이름";
+
+        await rig.Console.AddAsync();
+        Assert.False(rig.Console.EditViewModel.IsCreate);
+
+        var before = rig.Api.TemplateListCallCount;
+        await rig.Console.ReloadAsync();
+        Assert.Equal(before, rig.Api.TemplateListCallCount);
+    }
+
+    [Fact]
+    public async Task should_fetch_the_list_once_when_the_console_opens()
+    {
+        var rig = await OpenAsync();
+
+        Assert.Equal(1, rig.Api.StatusFilterCallCount);
+    }
+
+    [Fact]
+    public async Task should_keep_the_selection_and_the_preview_when_a_search_keystroke_narrows_the_list()
+    {
+        // Rows 를 Clear() 하면 묶인 DataGrid 의 선택이 그 자리에서 풀려 미리보기가 비워졌다.
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+
+        rig.Console.SearchText = "정기";
+
+        Assert.NotNull(rig.Console.ListViewModel.SelectedItem);
+        Assert.Equal(3, rig.Console.ListViewModel.SelectedItem!.Id);
+        Assert.True(rig.Console.PreviewViewModel.HasHtml);
+    }
+
+    [Fact]
+    public async Task should_say_the_search_only_covers_the_newest_page_when_nothing_matches()
+    {
+        var rig = await OpenAsync();
+
+        rig.Console.SearchText = "없는제목";
+
+        Assert.Contains($"최근 {ReportListViewModel.PageLimit}건", rig.Console.ListViewModel.EmptyStateText);
     }
 
     [Fact]

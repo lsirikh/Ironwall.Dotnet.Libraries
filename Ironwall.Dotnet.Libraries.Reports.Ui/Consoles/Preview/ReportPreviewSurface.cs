@@ -129,9 +129,10 @@ public static class ReportPreviewSurfaceRules
     }
 
     /// <summary>
-    /// 크게 보기 창을 열 수 있는가 — 완료된 보고서이고 런타임이 있을 때만.
+    /// 크게 보기 창을 열 수 있는가 — <b>HTML 을 다 받은</b> 보고서이고 런타임이 있을 때만.
+    /// 받는 중에 열면 빈 창이 뜨고, 그러면서 상세 칸 미리보기까지 자리표시자로 내려간다.
     /// 좁은 창에서도 <b>열 수 있다</b>(별도 HWND 라 공역 제약을 받지 않는다 — 그것이 이 창의 존재 이유다).
     /// </summary>
     public static bool CanOpenLargeView(bool isRuntimeReady, ReportPreviewContent content)
-        => isRuntimeReady && content is ReportPreviewContent.Ready or ReportPreviewContent.Loading;
+        => isRuntimeReady && content == ReportPreviewContent.Ready;
 }
