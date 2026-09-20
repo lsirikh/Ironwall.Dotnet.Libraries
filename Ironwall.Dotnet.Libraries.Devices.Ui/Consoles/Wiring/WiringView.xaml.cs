@@ -61,6 +61,11 @@ public partial class WiringView : UserControl
     private void OnCancelEdit(object sender, RoutedEventArgs e) => ViewModel?.CancelEdit();
     private void OnUnifyFirst(object sender, RoutedEventArgs e) => ViewModel?.UnifyWithFirst();
 
+    private void OnToggleGroup(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is WiringGroupCheckViewModel group) ViewModel?.ToggleGroup(group);
+    }
+
     private async void OnFillSequential(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.FillSequentialAsync();
@@ -101,16 +106,24 @@ public partial class WiringView : UserControl
     {
         if (ViewModel is not { } vm) return;
 
-        if (e.Key == Key.System && e.SystemKey is Key.Left or Key.Up)
+        if (e.Key == Key.System && e.SystemKey is Key.Left)
         {
             vm.MoveSelectedBack();
             e.Handled = true;
             return;
         }
 
-        if (e.Key == Key.System && e.SystemKey is Key.Right or Key.Down)
+        if (e.Key == Key.System && e.SystemKey is Key.Right)
         {
             vm.MoveSelectedForward();
+            e.Handled = true;
+            return;
+        }
+
+        // Alt+↑ · Alt+↓ = 다른 선으로 옮기기(C6) — 선 안에서만 움직이면 건너갈 길이 없다.
+        if (e.Key == Key.System && e.SystemKey is Key.Up or Key.Down)
+        {
+            vm.MoveSelectedToOtherLine();
             e.Handled = true;
             return;
         }
@@ -128,7 +141,7 @@ public partial class WiringView : UserControl
         if (e.Key != Key.Enter || ViewModel is not { } vm) return;
         if (sender is not ListBox list) return;
 
-        foreach (var row in list.SelectedItems.OfType<SensorRowViewModel>().ToList()) vm.PlaceFromPalette(row);
+        vm.PlaceManyFromPalette(list.SelectedItems.OfType<SensorRowViewModel>().ToList());
         e.Handled = true;
     }
     #endregion
@@ -149,6 +162,22 @@ public sealed class IssueLevelBrushConverter : IValueConverter
         // 매번 다시 찾는다 — 한 번 찾아 캐시하면 테마를 바꿔도 옛 색으로 굳는다.
         return Application.Current?.TryFindResource(key) ?? DependencyProperty.UnsetValue;
     }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>붙여넣기 열의 뜻 → 사람 말(W7).</summary>
+public sealed class PasteColumnTextConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value as PasteColumn? switch
+        {
+            PasteColumn.Number => "번호",
+            PasteColumn.Name => "이름",
+            PasteColumn.Type => "종류",
+            PasteColumn.Zone => "구역",
+            _ => "읽지 않음",
+        };
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

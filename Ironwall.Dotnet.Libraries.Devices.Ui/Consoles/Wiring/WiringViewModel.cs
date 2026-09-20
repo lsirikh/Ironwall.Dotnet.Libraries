@@ -28,7 +28,11 @@ public sealed record WiringControllerInfo(int Id, int Number, string Name, strin
 }
 
 /// <summary>서버에서 받은 센서 한 대 — 창은 모델 타입을 모른다(헤드리스 테스트).</summary>
-public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement = null, string? Issue = null);
+public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement = null, string? Issue = null,
+                                     IReadOnlyList<int>? Groups = null);
+
+/// <summary>고를 수 있는 그룹 한 개(W2) — 창은 그룹 모델 타입을 모른다.</summary>
+public sealed record WiringGroupInfo(int Id, string Name);
 
 /// <summary>
 /// 장비 셋업 · 결선맵 — 제어기 <b>한 대</b>의 센서 표와 1차/2차 선(WS 전체 · PRD N-04).
@@ -58,15 +62,18 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     private bool _closeWithoutAsking;
     private IReadOnlyList<SensorRowViewModel> _selectedRows = Array.Empty<SensorRowViewModel>();
 
+    private readonly Dictionary<int, bool> _touchedGroups = new();
     private string? _editNumber;
     private string? _editName;
     private string? _editType;
     private string? _editZone;
 
-    private WiringViewModel(WiringControllerInfo controller, IReadOnlyList<string> sensorTypes, WiringApplyService? apply, IWiringDialogs dialogs)
+    private WiringViewModel(WiringControllerInfo controller, IReadOnlyList<string> sensorTypes, IReadOnlyList<WiringGroupInfo> groups,
+                            WiringApplyService? apply, IWiringDialogs dialogs)
     {
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         SensorTypes = sensorTypes ?? Array.Empty<string>();
+        AvailableGroups = groups ?? Array.Empty<WiringGroupInfo>();
         _apply = apply;
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
 
@@ -76,6 +83,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         Line2 = new ObservableCollection<WiringSlotViewModel>();
         Issues = new ObservableCollection<WiringIssue>();
         SaveResults = new ObservableCollection<WiringRowResult>();
+        GroupChecks = new ObservableCollection<WiringGroupCheckViewModel>();
+        foreach (var group in AvailableGroups) GroupChecks.Add(new WiringGroupCheckViewModel(group));
         DisplayName = "장비 셋업 · 결선맵";
     }
 
@@ -84,9 +93,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
                                                 IEnumerable<WiringSensorSeed> sensors,
                                                 IReadOnlyList<string> sensorTypes,
                                                 WiringApplyService? apply,
-                                                IWiringDialogs dialogs)
+                                                IWiringDialogs dialogs,
+                                                IReadOnlyList<WiringGroupInfo>? groups = null)
     {
-        var vm = new WiringViewModel(controller, sensorTypes, apply, dialogs);
+        var vm = new WiringViewModel(controller, sensorTypes, groups ?? Array.Empty<WiringGroupInfo>(), apply, dialogs);
         vm.Load(sensors);
         return vm;
     }
@@ -94,6 +104,9 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     #region - Head -
     public WiringControllerInfo Controller { get; }
     public IReadOnlyList<string> SensorTypes { get; }
+
+    /// <summary>고를 수 있는 그룹(W2).</summary>
+    public IReadOnlyList<WiringGroupInfo> AvailableGroups { get; }
 
     public string Subject => Controller.Subject;
 
@@ -107,11 +120,31 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(IsSensorStep));
             NotifyOfPropertyChange(nameof(IsWiringStep));
+            RefreshSteps();
         }
     }
 
     public bool IsSensorStep => _step == WiringStep.Sensors;
     public bool IsWiringStep => _step == WiringStep.Wiring;
+
+    /// <summary>① 제어기 — 이 창은 제어기 한 대를 받아 열리므로 늘 끝난 단계다.</summary>
+    public string StepControllerGlyph => "✓";
+
+    /// <summary>② 센서 — 지금 보고 있으면 ▸, 센서가 있으면 ✓.</summary>
+    public string StepSensorsGlyph => IsSensorStep ? "▸" : SensorCount > 0 ? "✓" : "·";
+
+    /// <summary>③ 결선 — 지금 보고 있으면 ▸, 전부 붙고 치명 문제가 없으면 ✓.</summary>
+    public string StepWiringGlyph => IsWiringStep ? "▸" : IsWiringDone ? "✓" : "·";
+
+    /// <summary>
+    /// ④ 확인 — 결선 쪽의 확인 칸에 <b>실제로 볼 것이 있을 때</b>만 켠다(보낼 것이 있고 막는 문제가 없다).
+    /// </summary>
+    public string StepConfirmGlyph => IsConfirmActive ? "▸" : "·";
+
+    public bool IsConfirmActive => IsWiringStep && HasChanges && !WiringValidation.BlocksSave(Issues);
+
+    public bool IsSensorStepDone => !IsSensorStep && SensorCount > 0;
+    public bool IsWiringStepDone => !IsWiringStep && IsWiringDone;
 
     public void GoSensors() => Step = WiringStep.Sensors;
     public void GoWiring() => Step = WiringStep.Wiring;
@@ -152,6 +185,11 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     /// <summary>마지막 저장의 줄별 결과 — 실패한 줄만 남는다(WS L450).</summary>
     public ObservableCollection<WiringRowResult> SaveResults { get; }
 
+    /// <summary>그룹 3상태 칸(WS L614-618).</summary>
+    public ObservableCollection<WiringGroupCheckViewModel> GroupChecks { get; }
+
+    public bool HasGroups => GroupChecks.Count > 0;
+
     public bool HasSaveResults => SaveResults.Count > 0;
 
     public int SensorCount => _board.Rows.Count;
@@ -168,7 +206,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     private void Load(IEnumerable<WiringSensorSeed>? sensors)
     {
         var seeds = (sensors ?? Enumerable.Empty<WiringSensorSeed>())
-            .Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue));
+            .Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups));
         _board.Load(seeds);
         SyncAll();
         StatusText = _board.Rows.Count == 0
@@ -278,8 +316,20 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(FaultText));
     }
 
+    /// <summary>단계 띠 — 어느 단계에 있고 어디까지 끝났는지(W1).</summary>
+    private void RefreshSteps()
+    {
+        NotifyOfPropertyChange(nameof(StepSensorsGlyph));
+        NotifyOfPropertyChange(nameof(StepWiringGlyph));
+        NotifyOfPropertyChange(nameof(StepConfirmGlyph));
+        NotifyOfPropertyChange(nameof(IsConfirmActive));
+        NotifyOfPropertyChange(nameof(IsSensorStepDone));
+        NotifyOfPropertyChange(nameof(IsWiringStepDone));
+    }
+
     private void RefreshCommands()
     {
+        RefreshSteps();
         foreach (var item in Rows) item.Refresh();
         NotifyOfPropertyChange(nameof(DraftText));
         NotifyOfPropertyChange(nameof(CanUndo));
@@ -351,6 +401,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         _selectedRows = rows?.Where(r => r is not null).ToList() ?? (IReadOnlyList<SensorRowViewModel>)Array.Empty<SensorRowViewModel>();
         ResetEdit();
+        _touchedGroups.Clear();
+        RefreshGroupChecks();
         NotifyOfPropertyChange(nameof(HasSelection));
         NotifyOfPropertyChange(nameof(HasNoSelection));
         NotifyOfPropertyChange(nameof(SelectionCount));
@@ -413,8 +465,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         if (IsBusy) return;
 
         var text = _dialogs.ReadClipboardText();
-        var report = TsvPaste.Parse(text, _board.Rows.Select(r => r.Facts.Number).ToList(),
-                                    SensorTypes.FirstOrDefault() ?? string.Empty, LastZone());
+        var numbers = _board.Rows.Select(r => r.Facts.Number).ToList();
+        var defaultType = SensorTypes.FirstOrDefault() ?? string.Empty;
+        _dialogs.RememberPasteContext(numbers, defaultType, LastZone());
+        var report = TsvPaste.Parse(text, numbers, defaultType, LastZone());
 
         if (!await _dialogs.ShowPasteReportAsync(report))
         {
@@ -450,27 +504,59 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
     public SensorBulkEdit CurrentEdit => new(_editNumber, _editName, _editType, _editZone);
 
-    public bool HasEdit => !CurrentEdit.IsEmpty;
-    public string EditPreview => SensorTableEdit.PreviewSentence(CurrentEdit, _selectedRows.Count);
+    public bool HasEdit => !CurrentEdit.IsEmpty || _touchedGroups.Count > 0;
+
+    public string EditPreview
+    {
+        get
+        {
+            var fields = CurrentEdit.IsEmpty ? string.Empty : SensorTableEdit.PreviewSentence(CurrentEdit, _selectedRows.Count);
+            var groups = SensorGroupEdit.PreviewSentence(_touchedGroups, NameOfGroup);
+            if (groups.Length == 0) return fields.Length == 0 ? "고친 칸이 없습니다." : fields;
+            var head = fields.Length == 0 ? $"{_selectedRows.Count}줄에 적용: " : fields + " · ";
+            return head + "그룹 " + groups;
+        }
+    }
+
+    private string NameOfGroup(int id) => AvailableGroups.FirstOrDefault(g => g.Id == id)?.Name ?? $"그룹 {id}";
     public string? EditAdvice => SensorTableEdit.Advice(CurrentEdit, _selectedRows.Count);
     public bool HasEditAdvice => !string.IsNullOrEmpty(EditAdvice);
     public string ApplyEditText => _selectedRows.Count > 1 ? $"{_selectedRows.Count}줄에 적용" : "적용";
-    public bool CanApplyEdit => !IsBusy && HasSelection && HasEdit && SensorTableEdit.Validate(CurrentEdit, _selectedRows.Count) is null;
-    public string? EditError => HasEdit ? SensorTableEdit.Validate(CurrentEdit, _selectedRows.Count) : null;
+    public bool CanApplyEdit => !IsBusy && HasSelection && HasEdit
+        && (CurrentEdit.IsEmpty || SensorTableEdit.Validate(CurrentEdit, _selectedRows.Count) is null);
+    public string? EditError => CurrentEdit.IsEmpty ? null : SensorTableEdit.Validate(CurrentEdit, _selectedRows.Count);
     public bool HasEditError => !string.IsNullOrEmpty(EditError);
+
+    /// <summary>그룹 칸을 누른다 — 섞인 칸은 "전부 넣기"로 간다(WS L628). 적용 전까지는 Draft 표시일 뿐이다.</summary>
+    public void ToggleGroup(WiringGroupCheckViewModel? group)
+    {
+        if (group is null || !HasSelection || IsBusy) return;
+
+        var current = _touchedGroups.TryGetValue(group.Id, out var pending)
+            ? (pending ? GroupCheck.All : GroupCheck.None)
+            : SensorGroupEdit.StateOf(_selectedRows.Select(r => r.Row), group.Id);
+
+        _touchedGroups[group.Id] = SensorGroupEdit.NextValue(current);
+        RefreshGroupChecks();
+        RefreshHints();
+    }
 
     public void ApplyEdit()
     {
         if (!CanApplyEdit) return;
 
         var edit = CurrentEdit;
+        var groups = new Dictionary<int, bool>(_touchedGroups);
         _board.PushUndo();
         foreach (var item in _selectedRows) item.Row.Facts = SensorTableEdit.Apply(item.Row.Facts, edit);
+        SensorGroupEdit.Apply(_selectedRows.Select(r => r.Row), groups);
 
         var count = _selectedRows.Count;
         ResetEdit();
         SyncAll();
-        StatusText = $"{count}줄에 적용했습니다 — 손대지 않은 칸은 줄마다 원래 값을 그대로 두었습니다.";
+        StatusText = groups.Count == 0
+            ? $"{count}줄에 적용했습니다 — 손대지 않은 칸은 줄마다 원래 값을 그대로 두었습니다."
+            : $"{count}줄에 적용했습니다 — 체크를 바꾼 그룹만 더하고 뺐습니다(나머지 그룹은 그대로).";
     }
 
     public void CancelEdit()
@@ -484,7 +570,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         if (!HasSelection || IsBusy) return;
 
-        var start = _selectedRows[0].Row.Facts.Number;
+        var start = _selectedRows.OrderBy(r => Rows.IndexOf(r)).First().Row.Facts.Number;
         var text = await _dialogs.AskTextAsync("연속 번호 채우기", "시작 번호", start.ToString(CultureInfo.InvariantCulture));
         if (text is null) return;
         if (!int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 1)
@@ -493,9 +579,11 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             return;
         }
 
+        // 고른 차례가 아니라 <b>화면에 보이는 차례</b>로 채운다 — Ctrl 클릭 순서로 번호가 뒤섞이면 안 된다(C11).
+        var ordered = _selectedRows.OrderBy(r => Rows.IndexOf(r)).ToList();
         _board.PushUndo();
-        var filled = SensorTableEdit.FillSequential(_selectedRows.Select(r => r.Row.Facts), parsed);
-        for (var i = 0; i < _selectedRows.Count; i++) _selectedRows[i].Row.Facts = filled[i];
+        var filled = SensorTableEdit.FillSequential(ordered.Select(r => r.Row.Facts), parsed);
+        for (var i = 0; i < ordered.Count; i++) ordered[i].Row.Facts = filled[i];
 
         SyncAll();
         StatusText = $"연속 번호 {parsed} 부터 {_selectedRows.Count}줄을 채웠습니다.";
@@ -506,9 +594,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         if (!HasSelection || IsBusy) return;
 
+        var orderedRows = _selectedRows.OrderBy(r => Rows.IndexOf(r)).ToList();
         _board.PushUndo();
-        var unified = SensorTableEdit.UnifyWithFirst(_selectedRows.Select(r => r.Row.Facts));
-        for (var i = 0; i < _selectedRows.Count; i++) _selectedRows[i].Row.Facts = unified[i];
+        var unified = SensorTableEdit.UnifyWithFirst(orderedRows.Select(r => r.Row.Facts));
+        for (var i = 0; i < orderedRows.Count; i++) orderedRows[i].Row.Facts = unified[i];
 
         SyncAll();
         StatusText = $"첫 줄 값(종류 · 구역)으로 {_selectedRows.Count}줄을 통일했습니다.";
@@ -530,6 +619,17 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         StatusText = $"이름 규칙을 {_selectedRows.Count}줄에 적용했습니다.";
     }
 
+    private void RefreshGroupChecks()
+    {
+        foreach (var check in GroupChecks)
+        {
+            var touched = _touchedGroups.TryGetValue(check.Id, out var pending);
+            check.Update(
+                touched ? (pending ? GroupCheck.All : GroupCheck.None) : SensorGroupEdit.StateOf(_selectedRows.Select(r => r.Row), check.Id),
+                touched);
+        }
+    }
+
     private IEnumerable<SensorFacts> SelectedFacts() => _selectedRows.Select(r => r.Row.Facts);
 
     private static string Hint(string? common) => common ?? SensorTableEdit.MULTI_VALUE_TEXT;
@@ -537,6 +637,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     private void ResetEdit()
     {
         _editNumber = _editName = _editType = _editZone = null;
+        _touchedGroups.Clear();
+        RefreshGroupChecks();
         NotifyOfPropertyChange(nameof(EditNumber));
         NotifyOfPropertyChange(nameof(EditName));
         NotifyOfPropertyChange(nameof(EditType));
@@ -577,12 +679,14 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     /// <summary>칸을 하나 늘린다(WS L411).</summary>
     public void AddSlot(int line)
     {
-        _board.PushUndo();
-        if (!_board.AddSlot(line))
+        if (_board.SlotCount(line) >= WiringBoard.MAX_SLOTS)
         {
             StatusText = $"한 선에 칸은 {WiringBoard.MAX_SLOTS}개까지입니다.";
-            return;
+            return;      // 되돌리기 장면을 쌓지 않는다(C11)
         }
+
+        _board.PushUndo();
+        _board.AddSlot(line);
         SyncAll();
         StatusText = $"{line}차 선의 칸을 늘렸습니다.";
     }
@@ -600,9 +704,14 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         }
 
         _board.PushUndo();
-        _board.AutoLayoutByNumber();
+        if (!_board.AutoLayoutByNumber())
+        {
+            _board.Undo();
+            StatusText = $"센서가 너무 많아 자동 배치할 수 없습니다 — 한 선에 {WiringBoard.MAX_SLOTS}개까지입니다.";
+            return;
+        }
         SyncAll();
-        StatusText = "번호 순으로 자동 배치했습니다 — 앞 절반은 1차, 뒤 절반은 2차입니다.";
+        StatusText = "번호 순으로 자동 배치했습니다 — 앞 절반은 1차, 뒤 절반은 2차이고 빈 자리는 메워집니다.";
     }
 
     /// <summary>선에서 뺀다(칸의 ✕ · Delete · 빼는 곳 드롭).</summary>
@@ -613,7 +722,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         _board.Unplace(slot.Row.Key);
         var name = slot.Row.Display;
         SyncAll();
-        StatusText = $"{name} 을(를) 선에서 뺐습니다 — 뒤 순번이 당겨졌습니다.";
+        StatusText = $"{name} 을(를) 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다.";
     }
 
     /// <summary>키보드 폴백 — 고른 칸의 센서를 빼기(Delete).</summary>
@@ -626,20 +735,64 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
     /// <summary>키보드 폴백 — 팔레트에서 Enter: 첫 빈 칸에 붙인다.</summary>
     public void PlaceFromPalette(SensorRowViewModel? row)
-    {
-        if (row is null) return;
+        => PlaceManyFromPalette(row is null ? Array.Empty<SensorRowViewModel>() : new[] { row });
 
-        var target = FirstEmptySlot();
-        if (target is null)
+    /// <summary>여러 줄을 고르고 Enter — <b>되돌리기는 한 걸음</b>(C11).</summary>
+    public void PlaceManyFromPalette(IEnumerable<SensorRowViewModel>? rows)
+    {
+        var list = rows?.Where(r => r is not null).ToList() ?? new List<SensorRowViewModel>();
+        if (list.Count == 0 || IsBusy) return;
+
+        if (FirstEmptySlot() is null)
         {
             StatusText = "빈 칸이 없습니다 — [＋ 칸] 으로 칸을 먼저 늘리세요.";
             return;
         }
 
         _board.PushUndo();
-        _board.Place(row.Key, target.Value.Line, target.Value.Index);
+        var placed = 0;
+        foreach (var row in list)
+        {
+            if (FirstEmptySlot() is not { } target) break;
+            if (_board.Place(row.Key, target.Line, target.Index)) placed++;
+        }
+
         SyncAll();
-        StatusText = $"{row.Display} → {_board.PlacementOf(row.Key)?.Text} 에 놓았습니다 · 순번 자동";
+        StatusText = placed == 0 ? "놓을 빈 칸이 없습니다."
+            : placed == 1 ? $"{list[0].Display} → {_board.PlacementOf(list[0].Key)?.Text} 에 놓았습니다"
+            : $"{placed}대를 빈 칸에 차례로 놓았습니다"
+              + (placed < list.Count ? $" ({list.Count - placed}대는 칸이 모자랍니다)" : string.Empty);
+    }
+
+    /// <summary>키보드 폴백 — 다른 선의 같은 자리(없으면 첫 빈 칸)로 옮긴다(Alt+↑ · Alt+↓ · C6).</summary>
+    public void MoveSelectedToOtherLine()
+    {
+        var slot = SelectedSlots().FirstOrDefault(s => s.IsFilled);
+        if (slot?.Row is null || IsBusy) return;
+
+        var other = slot.Line == WiringSpec.LINE_PRIMARY ? WiringSpec.LINE_SECONDARY : WiringSpec.LINE_PRIMARY;
+        var target = TargetOnOtherLine(other, slot.Index);
+        if (target is null)
+        {
+            StatusText = $"{other}차 선에 빈 칸이 없습니다 — [＋ 칸] 으로 늘리세요.";
+            return;
+        }
+
+        _board.PushUndo();
+        var key = slot.Row.Key;
+        _board.Place(key, other, target.Value);
+        SyncAll();
+        SelectSlot(other, target.Value);
+        StatusText = $"{_board.Find(key)?.Display} → {_board.PlacementOf(key)?.Text}";
+    }
+
+    /// <summary>다른 선에서 받아 줄 자리 — 같은 자리가 비었으면 그 자리, 아니면 첫 빈 칸.</summary>
+    private int? TargetOnOtherLine(int line, int index)
+    {
+        if (index < _board.SlotCount(line) && _board.RowAt(line, index) is null) return index;
+        for (var i = 0; i < _board.SlotCount(line); i++)
+            if (_board.RowAt(line, i) is null) return i;
+        return null;
     }
 
     /// <summary>키보드 폴백 — 고른 칸의 센서를 한 칸 옮긴다(Alt+← · Alt+→).</summary>
@@ -734,8 +887,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             foreach (var row in removed) _board.Unplace(row.Key);
             SyncAll();
             StatusText = removed.Count == 1
-                ? $"{removed[0].Display} 을(를) 선에서 뺐습니다 — 뒤 순번이 당겨졌습니다."
-                : $"{removed.Count}대를 선에서 뺐습니다 — 뒤 순번이 당겨졌습니다.";
+                ? $"{removed[0].Display} 을(를) 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다."
+                : $"{removed.Count}대를 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다.";
             return;
         }
 
@@ -816,6 +969,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
                 _board.Promote(row.Key, row.NewId!.Value);
 
             if (result.OkKeys.Count > 0) _board.MarkBaseline(result.OkKeys);
+            if (result.IsSuccess && !_board.IsDirty) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
 
             SyncAll();
         }

@@ -35,6 +35,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     private readonly IDeviceApiService _api;
     private readonly IDeviceProviderService _providerService;
     private readonly DeviceProvider _devices;
+    private readonly DeviceGroupProvider? _groups;
     private readonly DeviceQueryPolicy _policy;
     private readonly ICatalogService? _catalog;
     private readonly ILogService? _log;
@@ -44,6 +45,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                           IDeviceProviderService providerService,
                           DeviceProvider devices,
                           DeviceQueryPolicy policy,
+                          DeviceGroupProvider? groups = null,
                           ICatalogService? catalog = null,
                           ILogService? log = null)
     {
@@ -51,6 +53,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _providerService = providerService ?? throw new ArgumentNullException(nameof(providerService));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
+        _groups = groups;
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _catalog = catalog;
         _log = log;
@@ -67,20 +70,51 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var types = SensorTypeCodes(seeds);
 
         var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy);
-        var vm = WiringViewModel.ForController(info, seeds, types, apply, this);
+        var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor());
 
         return await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true)) == true;
     }
 
     #region - Seeds -
     /// <summary>제어기에 달린 센서를 프로바이더 캐시에서 모은다 — 결선맵은 캐시만으로 그린다(WS L476).</summary>
+    /// <summary>고를 수 있는 그룹(id + 이름) — 프로바이더가 없으면 그룹 절은 통째로 안 보인다(W2).</summary>
+    private IReadOnlyList<WiringGroupInfo> GroupsFor()
+    {
+        if (_groups is null) return Array.Empty<WiringGroupInfo>();
+        try
+        {
+            return _groups.OfType<IDeviceGroupModel>()
+                          .Where(g => g.Id > 0)
+                          .OrderBy(g => g.Name, StringComparer.CurrentCulture)
+                          .Select(g => new WiringGroupInfo(g.Id, string.IsNullOrWhiteSpace(g.Name) ? $"그룹 {g.Id}" : g.Name!))
+                          .ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 그룹 목록을 읽지 못했습니다: {ex.Message}");
+            return Array.Empty<WiringGroupInfo>();
+        }
+    }
+
     private IReadOnlyList<WiringSensorSeed> SeedsFor(int controllerId)
     {
+        // 센서의 상위는 `controller_id` 하나다(서버 스키마 필수) — 모델에서는
+        // `DtoToModelHelper.ToSensorDeviceModel` 이 중첩 객체가 없어도 Id 만으로 씨를 뿌리고
+        // `NavigationMappingHelper.SetupBidirectionalReferences` 가 실제 객체로 다시 잇는다.
+        // 그래도 두 경로 중 하나가 비는 판본을 만나면 창이 통째로 비므로, 제어기 쪽 목록도 같이 본다(C12).
         var sensors = _devices.OfType<ISensorDeviceModel>()
-            .Where(s => s is IBaseDeviceModel model && ControllerIdOf(s) == controllerId)
+            .Where(s => s is IBaseDeviceModel && ControllerIdOf(s) == controllerId)
             .Cast<IBaseDeviceModel>()
-            .OrderBy(s => s.DeviceNumber)
             .ToList();
+
+        if (sensors.Count == 0)
+        {
+            var owner = _devices.OfType<IControllerDeviceModel>().FirstOrDefault(c => c.Id == controllerId);
+            if (owner?.Devices is { Count: > 0 } children)
+                sensors = children.OfType<ISensorDeviceModel>().Cast<IBaseDeviceModel>().ToList();
+        }
+
+        sensors = sensors.OrderBy(s => s.DeviceNumber).ToList();
 
         var seeds = new List<WiringSensorSeed>(sensors.Count);
         foreach (var sensor in sensors)
@@ -91,7 +125,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                 sensor.Axes?.Connection?.Channel,
                 new SensorFacts(sensor.DeviceNumber, sensor.DeviceName ?? string.Empty, TypeTextOf(sensor), sensor.Location ?? string.Empty),
                 WiringSpec.Read(spec),
-                WiringSpec.Validate(spec)));
+                WiringSpec.Validate(spec),
+                sensor.DeviceGroups?.ToList()));
         }
         return seeds;
     }
@@ -158,10 +193,23 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
 
     public async Task<bool> ShowPasteReportAsync(PasteReport report)
     {
-        var vm = new PasteReportViewModel(report);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(620, 620, resizable: true));
+        // 열 매핑을 바꾸면 그 자리에서 다시 읽는다 — 다시 읽을 재료(이미 있는 번호 · 기본값)를 같이 넘긴다(W7).
+        var vm = new PasteReportViewModel(report, _lastPasteNumbers, _lastPasteType, _lastPasteZone);
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(640, 560, resizable: true));
         return vm.Result;
     }
+
+    /// <summary>붙여넣기 보고를 다시 읽을 때 쓰는 재료 — 창이 보고를 만들 때 같이 적어 둔다.</summary>
+    public void RememberPasteContext(IReadOnlyCollection<int> numbers, string defaultType, string defaultZone)
+    {
+        _lastPasteNumbers = numbers;
+        _lastPasteType = defaultType;
+        _lastPasteZone = defaultZone;
+    }
+
+    private IReadOnlyCollection<int> _lastPasteNumbers = Array.Empty<int>();
+    private string _lastPasteType = string.Empty;
+    private string _lastPasteZone = string.Empty;
 
     /// <summary>
     /// 클립보드는 화면 계층에서만 만진다 — 다른 앱이 쥐고 있으면 예외가 나므로 조용히 <c>null</c> 로 떨어뜨린다.

@@ -757,9 +757,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
     public string? WiringBlockedReason => _wiring?.IsAvailable != true ? "이 서버 판본에는 결선을 담을 자리가 없습니다."
         : Category != EnumDeviceCategory.Controller ? "제어기 목록에서 제어기 한 대를 고르세요."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.IsCreating ? "만들던 장비를 먼저 저장하거나 취소하세요."
         : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
-        : Form.Rows.Count == 1 ? null
-        : "제어기 한 대를 고르세요.";
+        : Form.Rows.Count != 1 ? "제어기 한 대를 고르세요."
+        : RowId(Form.Rows[0]) > 0 ? null
+        : "아직 저장되지 않은 제어기입니다 — 먼저 저장하세요.";
 
     /// <summary>고른 제어기의 센서 표 · 결선맵을 연다.</summary>
     public async Task OpenWiringAsync()

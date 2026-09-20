@@ -158,6 +158,7 @@
 		</StackPanel>
 
 		<Border
+			MaxHeight="230"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="1"
@@ -175,6 +176,14 @@
 				<ListBox.ItemTemplate>
 					<DataTemplate>
 						<DockPanel Margin="2" LastChildFill="True">
+							<!--  충돌은 색만이 아니라 ✕ 표지와 흐린·줄 그은 글자로도 말한다(W6)  -->
+							<TextBlock
+								Width="16"
+								DockPanel.Dock="Left"
+								FontSize="12"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Text="✕"
+								Visibility="{Binding IsConflict, Converter={StaticResource BoolToVisibility}}" />
 							<TextBlock
 								Width="64"
 								DockPanel.Dock="Left"
@@ -190,7 +199,19 @@
 							<TextBlock
 								FontSize="12.5"
 								Text="{Binding Name}"
-								TextTrimming="CharacterEllipsis" />
+								TextTrimming="CharacterEllipsis">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsConflict}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+												<Setter Property="TextDecorations" Value="Strikethrough" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
 						</DockPanel>
 					</DataTemplate>
 				</ListBox.ItemTemplate>
