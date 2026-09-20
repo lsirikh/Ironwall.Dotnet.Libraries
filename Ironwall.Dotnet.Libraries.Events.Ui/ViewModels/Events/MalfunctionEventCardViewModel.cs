@@ -37,33 +37,49 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Implementation of Interface -
         #endregion 
         #region - Overrides -
+        /// <summary>역사적 입구 — 다이얼로그가 부른다. 진짜 결말은 <see cref="SendActionDetailed"/> 가 안다.</summary>
         public override async Task<bool> SendAction(string? content, string? idUser)
+            => (await SendActionDetailed(content, idUser).ConfigureAwait(true)).CanCloseDialog;
+
+        /// <summary>
+        /// 조치보고 전송의 정본 경로. 멱등 가드가 막은 경우를 <b>생성과 구분해</b> 돌려준다(N-07 R1).
+        /// </summary>
+        public override async Task<ActionSendResult> SendActionDetailed(string? content, string? idUser, CancellationToken token = default)
         {
             var account = IoC.Get<IAccountModel>();
             IdUser = account.Name;
             Contents = content ?? "자동 조치보고";
 
-            // (Phase3) 조치보고 멱등 — 동일 EventId가 자동/자동복구/배치 경로에서 진행 중이면 수동 보고 스킵(서버/NATS 중복 차단).
+            // (Phase3) 조치보고 멱등 — 동일 이벤트가 자동/자동복구/배치 경로에서 진행 중이면 수동 보고 스킵.
+            // (N-07 R1) 자물쇠는 종류 + Id 로 건다 — 탐지 3번과 장애 3번이 서로를 막지 않도록.
             var guard = IoC.Get<IActionReportGuard>();
-            if (!guard.TryEnter(Model.Id))
+            var keyed = guard as IKeyedActionReportGuard;
+            var entered = keyed is not null ? keyed.TryEnter(ActionReportKind.Malfunction, Model.Id) : guard.TryEnter(Model.Id);
+            if (!entered)
             {
                 _log?.Info($"[ACTION_REPORT] Malfunction Event({Model.Id}) 조치보고 진행 중 — 수동 중복 스킵");
-                return true;   // 다른 경로가 보고 중 → 이벤트는 보고됨(다이얼로그 닫기 허용)
+                // 만들지 않았다 — "적용" 이 아니라 "건너뜀" 이다.
+                return ActionSendResult.GuardSkipped("다른 경로가 같은 이벤트를 보고 중입니다 — 보내지 않았습니다");
             }
             try
             {
+                if (token.IsCancellationRequested)
+                    return new ActionSendResult(ActionSendOutcome.Cancelled, "중단됐습니다 — 보냈는지는 이 자리에서 알 수 없습니다");
+
                 var apiService = IoC.Get<IEventApiService>();
+                // ⚠ ActionEventCreateDto 에는 원본 종류 식별자가 없다 {User, Content, FromEventId} —
+                //   서버는 from_event_id 로 종류를 찾는다. 종류를 보는 것은 클라이언트 자물쇠뿐이다(와이어 불변).
                 var dto = new ActionEventCreateDto
                 {
                     User = IdUser ?? string.Empty,
                     Content = Contents,
                     FromEventId = Model.Id
                 };
-                var response = await apiService.CreateActionEventAsync(dto);
+                var response = await apiService.CreateActionEventAsync(dto, token);
                 if (!response.Success)
                 {
                     _log?.Error($"[ACTION_REPORT] Malfunction INSERT 실패: {response.Message}");
-                    return false;   // (EA3) 실패 신호 → 다이얼로그 유지
+                    return ActionSendResult.Failed(string.IsNullOrWhiteSpace(response.Message) ? "서버가 거절했습니다" : response.Message!);
                 }
 
                 await _eventAggregator.PublishOnCurrentThreadAsync(new MalfunctionReportedMessageModel(this, Contents, IdUser));
@@ -78,9 +94,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     ActionId = response.Data?.Id ?? 0    // 생성된 Action DB ID
                 });
 
-                return await base.SendAction(content, idUser);
+                await base.SendAction(content, idUser);  // 로그 + CloseDialog (지금 동작 보존)
+                return ActionSendResult.Created(response.Data?.Id ?? 0);
             }
-            finally { guard.Exit(Model.Id); }
+            catch (OperationCanceledException)
+            {
+                return new ActionSendResult(ActionSendOutcome.Cancelled, "중단됐습니다 — 보냈는지는 이 자리에서 알 수 없습니다");
+            }
+            finally
+            {
+                if (keyed is not null) keyed.Exit(ActionReportKind.Malfunction, Model.Id); else guard.Exit(Model.Id);
+            }
         }
 
         protected override Task CloseDialog()

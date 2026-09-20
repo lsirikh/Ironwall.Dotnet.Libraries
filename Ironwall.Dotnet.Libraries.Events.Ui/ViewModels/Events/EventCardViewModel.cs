@@ -34,6 +34,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #endregion
         #region - Overrides -
         protected abstract Task CloseDialog();
+        /// <summary>
+        /// 조치보고를 보내고 <b>진짜 결말</b>을 돌려준다(N-07 R1).
+        /// <see cref="SendAction"/> 은 이것을 bool 로 줄인 역사적 입구다 — 다이얼로그는 그대로 쓰고,
+        /// 조치 트레이처럼 "몇 건이 정말 만들어졌는가" 를 세야 하는 곳은 이쪽을 부른다.
+        /// </summary>
+        public virtual async Task<ActionSendResult> SendActionDetailed(string? content, string? idUser, CancellationToken token = default)
+        {
+            var ok = await SendAction(content, idUser);
+            return ok ? ActionSendResult.Created(0) : ActionSendResult.Failed("조치보고 저장에 실패했습니다.");
+        }
+
         // (EA3) 반환값: 조치보고 서버 저장 성공 여부. 호출자(다이얼로그)는 false 면 닫지 않고 오류를 알린다.
         public async virtual Task<bool> SendAction(string? content, string? idUser)
         {

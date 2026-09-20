@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Events console preview (events-console PRD V-01 · V-02 · V-17): shows the real EventDashboardView + view models
+    on fake data, with no host app and no server.
+    Run: dotnet run  |  snapshots: dotnet run (two dashes)snapshot <folder> [(two dashes)dark]
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>EventsConsolePreview</RootNamespace>
+    <AssemblyName>EventsConsolePreview</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+  </ItemGroup>
+
+</Project>

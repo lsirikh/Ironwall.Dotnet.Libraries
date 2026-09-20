@@ -1,0 +1,671 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles.EventOverviewView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		이벤트 개요(T3) — 정본 window-layout-system-storyboard.html L1041 · L2503-2612.
+		① 유형별 비중 ② 장비별 이벤트 ③ 시간대별 추이(좌우로 끌어 기간 선택) ④ 탐지 출처.
+		컨버터는 반드시 뷰 로컬로 등록한다 — Events.Ui/Resources/Resources.xaml 은 앱에 병합되지 않는다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<conv:TokenBrushConverter x:Key="TokenBrush" />
+		<conv:HatchBrushConverter x:Key="HatchBrush" />
+		<conv:InverseBoolToVisibilityConverter x:Key="NotBoolToVis" />
+		<conv:RatioToWidthConverter x:Key="RatioToWidth" />
+		<conv:LeftThicknessConverter x:Key="LeftThickness" />
+
+		<Style x:Key="OverviewCard" TargetType="Border">
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="8" />
+			<Setter Property="Padding" Value="14,12" />
+			<Setter Property="Margin" Value="0,0,10,10" />
+		</Style>
+
+		<Style x:Key="CardTitle" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="13.5" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Margin" Value="0,0,0,8" />
+		</Style>
+
+		<Style x:Key="CardNote" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+			<Setter Property="Margin" Value="0,8,0,0" />
+		</Style>
+	</UserControl.Resources>
+
+	<Grid>
+		<!--  불러오는 중 — 앱의 IsChartLoading 자리(정본 L2508)  -->
+		<StackPanel
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center"
+			Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+			<ProgressBar
+				Width="42"
+				Height="42"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Value="40" />
+			<TextBlock
+				Margin="0,10,0,0"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="통계를 불러오는 중" />
+		</StackPanel>
+
+		<ScrollViewer
+			HorizontalScrollBarVisibility="Disabled"
+			VerticalScrollBarVisibility="Auto"
+			Visibility="{Binding IsLoading, Converter={StaticResource NotBoolToVis}}">
+			<StackPanel Margin="12,10,2,12">
+
+				<!--  머리 — 총계 · 활성 장비  -->
+				<Grid Margin="0,0,10,12">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<StackPanel AutomationProperties.AutomationId="Console.Events.Overview.Total">
+						<TextBlock
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}">
+							<Run Text="총 이벤트 · " /><Run Text="{Binding RangeText, Mode=OneWay}" />
+						</TextBlock>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock
+								FontSize="34"
+								FontWeight="Bold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding TotalText, Mode=OneWay}" />
+							<TextBlock
+								Margin="6,0,0,6"
+								VerticalAlignment="Bottom"
+								FontSize="12"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="건" />
+						</StackPanel>
+					</StackPanel>
+
+					<StackPanel
+						Grid.Column="1"
+						HorizontalAlignment="Right"
+						Orientation="Horizontal">
+						<StackPanel Margin="18,0,0,0">
+							<TextBlock
+								FontSize="11.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="활성 센서" />
+							<TextBlock
+								FontSize="19"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding ActiveSensors, Mode=OneWay}" />
+						</StackPanel>
+						<StackPanel Margin="18,0,0,0">
+							<TextBlock
+								FontSize="11.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="활성 카메라" />
+							<TextBlock
+								FontSize="19"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding ActiveCameras, Mode=OneWay}" />
+						</StackPanel>
+						<StackPanel Margin="18,0,0,0">
+							<TextBlock
+								FontSize="11.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="활성 제어기" />
+							<TextBlock
+								FontSize="19"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding ActiveControllers, Mode=OneWay}" />
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+
+				<TextBlock
+					Margin="0,-6,10,10"
+					FontSize="11.5"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="{Binding TotalNote, Mode=OneWay}"
+					TextWrapping="Wrap" />
+
+				<!--  ③ 시간대별 추이 — 좌우로 끌면 기간이 바뀐다(정본 all-windows-drag-wireframe.html L427)  -->
+				<Border Style="{StaticResource OverviewCard}">
+					<StackPanel>
+						<DockPanel LastChildFill="False">
+							<TextBlock
+								DockPanel.Dock="Left"
+								Style="{StaticResource CardTitle}"
+								Text="시간대별 추이" />
+							<TextBlock
+								Margin="8,0,0,0"
+								VerticalAlignment="Center"
+								DockPanel.Dock="Left"
+								FontSize="11.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding IntervalText, Mode=OneWay}" />
+							<TextBlock
+								VerticalAlignment="Center"
+								DockPanel.Dock="Right"
+								FontSize="11.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="가로로 끌면 그 구간이 기간이 됩니다 · Esc 로 취소 · 기간 칩으로도 같은 일을 합니다" />
+						</DockPanel>
+
+						<!--  플롯 호스트 — Border 는 peer 가 없어 자동화가 못 본다. 밖을 peer 있는 Label 로 감싼다(R13)  -->
+						<Label
+							AutomationProperties.AutomationId="Console.Events.Overview.Trend"
+							Padding="0">
+						<Border
+							x:Uid="TrendHost"
+							Height="220"
+							Background="Transparent"
+							Cursor="SizeWE"
+							Loaded="OnTrendLoaded"
+							LostMouseCapture="OnTrendLostCapture"
+							MouseMove="OnTrendMouseMove"
+							PreviewMouseLeftButtonDown="OnTrendPressed"
+							PreviewMouseLeftButtonUp="OnTrendReleased"
+							SizeChanged="OnTrendSizeChanged"
+							ToolTip="가로로 끌어 기간을 고릅니다">
+							<Grid>
+								<!--  끄는 동안의 띠 — 색이 아니라 형태(파선 윤곽 + 옅은 면)로 보인다  -->
+								<Border
+									HorizontalAlignment="Left"
+									Background="{DynamicResource TintInfoBrush}"
+									BorderBrush="{DynamicResource PrimaryBrush}"
+									BorderThickness="1"
+									IsHitTestVisible="False"
+									Opacity="0.65"
+									Visibility="{Binding IsBandVisible, Converter={StaticResource BoolToVis}}"
+									Width="{Binding BandWidth, Mode=OneWay}">
+									<Border.Margin>
+										<Binding Converter="{StaticResource LeftThickness}" Mode="OneWay" Path="BandLeft" />
+									</Border.Margin>
+								</Border>
+
+								<ItemsControl
+									IsHitTestVisible="False"
+									ItemsSource="{Binding TrendSeries}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<Grid />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Grid>
+												<Polygon
+													conv:TokenBrushAssist.FillToken="{Binding BrushKey}"
+													Opacity="0.14"
+													Points="{Binding Area}" />
+												<Polyline
+													Points="{Binding Points}"
+													conv:TokenBrushAssist.StrokeToken="{Binding BrushKey}"
+													StrokeDashArray="{Binding Dashes}"
+													StrokeLineJoin="Round"
+													StrokeThickness="2" />
+											</Grid>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+
+								<ItemsControl
+									IsHitTestVisible="False"
+									ItemsSource="{Binding TrendLabels}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<Canvas />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemContainerStyle>
+										<Style TargetType="ContentPresenter">
+											<Setter Property="Canvas.Left" Value="{Binding X}" />
+											<Setter Property="Canvas.Bottom" Value="2" />
+										</Style>
+									</ItemsControl.ItemContainerStyle>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<TextBlock
+												FontSize="10.5"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="{Binding Text}" />
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+
+								<!--  끄는 동안의 기간 글자  -->
+								<Border
+									Margin="0,6,8,0"
+									Padding="8,3"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Top"
+									Background="{DynamicResource SurfaceBrush}"
+									BorderBrush="{DynamicResource PrimaryBrush}"
+									BorderThickness="1"
+									CornerRadius="4"
+									IsHitTestVisible="False"
+									Visibility="{Binding IsBandVisible, Converter={StaticResource BoolToVis}}">
+									<!--  TextBlock 은 UIA 트리에 안 나온다 — 읽기 전용 TextBox 로 낸다(R13)  -->
+									<TextBox
+										AutomationProperties.AutomationId="Console.Events.Overview.RangeLabel"
+										Background="Transparent"
+										BorderThickness="0"
+										FontFamily="Consolas"
+										FontSize="12"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										IsReadOnly="True"
+										IsTabStop="False"
+										Text="{Binding BandLabel, Mode=OneWay}" />
+								</Border>
+							</Grid>
+						</Border>
+						</Label>
+
+						<!--  계열 칩 — 켜고 끈다. 카메라는 빗금(색이 아니라 형태)  -->
+						<ItemsControl
+							Margin="0,8,0,0"
+							AutomationProperties.AutomationId="Console.Events.Overview.SeriesChips"
+							ItemsSource="{Binding Slices}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<WrapPanel />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<ToggleButton
+										Margin="0,2,6,2"
+										Padding="0"
+										AutomationProperties.AutomationId="{Binding Spec.Key, StringFormat=Console.Events.Overview.Series.{0}}"
+										IsChecked="{Binding IsOn, Mode=TwoWay}"
+										Style="{x:Null}"
+										ToolTip="{Binding Name}">
+										<ToggleButton.Template>
+											<ControlTemplate TargetType="ToggleButton">
+												<Border
+													Padding="9,3"
+													Background="{DynamicResource SurfaceBrush}"
+													BorderBrush="{DynamicResource BorderBrush}"
+													BorderThickness="1"
+													CornerRadius="11">
+													<StackPanel Orientation="Horizontal">
+														<Rectangle
+															Width="10"
+															Height="10"
+															Margin="0,0,6,0"
+															VerticalAlignment="Center"
+															RadiusX="2"
+															RadiusY="2">
+															<Rectangle.Style>
+																<Style TargetType="Rectangle">
+																	<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
+																	<Style.Triggers>
+																		<DataTrigger Binding="{Binding IsHatched}" Value="True">
+																			<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
+																		</DataTrigger>
+																	</Style.Triggers>
+																</Style>
+															</Rectangle.Style>
+														</Rectangle>
+														<TextBlock
+															VerticalAlignment="Center"
+															FontSize="12"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding Name}" />
+														<TextBlock
+															Margin="6,0,0,0"
+															VerticalAlignment="Center"
+															FontFamily="Consolas"
+															FontSize="12"
+															Foreground="{DynamicResource TextSecondaryBrush}"
+															Text="{Binding Count}" />
+													</StackPanel>
+													<Border.Style>
+														<Style TargetType="Border">
+															<Style.Triggers>
+																<DataTrigger Binding="{Binding IsOn}" Value="False">
+																	<Setter Property="Opacity" Value="0.45" />
+																	<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+																</DataTrigger>
+															</Style.Triggers>
+														</Style>
+													</Border.Style>
+												</Border>
+											</ControlTemplate>
+										</ToggleButton.Template>
+									</ToggleButton>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</Border>
+
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+
+					<!--  ① 유형별 비중  -->
+					<Border Style="{StaticResource OverviewCard}">
+						<StackPanel AutomationProperties.AutomationId="Console.Events.Overview.Mix">
+							<TextBlock Style="{StaticResource CardTitle}" Text="유형별 비중" />
+							<Border
+								Height="18"
+								Background="{DynamicResource SurfaceSunkenBrush}"
+								CornerRadius="9">
+								<ItemsControl ItemsSource="{Binding Slices}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<StackPanel Orientation="Horizontal" />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border>
+												<Border.Width>
+													<MultiBinding Converter="{StaticResource RatioToWidth}">
+														<Binding Path="Ratio" />
+														<Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+													</MultiBinding>
+												</Border.Width>
+												<Border.Style>
+													<Style TargetType="Border">
+														<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
+														<Style.Triggers>
+															<DataTrigger Binding="{Binding IsHatched}" Value="True">
+																<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
+															</DataTrigger>
+															<DataTrigger Binding="{Binding IsOn}" Value="False">
+																<Setter Property="Opacity" Value="0.25" />
+															</DataTrigger>
+														</Style.Triggers>
+													</Style>
+												</Border.Style>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</Border>
+
+							<ItemsControl Margin="0,10,0,0" ItemsSource="{Binding Slices}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<DockPanel Margin="0,3" LastChildFill="False">
+											<Rectangle
+												Width="10"
+												Height="10"
+												Margin="0,0,7,0"
+												VerticalAlignment="Center"
+												DockPanel.Dock="Left"
+												RadiusX="2"
+												RadiusY="2">
+												<Rectangle.Style>
+													<Style TargetType="Rectangle">
+														<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
+														<Style.Triggers>
+															<DataTrigger Binding="{Binding IsHatched}" Value="True">
+																<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
+															</DataTrigger>
+														</Style.Triggers>
+													</Style>
+												</Rectangle.Style>
+											</Rectangle>
+											<TextBlock
+												VerticalAlignment="Center"
+												DockPanel.Dock="Left"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextPrimaryBrush}"
+												Text="{Binding Name}" />
+											<TextBlock
+												VerticalAlignment="Center"
+												DockPanel.Dock="Right"
+												FontSize="12"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="{Binding PercentText}" />
+											<TextBlock
+												Margin="0,0,12,0"
+												VerticalAlignment="Center"
+												DockPanel.Dock="Right"
+												FontFamily="Consolas"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextSecondaryBrush}"
+												Text="{Binding Count}" />
+										</DockPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+
+							<Border
+								Margin="0,8,0,0"
+								Padding="9,5"
+								Background="{DynamicResource SurfaceBrush}"
+								CornerRadius="5">
+								<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}">
+									<Run Text="침입 탐지(센서 + 카메라) " /><Run FontWeight="SemiBold" Text="{Binding DetectionTotal, Mode=OneWay}" /><Run Text=" 건 · " /><Run Text="{Binding DetectionPercentText, Mode=OneWay}" />
+								</TextBlock>
+							</Border>
+						</StackPanel>
+					</Border>
+
+					<!--  ④ 탐지 출처 — 센서 vs 카메라(지금 '카메라 이벤트' 탭 KPI 자리)  -->
+					<Border Grid.Column="1" Style="{StaticResource OverviewCard}">
+						<StackPanel AutomationProperties.AutomationId="Console.Events.Overview.Source">
+							<TextBlock Style="{StaticResource CardTitle}" Text="탐지 출처" />
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="*" />
+								</Grid.ColumnDefinitions>
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+								</Grid.RowDefinitions>
+
+								<TextBlock
+									Grid.Row="0"
+									Grid.Column="1"
+									Margin="0,0,0,6"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="센서" />
+								<TextBlock
+									Grid.Row="0"
+									Grid.Column="2"
+									Margin="0,0,0,6"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="카메라" />
+
+								<TextBlock
+									Grid.Row="1"
+									Grid.Column="0"
+									Margin="0,0,14,4"
+									FontSize="12"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="총 건수" />
+								<TextBlock
+									Grid.Row="1"
+									Grid.Column="1"
+									FontFamily="Consolas"
+									FontSize="16"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding SensorDetection, Mode=OneWay}" />
+								<TextBlock
+									Grid.Row="1"
+									Grid.Column="2"
+									FontFamily="Consolas"
+									FontSize="16"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding CameraDetection, Mode=OneWay}" />
+
+								<TextBlock
+									Grid.Row="2"
+									Grid.Column="0"
+									Margin="0,0,14,0"
+									FontSize="12"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="일평균" />
+								<TextBlock
+									Grid.Row="2"
+									Grid.Column="1"
+									FontFamily="Consolas"
+									FontSize="13"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding SensorDailyAverage, StringFormat={}{0:0.0}, Mode=OneWay}" />
+								<TextBlock
+									Grid.Row="2"
+									Grid.Column="2"
+									FontFamily="Consolas"
+									FontSize="13"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding CameraDailyAverage, StringFormat={}{0:0.0}, Mode=OneWay}" />
+							</Grid>
+
+							<StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+								<TextBlock
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding SensorShareText, Mode=OneWay}" />
+								<TextBlock
+									Margin="12,0,0,0"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding CameraShareText, Mode=OneWay}" />
+							</StackPanel>
+
+							<TextBlock
+								Style="{StaticResource CardNote}"
+								Text="카메라 탐지는 따로 떨어진 탭이 아니라 탐지의 두 번째 출처입니다 — 도넛 · 막대 · 추이에 같은 계열로 들어갑니다." />
+						</StackPanel>
+					</Border>
+				</Grid>
+
+				<!--  ② 장비별 이벤트  -->
+				<Border Style="{StaticResource OverviewCard}">
+					<StackPanel AutomationProperties.AutomationId="Console.Events.Overview.ByDevice">
+						<DockPanel LastChildFill="False">
+							<TextBlock
+								DockPanel.Dock="Left"
+								Style="{StaticResource CardTitle}"
+								Text="장비별 이벤트" />
+							<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+								<RadioButton
+									Margin="0,0,6,0"
+									AutomationProperties.AutomationId="Console.Events.Overview.Group.Controller"
+									Content="제어기"
+									IsChecked="{Binding IsControllerGroup, Mode=OneWay}"
+									Style="{StaticResource MaterialDesignTabRadioButton}"
+									Click="OnControllerGroup" />
+								<RadioButton
+									AutomationProperties.AutomationId="Console.Events.Overview.Group.Camera"
+									Content="카메라"
+									IsChecked="{Binding IsCameraGroup, Mode=OneWay}"
+									Style="{StaticResource MaterialDesignTabRadioButton}"
+									Click="OnCameraGroup" />
+							</StackPanel>
+						</DockPanel>
+
+						<TextBlock
+							FontSize="12"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="이 기간에 집계된 장비가 없습니다."
+							Visibility="{Binding HasBars, Converter={StaticResource NotBoolToVis}}" />
+
+						<ItemsControl ItemsSource="{Binding Bars}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<Button
+										Margin="0,2"
+										Padding="0"
+										Background="Transparent"
+										BorderThickness="0"
+										Click="OnBarClick"
+										Cursor="Hand"
+										HorizontalContentAlignment="Stretch"
+										ToolTip="이 장비의 내역으로">
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="150" />
+												<ColumnDefinition Width="*" />
+												<ColumnDefinition Width="46" />
+											</Grid.ColumnDefinitions>
+											<TextBlock
+												VerticalAlignment="Center"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextPrimaryBrush}"
+												Text="{Binding Name}"
+												TextTrimming="CharacterEllipsis" />
+											<Border
+												Grid.Column="1"
+												Height="14"
+												VerticalAlignment="Center"
+												Background="{DynamicResource SurfaceSunkenBrush}"
+												CornerRadius="7">
+												<ItemsControl ItemsSource="{Binding Segments}">
+													<ItemsControl.ItemsPanel>
+														<ItemsPanelTemplate>
+															<StackPanel Orientation="Horizontal" />
+														</ItemsPanelTemplate>
+													</ItemsControl.ItemsPanel>
+													<ItemsControl.ItemTemplate>
+														<DataTemplate>
+															<Border>
+																<Border.Width>
+																	<MultiBinding Converter="{StaticResource RatioToWidth}">
+																		<Binding Path="Ratio" />
+																		<Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+																	</MultiBinding>
+																</Border.Width>
+																<Border.Style>
+																	<Style TargetType="Border">
+																		<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
+																		<Style.Triggers>
+																			<DataTrigger Binding="{Binding IsHatched}" Value="True">
+																				<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
+																			</DataTrigger>
+																		</Style.Triggers>
+																	</Style>
+																</Border.Style>
+															</Border>
+														</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+											</Border>
+											<TextBlock
+												Grid.Column="2"
+												VerticalAlignment="Center"
+												FontFamily="Consolas"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextSecondaryBrush}"
+												Text="{Binding Total}"
+												TextAlignment="Right" />
+										</Grid>
+									</Button>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+
+						<TextBlock Style="{StaticResource CardNote}" Text="{Binding DeviceGroupNote, Mode=OneWay}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</ScrollViewer>
+	</Grid>
+</UserControl>
