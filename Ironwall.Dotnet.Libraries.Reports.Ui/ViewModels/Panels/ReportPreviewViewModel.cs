@@ -40,8 +40,21 @@ public class ReportPreviewViewModel : BasePanelViewModel
     #endregion
 
     #region - Processes -
+    /// <summary>
+    /// 런타임 유무를 <b>화면 모드와 무관하게</b> 한 번 판정한다(콘솔이 열릴 때 부른다).
+    /// 좁은 창에서는 살아 있는 WebView2 를 아예 만들지 않으므로, 시도로는 영영 알 수 없다.
+    /// </summary>
+    public void ProbeRuntime()
+    {
+        var available = RuntimeProbe.IsAvailable();
+        if (_isRuntimeReady == available) return;
+        _isRuntimeReady = available;
+        NotifyOfPropertyChange(nameof(IsRuntimeReady));
+        RaiseSurface();
+    }
+
     /// <summary>고른 줄을 받는다. 완료된 보고서면 HTML 을 받아 오고, 아니면 사유가 적힌 자리표시자가 된다.</summary>
-    public async Task ShowAsync(ReportGenerationRow? row)
+    public async Task ShowAsync(ReportGenerationRow? row, CancellationToken token = default)
     {
         Row = row;
         Html = null;
@@ -49,12 +62,30 @@ public class ReportPreviewViewModel : BasePanelViewModel
         RaiseSurface();
 
         if (row is null || !row.IsCompleted) return;
-        await LoadAsync(row.Id);
+        await LoadAsync(row.Id, token);
     }
 
-    /// <summary>미리보기 HTML 로드.</summary>
-    public async Task LoadAsync(int generationId)
+    /// <summary>
+    /// 미리보기 HTML 로드.
+    /// </summary>
+    /// <remarks>
+    /// ★ <b>늦게 온 응답이 이긴다</b>를 막는다. A 를 고르고 곧바로 B 를 고르면 A 의 HTML 이 B 의 제목 · 메타 아래에
+    /// 앉을 수 있었다. 요청마다 번호를 매기고, 기다린 <b>뒤</b>의 모든 대입 앞에서 "아직 내 차례인가"를 본다.
+    /// 앞선 요청은 실제로 <b>취소</b>한다(종전엔 버리기만 해 타이머와 왕복이 남았다).
+    /// </remarks>
+    public async Task LoadAsync(int generationId, CancellationToken token = default)
     {
+        var mine = ++_loadSequence;
+
+        // 앞선 조회를 실제로 끊는다 — 버려두면 15초 타이머와 왕복이 매 선택마다 쌓인다.
+        var previous = _loadCts;
+        _loadCts = null;
+        try { previous?.Cancel(); previous?.Dispose(); } catch { /* 이미 끝났다 */ }
+
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        cts.CancelAfter(PreviewFetchTimeout);      // 조회가 멈춰도 무한 로딩이 되지 않게
+        _loadCts = cts;
+
         try
         {
             IsBusy = true;
@@ -62,30 +93,50 @@ public class ReportPreviewViewModel : BasePanelViewModel
             Html = null;   // 로딩은 WPF 로 표시 — WebView2 는 실제 HTML 1회만 네비게이트(이중 네비게이트 레이스 방지)
             RaiseSurface();
 
-            // 15초 타임아웃 가드 — 조회가 멈춰도 무한 로딩 방지
-            var fetchTask = _api.GetPreviewHtmlAsync(generationId);
-            var done = await Task.WhenAny(fetchTask, Task.Delay(15000));
-            string? html = done == fetchTask ? await fetchTask : null;
-            if (done != fetchTask) _log?.Warning($"[ReportPreview] HTML 조회 15초 시간초과 (id={generationId}) — 서버/토큰/파이프라인 확인");
-            else _log?.Info($"[ReportPreview] HTML fetched: {(html?.Length ?? 0)} chars (id={generationId})");
+            var html = await _api.GetPreviewHtmlAsync(generationId, cts.Token);
+            if (mine != _loadSequence) return;      // 그 사이 다른 줄을 골랐다 — 이 응답은 버린다
+
+            _log?.Info($"[ReportPreview] HTML fetched: {(html?.Length ?? 0)} chars (id={generationId})");
             Html = string.IsNullOrWhiteSpace(html) ? FailHtml : html;
+        }
+        catch (OperationCanceledException)
+        {
+            if (mine != _loadSequence) return;      // 새 선택이 끊었다 — 아무것도 말하지 않는다
+            _log?.Warning($"[ReportPreview] HTML 조회 시간초과 (id={generationId}) — 서버/토큰/파이프라인 확인");
+            Html = TimeoutHtml;
         }
         catch (Exception ex)
         {
+            if (mine != _loadSequence) return;
             _log?.Error($"[ReportPreview] Load: {ex.Message}");
             Html = FailHtml;
         }
-        finally { IsBusy = false; RaiseSurface(); }
+        finally
+        {
+            if (mine == _loadSequence) { IsBusy = false; RaiseSurface(); }
+            if (ReferenceEquals(_loadCts, cts)) _loadCts = null;
+            cts.Dispose();
+        }
     }
 
     /// <summary>상세 칸을 비운다(선택 없음 · 콘솔 닫힘).</summary>
     public void Clear()
     {
+        // 진행 중인 조회를 끊는다 — 안 끊으면 비운 뒤에 옛 HTML 이 되돌아온다.
+        var previous = _loadCts;
+        _loadCts = null;
+        _loadSequence++;
+        try { previous?.Cancel(); previous?.Dispose(); } catch { /* 이미 끝났다 */ }
+
         Row = null;
         GenerationId = 0;
         Html = null;
         IsBusy = false;
         IsLargeViewOpen = false;
+        // ★ 걸쇠를 푼다 — IsRuntimeReady 는 한 방향으로만 내려가면 안 된다(싱글턴이라 앱 수명 내내 굳는다).
+        //    무조건 참으로 되돌리지 않고 <b>프로브가 말하는 값</b>으로 되돌린다.
+        _isRuntimeReady = RuntimeProbe.IsAvailable();
+        NotifyOfPropertyChange(nameof(IsRuntimeReady));
         RaiseSurface();
     }
 
@@ -204,7 +255,7 @@ public class ReportPreviewViewModel : BasePanelViewModel
     public bool HasSurfaceHint => Surface.HasHint;
 
     /// <summary>[크게 보기] 를 켤 것인가 — 좁은 창에서도 켠다(별도 HWND 라 공역 제약이 없다).</summary>
-    public bool CanOpenLargeView => ReportPreviewSurfaceRules.CanOpenLargeView(IsRuntimeReady, Content);
+    public bool CanOpenLargeView => !IsLargeViewOpen && ReportPreviewSurfaceRules.CanOpenLargeView(IsRuntimeReady, Content);
 
     private void RaiseSurface()
     {
@@ -220,7 +271,22 @@ public class ReportPreviewViewModel : BasePanelViewModel
     #endregion
 
     #region - Attributes -
+    /// <summary>조회가 멈췄을 때 끊는 시각 — 무한 로딩을 만들지 않는다.</summary>
+    public static readonly TimeSpan PreviewFetchTimeout = TimeSpan.FromSeconds(15);
+
     private readonly IReportApiService _api;
+
+    /// <summary>런타임 프로브 — 시험 · 미리보기 도구가 갈아 끼운다.</summary>
+    public IWebViewRuntimeProbe RuntimeProbe { get; set; } = WebViewRuntimeProbe.Instance;
+
+    /// <summary>요청 번호 — 늦게 온 응답이 새 선택을 덮지 못하게 한다.</summary>
+    private int _loadSequence;
+    private CancellationTokenSource? _loadCts;
+
+    internal const string TimeoutHtml =
+        "<html><head><meta charset='utf-8'></head><body style='margin:0;background:#0c1117;color:#e5c07b;" +
+        "font-family:\"Malgun Gothic\",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'>" +
+        "미리보기를 불러오는 데 너무 오래 걸립니다. 잠시 후 다시 고르거나 [PDF 내려받기] 로 확인하세요.</body></html>";
 
     internal const string FailHtml =
         "<html><head><meta charset='utf-8'></head><body style='margin:0;background:#0c1117;color:#e06c75;" +
