@@ -145,6 +145,12 @@ public partial class App : Application
                                                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(List(actions));
 
+        // 조치 내역(원본별) — 상세 칸이 열 때 한 번 부른다.
+        mock.Setup(a => a.GetDetectionActionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, CancellationToken _) => List(PreviewData.ActionsFor(id)));
+        mock.Setup(a => a.GetMalfunctionActionsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, CancellationToken _) => List(PreviewData.ActionsFor(id)));
+
         mock.Setup(a => a.GetEventStatisticsDashboardAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ApiResponse<EventDashboardDto> { Success = true, Data = PreviewData.Dashboard() });
 
@@ -205,6 +211,7 @@ public partial class App : Application
             Save(directory, $"{theme}-04-detection-multi");
 
             // 5) 트레이에 Draft 를 담은 상태(드래그의 폴백 경로 = 같은 함수)
+            _viewModel.Tray.Phrase = ActionTrayViewModel.Phrases[0];   // 문구를 명시적으로 고른다(R14)
             _viewModel.QueueSelection();
             await Settle();
             Save(directory, $"{theme}-05-tray-drafts");
@@ -218,6 +225,18 @@ public partial class App : Application
             await Settle();
         }
 
+        // 6b) 거르기 — 칩 + 검색
+        _viewModel.SelectFilterChip("open");
+        await Settle();
+        Save(directory, $"{theme}-06b-filter-open");
+
+        _viewModel.SearchText = "북측";
+        await Settle();
+        Save(directory, $"{theme}-06c-search");
+        _viewModel.SearchText = string.Empty;
+        _viewModel.SelectFilterChip("all");
+        await Settle();
+
         // 7~9) 나머지 세 목록
         await _viewModel.SelectRailAsync(EventDashboardViewModel.MalfunctionRailKey);
         await Settle();
@@ -230,6 +249,25 @@ public partial class App : Application
         await _viewModel.SelectRailAsync(EventDashboardViewModel.ActionRailKey);
         await Settle();
         Save(directory, $"{theme}-09-action-list");
+
+        // 9b) 트레이가 다른 레일에서 줄어든 채로 남아 있다(R7)
+        await _viewModel.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        await Settle();
+        var keep = FindGrid("Console.Events.Grid.Detection");
+        if (keep.Items.Count > 0)
+        {
+            keep.SelectedItems.Clear();
+            foreach (var row in keep.Items.Cast<object>().Take(2)) keep.SelectedItems.Add(row);
+            _viewModel.Tray.Phrase = ActionTrayViewModel.Phrases[0];
+            _viewModel.QueueSelection();
+            await Settle();
+            await _viewModel.SelectRailAsync(EventDashboardViewModel.ConnectionRailKey);
+            await Settle();
+            Save(directory, $"{theme}-09b-tray-collapsed-other-rail");
+            _viewModel.RevertTray();
+            await _viewModel.SelectRailAsync(EventDashboardViewModel.ActionRailKey);
+            await Settle();
+        }
 
         // 10) 조치 한 건 — 내용만 고칠 수 있다
         var actionGrid = FindGrid("Console.Events.Grid.Action");

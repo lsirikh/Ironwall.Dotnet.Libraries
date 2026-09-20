@@ -269,6 +269,9 @@ public class EventDashboardViewModel : BasePanelViewModel
                 Overview.Load(DataChartPanelViewModel.LastDashboardDto, StartDate, EndDate);
             }
 
+            _searchText = string.Empty;          // 레일을 바꾸면 거르기도 처음으로
+            NotifyOfPropertyChange(nameof(SearchText));
+            RebuildChips();                      // 칩은 레일마다 다르다(정본 L2310-2313)
             DetailView.Load(CurrentKind, Array.Empty<object>(), CanEdit, CanReport, 0);
             RefreshRailCounts();
             RaiseShellState();

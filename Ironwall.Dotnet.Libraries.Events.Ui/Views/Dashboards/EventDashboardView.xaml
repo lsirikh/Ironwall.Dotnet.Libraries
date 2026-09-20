@@ -103,7 +103,7 @@
 			<c:ConsoleToolbar
 				AddClick="OnAdd"
 				AddDisabledReason="{Binding AddBlockedReason}"
-				AddText="이벤트 추가"
+				AddText="추가"
 				CanAdd="{Binding CanAdd}"
 				CanDelete="{Binding CanDelete}"
 				CanRefresh="{Binding CanReload}"
@@ -137,32 +137,6 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
-						<!--  필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다  -->
-						<ItemsControl
-							Margin="10,0,0,0"
-							AutomationProperties.AutomationId="Console.Events.Toolbar.Filters"
-							ItemsSource="{Binding FilterChips}"
-							Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
-							<ItemsControl.ItemsPanel>
-								<ItemsPanelTemplate>
-									<StackPanel Orientation="Horizontal" />
-								</ItemsPanelTemplate>
-							</ItemsControl.ItemsPanel>
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<RadioButton
-										Margin="0,0,4,0"
-										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
-										Click="OnFilterChipClick"
-										Content="{Binding Label}"
-										FontSize="12"
-										GroupName="EventsFilter"
-										IsChecked="{Binding IsSelected, Mode=OneWay}"
-										Style="{StaticResource MaterialDesignTabRadioButton}" />
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
-
 						<!--  직접 지정 — 드래그의 폴백이자 정확한 입력 수단  -->
 						<StackPanel Orientation="Horizontal" Visibility="{Binding IsCustomPeriod, Converter={StaticResource BoolToVis}}">
 							<mah:DateTimePicker
@@ -188,6 +162,7 @@
 
 				<c:ConsoleToolbar.Extra>
 					<StackPanel Orientation="Horizontal">
+
 					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁘 동안만 뜨다  -->
 					<Button
 						Margin="0,0,6,0"
@@ -211,6 +186,46 @@
 		</c:ConsoleShell.Toolbar>
 
 		<c:ConsoleShell.List>
+			<DockPanel ClipToBounds="True" LastChildFill="True">
+				<!--
+					필터 칩 — 정본은 이것을 툴바에 두지만(L1013), 커널 툴바는 줄바꿈이 없는 한 줄이고
+					캐넌이 ⋯ 안에 두는 [추가] · [삭제] 까지 고정으로 지고 있어 1360 폭에서 칩이 잘렸다.
+					목록 바로 위 한 줄로 내린다 — 자리만 다르고 구성과 동작은 정본 그대로다(선언된 편차).
+				-->
+				<Border
+					Padding="12,6"
+					Background="{DynamicResource SurfaceBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1"
+					DockPanel.Dock="Top"
+					Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
+						<!--  필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다  -->
+						<ItemsControl
+							Margin="0"
+							AutomationProperties.AutomationId="Console.Events.Toolbar.Filters"
+							ItemsSource="{Binding FilterChips}"
+							Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Orientation="Horizontal" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<RadioButton
+										Margin="0,0,4,0"
+										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
+										Click="OnFilterChipClick"
+										Content="{Binding Label}"
+										FontSize="12"
+										GroupName="EventsFilter"
+										IsChecked="{Binding IsSelected, Mode=OneWay}"
+										Style="{StaticResource MaterialDesignTabRadioButton}" />
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+				</Border>
+
 			<Grid ClipToBounds="True">
 				<!--  개요(T3)  -->
 				<views:EventOverviewView
@@ -520,6 +535,7 @@
 					</DataGrid.Columns>
 				</DataGrid>
 			</Grid>
+			</DockPanel>
 		</c:ConsoleShell.List>
 
 		<!--  상태 띠 — 건수 + 조치 트레이(끄는 중에 생기는 드롭존은 잡을 수 없어 접지 않는다)  -->

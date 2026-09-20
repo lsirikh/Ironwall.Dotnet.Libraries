@@ -93,6 +93,17 @@ internal static class PreviewData
             CreatedAt = Iso(End.AddMinutes(-51 * i)),
         }).ToList();
 
+    /// <summary>원본 한 건의 조치 내역 — 짝수 Id 면 2건, 홀수면 1건.</summary>
+    public static List<ActionEventDto> ActionsFor(int originId)
+        => Enumerable.Range(0, originId % 2 == 0 ? 2 : 1).Select(i => new ActionEventDto
+        {
+            Id = 7700 + originId * 10 + i,
+            TypeEvent = "Action",
+            Content = i == 0 ? "현장 확인 결과 이상 없음" : "순찰 인원 출동",
+            User = i == 0 ? "김상병(21-70001)" : "이하사(19-30014)",
+            CreatedAt = Iso(End.AddMinutes(-7 * (i + 1))),
+        }).ToList();
+
     public static EventDashboardDto Dashboard()
     {
         var buckets = Enumerable.Range(0, 24).Select(h => new EventTrendItemDto

@@ -21,12 +21,10 @@
 		drag:DropZone.Handler="{Binding TrayDrop}"
 		drag:DropZone.Key="{x:Static tray:ActionTrayDrop.ZoneKey}"
 		CornerRadius="6">
-		<!--  DropZoneChrome · Border 는 peer 가 없다 — 드롭존 자체를 peer 있는 GroupBox 로 감싼다(R13)  -->
-		<GroupBox
+		<!--  DropZoneChrome · Border 는 peer 가 없다 — 드롭존 자체를 peer 있는 Label 로 감싼다(R13)  -->
+		<Label
 			AutomationProperties.AutomationId="Console.Events.Tray"
-			BorderThickness="0"
 			Padding="0">
-		<GroupBox.Header><TextBlock Visibility="Collapsed" /></GroupBox.Header>
 		<Border
 			Padding="10,6"
 			Background="{DynamicResource SurfaceAltBrush}"
@@ -225,6 +223,6 @@
 					TextWrapping="Wrap" />
 			</StackPanel>
 		</Border>
-		</GroupBox>
+		</Label>
 	</drag:DropZoneChrome>
 </UserControl>
