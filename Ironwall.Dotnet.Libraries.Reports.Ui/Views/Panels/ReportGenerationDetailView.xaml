@@ -39,7 +39,7 @@
 		<c:ConsoleSection Header="미리보기">
 			<StackPanel>
 				<ContentControl
-					Height="240"
+					Height="196"
 					Content="{Binding PreviewViewModel}"
 					Focusable="False">
 					<ContentControl.ContentTemplate>
@@ -104,28 +104,28 @@
 				<DockPanel Margin="0,1">
 					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="유형" />
 					<TextBlock
-						AutomationProperties.AutomationId="Reports.Detail.Field.report_type"
+						AutomationProperties.AutomationId="Reports.Detail.Meta.report_type"
 						Style="{StaticResource MetaValue}"
 						Text="{Binding PreviewViewModel.MetaTypeText}" />
 				</DockPanel>
 				<DockPanel Margin="0,1">
 					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="기간" />
 					<TextBlock
-						AutomationProperties.AutomationId="Reports.Detail.Field.period_type"
+						AutomationProperties.AutomationId="Reports.Detail.Meta.period_type"
 						Style="{StaticResource MetaValue}"
 						Text="{Binding PreviewViewModel.MetaPeriodText}" />
 				</DockPanel>
 				<DockPanel Margin="0,1">
 					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="템플릿" />
 					<TextBlock
-						AutomationProperties.AutomationId="Reports.Detail.Field.template_id"
+						AutomationProperties.AutomationId="Reports.Detail.Meta.template_id"
 						Style="{StaticResource MetaValue}"
 						Text="{Binding PreviewViewModel.MetaTemplateText}" />
 				</DockPanel>
 				<DockPanel Margin="0,1">
 					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="요청자" />
 					<TextBlock
-						AutomationProperties.AutomationId="Reports.Detail.Field.generator_name"
+						AutomationProperties.AutomationId="Reports.Detail.Meta.generator_name"
 						Style="{StaticResource MetaValue}"
 						Text="{Binding PreviewViewModel.MetaRequesterText}" />
 				</DockPanel>
@@ -168,7 +168,7 @@
 		</Border>
 
 		<!--  ⑤ 동작 줄 — [크게 보기] 만 별도 창, 나머지는 제자리(L1269 · L1278)  -->
-		<c:ConsoleSection Header="내려받기">
+		<c:ConsoleSection Header="보기 · 내려받기">
 			<StackPanel>
 				<WrapPanel>
 					<Button
@@ -177,11 +177,11 @@
 						Click="OnLargeView"
 						Content="크게 보기"
 						IsEnabled="{Binding PreviewViewModel.CanOpenLargeView}"
-						Style="{StaticResource ModernPrimaryButton}"
+						Style="{StaticResource ConsolePrimaryButton}"
 						ToolTip="별도 창으로 크게 봅니다" />
 					<Button
 						Margin="0,0,6,6"
-						AutomationProperties.AutomationId="Reports.Detail.DownloadPdfButton"
+						AutomationProperties.AutomationId="Reports.Preview.DownloadPdfButton"
 						Click="OnDownloadPdf"
 						Content="PDF 내려받기"
 						IsEnabled="{Binding CanDownloadPdf}"
@@ -190,7 +190,7 @@
 						Width="92"
 						Margin="0,0,6,6"
 						VerticalAlignment="Center"
-						AutomationProperties.AutomationId="Reports.Detail.CsvTypeComboBox"
+						AutomationProperties.AutomationId="Reports.Preview.CsvTypeComboBox"
 						DisplayMemberPath="Display"
 						FontSize="12"
 						ItemsSource="{Binding PreviewViewModel.CsvTypes}"
@@ -198,7 +198,7 @@
 						ToolTip="상세 CSV 유형(8종)" />
 					<Button
 						Margin="0,0,6,6"
-						AutomationProperties.AutomationId="Reports.Detail.DownloadCsvButton"
+						AutomationProperties.AutomationId="Reports.Preview.DownloadCsvButton"
 						Click="OnDownloadCsv"
 						Content="상세 CSV"
 						IsEnabled="{Binding CanDownloadPdf}"
