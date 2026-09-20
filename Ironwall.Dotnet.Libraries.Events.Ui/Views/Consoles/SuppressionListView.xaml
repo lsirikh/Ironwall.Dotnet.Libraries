@@ -1,0 +1,223 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles.SuppressionListView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dash="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Dashboards"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		억제 스케줄 T1 목록 — 정본 window-layout-system-storyboard.html
+		L1048(폼이 위 → T1 + 서랍) · L1122 E-D7 · L2295-2300(예시 행) · L2313(상태 칩) · L2427-2428(열).
+
+		정본 열: 상태 · 작업명 · 대상 · 범위 · 시작(KST) · 종료(KST).
+		+ 반복 · 회차 · 취소 · 삭제 체크는 기존 억제창에 이미 있던 칸이라 그대로 가져온다
+		  (자동화 식별자 Events.SuppressionSchedule.Row* 가 살아 있어야 한다).
+
+		행 정렬 · 열 재정렬 없음 — 화면 순서와 저장 순서가 갈리면 뜻과 단언이 같이 무너진다.
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId 만.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<dash:EventIconKindConverter x:Key="IconKind" />
+
+		<Style x:Key="SuppressionRow" BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Suppression.Row.{0}}" />
+		</Style>
+	</UserControl.Resources>
+
+	<Grid AutomationProperties.AutomationId="Events.SuppressionSchedule.Panel">
+		<DataGrid
+			AutomationProperties.AutomationId="Events.SuppressionSchedule.ScheduleGrid"
+		CanUserAddRows="False"
+		CanUserReorderColumns="False"
+		CanUserResizeRows="False"
+		CanUserSortColumns="False"
+		IsReadOnly="True"
+		ItemsSource="{Binding RowsView}"
+		RowStyle="{StaticResource SuppressionRow}"
+		SelectedItem="{Binding Selected, Mode=TwoWay}"
+		SelectionMode="Single"
+		Style="{StaticResource Console.DataGrid}">
+		<DataGrid.Columns>
+
+			<!--  삭제 선택 — 취소/종료(terminal) 행에만 뜬다. 셀 여백 12 가 좁은 열을 지우므로 Flush 를 쓴다.  -->
+			<DataGridTemplateColumn
+				Width="32"
+				CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
+				IsReadOnly="True">
+				<DataGridTemplateColumn.HeaderTemplate>
+					<DataTemplate>
+						<CheckBox
+							HorizontalAlignment="Center"
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectAllCheckBox"
+							IsChecked="{Binding DataContext.SelectAllDeletable, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+							ToolTip="취소 · 종료된 행만 한꺼번에 고릅니다"
+							Visibility="{Binding DataContext.HasDeletableRows, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}" />
+					</DataTemplate>
+				</DataGridTemplateColumn.HeaderTemplate>
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<CheckBox
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowSelectCheckBox.{0}}"
+							IsChecked="{Binding IsSelected, Mode=TwoWay}"
+							ToolTip="삭제 대상으로 고릅니다(취소 · 종료 행만)"
+							Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVis}}" />
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+
+			<!--  상태 — 색이 아니라 '형태 + 글자'. 라이트에서 Primary · Selection 이 대비 1.00:1 로 같다.  -->
+			<DataGridTemplateColumn Width="84" Header="상태">
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<StackPanel Orientation="Horizontal" ToolTip="{Binding OccurrenceText}">
+							<md:PackIcon
+								Width="13"
+								Height="13"
+								Margin="0,0,5,0"
+								VerticalAlignment="Center"
+								AutomationProperties.Name="{Binding ShapeLabel}"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Kind="{Binding ShapeIconName, Converter={StaticResource IconKind}}" />
+							<TextBlock
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowStatusText.{0}}"
+								FontSize="12"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding ShapeLabel}" />
+						</StackPanel>
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+
+			<DataGridTextColumn
+				Width="*"
+				MinWidth="120"
+				Binding="{Binding Name}"
+				Header="작업명">
+				<DataGridTextColumn.ElementStyle>
+					<Style TargetType="TextBlock">
+						<Setter Property="ToolTip" Value="{Binding Name}" />
+						<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+					</Style>
+				</DataGridTextColumn.ElementStyle>
+			</DataGridTextColumn>
+
+			<DataGridTextColumn
+				Width="116"
+				Binding="{Binding TargetSummary}"
+				Header="대상">
+				<DataGridTextColumn.ElementStyle>
+					<Style TargetType="TextBlock">
+						<Setter Property="ToolTip" Value="{Binding TargetSummary}" />
+						<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+					</Style>
+				</DataGridTextColumn.ElementStyle>
+			</DataGridTextColumn>
+
+			<DataGridTextColumn
+				Width="84"
+				Binding="{Binding ScopeDetailText}"
+				Header="범위">
+				<DataGridTextColumn.ElementStyle>
+					<Style TargetType="TextBlock">
+						<Setter Property="ToolTip" Value="{Binding ScopeDetailText}" />
+						<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+					</Style>
+				</DataGridTextColumn.ElementStyle>
+			</DataGridTextColumn>
+
+			<DataGridTemplateColumn Width="104" Header="반복">
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<StackPanel VerticalAlignment="Center">
+							<TextBlock
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowRecurrenceText.{0}}"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{Binding RepeatText}"
+								ToolTip="{Binding RepeatText}"
+								TextTrimming="CharacterEllipsis" />
+							<TextBlock
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowOccurrenceText.{0}}"
+								FontSize="11"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding OccurrenceText}"
+								TextTrimming="CharacterEllipsis" />
+						</StackPanel>
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+
+			<DataGridTemplateColumn Width="102" Header="시작(KST)">
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<TextBlock
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding WindowStartShort}"
+							ToolTip="{Binding WindowStartText}" />
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+
+			<DataGridTemplateColumn Width="102" Header="종료(KST)">
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<TextBlock
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowWindowEndText.{0}}"
+							FontSize="12"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding WindowEndShort}"
+							ToolTip="{Binding WindowEndText}" />
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+
+			<!--  회차 — 열을 따로 두기에는 폭이 모자라 반복 칸 아래에 같이 낸다(자동화 식별자는 그대로 살아 있다)  -->
+
+			<!--  취소 예약 — 누르면 확인 팝업이 먼저 뜬다(즉시 삭제하지 않는다)  -->
+			<DataGridTemplateColumn
+				Width="72"
+				CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
+				Header="">
+				<DataGridTemplateColumn.CellTemplate>
+					<DataTemplate>
+						<Button
+							Margin="0,0,6,0"
+							Padding="6,1"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowCancelButton.{0}}"
+							AutomationProperties.Name="취소 예약"
+							Click="OnCancelRow"
+							Content="취소"
+							FontSize="11"
+							IsEnabled="{Binding IsCancellable}"
+							Style="{StaticResource MaterialDesignOutlinedButton}"
+							ToolTip="이 억제 창을 취소합니다 — 이력(revoked_at)은 남습니다"
+							Visibility="{Binding IsCancellable, Converter={StaticResource BoolToVis}}" />
+					</DataTemplate>
+				</DataGridTemplateColumn.CellTemplate>
+			</DataGridTemplateColumn>
+		</DataGrid.Columns>
+		</DataGrid>
+
+		<!--  빈 목록 — 왜 비었는지 말한다(정본 SB L2455 의 어휘)  -->
+		<TextBlock
+			Margin="24,120,24,0"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Top"
+			AutomationProperties.AutomationId="Console.Suppression.List.Empty"
+			FontSize="12.5"
+			Foreground="{DynamicResource TextMutedBrush}"
+			IsHitTestVisible="False"
+			Text="{Binding EmptyText}"
+			TextWrapping="Wrap"
+			Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+	</Grid>
+</UserControl>

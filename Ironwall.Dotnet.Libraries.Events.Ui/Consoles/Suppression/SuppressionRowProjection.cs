@@ -1,0 +1,148 @@
+﻿using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using System;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
+/****************************************************************************
+   Purpose      : 억제 스케줄 목록 행의 콘솔 투영 — 상태를 '색'이 아니라 '형태 + 글자'로.
+   Created By   : GHLee
+   Created On   : 2026-09-20
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+****************************************************************************/
+
+/// <summary>
+/// 상태 표시의 <b>형태</b>. 라이트 테마에서 Primary · Selection · Focus 가 대비 1.00:1 로 완전히 같아
+/// 색만으로는 구분되지 않는다(규칙 <c>drag-first-ux.md</c> §시각 피드백) — 그래서 모양이 다르다.
+/// </summary>
+public enum SuppressionStatusShape
+{
+    /// <summary>지금 억제 중 — 꽉 찬 동그라미.</summary>
+    Suppressing,
+    /// <summary>유효기간 안이지만 지금 회차는 아님 — 가운데가 빈 동그라미.</summary>
+    InWindow,
+    /// <summary>아직 시작 전 — 점선 동그라미.</summary>
+    Scheduled,
+    /// <summary>기간이 끝남 — 가로 줄.</summary>
+    Ended,
+    /// <summary>취소됨 — ✕.</summary>
+    Cancelled,
+}
+
+/// <summary>상태 두 축(생애주기 <c>status</c> · 지금 억제 중 <c>is_suppressing_now</c>)을 한 형태로 접는다.</summary>
+public static class SuppressionStatusView
+{
+    /// <summary>
+    /// 형태를 고른다.
+    /// </summary>
+    /// <param name="status">서버 파생 상태 — pending / active / expired / cancelled.</param>
+    /// <param name="isSuppressingNow">
+    /// 지금 이 순간 억제 중인가. <c>status=="active"</c> 와 <b>다른 축</b>이다 —
+    /// 주간 반복 창은 유효기간의 대부분을 active 이면서 미억제로 보낸다.
+    /// </param>
+    public static SuppressionStatusShape Resolve(string? status, bool isSuppressingNow)
+    {
+        if (string.Equals(status, "cancelled", StringComparison.OrdinalIgnoreCase)) return SuppressionStatusShape.Cancelled;
+        if (string.Equals(status, "expired", StringComparison.OrdinalIgnoreCase)) return SuppressionStatusShape.Ended;
+        if (isSuppressingNow) return SuppressionStatusShape.Suppressing;
+        if (string.Equals(status, "active", StringComparison.OrdinalIgnoreCase)) return SuppressionStatusShape.InWindow;
+        return SuppressionStatusShape.Scheduled;
+    }
+
+    /// <summary>형태에 붙는 글자 — 아이콘만으로 읽게 두지 않는다.</summary>
+    public static string Label(SuppressionStatusShape shape) => shape switch
+    {
+        SuppressionStatusShape.Suppressing => "억제중",
+        SuppressionStatusShape.InWindow => "진행중",
+        SuppressionStatusShape.Scheduled => "예정",
+        SuppressionStatusShape.Ended => "종료",
+        _ => "취소",
+    };
+
+    /// <summary>MaterialDesign <c>PackIconKind</c> 이름. 모양이 서로 확실히 다른 것만 고른다.</summary>
+    public static string IconName(SuppressionStatusShape shape) => shape switch
+    {
+        SuppressionStatusShape.Suppressing => "Circle",
+        SuppressionStatusShape.InWindow => "CircleOutline",
+        SuppressionStatusShape.Scheduled => "ClockOutline",
+        SuppressionStatusShape.Ended => "Minus",
+        _ => "Close",
+    };
+
+    /// <summary>필터 칩 키 — 정본 SB L2313 (전체 · 억제중 · 진행중 · 예정).</summary>
+    public const string FilterAll = "all";
+    public const string FilterSuppressing = "suppressing";
+    public const string FilterActive = "active";
+    public const string FilterPending = "pending";
+
+    /// <summary>필터 칩이 서버 <c>status</c> 파라미터로 번역되는가 — 되면 그 값, 아니면 null(전량 받아 걸러 낸다).</summary>
+    public static string? ServerStatusFor(string? filterKey) => filterKey switch
+    {
+        FilterActive => "active",
+        FilterPending => "pending",
+        // '억제중' 은 서버 status 가 아니라 is_suppressing_now 다 — active 를 받아 클라에서 좁힌다.
+        FilterSuppressing => "active",
+        _ => null,
+    };
+
+    /// <summary>그 행이 필터에 걸리는가(클라 쪽 좁히기).</summary>
+    public static bool Matches(string? filterKey, SuppressionStatusShape shape) => filterKey switch
+    {
+        FilterSuppressing => shape == SuppressionStatusShape.Suppressing,
+        FilterActive => shape is SuppressionStatusShape.Suppressing or SuppressionStatusShape.InWindow,
+        FilterPending => shape == SuppressionStatusShape.Scheduled,
+        _ => true,
+    };
+}
+
+/// <summary>
+/// 콘솔 목록의 억제 스케줄 행.
+/// </summary>
+/// <remarks>
+/// 기존 행 뷰모델(<see cref="EventSuppressionScheduleItemViewModel"/>)을 <b>물려받아</b> 쓴다 —
+/// 대상 요약 · 시간창 표기 · 취소 가능 · 하드삭제 가능 판정을 두 벌로 만들지 않는다.
+/// 콘솔이 더 필요로 하는 것(원본 DTO · 상태 형태)만 여기서 더한다.
+/// </remarks>
+public sealed class SuppressionConsoleRow : EventSuppressionScheduleItemViewModel
+{
+    public SuppressionConsoleRow(EventSuppressionScheduleDto dto,
+                                 DeviceProvider? deviceProvider,
+                                 DeviceGroupProvider? groupProvider,
+                                 Action? onSelectionChanged = null)
+        : base(dto, deviceProvider, groupProvider, onSelectionChanged)
+    {
+        Dto = dto ?? throw new ArgumentNullException(nameof(dto));
+        Shape = SuppressionStatusView.Resolve(dto.Status, IsSuppressingNow);
+    }
+
+    /// <summary>서버 원본. 수정(PATCH)은 <b>이 값에서 다시 채워</b> 만든다 — 빈 DTO 는 값을 지운다.</summary>
+    public EventSuppressionScheduleDto Dto { get; }
+
+    /// <summary>상태 형태.</summary>
+    public SuppressionStatusShape Shape { get; }
+
+    /// <summary>상태 글자 — 형태 옆에 반드시 같이 낸다.</summary>
+    public string ShapeLabel => SuppressionStatusView.Label(Shape);
+
+    /// <summary>상태 아이콘 이름.</summary>
+    public string ShapeIconName => SuppressionStatusView.IconName(Shape);
+
+    /// <summary>반복 요약이 있으면 그것, 없으면 단발 표기.</summary>
+    public string RepeatText => string.IsNullOrEmpty(RecurrenceSummary) ? "단발" : RecurrenceSummary;
+
+    /// <summary>목록 열은 좀다 — 해가 아니라 월·일부터 보인다(전체 값은 툴팁 · 상세 칸에 그대로 있다).</summary>
+    public string WindowStartShort => Shorten(WindowStartText);
+
+    /// <summary>종료 짧은 표기. '무제한' 은 그대로 남긴다.</summary>
+    public string WindowEndShort => Shorten(WindowEndText);
+
+    private static string Shorten(string text)
+        => text.Length >= 16 && text[4] == '-' ? text[5..] : text;
+
+    /// <summary>억제 범위 · 감지/감시 한 줄.</summary>
+    public string ScopeDetailText => Dto.TargetType == SuppressionTargetDrop.ModeDevice
+        ? ScopeText
+        : $"{ScopeText} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}";
+}

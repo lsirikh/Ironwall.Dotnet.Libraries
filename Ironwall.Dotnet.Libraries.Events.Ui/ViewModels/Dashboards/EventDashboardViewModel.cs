@@ -1,10 +1,13 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Detail;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
@@ -48,6 +51,9 @@ public class EventDashboardViewModel : BasePanelViewModel
     public const string ConnectionRailKey = "con";
     public const string ActionRailKey = "act";
 
+    /// <summary>억제 스케줄 레일(정본 SB L1122 결정 E-D7 — 억제창을 이벤트 콘솔 레일로 옮긴다).</summary>
+    public const string SuppressionRailKey = "sup";
+
     #region - Ctors -
     public EventDashboardViewModel(IEventAggregator eventAggregator
                                 , ILogService log
@@ -59,6 +65,12 @@ public class EventDashboardViewModel : BasePanelViewModel
                                 , EventInfoViewModel eventInfoViewModel
                                 , CameraEventInfoViewModel cameraEventInfoViewModel
                                 , DataChartPanelViewModel dataChartPanelViewModel
+                                // ── N-08: 억제 스케줄 레일. 선택 주입이다 — 안 받으면 레일이 서지 않고 나머지는 그대로다.
+                                //    (필수 인자로 바꾸면 이 뷰모델을 세우는 모든 곳 · 가짜가 한꺼번에 깨진다)
+                                , IEventSuppressionApiService? suppressionApi = null
+                                , DeviceProvider? deviceProvider = null
+                                , DeviceGroupProvider? deviceGroupProvider = null
+                                , IClock? clock = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -112,6 +124,15 @@ public class EventDashboardViewModel : BasePanelViewModel
         Tray = new ActionTrayViewModel(SendActionAsync);
         TrayDrop = new ActionTrayDropHandler(Tray, () => CanReport);
 
+        if (suppressionApi is not null)
+        {
+            Suppression = new SuppressionConsoleViewModel(
+                eventAggregator, log, suppressionApi, deviceProvider, deviceGroupProvider, clock,
+                // 권한 서비스를 두 번 해석하지 않는다 — 패널이 이미 계산해 둔 값을 그대로 쓴다.
+                canEdit: () => detectionEventPanelViewModel.CanSaveEvent,
+                canDelete: () => detectionEventPanelViewModel.CanDeleteEvent);
+        }
+
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         BuildRail();
 
@@ -132,6 +153,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         Overview.RangeSelected += OnTrendRangeSelected;
         Overview.DrillRequested += OnDrillRequested;
         TrayDrop.Completed += OnTrayCompleted;
+        if (Suppression is not null) Suppression.CountsChanged += OnSuppressionCountsChanged;
 
         EndDate = DateTime.Now;
         StartDate = EndDate.AddDays(-1);
@@ -157,6 +179,11 @@ public class EventDashboardViewModel : BasePanelViewModel
         Overview.RangeSelected -= OnTrendRangeSelected;
         Overview.DrillRequested -= OnDrillRequested;
         TrayDrop.Completed -= OnTrayCompleted;
+        if (Suppression is not null)
+        {
+            Suppression.CountsChanged -= OnSuppressionCountsChanged;
+            await Suppression.DeactivateAsync();     // 초안 · 구독을 내려놓는다(싱글턴)
+        }
         DetachRows();
 
         // 싱글턴 — 다음에 열 때 옛 선택 · 미적용 변경 · Draft 가 남아 있으면 안 된다.
@@ -222,7 +249,14 @@ public class EventDashboardViewModel : BasePanelViewModel
             _railKey = key;
             _current = _sources.TryGetValue(key, out var source) ? source : null;
 
-            if (_current is not null)
+            // 억제 스케줄은 이벤트 목록이 아니다 — 기존 억제창이 쓰던 그 API 경로를 그대로 부른다.
+            if (Suppression is not null && key != SuppressionRailKey) await Suppression.DeactivateAsync();
+
+            if (key == SuppressionRailKey && Suppression is not null)
+            {
+                await Suppression.ActivateAsync();
+            }
+            else if (_current is not null)
             {
                 // 패널의 활성화 수명주기는 그대로 — 활성화가 목록을 채우고 권한을 준비한다(TabControl 은 이것을 안 한다).
                 await TabControlViewModel.ActivateItemAsync(_current.Panel);
@@ -255,6 +289,25 @@ public class EventDashboardViewModel : BasePanelViewModel
         RailEntries.Add(new ConsoleRailEntry(MalfunctionRailKey, "장애", new EventConsoleIcon("AlertOutline")));
         RailEntries.Add(new ConsoleRailEntry(ConnectionRailKey, "연결", new EventConsoleIcon("LanConnect")));
         RailEntries.Add(new ConsoleRailEntry(ActionRailKey, "조치", new EventConsoleIcon("ClipboardCheckOutline")));
+        // 억제 스케줄 — 배지는 '지금 억제 중' 건수다(정본 SB L2361).
+        if (Suppression is not null)
+            RailEntries.Add(new ConsoleRailEntry(SuppressionRailKey, "억제 스케줄", new EventConsoleIcon("ClockAlertOutline")));
+    }
+
+    private void OnSuppressionCountsChanged()
+    {
+        var entry = RailEntries.FirstOrDefault(e => e.Key == SuppressionRailKey);
+        if (entry is not null && Suppression is not null)
+        {
+            // 정본 SB L2361 은 '억제중' 건수 하나만 배지로 낸다 — 합계는 상태 띄에 있다.
+            entry.Count = Suppression.SuppressingCount;
+            entry.BadCount = 0;
+        }
+        NotifyOfPropertyChange(nameof(ListStatusText));
+        // 툴바 [삭제] · [새 스케줄] · [갱신] 은 콘솔이 아니라 여기가 그린다 — 다시 읽게 한다.
+        NotifyOfPropertyChange(nameof(CanDelete));
+        NotifyOfPropertyChange(nameof(CanAdd));
+        NotifyOfPropertyChange(nameof(CanReload));
     }
 
     private void RefreshRailCounts()
@@ -310,7 +363,22 @@ public class EventDashboardViewModel : BasePanelViewModel
     #region - 목록 -
     public IEnumerable? Rows => _current?.Rows;
     public bool IsListVisible => _current is not null;
-    public bool IsOverview => _current is null;
+    public bool IsOverview => _current is null && !IsSuppressionRail;
+
+    /// <summary>억제 스케줄 레일인가 — 목록 · 상세 · 툴바가 통째로 바뀜다.</summary>
+    public bool IsSuppressionRail => _railKey == SuppressionRailKey && Suppression is not null;
+
+    /// <summary>억제 스케줄 콘솔(주입이 없으면 null — 레일도 서지 않는다).</summary>
+    public SuppressionConsoleViewModel? Suppression { get; }
+
+    /// <summary>툴바 [추가] 의 글자 — 억제 레일에서는 '새 스케줄'(정본 SB L2392).</summary>
+    public string AddButtonText => IsSuppressionRail ? "새 스케줄" : "이벤트 추가";
+
+    /// <summary>검색 칸을 낼 것인가 — 억제 목록은 서버 검색이 없다(상태 칩으로 거른다).</summary>
+    public bool ShowSearch => IsListVisible && !IsSuppressionRail;
+
+    /// <summary>기간 칩을 낼 것인가 — 억제 스케줄은 부제에서도 기간을 뺀다(정본 SB L2396).</summary>
+    public bool ShowPeriodChips => !IsSuppressionRail;
 
     /// <summary>지금 레일의 종류 — 상세 · 트레이 판정에 쓴다.</summary>
     public EventDetailKind CurrentKind => _railKey switch
@@ -329,7 +397,9 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>탐지 · 장애에서만 핸들을 끌 수 있다 — 연결 · 조치는 조치보고 원본이 아니다.</summary>
     public bool CanDragToTray => _railKey is DetectionRailKey or MalfunctionRailKey && CanReport;
 
-    public string ListStatusText => _current is null
+    public string ListStatusText => IsSuppressionRail
+        ? Suppression!.StatusLineText
+        : _current is null
         ? $"불러온 {Overview.Total}건"
         : $"불러온 {_current.LoadedCountText} · 선택 {SelectedRows.Count}건";
 
@@ -390,11 +460,15 @@ public class EventDashboardViewModel : BasePanelViewModel
             SyncPeriodChips();
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(IsCustomPeriod));
+            NotifyOfPropertyChange(nameof(ShowCustomPeriod));
             ApplyPeriod();
         }
     }
 
     public bool IsCustomPeriod => _period == "직접";
+
+    /// <summary>직접 지정 두 칸을 낼 것인가 — 억제 레일에서는 기간 자체가 없다.</summary>
+    public bool ShowCustomPeriod => IsCustomPeriod && ShowPeriodChips;
 
     public DateTime StartDate
     {
@@ -426,11 +500,13 @@ public class EventDashboardViewModel : BasePanelViewModel
         private set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
-    public string Subtitle => _current is null
+    public string Subtitle => IsSuppressionRail
+        ? "억제 스케줄"
+        : _current is null
         ? $"개요 · {Period}"
         : $"{RailEntries.FirstOrDefault(e => e.Key == _railKey)?.Label ?? string.Empty} 내역 · {Period}";
 
-    public bool CanReload => _current is null || !_current.IsBusy;
+    public bool CanReload => IsSuppressionRail ? Suppression!.CanReload : _current is null || !_current.IsBusy;
 
     /// <summary>기간 칩을 눌렀다 — 활성 탭 한 곳만 다시 부른다(나머지는 캐시만 버린다).</summary>
     private void ApplyPeriod()
@@ -457,7 +533,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     }
 
     /// <summary>수동 이벤트 추가 — 기존 패널의 [추가] 경로 그대로(권한 검사 포함).</summary>
-    public bool CanAdd => _current is not null && !_current.IsBusy && _railKey switch
+    public bool CanAdd => IsSuppressionRail ? Suppression!.CanAdd : _current is not null && !_current.IsBusy && _railKey switch
     {
         DetectionRailKey => DetectionPanelViewModel.CanInsertEvent,
         MalfunctionRailKey => MalfunctionPanelViewModel.CanInsertEvent,
@@ -466,12 +542,14 @@ public class EventDashboardViewModel : BasePanelViewModel
         _ => false,
     };
 
-    public string AddBlockedReason => _current is null
+    public string AddBlockedReason => IsSuppressionRail
+        ? Suppression!.AddBlockedReason
+        : _current is null
         ? "개요에서는 이벤트를 추가하지 않습니다 — 내역을 먼저 고르세요."
         : "권한이 없습니다.";
 
     /// <summary>선택한 행 삭제 — 패널이 확인 팝업을 띄우고, 취소하면 아무 일도 없다.</summary>
-    public bool CanDelete => _current is not null && !_current.IsBusy && SelectedRows.Count > 0 && _railKey switch
+    public bool CanDelete => IsSuppressionRail ? Suppression!.CanDeleteSelected : _current is not null && !_current.IsBusy && SelectedRows.Count > 0 && _railKey switch
     {
         DetectionRailKey => DetectionPanelViewModel.CanDeleteEvent,
         MalfunctionRailKey => MalfunctionPanelViewModel.CanDeleteEvent,
@@ -480,13 +558,16 @@ public class EventDashboardViewModel : BasePanelViewModel
         _ => false,
     };
 
-    public string DeleteBlockedReason => SelectedRows.Count == 0
+    public string DeleteBlockedReason => IsSuppressionRail
+        ? "삭제할 취소 · 종료 행을 체크하세요."
+        : SelectedRows.Count == 0
         ? "지울 행을 먼저 고르세요."
         : "권한이 없습니다.";
 
     public void Add()
     {
         if (!CanAdd || !Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
+        if (IsSuppressionRail) { Suppression!.AddNew(); return; }
         _current!.Insert();
         StatusText = "새 행을 더했습니다 — 저장하기 전까지는 서버에 가지 않습니다.";
     }
@@ -494,13 +575,25 @@ public class EventDashboardViewModel : BasePanelViewModel
     public void Delete()
     {
         if (!CanDelete) return;
+        if (IsSuppressionRail) { _ = Suppression!.DeleteSelectedAsync(); return; }
         _current!.Delete();
     }
+
+    /// <summary>억제 목록의 [모두 정리] — 취소 · 종료 행 일괄 하드삭제(확인 팝업이 먼저 뜼다).</summary>
+    public void CleanupSuppression() => _ = Suppression?.CleanupAllAsync();
 
     /// <summary>[갱신] — 기간을 밀어 넣고 지금 보고 있는 것 하나만 다시 부른다.</summary>
     public void Reload()
     {
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+
+        if (IsSuppressionRail)
+        {
+            Suppression!.Reload();
+            NotifyOfPropertyChange(nameof(Subtitle));
+            NotifyOfPropertyChange(nameof(CanReload));
+            return;
+        }
 
         PushDates();
         if (_current is null) DataChartPanelViewModel.ClickSearch();
@@ -722,6 +815,11 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(IsMalfunctionRail));
         NotifyOfPropertyChange(nameof(IsConnectionRail));
         NotifyOfPropertyChange(nameof(IsActionRail));
+        NotifyOfPropertyChange(nameof(IsSuppressionRail));
+        NotifyOfPropertyChange(nameof(AddButtonText));
+        NotifyOfPropertyChange(nameof(ShowSearch));
+        NotifyOfPropertyChange(nameof(ShowPeriodChips));
+        NotifyOfPropertyChange(nameof(ShowCustomPeriod));
         NotifyOfPropertyChange(nameof(CurrentKind));
         NotifyOfPropertyChange(nameof(CanDragToTray));
         NotifyOfPropertyChange(nameof(CanEdit));
