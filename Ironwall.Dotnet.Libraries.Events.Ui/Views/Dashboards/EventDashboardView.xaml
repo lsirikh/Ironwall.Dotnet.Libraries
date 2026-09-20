@@ -27,6 +27,8 @@
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 		<conv:EnumToKoreanConverter x:Key="Korean" />
+		<conv:DeviceZoneConverter x:Key="Zone" />
+		<conv:FaultSectionConverter x:Key="FaultSection" />
 		<conv:InverseBoolToVisibilityConverter x:Key="NotBoolToVis" />
 		<utils:BindingProxy x:Key="Proxy" Data="{Binding}" />
 		<local:EventIconKindConverter x:Key="IconKind" />
@@ -185,6 +187,16 @@
 				</c:ConsoleToolbar.Filters>
 
 				<c:ConsoleToolbar.Extra>
+					<StackPanel Orientation="Horizontal">
+					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁘 동안만 뜨다  -->
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Console.Events.Toolbar.CancelQuery"
+						Click="OnCancelQuery"
+						Content="중단"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="진행 중인 조회를 멈춥니다"
+						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}" />
 					<Button
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
 						Click="OnQueueSelection"
@@ -193,6 +205,7 @@
 						Style="{StaticResource MaterialDesignRaisedButton}"
 						ToolTip="고른 이벤트를 조치 트레이에 담습니다 — 행 손잡이를 끌어 놓아도 같습니다"
 						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
 				</c:ConsoleToolbar.Extra>
 			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>
@@ -290,9 +303,17 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
+							Width="100"
+							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
+							Header="유형" />
+						<DataGridTextColumn
 							Width="*"
 							Binding="{Binding Device.DeviceName}"
 							Header="장비" />
+						<DataGridTextColumn
+							Width="120"
+							Binding="{Binding Device, Converter={StaticResource Zone}}"
+							Header="구역" />
 						<DataGridTextColumn
 							Width="130"
 							Binding="{Binding Result, Converter={StaticResource Korean}}"
@@ -385,6 +406,18 @@
 							Width="140"
 							Binding="{Binding Reason, Converter={StaticResource Korean}}"
 							Header="사유" />
+						<!--  고장 구간 = 제어기 루프 위의 지점(정수)이지 시각이 아니다  -->
+						<DataGridTemplateColumn Width="150" Header="고장 구간">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<TextBlock
+										VerticalAlignment="Center"
+										FontFamily="Consolas"
+										FontSize="12"
+										Text="{Binding Converter={StaticResource FaultSection}}" />
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
 					</DataGrid.Columns>
 					<DataGrid.RowStyle>
 						<Style BasedOn="{StaticResource EventRow}" TargetType="DataGridRow">
@@ -452,6 +485,30 @@
 							Width="90"
 							Binding="{Binding OriginEvent.Id}"
 							Header="원본" />
+						<DataGridTemplateColumn Width="76" Header="스냅샷">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Grid Width="46" Height="30">
+										<md:PackIcon
+											Width="16"
+											Height="16"
+											HorizontalAlignment="Center"
+											VerticalAlignment="Center"
+											Kind="ImageOffOutline"
+											Opacity="0.4" />
+										<Image
+											RenderOptions.BitmapScalingMode="HighQuality"
+											Source="{Binding OriginThumbnail, Mode=OneWay}"
+											Stretch="Uniform"
+											Visibility="{Binding HasOriginThumbnail, Converter={StaticResource BoolToVis}}" />
+									</Grid>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+						<DataGridTextColumn
+							Width="160"
+							Binding="{Binding OriginEvent.Device.DeviceName}"
+							Header="장비" />
 						<DataGridTextColumn
 							Width="120"
 							Binding="{Binding User}"

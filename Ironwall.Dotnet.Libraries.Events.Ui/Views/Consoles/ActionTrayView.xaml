@@ -85,7 +85,8 @@
 						FontSize="12"
 						IsEnabled="{Binding Tray.CanApply}"
 						Style="{StaticResource MaterialDesignRaisedButton}"
-						ToolTip="고른 건마다 조치보고를 한 번씩 보냅니다 — 벌크 요청이 없어 N건이면 N회입니다"
+						ToolTip="{Binding Tray.ApplyBlockedReason}"
+						ToolTipService.ShowOnDisabled="True"
 						Visibility="{Binding Tray.IsApplying, Converter={StaticResource NotBoolToVis}}" />
 					<Button
 						Margin="6,0,0,0"
@@ -135,6 +136,7 @@
 						FontSize="12"
 						IsEditable="False"
 						ItemsSource="{Binding Tray.PhraseOptions}"
+						md:HintAssist.Hint="문구를 고르세요"
 						SelectedItem="{Binding Tray.Phrase, Mode=TwoWay}" />
 				</DockPanel>
 

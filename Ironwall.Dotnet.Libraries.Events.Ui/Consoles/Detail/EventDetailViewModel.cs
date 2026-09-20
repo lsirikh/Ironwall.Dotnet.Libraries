@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Detail;
 
@@ -133,12 +134,24 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     private bool _canReport = true;
     private int _actionCount;
 
-    public EventDetailViewModel(ConsoleDetailPresenter presenter)
+    public EventDetailViewModel(ConsoleDetailPresenter presenter, EventActionHistoryViewModel? actions = null)
     {
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
         Sections = new ObservableCollection<EventDetailSection>();
         SelectedSummary = new ObservableCollection<string>();
+        Actions = actions ?? new EventActionHistoryViewModel(() => null);
     }
+
+    /// <summary>조치 내역 — 열 때 한 번 부른다(정본 E-D4).</summary>
+    public EventActionHistoryViewModel Actions { get; }
+
+    /// <summary>탐지 스냅샷 — 없으면 기본 그림이 드러난다.</summary>
+    public ImageSource? Snapshot { get; private set; }
+
+    public bool HasSnapshot => Snapshot is not null;
+
+    /// <summary>스냅샷 칸을 보일까 — 탐지와 조치(원본이 탐지일 때)에서만.</summary>
+    public bool ShowSnapshotBox { get; private set; }
 
     public ObservableCollection<EventDetailSection> Sections { get; }
 
@@ -184,6 +197,8 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         Sections.Clear();
         SelectedSummary.Clear();
         _presenter.Tracker.Clear();
+        Snapshot = null;
+        ShowSnapshotBox = false;
 
         _presenter.TypeName = EventDetailProjection.KindLabel(kind);
         _presenter.IsReadOnly = !canEdit;
@@ -204,6 +219,12 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         }
 
         RaiseAll();
+
+        // 조치 내역은 한 건을 골랐을 때만, 그리고 조치 여부가 켜져 있을 때만 부른다(정본 E-D4).
+        if (_rows.Count == 1 && _rows[0] is ExEventViewModel ex && kind is EventDetailKind.Detection or EventDetailKind.Malfunction)
+            _ = Actions.LoadAsync(kind, ex.Model?.Id ?? 0, ex.IsActionReported);
+        else
+            Actions.Clear();
     }
 
     /// <summary>[적용] 이 손대진 칸을 행에 쓴 결과.</summary>
@@ -294,6 +315,10 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         _presenter.SingleTitle = row.Device?.DeviceName ?? "(장비 없음)";
         _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
 
+        // 빈 상태 안내가 약속한 "스냅샷" — 없으면 없다고 보이고, 있으면 그림을 낸다(R5).
+        ShowSnapshotBox = true;
+        Snapshot = row.Thumbnail;
+
         Add(new EventDetailSection("탐지 속성", null, new[]
         {
             Locked("datetime", "발생시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
@@ -355,6 +380,9 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     {
         _presenter.SingleTitle = string.IsNullOrWhiteSpace(row.Content) ? "(내용 없음)" : row.Content!;
         _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
+
+        ShowSnapshotBox = row.IsDetectionOrigin;
+        Snapshot = row.OriginThumbnail;
 
         var origin = row.OriginEvent;
         var originKind = origin is Ironwall.Dotnet.Monitoring.Models.Events.IDetectionEventModel
@@ -443,5 +471,8 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(CanShowReport));
         NotifyOfPropertyChange(nameof(ShowLegend));
         NotifyOfPropertyChange(nameof(BannerText));
+        NotifyOfPropertyChange(nameof(Snapshot));
+        NotifyOfPropertyChange(nameof(HasSnapshot));
+        NotifyOfPropertyChange(nameof(ShowSnapshotBox));
     }
 }

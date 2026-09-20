@@ -211,12 +211,12 @@
 										<DataTemplate>
 											<Grid>
 												<Polygon
-													Fill="{Binding BrushKey, Converter={StaticResource TokenBrush}}"
+													conv:TokenBrushAssist.FillToken="{Binding BrushKey}"
 													Opacity="0.14"
 													Points="{Binding Area}" />
 												<Polyline
 													Points="{Binding Points}"
-													Stroke="{Binding BrushKey, Converter={StaticResource TokenBrush}}"
+													conv:TokenBrushAssist.StrokeToken="{Binding BrushKey}"
 													StrokeDashArray="{Binding Dashes}"
 													StrokeLineJoin="Round"
 													StrokeThickness="2" />
@@ -314,7 +314,7 @@
 															RadiusY="2">
 															<Rectangle.Style>
 																<Style TargetType="Rectangle">
-																	<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource TokenBrush}}" />
+																	<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
 																	<Style.Triggers>
 																		<DataTrigger Binding="{Binding IsHatched}" Value="True">
 																			<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
@@ -387,7 +387,7 @@
 												</Border.Width>
 												<Border.Style>
 													<Style TargetType="Border">
-														<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource TokenBrush}}" />
+														<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
 														<Style.Triggers>
 															<DataTrigger Binding="{Binding IsHatched}" Value="True">
 																<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
@@ -418,7 +418,7 @@
 												RadiusY="2">
 												<Rectangle.Style>
 													<Style TargetType="Rectangle">
-														<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource TokenBrush}}" />
+														<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
 														<Style.Triggers>
 															<DataTrigger Binding="{Binding IsHatched}" Value="True">
 																<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
@@ -639,7 +639,7 @@
 																</Border.Width>
 																<Border.Style>
 																	<Style TargetType="Border">
-																		<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource TokenBrush}}" />
+																		<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
 																		<Style.Triggers>
 																			<DataTrigger Binding="{Binding IsHatched}" Value="True">
 																				<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />

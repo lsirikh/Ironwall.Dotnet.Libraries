@@ -40,7 +40,8 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     private readonly Dictionary<string, ActionTrayCandidate> _queued = new(StringComparer.Ordinal);
     private CancellationTokenSource? _cts;
     private string? _inFlightKey;
-    private string _phrase = Phrases[0];
+    // 고르지 않은 문구로 [적용] 이 살아 있으면 아무도 고르지 않은 사유로 기록이 남는다 — 빈 값에서 시작한다(R14).
+    private string _phrase = string.Empty;
     private string _memo = string.Empty;
     private string _statusLine = string.Empty;
 
@@ -58,7 +59,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     public string Phrase
     {
         get => _phrase;
-        set { _phrase = value ?? Phrases[0]; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsEtc)); NotifyOfPropertyChange(nameof(CanApply)); }
+        set { _phrase = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsEtc)); NotifyOfPropertyChange(nameof(CanApply)); NotifyOfPropertyChange(nameof(ApplyBlockedReason)); }
     }
 
     public bool IsEtc => string.Equals(_phrase, EtcPhrase, StringComparison.Ordinal);
@@ -66,11 +67,16 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     public string Memo
     {
         get => _memo;
-        set { _memo = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanApply)); }
+        set { _memo = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanApply)); NotifyOfPropertyChange(nameof(ApplyBlockedReason)); }
     }
 
-    /// <summary>실제로 보낼 문구 — '기타' 면 메모, 아니면 고른 문구.</summary>
-    public string EffectiveContent => IsEtc ? Memo.Trim() : _phrase;
+    /// <summary>실제로 보낼 문구 — '기타' 면 메모, 아니면 고른 문구. 고르지 않았으면 빈 글자.</summary>
+    public string EffectiveContent => IsEtc ? Memo.Trim() : _phrase.Trim();
+
+    /// <summary>문구를 고르지 않았다 — [적용] 이 꺼져 있는 까닭을 화면이 말해 준다.</summary>
+    public string ApplyBlockedReason => EffectiveContent.Length > 0
+        ? string.Empty
+        : (IsEtc ? "기타 내용을 적어야 보낼 수 있습니다" : "문구를 먼저 고르세요");
 
     public IReadOnlyList<string> PhraseOptions { get; } = Phrases.Concat(new[] { EtcPhrase }).ToList();
 
@@ -209,6 +215,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(ProgressTotal));
         NotifyOfPropertyChange(nameof(ProgressText));
         NotifyOfPropertyChange(nameof(CanApply));
+        NotifyOfPropertyChange(nameof(ApplyBlockedReason));
         NotifyOfPropertyChange(nameof(CanRevert));
         NotifyOfPropertyChange(nameof(CanCancel));
         NotifyOfPropertyChange(nameof(Entries));

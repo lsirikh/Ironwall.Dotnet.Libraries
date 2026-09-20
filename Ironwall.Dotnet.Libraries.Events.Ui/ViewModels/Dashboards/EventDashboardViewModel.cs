@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Detail;
@@ -83,7 +84,8 @@ public class EventDashboardViewModel : BasePanelViewModel
                 detectionEventPanelViewModel.ClickSearch,
                 detectionEventPanelViewModel.InvalidateCache,
                 () => detectionEventPanelViewModel.LoadedCountText,
-                () => detectionEventPanelViewModel.HasMorePages),
+                () => detectionEventPanelViewModel.HasMorePages,
+                detectionEventPanelViewModel.ClickCancel),
 
             [MalfunctionRailKey] = new EventConsoleSource<MalfunctionEventViewModel>(
                 malfunctionEventPanelViewModel,
@@ -92,7 +94,8 @@ public class EventDashboardViewModel : BasePanelViewModel
                 malfunctionEventPanelViewModel.ClickSearch,
                 malfunctionEventPanelViewModel.InvalidateCache,
                 () => malfunctionEventPanelViewModel.LoadedCountText,
-                () => malfunctionEventPanelViewModel.HasMorePages),
+                () => malfunctionEventPanelViewModel.HasMorePages,
+                malfunctionEventPanelViewModel.ClickCancel),
 
             [ConnectionRailKey] = new EventConsoleSource<ConnectionEventViewModel>(
                 connectionEventPanelViewModel,
@@ -101,7 +104,8 @@ public class EventDashboardViewModel : BasePanelViewModel
                 connectionEventPanelViewModel.ClickSearch,
                 connectionEventPanelViewModel.InvalidateCache,
                 () => connectionEventPanelViewModel.LoadedCountText,
-                () => connectionEventPanelViewModel.HasMorePages),
+                () => connectionEventPanelViewModel.HasMorePages,
+                connectionEventPanelViewModel.ClickCancel),
 
             [ActionRailKey] = new EventConsoleSource<ActionEventViewModel>(
                 actionEventPanelViewModel,
@@ -110,11 +114,13 @@ public class EventDashboardViewModel : BasePanelViewModel
                 actionEventPanelViewModel.ClickSearch,
                 actionEventPanelViewModel.InvalidateCache,
                 () => actionEventPanelViewModel.LoadedCountText,
-                () => actionEventPanelViewModel.HasMorePages),
+                () => actionEventPanelViewModel.HasMorePages,
+                actionEventPanelViewModel.ClickCancel),
         };
 
         Detail = new ConsoleDetailPresenter();
-        DetailView = new EventDetailViewModel(Detail);
+        // 조치 내역은 이미 있는 원본별 조회 API 를 열 때 한 번 부른다(정본 E-D4) — API 는 늦게 해석한다.
+        DetailView = new EventDetailViewModel(Detail, new EventActionHistoryViewModel(ResolveEventApi, log));
         Overview = new EventOverviewViewModel();
         Tray = new ActionTrayViewModel(SendActionAsync);
         Tray.PropertyChanged += (_, _) =>
@@ -209,7 +215,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         set
         {
             if (value is null || value.Key == _railKey) return;
-            _ = SelectRailAsync(value.Key);
+            // 관찰하지 않은 Task 는 예외를 숨긴다 — 끝날 때 로그로 남긴다(R12).
+            SelectRailAsync(value.Key).ContinueWith(
+                t => _log?.Error($"[EventConsole] 레일 전환 실패: {t.Exception?.GetBaseException().Message}"),
+                TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 
@@ -514,6 +523,14 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        // ViewModelProvider 는 평범한 ObservableCollection 이고 NATS 콜백 스레드에서도 바뀜다 —
+        // 배지를 세면서 화면을 만지므로 UI 스레드로 올긴다(R12).
+        if (!Execute.InDesignMode && System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+        {
+            d.BeginInvoke(new System.Action(() => OnRowsChanged(sender, e)));
+            return;
+        }
+
         RefreshRailCounts();
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
@@ -650,6 +667,19 @@ public class EventDashboardViewModel : BasePanelViewModel
         _current!.Delete();
     }
 
+    /// <summary>지금 조회 중인가 — [중단] 을 보일지 가른다.</summary>
+    public bool IsQueryRunning => _current?.IsBusy == true;
+
+    /// <summary>
+    /// 진행 중인 조회를 멈춘다. 옆 창에는 [취소] 버튼이 있었는데 새 툴바에 자리가 없어
+    /// 잃었던 기능이다 — 바쁘 동안만 뜨는 버튼으로 되살렸다(R14).
+    /// </summary>
+    public void CancelQuery()
+    {
+        _current?.CancelQuery();
+        StatusText = "조회를 멈췄습니다";
+    }
+
     /// <summary>[갱신] — 기간을 밀어 넣고 지금 보고 있는 것 하나만 다시 부른다.</summary>
     public void Reload()
     {
@@ -744,27 +774,24 @@ public class EventDashboardViewModel : BasePanelViewModel
     #region - 개요 -
     public EventOverviewViewModel Overview { get; }
 
-    private async void OnDashboardUpdated(DateTime start, DateTime end)
+    /// <summary>
+    /// 통계가 도착했다 — 개요만 다시 그린다.
+    /// </summary>
+    /// <remarks>
+    /// (R14) 예전엔 여기서 <c>EventInfoViewModel</c> · <c>CameraEventInfoViewModel</c> 을 활성화하고
+    /// <c>DataInitializeFromStats</c> 를 돌렸지만, 새 콘솔은 그 둘을 <b>그리지 않는다</b>
+    /// (<c>EventInfoView</c> · <c>CameraEventInfoView</c> 참조 0건) — 화면에 안 나오는 집계를 매번 돌리던 죽은 일이라 뜼어냈다.
+    /// 그 두 뷰모델은 생성자에 그대로 남겨 둔다 — 호스트 DI 가 이 형을 그대로 해석하고,
+    /// 카메라 KPI 를 개요에 다시 실을 때 쓴다.
+    /// </remarks>
+    private void OnDashboardUpdated(DateTime start, DateTime end)
     {
         try
         {
-            var dashboard = DataChartPanelViewModel.LastDashboardDto;
             Overview.IsLoading = false;
-            Overview.Load(dashboard, start, end);
+            Overview.Load(DataChartPanelViewModel.LastDashboardDto, start, end);
+            RefreshRailCounts();
             NotifyOfPropertyChange(nameof(ListStatusText));
-
-            if (dashboard is null) return;
-
-            // 기존 요약 뷰모델(센서 · 카메라 KPI)도 같은 DTO 로 계속 채운다 — 값의 원천을 둘로 만들지 않는다.
-            if (EventInfoViewModel.IsActive) await EventInfoViewModel.DeactivateAsync(true);
-            await EventInfoViewModel.ActivateAsync();
-            EventInfoViewModel.SetData(start, end, new[] { "DET", "MAL", "CON", "ACT" });
-            await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, EventInfoViewModel.CancelAndRestart());
-
-            if (CameraEventInfoViewModel.IsActive) await CameraEventInfoViewModel.DeactivateAsync(true);
-            await CameraEventInfoViewModel.ActivateAsync();
-            CameraEventInfoViewModel.SetData(start, end);
-            await CameraEventInfoViewModel.DataInitializeFromStats(dashboard.Summary, CameraEventInfoViewModel.CancelAndRestart());
         }
         catch (Exception ex)
         {
@@ -790,8 +817,17 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>막대 · 조각을 눌렀다 — 그 장비의 내역으로 내려간다.</summary>
     private async void OnDrillRequested(string railKey, string query)
     {
-        SearchText = query;
-        await SelectRailAsync(railKey == "det" ? DetectionRailKey : railKey);
+        // async void 는 예외가 그대로 터지면 앱을 내린다 — 여기서 감싼다(R12).
+        try
+        {
+            SearchText = query;
+            await SelectRailAsync(railKey == "det" ? DetectionRailKey : railKey);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[EventConsole] 내역으로 내려가지 못했습니다: {ex.Message}");
+            StatusText = "내역으로 이동하지 못했습니다";
+        }
     }
     #endregion
 
@@ -881,6 +917,17 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>마지막 전송의 까닭 한 줄(스킵 · 실패). 트레이가 줄마다 붙이기 어려워 상태 띄에 낸다.</summary>
     internal string? LastSendReason { get; private set; }
 
+    /// <summary>이벤트 API — 컨테이너가 없는 자리(단위 테스트 · 미리보기)에서는 null 이고, 그러면 조치 내역을 부르지 않는다.</summary>
+    private IEventApiService? ResolveEventApi()
+    {
+        try { return IoC.Get<IEventApiService>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[EventConsole] IEventApiService 미해석 — 조치 내역을 부르지 않습니다: {ex.Message}");
+            return null;
+        }
+    }
+
     private IExEventModel? FindOriginModel(ActionTrayCandidate candidate)
     {
         if (candidate.Kind == ActionTrayDrop.KindDetection)
@@ -932,6 +979,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         RefreshRailCounts();
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(CanReload));
+        NotifyOfPropertyChange(nameof(IsQueryRunning));
         NotifyOfPropertyChange(nameof(CanAdd));
         NotifyOfPropertyChange(nameof(CanDelete));
     }
@@ -955,6 +1003,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(QueueButtonText));
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(Subtitle));
+        NotifyOfPropertyChange(nameof(IsQueryRunning));
         NotifyOfPropertyChange(nameof(CanAdd));
         NotifyOfPropertyChange(nameof(CanDelete));
         NotifyOfPropertyChange(nameof(AddBlockedReason));

@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
 using System.Collections.Generic;
@@ -120,11 +121,18 @@ public class ActionTrayViewModelTests
     private static TrayPlan PlanOf(params int[] ids)
         => ActionTrayDrop.Plan(ids.Select(Row), canControl: true);
 
+    /// <summary>문구는 이제 명시적으로 골라야 한다(R14) — 전송을 보는 시험은 먼저 고른다.</summary>
+    private static ActionTrayViewModel TrayWithPhrase(ActionReportSender send)
+    {
+        var tray = new ActionTrayViewModel(send) { Phrase = ActionTrayViewModel.Phrases[0] };
+        return tray;
+    }
+
     [Fact]
     public async Task should_send_one_call_per_event_when_applying()
     {
         var sent = new List<int>();
-        var tray = new ActionTrayViewModel((c, _, _) => { sent.Add(c.EventId); return Task.FromResult(DraftOutcome.Applied); });
+        var tray = TrayWithPhrase((c, _, _) => { sent.Add(c.EventId); return Task.FromResult(DraftOutcome.Applied); });
 
         tray.Enqueue(PlanOf(1, 2, 3));
         Assert.Equal(3, tray.Count);
@@ -139,7 +147,7 @@ public class ActionTrayViewModelTests
     [Fact]
     public async Task should_keep_only_failed_entries_when_some_calls_fail()
     {
-        var tray = new ActionTrayViewModel((c, _, _) =>
+        var tray = TrayWithPhrase((c, _, _) =>
             Task.FromResult(c.EventId == 2 ? DraftOutcome.Failed : DraftOutcome.Applied));
 
         tray.Enqueue(PlanOf(1, 2, 3));
@@ -157,7 +165,7 @@ public class ActionTrayViewModelTests
     {
         var attempts = new List<int>();
         var failFirstTime = true;
-        var tray = new ActionTrayViewModel((c, _, _) =>
+        var tray = TrayWithPhrase((c, _, _) =>
         {
             attempts.Add(c.EventId);
             if (c.EventId == 2 && failFirstTime) return Task.FromResult(DraftOutcome.Failed);
@@ -180,7 +188,7 @@ public class ActionTrayViewModelTests
     public async Task should_not_call_the_server_when_reverted()
     {
         var calls = 0;
-        var tray = new ActionTrayViewModel((_, _, _) => { calls++; return Task.FromResult(DraftOutcome.Applied); });
+        var tray = TrayWithPhrase((_, _, _) => { calls++; return Task.FromResult(DraftOutcome.Applied); });
 
         tray.Enqueue(PlanOf(1, 2));
         tray.Revert();
@@ -193,7 +201,7 @@ public class ActionTrayViewModelTests
     [Fact]
     public void should_merge_into_one_entry_when_the_same_event_is_queued_twice()
     {
-        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
+        var tray = TrayWithPhrase((_, _, _) => Task.FromResult(DraftOutcome.Applied));
 
         tray.Enqueue(PlanOf(1, 2));
         tray.Enqueue(PlanOf(2, 3));
@@ -205,7 +213,7 @@ public class ActionTrayViewModelTests
     [Fact]
     public async Task should_report_skipped_when_the_guard_already_holds_the_event()
     {
-        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Skipped));
+        var tray = TrayWithPhrase((_, _, _) => Task.FromResult(DraftOutcome.Skipped));
 
         tray.Enqueue(PlanOf(1));
         var summary = await tray.ApplyAsync();
@@ -217,7 +225,7 @@ public class ActionTrayViewModelTests
     [Fact]
     public async Task should_report_missing_when_the_origin_row_is_gone()
     {
-        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Missing));
+        var tray = TrayWithPhrase((_, _, _) => Task.FromResult(DraftOutcome.Missing));
 
         tray.Enqueue(PlanOf(1));
         var summary = await tray.ApplyAsync();
@@ -230,7 +238,7 @@ public class ActionTrayViewModelTests
     public async Task should_send_the_memo_when_the_etc_phrase_is_chosen()
     {
         string? sentContent = null;
-        var tray = new ActionTrayViewModel((_, content, _) => { sentContent = content; return Task.FromResult(DraftOutcome.Applied); });
+        var tray = TrayWithPhrase((_, content, _) => { sentContent = content; return Task.FromResult(DraftOutcome.Applied); });
 
         tray.Phrase = ActionTrayViewModel.EtcPhrase;
         tray.Memo = "현장 확인 결과 이상 없음";
@@ -241,15 +249,20 @@ public class ActionTrayViewModelTests
     }
 
     [Fact]
-    public void should_not_allow_apply_when_the_etc_memo_is_empty()
+    public void should_not_allow_apply_when_no_phrase_is_chosen_or_the_etc_memo_is_empty()
     {
+        // (R14) 아무도 고르지 않은 문구로 기록이 남지 않게 한다.
         var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
-
         tray.Enqueue(PlanOf(1));
+        Assert.False(tray.CanApply);
+        Assert.Contains("문구", tray.ApplyBlockedReason);
+
+        tray.Phrase = ActionTrayViewModel.Phrases[0];
         Assert.True(tray.CanApply);
 
         tray.Phrase = ActionTrayViewModel.EtcPhrase;
         Assert.False(tray.CanApply);
+        Assert.Contains("기타", tray.ApplyBlockedReason);
     }
 
     [Fact]
@@ -263,7 +276,7 @@ public class ActionTrayViewModelTests
     [Fact]
     public void should_report_the_block_reason_when_the_plan_cannot_queue()
     {
-        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
+        var tray = TrayWithPhrase((_, _, _) => Task.FromResult(DraftOutcome.Applied));
 
         var line = tray.Enqueue(ActionTrayDrop.Plan(new[] { Row(1) }, canControl: false));
 
@@ -272,30 +285,58 @@ public class ActionTrayViewModelTests
     }
 
     [Fact]
-    public async Task should_leave_unsent_entries_when_cancelled()
+    public async Task should_leave_unsent_entries_and_mark_the_inflight_one_when_cancelled()
     {
-        var tray = new ActionTrayViewModel(async (c, _, token) =>
+        // 1번은 보내고, 2번을 보내는 중에 취소한다 — 3번은 손도 대지 않는다.
+        var started = new List<int>();
+        var gate = new TaskCompletionSource();
+        ActionTrayViewModel tray = null!;
+        tray = TrayWithPhrase(async (c, _, token) =>
         {
+            started.Add(c.EventId);
             if (c.EventId == 1) return DraftOutcome.Applied;
+
+            tray.Cancel();                       // 2번을 보내는 도중에 중단
+            gate.TrySetResult();
             await Task.Yield();
             token.ThrowIfCancellationRequested();
             return DraftOutcome.Applied;
         });
 
         tray.Enqueue(PlanOf(1, 2, 3));
+        var summary = await tray.ApplyAsync();
 
-        var apply = tray.ApplyAsync();
-        tray.Cancel();
-        var summary = await apply;
-
-        Assert.True(summary.WasCancelled || summary.Applied == 3);
-        Assert.Contains(summary.Applied, new[] { 1, 2, 3 });
+        Assert.True(summary.WasCancelled);
+        Assert.Equal(1, summary.Applied);
+        Assert.Equal(new[] { 1, 2 }, started);           // 3번은 보내지 않았다
+        Assert.Equal(2, tray.Count);                     // 2 · 3번은 트레이에 남는다
+        Assert.Equal("detection:2", tray.UnverifiedKey); // 보내는 중이던 줄은 "결과 미확인"
     }
 }
 
-/// <summary>드래그와 버튼이 <b>같은 담기 함수</b>를 부르는지(PRD FR-45 · V-13).</summary>
-public class ActionTrayDropHandlerTests
+/// <summary>드래그와 버튼이 <b>같은 담기 함수</b>를 부르는지(PRD FR-45 · V-13) + 상한 계약(R7).</summary>
+[Collection("IoC-Dependent")]   // 행 뷰모델이 생성자에서 IoC 를 본다 — 전역 정적이라 직렬화한다
+public class ActionTrayDropHandlerTests : IDisposable
 {
+    public ActionTrayDropHandlerTests()
+    {
+        var events = new Caliburn.Micro.EventAggregator();
+        var log = new Moq.Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>().Object;
+        Caliburn.Micro.IoC.GetInstance = (type, _) =>
+            type == typeof(Caliburn.Micro.IEventAggregator) ? events
+            : type == typeof(Ironwall.Dotnet.Libraries.Base.Services.ILogService) ? log
+            : null!;
+        Caliburn.Micro.IoC.GetAllInstances = _ => Array.Empty<object>();
+        Caliburn.Micro.IoC.BuildUp = _ => { };
+    }
+
+    public void Dispose()
+    {
+        Caliburn.Micro.IoC.GetInstance = null!;
+        Caliburn.Micro.IoC.GetAllInstances = null!;
+        Caliburn.Micro.IoC.BuildUp = null!;
+    }
+
     private sealed class FakeRow { }
 
     [Fact]
@@ -315,13 +356,49 @@ public class ActionTrayDropHandlerTests
     }
 
     [Fact]
-    public void should_refuse_the_drop_when_permission_is_missing()
+    public void should_refuse_real_rows_when_permission_is_missing()
     {
         var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
         var handler = new ActionTrayDropHandler(tray, () => false);
+        var lines = new List<string>();
+        handler.Completed += lines.Add;
+
+        // 진짜 행을 넣는다 — 빈 배열로는 권한 거절인지 빈 입력인지 구분할 수 없다.
+        var row = new DetectionEventViewModel(TestEvents.Detection(11));
+        handler.Queue(new object[] { row });
 
         Assert.Equal(0, tray.Count);
-        handler.Queue(Array.Empty<object>());
-        Assert.Equal(0, tray.Count);
+        Assert.Single(lines);
+        Assert.Contains("권한", lines[0]);
+    }
+
+    [Fact]
+    public void should_accept_the_same_real_rows_when_permission_is_granted()
+    {
+        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
+        var handler = new ActionTrayDropHandler(tray, () => true);
+
+        handler.Queue(new object[] { new DetectionEventViewModel(TestEvents.Detection(11)) });
+
+        Assert.Equal(1, tray.Count);
+        Assert.True(tray.Contains("detection:11"));
+    }
+
+    [Fact]
+    public void should_cap_the_tray_across_several_drops()
+    {
+        // (R7) 상한은 드롭 한 번이 아니라 트레이 전체에 걸린다.
+        var tray = new ActionTrayViewModel((_, _, _) => Task.FromResult(DraftOutcome.Applied));
+        var handler = new ActionTrayDropHandler(tray, () => true);
+
+        handler.Queue(Enumerable.Range(1, 30).Select(i => (object)new DetectionEventViewModel(TestEvents.Detection(i))).ToList());
+        Assert.Equal(30, tray.Count);
+
+        handler.Queue(Enumerable.Range(31, 30).Select(i => (object)new DetectionEventViewModel(TestEvents.Detection(i))).ToList());
+        Assert.Equal(ActionTrayDrop.MaxPerDrop, tray.Count);      // 50 에서 멈춘다(60 이 아니다)
+
+        var line = handler.Queue(new object[] { new DetectionEventViewModel(TestEvents.Detection(999)) });
+        Assert.Equal(ActionTrayDrop.MaxPerDrop, tray.Count);      // 51번째는 들어가지 않는다
+        Assert.Contains("가득", line);
     }
 }

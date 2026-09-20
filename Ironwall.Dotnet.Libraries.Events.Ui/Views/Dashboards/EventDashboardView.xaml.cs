@@ -58,6 +58,8 @@ public partial class EventDashboardView : UserControl
 
     private void OnReload(object sender, RoutedEventArgs e) => Model?.Reload();
 
+    private void OnCancelQuery(object sender, RoutedEventArgs e) => Model?.CancelQuery();
+
     private void OnAdd(object sender, RoutedEventArgs e) => Model?.Add();
 
     private void OnDelete(object sender, RoutedEventArgs e) => Model?.Delete();

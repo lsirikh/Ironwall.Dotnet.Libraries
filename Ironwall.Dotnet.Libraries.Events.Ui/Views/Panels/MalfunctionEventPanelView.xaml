@@ -23,7 +23,9 @@
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
-	<!--  events-console FR-02: 목록을 가두던 고정 높이(바깥 Grid Width/Height · 안쪽 DataGrid Height)를 없았다 — 목록은 남는 높이를 전부 쓴다.  -->
+	<!--  events-console FR-02: 목록을 가두던 고정 높이(바깥 Grid Width/Height · 안쪽 DataGrid Height)를 없았다.
+	     ⚠ 이 뷰는 새 콘솔이 호스팅하지 않는다 — 콘솔은 패널의 ViewModelProvider 를 제 그리드에 직접 묶는다.
+	     고친 것은 이 뷰를 다시 쓰게 될 때를 위한 정리이고, 보이는 수정은 콘솔 그리드 쪽이다.  -->
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />

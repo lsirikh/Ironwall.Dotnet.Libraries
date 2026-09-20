@@ -59,6 +59,9 @@ public interface IEventConsoleSource
     /// <summary>패널의 재조회를 부른다.</summary>
     bool Reload();
 
+    /// <summary>진행 중인 조회를 중단한다 — 옆 창의 [취소] 가 하던 일을 되살린다(R14).</summary>
+    void CancelQuery();
+
     /// <summary>"불러온 12 / 340건" — 패널이 만든 글자 그대로.</summary>
     string LoadedCountText { get; }
 
@@ -78,6 +81,7 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
     private readonly System.Action? _invalidate;
     private readonly Func<string>? _loadedText;
     private readonly Func<bool>? _hasMore;
+    private readonly System.Action? _cancelQuery;
     private bool _wasBusy;
 
     /// <param name="panel">감쌀 패널.</param>
@@ -91,7 +95,8 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
                               System.Action? search = null,
                               System.Action? invalidateCache = null,
                               Func<string>? loadedCountText = null,
-                              Func<bool>? hasMorePages = null)
+                              Func<bool>? hasMorePages = null,
+                              System.Action? cancelQuery = null)
     {
         _panel = panel ?? throw new ArgumentNullException(nameof(panel));
         _setDate = setDate;
@@ -99,6 +104,7 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
         _invalidate = invalidateCache;
         _loadedText = loadedCountText;
         _hasMore = hasMorePages;
+        _cancelQuery = cancelQuery;
         _panel.PropertyChanged += OnPanelPropertyChanged;
         // 패널은 활성화돼 목록을 다 읽기 전까지 [갱신] 이 꺼져 있다(= 바쁨). 그 첫 끝남도 알려야 콘솔이 툴바를 다시 켠다.
         _wasBusy = IsBusy;
@@ -133,6 +139,7 @@ public sealed class EventConsoleSource<T> : IEventConsoleSource where T : class,
     public void SetDate(DateTime start, DateTime end) => _setDate?.Invoke(start, end);
     public void InvalidateCache() => _invalidate?.Invoke();
     public void Search() => _search?.Invoke();
+    public void CancelQuery() => _cancelQuery?.Invoke();
 
     public void Insert() => _panel.OnClickInsertButton(this, new System.Windows.RoutedEventArgs());
     public bool Save() => Started(() => _panel.OnClickSaveButton(this, new System.Windows.RoutedEventArgs()));
