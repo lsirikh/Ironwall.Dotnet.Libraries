@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
@@ -47,6 +48,9 @@ public partial class App : Application
                 if (directory is not null) Shutdown();
                 return;
             }
+            // 부대 콘솔(N-11) — 콘솔과 따로 뜬다(--units [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--units")) { await RunUnitsAsync(directory); if (directory is not null) Shutdown(); return; }
+
             _viewModel = Build(isAxis);
 
             _view = new DeviceDashboardView { DataContext = _viewModel };
@@ -232,6 +236,105 @@ public partial class App : Application
         await Show(preview.PresetManager(), 720, 560, "06-preset-manager");
         await Show(preview.Register(withProblem: false), 980, 680, "07-register");
         await Show(preview.Register(withProblem: true), 980, 680, "08-register-problems");
+    }
+
+    /// <summary>
+    /// 부대 콘솔 — 진짜 뷰 + 진짜 뷰모델을 가짜 창구 위에 띄운다. 서버에 한 줄도 나가지 않는다.
+    /// </summary>
+    private async Task RunUnitsAsync(string? directory)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute.BeginOnUIThread 가 작업 스레드에서 돌아 교차 스레드가 된다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var preview = new UnitsPreview();
+        var console = preview.Build();
+        var view = new UnitConsoleView { DataContext = console };
+
+        _window = new Window
+        {
+            Title = "부대 콘솔 미리보기",
+            Width = 1320,
+            Height = 820,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = view },
+        };
+        _window.Show();
+        await ((IActivate)console).ActivateAsync();
+
+        if (directory is null) return;
+        Directory.CreateDirectory(directory);
+
+        async Task Shot(string name)
+        {
+            await Settle();
+            Save(directory, name);
+        }
+
+        async Task Sweep(string theme)
+        {
+            await Shot($"units-{theme}-01-tree");
+
+            var company = console.Rows.First(r => r.Code == "c0206");
+            await console.SelectRowAsync(company);
+            await Shot($"units-{theme}-02-detail");
+
+            console.Form.Name = "6중대 (개편)";
+            await Shot($"units-{theme}-03-dirty");
+            console.Revert();
+
+            console.BeginCreate();
+            console.Form.Code = "Bad.Code";
+            console.Form.Name = "새 중대";
+            await console.ApplyAsync();                   // 보내지 않고 칸에 까닭을 적는다
+            await Shot($"units-{theme}-04-create-invalid");
+            console.Revert();
+
+            await console.SelectRowAsync(console.Rows.First(r => r.Code == "c0206"));
+            preview.MakeNextWriteFail();
+            await console.MoveAsync(console.Rows.First(r => r.Code == "c0206").Id, console.Rows.First(r => r.Code == "r0101").Id);
+            await Shot($"units-{theme}-05-move-failed");
+
+            await console.SelectRowAsync(console.Rows.First(r => r.Code == "c0206"));
+            preview.MakeDeleteBlocked();
+            await console.DeleteAsync();
+            await Shot($"units-{theme}-06-delete-blocked");
+            console.DismissDeleteBlock();
+
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
+            await Shot($"units-{theme}-07-devices");
+
+            console.QueueAssign(console.Tree.Ordered.First(n => n.Code == "c0206").Id, console.DeviceRows.Take(3).ToList());
+            await Shot($"units-{theme}-08-devices-draft");
+            console.RevertAssigns();
+
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+            await Shot($"units-{theme}-09-adjacency-placeholder");
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_TREE);
+        }
+
+        await Sweep("light");
+
+        // 옛 계약(6.3) — 부대 편제 자체가 없는 서버. 화면이 빈 채로 까닭을 말해야 한다.
+        var legacy = preview.Build(legacy: true);
+        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = legacy };
+        await ((IActivate)legacy).ActivateAsync();
+        await Shot("units-light-10-legacy-empty");
+
+        ApplyDark();
+        _window.Background = (Brush)FindResource("SurfaceBrush");
+        var dark = new UnitsPreview();
+        var darkConsole = dark.Build();
+        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = darkConsole };
+        await ((IActivate)darkConsole).ActivateAsync();
+
+        var savedPreview = preview;
+        preview = dark;
+        console = darkConsole;
+        await Sweep("dark");
+        _ = savedPreview;
     }
 
     private void ApplyDark()

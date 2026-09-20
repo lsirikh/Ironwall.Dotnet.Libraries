@@ -35,6 +35,9 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public const string FIELD_CODE = "code";
     public const string FIELD_PARENT = "parent_id";
 
+    /// <summary>"최상위(루트)" 를 콤보에서 고를 수 있게 하는 자리표. 요청에서는 <c>null</c> 로 바뀐다.</summary>
+    public const int ROOT_OPTION = 0;
+
     private readonly ConsoleDetailPresenter _presenter;
 
     private UnitDto? _original;
@@ -175,6 +178,12 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public bool HasChildEchelonWarning => !string.IsNullOrEmpty(ChildEchelonWarning);
 
     public UnitDto? Original => _original;
+
+    /// <summary>손댄 칸 표지 — 색이 아니라 <b>형태</b>(좌측 3px 앰버 줄)로 낸다.</summary>
+    public bool IsNameTouched => _presenter.Tracker.IsTouched(FIELD_NAME);
+    public bool IsEchelonTouched => _presenter.Tracker.IsTouched(FIELD_ECHELON);
+    public bool IsDescriptionTouched => _presenter.Tracker.IsTouched(FIELD_DESCRIPTION);
+    public bool IsEnableTouched => _presenter.Tracker.IsTouched(FIELD_ENABLE);
     #endregion
 
     #region - Seeding -
@@ -194,7 +203,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             _echelon = detail.Echelon;
             Description = detail.Description ?? string.Empty;
             _isEnable = detail.IsEnable;
-            _parentId = tree.Find(detail.Id)?.ParentId ?? detail.ParentId;
+            _parentId = tree.Find(detail.Id)?.ParentId ?? detail.ParentId ?? ROOT_OPTION;
             DeviceCount = deviceCount;
             ChildCount = detail.Children?.Count ?? tree.Find(detail.Id)?.ChildIds.Count ?? 0;
             ErrorText = null;
@@ -224,7 +233,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             _echelon = EnumUnitEchelon.Outpost;
             Description = string.Empty;
             _isEnable = true;
-            _parentId = preselectedParentId;
+            _parentId = preselectedParentId ?? ROOT_OPTION;
             DeviceCount = 0;
             ChildCount = 0;
             ErrorText = null;
@@ -273,7 +282,10 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     #region - Derived -
     public UnitEditValues EditValues => new(Name, Echelon, Description, IsEnable);
 
-    public UnitCreateValues CreateValues => new(Code, Name, Echelon ?? EnumUnitEchelon.Outpost, ParentId, Description, IsEnable);
+    public UnitCreateValues CreateValues => new(Code, Name, Echelon ?? EnumUnitEchelon.Outpost, SelectedParentId, Description, IsEnable);
+
+    /// <summary>고른 상위 부대 — 최상위(루트)면 <c>null</c>.</summary>
+    public int? SelectedParentId => ParentId is int id && id > 0 ? id : null;
 
     /// <summary>지금 인접 집합(칩에서 읽는다).</summary>
     public IReadOnlyList<int> AdjacentIds => AdjacencyChips.Select(c => c.Id).ToList();
@@ -327,7 +339,8 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public void RebuildOptions(UnitTreeModel tree, int unitId, EnumUnitEchelon? echelon)
     {
         ParentOptions.Clear();
-        ParentOptions.Add(new UnitOptionViewModel(null, "최상위(루트)"));
+        // 루트는 null 이 아니라 0 으로 싣는다 — WPF 콤보는 SelectedValue=null 을 "고른 것 없음" 으로 읽어 칸이 빈 채로 남는다.
+        ParentOptions.Add(new UnitOptionViewModel(ROOT_OPTION, "최상위(루트)"));
 
         foreach (var node in tree.Ordered)
         {
@@ -350,7 +363,19 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
         }
     }
 
-    private void Touch(string key, object? original, object? current) => _presenter.Tracker.Touch(key, original, current);
+    private void Touch(string key, object? original, object? current)
+    {
+        _presenter.Tracker.Touch(key, original, current);
+        RaiseTouched();
+    }
+
+    private void RaiseTouched()
+    {
+        NotifyOfPropertyChange(nameof(IsNameTouched));
+        NotifyOfPropertyChange(nameof(IsEchelonTouched));
+        NotifyOfPropertyChange(nameof(IsDescriptionTouched));
+        NotifyOfPropertyChange(nameof(IsEnableTouched));
+    }
 
     private void RaiseAll()
     {

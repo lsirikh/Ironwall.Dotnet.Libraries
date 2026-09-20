@@ -23,6 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// 드래그 제스처 자체는 UIA 로 단언할 수 없다(.NET 8 WPF 에 드래그 패턴 타입이 없다) —
 /// 회귀는 <b>판정(<see cref="UnitDropHandler.Verdict"/>)과 폴백 경로</b>로 잡는다(와이어프레임 L228-233).
 /// </remarks>
+[Collection("CaliburnIoC")]      // BindableCollection · Screen 이 Caliburn 의 정적 PlatformProvider 를 쓴다 — 같은 정적 상태를 만지는 클래스와 직렬화한다.
 public class UnitConsoleViewModelTests
 {
     #region - Fakes -
@@ -178,6 +179,11 @@ public class UnitConsoleViewModelTests
         Assert.Equal(0, devices.Loads);
         Assert.Equal(0, console.Rows.Count);
         Assert.Contains("부대 편제가 없습니다", console.StatusText);
+        // 쓰기 입구도 전부 닫혀 있어야 한다 — 6.3 운영에서 새 요소가 하나도 보이지 않는 계약.
+        Assert.False(console.CanAdd);
+        Assert.False(console.CanReload);
+        Assert.False(console.CanMoveSelected);
+        Assert.False(console.CanAssignSelectedDevices);
     }
 
     [Fact]
@@ -621,7 +627,7 @@ public class UnitConsoleViewModelTests
         await console.SelectRowAsync(Row(console, 3));      // 대대3
 
         var ids = console.Form.ParentOptions.Select(o => o.Id).ToList();
-        Assert.Contains(null, ids);                         // 최상위(루트)
+        Assert.Contains(UnitDetailFormViewModel.ROOT_OPTION, ids);   // 최상위(루트)
         Assert.Contains(1, ids);                            // 사단
         Assert.Contains(2, ids);                            // 연대
         Assert.DoesNotContain(3, ids);                      // 자기 자신

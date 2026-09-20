@@ -81,7 +81,7 @@ public partial class UnitConsoleView : UserControl
     {
         var id = Vm?.SelectedRow?.Id ?? 0;
         if (id <= 0) return;
-        await Guard(() => Vm!.MoveAsync(id, Vm.Form.ParentId));
+        await Guard(() => Vm!.MoveAsync(id, Vm.Form.SelectedParentId));
     }
     #endregion
 

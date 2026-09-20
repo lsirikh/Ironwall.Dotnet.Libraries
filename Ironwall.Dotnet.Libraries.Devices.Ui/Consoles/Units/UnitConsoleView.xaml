@@ -99,7 +99,7 @@
 			<c:ConsoleToolbar
 				AddClick="OnAdd"
 				AddDisabledReason="{Binding AddBlockedReason}"
-				AddText="＋ 부대 등록"
+				AddText="부대 등록"
 				CanAdd="{Binding CanAdd}"
 				CanDelete="{Binding CanDeleteUnit}"
 				CanRefresh="{Binding CanReload}"
@@ -107,7 +107,7 @@
 				DeleteClick="OnDelete"
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
 				RefreshClick="OnReload"
-				SearchPlaceholder="부대 이름 · 코드 검색"
+				SearchPlaceholder="이름 · 코드"
 				SearchText="{Binding SearchText, Mode=TwoWay}">
 				<c:ConsoleToolbar.Filters>
 					<ItemsControl
@@ -447,8 +447,8 @@
 									Height="4"
 									Margin="0,4,0,0"
 									AutomationProperties.AutomationId="Units.Devices.Progress"
-									Maximum="{Binding Tray.ProgressTotal}"
-									Value="{Binding Tray.ProgressDone}"
+									Maximum="{Binding Tray.ProgressTotal, Mode=OneWay}"
+									Value="{Binding Tray.ProgressDone, Mode=OneWay}"
 									Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVisibility}}" />
 							</StackPanel>
 						</DockPanel>
@@ -497,22 +497,16 @@
 							<ListBox.ItemTemplate>
 								<DataTemplate>
 									<!--  Draft 행은 앰버 파선 {6,4} — 기존 {4,3}(그룹 선택)·{5,3}(드로잉)과 겹치지 않는다.  -->
-									<Border
-										Height="38"
-										Padding="0,0,6,0"
-										BorderThickness="1"
-										CornerRadius="4">
-										<Border.Style>
-											<Style TargetType="Border">
-												<Setter Property="BorderBrush" Value="Transparent" />
-												<Style.Triggers>
-													<DataTrigger Binding="{Binding IsPending}" Value="True">
-														<Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-													</DataTrigger>
-												</Style.Triggers>
-											</Style>
-										</Border.Style>
-										<Grid>
+									<Grid Height="38">
+										<!--  미저장 Draft — 앰버 파선 {6,4}. {4,3}(그룹 선택)·{5,3}(드로잉)과 겹치지 않는 새 패턴이다.  -->
+										<Rectangle
+											RadiusX="4"
+											RadiusY="4"
+											Stroke="{DynamicResource AccentBrush}"
+											StrokeDashArray="6,4"
+											StrokeThickness="1"
+											Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}" />
+										<Grid Margin="2,0,8,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="Auto" />
 												<ColumnDefinition Width="Auto" />
@@ -558,7 +552,7 @@
 												Foreground="{DynamicResource AccentBrush}"
 												Text="{Binding PendingText}" />
 										</Grid>
-									</Border>
+									</Grid>
 								</DataTemplate>
 							</ListBox.ItemTemplate>
 						</ListBox>
@@ -643,7 +637,20 @@
 				ShowButtons="{Binding Detail.ShowButtons}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				Title="{Binding Detail.Title}">
-				<StackPanel Margin="16,12,14,16" DataContext="{Binding Form}">
+				<Grid>
+				<TextBlock
+					Margin="16,16,14,0"
+					VerticalAlignment="Top"
+					AutomationProperties.AutomationId="Units.Detail.Empty"
+					FontSize="12"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="왼쪽 편제에서 부대를 고르면 여기에 상세가 뜹니다. 새로 만들려면 툴바의 [부대 등록] 을 누르십시오."
+					TextWrapping="Wrap"
+					Visibility="{Binding IsDetailRequested, Converter={StaticResource NotBoolToVisibility}}" />
+				<StackPanel
+					Margin="16,12,14,16"
+					DataContext="{Binding Form}"
+					Visibility="{Binding DataContext.IsDetailRequested, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
 
 					<!--  삭제 차단(409) — 무엇이 매달려 있는지 개수로(스토리보드 화면 J)  -->
 					<Border
@@ -698,6 +705,22 @@
 						</StackPanel>
 					</Border>
 
+					<!--  폼 오류 한 줄 — 보내기 전에 막은 까닭  -->
+					<Border
+						Margin="0,0,0,12"
+						Padding="8,6"
+						AutomationProperties.AutomationId="Units.Detail.Error"
+						Background="{DynamicResource TintCriticalBrush}"
+						BorderBrush="{DynamicResource StatusCriticalBrush}"
+						BorderThickness="3,0,0,0"
+						Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							FontSize="11.5"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding ErrorText}"
+							TextWrapping="Wrap" />
+					</Border>
+
 					<!--  부대 코드 — 등록에서만 입력, 그 뒤로는 🔒  -->
 					<TextBlock Style="{StaticResource Unit.Label}">
 						<Run Text="부대 코드" /><Run Foreground="{DynamicResource StatusCriticalBrush}" Text=" · 변경 불가" />
@@ -748,28 +771,51 @@
 						Margin="0,12,0,3"
 						Style="{StaticResource Unit.Label}"
 						Text="부대 이름" />
-					<TextBox
-						AutomationProperties.AutomationId="Units.Detail.NameBox"
-						IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
-						Style="{StaticResource Unit.TextBox}"
-						Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="3" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<!--  손댄 칸은 좌측 3px 앰버 줄로 — 색이 아니라 형태다.  -->
+						<Rectangle
+							Fill="{DynamicResource AccentBrush}"
+							Visibility="{Binding IsNameTouched, Converter={StaticResource BoolToVisibility}}" />
+						<TextBox
+							Grid.Column="1"
+							Margin="4,0,0,0"
+							AutomationProperties.AutomationId="Units.Detail.NameBox"
+							IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+							Style="{StaticResource Unit.TextBox}"
+							Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+					</Grid>
 
 					<TextBlock
 						Margin="0,10,0,3"
 						Style="{StaticResource Unit.Label}"
 						Text="제대" />
-					<ComboBox
-						Height="32"
-						AutomationProperties.AutomationId="Units.Detail.EchelonCombo"
-						IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
-						ItemsSource="{Binding Echelons}"
-						SelectedItem="{Binding Echelon, Mode=TwoWay}">
-						<ComboBox.ItemTemplate>
-							<DataTemplate>
-								<TextBlock Text="{Binding Converter={StaticResource EchelonText}}" />
-							</DataTemplate>
-						</ComboBox.ItemTemplate>
-					</ComboBox>
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="3" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<Rectangle
+							Fill="{DynamicResource AccentBrush}"
+							Visibility="{Binding IsEchelonTouched, Converter={StaticResource BoolToVisibility}}" />
+						<ComboBox
+							Grid.Column="1"
+							Height="32"
+							Margin="4,0,0,0"
+							AutomationProperties.AutomationId="Units.Detail.EchelonCombo"
+							IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+							ItemsSource="{Binding Echelons}"
+							SelectedItem="{Binding Echelon, Mode=TwoWay}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding Converter={StaticResource EchelonText}}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
 					<TextBlock
 						Margin="0,4,0,0"
 						AutomationProperties.AutomationId="Units.Detail.ChildEchelonWarning"
@@ -783,15 +829,26 @@
 						Margin="0,10,0,3"
 						Style="{StaticResource Unit.Label}"
 						Text="설명" />
-					<TextBox
-						MinHeight="56"
-						AcceptsReturn="True"
-						AutomationProperties.AutomationId="Units.Detail.DescriptionBox"
-						IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
-						Style="{StaticResource Unit.TextBox}"
-						Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
-						TextWrapping="Wrap"
-						VerticalContentAlignment="Top" />
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="3" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<Rectangle
+							Fill="{DynamicResource AccentBrush}"
+							Visibility="{Binding IsDescriptionTouched, Converter={StaticResource BoolToVisibility}}" />
+						<TextBox
+							Grid.Column="1"
+							MinHeight="56"
+							Margin="4,0,0,0"
+							AcceptsReturn="True"
+							AutomationProperties.AutomationId="Units.Detail.DescriptionBox"
+							IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+							Style="{StaticResource Unit.TextBox}"
+							Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+							TextWrapping="Wrap"
+							VerticalContentAlignment="Top" />
+					</Grid>
 					<TextBlock
 						HorizontalAlignment="Right"
 						FontSize="10.5"
@@ -799,6 +856,13 @@
 						Text="{Binding DescriptionCounter}" />
 
 					<DockPanel Margin="0,10,0,0" LastChildFill="False">
+						<Rectangle
+							Width="3"
+							Height="16"
+							Margin="0,0,5,0"
+							DockPanel.Dock="Left"
+							Fill="{DynamicResource AccentBrush}"
+							Visibility="{Binding IsEnableTouched, Converter={StaticResource BoolToVisibility}}" />
 						<TextBlock
 							VerticalAlignment="Center"
 							DockPanel.Dock="Left"
@@ -935,22 +999,6 @@
 						Foreground="{DynamicResource TextSecondaryBrush}"
 						Text="{Binding CountsText}" />
 
-					<!--  폼 오류 한 줄 — 보내기 전에 막은 까닭  -->
-					<Border
-						Margin="0,10,0,0"
-						Padding="8,6"
-						AutomationProperties.AutomationId="Units.Detail.Error"
-						Background="{DynamicResource TintCriticalBrush}"
-						BorderBrush="{DynamicResource StatusCriticalBrush}"
-						BorderThickness="3,0,0,0"
-						Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
-						<TextBlock
-							FontSize="11.5"
-							Foreground="{DynamicResource TextPrimaryBrush}"
-							Text="{Binding ErrorText}"
-							TextWrapping="Wrap" />
-					</Border>
-
 					<!--  파괴적 동작은 맨 아래, 서로 떨어뜨려 둔다.  -->
 					<StackPanel
 						Margin="0,18,0,0"
@@ -973,6 +1021,7 @@
 							Style="{StaticResource MaterialDesignFlatButton}" />
 					</StackPanel>
 				</StackPanel>
+				</Grid>
 			</c:ConsoleDetailHost>
 		</c:ConsoleShell.Detail>
 	</c:ConsoleShell>
