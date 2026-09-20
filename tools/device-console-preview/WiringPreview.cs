@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -17,6 +18,11 @@ internal sealed class WiringPreview
 {
     private static readonly string[] Types = { "Fence", "Underground", "PIR", "Laser", "SmartSensor" };
 
+    private static readonly WiringGroupInfo[] Groups =
+    {
+        new(1, "북측"), new(2, "탄약고"), new(3, "정문"), new(4, "남문"),
+    };
+
     private readonly PreviewWiringDialogs _dialogs = new();
 
     /// <summary>센서가 한 대도 없는 제어기 — 처음 여는 화면.</summary>
@@ -25,14 +31,36 @@ internal sealed class WiringPreview
     /// <summary>센서 8대 — 표 화면.</summary>
     public (FrameworkElement View, WiringViewModel Vm) Table() => Build(8, 0);
 
-    /// <summary>센서 8대 · 1차 4 · 2차 4 — 결선이 끝난 화면.</summary>
+    /// <summary>센서 9대 · 1차 5 · 2차 4 — 결선이 끝난 화면(고장 구간 예시가 뜨는 최소 대수).</summary>
     public (FrameworkElement View, WiringViewModel Vm) Wired()
     {
-        var (view, vm) = Build(8, 0);
-        vm.AutoLayout();
+        var (view, vm) = Build(9, 5);
+        for (var i = 0; i < 4; i++) vm.Drop(Payload(vm.Palette[0]), Slot(vm.Line2[i]));
         vm.GoWiring();
         return (view, vm);
     }
+
+    /// <summary>그룹 3상태 — 전부 · 하나도 · 줄마다 다름이 한 화면에 있다(W2).</summary>
+    public (FrameworkElement View, WiringViewModel Vm) GroupSelection()
+    {
+        var (view, vm) = Build(8, 0, groups: i => i < 4 ? new[] { 1 } : i < 6 ? new[] { 1, 2 } : Array.Empty<int>());
+        SelectInGrid(view, vm, 0, 5);
+        vm.OnSelectionChanged(new[] { vm.Rows[0], vm.Rows[5] });
+        vm.ToggleGroup(vm.GroupChecks[2]);       // "정문" 을 눌러 둔다 — 적용 미리보기가 뜬다
+        return (view, vm);
+    }
+
+    /// <summary>칸 하나를 고른 상태 — 키보드로 옮길 때 보이는 선택 표시(C8).</summary>
+    public (FrameworkElement View, WiringViewModel Vm) SlotSelected()
+    {
+        var (view, vm) = Wired();
+        vm.Line1[2].IsSelected = true;
+        return (view, vm);
+    }
+
+    private static DropTarget Slot(WiringSlotViewModel slot) => new(WiringViewModel.SlotZoneKey, slot, -1);
+
+    private static DragPayload Payload(object item) => new(null!, new[] { item }, "preview");
 
     /// <summary>1차에만 5대 · 3대는 미배치 — 경고와 치명이 같이 있는 화면.</summary>
     public (FrameworkElement View, WiringViewModel Vm) Problems()
@@ -49,7 +77,7 @@ internal sealed class WiringPreview
         var (view, vm) = Build(8, 0);
         vm.Rows[2].TypeText = "PIR";
         vm.Rows[3].Zone = "탄약고 동측";
-        SelectInGrid(view, vm);                 // 표의 선택이 먼저 — 선택이 바뀌면 손댄 칸이 비워진다(제품 동작)
+        SelectInGrid(view, vm, 2, 3);           // 표의 선택이 먼저 — 선택이 바뀌면 손댄 칸이 비워진다(제품 동작)
         vm.OnSelectionChanged(new[] { vm.Rows[2], vm.Rows[3] });
         vm.EditType = "Laser";
         return (view, vm);
@@ -84,7 +112,7 @@ internal sealed class WiringPreview
                           + "1101\t이미 있는 번호\tFence\t북측 8구간";
 
         var report = TsvPaste.Parse(text, new[] { 1101, 1102 }, "Fence", "북측 7구간");
-        return new PasteReportView { DataContext = new PasteReportViewModel(report) };
+        return new PasteReportView { DataContext = new PasteReportViewModel(report, new[] { 1101, 1102 }, "Fence", "북측 7구간") };
     }
 
     /// <summary>저장 전 확인 — 무엇을 몇 번 보내는지 글로 보인다.</summary>
@@ -97,7 +125,7 @@ internal sealed class WiringPreview
     }
 
     #region - Build -
-    private (FrameworkElement View, WiringViewModel Vm) Build(int sensors, int placedOnFirst)
+    private (FrameworkElement View, WiringViewModel Vm) Build(int sensors, int placedOnFirst, Func<int, int[]>? groups = null)
     {
         var seeds = new List<WiringSensorSeed>();
         for (var i = 0; i < sensors; i++)
@@ -106,7 +134,9 @@ internal sealed class WiringPreview
                 101 + i,
                 i + 1,
                 new SensorFacts(1101 + i, $"북측 {i + 1}구간 펜스", i < 5 ? "Fence" : "Underground", i < 5 ? "북측 7구간" : "북측 8구간"),
-                i < placedOnFirst ? new WiringPlacement(1, i + 1) : null));
+                i < placedOnFirst ? new WiringPlacement(1, i + 1) : null,
+                null,
+                groups?.Invoke(i)));
         }
 
         var gateway = new DeviceApiSensorGateway(new MockDeviceApiService());
@@ -114,13 +144,13 @@ internal sealed class WiringPreview
 
         var vm = WiringViewModel.ForController(
             new WiringControllerInfo(10, 1, "북측 제어기 B", "10.20.1.103"),
-            seeds, Types, apply, _dialogs);
+            seeds, Types, apply, _dialogs, Groups);
 
         return (new WiringView { DataContext = vm }, vm);
     }
 
     /// <summary>표의 실제 선택까지 맞춘다 — 선택 표시(좌측 바)가 화면에 보이게.</summary>
-    private static void SelectInGrid(FrameworkElement view, WiringViewModel vm)
+    private static void SelectInGrid(FrameworkElement view, WiringViewModel vm, params int[] rows)
     {
         view.Measure(new Size(1280, 820));
         view.Arrange(new Rect(0, 0, 1280, 820));
@@ -128,8 +158,7 @@ internal sealed class WiringPreview
 
         if (Find(view) is not { } grid) return;
         grid.SelectedItems.Clear();
-        grid.SelectedItems.Add(vm.Rows[2]);
-        grid.SelectedItems.Add(vm.Rows[3]);
+        foreach (var index in rows.Length == 0 ? new[] { 2, 3 } : rows) grid.SelectedItems.Add(vm.Rows[index]);
 
         static DataGrid? Find(DependencyObject parent)
         {
@@ -160,6 +189,7 @@ internal sealed class WiringPreview
         public Task<MakeSensorsResult?> AskMakeSensorsAsync(IReadOnlyList<string> types, string defaultType, string defaultZone, IReadOnlyCollection<int> existingNumbers, int suggestedStart)
             => Task.FromResult<MakeSensorsResult?>(null);
         public Task<bool> ShowPasteReportAsync(PasteReport report) => Task.FromResult(false);
+        public void RememberPasteContext(IReadOnlyCollection<int> existingNumbers, string defaultType, string defaultZone) { }
         public string? ReadClipboardText() => null;
     }
     #endregion

@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
@@ -18,7 +19,8 @@ public class WiringValidationTests
             Channel: channelOffset is null ? (int?)null : (int?)(i + channelOffset.Value),
             Facts: new SensorFacts(1101 + i, $"북측 {i + 1}구간 펜스", "Fence", "북측 7구간"),
             Placement: (WiringPlacement?)null,
-            Issue: (string?)null)));
+            Issue: (string?)null,
+            Groups: (IReadOnlyList<int>?)null)));
         return board;
     }
 
@@ -107,7 +109,7 @@ public class WiringValidationTests
         board.Load(new[]
         {
             (Id: 1, Channel: (int?)1, Facts: new SensorFacts(1101, "센서", "Fence", ""),
-             Placement: (WiringPlacement?)null, Issue: (string?)"순번 0 이 쓸 수 있는 범위 밖입니다"),
+             Placement: (WiringPlacement?)null, Issue: (string?)"순번 0 이 쓸 수 있는 범위 밖입니다", Groups: (IReadOnlyList<int>?)null),
         });
 
         var issues = WiringValidation.Evaluate(board);

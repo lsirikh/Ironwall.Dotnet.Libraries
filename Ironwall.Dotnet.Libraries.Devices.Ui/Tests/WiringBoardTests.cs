@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
@@ -22,13 +23,14 @@ public class WiringBoardTests
             Channel: (int?)(i + 1),
             Facts: Facts(1101 + i),
             Placement: i < placedOnFirst ? new WiringPlacement(1, i + 1) : null,
-            Issue: (string?)null)));
+            Issue: (string?)null,
+            Groups: (IReadOnlyList<int>?)null)));
         return board;
     }
 
     #region - Placement -
     [Fact]
-    public void should_number_by_filled_slots_when_slots_have_gaps()
+    public void should_number_by_slot_position_when_slots_have_gaps()
     {
         var board = Loaded(3);
         var keys = board.Rows.Select(r => r.Key).ToList();
@@ -36,14 +38,15 @@ public class WiringBoardTests
         board.Place(keys[0], 1, 0);
         board.Place(keys[1], 1, 3);      // 가운데 두 칸을 비워 둔다
 
+        // 번호 체계는 하나다(C5) — 칸의 자리가 곧 순번이고, 그 수가 장애의 고장 구간과 같은 축이다.
         Assert.Equal(1, board.OrderAt(1, 0));
         Assert.Equal(0, board.OrderAt(1, 1));            // 빈 칸은 순번이 없다
-        Assert.Equal(2, board.OrderAt(1, 3));            // 칸은 4번째인데 순번은 2다
-        Assert.Equal(new WiringPlacement(1, 2), board.PlacementOf(keys[1]));
+        Assert.Equal(4, board.OrderAt(1, 3));            // 4번째 칸 = 순번 4
+        Assert.Equal(new WiringPlacement(1, 4), board.PlacementOf(keys[1]));
     }
 
     [Fact]
-    public void should_pull_later_orders_up_when_a_middle_sensor_is_unplaced()
+    public void should_leave_a_hole_and_keep_later_orders_when_a_middle_sensor_is_unplaced()
     {
         var board = Loaded(3, placedOnFirst: 3);
         var keys = board.Rows.Select(r => r.Key).ToList();
@@ -52,9 +55,12 @@ public class WiringBoardTests
 
         board.Unplace(keys[1]);
 
+        // 뒤 순번을 당기지 않는다(C5) — 서버에 저장된 정수가 곧 루프 위의 자리이고,
+        // 당겨 버리면 장애의 "1차 3~4" 가 가리키는 지점이 말없이 바뀐다. 빈 자리는 경고로 알린다.
         Assert.Equal(1, board.PlacementOf(keys[0])!.Order);
         Assert.Null(board.PlacementOf(keys[1]));
-        Assert.Equal(2, board.PlacementOf(keys[2])!.Order);       // 뒤 순번이 당겨졌다
+        Assert.Equal(3, board.PlacementOf(keys[2])!.Order);
+        Assert.Equal(2, WiringValidation.FirstGap(board, 1));
     }
 
     [Fact]
@@ -91,7 +97,7 @@ public class WiringBoardTests
         board.Place(key, 1, 4);
 
         Assert.Equal(1, board.Line(1).Count(k => k == key));
-        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(key));
+        Assert.Equal(new WiringPlacement(1, 5), board.PlacementOf(key));
     }
 
     [Fact]
@@ -138,17 +144,35 @@ public class WiringBoardTests
 
     #region - Load -
     [Fact]
+    public void should_open_clean_when_saved_orders_have_a_hole()
+    {
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)2, Facts: Facts(1101), Placement: (WiringPlacement?)new WiringPlacement(1, 2), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)3, Facts: Facts(1102), Placement: (WiringPlacement?)new WiringPlacement(1, 3), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+        });
+
+        // 서버가 2·3 으로 저장해 두었으면 화면도 2·3 이다 — 1·2 로 당겨 놓고 "바뀐 줄 2" 로 여는 일은 없다(C5).
+        Assert.False(board.IsDirty);
+        Assert.Equal(0, board.UnsavedChangeCount);
+        Assert.Equal(new WiringPlacement(1, 2), board.PlacementOf(board.Rows[0].Key));
+        Assert.Equal(1, WiringValidation.FirstGap(board, 1));      // 빈 1번 자리는 경고로 알린다
+    }
+
+    [Fact]
     public void should_place_from_saved_orders_when_loading()
     {
         var board = new WiringBoard();
         board.Load(new[]
         {
-            (Id: 1, Channel: (int?)7, Facts: Facts(1101), Placement: (WiringPlacement?)new WiringPlacement(1, 2), Issue: (string?)null),
-            (Id: 2, Channel: (int?)8, Facts: Facts(1102), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null),
-            (Id: 3, Channel: (int?)9, Facts: Facts(1103), Placement: (WiringPlacement?)new WiringPlacement(2, 1), Issue: (string?)null),
+            (Id: 1, Channel: (int?)7, Facts: Facts(1101), Placement: (WiringPlacement?)new WiringPlacement(1, 2), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)8, Facts: Facts(1102), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 3, Channel: (int?)9, Facts: Facts(1103), Placement: (WiringPlacement?)new WiringPlacement(2, 1), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
         });
 
         Assert.Equal(new[] { 1102, 1101 }, board.Placed(1).Select(r => r.Facts.Number));
+        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(board.Rows[1].Key));
         Assert.Equal(new[] { 1103 }, board.Placed(2).Select(r => r.Facts.Number));
         Assert.Empty(board.Unplaced);
         Assert.False(board.IsDirty);          // 불러오기만으로 "바뀐 줄"이 생기지 않는다
@@ -160,8 +184,8 @@ public class WiringBoardTests
         var board = new WiringBoard();
         board.Load(new[]
         {
-            (Id: 1, Channel: (int?)1, Facts: Facts(1101), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null),
-            (Id: 2, Channel: (int?)2, Facts: Facts(1102), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null),
+            (Id: 1, Channel: (int?)1, Facts: Facts(1101), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)2, Facts: Facts(1102), Placement: (WiringPlacement?)new WiringPlacement(1, 1), Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
         });
 
         Assert.Single(board.Placed(1));
@@ -205,7 +229,7 @@ public class WiringBoardTests
 
         Assert.Single(diff.FactChanged);
         Assert.Contains(diff.WiringChanged, r => r.Key == keys[0]);
-        Assert.Equal(2, diff.ToSend.Count);          // 1101 한 줄 + 순번이 당겨진 1102
+        Assert.Single(diff.ToSend);                  // 한 줄이 둘 다 바뀌어도 호출은 한 번
         Assert.Equal(1, diff.ToSend.Count(r => r.Key == keys[0]));
     }
 

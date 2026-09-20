@@ -250,6 +250,8 @@ public partial class App : Application
         IoC.BuildUp = _ => { };
         PlatformProvider.Current = new XamlPlatformProvider();
 
+        if (directory is not null) Directory.CreateDirectory(directory);      // 오류 파일조차 못 쓰는 일이 없게
+
         var preview = new WiringPreview();
         _window = new Window { Title = "셋업 · 결선 미리보기", Width = 1320, Height = 860, Background = (Brush)FindResource("SurfaceBrush") };
         _window.Show();
@@ -280,9 +282,15 @@ public partial class App : Application
         var (changeView, _) = preview.ChangePreview();
         await Show(changeView, 1280, 820, "05-change-preview");
 
+        var (groupView, _) = preview.GroupSelection();
+        await Show(groupView, 1280, 820, "10-groups-tristate");
+
+        var (slotView, _) = preview.SlotSelected();
+        await Show(slotView, 1280, 820, "11-slot-selected");
+
         await Show(preview.MakeSensors(withConflict: false), 520, 640, "06-make-sensors");
         await Show(preview.MakeSensors(withConflict: true), 520, 640, "07-make-sensors-conflict");
-        await Show(preview.PasteReport(), 620, 620, "08-paste-report");
+        await Show(preview.PasteReport(), 640, 560, "08-paste-report");
         await Show(preview.SaveConfirm(), 520, 340, "09-save-confirm");
     }
 

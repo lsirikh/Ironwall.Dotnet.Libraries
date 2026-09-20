@@ -23,7 +23,7 @@ public class WiringViewModelTests
 {
     private static DragPayload Payload(params object[] items) => new(null!, items, "test");
 
-    private static WiringViewModel Open(int sensors = 4, int placedOnFirst = 0, FakeDialogs? dialogs = null, FakeGateway? gateway = null)
+    private static WiringViewModel Open(int sensors = 4, int placedOnFirst = 0, WiringFakeDialogs? dialogs = null, WiringFakeGateway? gateway = null)
     {
         var seeds = Enumerable.Range(0, sensors).Select(i => new WiringSensorSeed(
             101 + i,
@@ -37,10 +37,19 @@ public class WiringViewModelTests
             seeds,
             new[] { "Fence", "PIR", "Underground" },
             apply,
-            dialogs ?? new FakeDialogs());
+            dialogs ?? new WiringFakeDialogs());
     }
 
-    private static DeviceQueryPolicy AxisPolicy() => new(new FixedProbe(EnumServerContract.V8_0));
+    private static DeviceQueryPolicy AxisPolicy() => WiringDoubles.AxisPolicy();
+
+    /// <summary>센서 <paramref name="sensors"/> 대가 1차 선에 꽂힌 서버 쪽 상태.</summary>
+    private static WiringFakeGateway Gateway(int sensors)
+    {
+        var gateway = new WiringFakeGateway();
+        for (var i = 0; i < sensors; i++)
+            gateway.Fetched[101 + i] = WiringDoubles.ServerSensor(101 + i, 1101 + i, i + 1, new WiringPlacement(1, i + 1));
+        return gateway;
+    }
 
     #region - Load -
     [Fact]
@@ -90,7 +99,7 @@ public class WiringViewModelTests
         vm.Drop(Payload(sensor), target);
 
         Assert.Equal(sensor.Row, vm.Line1[1].Row);
-        Assert.Equal("1", vm.Line1[1].OrderText);            // 앞 칸이 비어 있어도 순번은 1이다
+        Assert.Equal("2", vm.Line1[1].OrderText);            // 2번째 칸이면 순번도 2다(C5 — 번호 체계는 하나)
         Assert.Single(vm.Palette);
         Assert.True(vm.HasChanges);
     }
@@ -141,7 +150,8 @@ public class WiringViewModelTests
         vm.Drop(Payload(slot), bin);
 
         Assert.Single(vm.Palette);
-        Assert.Equal("1", vm.Line1[1].OrderText);            // 뒤 순번이 당겨졌다
+        Assert.Equal("2", vm.Line1[1].OrderText);            // 자리는 그대로 — 빈 1번 자리는 경고가 알린다
+        Assert.Contains(vm.Issues, i => i.Code == WiringValidation.CODE_GAP);
     }
 
     [Fact]
@@ -299,7 +309,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_create_the_rows_when_the_make_dialog_returns_a_spec()
     {
-        var dialogs = new FakeDialogs
+        var dialogs = new WiringFakeDialogs
         {
             MakeResult = new MakeSensorsResult(new SensorBulkCreateSpec(3, 1201, 1, "북측 {번호}구간 펜스", "Fence", "북측 8구간"), true),
         };
@@ -315,7 +325,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_add_nothing_when_the_make_dialog_is_cancelled()
     {
-        var vm = Open(sensors: 1, dialogs: new FakeDialogs { MakeResult = null });
+        var vm = Open(sensors: 1, dialogs: new WiringFakeDialogs { MakeResult = null });
 
         await vm.MakeSensorsAsync();
 
@@ -325,7 +335,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_add_the_pasted_rows_when_the_report_is_accepted()
     {
-        var dialogs = new FakeDialogs { Clipboard = "1301\t북측 A\tPIR\t정문\n1302\t북측 B\tPIR\t정문", PasteAccepted = true };
+        var dialogs = new WiringFakeDialogs { Clipboard = "1301\t북측 A\tPIR\t정문\n1302\t북측 B\tPIR\t정문", PasteAccepted = true };
         var vm = Open(sensors: 1, dialogs: dialogs);
 
         await vm.PasteAsync();
@@ -340,7 +350,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_add_nothing_when_the_paste_report_is_cancelled()
     {
-        var vm = Open(sensors: 1, dialogs: new FakeDialogs { Clipboard = "1301\tA", PasteAccepted = false });
+        var vm = Open(sensors: 1, dialogs: new WiringFakeDialogs { Clipboard = "1301\tA", PasteAccepted = false });
 
         await vm.PasteAsync();
 
@@ -350,7 +360,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_say_there_is_nothing_when_the_clipboard_is_empty()
     {
-        var dialogs = new FakeDialogs { Clipboard = null, PasteAccepted = false };
+        var dialogs = new WiringFakeDialogs { Clipboard = null, PasteAccepted = false };
         var vm = Open(sensors: 1, dialogs: dialogs);
 
         await vm.PasteAsync();
@@ -364,7 +374,7 @@ public class WiringViewModelTests
     [Fact]
     public void should_block_saving_when_the_loop_does_not_close()
     {
-        var gateway = new FakeGateway();
+        var gateway = new WiringFakeGateway();
         var vm = Open(sensors: 2, gateway: gateway);
         vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
 
@@ -376,8 +386,8 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_send_one_call_per_changed_row_when_saving()
     {
-        var gateway = new FakeGateway(2);
-        var dialogs = new FakeDialogs { Confirm = true };
+        var gateway = Gateway(2);
+        var dialogs = new WiringFakeDialogs { Confirm = true };
         var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: dialogs, gateway: gateway);
 
         // 두 번째 센서를 2차 선으로 — 루프가 닫힌다.
@@ -395,8 +405,8 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_send_nothing_when_the_confirm_is_declined()
     {
-        var gateway = new FakeGateway(2);
-        var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new FakeDialogs { Confirm = false }, gateway: gateway);
+        var gateway = Gateway(2);
+        var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new WiringFakeDialogs { Confirm = false }, gateway: gateway);
         vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
 
         await vm.SaveAsync();
@@ -408,9 +418,9 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_keep_the_failed_row_as_draft_when_a_call_fails()
     {
-        var gateway = new FakeGateway(2);
+        var gateway = Gateway(2);
         gateway.PatchFails.Add(102);
-        var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new FakeDialogs { Confirm = true }, gateway: gateway);
+        var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
         vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
 
         await vm.SaveAsync();
@@ -423,8 +433,8 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_keep_a_created_row_as_saved_when_the_server_gives_it_an_id()
     {
-        var gateway = new FakeGateway(1);
-        var vm = Open(sensors: 1, placedOnFirst: 1, dialogs: new FakeDialogs { Confirm = true }, gateway: gateway);
+        var gateway = Gateway(1);
+        var vm = Open(sensors: 1, placedOnFirst: 1, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
         vm.AddOneRow();
         vm.PlaceFromPalette(vm.Palette[0]);
         vm.Drop(Payload(vm.Line1[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
@@ -439,7 +449,7 @@ public class WiringViewModelTests
     [Fact]
     public void should_report_the_change_preview_before_saving()
     {
-        var vm = Open(sensors: 2, placedOnFirst: 2, gateway: new FakeGateway(2));
+        var vm = Open(sensors: 2, placedOnFirst: 2, gateway: Gateway(2));
         vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
 
         Assert.Contains("결선이 바뀐 줄", vm.ChangePreview);
@@ -449,7 +459,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_ask_before_closing_when_there_are_unsaved_changes()
     {
-        var dialogs = new FakeDialogs { Confirm = false };
+        var dialogs = new WiringFakeDialogs { Confirm = false };
         var vm = Open(sensors: 1, dialogs: dialogs);
         vm.AddOneRow();
 
@@ -460,7 +470,7 @@ public class WiringViewModelTests
     [Fact]
     public async Task should_close_without_asking_when_nothing_changed()
     {
-        var dialogs = new FakeDialogs();
+        var dialogs = new WiringFakeDialogs();
         var vm = Open(sensors: 1, dialogs: dialogs);
 
         Assert.True(await vm.CanCloseAsync());
@@ -475,94 +485,6 @@ public class WiringViewModelTests
 
         Assert.False(vm.CanSave);
         Assert.NotNull(vm.SaveBlockedReason);
-    }
-    #endregion
-
-    #region - Fakes -
-    private sealed class FakeDialogs : IWiringDialogs
-    {
-        public bool Confirm { get; set; }
-        public string? TextAnswer { get; set; }
-        public MakeSensorsResult? MakeResult { get; set; }
-        public bool PasteAccepted { get; set; }
-        public string? Clipboard { get; set; }
-
-        public int ConfirmCount { get; private set; }
-        public PasteReport? LastReport { get; private set; }
-
-        public Task<bool> ConfirmAsync(string title, string message)
-        {
-            ConfirmCount++;
-            return Task.FromResult(Confirm);
-        }
-
-        public Task<string?> AskTextAsync(string title, string label, string initial) => Task.FromResult(TextAnswer);
-
-        public Task<MakeSensorsResult?> AskMakeSensorsAsync(IReadOnlyList<string> types, string defaultType, string defaultZone, IReadOnlyCollection<int> existingNumbers, int suggestedStart)
-            => Task.FromResult(MakeResult);
-
-        public Task<bool> ShowPasteReportAsync(PasteReport report)
-        {
-            LastReport = report;
-            return Task.FromResult(PasteAccepted && report.HasRows);
-        }
-
-        public string? ReadClipboardText() => Clipboard;
-    }
-
-    private sealed class FakeGateway : ISensorWriteGateway
-    {
-        private readonly Dictionary<int, SensorDeviceDto> _fetched = new();
-
-        public FakeGateway(int sensors = 0)
-        {
-            for (var i = 0; i < sensors; i++)
-            {
-                _fetched[101 + i] = new SensorDeviceDto
-                {
-                    Id = 101 + i,
-                    NumberDevice = 1101 + i,
-                    NameDevice = $"북측 {i + 1}구간 펜스",
-                    TypeDevice = "Fence",
-                    Status = "ACTIVATED",
-                    IsEnable = true,
-                    HardwareSpec = new HardwareSpecDto { Spec = WiringSpec.Apply(null, new WiringPlacement(1, i + 1)) },
-                };
-            }
-        }
-
-        public HashSet<int> PatchFails { get; } = new();
-        public int PatchCount { get; private set; }
-        public int CreateCount { get; private set; }
-
-        public Task<ApiResponse<SensorDeviceDto>> GetAsync(int id, CancellationToken token = default)
-            => Task.FromResult(_fetched.TryGetValue(id, out var dto)
-                ? ApiResponse<SensorDeviceDto>.CreateSuccess(dto)
-                : ApiResponse<SensorDeviceDto>.CreateError("NOT_FOUND", "없는 장비"));
-
-        public Task<ApiResponse<SensorDeviceDto>> CreateAsync(SensorDeviceDto dto, CancellationToken token = default)
-        {
-            CreateCount++;
-            return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(new SensorDeviceDto { Id = 900 + CreateCount }));
-        }
-
-        public Task<ApiResponse<SensorDeviceDto>> PatchAsync(int id, SensorDeviceDto dto, CancellationToken token = default)
-        {
-            PatchCount++;
-            return Task.FromResult(PatchFails.Contains(id)
-                ? ApiResponse<SensorDeviceDto>.CreateError("CONSTRAINT", "저장 실패")
-                : ApiResponse<SensorDeviceDto>.CreateSuccess(dto));
-        }
-    }
-
-    private sealed class FixedProbe : IServerContractProbe
-    {
-        public FixedProbe(EnumServerContract contract) => Contract = contract;
-        public EnumServerContract Contract { get; }
-        public string? RawVersion => Contract.ToString();
-        public bool IsResolved => true;
-        public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
-        public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
     }
     #endregion
 }

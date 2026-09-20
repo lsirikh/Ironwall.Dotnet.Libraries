@@ -147,7 +147,7 @@ public class WiringApplyTests
     }
 
     [Fact]
-    public async Task should_keep_other_spec_keys_when_saving_wiring()
+    public async Task should_send_only_our_key_inside_spec_when_saving_wiring()
     {
         var (board, gateway) = Arrange();
         gateway.Fetched[101].HardwareSpec!.Spec = JObject.Parse("""{"detection_range":120,"wiring":{"line":1,"order":1}}""");
@@ -155,8 +155,44 @@ public class WiringApplyTests
 
         await Service(gateway).ApplyAsync(10, board);
 
-        var body = JObject.Parse(Wire(gateway.Patched.First().Dto));
-        Assert.Equal(120, (int?)body.SelectToken("hardware_spec.spec.detection_range"));
+        // 서버가 축을 RFC 7396 으로 병합한다(app/services/device_axes_io.py:291-299 · json_merge.py:25-37).
+        // 그러니 우리 키 하나만 보내는 편이 낫다 — 벤더 키를 되보내면 그 사이 남이 고친 값을 덮는다.
+        var spec = (JObject)JObject.Parse(Wire(gateway.Patched.First().Dto)).SelectToken("hardware_spec.spec")!;
+        Assert.Equal(new[] { "wiring" }, spec.Properties().Select(p => p.Name));
+        Assert.Null(spec["detection_range"]);
+    }
+
+    [Fact]
+    public async Task should_send_an_explicit_null_when_a_sensor_is_taken_off_the_line()
+    {
+        var (board, gateway) = Arrange();
+        board.Unplace(board.Rows[0].Key);       // 선에서 뺀다
+
+        var result = await Service(gateway).ApplyAsync(10, board);
+        Assert.True(result.IsSuccess);
+
+        // 키를 빼는 것으로는 지워지지 않는다(병합) — 명시적 null 이 RFC 7396 의 삭제 표시다.
+        var wiring = JObject.Parse(Wire(gateway.Patched.Single().Dto)).SelectToken("hardware_spec.spec.wiring");
+        Assert.NotNull(wiring);
+        Assert.Equal(JTokenType.Null, wiring!.Type);
+    }
+
+    [Fact]
+    public async Task should_stay_clean_when_saving_twice_after_an_unplace()
+    {
+        var (board, gateway) = Arrange();
+        board.Unplace(board.Rows[0].Key);
+
+        Assert.True((await Service(gateway).ApplyAsync(10, board)).IsSuccess);
+        board.MarkBaseline();
+
+        // 서버도 우리 기준도 "미배치" 다 — 다음 저장이 드리프트로 막히거나 다시 보내지 않는다(C1).
+        gateway.Fetched[101].HardwareSpec!.Spec = JObject.Parse("""{"detection_range":120}""");
+        var second = await Service(gateway).ApplyAsync(10, board);
+
+        Assert.False(second.IsConflict);
+        Assert.Contains("바뀐 줄이 없습니다", second.Message);
+        Assert.Equal(1, gateway.PatchCount);
     }
 
     [Fact]
@@ -215,6 +251,7 @@ public class WiringApplyTests
     {
         var (board, gateway) = Arrange();
         gateway.Fetched[101].Geolocation = null;
+        board.Rows[0].Baseline = board.Rows[0].Baseline with { Zone = string.Empty };   // 서버에도 구역이 없다
         board.Rows[0].Facts = board.Rows[0].Facts with { Zone = "정문 초소" };
 
         var result = await Service(gateway).ApplyAsync(10, board);
@@ -318,13 +355,13 @@ public class WiringApplyTests
     #region - Helpers -
     private static string Wire(object dto) => JsonConvert.SerializeObject(dto, PresetRequestBuilder.WireSettings);
 
-    private static WiringApplyService Service(FakeGateway gateway) => new(gateway, null, null, AxisPolicy());
+    private static WiringApplyService Service(WiringFakeGateway gateway) => new(gateway, null, null, AxisPolicy());
 
-    private static DeviceQueryPolicy AxisPolicy() => new(new FixedProbe(EnumServerContract.V8_0));
-    private static DeviceQueryPolicy LegacyPolicy() => new(new FixedProbe(EnumServerContract.V6_3));
+    private static DeviceQueryPolicy AxisPolicy() => WiringDoubles.AxisPolicy();
+    private static DeviceQueryPolicy LegacyPolicy() => WiringDoubles.LegacyPolicy();
 
     /// <summary>센서 3대(1차 1·2·3번). 서버 쪽 DTO 도 같은 자리로 채워 둔다.</summary>
-    private static (WiringBoard Board, FakeGateway Gateway) Arrange()
+    private static (WiringBoard Board, WiringFakeGateway Gateway) Arrange()
     {
         var board = new WiringBoard();
         board.Load(Enumerable.Range(0, 3).Select(i => (
@@ -332,9 +369,10 @@ public class WiringApplyTests
             Channel: (int?)(i + 1),
             Facts: new SensorFacts(1101 + i, $"북측 {i + 1}구간 펜스", "Fence", "북측 7구간"),
             Placement: (WiringPlacement?)new WiringPlacement(1, i + 1),
-            Issue: (string?)null)));
+            Issue: (string?)null,
+            Groups: (IReadOnlyList<int>?)null)));
 
-        var gateway = new FakeGateway();
+        var gateway = new WiringFakeGateway();
         for (var i = 0; i < 3; i++)
         {
             gateway.Fetched[101 + i] = new SensorDeviceDto
@@ -373,52 +411,6 @@ public class WiringApplyTests
     private static void MoveAllToSecondLine(WiringBoard board)
     {
         for (var i = 0; i < board.Rows.Count; i++) board.Place(board.Rows[i].Key, 2, i);
-    }
-
-    private sealed class FixedProbe : IServerContractProbe
-    {
-        public FixedProbe(EnumServerContract contract) => Contract = contract;
-        public EnumServerContract Contract { get; }
-        public string? RawVersion => Contract.ToString();
-        public bool IsResolved => true;
-        public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
-        public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
-    }
-
-    /// <summary>보낸 DTO 를 그대로 붙잡는 가짜 통로 — 본문 감사가 이것을 직렬화한다.</summary>
-    private sealed class FakeGateway : ISensorWriteGateway
-    {
-        public Dictionary<int, SensorDeviceDto> Fetched { get; } = new();
-        public List<(int Id, SensorDeviceDto Dto)> Patched { get; } = new();
-        public List<SensorDeviceDto> Created { get; } = new();
-        public HashSet<int> FetchFails { get; } = new();
-        public HashSet<int> PatchFails { get; } = new();
-
-        public int GetCount { get; private set; }
-        public int PatchCount => Patched.Count;
-        public int CreateCount => Created.Count;
-
-        public Task<ApiResponse<SensorDeviceDto>> GetAsync(int id, CancellationToken token = default)
-        {
-            GetCount++;
-            if (FetchFails.Contains(id) || !Fetched.TryGetValue(id, out var dto))
-                return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateError("NOT_FOUND", "없는 장비"));
-            return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(dto));
-        }
-
-        public Task<ApiResponse<SensorDeviceDto>> CreateAsync(SensorDeviceDto dto, CancellationToken token = default)
-        {
-            Created.Add(dto);
-            return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(new SensorDeviceDto { Id = 900 + Created.Count }));
-        }
-
-        public Task<ApiResponse<SensorDeviceDto>> PatchAsync(int id, SensorDeviceDto dto, CancellationToken token = default)
-        {
-            Patched.Add((id, dto));
-            if (PatchFails.Contains(id))
-                return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateError("CONSTRAINT", "저장 실패"));
-            return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(dto));
-        }
     }
 
     private sealed class CountingProvider : MockDeviceProviderService, IDeviceProviderService
