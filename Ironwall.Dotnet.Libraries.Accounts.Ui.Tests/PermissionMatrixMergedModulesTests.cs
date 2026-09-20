@@ -67,6 +67,13 @@ public class PermissionMatrixMergedModulesTests
 
         api.Setup(a => a.GetUserGroupsAsync(It.IsAny<CancellationToken>()))
            .ReturnsAsync(ApiListResponse<UserGroupDto>.CreateSuccess(new List<UserGroupDto> { group }));
+        // ★ ReloadAsync 와 저장 전 재확인은 GetAllUserGroupsAsync 를 부른다 — 그것은 '기본 구현이 있는 인터페이스 멤버'라
+        //   Moq 프록시가 가로채 null 을 돌려준다(기본 구현으로 내려가지 않는다). 세우지 않으면 목록이 영영 비어
+        //   이 파일의 네 시험이 전부 Single() 에서 죽는다.
+        api.Setup(a => a.GetAllUserGroupsAsync(It.IsAny<CancellationToken>()))
+           .ReturnsAsync(ApiListResponse<UserGroupDto>.CreateSuccess(new List<UserGroupDto> { group }));
+        api.Setup(a => a.GetAllUsersAsync(It.IsAny<CancellationToken>()))
+           .ReturnsAsync(ApiListResponse<AuthUserDto>.CreateSuccess(new List<AuthUserDto>()));
         api.Setup(a => a.GetUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(ApiListResponse<AuthUserDto>.CreateSuccess(new List<AuthUserDto>()));
         api.Setup(a => a.UpdateGroupPermissionsAsync(It.IsAny<int>(), It.IsAny<PermissionsDto>(), It.IsAny<CancellationToken>()))

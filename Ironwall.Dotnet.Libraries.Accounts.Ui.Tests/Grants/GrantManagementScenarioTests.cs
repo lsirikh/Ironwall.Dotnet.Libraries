@@ -157,8 +157,10 @@ internal static class GrantScenarios
                 vm.ValidFrom = GrantFixtures.T0.AddHours(-2); vm.ValidUntil = GrantFixtures.T0.AddHours(-1);
                 ea.ClearPublished();
                 await vm.ClickCreateGrant();
-                log.Check("D2a", "과거종료: 서버 도달(클라 미차단)", s.CreateCallCount == 1);
-                log.Check("D2b", "과거종료: 422 실패 안내(미래여야)", HasInfo(ea, "valid_until must be in the future"));
+                // 종전 기대("클라 미차단 → 서버 422 영문 노출")는 VM 이 굳어지기 전의 것이다 —
+                // 지금은 클라가 먼저 막고 한글로 알린다(영문 422 누출을 없앤 하드닝, ClickCreateGrant 주석 ②).
+                log.Check("D2a", "과거종료: 클라가 먼저 막는다(서버 미도달)", s.CreateCallCount == 0);
+                log.Check("D2b", "과거종료: 한글 안내(미래여야)", HasInfo(ea, "종료 일시는 현재보다 미래여야 합니다"));
                 log.Check("D2c", "과거종료: 서버 부여행 미생성", s.GrantRows.Count == 0);
             }
             // D3: 과거 시작 + 상시 → 성공(ACTIVE) — 서버는 valid_from 과거를 허용
