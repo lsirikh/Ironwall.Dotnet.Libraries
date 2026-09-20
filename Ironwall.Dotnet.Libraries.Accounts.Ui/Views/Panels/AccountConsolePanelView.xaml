@@ -1069,7 +1069,7 @@
 					<StackPanel Visibility="{Binding IsUsersRail, Converter={StaticResource BoolToVisibility}}">
 						<forms:AccountDetailFormView DataContext="{Binding Form}" />
 
-						<c:ConsoleSection Margin="16,0,14,0" AxisName="user-sessions" Header="세션 요약">
+						<c:ConsoleSection Margin="0,0,0,0" AxisName="user-sessions" Header="세션 요약">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="활성 세션" />
@@ -1095,7 +1095,7 @@
 							</StackPanel>
 						</c:ConsoleSection>
 
-						<c:ConsoleSection Margin="16,0,14,0" AxisName="users.is_locked" Header="잠금">
+						<c:ConsoleSection Margin="0,0,0,0" AxisName="users.is_locked" Header="잠금">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="상태" />
@@ -1114,7 +1114,7 @@
 							</StackPanel>
 						</c:ConsoleSection>
 
-						<WrapPanel Margin="16,10,14,14" Visibility="{Binding HasSingleUser, Converter={StaticResource BoolToVisibility}}">
+						<WrapPanel Margin="0,10,0,0" Visibility="{Binding HasSingleUser, Converter={StaticResource BoolToVisibility}}">
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Detail.Unlock"
@@ -1147,7 +1147,7 @@
 						매트릭스와 구성원은 가운데 칸이 맡는다.
 					-->
 					<StackPanel Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleSection Margin="16,4,14,0" Header="요약">
+						<c:ConsoleSection Margin="0,4,0,0" Header="요약">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="구성원" />
@@ -1181,7 +1181,7 @@
 						</c:ConsoleSection>
 
 						<!--  목업 L1231 의 '주의' 절 — 문구 그대로  -->
-						<c:ConsoleSection Margin="16,4,14,0" Header="주의">
+						<c:ConsoleSection Margin="0,4,0,0" Header="주의">
 							<TextBlock
 								AutomationProperties.AutomationId="Console.Accounts.Matrix.ControlNotice"
 								FontSize="12"
@@ -1191,7 +1191,7 @@
 						</c:ConsoleSection>
 
 						<!--  그룹 자체의 CRUD — 목업의 그룹 관리 입구를 상세에 모은다(툴바 [새 그룹] · [삭제] 와 짝)  -->
-						<c:ConsoleSection Margin="16,4,14,0" Header="그룹">
+						<c:ConsoleSection Margin="0,4,0,0" Header="그룹">
 							<StackPanel>
 								<WrapPanel>
 									<Button
@@ -1244,7 +1244,7 @@
 
 					<!--  ③ 세션 상세 — 파괴 동작은 아래로 모은다  -->
 					<StackPanel Visibility="{Binding IsSessionsRail, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleSection Margin="16,4,14,0" AxisName="user-sessions" Header="세션">
+						<c:ConsoleSection Margin="0,4,0,0" AxisName="user-sessions" Header="세션">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="클라이언트" />
@@ -1283,7 +1283,7 @@
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
-						<WrapPanel Margin="16,10,14,14">
+						<WrapPanel Margin="0,10,0,0">
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogout"
@@ -1303,7 +1303,7 @@
 
 					<!--  ④ 권한 부여 — 폼을 상세 칸으로  -->
 					<StackPanel Visibility="{Binding IsGrantsRail, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleSection Margin="16,4,14,0" AxisName="grants" Header="새 부여">
+						<c:ConsoleSection Margin="0,4,0,0" AxisName="grants" Header="새 부여">
 							<StackPanel>
 								<c:ConsoleField ApiName="user_id" Header="계정">
 									<ComboBox
@@ -1341,7 +1341,7 @@
 								</c:ConsoleField>
 							</StackPanel>
 						</c:ConsoleSection>
-						<WrapPanel Margin="16,10,14,14">
+						<WrapPanel Margin="0,10,0,0">
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Grant.Create"
@@ -1361,7 +1361,7 @@
 
 					<!--  ⑥ 세션 설정 — 이 화면은 상세 칸을 쓰지 않는다(T2 성격의 폼)  -->
 					<TextBlock
-						Margin="16,16,14,0"
+						Margin="0,12,0,0"
 						AutomationProperties.AutomationId="Console.Accounts.Detail.NoDetail"
 						FontSize="12.5"
 						Foreground="{DynamicResource TextMutedBrush}"
@@ -1371,7 +1371,7 @@
 
 					<!--  ⑤ 감사 로그 상세 — 읽기 전용  -->
 					<StackPanel Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleSection Margin="16,4,14,0" AxisName="audit-logs" Header="기록">
+						<c:ConsoleSection Margin="0,4,0,0" AxisName="audit-logs" Header="기록">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="동작" />

@@ -26,7 +26,7 @@
 		</Style>
 	</UserControl.Resources>
 
-	<StackPanel Margin="16,6,14,16">
+	<StackPanel>
 		<c:ConsoleSection Header="무엇을 만들까">
 			<StackPanel>
 				<c:ConsoleField ApiName="report_type" Header="유형">

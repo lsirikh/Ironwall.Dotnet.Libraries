@@ -118,7 +118,6 @@
 	</UserControl.Resources>
 
 	<ItemsControl
-		Margin="16,4,14,16"
 		Focusable="False"
 		ItemsSource="{Binding Sections}">
 		<ItemsControl.ItemTemplate>

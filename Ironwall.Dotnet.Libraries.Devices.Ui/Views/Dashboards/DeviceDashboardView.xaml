@@ -333,7 +333,7 @@
 					<StackPanel>
 						<!--  부품은 폼에서 못 고친다(서버가 배열을 통째로 바꾼다) — 조립기로 보낸다  -->
 						<Button
-							Margin="16,10,14,0"
+							Margin="0,6,0,0"
 							HorizontalAlignment="Left"
 							AutomationProperties.AutomationId="Console.Devices.Detail.EditComponents"
 							Click="OnEditComponents"

@@ -34,7 +34,7 @@
 		</ResourceDictionary>
 	</UserControl.Resources>
 
-	<StackPanel Margin="16,6,14,16">
+	<StackPanel>
 		<!--  ① 미리보기 축소판(380 폭 — "미리보기라 넓게" L1271)  -->
 		<c:ConsoleSection Header="미리보기">
 			<StackPanel>
