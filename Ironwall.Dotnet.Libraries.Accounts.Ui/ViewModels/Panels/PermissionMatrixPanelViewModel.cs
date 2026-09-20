@@ -250,6 +250,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                 EditEnabled = PermissionCatalog.IsVerbAllowed(m, EnumPermissionVerb.Edit),
                 DeleteEnabled = PermissionCatalog.IsVerbAllowed(m, EnumPermissionVerb.Delete),
                 ControlEnabled = PermissionCatalog.IsVerbAllowed(m, EnumPermissionVerb.Control),
+                IsControlServerEnforced = IsControlEnforced(key),
             });
             shown.Add(key);
         }
@@ -272,6 +273,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                 DeleteEnabled = true,
                 ControlEnabled = true,
                 IsUnknownModule = true,
+                IsControlServerEnforced = IsControlEnforced(kv.Key),
             });
             _log?.Warning($"[PermGroup] 사전에 없는 권한 모듈 키 '{kv.Key}' — 키 그대로 노출한다(표시명·동작 적용성 미확인).");
         }
@@ -300,6 +302,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     /// <summary>
     /// 계약 세대 → <see cref="PermissionCatalog"/> 세대 정수. <b><c>&gt;=</c> 비교만</b> 쓴다(동치 비교 금지 — 새 판본이 나와도 안전).
     /// </summary>
+    /// <summary>
+    /// 서버가 <b>제어</b>를 실제로 집행하는 모듈 — 나머지의 제어 체크는 화면 게이팅용일 뿐이다(목업 L1231).
+    /// </summary>
+    public static bool IsControlEnforced(string moduleKey)
+        => moduleKey is "devices" or "users";
+
     private static int GenerationOf(EnumServerContract contract)
         => contract >= EnumServerContract.V8_0 ? PermissionCatalog.GEN_V8_0
          : contract >= EnumServerContract.V7_0 ? PermissionCatalog.GEN_V7_0
@@ -406,28 +414,92 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
 
     #region - Binding: 매트릭스 저장 -
     /// <summary>현재 매트릭스 그룹의 권한(모듈×동작)을 서버에 저장(ADMIN). POST /user-groups/{id}/permissions.</summary>
-    public async Task OnClickSave()
+    public async Task OnClickSave() => await SaveGroupPermissionsAsync().ConfigureAwait(true);
+
+    /// <summary>
+    /// 권한 저장 — <b>성패를 돌려준다</b>. 화면(콘솔)이 실패했을 때 미적용 상태를 그대로 두려면 이 결과가 있어야 한다.
+    /// </summary>
+    /// <remarks>
+    /// 보내기 직전에 그 그룹을 <b>다시 읽어</b> 열었을 때의 원본과 비교한다 — 그 사이 다른 관리자가 바꿨으면
+    /// 아무것도 보내지 않고 멈춘다(전체 교체라 그대로 보내면 남의 변경을 조용히 덮는다).
+    /// </remarks>
+    public async Task<PermissionSaveOutcome> SaveGroupPermissionsAsync(CancellationToken ct = default)
     {
-        if (_detailGroupId <= 0) return;
+        if (_detailGroupId <= 0) return PermissionSaveOutcome.Fail("고른 그룹이 없습니다.");
+
         try
         {
             IsSaving = true;
+
+            var drift = await DetectOriginDriftAsync(ct).ConfigureAwait(true);
+            if (drift is not null)
+            {
+                await Info(drift);
+                return PermissionSaveOutcome.Fail(drift, isDrift: true);
+            }
+
             var dto = new PermissionsDto
             {
                 DeviceGroups = _detailDeviceGroups,
                 // 원본 ∪ 화면 편집분 — 우리가 모르는 모듈을 떨어뜨리면 422(전체 교체 계약).
                 Modules = BuildMergedModules(),
             };
-            var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto);
-            if (res.Success)
+            var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto, ct).ConfigureAwait(true);
+            if (!res.Success)
             {
-                await Info($"'{DetailGroupName}' 그룹의 권한을 저장했습니다.");
-                await ReloadAsync(CancellationToken.None);
+                var reason = res.Error?.Message ?? res.Message;
+                await Info($"저장 실패: {reason}");
+                return PermissionSaveOutcome.Fail(reason);
             }
-            else await Info($"저장 실패: {res.Error?.Message ?? res.Message}");
+
+            await Info($"'{DetailGroupName}' 그룹의 권한을 저장했습니다.");
+            // 저장분이 새 원본이다 — 다음 저장의 드리프트 비교 기준.
+            _originModules = new Dictionary<string, ModulePermissionDto>(dto.Modules, StringComparer.Ordinal);
+            await ReloadAsync(ct).ConfigureAwait(true);
+            return PermissionSaveOutcome.Ok();
         }
-        catch (Exception ex) { _log?.Error($"[PermGroup] 권한 저장 실패: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[PermGroup] 권한 저장 실패: {ex.Message}");
+            return PermissionSaveOutcome.Fail("서버에 닿지 못했습니다.");
+        }
         finally { IsSaving = false; }
+    }
+
+    /// <summary>
+    /// 열었을 때의 원본과 지금 서버 값이 다른가. 다르면 사람이 읽을 한 줄, 같거나 확인할 수 없으면 null.
+    /// </summary>
+    private async Task<string?> DetectOriginDriftAsync(CancellationToken ct)
+    {
+        try
+        {
+            var res = await _api.GetAllUserGroupsAsync(ct).ConfigureAwait(true);
+            if (!res.Success || res.Data is null) return null;   // 못 읽었으면 막지 않는다(저장은 서버가 판정한다)
+
+            var now = res.Data.FirstOrDefault(g => g.Id == _detailGroupId);
+            if (now is null) return $"'{DetailGroupName}' 그룹이 사라졌습니다 — 목록을 갱신하세요.";
+
+            var server = now.Permissions?.Modules ?? new Dictionary<string, ModulePermissionDto>();
+            if (SameModules(_originModules, server)) return null;
+
+            return $"'{DetailGroupName}' 의 권한이 그 사이 다른 곳에서 바뀌었습니다 — 아무것도 보내지 않았습니다. [갱신] 뒤 다시 편집하세요.";
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[PermGroup] 저장 전 재확인 실패(막지 않는다): {ex.Message}");
+            return null;
+        }
+    }
+
+    private static bool SameModules(IReadOnlyDictionary<string, ModulePermissionDto> a, IReadOnlyDictionary<string, ModulePermissionDto> b)
+    {
+        if (a.Count != b.Count) return false;
+        foreach (var (key, left) in a)
+        {
+            if (!b.TryGetValue(key, out var right)) return false;
+            if (left.View != right.View || left.Edit != right.Edit || left.Delete != right.Delete || left.Control != right.Control) return false;
+        }
+        return true;
     }
     #endregion
 
@@ -505,37 +577,61 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                                       .GroupBy(u => u.GroupId!.Value)
                                       .ToDictionary(x => x.Key, x => x.Count());
 
-            Groups.Clear();
             // v5.4: 팀 그룹 먼저 → Preset 그룹, 각 이름 asc. 예약 보호 없음(전 그룹 편집/삭제 가능).
             var ordered = _raw
                 .OrderBy(g => IsPresetGroup(g.Name) ? 1 : 0)
-                .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase);
-            foreach (var g in ordered)
-            {
-                int v = 0, e = 0, d = 0, c = 0;
-                if (g.Permissions?.Modules is { } mods)
-                    foreach (var kv in mods.Values)
-                    {
-                        if (kv.View) v++;
-                        if (kv.Edit) e++;
-                        if (kv.Delete) d++;
-                        if (kv.Control) c++;
-                    }
-                Groups.Add(new PermissionGroupRowViewModel
-                {
-                    GroupId = g.Id,
-                    GroupName = g.Name,
-                    UserCount = countByGroupId.TryGetValue(g.Id, out var uc) ? uc : 0,
-                    Active = g.IsActive ? "사용" : "미사용",
-                    ViewCount = v,
-                    EditCount = e,
-                    DeleteCount = d,
-                    ControlCount = c,
-                });
-            }
+                .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            ReconcileGroups(ordered, countByGroupId);
             // (MC-PM-1) 실패 통지는 위 swap-on-success 가드로 이동(여기 도달 = 성공).
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 로드 실패: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// 그룹 목록을 <b>제자리에서</b> 맞춘다 — <c>Clear()+Add()</c> 로 갈아 끼우면 고른 그룹이 풀려
+    /// 편집 중이던 매트릭스가 통째로 비어 버린다(저장 직후 재조회가 바로 그 길이다).
+    /// </summary>
+    private void ReconcileGroups(IReadOnlyList<UserGroupDto> ordered, IReadOnlyDictionary<int, int> countByGroupId)
+    {
+        // ① 사라진 그룹을 뺀다.
+        for (var i = Groups.Count - 1; i >= 0; i--)
+            if (ordered.All(g => g.Id != Groups[i].GroupId)) Groups.RemoveAt(i);
+
+        // ② 있는 것은 값만 고치고, 없는 것은 제자리에 끼운다(순서도 서버 순서에 맞춘다).
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            var dto = ordered[index];
+            int v = 0, e = 0, d = 0, c = 0;
+            if (dto.Permissions?.Modules is { } mods)
+                foreach (var kv in mods.Values)
+                {
+                    if (kv.View) v++;
+                    if (kv.Edit) e++;
+                    if (kv.Delete) d++;
+                    if (kv.Control) c++;
+                }
+
+            var row = Groups.FirstOrDefault(r => r.GroupId == dto.Id);
+            if (row is null)
+            {
+                row = new PermissionGroupRowViewModel { GroupId = dto.Id };
+                Groups.Insert(Math.Min(index, Groups.Count), row);
+            }
+            else
+            {
+                var at = Groups.IndexOf(row);
+                if (at != index && index < Groups.Count) Groups.Move(at, index);
+            }
+
+            row.GroupName = dto.Name;
+            row.UserCount = countByGroupId.TryGetValue(dto.Id, out var uc) ? uc : 0;
+            row.Active = dto.IsActive ? "사용" : "미사용";
+            row.ViewCount = v;
+            row.EditCount = e;
+            row.DeleteCount = d;
+            row.ControlCount = c;
+        }
     }
 
     private async Task ReloadMembersAsync()

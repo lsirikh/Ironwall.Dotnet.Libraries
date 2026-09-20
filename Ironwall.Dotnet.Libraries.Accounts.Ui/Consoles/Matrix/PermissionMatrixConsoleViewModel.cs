@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
 using System.Collections.ObjectModel;
 
@@ -19,13 +20,18 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
     private readonly PermissionMatrixPanelViewModel _panel;
     private readonly Func<bool> _canEdit;
     private readonly Dictionary<string, (bool View, bool Edit, bool Delete, bool Control)> _baseline = new(StringComparer.Ordinal);
+    private readonly ILogService? _log;
     private PermissionGroupRowViewModel? _selected;
     private bool _showMembers;
     private bool _isSaving;
+    private string? _lastMessage;
+    private Func<bool>? _guard;
+    private int _paintDepth;
 
-    public PermissionMatrixConsoleViewModel(PermissionMatrixPanelViewModel panel, Func<bool> canEdit)
+    public PermissionMatrixConsoleViewModel(PermissionMatrixPanelViewModel panel, Func<bool> canEdit, ILogService? log = null)
     {
         _panel = panel ?? throw new ArgumentNullException(nameof(panel));
+        _log = log;
         _canEdit = canEdit ?? throw new ArgumentNullException(nameof(canEdit));
         Painter = new PermissionPainter(this);
 
@@ -63,6 +69,15 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
         set
         {
             if (ReferenceEquals(_selected, value)) return;
+
+            // 칠해 둔 변경이 있으면 다른 그룹으로 못 간다 — 가면 조용히 버려진다(사용자 폼과 같은 계약).
+            if (IsDirty && !(_guard?.Invoke() ?? true))
+            {
+                SelectionRestoreRequested?.Invoke(this, _selected);
+                NotifyOfPropertyChange();
+                return;
+            }
+
             _selected = value;
             _panel.LoadMatrixFor(value);
             MarkBaseline();
@@ -71,6 +86,27 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
             if (value is not null) _ = LoadMembersIfNeededAsync();
         }
     }
+
+    /// <summary>문지기를 건너뛰고 고른다 — 레일을 떠날 때처럼 이미 버리기로 정한 경우에만.</summary>
+    public void ForceSelect(PermissionGroupRowViewModel? row)
+    {
+        if (ReferenceEquals(_selected, row)) return;
+        _selected = row;
+        _panel.LoadMatrixFor(row);
+        MarkBaseline();
+        _showMembers = false;
+        LastMessage = null;
+        RaiseAll();
+    }
+
+    /// <summary>
+    /// 그룹을 바꿔도 되는지 묻는 문지기(콘솔의 <c>NavigationGuard</c>). 막으면 false 를 돌려주고
+    /// 화면은 <see cref="SelectionRestoreRequested"/> 로 옛 선택을 되살린다.
+    /// </summary>
+    public void UseNavigationGuard(Func<bool> guard) => _guard = guard;
+
+    /// <summary>그리드의 선택을 이 그룹으로 되돌려 달라(막힌 이동).</summary>
+    public event EventHandler<PermissionGroupRowViewModel?>? SelectionRestoreRequested;
 
     /// <summary>상세 칸의 칩 — 거짓이면 매트릭스, 참이면 구성원.</summary>
     public bool ShowMembers
@@ -90,6 +126,12 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
     public string GroupTitle => _selected?.GroupName ?? "선택한 그룹 없음";
     public string? CatalogWarning => _panel.CatalogWarning;
     public bool HasCatalogWarning => _panel.HasCatalogWarning;
+
+    /// <summary>가운데 칸 머리의 안내 — 목업 L1207 "모듈 16종 전부를 한 번에 보냅니다".</summary>
+    public string SendAllNote => _panel.Modules.Count == 0 ? string.Empty : $"모듈 {_panel.Modules.Count}종 전부를 한 번에 보냅니다";
+
+    /// <summary>요약의 미적용 건수.</summary>
+    public string DirtyCountText => IsDirty ? $"{DirtyCount}건" : "없음";
 
     /// <summary>상태 띠 — "모듈 N · 표시 N".</summary>
     public string ModuleCountText => _panel.Modules.Count == 0 ? string.Empty : $"모듈 {_panel.Modules.Count} · 표시 {_panel.Modules.Count}";
@@ -170,6 +212,9 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
 
     public void Set(PermissionCell cell, bool value)
     {
+        // 화면의 IsEnabled 는 1차 방어다 — 바인딩 · 폴백 · 시험이 우회할 수 있으므로 여기서도 막는다.
+        if (!IsEnabled(cell)) return;
+
         var row = RowAt(cell.Row);
         if (row is null) return;
         switch (cell.Verb)
@@ -204,7 +249,8 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
         if (cells.Count == 0) return false;
 
         var turnOn = cells.Any(c => !Get(c));
-        foreach (var cell in cells) Set(cell, turnOn);
+        using (BeginPaintBatch())
+            foreach (var cell in cells) Set(cell, turnOn);
         return true;
     }
 
@@ -218,28 +264,45 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
         if (cells.Count == 0) return false;
 
         var turnOn = cells.Any(c => !Get(c));
-        foreach (var cell in cells) Set(cell, turnOn);
+        using (BeginPaintBatch())
+            foreach (var cell in cells) Set(cell, turnOn);
         return true;
     }
     #endregion
 
     #region - Apply · revert -
     /// <summary>[적용] — 전체 교체 <b>1회</b>. 성공 여부는 패널이 팝업으로 알린다.</summary>
-    public async Task<bool> ApplyAsync()
+    public async Task<PermissionSaveOutcome> ApplyAsync()
     {
-        if (!CanEdit || !IsDirty) return false;
+        if (!CanEdit || !IsDirty) return PermissionSaveOutcome.Fail("바꾼 칸이 없습니다.");
 
+        PermissionSaveOutcome outcome;
         IsSaving = true;
         try
         {
-            await _panel.OnClickSave().ConfigureAwait(true);
+            outcome = await _panel.SaveGroupPermissionsAsync().ConfigureAwait(true);
         }
         finally { IsSaving = false; }
 
-        // 저장은 성공하면 목록을 다시 읽는다 — 그 값이 새 기준선이다.
-        MarkBaseline();
+        // ★ 성공했을 때만 기준선을 옮긴다. 실패에도 옮기면 미적용 표시가 사라지고 서버는 옛 값을 쥔 채 남는다.
+        if (outcome.Success)
+        {
+            LastMessage = null;
+            MarkBaseline();
+        }
+        else
+        {
+            LastMessage = outcome.Reason;
+        }
         RaiseAll();
-        return true;
+        return outcome;
+    }
+
+    /// <summary>방금 한 일 · 막힌 까닭 한 줄.</summary>
+    public string? LastMessage
+    {
+        get => _lastMessage;
+        private set { _lastMessage = value; NotifyOfPropertyChange(); }
     }
 
     /// <summary>[되돌리기] — 마지막으로 읽은 서버 값으로 되돌린다(서버 호출 0).</summary>
@@ -281,16 +344,40 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
     private async Task LoadMembersIfNeededAsync()
     {
         try { await _panel.LoadMembersFor(_selected); }
-        catch (Exception) { /* 패널이 안내 팝업을 띄운다 */ }
+        catch (Exception ex)
+        {
+            // 조용히 삼키면 "구성원 0명" 으로 보인다 — 한 줄로 알리고 기록한다.
+            LastMessage = "구성원을 불러오지 못했습니다.";
+            _log?.Error($"[AccountConsole] 구성원 로드 실패: {ex.Message}");
+        }
         RaiseAll();
     }
 
+    /// <summary>
+    /// 칠하는 한 번(누름 · 한 걸음 · 놓음) 동안 알림을 묶는다 — 칸마다 알리면 한 번 쓸 때 수십 번 다시 그린다.
+    /// </summary>
+    public IDisposable BeginPaintBatch() => new PaintBatch(this);
+
     private void RaiseDirty()
     {
+        if (_paintDepth > 0) return;        // 묶음이 끝날 때 한 번만 알린다
         NotifyOfPropertyChange(nameof(DirtyCount));
         NotifyOfPropertyChange(nameof(IsDirty));
         NotifyOfPropertyChange(nameof(EnabledModuleText));
         NotifyOfPropertyChange(nameof(ControlModuleText));
+        NotifyOfPropertyChange(nameof(DirtyCountText));
+    }
+
+    private sealed class PaintBatch : IDisposable
+    {
+        private readonly PermissionMatrixConsoleViewModel _owner;
+        public PaintBatch(PermissionMatrixConsoleViewModel owner) { _owner = owner; _owner._paintDepth++; }
+        public void Dispose()
+        {
+            if (--_owner._paintDepth > 0) return;
+            _owner._paintDepth = 0;
+            _owner.RaiseDirty();
+        }
     }
 
     private void RaiseAll() => Refresh();
