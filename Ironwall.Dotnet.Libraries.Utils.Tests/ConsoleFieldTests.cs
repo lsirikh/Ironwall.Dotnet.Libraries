@@ -27,6 +27,15 @@ public class ConsoleFieldTests
         Assert.True(LabelWidthMetadata().Inherits);
     }
 
+    [Fact]
+    public void should_be_settable_on_a_form_root_when_the_root_is_not_a_field()
+    {
+        // RegisterAttached 여야 ConsoleSection · StackPanel 같은 뿌리에 한 줄로 줄 수 있다.
+        Assert.NotNull(typeof(ConsoleField).GetMethod("GetLabelWidth", new[] { typeof(DependencyObject) }));
+        Assert.NotNull(typeof(ConsoleField).GetMethod("SetLabelWidth", new[] { typeof(DependencyObject), typeof(double) }));
+        Assert.Equal("LabelWidth", ConsoleField.LabelWidthProperty.Name);
+    }
+
     [Theory]
     [InlineData(102d, 102d)]
     [InlineData(168d, 168d)]

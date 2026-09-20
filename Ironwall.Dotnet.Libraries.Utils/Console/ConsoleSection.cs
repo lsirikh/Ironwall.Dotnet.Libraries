@@ -70,9 +70,18 @@ public class ConsoleField : HeaderedContentControl
     /// <summary>잠긴 칸 — 자물쇠 글리프를 붙인다.</summary>
     public bool IsLocked { get => (bool)GetValue(IsLockedProperty); set => SetValue(IsLockedProperty, value); }
 
-    public static readonly DependencyProperty LabelWidthProperty = DependencyProperty.Register(
-        nameof(LabelWidth), typeof(double), typeof(ConsoleField),
+    // RegisterAttached — 폼 뿌리(ConsoleSection · StackPanel 등 칸이 아닌 요소)에도 붙일 수 있어야
+    // "이 폼은 라벨을 168 로" 를 한 줄로 끝낸다. Inherits 로 그 아래 칸에 흘러든다.
+    public static readonly DependencyProperty LabelWidthProperty = DependencyProperty.RegisterAttached(
+        "LabelWidth", typeof(double), typeof(ConsoleField),
         new FrameworkPropertyMetadata(DefaultLabelWidth, FrameworkPropertyMetadataOptions.Inherits));
+
+    public static double GetLabelWidth(DependencyObject element)
+        => (double)(element ?? throw new System.ArgumentNullException(nameof(element))).GetValue(LabelWidthProperty);
+
+    public static void SetLabelWidth(DependencyObject element, double value)
+        => (element ?? throw new System.ArgumentNullException(nameof(element))).SetValue(LabelWidthProperty, value);
+
     /// <summary>
     /// 라벨 칸의 폭. 기본 <see cref="DefaultLabelWidth"/> — <b>상속</b>이라 폼 뿌리에 한 번만 주면
     /// 그 아래 모든 칸이 따른다 — 설정 창처럼 <c>appsettings</c> 키가 긴 창은 더 넓게 준다.
