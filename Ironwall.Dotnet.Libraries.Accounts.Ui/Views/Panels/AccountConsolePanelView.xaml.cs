@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Groups;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Lists;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Matrix;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
@@ -21,6 +22,8 @@ public partial class AccountConsolePanelView : UserControl
 {
     private AccountConsolePanelViewModel? _viewModel;
     private DataGrid? _usersGrid;
+    private DataGrid? _sessionsGrid;
+    private DataGrid? _auditGrid;
     private ConsoleToolbar? _toolbar;
     private ConsolePrefs? _prefs;
     private bool _isSyncingSelection;
@@ -44,6 +47,7 @@ public partial class AccountConsolePanelView : UserControl
         _viewModel = e.NewValue as AccountConsolePanelViewModel;
         if (_viewModel is null) return;
         _viewModel.SelectionRestoreRequested += OnSelectionRestoreRequested;
+        _viewModel.Matrix.SelectionRestoreRequested += OnGroupSelectionRestoreRequested;
         _viewModel.SearchChanged += OnSearchChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         HookUsersFilter();
@@ -54,6 +58,7 @@ public partial class AccountConsolePanelView : UserControl
     {
         if (_viewModel is null) return;
         _viewModel.SelectionRestoreRequested -= OnSelectionRestoreRequested;
+        _viewModel.Matrix.SelectionRestoreRequested -= OnGroupSelectionRestoreRequested;
         _viewModel.SearchChanged -= OnSearchChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel = null;
@@ -91,15 +96,16 @@ public partial class AccountConsolePanelView : UserControl
     /// <summary>레일이 바뀌면 "열 n/m" 단추를 다시 맞춘다 — 사용자 목록에서만 나온다.</summary>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(AccountConsolePanelViewModel.ShowColumnsButton) or nameof(AccountConsolePanelViewModel.IsUsersRail))
+        if (e.PropertyName is nameof(AccountConsolePanelViewModel.ShowColumnsButton) or nameof(AccountConsolePanelViewModel.IsUsersRail)
+            or nameof(AccountConsolePanelViewModel.IsSessionsRail) or nameof(AccountConsolePanelViewModel.IsAuditRail))
             ApplyColumnPrefs();
         if (e.PropertyName is nameof(AccountConsolePanelViewModel.IsPermissionsRail) or nameof(AccountConsolePanelViewModel.IsUsersRail))
             ApplyDetailWidth();
     }
 
     /// <summary>
-    /// 레일마다 상세 폭을 기억한다. 권한 매트릭스는 모듈 + 동작 4열이라 기본이 <b>L(480)</b> 이다(PRD FR-20);
-    /// 사용자는 기본 340. 사용자가 끌어 넓힌 폭은 그 레일로 돌아올 때 그대로 되살린다.
+    /// 레일마다 상세 폭을 기억한다. 권한 설정은 목업이 <b>300</b>(요약 · 주의 · 저장만), 나머지는 340.
+    /// 사용자가 끌어 넓힌 폭은 그 레일로 돌아올 때 그대로 되살린다.
     /// </summary>
     private void ApplyDetailWidth()
     {
@@ -114,7 +120,7 @@ public partial class AccountConsolePanelView : UserControl
         _shell.DetailWidth = _detailWidthByRail.TryGetValue(rail, out var remembered)
             ? remembered
             : rail == Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.AccountConsoleKeys.Permissions
-                ? ConsoleLayoutMath.DetailLarge
+                ? ConsoleLayoutMath.DetailSmall
                 : ConsoleLayoutMath.DetailDefault;
     }
 
@@ -127,6 +133,18 @@ public partial class AccountConsolePanelView : UserControl
     private void OnToolbarLoaded(object sender, RoutedEventArgs e)
     {
         _toolbar = (ConsoleToolbar)sender;
+        ApplyColumnPrefs();
+    }
+
+    private void OnSessionsGridLoaded(object sender, RoutedEventArgs e)
+    {
+        _sessionsGrid = (DataGrid)sender;
+        ApplyColumnPrefs();
+    }
+
+    private void OnAuditGridLoaded(object sender, RoutedEventArgs e)
+    {
+        _auditGrid = (DataGrid)sender;
         ApplyColumnPrefs();
     }
 
@@ -147,37 +165,50 @@ public partial class AccountConsolePanelView : UserControl
     #endregion
 
     #region - Columns -
+    /// <summary>"열" 메뉴가 붙는 그리드 — 레일마다 다르고, 설정도 레일마다 따로 기억한다.</summary>
+    private (DataGrid? Grid, string Key)? ColumnTarget()
+    {
+        if (_viewModel is null) return null;
+        if (_viewModel.IsUsersRail) return (_usersGrid, "users");
+        if (_viewModel.IsSessionsRail) return (_sessionsGrid, "sessions");
+        if (_viewModel.IsAuditRail) return (_auditGrid, "audit");
+        return null;
+    }
+
     private ConsolePrefEntry? ColumnPrefs()
     {
+        if (ColumnTarget() is not { } target) return null;
         _prefs ??= new ConsolePrefs(ConsolePrefs.DefaultPath);
-        return _prefs.Get($"{AccountConsolePanelViewModel.ConsoleKey}.users");
+        return _prefs.Get($"{AccountConsolePanelViewModel.ConsoleKey}.{target.Key}");
     }
 
     private void ApplyColumnPrefs()
     {
-        if (_usersGrid is null || _toolbar is null) return;
-        var prefs = ColumnPrefs();
-        var text = ConsoleColumns.Apply(_usersGrid.Columns, prefs?.ShowAllColumns ?? false, prefs?.HiddenColumns);
-        // 사용자 목록이 아닌 레일에서는 "열" 단추를 내지 않는다 — 빈 글자면 툴바가 접는다.
-        _toolbar.ColumnsText = ViewModel?.ShowColumnsButton == true ? text : string.Empty;
+        if (_toolbar is null) return;
+        if (ColumnTarget() is not { Grid: { } grid } || ColumnPrefs() is not { } prefs)
+        {
+            _toolbar.ColumnsText = string.Empty;    // 빈 글자면 툴바가 단추를 접는다
+            return;
+        }
+        _toolbar.ColumnsText = ConsoleColumns.Apply(grid.Columns, prefs.ShowAllColumns, prefs.HiddenColumns);
     }
 
     private void OnColumns(object sender, RoutedEventArgs e)
     {
-        if (_usersGrid is null || ColumnPrefs() is not { } prefs) return;
+        if (ColumnTarget() is not { Grid: { } columnsGrid } || ColumnPrefs() is not { } prefs) return;
 
         var menu = new ContextMenu { PlacementTarget = (UIElement)sender, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        foreach (var (key, header, isVisible, isDefault) in ConsoleColumns.Describe(_usersGrid.Columns))
+        foreach (var (key, header, isVisible, isDefault) in ConsoleColumns.Describe(columnsGrid.Columns))
         {
             var item = new MenuItem { Header = isDefault ? header : $"{header} (추가 열)", IsCheckable = true, IsChecked = isVisible, StaysOpenOnClick = true, Tag = key };
             item.Click += (_, _) =>
             {
-                ConsoleColumns.Toggle(_usersGrid.Columns, prefs, key);
+                ConsoleColumns.Toggle(columnsGrid.Columns, prefs, key);
                 ApplyColumnPrefs();
                 _prefs?.Save();
 
                 // 한 열을 켜면 다른 비기본 열이 숨김으로 갈 수 있다 — 체크 표시를 전부 다시 맞춘다.
-                var visible = ConsoleColumns.Describe(_usersGrid.Columns).ToDictionary(c => c.Key, c => c.IsVisible);
+                var visible = ConsoleColumns.Describe(columnsGrid.Columns).ToDictionary(c => c.Key, c => c.IsVisible);
                 foreach (var other in menu.Items.OfType<MenuItem>())
                     if (other.Tag is string otherKey && visible.TryGetValue(otherKey, out var on)) other.IsChecked = on;
             };
@@ -200,6 +231,13 @@ public partial class AccountConsolePanelView : UserControl
     }
 
     private void OnSelectionRestoreRequested(object? sender, IReadOnlyList<AccountViewModel> rows) => SelectRows(rows);
+
+    /// <summary>그룹 전환이 막혔다 — 칩의 "고른 것" 표시를 옛 그룹으로 되돌린다(칩은 바인딩으로 따라온다).</summary>
+    private void OnGroupSelectionRestoreRequested(object? sender, PermissionGroupRowViewModel? previous)
+    {
+        // 칩의 선택 표시는 Matrix.SelectedGroup 바인딩이라 되돌릴 것이 없다 — 막혔다는 사실만 알리면 된다.
+        _viewModel?.Matrix.NotifyOfPropertyChange(nameof(PermissionMatrixConsoleViewModel.SelectedGroup));
+    }
 
     private void SelectRows(IReadOnlyList<AccountViewModel> rows)
     {
@@ -267,15 +305,37 @@ public partial class AccountConsolePanelView : UserControl
         if (ViewModel is { } vm) await vm.UnlockSelectedAsync();
     }
 
-    private async void OnResetPassword(object sender, RoutedEventArgs e)
+    private async void OnOpenUserDialog(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.ResetPasswordAsync();
+        if (ViewModel is { } vm) await vm.OpenUserDialogAsync();
     }
 
     private async void OnDeleteSelected(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.DeleteSelectedAsync();
     }
+
+    /// <summary>그룹 칩 — 고른 그룹을 바꾼다(미적용 변경이 있으면 문지기가 막는다).</summary>
+    private void OnSelectGroup(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && (sender as FrameworkElement)?.Tag is PermissionGroupRowViewModel row)
+            vm.Matrix.SelectedGroup = row;
+    }
+
+    private void OnRenameGroup(object sender, RoutedEventArgs e)
+        => ViewModel?.PermissionMatrixPanelViewModel.OnClickRenameGroup();
+
+    private async void OnSaveGroupForm(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            await vm.PermissionMatrixPanelViewModel.ClickSaveGroupForm();
+            await vm.LoadGroupsAsync(CancellationToken.None);
+        }
+    }
+
+    private void OnCancelGroupForm(object sender, RoutedEventArgs e)
+        => ViewModel?.PermissionMatrixPanelViewModel.ClickCancelGroupForm();
 
     private void OnShowMatrix(object sender, RoutedEventArgs e)
     {

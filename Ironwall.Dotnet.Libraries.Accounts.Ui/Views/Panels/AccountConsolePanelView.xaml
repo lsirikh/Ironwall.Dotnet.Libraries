@@ -7,9 +7,11 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Converters"
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Forms"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
+	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:matrix="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Matrix"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -39,6 +41,60 @@
 			<Setter Property="FontSize" Value="12" />
 			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<local:AllTrueConverter x:Key="AllTrue" />
+		<local:SameReferenceConverter x:Key="SameRef" />
+		<conv:LogoutReasonConverter x:Key="LogoutReason" />
+
+		<!--
+			읽기 전용 값 — TextBlock 에 AutomationId 를 달면 UIA 트리에 나오지 않는다(프로젝트 실측).
+			peer 가 실재하는 TextBox 를 읽기 전용 · 테두리 없이 쓴다.
+		-->
+		<Style x:Key="Kv.ReadOnlyValue" TargetType="TextBox">
+			<Setter Property="IsReadOnly" Value="True" />
+			<Setter Property="IsReadOnlyCaretVisible" Value="False" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+		</Style>
+
+		<Style x:Key="Kv.Input" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<!--  그룹 고르기 칩 — 고른 것은 색이 아니라 형태(테두리 두께 · 글자 굵기)로 구분한다  -->
+		<Style
+			x:Key="Matrix.GroupChip"
+			BasedOn="{StaticResource MaterialDesignOutlinedButton}"
+			TargetType="Button">
+			<Setter Property="Padding" Value="10,2" />
+			<Setter Property="Height" Value="26" />
+			<Setter Property="MinWidth" Value="0" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Style.Triggers>
+				<DataTrigger Value="True">
+					<DataTrigger.Binding>
+						<MultiBinding Converter="{StaticResource SameRef}">
+							<Binding />
+							<Binding Path="DataContext.Matrix.SelectedGroup" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+						</MultiBinding>
+					</DataTrigger.Binding>
+					<Setter Property="BorderThickness" Value="2" />
+					<Setter Property="FontWeight" Value="SemiBold" />
+				</DataTrigger>
+			</Style.Triggers>
 		</Style>
 
 		<!--  [권한] · [구성원] 칩 — 지금 보고 있는 쪽을 색이 아니라 형태(테두리 두께 · 글자 굵기)로 구분한다.  -->
@@ -341,32 +397,272 @@
 					</DataGrid.Columns>
 				</DataGrid>
 
-				<!--  ② 권한 그룹 목록 — 매트릭스와 구성원은 상세 칸에서(뷰 교체 없음)  -->
-				<DataGrid
-					AutomationProperties.AutomationId="Console.Accounts.Grid.Groups"
-					IsReadOnly="True"
-					ItemsSource="{Binding Matrix.Groups}"
-					SelectedItem="{Binding Matrix.SelectedGroup, Mode=TwoWay}"
-					Style="{StaticResource Console.DataGrid}"
-					Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
-					<DataGrid.RowStyle>
-						<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
-							<Setter Property="AutomationProperties.AutomationId" Value="{Binding GroupId, StringFormat=Console.Accounts.GroupRow.{0}}" />
-						</Style>
-					</DataGrid.RowStyle>
-					<DataGrid.Columns>
-						<DataGridTextColumn Width="200" Binding="{Binding GroupName}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="그룹" />
-						<DataGridTextColumn Width="80" Binding="{Binding UserCount}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="사용자" />
-						<DataGridTextColumn Width="80" Binding="{Binding Active}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="활성" />
-						<DataGridTextColumn Width="*" Binding="{Binding Summary}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="권한 요약" />
-					</DataGrid.Columns>
-				</DataGrid>
+				<!--
+					② 권한 설정 — 목업 L1205-L1220 그대로: 가운데 칸 = [그룹 칩(선택)] + [그룹|구성원] 전환 + 매트릭스 표.
+					상세 칸(300)은 요약 · 주의 · 저장만 맡는다. 세 뷰 교대는 없앴다(L1238 · 결정 L-D7).
+				-->
+				<Grid Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+					</Grid.RowDefinitions>
 
-				<!--  ③ 세션 — 무한 스크롤 유지 · 드래그 정렬 없음  -->
+					<!--  .tool — 그룹 고르기 · 보기 전환 · 전체 교체 안내  -->
+					<Border
+						Grid.Row="0"
+						Padding="12,7"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,0,0,1">
+						<DockPanel LastChildFill="True">
+							<TextBlock
+								Margin="10,0,0,0"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Console.Accounts.Matrix.Note"
+								DockPanel.Dock="Right"
+								FontSize="12"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding Matrix.SendAllNote}" />
+							<StackPanel
+								Margin="0,0,10,0"
+								DockPanel.Dock="Right"
+								Orientation="Horizontal">
+								<Button
+									Margin="0,0,6,0"
+									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Permissions"
+									Click="OnShowMatrix"
+									Content="그룹"
+									Style="{StaticResource Matrix.Chip}"
+									Tag="{Binding Matrix.ShowMatrix}"
+									ToolTip="이 그룹의 권한(모듈 × 동작)" />
+								<Button
+									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Members"
+									Click="OnShowMembers"
+									Content="구성원"
+									Style="{StaticResource Matrix.Chip}"
+									Tag="{Binding Matrix.ShowMembers}"
+									ToolTip="이 그룹에 속한 계정" />
+							</StackPanel>
+							<!--  그룹 고르기 — 목업의 가운데 칸은 매트릭스가 차지하므로 그룹은 칩으로 고른다  -->
+							<ItemsControl Focusable="False" ItemsSource="{Binding Matrix.Groups}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<WrapPanel />
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<Button
+											Margin="0,2,6,2"
+											AutomationProperties.AutomationId="{Binding GroupId, StringFormat=Console.Accounts.GroupRow.{0}}"
+											Click="OnSelectGroup"
+											Style="{StaticResource Matrix.GroupChip}"
+											Tag="{Binding}"
+											ToolTip="{Binding Summary}">
+											<TextBlock FontSize="12">
+												<Run Text="{Binding GroupName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding UserCount, Mode=OneWay}" />
+											</TextBlock>
+										</Button>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</DockPanel>
+					</Border>
+
+					<!--  모듈 × 동작 — 가운데 칸에서 스크롤한다(스크롤 영역 하나)  -->
+					<DataGrid
+						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Accounts.Matrix"
+						IsReadOnly="True"
+						ItemsSource="{Binding Matrix.Modules}"
+						Style="{StaticResource Console.DataGrid}"
+						Visibility="{Binding Matrix.ShowMatrix, Converter={StaticResource BoolToVisibility}}">
+						<b:Interaction.Behaviors>
+							<matrix:PermissionPaintBehavior KeyboardFallback="Space · 열 머리글 클릭 · 행 [전체] 버튼" Matrix="{Binding Matrix}" />
+						</b:Interaction.Behaviors>
+						<DataGrid.RowStyle>
+							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding ModuleKey, StringFormat=Accounts.Matrix.Row.{0}}" />
+							</Style>
+						</DataGrid.RowStyle>
+						<DataGrid.Columns>
+							<DataGridTemplateColumn Width="*" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="모듈">
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<StackPanel Orientation="Horizontal">
+											<TextBlock
+												VerticalAlignment="Center"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextPrimaryBrush}"
+												Text="{Binding ModuleDisplay}"
+												ToolTip="{Binding ModuleKey}" />
+											<Border
+												Margin="6,0,0,0"
+												Padding="5,0"
+												VerticalAlignment="Center"
+												Background="{DynamicResource SurfaceSunkenBrush}"
+												CornerRadius="3"
+												ToolTip="사전에 없는 서버 모듈 — 표시명·동작 적용성 미확인"
+												Visibility="{Binding IsUnknownModule, Converter={StaticResource BoolToVisibility}}">
+												<TextBlock
+													FontSize="10.5"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="신규" />
+											</Border>
+										</StackPanel>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="0" CellStyle="{StaticResource Console.DataGrid.Cell}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.0"
+										Click="OnToggleVerb"
+										Content="조회"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="0"
+										ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<CheckBox
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.view}"
+											IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="ViewEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="1" CellStyle="{StaticResource Console.DataGrid.Cell}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.1"
+										Click="OnToggleVerb"
+										Content="편집"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="1"
+										ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<CheckBox
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.edit}"
+											IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="EditEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="2" CellStyle="{StaticResource Console.DataGrid.Cell}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.2"
+										Click="OnToggleVerb"
+										Content="삭제"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="2"
+										ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<CheckBox
+											HorizontalAlignment="Center"
+											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.delete}"
+											IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+											<CheckBox.IsEnabled>
+												<MultiBinding Converter="{StaticResource AllTrue}">
+													<Binding Path="DeleteEnabled" />
+													<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</CheckBox.IsEnabled>
+										</CheckBox>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+							<DataGridTemplateColumn Width="96" matrix:PermissionColumn.Verb="3" CellStyle="{StaticResource Console.DataGrid.Cell}">
+								<DataGridTemplateColumn.Header>
+									<Button
+										AutomationProperties.AutomationId="Accounts.Matrix.Verb.3"
+										Click="OnToggleVerb"
+										Content="제어"
+										Style="{StaticResource Matrix.VerbHeader}"
+										Tag="3"
+										ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
+								</DataGridTemplateColumn.Header>
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+											<CheckBox
+												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.control}"
+												IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+												<CheckBox.IsEnabled>
+													<MultiBinding Converter="{StaticResource AllTrue}">
+														<Binding Path="ControlEnabled" />
+														<Binding Path="DataContext.Matrix.CanEdit" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+													</MultiBinding>
+												</CheckBox.IsEnabled>
+											</CheckBox>
+											<!--  목업의 "실집행" 꼬리표 — 서버가 실제로 검사하는 모듈만  -->
+											<TextBlock
+												Margin="5,0,0,0"
+												VerticalAlignment="Center"
+												FontSize="10.5"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="실집행"
+												ToolTip="서버가 실제로 검사하는 제어 권한입니다"
+												Visibility="{Binding IsControlServerEnforced, Converter={StaticResource BoolToVisibility}}" />
+										</StackPanel>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+						</DataGrid.Columns>
+					</DataGrid>
+
+					<!--  구성원 — 칩으로 전환한다(같은 가운데 칸)  -->
+					<DataGrid
+						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Accounts.Grid.Members"
+						IsReadOnly="True"
+						ItemsSource="{Binding Matrix.Members}"
+						Style="{StaticResource Console.DataGrid}"
+						Visibility="{Binding Matrix.ShowMembers, Converter={StaticResource BoolToVisibility}}">
+						<DataGrid.Columns>
+							<DataGridTextColumn Width="160" Binding="{Binding LoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="로그인 ID" />
+							<DataGridTextColumn Width="160" Binding="{Binding Name}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="이름" />
+							<DataGridTextColumn Width="*" Binding="{Binding Role}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="역할" />
+							<DataGridTemplateColumn Width="80" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="해제">
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<Button
+											Padding="8,1"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.Member.Remove.{0}}"
+											Click="OnRemoveMember"
+											Content="해제"
+											FontSize="11.5" />
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+						</DataGrid.Columns>
+					</DataGrid>
+				</Grid>
+
+				<!--  ③ 세션 — 무한 스크롤 유지 · 드래그 정렬 없음. 폭은 별(*)로 나눠 마지막 칸이 0이 되지 않게 한다  -->
 				<DataGrid
 					AutomationProperties.AutomationId="Console.Accounts.Grid.Sessions"
 					IsReadOnly="True"
 					ItemsSource="{Binding UserSessionPanelViewModel.Items}"
+					Loaded="OnSessionsGridLoaded"
 					SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
 					Style="{StaticResource Console.DataGrid}"
 					Visibility="{Binding IsSessionsRail, Converter={StaticResource BoolToVisibility}}">
@@ -374,14 +670,102 @@
 						<behavior:DataGridScrollEndBehavior Command="{Binding UserSessionPanelViewModel.LoadMoreCommand}" Threshold="50" />
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
-						<DataGridTextColumn Width="130" Binding="{Binding LoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="사용자" />
-						<DataGridTextColumn Width="80" Binding="{Binding Role}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="역할" />
-						<DataGridTextColumn Width="120" Binding="{Binding ClientId, TargetNullValue=-}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="클라이언트" />
-						<DataGridTextColumn Width="130" Binding="{Binding IpAddress}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="IP" />
-						<DataGridCheckBoxColumn Width="60" Binding="{Binding IsActive}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="활성" />
-						<DataGridTextColumn Width="150" Binding="{Binding CreatedAt, Converter={StaticResource IsoDate}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="로그인시각" />
-						<DataGridTextColumn Width="150" Binding="{Binding ExpiresAt, Converter={StaticResource IsoDate}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="만료" />
-						<DataGridTextColumn Width="*" Binding="{Binding LogoutReason, TargetNullValue=-}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="사유" />
+						<!--  자기 세션은 형태(알약)로 표시한다 — 강제 종료가 자기를 쫓아내지 않게  -->
+						<DataGridTemplateColumn
+							Width="56"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="current"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="현재">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Border
+										Padding="6,1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										BorderBrush="{DynamicResource PrimaryBrush}"
+										BorderThickness="1"
+										CornerRadius="8"
+										Visibility="{Binding IsCurrentSession, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock
+											FontSize="10.5"
+											Foreground="{DynamicResource PrimaryBrush}"
+											Text="현재" />
+									</Border>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="user"
+							Binding="{Binding LoginId}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="사용자" />
+						<DataGridTextColumn
+							Width="0.9*"
+							MinWidth="70"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="role"
+							Binding="{Binding Role}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="역할" />
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="92"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="client"
+							Binding="{Binding ClientId, TargetNullValue=-}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="클라이언트" />
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="104"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="ip"
+							Binding="{Binding IpAddress}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="IP" />
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="created"
+							Binding="{Binding CreatedAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="로그인시각" />
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="reason"
+							Binding="{Binding LogoutReason, Converter={StaticResource LogoutReason}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="사유" />
+						<DataGridCheckBoxColumn
+							Width="54"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="active"
+							Binding="{Binding IsActive}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="활성" />
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="expires"
+							Binding="{Binding ExpiresAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="만료" />
+						<DataGridTextColumn
+							Width="1.8*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="loggedout"
+							Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDate}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="로그아웃" />
 					</DataGrid.Columns>
 				</DataGrid>
 
@@ -405,11 +789,12 @@
 					</DataGrid.Columns>
 				</DataGrid>
 
-				<!--  ⑤ 감사 로그 — 읽기 전용  -->
+				<!--  ⑤ 감사 로그 — 읽기 전용. 별(*) 폭으로 나눠 설명이 잘리지 않게 한다  -->
 				<DataGrid
 					AutomationProperties.AutomationId="Console.Accounts.Grid.Audit"
 					IsReadOnly="True"
 					ItemsSource="{Binding AuditLogPanelViewModel.Items}"
+					Loaded="OnAuditGridLoaded"
 					SelectedItem="{Binding SelectedAuditLog, Mode=TwoWay}"
 					Style="{StaticResource Console.DataGrid}"
 					Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
@@ -417,16 +802,87 @@
 						<behavior:DataGridScrollEndBehavior Command="{Binding AuditLogPanelViewModel.LoadMoreCommand}" Threshold="50" />
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
-						<DataGridTextColumn Width="150" Binding="{Binding CreatedAt}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="시각" />
-						<DataGridTextColumn Width="140" Binding="{Binding ActionType}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="동작" />
-						<DataGridTextColumn Width="80" Binding="{Binding ActionStatus}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="상태" />
-						<DataGridTextColumn Width="150" Binding="{Binding ResourceName}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="대상명" />
-						<DataGridTextColumn Width="130" Binding="{Binding ActorLoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="행위자" />
-						<DataGridTextColumn Width="*" Binding="{Binding Description}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="설명" />
+						<DataGridTextColumn
+							Width="1.7*"
+							MinWidth="136"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="time"
+							Binding="{Binding CreatedAt}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="시각" />
+						<DataGridTextColumn
+							Width="1.9*"
+							MinWidth="130"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="action"
+							Binding="{Binding ActionType}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="동작">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding ActionType}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="0.9*"
+							MinWidth="78"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="status"
+							Binding="{Binding ActionStatus}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="상태" />
+						<DataGridTextColumn
+							Width="1.4*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="resource"
+							Binding="{Binding ResourceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="대상명" />
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="92"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="actor"
+							Binding="{Binding ActorLoginId}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="행위자" />
+						<DataGridTextColumn
+							Width="2*"
+							MinWidth="120"
+							c:ConsoleColumns.IsDefault="True"
+							c:ConsoleColumns.Key="description"
+							Binding="{Binding Description}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="설명">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding Description}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
+						<DataGridTextColumn
+							Width="1.2*"
+							MinWidth="88"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="resource_type"
+							Binding="{Binding ResourceType}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="대상" />
+						<DataGridTextColumn
+							Width="1.3*"
+							MinWidth="96"
+							c:ConsoleColumns.IsDefault="False"
+							c:ConsoleColumns.Key="ip"
+							Binding="{Binding IpAddress}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="IP" />
 					</DataGrid.Columns>
 				</DataGrid>
 
-				<!--  ⑥ 세션 설정 — T2 성격의 폼이라 목록 칸 전체를 쓴다(상세 칸은 감춘다)  -->
 				<!--  뷰 찾기는 Caliburn 의 이름 규약으로 — x:Name 을 새로 쓰지 않는다  -->
 				<ContentControl
 					cal:View.Model="{Binding AccountSetupPanelViewModel}"
@@ -617,15 +1073,24 @@
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="활성 세션" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.session_active" Style="{StaticResource Kv.Value}" Text="{Binding SessionSummaryText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.session_active"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SessionSummaryText, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="마지막 로그인" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.last_login" Style="{StaticResource Kv.Value}" Text="{Binding LastLoginText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.last_login"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LastLoginText, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="부여 이력" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.grants" Style="{StaticResource Kv.Value}" Text="{Binding GrantSummaryText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grants"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding GrantSummaryText, Mode=OneWay}" />
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -634,11 +1099,17 @@
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="상태" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.lock_state" Style="{StaticResource Kv.Value}" Text="{Binding LockStateText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.lock_state"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LockStateText, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="사유" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.lock_reason" Style="{StaticResource Kv.Value}" Text="{Binding LockReasonText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.lock_reason"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding LockReasonText, Mode=OneWay}" />
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -654,12 +1125,12 @@
 								ToolTip="계정 잠금을 해제합니다 (확인 팝업)" />
 							<Button
 								Margin="0,0,6,6"
-								AutomationProperties.AutomationId="Console.Accounts.Detail.ResetPassword"
-								Click="OnResetPassword"
-								Content="비밀번호 초기화"
-								IsEnabled="{Binding CanEditUsers}"
+								AutomationProperties.AutomationId="Console.Accounts.Detail.OpenUserDialog"
+								Click="OnOpenUserDialog"
+								Content="사용자 변경 창"
+								IsEnabled="{Binding CanOpenUserDialog}"
 								Style="{StaticResource MaterialDesignOutlinedButton}"
-								ToolTip="비밀번호 재설정 다이얼로그를 엽니다" />
+								ToolTip="비밀번호 초기화 · 사진 변경은 이 창에서 합니다. 손댄 칸이 있으면 먼저 적용하거나 되돌리세요." />
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Detail.Delete"
@@ -671,181 +1142,104 @@
 						</WrapPanel>
 					</StackPanel>
 
-					<!--  ② 권한 그룹 상세 — 요약 + 칩([권한] · [구성원]) + 매트릭스(드래그 페인팅)  -->
+					<!--
+						② 권한 그룹 상세(300) — 목업 L1222-L1234 그대로: 경고 배너 · 요약 · 주의 · [되돌리기][저장].
+						매트릭스와 구성원은 가운데 칸이 맡는다.
+					-->
 					<StackPanel Visibility="{Binding IsPermissionsRail, Converter={StaticResource BoolToVisibility}}">
 						<c:ConsoleSection Margin="16,4,14,0" Header="요약">
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="구성원" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.member_count" Style="{StaticResource Kv.Value}" Text="{Binding Matrix.MemberCountText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.member_count"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding Matrix.MemberCountText, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="켜진 모듈" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.enabled_modules" Style="{StaticResource Kv.Value}" Text="{Binding Matrix.EnabledModuleText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.enabled_modules"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding Matrix.EnabledModuleText, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="제어 권한" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.control_modules" Style="{StaticResource Kv.Value}" Text="{Binding Matrix.ControlModuleText}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.control_modules"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding Matrix.ControlModuleText, Mode=OneWay}" />
+								</DockPanel>
+								<DockPanel Margin="0,2">
+									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="미적용" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.dirty_count"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding Matrix.DirtyCountText, Mode=OneWay}" />
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
 
-						<StackPanel Margin="16,10,14,6" Orientation="Horizontal">
-							<Button
-								Margin="0,0,6,0"
-								AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Permissions"
-								Click="OnShowMatrix"
-								Content="권한"
-								Style="{StaticResource Matrix.Chip}"
-								Tag="{Binding Matrix.ShowMatrix}" />
-							<Button
-								AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Members"
-								Click="OnShowMembers"
-								Content="구성원"
-								Style="{StaticResource Matrix.Chip}"
-								Tag="{Binding Matrix.ShowMembers}" />
-						</StackPanel>
+						<!--  목업 L1231 의 '주의' 절 — 문구 그대로  -->
+						<c:ConsoleSection Margin="16,4,14,0" Header="주의">
+							<TextBlock
+								AutomationProperties.AutomationId="Console.Accounts.Matrix.ControlNotice"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="나머지 모듈의 제어는 서버가 검사하지 않습니다 — 화면 게이팅용이라고 표기합니다."
+								TextWrapping="Wrap" />
+						</c:ConsoleSection>
 
-						<!--  모듈 × 동작 — 칸을 누르고 쓸면 같은 행 · 열에 같은 값을 칠한다(저장 때 전체 교체 1회)  -->
-						<DataGrid
-							MaxHeight="420"
-							Margin="16,0,14,10"
-							AutomationProperties.AutomationId="Console.Accounts.Matrix"
-							IsReadOnly="True"
-							ItemsSource="{Binding Matrix.Modules}"
-							Style="{StaticResource Console.DataGrid}"
-							Visibility="{Binding Matrix.ShowMatrix, Converter={StaticResource BoolToVisibility}}">
-							<b:Interaction.Behaviors>
-								<matrix:PermissionPaintBehavior KeyboardFallback="Space · 열 머리글 클릭 · 행 [전체] 버튼" Matrix="{Binding Matrix}" />
-							</b:Interaction.Behaviors>
-							<DataGrid.RowStyle>
-								<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
-									<Setter Property="AutomationProperties.AutomationId" Value="{Binding ModuleKey, StringFormat=Accounts.Matrix.Row.{0}}" />
-								</Style>
-							</DataGrid.RowStyle>
-							<DataGrid.Columns>
-								<DataGridTemplateColumn Width="*" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="모듈">
-									<DataGridTemplateColumn.CellTemplate>
-										<DataTemplate>
-											<TextBlock
-												VerticalAlignment="Center"
-												FontSize="12.5"
-												Foreground="{DynamicResource TextPrimaryBrush}"
-												Text="{Binding ModuleDisplay}"
-												ToolTip="{Binding ModuleKey}" />
-										</DataTemplate>
-									</DataGridTemplateColumn.CellTemplate>
-								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="0" CellStyle="{StaticResource Console.DataGrid.Cell}">
-									<DataGridTemplateColumn.Header>
-										<Button
-											AutomationProperties.AutomationId="Accounts.Matrix.Verb.0"
-											Click="OnToggleVerb"
-											Content="조회"
-											Style="{StaticResource Matrix.VerbHeader}"
-											Tag="0"
-											ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
-									</DataGridTemplateColumn.Header>
-									<DataGridTemplateColumn.CellTemplate>
-										<DataTemplate>
-											<CheckBox
-												HorizontalAlignment="Center"
-												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.view}"
-												IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-												IsEnabled="{Binding ViewEnabled}" />
-										</DataTemplate>
-									</DataGridTemplateColumn.CellTemplate>
-								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="1" CellStyle="{StaticResource Console.DataGrid.Cell}">
-									<DataGridTemplateColumn.Header>
-										<Button
-											AutomationProperties.AutomationId="Accounts.Matrix.Verb.1"
-											Click="OnToggleVerb"
-											Content="편집"
-											Style="{StaticResource Matrix.VerbHeader}"
-											Tag="1"
-											ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
-									</DataGridTemplateColumn.Header>
-									<DataGridTemplateColumn.CellTemplate>
-										<DataTemplate>
-											<CheckBox
-												HorizontalAlignment="Center"
-												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.edit}"
-												IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-												IsEnabled="{Binding EditEnabled}" />
-										</DataTemplate>
-									</DataGridTemplateColumn.CellTemplate>
-								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="2" CellStyle="{StaticResource Console.DataGrid.Cell}">
-									<DataGridTemplateColumn.Header>
-										<Button
-											AutomationProperties.AutomationId="Accounts.Matrix.Verb.2"
-											Click="OnToggleVerb"
-											Content="삭제"
-											Style="{StaticResource Matrix.VerbHeader}"
-											Tag="2"
-											ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
-									</DataGridTemplateColumn.Header>
-									<DataGridTemplateColumn.CellTemplate>
-										<DataTemplate>
-											<CheckBox
-												HorizontalAlignment="Center"
-												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.delete}"
-												IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-												IsEnabled="{Binding DeleteEnabled}" />
-										</DataTemplate>
-									</DataGridTemplateColumn.CellTemplate>
-								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="3" CellStyle="{StaticResource Console.DataGrid.Cell}">
-									<DataGridTemplateColumn.Header>
-										<Button
-											AutomationProperties.AutomationId="Accounts.Matrix.Verb.3"
-											Click="OnToggleVerb"
-											Content="제어"
-											Style="{StaticResource Matrix.VerbHeader}"
-											Tag="3"
-											ToolTip="이 열 전체를 켜거나 끕니다(드래그 페인팅의 키보드 폴백)" />
-									</DataGridTemplateColumn.Header>
-									<DataGridTemplateColumn.CellTemplate>
-										<DataTemplate>
-											<CheckBox
-												HorizontalAlignment="Center"
-												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.control}"
-												IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-												IsEnabled="{Binding ControlEnabled}" />
-										</DataTemplate>
-									</DataGridTemplateColumn.CellTemplate>
-								</DataGridTemplateColumn>
-							</DataGrid.Columns>
-						</DataGrid>
+						<!--  그룹 자체의 CRUD — 목업의 그룹 관리 입구를 상세에 모은다(툴바 [새 그룹] · [삭제] 와 짝)  -->
+						<c:ConsoleSection Margin="16,4,14,0" Header="그룹">
+							<StackPanel>
+								<WrapPanel>
+									<Button
+										Margin="0,0,6,6"
+										AutomationProperties.AutomationId="Console.Accounts.Group.Rename"
+										Click="OnRenameGroup"
+										Content="이름/설명 수정"
+										IsEnabled="{Binding Matrix.CanEdit}"
+										Style="{StaticResource MaterialDesignOutlinedButton}" />
+									<Button
+										Margin="0,0,6,6"
+										AutomationProperties.AutomationId="Console.Accounts.Group.Members"
+										Click="OnShowMembers"
+										Content="구성원 보기"
+										Style="{StaticResource MaterialDesignOutlinedButton}" />
+								</WrapPanel>
 
-						<!--  구성원 — 칩으로 전환  -->
-						<ItemsControl
-							Margin="16,0,14,10"
-							Focusable="False"
-							ItemsSource="{Binding Matrix.Members}"
-							Visibility="{Binding Matrix.ShowMembers, Converter={StaticResource BoolToVisibility}}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<DockPanel Margin="0,3" LastChildFill="True">
+								<!--  이름/설명 폼 — 열렸을 때만  -->
+								<StackPanel Visibility="{Binding PermissionMatrixPanelViewModel.IsGroupFormOpen, Converter={StaticResource BoolToVisibility}}">
+									<c:ConsoleField ApiName="name" Header="이름">
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.group_name"
+											Style="{StaticResource Kv.Input}"
+											Text="{Binding PermissionMatrixPanelViewModel.FormName, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<c:ConsoleField ApiName="description" Header="설명">
+										<TextBox
+											AutomationProperties.AutomationId="Accounts.Detail.Field.group_description"
+											Style="{StaticResource Kv.Input}"
+											Text="{Binding PermissionMatrixPanelViewModel.FormDescription, UpdateSourceTrigger=PropertyChanged}" />
+									</c:ConsoleField>
+									<WrapPanel Margin="0,6,0,0">
 										<Button
-											Margin="6,0,0,0"
-											Padding="8,1"
-											AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.Member.Remove.{0}}"
-											Click="OnRemoveMember"
-											Content="해제"
-											DockPanel.Dock="Right"
-											FontSize="11.5" />
-										<TextBlock
-											VerticalAlignment="Center"
-											FontSize="12.5"
-											Foreground="{DynamicResource TextPrimaryBrush}">
-											<Run Text="{Binding LoginId, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Name, Mode=OneWay}" />
-										</TextBlock>
-									</DockPanel>
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+											Margin="0,0,6,0"
+											AutomationProperties.AutomationId="Console.Accounts.Group.FormSave"
+											Click="OnSaveGroupForm"
+											Content="그룹 저장"
+											IsEnabled="{Binding PermissionMatrixPanelViewModel.CanSaveGroupForm}"
+											Style="{StaticResource MaterialDesignOutlinedButton}" />
+										<Button
+											AutomationProperties.AutomationId="Console.Accounts.Group.FormCancel"
+											Click="OnCancelGroupForm"
+											Content="취소"
+											Style="{StaticResource MaterialDesignFlatButton}" />
+									</WrapPanel>
+								</StackPanel>
+							</StackPanel>
+						</c:ConsoleSection>
 					</StackPanel>
 
 					<!--  ③ 세션 상세 — 파괴 동작은 아래로 모은다  -->
@@ -854,23 +1248,38 @@
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="클라이언트" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.client_id" Style="{StaticResource Kv.Value}" Text="{Binding SelectedSession.ClientId, TargetNullValue=-}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.client_id"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedSession.ClientId, TargetNullValue=-, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="IP" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.ip" Style="{StaticResource Kv.Value}" Text="{Binding SelectedSession.IpAddress}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.ip"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedSession.IpAddress, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="단말" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.user_agent" Style="{StaticResource Kv.Value}" Text="{Binding SelectedSession.UserAgent}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.user_agent"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedSession.UserAgent, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="만료" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.expires" Style="{StaticResource Kv.Value}" Text="{Binding SelectedSession.ExpiresAt, Converter={StaticResource IsoDate}}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.expires"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedSession.ExpiresAt, Converter={StaticResource IsoDate}, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="사유" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.logout_reason" Style="{StaticResource Kv.Value}" Text="{Binding SelectedSession.LogoutReason, TargetNullValue=-}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.logout_reason"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedSession.LogoutReason, Converter={StaticResource LogoutReason}, Mode=OneWay}" />
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -886,7 +1295,7 @@
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogoutAll"
 								Click="OnForceLogoutAll"
-								Content="이 사용자 전체 종료"
+								Content="{Binding ForceLogoutAllText}"
 								IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
 								Style="{StaticResource MaterialDesignOutlinedButton}" />
 						</WrapPanel>
@@ -913,13 +1322,22 @@
 										SelectedItem="{Binding GrantManagementPanelViewModel.SelectedGroup, Mode=TwoWay}" />
 								</c:ConsoleField>
 								<c:ConsoleField ApiName="valid_from" Header="시작">
-									<DatePicker AutomationProperties.AutomationId="Accounts.Detail.Field.grant_from" SelectedDate="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
+									<!--  날짜만 고르면 자정이 되어 "오늘 몇 시부터 몇 시까지" 한시 부여가 불가능해진다  -->
+									<mah:DateTimePicker
+										Width="180"
+										HorizontalAlignment="Left"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_from"
+										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="valid_until"
 									Header="종료"
 									Note="비우면 상시입니다.">
-									<DatePicker AutomationProperties.AutomationId="Accounts.Detail.Field.grant_until" SelectedDate="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}" />
+									<mah:DateTimePicker
+										Width="180"
+										HorizontalAlignment="Left"
+										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_until"
+										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}" />
 								</c:ConsoleField>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -957,19 +1375,31 @@
 							<StackPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="동작" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.audit_action" Style="{StaticResource Kv.Value}" Text="{Binding SelectedAuditLog.ActionType}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.audit_action"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedAuditLog.ActionType, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="대상" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.audit_resource" Style="{StaticResource Kv.Value}" Text="{Binding SelectedAuditLog.ResourceName}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.audit_resource"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedAuditLog.ResourceName, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="행위자" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.audit_actor" Style="{StaticResource Kv.Value}" Text="{Binding SelectedAuditLog.ActorLoginId}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.audit_actor"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedAuditLog.ActorLoginId, Mode=OneWay}" />
 								</DockPanel>
 								<DockPanel Margin="0,2">
 									<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="설명" />
-									<TextBlock AutomationProperties.AutomationId="Accounts.Detail.Field.audit_description" Style="{StaticResource Kv.Value}" Text="{Binding SelectedAuditLog.Description}" />
+									<TextBox
+										AutomationProperties.AutomationId="Accounts.Detail.Field.audit_description"
+										Style="{StaticResource Kv.ReadOnlyValue}"
+										Text="{Binding SelectedAuditLog.Description, Mode=OneWay}" />
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>

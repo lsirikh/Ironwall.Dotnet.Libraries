@@ -23,12 +23,19 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRevokeGrantMessageModel>
 {
     private readonly IAccountApiService _api;
+    private readonly IClock _clock;
 
-    public GrantManagementPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api)
+    /// <param name="clock">
+    /// 시각의 출처. 비워 두면 시스템 시계다 — 시험은 <b>고정 시계</b>를 넣어 "오늘"이 흘러가도 깨지지 않게 한다
+    /// (규칙 csharp/testing-patterns I-02: 서비스 안에서 <c>DateTime.Now</c> 를 직접 부르지 않는다).
+    /// </param>
+    public GrantManagementPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api,
+                                         IClock? clock = null)
         : base(eventAggregator, log)
     {
         _api = api;
-        _validFrom = DateTime.Now;
+        _clock = clock ?? new SystemClock();
+        _validFrom = _clock.Now;
         // 람다가 _cancellationTokenSource '필드'를 캡처 — 매 발화 시 재평가되어 재활성 후 새 CTS 토큰을 읽는다(값 캡처 아님).
         LoadMoreCommand = new AsyncRelayCommand(() => LoadNextGrantsPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
@@ -46,7 +53,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         await base.OnActivateAsync(cancellationToken);
         // 시작 일시는 '폼을 열 때' 기준으로 되감는다 — ctor 1회 초기화라 패널이 장수명(탭 상주)이면 값이 낡아
         // 며칠 전 시각이 그대로 전송된다(과거 valid_from 자체는 서버가 허용하지만 운영자 의도와 다르다).
-        ValidFrom = DateTime.Now;
+        ValidFrom = _clock.Now;
         await LoadAccountsAndGroupsAsync(_cancellationTokenSource?.Token ?? cancellationToken);
         await LoadAllGrantsAsync(_cancellationTokenSource?.Token ?? cancellationToken);   // 탭 열자마자 전체 부여 현황 표시(계정 미선택에도 목록이 비지 않도록)
     }
@@ -75,7 +82,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             { Title = "권한 부여", Explain = "종료 일시는 시작 일시보다 뒤여야 합니다." });
             return;
         }
-        if (ValidUntil.HasValue && ValidUntil.Value <= DateTime.Now)
+        if (ValidUntil.HasValue && ValidUntil.Value <= _clock.Now)
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
             { Title = "권한 부여", Explain = "종료 일시는 현재보다 미래여야 합니다. (서버가 과거 종료일을 거부합니다)" });
@@ -92,7 +99,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
                 // item4(사용자 요청): 부여 후 폼 초기화 — 그룹/기간/계정 리셋.
                 SelectedGroup = null;
                 ValidUntil = null;
-                ValidFrom = DateTime.Now;
+                ValidFrom = _clock.Now;
                 SelectedAccount = null;
                 await LoadAllGrantsAsync();   // 새 부여를 전체 목록에 즉시 반영
             }

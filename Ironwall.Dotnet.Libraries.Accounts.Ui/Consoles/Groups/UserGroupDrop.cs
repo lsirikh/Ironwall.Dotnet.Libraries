@@ -45,9 +45,22 @@ public sealed record GroupAssignPlan(
     IReadOnlyList<AccountViewModel> Targets,
     int AlreadyIn,
     int Unsaved,
-    string? BlockReason)
+    string? BlockReason,
+    int SelfExcluded = 0,
+    int AdminGuardExcluded = 0)
 {
     public bool CanSend => BlockReason is null;
+}
+
+/// <summary>
+/// 끌어 놓기 판정이 알아야 하는 주변 사실 — 누가 조작하고 있는지, 어느 그룹이 계정 관리 권한을 쥐는지.
+/// </summary>
+/// <param name="SelfUserId">지금 조작하는 계정(0이면 모른다).</param>
+/// <param name="AdminGroupId">계정 관리(users:edit)를 쥔 그룹(0이면 없다/모른다).</param>
+/// <param name="AdminGroupMemberCount">그 그룹의 지금 구성원 수.</param>
+public sealed record GroupDropContext(int SelfUserId, int AdminGroupId, int AdminGroupMemberCount)
+{
+    public static GroupDropContext Unknown { get; } = new(0, 0, 0);
 }
 
 /// <summary>
@@ -58,7 +71,13 @@ public static class UserGroupDrop
 {
     public const string ZoneKey = AccountConsoleKeys.GroupZone;
 
+    public const string SelfBlocked = "자기 계정의 권한 그룹은 끌어서 바꿀 수 없습니다 — [구성원] 화면에서 바꾸세요.";
+    public const string LastAdminBlocked = "계정 관리 권한 그룹의 마지막 구성원입니다 — 옮기면 아무도 계정을 관리할 수 없습니다.";
+
     public static GroupAssignPlan Plan(int groupId, string groupName, IEnumerable<AccountViewModel>? users)
+        => Plan(groupId, groupName, users, GroupDropContext.Unknown);
+
+    public static GroupAssignPlan Plan(int groupId, string groupName, IEnumerable<AccountViewModel>? users, GroupDropContext context)
     {
         var list = users?.Where(u => u is not null).ToList() ?? new List<AccountViewModel>();
 
@@ -70,16 +89,35 @@ public static class UserGroupDrop
         var unsaved = list.Count(u => u.Id <= 0);
         var saved = list.Where(u => u.Id > 0).ToList();
         var alreadyIn = saved.Count(u => u.GroupId == groupId);
-        var targets = saved.Where(u => u.GroupId != groupId)
-                           .GroupBy(u => u.Id)
-                           .Select(g => g.First())
-                           .ToList();
+        var moving = saved.Where(u => u.GroupId != groupId)
+                          .GroupBy(u => u.Id)
+                          .Select(g => g.First())
+                          .ToList();
+
+        // ① 자기 계정은 끌어서 옮기지 않는다 — 스쳐 고른 뒤 떨어뜨려 스스로 관리 권한을 잃는 사고를 막는다.
+        var self = context.SelfUserId > 0 ? moving.Count(u => u.Id == context.SelfUserId) : 0;
+        if (self > 0) moving = moving.Where(u => u.Id != context.SelfUserId).ToList();
+
+        // ② 계정 관리 그룹을 비우지 않는다(서버 8.0.1 은 마지막 ADMIN 에 409, 6.3.2 는 막지 않는다).
+        var adminGuard = 0;
+        if (context.AdminGroupId > 0 && context.AdminGroupId != groupId)
+        {
+            var leaving = moving.Count(u => u.GroupId == context.AdminGroupId);
+            if (leaving > 0 && leaving >= context.AdminGroupMemberCount)
+            {
+                adminGuard = leaving;
+                moving = moving.Where(u => u.GroupId != context.AdminGroupId).ToList();
+            }
+        }
 
         string? reason = null;
-        if (targets.Count == 0)
-            reason = saved.Count == 0 ? "아직 저장되지 않은 계정입니다." : "이미 이 그룹에 들어 있습니다.";
+        if (moving.Count == 0)
+            reason = adminGuard > 0 ? LastAdminBlocked
+                   : self > 0 ? SelfBlocked
+                   : saved.Count == 0 ? "아직 저장되지 않은 계정입니다."
+                   : "이미 이 그룹에 들어 있습니다.";
 
-        return new GroupAssignPlan(groupId, groupName, targets, alreadyIn, unsaved, reason);
+        return new GroupAssignPlan(groupId, groupName, moving, alreadyIn, unsaved, reason, self, adminGuard);
     }
 
     /// <summary>드롭 직후 상태 띠에 남길 한 줄 — 호출이 N회로 번지므로 곧바로 보내지 않는다.</summary>
@@ -88,6 +126,8 @@ public static class UserGroupDrop
         var parts = new List<string> { $"Draft {draftCount}건 — 호출은 {draftCount}회로 번지므로 [적용] 때 모아 보냅니다" };
         if (plan.AlreadyIn > 0) parts.Add($"이미 '{plan.GroupName}' 인 {plan.AlreadyIn}명은 담지 않았습니다");
         if (plan.Unsaved > 0) parts.Add($"저장 전 {plan.Unsaved}명은 뺐습니다");
+        if (plan.SelfExcluded > 0) parts.Add("자기 계정은 뺐습니다");
+        if (plan.AdminGuardExcluded > 0) parts.Add($"계정 관리 그룹의 마지막 {plan.AdminGuardExcluded}명은 뺐습니다");
         return string.Join(" · ", parts);
     }
 }
@@ -113,14 +153,19 @@ public sealed class UserGroupDropHandler : IDragDropHandler
     private readonly Func<bool> _canAssign;
     private readonly ILogService? _log;
     private readonly List<GroupAssignUndo> _undo = new();
+    private bool _settled = true;
 
-    public UserGroupDropHandler(IAccountApiService api, DraftTrayViewModel tray, Func<bool> canAssign, ILogService? log = null)
+    public UserGroupDropHandler(IAccountApiService api, DraftTrayViewModel tray, Func<bool> canAssign,
+                                ILogService? log = null, Func<GroupDropContext>? context = null)
     {
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _tray = tray ?? throw new ArgumentNullException(nameof(tray));
         _canAssign = canAssign ?? throw new ArgumentNullException(nameof(canAssign));
         _log = log;
+        _context = context ?? (() => GroupDropContext.Unknown);
     }
+
+    private readonly Func<GroupDropContext> _context;
 
     /// <summary>무엇이 쌓였는지 · 무엇이 바뀌었는지 알린다(상태 띠 한 줄).</summary>
     public event Action<string>? Announced;
@@ -132,7 +177,7 @@ public sealed class UserGroupDropHandler : IDragDropHandler
     {
         if (!_canAssign() || _tray.IsApplying) return false;
         if (target.ZoneKey != UserGroupDrop.ZoneKey || target.ZoneData is not AccountGroupChipViewModel chip) return false;
-        return UserGroupDrop.Plan(chip.Id, chip.Name, Accounts(payload.Items)).CanSend;
+        return UserGroupDrop.Plan(chip.Id, chip.Name, Accounts(payload.Items), _context()).CanSend;
     }
 
     public void Drop(DragPayload payload, DropTarget target)
@@ -148,8 +193,15 @@ public sealed class UserGroupDropHandler : IDragDropHandler
         if (!_canAssign()) { Announce("권한이 없어 그룹을 바꿀 수 없습니다."); return 0; }
         if (_tray.IsApplying) { Announce("적용 중에는 더 담을 수 없습니다."); return 0; }
 
-        var plan = UserGroupDrop.Plan(chip.Id, chip.Name, users);
+        var plan = UserGroupDrop.Plan(chip.Id, chip.Name, users, _context());
         if (!plan.CanSend) { Announce(plan.BlockReason!); return 0; }
+
+        // 완전히 끝난 묶음 뒤에 새로 담기 시작하면 되돌리기 장부를 새로 연다(재시도 중에는 이어 쓴다).
+        if (_settled && !_tray.HasEntries)
+        {
+            _undo.Clear();
+            _settled = false;
+        }
 
         foreach (var user in plan.Targets) _tray.Add(EntryFor(user, chip));
 
@@ -160,8 +212,12 @@ public sealed class UserGroupDropHandler : IDragDropHandler
     /// <summary>쌓아 둔 Draft 를 순차 전송한다 — 진행률과 부분 실패 4분류는 트레이가 센다.</summary>
     public async Task<DraftApplySummary> ApplyAsync(CancellationToken token = default)
     {
-        _undo.Clear();
+        // ★ 되돌리기 장부를 여기서 비우지 않는다 — 부분 실패를 다시 [적용] 하면 앞서 성공한 것들이 장부에서 사라져
+        //   [되돌리기] 가 재시도분만 되돌린다. 장부는 "새 묶음을 담기 시작할 때"만 비운다.
+        _settled = false;
         var summary = await _tray.ApplyAsync(token).ConfigureAwait(true);
+        // 남은 Draft 가 없으면 이 묶음은 끝났다 — 다음에 담는 것은 새 묶음이다.
+        _settled = !_tray.HasEntries;
         Announce(summary.ToMessage() + (summary.Applied > 0 ? " (벌크 입구가 있으면 1회)" : string.Empty));
         return summary;
     }
@@ -225,7 +281,7 @@ public sealed class UserGroupDropHandler : IDragDropHandler
                 user.GroupId = chip.Id;
                 user.GroupText = chip.Name;
                 chip.UserCount++;
-                _undo.Add(new GroupAssignUndo(user.Id, user.Username, before));
+                if (_undo.All(u => u.UserId != user.Id)) _undo.Add(new GroupAssignUndo(user.Id, user.Username, before));
                 return DraftOutcome.Applied;
             });
     }
