@@ -1,0 +1,223 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.PasteReportView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:wiring="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	PreviewKeyDown="OnPreviewKeyDown">
+	<!--
+		엑셀에서 붙여넣기(WS L368, L499 · WPF 메모 L371 "탭·줄바꿈 분해 → 열 매핑 미리보기 → Draft 행 생성").
+		버린 줄은 색만이 아니라 ✕ 표지와 흐린 글자로도 말한다(W6).
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<wiring:PasteColumnTextConverter x:Key="ColumnText" />
+	</UserControl.Resources>
+	<DockPanel Margin="16,14" LastChildFill="True">
+		<TextBlock
+			DockPanel.Dock="Top"
+			FontSize="15"
+			FontWeight="Bold"
+			Text="엑셀에서 붙여넣기" />
+		<TextBlock
+			Margin="0,6,0,0"
+			AutomationProperties.AutomationId="Devices.Wiring.Paste.Summary"
+			DockPanel.Dock="Top"
+			FontSize="13"
+			Text="{Binding Summary}"
+			TextWrapping="Wrap" />
+		<TextBlock
+			Margin="0,4,0,0"
+			DockPanel.Dock="Top"
+			FontSize="12"
+			Foreground="{DynamicResource TextMutedBrush}"
+			Text="{Binding ColumnText}"
+			TextWrapping="Wrap" />
+
+		<!--  열 매핑(W7) — 바꾸면 그 자리에서 다시 읽는다  -->
+		<Border
+			Margin="0,8,0,0"
+			Padding="8,6"
+			Background="{DynamicResource SurfaceSunkenBrush}"
+			CornerRadius="6"
+			DockPanel.Dock="Top"
+			Visibility="{Binding HasColumns, Converter={StaticResource BoolToVisibility}}">
+			<ItemsControl AutomationProperties.AutomationId="Devices.Wiring.Paste.Columns" ItemsSource="{Binding Columns}">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<WrapPanel Orientation="Horizontal" />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Width="132" Margin="0,0,8,4">
+							<TextBlock
+								FontSize="11"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding Header}" />
+							<ComboBox
+								Margin="0,2"
+								AutomationProperties.AutomationId="{Binding Index, StringFormat=Devices.Wiring.Paste.Column.{0}}"
+								FontSize="12"
+								ItemsSource="{Binding Roles}"
+								SelectedItem="{Binding Role, Mode=TwoWay}">
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding Converter={StaticResource ColumnText}}" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+							</ComboBox>
+							<TextBlock
+								FontSize="10.5"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding Sample}"
+								TextTrimming="CharacterEllipsis"
+								ToolTip="{Binding Sample}" />
+						</StackPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</Border>
+
+		<StackPanel
+			Margin="0,12,0,0"
+			HorizontalAlignment="Right"
+			DockPanel.Dock="Bottom"
+			Orientation="Horizontal">
+			<Button
+				Margin="0,0,6,0"
+				AutomationProperties.AutomationId="Devices.Wiring.Paste.Cancel"
+				Click="OnCancel"
+				Content="취소"
+				Style="{StaticResource MaterialDesignOutlinedButton}" />
+			<Button
+				MinWidth="110"
+				AutomationProperties.AutomationId="Devices.Wiring.Paste.Accept"
+				Click="OnAccept"
+				Content="{Binding ApplyText}"
+				IsEnabled="{Binding CanApply}" />
+		</StackPanel>
+
+		<!--  건너뛸 줄 — 아래에서부터 필요한 만큼만 차지한다(W8)  -->
+		<StackPanel
+			Margin="0,10,0,0"
+			DockPanel.Dock="Bottom"
+			Visibility="{Binding HasRejected, Converter={StaticResource BoolToVisibility}}">
+			<TextBlock
+				Margin="0,0,0,4"
+				FontSize="12"
+				FontWeight="Bold"
+				Foreground="{DynamicResource StatusCriticalBrush}"
+				Text="✕ 건너뛸 줄" />
+			<ItemsControl
+				MaxHeight="110"
+				AutomationProperties.AutomationId="Devices.Wiring.Paste.Rejected"
+				Focusable="False"
+				ItemsSource="{Binding Rejected}">
+				<ItemsControl.Template>
+					<ControlTemplate TargetType="ItemsControl">
+						<ScrollViewer VerticalScrollBarVisibility="Auto">
+							<ItemsPresenter />
+						</ScrollViewer>
+					</ControlTemplate>
+				</ItemsControl.Template>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<DockPanel Margin="0,1,0,0" LastChildFill="True">
+							<TextBlock
+								Margin="0,0,5,0"
+								VerticalAlignment="Top"
+								DockPanel.Dock="Left"
+								FontSize="12"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Text="✕" />
+							<TextBlock
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								TextWrapping="Wrap">
+								<Run Text="{Binding LineNumber, Mode=OneWay, StringFormat={}{0}줄}" />
+								<Run Text=" — " />
+								<Run Text="{Binding Error, Mode=OneWay}" />
+							</TextBlock>
+						</DockPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+			<TextBlock
+				FontSize="11.5"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="{Binding MoreRejectedText}" />
+		</StackPanel>
+
+		<Border
+			MaxHeight="300"
+			Margin="0,10,0,0"
+			VerticalAlignment="Top"
+			Background="{DynamicResource SurfaceAltBrush}"
+			BorderBrush="{DynamicResource DividerBrush}"
+			BorderThickness="1"
+			CornerRadius="6">
+			<Grid>
+				<TextBlock
+					Margin="12"
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center"
+					FontSize="12.5"
+					Foreground="{DynamicResource StatusCriticalBrush}"
+					Text="{Binding Report.FatalError}"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasFatal, Converter={StaticResource BoolToVisibility}}" />
+				<ListBox
+					AutomationProperties.AutomationId="Devices.Wiring.Paste.Accepted"
+					Background="Transparent"
+					BorderThickness="0"
+					ItemsSource="{Binding Accepted}">
+					<ListBox.ItemContainerStyle>
+						<Style TargetType="ListBoxItem">
+							<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+						</Style>
+					</ListBox.ItemContainerStyle>
+					<ListBox.ItemTemplate>
+						<DataTemplate>
+							<DockPanel Margin="2" LastChildFill="True">
+								<TextBlock
+									Width="42"
+									DockPanel.Dock="Left"
+									FontFamily="Consolas"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding LineNumber}" />
+								<TextBlock
+									Width="64"
+									DockPanel.Dock="Left"
+									FontFamily="Consolas"
+									FontSize="12"
+									Text="{Binding Facts.Number}" />
+								<TextBlock
+									Width="120"
+									DockPanel.Dock="Right"
+									FontSize="11.5"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding Facts.Zone}"
+									TextTrimming="CharacterEllipsis" />
+								<TextBlock
+									Width="90"
+									DockPanel.Dock="Right"
+									FontSize="11.5"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding Facts.TypeText}"
+									TextTrimming="CharacterEllipsis" />
+								<TextBlock
+									FontSize="12.5"
+									Text="{Binding Facts.Name}"
+									TextTrimming="CharacterEllipsis" />
+							</DockPanel>
+						</DataTemplate>
+					</ListBox.ItemTemplate>
+				</ListBox>
+			</Grid>
+		</Border>
+	</DockPanel>
+</UserControl>

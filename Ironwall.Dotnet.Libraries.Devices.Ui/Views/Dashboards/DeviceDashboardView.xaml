@@ -142,10 +142,19 @@
 								Style="{StaticResource MaterialDesignOutlinedButton}"
 								ToolTip="프리셋을 고르고 번호 · 이름 · 접속만 넣으면 부품까지 한 번에 등록된다" />
 							<Button
+								Margin="0,0,6,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Presets"
 								Click="OnManagePresets"
 								Content="프리셋…"
 								Style="{StaticResource MaterialDesignFlatButton}" />
+							<!--  셋업 · 결선(N-04) — 제어기 한 대를 골랐을 때만 눌린다  -->
+							<Button
+								AutomationProperties.AutomationId="Console.Devices.Toolbar.Wiring"
+								Click="OnOpenWiring"
+								Content="셋업 · 결선"
+								IsEnabled="{Binding CanOpenWiring}"
+								Style="{StaticResource MaterialDesignOutlinedButton}"
+								ToolTip="{Binding WiringBlockedReason}" />
 						</StackPanel>
 					</c:ConsoleToolbar.Extra>
 				</c:ConsoleToolbar>

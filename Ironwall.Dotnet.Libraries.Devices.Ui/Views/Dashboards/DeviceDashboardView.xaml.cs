@@ -271,6 +271,11 @@ public partial class DeviceDashboardView : UserControl
         if (ViewModel is { } vm) await vm.ManagePresetsAsync();
     }
 
+    private async void OnOpenWiring(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.OpenWiringAsync();
+    }
+
     private async void OnEditComponents(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.EditComponentsAsync();

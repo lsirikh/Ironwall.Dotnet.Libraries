@@ -47,6 +47,14 @@ public partial class App : Application
                 if (directory is not null) Shutdown();
                 return;
             }
+
+            // 셋업 · 결선 창 — 콘솔과 따로 뜬다(--wiring [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--wiring"))
+            {
+                await RunWiringAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
             _viewModel = Build(isAxis);
 
             _view = new DeviceDashboardView { DataContext = _viewModel };
@@ -232,6 +240,58 @@ public partial class App : Application
         await Show(preview.PresetManager(), 720, 560, "06-preset-manager");
         await Show(preview.Register(withProblem: false), 980, 680, "07-register");
         await Show(preview.Register(withProblem: true), 980, 680, "08-register-problems");
+    }
+
+    /// <summary>셋업 · 결선 창의 상태 8종을 띄우고(스냅샷이면) 찍는다.</summary>
+    private async Task RunWiringAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        if (directory is not null) Directory.CreateDirectory(directory);      // 오류 파일조차 못 쓰는 일이 없게
+
+        var preview = new WiringPreview();
+        _window = new Window { Title = "셋업 · 결선 미리보기", Width = 1320, Height = 860, Background = (Brush)FindResource("SurfaceBrush") };
+        _window.Show();
+
+        async Task Show(FrameworkElement view, double width, double height, string name)
+        {
+            _window.Width = width + 40;
+            _window.Height = height + 60;
+            if (view.Parent is Border old) old.Child = null;     // 같은 뷰를 두 번 찍을 때 — 옛 부모에서 먼저 뗀다
+            _window.Content = new Border { Margin = new Thickness(12), Child = view };
+            await Settle();
+            if (directory is not null) Save(directory, $"wiring-{theme}-{name}");
+        }
+
+        var (emptyView, _) = preview.Empty();
+        await Show(emptyView, 1280, 820, "01-empty-controller");
+        if (directory is null) return;      // 손으로 써 볼 때는 창 하나만 띄워 둔다
+
+        var (tableView, _) = preview.TableWithSelection();
+        await Show(tableView, 1280, 820, "02-table-selection");
+
+        var (wiredView, _) = preview.Wired();
+        await Show(wiredView, 1280, 820, "03-wiring-placed");
+
+        var (problemView, _) = preview.Problems();
+        await Show(problemView, 1280, 820, "04-wiring-problems");
+
+        var (changeView, _) = preview.ChangePreview();
+        await Show(changeView, 1280, 820, "05-change-preview");
+
+        var (groupView, _) = preview.GroupSelection();
+        await Show(groupView, 1280, 820, "10-groups-tristate");
+
+        var (slotView, _) = preview.SlotSelected();
+        await Show(slotView, 1280, 820, "11-slot-selected");
+
+        await Show(preview.MakeSensors(withConflict: false), 520, 640, "06-make-sensors");
+        await Show(preview.MakeSensors(withConflict: true), 520, 640, "07-make-sensors-conflict");
+        await Show(preview.PasteReport(), 640, 560, "08-paste-report");
+        await Show(preview.SaveConfirm(), 520, 340, "09-save-confirm");
     }
 
     private void ApplyDark()

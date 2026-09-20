@@ -85,6 +85,9 @@ public class DeviceUiModule : Module
             // 조립기 · 프리셋 · 프리셋으로 등록 창을 여는 입구. 창 뷰모델은 싱글턴이 아니다 — 열 때마다 새로 만든다.
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.AssemblyLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>().SingleInstance();
+            // 셋업 · 결선 창(N-04) — 장비 콘솔이 Lazy 로만 잡는다(못 만들어도 콘솔은 열린다).
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringLauncher>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher>().SingleInstance();
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();
