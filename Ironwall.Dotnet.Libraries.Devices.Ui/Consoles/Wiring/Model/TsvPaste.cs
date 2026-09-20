@@ -13,17 +13,62 @@ public sealed record PasteRow(int LineNumber, SensorFacts Facts, string? Error)
     public bool IsAccepted => Error is null;
 }
 
+/// <summary>붙여넣은 글자의 열 하나가 무엇인가(W7).</summary>
+public enum PasteColumn
+{
+    /// <summary>읽지 않는다.</summary>
+    Ignore = 0,
+    Number = 1,
+    Name = 2,
+    Type = 3,
+    Zone = 4,
+}
+
+/// <summary>열 매핑 — 붙여넣은 글자의 <b>열 순서대로</b> 무엇으로 읽을지(W7).</summary>
+public sealed record PasteColumnMap(IReadOnlyList<PasteColumn> Columns)
+{
+    public int IndexOf(PasteColumn column)
+    {
+        for (var i = 0; i < Columns.Count; i++) if (Columns[i] == column) return i;
+        return -1;
+    }
+
+    public PasteColumn At(int index) => index >= 0 && index < Columns.Count ? Columns[index] : PasteColumn.Ignore;
+
+    /// <summary>번호 열이 없으면 아무 줄도 만들 수 없다.</summary>
+    public bool HasNumber => IndexOf(PasteColumn.Number) >= 0;
+
+    /// <summary>한 열의 뜻을 바꾼 새 매핑 — 같은 뜻을 두 열에 둘 수 없다.</summary>
+    public PasteColumnMap With(int index, PasteColumn column)
+    {
+        var next = Columns.ToList();
+        while (next.Count <= index) next.Add(PasteColumn.Ignore);
+        if (column != PasteColumn.Ignore)
+            for (var i = 0; i < next.Count; i++) if (i != index && next[i] == column) next[i] = PasteColumn.Ignore;
+        next[index] = column;
+        return new PasteColumnMap(next);
+    }
+}
+
 /// <summary>붙여넣기 결과 보고 — 받은 줄 · 만들 줄 · 버린 줄과 까닭(WS L368, L499, L527).</summary>
 public sealed record PasteReport(
     int TotalLines,
     bool HeaderDetected,
     IReadOnlyList<string> ColumnOrder,
     IReadOnlyList<PasteRow> Rows,
-    string? FatalError)
+    string? FatalError,
+    PasteColumnMap? Mapping = null,
+    string? SourceText = null)
 {
     public IReadOnlyList<PasteRow> Accepted { get; } = Rows.Where(r => r.IsAccepted).ToList();
     public IReadOnlyList<PasteRow> Rejected { get; } = Rows.Where(r => !r.IsAccepted).ToList();
     public bool HasRows => Accepted.Count > 0;
+
+    /// <summary>다시 읽을 때 쓰는 원본 — 열 매핑을 바꾸면 이 글자를 다시 읽는다.</summary>
+    public string? Text { get; } = SourceText;
+
+    /// <summary>사람이 고칠 수 있는 열 매핑.</summary>
+    public PasteColumnMap Columns { get; } = Mapping ?? new PasteColumnMap(Array.Empty<PasteColumn>());
 
     public string Summary => FatalError is not null
         ? FatalError
@@ -62,7 +107,8 @@ public static class TsvPaste
     /// <param name="existingNumbers">이미 있는 장비 번호 — 겹치면 그 줄은 버린다.</param>
     /// <param name="defaultType">종류 칸이 비었을 때 넣을 값.</param>
     /// <param name="defaultZone">구역 칸이 비었을 때 넣을 값.</param>
-    public static PasteReport Parse(string? text, IEnumerable<int>? existingNumbers, string defaultType = "", string defaultZone = "")
+    public static PasteReport Parse(string? text, IEnumerable<int>? existingNumbers, string defaultType = "", string defaultZone = "",
+                                    PasteColumnMap? mapping = null, bool? treatFirstLineAsHeader = null)
     {
         if (string.IsNullOrWhiteSpace(text))
             return new PasteReport(0, false, Array.Empty<string>(), Array.Empty<PasteRow>(), "붙여넣을 내용이 없습니다.");
@@ -71,21 +117,24 @@ public static class TsvPaste
             return new PasteReport(0, false, Array.Empty<string>(), Array.Empty<PasteRow>(),
                 $"붙여넣은 내용이 너무 큽니다({text.Length:N0}자) — 한 번에 {MAX_TEXT_LENGTH:N0}자까지 받습니다.");
 
-        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal)
-                        .Replace('\r', '\n')
-                        .Split('\n')
-                        .Where(l => !string.IsNullOrWhiteSpace(l))
-                        .ToList();
+        var lines = Lines(text).ToList();
 
         if (lines.Count == 0)
             return new PasteReport(0, false, Array.Empty<string>(), Array.Empty<PasteRow>(), "붙여넣을 내용이 없습니다.");
 
         var cells = lines.Select(l => l.Split('\t').Select(Sanitize).ToArray()).ToList();
 
-        var map = DetectHeader(cells[0]);
-        var headerDetected = map is not null;
-        map ??= new ColumnMap(0, 1, 2, 3);
+        var detected = DetectHeader(cells[0]);
+        var headerDetected = treatFirstLineAsHeader ?? detected is not null;
+        var columns = mapping ?? detected ?? DefaultMap(cells.Max(c => c.Length));
         var start = headerDetected ? 1 : 0;
+
+        if (!columns.HasNumber)
+            return new PasteReport(Math.Max(lines.Count - start, 0), headerDetected, ColumnNames, Array.Empty<PasteRow>(),
+                "번호 열을 골라 주세요 — 번호가 없으면 어느 센서인지 알 수 없습니다.", columns, text);
+
+        var map = new ColumnMap(columns.IndexOf(PasteColumn.Number), columns.IndexOf(PasteColumn.Name),
+                                columns.IndexOf(PasteColumn.Type), columns.IndexOf(PasteColumn.Zone));
 
         var taken = new HashSet<int>(existingNumbers ?? Enumerable.Empty<int>());
         var rows = new List<PasteRow>();
@@ -138,29 +187,58 @@ public static class TsvPaste
             made++;
         }
 
-        var order = new[] { "번호", "이름", "종류", "구역" };
-        return new PasteReport(lines.Count - start, headerDetected, order, rows, null);
+        return new PasteReport(lines.Count - start, headerDetected, ColumnNames, rows, null, columns, text);
     }
 
     private sealed record ColumnMap(int Number, int Name, int Type, int Zone);
 
-    /// <summary>첫 줄이 머리글이면 열 자리를, 아니면 <c>null</c>.</summary>
-    private static ColumnMap? DetectHeader(IReadOnlyList<string> cells)
+    /// <summary>열 이름 — 매핑 콤보에 그대로 쓴다.</summary>
+    public static readonly IReadOnlyList<string> ColumnNames = new[] { "번호", "이름", "종류", "구역" };
+
+    /// <summary>머리글이 없을 때의 기본 순서: 번호 · 이름 · 종류 · 구역.</summary>
+    public static PasteColumnMap DefaultMap(int columnCount)
     {
-        int number = -1, name = -1, type = -1, zone = -1;
-        for (var i = 0; i < cells.Count; i++)
+        var order = new[] { PasteColumn.Number, PasteColumn.Name, PasteColumn.Type, PasteColumn.Zone };
+        var count = Math.Max(columnCount, 1);
+        var columns = new List<PasteColumn>(count);
+        for (var i = 0; i < count; i++) columns.Add(i < order.Length ? order[i] : PasteColumn.Ignore);
+        return new PasteColumnMap(columns);
+    }
+
+    /// <summary>첫 줄이 머리글이면 그 자리로 읽은 매핑을, 아니면 <c>null</c>(W7 — 사람이 고칠 수 있는 시작값).</summary>
+    public static PasteColumnMap? DetectHeader(IReadOnlyList<string> cells)
+    {
+        var columns = new List<PasteColumn>(cells.Count);
+        var found = 0;
+        foreach (var raw in cells)
         {
-            var key = cells[i].Trim().ToLowerInvariant();
-            if (number < 0 && NumberHeaders.Contains(key)) number = i;
-            else if (name < 0 && NameHeaders.Contains(key)) name = i;
-            else if (type < 0 && TypeHeaders.Contains(key)) type = i;
-            else if (zone < 0 && ZoneHeaders.Contains(key)) zone = i;
+            var key = raw.Trim().ToLowerInvariant();
+            var column = NumberHeaders.Contains(key) ? PasteColumn.Number
+                : NameHeaders.Contains(key) ? PasteColumn.Name
+                : TypeHeaders.Contains(key) ? PasteColumn.Type
+                : ZoneHeaders.Contains(key) ? PasteColumn.Zone
+                : PasteColumn.Ignore;
+            if (column != PasteColumn.Ignore && columns.Contains(column)) column = PasteColumn.Ignore;
+            if (column != PasteColumn.Ignore) found++;
+            columns.Add(column);
         }
 
-        // 번호 + 하나만 더 알아봐도 머리글로 본다 — 못 찾은 열은 자리를 비운다(-1 = 읽지 않음).
-        if (number < 0 || (name < 0 && type < 0 && zone < 0)) return null;
-        return new ColumnMap(number, name, type, zone);
+        var map = new PasteColumnMap(columns);
+        return map.HasNumber && found >= 2 ? map : null;
     }
+
+    /// <summary>글자를 줄 · 칸으로만 쪼갠다 — 매핑 화면이 첫 줄을 보여 줄 때 쓴다.</summary>
+    public static IReadOnlyList<IReadOnlyList<string>> Split(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return Array.Empty<IReadOnlyList<string>>();
+        return Lines(text).Select(l => (IReadOnlyList<string>)l.Split('\t').Select(Sanitize).ToArray()).ToList();
+    }
+
+    private static IEnumerable<string> Lines(string text)
+        => text.Replace("\r\n", "\n", StringComparison.Ordinal)
+               .Replace('\r', '\n')
+               .Split('\n')
+               .Where(l => !string.IsNullOrWhiteSpace(l));
 
     private static string At(IReadOnlyList<string> cells, int index)
         => index >= 0 && index < cells.Count ? cells[index] : string.Empty;

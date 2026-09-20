@@ -26,6 +26,9 @@ public interface IWiringDialogs
     /// <summary>붙여넣기 보고를 보이고 "이대로 만들까?" 를 묻는다.</summary>
     Task<bool> ShowPasteReportAsync(PasteReport report);
 
+    /// <summary>열 매핑을 바꿨을 때 다시 읽을 재료를 화면 계층에 알려 둔다(W7).</summary>
+    void RememberPasteContext(IReadOnlyCollection<int> existingNumbers, string defaultType, string defaultZone);
+
     /// <summary>클립보드 글자(없거나 읽을 수 없으면 <c>null</c>). 화면 계층에서만 실제 클립보드를 만진다.</summary>
     string? ReadClipboardText();
 }
@@ -202,31 +205,88 @@ public sealed class MakeSensorsViewModel : Screen
     }
 }
 
-/// <summary>붙여넣기 보고 — 받은 줄 · 만들 줄 · 버린 줄과 까닭(WS L368, L499).</summary>
+/// <summary>열 매핑 콤보 한 칸(W7) — 붙여넣은 글자의 그 열을 무엇으로 읽을지.</summary>
+public sealed class PasteColumnViewModel : PropertyChangedBase
+{
+    private readonly Action<PasteColumnViewModel> _changed;
+    private PasteColumn _role;
+
+    public PasteColumnViewModel(int index, string sample, PasteColumn role, Action<PasteColumnViewModel> changed)
+    {
+        Index = index;
+        Sample = sample;
+        _role = role;
+        _changed = changed;
+    }
+
+    public int Index { get; }
+
+    /// <summary>첫 줄의 그 칸 — 무엇을 고르는지 눈으로 알 수 있게.</summary>
+    public string Sample { get; }
+
+    public string Header => $"{Index + 1}번째 열";
+
+    public IReadOnlyList<PasteColumn> Roles { get; } = new[]
+    {
+        PasteColumn.Number, PasteColumn.Name, PasteColumn.Type, PasteColumn.Zone, PasteColumn.Ignore,
+    };
+
+    public PasteColumn Role
+    {
+        get => _role;
+        set
+        {
+            if (_role == value) return;
+            _role = value;
+            NotifyOfPropertyChange();
+            _changed(this);
+        }
+    }
+}
+
+/// <summary>붙여넣기 보고 — 받은 줄 · 만들 줄 · 버린 줄과 까닭(WS L368, L499) + 열 매핑(WS L371 · W7).</summary>
 public sealed class PasteReportViewModel : Screen
 {
     /// <summary>한 번에 보여 주는 줄 수 — 500줄을 다 그리면 창이 멈춘다.</summary>
     public const int SHOW_LIMIT = 50;
 
-    public PasteReportViewModel(PasteReport report)
+    private readonly IReadOnlyCollection<int> _existingNumbers;
+    private readonly string _defaultType;
+    private readonly string _defaultZone;
+    private bool _rebuilding;
+
+    public PasteReportViewModel(PasteReport report, IReadOnlyCollection<int>? existingNumbers = null,
+                                string defaultType = "", string defaultZone = "")
     {
         Report = report ?? throw new ArgumentNullException(nameof(report));
+        _existingNumbers = existingNumbers ?? Array.Empty<int>();
+        _defaultType = defaultType;
+        _defaultZone = defaultZone;
+
         DisplayName = "엑셀에서 붙여넣기";
-        Accepted = new ObservableCollection<PasteRow>(report.Accepted.Take(SHOW_LIMIT));
-        Rejected = new ObservableCollection<PasteRow>(report.Rejected.Take(SHOW_LIMIT));
+        Accepted = new ObservableCollection<PasteRow>();
+        Rejected = new ObservableCollection<PasteRow>();
+        Columns = new ObservableCollection<PasteColumnViewModel>();
+        Rebuild(report);
     }
 
-    public PasteReport Report { get; }
+    public PasteReport Report { get; private set; }
     public ObservableCollection<PasteRow> Accepted { get; }
     public ObservableCollection<PasteRow> Rejected { get; }
 
+    /// <summary>열 매핑 콤보(W7) — 바꾸면 곧바로 다시 읽는다.</summary>
+    public ObservableCollection<PasteColumnViewModel> Columns { get; }
+
+    public bool HasColumns => Columns.Count > 0;
+
     public string Summary => Report.Summary;
-    public string ColumnText => $"열 순서: {string.Join(" · ", Report.ColumnOrder)}";
+    public string ColumnText => "열마다 무엇으로 읽을지 고르세요 — 머리글이 있으면 자동으로 맞춰 둡니다.";
     public bool HasRejected => Report.Rejected.Count > 0;
     public string MoreAcceptedText => Report.Accepted.Count > SHOW_LIMIT ? $"… 외 {Report.Accepted.Count - SHOW_LIMIT}줄" : string.Empty;
     public string MoreRejectedText => Report.Rejected.Count > SHOW_LIMIT ? $"… 외 {Report.Rejected.Count - SHOW_LIMIT}줄" : string.Empty;
     public bool CanApply => Report.HasRows;
     public string ApplyText => $"{Report.Accepted.Count}줄 만들기";
+    public bool HasFatal => Report.FatalError is not null;
 
     public bool Result { get; private set; }
 
@@ -241,5 +301,53 @@ public sealed class PasteReportViewModel : Screen
     {
         Result = false;
         await TryCloseAsync(false);
+    }
+
+    /// <summary>콤보가 바뀌었다 — 같은 글자를 새 매핑으로 다시 읽는다.</summary>
+    private void OnColumnChanged(PasteColumnViewModel column)
+    {
+        if (_rebuilding) return;
+
+        var mapping = new PasteColumnMap(Columns.Select(c => c.Role).ToList()).With(column.Index, column.Role);
+        Rebuild(TsvPaste.Parse(Report.Text, _existingNumbers, _defaultType, _defaultZone, mapping, Report.HeaderDetected));
+    }
+
+    private void Rebuild(PasteReport report)
+    {
+        _rebuilding = true;
+        try
+        {
+            Report = report;
+
+            Accepted.Clear();
+            foreach (var row in report.Accepted.Take(SHOW_LIMIT)) Accepted.Add(row);
+            Rejected.Clear();
+            foreach (var row in report.Rejected.Take(SHOW_LIMIT)) Rejected.Add(row);
+
+            var samples = TsvPaste.Split(report.Text);
+            var first = samples.Count > 0 ? samples[0] : Array.Empty<string>();
+            var count = Math.Max(report.Columns.Columns.Count, first.Count);
+
+            if (Columns.Count != count)
+            {
+                Columns.Clear();
+                for (var i = 0; i < count; i++)
+                    Columns.Add(new PasteColumnViewModel(i, i < first.Count ? first[i] : string.Empty, report.Columns.At(i), OnColumnChanged));
+            }
+            else
+            {
+                for (var i = 0; i < count; i++) Columns[i].Role = report.Columns.At(i);
+            }
+        }
+        finally { _rebuilding = false; }
+
+        NotifyOfPropertyChange(nameof(Summary));
+        NotifyOfPropertyChange(nameof(HasRejected));
+        NotifyOfPropertyChange(nameof(MoreAcceptedText));
+        NotifyOfPropertyChange(nameof(MoreRejectedText));
+        NotifyOfPropertyChange(nameof(CanApply));
+        NotifyOfPropertyChange(nameof(ApplyText));
+        NotifyOfPropertyChange(nameof(HasColumns));
+        NotifyOfPropertyChange(nameof(HasFatal));
     }
 }
