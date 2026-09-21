@@ -105,6 +105,10 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             new SuppressionFilterOption(SuppressionStatusView.FilterSuppressing, "억제중"),
             new SuppressionFilterOption(SuppressionStatusView.FilterActive, "진행중"),
             new SuppressionFilterOption(SuppressionStatusView.FilterPending, "예정"),
+            // 정리(일괄 하드삭제)의 대상은 취소 · 종료 행뿐이다 — 그 둘을 부를 길이 없으면
+            // [모두 정리] 가 '화면에 실린 것' 만 덮는다(옛 억제창의 상태 콤보에는 있던 값이다).
+            new SuppressionFilterOption(SuppressionStatusView.FilterExpired, "종료"),
+            new SuppressionFilterOption(SuppressionStatusView.FilterCancelled, "취소"),
         };
         SyncFilterChips();
 
@@ -213,10 +217,21 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         ? "등록된 억제 스케줄이 없습니다 — [새 스케줄] 로 만드세요."
         : "이 상태에 맞는 스케줄이 없습니다 — 필터를 '전체' 로 바꿔 보세요.";
 
-    /// <summary>상태 띠 — 불러온 수 · 전체 수 · 억제중 수.</summary>
+    /// <summary>
+    /// 상태 띠 — 불러온 수 · 전체 수 · 억제중 수 · <b>기준 시각</b>.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ 행의 상태는 <b>불러온 순간의 스냅샷</b>이다. 억제 여부의 권위는 서버(<c>is_suppressing_now</c>)이고
+    /// 화면에는 다시 계산할 근거가 없다(회차는 유효기간 경계에서 잘린다). 자동 갱신도 없다 —
+    /// 그래서 <b>언제 기준인지를 적고</b> [갱신] 을 권한다. 숨기는 것보다 낫다.
+    /// </remarks>
     public string StatusLineText
         => $"불러온 {Schedules.Count} / {_totalCount}건 · 억제중 {SuppressingCount}건"
+         + (_loadedAt is { } at ? $" · {at:HH:mm} 기준([갱신]으로 최신화)" : string.Empty)
          + (_selected is null ? string.Empty : $" · 선택 {_selected.Name}");
+
+    /// <summary>목록을 마지막으로 받아 온 시각(시계에서 온 값).</summary>
+    private DateTime? _loadedAt;
 
     /// <summary>레일 배지 — 지금 억제 중인 창의 수(정본 SB L2361).</summary>
     public int SuppressingCount => Schedules.Count(s => s.Shape == SuppressionStatusShape.Suppressing);
@@ -268,8 +283,10 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             var total = res.Pagination?.Total ?? res.Total ?? res.Data.Count;
             var page = res.Pagination?.Page ?? 1;
 
+            var at = _clock.Now;
             Post(() =>
             {
+                _loadedAt = at;
                 _totalCount = total;
                 _currentPage = page;
                 _totalPages = total > 0 ? (int)Math.Ceiling(total / (double)PageSize) : 1;
@@ -630,18 +647,31 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         var before = _totalCount;
         try
         {
-            var res = await _api.BulkDeleteSuppressionSchedulesAsync(message.Ids, cancellationToken).ConfigureAwait(false);
-            if (!res.Success)
-            {
-                // 404/405 = 서버에 /bulk-delete 미배포 — 원인을 바로 알 수 있게 밝힌다.
-                var hint = res.StatusCode is 404 or 405 ? " (서버에 일괄삭제가 아직 배포되지 않았습니다)" : string.Empty;
-                Post(() => StatusText = $"삭제하지 못했습니다 — {res.Error?.Message ?? res.Message}{hint}");
-                return;
-            }
+            // ⚠ 서버는 한 요청에 500개까지만 받는다(schemas/event_suppression.py:379-383) —
+            //   넘기면 요청 전체가 422 라 한 건도 지워지지 않는다. 목록은 100씩 쌓이므로 실제로 닿는 수다.
+            var batches = SuppressionDeletionCheck.Chunk(message.Ids);
+            var deleted = new List<int>();
+            var skipped = 0;
+            var notFound = 0;
 
-            var deleted = res.Data?.DeletedIds ?? new List<int>();
-            var skipped = res.Data?.SkippedIds?.Count ?? 0;
-            var notFound = res.Data?.NotFoundIds?.Count ?? 0;
+            foreach (var batch in batches)
+            {
+                var res = await _api.BulkDeleteSuppressionSchedulesAsync(batch, cancellationToken).ConfigureAwait(false);
+                if (!res.Success)
+                {
+                    // 404/405 = 서버에 /bulk-delete 미배포 — 원인을 바로 알 수 있게 밝힌다.
+                    var hint = res.StatusCode is 404 or 405 ? " (서버에 일괄삭제가 아직 배포되지 않았습니다)" : string.Empty;
+                    var partial = deleted.Count > 0 ? $" 앞선 {deleted.Count}건은 이미 지워졌습니다." : string.Empty;
+                    var reason = res.Error?.Message ?? res.Message;
+                    Post(() => StatusText = $"삭제하지 못했습니다 — {reason}{hint}{partial}");
+                    if (deleted.Count > 0) await LoadAsync(cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                deleted.AddRange(res.Data?.DeletedIds ?? new List<int>());
+                skipped += res.Data?.SkippedIds?.Count ?? 0;
+                notFound += res.Data?.NotFoundIds?.Count ?? 0;
+            }
 
             await LoadAsync(cancellationToken).ConfigureAwait(false);
 

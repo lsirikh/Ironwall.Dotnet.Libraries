@@ -76,12 +76,18 @@ public static class SuppressionStatusView
     public const string FilterSuppressing = "suppressing";
     public const string FilterActive = "active";
     public const string FilterPending = "pending";
+    /// <summary>종료 — 정본에는 없지만 <b>정리(일괄 하드삭제)의 대상을 찾는 유일한 길</b>이다.</summary>
+    public const string FilterExpired = "expired";
+    /// <summary>취소 — 같은 이유.</summary>
+    public const string FilterCancelled = "cancelled";
 
     /// <summary>필터 칩이 서버 <c>status</c> 파라미터로 번역되는가 — 되면 그 값, 아니면 null(전량 받아 걸러 낸다).</summary>
     public static string? ServerStatusFor(string? filterKey) => filterKey switch
     {
         FilterActive => "active",
         FilterPending => "pending",
+        FilterExpired => "expired",
+        FilterCancelled => "cancelled",
         // '억제중' 은 서버 status 가 아니라 is_suppressing_now 다 — active 를 받아 클라에서 좁힌다.
         FilterSuppressing => "active",
         _ => null,
@@ -93,6 +99,8 @@ public static class SuppressionStatusView
         FilterSuppressing => shape == SuppressionStatusShape.Suppressing,
         FilterActive => shape is SuppressionStatusShape.Suppressing or SuppressionStatusShape.InWindow,
         FilterPending => shape == SuppressionStatusShape.Scheduled,
+        FilterExpired => shape == SuppressionStatusShape.Ended,
+        FilterCancelled => shape == SuppressionStatusShape.Cancelled,
         _ => true,
     };
 }

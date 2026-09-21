@@ -24,7 +24,7 @@ public readonly record struct SuppressionDeletionVerdict(bool Confirmed,
                                                          string Message);
 
 /// <summary>
-/// 삭제 검증(순수).
+/// 삭제 검증 · 요청 쪼개기(순수).
 /// </summary>
 /// <remarks>
 /// <para>목록 재조회는 <b>1페이지로 리셋</b>된다 — 무한 스크롤로 300행을 보고 있다가 3건을 지우면
@@ -33,6 +33,26 @@ public readonly record struct SuppressionDeletionVerdict(bool Confirmed,
 /// </remarks>
 public static class SuppressionDeletionCheck
 {
+    /// <summary>
+    /// 한 번의 일괄삭제 요청에 담을 수 있는 최대 id 수 — <b>서버 계약</b>이다.
+    /// <para><c>app/schemas/event_suppression.py:379-383</c>
+    /// <c>ids: list[int] = Field(..., min_length=1, max_length=500)</c>.
+    /// 넘기면 요청 전체가 422 라 <b>한 건도 지워지지 않는다</b> — 목록이 100씩 쌓이므로 실제로 닿는 수다.</para>
+    /// </summary>
+    public const int MaxIdsPerRequest = 500;
+
+    /// <summary>id 목록을 서버가 받는 크기로 쪼갠다. 중복은 한 번만 보낸다(서버가 세는 수와 맞춘다).</summary>
+    public static IReadOnlyList<IReadOnlyList<int>> Chunk(IEnumerable<int>? ids, int size = MaxIdsPerRequest)
+    {
+        if (size <= 0) throw new ArgumentOutOfRangeException(nameof(size));
+
+        var unique = ids?.Distinct().ToList() ?? new List<int>();
+        var chunks = new List<IReadOnlyList<int>>();
+        for (var at = 0; at < unique.Count; at += size)
+            chunks.Add(unique.GetRange(at, Math.Min(size, unique.Count - at)));
+        return chunks;
+    }
+
     /// <summary>
     /// 지운 뒤 다시 불러온 결과가 기대와 맞는지 본다.
     /// </summary>

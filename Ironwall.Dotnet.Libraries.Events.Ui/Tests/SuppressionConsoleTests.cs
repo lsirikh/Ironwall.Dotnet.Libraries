@@ -208,6 +208,37 @@ public class SuppressionDeletionCheckTests
     [Fact]
     public void should_count_a_repeated_id_once()
         => Assert.True(SuppressionDeletionCheck.Verify(5, new[] { 7, 7 }, 4, new[] { 1 }).Confirmed);
+
+    [Fact]
+    public void should_send_one_request_when_the_ids_fit_the_server_cap()
+    {
+        var chunks = SuppressionDeletionCheck.Chunk(Enumerable.Range(1, SuppressionDeletionCheck.MaxIdsPerRequest));
+
+        // 경계 — 정확히 500은 한 번에 간다(서버 max_length=500 은 '이하' 다).
+        Assert.Single(chunks);
+        Assert.Equal(SuppressionDeletionCheck.MaxIdsPerRequest, chunks[0].Count);
+    }
+
+    [Fact]
+    public void should_split_when_the_ids_exceed_the_server_cap()
+    {
+        var chunks = SuppressionDeletionCheck.Chunk(Enumerable.Range(1, SuppressionDeletionCheck.MaxIdsPerRequest + 1));
+
+        Assert.Equal(2, chunks.Count);
+        Assert.Single(chunks[1]);
+    }
+
+    [Fact]
+    public void should_send_each_id_once_when_chunking()
+    {
+        var chunks = SuppressionDeletionCheck.Chunk(new[] { 1, 1, 2, 3, 3 });
+
+        Assert.Equal(new[] { 1, 2, 3 }, chunks.SelectMany(c => c));
+    }
+
+    [Fact]
+    public void should_send_nothing_when_there_is_nothing_to_delete()
+        => Assert.Empty(SuppressionDeletionCheck.Chunk(System.Array.Empty<int>()));
 }
 
 /// <summary>상태 두 축 → 한 형태(PRD FR-11~FR-13 · V-21~V-23).</summary>
@@ -244,9 +275,27 @@ public class SuppressionStatusViewTests
     [InlineData(SuppressionStatusView.FilterAll, null)]
     [InlineData(SuppressionStatusView.FilterActive, "active")]
     [InlineData(SuppressionStatusView.FilterPending, "pending")]
+    [InlineData(SuppressionStatusView.FilterExpired, "expired")]
+    [InlineData(SuppressionStatusView.FilterCancelled, "cancelled")]
     [InlineData(SuppressionStatusView.FilterSuppressing, "active")]
     public void should_translate_the_chip_to_a_server_status(string key, string? expected)
         => Assert.Equal(expected, SuppressionStatusView.ServerStatusFor(key));
+
+    [Fact]
+    public void should_be_able_to_reach_every_shape_with_some_chip()
+    {
+        // 정리(일괄 하드삭제)의 대상은 취소 · 종료 행뿐이다 —
+        // 그 둘을 부를 칩이 없으면 [모두 정리] 가 화면에 실린 것만 덮는다.
+        var chips = new[]
+        {
+            SuppressionStatusView.FilterSuppressing, SuppressionStatusView.FilterActive,
+            SuppressionStatusView.FilterPending, SuppressionStatusView.FilterExpired,
+            SuppressionStatusView.FilterCancelled,
+        };
+
+        foreach (var shape in System.Enum.GetValues<SuppressionStatusShape>())
+            Assert.Contains(chips, c => SuppressionStatusView.Matches(c, shape));
+    }
 
     [Fact]
     public void should_narrow_to_suppressing_rows_on_the_client()
@@ -513,6 +562,20 @@ public class SuppressionConsoleViewModelTests
         Assert.Equal(1, _api.BulkDeleteCalls);
         Assert.Single(_console.Schedules);
         Assert.Contains("2건을 삭제했습니다", _console.StatusText);
+    }
+
+    [Fact]
+    public async Task should_split_a_bulk_delete_that_exceeds_the_server_cap()
+    {
+        // 서버는 한 요청에 500개까지다 — 넘기면 요청 전체가 422 라 한 건도 안 지워진다.
+        var ids = Enumerable.Range(1, SuppressionDeletionCheck.MaxIdsPerRequest + 10).ToList();
+        foreach (var id in ids) _api.Stored.Add(Row(id, "cancelled"));
+        await _console.ActivateAsync();
+
+        await _console.HandleAsync(new CallDeleteConsoleSuppressionMessageModel { Ids = ids }, default);
+
+        Assert.Equal(2, _api.BulkDeleteCalls);
+        Assert.Empty(_api.Stored);
     }
 
     [Fact]
