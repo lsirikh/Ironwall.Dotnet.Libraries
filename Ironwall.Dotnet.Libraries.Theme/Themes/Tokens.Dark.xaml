@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
@@ -17,9 +17,15 @@
     <SolidColorBrush x:Key="SurfaceHoverBrush"  Color="#243240" />
     <SolidColorBrush x:Key="SurfacePressedBrush" Color="#2E3F4D" />
 
-    <!-- ══ Borders / Dividers ══ -->
-    <SolidColorBrush x:Key="BorderBrush"  Color="#2C3A48" />
-    <SolidColorBrush x:Key="DividerBrush" Color="#243140" />
+    <!--
+        ══ Borders / Dividers ══
+        K-03(측정) — 옛 값: Border/Surface 1.46 · Divider/SurfaceAlt 1.13(사실상 안 보임).
+        다크에서는 검색 상자 바탕(Sunken)과 툴바(Surface)가 1.08 이라 테두리가 없으면 입력칸 경계가 사라진다.
+        구조선은 3:1 대역으로 올리고, 표의 행 구분선은 RowLineBrush 로 떼어 ~2:1 에 둔다.
+    -->
+    <SolidColorBrush x:Key="BorderBrush"  Color="#5F7185" /><!-- vs Surface 3.38 · Sunken 3.66 · SurfaceAlt 2.98 -->
+    <SolidColorBrush x:Key="DividerBrush" Color="#5A6C80" /><!-- 구조 구분선 — vs Surface 3.14 · SurfaceAlt 2.77 -->
+    <SolidColorBrush x:Key="RowLineBrush" Color="#455667" /><!-- 표 행 구분선 — vs SurfaceAlt 1.98 · Surface 2.25 -->
 
     <!-- ══ Text ══ -->
     <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#E6EDF3" />
@@ -55,7 +61,8 @@
     <SolidColorBrush x:Key="TintInfoBrush"     Color="#2A4FB8FF" /><!-- 정보 틴트 -->
     <SolidColorBrush x:Key="TintSuccessBrush"  Color="#2A46D17A" /><!-- 성공 틴트 -->
     <SolidColorBrush x:Key="TintCriticalBrush" Color="#33FF5A52" /><!-- 위험 틴트 -->
-    <SolidColorBrush x:Key="TintWarningBrush"  Color="#33FFB02E" /><!-- 경고 틴트 -->
+    <!--  K-04 — 라이트와 같은 이유로 올린다(측정: 0x33 은 미적용 막대가 제 바탕과 1.34:1).  -->
+    <SolidColorBrush x:Key="TintWarningBrush"  Color="#55FFB02E" /><!-- 경고 틴트 -->
     <SolidColorBrush x:Key="TintAccentBrush"   Color="#3322B8D9" /><!-- 강조 틴트(cyan) -->
     <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#CC161D26" /><!-- 반투명 표면 -->
 
