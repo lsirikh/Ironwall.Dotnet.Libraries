@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
@@ -108,6 +109,20 @@ public sealed class MatrixWindow : Window
             Cell("apply.dirty", MakeDetail(dirty: true, readOnly: false), null, 360, 260),
             Cell("apply.readonly", MakeDetail(dirty: false, readOnly: true), null, 360, 260)));
 
+        // D-12 — 좁은 상세(최소 폭 300)에서 막대 문구가 쓸 수 있는 폭은 120 남짓이다. 버튼 둘이 자리를 먹기 때문이다.
+        // 긴 한국어 한 문장(막힌 이동 안내)이 줄임표 없이 다 보이는지는 이 폭에서만 드러난다.
+        Section("ConsoleDetailHost — 좁은 상세(300) 적용 막대 (D-12)", Row(
+            Cell("narrow.clean", MakeDetail(dirty: false, readOnly: false, width: 300, footer: ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Single, 0)), null, 324, 270),
+            Cell("narrow.dirty", MakeDetail(dirty: true, readOnly: false, width: 300, footer: ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Dirty, 2)), null, 324, 270),
+            Cell("narrow.error", MakeDetail(dirty: true, readOnly: false, width: 300, footer: "적용하지 못했습니다 — 서버가 거절했습니다"), null, 324, 270),
+            Cell("narrow.blocked", MakeDetail(dirty: true, readOnly: false, width: 300, footer: ConsoleDetailStateMachine.BlockedNotice), null, 324, 270)));
+
+        // D-37 — 본문이 넘칠 때(세로 스크롤막대가 서는 상태) 마지막 잉크와 막대 윗선 사이에 숨 쉴 띠가 남는가.
+        Section("ConsoleDetailHost — 넘치는 본문 (D-37)", Row(
+            Cell("overflow.clean", MakeDetail(dirty: false, readOnly: false, width: 300, height: 250, footer: "변경 없음", overflow: true), null, 324, 270),
+            Cell("overflow.dirty", MakeDetail(dirty: true, readOnly: false, width: 300, height: 250, footer: ConsoleDetailStateMachine.BlockedNotice, overflow: true), null, 324, 270),
+            Cell("overflow.wide", MakeDetail(dirty: false, readOnly: false, width: 340, height: 250, footer: "변경 없음", overflow: true), null, 364, 270)));
+
         Section("ConsoleEmptyState (D-33)", Row(
             Cell("empty.plain", MakeEmpty(withAction: false), null, 360, 200),
             Cell("empty.action", MakeEmpty(withAction: true), null, 360, 200)));
@@ -214,7 +229,12 @@ public sealed class MatrixWindow : Window
         return pill;
     }
 
-    private static FrameworkElement MakeDetail(bool dirty, bool readOnly)
+    /// <summary>
+    /// 상세 한 칸. <paramref name="overflow"/> 면 본문을 일부러 넘치게 채운다 — 세로 스크롤막대가 서고,
+    /// 마지막 문단이 고정 적용 막대와 얼마나 떨어지는지(D-37)를 잴 수 있는 유일한 상태다.
+    /// </summary>
+    private static FrameworkElement MakeDetail(
+        bool dirty, bool readOnly, double width = 340, double height = 240, string? footer = null, bool overflow = false)
     {
         var body = new StackPanel();
         var p = new TextBlock
@@ -226,6 +246,21 @@ public sealed class MatrixWindow : Window
         };
         p.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
         body.Children.Add(p);
+
+        if (overflow)
+            for (var i = 0; i < 6; i++)
+            {
+                var more = new TextBlock
+                {
+                    Text = $"{i + 1}) 설치 위치와 담당 부대를 적어 둡니다. 여기에 적은 내용은 목록의 설명 열에도 같이 보입니다.",
+                    FontSize = 12.5,
+                    TextWrapping = TextWrapping.WrapWithOverflow,
+                    Margin = new Thickness(0, 0, 0, 8),
+                };
+                more.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+                body.Children.Add(more);
+            }
+
         var host = new ConsoleDetailHost
         {
             ConsoleKey = "Matrix",
@@ -237,10 +272,10 @@ public sealed class MatrixWindow : Window
             CanApply = dirty,
             CanRevert = dirty,
             ShowWidthTools = false,
-            FooterText = dirty ? "변경 2건 미적용 — 적용하거나 되돌린 뒤 이동하세요" : "변경 없음",
+            FooterText = footer ?? (dirty ? "변경 2건 미적용 — 적용하거나 되돌린 뒤 이동하세요" : "변경 없음"),
             Content = body,
-            Width = 340,
-            Height = 240,
+            Width = width,
+            Height = height,
         };
         host.SetResourceReference(BackgroundProperty, "SurfaceBrush");
         return host;
