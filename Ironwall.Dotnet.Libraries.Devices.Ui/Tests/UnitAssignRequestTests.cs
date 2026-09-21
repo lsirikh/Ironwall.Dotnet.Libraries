@@ -20,6 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// 이 판정을 사람 눈에 맡기지 않도록 <b>일곱 카테고리를 전수로</b> 잠근다
 /// (선례: <c>PresetRegisterTests.should_never_null_or_reset_a_fetched_value_in_the_apply_body</c>).</para>
 /// </remarks>
+[Collection("CaliburnIoC")]   // 컬렉션 수를 늘리면 정적 IoC 를 바꾸는 이웃과 겹칠 확률이 올라간다 — 같이 직렬화한다.
 public class UnitAssignRequestTests
 {
     private const int TARGET_UNIT = 42;

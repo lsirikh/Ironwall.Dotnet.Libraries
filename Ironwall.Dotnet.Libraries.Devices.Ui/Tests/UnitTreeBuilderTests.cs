@@ -13,6 +13,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// 계층의 정본은 <c>edges.hierarchy</c> 다(와이어프레임 L473 R6). 부분 그래프에서는 인접 상대가
 /// <b>트리 밖 부모</b>를 가리킨 채 끌려 들어오므로, 그 노드를 최상단으로 올려 잃지 않아야 한다.
 /// </remarks>
+[Collection("CaliburnIoC")]   // 컬렉션 수를 늘리면 정적 IoC 를 바꾸는 이웃과 겹칠 확률이 올라간다 — 같이 직렬화한다.
 public class UnitTreeBuilderTests
 {
     #region - Fixtures -

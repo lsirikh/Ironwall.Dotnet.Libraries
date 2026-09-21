@@ -10,6 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// N-11 FR-06 · FR-09 · FR-12 — 무엇을 어디에 놓을 수 있는가. 서버가 422 로 거절할 것을
 /// <b>네트워크에 나가기 전에</b> 전부 막는다(와이어프레임 §5-2 L356-364).
 /// </summary>
+[Collection("CaliburnIoC")]   // 컬렉션 수를 늘리면 정적 IoC 를 바꾸는 이웃과 겹칠 확률이 올라간다 — 같이 직렬화한다.
 public class UnitDropRulesTests
 {
     #region - Fixture -
