@@ -343,6 +343,11 @@ public static class DtoToModelHelper
 
         if (dto.Server != null)
             model.Server = dto.Server.ToServerModel();
+        // v7.0 은 중첩 `server` 를 없앴다 — 기본 응답에는 `server_id` 뿐이고 확장은 `?include=server` 다
+        // (서버 app/routers/speakers.py 머리말 D4). 중첩만 보면 그 판본에서 소속이 통째로 사라져
+        // "이미 그 서버" 판정과 되돌리기가 눈을 감는다. id 만 온 경우 최소 모델로 채운다.
+        else if (dto.ServerId is > 0)
+            model.Server = new ServerModel { Id = dto.ServerId.Value };
 
         return model;
     }

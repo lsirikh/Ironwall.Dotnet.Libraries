@@ -55,6 +55,14 @@ public partial class App : Application
                 if (directory is not null) Shutdown();
                 return;
             }
+
+            // 서버 모니터(N-12) — 콘솔과 따로 뜬다(--servers [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--servers"))
+            {
+                await RunServersAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
             _viewModel = Build(isAxis);
 
             _view = new DeviceDashboardView { DataContext = _viewModel };
@@ -292,6 +300,115 @@ public partial class App : Application
         await Show(preview.MakeSensors(withConflict: true), 520, 640, "07-make-sensors-conflict");
         await Show(preview.PasteReport(), 640, 560, "08-paste-report");
         await Show(preview.SaveConfirm(), 520, 340, "09-save-confirm");
+    }
+
+/// <summary>
+    /// 서버 모니터(N-12) 상태별 스냅숏 — 빈 화면 · 목록 · 선택+지표 · 보고 없음 · 미적용 변경 ·
+    /// 드롭 가능/불가 · 등록 폼 · 모드 절 · 지표 이력 창 · 6.3 계약.
+    /// </summary>
+    private async Task RunServersAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute 가 작업 스레드에서 돌아 교차 스레드로 화면을 만진다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var preview = new ServersPreview();
+        var view = await preview.BuildAsync(withData: false);
+
+        _window = new Window
+        {
+            Title = "서버 모니터 미리보기",
+            Width = 1320,
+            Height = 820,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = view },
+        };
+        _window.Show();
+        await Settle();
+
+        if (directory is null) return;      // 손으로 써 볼 때는 띄워만 둔다
+
+        Directory.CreateDirectory(directory);
+        await Settle();
+        Save(directory, $"servers-{theme}-01-empty");
+
+        await preview.LoadAsync();
+        await Settle();
+        Save(directory, $"servers-{theme}-02-loaded");
+
+        preview.Select(preview.Row("방송서버-01"));       // 지표가 붙어 있는 행
+        await Settle();
+        Save(directory, $"servers-{theme}-03-selected-metrics");
+
+        preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행(status_observed_at = null)
+        await Settle();
+        ServersPreview.ScrollDetailToEnd(view);            // "상태(관측)" 절의 미수신 상자를 보이게 굴린다
+        await Settle();
+        Save(directory, $"servers-{theme}-04-never-reported");
+
+        preview.Select(preview.Row("방송서버-01"));
+        ServersPreview.ScrollDetailToTop(view);
+        preview.ViewModel.BeginEdit();
+        preview.ViewModel.NameText = "방송서버-01 (수정)";
+        preview.ViewModel.CpuWarningText = "65";
+        await Settle();
+        Save(directory, $"servers-{theme}-05-dirty");
+
+        preview.ViewModel.Revert();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+
+        // 드롭 불가 — 스피커를 NVR 행 위로. 끝은 반드시 취소라 서버 호출이 0 이다.
+        using (preview.BeginDrag(view, preview.Row("NVR-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-06-drop-refused");
+        }
+        await Settle();
+
+        // 드롭 가능 + 지금 그 위 — 같은 스피커를 받는 서버 행 위로.
+        using (preview.BeginDrag(view, preview.Row("방송서버-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-07-drop-hover");
+        }
+        await Settle();
+
+        // 모드 절 — PROXY 서버는 server_config.modes 를 갖는다(7.0+).
+        preview.Select(preview.Row("PIDS 프록시"));
+        preview.ViewModel.BeginEdit();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+        Save(directory, $"servers-{theme}-08-modes");
+        preview.ViewModel.Revert();
+
+        // 등록 폼 — 상태 칸이 없다.
+        preview.ViewModel.Add();
+        await Settle();
+        Save(directory, $"servers-{theme}-09-create");
+        preview.ViewModel.Revert();
+        await Settle();
+
+        // 6.3 계약 — "마지막 변화" 가 "—" 이고 배정 후보가 스피커뿐이다.
+        var legacy = new ServersPreview(EnumServerContract.V6_3);
+        var legacyView = await legacy.BuildAsync(withData: true);
+        _window.Width = 1320;
+        _window.Height = 820;
+        _window.Content = new Border { Margin = new Thickness(12), Child = legacyView };
+        await Settle();
+        legacy.Select(legacy.Row("방송서버-01"));
+        await Settle();
+        Save(directory, $"servers-{theme}-11-legacy-6-3");
+        // 지표 이력 창 — 임계 배지를 그리지 않는다.
+        var history = await preview.MetricHistoryAsync(11, "방송서버-01");
+        _window.Width = 600;
+        _window.Height = 560;
+        _window.Content = new Border { Margin = new Thickness(12), Child = history };
+        await Settle();
+        Save(directory, $"servers-{theme}-10-metric-history");
+
     }
 
     private void ApplyDark()
