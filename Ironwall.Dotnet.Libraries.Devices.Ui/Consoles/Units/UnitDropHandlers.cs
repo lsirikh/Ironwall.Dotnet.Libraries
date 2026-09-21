@@ -39,31 +39,45 @@ public sealed class UnitDropHandler : IDragDropHandler
     private readonly Func<bool> _canEdit;
     private readonly Func<bool> _isBusy;
     private readonly Action<UnitDropRequest> _onDrop;
+    private readonly Action<string>? _onBlocked;
 
     public UnitDropHandler(
         Func<UnitTreeModel?> tree,
         Func<int> selectedUnitId,
         Func<bool> canEdit,
         Func<bool> isBusy,
-        Action<UnitDropRequest> onDrop)
+        Action<UnitDropRequest> onDrop,
+        Action<string>? onBlocked = null)
     {
         _tree = tree ?? throw new ArgumentNullException(nameof(tree));
         _selectedUnitId = selectedUnitId ?? throw new ArgumentNullException(nameof(selectedUnitId));
         _canEdit = canEdit ?? throw new ArgumentNullException(nameof(canEdit));
         _isBusy = isBusy ?? throw new ArgumentNullException(nameof(isBusy));
         _onDrop = onDrop ?? throw new ArgumentNullException(nameof(onDrop));
+        _onBlocked = onBlocked;
     }
 
     public bool CanDrop(DragPayload payload, DropTarget target)
         => Verdict(payload?.Items, target).IsAllowed;
 
-    public void Drop(DragPayload payload, DropTarget target)
-    {
-        if (!Verdict(payload?.Items, target).IsAllowed) return;
+    public void Drop(DragPayload payload, DropTarget target) => Drop(payload?.Items, target);
 
-        var units = UnitsOf(payload!.Items);
-        var devices = DevicesOf(payload.Items);
-        _onDrop(new UnitDropRequest(target.ZoneKey, TargetIdOf(target), units, devices));
+    /// <summary>
+    /// 같은 처리를 <b>끌린 항목만</b> 으로 한다 — <see cref="DragPayload"/> 는 <c>ItemsControl</c> 을 요구해
+    /// STA 스레드가 없으면 만들 수 없다. 헤드리스 테스트는 이쪽을 쓴다.
+    /// </summary>
+    public void Drop(IReadOnlyList<object>? items, DropTarget? target)
+    {
+        // 막혔으면 조용히 끝내지 않는다 — 규칙이 열다섯 가지라 "왜 안 놓아지는지" 를 말해 주지 않으면
+        // 운영자는 같은 자리에 계속 놓아 본다.
+        var verdict = Verdict(items, target);
+        if (!verdict.IsAllowed)
+        {
+            if (verdict.Reason is { Length: > 0 } reason) _onBlocked?.Invoke(reason);
+            return;
+        }
+
+        _onDrop(new UnitDropRequest(target!.ZoneKey, TargetIdOf(target), UnitsOf(items!), DevicesOf(items!)));
     }
 
     /// <summary>판정 + 막힌 까닭. 화면이 "왜 못 놓는지" 를 한 줄로 보여줄 때도 쓴다.</summary>

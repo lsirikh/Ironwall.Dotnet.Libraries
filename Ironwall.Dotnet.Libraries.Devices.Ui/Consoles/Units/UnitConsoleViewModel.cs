@@ -59,11 +59,13 @@ public sealed class UnitConsoleViewModel : Screen
         Detail = new ConsoleDetailPresenter { TypeName = "부대" };
         Form = new UnitDetailFormViewModel(Detail);
         Tray = new DraftTrayViewModel();
-        Drop = new UnitDropHandler(() => Tree, () => SelectedRow?.Id ?? 0, () => _canEdit(), () => IsBusy, OnDropped);
+        Drop = new UnitDropHandler(() => Tree, () => SelectedRow?.Id ?? 0, () => _canEdit(), () => IsBusy, OnDropped,
+                                   reason => StatusText = reason);
 
-        RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리") { ShowCount = true });
-        RailEntries.Add(new ConsoleRailEntry(RAIL_ADJACENCY, "인접 관계도") { ShowCount = true });
-        RailEntries.Add(new ConsoleRailEntry(RAIL_DEVICES, "미배치 장비") { ShowCount = true });
+        // 아이콘은 이름만 쥔 토큰이다 — 싱글턴이 아닌 창이어도 뷰모델이 시각 요소를 쥐지 않는다(장비 콘솔 선례).
+        RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리", new ConsoleIconToken("FileTree")) { ShowCount = true });
+        RailEntries.Add(new ConsoleRailEntry(RAIL_ADJACENCY, "인접 관계도", new ConsoleIconToken("GraphOutline")) { ShowCount = true });
+        RailEntries.Add(new ConsoleRailEntry(RAIL_DEVICES, "미배치 장비", new ConsoleIconToken("Devices")) { ShowCount = true });
         _selectedRail = RailEntries[0];
 
         EchelonFilters.Add(new UnitEchelonFilterViewModel(null, "전체") { IsSelected = true });
@@ -141,6 +143,13 @@ public sealed class UnitConsoleViewModel : Screen
 
     public string StatusText { get => _statusText; private set { _statusText = value; NotifyOfPropertyChange(); } }
 
+    /// <summary>트리에 그릴 행이 없다 — 필터 때문인지 편제가 빈 것인지 글로 가른다.</summary>
+    public bool IsTreeEmpty => Rows.Count == 0;
+
+    public bool IsDeviceListEmpty => DeviceRows.Count == 0;
+
+    public string DeviceHeaderText => $"미배치 장비 {DeviceRows.Count}";
+
     public string ListStatusText => IsDeviceView
         ? $"미배치 장비 {DeviceRows.Count}"
         : $"부대 {Tree.Count} · 인접 쌍 {AdjacencyPairCount}";
@@ -153,6 +162,9 @@ public sealed class UnitConsoleViewModel : Screen
 
     public int AdjacencyPairCount { get; private set; }
 
+    /// <summary>제대 칩 · 검색이 걸려 있다 — 목록은 트리가 아니라 평면이다.</summary>
+    public bool IsFiltered { get => _isFiltered; private set { _isFiltered = value; NotifyOfPropertyChange(); } }
+
     /// <summary>삭제가 409 로 막혔을 때 무엇이 매달려 있는지(스토리보드 화면 J).</summary>
     public UnitDeleteBlock? DeleteBlock { get => _deleteBlock; private set { _deleteBlock = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsDeleteBlocked)); } }
     public bool IsDeleteBlocked => _deleteBlock is { Items.Count: > 0 };
@@ -164,13 +176,31 @@ public sealed class UnitConsoleViewModel : Screen
     #region - Commands state -
     public bool IsAvailable => _units.IsAvailable;
     public bool CanEditUnits => _canEdit();
-    public bool CanAdd => IsAvailable && CanEditUnits && !IsBusy && !IsDeviceView;
+    public bool CanAdd => IsAvailable && CanEditUnits && !IsBusy;
     public string AddBlockedReason => !IsAvailable ? "이 서버 판본에는 부대 편제가 없습니다." : "부대를 등록할 권한이 없습니다(units:edit).";
     public bool CanDeleteUnit => IsAvailable && _canDelete() && SelectedRow is not null && !Form.IsCreating && !IsBusy;
     public string DeleteBlockedReason => SelectedRow is null ? "지울 부대를 먼저 고르세요." : "부대를 지울 권한이 없습니다(units:delete).";
     public bool CanReload => IsAvailable && !IsBusy;
     public bool CanMoveSelected => IsAvailable && CanEditUnits && SelectedRow is not null && !IsBusy;
-    public bool CanAssignSelectedDevices => IsAvailable && CanEditUnits && SelectedDevices.Count > 0 && SelectedRow is not null && !IsBusy;
+    public bool CanAssignSelectedDevices => IsAvailable && CanEditUnits && SelectedDevices.Count > 0 && AssignTargetId > 0 && !IsBusy;
+
+    /// <summary>장비를 놓을 부대 — 트리 선택을 따르되 콤보로도 고른다(드래그의 버튼 · 키보드 경로).</summary>
+    public int? AssignTargetUnitId
+    {
+        get => _assignTargetUnitId;
+        set { _assignTargetUnitId = value; NotifyOfPropertyChange(); RaiseCommands(); }
+    }
+
+    /// <summary>실제로 쓰이는 대상 — 콤보가 비어 있으면 트리에서 고른 부대.</summary>
+    public int AssignTargetId => _assignTargetUnitId is int id && id > 0 ? id : SelectedRow?.Id ?? 0;
+
+    public string AssignTargetText
+        => AssignTargetId <= 0
+         ? "놓을 부대를 고르십시오"
+         : $"'{Tree.Find(AssignTargetId)?.Name ?? $"#{AssignTargetId}"}' 에 배치";
+
+    /// <summary>피커가 고를 수 있는 부대 전부.</summary>
+    public BindableCollection<UnitOptionViewModel> AssignTargets { get; } = new();
     public bool IsDetailRequested => Detail.IsDetailRequested;
     #endregion
 
@@ -188,9 +218,16 @@ public sealed class UnitConsoleViewModel : Screen
     /// 쓰기 뒤의 재조회다 — 상태 띠의 <b>방금 한 일</b>을 "편제 N개를 읽었습니다" 로 덮지 않는다.
     /// 덮으면 이동 · 인접 · 배치의 결과(특히 실패 사유)가 한 순간에 사라진다.
     /// </param>
-    public async Task ReloadAsync(CancellationToken token = default, bool quiet = false)
+    /// <param name="bypassGuard">
+    /// <b>서버가 이미 바꾼 것</b>을 다시 읽는 길이다 — 미적용 관문을 건너뛴다.
+    /// 관문은 <b>사용자가 손댄 칸</b>을 지키려고 있는 것이지, 서버가 확인해 준 사실을 화면에서 막으라는 뜻이 아니다.
+    /// 건너뛰지 않으면 상세가 더럽다는 이유로 이동 · 인접 · 배치 뒤의 재조회가 조용히 취소되어
+    /// <b>서버는 바뀌었는데 화면만 옛 상태</b>로 남는다.
+    /// </param>
+    public async Task ReloadAsync(CancellationToken token = default, bool quiet = false, bool bypassGuard = false)
     {
-        if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+        if (!bypassGuard && !Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
+        if (IsBusy) return;                 // 스스로 막는다 — 호출부가 IsBusy 를 내려놓고 부르는 길이 여럿이다
         if (!IsAvailable)
         {
             StatusText = "이 서버 판본에는 부대 편제가 없습니다 — 서버 8.0 이상에서만 보입니다.";
@@ -221,6 +258,8 @@ public sealed class UnitConsoleViewModel : Screen
             DeleteBlock = null;
             RestoreSelection();
             Project();
+            // 고른 행의 통지는 Project 뒤다 — 목록에 아직 없는 인스턴스를 밀면 ListBox 가 그냥 버린다.
+            NotifyOfPropertyChange(nameof(SelectedRow));
             if (!quiet) StatusText = $"편제 {Tree.Count}개를 읽었습니다.";
         }
         catch (OperationCanceledException) { StatusText = "읽기를 취소했습니다."; }
@@ -243,6 +282,8 @@ public sealed class UnitConsoleViewModel : Screen
     {
         var echelon = EchelonFilters.FirstOrDefault(f => f.IsSelected)?.Echelon;
         var needle = _searchText.Trim();
+        // 필터가 걸리면 더는 트리가 아니다 — 부모가 빠진 자식을 원래 깊이로 그리면 허공에 들여쓰기된다.
+        IsFiltered = echelon is not null || needle.Length > 0;
 
         var keep = new List<UnitNodeRowViewModel>();
         var collapsed = new HashSet<int>();
@@ -261,6 +302,7 @@ public sealed class UnitConsoleViewModel : Screen
                 && node.Code.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0) continue;
 
             row.DeviceCount = _allDevices.Count(d => d.UnitId == node.Id);
+            row.IsFlat = IsFiltered;
             keep.Add(row);
         }
 
@@ -270,12 +312,16 @@ public sealed class UnitConsoleViewModel : Screen
         var deviceRows = unassigned.Select(item => DeviceRowOf(item)).ToList();
         Sync(DeviceRows, deviceRows);
 
+        SyncAssignTargets();
         RailEntries[0].Count = Tree.Count;
         RailEntries[1].Count = AdjacencyPairCount;
         RailEntries[2].Count = DeviceRows.Count;
 
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(RailFooterText));
+        NotifyOfPropertyChange(nameof(IsTreeEmpty));
+        NotifyOfPropertyChange(nameof(IsDeviceListEmpty));
+        NotifyOfPropertyChange(nameof(DeviceHeaderText));
     }
 
     /// <summary>
@@ -294,8 +340,8 @@ public sealed class UnitConsoleViewModel : Screen
         if (_rowCache.TryGetValue(node.Id, out var existing) && ReferenceEquals(existing.Node, node)) return existing;
 
         var isMine = !string.IsNullOrEmpty(MyUnitCode) && string.Equals(node.Code, MyUnitCode, StringComparison.Ordinal);
-        var row = new UnitNodeRowViewModel(node, isMine);
-        if (existing is not null) row.IsExpanded = existing.IsExpanded;
+        // 접힘은 _collapsed 가 정본이다 — 행 인스턴스에 기대면 재조회가 캐시를 비우는 순간 전부 펼쳐진다.
+        var row = new UnitNodeRowViewModel(node, isMine) { IsExpanded = !_collapsed.Contains(node.Id) };
         _rowCache[node.Id] = row;
         return row;
     }
@@ -309,6 +355,25 @@ public sealed class UnitConsoleViewModel : Screen
         if (existing is not null) row.PendingUnitName = existing.PendingUnitName;
         _deviceRowCache[item.Id] = row;
         return row;
+    }
+
+    /// <summary>장비를 놓을 부대 후보 — 편제 전체(트리 순서).</summary>
+    private void SyncAssignTargets()
+    {
+        var wanted = Tree.Ordered
+                         .Select(n => new UnitOptionViewModel(n.Id, $"{UnitDropRules.EchelonTextOf(n)} · {n.Name}"))
+                         .ToList();
+
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            if (i < AssignTargets.Count && AssignTargets[i].Id == wanted[i].Id) continue;
+            if (i < AssignTargets.Count) AssignTargets[i] = wanted[i];
+            else AssignTargets.Add(wanted[i]);
+        }
+        while (AssignTargets.Count > wanted.Count) AssignTargets.RemoveAt(AssignTargets.Count - 1);
+
+        if (_assignTargetUnitId is int id && Tree.Find(id) is null) AssignTargetUnitId = null;
+        NotifyOfPropertyChange(nameof(AssignTargetText));
     }
 
     /// <summary>선택을 죽이지 않고 목록을 맞춘다 — <c>Clear()+Add()</c> 는 쓰지 않는다.</summary>
@@ -325,10 +390,16 @@ public sealed class UnitConsoleViewModel : Screen
     #endregion
 
     #region - Selection -
-    public async Task SelectRowAsync(UnitNodeRowViewModel? row, CancellationToken token = default)
+    /// <param name="force">
+    /// <b>쓰기가 끝난 뒤</b>의 다시 읽기다. 재조회가 행 인스턴스를 새로 만들어도 <b>같은 부대</b>라
+    /// 참조 비교 조기 반환에 걸려 상세가 영영 갱신되지 않는다 — 인접 칩이 그대로 남고,
+    /// <see cref="UnitDetailFormViewModel.Original"/> 이 저장 전 DTO 를 붙들어 다음 PATCH 가
+    /// <b>이미 저장된 칸을 다시 보낸다</b>.
+    /// </param>
+    public async Task SelectRowAsync(UnitNodeRowViewModel? row, CancellationToken token = default, bool force = false)
     {
-        if (ReferenceEquals(row, SelectedRow)) return;
-        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
+        if (!force && ReferenceEquals(row, SelectedRow)) return;
+        if (!force && !Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
 
         SelectedRow = row;
         DeleteBlock = null;
@@ -353,6 +424,8 @@ public sealed class UnitConsoleViewModel : Screen
 
     private async Task LoadDetailAsync(UnitNodeRowViewModel row, CancellationToken token)
     {
+        // A 를 고르고 곧바로 B 를 고르면 A 의 답이 뒤에 도착해 B 의 상세를 덮을 수 있다 — 표를 끊어 둔다.
+        var ticket = ++_detailTicket;
         var deviceCount = _allDevices.Count(d => d.UnitId == row.Id);
 
         if (!IsAvailable)
@@ -364,6 +437,7 @@ public sealed class UnitConsoleViewModel : Screen
         try
         {
             var response = await _units.GetDetailAsync(row.Id, token).ConfigureAwait(true);
+            if (ticket != _detailTicket) return;                 // 그 사이 다른 부대를 골랐다
             if (response.Success && response.Data is { } detail)
             {
                 Form.Load(detail, Tree, deviceCount);
@@ -401,8 +475,8 @@ public sealed class UnitConsoleViewModel : Screen
         var wanted = SelectedRow?.Id ?? 0;
         _rowCache.Clear();
         _deviceRowCache.Clear();
-        SelectedRow = null;
-        if (wanted > 0 && Tree.Find(wanted) is { } node) SelectedRow = RowOf(node);
+        // 통지 없이 바꾼다 — Project 가 끝나 목록이 채워진 뒤에 한 번만 알린다(ReloadAsync).
+        _selectedRow = wanted > 0 && Tree.Find(wanted) is { } node ? RowOf(node) : null;
     }
     #endregion
 
@@ -477,8 +551,8 @@ public sealed class UnitConsoleViewModel : Screen
             StatusText = $"'{values.Name}'({values.Code}) 을 등록했습니다.";
             _pendingSelectId = response.Data?.Id ?? 0;
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);
-            await SelectByIdAsync(_pendingSelectId, token).ConfigureAwait(true);
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+            await SelectByIdAsync(_pendingSelectId, token, force: true).ConfigureAwait(true);
         }
         catch (OperationCanceledException) { Form.ErrorText = "등록을 취소했습니다."; }
         catch (Exception ex)
@@ -506,8 +580,8 @@ public sealed class UnitConsoleViewModel : Screen
             Detail.Settle($"'{Form.Name}' 을 저장했습니다.");
             StatusText = $"'{Form.Name}' 을 저장했습니다.";
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);
-            await SelectByIdAsync(row.Id, token).ConfigureAwait(true);
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+            await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
         }
         catch (OperationCanceledException) { Form.ErrorText = "저장을 취소했습니다."; }
         catch (Exception ex)
@@ -542,15 +616,15 @@ public sealed class UnitConsoleViewModel : Screen
             {
                 StatusText = $"'{moving.Name}' 을 옮기지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
                 IsBusy = false;
-                await ReloadAsync(token, quiet: true).ConfigureAwait(true);   // 실패 복구는 재조회다(화면과 서버를 다시 맞춘다)
+                await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);   // 실패 복구는 재조회다(화면과 서버를 다시 맞춘다)
                 return false;
             }
 
             _lastMove = new UnitMoveUndo(movingId, moving.Name, previousParentId);
             StatusText = $"'{moving.Name}' 을 '{targetName}' 으로 옮겼습니다.";
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);
-            await SelectByIdAsync(movingId, token).ConfigureAwait(true);
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+            await SelectByIdAsync(movingId, token, force: true).ConfigureAwait(true);
             return true;
         }
         catch (OperationCanceledException) { StatusText = "이동을 취소했습니다."; return false; }
@@ -567,16 +641,12 @@ public sealed class UnitConsoleViewModel : Screen
     public async Task UndoMoveAsync(CancellationToken token = default)
     {
         if (_lastMove is not { } undo) return;
-        _lastMove = null;
-        NotifyOfPropertyChange(nameof(CanUndoMove));
 
+        // 표를 미리 버리지 않는다 — 되돌리기가 실패하면 되돌릴 방법이 영영 사라진다.
         var ok = await MoveAsync(undo.UnitId, undo.PreviousParentId, token).ConfigureAwait(true);
-        if (ok)
-        {
-            _lastMove = null;
-            StatusText = $"'{undo.UnitName}' 의 이동을 되돌렸습니다.";
-            NotifyOfPropertyChange(nameof(CanUndoMove));
-        }
+        _lastMove = ok ? null : undo;
+        if (ok) StatusText = $"'{undo.UnitName}' 의 이동을 되돌렸습니다.";
+        NotifyOfPropertyChange(nameof(CanUndoMove));
     }
 
     /// <summary>키보드 폴백 — Alt+↑ 는 한 단계 위로(부모의 부모, 없으면 최상위).</summary>
@@ -655,8 +725,8 @@ public sealed class UnitConsoleViewModel : Screen
                 : $"'{row.Name}' 과 '{otherName}' 의 인접을 끊었습니다.";
 
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);
-            await SelectByIdAsync(row.Id, token).ConfigureAwait(true);
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+            await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
         }
         catch (OperationCanceledException) { StatusText = "인접 변경을 취소했습니다."; }
         catch (Exception ex)
@@ -685,7 +755,7 @@ public sealed class UnitConsoleViewModel : Screen
                 Form.Clear();
                 Detail.Reset();
                 IsBusy = false;
-                await ReloadAsync(token, quiet: true).ConfigureAwait(true);
+                await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
                 return;
             }
 
@@ -719,8 +789,8 @@ public sealed class UnitConsoleViewModel : Screen
 
             DeleteBlock = null;
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);
-            await SelectByIdAsync(row.Id, token).ConfigureAwait(true);
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+            await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
         }
         catch (OperationCanceledException) { StatusText = "운용 중지를 취소했습니다."; }
         catch (Exception ex)
@@ -769,7 +839,9 @@ public sealed class UnitConsoleViewModel : Screen
     private async Task<DraftOutcome> AssignOneAsync(UnitDeviceItem item, int unitId, CancellationToken token)
     {
         // 앞이 실패했으면 그 뒤는 보내지 않는다 — 폭발반경을 실패 지점에서 끊는다.
-        if (_assignStopped) { _assignSkipped.Add(item.Name); return DraftOutcome.Skipped; }
+        // Skipped 가 아니라 Failed 다: 커널 트레이는 Skipped 를 목록에서 <b>지우고</b> Failed 만 남긴다.
+        // 지워지면 "남겨 뒀다" 는 안내가 거짓이 되고 실패분만 다시 보내는 길도 사라진다.
+        if (_assignStopped) { _assignSkipped.Add(item.Name); return DraftOutcome.Failed; }
 
         var result = await _devices.AssignAsync(item, unitId, token).ConfigureAwait(true);
         if (result.IsSuccess) return DraftOutcome.Applied;
@@ -793,11 +865,11 @@ public sealed class UnitConsoleViewModel : Screen
             var summary = await Tray.ApplyAsync(token).ConfigureAwait(true);
             var line = summary.ToMessage();
             if (_assignFailure is not null) line += $" · 첫 실패에서 멈췄습니다 — {_assignFailure}";
-            if (_assignSkipped.Count > 0) line += $" · 보내지 않은 {_assignSkipped.Count}대는 그대로 남습니다";
+            if (_assignSkipped.Count > 0) line += $" · 앞선 실패로 보내지 않은 {_assignSkipped.Count}대는 트레이에 남아 있습니다(다시 [적용] 하면 그것만 보냅니다)";
             StatusText = line;
 
             IsBusy = false;
-            await ReloadAsync(token, quiet: true).ConfigureAwait(true);   // 성공분 반영은 재조회로 확정한다
+            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);   // 성공분 반영은 재조회로 확정한다
         }
         catch (OperationCanceledException) { StatusText = "배치를 취소했습니다."; }
         catch (Exception ex)
@@ -819,8 +891,9 @@ public sealed class UnitConsoleViewModel : Screen
     /// <summary>끌기의 버튼 폴백 — 고른 장비를 지금 고른 부대에 쌓는다.</summary>
     public void QueueAssignSelected()
     {
-        if (SelectedRow is not { } row) { StatusText = "놓을 부대를 트리에서 먼저 고르십시오."; return; }
-        QueueAssign(row.Id, SelectedDevices);
+        var target = AssignTargetId;
+        if (target <= 0) { StatusText = "놓을 부대를 트리에서 고르거나 아래 콤보에서 고르십시오."; return; }
+        QueueAssign(target, SelectedDevices);
     }
     #endregion
 
@@ -861,12 +934,12 @@ public sealed class UnitConsoleViewModel : Screen
     #endregion
 
     #region - Helpers -
-    public async Task SelectByIdAsync(int unitId, CancellationToken token = default)
+    public async Task SelectByIdAsync(int unitId, CancellationToken token = default, bool force = false)
     {
         if (unitId <= 0) return;
         var node = Tree.Find(unitId);
         if (node is null) return;
-        await SelectRowAsync(RowOf(node), token).ConfigureAwait(true);
+        await SelectRowAsync(RowOf(node), token, force).ConfigureAwait(true);
     }
 
     public void SelectEchelon(UnitEchelonFilterViewModel? filter)
@@ -880,6 +953,8 @@ public sealed class UnitConsoleViewModel : Screen
     {
         if (row is null || !row.HasChildren) return;
         row.IsExpanded = !row.IsExpanded;
+        if (row.IsExpanded) _collapsed.Remove(row.Id);
+        else _collapsed.Add(row.Id);
         Project();
     }
 
@@ -915,6 +990,8 @@ public sealed class UnitConsoleViewModel : Screen
         NotifyOfPropertyChange(nameof(CanReload));
         NotifyOfPropertyChange(nameof(CanMoveSelected));
         NotifyOfPropertyChange(nameof(CanAssignSelectedDevices));
+        NotifyOfPropertyChange(nameof(AssignTargetId));
+        NotifyOfPropertyChange(nameof(AssignTargetText));
         NotifyOfPropertyChange(nameof(CanUndoMove));
         NotifyOfPropertyChange(nameof(CanEditUnits));
         NotifyOfPropertyChange(nameof(IsAvailable));
@@ -938,6 +1015,7 @@ public sealed class UnitConsoleViewModel : Screen
     private readonly Dictionary<int, UnitNodeRowViewModel> _rowCache = new();
     private readonly Dictionary<int, UnitDeviceRowViewModel> _deviceRowCache = new();
     private readonly List<string> _assignSkipped = new();
+    private readonly HashSet<int> _collapsed = new();
 
     private IReadOnlyList<UnitDeviceItem> _allDevices = Array.Empty<UnitDeviceItem>();
     private IReadOnlyList<UnitDeviceRowViewModel> _selectedDevices = Array.Empty<UnitDeviceRowViewModel>();
@@ -952,5 +1030,8 @@ public sealed class UnitConsoleViewModel : Screen
     private bool _assignStopped;
     private string? _assignFailure;
     private int _pendingSelectId;
+    private int _detailTicket;
+    private int? _assignTargetUnitId;
+    private bool _isFiltered;
     #endregion
 }

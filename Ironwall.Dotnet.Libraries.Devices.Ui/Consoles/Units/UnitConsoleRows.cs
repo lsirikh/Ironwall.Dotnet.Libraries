@@ -33,6 +33,7 @@ public sealed class UnitNodeRowViewModel : PropertyChangedBase
     private bool _isExpanded = true;
     private int _deviceCount;
     private bool _isMoving;
+    private bool _isFlat;
 
     public UnitNodeRowViewModel(UnitTreeNode node, bool isMine)
     {
@@ -56,8 +57,18 @@ public sealed class UnitNodeRowViewModel : PropertyChangedBase
     /// <summary>이 앱이 붙어 있는 부대(<c>GroupNats</c> 코드)와 같다 — 트리에서 강조한다(스토리보드 L407).</summary>
     public bool IsMine { get; }
 
+    /// <summary>
+    /// 필터가 걸려 <b>평면</b>으로 그리는 중이다 — 부모가 걸러져 빠진 자식을 원래 깊이로 그리면
+    /// 아무 것도 없는 자리 밑에 들여쓰기된 채 떠 있게 된다.
+    /// </summary>
+    public bool IsFlat
+    {
+        get => _isFlat;
+        set { if (_isFlat == value) return; _isFlat = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(Indent)); }
+    }
+
     /// <summary>들여쓰기 — 단계당 16. 컨테이너에 로컬 값을 쓰지 않고 <b>내용</b>의 여백으로만 준다.</summary>
-    public Thickness Indent => new(Depth * INDENT_PER_DEPTH, 0, 0, 0);
+    public Thickness Indent => new(IsFlat ? 0 : Depth * INDENT_PER_DEPTH, 0, 0, 0);
 
     /// <summary>이 부대에 직접 매인 장비 수.</summary>
     public int DeviceCount { get => _deviceCount; set { _deviceCount = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasDeviceCount)); } }

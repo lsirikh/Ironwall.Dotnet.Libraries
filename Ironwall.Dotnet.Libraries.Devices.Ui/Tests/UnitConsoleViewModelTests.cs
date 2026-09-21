@@ -85,6 +85,18 @@ public class UnitConsoleViewModelTests
                 }
                 if (dto.IsEnable is bool enable) node.IsEnable = enable;
                 if (dto.Name is not null) node.Name = dto.Name;
+                // 인접도 진짜 서버처럼 갈아 끼운다 — 전삭제 후 재생성이다.
+                if (dto.AdjacentUnitIds is { } adjacent)
+                {
+                    DetailAdjacency = adjacent.ToList();
+                    Graph.Edges.Adjacency.RemoveAll(e => e.Count == 2 && (e[0] == unitId || e[1] == unitId));
+                    foreach (var partner in adjacent)
+                    {
+                        var low = System.Math.Min(unitId, partner);
+                        var high = System.Math.Max(unitId, partner);
+                        Graph.Edges.Adjacency.Add(new List<int> { low, high });
+                    }
+                }
             }
             if (PatchError is not null)
             {
@@ -492,6 +504,29 @@ public class UnitConsoleViewModelTests
 
         Assert.Single(devices.Assigns);                                  // 첫 실패에서 멈춘다 — 2·3 은 보내지 않았다
         Assert.Contains("첫 실패에서 멈췄습니다", console.StatusText);
+
+        // ★ 보내지 않은 것은 트레이에 남는다. 커널은 Skipped 를 목록에서 지우므로,
+        //   "남겨 뒀다" 고 알리려면 멈춘 항목을 Failed 로 돌려주어야 한다.
+        Assert.Equal(3, console.Tray.Count);
+        Assert.Contains("남아 있습니다", console.StatusText);
+    }
+
+    [Fact]
+    public async Task should_retry_only_what_failed_when_applied_again()
+    {
+        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null), Device(2, null) });
+        await console.ReloadAsync();
+        devices.FailFor.Add(1);
+        console.QueueAssign(6, console.DeviceRows.ToList());
+        await console.ApplyAssignsAsync();
+        Assert.Equal(2, console.Tray.Count);
+
+        devices.FailFor.Clear();
+        devices.Assigns.Clear();
+        await console.ApplyAssignsAsync();
+
+        Assert.Equal(new[] { (1, 6), (2, 6) }, devices.Assigns);
+        Assert.Equal(0, console.Tray.Count);
     }
 
     [Fact]
@@ -532,6 +567,122 @@ public class UnitConsoleViewModelTests
         console.QueueAssignSelected();
 
         Assert.Equal(1, console.Tray.Count);
+    }
+    #endregion
+
+    #region - 검토 회귀 (쓰기 뒤의 화면 상태) -
+    [Fact]
+    public async Task should_reload_the_detail_after_an_adjacency_write()
+    {
+        // 재조회가 같은 부대의 <b>새 행 인스턴스</b>를 만들면 참조 비교 조기 반환에 걸려
+        // 상세가 영영 갱신되지 않았다 — 인접 칩이 그대로 남고 Original 이 저장 전 DTO 를 붙들었다.
+        var (console, _, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        Assert.Equal(new[] { 5 }, console.Form.AdjacentIds);
+
+        await console.ChangeAdjacencyAsync(add: null, remove: 5);
+
+        Assert.Empty(console.Form.AdjacentIds);                  // 칩이 실제로 사라진다
+        Assert.Empty(console.Tree.Find(6)!.AdjacentIds);
+    }
+
+    [Fact]
+    public async Task should_refresh_even_when_the_form_has_unapplied_changes()
+    {
+        // 관문은 사용자가 손댄 칸을 지키는 것이지, 서버가 이미 바꾼 사실을 화면에서 막으라는 뜻이 아니다.
+        var (console, units, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        console.Form.Description = "손댄 설명";
+        Assert.True(console.Detail.IsDirty);
+        var before = units.GraphReads;
+
+        await console.MoveAsync(6, 8);
+
+        Assert.Equal(before + 1, units.GraphReads);              // 서버가 바뀌었으면 화면도 따라간다
+        Assert.Equal(8, console.Tree.Find(6)!.ParentId);
+    }
+
+    [Fact]
+    public async Task should_keep_collapsed_nodes_collapsed_across_a_refresh()
+    {
+        var (console, _, _) = await OpenAsync();
+        console.ToggleExpand(Row(console, 3));
+        Assert.DoesNotContain(console.Rows, r => r.Id is 5 or 6);
+
+        await console.ReloadAsync();
+
+        Assert.DoesNotContain(console.Rows, r => r.Id is 5 or 6);
+        Assert.False(console.Rows.First(r => r.Id == 3).IsExpanded);
+    }
+
+    [Fact]
+    public async Task should_keep_the_undo_token_when_the_reverse_write_fails()
+    {
+        var (console, units, _) = await OpenAsync();
+        await console.MoveAsync(6, 8);
+        Assert.True(console.CanUndoMove);
+
+        units.PatchError = new ApiError { Code = ApiErrorCodes.ValidationError, Message = "거절" };
+        await console.UndoMoveAsync();
+
+        Assert.True(console.CanUndoMove);                        // 되돌릴 방법이 사라지면 안 된다
+    }
+
+    [Fact]
+    public async Task should_flatten_the_list_when_a_filter_is_active()
+    {
+        // 필터가 부모를 걸러내면 자식이 원래 깊이로 남아 허공에 들여쓰기된다.
+        var (console, _, _) = await OpenAsync();
+
+        console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon == EnumUnitEchelon.Company));
+
+        Assert.True(console.IsFiltered);
+        Assert.All(console.Rows, r => Assert.True(r.IsFlat));
+        Assert.All(console.Rows, r => Assert.Equal(0d, r.Indent.Left));
+
+        console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon is null));
+
+        Assert.False(console.IsFiltered);
+        Assert.Equal(3 * UnitNodeRowViewModel.INDENT_PER_DEPTH, Row(console, 5).Indent.Left);
+    }
+
+    [Fact]
+    public async Task should_say_why_when_a_drop_is_blocked()
+    {
+        var (console, _, _) = await OpenAsync();
+
+        console.Drop.Drop(new object[] { Row(console, 6) },
+                          new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 5), -1));
+
+        Assert.Contains("상위 제대", console.StatusText);         // 조용히 끝나지 않는다
+    }
+
+    [Fact]
+    public async Task should_offer_a_button_path_for_assigning_devices_without_the_tree()
+    {
+        // 트리에서 아무것도 고르지 않아도 콤보로 대상 부대를 정할 수 있어야 한다(드래그의 폴백).
+        var (console, _, _) = await OpenAsync(devices: new[] { Device(1, null) });
+        await console.ReloadAsync();
+        console.SetSelectedDevices(console.DeviceRows.ToList());
+
+        Assert.Null(console.SelectedRow);
+        Assert.False(console.CanAssignSelectedDevices);
+
+        console.AssignTargetUnitId = 6;
+
+        Assert.True(console.CanAssignSelectedDevices);
+        Assert.Contains("6", console.AssignTargetText);
+
+        console.QueueAssignSelected();
+        Assert.Equal(1, console.Tray.Count);
+    }
+
+    [Fact]
+    public async Task should_list_every_unit_as_an_assign_target()
+    {
+        var (console, _, _) = await OpenAsync();
+
+        Assert.Equal(console.Tree.Ordered.Select(n => n.Id).ToList(), console.AssignTargets.Select(o => o.Id!.Value).ToList());
     }
     #endregion
 

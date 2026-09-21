@@ -29,6 +29,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 /// </remarks>
 public partial class UnitConsoleView : UserControl
 {
+    private bool _syncingTreeSelection;
+
     public UnitConsoleView() => InitializeComponent();
 
     private UnitConsoleViewModel? Vm => DataContext as UnitConsoleViewModel;
@@ -47,11 +49,27 @@ public partial class UnitConsoleView : UserControl
     #endregion
 
     #region - Tree -
+    /// <summary>
+    /// 행을 고른다. <b>관문이 거절하면 목록 선택을 되돌린다</b> — 되돌리지 않으면 목록은 B 를 가리키는데
+    /// 상세는 A 를 보이는 어긋남이 남는다(레일 셋터는 이미 같은 일을 한다).
+    /// </summary>
     private async void OnTreeSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (sender is not ListBox list) return;
-        await Guard(() => Vm?.SelectRowAsync(list.SelectedItem as UnitNodeRowViewModel) ?? System.Threading.Tasks.Task.CompletedTask);
+        if (_syncingTreeSelection || sender is not ListBox list) return;
+
+        var wanted = list.SelectedItem as UnitNodeRowViewModel;
+        await Guard(() => Vm?.SelectRowAsync(wanted) ?? System.Threading.Tasks.Task.CompletedTask);
+
+        var actual = Vm?.SelectedRow;
+        if (ReferenceEquals(actual, wanted)) return;
+
+        _syncingTreeSelection = true;
+        try { list.SelectedItem = actual; }
+        finally { _syncingTreeSelection = false; }
     }
+
+    /// <summary>끌기의 버튼 경로 — 고른 장비를 배치 바가 가리키는 부대에 쌓는다.</summary>
+    private void OnAssignSelected(object sender, RoutedEventArgs e) => Vm?.QueueAssignSelected();
 
     private void OnToggleExpand(object sender, RoutedEventArgs e)
     {

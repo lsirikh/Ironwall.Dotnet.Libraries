@@ -209,15 +209,21 @@ public static class UnitRequestBuilder
         return new UnitDeleteBlock(items);
     }
 
+    /// <summary>
+    /// 서버가 세는 <b>여덟 표</b>의 키 — 원본은 <c>app/routers/units.py</c> 의 <c>_UNIT_DEPENDENTS</c> 다
+    /// (실측 2026-09-21: <c>child_units · devices · device_groups · servers · events ·
+    /// action_events · event_suppression_schedules · system_events</c>).
+    /// </summary>
+    /// <remarks>모르는 키는 <b>원문 그대로</b> 보인다 — 서버가 표를 더하면 영어로라도 보이는 편이 감추는 것보다 낫다.</remarks>
     private static string LabelOf(string key) => key switch
     {
-        "child_units" or "children" => "하위 부대",
+        "child_units" => "하위 부대",
         "devices" => "장비",
         "device_groups" => "장비 그룹",
         "servers" => "서버",
         "events" => "이벤트 이력",
-        "actions" or "action_reports" => "조치 보고",
-        "suppression_schedules" => "억제 스케줄",
+        "action_events" => "조치 이력",
+        "event_suppression_schedules" => "억제 스케줄",
         "system_events" => "시스템 이벤트",
         _ => key,
     };

@@ -155,7 +155,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public bool IsCreating
     {
         get => _isCreating;
-        private set { _isCreating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsCodeLocked)); }
+        private set { _isCreating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsCodeLocked)); NotifyOfPropertyChange(nameof(CodeNote)); }
     }
 
     /// <summary>등록 뒤에는 코드 칸이 잠긴다 — 🔒.</summary>
@@ -168,13 +168,20 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public int ChildCount { get => _childCount; set { _childCount = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CountsText)); } }
 
     public string CountsText => $"소속 장비 {_deviceCount} · 하위 부대 {_childCount}";
+
+    /// <summary>코드 칸 밑에 붙는 한 줄 — 등록에서는 경고, 그 뒤로는 불변 사실.</summary>
+    public string CodeNote => IsCreating
+        ? "이 값은 나중에 바꿀 수 없습니다 — 바꾸면 그 부대 구독자가 메시지를 잃습니다."
+        : "등록 뒤 바꿀 수 없습니다(NATS subject 의 두 번째 토큰).";
+
+    public string AdjacencyCountText => AdjacencyChips.Count == 0 ? string.Empty : AdjacencyChips.Count.ToString();
     public string DescriptionCounter => $"{_description.Length} / {UnitRules.DESCRIPTION_MAX_LENGTH}";
 
     public string? ErrorText { get => _errorText; set { _errorText = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrEmpty(_errorText);
 
     /// <summary>제대를 바꾸면 이미 매달린 자식과 어긋날 수 있다 — 서버가 422 로 막기 전에 먼저 알린다(스토리보드 L354).</summary>
-    public string? ChildEchelonWarning { get; private set; }
+    public string ChildEchelonWarning { get; private set; } = string.Empty;
     public bool HasChildEchelonWarning => !string.IsNullOrEmpty(ChildEchelonWarning);
 
     public UnitDto? Original => _original;
@@ -207,10 +214,11 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             DeviceCount = deviceCount;
             ChildCount = detail.Children?.Count ?? tree.Find(detail.Id)?.ChildIds.Count ?? 0;
             ErrorText = null;
-            ChildEchelonWarning = null;
+            ChildEchelonWarning = string.Empty;
 
             RebuildAdjacency(detail, tree);
             RebuildOptions(tree, detail.Id, detail.Echelon);
+            RaiseAdjacency();
         }
         finally
         {
@@ -237,7 +245,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             DeviceCount = 0;
             ChildCount = 0;
             ErrorText = null;
-            ChildEchelonWarning = null;
+            ChildEchelonWarning = string.Empty;
             AdjacencyChips.Clear();
             AdjacencyCandidates.Clear();
             RebuildOptions(tree, unitId: 0, echelon: _echelon);
@@ -266,7 +274,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             DeviceCount = 0;
             ChildCount = 0;
             ErrorText = null;
-            ChildEchelonWarning = null;
+            ChildEchelonWarning = string.Empty;
             AdjacencyChips.Clear();
             AdjacencyCandidates.Clear();
             ParentOptions.Clear();
@@ -293,7 +301,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     /// <summary>제대를 바꿨을 때 자식과 어긋나는지 미리 본다.</summary>
     public void RefreshChildEchelonWarning(UnitTreeModel tree)
     {
-        ChildEchelonWarning = null;
+        ChildEchelonWarning = string.Empty;
         if (_original == null || Echelon is not EnumUnitEchelon echelon) { RaiseWarning(); return; }
 
         var node = tree.Find(_original.Id);
@@ -316,13 +324,18 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(ChildEchelonWarning));
         NotifyOfPropertyChange(nameof(HasChildEchelonWarning));
     }
+
+    private void RaiseAdjacency() => NotifyOfPropertyChange(nameof(AdjacencyCountText));
     #endregion
 
     #region - Helpers -
     private void RebuildAdjacency(UnitDetailDto detail, UnitTreeModel tree)
     {
         AdjacencyChips.Clear();
+        // 순서가 곧 신뢰도다: ① 서버가 펼쳐 준 객체 ② 서버가 준 id 목록 ③ 마지막에야 트리(방금 읽은 것이 아닐 수 있다).
+        // ②를 빼먹으면 인접을 바꾼 직후 상세가 <b>옛 트리 값</b>으로 되돌아간다.
         var ids = detail.Adjacent?.Select(a => a.Id).ToList()
+               ?? (detail.AdjacentUnitIds is { Count: > 0 } ? detail.AdjacentUnitIds.ToList() : null)
                ?? tree.Find(detail.Id)?.AdjacentIds.ToList()
                ?? new List<int>();
 

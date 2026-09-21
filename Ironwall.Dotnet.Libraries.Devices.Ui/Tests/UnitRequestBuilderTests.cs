@@ -17,6 +17,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// <c>PATCH</c> 는 RFC 7396 병합이라 <b>안 보낸 키는 그대로 남고 <c>null</c> 은 삭제</b>다.
 /// 그래서 "무엇이 실렸는가" 를 와이어 글자로 직접 본다 — 프로퍼티만 보면 <c>ShouldSerialize</c> 를 놓친다.
 /// </remarks>
+[Collection("CaliburnIoC")]   // 컬렉션 수를 늘리면 정적 IoC 를 바꾸는 이웃과 겹칠 확률이 올라간다 — 같이 직렬화한다.
 public class UnitRequestBuilderTests
 {
     private static JObject Wire(object dto) => JObject.Parse(JsonConvert.SerializeObject(dto));
@@ -209,14 +210,56 @@ public class UnitRequestBuilderTests
         var error = new ApiError
         {
             Code = ApiErrorCodes.Conflict,
-            DetailsToken = JObject.Parse("""{"counts":{"devices":18,"device_groups":2,"events":431,"servers":0}}"""),
+            // 키 이름은 서버 정본 그대로다 — app/routers/units.py 의 _UNIT_DEPENDENTS (실측 2026-09-21).
+            DetailsToken = JObject.Parse("""
+                {"counts":{"child_units":1,"devices":18,"device_groups":2,"servers":0,
+                           "events":431,"action_events":7,"event_suppression_schedules":3,"system_events":2}}
+                """),
         };
 
         var block = UnitRequestBuilder.ParseDeleteConflict(error)!;
 
-        Assert.Equal(new[] { "장비", "장비 그룹", "이벤트 이력" }, block.Items.Select(i => i.Label));
-        Assert.Equal(new[] { 18, 2, 431 }, block.Items.Select(i => i.Count));   // 0 인 종류는 싣지 않는다
-        Assert.Equal(451, block.Total);
+        Assert.Equal(new[] { "하위 부대", "장비", "장비 그룹", "이벤트 이력", "조치 이력", "억제 스케줄", "시스템 이벤트" },
+                     block.Items.Select(i => i.Label));
+        Assert.Equal(new[] { 1, 18, 2, 431, 7, 3, 2 }, block.Items.Select(i => i.Count));   // 0 인 종류는 싣지 않는다
+        Assert.Equal(464, block.Total);
+    }
+
+    /// <summary>
+    /// ★ 서버가 세는 <b>여덟 표 전부</b>가 한글로 풀린다 — 하나라도 영어로 새면 삭제 차단 안내가 반쪽이 된다.
+    /// </summary>
+    [Theory]
+    [InlineData("child_units", "하위 부대")]
+    [InlineData("devices", "장비")]
+    [InlineData("device_groups", "장비 그룹")]
+    [InlineData("servers", "서버")]
+    [InlineData("events", "이벤트 이력")]
+    [InlineData("action_events", "조치 이력")]
+    [InlineData("event_suppression_schedules", "억제 스케줄")]
+    [InlineData("system_events", "시스템 이벤트")]
+    public void should_spell_every_server_dependent_key_in_korean(string key, string label)
+    {
+        var error = new ApiError
+        {
+            Code = ApiErrorCodes.Conflict,
+            DetailsToken = JObject.Parse("{\"counts\":{\"" + key + "\":3}}"),
+        };
+
+        var item = Assert.Single(UnitRequestBuilder.ParseDeleteConflict(error)!.Items);
+        Assert.Equal(label, item.Label);
+        Assert.NotEqual(key, item.Label);
+    }
+
+    [Fact]
+    public void should_show_an_unknown_key_verbatim_rather_than_hiding_it()
+    {
+        var error = new ApiError
+        {
+            Code = ApiErrorCodes.Conflict,
+            DetailsToken = JObject.Parse("""{"counts":{"future_table":4}}"""),
+        };
+
+        Assert.Equal("future_table", Assert.Single(UnitRequestBuilder.ParseDeleteConflict(error)!.Items).Label);
     }
 
     [Fact]
