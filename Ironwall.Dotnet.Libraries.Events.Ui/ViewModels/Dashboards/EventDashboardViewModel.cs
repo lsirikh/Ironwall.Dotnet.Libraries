@@ -438,7 +438,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>끌 수 없는 레일에서는 줄이진 요약만 보인다.</summary>
     public bool IsTrayCollapsed => !CanDragToTray && Tray.HasEntries;
 
-    public string TraySummaryText => $"조치 트레이 {Tray.Count}건 — 탐지 · 장애 내역에서 [적용] 할 수 있습니다";
+    public string TraySummaryText => $"조치 트레이 {Tray.Count}건 — 탐지 · 장애 내역에서 [조치 적용] 할 수 있습니다";
 
     public string ListStatusText
     {
