@@ -918,9 +918,9 @@
 									<CheckBox
 										AutomationProperties.AutomationId="Units.Detail.EnableSwitch"
 										Content="운용 중"
-										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding IsEnable, Mode=TwoWay}"
 										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource Console.CheckBox}"
 										ToolTip="퇴역은 삭제가 아니라 운용 중지(is_enable=false)입니다." />
 								</c:ConsoleField>
 							</StackPanel>

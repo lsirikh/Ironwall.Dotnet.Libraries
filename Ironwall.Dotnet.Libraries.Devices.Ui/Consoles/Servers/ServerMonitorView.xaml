@@ -103,8 +103,8 @@
 								AutomationProperties.AutomationId="Console.Servers.IncludeDescendants"
 								Content="예하 포함"
 								FontSize="12"
-								Foreground="{DynamicResource TextSecondaryBrush}"
-								IsChecked="{Binding IncludeDescendants, Mode=TwoWay}" />
+								IsChecked="{Binding IncludeDescendants, Mode=TwoWay}"
+								Style="{StaticResource Console.CheckBox}" />
 						</StackPanel>
 					</StackPanel>
 				</c:ConsoleRail.Footer>

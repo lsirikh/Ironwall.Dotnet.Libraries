@@ -184,8 +184,15 @@
 							<Setter TargetName="PART_Title" Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 						</Trigger>
 
+						<!--
+							고른 블록은 <b>더 또렷해야</b> 한다 — 앞의 IsOutOfService 트리거가 제목을 흐린 글자색으로
+							내려놓기 때문에, 고른 비가동 블록이 이웃보다 어두웠다(라이트 5.45:1 vs 16.53:1 실측).
+							이 트리거가 뒤에 있어 색을 되돌린다. 비가동은 여전히 점선 {2,2}(형태)로 말한다.
+						-->
 						<Trigger Property="IsSelected" Value="True">
 							<Setter TargetName="PART_SelectionBar" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_Title" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+							<Setter TargetName="PART_Title" Property="FontWeight" Value="SemiBold" />
 						</Trigger>
 
 						<Trigger Property="IsMouseOver" Value="True">

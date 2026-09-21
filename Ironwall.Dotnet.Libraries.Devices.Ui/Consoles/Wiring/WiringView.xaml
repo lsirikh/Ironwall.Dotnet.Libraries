@@ -100,6 +100,12 @@
 				<Setter.Value>
 					<Style TargetType="ListBoxItem">
 						<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+						<!--
+							칸 컨테이너는 상속을 끊는다(ItemContainerStyle 에 BasedOn 이 없어 Control.Foreground 가
+							기본값 검정으로 떨어진다) — 다크에서 칸 안 글자가 #000000 로 찍혔다(1.40:1 실측).
+							컨테이너에서 한 번 못 박고, 글자마다도 명시한다.
+						-->
+						<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 						<!--  키보드로 옮기면 선택 표시와 UIA SelectionItemPattern 이 같이 따라와야 한다(C8)  -->
 						<Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
 						<!--  계측은 peer 가 있는 컨테이너에 붙인다 — DropZoneChrome(ContentControl)은 UIA 에 안 나온다(C9)  -->
@@ -175,6 +181,7 @@
 									FontFamily="Consolas"
 									FontSize="12"
 									FontWeight="Bold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
 									Text="{Binding NumberText}" />
 								<TextBlock
 									Margin="0,1,0,0"
@@ -246,53 +253,52 @@
 	</UserControl.Resources>
 
 	<DockPanel LastChildFill="True">
-		<!--  ── 머리 (WS L332, L382) ──  -->
+		<!--
+			── 머리 (WS L332, L382) ── 높이 40 — 콘솔 커널의 머리(ConsoleShell 40 · Utils/Themes/Generic.xaml L316)와 같다.
+			단추는 한 칸(6)씩 · 보조 → 주(主) 차례로, [저장하기]가 맨 오른쪽이다. 막힌 까닭은 같은 줄에 두지 않는다
+			(줄을 나눠 쓰면 단추가 밀려 문장이 잘린다 — D-14 실측).
+		-->
 		<Border
-			Padding="16,8"
+			Height="40"
+			Padding="16,0,8,0"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,0,0,1"
 			DockPanel.Dock="Top">
 			<DockPanel LastChildFill="True">
-				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+				<StackPanel
+					VerticalAlignment="Center"
+					DockPanel.Dock="Right"
+					Orientation="Horizontal">
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Wiring.AutoLayout"
 						Click="OnAutoLayout"
 						Content="번호 순으로 자동 배치"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="전체를 번호 순으로 정렬해 앞 절반은 1차, 뒤 절반은 2차에 꽂습니다"
 						Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}" />
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Wiring.Undo"
 						Click="OnUndo"
 						Content="되돌리기"
 						IsEnabled="{Binding CanUndo}"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
-					<TextBlock
-						MaxWidth="260"
-						Margin="0,0,8,0"
-						VerticalAlignment="Center"
-						AutomationProperties.AutomationId="Devices.Wiring.SaveBlockedReason"
-						FontSize="11.5"
-						Foreground="{DynamicResource StatusWarningBrush}"
-						Text="{Binding SaveBlockedReason}"
-						TextTrimming="CharacterEllipsis"
-						ToolTip="{Binding SaveBlockedReason}" />
+						Style="{StaticResource Console.Button}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Save"
 						Click="OnSave"
 						Content="저장하기"
 						IsEnabled="{Binding CanSave}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
+						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding SaveBlockedReason}" />
 				</StackPanel>
-				<StackPanel Orientation="Horizontal">
+				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 					<TextBlock
 						VerticalAlignment="Center"
 						FontSize="15"
 						FontWeight="Bold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
 						Text="장비 셋업 · 결선맵" />
 					<TextBlock
 						Margin="10,0,0,0"
@@ -303,6 +309,41 @@
 						Text="{Binding Subject}" />
 				</StackPanel>
 			</DockPanel>
+		</Border>
+
+		<!--
+			── 저장이 막힌 까닭 — 제 줄을 통째로 쓴다(자르지 않는다). 비어 있으면 줄 자체가 없다.
+			바꾼 것이 있는데 막혔을 때만 경고색이다 — "바뀐 줄이 없습니다" 같은 평시 안내까지 앰버로 칠하면
+			진짜 막힘이 묻힌다.
+		-->
+		<Border
+			Padding="16,5"
+			BorderThickness="0,0,0,1"
+			DockPanel.Dock="Top">
+			<Border.Style>
+				<Style TargetType="Border">
+					<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+					<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding HasChanges}" Value="True">
+							<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+							<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding SaveBlockedReason}" Value="">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding SaveBlockedReason}" Value="{x:Null}">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Style>
+			<TextBlock
+				AutomationProperties.AutomationId="Devices.Wiring.SaveBlockedReason"
+				FontSize="12"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				Text="{Binding SaveBlockedReason}"
+				TextWrapping="Wrap" />
 		</Border>
 
 		<!--  ── 단계 띠 (WS L334-337) ──  -->
@@ -469,18 +510,18 @@
 									AutomationProperties.AutomationId="Devices.Wiring.MakeSensors"
 									Click="OnMakeSensors"
 									Content="＋ 센서 여러 개 만들기"
-									Style="{StaticResource MaterialDesignRaisedButton}" />
+									Style="{StaticResource Console.Button.Primary}" />
 								<Button
 									Margin="0,0,6,0"
 									AutomationProperties.AutomationId="Devices.Wiring.AddRow"
 									Click="OnAddRow"
 									Content="＋ 한 줄"
-									Style="{StaticResource MaterialDesignOutlinedButton}" />
+									Style="{StaticResource Console.Button}" />
 								<Button
 									AutomationProperties.AutomationId="Devices.Wiring.Paste"
 									Click="OnPaste"
 									Content="엑셀에서 붙여넣기"
-									Style="{StaticResource MaterialDesignOutlinedButton}" />
+									Style="{StaticResource Console.Button}" />
 							</StackPanel>
 						</DockPanel>
 					</Border>
@@ -623,14 +664,14 @@
 									Content="{Binding ApplyEditText}"
 									DockPanel.Dock="Right"
 									IsEnabled="{Binding CanApplyEdit}"
-									Style="{StaticResource MaterialDesignRaisedButton}" />
+									Style="{StaticResource Console.Button.Primary}" />
 								<Button
 									Margin="0,0,6,0"
 									AutomationProperties.AutomationId="Devices.Wiring.CancelEdit"
 									Click="OnCancelEdit"
 									Content="취소"
 									DockPanel.Dock="Right"
-									Style="{StaticResource MaterialDesignFlatButton}" />
+									Style="{StaticResource Console.Button.Ghost}" />
 								<TextBlock
 									VerticalAlignment="Center"
 									Style="{StaticResource W.Hint}"
@@ -638,7 +679,10 @@
 							</DockPanel>
 						</Border>
 
-						<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+						<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 							<Grid Margin="13,0,13,12">
 							<TextBlock
 								Margin="0,12,0,0"
@@ -797,7 +841,8 @@
 															Focusable="False"
 															IsChecked="{Binding IsChecked, Mode=OneWay}"
 															IsHitTestVisible="False"
-															IsThreeState="True" />
+															IsThreeState="True"
+															Style="{StaticResource Console.CheckBox}" />
 														<TextBlock
 															Margin="8,0,0,0"
 															VerticalAlignment="Center"
@@ -881,7 +926,10 @@
 					<ColumnDefinition Width="360" />
 				</Grid.ColumnDefinitions>
 
-				<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+				<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 					<StackPanel Margin="12">
 						<Grid>
 							<Grid.ColumnDefinitions>
@@ -964,7 +1012,7 @@
 											Click="OnAddSlotPrimary"
 											Content="＋ 칸"
 											DockPanel.Dock="Right"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.1"
 											ItemsSource="{Binding Line1}"
@@ -1014,7 +1062,7 @@
 											Click="OnAddSlotSecondary"
 											Content="＋ 칸"
 											DockPanel.Dock="Right"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.2"
 											ItemsSource="{Binding Line2}"
@@ -1125,7 +1173,7 @@
 										Click="OnUnplaceSelected"
 										Content="고른 칸 빼기"
 										DockPanel.Dock="Right"
-										Style="{StaticResource MaterialDesignFlatButton}" />
+										Style="{StaticResource Console.Button.Ghost}" />
 									<md:PackIcon
 										Width="16"
 										Height="16"
@@ -1161,7 +1209,10 @@
 								Text="이렇게 저장됩니다" />
 						</StackPanel>
 
-						<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+						<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 							<StackPanel Margin="13,0,13,12">
 								<!--  배너 — 색이 아니라 왼쪽 굵은 바 + 글자  -->
 								<Border

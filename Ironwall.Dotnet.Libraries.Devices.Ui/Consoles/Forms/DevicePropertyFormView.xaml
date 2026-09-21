@@ -66,9 +66,9 @@
 			<CheckBox
 				VerticalAlignment="Center"
 				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
-				Foreground="{DynamicResource TextPrimaryBrush}"
 				IsChecked="{Binding BoolValue}"
-				IsThreeState="{Binding IsMixed}" />
+				IsThreeState="{Binding IsMixed}"
+				Style="{StaticResource Console.CheckBox}" />
 		</DataTemplate>
 
 		<DataTemplate x:Key="Editor.Choice">
@@ -138,27 +138,33 @@
 							</ItemsControl.Style>
 							<ItemsControl.ItemTemplate>
 								<DataTemplate>
-									<c:ConsoleField
-										ApiName="{Binding ApiPath}"
-										Header="{Binding HeaderText}"
-										IsLocked="{Binding IsLocked}"
-										IsTouched="{Binding IsTouched}"
-										Note="{Binding LockReason}">
-										<StackPanel>
+									<!--
+										까닭 한 줄은 값 열(~190px)이 아니라 상세 칸 전폭을 쓴다 — 값 열 안에 두면
+										"…65535 이하여야 합니|다." 로 둘째 줄이 생기고 그 줄이 스크롤 영역 아래로
+										잘려 마지막 글자가 사라진다(D-11 실측).
+									-->
+									<StackPanel>
+										<c:ConsoleField
+											ApiName="{Binding ApiPath}"
+											Header="{Binding HeaderText}"
+											IsLocked="{Binding IsLocked}"
+											IsTouched="{Binding IsTouched}"
+											Note="{Binding LockReason}">
 											<ContentControl
 												Content="{Binding}"
 												ContentTemplateSelector="{StaticResource EditorSelector}"
 												Focusable="False" />
-											<TextBlock
-												Margin="0,3,0,0"
-												AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Error.{0}}"
-												FontSize="11.5"
-												Foreground="{DynamicResource StatusCriticalBrush}"
-												Text="{Binding Error, StringFormat=⚠ {0}}"
-												TextWrapping="Wrap"
-												Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
-										</StackPanel>
-									</c:ConsoleField>
+										</c:ConsoleField>
+										<TextBlock
+											Margin="0,1,0,3"
+											AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Error.{0}}"
+											FontSize="11.5"
+											Foreground="{DynamicResource StatusCriticalBrush}"
+											IsVisibleChanged="OnErrorVisibleChanged"
+											Text="{Binding Error, StringFormat=⚠ {0}}"
+											TextWrapping="Wrap"
+											Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+									</StackPanel>
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>

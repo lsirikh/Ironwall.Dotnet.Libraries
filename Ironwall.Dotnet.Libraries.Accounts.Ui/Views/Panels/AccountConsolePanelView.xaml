@@ -114,6 +114,17 @@
 			</Style.Triggers>
 		</Style>
 
+		<!--
+			동작 열 머리글 자리 — 머리글은 왼쪽 정렬(Console.DataGrid.ColumnHeader 기본)인데 칸의 체크는 가운데라
+			열마다 어긋났다(제어 열 Δ19px 실측). 이 열들만 머리글을 가운데로 돌린다.
+		-->
+		<Style
+			x:Key="Matrix.VerbColumnHeader"
+			BasedOn="{StaticResource Console.DataGrid.ColumnHeader}"
+			TargetType="DataGridColumnHeader">
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+		</Style>
+
 		<!--  동작 열 머리글 — 누르면 그 열 전체를 켜거나 끈다(드래그 페인팅의 폴백). 글자가 보여야 하므로 바탕 없는 단추로 그린다.  -->
 		<Style x:Key="Matrix.VerbHeader" TargetType="Button">
 			<Setter Property="Background" Value="Transparent" />
@@ -151,6 +162,61 @@
 			<Setter Property="VerticalAlignment" Value="Center" />
 			<Setter Property="TextWrapping" Value="Wrap" />
 		</Style>
+
+		<!--  되돌릴 수 없는 동작 — 위험을 색 하나가 아니라 <b>테두리(형태) + 바탕 + 구분선</b> 으로 말한다.  -->
+		<Style
+			x:Key="Acc.Btn.Danger"
+			BasedOn="{StaticResource Console.Button}"
+			TargetType="Button">
+			<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+			<Setter Property="BorderThickness" Value="1.5" />
+			<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+		</Style>
+
+		<!--
+			패널 닫기 ✕ — 앱 표준 ModernPanelCloseButton 은 시안 머리 위를 가정해 OnPrimaryFixed 를 박아 둔다.
+			콘솔 머리는 SurfaceAlt 라 라이트에서 흰 글리프가 흰 바탕 위에 놓여 <b>잉크 0%</b>, 다크는 1.35:1 이었다(D-30 실측).
+			여기서는 머리 바탕에 맞는 토큰을 쓴다. Theme 쪽 스타일 자체는 다른 창도 쓰므로 건드리지 않는다.
+		-->
+		<Style x:Key="Acc.CloseButton" TargetType="Button">
+			<Setter Property="Width" Value="26" />
+			<Setter Property="Height" Value="26" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="ToolTip" Value="닫기" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border
+							x:Name="Bd"
+							Background="Transparent"
+							CornerRadius="13">
+							<Path
+								x:Name="Glyph"
+								Width="11"
+								Height="11"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								Data="M0.9,0 L5.5,4.6 L10.1,0 L11,0.9 L6.4,5.5 L11,10.1 L10.1,11 L5.5,6.4 L0.9,11 L0,10.1 L4.6,5.5 L0,0.9z"
+								Fill="{TemplateBinding Foreground}"
+								Stretch="Uniform" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+								<Setter TargetName="Glyph" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 	</UserControl.Resources>
 
 	<c:ConsoleShell
@@ -164,7 +230,7 @@
 			<Button
 				x:Name="ClickClose"
 				AutomationProperties.AutomationId="Console.Accounts.CloseButton"
-				Style="{StaticResource ModernPanelCloseButton}" />
+				Style="{StaticResource Acc.CloseButton}" />
 		</c:ConsoleShell.HeaderContent>
 
 		<!--  레일 — 상단 탭 6 → 레일 6(세션 설정만 구분선 뒤). 권한이 없으면 항목 자체가 없다  -->
@@ -235,7 +301,7 @@
 							AutomationProperties.AutomationId="Console.Accounts.Audit.Search"
 							Click="OnAuditSearch"
 							Content="검색"
-							Style="{StaticResource MaterialDesignFlatButton}" />
+							Style="{StaticResource Console.Button.Ghost}" />
 					</StackPanel>
 				</c:ConsoleToolbar.Filters>
 			</c:ConsoleToolbar>
@@ -512,7 +578,10 @@
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
-							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="0" CellStyle="{StaticResource Console.DataGrid.Cell}">
+							<DataGridTemplateColumn
+								Width="62" matrix:PermissionColumn.Verb="0"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
 									<Button
 										AutomationProperties.AutomationId="Accounts.Matrix.Verb.0"
@@ -524,9 +593,15 @@
 								</DataGridTemplateColumn.Header>
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
+										<!--
+											왼쪽 8 은 보정값이다 — 커널 Console.CheckBox 는 글자 칸을 늘 달고 있어(빈 칸이어도 8 여백)
+											가운데 정렬하면 네모가 열 중심에서 4px 왼쪽으로 앉는다. 이 여백이 그만큼 되민다.
+										-->
 										<CheckBox
-											HorizontalAlignment="Center"
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.view}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -538,7 +613,10 @@
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
-							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="1" CellStyle="{StaticResource Console.DataGrid.Cell}">
+							<DataGridTemplateColumn
+								Width="62" matrix:PermissionColumn.Verb="1"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
 									<Button
 										AutomationProperties.AutomationId="Accounts.Matrix.Verb.1"
@@ -551,8 +629,10 @@
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
 										<CheckBox
-											HorizontalAlignment="Center"
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.edit}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -564,7 +644,10 @@
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
-							<DataGridTemplateColumn Width="62" matrix:PermissionColumn.Verb="2" CellStyle="{StaticResource Console.DataGrid.Cell}">
+							<DataGridTemplateColumn
+								Width="62" matrix:PermissionColumn.Verb="2"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
 									<Button
 										AutomationProperties.AutomationId="Accounts.Matrix.Verb.2"
@@ -577,8 +660,10 @@
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
 										<CheckBox
-											HorizontalAlignment="Center"
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.delete}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -590,7 +675,10 @@
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
-							<DataGridTemplateColumn Width="96" matrix:PermissionColumn.Verb="3" CellStyle="{StaticResource Console.DataGrid.Cell}">
+							<DataGridTemplateColumn
+								Width="110" matrix:PermissionColumn.Verb="3"
+								CellStyle="{StaticResource Console.DataGrid.Cell}"
+								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
 									<Button
 										AutomationProperties.AutomationId="Accounts.Matrix.Verb.3"
@@ -602,10 +690,18 @@
 								</DataGridTemplateColumn.Header>
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
-										<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+										<!--
+											체크는 <b>언제나 열 가운데</b>다 — 전에는 "실집행" 꼬리표가 있고 없고에 따라
+											같은 열 안에서 체크가 18px 씩 옮겨 다녔고(925.5 vs 943.5 실측) 머리글과도 Δ19px 어긋났다.
+											이제 꼬리표는 오른쪽 끝에 따로 붙어 체크를 밀지 않는다.
+										-->
+										<Grid>
 											<CheckBox
 												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.control}"
-												IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+												IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+												Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}">
 												<CheckBox.IsEnabled>
 													<MultiBinding Converter="{StaticResource AllTrue}">
 														<Binding Path="ControlEnabled" />
@@ -615,14 +711,14 @@
 											</CheckBox>
 											<!--  목업의 "실집행" 꼬리표 — 서버가 실제로 검사하는 모듈만  -->
 											<TextBlock
-												Margin="5,0,0,0"
+												HorizontalAlignment="Right"
 												VerticalAlignment="Center"
 												FontSize="10.5"
 												Foreground="{DynamicResource TextMutedBrush}"
 												Text="실집행"
 												ToolTip="서버가 실제로 검사하는 제어 권한입니다"
 												Visibility="{Binding IsControlServerEnforced, Converter={StaticResource BoolToVisibility}}" />
-										</StackPanel>
+										</Grid>
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
@@ -1121,7 +1217,7 @@
 								Click="OnUnlock"
 								Content="잠금 해제"
 								IsEnabled="{Binding CanUnlockSelected}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="계정 잠금을 해제합니다 (확인 팝업)" />
 							<Button
 								Margin="0,0,6,6"
@@ -1129,7 +1225,7 @@
 								Click="OnOpenUserDialog"
 								Content="사용자 변경 창"
 								IsEnabled="{Binding CanOpenUserDialog}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="비밀번호 초기화 · 사진 변경은 이 창에서 합니다. 손댄 칸이 있으면 먼저 적용하거나 되돌리세요." />
 							<Button
 								Margin="0,0,6,6"
@@ -1137,7 +1233,7 @@
 								Click="OnDeleteSelected"
 								Content="삭제"
 								IsEnabled="{Binding CanDelete}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="고른 계정을 삭제합니다 (확인 팝업)" />
 						</WrapPanel>
 					</StackPanel>
@@ -1230,12 +1326,12 @@
 											Click="OnSaveGroupForm"
 											Content="그룹 저장"
 											IsEnabled="{Binding PermissionMatrixPanelViewModel.CanSaveGroupForm}"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<Button
 											AutomationProperties.AutomationId="Console.Accounts.Group.FormCancel"
 											Click="OnCancelGroupForm"
 											Content="취소"
-											Style="{StaticResource MaterialDesignFlatButton}" />
+											Style="{StaticResource Console.Button.Ghost}" />
 									</WrapPanel>
 								</StackPanel>
 							</StackPanel>
@@ -1283,22 +1379,42 @@
 								</DockPanel>
 							</StackPanel>
 						</c:ConsoleSection>
-						<WrapPanel Margin="0,10,0,0">
+						<!--
+							되돌릴 수 없는 동작 — 구분선으로 위의 읽기 전용 요약과 갈라 놓고, 두 단추는 같은 폭
+							(칸 전폭)으로 세로로 쌓는다. 전에는 112px · 252px 로 폭이 달라 한 묶음으로 읽히지 않았고
+							MDIX 기본색이라 위험 신호가 없었다(D-19 실측).
+						-->
+						<StackPanel Margin="0,14,0,0">
+							<Rectangle
+								Height="1"
+								Margin="0,0,0,8"
+								Fill="{DynamicResource DividerBrush}" />
+							<TextBlock
+								Margin="0,0,0,6"
+								AutomationProperties.AutomationId="Console.Accounts.Session.DangerCaption"
+								FontSize="11.5"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Text="되돌릴 수 없는 동작"
+								TextWrapping="Wrap" />
 							<Button
-								Margin="0,0,6,6"
+								Margin="0,0,0,6"
+								HorizontalAlignment="Stretch"
+								HorizontalContentAlignment="Center"
 								AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogout"
 								Click="OnForceLogout"
 								Content="이 세션 종료"
 								IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Acc.Btn.Danger}" />
 							<Button
-								Margin="0,0,6,6"
+								HorizontalAlignment="Stretch"
+								HorizontalContentAlignment="Center"
 								AutomationProperties.AutomationId="Console.Accounts.Session.ForceLogoutAll"
 								Click="OnForceLogoutAll"
 								Content="{Binding ForceLogoutAllText}"
 								IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
-						</WrapPanel>
+								Style="{StaticResource Acc.Btn.Danger}" />
+						</StackPanel>
 					</StackPanel>
 
 					<!--  ④ 권한 부여 — 폼을 상세 칸으로  -->
@@ -1348,14 +1464,14 @@
 								Click="OnCreateGrant"
 								Content="부여"
 								IsEnabled="{Binding GrantManagementPanelViewModel.CanCreateGrant}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Console.Button}" />
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Grant.Revoke"
 								Click="OnRevokeGrant"
 								Content="회수"
 								IsEnabled="{Binding SelectedGrant.IsActive, FallbackValue=False}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Console.Button}" />
 						</WrapPanel>
 					</StackPanel>
 

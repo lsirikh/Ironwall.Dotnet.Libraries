@@ -2,6 +2,7 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent.ByComponentView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	d:DesignHeight="600"
@@ -121,15 +122,22 @@
 			</WrapPanel>
 		</Border>
 
-		<!--  결과 그리드 — 읽기 전용 6열. 정렬 · 열 재정렬은 Console.DataGrid 스타일이 이미 끈다.  -->
-		<DataGrid
-			Grid.Row="1"
-			AutomationProperties.AutomationId="Console.Devices.ByComponent.Grid"
-			IsReadOnly="True"
-			ItemsSource="{Binding Rows}"
-			Style="{StaticResource Console.DataGrid}">
+		<!--
+			결과 그리드 — 읽기 전용 6열. 정렬 · 열 재정렬은 Console.DataGrid 스타일이 이미 끈다.
+			열마다 CellStyle 을 <b>직접</b> 건다 — 비워 두면 MDIX 의 암시적 DataGridCell 스타일이 이겨
+			고른 행이 회색 칸으로 갈라진다(K-07).
+		-->
+		<Grid Grid.Row="1">
+			<DataGrid
+				AutomationProperties.AutomationId="Console.Devices.ByComponent.Grid"
+				IsReadOnly="True"
+				ItemsSource="{Binding Rows}"
+				Style="{StaticResource Console.DataGrid}">
 			<DataGrid.Columns>
-				<DataGridTemplateColumn Width="140" Header="장비">
+				<DataGridTemplateColumn
+					Width="140"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="장비">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
 							<StackPanel Orientation="Horizontal">
@@ -145,52 +153,67 @@
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
-				<DataGridTextColumn Width="90" Binding="{Binding CategoryText}" Header="카테고리" />
-				<DataGridTextColumn Width="130" Binding="{Binding ComponentKey}" Header="부품 key">
+				<DataGridTextColumn
+					Width="90"
+					Binding="{Binding CategoryText}"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="카테고리" />
+				<DataGridTextColumn
+					Width="130"
+					Binding="{Binding ComponentKey}"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="부품 key">
 					<DataGridTextColumn.ElementStyle>
 						<Style TargetType="TextBlock">
 							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
 						</Style>
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
-				<DataGridTextColumn Width="100" Binding="{Binding StateText}" Header="상태" />
-				<DataGridTemplateColumn Width="100" Header="건강">
+				<DataGridTextColumn
+					Width="100"
+					Binding="{Binding StateText}"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="상태" />
+				<DataGridTemplateColumn
+					Width="100"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="건강">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
-							<Border Style="{StaticResource Console.Pill}">
+							<!--
+								배지 글자에 지역 Foreground 를 두지 않는다 — 지역 값은 Console.Pill 이 물려 주는
+								TextElement.Foreground 를 이겨, 커널이 토큰을 고쳐도 아무 일도 일어나지 않는다.
+								뜻은 점(Console.Pill.Dot)과 테두리가 나른다.
+							-->
+							<Border x:Name="Pill" Style="{StaticResource Console.Pill}">
 								<StackPanel Orientation="Horizontal">
-									<Ellipse
-										x:Name="Dot"
-										Width="7"
-										Height="7"
-										Margin="0,0,5,0"
-										VerticalAlignment="Center"
-										Fill="{DynamicResource TextMutedBrush}" />
-									<TextBlock
-										x:Name="Txt"
-										FontSize="12"
-										Foreground="{DynamicResource TextSecondaryBrush}"
-										Text="{Binding HealthText}" />
+									<Ellipse x:Name="Dot" Style="{StaticResource Console.Pill.Dot}" />
+									<TextBlock VerticalAlignment="Center" Text="{Binding HealthText}" />
 								</StackPanel>
 							</Border>
 							<DataTemplate.Triggers>
 								<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+									<Setter TargetName="Pill" Property="Style" Value="{StaticResource Console.Pill.Normal}" />
 									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
-									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
 								</DataTrigger>
 								<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+									<Setter TargetName="Pill" Property="Style" Value="{StaticResource Console.Pill.Warning}" />
 									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
-									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
 								</DataTrigger>
 								<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+									<Setter TargetName="Pill" Property="Style" Value="{StaticResource Console.Pill.Critical}" />
 									<Setter TargetName="Dot" Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
-									<Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
 								</DataTrigger>
 							</DataTemplate.Triggers>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
-				<DataGridTextColumn Width="*" MinWidth="160" Binding="{Binding LastChangeText}" Header="마지막 변화">
+				<DataGridTextColumn
+					Width="*"
+					MinWidth="160"
+					Binding="{Binding LastChangeText}"
+					CellStyle="{StaticResource Console.DataGrid.Cell}"
+					Header="마지막 변화">
 					<DataGridTextColumn.ElementStyle>
 						<Style TargetType="TextBlock">
 							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
@@ -199,7 +222,30 @@
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
 			</DataGrid.Columns>
-		</DataGrid>
+			</DataGrid>
+
+			<!--
+				빈 결과 — 몸통이 통째로 비면(잉크 0.0% 실측) 왜 비었는지 30px 상태 줄 하나만 설명하게 된다.
+				자리는 커널의 ConsoleEmptyState 가 만든다 — 문구만 이 창이 넣는다.
+			-->
+			<c:ConsoleEmptyState
+				AutomationProperties.AutomationId="Console.Devices.ByComponent.Empty"
+				Glyph="M9.5,3 A6.5,6.5 0 0,1 16,9.5 A6.5,6.5 0 0,1 9.5,16 A6.5,6.5 0 0,1 3,9.5 A6.5,6.5 0 0,1 9.5,3 M14.2,14.2 L20,20"
+				Hint="부품 유형이나 상태 · 건강 칩을 바꿔 보세요"
+				IsHitTestVisible="False"
+				Title="{Binding StatusText}">
+				<c:ConsoleEmptyState.Style>
+					<Style BasedOn="{StaticResource {x:Type c:ConsoleEmptyState}}" TargetType="c:ConsoleEmptyState">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding Rows.Count}" Value="0">
+								<Setter Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</c:ConsoleEmptyState.Style>
+			</c:ConsoleEmptyState>
+		</Grid>
 
 		<!--  상태 줄 — "조건에 맞는 부품 N건" / "조건에 맞는 부품이 없습니다" / 오류 문장.  -->
 		<Border
