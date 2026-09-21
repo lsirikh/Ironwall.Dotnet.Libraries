@@ -39,6 +39,7 @@ public partial class App : Application
     private EventDashboardViewModel _viewModel = null!;
     private EventDashboardView _view = null!;
     private Window _window = null!;
+    private static bool _suppression;
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
@@ -60,7 +61,6 @@ public partial class App : Application
                 return;
             }
 
-            _viewModel = Build();
             _viewModel = Build(_suppression);
             _view = new EventDashboardView { DataContext = _viewModel };
             _window = new Window
@@ -90,7 +90,6 @@ public partial class App : Application
     }
 
     #region - Composition -
-    private static EventDashboardViewModel Build()
     private static EventDashboardViewModel Build(bool withSuppression)
     {
         var log = new PreviewLog();
@@ -122,6 +121,12 @@ public partial class App : Application
         // 콘솔이 교차 스레드로 화면을 만진다.
         PlatformProvider.Current = new XamlPlatformProvider();
 
+        // N-08: 억제 모드에서만 억제 API · 장비 · 그룹을 대 준다 —
+        //       안 대면 레일이 서지 않아 N-07 의 24장이 그대로 나온다.
+        var suppressionApi = withSuppression ? SuppressionShots.Api : null;
+        var suppressionDevices = withSuppression ? SuppressionPreviewData.Devices() : null;
+        var suppressionGroups = withSuppression ? SuppressionPreviewData.Groups(log) : null;
+
         return new EventDashboardViewModel(
             events, log,
             new EventTabControlViewModel(events, log),
@@ -131,10 +136,12 @@ public partial class App : Application
             new ActionEventPanelViewModel(events, log, providerService, eventProvider),
             new EventInfoViewModel(deviceProvider, eventProvider, providerService, events, log),
             new CameraEventInfoViewModel(eventProvider, events, log),
-            new DataChartPanelViewModel(events, log, providerService));
             new DataChartPanelViewModel(events, log, providerService),
-            suppressionApi, suppressionDevices, suppressionGroups,
-            withSuppression ? new PreviewClock() : null);
+            mappingLauncher: null,
+            suppressionApi: suppressionApi,
+            deviceProvider: suppressionDevices,
+            deviceGroupProvider: suppressionGroups,
+            clock: withSuppression ? new PreviewClock() : null);
     }
 
     /// <summary>가짜 서버 — 네 목록과 통계만 답한다. 나머지는 부르지 않는다.</summary>
@@ -582,14 +589,6 @@ public partial class App : Application
                           [System.Runtime.CompilerServices.CallerFilePath] string filePath = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = 0)
             => Write("ERROR", msg);
-
-    private static bool _suppression;
-
-        // N-08: 억제 모드에서만 억제 API · 장비 · 그룹을 대 준다 —
-        //       안 대면 레일이 서지 않아 N-07 의 24장이 그대로 나온다.
-        var suppressionApi = withSuppression ? SuppressionShots.Api : null;
-        var suppressionDevices = withSuppression ? SuppressionPreviewData.Devices() : null;
-        var suppressionGroups = withSuppression ? SuppressionPreviewData.Groups(log) : null;
 
         private void Write(string level, string msg)
         {
