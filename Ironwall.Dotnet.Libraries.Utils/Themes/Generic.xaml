@@ -11,190 +11,24 @@
 		이 어셈블리의 컨트롤에만 — 남의 Button/TextBox 를 건드리지 않는다 ④ x:Name 은 템플릿 부품(PART_*) 에만.
 	-->
 
+	<!--
+		이 두 변환기는 여기 남는다 — Binding.Converter 는 DP 가 아니라 DynamicResource 를 못 받고,
+		StaticResource 는 이 사전(테마 사전) 안에서만 풀린다. 창 쪽에서 bool→Visibility 가 필요하면
+		Theme/Converters.xaml 의 정본 {StaticResource BooleanToVisibilityConverter} 를 쓴다(중복 정의를 만들지 않는다).
+	-->
 	<BooleanToVisibilityConverter x:Key="Console.BoolToVisibility" />
 	<c:ConsoleLengthConverter x:Key="Console.DoubleToGridLength" />
 
-	<!--  ───────── 버튼 (템플릿 안에서만 쓰는 명시 스타일)  ─────────  -->
-	<Style x:Key="Console.Button" TargetType="ButtonBase">
-		<Setter Property="Height" Value="32" />
-		<Setter Property="MinWidth" Value="56" />
-		<Setter Property="Padding" Value="12,0" />
-		<Setter Property="FontSize" Value="13" />
-		<Setter Property="Cursor" Value="Hand" />
-		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-		<Setter Property="BorderThickness" Value="1" />
-		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-		<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="ButtonBase">
-					<Grid>
-						<Border
-							x:Name="Bd"
-							Background="{TemplateBinding Background}"
-							BorderBrush="{TemplateBinding BorderBrush}"
-							BorderThickness="{TemplateBinding BorderThickness}"
-							CornerRadius="4" />
-						<!--  포커스는 색이 아니라 바깥 윤곽(형태)  -->
-						<Border
-							x:Name="Focus"
-							Margin="-3"
-							BorderBrush="{DynamicResource FocusRingBrush}"
-							BorderThickness="2"
-							CornerRadius="6"
-							Visibility="Collapsed" />
-						<ContentPresenter
-							Margin="{TemplateBinding Padding}"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
-							RecognizesAccessKey="True" />
-					</Grid>
-					<ControlTemplate.Triggers>
-						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-						</Trigger>
-						<Trigger Property="IsPressed" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
-						</Trigger>
-						<Trigger Property="IsKeyboardFocused" Value="True">
-							<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="IsEnabled" Value="False">
-							<Setter Property="Opacity" Value="0.45" />
-							<Setter Property="Cursor" Value="No" />
-						</Trigger>
-					</ControlTemplate.Triggers>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
-
-	<Style
-		x:Key="Console.Button.Primary"
-		BasedOn="{StaticResource Console.Button}"
-		TargetType="ButtonBase">
-		<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
-		<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
-		<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-		<Setter Property="FontWeight" Value="SemiBold" />
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="ButtonBase">
-					<Grid>
-						<Border
-							x:Name="Bd"
-							Background="{TemplateBinding Background}"
-							BorderBrush="{TemplateBinding BorderBrush}"
-							BorderThickness="1"
-							CornerRadius="4" />
-						<Border
-							x:Name="Focus"
-							Margin="-3"
-							BorderBrush="{DynamicResource FocusRingBrush}"
-							BorderThickness="2"
-							CornerRadius="6"
-							Visibility="Collapsed" />
-						<ContentPresenter
-							Margin="{TemplateBinding Padding}"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center" />
-					</Grid>
-					<ControlTemplate.Triggers>
-						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
-						</Trigger>
-						<Trigger Property="IsKeyboardFocused" Value="True">
-							<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="IsEnabled" Value="False">
-							<Setter Property="Opacity" Value="0.45" />
-							<Setter Property="Cursor" Value="No" />
-						</Trigger>
-					</ControlTemplate.Triggers>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
-
-	<Style
-		x:Key="Console.Button.Ghost"
-		BasedOn="{StaticResource Console.Button}"
-		TargetType="ButtonBase">
-		<Setter Property="Background" Value="Transparent" />
-		<Setter Property="BorderBrush" Value="Transparent" />
-		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-	</Style>
-
-	<Style
-		x:Key="Console.Button.Mini"
-		BasedOn="{StaticResource Console.Button.Ghost}"
-		TargetType="ButtonBase">
-		<Setter Property="Height" Value="22" />
-		<Setter Property="MinWidth" Value="24" />
-		<Setter Property="Padding" Value="4,0" />
-		<Setter Property="FontSize" Value="11" />
-		<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
-	</Style>
-
-	<!--  ───────── 검색 상자  ─────────  -->
-	<Style x:Key="Console.SearchBox" TargetType="TextBox">
-		<Setter Property="Height" Value="32" />
-		<Setter Property="FontSize" Value="13" />
-		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-		<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
-		<Setter Property="VerticalContentAlignment" Value="Center" />
-		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="TextBox">
-					<Border
-						x:Name="Bd"
-						Background="{DynamicResource SurfaceSunkenBrush}"
-						BorderBrush="{DynamicResource BorderBrush}"
-						BorderThickness="1"
-						CornerRadius="4">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="30" />
-								<ColumnDefinition Width="*" />
-							</Grid.ColumnDefinitions>
-							<Path
-								Width="13"
-								Height="13"
-								Data="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"
-								Fill="{DynamicResource TextMutedBrush}"
-								Stretch="Uniform" />
-							<TextBlock
-								x:Name="Hint"
-								Grid.Column="1"
-								VerticalAlignment="Center"
-								Foreground="{DynamicResource TextMutedBrush}"
-								IsHitTestVisible="False"
-								Text="{TemplateBinding Tag}"
-								Visibility="Collapsed" />
-							<ScrollViewer
-								x:Name="PART_ContentHost"
-								Grid.Column="1"
-								Margin="0,0,6,0"
-								VerticalAlignment="Center"
-								Focusable="False" />
-						</Grid>
-					</Border>
-					<ControlTemplate.Triggers>
-						<Trigger Property="Text" Value="{x:Static sys:String.Empty}">
-							<Setter TargetName="Hint" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="IsKeyboardFocused" Value="True">
-							<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-							<Setter TargetName="Bd" Property="BorderThickness" Value="2" />
-						</Trigger>
-					</ControlTemplate.Triggers>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
+	<!--
+		───────── 버튼 · 검색 상자는 여기 없다 (K-02, 2026-09-21) ─────────
+		Console.Button / .Primary / .Ghost / .Mini / Console.SearchBox 는
+		Ironwall.Dotnet.Libraries.Theme/Themes/Styles.Console.xaml 로 옮겼다 — 정의는 거기 한 곳뿐이다.
+		이유: 이 파일은 테마 사전이라 앱 스코프의 {StaticResource} 로 닿지 않는다. 창들이 못 닿으니
+		MDIX 암시 스타일로 떨어졌고 Teal500(#009688) · 체크 색 세 가지 · 회색 스크롤바가 새어 들어왔다.
+		실측(2026-09-21): 반대 방향도 막힌다 — 이 사전 안의 {StaticResource} 는 Application.Resources 를
+		보지 못하고 DependencyProperty.UnsetValue 를 돌려준다(조용한 실패). 그래서 커널 템플릿은
+		아래에서 {DynamicResource Console.*} 로 같은 정의를 가져다 쓴다. 앱이 Theme.Current 를 병합해야 한다.
+	-->
 
 	<!--  ───────── 드래그 핸들  ─────────  -->
 	<Style TargetType="{x:Type d:DragHandle}">
@@ -468,6 +302,7 @@
 						<ScrollViewer
 							Padding="0,10,0,10"
 							Focusable="False"
+							Style="{DynamicResource Console.ScrollViewer}"
 							VerticalScrollBarVisibility="Auto">
 							<ItemsPresenter />
 						</ScrollViewer>
@@ -516,7 +351,7 @@
 							x:Name="Sep"
 							Height="1"
 							Margin="8,6"
-							Fill="{DynamicResource DividerBrush}"
+							Fill="{DynamicResource RowLineBrush}"
 							Visibility="{Binding HasSeparatorAbove, Converter={StaticResource Console.BoolToVisibility}}" />
 						<Grid Margin="8,1">
 							<Border
@@ -613,69 +448,82 @@
 						Padding="12,8"
 						BorderBrush="{DynamicResource DividerBrush}"
 						BorderThickness="0,0,0,1">
-						<DockPanel LastChildFill="True">
-							<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+						<!--
+							D-16 — 옛 구조는 DockPanel(LastChildFill) 이라 검색이 '남는 자리' 였다. Extra 가 길면
+							검색이 MinWidth 120 아래로 눌려 글자가 잘렸다. Grid 로 바꾸고 검색 칸에 MinWidth 를 걸어
+							이제는 왼쪽 · 오른쪽 묶음이 먼저 줄어든다 — 검색은 결코 잘리지 않는다.
+							D-44 — 버튼 사이 간격은 8px 로 통일한다(집 규칙). 커널이 8 이면 창도 8 이다.
+						-->
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="*" MinWidth="132" />
+								<ColumnDefinition Width="Auto" />
+							</Grid.ColumnDefinitions>
+							<StackPanel Orientation="Horizontal">
 								<Button
 									x:Name="PART_Add"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Add}"
 									IsEnabled="{TemplateBinding CanAdd}"
-									Style="{StaticResource Console.Button.Primary}">
+									Style="{DynamicResource Console.Button.Primary}">
 									<StackPanel Orientation="Horizontal">
+										<!--  글리프는 버튼의 Foreground 를 따른다 — 꺼지면 판이 가라앉으므로 흰 십자가 사라지면 안 된다(K-01)  -->
 										<Path
 											Width="10"
 											Height="10"
 											Margin="0,0,6,0"
 											VerticalAlignment="Center"
 											Data="M4,0 h2 v4 h4 v2 h-4 v4 h-2 v-4 h-4 v-2 h4z"
-											Fill="{DynamicResource OnPrimaryBrush}"
+											Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
 											Stretch="Fill" />
 										<TextBlock VerticalAlignment="Center" Text="{Binding AddText, RelativeSource={RelativeSource TemplatedParent}}" />
 									</StackPanel>
 								</Button>
 								<Button
 									x:Name="PART_Delete"
-									Margin="6,0,0,0"
+									Margin="8,0,0,0"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Delete}"
 									Content="삭제"
 									IsEnabled="{TemplateBinding CanDelete}"
-									Style="{StaticResource Console.Button}" />
+									Style="{DynamicResource Console.Button}" />
 								<Button
 									x:Name="PART_Refresh"
-									Margin="6,0,0,0"
+									Margin="8,0,0,0"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Refresh}"
 									Content="갱신"
 									IsEnabled="{TemplateBinding CanRefresh}"
-									Style="{StaticResource Console.Button.Ghost}" />
+									Style="{DynamicResource Console.Button.Ghost}" />
 								<ContentPresenter
 									Margin="10,0,0,0"
 									VerticalAlignment="Center"
 									Content="{TemplateBinding Filters}" />
 							</StackPanel>
-							<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+							<TextBox
+								x:Name="Search"
+								Grid.Column="1"
+								MinWidth="120"
+								MaxWidth="320"
+								Margin="12,0,0,0"
+								HorizontalAlignment="Right"
+								AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Search}"
+								Style="{DynamicResource Console.SearchBox}"
+								Tag="{TemplateBinding SearchPlaceholder}"
+								Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							<StackPanel Grid.Column="2" Orientation="Horizontal">
 								<Button
 									x:Name="PART_Columns"
 									Margin="8,0,0,0"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Columns}"
 									Content="{TemplateBinding ColumnsText}"
 									FontFamily="{DynamicResource MonoFont}"
-									Style="{StaticResource Console.Button.Ghost}"
+									Style="{DynamicResource Console.Button.Ghost}"
 									ToolTip="기본 열 / 전체 열" />
 								<ContentPresenter
-									Margin="4,0,0,0"
+									Margin="8,0,0,0"
 									VerticalAlignment="Center"
 									Content="{TemplateBinding Extra}" />
 							</StackPanel>
-							<TextBox
-								x:Name="Search"
-								MinWidth="120"
-								MaxWidth="320"
-								Margin="12,0,0,0"
-								HorizontalAlignment="Right"
-								AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Search}"
-								Style="{StaticResource Console.SearchBox}"
-								Tag="{TemplateBinding SearchPlaceholder}"
-								Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-						</DockPanel>
+						</Grid>
 					</Border>
 					<ControlTemplate.Triggers>
 						<!--  꺼진 버튼은 늘 사유를 갖는다  -->
@@ -742,17 +590,17 @@
 								<Button
 									x:Name="PART_WidthS"
 									Content="S"
-									Style="{StaticResource Console.Button.Mini}"
+									Style="{DynamicResource Console.Button.Mini}"
 									ToolTip="상세 폭 300" />
 								<Button
 									x:Name="PART_WidthM"
 									Content="M"
-									Style="{StaticResource Console.Button.Mini}"
+									Style="{DynamicResource Console.Button.Mini}"
 									ToolTip="상세 폭 340" />
 								<Button
 									x:Name="PART_WidthL"
 									Content="L"
-									Style="{StaticResource Console.Button.Mini}"
+									Style="{DynamicResource Console.Button.Mini}"
 									ToolTip="상세 폭 480" />
 							</StackPanel>
 						</Grid>
@@ -766,11 +614,12 @@
 							BorderBrush="{DynamicResource StatusInfoBrush}"
 							BorderThickness="3,0,0,0"
 							CornerRadius="3">
+							<!--  D-17 — Wrap 은 한 글자짜리 고아 줄을 만든다(실측: 12px 셋째 줄에 한 음절). WrapWithOverflow 로.  -->
 							<TextBlock
 								FontSize="12.5"
 								Foreground="{DynamicResource TextSecondaryBrush}"
 								Text="{TemplateBinding Banner}"
-								TextWrapping="Wrap" />
+								TextWrapping="WrapWithOverflow" />
 						</Border>
 
 						<!--
@@ -781,9 +630,11 @@
 							Grid.Row="2"
 							Focusable="False"
 							HorizontalScrollBarVisibility="Disabled"
+							Style="{DynamicResource Console.ScrollViewer}"
 							VerticalScrollBarVisibility="Auto">
+							<!--  D-37 — 아래 16 은 고정 적용 막대에 먹혀 마지막 문단이 문장 중간에서 잘렸다. 24 로 띄운다.  -->
 							<ContentPresenter
-								Margin="16,4,16,16"
+								Margin="16,4,16,24"
 								HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
 								VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
 						</ScrollViewer>
@@ -799,6 +650,7 @@
 							<DockPanel LastChildFill="True">
 								<StackPanel
 									x:Name="Buttons"
+									VerticalAlignment="Center"
 									DockPanel.Dock="Right"
 									Orientation="Horizontal">
 									<Button
@@ -806,24 +658,32 @@
 										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Detail.Revert}"
 										Content="{TemplateBinding RevertText}"
 										IsEnabled="{TemplateBinding CanRevert}"
-										Style="{StaticResource Console.Button}"
+										Style="{DynamicResource Console.Button}"
 										ToolTip="바꾼 것을 버리고 원래 값으로" />
 									<Button
 										x:Name="PART_Apply"
-										Margin="6,0,0,0"
+										Margin="8,0,0,0"
 										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Detail.Apply}"
 										Content="{TemplateBinding ApplyText}"
 										IsEnabled="{TemplateBinding CanApply}"
-										Style="{StaticResource Console.Button.Primary}" />
+										Style="{DynamicResource Console.Button.Primary}" />
 								</StackPanel>
+								<!--
+									D-12/D-13 — 한 줄 + 줄임표였다. 버튼 둘이 자리를 먹으면 "적용하거나 되돌린 뒤 이동하세요" ·
+									"등록 전에는 목록에 나타나지…" 가 매번 잘렸다. 두 줄까지 접고(막대는 Auto 높이라 같이 자란다)
+									그래도 넘치면 줄임표. 흔들기는 PART_Footer 의 RenderTransform 이라 레이아웃과 무관하게 그대로다.
+								-->
 								<TextBlock
 									x:Name="Msg"
+									MaxWidth="360"
+									Margin="0,0,12,0"
 									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Detail.Message}"
 									FontSize="12.5"
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="{TemplateBinding FooterText}"
-									TextTrimming="CharacterEllipsis" />
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="WrapWithOverflow" />
 							</DockPanel>
 						</Border>
 					</Grid>
@@ -841,11 +701,11 @@
 						<Trigger Property="ShowWidthTools" Value="False">
 							<Setter TargetName="WidthTools" Property="Visibility" Value="Collapsed" />
 						</Trigger>
-						<!--  미적용 변경: 경고색 바탕 + 굵은 윗선(형태) + 굵은 글자  -->
+						<!--  미적용 변경: 경고색 바탕 + 굵은 윗선(형태) + 굵은 글자. K-04 — 틴트 0x22 는 흰 바탕과 1.18 이라 안 보였다: 토큰 0x55 + 윗선 4px.  -->
 						<Trigger Property="IsDirty" Value="True">
 							<Setter TargetName="PART_Footer" Property="Background" Value="{DynamicResource TintWarningBrush}" />
 							<Setter TargetName="PART_Footer" Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
-							<Setter TargetName="PART_Footer" Property="BorderThickness" Value="0,3,0,0" />
+							<Setter TargetName="PART_Footer" Property="BorderThickness" Value="0,4,0,0" />
 							<Setter TargetName="Msg" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Setter TargetName="Msg" Property="FontWeight" Value="SemiBold" />
 						</Trigger>
@@ -908,7 +768,7 @@
 						<Rectangle
 							Height="1"
 							Margin="0,6,0,6"
-							Fill="{DynamicResource DividerBrush}" />
+							Fill="{DynamicResource RowLineBrush}" />
 						<ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
 					</StackPanel>
 					<ControlTemplate.Triggers>
@@ -996,7 +856,7 @@
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{TemplateBinding Note}"
-								TextWrapping="Wrap" />
+								TextWrapping="WrapWithOverflow" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
@@ -1035,7 +895,7 @@
 							<TextBlock
 								FontSize="12"
 								Foreground="{DynamicResource TextSecondaryBrush}"
-								TextWrapping="Wrap">
+								TextWrapping="WrapWithOverflow">
 								<Run Text="이 응답에 " /><Run
 									FontFamily="{DynamicResource MonoFont}"
 									FontWeight="SemiBold"
@@ -1046,7 +906,7 @@
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="빈 값이 아니라 미수신입니다."
-								TextWrapping="Wrap" />
+								TextWrapping="WrapWithOverflow" />
 							<TextBlock
 								x:Name="Hint"
 								Margin="0,2,0,0"
@@ -1054,12 +914,84 @@
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{TemplateBinding ReloadHint}"
-								TextWrapping="Wrap" />
+								TextWrapping="WrapWithOverflow" />
 						</StackPanel>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="ReloadHint" Value="{x:Static sys:String.Empty}">
 							<Setter TargetName="Hint" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!--  ───────── 빈 자리 (D-33)  ─────────  -->
+	<!--
+		걸릴 것이 없을 때 본문을 비워 두지 않는다 — 네 콘솔이 잉크 0.0% 로 비어 있었고,
+		"없음" 과 "덜 불러옴" 과 "고장" 이 화면에서 같아 보였다. 글리프 + 제목 + 힌트 + (선택) 단추.
+		커널은 자리만 만든다; 어느 콘솔에 붙일지는 창이 정한다.
+	-->
+	<Style TargetType="{x:Type c:ConsoleEmptyState}">
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="HorizontalAlignment" Value="Stretch" />
+		<Setter Property="VerticalAlignment" Value="Stretch" />
+		<Setter Property="Padding" Value="24" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="AutomationProperties.AutomationId" Value="Console.EmptyState" />
+		<Setter Property="AutomationProperties.Name" Value="{Binding Title, RelativeSource={RelativeSource Self}}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type c:ConsoleEmptyState}">
+					<Border Padding="{TemplateBinding Padding}" Background="Transparent">
+						<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+							<Path
+								Width="34"
+								Height="34"
+								HorizontalAlignment="Center"
+								Data="{TemplateBinding Glyph}"
+								Stretch="Uniform"
+								Stroke="{DynamicResource TextMutedBrush}"
+								StrokeLineJoin="Round"
+								StrokeThickness="1.4" />
+							<TextBlock
+								x:Name="TitleText"
+								MaxWidth="320"
+								Margin="0,12,0,0"
+								HorizontalAlignment="Center"
+								FontSize="13.5"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{TemplateBinding Title}"
+								TextAlignment="Center"
+								TextWrapping="WrapWithOverflow" />
+							<TextBlock
+								x:Name="HintText"
+								MaxWidth="320"
+								Margin="0,5,0,0"
+								HorizontalAlignment="Center"
+								FontSize="12.5"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{TemplateBinding Hint}"
+								TextAlignment="Center"
+								TextWrapping="WrapWithOverflow" />
+							<ContentPresenter
+								x:Name="ActionHost"
+								Margin="0,14,0,0"
+								HorizontalAlignment="Center"
+								Content="{TemplateBinding Action}" />
+						</StackPanel>
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="Hint" Value="{x:Static sys:String.Empty}">
+							<Setter TargetName="HintText" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+						<Trigger Property="Title" Value="{x:Static sys:String.Empty}">
+							<Setter TargetName="TitleText" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+						<Trigger Property="Action" Value="{x:Null}">
+							<Setter TargetName="ActionHost" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
