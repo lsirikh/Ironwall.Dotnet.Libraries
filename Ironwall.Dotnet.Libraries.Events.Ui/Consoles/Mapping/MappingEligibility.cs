@@ -95,6 +95,10 @@ public static class MappingEligibility
     /// 프리셋 칩 → 카메라 행의 슬롯. <b>그 카메라 소유 프리셋만</b> 받는다 —
     /// 아니면 서버가 422 를 내므로 드롭 전에 구조적으로 막는다.
     /// </summary>
+    /// <remarks>
+    /// ⚠ <b>이번 판에는 행 편집기가 없어 화면에서 부르는 곳이 없다.</b> 규칙이 서버 문서가 아니라
+    /// 서버 <b>코드</b>에만 있는 것이라(<c>event_mapping_cameras.py:84-95</c>) 판정만 먼저 굳혀 둔다.
+    /// </remarks>
     public static MappingDropVerdict PresetToRow(int presetCameraId, int? rowCameraId, bool isReadOnly)
     {
         if (isReadOnly) return MappingDropVerdict.Block(ReadOnlyReason);

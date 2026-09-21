@@ -90,13 +90,33 @@ public sealed class MappingPaletteItemViewModel : PropertyChangedBase
     public string Subtitle => $"{Device.TypeText} · #{Device.Id}";
 
     /// <summary>이미 이 맵핑에 들어가 있는가 — 흐리게 + "등록됨" 으로 중복 드래그를 미리 억제한다.</summary>
-    public bool IsRegistered { get => _isRegistered; set { _isRegistered = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(StatusText)); } }
+    public bool IsRegistered
+    {
+        get => _isRegistered;
+        set
+        {
+            _isRegistered = value;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(StatusText));
+            NotifyOfPropertyChange(nameof(HasStatus));
+            NotifyOfPropertyChange(nameof(StatusIcon));
+        }
+    }
 
     /// <summary>장비 자체가 운용 중인가.</summary>
     public bool IsDeviceEnabled => Device.IsEnabled;
 
     /// <summary>상태 칸 문구.</summary>
     public string StatusText => IsRegistered ? "등록됨" : IsDeviceEnabled ? string.Empty : "사용 안 함";
+
+    /// <summary>상태 알약을 띄울 것인가.</summary>
+    public bool HasStatus => StatusText.Length > 0;
+
+    /// <summary>
+    /// 상태 아이콘 — <b>형태로</b> 구분한다. 흐림 하나로 뭉개면
+    /// "이미 올라감"(추가 불가)과 "장비가 꺼짐"(추가는 됨)이 같아 보인다.
+    /// </summary>
+    public string StatusIcon => IsRegistered ? "CheckBold" : "PowerPlugOff";
 
     /// <summary>드래그 고스트에 쓰는 이름.</summary>
     public string Display => Name;
@@ -217,20 +237,6 @@ public sealed class MappingRowViewModel : PropertyChangedBase
         EnumBuzzerSound.PiContinue => "연속음",
         _ => sound.ToString(),
     };
-
-    /// <summary>표시 값을 전부 다시 읽는다.</summary>
-    public void RefreshAll()
-    {
-        Refresh();
-        NotifyOfPropertyChange(nameof(Chips));
-        NotifyOfPropertyChange(nameof(IsRemoved));
-        NotifyOfPropertyChange(nameof(IsAdded));
-        NotifyOfPropertyChange(nameof(IsEdited));
-        NotifyOfPropertyChange(nameof(IsDraft));
-        NotifyOfPropertyChange(nameof(IsOrphan));
-        NotifyOfPropertyChange(nameof(IsEnable));
-        NotifyOfPropertyChange(nameof(Key));
-    }
 }
 
 /// <summary>팔레트 검색 — 순수 판정(이름·부제·id 를 본다).</summary>

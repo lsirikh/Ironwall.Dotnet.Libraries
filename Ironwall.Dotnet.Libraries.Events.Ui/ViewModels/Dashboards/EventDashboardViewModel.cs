@@ -147,6 +147,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         EventProvider = IoC.Get<EventProvider>();
         NotifyOfPropertyChange(nameof(EventProvider));
 
+        RefreshMappingEntry();      // N-13 mapping workbench — 판본·권한은 열릴 때마다 다시 본다
+
         await SwitchRailAsync(_railKey, force: true);
     }
 
@@ -807,6 +809,12 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     /// <summary>워크벤치 창을 연다.</summary>
     public Task OpenMappingWorkbenchAsync() => _mapping?.OpenAsync() ?? Task.CompletedTask;
+
+    /// <summary>
+    /// 입구를 다시 판정한다 — <see cref="CanOpenMappingWorkbench"/> 는 권한·판본에서 나온
+    /// <b>파생값</b>이라 스스로 알리지 못한다. 권한이 바뀌면 누가 깨워 줘야 한다.
+    /// </summary>
+    public void RefreshMappingEntry() => NotifyOfPropertyChange(nameof(CanOpenMappingWorkbench));
     #endregion
 }
 

@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -35,19 +36,39 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     private const int PAGE_LIMIT = 100;
     private const int MAX_PAGES = 200;      // 2만 건. 이보다 많으면 경고하고 멈춘다(무한 루프 금지)
 
+    /// <summary>이 화면이 읽고 쓰는 연동 계약이 없는 판본에서 쓰는 거절 문구.</summary>
+    public const string ContractRefusal = "이 서버 판본에는 이벤트 맵핑 연동 계약이 없습니다.";
+
     private readonly IApiService _api;
     private readonly ApiSetupModel _setup;
+    private readonly IServerContractProbe? _probe;
     private readonly ILogService? _log;
 
     /// <summary>생성자.</summary>
     /// <param name="api">HTTP 클라이언트.</param>
     /// <param name="setup">서버 주소 설정.</param>
+    /// <param name="probe">서버 계약 세대. <c>null</c>(미등록)이면 <see cref="EnumServerContract.V6_3"/> 로 본다.</param>
     /// <param name="log">로그(없어도 동작한다).</param>
-    public MappingWorkbenchGateway(IApiService api, ApiSetupModel setup, ILogService? log = null)
+    public MappingWorkbenchGateway(IApiService api, ApiSetupModel setup, IServerContractProbe? probe = null, ILogService? log = null)
     {
         _api = api;
         _setup = setup;
+        _probe = probe;
         _log = log;
+    }
+
+    /// <summary>이 판본에서 연동 경로를 써도 되는가 — <b>7.0 이상</b>.</summary>
+    /// <remarks>
+    /// 🔴 입구(<see cref="MappingWorkbenchLauncher"/>)만 막으면 부족하다. 뷰모델을 직접 만든 코드는
+    /// 그 관문을 지나지 않는다. <b>서비스 쪽에서도 거절</b>한다 — 선례는 <c>AssemblyWriteGuard</c>.
+    /// <c>==</c> 가 아니라 <c>&gt;=</c> 로 본다(판본은 앞으로도 올라간다).
+    /// </remarks>
+    public bool IsSupported => (_probe?.Contract ?? EnumServerContract.V6_3) >= EnumServerContract.V7_0;
+
+    private MappingCallResult<T> Refuse<T>()
+    {
+        _log?.Warning("[MappingWorkbench] " + ContractRefusal);
+        return MappingCallResult<T>.Fail(ContractRefusal, "server contract < 7.0", 0);
     }
 
     private string Root => $"{_setup.Url}/integrations/event-mappings";
@@ -56,6 +77,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     /// <inheritdoc/>
     public async Task<MappingCallResult<IReadOnlyList<EventMappingReadDto>>> ListMappingsAsync(CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<IReadOnlyList<EventMappingReadDto>>();
         var all = new List<EventMappingReadDto>();
         for (var page = 1; page <= MAX_PAGES; page++)
         {
@@ -80,6 +102,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     /// <inheritdoc/>
     public async Task<MappingCallResult<EventMappingReadDto>> GetMappingAsync(int mappingId, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<EventMappingReadDto>();
         var result = await SendAsync(() => _api.GetRequestAsync($"{Root}/{mappingId}"), "맵핑을 다시 읽지 못했습니다.").ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<EventMappingReadDto>.Fail(result.Message, result.RawError, result.StatusCode);
 
@@ -92,6 +115,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     /// <inheritdoc/>
     public async Task<MappingCallResult<EventMappingReadDto>> CreateMappingAsync(EventMappingCreateDto body, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<EventMappingReadDto>();
         var result = await SendAsync(() => _api.PostRequestAsync(Root, body), "맵핑을 만들지 못했습니다.").ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<EventMappingReadDto>.Fail(result.Message, result.RawError, result.StatusCode);
 
@@ -104,6 +128,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     /// <inheritdoc/>
     public async Task<MappingCallResult<EventMappingReadDto>> PatchMappingAsync(int mappingId, EventMappingUpdateDto body, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<EventMappingReadDto>();
         if (body.IsEmpty) return MappingCallResult<EventMappingReadDto>.Fail("바뀐 값이 없습니다.", null, 0);
 
         var result = await SendAsync(() => _api.PatchRequestAsync($"{Root}/{mappingId}", body), "맵핑을 저장하지 못했습니다.").ConfigureAwait(false);
@@ -119,22 +144,25 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     #region - 하위 배선 -
     /// <inheritdoc/>
     public Task<MappingCallResult<IReadOnlyList<MappingCameraReadDto>>> ListCamerasAsync(int mappingId, CancellationToken token = default)
-        => ListConfigsAsync<MappingCameraReadDto>(mappingId, MappingActionKind.Camera);
+        => ListConfigsAsync<MappingCameraReadDto>(mappingId, MappingActionKind.Camera, token);
 
     /// <inheritdoc/>
     public Task<MappingCallResult<IReadOnlyList<MappingSpeakerReadDto>>> ListSpeakersAsync(int mappingId, CancellationToken token = default)
-        => ListConfigsAsync<MappingSpeakerReadDto>(mappingId, MappingActionKind.Speaker);
+        => ListConfigsAsync<MappingSpeakerReadDto>(mappingId, MappingActionKind.Speaker, token);
 
     /// <inheritdoc/>
     public Task<MappingCallResult<IReadOnlyList<MappingLampReadDto>>> ListLampsAsync(int mappingId, CancellationToken token = default)
-        => ListConfigsAsync<MappingLampReadDto>(mappingId, MappingActionKind.Lamp);
+        => ListConfigsAsync<MappingLampReadDto>(mappingId, MappingActionKind.Lamp, token);
 
-    private async Task<MappingCallResult<IReadOnlyList<T>>> ListConfigsAsync<T>(int mappingId, MappingActionKind kind)
+    private async Task<MappingCallResult<IReadOnlyList<T>>> ListConfigsAsync<T>(int mappingId, MappingActionKind kind, CancellationToken token)
     {
+        if (!IsSupported) return Refuse<IReadOnlyList<T>>();
         var label = MappingKindText.Label(kind);
         var url = $"{Root}/{mappingId}/{MappingKindText.Segment(kind)}";
         var result = await SendAsync(() => _api.GetRequestAsync(url), $"{label} 배선을 불러오지 못했습니다.").ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<T>>.Fail(result.Message, result.RawError, result.StatusCode);
+        // 주의: IApiService 에 토큰 오버로드가 없어 요청 자체는 취소되지 않는다 — 늦게 온 결과를 버릴 뿐이다.
+        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<T>>.Fail("취소되었습니다.", "cancelled", 0);
 
         return MappingCallResult<IReadOnlyList<T>>.Ok(ReadList<T>(result.Value), result.StatusCode);
     }
@@ -143,6 +171,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     public async Task<MappingCallResult<MappingBulkCreateResultDto>> BulkCreateAsync(
         int mappingId, MappingActionKind kind, IReadOnlyList<object> items, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<MappingBulkCreateResultDto>();
         if (items.Count == 0) return MappingCallResult<MappingBulkCreateResultDto>.Fail("보낼 항목이 없습니다.");
         if (items.Count > EventMappingRules.CHUNK_SIZE)
             return MappingCallResult<MappingBulkCreateResultDto>.Fail($"한 번에 {EventMappingRules.CHUNK_SIZE}건까지만 보낼 수 있습니다.");
@@ -164,6 +193,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     public async Task<MappingCallResult<MappingBulkUnassignResultDto>> BulkUnassignAsync(
         int mappingId, MappingActionKind kind, IReadOnlyList<int> configIds, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<MappingBulkUnassignResultDto>();
         if (configIds.Count == 0) return MappingCallResult<MappingBulkUnassignResultDto>.Fail("해제할 배선이 없습니다.");
         if (configIds.Count > EventMappingRules.CHUNK_SIZE)
             return MappingCallResult<MappingBulkUnassignResultDto>.Fail($"한 번에 {EventMappingRules.CHUNK_SIZE}건까지만 해제할 수 있습니다.");
@@ -185,42 +215,13 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     public async Task<MappingCallResult<bool>> PatchConfigAsync(
         int mappingId, MappingActionKind kind, int configId, object body, CancellationToken token = default)
     {
+        if (!IsSupported) return Refuse<bool>();
         var label = MappingKindText.Label(kind);
         var url = $"{Root}/{mappingId}/{MappingKindText.Segment(kind)}/{configId}";
         var result = await SendAsync(() => _api.PatchRequestAsync(url, body), $"{label} 배선을 저장하지 못했습니다.").ConfigureAwait(false);
         return result.IsSuccess
             ? MappingCallResult<bool>.Ok(true, result.StatusCode)
             : MappingCallResult<bool>.Fail(result.Message, result.RawError, result.StatusCode);
-    }
-    #endregion
-
-    #region - 후보 목록 -
-    /// <inheritdoc/>
-    public async Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default)
-    {
-        var url = $"{_setup.Url}/devices/cameras/{cameraId}/presets";
-        var parameters = new Dictionary<string, string> { ["page"] = "1", ["limit"] = PAGE_LIMIT.ToString() };
-        var result = await SendAsync(() => _api.GetRequestAsync(url, parameters), "프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
-        if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Fail(result.Message, result.RawError, result.StatusCode);
-
-        var rows = ReadList<MappingPresetRefDto>(result.Value)
-            .Select(p => new MappingPresetInfo(p.Id, p.CameraId, p.PresetName ?? $"#{p.Id}", p.IsRestrictedZone))
-            .ToList();
-        return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Ok(rows, result.StatusCode);
-    }
-
-    /// <inheritdoc/>
-    public async Task<MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>> ListFileGroupsAsync(CancellationToken token = default)
-    {
-        var url = $"{_setup.Url}/file-groups";
-        var parameters = new Dictionary<string, string> { ["page"] = "1", ["limit"] = PAGE_LIMIT.ToString() };
-        var result = await SendAsync(() => _api.GetRequestAsync(url, parameters), "음원그룹을 불러오지 못했습니다.").ConfigureAwait(false);
-        if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>.Fail(result.Message, result.RawError, result.StatusCode);
-
-        var rows = ReadList<MappingFileGroupRefDto>(result.Value)
-            .Select(g => new MappingFileGroupInfo(g.Id, g.GroupName ?? $"#{g.Id}"))
-            .ToList();
-        return MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>.Ok(rows, result.StatusCode);
     }
     #endregion
 

@@ -240,17 +240,4 @@ internal sealed class PreviewMappingGateway : IMappingWorkbenchGateway
         => Task.FromResult(FailingConfigIds.Contains(configId)
             ? MappingCallResult<bool>.Fail("서버가 이 배선을 거절했습니다.", "422 VALUE_NOT_ALLOWED", 422)
             : MappingCallResult<bool>.Ok(true));
-
-    public Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default)
-        => Task.FromResult(MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Ok(new[]
-        {
-            new MappingPresetInfo(5, cameraId, "정문 정면", false),
-            new MappingPresetInfo(6, cameraId, "Home", false),
-        }));
-
-    public Task<MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>> ListFileGroupsAsync(CancellationToken token = default)
-        => Task.FromResult(MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>.Ok(new[]
-        {
-            new MappingFileGroupInfo(9, "경고 방송 그룹"),
-        }));
 }

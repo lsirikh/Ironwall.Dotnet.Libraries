@@ -130,11 +130,6 @@ public interface IMappingWorkbenchGateway
     /// <summary>배선 1행 부분 수정. 순서 저장도 이 경로다 — 서버에 재정렬 API 가 없다.</summary>
     Task<MappingCallResult<bool>> PatchConfigAsync(int mappingId, MappingActionKind kind, int configId, object body, CancellationToken token = default);
 
-    /// <summary>그 카메라 소유 프리셋만. 전역 선적재는 하지 않는다(500대 × N 폭발).</summary>
-    Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default);
-
-    /// <summary>음원그룹 후보.</summary>
-    Task<MappingCallResult<IReadOnlyList<MappingFileGroupInfo>>> ListFileGroupsAsync(CancellationToken token = default);
 }
 
 /// <summary>

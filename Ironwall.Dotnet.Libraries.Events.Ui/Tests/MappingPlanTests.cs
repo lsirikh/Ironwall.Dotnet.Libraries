@@ -68,6 +68,16 @@ public class MappingPriorityTests
     }
 
     [Fact]
+    public void should_report_every_row_when_the_server_left_priority_null()
+    {
+        // 순수 계산은 "번호가 다르다" 고 맞게 말한다 — 그래서 이 목록을 그대로 PATCH 대상으로 쓰면 안 된다.
+        // 실제로 끌었는지는 보드가 기억한다(MappingBoard.WasReordered).
+        var rows = new[] { Row(10, null), Row(20, null) };
+
+        Assert.Equal(2, MappingPriority.Reordered(rows).Count);
+    }
+
+    [Fact]
     public void should_ignore_new_rows_when_reporting_reorder()
     {
         // 새 행의 순서는 등록 본문의 priority 로 함께 나가므로 따로 PATCH 하지 않는다.
@@ -354,6 +364,28 @@ public class MappingCommitPlanTests
 
         Assert.Equal(2, plan.Patches.Count);     // 두 행 모두 번호가 달라졌다
         Assert.Equal(1, plan.Patches.Count(p => p.Row.ConfigId == 20));
+    }
+
+    [Fact]
+    public void should_plan_no_patch_when_the_order_was_never_touched()
+    {
+        // 🔴 서버가 priority 를 null 로 두고 내려 주면 번호는 늘 "다르다".
+        //    조작 사실을 보지 않으면 첫 [적용] 이 전 행 PATCH 로 번진다.
+        var board = MappingRowFactory.WithCameras((10, 101, null), (20, 102, null), (30, 103, null));
+
+        Assert.Empty(CameraPlan(board).Patches);
+        Assert.Equal(0, board.ReorderedCount(MappingActionKind.Camera));
+    }
+
+    [Fact]
+    public void should_plan_patches_only_after_a_real_move()
+    {
+        var board = MappingRowFactory.WithCameras((10, 101, null), (20, 102, null), (30, 103, null));
+        var rows = board.Rows(MappingActionKind.Camera);
+
+        board.Step(MappingActionKind.Camera, rows[2], -1);
+
+        Assert.Equal(3, CameraPlan(board).Patches.Count);
     }
 
     [Fact]

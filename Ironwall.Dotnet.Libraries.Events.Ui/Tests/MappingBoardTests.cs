@@ -271,6 +271,60 @@ public class MappingBoardTests
     }
 
     [Fact]
+    public void should_undo_a_release()
+    {
+        // 🔴 목록만 얕게 복사하면 아무것도 안 돌아간다 — 해제는 같은 행 객체를 고치는 조작이다.
+        var board = MappingRowFactory.WithCameras((10, 101, 1));
+        var row = board.Rows(MappingActionKind.Camera)[0];
+        board.Remove(MappingActionKind.Camera, new[] { row });
+
+        board.Undo();
+
+        Assert.Equal(MappingDraftState.Pristine, row.State);
+        Assert.False(board.IsDirty);
+        Assert.Single(board.LiveRows(MappingActionKind.Camera));
+    }
+
+    [Fact]
+    public void should_undo_a_restore()
+    {
+        var board = MappingRowFactory.WithCameras((10, 101, 1));
+        var row = board.Rows(MappingActionKind.Camera)[0];
+        board.Remove(MappingActionKind.Camera, new[] { row });
+        board.Restore(MappingActionKind.Camera, new[] { row });
+
+        board.Undo();
+
+        Assert.Equal(MappingDraftState.Removed, row.State);
+        Assert.Equal(1, board.TotalRemoved);
+    }
+
+    [Fact]
+    public void should_undo_a_revive()
+    {
+        var board = MappingRowFactory.WithCameras((10, 101, 1));
+        var row = board.Rows(MappingActionKind.Camera)[0];
+        board.Remove(MappingActionKind.Camera, new[] { row });
+        board.Add(MappingActionKind.Camera, new[] { 101 });
+
+        board.Undo();
+
+        Assert.Equal(MappingDraftState.Removed, row.State);
+    }
+
+    [Fact]
+    public void should_forget_that_the_order_was_touched_when_reloaded()
+    {
+        var board = MappingRowFactory.WithCameras((10, 101, 1), (20, 102, 2));
+        board.Step(MappingActionKind.Camera, board.Rows(MappingActionKind.Camera)[1], -1);
+        Assert.True(board.WasReordered(MappingActionKind.Camera));
+
+        board.Load(MappingActionKind.Camera, new[] { MappingBoardRow.FromDto(MappingRowFactory.Camera(10, 101, 1)) });
+
+        Assert.False(board.WasReordered(MappingActionKind.Camera));
+    }
+
+    [Fact]
     public void should_clear_undo_stack_when_told_to()
     {
         // 저장 뒤 비우지 않으면 되돌리기가 config_id=0 행을 되살려 중복 등록이 난다.

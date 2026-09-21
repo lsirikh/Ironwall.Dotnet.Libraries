@@ -211,6 +211,12 @@ public sealed class MappingBoardRow
         MarkBaseline();
     }
 
+    /// <summary>
+    /// 되돌리기가 찍어 둔 상태를 그대로 되돌린다 — <b>되돌리기 전용</b>이다.
+    /// </summary>
+    /// <remarks>값 판정을 거치지 않는다. 되돌리기는 "그때 그 상태" 를 복원하는 것이지 다시 판정하는 것이 아니다.</remarks>
+    internal void ForceState(MappingDraftState state) => State = state;
+
     /// <summary>해제 표시. 새 행이면 애초에 서버에 없으니 호출자가 목록에서 <b>빼야</b> 한다.</summary>
     public void MarkRemoved() => State = MappingDraftState.Removed;
 

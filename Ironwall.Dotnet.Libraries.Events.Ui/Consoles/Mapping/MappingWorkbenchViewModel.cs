@@ -255,8 +255,8 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         OnPermissionsChanged();     // ★ 1회 직접 호출 — 빠뜨리면 첫 진입 버튼이 권한과 무관하게 살아 있다
         Detail.Guard.Blocked += OnNavigationBlocked;
 
-        await ReloadAsync().ConfigureAwait(false);
-        await base.OnActivateAsync(cancellationToken).ConfigureAwait(false);
+        await ReloadAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -305,7 +305,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             foreach (var group in _devices.Groups()) Groups.Add(group);
             _paletteCache.Clear();
 
-            var result = await _gateway.ListMappingsAsync().ConfigureAwait(false);
+            var result = await _gateway.ListMappingsAsync();
             if (!result.IsSuccess)
             {
                 // 🔴 실패에 캐시를 비우지 않는다 — 비우면 500/503 이 "0건" 으로 보인다.
@@ -329,7 +329,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             NotifyOfPropertyChange(nameof(IsBoardEnabled));
             NotifyOfPropertyChange(nameof(MappingTitle));
 
-            await LoadBoardAsync().ConfigureAwait(false);
+            await LoadBoardAsync();
             StatusText = $"맵핑 {Mappings.Count}건";
         }
         finally
@@ -357,14 +357,17 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         }
 
         IsBusy = true;
+        var stale = false;
         try
         {
-            var cameras = await _gateway.ListCamerasAsync(mapping.Id, token).ConfigureAwait(false);
-            var speakers = await _gateway.ListSpeakersAsync(mapping.Id, token).ConfigureAwait(false);
-            var lamps = await _gateway.ListLampsAsync(mapping.Id, token).ConfigureAwait(false);
+            var cameras = await _gateway.ListCamerasAsync(mapping.Id, token);
+            var speakers = await _gateway.ListSpeakersAsync(mapping.Id, token);
+            var lamps = await _gateway.ListLampsAsync(mapping.Id, token);
 
             // 늦게 도착한 응답이 새 선택을 덮어쓰지 않게 한다.
-            if (token.IsCancellationRequested || !ReferenceEquals(_loadToken, source)) return;
+            // 🔴 여기서 그냥 return 하면 finally 가 돌아 IsBusy 를 끄고 목록을 다시 그린다 —
+            //    더 새 조회가 진행 중인데 옛 결과로 화면을 세우는 것과 같다. 그래서 '헛걸음' 으로 표시하고 나간다.
+            if (token.IsCancellationRequested || !ReferenceEquals(_loadToken, source)) { stale = true; return; }
 
             var problems = new List<string>();
             if (cameras.IsSuccess) _board.Load(MappingActionKind.Camera, (cameras.Value ?? Array.Empty<MappingCameraReadDto>()).Select(MappingBoardRow.FromDto));
@@ -384,11 +387,14 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         }
         finally
         {
-            IsBusy = false;
-            RebuildBoardRows();
-            RebuildPalette();
-            RefreshRailCounts();
-            UpdateWarnings();
+            if (!stale)
+            {
+                IsBusy = false;
+                RebuildBoardRows();
+                RebuildPalette();
+                RefreshRailCounts();
+                UpdateWarnings();
+            }
         }
     }
     #endregion
@@ -750,7 +756,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             if (IsCreatingMapping)
             {
                 var body = MappingRequestBuilder.CreateMapping(EditName, EditGroupId, EditCategory, EditDescription, EditStatus);
-                var created = await _gateway.CreateMappingAsync(body).ConfigureAwait(false);
+                var created = await _gateway.CreateMappingAsync(body);
                 if (!created.IsSuccess) { MappingFormError = created.Message; return; }
 
                 IsCreatingMapping = false;
@@ -762,7 +768,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             NotifyOfPropertyChange(nameof(IsBoardEnabled));
                 NotifyOfPropertyChange(nameof(MappingTitle));
                 StatusText = "맵핑을 등록했습니다.";
-                await LoadBoardAsync().ConfigureAwait(false);
+                await LoadBoardAsync();
                 return;
             }
 
@@ -772,7 +778,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             var patch = MappingRequestBuilder.PatchMapping(current.Dto, EditName, EditGroupId, EditCategory, EditDescription, EditStatus);
             if (patch.IsEmpty) { StatusText = "바뀐 값이 없습니다."; return; }
 
-            var saved = await _gateway.PatchMappingAsync(current.Id, patch).ConfigureAwait(false);
+            var saved = await _gateway.PatchMappingAsync(current.Id, patch);
             if (!saved.IsSuccess) { MappingFormError = saved.Message; return; }
 
             current.Replace(saved.Value!);
@@ -825,7 +831,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     {
         if (!CanRevert) return;
         Detail.Tracker.Clear();
-        await LoadBoardAsync().ConfigureAwait(false);
+        await LoadBoardAsync();
         Detail.Settle("변경을 되돌렸습니다.");
         StatusText = "변경을 되돌렸습니다.";
     }
@@ -848,7 +854,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         var outcome = new MappingCommitOutcome();
         try
         {
-            var fresh = await _gateway.GetMappingAsync(mapping.Id).ConfigureAwait(false);
+            var fresh = await _gateway.GetMappingAsync(mapping.Id);
             if (!fresh.IsSuccess)
             {
                 outcome.Abort(fresh.Message);
@@ -857,7 +863,18 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             }
             if (!string.Equals(fresh.Value!.UpdatedAt, mapping.Dto.UpdatedAt, StringComparison.Ordinal))
             {
-                outcome.Abort("다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하십시오. 변경한 내용은 그대로 있습니다.");
+                outcome.Abort(DriftNotice);
+                StatusText = outcome.ToMessage();
+                return;
+            }
+
+            // 🔴 부모만 보면 놓친다. 서버의 onupdate 는 <b>그 행에만</b> 걸려 있어
+            //    (app/models/integration.py:53 · :142 · :202 · :283) 배선을 고쳐도 맵핑 본체는 그대로다.
+            //    그래서 하위 3종을 다시 읽어 <b>행마다</b> 대조한다.
+            var childDrift = await HasChildDriftAsync(mapping.Id);
+            if (childDrift)
+            {
+                outcome.Abort(DriftNotice);
                 StatusText = outcome.ToMessage();
                 return;
             }
@@ -868,7 +885,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             foreach (var kindPlan in plan.Kinds)
             {
                 if (!kindPlan.HasWork) continue;
-                await ApplyKindAsync(mapping.Id, kindPlan, outcome).ConfigureAwait(false);
+                await ApplyKindAsync(mapping.Id, kindPlan, outcome);
             }
 
             StatusText = outcome.ToMessage();
@@ -888,9 +905,20 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
                 // 성공한 것만 화면에서 정리하고, 진실은 재조회로 확정한다.
                 _board.ClearUndo();                    // ★ 비우지 않으면 되돌리기가 id=0 행을 되살려 중복 등록한다
                 Detail.Tracker.Clear();
-                Detail.Settle(outcome.ToMessage());
-                await LoadBoardAsync().ConfigureAwait(false);
+
+                // 🔴 실패한 <b>새 행</b>은 서버에 없다 — 재조회가 통째로 지워 버린다.
+                //    "실패 N건은 화면에 남았습니다" 라고 말했으면 실제로 남겨야 한다.
+                var stranded = outcome.FailedRows
+                    .Where(r => r.State == MappingDraftState.Added && !r.IsPersisted)
+                    .ToList();
+
+                await LoadBoardAsync();
+                Readd(stranded);
                 MarkFailures(outcome);
+
+                // 부분 실패면 아직 깨끗하지 않다 — 보낼 것이 남아 있다.
+                if (outcome.HasFailure) UpdateDirty();
+                else Detail.Settle(outcome.ToMessage());
             }
         }
     }
@@ -900,7 +928,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         foreach (var chunk in plan.ReleaseChunks)
         {
             var rows = _board.Rows(plan.Kind).Where(r => chunk.Contains(r.ConfigId)).ToList();
-            var result = await _gateway.BulkUnassignAsync(mappingId, plan.Kind, chunk).ConfigureAwait(false);
+            var result = await _gateway.BulkUnassignAsync(mappingId, plan.Kind, chunk);
             if (!result.IsSuccess) { outcome.AcceptPatch(rows.FirstOrDefault() ?? MappingBoardRow.NewFor(plan.Kind, 0), false, result.Message); continue; }
             outcome.AcceptRelease(rows, result.Value!);
         }
@@ -909,7 +937,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         {
             var rows = chunk.Select(c => c.Row).ToList();
             var items = chunk.Select(c => c.Item).ToList();
-            var result = await _gateway.BulkCreateAsync(mappingId, plan.Kind, items).ConfigureAwait(false);
+            var result = await _gateway.BulkCreateAsync(mappingId, plan.Kind, items);
             if (!result.IsSuccess)
             {
                 foreach (var row in rows) outcome.AcceptPatch(row, false, result.Message);
@@ -920,18 +948,79 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
 
         foreach (var (row, configId, body) in plan.Patches)
         {
-            var result = await _gateway.PatchConfigAsync(mappingId, plan.Kind, configId, body).ConfigureAwait(false);
+            var result = await _gateway.PatchConfigAsync(mappingId, plan.Kind, configId, body);
             outcome.AcceptPatch(row, result.IsSuccess, result.Message);
         }
     }
 
+    /// <summary>
+    /// 실패한 행에 배지를 단다 — <b>(종류, 장비) 짝</b>으로 찾는다.
+    /// </summary>
+    /// <remarks>장비 id 만 보면 카메라 5번의 실패가 스피커 5번 행에 배지를 단다(축이 다르면 id 공간도 다르다).</remarks>
     private void MarkFailures(MappingCommitOutcome outcome)
     {
         if (!outcome.HasFailure) return;
         var note = outcome.FailureNotes.FirstOrDefault();
-        var failedDevices = outcome.FailedRows.Select(r => r.DeviceId).Where(id => id is not null).ToHashSet();
+        var failed = outcome.FailedRows
+            .Where(r => r.DeviceId is not null)
+            .Select(r => (r.Kind, Device: r.DeviceId!.Value))
+            .ToHashSet();
+
         foreach (var vm in BoardRows)
-            if (failedDevices.Contains(vm.Row.DeviceId)) vm.MarkFailure(note);
+        {
+            if (vm.Row.DeviceId is not int id) continue;
+            if (failed.Contains((vm.Row.Kind, id))) vm.MarkFailure(note);
+        }
+    }
+
+    /// <summary>재조회가 지워 버린 <b>실패한 새 행</b>을 보드에 되돌려 놓는다.</summary>
+    private void Readd(IReadOnlyList<MappingBoardRow> stranded)
+    {
+        if (stranded.Count == 0) return;
+        foreach (var group in stranded.GroupBy(r => r.Kind))
+        {
+            var ids = group.Select(r => r.DeviceId ?? 0).Where(id => id > 0).ToList();
+            if (ids.Count > 0) _board.Add(group.Key, ids);
+        }
+        _board.ClearUndo();     // 되돌리기 칸에 재조회 이전 상태를 남기지 않는다
+    }
+
+    /// <summary>동시 편집 안내 — 부모든 배선이든 같은 문구를 쓴다.</summary>
+    private const string DriftNotice =
+        "다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하십시오. 변경한 내용은 그대로 있습니다.";
+
+    /// <summary>
+    /// 배선 행이 내가 읽은 뒤에 바뀌었는가 — <c>config_id</c> 별 <c>updated_at</c> 대조.
+    /// </summary>
+    /// <remarks>
+    /// 행이 <b>사라졌거나</b>(다른 사람이 해제) <b>시각이 달라졌으면</b> 드리프트다.
+    /// 새로 생긴 행은 내 변경과 충돌하지 않으므로 보지 않는다.
+    /// </remarks>
+    private async Task<bool> HasChildDriftAsync(int mappingId)
+    {
+        var cameras = await _gateway.ListCamerasAsync(mappingId);
+        var speakers = await _gateway.ListSpeakersAsync(mappingId);
+        var lamps = await _gateway.ListLampsAsync(mappingId);
+        if (!cameras.IsSuccess || !speakers.IsSuccess || !lamps.IsSuccess) return false;   // 못 읽은 것을 드리프트로 읽지 않는다
+
+        var seen = new Dictionary<(MappingActionKind, int), string?>();
+        foreach (var dto in cameras.Value ?? Array.Empty<MappingCameraReadDto>())
+            seen[(MappingActionKind.Camera, dto.ConfigId)] = dto.UpdatedAt;
+        foreach (var dto in speakers.Value ?? Array.Empty<MappingSpeakerReadDto>())
+            seen[(MappingActionKind.Speaker, dto.ConfigId)] = dto.UpdatedAt;
+        foreach (var dto in lamps.Value ?? Array.Empty<MappingLampReadDto>())
+            seen[(MappingActionKind.Lamp, dto.ConfigId)] = dto.UpdatedAt;
+
+        foreach (var kind in MappingBoard.Kinds)
+        {
+            foreach (var row in _board.Rows(kind))
+            {
+                if (!row.IsPersisted) continue;
+                if (!seen.TryGetValue((kind, row.ConfigId), out var now)) return true;      // 남이 지웠다
+                if (!string.Equals(now, row.UpdatedAt, StringComparison.Ordinal)) return true;
+            }
+        }
+        return false;
     }
     #endregion
 

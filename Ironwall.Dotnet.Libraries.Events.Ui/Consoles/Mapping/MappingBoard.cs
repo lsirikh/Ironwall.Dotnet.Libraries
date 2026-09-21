@@ -29,7 +29,19 @@ public sealed class MappingBoard
         [MappingActionKind.Lamp] = new(),
     };
 
-    private readonly Stack<Dictionary<MappingActionKind, List<MappingBoardRow>>> _undo = new();
+    private readonly Stack<Dictionary<MappingActionKind, List<RowState>>> _undo = new();
+
+    /// <summary>사용자가 이 축의 순서를 실제로 건드렸는가(끌기 · Alt+↑↓ · ▲▼).</summary>
+    private readonly HashSet<MappingActionKind> _reordered = new();
+
+    /// <summary>
+    /// 되돌리기 한 칸 — <b>행과 그 상태를 함께</b> 찍는다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 목록만 얕게 복사하면 아무것도 되돌아가지 않는다. 해제(<c>MarkRemoved</c>)·복원(<c>Restore</c>)은
+    /// <b>같은 행 객체를 고치는</b> 조작이라, 목록을 되돌려도 행은 여전히 해제 표시인 채로 남는다.
+    /// </remarks>
+    private readonly record struct RowState(MappingBoardRow Row, MappingDraftState State);
 
     /// <summary>보드가 바뀌었다 — 화면이 다시 그린다.</summary>
     public event EventHandler? Changed;
@@ -39,6 +51,15 @@ public sealed class MappingBoard
     {
         MappingActionKind.Camera, MappingActionKind.Speaker, MappingActionKind.Lamp,
     };
+
+    /// <summary>
+    /// 사용자가 이 축의 순서를 <b>실제로 건드렸는가</b>.
+    /// </summary>
+    /// <remarks>
+    /// 서버가 <c>priority</c> 를 <c>null</c> 로 두고 내려주는 일이 흔해서, 번호만 비교하면
+    /// 정렬한 적 없는 보드도 "전 행이 달라졌다" 로 보인다. 그래서 <b>조작 사실</b>을 따로 기억한다.
+    /// </remarks>
+    public bool WasReordered(MappingActionKind kind) => _reordered.Contains(kind);
 
     /// <summary>그 축의 행 목록(화면 순서 그대로).</summary>
     public IReadOnlyList<MappingBoardRow> Rows(MappingActionKind kind) => _rows[kind];
@@ -55,6 +76,7 @@ public sealed class MappingBoard
     public void Load(MappingActionKind kind, IEnumerable<MappingBoardRow> rows)
     {
         _rows[kind] = MappingPriority.Sort(rows).ToList();
+        _reordered.Remove(kind);
         _undo.Clear();
         Raise();
     }
@@ -63,6 +85,7 @@ public sealed class MappingBoard
     public void Clear()
     {
         foreach (var kind in Kinds) _rows[kind].Clear();
+        _reordered.Clear();
         _undo.Clear();
         Raise();
     }
@@ -170,6 +193,7 @@ public sealed class MappingBoard
         }
         if (target > list.Count) target = list.Count;
         list.InsertRange(target, picked);
+        _reordered.Add(kind);
         Raise();
     }
 
@@ -185,6 +209,7 @@ public sealed class MappingBoard
         PushUndo();
         list.RemoveAt(index);
         list.Insert(to, row);
+        _reordered.Add(kind);
         Raise();
         return true;
     }
@@ -194,12 +219,21 @@ public sealed class MappingBoard
     /// <summary>되돌릴 것이 있는가.</summary>
     public bool CanUndo => _undo.Count > 0;
 
-    /// <summary>마지막 조작 하나를 되돌린다.</summary>
+    /// <summary>마지막 조작 하나를 되돌린다 — 목록 순서와 <b>행 상태</b>를 함께 되돌린다.</summary>
     public void Undo()
     {
         if (_undo.Count == 0) return;
         var snapshot = _undo.Pop();
-        foreach (var kind in Kinds) _rows[kind] = snapshot[kind];
+        foreach (var kind in Kinds)
+        {
+            var restored = new List<MappingBoardRow>(snapshot[kind].Count);
+            foreach (var (row, state) in snapshot[kind])
+            {
+                row.ForceState(state);
+                restored.Add(row);
+            }
+            _rows[kind] = restored;
+        }
         Raise();
     }
 
@@ -212,8 +246,9 @@ public sealed class MappingBoard
 
     private void PushUndo()
     {
-        var snapshot = new Dictionary<MappingActionKind, List<MappingBoardRow>>();
-        foreach (var kind in Kinds) snapshot[kind] = new List<MappingBoardRow>(_rows[kind]);
+        var snapshot = new Dictionary<MappingActionKind, List<RowState>>();
+        foreach (var kind in Kinds)
+            snapshot[kind] = _rows[kind].Select(r => new RowState(r, r.State)).ToList();
         _undo.Push(snapshot);
     }
 
@@ -234,7 +269,8 @@ public sealed class MappingBoard
     public int EditedCount(MappingActionKind kind) => _rows[kind].Count(r => r.State == MappingDraftState.Edited);
 
     /// <summary>그 축에서 순서가 바뀐 건수.</summary>
-    public int ReorderedCount(MappingActionKind kind) => MappingPriority.Reordered(LiveRows(kind)).Count;
+    public int ReorderedCount(MappingActionKind kind)
+        => WasReordered(kind) ? MappingPriority.Reordered(LiveRows(kind)).Count : 0;
 
     /// <summary>세 축을 합친 추가 건수.</summary>
     public int TotalAdded => Kinds.Sum(AddedCount);

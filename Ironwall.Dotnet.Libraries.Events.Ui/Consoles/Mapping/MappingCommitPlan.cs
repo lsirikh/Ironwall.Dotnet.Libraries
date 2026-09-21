@@ -65,7 +65,11 @@ public sealed record MappingCommitPlan(IReadOnlyList<MappingKindPlan> Kinds)
 
             // 화면 순서대로 1..N — 해제 표시된 행은 번호를 건너뛴다.
             var numbered = MappingPriority.Assign(rows);
-            var priorityOf = numbered.ToDictionary(x => x.Row, x => x.Priority);
+
+            // 🔴 순서 키는 "이 축을 실제로 끌었을 때만" 싣는다.
+            //    서버가 카메라·스피커의 priority 기본값을 null 로 두기 때문에(app/schemas/integration.py:221·:335)
+            //    번호만 비교하면 한 번도 정렬한 적 없는 보드가 첫 [적용] 에서 전 행 PATCH 로 번진다.
+            var reordered = board.WasReordered(kind);
 
             var creates = numbered
                 .Where(x => x.Row.State == MappingDraftState.Added && !x.Row.IsOrphan)
@@ -79,7 +83,7 @@ public sealed record MappingCommitPlan(IReadOnlyList<MappingKindPlan> Kinds)
                 if (row.State == MappingDraftState.Removed) continue;
                 if (row.IsOrphan) continue;                       // 고아는 저장 차단 대상이라 여기 오지 않는다
 
-                var changedOrder = row.BaselinePriority != priority;
+                var changedOrder = reordered && row.BaselinePriority != priority;
                 if (!row.HasValueChange && !changedOrder) continue;
 
                 var body = MappingRequestBuilder.Patch(row, changedOrder ? priority : null);
