@@ -243,7 +243,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 서버 모니터(N-12) 상태별 스냅숏 — 빈 화면 · 목록 · 선택+지표 · 보고 없음 · 미적용 변경 · 드롭 불가.
+    /// 서버 모니터(N-12) 상태별 스냅숏 — 빈 화면 · 목록 · 선택+지표 · 보고 없음 · 미적용 변경 ·
+    /// 드롭 가능/불가 · 등록 폼 · 모드 절 · 지표 이력 창 · 6.3 계약.
     /// </summary>
     private async Task RunServersAsync(string? directory, string theme)
     {
@@ -270,7 +271,7 @@ public partial class App : Application
         if (directory is null) return;      // 손으로 써 볼 때는 띄워만 둔다
 
         Directory.CreateDirectory(directory);
-        await Settle();                                   // 첫 장면은 배치가 한 번 더 도는 것을 기다린다
+        await Settle();
         Save(directory, $"servers-{theme}-01-empty");
 
         await preview.LoadAsync();
@@ -281,7 +282,7 @@ public partial class App : Application
         await Settle();
         Save(directory, $"servers-{theme}-03-selected-metrics");
 
-        preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행
+        preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행(status_observed_at = null)
         await Settle();
         ServersPreview.ScrollDetailToEnd(view);            // "상태(관측)" 절의 미수신 상자를 보이게 굴린다
         await Settle();
@@ -299,13 +300,55 @@ public partial class App : Application
         ServersPreview.ScrollDetailToTop(view);
         await Settle();
 
-        // 드롭 불가 — 스피커를 NVR 행 위로 끌어 본다. 끝은 반드시 취소라 서버 호출이 0 이다.
-        using (preview.BeginRefusedDrag(view, preview.Row("NVR-01")))
+        // 드롭 불가 — 스피커를 NVR 행 위로. 끝은 반드시 취소라 서버 호출이 0 이다.
+        using (preview.BeginDrag(view, preview.Row("NVR-01")))
         {
             await Settle();
             Save(directory, $"servers-{theme}-06-drop-refused");
         }
         await Settle();
+
+        // 드롭 가능 + 지금 그 위 — 같은 스피커를 받는 서버 행 위로.
+        using (preview.BeginDrag(view, preview.Row("방송서버-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-07-drop-hover");
+        }
+        await Settle();
+
+        // 모드 절 — PROXY 서버는 server_config.modes 를 갖는다(7.0+).
+        preview.Select(preview.Row("PIDS 프록시"));
+        preview.ViewModel.BeginEdit();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+        Save(directory, $"servers-{theme}-08-modes");
+        preview.ViewModel.Revert();
+
+        // 등록 폼 — 상태 칸이 없다.
+        preview.ViewModel.Add();
+        await Settle();
+        Save(directory, $"servers-{theme}-09-create");
+        preview.ViewModel.Revert();
+        await Settle();
+
+        // 6.3 계약 — "마지막 변화" 가 "—" 이고 배정 후보가 스피커뿐이다.
+        var legacy = new ServersPreview(EnumServerContract.V6_3);
+        var legacyView = await legacy.BuildAsync(withData: true);
+        _window.Width = 1320;
+        _window.Height = 820;
+        _window.Content = new Border { Margin = new Thickness(12), Child = legacyView };
+        await Settle();
+        legacy.Select(legacy.Row("방송서버-01"));
+        await Settle();
+        Save(directory, $"servers-{theme}-11-legacy-6-3");
+        // 지표 이력 창 — 임계 배지를 그리지 않는다.
+        var history = await preview.MetricHistoryAsync(11, "방송서버-01");
+        _window.Width = 600;
+        _window.Height = 560;
+        _window.Content = new Border { Margin = new Thickness(12), Child = history };
+        await Settle();
+        Save(directory, $"servers-{theme}-10-metric-history");
+
     }
 
     private void ApplyDark()
@@ -344,7 +387,10 @@ public partial class App : Application
         using (var dc = visual.RenderOpen())
         {
             dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
+            // 기본 정렬은 가운데다 — 잰 크기와 실제 시각 크기가 한 프레임이라도 어긋나면 위아래가 잘린다.
+            dc.DrawRectangle(
+                new VisualBrush(content) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top },
+                null, new Rect(0, 0, width, height));
         }
         bitmap.Render(visual);
 

@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -30,20 +31,24 @@ internal sealed class FakeServerConsoleService : IServerConsoleService
 
     public EnumServerContract Contract { get; }
     public bool IsUnitEra => Contract >= EnumServerContract.V8_0;
-    public bool CanReadProxySettings => Contract <= EnumServerContract.V6_3;
+    public bool IsAxisEra => Contract >= EnumServerContract.V7_0;
 
-    public List<ServerListEntry> Servers { get; } = new();
+    public List<ServerAxisView> Servers { get; } = new();
     public List<ServerUnitOption> Units { get; } = new();
     public List<ServerCategoryOption> Categories { get; } = new();
     public ServerMetricDto? LatestMetric { get; set; }
 
-    public List<(int DeviceId, int ServerId)> Assigns { get; } = new();
-    public List<(int Id, ServerEditDraft Draft)> Saves { get; } = new();
-    public List<(int CategoryId, ServerEditDraft Draft)> Creates { get; } = new();
+    public List<(int DeviceId, int? ServerId)> Assigns { get; } = new();
+    public List<(int Id, ServerWriteIntent Intent)> Saves { get; } = new();
+    public List<(ServerCategoryOption Category, ServerWriteIntent Intent)> Creates { get; } = new();
     public int LoadCount { get; private set; }
 
     /// <summary>이 장비 Id 에서 배정이 실패한다.</summary>
     public int FailAssignForDeviceId { get; set; }
+
+    /// <summary>단건 조회를 이 id 에서 붙잡아 둔다(늦은 응답 재현).</summary>
+    public int SlowGetId { get; set; }
+    public TaskCompletionSource<bool> SlowGate { get; } = new();
 
     public Task<ServerLoadResult> LoadAsync(int? unitId, bool includeDescendants, CancellationToken token = default)
     {
@@ -51,18 +56,23 @@ internal sealed class FakeServerConsoleService : IServerConsoleService
         return Task.FromResult(new ServerLoadResult(Servers.ToList(), Units.ToList(), Categories.ToList(), false, null));
     }
 
-    public Task<ServerDto?> GetAsync(int id, CancellationToken token = default)
-        => Task.FromResult(Servers.FirstOrDefault(s => s.Dto.Id == id)?.Dto);
-
-    public Task<ServerWriteResult> SaveAsync(int id, ServerEditDraft draft, CancellationToken token = default)
+    public async Task<ServerAxisView?> GetAsync(int id, CancellationToken token = default)
     {
-        Saves.Add((id, draft));
+        if (SlowGetId == id) await SlowGate.Task.ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        return Servers.FirstOrDefault(s => s.Id == id);
+    }
+
+    public Task<ServerWriteResult> SaveAsync(int id, ServerWriteIntent intent, CancellationToken token = default)
+    {
+        Saves.Add((id, intent));
         return Task.FromResult(new ServerWriteResult(true, "설정을 저장했습니다"));
     }
 
-    public Task<(ServerWriteResult Result, int NewId)> CreateAsync(int categoryId, ServerEditDraft draft, CancellationToken token = default)
+    public Task<(ServerWriteResult Result, int NewId)> CreateAsync(
+        ServerCategoryOption category, ServerWriteIntent intent, CancellationToken token = default)
     {
-        Creates.Add((categoryId, draft));
+        Creates.Add((category, intent));
         return Task.FromResult((new ServerWriteResult(true, ServerStatusRules.JustRegisteredNotice), 99));
     }
 
@@ -71,13 +81,14 @@ internal sealed class FakeServerConsoleService : IServerConsoleService
     public Task<IReadOnlyList<ServerMetricDto>> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
         => Task.FromResult<IReadOnlyList<ServerMetricDto>>(Array.Empty<ServerMetricDto>());
 
-    public Task<(ProxySettingDto? Setting, string? Note)> OperationModeAsync(int id, CancellationToken token = default)
-        => Task.FromResult<(ProxySettingDto?, string?)>((null, "모드 안내"));
+    public Task<(ProxySettingDto? Setting, string? Note)> LegacyOperationModeAsync(int id, CancellationToken token = default)
+        => Task.FromResult<(ProxySettingDto?, string?)>((null, null));
 
-    public Task<ServerWriteResult> AssignSpeakerAsync(int speakerId, int serverId, CancellationToken token = default)
+    public Task<ServerWriteResult> AssignDeviceAsync(
+        EnumDeviceCategory category, int deviceId, int? serverId, CancellationToken token = default)
     {
-        if (speakerId == FailAssignForDeviceId) return Task.FromResult(new ServerWriteResult(false, "서버가 거절했습니다"));
-        Assigns.Add((speakerId, serverId));
+        if (deviceId == FailAssignForDeviceId) return Task.FromResult(new ServerWriteResult(false, "서버가 거절했습니다"));
+        Assigns.Add((deviceId, serverId));
         return Task.FromResult(new ServerWriteResult(true, string.Empty));
     }
 }
@@ -94,20 +105,30 @@ internal sealed class FakeServerDialogs : IServerConsoleDialogs
 
 public class ServerMonitorViewModelTests
 {
-    private static readonly DateTime Now = new(2026, 9, 20, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime Now = new(2026, 9, 20, 0, 5, 0, DateTimeKind.Utc);
 
-    private static ServerListEntry Entry(int id, string name, EnumServerType type, string status = "NORMAL", string? updatedAt = "2026-09-20T08:59:30+00:00")
-        => new(new ServerDto
+    private static ServerAxisView Entry(int id, string name, EnumServerType type,
+        string status = "NORMAL", string? observedAt = "2026-09-20T00:03:30+00:00")
+        => new()
         {
             Id = id,
+            TypeServer = type.ToString(),
             Name = name,
-            CategoryId = 1,
+            IsEnable = true,
+            UnitId = 4,
             Status = status,
+            HasStatusKey = true,
+            StatusObservedAt = observedAt,
+            HasStatusObservedAtKey = true,
             IpAddress = $"10.0.0.{id}",
             Port = 8000 + id,
-            UpdatedAt = updatedAt,
-            CreatedAt = updatedAt,
-        }, type, type.ToString(), "1대대");
+            Hostname = $"host-{id}",
+            UserName = "admin",
+            HasConnectionSection = true,
+            HasConfigSection = true,
+            CreatedAt = "2026-01-01T00:00:00+00:00",
+            UpdatedAt = observedAt,
+        };
 
     private static (ServerMonitorViewModel Vm, FakeServerConsoleService Service, DeviceProvider Devices, FakeServerDialogs Dialogs) Build(
         EnumServerContract contract = EnumServerContract.V8_0)
@@ -122,13 +143,29 @@ public class ServerMonitorViewModelTests
 
     private static async Task ActivateAsync(ServerMonitorViewModel vm) => await ((IActivate)vm).ActivateAsync();
 
+    private static SpeakerDeviceModel NewSpeaker(int id, int? previousServer = null) => new()
+    {
+        Id = id,
+        DeviceName = $"스피커{id}",
+        CategoryDevice = EnumDeviceCategory.Speaker,
+        Server = previousServer is null ? null : new ServerModel { Id = previousServer.Value, Name = $"서버{previousServer}" },
+    };
+
+    private static CameraDeviceModel NewCamera(int id) => new()
+    {
+        Id = id,
+        DeviceName = $"카메라{id}",
+        CategoryDevice = EnumDeviceCategory.Camera,
+    };
+
+    #region - 목록 · 레일 -
     [Fact]
     public async Task should_show_every_rail_slot_with_counts_when_servers_loaded()
     {
         var (vm, service, _, _) = Build();
         service.Servers.Add(Entry(1, "스피커서버", EnumServerType.SPEAKER_API));
         service.Servers.Add(Entry(2, "NVR", EnumServerType.NVR_API, "ERROR"));
-        service.Servers.Add(Entry(3, "백업", EnumServerType.BACKUP, "NORMAL", updatedAt: null));
+        service.Servers.Add(Entry(3, "백업", EnumServerType.BACKUP, "NORMAL", observedAt: null));
 
         await ActivateAsync(vm);
 
@@ -152,7 +189,6 @@ public class ServerMonitorViewModelTests
 
         Assert.Single(vm.Rows);
         Assert.Equal("NVR", vm.Rows[0].Name);
-        Assert.True(vm.IsServerList);
     }
 
     [Fact]
@@ -189,13 +225,25 @@ public class ServerMonitorViewModelTests
     public async Task should_label_a_never_reported_server_as_not_reported()
     {
         var (vm, service, _, _) = Build();
-        service.Servers.Add(Entry(1, "새 서버", EnumServerType.PROXY, "NORMAL", updatedAt: null));
+        service.Servers.Add(Entry(1, "새 서버", EnumServerType.PROXY, "UNKNOWN", observedAt: null));
         await ActivateAsync(vm);
 
         Assert.True(vm.Rows[0].IsNotReported);
         Assert.Equal("보고 없음", vm.Rows[0].StatusText);
         Assert.Equal("보고 없음", vm.Rows[0].LastChangeText);
+        Assert.Equal("○", vm.Rows[0].StatusGlyph);
         Assert.False(vm.Rows[0].IsFault);
+    }
+
+    [Fact]
+    public async Task should_not_claim_a_status_transition_when_the_contract_is_legacy()
+    {
+        var (vm, service, _, _) = Build(EnumServerContract.V6_3);
+        service.Servers.Add(Entry(1, "운영 서버", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+
+        Assert.Equal("—", vm.Rows[0].LastChangeText);
+        Assert.Contains("전이 시각이 없습니다", vm.LastChangeNote);
     }
 
     [Fact]
@@ -207,6 +255,20 @@ public class ServerMonitorViewModelTests
         Assert.False(vm.IsUnitEra);
         Assert.DoesNotContain(vm.Columns, c => c.Key == "unit");
         Assert.Contains("부대 편제가 없습니다", vm.UnitSectionText);
+    }
+    #endregion
+
+    #region - 상세 -
+    [Fact]
+    public async Task should_draw_no_detail_form_when_nothing_is_selected()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+
+        Assert.False(vm.HasDetail);
+        Assert.Equal(string.Empty, vm.PortText);      // 빈 폼이 "0" 을 보이지 않는다
+        Assert.Equal(string.Empty, vm.NameText);
     }
 
     [Fact]
@@ -229,20 +291,39 @@ public class ServerMonitorViewModelTests
     }
 
     [Fact]
-    public async Task should_block_the_row_change_when_there_are_unapplied_edits()
+    public async Task should_drop_a_late_detail_response_when_another_row_was_picked()
     {
         var (vm, service, _, _) = Build();
-        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
-        service.Servers.Add(Entry(2, "b", EnumServerType.PROXY));
+        service.Servers.Add(Entry(1, "느린 서버", EnumServerType.PROXY));
+        service.Servers.Add(Entry(2, "빠른 서버", EnumServerType.NVR_API));
         await ActivateAsync(vm);
 
-        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
-        vm.BeginEdit();
-        vm.NameText = "고친 이름";
+        service.SlowGetId = 1;
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });    // A — 응답이 붙잡혀 있다
+        vm.OnRowsSelected(new List<object> { vm.Rows[1] });    // B — 먼저 끝난다
+        service.SlowGate.TrySetResult(true);
+        await Task.Delay(30);
 
-        Assert.True(vm.Detail.IsDirty);
-        Assert.False(vm.OnRowsSelected(new List<object> { vm.Rows[1] }));
-        Assert.False(vm.SelectRail(ServerTypeCatalog.NvrKey));
+        // A 의 응답이 B 의 상세에 들어앉으면 안 된다.
+        Assert.Equal("빠른 서버", vm.NameText);
+        Assert.Equal("10.0.0.2", vm.IpText);
+    }
+
+    [Fact]
+    public async Task should_not_refill_the_detail_after_the_console_was_closed()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "느린 서버", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+
+        service.SlowGetId = 1;
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await ((IDeactivate)vm).DeactivateAsync(true);
+        service.SlowGate.TrySetResult(true);
+        await Task.Delay(30);
+
+        Assert.False(vm.HasDetail);
+        Assert.Equal(string.Empty, vm.NameText);
     }
 
     [Fact]
@@ -254,6 +335,7 @@ public class ServerMonitorViewModelTests
 
         vm.OnRowsSelected(new List<object> { vm.Rows[0] });
 
+        Assert.True(vm.HasDetail);
         Assert.False(vm.IsEditing);
         Assert.True(vm.CanBeginEdit);
         vm.BeginEdit();
@@ -275,23 +357,94 @@ public class ServerMonitorViewModelTests
         Assert.Equal(string.Empty, vm.PasswordText);
         Assert.Equal("저장할 때 바뀝니다", vm.PasswordNote);
         Assert.True(vm.Detail.IsDirty);
+        Assert.True(vm.IsPasswordTouched);
     }
 
+    [Fact]
+    public async Task should_mark_a_touched_threshold_the_same_way_as_a_touched_field()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        vm.BeginEdit();
+
+        vm.CpuWarningText = "65";
+
+        Assert.True(vm.IsCpuTouched);
+        Assert.True(vm.Detail.IsDirty);
+    }
+
+    [Fact]
+    public async Task should_offer_the_modes_section_only_for_a_proxy_server_on_the_axis_contract()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "프록시", EnumServerType.PROXY));
+        service.Servers.Add(Entry(2, "NVR", EnumServerType.NVR_API));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        Assert.True(vm.HasModesSection);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[1] });
+        Assert.False(vm.HasModesSection);
+    }
+
+    [Fact]
+    public async Task should_block_the_row_change_when_there_are_unapplied_edits()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
+        service.Servers.Add(Entry(2, "b", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        vm.BeginEdit();
+        vm.NameText = "고친 이름";
+
+        Assert.True(vm.Detail.IsDirty);
+        Assert.False(vm.OnRowsSelected(new List<object> { vm.Rows[1] }));
+        Assert.False(vm.SelectRail(ServerTypeCatalog.NvrKey));
+    }
+
+    [Fact]
+    public async Task should_refuse_a_unit_filter_change_while_edits_are_unapplied()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
+        service.Units.Add(new ServerUnitOption(4, "1대대", "unit001"));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        vm.BeginEdit();
+        vm.NameText = "고친 이름";
+
+        var before = service.LoadCount;
+        vm.SelectedUnit = vm.UnitOptions[0];
+        vm.IncludeDescendants = true;
+
+        // 콤보만 바뀌고 목록은 그대로인 상태를 만들지 않는다 — 되돌리고 조회도 나가지 않는다.
+        Assert.Null(vm.SelectedUnit);
+        Assert.False(vm.IncludeDescendants);
+        Assert.Equal(before, service.LoadCount);
+    }
+    #endregion
+
+    #region - 등록 · 저장 -
     [Fact]
     public async Task should_offer_a_create_form_without_any_status_field()
     {
         var (vm, service, _, _) = Build();
-        service.Categories.Add(new ServerCategoryOption(1, "방송", EnumServerType.SPEAKER_API));
+        service.Categories.Add(new ServerCategoryOption(1, "방송", EnumServerType.SPEAKER_API, "SPEAKER_API"));
         await ActivateAsync(vm);
 
         Assert.True(vm.CanAdd);
         vm.Add();
 
         Assert.True(vm.Detail.IsCreating);
+        Assert.True(vm.HasDetail);
         Assert.Contains("상태는 서버가 보고합니다", vm.Detail.CreateBanner);
-
-        // 등록 폼이 실어 보낼 수 있는 것에 상태가 없다 — 초안 타입에 그런 칸 자체가 없다(관측 필드를 쓰면 422).
-        Assert.DoesNotContain(typeof(ServerEditDraft).GetProperties(), p => p.Name.Contains("Status", StringComparison.Ordinal));
+        Assert.DoesNotContain(typeof(ServerWriteIntent).GetProperties(), p => p.Name.Contains("Status", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -304,14 +457,14 @@ public class ServerMonitorViewModelTests
         Assert.Contains("분류를 받지 못해", vm.AddBlockedReason);
 
         vm.Add();
-        Assert.False(vm.Detail.IsCreating);      // 꺼진 단추는 아무 일도 하지 않는다
+        Assert.False(vm.Detail.IsCreating);
     }
 
     [Fact]
-    public async Task should_send_a_create_request_when_the_form_is_applied()
+    public async Task should_send_a_create_request_with_the_chosen_category_when_applied()
     {
         var (vm, service, _, _) = Build();
-        service.Categories.Add(new ServerCategoryOption(3, "방송", EnumServerType.SPEAKER_API));
+        service.Categories.Add(new ServerCategoryOption(3, "방송", EnumServerType.SPEAKER_API, "SPEAKER_API"));
         await ActivateAsync(vm);
 
         vm.Add();
@@ -321,8 +474,8 @@ public class ServerMonitorViewModelTests
         await vm.ApplyAsync(CancellationToken.None);
 
         Assert.Single(service.Creates);
-        Assert.Equal(3, service.Creates[0].CategoryId);
-        Assert.Equal("새 서버", service.Creates[0].Draft.Name);
+        Assert.Equal(3, service.Creates[0].Category.Id);
+        Assert.Equal("새 서버", service.Creates[0].Intent.Name);
         Assert.Equal(ServerStatusRules.JustRegisteredNotice, vm.StatusText);
     }
 
@@ -340,9 +493,25 @@ public class ServerMonitorViewModelTests
 
         Assert.Single(service.Saves);
         Assert.Equal(1, service.Saves[0].Id);
-        Assert.Equal(9000, service.Saves[0].Draft.Port);
+        Assert.Equal(9000, service.Saves[0].Intent.Port);
         Assert.False(vm.IsEditing);
         Assert.False(vm.Detail.IsDirty);
+    }
+
+    [Fact]
+    public async Task should_ask_to_clear_a_field_with_an_explicit_flag_when_it_is_emptied()
+    {
+        var (vm, service, _, _) = Build();
+        service.Servers.Add(Entry(1, "a", EnumServerType.PROXY));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        vm.BeginEdit();
+        vm.HostnameText = string.Empty;
+        await vm.ApplyAsync(CancellationToken.None);
+
+        Assert.Single(service.Saves);
+        Assert.True(service.Saves[0].Intent.ClearHostname);
     }
 
     [Fact]
@@ -361,9 +530,45 @@ public class ServerMonitorViewModelTests
         Assert.False(vm.Detail.IsDirty);
         Assert.Equal("a", vm.NameText);
     }
+    #endregion
+
+    #region - 배정 -
+    [Fact]
+    public async Task should_send_straight_out_when_a_single_device_is_assigned()
+    {
+        var (vm, service, devices, dialogs) = Build();
+        service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
+        devices.CollectionEntity.Add(NewSpeaker(1));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+
+        Assert.Single(service.Assigns);
+        Assert.Empty(dialogs.Asked);          // 한 건은 묻지 않는다
+        Assert.Empty(vm.Tray.Entries);
+        Assert.True(vm.CanUndoAssign);
+    }
 
     [Fact]
-    public async Task should_ask_before_assigning_when_more_than_one_write_goes_out()
+    public async Task should_queue_without_calling_the_server_when_several_devices_are_assigned()
+    {
+        var (vm, service, devices, _) = Build();
+        service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
+        devices.CollectionEntity.Add(NewSpeaker(1));
+        devices.CollectionEntity.Add(NewSpeaker(2));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+
+        Assert.Empty(service.Assigns);        // 아직 0회
+        Assert.Equal(2, vm.Tray.Count);
+        Assert.Contains("지금은 0회", vm.StatusText);
+    }
+
+    [Fact]
+    public async Task should_send_every_queued_write_when_the_tray_is_applied()
     {
         var (vm, service, devices, dialogs) = Build();
         service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
@@ -373,18 +578,17 @@ public class ServerMonitorViewModelTests
 
         vm.OnRowsSelected(new List<object> { vm.Rows[0] });
         await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+        await vm.ApplyTrayAsync();
 
-        Assert.Single(dialogs.Asked);
-        Assert.Contains("서버 쓰기 2회", dialogs.Asked[0]);
+        Assert.Contains("2회", dialogs.Asked.Single());
         Assert.Equal(2, service.Assigns.Count);
         Assert.True(vm.CanUndoAssign);
     }
 
     [Fact]
-    public async Task should_send_nothing_when_the_confirmation_is_declined()
+    public async Task should_throw_the_queue_away_without_calling_the_server_when_reverted()
     {
-        var (vm, service, devices, dialogs) = Build();
-        dialogs.Answer = false;
+        var (vm, service, devices, _) = Build();
         service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
         devices.CollectionEntity.Add(NewSpeaker(1));
         devices.CollectionEntity.Add(NewSpeaker(2));
@@ -392,28 +596,56 @@ public class ServerMonitorViewModelTests
 
         vm.OnRowsSelected(new List<object> { vm.Rows[0] });
         await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+        vm.RevertTray();
 
         Assert.Empty(service.Assigns);
+        Assert.Empty(vm.Tray.Entries);
         Assert.Contains("서버 호출 0회", vm.StatusText);
     }
 
     [Fact]
-    public async Task should_stop_at_the_first_failure_when_assigning_many()
+    public async Task should_keep_the_failed_entry_in_the_tray_when_one_write_is_refused()
     {
         var (vm, service, devices, _) = Build();
         service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
         service.FailAssignForDeviceId = 2;
         devices.CollectionEntity.Add(NewSpeaker(1));
         devices.CollectionEntity.Add(NewSpeaker(2));
-        devices.CollectionEntity.Add(NewSpeaker(3));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+        await vm.ApplyTrayAsync();
+
+        Assert.Equal(new[] { 1 }, service.Assigns.Select(a => a.DeviceId));
+        Assert.Single(vm.Tray.Entries);      // 실패한 것만 남는다
+    }
+
+    [Fact]
+    public async Task should_offer_a_camera_to_an_nvr_server_on_the_axis_contract()
+    {
+        var (vm, service, devices, _) = Build();
+        service.Servers.Add(Entry(7, "NVR", EnumServerType.NVR_API));
+        devices.CollectionEntity.Add(NewCamera(5));
         await ActivateAsync(vm);
 
         vm.OnRowsSelected(new List<object> { vm.Rows[0] });
         await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
 
-        // 1 은 나갔고 2 에서 멈췄다 — 3 은 보내지 않는다.
-        Assert.Equal(new[] { 1 }, service.Assigns.Select(a => a.DeviceId));
-        Assert.Contains("멈췄습니다", vm.StatusText);
+        Assert.Equal(new[] { 5 }, service.Assigns.Select(a => a.DeviceId));
+    }
+
+    [Fact]
+    public async Task should_only_offer_speakers_when_the_contract_is_legacy()
+    {
+        var (vm, service, devices, _) = Build(EnumServerContract.V6_3);
+        service.Servers.Add(Entry(7, "NVR", EnumServerType.NVR_API));
+        devices.CollectionEntity.Add(NewCamera(5));
+        devices.CollectionEntity.Add(NewSpeaker(1));
+        await ActivateAsync(vm);
+
+        Assert.Equal(new[] { 1 }, vm.AssignCandidates.Select(c => c.Id));
+        Assert.Contains("6.3", vm.AssignHint);
     }
 
     [Fact]
@@ -428,16 +660,50 @@ public class ServerMonitorViewModelTests
         await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
 
         Assert.Empty(service.Assigns);
-        Assert.False(vm.CanAssignSelection);
+        Assert.Contains("NVR", vm.StatusText);
     }
 
     [Fact]
-    public async Task should_restore_only_the_devices_that_had_a_previous_server_when_undone()
+    public async Task should_detach_a_device_that_had_no_previous_server_when_undone_on_the_axis_contract()
     {
-        var (vm, service, devices, dialogs) = Build();
-        dialogs.Answer = true;
+        var (vm, service, devices, _) = Build();
         service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
-        devices.CollectionEntity.Add(NewSpeaker(1));                 // 이전 서버 없음 → 되돌릴 수 없다
+        devices.CollectionEntity.Add(NewSpeaker(1));           // 이전 서버 없음
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+        service.Assigns.Clear();
+
+        await vm.UndoAssignAsync();
+
+        // server_id: null 이 해제다(app/schemas/device.py:740).
+        Assert.Equal(new (int, int?)[] { (1, null) }, service.Assigns.Select(a => (a.DeviceId, a.ServerId)));
+    }
+
+    [Fact]
+    public async Task should_say_it_cannot_undo_when_the_contract_has_no_detach_entry()
+    {
+        var (vm, service, devices, _) = Build(EnumServerContract.V6_3);
+        service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
+        devices.CollectionEntity.Add(NewSpeaker(1));
+        await ActivateAsync(vm);
+
+        vm.OnRowsSelected(new List<object> { vm.Rows[0] });
+        await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
+        service.Assigns.Clear();
+
+        await vm.UndoAssignAsync();
+
+        Assert.Empty(service.Assigns);
+        Assert.Contains("해제 입구가 없어", vm.StatusText);
+    }
+
+    [Fact]
+    public async Task should_restore_the_previous_server_when_undone()
+    {
+        var (vm, service, devices, _) = Build();
+        service.Servers.Add(Entry(7, "방송서버", EnumServerType.SPEAKER_API));
         devices.CollectionEntity.Add(NewSpeaker(2, previousServer: 9));
         await ActivateAsync(vm);
 
@@ -447,10 +713,11 @@ public class ServerMonitorViewModelTests
 
         await vm.UndoAssignAsync();
 
-        Assert.Equal(new[] { (2, 9) }, service.Assigns.Select(a => (a.DeviceId, a.ServerId)));
-        Assert.Contains("되돌릴 수 없습니다", vm.StatusText);
+        Assert.Equal(new (int, int?)[] { (2, 9) }, service.Assigns.Select(a => (a.DeviceId, a.ServerId)));
     }
+    #endregion
 
+    #region - 그 밖 -
     [Fact]
     public async Task should_open_the_metric_history_when_the_button_is_pressed()
     {
@@ -475,6 +742,16 @@ public class ServerMonitorViewModelTests
     }
 
     [Fact]
+    public async Task should_say_no_liveness_signal_is_connected()
+    {
+        var (vm, _, _, _) = Build();
+        await ActivateAsync(vm);
+
+        Assert.Contains("생존 신호", vm.LivenessNote);
+        Assert.Contains("REST 로는", vm.LivenessNote);
+    }
+
+    [Fact]
     public async Task should_let_go_of_selection_and_edits_when_the_console_is_closed()
     {
         var (vm, service, _, _) = Build();
@@ -490,13 +767,7 @@ public class ServerMonitorViewModelTests
         Assert.False(vm.Detail.IsDirty);
         Assert.False(vm.IsEditing);
         Assert.False(vm.CanUndoAssign);
+        Assert.False(vm.HasDetail);
     }
-
-    private static SpeakerDeviceModel NewSpeaker(int id, int? previousServer = null) => new()
-    {
-        Id = id,
-        DeviceName = $"스피커{id}",
-        CategoryDevice = EnumDeviceCategory.Speaker,
-        Server = previousServer is null ? null : new ServerModel { Id = previousServer.Value, Name = $"서버{previousServer}" },
-    };
+    #endregion
 }

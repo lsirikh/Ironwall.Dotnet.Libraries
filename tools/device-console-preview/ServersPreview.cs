@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
@@ -9,7 +10,6 @@ using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
 using Newtonsoft.Json.Linq;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -23,8 +23,10 @@ namespace DeviceConsolePreview;
 /// </summary>
 internal sealed class ServersPreview
 {
-    private readonly FakeServerConsole _service = new();
+    private readonly FakeServerConsole _service;
     private readonly DeviceProvider _devices = new();
+
+    public ServersPreview(EnumServerContract contract = EnumServerContract.V8_0) => _service = new FakeServerConsole(contract);
 
     public ServerMonitorViewModel ViewModel { get; private set; } = null!;
     public ServerMonitorView View { get; private set; } = null!;
@@ -55,17 +57,28 @@ internal sealed class ServersPreview
 
     public void Select(ServerRowViewModel row) => ViewModel.OnRowsSelected(new List<object> { row });
 
-    /// <summary>
-    /// 입력 없이 끌기를 재현해 <b>받지 않는 행</b>이 어떻게 보이는지 찍는다 — 실제 마우스를 건드리지 않고,
-    /// 끝에는 <b>취소</b>로 놓아 서버 호출이 한 번도 나가지 않게 한다.
-    /// </summary>
-    public IDisposable BeginRefusedDrag(FrameworkElement root, ServerRowViewModel blockedRow)
+    /// <summary>지표 이력 창 — 임계 배지를 그리지 않는 화면을 그대로 만든다.</summary>
+    public async Task<FrameworkElement> MetricHistoryAsync(int serverId, string serverName)
     {
-        var handle = Descendants<DragHandle>(root).FirstOrDefault();
-        var grid = Descendants<DataGrid>(root).First();
-        var container = grid.ItemContainerGenerator.ContainerFromItem(blockedRow) as FrameworkElement;
-        if (handle is null || container is null) return new DragScope(null);
+        var vm = new ServerMetricHistoryViewModel(_service, new FrozenClock(new DateTime(2026, 9, 20, 0, 5, 0, DateTimeKind.Utc)), serverId, serverName);
+        var view = new ServerMetricHistoryView { DataContext = vm };
+        await ((IActivate)vm).ActivateAsync();
+        return view;
+    }
 
+    /// <summary>
+    /// 입력 없이 끌기를 재현한다 — 실제 마우스를 건드리지 않고, 끝에는 <b>취소</b>로 놓아
+    /// 서버 호출이 한 번도 나가지 않게 한다.
+    /// </summary>
+    /// <param name="overRow">포인터를 올려 둘 행(받는 행이면 Hover, 아니면 Blocked 가 된다).</param>
+    public IDisposable BeginDrag(FrameworkElement root, ServerRowViewModel overRow, int chipIndex = 0)
+    {
+        var handles = Descendants<DragHandle>(root).ToList();
+        var grid = Descendants<DataGrid>(root).First();
+        var container = grid.ItemContainerGenerator.ContainerFromItem(overRow) as FrameworkElement;
+        if (handles.Count <= chipIndex || container is null) return new DragScope(null);
+
+        var handle = handles[chipIndex];
         var pointer = new Point();
         DragPointer.Override = relativeTo => root.TranslatePoint(pointer, (UIElement)relativeTo);
 
@@ -78,23 +91,17 @@ internal sealed class ServersPreview
     }
 
     /// <summary>상세 칸을 끝까지 굴린다 — 절이 접혀 보이지 않으면 스냅숏이 상태를 증명하지 못한다.</summary>
-    public static void ScrollDetailToEnd(FrameworkElement root)
-    {
-        root.UpdateLayout();
-        foreach (var viewer in Descendants<ScrollViewer>(root).Where(v => v.ActualWidth is > 0 and < 420 && v.ScrollableHeight > 0))
-        {
-            viewer.ScrollToVerticalOffset(viewer.ScrollableHeight);
-            viewer.UpdateLayout();
-        }
-    }
+    public static void ScrollDetailToEnd(FrameworkElement root) => Scroll(root, toEnd: true);
 
     /// <summary>상세 칸을 맨 위로 되돌린다 — 앞 장면의 스크롤이 다음 스냅숏을 가리지 않게.</summary>
-    public static void ScrollDetailToTop(FrameworkElement root)
+    public static void ScrollDetailToTop(FrameworkElement root) => Scroll(root, toEnd: false);
+
+    private static void Scroll(FrameworkElement root, bool toEnd)
     {
         root.UpdateLayout();
         foreach (var viewer in Descendants<ScrollViewer>(root).Where(v => v.ActualWidth is > 0 and < 420))
         {
-            viewer.ScrollToVerticalOffset(0);
+            viewer.ScrollToVerticalOffset(toEnd ? viewer.ScrollableHeight : 0);
             viewer.UpdateLayout();
         }
     }
@@ -116,16 +123,18 @@ internal sealed class ServersPreview
     {
         if (_service.Servers.Count > 0) return;
 
-        _service.Categories.Add(new ServerCategoryOption(1, "방송", EnumServerType.SPEAKER_API));
-        _service.Categories.Add(new ServerCategoryOption(2, "영상", EnumServerType.NVR_API));
+        _service.Categories.Add(new ServerCategoryOption(1, "방송", EnumServerType.SPEAKER_API, "SPEAKER_API"));
+        _service.Categories.Add(new ServerCategoryOption(2, "영상", EnumServerType.NVR_API, "NVR_API"));
+        _service.Categories.Add(new ServerCategoryOption(3, "프록시", EnumServerType.PROXY, "PROXY"));
         _service.Units.Add(new ServerUnitOption(4, "1대대", "unit001"));
 
         _service.Servers.Add(Entry(11, "방송서버-01", EnumServerType.SPEAKER_API, "NORMAL", "2026-09-20T00:03:30+00:00"));
         _service.Servers.Add(Entry(12, "방송서버-02", EnumServerType.SPEAKER_API, "WARNING", "2026-09-19T23:02:00+00:00"));
         _service.Servers.Add(Entry(21, "NVR-01", EnumServerType.NVR_API, "ERROR", "2026-09-18T02:00:00+00:00"));
-        _service.Servers.Add(Entry(31, "PIDS 프록시", EnumServerType.PROXY, "NORMAL", "2026-09-19T21:05:00+00:00"));
+        _service.Servers.Add(Entry(31, "PIDS 프록시", EnumServerType.PROXY, "NORMAL", "2026-09-19T21:05:00+00:00", withModes: true));
         _service.Servers.Add(Entry(41, "함체 게이트웨이", EnumServerType.ENCLOSURE_API, "NORMAL", "2026-09-17T10:00:00+00:00"));
-        _service.Servers.Add(Entry(51, "백업서버", EnumServerType.BACKUP, "NORMAL", updatedAt: null));   // 보고 없음
+        // 한 번도 보고가 없는 서버 — 7.0+ 는 status=UNKNOWN 이고 status_observed_at 이 null 이다(실제 응답 모양).
+        _service.Servers.Add(Entry(51, "백업서버", EnumServerType.BACKUP, "UNKNOWN", observedAt: null));
 
         _service.LatestMetric = new ServerMetricDto
         {
@@ -150,13 +159,15 @@ internal sealed class ServersPreview
             })),
         };
 
-        foreach (var (id, name, server) in new[]
+        _service.History.AddRange(new[]
         {
-            (101, "정문 스피커", 11),
-            (102, "후문 스피커", 0),
-            (103, "감시탑 스피커", 12),
-        })
-        {
+            Metric(91.5, 63.2, 78, "2026-09-20T09:04:00+09:00"),
+            Metric(88.0, 62.0, 78, "2026-09-20T09:03:00+09:00"),
+            Metric(72.4, 60.5, 77, "2026-09-20T09:02:00+09:00"),
+            Metric(65.1, 59.9, 77, "2026-09-20T09:01:00+09:00"),
+        });
+
+        foreach (var (id, name, server) in new[] { (101, "정문 스피커", 11), (102, "후문 스피커", 0), (103, "감시탑 스피커", 12) })
             _devices.CollectionEntity.Add(new SpeakerDeviceModel
             {
                 Id = id,
@@ -164,30 +175,49 @@ internal sealed class ServersPreview
                 CategoryDevice = EnumDeviceCategory.Speaker,
                 Server = server == 0 ? null : new ServerModel { Id = server, Name = $"방송서버-{server - 10:00}" },
             });
-        }
+
+        // 축 계약에서는 카메라도 NVR 에 배정할 수 있다(서버 표 app/schemas/device.py:85-93).
+        _devices.CollectionEntity.Add(new CameraDeviceModel { Id = 201, DeviceName = "정문 카메라", CategoryDevice = EnumDeviceCategory.Camera });
     }
 
-    private static ServerListEntry Entry(int id, string name, EnumServerType type, string status, string? updatedAt)
-        => new(new ServerDto
+    private static ServerMetricDto Metric(double cpu, double ram, double disk, string observedAt) => new()
+    {
+        CpuUsage = cpu,
+        RamUsage = ram,
+        DiskUsage = disk,
+        NetworkInMbps = 120,
+        NetworkOutMbps = 11,
+        ObservedAt = observedAt,
+    };
+
+    private static ServerAxisView Entry(int id, string name, EnumServerType type, string status, string? observedAt, bool withModes = false)
+        => new()
         {
             Id = id,
-            CategoryId = type == EnumServerType.SPEAKER_API ? 1 : 2,
+            TypeServer = type.ToString(),
             Name = name,
+            IsEnable = true,
+            UnitId = 4,
             Status = status,
+            HasStatusKey = true,
+            StatusObservedAt = observedAt,
+            HasStatusObservedAtKey = true,
             IpAddress = $"10.0.{id / 10}.{id % 10 + 1}",
             Port = 8000 + id,
             Hostname = $"host-{id}",
             UserName = "admin",
-            UpdatedAt = updatedAt,
-            CreatedAt = updatedAt,
-            UnitId = 4,
-            ThresholdConfig = JObject.FromObject(new
+            HasConnectionSection = true,
+            HasConfigSection = true,
+            CreatedAt = observedAt ?? "2026-09-01T00:00:00+00:00",
+            UpdatedAt = observedAt ?? "2026-09-01T00:00:00+00:00",
+            Thresholds = JObject.FromObject(new
             {
                 cpu = new { warning = 70.0, critical = 90.0 },
                 ram = new { warning = 75.0, critical = 92.0 },
                 disk = new { warning = 80.0, critical = 95.0 },
             }),
-        }, type, type.ToString(), "1대대");
+            Modes = withModes ? JObject.FromObject(new { operation_mode = "NORMAL", windy_mode = "wind0" }) : null,
+        };
 
     /// <summary>끌기를 반드시 <b>취소</b>로 끝낸다 — 미리보기에서 쓰기가 나가지 않게.</summary>
     private sealed class DragScope : IDisposable
@@ -219,38 +249,43 @@ internal sealed class ServersPreview
     /// <summary>서버를 부르지 않는 가짜 통로.</summary>
     private sealed class FakeServerConsole : IServerConsoleService
     {
-        public List<ServerListEntry> Servers { get; } = new();
+        public FakeServerConsole(EnumServerContract contract) => Contract = contract;
+
+        public List<ServerAxisView> Servers { get; } = new();
         public List<ServerUnitOption> Units { get; } = new();
         public List<ServerCategoryOption> Categories { get; } = new();
+        public List<ServerMetricDto> History { get; } = new();
         public ServerMetricDto? LatestMetric { get; set; }
 
-        public EnumServerContract Contract => EnumServerContract.V8_0;
-        public bool IsUnitEra => true;
-        public bool CanReadProxySettings => false;
+        public EnumServerContract Contract { get; }
+        public bool IsUnitEra => Contract >= EnumServerContract.V8_0;
+        public bool IsAxisEra => Contract >= EnumServerContract.V7_0;
 
         public Task<ServerLoadResult> LoadAsync(int? unitId, bool includeDescendants, CancellationToken token = default)
             => Task.FromResult(new ServerLoadResult(Servers.ToList(), Units.ToList(), Categories.ToList(), false, null));
 
-        public Task<ServerDto?> GetAsync(int id, CancellationToken token = default)
-            => Task.FromResult(Servers.FirstOrDefault(s => s.Dto.Id == id)?.Dto);
+        public Task<ServerAxisView?> GetAsync(int id, CancellationToken token = default)
+            => Task.FromResult(Servers.FirstOrDefault(s => s.Id == id));
 
-        public Task<ServerWriteResult> SaveAsync(int id, ServerEditDraft draft, CancellationToken token = default)
+        public Task<ServerWriteResult> SaveAsync(int id, ServerWriteIntent intent, CancellationToken token = default)
             => Task.FromResult(new ServerWriteResult(true, "설정을 저장했습니다"));
 
-        public Task<(ServerWriteResult Result, int NewId)> CreateAsync(int categoryId, ServerEditDraft draft, CancellationToken token = default)
+        public Task<(ServerWriteResult Result, int NewId)> CreateAsync(
+            ServerCategoryOption category, ServerWriteIntent intent, CancellationToken token = default)
             => Task.FromResult((new ServerWriteResult(true, ServerStatusRules.JustRegisteredNotice), 0));
 
         public Task<ServerMetricDto?> LatestMetricAsync(int id, CancellationToken token = default)
             => Task.FromResult(id == 11 ? LatestMetric : null);
 
         public Task<IReadOnlyList<ServerMetricDto>> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
-            => Task.FromResult<IReadOnlyList<ServerMetricDto>>(Array.Empty<ServerMetricDto>());
+            => Task.FromResult<IReadOnlyList<ServerMetricDto>>(History.ToList());
 
-        public Task<(ProxySettingDto? Setting, string? Note)> OperationModeAsync(int id, CancellationToken token = default)
-            => Task.FromResult<(ProxySettingDto?, string?)>((null,
-                "프록시 설정 창은 없어졌습니다(410) — 운용 모드는 이 서버의 server_config 로 옮겨졌습니다."));
+        public Task<(ProxySettingDto? Setting, string? Note)> LegacyOperationModeAsync(int id, CancellationToken token = default)
+            => Task.FromResult<(ProxySettingDto?, string?)>(
+                (IsAxisEra ? null : new ProxySettingDto { ServerId = id, OperationMode = "NORMAL", WindyMode = "wind0" }, null));
 
-        public Task<ServerWriteResult> AssignSpeakerAsync(int speakerId, int serverId, CancellationToken token = default)
+        public Task<ServerWriteResult> AssignDeviceAsync(
+            EnumDeviceCategory category, int deviceId, int? serverId, CancellationToken token = default)
             => throw new InvalidOperationException("미리보기는 서버에 쓰지 않는다");
     }
 }

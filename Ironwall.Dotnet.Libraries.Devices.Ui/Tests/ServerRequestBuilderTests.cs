@@ -1,15 +1,13 @@
 ﻿using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
-using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Linq;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /****************************************************************************
-   Purpose      : 서버 쓰기 본문 검증 — 관측 필드 금지 · null 로 지우지 않기 (N-12)
+   Purpose      : 서버 편집 폼의 지역 검사 검증 (N-12)
    Created By   : GHLee
    Created On   : 9/20/2026
    Department   : SW Team
@@ -17,157 +15,35 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 
+/// <summary>
+/// 본문 조립은 <c>Devices.Api</c> 의 계약 테스트가 잠근다(<c>ServerAxisContractTests</c>).
+/// 여기서는 <b>보내기 전에 화면이 막는 것</b>만 본다.
+/// </summary>
 public class ServerRequestBuilderTests
 {
-    private static ServerDto Fetched() => new()
+    private static ServerAxisView Fetched() => new()
     {
         Id = 12,
-        CategoryId = 3,
+        TypeServer = "SPEAKER_API",
         Name = "방송서버",
         Status = "ERROR",
+        HasStatusKey = true,
         IpAddress = "10.0.0.5",
         Port = 8080,
         Hostname = "bcast-01",
         UserName = "admin",
-        UserPassword = "secret-from-server",
         UnitId = 4,
-        CreatedAt = "2026-01-01T00:00:00+09:00",
-        UpdatedAt = "2026-09-20T09:00:00+09:00",
-        ThresholdConfig = JObject.FromObject(new
+        Thresholds = JObject.FromObject(new
         {
             cpu = new { warning = 70.0, critical = 90.0 },
             ram = new { warning = 75.0, critical = 92.0 },
         }),
+        Modes = JObject.FromObject(new { operation_mode = "NORMAL", windy_mode = "wind0" }),
     };
 
-    private static JObject Body(ServerPatchDto dto) => JObject.Parse(JsonConvert.SerializeObject(dto));
-
     [Fact]
-    public void should_never_send_the_observed_status_when_a_patch_body_is_built()
-    {
-        var body = Body(ServerRequestBuilder.BuildPatch(Fetched(), new ServerEditDraft(), EnumServerContract.V8_0));
-
-        // status 는 관측 필드다 — 실리는 순간 7.0 이 422(OBSERVED_FIELD) 로 거부한다.
-        Assert.False(body.ContainsKey("status"));
-        Assert.False(body.ContainsKey("id"));
-        Assert.False(body.ContainsKey("created_at"));
-        Assert.False(body.ContainsKey("updated_at"));
-    }
-
-    [Fact]
-    public void should_never_null_or_reset_a_fetched_value_when_nothing_was_edited()
-    {
-        var fetched = Fetched();
-        var body = Body(ServerRequestBuilder.BuildPatch(fetched, new ServerEditDraft(), EnumServerContract.V8_0));
-
-        // PATCH 는 RFC 7396 이다: 키가 null 이면 서버가 그 값을 지운다. 하나도 null 이어서는 안 된다.
-        Assert.DoesNotContain(body.Properties(), p => p.Value.Type == JTokenType.Null);
-
-        Assert.Equal(fetched.Name, (string?)body["name"]);
-        Assert.Equal(fetched.IpAddress, (string?)body["ip_address"]);
-        Assert.Equal(fetched.Port, (int?)body["port"]);
-        Assert.Equal(fetched.Hostname, (string?)body["hostname"]);
-        Assert.Equal(fetched.UserName, (string?)body["user_name"]);
-        Assert.Equal(fetched.CategoryId, (int?)body["category_id"]);
-        Assert.Equal(90.0, (double?)body["threshold_config"]!["cpu"]!["critical"]);
-    }
-
-    [Fact]
-    public void should_drop_the_key_instead_of_sending_null_when_the_server_never_sent_it()
-    {
-        // 목록 기본 프로필(basic)은 계정·임계를 아예 주지 않는다 — 그 상태로 저장해도 서버 값이 지워지면 안 된다.
-        var sparse = new ServerDto { Id = 1, CategoryId = 2, Name = "a", IpAddress = "1.1.1.1", Port = 1 };
-        var body = Body(ServerRequestBuilder.BuildPatch(sparse, new ServerEditDraft(), EnumServerContract.V8_0));
-
-        Assert.False(body.ContainsKey("hostname"));
-        Assert.False(body.ContainsKey("user_name"));
-        Assert.False(body.ContainsKey("user_password"));
-        Assert.False(body.ContainsKey("threshold_config"));
-    }
-
-    [Fact]
-    public void should_audit_every_writable_property_when_a_patch_body_is_built()
-    {
-        // 감사: 받은 값이 있는 속성은 본문에도 같은 값으로 남거나, 의도적으로 빠진 것(관측·서버 소유)이어야 한다.
-        var fetched = Fetched();
-        var body = ServerRequestBuilder.BuildPatch(fetched, new ServerEditDraft(), EnumServerContract.V8_0);
-        var intentionallyDropped = ServerPatchDtoConverter.IntentionallyDropped;
-
-        foreach (var property in ServerRequestBuilder.WritableProperties(typeof(ServerDto)))
-        {
-            var original = property.GetValue(fetched);
-            var written = property.GetValue(body);
-
-            if (intentionallyDropped.Contains(property.Name)) continue;
-            Assert.True(Equals(original?.ToString(), written?.ToString()),
-                $"{property.Name} 이(가) 본문에서 바뀌었습니다: {original} → {written}");
-        }
-    }
-
-    [Fact]
-    public void should_apply_only_the_edited_fields_when_a_draft_is_given()
-    {
-        var draft = new ServerEditDraft { Name = "  새 이름  ", Port = 9090 };
-        var body = Body(ServerRequestBuilder.BuildPatch(Fetched(), draft, EnumServerContract.V8_0));
-
-        Assert.Equal("새 이름", (string?)body["name"]);
-        Assert.Equal(9090, (int?)body["port"]);
-        Assert.Equal("10.0.0.5", (string?)body["ip_address"]);   // 손대지 않은 칸은 그대로
-    }
-
-    [Fact]
-    public void should_keep_the_server_password_when_the_user_typed_nothing()
-    {
-        var body = Body(ServerRequestBuilder.BuildPatch(Fetched(), new ServerEditDraft(), EnumServerContract.V8_0));
-        Assert.Equal("secret-from-server", (string?)body["user_password"]);
-
-        var changed = Body(ServerRequestBuilder.BuildPatch(Fetched(), new ServerEditDraft { NewPassword = "new-one" }, EnumServerContract.V8_0));
-        Assert.Equal("new-one", (string?)changed["user_password"]);
-    }
-
-    [Theory]
-    [InlineData(EnumServerContract.V6_3, false)]
-    [InlineData(EnumServerContract.V7_0, false)]
-    [InlineData(EnumServerContract.V8_0, true)]
-    public void should_send_unit_id_only_when_the_contract_has_the_unit_axis(EnumServerContract contract, bool expected)
-    {
-        var body = Body(ServerRequestBuilder.BuildPatch(Fetched(), new ServerEditDraft(), contract));
-        Assert.Equal(expected, body.ContainsKey("unit_id"));
-    }
-
-    [Fact]
-    public void should_merge_thresholds_into_the_fetched_object_when_one_value_is_edited()
-    {
-        var body = ServerRequestBuilder.BuildThresholds(Fetched().ThresholdConfig, new ServerEditDraft { CpuWarning = 55 });
-
-        Assert.Equal(55.0, (double?)body!["cpu"]!["warning"]);
-        Assert.Equal(90.0, (double?)body["cpu"]!["critical"]);    // 손대지 않은 값이 살아 있다
-        Assert.Equal(92.0, (double?)body["ram"]!["critical"]);
-    }
-
-    [Fact]
-    public void should_return_the_fetched_thresholds_untouched_when_nothing_was_edited()
-    {
-        var fetched = Fetched().ThresholdConfig;
-        Assert.Same(fetched, ServerRequestBuilder.BuildThresholds(fetched, new ServerEditDraft()));
-        Assert.Null(ServerRequestBuilder.BuildThresholds(null, new ServerEditDraft()));
-    }
-
-    [Fact]
-    public void should_create_the_network_group_when_it_was_missing()
-    {
-        var body = ServerRequestBuilder.BuildThresholds(null, new ServerEditDraft { NetworkWarningMbps = 500 });
-        Assert.Equal(500.0, (double?)body!["network"]!["warning_mbps"]);
-    }
-
-    [Fact]
-    public void should_read_a_threshold_value_when_the_shape_matches()
-    {
-        var thresholds = Fetched().ThresholdConfig;
-        Assert.Equal(70.0, ServerRequestBuilder.ReadThreshold(thresholds, "cpu", "warning"));
-        Assert.Null(ServerRequestBuilder.ReadThreshold(thresholds, "disk", "warning"));
-        Assert.Null(ServerRequestBuilder.ReadThreshold(null, "cpu", "warning"));
-    }
+    public void should_accept_an_untouched_form_when_the_fetched_values_are_valid()
+        => Assert.Empty(ServerRequestBuilder.Validate(new ServerWriteIntent(), Fetched()));
 
     [Theory]
     [InlineData(0)]
@@ -175,7 +51,7 @@ public class ServerRequestBuilderTests
     [InlineData(-1)]
     public void should_refuse_a_port_outside_the_valid_range(int port)
     {
-        var errors = ServerRequestBuilder.Validate(new ServerEditDraft { Port = port }, Fetched());
+        var errors = ServerRequestBuilder.Validate(new ServerWriteIntent { Port = port }, Fetched());
         Assert.Contains(errors, e => e.Key == ServerRequestBuilder.PortKey);
     }
 
@@ -183,49 +59,129 @@ public class ServerRequestBuilderTests
     [InlineData(1)]
     [InlineData(65535)]
     public void should_accept_a_port_at_the_boundary(int port)
-        => Assert.Empty(ServerRequestBuilder.Validate(new ServerEditDraft { Port = port }, Fetched()));
+        => Assert.Empty(ServerRequestBuilder.Validate(new ServerWriteIntent { Port = port }, Fetched()));
 
     [Fact]
     public void should_refuse_an_empty_name_or_address()
     {
-        var errors = ServerRequestBuilder.Validate(new ServerEditDraft { Name = "  ", IpAddress = string.Empty }, Fetched());
+        var errors = ServerRequestBuilder.Validate(new ServerWriteIntent { Name = "  ", IpAddress = string.Empty }, Fetched());
 
         Assert.Contains(errors, e => e.Key == ServerRequestBuilder.NameKey);
         Assert.Contains(errors, e => e.Key == ServerRequestBuilder.IpKey);
     }
 
     [Fact]
-    public void should_copy_every_fetched_value_and_change_only_the_server_id_when_a_speaker_is_assigned()
+    public void should_refuse_a_create_form_that_is_still_empty()
     {
-        var fetched = new SpeakerDeviceDto
-        {
-            Id = 5,
-            NumberDevice = 101,
-            NameDevice = "스피커1",
-            Status = "ACTIVATED",
-            IsEnable = true,
-            Version = "1.2.3",
-            SpeakerType = "NORMAL",
-            Description = "정문",
-            ServerId = 9,
-            Server = new ServerDto { Id = 9, Name = "옛 서버" },
-        };
+        var errors = ServerRequestBuilder.Validate(new ServerWriteIntent(), fetched: null);
 
-        var body = ServerRequestBuilder.BuildSpeakerAssign(fetched, 12);
-
-        Assert.Equal(12, body.ServerId);
-        foreach (var property in ServerRequestBuilder.WritableProperties(typeof(SpeakerDeviceDto)))
-        {
-            if (property.Name == nameof(SpeakerDeviceDto.ServerId)) continue;
-            Assert.True(Equals(property.GetValue(fetched)?.ToString(), property.GetValue(body)?.ToString()),
-                $"{property.Name} 이(가) 배정 본문에서 바뀌었습니다");
-        }
+        Assert.Contains(errors, e => e.Key == ServerRequestBuilder.NameKey);
+        Assert.Contains(errors, e => e.Key == ServerRequestBuilder.IpKey);
+        Assert.Contains(errors, e => e.Key == ServerRequestBuilder.PortKey);
     }
 
     [Fact]
-    public void should_throw_when_the_assign_target_is_not_saved()
+    public void should_refuse_clearing_a_field_when_the_contract_cannot_send_a_deletion()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ServerRequestBuilder.BuildSpeakerAssign(new SpeakerDeviceDto(), 0));
-        Assert.Throws<ArgumentNullException>(() => ServerRequestBuilder.BuildSpeakerAssign(null!, 1));
+        var intent = new ServerWriteIntent { ClearHostname = true, ClearUserName = true };
+
+        var legacy = ServerRequestBuilder.Validate(intent, Fetched(), EnumServerContract.V6_3);
+        Assert.Contains(legacy, e => e.Key == ServerRequestBuilder.HostnameKey);
+        Assert.Contains(legacy, e => e.Key == ServerRequestBuilder.UserNameKey);
+        Assert.All(legacy, e => Assert.Contains("6.3", e.Message));
+
+        Assert.Empty(ServerRequestBuilder.Validate(intent, Fetched(), EnumServerContract.V8_0));
+    }
+
+    [Fact]
+    public void should_refuse_a_warning_that_is_not_below_the_critical_threshold()
+    {
+        // 서버도 같은 것을 본다(app/schemas/server.py:245-250 — 같아도 422).
+        var errors = ServerRequestBuilder.Validate(new ServerWriteIntent { CpuWarning = 95 }, Fetched());
+        Assert.Contains(errors, e => e.Key == "threshold.cpu");
+    }
+
+    [Fact]
+    public void should_compare_a_touched_warning_against_the_fetched_critical()
+    {
+        Assert.Empty(ServerRequestBuilder.Validate(new ServerWriteIntent { CpuWarning = 65 }, Fetched()));
+        Assert.Contains(
+            ServerRequestBuilder.Validate(new ServerWriteIntent { RamCritical = 70 }, Fetched()),
+            e => e.Key == "threshold.ram");
+    }
+
+    [Fact]
+    public void should_refuse_a_network_warning_that_is_not_below_the_critical()
+    {
+        var errors = ServerRequestBuilder.Validate(
+            new ServerWriteIntent { NetworkWarningMbps = 900, NetworkCriticalMbps = 500 }, Fetched());
+        Assert.Contains(errors, e => e.Key == "threshold.network");
+    }
+
+    [Fact]
+    public void should_read_a_threshold_value_when_the_shape_matches()
+    {
+        var thresholds = Fetched().Thresholds;
+        Assert.Equal(70.0, ServerRequestBuilder.ReadThreshold(thresholds, "cpu", "warning"));
+        Assert.Null(ServerRequestBuilder.ReadThreshold(thresholds, "disk", "warning"));
+        Assert.Null(ServerRequestBuilder.ReadThreshold(null, "cpu", "warning"));
+    }
+
+    [Fact]
+    public void should_read_a_mode_value_when_the_axis_sent_one()
+    {
+        Assert.Equal("NORMAL", ServerRequestBuilder.ReadMode(Fetched().Modes, "operation_mode"));
+        Assert.Null(ServerRequestBuilder.ReadMode(Fetched().Modes, "no_such_key"));
+        Assert.Null(ServerRequestBuilder.ReadMode(null, "operation_mode"));
+    }
+}
+
+/// <summary>
+/// 7.0+ 응답에는 중첩 <c>server</c> 가 없다 — <c>server_id</c> 만 와도 소속을 잃지 않는가
+/// (서버 <c>app/routers/speakers.py</c> 머리말 D4).
+/// </summary>
+public class SpeakerServerIdMappingTests
+{
+    [Fact]
+    public void should_seed_the_server_reference_when_only_the_id_arrived()
+    {
+        var dto = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.SpeakerDeviceDto
+        {
+            Id = 5,
+            NumberDevice = 1,
+            NameDevice = "스피커",
+            ServerId = 12,
+            Server = null,
+        };
+
+        var model = Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DtoToModelHelper.ToSpeakerDeviceModel(dto);
+
+        Assert.NotNull(model.Server);
+        Assert.Equal(12, model.Server!.Id);
+        Assert.Equal(12, ServerDropRules.ServerIdOf(model));
+    }
+
+    [Fact]
+    public void should_prefer_the_nested_server_when_the_expansion_was_requested()
+    {
+        var dto = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.SpeakerDeviceDto
+        {
+            Id = 5,
+            NameDevice = "스피커",
+            ServerId = 12,
+            Server = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.ServerDto { Id = 12, Name = "방송서버" },
+        };
+
+        var model = Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DtoToModelHelper.ToSpeakerDeviceModel(dto);
+
+        Assert.Equal("방송서버", model.Server!.Name);
+    }
+
+    [Fact]
+    public void should_leave_the_server_empty_when_the_device_has_none()
+    {
+        var dto = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.SpeakerDeviceDto { Id = 5, NameDevice = "스피커" };
+
+        Assert.Null(Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DtoToModelHelper.ToSpeakerDeviceModel(dto).Server);
     }
 }

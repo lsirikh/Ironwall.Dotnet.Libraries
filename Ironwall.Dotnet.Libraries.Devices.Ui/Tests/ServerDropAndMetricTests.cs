@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
+﻿using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -29,36 +30,60 @@ public class ServerDropRulesTests
         Server = serverId is null ? null : new ServerModel { Id = serverId.Value, Name = $"서버{serverId}" },
     };
 
-    [Theory]
-    [InlineData(EnumDeviceCategory.Speaker, true)]
-    [InlineData(EnumDeviceCategory.Sensor, false)]
-    [InlineData(EnumDeviceCategory.Camera, false)]
-    [InlineData(EnumDeviceCategory.Controller, false)]
-    [InlineData(EnumDeviceCategory.Enclosure, false)]
-    [InlineData(EnumDeviceCategory.Lamp, false)]
-    [InlineData(EnumDeviceCategory.Gate, false)]
-    public void should_accept_only_speakers_when_target_is_a_speaker_server(EnumDeviceCategory category, bool expected)
-        => Assert.Equal(expected, ServerDropRules.Accepts(EnumServerType.SPEAKER_API, category));
-
-    [Theory]
-    [InlineData(EnumServerType.NVR_API)]
-    [InlineData(EnumServerType.PROXY)]
-    [InlineData(EnumServerType.ENCLOSURE_API)]
-    [InlineData(null)]
-    public void should_refuse_every_device_when_server_type_is_not_a_speaker_server(EnumServerType? type)
+    private static CameraDeviceModel Camera(int id) => new()
     {
-        Assert.False(ServerDropRules.Accepts(type, EnumDeviceCategory.Speaker));
-        Assert.NotNull(ServerDropRules.RefusalReason(type, EnumDeviceCategory.Speaker));
+        Id = id,
+        DeviceName = $"카메라{id}",
+        CategoryDevice = EnumDeviceCategory.Camera,
+    };
+
+    #region - 허용 표는 서버가 정한다(app/schemas/device.py:85-93) -
+    [Theory]
+    [InlineData(EnumDeviceCategory.Controller, EnumServerType.PROXY, true)]
+    [InlineData(EnumDeviceCategory.Controller, EnumServerType.NVR_API, false)]
+    [InlineData(EnumDeviceCategory.Lamp, EnumServerType.PROXY, true)]
+    [InlineData(EnumDeviceCategory.Camera, EnumServerType.NVR_API, true)]
+    [InlineData(EnumDeviceCategory.Camera, EnumServerType.PROXY, false)]
+    [InlineData(EnumDeviceCategory.Speaker, EnumServerType.SPEAKER_API, true)]
+    [InlineData(EnumDeviceCategory.Speaker, EnumServerType.PROXY, false)]
+    [InlineData(EnumDeviceCategory.Enclosure, EnumServerType.ENCLOSURE_API, true)]
+    [InlineData(EnumDeviceCategory.Gate, EnumServerType.PROXY, true)]
+    [InlineData(EnumDeviceCategory.Gate, EnumServerType.ENCLOSURE_API, true)]
+    [InlineData(EnumDeviceCategory.Gate, EnumServerType.NVR_API, false)]
+    [InlineData(EnumDeviceCategory.Sensor, EnumServerType.PROXY, false)]
+    [InlineData(EnumDeviceCategory.Sensor, EnumServerType.SPEAKER_API, false)]
+    public void should_follow_the_server_eligibility_table(EnumDeviceCategory category, EnumServerType type, bool expected)
+        => Assert.Equal(expected, ServerDropRules.Accepts(type, category));
+
+    [Fact]
+    public void should_refuse_every_device_when_the_server_type_is_unknown()
+    {
+        foreach (EnumDeviceCategory category in Enum.GetValues(typeof(EnumDeviceCategory)))
+            Assert.False(ServerDropRules.Accepts(null, category));
+    }
+
+    [Fact]
+    public void should_say_a_sensor_has_no_managing_server_at_all()
+    {
+        var reason = ServerDropRules.RefusalReason(EnumServerType.PROXY, EnumDeviceCategory.Sensor);
+        Assert.Contains("관리 서버가 없습니다", reason);
+        Assert.Contains("소속 제어기", reason);
+    }
+
+    [Fact]
+    public void should_name_the_allowed_server_types_when_refusing()
+    {
+        var reason = ServerDropRules.RefusalReason(EnumServerType.SPEAKER_API, EnumDeviceCategory.Camera);
+        Assert.Contains("카메라", reason);
+        Assert.Contains("NVR", reason);
     }
 
     [Fact]
     public void should_have_no_refusal_reason_when_the_drop_is_allowed()
         => Assert.Null(ServerDropRules.RefusalReason(EnumServerType.SPEAKER_API, EnumDeviceCategory.Speaker));
+    #endregion
 
-    [Fact]
-    public void should_name_the_device_kind_when_refusing_a_sensor()
-        => Assert.Contains("센서", ServerDropRules.RefusalReason(EnumServerType.SPEAKER_API, EnumDeviceCategory.Sensor));
-
+    #region - 계획 -
     [Fact]
     public void should_block_when_the_server_row_is_not_saved_yet()
     {
@@ -81,6 +106,16 @@ public class ServerDropRulesTests
         Assert.False(plan.CanSend);
         Assert.Equal(1, plan.Ineligible);
         Assert.Equal(0, plan.WriteCount);
+    }
+
+    [Fact]
+    public void should_keep_only_the_eligible_devices_when_the_drag_is_mixed()
+    {
+        var plan = ServerDropRules.Plan(7, EnumServerType.NVR_API, new IBaseDeviceModel[] { Speaker(1), Camera(2) });
+
+        Assert.True(plan.CanSend);
+        Assert.Equal(new[] { 2 }, plan.DeviceIds);
+        Assert.Equal(1, plan.Ineligible);
     }
 
     [Fact]
@@ -113,15 +148,35 @@ public class ServerDropRulesTests
     }
 
     [Fact]
-    public void should_require_confirmation_only_when_more_than_one_write_goes_out()
+    public void should_queue_instead_of_sending_when_more_than_one_write_goes_out()
     {
-        var one = ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1) });
-        var many = ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1), Speaker(2) });
-
-        Assert.False(one.NeedsConfirm);
-        Assert.True(many.NeedsConfirm);
-        Assert.Contains("2회", many.ConfirmText("방송서버"));
+        Assert.False(ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1) }).IsMultiCall);
+        Assert.True(ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1), Speaker(2) }).IsMultiCall);
+        Assert.Contains("2회", ServerDropRules.ConfirmText("방송서버", 2));
     }
+    #endregion
+
+    #region - 6.3 에서는 스피커만 -
+    [Fact]
+    public void should_refuse_a_camera_on_the_legacy_contract_even_though_the_server_allows_it()
+    {
+        var plan = ServerDropRules.Plan(7, EnumServerType.NVR_API, new[] { Camera(2) }, EnumServerContract.V6_3);
+
+        Assert.False(plan.CanSend);
+        Assert.Contains("6.3", plan.BlockReason);
+    }
+
+    [Fact]
+    public void should_still_allow_a_speaker_on_the_legacy_contract()
+        => Assert.True(ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1) }, EnumServerContract.V6_3).CanSend);
+
+    [Fact]
+    public void should_declare_which_categories_the_legacy_contract_can_send()
+    {
+        Assert.True(ServerDropRules.IsSupportedOnLegacy(EnumDeviceCategory.Speaker));
+        Assert.False(ServerDropRules.IsSupportedOnLegacy(EnumDeviceCategory.Camera));
+    }
+    #endregion
 
     [Fact]
     public void should_state_the_write_count_when_the_result_line_is_built()
@@ -142,7 +197,7 @@ public class ServerDropRulesTests
     {
         Assert.Equal(7, ServerDropRules.ServerIdOf(Speaker(1, serverId: 7)));
         Assert.Null(ServerDropRules.ServerIdOf(Speaker(1)));
-        Assert.Null(ServerDropRules.ServerIdOf(new CameraDeviceModel { Id = 4 }));
+        Assert.Null(ServerDropRules.ServerIdOf(Camera(4)));
         Assert.Null(ServerDropRules.ServerIdOf(null));
     }
 
