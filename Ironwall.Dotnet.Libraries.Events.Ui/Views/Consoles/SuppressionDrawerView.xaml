@@ -10,8 +10,10 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:sup="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression"
 	FontFamily="{DynamicResource MaterialDesignFont}"
+	AutomationProperties.AutomationId="Console.Suppression.Drawer"
 	Focusable="True"
-	PreviewKeyDown="OnPreviewKeyDown">
+	PreviewKeyDown="OnPreviewKeyDown"
+	Visibility="{Binding IsOpen, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
 	<!--
 		억제 편집 서랍 — 정본 window-layout-system-storyboard.html
 		L738-742(.slide CSS: 오른쪽 · width min(780px,94%) · 머리 44 / 본문 / 바닥 3단) ·
@@ -71,19 +73,19 @@
 		</Style>
 	</UserControl.Resources>
 
-	<!--  주입이 없으면(Suppression=null) 바인딩이 실패한다 — 그때 스크림이 화면을 덮지 않게 FallbackValue 를 명시한다  -->
-	<Grid Visibility="{Binding IsOpen, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+	<!--  '열림' 은 UserControl 의 Visibility 로 낸다 — 그래야 UIA 트리에 서랍이 '있다/없다' 로 보인다.
+	      (Border 는 peer 가 없어 앵커가 되지 못하고, 늘 보이는 UserControl 은 '열림' 을 뜻하지 못한다.)  -->
+	<Grid>
 
 		<!--  스크림 — 누르면 닫기를 '시도' 한다(미적용 변경이 있으면 막힌다)  -->
 		<Border
-			AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerScrim"
+			AutomationProperties.AutomationId="Console.Suppression.Drawer.Scrim"
 			Background="{DynamicResource ScrimModalBrush}"
 			MouseLeftButtonDown="OnScrimClick" />
 
 		<!--  서랍 본체 — 오른쪽에 붙는다. 폭 min(780, 창폭 − 24)  -->
 		<Border
 			HorizontalAlignment="Right"
-			AutomationProperties.AutomationId="Events.SuppressionSchedule.Drawer"
 			KeyboardNavigation.ControlTabNavigation="Cycle"
 			KeyboardNavigation.DirectionalNavigation="Contained"
 			KeyboardNavigation.TabNavigation="Cycle"
@@ -111,7 +113,7 @@
 						</Grid.ColumnDefinitions>
 						<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 							<TextBlock
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerTitle"
+								AutomationProperties.AutomationId="Console.Suppression.Drawer.Title"
 								FontSize="15"
 								FontWeight="SemiBold"
 								Foreground="{DynamicResource TextPrimaryBrush}"
@@ -129,7 +131,7 @@
 							Grid.Column="1"
 							Width="30"
 							Height="30"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerCloseButton"
+							AutomationProperties.AutomationId="Console.Suppression.Drawer.Close"
 							Click="OnClose"
 							Style="{StaticResource MaterialDesignIconButton}"
 							ToolTip="닫기 (Esc)">
@@ -157,7 +159,7 @@
 							<TextBlock Style="{StaticResource BoxLabel}" Text="작업명 *" />
 							<TextBox
 								Height="32"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.NameTextBox"
+								AutomationProperties.AutomationId="Console.Suppression.Form.Name"
 								FontSize="13"
 								Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								VerticalContentAlignment="Center" />
@@ -174,27 +176,27 @@
 								</Grid.ColumnDefinitions>
 								<ComboBox
 									Height="32"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetTypeComboBox"
+									AutomationProperties.AutomationId="Console.Suppression.Form.TargetType"
 									FontSize="13"
 									SelectedValue="{Binding TargetType, Mode=TwoWay}"
 									SelectedValuePath="Tag">
 									<ComboBoxItem
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetDeviceRadio"
+										AutomationProperties.AutomationId="Console.Suppression.Form.TargetType.Device"
 										Content="장비"
 										Tag="device" />
 									<ComboBoxItem
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetGroupRadio"
+										AutomationProperties.AutomationId="Console.Suppression.Form.TargetType.Group"
 										Content="그룹"
 										Tag="group" />
 									<ComboBoxItem
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetAllRadio"
+										AutomationProperties.AutomationId="Console.Suppression.Form.TargetType.All"
 										Content="전체 대상"
 										Tag="all" />
 								</ComboBox>
 								<ComboBox
 									Grid.Column="2"
 									Height="32"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.EventScopeComboBox"
+									AutomationProperties.AutomationId="Console.Suppression.Form.EventScope"
 									FontSize="13"
 									SelectedValue="{Binding EventScope, Mode=TwoWay}"
 									SelectedValuePath="Tag">
@@ -216,7 +218,7 @@
 									Text="감지 / 감시" />
 								<ComboBox
 									Height="32"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetSideComboBox"
+									AutomationProperties.AutomationId="Console.Suppression.Form.TargetSide"
 									FontSize="13"
 									SelectedValue="{Binding TargetSide, Mode=TwoWay}"
 									SelectedValuePath="Tag">
@@ -233,14 +235,14 @@
 							<StackPanel Orientation="Horizontal">
 								<RadioButton
 									Margin="0,0,12,0"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceOneShotRadio"
+									AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.OneShot"
 									Content="단발"
 									FontSize="13"
 									GroupName="SuppressionRecurrence"
 									IsChecked="{Binding IsOneShot, Mode=TwoWay}"
 									IsEnabled="{Binding CanEditRecurrence}" />
 								<RadioButton
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceWeeklyRadio"
+									AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.Weekly"
 									Content="주간 반복"
 									FontSize="13"
 									GroupName="SuppressionRecurrence"
@@ -249,7 +251,7 @@
 							</StackPanel>
 							<TextBlock
 								Margin="0,4,0,0"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceLockText"
+								AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.Lock"
 								FontSize="11.5"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{Binding RecurrenceLockText}"
@@ -268,7 +270,7 @@
 								<mah:DateTimePicker
 									MinHeight="36"
 									mah:TextBoxHelper.Watermark=""
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowStartPicker"
+									AutomationProperties.AutomationId="Console.Suppression.Form.WindowStart"
 									FontSize="12.5"
 									SelectedDateTime="{Binding WindowStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								<TextBlock
@@ -281,7 +283,7 @@
 									<mah:DateTimePicker
 										MinHeight="36"
 										mah:TextBoxHelper.Watermark=""
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowEndPicker"
+										AutomationProperties.AutomationId="Console.Suppression.Form.WindowEnd"
 										FontSize="12.5"
 										SelectedDateTime="{Binding WindowEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 										Visibility="{Binding IsUnlimited, Converter={StaticResource NotBoolToVis}}" />
@@ -293,7 +295,7 @@
 										<TextBlock
 											Margin="9,0"
 											VerticalAlignment="Center"
-											AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedPlaceholder"
+											AutomationProperties.AutomationId="Console.Suppression.Form.UnlimitedPlaceholder"
 											FontSize="12.5"
 											Foreground="{DynamicResource TextMutedBrush}"
 											Text="무제한 — 종료일 없음" />
@@ -302,7 +304,7 @@
 							</Grid>
 							<CheckBox
 								Margin="0,6,0,0"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedCheckBox"
+								AutomationProperties.AutomationId="Console.Suppression.Form.Unlimited"
 								Content="기간 제한 없음 (주간 반복 전용)"
 								FontSize="12"
 								IsChecked="{Binding IsUnlimited, Mode=TwoWay}"
@@ -314,50 +316,56 @@
 									Margin="0,14,0,3"
 									Style="{StaticResource BoxLabel}"
 									Text="요일 *" />
-								<StackPanel AutomationProperties.AutomationId="Events.SuppressionSchedule.DayStrip" Orientation="Horizontal">
+								<!--  StackPanel 은 자동화 peer 가 없어 앵커가 되지 못한다 — ItemsControl 로 담는다  -->
+								<ItemsControl AutomationProperties.AutomationId="Console.Suppression.Form.Days">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<StackPanel Orientation="Horizontal" />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Mon"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Mon"
 										Content="월"
 										IsChecked="{Binding IsMonChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Tue"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Tue"
 										Content="화"
 										IsChecked="{Binding IsTueChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Wed"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Wed"
 										Content="수"
 										IsChecked="{Binding IsWedChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Thu"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Thu"
 										Content="목"
 										IsChecked="{Binding IsThuChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Fri"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Fri"
 										Content="금"
 										IsChecked="{Binding IsFriChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sat"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Sat"
 										Content="토"
 										IsChecked="{Binding IsSatChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
 									<ToggleButton
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sun"
+										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Sun"
 										Content="일"
 										IsChecked="{Binding IsSunChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
-								</StackPanel>
+								</ItemsControl>
 
 								<TextBlock
 									Margin="0,14,0,3"
@@ -372,7 +380,7 @@
 									<mah:TimePicker
 										MinHeight="36"
 										mah:TextBoxHelper.Watermark=""
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyStartPicker"
+										AutomationProperties.AutomationId="Console.Suppression.Form.DailyStart"
 										FontSize="12.5"
 										IsEnabled="{Binding CanEditRecurrence}"
 										SelectedDateTime="{Binding DailyStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -386,7 +394,7 @@
 										Grid.Column="2"
 										MinHeight="36"
 										mah:TextBoxHelper.Watermark=""
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyEndPicker"
+										AutomationProperties.AutomationId="Console.Suppression.Form.DailyEnd"
 										FontSize="12.5"
 										IsEnabled="{Binding CanEditRecurrence}"
 										SelectedDateTime="{Binding DailyEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -400,7 +408,7 @@
 								Background="{DynamicResource SurfaceSunkenBrush}"
 								CornerRadius="5">
 								<TextBlock
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceSummaryText"
+									AutomationProperties.AutomationId="Console.Suppression.Form.Recap"
 									FontFamily="{DynamicResource MonoFont}"
 									FontSize="12"
 									Foreground="{DynamicResource TextPrimaryBrush}"
@@ -421,7 +429,7 @@
 									Foreground="{DynamicResource StatusCriticalBrush}"
 									Kind="HelpCircleOutline" />
 								<TextBlock
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.UnknownScopeText"
+									AutomationProperties.AutomationId="Console.Suppression.Form.UnknownScope"
 									FontSize="12"
 									Foreground="{DynamicResource StatusCriticalBrush}"
 									Text="{Binding UnknownScopeText}"
@@ -441,7 +449,7 @@
 									Foreground="{DynamicResource StatusCriticalBrush}"
 									Kind="AlertOutline" />
 								<TextBlock
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.FormErrorText"
+									AutomationProperties.AutomationId="Console.Suppression.Form.Error"
 									FontSize="12"
 									Foreground="{DynamicResource StatusCriticalBrush}"
 									Text="{Binding ErrorText}"
@@ -459,7 +467,7 @@
 									Foreground="{DynamicResource TextSecondaryBrush}"
 									Kind="InformationOutline" />
 								<TextBlock
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.OvernightNotice"
+									AutomationProperties.AutomationId="Console.Suppression.Form.Warning"
 									FontSize="12"
 									Foreground="{DynamicResource TextSecondaryBrush}"
 									Text="{Binding WarningText}"
@@ -479,7 +487,7 @@
 								<TextBlock
 									Margin="8,0,0,0"
 									VerticalAlignment="Center"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectedDeviceCountText"
+									AutomationProperties.AutomationId="Console.Suppression.Tray.Count"
 									DockPanel.Dock="Left"
 									FontFamily="{DynamicResource MonoFont}"
 									FontSize="11.5"
@@ -487,7 +495,7 @@
 									Text="{Binding TrayCountText}" />
 								<Button
 									Padding="8,1"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.ClearDevicesButton"
+									AutomationProperties.AutomationId="Console.Suppression.Tray.Clear"
 									Click="OnClearChips"
 									Content="모두 빼기"
 									DockPanel.Dock="Right"
@@ -500,13 +508,13 @@
 								Height="176"
 								drag:DropZone.Handler="{Binding Drop}"
 								drag:DropZone.Key="{x:Static sup:SuppressionTargetDrop.ZoneKey}"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.DeviceChipTray"
+								AutomationProperties.AutomationId="Console.Suppression.Tray.DropZone"
 								CornerRadius="6"
 								IsEnabled="{Binding AcceptsTargets}">
 								<Grid>
 									<ListBox
 										Padding="8"
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.GroupChipTray"
+										AutomationProperties.AutomationId="Console.Suppression.Tray"
 										Background="Transparent"
 										BorderThickness="0"
 										ItemsSource="{Binding Tray}"
@@ -535,7 +543,7 @@
 											<DataTemplate>
 												<Border
 													Padding="9,3,4,3"
-													AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.DeviceChip.{0}}"
+													AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.Chip.{0}}"
 													Background="{DynamicResource TintInfoBrush}"
 													CornerRadius="11"
 													ToolTip="{Binding Detail}">
@@ -550,7 +558,7 @@
 															Height="18"
 															Margin="5,0,0,0"
 															Padding="0"
-															AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.DeviceChipRemove.{0}}"
+															AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.ChipRemove.{0}}"
 															Click="OnRemoveChip"
 															Style="{StaticResource MaterialDesignIconButton}"
 															ToolTip="이 대상을 뺍니다 (Delete)">
@@ -569,7 +577,7 @@
 										Margin="12"
 										HorizontalAlignment="Left"
 										VerticalAlignment="Top"
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.AllTargetNoticeText"
+										AutomationProperties.AutomationId="Console.Suppression.Tray.EmptyHint"
 										FontSize="12"
 										Foreground="{DynamicResource TextMutedBrush}"
 										IsHitTestVisible="False"
@@ -585,6 +593,7 @@
 								Margin="0,8,0,0"
 								FontSize="12"
 								Foreground="{DynamicResource TextMutedBrush}"
+								AutomationProperties.AutomationId="Console.Suppression.Tray.AllTargetNotice"
 								Text="전체 대상 스케줄입니다 — 개별 장비 · 그룹을 담지 않습니다."
 								TextWrapping="Wrap"
 								Visibility="{Binding AcceptsTargets, Converter={StaticResource NotBoolToVis}}" />
@@ -609,7 +618,7 @@
 										Height="28"
 										Margin="8,0,0,0"
 										md:HintAssist.Hint="이름 검색"
-										AutomationProperties.AutomationId="Events.SuppressionSchedule.DevicePickerComboBox"
+										AutomationProperties.AutomationId="Console.Suppression.Picker.Search"
 										FontSize="12"
 										Text="{Binding PickerSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 										VerticalContentAlignment="Center" />
@@ -617,7 +626,7 @@
 
 								<ListBox
 									Height="190"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.GroupPickerComboBox"
+									AutomationProperties.AutomationId="Console.Suppression.Picker"
 									ItemsSource="{Binding PickerItems}"
 									PreviewKeyDown="OnPickerKeyDown"
 									SelectionMode="Extended">
@@ -634,7 +643,7 @@
 											<DockPanel LastChildFill="True">
 												<drag:DragHandle
 													Margin="0,0,6,0"
-													AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.PickerHandle.{0}}"
+													AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.PickerHandle.{0}}"
 													DockPanel.Dock="Left"
 													ToolTip="끌어서 위 대상 트레이에 담기" />
 												<TextBlock
@@ -658,7 +667,7 @@
 								<Button
 									Margin="0,8,0,0"
 									HorizontalAlignment="Right"
-									AutomationProperties.AutomationId="Events.SuppressionSchedule.AddTargetsButton"
+									AutomationProperties.AutomationId="Console.Suppression.Picker.Add"
 									Click="OnAddSelected"
 									Content="추가 ▶"
 									FontSize="12"
@@ -673,7 +682,7 @@
 				<Border
 					Grid.Row="2"
 					Padding="16,10"
-					AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerFooter"
+					AutomationProperties.AutomationId="Console.Suppression.Drawer.Footer"
 					BorderBrush="{DynamicResource DividerBrush}"
 					BorderThickness="0,1,0,0"
 					RenderTransformOrigin="0.5,0.5">
@@ -689,7 +698,7 @@
 						</Grid.ColumnDefinitions>
 						<TextBlock
 							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerStatusText"
+							AutomationProperties.AutomationId="Console.Suppression.Drawer.Status"
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="{Binding StatusLine}"
@@ -701,7 +710,7 @@
 							<Button
 								Margin="0,0,8,0"
 								Padding="14,3"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.ResetFormButton"
+								AutomationProperties.AutomationId="Console.Suppression.Drawer.Revert"
 								Click="OnRevert"
 								Content="되돌리기"
 								IsEnabled="{Binding CanRevert}"
@@ -710,13 +719,13 @@
 							<Button
 								Margin="0,0,8,0"
 								Padding="14,3"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerCancelButton"
+								AutomationProperties.AutomationId="Console.Suppression.Drawer.Cancel"
 								Click="OnClose"
 								Content="취소"
 								Style="{StaticResource MaterialDesignOutlinedButton}" />
 							<Button
 								Padding="16,3"
-								AutomationProperties.AutomationId="Events.SuppressionSchedule.CreateButton"
+								AutomationProperties.AutomationId="Console.Suppression.Drawer.Save"
 								Click="OnSave"
 								Content="저장"
 								IsEnabled="{Binding CanSave}"

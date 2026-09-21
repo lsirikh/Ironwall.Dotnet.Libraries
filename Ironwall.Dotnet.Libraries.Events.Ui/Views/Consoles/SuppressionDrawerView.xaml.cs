@@ -44,7 +44,7 @@ public partial class SuppressionDrawerView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _footer = FindByAutomationId(this, "Events.SuppressionSchedule.DrawerFooter");
+        _footer = FindByAutomationId(this, "Console.Suppression.Drawer.Footer");
         Hook(Model);
     }
 
@@ -82,7 +82,7 @@ public partial class SuppressionDrawerView : UserControl
         => Dispatcher.BeginInvoke(DispatcherPriority.Input, new System.Action(() =>
         {
             if (Model is not { IsOpen: true }) return;
-            var first = FindByAutomationId(this, "Events.SuppressionSchedule.NameTextBox");
+            var first = FindByAutomationId(this, "Console.Suppression.Form.Name");
             if (first is not null && first.Focusable) first.Focus();
             else Focus();
         }));
@@ -154,7 +154,7 @@ public partial class SuppressionDrawerView : UserControl
     private void AddPickerSelection()
     {
         if (Model is null) return;
-        var picker = FindByAutomationId(this, "Events.SuppressionSchedule.GroupPickerComboBox") as ListBox;
+        var picker = FindByAutomationId(this, "Console.Suppression.Picker") as ListBox;
         if (picker is null) return;
 
         var rows = picker.SelectedItems.Cast<object>().ToList();

@@ -4,14 +4,18 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:dash="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Dashboards"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	AutomationProperties.AutomationId="Console.Suppression.Panel"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		억제 스케줄 T1 목록 — 정본 window-layout-system-storyboard.html
 		L1048(폼이 위 → T1 + 서랍) · L1122 E-D7 · L2295-2300(예시 행) · L2313(상태 칩) · L2427-2428(열).
 
 		정본 열: 상태 · 작업명 · 대상 · 범위 · 시작(KST) · 종료(KST).
-		+ 반복 · 회차 · 취소 · 삭제 체크는 기존 억제창에 이미 있던 칸이라 그대로 가져온다
-		  (자동화 식별자 Events.SuppressionSchedule.Row* 가 살아 있어야 한다).
+		+ 반복 · 회차 · 취소 · 삭제 체크는 기존 억제창에 이미 있던 칸이라 그대로 가져온다.
+
+		자동화 식별자는 전부 Console.Suppression.* 다 — 옛 Events.SuppressionSchedule.* 를 그대로 쓰면
+		폐기 예정인 억제창(EventSuppressionSchedulePanelView)과 같은 이름이 두 화면에 동시에 살아
+		UIA 탐색이 어느 쪽을 잡을지 비결정적이 된다. 옛↔새 대응표는 호스트 후속 문서에 있다.
 
 		행 정렬 · 열 재정렬 없음 — 화면 순서와 저장 순서가 갈리면 뜻과 단언이 같이 무너진다.
 		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId 만.
@@ -25,9 +29,9 @@
 		</Style>
 	</UserControl.Resources>
 
-	<Grid AutomationProperties.AutomationId="Events.SuppressionSchedule.Panel">
+	<Grid>
 		<DataGrid
-			AutomationProperties.AutomationId="Events.SuppressionSchedule.ScheduleGrid"
+			AutomationProperties.AutomationId="Console.Suppression.Grid"
 		CanUserAddRows="False"
 		CanUserReorderColumns="False"
 		CanUserResizeRows="False"
@@ -49,7 +53,7 @@
 					<DataTemplate>
 						<CheckBox
 							HorizontalAlignment="Center"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.SelectAllCheckBox"
+							AutomationProperties.AutomationId="Console.Suppression.SelectAll"
 							IsChecked="{Binding DataContext.SelectAllDeletable, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
 							ToolTip="취소 · 종료된 행만 한꺼번에 고릅니다"
 							Visibility="{Binding DataContext.HasDeletableRows, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}" />
@@ -60,7 +64,7 @@
 						<CheckBox
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowSelectCheckBox.{0}}"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowSelect.{0}}"
 							IsChecked="{Binding IsSelected, Mode=TwoWay}"
 							ToolTip="삭제 대상으로 고릅니다(취소 · 종료 행만)"
 							Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVis}}" />
@@ -83,7 +87,7 @@
 								Kind="{Binding ShapeIconName, Converter={StaticResource IconKind}}" />
 							<TextBlock
 								VerticalAlignment="Center"
-								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowStatusText.{0}}"
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowStatus.{0}}"
 								FontSize="12"
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								Text="{Binding ShapeLabel}" />
@@ -134,14 +138,14 @@
 					<DataTemplate>
 						<StackPanel VerticalAlignment="Center">
 							<TextBlock
-								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowRecurrenceText.{0}}"
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowRepeat.{0}}"
 								FontSize="12"
 								Foreground="{DynamicResource TextSecondaryBrush}"
 								Text="{Binding RepeatText}"
 								ToolTip="{Binding RepeatText}"
 								TextTrimming="CharacterEllipsis" />
 							<TextBlock
-								AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowOccurrenceText.{0}}"
+								AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowOccurrence.{0}}"
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{Binding OccurrenceText}"
@@ -158,6 +162,7 @@
 							VerticalAlignment="Center"
 							FontSize="12"
 							Foreground="{DynamicResource TextPrimaryBrush}"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowStart.{0}}"
 							Text="{Binding WindowStartShort}"
 							ToolTip="{Binding WindowStartText}" />
 					</DataTemplate>
@@ -169,7 +174,7 @@
 					<DataTemplate>
 						<TextBlock
 							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowWindowEndText.{0}}"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowEnd.{0}}"
 							FontSize="12"
 							Foreground="{DynamicResource TextPrimaryBrush}"
 							Text="{Binding WindowEndShort}"
@@ -192,7 +197,7 @@
 							Padding="6,1"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowCancelButton.{0}}"
+							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowCancel.{0}}"
 							AutomationProperties.Name="취소 예약"
 							Click="OnCancelRow"
 							Content="취소"

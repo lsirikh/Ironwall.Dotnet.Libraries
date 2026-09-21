@@ -192,7 +192,7 @@
 						<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
 						<Button
 							Margin="0,0,6,0"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.CleanupAllButton"
+							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Cleanup"
 							Click="OnSuppressionCleanup"
 							Content="{Binding Suppression.CleanupText}"
 							FontSize="12"
