@@ -45,6 +45,8 @@ public partial class App : Application
         var snapshotAt = Array.IndexOf(e.Args, "--snapshot");
         var directory = snapshotAt >= 0 && snapshotAt + 1 < e.Args.Length ? e.Args[snapshotAt + 1] : null;
         var startDark = e.Args.Contains("--dark");
+        // N-08: 억제 스케줄 레일만 찍는다 — 이벤트 콘솔 기본 촬영은 그대로 둔다.
+        _suppression = e.Args.Contains("--suppression");
 
         try
         {
@@ -59,6 +61,7 @@ public partial class App : Application
             }
 
             _viewModel = Build();
+            _viewModel = Build(_suppression);
             _view = new EventDashboardView { DataContext = _viewModel };
             _window = new Window
             {
@@ -88,6 +91,7 @@ public partial class App : Application
 
     #region - Composition -
     private static EventDashboardViewModel Build()
+    private static EventDashboardViewModel Build(bool withSuppression)
     {
         var log = new PreviewLog();
         var events = new EventAggregator();
@@ -128,6 +132,9 @@ public partial class App : Application
             new EventInfoViewModel(deviceProvider, eventProvider, providerService, events, log),
             new CameraEventInfoViewModel(eventProvider, events, log),
             new DataChartPanelViewModel(events, log, providerService));
+            new DataChartPanelViewModel(events, log, providerService),
+            suppressionApi, suppressionDevices, suppressionGroups,
+            withSuppression ? new PreviewClock() : null);
     }
 
     /// <summary>가짜 서버 — 네 목록과 통계만 답한다. 나머지는 부르지 않는다.</summary>
@@ -188,12 +195,26 @@ public partial class App : Application
     private async Task RunSnapshotsAsync(string directory, bool startedDark)
     {
         await Shot(directory, startedDark ? "dark" : "light");
+        await ShotAll(directory, startedDark ? "dark" : "light");
 
         if (startedDark) return;        // 다크로 시작했으면 다크만 찍는다(호출부가 두 번 돌린다)
 
         ApplyDark();
         _window.Background = (Brush)FindResource("SurfaceBrush");
         await Shot(directory, "dark");
+        await ShotAll(directory, "dark");
+    }
+
+    /// <summary>억제 모드면 억제 상태만, 아니면 이벤트 콘솔 상태를 찍는다.</summary>
+    private async Task ShotAll(string directory, string theme)
+    {
+        if (!_suppression) { await Shot(directory, theme); return; }
+
+        SuppressionShots.AssertRailExists(_viewModel);
+        await SuppressionShots.RunAsync(
+            _viewModel, _window,
+            name => { Save(directory, $"{theme}-{name}"); return Task.CompletedTask; },
+            Settle);
     }
 
     private async Task Shot(string directory, string theme)
@@ -561,6 +582,14 @@ public partial class App : Application
                           [System.Runtime.CompilerServices.CallerFilePath] string filePath = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = 0)
             => Write("ERROR", msg);
+
+    private static bool _suppression;
+
+        // N-08: 억제 모드에서만 억제 API · 장비 · 그룹을 대 준다 —
+        //       안 대면 레일이 서지 않아 N-07 의 24장이 그대로 나온다.
+        var suppressionApi = withSuppression ? SuppressionShots.Api : null;
+        var suppressionDevices = withSuppression ? SuppressionPreviewData.Devices() : null;
+        var suppressionGroups = withSuppression ? SuppressionPreviewData.Groups(log) : null;
 
         private void Write(string level, string msg)
         {

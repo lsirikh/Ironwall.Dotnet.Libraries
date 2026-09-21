@@ -207,8 +207,9 @@
 		</Style>
 	</UserControl.Resources>
 
-	<c:ConsoleShell
-		ConsoleKey="Events"
+	<Grid>
+		<c:ConsoleShell
+			ConsoleKey="Events"
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Subtitle="{Binding Subtitle}"
 		Title="이벤트">
@@ -252,7 +253,7 @@
 			<c:ConsoleToolbar
 				AddClick="OnAdd"
 				AddDisabledReason="{Binding AddBlockedReason}"
-				AddText="추가"
+				AddText="{Binding AddButtonText}"
 				CanAdd="{Binding CanAdd}"
 				CanDelete="{Binding CanDelete}"
 				CanRefresh="{Binding CanReload}"
@@ -262,10 +263,38 @@
 				RefreshClick="OnReload"
 				SearchPlaceholder="장비 · 구역"
 				SearchText="{Binding SearchText, Mode=TwoWay}"
-				ShowSearch="{Binding IsListVisible}">
+				ShowSearch="{Binding ShowSearch}">
 				<c:ConsoleToolbar.Filters>
 					<StackPanel Orientation="Horizontal">
-						<ItemsControl AutomationProperties.AutomationId="Console.Events.Toolbar.Period" ItemsSource="{Binding PeriodOptions}">
+						<!--  억제 스케줄 상태 칩 (정본 SB L2313) — 기간 칩 대신 뜬다  -->
+						<ItemsControl
+							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Filter"
+							ItemsSource="{Binding Suppression.Filters}"
+							Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Orientation="Horizontal" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<RadioButton
+										Margin="0,0,4,0"
+										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Suppression.Filter.{0}}"
+										Click="OnSuppressionFilterClick"
+										Content="{Binding Label}"
+										FontSize="12"
+										GroupName="SuppressionFilter"
+										IsChecked="{Binding IsSelected, Mode=OneWay}"
+										Style="{StaticResource MaterialDesignTabRadioButton}" />
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+
+						<ItemsControl
+							AutomationProperties.AutomationId="Console.Events.Toolbar.Period"
+							ItemsSource="{Binding PeriodOptions}"
+							Visibility="{Binding ShowPeriodChips, Converter={StaticResource BoolToVis}}">
 							<ItemsControl.ItemsPanel>
 								<ItemsPanelTemplate>
 									<StackPanel Orientation="Horizontal" />
@@ -285,7 +314,7 @@
 						</ItemsControl>
 
 						<!--  직접 지정 — 드래그의 폴백이자 정확한 입력 수단  -->
-						<StackPanel Orientation="Horizontal" Visibility="{Binding IsCustomPeriod, Converter={StaticResource BoolToVis}}">
+						<StackPanel Orientation="Horizontal" Visibility="{Binding ShowCustomPeriod, Converter={StaticResource BoolToVis}}">
 							<mah:DateTimePicker
 								Width="170"
 								Margin="6,0,0,0"
@@ -328,6 +357,17 @@
 						Style="{StaticResource MaterialDesignOutlinedButton}"
 						ToolTip="이벤트가 났을 때 움직일 카메라 · 스피커 · 경광등을 정합니다"
 						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
+					<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
+					<Button
+						Margin="0,0,6,0"
+						AutomationProperties.AutomationId="Console.Suppression.Toolbar.Cleanup"
+						Click="OnSuppressionCleanup"
+						Content="{Binding Suppression.CleanupText}"
+						FontSize="11.5"
+						IsEnabled="{Binding Suppression.CanCleanupAll}"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="목록의 취소 · 종료 항목을 모두 지웁니다 — 되돌릴 수 없습니다"
+						Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}" />
 					<Button
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
 						Click="OnQueueSelection"
@@ -679,6 +719,10 @@
 					Hint="{Binding EmptyStateHint}"
 					Title="{Binding EmptyStateTitle}"
 					Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVis}}" />
+				<!--  억제 스케줄 T1 목록 (N-08) — 정렬 · 열 재정렬 없음  -->
+				<views:SuppressionListView
+					DataContext="{Binding Suppression}"
+					Visibility="{Binding DataContext.IsSuppressionRail, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}" />
 			</Grid>
 			</DockPanel>
 		</c:ConsoleShell.List>
@@ -718,7 +762,8 @@
 
 		<!--  상세 — 여섯 상태 + 고정 적용 막대  -->
 		<c:ConsoleShell.Detail>
-			<c:ConsoleDetailHost
+			<Grid>
+				<c:ConsoleDetailHost
 				ApplyClick="OnApply"
 				ApplyText="{Binding Detail.ApplyText}"
 				Banner="{Binding DetailView.BannerText}"
@@ -735,9 +780,38 @@
 				ShakeToken="{Binding Detail.ShakeToken}"
 				ShowButtons="{Binding Detail.ShowButtons}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
-				Title="{Binding Detail.Title}">
-				<views:EventDetailView DataContext="{Binding DetailView}" />
-			</c:ConsoleDetailHost>
+				Title="{Binding Detail.Title}"
+				Visibility="{Binding IsSuppressionRail, Converter={StaticResource NotBoolToVis}}">
+					<views:EventDetailView DataContext="{Binding DetailView}" />
+				</c:ConsoleDetailHost>
+
+				<!--  억제 스케줄 상세 (정본 SB L2734-2740) — 동작은 상세 안에 있다([수정] [취소 예약])  -->
+				<c:ConsoleDetailHost
+					ApplyClick="OnSuppressionEdit"
+					ApplyText="수정"
+					CanApply="{Binding Suppression.CanEditSelected}"
+					CanRevert="{Binding Suppression.CanCancelSelected}"
+					ConsoleKey="Suppression"
+					DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+					FooterText="{Binding Suppression.StatusText}"
+					Kind="{Binding Suppression.DetailKind}"
+					RevertClick="OnSuppressionCancelBooking"
+					RevertText="취소 예약"
+					ShowButtons="{Binding Suppression.HasSelection}"
+					ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+					Title="{Binding Suppression.DetailTitle}"
+					Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}">
+					<views:SuppressionDetailView DataContext="{Binding Suppression}" />
+				</c:ConsoleDetailHost>
+			</Grid>
 		</c:ConsoleShell.Detail>
-	</c:ConsoleShell>
+		</c:ConsoleShell>
+
+		<!--  억제 편집 서랍 — 같은 창 안 780 오버레이(정본 SB L1028 · L1122 E-D7).
+				 윈도 머리띠(40)는 덮지 않는다 — 스크림은 몸통만 가린다.  -->
+		<views:SuppressionDrawerView
+			Margin="0,40,0,0"
+			Panel.ZIndex="20"
+			DataContext="{Binding Suppression.Drawer}" />
+	</Grid>
 </UserControl>

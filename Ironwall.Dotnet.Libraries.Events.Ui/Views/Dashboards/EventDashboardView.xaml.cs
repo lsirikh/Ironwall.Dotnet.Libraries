@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
+﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using MaterialDesignThemes.Wpf;
 using System;
 using System.Globalization;
@@ -69,6 +70,22 @@ public partial class EventDashboardView : UserControl
     private void OnApply(object sender, RoutedEventArgs e) => Model?.Apply();
 
     private void OnRevert(object sender, RoutedEventArgs e) => Model?.Revert();
+
+    /// <summary>억제 목록의 상태 칩(정본 SB L2313).</summary>
+    private void OnSuppressionFilterClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SuppressionFilterOption option } && Model?.Suppression is { } console)
+            console.FilterKey = option.Key;
+    }
+
+    /// <summary>억제 목록의 [모두 정리] — 확인 팝업이 먼저 뜬다.</summary>
+    private void OnSuppressionCleanup(object sender, RoutedEventArgs e) => Model?.CleanupSuppression();
+
+    /// <summary>상세 적용 막대의 [수정] — 같은 창 안 780 서랍을 연다(서버 호출 없음).</summary>
+    private void OnSuppressionEdit(object sender, RoutedEventArgs e) => _ = Model?.Suppression?.EditSelectedAsync();
+
+    /// <summary>상세 적용 막대의 [취소 예약] — 확인 팝업이 먼저 뜬다.</summary>
+    private void OnSuppressionCancelBooking(object sender, RoutedEventArgs e) => _ = Model?.Suppression?.CancelSelectedAsync();
 
     // N-13 mapping workbench
     private void OnOpenMappingWorkbench(object sender, RoutedEventArgs e) => _ = Model?.OpenMappingWorkbenchAsync();
