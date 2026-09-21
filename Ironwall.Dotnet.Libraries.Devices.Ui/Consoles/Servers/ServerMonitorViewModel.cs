@@ -1,8 +1,11 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
-using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -29,16 +32,18 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 /// <summary>배정 트레이의 칩 하나 — 끌어서 서버 행에 놓는다.</summary>
 public sealed class ServerAssignCandidateViewModel : PropertyChangedBase
 {
-    public ServerAssignCandidateViewModel(ISpeakerDeviceModel model)
+    public ServerAssignCandidateViewModel(IBaseDeviceModel model, string categoryLabel, string serverText)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
-        Name = string.IsNullOrWhiteSpace(model.DeviceName) ? $"스피커 {model.Id}" : model.DeviceName!;
-        ServerText = model.Server is { Id: > 0 } server && !string.IsNullOrWhiteSpace(server.Name) ? server.Name : "서버 없음";
+        Name = string.IsNullOrWhiteSpace(model.DeviceName) ? $"장비 {model.Id}" : model.DeviceName!;
+        CategoryLabel = categoryLabel;
+        ServerText = serverText;
     }
 
-    public ISpeakerDeviceModel Model { get; }
+    public IBaseDeviceModel Model { get; }
     public int Id => Model.Id;
     public string Name { get; }
+    public string CategoryLabel { get; }
     public string ServerText { get; }
     public override string ToString() => Name;
 }
@@ -47,11 +52,9 @@ public sealed class ServerAssignCandidateViewModel : PropertyChangedBase
 /// 서버 모니터 — 레일(유형별 + 시스템 이벤트) · 목록 + 지표 띠 · 상세 340.
 /// </summary>
 /// <remarks>
-/// <para>정본: <c>window-layout-system-storyboard.html</c> L1330-1365 · 드래그 와이어프레임 L368-372.</para>
-/// <para><b>이 콘솔은 상태를 쓰지 않는다.</b> 상태는 관측 값이고 보고 입구는 서버 매니저의 것이다 —
-/// 우리 쓰기는 ① 서버 설정 <c>PATCH</c> ② 등록 <c>POST</c> ③ 스피커 배정 <c>PATCH</c> 셋뿐이다.</para>
-/// <para>싱글턴이다 — 닫을 때 선택 · 미적용 변경 · 구독을 전부 내려놓는다. 주기 타이머를 두지 않는다
-/// (뷰보다 오래 사는 타이머는 싱글턴에 붙박이고, 경과 시간은 애초에 생존 판정이 아니다).</para>
+/// <para>정본: <c>window-layout-system-storyboard.html</c> L1330-1365 · 드래그 와이어프레임 L368-372 · L432.</para>
+/// <para><b>이 콘솔은 상태를 쓰지 않는다.</b> 상태는 관측 값이고 보고 입구는 서버 매니저의 것이다.</para>
+/// <para>싱글턴이다 — 닫을 때 선택 · 미적용 변경 · 구독을 전부 내려놓고, <b>돌고 있던 상세 적재를 취소</b>한다.</para>
 /// </remarks>
 public class ServerMonitorViewModel : Screen
 {
@@ -75,7 +78,9 @@ public class ServerMonitorViewModel : Screen
 
         DisplayName = "서버";
         Detail = new ConsoleDetailPresenter { TypeName = "서버" };
-        Assign = new ServerAssignHandler(_service, () => _devices.OfType<IBaseDeviceModel>(), DialogsOrNull(), log);
+        Tray = new DraftTrayViewModel();
+        Assign = new ServerAssignHandler(_service, () => _devices.OfType<IBaseDeviceModel>(), Tray, DialogsOrNull(), log);
+        Assign.DragProbeRequested += OnDragProbe;
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         Rows = new ObservableCollection<ServerRowViewModel>();
@@ -99,8 +104,8 @@ public class ServerMonitorViewModel : Screen
         Detail.Guard.Blocked += OnNavigationBlocked;
 
         Columns = ServerColumnCatalog.For(_service.IsUnitEra);
-        NotifyOfPropertyChange(nameof(Columns));
-        NotifyOfPropertyChange(nameof(IsUnitEra));
+        foreach (var name in new[] { nameof(Columns), nameof(IsUnitEra), nameof(IsAxisEra), nameof(LastChangeNote) })
+            NotifyOfPropertyChange(name);
 
         RefreshCandidates();
         await ReloadAsync(cancellationToken).ConfigureAwait(true);
@@ -112,19 +117,25 @@ public class ServerMonitorViewModel : Screen
         Assign.Completed -= OnAssignCompleted;
         Detail.Guard.Blocked -= OnNavigationBlocked;
 
+        // 돌고 있던 상세 적재를 끊는다 — 닫힌 싱글턴에 늦은 응답이 들어차면 다음에 열 때 남의 값이 보인다.
+        CancelDetailLoad();
+        _generation++;
+
         Rows.Clear();
         MetricCells.Clear();
         AssignCandidates.Clear();
+        Tray.Revert();
         _all = Array.Empty<ServerRowViewModel>();
         _selected = new List<ServerRowViewModel>();
-        _detailDto = null;
-        _draft = new ServerEditDraft();
+        _detail = null;
+        _intent = new ServerWriteIntent();
         _lastUndo = null;
         IsEditing = false;
         SearchText = string.Empty;
         StatusText = string.Empty;
         Detail.Reset();
         NotifyOfPropertyChange(nameof(CanUndoAssign));
+        NotifyOfPropertyChange(nameof(HasDetail));
 
         await base.OnDeactivateAsync(close, cancellationToken).ConfigureAwait(true);
     }
@@ -157,10 +168,8 @@ public class ServerMonitorViewModel : Screen
         ClearSelection();
         ApplyFilter();
 
-        NotifyOfPropertyChange(nameof(SelectedRail));
-        NotifyOfPropertyChange(nameof(IsServerList));
-        NotifyOfPropertyChange(nameof(IsSystemEvents));
-        NotifyOfPropertyChange(nameof(CanAdd));
+        foreach (var name in new[] { nameof(SelectedRail), nameof(IsServerList), nameof(IsSystemEvents), nameof(CanAdd) })
+            NotifyOfPropertyChange(name);
         RefreshStatus();
         return true;
     }
@@ -201,12 +210,17 @@ public class ServerMonitorViewModel : Screen
 
     public IReadOnlyList<ServerColumnSpec> Columns { get; private set; }
 
-    /// <summary>지금 칸이 서버 목록인가 — "시스템 이벤트" 는 목록이 아니다.</summary>
     public bool IsServerList => ServerTypeCatalog.IsServerList(_railKey);
     public bool IsSystemEvents => !IsServerList;
 
-    /// <summary>부대 편제(8.0 이상)를 쓸 수 있는가 — 부대 필터 · "부대" 열의 게이트.</summary>
+    /// <summary>부대 편제(8.0 이상)를 쓸 수 있는가.</summary>
     public bool IsUnitEra => _service.IsUnitEra;
+
+    /// <summary>축 계약(7.0 이상)인가 — 모드 절 · 해제 · 전 카테고리 배정의 게이트.</summary>
+    public bool IsAxisEra => _service.IsAxisEra;
+
+    /// <summary>"마지막 변화" 칸의 설명 — 6.3 에는 전이 시각이 없다는 사실을 화면이 말한다.</summary>
+    public string LastChangeNote => IsAxisEra ? string.Empty : ServerStatusRules.NoTransitionClockNote;
 
     public string SearchText
     {
@@ -224,12 +238,17 @@ public class ServerMonitorViewModel : Screen
 
     public ObservableCollection<ServerUnitOption> UnitOptions { get; }
 
+    /// <summary>
+    /// 부대 필터. 미적용 변경이 있으면 <b>되돌린다</b> — 콤보만 바뀌고 목록은 그대로인 상태를 만들지 않는다.
+    /// </summary>
     public ServerUnitOption? SelectedUnit
     {
         get => _selectedUnit;
         set
         {
             if (ReferenceEquals(_selectedUnit, value)) return;
+            if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) { NotifyOfPropertyChange(); return; }
+
             _selectedUnit = value;
             NotifyOfPropertyChange();
             _ = ReloadAsync(CancellationToken.None);
@@ -243,6 +262,8 @@ public class ServerMonitorViewModel : Screen
         set
         {
             if (_includeDescendants == value) return;
+            if (!Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) { NotifyOfPropertyChange(); return; }
+
             _includeDescendants = value;
             NotifyOfPropertyChange();
             if (_selectedUnit is not null) _ = ReloadAsync(CancellationToken.None);
@@ -265,6 +286,11 @@ public class ServerMonitorViewModel : Screen
     public string SystemEventsNote =>
         "시스템 이벤트 입구가 이 판의 서버 API 에 없습니다 — 받은 것이 없어 목록을 그리지 않습니다. "
         + "서버가 경로를 내면 이 칸과 상세의 '최근 시스템 이벤트' 가 같은 자료를 씁니다.";
+
+    /// <summary>생존 신호 — 스토리보드 L1357 이 말한 "NATS 수신 간격 등 별도 신호". 아직 연결된 것이 없다.</summary>
+    public string LivenessNote =>
+        "생존 신호: 이 콘솔에 연결된 신호가 없습니다 — REST 로는 살아 있는지 판정하지 않습니다. "
+        + "NATS 수신 간격 같은 별도 신호가 붙어야 생존을 말할 수 있습니다.";
 
     private void ApplyFilter()
     {
@@ -320,17 +346,18 @@ public class ServerMonitorViewModel : Screen
         }
     }
 
-    /// <summary>실제 적재 — 바쁨 판정을 하지 않는다(적용 뒤 재조회처럼 이미 바쁜 자리에서도 부른다).</summary>
     private async Task LoadCoreAsync(CancellationToken token)
     {
         try
         {
             var result = await _service.LoadAsync(
-                IsUnitEra ? _selectedUnit?.Id : null,
-                _includeDescendants,
-                token).ConfigureAwait(true);
+                IsUnitEra ? _selectedUnit?.Id : null, _includeDescendants, token).ConfigureAwait(true);
 
-            _all = result.Servers.Select(entry => new ServerRowViewModel(entry, _clock)).ToList();
+            var unitNames = result.Units.ToDictionary(u => u.Id, u => u.Name);
+            _all = result.Servers
+                .Select(view => new ServerRowViewModel(view, _service.Contract, _clock,
+                    view.UnitId is { } id && unitNames.TryGetValue(id, out var name) ? name : null))
+                .ToList();
 
             SyncOptions(UnitOptions, result.Units);
             SyncOptions(CategoryOptions, result.Categories);
@@ -339,10 +366,9 @@ public class ServerMonitorViewModel : Screen
             ApplyFilter();
             RefreshRailCounts();
             RefreshStatus();
-            NotifyOfPropertyChange(nameof(CanAdd));     // 분류가 들어와야 [추가] 가 켜진다
+            NotifyOfPropertyChange(nameof(CanAdd));
 
-            StatusText = result.Message
-                ?? (result.IsTruncated ? "서버가 총계를 주지 않아 목록이 끊겼을 수 있습니다 — 첫 페이지만 보입니다" : StatusText);
+            if (result.Message is not null) StatusText = result.Message;
         }
         catch (OperationCanceledException) { /* 화면을 닫는 중이다 */ }
         catch (Exception ex)
@@ -354,7 +380,6 @@ public class ServerMonitorViewModel : Screen
 
     private static void SyncOptions<T>(ObservableCollection<T> target, IReadOnlyList<T> source)
     {
-        // 묶인 목록은 비우고 채우지 않는다 — 콤보의 선택이 사라진다.
         for (var i = target.Count - 1; i >= 0; i--)
             if (!source.Contains(target[i])) target.RemoveAt(i);
         foreach (var item in source)
@@ -364,6 +389,9 @@ public class ServerMonitorViewModel : Screen
 
     #region - Selection · Detail -
     public ConsoleDetailPresenter Detail { get; }
+
+    /// <summary>상세에 그릴 것이 있는가 — 없으면 <b>빈 편집 폼을 그리지 않는다</b>.</summary>
+    public bool HasDetail => _detail is not null || Detail.IsCreating;
 
     /// <summary>뷰가 알린 선택 변경. 막혔으면 false — 뷰가 선택을 되돌린다.</summary>
     public bool OnRowsSelected(IList? selected)
@@ -379,15 +407,12 @@ public class ServerMonitorViewModel : Screen
         Detail.SingleTitle = rows.Count == 1 ? rows[0].Name : string.Empty;
         Detail.SingleNumber = rows.Count == 1 ? rows[0].Id.ToString(CultureInfo.InvariantCulture) : string.Empty;
 
-        // 커널의 ReadOnly 상태는 쓰지 않는다 — 그 배너 문구가 "편집 권한이 없어" 라 여기서는 거짓말이 된다.
-        // 칸을 잠그는 것은 IsEditing 이고, 상세 상태는 Single/Multiple 그대로 둔다.
+        // 커널의 ReadOnly 상태는 쓰지 않는다 — 그 배너가 "편집 권한이 없어" 라 여기서는 거짓말이 된다.
         Detail.IsReadOnly = false;
 
         _ = LoadDetailAsync(rows.Count == 1 ? rows[0] : null);
-        NotifyOfPropertyChange(nameof(SelectedRow));
-        NotifyOfPropertyChange(nameof(CanBeginEdit));
-        NotifyOfPropertyChange(nameof(CanShowHistory));
-        NotifyOfPropertyChange(nameof(CanAssignSelection));
+        foreach (var name in new[] { nameof(SelectedRow), nameof(CanBeginEdit), nameof(CanShowHistory), nameof(CanAssignSelection), nameof(HasDetail) })
+            NotifyOfPropertyChange(name);
         return true;
     }
 
@@ -395,29 +420,65 @@ public class ServerMonitorViewModel : Screen
 
     public IReadOnlyList<ServerRowViewModel> SelectedRows => _selected;
 
+    /// <summary>
+    /// 상세 적재. <b>세대 번호</b>와 <b>선택별 취소</b>로 늦은 응답을 버린다 — A 를 고르고 곧바로 B 를 고르면
+    /// A 의 응답이 B 의 상세에 들어앉아 편집 기준선까지 오염된다.
+    /// </summary>
     private async Task LoadDetailAsync(ServerRowViewModel? row)
     {
-        _detailDto = null;
-        _draft = new ServerEditDraft();
+        CancelDetailLoad();
+        var generation = ++_generation;
+        var cts = _detailCts = new CancellationTokenSource();
+
+        _detail = null;
+        _intent = new ServerWriteIntent();
         MetricCells.Clear();
         OperationModeText = string.Empty;
         NotifyAllFields();
 
-        if (row is null) { NotifyOfPropertyChange(nameof(IsMetricBandVisible)); return; }
+        if (row is null)
+        {
+            NotifyOfPropertyChange(nameof(IsMetricBandVisible));
+            NotifyOfPropertyChange(nameof(HasDetail));
+            return;
+        }
 
-        var dto = await _service.GetAsync(row.Id, CancellationToken.None).ConfigureAwait(true);
-        _detailDto = dto ?? row.Dto;
+        try
+        {
+            var view = await _service.GetAsync(row.Id, cts.Token).ConfigureAwait(true);
+            if (generation != _generation) return;
+            _detail = view ?? row.View;
 
-        var metric = await _service.LatestMetricAsync(row.Id, CancellationToken.None).ConfigureAwait(true);
-        foreach (var cell in ServerMetricBand.Band(metric)) MetricCells.Add(cell);
+            var metric = await _service.LatestMetricAsync(row.Id, cts.Token).ConfigureAwait(true);
+            if (generation != _generation) return;
+            foreach (var cell in ServerMetricBand.Band(metric)) MetricCells.Add(cell);
 
-        var (proxy, note) = await _service.OperationModeAsync(row.Id, CancellationToken.None).ConfigureAwait(true);
-        OperationModeText = proxy is not null
-            ? $"{proxy.OperationMode} · {proxy.WindyMode}"
-            : note ?? string.Empty;
+            if (!IsAxisEra)
+            {
+                var (proxy, _) = await _service.LegacyOperationModeAsync(row.Id, cts.Token).ConfigureAwait(true);
+                if (generation != _generation) return;
+                OperationModeText = proxy is not null ? $"{proxy.OperationMode} · {proxy.WindyMode}" : "—";
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ServerConsole] 상세 적재 실패 — {ex.Message}");
+        }
 
+        if (generation != _generation) return;
         NotifyAllFields();
         NotifyOfPropertyChange(nameof(IsMetricBandVisible));
+        NotifyOfPropertyChange(nameof(HasDetail));
+    }
+
+    private void CancelDetailLoad()
+    {
+        var cts = _detailCts;
+        _detailCts = null;
+        if (cts is null) return;
+        try { cts.Cancel(); } catch (ObjectDisposedException) { }
+        cts.Dispose();
     }
 
     /// <summary>선택한 한 대가 있을 때만 지표 띠가 뜬다(스토리보드 L1345).</summary>
@@ -425,92 +486,113 @@ public class ServerMonitorViewModel : Screen
 
     public ObservableCollection<ServerMetricCell> MetricCells { get; }
 
-    /// <summary>지표가 하나도 없을 때 띠 자리에 적는 한 줄.</summary>
     public string MetricNote => "서버가 보낸 계측만 그립니다 — 임계 배지는 서버가 판정해 보낸 것만 뜹니다.";
     #endregion
 
     #region - Detail fields -
     public string NameText
     {
-        get => Field(_draft.Name, _detailDto?.Name);
-        set => SetField(v => _draft.Name = v, value, _detailDto?.Name, ServerRequestBuilder.NameKey, nameof(NameText));
+        get => _intent.Name ?? _detail?.Name ?? string.Empty;
+        set => SetText(v => _intent.Name = v, value, _detail?.Name, ServerRequestBuilder.NameKey, nameof(NameText));
     }
 
     public string IpText
     {
-        get => Field(_draft.IpAddress, _detailDto?.IpAddress);
-        set => SetField(v => _draft.IpAddress = v, value, _detailDto?.IpAddress, ServerRequestBuilder.IpKey, nameof(IpText));
+        get => _intent.IpAddress ?? _detail?.IpAddress ?? string.Empty;
+        set => SetText(v => _intent.IpAddress = v, value, _detail?.IpAddress, ServerRequestBuilder.IpKey, nameof(IpText));
     }
 
+    /// <summary>호스트명 — 비우면 <b>지운다</b>(축 계약). 6.3 에서는 검사에서 막는다.</summary>
     public string HostnameText
     {
-        get => Field(_draft.Hostname, _detailDto?.Hostname);
-        set => SetField(v => _draft.Hostname = v, value, _detailDto?.Hostname, "hostname", nameof(HostnameText));
+        get => _intent.ClearHostname ? string.Empty : _intent.Hostname ?? _detail?.Hostname ?? string.Empty;
+        set => SetClearable(
+            text => { _intent.Hostname = text; _intent.ClearHostname = false; },
+            () => { _intent.Hostname = null; _intent.ClearHostname = true; },
+            value, _detail?.Hostname, ServerRequestBuilder.HostnameKey, nameof(HostnameText));
     }
 
     public string UserNameText
     {
-        get => Field(_draft.UserName, _detailDto?.UserName);
-        set => SetField(v => _draft.UserName = v, value, _detailDto?.UserName, "user_name", nameof(UserNameText));
+        get => _intent.ClearUserName ? string.Empty : _intent.UserName ?? _detail?.UserName ?? string.Empty;
+        set => SetClearable(
+            text => { _intent.UserName = text; _intent.ClearUserName = false; },
+            () => { _intent.UserName = null; _intent.ClearUserName = true; },
+            value, _detail?.UserName, ServerRequestBuilder.UserNameKey, nameof(UserNameText));
     }
 
     public string PortText
     {
-        get => (_draft.Port ?? _detailDto?.Port ?? 0).ToString(CultureInfo.InvariantCulture);
+        get => (_intent.Port ?? _detail?.Port ?? 0) is var port && port == 0 && _detail is null ? string.Empty : (_intent.Port ?? _detail?.Port ?? 0).ToString(CultureInfo.InvariantCulture);
         set
         {
             var parsed = int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var port) ? port : (int?)null;
-            _draft.Port = parsed;
-            Detail.Tracker.Touch(ServerRequestBuilder.PortKey, _detailDto?.Port, parsed);
+            _intent.Port = parsed;
+            Detail.Tracker.Touch(ServerRequestBuilder.PortKey, _detail?.Port, parsed);
             NotifyOfPropertyChange();
             NotifyTouchFlags();
         }
     }
 
     /// <summary>
-    /// 새 비밀번호. <b>읽으면 언제나 빈 글자</b>다 — 서버가 준 값을 화면에 되비추지 않고 로그 · 자동화 · 미리보기에도 남기지 않는다.
+    /// 새 비밀번호. <b>읽으면 언제나 빈 글자</b>다 — 서버가 준 값을 화면에 되비추지 않고
+    /// 로그 · 자동화 · 미리보기에도 남기지 않는다.
     /// </summary>
     public string PasswordText
     {
         get => string.Empty;
         set
         {
-            _draft.NewPassword = string.IsNullOrEmpty(value) ? null : value;
-            Detail.Tracker.Touch("user_password", null, _draft.NewPassword is null ? null : "(변경)", hasOriginal: false);
+            _intent.NewPassword = string.IsNullOrEmpty(value) ? null : value;
+            Detail.Tracker.Touch("user_password", null, _intent.NewPassword is null ? null : "(변경)", hasOriginal: false);
             NotifyOfPropertyChange(nameof(PasswordNote));
             NotifyTouchFlags();
         }
     }
 
-    public string PasswordNote => _draft.NewPassword is null ? "비워 두면 바꾸지 않습니다" : "저장할 때 바뀝니다";
+    public string PasswordNote => _intent.NewPassword is null ? "비워 두면 바꾸지 않습니다" : "저장할 때 바뀝니다";
 
-    public string CpuWarningText { get => Threshold(_draft.CpuWarning, "cpu", "warning"); set => SetThreshold(v => _draft.CpuWarning = v, value, "cpu", "warning", nameof(CpuWarningText)); }
-    public string CpuCriticalText { get => Threshold(_draft.CpuCritical, "cpu", "critical"); set => SetThreshold(v => _draft.CpuCritical = v, value, "cpu", "critical", nameof(CpuCriticalText)); }
-    public string RamWarningText { get => Threshold(_draft.RamWarning, "ram", "warning"); set => SetThreshold(v => _draft.RamWarning = v, value, "ram", "warning", nameof(RamWarningText)); }
-    public string RamCriticalText { get => Threshold(_draft.RamCritical, "ram", "critical"); set => SetThreshold(v => _draft.RamCritical = v, value, "ram", "critical", nameof(RamCriticalText)); }
-    public string DiskWarningText { get => Threshold(_draft.DiskWarning, "disk", "warning"); set => SetThreshold(v => _draft.DiskWarning = v, value, "disk", "warning", nameof(DiskWarningText)); }
-    public string DiskCriticalText { get => Threshold(_draft.DiskCritical, "disk", "critical"); set => SetThreshold(v => _draft.DiskCritical = v, value, "disk", "critical", nameof(DiskCriticalText)); }
-    public string NetworkWarningText { get => Threshold(_draft.NetworkWarningMbps, "network", "warning_mbps"); set => SetThreshold(v => _draft.NetworkWarningMbps = v, value, "network", "warning_mbps", nameof(NetworkWarningText)); }
-    public string NetworkCriticalText { get => Threshold(_draft.NetworkCriticalMbps, "network", "critical_mbps"); set => SetThreshold(v => _draft.NetworkCriticalMbps = v, value, "network", "critical_mbps", nameof(NetworkCriticalText)); }
+    /// <summary>6.3 에서 비우기가 막힌다는 사실을 칸 주석으로 먼저 말한다.</summary>
+    public string ClearableNote => IsAxisEra ? "비우면 서버에서 지워집니다" : ServerRequestBuilder.CannotClear("이 값");
 
-    /// <summary>손댄 칸 표지 — 칸 왼쪽에 경고색 줄이 선다(색이 아니라 <b>형태</b>).</summary>
-    public bool IsNameTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.NameKey);
-    public bool IsIpTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.IpKey);
-    public bool IsPortTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.PortKey);
-    public bool IsHostnameTouched => Detail.Tracker.IsTouched("hostname");
-    public bool IsUserNameTouched => Detail.Tracker.IsTouched("user_name");
-    public bool IsPasswordTouched => Detail.Tracker.IsTouched("user_password");
+    public string CpuWarningText { get => Threshold(_intent.CpuWarning, "cpu", "warning"); set => SetThreshold(v => _intent.CpuWarning = v, value, "cpu", "warning", nameof(CpuWarningText)); }
+    public string CpuCriticalText { get => Threshold(_intent.CpuCritical, "cpu", "critical"); set => SetThreshold(v => _intent.CpuCritical = v, value, "cpu", "critical", nameof(CpuCriticalText)); }
+    public string RamWarningText { get => Threshold(_intent.RamWarning, "ram", "warning"); set => SetThreshold(v => _intent.RamWarning = v, value, "ram", "warning", nameof(RamWarningText)); }
+    public string RamCriticalText { get => Threshold(_intent.RamCritical, "ram", "critical"); set => SetThreshold(v => _intent.RamCritical = v, value, "ram", "critical", nameof(RamCriticalText)); }
+    public string DiskWarningText { get => Threshold(_intent.DiskWarning, "disk", "warning"); set => SetThreshold(v => _intent.DiskWarning = v, value, "disk", "warning", nameof(DiskWarningText)); }
+    public string DiskCriticalText { get => Threshold(_intent.DiskCritical, "disk", "critical"); set => SetThreshold(v => _intent.DiskCritical = v, value, "disk", "critical", nameof(DiskCriticalText)); }
+    public string NetworkWarningText { get => Threshold(_intent.NetworkWarningMbps, "network", "warning_mbps"); set => SetThreshold(v => _intent.NetworkWarningMbps = v, value, "network", "warning_mbps", nameof(NetworkWarningText)); }
+    public string NetworkCriticalText { get => Threshold(_intent.NetworkCriticalMbps, "network", "critical_mbps"); set => SetThreshold(v => _intent.NetworkCriticalMbps = v, value, "network", "critical_mbps", nameof(NetworkCriticalText)); }
 
-    /// <summary>운용 모드 — 6.3 이면 프록시 설정, 그 위면 "server_config 로 이관됐다" 는 안내.</summary>
+    /// <summary>운용 모드(7.0+ <c>server_config.modes</c>) — PROXY 서버만 갖는다.</summary>
+    public bool HasModesSection => IsAxisEra && SelectedRow?.Type == EnumServerType.PROXY;
+
+    public string OperationModeValue
+    {
+        get => _intent.OperationMode ?? ServerRequestBuilder.ReadMode(_detail?.Modes, "operation_mode") ?? string.Empty;
+        set { _intent.OperationMode = string.IsNullOrWhiteSpace(value) ? null : value; Touch("modes.operation_mode", ServerRequestBuilder.ReadMode(_detail?.Modes, "operation_mode"), _intent.OperationMode, nameof(OperationModeValue)); }
+    }
+
+    public string WindyModeValue
+    {
+        get => _intent.WindyMode ?? ServerRequestBuilder.ReadMode(_detail?.Modes, "windy_mode") ?? string.Empty;
+        set { _intent.WindyMode = string.IsNullOrWhiteSpace(value) ? null : value; Touch("modes.windy_mode", ServerRequestBuilder.ReadMode(_detail?.Modes, "windy_mode"), _intent.WindyMode, nameof(WindyModeValue)); }
+    }
+
+    public IReadOnlyList<string> OperationModeOptions { get; } = new[] { "NORMAL", "REGISTER" };
+    public IReadOnlyList<string> WindyModeOptions { get; } = new[] { "wind0", "wind1", "wind2", "wind3" };
+
+    /// <summary>6.3 전용 — 프록시 설정 경로에서 읽은 모드 글자.</summary>
     public string OperationModeText
     {
         get => _operationModeText;
         private set { _operationModeText = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>관측 절 — 읽기 전용이다. 보고가 없으면 칸이 아니라 "미수신 상자" 를 그린다.</summary>
+    /// <summary>관측 절 — 읽기 전용이다.</summary>
     public string ObservedStatusText => SelectedRow?.StatusText ?? ServerStatusRules.NotReportedText;
     public string ObservedLastChangeText => SelectedRow?.LastChangeText ?? ServerStatusRules.NotReportedText;
+    public string ObservedLastEditText => SelectedRow?.LastEditText ?? ServerStatusRules.NotReportedText;
     public bool IsStatusReceived => SelectedRow is { IsNotReported: false };
     public string StatusIsObservedNote => ServerWriteGuard.STATUS_IS_OBSERVED_NOTE;
 
@@ -522,46 +604,68 @@ public class ServerMonitorViewModel : Screen
     {
         get
         {
-            if (_detailDto is null) return string.Empty;
-            var errors = ServerRequestBuilder.Validate(_draft, _detailDto);
+            if (!HasDetail) return string.Empty;
+            var errors = ServerRequestBuilder.Validate(_intent, _detail, _service.Contract);
             return errors.Count == 0 ? string.Empty : string.Join(" · ", errors.Select(e => e.Message));
         }
     }
 
-    private string Field(string? draft, string? original) => draft ?? original ?? string.Empty;
+    #region - 손댄 칸 표지 -
+    public bool IsNameTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.NameKey);
+    public bool IsIpTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.IpKey);
+    public bool IsPortTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.PortKey);
+    public bool IsHostnameTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.HostnameKey);
+    public bool IsUserNameTouched => Detail.Tracker.IsTouched(ServerRequestBuilder.UserNameKey);
+    public bool IsPasswordTouched => Detail.Tracker.IsTouched("user_password");
+    public bool IsCpuTouched => Detail.Tracker.IsTouched("threshold.cpu.warning") || Detail.Tracker.IsTouched("threshold.cpu.critical");
+    public bool IsRamTouched => Detail.Tracker.IsTouched("threshold.ram.warning") || Detail.Tracker.IsTouched("threshold.ram.critical");
+    public bool IsDiskTouched => Detail.Tracker.IsTouched("threshold.disk.warning") || Detail.Tracker.IsTouched("threshold.disk.critical");
+    public bool IsNetworkTouched => Detail.Tracker.IsTouched("threshold.network.warning_mbps") || Detail.Tracker.IsTouched("threshold.network.critical_mbps");
+    public bool IsModesTouched => Detail.Tracker.IsTouched("modes.operation_mode") || Detail.Tracker.IsTouched("modes.windy_mode");
+    #endregion
 
-    private void SetField(Action<string?> assign, string value, string? original, string key, string propertyName)
+    private void SetText(System.Action<string?> assign, string value, string? original, string key, string propertyName)
     {
         assign(value);
-        Detail.Tracker.Touch(key, original ?? string.Empty, value ?? string.Empty);
+        Touch(key, original ?? string.Empty, value ?? string.Empty, propertyName);
+    }
+
+    private void SetClearable(System.Action<string> assign, System.Action clear, string value, string? original, string key, string propertyName)
+    {
+        if (string.IsNullOrEmpty(value)) clear();
+        else assign(value);
+
+        Touch(key, original ?? string.Empty, value ?? string.Empty, propertyName);
+    }
+
+    private void Touch(string key, object? original, object? current, string propertyName)
+    {
+        Detail.Tracker.Touch(key, original, current);
         NotifyOfPropertyChange(propertyName);
         NotifyTouchFlags();
     }
 
     private string Threshold(double? draft, string group, string key)
     {
-        var value = draft ?? ServerRequestBuilder.ReadThreshold(_detailDto?.ThresholdConfig, group, key);
+        var value = draft ?? ServerRequestBuilder.ReadThreshold(_detail?.Thresholds, group, key);
         return value?.ToString("0.#", CultureInfo.InvariantCulture) ?? string.Empty;
     }
 
-    private void SetThreshold(Action<double?> assign, string value, string group, string key, string propertyName)
+    private void SetThreshold(System.Action<double?> assign, string value, string group, string key, string propertyName)
     {
         var parsed = double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : (double?)null;
         assign(parsed);
-        Detail.Tracker.Touch($"threshold.{group}.{key}", ServerRequestBuilder.ReadThreshold(_detailDto?.ThresholdConfig, group, key), parsed);
-        NotifyOfPropertyChange(propertyName);
-        NotifyTouchFlags();
+        Touch($"threshold.{group}.{key}", ServerRequestBuilder.ReadThreshold(_detail?.Thresholds, group, key), parsed, propertyName);
     }
 
     private void NotifyTouchFlags()
     {
-        NotifyOfPropertyChange(nameof(ValidationText));
-        NotifyOfPropertyChange(nameof(IsNameTouched));
-        NotifyOfPropertyChange(nameof(IsIpTouched));
-        NotifyOfPropertyChange(nameof(IsPortTouched));
-        NotifyOfPropertyChange(nameof(IsHostnameTouched));
-        NotifyOfPropertyChange(nameof(IsUserNameTouched));
-        NotifyOfPropertyChange(nameof(IsPasswordTouched));
+        foreach (var name in new[]
+        {
+            nameof(ValidationText), nameof(IsNameTouched), nameof(IsIpTouched), nameof(IsPortTouched),
+            nameof(IsHostnameTouched), nameof(IsUserNameTouched), nameof(IsPasswordTouched),
+            nameof(IsCpuTouched), nameof(IsRamTouched), nameof(IsDiskTouched), nameof(IsNetworkTouched), nameof(IsModesTouched),
+        }) NotifyOfPropertyChange(name);
     }
 
     private void NotifyAllFields()
@@ -571,10 +675,11 @@ public class ServerMonitorViewModel : Screen
             nameof(NameText), nameof(IpText), nameof(PortText), nameof(HostnameText), nameof(UserNameText),
             nameof(PasswordNote), nameof(CpuWarningText), nameof(CpuCriticalText), nameof(RamWarningText), nameof(RamCriticalText),
             nameof(DiskWarningText), nameof(DiskCriticalText), nameof(NetworkWarningText), nameof(NetworkCriticalText),
-            nameof(ObservedStatusText), nameof(ObservedLastChangeText), nameof(IsStatusReceived), nameof(UnitSectionText),
-            nameof(ValidationText), nameof(IsNameTouched), nameof(IsIpTouched), nameof(IsPortTouched),
-            nameof(IsHostnameTouched), nameof(IsUserNameTouched), nameof(IsPasswordTouched),
+            nameof(OperationModeValue), nameof(WindyModeValue), nameof(HasModesSection),
+            nameof(ObservedStatusText), nameof(ObservedLastChangeText), nameof(ObservedLastEditText),
+            nameof(IsStatusReceived), nameof(UnitSectionText), nameof(HasDetail), nameof(ClearableNote),
         }) NotifyOfPropertyChange(name);
+        NotifyTouchFlags();
     }
     #endregion
 
@@ -604,7 +709,6 @@ public class ServerMonitorViewModel : Screen
     {
         if (!CanBeginEdit) return;
         IsEditing = true;
-        Detail.IsReadOnly = false;
         NotifyOfPropertyChange(nameof(CanBeginEdit));
     }
 
@@ -619,9 +723,11 @@ public class ServerMonitorViewModel : Screen
     {
         if (!CanAdd || !Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
 
+        CancelDetailLoad();
+        _generation++;
         _selected = new List<ServerRowViewModel>();
-        _detailDto = new ServerDto();
-        _draft = new ServerEditDraft();
+        _detail = null;
+        _intent = new ServerWriteIntent();
         MetricCells.Clear();
         SelectedCategory ??= CategoryOptions.FirstOrDefault();
 
@@ -648,7 +754,7 @@ public class ServerMonitorViewModel : Screen
         {
             if (Detail.IsCreating)
             {
-                var (created, newId) = await _service.CreateAsync(SelectedCategory?.Id ?? 0, _draft, token).ConfigureAwait(true);
+                var (created, newId) = await _service.CreateAsync(SelectedCategory!, _intent, token).ConfigureAwait(true);
                 StatusText = created.Message;
                 if (!created.IsSuccess) return;
 
@@ -662,7 +768,7 @@ public class ServerMonitorViewModel : Screen
 
             if (SelectedRow is not { } row) return;
 
-            var saved = await _service.SaveAsync(row.Id, _draft, token).ConfigureAwait(true);
+            var saved = await _service.SaveAsync(row.Id, _intent, token).ConfigureAwait(true);
             StatusText = saved.Message;
             if (!saved.IsSuccess) return;
 
@@ -686,17 +792,17 @@ public class ServerMonitorViewModel : Screen
 
     public void Revert()
     {
-        _draft = new ServerEditDraft();
+        _intent = new ServerWriteIntent();
         Detail.Tracker.Clear();
 
         if (Detail.IsCreating)
         {
             Detail.IsCreating = false;
-            _detailDto = null;
+            _detail = null;
         }
 
         IsEditing = false;
-        Detail.IsReadOnly = false;          // 커널 ReadOnly 배너는 "권한 없음" 이라 여기서는 거짓말이 된다
+        Detail.IsReadOnly = false;
         Detail.Settle("되돌렸습니다");
         NotifyAllFields();
     }
@@ -715,12 +821,17 @@ public class ServerMonitorViewModel : Screen
     #region - Assign -
     public ServerAssignHandler Assign { get; }
 
+    /// <summary>여러 대 배정은 여기 쌓였다가 [적용] 한 번에 나간다(콘솔 공통 규칙).</summary>
+    public DraftTrayViewModel Tray { get; }
+
     public ObservableCollection<ServerAssignCandidateViewModel> AssignCandidates { get; }
 
-    /// <summary>배정 트레이를 낼 것인가 — 끌 수 있는 장비가 하나라도 있을 때.</summary>
     public bool HasAssignCandidates => AssignCandidates.Count > 0;
 
-    public string AssignHint => "스피커를 끌어 목록의 스피커 서버 행에 놓습니다 — 다른 유형의 행은 놓을 수 없습니다";
+    public string AssignHint => IsAxisEra
+        ? "장비를 끌어 목록의 허용 유형 서버 행에 놓습니다 — 여러 대는 트레이에 쌓였다가 [적용] 때 나갑니다. "
+          + "화면 밖 행에는 끌 수 없으니 그때는 행을 고르고 [배정] 을 누릅니다"
+        : "이 서버 판본(6.3)에서는 스피커만 배정할 수 있습니다 — 행을 고르고 [배정] 을 눌러도 같습니다";
 
     public bool CanAssignSelection => SelectedRow is { AcceptsDevices: true } && AssignCandidates.Count > 0;
 
@@ -728,11 +839,24 @@ public class ServerMonitorViewModel : Screen
     public async Task AssignSelectionAsync(IReadOnlyList<ServerAssignCandidateViewModel>? candidates)
     {
         if (SelectedRow is not { } row) { StatusText = "먼저 서버 행을 고르십시오"; return; }
-        var models = (candidates ?? Array.Empty<ServerAssignCandidateViewModel>()).Select(c => (IBaseDeviceModel)c.Model).ToList();
+        var models = (candidates ?? Array.Empty<ServerAssignCandidateViewModel>()).Select(c => c.Model).ToList();
         if (models.Count == 0) { StatusText = "배정할 장비를 먼저 고르십시오"; return; }
 
         await Assign.AssignAsync(row, models).ConfigureAwait(true);
     }
+
+    public async Task ApplyTrayAsync()
+    {
+        if (!Tray.HasEntries) return;
+        if (DialogsOrNull() is { } dialogs)
+        {
+            var accepted = await dialogs.ConfirmAsync("서버 배정", ServerDropRules.ConfirmText("트레이", Tray.Count)).ConfigureAwait(true);
+            if (!accepted) { StatusText = "적용을 취소했습니다 — 서버 호출 0회"; return; }
+        }
+        await Assign.ApplyTrayAsync().ConfigureAwait(true);
+    }
+
+    public void RevertTray() => Assign.RevertTray();
 
     public bool CanUndoAssign => _lastUndo is not null;
 
@@ -754,17 +878,32 @@ public class ServerMonitorViewModel : Screen
         });
     }
 
+    /// <summary>끄는 동안 행마다 "왜 못 받는지" 를 채운다 — 툴팁과 상태 줄이 같은 문장을 쓴다.</summary>
+    private void OnDragProbe(IReadOnlyList<IBaseDeviceModel> dragged)
+    {
+        foreach (var row in Rows)
+        {
+            var plan = ServerDropRules.Plan(row.Id, row.Type, dragged, _service.Contract);
+            row.DropBlockReason = plan.CanSend ? null : plan.BlockReason;
+        }
+    }
+
     private void OnDevicesChanged(object? sender, NotifyCollectionChangedEventArgs e) => Execute.OnUIThread(RefreshCandidates);
 
     private void RefreshCandidates()
     {
-        var wanted = _devices.OfType<ISpeakerDeviceModel>()
-            .Where(s => s is not null && s.Id > 0)
-            .OrderBy(s => s.DeviceName, StringComparer.CurrentCulture)
-            .Select(s => new ServerAssignCandidateViewModel(s))
+        var wanted = _devices.OfType<IBaseDeviceModel>()
+            .Where(d => d is not null && d.Id > 0)
+            .Where(d => ServerDropRules.AllowedServerTypes.ContainsKey(DeviceAxesMapper.CategoryOf(d)))
+            .Where(d => IsAxisEra || ServerDropRules.IsSupportedOnLegacy(DeviceAxesMapper.CategoryOf(d)))
+            .OrderBy(d => ServerDropRules.CategoryLabel(DeviceAxesMapper.CategoryOf(d)), StringComparer.CurrentCulture)
+            .ThenBy(d => d.DeviceName, StringComparer.CurrentCulture)
+            .Select(d => new ServerAssignCandidateViewModel(
+                d,
+                ServerDropRules.CategoryLabel(DeviceAxesMapper.CategoryOf(d)),
+                ServerNameOf(d)))
             .ToList();
 
-        // 묶인 목록은 비우고 채우지 않는다 — 끌던 선택과 스크롤이 날아간다. 자리마다 맞춰 넣고 뺀다.
         for (var i = AssignCandidates.Count - 1; i >= 0; i--)
             if (wanted.All(w => w.Id != AssignCandidates[i].Id)) AssignCandidates.RemoveAt(i);
 
@@ -782,10 +921,17 @@ public class ServerMonitorViewModel : Screen
         NotifyOfPropertyChange(nameof(HasAssignCandidates));
         NotifyOfPropertyChange(nameof(CanAssignSelection));
     }
+
+    private string ServerNameOf(IBaseDeviceModel device)
+    {
+        var serverId = ServerDropRules.ServerIdOf(device);
+        if (serverId is null) return "서버 없음";
+        var row = _all.FirstOrDefault(r => r.Id == serverId.Value);
+        return row?.Name ?? $"서버 #{serverId}";
+    }
     #endregion
 
     #region - View plumbing -
-    /// <summary>뷰가 그리드 선택을 되돌리게 한다.</summary>
     public event EventHandler<IReadOnlyList<object>>? SelectionRestoreRequested;
 
     public event EventHandler? ClearGridSelectionRequested;
@@ -798,9 +944,11 @@ public class ServerMonitorViewModel : Screen
 
     private void ClearSelection()
     {
+        CancelDetailLoad();
+        _generation++;
         _selected = new List<ServerRowViewModel>();
-        _detailDto = null;
-        _draft = new ServerEditDraft();
+        _detail = null;
+        _intent = new ServerWriteIntent();
         MetricCells.Clear();
         IsEditing = false;
         Detail.IsCreating = false;
@@ -808,11 +956,8 @@ public class ServerMonitorViewModel : Screen
         Detail.IsReadOnly = false;
         Detail.Tracker.Clear();
         NotifyAllFields();
-        NotifyOfPropertyChange(nameof(SelectedRow));
-        NotifyOfPropertyChange(nameof(IsMetricBandVisible));
-        NotifyOfPropertyChange(nameof(CanBeginEdit));
-        NotifyOfPropertyChange(nameof(CanShowHistory));
-        NotifyOfPropertyChange(nameof(CanAssignSelection));
+        foreach (var name in new[] { nameof(SelectedRow), nameof(IsMetricBandVisible), nameof(CanBeginEdit), nameof(CanShowHistory), nameof(CanAssignSelection), nameof(HasDetail) })
+            NotifyOfPropertyChange(name);
     }
 
     private void SelectAfterReload(int id)
@@ -839,11 +984,13 @@ public class ServerMonitorViewModel : Screen
 
     private IReadOnlyList<ServerRowViewModel> _all = Array.Empty<ServerRowViewModel>();
     private List<ServerRowViewModel> _selected = new();
-    private ServerDto? _detailDto;
-    private ServerEditDraft _draft = new();
+    private ServerAxisView? _detail;
+    private ServerWriteIntent _intent = new();
     private ServerAssignUndo? _lastUndo;
     private ServerUnitOption? _selectedUnit;
     private ServerCategoryOption? _selectedCategory;
+    private CancellationTokenSource? _detailCts;
+    private int _generation;
 
     private string _railKey = ServerTypeCatalog.AllKey;
     private string _railFooterText = string.Empty;

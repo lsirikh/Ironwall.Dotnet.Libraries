@@ -11,8 +11,9 @@
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		서버 모니터(N-12) — 레일 184 · 목록 + 지표 띠 · 상세 340.
-		정본: docs/design/window-layout-system-storyboard.html L1330-1365 · all-windows-drag-wireframe.html L368-372.
+		정본: docs/design/window-layout-system-storyboard.html L1330-1365 · all-windows-drag-wireframe.html L368-372 · L432.
 		치수와 폭별 도킹/서랍/접힘은 ConsoleShell 이 맡는다. x:Name 은 쓰지 않는다(CM 바인딩 지시자) — 계측은 AutomationId 만.
+		AutomationId 는 peer 가 실재하는 요소에만 단다(TextBlock·Border·커스텀 Control 은 UIA 트리에 없다).
 	-->
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -20,21 +21,6 @@
 		<local:InverseBoolConverter x:Key="NotBool" />
 		<local:TextToVisibilityConverter x:Key="TextToVisibility" />
 		<local:MetricBarWidthConverter x:Key="BarWidth" />
-
-		<!--  놓을 수 없음 = 사선 해치. 색이 아니라 형태로 말한다(라이트에서 주색·선택색이 같은 색이다).  -->
-		<DrawingBrush
-			x:Key="Servers.Drop.Blocked"
-			TileMode="Tile"
-			Viewport="0,0,8,8"
-			ViewportUnits="Absolute">
-			<DrawingBrush.Drawing>
-				<GeometryDrawing Geometry="M0,8 L8,0">
-					<GeometryDrawing.Pen>
-						<Pen Brush="{DynamicResource BorderBrush}" Thickness="1" />
-					</GeometryDrawing.Pen>
-				</GeometryDrawing>
-			</DrawingBrush.Drawing>
-		</DrawingBrush>
 
 		<Style x:Key="Servers.FieldBox" TargetType="TextBox">
 			<Setter Property="Height" Value="28" />
@@ -44,6 +30,18 @@
 			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
 			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		</Style>
+
+		<!--  읽기 전용 값 — TextBlock 은 UIA peer 가 없어 자동화가 못 읽는다. 테두리 없는 TextBox 로 낸다.  -->
+		<Style x:Key="Servers.ReadOnlyValue" TargetType="TextBox">
+			<Setter Property="IsReadOnly" Value="True" />
+			<Setter Property="IsReadOnlyCaretVisible" Value="False" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="TextWrapping" Value="Wrap" />
 		</Style>
 
 		<Style x:Key="Servers.Chip" TargetType="Border">
@@ -80,12 +78,11 @@
 				</c:ConsoleRail.Resources>
 				<c:ConsoleRail.Footer>
 					<StackPanel>
-						<TextBlock
+						<TextBox
 							AutomationProperties.AutomationId="Console.Servers.Rail.Footer"
-							FontSize="12.5"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="{Binding RailFooterText}"
-							TextWrapping="Wrap" />
+							Style="{StaticResource Servers.ReadOnlyValue}"
+							Text="{Binding RailFooterText, Mode=OneWay}" />
 
 						<!--  부대 필터 — 8.0 이상에서만 뜻이 있어 그 밖에서는 아예 감춘다(비활성이 아니라).  -->
 						<StackPanel Margin="0,10,0,0" Visibility="{Binding IsUnitEra, Converter={StaticResource BoolToVisibility}}">
@@ -97,9 +94,9 @@
 								Margin="0,3,0,0"
 								AutomationProperties.AutomationId="Console.Servers.UnitFilter"
 								DisplayMemberPath="Name"
-								md:HintAssist.Hint="전체"
 								FontSize="12.5"
 								ItemsSource="{Binding UnitOptions}"
+								md:HintAssist.Hint="전체"
 								SelectedItem="{Binding SelectedUnit, Mode=TwoWay}" />
 							<CheckBox
 								Margin="0,5,0,0"
@@ -139,24 +136,23 @@
 					Margin="16"
 					VerticalAlignment="Top"
 					Visibility="{Binding IsSystemEvents, Converter={StaticResource BoolToVisibility}}">
-					<c:NotReceivedBox
-						AutomationProperties.AutomationId="Console.Servers.SystemEvents.NotReceived"
-						ReloadHint="{Binding SystemEventsNote}"
-						SectionName="시스템 이벤트" />
+					<c:NotReceivedBox ReloadHint="{Binding SystemEventsNote}" SectionName="시스템 이벤트" />
 				</Border>
 
 				<DockPanel LastChildFill="True" Visibility="{Binding IsServerList, Converter={StaticResource BoolToVisibility}}">
 					<!--  지표 띠 — 한 대를 고르면 목록 아래에 붙는다(SB L1345-1346).  -->
 					<Border
 						Padding="12,8"
-						AutomationProperties.AutomationId="Console.Servers.MetricBand"
 						Background="{DynamicResource SurfaceAltBrush}"
 						BorderBrush="{DynamicResource DividerBrush}"
 						BorderThickness="0,1,0,0"
 						DockPanel.Dock="Bottom"
 						Visibility="{Binding IsMetricBandVisible, Converter={StaticResource BoolToVisibility}}">
 						<StackPanel>
-							<ItemsControl Focusable="False" ItemsSource="{Binding MetricCells}">
+							<ItemsControl
+								AutomationProperties.AutomationId="Console.Servers.MetricBand"
+								Focusable="False"
+								ItemsSource="{Binding MetricCells}">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>
 										<UniformGrid Columns="4" />
@@ -167,7 +163,6 @@
 										<Border
 											Margin="0,0,10,0"
 											Padding="10,6"
-											AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Servers.Metric.{0}}"
 											Background="{DynamicResource SurfaceBrush}"
 											BorderBrush="{DynamicResource BorderBrush}"
 											BorderThickness="1"
@@ -178,19 +173,47 @@
 														FontSize="12"
 														Foreground="{DynamicResource TextMutedBrush}"
 														Text="{Binding Label}" />
-													<!--  임계 배지 — 서버가 판정해 보낸 것만. 형태(▲)로도 구분한다.  -->
+													<!--
+														임계 배지 — 서버가 판정해 보낸 것만. 위험과 경고를 <b>형태</b>로 가른다:
+														위험 = 채운 배경 + ▲ · 경고 = 테두리만 + ◆.
+													-->
 													<Border
 														Padding="6,1"
-														Background="{DynamicResource TintWarningBrush}"
-														BorderBrush="{DynamicResource StatusWarningBrush}"
-														BorderThickness="1"
 														CornerRadius="8"
 														DockPanel.Dock="Right"
 														Visibility="{Binding BadgeText, Converter={StaticResource TextToVisibility}}">
-														<TextBlock
-															FontSize="10.5"
-															Foreground="{DynamicResource TextPrimaryBrush}"
-															Text="{Binding BadgeText}" />
+														<Border.Style>
+															<Style TargetType="Border">
+																<Setter Property="Background" Value="Transparent" />
+																<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+																<Setter Property="BorderThickness" Value="1" />
+																<Style.Triggers>
+																	<DataTrigger Binding="{Binding IsCritical}" Value="True">
+																		<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+																		<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+																		<Setter Property="BorderThickness" Value="2" />
+																	</DataTrigger>
+																</Style.Triggers>
+															</Style>
+														</Border.Style>
+														<StackPanel Orientation="Horizontal">
+															<TextBlock FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}">
+																<TextBlock.Style>
+																	<Style TargetType="TextBlock">
+																		<Setter Property="Text" Value="◆ " />
+																		<Style.Triggers>
+																			<DataTrigger Binding="{Binding IsCritical}" Value="True">
+																				<Setter Property="Text" Value="▲ " />
+																			</DataTrigger>
+																		</Style.Triggers>
+																	</Style>
+																</TextBlock.Style>
+															</TextBlock>
+															<TextBlock
+																FontSize="10.5"
+																Foreground="{DynamicResource TextPrimaryBrush}"
+																Text="{Binding BadgeText}" />
+														</StackPanel>
 													</Border>
 												</DockPanel>
 												<TextBlock
@@ -245,23 +268,19 @@
 						<DataGrid.RowStyle>
 							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
 								<!--  행마다 Id — 자동화가 "이 서버" 를 짚을 수 있어야 쓰기 안전 계약을 지킬 수 있다.  -->
-								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Servers.Console.Row.{0}}" />
+								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Servers.Row.{0}}" />
 								<!--  행이 곧 드롭존이다 — 장비를 끌어 여기에 놓는다.  -->
 								<Setter Property="drag:DropZone.Key" Value="server-row" />
 								<Setter Property="drag:DropZone.Handler" Value="{Binding DataContext.Assign, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 								<Style.Triggers>
-									<!--  놓을 수 있음 = 위아래 얇은 선 / 지금 그 위 = 굵은 테두리 / 놓을 수 없음 = 사선 해치.  -->
-									<DataTrigger Binding="{Binding (drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Available">
-										<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-										<Setter Property="BorderThickness" Value="0,2,0,2" />
-									</DataTrigger>
-									<DataTrigger Binding="{Binding (drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Hover">
-										<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-										<Setter Property="BorderThickness" Value="2" />
-									</DataTrigger>
+									<!--
+										형태는 맨 앞 표시 칸의 DropZoneChrome 이 맡는다(행 템플릿이 테두리를 고정값으로 그려
+										행에 건 Border* 설정이 화면에 닿지 않는다 — 그 스타일은 이 노드 범위 밖이다).
+										행은 배경 해치로 거들고, 까닭은 행마다 다른 문장을 툴팁에 띄운다.
+									-->
 									<DataTrigger Binding="{Binding (drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Blocked">
-										<Setter Property="Background" Value="{StaticResource Servers.Drop.Blocked}" />
-										<Setter Property="ToolTip" Value="이 서버 유형은 장비를 받지 않습니다" />
+										<Setter Property="Opacity" Value="0.72" />
+										<Setter Property="ToolTip" Value="{Binding DropBlockReason}" />
 									</DataTrigger>
 								</Style.Triggers>
 							</Style>
@@ -289,21 +308,59 @@
 							DockPanel.Dock="Right"
 							FontSize="12"
 							Visibility="{Binding CanUndoAssign, Converter={StaticResource BoolToVisibility}}" />
-						<TextBlock
+						<TextBox
+							Width="360"
 							Margin="12,0,0,0"
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Console.Servers.Status.Message"
 							DockPanel.Dock="Right"
-							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="{Binding StatusText}"
-							TextTrimming="CharacterEllipsis" />
-						<TextBlock
+							Style="{StaticResource Servers.ReadOnlyValue}"
+							Text="{Binding StatusText, Mode=OneWay}"
+							TextWrapping="NoWrap" />
+						<TextBox
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Console.Servers.Status.Count"
-							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="{Binding ListStatusText}" />
+							Style="{StaticResource Servers.ReadOnlyValue}"
+							Text="{Binding ListStatusText, Mode=OneWay}" />
+					</DockPanel>
+
+					<!--  Draft 트레이 — 여러 대 배정은 여기 쌓였다가 [적용] 한 번에 나간다(콘솔 공통 규칙).  -->
+					<DockPanel
+						Margin="0,5,0,0"
+						LastChildFill="True"
+						Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVisibility}}">
+						<Button
+							Margin="6,0,0,0"
+							Padding="10,2"
+							AutomationProperties.AutomationId="Console.Servers.Tray.Revert"
+							Click="OnRevertTray"
+							Content="버리기"
+							DockPanel.Dock="Right"
+							FontSize="12"
+							IsEnabled="{Binding Tray.CanRevert}" />
+						<Button
+							Margin="8,0,0,0"
+							Padding="10,2"
+							AutomationProperties.AutomationId="Console.Servers.Tray.Apply"
+							Click="OnApplyTray"
+							Content="적용"
+							DockPanel.Dock="Right"
+							FontSize="12"
+							IsEnabled="{Binding Tray.CanApply}" />
+						<TextBox
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Servers.Tray.Message"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Style="{StaticResource Servers.ReadOnlyValue}">
+							<TextBox.Text>
+								<MultiBinding Mode="OneWay" StringFormat="담아 둔 배정 {0}건 — [적용] 때 서버 쓰기 {0}회 · {1}">
+									<Binding Path="Tray.Count" />
+									<Binding Path="Tray.Message" />
+								</MultiBinding>
+							</TextBox.Text>
+						</TextBox>
 					</DockPanel>
 
 					<!--  배정 트레이 — 여기서 끌어 위의 서버 행에 놓는다. 같은 일을 [배정] 단추로도 한다(키보드 폴백).  -->
@@ -318,7 +375,7 @@
 							DockPanel.Dock="Left"
 							FontSize="12"
 							Foreground="{DynamicResource TextMutedBrush}"
-							Text="스피커" />
+							Text="장비" />
 						<Button
 							Margin="8,0,0,0"
 							Padding="10,2"
@@ -337,6 +394,12 @@
 							ItemsSource="{Binding AssignCandidates}"
 							Loaded="OnTrayLoaded"
 							SelectionMode="Extended">
+							<ListBox.ItemContainerStyle>
+								<Style TargetType="ListBoxItem">
+									<!--  ListBoxItem 은 peer 가 실재한다 — 칩의 식별자는 여기 단다.  -->
+									<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Servers.Assign.Chip.{0}}" />
+								</Style>
+							</ListBox.ItemContainerStyle>
 							<ListBox.ItemsPanel>
 								<ItemsPanelTemplate>
 									<WrapPanel />
@@ -353,6 +416,11 @@
 												AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Servers.Assign.Handle.{0}}"
 												ToolTip="끌어서 서버 행에 놓습니다" />
 											<TextBlock
+												FontSize="11"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="{Binding CategoryLabel}" />
+											<TextBlock
+												Margin="4,0,0,0"
 												FontSize="12"
 												Foreground="{DynamicResource TextPrimaryBrush}"
 												Text="{Binding Name}" />
@@ -369,7 +437,7 @@
 								<drag:CaptureDragBehavior
 									DisplayMemberPath="Name"
 									Handler="{Binding Assign}"
-									KeyboardFallback="칩을 고르고 서버 행을 고른 뒤 [배정] 을 누릅니다" />
+									KeyboardFallback="칩을 고르고 서버 행을 고른 뒤 [배정] 을 누릅니다(화면 밖 행도 이 길로 됩니다)" />
 							</b:Interaction.Behaviors>
 						</ListBox>
 					</DockPanel>
@@ -377,7 +445,7 @@
 			</Border>
 		</c:ConsoleShell.StatusBar>
 
-		<!--  상세 340 — 접속 · 설정 · 상태(관측) · 소속 부대 · 최근 시스템 이벤트 (SB L1347-1351)  -->
+		<!--  상세 340 — 접속 · 설정 · 상태(관측) · 소속 부대 · 최근 시스템 이벤트, 그 뒤에 단추 (SB L1347-1351)  -->
 		<c:ConsoleShell.Detail>
 			<c:ConsoleDetailHost
 				ApplyClick="OnApply"
@@ -397,31 +465,15 @@
 				ShowButtons="{Binding Detail.ShowButtons}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				Title="{Binding Detail.Title}">
-				<StackPanel Margin="14,10,14,8">
-					<!--  [설정 수정] [지표 이력] (SB L1351)  -->
-					<StackPanel Margin="0,0,0,8" Orientation="Horizontal">
-						<Button
-							Margin="0,0,6,0"
-							AutomationProperties.AutomationId="Console.Servers.Detail.BeginEdit"
-							Click="OnBeginEdit"
-							Content="설정 수정"
-							IsEnabled="{Binding CanBeginEdit}"
-							Style="{StaticResource MaterialDesignOutlinedButton}" />
-						<Button
-							AutomationProperties.AutomationId="Console.Servers.Detail.MetricHistory"
-							Click="OnShowHistory"
-							Content="지표 이력"
-							IsEnabled="{Binding CanShowHistory}"
-							Style="{StaticResource MaterialDesignFlatButton}" />
-					</StackPanel>
-
+				<!--  고른 것이 없으면 절을 그리지 않는다 — 빈 편집 폼은 "고칠 수 있다" 는 거짓말이다.  -->
+				<StackPanel Margin="14,10,14,8" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
 					<!--  등록 폼의 분류 — 서버 유형은 분류가 쥔다. 상태 칸은 없다(관측 필드를 쓰면 422).  -->
 					<c:ConsoleSection
-						AxisName="category_id"
+						AxisName="category_server"
 						Header="분류"
 						TagKind="Intent"
 						Visibility="{Binding Detail.IsCreating, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleField ApiName="category_id" Header="분류">
+						<c:ConsoleField ApiName="category_server" Header="분류">
 							<ComboBox
 								AutomationProperties.AutomationId="Console.Servers.Detail.Category"
 								DisplayMemberPath="Display"
@@ -432,14 +484,20 @@
 
 					<c:ConsoleSection AxisName="connection" Header="접속" TagKind="Intent">
 						<StackPanel>
-							<c:ConsoleField IsTouched="{Binding IsNameTouched}" ApiName="name" Header="이름">
+							<c:ConsoleField
+								ApiName="name"
+								Header="이름"
+								IsTouched="{Binding IsNameTouched}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.Name"
 									IsEnabled="{Binding IsEditing}"
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding NameText, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
-							<c:ConsoleField IsTouched="{Binding IsIpTouched}" ApiName="ip_address" Header="주소">
+							<c:ConsoleField
+								ApiName="ip_address"
+								Header="주소"
+								IsTouched="{Binding IsIpTouched}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.Ip"
 									FontFamily="Consolas"
@@ -447,7 +505,10 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding IpText, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
-							<c:ConsoleField IsTouched="{Binding IsPortTouched}" ApiName="port" Header="포트">
+							<c:ConsoleField
+								ApiName="ip_port"
+								Header="포트"
+								IsTouched="{Binding IsPortTouched}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.Port"
 									FontFamily="Consolas"
@@ -455,14 +516,22 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding PortText, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
-							<c:ConsoleField IsTouched="{Binding IsHostnameTouched}" ApiName="hostname" Header="호스트명">
+							<c:ConsoleField
+								ApiName="hostname"
+								Header="호스트명"
+								IsTouched="{Binding IsHostnameTouched}"
+								Note="{Binding ClearableNote}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.Hostname"
 									IsEnabled="{Binding IsEditing}"
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding HostnameText, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
-							<c:ConsoleField IsTouched="{Binding IsUserNameTouched}" ApiName="user_name" Header="계정">
+							<c:ConsoleField
+								ApiName="credentials.user_name"
+								Header="계정"
+								IsTouched="{Binding IsUserNameTouched}"
+								Note="{Binding ClearableNote}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.UserName"
 									IsEnabled="{Binding IsEditing}"
@@ -471,9 +540,9 @@
 							</c:ConsoleField>
 							<!--  비밀번호는 마스킹 편집기로만 다룬다. 읽으면 언제나 빈 글자라 화면·PNG·자동화 어디에도 원문이 남지 않는다.  -->
 							<c:ConsoleField
-								ApiName="user_password"
-								IsTouched="{Binding IsPasswordTouched}"
+								ApiName="credentials.user_password"
 								Header="비밀번호"
+								IsTouched="{Binding IsPasswordTouched}"
 								Note="{Binding PasswordNote}">
 								<PasswordBox
 									Height="28"
@@ -492,14 +561,39 @@
 					<!--  설정 — server_config(모드 · 임계). 옛 프록시 설정 창이 여기로 흡수됐다(SB L1361).  -->
 					<c:ConsoleSection AxisName="server_config" Header="설정" TagKind="Intent">
 						<StackPanel>
-							<c:ConsoleField ApiName="modes" Header="운용 모드">
-								<TextBlock
-									AutomationProperties.AutomationId="Console.Servers.Detail.OperationMode"
-									FontSize="12"
+							<!--  7.0+ — 운용 모드는 server_config.modes 다(PROXY 서버만).  -->
+							<StackPanel Visibility="{Binding HasModesSection, Converter={StaticResource BoolToVisibility}}">
+								<c:ConsoleField
+									ApiName="modes.operation_mode"
+									Header="운용 모드"
+									IsTouched="{Binding IsModesTouched}">
+									<ComboBox
+										AutomationProperties.AutomationId="Console.Servers.Detail.OperationMode"
+										IsEnabled="{Binding IsEditing}"
+										ItemsSource="{Binding OperationModeOptions}"
+										SelectedItem="{Binding OperationModeValue, Mode=TwoWay}" />
+								</c:ConsoleField>
+								<c:ConsoleField ApiName="modes.windy_mode" Header="강풍 모드">
+									<ComboBox
+										AutomationProperties.AutomationId="Console.Servers.Detail.WindyMode"
+										IsEnabled="{Binding IsEditing}"
+										ItemsSource="{Binding WindyModeOptions}"
+										SelectedItem="{Binding WindyModeValue, Mode=TwoWay}" />
+								</c:ConsoleField>
+							</StackPanel>
+
+							<!--  6.3 — 모드는 옛 프록시 설정 경로에서 읽는다(7.0 에서 410).  -->
+							<c:ConsoleField
+								ApiName="proxy_settings"
+								Header="운용 모드"
+								Visibility="{Binding IsAxisEra, Converter={StaticResource NotBool}}">
+								<TextBox
+									AutomationProperties.AutomationId="Console.Servers.Detail.LegacyMode"
 									Foreground="{DynamicResource TextSecondaryBrush}"
-									Text="{Binding OperationModeText}"
-									TextWrapping="Wrap" />
+									Style="{StaticResource Servers.ReadOnlyValue}"
+									Text="{Binding OperationModeText, Mode=OneWay}" />
 							</c:ConsoleField>
+
 							<Grid Margin="0,4,0,0">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="72" />
@@ -528,6 +622,15 @@
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="위험" />
 
+								<!--  손댄 임계도 접속 칸과 같은 표지를 단다 — 왼쪽 앰버 줄(형태).  -->
+								<Border
+									Grid.Row="1"
+									Grid.Column="0"
+									Grid.ColumnSpan="3"
+									Margin="-6,0,0,0"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									Visibility="{Binding IsCpuTouched, Converter={StaticResource BoolToVisibility}}" />
 								<TextBlock
 									Grid.Row="1"
 									Grid.Column="0"
@@ -552,6 +655,14 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding CpuCriticalText, UpdateSourceTrigger=PropertyChanged}" />
 
+								<Border
+									Grid.Row="2"
+									Grid.Column="0"
+									Grid.ColumnSpan="3"
+									Margin="-6,0,0,0"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									Visibility="{Binding IsRamTouched, Converter={StaticResource BoolToVisibility}}" />
 								<TextBlock
 									Grid.Row="2"
 									Grid.Column="0"
@@ -576,6 +687,14 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding RamCriticalText, UpdateSourceTrigger=PropertyChanged}" />
 
+								<Border
+									Grid.Row="3"
+									Grid.Column="0"
+									Grid.ColumnSpan="3"
+									Margin="-6,0,0,0"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									Visibility="{Binding IsDiskTouched, Converter={StaticResource BoolToVisibility}}" />
 								<TextBlock
 									Grid.Row="3"
 									Grid.Column="0"
@@ -600,6 +719,14 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding DiskCriticalText, UpdateSourceTrigger=PropertyChanged}" />
 
+								<Border
+									Grid.Row="4"
+									Grid.Column="0"
+									Grid.ColumnSpan="3"
+									Margin="-6,0,0,0"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									Visibility="{Binding IsNetworkTouched, Converter={StaticResource BoolToVisibility}}" />
 								<TextBlock
 									Grid.Row="4"
 									Grid.Column="0"
@@ -624,13 +751,13 @@
 									Style="{StaticResource Servers.FieldBox}"
 									Text="{Binding NetworkCriticalText, UpdateSourceTrigger=PropertyChanged}" />
 							</Grid>
-							<TextBlock
+							<TextBox
 								Margin="2,6,0,0"
 								AutomationProperties.AutomationId="Console.Servers.Detail.Validation"
 								FontSize="11.5"
 								Foreground="{DynamicResource StatusCriticalBrush}"
-								Text="{Binding ValidationText}"
-								TextWrapping="Wrap"
+								Style="{StaticResource Servers.ReadOnlyValue}"
+								Text="{Binding ValidationText, Mode=OneWay}"
 								Visibility="{Binding ValidationText, Converter={StaticResource TextToVisibility}}" />
 						</StackPanel>
 					</c:ConsoleSection>
@@ -640,52 +767,85 @@
 						<StackPanel>
 							<StackPanel Visibility="{Binding IsStatusReceived, Converter={StaticResource BoolToVisibility}}">
 								<c:ConsoleField ApiName="status" Header="상태">
-									<TextBlock
+									<TextBox
 										AutomationProperties.AutomationId="Console.Servers.Detail.Status"
-										FontSize="12.5"
-										Foreground="{DynamicResource TextPrimaryBrush}"
-										Text="{Binding ObservedStatusText}" />
+										Style="{StaticResource Servers.ReadOnlyValue}"
+										Text="{Binding ObservedStatusText, Mode=OneWay}" />
+								</c:ConsoleField>
+								<c:ConsoleField
+									ApiName="status_observed_at"
+									Header="마지막 변화"
+									Note="마지막 상태 전이의 관측 시각입니다 — 마지막 수신이 아닙니다">
+									<TextBox
+										AutomationProperties.AutomationId="Console.Servers.Detail.LastChange"
+										Style="{StaticResource Servers.ReadOnlyValue}"
+										Text="{Binding ObservedLastChangeText, Mode=OneWay}" />
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="updated_at"
-									Header="마지막 변화"
-									Note="마지막 전이 시각입니다 — 마지막 수신이 아닙니다">
-									<TextBlock
-										AutomationProperties.AutomationId="Console.Servers.Detail.LastChange"
-										FontSize="12.5"
-										Foreground="{DynamicResource TextPrimaryBrush}"
-										Text="{Binding ObservedLastChangeText}" />
+									Header="마지막 수정"
+									Note="이름 · 접속을 고친 시각입니다 — 상태와 무관합니다">
+									<TextBox
+										AutomationProperties.AutomationId="Console.Servers.Detail.LastEdit"
+										Style="{StaticResource Servers.ReadOnlyValue}"
+										Text="{Binding ObservedLastEditText, Mode=OneWay}" />
 								</c:ConsoleField>
 							</StackPanel>
 							<c:NotReceivedBox
-								AutomationProperties.AutomationId="Console.Servers.Detail.Status.NotReceived"
 								ReloadHint="서버 매니저가 보고하면 채워집니다"
 								SectionName="상태(관측)"
 								Visibility="{Binding IsStatusReceived, Converter={StaticResource NotBool}}" />
+
+							<!--  생존 신호 — 스토리보드 L1357 이 요구한 별도 신호. 아직 붙은 것이 없다는 사실을 그대로 적는다.  -->
+							<c:NotReceivedBox
+								Margin="0,6,0,0"
+								ReloadHint="{Binding LivenessNote}"
+								SectionName="생존 신호" />
+
 							<TextBlock
 								Margin="2,6,0,0"
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{Binding StatusIsObservedNote}"
 								TextWrapping="Wrap" />
+							<TextBlock
+								Margin="2,4,0,0"
+								FontSize="11"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="{Binding LastChangeNote}"
+								TextWrapping="Wrap"
+								Visibility="{Binding LastChangeNote, Converter={StaticResource TextToVisibility}}" />
 						</StackPanel>
 					</c:ConsoleSection>
 
 					<c:ConsoleSection AxisName="unit_id" Header="소속 부대" TagKind="Observed">
-						<TextBlock
+						<TextBox
 							AutomationProperties.AutomationId="Console.Servers.Detail.Unit"
-							FontSize="12.5"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="{Binding UnitSectionText}"
-							TextWrapping="Wrap" />
+							Style="{StaticResource Servers.ReadOnlyValue}"
+							Text="{Binding UnitSectionText, Mode=OneWay}" />
 					</c:ConsoleSection>
 
 					<c:ConsoleSection AxisName="system_events" Header="최근 시스템 이벤트" TagKind="Observed">
-						<c:NotReceivedBox
-							AutomationProperties.AutomationId="Console.Servers.Detail.SystemEvents.NotReceived"
-							ReloadHint="{Binding SystemEventsNote}"
-							SectionName="최근 시스템 이벤트 5" />
+						<c:NotReceivedBox ReloadHint="{Binding SystemEventsNote}" SectionName="최근 시스템 이벤트 5" />
 					</c:ConsoleSection>
+
+					<!--  [설정 수정] [지표 이력] — 스토리보드는 절 <b>뒤</b>에 둔다(SB L1351).  -->
+					<StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Console.Servers.Detail.BeginEdit"
+							Click="OnBeginEdit"
+							Content="설정 수정"
+							IsEnabled="{Binding CanBeginEdit}"
+							Style="{StaticResource MaterialDesignOutlinedButton}" />
+						<Button
+							AutomationProperties.AutomationId="Console.Servers.Detail.MetricHistory"
+							Click="OnShowHistory"
+							Content="지표 이력"
+							IsEnabled="{Binding CanShowHistory}"
+							Style="{StaticResource MaterialDesignFlatButton}" />
+					</StackPanel>
 				</StackPanel>
 			</c:ConsoleDetailHost>
 		</c:ConsoleShell.Detail>

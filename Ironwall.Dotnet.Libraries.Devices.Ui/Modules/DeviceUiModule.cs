@@ -87,12 +87,21 @@ public class DeviceUiModule : Module
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>().SingleInstance();
 
             // N-12 server monitor — 서버 모니터 콘솔(레일 · 목록 + 지표 띠 · 상세).
-            // IUnitApiService 는 Lazy 로만 잡는다: 8.0 미만이면 서비스가 부대를 아예 묻지 않는다(미등록이어도 죽지 않는다).
+            // 판본(6.3 평면 ↔ 7.0/8.0 축)을 아는 통로는 Devices.Api 의 새 인터페이스다 — 기존 IServerApiService 는 그대로 둔다.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Api.Servers.ServerAxisApiService(
+                        c.Resolve<Ironwall.Dotnet.Libraries.Api.Services.IApiService>(),
+                        new ApiSetupModel(_apiSetup),
+                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Api.Servers.IServerAxisApiService>()
+                   .SingleInstance();
+            // IUnitApiService · IUnitScopeService 는 Lazy 로만 잡는다: 8.0 미만이면 서비스가 부대를 아예 묻지 않는다.
             builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerConsoleService(
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Servers.IServerAxisApiService>(),
                         c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Services.IServerApiService>(),
-                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService>(),
                         c.Resolve<DeviceQueryPolicy>(),
                         c.ResolveOptional<Lazy<Ironwall.Dotnet.Libraries.Devices.Api.Services.IUnitApiService>>(),
+                        c.ResolveOptional<Lazy<IUnitScopeService>>(),
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.IServerConsoleService>()
                    .SingleInstance();

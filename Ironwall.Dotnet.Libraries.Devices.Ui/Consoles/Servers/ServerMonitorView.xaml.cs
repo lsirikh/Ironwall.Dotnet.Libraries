@@ -141,18 +141,18 @@ public partial class ServerMonitorView : UserControl
         switch (spec.Kind)
         {
             case ServerColumnKind.StatusPill:
-                // 색만으로 뜻을 전하지 않는다 — 장애 ▲ · 보고 없음 ○ · 그 밖 ●.
+                // 색만으로 뜻을 전하지 않는다 — 넷을 글리프로 가른다(▲ 장애 · ◆ 경고 · ● 정상 · ○ 보고 없음).
                 return new DataGridTemplateColumn
                 {
                     SortMemberPath = spec.BindingPath,
                     CellTemplate = ParseTemplate(
                         "<Border Style=\"{DynamicResource Console.Pill}\"><StackPanel Orientation=\"Horizontal\">"
-                        + "<TextBlock Margin=\"0,0,5,0\" FontSize=\"10\" VerticalAlignment=\"Center\"><TextBlock.Style><Style TargetType=\"TextBlock\">"
-                        + "<Setter Property=\"Text\" Value=\"&#9679;\" /><Setter Property=\"Foreground\" Value=\"{DynamicResource TextMutedBrush}\" />"
+                        + "<TextBlock Margin=\"0,0,5,0\" FontSize=\"10\" VerticalAlignment=\"Center\" Text=\"{Binding StatusGlyph, Mode=OneWay}\">"
+                        + "<TextBlock.Style><Style TargetType=\"TextBlock\">"
+                        + "<Setter Property=\"Foreground\" Value=\"{DynamicResource TextMutedBrush}\" />"
                         + "<Style.Triggers>"
-                        + "<DataTrigger Binding=\"{Binding IsNotReported}\" Value=\"True\"><Setter Property=\"Text\" Value=\"&#9675;\" /></DataTrigger>"
-                        + "<DataTrigger Binding=\"{Binding IsFault}\" Value=\"True\"><Setter Property=\"Text\" Value=\"&#9650;\" />"
-                        + "<Setter Property=\"Foreground\" Value=\"{DynamicResource StatusCriticalBrush}\" /></DataTrigger>"
+                        + "<DataTrigger Binding=\"{Binding IsWarning}\" Value=\"True\"><Setter Property=\"Foreground\" Value=\"{DynamicResource StatusWarningBrush}\" /></DataTrigger>"
+                        + "<DataTrigger Binding=\"{Binding IsFault}\" Value=\"True\"><Setter Property=\"Foreground\" Value=\"{DynamicResource StatusCriticalBrush}\" /></DataTrigger>"
                         + "</Style.Triggers></Style></TextBlock.Style></TextBlock>"
                         + $"<TextBlock FontSize=\"12\" VerticalAlignment=\"Center\" Foreground=\"{{DynamicResource TextPrimaryBrush}}\" Text=\"{{Binding {spec.BindingPath}, Mode=OneWay}}\" />"
                         + "</StackPanel></Border>"),
@@ -268,6 +268,13 @@ public partial class ServerMonitorView : UserControl
     {
         if (ViewModel is { } vm) await vm.UndoAssignAsync();
     }
+
+    private async void OnApplyTray(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.ApplyTrayAsync();
+    }
+
+    private void OnRevertTray(object sender, RoutedEventArgs e) => ViewModel?.RevertTray();
 
     private async void OnAssignSelection(object sender, RoutedEventArgs e)
     {
