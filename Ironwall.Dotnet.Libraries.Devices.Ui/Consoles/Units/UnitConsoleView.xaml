@@ -1,0 +1,1079 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitConsoleView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles"
+	xmlns:dash="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:units="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units"
+	Background="{DynamicResource SurfaceBrush}"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		부대 콘솔(N-11). 정본 목업:
+		docs/design/event-mapping-unit-console-storyboard.html 화면 G~K ·
+		docs/design/event-mapping-unit-console-wireframe.html §2-2 · §3 · §4-3 · §7 ·
+		docs/design/all-windows-drag-wireframe.html L411-413(호출 횟수 판정).
+
+		★ 트리와 미배치 장비는 같은 칸을 번갈아 쓰지 않는다 — 나란히 둔다.
+		  드래그 커널은 화면에 <b>보이는</b> 드롭존만 후보로 삼으므로(DropZone.ZonesUnder 가 IsVisible 로 거른다),
+		  둘이 배타적이면 끄는 쪽과 놓는 쪽이 한 번도 함께 있지 못해 이 노드의 대표 기능이 성립하지 않는다.
+
+		치수: 헤더 40 · 레일 184 · 툴바 40 · 트리 노드 30 · 들여쓰기 16/단계 · 입력 32 · 상세 340 · 상태 띠 30.
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationProperties.AutomationId 만.
+		식별자 모양은 둘뿐이다: 커널이 만드는 Console.Units.* · 이 창이 만드는 Units.<구역>.*
+		(루트만 목업이 정한 Units.Console.Panel 이다 — 와이어프레임 L427).
+		색이 아니라 형태로 구분한다: 선택 = 좌측 3px 세로 바 / 드롭 = 파선 윤곽 · 사선 해치 / Draft = 앰버 파선 {6,4}.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<units:EchelonTextConverter x:Key="EchelonText" />
+		<units:NotBoolToVisibilityConverter x:Key="NotBoolToVisibility" />
+		<dash:PackIconKindConverter x:Key="IconKind" />
+
+		<!--  제대 배지 — 글자 + 테두리(형태). 색만으로 뜻을 전하지 않는다.  -->
+		<Style x:Key="Unit.EchelonBadge" TargetType="Border">
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="Height" Value="18" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="CornerRadius" Value="3" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<!--
+			제대 칩 — 고른 상태는 틴트 + Primary 2px 테두리.
+			바탕·테두리·글자색을 요소에 직접 쓰지 않는다: 로컬 값은 Style 트리거를 이겨
+			"고름" 이 화면에 나타나지 않는다(그 전 판이 정확히 그래서 아무 표시가 없었다).
+		-->
+		<Style x:Key="Unit.Chip.Plate" TargetType="Border">
+			<Setter Property="Padding" Value="9,2" />
+			<Setter Property="CornerRadius" Value="11" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="TextElement.Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsSelected}" Value="True">
+					<Setter Property="Background" Value="{DynamicResource TintInfoBrush}" />
+					<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+					<Setter Property="BorderThickness" Value="2" />
+					<Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style x:Key="Unit.Chip" TargetType="Border">
+			<Setter Property="Padding" Value="8,2" />
+			<Setter Property="CornerRadius" Value="11" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<Style x:Key="Unit.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="32" />
+			<Setter Property="Padding" Value="8,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<Style x:Key="Unit.Combo" TargetType="ComboBox">
+			<Setter Property="Height" Value="32" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="12.5" />
+		</Style>
+
+		<!--  UIA 에 실제로 나오는 글자 — TextBlock 은 peer 가 없어 계측점이 되지 못한다.  -->
+		<Style x:Key="Unit.Readout" TargetType="Label">
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="HorizontalContentAlignment" Value="Left" />
+		</Style>
+
+		<!--
+			트리 행 — 커널 Console.ReorderList 의 선택 어휘(좌측 3px 세로 바)를 옮겨 왔다.
+			컨테이너에 AutomationId 를 달아야 자동화가 "그 부대 행" 을 짚을 수 있는데,
+			ItemContainerStyle 을 통째로 주면 커널 스타일의 컨테이너 템플릿이 사라져 선택 표시가 없어진다.
+		-->
+		<Style x:Key="Unit.TreeRow" TargetType="ListBoxItem">
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Units.Tree.Node.{0}}" />
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ListBoxItem">
+						<Grid>
+							<Border
+								x:Name="Bd"
+								Background="Transparent"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="0,0,0,1" />
+							<Rectangle
+								x:Name="Bar"
+								Width="3"
+								HorizontalAlignment="Left"
+								Fill="{DynamicResource PrimaryBrush}"
+								Visibility="Collapsed" />
+							<Border
+								x:Name="Focus"
+								BorderBrush="{DynamicResource FocusRingBrush}"
+								BorderThickness="2"
+								Visibility="Collapsed" />
+							<ContentPresenter Margin="6,0" />
+						</Grid>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsSelected" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+								<Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+	</UserControl.Resources>
+
+	<c:ConsoleShell
+		AutomationProperties.AutomationId="Units.Console.Panel"
+		ConsoleKey="Units"
+		IsDetailRequested="{Binding IsDetailRequested}"
+		Subtitle="{Binding MyUnitCode}"
+		Title="부대 편제">
+
+		<!--  레일 — 보기 3종(스토리보드 화면 G L306-310). 인접 관계도는 이 노드 범위 밖이라 자리만 둔다.  -->
+		<c:ConsoleShell.Rail>
+			<c:ConsoleRail
+				AutomationProperties.AutomationId="Console.Units.Rail"
+				ConsoleKey="Units"
+				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				ItemsSource="{Binding RailEntries}"
+				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Resources>
+					<!--  레일 항목의 Icon 은 아이콘 이름을 쥔 토큰이다 — 뷰모델이 시각 요소를 쥐지 않게 여기서 그린다  -->
+					<DataTemplate DataType="{x:Type consoles:ConsoleIconToken}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
+					</DataTemplate>
+				</c:ConsoleRail.Resources>
+				<c:ConsoleRail.Footer>
+					<Label
+						AutomationProperties.AutomationId="Console.Units.Rail.Footer"
+						Content="{Binding RailFooterText}"
+						Style="{StaticResource Unit.Readout}" />
+				</c:ConsoleRail.Footer>
+			</c:ConsoleRail>
+		</c:ConsoleShell.Rail>
+
+		<!--  툴바 — 제대 칩 · 검색 · [＋ 부대 등록] · [갱신] · [삭제] · [이동 되돌리기]  -->
+		<c:ConsoleShell.Toolbar>
+			<c:ConsoleToolbar
+				AddClick="OnAdd"
+				AddDisabledReason="{Binding AddBlockedReason}"
+				AddText="부대 등록"
+				CanAdd="{Binding CanAdd}"
+				CanDelete="{Binding CanDeleteUnit}"
+				CanRefresh="{Binding CanReload}"
+				ConsoleKey="Units"
+				DeleteClick="OnDelete"
+				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				RefreshClick="OnReload"
+				SearchPlaceholder="이름 · 코드"
+				SearchText="{Binding SearchText, Mode=TwoWay}">
+				<c:ConsoleToolbar.Filters>
+					<ItemsControl
+						AutomationProperties.AutomationId="Units.Toolbar.EchelonChips"
+						Focusable="False"
+						ItemsSource="{Binding EchelonFilters}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<StackPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Button
+									Margin="0,0,5,0"
+									Padding="0"
+									AutomationProperties.AutomationId="{Binding Key, StringFormat=Units.Toolbar.Echelon.{0}}"
+									Background="Transparent"
+									BorderThickness="0"
+									Click="OnEchelonChip"
+									Cursor="Hand">
+									<Button.Template>
+										<ControlTemplate TargetType="Button">
+											<Border Style="{StaticResource Unit.Chip.Plate}">
+												<TextBlock FontSize="12" Text="{Binding Label}" />
+											</Border>
+										</ControlTemplate>
+									</Button.Template>
+								</Button>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</c:ConsoleToolbar.Filters>
+
+				<c:ConsoleToolbar.Extra>
+					<Button
+						AutomationProperties.AutomationId="Units.Toolbar.MoveUndo"
+						Click="OnUndoMove"
+						Content="이동 되돌리기"
+						IsEnabled="{Binding CanUndoMove}"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="마지막 이동 1회를 반대로 되돌립니다."
+						Visibility="{Binding CanUndoMove, Converter={StaticResource BoolToVisibility}}" />
+				</c:ConsoleToolbar.Extra>
+			</c:ConsoleToolbar>
+		</c:ConsoleShell.Toolbar>
+
+		<!--  가운데 — 편제 트리(항상) + 미배치 장비(나란히) + 인접 관계도 자리(트리 위 덮개)  -->
+		<c:ConsoleShell.List>
+			<Grid ClipToBounds="True">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
+
+				<!--  ① 편제 트리 — 언제나 보인다(장비를 놓을 자리라서)  -->
+				<DockPanel Grid.Column="0" LastChildFill="True">
+					<!--  "루트로" 드롭존 — 트리 최상단. 끌지 않을 때도 자리를 지켜 레이아웃이 튀지 않는다.  -->
+					<drag:DropZoneChrome
+						Margin="6,6,6,4"
+						drag:DropZone.Handler="{Binding Drop}"
+						drag:DropZone.Key="unit-root"
+						CornerRadius="5"
+						DockPanel.Dock="Top">
+						<!--  계측점은 Button 이다 — DropZoneChrome 은 ContentControl 이라 UIA 트리에 나오지 않는다.  -->
+						<Button
+							Height="28"
+							Padding="0"
+							AutomationProperties.AutomationId="Units.Tree.RootDrop"
+							Background="Transparent"
+							BorderThickness="0"
+							Click="OnMoveToRoot"
+							Cursor="Hand"
+							IsEnabled="{Binding CanMoveSelected}"
+							ToolTip="고른 부대를 최상위로 올립니다 — 부대를 여기에 끌어다 놓아도 됩니다.">
+							<Button.Template>
+								<ControlTemplate TargetType="Button">
+									<Border Background="Transparent">
+										<TextBlock
+											HorizontalAlignment="Center"
+											VerticalAlignment="Center"
+											FontSize="11.5"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="여기에 놓으면 최상위(루트)로 — 또는 부대를 고르고 누르십시오" />
+									</Border>
+								</ControlTemplate>
+							</Button.Template>
+						</Button>
+					</drag:DropZoneChrome>
+
+					<Label
+						Margin="16,10,16,0"
+						AutomationProperties.AutomationId="Units.Tree.Empty"
+						Content="편제가 비어 있습니다 — 툴바의 [부대 등록] 으로 첫 부대를 만드십시오."
+						DockPanel.Dock="Top"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Style="{StaticResource Unit.Readout}"
+						Visibility="{Binding IsTreeEmpty, Converter={StaticResource BoolToVisibility}}" />
+
+					<!--
+						트리는 평면 ListBox 다 — 커널 CaptureDragBehavior 가 ItemsControl 의 뿌리 생성기로 항목을 되찾으므로
+						중첩 TreeViewItem 은 끌리지 않고, TreeView 는 Selector 가 아니라 데드존 미만의 클릭 폴백도 죽는다.
+					-->
+					<ListBox
+						AutomationProperties.AutomationId="Units.Tree"
+						ItemContainerStyle="{StaticResource Unit.TreeRow}"
+						ItemsSource="{Binding Rows}"
+						PreviewKeyDown="OnTreeKeyDown"
+						SelectedItem="{Binding SelectedRow, Mode=OneWay}"
+						SelectionChanged="OnTreeSelectionChanged"
+						SelectionMode="Single"
+						Style="{StaticResource Console.ReorderList}">
+						<b:Interaction.Behaviors>
+							<drag:CaptureDragBehavior
+								DisplayMemberPath="Name"
+								Handler="{Binding Drop}"
+								IsDragEnabled="{Binding CanEditUnits}"
+								KeyboardFallback="Alt+↑ 상위로 · Alt+↓ 바로 위 형제 밑으로 · 상세 칸의 '상위 부대' 콤보 + [옮기기]" />
+						</b:Interaction.Behaviors>
+						<ListBox.ItemTemplate>
+							<DataTemplate>
+								<!--  행 하나가 곧 드롭존이다 — 상위 바꾸기(부대) · 배치(장비) 둘 다 여기로 온다.  -->
+								<drag:DropZoneChrome
+									Margin="{Binding Indent}"
+									drag:DropZone.Data="{Binding}"
+									drag:DropZone.Handler="{Binding DataContext.Drop, RelativeSource={RelativeSource AncestorType=UserControl}}"
+									drag:DropZone.Key="unit-parent"
+									CornerRadius="4">
+									<Grid Height="30">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="16" />
+											<ColumnDefinition Width="Auto" />
+											<ColumnDefinition Width="Auto" />
+											<ColumnDefinition Width="*" />
+											<ColumnDefinition Width="Auto" />
+										</Grid.ColumnDefinitions>
+
+										<Button
+											Grid.Column="0"
+											Width="16"
+											Height="16"
+											Padding="0"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Tree.Expander.{0}}"
+											Background="Transparent"
+											BorderThickness="0"
+											Click="OnToggleExpand"
+											Focusable="False"
+											Visibility="{Binding ShowExpander, Converter={StaticResource BoolToVisibility}}">
+											<Button.Template>
+												<ControlTemplate TargetType="Button">
+													<Border Background="Transparent">
+														<md:PackIcon
+															Width="14"
+															Height="14"
+															HorizontalAlignment="Center"
+															VerticalAlignment="Center"
+															Foreground="{DynamicResource TextSecondaryBrush}"
+															Kind="ChevronDown">
+															<md:PackIcon.Style>
+																<Style TargetType="md:PackIcon">
+																	<Style.Triggers>
+																		<DataTrigger Binding="{Binding IsExpanded}" Value="False">
+																			<Setter Property="Kind" Value="ChevronRight" />
+																		</DataTrigger>
+																	</Style.Triggers>
+																</Style>
+															</md:PackIcon.Style>
+														</md:PackIcon>
+													</Border>
+												</ControlTemplate>
+											</Button.Template>
+										</Button>
+
+										<!--  집기 핸들 — Thumb 파생이라 UIA peer 가 실재한다. Button 계열은 캡처를 빼앗아 쓸 수 없다.  -->
+										<drag:DragHandle
+											Grid.Column="1"
+											Width="14"
+											Margin="2,0,4,0"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Tree.Handle.{0}}"
+											AutomationProperties.Name="부대 옮기기 손잡이"
+											ToolTip="잡아 끌면 다른 부대 아래로 옮깁니다 · Esc 로 취소" />
+
+										<Border
+											Grid.Column="2"
+											Margin="0,0,7,0"
+											Style="{StaticResource Unit.EchelonBadge}">
+											<TextBlock
+												VerticalAlignment="Center"
+												FontSize="10.5"
+												Foreground="{DynamicResource TextSecondaryBrush}"
+												Text="{Binding EchelonText}" />
+										</Border>
+
+										<StackPanel
+											Grid.Column="3"
+											VerticalAlignment="Center"
+											Orientation="Horizontal">
+											<TextBlock
+												VerticalAlignment="Center"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextPrimaryBrush}"
+												Text="{Binding Name}"
+												TextTrimming="CharacterEllipsis"
+												ToolTip="{Binding Tooltip}" />
+											<md:PackIcon
+												Width="13"
+												Height="13"
+												Margin="5,0,0,0"
+												VerticalAlignment="Center"
+												Foreground="{DynamicResource PrimaryBrush}"
+												Kind="Star"
+												ToolTip="이 앱이 붙어 있는 부대입니다"
+												Visibility="{Binding IsMine, Converter={StaticResource BoolToVisibility}}" />
+											<TextBlock
+												Margin="6,0,0,0"
+												VerticalAlignment="Center"
+												FontSize="10.5"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="{Binding Code}" />
+										</StackPanel>
+
+										<StackPanel
+											Grid.Column="4"
+											VerticalAlignment="Center"
+											Orientation="Horizontal">
+											<!--  운용 중지 — 글자는 본문색, 상태색은 점이 진다(색만으로 뜻을 전하지 않는다).  -->
+											<Border
+												Margin="0,0,4,0"
+												Style="{StaticResource Console.Pill}"
+												ToolTip="운용 중지된 부대입니다(is_enable=false)."
+												Visibility="{Binding IsEnable, Converter={StaticResource NotBoolToVisibility}}">
+												<StackPanel Orientation="Horizontal">
+													<Ellipse
+														Width="6"
+														Height="6"
+														Margin="0,0,5,0"
+														VerticalAlignment="Center"
+														Fill="{DynamicResource StatusWarningBrush}" />
+													<TextBlock
+														FontSize="10.5"
+														Foreground="{DynamicResource TextPrimaryBrush}"
+														Text="중지" />
+												</StackPanel>
+											</Border>
+											<Border
+												Padding="6,0"
+												Style="{StaticResource Unit.EchelonBadge}"
+												Visibility="{Binding HasDeviceCount, Converter={StaticResource BoolToVisibility}}">
+												<TextBlock FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}">
+													<Run Text="장비" /><Run Text=" " /><Run Text="{Binding DeviceCount, Mode=OneWay}" />
+												</TextBlock>
+											</Border>
+										</StackPanel>
+									</Grid>
+								</drag:DropZoneChrome>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+				</DockPanel>
+
+				<!--  ③ 인접 관계도 — 이 노드의 범위 밖(봉투: "관계도는 뒤"). 트리 위를 덮되 사실을 적는다.  -->
+				<Border
+					Grid.Column="0"
+					Padding="18"
+					Background="{DynamicResource SurfaceBrush}"
+					Visibility="{Binding IsAdjacencyView, Converter={StaticResource BoolToVisibility}}">
+					<StackPanel VerticalAlignment="Top">
+						<Label
+							AutomationProperties.AutomationId="Units.Adjacency.Placeholder"
+							Content="인접 관계도는 다음 단계입니다"
+							FontSize="13"
+							FontWeight="Bold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Style="{StaticResource Unit.Readout}" />
+						<TextBlock
+							Margin="0,6,0,0"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="인접 연결·해제는 지금도 됩니다 — 편제 트리에서 부대를 고르고 상세 칸의 '인접 부대' 에서 잇거나 끊으십시오. 그림으로 보는 관계도만 뒤로 미뤘습니다."
+							TextWrapping="Wrap" />
+					</StackPanel>
+				</Border>
+
+				<!--  ② 미배치 장비 — 트리와 나란히 선다. 여기서 끌어 왼쪽 부대 위에 놓는다.  -->
+				<Border
+					Grid.Column="1"
+					Width="320"
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="1,0,0,0"
+					Visibility="{Binding IsDeviceView, Converter={StaticResource BoolToVisibility}}">
+					<DockPanel LastChildFill="True">
+						<Border
+							Height="30"
+							Padding="10,0"
+							Background="{DynamicResource SurfaceAltBrush}"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="0,0,0,1"
+							DockPanel.Dock="Top">
+							<Label
+								AutomationProperties.AutomationId="Units.Devices.Header"
+								Content="{Binding DeviceHeaderText}"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Style="{StaticResource Unit.Readout}" />
+						</Border>
+
+						<Border
+							Padding="10,7"
+							Background="{DynamicResource TintInfoBrush}"
+							BorderBrush="{DynamicResource StatusInfoBrush}"
+							BorderThickness="4,0,0,0"
+							DockPanel.Dock="Top">
+							<TextBlock
+								FontSize="11"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="소속이 비었거나 편제에 없는 부대를 가리키는 장비입니다. 서버에 이 질의가 없어 전량을 읽어 여기서 가릅니다 — 대개 비어 있는 것이 정상입니다."
+								TextWrapping="Wrap" />
+						</Border>
+
+						<!--  Draft 트레이 — 쌓인 배치와 [적용] · [되돌리기]  -->
+						<Border
+							Padding="10,6"
+							Background="{DynamicResource SurfaceAltBrush}"
+							BorderBrush="{DynamicResource AccentBrush}"
+							BorderThickness="0,2,0,0"
+							DockPanel.Dock="Bottom"
+							Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVisibility}}">
+							<StackPanel>
+								<Label
+									AutomationProperties.AutomationId="Units.Devices.TrayMessage"
+									Content="{Binding Tray.Message}"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Style="{StaticResource Unit.Readout}" />
+								<ProgressBar
+									Height="4"
+									Margin="0,4,0,0"
+									AutomationProperties.AutomationId="Units.Devices.Progress"
+									Maximum="{Binding Tray.ProgressTotal, Mode=OneWay}"
+									Value="{Binding Tray.ProgressDone, Mode=OneWay}"
+									Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVisibility}}" />
+								<StackPanel
+									Margin="0,6,0,0"
+									HorizontalAlignment="Right"
+									Orientation="Horizontal">
+									<Button
+										Margin="0,0,6,0"
+										AutomationProperties.AutomationId="Units.Devices.Revert"
+										Click="OnRevertAssigns"
+										Content="되돌리기"
+										IsEnabled="{Binding Tray.CanRevert}"
+										Style="{StaticResource MaterialDesignOutlinedButton}" />
+									<Button
+										AutomationProperties.AutomationId="Units.Devices.Apply"
+										Click="OnApplyAssigns"
+										Content="적용"
+										IsEnabled="{Binding Tray.CanApply}"
+										Style="{StaticResource MaterialDesignRaisedButton}" />
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+						<!--  배치 바 — 드래그의 버튼 · 키보드 경로. 콤보를 비우면 트리에서 고른 부대로 간다.  -->
+						<Border
+							Padding="10,7"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="0,1,0,0"
+							DockPanel.Dock="Bottom">
+							<StackPanel>
+								<Label
+									AutomationProperties.AutomationId="Units.Devices.TargetLabel"
+									Content="{Binding AssignTargetText}"
+									Style="{StaticResource Unit.Readout}" />
+								<ComboBox
+									Margin="0,4,0,0"
+									AutomationProperties.AutomationId="Units.Devices.TargetCombo"
+									DisplayMemberPath="Label"
+									IsEnabled="{Binding CanEditUnits}"
+									ItemsSource="{Binding AssignTargets}"
+									SelectedValue="{Binding AssignTargetUnitId, Mode=TwoWay}"
+									SelectedValuePath="Id"
+									Style="{StaticResource Unit.Combo}"
+									ToolTip="비워 두면 편제 트리에서 고른 부대로 갑니다." />
+								<Button
+									Margin="0,6,0,0"
+									HorizontalAlignment="Stretch"
+									AutomationProperties.AutomationId="Units.Devices.AssignButton"
+									Click="OnAssignSelected"
+									Content="이 부대에 배치"
+									IsEnabled="{Binding CanAssignSelectedDevices}"
+									Style="{StaticResource MaterialDesignOutlinedButton}"
+									ToolTip="고른 장비를 위 부대에 쌓습니다 — 손잡이를 끌어 트리에 놓아도 같습니다." />
+							</StackPanel>
+						</Border>
+
+						<Grid>
+							<Label
+								Margin="12,12,12,0"
+								VerticalAlignment="Top"
+								AutomationProperties.AutomationId="Units.Devices.Empty"
+								Content="미배치 장비가 없습니다."
+								Foreground="{DynamicResource TextMutedBrush}"
+								Style="{StaticResource Unit.Readout}"
+								Visibility="{Binding IsDeviceListEmpty, Converter={StaticResource BoolToVisibility}}" />
+
+							<ListBox
+								AutomationProperties.AutomationId="Units.Devices.List"
+								ItemsSource="{Binding DeviceRows}"
+								SelectionChanged="OnDeviceSelectionChanged"
+								SelectionMode="Extended"
+								Style="{StaticResource Console.ReorderList}">
+								<b:Interaction.Behaviors>
+									<drag:CaptureDragBehavior
+										DisplayMemberPath="Name"
+										Handler="{Binding Drop}"
+										IsDragEnabled="{Binding CanEditUnits}"
+										KeyboardFallback="장비를 고르고 아래 [이 부대에 배치]" />
+								</b:Interaction.Behaviors>
+								<ListBox.ItemContainerStyle>
+									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+										<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Units.Devices.Item.{0}}" />
+										<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+									</Style>
+								</ListBox.ItemContainerStyle>
+								<ListBox.ItemTemplate>
+									<DataTemplate>
+										<Grid Height="38">
+											<!--  미저장 Draft — 앰버 파선 {6,4}. {4,3}(그룹 선택)·{5,3}(드로잉)과 겹치지 않는 새 패턴이다.  -->
+											<Rectangle
+												RadiusX="4"
+												RadiusY="4"
+												Stroke="{DynamicResource AccentBrush}"
+												StrokeDashArray="6,4"
+												StrokeThickness="1"
+												Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}" />
+											<Grid Margin="2,0,8,0">
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="Auto" />
+													<ColumnDefinition Width="Auto" />
+													<ColumnDefinition Width="*" />
+													<ColumnDefinition Width="Auto" />
+												</Grid.ColumnDefinitions>
+												<drag:DragHandle
+													Grid.Column="0"
+													Width="14"
+													Margin="2,0,6,0"
+													AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Devices.Handle.{0}}"
+													AutomationProperties.Name="장비 배치 손잡이"
+													ToolTip="잡아 끌어 왼쪽 편제 트리의 부대 위에 놓습니다 · Esc 로 취소" />
+												<Border
+													Grid.Column="1"
+													Margin="0,0,7,0"
+													Style="{StaticResource Unit.EchelonBadge}">
+													<TextBlock
+														VerticalAlignment="Center"
+														FontSize="10.5"
+														Foreground="{DynamicResource TextSecondaryBrush}"
+														Text="{Binding CategoryText}" />
+												</Border>
+												<StackPanel
+													Grid.Column="2"
+													VerticalAlignment="Center"
+													Orientation="Horizontal">
+													<TextBlock
+														FontSize="12.5"
+														Foreground="{DynamicResource TextPrimaryBrush}"
+														Text="{Binding Name}"
+														TextTrimming="CharacterEllipsis" />
+													<TextBlock
+														Margin="6,0,0,0"
+														FontSize="10.5"
+														Foreground="{DynamicResource TextMutedBrush}"
+														Text="{Binding NumberText}" />
+												</StackPanel>
+												<TextBlock
+													Grid.Column="3"
+													VerticalAlignment="Center"
+													FontSize="11"
+													Foreground="{DynamicResource AccentBrush}"
+													Text="{Binding PendingText}" />
+											</Grid>
+										</Grid>
+									</DataTemplate>
+								</ListBox.ItemTemplate>
+							</ListBox>
+						</Grid>
+					</DockPanel>
+				</Border>
+			</Grid>
+		</c:ConsoleShell.List>
+
+		<!--  상태 띠 — 건수 · 방금 한 일 · 권한  -->
+		<c:ConsoleShell.StatusBar>
+			<Border
+				Padding="12,5"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="0,1,0,0">
+				<DockPanel LastChildFill="True">
+					<Label
+						AutomationProperties.AutomationId="Units.Status.Permission"
+						Content="읽기 전용 — units:edit 없음"
+						DockPanel.Dock="Right"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Style="{StaticResource Unit.Readout}"
+						Visibility="{Binding CanEditUnits, Converter={StaticResource NotBoolToVisibility}}" />
+					<Label
+						Margin="12,0"
+						AutomationProperties.AutomationId="Units.Status.Message"
+						Content="{Binding StatusText}"
+						DockPanel.Dock="Right"
+						Style="{StaticResource Unit.Readout}" />
+					<Label
+						AutomationProperties.AutomationId="Units.Status.Count"
+						Content="{Binding ListStatusText}"
+						Style="{StaticResource Unit.Readout}" />
+				</DockPanel>
+			</Border>
+		</c:ConsoleShell.StatusBar>
+
+		<!--  상세 340 — 커널 ConsoleField 두 칸(라벨 102 · 입력)으로 왼쪽 모서리를 하나로 맞춘다  -->
+		<c:ConsoleShell.Detail>
+			<c:ConsoleDetailHost
+				ApplyClick="OnApply"
+				ApplyText="{Binding Detail.ApplyText}"
+				Banner="{Binding Detail.Banner}"
+				CanApply="{Binding Detail.CanApply}"
+				CanRevert="{Binding Detail.CanRevert}"
+				ConsoleKey="Units"
+				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+				FooterText="{Binding Detail.FooterText}"
+				IsDirty="{Binding Detail.IsDirty}"
+				IsReadOnly="{Binding Detail.IsReadOnly}"
+				Kind="{Binding Detail.Kind}"
+				RevertClick="OnRevert"
+				RevertText="{Binding Detail.RevertText}"
+				ShakeToken="{Binding Detail.ShakeToken}"
+				ShowButtons="{Binding Detail.ShowButtons}"
+				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				Title="{Binding Detail.Title}">
+				<Grid>
+					<TextBlock
+						Margin="16,16,14,0"
+						VerticalAlignment="Top"
+						FontSize="12"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="왼쪽 편제에서 부대를 고르면 여기에 상세가 뜹니다. 새로 만들려면 툴바의 [부대 등록] 을 누르십시오."
+						TextWrapping="Wrap"
+						Visibility="{Binding IsDetailRequested, Converter={StaticResource NotBoolToVisibility}}" />
+
+					<StackPanel
+						Margin="16,4,14,16"
+						DataContext="{Binding Form}"
+						Visibility="{Binding DataContext.IsDetailRequested, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+
+						<!--  삭제 차단(409) — 무엇이 매달려 있는지 개수로(스토리보드 화면 J)  -->
+						<Border
+							Margin="0,8,0,0"
+							Padding="10,8"
+							Background="{DynamicResource TintCriticalBrush}"
+							BorderBrush="{DynamicResource StatusCriticalBrush}"
+							BorderThickness="4,1,1,1"
+							CornerRadius="4"
+							Visibility="{Binding DataContext.IsDeleteBlocked, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+							<StackPanel>
+								<Label
+									AutomationProperties.AutomationId="Units.Detail.DeleteBlocked"
+									Content="부대를 삭제할 수 없습니다"
+									FontSize="12.5"
+									FontWeight="Bold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Style="{StaticResource Unit.Readout}" />
+								<ItemsControl
+									Margin="0,6,0,0"
+									Focusable="False"
+									ItemsSource="{Binding DataContext.DeleteBlock.Items, RelativeSource={RelativeSource AncestorType=UserControl}}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}">
+												<Run Text="·" /><Run Text=" " /><Run Text="{Binding Label, Mode=OneWay}" /><Run Text=" " /><Run FontWeight="Bold" Text="{Binding Count, Mode=OneWay}" />
+											</TextBlock>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+								<TextBlock
+									Margin="0,6,0,0"
+									FontSize="11.5"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="운용을 멈추려면 삭제 대신 운용 중지를 쓰십시오 — 이력과 소속은 보존됩니다."
+									TextWrapping="Wrap" />
+								<StackPanel
+									Margin="0,8,0,0"
+									HorizontalAlignment="Right"
+									Orientation="Horizontal">
+									<Button
+										Margin="0,0,6,0"
+										AutomationProperties.AutomationId="Units.Detail.DeleteBlocked.Close"
+										Click="OnDismissDeleteBlock"
+										Content="닫기"
+										Style="{StaticResource MaterialDesignFlatButton}" />
+									<Button
+										AutomationProperties.AutomationId="Units.Detail.DeleteBlocked.Disable"
+										Click="OnDisable"
+										Content="운용 중지"
+										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource MaterialDesignOutlinedButton}" />
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+						<!--  폼 오류 한 줄 — 보내기 전에 막은 까닭. 고친 칸 바로 위에 둔다.  -->
+						<Border
+							Margin="0,10,0,0"
+							Padding="8,6"
+							Background="{DynamicResource TintCriticalBrush}"
+							BorderBrush="{DynamicResource StatusCriticalBrush}"
+							BorderThickness="3,0,0,0"
+							Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+							<Label
+								AutomationProperties.AutomationId="Units.Detail.Error"
+								Content="{Binding ErrorText}"
+								FontSize="11.5"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Style="{StaticResource Unit.Readout}">
+								<Label.ContentTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding}" TextWrapping="Wrap" />
+									</DataTemplate>
+								</Label.ContentTemplate>
+							</Label>
+						</Border>
+
+						<c:ConsoleSection AxisName="units" Header="기본">
+							<StackPanel>
+								<!--  부대 코드 — 등록에서만 입력, 그 뒤로는 잠김(커널이 자물쇠 글리프를 그린다)  -->
+								<c:ConsoleField
+									ApiName="code"
+									Header="부대 코드"
+									IsLocked="{Binding IsCodeLocked}"
+									Note="{Binding CodeNote}">
+									<Grid>
+										<TextBox
+											AutomationProperties.AutomationId="Units.Detail.CodeField"
+											Style="{StaticResource Unit.TextBox}"
+											Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}"
+											Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibility}}" />
+										<Border
+											Height="32"
+											Padding="8,0"
+											Background="{DynamicResource SurfaceSunkenBrush}"
+											BorderBrush="{DynamicResource DividerBrush}"
+											BorderThickness="1"
+											CornerRadius="3"
+											Visibility="{Binding IsCodeLocked, Converter={StaticResource BoolToVisibility}}">
+											<Label
+												AutomationProperties.AutomationId="Units.Detail.CodeText"
+												Content="{Binding Code}"
+												FontFamily="{DynamicResource MonoFont}"
+												FontSize="12.5"
+												Foreground="{DynamicResource TextPrimaryBrush}"
+												Style="{StaticResource Unit.Readout}" />
+										</Border>
+									</Grid>
+								</c:ConsoleField>
+
+								<c:ConsoleField
+									ApiName="name"
+									Header="부대 이름"
+									IsTouched="{Binding IsNameTouched}">
+									<TextBox
+										AutomationProperties.AutomationId="Units.Detail.NameBox"
+										IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource Unit.TextBox}"
+										Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+								</c:ConsoleField>
+
+								<c:ConsoleField
+									ApiName="echelon"
+									Header="제대"
+									IsTouched="{Binding IsEchelonTouched}"
+									Note="{Binding ChildEchelonWarning}">
+									<ComboBox
+										AutomationProperties.AutomationId="Units.Detail.EchelonCombo"
+										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										ItemsSource="{Binding Echelons}"
+										SelectedItem="{Binding Echelon, Mode=TwoWay}"
+										Style="{StaticResource Unit.Combo}">
+										<ComboBox.ItemTemplate>
+											<DataTemplate>
+												<TextBlock Text="{Binding Converter={StaticResource EchelonText}}" />
+											</DataTemplate>
+										</ComboBox.ItemTemplate>
+									</ComboBox>
+								</c:ConsoleField>
+
+								<c:ConsoleField
+									ApiName="description"
+									Header="설명"
+									IsTouched="{Binding IsDescriptionTouched}"
+									Note="{Binding DescriptionCounter}">
+									<TextBox
+										MinHeight="56"
+										AcceptsReturn="True"
+										AutomationProperties.AutomationId="Units.Detail.DescriptionBox"
+										IsReadOnly="{Binding DataContext.Detail.IsFormReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource Unit.TextBox}"
+										Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+										TextWrapping="Wrap"
+										VerticalContentAlignment="Top" />
+								</c:ConsoleField>
+
+								<!--  운용 — 장비·계정·설정과 같은 어휘(체크 상자)로 낸다.  -->
+								<c:ConsoleField
+									ApiName="is_enable"
+									Header="운용"
+									IsTouched="{Binding IsEnableTouched}">
+									<CheckBox
+										AutomationProperties.AutomationId="Units.Detail.EnableSwitch"
+										Content="운용 중"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										IsChecked="{Binding IsEnable, Mode=TwoWay}"
+										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										ToolTip="퇴역은 삭제가 아니라 운용 중지(is_enable=false)입니다." />
+								</c:ConsoleField>
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<!--  상위 부대 — 드래그의 버튼 폴백. 수정 화면에서는 [옮기기] 가 곧바로 보낸다.  -->
+						<c:ConsoleSection AxisName="parent_id" Header="상위 부대">
+							<StackPanel>
+								<c:ConsoleField ApiName="parent_id" Header="상위">
+									<ComboBox
+										AutomationProperties.AutomationId="Units.Detail.ParentCombo"
+										DisplayMemberPath="Label"
+										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										ItemsSource="{Binding ParentOptions}"
+										SelectedValue="{Binding ParentId, Mode=TwoWay}"
+										SelectedValuePath="Id"
+										Style="{StaticResource Unit.Combo}" />
+								</c:ConsoleField>
+								<StackPanel
+									Margin="0,6,0,0"
+									HorizontalAlignment="Right"
+									Orientation="Horizontal"
+									Visibility="{Binding IsCreating, Converter={StaticResource NotBoolToVisibility}}">
+									<Button
+										Margin="0,0,6,0"
+										AutomationProperties.AutomationId="Units.Detail.MoveToRootButton"
+										Click="OnMoveToRoot"
+										Content="최상위로"
+										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource MaterialDesignFlatButton}" />
+									<Button
+										AutomationProperties.AutomationId="Units.Detail.MoveButton"
+										Click="OnMoveToSelectedParent"
+										Content="옮기기"
+										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource MaterialDesignOutlinedButton}"
+										ToolTip="고른 상위 부대로 옮깁니다 — 호출 1회, 되돌리기 있음." />
+								</StackPanel>
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<!--  인접 부대 — 같은 제대만. 무방향이라 양쪽에 생긴다.  -->
+						<c:ConsoleSection
+							AxisName="adjacent_unit_ids"
+							CountText="{Binding AdjacencyCountText}"
+							Header="인접 부대">
+							<StackPanel>
+								<ItemsControl Focusable="False" ItemsSource="{Binding AdjacencyChips}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border Margin="0,0,5,5" Style="{StaticResource Unit.Chip}">
+												<StackPanel Orientation="Horizontal">
+													<TextBlock
+														VerticalAlignment="Center"
+														FontSize="11.5"
+														Foreground="{DynamicResource TextPrimaryBrush}"
+														Text="{Binding Name}" />
+													<Button
+														Width="16"
+														Height="16"
+														Margin="6,0,0,0"
+														Padding="0"
+														AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Detail.AdjacencyRemove.{0}}"
+														Click="OnRemoveAdjacency"
+														Style="{StaticResource MaterialDesignFlatButton}"
+														ToolTip="인접을 끊습니다 — 양쪽에서 함께 사라집니다.">
+														<md:PackIcon
+															Width="11"
+															Height="11"
+															Kind="Close" />
+													</Button>
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+
+								<!--  인접 드롭존 — 계측점은 Label(peer 실재)이다. Chrome 은 ContentControl 이라 트리에 없다.  -->
+								<drag:DropZoneChrome
+									MinHeight="34"
+									Margin="0,2,0,0"
+									drag:DropZone.Handler="{Binding DataContext.Drop, RelativeSource={RelativeSource AncestorType=UserControl}}"
+									drag:DropZone.Key="unit-adjacency"
+									CornerRadius="5">
+									<Label
+										Margin="8,7"
+										AutomationProperties.AutomationId="Units.Detail.AdjacencyDrop"
+										Content="여기에 부대를 끌어다 놓아 인접 연결"
+										FontSize="11.5"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Style="{StaticResource Unit.Readout}" />
+								</drag:DropZoneChrome>
+
+								<DockPanel Margin="0,6,0,0" LastChildFill="True">
+									<Button
+										Margin="6,0,0,0"
+										AutomationProperties.AutomationId="Units.Detail.AdjacencyAddButton"
+										Click="OnAddAdjacency"
+										Content="인접 추가"
+										DockPanel.Dock="Right"
+										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										Style="{StaticResource MaterialDesignOutlinedButton}" />
+									<ComboBox
+										AutomationProperties.AutomationId="Units.Detail.AdjacencyCombo"
+										DisplayMemberPath="Label"
+										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
+										ItemsSource="{Binding AdjacencyCandidates}"
+										Style="{StaticResource Unit.Combo}" />
+								</DockPanel>
+								<TextBlock
+									Margin="0,4,0,0"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="인접은 양방향으로 연결됩니다 — 상대 부대 상세에도 나타납니다. 보내기 직전에 서버 목록을 다시 읽어 다른 세션의 변경을 덮지 않습니다."
+									TextWrapping="Wrap" />
+							</StackPanel>
+						</c:ConsoleSection>
+
+						<Label
+							Margin="0,14,0,0"
+							AutomationProperties.AutomationId="Units.Detail.Counts"
+							Content="{Binding CountsText}"
+							Style="{StaticResource Unit.Readout}" />
+
+						<!--  파괴적 동작은 맨 아래, 서로 떨어뜨려 둔다.  -->
+						<StackPanel
+							Margin="0,18,0,24"
+							HorizontalAlignment="Left"
+							Orientation="Horizontal"
+							Visibility="{Binding IsCreating, Converter={StaticResource NotBoolToVisibility}}">
+							<Button
+								Margin="0,0,10,0"
+								AutomationProperties.AutomationId="Units.Detail.DeleteButton"
+								Click="OnDelete"
+								Content="삭제"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								IsEnabled="{Binding DataContext.CanDeleteUnit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								Style="{StaticResource MaterialDesignOutlinedButton}" />
+							<Button
+								AutomationProperties.AutomationId="Units.Detail.DisableButton"
+								Click="OnDisable"
+								Content="운용 중지"
+								IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								Style="{StaticResource MaterialDesignFlatButton}" />
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+			</c:ConsoleDetailHost>
+		</c:ConsoleShell.Detail>
+	</c:ConsoleShell>
+</UserControl>

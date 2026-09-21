@@ -1849,7 +1849,9 @@ public class DtoToModelHelperCameraTests
 [Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class DevicePanelCrudCompletionTests : IDisposable
 {
-    public DevicePanelCrudCompletionTests()
+        private readonly TestIoCScope _ioc = new();
+
+public DevicePanelCrudCompletionTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -1861,12 +1863,7 @@ public class DevicePanelCrudCompletionTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public void MessageModel_CallDeleteSpeakerExists()
@@ -2105,7 +2102,9 @@ public class DevicePanelCrudCompletionTests : IDisposable
 [Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class SensorPanelCacheTests : IDisposable
 {
-    public SensorPanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public SensorPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2117,12 +2116,7 @@ public class SensorPanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task SensorPanel_DataInitialize_DoesNotCallApi()
@@ -2157,9 +2151,12 @@ public class SensorPanelCacheTests : IDisposable
 /// SpeakerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
 public class SpeakerPanelCacheTests : IDisposable
 {
-    public SpeakerPanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public SpeakerPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2171,12 +2168,7 @@ public class SpeakerPanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task SpeakerPanel_DataInitialize_DoesNotCallApi()
@@ -2206,9 +2198,12 @@ public class SpeakerPanelCacheTests : IDisposable
 /// EnclosurePanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
 public class EnclosurePanelCacheTests : IDisposable
 {
-    public EnclosurePanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public EnclosurePanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2220,12 +2215,7 @@ public class EnclosurePanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task EnclosurePanel_DataInitialize_DoesNotCallApi()
@@ -2255,9 +2245,12 @@ public class EnclosurePanelCacheTests : IDisposable
 /// LampPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
 public class LampPanelCacheTests : IDisposable
 {
-    public LampPanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public LampPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2269,12 +2262,7 @@ public class LampPanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task LampPanel_DataInitialize_DoesNotCallApi()
@@ -2304,9 +2292,12 @@ public class LampPanelCacheTests : IDisposable
 /// ControllerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
 public class ControllerPanelCacheTests : IDisposable
 {
-    public ControllerPanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public ControllerPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2318,12 +2309,7 @@ public class ControllerPanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task ControllerPanel_DataInitialize_DoesNotCallApi()
@@ -2429,9 +2415,12 @@ public class ControllerPanelCacheTests : IDisposable
 /// CameraPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
 public class CameraPanelCacheTests : IDisposable
 {
-    public CameraPanelCacheTests()
+        private readonly TestIoCScope _ioc = new();
+
+public CameraPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2443,12 +2432,7 @@ public class CameraPanelCacheTests : IDisposable
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose()
-    {
-        IoC.GetInstance = null!;
-        IoC.GetAllInstances = null!;
-        IoC.BuildUp = null!;
-    }
+    public void Dispose() => _ioc.Dispose();
 
     [Fact]
     public async Task CameraPanel_DataInitialize_DoesNotCallApi()

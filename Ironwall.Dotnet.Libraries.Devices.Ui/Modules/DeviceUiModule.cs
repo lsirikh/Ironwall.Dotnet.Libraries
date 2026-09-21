@@ -85,6 +85,29 @@ public class DeviceUiModule : Module
             // 조립기 · 프리셋 · 프리셋으로 등록 창을 여는 입구. 창 뷰모델은 싱글턴이 아니다 — 열 때마다 새로 만든다.
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.AssemblyLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>().SingleInstance();
+            // N-11 units console — 부대 편제 콘솔(서버 8.0 이상에만 존재한다).
+            // 세 등록 모두 ResolveOptional 로 의존을 받는다: 프로브·부대 API 가 없으면 IsAvailable=false 가 되어
+            // 창 입구 자체가 나오지 않는다(운영 6.3.2 무회귀). 콘솔 뷰모델은 싱글턴이 아니라 열 때마다 새로 만든다.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitGraphApiAdapter(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Api.Services.IUnitApiService>(),
+                        c.ResolveOptional<IServerContractProbe>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>()
+                   .SingleInstance();
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitDeviceApiAdapter(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Api.Services.IDeviceApiService>(),
+                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>()
+                   .SingleInstance();
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitConsoleLauncher(
+                        c.Resolve<Caliburn.Micro.IWindowManager>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
+                   .SingleInstance();
+
 
             // N-12 server monitor — 서버 모니터 콘솔(레일 · 목록 + 지표 띠 · 상세).
             // 판본(6.3 평면 ↔ 7.0/8.0 축)을 아는 통로는 Devices.Api 의 새 인터페이스다 — 기존 IServerApiService 는 그대로 둔다.
