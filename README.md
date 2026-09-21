@@ -41,9 +41,9 @@ Ironwall.Dotnet.Libraries는 Sensorway에서 개발한 .NET 8.0 기반의 재사
 ┌─────────────────────────────────────────────────┐
 │  애플리케이션 계층 (Dotnet.Monitoring.Solution) │
 ├─────────────────────────────────────────────────┤
-│  UI 계층                                         │
-│  - Devices.Ui    - Events.Ui                    │
-│  - GMaps.Ui      - Sounds.Ui                    │
+│  UI 계층 (콘솔)                                  │
+│  - Devices.Ui    - Events.Ui    - Accounts.Ui   │
+│  - Reports.Ui    - GMaps.Ui     - Sounds.Ui     │
 ├─────────────────────────────────────────────────┤
 │  비즈니스 로직 계층                              │
 │  - Accounts      - Devices      - Events        │
@@ -98,10 +98,17 @@ MVVM ViewModel 계층
 - `EnumMapProvider`, `EnumMapMode`
 
 #### Ironwall.Dotnet.Libraries.Utils
-유틸리티 및 변환기
+유틸리티 · 변환기 · **콘솔 커널**
 - `BindingProxy`, `BoolToInverseVisibleConverter`
 - `EnumBindingSourceExtension`
 - `NumericOnlyBehavior`, `ClearSelectionOnEscBehavior`
+- **콘솔 커널** `Console/` (네임스페이스는 `…Utils.Consoles` — 폴더는 단수, 이름공간은 복수다):
+  `ConsoleShell` · `ConsoleRail`/`ConsoleRailItem`/`ConsoleRailEntry` · `ConsoleToolbar` · `ConsoleDetailHost`(고정 적용 막대) ·
+  `ConsoleSection`/`ConsoleField`/`NotReceivedBox`(**셋 다 `Console/ConsoleSection.cs` 한 파일에 있다**) ·
+  `ConsoleEmptyState` · `ConsoleColumns` · `ConsolePrefs` · `ConsoleLayoutMath`
+- **다이얼로그 커널(T4)** `Console/Dialogs/`: `ConsoleDialogFrame`(+`ConsoleDialogFramePeer`) · `ConsoleDialogText` · `DialogSizeRules` · `DialogKeyRules` · `DialogFocusRules` · `DialogIds`. 뷰모델 없음 — 컨트롤 + 정적 규칙 클래스다
+- **드래그 커널** `Behaviors/Drag/`: `CaptureDragBehavior` · `DragHandle`(**`CaptureDragBehavior.cs` 안에 있다**) · `DropZone`/`DragPayload`/`IDragDropHandler`(**`DragContracts.cs`**) · `DropZoneChrome` · `ReorderKeyboardBehavior` · `DragMath`(순수) · `DragAdorners`
+- 기본 템플릿은 `Themes/Generic.xaml`(+`Themes/Dialogs.xaml`), **공유 스타일은 `Theme` 프로젝트**로 옮겼다 — 아래 §콘솔 커널 소비법
 
 ---
 
@@ -118,6 +125,19 @@ MVVM ViewModel 계층
 - CRUD 작업 (Create, Read, Update, Delete)
 - 로그인 이력 추적
 - Dapper 기반 쿼리
+
+#### Ironwall.Dotnet.Libraries.Accounts.Ui
+계정 · 권한 UI — **계정 콘솔**(N-06)
+- `Views/Panels/AccountConsolePanelView` + `ViewModels/Panels/AccountConsolePanelViewModel` — 레일 6(사용자 · 권한 설정 · 세션 관리 · 권한 부여 · 감사 로그 · ─ · 세션 설정)
+- `Consoles/` — `Lists/`(열 명세) · `Forms/`(상세 5절) · `Groups/`(사용자→그룹 드롭 판정) · `Matrix/`(권한 매트릭스 + 드래그 페인팅 좌표 수학) · `Sessions/` · `Audit/` · `Grants/`
+- **호스트가 잡는 클래스 · 뷰 이름은 동결**돼 있다(`AccountConsolePanelViewModel` / `AccountConsolePanelView`) — 바꾸면 호스트가 창을 못 찾는다
+- 테스트는 별도 프로젝트 `Ironwall.Dotnet.Libraries.Accounts.Ui.Tests`
+
+#### Ironwall.Dotnet.Libraries.Reports.Ui
+보고서 UI — **보고서 콘솔**(N-09)
+- `Views/Panels/ReportConsoleView` + `ViewModels/Panels/ReportConsoleViewModel` — 레일 3(생성 이력 · 새 보고서 · 템플릿) · 상세 칸 기본 폭 **380**
+- `Consoles/` — `Lists/`(열 · 상태 칩) · `Preview/`(**`ReportPreviewSurface` — WebView2 공역 판정, 순수 함수**) · `Templates/`(구성 체크 · 순서 · 드롭 핸들러)
+- 테스트는 라이브러리 csproj 안 `Tests/`
 
 #### Ironwall.Dotnet.Libraries.Devices
 장치 관리
@@ -140,13 +160,13 @@ Device API 서비스 (GOP RESTful API 연동)
 - xUnit 단위 테스트 (15개 테스트, 100% 통과)
 
 #### Ironwall.Dotnet.Libraries.Devices.Ui
-장치 UI 컴포넌트 및 서비스
+장치 UI 컴포넌트 및 서비스 — **콘솔 넷이 여기 산다**
 - **DeviceProviderService**: GOP API를 통한 Device 데이터 Fetching 및 Provider 업데이트
 - **NavigationMappingHelper**: Controller ↔ Sensor 양방향 Navigation 참조 설정 (TDD 구현)
 - **DtoToModelHelper**: DTO ↔ Model 변환 헬퍼
-- 장치 목록 ViewModel
-- 장치 속성 다이얼로그
-- xUnit 단위 테스트 (18개 테스트, 100% 통과)
+- `Consoles/` — 장비 콘솔(N-02) · `Assembly/` 조립기·프리셋(N-03) · `Wiring/` 셋업·결선맵(N-04) · `Units/` **부대 콘솔**(N-11) · `Servers/` **서버 모니터**(N-12) · `ByComponent/` · `Properties/` · `Forms/` · `Lists/` · `Groups/` · `Dialogs/`
+- 뷰 · 뷰모델 위치가 두 가지다 — `Consoles/<기능>/` 은 View + ViewModel 을 **같이** 두고(N-04 · N-11 · N-12), 장비 대시보드는 `Views/Dashboards/` + `ViewModels/Dashboards/` 로 갈라져 있다
+- 테스트는 **라이브러리 csproj 안 `Tests/`** 에 있다(별도 테스트 프로젝트가 아니다)
 
 #### Ironwall.Dotnet.Libraries.Events
 이벤트 처리
@@ -169,10 +189,13 @@ Event API 서비스 (GOP RESTful API 연동)
 - xUnit 단위 테스트 (15개 테스트, 100% 통과)
 
 #### Ironwall.Dotnet.Libraries.Events.Ui
-이벤트 UI 컴포넌트
-- 이벤트 패널 ViewModel
-- 이벤트 다이얼로그
-- 이벤트 카드 리스트
+이벤트 UI 컴포넌트 — 이벤트 콘솔 · 억제 스케줄 · 맵핑 워크벤치
+- 이벤트 패널 ViewModel / 이벤트 다이얼로그 / 이벤트 카드 리스트
+- `Views/Dashboards/EventDashboardView` + `ViewModels/Dashboards/EventDashboardViewModel` — **이벤트 콘솔**(N-07). 레일 6(개요 · 탐지 · 장애 · 연결 · 조치 · **억제 스케줄**)
+- `Consoles/` — `Overview/`(개요 T3 · 추이 기간 끌기) · `Lists/` · `Detail/` · `Tray/`(조치 트레이) · `Suppression/`(**억제 스케줄** N-08) · `Mapping/`(**이벤트 맵핑 워크벤치** N-13, View + VM 동거)
+- `Views/Consoles/` — `SuppressionListView` · `SuppressionDrawerView`(780 서랍) · `SuppressionDetailView` · `ActionTrayView` · `EventOverviewView` · `EventDetailView`
+- ⚠ **`Events.Ui/Resources/Resources.xaml` 는 앱 리소스 트리에 병합되지 않는다** — 새 컨버터 · 스타일은 **뷰 로컬**(`UserControl.Resources`)에 등록한다. 라이브러리 Resources 에 넣으면 빌드는 통과하고 **런타임 `XamlParseException`** 이 난다
+- ⚠ 옛 독립 억제창(`Views/Panels/EventSuppressionSchedulePanelView`)이 **아직 살아 있다**(호스트가 직접 띄운다). 그래서 콘솔 쪽 자동화 식별자는 `Console.Suppression.*` 로 이름을 갈라 놓았다
 
 #### Ironwall.Dotnet.Libraries.GMaps
 GMap.NET 통합
@@ -558,15 +581,32 @@ dotnet test Ironwall.Dotnet.Libraries.sln
 
 # 특정 프로젝트 테스트 실행
 dotnet test Ironwall.Dotnet.Libraries.Devices.Ui/Ironwall.Dotnet.Libraries.Devices.Ui.csproj
-dotnet test Ironwall.Dotnet.Libraries.Devices.Api/Ironwall.Dotnet.Libraries.Devices.Api.csproj
-dotnet test Ironwall.Dotnet.Libraries.Events.Api/Ironwall.Dotnet.Libraries.Events.Api.csproj
+dotnet test Ironwall.Dotnet.Libraries.Utils.Tests/Ironwall.Dotnet.Libraries.Utils.Tests.csproj
+dotnet test Ironwall.Dotnet.Libraries.Accounts.Ui.Tests/Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.csproj
 ```
- 
-**테스트 커버리지:**
-- **Devices.Ui**: 18개 테스트 (DeviceProviderService: 11, NavigationMappingHelper: 7)
-- **Devices.Api**: 15개 테스트 (Controllers: 5, Sensors: 5, Cameras: 5)
-- **Events.Api**: 15개 테스트 (Detection: 3, Malfunction: 3, Connection: 2, Action: 2, Integration: 5)
-- **Total**: 48개 테스트, 100% 통과 ✅
+
+> ⚠ **테스트가 어디 있는지가 프로젝트마다 다르다.** `Utils` · `Accounts.Ui` · `ViewModel` · `Theme` 만 별도 `*.Tests.csproj` 를 갖고,
+> `Devices.Ui` · `Events.Ui` · `Messages` · `Reports.Ui` 는 **제품 csproj 안 `Tests/` 폴더**에 테스트를 둔다(`dotnet test` 를 제품 csproj 에 바로 건다).
+> `GMaps.Db` 만 `-p:IncludeTests=true` 게이트가 따로 있다.
+>
+> ⚠ **솔루션 빌드는 WPF 임시 프로젝트(`_wpftmp`)를 타지 않아** `*.Ui` 의 `CS0535`(인터페이스 미구현)를 놓친다.
+> 장비 계열을 손댔으면 `tools/build-device-console-projects.ps1` 로 프로젝트별 14개를 따로 빌드한다(`-Test` 를 주면 테스트까지).
+>
+> ⚠ 전체 스위트는 이 저장소 실측 **약 461초**다. 하네스 기본 타임아웃(240초)으로는 **항상** INFRA 타임아웃이 난다.
+
+**테스트 현황** (통합 브랜치 `v2.14.0` @ `02f69f46` 실측, 2026-09-21)
+
+| 프로젝트 | 통과 | 실패 |
+|---|---|---|
+| `Devices.Ui` | **1288** | 0 |
+| `Events.Ui` | **936** | **15**(전부 이번 작업 이전부터 깨져 있던 것) |
+| `Messages` | **374** | 0 |
+| `Utils.Tests` | **193** | 0 |
+| `Reports.Ui` | **166** | 0 |
+| `Accounts.Ui.Tests` | **148** | 0 |
+
+`Events.Ui` 의 실패 15건은 네 덩어리다 — 시각 직렬화 `Z` vs `+00:00` 4건 · PIDS FOV 줌 환산 6건 · NATS 탐지 발행 1건 · **XAML 을 글자로 읽어 단언하는 시험** 4건(이름만 바꿔도 깨진다). 전부 제품 변경을 따라오지 못한 단언이거나 구조적으로 무른 시험이다.
+⚠ 위 수치는 **N-08(억제) 머지 `8766b292` 를 포함하지 않는다**(측정 시점이 그 앞이다).
 
 ### 패키지 게시 (내부용)
 
@@ -581,6 +621,68 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 ---
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
+
+**전 창 콘솔 재구성 N-04 ~ N-14 — 어디에 무엇이 있나** (봉투 all-windows-console-redesign · 통합 브랜치 `v2.14.0`, 2026-09-21 · **실기 전부 미검증** — 앱을 띄우지 않았고 운영 서버에 요청 0)
+
+*내일 이 코드를 처음 여는 사람을 위한 지도다. 무엇이 왜 그렇게 돼 있는지는 [CHANGELOG](CHANGELOG.md) 의 노드별 항목에 있다.*
+
+| 창 | 노드 | 프로젝트 · 폴더 | View / ViewModel |
+|---|---|---|---|
+| 장비 셋업 · 결선맵 | N-04 | `Devices.Ui/Consoles/Wiring/` (View + VM 동거) | `WiringView` / `WiringViewModel : Screen, IDragDropHandler` |
+| 다이얼로그 가족 T4 | N-05 | `Utils/Console/Dialogs/` | `ConsoleDialogFrame`(컨트롤 · 뷰모델 없음) |
+| 계정 콘솔 | N-06 | `Accounts.Ui/Views\|ViewModels/Panels/` + `Consoles/` | `AccountConsolePanelView` / `AccountConsolePanelViewModel` |
+| 이벤트 콘솔 | N-07 | `Events.Ui/Views\|ViewModels/Dashboards/` + `Consoles/{Overview,Lists,Detail,Tray}` | `EventDashboardView` / `EventDashboardViewModel` |
+| 억제 스케줄 | N-08 | `Events.Ui/Consoles/Suppression/` + `Views/Consoles/` | `SuppressionListView` · `SuppressionDrawerView` · `SuppressionDetailView` / `SuppressionConsoleViewModel` · `SuppressionDrawerViewModel` |
+| 보고서 콘솔 | N-09 | `Reports.Ui/Views\|ViewModels/Panels/` + `Consoles/{Lists,Preview,Templates}` | `ReportConsoleView` / `ReportConsoleViewModel` |
+| 설정 창(T2) | N-10 | **호스트 앱** `Dotnet.Monitoring.Solution` (브랜치 `n10`) | 라이브러리는 커널만 빌려준다 |
+| 부대 콘솔 | N-11 | `Devices.Ui/Consoles/Units/` (View + VM 동거) | `UnitConsoleView` / `UnitConsoleViewModel : Screen` |
+| 서버 모니터 | N-12 | `Devices.Ui/Consoles/Servers/` + `Devices.Api/Servers/`(판본 통로) | `ServerMonitorView` / `ServerMonitorViewModel : Screen` |
+| 이벤트 맵핑 워크벤치 | N-13 | `Events.Ui/Consoles/Mapping/` (View + VM 동거) + `Messages/Dto/Integrations/` | `MappingWorkbenchView` / `MappingWorkbenchViewModel : Screen, IDragDropHandler` |
+| 셸 표면(창 이동 · 크기 · 자리 기억) | N-14 | **호스트 앱** (브랜치 `n14`) | 라이브러리 숙제는 `N14-library-follow-up.md` |
+
+> N-06 · N-07 · N-09 는 **기존 파일을 다시 쓴 것**이라 "새로 생긴 파일" 로 찾으면 안 보인다.
+> 호스트가 이름으로 잡는 **뷰 · 뷰모델 클래스 이름은 동결**돼 있다 — `AccountConsolePanelViewModel` · `EventDashboardViewModel` · `ReportConsoleViewModel` · `DeviceDashboardViewModel`.
+
+**콘솔 커널을 어떻게 쓰나** (`Utils/Console/` · 네임스페이스 `…Utils.Consoles`)
+
+- **틀**: `ConsoleShell` 이 슬롯 넷(Rail · Toolbar · List · Detail)과 StatusBar 를 받는다. 치수(머리 40 · 레일 184/56 · 툴바 48 · 행 38 · 상태 띠 30 · 상세 340, 300~480)와 폭별 도킹/서랍/접힘은 **`ConsoleLayoutMath` 한 곳**이 정한다 — 창이 치수를 다시 쓰지 않는다. **1280 이상 도킹 / 960~1279 상세 서랍 / 960 미만 레일 56.**
+- **레일**: `ConsoleRail` 에 `ConsoleRailEntry` 를 바인딩한다(`Tag` 문자열 switch 금지). 항목 `AutomationId` 는 커널이 **`Console.{ConsoleKey}.Rail.{항목키}` 로 강제**한다 — 한 요소에 `AutomationId` 는 하나뿐이라 창 고유 이름을 같이 둘 수 없다.
+- **툴바**: `ConsoleToolbar` — 꺼진 버튼은 **늘 사유 툴팁**을 갖는다. ⚠ **`CanDelete=False` 는 버튼을 감추지 못한다**(`ShowDelete` DP 가 없다) — 삭제가 없는 콘솔에는 죽은 버튼이 남는다. `⋯` 오버플로 슬롯도 없다.
+- **상세 + 적용 막대**: `ConsoleDetailHost`(여섯 상태 겉모습). **적용 막대는 별도 타입이 아니라 이 컨트롤의 바닥**이다 — 템플릿 부품 `PART_Apply` / `PART_Revert` / `PART_Footer`, 라우티드 이벤트 `ApplyClick` / `RevertClick`, DP `IsDirty` · `CanApply` · `CanRevert` · `ApplyText`(기본 `"적용"`) · `RevertText`(`"되돌리기"`) · `ShowButtons` · `FooterText` · `ShakeToken`(220ms 흔들기, `SystemParameters.ClientAreaAnimation` 존중). **`ConsoleKey` 를 주면** `Console.{키}.Detail.Apply` / `.Revert` / `.ApplyBar` / `.Message` 가 자동 생성된다.
+- **빈 상태**: `ConsoleEmptyState` — DP 넷뿐이다. `Glyph`(`Geometry`, 기본은 얇은 외곽 상자) · `Title`(**무엇이** 없는가) · `Hint`(**다음에 무엇을** 하나 — 비면 숨는다) · `Action`(단추 하나 슬롯 — 비면 숨는다). **기본 스타일은 암시적이라 `Generic.xaml` 에 그대로 있다 — 앱 스코프 병합이 필요 없다.** 빈 목록을 `TextBlock` 으로 겹쳐 놓지 말고 이것을 쓴다(네 콘솔이 잉크 0.0% 로 렌더되던 결함이 여기서 나왔다).
+- **공유 스타일은 `Theme` 프로젝트로 옮겼다**: **`Ironwall.Dotnet.Libraries.Theme/Themes/Styles.Console.xaml`**(23키 · **전부 키 있는 스타일, 암시적 0**). 소비자는 **사전 하나만** 병합하면 된다 —
+  ```xml
+  <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Theme.Current.xaml" />
+  ```
+  (그 안에서 `Styles.Console.xaml` 을 끌어온다. 병합 순서는 `MD3.Defaults` → `Theme.Current`.) 뷰는 `{StaticResource Console.Button}` 처럼 쓰고, **커널 템플릿은 `{DynamicResource}`** 로 당긴다.
+  키: `Console.Button` / `.Primary` / `.Ghost` / `.Mini` · `Console.SearchBox` · `Console.CheckBox` · `Console.ToggleSwitch` · `Console.ScrollBar`(+`.Page` `.Thumb`) · `Console.ScrollViewer` · `Console.DataGrid`(+`.ColumnHeader` `.Cell` `.Cell.Flush` `.Row`) · `Console.ReorderList` · `Console.Pill`(+`.Normal` `.Warning` `.Critical` `.Info` `.Dot`).
+  **왜 옮겼나**: `Generic.xaml` 은 **테마 사전**이라 다른 어셈블리의 뷰가 `StaticResource` 로 닿지 못한다 — 콘솔들이 조용히 MDIX 암시 스타일로 떨어져 Teal500 `#009688` 이 샜다(장비 콘솔 렌더 4장에서 6324픽셀). 반대 방향도 막혀 있다: `Generic.xaml` 안의 `StaticResource` 는 `Application.Resources` 를 못 보고 **오류 없이 `UnsetValue`** 를 돌려준다.
+  ⚠ **`Console.EmptyState` 는 스타일 키가 아니다** — 같은 이름의 `AutomationId` 만 있다(`Generic.xaml:942`). 승격 커밋 메시지가 이 한 줄을 잘못 적었다.
+  ⚠ 두 사전이 같은 키를 들면 **조용히 갈린다** → `Utils.Tests/ConsoleStyleContractTests` 가 빌드 단계에서 잡는다(커널이 당기는 키가 Theme 에 실재하는가 · 두 곳에 중복 정의가 없는가 · 커널이 공유 키를 `StaticResource` 로 당기지 않는가 · 꺼진 상태에 `Opacity` 를 쓰지 않는가).
+- **드래그 커널**(`Utils/Behaviors/Drag/`, OLE 미사용): 목록에 `CaptureDragBehavior`, 행 안에 `DragHandle`(`Thumb`), 놓을 곳에 `DropZone.Key`(+ `DropZoneChrome`), 순서 목록에는 `DropZone.IsReorder` + `ReorderKeyboardBehavior`. 판정 · 처리는 창이 `IDragDropHandler` 로. **호출 1회면 즉시 전송, N회로 번지면 `DraftTrayViewModel` 에 쌓았다가 [적용]**(진행률 · 부분 실패 4분류 · 되돌리기는 서버 호출 0). `KeyboardFallback` 이 비면 **디버그 빌드에서 예외** — 드래그 전용 UI 는 만들지 않는다.
+- **커널에 아직 없는 것**(창마다 지역으로 지었다 · 승격 후보): **T2 틀**(레일 + 섹션 폼 + 저장 막대 — `ConsoleShell` 은 800폭에서 레일을 56으로 접어 설정 창에 못 쓴다) · **780 오버레이 서랍**(억제) · **트리 목록**(부대) · `ConsoleField.ErrorText` · `ConsoleToolbar.DeleteText`/필터 칩 슬롯 · `DraftTrayViewModel` 의 "첫 실패에서 멈춤" · `Console.ReorderList` 의 **컨테이너 스타일이 인라인이라** 행에 `AutomationId` 를 달려고 `ItemContainerStyle` 을 주면 선택 바 · Stretch · 포커스 링이 **통째로 사라진다**(지금은 템플릿을 옮겨 적어 쓴다).
+
+**화면을 보려면 — 오프라인 미리보기 도구** (앱도 서버도 띄우지 않는다. `--snapshot` 을 주면 입력 없이 PNG 를 뜨고 종료한다. 실패하면 MessageBox 대신 그 폴더에 `snapshot-error.txt` 를 남긴다.)
+
+| 도구 | 실행 | 스위치 |
+|---|---|---|
+| `tools/device-console-preview` | `dotnet run --project tools/device-console-preview -- <모드>` | 모드(**먼저 걸리는 하나만 실행**): `--assembly` · `--units` · `--dialogs` · `--wiring` · `--servers`(없으면 장비 콘솔) / 공통: `--snapshot <폴더>` · `--dark` · `--legacy` |
+| `tools/events-console-preview` | `dotnet run --project tools/events-console-preview` | `--mapping` · `--suppression` · `--snapshot <폴더>` · `--dark` |
+| `tools/reports-console-preview` | `dotnet run --project tools/reports-console-preview` | `--snapshot <폴더>` · `--dark` · `--readonly`(권한 없는 화면) |
+| `tools/accounts-console-preview` | `dotnet run --project tools/accounts-console-preview` | `--snapshot <폴더>` · `--dark`(스냅샷 스윕은 두 테마를 모두 돈다) |
+| `tools/console-gallery` | `dotnet run --project tools/console-gallery` | `--snapshot <폴더>`(상태별 PNG + 드래그 재현 로그) · **`--matrix <폴더>`**(전 상태 × 두 테마 매트릭스 + 셀 좌표 JSON) · `--legacy`(`--matrix` 안에서만 — v2.14.0 이전 토큰을 덮어 "전/후"를 같은 무대에서 잰다) |
+| `tools/build-device-console-projects.ps1` | `powershell -File tools/build-device-console-projects.ps1 [-Test]` | 장비 계열 14개 프로젝트를 **하나씩** 빌드(솔루션 빌드가 WPF `_wpftmp` 를 안 타서 `CS0535` 를 놓친다) |
+
+> 미리보기가 **드래그를 실제로 재현하는지** 확인하고 쓸 것. N-13 에서 스냅샷 스크립트가 드래그를 건너뛰고 메서드를 직접 부르는 바람에, **드롭이 핸들러에 한 번도 닿지 않는 결함이 정상으로 보이는 스크린샷 18장 뒤에 숨어 있었다.**
+> 설정 창 · 셸 표면 미리보기(`tools/settings-preview` · `tools/shell-surface-preview`)는 **호스트 저장소**에 있다.
+
+**물린 규칙 — 이것들을 어기면 빌드는 통과하고 화면만 조용히 깨진다**
+
+1. **`DataGrid` 열마다 `CellStyle` 을 명시한다.** `Console.DataGrid` 가 그리드 수준에서 `CellStyle` 을 걸어도, 열이 자기 `CellStyle` 을 지정하지 않으면 **MaterialDesign 의 암시적 `DataGridCell` 스타일이 이긴다** — 선택 행이 MDIX 회색(`#D8D8D8` 라이트 / `#757575` 다크)으로 갈라지고, 커널의 3px 선택 바가 그 위에서 **1.96:1** 이 된다. **코드로 만든 열은 특히** 잊기 쉽다. 핸들 열은 `Console.DataGrid.Cell.Flush`(패딩 0) — 그냥 두면 `Padding="12,0"` 이 26px 핸들 열을 통째로 지운다.
+2. **컨트롤에 content 로 넘긴 `TextBlock` 은 색을 상속받지 못할 수 있다.** 템플릿의 `ContentPresenter` 가 `TextElement.Foreground` 를 걸어도, `Header` 로 넘긴 `TextBlock` 은 **템플릿이 아니라 논리 부모**(예: `ConsoleField`)를 통해 상속한다. 아무도 색을 주지 않으면 **순수 검정**이 되고, 다크에서 `#000000` on `#161D26` = **1.24:1** — 사실상 투명이다(라이트는 같은 검정이 밝은 판 위라 19.2:1 로 우연히 살아남아 **한쪽 테마에서만 터진다**). `Foreground` 를 **명시**하고, 창 루트에 `TextElement.Foreground="{DynamicResource TextPrimaryBrush}"` 를 깔아 빠뜨려도 토큰에 떨어지게 한다.
+3. **드롭존은 `ItemsControl` 위에 있어야 한다.** 커널은 드롭존이 `ItemsControl` 일 때만 삽입 위치를 계산하고(`CaptureDragBehavior.cs:205`) 그 인덱스가 음수면 후보로 올리지 않는다(`:218`). `DropZoneChrome`(= `ContentControl`)이나 `Border` 에 붙이면 **파선 윤곽은 계속 떠서 살아 있어 보이는데 드롭이 핸들러에 닿지 않는다.** `ReorderKeyboardBehavior` 도 키를 목록에서 읽으므로 `Alt+↑↓` 가 **같이** 죽는다. 세 첨부 속성(`DropZone.Key` · `.IsReorder` · `.State`)은 `ListBox`/`ItemsControl` 에 건다 — 가라앉은 면은 그 뒤의 `Border` 가 맡는다.
+4. **`AutomationId` 는 peer 가 실재하는 요소에만 붙는다.** `TextBlock` · `Border` · `ContentControl`(`DropZoneChrome` 포함) · `Grid` · `StackPanel` · `md:PackIcon` 은 **UIA 트리에 나오지 않는다** — 붙여도 자동화가 못 찾고, 실제로 그 상태의 호스트 페이지 오브젝트가 **폐기 예정인 옛 패널을 조용히 몰고 있었다.** 단언할 값은 테두리 없는 **읽기 전용 `TextBox`**(`ValuePattern` 까지 온다) · `Label` · `ListBoxItem` · `Button` 으로 낸다.
+5. 그 밖에 — **`x:Name` 은 건드리지 않는다**(이 앱에서 `x:Name` 은 Caliburn 바인딩 지시자다. 계측은 `AutomationProperties.AutomationId` 만) · **색 토큰은 매번 재해석**한다(`DynamicResource`. 1회 캐싱 · `static readonly` Frozen 은 테마 전환 때 옛 색으로 굳는다) · **바인딩된 목록을 `Clear()+Add()` 로 다시 채우지 않는다**(선택과 상세가 풀린다 — `Insert`/`Move`/`Remove` 로 맞춘다) · **요소에 로컬 값을 쓰면 Style 트리거가 진다**(알약의 지역 `Foreground` 하나가 커널의 대비 수정을 통째로 무효로 만들었다) · **한글은 음절 단위로 감긴다** — 마지막 줄이 한 글자만 남으면 문구를 **짧게 고치는 것**이 유일한 결정적 해법이다(`TextWrapping="WrapWithOverflow"` 를 쓴다).
 
 **콘솔 커널 — 전 창 재구성의 공용 토대** (봉투 all-windows-console-redesign N-01 · 브랜치 `v2.11.0` · 2026-09-19 · 기존 창 무변경 · 실제 입력 미검증)
 - 왜: 맵 OverlayWindow 를 뺀 전 창을 와이어프레임 구조(레일 · 목록 · 상세 + 드래그 관리)로 다시 짠다. 그 틀과 드래그 규약을 창마다 복사하지 않도록 먼저 공용 자산으로 세웠다
