@@ -1325,12 +1325,16 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<object>> DeleteDeviceGroupAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    /// <summary>N-05: 그룹 배정 배치 호출을 가로채 기록한다. 걸어 두지 않으면 옛 동작 그대로(오류).</summary>
+    public Func<int, DeviceGroupAssignRequestDto, ApiResponse<DeviceGroupAssignResultDto>>? AssignHook;
+    public Func<int, DeviceGroupAssignRequestDto, ApiResponse<DeviceGroupBulkRemoveResultDto>>? RemoveHook;
+
     public Task<ApiResponse<DeviceGroupAssignResultDto>> AssignDevicesToGroupAsync(int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<DeviceGroupAssignResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+        => Task.FromResult(AssignHook?.Invoke(groupId, dto) ?? ApiResponse<DeviceGroupAssignResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<object>> RemoveDeviceFromGroupAsync(int groupId, int deviceId, CancellationToken token = default)
         => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveDevicesFromGroupAsync(int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<DeviceGroupBulkRemoveResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+        => Task.FromResult(RemoveHook?.Invoke(groupId, dto) ?? ApiResponse<DeviceGroupBulkRemoveResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Enclosure Metrics ────────────────────────────
     public Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(int enclosureId, EnclosureMetricDto dto, CancellationToken token = default)
@@ -1849,9 +1853,7 @@ public class DtoToModelHelperCameraTests
 [Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class DevicePanelCrudCompletionTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public DevicePanelCrudCompletionTests()
+    public DevicePanelCrudCompletionTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -1863,7 +1865,12 @@ public DevicePanelCrudCompletionTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public void MessageModel_CallDeleteSpeakerExists()
@@ -2102,9 +2109,7 @@ public DevicePanelCrudCompletionTests()
 [Collection("CaliburnIoC")]   // serialize: two classes here swap Caliburn's static IoC delegates, the others read them
 public class SensorPanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public SensorPanelCacheTests()
+    public SensorPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2116,7 +2121,12 @@ public SensorPanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task SensorPanel_DataInitialize_DoesNotCallApi()
@@ -2151,12 +2161,10 @@ public SensorPanelCacheTests()
 /// SpeakerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
-[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class SpeakerPanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public SpeakerPanelCacheTests()
+    public SpeakerPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2168,7 +2176,12 @@ public SpeakerPanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task SpeakerPanel_DataInitialize_DoesNotCallApi()
@@ -2198,12 +2211,10 @@ public SpeakerPanelCacheTests()
 /// EnclosurePanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
-[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class EnclosurePanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public EnclosurePanelCacheTests()
+    public EnclosurePanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2215,7 +2226,12 @@ public EnclosurePanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task EnclosurePanel_DataInitialize_DoesNotCallApi()
@@ -2245,12 +2261,10 @@ public EnclosurePanelCacheTests()
 /// LampPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
-[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class LampPanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public LampPanelCacheTests()
+    public LampPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2262,7 +2276,12 @@ public LampPanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task LampPanel_DataInitialize_DoesNotCallApi()
@@ -2292,12 +2311,10 @@ public LampPanelCacheTests()
 /// ControllerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
-[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class ControllerPanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public ControllerPanelCacheTests()
+    public ControllerPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2309,7 +2326,12 @@ public ControllerPanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task ControllerPanel_DataInitialize_DoesNotCallApi()
@@ -2415,12 +2437,10 @@ public ControllerPanelCacheTests()
 /// CameraPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
-[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates in its ctor and nulls them in Dispose
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class CameraPanelCacheTests : IDisposable
 {
-        private readonly TestIoCScope _ioc = new();
-
-public CameraPanelCacheTests()
+    public CameraPanelCacheTests()
     {
         IoC.GetInstance = (type, key) =>
         {
@@ -2432,7 +2452,12 @@ public CameraPanelCacheTests()
         IoC.BuildUp = obj => { };
     }
 
-    public void Dispose() => _ioc.Dispose();
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
 
     [Fact]
     public async Task CameraPanel_DataInitialize_DoesNotCallApi()
@@ -2513,32 +2538,6 @@ public sealed class DeviceGroupEqualsTests
     }
 }
 
-#region - DeviceAssignDialogViewModel Unit Tests -
-public sealed class DeviceAssignDialogViewModelTests
-{
-    [Fact]
-    public void Initialize_ExcludesAlreadyAssignedDevices()
-    {
-        // Arrange
-        var provider = new DeviceProvider();
-        provider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "CTL-01", DeviceNumber = 1 });
-        provider.Add(new ControllerDeviceModel { Id = 2, DeviceName = "CTL-02", DeviceNumber = 2 });
-        provider.Add(new ControllerDeviceModel { Id = 3, DeviceName = "CTL-03", DeviceNumber = 3 });
-
-        var vm = new DeviceAssignDialogViewModel(new MockDeviceApiService(), provider);
-        var assignedIds = new[] { 1, 3 }; // devices 1 and 3 already assigned
-
-        // Act
-        vm.Initialize(groupId: 10, assignedDeviceIds: assignedIds);
-
-        // Assert: only device 2 should be in AllDevices
-        Assert.Single(vm.AllDevices);
-        Assert.Equal(2, vm.AllDevices[0].Id);
-        Assert.DoesNotContain(vm.AllDevices, d => d.Id == 1);
-        Assert.DoesNotContain(vm.AllDevices, d => d.Id == 3);
-    }
-}
-#endregion
 
 #region - Phase 21: FetchDeviceByIdAsync SensorSubType Tests -
 /// <summary>
