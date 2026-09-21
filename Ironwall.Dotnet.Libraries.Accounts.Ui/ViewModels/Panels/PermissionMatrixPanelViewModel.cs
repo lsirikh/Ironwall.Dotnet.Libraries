@@ -290,7 +290,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     {
         var notes = new List<string>();
         if (_contractProbe is null || !_contractProbe.IsResolved)
-            notes.Add("서버 판본을 확정하지 못했습니다 — 새 모듈이 빠지면 저장이 422 로 막힐 수 있습니다");
+            // 배너 폭(278px)에 맞춰 짧게 — 길면 마지막 줄에 글자 하나만 남는다(D-17: 셋째 줄 12px 실측).
+            notes.Add("서버 판본 미확정 — 새 모듈이 빠지면 저장이 422 로 막힐 수 있습니다");
 
         var unknown = Modules.Count(m => m.IsUnknownModule);
         if (unknown > 0)
