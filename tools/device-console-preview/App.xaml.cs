@@ -277,30 +277,30 @@ public partial class App : Application
         await Show(preview.Gallery(), 1760, 520, "01-gallery-sml");
         if (directory is null) return;      // 손으로 써 볼 때는 갤러리만 띄워 둔다
 
-        await Show(preview.ConfirmPrompt(), 480, 340, "02-confirm-s400");
-        await Show(preview.TextPrompt(), 480, 340, "03-text-prompt-s400");
-        await Show(preview.RepeatExpand(withConflict: true), 480, 640, "04-repeat-expand-s400");
-        await Show(preview.WiringPrompt(), 480, 360, "05-wiring-prompt-s400");
+        await Show(preview.ConfirmPrompt(), 448, 260, "02-confirm-s400");
+        await Show(preview.TextPrompt(), 448, 240, "03-text-prompt-s400");
+        await Show(preview.RepeatExpand(withConflict: true), 448, 620, "04-repeat-expand-s400");
+        await Show(preview.WiringPrompt(), 448, 360, "05-wiring-prompt-s400");
 
         var work = Path.Combine(Path.GetTempPath(), "ironwall-dialog-preview");
         Directory.CreateDirectory(work);
         var presetFile = Path.Combine(work, "preview-presets.json");
         if (File.Exists(presetFile)) File.Delete(presetFile);
 
-        await Show(preview.MakeSensors(withConflict: true), 640, 700, "14-make-sensors-m560");
-        await Show(preview.PasteReport(), 640, 660, "15-paste-report-m560");
-        await Show(preview.PresetManager(work), 800, 620, "16-preset-manager-l720");
-        await Show(preview.Register(work, withProblem: true), 800, 660, "17-register-l720");
+        await Show(preview.MakeSensors(withConflict: true), 608, 700, "14-make-sensors-m560");
+        await Show(preview.PasteReport(), 608, 680, "15-paste-report-m560");
+        await Show(preview.PresetManager(work), 768, 560, "16-preset-manager-l720");
+        await Show(preview.Register(work, withProblem: true), 768, 660, "17-register-l720");
 
-        await Show(preview.Assign(AssignState.Loaded).View, 800, 560, "06-assign-loaded-l720");
-        await Show(preview.Assign(AssignState.MultiSelect).View, 800, 560, "07-assign-multi-select");
-        await Show(preview.Assign(AssignState.Blocked).View, 800, 560, "08-assign-blocked-drop");
-        await Show(preview.Assign(AssignState.Dirty).View, 800, 560, "09-assign-dirty-delta");
-        await Show(preview.Assign(AssignState.PartialFailure).View, 800, 560, "10-assign-partial-failure");
-        await Show(preview.AssignUnsavedGroup(), 800, 560, "11-assign-unsaved-group");
+        await Show(preview.Assign(AssignState.Loaded).View, 768, 620, "06-assign-loaded-l720");
+        await Show(preview.Assign(AssignState.MultiSelect).View, 768, 620, "07-assign-multi-select");
+        await Show(preview.Assign(AssignState.Blocked).View, 768, 620, "08-assign-blocked-drop");
+        await Show(preview.Assign(AssignState.Dirty).View, 768, 620, "09-assign-dirty-delta");
+        await Show(preview.Assign(AssignState.PartialFailure).View, 768, 620, "10-assign-partial-failure");
+        await Show(preview.AssignUnsavedGroup(), 768, 620, "11-assign-unsaved-group");
 
-        await Show(preview.Progress(cancelled: false).View, 480, 380, "12-progress-running");
-        await Show(preview.Progress(cancelled: true).View, 480, 380, "13-progress-cancelled");
+        await Show(preview.Progress(cancelled: false).View, 448, 320, "12-progress-running");
+        await Show(preview.Progress(cancelled: true).View, 448, 320, "13-progress-cancelled");
     }
 
     /// <summary>셋업 · 결선 창의 상태 8종을 띄우고(스냅샷이면) 찍는다.</summary>

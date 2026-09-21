@@ -25,6 +25,7 @@
 	<!--  T4 · S 400. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
 	<dlg:ConsoleDialogFrame
 		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Repeat"
 		IsPrimaryEnabled="{Binding CanExpand}"
 		Kind="규칙적인 부품을 한 번에 만든다"
@@ -36,7 +37,7 @@
 		SecondaryText="취소"
 		Size="Small"
 		Title="반복 펼치기">
-	<DockPanel LastChildFill="True">
+	<DockPanel Height="380" LastChildFill="True">
 		<StackPanel DockPanel.Dock="Top">
 			<c:ConsoleField ApiName="type" Header="유형">
 				<ComboBox
@@ -81,7 +82,8 @@
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="1"
 			CornerRadius="4">
-			<ScrollViewer VerticalScrollBarVisibility="Auto">
+			<!--  한 줄이 규격 폭보다 길 수 있다(까닭이 붙는 줄) — 글을 자르지 않고 이 칸 안에서만 옆으로 민다.  -->
+			<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
 				<ItemsControl
 					Margin="8,6"
 					AutomationProperties.AutomationId="Devices.Assembly.Repeat.Preview"

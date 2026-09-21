@@ -15,6 +15,7 @@
 	<!--  T4 · L 720. 닫기 하나뿐인 창이라 주 동작이 없다 — 보조(닫기)만 둔다. 옛 AutomationId 유지.  -->
 	<dlg:ConsoleDialogFrame
 		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Presets"
 		Kind="구조(부품 · 설정)만 담는다 — 번호 · 이름 · 접속 · 일련번호는 담지 않는다"
 		Message="{Binding Message}"
@@ -24,7 +25,7 @@
 		SecondaryText="닫기"
 		Size="Large"
 		Title="프리셋 관리">
-	<DockPanel LastChildFill="True">
+	<DockPanel Height="360" LastChildFill="True">
 		<StackPanel DockPanel.Dock="Top">
 			<TextBlock
 				Margin="0,0,0,8"

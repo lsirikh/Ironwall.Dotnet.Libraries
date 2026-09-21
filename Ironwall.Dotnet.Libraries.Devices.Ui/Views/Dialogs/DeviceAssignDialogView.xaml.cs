@@ -23,7 +23,24 @@ public partial class DeviceAssignDialogView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+    }
+
+    /// <summary>
+    /// 뷰모델이 이미 쥐고 있는 선택을 목록에 옮긴다 — 창을 다시 세운 뒤(부분 실패 복구)에도 고른 것이 남게.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+        Apply(AssignSide.Available, vm.SelectionOf(AssignSide.Available));
+        Apply(AssignSide.Assigned, vm.SelectionOf(AssignSide.Assigned));
+
+        void Apply(AssignSide side, IReadOnlyList<DeviceAssignItemViewModel> items)
+        {
+            if (items.Count == 0) return;
+            OnSelectionRequested(this, new AssignSelectionRequest(side, items));
+        }
     }
 
     private DeviceAssignDialogViewModel? ViewModel => DataContext as DeviceAssignDialogViewModel;

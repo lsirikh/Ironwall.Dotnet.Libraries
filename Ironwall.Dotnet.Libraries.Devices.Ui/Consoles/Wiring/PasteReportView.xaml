@@ -17,6 +17,7 @@
 	<!--  T4 · M 560. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
 	<dlg:ConsoleDialogFrame
 		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
 		DialogKey="Devices.Wiring.Paste"
 		IsPrimaryEnabled="{Binding CanApply}"
 		PrimaryAutomationId="Devices.Wiring.Paste.Accept"
@@ -27,7 +28,7 @@
 		SecondaryText="취소"
 		Size="Medium"
 		Title="엑셀에서 붙여넣기">
-	<DockPanel LastChildFill="True">
+	<DockPanel Height="440" LastChildFill="True">
 		<TextBlock
 			Margin="0,6,0,0"
 			AutomationProperties.AutomationId="Devices.Wiring.Paste.Summary"

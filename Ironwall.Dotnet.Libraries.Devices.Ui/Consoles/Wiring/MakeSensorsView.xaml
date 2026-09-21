@@ -29,6 +29,7 @@
 	<!--  T4 · M 560. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
 	<dlg:ConsoleDialogFrame
 		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
 		DialogKey="Devices.Wiring.Make"
 		IsPrimaryEnabled="{Binding CanMake}"
 		Kind="규칙은 한 번만 정하면 전부에 들어갑니다 — 만든 줄은 저장 전까지 Draft"
@@ -40,7 +41,7 @@
 		SecondaryText="취소"
 		Size="Medium"
 		Title="센서 여러 개 만들기">
-	<DockPanel LastChildFill="True">
+	<DockPanel Height="460" LastChildFill="True">
 
 		<Border
 			Margin="0,10,0,0"

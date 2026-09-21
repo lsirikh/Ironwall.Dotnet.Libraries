@@ -58,9 +58,9 @@ public class DialogSizeRulesTests
     }
 
     [Theory]
-    [InlineData(DialogSize.Small, 480d)]
-    [InlineData(DialogSize.Medium, 680d)]
-    [InlineData(DialogSize.Large, 760d)]
+    [InlineData(DialogSize.Small, 560d)]
+    [InlineData(DialogSize.Medium, 720d)]
+    [InlineData(DialogSize.Large, 780d)]
     public void should_cap_height_at_the_nominal_maximum_when_owner_is_tall(DialogSize size, double expected)
     {
         Assert.Equal(expected, DialogSizeRules.ResolveMaxHeight(size, 2000d));
@@ -83,7 +83,7 @@ public class DialogSizeRulesTests
     {
         var metrics = DialogSizeRules.Resolve(DialogSize.Medium, 1920d, 1080d);
         Assert.Equal(560d, metrics.Width);
-        Assert.Equal(680d, metrics.MaxHeight);
+        Assert.Equal(720d, metrics.MaxHeight);
     }
 
     [Fact]

@@ -48,10 +48,10 @@ public static class DialogSizeRules
     /// <summary>규격별 높이 상한 — 내용이 길어도 여기서 멈추고 몸통이 스크롤한다.</summary>
     public static double NominalMaxHeight(DialogSize size) => size switch
     {
-        DialogSize.Small => 480d,
-        DialogSize.Medium => 680d,
-        DialogSize.Large => 760d,
-        _ => 680d,
+        DialogSize.Small => 560d,
+        DialogSize.Medium => 720d,
+        DialogSize.Large => 780d,
+        _ => 720d,
     };
 
     /// <summary>규격과 창 치수로 카드 치수를 정한다. <paramref name="ownerWidth"/>/<paramref name="ownerHeight"/> 가 쓸 수 없는 값이면 규격 값 그대로.</summary>
