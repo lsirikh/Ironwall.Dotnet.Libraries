@@ -84,6 +84,9 @@
 		<Border
 			HorizontalAlignment="Right"
 			AutomationProperties.AutomationId="Events.SuppressionSchedule.Drawer"
+			KeyboardNavigation.ControlTabNavigation="Cycle"
+			KeyboardNavigation.DirectionalNavigation="Contained"
+			KeyboardNavigation.TabNavigation="Cycle"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource BorderBrush}"
 			BorderThickness="2,0,0,0"
@@ -100,33 +103,39 @@
 					Padding="16,0,8,0"
 					BorderBrush="{DynamicResource DividerBrush}"
 					BorderThickness="0,0,0,1">
-					<DockPanel LastChildFill="False">
-						<TextBlock
-							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerTitle"
-							DockPanel.Dock="Left"
-							FontSize="15"
-							FontWeight="SemiBold"
-							Foreground="{DynamicResource TextPrimaryBrush}"
-							Text="{Binding HeaderText}" />
-						<TextBlock
-							Margin="10,0,0,0"
-							VerticalAlignment="Center"
-							DockPanel.Dock="Left"
-							FontSize="12"
-							Foreground="{DynamicResource TextMutedBrush}"
-							Text="같은 창 안 서랍 · 저장할 때 한 번만 보냅니다" />
+					<!--  2열(*/Auto) — 긴 작업명이 들어와도 ✕ 가 줄 밖으로 밀리지 않는다  -->
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+							<TextBlock
+								AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerTitle"
+								FontSize="15"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding HeaderText}"
+								TextTrimming="CharacterEllipsis" />
+							<TextBlock
+								Margin="10,0,0,0"
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextMutedBrush}"
+								Text="같은 창 안 서랍 · 저장할 때 한 번만 보냅니다"
+								TextTrimming="CharacterEllipsis" />
+						</StackPanel>
 						<Button
+							Grid.Column="1"
 							Width="30"
 							Height="30"
 							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerCloseButton"
 							Click="OnClose"
-							DockPanel.Dock="Right"
 							Style="{StaticResource MaterialDesignIconButton}"
 							ToolTip="닫기 (Esc)">
 							<md:PackIcon Kind="Close" />
 						</Button>
-					</DockPanel>
+					</Grid>
 				</Border>
 
 				<!--  ── 본문: 확정 두 칸 폼 (SB L743 .form2) ────────────────  -->
@@ -671,44 +680,50 @@
 					<Border.RenderTransform>
 						<TranslateTransform />
 					</Border.RenderTransform>
-					<DockPanel LastChildFill="False">
+					<!--  2열(*/Auto) — 긴 알림 한 줄이 버튼을 줄 밖으로 밀지 않는다.
+					      버튼 간격은 8 하나로 통일하고 ghost → outlined → primary 순서로 둔다.  -->
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
 						<TextBlock
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerStatusText"
-							DockPanel.Dock="Left"
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="{Binding StatusLine}"
 							TextTrimming="CharacterEllipsis" />
-						<Button
-							Margin="8,0,0,0"
-							Padding="16,3"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.CreateButton"
-							Click="OnSave"
-							Content="저장"
-							DockPanel.Dock="Right"
-							IsEnabled="{Binding CanSave}"
-							Style="{StaticResource MaterialDesignRaisedButton}"
-							ToolTip="서버를 한 번 부릅니다 — 대상이 몇 개든 요청은 하나입니다" />
-						<Button
-							Margin="8,0,0,0"
-							Padding="14,3"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerCancelButton"
-							Click="OnClose"
-							Content="취소"
-							DockPanel.Dock="Right"
-							Style="{StaticResource MaterialDesignOutlinedButton}" />
-						<Button
-							Margin="8,0,0,0"
-							Padding="14,3"
-							AutomationProperties.AutomationId="Events.SuppressionSchedule.ResetFormButton"
-							Click="OnRevert"
-							Content="되돌리기"
-							DockPanel.Dock="Right"
-							IsEnabled="{Binding CanRevert}"
-							Style="{StaticResource MaterialDesignFlatButton}"
-							ToolTip="연 시점으로 되돌립니다 — 서버 호출 0" />
-					</DockPanel>
+						<StackPanel
+							Grid.Column="1"
+							Margin="12,0,0,0"
+							Orientation="Horizontal">
+							<Button
+								Margin="0,0,8,0"
+								Padding="14,3"
+								AutomationProperties.AutomationId="Events.SuppressionSchedule.ResetFormButton"
+								Click="OnRevert"
+								Content="되돌리기"
+								IsEnabled="{Binding CanRevert}"
+								Style="{StaticResource MaterialDesignFlatButton}"
+								ToolTip="연 시점으로 되돌립니다 — 서버 호출 0" />
+							<Button
+								Margin="0,0,8,0"
+								Padding="14,3"
+								AutomationProperties.AutomationId="Events.SuppressionSchedule.DrawerCancelButton"
+								Click="OnClose"
+								Content="취소"
+								Style="{StaticResource MaterialDesignOutlinedButton}" />
+							<Button
+								Padding="16,3"
+								AutomationProperties.AutomationId="Events.SuppressionSchedule.CreateButton"
+								Click="OnSave"
+								Content="저장"
+								IsEnabled="{Binding CanSave}"
+								Style="{StaticResource MaterialDesignRaisedButton}"
+								ToolTip="서버를 한 번 부릅니다 — 대상이 몇 개든 요청은 하나입니다" />
+						</StackPanel>
+					</Grid>
 				</Border>
 			</Grid>
 		</Border>

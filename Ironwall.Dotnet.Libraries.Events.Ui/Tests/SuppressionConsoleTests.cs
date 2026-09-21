@@ -73,11 +73,15 @@ internal sealed class FakeSuppressionApi : IEventSuppressionApiService
         });
     }
 
-    public Task<ApiResponse<EventSuppressionScheduleDto>> GetSuppressionScheduleByIdAsync(int id, CancellationToken token = default)
+    /// <summary>다음 단건 조회를 여기에 매달아 응답 순서를 뒤집는다(늦게 오는 응답 시험).</summary>
+    public Task? HoldNextGetById { get; set; }
+
+    public async Task<ApiResponse<EventSuppressionScheduleDto>> GetSuppressionScheduleByIdAsync(int id, CancellationToken token = default)
     {
         GetByIdCalls++;
+        if (HoldNextGetById is { } gate) { HoldNextGetById = null; await gate.ConfigureAwait(false); }
         var found = Stored.FirstOrDefault(s => s.Id == id);
-        return Task.FromResult(new ApiResponse<EventSuppressionScheduleDto> { Success = found is not null, Data = found });
+        return new ApiResponse<EventSuppressionScheduleDto> { Success = found is not null, Data = found };
     }
 
     public Task<ApiResponse<EventSuppressionScheduleDto>> CreateSuppressionScheduleAsync(
@@ -536,6 +540,121 @@ public class SuppressionConsoleViewModelTests
         Assert.Contains("권한", locked.StatusText);
         Assert.Equal(0, _api.WriteCalls);
     }
+
+    #region - 미적용 변경은 어디로도 조용히 사라지지 않는다 (R1) -
+
+    [Fact]
+    public async Task should_refuse_to_leave_the_rail_when_the_drawer_is_dirty()
+    {
+        await _console.ActivateAsync();
+        _console.AddNew();
+        _console.Drawer.Name = "쓰다 만 것";
+
+        Assert.False(_console.TryLeave());
+        Assert.True(_console.Drawer.IsOpen);
+        Assert.Equal("쓰다 만 것", _console.Drawer.Name);
+    }
+
+    [Fact]
+    public async Task should_allow_leaving_the_rail_once_the_drawer_is_clean()
+    {
+        await _console.ActivateAsync();
+        _console.AddNew();
+        _console.Drawer.Name = "쓰다 만 것";
+        _console.Drawer.Revert();
+
+        Assert.True(_console.TryLeave());
+    }
+
+    [Fact]
+    public async Task should_not_replace_a_dirty_draft_when_new_is_pressed_again()
+    {
+        await _console.ActivateAsync();
+        _console.AddNew();
+        _console.Drawer.Name = "지키고 싶은 초안";
+
+        _console.AddNew();                       // 두 번째 [새 스케줄]
+
+        Assert.Equal("지키고 싶은 초안", _console.Drawer.Name);
+        Assert.Contains("이동하세요", _console.StatusText);
+    }
+
+    [Fact]
+    public async Task should_not_replace_a_dirty_draft_when_edit_is_pressed()
+    {
+        _api.Stored.Add(Row(7));
+        await _console.ActivateAsync();
+        _console.AddNew();
+        _console.Drawer.Name = "지키고 싶은 초안";
+        _console.Selected = _console.Schedules[0];
+
+        await _console.EditSelectedAsync();
+
+        Assert.Equal("지키고 싶은 초안", _console.Drawer.Name);
+        Assert.Equal(0, _api.GetByIdCalls);       // 막혔으면 서버도 부르지 않는다
+    }
+
+    #endregion
+
+    #region - 늦게 오는 [수정] 응답 (R7) -
+
+    [Fact]
+    public async Task should_ignore_a_late_edit_response_when_another_edit_started()
+    {
+        _api.Stored.Add(Row(1));
+        _api.Stored.Add(Row(2));
+        await _console.ActivateAsync();
+
+        // A 를 고르고 [수정] → 응답을 잡아 둔다
+        var gateA = new TaskCompletionSource<bool>();
+        _api.HoldNextGetById = gateA.Task;
+        _console.Selected = _console.Schedules.First(r => r.Id == 1);
+        var first = _console.EditSelectedAsync();
+
+        // B 를 고르고 [수정] → 먼저 끝난다
+        _console.Selected = _console.Schedules.First(r => r.Id == 2);
+        await _console.EditSelectedAsync();
+        Assert.Equal(2, _console.Drawer.Draft.Id);
+
+        // 이제 A 의 응답이 도착한다 — 덮어쓰면 목록은 B 인데 서랍은 A 가 된다
+        gateA.SetResult(true);
+        await first;
+
+        Assert.Equal(2, _console.Drawer.Draft.Id);
+    }
+
+    #endregion
+
+    #region - 확인 팝업에서 '아니오' (R8) -
+
+    [Fact]
+    public async Task should_write_nothing_when_the_cancel_confirmation_is_declined()
+    {
+        _api.Stored.Add(Row(4, "active", suppressing: true));
+        await _console.ActivateAsync();
+        _console.Selected = _console.Schedules[0];
+
+        await _console.CancelSelectedAsync();      // 확인 팝업만 띄운다
+        // 사용자가 '아니오' 를 누르면 CallCancel... 메시지가 발행되지 않는다.
+
+        Assert.Equal(0, _api.WriteCalls);
+        Assert.Equal("active", _api.Stored[0].Status);
+    }
+
+    [Fact]
+    public async Task should_write_nothing_when_the_delete_confirmation_is_declined()
+    {
+        _api.Stored.Add(Row(1, "cancelled"));
+        await _console.ActivateAsync();
+        _console.Schedules[0].IsSelected = true;
+
+        await _console.DeleteSelectedAsync();      // 확인 팝업만
+
+        Assert.Equal(0, _api.WriteCalls);
+        Assert.Single(_api.Stored);
+    }
+
+    #endregion
 
     [Fact]
     public async Task should_drop_the_draft_when_the_console_is_left()

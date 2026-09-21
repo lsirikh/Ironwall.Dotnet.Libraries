@@ -96,21 +96,53 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <summary>서랍 머리글 — 정본 SB L2869.</summary>
     public string HeaderText => IsNew ? "새 억제 스케줄" : $"억제 스케줄 수정 · {_draft.Name}";
 
-    /// <summary>새로 만들기로 연다.</summary>
-    public void OpenNew()
+    /// <summary>
+    /// <b>떠나도 되는가</b> — 서랍을 닫거나, 다른 초안으로 갈아 끼우거나, 레일을 옮기기 전에 묻는 단 하나의 질문.
+    /// </summary>
+    /// <remarks>
+    /// 정본(window-layout-system-storyboard.html L2372 <c>switchTab</c> → L2665 <c>dirtyBlock</c>)은
+    /// <b>탭 전환까지</b> 미적용 변경으로 막는다. 닫기만 막고 레일 전환은 통과시키면
+    /// 초안이 <b>말없이 사라진다</b> — 가장 나쁜 실패다.
+    /// </remarks>
+    public bool CanLeave => !IsOpen || (!IsDirty && !IsSaving);
+
+    /// <summary>떠나도 되면 true. 막았으면 false 를 돌려주고 흔든다. <b>호출부는 false 를 반드시 존중한다.</b></summary>
+    public bool TryLeave()
     {
-        Load(SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now)));
-        StatusLine = "저장하기 전에는 서버에 가지 않습니다.";
+        if (CanLeave) return true;
+
+        StatusLine = IsSaving
+            ? "보내는 중입니다 — 끝날 때까지 기다리세요."
+            : "저장하거나 되돌린 뒤 이동하세요.";
+        ShakeToken++;
+        NotifyOfPropertyChange(nameof(StatusLine));
+        return false;
     }
 
-    /// <summary>받아 온 스케줄을 고치러 연다 — 초안은 <b>원본에서</b> 채운다(PATCH 는 RFC 7396).</summary>
-    public void OpenEdit(EventSuppressionScheduleDto dto)
+    /// <summary>새로 만들기로 연다. 미적용 변경이 있으면 <b>열지 않는다</b>.</summary>
+    public bool OpenNew()
     {
-        if (dto is null) return;
+        if (!TryLeave()) return false;
+
+        Load(SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now)));
+        StatusLine = "저장하기 전에는 서버에 가지 않습니다.";
+        return true;
+    }
+
+    /// <summary>
+    /// 받아 온 스케줄을 고치러 연다 — 초안은 <b>원본에서</b> 채운다(PATCH 는 RFC 7396).
+    /// 미적용 변경이 있으면 <b>갈아 끼우지 않는다</b>.
+    /// </summary>
+    public bool OpenEdit(EventSuppressionScheduleDto dto)
+    {
+        if (dto is null) return false;
+        if (!TryLeave()) return false;
+
         Load(SuppressionDraft.FromDto(dto, DeviceName, GroupName));
         StatusLine = _draft.CanEditRecurrence
             ? string.Empty
             : "반복 규칙은 수정할 수 없습니다 — 서버 수정 스키마에 반복 칸이 없습니다(바꾸려면 새로 만드세요).";
+        return true;
     }
 
     private void Load(SuppressionDraft draft)
@@ -123,7 +155,12 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
 
         IsOpen = true;
         RaiseAll();
+        // ESC 는 터널 이벤트라 초점이 서랍 안에 있어야 도착한다 — 여는 쪽이 초점을 넣어 준다.
+        Opened?.Invoke();
     }
+
+    /// <summary>서랍이 방금 열렸다 — 뷰가 첫 칸에 초점을 준다.</summary>
+    public event System.Action? Opened;
 
     /// <summary>
     /// 닫기 시도(✕ · 취소 · ESC · 스크림). 미적용 변경이 있으면 <b>닫지 않고</b> 흔든다.
@@ -131,20 +168,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <returns>닫혔으면 true.</returns>
     public bool TryClose()
     {
-        if (_isSaving)
-        {
-            StatusLine = "저장하는 중입니다 — 끝나면 닫힙니다.";
-            ShakeToken++;
-            return false;
-        }
-
-        if (IsDirty)
-        {
-            StatusLine = "저장하거나 되돌린 뒤 닫으세요.";
-            ShakeToken++;
-            NotifyOfPropertyChange(nameof(StatusLine));
-            return false;
-        }
+        if (!TryLeave()) return false;
 
         Close();
         return true;

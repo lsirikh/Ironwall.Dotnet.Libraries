@@ -227,6 +227,15 @@ public class EventDashboardViewModel : BasePanelViewModel
             return false;
         }
 
+        // 억제 서랍의 미적용 변경도 같은 문을 지난다 — 여기서 묻지 않으면 레일을 옮기는 순간 초안이 말없이 사라진다
+        // (정본 SB L2372 switchTab → L2665 dirtyBlock 이 탭 전환까지 막는다).
+        if (IsSuppressionRail && !Suppression!.TryLeave())
+        {
+            StatusText = ConsoleDetailStateMachine.BlockedNotice;
+            NotifyOfPropertyChange(nameof(SelectedRail));   // 레일 선택을 되돌린다
+            return false;
+        }
+
         await SwitchRailAsync(key, force: false);
         return true;
     }

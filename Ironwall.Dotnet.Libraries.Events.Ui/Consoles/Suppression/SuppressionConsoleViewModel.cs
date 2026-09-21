@@ -72,6 +72,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     private SuppressionConsoleRow? _selected;
     private bool _isBusy;
     private bool _isSubscribed;
+    private int _editEpoch;
     private int _currentPage;
     private int _totalPages = 1;
     private int _totalCount;
@@ -127,7 +128,15 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     }
 
     /// <summary>
+    /// 이 레일을 떠나도 되는가 — 서랍에 미적용 변경이 있으면 <b>안 된다</b>.
+    /// 대시보드의 레일 전환이 이것을 먼저 묻는다.
+    /// </summary>
+    public bool TryLeave() => Drawer.TryLeave();
+
+    /// <summary>
     /// 콘솔이 이 레일을 떠났다 — 구독을 풀고 <b>초안을 버린다</b>.
+    /// <para>⚠ 호출부가 <see cref="TryLeave"/> 를 먼저 물었다는 전제다. 여기서는 되묻지 않는다 —
+    /// 창을 닫는 경로(대시보드 <c>OnDeactivateAsync</c>)는 막을 수 없기 때문이다.</para>
     /// <para>싱글턴이라 초안이 남으면 다음에 열 때 남의 편집이 떠 있다.</para>
     /// </summary>
     public Task DeactivateAsync()
@@ -137,6 +146,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             _events.Unsubscribe(this);
             _isSubscribed = false;
         }
+        _editEpoch++;               // 날아오던 [수정] 응답이 떠난 뒤에 서랍을 열지 못하게 한다
         Drawer.Close();
         Selected = null;
         StatusText = string.Empty;
@@ -415,7 +425,9 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     public void AddNew()
     {
         if (!CanAdd) { StatusText = AddBlockedReason; return; }
-        Drawer.OpenNew();
+        _editEpoch++;               // 날아오던 [수정] 응답이 이 새 초안을 덮지 못하게 한다
+        // 미적용 변경이 있으면 서랍이 거절한다 — 초안을 말없이 버리지 않는다.
+        if (!Drawer.OpenNew()) StatusText = Drawer.StatusLine;
     }
 
     /// <summary>[수정] — 받아 온 원본에서 초안을 채운다.</summary>
@@ -428,8 +440,14 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     {
         if (_selected is null) return;
         if (!_canEdit()) { StatusText = "이벤트 편집 권한(events:edit)이 없습니다."; return; }
+        // 초안이 살아 있으면 열기 전에 막는다 — 응답을 기다린 뒤 막으면 그 사이 화면이 바뀐다.
+        if (!Drawer.TryLeave()) { StatusText = Drawer.StatusLine; return; }
 
         var row = _selected;
+        // ⚠ 골라 놓고 [수정], 다시 골라 [수정] 하면 앞선 응답이 뒤에 도착할 수 있다.
+        //   그러면 목록은 B 를 가리키는데 서랍은 A 를 연다 — 그대로 저장하면 엉뚱한 스케줄을 고친다.
+        var epoch = ++_editEpoch;
+
         // 가장 최근 원본으로 연다 — 다른 세션이 고쳤을 수 있다. 실패하면 목록이 준 원본으로 간다(읽기라서 안전).
         EventSuppressionScheduleDto baseline = row.Dto;
         try
@@ -437,9 +455,13 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             var res = await _api.GetSuppressionScheduleByIdAsync(row.Id, token).ConfigureAwait(false);
             if (res.Success && res.Data is not null) baseline = res.Data;
         }
-        catch (Exception ex) { _log?.Warning($"[SuppressionConsole] 단건 조회 실패(목록 값으로 엽니다): {ex.Message}"); }
+        catch (Exception ex) { _log?.Warning($"[SuppressionConsole] 단건 조회 실패(목록 값으로 엽니다): {ex}"); }
 
-        Post(() => Drawer.OpenEdit(baseline));
+        Post(() =>
+        {
+            if (epoch != _editEpoch) return;        // 더 최신 [수정] 이 이미 떠났다 — 이 응답은 버린다
+            Drawer.OpenEdit(baseline);
+        });
     }
 
     private void OnDrawerSaved(EventSuppressionScheduleDto? saved)

@@ -95,6 +95,48 @@ public class SuppressionDrawerViewModelTests
     }
 
     [Fact]
+    public void should_refuse_to_leave_when_there_are_unapplied_edits()
+    {
+        _drawer.OpenNew();
+        _drawer.Name = "쓰다 만 것";
+
+        Assert.False(_drawer.CanLeave);
+        Assert.False(_drawer.TryLeave());
+    }
+
+    [Fact]
+    public void should_allow_leaving_a_closed_drawer()
+    {
+        // 열리지도 않은 서랍은 아무것도 막지 않는다 — 레일을 옮기는 것이 막히면 안 된다.
+        Assert.True(_drawer.CanLeave);
+        Assert.True(_drawer.TryLeave());
+    }
+
+    [Fact]
+    public void should_not_reopen_over_a_dirty_draft()
+    {
+        _drawer.OpenNew();
+        _drawer.Name = "지키고 싶은 초안";
+
+        Assert.False(_drawer.OpenNew());
+        Assert.Equal("지키고 싶은 초안", _drawer.Name);
+
+        Assert.False(_drawer.OpenEdit(Existing()));
+        Assert.Equal("지키고 싶은 초안", _drawer.Name);
+    }
+
+    [Fact]
+    public void should_reopen_once_the_draft_is_reverted()
+    {
+        _drawer.OpenNew();
+        _drawer.Name = "쓰다 만 것";
+        _drawer.Revert();
+
+        Assert.True(_drawer.OpenEdit(Existing()));
+        Assert.Equal("탄약고 야간 점검", _drawer.Name);
+    }
+
+    [Fact]
     public void should_make_no_server_call_when_reverting()
     {
         FillValidNew();

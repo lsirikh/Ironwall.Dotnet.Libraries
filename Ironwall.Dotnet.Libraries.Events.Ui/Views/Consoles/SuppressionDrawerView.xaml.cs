@@ -10,6 +10,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles;
 
@@ -55,14 +56,36 @@ public partial class SuppressionDrawerView : UserControl
     private void Hook(SuppressionDrawerViewModel? next)
     {
         if (ReferenceEquals(_bound, next)) return;
-        if (_bound is not null) _bound.PropertyChanged -= OnModelPropertyChanged;
+        if (_bound is not null)
+        {
+            _bound.PropertyChanged -= OnModelPropertyChanged;
+            _bound.Opened -= OnDrawerOpened;
+        }
         _bound = next;
         if (_bound is not null)
         {
             _bound.PropertyChanged += OnModelPropertyChanged;
+            _bound.Opened += OnDrawerOpened;
             _lastShakeToken = _bound.ShakeToken;
         }
     }
+
+    /// <summary>
+    /// 서랍이 열렸다 — 첫 칸에 초점을 준다.
+    /// </summary>
+    /// <remarks>
+    /// ESC 는 <see cref="UIElement.PreviewKeyDown"/> 즉 <b>터널</b> 이벤트라 초점 경로 위에 있어야 도착한다.
+    /// 아무도 초점을 옮겨 주지 않으면 초점은 뒤의 목록에 남고 ESC 가 서랍에 닿지 않는다(실측 지적).
+    /// 레이아웃이 끝난 뒤에 줘야 하므로 한 박자 미룬다.
+    /// </remarks>
+    private void OnDrawerOpened()
+        => Dispatcher.BeginInvoke(DispatcherPriority.Input, new System.Action(() =>
+        {
+            if (Model is not { IsOpen: true }) return;
+            var first = FindByAutomationId(this, "Events.SuppressionSchedule.NameTextBox");
+            if (first is not null && first.Focusable) first.Focus();
+            else Focus();
+        }));
 
     private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
