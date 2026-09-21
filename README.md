@@ -594,19 +594,19 @@ dotnet test Ironwall.Dotnet.Libraries.Accounts.Ui.Tests/Ironwall.Dotnet.Librarie
 >
 > ⚠ 전체 스위트는 이 저장소 실측 **약 461초**다. 하네스 기본 타임아웃(240초)으로는 **항상** INFRA 타임아웃이 난다.
 
-**테스트 현황** (통합 브랜치 `v2.14.0` @ `02f69f46` 실측, 2026-09-21)
+**테스트 현황** (통합 브랜치 `v2.14.0` @ **`093ca377`** 실측 — N-04 ~ N-13 전부 머지된 상태, 2026-09-21)
 
 | 프로젝트 | 통과 | 실패 |
 |---|---|---|
 | `Devices.Ui` | **1288** | 0 |
-| `Events.Ui` | **936** | **15**(전부 이번 작업 이전부터 깨져 있던 것) |
+| `Events.Ui` | **1138** | **15**(전부 이번 작업 이전부터 깨져 있던 것) |
 | `Messages` | **374** | 0 |
 | `Utils.Tests` | **193** | 0 |
 | `Reports.Ui` | **166** | 0 |
 | `Accounts.Ui.Tests` | **148** | 0 |
+| **합계** | **3307** | **15** |
 
-`Events.Ui` 의 실패 15건은 네 덩어리다 — 시각 직렬화 `Z` vs `+00:00` 4건 · PIDS FOV 줌 환산 6건 · NATS 탐지 발행 1건 · **XAML 을 글자로 읽어 단언하는 시험** 4건(이름만 바꿔도 깨진다). 전부 제품 변경을 따라오지 못한 단언이거나 구조적으로 무른 시험이다.
-⚠ 위 수치는 **N-08(억제) 머지 `8766b292` 를 포함하지 않는다**(측정 시점이 그 앞이다).
+`Events.Ui` 의 실패 15건은 네 덩어리다 — 시각 직렬화 `Z` vs `+00:00` 4건 · PIDS FOV 줌 환산 6건 · NATS 탐지 발행 1건 · **XAML 을 글자로 읽어 단언하는 시험** 4건(이름만 바꿔도 깨진다). 전부 제품 변경을 따라오지 못한 단언이거나 구조적으로 무른 시험이다. **N-08 머지 전후로 집합이 바뀌지 않았다.**
 
 ### 패키지 게시 (내부용)
 
@@ -661,6 +661,7 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
   ⚠ 두 사전이 같은 키를 들면 **조용히 갈린다** → `Utils.Tests/ConsoleStyleContractTests` 가 빌드 단계에서 잡는다(커널이 당기는 키가 Theme 에 실재하는가 · 두 곳에 중복 정의가 없는가 · 커널이 공유 키를 `StaticResource` 로 당기지 않는가 · 꺼진 상태에 `Opacity` 를 쓰지 않는가).
 - **드래그 커널**(`Utils/Behaviors/Drag/`, OLE 미사용): 목록에 `CaptureDragBehavior`, 행 안에 `DragHandle`(`Thumb`), 놓을 곳에 `DropZone.Key`(+ `DropZoneChrome`), 순서 목록에는 `DropZone.IsReorder` + `ReorderKeyboardBehavior`. 판정 · 처리는 창이 `IDragDropHandler` 로. **호출 1회면 즉시 전송, N회로 번지면 `DraftTrayViewModel` 에 쌓았다가 [적용]**(진행률 · 부분 실패 4분류 · 되돌리기는 서버 호출 0). `KeyboardFallback` 이 비면 **디버그 빌드에서 예외** — 드래그 전용 UI 는 만들지 않는다.
 - **커널에 아직 없는 것**(창마다 지역으로 지었다 · 승격 후보): **T2 틀**(레일 + 섹션 폼 + 저장 막대 — `ConsoleShell` 은 800폭에서 레일을 56으로 접어 설정 창에 못 쓴다) · **780 오버레이 서랍**(억제) · **트리 목록**(부대) · `ConsoleField.ErrorText` · `ConsoleToolbar.DeleteText`/필터 칩 슬롯 · `DraftTrayViewModel` 의 "첫 실패에서 멈춤" · `Console.ReorderList` 의 **컨테이너 스타일이 인라인이라** 행에 `AutomationId` 를 달려고 `ItemContainerStyle` 을 주면 선택 바 · Stretch · 포커스 링이 **통째로 사라진다**(지금은 템플릿을 옮겨 적어 쓴다).
+- **커널에 남아 있는 시각 결함 둘**(`093ca377` 기준 미수정 · 수정 진행 중): ① `ConsoleDetailHost` 의 스크롤 내용 여백이 `Margin="16,4,16,24"` 라 **상세 칸 마지막 문단이 적용 막대에 2~4px 까지 붙는다**(잘리지는 않는다) ② **적용 막대의 이동 차단 안내가 잘린다** — 버튼 둘이 자리를 먹고 남는 폭이 좁으면 약 **124px** 인데 커널 문장은 약 **190px** 를 쓴다. 두 줄까지 접은 뒤 `TextTrimming` 이 먹어 "적용하거나 되돌린…" 으로 끝난다. **창 쪽에서 문구를 줄여 피하지 말고**(계정 콘솔이 그렇게 했다) 커널이 고쳐질 때 되돌릴 수 있게 그 사실을 주석으로 남긴다.
 
 **화면을 보려면 — 오프라인 미리보기 도구** (앱도 서버도 띄우지 않는다. `--snapshot` 을 주면 입력 없이 PNG 를 뜨고 종료한다. 실패하면 MessageBox 대신 그 폴더에 `snapshot-error.txt` 를 남긴다.)
 
@@ -682,7 +683,8 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 2. **컨트롤에 content 로 넘긴 `TextBlock` 은 색을 상속받지 못할 수 있다.** 템플릿의 `ContentPresenter` 가 `TextElement.Foreground` 를 걸어도, `Header` 로 넘긴 `TextBlock` 은 **템플릿이 아니라 논리 부모**(예: `ConsoleField`)를 통해 상속한다. 아무도 색을 주지 않으면 **순수 검정**이 되고, 다크에서 `#000000` on `#161D26` = **1.24:1** — 사실상 투명이다(라이트는 같은 검정이 밝은 판 위라 19.2:1 로 우연히 살아남아 **한쪽 테마에서만 터진다**). `Foreground` 를 **명시**하고, 창 루트에 `TextElement.Foreground="{DynamicResource TextPrimaryBrush}"` 를 깔아 빠뜨려도 토큰에 떨어지게 한다.
 3. **드롭존은 `ItemsControl` 위에 있어야 한다.** 커널은 드롭존이 `ItemsControl` 일 때만 삽입 위치를 계산하고(`CaptureDragBehavior.cs:205`) 그 인덱스가 음수면 후보로 올리지 않는다(`:218`). `DropZoneChrome`(= `ContentControl`)이나 `Border` 에 붙이면 **파선 윤곽은 계속 떠서 살아 있어 보이는데 드롭이 핸들러에 닿지 않는다.** `ReorderKeyboardBehavior` 도 키를 목록에서 읽으므로 `Alt+↑↓` 가 **같이** 죽는다. 세 첨부 속성(`DropZone.Key` · `.IsReorder` · `.State`)은 `ListBox`/`ItemsControl` 에 건다 — 가라앉은 면은 그 뒤의 `Border` 가 맡는다.
 4. **`AutomationId` 는 peer 가 실재하는 요소에만 붙는다.** `TextBlock` · `Border` · `ContentControl`(`DropZoneChrome` 포함) · `Grid` · `StackPanel` · `md:PackIcon` 은 **UIA 트리에 나오지 않는다** — 붙여도 자동화가 못 찾고, 실제로 그 상태의 호스트 페이지 오브젝트가 **폐기 예정인 옛 패널을 조용히 몰고 있었다.** 단언할 값은 테두리 없는 **읽기 전용 `TextBox`**(`ValuePattern` 까지 온다) · `Label` · `ListBoxItem` · `Button` 으로 낸다.
-5. 그 밖에 — **`x:Name` 은 건드리지 않는다**(이 앱에서 `x:Name` 은 Caliburn 바인딩 지시자다. 계측은 `AutomationProperties.AutomationId` 만) · **색 토큰은 매번 재해석**한다(`DynamicResource`. 1회 캐싱 · `static readonly` Frozen 은 테마 전환 때 옛 색으로 굳는다) · **바인딩된 목록을 `Clear()+Add()` 로 다시 채우지 않는다**(선택과 상세가 풀린다 — `Insert`/`Move`/`Remove` 로 맞춘다) · **요소에 로컬 값을 쓰면 Style 트리거가 진다**(알약의 지역 `Foreground` 하나가 커널의 대비 수정을 통째로 무효로 만들었다) · **한글은 음절 단위로 감긴다** — 마지막 줄이 한 글자만 남으면 문구를 **짧게 고치는 것**이 유일한 결정적 해법이다(`TextWrapping="WrapWithOverflow"` 를 쓴다).
+5. **한 뷰를 두 노드가 고치면 병합은 텍스트 작업이 아니라 설계 판단이다.** N-08(억제 레일)이 내려앉은 `EventDashboardView(Model)` 은 그 사이 N-07 의 적대 검토 수정 · N-13 의 맵핑 입구 · 시각 교정이 **각각 고쳐 놓은 상태**였다. 충돌난 다섯 자리를 손으로 풀었고, 규칙은 **"어느 한쪽을 통째로 택하지 않는다"** 였다 — 툴바는 [중단] · [맵핑] · [정리] 를 **전부** 남기고, 목록 자리는 빈 상태와 억제 목록을 **둘 다** 들고, `ListStatusText` 는 기존 형태를 지킨 채 분기만 앞에 더한다. 가장 중요한 한 자리: **`Delete()` 는 미적용 문지기를 억제 분기보다 먼저 지난다** — 어느 한쪽을 통째로 택했다면 삭제가 미적용 편집을 **조용히 버렸을 것**이다. 공유 뷰를 건드리는 노드가 둘 이상이면, 병합 전에 **무엇을 잃으면 안 되는지**를 먼저 적고 시작한다.
+6. 그 밖에 — **`x:Name` 은 건드리지 않는다**(이 앱에서 `x:Name` 은 Caliburn 바인딩 지시자다. 계측은 `AutomationProperties.AutomationId` 만) · **색 토큰은 매번 재해석**한다(`DynamicResource`. 1회 캐싱 · `static readonly` Frozen 은 테마 전환 때 옛 색으로 굳는다) · **바인딩된 목록을 `Clear()+Add()` 로 다시 채우지 않는다**(선택과 상세가 풀린다 — `Insert`/`Move`/`Remove` 로 맞춘다) · **요소에 로컬 값을 쓰면 Style 트리거가 진다**(알약의 지역 `Foreground` 하나가 커널의 대비 수정을 통째로 무효로 만들었다) · **한글은 음절 단위로 감긴다** — 마지막 줄이 한 글자만 남으면 문구를 **짧게 고치는 것**이 유일한 결정적 해법이다(`TextWrapping="WrapWithOverflow"` 를 쓴다).
 
 **콘솔 커널 — 전 창 재구성의 공용 토대** (봉투 all-windows-console-redesign N-01 · 브랜치 `v2.11.0` · 2026-09-19 · 기존 창 무변경 · 실제 입력 미검증)
 - 왜: 맵 OverlayWindow 를 뺀 전 창을 와이어프레임 구조(레일 · 목록 · 상세 + 드래그 관리)로 다시 짠다. 그 틀과 드래그 규약을 창마다 복사하지 않도록 먼저 공용 자산으로 세웠다
