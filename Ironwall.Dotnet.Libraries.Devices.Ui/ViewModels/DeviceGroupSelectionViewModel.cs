@@ -111,8 +111,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 var groupId = _selection[0].Id;
                 var assignedIds = AssignedDevices.Select(d => d.Id);
 
-                var dialog = new DeviceAssignDialogViewModel(_apiService, _deviceProvider, _log);
-                dialog.Initialize(groupId, assignedIds);
+                var dialog = new DeviceAssignDialogViewModel(_apiService, () => _deviceProvider.OfType<IBaseDeviceModel>(), log: _log);
+                dialog.Initialize(groupId, _selection[0].Name, assignedIds);
 
                 await _eventAggregator.PublishOnUIThreadAsync(
                     new OpenDeviceAssignDialogMessageModel
