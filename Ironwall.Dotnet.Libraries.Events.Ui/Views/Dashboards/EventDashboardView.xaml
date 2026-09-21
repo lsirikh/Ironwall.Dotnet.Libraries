@@ -159,14 +159,25 @@
 				</c:ConsoleToolbar.Filters>
 
 				<c:ConsoleToolbar.Extra>
-					<Button
-						AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
-						Click="OnQueueSelection"
-						Content="{Binding QueueButtonText}"
-						IsEnabled="{Binding CanQueueSelection}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
-						ToolTip="고른 이벤트를 조치 트레이에 담습니다 — 행 손잡이를 끌어 놓아도 같습니다"
-						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
+					<StackPanel Orientation="Horizontal">
+						<!--  N-13 mapping workbench — 창으로 연다(3-Pane 은 1280 폭이 필요해 이 콘솔 안에 들어가지 않는다).  -->
+						<Button
+							Margin="0,0,8,0"
+							AutomationProperties.AutomationId="Console.Events.Toolbar.Mapping"
+							Click="OnOpenMappingWorkbench"
+							Content="이벤트 맵핑"
+							Style="{StaticResource MaterialDesignOutlinedButton}"
+							ToolTip="이벤트가 났을 때 움직일 카메라 · 스피커 · 경광등을 정합니다"
+							Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
+						<Button
+							AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
+							Click="OnQueueSelection"
+							Content="{Binding QueueButtonText}"
+							IsEnabled="{Binding CanQueueSelection}"
+							Style="{StaticResource MaterialDesignRaisedButton}"
+							ToolTip="고른 이벤트를 조치 트레이에 담습니다 — 행 손잡이를 끌어 놓아도 같습니다"
+							Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
 				</c:ConsoleToolbar.Extra>
 			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>

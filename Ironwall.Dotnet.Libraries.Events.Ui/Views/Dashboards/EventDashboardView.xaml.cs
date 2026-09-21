@@ -46,6 +46,9 @@ public partial class EventDashboardView : UserControl
     private void OnApply(object sender, RoutedEventArgs e) => Model?.Apply();
 
     private void OnRevert(object sender, RoutedEventArgs e) => Model?.Revert();
+
+    // N-13 mapping workbench
+    private void OnOpenMappingWorkbench(object sender, RoutedEventArgs e) => _ = Model?.OpenMappingWorkbenchAsync();
 }
 
 /// <summary>

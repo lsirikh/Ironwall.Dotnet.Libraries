@@ -59,8 +59,11 @@ public class EventDashboardViewModel : BasePanelViewModel
                                 , EventInfoViewModel eventInfoViewModel
                                 , CameraEventInfoViewModel cameraEventInfoViewModel
                                 , DataChartPanelViewModel dataChartPanelViewModel
+                                // N-13 mapping workbench — 늦게 푼다(아래 _mapping 주석 참조). 없어도 콘솔은 뜬다.
+                                , Lazy<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher>? mappingLauncher = null
                                 ) : base(eventAggregator, log)
     {
+        _mappingFactory = mappingLauncher;
         TabControlViewModel = tabControlViewModel;
         DetectionPanelViewModel = detectionEventPanelViewModel;
         MalfunctionPanelViewModel = malfunctionEventPanelViewModel;
@@ -773,6 +776,38 @@ public class EventDashboardViewModel : BasePanelViewModel
     private DateTime _endDate;
     private DateTime _endDateDisplay;
     #endregion
+
+    #region - N-13 mapping workbench -
+    private readonly Lazy<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher>? _mappingFactory;
+    private bool _mappingFailed;
+
+    /// <summary>
+    /// 맵핑 워크벤치 입구 — <b>늦게 만든다</b>. 곧바로 주입받으면 입구의 의존 하나가 컨테이너에서 안 풀릴 때
+    /// 이 뷰모델까지 못 만들어져 <b>이벤트 콘솔 전체가 안 열린다</b>. 늦게 풀고, 실패하면 입구만 감춘다.
+    /// </summary>
+    private Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher? _mapping
+    {
+        get
+        {
+            if (_mappingFactory is null || _mappingFailed) return null;
+            try { return _mappingFactory.Value; }
+            catch (Exception ex)
+            {
+                _mappingFailed = true;
+                _log?.Error($"[EventConsole] 맵핑 워크벤치 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 워크벤치 입구를 보일 것인가. 운영 6.3.2 서버에는 이 연동 계약이 없어 <b>감춘다</b>(비활성 아님).
+    /// </summary>
+    public bool CanOpenMappingWorkbench => _mapping?.IsAvailable ?? false;
+
+    /// <summary>워크벤치 창을 연다.</summary>
+    public Task OpenMappingWorkbenchAsync() => _mapping?.OpenAsync() ?? Task.CompletedTask;
+    #endregion
 }
 
 /// <summary>기간 칩 한 칸 — 선택 표시를 스스로 든다(라디오 버튼이 직접 묶을 것을 가진다).</summary>
@@ -787,4 +822,5 @@ public sealed class EventPeriodOption : Caliburn.Micro.PropertyChangedBase
     public bool IsSelected { get => _isSelected; set { _isSelected = value; NotifyOfPropertyChange(); } }
 
     public override string ToString() => Name;
+
 }
