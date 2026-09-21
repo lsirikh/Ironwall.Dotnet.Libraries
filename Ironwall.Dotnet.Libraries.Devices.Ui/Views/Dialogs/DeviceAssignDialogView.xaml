@@ -190,7 +190,7 @@
 		</dlg:ConsoleDialogFrame.FooterExtra>
 
 		<!--  창이 작아지면 카드가 눌린다 — 높이를 고정하지 않고 목록이 제 안에서 스크롤하게 둔다(C8).  -->
-		<Grid MinHeight="220">
+		<Grid MinHeight="320">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="Auto" />
@@ -203,7 +203,10 @@
 					DockPanel.Dock="Top"
 					Style="{StaticResource Assign.PaneTitle}"
 					Text="{Binding Available.Count, StringFormat=후보 ({0})}" />
-				<Border Style="{StaticResource Assign.Pane}">
+				<Border
+					drag:DropZone.Handler="{Binding}"
+					drag:DropZone.Key="assign-available"
+					Style="{StaticResource Assign.Pane}">
 					<Grid>
 						<TextBlock
 							Margin="16"
@@ -219,8 +222,6 @@
 						<ListBox
 							Margin="6"
 							AutomationProperties.AutomationId="Devices.Assign.Available"
-							drag:DropZone.Handler="{Binding}"
-							drag:DropZone.Key="assign-available"
 							IsEnabled="{Binding IsEditable}"
 							ItemTemplate="{StaticResource Assign.RowTemplate}"
 							ItemsSource="{Binding Available}"
@@ -285,7 +286,10 @@
 					DockPanel.Dock="Top"
 					Style="{StaticResource Assign.PaneTitle}"
 					Text="{Binding Assigned.Count, StringFormat=이 그룹 ({0})}" />
-				<Border Style="{StaticResource Assign.Pane}">
+				<Border
+					drag:DropZone.Handler="{Binding}"
+					drag:DropZone.Key="assign-assigned"
+					Style="{StaticResource Assign.Pane}">
 					<Grid>
 						<TextBlock
 							Margin="16"
@@ -301,8 +305,6 @@
 						<ListBox
 							Margin="6"
 							AutomationProperties.AutomationId="Devices.Assign.Assigned"
-							drag:DropZone.Handler="{Binding}"
-							drag:DropZone.Key="assign-assigned"
 							IsEnabled="{Binding IsEditable}"
 							ItemTemplate="{StaticResource Assign.RowTemplate}"
 							ItemsSource="{Binding Assigned}"

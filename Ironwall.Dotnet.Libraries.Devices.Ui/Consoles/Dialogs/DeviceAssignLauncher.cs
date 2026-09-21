@@ -67,7 +67,7 @@ public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
         return new Dictionary<string, object>
         {
             ["Width"] = width,
-            ["Height"] = 620d,
+            ["Height"] = 560d,
             ["MinWidth"] = DialogSizeRules.MinWidth,
             ["MinHeight"] = 420d,
             ["SizeToContent"] = SizeToContent.Manual,

@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System.IO;
@@ -292,10 +293,27 @@ public partial class App : Application
         await Show(preview.PresetManager(work), 768, 560, "16-preset-manager-l720");
         await Show(preview.Register(work, withProblem: true), 768, 660, "17-register-l720");
 
-        await Show(preview.Assign(AssignState.Loaded).View, 768, 620, "06-assign-loaded-l720");
-        await Show(preview.Assign(AssignState.MultiSelect).View, 768, 620, "07-assign-multi-select");
-        await Show(preview.Assign(AssignState.Blocked).View, 768, 620, "08-assign-blocked-drop");
-        await Show(preview.Assign(AssignState.Dirty).View, 768, 620, "09-assign-dirty-delta");
+        await Show(preview.Assign(AssignState.Loaded).View, 768, 560, "06-assign-loaded-l720");
+        await Show(preview.Assign(AssignState.MultiSelect).View, 768, 560, "07-assign-multi-select");
+        // 끄는 동안의 모양 — 드롭존 상태를 실제로 물린 뒤에 찍는다(형태 피드백 증거).
+        var blocked = preview.Assign(AssignState.Blocked);
+        _window.Width = 768 + 40;
+        _window.Height = 560 + 60;
+        _window.Content = new Border { Margin = new Thickness(12), Child = blocked.View };
+        await Settle();
+        DialogPreview.ForceZoneState(blocked.View, "Devices.Assign.Assigned", DropZoneState.Blocked);
+        DialogPreview.ForceZoneState(blocked.View, "Devices.Assign.Available", DropZoneState.Available);
+        await Settle();
+        if (directory is not null) Save(directory, $"dialogs-{theme}-08-assign-blocked-drop");
+
+        var dragOver = preview.Assign(AssignState.DragOver);
+        _window.Content = new Border { Margin = new Thickness(12), Child = dragOver.View };
+        await Settle();
+        DialogPreview.ForceZoneState(dragOver.View, "Devices.Assign.Assigned", DropZoneState.Hover);
+        DialogPreview.ForceZoneState(dragOver.View, "Devices.Assign.Available", DropZoneState.Available);
+        await Settle();
+        if (directory is not null) Save(directory, $"dialogs-{theme}-08b-assign-drag-over");
+        await Show(preview.Assign(AssignState.Dirty).View, 768, 560, "09-assign-dirty-delta");
         await Show(preview.Assign(AssignState.PartialFailure).View, 768, 620, "10-assign-partial-failure");
         await Show(preview.AssignUnsavedGroup(), 768, 620, "11-assign-unsaved-group");
 

@@ -90,7 +90,7 @@ internal sealed class DialogPreview
             api.AssignHook = (_, dto) => ApiResponse<DeviceGroupAssignResultDto>.CreateSuccess(
                 new DeviceGroupAssignResultDto { AssignedDeviceIds = dto.DeviceIds.Take(1).ToList(), SkippedDeviceIds = dto.DeviceIds.Skip(1).ToList() });
 
-        var vm = new DeviceAssignDialogViewModel(api, () => models, log: new MockLogService());
+        var vm = new DeviceAssignDialogViewModel(api, () => models, new PreviewProbe(models), new MockLogService());
         vm.Initialize(10, "동측 1구역", new[] { 101, 104 });
 
         switch (state)
@@ -101,6 +101,10 @@ internal sealed class DialogPreview
             case AssignState.Blocked:
                 // 오른쪽 행을 오른쪽에 떨어뜨리려 한다 — 까닭이 버튼 줄에 뜬다.
                 vm.CanDrop(PreviewPayload(vm.Assigned.Take(1)), new Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropTarget(AssignDelta.AssignedZone, null, -1));
+                break;
+            case AssignState.DragOver:
+                vm.SetSelection(AssignSide.Available, vm.Available.Take(2).ToList());
+                vm.CanDrop(PreviewPayload(vm.Available.Take(2)), new Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropTarget(AssignDelta.AssignedZone, null, -1));
                 break;
             case AssignState.Dirty:
                 vm.SetSelection(AssignSide.Available, vm.Available.Take(2).ToList());
@@ -121,13 +125,65 @@ internal sealed class DialogPreview
     /// <summary>미저장 그룹 — 빈 칸이 아니라 까닭을 낸다.</summary>
     public FrameworkElement AssignUnsavedGroup()
     {
-        var vm = new DeviceAssignDialogViewModel(new MockDeviceApiService(), Devices);
+        var models = Devices();
+        var vm = new DeviceAssignDialogViewModel(new MockDeviceApiService(), () => models, new PreviewProbe(models));
         vm.Initialize(0, "새 그룹", Array.Empty<int>());
         return new DeviceAssignDialogView { DataContext = vm };
     }
 
     private static Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragPayload PreviewPayload(IEnumerable<DeviceAssignItemViewModel> items)
         => new(null!, items.Cast<object>().ToList(), "행");
+
+    /// <summary>
+    /// 끄는 동안의 <b>모양</b>을 찍기 위해 드롭존 상태를 직접 물린다.
+    /// </summary>
+    /// <remarks>
+    /// <c>DropZone.SetState</c> 는 커널 내부용(<c>internal</c>)이라 미리보기에서는 리플렉션으로 부른다 —
+    /// 실제 드래그는 캡처 드래그 행동이 같은 자리에 같은 값을 쓴다. 여기는 제품 코드가 아니라 하네스다.
+    /// </remarks>
+    public static void ForceZoneState(FrameworkElement root, string automationId, object state)
+    {
+        // 드롭존은 칸(Border)이고 자동화 식별자는 그 안의 목록에 있다 — 목록에서 위로 걸어 칸을 찾는다.
+        var list = FindByAutomationId(root, automationId);
+        var zone = list is null ? null : Ancestors(list).FirstOrDefault(
+            a => Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.GetKey(a) is { Length: > 0 });
+        if (zone is null) return;
+
+        var setter = typeof(Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone)
+            .GetMethod("SetState", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        setter?.Invoke(null, new object[] { zone, state });
+    }
+
+    private static IEnumerable<DependencyObject> Ancestors(DependencyObject from)
+    {
+        var current = System.Windows.Media.VisualTreeHelper.GetParent(from);
+        while (current is not null)
+        {
+            yield return current;
+            current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+        }
+    }
+
+    private static DependencyObject? FindByAutomationId(DependencyObject root, string id)
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (System.Windows.Automation.AutomationProperties.GetAutomationId(child) == id) return child;
+            if (FindByAutomationId(child, id) is { } found) return found;
+        }
+        return null;
+    }
+
+    /// <summary>미리보기의 눈 — 프로바이더가 아는 소속 수를 그대로 돌려준다(서버 없음).</summary>
+    private sealed class PreviewProbe : IGroupMembershipProbe
+    {
+        private readonly List<IBaseDeviceModel> _models;
+        public PreviewProbe(List<IBaseDeviceModel> models) => _models = models;
+
+        public Task<int?> CountAsync(int groupId, CancellationToken token = default)
+            => Task.FromResult<int?>(_models.Count(m => m.DeviceGroups?.Contains(groupId) == true));
+    }
 
     private static List<IBaseDeviceModel> Devices()
     {
@@ -167,6 +223,7 @@ internal enum AssignState
     Loaded,
     MultiSelect,
     Blocked,
+    DragOver,
     Dirty,
     PartialFailure,
 }

@@ -51,7 +51,8 @@
 	<DockPanel LastChildFill="True">
 		<Grid MinHeight="320">
 			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="420" />
+				<!--  L 720 안에서 왼쪽 폼과 오른쪽 미리보기가 같이 살아야 한다 — 폼을 좁혀 미리보기에 자리를 준다.  -->
+				<ColumnDefinition Width="330" />
 				<ColumnDefinition Width="*" />
 			</Grid.ColumnDefinitions>
 
