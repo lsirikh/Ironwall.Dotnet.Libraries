@@ -115,89 +115,6 @@
 		</Style>
 
 		<!--
-			매트릭스 칸 — "쓸 수 없음" 과 "안 켜짐" 을 <b>형태</b>로 가른다.
-			전에는 꺼진 칸이 그냥 흐린 빈 네모라 안 켠 것과 구별되지 않았다(라이트 1.36:1 · 다크 1.71:1 실측).
-			이제 꺼진 칸에는 사선 하나가 그어진다 — 색맹 · 저대비 화면에서도 읽힌다.
-		-->
-		<Style x:Key="Matrix.Cell.CheckBox" TargetType="CheckBox">
-			<Setter Property="HorizontalAlignment" Value="Center" />
-			<Setter Property="VerticalAlignment" Value="Center" />
-			<Setter Property="Focusable" Value="True" />
-			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-			<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="CheckBox">
-						<Grid
-							Width="18"
-							Height="18"
-							Background="Transparent">
-							<Border
-								x:Name="Box"
-								Width="16"
-								Height="16"
-								Background="{DynamicResource SurfaceAltBrush}"
-								BorderBrush="{DynamicResource TextMutedBrush}"
-								BorderThickness="1.4"
-								CornerRadius="2" />
-							<Path
-								x:Name="Check"
-								Width="11"
-								Height="9"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Data="M0,4.6 L1.4,3.2 L4.2,6 L9.6,0.6 L11,2 L4.2,8.8z"
-								Fill="{DynamicResource PrimaryBrush}"
-								Stretch="Uniform"
-								Visibility="Collapsed" />
-							<!--  쓸 수 없는 칸의 사선 — 색이 아니라 형태로 "여기는 못 쓴다" 를 말한다  -->
-							<Path
-								x:Name="Slash"
-								Width="16"
-								Height="16"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Data="M1,15 L15,1"
-								Stretch="None"
-								Stroke="{DynamicResource TextSecondaryBrush}"
-								StrokeEndLineCap="Round"
-								StrokeStartLineCap="Round"
-								StrokeThickness="1.8"
-								Visibility="Collapsed" />
-							<Border
-								x:Name="Focus"
-								Margin="-3"
-								BorderBrush="{DynamicResource FocusRingBrush}"
-								BorderThickness="2"
-								CornerRadius="4"
-								Visibility="Collapsed" />
-						</Grid>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsChecked" Value="True">
-								<Setter TargetName="Check" Property="Visibility" Value="Visible" />
-								<Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-							</Trigger>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Box" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-							</Trigger>
-							<Trigger Property="IsKeyboardFocused" Value="True">
-								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
-							</Trigger>
-							<Trigger Property="IsEnabled" Value="False">
-								<Setter TargetName="Slash" Property="Visibility" Value="Visible" />
-								<Setter TargetName="Box" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-								<Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource TextMutedBrush}" />
-								<Setter TargetName="Check" Property="Fill" Value="{DynamicResource TextMutedBrush}" />
-								<Setter Property="Cursor" Value="No" />
-								<Setter Property="ToolTip" Value="이 모듈에는 이 동작이 없거나 편집 권한이 없습니다" />
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-
-		<!--
 			동작 열 머리글 자리 — 머리글은 왼쪽 정렬(Console.DataGrid.ColumnHeader 기본)인데 칸의 체크는 가운데라
 			열마다 어긋났다(제어 열 Δ19px 실측). 이 열들만 머리글을 가운데로 돌린다.
 		-->
@@ -246,70 +163,10 @@
 			<Setter Property="TextWrapping" Value="Wrap" />
 		</Style>
 
-		<!--
-			상세 칸 단추 — 콘솔 커널 Console.Button 과 같은 치수 · 토큰(높이 32 · 안쪽 12 · 모서리 4).
-			커널 스타일은 Utils 의 Themes/Generic.xaml(ThemeInfo 사전)에 있어 소비 어셈블리에서 StaticResource 로
-			찾을 수 없다 — 같은 값을 여기서 다시 적는다(보고서의 커널 공백 항목).
-		-->
-		<Style x:Key="Acc.Btn" TargetType="Button">
-			<Setter Property="Height" Value="32" />
-			<Setter Property="MinWidth" Value="56" />
-			<Setter Property="Padding" Value="12,0" />
-			<Setter Property="FontSize" Value="13" />
-			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-			<Setter Property="BorderThickness" Value="1" />
-			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-			<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="Button">
-						<Grid>
-							<Border
-								x:Name="Bd"
-								Background="{TemplateBinding Background}"
-								BorderBrush="{TemplateBinding BorderBrush}"
-								BorderThickness="{TemplateBinding BorderThickness}"
-								CornerRadius="4" />
-							<Border
-								x:Name="Focus"
-								Margin="-3"
-								BorderBrush="{DynamicResource FocusRingBrush}"
-								BorderThickness="2"
-								CornerRadius="6"
-								Visibility="Collapsed" />
-							<ContentPresenter
-								Margin="{TemplateBinding Padding}"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								RecognizesAccessKey="True" />
-						</Grid>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-							</Trigger>
-							<Trigger Property="IsPressed" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
-							</Trigger>
-							<Trigger Property="IsKeyboardFocused" Value="True">
-								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
-							</Trigger>
-							<Trigger Property="IsEnabled" Value="False">
-								<Setter Property="Opacity" Value="0.45" />
-								<Setter Property="Cursor" Value="No" />
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-
 		<!--  되돌릴 수 없는 동작 — 위험을 색 하나가 아니라 <b>테두리(형태) + 바탕 + 구분선</b> 으로 말한다.  -->
 		<Style
 			x:Key="Acc.Btn.Danger"
-			BasedOn="{StaticResource Acc.Btn}"
+			BasedOn="{StaticResource Console.Button}"
 			TargetType="Button">
 			<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
 			<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
@@ -444,7 +301,7 @@
 							AutomationProperties.AutomationId="Console.Accounts.Audit.Search"
 							Click="OnAuditSearch"
 							Content="검색"
-							Style="{StaticResource MaterialDesignFlatButton}" />
+							Style="{StaticResource Console.Button.Ghost}" />
 					</StackPanel>
 				</c:ConsoleToolbar.Filters>
 			</c:ConsoleToolbar>
@@ -736,9 +593,15 @@
 								</DataGridTemplateColumn.Header>
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
+										<!--
+											왼쪽 8 은 보정값이다 — 커널 Console.CheckBox 는 글자 칸을 늘 달고 있어(빈 칸이어도 8 여백)
+											가운데 정렬하면 네모가 열 중심에서 4px 왼쪽으로 앉는다. 이 여백이 그만큼 되민다.
+										-->
 										<CheckBox
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.view}"
-											Style="{StaticResource Matrix.Cell.CheckBox}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -767,7 +630,9 @@
 									<DataTemplate>
 										<CheckBox
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.edit}"
-											Style="{StaticResource Matrix.Cell.CheckBox}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -796,7 +661,9 @@
 									<DataTemplate>
 										<CheckBox
 											AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.delete}"
-											Style="{StaticResource Matrix.Cell.CheckBox}"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}"
 											IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 											<CheckBox.IsEnabled>
 												<MultiBinding Converter="{StaticResource AllTrue}">
@@ -832,7 +699,9 @@
 											<CheckBox
 												AutomationProperties.AutomationId="{Binding ModuleKey, StringFormat=Accounts.Matrix.Cell.{0}.control}"
 												IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-												Style="{StaticResource Matrix.Cell.CheckBox}">
+												Margin="8,0,0,0"
+											HorizontalAlignment="Center"
+											Style="{StaticResource Console.CheckBox}">
 												<CheckBox.IsEnabled>
 													<MultiBinding Converter="{StaticResource AllTrue}">
 														<Binding Path="ControlEnabled" />
@@ -1348,7 +1217,7 @@
 								Click="OnUnlock"
 								Content="잠금 해제"
 								IsEnabled="{Binding CanUnlockSelected}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="계정 잠금을 해제합니다 (확인 팝업)" />
 							<Button
 								Margin="0,0,6,6"
@@ -1356,7 +1225,7 @@
 								Click="OnOpenUserDialog"
 								Content="사용자 변경 창"
 								IsEnabled="{Binding CanOpenUserDialog}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="비밀번호 초기화 · 사진 변경은 이 창에서 합니다. 손댄 칸이 있으면 먼저 적용하거나 되돌리세요." />
 							<Button
 								Margin="0,0,6,6"
@@ -1364,7 +1233,7 @@
 								Click="OnDeleteSelected"
 								Content="삭제"
 								IsEnabled="{Binding CanDelete}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="고른 계정을 삭제합니다 (확인 팝업)" />
 						</WrapPanel>
 					</StackPanel>
@@ -1457,12 +1326,12 @@
 											Click="OnSaveGroupForm"
 											Content="그룹 저장"
 											IsEnabled="{Binding PermissionMatrixPanelViewModel.CanSaveGroupForm}"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<Button
 											AutomationProperties.AutomationId="Console.Accounts.Group.FormCancel"
 											Click="OnCancelGroupForm"
 											Content="취소"
-											Style="{StaticResource MaterialDesignFlatButton}" />
+											Style="{StaticResource Console.Button.Ghost}" />
 									</WrapPanel>
 								</StackPanel>
 							</StackPanel>
@@ -1595,14 +1464,14 @@
 								Click="OnCreateGrant"
 								Content="부여"
 								IsEnabled="{Binding GrantManagementPanelViewModel.CanCreateGrant}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Console.Button}" />
 							<Button
 								Margin="0,0,6,6"
 								AutomationProperties.AutomationId="Console.Accounts.Grant.Revoke"
 								Click="OnRevokeGrant"
 								Content="회수"
 								IsEnabled="{Binding SelectedGrant.IsActive, FallbackValue=False}"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Console.Button}" />
 						</WrapPanel>
 					</StackPanel>
 
