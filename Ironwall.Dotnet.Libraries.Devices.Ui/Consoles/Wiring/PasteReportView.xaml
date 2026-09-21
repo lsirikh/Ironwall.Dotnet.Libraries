@@ -118,7 +118,7 @@
 				ItemsSource="{Binding Rejected}">
 				<ItemsControl.Template>
 					<ControlTemplate TargetType="ItemsControl">
-						<ScrollViewer VerticalScrollBarVisibility="Auto">
+						<ScrollViewer Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
 							<ItemsPresenter />
 						</ScrollViewer>
 					</ControlTemplate>

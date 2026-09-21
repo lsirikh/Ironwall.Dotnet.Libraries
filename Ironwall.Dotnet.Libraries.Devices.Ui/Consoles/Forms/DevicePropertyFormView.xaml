@@ -66,9 +66,9 @@
 			<CheckBox
 				VerticalAlignment="Center"
 				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
-				Foreground="{DynamicResource TextPrimaryBrush}"
 				IsChecked="{Binding BoolValue}"
-				IsThreeState="{Binding IsMixed}" />
+				IsThreeState="{Binding IsMixed}"
+				Style="{StaticResource Console.CheckBox}" />
 		</DataTemplate>
 
 		<DataTemplate x:Key="Editor.Choice">

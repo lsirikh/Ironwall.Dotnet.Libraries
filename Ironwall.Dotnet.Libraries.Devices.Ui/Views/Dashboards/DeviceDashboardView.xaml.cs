@@ -139,7 +139,7 @@ public partial class DeviceDashboardView : UserControl
                     SortMemberPath = spec.BindingPath,
                     CellTemplate = ParseTemplate(
                         "<Border Style=\"{DynamicResource Console.Pill}\"><StackPanel Orientation=\"Horizontal\">" + glyph
-                        + $"<TextBlock FontSize=\"12\" VerticalAlignment=\"Center\" Foreground=\"{{DynamicResource TextPrimaryBrush}}\" Text=\"{{Binding {spec.BindingPath}, Mode=OneWay}}\" />"
+                        + $"<TextBlock FontSize=\"12\" VerticalAlignment=\"Center\" Text=\"{{Binding {spec.BindingPath}, Mode=OneWay}}\" />"
                         + "</StackPanel></Border>"),
                 };
 
@@ -148,7 +148,7 @@ public partial class DeviceDashboardView : UserControl
                 {
                     SortMemberPath = spec.BindingPath,
                     CellTemplate = ParseTemplate(
-                        $"<CheckBox IsHitTestVisible=\"False\" Focusable=\"False\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" IsChecked=\"{{Binding {spec.BindingPath}, Mode=OneWay}}\" />"),
+                        $"<CheckBox Style=\"{{DynamicResource Console.CheckBox}}\" IsHitTestVisible=\"False\" Focusable=\"False\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" IsChecked=\"{{Binding {spec.BindingPath}, Mode=OneWay}}\" />"),
                 };
 
             default:

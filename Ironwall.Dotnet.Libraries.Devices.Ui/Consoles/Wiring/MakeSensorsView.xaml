@@ -147,6 +147,7 @@
 				Content="이미 있는 번호는 건너뛰기"
 				FontSize="12.5"
 				IsChecked="{Binding SkipConflicts}"
+				Style="{StaticResource Console.CheckBox}"
 				Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
 
 			<TextBlock

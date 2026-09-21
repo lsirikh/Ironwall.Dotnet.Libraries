@@ -73,75 +73,6 @@
 		<Style x:Key="W.Cable" TargetType="Rectangle">
 			<Setter Property="Margin" Value="4,36,68,0" />
 		</Style>
-		<!--
-			머리 단추 — 콘솔 커널의 Console.Button 과 같은 치수·토큰(높이 32 · 안쪽 12 · 모서리 4).
-			커널 스타일은 Utils 의 Themes/Generic.xaml(ThemeInfo 사전)에 있어 소비 어셈블리의 StaticResource 로는
-			찾을 수 없다 — 그래서 같은 값을 여기서 다시 적는다(보고서의 커널 공백 항목).
-		-->
-		<Style x:Key="W.Btn" TargetType="Button">
-			<Setter Property="Height" Value="32" />
-			<Setter Property="MinWidth" Value="56" />
-			<Setter Property="Padding" Value="12,0" />
-			<Setter Property="FontSize" Value="13" />
-			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-			<Setter Property="BorderThickness" Value="1" />
-			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-			<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="Button">
-						<Grid>
-							<Border
-								x:Name="Bd"
-								Background="{TemplateBinding Background}"
-								BorderBrush="{TemplateBinding BorderBrush}"
-								BorderThickness="{TemplateBinding BorderThickness}"
-								CornerRadius="4" />
-							<Border
-								x:Name="Focus"
-								Margin="-3"
-								BorderBrush="{DynamicResource FocusRingBrush}"
-								BorderThickness="2"
-								CornerRadius="6"
-								Visibility="Collapsed" />
-							<ContentPresenter
-								Margin="{TemplateBinding Padding}"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								RecognizesAccessKey="True" />
-						</Grid>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-							</Trigger>
-							<Trigger Property="IsPressed" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
-							</Trigger>
-							<Trigger Property="IsKeyboardFocused" Value="True">
-								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
-							</Trigger>
-							<Trigger Property="IsEnabled" Value="False">
-								<Setter Property="Opacity" Value="0.45" />
-								<Setter Property="Cursor" Value="No" />
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-		<Style
-			x:Key="W.Btn.Primary"
-			BasedOn="{StaticResource W.Btn}"
-			TargetType="Button">
-			<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
-			<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
-			<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-			<Setter Property="FontWeight" Value="SemiBold" />
-		</Style>
-
 		<Style x:Key="W.Chip" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
 			<Setter Property="Height" Value="28" />
 			<Setter Property="Padding" Value="10,0" />
@@ -340,26 +271,26 @@
 					DockPanel.Dock="Right"
 					Orientation="Horizontal">
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Wiring.AutoLayout"
 						Click="OnAutoLayout"
 						Content="번호 순으로 자동 배치"
-						Style="{StaticResource W.Btn}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="전체를 번호 순으로 정렬해 앞 절반은 1차, 뒤 절반은 2차에 꽂습니다"
 						Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}" />
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Wiring.Undo"
 						Click="OnUndo"
 						Content="되돌리기"
 						IsEnabled="{Binding CanUndo}"
-						Style="{StaticResource W.Btn}" />
+						Style="{StaticResource Console.Button}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Save"
 						Click="OnSave"
 						Content="저장하기"
 						IsEnabled="{Binding CanSave}"
-						Style="{StaticResource W.Btn.Primary}"
+						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding SaveBlockedReason}" />
 				</StackPanel>
 				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
@@ -579,18 +510,18 @@
 									AutomationProperties.AutomationId="Devices.Wiring.MakeSensors"
 									Click="OnMakeSensors"
 									Content="＋ 센서 여러 개 만들기"
-									Style="{StaticResource MaterialDesignRaisedButton}" />
+									Style="{StaticResource Console.Button.Primary}" />
 								<Button
 									Margin="0,0,6,0"
 									AutomationProperties.AutomationId="Devices.Wiring.AddRow"
 									Click="OnAddRow"
 									Content="＋ 한 줄"
-									Style="{StaticResource MaterialDesignOutlinedButton}" />
+									Style="{StaticResource Console.Button}" />
 								<Button
 									AutomationProperties.AutomationId="Devices.Wiring.Paste"
 									Click="OnPaste"
 									Content="엑셀에서 붙여넣기"
-									Style="{StaticResource MaterialDesignOutlinedButton}" />
+									Style="{StaticResource Console.Button}" />
 							</StackPanel>
 						</DockPanel>
 					</Border>
@@ -733,14 +664,14 @@
 									Content="{Binding ApplyEditText}"
 									DockPanel.Dock="Right"
 									IsEnabled="{Binding CanApplyEdit}"
-									Style="{StaticResource MaterialDesignRaisedButton}" />
+									Style="{StaticResource Console.Button.Primary}" />
 								<Button
 									Margin="0,0,6,0"
 									AutomationProperties.AutomationId="Devices.Wiring.CancelEdit"
 									Click="OnCancelEdit"
 									Content="취소"
 									DockPanel.Dock="Right"
-									Style="{StaticResource MaterialDesignFlatButton}" />
+									Style="{StaticResource Console.Button.Ghost}" />
 								<TextBlock
 									VerticalAlignment="Center"
 									Style="{StaticResource W.Hint}"
@@ -748,7 +679,10 @@
 							</DockPanel>
 						</Border>
 
-						<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+						<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 							<Grid Margin="13,0,13,12">
 							<TextBlock
 								Margin="0,12,0,0"
@@ -907,7 +841,8 @@
 															Focusable="False"
 															IsChecked="{Binding IsChecked, Mode=OneWay}"
 															IsHitTestVisible="False"
-															IsThreeState="True" />
+															IsThreeState="True"
+															Style="{StaticResource Console.CheckBox}" />
 														<TextBlock
 															Margin="8,0,0,0"
 															VerticalAlignment="Center"
@@ -991,7 +926,10 @@
 					<ColumnDefinition Width="360" />
 				</Grid.ColumnDefinitions>
 
-				<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+				<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 					<StackPanel Margin="12">
 						<Grid>
 							<Grid.ColumnDefinitions>
@@ -1074,7 +1012,7 @@
 											Click="OnAddSlotPrimary"
 											Content="＋ 칸"
 											DockPanel.Dock="Right"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.1"
 											ItemsSource="{Binding Line1}"
@@ -1124,7 +1062,7 @@
 											Click="OnAddSlotSecondary"
 											Content="＋ 칸"
 											DockPanel.Dock="Right"
-											Style="{StaticResource MaterialDesignOutlinedButton}" />
+											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.2"
 											ItemsSource="{Binding Line2}"
@@ -1235,7 +1173,7 @@
 										Click="OnUnplaceSelected"
 										Content="고른 칸 빼기"
 										DockPanel.Dock="Right"
-										Style="{StaticResource MaterialDesignFlatButton}" />
+										Style="{StaticResource Console.Button.Ghost}" />
 									<md:PackIcon
 										Width="16"
 										Height="16"
@@ -1271,7 +1209,10 @@
 								Text="이렇게 저장됩니다" />
 						</StackPanel>
 
-						<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+						<ScrollViewer
+							HorizontalScrollBarVisibility="Disabled"
+							Style="{StaticResource Console.ScrollViewer}"
+							VerticalScrollBarVisibility="Auto">
 							<StackPanel Margin="13,0,13,12">
 								<!--  배너 — 색이 아니라 왼쪽 굵은 바 + 글자  -->
 								<Border

@@ -30,7 +30,7 @@
 				FontSize="15"
 				FontWeight="Bold"
 				Text="{Binding DisplayName}" />
-			<ScrollViewer MaxHeight="140" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+			<ScrollViewer MaxHeight="140" Margin="0,10,0,0" Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
 				<TextBlock
 					AutomationProperties.AutomationId="Devices.Assembly.Confirm.Message"
 					FontSize="13"

@@ -368,7 +368,7 @@
 				Grid.Column="2"
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="1,0,0,0">
-				<ScrollViewer VerticalScrollBarVisibility="Auto">
+				<ScrollViewer Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
 					<StackPanel Margin="14,10">
 						<TextBlock Style="{StaticResource Asm.PaneTitle}" Text="속성" />
 
@@ -434,8 +434,8 @@
 										<CheckBox
 											VerticalAlignment="Center"
 											AutomationProperties.AutomationId="Devices.Assembly.Field.in_service"
-											Foreground="{DynamicResource TextPrimaryBrush}"
-											IsChecked="{Binding Inspected.Slot.InService}" />
+											IsChecked="{Binding Inspected.Slot.InService}"
+											Style="{StaticResource Console.CheckBox}" />
 									</c:ConsoleField>
 									<c:ConsoleField ApiName="manufacturer" Header="제조사">
 										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Manufacturer, UpdateSourceTrigger=PropertyChanged}" />
