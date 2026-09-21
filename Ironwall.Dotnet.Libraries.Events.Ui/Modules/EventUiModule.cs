@@ -267,6 +267,18 @@ public class EventUiModule : Module
 
             // 탐지 신호 이력 다이얼로그 (Detection_Signal_History FR-09) — 단일 인스턴스, Initialize()로 장비 컨텍스트 교체
             builder.RegisterType<DetectionHistoryDialogViewModel>().AsSelf().SingleInstance();
+
+            // N-13 mapping workbench — 이벤트 맵핑 워크벤치(3-Pane · 팔레트 → 액션 보드 · Draft + [적용]).
+            // 창 뷰모델은 여기 등록하지 않는다 — 입구가 열 때마다 새로 만든다(Draft 가 창을 넘어 살아남지 않게).
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchGateway>()
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchGateway>()
+                   .SingleInstance();
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingDeviceSource>()
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingDeviceSource>()
+                   .SingleInstance();
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchLauncher>()
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher>()
+                   .SingleInstance();
     }
     #endregion
     #region - Overrides -
