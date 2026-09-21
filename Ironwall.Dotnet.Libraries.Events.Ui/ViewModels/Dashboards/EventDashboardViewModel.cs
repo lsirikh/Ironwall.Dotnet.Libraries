@@ -507,8 +507,13 @@ public class EventDashboardViewModel : BasePanelViewModel
         _attached = source;
         source.RowsChanged.CollectionChanged += OnRowsChanged;
 
-        _view = CollectionViewSource.GetDefaultView(source.Rows);
-        if (_view is not null) _view.Filter = PassesFilter;
+        // ★ 기본 뷰(CollectionViewSource.GetDefaultView)를 쓰지 않는다.
+        //   그것은 콜렉션마다 전역 캐시되고 <b>뗄 수가 없어</b>, 레일을 떠난 뒤에도
+        //   패널의 ViewModelProvider 에 붙어 산다. 그 패널이 다음에 다른 스레드에서
+        //   목록을 비우면 CollectionView 가 "발송자 스레드가 다르다" 로 터진다(NotSupportedException).
+        //   자기 뷰를 만들고 떠날 때 DetachFromSourceCollection() 으로 말끔히 뗀다(장비 콘솔 선례).
+        var view = new ListCollectionView((IList)source.Rows) { Filter = PassesFilter };
+        _view = view;
 
         NotifyOfPropertyChange(nameof(Rows));
         NotifyOfPropertyChange(nameof(ListStatusText));
@@ -517,7 +522,10 @@ public class EventDashboardViewModel : BasePanelViewModel
     private void DetachRows()
     {
         if (_attached is not null) _attached.RowsChanged.CollectionChanged -= OnRowsChanged;
-        if (_view is not null) _view.Filter = null;      // 기본 뷰는 콜렉션에 붙어 산다 — 떠날 때 거름망을 벘긴다
+
+        // 안 떼면 버린 뷰가 패널의 목록에 매달려 남아, 그 패널을 다시 열 때
+        // 다른 스레드의 변경을 받아 터진다.
+        (_view as ListCollectionView)?.DetachFromSourceCollection();
         _view = null;
         _attached = null;
         SelectedRows = Array.Empty<object>();
@@ -526,11 +534,11 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        // ViewModelProvider 는 평범한 ObservableCollection 이고 NATS 콜백 스레드에서도 바뀜다 —
-        // 배지를 세면서 화면을 만지므로 UI 스레드로 올긴다(R12).
-        if (!Execute.InDesignMode && System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+        // 배지를 세면서 화면 글자를 바꾸므로 UI 스레드에서 돌아야 한다(R12).
+        // 마샤러는 주입된다 — 전역 Dispatcher 를 직접 잡으면 헤드리스에서 동작이 갈려 간헐 실패한다.
+        if (!_uiThread.IsOnUiThread)
         {
-            d.BeginInvoke(new System.Action(() => OnRowsChanged(sender, e)));
+            _uiThread.Post(() => OnRowsChanged(sender, e));
             return;
         }
 
@@ -1014,6 +1022,12 @@ public class EventDashboardViewModel : BasePanelViewModel
     }
 
     /// <summary>시험이 결정론적으로 목록을 갈아 끼우는 이음매 — 제품 경로는 쓰지 않는다.</summary>
+    /// <summary>
+    /// UI 스레드 마샤러를 갈아 끼운다 — 시험은 <see cref="ImmediateUiThread"/> 로 스레드 전환을 없앤다.
+    /// 제품 경로는 이것을 부르지 않는다(기본값 = <see cref="ApplicationUiThread"/>).
+    /// </summary>
+    internal void UseUiThread(IUiThread uiThread) => _uiThread = uiThread ?? ApplicationUiThread.Instance;
+
     internal void UseSource(string railKey, IEventConsoleSource source)
     {
         _sources[railKey] = source;
@@ -1047,6 +1061,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     private string _searchText = string.Empty;
     private string _chipKey = EventListFilter.ChipAll;
     private bool _isRevertingSelection;
+    private IUiThread _uiThread = ApplicationUiThread.Instance;
     private string _statusText = string.Empty;
     private DateTime _startDate;
     private DateTime _endDate;
