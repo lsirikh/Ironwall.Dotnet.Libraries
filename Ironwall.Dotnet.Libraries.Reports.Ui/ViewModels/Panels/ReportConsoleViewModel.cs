@@ -681,6 +681,13 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
             case nameof(ReportListViewModel.ActionStatus):
                 RaiseAll();
                 break;
+
+            // 목록 · 템플릿의 SelectedItem 은 이름이 같아 한 가지로 받는다.
+            // 뷰모델이 스스로 줄을 고르는 길(생성 완료 · 되돌리기 · 재조회 화해)에서도
+            // 그리드가 따라오게 하는 유일한 신호다 — 없으면 상세 칸만 바뀌고 목록은 아무 줄도 안 켜진다.
+            case nameof(ReportListViewModel.SelectedItem):
+                NotifyOfPropertyChange(nameof(CurrentRow));
+                break;
         }
     }
     #endregion
@@ -694,6 +701,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         NotifyOfPropertyChange(nameof(IsCreateRail));
         NotifyOfPropertyChange(nameof(IsTemplateRail));
         NotifyOfPropertyChange(nameof(Rows));
+        NotifyOfPropertyChange(nameof(CurrentRow));   // 레일이 바뀌면 '지금 고른 줄' 의 출처 자체가 바뀐다
         NotifyOfPropertyChange(nameof(Columns));
         NotifyOfPropertyChange(nameof(ListCaption));
         NotifyOfPropertyChange(nameof(HasListCaption));

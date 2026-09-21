@@ -126,6 +126,7 @@ public partial class ReportConsoleView : UserControl
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ReportConsoleViewModel.Columns)) RebuildColumns();
+        if (e.PropertyName is nameof(ReportConsoleViewModel.CurrentRow) or nameof(ReportConsoleViewModel.Rows)) SyncSelection();
     }
     #endregion
 
@@ -151,6 +152,7 @@ public partial class ReportConsoleView : UserControl
         }
 
         ApplyColumnPrefs();
+        SyncSelection();        // 레일을 바꿔 열을 다시 만든 직후 — 그 레일이 쥔 줄을 다시 켜 준다
     }
 
     private static DataGridColumn CreateColumn(ReportColumnSpec spec)
@@ -258,6 +260,25 @@ public partial class ReportConsoleView : UserControl
     #endregion
 
     #region - Selection -
+    /// <summary>
+    /// 그리드의 켜진 줄을 뷰모델이 쥔 줄에 맞춘다.
+    /// <para>★ 선택은 <b>양쪽</b>에서 움직인다. 사람이 누르는 길(그리드 → 뷰모델)만 배선돼 있어서,
+    /// 뷰모델이 스스로 고르는 길 — 생성이 끝나 그 보고서를 켜 줄 때(<c>OnReportGenerated</c>) ·
+    /// 되돌릴 때 · 재조회가 줄 객체를 새로 만들 때 — 에는 <b>상세 칸만 바뀌고 목록에는 아무 표시도 없었다</b>
+    /// (고른 화면과 안 고른 화면이 픽셀 단위로 같았다).</para>
+    /// </summary>
+    private void SyncSelection()
+    {
+        if (_grid is null || _viewModel is null || _isSyncingSelection) return;
+
+        var row = _viewModel.CurrentRow;
+        if (ReferenceEquals(_grid.SelectedItem, row)) return;
+
+        _isSyncingSelection = true;
+        try { _grid.SelectedItem = row; }
+        finally { _isSyncingSelection = false; }
+    }
+
     private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isSyncingSelection || _viewModel is null || !ReferenceEquals(e.OriginalSource, sender)) return;
