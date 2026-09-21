@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+﻿using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
@@ -17,41 +18,42 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 
 /// <summary>배정 한 번의 계획 — 무엇을 몇 번 보내고 무엇을 왜 뺐는가.</summary>
 /// <param name="ServerId">대상 서버.</param>
-/// <param name="DeviceIds">실제로 보낼 장비 Id(저장된 것 · 허용 유형 · 아직 그 서버가 아닌 것).</param>
+/// <param name="Devices">실제로 보낼 장비(저장된 것 · 허용 유형 · 아직 그 서버가 아닌 것).</param>
 /// <param name="DraftExcluded">아직 서버에 없어(Id≤0) 뺀 수.</param>
 /// <param name="AlreadyOn">이미 그 서버에 붙어 있어 뺀 수.</param>
 /// <param name="Ineligible">그 서버 유형이 받지 않는 장비라 뺀 수.</param>
 /// <param name="BlockReason">한 건도 보낼 수 없는 까닭. 보낼 수 있으면 <c>null</c>.</param>
 public sealed record ServerAssignPlan(
     int ServerId,
-    IReadOnlyList<int> DeviceIds,
+    IReadOnlyList<IBaseDeviceModel> Devices,
     int DraftExcluded,
     int AlreadyOn,
     int Ineligible,
     string? BlockReason)
 {
-    public bool CanSend => BlockReason is null && DeviceIds.Count > 0;
+    public bool CanSend => BlockReason is null && Devices.Count > 0;
+
+    public IReadOnlyList<int> DeviceIds => Devices.Select(d => d.Id).ToList();
 
     /// <summary>서버 호출 횟수 — 장비 한 대당 <b>쓰기 1회</b>다(배치 입구가 없다).</summary>
-    public int WriteCount => DeviceIds.Count;
+    public int WriteCount => Devices.Count;
 
-    /// <summary>두 건 이상이면 확인을 받는다 — 폭발반경을 문장으로 먼저 말한다.</summary>
-    public bool NeedsConfirm => WriteCount > 1;
-
-    /// <summary>확인 문구 — 호출 횟수를 반드시 포함한다.</summary>
-    public string ConfirmText(string serverName)
-        => $"'{serverName}' 에 {WriteCount}대를 배정합니다 — 서버 쓰기 {WriteCount}회가 나갑니다. 계속할까요?";
+    /// <summary>두 건 이상은 즉시 보내지 않고 Draft 트레이에 쌓는다(콘솔 공통 규칙).</summary>
+    public bool IsMultiCall => WriteCount > 1;
 }
 
 /// <summary>
 /// 장비 → 서버 드롭의 판정(순수 함수) — 화면 없이 단위 테스트한다.
 /// </summary>
 /// <remarks>
-/// <para><b>허용 유형만</b>(드래그 와이어프레임 L371-372 "카테고리별 허용 서버 유형이 아니면 드롭 불가",
-/// L572 "센서는 서버에 배정할 수 없어 드롭 불가로 막힙니다").</para>
-/// <para><b>왜 스피커뿐인가</b> — 장비 쓰기 계약에서 <c>server_id</c> 를 가진 DTO 는
-/// <c>SpeakerDeviceDto</c> <b>하나뿐</b>이다(전수 확인). 다른 카테고리에 서버를 붙이는 입구는 서버에 없다 —
-/// 끌 수 있게 만들면 저장되지 않는 거짓 UI 가 된다. 서버가 축을 넓히면 <see cref="Accepts"/> 한 곳만 고친다.</para>
+/// <para><b>허용 표는 서버가 정한다</b>(읽기 전용 서버 소스 <c>app/schemas/device.py:85-93</c>
+/// <c>SERVER_CATEGORIES_BY_DEVICE</c>): 제어기·경광등 → <c>PROXY</c> · 카메라 → <c>NVR_API</c> ·
+/// 스피커 → <c>SPEAKER_API</c> · 함체 → <c>ENCLOSURE_API</c> ·
+/// 통문 → <c>PROXY</c> 또는 <c>ENCLOSURE_API</c>(결선에 따라) · <b>센서는 없다</b>
+/// (<c>device.py:645-647</c> — 소속 제어기를 따른다). 어긋나면 서버가 422 다
+/// (<c>app/services/device_axes_io.py:404-452</c>).</para>
+/// <para><b>해제는 서버가 지원한다</b> — <c>server_id: null</c> = 관계 해제
+/// (<c>device.py:568 · 683 · 740</c>). 6.3 에서만 그 입구가 없다.</para>
 /// <para>이 판정은 끄는 동안 <b>매 프레임</b> 불린다 — 서버 호출도, <c>Keyboard.Modifiers</c> 읽기도 없다.</para>
 /// </remarks>
 public static class ServerDropRules
@@ -59,49 +61,87 @@ public static class ServerDropRules
     /// <summary>드롭존 종류 — 목록의 서버 <b>행</b>이 드롭존이다.</summary>
     public const string ZoneKey = "server-row";
 
+    /// <summary>카테고리 → 그 장비를 중계할 수 있는 서버 유형(서버 표를 그대로 옮긴 것).</summary>
+    public static readonly IReadOnlyDictionary<EnumDeviceCategory, IReadOnlyList<EnumServerType>> AllowedServerTypes =
+        new Dictionary<EnumDeviceCategory, IReadOnlyList<EnumServerType>>
+        {
+            [EnumDeviceCategory.Controller] = new[] { EnumServerType.PROXY },
+            [EnumDeviceCategory.Lamp] = new[] { EnumServerType.PROXY },
+            [EnumDeviceCategory.Camera] = new[] { EnumServerType.NVR_API },
+            [EnumDeviceCategory.Speaker] = new[] { EnumServerType.SPEAKER_API },
+            [EnumDeviceCategory.Enclosure] = new[] { EnumServerType.ENCLOSURE_API },
+            [EnumDeviceCategory.Gate] = new[] { EnumServerType.PROXY, EnumServerType.ENCLOSURE_API },
+        };
+
     /// <summary>그 서버 유형이 이 카테고리의 장비를 받는가.</summary>
     public static bool Accepts(EnumServerType? serverType, EnumDeviceCategory deviceCategory)
-        => serverType == EnumServerType.SPEAKER_API && deviceCategory == EnumDeviceCategory.Speaker;
+        => serverType is not null
+           && AllowedServerTypes.TryGetValue(deviceCategory, out var allowed)
+           && allowed.Contains(serverType.Value);
 
     /// <summary>못 받는 까닭 한 줄. 받을 수 있으면 <c>null</c>.</summary>
     public static string? RefusalReason(EnumServerType? serverType, EnumDeviceCategory deviceCategory)
     {
         if (Accepts(serverType, deviceCategory)) return null;
-        if (serverType != EnumServerType.SPEAKER_API)
-            return $"'{ServerTypeCatalog.TypeLabel(serverType)}' 유형 서버에는 장비를 배정할 수 없습니다 — 스피커 서버만 받습니다";
-        return $"{CategoryLabel(deviceCategory)} 은(는) 서버에 배정할 수 없습니다 — 스피커만 받습니다";
+
+        if (!AllowedServerTypes.TryGetValue(deviceCategory, out var allowed))
+            return $"{CategoryLabel(deviceCategory)} 에는 관리 서버가 없습니다 — 소속 제어기를 따릅니다";
+
+        var names = string.Join(" · ", allowed.Select(t => ServerTypeCatalog.TypeLabel(t)));
+        return $"{CategoryLabel(deviceCategory)} 의 관리 서버는 {names} 입니다 — "
+             + $"'{ServerTypeCatalog.TypeLabel(serverType)}' 유형에는 놓을 수 없습니다";
     }
 
+    /// <summary>6.3 에서 이 배정을 보낼 수 있는가 — 그 판본의 클라 계약은 스피커만 서버를 쓴다.</summary>
+    public static bool IsSupportedOnLegacy(EnumDeviceCategory deviceCategory)
+        => deviceCategory == EnumDeviceCategory.Speaker;
+
     /// <summary>끌어 온 장비들을 그 서버에 배정하는 계획. 서버를 부르지 않는다.</summary>
-    public static ServerAssignPlan Plan(int serverId, EnumServerType? serverType, IEnumerable<IBaseDeviceModel>? devices)
+    public static ServerAssignPlan Plan(
+        int serverId, EnumServerType? serverType, IEnumerable<IBaseDeviceModel>? devices,
+        EnumServerContract contract = EnumServerContract.V8_0)
     {
         var list = devices?.Where(d => d is not null).ToList() ?? new List<IBaseDeviceModel>();
 
-        if (serverId <= 0)
-            return Blocked(serverId, "아직 서버에 등록되지 않은 행입니다 — 먼저 등록하십시오");
-        if (list.Count == 0)
-            return Blocked(serverId, "끌어 온 장비가 없습니다");
+        if (serverId <= 0) return Blocked(serverId, "아직 서버에 등록되지 않은 행입니다 — 먼저 등록하십시오");
+        if (list.Count == 0) return Blocked(serverId, "끌어 온 장비가 없습니다");
 
-        var ineligible = list.Count(d => !Accepts(serverType, DeviceAxesMapper.CategoryOf(d)));
-        var eligible = list.Where(d => Accepts(serverType, DeviceAxesMapper.CategoryOf(d))).ToList();
+        var eligible = new List<IBaseDeviceModel>();
+        var ineligible = 0;
+        string? firstRefusal = null;
+
+        foreach (var device in list)
+        {
+            var category = DeviceAxesMapper.CategoryOf(device);
+            var reason = RefusalReason(serverType, category)
+                         ?? (contract < EnumServerContract.V7_0 && !IsSupportedOnLegacy(category)
+                             ? $"이 서버 판본(6.3)에서는 {CategoryLabel(category)} 의 서버 배정 입구가 없습니다"
+                             : null);
+
+            if (reason is null) { eligible.Add(device); continue; }
+            ineligible++;
+            firstRefusal ??= reason;
+        }
 
         if (eligible.Count == 0)
-        {
-            var reason = RefusalReason(serverType, list.Select(DeviceAxesMapper.CategoryOf).First());
-            return Blocked(serverId, reason ?? "이 서버가 받지 않는 장비입니다", ineligible: ineligible);
-        }
+            return Blocked(serverId, firstRefusal ?? "이 서버가 받지 않는 장비입니다", ineligible);
 
         var drafts = eligible.Count(d => d.Id <= 0);
         var saved = eligible.Where(d => d.Id > 0).ToList();
         var already = saved.Count(d => ServerIdOf(d) == serverId);
-        var ids = saved.Where(d => ServerIdOf(d) != serverId).Select(d => d.Id).Distinct().ToList();
+        var sending = saved.Where(d => ServerIdOf(d) != serverId)
+                           .GroupBy(d => d.Id).Select(g => g.First()).ToList();
 
         string? block = null;
-        if (ids.Count == 0)
+        if (sending.Count == 0)
             block = saved.Count == 0 ? "아직 등록되지 않은 장비입니다 — 장비를 먼저 등록하십시오" : "이미 이 서버에 배정돼 있습니다";
 
-        return new ServerAssignPlan(serverId, ids, drafts, already, ineligible, block);
+        return new ServerAssignPlan(serverId, sending, drafts, already, ineligible, block);
     }
+
+    /// <summary>확인 문구 — 호출 횟수를 반드시 포함한다.</summary>
+    public static string ConfirmText(string serverName, int writeCount)
+        => $"'{serverName}' 에 {writeCount}대를 배정합니다 — 서버 쓰기 {writeCount}회가 나갑니다. 계속할까요?";
 
     /// <summary>상태 띠에 남길 한 줄.</summary>
     public static string ResultLine(string serverName, ServerAssignPlan plan, int assigned, int failed)
@@ -114,11 +154,18 @@ public static class ServerDropRules
         return string.Join(" · ", parts);
     }
 
-    /// <summary>그 장비가 지금 붙어 있는 서버 Id. 스피커가 아니거나 없으면 <c>null</c>.</summary>
+    /// <summary>
+    /// 그 장비가 지금 붙어 있는 서버 Id.
+    /// </summary>
+    /// <remarks>
+    /// 모델에 서버 축을 가진 것은 스피커뿐이다(<c>Messages</c> 범위 밖이라 넓히지 않았다) —
+    /// 다른 카테고리는 <c>null</c> 이고, 그래서 "이미 그 서버" 판정이 <b>보수적</b>으로 동작한다
+    /// (같은 서버에 다시 보내도 서버가 멱등하게 처리한다).
+    /// </remarks>
     public static int? ServerIdOf(IBaseDeviceModel? device)
         => device is ISpeakerDeviceModel speaker && speaker.Server is { Id: > 0 } server ? server.Id : null;
 
-    internal static string CategoryLabel(EnumDeviceCategory category) => category switch
+    public static string CategoryLabel(EnumDeviceCategory category) => category switch
     {
         EnumDeviceCategory.Controller => "제어기",
         EnumDeviceCategory.Sensor => "센서",
@@ -131,5 +178,5 @@ public static class ServerDropRules
     };
 
     private static ServerAssignPlan Blocked(int serverId, string reason, int ineligible = 0)
-        => new(serverId, Array.Empty<int>(), 0, 0, ineligible, reason);
+        => new(serverId, Array.Empty<IBaseDeviceModel>(), 0, 0, ineligible, reason);
 }

@@ -57,5 +57,7 @@ public static class ServerColumnCatalog
         new ServerColumnSpec("unit", "부대", nameof(ServerRowViewModel.UnitText), ServerColumnKind.Text, IsDefault: true, Width: 110, UnitEraOnly: true),
         // 선택 열 — 기본으로는 상세 칸이 맡는다.
         new ServerColumnSpec("hostname", "호스트명", nameof(ServerRowViewModel.HostnameText), ServerColumnKind.Text, IsDefault: false, Width: 140),
+        // "마지막 수정"(updated_at)은 상태 전이가 아니다 — 이름을 달리해 선택 열로만 낸다(혼동 방지).
+        new ServerColumnSpec("last_edit", "마지막 수정", nameof(ServerRowViewModel.LastEditText), ServerColumnKind.Text, IsDefault: false, Width: 120),
     };
 }
