@@ -2,10 +2,9 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.MakeSensorsView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	Background="{DynamicResource SurfaceBrush}"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
+	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--  센서 여러 개 만들기(WS L157, L446, L649-653) — 규칙을 한 번 정하고 미리보기를 본 뒤 만든다.  -->
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -27,38 +26,21 @@
 		</Style>
 	</UserControl.Resources>
 
-	<DockPanel Margin="16,14" LastChildFill="True">
-		<TextBlock
-			DockPanel.Dock="Top"
-			FontSize="15"
-			FontWeight="Bold"
-			Text="센서 여러 개 만들기" />
-		<TextBlock
-			Margin="0,4,0,0"
-			DockPanel.Dock="Top"
-			FontSize="12"
-			Foreground="{DynamicResource TextMutedBrush}"
-			Text="규칙은 한 번만 정하면 전부에 들어갑니다. 만든 줄은 저장 전까지 Draft 입니다."
-			TextWrapping="Wrap" />
-
-		<StackPanel
-			Margin="0,12,0,0"
-			HorizontalAlignment="Right"
-			DockPanel.Dock="Bottom"
-			Orientation="Horizontal">
-			<Button
-				Margin="0,0,6,0"
-				AutomationProperties.AutomationId="Devices.Wiring.Make.Cancel"
-				Click="OnCancel"
-				Content="취소"
-				Style="{StaticResource MaterialDesignOutlinedButton}" />
-			<Button
-				MinWidth="110"
-				AutomationProperties.AutomationId="Devices.Wiring.Make.Accept"
-				Click="OnAccept"
-				Content="만들기"
-				IsEnabled="{Binding CanMake}" />
-		</StackPanel>
+	<!--  T4 · M 560. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Wiring.Make"
+		IsPrimaryEnabled="{Binding CanMake}"
+		Kind="규칙은 한 번만 정하면 전부에 들어갑니다 — 만든 줄은 저장 전까지 Draft"
+		PrimaryAutomationId="Devices.Wiring.Make.Accept"
+		PrimaryInvoked="OnAccept"
+		PrimaryText="만들기"
+		SecondaryAutomationId="Devices.Wiring.Make.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Medium"
+		Title="센서 여러 개 만들기">
+	<DockPanel LastChildFill="True">
 
 		<Border
 			Margin="0,10,0,0"
@@ -218,4 +200,5 @@
 			</ListBox>
 		</Border>
 	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

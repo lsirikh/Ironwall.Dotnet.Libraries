@@ -3,27 +3,34 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
-	Background="{DynamicResource SurfaceBrush}"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
+	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--  프리셋 관리(FR-11 · 목업 L312-342). 프리셋은 이 컴퓨터의 파일에 산다 — 서버에 프리셋 리소스가 없다.  -->
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<asm:CategoryTextConverter x:Key="CategoryText" />
 	</UserControl.Resources>
 
-	<DockPanel Margin="16,12" LastChildFill="True">
+	<!--  T4 · L 720. 닫기 하나뿐인 창이라 주 동작이 없다 — 보조(닫기)만 둔다. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Assembly.Presets"
+		Kind="구조(부품 · 설정)만 담는다 — 번호 · 이름 · 접속 · 일련번호는 담지 않는다"
+		Message="{Binding Message}"
+		PrimaryText=""
+		SecondaryAutomationId="Devices.Assembly.Presets.Close"
+		SecondaryInvoked="OnClose"
+		SecondaryText="닫기"
+		Size="Large"
+		Title="프리셋 관리">
+	<DockPanel LastChildFill="True">
 		<StackPanel DockPanel.Dock="Top">
 			<TextBlock
-				FontSize="15"
-				FontWeight="Bold"
-				Text="프리셋 관리" />
-			<TextBlock
-				Margin="0,2,0,8"
+				Margin="0,0,0,8"
 				FontSize="11.5"
 				Foreground="{DynamicResource TextMutedBrush}"
-				Text="프리셋은 조립 결과의 구조(부품 · 설정)만 담는다. 번호 · 이름 · 접속 · 일련번호는 담지 않는다. 이 컴퓨터에만 저장된다 — 옮기려면 내보내기."
+				Text="이 컴퓨터에만 저장된다 — 옮기려면 내보내기."
 				TextWrapping="Wrap" />
 			<!--  파일이 더 새 판이거나 깨져서 옮겼을 때 — 색이 아니라 세로 바 + 글로 알린다  -->
 			<Border
@@ -54,24 +61,6 @@
 			</ComboBox>
 		</StackPanel>
 
-		<DockPanel
-			Margin="0,10,0,0"
-			DockPanel.Dock="Bottom"
-			LastChildFill="True">
-			<Button
-				AutomationProperties.AutomationId="Devices.Assembly.Presets.Close"
-				Click="OnClose"
-				Content="닫기"
-				DockPanel.Dock="Right"
-				Style="{StaticResource MaterialDesignOutlinedButton}" />
-			<TextBlock
-				VerticalAlignment="Center"
-				AutomationProperties.AutomationId="Devices.Assembly.Presets.Message"
-				FontSize="12.5"
-				Foreground="{DynamicResource TextSecondaryBrush}"
-				Text="{Binding Message}"
-				TextWrapping="Wrap" />
-		</DockPanel>
 
 		<Grid Margin="0,10,0,0">
 			<Grid.ColumnDefinitions>
@@ -143,4 +132,5 @@
 			</StackPanel>
 		</Grid>
 	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

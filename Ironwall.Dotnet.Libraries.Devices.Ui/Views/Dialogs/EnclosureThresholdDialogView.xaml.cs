@@ -4,10 +4,10 @@ using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dialogs;
 
-/// <summary>카메라 속성 창. 닫기 · ESC 는 틀(<c>ConsoleDialogFrame</c>)이 한 길로 모은다.</summary>
-public partial class CameraDetailDialogView : UserControl
+/// <summary>함체 임계값 창. 닫기 · ESC 는 틀(<c>ConsoleDialogFrame</c>)이 한 길로 모은다.</summary>
+public partial class EnclosureThresholdDialogView : UserControl
 {
-    public CameraDetailDialogView()
+    public EnclosureThresholdDialogView()
     {
         InitializeComponent();
     }

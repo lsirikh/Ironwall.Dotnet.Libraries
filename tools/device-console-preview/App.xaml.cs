@@ -48,6 +48,14 @@ public partial class App : Application
                 return;
             }
 
+            // 다이얼로그 가족 T4 — 콘솔과 따로 뜬다(--dialogs [--dark] [--snapshot <폴더>]). N-05.
+            if (e.Args.Contains("--dialogs"))
+            {
+                await RunDialogsAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
+
             // 셋업 · 결선 창 — 콘솔과 따로 뜬다(--wiring [--dark] [--snapshot <폴더>]).
             if (e.Args.Contains("--wiring"))
             {
@@ -240,6 +248,59 @@ public partial class App : Application
         await Show(preview.PresetManager(), 720, 560, "06-preset-manager");
         await Show(preview.Register(withProblem: false), 980, 680, "07-register");
         await Show(preview.Register(withProblem: true), 980, 680, "08-register-problems");
+    }
+
+    /// <summary>다이얼로그 가족 T4 — 규격 갤러리 · 옮긴 창들 · 배정 창의 상태들을 띄우고(스냅샷이면) 찍는다.</summary>
+    private async Task RunDialogsAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        if (directory is not null) Directory.CreateDirectory(directory);
+
+        var preview = new DialogPreview();
+        _window = new Window { Title = "다이얼로그 가족 미리보기", Width = 1320, Height = 860, Background = (Brush)FindResource("BgBrush") };
+        _window.Show();
+
+        async Task Show(FrameworkElement view, double width, double height, string name)
+        {
+            _window.Width = width + 40;
+            _window.Height = height + 60;
+            if (view.Parent is Border old) old.Child = null;
+            _window.Content = new Border { Margin = new Thickness(12), Child = view };
+            await Settle();
+            if (directory is not null) Save(directory, $"dialogs-{theme}-{name}");
+        }
+
+        await Show(preview.Gallery(), 1760, 520, "01-gallery-sml");
+        if (directory is null) return;      // 손으로 써 볼 때는 갤러리만 띄워 둔다
+
+        await Show(preview.ConfirmPrompt(), 480, 340, "02-confirm-s400");
+        await Show(preview.TextPrompt(), 480, 340, "03-text-prompt-s400");
+        await Show(preview.RepeatExpand(withConflict: true), 480, 640, "04-repeat-expand-s400");
+        await Show(preview.WiringPrompt(), 480, 360, "05-wiring-prompt-s400");
+
+        var work = Path.Combine(Path.GetTempPath(), "ironwall-dialog-preview");
+        Directory.CreateDirectory(work);
+        var presetFile = Path.Combine(work, "preview-presets.json");
+        if (File.Exists(presetFile)) File.Delete(presetFile);
+
+        await Show(preview.MakeSensors(withConflict: true), 640, 700, "14-make-sensors-m560");
+        await Show(preview.PasteReport(), 640, 660, "15-paste-report-m560");
+        await Show(preview.PresetManager(work), 800, 620, "16-preset-manager-l720");
+        await Show(preview.Register(work, withProblem: true), 800, 660, "17-register-l720");
+
+        await Show(preview.Assign(AssignState.Loaded).View, 800, 560, "06-assign-loaded-l720");
+        await Show(preview.Assign(AssignState.MultiSelect).View, 800, 560, "07-assign-multi-select");
+        await Show(preview.Assign(AssignState.Blocked).View, 800, 560, "08-assign-blocked-drop");
+        await Show(preview.Assign(AssignState.Dirty).View, 800, 560, "09-assign-dirty-delta");
+        await Show(preview.Assign(AssignState.PartialFailure).View, 800, 560, "10-assign-partial-failure");
+        await Show(preview.AssignUnsavedGroup(), 800, 560, "11-assign-unsaved-group");
+
+        await Show(preview.Progress(cancelled: false).View, 480, 380, "12-progress-running");
+        await Show(preview.Progress(cancelled: true).View, 480, 380, "13-progress-cancelled");
     }
 
     /// <summary>셋업 · 결선 창의 상태 8종을 띄우고(스냅샷이면) 찍는다.</summary>

@@ -1,0 +1,48 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.ProgressDialogView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		진행 창 — T4 · S 400 + 취소 버튼(스토리보드 #h-dlg T5 표 L1450).
+		지금의 공용 진행 팝업은 500×500 에 닫기 요소가 0개라 예외가 나면 재시작 말고 나갈 길이 없다. 그 창을 다시 만들지 않는다.
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Common.Progress"
+		Kind="{Binding Kind}"
+		Message="{Binding Message}"
+		PrimaryInvoked="OnClose"
+		PrimaryText="{Binding PrimaryText}"
+		SecondaryAutomationId="Common.Progress.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="{Binding SecondaryText}"
+		Size="Small"
+		Title="{Binding DisplayName}">
+		<StackPanel>
+			<TextBlock
+				FontFamily="Consolas"
+				FontSize="22"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				Text="{Binding CountText}" />
+			<ProgressBar
+				Height="8"
+				Margin="0,12,0,0"
+				AutomationProperties.AutomationId="Common.Progress.Bar"
+				Background="{DynamicResource SurfaceSunkenBrush}"
+				BorderThickness="0"
+				Foreground="{DynamicResource PrimaryBrush}"
+				IsIndeterminate="{Binding IsIndeterminate}"
+				Maximum="100"
+				Value="{Binding Percent, Mode=OneWay}" />
+			<TextBlock
+				Margin="0,12,0,0"
+				FontSize="12"
+				Foreground="{DynamicResource TextMutedBrush}"
+				Text="취소해도 보낸 것은 되돌리지 않습니다."
+				TextWrapping="Wrap" />
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

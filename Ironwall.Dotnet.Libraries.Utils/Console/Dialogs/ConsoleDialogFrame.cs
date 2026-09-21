@@ -58,7 +58,6 @@ public class ConsoleDialogFrame : ContentControl
     public ConsoleDialogFrame()
     {
         Loaded += OnLoaded;
-        SizeChanged += OnSizeChanged;
     }
 
     #region - Events -
@@ -265,22 +264,28 @@ public class ConsoleDialogFrame : ContentControl
 
     #region - Metrics -
     private static void OnSizeSpecChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        => ((ConsoleDialogFrame)d).UpdateMetrics();
+        => ((ConsoleDialogFrame)d).InvalidateMeasure();
 
-    private void OnSizeChanged(object sender, SizeChangedEventArgs e) => UpdateMetrics();
-
-    private void UpdateMetrics()
+    /// <summary>
+    /// 창(부모가 내주는 자리)으로 카드 치수를 정한다.
+    /// </summary>
+    /// <remarks>
+    /// <b>제 <c>ActualWidth</c> 를 보면 안 된다</b> — 카드 폭이 제 폭을 정하고 그 폭이 다시 카드 폭을 정해
+    /// 재면 잴수록 좁아진다(실측: 400·560·720 이 모두 최소 폭 320 으로 수렴). 부모가 내주는
+    /// <paramref name="availableSize"/> 가 이 창의 '창'이다. 무한대(자동 크기 칸 안)면 규격 폭을 그대로 쓴다.
+    /// </remarks>
+    protected override Size MeasureOverride(Size availableSize)
     {
-        var metrics = DialogSizeRules.Resolve(Size, ActualWidth, ActualHeight);
-        SetValue(CardWidthKey, metrics.Width);
-        SetValue(CardMaxHeightKey, metrics.MaxHeight);
+        var metrics = DialogSizeRules.Resolve(Size, availableSize.Width, availableSize.Height);
+        if (Math.Abs(CardWidth - metrics.Width) > 0.01) SetValue(CardWidthKey, metrics.Width);
+        if (Math.Abs(CardMaxHeight - metrics.MaxHeight) > 0.01) SetValue(CardMaxHeightKey, metrics.MaxHeight);
+        return base.MeasureOverride(availableSize);
     }
     #endregion
 
     #region - Keys and focus -
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        UpdateMetrics();
         if (_focusApplied) return;
         _focusApplied = true;
 

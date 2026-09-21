@@ -60,9 +60,13 @@
 							<Setter TargetName="Ring" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<Trigger Property="IsEnabled" Value="False">
-							<!--  꺼진 버튼도 읽혀야 한다 — 투명도를 떨어뜨리지 않고 글자를 muted 로만 바꾼다  -->
+							<!--
+								꺼진 버튼도 읽혀야 한다 — 투명도를 떨어뜨리지 않고 글자만 muted 로 바꾼다.
+								테두리까지 한 단계 여리게 해야 '꺼진 주 동작'이 '켜진 보조'처럼 보이지 않는다.
+							-->
 							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+							<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
 							<Setter Property="Cursor" Value="Arrow" />
 						</Trigger>
 					</ControlTemplate.Triggers>
@@ -244,23 +248,29 @@
 											<ColumnDefinition Width="*" />
 											<ColumnDefinition Width="Auto" />
 										</Grid.ColumnDefinitions>
-										<StackPanel
-											Grid.Column="0"
-											Margin="0,0,12,0"
-											VerticalAlignment="Center"
-											Orientation="Horizontal">
+										<!--
+											가로 StackPanel 이면 글이 무한 폭을 받아 버튼 줄 밖으로 잘린다 —
+											남는 폭을 실제로 받아 접히도록 칸으로 나눈다(S 400 에서 실측).
+										-->
+										<Grid Grid.Column="0" Margin="0,0,12,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="Auto" />
+												<ColumnDefinition Width="*" />
+											</Grid.ColumnDefinitions>
 											<ContentPresenter
+												Grid.Column="0"
 												Margin="0,0,10,0"
 												VerticalAlignment="Center"
 												Content="{TemplateBinding FooterExtra}" />
 											<dlg:ConsoleDialogText
 												x:Name="PART_Message"
-												MaxWidth="320"
+												Grid.Column="1"
+												VerticalAlignment="Center"
 												FontSize="12"
 												Foreground="{DynamicResource TextSecondaryBrush}"
 												Text="{TemplateBinding Message}"
 												TextWrapping="Wrap" />
-										</StackPanel>
+										</Grid>
 										<StackPanel
 											Grid.Column="1"
 											VerticalAlignment="Center"

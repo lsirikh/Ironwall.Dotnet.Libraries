@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -100,6 +101,28 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         private set { if (_message == value) return; _message = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
+    /// <summary>그 글의 무게 — 거절 · 부분 실패는 회색 안내가 아니라 눈에 띄어야 한다.</summary>
+    public DialogMessageSeverity MessageSeverity
+    {
+        get => _severity;
+        private set { if (_severity == value) return; _severity = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>비었을 때 그 칸에 적을 말 — 까닭에 따라 다르다.</summary>
+    public string AvailableEmptyText => _groupId <= 0
+        ? "그룹을 먼저 저장해야 후보가 뜹니다"
+        : "넣을 수 있는 장비가 없습니다";
+
+    public string AssignedEmptyText => _groupId <= 0
+        ? "저장되지 않은 그룹에는 배정할 수 없습니다"
+        : "아직 배정된 장비가 없습니다 — 왼쪽에서 끌어 놓거나 ▶ 를 누르세요";
+
+    private void Say(string message, DialogMessageSeverity severity = DialogMessageSeverity.Normal)
+    {
+        Message = message;
+        MessageSeverity = severity;
+    }
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -158,7 +181,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         if (groupId <= 0)
         {
             // 미저장 그룹에는 아무것도 배정할 수 없다 — 후보도 띄우지 않고 까닭을 적는다.
-            Message = "아직 저장되지 않은 그룹입니다 — 그룹을 먼저 저장하세요.";
+            Say("아직 저장되지 않은 그룹입니다 — 그룹을 먼저 저장하세요.", DialogMessageSeverity.Warning);
             NotifyAll();
             return;
         }
@@ -170,7 +193,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             else if (model.Id > 0) Available.Add(item);      // 저장되지 않은 장비는 후보가 아니다 — 서버가 모르는 Id 다
         }
 
-        Message = AssignDelta.Summary(CurrentPlan);
+        Say(AssignDelta.Summary(CurrentPlan));
         NotifyAll();
     }
 
@@ -230,7 +253,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     {
         if (_isBusy) return;
         Initialize(_groupId, GroupName, _baseline);
-        Message = "창을 연 상태로 되돌렸다";
+        Say("창을 연 상태로 되돌렸다");
     }
 
     private void Move(IReadOnlyList<DeviceAssignItemViewModel> items, AssignSide target)
@@ -256,7 +279,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         SetSelection(target == AssignSide.Assigned ? AssignSide.Available : AssignSide.Assigned, Array.Empty<DeviceAssignItemViewModel>());
         SelectionRequested?.Invoke(this, new AssignSelectionRequest(target, moved));
 
-        Message = AssignDelta.Summary(CurrentPlan);
+        Say(AssignDelta.Summary(CurrentPlan), CurrentPlan.HasChanges ? DialogMessageSeverity.Info : DialogMessageSeverity.Normal);
         NotifyAll();
     }
 
@@ -283,17 +306,17 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     public bool CanDrop(DragPayload payload, DropTarget target)
     {
         var reason = RefuseReason(payload, target);
-        if (reason is not null) { Message = reason; return false; }
+        if (reason is not null) { Say(reason, DialogMessageSeverity.Warning); return false; }
 
-        Message = target.ZoneKey == AssignDelta.AssignedZone
+        Say(target.ZoneKey == AssignDelta.AssignedZone
             ? $"놓으면 {Countable(payload)}대를 이 그룹에 넣는다(아직 보내지 않는다)"
-            : $"놓으면 {Countable(payload)}대를 이 그룹에서 뺀다(아직 보내지 않는다)";
+            : $"놓으면 {Countable(payload)}대를 이 그룹에서 뺀다(아직 보내지 않는다)", DialogMessageSeverity.Info);
         return true;
     }
 
     public void Drop(DragPayload payload, DropTarget target)
     {
-        if (RefuseReason(payload, target) is { } reason) { Message = reason; return; }
+        if (RefuseReason(payload, target) is { } reason) { Say(reason, DialogMessageSeverity.Warning); return; }
 
         var items = payload.Items.OfType<DeviceAssignItemViewModel>().ToList();
         Move(items, target.ZoneKey == AssignDelta.AssignedZone ? AssignSide.Assigned : AssignSide.Available);
@@ -335,7 +358,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         if (_isBusy) return;
 
         var plan = CurrentPlan;
-        if (!plan.CanSend) { Message = plan.BlockReason ?? "보낼 것이 없다"; return; }
+        if (!plan.CanSend) { Say(plan.BlockReason ?? "보낼 것이 없다", DialogMessageSeverity.Warning); return; }
 
         IsBusy = true;
         NotifyAll();
@@ -345,19 +368,19 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             if (_refreshAsync is not null)
             {
                 try { await _refreshAsync(token).ConfigureAwait(true); }
-                catch (OperationCanceledException) { Message = "취소했다 — 아무것도 보내지 않았다"; return; }
+                catch (OperationCanceledException) { Say("취소했다 — 아무것도 보내지 않았다", DialogMessageSeverity.Warning); return; }
                 catch (Exception ex)
                 {
                     // 사람에게는 까닭만, 날 예외 글은 기록에만.
                     _log?.Error($"[Assign] 재조회 실패: {ex.Message}");
-                    Message = "그룹을 다시 읽지 못해 보내지 않았다 — 잠시 뒤 다시 시도하세요.";
+                    Say("그룹을 다시 읽지 못해 보내지 않았다 — 잠시 뒤 다시 시도하세요.", DialogMessageSeverity.Critical);
                     return;
                 }
 
                 var server = _deviceSource().Where(m => m?.DeviceGroups?.Contains(_groupId) == true).Select(m => m.Id);
                 if (AssignDelta.Drift(_baseline, server) is { } drift)
                 {
-                    Message = drift;
+                    Say(drift, DialogMessageSeverity.Warning);
                     return;
                 }
             }
@@ -366,7 +389,8 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             var add = plan.Added.Count > 0 ? await SendAsync(plan.Added, assign: true, token).ConfigureAwait(true) : null;
             var remove = plan.Removed.Count > 0 ? await SendAsync(plan.Removed, assign: false, token).ConfigureAwait(true) : null;
 
-            Message = AssignDelta.ResultLine(GroupName, add, remove);
+            Say(AssignDelta.ResultLine(GroupName, add, remove),
+                AssignDelta.ShouldStayOpen(add, remove) ? DialogMessageSeverity.Warning : DialogMessageSeverity.Normal);
 
             // ③ 서버가 실제로 한 것만 기준선에 반영한다 — 보냈다는 사실은 성공이 아니다.
             if (add is { Failed: false }) foreach (var id in _lastAssigned) _baseline.Add(id);
@@ -451,6 +475,8 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     private void NotifyAll()
     {
         NotifyOfPropertyChange(nameof(Kind));
+        NotifyOfPropertyChange(nameof(AvailableEmptyText));
+        NotifyOfPropertyChange(nameof(AssignedEmptyText));
         NotifyOfPropertyChange(nameof(IsDirty));
         NotifyOfPropertyChange(nameof(CanSave));
         NotifyOfPropertyChange(nameof(CanRevert));
@@ -475,6 +501,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     private List<int> _lastAssigned = new();
     private List<int> _lastRemoved = new();
     private string _message = string.Empty;
+    private DialogMessageSeverity _severity = DialogMessageSeverity.Normal;
     private bool _isBusy;
     #endregion
 }

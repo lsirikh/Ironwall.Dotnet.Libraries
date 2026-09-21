@@ -23,10 +23,4 @@ public partial class MakeSensorsView : UserControl
         if (ViewModel is { } vm) await vm.CancelAsync();
     }
 
-    private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape || ViewModel is not { } vm) return;
-        e.Handled = true;
-        await vm.CancelAsync();
-    }
 }

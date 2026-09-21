@@ -12,7 +12,14 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Model;
 public sealed record RepeatExpandSpec(string TypeCode, int Count, int StartChannel, string KeyFormat);
 
 /// <summary>미리보기 한 줄. <paramref name="IsConflict"/> 인 줄은 붉게 — 하나라도 있으면 펼치지 않는다.</summary>
-public sealed record RepeatPreviewRow(string Key, int Channel, bool IsConflict, string? Error);
+public sealed record RepeatPreviewRow(string Key, int Channel, bool IsConflict, string? Error)
+{
+    /// <summary>
+    /// 미리보기 줄에 붙일 까닭. 까닭이 없으면 <b>빈 글자</b>다 — <c>StringFormat</c> 은 null 에도 틀을 씌워
+    /// 멀쩡한 줄마다 ⚠ 를 하나씩 찍는다(실측).
+    /// </summary>
+    public string ErrorSuffix => string.IsNullOrEmpty(Error) ? string.Empty : $"   ⚠ {Error}";
+}
 
 /// <summary>
 /// 16채널을 16번 끌게 하지 않는다(AS §3). 위치가 의미를 갖는 조작은 드래그가 1순위지만,
