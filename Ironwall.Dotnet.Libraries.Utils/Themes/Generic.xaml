@@ -623,18 +623,28 @@
 						</Border>
 
 						<!--
-							여백은 <b>ScrollViewer 의 Padding 이 아니라 안쪽 Margin</b> 이다 — 앱 전역 MaterialDesign
+							좌우 여백은 <b>ScrollViewer 의 Padding 이 아니라 안쪽 Margin</b> 이다 — 앱 전역 MaterialDesign
 							ScrollViewer 암시 스타일이 Padding 을 삼켜 폼이 왼쪽으로 2px 붙어 버렸다(N-10 실측).
+							<b>아래 여백은 반대로 바깥이어야 한다</b>(D-37): 안쪽 Margin 은 굴러가는 내용 <b>안</b>이라
+							맨 위에서는 화면 밖으로 나가 한 뼘도 벌어 주지 못한다 — 본문이 넘치는 여섯 상태에서
+							마지막 줄이 막대 윗선에 2px 까지 붙었다(보고서 콘솔 light/dark-03·04·09~12 실측).
+							그래서 아래 12 는 <b>ScrollViewer 자신의 Margin</b> 으로 잡는다. 뷰포트가 그만큼 줄어
+							어느 스크롤 위치에서도 띠가 남는다. Padding 도 같은 값을 냈지만(렌더로 대조) 템플릿이
+							Padding 을 template-binding 하지 않으면 조용히 사라진다 — N-10 이 바로 그 사고였다.
+							Margin 은 어떤 스타일 · 템플릿도 삼킬 수 없다.
+							대가: 넘치던 칸이 12 만큼 더 넘친다 — 이미 어딘가에 초점이 가 있던 칸(검증 실패 · 등록)은
+							초점을 보이려고 처음부터 조금 굴러간 채로 열린다(장비 콘솔 05~08·10~12 실측, 의도된 거동).
 						-->
 						<ScrollViewer
 							Grid.Row="2"
+							Margin="0,0,0,12"
 							Focusable="False"
 							HorizontalScrollBarVisibility="Disabled"
 							Style="{DynamicResource Console.ScrollViewer}"
 							VerticalScrollBarVisibility="Auto">
-							<!--  D-37 — 아래 16 은 고정 적용 막대에 먹혀 마지막 문단이 문장 중간에서 잘렸다. 24 로 띄운다.  -->
+							<!--  맨 아래까지 굴렸을 때의 여백 = 바깥 Margin 12 + 이 Margin 12 = 24(종전과 같다).  -->
 							<ContentPresenter
-								Margin="16,4,16,24"
+								Margin="16,4,16,12"
 								HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
 								VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
 						</ScrollViewer>
