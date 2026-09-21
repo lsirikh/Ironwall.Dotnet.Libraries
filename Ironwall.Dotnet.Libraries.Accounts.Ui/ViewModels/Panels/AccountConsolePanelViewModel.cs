@@ -82,6 +82,20 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         _permission.PermissionsChanged += OnPermissionsChanged;
         // 매트릭스는 제 상태를 스스로 알린다 — 상세 칸의 머리 · 적용 막대는 콘솔이 그리므로 여기서 이어 준다.
         Matrix.PropertyChanged += (_, _) => { SyncMatrixDirt(); RaiseDetail(); };
+        // 사용자 폼도 마찬가지다 — 칸을 고치면 손댄-칸 장부가 울려 발표자(Detail)가 제 상태를 알리지만,
+        // 콘솔의 DetailIsDirty · DetailCanApply 는 <b>여기서 만든 파생 값</b>이라 이어 주지 않으면
+        // 적용 막대가 "변경 없음" 인 채 [되돌리기] · [적용] 이 꺼져 있었다(D-10 실측: 깨끗한 화면과 픽셀 동일).
+        Detail.PropertyChanged += OnDetailPresenterChanged;
+    }
+
+    private bool _raisingDetail;
+
+    private void OnDetailPresenterChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_raisingDetail) return;     // RaiseDetail 안에서 다시 발표자를 건드려도 되돌아오지 않게
+        _raisingDetail = true;
+        try { RaiseDetail(); }
+        finally { _raisingDetail = false; }
     }
     #endregion
 
@@ -479,8 +493,15 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         ? (Matrix.HasCatalogWarning ? Matrix.CatalogWarning! : string.Empty)
         : IsUsersRail ? Detail.Banner : string.Empty;
 
+    /// <summary>
+    /// 권한 설정 레일의 막힘 문구는 <b>짧게</b> 쓴다 — 적용 막대의 글 자리는 단추를 빼면 124px 뿐이라
+    /// 커널 기본 문구("적용하거나 되돌린 뒤 이동하세요", ≈190px)는 "적용하거나 되돌린…" 으로 잘린다(D-12 실측).
+    /// 사용자 레일의 같은 문구는 커널이 만든다(<c>ConsoleDetailStateMachine.BlockedNotice</c>) — 여기서 못 고친다.
+    /// </summary>
+    public const string BlockedNoticeShort = "적용/되돌리기 필요";
+
     public string DetailFooter => IsPermissionsRail
-        ? (_blockedNotice && Matrix.IsDirty ? ConsoleDetailStateMachine.BlockedNotice
+        ? (_blockedNotice && Matrix.IsDirty ? BlockedNoticeShort
             : Matrix.IsDirty
                 ? $"변경 {Matrix.DirtyCount}건 미적용" + (string.IsNullOrEmpty(Matrix.LastMessage) ? string.Empty : $" — {Matrix.LastMessage}")
                 : Matrix.LastMessage ?? "저장 = 전체 교체")

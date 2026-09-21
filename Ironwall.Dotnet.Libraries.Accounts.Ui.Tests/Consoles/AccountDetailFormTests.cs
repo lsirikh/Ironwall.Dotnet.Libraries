@@ -144,6 +144,50 @@ public class AccountDetailFormTests
         Assert.True(console.CanUnlockSelected);
     }
 
+    /// <summary>
+    /// D-10 — 칸을 하나 건드리면 적용 막대가 <b>즉시</b> 따라와야 한다.
+    /// 값(<c>DetailIsDirty</c>)은 늘 맞았지만 <b>알림</b>이 없어 화면은 "변경 없음" 인 채
+    /// [되돌리기] · [적용] 이 꺼져 있었다(깨끗한 화면과 픽셀 100% 동일 실측). 그래서 값이 아니라 알림을 단언한다.
+    /// </summary>
+    [Fact]
+    public async Task should_raise_the_apply_bar_state_when_a_field_is_touched()
+    {
+        var console = await OpenWithUsersAsync();
+        SelectOne(console, 0);
+
+        var raised = new List<string>();
+        console.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        console.Form.Fields.Single(f => f.Key == "department").Text = "경비1과(수정)";
+
+        Assert.True(console.DetailIsDirty);
+        Assert.True(console.DetailCanApply);
+        Assert.True(console.DetailCanRevert);
+        Assert.Contains(nameof(console.DetailIsDirty), raised);
+        Assert.Contains(nameof(console.DetailCanApply), raised);
+        Assert.Contains(nameof(console.DetailCanRevert), raised);
+        Assert.Contains(nameof(console.DetailFooter), raised);
+    }
+
+    /// <summary>되돌리면 같은 길로 알림이 돌아와 막대가 다시 조용해진다.</summary>
+    [Fact]
+    public async Task should_raise_the_apply_bar_state_when_the_touched_field_is_reverted()
+    {
+        var console = await OpenWithUsersAsync();
+        SelectOne(console, 0);
+        console.Form.Fields.Single(f => f.Key == "department").Text = "경비1과(수정)";
+
+        var raised = new List<string>();
+        console.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        console.Revert();
+
+        Assert.False(console.DetailIsDirty);
+        Assert.False(console.DetailCanApply);
+        Assert.Contains(nameof(console.DetailIsDirty), raised);
+        Assert.Contains(nameof(console.DetailCanApply), raised);
+    }
+
     private static IEnumerable<Ironwall.Dotnet.Monitoring.Models.Accounts.AccountModel> Users() => new[]
     {
         ConsoleFixtures.User(1, "op1", "김운영", department: "경비과", position: "주임"),
