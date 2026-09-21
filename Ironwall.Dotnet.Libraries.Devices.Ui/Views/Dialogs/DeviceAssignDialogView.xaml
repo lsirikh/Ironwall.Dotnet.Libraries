@@ -93,18 +93,50 @@
 			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
 
+		<!--  가라앉은 칸(SurfaceSunken) 위의 작은 글씨라 Muted 는 AA 에 못 미친다 — Secondary 로 올린다.  -->
 		<Style x:Key="Assign.RowMeta" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="11" />
-			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
 
+		<!--
+			드롭존 겉모습 — 색이 아니라 형태다(라이트에서 주색 · 선택색 · 포커스색이 같은 색이다).
+			놓을 수 있음 = 파선 {6,4} · 지금 그 위 = 굵은 윤곽 · 놓을 수 없음 = 굵은 점선 {1,3} + 가라앉은 바탕.
+		-->
 		<Style x:Key="Assign.Pane" TargetType="Border">
 			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 			<Setter Property="BorderThickness" Value="1" />
 			<Setter Property="CornerRadius" Value="6" />
+		</Style>
+
+		<Style x:Key="Assign.DropChrome" TargetType="Rectangle">
+			<Setter Property="RadiusX" Value="6" />
+			<Setter Property="RadiusY" Value="6" />
+			<Setter Property="IsHitTestVisible" Value="False" />
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}" />
+			<Setter Property="StrokeThickness" Value="2" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding Path=(drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Available">
+					<Setter Property="Visibility" Value="Visible" />
+					<Setter Property="StrokeDashArray" Value="6,4" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding Path=(drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Hover">
+					<Setter Property="Visibility" Value="Visible" />
+					<Setter Property="StrokeThickness" Value="3" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding Path=(drag:DropZone.State), RelativeSource={RelativeSource Self}}" Value="Blocked">
+					<Setter Property="Visibility" Value="Visible" />
+					<Setter Property="Stroke" Value="{DynamicResource StatusCriticalBrush}" />
+					<Setter Property="StrokeThickness" Value="3" />
+					<Setter Property="StrokeDashArray" Value="1,2" />
+					<Setter Property="StrokeDashCap" Value="Round" />
+					<Setter Property="Fill" Value="{DynamicResource TintCriticalBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
 		</Style>
 
 		<!--  한 행: 손잡이 · 번호 · 이름 · 종류  -->
@@ -157,7 +189,8 @@
 				ToolTip="창을 연 상태로 되돌린다 (서버는 건드리지 않는다)" />
 		</dlg:ConsoleDialogFrame.FooterExtra>
 
-		<Grid Height="360">
+		<!--  창이 작아지면 카드가 눌린다 — 높이를 고정하지 않고 목록이 제 안에서 스크롤하게 둔다(C8).  -->
+		<Grid MinHeight="220">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="Auto" />
@@ -182,6 +215,7 @@
 							TextAlignment="Center"
 							TextWrapping="Wrap"
 							Visibility="{Binding IsAvailableEmpty, Converter={StaticResource BoolToVisibility}}" />
+						<Rectangle Margin="2" Style="{StaticResource Assign.DropChrome}" />
 						<ListBox
 							Margin="6"
 							AutomationProperties.AutomationId="Devices.Assign.Available"
@@ -263,6 +297,7 @@
 							TextAlignment="Center"
 							TextWrapping="Wrap"
 							Visibility="{Binding IsAssignedEmpty, Converter={StaticResource BoolToVisibility}}" />
+						<Rectangle Margin="2" Style="{StaticResource Assign.DropChrome}" />
 						<ListBox
 							Margin="6"
 							AutomationProperties.AutomationId="Devices.Assign.Assigned"

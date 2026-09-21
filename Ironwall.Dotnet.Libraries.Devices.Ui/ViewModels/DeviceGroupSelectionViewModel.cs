@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -111,7 +111,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 var groupId = _selection[0].Id;
                 var assignedIds = AssignedDevices.Select(d => d.Id);
 
-                var dialog = new DeviceAssignDialogViewModel(_apiService, () => _deviceProvider.OfType<IBaseDeviceModel>(), log: _log);
+                var dialog = new DeviceAssignDialogViewModel(_apiService, () => _deviceProvider.OfType<IBaseDeviceModel>(),
+                    new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.DeviceGroupMembershipProbe(_apiService, _log), _log);
                 dialog.Initialize(groupId, _selection[0].Name, assignedIds);
 
                 await _eventAggregator.PublishOnUIThreadAsync(

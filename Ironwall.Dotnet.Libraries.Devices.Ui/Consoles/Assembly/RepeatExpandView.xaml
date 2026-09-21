@@ -37,7 +37,7 @@
 		SecondaryText="취소"
 		Size="Small"
 		Title="반복 펼치기">
-	<DockPanel Height="380" LastChildFill="True">
+	<DockPanel MinHeight="300" LastChildFill="True">
 		<StackPanel DockPanel.Dock="Top">
 			<c:ConsoleField ApiName="type" Header="유형">
 				<ComboBox

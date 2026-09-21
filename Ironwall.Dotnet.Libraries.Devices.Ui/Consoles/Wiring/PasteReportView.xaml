@@ -28,7 +28,7 @@
 		SecondaryText="취소"
 		Size="Medium"
 		Title="엑셀에서 붙여넣기">
-	<DockPanel Height="440" LastChildFill="True">
+	<DockPanel MinHeight="300" LastChildFill="True">
 		<TextBlock
 			Margin="0,6,0,0"
 			AutomationProperties.AutomationId="Devices.Wiring.Paste.Summary"

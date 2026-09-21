@@ -25,7 +25,7 @@
 		SecondaryText="닫기"
 		Size="Large"
 		Title="프리셋 관리">
-	<DockPanel Height="360" LastChildFill="True">
+	<DockPanel MinHeight="280" LastChildFill="True">
 		<StackPanel DockPanel.Dock="Top">
 			<TextBlock
 				Margin="0,0,0,8"

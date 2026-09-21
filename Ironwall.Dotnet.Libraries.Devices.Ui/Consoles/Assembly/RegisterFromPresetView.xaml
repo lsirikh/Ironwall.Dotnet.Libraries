@@ -49,7 +49,7 @@
 		Size="Large"
 		Title="프리셋으로 장비 만들기">
 	<DockPanel LastChildFill="True">
-		<Grid Height="460">
+		<Grid MinHeight="320">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="420" />
 				<ColumnDefinition Width="*" />

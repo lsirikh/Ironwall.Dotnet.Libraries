@@ -136,6 +136,7 @@
 							IsEnabled="{Binding CanOpenAssign}"
 							Style="{StaticResource MaterialDesignOutlinedButton}"
 							ToolTip="{Binding AssignBlockedReason}"
+							ToolTipService.ShowOnDisabled="True"
 							Visibility="{Binding IsGroupsRail, Converter={StaticResource BoolToVisibility}}" />
 						<StackPanel Orientation="Horizontal" Visibility="{Binding CanAssemble, Converter={StaticResource BoolToVisibility}}">
 							<Button
@@ -165,7 +166,8 @@
 								Content="셋업 · 결선"
 								IsEnabled="{Binding CanOpenWiring}"
 								Style="{StaticResource MaterialDesignOutlinedButton}"
-								ToolTip="{Binding WiringBlockedReason}" />
+								ToolTip="{Binding WiringBlockedReason}"
+								ToolTipService.ShowOnDisabled="True" />
 						</StackPanel>
 						</StackPanel>
 					</c:ConsoleToolbar.Extra>

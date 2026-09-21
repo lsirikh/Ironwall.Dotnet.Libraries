@@ -21,7 +21,7 @@
 		Size="Medium"
 		Title="{Binding DisplayName}">
 		<TabControl
-			Height="360"
+			MinHeight="220"
 			ItemsSource="{Binding Items}"
 			SelectedItem="{Binding ActiveItem}"
 			Style="{StaticResource MaterialDesignTabControl}">

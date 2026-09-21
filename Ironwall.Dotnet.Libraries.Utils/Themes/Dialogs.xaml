@@ -7,6 +7,8 @@
 		다이얼로그 가족 T4 (all-windows-console-redesign N-05).
 		치수 정본: docs/design/window-layout-system-storyboard.html #h-dlg (L1421-1428) · T4 정의 (L1502).
 		머리 48 · 버튼 줄 56 · 버튼 34 · 모서리 10 · 폭은 DialogSizeRules 가 정한다(여기에 숫자를 적지 않는다).
+		카드 테두리에 TextMutedBrush 를 쓰는 까닭: BorderBrush 는 다크에서 BgBrush 와 1.63:1 이라 카드 가장자리가
+		  배경에 잠긴다(그림자도 근-검정 위에서는 보이지 않는다). TextMuted 는 두 테마 모두 3:1 을 넘는다.
 		규칙: ① 색은 전부 DynamicResource(캐싱 금지) ② 상태는 색이 아니라 형태 ③ 식별자는 peer 가 있는 요소에만
 		④ 이 사전은 Generic.xaml 이 Source= 로 병합한다 — 그래서 위쪽 사전의 키를 StaticResource 로 볼 수 없다.
 		  버튼 스타일을 여기에 따로 둔 까닭이 그것이다(Console.Button 재사용 불가).
@@ -161,7 +163,7 @@
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
 							Background="{DynamicResource SurfaceBrush}"
-							BorderBrush="{DynamicResource BorderBrush}"
+							BorderBrush="{DynamicResource TextMutedBrush}"
 							BorderThickness="1"
 							CornerRadius="10">
 							<Border.Effect>
@@ -255,16 +257,33 @@
 										<Grid Grid.Column="0" Margin="0,0,12,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="Auto" />
+												<ColumnDefinition Width="Auto" />
 												<ColumnDefinition Width="*" />
 											</Grid.ColumnDefinitions>
 											<ContentPresenter
+												x:Name="FooterExtraHost"
 												Grid.Column="0"
 												Margin="0,0,10,0"
 												VerticalAlignment="Center"
 												Content="{TemplateBinding FooterExtra}" />
+											<!--
+												무게는 색이 아니라 글리프 + 굵기로 말한다 — 라이트에서
+												StatusWarning(#B26A00) 은 흰 바탕에서 4.24:1 로 AA 에 못 미친다.
+												글자는 대비가 높은 토큰으로 두고, 색은 작은 글리프만 진다.
+											-->
+											<dlg:ConsoleDialogText
+												x:Name="MessageIcon"
+												Grid.Column="1"
+												Margin="0,0,5,0"
+												VerticalAlignment="Center"
+												FontSize="12.5"
+												FontWeight="Bold"
+												Foreground="{DynamicResource StatusWarningBrush}"
+												Text=""
+												Visibility="Collapsed" />
 											<dlg:ConsoleDialogText
 												x:Name="PART_Message"
-												Grid.Column="1"
+												Grid.Column="2"
 												VerticalAlignment="Center"
 												FontSize="12"
 												Foreground="{DynamicResource TextSecondaryBrush}"
@@ -283,7 +302,6 @@
 											<Button
 												x:Name="PART_Primary"
 												Content="{TemplateBinding PrimaryText}"
-												IsEnabled="{TemplateBinding IsPrimaryEnabled}"
 												Style="{StaticResource Dialog.Button.Primary}" />
 										</StackPanel>
 									</Grid>
@@ -292,6 +310,14 @@
 						</Border>
 					</Grid>
 					<ControlTemplate.Triggers>
+						<!--  버튼 줄 왼쪽에 끼운 것이 없으면 여백도 없다 — 안내 글이 본문보다 들여쓰이지 않게(S1).  -->
+						<Trigger Property="FooterExtra" Value="{x:Null}">
+							<Setter TargetName="FooterExtraHost" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="FooterExtraHost" Property="Margin" Value="0" />
+						</Trigger>
+						<Trigger Property="IsPrimaryEnabled" Value="False">
+							<Setter TargetName="PART_Primary" Property="IsEnabled" Value="False" />
+						</Trigger>
 						<Trigger Property="ShowClose" Value="False">
 							<Setter TargetName="PART_Close" Property="Visibility" Value="Collapsed" />
 						</Trigger>
@@ -314,14 +340,22 @@
 							<Setter TargetName="PART_Primary" Property="IsEnabled" Value="False" />
 						</Trigger>
 						<Trigger Property="MessageSeverity" Value="Info">
-							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource StatusInfoBrush}" />
+							<Setter TargetName="MessageIcon" Property="Text" Value="●" />
+							<Setter TargetName="MessageIcon" Property="Foreground" Value="{DynamicResource StatusInfoBrush}" />
+							<Setter TargetName="MessageIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<Trigger Property="MessageSeverity" Value="Warning">
-							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+							<Setter TargetName="MessageIcon" Property="Text" Value="⚠" />
+							<Setter TargetName="MessageIcon" Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+							<Setter TargetName="MessageIcon" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Setter TargetName="PART_Message" Property="FontWeight" Value="SemiBold" />
 						</Trigger>
 						<Trigger Property="MessageSeverity" Value="Critical">
-							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+							<Setter TargetName="MessageIcon" Property="Text" Value="✕" />
+							<Setter TargetName="MessageIcon" Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+							<Setter TargetName="MessageIcon" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Setter TargetName="PART_Message" Property="FontWeight" Value="SemiBold" />
 						</Trigger>
 					</ControlTemplate.Triggers>

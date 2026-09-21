@@ -41,7 +41,7 @@
 		SecondaryText="취소"
 		Size="Medium"
 		Title="센서 여러 개 만들기">
-	<DockPanel Height="460" LastChildFill="True">
+	<DockPanel MinHeight="320" LastChildFill="True">
 
 		<Border
 			Margin="0,10,0,0"

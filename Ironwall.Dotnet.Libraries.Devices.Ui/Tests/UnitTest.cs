@@ -2161,6 +2161,7 @@ public class SensorPanelCacheTests : IDisposable
 /// SpeakerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class SpeakerPanelCacheTests : IDisposable
 {
     public SpeakerPanelCacheTests()
@@ -2210,6 +2211,7 @@ public class SpeakerPanelCacheTests : IDisposable
 /// EnclosurePanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class EnclosurePanelCacheTests : IDisposable
 {
     public EnclosurePanelCacheTests()
@@ -2259,6 +2261,7 @@ public class EnclosurePanelCacheTests : IDisposable
 /// LampPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class LampPanelCacheTests : IDisposable
 {
     public LampPanelCacheTests()
@@ -2308,6 +2311,7 @@ public class LampPanelCacheTests : IDisposable
 /// ControllerPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class ControllerPanelCacheTests : IDisposable
 {
     public ControllerPanelCacheTests()
@@ -2433,6 +2437,7 @@ public class ControllerPanelCacheTests : IDisposable
 /// CameraPanel Cache-first 테스트 (PRD v3.0)
 /// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
 /// </summary>
+[Collection("CaliburnIoC")]   // serialize: this class swaps Caliburn's static IoC delegates (N-05 T1)
 public class CameraPanelCacheTests : IDisposable
 {
     public CameraPanelCacheTests()

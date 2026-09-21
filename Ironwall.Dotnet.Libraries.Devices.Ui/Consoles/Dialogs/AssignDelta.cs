@@ -17,8 +17,15 @@ public sealed record AssignPlan(int GroupId, IReadOnlyList<int> Added, IReadOnly
     public bool HasChanges => Added.Count > 0 || Removed.Count > 0;
     public bool CanSend => BlockReason is null && HasChanges;
 
-    /// <summary>서버를 몇 번 부르는가 — <b>방향마다 한 번</b>이다(장비마다가 아니다).</summary>
-    public int CallCount => (Added.Count > 0 ? 1 : 0) + (Removed.Count > 0 ? 1 : 0);
+    /// <summary>
+    /// 서버를 몇 번 부르는가 — 넣기는 <b>한 번</b>, 빼기는 <b>⌈n/100⌉번</b>이다(장비마다가 아니다).
+    /// </summary>
+    /// <remarks>
+    /// 빼기만 나뉘는 까닭: 서버의 <c>DeviceUnassignRequest.device_ids</c> 가
+    /// <c>max_length=100</c> 이다(<c>app/schemas/device_group.py:108</c>). 넣기 쪽에는 상한이 없다(<c>:78</c>).
+    /// 101대를 한 번에 빼려 하면 422 로 <b>한 대도</b> 빠지지 않는다.
+    /// </remarks>
+    public int CallCount => (Added.Count > 0 ? 1 : 0) + AssignDelta.RemoveCallCount(Removed.Count);
 }
 
 /// <summary>한 방향(넣기 · 빼기)의 결과 판정.</summary>
@@ -43,6 +50,27 @@ public sealed record AssignLegOutcome(int Requested, int Applied, int Skipped, b
 /// </remarks>
 public static class AssignDelta
 {
+    /// <summary>
+    /// 한 번에 뺄 수 있는 최대 수 — 서버 계약(<c>app/schemas/device_group.py:108</c> <c>max_length=100</c>).
+    /// 넣기 쪽에는 상한이 없다.
+    /// </summary>
+    public const int RemoveChunkSize = 100;
+
+    /// <summary>빼기를 몇 번에 나눠 보내는가.</summary>
+    public static int RemoveCallCount(int removedCount)
+        => removedCount <= 0 ? 0 : ((removedCount - 1) / RemoveChunkSize) + 1;
+
+    /// <summary>빼기 목록을 서버 상한에 맞춰 자른다(순서 유지).</summary>
+    public static IReadOnlyList<IReadOnlyList<int>> ChunkRemovals(IReadOnlyList<int> removed)
+    {
+        if (removed is null || removed.Count == 0) return Array.Empty<IReadOnlyList<int>>();
+
+        var chunks = new List<IReadOnlyList<int>>();
+        for (var offset = 0; offset < removed.Count; offset += RemoveChunkSize)
+            chunks.Add(removed.Skip(offset).Take(RemoveChunkSize).ToList());
+        return chunks;
+    }
+
     /// <summary>왼쪽 목록(후보) 드롭존.</summary>
     public const string AvailableZone = "assign-available";
 
@@ -86,6 +114,23 @@ public static class AssignDelta
         if (appeared > 0) parts.Add($"{appeared}대가 더 들어와 있다");
         if (vanished > 0) parts.Add($"{vanished}대가 빠져 있다");
         return $"이 창을 연 뒤 다른 곳에서 그룹이 바뀌었다 — {string.Join(" · ", parts)}. 아무것도 보내지 않았다, 다시 읽고 고쳐 주세요.";
+    }
+
+    /// <summary>
+    /// 보내기 직전 재조회와 견주기 — <b>수</b>만 아는 경우.
+    /// </summary>
+    /// <remarks>
+    /// 지금 그룹 상세 DTO 에는 소속 장비 id 목록이 없어 수밖에 읽지 못한다(<see cref="IGroupMembershipProbe"/> 주석).
+    /// 수가 같은 <b>맞교환</b>은 이 검사로 잡히지 않는다 — 다만 보내는 것이 차분이라 그 경우에도 남의 변경을 덮어쓰지는 않는다.
+    /// </remarks>
+    public static string? DriftByCount(int baselineCount, int? serverCount)
+    {
+        if (serverCount is not { } now) return "그룹을 다시 읽지 못해 보내지 않았다 — 잠시 뒤 다시 시도하세요.";
+        if (now == baselineCount) return null;
+
+        var delta = now - baselineCount;
+        var what = delta > 0 ? $"{delta}대가 더 들어와 있다" : $"{-delta}대가 빠져 있다";
+        return $"이 창을 연 뒤 다른 곳에서 그룹이 바뀌었다 — {what}. 아무것도 보내지 않았다, 다시 읽고 고쳐 주세요.";
     }
 
     /// <summary>버튼 줄에 적을 한 줄 — 무엇을 보낼 참인지.</summary>

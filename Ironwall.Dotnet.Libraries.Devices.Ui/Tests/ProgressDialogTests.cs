@@ -6,6 +6,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// <summary>
 /// 진행 창 — 취소가 있는 진행(스토리보드 #h-dlg T5 표 L1450: 지금은 500×500 에 닫기 요소 0개).
 /// </summary>
+[Collection("CaliburnIoC")]
 public class ProgressDialogViewModelTests
 {
     [Fact]

@@ -29,8 +29,9 @@ public interface IDeviceAssignLauncher
 /// <remarks>
 /// <para>창 폭은 <see cref="DialogSizeRules.WindowWidth"/> 가 정한다 — 규격(L 720)에 여백을 더한 값이고,
 /// 여기에 숫자를 따로 적지 않는다.</para>
-/// <para>보내기 직전 재조회는 <see cref="IDeviceProviderService.FetchAllDevicesAsync"/> 다. 그 한 번이
-/// 다른 창이 그 사이 그룹을 바꿨는지 보는 유일한 눈이다.</para>
+/// <para>보내기 직전 재조회는 <see cref="DeviceGroupMembershipProbe"/> 로 <b>그 그룹 하나만</b> 읽는다.
+/// 전량 재조회(<c>FetchAllDevicesAsync</c>)는 9단계 조회 끝에 <c>AllDevicesLoadedMessage</c> 를 뿌리는데,
+/// 그것은 로그인 게이팅의 가림막 해제 · 심볼 대량 동기화 신호다 — 저장 한 번마다 울릴 것이 아니다.</para>
 /// </remarks>
 public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
 {
@@ -53,7 +54,7 @@ public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
     public async Task<bool> OpenAsync(int groupId, string? groupName, CancellationToken token = default)
     {
         var vm = new DeviceAssignDialogViewModel(_api, () => _devices.OfType<IBaseDeviceModel>(),
-            ct => _providerService.FetchAllDevicesAsync(ct), _log);
+            new DeviceGroupMembershipProbe(_api, _log), _log);
         vm.Initialize(groupId, groupName);
 
         await _windows.ShowDialogAsync(vm, null, WindowSettings()).ConfigureAwait(true);

@@ -54,12 +54,13 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     #region - Ctors -
     public DeviceAssignDialogViewModel(IDeviceApiService apiService
                                       , Func<IEnumerable<IBaseDeviceModel>> deviceSource
-                                      , Func<CancellationToken, Task>? refreshAsync = null
+                                      , IGroupMembershipProbe membershipProbe
                                       , ILogService? log = null)
     {
         _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
         _deviceSource = deviceSource ?? throw new ArgumentNullException(nameof(deviceSource));
-        _refreshAsync = refreshAsync;
+        // 눈이 없으면 남의 변경을 말없이 덮어쓴다 — 빠뜨릴 수 있는 선택 인자로 두지 않는다.
+        _probe = membershipProbe ?? throw new ArgumentNullException(nameof(membershipProbe));
         _log = log;
 
         Available = new BindableCollection<DeviceAssignItemViewModel>();
@@ -364,42 +365,38 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         NotifyAll();
         try
         {
-            // ① 보내기 전에 다시 읽는다 — 그 사이 다른 창이 이 그룹을 건드렸을 수 있다.
-            if (_refreshAsync is not null)
-            {
-                try { await _refreshAsync(token).ConfigureAwait(true); }
-                catch (OperationCanceledException) { Say("취소했다 — 아무것도 보내지 않았다", DialogMessageSeverity.Warning); return; }
-                catch (Exception ex)
-                {
-                    // 사람에게는 까닭만, 날 예외 글은 기록에만.
-                    _log?.Error($"[Assign] 재조회 실패: {ex.Message}");
-                    Say("그룹을 다시 읽지 못해 보내지 않았다 — 잠시 뒤 다시 시도하세요.", DialogMessageSeverity.Critical);
-                    return;
-                }
+            // ① 보내기 전에 그 그룹 하나만 다시 읽는다 — 그 사이 다른 창이 건드렸을 수 있다.
+            //    전량 재조회(9단계 + 전역 브로드캐스트)는 하지 않는다.
+            int? serverCount;
+            try { serverCount = await _probe.CountAsync(_groupId, token).ConfigureAwait(true); }
+            catch (OperationCanceledException) { Say("취소했다 — 아무것도 보내지 않았다", DialogMessageSeverity.Warning); return; }
 
-                var server = _deviceSource().Where(m => m?.DeviceGroups?.Contains(_groupId) == true).Select(m => m.Id);
-                if (AssignDelta.Drift(_baseline, server) is { } drift)
-                {
-                    Say(drift, DialogMessageSeverity.Warning);
-                    return;
-                }
+            if (AssignDelta.DriftByCount(_baseline.Count, serverCount) is { } drift)
+            {
+                Say(drift, serverCount is null ? DialogMessageSeverity.Critical : DialogMessageSeverity.Warning);
+                return;
             }
 
-            // ② 방향마다 한 번씩. 장비마다 부르지 않는다 — 10초 타임아웃이 곱해진다.
-            var add = plan.Added.Count > 0 ? await SendAsync(plan.Added, assign: true, token).ConfigureAwait(true) : null;
-            var remove = plan.Removed.Count > 0 ? await SendAsync(plan.Removed, assign: false, token).ConfigureAwait(true) : null;
+            // ② 넣기는 한 번, 빼기는 서버 상한(100)에 맞춰 나눠서. 장비마다 부르지 않는다.
+            var add = plan.Added.Count > 0 ? await SendAssignAsync(plan.Added, token).ConfigureAwait(true) : null;
+            var remove = plan.Removed.Count > 0 ? await SendRemoveAsync(plan.Removed, token).ConfigureAwait(true) : null;
 
+            var stayOpen = AssignDelta.ShouldStayOpen(add, remove);
             Say(AssignDelta.ResultLine(GroupName, add, remove),
-                AssignDelta.ShouldStayOpen(add, remove) ? DialogMessageSeverity.Warning : DialogMessageSeverity.Normal);
+                stayOpen ? DialogMessageSeverity.Warning : DialogMessageSeverity.Normal);
 
-            // ③ 서버가 실제로 한 것만 기준선에 반영한다 — 보냈다는 사실은 성공이 아니다.
-            if (add is { Failed: false }) foreach (var id in _lastAssigned) _baseline.Add(id);
-            if (remove is { Failed: false }) foreach (var id in _lastRemoved) _baseline.Remove(id);
+            // ③ 서버가 실제로 한 것 + 이미 그렇게 돼 있던 것(skipped)만 반영한다.
+            //    보냈다는 사실은 성공이 아니고, 건너뛴 것은 이미 서버가 그 상태라는 뜻이다.
+            Absorb(_lastAssigned, joined: true);
+            Absorb(_lastSkippedAssign, joined: true);      // 이미 그 그룹에 있었다
+            Absorb(_lastRemoved, joined: false);
+            Absorb(_lastSkippedRemove, joined: false);     // 애초에 그 그룹이 아니었다
 
-            if (AssignDelta.ShouldStayOpen(add, remove))
+            if (stayOpen)
             {
-                // 남은 것이 보이도록 창을 열어 둔다. 목록은 실제 상태로 다시 세운다.
-                RebuildFromBaseline();
+                // 창을 닫지 않는다. 손으로 옮긴 것은 그대로 두고 못 한 것만 다시 보낼 수 있게 한다 —
+                // 기준선이 방금 된 것을 흡수했으므로 CurrentPlan 은 저절로 남은 나머지가 된다.
+                NotifyAll();
                 return;
             }
 
@@ -413,45 +410,101 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
         }
     }
 
-    private async Task<AssignLegOutcome> SendAsync(IReadOnlyList<int> ids, bool assign, CancellationToken token)
+    /// <summary>넣기 — 서버에 상한이 없어 한 번에 보낸다(device_group.py:78).</summary>
+    private async Task<AssignLegOutcome> SendAssignAsync(IReadOnlyList<int> ids, CancellationToken token)
     {
+        _lastAssigned = new List<int>();
+        _lastSkippedAssign = new List<int>();
         var dto = new DeviceGroupAssignRequestDto { DeviceIds = ids.ToList() };
         try
         {
-            if (assign)
+            var response = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token).ConfigureAwait(true);
+            if (!response.Success)
             {
-                var response = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token).ConfigureAwait(true);
-                var applied = response.Success ? response.Data?.AssignedDeviceIds ?? new List<int>() : new List<int>();
-                _lastAssigned = applied.ToList();
-                _log?.Info($"[Assign] group={_groupId} 넣기 보냄={ids.Count} 처리={applied.Count} 성공={response.Success}");
-                return new AssignLegOutcome(ids.Count, applied.Count, response.Data?.SkippedDeviceIds?.Count ?? 0, !response.Success);
+                _log?.Warning($"[Assign] group={_groupId} 넣기 실패 보냄={ids.Count}: {response.Message}");
+                return new AssignLegOutcome(ids.Count, 0, 0, Failed: true);
             }
 
-            var removeResponse = await _apiService.RemoveDevicesFromGroupAsync(_groupId, dto, token).ConfigureAwait(true);
-            var removed = removeResponse.Success ? removeResponse.Data?.RemovedDeviceIds ?? new List<int>() : new List<int>();
-            _lastRemoved = removed.ToList();
-            _log?.Info($"[Assign] group={_groupId} 빼기 보냄={ids.Count} 처리={removed.Count} 성공={removeResponse.Success}");
-            return new AssignLegOutcome(ids.Count, removed.Count, removeResponse.Data?.SkippedDeviceIds?.Count ?? 0, !removeResponse.Success);
+            _lastAssigned = (response.Data?.AssignedDeviceIds ?? new List<int>()).ToList();
+            _lastSkippedAssign = (response.Data?.SkippedDeviceIds ?? new List<int>()).ToList();
+            _log?.Info($"[Assign] group={_groupId} 넣기 보냄={ids.Count} 처리={_lastAssigned.Count} 건너뜀={_lastSkippedAssign.Count}");
+            return new AssignLegOutcome(ids.Count, _lastAssigned.Count, _lastSkippedAssign.Count, Failed: false);
         }
-        catch (OperationCanceledException)
-        {
-            if (assign) _lastAssigned = new List<int>(); else _lastRemoved = new List<int>();
-            return new AssignLegOutcome(ids.Count, 0, 0, Failed: true);
-        }
+        catch (OperationCanceledException) { return new AssignLegOutcome(ids.Count, 0, 0, Failed: true); }
         catch (Exception ex)
         {
-            _log?.Error($"[Assign] {(assign ? "넣기" : "빼기")} 실패: {ex.Message}");
-            if (assign) _lastAssigned = new List<int>(); else _lastRemoved = new List<int>();
+            _log?.Error($"[Assign] 넣기 오류: {ex.Message}");
             return new AssignLegOutcome(ids.Count, 0, 0, Failed: true);
         }
     }
 
-    /// <summary>부분 실패 뒤 — 화면을 서버가 아는 상태(기준선)로 다시 세운다.</summary>
-    private void RebuildFromBaseline()
+    /// <summary>
+    /// 빼기 — 서버가 한 번에 <b>100대</b>까지만 받는다(<c>app/schemas/device_group.py:108</c> <c>max_length=100</c>).
+    /// 넘겨 보내면 422 로 <b>한 대도</b> 빠지지 않으므로 잘라서 보낸다.
+    /// </summary>
+    private async Task<AssignLegOutcome> SendRemoveAsync(IReadOnlyList<int> ids, CancellationToken token)
     {
-        var keep = Message;
-        Initialize(_groupId, GroupName, _baseline);
-        Message = keep;
+        _lastRemoved = new List<int>();
+        _lastSkippedRemove = new List<int>();
+        var anyFailed = false;
+
+        foreach (var chunk in AssignDelta.ChunkRemovals(ids))
+        {
+            var dto = new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() };
+            try
+            {
+                var response = await _apiService.RemoveDevicesFromGroupAsync(_groupId, dto, token).ConfigureAwait(true);
+                if (!response.Success)
+                {
+                    anyFailed = true;
+                    _log?.Warning($"[Assign] group={_groupId} 빼기 실패 보냄={chunk.Count}: {response.Message}");
+                    continue;
+                }
+                _lastRemoved.AddRange(response.Data?.RemovedDeviceIds ?? new List<int>());
+                _lastSkippedRemove.AddRange(response.Data?.SkippedDeviceIds ?? new List<int>());
+            }
+            catch (OperationCanceledException) { anyFailed = true; break; }
+            catch (Exception ex)
+            {
+                anyFailed = true;
+                _log?.Error($"[Assign] 빼기 오류: {ex.Message}");
+            }
+        }
+
+        _log?.Info($"[Assign] group={_groupId} 빼기 보냄={ids.Count} 묶음={AssignDelta.RemoveCallCount(ids.Count)} 처리={_lastRemoved.Count} 건너뜀={_lastSkippedRemove.Count}");
+        // 한 묶음이라도 됐으면 부분 실패다 — 전부 실패했을 때만 실패로 적는다(그래야 남은 것만 다시 보낸다).
+        var failed = anyFailed && _lastRemoved.Count == 0 && _lastSkippedRemove.Count == 0;
+        return new AssignLegOutcome(ids.Count, _lastRemoved.Count, _lastSkippedRemove.Count, failed);
+    }
+
+    /// <summary>
+    /// 서버가 그렇게 해 준 것을 <b>기준선과 공용 캐시 양쪽</b>에 적는다.
+    /// </summary>
+    /// <remarks>
+    /// 캐시(프로바이더)를 고치지 않으면, 창을 다시 열 때 방금 넣은 장비가 <b>후보</b>로 돌아오고 기준선도 옛것이라
+    /// 다시 보내게 되며 서버는 멱등하게 <c>skipped</c> 로 답한다(<c>device_groups.py:354</c>) —
+    /// 영원히 "건너뛰었다" 인 창이 된다.
+    /// </remarks>
+    private void Absorb(IReadOnlyCollection<int> ids, bool joined)
+    {
+        if (ids.Count == 0) return;
+
+        foreach (var id in ids)
+        {
+            if (joined) _baseline.Add(id);
+            else _baseline.Remove(id);
+        }
+
+        var wanted = new HashSet<int>(ids);
+        foreach (var model in _deviceSource().Where(m => m is not null && wanted.Contains(m.Id)))
+        {
+            model.DeviceGroups ??= new List<int>();
+            if (joined)
+            {
+                if (!model.DeviceGroups.Contains(_groupId)) model.DeviceGroups.Add(_groupId);
+            }
+            else model.DeviceGroups.Remove(_groupId);
+        }
     }
 
     public Task CancelAsync() => TryCloseAsync(false);
@@ -493,13 +546,15 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly Func<IEnumerable<IBaseDeviceModel>> _deviceSource;
-    private readonly Func<CancellationToken, Task>? _refreshAsync;
+    private readonly IGroupMembershipProbe _probe;
     private readonly ILogService? _log;
 
     private int _groupId;
     private HashSet<int> _baseline = new();
     private List<int> _lastAssigned = new();
+    private List<int> _lastSkippedAssign = new();
     private List<int> _lastRemoved = new();
+    private List<int> _lastSkippedRemove = new();
     private string _message = string.Empty;
     private DialogMessageSeverity _severity = DialogMessageSeverity.Normal;
     private bool _isBusy;
