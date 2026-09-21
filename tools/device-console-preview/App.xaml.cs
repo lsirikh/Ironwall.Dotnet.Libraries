@@ -51,6 +51,14 @@ public partial class App : Application
                 return;
             }
 
+            // 부대 콘솔(N-11) — 콘솔과 따로 뜬다(--units [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--units"))
+            {
+                await RunUnitsAsync(directory);
+                if (directory is not null) Shutdown();
+                return;
+            }
+
             // 셋업 · 결선 창 — 콘솔과 따로 뜬다(--wiring [--dark] [--snapshot <폴더>]).
             if (e.Args.Contains("--wiring"))
             {
@@ -414,60 +422,6 @@ public partial class App : Application
 
     }
 
-    private void ApplyDark()
-    {
-        if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
-        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(DarkTokens) });
-        foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Dark;
-    }
-
-    private static Task Settle() => Task.Delay(450);
-
-    private DataGrid FindGrid()
-    {
-        return Find(_view) ?? throw new InvalidOperationException("DataGrid 를 찾지 못했다");
-
-        static DataGrid? Find(DependencyObject parent)
-        {
-            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is DataGrid grid && System.Windows.Automation.AutomationProperties.GetAutomationId(grid) == "Console.Devices.Grid") return grid;
-                if (Find(child) is { } found) return found;
-            }
-            // 부대 콘솔(N-11) — 콘솔과 따로 뜬다(--units [--dark] [--snapshot <폴더>]).
-            if (e.Args.Contains("--units")) { await RunUnitsAsync(directory); if (directory is not null) Shutdown(); return; }
-
-            return null;
-        }
-    }
-
-    private void Save(string directory, string name)
-    {
-        var content = (FrameworkElement)_window.Content;
-        var width = (int)Math.Ceiling(content.ActualWidth);
-        var height = (int)Math.Ceiling(content.ActualHeight);
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(directory, name + ".png"));
-        encoder.Save(stream);
-    }
-    #endregion
-
-    private sealed class FixedProbe : IServerContractProbe
-    {
-        public FixedProbe(bool isAxis) => Contract = isAxis ? Enum.GetValues<EnumServerContract>().Max() : EnumServerContract.V6_3;
-
     /// <summary>
     /// 부대 콘솔 — 진짜 뷰 + 진짜 뷰모델을 가짜 창구 위에 띄운다. 서버에 한 줄도 나가지 않는다.
     /// </summary>
@@ -587,6 +541,58 @@ public partial class App : Application
         await Sweep("dark");
         _ = savedPreview;
     }
+
+    private void ApplyDark()
+    {
+        if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(DarkTokens) });
+        foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Dark;
+    }
+
+    private static Task Settle() => Task.Delay(450);
+
+    private DataGrid FindGrid()
+    {
+        return Find(_view) ?? throw new InvalidOperationException("DataGrid 를 찾지 못했다");
+
+        static DataGrid? Find(DependencyObject parent)
+        {
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is DataGrid grid && System.Windows.Automation.AutomationProperties.GetAutomationId(grid) == "Console.Devices.Grid") return grid;
+                if (Find(child) is { } found) return found;
+            }
+
+            return null;
+        }
+    }
+
+    private void Save(string directory, string name)
+    {
+        var content = (FrameworkElement)_window.Content;
+        var width = (int)Math.Ceiling(content.ActualWidth);
+        var height = (int)Math.Ceiling(content.ActualHeight);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
+            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
+        }
+        bitmap.Render(visual);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(directory, name + ".png"));
+        encoder.Save(stream);
+    }
+    #endregion
+
+    private sealed class FixedProbe : IServerContractProbe
+    {
+        public FixedProbe(bool isAxis) => Contract = isAxis ? Enum.GetValues<EnumServerContract>().Max() : EnumServerContract.V6_3;
 
         public EnumServerContract Contract { get; }
         public string? RawVersion => Contract == EnumServerContract.V6_3 ? "6.3.2" : "8.0.1";
