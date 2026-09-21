@@ -92,7 +92,7 @@
 					AutomationProperties.AutomationId="Reports.Console.CloseButton"
 					Click="OnClose"
 					Content="닫기"
-					Style="{StaticResource ModernTextButton}" />
+					Style="{StaticResource Console.Button.Ghost}" />
 			</StackPanel>
 		</c:ConsoleShell.HeaderContent>
 

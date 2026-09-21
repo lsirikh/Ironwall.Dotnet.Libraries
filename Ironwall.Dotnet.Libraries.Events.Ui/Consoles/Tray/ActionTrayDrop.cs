@@ -96,7 +96,7 @@ public static class ActionTrayDrop
 
         string? reason = null;
         if (unique.Count == 0 && overLimit > 0)
-            reason = $"조치 트레이가 가득 찼습니다 — 한 번에 {MaxPerDrop}건까지입니다. [적용] 하거나 몇 건을 빼고 다시 담으세요.";
+            reason = $"조치 트레이가 가득 찼습니다 — 한 번에 {MaxPerDrop}건까지입니다. [조치 적용] 하거나 몇 건을 빼고 다시 담으세요.";
         else if (unique.Count == 0)
             reason = wrongKind > 0 && reportable.Count == 0
                 ? "이 목록의 행은 조치보고 원본이 아닙니다 — 탐지 · 장애에서 고르세요."

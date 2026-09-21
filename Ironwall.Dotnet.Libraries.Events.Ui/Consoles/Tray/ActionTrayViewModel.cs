@@ -160,9 +160,9 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
             _inFlightKey = null;
             var summary = await Draft.ApplyAsync(_cts.Token).ConfigureAwait(true);
             StatusLine = summary.ToMessage();
-            if (summary.Failed > 0) StatusLine += " — 실패한 줄은 트레이에 남습니다. [적용] 을 다시 누르면 그것만 보냅니다.";
+            if (summary.Failed > 0) StatusLine += " — 실패한 줄은 트레이에 남습니다. [조치 적용] 을 다시 누르면 그것만 보냅니다.";
             if (summary.WasCancelled && UnverifiedKey is not null)
-                StatusLine += " — ⚠ 중단 순간 보내는 중이던 1건은 결과 미확인입니다. 다시 [적용] 하면 중복될 수 있습니다.";
+                StatusLine += " — ⚠ 중단 순간 보내는 중이던 1건은 결과 미확인입니다. 다시 [조치 적용] 하면 중복될 수 있습니다.";
             RaiseAll();
             return summary;
         }

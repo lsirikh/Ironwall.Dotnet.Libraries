@@ -137,6 +137,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         BuildRail();
 
+        // ★ 기간 칩의 눌림 표시는 Period 의 setter 안에서만 맞춰졌다 — 처음 뜰 때는 아무도 그 setter 를
+        //   지나가지 않아 넷 다 안 눌린 채로 떴다(부제는 "24시간" 인데 화면엔 고른 표시가 없었다).
+        SyncPeriodChips();
+
         _endDate = DateTime.Now;
         _startDate = _endDate.AddDays(-1);
     }
@@ -403,7 +407,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         _view?.Refresh();
         NotifyOfPropertyChange(nameof(IsFiltered));
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
     }
 
     /// <summary>ICollectionView 의 거름망 — 판정은 순수 함수가 한다.</summary>
@@ -439,7 +443,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>끌 수 없는 레일에서는 줄이진 요약만 보인다.</summary>
     public bool IsTrayCollapsed => !CanDragToTray && Tray.HasEntries;
 
-    public string TraySummaryText => $"조치 트레이 {Tray.Count}건 — 탐지 · 장애 내역에서 [적용] 할 수 있습니다";
+    public string TraySummaryText => $"조치 트레이 {Tray.Count}건 — 탐지 · 장애 내역에서 [조치 적용] 할 수 있습니다";
 
     public string ListStatusText
     {
@@ -452,6 +456,34 @@ public class EventDashboardViewModel : BasePanelViewModel
             var shown = _view?.Cast<object>().Count() ?? 0;
             return EventListFilter.StatusLine(shown, _current.RowCount, SelectedRows.Count, true, _current.HasMorePages);
         }
+    }
+
+    /// <summary>
+    /// 목록이 비었는가. 빈 칸을 <b>정말 비워 두지 않는다</b> — 아무것도 없는 본문은
+    /// "한 건도 없다"와 "못 불러왔다"를 구별해 주지 못한다(상태 띠 한 줄로는 모자란다).
+    /// 불러오는 중에는 비었다고 말하지 않는다.
+    /// </summary>
+    public bool IsListEmpty
+        => _current is not null && !_current.IsBusy && _view?.Cast<object>().Any() != true;
+
+    /// <summary>빈 목록의 제목 — 거르기 때문인지 원래 없는지를 가른다.</summary>
+    public string EmptyStateTitle => IsFiltered ? "조건에 맞는 이벤트가 없습니다" : "표시할 이벤트가 없습니다";
+
+    /// <summary>
+    /// 빈 목록에서 다음에 할 일. 한 줄로 끝나게 짧게 쓴다 —
+    /// WPF 는 한글을 음절 단위로 끊어, 긴 문장은 마지막 줄에 음절 하나만 남긴다.
+    /// </summary>
+    public string EmptyStateHint => IsFiltered
+        ? "검색어를 지우거나 거르기를 [전체] 로"
+        : "기간을 넓히거나 [갱신] 을 눌러 보세요";
+
+    /// <summary>목록 상태 한 벌 — 건수 줄과 빈 칸 안내는 늘 같은 순간에 바뀐다.</summary>
+    private void RaiseListState()
+    {
+        NotifyOfPropertyChange(nameof(ListStatusText));
+        NotifyOfPropertyChange(nameof(IsListEmpty));
+        NotifyOfPropertyChange(nameof(EmptyStateTitle));
+        NotifyOfPropertyChange(nameof(EmptyStateHint));
     }
 
     public IReadOnlyList<object> SelectedRows { get; private set; } = Array.Empty<object>();
@@ -476,7 +508,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         DetailView.Load(CurrentKind, SelectedRows, CanEdit, CanReport, actionCount);
 
         NotifyOfPropertyChange(nameof(SelectedRows));
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
         NotifyOfPropertyChange(nameof(CanQueueSelection));
         NotifyOfPropertyChange(nameof(QueueButtonText));
         NotifyOfPropertyChange(nameof(CanDelete));
@@ -521,7 +553,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         _view = view;
 
         NotifyOfPropertyChange(nameof(Rows));
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
     }
 
     private void DetachRows()
@@ -548,7 +580,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         }
 
         RefreshRailCounts();
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
     }
     #endregion
 
@@ -807,7 +839,7 @@ public class EventDashboardViewModel : BasePanelViewModel
             Overview.IsLoading = false;
             Overview.Load(DataChartPanelViewModel.LastDashboardDto, start, end);
             RefreshRailCounts();
-            NotifyOfPropertyChange(nameof(ListStatusText));
+            RaiseListState();
         }
         catch (Exception ex)
         {
@@ -993,7 +1025,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         SettlePendingApply();                 // (R8) 진짜 결과는 여기서야 알 수 있다
         RefreshRailCounts();
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
         NotifyOfPropertyChange(nameof(CanReload));
         NotifyOfPropertyChange(nameof(IsQueryRunning));
         NotifyOfPropertyChange(nameof(CanAdd));
@@ -1017,7 +1049,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(CanReport));
         NotifyOfPropertyChange(nameof(CanQueueSelection));
         NotifyOfPropertyChange(nameof(QueueButtonText));
-        NotifyOfPropertyChange(nameof(ListStatusText));
+        RaiseListState();
         NotifyOfPropertyChange(nameof(Subtitle));
         NotifyOfPropertyChange(nameof(IsQueryRunning));
         NotifyOfPropertyChange(nameof(CanAdd));
