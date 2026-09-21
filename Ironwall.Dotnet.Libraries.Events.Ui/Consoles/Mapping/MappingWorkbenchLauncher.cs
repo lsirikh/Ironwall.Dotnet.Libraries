@@ -32,7 +32,10 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
     //    창을 딱 1280 으로 열면 테두리만큼 모자라 <b>늘 서랍</b>으로 떠서 액션 보드가 팔레트에 가린다.
     private const double WIDTH = 1360;      // 셸 1280(레일 184 + 목록 300 + 본문 456 + 팔레트 340) + 창 테두리
     private const double HEIGHT = 800;
-    private const double MIN_WIDTH = 1180;  // 레일 접힘(56) 기준 최소 1120 + 테두리
+    // 🔴 최소값도 도킹 문턱 위여야 한다. 1180 으로 두면 <b>최소 크기가 곧 서랍 모드</b>라
+    //    팔레트가 액션 보드를 덮고 [▲ 위로]·[▼ 아래로]·[◀ 해제] 와 Draft 배지가 통째로 가려진다(실측).
+    //    와이어프레임의 "최소 1120" 은 레일이 접히는 것을 전제했지만 커널은 960 아래에서만 접는다.
+    private const double MIN_WIDTH = 1300;  // 셸 1280 + 창 테두리
     private const double MIN_HEIGHT = 680;
 
     private readonly IWindowManager _windows;

@@ -18,6 +18,9 @@ using MaterialDesignThemes.Wpf;
 using Moq;
 using System.IO;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using System.Text;
+using System.Windows.Controls.Primitives;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -318,7 +321,10 @@ public partial class App : Application
         await Settle();
         Save(directory, $"mapping-dirty-{theme}");
 
-        // 좁은 폭
+        // 좁은 폭 — 창 최소값(1300)과 그 아래(1140) 둘 다.
+        _window.Width = 1300;
+        await Settle();
+        Save(directory, $"mapping-min-{theme}");
         _window.Width = 1140;
         await Settle();
         Save(directory, $"mapping-narrow-{theme}");
@@ -343,6 +349,14 @@ public partial class App : Application
         await Settle();
         Save(directory, $"mapping-readonly-{theme}");
 
+        // 진짜 드래그 — 손잡이를 잡고 보드 위로 옮긴 상태를 그대로 찍는다.
+        var dragModel = MappingPreview.Build();
+        var dragView = new MappingWorkbenchView { DataContext = dragModel };
+        _window.Content = new Border { Child = dragView, ClipToBounds = true };
+        await ((IActivate)dragModel).ActivateAsync();
+        await Settle();
+        await SimulateMappingDragAsync(directory, theme, dragView, dragModel);
+
         // 빈 목록
         var emptyGateway = new PreviewMappingGateway { IsEmpty = true };
         var empty = new MappingWorkbenchViewModel(emptyGateway, new PreviewDeviceSource());
@@ -353,6 +367,78 @@ public partial class App : Application
         Save(directory, $"mapping-empty-{theme}");
     }
     #endregion
+
+
+    /// <summary>
+    /// 드래그를 <b>입력 없이</b> 재현한다 — 손잡이의 Thumb 이벤트를 직접 일으키고
+    /// 포인터 자리만 <see cref="DragPointer.Override"/> 로 알려 준다. 사용자의 마우스는 건드리지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 이 재현이 없으면 "드롭이 핸들러에 닿는가" 를 그림으로도 시험으로도 못 본다 —
+    /// 이전 판은 스냅샷이 <c>AddDevices</c> 를 직접 불러서, 드롭존이 잘못된 타입 위에 있는 것을 놓쳤다.
+    /// </remarks>
+    private async Task SimulateMappingDragAsync(string directory, string theme, FrameworkElement view, MappingWorkbenchViewModel model)
+    {
+        var log = new StringBuilder();
+        var before = model.BoardRows.Count;
+
+        var handle = Descendants<DragHandle>(view)
+            .FirstOrDefault(h => h.DataContext is MappingPaletteItemViewModel { IsRegistered: false });
+        var board = Descendants<ListBox>(view)
+            .FirstOrDefault(l => System.Windows.Automation.AutomationProperties.GetAutomationId(l) == "Integrations.Board.List");
+
+        if (handle is null || board is null)
+        {
+            log.AppendLine("손잡이나 보드를 못 찾았다 — 드래그 재현을 건너뛴다.");
+            File.WriteAllText(Path.Combine(directory, $"drag-simulation-{theme}.txt"), log.ToString());
+            return;
+        }
+
+        var pointer = new Point();
+        DragPointer.Override = relativeTo => view.TranslatePoint(pointer, (UIElement)relativeTo);
+        try
+        {
+            Point CenterOf(FrameworkElement e, double fy = 0.5)
+                => e.TranslatePoint(new Point(e.ActualWidth / 2, e.ActualHeight * fy), view);
+
+            pointer = CenterOf(handle);
+            handle.RaiseEvent(new DragStartedEventArgs(0, 0));
+
+            // 데드존 안 — 아직 아무 일도 없어야 한다(8.0 DIU 미만).
+            pointer = new Point(pointer.X + 4, pointer.Y + 4);
+            handle.RaiseEvent(new DragDeltaEventArgs(0, 0));
+            log.AppendLine($"데드존 안  boardZone={DropZone.GetState(board)}  (기대 None)");
+
+            // 보드 위로 — 첫 행과 둘째 행 사이를 노린다.
+            pointer = CenterOf(board, 0.22);
+            handle.RaiseEvent(new DragDeltaEventArgs(0, 0));
+            log.AppendLine($"보드 위    boardZone={DropZone.GetState(board)}  (기대 Hover)");
+            await Settle(260);
+            Save(directory, $"mapping-dragging-{theme}");
+
+            handle.RaiseEvent(new DragCompletedEventArgs(0, 0, false));
+            await Settle(260);
+            log.AppendLine($"드롭 뒤    보드 {before} → {model.BoardRows.Count}  (기대 +1 이상)");
+            log.AppendLine($"Draft      {model.DraftText}");
+            Save(directory, $"mapping-dropped-{theme}");
+        }
+        finally
+        {
+            DragPointer.Override = null;
+        }
+
+        File.WriteAllText(Path.Combine(directory, $"drag-simulation-{theme}.txt"), log.ToString());
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T hit) yield return hit;
+            foreach (var deep in Descendants<T>(child)) yield return deep;
+        }
+    }
 
     private void ApplyDark()
     {

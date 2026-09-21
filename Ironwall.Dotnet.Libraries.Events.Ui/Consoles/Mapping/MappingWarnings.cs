@@ -55,7 +55,7 @@ public static class MappingWarnings
 
         // ① 장비그룹이 없으면 이 매핑은 아무 이벤트와도 짝지어지지 않는다.
         if (current.DeviceGroupId is null)
-            list.Add(new(MappingWarningLevel.Warning, "장비그룹이 지정되지 않아 어떤 이벤트와도 매칭되지 않습니다."));
+            list.Add(new(MappingWarningLevel.Warning, "장비그룹 미지정 — 어떤 이벤트와도 매칭되지 않습니다."));
 
         // ② 같은 (장비그룹, 카테고리) 조합이 이미 있으면 둘이 동시에 실행된다. 막지는 않는다.
         var duplicates = all.Count(m =>
@@ -64,7 +64,7 @@ public static class MappingWarnings
             && string.Equals(m.CategoryEventMapping, current.CategoryEventMapping, System.StringComparison.Ordinal));
         if (duplicates > 0)
             list.Add(new(MappingWarningLevel.Warning,
-                $"같은 조건의 맵핑이 {duplicates}건 더 있습니다 — 이벤트가 나면 {duplicates + 1}건이 동시에 실행됩니다."));
+                $"같은 조건 맵핑 {duplicates}건 더 있음 — 이벤트마다 {duplicates + 1}건이 함께 실행됩니다."));
 
         // ③ 매핑 자체가 중지 상태.
         if (!current.Status)
@@ -74,7 +74,7 @@ public static class MappingWarnings
         var orphans = board.AllBlockingOrphans().Count;
         if (orphans > 0)
             list.Add(new(MappingWarningLevel.Blocking,
-                $"장비가 끊긴 행이 {orphans}건 있습니다 — 장비를 다시 지정하거나 해제해야 저장할 수 있습니다."));
+                $"장비가 끊긴 행 {orphans}건 — 다시 지정하거나 해제해야 저장됩니다."));
 
         // ⑤ 그 매핑의 장비그룹에 속하지 않는 장비. 경고만 한다(임시 구성 중일 수 있다).
         if (devices is not null && current.DeviceGroupId is int groupId)

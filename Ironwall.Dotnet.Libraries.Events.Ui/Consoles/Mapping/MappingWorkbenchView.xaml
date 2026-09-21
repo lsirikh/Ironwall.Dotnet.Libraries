@@ -83,12 +83,64 @@
 			<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
 		</Style>
 
-		<!--  탭 머리 = 레일 항목. 계측은 컨테이너에 — peer 가 있는 유일한 자리다.  -->
-		<Style
-			x:Key="Mapping.TabItem"
-			BasedOn="{StaticResource {x:Type c:ConsoleRailItem}}"
-			TargetType="c:ConsoleRailItem">
-			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Key, StringFormat=Integrations.Board.Tab.{0}}" />
+		<!--
+			행 컨테이너 — 계측할 자리는 여기뿐이다(ListBoxItem 만 UIA peer 를 갖는다).
+			⚠ Console.ReorderList 는 컨테이너 스타일을 <b>인라인</b>으로 들고 있어, 그냥 덮으면
+			Stretch · 선택 3px 바 · 포커스 링이 함께 사라진다 — 그래서 그 템플릿을 그대로 옮겨 온다.
+		-->
+		<ControlTemplate x:Key="Mapping.RowTemplate" TargetType="ListBoxItem">
+			<Grid>
+				<Border
+					x:Name="Bd"
+					Background="Transparent"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1" />
+				<Rectangle
+					x:Name="Bar"
+					Width="3"
+					HorizontalAlignment="Left"
+					Fill="{DynamicResource PrimaryBrush}"
+					Visibility="Collapsed" />
+				<Border
+					x:Name="Focus"
+					BorderBrush="{DynamicResource FocusRingBrush}"
+					BorderThickness="2"
+					Visibility="Collapsed" />
+				<ContentPresenter Margin="6,0" />
+			</Grid>
+			<ControlTemplate.Triggers>
+				<Trigger Property="IsMouseOver" Value="True">
+					<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+				</Trigger>
+				<Trigger Property="IsSelected" Value="True">
+					<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+					<Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+				</Trigger>
+				<Trigger Property="IsKeyboardFocused" Value="True">
+					<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+				</Trigger>
+			</ControlTemplate.Triggers>
+		</ControlTemplate>
+
+		<Style x:Key="Mapping.MappingRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Mapping.Row.{0}}" />
+		</Style>
+
+		<Style x:Key="Mapping.BoardRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Key, StringFormat=Integrations.Board.Row.{0}}" />
+		</Style>
+
+		<Style x:Key="Mapping.PaletteRow" TargetType="ListBoxItem">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template" Value="{StaticResource Mapping.RowTemplate}" />
+			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Palette.Item.{0}}" />
 		</Style>
 
 		<!--  팔레트 카드 — 이미 들어간 장비는 흐리게 + "등록됨"  -->
@@ -310,14 +362,10 @@
 						Padding="8"
 						Background="Transparent"
 						AutomationProperties.AutomationId="Integrations.Mapping.List"
+						ItemContainerStyle="{StaticResource Mapping.MappingRow}"
 						ItemsSource="{Binding Mappings}"
 						SelectedItem="{Binding SelectedMapping, Mode=TwoWay}"
 						Style="{StaticResource Console.ReorderList}">
-						<ListBox.ItemContainerStyle>
-							<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
-								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Mapping.Row.{0}}" />
-							</Style>
-						</ListBox.ItemContainerStyle>
 						<ListBox.ItemTemplate>
 							<DataTemplate DataType="{x:Type local:MappingListItemViewModel}">
 								<DockPanel Height="38" LastChildFill="True">
@@ -553,17 +601,13 @@
 								drag:DropZone.IsReorder="True"
 								drag:DropZone.Key="{Binding BoardZoneKey}"
 								AutomationProperties.AutomationId="Integrations.Board.List"
+								ItemContainerStyle="{StaticResource Mapping.BoardRow}"
 								ItemTemplate="{StaticResource BoardRow}"
 								ItemsSource="{Binding BoardRows}"
 								PreviewKeyDown="OnBoardPreviewKeyDown"
 								SelectionChanged="OnBoardSelectionChanged"
 								SelectionMode="Extended"
 								Style="{StaticResource Console.ReorderList}">
-								<ListBox.ItemContainerStyle>
-									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
-										<Setter Property="AutomationProperties.AutomationId" Value="{Binding Key, StringFormat=Integrations.Board.Row.{0}}" />
-									</Style>
-								</ListBox.ItemContainerStyle>
 								<b:Interaction.Behaviors>
 									<drag:CaptureDragBehavior
 										DisplayMemberPath="Display"
@@ -578,7 +622,7 @@
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
 								FontSize="12"
-								Foreground="{DynamicResource TextMutedBrush}"
+								Foreground="{DynamicResource TextSecondaryBrush}"
 								Text="오른쪽 팔레트에서 장비를 끌어다 놓거나 [＋ 추가] 를 누르십시오."
 								TextWrapping="Wrap">
 								<TextBlock.Style>
@@ -658,6 +702,7 @@
 							Padding="6"
 							Background="{DynamicResource SurfaceSunkenBrush}"
 							AutomationProperties.AutomationId="Integrations.Palette.List"
+							ItemContainerStyle="{StaticResource Mapping.PaletteRow}"
 							ItemTemplate="{StaticResource PaletteCard}"
 							ItemsSource="{Binding PaletteItems}"
 							PreviewKeyDown="OnPalettePreviewKeyDown"
@@ -671,11 +716,6 @@
 									IsDragEnabled="{Binding IsDragEnabled}"
 									KeyboardFallback="Enter 또는 [＋ 추가 ▶] 버튼" />
 							</b:Interaction.Behaviors>
-							<ListBox.ItemContainerStyle>
-								<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
-									<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Integrations.Palette.Item.{0}}" />
-								</Style>
-							</ListBox.ItemContainerStyle>
 						</ListBox>
 					</drag:DropZoneChrome>
 				</Grid>

@@ -271,9 +271,15 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     }
 
     /// <inheritdoc/>
+    /// <summary>
+    /// 미저장 변경이 있으면 닫히지 않는다 — 막대가 흔들리며 이유를 말한다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 단 <b>읽기 전용이면 붙잡지 않는다</b>. 저장할 길이 없는데 이탈까지 막으면
+    /// 창을 닫을 방법이 사라진다(권한이 중간에 회수된 경우).
+    /// </remarks>
     public override Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
-        // 미저장 변경이 있으면 닫히지 않는다 — 막대가 흔들리며 이유를 말한다.
-        => Task.FromResult(!_board.IsDirty || Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
+        => Task.FromResult(!_board.IsDirty || IsReadOnly || Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
 
     private void OnPermissionsChanged()
     {
@@ -624,8 +630,15 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     /// <summary>해제 버튼을 누를 수 있는가.</summary>
     public bool CanReleaseSelected => CanDelete && SelectedBoardRows.Any(r => !r.IsRemoved);
 
-    /// <summary>되돌리기를 누를 수 있는가.</summary>
-    public bool CanRevert => CanEdit && (_board.IsDirty || _board.CanUndo);
+    /// <summary>
+    /// 되돌리기를 누를 수 있는가 — <b>편집 권한을 묻지 않는다</b>.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 여기에 <c>CanEdit</c> 를 걸면 덫이 된다: 미저장 변경을 든 채 권한이 회수되면
+    /// 적용도 되돌리기도 못 하고, 이탈 차단 때문에 창도 못 닫는다. 되돌리기는 <b>지역 상태를 버리는 일</b>이라
+    /// 서버를 한 번도 부르지 않는다.
+    /// </remarks>
+    public bool CanRevert => !IsApplying && (_board.IsDirty || _board.CanUndo);
 
     /// <summary>적용을 누를 수 있는가 — 고아가 있으면 막힌다.</summary>
     public bool CanApply => CanEdit && HasMapping && _board.IsDirty && !_blocked && !IsApplying;
@@ -830,6 +843,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public async Task RevertAsync()
     {
         if (!CanRevert) return;
+
         Detail.Tracker.Clear();
         await LoadBoardAsync();
         Detail.Settle("변경을 되돌렸습니다.");

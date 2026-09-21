@@ -176,7 +176,7 @@ public class MappingWarningsTests
 
         var warnings = MappingWarnings.For(current, new[] { current, twin }, new MappingBoard(), null);
 
-        Assert.Contains(warnings, w => w.Text.Contains("동시에 실행"));
+        Assert.Contains(warnings, w => w.Text.Contains("함께 실행"));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class MappingWarningsTests
 
         var warnings = MappingWarnings.For(current, new[] { current, other }, new MappingBoard(), null);
 
-        Assert.DoesNotContain(warnings, w => w.Text.Contains("동시에 실행"));
+        Assert.DoesNotContain(warnings, w => w.Text.Contains("함께 실행"));
     }
 
     [Fact]
