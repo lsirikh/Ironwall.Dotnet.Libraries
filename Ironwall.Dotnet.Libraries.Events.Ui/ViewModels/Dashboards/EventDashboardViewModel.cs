@@ -464,10 +464,13 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>빈 목록의 제목 — 거르기 때문인지 원래 없는지를 가른다.</summary>
     public string EmptyStateTitle => IsFiltered ? "조건에 맞는 이벤트가 없습니다" : "표시할 이벤트가 없습니다";
 
-    /// <summary>빈 목록에서 다음에 할 일.</summary>
+    /// <summary>
+    /// 빈 목록에서 다음에 할 일. 한 줄로 끝나게 짧게 쓴다 —
+    /// WPF 는 한글을 음절 단위로 끊어, 긴 문장은 마지막 줄에 음절 하나만 남긴다.
+    /// </summary>
     public string EmptyStateHint => IsFiltered
-        ? "검색어를 지우거나 위의 거르기를 [전체] 로 되돌려 보세요."
-        : "기간을 넓히거나 [갱신] 을 눌러 다시 불러옵니다.";
+        ? "검색어를 지우거나 거르기를 [전체] 로"
+        : "기간을 넓히거나 [갱신] 을 눌러 보세요";
 
     /// <summary>목록 상태 한 벌 — 건수 줄과 빈 칸 안내는 늘 같은 순간에 바뀐다.</summary>
     private void RaiseListState()

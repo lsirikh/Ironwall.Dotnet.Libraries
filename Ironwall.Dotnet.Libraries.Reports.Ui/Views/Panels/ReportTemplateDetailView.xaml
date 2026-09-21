@@ -17,10 +17,6 @@
 	-->
 	<UserControl.Resources>
 		<ResourceDictionary>
-		<ResourceDictionary.MergedDictionaries>
-			<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Reports.Ui;component/Views/Panels/ReportStyles.xaml" />
-		</ResourceDictionary.MergedDictionaries>
-
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
 		<Style x:Key="Form.TextBox" TargetType="TextBox">
@@ -100,7 +96,7 @@
 						Content="▼"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding EditViewModel.CanEdit}"
-						Style="{StaticResource ConsoleMiniButton}"
+						Style="{StaticResource Console.Button.Mini}"
 						ToolTip="고른 줄을 아래로 (Alt+↓)" />
 					<Button
 						Margin="4,0,0,0"
@@ -109,7 +105,7 @@
 						Content="▲"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding EditViewModel.CanEdit}"
-						Style="{StaticResource ConsoleMiniButton}"
+						Style="{StaticResource Console.Button.Mini}"
 						ToolTip="고른 줄을 위로 (Alt+↑)" />
 					<TextBlock
 						VerticalAlignment="Center"
@@ -156,7 +152,8 @@
 									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="{Binding AutomationId}"
 									DockPanel.Dock="Left"
-									IsChecked="{Binding IsEnabled}" />
+									IsChecked="{Binding IsEnabled}"
+									Style="{StaticResource Console.CheckBox}" />
 								<TextBlock
 									MinWidth="52"
 									Margin="8,0,0,0"

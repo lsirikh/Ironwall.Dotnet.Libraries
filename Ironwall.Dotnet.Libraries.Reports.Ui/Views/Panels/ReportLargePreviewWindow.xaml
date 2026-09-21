@@ -16,13 +16,6 @@
 		  같은 최상위 창 안에서는 WPF 를 그 위에 못 그린다 — 창을 나누는 것이 공역 문제의 근본 회피책이다.
 		  크기 기준은 목업의 다이얼로그 폭 사다리(S400 / M560 / L720)보다 큰 탐지 신호 이력(880) 을 따랐다.
 	-->
-	<Window.Resources>
-		<ResourceDictionary>
-		<ResourceDictionary.MergedDictionaries>
-			<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Reports.Ui;component/Views/Panels/ReportStyles.xaml" />
-		</ResourceDictionary.MergedDictionaries>
-		</ResourceDictionary>
-	</Window.Resources>
 
 	<Grid>
 		<Grid.RowDefinitions>
@@ -42,28 +35,28 @@
 					Click="OnClose"
 					Content="닫기"
 					DockPanel.Dock="Right"
-					Style="{StaticResource ModernTextButton}" />
+					Style="{StaticResource Console.Button.Ghost}" />
 				<Button
 					Margin="0,0,6,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.ZoomResetButton"
 					Click="OnZoomReset"
 					Content="100%"
 					DockPanel.Dock="Right"
-					Style="{StaticResource ConsoleMiniButton}" />
+					Style="{StaticResource Console.Button.Mini}" />
 				<Button
 					Margin="0,0,4,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.ZoomInButton"
 					Click="OnZoomIn"
 					Content="＋"
 					DockPanel.Dock="Right"
-					Style="{StaticResource ConsoleMiniButton}" />
+					Style="{StaticResource Console.Button.Mini}" />
 				<Button
 					Margin="0,0,4,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.ZoomOutButton"
 					Click="OnZoomOut"
 					Content="−"
 					DockPanel.Dock="Right"
-					Style="{StaticResource ConsoleMiniButton}" />
+					Style="{StaticResource Console.Button.Mini}" />
 				<TextBlock
 					VerticalAlignment="Center"
 					AutomationProperties.AutomationId="Reports.LargePreview.TitleText"

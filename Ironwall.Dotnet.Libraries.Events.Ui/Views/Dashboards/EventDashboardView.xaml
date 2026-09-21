@@ -168,38 +168,42 @@
 		</Style>
 
 		<!--
-			조치 배지 — 커널 Console.Pill 위에 상태 색만 얹는다. 폭을 고정하지 않는다:
+			조치 배지 — 커널 Console.Pill.{변형} 그대로. 폭을 고정하지 않는다:
 			92 폭 열 안의 고정 배지가 "조치 있음" 의 마지막 글자를 제 테두리로 잘라 먹고 있었다.
+			★ 글자에 Foreground 를 다시 쓰지 않는다 — 지역 값이 커널의 상속 TextElement.Foreground 를
+			  이겨 버려 대비 보정이 그 자리에서만 무효가 된다. 뜻은 점과 테두리(형태)가 나른다.
 		-->
 		<Style
 			x:Key="ActionPill"
-			BasedOn="{StaticResource Console.Pill}"
+			BasedOn="{StaticResource Console.Pill.Warning}"
 			TargetType="Border">
-			<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
 			<Style.Triggers>
 				<DataTrigger Binding="{Binding IsActionReported}" Value="True">
-					<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+					<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style
+			x:Key="ActionPillDot"
+			BasedOn="{StaticResource Console.Pill.Dot}"
+			TargetType="Ellipse">
+			<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsActionReported}" Value="True">
+					<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
 				</DataTrigger>
 			</Style.Triggers>
 		</Style>
 
 		<Style x:Key="ActionPillText" TargetType="TextBlock">
 			<Setter Property="VerticalAlignment" Value="Center" />
-			<Setter Property="FontSize" Value="11.5" />
-			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 			<Setter Property="Text" Value="미조치" />
 			<Style.Triggers>
 				<DataTrigger Binding="{Binding IsActionReported}" Value="True">
 					<Setter Property="Text" Value="조치 있음" />
 				</DataTrigger>
 			</Style.Triggers>
-		</Style>
-
-		<!--  빈 목록 — 0.0% 잉크(아무것도 없는 칸)는 "못 불러온 것"과 구별되지 않는다. 아이콘 + 제목 + 안내.  -->
-		<Style x:Key="ConsoleEmptyState" TargetType="StackPanel">
-			<Setter Property="MaxWidth" Value="320" />
-			<Setter Property="HorizontalAlignment" Value="Center" />
-			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
 	</UserControl.Resources>
 
@@ -308,11 +312,11 @@
 
 					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁘 동안만 뜨다  -->
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Console.Events.Toolbar.CancelQuery"
 						Click="OnCancelQuery"
 						Content="중단"
-						Style="{StaticResource ModernSecondaryButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="진행 중인 조회를 멈춥니다"
 						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}" />
 					<Button
@@ -320,7 +324,7 @@
 						Click="OnQueueSelection"
 						Content="{Binding QueueButtonText}"
 						IsEnabled="{Binding CanQueueSelection}"
-						Style="{StaticResource ModernPrimaryButton}"
+						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="고른 이벤트를 조치 트레이에 담습니다 — 행 손잡이를 끌어 놓아도 같습니다"
 						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
 					</StackPanel>
@@ -401,13 +405,16 @@
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
 						<DataGridTemplateColumn
-							Width="96"
+							Width="120"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Border Style="{StaticResource ActionPill}">
-										<TextBlock Style="{StaticResource ActionPillText}" />
+										<StackPanel Orientation="Horizontal">
+											<Ellipse Style="{StaticResource ActionPillDot}" />
+											<TextBlock Style="{StaticResource ActionPillText}" />
+										</StackPanel>
 									</Border>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
@@ -497,13 +504,16 @@
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
 						<DataGridTemplateColumn
-							Width="96"
+							Width="120"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Border Style="{StaticResource ActionPill}">
-										<TextBlock Style="{StaticResource ActionPillText}" />
+										<StackPanel Orientation="Horizontal">
+											<Ellipse Style="{StaticResource ActionPillDot}" />
+											<TextBlock Style="{StaticResource ActionPillText}" />
+										</StackPanel>
 									</Border>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
@@ -529,7 +539,7 @@
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="사유" />
 						<!--  고장 구간 = 제어기 루프 위의 지점(정수)이지 시각이 아니다  -->
-						<DataGridTemplateColumn Width="136" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="고장 구간">
+						<DataGridTemplateColumn Width="124" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="고장 구간">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<TextBlock
@@ -655,35 +665,11 @@
 					빈 목록 — 본문을 정말 비워 두지 않는다. 아무것도 없는 칸은 "한 건도 없다" 와
 					"못 불러왔다" 를 구별해 주지 못하고, 바닥의 30px 상태 줄 하나로는 모자랐다.
 				-->
-				<StackPanel
+				<c:ConsoleEmptyState
 					AutomationProperties.AutomationId="Console.Events.List.EmptyState"
-					Style="{StaticResource ConsoleEmptyState}"
-					Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVis}}">
-					<md:PackIcon
-						Width="40"
-						Height="40"
-						HorizontalAlignment="Center"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Kind="InboxOutline" />
-					<TextBlock
-						Margin="0,12,0,0"
-						HorizontalAlignment="Center"
-						AutomationProperties.AutomationId="Console.Events.List.EmptyState.Title"
-						FontSize="14"
-						FontWeight="SemiBold"
-						Foreground="{DynamicResource TextSecondaryBrush}"
-						Text="{Binding EmptyStateTitle}"
-						TextAlignment="Center"
-						TextWrapping="Wrap" />
-					<TextBlock
-						Margin="0,6,0,0"
-						HorizontalAlignment="Center"
-						FontSize="12"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="{Binding EmptyStateHint}"
-						TextAlignment="Center"
-						TextWrapping="Wrap" />
-				</StackPanel>
+					Hint="{Binding EmptyStateHint}"
+					Title="{Binding EmptyStateTitle}"
+					Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVis}}" />
 			</Grid>
 			</DockPanel>
 		</c:ConsoleShell.List>

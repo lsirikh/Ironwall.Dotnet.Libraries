@@ -59,7 +59,7 @@
 			HorizontalScrollBarVisibility="Disabled"
 			VerticalScrollBarVisibility="Auto">
 			<ScrollViewer.Style>
-				<Style TargetType="ScrollViewer">
+				<Style BasedOn="{StaticResource Console.ScrollViewer}" TargetType="ScrollViewer">
 					<Setter Property="Visibility" Value="Collapsed" />
 					<Style.Triggers>
 						<MultiDataTrigger>

@@ -77,7 +77,9 @@ public static class ReportPreviewSurfaceRules
     public const string LargeViewHint = "그 창을 닫으면 미리보기가 이 자리로 돌아옵니다";
     public const string OverlayReason = "확인 창이 열려 있는 동안 미리보기를 잠시 내렸습니다";
     public const string OverlayHint = "미리보기가 네이티브 창이라 확인 창을 가리기 때문입니다";
-    public const string NarrowReason = "창이 좁아 미리보기를 이 자리에 그릴 수 없습니다";
+    // 짧게 둔다 — WPF 는 한글을 음절 단위로 끊으므로, 좁은 칸에서 긴 문장은 마지막 줄에
+    // 음절 하나만 남긴다(접힘 900 에서 "…없습니 / 다" 로 갈라졌다).
+    public const string NarrowReason = "창이 좁아 여기서는 미리보기를 못 그립니다";
     public const string NarrowHint = "[크게 보기] 를 누르면 큰 창으로 봅니다";
     public const string InProgressReason = "아직 만들어지는 중입니다";
     public const string InProgressHint = "아래 진행 상황이 단계와 퍼센트를 보여 줍니다";

@@ -13,10 +13,6 @@
 	-->
 	<UserControl.Resources>
 		<ResourceDictionary>
-		<ResourceDictionary.MergedDictionaries>
-			<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Reports.Ui;component/Views/Panels/ReportStyles.xaml" />
-		</ResourceDictionary.MergedDictionaries>
-
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
 		<Style x:Key="MetaLabel" TargetType="TextBlock">
@@ -66,7 +62,7 @@
 						Click="OnZoomOut"
 						Content="−"
 						DockPanel.Dock="Left"
-						Style="{StaticResource ConsoleMiniButton}"
+						Style="{StaticResource Console.Button.Mini}"
 						ToolTip="축소" />
 					<TextBlock
 						MinWidth="46"
@@ -84,7 +80,7 @@
 						Click="OnZoomIn"
 						Content="＋"
 						DockPanel.Dock="Left"
-						Style="{StaticResource ConsoleMiniButton}"
+						Style="{StaticResource Console.Button.Mini}"
 						ToolTip="확대" />
 					<Button
 						Margin="8,0,0,0"
@@ -92,7 +88,7 @@
 						Click="OnZoomReset"
 						Content="100%"
 						DockPanel.Dock="Left"
-						Style="{StaticResource ConsoleMiniButton}"
+						Style="{StaticResource Console.Button.Mini}"
 						ToolTip="원본 크기" />
 				</DockPanel>
 			</StackPanel>
@@ -177,7 +173,7 @@
 						Click="OnLargeView"
 						Content="크게 보기"
 						IsEnabled="{Binding PreviewViewModel.CanOpenLargeView}"
-						Style="{StaticResource ConsolePrimaryButton}"
+						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="별도 창으로 크게 봅니다" />
 					<Button
 						Margin="0,0,6,6"
@@ -185,7 +181,7 @@
 						Click="OnDownloadPdf"
 						Content="PDF 내려받기"
 						IsEnabled="{Binding CanDownloadPdf}"
-						Style="{StaticResource ModernSecondaryButton}" />
+						Style="{StaticResource Console.Button}" />
 					<ComboBox
 						Width="92"
 						Margin="0,0,6,6"
@@ -202,7 +198,7 @@
 						Click="OnDownloadCsv"
 						Content="상세 CSV"
 						IsEnabled="{Binding CanDownloadPdf}"
-						Style="{StaticResource ModernSecondaryButton}" />
+						Style="{StaticResource Console.Button}" />
 				</WrapPanel>
 
 				<!--  결과 안내는 팝업이 아니라 인라인 — WebView2 가 팝업을 가린다(L1290)  -->
@@ -227,21 +223,21 @@
 						Click="OnCancelGeneration"
 						Content="생성 취소"
 						IsEnabled="{Binding CanCancelGeneration}"
-						Style="{StaticResource ModernSecondaryButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="대기 · 생성중인 보고서만 취소할 수 있습니다" />
 					<Button
 						AutomationProperties.AutomationId="Reports.List.DeleteButton"
 						Click="OnDeleteGeneration"
 						Content="삭제"
 						IsEnabled="{Binding CanDeleteGeneration}"
-						Style="{StaticResource ModernSecondaryButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="보고서 기록과 PDF 파일을 지웁니다" />
 				</WrapPanel>
 				<TextBlock
 					Margin="0,6,0,0"
 					FontSize="11"
 					Foreground="{DynamicResource TextMutedBrush}"
-					Text="누르면 확인 창이 먼저 뜹니다. 그동안 미리보기는 잠시 내려갑니다."
+					Text="확인 창이 먼저 뜹니다. 그동안 미리보기는 내려갑니다."
 					TextWrapping="Wrap" />
 			</StackPanel>
 		</c:ConsoleSection>

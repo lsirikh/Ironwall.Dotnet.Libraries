@@ -166,8 +166,8 @@
 								Margin="0,0,12,4"
 								AutomationProperties.AutomationId="{Binding Value, StringFormat=Reports.Create.Severity.{0}}"
 								Content="{Binding Display}"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								IsChecked="{Binding IsSelected}" />
+								IsChecked="{Binding IsSelected}"
+								Style="{StaticResource Console.CheckBox}" />
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
