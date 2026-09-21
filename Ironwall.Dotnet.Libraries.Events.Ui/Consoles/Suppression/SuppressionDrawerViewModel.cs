@@ -148,6 +148,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     private void Load(SuppressionDraft draft)
     {
         _draft = draft;
+        _windowStartText = _windowEndText = _dailyStartText = _dailyEndText = null;
         _openedSignature = Signature(draft);
 
         SyncChips(Tray, draft.Targets);
@@ -320,24 +321,61 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         ? string.Empty
         : "수정 요청에는 반복 칸이 없습니다 — 반복을 바꾸려면 새 스케줄을 만드세요.";
 
-    /// <summary>유효기간 시작 * — 피커가 <see cref="DateTime"/> 을 쓰므로 offset 은 초안이 보존한다.</summary>
-    public DateTime WindowStart
+    /// <summary>
+    /// 유효기간 시작 * — <b>글자로 받는다</b>(<c>yyyy-MM-dd HH:mm</c>).
+    /// </summary>
+    /// <remarks>
+    /// MahApps 피커를 쓰지 않는 이유가 둘 있다. ① 다크에서 <b>흰 카드에 검은 글자</b>로 떠 테마를 따르지 않았고
+    /// (측정: 값 대비 1.40:1) ② 머신 로캘 표기(<c>9/20/2026 2:30:00 PM</c>)가 바로 아래 요약 줄 · 목록 열과
+    /// 달라, "유효기간 (KST)" 라고 적힌 폼 안에서 시각이 세 얼굴을 했다. 표기는 하나여야 한다.
+    /// <para>읽을 수 없는 글자는 <b>버리지 않는다</b> — 그대로 두고 저장을 막는다(고쳐 쓸 수 있어야 한다).</para>
+    /// </remarks>
+    public string WindowStartText
     {
-        get => _draft.WindowStart.DateTime;
-        set { _draft.WindowStart = WithOffset(value, _draft.WindowStart.Offset); RaiseAll(); }
-    }
-
-    /// <summary>유효기간 끝. 무제한이면 의미가 없다.</summary>
-    public DateTime WindowEnd
-    {
-        get => (_draft.WindowEnd ?? _draft.WindowStart.AddHours(1)).DateTime;
+        get => _windowStartText ?? SuppressionTimeText.Format(_draft.WindowStart);
         set
         {
-            var offset = _draft.WindowEnd?.Offset ?? _draft.WindowStart.Offset;
-            _draft.WindowEnd = WithOffset(value, offset);
+            _windowStartText = value;
+            if (SuppressionTimeText.TryParseDateTime(value, out var parsed))
+            {
+                _windowStartText = null;                 // 읽혔으면 초안이 정본이다
+                _draft.WindowStart = WithOffset(parsed, _draft.WindowStart.Offset);
+            }
             RaiseAll();
         }
     }
+
+    /// <summary>유효기간 끝. 무제한이면 의미가 없다.</summary>
+    public string WindowEndText
+    {
+        get => _windowEndText ?? SuppressionTimeText.Format(_draft.WindowEnd ?? _draft.WindowStart.AddHours(1));
+        set
+        {
+            _windowEndText = value;
+            if (SuppressionTimeText.TryParseDateTime(value, out var parsed))
+            {
+                _windowEndText = null;
+                var offset = _draft.WindowEnd?.Offset ?? _draft.WindowStart.Offset;
+                _draft.WindowEnd = WithOffset(parsed, offset);
+            }
+            RaiseAll();
+        }
+    }
+
+    /// <summary>읽을 수 없는 시각 글자가 남아 있는가 — 그대로 저장하면 엉뚱한 시각이 나간다.</summary>
+    public bool HasUnreadableTime
+        => _windowStartText is not null || _windowEndText is not null
+           || _dailyStartText is not null || _dailyEndText is not null;
+
+    /// <summary>어느 칸이 읽히지 않았는지.</summary>
+    public string UnreadableTimeText => HasUnreadableTime
+        ? $"시각을 읽을 수 없습니다 — {SuppressionTimeText.DateTimeHint} 형식으로 적으세요."
+        : string.Empty;
+
+    private string? _windowStartText;
+    private string? _windowEndText;
+    private string? _dailyStartText;
+    private string? _dailyEndText;
 
     /// <summary>"기간 제한 없음" — <b>주간 반복에서만</b> 켤 수 있다.</summary>
     public bool IsUnlimited
@@ -370,18 +408,28 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     public bool IsSatChecked { get => Day(5); set => SetDay(5, value); }
     public bool IsSunChecked { get => Day(6); set => SetDay(6, value); }
 
-    /// <summary>일일 시작 * — 시각만 쓴다(offset 금지).</summary>
-    public DateTime DailyStart
+    /// <summary>일일 시작 * — 벽시계 <c>HH:mm</c>(offset 금지).</summary>
+    public string DailyStartText
     {
-        get => DateTime.Today.Add(_draft.DailyStart);
-        set { _draft.DailyStart = value.TimeOfDay; RaiseAll(); }
+        get => _dailyStartText ?? SuppressionTimeText.Format(_draft.DailyStart);
+        set
+        {
+            _dailyStartText = value;
+            if (SuppressionTimeText.TryParseTime(value, out var parsed)) { _dailyStartText = null; _draft.DailyStart = parsed; }
+            RaiseAll();
+        }
     }
 
     /// <summary>일일 끝 * — 시작보다 이르면 자정 넘김.</summary>
-    public DateTime DailyEnd
+    public string DailyEndText
     {
-        get => DateTime.Today.Add(_draft.DailyEnd);
-        set { _draft.DailyEnd = value.TimeOfDay; RaiseAll(); }
+        get => _dailyEndText ?? SuppressionTimeText.Format(_draft.DailyEnd);
+        set
+        {
+            _dailyEndText = value;
+            if (SuppressionTimeText.TryParseTime(value, out var parsed)) { _dailyEndText = null; _draft.DailyEnd = parsed; }
+            RaiseAll();
+        }
     }
 
     /// <summary>요약 한 줄 — 전송될 내용을 그대로 옮긴다(SB L2877).</summary>
@@ -496,7 +544,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     public bool IsDirty => Signature(_draft) != _openedSignature;
 
     /// <summary>[저장] 을 켤 것인가.</summary>
-    public bool CanSave => _canEdit() && !_isSaving && !IsScopeUnknown && Verdict.CanSave && (IsDirty || IsNew);
+    public bool CanSave => _canEdit() && !_isSaving && !IsScopeUnknown && !HasUnreadableTime && Verdict.CanSave && (IsDirty || IsNew);
 
     /// <summary>[되돌리기] 를 켤 것인가.</summary>
     public bool CanRevert => !_isSaving && IsDirty;
@@ -532,6 +580,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
             StatusLine = !_canEdit()
                 ? "이벤트 편집 권한(events:edit)이 없습니다."
                 : IsScopeUnknown ? UnknownScopeText
+                : HasUnreadableTime ? UnreadableTimeText
                 : Verdict.CanSave ? "바뀐 것이 없습니다." : Verdict.FirstErrorText;
             ShakeToken++;
             return;

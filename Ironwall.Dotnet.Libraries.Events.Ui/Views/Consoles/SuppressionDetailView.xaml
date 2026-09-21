@@ -205,26 +205,11 @@
 						TextWrapping="Wrap" />
 				</Border>
 
-				<!--  동작 (SB L2739) — 수정은 서랍을 열고, 취소 예약은 확인 팝업을 먼저 띄운다  -->
-				<StackPanel Margin="0,16,0,0">
-					<Button
-						Padding="0,5"
-						AutomationProperties.AutomationId="Console.Suppression.Detail.EditButton"
-						Click="OnEdit"
-						Content="수정"
-						IsEnabled="{Binding CanEditSelected}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
-						ToolTip="같은 창 안 780 서랍에서 고칩니다" />
-					<Button
-						Margin="0,8,0,0"
-						Padding="0,5"
-						AutomationProperties.AutomationId="Console.Suppression.Detail.CancelButton"
-						Click="OnCancel"
-						Content="취소 예약"
-						IsEnabled="{Binding CanCancelSelected}"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
-						ToolTip="이 억제 창을 취소합니다 — 이력(revoked_at)은 남습니다" />
-				</StackPanel>
+				<!--
+					동작(SB L2739)은 커널 ConsoleDetailHost 의 <b>적용 막대</b>에 있다 —
+					[수정] = Apply · [취소 예약] = Revert. 다른 콘솔과 같은 자리이고,
+					상세 본문에 전폭 버튼 더미를 쌓지 않는다.
+				-->
 			</StackPanel>
 		</ScrollViewer>
 	</Grid>

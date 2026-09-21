@@ -107,8 +107,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             new SuppressionFilterOption(SuppressionStatusView.FilterPending, "예정"),
             // 정리(일괄 하드삭제)의 대상은 취소 · 종료 행뿐이다 — 그 둘을 부를 길이 없으면
             // [모두 정리] 가 '화면에 실린 것' 만 덮는다(옛 억제창의 상태 콤보에는 있던 값이다).
-            new SuppressionFilterOption(SuppressionStatusView.FilterExpired, "종료"),
-            new SuppressionFilterOption(SuppressionStatusView.FilterCancelled, "취소"),
+            new SuppressionFilterOption(SuppressionStatusView.FilterTerminal, "종료·취소"),
         };
         SyncFilterChips();
 
@@ -592,7 +591,10 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     /// <summary>[취소·종료 모두 정리].</summary>
     public bool CanCleanupAll => _canDelete() && Schedules.Any(s => s.IsDeletable);
 
-    public string CleanupText => $"모두 정리 ({Schedules.Count(s => s.IsDeletable)})";
+    /// <summary>
+    /// [정리] 버튼 글자. 칩이 여섯이라 툴바가 빡빡하다 — 짧게 쓰고 무엇을 지우는지는 ToolTip 이 말한다.
+    /// </summary>
+    public string CleanupText => $"정리 ({Schedules.Count(s => s.IsDeletable)})";
 
     public async Task CleanupAllAsync()
     {

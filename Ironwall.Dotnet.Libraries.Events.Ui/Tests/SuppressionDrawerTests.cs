@@ -307,7 +307,7 @@ public class SuppressionDrawerViewModelTests
         _drawer.IsWeekly = true;
 
         // 1시간짜리 유효기간에는 어떤 요일도 들어가지 않는다 — 서버가 422 로 막는 창이 된다.
-        Assert.True((_drawer.WindowEnd - _drawer.WindowStart).TotalDays >= 7);
+        Assert.True((_drawer.Draft.WindowEnd!.Value - _drawer.Draft.WindowStart).TotalDays >= 7);
         Assert.True(SuppressionRules.HasAnyDay(_drawer.DaysOfWeekMask));
     }
 
@@ -548,6 +548,105 @@ public class SuppressionDrawerViewModelTests
         Assert.DoesNotContain("10.20.30.40", thrower.StatusLine);
         Assert.DoesNotContain("8000", thrower.StatusLine);
         Assert.NotNull(logged);                       // 사라지지는 않는다 — 로그에는 남는다
+    }
+
+    #endregion
+
+    #region - 시각 입력 (V2: 표기 하나로 · 읽을 수 없으면 버리지 않는다) -
+
+    [Theory]
+    [InlineData("2026-09-20 09:00", 2026, 9, 20, 9, 0)]
+    [InlineData("2026-9-2 9:05", 2026, 9, 2, 9, 5)]
+    [InlineData("2026/09/20 09:00", 2026, 9, 20, 9, 0)]
+    [InlineData("  2026-09-20 09:00  ", 2026, 9, 20, 9, 0)]
+    public void should_read_a_date_time_in_the_one_format(string text, int y, int mo, int d, int h, int mi)
+    {
+        Assert.True(SuppressionTimeText.TryParseDateTime(text, out var value));
+        Assert.Equal(new DateTime(y, mo, d, h, mi, 0), value);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("내일 아침")]
+    public void should_refuse_a_date_time_it_cannot_read(string? text)
+        => Assert.False(SuppressionTimeText.TryParseDateTime(text, out _));
+
+    [Theory]
+    [InlineData("08:00", 8, 0)]
+    [InlineData("8:5", 8, 5)]
+    [InlineData("0830", 8, 30)]
+    [InlineData("23:59", 23, 59)]
+    public void should_read_a_wall_clock_time(string text, int h, int m)
+    {
+        Assert.True(SuppressionTimeText.TryParseTime(text, out var value));
+        Assert.Equal(new TimeSpan(h, m, 0), value);
+    }
+
+    [Theory]
+    [InlineData("24:00")]
+    [InlineData("2560")]
+    [InlineData("아침")]
+    public void should_refuse_a_time_it_cannot_read(string text)
+        => Assert.False(SuppressionTimeText.TryParseTime(text, out _));
+
+    [Fact]
+    public void should_round_trip_the_one_format()
+    {
+        var at = new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.FromHours(9));
+
+        Assert.Equal("2026-09-20 09:00", SuppressionTimeText.Format(at));
+        Assert.True(SuppressionTimeText.TryParseDateTime(SuppressionTimeText.Format(at), out var back));
+        Assert.Equal(at.DateTime, back);
+    }
+
+    [Fact]
+    public void should_keep_unreadable_text_instead_of_discarding_it()
+    {
+        _drawer.OpenNew();
+
+        _drawer.WindowEndText = "내일 아침";
+
+        // 지우면 고쳐 쓸 수 없고, 그대로 보내면 엉뚱한 시각이 나간다 — 두고 막는다.
+        Assert.Equal("내일 아침", _drawer.WindowEndText);
+        Assert.True(_drawer.HasUnreadableTime);
+        Assert.False(_drawer.CanSave);
+    }
+
+    [Fact]
+    public async Task should_not_save_while_a_time_is_unreadable()
+    {
+        FillValidNew();
+        _drawer.WindowEndText = "???";
+
+        await _drawer.SaveAsync();
+
+        Assert.Empty(_saved);
+        Assert.Contains("시각을 읽을 수 없습니다", _drawer.StatusLine);
+    }
+
+    [Fact]
+    public void should_recover_once_the_time_becomes_readable()
+    {
+        _drawer.OpenNew();
+        _drawer.WindowEndText = "???";
+        Assert.True(_drawer.HasUnreadableTime);
+
+        _drawer.WindowEndText = "2026-09-21 18:00";
+
+        Assert.False(_drawer.HasUnreadableTime);
+        Assert.Equal(new DateTime(2026, 9, 21, 18, 0, 0), _drawer.Draft.WindowEnd!.Value.DateTime);
+    }
+
+    [Fact]
+    public void should_drop_unreadable_text_when_another_draft_is_loaded()
+    {
+        _drawer.OpenNew();
+        _drawer.WindowEndText = "???";
+        _drawer.Revert();
+
+        Assert.False(_drawer.HasUnreadableTime);
     }
 
     #endregion

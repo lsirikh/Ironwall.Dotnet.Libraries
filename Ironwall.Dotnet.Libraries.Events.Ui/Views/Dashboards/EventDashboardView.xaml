@@ -195,7 +195,7 @@
 							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Cleanup"
 							Click="OnSuppressionCleanup"
 							Content="{Binding Suppression.CleanupText}"
-							FontSize="12"
+							FontSize="11.5"
 							IsEnabled="{Binding Suppression.CanCleanupAll}"
 							Style="{StaticResource MaterialDesignOutlinedButton}"
 							ToolTip="목록의 취소 · 종료 항목을 모두 지웁니다 — 되돌릴 수 없습니다"
@@ -545,11 +545,17 @@
 
 				<!--  억제 스케줄 상세 (정본 SB L2734-2740) — 동작은 상세 안에 있다([수정] [취소 예약])  -->
 				<c:ConsoleDetailHost
+					ApplyClick="OnSuppressionEdit"
+					ApplyText="수정"
+					CanApply="{Binding Suppression.CanEditSelected}"
+					CanRevert="{Binding Suppression.CanCancelSelected}"
 					ConsoleKey="Suppression"
 					DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
 					FooterText="{Binding Suppression.StatusText}"
 					Kind="{Binding Suppression.DetailKind}"
-					ShowButtons="False"
+					RevertClick="OnSuppressionCancelBooking"
+					RevertText="취소 예약"
+					ShowButtons="{Binding Suppression.HasSelection}"
 					ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 					Title="{Binding Suppression.DetailTitle}"
 					Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}">

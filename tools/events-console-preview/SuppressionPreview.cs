@@ -5,8 +5,10 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -229,11 +231,32 @@ internal static class SuppressionShots
         // 6) 미적용 변경 — 저장이 켜져 있고 되돌리기가 살아 있다
         await save("06-drawer-dirty");
 
-        // 7) 드롭 불가 — '전체 대상' 으로 바꾸면 개별 대상을 담을 수 없다
+        // 7) 드롭존이 실제로 '가능 / 불가' 로 보이는 모습 — 커널이 끌기 중에 매기는 상태를 그대로 세운다.
+        //    (State 는 붙임 속성이라 SetValue 로 세울 수 있다 — 끌지 않고도 그 그림을 찍을 수 있다.)
+        var zone = FindByAutomationId(window, "Console.Suppression.Tray.DropZone");
+        if (zone is not null)
+        {
+            zone.SetValue(DropZone.StateProperty, DropZoneState.Available);
+            await settle(260);
+            await save("07a-drop-available");
+
+            zone.SetValue(DropZone.StateProperty, DropZoneState.Hover);
+            await settle(260);
+            await save("07b-drop-hover");
+
+            zone.SetValue(DropZone.StateProperty, DropZoneState.Blocked);
+            await settle(260);
+            await save("07c-drop-blocked");
+
+            zone.SetValue(DropZone.StateProperty, DropZoneState.None);
+            await settle(160);
+        }
+
+        // 7d) '전체 대상' — 트레이 · 픽커가 통째로 사라지고 까닭이 뜬다
         drawer.TargetType = SuppressionTargetDrop.ModeAll;
         drawer.AddSelected(new object[] { new SuppressionTargetChip(SuppressionTargetKind.Device, 301, "SEN-1301") });
         await settle(320);
-        await save("07-drawer-drop-blocked");
+        await save("07d-all-target");
 
         // 8) 오류 — 대상이 없는 장비 스케줄
         drawer.TargetType = SuppressionTargetDrop.ModeDevice;
@@ -244,6 +267,13 @@ internal static class SuppressionShots
         drawer.TryClose();
         await settle(400);
         await save("09-drawer-close-blocked");
+
+        // 9b) 읽을 수 없는 시각 — 글자를 버리지 않고 그대로 두고 저장만 막는다
+        drawer.WindowEndText = "내일 아침";
+        await settle(300);
+        await save("09b-drawer-bad-time");
+        drawer.WindowEndText = SuppressionTimeText.Format(drawer.Draft.WindowStart.AddHours(6));
+        await settle(200);
 
         // 10) 주간 반복 — 요일 칩 · 일일 시각 · 요약 한 줄
         drawer.AddSelected(drawer.PickerItems.Take(2).Cast<object>().ToList());
@@ -278,6 +308,16 @@ internal static class SuppressionShots
         console.Selected = console.Schedules.FirstOrDefault(s => s.Id == 9);
         await settle(320);
         await save("14-list-delete-armed");
+    }
+
+    /// <summary>자동화 식별자로 요소를 찾는다(시각 트리).</summary>
+    private static FrameworkElement? FindByAutomationId(DependencyObject root, string id)
+    {
+        if (root is FrameworkElement fe && (string?)fe.GetValue(AutomationProperties.AutomationIdProperty) == id) return fe;
+        var n = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < n; i++)
+            if (FindByAutomationId(VisualTreeHelper.GetChild(root, i), id) is { } hit) return hit;
+        return null;
     }
 
     /// <summary>레일이 실제로 섰는지 — 미리보기가 조용히 빈 화면을 찍는 것을 막는다.</summary>

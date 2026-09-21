@@ -73,7 +73,10 @@
 			</DataGridTemplateColumn>
 
 			<!--  상태 — 색이 아니라 '형태 + 글자'. 라이트에서 Primary · Selection 이 대비 1.00:1 로 같다.  -->
-			<DataGridTemplateColumn Width="84" Header="상태">
+			<DataGridTemplateColumn
+				Width="78"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
+				Header="상태">
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
 						<StackPanel Orientation="Horizontal" ToolTip="{Binding OccurrenceText}">
@@ -98,8 +101,9 @@
 
 			<DataGridTextColumn
 				Width="*"
-				MinWidth="120"
+				MinWidth="170"
 				Binding="{Binding Name}"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="작업명">
 				<DataGridTextColumn.ElementStyle>
 					<Style TargetType="TextBlock">
@@ -110,8 +114,9 @@
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="116"
+				Width="104"
 				Binding="{Binding TargetSummary}"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="대상">
 				<DataGridTextColumn.ElementStyle>
 					<Style TargetType="TextBlock">
@@ -122,8 +127,9 @@
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="84"
+				Width="76"
 				Binding="{Binding ScopeDetailText}"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="범위">
 				<DataGridTextColumn.ElementStyle>
 					<Style TargetType="TextBlock">
@@ -133,21 +139,28 @@
 				</DataGridTextColumn.ElementStyle>
 			</DataGridTextColumn>
 
-			<DataGridTemplateColumn Width="104" Header="반복">
+			<DataGridTemplateColumn
+				Width="92"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
+				Header="반복">
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
 						<StackPanel VerticalAlignment="Center">
 							<TextBlock
 								AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowRepeat.{0}}"
-								FontSize="12"
+								FontSize="11.5"
 								Foreground="{DynamicResource TextSecondaryBrush}"
+								LineHeight="14"
+								LineStackingStrategy="BlockLineHeight"
 								Text="{Binding RepeatText}"
 								ToolTip="{Binding RepeatText}"
 								TextTrimming="CharacterEllipsis" />
 							<TextBlock
 								AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowOccurrence.{0}}"
-								FontSize="11"
+								FontSize="10.5"
 								Foreground="{DynamicResource TextMutedBrush}"
+								LineHeight="13"
+								LineStackingStrategy="BlockLineHeight"
 								Text="{Binding OccurrenceText}"
 								TextTrimming="CharacterEllipsis" />
 						</StackPanel>
@@ -155,7 +168,10 @@
 				</DataGridTemplateColumn.CellTemplate>
 			</DataGridTemplateColumn>
 
-			<DataGridTemplateColumn Width="102" Header="시작(KST)">
+			<DataGridTemplateColumn
+				Width="98"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
+				Header="시작(KST)">
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
 						<TextBlock
@@ -169,7 +185,10 @@
 				</DataGridTemplateColumn.CellTemplate>
 			</DataGridTemplateColumn>
 
-			<DataGridTemplateColumn Width="102" Header="종료(KST)">
+			<DataGridTemplateColumn
+				Width="98"
+				CellStyle="{StaticResource Console.DataGrid.Cell}"
+				Header="종료(KST)">
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
 						<TextBlock

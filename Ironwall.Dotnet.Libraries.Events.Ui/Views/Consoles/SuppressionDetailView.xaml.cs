@@ -1,5 +1,4 @@
 ﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
-using System.Windows;
 using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles;
@@ -14,7 +13,5 @@ public partial class SuppressionDetailView : UserControl
 
     private SuppressionConsoleViewModel? Model => DataContext as SuppressionConsoleViewModel;
 
-    private void OnEdit(object sender, RoutedEventArgs e) => _ = Model?.EditSelectedAsync();
-
-    private void OnCancel(object sender, RoutedEventArgs e) => _ = Model?.CancelSelectedAsync();
+    // 동작 버튼은 커널 적용 막대로 옮겼다 — 배선은 EventDashboardView 가 한다.
 }

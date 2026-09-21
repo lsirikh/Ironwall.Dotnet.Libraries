@@ -277,6 +277,7 @@ public class SuppressionStatusViewTests
     [InlineData(SuppressionStatusView.FilterPending, "pending")]
     [InlineData(SuppressionStatusView.FilterExpired, "expired")]
     [InlineData(SuppressionStatusView.FilterCancelled, "cancelled")]
+    [InlineData(SuppressionStatusView.FilterTerminal, null)]
     [InlineData(SuppressionStatusView.FilterSuppressing, "active")]
     public void should_translate_the_chip_to_a_server_status(string key, string? expected)
         => Assert.Equal(expected, SuppressionStatusView.ServerStatusFor(key));
@@ -289,8 +290,7 @@ public class SuppressionStatusViewTests
         var chips = new[]
         {
             SuppressionStatusView.FilterSuppressing, SuppressionStatusView.FilterActive,
-            SuppressionStatusView.FilterPending, SuppressionStatusView.FilterExpired,
-            SuppressionStatusView.FilterCancelled,
+            SuppressionStatusView.FilterPending, SuppressionStatusView.FilterTerminal,
         };
 
         foreach (var shape in System.Enum.GetValues<SuppressionStatusShape>())

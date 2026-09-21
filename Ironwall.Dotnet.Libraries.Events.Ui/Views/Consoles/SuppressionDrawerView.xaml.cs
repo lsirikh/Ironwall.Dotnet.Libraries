@@ -217,10 +217,18 @@ public sealed class DrawerWidthConverter : IValueConverter
     /// <summary>좁을 때 남기는 왼쪽 여백 — 뒤의 목록이 '있다'는 것이 보여야 한다.</summary>
     public const double MinimumGutter = 24;
 
+    /// <summary>
+    /// 좁을 때 남기는 <b>비율</b> — 서랍의 존재 이유는 "뒤의 목록이 계속 보인다" 는 것이다.
+    /// <para>고정 여백 24 로만 깎으면 900 폭에서 목록이 <b>16px</b> 만 남아(실측) 모달과 다를 바가 없었다.
+    /// 폭에 비례해 깎으면 좁을수록 목록이 더 남는다. 1084 이상에서는 확정 폭 780 이 이긴다.</para>
+    /// </summary>
+    public const double GutterRatio = 0.28;
+
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         var available = value is double d && d > 0 ? d : Preferred + MinimumGutter;
-        return Math.Max(280, Math.Min(Preferred, available - MinimumGutter));
+        var gutter = Math.Max(MinimumGutter, available * GutterRatio);
+        return Math.Max(280, Math.Min(Preferred, available - gutter));
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

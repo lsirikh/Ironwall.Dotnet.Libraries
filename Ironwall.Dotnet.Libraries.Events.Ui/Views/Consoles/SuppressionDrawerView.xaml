@@ -12,8 +12,7 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	AutomationProperties.AutomationId="Console.Suppression.Drawer"
 	Focusable="True"
-	PreviewKeyDown="OnPreviewKeyDown"
-	Visibility="{Binding IsOpen, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+	PreviewKeyDown="OnPreviewKeyDown">
 	<!--
 		억제 편집 서랍 — 정본 window-layout-system-storyboard.html
 		L738-742(.slide CSS: 오른쪽 · width min(780px,94%) · 머리 44 / 본문 / 바닥 3단) ·
@@ -65,6 +64,37 @@
 			</Setter>
 		</Style>
 
+		<!--
+			비활성 버튼 임시 보정 — 라이트에서는 흐린 흰 글자가 연한 바탕에 얹혀 읽히지 않고,
+			다크에서는 비활성이 활성과 같은 단색 청록으로 떴다. 커널이 Console.Button* 을
+			Theme/Themes/Styles.Console.xaml 로 승격하면 이 스타일을 지우고 그것을 쓴다(중복 정의 금지).
+		-->
+		<Style
+			x:Key="LocalPrimaryButton"
+			BasedOn="{StaticResource MaterialDesignRaisedButton}"
+			TargetType="Button">
+			<Style.Triggers>
+				<Trigger Property="IsEnabled" Value="False">
+					<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+					<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+					<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="Opacity" Value="1" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style
+			x:Key="LocalGhostButton"
+			BasedOn="{StaticResource MaterialDesignFlatButton}"
+			TargetType="Button">
+			<Style.Triggers>
+				<Trigger Property="IsEnabled" Value="False">
+					<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="Opacity" Value="1" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+
 		<!--  칸 제목 (SB .bx 의 라벨)  -->
 		<Style x:Key="BoxLabel" TargetType="TextBlock">
 			<Setter Property="FontSize" Value="12.5" />
@@ -75,6 +105,22 @@
 
 	<!--  '열림' 은 UserControl 의 Visibility 로 낸다 — 그래야 UIA 트리에 서랍이 '있다/없다' 로 보인다.
 	      (Border 는 peer 가 없어 앵커가 되지 못하고, 늘 보이는 UserControl 은 '열림' 을 뜻하지 못한다.)  -->
+	<!--
+		'열림' 은 이 UserControl 의 Visibility 로 낸다 — 그래야 UIA 트리에 서랍이 '있다/없다' 로 보인다.
+		⚠ Root 요소의 속성에서는 <c>StaticResource</c> 가 자기 Resources 를 아직 못 본다(파싱 순서) —
+		   그래서 컨버터가 아니라 Style 의 DataTrigger 로 쓴다. 기본값 Collapsed 라 주입이 없어도 화면을 덮지 않는다.
+	-->
+	<UserControl.Style>
+		<Style TargetType="UserControl">
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsOpen}" Value="True">
+					<Setter Property="Visibility" Value="Visible" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+	</UserControl.Style>
+
 	<Grid>
 
 		<!--  스크림 — 누르면 닫기를 '시도' 한다(미적용 변경이 있으면 막힌다)  -->
@@ -86,6 +132,7 @@
 		<!--  서랍 본체 — 오른쪽에 붙는다. 폭 min(780, 창폭 − 24)  -->
 		<Border
 			HorizontalAlignment="Right"
+			TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
 			KeyboardNavigation.ControlTabNavigation="Cycle"
 			KeyboardNavigation.DirectionalNavigation="Contained"
 			KeyboardNavigation.TabNavigation="Cycle"
@@ -147,10 +194,11 @@
 					VerticalScrollBarVisibility="Auto">
 					<!--  MDIX 암시 ScrollViewer 스타일이 Padding 을 삼킨다 — 안쪽 패널에 여백을 준다  -->
 					<Grid Margin="16">
+						<!--  두 칸 다 비례로 줄인다 — 오른쪽을 340 에 고정하면 좁은 폭에서 왼쪽 폼(요일 칩 일곱)이 잘린다  -->
 						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="*" MinWidth="0" />
+							<ColumnDefinition Width="1.05*" MinWidth="0" />
 							<ColumnDefinition Width="18" />
-							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="0" />
 						</Grid.ColumnDefinitions>
 
 						<!--  왼쪽 칸 — 일정  -->
@@ -160,7 +208,9 @@
 							<TextBox
 								Height="32"
 								AutomationProperties.AutomationId="Console.Suppression.Form.Name"
+								CaretBrush="{DynamicResource TextPrimaryBrush}"
 								FontSize="13"
+								Foreground="{DynamicResource TextPrimaryBrush}"
 								Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								VerticalContentAlignment="Center" />
 
@@ -178,6 +228,7 @@
 									Height="32"
 									AutomationProperties.AutomationId="Console.Suppression.Form.TargetType"
 									FontSize="13"
+									Foreground="{DynamicResource TextPrimaryBrush}"
 									SelectedValue="{Binding TargetType, Mode=TwoWay}"
 									SelectedValuePath="Tag">
 									<ComboBoxItem
@@ -198,6 +249,7 @@
 									Height="32"
 									AutomationProperties.AutomationId="Console.Suppression.Form.EventScope"
 									FontSize="13"
+									Foreground="{DynamicResource TextPrimaryBrush}"
 									SelectedValue="{Binding EventScope, Mode=TwoWay}"
 									SelectedValuePath="Tag">
 									<ComboBoxItem Content="전체" Tag="all" />
@@ -220,6 +272,7 @@
 									Height="32"
 									AutomationProperties.AutomationId="Console.Suppression.Form.TargetSide"
 									FontSize="13"
+									Foreground="{DynamicResource TextPrimaryBrush}"
 									SelectedValue="{Binding TargetSide, Mode=TwoWay}"
 									SelectedValuePath="Tag">
 									<ComboBoxItem Content="감지 + 감시" Tag="both" />
@@ -267,12 +320,16 @@
 									<ColumnDefinition Width="Auto" />
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
-								<mah:DateTimePicker
-									MinHeight="36"
-									mah:TextBoxHelper.Watermark=""
+								<TextBox
+									Height="32"
+									md:HintAssist.Hint="YYYY-MM-DD HH:MM"
 									AutomationProperties.AutomationId="Console.Suppression.Form.WindowStart"
+									CaretBrush="{DynamicResource TextPrimaryBrush}"
+									FontFamily="{DynamicResource MonoFont}"
 									FontSize="12.5"
-									SelectedDateTime="{Binding WindowStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding WindowStartText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+									VerticalContentAlignment="Center" />
 								<TextBlock
 									Grid.Column="1"
 									Margin="8,0"
@@ -280,12 +337,16 @@
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="~" />
 								<Grid Grid.Column="2">
-									<mah:DateTimePicker
-										MinHeight="36"
-										mah:TextBoxHelper.Watermark=""
+									<TextBox
+										Height="32"
+										md:HintAssist.Hint="YYYY-MM-DD HH:MM"
 										AutomationProperties.AutomationId="Console.Suppression.Form.WindowEnd"
+										CaretBrush="{DynamicResource TextPrimaryBrush}"
+										FontFamily="{DynamicResource MonoFont}"
 										FontSize="12.5"
-										SelectedDateTime="{Binding WindowEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding WindowEndText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+										VerticalContentAlignment="Center"
 										Visibility="{Binding IsUnlimited, Converter={StaticResource NotBoolToVis}}" />
 									<Border
 										MinHeight="36"
@@ -377,27 +438,35 @@
 										<ColumnDefinition Width="Auto" />
 										<ColumnDefinition Width="*" />
 									</Grid.ColumnDefinitions>
-									<mah:TimePicker
-										MinHeight="36"
-										mah:TextBoxHelper.Watermark=""
+									<TextBox
+										Height="32"
+										md:HintAssist.Hint="HH:MM"
 										AutomationProperties.AutomationId="Console.Suppression.Form.DailyStart"
+										CaretBrush="{DynamicResource TextPrimaryBrush}"
+										FontFamily="{DynamicResource MonoFont}"
 										FontSize="12.5"
+										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsEnabled="{Binding CanEditRecurrence}"
-										SelectedDateTime="{Binding DailyStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+										Text="{Binding DailyStartText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+										VerticalContentAlignment="Center" />
 									<TextBlock
 										Grid.Column="1"
 										Margin="8,0"
 										VerticalAlignment="Center"
 										Foreground="{DynamicResource TextMutedBrush}"
 										Text="–" />
-									<mah:TimePicker
+									<TextBox
 										Grid.Column="2"
-										MinHeight="36"
-										mah:TextBoxHelper.Watermark=""
+										Height="32"
+										md:HintAssist.Hint="HH:MM"
 										AutomationProperties.AutomationId="Console.Suppression.Form.DailyEnd"
+										CaretBrush="{DynamicResource TextPrimaryBrush}"
+										FontFamily="{DynamicResource MonoFont}"
 										FontSize="12.5"
+										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsEnabled="{Binding CanEditRecurrence}"
-										SelectedDateTime="{Binding DailyEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+										Text="{Binding DailyEndText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+										VerticalContentAlignment="Center" />
 								</Grid>
 							</StackPanel>
 
@@ -415,6 +484,26 @@
 									Text="{Binding RecapText}"
 									TextWrapping="Wrap" />
 							</Border>
+
+							<!--  읽을 수 없는 시각 글자 — 지우지 않고 그대로 두고 저장만 막는다  -->
+							<DockPanel
+								Margin="0,10,0,0"
+								LastChildFill="True"
+								Visibility="{Binding HasUnreadableTime, Converter={StaticResource BoolToVis}}">
+								<md:PackIcon
+									Width="15"
+									Height="15"
+									Margin="0,1,5,0"
+									DockPanel.Dock="Left"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Kind="ClockAlertOutline" />
+								<TextBlock
+									AutomationProperties.AutomationId="Console.Suppression.Form.UnreadableTime"
+									FontSize="12"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="{Binding UnreadableTimeText}"
+									TextWrapping="Wrap" />
+							</DockPanel>
 
 							<!--  화면이 모르는 억제 범위 — 값을 지어내지 않고 그대로 보이고 저장을 막는다  -->
 							<DockPanel
@@ -476,7 +565,7 @@
 						</StackPanel>
 
 						<!--  오른쪽 칸 — 대상 칩 트레이 + 픽커(끌어 오는 곳)  -->
-						<StackPanel Grid.Column="2" Width="340">
+						<StackPanel Grid.Column="2" MaxWidth="340">
 							<StackPanel Visibility="{Binding AcceptsTargets, Converter={StaticResource BoolToVis}}">
 							<DockPanel LastChildFill="False">
 								<TextBlock
@@ -512,6 +601,16 @@
 								CornerRadius="6"
 								IsEnabled="{Binding AcceptsTargets}">
 								<Grid>
+									<!--  쉴 때도 '놓는 자리' 가 보여야 한다(정본 .trayb 는 파선 테두리다).
+									      파선 {4,3}·{5,3} 은 그룹 선택 박스 · 러버밴드에 이미 배정돼 있어 {2,2} 를 쓴다.  -->
+									<Rectangle
+										RadiusX="6"
+										RadiusY="6"
+										Fill="{DynamicResource SurfaceSunkenBrush}"
+										IsHitTestVisible="False"
+										Stroke="{DynamicResource DividerBrush}"
+										StrokeDashArray="2,2"
+										StrokeThickness="1" />
 									<ListBox
 										Padding="8"
 										AutomationProperties.AutomationId="Console.Suppression.Tray"
@@ -619,7 +718,9 @@
 										Margin="8,0,0,0"
 										md:HintAssist.Hint="이름 검색"
 										AutomationProperties.AutomationId="Console.Suppression.Picker.Search"
+										CaretBrush="{DynamicResource TextPrimaryBrush}"
 										FontSize="12"
+										Foreground="{DynamicResource TextPrimaryBrush}"
 										Text="{Binding PickerSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 										VerticalContentAlignment="Center" />
 								</DockPanel>
@@ -714,7 +815,7 @@
 								Click="OnRevert"
 								Content="되돌리기"
 								IsEnabled="{Binding CanRevert}"
-								Style="{StaticResource MaterialDesignFlatButton}"
+								Style="{StaticResource LocalGhostButton}"
 								ToolTip="연 시점으로 되돌립니다 — 서버 호출 0" />
 							<Button
 								Margin="0,0,8,0"
@@ -729,7 +830,7 @@
 								Click="OnSave"
 								Content="저장"
 								IsEnabled="{Binding CanSave}"
-								Style="{StaticResource MaterialDesignRaisedButton}"
+								Style="{StaticResource LocalPrimaryButton}"
 								ToolTip="서버를 한 번 부릅니다 — 대상이 몇 개든 요청은 하나입니다" />
 						</StackPanel>
 					</Grid>
