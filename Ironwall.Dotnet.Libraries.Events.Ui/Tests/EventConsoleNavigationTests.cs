@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Detail;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
@@ -68,6 +69,9 @@ public class EventConsoleNavigationTests : IDisposable
             new EventInfoViewModel(_devices, _events, providerService, ea, log),
             new CameraEventInfoViewModel(_events, ea, log),
             new DataChartPanelViewModel(ea, log, providerService));
+
+        // 스레드 전환을 없앤다 — 전역 Dispatcher 에 기대면 헤드리스에서 동작이 갈려 간헐 실패한다.
+        _console.UseUiThread(ImmediateUiThread.Instance);
     }
 
     public void Dispose()
@@ -137,6 +141,34 @@ public class EventConsoleNavigationTests : IDisposable
 
         Assert.NotNull(_console.Rows);
         Assert.Contains(added, _console.Rows!.Cast<object>());
+    }
+
+    [Fact]
+    public async Task should_not_leave_a_view_attached_to_a_rail_that_was_left()
+    {
+        // ★ 간헐 실패의 진짜 기제: 기본 뷰(GetDefaultView)는 콜렉션마다 전역 캐시되고 띆 수가 없어,
+        //   레일을 떠난 뒤에도 패널 목록에 매달려 남았다. 그 패널이 다른 스레드에서
+        //   목록을 비우면 CollectionView 가 NotSupportedException 으로 터졌다.
+        //   이제는 자기 ListCollectionView 를 만들고 떠날 때 DetachFromSourceCollection() 한다.
+        await Activate();
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+
+        var left = _console.DetectionPanelViewModel.ViewModelProvider;
+        await _console.SelectRailAsync(EventDashboardViewModel.MalfunctionRailKey);
+
+        // 떠난 레일의 목록을 다른 스레드에서 비우고 다시 채운다 — 매달린 뷰가 있으면 여기서 터진다.
+        var fault = await Task.Run(() =>
+        {
+            try
+            {
+                left.Clear();
+                left.Add(new DetectionEventViewModel(TestEvents.Detection(777)));
+                return (Exception?)null;
+            }
+            catch (Exception ex) { return ex; }
+        });
+
+        Assert.Null(fault);
     }
 
     [Fact]
