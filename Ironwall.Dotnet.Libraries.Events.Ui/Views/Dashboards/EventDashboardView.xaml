@@ -163,7 +163,7 @@
 				<c:ConsoleToolbar.Extra>
 					<StackPanel Orientation="Horizontal">
 
-					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁘 동안만 뜨다  -->
+					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁜 동안만 뜬다  -->
 					<Button
 						Margin="0,0,6,0"
 						AutomationProperties.AutomationId="Console.Events.Toolbar.CancelQuery"
@@ -172,6 +172,15 @@
 						Style="{StaticResource MaterialDesignOutlinedButton}"
 						ToolTip="진행 중인 조회를 멈춥니다"
 						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}" />
+					<!--  N-13 mapping workbench — 창으로 연다(3-Pane 은 1280 폭이 필요해 이 콘솔 안에 들어가지 않는다).  -->
+					<Button
+						Margin="0,0,8,0"
+						AutomationProperties.AutomationId="Console.Events.Toolbar.Mapping"
+						Click="OnOpenMappingWorkbench"
+						Content="이벤트 맵핑"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="이벤트가 났을 때 움직일 카메라 · 스피커 · 경광등을 정합니다"
+						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
 					<Button
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
 						Click="OnQueueSelection"
