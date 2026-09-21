@@ -276,6 +276,12 @@ public partial class DeviceDashboardView : UserControl
         if (ViewModel is { } vm) await vm.OpenWiringAsync();
     }
 
+    // N-05: 장비 배정 창.
+    private async void OnOpenDeviceAssign(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.OpenDeviceAssignAsync();
+    }
+
     private async void OnEditComponents(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.EditComponentsAsync();

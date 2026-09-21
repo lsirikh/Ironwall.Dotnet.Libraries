@@ -3,6 +3,7 @@ using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 
+/// <summary>예 · 아니오. ESC · Enter · 첫 포커스는 틀(<c>ConsoleDialogFrame</c>)이 정한다.</summary>
 public partial class ConfirmPromptView : UserControl
 {
     public ConfirmPromptView()
@@ -14,19 +15,11 @@ public partial class ConfirmPromptView : UserControl
 
     private async void OnAccept(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.AcceptAsync();
+        try { if (ViewModel is { } vm) await vm.AcceptAsync(); } catch { /* 창을 닫는 것 말고 할 일이 없다 */ }
     }
 
     private async void OnCancel(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.CancelAsync();
-    }
-
-    // Esc = 취소. 단추의 IsCancel 에 맡기지 않는다 — IsCancel 은 창을 닫고, 클릭 처리기도 닫아 두 번 닫게 된다.
-    private async void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key != System.Windows.Input.Key.Escape || ViewModel is not { } vm) return;
-        e.Handled = true;
-        await vm.CancelAsync();
+        try { if (ViewModel is { } vm) await vm.CancelAsync(); } catch { /* 같다 */ }
     }
 }

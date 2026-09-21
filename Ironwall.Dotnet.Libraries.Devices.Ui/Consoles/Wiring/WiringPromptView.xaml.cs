@@ -1,9 +1,9 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 
+/// <summary>확인 · 저장 미리보기. ESC · Enter · 첫 포커스는 틀(<c>ConsoleDialogFrame</c>)이 정한다.</summary>
 public partial class WiringPromptView : UserControl
 {
     public WiringPromptView()
@@ -15,19 +15,11 @@ public partial class WiringPromptView : UserControl
 
     private async void OnConfirm(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.ConfirmAsync();
+        try { if (ViewModel is { } vm) await vm.ConfirmAsync(); } catch { /* 창을 닫는 것 말고 할 일이 없다 */ }
     }
 
     private async void OnCancel(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.CancelAsync();
-    }
-
-    // Esc = 취소. 단추의 IsCancel 에 맡기지 않는다 — IsCancel 이 창을 닫고 처리기도 닫아 두 번 닫는다.
-    private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape || ViewModel is not { } vm) return;
-        e.Handled = true;
-        await vm.CancelAsync();
+        try { if (ViewModel is { } vm) await vm.CancelAsync(); } catch { /* 같다 */ }
     }
 }

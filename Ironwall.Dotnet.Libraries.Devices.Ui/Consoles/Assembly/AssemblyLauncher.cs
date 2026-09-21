@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -96,7 +97,7 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
     {
         if (!IsAvailable) return null;
         var vm = NewRegister(category, null);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(980, 680, resizable: true));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Large), 660, resizable: true));
         return vm.RegisteredDeviceId;
     }
 
@@ -114,7 +115,7 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
             }
             catch (Exception ex) { _log?.Error($"[Assembly] 프리셋을 조립기로 열지 못했다 — {ex.Message}"); }
         };
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(720, 560, resizable: true));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Large), 560, resizable: true));
     }
     #endregion
 
@@ -122,28 +123,28 @@ public sealed class AssemblyLauncher : IAssemblyLauncher, IAssemblyDialogs
     public async Task<bool> ConfirmAsync(string title, string message)
     {
         var vm = new ConfirmPromptViewModel(title, message);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(440, 240, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Small), 260, resizable: false));
         return vm.Result;
     }
 
     public async Task<string?> AskTextAsync(string title, string label, string initial)
     {
         var vm = new TextPromptViewModel(title, label, initial);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(440, 210, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Small), 240, resizable: false));
         return vm.Result;
     }
 
     public async Task<RepeatExpandSpec?> AskRepeatExpandAsync(IReadOnlyList<PaletteItemViewModel> palette, PaletteItemViewModel? preselected, IReadOnlyCollection<string> existingKeys)
     {
         var vm = new RepeatExpandViewModel(palette, preselected, existingKeys);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(440, 600, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Small), 620, resizable: false));
         return vm.Result;
     }
 
     public async Task<int?> OpenRegisterAsync(DevicePreset preset)
     {
         var vm = NewRegister(preset.Category, preset);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(980, 680, resizable: true));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Large), 660, resizable: true));
         return vm.RegisteredDeviceId;
     }
     #endregion

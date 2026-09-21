@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -173,21 +174,21 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     public async Task<bool> ConfirmAsync(string title, string message)
     {
         var vm = new WiringPromptViewModel(title, message);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(520, 340, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Small), 360, resizable: false));
         return vm.Result;
     }
 
     public async Task<string?> AskTextAsync(string title, string label, string initial)
     {
         var vm = new WiringTextPromptViewModel(title, label, initial);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(440, 220, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Small), 260, resizable: false));
         return vm.Result;
     }
 
     public async Task<MakeSensorsResult?> AskMakeSensorsAsync(IReadOnlyList<string> types, string defaultType, string defaultZone, IReadOnlyCollection<int> existingNumbers, int suggestedStart)
     {
         var vm = new MakeSensorsViewModel(types, defaultType, defaultZone, existingNumbers, suggestedStart);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(520, 640, resizable: false));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Medium), 700, resizable: false));
         return vm.Result;
     }
 
@@ -195,7 +196,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     {
         // 열 매핑을 바꾸면 그 자리에서 다시 읽는다 — 다시 읽을 재료(이미 있는 번호 · 기본값)를 같이 넘긴다(W7).
         var vm = new PasteReportViewModel(report, _lastPasteNumbers, _lastPasteType, _lastPasteZone);
-        await _windows.ShowDialogAsync(vm, null, WindowSettings(640, 560, resizable: true));
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Medium), 680, resizable: true));
         return vm.Result;
     }
 

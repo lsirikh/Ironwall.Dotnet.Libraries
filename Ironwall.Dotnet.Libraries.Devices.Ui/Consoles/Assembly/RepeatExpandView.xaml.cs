@@ -3,6 +3,7 @@ using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 
+/// <summary>반복 펼치기. ESC · Enter · 첫 포커스는 틀(<c>ConsoleDialogFrame</c>)이 정한다.</summary>
 public partial class RepeatExpandView : UserControl
 {
     public RepeatExpandView()
@@ -14,19 +15,12 @@ public partial class RepeatExpandView : UserControl
 
     private async void OnExpand(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.ExpandAsync();
+        try { if (ViewModel is { } vm) await vm.ExpandAsync(); } catch { /* 창을 닫는 것 말고 할 일이 없다 */ }
     }
 
     private async void OnCancel(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { } vm) await vm.CancelAsync();
+        try { if (ViewModel is { } vm) await vm.CancelAsync(); } catch { /* 같다 */ }
     }
 
-    // Esc = 취소. 단추의 IsCancel 에 맡기지 않는다 — IsCancel 은 창을 닫고, 클릭 처리기도 닫아 두 번 닫게 된다.
-    private async void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key != System.Windows.Input.Key.Escape || ViewModel is not { } vm) return;
-        e.Handled = true;
-        await vm.CancelAsync();
-    }
 }

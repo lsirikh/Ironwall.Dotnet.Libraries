@@ -1,31 +1,27 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dialogs.EnclosureThresholdDialogView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:cal="http://www.caliburnproject.org"
-	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	d:DesignHeight="320"
-	d:DesignWidth="420"
-	mc:Ignorable="d">
-	<Grid Margin="16">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="*" />
-		</Grid.RowDefinitions>
-
-		<!--  Header  -->
-		<TextBlock
-			Grid.Row="0"
-			Margin="0,0,0,8"
-			FontSize="16"
-			FontWeight="Bold"
-			Text="{Binding DisplayName}" />
-
-		<!--  Tab items from Conductor.Collection  -->
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		T4 · M 560 (스토리보드 #h-dlg L1433-1435).
+		※ 지금 이 창을 여는 곳이 <b>없다</b> — N-02 가 장비 콘솔을 상세 칸으로 다시 쓰면서 이 창을 열던 뷰모델이 끊겼다.
+		  형(型)은 호스트 래퍼가 아직 참조하므로 지우지 않고, 틀만 가족 규격으로 맞춰 둔다(따라오기 문서 참고).
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Devices.EnclosureThreshold"
+		PrimaryText=""
+		SecondaryInvoked="OnClose"
+		SecondaryText="닫기"
+		Size="Medium"
+		Title="{Binding DisplayName}">
 		<TabControl
-			Grid.Row="1"
+			MinHeight="220"
 			ItemsSource="{Binding Items}"
 			SelectedItem="{Binding ActiveItem}"
 			Style="{StaticResource MaterialDesignTabControl}">
@@ -36,14 +32,11 @@
 			</TabControl.ItemTemplate>
 			<TabControl.ContentTemplate>
 				<DataTemplate>
-					<ScrollViewer
-						MaxHeight="400"
-						HorizontalScrollBarVisibility="Disabled"
-						VerticalScrollBarVisibility="Auto">
+					<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
 						<ContentControl cal:View.Model="{Binding}" />
 					</ScrollViewer>
 				</DataTemplate>
 			</TabControl.ContentTemplate>
 		</TabControl>
-	</Grid>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

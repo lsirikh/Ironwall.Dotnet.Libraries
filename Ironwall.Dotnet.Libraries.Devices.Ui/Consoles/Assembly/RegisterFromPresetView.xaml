@@ -4,11 +4,10 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:asm="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly"
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:pw="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
-	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
+	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--
 		프리셋으로 장비 만들기(device-assembly-preset FR-12 ~ FR-14). 정본 목업 L312-351.
 		왼쪽: 프리셋 고르기 + 프리셋이 담지 않는 개체 정보만. 오른쪽: 보낼 내용 — 이대로 나간다(POST 1건).
@@ -33,59 +32,27 @@
 		</Style>
 	</UserControl.Resources>
 
+	<!--  T4 · L 720. 머리 · 버튼 줄은 틀이 댄다 — 창이 제 머리를 또 그리지 않는다. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Devices.Assembly.Register"
+		IsPrimaryEnabled="{Binding CanRegister}"
+		Kind="프리셋이 구조를 대고 여기서는 그 장비만의 것(번호 · 이름 · 접속)을 넣는다 — 보내는 것은 POST 1건"
+		Message="{Binding Message}"
+		PrimaryAutomationId="Devices.Assembly.Register.Submit"
+		PrimaryInvoked="OnRegister"
+		PrimaryText="등록"
+		SecondaryAutomationId="Devices.Assembly.Register.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Large"
+		Title="프리셋으로 장비 만들기">
 	<DockPanel LastChildFill="True">
-		<Border
-			Padding="16,10"
-			BorderBrush="{DynamicResource DividerBrush}"
-			BorderThickness="0,0,0,1"
-			DockPanel.Dock="Top">
-			<StackPanel>
-				<TextBlock
-					FontSize="15"
-					FontWeight="Bold"
-					Text="프리셋으로 장비 만들기" />
-				<TextBlock
-					Margin="0,2,0,0"
-					Style="{StaticResource Reg.Hint}"
-					Text="프리셋이 구조(부품 · 설정)를 대고, 여기서는 그 장비만의 것(번호 · 이름 · 접속)만 넣는다. 보내는 것은 POST 1건 — 실패하면 아무것도 만들어지지 않는다." />
-			</StackPanel>
-		</Border>
-
-		<Border
-			Padding="16,8"
-			Background="{DynamicResource SurfaceAltBrush}"
-			BorderBrush="{DynamicResource DividerBrush}"
-			BorderThickness="0,1,0,0"
-			DockPanel.Dock="Bottom">
-			<DockPanel LastChildFill="True">
-				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-					<Button
-						Margin="0,0,6,0"
-						AutomationProperties.AutomationId="Devices.Assembly.Register.Cancel"
-						Click="OnCancel"
-						Content="취소"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
-					<Button
-						MinWidth="96"
-						AutomationProperties.AutomationId="Devices.Assembly.Register.Submit"
-						IsDefault="True"
-						Click="OnRegister"
-						Content="등록"
-						IsEnabled="{Binding CanRegister}" />
-				</StackPanel>
-				<TextBlock
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Devices.Assembly.Register.Message"
-					FontSize="12.5"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="{Binding Message}"
-					TextWrapping="Wrap" />
-			</DockPanel>
-		</Border>
-
-		<Grid>
+		<Grid MinHeight="320">
 			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="420" />
+				<!--  L 720 안에서 왼쪽 폼과 오른쪽 미리보기가 같이 살아야 한다 — 폼을 좁혀 미리보기에 자리를 준다.  -->
+				<ColumnDefinition Width="330" />
 				<ColumnDefinition Width="*" />
 			</Grid.ColumnDefinitions>
 
@@ -244,4 +211,5 @@
 			</Border>
 		</Grid>
 	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

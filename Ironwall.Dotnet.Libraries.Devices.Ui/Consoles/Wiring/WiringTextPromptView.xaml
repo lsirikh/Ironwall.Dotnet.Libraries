@@ -2,36 +2,24 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringTextPromptView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	Background="{DynamicResource SurfaceBrush}"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
-	<DockPanel Margin="16,14" LastChildFill="True">
-		<StackPanel
-			Margin="0,12,0,0"
-			HorizontalAlignment="Right"
-			DockPanel.Dock="Bottom"
-			Orientation="Horizontal">
-			<Button
-				Margin="0,0,6,0"
-				AutomationProperties.AutomationId="Devices.Wiring.TextPrompt.Cancel"
-				Click="OnCancel"
-				Content="취소"
-				Style="{StaticResource MaterialDesignOutlinedButton}" />
-			<Button
-				MinWidth="88"
-				AutomationProperties.AutomationId="Devices.Wiring.TextPrompt.Accept"
-				Click="OnAccept"
-				Content="확인"
-				IsDefault="True" />
-		</StackPanel>
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  글 한 줄 묻기 — T4 · S 400. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Wiring.TextPrompt"
+		PrimaryAutomationId="Devices.Wiring.TextPrompt.Accept"
+		PrimaryInvoked="OnAccept"
+		PrimaryText="확인"
+		SecondaryAutomationId="Devices.Wiring.TextPrompt.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Small"
+		Title="{Binding Title}">
 		<StackPanel>
 			<TextBlock
-				FontSize="15"
-				FontWeight="Bold"
-				Text="{Binding Title}" />
-			<TextBlock
-				Margin="0,10,0,4"
+				Margin="0,0,0,6"
 				FontSize="12.5"
 				Foreground="{DynamicResource TextSecondaryBrush}"
 				Text="{Binding Label}"
@@ -49,5 +37,5 @@
 				Loaded="OnTextLoaded"
 				Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
 		</StackPanel>
-	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

@@ -126,6 +126,18 @@
 					ShowSearch="{Binding IsListVisible}">
 					<!--  조립기 · 프리셋 입구 — 부품 모델이 있는 서버(7.0+)에서만 보인다  -->
 					<c:ConsoleToolbar.Extra>
+						<StackPanel Orientation="Horizontal">
+						<!--  장비 배정 창(N-05) — 그룹 레일에서 그룹 하나를 골랐을 때만 눌린다. 6.3 서버에서도 쓴다.  -->
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Console.Devices.Toolbar.Assign"
+							Click="OnOpenDeviceAssign"
+							Content="장비 배정"
+							IsEnabled="{Binding CanOpenAssign}"
+							Style="{StaticResource MaterialDesignOutlinedButton}"
+							ToolTip="{Binding AssignBlockedReason}"
+							ToolTipService.ShowOnDisabled="True"
+							Visibility="{Binding IsGroupsRail, Converter={StaticResource BoolToVisibility}}" />
 						<StackPanel Orientation="Horizontal" Visibility="{Binding CanAssemble, Converter={StaticResource BoolToVisibility}}">
 							<Button
 								Margin="0,0,6,0"
@@ -154,7 +166,9 @@
 								Content="셋업 · 결선"
 								IsEnabled="{Binding CanOpenWiring}"
 								Style="{StaticResource MaterialDesignOutlinedButton}"
-								ToolTip="{Binding WiringBlockedReason}" />
+								ToolTip="{Binding WiringBlockedReason}"
+								ToolTipService.ShowOnDisabled="True" />
+						</StackPanel>
 						</StackPanel>
 					</c:ConsoleToolbar.Extra>
 				</c:ConsoleToolbar>

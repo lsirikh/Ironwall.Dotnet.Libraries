@@ -2,11 +2,10 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.PasteReportView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:wiring="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring"
-	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
+	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--
 		엑셀에서 붙여넣기(WS L368, L499 · WPF 메모 L371 "탭·줄바꿈 분해 → 열 매핑 미리보기 → Draft 행 생성").
 		버린 줄은 색만이 아니라 ✕ 표지와 흐린 글자로도 말한다(W6).
@@ -15,12 +14,21 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<wiring:PasteColumnTextConverter x:Key="ColumnText" />
 	</UserControl.Resources>
-	<DockPanel Margin="16,14" LastChildFill="True">
-		<TextBlock
-			DockPanel.Dock="Top"
-			FontSize="15"
-			FontWeight="Bold"
-			Text="엑셀에서 붙여넣기" />
+	<!--  T4 · M 560. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		BodyScroll="Disabled"
+		DialogKey="Devices.Wiring.Paste"
+		IsPrimaryEnabled="{Binding CanApply}"
+		PrimaryAutomationId="Devices.Wiring.Paste.Accept"
+		PrimaryInvoked="OnAccept"
+		PrimaryText="{Binding ApplyText}"
+		SecondaryAutomationId="Devices.Wiring.Paste.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Medium"
+		Title="엑셀에서 붙여넣기">
+	<DockPanel MinHeight="300" LastChildFill="True">
 		<TextBlock
 			Margin="0,6,0,0"
 			AutomationProperties.AutomationId="Devices.Wiring.Paste.Summary"
@@ -80,25 +88,6 @@
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
 		</Border>
-
-		<StackPanel
-			Margin="0,12,0,0"
-			HorizontalAlignment="Right"
-			DockPanel.Dock="Bottom"
-			Orientation="Horizontal">
-			<Button
-				Margin="0,0,6,0"
-				AutomationProperties.AutomationId="Devices.Wiring.Paste.Cancel"
-				Click="OnCancel"
-				Content="취소"
-				Style="{StaticResource MaterialDesignOutlinedButton}" />
-			<Button
-				MinWidth="110"
-				AutomationProperties.AutomationId="Devices.Wiring.Paste.Accept"
-				Click="OnAccept"
-				Content="{Binding ApplyText}"
-				IsEnabled="{Binding CanApply}" />
-		</StackPanel>
 
 		<!--  건너뛸 줄 — 아래에서부터 필요한 만큼만 차지한다(W8)  -->
 		<StackPanel
@@ -220,4 +209,5 @@
 			</Grid>
 		</Border>
 	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>

@@ -998,4 +998,9 @@
 			</Setter.Value>
 		</Setter>
 	</Style>
+
+	<!--  다이얼로그 가족 T4 (N-05) — 새 사전 하나로 들어온다. 이 줄 하나만 더한다.  -->
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Utils;component/Themes/Dialogs.xaml" />
+	</ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

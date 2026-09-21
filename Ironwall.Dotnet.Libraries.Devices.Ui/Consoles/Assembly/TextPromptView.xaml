@@ -2,37 +2,25 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.TextPromptView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	Background="{DynamicResource SurfaceBrush}"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	Foreground="{DynamicResource TextPrimaryBrush}"
-	PreviewKeyDown="OnPreviewKeyDown">
-	<DockPanel Margin="16,14" LastChildFill="True">
-		<StackPanel
-			Margin="0,12,0,0"
-			HorizontalAlignment="Right"
-			DockPanel.Dock="Bottom"
-			Orientation="Horizontal">
-			<Button
-				Margin="0,0,6,0"
-				AutomationProperties.AutomationId="Devices.Assembly.Prompt.Cancel"
-				Click="OnCancel"
-				Content="취소"
-				Style="{StaticResource MaterialDesignOutlinedButton}" />
-			<Button
-				MinWidth="88"
-				AutomationProperties.AutomationId="Devices.Assembly.Prompt.Accept"
-				IsDefault="True"
-				Click="OnAccept"
-				Content="확인"
-				IsEnabled="{Binding CanAccept}" />
-		</StackPanel>
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--  글 한 줄 묻기 — T4 · S 400. 옛 AutomationId 유지.  -->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Assembly.Prompt"
+		IsPrimaryEnabled="{Binding CanAccept}"
+		PrimaryAutomationId="Devices.Assembly.Prompt.Accept"
+		PrimaryInvoked="OnAccept"
+		PrimaryText="확인"
+		SecondaryAutomationId="Devices.Assembly.Prompt.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Small"
+		Title="{Binding DisplayName}">
 		<StackPanel>
 			<TextBlock
-				FontSize="15"
-				FontWeight="Bold"
-				Text="{Binding DisplayName}" />
-			<TextBlock
-				Margin="0,10,0,4"
+				Margin="0,0,0,6"
 				FontSize="12.5"
 				Foreground="{DynamicResource TextSecondaryBrush}"
 				Text="{Binding Label}" />
@@ -41,13 +29,13 @@
 				Padding="6,0"
 				VerticalContentAlignment="Center"
 				AutomationProperties.AutomationId="Devices.Assembly.Prompt.Text"
-				Loaded="OnTextLoaded"
 				Background="{DynamicResource SurfaceSunkenBrush}"
 				BorderBrush="{DynamicResource BorderBrush}"
 				CaretBrush="{DynamicResource TextPrimaryBrush}"
 				FontSize="13"
 				Foreground="{DynamicResource TextPrimaryBrush}"
+				Loaded="OnTextLoaded"
 				Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
 		</StackPanel>
-	</DockPanel>
+	</dlg:ConsoleDialogFrame>
 </UserControl>
