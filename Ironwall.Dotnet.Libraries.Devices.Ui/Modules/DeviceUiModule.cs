@@ -101,6 +101,10 @@ public class DeviceUiModule : Module
             builder.RegisterType<ControllerDeviceViewModel>().SingleInstance();
             builder.RegisterType<SensorDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<CameraDeviceViewModel>().SingleInstance();
+
+            // N-05 dialogs — 장비 배정 창(T4 · L 720)을 여는 입구. 창 뷰모델은 열 때마다 새로 만든다.
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.DeviceAssignLauncher>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.IDeviceAssignLauncher>().SingleInstance();
         }
         catch
         {

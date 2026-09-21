@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Groups;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists;
@@ -67,6 +68,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                                 , DeviceQueryPolicy? queryPolicy = null
                                 , Lazy<IAssemblyLauncher>? assemblyLauncher = null
                                 , Lazy<IWiringLauncher>? wiringLauncher = null
+                                , Lazy<IDeviceAssignLauncher>? assignLauncher = null
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
@@ -114,6 +116,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _catalogService = catalogService;
         _assemblyFactory = assemblyLauncher;
         _wiringFactory = wiringLauncher;
+        _assignFactory = assignLauncher;
 
         // 계약 판정은 한 곳에서 — 레일(부품으로 찾기를 낼지)과 그 조회 뷰모델이 서로 다른 정책을 보면 항목은 있는데 화면은 영영 빈다.
         // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
@@ -843,6 +846,59 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         else
             _selectAfterReload = null;
         RefreshToolbar();
+    }
+    #endregion
+
+    #region - Device assign dialog (N-05) -
+    /// <summary>그룹 레일에서 그룹 하나를 골랐을 때만 — 그 그룹의 소속을 고치는 창을 낸다.</summary>
+    public bool CanOpenAssign => _assign is not null && _railKey == GroupsRailKey && DevicePermissionGate.CanEdit()
+        && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    /// <summary>눌리지 않는 까닭 — 거절은 말없이 하지 않는다.</summary>
+    public string? AssignBlockedReason
+        => _assign is null ? "장비 배정 창을 열 수 없습니다."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : _railKey != GroupsRailKey ? "그룹 레일에서 그룹을 고르세요."
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.IsCreating ? "만들던 그룹을 먼저 저장하거나 취소하세요."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : Form.Rows.Count != 1 ? "그룹 하나를 고르세요."
+        : RowId(Form.Rows[0]) > 0 ? null
+        : "아직 저장되지 않은 그룹입니다 — 먼저 저장하세요.";
+
+    public async Task OpenDeviceAssignAsync()
+    {
+        if (!CanOpenAssign) return;
+        var row = Form.Rows[0];
+        var groupId = RowId(row);
+        if (groupId <= 0) return;
+
+        if (await _assign!.OpenAsync(groupId, RowText(row, "Name")))
+        {
+            StatusText = "그룹 소속을 저장했다";
+            if (_current?.Reload() != true) StatusText = "그룹 소속을 저장했다 — 목록은 [갱신] 으로 다시 읽으세요";
+            RefreshToolbar();
+        }
+    }
+
+    private readonly Lazy<IDeviceAssignLauncher>? _assignFactory;
+    private bool _assignFailed;
+
+    /// <summary>조립기 · 결선 입구와 같은 관용구 — 늦게 풀고, 못 만들면 그 입구만 감춘다.</summary>
+    private IDeviceAssignLauncher? _assign
+    {
+        get
+        {
+            if (_assignFactory is null || _assignFailed) return null;
+            try { return _assignFactory.Value; }
+            catch (Exception ex)
+            {
+                _assignFailed = true;
+                _log?.Error($"[DeviceConsole] 장비 배정 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                return null;
+            }
+        }
     }
     #endregion
 
