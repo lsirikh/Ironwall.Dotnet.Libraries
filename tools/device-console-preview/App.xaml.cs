@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
@@ -9,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System.IO;
@@ -303,6 +305,7 @@ public partial class App : Application
             await Shot($"units-{theme}-06-delete-blocked");
             console.DismissDeleteBlock();
 
+            // 끄는 쪽(장비)과 놓는 쪽(트리)이 한 화면에 같이 있어야 이 창의 대표 기능이 성립한다.
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
             await Shot($"units-{theme}-07-devices");
 
@@ -313,6 +316,26 @@ public partial class App : Application
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
             await Shot($"units-{theme}-09-adjacency-placeholder");
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_TREE);
+
+            // 막힌 드롭 — 같은 제대 위에 놓으려 하면 까닭이 상태 띠에 뜬다.
+            var moving = console.Rows.First(r => r.Code == "c0206");
+            var sameEchelon = console.Rows.First(r => r.Code == "c0205");
+            console.Drop.Drop(new object[] { moving }, new DropTarget(UnitDropRules.ZONE_PARENT, sameEchelon, -1));
+            await Shot($"units-{theme}-11-drop-blocked");
+
+            // 필터가 걸리면 평면이다 — 부모가 걸러진 자식이 허공에 들여쓰기되지 않는다.
+            console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon == EnumUnitEchelon.Company));
+            await Shot($"units-{theme}-12-filtered");
+            console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon is null));
+
+            // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
+            var wide = _window.Width;
+            _window.Width = 1150;
+            await Shot($"units-{theme}-13-drawer-1150");
+            _window.Width = 900;
+            await Shot($"units-{theme}-14-compact-900");
+            _window.Width = wide;
+            await Settle();
         }
 
         await Sweep("light");

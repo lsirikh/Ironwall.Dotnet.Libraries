@@ -49,6 +49,11 @@ public sealed class UnitNodeRowViewModel : PropertyChangedBase
     public int Depth => Node.Depth;
     public bool IsEnable => Node.IsEnable;
     public bool HasChildren => Node.HasChildren;
+
+    /// <summary>
+    /// 펼침 손잡이를 낼 것인가 — 평면(필터) 상태에서는 접었다 펴도 보이는 것이 없어 거짓 조작이 된다.
+    /// </summary>
+    public bool ShowExpander => HasChildren && !IsFlat;
     public bool IsOrphan => Node.IsOrphan;
     public EnumUnitEchelon? Echelon => Node.Echelon;
     public string EchelonText => UnitDropRules.EchelonTextOf(Node);
@@ -64,7 +69,7 @@ public sealed class UnitNodeRowViewModel : PropertyChangedBase
     public bool IsFlat
     {
         get => _isFlat;
-        set { if (_isFlat == value) return; _isFlat = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(Indent)); }
+        set { if (_isFlat == value) return; _isFlat = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(Indent)); NotifyOfPropertyChange(nameof(ShowExpander)); }
     }
 
     /// <summary>들여쓰기 — 단계당 16. 컨테이너에 로컬 값을 쓰지 않고 <b>내용</b>의 여백으로만 준다.</summary>
