@@ -44,7 +44,9 @@ public partial class App : Application
             _window = new Window
             {
                 Title = "보고서 콘솔 미리보기",
-                Width = 1320,
+                // ★ 1320 이면 바깥 여백(12×2) + 창 테두리를 빼고 셸이 1256 밖에 안 돼 늘 서랍(<1280)으로 찍혔다 —
+                //   도킹(세 칸이 나란한 기본 배치)을 한 번도 안 보여 주던 값이다. 1360 이면 셸이 1296 으로 도킹이다.
+                Width = 1360,
                 Height = 820,
                 Background = (Brush)FindResource("SurfaceBrush"),
                 Content = new Border { Margin = new Thickness(12), Child = _view },
@@ -199,7 +201,9 @@ public partial class App : Application
 
     private void Save(string directory, string name)
     {
-        var content = (FrameworkElement)_window.Content;
+        // ★ 바깥 여백을 두른 Border 가 아니라 콘솔 자체를 찍는다 — Border 를 찍으면 제 Margin 이 그림 안에
+        //   들어오면서 오른쪽·아래가 그만큼 잘려, 그림에서 잰 치수가 12px 씩 거짓말을 했다.
+        var content = (FrameworkElement)((Border)_window.Content).Child;
         var width = (int)System.Math.Ceiling(content.ActualWidth);
         var height = (int)System.Math.Ceiling(content.ActualHeight);
         if (width <= 0 || height <= 0) return;
@@ -209,7 +213,17 @@ public partial class App : Application
         using (var dc = visual.RenderOpen())
         {
             dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
+            // ★ Viewbox 를 절대 좌표로 못박는다 — 기본(RelativeToBoundingBox)이면 자식 경계가 요소보다
+            //   크거나 작을 때 Stretch.None 이 가운데로 맞추느라 그림이 몇 px 어긋나 찍힌다(치수 측정이 거짓말한다).
+            var source = new VisualBrush(content)
+            {
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top,
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(0, 0, width, height),
+            };
+            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
         }
         bitmap.Render(visual);
 

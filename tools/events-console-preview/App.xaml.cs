@@ -233,6 +233,12 @@ public partial class App : Application
         _viewModel.SearchText = "북측";
         await Settle();
         Save(directory, $"{theme}-06c-search");
+
+        // 6d) 아무것도 걸리지 않는 검색 — 빈 목록 본문을 볼 수 있는 유일한 상태다.
+        _viewModel.SearchText = "ZZZZ";
+        await Settle();
+        Save(directory, $"{theme}-06d-empty");
+
         _viewModel.SearchText = string.Empty;
         _viewModel.SelectFilterChip("all");
         await Settle();
@@ -319,7 +325,9 @@ public partial class App : Application
 
     private void Save(string directory, string name)
     {
-        var content = (FrameworkElement)_window.Content;
+        // ★ 바깥 여백을 두른 Border 가 아니라 콘솔 자체를 찍는다 — Border 를 찍으면 제 Margin 이 그림 안에
+        //   들어오면서 오른쪽·아래가 그만큼 잘려, 그림에서 잰 치수가 12px 씩 거짓말을 했다.
+        var content = (FrameworkElement)((Border)_window.Content).Child;
         var width = (int)Math.Ceiling(content.ActualWidth);
         var height = (int)Math.Ceiling(content.ActualHeight);
         if (width <= 0 || height <= 0) return;
@@ -329,7 +337,17 @@ public partial class App : Application
         using (var dc = visual.RenderOpen())
         {
             dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
+            // ★ Viewbox 를 절대 좌표로 못박는다 — 기본(RelativeToBoundingBox)이면 자식 경계가 요소보다
+            //   크거나 작을 때 Stretch.None 이 가운데로 맞추느라 그림이 몇 px 어긋나 찍힌다(치수 측정이 거짓말한다).
+            var source = new VisualBrush(content)
+            {
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top,
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(0, 0, width, height),
+            };
+            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
         }
         bitmap.Render(visual);
 
