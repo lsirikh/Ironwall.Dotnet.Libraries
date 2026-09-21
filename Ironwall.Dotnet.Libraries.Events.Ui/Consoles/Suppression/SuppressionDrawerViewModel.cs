@@ -43,6 +43,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     private readonly Func<SuppressionDraft, CancellationToken, Task<SuppressionSaveOutcome>> _save;
     private readonly Func<bool> _canEdit;
     private readonly Func<IReadOnlyList<EventSuppressionScheduleDto>> _others;
+    private readonly Action<string, Exception>? _onError;
 
     private SuppressionDraft _draft;
     private string _openedSignature = string.Empty;
@@ -57,7 +58,8 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
                                       DeviceGroupProvider? groups,
                                       Func<SuppressionDraft, CancellationToken, Task<SuppressionSaveOutcome>> save,
                                       Func<bool>? canEdit = null,
-                                      Func<IReadOnlyList<EventSuppressionScheduleDto>>? others = null)
+                                      Func<IReadOnlyList<EventSuppressionScheduleDto>>? others = null,
+                                      Action<string, Exception>? onError = null)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _devices = devices;
@@ -65,6 +67,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         _save = save ?? throw new ArgumentNullException(nameof(save));
         _canEdit = canEdit ?? (() => true);
         _others = others ?? (() => Array.Empty<EventSuppressionScheduleDto>());
+        _onError = onError;
 
         _draft = SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now));
         Tray = new ObservableCollection<SuppressionTargetChip>();
@@ -217,12 +220,32 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <summary>개별 대상을 담는 유형인가 — 트레이 · 픽커 표시 조건.</summary>
     public bool AcceptsTargets => SuppressionTargetDrop.AcceptsTargets(TargetType);
 
-    /// <summary>억제 범위 * — connection / detection / malfunction / all(SB L2872 는 3값, 서버는 4값).</summary>
+    /// <summary>
+    /// 억제 범위 * — <c>connection</c> / <c>detection</c> / <c>malfunction</c> / <c>operation</c> / <c>all</c>.
+    /// <para>목업(SB L2872)은 3값이지만 서버는 <b>5값</b>이다(<c>app/utils/enums.py:295-302</c>).</para>
+    /// <para>⚠ 콤보가 값을 못 찾으면 WPF 가 <c>null</c> 을 되민다. 그것을 <c>"all"</c> 로 바꾸면
+    /// <b>억제 범위가 조용히 넓어진다</b> — 안전 방향의 반대다. 그래서 <b>모르는 값은 보존</b>하고
+    /// 저장을 막는다(<see cref="IsScopeUnknown"/>).</para>
+    /// </summary>
     public string EventScope
     {
         get => _draft.EventScope;
-        set { _draft.EventScope = string.IsNullOrWhiteSpace(value) ? "all" : value; RaiseAll(); }
+        set
+        {
+            // null · 빈 값 = "콤보가 매칭에 실패했다" 는 뜻이다. 원래 값을 그대로 둔다.
+            if (string.IsNullOrWhiteSpace(value)) { NotifyOfPropertyChange(); return; }
+            _draft.EventScope = value;
+            RaiseAll();
+        }
     }
+
+    /// <summary>화면이 모르는 억제 범위인가 — 그런 스케줄은 범위를 건드리지 않은 채로도 저장할 수 없다.</summary>
+    public bool IsScopeUnknown => !SuppressionRequestBuilder.IsKnownScope(_draft.EventScope);
+
+    /// <summary>모르는 범위 안내 — 무엇이 실려 있는지 그대로 보여 준다.</summary>
+    public string UnknownScopeText => IsScopeUnknown
+        ? $"이 화면이 모르는 억제 범위입니다({_draft.EventScope}) — 서버가 새 값을 추가했습니다. 저장할 수 없습니다."
+        : string.Empty;
 
     /// <summary>감지/감시 — 그룹 · 전체에서만 뜻이 있다.</summary>
     public string TargetSide
@@ -449,7 +472,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     public bool IsDirty => Signature(_draft) != _openedSignature;
 
     /// <summary>[저장] 을 켤 것인가.</summary>
-    public bool CanSave => _canEdit() && !_isSaving && Verdict.CanSave && (IsDirty || IsNew);
+    public bool CanSave => _canEdit() && !_isSaving && !IsScopeUnknown && Verdict.CanSave && (IsDirty || IsNew);
 
     /// <summary>[되돌리기] 를 켤 것인가.</summary>
     public bool CanRevert => !_isSaving && IsDirty;
@@ -476,10 +499,15 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// </summary>
     public async Task SaveAsync(CancellationToken token = default)
     {
+        // ⚠ 순서가 중요하다 — CanSave 가 !_isSaving 을 품고 있어, 보내는 중에 또 누르면
+        //   "바뀐 것이 없습니다" 라는 거짓말이 뜬다(두 번 보내지는 않는다).
+        if (IsSaving) { StatusLine = "보내는 중입니다 — 끝날 때까지 기다리세요."; return; }
+
         if (!CanSave)
         {
             StatusLine = !_canEdit()
                 ? "이벤트 편집 권한(events:edit)이 없습니다."
+                : IsScopeUnknown ? UnknownScopeText
                 : Verdict.CanSave ? "바뀐 것이 없습니다." : Verdict.FirstErrorText;
             ShakeToken++;
             return;
@@ -500,7 +528,14 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         }
         catch (Exception ex)
         {
-            Execute.OnUIThread(() => { IsSaving = false; StatusLine = $"저장에 실패했습니다 — {ex.Message}"; ShakeToken++; });
+            // 예외 본문은 로그로만 — HttpRequestException 은 서버 호스트 · 포트를 문장에 담는다.
+            _onError?.Invoke("억제 스케줄 저장", ex);
+            Execute.OnUIThread(() =>
+            {
+                IsSaving = false;
+                StatusLine = "저장하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.";
+                ShakeToken++;
+            });
             return;
         }
 

@@ -107,7 +107,9 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         };
         SyncFilterChips();
 
-        Drawer = new SuppressionDrawerViewModel(_clock, devices, groups, SaveAsync, _canEdit, () => _active);
+        Drawer = new SuppressionDrawerViewModel(
+            _clock, devices, groups, SaveAsync, _canEdit, () => _active,
+            onError: (what, ex) => _log?.Error($"[SuppressionConsole] {what} 실패: {ex}"));
         Drawer.Saved += OnDrawerSaved;
     }
 
@@ -269,8 +271,9 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            _log?.Error($"[SuppressionConsole] 목록 실패: {ex.Message}");
-            Post(() => StatusText = $"목록을 불러오지 못했습니다 — {ex.Message}");
+            // 예외 본문은 로그로만 — 화면 문장에 서버 주소가 실리면 안 된다.
+            _log?.Error($"[SuppressionConsole] 목록 실패: {ex}");
+            Post(() => StatusText = "목록을 불러오지 못했습니다 — 서버에 닿지 못했습니다. [갱신] 으로 다시 시도하세요.");
         }
         finally
         {
@@ -590,8 +593,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         }
         catch (Exception ex)
         {
-            _log?.Error($"[SuppressionConsole] 취소 실패: {ex.Message}");
-            Post(() => StatusText = $"취소하지 못했습니다 — {ex.Message}");
+            _log?.Error($"[SuppressionConsole] 취소 실패: {ex}");
+            Post(() => StatusText = "취소하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.");
         }
         finally
         {
@@ -628,8 +631,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         }
         catch (Exception ex)
         {
-            _log?.Error($"[SuppressionConsole] 일괄 삭제 실패: {ex.Message}");
-            Post(() => StatusText = $"삭제하지 못했습니다 — {ex.Message}");
+            _log?.Error($"[SuppressionConsole] 일괄 삭제 실패: {ex}");
+            Post(() => StatusText = "삭제하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.");
         }
         finally
         {

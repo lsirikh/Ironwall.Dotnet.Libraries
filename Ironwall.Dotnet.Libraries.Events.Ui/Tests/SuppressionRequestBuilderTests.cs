@@ -137,18 +137,6 @@ public class SuppressionRequestBuilderTests
         Assert.Equal(7, (int?)json["unit_id"]);
     }
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(50)]
-    [InlineData(100)]
-    public void should_call_the_server_once_no_matter_how_many_targets(int count)
-    {
-        var draft = NewDraft(SuppressionTargetDrop.ModeDevice, Enumerable.Range(1, count).ToArray());
-
-        // 대상 배열 계약이라 N개여도 호출은 하나다 — 부분 실패 · 재시도 화면이 필요 없는 근거.
-        Assert.Equal(1, SuppressionRequestBuilder.ServerCallsForSave(draft));
-    }
-
     #endregion
 
     #region - 수정(PATCH) — 받아 온 원본에서 다시 채운다 -
@@ -194,6 +182,14 @@ public class SuppressionRequestBuilderTests
         var missed = new List<string>();
         foreach (var property in typeof(EventSuppressionScheduleUpdateDto).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
+            // 서버가 명시적으로 거절하는 칸은 '보내지 않는 것' 이 정답이다.
+            if (ServerRejectsOnUpdate.Contains(property.Name))
+            {
+                Assert.True(property.GetValue(patch) is null,
+                    $"'{property.Name}' 은 PATCH 에 실리면 서버가 422 로 거절합니다 — 비워 두어야 합니다.");
+                continue;
+            }
+
             var mirror = typeof(EventSuppressionScheduleDto).GetProperty(property.Name);
             Assert.True(mirror is not null,
                 $"응답 DTO 에 '{property.Name}' 이(가) 없습니다 — 되돌려 보낼 값을 어디서 가져올지 정해야 합니다.");
@@ -207,11 +203,27 @@ public class SuppressionRequestBuilderTests
     }
 
     [Fact]
-    public void should_keep_the_unedited_recurrence_rule_when_patching()
+    public void should_never_send_recurrence_rule_when_patching()
     {
-        var draft = SuppressionDraft.FromDto(FullBaseline());
+        // 서버는 이 키가 본문에 **있기만 해도** 422 다 — 값이 무엇이든 상관없다
+        //   (routers/event_suppression_schedules.py:438 `if "recurrence_rule" in fields: raise 422`).
+        //   원본에 값이 남아 있는 구버전 행을 고칠 때 이름만 바꾸는 PATCH 까지 죽는다.
+        var draft = SuppressionDraft.FromDto(FullBaseline());       // 원본에 RRULE 이 있다
 
-        Assert.Equal("RRULE:FREQ=WEEKLY", SuppressionRequestBuilder.BuildUpdate(draft).RecurrenceRule);
+        var patch = SuppressionRequestBuilder.BuildUpdate(draft);
+        var json = JObject.Parse(JsonConvert.SerializeObject(patch));
+
+        Assert.Null(patch.RecurrenceRule);
+        Assert.False(json.ContainsKey("recurrence_rule"));
+    }
+
+    [Fact]
+    public void should_never_send_recurrence_rule_when_creating()
+    {
+        var json = JObject.Parse(JsonConvert.SerializeObject(SuppressionRequestBuilder.BuildCreate(NewDraft(ids: 1))));
+
+        // 생성 스키마도 not-null 이면 거절한다(schemas/event_suppression.py:209-213).
+        Assert.False(json.ContainsKey("recurrence_rule"));
     }
 
     [Fact]
@@ -362,6 +374,79 @@ public class SuppressionRequestBuilderTests
     }
 
     #endregion
+
+    /// <summary>
+    /// 생성(POST) 본문 <b>전수 감사</b> — Create DTO 에 칸이 생겼는데 빌더가 채우지 않으면 여기서 깨진다.
+    /// </summary>
+    [Fact]
+    public void should_fill_every_create_field_from_the_draft()
+    {
+        var draft = NewDraft(SuppressionTargetDrop.ModeDevice, 3, 5);
+        draft.Description = "설명";
+        draft.TargetSide = "detection";
+        draft.EventScope = "operation";
+        draft.IsWeekly = true;
+        draft.WindowEnd = Kst.AddDays(30);
+        draft.DaysOfWeekMask = SuppressionRules.DaysWeekendPreset;
+        draft.DailyStart = TimeSpan.FromHours(22);
+        draft.DailyEnd = TimeSpan.FromHours(6);
+
+        var dto = SuppressionRequestBuilder.BuildCreate(draft, unitId: 7);
+
+        var untouched = new List<string>();
+        foreach (var property in typeof(EventSuppressionScheduleCreateDto).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (CreateFieldsThatStayEmpty.Contains(property.Name)) continue;
+
+            var value = property.GetValue(dto);
+            var isEmpty = value is null
+                          || (value is string text && text.Length == 0)
+                          || (value is IEnumerable list and not string && !list.Cast<object>().Any());
+            if (isEmpty) untouched.Add(property.Name);
+        }
+
+        Assert.True(untouched.Count == 0,
+            "생성 본문에 빈 칸이 남았습니다 — " + string.Join(", ", untouched));
+    }
+
+    /// <summary>PATCH 에 실리면 서버가 422 로 거절하는 칸.</summary>
+    private static readonly HashSet<string> ServerRejectsOnUpdate = new(StringComparer.Ordinal) { "RecurrenceRule" };
+
+    /// <summary>이 초안에서는 비어 있는 것이 정상인 생성 칸.</summary>
+    private static readonly HashSet<string> CreateFieldsThatStayEmpty = new(StringComparer.Ordinal)
+    {
+        "RecurrenceRule",       // 서버가 not-null 을 거절한다
+        "TargetGroupIds",       // 장비 모드라 비어 있어야 한다(서버가 교차 배열을 422 로 막는다)
+    };
+
+    [Theory]
+    [InlineData("all")]
+    [InlineData("detection")]
+    [InlineData("malfunction")]
+    [InlineData("connection")]
+    [InlineData("operation")]
+    public void should_know_every_scope_the_server_knows(string scope)
+        => Assert.True(SuppressionRequestBuilder.IsKnownScope(scope));
+
+    [Fact]
+    public void should_not_pretend_to_know_a_new_scope()
+        => Assert.False(SuppressionRequestBuilder.IsKnownScope("something_new"));
+
+    [Fact]
+    public void should_show_an_unknown_scope_as_its_raw_value()
+        => Assert.Equal("something_new", SuppressionRequestBuilder.ScopeLabel("something_new"));
+
+    [Fact]
+    public void should_carry_an_operation_scope_through_a_patch()
+    {
+        var baseline = FullBaseline();
+        baseline.EventScope = "operation";
+
+        var patch = SuppressionRequestBuilder.BuildUpdate(SuppressionDraft.FromDto(baseline));
+
+        // 화면이 그 값을 모르면 콤보가 null 을 되밀고 저장이 억제 범위를 'all' 로 넓힌다.
+        Assert.Equal("operation", patch.EventScope);
+    }
 
     #region - Helpers -
 

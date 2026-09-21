@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Net.Http;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -398,9 +399,9 @@ public class SuppressionDrawerViewModelTests
 
         await thrower.SaveAsync();
 
-        // 예외도 조용히 사라지면 안 된다.
+        // 예외도 조용히 사라지면 안 된다 — 다만 문장은 고정이다(예외 본문은 로그로만 간다).
         Assert.True(thrower.IsOpen);
-        Assert.Contains("연결이 끊겼습니다", thrower.StatusLine);
+        Assert.Contains("저장하지 못했습니다", thrower.StatusLine);
     }
 
     [Fact]
@@ -425,6 +426,86 @@ public class SuppressionDrawerViewModelTests
         await _drawer.SaveAsync();
 
         Assert.Empty(_saved);
+    }
+
+    [Fact]
+    public async Task should_say_it_is_busy_when_save_is_pressed_twice()
+    {
+        // CanSave 가 !_isSaving 을 품고 있어, 순서를 틀리면 "바뀐 것이 없습니다" 라는 거짓말이 뜬다.
+        var gate = new TaskCompletionSource<SuppressionSaveOutcome>();
+        var slow = new SuppressionDrawerViewModel(_clock, null, null, (_, _) => gate.Task, () => true);
+        slow.OpenNew();
+        slow.Name = "느린 저장";
+        slow.AddSelected(new[] { Device(1) });
+
+        var first = slow.SaveAsync();
+        Assert.True(slow.IsSaving);
+
+        await slow.SaveAsync();                       // 두 번째 누름
+        Assert.Contains("보내는 중", slow.StatusLine);
+        Assert.DoesNotContain("바뀐 것이 없습니다", slow.StatusLine);
+
+        gate.SetResult(new SuppressionSaveOutcome(true, "저장했습니다.", null));
+        await first;
+    }
+
+    [Fact]
+    public void should_keep_an_unknown_scope_instead_of_widening_it()
+    {
+        // 서버가 새 event_scope 를 추가하면 콤보가 매칭에 실패해 null 을 되밀고,
+        // 그것을 "all" 로 바꾸면 억제 범위가 조용히 넓어진다 — 안전 방향의 반대다.
+        var dto = Existing();
+        dto.EventScope = "something_new";
+        _drawer.OpenEdit(dto);
+
+        _drawer.EventScope = null!;                   // WPF Selector 가 하는 짓
+
+        Assert.Equal("something_new", _drawer.EventScope);
+        Assert.True(_drawer.IsScopeUnknown);
+        Assert.False(_drawer.CanSave);
+    }
+
+    [Fact]
+    public async Task should_refuse_to_save_an_unknown_scope()
+    {
+        var dto = Existing();
+        dto.EventScope = "something_new";
+        _drawer.OpenEdit(dto);
+        _drawer.Name = "이름만 고친다";
+
+        await _drawer.SaveAsync();
+
+        Assert.Empty(_saved);
+        Assert.Contains("모르는 억제 범위", _drawer.StatusLine);
+    }
+
+    [Fact]
+    public void should_accept_the_operation_scope()
+    {
+        _drawer.OpenNew();
+
+        _drawer.EventScope = "operation";
+
+        Assert.False(_drawer.IsScopeUnknown);
+    }
+
+    [Fact]
+    public async Task should_not_leak_the_server_address_when_the_save_path_throws()
+    {
+        // HttpRequestException 은 호스트 · 포트를 문장에 담는다 — 운영자 화면에 가면 안 된다.
+        Exception? logged = null;
+        var thrower = new SuppressionDrawerViewModel(_clock, null, null,
+            (_, _) => throw new HttpRequestException("No connection could be made to 10.20.30.40:8000"),
+            () => true, null, (_, ex) => logged = ex);
+        thrower.OpenNew();
+        thrower.Name = "던질 것";
+        thrower.AddSelected(new[] { Device(1) });
+
+        await thrower.SaveAsync();
+
+        Assert.DoesNotContain("10.20.30.40", thrower.StatusLine);
+        Assert.DoesNotContain("8000", thrower.StatusLine);
+        Assert.NotNull(logged);                       // 사라지지는 않는다 — 로그에는 남는다
     }
 
     #endregion

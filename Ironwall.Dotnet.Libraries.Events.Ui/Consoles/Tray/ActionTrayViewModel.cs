@@ -89,7 +89,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
 
     /// <summary>
     /// 화면이 그리는 줄들. <b>불러올 때마다 새 목록</b>을 만든다 — <c>DraftEntry</c> 는 변경 통지를 하지 않아
-    /// 같은 인스턴스를 다시 주면 적용 뒤의 실패 사유가 화면에 영영 안 뜼다.
+    /// 같은 인스턴스를 다시 주면 적용 뒤의 실패 사유가 화면에 영영 안 뜬다.
     /// </summary>
     public IReadOnlyList<DraftEntry> Entries => Draft.Entries.ToList();
 

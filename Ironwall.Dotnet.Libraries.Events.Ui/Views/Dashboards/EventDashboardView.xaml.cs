@@ -55,7 +55,7 @@ public partial class EventDashboardView : UserControl
             console.FilterKey = option.Key;
     }
 
-    /// <summary>억제 목록의 [모두 정리] — 확인 팝업이 먼저 뜼다.</summary>
+    /// <summary>억제 목록의 [모두 정리] — 확인 팝업이 먼저 뜬다.</summary>
     private void OnSuppressionCleanup(object sender, RoutedEventArgs e) => Model?.CleanupSuppression();
 }
 

@@ -141,8 +141,11 @@ public sealed class SuppressionConsoleRow : EventSuppressionScheduleItemViewMode
     private static string Shorten(string text)
         => text.Length >= 16 && text[4] == '-' ? text[5..] : text;
 
-    /// <summary>억제 범위 · 감지/감시 한 줄.</summary>
+    /// <summary>
+    /// 억제 범위 · 감지/감시 한 줄. 범위 문구는 <see cref="SuppressionRequestBuilder.ScopeLabel"/> 단일 정본을 쓴다 —
+    /// 기반 클래스의 표는 <c>operation</c>(서버 5번째 값)을 모른다.
+    /// </summary>
     public string ScopeDetailText => Dto.TargetType == SuppressionTargetDrop.ModeDevice
-        ? ScopeText
-        : $"{ScopeText} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}";
+        ? SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)
+        : $"{SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}";
 }

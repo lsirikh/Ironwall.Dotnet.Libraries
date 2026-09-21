@@ -115,7 +115,7 @@
 				ShowSearch="{Binding ShowSearch}">
 				<c:ConsoleToolbar.Filters>
 					<StackPanel Orientation="Horizontal">
-						<!--  억제 스케줄 상태 칩 (정본 SB L2313) — 기간 칩 대신 뜼다  -->
+						<!--  억제 스케줄 상태 칩 (정본 SB L2313) — 기간 칩 대신 뜬다  -->
 						<ItemsControl
 							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Filter"
 							ItemsSource="{Binding Suppression.Filters}"
@@ -189,7 +189,7 @@
 
 				<c:ConsoleToolbar.Extra>
 					<StackPanel Orientation="Horizontal">
-						<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜼다)  -->
+						<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
 						<Button
 							Margin="0,0,6,0"
 							AutomationProperties.AutomationId="Events.SuppressionSchedule.CleanupAllButton"
@@ -559,8 +559,8 @@
 		</c:ConsoleShell.Detail>
 		</c:ConsoleShell>
 
-		<!--  억제 편집 서람 — 같은 창 안 780 오버레이(정본 SB L1028 · L1122 E-D7).
-				 윈도 머리띄(40)는 덮지 않는다 — 스크림은 몸통만 가린다.  -->
+		<!--  억제 편집 서랍 — 같은 창 안 780 오버레이(정본 SB L1028 · L1122 E-D7).
+				 윈도 머리띠(40)는 덮지 않는다 — 스크림은 몸통만 가린다.  -->
 		<views:SuppressionDrawerView
 			Margin="0,40,0,0"
 			Panel.ZIndex="20"

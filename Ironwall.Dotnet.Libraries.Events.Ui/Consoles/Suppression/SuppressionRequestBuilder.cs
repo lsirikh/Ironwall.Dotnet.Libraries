@@ -54,7 +54,9 @@ public static class SuppressionRequestBuilder
             WindowStart = KoreaTimeHelper.ToServerIso8601(draft.WindowStart),
             // ⚠ 무제한은 키를 생략하면 422 — 명시적 null 이어야 한다(서버 model_fields_set 검사).
             WindowEnd = draft.WindowEnd is { } end ? KoreaTimeHelper.ToServerIso8601(end) : null,
-            RecurrenceRule = null,          // Phase 2 RRULE 용 예약 칸 — 신규 반복은 recurrence_type 을 쓴다
+            // ⚠ 생성도 같다 — 서버 스키마가 not-null 이면 거절한다(schemas/event_suppression.py:209-213).
+            //   null 이면 NullValueHandling.Ignore 로 키가 나가지 않는다. 신규 반복은 recurrence_type 을 쓴다.
+            RecurrenceRule = null,
             RecurrenceType = draft.IsWeekly ? "weekly" : "none",
             DaysOfWeek = draft.IsWeekly ? draft.DaysOfWeekMask : null,
             // ⚠ offset/Z 를 붙이면 즉시 422 — 일일 시각은 offset 없는 벽시계다.
@@ -94,19 +96,13 @@ public static class SuppressionRequestBuilder
             EventScope = draft.EventScope,
             WindowStart = KoreaTimeHelper.ToServerIso8601(draft.WindowStart),
             WindowEnd = draft.WindowEnd is { } end ? KoreaTimeHelper.ToServerIso8601(end) : null,
-            // 초안이 만지지 않는 칸 — 원본에서 되돌려 보낸다(null 로 두면 서버가 지운다).
-            RecurrenceRule = baseline.RecurrenceRule,
+            // ⚠ RecurrenceRule 은 **일부러 넣지 않는다**(기본값 null → NullValueHandling.Ignore → 키 자체가 안 나간다).
+            //   서버는 이 키가 본문에 **있기만 해도** 422 로 거절한다 — 값이 무엇이든 상관없다:
+            //     routers/event_suppression_schedules.py:438  `if "recurrence_rule" in fields: raise 422`
+            //     schemas/event_suppression.py:308-312        "**미사용 레거시 — 값을 보내면 422**"
+            //   원본에서 되돌려 보내면(구버전 행에 값이 남아 있는 경우) 이름만 고치는 PATCH 까지 죽는다.
         };
     }
-
-    /// <summary>
-    /// 이 저장이 서버를 몇 번 부르는가. 대상 수와 <b>무관하게 항상 1</b> 이다.
-    /// </summary>
-    /// <remarks>
-    /// 장비 콘솔의 그룹 배정(<c>PATCH /devices/{id}</c> N회)과 달리 억제는 배열 계약이라 한 번이다 —
-    /// 그래서 부분 실패 · 재시도 화면이 필요 없다. 실패하면 아무것도 바뀌지 않는다.
-    /// </remarks>
-    public static int ServerCallsForSave(SuppressionDraft draft) => 1;
 
     /// <summary>
     /// 저장 성공 뒤 보여 줄 대상 확인 문구 — 서버가 확정한 id 를 <b>이름</b>으로 되풀이한다.
@@ -152,13 +148,25 @@ public static class SuppressionRequestBuilder
         _ => "감지+감시",
     };
 
+    /// <summary>
+    /// 억제 범위 코드 — 서버 <c>EnumSuppressionEventScope</c> 5값(<c>app/utils/enums.py:295-302</c>).
+    /// </summary>
+    public static readonly string[] KnownScopes = { "all", "detection", "malfunction", "connection", "operation" };
+
+    /// <summary>화면이 아는 범위인가. 모르는 값은 <b>고치지 않고 보존</b>하고 저장을 막는다.</summary>
+    public static bool IsKnownScope(string? scope)
+        => scope is not null && System.Array.IndexOf(KnownScopes, scope) >= 0;
+
     /// <summary>억제 범위 코드 → 표시 문구.</summary>
     public static string ScopeLabel(string? scope) => scope switch
     {
         "detection" => "탐지",
         "malfunction" => "장애",
         "connection" => "연결",
-        _ => "전체",
+        "operation" => "운영",
+        "all" => "전체",
+        null => "전체",
+        _ => scope,            // 모르는 값은 지어내지 않고 원값을 보인다
     };
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;

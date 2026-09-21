@@ -193,6 +193,9 @@
 									<ComboBoxItem Content="탐지" Tag="detection" />
 									<ComboBoxItem Content="장애" Tag="malfunction" />
 									<ComboBoxItem Content="연결" Tag="connection" />
+									<!--  서버 EnumSuppressionEventScope 는 5값이다(app/utils/enums.py:295-302) — 하나라도 빠지면
+									      그 스케줄을 열 때 콤보가 매칭에 실패해 범위가 조용히 '전체' 로 넓어진다  -->
+									<ComboBoxItem Content="운영" Tag="operation" />
 								</ComboBox>
 							</Grid>
 
@@ -395,6 +398,26 @@
 									Text="{Binding RecapText}"
 									TextWrapping="Wrap" />
 							</Border>
+
+							<!--  화면이 모르는 억제 범위 — 값을 지어내지 않고 그대로 보이고 저장을 막는다  -->
+							<DockPanel
+								Margin="0,10,0,0"
+								LastChildFill="True"
+								Visibility="{Binding IsScopeUnknown, Converter={StaticResource BoolToVis}}">
+								<md:PackIcon
+									Width="15"
+									Height="15"
+									Margin="0,1,5,0"
+									DockPanel.Dock="Left"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Kind="HelpCircleOutline" />
+								<TextBlock
+									AutomationProperties.AutomationId="Events.SuppressionSchedule.UnknownScopeText"
+									FontSize="12"
+									Foreground="{DynamicResource StatusCriticalBrush}"
+									Text="{Binding UnknownScopeText}"
+									TextWrapping="Wrap" />
+							</DockPanel>
 
 							<!--  오류 · 경고 — 형태로 가른다(느낌표 삼각 / 동그라미 i)  -->
 							<DockPanel

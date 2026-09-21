@@ -299,7 +299,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         var entry = RailEntries.FirstOrDefault(e => e.Key == SuppressionRailKey);
         if (entry is not null && Suppression is not null)
         {
-            // 정본 SB L2361 은 '억제중' 건수 하나만 배지로 낸다 — 합계는 상태 띄에 있다.
+            // 정본 SB L2361 은 '억제중' 건수 하나만 배지로 낸다 — 합계는 상태 띠에 있다.
             entry.Count = Suppression.SuppressingCount;
             entry.BadCount = 0;
         }
@@ -365,7 +365,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     public bool IsListVisible => _current is not null;
     public bool IsOverview => _current is null && !IsSuppressionRail;
 
-    /// <summary>억제 스케줄 레일인가 — 목록 · 상세 · 툴바가 통째로 바뀜다.</summary>
+    /// <summary>억제 스케줄 레일인가 — 목록 · 상세 · 툴바가 통째로 바뀐다.</summary>
     public bool IsSuppressionRail => _railKey == SuppressionRailKey && Suppression is not null;
 
     /// <summary>억제 스케줄 콘솔(주입이 없으면 null — 레일도 서지 않는다).</summary>
@@ -579,7 +579,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         _current!.Delete();
     }
 
-    /// <summary>억제 목록의 [모두 정리] — 취소 · 종료 행 일괄 하드삭제(확인 팝업이 먼저 뜼다).</summary>
+    /// <summary>억제 목록의 [모두 정리] — 취소 · 종료 행 일괄 하드삭제(확인 팝업이 먼저 뜬다).</summary>
     public void CleanupSuppression() => _ = Suppression?.CleanupAllAsync();
 
     /// <summary>[갱신] — 기간을 밀어 넣고 지금 보고 있는 것 하나만 다시 부른다.</summary>

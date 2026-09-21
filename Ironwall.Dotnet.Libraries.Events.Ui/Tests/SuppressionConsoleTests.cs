@@ -347,6 +347,27 @@ public class SuppressionConsoleViewModelTests
         Assert.Equal(new[] { 3, 5 }, _api.LastCreate!.TargetDeviceIds);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(50)]
+    [InlineData(100)]
+    public async Task should_write_once_no_matter_how_many_targets(int count)
+    {
+        // 상수 하나를 읽는 것은 아무것도 증명하지 않는다 — 진짜 저장 경로를 몰고 가짜 서버의 쓰기 카운터를 본다.
+        await _console.ActivateAsync();
+        _console.AddNew();
+        _console.Drawer.Name = $"대상 {count}개";
+        _console.Drawer.AddSelected(Enumerable.Range(1, count)
+            .Select(id => (object)new SuppressionTargetChip(SuppressionTargetKind.Device, id, $"센서-{id}"))
+            .ToList());
+        Assert.Equal(count, _console.Drawer.Tray.Count);
+
+        await _console.Drawer.SaveAsync();
+
+        Assert.Equal(1, _api.WriteCalls);
+        Assert.Equal(count, _api.LastCreate!.TargetDeviceIds.Count);
+    }
+
     [Fact]
     public async Task should_patch_once_when_an_existing_schedule_is_edited()
     {
