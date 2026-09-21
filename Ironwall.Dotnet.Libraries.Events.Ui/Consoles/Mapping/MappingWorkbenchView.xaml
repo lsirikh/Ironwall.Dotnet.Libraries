@@ -203,6 +203,7 @@
 				AddText="맵핑 등록"
 				CanAdd="{Binding CanEdit}"
 				CanDelete="False"
+				DeleteDisabledReason="맵핑 삭제는 하위 배선까지 함께 지웁니다 — 이번 판에서는 제공하지 않습니다."
 				CanRefresh="{Binding IsInputEnabled}"
 				ConsoleKey="Mapping"
 				RefreshClick="OnReload"
@@ -216,16 +217,18 @@
 			<Grid IsEnabled="{Binding IsInputEnabled}">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="300" />
-					<ColumnDefinition Width="*" MinWidth="420" />
+					<ColumnDefinition Width="*" MinWidth="380" />
 				</Grid.ColumnDefinitions>
 
 				<!--  ① 매핑 목록  -->
 				<Border
 					Grid.Column="0"
+					Background="{DynamicResource SurfaceBrush}"
 					BorderBrush="{DynamicResource DividerBrush}"
 					BorderThickness="0,0,1,0">
 					<ListBox
 						Padding="8"
+						Background="Transparent"
 						AutomationProperties.AutomationId="Integrations.Mapping.List"
 						ItemsSource="{Binding Mappings}"
 						SelectedItem="{Binding SelectedMapping, Mode=TwoWay}"
@@ -287,6 +290,10 @@
 							<c:ConsoleField ApiName="name_event" Header="이름">
 								<TextBox
 									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
 									AutomationProperties.AutomationId="Integrations.Mapping.NameBox"
 									MaxLength="100"
 									Style="{StaticResource MaterialDesignOutlinedTextBox}"
@@ -295,6 +302,9 @@
 							<c:ConsoleField ApiName="device_group_id" Header="장비그룹">
 								<ComboBox
 									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
 									AutomationProperties.AutomationId="Integrations.Mapping.GroupCombo"
 									DisplayMemberPath="Name"
 									ItemsSource="{Binding Groups}"
@@ -302,9 +312,12 @@
 									SelectedValuePath="Id"
 									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
 							</c:ConsoleField>
-							<c:ConsoleField ApiName="category_event_mapping" Header="카테고리">
+							<c:ConsoleField Header="카테고리" ToolTip="category_event_mapping">
 								<ComboBox
 									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
 									AutomationProperties.AutomationId="Integrations.Mapping.CategoryCombo"
 									ItemsSource="{Binding Categories}"
 									SelectedItem="{Binding EditCategory}"
@@ -319,42 +332,47 @@
 							<c:ConsoleField ApiName="description" Header="설명">
 								<TextBox
 									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
 									AutomationProperties.AutomationId="Integrations.Mapping.DescriptionBox"
 									MaxLength="500"
 									Style="{StaticResource MaterialDesignOutlinedTextBox}"
 									Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 							<c:ConsoleField ApiName="status" Header="운용">
-								<DockPanel LastChildFill="False">
-									<ToggleButton
-										VerticalAlignment="Center"
-										AutomationProperties.AutomationId="Integrations.Mapping.StatusToggle"
-										DockPanel.Dock="Left"
-										IsChecked="{Binding EditStatus}"
-										Style="{StaticResource MaterialDesignSwitchToggleButton}" />
-									<Button
-										Height="30"
-										MinWidth="84"
-										Margin="8,0,0,0"
-										AutomationProperties.AutomationId="Integrations.Mapping.SaveButton"
-										Click="OnSaveMapping"
-										Content="{Binding SaveMappingText}"
-										DockPanel.Dock="Right"
-										IsEnabled="{Binding CanSaveMapping}"
-										Style="{StaticResource MaterialDesignRaisedButton}"
-										ToolTip="맵핑 본체는 호출 한 번이라 바로 저장됩니다" />
-									<Button
-										Height="30"
-										MinWidth="84"
-										Margin="8,0,0,0"
-										AutomationProperties.AutomationId="Integrations.Mapping.CancelCreateButton"
-										Click="OnCancelCreate"
-										Content="취소"
-										DockPanel.Dock="Right"
-										Style="{StaticResource MaterialDesignOutlinedButton}"
-										Visibility="{Binding IsCreatingMapping, Converter={StaticResource BoolToVis}}" />
-								</DockPanel>
+								<ToggleButton
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Integrations.Mapping.StatusToggle"
+									IsChecked="{Binding EditStatus}"
+									Style="{StaticResource MaterialDesignSwitchToggleButton}" />
 							</c:ConsoleField>
+							<!--  저장 줄 — 같은 높이 30 · 같은 간격 8 · 왼쪽이 취소, 오른쪽이 저장  -->
+							<StackPanel
+								Margin="0,8,0,0"
+								HorizontalAlignment="Right"
+								Orientation="Horizontal">
+								<Button
+									Height="30"
+									MinWidth="84"
+									Margin="0,0,8,0"
+									AutomationProperties.AutomationId="Integrations.Mapping.CancelCreateButton"
+									Click="OnCancelCreate"
+									Content="취소"
+									Style="{StaticResource MaterialDesignOutlinedButton}"
+									Visibility="{Binding IsCreatingMapping, Converter={StaticResource BoolToVis}}" />
+								<Button
+									Height="30"
+									MinWidth="84"
+									AutomationProperties.AutomationId="Integrations.Mapping.SaveButton"
+									Click="OnSaveMapping"
+									Content="{Binding SaveMappingText}"
+									IsEnabled="{Binding CanSaveMapping}"
+									Style="{StaticResource MaterialDesignOutlinedButton}"
+									ToolTip="맵핑 본체는 서버 호출이 한 번이라 바로 저장됩니다" />
+							</StackPanel>
 							<TextBlock
 								Margin="0,4,0,0"
 								AutomationProperties.AutomationId="Integrations.Mapping.FormError"
@@ -385,6 +403,7 @@
 						<StackPanel
 							Grid.Column="1"
 							VerticalAlignment="Center"
+							IsEnabled="{Binding IsBoardEnabled}"
 							Orientation="Horizontal">
 							<Button
 								Height="30"
@@ -450,14 +469,16 @@
 					<drag:DropZoneChrome
 						Grid.Row="3"
 						Margin="12,8,12,12"
+						Opacity="{Binding IsBoardEnabled, Converter={StaticResource DimWhenFalse}}"
 						drag:DropZone.Handler="{Binding}"
 						drag:DropZone.IsReorder="True"
 						drag:DropZone.Key="{Binding BoardZoneKey}"
 						AutomationProperties.AutomationId="Integrations.Board.Zone"
 						CornerRadius="6">
-						<Grid>
+						<Grid Background="{DynamicResource SurfaceSunkenBrush}">
 							<ListBox
 								Padding="6"
+								Background="Transparent"
 								AutomationProperties.AutomationId="Integrations.Board.List"
 								ItemTemplate="{StaticResource BoardRow}"
 								ItemsSource="{Binding BoardRows}"
@@ -504,18 +525,18 @@
 			<c:ConsoleDetailHost
 				ApplyClick="OnApply"
 				ApplyText="적용"
-				Banner="{Binding Detail.Banner}"
+				Banner="{Binding BannerText}"
 				CanApply="{Binding CanApply}"
 				CanRevert="{Binding CanRevert}"
 				ConsoleKey="Mapping"
 				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
-				FooterText="{Binding DraftText}"
+				FooterText="{Binding DraftShortText}"
 				IsDirty="{Binding IsDirty}"
 				IsReadOnly="{Binding IsReadOnly}"
 				Kind="장비 팔레트"
 				RevertClick="OnRevert"
 				RevertText="되돌리기"
-				ShowButtons="True"
+				ShowButtons="{Binding CanEdit}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				Title="{Binding KindLabel}">
 				<Grid IsEnabled="{Binding IsInputEnabled}">
@@ -529,7 +550,10 @@
 						Grid.Row="0"
 						Height="32"
 						Margin="0,0,0,8"
+						Padding="8,0"
+						VerticalContentAlignment="Center"
 						md:HintAssist.Hint="장비 검색"
+						md:HintAssist.IsFloating="False"
 						AutomationProperties.AutomationId="Integrations.Palette.Search"
 						Style="{StaticResource MaterialDesignOutlinedTextBox}"
 						Text="{Binding PaletteSearch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
@@ -543,7 +567,7 @@
 						Click="OnAddSelected"
 						Content="＋ 추가 ▶"
 						IsEnabled="{Binding CanAddSelected}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
 						ToolTip="Enter 키와 같은 동작 — 고른 장비를 액션 보드에 넣습니다" />
 
 					<!--  팔레트 = 해제 드롭존(보드 행을 여기로 끌면 해제)  -->
@@ -555,6 +579,7 @@
 						CornerRadius="6">
 						<ListBox
 							Padding="6"
+							Background="{DynamicResource SurfaceSunkenBrush}"
 							AutomationProperties.AutomationId="Integrations.Palette.List"
 							ItemTemplate="{StaticResource PaletteCard}"
 							ItemsSource="{Binding PaletteItems}"

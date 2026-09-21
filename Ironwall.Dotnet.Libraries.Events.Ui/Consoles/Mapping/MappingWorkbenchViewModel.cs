@@ -122,6 +122,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             SeedForm(value?.Dto);
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(HasMapping));
+            NotifyOfPropertyChange(nameof(IsBoardEnabled));
             NotifyOfPropertyChange(nameof(MappingTitle));
             _ = LoadBoardAsync();
         }
@@ -213,11 +214,17 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public bool IsApplying
     {
         get => _isApplying;
-        private set { _isApplying = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsInputEnabled)); RaiseCommandStates(); }
+        private set { _isApplying = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsInputEnabled)); NotifyOfPropertyChange(nameof(IsBoardEnabled)); RaiseCommandStates(); }
     }
 
     /// <summary>입력을 받을 수 있는가(적용 중에는 전부 잠근다 — 두 번 커밋하는 사고를 막는다).</summary>
     public bool IsInputEnabled => !IsApplying;
+
+    /// <summary>
+    /// 액션 보드를 만질 수 있는가. <b>새 맵핑을 만드는 중에는 잠근다</b> —
+    /// 보드에 보이는 배선은 아직 <b>이전에 고른 맵핑</b>의 것이라, 그대로 두면 엉뚱한 맵핑에 장비를 넣게 된다.
+    /// </summary>
+    public bool IsBoardEnabled => IsInputEnabled && !IsCreatingMapping && HasMapping;
     #endregion
 
     #region - 권한 -
@@ -276,6 +283,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(IsReadOnly));
         NotifyOfPropertyChange(nameof(IsDragEnabled));
         NotifyOfPropertyChange(nameof(PermissionText));
+        NotifyOfPropertyChange(nameof(BannerText));
         Detail.IsReadOnly = IsReadOnly;
         RaiseCommandStates();
     }
@@ -318,6 +326,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             SeedForm(_selectedMapping?.Dto);
             NotifyOfPropertyChange(nameof(SelectedMapping));
             NotifyOfPropertyChange(nameof(HasMapping));
+            NotifyOfPropertyChange(nameof(IsBoardEnabled));
             NotifyOfPropertyChange(nameof(MappingTitle));
 
             await LoadBoardAsync().ConfigureAwait(false);
@@ -397,7 +406,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     {
         MappingActionKind.Camera => "Cctv",
         MappingActionKind.Speaker => "Bullhorn",
-        MappingActionKind.Lamp => "CarLightAlert",
+        MappingActionKind.Lamp => "AlarmLight",
         _ => "HelpCircleOutline",
     };
 
@@ -495,6 +504,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         if (_board.TotalReordered > 0) Detail.Tracker.Touch("reordered", 0, _board.TotalReordered);
 
         NotifyOfPropertyChange(nameof(DraftText));
+        NotifyOfPropertyChange(nameof(DraftShortText));
         NotifyOfPropertyChange(nameof(IsDirty));
         RaiseCommandStates();
     }
@@ -514,10 +524,33 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     /// <summary>미저장 변경이 있는가.</summary>
     public bool IsDirty => _board.IsDirty;
 
-    /// <summary>상태줄 Draft 요약.</summary>
-    public string DraftText => _board.IsDirty
-        ? $"미저장 추가 {_board.TotalAdded} · 해제 {_board.TotalRemoved} · 수정 {_board.TotalEdited} · 정렬 {_board.TotalReordered}"
-        : "변경 없음";
+    /// <summary>
+    /// 상태줄·적용 막대의 Draft 요약. <b>340px 안에 잘리지 않게</b> 0 인 항목은 적지 않는다.
+    /// </summary>
+    public string DraftText
+    {
+        get
+        {
+            if (!_board.IsDirty) return "변경 없음";
+            var parts = new List<string>();
+            if (_board.TotalAdded > 0) parts.Add($"추가 {_board.TotalAdded}");
+            if (_board.TotalRemoved > 0) parts.Add($"해제 {_board.TotalRemoved}");
+            if (_board.TotalEdited > 0) parts.Add($"수정 {_board.TotalEdited}");
+            if (_board.TotalReordered > 0) parts.Add($"정렬 {_board.TotalReordered}");
+            return "미저장 " + string.Join(" · ", parts);
+        }
+    }
+
+    /// <summary>적용 막대의 좁은 칸(약 200px)에 들어가는 짧은 요약.</summary>
+    public string DraftShortText => _board.IsDirty ? $"미저장 {_board.UnsavedCount}건" : "변경 없음";
+
+    /// <summary>
+    /// 적용 막대 머리에 띄우는 안내. 읽기 전용이면 <b>그 사실을 먼저</b> 말한다 —
+    /// 커널의 기본 배너는 상세 칸 선택 상태에 묶여 있어 이 창에서는 뜨지 않는다.
+    /// </summary>
+    public string BannerText => IsReadOnly
+        ? "이벤트 맵핑 편집 권한이 없어 읽기 전용으로 열었습니다."
+        : string.Empty;
 
     /// <summary>선택 요약.</summary>
     public string SelectionText => $"선택 {SelectedBoardRows.Count}건";
@@ -622,7 +655,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public bool IsCreatingMapping
     {
         get => _isCreatingMapping;
-        private set { _isCreatingMapping = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(SaveMappingText)); RaiseFormStates(); }
+        private set { _isCreatingMapping = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(SaveMappingText)); NotifyOfPropertyChange(nameof(IsBoardEnabled)); RaiseFormStates(); }
     }
 
     /// <summary>이벤트 이름.</summary>
@@ -726,6 +759,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
                 _selectedMapping = Mappings.FirstOrDefault(m => m.Id == created.Value!.Id);
                 NotifyOfPropertyChange(nameof(SelectedMapping));
                 NotifyOfPropertyChange(nameof(HasMapping));
+            NotifyOfPropertyChange(nameof(IsBoardEnabled));
                 NotifyOfPropertyChange(nameof(MappingTitle));
                 StatusText = "맵핑을 등록했습니다.";
                 await LoadBoardAsync().ConfigureAwait(false);
@@ -910,6 +944,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public MappingDropVerdict Verdict(DragPayload payload, DropTarget target)
     {
         if (IsApplying) return MappingDropVerdict.Block("적용하는 중입니다.");
+        if (IsCreatingMapping) return MappingDropVerdict.Block("새 맵핑을 먼저 등록하십시오.");
 
         if (target.ZoneKey == MappingKindText.PaletteZone)
         {

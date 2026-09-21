@@ -27,10 +27,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// </remarks>
 public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
 {
-    private const double WIDTH = 1280;      // 콘솔 기준 크기 — 레일 184 + 목록 300 + 본문 420 + 팔레트 340
-    private const double HEIGHT = 760;
-    private const double MIN_WIDTH = 1120;  // 레일 접힘(56) 기준 최소
-    private const double MIN_HEIGHT = 640;
+    // 🔴 치수는 <b>창</b>이 아니라 <b>셸</b> 기준이다. 커널은 셸의 ActualWidth 가 1280 미만이면
+    //    상세(여기서는 팔레트) 칸을 목록 위에 겹치는 서랍으로 내린다(ConsoleLayoutMath.DockedMinWidth).
+    //    창을 딱 1280 으로 열면 테두리만큼 모자라 <b>늘 서랍</b>으로 떠서 액션 보드가 팔레트에 가린다.
+    private const double WIDTH = 1360;      // 셸 1280(레일 184 + 목록 300 + 본문 456 + 팔레트 340) + 창 테두리
+    private const double HEIGHT = 800;
+    private const double MIN_WIDTH = 1180;  // 레일 접힘(56) 기준 최소 1120 + 테두리
+    private const double MIN_HEIGHT = 680;
 
     private readonly IWindowManager _windows;
     private readonly IMappingWorkbenchGateway _gateway;

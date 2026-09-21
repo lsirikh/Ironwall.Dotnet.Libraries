@@ -17,6 +17,7 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using MaterialDesignThemes.Wpf;
 using Moq;
 using System.IO;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -45,6 +46,14 @@ public partial class App : Application
         try
         {
             if (startDark) ApplyDark();
+
+            // N-13 이벤트 맵핑 워크벤치 — 콘솔과 따로 뜬다(--mapping [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--mapping"))
+            {
+                await RunMappingAsync(directory, startDark);
+                if (directory is not null) Shutdown();
+                return;
+            }
 
             _viewModel = Build();
             _view = new EventDashboardView { DataContext = _viewModel };
@@ -255,6 +264,95 @@ public partial class App : Application
         _window.Width = 1360;
         await Settle();
     }
+
+    #region - N-13 이벤트 맵핑 워크벤치 -
+    /// <summary>워크벤치를 띄우고, 스냅샷 폴더가 있으면 상태별 PNG 를 찍는다.</summary>
+    private async Task RunMappingAsync(string? directory, bool dark)
+    {
+        var theme = dark ? "dark" : "light";
+        var model = MappingPreview.Build();
+        var view = new MappingWorkbenchView { DataContext = model };
+
+        _window = new Window
+        {
+            Title = "이벤트 맵핑 워크벤치 미리보기",
+            Width = 1360,      // 셸이 1280 이상이어야 3단 도킹이다 — 딱 1280 이면 테두리만큼 모자라 서랍으로 내려간다
+            Height = 800,
+            Background = (Brush)FindResource("BgBrush"),
+            Content = new Border { Child = view, ClipToBounds = true },
+        };
+        _window.Show();
+        await ((IActivate)model).ActivateAsync();
+        await Settle();
+
+        if (directory is null) return;
+        Directory.CreateDirectory(directory);
+
+        Save(directory, $"mapping-loaded-{theme}");
+
+        // 팔레트 검색
+        model.PaletteSearch = "초소";
+        await Settle();
+        Save(directory, $"mapping-palette-filtered-{theme}");
+        model.PaletteSearch = string.Empty;
+        await Settle();
+
+        // 투입 — 드래그와 같은 경로
+        model.AddDevices(new[] { 373, 374 }, -1);
+        await Settle();
+        Save(directory, $"mapping-dragged-in-{theme}");
+
+        // 순서 바꾸기
+        model.SelectedBoardRows.Clear();
+        model.SelectedBoardRows.Add(model.BoardRows[^1]);
+        model.OnSelectionChanged();
+        model.MoveUp();
+        await Settle();
+        Save(directory, $"mapping-reordered-{theme}");
+
+        // 해제 — 취소선으로 남는다
+        model.SelectedBoardRows.Clear();
+        model.SelectedBoardRows.Add(model.BoardRows[0]);
+        model.OnSelectionChanged();
+        model.ReleaseSelected();
+        await Settle();
+        Save(directory, $"mapping-dirty-{theme}");
+
+        // 좁은 폭
+        _window.Width = 1140;
+        await Settle();
+        Save(directory, $"mapping-narrow-{theme}");
+        _window.Width = 1360;
+        await Settle();
+
+        // 새 맵핑 — 검증 실패(이름 없음)로 [등록] 이 꺼진 상태
+        var fresh = MappingPreview.Build();
+        var freshView = new MappingWorkbenchView { DataContext = fresh };
+        _window.Content = new Border { Child = freshView, ClipToBounds = true };
+        await ((IActivate)fresh).ActivateAsync();
+        await Settle();
+        fresh.BeginCreateMapping();
+        await Settle();
+        Save(directory, $"mapping-invalid-{theme}");
+
+        // 읽기 전용 — 툴바·버튼이 전부 꺼진 상태(숨김 아님)
+        var readOnly = MappingPreview.Build(readOnly: true);
+        var readOnlyView = new MappingWorkbenchView { DataContext = readOnly };
+        _window.Content = new Border { Child = readOnlyView, ClipToBounds = true };
+        await ((IActivate)readOnly).ActivateAsync();
+        await Settle();
+        Save(directory, $"mapping-readonly-{theme}");
+
+        // 빈 목록
+        var emptyGateway = new PreviewMappingGateway { IsEmpty = true };
+        var empty = new MappingWorkbenchViewModel(emptyGateway, new PreviewDeviceSource());
+        var emptyView = new MappingWorkbenchView { DataContext = empty };
+        _window.Content = new Border { Child = emptyView, ClipToBounds = true };
+        await ((IActivate)empty).ActivateAsync();
+        await Settle();
+        Save(directory, $"mapping-empty-{theme}");
+    }
+    #endregion
 
     private void ApplyDark()
     {
