@@ -1,10 +1,11 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json;
+using System;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
@@ -13,8 +14,14 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// Geolocation(Heading/Altitude) 모델↔DTO 왕복 매핑 + DTO 직렬화 회귀 가드.
 /// PRD DevicePropertyPanel_Layout_Redesign v1.1 P2 — BLOCKER-1(저장 시 Heading 미전송) 핫픽스 보호.
 /// </summary>
-public class GeolocationMappingTests
+[Collection("CaliburnIoC")]   // 이 클래스는 뷰모델을 만든다 — 그 생성자가 IoC.Get 을 부른다.
+public class GeolocationMappingTests : IDisposable
 {
+    // 종전엔 IoC 를 <b>스스로 세우지 않고</b> 옆 클래스가 우연히 설치해 둔 델리게이트에 기대고 있었다.
+    // 그 클래스가 Dispose 로 되돌린 뒤에 돌면 "IoC is not initialized" 로 죽는다 — 실행 순서에 따라 오가는 flaky 였다.
+    private readonly TestIoCScope _ioc = new();
+    public void Dispose() => _ioc.Dispose();
+
     private static ControllerDeviceModel MakeModel(double lat, double lng, double? heading, double? altitude, string? location = "테스트위치")
         => new()
         {

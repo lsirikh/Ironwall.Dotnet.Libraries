@@ -1,6 +1,8 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
@@ -8,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System.IO;
@@ -52,6 +55,14 @@ public partial class App : Application
             if (e.Args.Contains("--wiring"))
             {
                 await RunWiringAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+                if (directory is not null) Shutdown();
+                return;
+            }
+
+            // 서버 모니터(N-12) — 콘솔과 따로 뜬다(--servers [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--servers"))
+            {
+                await RunServersAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
                 if (directory is not null) Shutdown();
                 return;
             }
@@ -294,6 +305,115 @@ public partial class App : Application
         await Show(preview.SaveConfirm(), 520, 340, "09-save-confirm");
     }
 
+/// <summary>
+    /// 서버 모니터(N-12) 상태별 스냅숏 — 빈 화면 · 목록 · 선택+지표 · 보고 없음 · 미적용 변경 ·
+    /// 드롭 가능/불가 · 등록 폼 · 모드 절 · 지표 이력 창 · 6.3 계약.
+    /// </summary>
+    private async Task RunServersAsync(string? directory, string theme)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute 가 작업 스레드에서 돌아 교차 스레드로 화면을 만진다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var preview = new ServersPreview();
+        var view = await preview.BuildAsync(withData: false);
+
+        _window = new Window
+        {
+            Title = "서버 모니터 미리보기",
+            Width = 1320,
+            Height = 820,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = view },
+        };
+        _window.Show();
+        await Settle();
+
+        if (directory is null) return;      // 손으로 써 볼 때는 띄워만 둔다
+
+        Directory.CreateDirectory(directory);
+        await Settle();
+        Save(directory, $"servers-{theme}-01-empty");
+
+        await preview.LoadAsync();
+        await Settle();
+        Save(directory, $"servers-{theme}-02-loaded");
+
+        preview.Select(preview.Row("방송서버-01"));       // 지표가 붙어 있는 행
+        await Settle();
+        Save(directory, $"servers-{theme}-03-selected-metrics");
+
+        preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행(status_observed_at = null)
+        await Settle();
+        ServersPreview.ScrollDetailToEnd(view);            // "상태(관측)" 절의 미수신 상자를 보이게 굴린다
+        await Settle();
+        Save(directory, $"servers-{theme}-04-never-reported");
+
+        preview.Select(preview.Row("방송서버-01"));
+        ServersPreview.ScrollDetailToTop(view);
+        preview.ViewModel.BeginEdit();
+        preview.ViewModel.NameText = "방송서버-01 (수정)";
+        preview.ViewModel.CpuWarningText = "65";
+        await Settle();
+        Save(directory, $"servers-{theme}-05-dirty");
+
+        preview.ViewModel.Revert();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+
+        // 드롭 불가 — 스피커를 NVR 행 위로. 끝은 반드시 취소라 서버 호출이 0 이다.
+        using (preview.BeginDrag(view, preview.Row("NVR-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-06-drop-refused");
+        }
+        await Settle();
+
+        // 드롭 가능 + 지금 그 위 — 같은 스피커를 받는 서버 행 위로.
+        using (preview.BeginDrag(view, preview.Row("방송서버-01")))
+        {
+            await Settle();
+            Save(directory, $"servers-{theme}-07-drop-hover");
+        }
+        await Settle();
+
+        // 모드 절 — PROXY 서버는 server_config.modes 를 갖는다(7.0+).
+        preview.Select(preview.Row("PIDS 프록시"));
+        preview.ViewModel.BeginEdit();
+        ServersPreview.ScrollDetailToTop(view);
+        await Settle();
+        Save(directory, $"servers-{theme}-08-modes");
+        preview.ViewModel.Revert();
+
+        // 등록 폼 — 상태 칸이 없다.
+        preview.ViewModel.Add();
+        await Settle();
+        Save(directory, $"servers-{theme}-09-create");
+        preview.ViewModel.Revert();
+        await Settle();
+
+        // 6.3 계약 — "마지막 변화" 가 "—" 이고 배정 후보가 스피커뿐이다.
+        var legacy = new ServersPreview(EnumServerContract.V6_3);
+        var legacyView = await legacy.BuildAsync(withData: true);
+        _window.Width = 1320;
+        _window.Height = 820;
+        _window.Content = new Border { Margin = new Thickness(12), Child = legacyView };
+        await Settle();
+        legacy.Select(legacy.Row("방송서버-01"));
+        await Settle();
+        Save(directory, $"servers-{theme}-11-legacy-6-3");
+        // 지표 이력 창 — 임계 배지를 그리지 않는다.
+        var history = await preview.MetricHistoryAsync(11, "방송서버-01");
+        _window.Width = 600;
+        _window.Height = 560;
+        _window.Content = new Border { Margin = new Thickness(12), Child = history };
+        await Settle();
+        Save(directory, $"servers-{theme}-10-metric-history");
+
+    }
+
     private void ApplyDark()
     {
         if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
@@ -315,6 +435,9 @@ public partial class App : Application
                 if (child is DataGrid grid && System.Windows.Automation.AutomationProperties.GetAutomationId(grid) == "Console.Devices.Grid") return grid;
                 if (Find(child) is { } found) return found;
             }
+            // 부대 콘솔(N-11) — 콘솔과 따로 뜬다(--units [--dark] [--snapshot <폴더>]).
+            if (e.Args.Contains("--units")) { await RunUnitsAsync(directory); if (directory is not null) Shutdown(); return; }
+
             return null;
         }
     }
@@ -344,6 +467,126 @@ public partial class App : Application
     private sealed class FixedProbe : IServerContractProbe
     {
         public FixedProbe(bool isAxis) => Contract = isAxis ? Enum.GetValues<EnumServerContract>().Max() : EnumServerContract.V6_3;
+
+    /// <summary>
+    /// 부대 콘솔 — 진짜 뷰 + 진짜 뷰모델을 가짜 창구 위에 띄운다. 서버에 한 줄도 나가지 않는다.
+    /// </summary>
+    private async Task RunUnitsAsync(string? directory)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute.BeginOnUIThread 가 작업 스레드에서 돌아 교차 스레드가 된다.
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        var preview = new UnitsPreview();
+        var console = preview.Build();
+        var view = new UnitConsoleView { DataContext = console };
+
+        _window = new Window
+        {
+            Title = "부대 콘솔 미리보기",
+            Width = 1320,
+            Height = 820,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = view },
+        };
+        _window.Show();
+        await ((IActivate)console).ActivateAsync();
+
+        if (directory is null) return;
+        Directory.CreateDirectory(directory);
+
+        async Task Shot(string name)
+        {
+            await Settle();
+            Save(directory, name);
+        }
+
+        async Task Sweep(string theme)
+        {
+            await Shot($"units-{theme}-01-tree");
+
+            var company = console.Rows.First(r => r.Code == "c0206");
+            await console.SelectRowAsync(company);
+            await Shot($"units-{theme}-02-detail");
+
+            console.Form.Name = "6중대 (개편)";
+            await Shot($"units-{theme}-03-dirty");
+            console.Revert();
+
+            console.BeginCreate();
+            console.Form.Code = "Bad.Code";
+            console.Form.Name = "새 중대";
+            await console.ApplyAsync();                   // 보내지 않고 칸에 까닭을 적는다
+            await Shot($"units-{theme}-04-create-invalid");
+            console.Revert();
+
+            await console.SelectRowAsync(console.Rows.First(r => r.Code == "c0206"));
+            preview.MakeNextWriteFail();
+            await console.MoveAsync(console.Rows.First(r => r.Code == "c0206").Id, console.Rows.First(r => r.Code == "r0101").Id);
+            await Shot($"units-{theme}-05-move-failed");
+
+            await console.SelectRowAsync(console.Rows.First(r => r.Code == "c0206"));
+            preview.MakeDeleteBlocked();
+            await console.DeleteAsync();
+            await Shot($"units-{theme}-06-delete-blocked");
+            console.DismissDeleteBlock();
+
+            // 끄는 쪽(장비)과 놓는 쪽(트리)이 한 화면에 같이 있어야 이 창의 대표 기능이 성립한다.
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
+            await Shot($"units-{theme}-07-devices");
+
+            console.QueueAssign(console.Tree.Ordered.First(n => n.Code == "c0206").Id, console.DeviceRows.Take(3).ToList());
+            await Shot($"units-{theme}-08-devices-draft");
+            console.RevertAssigns();
+
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+            await Shot($"units-{theme}-09-adjacency-placeholder");
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_TREE);
+
+            // 막힌 드롭 — 같은 제대 위에 놓으려 하면 까닭이 상태 띠에 뜬다.
+            var moving = console.Rows.First(r => r.Code == "c0206");
+            var sameEchelon = console.Rows.First(r => r.Code == "c0205");
+            console.Drop.Drop(new object[] { moving }, new DropTarget(UnitDropRules.ZONE_PARENT, sameEchelon, -1));
+            await Shot($"units-{theme}-11-drop-blocked");
+
+            // 필터가 걸리면 평면이다 — 부모가 걸러진 자식이 허공에 들여쓰기되지 않는다.
+            console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon == EnumUnitEchelon.Company));
+            await Shot($"units-{theme}-12-filtered");
+            console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon is null));
+
+            // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
+            var wide = _window.Width;
+            _window.Width = 1150;
+            await Shot($"units-{theme}-13-drawer-1150");
+            _window.Width = 900;
+            await Shot($"units-{theme}-14-compact-900");
+            _window.Width = wide;
+            await Settle();
+        }
+
+        await Sweep("light");
+
+        // 옛 계약(6.3) — 부대 편제 자체가 없는 서버. 화면이 빈 채로 까닭을 말해야 한다.
+        var legacy = preview.Build(legacy: true);
+        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = legacy };
+        await ((IActivate)legacy).ActivateAsync();
+        await Shot("units-light-10-legacy-empty");
+
+        ApplyDark();
+        _window.Background = (Brush)FindResource("SurfaceBrush");
+        var dark = new UnitsPreview();
+        var darkConsole = dark.Build();
+        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = darkConsole };
+        await ((IActivate)darkConsole).ActivateAsync();
+
+        var savedPreview = preview;
+        preview = dark;
+        console = darkConsole;
+        await Sweep("dark");
+        _ = savedPreview;
+    }
 
         public EnumServerContract Contract { get; }
         public string? RawVersion => Contract == EnumServerContract.V6_3 ? "6.3.2" : "8.0.1";
