@@ -72,17 +72,21 @@
 						IsTabStop="False"
 						Text="{Binding Tray.Count, Mode=OneWay, StringFormat=Draft {0}건}" />
 
-					<!--  적용 · 되돌리기 · 취소  -->
+					<!--
+						조치 적용 · 트레이 비우기 · 중단.
+						★ 글자는 반드시 "무엇에 대한" 단추인지 말한다 — 상세 칸의 고정 막대도 [되돌리기]/[적용] 이라
+						  같은 화면에 같은 이름의 짝이 둘 생겼고, 둘 다 꺼져 있을 때 구별할 길이 없었다.
+					-->
 					<Button
 						Margin="6,0,0,0"
 						Padding="12,2"
 						AutomationProperties.AutomationId="Console.Events.Tray.Apply"
 						Click="OnApply"
-						Content="적용"
+						Content="조치 적용"
 						DockPanel.Dock="Right"
 						FontSize="12"
 						IsEnabled="{Binding Tray.CanApply}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
+						Style="{StaticResource ModernPrimaryButton}"
 						ToolTip="{Binding Tray.ApplyBlockedReason}"
 						ToolTipService.ShowOnDisabled="True"
 						Visibility="{Binding Tray.IsApplying, Converter={StaticResource NotBoolToVis}}" />
@@ -91,11 +95,11 @@
 						Padding="10,2"
 						AutomationProperties.AutomationId="Console.Events.Tray.Revert"
 						Click="OnRevert"
-						Content="되돌리기"
+						Content="트레이 비우기"
 						DockPanel.Dock="Right"
 						FontSize="12"
 						IsEnabled="{Binding Tray.CanRevert}"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource ModernSecondaryButton}"
 						ToolTip="담은 것을 전부 버립니다 — 서버 호출 0"
 						Visibility="{Binding Tray.IsApplying, Converter={StaticResource NotBoolToVis}}" />
 					<Button
@@ -106,7 +110,7 @@
 						Content="중단"
 						DockPanel.Dock="Right"
 						FontSize="12"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource ModernSecondaryButton}"
 						ToolTip="아직 보내지 않은 줄은 트레이에 남습니다"
 						Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVis}}" />
 				</DockPanel>

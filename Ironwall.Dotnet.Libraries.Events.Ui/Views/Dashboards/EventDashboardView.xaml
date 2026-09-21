@@ -60,6 +60,147 @@
 		<Style x:Key="EventRow" BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
 			<Setter Property="AutomationProperties.AutomationId" Value="{Binding Model.Id, StringFormat=Console.Events.Row.{0}}" />
 		</Style>
+
+		<!--
+			기간 칩(오늘 · 24시간 · 7일 · 직접) — 고른 것을 형태(2px 테두리)와 틴트 바탕, 글자 굵기로 보인다.
+			MDIX 의 MaterialDesignTabRadioButton 은 고른 것을 앰버(#FFAB00) 글자로만 칠해
+			라이트 바탕(#F2F5F9) 대비 1.73:1 이었다 — 어느 것이 켜졌는지 눈으로 가를 수 없었다.
+			두꺼워진 테두리만큼 안쪽 여백을 줄여 고를 때 줄이 흔들리지 않게 한다.
+		-->
+		<Style x:Key="ConsoleChip" TargetType="RadioButton">
+			<Setter Property="Margin" Value="0,0,5,0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="RadioButton">
+						<Grid>
+							<Border
+								x:Name="Chip"
+								Padding="10,3"
+								Background="{DynamicResource SurfaceAltBrush}"
+								BorderBrush="{DynamicResource BorderBrush}"
+								BorderThickness="1"
+								CornerRadius="11">
+								<TextBlock
+									x:Name="Label"
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{TemplateBinding Content}" />
+							</Border>
+							<!--  포커스는 색이 아니라 바깥 윤곽(형태)  -->
+							<Border
+								x:Name="Focus"
+								Margin="-3"
+								BorderBrush="{DynamicResource FocusRingBrush}"
+								BorderThickness="2"
+								CornerRadius="13"
+								Visibility="Collapsed" />
+						</Grid>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+								<Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Chip" Property="Padding" Value="9,2" />
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource TintInfoBrush}" />
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter TargetName="Chip" Property="BorderThickness" Value="2" />
+								<Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+								<Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--
+			목록 위 거르기 줄(탭 꼴) — 고른 것은 본문색 + SemiBold + 2px PrimaryBrush 밑줄.
+			형태(밑줄)와 읽히는 색을 함께 쓴다. 앰버는 라이트에서 흰 바탕과 1.73:1 이라 쓰지 않는다.
+		-->
+		<Style x:Key="ConsoleTab" TargetType="RadioButton">
+			<Setter Property="Margin" Value="0,0,4,0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="RadioButton">
+						<Border
+							x:Name="Bd"
+							Padding="14,5"
+							Background="Transparent"
+							BorderBrush="Transparent"
+							BorderThickness="0,0,0,2">
+							<TextBlock
+								x:Name="Label"
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{TemplateBinding Content}" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+								<Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+								<Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--
+			조치 배지 — 커널 Console.Pill 위에 상태 색만 얹는다. 폭을 고정하지 않는다:
+			92 폭 열 안의 고정 배지가 "조치 있음" 의 마지막 글자를 제 테두리로 잘라 먹고 있었다.
+		-->
+		<Style
+			x:Key="ActionPill"
+			BasedOn="{StaticResource Console.Pill}"
+			TargetType="Border">
+			<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsActionReported}" Value="True">
+					<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style x:Key="ActionPillText" TargetType="TextBlock">
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Text" Value="미조치" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsActionReported}" Value="True">
+					<Setter Property="Text" Value="조치 있음" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  빈 목록 — 0.0% 잉크(아무것도 없는 칸)는 "못 불러온 것"과 구별되지 않는다. 아이콘 + 제목 + 안내.  -->
+		<Style x:Key="ConsoleEmptyState" TargetType="StackPanel">
+			<Setter Property="MaxWidth" Value="320" />
+			<Setter Property="HorizontalAlignment" Value="Center" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
 	</UserControl.Resources>
 
 	<c:ConsoleShell
@@ -98,7 +239,11 @@
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
 
-		<!--  툴바 — 기간 칩 · 검색 · [N건 조치보고](드래그의 키보드 폴백) · [갱신]  -->
+		<!--
+			툴바 — 기간 칩 · 검색 · [N건 조치보고](드래그의 키보드 폴백) · [갱신]
+			검색칸 안내 글은 짧게 둔다: 커널 검색칸은 남는 폭만 받는 자리(MinWidth 120)라
+			"장비 · 구역 검색" 은 제 테두리에 마지막 글자가 잘려 나갔다.
+		-->
 		<c:ConsoleShell.Toolbar>
 			<c:ConsoleToolbar
 				AddClick="OnAdd"
@@ -111,7 +256,7 @@
 				DeleteClick="OnDelete"
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
 				RefreshClick="OnReload"
-				SearchPlaceholder="장비 · 구역 검색"
+				SearchPlaceholder="장비 · 구역"
 				SearchText="{Binding SearchText, Mode=TwoWay}"
 				ShowSearch="{Binding IsListVisible}">
 				<c:ConsoleToolbar.Filters>
@@ -125,14 +270,12 @@
 							<ItemsControl.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
-										Margin="0,0,4,0"
 										AutomationProperties.AutomationId="{Binding Name, StringFormat=Console.Events.Period.{0}}"
 										Click="OnPeriodClick"
 										Content="{Binding Name}"
-										FontSize="12"
 										GroupName="EventsPeriod"
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
-										Style="{StaticResource MaterialDesignTabRadioButton}" />
+										Style="{StaticResource ConsoleChip}" />
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
@@ -169,7 +312,7 @@
 						AutomationProperties.AutomationId="Console.Events.Toolbar.CancelQuery"
 						Click="OnCancelQuery"
 						Content="중단"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource ModernSecondaryButton}"
 						ToolTip="진행 중인 조회를 멈춥니다"
 						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}" />
 					<Button
@@ -177,7 +320,7 @@
 						Click="OnQueueSelection"
 						Content="{Binding QueueButtonText}"
 						IsEnabled="{Binding CanQueueSelection}"
-						Style="{StaticResource MaterialDesignRaisedButton}"
+						Style="{StaticResource ModernPrimaryButton}"
 						ToolTip="고른 이벤트를 조치 트레이에 담습니다 — 행 손잡이를 끌어 놓아도 같습니다"
 						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
 					</StackPanel>
@@ -213,14 +356,12 @@
 							<ItemsControl.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
-										Margin="0,0,4,0"
 										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
 										Click="OnFilterChipClick"
 										Content="{Binding Label}"
-										FontSize="12"
 										GroupName="EventsFilter"
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
-										Style="{StaticResource MaterialDesignTabRadioButton}" />
+										Style="{StaticResource ConsoleTab}" />
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
@@ -259,45 +400,24 @@
 							CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
-						<DataGridTemplateColumn Width="92" Header="조치">
+						<DataGridTemplateColumn
+							Width="96"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
-									<Border
-										Padding="7,1"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										CornerRadius="9">
-										<Border.Style>
-											<Style TargetType="Border">
-												<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
-												<Style.Triggers>
-													<DataTrigger Binding="{Binding IsActionReported}" Value="True">
-														<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
-													</DataTrigger>
-												</Style.Triggers>
-											</Style>
-										</Border.Style>
-										<TextBlock FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}">
-											<TextBlock.Style>
-												<Style TargetType="TextBlock">
-													<Setter Property="Text" Value="미조치" />
-													<Style.Triggers>
-														<DataTrigger Binding="{Binding IsActionReported}" Value="True">
-															<Setter Property="Text" Value="조치 있음" />
-														</DataTrigger>
-													</Style.Triggers>
-												</Style>
-											</TextBlock.Style>
-										</TextBlock>
+									<Border Style="{StaticResource ActionPill}">
+										<TextBlock Style="{StaticResource ActionPillText}" />
 									</Border>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
-							Width="150"
+							Width="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
-						<DataGridTemplateColumn Width="76" Header="스냅샷">
+						<DataGridTemplateColumn Width="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Grid Width="46" Height="30">
@@ -320,22 +440,27 @@
 						<DataGridTextColumn
 							Width="100"
 							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="유형" />
 						<DataGridTextColumn
 							Width="*"
 							Binding="{Binding Device.DeviceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="120"
 							Binding="{Binding Device, Converter={StaticResource Zone}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="구역" />
 						<DataGridTextColumn
 							Width="130"
 							Binding="{Binding Result, Converter={StaticResource Korean}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="결과" />
 						<DataGridTextColumn
 							Width="80"
 							Binding="{Binding SignalText}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="신호" />
 					</DataGrid.Columns>
 					<DataGrid.RowStyle>
@@ -371,58 +496,40 @@
 							CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
-						<DataGridTemplateColumn Width="92" Header="조치">
+						<DataGridTemplateColumn
+							Width="96"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
-									<Border
-										Padding="7,1"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										CornerRadius="9">
-										<Border.Style>
-											<Style TargetType="Border">
-												<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
-												<Style.Triggers>
-													<DataTrigger Binding="{Binding IsActionReported}" Value="True">
-														<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
-													</DataTrigger>
-												</Style.Triggers>
-											</Style>
-										</Border.Style>
-										<TextBlock FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}">
-											<TextBlock.Style>
-												<Style TargetType="TextBlock">
-													<Setter Property="Text" Value="미조치" />
-													<Style.Triggers>
-														<DataTrigger Binding="{Binding IsActionReported}" Value="True">
-															<Setter Property="Text" Value="조치 있음" />
-														</DataTrigger>
-													</Style.Triggers>
-												</Style>
-											</TextBlock.Style>
-										</TextBlock>
+									<Border Style="{StaticResource ActionPill}">
+										<TextBlock Style="{StaticResource ActionPillText}" />
 									</Border>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
-							Width="150"
+							Width="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
 							Width="*"
 							Binding="{Binding Device.DeviceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
-							Width="120"
+							Width="100"
 							Binding="{Binding DeviceTypeName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="종류" />
 						<DataGridTextColumn
-							Width="140"
+							Width="124"
 							Binding="{Binding Reason, Converter={StaticResource Korean}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="사유" />
 						<!--  고장 구간 = 제어기 루프 위의 지점(정수)이지 시각이 아니다  -->
-						<DataGridTemplateColumn Width="150" Header="고장 구간">
+						<DataGridTemplateColumn Width="136" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="고장 구간">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<TextBlock
@@ -458,20 +565,24 @@
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
 						<DataGridTextColumn
-							Width="150"
+							Width="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
 							Width="*"
 							Binding="{Binding Device.DeviceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="140"
 							Binding="{Binding DeviceTypeName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="종류" />
 						<DataGridTextColumn
 							Width="120"
 							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="상태" />
 					</DataGrid.Columns>
 				</DataGrid>
@@ -493,14 +604,16 @@
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
 						<DataGridTextColumn
-							Width="150"
+							Width="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
-							Width="90"
+							Width="80"
 							Binding="{Binding OriginEvent.Id}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="원본" />
-						<DataGridTemplateColumn Width="76" Header="스냅샷">
+						<DataGridTemplateColumn Width="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Grid Width="46" Height="30">
@@ -521,19 +634,56 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
-							Width="160"
+							Width="130"
 							Binding="{Binding OriginEvent.Device.DeviceName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
-							Width="120"
+							Width="150"
 							Binding="{Binding User}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="사용자" />
 						<DataGridTextColumn
 							Width="*"
 							Binding="{Binding Content}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="내용" />
 					</DataGrid.Columns>
 				</DataGrid>
+
+				<!--
+					빈 목록 — 본문을 정말 비워 두지 않는다. 아무것도 없는 칸은 "한 건도 없다" 와
+					"못 불러왔다" 를 구별해 주지 못하고, 바닥의 30px 상태 줄 하나로는 모자랐다.
+				-->
+				<StackPanel
+					AutomationProperties.AutomationId="Console.Events.List.EmptyState"
+					Style="{StaticResource ConsoleEmptyState}"
+					Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVis}}">
+					<md:PackIcon
+						Width="40"
+						Height="40"
+						HorizontalAlignment="Center"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Kind="InboxOutline" />
+					<TextBlock
+						Margin="0,12,0,0"
+						HorizontalAlignment="Center"
+						AutomationProperties.AutomationId="Console.Events.List.EmptyState.Title"
+						FontSize="14"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding EmptyStateTitle}"
+						TextAlignment="Center"
+						TextWrapping="Wrap" />
+					<TextBlock
+						Margin="0,6,0,0"
+						HorizontalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding EmptyStateHint}"
+						TextAlignment="Center"
+						TextWrapping="Wrap" />
+				</StackPanel>
 			</Grid>
 			</DockPanel>
 		</c:ConsoleShell.List>
