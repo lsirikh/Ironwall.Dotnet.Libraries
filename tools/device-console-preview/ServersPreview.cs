@@ -55,7 +55,15 @@ internal sealed class ServersPreview
 
     public ServerRowViewModel Row(string name) => ViewModel.Rows.First(r => r.Name == name);
 
-    public void Select(ServerRowViewModel row) => ViewModel.OnRowsSelected(new List<object> { row });
+    /// <summary>
+    /// 실제 클릭처럼 그리드를 거쳐 고른다 — <c>ViewModel.OnRowsSelected</c> 를 직접 부르면
+    /// <see cref="DataGridRow.IsSelected"/> 가 한 번도 서지 않아 선택 시각효과가 찍히지 않는다.
+    /// </summary>
+    public void Select(ServerRowViewModel row)
+    {
+        var grid = Descendants<DataGrid>(View).First();
+        grid.SelectedItem = row;
+    }
 
     /// <summary>지표 이력 창 — 임계 배지를 그리지 않는 화면을 그대로 만든다.</summary>
     public async Task<FrameworkElement> MetricHistoryAsync(int serverId, string serverName)

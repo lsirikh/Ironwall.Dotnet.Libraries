@@ -705,12 +705,30 @@
 						Foreground="{DynamicResource TextMutedBrush}"
 						Style="{StaticResource Unit.Readout}"
 						Visibility="{Binding CanEditUnits, Converter={StaticResource NotBoolToVisibility}}" />
+					<!--
+						막는 까닭을 말하려고 만든 자리다 — 좁은 폭에서 잘려 사라지면 안 된다(커널의
+						"적용하거나 되돌린…" 실패와 같은 함정). 두 줄까지 굴리고 그래도 넘치면 말줄임 +
+						툴팁으로 전체 문장을 남긴다. Label 은 그대로 둔다(peer 가 있어 자동화가 짚을 수 있다) —
+						안의 TextBlock 만 트리밍을 맡는다.
+					-->
 					<Label
 						Margin="12,0"
 						AutomationProperties.AutomationId="Units.Status.Message"
 						Content="{Binding StatusText}"
 						DockPanel.Dock="Right"
-						Style="{StaticResource Unit.Readout}" />
+						Style="{StaticResource Unit.Readout}"
+						ToolTip="{Binding StatusText}">
+						<Label.ContentTemplate>
+							<DataTemplate>
+								<TextBlock
+									MaxWidth="320"
+									MaxHeight="34"
+									Text="{Binding}"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="Wrap" />
+							</DataTemplate>
+						</Label.ContentTemplate>
+					</Label>
 					<Label
 						AutomationProperties.AutomationId="Units.Status.Count"
 						Content="{Binding ListStatusText}"

@@ -116,7 +116,7 @@ public partial class ServerMonitorView : UserControl
     }
 
     /// <summary>
-    /// 맨 앞의 <b>놓을 곳 표시</b> 칸. 행의 드롭 상태(<c>DropZone.State</c>)는 <b>상속되는</b> 속성이라
+    /// 맨 앞의 <b>놓을 곳 표시 · 선택 표시</b> 칸. 행의 드롭 상태(<c>DropZone.State</c>)는 <b>상속되는</b> 속성이라
     /// 행 안의 <see cref="DropZoneChrome"/> 이 그대로 받아 커널의 어휘 그대로 그린다 —
     /// 놓을 수 있음 = 파선 · 지금 그 위 = 굵은 실선 · 놓을 수 없음 = 사선 해치.
     /// </summary>
@@ -124,6 +124,11 @@ public partial class ServerMonitorView : UserControl
     /// 행 자체의 테두리로는 표현할 수 없다: <c>Console.DataGrid.Row</c> 의 템플릿이
     /// <c>BorderThickness</c>·<c>BorderBrush</c> 를 <b>고정값</b>으로 그려 행에 건 설정이 닿지 않는다
     /// (테마는 이 노드 범위 밖이다). 그래서 형태는 이 칸이 맡고, 행 배경의 해치는 보조 신호로 남긴다.
+    /// <para>
+    /// <b>선택 = 좌측 3px 바</b>(보고서 콘솔과 같은 어휘)도 여기서 낸다 — 행 템플릿 자체의 <c>Bar</c>
+    /// 요소는 이 칸이 맨 앞 열을 차지한 채로는 화면에 닿지 않는다(실측: 배경 틴트는 뜨는데 바는 안 뜬다).
+    /// 색만으로 뜻을 전하지 않기 위해 배경 틴트(행 템플릿이 이미 낸다) 옆에 <b>형태</b> 신호를 더한다.
+    /// </para>
     /// </remarks>
     private static DataGridColumn CreateDropMarkerColumn(Style? cellStyle)
         => new DataGridTemplateColumn
@@ -132,8 +137,19 @@ public partial class ServerMonitorView : UserControl
             CanUserResize = false,
             CellStyle = cellStyle,
             CellTemplate = ParseTemplate(
-                "<drag:DropZoneChrome Margin=\"2,4\" CornerRadius=\"3\" IsHitTestVisible=\"False\">"
-                + "<Border Width=\"14\" Height=\"22\" Background=\"Transparent\" /></drag:DropZoneChrome>"),
+                "<Grid>"
+                + "<Rectangle Width=\"3\" HorizontalAlignment=\"Left\" Fill=\"{DynamicResource PrimaryBrush}\" IsHitTestVisible=\"False\">"
+                + "<Rectangle.Style><Style TargetType=\"Rectangle\">"
+                + "<Setter Property=\"Visibility\" Value=\"Collapsed\" />"
+                + "<Style.Triggers>"
+                + "<DataTrigger Binding=\"{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=IsSelected}\" Value=\"True\">"
+                + "<Setter Property=\"Visibility\" Value=\"Visible\" />"
+                + "</DataTrigger>"
+                + "</Style.Triggers></Style></Rectangle.Style>"
+                + "</Rectangle>"
+                + "<drag:DropZoneChrome Margin=\"6,4,2,4\" CornerRadius=\"3\" IsHitTestVisible=\"False\">"
+                + "<Border Width=\"14\" Height=\"22\" Background=\"Transparent\" /></drag:DropZoneChrome>"
+                + "</Grid>"),
         };
 
     private static DataGridColumn CreateColumn(ServerColumnSpec spec)
