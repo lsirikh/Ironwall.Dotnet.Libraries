@@ -6,11 +6,17 @@
 	Startup="OnStartup">
 	<Application.Resources>
 		<ResourceDictionary>
-			<!--  Same order as the host App.xaml: MDIX bundle, MD3 defaults, then the Ironwall theme (tokens + console styles).  -->
+			<!--
+				D-28 (2026-09-23): merges the HOST's exact list (MahApps → BundledTheme → MD3 defaults/MDIX → Theme.Current),
+				not an approximation of it — see tools/shared/HostResources.Pre.xaml and .Post.xaml for the line-by-line
+				mapping to Dotnet.Monitoring.Solution/App.xaml and why this used to be MDIX-only (phantom teal-block /
+				Path-text defect). BundledTheme stays local (not in the shared files) so App.xaml.cs's ApplyDark() can
+				still find it via Resources.MergedDictionaries.OfType<BundledTheme>().
+			-->
 			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="HostResources.Pre.xaml" />
 				<md:BundledTheme BaseTheme="Light" PrimaryColor="Teal" SecondaryColor="Amber" />
-				<ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
-				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Theme.Current.xaml" />
+				<ResourceDictionary Source="HostResources.Post.xaml" />
 			</ResourceDictionary.MergedDictionaries>
 
 			<!--

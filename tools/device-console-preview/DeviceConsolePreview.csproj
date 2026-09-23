@@ -20,4 +20,16 @@
     <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
   </ItemGroup>
 
+  <!--  D-28: shared host-merge-list dictionaries, linked (not copied) from tools/shared — see that folder's XAML comments.  -->
+  <ItemGroup>
+    <Page Include="..\shared\HostResources.Pre.xaml" Link="HostResources.Pre.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="..\shared\HostResources.Post.xaml" Link="HostResources.Post.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
 </Project>

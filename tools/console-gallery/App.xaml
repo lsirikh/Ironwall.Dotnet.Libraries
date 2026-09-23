@@ -2,13 +2,32 @@
 	x:Class="ConsoleGallery.App"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	Startup="OnStartup">
 	<Application.Resources>
 		<ResourceDictionary>
-			<!--  토큰만 병합한다(불변 + 라이트). 다크 전환은 MainWindow 가 마지막 사전을 바꿔 끼운다.  -->
+			<!--
+				D-28 (2026-09-23): this used to merge only Tokens.Shared/Styles.Console/Tokens.Light — neither MDIX nor
+				MahApps at all. It got away with that because nothing on screen here uses a MahApps or MaterialDesign
+				control (no mah:DateTimePicker, no md:PackIcon): the DragHandle/ReorderList/console chrome all come from
+				Ironwall.Dotnet.Libraries.Utils's own Themes/Generic.xaml (WPF's default-style resolution for custom
+				controls, resolved via the control's own Themes/Generic.xaml regardless of what the Application merges —
+				that's the "implicit" catalog the task asked to identify). It still converges on the same shared list as
+				the other four tools now, for D-28 consistency and so a future control that DOES need MD/MahApps here
+				doesn't silently regress to the phantom-defect state. See tools/shared/HostResources.Pre.xaml/.Post.xaml
+				for the line-by-line host mapping; BundledTheme stays local for the same OfType<BundledTheme> reason
+				documented there (unused today — console-gallery's own theme toggle below never inspects it — kept for
+				parity with the host and the other four tools, and to price the MD engine here truthfully if that changes).
+
+				MainWindow.OnToggleTheme / MatrixWindow.SwapTokens still swap the LAST top-level dictionary in
+				Resources.MergedDictionaries by index/name — so an explicit trailing Tokens.Light.xaml entry is kept
+				here (Theme.Current.xaml's own nested Tokens.Light is not reachable by that top-level index/name logic).
+				Not touched: MainWindow.xaml.cs / MatrixWindow.cs are out of this task's scope (XAML only).
+			-->
 			<ResourceDictionary.MergedDictionaries>
-				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Shared.xaml" />
-				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Console.xaml" />
+				<ResourceDictionary Source="HostResources.Pre.xaml" />
+				<md:BundledTheme BaseTheme="Light" PrimaryColor="Teal" SecondaryColor="Amber" />
+				<ResourceDictionary Source="HostResources.Post.xaml" />
 				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Light.xaml" />
 			</ResourceDictionary.MergedDictionaries>
 		</ResourceDictionary>

@@ -879,14 +879,27 @@
 	<!--  ═════════ 날짜/시각 입력 ═════════
 	     K-11 — mah:DateTimePicker 내부 달력 토글 버튼은 자기 Style 이 없는 게 아니라
 	     Style="{DynamicResource MahApps.Styles.Button.Chromeless}" 로 MahApps 자신의 키를 명시로 찾는다(실측:
-	     GitHub MahApps.Metro 2.4.10 Styles/Controls.DatePicker.xaml). 이 앱은 MDIX + Theme.Current 만 병합하고
-	     MahApps 자신의 Controls.Buttons.xaml 은 병합하지 않으므로 그 DynamicResource 가 어디서도 안 풀린다 →
-	     Style 이 끝내 비어 WPF 가 암시 스타일 탐색으로 떨어지고, 앱 스코프에 있는 MDIX 의 암시 Button 스타일
-	     (Teal500 #009688)이 대신 먹힌다(실측: 통짜 사각형, 글리프 없음). 고치는 법은 그 정확한 키 이름으로
-	     우리 정의를 Style.Resources 에 두는 것 — 이 컨트롤 스코프 DynamicResource 조회가 Application 보다
-	     먼저 이 사전을 본다. Template 은 손대지 않는다(Background/BorderThickness 만 비우면 컨트롤 자신의
-	     테마 스타일이 글리프까지 그대로 그려진다 — Style setter 는 그 Style 이 정의하지 않은 속성에 한해
-	     테마 스타일로 떨어진다).
+	     GitHub MahApps.Metro 2.4.10 Styles/Controls.DatePicker.xaml). ★정정(D-28, 2026-09-23): 호스트 앱
+	     (Dotnet.Monitoring.Solution/App.xaml:15-17)은 MahApps 자신의 Controls.xaml·Fonts.xaml·Light.Blue.xaml 을
+	     MDIX 보다 먼저 병합해 이 카탈로그를 갖고 있으므로, 호스트에서는 그 DynamicResource 가 정상적으로 풀린다
+	     — "이 앱은 MDIX + Theme.Current 만 병합한다"는 예전 진술은 틀렸다. 통짜 사각형 증상(Teal500 #009688,
+	     글리프 없음)은 과거 미리보기 도구들(tools/*-console-preview, console-gallery)이 MDIX 만 병합하고
+	     MahApps 자신의 사전은 하나도 병합하지 않았던 데서 나온 것이었다 — 즉 이 저장소 실코드의 결함이 아니라
+	     미리보기 도구의 병합 목록 누락이 만든 팬텀 증상이었다(실측). tools/shared/HostResources.Pre.xaml 이
+	     호스트 목록을 그대로 병합하도록 다섯 도구를 정정해 지금은 도구에서도 재현되지 않는다(단, 다섯 도구의
+	     전체 스냅샷 모드를 픽셀 diff 로 훑었을 때 이 토글 글리프 자체를 노출하는 프레임을 찾지 못해 "고쳐지는
+	     장면"을 직접 본 것은 아니다 — 병합 목록이 호스트와 바이트 단위로 같아졌다는 코드 사실로 판단한다).
+	     같은 조사에서 별개의 프리뷰-하네스 전용 결함이 하나 더 나왔다 — device-console-preview 의 옛 Save()
+	     가 VisualBrush 간접 합성을 쓰다 창을 막 띄운 첫 캡처에서 40px 헤더가 통째로 빠지는 결함이 있었다
+	     (제품 코드는 처음부터 정상, D-05, 2026-09-23). 즉 "통짜 사각형"과 "빠진 헤더" 둘 다 제품 결함이 아니라
+	     미리보기 하네스 자체의 결함이었다 — 프리뷰에서만 보이는 증상은, 그 도구가 호스트에 충실하다고
+	     증명되기 전까지는 일단 의심한다.
+	     그렇다고 아래 Style.Resources 오버라이드가 불필요해지는 것은 아니다 — 호스트가 카탈로그를 갖고 있어도
+	     Culture/워터마크/다크 배경(K-11 나머지 항목, 아래 계속)은 MahApps 2.4.10 의 별개 결함이라 여전히
+	     유효하다. 고치는 법은 그 정확한 키 이름으로 우리 정의를 Style.Resources 에 두는 것 — 이 컨트롤 스코프
+	     DynamicResource 조회가 Application 보다 먼저 이 사전을 본다. Template 은 손대지 않는다
+	     (Background/BorderThickness 만 비우면 컨트롤 자신의 테마 스타일이 글리프까지 그대로 그려진다 —
+	     Style setter 는 그 Style 이 정의하지 않은 속성에 한해 테마 스타일로 떨어진다).
 	     Culture 를 비워 두면 WPF FrameworkElement.Language 기본값(en-US)으로 떨어져 9/16/2026 3:52:12 PM 처럼
 	     미국식 · 초 포함 · AM/PM 으로 렌더링된다(실측). ConsoleDateTimeFormat.FixedCulture(불변 문화권 복제 +
 	     yyyy-MM-dd / HH:mm 패턴 + AM/PM 디자이네이터 제거) + SelectedDateFormat=Short + SelectedTimeFormat=Short 로
