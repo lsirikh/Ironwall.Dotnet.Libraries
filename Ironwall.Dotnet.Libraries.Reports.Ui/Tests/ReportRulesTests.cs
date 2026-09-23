@@ -3,6 +3,8 @@ using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Templates;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
@@ -154,6 +156,85 @@ public class ReportColumnPriorityTests
         var keys = ReportColumnCatalog.Generations.Select(c => c.Key).ToHashSet();
 
         Assert.All(At(200), key => Assert.Contains(key, keys));
+    }
+}
+
+/// <summary>
+/// D-03 — 접힘(900) + 서랍 열림 복합 상태. <see cref="ReportColumnPriority"/> 자체는 폭만 정확히 받으면 늘 옳았다
+/// (<see cref="ReportColumnPriorityTests"/> 가 이미 증명한다) — 실제 결함은 뷰 코드비하인드가 서랍이 열려도
+/// <c>ApplyColumnPrefs</c> 를 다시 부르지 않아 <b>서랍이 열리기 전의 넓은 폭</b>으로 내린 판단이 굳어 있던 것이었다.
+/// 여기서는 그 결함이 실제로 겪는 폭을 <see cref="ConsoleLayoutMath"/> 의 같은 공식으로 재구성해서,
+/// "사다리가 그 폭을 받으면" 제목이 읽을 수 있게 남는지를 증명한다 — 뷰가 그 폭을 <i>언제</i> 넘겨주는지는
+/// (그것이 이번에 고친 배선이다) 여기서 다루지 않는다.
+/// </summary>
+public class ReportColumnPriorityCompoundStateTests
+{
+    /// <summary>ReportConsoleView.xaml 의 <c>ConsoleShell.DetailWidth="380"</c> 과 같다.</summary>
+    private const double ShellDetailWidth = 380;
+
+    /// <summary>서랍이 열렸을 때 목록이 실제로 받는 폭 — <see cref="ConsoleShell"/> 이 <c>ApplyLayout</c> 에서
+    /// 계산하는 것과 같은 두 함수(<see cref="ConsoleLayoutMath.Resolve"/> · <see cref="ConsoleLayoutMath.ListRightInset"/>)
+    /// 를 그대로 합성한다.</summary>
+    private static double EffectiveListWidth(double shellWidth, bool isDrawerOpen)
+    {
+        var layout = ConsoleLayoutMath.Resolve(shellWidth, ShellDetailWidth);
+        var inset = ConsoleLayoutMath.ListRightInset(layout, isDrawerOpen);
+        return Math.Max(0, layout.ListWidth - inset);
+    }
+
+    [Fact]
+    public void should_be_compact_mode_when_the_shell_is_900_wide()
+    {
+        Assert.Equal(ConsoleLayoutMode.Compact, ConsoleLayoutMath.Resolve(900, ShellDetailWidth).Mode);
+    }
+
+    [Fact]
+    public void should_collapse_nothing_when_compact_with_the_drawer_closed()
+    {
+        var width = EffectiveListWidth(900, isDrawerOpen: false);
+
+        Assert.Empty(ReportColumnPriority.CollapsedAt(width, ReportColumnCatalog.Generations));
+    }
+
+    [Fact]
+    public void should_collapse_the_low_priority_columns_when_compact_with_the_drawer_open()
+    {
+        var width = EffectiveListWidth(900, isDrawerOpen: true);
+        var collapsed = ReportColumnPriority.CollapsedAt(width, ReportColumnCatalog.Generations).ToArray();
+
+        Assert.Contains("created_at", collapsed);
+        Assert.Contains("period_type", collapsed);
+        Assert.Contains("report_type", collapsed);
+        Assert.DoesNotContain("id", collapsed);
+        Assert.DoesNotContain("title", collapsed);
+        Assert.DoesNotContain("status", collapsed);
+    }
+
+    [Fact]
+    public void should_leave_enough_room_for_a_readable_title_when_compact_with_the_drawer_open()
+    {
+        var width = EffectiveListWidth(900, isDrawerOpen: true);
+        var collapsed = ReportColumnPriority.CollapsedAt(width, ReportColumnCatalog.Generations).ToHashSet();
+
+        var fixedWidthRemaining = ReportColumnCatalog.Generations
+            .Where(c => c.IsDefault && c.Width > 0 && !collapsed.Contains(c.Key))
+            .Sum(c => c.Width);
+
+        // 뷰의 별 열 MinWidth(140, ReportConsoleView.StarColumnMinWidth)를 채울 폭이 남아야 한다.
+        Assert.True(width - fixedWidthRemaining >= 140, $"list={width}, fixed remaining={fixedWidthRemaining}");
+    }
+
+    [Fact]
+    public void should_leave_enough_room_for_a_readable_name_when_compact_with_the_drawer_open_on_the_template_rail()
+    {
+        var width = EffectiveListWidth(900, isDrawerOpen: true);
+        var collapsed = ReportColumnPriority.CollapsedAt(width, ReportColumnCatalog.Templates).ToHashSet();
+
+        var fixedWidthRemaining = ReportColumnCatalog.Templates
+            .Where(c => c.IsDefault && c.Width > 0 && !collapsed.Contains(c.Key))
+            .Sum(c => c.Width);
+
+        Assert.True(width - fixedWidthRemaining >= 140, $"list={width}, fixed remaining={fixedWidthRemaining}");
     }
 }
 

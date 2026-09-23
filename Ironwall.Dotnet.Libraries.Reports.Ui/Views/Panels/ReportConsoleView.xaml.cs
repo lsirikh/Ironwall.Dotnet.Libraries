@@ -45,6 +45,7 @@ public partial class ReportConsoleView : UserControl
     {
         DetachShell();
         Detach();
+        if (_grid is not null) _grid.SizeChanged -= OnGridSizeChanged;
     }
 
     private ReportConsoleViewModel? ViewModel => DataContext as ReportConsoleViewModel;
@@ -104,6 +105,17 @@ public partial class ReportConsoleView : UserControl
     /// <summary>목록이 좁아지면 낮은 우선순위 열을 접는다 — 상태 칩은 끝까지 남긴다.</summary>
     private void OnShellSizeChanged(object sender, SizeChangedEventArgs e) => ApplyColumnPrefs();
 
+    /// <summary>
+    /// ★ D-03: 서랍이 열리고 닫힐 때는 <b>셸 자신의 크기는 바뀌지 않는다</b> — <see cref="ConsoleShell"/> 이
+    /// 목록 칸에 오른쪽 여백(서랍 폭만큼)만 줄 뿐이다(<c>ApplyLayout</c> 의 <c>_contentHost.Margin</c>).
+    /// <see cref="OnShellSizeChanged"/> 하나만 듣던 낡은 배선은 그래서 <b>접힘(900) + 서랍 열림</b> 복합 상태에서
+    /// <see cref="ApplyColumnPrefs"/> 가 다시 불리지 않아, 서랍이 열리기 <i>전</i> 의 넓은 폭으로 내린 "아무것도
+    /// 접지 않는다" 판단이 굳어 있었다 — 그리드는 실제로 좁아졌는데 우선순위 사다리는 그걸 몰랐다.
+    /// 그리드 자신의 <see cref="FrameworkElement.SizeChanged"/> 는 Arrange 가 끝난 <b>뒤</b>에만 올라오므로,
+    /// 여기서 다시 재는 폭은 항상 DataGrid 가 실제로 쓸 최종 폭과 같다(Margin 반영 전 폭을 읽는 레이스가 없다).
+    /// </summary>
+    private void OnGridSizeChanged(object sender, SizeChangedEventArgs e) => ApplyColumnPrefs();
+
     /// <summary>★ 공역: 서랍 · 접힘에서는 살아 있는 WebView2 를 만들지 않는다(뷰모델이 판정한다).</summary>
     private void PushLayoutMode()
     {
@@ -113,7 +125,9 @@ public partial class ReportConsoleView : UserControl
 
     private void OnGridLoaded(object sender, RoutedEventArgs e)
     {
+        if (_grid is not null) _grid.SizeChanged -= OnGridSizeChanged;
         _grid = (DataGrid)sender;
+        _grid.SizeChanged += OnGridSizeChanged;
         RebuildColumns();
     }
 
@@ -131,6 +145,22 @@ public partial class ReportConsoleView : UserControl
     #endregion
 
     #region - Columns -
+    /// <summary>
+    /// 별 열(제목 · 이름)의 바닥 폭 — 이 밑으로는 DataGrid 가 <c>MinWidth</c> 를 지키느라
+    /// 가로 스크롤을 낸다(<c>Console.DataGrid</c> 스타일의 <c>HorizontalScrollBarVisibility="Auto"</c>).
+    /// <see cref="ReportColumnPriority"/> 사다리가 그 순간의 실제 폭으로 다시 불리지 않는 한 프레임(레이아웃
+    /// 타이밍 · 향후 회귀)에서도, 이 화면의 유일한 사람이 읽는 식별자가 <b>0px 로 뭉개지는 일은 없어야 한다</b>(D-03) —
+    /// 기본값(20px, <see cref="DataGridColumn.MinWidth"/>)은 숫자로는 0이 아니지만 글자 하나도 못 읽어 사실상 같다.
+    /// </summary>
+    /// <remarks>
+    /// ★ 실측(접힘 900 + 서랍 열림 재현): DataGrid 가 좁은 과도 폭(예: 리사이즈 도중의 316)을 지나가면,
+    /// <b>고정 폭 열까지</b> 그 폭에서 계산한 최소값에 눌어붙고 — 그리드가 그 뒤 444 로 다시 넓어져도 저절로
+    /// 안 돌아온다(별 열만의 문제가 아니었다: 진단에서 <c>아이디</c> 열이 68 대신 20, <c>상태</c> 열이 132 대신
+    /// 34 로 고정되는 것을 확인했다). 그래서 <b>고정 열도</b> 제 폭을 바닥으로 걸어 둔다 — 별 열과 같은 이유,
+    /// 같은 처방이다.
+    /// </remarks>
+    private const double StarColumnMinWidth = 140;
+
     /// <summary>열 명세 → DataGrid 열. 레일을 바꿀 때마다 다시 만든다(화면마다 열이 다르다).</summary>
     private void RebuildColumns()
     {
@@ -144,7 +174,10 @@ public partial class ReportConsoleView : UserControl
         {
             var column = CreateColumn(spec);
             column.Header = spec.Header;
-            column.Width = spec.Width > 0 ? new DataGridLength(spec.Width) : new DataGridLength(1, DataGridLengthUnitType.Star);
+            var isStar = spec.Width <= 0;
+            column.Width = isStar ? new DataGridLength(1, DataGridLengthUnitType.Star) : new DataGridLength(spec.Width);
+            // 고정 열도 제 폭을 MinWidth 로 건다 — 안 걸면 DataGrid 의 기본 MinWidth(20) 까지 눌어붙을 수 있다(위 remarks).
+            column.MinWidth = isStar ? StarColumnMinWidth : spec.Width;
             column.CellStyle = cellStyle;
             ConsoleColumns.SetKey(column, spec.Key);
             ConsoleColumns.SetIsDefault(column, spec.IsDefault);
