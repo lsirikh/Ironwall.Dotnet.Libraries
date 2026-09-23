@@ -195,6 +195,15 @@ public partial class App : Application
         await Settle();
         Save(directory, $"{prefix}-03-camera-single");
 
+        // D-07 — 레거시 계약의 "제어 모드"·"카메라 유형(레거시)" 콤보(연결 절 맨 아래)는 고정 높이 미리보기
+        // 창의 접힘 아래에 있어 지금까지 렌더된 채로 눈으로 확인된 적이 없다. 상세 칸을 끝까지 굴려 그 절을
+        // 프레임 안으로 끌어온다 — --legacy 에서만 뜻이 있다(LegacyContractOnly, DevicePropertyCatalog.cs:318-331).
+        ServersPreview.ScrollDetailToEnd(_view);
+        await Settle();
+        Save(directory, $"{prefix}-03c-camera-detail-scrolled");
+        ServersPreview.ScrollDetailToTop(_view);
+        await Settle();
+
         var name = _viewModel.Form.Fields.First(f => f.Key == "name_device");
         name.Text += " (수정)";
         _viewModel.Form.Fields.First(f => f.Key == "connection.ip_port").Text = "70000";
@@ -260,8 +269,16 @@ public partial class App : Application
         await Settle();
         Save(directory, $"{prefix}-10-dark-camera-dirty");
 
-        // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
+        // D-07 다크 — 같은 절을 다크에서도 눈으로 확인한다(색만 다를 뿐 같은 자리).
+        ServersPreview.ScrollDetailToEnd(_view);
+        await Settle();
+        Save(directory, $"{prefix}-09c-dark-camera-detail-scrolled");
+        ServersPreview.ScrollDetailToTop(_view);
+        await Settle();
         _viewModel.Revert();
+        await Settle();
+
+        // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
         _window.Width = 1150;
         await Settle();
         Save(directory, $"{prefix}-11-dark-drawer-1150");
@@ -700,6 +717,16 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// D-05(2026-09-23) — <c>DrawingVisual</c> 에 <c>VisualBrush(content){Stretch=None}</c> 를 그려 간접 합성하던
+    /// 옛 방식은, 창을 막 띄운 <b>첫 캡처</b>에서 자식의 최근 레이아웃 변경분을 브러시가 못 따라가는 경우가 있었다
+    /// (실측: 서버 콘솔의 40px 헤더 Border 가 살아있는 트리에서 ActualHeight=40 · Visibility=Visible ·
+    /// Background 도 올바르게 흰색으로 풀렸는데 — 즉 제품 바인딩·레이아웃은 처음부터 맞았는데 — 옛 저장 방식으로
+    /// 뜬 PNG 에서만 그 40px 띠가 통째로 빠졌다. 같은 순간 같은 요소를 <c>RenderTargetBitmap.Render(element)</c> 로
+    /// <b>직접</b> 찍으면 헤더가 제대로 나왔다 — 재현 트리거는 데이터 로딩이 아니라 "막 뜬 창의 첫 프레임"이었다).
+    /// 그래서 지금은 배경 사각형을 그린 뒤 <c>content</c> 를 VisualBrush 없이 <b>직접 Render</b> 한다 —
+    /// <see cref="RenderTargetBitmap.Render"/> 는 같은 비트맵에 여러 번 불러도 앞서 그린 내용 위에 합성된다.
+    /// </summary>
     private void Save(string directory, string name)
     {
         var content = (FrameworkElement)_window.Content;
@@ -707,13 +734,11 @@ public partial class App : Application
         var height = (int)Math.Ceiling(content.ActualHeight);
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
 
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
+        var background = new DrawingVisual();
+        using (var dc = background.RenderOpen())
             dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None }, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
+        bitmap.Render(background);
+        bitmap.Render(content);
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
