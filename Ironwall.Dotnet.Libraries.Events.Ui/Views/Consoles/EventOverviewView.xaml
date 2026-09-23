@@ -60,7 +60,15 @@
 				Text="통계를 불러오는 중" />
 		</StackPanel>
 
+		<!--
+			D-37 과 같은 결함군 — 유형별 비중 카드의 마지막 줄("…탐지 192 건 · 60%")이 하단 상태
+			막대 윗선에 붙어 잘렸다. 안쪽 StackPanel 의 바닥 Margin(12) 은 스크롤 되는 내용물 <b>안</b>이라
+			다 굴렸을 때도 여분을 안 남긴다 — 커널 정본(Generic.xaml Console.DetailPane 템플릿, 4785d422)
+			과 같은 처방으로 나머지 12 를 <b>이 ScrollViewer 자신의 Margin</b> 에 얹는다. 이 뷰는 그 커널
+			템플릿을 안 쓰는 평범한 ScrollViewer 라 D-37 이 자동으로 못 미쳤다 — 여기서 같은 값을 반복한다.
+		-->
 		<ScrollViewer
+			Margin="0,0,0,12"
 			HorizontalScrollBarVisibility="Disabled"
 			Style="{StaticResource Console.ScrollViewer}"
 			VerticalScrollBarVisibility="Auto"
@@ -164,9 +172,20 @@
 								Text="가로로 끌면 그 구간이 기간이 됩니다 · Esc 로 취소 · 기간 칩으로도 같은 일을 합니다" />
 						</DockPanel>
 
-						<!--  플롯 호스트 — Border 는 peer 가 없어 자동화가 못 본다. 밖을 peer 있는 Label 로 감싼다(R13)  -->
+						<!--
+							플롯 호스트 — Border 는 peer 가 없어 자동화가 못 본다. 밖을 peer 있는 Label 로 감싼다(R13).
+							★ Label 의 기본 HorizontalContentAlignment/VerticalContentAlignment 는 Stretch 가 아니라
+							Left/Top 이다(Control 대부분과 달리 Label 만의 기본 스타일) — 안의 Border 가 Width 를
+							스스로 정하지 않고 부모 폭에 맞춰 늘어나야(Stretch) 하는데, Label 이 그 늘어남을 주지 않고
+							"제 desired size(=속이 비어 있으니 거의 0)" 만큼만 자리를 내준다. 그 결과 TrendHost.ActualWidth
+							가 사실상 0에 머물러 RebuildTrendGeometry() 가 매번 width<=0 으로 조용히 빈 도형을 낸다 —
+							플롯이 비고 X 축 라벨이 왼쪽 한 점에 뭉치는 결함의 실제 원인(2026-09-23 스냅샷으로 실증).
+							창을 나중에 늘려도 Label 이 여전히 Stretch 를 안 주므로 자가 회복되지 않는다.
+						-->
 						<Label
 							AutomationProperties.AutomationId="Console.Events.Overview.Trend"
+							HorizontalContentAlignment="Stretch"
+							VerticalContentAlignment="Stretch"
 							Padding="0">
 						<Border
 							x:Uid="TrendHost"
