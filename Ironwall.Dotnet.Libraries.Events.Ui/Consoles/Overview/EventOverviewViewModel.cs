@@ -485,9 +485,8 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         YAxes.Clear();
         YAxes.Add(new Axis
         {
-            Name = "건수",
-            NameTextSize = 12,
-            NamePaint = ChartThemeProvider.TextPaint(_theme),
+            // 축 이름 없음(의도) — LiveCharts2 는 Y축 Name 을 세로(90°)로 그리고 가로 배치 옵션이 없다.
+            // 한글 세로쓰기는 읽기 어렵고, 카드 제목("시간대별 추이")과 값 라벨이 단위를 이미 밝힌다.
             TextSize = 11,
             LabelsPaint = ChartThemeProvider.TextPaint(_theme),
             MinLimit = 0,

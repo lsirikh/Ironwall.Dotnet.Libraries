@@ -440,11 +440,13 @@
 						<!--  핸들 열은 안쪽 여백이 없어야 한다 — 기본 셀 템플릿의 Padding 12 가 26폭 열을 지워 버린다.  -->
 						<DataGridTemplateColumn
 							Width="28"
+							MinWidth="28"
 							CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
 						<DataGridTemplateColumn
 							Width="120"
+							MinWidth="120"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
@@ -460,10 +462,11 @@
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
 							Width="160"
+							MinWidth="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
-						<DataGridTemplateColumn Width="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
+						<DataGridTemplateColumn Width="76" MinWidth="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Grid Width="46" Height="30">
@@ -485,26 +488,31 @@
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
 							Width="100"
+							MinWidth="100"
 							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="유형" />
 						<DataGridTextColumn
 							Width="*"
+							MinWidth="140"
 							Binding="{Binding Device.DeviceName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="120"
+							MinWidth="120"
 							Binding="{Binding Device, Converter={StaticResource Zone}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="구역" />
 						<DataGridTextColumn
 							Width="130"
+							MinWidth="130"
 							Binding="{Binding Result, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="결과" />
 						<DataGridTextColumn
 							Width="80"
+							MinWidth="80"
 							Binding="{Binding SignalText}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="신호" />
@@ -539,11 +547,13 @@
 						<!--  핸들 열은 안쪽 여백이 없어야 한다 — 기본 셀 템플릿의 Padding 12 가 26폭 열을 지워 버린다.  -->
 						<DataGridTemplateColumn
 							Width="28"
+							MinWidth="28"
 							CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
 							CellTemplate="{StaticResource HandleCell}"
 							IsReadOnly="True" />
 						<DataGridTemplateColumn
 							Width="120"
+							MinWidth="120"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="조치">
 							<DataGridTemplateColumn.CellTemplate>
@@ -559,26 +569,30 @@
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
 							Width="160"
+							MinWidth="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
 							Width="*"
+							MinWidth="140"
 							Binding="{Binding Device.DeviceName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="100"
+							MinWidth="100"
 							Binding="{Binding DeviceTypeName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="종류" />
 						<DataGridTextColumn
 							Width="124"
+							MinWidth="124"
 							Binding="{Binding Reason, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="사유" />
 						<!--  고장 구간 = 제어기 루프 위의 지점(정수)이지 시각이 아니다  -->
-						<DataGridTemplateColumn Width="124" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="고장 구간">
+						<DataGridTemplateColumn Width="124" MinWidth="124" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="고장 구간">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<TextBlock
@@ -615,21 +629,25 @@
 					<DataGrid.Columns>
 						<DataGridTextColumn
 							Width="160"
+							MinWidth="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
 							Width="*"
+							MinWidth="140"
 							Binding="{Binding Device.DeviceName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="140"
+							MinWidth="140"
 							Binding="{Binding DeviceTypeName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="종류" />
 						<DataGridTextColumn
 							Width="120"
+							MinWidth="120"
 							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="상태" />
@@ -654,15 +672,17 @@
 					<DataGrid.Columns>
 						<DataGridTextColumn
 							Width="160"
+							MinWidth="160"
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
 						<DataGridTextColumn
 							Width="80"
+							MinWidth="80"
 							Binding="{Binding OriginEvent.Id}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="원본" />
-						<DataGridTemplateColumn Width="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
+						<DataGridTemplateColumn Width="76" MinWidth="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Grid Width="46" Height="30">
@@ -684,16 +704,19 @@
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
 							Width="130"
+							MinWidth="130"
 							Binding="{Binding OriginEvent.Device.DeviceName}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
 							Width="150"
+							MinWidth="150"
 							Binding="{Binding User}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="사용자" />
 						<DataGridTextColumn
 							Width="*"
+							MinWidth="140"
 							Binding="{Binding Content}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="내용" />

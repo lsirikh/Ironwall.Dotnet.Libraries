@@ -28,11 +28,11 @@ public static class SuppressionTimeText
     /// <summary>일일 시각 표기(벽시계).</summary>
     public const string TimeFormat = "HH:mm";
 
-    /// <summary>사람이 볼 안내 — 입력 칸 옆에 그대로 쓴다.</summary>
-    public const string DateTimeHint = "YYYY-MM-DD HH:MM";
+    /// <summary>사람이 볼 안내 — 입력 칸 옆에 그대로 쓴다. <see cref="DateTimeFormat"/>과 같은 토큰 표기(소문자 관례).</summary>
+    public const string DateTimeHint = "yyyy-MM-dd HH:mm";
 
-    /// <summary>일일 시각 안내.</summary>
-    public const string TimeHint = "HH:MM";
+    /// <summary>일일 시각 안내. <see cref="TimeFormat"/>과 같은 토큰 표기.</summary>
+    public const string TimeHint = "HH:mm";
 
     private static readonly CultureInfo Fixed = CultureInfo.InvariantCulture;
 

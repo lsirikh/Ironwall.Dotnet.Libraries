@@ -1166,7 +1166,7 @@
 					</i:Interaction.Behaviors>
 					<DataGrid.Columns>
 						<!--  삭제 선택 체크박스 — 취소/종료(terminal) 행에만 노출  -->
-						<DataGridTemplateColumn Width="60">
+						<DataGridTemplateColumn Width="60" MinWidth="60">
 							<!--  헤더 전체선택 — 취소/종료(삭제 가능) 행 일괄 체크. 대상 행 없으면 비활성  -->
 							<DataGridTemplateColumn.HeaderTemplate>
 								<DataTemplate>
@@ -1196,7 +1196,7 @@
 						     ⚠ 두 값은 서로 다른 축이다 — status 는 창의 생애주기, 억제중은 지금 이 순간.
 						        StatusText 문자열에는 어떤 접미도 붙이지 않는다(하네스 T-SUP028 이 판독).
 						     ⚠ 헤더 이름 '상태'는 불변(T-SUP025 가 All(contains) 로 단언).  -->
-						<DataGridTemplateColumn Width="132" Header="상태">
+						<DataGridTemplateColumn Width="132" MinWidth="132" Header="상태">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 								  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -1254,7 +1254,7 @@
 
 						<!--  작업명 2줄 — 1줄 작업명 / 2줄 반복 요약(단발이면 빈 문자열이라 1줄 그대로).
 						     새 컬럼을 만들지 않는다(고정 합이 이미 빠듯해 작업명 * 가 붕괴한다).  -->
-						<DataGridTemplateColumn Width="*" Header="작업명">
+						<DataGridTemplateColumn Width="*" MinWidth="140" Header="작업명">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<StackPanel VerticalAlignment="Center">
@@ -1270,13 +1270,13 @@
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
-						<DataGridTextColumn Width="170" Binding="{Binding TargetSummary}" Header="대상" />
-						<DataGridTextColumn Width="70" Binding="{Binding ScopeText}" Header="범위" />
-						<DataGridTextColumn Width="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
+						<DataGridTextColumn Width="170" MinWidth="170" Binding="{Binding TargetSummary}" Header="대상" />
+						<DataGridTextColumn Width="70" MinWidth="70" Binding="{Binding ScopeText}" Header="범위" />
+						<DataGridTextColumn Width="130" MinWidth="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
 						<!--  종료 2행 — 1행 종료/무제한, 2행 회차 정보.
 						     ⚠ OccurrenceText 는 서버 occurrence_end/next_occurrence_start 를 그대로 쓴다.
 						        유효기간 경계에서 회차가 잘리므로 요약 문자열로 재계산하면 마지막 날에 거짓말을 한다.  -->
-						<DataGridTemplateColumn Width="130" Header="종료(KST)">
+						<DataGridTemplateColumn Width="130" MinWidth="130" Header="종료(KST)">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<StackPanel VerticalAlignment="Center">
@@ -1294,7 +1294,7 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 
-						<DataGridTemplateColumn Width="70" Header="취소">
+						<DataGridTemplateColumn Width="70" MinWidth="70" Header="취소">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Button
