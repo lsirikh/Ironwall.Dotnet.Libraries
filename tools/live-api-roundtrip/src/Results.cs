@@ -45,7 +45,9 @@ public sealed class Recorder
         return c;
     }
 
-    public int LastSeq() { return Wire.Count; }
+    // 건수가 아니라 실제 최대 번호 — 번호는 실행 전체에서 이어지고(WireCaptureHandler._seq),
+    // 비동기 요청은 번호 순서와 다르게 큐에 들어갈 수 있다.
+    public int LastSeq() { return Wire.IsEmpty ? 0 : Wire.Max(w => w.Seq); }
 
     public IEnumerable<WireExchange> Since(int seqExclusive) => Wire.Where(w => w.Seq > seqExclusive).OrderBy(w => w.Seq);
 

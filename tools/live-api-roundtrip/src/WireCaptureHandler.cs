@@ -18,7 +18,10 @@ public sealed class WireCaptureHandler : DelegatingHandler
 {
     readonly HttpMessageInvoker _invoker;
     readonly ConcurrentQueue<WireExchange> _log;
-    int _seq;
+    // 실행 전체에서 하나로 이어지는 번호. 점검이 두 번째 Bootstrap(다른 사용자 로그인)을 만들면
+    // 처리기가 둘이 되는데, 번호를 처리기마다 따로 매기면 같은 Recorder.Wire 안에서 번호가 겹쳐
+    // LastSeq/Since 가 주 연결의 요청을 건너뛰었다(모든 뒤 점검이 "body=(none)" 거짓 실패).
+    static int _seq;
 
     public string CurrentTag { get; set; } = "";
 
