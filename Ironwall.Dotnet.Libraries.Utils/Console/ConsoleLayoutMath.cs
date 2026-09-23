@@ -21,6 +21,19 @@ public readonly record struct ConsoleLayout(
     bool IsSplitterVisible);
 
 /// <summary>
+/// 툴바 검색창의 밀도(D-23) — 폭이 모자라면 검색을 아이콘 트리거로 접는다.
+/// 필터 · 기본 액션(Extra)은 절대 줄이지 않는다 — Grid 의 Auto 칸이라 애초에 줄지 않기 때문에
+/// 줄일 수 있는 건 가운데 Star 칸(검색)뿐이다.
+/// </summary>
+public enum ConsoleToolbarSearchMode
+{
+    /// <summary>전체 폭 검색창(placeholder 포함).</summary>
+    Full,
+    /// <summary>아이콘 전용 — 포커스를 받으면 그 순간만 넓어진다(ConsoleToolbar 코드비하인드).</summary>
+    IconOnly,
+}
+
+/// <summary>
 /// 콘솔 배치 판정 — <b>이 한 곳에서만</b> 한다. 화면 없이 단위 테스트할 수 있게 WPF 에 기대지 않는다.
 /// (설계 정본 window-layout-system-storyboard.html L116-127 · L2175-2197)
 /// </summary>
@@ -107,4 +120,46 @@ public static class ConsoleLayoutMath
     /// </summary>
     public static double DetailWidthAfterSplitterMove(double currentDetailWidth, double splitterDelta)
         => ClampDetailWidth(currentDetailWidth - splitterDelta);
+
+    #region 툴바 오버플로 — 검색 밀도 (D-23)
+    /// <summary>검색창이 전체 폭일 때 필요한 최소 폭 — <c>Generic.xaml</c> Search 의 기본 MinWidth 와 같다.</summary>
+    public const double ToolbarSearchFullMinWidth = 120;
+    /// <summary>검색창이 전체 폭일 때 허용하는 최대 폭 — <c>Generic.xaml</c> Search 의 기본 MaxWidth 와 같다.</summary>
+    public const double ToolbarSearchFullMaxWidth = 320;
+    /// <summary>검색창과 왼쪽 클러스터 사이 여백 — <c>Generic.xaml</c> Search 의 Margin 왼쪽 값과 같다(예산 계산용).</summary>
+    public const double ToolbarSearchLeftMargin = 12;
+    /// <summary>툴바 띠 안쪽 여백의 좌우 합 — <c>Generic.xaml</c> Border 의 <c>Padding="12,8"</c> 중 좌 12 + 우 12.</summary>
+    public const double ToolbarHorizontalPadding = 24;
+
+    /// <summary>
+    /// 검색창에 실제로 내줄 수 있는 최소 폭(px, 0~<see cref="ToolbarSearchFullMinWidth"/>) — <b>항상 안전하다</b>:
+    /// 이 값 + 왼쪽 마진을 검색 칸의 <c>MinWidth</c> 로 그대로 써도 Grid 의 총 요구 폭이 툴바 자신의 폭을
+    /// 넘지 않는다. 왼쪽 클러스터(추가 · 삭제 · 갱신 · 필터)와 오른쪽 필수 클러스터(열 버튼 · Extra = 창
+    /// 고유 기본 액션)는 둘 다 Grid 의 <c>Auto</c> 칸이라 폭이 모자라도 줄지 않고 제 몫을 그대로 가져간다 —
+    /// 안쪽 여백 · 검색 왼쪽 마진 · 그 둘을 뺀 "예산"이 바로 검색이 가질 수 있는 전부다.
+    /// <para>
+    /// D-23 — 옛 구조는 가운데 칸에 고정 <c>MinWidth 132</c> 를 걸어 두어, 예산이 132 보다 적어도 132 를
+    /// 강제로 채우려다 총 폭이 넘쳐 오른쪽(기본 액션 · 조치보고 버튼)이 화면 밖으로 밀렸다(서랍 1150px ·
+    /// "직접" 에서 실측). <b>고정폭이면 뭐든(120 이든 32 든) 같은 병이 재발한다</b> — 실측으로 확인:
+    /// 왼쪽 750.7px · 오른쪽 84px 인 채 900px 로 좁히면 예산이 13.3px 뿐인데, 검색을 32(아이콘 고정)로
+    /// 접어도 32 &gt; 13.3 이라 여전히 18.7px 이 넘쳤다. 그래서 고정 두 단계(전체/아이콘) 대신 예산을
+    /// 그대로 상한으로 쓴다 — 얼마가 남았든 그 이상은 절대 요구하지 않는다.
+    /// </para>
+    /// </summary>
+    public static double ResolveToolbarSearchMinWidth(double toolbarWidth, double leftClusterWidth, double rightClusterWidth)
+    {
+        if (double.IsNaN(toolbarWidth) || toolbarWidth < 0) toolbarWidth = 0;
+        if (double.IsNaN(leftClusterWidth) || leftClusterWidth < 0) leftClusterWidth = 0;
+        if (double.IsNaN(rightClusterWidth) || rightClusterWidth < 0) rightClusterWidth = 0;
+
+        var budget = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin - leftClusterWidth - rightClusterWidth;
+        return Math.Max(0, Math.Min(budget, ToolbarSearchFullMinWidth));
+    }
+
+    /// <summary>검색창의 밀도 — <see cref="ResolveToolbarSearchMinWidth"/> 가 전체 폭을 다 주지 못하면 접힌 것이다.</summary>
+    public static ConsoleToolbarSearchMode ResolveToolbarSearchMode(double toolbarWidth, double leftClusterWidth, double rightClusterWidth)
+        => ResolveToolbarSearchMinWidth(toolbarWidth, leftClusterWidth, rightClusterWidth) >= ToolbarSearchFullMinWidth
+            ? ConsoleToolbarSearchMode.Full
+            : ConsoleToolbarSearchMode.IconOnly;
+    #endregion
 }

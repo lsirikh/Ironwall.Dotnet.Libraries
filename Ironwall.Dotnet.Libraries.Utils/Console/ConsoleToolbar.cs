@@ -1,6 +1,8 @@
-﻿using System.Windows;
+﻿using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
 
@@ -83,7 +85,25 @@ public class ConsoleToolbar : Control
     public static readonly DependencyProperty ExtraProperty = Reg<object?>(nameof(Extra), null);
     /// <summary>맨 오른쪽 자리(⋯ · 창 고유 버튼).</summary>
     public object? Extra { get => GetValue(ExtraProperty); set => SetValue(ExtraProperty, value); }
+
+    private static readonly DependencyPropertyKey IsSearchCompactPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsSearchCompact), typeof(bool), typeof(ConsoleToolbar), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsSearchCompactProperty = IsSearchCompactPropertyKey.DependencyProperty;
+    /// <summary>
+    /// 검색창이 아이콘 트리거로 접힌 상태인가(D-23) — 폭 부족을 커널이 스스로 판정한다(읽기 전용,
+    /// <see cref="ConsoleLayoutMath.ResolveToolbarSearchMode"/> 의 결과). 소비자가 직접 쓰지 않는다.
+    /// </summary>
+    public bool IsSearchCompact { get => (bool)GetValue(IsSearchCompactProperty); private set => SetValue(IsSearchCompactPropertyKey, value); }
     #endregion
+
+    // D-23 — 왼쪽(추가·삭제·갱신·필터) · 오른쪽(열 버튼·Extra) 클러스터, 가운데 Grid 는 이름 없는 템플릿
+    // 요소다(x:Name 신설 금지 — 시각 트리에서 Grid.Column 번호로 찾는다). 폭을 알아야 오버플로를 판정하고,
+    // Grid 도 있어야 가운데 칸의 최소폭을 검색 상태에 맞춰 줄일 수 있다(칸 자체의 고정 MinWidth 는
+    // 폭이 모자라도 줄지 않아 옛 결함의 원인이었다).
+    private Grid? _grid;
+    private TextBox? _search;
+    private FrameworkElement? _leftCluster;
+    private FrameworkElement? _rightCluster;
 
     public override void OnApplyTemplate()
     {
@@ -93,6 +113,55 @@ public class ConsoleToolbar : Control
         Hook("PART_Delete", DeleteClickEvent);
         Hook("PART_Refresh", RefreshClickEvent);
         Hook("PART_Columns", ColumnsClickEvent);
+
+        LayoutUpdated -= OnToolbarLayoutUpdated;
+
+        _grid = (VisualTreeHelper.GetChild(this, 0) as Border)?.Child as Grid;
+        _search = GetTemplateChild("Search") as TextBox;
+        _leftCluster = _grid?.Children.OfType<FrameworkElement>().FirstOrDefault(c => Grid.GetColumn(c) == 0);
+        _rightCluster = _grid?.Children.OfType<FrameworkElement>().FirstOrDefault(c => Grid.GetColumn(c) == 2);
+
+        LayoutUpdated += OnToolbarLayoutUpdated;
+
+        ApplySearchGeometry();
+    }
+
+    // D-23 — 필터 · Extra 내용은 이 컨트롤의 SizeChanged 밖에서도 바뀐다(예: "직접" 선택 시 날짜 범위
+    // 필드가 나타난다). LayoutUpdated 로 레이아웃이 정착할 때마다 다시 재는 것이 안전하다 — 판정이
+    // 바뀔 때만 DependencyProperty 를 쓰므로(UpdateSearchMode 내부 조기 반환) 무한 루프가 없다.
+    private void OnToolbarLayoutUpdated(object? sender, EventArgs e) => UpdateSearchMode();
+
+    /// <summary>
+    /// 마지막으로 판정한 안전한 검색 최소폭(D-23) — <see cref="ConsoleLayoutMath.ResolveToolbarSearchMinWidth"/>
+    /// 는 이미 "예산을 넘지 않는 최대치"를 돌려주므로, 포커스가 와도 이 값을 더 넓힐 필요가 없다(넓힐 여지가
+    /// 있었다면 애초에 이 값 자체가 더 컸을 것이다) — 그래서 포커스 이벤트를 따로 듣지 않는다.
+    /// </summary>
+    private double _searchMinWidth = ConsoleLayoutMath.ToolbarSearchFullMinWidth;
+
+    private void UpdateSearchMode()
+    {
+        if (_leftCluster is null || _rightCluster is null) return;
+
+        var resolved = ConsoleLayoutMath.ResolveToolbarSearchMinWidth(ActualWidth, _leftCluster.ActualWidth, _rightCluster.ActualWidth);
+        if (Math.Abs(resolved - _searchMinWidth) < 0.5) return; // 거의 그대로면 다시 쓰지 않는다 — 레이아웃 진동 방지
+        _searchMinWidth = resolved;
+
+        var compact = resolved < ConsoleLayoutMath.ToolbarSearchFullMinWidth;
+        if (compact != IsSearchCompact) IsSearchCompact = compact;
+
+        ApplySearchGeometry();
+    }
+
+    // 판정(ConsoleLayoutMath, 순수 함수)과 적용(여기)을 분리한다. 가운데 칸의 MinWidth 도 검색과 함께
+    // 줄인다 — 칸 자체의 고정폭이 검색의 접힘을 무력화하지 않도록(옛 결함의 직접 원인이었다).
+    private void ApplySearchGeometry()
+    {
+        if (_search is null || _grid is null || _grid.ColumnDefinitions.Count < 2) return;
+
+        var full = _searchMinWidth >= ConsoleLayoutMath.ToolbarSearchFullMinWidth;
+        _search.MinWidth = _searchMinWidth;
+        _search.MaxWidth = full ? ConsoleLayoutMath.ToolbarSearchFullMaxWidth : _searchMinWidth;
+        _grid.ColumnDefinitions[1].MinWidth = _searchMinWidth + ConsoleLayoutMath.ToolbarSearchLeftMargin;
     }
 
     // 템플릿은 다시 적용될 수 있다(스타일 · 테마 교체). 옛 부품의 구독을 풀지 않고 람다를 또 얹으면 한 번 눌러 N번 울린다.

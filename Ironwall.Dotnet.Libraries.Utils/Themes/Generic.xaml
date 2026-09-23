@@ -444,16 +444,28 @@
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type c:ConsoleToolbar}">
+					<!--
+						D-23 — 띠 높이는 고정한다(MinHeight 가 아니라 Height) + ClipToBounds. 폭 32 를 넘는
+						내용이 들어와도 행을 밀어 키우지 못하고 잘린다 — Padding 12,8 이 위아래 16 을 먹고
+						남는 32 가 버튼·검색 높이(Console.Button/.SearchBox = 32)와 정확히 맞는다(D-20 은
+						900~1900 어떤 폭에서도 재현 안 됨 — 이 고정은 재현 여부와 무관하게 구조로 막는다).
+					-->
 					<Border
-						MinHeight="48"
+						Height="{x:Static c:ConsoleLayoutMath.ToolbarHeight}"
 						Padding="12,8"
 						BorderBrush="{DynamicResource DividerBrush}"
-						BorderThickness="0,0,0,1">
+						BorderThickness="0,0,0,1"
+						ClipToBounds="True">
 						<!--
 							D-16 — 옛 구조는 DockPanel(LastChildFill) 이라 검색이 '남는 자리' 였다. Extra 가 길면
 							검색이 MinWidth 120 아래로 눌려 글자가 잘렸다. Grid 로 바꾸고 검색 칸에 MinWidth 를 걸어
 							이제는 왼쪽 · 오른쪽 묶음이 먼저 줄어든다 — 검색은 결코 잘리지 않는다.
 							D-44 — 버튼 사이 간격은 8px 로 통일한다(집 규칙). 커널이 8 이면 창도 8 이다.
+							D-23 — 그 "결코 잘리지 않는다"가 틀렸다: 가운데 칸의 고정 MinWidth(132) 는 폭이
+							모자라도 줄지 않아, 왼쪽(필터)이 넓어지면 오른쪽(Extra=기본 액션)이 화면 밖으로
+							밀렸다(서랍 1150px · "직접" 에서 실측). 가운데 칸의 MinWidth 는 이제 코드비하인드
+							(ConsoleToolbar.ApplySearchGeometry)가 검색 밀도에 맞춰 동적으로 줄인다 — 아래 132 는
+							"전체 폭 검색" 상태의 초기값일 뿐이다.
 						-->
 						<Grid>
 							<Grid.ColumnDefinitions>
