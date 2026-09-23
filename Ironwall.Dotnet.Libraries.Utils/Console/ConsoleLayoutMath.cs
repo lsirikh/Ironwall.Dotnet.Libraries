@@ -89,6 +89,20 @@ public static class ConsoleLayoutMath
         => !layout.IsDetailDocked && isDetailOpen ? layout.DetailWidth : 0;
 
     /// <summary>
+    /// 목록 · 상태바가 <b>실제로</b> 쓸 수 있는 폭(DIU) — <see cref="ConsoleLayout.ListWidth"/> 에서
+    /// <see cref="ListRightInset"/> 을 뺀 값. 도킹이면 상세가 제 칸을 가져 인셋이 0이라 <c>ListWidth</c> 와 같고,
+    /// 서랍이 열려 있으면 겹친 만큼 줄어든다.
+    /// <para>
+    /// 열 우선순위 사다리 · 카드 개수처럼 "목록이 지금 몇 px 를 쓰는가"에 반응하는 소비자는
+    /// <c>ConsoleShell.ActualWidth</c> 가 아니라 이 값(<see cref="ConsoleShell.EffectiveListWidth"/> /
+    /// <see cref="ConsoleShell.EffectiveListWidthChanged"/> 로 노출)을 읽어야 한다 — 서랍이 목록 위에
+    /// 겹칠 때 셸 자신의 폭은 바뀌지 않기 때문이다(D-03, 커밋 55d257a4 · 8fa2cb5e 에서 실증).
+    /// </para>
+    /// </summary>
+    public static double EffectiveListWidth(ConsoleLayout layout, bool isDetailOpen)
+        => Math.Max(0, layout.ListWidth - ListRightInset(layout, isDetailOpen));
+
+    /// <summary>
     /// 경계가 <paramref name="splitterDelta"/> 만큼 움직인 뒤의 상세 폭. 경계가 왼쪽(음수)으로 가면 상세가 넓어진다.
     /// </summary>
     public static double DetailWidthAfterSplitterMove(double currentDetailWidth, double splitterDelta)

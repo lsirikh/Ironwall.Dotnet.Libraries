@@ -18,6 +18,13 @@ namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
 /// <para>어떤 행 · 열도 고정 높이로 목록을 가두지 않는다 — 목록은 남는 높이를 전부 쓴다.</para>
 /// <para>템플릿에 <c>AdornerDecorator</c> 가 들어 있다 — 고스트 · 삽입선이 콘솔 안에서 뜨고 콘솔 밖으로 새지 않는다.</para>
 /// <para>경계 끌기: 데드존 8 · 끄는 동안 폭 라벨 · 더블클릭 = 340 · Esc = 끌기 전 폭 · ←/→ 10px.</para>
+/// <para>
+/// <b>목록 실효 폭 계약</b>: 서랍이 목록 위에 겹칠 때 이 셸의 <see cref="FrameworkElement.ActualWidth"/> 는
+/// 바뀌지 않는다 — 목록 칸에는 오른쪽 여백(서랍 폭)만 더해진다. 그래서 <see cref="FrameworkElement.SizeChanged"/>
+/// 는 "목록이 지금 몇 px 를 쓰는가"를 알기에 <b>불충분</b>하다. 그 값이 필요한 소비자는 대신
+/// <see cref="EffectiveListWidth"/> / <see cref="EffectiveListWidthChanged"/> 를 쓴다 — 셸 리사이즈 ·
+/// 배치 모드 전환 · 상세 열림/닫힘 어느 쪽으로 바뀌었든 이 계약 하나로 잡힌다.
+/// </para>
 /// </remarks>
 [TemplatePart(Name = PartRailColumn, Type = typeof(ColumnDefinition))]
 [TemplatePart(Name = PartDetailColumn, Type = typeof(ColumnDefinition))]
@@ -126,6 +133,36 @@ public class ConsoleShell : Control
     public static readonly DependencyProperty SplitLabelTextProperty = SplitLabelTextKey.DependencyProperty;
     public string SplitLabelText => (string)GetValue(SplitLabelTextProperty);
 
+    private static readonly DependencyPropertyKey EffectiveListWidthKey = DependencyProperty.RegisterReadOnly(
+        nameof(EffectiveListWidth), typeof(double), typeof(ConsoleShell), new PropertyMetadata(0.0));
+    public static readonly DependencyProperty EffectiveListWidthProperty = EffectiveListWidthKey.DependencyProperty;
+    /// <summary>
+    /// 목록 · 상태바가 지금 실제로 쓸 수 있는 폭(DIU) — <see cref="ConsoleLayoutMath.EffectiveListWidth"/> 참고.
+    /// 바뀔 때마다 <see cref="EffectiveListWidthChanged"/> 도 같은 값으로 발화한다.
+    /// </summary>
+    public double EffectiveListWidth => (double)GetValue(EffectiveListWidthProperty);
+
+    /// <summary>
+    /// <see cref="EffectiveListWidth"/> 가 바뀔 때마다 발화한다 — 셸 리사이즈 · 배치 모드 전환(Docked/Drawer/Compact) ·
+    /// 상세 열림/닫힘(도킹 폭 조절 포함) 어느 쪽이 원인이든.
+    /// <para>
+    /// <b>왜 필요한가</b>: 서랍이 목록 위에 겹칠 때 이 셸 자신의 <see cref="FrameworkElement.ActualWidth"/> 는
+    /// 바뀌지 않는다 — <see cref="ApplyLayout"/> 은 목록 콘텐츠 호스트에 오른쪽 여백(서랍 폭)만 줄 뿐이다
+    /// (D-03, 커밋 55d257a4). 그래서 <see cref="FrameworkElement.SizeChanged"/> 만 구독하는 소비자는 서랍이
+    /// 열리고 닫혀도 낡은(더 넓은) 폭으로 계속 판정한다 — Reports 콘솔이 900px 폭 + 서랍 열림에서 열
+    /// 우선순위 사다리를 그렇게 잘못 판정해, 유일하게 사람이 읽는 제목 열이 기본 MinWidth(20px)까지 눌린
+    /// 사고로 실증됐다(커밋 8fa2cb5e). 열 폭 · 카드 개수처럼 "목록이 지금 몇 px 를 쓰는가"에 반응하는 로직은
+    /// <see cref="FrameworkElement.SizeChanged"/> 대신 이 이벤트(또는 <see cref="EffectiveListWidth"/> 바인딩)를 써야 한다.
+    /// </para>
+    /// <para>
+    /// 값이 실제로 바뀔 때만 발화한다(0.5 DIU 미만 차이는 같은 값으로 본다) — 매 Arrange 패스마다 같은
+    /// 폭으로 다시 부르면 구독자가 스로틀 없이 재계산을 반복해 스래싱한다.
+    /// </para>
+    /// </summary>
+    public event EventHandler<double>? EffectiveListWidthChanged;
+
+    private double _lastAnnouncedListWidth = double.NaN;
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -192,6 +229,21 @@ public class ConsoleShell : Control
         }
 
         if (_splitter != null) _splitter.Visibility = layout.IsSplitterVisible ? Visibility.Visible : Visibility.Collapsed;
+
+        AnnounceEffectiveListWidthIfChanged(ConsoleLayoutMath.EffectiveListWidth(layout, open));
+    }
+
+    /// <summary>
+    /// <see cref="EffectiveListWidth"/> / <see cref="EffectiveListWidthChanged"/> 계약의 발화 지점 — 값이
+    /// 0.5 DIU 이상 바뀔 때만 알린다(비-chatty, 리포트 요구사항). 최초 호출은 <c>NaN</c> 대비 항상 발화한다.
+    /// </summary>
+    private void AnnounceEffectiveListWidthIfChanged(double effectiveListWidth)
+    {
+        if (!double.IsNaN(_lastAnnouncedListWidth) && Math.Abs(_lastAnnouncedListWidth - effectiveListWidth) < 0.5) return;
+
+        _lastAnnouncedListWidth = effectiveListWidth;
+        SetValue(EffectiveListWidthKey, effectiveListWidth);
+        EffectiveListWidthChanged?.Invoke(this, effectiveListWidth);
     }
 
     /// <summary>

@@ -136,4 +136,47 @@ public class ConsoleLayoutMathTests
         Assert.Equal(layout.DetailWidth, ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: true));
     }
     #endregion
+
+    #region 목록 실효 폭 — ConsoleShell.EffectiveListWidth 계약이 소비하는 순수 판정
+    [Fact]
+    public void should_equal_list_width_when_docked_because_inset_is_always_zero()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1400);
+
+        Assert.Equal(layout.ListWidth, ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true));
+    }
+
+    [Fact]
+    public void should_equal_list_width_when_drawer_is_closed()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1100);
+
+        Assert.Equal(layout.ListWidth, ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: false));
+    }
+
+    [Fact]
+    public void should_subtract_the_drawer_width_when_drawer_is_open()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1100);
+
+        Assert.Equal(layout.ListWidth - layout.DetailWidth, ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true));
+    }
+
+    [Fact]
+    public void should_subtract_the_drawer_width_when_compact_and_open()
+    {
+        var layout = ConsoleLayoutMath.Resolve(900);
+
+        Assert.Equal(ConsoleLayoutMode.Compact, layout.Mode);
+        Assert.Equal(layout.ListWidth - layout.DetailWidth, ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true));
+    }
+
+    [Fact]
+    public void should_never_go_negative_when_the_drawer_is_wider_than_the_list()
+    {
+        var layout = ConsoleLayoutMath.Resolve(0);
+
+        Assert.True(ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true) >= 0);
+    }
+    #endregion
 }
