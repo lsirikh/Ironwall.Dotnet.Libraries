@@ -17,18 +17,18 @@ public static class ActionTrayCandidateFactory
         DetectionEventViewModel detection => new ActionTrayCandidate(
             detection.Model?.Id ?? 0,
             ActionTrayDrop.KindDetection,
-            Label(detection.Device?.DeviceName, detection.DateTime),
+            Label(detection.DeviceLabel, detection.DateTime),
             detection.IsActionReported),
 
         MalfunctionEventViewModel malfunction => new ActionTrayCandidate(
             malfunction.Model?.Id ?? 0,
             ActionTrayDrop.KindMalfunction,
-            Label(malfunction.Device?.DeviceName, malfunction.DateTime),
+            Label(malfunction.DeviceLabel, malfunction.DateTime),
             malfunction.IsActionReported),
 
         // 연결 · 조치 행은 원본이 아니다 — 종류를 비워 두면 판정이 "원본이 아님" 으로 센다.
         ConnectionEventViewModel connection => new ActionTrayCandidate(
-            connection.Model?.Id ?? 0, "connection", Label(connection.Device?.DeviceName, connection.DateTime), false),
+            connection.Model?.Id ?? 0, "connection", Label(connection.DeviceLabel, connection.DateTime), false),
 
         ActionEventViewModel action => new ActionTrayCandidate(
             action.Model?.Id ?? 0, "action", Label(action.User, action.DateTime), false),

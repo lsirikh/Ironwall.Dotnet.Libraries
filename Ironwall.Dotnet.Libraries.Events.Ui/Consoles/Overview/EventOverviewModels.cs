@@ -18,8 +18,20 @@ public sealed record EventSeriesSpec(string Key, string Name, string BrushKey, b
     public static readonly EventSeriesSpec Connection = new("con", "연결", "PrimaryBrush", false, null, true);
     public static readonly EventSeriesSpec Action = new("act", "조치", "StatusNormalBrush", false, null, true);
 
-    /// <summary>표시 순서대로.</summary>
-    public static readonly IReadOnlyList<EventSeriesSpec> All = new[] { Sensor, Camera, Malfunction, Connection, Action };
+    /// <summary>
+    /// 사전 경보(접근, <c>type_event=Alert</c>) — 서버는 침입과 따로 세고 <c>total</c> 에 넣는다(detection-alert FR-04).
+    /// 탐지와 같은 색 계열이되 <b>형태</b>(빗금 · 점선)로 가른다.
+    /// </summary>
+    public static readonly EventSeriesSpec Alert = new("alert", "사전 경보", "StatusWarningBrush", true, "2 3", true);
+
+    /// <summary>
+    /// 운영 이벤트(함체 · 통문 개폐, 환경 경보) — 서버가 <b>총계 밖</b>에서 따로 센다(X12).
+    /// 조각 · 추이 계열이 아니라 함체·통문 막대의 한 칸으로만 쓴다(그래서 <see cref="All"/> 에 없다).
+    /// </summary>
+    public static readonly EventSeriesSpec Operation = new("op", "운영", "StatusInfoBrush", false, null, false);
+
+    /// <summary>표시 순서대로(총계에 드는 계열만).</summary>
+    public static readonly IReadOnlyList<EventSeriesSpec> All = new[] { Sensor, Camera, Alert, Malfunction, Connection, Action };
 }
 
 /// <summary>도넛 한 조각 · 범례 한 줄.</summary>

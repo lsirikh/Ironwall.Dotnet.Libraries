@@ -51,6 +51,12 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
         }
     }
 
+    /// <summary>
+    /// 표시용 장비 이름 — 장비가 지워졌으면 서버 스냅샷(<c>device_description</c>)을 "삭제된 장비 · …" 로 보인다(E8).
+    /// 목록 열 · 드래그 고스트 · 상세 제목이 이 값을 쓴다.
+    /// </summary>
+    public string? DeviceLabel => Helpers.EventDeviceSnapshot.Label(_model.Device, _model);
+
     public IBaseDeviceModel? Device
     {
         get { return _model.Device; }

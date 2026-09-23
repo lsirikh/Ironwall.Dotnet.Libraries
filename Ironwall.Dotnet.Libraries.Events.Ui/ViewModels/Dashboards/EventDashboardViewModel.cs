@@ -381,7 +381,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         var action = EventRailCounter.PlainCount(ActionPanelViewModel.ViewModelProvider.Count);
 
         // (R10) 목록을 열기 전 폴백은 센서 + 카메라 둘 다다 — 탐지 목록은 두 출처를 한 줄로 섮는다.
-        Apply(DetectionRailKey, detection, "sensor", "camera");
+        Apply(DetectionRailKey, detection, "sensor", "camera", "alert");   // 탐지 목록에는 사전 경보(Alert)도 들어 있다
         Apply(MalfunctionRailKey, malfunction, "mal");
         Apply(ConnectionRailKey, connection, "con");
         Apply(ActionRailKey, action, "act");
@@ -1075,6 +1075,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         _ = detectionCard; _ = malfunctionCard;
 
         LastSendReason = result.Reason;
+        // 만들어졌으면 그 행의 '조치 있음' 을 바로 다시 그린다 — 모델 상태는 카드가 맞춰 두었다(E7a).
+        if (result.Outcome == ActionSendOutcome.Created) FindOriginRow(candidate)?.Refresh();
         return result.Outcome switch
         {
             ActionSendOutcome.Created => DraftOutcome.Applied,
@@ -1107,6 +1109,12 @@ public class EventDashboardViewModel : BasePanelViewModel
         return MalfunctionPanelViewModel.ViewModelProvider
             .FirstOrDefault(r => r.Model?.Id == candidate.EventId)?.Model as IExEventModel;
     }
+
+    /// <summary>트레이 후보의 목록 행(다시 그리기용).</summary>
+    private Caliburn.Micro.PropertyChangedBase? FindOriginRow(ActionTrayCandidate candidate)
+        => candidate.Kind == ActionTrayDrop.KindDetection
+            ? DetectionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == candidate.EventId) as Caliburn.Micro.PropertyChangedBase
+            : MalfunctionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == candidate.EventId) as Caliburn.Micro.PropertyChangedBase;
 
     private string ResolveUserName()
     {

@@ -98,6 +98,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     ActionId = response.Data?.Id ?? 0    // 생성된 Action DB ID
                 });
 
+                // 서버는 조치가 생기면 원본의 action_reported 를 '조치가 있는가(EXISTS)' 로 다시 계산한다 — 201 이면 참이다.
+                //   이 모델은 목록 행이 들고 있는 바로 그 인스턴스라(트레이 · 우클릭 · 이력) 여기서 맞춰 두지 않으면
+                //   행이 새로 부를 때까지 '미조치' 로 남았다(실서버 왕복 E7a).
+                _model.Status = EnumTrueFalse.True;
+
                 await base.SendAction(content, idUser);  // 로그 + CloseDialog (지금 동작 보존)
                 return ActionSendResult.Created(response.Data?.Id ?? 0);
             }

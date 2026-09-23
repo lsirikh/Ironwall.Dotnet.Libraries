@@ -74,9 +74,10 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     public string EffectiveContent => IsEtc ? Memo.Trim() : _phrase.Trim();
 
     /// <summary>문구를 고르지 않았다 — [적용] 이 꺼져 있는 까닭을 화면이 말해 준다.</summary>
-    public string ApplyBlockedReason => EffectiveContent.Length > 0
-        ? string.Empty
-        : (IsEtc ? "기타 내용을 적어야 보낼 수 있습니다" : "문구를 먼저 고르세요");
+    /// <remarks>서버 <c>content</c> 는 1~500자다 — 넘치면 줄마다 422 가 났다(실서버 왕복 E7b). 보내기 전에 막는다.</remarks>
+    public string ApplyBlockedReason => EffectiveContent.Length == 0
+        ? (IsEtc ? "기타 내용을 적어야 보낼 수 있습니다" : "문구를 먼저 고르세요")
+        : Helpers.ActionReportRules.ValidateContent(EffectiveContent) ?? string.Empty;
 
     public IReadOnlyList<string> PhraseOptions { get; } = Phrases.Concat(new[] { EtcPhrase }).ToList();
 
@@ -90,7 +91,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
     public string ProgressText => Draft.IsApplying ? $"{Draft.ProgressDone} / {Draft.ProgressTotal}" : string.Empty;
 
     /// <summary>문구가 비면 보내지 않는다 — 내용 없는 조치보고는 기록이 아니다.</summary>
-    public bool CanApply => Draft.CanApply && EffectiveContent.Length > 0;
+    public bool CanApply => Draft.CanApply && EffectiveContent.Length > 0 && Helpers.ActionReportRules.ValidateContent(EffectiveContent) is null;
     public bool CanRevert => Draft.CanRevert;
     public bool CanCancel => Draft.IsApplying;
 

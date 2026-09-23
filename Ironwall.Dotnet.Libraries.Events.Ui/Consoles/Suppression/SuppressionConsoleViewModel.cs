@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -65,6 +66,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     private readonly IClock _clock;
     private readonly Func<bool> _canEdit;
     private readonly Func<bool> _canDelete;
+    private readonly Func<IUnitScopeService?> _unitScope;
 
     private IReadOnlyList<EventSuppressionScheduleDto> _active = Array.Empty<EventSuppressionScheduleDto>();
     private string _filterKey = SuppressionStatusView.FilterAll;
@@ -84,7 +86,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
                                        DeviceGroupProvider? groups,
                                        IClock? clock = null,
                                        Func<bool>? canEdit = null,
-                                       Func<bool>? canDelete = null)
+                                       Func<bool>? canDelete = null,
+                                       Func<IUnitScopeService?>? unitScope = null)
     {
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _log = log;
@@ -94,6 +97,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         _clock = clock ?? new SystemClock();
         _canEdit = canEdit ?? (() => true);
         _canDelete = canDelete ?? (() => true);
+        // 부대 해석기는 늦게 찾는다 — 장비 쓰기 관문(UnitScopeGate)과 같은 관용구. 미등록이면 null → unit_id 를 싣지 않는다.
+        _unitScope = unitScope ?? SuppressionUnitStamp.ResolveFromIoC;
 
         Schedules = new ObservableCollection<SuppressionConsoleRow>();
         RowsView = CollectionViewSource.GetDefaultView(Schedules);
@@ -495,7 +500,11 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     {
         if (draft.IsNew)
         {
-            var res = await _api.CreateSuppressionScheduleAsync(SuppressionRequestBuilder.BuildCreate(draft), token)
+            // 서버 8.0 은 unit_id 생략을 "기본 부대 귀속 + 서버 로그 경고" 로 받고 다음 차수부터 422 로 바꾼다
+            //   (schemas/event_suppression.py:68-71). 이 클라이언트의 부대를 싣는다 — 8.0 미만은 키 자체가 없다(extra=forbid).
+            //   수정(PATCH)은 unit_id 를 보내지 않는다 — RFC 7396 에서 미전송은 '그대로 둠'이라 원래 부대가 보존된다.
+            var unitId = await SuppressionUnitStamp.ResolveForCreateAsync(_unitScope(), _log, "SuppressionConsole", token).ConfigureAwait(false);
+            var res = await _api.CreateSuppressionScheduleAsync(SuppressionRequestBuilder.BuildCreate(draft, unitId), token)
                                 .ConfigureAwait(false);
             return res.Success
                 ? new SuppressionSaveOutcome(true, "억제 스케줄을 만들었습니다.", res.Data)

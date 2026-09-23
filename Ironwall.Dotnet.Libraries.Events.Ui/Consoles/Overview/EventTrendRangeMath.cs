@@ -114,4 +114,8 @@ public static class EventTrendRangeMath
     /// <summary>기간 길이에 맞는 한 칸의 폭 — 하루 이하면 1시간, 넘으면 1일(서버 <c>trend.interval</c> 과 같은 규칙).</summary>
     public static TimeSpan BucketFor(DateTime start, DateTime end)
         => (end - start) <= TimeSpan.FromHours(25) ? TimeSpan.FromHours(1) : TimeSpan.FromDays(1);
+
+    /// <summary><see cref="BucketFor"/> 와 같은 규칙을 서버 <c>interval</c> 쿼리 값으로 — <c>"hour"</c> | <c>"day"</c>.</summary>
+    public static string IntervalFor(DateTime start, DateTime end)
+        => BucketFor(start, end) >= TimeSpan.FromDays(1) ? "day" : "hour";
 }

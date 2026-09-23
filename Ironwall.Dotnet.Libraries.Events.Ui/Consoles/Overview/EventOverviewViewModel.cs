@@ -22,8 +22,10 @@ public enum OverviewDeviceGroup
 {
     /// <summary>제어기 — 센서 탐지 · 장애 · 연결 · 조치(카메라 탐지는 제어기에 속하지 않는다).</summary>
     Controller,
-    /// <summary>카메라 — 카메라 탐지만.</summary>
+    /// <summary>카메라 — 카메라 탐지 · 사전 경보.</summary>
     Camera,
+    /// <summary>함체 · 통문 — 운영 이벤트(문 개폐 · 환경 경보)가 실리는 유일한 장비별 자리(서버 <c>by_device.enclosures/gates</c>).</summary>
+    Facility,
 }
 
 /// <summary>
@@ -89,8 +91,12 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     public int ActiveCameras { get => _activeCameras; private set { _activeCameras = value; NotifyOfPropertyChange(); } }
     public int ActiveControllers { get => _activeControllers; private set { _activeControllers = value; NotifyOfPropertyChange(); } }
 
-    /// <summary>운영 이벤트는 총계에서 빠진다는 서버 규칙을 화면에 그대로 적는다.</summary>
-    public string TotalNote => $"총계는 5종 합(센서 탐지 · 카메라 탐지 · 장애 · 연결 · 조치)입니다 · 조회 기간 {Days}일";
+    /// <summary>운영 이벤트 — 서버가 총계 밖에서 따로 센 건수(<c>summary.operation</c>).</summary>
+    public int OperationCount { get; private set; }
+
+    /// <summary>운영 이벤트는 총계에서 빠진다는 서버 규칙을 화면에 그대로 적는다 — 그리고 그 수를 숨기지 않는다.</summary>
+    public string TotalNote => $"총계는 6종 합(센서 탐지 · 카메라 탐지 · 사전 경보 · 장애 · 연결 · 조치)입니다 · "
+                             + $"운영 {OperationCount:N0}건은 서버 규칙상 총계 밖(별도 집계) · 조회 기간 {Days}일";
     #endregion
 
     #region - ① 유형별 비중 -
@@ -114,6 +120,7 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(IsControllerGroup));
             NotifyOfPropertyChange(nameof(IsCameraGroup));
+            NotifyOfPropertyChange(nameof(IsFacilityGroup));
             NotifyOfPropertyChange(nameof(DeviceGroupNote));
             RebuildBars();
         }
@@ -121,10 +128,14 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
 
     public bool IsControllerGroup => _deviceGroup == OverviewDeviceGroup.Controller;
     public bool IsCameraGroup => _deviceGroup == OverviewDeviceGroup.Camera;
+    public bool IsFacilityGroup => _deviceGroup == OverviewDeviceGroup.Facility;
 
-    public string DeviceGroupNote => _deviceGroup == OverviewDeviceGroup.Controller
-        ? "제어기 막대의 탐지는 센서 탐지만 — 카메라 탐지는 제어기에 속하지 않아 카메라 탭에서 봅니다 · 막대를 누르면 그 장비의 내역"
-        : "카메라 묶음이 받는 계열은 카메라 탐지 하나입니다 · 막대를 누르면 그 장비의 내역";
+    public string DeviceGroupNote => _deviceGroup switch
+    {
+        OverviewDeviceGroup.Controller => "제어기 막대의 탐지는 센서 탐지만 — 카메라 탐지는 제어기에 속하지 않아 카메라 탭에서 봅니다 · 막대를 누르면 그 장비의 내역",
+        OverviewDeviceGroup.Camera => "카메라 묶음이 받는 계열은 카메라 탐지 · 사전 경보입니다 · 막대를 누르면 그 장비의 내역",
+        _ => "함체 · 통문 막대에는 운영 이벤트(문 개폐 · 환경 경보)가 함께 실립니다 — 운영은 총계 밖입니다 · 막대를 누르면 그 장비의 내역",
+    };
 
     public bool HasBars => Bars.Count > 0;
 
@@ -157,6 +168,14 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
 
     public string IntervalText => Bucket == TimeSpan.FromHours(1) ? "1시간 단위" : "1일 단위";
+
+    /// <summary>
+    /// 한 칸의 폭 — <b>서버가 실제로 집계한 단위</b>(<c>trend.interval</c>)가 정본이다. 없거나 모르는 값이면 기간 규칙
+    /// (<see cref="EventTrendRangeMath.BucketFor"/>)으로 짐작한다. 예전엔 짐작만 써서 3일 기간이 '1일 단위'라고 적힌 채
+    /// 서버의 시간 칸을 그렸다(실서버 왕복 E3f).
+    /// </summary>
+    private static TimeSpan ResolveBucket(EventDashboardDto? dashboard, DateTime start, DateTime end)
+        => EventTrendBuckets.BucketOf(dashboard?.Trend?.Interval) ?? EventTrendRangeMath.BucketFor(start, end);
 
     /// <summary>한 칸의 폭 — 끌어 고른 기간이 여기에 맞춰진다.</summary>
     public TimeSpan Bucket { get; private set; } = TimeSpan.FromHours(1);
@@ -261,7 +280,7 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     {
         _start = start;
         _end = end > start ? end : start.AddHours(1);
-        Bucket = EventTrendRangeMath.BucketFor(_start, _end);
+        Bucket = ResolveBucket(dashboard, _start, _end);
         NotifyOfPropertyChange(nameof(IntervalText));
 
         _dashboard = dashboard;
@@ -277,16 +296,20 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         ActiveSensors = summary.ActiveDevices?.Sensors ?? 0;
         ActiveCameras = summary.ActiveDevices?.Cameras ?? 0;
         ActiveControllers = summary.ActiveDevices?.Controllers ?? 0;
+        OperationCount = summary.Operation;
 
         var counts = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["sensor"] = summary.SensorDetection,
             ["camera"] = summary.CameraDetection,
+            ["alert"] = summary.Alert,
             ["mal"] = summary.Malfunction,
             ["con"] = summary.Connection,
             ["act"] = summary.Action,
         };
         // 서버가 total 을 주지만, 켜고 끄기와 맞물리려면 화면이 스스로 더한 값이 정본이다.
+        //   더하는 계열은 서버 total 과 같아야 한다 — 서버 total = 센서 + 카메라 + 사전 경보 + 장애 + 연결 + 조치(운영 제외).
+        //   예전엔 사전 경보를 빼고 더해 서버보다 작은 총계를 그렸다(실서버 왕복 E3a).
         Total = counts.Values.Sum();
         SummaryCounts = new Dictionary<string, int>(counts, StringComparer.Ordinal);
 
@@ -311,6 +334,7 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(SensorShareText));
         NotifyOfPropertyChange(nameof(CameraShareText));
         NotifyOfPropertyChange(nameof(TotalNote));
+        NotifyOfPropertyChange(nameof(OperationCount));
 
         RebuildBars();
         RebuildTrend();
@@ -341,6 +365,7 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
                 var values = new List<(EventSeriesSpec Spec, int Value)>
                 {
                     (EventSeriesSpec.Sensor, IsOn("sensor") ? controller.SensorDetection : 0),
+                    (EventSeriesSpec.Alert, IsOn("alert") ? controller.Alert : 0),
                     (EventSeriesSpec.Malfunction, IsOn("mal") ? controller.Malfunction : 0),
                     (EventSeriesSpec.Connection, IsOn("con") ? controller.Connection : 0),
                     (EventSeriesSpec.Action, IsOn("act") ? controller.Action : 0),
@@ -348,15 +373,32 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
                 rows.Add(Bar(controller.ControllerName, values));
             }
         }
-        else
+        else if (_deviceGroup == OverviewDeviceGroup.Camera)
         {
             foreach (var camera in byDevice.Cameras ?? new List<CameraStatsDto>())
             {
                 var values = new List<(EventSeriesSpec, int)>
                 {
                     (EventSeriesSpec.Camera, IsOn("camera") ? camera.CameraDetection : 0),
+                    (EventSeriesSpec.Alert, IsOn("alert") ? camera.Alert : 0),
                 };
                 rows.Add(Bar(camera.CameraName, values));
+            }
+        }
+        else
+        {
+            // 함체 · 통문 — 운영 이벤트는 총계 밖이라 켜고 끄는 칩이 없다(항상 보인다).
+            foreach (var device in (byDevice.Enclosures ?? new List<DeviceEventStatsDto>()).Concat(byDevice.Gates ?? new List<DeviceEventStatsDto>()))
+            {
+                var values = new List<(EventSeriesSpec, int)>
+                {
+                    (EventSeriesSpec.Sensor, IsOn("sensor") ? device.SensorDetection : 0),
+                    (EventSeriesSpec.Alert, IsOn("alert") ? device.Alert : 0),
+                    (EventSeriesSpec.Malfunction, IsOn("mal") ? device.Malfunction : 0),
+                    (EventSeriesSpec.Connection, IsOn("con") ? device.Connection : 0),
+                    (EventSeriesSpec.Operation, device.Operation),
+                };
+                rows.Add(Bar(device.DeviceName ?? $"#{device.DeviceNumber}", values));
             }
         }
 
@@ -386,8 +428,10 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     {
         Series.Clear();
 
-        var buckets = _dashboard?.Trend?.Series ?? new List<EventTrendItemDto>();
-        if (buckets.Count == 0) { _xLabels = Array.Empty<string>(); BuildAxes(); return; }
+        // 서버는 빈 칸을 주지 않는다 — 기간 전체를 칸마다 채워야 등간격 그림 = 시각 비례(끌기 수학의 가정)가 된다(E3e).
+        if (_dashboard?.Trend?.Series is not { Count: > 0 }) { _xLabels = Array.Empty<string>(); BuildAxes(); return; }
+        var dense = EventTrendBuckets.Densify(_dashboard.Trend.Series, _start, _end, Bucket);
+        var buckets = dense.Select(b => b.Item).ToList();
 
         void Add(EventSeriesSpec spec, Func<EventTrendItemDto, int> pick)
         {
@@ -413,19 +457,13 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
 
         Add(EventSeriesSpec.Sensor, b => b.SensorDetection);
         Add(EventSeriesSpec.Camera, b => b.CameraDetection);
+        Add(EventSeriesSpec.Alert, b => b.Alert);
         Add(EventSeriesSpec.Malfunction, b => b.Malfunction);
         Add(EventSeriesSpec.Connection, b => b.Connection);
         Add(EventSeriesSpec.Action, b => b.Action);
 
-        _xLabels = buckets.Select(b => ShortLabel(b.TimeBucket)).ToList();
+        _xLabels = dense.Select(b => EventTrendBuckets.Label(b, Bucket)).ToList();
         BuildAxes();
-    }
-
-    private static string ShortLabel(string timeBucket)
-    {
-        if (DateTime.TryParse(timeBucket, CultureInfo.InvariantCulture, DateTimeStyles.None, out var when))
-            return when.Hour == 0 && when.Minute == 0 ? when.ToString("MM-dd") : when.ToString("HH시");
-        return timeBucket.Length > 5 ? timeBucket[^5..] : timeBucket;
     }
 
     /// <summary>

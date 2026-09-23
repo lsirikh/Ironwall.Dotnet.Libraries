@@ -81,7 +81,7 @@ public static class DtoToModelHelper
     /// </summary>
     public static IDetectionEventModel ToDetectionEventModel(this DetectionEventDto dto)
     {
-        return new DetectionEventModel
+        return Carry(new DetectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -96,7 +96,7 @@ public static class DtoToModelHelper
             FrameHeight = dto.Detail?.FrameHeight,
             Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, null)
-        };
+        }, dto);
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public static class DtoToModelHelper
     /// </summary>
     public static IMalfunctionEventModel ToMalfunctionEventModel(this MalfunctionEventDto dto)
     {
-        return new MalfunctionEventModel
+        return Carry(new MalfunctionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -116,7 +116,7 @@ public static class DtoToModelHelper
             SecondStart = dto.Detail?.SecondStart ?? 0,
             SecondEnd = dto.Detail?.SecondEnd ?? 0,
             Device = ConvertDeviceFromDto(dto.Device, null)
-        };
+        }, dto);
     }
 
     /// <summary>
@@ -124,14 +124,14 @@ public static class DtoToModelHelper
     /// </summary>
     public static IConnectionEventModel ToConnectionEventModel(this ConnectionEventDto dto)
     {
-        return new ConnectionEventModel
+        return Carry(new ConnectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
             MessageType = ParseOrDefault<EnumEventType>(dto.TypeEvent),
             Status = EnumTrueFalse.False,
             Device = ConvertDeviceFromDto(dto.Device, null)
-        };
+        }, dto);
     }
 
     /// <summary>
@@ -241,7 +241,8 @@ public static class DtoToModelHelper
         {
             TypeEvent = ToDetectionTypeEvent(model.MessageType),   // F-08
             Result = model.Result.ToString(),
-            Detail = BuildDetectionDetail(model)
+            // 서버 PUT 은 detail 을 통째로 갈아 끼운다 — 읽을 때 있던 모르는 키(업체 키)를 되붙인다(E5).
+            Detail = EventDetailCarry.MergeDetection(model, BuildDetectionDetail(model))
         };
 
     /// <summary>detail 필드가 하나라도 있으면 전체 재구성(없으면 필드 자체 생략 — 기존 페이로드와 동일).</summary>
@@ -274,6 +275,29 @@ public static class DtoToModelHelper
         };
     }
 
+    /// <summary>읽어 온 탐지 모델에 서버 detail 의 모양과 장비 스냅샷을 곁들인다(E5 · E8).</summary>
+    private static IDetectionEventModel Carry(IDetectionEventModel model, DetectionEventDto dto)
+    {
+        EventDetailCarry.Remember(model, dto.Detail);
+        EventDeviceSnapshot.Remember(model, dto.DeviceDescription);
+        return model;
+    }
+
+    /// <summary>읽어 온 장애 모델에 서버 detail 의 모양과 장비 스냅샷을 곁들인다(E5 · E8).</summary>
+    private static IMalfunctionEventModel Carry(IMalfunctionEventModel model, MalfunctionEventDto dto)
+    {
+        EventDetailCarry.Remember(model, dto.Detail);
+        EventDeviceSnapshot.Remember(model, dto.DeviceDescription);
+        return model;
+    }
+
+    /// <summary>읽어 온 연결 모델에 장비 스냅샷을 곁들인다(E8).</summary>
+    private static IConnectionEventModel Carry(IConnectionEventModel model, ConnectionEventDto dto)
+    {
+        EventDeviceSnapshot.Remember(model, dto.DeviceDescription);
+        return model;
+    }
+
     /// <summary>detail.objects[] DTO → 모델 변환.</summary>
     private static List<DetectionObjectModel>? ConvertObjectsFromDto(List<DetectedObjectDto>? objects)
         => objects?.Select(o => new DetectionObjectModel
@@ -285,19 +309,20 @@ public static class DtoToModelHelper
         }).ToList();
 
     /// <summary>IMalfunctionEventModel → MalfunctionEventReplaceDto (PUT 전용, type_event/reason/detail만)</summary>
+    /// <remarks>
+    /// 서버 PUT 은 detail 을 통째로 갈아 끼운다. 읽을 때의 모양을 되살린다(<see cref="EventDetailCarry"/>) —
+    /// null 이던 detail 은 null 로(구간 0 네 칸으로 채우지 않는다), 없던 칸은 0 이면 싣지 않고, 업체 키는 되붙인다(E5c · E5d).
+    /// </remarks>
     public static MalfunctionEventReplaceDto ToMalfunctionEventReplaceDto(this IMalfunctionEventModel model)
-        => new()
+    {
+        var detail = EventDetailCarry.MergeMalfunction(model, out var keepNull);
+        return new()
         {
             TypeEvent = MALFUNCTION_TYPE_EVENT,                    // F-08
             Reason = model.Reason.ToString(),
-            Detail = new MalfunctionDetailDto
-            {
-                FirstStart = model.FirstStart,
-                FirstEnd = model.FirstEnd,
-                SecondStart = model.SecondStart,
-                SecondEnd = model.SecondEnd
-            }
+            Detail = keepNull ? null : detail
         };
+    }
 
     /// <summary>IConnectionEventModel → ConnectionEventReplaceDto (PUT 전용, type_event만)</summary>
     public static ConnectionEventReplaceDto ToConnectionEventReplaceDto(this IConnectionEventModel model)
@@ -326,7 +351,7 @@ public static class DtoToModelHelper
         this DetectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        return new DetectionEventModel
+        return Carry(new DetectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -341,7 +366,7 @@ public static class DtoToModelHelper
             FrameHeight = dto.Detail?.FrameHeight,
             Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
-        };
+        }, dto);
     }
 
     /// <summary>
@@ -351,7 +376,7 @@ public static class DtoToModelHelper
         this MalfunctionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        return new MalfunctionEventModel
+        return Carry(new MalfunctionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -363,7 +388,7 @@ public static class DtoToModelHelper
             SecondStart = dto.Detail?.SecondStart ?? 0,
             SecondEnd = dto.Detail?.SecondEnd ?? 0,
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
-        };
+        }, dto);
     }
 
     /// <summary>
@@ -373,14 +398,14 @@ public static class DtoToModelHelper
         this ConnectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        return new ConnectionEventModel
+        return Carry(new ConnectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
             MessageType = ParseOrDefault<EnumEventType>(dto.TypeEvent),
             Status = EnumTrueFalse.False,
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
-        };
+        }, dto);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

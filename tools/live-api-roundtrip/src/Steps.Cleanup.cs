@@ -61,6 +61,10 @@ public static partial class Steps
             ("action-report-template", "events/action-report-templates", d => Str(d["content"])),
             // reports-vm (Steps.ReportsVm.cs) 가 보고서 생성을 만든다 — 제목으로 매칭.
             ("report-generation", "reports/generations?page=1&limit=100", d => Str(d["title"])),
+            // events-vm (Steps.EventsVm.cs) — 억제 일정은 DELETE 가 취소(soft)라 취소된 행도 목록에 남는다:
+            // 그 점검은 bulk-delete 로 완전히 지운다. 남아 있으면 여기서 잡힌다.
+            ("suppression-schedule", "event-suppression-schedules?page=1&limit=100", d => Str(d["name"])),
+            ("event-mapping", "integrations/event-mappings?page=1&limit=100", d => Str(d["name_event"])),
         };
 
         var unverifiable = new List<string>();

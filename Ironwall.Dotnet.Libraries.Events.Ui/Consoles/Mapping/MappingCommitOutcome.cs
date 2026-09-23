@@ -77,12 +77,18 @@ public sealed class MappingCommitOutcome
     {
         var createdIds = result.CreatedIds ?? new List<int>();
         var failedIndexes = new HashSet<int>((result.FailedItems ?? new List<MappingBulkFailedItemDto>()).Select(f => f.Index));
+        // ⚠ 등록 응답의 not_found_config_ids 는 이름과 달리 <b>장비 id</b> 다(서버 routers/event_mapping_*.py —
+        //   "장비 테이블에 없는 camera_id/speaker_id 목록"). 그 행은 만들어지지 않았다 — 실패로 남겨야 한다.
+        //   예전엔 수만 세고 행은 '정착' 으로 넣어, 재조회가 그 행을 지우는데 상태줄은 "실패 N건은 화면에 남았습니다"
+        //   라고 말했다(실서버 왕복 E4a: 편집 중 지워진 스피커).
+        var notFoundDevices = new HashSet<int>(result.NotFoundConfigIds ?? new List<int>());
 
         Created += createdIds.Count;
         Skipped += result.SkippedConfigIds?.Count ?? 0;
 
         // created_ids 는 "요청 순서 보존" 이지만 실패·건너뜀이 섞이면 행과 1:1 이 아니다.
         // 그래서 id 를 행에 억지로 붙이지 않고, 실패하지 않은 행만 "정착" 으로 표시한 뒤 재조회로 확정한다.
+        var matchedNotFound = new HashSet<int>();
         for (var i = 0; i < rows.Count; i++)
         {
             if (failedIndexes.Contains(i))
@@ -91,17 +97,24 @@ public sealed class MappingCommitOutcome
                 _failedRows.Add(rows[i]);
                 continue;
             }
+            if (rows[i].DeviceId is int deviceId && notFoundDevices.Contains(deviceId))
+            {
+                Failed++;
+                _failedRows.Add(rows[i]);
+                matchedNotFound.Add(deviceId);
+                continue;
+            }
             _settled.Add((rows[i], 0));
         }
 
         foreach (var failure in result.FailedItems ?? new List<MappingBulkFailedItemDto>())
             AddFailure("등록", failure.Error);
 
-        var notFound = result.NotFoundConfigIds?.Count ?? 0;
-        if (notFound > 0)
+        if (notFoundDevices.Count > 0)
         {
-            Failed += notFound;
-            AddFailure("등록", $"서버에 없는 장비 {notFound}건");
+            // 보낸 행과 짝이 안 맞는 id 가 있어도 수는 숨기지 않는다(서버가 없다고 한 것은 전부 실패다).
+            Failed += notFoundDevices.Count - matchedNotFound.Count;
+            AddFailure("등록", $"서버에 없는 장비 {notFoundDevices.Count}건(그사이 삭제됐을 수 있습니다)");
         }
     }
 

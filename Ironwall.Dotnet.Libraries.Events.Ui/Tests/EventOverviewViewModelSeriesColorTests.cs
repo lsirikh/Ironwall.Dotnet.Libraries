@@ -59,6 +59,7 @@ public sealed class EventOverviewViewModelSeriesColorTests : IDisposable
             Malfunction = h % 4,
             Connection = h % 2,
             Action = 1 + h % 6,
+            Alert = h % 2,
         }).ToList();
 
         return new EventDashboardDto
@@ -74,8 +75,8 @@ public sealed class EventOverviewViewModelSeriesColorTests : IDisposable
         var model = new EventOverviewViewModel();
         model.Load(BuildDashboard(), new DateTime(2026, 9, 22), new DateTime(2026, 9, 23));
 
-        Assert.Equal(5, model.Series.Count);
-        Assert.Equal(5, model.Slices.Count);
+        Assert.Equal(EventSeriesSpec.All.Count, model.Series.Count);
+        Assert.Equal(EventSeriesSpec.All.Count, model.Slices.Count);
 
         foreach (var slice in model.Slices)
         {
@@ -126,6 +127,6 @@ public sealed class EventOverviewViewModelSeriesColorTests : IDisposable
         var model = new EventOverviewViewModel();
         model.Load(BuildDashboard(), new DateTime(2026, 9, 22), new DateTime(2026, 9, 23));
 
-        Assert.Equal(5, model.Series.Count);   // 예외 없이, 대체색으로만
+        Assert.Equal(EventSeriesSpec.All.Count, model.Series.Count);   // 예외 없이, 대체색으로만
     }
 }

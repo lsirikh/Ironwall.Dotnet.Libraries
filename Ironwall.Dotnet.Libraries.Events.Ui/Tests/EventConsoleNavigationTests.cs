@@ -239,8 +239,9 @@ public class EventConsoleNavigationTests : IDisposable
         await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
         Assert.Contains(_console.FilterChips, c => c.Key == EventListFilterKeys.Alert);
 
+        // 연결: 서버가 상태 칸을 주지 않으므로(type_event=Connection 하나) '끊김 / 연결' 칩을 내지 않는다(E6a).
         await _console.SelectRailAsync(EventDashboardViewModel.ConnectionRailKey);
-        Assert.Contains(_console.FilterChips, c => c.Key == EventListFilterKeys.Disconnected);
+        Assert.DoesNotContain(_console.FilterChips, c => c.Key == EventListFilterKeys.Disconnected);
         Assert.DoesNotContain(_console.FilterChips, c => c.Key == EventListFilterKeys.Alert);
 
         await _console.SelectRailAsync(EventDashboardViewModel.ActionRailKey);

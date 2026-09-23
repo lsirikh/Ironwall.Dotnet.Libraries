@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
@@ -21,4 +21,10 @@ public class DailyAveragesDto
 
     [JsonProperty("action", Order = 5)]
     public double Action { get; set; }
+
+    [JsonProperty("alert", Order = 6)]
+    public double Alert { get; set; }
+
+    [JsonProperty("operation", Order = 7)]
+    public double Operation { get; set; }
 }

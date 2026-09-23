@@ -40,8 +40,16 @@ public static class EventListFilter
     public const string ChipDone = "done";          // 조치 있음
     public const string ChipIntrusion = "Intrusion";
     public const string ChipAlert = "Alert";
-    public const string ChipConnected = "on";       // 연결
-    public const string ChipDisconnected = "off";   // 끊김
+    /// <summary>탐지 중 침입 · 사전 경보가 아닌 것 — 접점 ON/OFF · 강풍 모드(서버 탐지 type_event 5종 중 나머지 셋).</summary>
+    public const string ChipContact = "contact";
+    /// <summary>
+    /// ⚠ 더 이상 칩으로 내지 않는다(E6a) — 서버 연결 이벤트는 <c>type_event=Connection</c> 하나뿐이고 상태 칸이 없다
+    /// (api-test-server <c>utils/enums.py:126</c> · <c>schemas/event.py:669-684</c>, <c>ContactOff</c> 로 만들면 422).
+    /// '끊김' 칩은 늘 비어 있었고 모든 행이 '연결' 로 셌다. 상수는 외부 참조 호환으로만 남긴다.
+    /// </summary>
+    public const string ChipConnected = "on";
+    /// <inheritdoc cref="ChipConnected"/>
+    public const string ChipDisconnected = "off";
 
     private static readonly EventFilterChip All = new(ChipAll, "전체");
 
@@ -53,6 +61,8 @@ public static class EventListFilter
             All,
             new EventFilterChip(ChipIntrusion, "침입"),
             new EventFilterChip(ChipAlert, "사전 경보"),
+            // 접점 ON/OFF · 강풍 모드는 침입이 아니다 — 예전엔 '침입' 에 섞여 셌다(실서버 왕복 E6b).
+            new EventFilterChip(ChipContact, "접점·강풍"),
             new EventFilterChip(ChipOpen, "미조치"),
             new EventFilterChip(ChipDone, "조치 있음"),
         },
@@ -62,12 +72,8 @@ public static class EventListFilter
             new EventFilterChip(ChipOpen, "미조치"),
             new EventFilterChip(ChipDone, "조치 있음"),
         },
-        EventDetailKind.Connection => new[]
-        {
-            All,
-            new EventFilterChip(ChipDisconnected, "끊김"),
-            new EventFilterChip(ChipConnected, "연결"),
-        },
+        // 연결: 서버가 상태를 주지 않는다 — 가를 사실이 없으니 칩을 내지 않는다(E6a).
+        EventDetailKind.Connection => Array.Empty<EventFilterChip>(),
         _ => Array.Empty<EventFilterChip>(),
     };
 
@@ -80,7 +86,7 @@ public static class EventListFilter
         {
             ChipOpen => !row.IsActionReported,
             ChipDone => row.IsActionReported,
-            ChipIntrusion or ChipAlert => string.Equals(row.TypeEventKey ?? ChipIntrusion, chipKey, StringComparison.Ordinal),
+            ChipIntrusion or ChipAlert or ChipContact => string.Equals(row.TypeEventKey ?? ChipIntrusion, chipKey, StringComparison.Ordinal),
             ChipConnected or ChipDisconnected => string.Equals(row.StateKey, chipKey, StringComparison.Ordinal),
             _ => true,
         };

@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -60,7 +61,8 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         }
         return _permissionService;
     }
-    private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+    // 조치보고 = 서버 events:edit — ActionReportRules 참조(종전 control 은 운영자를 403 으로 보냈다).
+    private bool CanCtrlEvents() => ActionReportRules.CanReport(ResolvePermissionService());
     private bool CanEditEvents() => ResolvePermissionService()?.CanEdit("events") ?? true;
     private bool CanDelEvents()  => ResolvePermissionService()?.CanDelete("events") ?? true;
 
@@ -90,7 +92,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "권한 없음",
-                Explain = "조치보고 권한이 없습니다."
+                Explain = ActionReportRules.NO_PERMISSION_TEXT
             });
             return;
         }
@@ -527,8 +529,12 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
             DispatcherService.Invoke(() =>
             {
+                // offset 페이지라 두 쪽 사이에 새 이벤트가 생기면 다음 쪽이 앞 쪽의 행을 다시 준다(실서버 왕복 E9b:
+                //   page1=[511,510] · page2=[510,509]). 이미 붙은 Id 는 건너뛴다 — 같은 행이 두 번 보이면 조치도 두 번 간다.
+                var seenIds = new HashSet<int>(ViewModelProvider.Select(v => v.Model.Id));
                 foreach (var item in result.Items)
                 {
+                    if (!seenIds.Add(item.Id)) continue;
                     // _eventProvider 동기화는 CollectionChanged 핸들러가 담당
                     ViewModelProvider.Add(new MalfunctionEventViewModel(item)
                     {

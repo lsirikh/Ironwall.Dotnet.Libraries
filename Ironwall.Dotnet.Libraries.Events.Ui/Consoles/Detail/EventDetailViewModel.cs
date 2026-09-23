@@ -312,7 +312,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
     private void BuildDetection(DetectionEventViewModel row)
     {
-        _presenter.SingleTitle = row.Device?.DeviceName ?? "(장비 없음)";
+        _presenter.SingleTitle = row.DeviceLabel ?? "(장비 없음)";
         _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
 
         // 빈 상태 안내가 약속한 "스냅샷" — 없으면 없다고 보이고, 있으면 그림을 낸다(R5).
@@ -322,7 +322,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         Add(new EventDetailSection("탐지 속성", null, new[]
         {
             Locked("datetime", "발생시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
-            Locked("device", "장비", row.Device?.DeviceName ?? "—"),
+            Locked("device", "장비", row.DeviceLabel ?? "—"),
             Locked("zone", "구역", ZoneTextOf(row.Device)),
             Locked("kind", "종류", row.DeviceTypeName ?? "—"),
             Locked("number", "번호", row.Model?.Id.ToString() ?? "—"),
@@ -341,13 +341,13 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
     private void BuildMalfunction(MalfunctionEventViewModel row)
     {
-        _presenter.SingleTitle = row.Device?.DeviceName ?? "(장비 없음)";
+        _presenter.SingleTitle = row.DeviceLabel ?? "(장비 없음)";
         _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
 
         Add(new EventDetailSection("장애 속성", null, new[]
         {
             Locked("datetime", "발생시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
-            Locked("device", "장비", row.Device?.DeviceName ?? "—"),
+            Locked("device", "장비", row.DeviceLabel ?? "—"),
             Locked("kind", "종류", row.DeviceTypeName ?? "—"),
             Locked("number", "번호", row.Model?.Id.ToString() ?? "—"),
             Locked("status", "상태", EventDetailProjection.StatusText(_actionCount)),
@@ -363,7 +363,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
     private void BuildConnection(ConnectionEventViewModel row)
     {
-        _presenter.SingleTitle = row.Device?.DeviceName ?? "(장비 없음)";
+        _presenter.SingleTitle = row.DeviceLabel ?? "(장비 없음)";
         _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
 
         Add(new EventDetailSection("연결 속성", "전부 발생 기록", new[]
@@ -424,9 +424,9 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
     private static string SummaryOf(object row) => row switch
     {
-        DetectionEventViewModel d => $"{d.DateTime:MM-dd HH:mm} · {d.Device?.DeviceName ?? "—"} · {EnumKoreanMap.To(d.Result)}",
-        MalfunctionEventViewModel m => $"{m.DateTime:MM-dd HH:mm} · {m.Device?.DeviceName ?? "—"} · {EnumKoreanMap.To(m.Reason)}",
-        ConnectionEventViewModel c => $"{c.DateTime:MM-dd HH:mm} · {c.Device?.DeviceName ?? "—"}",
+        DetectionEventViewModel d => $"{d.DateTime:MM-dd HH:mm} · {d.DeviceLabel ?? "—"} · {EnumKoreanMap.To(d.Result)}",
+        MalfunctionEventViewModel m => $"{m.DateTime:MM-dd HH:mm} · {m.DeviceLabel ?? "—"} · {EnumKoreanMap.To(m.Reason)}",
+        ConnectionEventViewModel c => $"{c.DateTime:MM-dd HH:mm} · {c.DeviceLabel ?? "—"}",
         ActionEventViewModel a => $"{a.DateTime:MM-dd HH:mm} · {a.User} · {a.Content}",
         _ => row?.ToString() ?? string.Empty,
     };

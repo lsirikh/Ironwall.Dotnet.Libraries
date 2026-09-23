@@ -331,7 +331,7 @@
 						<inner:DataGridScrollEndBehavior Command="{Binding DetectionPanelViewModel.LoadMoreCommand}" Threshold="50" />
 						<!--  선택한 행 N건 → 조치 트레이. 같은 일을 툴바 버튼으로도 한다(드래그 전용 아님)  -->
 						<drag:CaptureDragBehavior
-							DisplayMemberPath="Device.DeviceName"
+							DisplayMemberPath="DeviceLabel"
 							Handler="{Binding TrayDrop}"
 							IsDragEnabled="{Binding CanDragToTray}"
 							KeyboardFallback="행을 고른 뒤 툴바의 [조치보고] 를 누른다" />
@@ -395,7 +395,7 @@
 						<DataGridTextColumn
 							Width="*"
 							MinWidth="140"
-							Binding="{Binding Device.DeviceName}"
+							Binding="{Binding DeviceLabel}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
@@ -438,7 +438,7 @@
 					<b:Interaction.Behaviors>
 						<inner:DataGridScrollEndBehavior Command="{Binding MalfunctionPanelViewModel.LoadMoreCommand}" Threshold="50" />
 						<drag:CaptureDragBehavior
-							DisplayMemberPath="Device.DeviceName"
+							DisplayMemberPath="DeviceLabel"
 							Handler="{Binding TrayDrop}"
 							IsDragEnabled="{Binding CanDragToTray}"
 							KeyboardFallback="행을 고른 뒤 툴바의 [조치보고] 를 누른다" />
@@ -476,7 +476,7 @@
 						<DataGridTextColumn
 							Width="*"
 							MinWidth="140"
-							Binding="{Binding Device.DeviceName}"
+							Binding="{Binding DeviceLabel}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn
@@ -536,7 +536,7 @@
 						<DataGridTextColumn
 							Width="*"
 							MinWidth="140"
-							Binding="{Binding Device.DeviceName}"
+							Binding="{Binding DeviceLabel}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="장비" />
 						<DataGridTextColumn

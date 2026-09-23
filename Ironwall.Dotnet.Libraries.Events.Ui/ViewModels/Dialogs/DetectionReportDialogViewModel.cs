@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -30,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
         }
         #endregion
-        #region - FR-EN-10 권한 게이팅 (events:control) -
+        #region - 조치보고 권한 게이팅 (서버 계약 events:edit) -
         // IoC.Get lazy — 미등록 시 null → 전체허용 폴백
         private IPermissionService? _permissionService;
         private bool _permissionResolved;
@@ -41,18 +42,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             catch { _permissionService = null; }
             return _permissionService;
         }
-        private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+        // 조치보고 = POST /events/actions = 서버 events:edit(v6.3.2 · 8.0.x 동일). control 이 아니다 — ActionReportRules 참조.
+        private bool CanReportAction() => ActionReportRules.CanReport(ResolvePermissionService());
         #endregion
         #region - Implementation of Interface -
         public override async void ClickOk()
         {
-            // FR-EN-10 ACK 게이트 (CanControl) — SendAction 호출 이전 검사
-            if (!CanCtrlEvents())
+            // 권한 게이트 — SendAction 호출 이전 검사. 서버가 403 을 줄 요청은 보내지 않는다.
+            if (!CanReportAction())
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "권한 없음",
-                    Explain = "조치보고 권한이 없습니다."
+                    Explain = ActionReportRules.NO_PERMISSION_TEXT
                 });
                 return;
             }
@@ -60,17 +62,31 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             var user = $"{_user?.Username}({_user?.EmployeeNumber})";
             if (!(Model is DetectionEventCardViewModel vm)) return;
 
-            // (EA3) SendAction 성공 여부 확인 — 실패 시 다이얼로그 유지 + 오류 알림(성공 오인식 방지)
-            bool ok = (SelectableItemViewModel?.Name == "기타")
-                ? await vm.SendAction(Memo, user)
-                : await vm.SendAction(SelectableItemViewModel?.Name, user);
+            // 내용 게이트 — '기타' + 빈 메모는 서버 422(content min_length=1). 보내기 전에 이유를 알린다.
+            var content = (SelectableItemViewModel?.Name == "기타") ? Memo : SelectableItemViewModel?.Name;
+            var invalid = ActionReportRules.ValidateContent(content);
+            if (invalid is not null)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "조치 내용 확인",
+                    Explain = invalid
+                });
+                return;
+            }
 
-            if (!ok)
+            // (EA3) SendAction 성공 여부 확인 — 실패 시 다이얼로그 유지 + 오류 알림(성공 오인식 방지)
+            //   실패하면 서버가 준 까닭을 그대로 보인다 — "네트워크를 확인" 한 줄은 403·422 를 가렸다.
+            var result = await vm.SendActionDetailed(content, user);
+
+            if (!result.CanCloseDialog)
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "조치보고 실패",
-                    Explain = "조치보고 저장에 실패했습니다. 네트워크/서버 상태를 확인 후 다시 시도하세요."
+                    Explain = string.IsNullOrWhiteSpace(result.Reason)
+                        ? "조치보고 저장에 실패했습니다. 네트워크/서버 상태를 확인 후 다시 시도하세요."
+                        : $"조치보고 저장에 실패했습니다 — {result.Reason}"
                 });
                 return;
             }

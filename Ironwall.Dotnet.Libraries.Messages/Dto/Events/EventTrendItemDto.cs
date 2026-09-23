@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
@@ -24,4 +24,14 @@ public class EventTrendItemDto
 
     [JsonProperty("action", Order = 6)]
     public int Action { get; set; }
+
+    /// <summary>사전 경보(접근, <c>type_event=Alert</c>) — 서버는 침입과 따로 세고 <c>total</c> 에 <b>넣는다</b>(detection-alert FR-04).
+    /// 이 키가 없던 판본(6.3)은 0 으로 읽힌다.</summary>
+    [JsonProperty("alert", Order = 7)]
+    public int Alert { get; set; }
+
+    /// <summary>운영 이벤트(함체 · 통문 개폐, 환경 경보) — 서버가 <b>별도 집계</b>하고 <c>total</c> 에 넣지 않는다(X12).
+    /// 이 키가 없던 판본은 0 으로 읽힌다.</summary>
+    [JsonProperty("operation", Order = 8)]
+    public int Operation { get; set; }
 }

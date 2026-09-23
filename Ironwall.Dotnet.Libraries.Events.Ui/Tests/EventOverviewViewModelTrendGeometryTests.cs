@@ -41,6 +41,7 @@ public class EventOverviewViewModelTrendGeometryTests
             Malfunction = h % 5 == 0 ? 2 : h % 3 == 0 ? 1 : 0,
             Connection = h % 4 == 0 ? 2 : 0,
             Action = 1 + (h * 3) % 4,
+            Alert = h % 3,
         }).ToList();
 
         return new EventDashboardDto
@@ -53,6 +54,7 @@ public class EventOverviewViewModelTrendGeometryTests
                 Malfunction = buckets.Sum(b => b.Malfunction),
                 Connection = buckets.Sum(b => b.Connection),
                 Action = buckets.Sum(b => b.Action),
+                Alert = buckets.Sum(b => b.Alert),
             },
             Trend = new EventTrendDto { Interval = "hour", Series = buckets },
         };
@@ -60,7 +62,7 @@ public class EventOverviewViewModelTrendGeometryTests
 
     private static void AssertSeriesPopulated(EventOverviewViewModel model)
     {
-        Assert.Equal(5, model.Series.Count);   // 센서 탐지 · 카메라 탐지 · 장애 · 연결 · 조치
+        Assert.Equal(EventSeriesSpec.All.Count, model.Series.Count);   // 센서 탐지 · 카메라 탐지 · 사전 경보 · 장애 · 연결 · 조치
 
         foreach (var series in model.Series.Cast<LineSeries<int>>())
         {
@@ -166,12 +168,12 @@ public class EventOverviewViewModelTrendGeometryTests
     {
         var model = new EventOverviewViewModel();
         model.Load(BuildDashboard(), new DateTime(2026, 9, 22), new DateTime(2026, 9, 23));
-        Assert.Equal(5, model.Series.Count);
+        Assert.Equal(EventSeriesSpec.All.Count, model.Series.Count);
 
         var sensorSlice = model.Slices.Single(s => s.Spec.Key == "sensor");
         sensorSlice.IsOn = false;
 
-        Assert.Equal(4, model.Series.Count);
+        Assert.Equal(EventSeriesSpec.All.Count - 1, model.Series.Count);
         Assert.DoesNotContain(model.Series.Cast<LineSeries<int>>(), s => s.Name == "센서 탐지");
     }
 }

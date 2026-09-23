@@ -143,6 +143,7 @@
 							FontSize="16"
 							IsEnabled="{Binding ElementName=RadioButtonEtc, Path=IsChecked}"
 							Style="{StaticResource MaterialDesignOutlinedTextBox}"
+							MaxLength="500"
 							Text="{Binding Memo, Mode=TwoWay}"
 							TextWrapping="Wrap"
 							VerticalScrollBarVisibility="Auto" />

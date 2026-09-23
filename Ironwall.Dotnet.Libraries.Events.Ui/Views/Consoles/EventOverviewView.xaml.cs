@@ -193,6 +193,11 @@ public partial class EventOverviewView : UserControl
         if (Model is not null) Model.DeviceGroup = OverviewDeviceGroup.Camera;
     }
 
+    private void OnFacilityGroup(object sender, RoutedEventArgs e)
+    {
+        if (Model is not null) Model.DeviceGroup = OverviewDeviceGroup.Facility;
+    }
+
     private void OnBarClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: EventDeviceBarViewModel bar }) Model?.Drill(bar);

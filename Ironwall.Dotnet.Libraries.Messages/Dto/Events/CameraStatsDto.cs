@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
@@ -18,4 +18,9 @@ public class CameraStatsDto
 
     [JsonProperty("camera_detection", Order = 4)]
     public int CameraDetection { get; set; }
+
+    /// <summary>사전 경보(접근, <c>type_event=Alert</c>) — 서버는 침입과 따로 세고 <c>total</c> 에 <b>넣는다</b>(detection-alert FR-04).
+    /// 이 키가 없던 판본(6.3)은 0 으로 읽힌다.</summary>
+    [JsonProperty("alert", Order = 5)]
+    public int Alert { get; set; }
 }

@@ -651,10 +651,10 @@ public static partial class Steps
     }
 
     /// <summary>
-    /// before 이후에 선 교환들 — 순번(Seq)이 아니라 <b>큐 위치</b>로 자른다. 두 번째 Bootstrap(폐기용 편집자)은
-    /// 자기 WireCaptureHandler 가 순번을 1부터 다시 세므로 <c>Recorder.Since(Seq)</c> 로는 서로를 가린다.
+    /// before(= <c>rec.LastSeq()</c>) 이후의 교환들. 12e79bbe 이후 순번은 두 번째 Bootstrap 까지 실행 전체에서 이어지고
+    /// LastSeq 는 최대 순번이므로 순번으로 자른다 — 위치(Skip)로 자르면 LastSeq 와 단위가 달라 전부 놓친다.
     /// </summary>
-    static List<WireExchange> AccSince(Recorder rec, int before) => rec.Wire.Skip(before).ToList();
+    static List<WireExchange> AccSince(Recorder rec, int before) => rec.Since(before).ToList();
     static int[] AccSeqs(Recorder rec, int before) => AccSince(rec, before).Select(w => w.Seq).ToArray();
 
     /// <summary>Raw 는 날짜를 DateTime 으로 바꿔 읽는다(문화권 문자열로 새면 오프셋이 사라진다) — 시각으로 되돌린다.</summary>

@@ -467,8 +467,12 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
             DispatcherService.Invoke(() =>
             {
+                // offset 페이지라 두 쪽 사이에 새 이벤트가 생기면 다음 쪽이 앞 쪽의 행을 다시 준다(실서버 왕복 E9b:
+                //   page1=[511,510] · page2=[510,509]). 이미 붙은 Id 는 건너뛴다 — 같은 행이 두 번 보이면 조치도 두 번 간다.
+                var seenIds = new HashSet<int>(ViewModelProvider.Select(v => v.Model.Id));
                 foreach (var item in result.Items)
                 {
+                    if (!seenIds.Add(item.Id)) continue;
                     // EventProvider 동기화는 CollectionChanged 핸들러가 담당
 
                     // OriginEvent도 EventProvider에 추가 (중복 방지)

@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -303,9 +304,13 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         }
         try
         {
+            // 서버 8.0: unit_id 생략은 기본 부대 귀속 + 서버 로그 경고("다음 차수부터 필수"). 8.0 미만은 키가 없다 — SuppressionUnitStamp.
+            var unitId = await SuppressionUnitStamp.ResolveForCreateAsync(
+                SuppressionUnitStamp.ResolveFromIoC(), _log, nameof(EventSuppressionSchedulePanelViewModel)).ConfigureAwait(true);
             var dto = new EventSuppressionScheduleCreateDto
             {
                 Name = Name!.Trim(),
+                UnitId = unitId,
                 Description = string.IsNullOrWhiteSpace(Description) ? null : Description,
                 TargetType = TargetType,
                 TargetDeviceIds = TargetType == "device" ? SelectedDevices.Select(d => d.Id).ToList() : new(),

@@ -18,28 +18,26 @@ public static class EventRowFactsFactory
     public static EventRowFacts From(object? row) => row switch
     {
         DetectionEventViewModel d => new EventRowFacts(
-            d.Device?.DeviceName,
+            d.DeviceLabel,
             ZoneTextOf(d.Device),
             d.Model?.Id.ToString(),
             d.IsActionReported,
-            TypeEventKey: d.MessageType == EnumEventType.Alert ? EventListFilter.ChipAlert : EventListFilter.ChipIntrusion,
+            TypeEventKey: TypeEventKeyOf(d.MessageType),
             Extra: EnumKoreanMap.To(d.Result)),
 
         MalfunctionEventViewModel m => new EventRowFacts(
-            m.Device?.DeviceName,
+            m.DeviceLabel,
             ZoneTextOf(m.Device),
             m.Model?.Id.ToString(),
             m.IsActionReported,
             Extra: EnumKoreanMap.To(m.Reason)),
 
-        // 연결의 '끊김 / 연결' 은 접점 ON · OFF 로 가른다.
-        // ⚠ 서버가 어느 필드로 이 상태를 싣는지는 실기 미확인 — MessageType 만이 클라에서 증명 가능한 축이다.
+        // 연결: 서버는 type_event=Connection 하나만 주고 상태 칸이 없다(실서버 왕복 E6a) — 상태 키를 지어내지 않는다.
         ConnectionEventViewModel c => new EventRowFacts(
-            c.Device?.DeviceName,
+            c.DeviceLabel,
             ZoneTextOf(c.Device),
             c.Model?.Id.ToString(),
             false,
-            StateKey: c.MessageType == EnumEventType.ContactOff ? EventListFilter.ChipDisconnected : EventListFilter.ChipConnected,
             Extra: EnumKoreanMap.To(c.MessageType)),
 
         ActionEventViewModel a => new EventRowFacts(
@@ -50,6 +48,18 @@ public static class EventRowFactsFactory
             Extra: $"{a.User} {a.Content} {a.OriginEvent?.Id}"),
 
         _ => new EventRowFacts(null, null, null, false),
+    };
+
+    /// <summary>
+    /// 탐지 유형 → 칩 키. 서버 탐지 type_event 는 Intrusion · Alert · ContactOn · ContactOff · WindyMode 다섯이다
+    /// (api-test-server <c>utils/enums.py:124</c>). 접점 · 강풍은 침입이 아니다 — 자기 칩으로 간다(E6b).
+    /// 모르는 값(파싱 실패 None 포함)은 침입으로 두지 않고 접점·강풍 쪽에 둔다 — 침입 수를 부풀리지 않는다.
+    /// </summary>
+    public static string TypeEventKeyOf(EnumEventType type) => type switch
+    {
+        EnumEventType.Intrusion => EventListFilter.ChipIntrusion,
+        EnumEventType.Alert => EventListFilter.ChipAlert,
+        _ => EventListFilter.ChipContact,
     };
 
     /// <summary>장비 소속 구역(그룹) 이름 — 기존 선택 편집기의 <c>DeviceZoneText</c> 와 같은 규칙.</summary>

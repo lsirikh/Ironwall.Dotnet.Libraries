@@ -53,6 +53,9 @@
     <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Accounts.Ui\Ironwall.Dotnet.Libraries.Accounts.Ui.csproj" />
     <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Reports.Api\Ironwall.Dotnet.Libraries.Reports.Api.csproj" />
     <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Reports.Ui\Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
+    <!-- events-vm (Steps.EventsVm.cs): 이벤트 창 VM · EventApiService 를 실서버로 왕복 -->
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
   </ItemGroup>
 
 </Project>

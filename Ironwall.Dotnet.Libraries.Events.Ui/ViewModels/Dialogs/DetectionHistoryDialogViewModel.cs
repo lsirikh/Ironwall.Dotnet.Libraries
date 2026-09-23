@@ -667,7 +667,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "권한 없음",
-                Explain = "조치보고 권한이 없습니다."
+                Explain = ActionReportRules.NO_PERMISSION_TEXT
             });
             return;
         }
@@ -685,7 +685,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
     private bool CanControlEvents()
     {
-        try { return IoC.Get<IPermissionService>()?.CanControl("events") ?? true; }
+        // 조치보고 = 서버 events:edit — ActionReportRules 참조(종전 control 은 운영자를 403 으로 보냈다).
+        try { return ActionReportRules.CanReport(IoC.Get<IPermissionService>()); }
         catch { return true; }   // IoC 미구성(테스트/오프라인) → 전체허용 폴백
     }
     #endregion

@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Theme.Services;
@@ -149,8 +150,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     /*──────────────────────────────────────────────────────────────
                      *  Statistics API 단일 호출 → 라인 차트 생성
                      *──────────────────────────────────────────────────────────────*/
+                    // 단위는 기간 규칙으로 정한다(하루 이하 hour, 넘으면 day) — 예전엔 "hour" 고정이라
+                    //   개요가 '1일 단위' 라고 적힌 채 시간 칸을 그렸다(실서버 왕복 E3f).
                     var dashboardDto = await _providerService.FetchEventDashboardAsync(
-                        StartDate, EndDate, "hour", ct);
+                        StartDate, EndDate, EventTrendRangeMath.IntervalFor(StartDate, EndDate), ct);
 
                     if (dashboardDto == null)
                     {
@@ -219,7 +222,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public async Task<EventDashboardDto?> RefreshDashboardDtoAsync(CancellationToken ct = default)
         {
             var dto = await _providerService.FetchEventDashboardAsync(
-                StartDate, EndDate, "hour", ct);
+                StartDate, EndDate, EventTrendRangeMath.IntervalFor(StartDate, EndDate), ct);
             if (dto != null)
                 LastDashboardDto = dto;
             return LastDashboardDto;

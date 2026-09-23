@@ -274,10 +274,21 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
         _ => fallback,
     };
 
-    private static JObject? Parse(string content)
+    /// <summary>
+    /// 봉투를 읽는다 — <b>날짜를 날짜로 바꾸지 않는다</b>(<see cref="DateParseHandling.None"/>).
+    /// </summary>
+    /// <remarks>
+    /// 기본 설정은 <c>"2026-09-24T01:55:48.053887+09:00"</c> 을 <see cref="DateTime"/> 으로 바꾸고, 문자열 필드
+    /// (<c>UpdatedAt</c>)로 옮길 때 <c>"09/24/2026 01:55:48"</c> 로 다시 적는다 — 마이크로초와 offset 이 사라져
+    /// [적용] 전 동시 편집 대조가 <b>같은 초 안의 변경</b>을 못 봤다(실서버 왕복 E4b · E4c).
+    /// 대조는 서버 원문끼리 한다.
+    /// </remarks>
+    private static readonly JsonSerializerSettings EnvelopeSettings = new() { DateParseHandling = DateParseHandling.None };
+
+    internal static JObject? Parse(string content)
     {
         if (string.IsNullOrWhiteSpace(content)) return null;
-        try { return JsonConvert.DeserializeObject<JObject>(content); }
+        try { return JsonConvert.DeserializeObject<JObject>(content, EnvelopeSettings); }
         catch { return null; }
     }
 

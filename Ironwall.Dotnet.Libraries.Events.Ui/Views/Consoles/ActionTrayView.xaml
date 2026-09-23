@@ -121,6 +121,7 @@
 					<TextBox
 						Margin="6,0,0,0"
 						MinWidth="160"
+						MaxLength="500"
 						AutomationProperties.AutomationId="Console.Events.Tray.Memo"
 						DockPanel.Dock="Right"
 						FontSize="12"

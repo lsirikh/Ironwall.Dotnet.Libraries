@@ -572,11 +572,19 @@
 									Style="{StaticResource Console.Tab}"
 									Click="OnControllerGroup" />
 								<RadioButton
+									Margin="0,0,6,0"
 									AutomationProperties.AutomationId="Console.Events.Overview.Group.Camera"
 									Content="카메라"
 									IsChecked="{Binding IsCameraGroup, Mode=OneWay}"
 									Style="{StaticResource Console.Tab}"
 									Click="OnCameraGroup" />
+								<!-- 함체 · 통문: 운영 이벤트(문 개폐 · 환경 경보)가 실리는 유일한 장비별 자리(서버 by_device.enclosures/gates) -->
+								<RadioButton
+									AutomationProperties.AutomationId="Console.Events.Overview.Group.Facility"
+									Content="함체·통문"
+									IsChecked="{Binding IsFacilityGroup, Mode=OneWay}"
+									Style="{StaticResource Console.Tab}"
+									Click="OnFacilityGroup" />
 							</StackPanel>
 						</DockPanel>
 

@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -77,7 +78,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
             return _permissionService;
         }
-        private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+        // 조치보고 = 서버 events:edit — ActionReportRules 참조(종전 control 은 운영자를 403 으로 보냈다).
+        private bool CanCtrlEvents() => ActionReportRules.CanReport(ResolvePermissionService());
 
         // FR-EN-11: 역할강등 시 ACK 버튼 CanExecute 재평가
         private void OnPermissionsChanged()
@@ -281,7 +283,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "권한 없음",
-                    Explain = "조치보고 권한이 없습니다."
+                    Explain = ActionReportRules.NO_PERMISSION_TEXT
                 });
                 return;
             }
@@ -308,7 +310,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "권한 없음",
-                    Explain = "조치보고 권한이 없습니다."
+                    Explain = ActionReportRules.NO_PERMISSION_TEXT
                 });
                 return;
             }
@@ -354,7 +356,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             // FR-EN-10 ACK 배치 게이트 (CanControl) — _batchReportGate 이전에 검사
             if (!CanCtrlEvents())
             {
-                _log?.Warning("[ExecuteBatchReportAsync] 권한 없음 — events:control 미보유");
+                _log?.Warning("[ExecuteBatchReportAsync] 권한 없음 — events:edit 미보유");
                 return;
             }
 
