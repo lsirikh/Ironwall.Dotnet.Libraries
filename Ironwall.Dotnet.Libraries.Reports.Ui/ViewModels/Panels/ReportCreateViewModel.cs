@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
+using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System.Collections.ObjectModel;
 
@@ -110,8 +111,8 @@ public class ReportCreateViewModel : BasePanelViewModel
             StatusText = "생성 중… (GENERATING)";
             var completed = await PollUntilDoneAsync(id);
             if (completed != null && completed.IsCompleted) { GenProgress = 100; StatusText = "완료됨."; Generated?.Invoke(id); }
-            else if (completed != null && completed.IsCancelled) StatusText = "취소됨.";
-            else if (completed != null && completed.IsFailed) StatusText = $"실패: {FailReason(completed.ErrorMessage)}";
+            else if (completed != null && completed.IsCancelled) StatusText = CancelledStatus(completed);
+            else if (completed != null && completed.IsFailed) StatusText = $"실패: {new ReportGenerationRow(completed).FailureText}";
             else StatusText = "시간 초과(폴링 중단). 목록에서 상태를 확인하세요.";
         }
         catch (Exception ex)
@@ -143,18 +144,17 @@ public class ReportCreateViewModel : BasePanelViewModel
     }
 
     /// <summary>
-    /// 서버 error_message → 사용자 안내 문구 분화(v6.0).
-    /// <para>⚠ 배포본(8.0.1 재확인 2026-09-18) 생성 이력 응답에는 <c>error_message</c> 키가 <b>아예 없다</b>(18키 실측).
-    /// 즉 이 인자는 현재 <b>항상 null</b> 이고 폴백 문구만 보인다 — 서버가 키를 노출하기 전까지는
-    /// "사유 미제공"을 <b>명시</b>해 운영자가 목록·로그로 유도되게 한다(공백으로 뭉개지 않는다).</para>
+    /// 취소로 끝났다 — 서버가 사유(예: "사용자 admin 가 취소했습니다")를 실었으면 함께 보인다.
     /// </summary>
-    private static string FailReason(string? msg)
+    /// <remarks>
+    /// 실패 · 취소 사유는 <see cref="ReportGenerationRow.FailureText"/> 한 곳에서 만든다(목록 상세 칸과 같은 글).
+    /// 종전의 영문 원문 대조(<c>"stalled"</c> · <c>"server restarted"</c> · <c>"Cancelled"</c>)는 지웠다 —
+    /// 8.0.2 서버는 원문을 내보내지 않고 한국어 한 줄로 정규화해 보낸다(routers/reports.py <c>_public_error_message</c>).
+    /// </remarks>
+    private static string CancelledStatus(ReportGenerationDto dto)
     {
-        if (string.IsNullOrWhiteSpace(msg)) return "생성 실패 — 서버가 사유를 제공하지 않았습니다(잠시 후 재생성하세요).";
-        if (msg.Contains("server restarted")) return "서버 재시작으로 실패 — 재생성하세요";
-        if (msg.Contains("stalled")) return "생성 지연으로 중단 — 재시도하세요";
-        if (msg.Contains("Cancelled")) return "취소됨";
-        return msg;
+        var reason = new ReportGenerationRow(dto).FailureText;
+        return string.IsNullOrEmpty(reason) ? "취소됨." : $"취소됨: {reason}";
     }
 
     /// <summary>

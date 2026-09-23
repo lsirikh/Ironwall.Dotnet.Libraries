@@ -405,11 +405,14 @@ public sealed class RailIconKindConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
-/// <summary>서버 기간 코드(<c>7d</c>) → 화면 글자. 어휘 자체는 <see cref="ReportGenerationRow"/> 한 곳에 있다.</summary>
+/// <summary>
+/// 서버 기간 코드(<c>7d</c>) → 화면 글자. 어휘 자체는 <see cref="ReportGenerationRow"/> 한 곳에 있다.
+/// 이 변환기는 <b>템플릿 기본 기간</b> 열(<c>default_period</c>)에만 쓰인다 — 서버가 <c>null</c> 을 주면 "지정 안 함".
+/// </summary>
 public sealed class PeriodCodeConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => ReportGenerationRow.PeriodDisplay(value as string);
+        => ReportGenerationRow.DefaultPeriodDisplay(value as string);
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

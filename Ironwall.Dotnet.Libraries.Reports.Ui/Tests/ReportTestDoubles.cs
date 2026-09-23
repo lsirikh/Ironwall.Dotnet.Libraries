@@ -45,7 +45,9 @@ public sealed class FakePermissionService : IPermissionService
     public bool CanView(string module) => ViewFor?.Invoke(module) ?? View;
     public bool CanEdit(string module) => Edit;
     public bool CanControl(string module) => Edit;
-    public bool CanDelete(string module) => Edit;
+    /// <summary>delete 를 edit 와 따로 정하고 싶을 때만 준다(없으면 <see cref="Edit"/> 를 따른다).</summary>
+    public bool? Delete { get; set; }
+    public bool CanDelete(string module) => Delete ?? Edit;
     public bool HasDeviceGroup(int id) => true;
     public IReadOnlyList<int> GetAccessibleDeviceGroups() => Array.Empty<int>();
     public bool CanAccessAuditLogs() => true;
@@ -70,6 +72,11 @@ public sealed class FakeReportApiService : IReportApiService
     public bool FailList { get; set; }
     public bool FailWrite { get; set; }
     public bool DeleteSucceeds { get; set; } = true;
+
+    /// <summary>생성 요청이 끝난 상태 — 폴링이 처음 보는 값(기본: 완료).</summary>
+    public string GeneratedStatus { get; set; } = "COMPLETED";
+    /// <summary>서버가 싣는 사유(8.0.2 는 한국어 한 줄로 정규화해 보낸다).</summary>
+    public string? GeneratedErrorMessage { get; set; }
 
     // 무엇이 실제로 나갔는가 — 계약 단언에 쓴다.
     public ReportTemplateUpdateDto? LastUpdate { get; private set; }
@@ -155,7 +162,8 @@ public sealed class FakeReportApiService : IReportApiService
             Title = dto.Title,
             ReportType = dto.ReportType,
             PeriodType = dto.PeriodType,
-            Status = "COMPLETED",
+            Status = GeneratedStatus,
+            ErrorMessage = GeneratedErrorMessage,
         };
         Generations.Insert(0, created);
         return Task.FromResult(new ApiResponse<ReportGenerationDto> { Success = true, Data = created });

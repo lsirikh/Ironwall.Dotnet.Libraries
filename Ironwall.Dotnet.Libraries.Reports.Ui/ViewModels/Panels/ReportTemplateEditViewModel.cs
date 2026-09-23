@@ -87,12 +87,15 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
             _originalName = src.Name ?? string.Empty;
             _originalDescription = src.Description ?? string.Empty;
-            _originalPeriod = src.DefaultPeriod ?? "7d";
+            // ★ 서버가 null 을 주면 null 로 둔다 — "7d" 로 채우면 고르지 않은 기간을 고른 것처럼 보이고,
+            //   기준값까지 "7d" 가 돼 사용자가 7일을 골라도 "손댄 것 없음" 으로 삼켜진다.
+            _originalPeriod = src.DefaultPeriod;
 
             SetQuiet(ref _name, _originalName, nameof(Name));
             SetQuiet(ref _description, _originalDescription, nameof(Description));
-            _selectedPeriod = Periods.FirstOrDefault(p => p.Value == _originalPeriod) ?? Periods[0];
+            _selectedPeriod = Periods.FirstOrDefault(p => p.Value == _originalPeriod);   // 모르는 코드 · null → 선택 없음
             NotifyOfPropertyChange(nameof(SelectedPeriod));
+            NotifyOfPropertyChange(nameof(IsPeriodUnset));
 
             await LoadCatalogAsync(src.Components);
         }
@@ -116,6 +119,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             SetQuiet(ref _description, string.Empty, nameof(Description));
             _selectedPeriod = Periods[0];
             NotifyOfPropertyChange(nameof(SelectedPeriod));
+            NotifyOfPropertyChange(nameof(IsPeriodUnset));
 
             await LoadCatalogAsync(null);
         }
@@ -183,7 +187,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     Description = string.IsNullOrWhiteSpace(Description) ? null : Description,
                     ReportType = "CUSTOM",
                     // IsPublic 미지정 → 서버 기본값(false). UI 를 두지 않는 사유는 클래스 주석 참조.
-                    DefaultPeriod = SelectedPeriod.Value,
+                    // 등록 폼은 늘 한 기간을 고른 채 시작한다(LoadNewAsync) — 서버 생성 스키마가 null 을 받지 않는다.
+                    DefaultPeriod = (SelectedPeriod ?? Periods[0]).Value,
                     Components = comps,
                 };
                 var res = await _api.CreateTemplateAsync(dto);
@@ -205,7 +210,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     Name = IsTouched(FieldName) ? name : null,
                     Description = IsTouched(FieldDescription) ? (Description ?? string.Empty) : null,
                     // IsPublic 은 의도적으로 null — 전송 자체를 생략한다(클래스 주석).
-                    DefaultPeriod = IsTouched(FieldPeriod) ? SelectedPeriod.Value : null,
+                    // 손대지 않은 기간은 싣지 않는다 — 서버의 null 을 그대로 둔다(NullValueHandling.Ignore 로 키째 빠진다).
+                    DefaultPeriod = IsTouched(FieldPeriod) ? SelectedPeriod?.Value : null,
                     Components = IsTouched(FieldComponents) ? comps : null,
                 };
                 if (dto.Name is null && dto.Description is null && dto.DefaultPeriod is null && dto.Components is null)
@@ -240,7 +246,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     {
         _originalName = (Name ?? string.Empty).Trim();
         _originalDescription = Description ?? string.Empty;
-        _originalPeriod = SelectedPeriod.Value;
+        _originalPeriod = SelectedPeriod?.Value;
         SetQuiet(ref _name, _originalName, nameof(Name));
         Board.MarkBaseline();
         RaiseBoard();
@@ -254,8 +260,9 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
         {
             SetQuiet(ref _name, _originalName, nameof(Name));
             SetQuiet(ref _description, _originalDescription, nameof(Description));
-            _selectedPeriod = Periods.FirstOrDefault(p => p.Value == _originalPeriod) ?? Periods[0];
+            _selectedPeriod = Periods.FirstOrDefault(p => p.Value == _originalPeriod);
             NotifyOfPropertyChange(nameof(SelectedPeriod));
+            NotifyOfPropertyChange(nameof(IsPeriodUnset));
             Board.Revert();
             StatusText = string.Empty;
         }
@@ -321,8 +328,13 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
         }
     }
 
-    private PeriodOption _selectedPeriod;
-    public PeriodOption SelectedPeriod
+    private PeriodOption? _selectedPeriod;
+    /// <summary>
+    /// 기본 기간. 서버 템플릿에 기간이 없으면(<c>default_period: null</c>) <c>null</c> — 콤보가 아무것도 고르지 않고
+    /// "지정 안 함" 을 보인다. 사용자가 고르면 그 값이 손댄 칸이 된다. 화면에서 null 로 되돌리는 길은 없다
+    /// (PATCH 가 null 을 싣지 않는다 — 키째 빠진다).
+    /// </summary>
+    public PeriodOption? SelectedPeriod
     {
         get => _selectedPeriod;
         set
@@ -330,9 +342,16 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             if (Equals(_selectedPeriod, value) || value is null) return;
             _selectedPeriod = value;
             NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(IsPeriodUnset));
             Touch(FieldPeriod, _originalPeriod, value.Value);
         }
     }
+
+    /// <summary>서버 템플릿에 기본 기간이 없다 — 콤보 자리표시자 "지정 안 함" 을 켠다.</summary>
+    public bool IsPeriodUnset => _selectedPeriod is null;
+
+    /// <summary>기본 기간이 없을 때 콤보에 보일 글(<see cref="Consoles.Lists.ReportGenerationRow.UnsetPeriodText"/> 와 같다).</summary>
+    public string UnsetPeriodText => Consoles.Lists.ReportGenerationRow.UnsetPeriodText;
 
     private string _statusText = string.Empty;
     /// <summary>저장 결과 한 줄 — 팝업이 아니다(상세 칸 안에 인라인).</summary>
@@ -356,7 +375,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
     private string _originalName = string.Empty;
     private string _originalDescription = string.Empty;
-    private string _originalPeriod = "7d";
+    private string? _originalPeriod = "7d";
     private bool _isLoading;
     private bool _canEdit = true;
 

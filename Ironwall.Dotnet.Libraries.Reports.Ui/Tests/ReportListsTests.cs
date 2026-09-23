@@ -218,6 +218,85 @@ public class ReportGenerationRowTests
     {
         Assert.Equal("전 심각도", new ReportGenerationRow(ReportSeed.Generation(1, "a")).SeverityLabel);
     }
+
+    [Fact]
+    public void should_show_the_server_reason_when_a_generation_is_cancelled()
+    {
+        // 8.0.2 는 취소 사유를 한국어 한 줄로 싣는다(routers/reports.py _public_error_message) — 버리지 않는다.
+        var dto = ReportSeed.Generation(3, "c", "CANCELLED");
+        dto.ErrorMessage = "사용자 admin 가 취소했습니다";
+
+        Assert.Equal("사용자 admin 가 취소했습니다", new ReportGenerationRow(dto).FailureText);
+    }
+
+    [Fact]
+    public void should_show_the_server_reason_verbatim_when_a_generation_failed()
+    {
+        var dto = ReportSeed.Generation(1, "a", "FAILED");
+        dto.ErrorMessage = "진행이 멈춰 중단됐습니다 — 60초 동안 진척이 없었습니다";
+
+        Assert.Equal("진행이 멈춰 중단됐습니다 — 60초 동안 진척이 없었습니다", new ReportGenerationRow(dto).FailureText);
+    }
+
+    [Fact]
+    public void should_add_no_reason_line_when_a_cancelled_generation_has_no_reason()
+    {
+        // 운영 6.3.2 는 error_message 키가 없다 — 취소는 상태 칩만으로 충분하다.
+        Assert.Equal(string.Empty, new ReportGenerationRow(ReportSeed.Generation(3, "c", "CANCELLED")).FailureText);
+        Assert.Equal(string.Empty, new ReportGenerationRow(ReportSeed.Generation(2, "b")).FailureText);
+    }
+}
+
+/// <summary>
+/// 서버가 실제로 보내는 모양 그대로 — 역직렬화 · 표시가 서버 값을 꾸미지 않는가(라이브 하네스 rv.tpl.* 와 짝).
+/// </summary>
+public class ReportServerTruthTests
+{
+    private static System.Net.Http.HttpResponseMessage Json(string body)
+        => new(System.Net.HttpStatusCode.OK)
+        {
+            Content = new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        };
+
+    [Fact]
+    public async Task should_keep_default_period_null_when_the_server_sends_null()
+    {
+        var parsed = await Ironwall.Dotnet.Libraries.Messages.Helpers.ApiMessageHelper.ToApiResponseAsync<ReportTemplateDto>(
+            Json("{\"success\":true,\"data\":{\"id\":7,\"name\":\"t\",\"default_period\":null,\"components\":[]}}"));
+
+        Assert.True(parsed.Success);
+        Assert.Null(parsed.Data!.DefaultPeriod);
+    }
+
+    [Fact]
+    public async Task should_keep_default_period_null_in_the_list_when_the_server_sends_null()
+    {
+        var parsed = await Ironwall.Dotnet.Libraries.Messages.Helpers.ApiMessageHelper.ToApiListResponseAsync<ReportTemplateDto>(
+            Json("{\"success\":true,\"data\":[{\"id\":7,\"name\":\"t\",\"component_count\":3,\"default_period\":null}," +
+                 "{\"id\":8,\"name\":\"u\",\"component_count\":1,\"default_period\":\"30d\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1}}"));
+
+        Assert.Null(parsed.Data![0].DefaultPeriod);
+        Assert.Equal("30d", parsed.Data[1].DefaultPeriod);
+        Assert.Equal(3, parsed.Data[0].EffectiveComponentCount);
+        Assert.Equal(2, parsed.Pagination!.Total);
+    }
+
+    [Fact]
+    public void should_show_an_unset_default_period_as_not_specified()
+    {
+        var converter = new Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.PeriodCodeConverter();
+
+        Assert.Equal("지정 안 함", converter.Convert(null!, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("최근 7일", converter.Convert("7d", typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void should_leave_default_period_out_of_a_patch_body_when_it_is_not_set()
+    {
+        var body = Newtonsoft.Json.JsonConvert.SerializeObject(new ReportTemplateUpdateDto { Name = "x" });
+
+        Assert.DoesNotContain("default_period", body);
+    }
 }
 
 /// <summary>레일 — 탭 3 이 레일 3 이 된다(L1260-1262).</summary>

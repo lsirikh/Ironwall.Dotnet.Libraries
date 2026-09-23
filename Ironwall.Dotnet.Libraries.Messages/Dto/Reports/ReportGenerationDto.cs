@@ -11,8 +11,8 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 /// <c>id · report_type · template_id · title · period_type · start_date · end_date · generator_id ·
 /// generator_name · status · created_at · completed_at · severity_filter · progress_pct · progress_stage ·
 /// progress_updated_at · preview_html_url · pdf_download_url</c>.</para>
-/// <para><b>서버가 싣지 않는 키</b> — <c>error_message</c>(DB 에는 있으나 어느 엔드포인트로도 노출되지 않는다) ·
-/// <c>pdf_file_size</c> · <c>updated_at</c>. 아래 해당 프로퍼티는 <b>항상 null</b> 이다.</para>
+/// <para><b>서버가 싣지 않는 키</b> — <c>pdf_file_size</c> · <c>updated_at</c>. 아래 해당 프로퍼티는 <b>항상 null</b> 이다.
+/// <c>error_message</c> 는 8.0.2(GIS 요청 R-01)부터 <b>실린다</b> — 운영 6.3.2 에는 키가 없다.</para>
 /// <para><c>preview_html_url</c> 은 <b>항상 문자열</b>이고 <c>pdf_download_url</c> 은 <b><c>string|null</c></b> 로
 /// 키가 늘 실린다 — "키가 있으면 받을 수 있다"가 아니라 <b>값이 null 인지</b>로 분기한다(§10.4.3).</para>
 /// </summary>
@@ -50,10 +50,11 @@ public class ReportGenerationDto : BaseDto
     public string Status { get; set; } = "PENDING";
 
     /// <summary>
-    /// 실패 사유. ⚠ <b>서버가 응답에 싣지 않는다</b>(실측 — DB `_write_terminal_state` 에는 기록되지만
-    /// 어느 읽기 엔드포인트도 노출하지 않는다). 즉 <b>항상 null</b> 이며 FAILED 사유는 현재
-    /// <b>클라에서 볼 수 없다</b> — 폴백 문구로 "사유 미제공"을 명시해야 한다(공백으로 뭉개면 안 된다).
-    /// 서버가 키를 노출하면 이 프로퍼티가 그대로 살아난다.
+    /// 실패 · 취소 사유 — <b>서버가 운영자용 한국어 한 줄로 정규화해</b> 싣는다(8.0.2, GIS 요청 R-01:
+    /// api-test-server routers/reports.py <c>_public_error_message</c>). 원문(DB 예외 문자열)은 내보내지 않으므로
+    /// 클라가 영문 원문을 짐작해 번역하지 않는다 — <b>받은 그대로 보인다</b>.
+    /// <para>FAILED · CANCELLED 에 값이 있고, 그 밖에는 <c>null</c>. 운영 6.3.2 는 키가 없어 늘 <c>null</c> 이다
+    /// (그때 FAILED 는 "사유 미제공" 폴백 문구를 보인다 — 공백으로 뭉개지 않는다).</para>
     /// </summary>
     [JsonProperty("error_message", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
     public string? ErrorMessage { get; set; }

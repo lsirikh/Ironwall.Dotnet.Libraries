@@ -17,6 +17,12 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     public List<ActionReportTemplateDto> Templates { get; } = new();
 
     public bool? IsSupported { get; private set; } = true;
+
+    /// <summary>
+    /// 구 서버(운영 6.3.2) 흉내 — 라우터가 없다. 실제 서비스처럼 목록 404 를 <c>NOT_SUPPORTED</c> 로 번역하고
+    /// <see cref="IsSupported"/> 를 false 로 굳히며, 쓰기는 전부 404 다.
+    /// </summary>
+    public bool Unsupported { get; set; }
     public bool FailList { get; set; }
     public bool FailWrite { get; set; }
     public bool FailReorder { get; set; }
@@ -26,12 +32,32 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     /// <summary>실제로 나간 reorder 호출 — "단일 호출·전체 목록" 계약을 단언하는 데 쓴다.</summary>
     public List<List<ActionReportTemplateReorderItemDto>> ReorderCalls { get; } = new();
     public List<ActionReportTemplateCreateDto> CreateCalls { get; } = new();
+    public List<(int Id, ActionReportTemplateUpdateDto Dto)> UpdateCalls { get; } = new();
     public List<int> DeletedIds { get; } = new();
 
     public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
 
     public Task<ApiListResponse<ActionReportTemplateDto>> GetTemplatesAsync(CancellationToken token = default)
+    {
+        if (Unsupported)
+        {
+            IsSupported = false;
+            var notSupported = ApiListResponse<ActionReportTemplateDto>.CreateError(
+                ActionReportTemplateApiService.NotSupportedCode, "이 서버는 조치보고 문구 관리를 지원하지 않습니다.", "GET → 404");
+            notSupported.StatusCode = 404;
+            return Task.FromResult(notSupported);
+        }
+        return GetTemplatesCoreAsync();
+    }
+
+    private Task<ApiListResponse<ActionReportTemplateDto>> GetTemplatesCoreAsync()
+    {
+        if (!FailList) IsSupported = true;   // 실제 서비스처럼 정상 응답 1회면 지원으로 굳힌다
+        return GetTemplatesResultAsync();
+    }
+
+    private Task<ApiListResponse<ActionReportTemplateDto>> GetTemplatesResultAsync()
         => Task.FromResult(FailList
             ? new ApiListResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure }
             : new ApiListResponse<ActionReportTemplateDto> { Success = true, Data = Templates.OrderBy(t => t.DisplayOrder).ThenBy(t => t.Id).ToList() });
@@ -42,6 +68,7 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     public Task<ApiResponse<ActionReportTemplateDto>> CreateTemplateAsync(ActionReportTemplateCreateDto dto, CancellationToken token = default)
     {
         CreateCalls.Add(dto);
+        if (Unsupported) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
         if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure });
         if (Templates.Any(t => string.Equals(t.Content.Trim(), dto.Content.Trim(), StringComparison.Ordinal)))
             return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 409, Message = $"content '{dto.Content}' already exists" });
@@ -53,6 +80,8 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
 
     public Task<ApiResponse<ActionReportTemplateDto>> UpdateTemplateAsync(int id, ActionReportTemplateUpdateDto dto, CancellationToken token = default)
     {
+        UpdateCalls.Add((id, dto));
+        if (Unsupported) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
         if (FailWrite) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure });
         var target = Templates.FirstOrDefault(t => t.Id == id);
         if (target is null) return Task.FromResult(new ApiResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
@@ -67,6 +96,7 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     public Task<ApiResponse<object>> DeleteTemplateAsync(int id, CancellationToken token = default)
     {
         DeletedIds.Add(id);
+        if (Unsupported) return Task.FromResult(new ApiResponse<object> { Success = false, StatusCode = 404 });
         if (FailDelete) return Task.FromResult(new ApiResponse<object> { Success = false, StatusCode = StatusCodeOnFailure });
         Templates.RemoveAll(t => t.Id == id);
         return Task.FromResult(new ApiResponse<object> { Success = true, StatusCode = 200 });
@@ -76,6 +106,7 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     {
         var list = items.ToList();
         ReorderCalls.Add(list);
+        if (Unsupported) return Task.FromResult(new ApiListResponse<ActionReportTemplateDto> { Success = false, StatusCode = 404 });
         if (FailReorder) return Task.FromResult(new ApiListResponse<ActionReportTemplateDto> { Success = false, StatusCode = StatusCodeOnFailure });
 
         // 요청 id 중 하나라도 모르면 서버는 아무것도 바꾸지 않고 404 를 돌려준다(실제 계약).

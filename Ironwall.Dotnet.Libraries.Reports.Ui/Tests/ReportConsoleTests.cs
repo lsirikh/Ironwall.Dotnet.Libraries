@@ -552,6 +552,82 @@ public class ReportConsoleTests : IDisposable
     }
 
     [Fact]
+    public async Task should_leave_the_period_unselected_when_the_template_has_no_default_period()
+    {
+        // 서버 default_period 는 nullable 이다 — 없는 기간을 "최근 7일" 로 꾸며 고른 척하지 않는다.
+        var rig = await OpenAsync(api => api.Templates.First(t => t.Id == 11).DefaultPeriod = null);
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+
+        Assert.Null(rig.Console.EditViewModel.SelectedPeriod);
+        Assert.False(rig.Console.Detail.IsDirty);
+    }
+
+    [Fact]
+    public async Task should_not_send_default_period_when_only_the_name_changes_on_a_template_without_one()
+    {
+        var rig = await OpenAsync(api => api.Templates.First(t => t.Id == 11).DefaultPeriod = null);
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+
+        rig.Console.EditViewModel.Name = "주간 요약 (개정)";
+        await rig.Console.ApplyAsync();
+
+        Assert.NotNull(rig.Api.LastUpdate);
+        Assert.Null(rig.Api.LastUpdate!.DefaultPeriod);
+        Assert.DoesNotContain("default_period", Newtonsoft.Json.JsonConvert.SerializeObject(rig.Api.LastUpdate));
+        Assert.Null(rig.Api.Templates.First(t => t.Id == 11).DefaultPeriod);   // 서버 값은 그대로 null
+    }
+
+    [Fact]
+    public async Task should_send_the_chosen_period_when_the_user_picks_one_for_a_template_without_one()
+    {
+        // 기준값을 "7d" 로 채워 두면 사용자가 7일을 골라도 "손댄 것 없음" 으로 삼켜진다.
+        var rig = await OpenAsync(api => api.Templates.First(t => t.Id == 11).DefaultPeriod = null);
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+
+        rig.Console.EditViewModel.SelectedPeriod = rig.Console.EditViewModel.Periods.First(p => p.Value == "7d");
+        await rig.Console.ApplyAsync();
+
+        Assert.NotNull(rig.Api.LastUpdate);
+        Assert.Equal("7d", rig.Api.LastUpdate!.DefaultPeriod);
+    }
+
+    [Fact]
+    public async Task should_show_the_server_cancel_reason_in_the_create_status_when_the_generation_is_cancelled()
+    {
+        var rig = await OpenAsync(api =>
+        {
+            api.GeneratedStatus = "CANCELLED";
+            api.GeneratedErrorMessage = "사용자 admin 가 취소했습니다";
+        });
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        rig.Console.CreateViewModel.Title = "제목";
+
+        await rig.Console.ApplyAsync();
+
+        Assert.Equal("취소됨: 사용자 admin 가 취소했습니다", rig.Console.CreateViewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task should_show_the_cancel_reason_in_the_detail_pane_when_a_cancelled_generation_is_selected()
+    {
+        var rig = await OpenAsync(api =>
+        {
+            var cancelled = ReportSeed.Generation(4, "취소된 보고서", "CANCELLED");
+            cancelled.ErrorMessage = "사용자 admin 가 취소했습니다";
+            api.Generations.Add(cancelled);
+        });
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 4));
+
+        Assert.True(rig.Console.PreviewViewModel.HasFailure);
+        Assert.Equal("사용자 admin 가 취소했습니다", rig.Console.PreviewViewModel.FailureText);
+    }
+
+    [Fact]
     public async Task should_never_send_is_public_because_the_server_does_not_enforce_it()
     {
         var rig = await OpenAsync();
@@ -848,6 +924,63 @@ public class ReportConsoleTests : IDisposable
         Assert.False(rig.Console.CanDelete);
         Assert.False(rig.Console.EditViewModel.CanEdit);
         Assert.Contains("권한", rig.Console.AddBlockedReason);
+    }
+
+    [Fact]
+    public async Task should_disable_delete_and_cancel_when_the_user_can_edit_but_not_delete()
+    {
+        // 서버는 템플릿 · 생성 이력 삭제와 생성 취소를 reports:delete 로 거른다(routers/reports.py) —
+        // edit 만 있는 사용자에게 켜 두면 눌러도 403 이다(라이브 하네스 rv.gen.1 실측).
+        var rig = await OpenAsync(permission_: p => p.Delete = false);
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));   // 완료
+        Assert.False(rig.Console.CanDeleteGeneration);
+        Assert.False(rig.Console.CanDelete);
+        Assert.Equal("지울 권한이 없습니다.", rig.Console.DeleteBlockedReason);
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 2));   // 생성중
+        Assert.False(rig.Console.CanCancelGeneration);
+
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        Assert.False(rig.Console.CanDelete);
+
+        // 편집은 그대로 열려 있다 — delete 가 없다고 edit 까지 막지 않는다.
+        Assert.True(rig.Console.CanEditReports);
+        Assert.False(rig.Console.Detail.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task should_refuse_delete_and_cancel_at_the_view_model_when_delete_permission_is_missing()
+    {
+        var rig = await OpenAsync(permission_: p => p.Delete = false);
+        var confirmations = 0;
+        rig.Events.SubscribeOnPublishedThread(new ConfirmSpy(() => confirmations++));
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 2));   // 생성중
+        await rig.Console.CancelGenerationAsync();
+        await rig.Console.DeleteGenerationAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        await rig.Console.DeleteAsync();
+
+        // 확인 창조차 뜨지 않는다 — 떴다면 [확인] 한 번에 서버 403 이 된다.
+        Assert.Equal(0, confirmations);
+        Assert.Empty(rig.Api.CancelledIds);
+        Assert.Empty(rig.Api.DeletedGenerationIds);
+        Assert.Empty(rig.Api.DeletedTemplateIds);
+    }
+
+    [Fact]
+    public async Task should_enable_delete_and_cancel_when_the_user_has_delete_without_edit()
+    {
+        // 게이트는 한 동사만 본다 — delete 만 있어도 지우기 · 취소는 서버가 받는다.
+        var rig = await OpenAsync(permission_: p => { p.Edit = false; p.Delete = true; });
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 2));   // 생성중
+        Assert.True(rig.Console.CanCancelGeneration);
+        Assert.True(rig.Console.CanDeleteGeneration);
+        Assert.False(rig.Console.CanAdd);
     }
 
     [Fact]

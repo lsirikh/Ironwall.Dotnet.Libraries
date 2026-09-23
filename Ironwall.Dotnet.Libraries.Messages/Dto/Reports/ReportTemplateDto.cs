@@ -48,8 +48,16 @@ public class ReportTemplateDto : BaseDto
     [JsonProperty("is_public", Order = 6)]
     public bool IsPublic { get; set; }
 
-    [JsonProperty("default_period", Order = 7)]
-    public string DefaultPeriod { get; set; } = "7d";
+    /// <summary>
+    /// 기본 기간 코드(<c>7d</c> · <c>30d</c> · <c>90d</c> · <c>1y</c>). <b>서버 DB 칸이 nullable</b> 이라
+    /// <c>null</c> 이 실제로 온다(PATCH <c>{"default_period": null}</c> 로 만들어진다 — api-test-server
+    /// schemas/report.py 가 "default_period IS NULL 인 행" 을 명시한다).
+    /// <para>⚠ 기본값을 두지 않는다. 역직렬화 설정이 <c>NullValueHandling.Ignore</c> 라(ApiMessageHelper)
+    /// JSON <c>null</c> 은 대입 자체가 생략된다 — 예전 기본값 <c>"7d"</c> 가 그대로 남아 "지정 안 함" 인 템플릿을
+    /// "최근 7일" 로 보였다(라이브 하네스 rv.tpl.1 실측). 표시는 <c>null</c> 을 "지정 안 함" 으로 한다.</para>
+    /// </summary>
+    [JsonProperty("default_period", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
+    public string? DefaultPeriod { get; set; }
 
     /// <summary>
     /// 구성 컴포넌트 수 — <b>목록 응답 전용</b>(상세에는 없다). 목록에서 "컴포넌트 N개"를 표시할 유일한 근거.

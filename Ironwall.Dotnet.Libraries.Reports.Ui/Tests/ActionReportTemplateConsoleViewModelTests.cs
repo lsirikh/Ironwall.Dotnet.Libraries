@@ -196,6 +196,48 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.Null(rig.Console.LoadError);
     }
 
+    #region - 구 서버(라우터 없음) -
+    [Fact]
+    public async Task should_disable_writes_and_say_the_server_does_not_support_it_when_the_list_returns_404()
+    {
+        // 운영 6.3.2 에는 /events/action-report-templates 가 없다 — 서비스가 404 를 NOT_SUPPORTED 로 번역한다.
+        var rig = await OpenAsync(api => api.Unsupported = true);
+
+        Assert.False(rig.Console.CanAdd);
+        Assert.True(rig.Console.Detail.IsReadOnly);
+        Assert.Contains("지원하지 않습니다", rig.Console.EmptyStateText);
+        Assert.Contains("지원하지 않습니다", rig.Console.AddBlockedReason);
+    }
+
+    [Fact]
+    public async Task should_not_send_a_write_or_blame_a_deleted_row_when_the_server_does_not_support_the_api()
+    {
+        var rig = await OpenAsync(api => api.Unsupported = true);
+
+        await rig.Console.AddAsync();
+        rig.Console.DraftContent = "차량 통제";
+        await rig.Console.ApplyAsync();
+
+        Assert.Empty(rig.Api.CreateCalls);
+        Assert.Empty(rig.Api.UpdateCalls);
+        Assert.DoesNotContain("다른 곳에서 삭제된", rig.Console.Detail.LastMessage ?? string.Empty);
+        Assert.Contains("지원하지 않습니다", rig.Console.Detail.LastMessage ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task should_enable_writes_again_when_a_later_load_succeeds()
+    {
+        var rig = await OpenAsync(api => api.Unsupported = true);
+
+        rig.Api.Unsupported = false;   // 서버를 올렸다
+        await rig.Console.ReloadAsync();
+
+        Assert.True(rig.Console.CanAdd);
+        Assert.False(rig.Console.Detail.IsReadOnly);
+        Assert.Equal(3, rig.Console.Items.Count);
+    }
+    #endregion
+
     [Fact]
     public async Task should_show_the_view_permission_message_when_only_template_view_is_granted()
     {

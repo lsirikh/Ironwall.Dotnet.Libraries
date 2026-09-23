@@ -1,5 +1,7 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles;
@@ -36,6 +38,8 @@ namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, IHandle<ClosePopupMessageModel>
 {
     public const string ConsoleKey = "Reports";
+    /// <summary>서버 권한 모듈 — 조회 view · 생성/템플릿 쓰기 edit · 삭제/생성 취소 delete.</summary>
+    public const string PermissionModuleKey = "reports";
 
     #region - Ctors -
     public ReportConsoleViewModel(IEventAggregator eventAggregator,
@@ -295,9 +299,14 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         ? "보고서를 만들 권한이 없습니다."
         : "이미 새 보고서 화면입니다.";
 
-    public bool CanDelete => CanEditReports && (IsTemplateRail ? TemplateViewModel.CanDelete : IsListRail && ListViewModel.CanDelete);
+    /// <summary>
+    /// 툴바 [삭제] — 서버는 템플릿 · 생성 이력 삭제를 <c>reports:delete</c> 로 거른다
+    /// (api-test-server routers/reports.py delete_template · delete_generation, permission_map.py).
+    /// <c>reports:edit</c> 로 켜면 편집만 가진 사용자에게 눌러도 403 인 단추가 선다(실측).
+    /// </summary>
+    public bool CanDelete => CanDeleteReports && (IsTemplateRail ? TemplateViewModel.CanDelete : IsListRail && ListViewModel.CanDelete);
 
-    public string DeleteBlockedReason => !CanEditReports
+    public string DeleteBlockedReason => !CanDeleteReports
         ? "지울 권한이 없습니다."
         : IsCreateRail ? "이 화면에는 지울 것이 없습니다." : "지울 줄을 먼저 고르세요.";
 
@@ -463,13 +472,17 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         RaiseStatus();
     }
 
-    public Task CancelGenerationAsync() => ListViewModel.Cancel();
+    /// <summary>
+    /// 상세 하단의 [취소]. 단추를 끄는 것만으로는 부족하다 — 뷰모델 경로에서도 거절한다
+    /// (서버는 취소를 삭제와 같은 <c>reports:delete</c> 로 거른다).
+    /// </summary>
+    public Task CancelGenerationAsync() => CanCancelGeneration ? ListViewModel.Cancel() : Task.CompletedTask;
 
     /// <summary>상세 하단의 [삭제] — 툴바와 같은 길(이동 차단 포함).</summary>
     public Task DeleteGenerationAsync() => DeleteAsync();
 
-    public bool CanCancelGeneration => CanEditReports && ListViewModel.CanCancel;
-    public bool CanDeleteGeneration => CanEditReports && ListViewModel.CanDelete;
+    public bool CanCancelGeneration => CanDeleteReports && ListViewModel.CanCancel;
+    public bool CanDeleteGeneration => CanDeleteReports && ListViewModel.CanDelete;
     public bool CanDownloadPdf => ListViewModel.CanDownload;
     #endregion
 
@@ -588,8 +601,10 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
 
     private void RefreshPermissions()
     {
-        CanViewReports = _permission?.CanView("reports") ?? true;
-        CanEditReports = _permission?.CanEdit("reports") ?? true;
+        CanViewReports = PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.View);
+        CanEditReports = PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Edit);
+        // 삭제 · 생성 취소는 서버가 edit 가 아니라 delete 로 거른다 — 편집 권한에 얹지 않는다.
+        CanDeleteReports = PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Delete);
         // 편집 권한이 없으면 상세 칸은 여섯 상태의 "읽기 전용"이다(WL L929).
         Detail.IsReadOnly = !CanEditReports;
         EditViewModel.CanEdit = CanEditReports;
@@ -601,6 +616,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
 
     public bool CanViewReports { get; private set; } = true;
     public bool CanEditReports { get; private set; } = true;
+    /// <summary>템플릿 · 생성 이력 삭제와 생성 취소 — 서버 <c>reports:delete</c>.</summary>
+    public bool CanDeleteReports { get; private set; } = true;
     #endregion
 
     #region - Handlers -
@@ -751,6 +768,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         NotifyOfPropertyChange(nameof(DeleteBlockedReason));
         NotifyOfPropertyChange(nameof(CanViewReports));
         NotifyOfPropertyChange(nameof(CanEditReports));
+        NotifyOfPropertyChange(nameof(CanDeleteReports));
     }
     #endregion
 

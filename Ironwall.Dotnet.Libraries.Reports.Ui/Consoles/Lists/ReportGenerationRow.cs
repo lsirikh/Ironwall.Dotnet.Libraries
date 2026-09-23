@@ -130,19 +130,39 @@ public sealed class ReportGenerationRow : PropertyChangedBase
     }
 
     /// <summary>
-    /// 실패 안내 — 서버가 <c>error_message</c> 키를 <b>싣지 않는다</b>(8.0.1 18키 실측).
-    /// 공백으로 뭉개지 않고 "사유 미제공"을 명시해 목록 · 로그로 유도한다.
+    /// 실패 · 취소 사유 — 서버가 준 <c>error_message</c> 를 <b>그대로</b> 보인다.
     /// </summary>
+    /// <remarks>
+    /// <para>8.0.2 부터 서버가 사유를 운영자용 한국어 한 줄로 정규화해 싣는다(GIS 요청 R-01 —
+    /// 예: "사용자 admin 가 취소했습니다" · "진행이 멈춰 중단됐습니다 — …"). 클라가 영문 원문을 짐작해
+    /// 번역하지 않는다(그 원문은 이제 오지 않는다).</para>
+    /// <para><b>FAILED</b> 인데 사유가 없으면(운영 6.3.2 는 키 자체가 없다) 공백으로 뭉개지 않고 "사유 미제공"을 명시한다.
+    /// <b>CANCELLED</b> 는 사유가 있을 때만 보인다 — 없으면 상태 칩의 "취소됨" 으로 충분하다.
+    /// 종전에는 CANCELLED 사유를 버려, 서버가 보낸 "누가 멈췄나" 가 화면에 닿지 않았다(라이브 하네스 rv.gen.3).</para>
+    /// </remarks>
     public string FailureText
     {
         get
         {
-            if (!Dto.IsFailed) return string.Empty;
-            return string.IsNullOrWhiteSpace(Dto.ErrorMessage)
-                ? "생성 실패 — 서버가 사유를 제공하지 않았습니다(잠시 후 다시 생성하세요)."
-                : Dto.ErrorMessage!;
+            var reason = string.IsNullOrWhiteSpace(Dto.ErrorMessage) ? null : Dto.ErrorMessage!.Trim();
+            if (Dto.IsFailed) return reason ?? MissingFailureReasonText;
+            if (Dto.IsCancelled) return reason ?? string.Empty;
+            return string.Empty;
         }
     }
+
+    /// <summary>FAILED 인데 서버가 사유를 싣지 않았을 때(구 판본).</summary>
+    public const string MissingFailureReasonText = "생성 실패 — 서버가 사유를 제공하지 않았습니다(잠시 후 다시 생성하세요).";
+
+    /// <summary>템플릿 기본 기간이 비었을 때(서버 <c>default_period: null</c>) — "최근 7일" 로 꾸며 보이지 않는다.</summary>
+    public const string UnsetPeriodText = "지정 안 함";
+
+    /// <summary>
+    /// 템플릿 <b>기본 기간</b> 표시 — <see cref="PeriodDisplay"/> 와 같되 <c>null</c> 을 "—" 가 아니라
+    /// <see cref="UnsetPeriodText"/> 로 말한다(생성 이력의 기간은 늘 있으므로 "—" 는 거기서만 쓴다).
+    /// </summary>
+    public static string DefaultPeriodDisplay(string? period)
+        => string.IsNullOrWhiteSpace(period) ? UnsetPeriodText : PeriodDisplay(period);
 
     public static IEnumerable<ReportGenerationRow> From(IEnumerable<ReportGenerationDto>? items)
         => (items ?? Enumerable.Empty<ReportGenerationDto>()).Select(d => new ReportGenerationRow(d));

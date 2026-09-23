@@ -59,6 +59,8 @@ public static partial class Steps
             ("server",          "servers?page=1&limit=100",              d => Str(d["name"])),
             // D-34 seeds action-report templates; the list has no name field, the text lives in "content".
             ("action-report-template", "events/action-report-templates", d => Str(d["content"])),
+            // reports-vm (Steps.ReportsVm.cs) 가 보고서 생성을 만든다 — 제목으로 매칭.
+            ("report-generation", "reports/generations?page=1&limit=100", d => Str(d["title"])),
         };
 
         var unverifiable = new List<string>();

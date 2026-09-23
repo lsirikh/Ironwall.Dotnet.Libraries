@@ -266,10 +266,11 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     #region - Toolbar -
     public bool CanAdd => CanEdit;
-    public string AddBlockedReason => CanEdit ? string.Empty : "문구 편집 권한이 없습니다.";
+    public string AddBlockedReason => CanEdit ? string.Empty : IsUnsupported ? UnsupportedText : "문구 편집 권한이 없습니다.";
 
     public bool CanDelete => CanDeletePermission && SelectedItem != null;
-    public string DeleteBlockedReason => !CanDeletePermission ? "지울 권한이 없습니다." : "지울 문구를 먼저 고르세요.";
+    public string DeleteBlockedReason => IsUnsupported ? UnsupportedText
+        : !CanDeletePermission ? "지울 권한이 없습니다." : "지울 문구를 먼저 고르세요.";
 
     public bool CanReload => !IsBusy;
 
@@ -396,7 +397,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// <summary>[적용] · [등록].</summary>
     public async Task ApplyAsync()
     {
-        if (!CanEdit) { Detail.Settle("편집 권한이 없습니다."); RaiseAll(); return; }
+        if (!CanEdit) { Detail.Settle(IsUnsupported ? UnsupportedText : "편집 권한이 없습니다."); RaiseAll(); return; }
         if (DraftValidationError != null) { Detail.Settle(DraftValidationError); RaiseAll(); return; }
         if (IsBusy) return;
 
@@ -493,7 +494,11 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 // 되살아나 저장될 수 있다 — scenario-analysis §3 G1).
                 Board.Load(Enumerable.Empty<ActionReportTemplateDto>());
                 _log?.Warning($"[ActionReportTemplate] 조회 실패: {res.ErrorText()}");
-                LoadError = "문구 목록을 불러오지 못했습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
+                // 구 서버(운영 6.3.2)는 이 라우터가 없다 — 목록 404 를 서비스가 NOT_SUPPORTED 로 번역한다.
+                // "불러오지 못했다"(일시 장애)로 뭉개면 [추가] 가 켜진 채 남아 누를 때마다 404 가 된다.
+                LoadError = IsUnsupported
+                    ? UnsupportedText
+                    : "문구 목록을 불러오지 못했습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
             }
             if (keepId.HasValue) SelectById(keepId.Value);
         }
@@ -503,18 +508,37 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             Board.Load(Enumerable.Empty<ActionReportTemplateDto>());
             LoadError = "문구 목록을 불러오지 못했습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
         }
-        finally { IsBusy = false; RaiseAll(); }
+        finally
+        {
+            IsBusy = false;
+            Detail.IsReadOnly = !CanEdit;   // 지원 여부는 조회로만 안다 — 적재가 끝날 때마다 쓰기 상태를 다시 맞춘다
+            RaiseAll();
+        }
     }
 
     /// <summary>서버 detail(영문) → 화면 문구(와이어프레임 §6 표).</summary>
-    private static string MapError(int statusCode, string fallback) => statusCode switch
+    private string MapError(int statusCode, string fallback)
     {
-        409 => "이미 등록된 문구입니다.",
-        404 => "다른 곳에서 삭제된 문구입니다. 목록을 다시 불러옵니다.",
-        422 => "문구는 1~500자여야 합니다.",
-        403 => "문구 편집 권한이 없습니다.",
-        _ => string.IsNullOrWhiteSpace(fallback) ? "요청을 처리하지 못했습니다." : fallback,
-    };
+        // 서버가 이 기능을 모르는데 "다른 곳에서 삭제된 문구" 라고 말하면 거짓이다.
+        if (IsUnsupported) return UnsupportedText;
+        return statusCode switch
+        {
+            409 => "이미 등록된 문구입니다.",
+            404 => "다른 곳에서 삭제된 문구입니다. 목록을 다시 불러옵니다.",
+            422 => "문구는 1~500자여야 합니다.",
+            403 => "문구 편집 권한이 없습니다.",
+            _ => string.IsNullOrWhiteSpace(fallback) ? "요청을 처리하지 못했습니다." : fallback,
+        };
+    }
+
+    /// <summary>
+    /// 서버가 조치보고 문구 API 를 제공하지 않는다(<see cref="IActionReportTemplateApiService.IsSupported"/> == false —
+    /// 목록 GET 404, 운영 6.3.2). 그때는 쓰기를 전부 끄고 이 글을 보인다.
+    /// <c>null</c>(아직 모름)은 막지 않는다 — 판정의 권위는 실제 404 다.
+    /// </summary>
+    public bool IsUnsupported => _api.IsSupported == false;
+
+    public const string UnsupportedText = "이 서버는 조치보고 문구 관리를 지원하지 않습니다. 서버를 업그레이드한 뒤 사용할 수 있습니다.";
     #endregion
 
     #region - Permissions -
@@ -526,8 +550,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         RaiseAll();
     }
 
-    public bool CanEdit => PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Edit);
-    public bool CanDeletePermission => PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Delete);
+    /// <summary>
+    /// 쓰기(등록 · 수정 · 순서) 가능 — 권한 <b>그리고</b> 서버 지원. 끌기 · ▲▼ · [추가] · [적용] 이 전부 이것 하나를 본다.
+    /// </summary>
+    public bool CanEdit => !IsUnsupported && PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Edit);
+    /// <summary>삭제 가능 — 권한 <b>그리고</b> 서버 지원.</summary>
+    public bool CanDeletePermission => !IsUnsupported && PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Delete);
     public bool CanViewPermission => PermissionUiPolicy.Allowed(_permission, ReadPermissionModuleKey, EnumPermissionVerb.View);
     #endregion
 
@@ -546,6 +574,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         NotifyOfPropertyChange(nameof(CanEdit));
         NotifyOfPropertyChange(nameof(CanDeletePermission));
         NotifyOfPropertyChange(nameof(CanViewPermission));
+        NotifyOfPropertyChange(nameof(IsUnsupported));
         NotifyOfPropertyChange(nameof(CanUndoReorder));
         NotifyOfPropertyChange(nameof(DetailCanApply));
         NotifyOfPropertyChange(nameof(IsContentTouched));

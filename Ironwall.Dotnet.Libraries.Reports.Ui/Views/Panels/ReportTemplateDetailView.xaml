@@ -71,6 +71,7 @@
 					IsTouched="{Binding IsPeriodTouched}">
 					<ComboBox
 						Height="30"
+						md:HintAssist.Hint="{Binding EditViewModel.UnsetPeriodText}"
 						AutomationProperties.AutomationId="Reports.Detail.Field.default_period"
 						DisplayMemberPath="Display"
 						FontSize="13"
