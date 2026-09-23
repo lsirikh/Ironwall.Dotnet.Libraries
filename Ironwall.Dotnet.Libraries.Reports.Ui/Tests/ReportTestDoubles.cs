@@ -40,7 +40,9 @@ public sealed class FakePermissionService : IPermissionService
     public TimeSpan ClockSkew => TimeSpan.Zero;
 
     public bool HasRole(EnumUserRole required) => true;
-    public bool CanView(string module) => View;
+    /// <summary>모듈별로 view 를 가르고 싶을 때만 준다(없으면 <see cref="View"/> 하나로 답한다).</summary>
+    public Func<string, bool>? ViewFor { get; set; }
+    public bool CanView(string module) => ViewFor?.Invoke(module) ?? View;
     public bool CanEdit(string module) => Edit;
     public bool CanControl(string module) => Edit;
     public bool CanDelete(string module) => Edit;

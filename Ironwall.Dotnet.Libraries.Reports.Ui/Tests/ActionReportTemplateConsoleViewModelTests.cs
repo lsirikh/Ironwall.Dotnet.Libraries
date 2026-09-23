@@ -25,12 +25,12 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         public required EventAggregator Events { get; init; }
     }
 
-    private static async Task<Rig> OpenAsync(System.Action<FakeActionReportTemplateApiService>? seed = null, bool canEdit = true, bool canView = true)
+    private static async Task<Rig> OpenAsync(System.Action<FakeActionReportTemplateApiService>? seed = null, bool canEdit = true, bool canView = true, System.Func<string, bool>? viewFor = null)
     {
         var log = new FakeLogService();
         var events = new EventAggregator();
         var api = new FakeActionReportTemplateApiService();
-        var permission = new FakePermissionService { Edit = canEdit, View = canView };
+        var permission = new FakePermissionService { Edit = canEdit, View = canView, ViewFor = viewFor };
 
         api.Templates.Add(ActionReportTemplateSeed.Template(1, "야생동물출현", 0));
         api.Templates.Add(ActionReportTemplateSeed.Template(2, "강풍/폭우", 1));
@@ -181,6 +181,25 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
     public async Task should_show_a_view_permission_message_instead_of_the_hardcoded_empty_state_when_view_is_denied()
     {
         var rig = await OpenAsync(canView: false);
+
+        Assert.True(rig.Console.IsEmpty);
+        Assert.Equal("문구를 볼 권한이 없습니다.", rig.Console.LoadError);
+    }
+
+    [Fact]
+    public async Task should_load_the_list_when_events_view_is_granted_even_without_template_view()
+    {
+        // 서버는 목록 GET 을 events:view 로 거른다 — action_report_templates:view 가 없어도 읽을 수 있어야 한다.
+        var rig = await OpenAsync(viewFor: module => module == ActionReportTemplateConsoleViewModel.ReadPermissionModuleKey);
+
+        Assert.False(rig.Console.IsEmpty);
+        Assert.Null(rig.Console.LoadError);
+    }
+
+    [Fact]
+    public async Task should_show_the_view_permission_message_when_only_template_view_is_granted()
+    {
+        var rig = await OpenAsync(viewFor: module => module == ActionReportTemplateConsoleViewModel.PermissionModuleKey);
 
         Assert.True(rig.Console.IsEmpty);
         Assert.Equal("문구를 볼 권한이 없습니다.", rig.Console.LoadError);

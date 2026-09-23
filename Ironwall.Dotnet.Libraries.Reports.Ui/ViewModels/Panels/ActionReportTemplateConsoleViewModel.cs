@@ -36,7 +36,15 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 {
     public const string ConsoleKey = "ActionReportTemplates";
     public const string RailKey = "templates";
+    /// <summary>쓰기(등록 · 수정 · 순서) = edit, 삭제 = delete. 서버에 이 모듈의 view 는 쓰이지 않는다.</summary>
     public const string PermissionModuleKey = "action_report_templates";
+    /// <summary>
+    /// 목록 읽기 권한 모듈. 서버는 목록 GET 을 <c>events:view</c> 로 거른다
+    /// (api-test-server routers/action_report_templates.py list_action_report_templates) —
+    /// 문구는 조치보고 입력 드롭다운을 채우는 이벤트 데이터이기 때문이다. 여기서
+    /// <see cref="PermissionModuleKey"/> 의 view 를 요구하면 서버가 허락한 사용자를 화면이 막는다.
+    /// </summary>
+    public const string ReadPermissionModuleKey = "events";
     public const string FieldContent = "content";
     public const int MaxContentLength = 500;
 
@@ -520,7 +528,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     public bool CanEdit => PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Edit);
     public bool CanDeletePermission => PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.Delete);
-    public bool CanViewPermission => PermissionUiPolicy.Allowed(_permission, PermissionModuleKey, EnumPermissionVerb.View);
+    public bool CanViewPermission => PermissionUiPolicy.Allowed(_permission, ReadPermissionModuleKey, EnumPermissionVerb.View);
     #endregion
 
     #region - Notifications -
