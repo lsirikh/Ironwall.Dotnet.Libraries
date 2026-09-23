@@ -54,6 +54,9 @@ public static partial class Steps
             ("user",            "users?page=1&limit=100",                d => Str(d["login_id"])),
             ("report-template", "reports/templates?page=1&limit=100",    d => Str(d["name"])),
             ("unit",            "units?page=1&limit=100",                d => Str(d["name"])),
+            // item 10 (D-22) seeds a server — a category the sweep cannot see is exactly the D-17
+            // vacuous-clean hole, so it joins the list the moment the harness starts creating them.
+            ("server",          "servers?page=1&limit=100",              d => Str(d["name"])),
         };
 
         var unverifiable = new List<string>();

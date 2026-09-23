@@ -52,6 +52,10 @@ public static partial class Steps
         // ---- item 8: unit create/delete round trip through the real service ----
         await Item8_Unit(boot, rec, raw, unitApi).ConfigureAwait(false);
 
+        // ---- item 10: server axis round trip (D-22) - the real ServerAxisApiService writes the
+        //      8.0 shape, the legacy ServerApiService refuses on axis-era before touching the wire ----
+        await Item10_ServerAxis(boot, rec, raw).ConfigureAwait(false);
+
         // ---- item 9: the mandated fix (D-17) - verify cleanup for real, never let an
         //      unreachable listing endpoint read as "clean" ----
         await Item9_CleanupSweep(boot, rec, raw).ConfigureAwait(false);
