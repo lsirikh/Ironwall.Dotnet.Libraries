@@ -1,9 +1,12 @@
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+﻿using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -59,8 +62,9 @@ public class LayerPanelControl : Control
 
             // ContextMenu Command → 이벤트 라우팅
             leaf.OnDeleteAction = RaiseLayerDeleteRequested;
-            leaf.OnMoveUpAction = RaiseLayerMoveUpRequested;
-            leaf.OnMoveDownAction = RaiseLayerMoveDownRequested;
+            // 우클릭 '위로/아래로' 도 끌기 · Alt+↑↓ 와 같은 한 경로(LayerReorderRequested)로 보낸다(D-36).
+            leaf.OnMoveUpAction = n => RaiseLayerStepRequested(n, -1);
+            leaf.OnMoveDownAction = n => RaiseLayerStepRequested(n, +1);
             // 개별 심볼 리프는 심볼 전용 rename/navigate, 그 외(오버레이 Leaf)는 기존 레이어 경로 (FR-01/04)
             leaf.OnRenameAction = leaf.IsSymbolLeaf ? RaiseSymbolRenameRequested : RaiseLayerRenameRequested;
             leaf.OnNavigateAction = leaf.IsSymbolLeaf ? RaiseSymbolNavigateRequested : RaiseLayerNavigateRequested;
@@ -135,8 +139,11 @@ public class LayerPanelControl : Control
     public event EventHandler<LayerOpacityChangedEventArgs>? LayerOpacityChanged;
     public event EventHandler? CloseRequested;
     public event EventHandler<LayerChangedEventArgs>? LayerDeleteRequested;
-    public event EventHandler<LayerChangedEventArgs>? LayerMoveUpRequested;
-    public event EventHandler<LayerChangedEventArgs>? LayerMoveDownRequested;
+    /// <summary>
+    /// 오버레이 레이어 순서 바꾸기(D-36) — 끌기 · Alt+↑↓ · 우클릭 '위로/아래로' 의 단일 경로.
+    /// 예전 LayerMoveUp/DownRequested(두 행 스왑 · 두 번의 개별 UPDATE)를 대체한다.
+    /// </summary>
+    public event EventHandler<LayerReorderRequestedEventArgs>? LayerReorderRequested;
     public event EventHandler<LayerRenameEventArgs>? LayerRenameRequested;
     public event EventHandler<LayerChangedEventArgs>? LayerNavigateRequested;
     public event EventHandler<SymbolVisibilityChangedEventArgs>? SymbolVisibilityChanged;
@@ -153,16 +160,45 @@ public class LayerPanelControl : Control
             LayerDeleteRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
     }
 
-    internal void RaiseLayerMoveUpRequested(LayerTreeNode node)
+    /// <summary>
+    /// 오버레이 목록(ListBox)의 드롭 담당 — 템플릿이 <c>drag:DropZone.Handler</c> 로 물린다.
+    /// 끌기(<c>CaptureDragBehavior</c>)와 Alt+↑↓(<c>ReorderKeyboardBehavior</c>)가 같은 이 담당을 부른다.
+    /// </summary>
+    public IDragDropHandler ReorderHandler { get; }
+
+    /// <summary>우클릭 '위로'(-1) · '아래로'(+1) — 한 칸 삽입으로 바꿔 끌기와 같은 판정 · 같은 이벤트로 보낸다.</summary>
+    internal void RaiseLayerStepRequested(LayerTreeNode node, int direction)
     {
-        if (node.Model != null)
-            LayerMoveUpRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+        var section = node.Parent;
+        if (section == null) return;
+        var insertion = LayerReorderRules.StepInsertion(section.Children.IndexOf(node), direction, section.Children.Count);
+        if (insertion < 0) return;
+        if (LayerReorderRules.TryPlan(section, new[] { node }, insertion, out var newOrder))
+            RaiseLayerReorderRequested(section, newOrder, "menu");
     }
 
-    internal void RaiseLayerMoveDownRequested(LayerTreeNode node)
+    private void RaiseLayerReorderRequested(LayerTreeNode section, IReadOnlyList<LayerTreeNode> newOrder, string source)
+        => LayerReorderRequested?.Invoke(this, new LayerReorderRequestedEventArgs(section, newOrder, source));
+
+    /// <summary>
+    /// 이 패널 안에서 레이어 행을 <b>끄는 중</b>인가(데드존을 넘긴 뒤). 지도 모드(조준 · 배치 · 측정 · 드로잉)의
+    /// 창 전역 Esc 후킹이 이 값을 보고 양보한다 — 그 후킹들이 커널보다 먼저 창에 구독돼 있어, 양보하지 않으면
+    /// Esc 가 지도 모드만 끄고(Handled) 끌기 취소는 커널에 닿지 않는다.
+    /// </summary>
+    public bool IsReorderDragging
     {
-        if (node.Model != null)
-            LayerMoveDownRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+        get
+        {
+            // 손잡이(Thumb)가 눌린 동안 마우스를 쥐고 있다. 그 손잡이를 품은 목록의 커널이 끄는 중인지 묻는다.
+            if (Mouse.Captured is not DragHandle handle || !handle.IsDescendantOf(this)) return false;
+            for (DependencyObject? d = handle; d != null && !ReferenceEquals(d, this); d = VisualTreeHelper.GetParent(d))
+            {
+                if (d is ItemsControl list
+                    && Microsoft.Xaml.Behaviors.Interaction.GetBehaviors(list).OfType<CaptureDragBehavior>().Any(b => b.IsDragging))
+                    return true;
+            }
+            return false;
+        }
     }
 
     internal void RaiseLayerRenameRequested(LayerTreeNode node, string newName)
@@ -206,6 +242,7 @@ public class LayerPanelControl : Control
     public LayerPanelControl()
     {
         CloseCommand = new RelayCommand(_ => OnCloseRequested());
+        ReorderHandler = new LayerReorderDropHandler((section, newOrder) => RaiseLayerReorderRequested(section, newOrder, "list"));
         InitializeDragSupport();
         _opacityDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _opacityDebounceTimer.Tick += OnOpacityDebounce;

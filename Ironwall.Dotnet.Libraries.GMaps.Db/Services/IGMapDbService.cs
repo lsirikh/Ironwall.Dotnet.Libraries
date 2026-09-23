@@ -313,6 +313,13 @@ public interface IGMapDbService
     Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default);
     Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default);
     Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default);
+
+    /// <summary>
+    /// 레이어 순서(ZOrder) 일괄 기록 — <b>한 트랜잭션</b>. 드래그 · Alt+↑↓ · 우클릭 위로/아래로가 전부 이 한 번의 호출로 끝난다.
+    /// </summary>
+    /// <returns>전 행이 갱신되면 true. 한 행이라도 없으면(다른 세션이 지움) 전부 되돌리고 false.</returns>
+    Task<bool> BatchUpdateMapLayerZOrderAsync(IReadOnlyList<(int Id, int ZOrder)> changes, CancellationToken token = default);
+
     Task<int> GetNextZOrderAsync(string layerType, CancellationToken token = default);
     Task SeedDefaultSymbolLayersAsync(CancellationToken token = default);
 }

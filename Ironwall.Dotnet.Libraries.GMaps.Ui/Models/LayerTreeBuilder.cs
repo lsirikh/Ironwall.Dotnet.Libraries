@@ -120,12 +120,14 @@ public static class LayerTreeBuilder
 
         // Section 1: OVERLAY MAP
         var overlayMapSection = LayerTreeNode.CreateSection("OVERLAY MAP", "Map");
+        overlayMapSection.OverlayLayerType = "OverlayMap";      // 순서 바꾸기 가능 섹션(D-36)
         foreach (var layer in layerList.Where(l => l.LayerType == "OverlayMap"))
             overlayMapSection.AddChild(LayerTreeNode.FromModel(layer, layer.Name ?? "지도", "Map"));
         result.Add(overlayMapSection);
 
         // Section 2: OVERLAY IMAGE
         var overlayImageSection = LayerTreeNode.CreateSection("OVERLAY IMAGE", "Image");
+        overlayImageSection.OverlayLayerType = "OverlayImage";  // 순서 바꾸기 가능 섹션(D-36)
         foreach (var layer in layerList.Where(l => l.LayerType == "OverlayImage"))
             overlayImageSection.AddChild(LayerTreeNode.FromModel(layer, layer.Name ?? "이미지", "Image"));
         result.Add(overlayImageSection);

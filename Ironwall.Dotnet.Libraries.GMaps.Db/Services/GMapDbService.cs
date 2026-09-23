@@ -1966,6 +1966,44 @@ internal class GMapDbService : TaskService, IGMapDbService
         catch (Exception ex) { _log?.Error($"MapLayer 삭제 실패 (Id={id}): {ex.Message}"); throw; }
     }
 
+    /// <summary>
+    /// 레이어 순서 일괄 기록(D-36) — 한 트랜잭션 · 행마다 매개변수 바인딩(값을 SQL 문자열에 이어 붙이지 않는다).
+    /// 예전 '위로/아래로' 는 두 행을 따로 UPDATE 해서 가운데서 끊기면 순서가 반쯤 바뀐 채 남았다.
+    /// </summary>
+    /// <remarks>
+    /// 일치 행 수로 존재를 판정한다 — MySql.Data 기본(UseAffectedRows=false)은 <b>찾은 행</b> 수를 돌려주므로
+    /// 값이 그대로인 행도 1 이다. 0 이면 그 행이 없다(다른 세션이 지움) → 전부 되돌리고 false.
+    /// </remarks>
+    public async Task<bool> BatchUpdateMapLayerZOrderAsync(IReadOnlyList<(int Id, int ZOrder)> changes, CancellationToken token = default)
+    {
+        if (changes == null || changes.Count == 0) return true;
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var tx = await conn.BeginTransactionAsync(token);
+        try
+        {
+            const string sql = "UPDATE MapLayers SET ZOrder = @ZOrder WHERE Id = @Id;";
+            foreach (var (id, zOrder) in changes)
+            {
+                var matched = await conn.ExecuteAsync(new CommandDefinition(sql, new { Id = id, ZOrder = zOrder }, tx, cancellationToken: token));
+                if (matched == 0)
+                {
+                    await tx.RollbackAsync(CancellationToken.None);
+                    _log?.Warning($"MapLayer 순서 일괄 기록 취소 — Id={id} 행 없음(다른 세션이 지웠을 수 있음), {changes.Count}건 전부 되돌림");
+                    return false;
+                }
+            }
+            await tx.CommitAsync(token);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(CancellationToken.None);
+            _log?.Error($"MapLayer 순서 일괄 기록 실패 ({changes.Count}건, 전부 되돌림): {ex.Message}");
+            throw;
+        }
+    }
+
     public async Task SeedDefaultSymbolLayersAsync(CancellationToken token = default)
     {
         try

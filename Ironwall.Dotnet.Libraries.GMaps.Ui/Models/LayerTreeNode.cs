@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+﻿using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -182,6 +182,15 @@ public class LayerTreeNode : INotifyPropertyChanged
     /// DB Category 값 (필터링/매핑용)
     /// </summary>
     public string Category { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 순서를 바꿀 수 있는 오버레이 섹션이면 그 자식들의 <c>MapLayers.LayerType</c>("OverlayMap" · "OverlayImage"), 아니면 null.
+    /// SYMBOLS 섹션 · 그룹 · 카테고리 · 리프는 null 이다(D-36 — 순서 바꾸기는 같은 오버레이 섹션의 평평한 리프끼리만).
+    /// </summary>
+    public string? OverlayLayerType { get; set; }
+
+    /// <summary>끌기 · Alt+↑↓ 로 자식 순서를 바꿀 수 있는 섹션인가(템플릿이 ListBox 를 고르는 기준).</summary>
+    public bool IsReorderSection => NodeType == LayerNodeType.Section && !string.IsNullOrEmpty(OverlayLayerType);
 
     /// <summary>
     /// 부모 노드 참조

@@ -219,6 +219,7 @@ public partial class MapViewModel
     private void OnMeasureKeyDown(object sender, KeyEventArgs e)
     {
         if (MainMap == null || !MainMap.IsMeasuring) return;
+        if (YieldEscapeToLayerDrag(e)) return;   // D-36: 레이어 행을 끄는 중이면 Esc 는 끌기 취소가 먼저
         switch (e.Key)
         {
             case Key.Escape:

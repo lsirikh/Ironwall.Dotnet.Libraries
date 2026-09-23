@@ -940,6 +940,7 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         var map = MainMap;
         if (map == null || e.Handled) return false;
+        if (YieldEscapeToLayerDrag(e)) return false;
         if (!map.IsLineDrawing && !map.IsLineStrokePressed) return false;
         // 텍스트/콤보 입력 중이면 드로잉 키(Backspace·Enter·Delete·방향키·Ctrl+Z)도 가로채지 않는다 — 윈도우 광역 후킹이라
         //   그룹 후킹의 RISK-02 가드와 같은 기준을 여기(양 후킹 공통 진입점)에 둔다. Aim 후킹은 그룹 후킹 뒤에 구독되어
@@ -974,6 +975,7 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         if (TryRouteDrawingKey(e)) return;
         if (e.Key != System.Windows.Input.Key.Escape) return;
+        if (YieldEscapeToLayerDrag(e)) return;
         if (MainMap?.IsTargetAimMode ?? false)
         {
             ExitTargetAimMode();
@@ -999,6 +1001,16 @@ public partial class MapViewModel : BasePanelViewModel,
             e.Handled = true;
         }
     }
+
+    /// <summary>
+    /// 레이어 패널에서 행을 끄는 중이면 Esc 를 끌기 취소에 양보한다(D-36).
+    /// 지도 모드(조준 · 배치 · 홈 · 앵커 · 측정 · 드로잉)의 Esc 후킹은 창 <c>PreviewKeyDown</c> 에 <b>커널보다 먼저</b>
+    /// 구독돼 있어(같은 요소 = 구독 순서대로 호출), 양보하지 않으면 Esc 가 지도 모드만 끄고 Handled 가 되어
+    /// 커널의 끌기 취소(handledEventsToo=false)에 닿지 않는다. 양보하면 이번 Esc 는 끌기만 취소하고 지도 모드는 그대로다 —
+    /// 한 번 더 Esc 를 누르면 지도 모드가 꺼진다.
+    /// </summary>
+    private bool YieldEscapeToLayerDrag(System.Windows.Input.KeyEventArgs e)
+        => e.Key == System.Windows.Input.Key.Escape && (LayerPanel?.IsReorderDragging ?? false);
 
     /// <summary>타겟 모드 상태 안내(상단 배너 + 로그). autoHide=true면 2.5초 후 숨김(세대 유지 시).</summary>
     private void SetAimStatus(string message, bool autoHide = false)
@@ -9697,8 +9709,7 @@ public partial class MapViewModel : BasePanelViewModel,
         LayerPanel.LayerVisibilityChanged += OnLayerVisibilityChanged;
         LayerPanel.LayerOpacityChanged += OnLayerOpacityChanged;
         LayerPanel.LayerDeleteRequested += OnLayerDeleteRequested;
-        LayerPanel.LayerMoveUpRequested += OnLayerMoveUpRequested;
-        LayerPanel.LayerMoveDownRequested += OnLayerMoveDownRequested;
+        LayerPanel.LayerReorderRequested += OnLayerReorderRequested;       // D-36 끌기 · Alt+↑↓ · 우클릭 위로/아래로(단일 경로)
         LayerPanel.LayerRenameRequested += OnLayerRenameRequested;
         LayerPanel.LayerNavigateRequested += OnLayerNavigateRequested;
         LayerPanel.SymbolVisibilityChanged += OnSymbolVisibilityChanged;   // FR-03 개별 심볼 토글
@@ -9727,8 +9738,7 @@ public partial class MapViewModel : BasePanelViewModel,
             LayerPanel.LayerVisibilityChanged -= OnLayerVisibilityChanged;
             LayerPanel.LayerOpacityChanged -= OnLayerOpacityChanged;
             LayerPanel.LayerDeleteRequested -= OnLayerDeleteRequested;
-            LayerPanel.LayerMoveUpRequested -= OnLayerMoveUpRequested;
-            LayerPanel.LayerMoveDownRequested -= OnLayerMoveDownRequested;
+            LayerPanel.LayerReorderRequested -= OnLayerReorderRequested;
             LayerPanel.LayerRenameRequested -= OnLayerRenameRequested;
             LayerPanel.LayerNavigateRequested -= OnLayerNavigateRequested;
             LayerPanel.SymbolVisibilityChanged -= OnSymbolVisibilityChanged;
@@ -10140,65 +10150,40 @@ public partial class MapViewModel : BasePanelViewModel,
         finally { _isSyncingRename = false; }
     }
 
-    private async void OnLayerMoveUpRequested(object? sender, LayerChangedEventArgs e)
+    private LayerReorderCoordinator? _layerReorder;
+
+    /// <summary>
+    /// 오버레이 레이어 순서 바꾸기(D-36) — 끌기 · Alt+↑↓ · 우클릭 '위로/아래로' 의 단일 진입점.
+    /// 예전 SwapZOrderWithSibling(두 행을 따로 UPDATE · 매번 트리 재빌드)을 대체한다.
+    /// </summary>
+    /// <remarks>
+    /// 트리 노드 이동 · 렌더 동기화는 코디네이터 안에서 <b>동기로</b> 끝난다(첫 await 전) — 커널이 드롭 직후 같은 행을
+    /// 다시 고르는 예약보다 앞서야 연달아 Alt+↑ 가 이어진다. 성공 시 트리를 다시 세우지 않는다(노드 · 선택 유지).
+    /// 실패 시에만 DB 에서 다시 세운다(<see cref="ReloadLayersAfterReorderFailureAsync"/>).
+    /// </remarks>
+    private async void OnLayerReorderRequested(object? sender, LayerReorderRequestedEventArgs e)
     {
         try
         {
-            await SwapZOrderWithSibling(e.Layer, -1); // 위 노드와 스왑
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 순서 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            _layerReorder ??= new LayerReorderCoordinator(_gMapDbService, SyncMapRenderingOrder,
+                ReloadLayersAfterReorderFailureAsync, _editRecorder, _log);
+            await _layerReorder.ReorderAsync(e.Section, e.NewOrder);
         }
-        catch (Exception ex) { _log?.Error($"레이어 위로 이동 실패: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"레이어 순서 변경 실패({e.Source}): {ex.Message}");
+            await ReloadLayersAfterReorderFailureAsync();
+        }
     }
 
-    private async void OnLayerMoveDownRequested(object? sender, LayerChangedEventArgs e)
+    /// <summary>순서 기록 실패 복구 — DB 에서 트리를 다시 세우고, 오버레이 렌더 순서도 DB 값에 다시 맞춘다.</summary>
+    private async Task ReloadLayersAfterReorderFailureAsync()
     {
-        try
-        {
-            await SwapZOrderWithSibling(e.Layer, +1); // 아래 노드와 스왑
-        }
-        catch (Exception ex) { _log?.Error($"레이어 아래로 이동 실패: {ex.Message}"); }
-    }
-
-    private async Task SwapZOrderWithSibling(IMapLayerModel layer, int direction)
-    {
-        var layers = await _gMapDbService.FetchMapLayersAsync();
-        var sametype = layers?.Where(l => l.LayerType == layer.LayerType).ToList();
-        if (sametype == null) return;
-
-        var idx = sametype.FindIndex(l => l.Id == layer.Id);
-        var siblingIdx = idx + direction;
-        if (idx < 0 || siblingIdx < 0 || siblingIdx >= sametype.Count) return;
-
-        var sibling = sametype[siblingIdx];
-        int oldLayerZ = layer.ZOrder, oldSiblingZ = sibling.ZOrder;   // Undo용 이전 순서(AREA 3)
-        _log?.Info($"[레이어 순서] 스왑 시작: {layer.Name}(Z={layer.ZOrder}) ↔ {sibling.Name}(Z={sibling.ZOrder}), direction={direction}");
-
-        if (layer.ZOrder != sibling.ZOrder)
-        {
-            // ZOrder가 다르면 단순 스왑
-            (layer.ZOrder, sibling.ZOrder) = (sibling.ZOrder, layer.ZOrder);
-        }
-        else
-        {
-            // ZOrder 동일 (기존 데이터 ZOrder=0) — 위치 기반 강제 분리
-            // ORDER BY ZOrder ASC이므로 낮은 값 = 위에 표시
-            // layer가 siblingIdx 위치로, sibling이 idx 위치로
-            layer.ZOrder = siblingIdx;
-            sibling.ZOrder = idx;
-        }
-
-        _log?.Info($"[레이어 순서] 스왑 결과: {layer.Name}(Z={layer.ZOrder}) ↔ {sibling.Name}(Z={sibling.ZOrder})");
-
-        await _gMapDbService.UpdateMapLayerAsync(layer);
-        await _gMapDbService.UpdateMapLayerAsync(sibling);
-        _editRecorder?.RecordLayerChange("레이어 순서 변경",
-            new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, null, null, oldLayerZ), new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(sibling.Id, null, null, oldSiblingZ) },
-            new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, null, null, layer.ZOrder), new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(sibling.Id, null, null, sibling.ZOrder) });
-
-        // 맵 위 렌더링 순서 동기화
-        SyncMapRenderingOrder(layer);
-        SyncMapRenderingOrder(sibling);
-
         await LoadLayersFromDbAsync();
+        foreach (var section in _layerTreeNodes.Where(s => s.IsReorderSection))
+            foreach (var leaf in section.Children)
+                if (leaf.Model != null) SyncMapRenderingOrder(leaf.Model);
     }
 
     /// <summary>
