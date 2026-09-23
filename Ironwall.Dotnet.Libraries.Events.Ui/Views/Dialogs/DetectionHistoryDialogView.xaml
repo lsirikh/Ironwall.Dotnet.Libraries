@@ -31,7 +31,14 @@
 		<converters:SignalIsMaxConverter x:Key="SignalIsMaxConverter" />
 		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 
-		<!--  기간 세그먼트 버튼 — 선택 시 primary 채움 (템플릿 스코프=DynamicResource 토큰만)  -->
+		<!--
+			기간 세그먼트 버튼 · 필터 칩(전체 · 컴팩트) — 선택 시 primary 채움/외곽 + Bold.
+			U-12/U-13 — 세 스타일 다 IsChecked 에서 FontWeight="Bold" 만 얹고 폭을 예약하지 않아
+			고를 때마다 폭이 흔들렸다. 이 다이얼로그는 세그먼트(선 없는 pill) · 일반 칩(반경 20) ·
+			컴팩트 칩(반경 16, 사용자 피드백으로 좁힌 밀도)이 서로 다른 시각 언어라 커널 Console.Chip
+			(반경 11)로 통합하지 않고, 같은 예약 기법(숨은 Bold 고스트를 같은 칸에 겹친다)만 로컬에
+			그대로 적용한다 — "칩이 하는 일"은 바꾸지 않고 "잰 폭"만 고정한다.
+		-->
 		<Style x:Key="PeriodSegButton" TargetType="RadioButton">
 			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="FontSize" Value="12" />
@@ -43,13 +50,25 @@
 							x:Name="Bd"
 							Padding="12,5"
 							Background="Transparent">
-							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+							<Grid>
+								<ContentPresenter
+									x:Name="Ghost"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									IsHitTestVisible="False"
+									Opacity="0"
+									TextElement.FontWeight="Bold" />
+								<ContentPresenter
+									x:Name="Cp"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center" />
+							</Grid>
 						</Border>
 						<ControlTemplate.Triggers>
 							<Trigger Property="IsChecked" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 								<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
-								<Setter Property="FontWeight" Value="Bold" />
+								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
 							</Trigger>
 							<Trigger Property="IsMouseOver" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
@@ -76,14 +95,26 @@
 							BorderBrush="{DynamicResource BorderBrush}"
 							BorderThickness="1"
 							CornerRadius="20">
-							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+							<Grid>
+								<ContentPresenter
+									x:Name="Ghost"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									IsHitTestVisible="False"
+									Opacity="0"
+									TextElement.FontWeight="Bold" />
+								<ContentPresenter
+									x:Name="Cp"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center" />
+							</Grid>
 						</Border>
 						<ControlTemplate.Triggers>
 							<Trigger Property="IsChecked" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintAccentBrush}" />
 								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
 								<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
-								<Setter Property="FontWeight" Value="Bold" />
+								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
 							</Trigger>
 							<Trigger Property="IsMouseOver" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
@@ -110,14 +141,26 @@
 							BorderBrush="{DynamicResource BorderBrush}"
 							BorderThickness="1"
 							CornerRadius="16">
-							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+							<Grid>
+								<ContentPresenter
+									x:Name="Ghost"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									IsHitTestVisible="False"
+									Opacity="0"
+									TextElement.FontWeight="Bold" />
+								<ContentPresenter
+									x:Name="Cp"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center" />
+							</Grid>
 						</Border>
 						<ControlTemplate.Triggers>
 							<Trigger Property="IsChecked" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintAccentBrush}" />
 								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
 								<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
-								<Setter Property="FontWeight" Value="Bold" />
+								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
 							</Trigger>
 							<Trigger Property="IsMouseOver" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
@@ -150,6 +193,7 @@
 					VerticalAlignment="Center"
 					Cursor="Hand"
 					DockPanel.Dock="Right"
+					Style="{x:Null}"
 					ToolTip="닫기">
 					<Button.Template>
 						<ControlTemplate TargetType="Button">

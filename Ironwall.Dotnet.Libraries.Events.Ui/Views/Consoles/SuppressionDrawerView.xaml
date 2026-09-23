@@ -293,14 +293,16 @@
 									FontSize="13"
 									GroupName="SuppressionRecurrence"
 									IsChecked="{Binding IsOneShot, Mode=TwoWay}"
-									IsEnabled="{Binding CanEditRecurrence}" />
+									IsEnabled="{Binding CanEditRecurrence}"
+									Style="{StaticResource Console.RadioButton}" />
 								<RadioButton
 									AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.Weekly"
 									Content="주간 반복"
 									FontSize="13"
 									GroupName="SuppressionRecurrence"
 									IsChecked="{Binding IsWeekly, Mode=TwoWay}"
-									IsEnabled="{Binding CanEditRecurrence}" />
+									IsEnabled="{Binding CanEditRecurrence}"
+									Style="{StaticResource Console.RadioButton}" />
 							</StackPanel>
 							<TextBlock
 								Margin="0,4,0,0"

@@ -597,6 +597,7 @@
 										Click="OnBarClick"
 										Cursor="Hand"
 										HorizontalContentAlignment="Stretch"
+										Template="{StaticResource Console.Button.TransparentRow}"
 										ToolTip="이 장비의 내역으로">
 										<Grid>
 											<Grid.ColumnDefinitions>

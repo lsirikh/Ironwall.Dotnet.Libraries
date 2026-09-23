@@ -219,7 +219,8 @@
 									Background="Transparent"
 									BorderThickness="0"
 									Click="OnEchelonChip"
-									Cursor="Hand">
+									Cursor="Hand"
+									Style="{x:Null}">
 									<Button.Template>
 										<ControlTemplate TargetType="Button">
 											<Border Style="{StaticResource Unit.Chip.Plate}">
@@ -273,6 +274,7 @@
 							Click="OnMoveToRoot"
 							Cursor="Hand"
 							IsEnabled="{Binding CanMoveSelected}"
+							Style="{x:Null}"
 							ToolTip="고른 부대를 최상위로 올립니다 — 부대를 여기에 끌어다 놓아도 됩니다.">
 							<Button.Template>
 								<ControlTemplate TargetType="Button">
@@ -346,6 +348,7 @@
 											BorderThickness="0"
 											Click="OnToggleExpand"
 											Focusable="False"
+											Style="{x:Null}"
 											Visibility="{Binding ShowExpander, Converter={StaticResource BoolToVisibility}}">
 											<Button.Template>
 												<ControlTemplate TargetType="Button">

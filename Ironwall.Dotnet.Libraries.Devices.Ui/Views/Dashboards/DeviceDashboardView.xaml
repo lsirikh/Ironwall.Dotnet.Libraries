@@ -231,6 +231,7 @@
 								Content="되돌리기"
 								DockPanel.Dock="Right"
 								FontSize="12"
+								Style="{StaticResource Console.Button.Ghost}"
 								Visibility="{Binding CanUndoGroupDrop, Converter={StaticResource BoolToVisibility}}" />
 							<TextBlock
 								Margin="12,0,0,0"
@@ -303,6 +304,7 @@
 													BorderThickness="0"
 													Click="OnGroupChipClick"
 													Cursor="Hand"
+													Style="{x:Null}"
 													ToolTip="고른 장비를 이 그룹에 넣는다 — 목록의 핸들을 끌어 놓아도 된다">
 													<Button.Template>
 														<ControlTemplate TargetType="Button">

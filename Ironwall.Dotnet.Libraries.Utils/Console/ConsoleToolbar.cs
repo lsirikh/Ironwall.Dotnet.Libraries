@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
@@ -105,6 +106,11 @@ public class ConsoleToolbar : Control
     private FrameworkElement? _leftCluster;
     private FrameworkElement? _rightCluster;
 
+    // U-13 — 압축 모드(검색이 아이콘 하나로 접힌 상태)의 트리거 · 오버레이 · 확장 입력칸.
+    private ButtonBase? _searchCompactTrigger;
+    private Popup? _searchPopup;
+    private TextBox? _searchExpanded;
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -121,9 +127,38 @@ public class ConsoleToolbar : Control
         _leftCluster = _grid?.Children.OfType<FrameworkElement>().FirstOrDefault(c => Grid.GetColumn(c) == 0);
         _rightCluster = _grid?.Children.OfType<FrameworkElement>().FirstOrDefault(c => Grid.GetColumn(c) == 2);
 
+        if (_searchCompactTrigger is not null) _searchCompactTrigger.Click -= OnSearchCompactTriggerClick;
+        _searchCompactTrigger = GetTemplateChild("PART_SearchCompact") as ButtonBase;
+        if (_searchCompactTrigger is not null) _searchCompactTrigger.Click += OnSearchCompactTriggerClick;
+
+        if (_searchExpanded is not null) _searchExpanded.PreviewKeyDown -= OnSearchExpandedPreviewKeyDown;
+        _searchPopup = GetTemplateChild("PART_SearchPopup") as Popup;
+        _searchExpanded = GetTemplateChild("PART_SearchExpanded") as TextBox;
+        if (_searchExpanded is not null) _searchExpanded.PreviewKeyDown += OnSearchExpandedPreviewKeyDown;
+
         LayoutUpdated += OnToolbarLayoutUpdated;
 
         ApplySearchGeometry();
+    }
+
+    // U-13 — 압축 아이콘을 누르면 전체 폭(320) 오버레이가 뜬다. 예산이 모자라 TextBox 자체를 못 보여줄
+    // 때도 이 팝업은 그리드 예산 밖(Popup 은 별도 레이어)이라 절대 잘리지 않는다.
+    private void OnSearchCompactTriggerClick(object sender, RoutedEventArgs e)
+    {
+        if (_searchPopup is null || _searchExpanded is null) return;
+        _searchPopup.IsOpen = true;
+        _searchExpanded.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _searchExpanded.Focus();
+            _searchExpanded.CaretIndex = _searchExpanded.Text.Length;
+        }), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private void OnSearchExpandedPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || _searchPopup is null) return;
+        _searchPopup.IsOpen = false;
+        e.Handled = true;
     }
 
     // D-23 — 필터 · Extra 내용은 이 컨트롤의 SizeChanged 밖에서도 바뀐다(예: "직접" 선택 시 날짜 범위

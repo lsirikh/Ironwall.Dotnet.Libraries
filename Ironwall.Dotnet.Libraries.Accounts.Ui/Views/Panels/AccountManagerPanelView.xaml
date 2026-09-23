@@ -250,13 +250,14 @@
 								Width="18"
 								Height="18"
 								VerticalAlignment="Center"
-								Foreground="#E53935"
+								Foreground="{DynamicResource StatusCriticalBrush}"
 								Kind="LockOutline"
 								ToolTip="{Binding LockReason}" />
 										<Button
 								Margin="4,0,0,0"
 								VerticalAlignment="Center"
 								Content="해제"
+								Style="{StaticResource Console.Button.Ghost}"
 								ToolTip="계정 잠금 해제">
 											<cal:Message.Attach>[Event Click] = [Action OnClickUnlock($dataContext)]</cal:Message.Attach>
 										</Button>

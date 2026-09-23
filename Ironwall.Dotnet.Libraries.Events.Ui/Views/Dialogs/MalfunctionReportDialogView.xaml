@@ -98,7 +98,8 @@
 									<RadioButton
 										VerticalAlignment="Center"
 										GroupName="CollectionActionItem"
-										IsChecked="{Binding Path=IsSelected, Mode=TwoWay}">
+										IsChecked="{Binding Path=IsSelected, Mode=TwoWay}"
+										Style="{StaticResource Console.RadioButton}">
 
 										<RadioButton.Content>
 											<StackPanel Orientation="Horizontal">
@@ -126,7 +127,8 @@
 						<RadioButton
 							x:Name="RadioButtonEtc"
 							GroupName="CollectionActionItem"
-							IsChecked="{Binding EtcViewModel.IsSelected, Mode=TwoWay}">
+							IsChecked="{Binding EtcViewModel.IsSelected, Mode=TwoWay}"
+							Style="{StaticResource Console.RadioButton}">
 
 							<RadioButton.Content>
 								<TextBlock Style="{StaticResource TextBlockContent}" Text="{Binding EtcViewModel.Name, FallbackValue=Etcs}" />

@@ -63,6 +63,10 @@ public class ConsoleStyleContractTests
     [InlineData("Console.Button.Mini")]
     [InlineData("Console.SearchBox")]
     [InlineData("Console.CheckBox")]
+    [InlineData("Console.RadioButton")]
+    [InlineData("Console.Chip")]
+    [InlineData("Console.Chip.ListBoxItem")]
+    [InlineData("Console.Tab")]
     [InlineData("Console.ToggleSwitch")]
     [InlineData("Console.ScrollBar")]
     [InlineData("Console.ScrollViewer")]
@@ -82,6 +86,106 @@ public class ConsoleStyleContractTests
 
         // Assert
         Assert.True(both.Count == 0, $"두 사전에 같이 있는 키: {string.Join(", ", both)}");
+    }
+
+    #region - K-15 no implicit MD3 button-family chrome in product XAML -
+    // U-12 코디네이터 발견(D-28 preview-fidelity, 커밋 ae967783) — 미리보기 도구가 호스트 App.xaml 이
+    // 병합하는 MaterialDesign3.Defaults.xaml 까지 그대로 병합하도록 고쳤더니, Style 없는 Button 계열이
+    // 앱 스코프의 MD3 암시(implicit) 스타일(틸 채움)로 떨어지는 게 드러났다 — 커널 자신은 "암시 스타일 0"
+    // 원칙(Styles.Console.xaml 머리말)을 지키지만, 그걸 쓰는 창들이 Style 을 안 주면 소용없다.
+    // 아래 정규식은 <Button>·<ToggleButton>·<RadioButton>·<RepeatButton> "요소"만 잡는다 — WPF 속성-요소
+    // 구문(<Button.Content>, <Button.Template> 등)은 태그 이름 뒤에 '.' 이 오므로 lookahead 로 제외한다.
+    private static readonly Regex ButtonFamilyTag = new(
+        @"<(?:\w+:)?(Button|ToggleButton|RadioButton|RepeatButton)(?=[\s/>])((?:[^<>]|\n)*?)(/?)>",
+        RegexOptions.Compiled);
+
+    // 제네릭 허용 목록 — "진짜 예외"만. 이유 없이 추가하지 않는다.
+    // Generic.xaml 의 달력 이전/다음/머리 버튼은 Console.DateTimeRangeField 절 소속(D-30 소유) —
+    // 이 스킬 세션은 그 구획을 건드리지 않는다(코디네이션 경계). 커밋 시점 기준 미해결로 남긴다.
+    private static readonly HashSet<string> ButtonFamilyStyleAllowList = new(StringComparer.Ordinal)
+    {
+        "Ironwall.Dotnet.Libraries.Utils/Themes/Generic.xaml:PART_PreviousButton",
+        "Ironwall.Dotnet.Libraries.Utils/Themes/Generic.xaml:PART_HeaderButton",
+        "Ironwall.Dotnet.Libraries.Utils/Themes/Generic.xaml:PART_NextButton",
+    };
+
+    [Fact]
+    public void should_give_every_product_button_family_element_an_explicit_style_or_template()
+    {
+        // Arrange
+        var offenders = new List<string>();
+        var root = RepoRoot();
+        var projects = new[]
+        {
+            "Ironwall.Dotnet.Libraries.Events.Ui",
+            "Ironwall.Dotnet.Libraries.Devices.Ui",
+            "Ironwall.Dotnet.Libraries.Accounts.Ui",
+            "Ironwall.Dotnet.Libraries.Reports.Ui",
+            "Ironwall.Dotnet.Libraries.Utils",
+        };
+
+        // Act
+        foreach (var project in projects)
+        {
+            var dir = Path.Combine(root, project);
+            if (!Directory.Exists(dir)) continue;
+
+            foreach (var file in Directory.EnumerateFiles(dir, "*.xaml", SearchOption.AllDirectories))
+            {
+                if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
+                    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+                    file.Contains($"{Path.DirectorySeparatorChar}Tests{Path.DirectorySeparatorChar}")) continue;
+
+                var text = File.ReadAllText(file);
+                foreach (Match m in ButtonFamilyTag.Matches(text))
+                {
+                    var attrs = m.Groups[2].Value;
+                    // TargetType 이 있으면 Style/ControlTemplate 정의 자체(사용처가 아니다) — 건너뛴다.
+                    if (attrs.Contains("TargetType", StringComparison.Ordinal)) continue;
+                    // Style= 또는(자기 완결 템플릿을 로컬로 바로 거는) Template= 둘 중 하나면 명시된 것으로 친다.
+                    if (attrs.Contains("Style=", StringComparison.Ordinal) || attrs.Contains("Template=", StringComparison.Ordinal)) continue;
+
+                    var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+                    var nameMatch = Regex.Match(attrs, "x:Name=\"([^\"]+)\"");
+                    if (nameMatch.Success && ButtonFamilyStyleAllowList.Contains($"{relative}:{nameMatch.Groups[1].Value}")) continue;
+
+                    var lineNo = text[..m.Index].Count(c => c == '\n') + 1;
+                    offenders.Add($"{relative}:{lineNo}");
+                }
+            }
+        }
+
+        // Assert — 하나라도 있으면 그 요소는 런타임에 MD3 암시 스타일(틸 채움)로 떨어진다(U-12 실측 계열)
+        Assert.True(offenders.Count == 0, $"Style/Template 이 없는 버튼 계열: {string.Join("; ", offenders)}");
+    }
+    #endregion
+
+    [Fact]
+    public void should_not_reintroduce_a_local_chip_style_copy_after_migration()
+    {
+        // Arrange — U-12/U-13: EventDashboardView 의 ConsoleChip/ConsoleTab, ByComponentView 의
+        // ByComponent.Chip 은 커널 Console.Chip/Console.Tab/Console.Chip.ListBoxItem 로 이관·삭제했다.
+        // 이 이름들이 x:Key 로 다시 나타나면 로컬 사본이 되살아난 것이다(고스트 예약 없는 옛 버그 재발).
+        var offenders = new List<string>();
+        var staleKeys = new[] { "ConsoleChip", "ConsoleTab", "ByComponent.Chip" };
+        var root = Path.Combine(RepoRoot());
+        foreach (var project in new[] { "Ironwall.Dotnet.Libraries.Events.Ui", "Ironwall.Dotnet.Libraries.Devices.Ui" })
+        {
+            var dir = Path.Combine(root, project);
+            if (!Directory.Exists(dir)) continue;
+            foreach (var file in Directory.EnumerateFiles(dir, "*.xaml", SearchOption.AllDirectories))
+            {
+                if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
+                    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+                var text = File.ReadAllText(file);
+                foreach (var key in staleKeys)
+                    if (text.Contains($"x:Key=\"{key}\"", StringComparison.Ordinal))
+                        offenders.Add($"{file}: x:Key=\"{key}\"");
+            }
+        }
+
+        // Assert
+        Assert.True(offenders.Count == 0, $"로컬 칩 사본이 되살아났다: {string.Join("; ", offenders)}");
     }
 
     [Fact]

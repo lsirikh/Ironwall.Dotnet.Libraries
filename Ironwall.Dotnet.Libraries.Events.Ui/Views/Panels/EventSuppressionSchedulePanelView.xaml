@@ -526,17 +526,20 @@
 												Content="장비"
 												GroupName="tt"
 												IsChecked="{Binding IsDeviceMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetDeviceRadio" />
 											<RadioButton
 												Margin="0,0,14,0"
 												Content="그룹"
 												GroupName="tt"
 												IsChecked="{Binding IsGroupMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetGroupRadio" />
 											<RadioButton
 												Content="전체"
 												GroupName="tt"
 												IsChecked="{Binding IsAllMode, Mode=TwoWay}"
+												Style="{StaticResource Console.RadioButton}"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetAllRadio" />
 										</StackPanel>
 									</Border>
@@ -659,11 +662,13 @@
 													Content="단발"
 													GroupName="RecurrenceMode"
 													IsChecked="{Binding IsOneShotMode, Mode=TwoWay}"
+													Style="{StaticResource Console.RadioButton}"
 													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceOneShotRadio" />
 												<RadioButton
 													Content="주간 반복"
 													GroupName="RecurrenceMode"
 													IsChecked="{Binding IsWeeklyMode, Mode=TwoWay}"
+													Style="{StaticResource Console.RadioButton}"
 													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceWeeklyRadio" />
 											</StackPanel>
 										</Border>
@@ -909,6 +914,7 @@
 																		Cursor="Hand"
 																		DockPanel.Dock="Right"
 																		ToolTip="제거"
+																		Template="{StaticResource Console.Button.TransparentRow}"
 																		AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.DeviceChipRemove.{0}}">
 																		<cal:Message.Attach>[Event Click] = [Action RemoveDevice($dataContext)]</cal:Message.Attach>
 																		<md:PackIcon
@@ -1055,6 +1061,7 @@
 																		Cursor="Hand"
 																		DockPanel.Dock="Right"
 																		ToolTip="제거"
+																		Template="{StaticResource Console.Button.TransparentRow}"
 																		AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.GroupChipRemove.{0}}">
 																		<cal:Message.Attach>[Event Click] = [Action RemoveGroup($dataContext)]</cal:Message.Attach>
 																		<md:PackIcon

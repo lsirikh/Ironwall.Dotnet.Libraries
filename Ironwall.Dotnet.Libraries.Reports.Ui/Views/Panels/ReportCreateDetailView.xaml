@@ -36,14 +36,16 @@
 							Content="표준 전체 — 모든 섹션"
 							Foreground="{DynamicResource TextPrimaryBrush}"
 							GroupName="ReportKind"
-							IsChecked="{Binding CreateViewModel.IsStandard}" />
+							IsChecked="{Binding CreateViewModel.IsStandard}"
+							Style="{StaticResource Console.RadioButton}" />
 						<RadioButton
 							Margin="0,4,0,0"
 							AutomationProperties.AutomationId="Reports.Create.TemplateRadio"
 							Content="템플릿 기반 — 저장한 구성"
 							Foreground="{DynamicResource TextPrimaryBrush}"
 							GroupName="ReportKind"
-							IsChecked="{Binding CreateViewModel.IsTemplateBased}" />
+							IsChecked="{Binding CreateViewModel.IsTemplateBased}"
+							Style="{StaticResource Console.RadioButton}" />
 					</StackPanel>
 				</c:ConsoleField>
 
@@ -99,14 +101,16 @@
 							Content="정해진 기간"
 							Foreground="{DynamicResource TextPrimaryBrush}"
 							GroupName="ReportPeriod"
-							IsChecked="{Binding CreateViewModel.IsPreset}" />
+							IsChecked="{Binding CreateViewModel.IsPreset}"
+							Style="{StaticResource Console.RadioButton}" />
 						<RadioButton
 							Margin="0,4,0,0"
 							AutomationProperties.AutomationId="Reports.Create.CustomRangeRadio"
 							Content="직접 지정"
 							Foreground="{DynamicResource TextPrimaryBrush}"
 							GroupName="ReportPeriod"
-							IsChecked="{Binding CreateViewModel.IsCustomRange}" />
+							IsChecked="{Binding CreateViewModel.IsCustomRange}"
+							Style="{StaticResource Console.RadioButton}" />
 					</StackPanel>
 				</c:ConsoleField>
 

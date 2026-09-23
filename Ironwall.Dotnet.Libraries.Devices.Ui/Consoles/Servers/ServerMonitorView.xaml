@@ -307,6 +307,7 @@
 							Content="되돌리기"
 							DockPanel.Dock="Right"
 							FontSize="12"
+							Style="{StaticResource Console.Button.Ghost}"
 							Visibility="{Binding CanUndoAssign, Converter={StaticResource BoolToVisibility}}" />
 						<TextBox
 							Width="360"
@@ -339,7 +340,8 @@
 							Content="버리기"
 							DockPanel.Dock="Right"
 							FontSize="12"
-							IsEnabled="{Binding Tray.CanRevert}" />
+							IsEnabled="{Binding Tray.CanRevert}"
+							Style="{StaticResource Console.Button.Ghost}" />
 						<Button
 							Margin="8,0,0,0"
 							Padding="10,2"
@@ -348,7 +350,8 @@
 							Content="적용"
 							DockPanel.Dock="Right"
 							FontSize="12"
-							IsEnabled="{Binding Tray.CanApply}" />
+							IsEnabled="{Binding Tray.CanApply}"
+							Style="{StaticResource Console.Button.Primary}" />
 						<TextBox
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Console.Servers.Tray.Message"
@@ -386,6 +389,7 @@
 							DockPanel.Dock="Right"
 							FontSize="12"
 							IsEnabled="{Binding CanAssignSelection}"
+							Style="{StaticResource Console.Button.Primary}"
 							ToolTip="{Binding AssignHint}" />
 						<ListBox
 							AutomationProperties.AutomationId="Console.Servers.Assign.Tray"

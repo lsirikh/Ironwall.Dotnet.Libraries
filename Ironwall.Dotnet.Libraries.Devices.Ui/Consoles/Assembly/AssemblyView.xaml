@@ -138,6 +138,7 @@
 						Click="OnCommit"
 						Content="{Binding PrimaryText}"
 						IsEnabled="{Binding CanCommit}"
+						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding CommitBlockedReason}"
 						ToolTipService.ShowOnDisabled="True" />
 				</StackPanel>

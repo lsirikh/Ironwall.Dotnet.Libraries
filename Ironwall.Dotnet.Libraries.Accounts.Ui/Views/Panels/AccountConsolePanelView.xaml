@@ -756,7 +756,8 @@
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.Member.Remove.{0}}"
 											Click="OnRemoveMember"
 											Content="해제"
-											FontSize="11.5" />
+											FontSize="11.5"
+											Style="{StaticResource Console.Button.Ghost}" />
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
@@ -1085,6 +1086,7 @@
 												BorderThickness="0"
 												Click="OnGroupChipClick"
 												Cursor="Hand"
+												Style="{x:Null}"
 												ToolTip="고른 계정을 이 그룹에 넣는다(Draft) — 목록의 핸들을 끌어 놓아도 된다">
 												<Button.Template>
 													<ControlTemplate TargetType="Button">
@@ -1121,7 +1123,8 @@
 								Content="적용"
 								DockPanel.Dock="Right"
 								FontSize="12"
-								IsEnabled="{Binding DraftTray.CanApply}" />
+								IsEnabled="{Binding DraftTray.CanApply}"
+								Style="{StaticResource Console.Button.Primary}" />
 							<Button
 								Margin="6,0,0,0"
 								Padding="10,1"
@@ -1130,7 +1133,8 @@
 								Content="버리기"
 								DockPanel.Dock="Right"
 								FontSize="12"
-								IsEnabled="{Binding DraftTray.CanRevert}" />
+								IsEnabled="{Binding DraftTray.CanRevert}"
+								Style="{StaticResource Console.Button.Ghost}" />
 							<Button
 								Margin="6,0,0,0"
 								Padding="10,1"
@@ -1139,6 +1143,7 @@
 								Content="되돌리기"
 								DockPanel.Dock="Right"
 								FontSize="12"
+								Style="{StaticResource Console.Button.Ghost}"
 								Visibility="{Binding CanUndoDraft, Converter={StaticResource BoolToVisibility}}" />
 							<TextBlock
 								VerticalAlignment="Center"

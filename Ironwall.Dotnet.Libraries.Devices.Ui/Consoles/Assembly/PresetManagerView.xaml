@@ -97,7 +97,8 @@
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.OpenInAssembly"
 					Click="OnOpenInAssembly"
 					Content="조립기로 열기"
-					IsEnabled="{Binding HasSelected}" />
+					IsEnabled="{Binding HasSelected}"
+					Style="{StaticResource Console.Button}" />
 				<Button
 					Margin="0,0,0,6"
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.Rename"

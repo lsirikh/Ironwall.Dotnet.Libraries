@@ -16,44 +16,13 @@
 		· 칩은 색이 아니라 굵기 + 두꺼운 테두리로 선택을 표시한다(drag-first-ux.md 시각 규칙과 같은 취지).
 		· DataGrid 는 고정 높이를 주지 않는다 — 행 * 로 늘어난다.
 	-->
-	<UserControl.Resources>
-		<!--  칩 — 선택은 색이 아니라 두꺼운 테두리 + 굵은 글자로 표시한다.  -->
-		<Style x:Key="ByComponent.Chip" TargetType="ListBoxItem">
-			<Setter Property="Padding" Value="10,4" />
-			<Setter Property="Margin" Value="0,0,6,0" />
-			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="ListBoxItem">
-						<Border
-							x:Name="Bd"
-							Padding="{TemplateBinding Padding}"
-							Background="{DynamicResource SurfaceAltBrush}"
-							BorderBrush="{DynamicResource BorderBrush}"
-							BorderThickness="1"
-							CornerRadius="12">
-							<ContentPresenter
-								x:Name="Cp"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								TextElement.FontSize="12"
-								TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
-						</Border>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-							</Trigger>
-							<Trigger Property="IsSelected" Value="True">
-								<Setter TargetName="Bd" Property="BorderThickness" Value="2" />
-								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-	</UserControl.Resources>
+	<!--
+		칩 — 커널 정본 Console.Chip.ListBoxItem(Theme/Themes/Styles.Console.xaml)을 그대로 쓴다.
+		로컬 ByComponent.Chip 은 이관 후 삭제했다(U-12/U-13) — IsSelected 에서 BorderThickness 를
+		1→2 로 키우고 글자도 Bold 로 얹어 두 방향으로 폭이 흔들렸다. 커널 판은 테두리를 늘 1 로
+		고정하고 두꺼운 링은 레이아웃 밖 오버레이로, Bold 폭은 고스트로 미리 예약한다.
+	-->
+	<UserControl.Resources />
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
@@ -91,7 +60,7 @@
 					AutomationProperties.AutomationId="Console.Devices.ByComponent.States"
 					BorderThickness="0"
 					Background="Transparent"
-					ItemContainerStyle="{StaticResource ByComponent.Chip}"
+					ItemContainerStyle="{StaticResource Console.Chip.ListBoxItem}"
 					ItemsSource="{Binding StateChips}"
 					SelectedItem="{Binding SelectedState, Mode=TwoWay}"
 					SelectionChanged="OnFilterSelectionChanged"
@@ -109,7 +78,7 @@
 					BorderThickness="0"
 					Background="Transparent"
 					DisplayMemberPath="Display"
-					ItemContainerStyle="{StaticResource ByComponent.Chip}"
+					ItemContainerStyle="{StaticResource Console.Chip.ListBoxItem}"
 					ItemsSource="{Binding HealthChips}"
 					SelectedItem="{Binding SelectedHealth, Mode=TwoWay}"
 					SelectionChanged="OnFilterSelectionChanged"
