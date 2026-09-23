@@ -1,5 +1,12 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using LiveChartsCore.SkiaSharpView.Painting.Effects;
+using MaterialDesignThemes.Wpf;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -31,11 +38,6 @@ public enum OverviewDeviceGroup
 /// </remarks>
 public sealed class EventOverviewViewModel : PropertyChangedBase
 {
-    private const double PlotPaddingLeft = 40;
-    private const double PlotPaddingRight = 12;
-    private const double PlotPaddingTop = 10;
-    private const double PlotPaddingBottom = 22;
-
     private bool _isLoading;
     private int _total;
     private int _days = 1;
@@ -44,22 +46,31 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     private int _activeCameras;
     private int _activeControllers;
     private OverviewDeviceGroup _deviceGroup = OverviewDeviceGroup.Controller;
-    private double _plotWidth = 640;
-    private double _plotHeight = 200;
+    // 차트가 첫 측정을 보내기 전(Loaded 직후 아주 짧은 창)에만 쓰는 잠정값 — 더 이상 DrawMargin 을
+    // 박지 않으므로 이 숫자가 실제 여백과 같아야 할 이유가 없다(전엔 같아야 했던 게 결함의 근원이었다).
+    // PlotWidth<=0 이면 EventTrendRangeMath 가 그냥 커밋하지 않는다(안전 폐쇄) — 첫 측정 전에 드래그를
+    // 시작하는 극단적 타이밍이어도 아무 일도 안 일어날 뿐 잘못 커밋되지 않는다.
+    private double _plotLeft;
+    private double _plotTop;
+    private double _plotWidth;
+    private double _plotHeight;
     private double _bandLeft;
     private double _bandWidth;
     private bool _isBandVisible;
     private string _bandLabel = string.Empty;
     private DateTime _start = DateTime.Today;
     private DateTime _end = DateTime.Today.AddDays(1);
-    private IReadOnlyList<int> _bucketMax = Array.Empty<int>();
+    private BaseTheme _theme = BaseTheme.Light;
+    private IReadOnlyList<string> _xLabels = Array.Empty<string>();
 
     public EventOverviewViewModel()
     {
         Slices = new ObservableCollection<EventSliceViewModel>();
         Bars = new ObservableCollection<EventDeviceBarViewModel>();
-        TrendSeries = new ObservableCollection<EventTrendSeriesViewModel>();
-        TrendLabels = new ObservableCollection<EventTrendLabel>();
+        Series = new ObservableCollection<ISeries>();
+        XAxes = new ObservableCollection<Axis>();
+        YAxes = new ObservableCollection<Axis>();
+        BuildAxes();
     }
 
     /// <summary>막대 · 조각을 눌렀다 — 그 장비/계열의 내역으로 내려간다(레일 전환 + 검색어).</summary>
@@ -125,29 +136,74 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     #endregion
 
     #region - ③ 시간대별 추이 -
-    public ObservableCollection<EventTrendSeriesViewModel> TrendSeries { get; }
-    public ObservableCollection<EventTrendLabel> TrendLabels { get; }
+    /// <summary>LiveChartsCore(SkiaSharpView.WPF) CartesianChart 가 그리는 다섯 계열(DataChartPanelViewModel 과 같은 관용구).</summary>
+    public ObservableCollection<ISeries> Series { get; }
+    public ObservableCollection<Axis> XAxes { get; }
+    public ObservableCollection<Axis> YAxes { get; }
+
+    /// <summary>툴팁 텍스트/배경 — SkiaSharp 페인트는 DynamicResource 에 못 닿아 테마 전환 때 <see cref="ApplyTheme"/> 로 재공급한다.</summary>
+    public SolidColorPaint TooltipTextPaint
+    {
+        get => _tooltipTextPaint;
+        private set { _tooltipTextPaint = value; NotifyOfPropertyChange(); }
+    }
+    private SolidColorPaint _tooltipTextPaint = ChartThemeProvider.TooltipTextPaint(BaseTheme.Light);
+
+    public SolidColorPaint TooltipBackgroundPaint
+    {
+        get => _tooltipBackgroundPaint;
+        private set { _tooltipBackgroundPaint = value; NotifyOfPropertyChange(); }
+    }
+    private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
 
     public string IntervalText => Bucket == TimeSpan.FromHours(1) ? "1시간 단위" : "1일 단위";
 
     /// <summary>한 칸의 폭 — 끌어 고른 기간이 여기에 맞춰진다.</summary>
     public TimeSpan Bucket { get; private set; } = TimeSpan.FromHours(1);
 
-    /// <summary>플롯 왼쪽(뷰가 알려 준 크기 기준).</summary>
-    public double PlotLeft => PlotPaddingLeft;
-    public double PlotTop => PlotPaddingTop;
-    public double PlotWidth => Math.Max(0, _plotWidth - PlotPaddingLeft - PlotPaddingRight);
-    public double PlotHeight => Math.Max(0, _plotHeight - PlotPaddingTop - PlotPaddingBottom);
+    /// <summary>플롯 왼쪽 — 차트가 실제로 측정한 그림 영역의 왼쪽(<see cref="Resize"/> 로 들어온다).</summary>
+    public double PlotLeft => _plotLeft;
+    public double PlotTop => _plotTop;
+    public double PlotWidth => _plotWidth;
+    public double PlotHeight => _plotHeight;
 
-    /// <summary>뷰가 크기를 알려 준다 — 고정 치수를 뷰모델에 박지 않는다.</summary>
-    public void Resize(double width, double height)
+    /// <summary>
+    /// 뷰가 차트의 <b>실측</b> 그림 영역을 알려 준다 — 더 이상 고정 여백을 추측해 빼지 않는다.
+    /// <para>예전엔 뷰가 Border 의 전체 폭/높이만 주고, 여기서 고정 상수(PlotPadding*)를 빼서 안쪽 사각형을
+    /// <b>추측</b>했다. 그 상수가 실제 차트가 그리는 여백(한글 라벨 높이 · DPI · 폰트 스케일에 좌우됨)과
+    /// 어긋나면, 차트를 정확히 못 따라가는 채로 드래그 수학만 딴 자리를 가리켰다(2026-09-24 세 번째 실기
+    /// 캡처 — 라벨이 잘리거나 플롯 안으로 겹쳐 찍힌 게 원인이자 증거). 이제 뷰가 차트의
+    /// <c>CoreChart.DrawMarginLocation</c>/<c>DrawMarginSize</c>(라이브러리가 제 폰트 메트릭으로 스스로 잰
+    /// 값)를 그대로 여기로 밀어 준다 — 추측이 사라졌으니 어긋날 수도 없다.</para>
+    /// </summary>
+    public void Resize(double plotLeft, double plotTop, double plotWidth, double plotHeight)
     {
-        if (Math.Abs(_plotWidth - width) < 0.5 && Math.Abs(_plotHeight - height) < 0.5) return;
-        _plotWidth = width;
-        _plotHeight = height;
+        plotWidth = Math.Max(0, plotWidth);
+        plotHeight = Math.Max(0, plotHeight);
+        if (Math.Abs(_plotLeft - plotLeft) < 0.5 && Math.Abs(_plotTop - plotTop) < 0.5 &&
+            Math.Abs(_plotWidth - plotWidth) < 0.5 && Math.Abs(_plotHeight - plotHeight) < 0.5) return;
+
+        _plotLeft = plotLeft;
+        _plotTop = plotTop;
+        _plotWidth = plotWidth;
+        _plotHeight = plotHeight;
+        NotifyOfPropertyChange(nameof(PlotLeft));
+        NotifyOfPropertyChange(nameof(PlotTop));
         NotifyOfPropertyChange(nameof(PlotWidth));
         NotifyOfPropertyChange(nameof(PlotHeight));
-        RebuildTrendGeometry();
+    }
+
+    /// <summary>
+    /// 테마가 바뀌었다 — 뷰가 <c>IThemeService.ThemeChanged</c>(구독은 뷰의 Loaded/Unloaded 수명)를 받아 이걸 부른다.
+    /// 계열 색도 이제 칩과 같은 테마 토큰 브러시에서 읽으므로(<see cref="SeriesColor"/>) 테마가 바뀌면
+    /// 같이 갱신해야 한다 — <see cref="RebuildTrend"/> 를 통째로 다시 부른다(축 텍스트/툴팁 페인트까지 한 번에).
+    /// </summary>
+    public void ApplyTheme(BaseTheme theme)
+    {
+        _theme = theme;
+        TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(theme);
+        TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);
+        RebuildTrend();
     }
 
     public double BandLeft { get => _bandLeft; private set { _bandLeft = value; NotifyOfPropertyChange(); } }
@@ -319,18 +375,40 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         }
     }
 
+    /// <summary>
+    /// 다섯 계열(LiveCharts <see cref="LineSeries{T}"/>)과 시간 축 라벨을 다시 쌓는다.
+    /// <para>픽셀 좌표를 손으로 계산하지 않는다 — 차트가 제 <c>ActualWidth</c>로 스스로 배치한다(레거시
+    /// <c>DataChartPanelViewModel.DataInitialize</c>와 같은 관용구). 그래서 2026-09-23 결함
+    /// (플롯 폭 0 → 도형이 한 점에 뭉침)은 이 경로에서 구조적으로 재발할 수 없다 — Resize 가
+    /// 언제 오든, 심지어 한 번도 안 오든 Series/XAxes 는 항상 채워진다.</para>
+    /// </summary>
     private void RebuildTrend()
     {
-        TrendSeries.Clear();
-        TrendLabels.Clear();
+        Series.Clear();
 
         var buckets = _dashboard?.Trend?.Series ?? new List<EventTrendItemDto>();
-        if (buckets.Count == 0) { _bucketMax = Array.Empty<int>(); RebuildTrendGeometry(); return; }
+        if (buckets.Count == 0) { _xLabels = Array.Empty<string>(); BuildAxes(); return; }
 
         void Add(EventSeriesSpec spec, Func<EventTrendItemDto, int> pick)
         {
             if (!IsOn(spec.Key)) return;
-            TrendSeries.Add(new EventTrendSeriesViewModel(spec, buckets.Select(pick).ToList()));
+
+            var color = SeriesColor(spec.BrushKey);
+            var stroke = new SolidColorPaint(color, 2.5f);
+            if (spec.DashArray is not null) stroke.PathEffect = new DashEffect(ParseDashArray(spec.DashArray));
+
+            Series.Add(new LineSeries<int>
+            {
+                Name = spec.Name,
+                Values = buckets.Select(pick).ToArray(),
+                Stroke = stroke,
+                GeometryStroke = stroke,
+                GeometryFill = new SolidColorPaint(color),
+                GeometrySize = 5,
+                LineSmoothness = 0,   // 원래 손그림처럼 버킷 사이를 직선으로 — 곡선은 실제 값을 왜곡해 보인다.
+                // 센서 탐지만 면적을 깐다(정본 window-layout-system-storyboard.html L2578).
+                Fill = spec.Key == "sensor" ? new SolidColorPaint(color.WithAlpha(36)) : null,
+            });
         }
 
         Add(EventSeriesSpec.Sensor, b => b.SensorDetection);
@@ -339,14 +417,8 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         Add(EventSeriesSpec.Connection, b => b.Connection);
         Add(EventSeriesSpec.Action, b => b.Action);
 
-        _bucketMax = buckets.Select(b => Math.Max(Math.Max(b.SensorDetection, b.CameraDetection),
-                                                  Math.Max(b.Malfunction, Math.Max(b.Connection, b.Action)))).ToList();
-
-        var labelStep = Math.Max(1, buckets.Count / 6);
-        for (var i = 0; i < buckets.Count; i += labelStep)
-            TrendLabels.Add(new EventTrendLabel(0, ShortLabel(buckets[i].TimeBucket)));
-
-        RebuildTrendGeometry();
+        _xLabels = buckets.Select(b => ShortLabel(b.TimeBucket)).ToList();
+        BuildAxes();
     }
 
     private static string ShortLabel(string timeBucket)
@@ -356,38 +428,75 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         return timeBucket.Length > 5 ? timeBucket[^5..] : timeBucket;
     }
 
-    private void RebuildTrendGeometry()
+    /// <summary>
+    /// 계열 색의 <b>유일한</b> 출처 — 칩이 읽는 바로 그 브러시 토큰(<see cref="EventSeriesSpec.BrushKey"/>)을
+    /// <see cref="BrushTokenResolver"/> 로 읽는다(칩과 똑같이 <c>Application.Current.TryFindResource</c>,
+    /// <c>Converters/ConsoleTokenConverters.cs</c> 의 <c>TokenBrushConverter</c>·<c>TokenBrushAssist</c> 와 동일
+    /// 경로). 전엔 여기서 <c>ChartHelper.TrendCategories</c> 하드코딩 팔레트를 <b>복제</b>해 썼는데, 그 팔레트가
+    /// 칩의 실제 테마 토큰 색(예: StatusWarningBrush=#B26A00)과 전혀 다른 값(#FFCD00)이라 차트 선이 칩과
+    /// 따로 노는 결함으로 실측됐다(2026-09-24 라이브 캡처). 두 번째 팔레트를 새로 하드코딩하지 않고
+    /// 아예 <b>같은 소스</b>를 부르게 해 구조적으로 다시 어긋날 수 없게 한다.
+    /// </summary>
+    private static SKColor SeriesColor(string brushKey)
+        => BrushTokenResolver(brushKey) is SolidColorBrush brush
+            ? new SKColor(brush.Color.R, brush.Color.G, brush.Color.B, brush.Color.A)
+            : FallbackSeriesColor;
+
+    /// <summary>
+    /// 브러시 토큰 해석 — 기본은 칩과 같은 <c>Application.Current.TryFindResource</c>. 헤드리스 테스트(Application
+    /// 없음)에서 이 델리게이트를 가짜 리소스 사전으로 갈아 끼워 "칩과 같은 키를 실제로 물어봤는가"를 검증한다
+    /// (<c>EventOverviewViewModelSeriesColorTests</c>). internal — 테스트가 같은 어셈블리에서 갈아 끼운다.
+    /// </summary>
+    internal static Func<string, Brush?> BrushTokenResolver { get; set; } =
+        key => Application.Current?.TryFindResource(key) as Brush;
+
+    /// <summary>토큰을 못 찾았을 때만(Application 부재 등) 쓰는 대체색 — slate-400, 정상 경로에선 절대 안 쓰인다.</summary>
+    private static readonly SKColor FallbackSeriesColor = new(148, 163, 184);
+
+    private static float[] ParseDashArray(string dashArray)
+        => dashArray.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => float.Parse(s, CultureInfo.InvariantCulture))
+                    .ToArray();
+
+    /// <summary>
+    /// 축을 다시 쌓는다 — 데이터가 바뀌었을 때(<see cref="RebuildTrend"/>)와 테마가 바뀌었을 때
+    /// (<see cref="ApplyTheme"/>) 양쪽에서 부른다. 어느 쪽이 먼저 오든 <see cref="_theme"/>·<see cref="_xLabels"/>
+    /// 캐시를 쓰므로 결과가 어긋나지 않는다.
+    /// </summary>
+    private void BuildAxes()
     {
-        var width = PlotWidth;
-        var height = PlotHeight;
-        if (width <= 0 || height <= 0) return;
-
-        var count = TrendSeries.FirstOrDefault()?.Values.Count ?? 0;
-        if (count == 0) return;
-
-        var max = Math.Max(1, TrendSeries.SelectMany(s => s.Values).DefaultIfEmpty(0).Max());
-        var step = count > 1 ? width / (count - 1) : 0;
-
-        foreach (var series in TrendSeries)
+        XAxes.Clear();
+        XAxes.Add(new Axis
         {
-            var points = new PointCollection();
-            for (var i = 0; i < series.Values.Count; i++)
-                points.Add(new Point(PlotLeft + i * step, PlotTop + height * (1 - series.Values[i] / (double)max)));
-            series.Points = points;
+            Name = "시간",
+            NameTextSize = 12,
+            NamePaint = ChartThemeProvider.TextPaint(_theme),
+            Labels = _xLabels.Count > 0 ? _xLabels.ToArray() : null,
+            // 회전 없음(가로) — 회전 라벨은 대각선 바운딩박스라 여백을 더 많이, 더 예측하기 어렵게 먹는다.
+            // 가로 한 줄은 높이가 폰트 한 줄로 단순해 DrawMargin 을 Auto 로 맡겼을 때 라이브러리가 정확히
+            // 잰다(EventOverviewView.xaml.cs OnChartLoaded — 더 이상 여백을 고정 상수로 추측하지 않는다).
+            // 라이브러리가 겹치는 라벨은 알아서 건너뛴다(24개 중 일부만 — 의도된 동작, "빽빽한 24개"보다 낫다).
+            TextSize = 11,
+            LabelsPaint = ChartThemeProvider.TextPaint(_theme),
+            UnitWidth = 1,
+            ShowSeparatorLines = false,
+        });
 
-            if (series.Spec.Key == "sensor")
-            {
-                var area = new PointCollection { new(PlotLeft, PlotTop + height) };
-                foreach (var p in points) area.Add(p);
-                area.Add(new Point(PlotLeft + (count - 1) * step, PlotTop + height));
-                series.Area = area;
-            }
-        }
+        YAxes.Clear();
+        YAxes.Add(new Axis
+        {
+            Name = "건수",
+            NameTextSize = 12,
+            NamePaint = ChartThemeProvider.TextPaint(_theme),
+            TextSize = 11,
+            LabelsPaint = ChartThemeProvider.TextPaint(_theme),
+            MinLimit = 0,
+            // 값 축 눈금선 — 옅게(알파 40/255), 텍스트와 같은 색이면 너무 강하다.
+            SeparatorsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(_theme).WithAlpha(40), 1),
+            ShowSeparatorLines = true,
+        });
 
-        var labelStep = Math.Max(1, count / 6);
-        for (var i = 0; i < TrendLabels.Count; i++)
-            TrendLabels[i] = TrendLabels[i] with { X = PlotLeft + Math.Min(count - 1, i * labelStep) * step };
-
-        NotifyOfPropertyChange(nameof(TrendSeries));
+        NotifyOfPropertyChange(nameof(XAxes));
+        NotifyOfPropertyChange(nameof(YAxes));
     }
 }

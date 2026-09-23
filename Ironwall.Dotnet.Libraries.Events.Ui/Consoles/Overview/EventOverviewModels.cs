@@ -1,6 +1,5 @@
 ﻿using Caliburn.Micro;
 using System.Collections.Generic;
-using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
 
@@ -74,31 +73,5 @@ public sealed record EventBarSegment(EventSeriesSpec Spec, int Value, double Rat
     public bool IsHatched => Spec.IsHatched;
 }
 
-/// <summary>추이 선 하나.</summary>
-public sealed class EventTrendSeriesViewModel : PropertyChangedBase
-{
-    private PointCollection _points = new();
-    private PointCollection? _area;
-
-    public EventTrendSeriesViewModel(EventSeriesSpec spec, IReadOnlyList<int> values)
-    {
-        Spec = spec;
-        Values = values;
-    }
-
-    public EventSeriesSpec Spec { get; }
-    public IReadOnlyList<int> Values { get; }
-    public string Name => Spec.Name;
-    public string BrushKey => Spec.BrushKey;
-
-    /// <summary>파선 패턴(없으면 실선). 문자열이 아니라 컬렉션이어야 <c>Polyline.StrokeDashArray</c> 에 바로 물린다.</summary>
-    public DoubleCollection? Dashes => Spec.DashArray is null ? null : DoubleCollection.Parse(Spec.DashArray);
-
-    public PointCollection Points { get => _points; set { _points = value; NotifyOfPropertyChange(); } }
-
-    /// <summary>센서 탐지만 면적을 깐다(정본 L2578).</summary>
-    public PointCollection? Area { get => _area; set { _area = value; NotifyOfPropertyChange(); } }
-}
-
-/// <summary>x 축 눈금 한 칸.</summary>
-public sealed record EventTrendLabel(double X, string Text);
+// 추이 선(과거 Polygon/Polyline 손그림 도형)과 x 축 눈금 뷰모델은 LiveChartsCore CartesianChart 로
+// 옮기며 사라졌다 — 차트가 제 값(EventOverviewViewModel.Series/XAxes)으로 스스로 배치·그린다(2026-09-23).

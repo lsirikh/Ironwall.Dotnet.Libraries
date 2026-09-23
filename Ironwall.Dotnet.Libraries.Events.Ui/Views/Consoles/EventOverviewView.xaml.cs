@@ -1,7 +1,13 @@
-﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Overview;
+using Ironwall.Dotnet.Libraries.Theme.Services;
+using LiveChartsCore.Kernel.Sketches;
+using MaterialDesignThemes.Wpf;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using LvcCartesianChart = LiveChartsCore.SkiaSharpView.WPF.CartesianChart;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles;
 
@@ -20,29 +26,98 @@ public partial class EventOverviewView : UserControl
 {
     private readonly TrendDragStateMachine _drag = new();
     private FrameworkElement? _plot;
+    private LvcCartesianChart? _chart;
     private Window? _keyHost;
+    private IThemeService? _themeService;
 
     public EventOverviewView()
     {
         InitializeComponent();
-        Unloaded += (_, _) => FinishDrag(_drag.LostCapture());
+        Loaded += OnViewLoaded;
+        Unloaded += (_, _) =>
+        {
+            FinishDrag(_drag.LostCapture());
+            UnsubscribeTheme();
+            if (_chart is not null) _chart.UpdateFinished -= OnChartUpdateFinished;
+        };
     }
 
     private EventOverviewViewModel? Model => DataContext as EventOverviewViewModel;
 
+    /// <summary>
+    /// 테마 구독 — IThemeService 는 부트 순서 때문에 생성자 시점엔 없을 수 있다(IoC 미준비).
+    /// 뷰가 Loaded 됐다는 건 셸이 떴다는 뜻이라 이 시점엔 항상 있다. 해제-후-구독으로 재로드 중복을 막는다
+    /// (ChartThemeRefreshBehavior 와 같은 방식). 싱글턴 VM 이라도 구독은 뷰 수명에 묶어 안전하다.
+    /// </summary>
+    private void OnViewLoaded(object sender, RoutedEventArgs e)
+    {
+        _themeService = TryResolveThemeService();
+        if (_themeService is null) return;
+
+        _themeService.ThemeChanged -= OnAppThemeChanged;
+        _themeService.ThemeChanged += OnAppThemeChanged;
+        Model?.ApplyTheme(_themeService.Current);
+    }
+
+    private void OnAppThemeChanged(object? sender, BaseTheme theme) => Model?.ApplyTheme(theme);
+
+    private void UnsubscribeTheme()
+    {
+        if (_themeService is null) return;
+        _themeService.ThemeChanged -= OnAppThemeChanged;
+        _themeService = null;
+    }
+
+    private static IThemeService? TryResolveThemeService()
+    {
+        try { return IoC.Get<IThemeService>(); }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// 드래그 픽셀 수학(<see cref="EventOverviewViewModel.PlotLeft"/>/<c>PlotWidth</c>)을 차트가 <b>실제로
+    /// 측정한</b> 그림 영역(<c>CoreChart.DrawMarginLocation</c>/<c>DrawMarginSize</c>)으로 맞춘다 — 더 이상
+    /// 고정 여백을 추측해 <c>DrawMargin</c> 에 박지 않는다(그 여백을 쓰던 예전 판은 한글 글리프 높이·DPI·
+    /// 폰트 스케일을 몰라 세 번째 실기 캡처까지 라벨이 잘리거나 겹쳤다). 방향을 뒤집는다: 라이브러리가
+    /// 제 폰트 메트릭으로 스스로 여백을 계산하게 두고(<c>DrawMargin</c> 미지정 = Auto), 그 결과를 읽어
+    /// 뷰모델에 되먹인다 — 드래그가 차트를 따라가지, 차트가 추측을 따라가지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// <para><see cref="LvcCartesianChart.UpdateFinished"/> 는 매 렌더 패스(크기 변화 · 테마 재색칠 · 데이터
+    /// 갱신) 뒤에 돈다 — 리사이즈마다 따로 손볼 필요가 없다. 콜백이 UI 스레드가 아닐 수 있어(SkiaSharp 렌더
+    /// 루프, <c>ChartThemeRefreshBehavior</c> 의 기존 선례와 같은 이유) <c>Dispatcher</c> 를 거친다.</para>
+    /// <para><c>Loaded</c> 시점엔 아직 첫 측정 전일 수도, 재방문이라 이미 측정된 채일 수도 있다 — 구독을
+    /// 걸고 나서 한 번 즉시 읽어 둘 중 어느 쪽이어도 맞는 값(또는 0, 다음 UpdateFinished 로 바로 갱신됨)을
+    /// 받는다.</para>
+    /// </remarks>
+    private void OnChartLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not LvcCartesianChart chart) return;
+        _chart = chart;
+        chart.UpdateFinished -= OnChartUpdateFinished;   // 해제-후-구독(재로드 중복 방지)
+        chart.UpdateFinished += OnChartUpdateFinished;
+        PushChartRect();
+    }
+
+    private void OnChartUpdateFinished(IChartView chartView)
+    {
+        var chart = _chart;
+        if (chart is null) return;
+        chart.Dispatcher.BeginInvoke(PushChartRect);
+    }
+
+    private void PushChartRect()
+    {
+        if (_chart is null || Model is null) return;
+        var core = _chart.CoreChart;
+        Model.Resize(core.DrawMarginLocation.X, core.DrawMarginLocation.Y, core.DrawMarginSize.Width, core.DrawMarginSize.Height);
+    }
+
     private void OnTrendLoaded(object sender, RoutedEventArgs e)
     {
         // 배선 탐색은 Loaded 에서 — OnAttached 시점에는 부모 체인이 없다.
+        // 마우스 좌표 기준점으로만 쓴다 — 플롯 크기는 더 이상 이 Border 에서 재지 않는다(위 OnChartLoaded).
         _plot = sender as FrameworkElement;
-        PushSize();
-    }
-
-    private void OnTrendSizeChanged(object sender, SizeChangedEventArgs e) => PushSize();
-
-    private void PushSize()
-    {
-        if (_plot is null || Model is null) return;
-        Model.Resize(_plot.ActualWidth, _plot.ActualHeight);
     }
 
     private void OnTrendPressed(object sender, MouseButtonEventArgs e)
