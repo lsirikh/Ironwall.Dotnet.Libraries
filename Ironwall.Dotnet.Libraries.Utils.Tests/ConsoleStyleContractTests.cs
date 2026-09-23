@@ -124,6 +124,9 @@ public class ConsoleStyleContractTests
             "Ironwall.Dotnet.Libraries.Devices.Ui",
             "Ironwall.Dotnet.Libraries.Accounts.Ui",
             "Ironwall.Dotnet.Libraries.Reports.Ui",
+            // U-13 — 소리 설정의 폴더 · 재생 단추 4개가 Style 없이 MD3 암시 스타일(틸 채움 48×32)로 그려졌다.
+            "Ironwall.Dotnet.Libraries.Sounds.Ui",
+            "Ironwall.Dotnet.Libraries.Gateway",
             "Ironwall.Dotnet.Libraries.Utils",
         };
 
@@ -163,10 +166,12 @@ public class ConsoleStyleContractTests
     }
     #endregion
 
-    #region - U-14 one button language in Devices.Ui / Events.Ui -
+    #region - U-14 one button language in the console UI projects -
     // U-14 — 같은 화면에 MD3 틸 Flat/Outlined 버튼과 커널 Console.Button* 이 섞여 "버튼 언어가 둘" 이었다
     // (예: 부대 콘솔 상세의 [최상위로] 틸 글자 · [옮기기] 틸 윤곽 옆에 커널 [되돌리기]/[적용]).
-    // 두 프로젝트의 XAML 은 MaterialDesign*Button 계열 스타일 키를 참조하지 않는다 — 커널 키만 쓴다.
+    // 아래 프로젝트들의 XAML 은 MaterialDesign*Button 계열 스타일 키를 참조하지 않는다 — 커널 키만 쓴다.
+    // 처음엔 장비 · 이벤트 두 곳이었고, U-13 마무리로 계정 · 보고서 · 소리 · 게이트웨이를 더했다.
+    // 주석 처리된 옛 버튼도 센다 — 되살리는 순간 MD 버튼이 돌아오므로 주석 안의 키도 커널 키로 바꿔 두었다.
     // IconButtonStyle 도 금지한다: 라이브러리 Resources.xaml 은 앱에 병합되지 않아, 뷰가 그 키를 부르면
     // 런타임에는 호스트 앱의 사본(BasedOn MaterialDesignIconButton — 48 원형 · 물결)으로 풀린다.
     private static readonly Regex MaterialDesignButtonStyleRef = new(
@@ -205,11 +210,21 @@ public class ConsoleStyleContractTests
         return offenders;
     }
 
+    internal static readonly string[] OneButtonLanguageProjects =
+    {
+        "Ironwall.Dotnet.Libraries.Devices.Ui",
+        "Ironwall.Dotnet.Libraries.Events.Ui",
+        "Ironwall.Dotnet.Libraries.Accounts.Ui",
+        "Ironwall.Dotnet.Libraries.Reports.Ui",
+        "Ironwall.Dotnet.Libraries.Sounds.Ui",
+        "Ironwall.Dotnet.Libraries.Gateway",
+    };
+
     [Fact]
-    public void should_not_reference_materialdesign_button_styles_when_view_is_in_devices_or_events_ui()
+    public void should_not_reference_materialdesign_button_styles_when_view_is_in_a_console_ui_project()
     {
         // Arrange
-        var projects = new[] { "Ironwall.Dotnet.Libraries.Devices.Ui", "Ironwall.Dotnet.Libraries.Events.Ui" };
+        var projects = OneButtonLanguageProjects;
 
         // Act
         var offenders = FindMaterialDesignButtonRefs(RepoRoot(), projects);
@@ -250,6 +265,35 @@ public class ConsoleStyleContractTests
 
         // Assert
         Assert.DoesNotContain("FontWeight", disabled);
+    }
+
+    [Fact]
+    public void should_not_reintroduce_a_local_danger_button_copy_when_the_kernel_has_one()
+    {
+        // Arrange — U-13: 계정(Acc.Btn.Danger) · 보고서(Local.Button.Mini.Danger) 의 로컬 사본을 커널
+        // Console.Button.Danger 로 옮기고 지웠다. 같은 이름이 x:Key 로 다시 나타나면 사본이 되살아난 것이다.
+        var staleKeys = new[] { "Acc.Btn.Danger", "Local.Button.Mini.Danger" };
+        var offenders = new List<string>();
+        var root = RepoRoot();
+
+        // Act
+        foreach (var project in OneButtonLanguageProjects)
+        {
+            var dir = Path.Combine(root, project);
+            if (!Directory.Exists(dir)) continue;
+            foreach (var file in Directory.EnumerateFiles(dir, "*.xaml", SearchOption.AllDirectories))
+            {
+                if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
+                    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+                var text = File.ReadAllText(file);
+                foreach (var key in staleKeys)
+                    if (text.Contains($"x:Key=\"{key}\"", StringComparison.Ordinal))
+                        offenders.Add($"{Path.GetRelativePath(root, file)}: x:Key=\"{key}\"");
+            }
+        }
+
+        // Assert
+        Assert.True(offenders.Count == 0, $"로컬 위험 버튼 사본이 되살아났다: {string.Join("; ", offenders)}");
     }
     #endregion
 

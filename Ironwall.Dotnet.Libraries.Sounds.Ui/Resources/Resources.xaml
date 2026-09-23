@@ -265,16 +265,6 @@
 		<Setter Property="Margin" Value="10,0,0,0" />
 	</Style>
 
-	<!--  Material Design 스타일 기반 버튼  -->
-	<Style
-		x:Key="IconButtonStyle"
-		BasedOn="{StaticResource MaterialDesignIconButton}"
-		TargetType="Button">
-		<Setter Property="VerticalAlignment" Value="Center" />
-		<Setter Property="Margin" Value="2,2" />
-		<Setter Property="md:RippleAssist.IsCentered" Value="True" />
-	</Style>
-
 	<!--  Material Design 스타일 기반 DataGrid  -->
 	<Style
 		x:Key="CustomDataGridStyle"

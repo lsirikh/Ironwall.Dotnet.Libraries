@@ -130,18 +130,6 @@
 			<Setter Property="TextWrapping" Value="Wrap" />
 		</Style>
 
-		<!--  되돌릴 수 없는 동작 — 위험을 색 하나가 아니라 <b>테두리(형태) + 바탕 + 구분선</b> 으로 말한다.  -->
-		<Style
-			x:Key="Acc.Btn.Danger"
-			BasedOn="{StaticResource Console.Button}"
-			TargetType="Button">
-			<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
-			<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
-			<Setter Property="BorderThickness" Value="1.5" />
-			<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
-			<Setter Property="FontWeight" Value="SemiBold" />
-		</Style>
-
 		<!--
 			패널 닫기 ✕ — 앱 표준 ModernPanelCloseButton 은 시안 머리 위를 가정해 OnPrimaryFixed 를 박아 둔다.
 			콘솔 머리는 SurfaceAlt 라 라이트에서 흰 글리프가 흰 바탕 위에 놓여 <b>잉크 0%</b>, 다크는 1.35:1 이었다(D-30 실측).
@@ -1396,7 +1384,7 @@
 								Click="OnForceLogout"
 								Content="이 세션 종료"
 								IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
-								Style="{StaticResource Acc.Btn.Danger}" />
+								Style="{StaticResource Console.Button.Danger}" />
 							<Button
 								HorizontalAlignment="Stretch"
 								HorizontalContentAlignment="Center"
@@ -1404,7 +1392,7 @@
 								Click="OnForceLogoutAll"
 								Content="{Binding ForceLogoutAllText}"
 								IsEnabled="{Binding SelectedSession.IsActive, FallbackValue=False}"
-								Style="{StaticResource Acc.Btn.Danger}" />
+								Style="{StaticResource Console.Button.Danger}" />
 						</StackPanel>
 					</StackPanel>
 

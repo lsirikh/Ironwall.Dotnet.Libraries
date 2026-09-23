@@ -87,7 +87,7 @@
 								Margin="0,-5,-5,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Top"
-								Style="{StaticResource MaterialDesignIconButton}"
+								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="사진 제거하기">
 								<Button.Content>
 									<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
@@ -375,8 +375,7 @@
 						Grid.Row="2"
 						Grid.ColumnSpan="3"
 						Margin="0,10,0,0"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						Style="{StaticResource Console.Button}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Cancel" Style="{StaticResource ButtonIcon}" />

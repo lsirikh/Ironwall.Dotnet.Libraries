@@ -86,7 +86,7 @@
 				x:Name="ButtonSoundFolder"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="FolderOpen" />
 				</Button.Content>
@@ -168,7 +168,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>
@@ -324,7 +324,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>
@@ -478,7 +478,7 @@
 				Grid.Row="0"
 				Grid.Column="4"
 				VerticalAlignment="Center"
-				HorizontalContentAlignment="Right">
+				Style="{StaticResource Console.Button.Icon}">
 				<Button.Content>
 					<md:PackIcon Kind="Play" />
 				</Button.Content>

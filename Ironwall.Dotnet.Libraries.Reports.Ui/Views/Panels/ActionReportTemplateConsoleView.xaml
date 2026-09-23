@@ -30,15 +30,6 @@
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
 		</Style>
-
-		<!--  Console.Button.Mini 에는 위험색 변형이 없다 — 삭제는 형태(확인 팝업 2단)로 보호되므로
-		      색만 뷰 로컬로 덧댄다(Theme 은 건드리지 않는다).  -->
-		<Style
-			x:Key="Local.Button.Mini.Danger"
-			BasedOn="{StaticResource Console.Button.Mini}"
-			TargetType="ButtonBase">
-			<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
-		</Style>
 	</UserControl.Resources>
 
 	<c:ConsoleShell
@@ -205,7 +196,7 @@
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.DeleteButton.{0}}"
 											Click="OnDeleteRow"
 											Content="삭제"
-											Style="{StaticResource Local.Button.Mini.Danger}" />
+											Style="{StaticResource Console.Button.Mini.Danger}" />
 									</StackPanel>
 									<TextBlock
 										Margin="4,0,8,0"

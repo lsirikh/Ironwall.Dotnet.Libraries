@@ -83,14 +83,14 @@
 						<Button
 							Grid.Column="9"
 							IsEnabled="{Binding IsButtonEnable}"
-							Style="{StaticResource IconButtonStyle}"
+							Style="{StaticResource Console.Button.Icon}"
 							ToolTip="추가하기">
 							<cal:Message.Attach>
 								[Event Click] = [Action OnClickInsertButton($source, $eventArgs]
 							</cal:Message.Attach>
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="AddBox" />
 						</Button>
 
@@ -98,14 +98,14 @@
 						<Button
 							Grid.Column="11"
 							IsEnabled="{Binding IsButtonEnable}"
-							Style="{StaticResource IconButtonStyle}"
+							Style="{StaticResource Console.Button.Icon}"
 							ToolTip="삭제하기">
 							<cal:Message.Attach>
 								[Event Click] = [Action OnClickDeleteButton($source, $eventArgs]
 							</cal:Message.Attach>
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="MinusBox" />
 						</Button>
 
@@ -113,7 +113,7 @@
 						<Button
 							Grid.Column="13"
 							IsEnabled="{Binding IsButtonEnable}"
-							Style="{StaticResource IconButtonStyle}"
+							Style="{StaticResource Console.Button.Icon}"
 							ToolTip="갱신하기">
 							<cal:Message.Attach>
 								[Event Click] = [Action OnClickReloadButton($source, $eventArgs)]
@@ -121,15 +121,15 @@
 							<Button.Content>
 								<Grid>
 									<ProgressBar
-										Width="30"
-										Height="30"
+										Width="20"
+										Height="20"
 										IsIndeterminate="True"
 										Style="{DynamicResource MaterialDesignCircularProgressBar}"
 										Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
 										Value="44" />
 									<md:PackIcon
-										Width="30"
-										Height="30"
+										Width="20"
+										Height="20"
 										Kind="CircleArrows"
 										ToolTip="갱신하기"
 										Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -142,23 +142,22 @@
 						<!--<Button Grid.Column="9"
 								VerticalAlignment="Center"
 								Margin="2 2"
-								Style="{StaticResource MaterialDesignIconButton}"
+								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="저장하기"
-								IsEnabled="{Binding IsButtonEnable}"
-								md:RippleAssist.IsCentered="True">
+								IsEnabled="{Binding IsButtonEnable}">
 							<cal:Message.Attach>
 								[Event Click] = [Action OnClickSaveButton($source, $eventArgs]
 							</cal:Message.Attach>
 							<Button.Content>
 								<Grid>
-									<ProgressBar Width="30"
-												 Height="30"
+									<ProgressBar Width="20"
+												 Height="20"
 												 Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
 												 Style="{DynamicResource MaterialDesignCircularProgressBar}"
 												 IsIndeterminate="True"
 												 Value="44" />
 									<md:PackIcon Kind="FloppyDisc"
-												 Width="30" Height="30"
+												 Width="20" Height="20"
 												 Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}"
 												 ToolTip="저장하기"/>
 								</Grid>
