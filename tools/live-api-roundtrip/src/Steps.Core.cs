@@ -56,6 +56,11 @@ public static partial class Steps
         //      8.0 shape, the legacy ServerApiService refuses on axis-era before touching the wire ----
         await Item10_ServerAxis(boot, rec, raw).ConfigureAwait(false);
 
+        // ---- item 11: unit preservation on edit (D-13, ledger D-2026-09-23-1b2e76) - a SECOND
+        //      unit proves editing another unit's device does not silently reassign it to this
+        //      client's own unit. Must run before the cleanup sweep (item 9 stays last). ----
+        await Item11_UnitPreservation(boot, rec, raw, deviceApi, unitApi, policy).ConfigureAwait(false);
+
         // ---- item 9: the mandated fix (D-17) - verify cleanup for real, never let an
         //      unreachable listing endpoint read as "clean" ----
         await Item9_CleanupSweep(boot, rec, raw).ConfigureAwait(false);
