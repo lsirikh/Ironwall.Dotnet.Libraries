@@ -21,14 +21,20 @@ public class PermissionGroupRowViewModel : PropertyChangedBase
     public string GroupName
     {
         get => _groupName;
-        set { _groupName = value ?? string.Empty; NotifyOfPropertyChange(); }
+        set { _groupName = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(ChipText)); }
     }
 
     public int UserCount
     {
         get => _userCount;
-        set { _userCount = value; NotifyOfPropertyChange(); }
+        set { _userCount = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(ChipText)); }
     }
+
+    /// <summary>
+    /// 칩 라벨 "이름 · 인원" — 커널 <c>Console.Chip</c> 은 Content 를 글자(string)로 그려 굵은 폭을 미리 잡는다
+    /// (선택해도 칩 폭이 변하지 않는 U-12 관용구). 그래서 Run 조합 대신 한 문자열로 준다.
+    /// </summary>
+    public string ChipText => $"{GroupName} · {UserCount}";
 
     /// <summary>"사용" / "미사용".</summary>
     public string Active

@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.GrantManagementPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -71,7 +71,7 @@
 					Margin="4,0,0,0"
 					Content="부여"
 					IsEnabled="{Binding CanCreateGrant}"
-					Style="{StaticResource MaterialDesignFlatButton}">
+					Style="{StaticResource Console.Button}">
 					<cal:Message.Attach>[Event Click] = [Action ClickCreateGrant()]</cal:Message.Attach>
 				</Button>
 			</WrapPanel>

@@ -211,7 +211,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsDetectionAutoSoundStop, Mode=TwoWay}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"
@@ -365,7 +365,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsMalfunctionAutoSoundStop, Mode=TwoWay}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"
@@ -521,7 +521,7 @@
 				Grid.Row="2"
 				Grid.Column="4"
 				IsChecked="{Binding IsActionReportAutoSoundStop, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+				Style="{StaticResource Console.ToggleSwitch}" />
 
 			<Grid
 				Grid.Row="3"

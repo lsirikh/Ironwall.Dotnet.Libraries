@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs.DeleteAccountDialogView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -151,16 +151,14 @@
 						x:Name="ClickOk"
 						Grid.Column="0"
 						Margin="10,0"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						확인
 					</Button>
 					<Button
 						x:Name="ClickCancel"
 						Grid.Column="1"
 						Margin="10,0"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						Style="{StaticResource Console.Button}">
 						취소
 					</Button>
 				</Grid>

@@ -64,10 +64,10 @@
 							Margin="4,0,0,0"
 							Content="저장"
 							IsEnabled="{Binding CanSaveGroupForm}"
-							Style="{StaticResource MaterialDesignFlatButton}">
+							Style="{StaticResource Console.Button}">
 							<cal:Message.Attach>[Event Click] = [Action ClickSaveGroupForm()]</cal:Message.Attach>
 						</Button>
-						<Button Margin="4,0,0,0" Content="취소" Style="{StaticResource MaterialDesignFlatButton}">
+						<Button Margin="4,0,0,0" Content="취소" Style="{StaticResource Console.Button.Ghost}">
 							<cal:Message.Attach>[Event Click] = [Action ClickCancelGroupForm()]</cal:Message.Attach>
 						</Button>
 					</WrapPanel>
@@ -228,7 +228,7 @@
 					<Button
 						Content="그룹에 배정"
 						IsEnabled="{Binding CanAddMember}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button}">
 						<cal:Message.Attach>[Event Click] = [Action ClickAddMember()]</cal:Message.Attach>
 					</Button>
 				</WrapPanel>

@@ -163,7 +163,8 @@
 							Background="Transparent"
 							BorderThickness="0"
 							Focusable="False"
-							Style="{StaticResource MaterialDesignFlatButton}"
+							MinWidth="0"
+							Style="{StaticResource Console.Button.Ghost}"
 							ToolTip="누르고 있는 동안 비밀번호 표시">
 							<md:PackIcon
 								Width="20"
@@ -209,7 +210,7 @@
 						Margin="5,0"
 						VerticalAlignment="Center"
 						IsDefault="True"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
@@ -228,7 +229,7 @@
 						Margin="5,0"
 						VerticalAlignment="Center"
 						IsDefault="True"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						Style="{StaticResource Console.Button}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Cancel" Style="{StaticResource ButtonIcon}" />
@@ -264,7 +265,7 @@
 						Grid.Column="1"
 						VerticalAlignment="Center"
 						md:RippleAssist.IsCentered="True"
-						Style="{StaticResource MaterialDesignFlatButton}"
+						Style="{StaticResource Console.Button.Ghost}"
 						ToolTip="가입하기">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">

@@ -74,45 +74,12 @@
 			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
 		</Style>
 
-		<!--  그룹 고르기 칩 — 고른 것은 색이 아니라 형태(테두리 두께 · 글자 굵기)로 구분한다  -->
-		<Style
-			x:Key="Matrix.GroupChip"
-			BasedOn="{StaticResource MaterialDesignOutlinedButton}"
-			TargetType="Button">
-			<Setter Property="Padding" Value="10,2" />
-			<Setter Property="Height" Value="26" />
-			<Setter Property="MinWidth" Value="0" />
-			<Setter Property="BorderThickness" Value="1" />
-			<Style.Triggers>
-				<DataTrigger Value="True">
-					<DataTrigger.Binding>
-						<MultiBinding Converter="{StaticResource SameRef}">
-							<Binding />
-							<Binding Path="DataContext.Matrix.SelectedGroup" RelativeSource="{RelativeSource AncestorType=UserControl}" />
-						</MultiBinding>
-					</DataTrigger.Binding>
-					<Setter Property="BorderThickness" Value="2" />
-					<Setter Property="FontWeight" Value="SemiBold" />
-				</DataTrigger>
-			</Style.Triggers>
-		</Style>
-
-		<!--  [권한] · [구성원] 칩 — 지금 보고 있는 쪽을 색이 아니라 형태(테두리 두께 · 글자 굵기)로 구분한다.  -->
-		<Style
-			x:Key="Matrix.Chip"
-			BasedOn="{StaticResource MaterialDesignOutlinedButton}"
-			TargetType="Button">
-			<Setter Property="Padding" Value="12,3" />
-			<Setter Property="Height" Value="28" />
-			<Setter Property="FontSize" Value="12" />
-			<Setter Property="BorderThickness" Value="1" />
-			<Style.Triggers>
-				<Trigger Property="Tag" Value="True">
-					<Setter Property="BorderThickness" Value="2" />
-					<Setter Property="FontWeight" Value="SemiBold" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
+		<!--
+			그룹 고르기 칩 · [그룹|구성원] 전환은 커널 Console.Chip / Console.Tab 을 그대로 쓴다(U-12).
+			옛 로컬 스타일(Matrix.GroupChip · Matrix.Chip, MDIX Outlined 기반)은 고르면 테두리 1→2 · 글자 SemiBold 로
+			폭이 늘어 옆 칩이 밀렸다. 커널 스타일은 굵은 폭을 미리 잡고 선택 테두리를 레이아웃 밖에 그린다.
+			선택은 RadioButton + IsChecked OneWay + Click — 이벤트 대시보드 칩과 같은 관용구(막힌 이동은 VM 이 되돌린다).
+		-->
 
 		<!--
 			동작 열 머리글 자리 — 머리글은 왼쪽 정렬(Console.DataGrid.ColumnHeader 기본)인데 칸의 체크는 가운데라
@@ -503,20 +470,22 @@
 								Margin="0,0,10,0"
 								DockPanel.Dock="Right"
 								Orientation="Horizontal">
-								<Button
-									Margin="0,0,6,0"
+								<RadioButton
 									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Permissions"
 									Click="OnShowMatrix"
 									Content="그룹"
-									Style="{StaticResource Matrix.Chip}"
-									Tag="{Binding Matrix.ShowMatrix}"
+									GroupName="AccountsMatrixView"
+									IsChecked="{Binding Matrix.ShowMatrix, Mode=OneWay}"
+									Style="{StaticResource Console.Tab}"
 									ToolTip="이 그룹의 권한(모듈 × 동작)" />
-								<Button
+								<RadioButton
+									Margin="0"
 									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Members"
 									Click="OnShowMembers"
 									Content="구성원"
-									Style="{StaticResource Matrix.Chip}"
-									Tag="{Binding Matrix.ShowMembers}"
+									GroupName="AccountsMatrixView"
+									IsChecked="{Binding Matrix.ShowMembers, Mode=OneWay}"
+									Style="{StaticResource Console.Tab}"
 									ToolTip="이 그룹에 속한 계정" />
 							</StackPanel>
 							<!--  그룹 고르기 — 목업의 가운데 칸은 매트릭스가 차지하므로 그룹은 칩으로 고른다  -->
@@ -528,17 +497,22 @@
 								</ItemsControl.ItemsPanel>
 								<ItemsControl.ItemTemplate>
 									<DataTemplate>
-										<Button
+										<RadioButton
 											Margin="0,2,6,2"
 											AutomationProperties.AutomationId="{Binding GroupId, StringFormat=Console.Accounts.GroupRow.{0}}"
 											Click="OnSelectGroup"
-											Style="{StaticResource Matrix.GroupChip}"
+											Content="{Binding ChipText}"
+											GroupName="AccountsMatrixGroup"
+											Style="{StaticResource Console.Chip}"
 											Tag="{Binding}"
 											ToolTip="{Binding Summary}">
-											<TextBlock FontSize="12">
-												<Run Text="{Binding GroupName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding UserCount, Mode=OneWay}" />
-											</TextBlock>
-										</Button>
+											<RadioButton.IsChecked>
+												<MultiBinding Converter="{StaticResource SameRef}" Mode="OneWay">
+													<Binding />
+													<Binding Path="DataContext.Matrix.SelectedGroup" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+												</MultiBinding>
+											</RadioButton.IsChecked>
+										</RadioButton>
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
 							</ItemsControl>
@@ -913,8 +887,8 @@
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
 						<DataGridTextColumn
-							Width="1.7*"
-							MinWidth="136"
+							Width="1.9*"
+							MinWidth="156"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="time"
 							Binding="{Binding CreatedAt}"
@@ -936,8 +910,8 @@
 							</DataGridTextColumn.ElementStyle>
 						</DataGridTextColumn>
 						<DataGridTextColumn
-							Width="0.9*"
-							MinWidth="78"
+							Width="1*"
+							MinWidth="90"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="status"
 							Binding="{Binding ActionStatus}"
@@ -1041,8 +1015,7 @@
 						LastChildFill="True"
 						Visibility="{Binding ShowGroupChips, Converter={StaticResource BoolToVisibility}}">
 						<TextBlock
-							Width="52"
-							Margin="0,4,0,0"
+							Margin="0,5,8,0"
 							VerticalAlignment="Top"
 							DockPanel.Dock="Left"
 							FontSize="12"
@@ -1314,13 +1287,13 @@
 										Click="OnRenameGroup"
 										Content="이름/설명 수정"
 										IsEnabled="{Binding Matrix.CanEdit}"
-										Style="{StaticResource MaterialDesignOutlinedButton}" />
+										Style="{StaticResource Console.Button}" />
 									<Button
 										Margin="0,0,6,6"
 										AutomationProperties.AutomationId="Console.Accounts.Group.Members"
 										Click="OnShowMembers"
 										Content="구성원 보기"
-										Style="{StaticResource MaterialDesignOutlinedButton}" />
+										Style="{StaticResource Console.Button}" />
 								</WrapPanel>
 
 								<!--  이름/설명 폼 — 열렸을 때만  -->
