@@ -227,6 +227,40 @@ public class PresetRegisterTests
         Assert.False(body.ContainsKey("description"), "description 키 자체가 없어야 한다 — null 이나 빈 문자열이 아니라.");
     }
 
+    /// <summary>
+    /// ★ D-21 회귀 가드 — 라이브 하네스 FAIL 3b2 의 재발 방지. 함체·스피커·센서 등록이
+    /// <c>PresetInstanceInfo.IpAddress</c>·<c>IpPort</c> 를 <b>실제로</b> <c>connection.ip_address</c>·
+    /// <c>connection.ip_port</c> 로 실어 보내는지 못 박는다. 이전에는 세 DTO 모두 접속 축 프로퍼티가
+    /// 아예 없어 이 값이 조용히 유실됐다(서버 스키마 <c>app/schemas/device.py:97-109</c>는 7 카테고리
+    /// 전부에 <c>connection</c> 을 선언한다).
+    /// </summary>
+    [Theory]
+    [InlineData(EnumDeviceCategory.Enclosure)]
+    [InlineData(EnumDeviceCategory.Speaker)]
+    [InlineData(EnumDeviceCategory.Sensor)]
+    public void should_carry_ip_address_and_port_in_the_connection_axis_when_registering_ip_capable_categories(
+        EnumDeviceCategory category)
+    {
+        var preset = new DevicePreset
+        {
+            Id = "p1",
+            Name = "t",
+            Category = category,
+            Components = new[] { Component("nic", "NETWORK_INTERFACE") },
+        };
+        var controller = category == EnumDeviceCategory.Sensor
+            ? new ControllerDeviceModel { Id = 12, DeviceNumber = 1, DeviceName = "CTL" }
+            : null;
+
+        var info = Instance() with { IpAddress = "10.66.2.1", IpPort = 9620, Controller = controller };
+        var request = PresetRequestBuilder.Build(preset, info);
+        var body = JObject.Parse(request.PreviewJson);
+
+        Assert.Equal("IP_DIRECT", (string?)body.SelectToken("connection.type"));
+        Assert.Equal("10.66.2.1", (string?)body.SelectToken("connection.ip_address"));
+        Assert.Equal(9620, (int?)body.SelectToken("connection.ip_port"));
+    }
+
     [Fact]
     public void should_carry_both_speaker_axes_when_preset_declares_role_and_shape()
     {
@@ -342,29 +376,40 @@ public class PresetRegisterTests
     }
 
     /// <summary>
-    /// 제어기·카메라·경광등만 접속(IP/포트) 축을 실제로 보낸다(<c>PresetRequestBuilder.HasConnectionAxis</c>) —
-    /// 그래서 포트 범위 검사도 그 세 카테고리에서만 뜻이 있다.
+    /// ★ D-21 정정 — 제어기·카메라·경광등뿐 아니라 함체·스피커·센서도 접속(IP/포트) 축을 실제로 보낸다
+    /// (<c>PresetRequestBuilder.HasConnectionAxis</c>) — "센서·스피커·함체·통문은 서버 계약에 접속 축이 없다"는
+    /// 예전 결론은 틀렸다(라이브 하네스 FAIL 3b2). 포트 범위 검사는 이 여섯 카테고리 전부에서 뜻이 있다.
     /// </summary>
     [Theory]
-    [InlineData(0)]
-    [InlineData(70000)]
-    public void should_block_when_port_is_outside_the_server_range_for_a_category_with_connection(int port)
+    [InlineData(EnumDeviceCategory.Controller, 0)]
+    [InlineData(EnumDeviceCategory.Controller, 70000)]
+    [InlineData(EnumDeviceCategory.Enclosure, 70000)]
+    [InlineData(EnumDeviceCategory.Speaker, 70000)]
+    [InlineData(EnumDeviceCategory.Sensor, 70000)]
+    public void should_block_when_port_is_outside_the_server_range_for_a_category_with_connection(
+        EnumDeviceCategory category, int port)
     {
-        var preset = new DevicePreset { Id = "p1", Name = "t", Category = EnumDeviceCategory.Controller };
+        var preset = new DevicePreset { Id = "p1", Name = "t", Category = category };
+        var controller = category == EnumDeviceCategory.Sensor
+            ? new ControllerDeviceModel { Id = 12, DeviceNumber = 1, DeviceName = "CTL" }
+            : null;
 
         Assert.Contains(
-            PresetRequestBuilder.Validate(preset, Instance() with { IpPort = port }, Catalog()),
+            PresetRequestBuilder.Validate(preset, Instance() with { IpPort = port, Controller = controller }, Catalog()),
             p => p.Contains("포트", StringComparison.Ordinal));
     }
 
     /// <summary>
-    /// ★ 함체는 접속 축이 없다 — <c>BuildCategoryDto</c> 가 포트를 절대 실어 보내지 않으므로, 범위 밖 값이라도
+    /// ★ 통문만 접속 축이 없다(결선은 <c>link_info</c>·프리셋 쪽에서 오지 <see cref="PresetInstanceInfo"/> 의
+    /// <c>IpPort</c> 가 아니다) — <c>BuildCategoryDto</c> 가 그 값을 절대 쓰지 않으므로, 범위 밖 값이라도
     /// 막을 이유가 없다("검사를 통과했다"가 "전달된다"를 뜻하지 않는 죽은 길을 없앤다).
     /// </summary>
     [Fact]
     public void should_not_block_an_out_of_range_port_when_the_category_has_no_connection_axis()
         => Assert.DoesNotContain(
-            PresetRequestBuilder.Validate(EnclosurePreset(), Instance() with { IpPort = 70000 }, Catalog()),
+            PresetRequestBuilder.Validate(
+                new DevicePreset { Id = "p1", Name = "t", Category = EnumDeviceCategory.Gate },
+                Instance() with { IpPort = 70000 }, Catalog()),
             p => p.Contains("포트", StringComparison.Ordinal));
 
     [Fact]
@@ -857,6 +902,12 @@ public class PresetRegisterTests
               "name_device": "DEV-5",
               "status": "ACTIVATED",
               "is_enable": true,
+              "connection": {
+                "schema": 1,
+                "type": "IP_DIRECT",
+                "ip_address": "10.0.0.22",
+                "ip_port": 8022
+              },
               "hardware_spec": {
                 "components": [
                   {
@@ -988,6 +1039,10 @@ public class PresetRegisterTests
             {
                 TypeDevice = "Multi",
                 ControllerId = 12,
+                // (D-21) IP 기반 센서 — RS485 Channel 은 IpAddress 가 있으면 getter 가 후순위로 두므로
+                // 둘 다 채워도 축은 IP_DIRECT 하나만 나간다(전수 감사가 "실린 키 = 받은 값"만 보므로 무해).
+                IpAddress = "10.0.0.20",
+                IpPort = 8020,
                 HardwareSpec = spec,
             },
             EnumDeviceCategory.Camera => new CameraDeviceDto
@@ -1013,6 +1068,9 @@ public class PresetRegisterTests
                 Description = "북측 9구간 방송",
                 ServerId = 3,
                 TypeSpeaker = "Horn",
+                // (D-21) 방송서버 경유(server_id)와 별개로 IP_DIRECT 접속도 채운다.
+                IpAddress = "10.0.0.21",
+                IpPort = 8021,
                 HardwareSpec = spec,
             },
             EnumDeviceCategory.Enclosure => new EnclosureDeviceDto
@@ -1022,6 +1080,9 @@ public class PresetRegisterTests
                 HeaterEnabled = true,
                 FanEnabled = true,
                 ThresholdConfig = new JObject { ["temp_high"] = 45, ["temp_low"] = -10, ["humidity_high"] = 80 },
+                // (D-21) 라이브 하네스 FAIL 3b2 의 재료 — 함체도 IP_DIRECT 접속을 받는다.
+                IpAddress = "10.0.0.22",
+                IpPort = 8022,
                 HardwareSpec = spec,
             },
             EnumDeviceCategory.Lamp => new LampDeviceDto

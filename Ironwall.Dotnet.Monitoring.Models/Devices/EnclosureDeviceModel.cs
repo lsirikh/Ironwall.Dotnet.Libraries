@@ -16,6 +16,8 @@ public class EnclosureDeviceModel : BaseDeviceModel, IEnclosureDeviceModel
         ThresholdConfig = model.ThresholdConfig as EnclosureThresholdConfigModel;
         HeaterEnabled = model.HeaterEnabled;
         FanEnabled = model.FanEnabled;
+        IpAddress = model.IpAddress;
+        IpPort = model.IpPort;
     }
 
     [JsonProperty("door_status", Order = 7)]
@@ -35,4 +37,12 @@ public class EnclosureDeviceModel : BaseDeviceModel, IEnclosureDeviceModel
 
     [JsonProperty("fan_enabled", Order = 10)]
     public bool FanEnabled { get; set; }
+
+    /// <summary>접속 IP(D-21) — 서버 7.0+ <c>connection.ip_address</c>. 6.3 에는 자리가 없었다.</summary>
+    [JsonProperty("ip_address", Order = 11)]
+    public string? IpAddress { get; set; }
+
+    /// <summary>접속 포트(D-21) — 서버 7.0+ <c>connection.ip_port</c>.</summary>
+    [JsonProperty("ip_port", Order = 12)]
+    public int? IpPort { get; set; }
 }

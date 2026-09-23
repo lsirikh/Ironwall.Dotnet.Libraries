@@ -125,8 +125,16 @@ public sealed class RegisterFromPresetViewModel : Screen
         set { if (ReferenceEquals(_controller, value)) return; _controller = value; NotifyOfPropertyChange(); Rebuild(); }
     }
 
-    /// <summary>접속 칸이 있는 카테고리만 보인다(행 뷰모델이 그 속성을 가진 것들).</summary>
-    public bool ShowsConnection => _category is EnumDeviceCategory.Controller or EnumDeviceCategory.Camera or EnumDeviceCategory.Lamp;
+    /// <summary>
+    /// 접속 칸이 있는 카테고리만 보인다(행 뷰모델이 그 속성을 가진 것들).
+    /// </summary>
+    /// <remarks>
+    /// D-21 정정 — 함체·스피커도 서버 <c>connection</c>(IP_DIRECT) 을 받는다(<see cref="PresetRequestBuilder.HasConnectionAxis"/>
+    /// 와 같은 판정). 센서는 <b>빼 둔다</b> — 서버는 RS485(<c>channel</c>) 도 받지만 이 창에는 아직 버스 주소
+    /// 입력칸이 없고, IP 칸만 열면 RS485 로 결선된 센서를 IP 로 오인시킬 수 있다(향후 확장 과제).
+    /// </remarks>
+    public bool ShowsConnection => _category is EnumDeviceCategory.Controller or EnumDeviceCategory.Camera
+        or EnumDeviceCategory.Lamp or EnumDeviceCategory.Enclosure or EnumDeviceCategory.Speaker;
     public bool ShowsCredentials => _category is EnumDeviceCategory.Camera or EnumDeviceCategory.Lamp;
     public bool ShowsController => _category == EnumDeviceCategory.Sensor;
 

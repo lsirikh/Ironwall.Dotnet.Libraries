@@ -87,6 +87,46 @@ public class EnclosureDeviceDto : BaseDeviceDto
     public bool ShouldSerializeTypeEnclosure() => UseAxisWrite && TypeEnclosure != null;
 
     /// <summary>
+    /// 축 전용 배후 저장소 — 6.3 함체 쓰기 스키마에는 <c>ip_address</c>·<c>ip_port</c> 자리가 <b>아예 없었다</b>
+    /// (D-21 원인: <c>EnclosureDeviceDto</c> 가 이 필드를 전혀 선언하지 않아 프리셋 등록에서 IP·포트가
+    /// 조용히 유실됐다 — 서버 스키마 <c>app/schemas/device.py:776</c>는 함체도 <c>connection: Optional[ConnectionAxis]</c>
+    /// 를 받는다). <c>[JsonIgnore]</c> 라 6.3 본문 바이트는 절대 늘지 않는다 — 오직 <see cref="ConnectionAxis"/>
+    /// 를 통해서만 나간다.
+    /// </summary>
+    [JsonIgnore]
+    public string? IpAddress { get; set; }
+
+    [JsonIgnore]
+    public int? IpPort { get; set; }
+
+    /// <summary>
+    /// 7.0 <c>connection</c> — 함체는 <c>ControllerConnectionAxis</c> 처럼 필수가 아니다
+    /// (<c>EnclosureCreate.connection: Optional[ConnectionAxis] = None</c>). IP 가 하나도 없으면
+    /// <c>null</c> 을 돌려줘 키 자체를 뺀다 — <see cref="GateDeviceDto.ConnectionAxis"/> 와 같은 "선택 축" 관례.
+    /// </summary>
+    /// <remarks>setter 는 7.0+ 응답 역투영(D-24) — 없으면 함체 IP·포트가 화면에서 사라진다.</remarks>
+    [JsonProperty("connection", Order = 30, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public ConnectionAxisDto? ConnectionAxis
+    {
+        get
+        {
+            var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
+            var port = DeviceAxisWrite.PortOrNull(IpPort ?? 0);
+            return ip == null && port == null ? null : DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0);
+        }
+        set
+        {
+            ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)
+            if (value == null) return;
+            if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
+            if (value.IpPort is > 0) IpPort = value.IpPort.Value;
+        }
+    }
+
+    public bool ShouldSerializeConnectionAxis() => UseAxisWrite && ConnectionAxis != null;
+
+    /// <summary>
     /// 7.0+ <c>hardware_spec</c> — 함체는 계측 부품(<c>TEMPERATURE_SENSOR</c> 등)과
     /// <c>DOOR_SENSOR</c>·<c>HEATER</c>·<c>FAN</c> 을 선언한다(명세 §5.5.3).
     /// </summary>

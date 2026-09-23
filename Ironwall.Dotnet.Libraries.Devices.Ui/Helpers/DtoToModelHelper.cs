@@ -223,7 +223,11 @@ public static class DtoToModelHelper
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
-            Status = ParseDeviceStatus(dto.Status)
+            Status = ParseDeviceStatus(dto.Status),
+            // (D-21) 응답 역투영 — DTO 의 ConnectionAxis setter 가 ReceivedConnection 과 함께 채운다.
+            IpAddress = dto.IpAddress,
+            IpPort = dto.IpPort,
+            Channel = dto.Channel
         };
 
         MapGeolocationToModel(dto, model);
@@ -261,6 +265,10 @@ public static class DtoToModelHelper
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             ControllerId = model.Controller?.Id ?? 0,
+            // (D-21) IP 기반 센서만 쓴다 — 비면 ConnectionAxis getter 가 RS485(Channel)로 폴백하거나 키를 뺀다.
+            IpAddress = model.IpAddress,
+            IpPort = model.IpPort,
+            Channel = model.Channel,
             // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
             UnitId = model.UnitId
         };
@@ -341,7 +349,10 @@ public static class DtoToModelHelper
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             SpeakerType = dto.SpeakerType ?? "NORMAL",
-            Description = dto.Description
+            Description = dto.Description,
+            // (D-21) 응답 역투영 — DTO 의 ConnectionAxis setter 가 ReceivedConnection 과 함께 채운다.
+            IpAddress = dto.IpAddress,
+            IpPort = dto.IpPort
         };
 
         MapGeolocationToModel(dto, model);
@@ -392,6 +403,9 @@ public static class DtoToModelHelper
             Status = model.Status.ToString(),
             SpeakerType = model.SpeakerType ?? "NORMAL",
             Description = model.Description,
+            // (D-21) 방송서버 경유(server_id)와 별개 — IP_DIRECT 접속도 받는다.
+            IpAddress = model.IpAddress,
+            IpPort = model.IpPort,
             // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
             UnitId = model.UnitId
         };
@@ -492,7 +506,10 @@ public static class DtoToModelHelper
             //   components.door.state 를 읽을 통로가 Devices.Ui 에 없다 → DTO 뷰 생기면 우선순위 배선 필요.
             DoorStatus = NormalizeDoorScalar(dto.DoorStatus),
             HeaterEnabled = dto.HeaterEnabled,
-            FanEnabled = dto.FanEnabled
+            FanEnabled = dto.FanEnabled,
+            // (D-21) 응답 역투영 — DTO 의 ConnectionAxis setter 가 ReceivedConnection 과 함께 채운다.
+            IpAddress = dto.IpAddress,
+            IpPort = dto.IpPort
         };
         // 임계값(threshold_config JObject) → 강타입 모델 (이전엔 드롭 → 재조회 시 임계값 소실)
         model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
@@ -520,6 +537,9 @@ public static class DtoToModelHelper
             DoorStatus = string.IsNullOrWhiteSpace(model.DoorStatus) ? "CLOSED" : model.DoorStatus,
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled,
+            // (D-21) 서버 EnclosureCreate.connection 은 선택 축이지만 IP_DIRECT 를 받는다(app/schemas/device.py:776).
+            IpAddress = model.IpAddress,
+            IpPort = model.IpPort,
             // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
             UnitId = model.UnitId
         };

@@ -73,6 +73,52 @@ public class SensorDeviceDto : BaseDeviceDto
 
     public bool ShouldSerializeTypeSensorAxis() => UseAxisWrite;
 
+    /// <summary>
+    /// 축 전용 배후 저장소 — 센서의 접속은 <b>둘로 갈린다</b>(PM 확정: "뭐는 IP 가 없는 센서 RS485,
+    /// 어떤 건 IP 기반"). <see cref="Channel"/> 이 있으면 RS485 버스 주소, <see cref="IpAddress"/> 가 있으면
+    /// IP_DIRECT — 서버 <c>SensorConnectionAxis</c>(<c>app/schemas/device.py:132</c>)는 <c>ConnectionAxis</c> 를
+    /// 그대로 물려받되 <c>parent_device_id</c> 만 거부한다(D13 — 상위는 <c>controller_id</c> 한 곳).
+    /// 이 DTO 는 <c>ParentDeviceId</c> 를 애초에 채우지 않으므로 그 거부에 저절로 순응한다.
+    /// </summary>
+    [JsonIgnore]
+    public string? IpAddress { get; set; }
+
+    [JsonIgnore]
+    public int? IpPort { get; set; }
+
+    /// <summary>RS485 버스 주소(D13) — 접점 채널이 아니라 그 제어기 버스 안에서의 노드 주소다.</summary>
+    [JsonIgnore]
+    public int? Channel { get; set; }
+
+    /// <summary>
+    /// 7.0 <c>connection</c> — 필수가 아니다(<c>SensorCreate.connection: Optional[SensorConnectionAxis]</c>).
+    /// IP 가 있으면 IP_DIRECT 를 우선하고, 없고 <see cref="Channel"/> 만 있으면 RS485 를 싣는다.
+    /// 둘 다 없으면 <c>null</c> 로 키를 뺀다.
+    /// </summary>
+    /// <remarks>setter 는 7.0+ 응답 역투영(D-24) — 없으면 센서 접속 정보가 화면에서 사라진다.</remarks>
+    [JsonProperty("connection", Order = 29, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public ConnectionAxisDto? ConnectionAxis
+    {
+        get
+        {
+            var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
+            if (ip != null) return DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0);
+            if (Channel.HasValue) return new ConnectionAxisDto { Type = EnumConnectionTypeNames.Rs485, Channel = Channel };
+            return null;
+        }
+        set
+        {
+            ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)
+            if (value == null) return;
+            if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
+            if (value.IpPort is > 0) IpPort = value.IpPort.Value;
+            if (value.Channel.HasValue) Channel = value.Channel;
+        }
+    }
+
+    public bool ShouldSerializeConnectionAxis() => UseAxisWrite && ConnectionAxis != null;
+
     /// <summary>7.0+ <c>hardware_spec</c> — 센서는 <c>max_detection_range</c> 를 쓸 수 있는 두 카테고리 중 하나다.</summary>
     [JsonProperty("hardware_spec", Order = 31, NullValueHandling = NullValueHandling.Ignore,
         ObjectCreationHandling = ObjectCreationHandling.Replace)]

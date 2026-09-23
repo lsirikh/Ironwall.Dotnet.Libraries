@@ -59,6 +59,44 @@ public class SpeakerDeviceDto : BaseDeviceDto
     public bool ShouldSerializeSpeakerRoleAxis() => UseAxisWrite;
 
     /// <summary>
+    /// 축 전용 배후 저장소 — 6.3 스피커 쓰기 스키마에는 <c>ip_address</c>·<c>ip_port</c> 자리가 없었다
+    /// (D-21: 서버 스키마 <c>app/schemas/device.py:718</c>는 스피커도 <c>connection: Optional[ConnectionAxis]</c>
+    /// 를 받는다 — 예시는 <c>{"type":"IP_DIRECT","ip_address":..,"ip_port":80}</c>). <c>[JsonIgnore]</c> 라
+    /// 6.3 본문 바이트는 늘지 않는다 — <see cref="ConnectionAxis"/> 를 통해서만 나간다.
+    /// </summary>
+    [JsonIgnore]
+    public string? IpAddress { get; set; }
+
+    [JsonIgnore]
+    public int? IpPort { get; set; }
+
+    /// <summary>
+    /// 7.0 <c>connection</c> — 스피커도 필수가 아니다(<c>SpeakerCreate.connection: Optional[ConnectionAxis]</c>).
+    /// <c>server_id</c>(방송서버 경유)로도 운용되므로, IP 가 없으면 <c>null</c> 을 돌려줘 키를 뺀다.
+    /// </summary>
+    /// <remarks>setter 는 7.0+ 응답 역투영(D-24) — 없으면 스피커 IP·포트가 화면에서 사라진다.</remarks>
+    [JsonProperty("connection", Order = 29, NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public ConnectionAxisDto? ConnectionAxis
+    {
+        get
+        {
+            var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
+            var port = DeviceAxisWrite.PortOrNull(IpPort ?? 0);
+            return ip == null && port == null ? null : DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0);
+        }
+        set
+        {
+            ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)
+            if (value == null) return;
+            if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
+            if (value.IpPort is > 0) IpPort = value.IpPort.Value;
+        }
+    }
+
+    public bool ShouldSerializeConnectionAxis() => UseAxisWrite && ConnectionAxis != null;
+
+    /// <summary>
     /// 7.0 <c>type_speaker</c>(<c>EnumSpeakerShape</c> = Horn·Pillar·Unknown) — <b>하우징 형상</b> 축.
     /// </summary>
     /// <remarks>

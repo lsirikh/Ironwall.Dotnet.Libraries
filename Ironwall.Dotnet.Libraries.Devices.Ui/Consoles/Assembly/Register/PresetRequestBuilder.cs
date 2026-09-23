@@ -69,10 +69,11 @@ public static class PresetRequestBuilder
         if (preset.Category == EnumDeviceCategory.Sensor && (info.Controller == null || info.Controller.Id <= 0))
             problems.Add("센서는 소속 제어기를 지정해야 합니다(제어기 없이 등록하면 서버가 404 로 거절합니다).");
 
-        // 포트는 "그 카테고리가 접속 칸을 보낼 때만" 본다 — 접속 축이 없는 카테고리(센서·스피커·함체·통문)는
-        // BuildCategoryDto 가 애초에 포트를 실어 보내지 않으므로, 그 값을 범위 검사해 봐야 아무 데도 안 닿는다
-        // (등록 창은 ShowsConnection 으로 입력 자체를 막아 이 죽은 길이 UI 로는 발화하지 않지만, Validate 를 직접
-        // 부르는 호출자에게는 "검사를 통과했다"가 "전달된다"를 뜻하지 않는 거짓 안전감을 준다).
+        // 포트는 "그 카테고리가 접속 칸을 보낼 때만" 본다 — 접속 축이 아예 없는 카테고리(통문 — 결선은
+        // link_info/channel 이지 PresetInstanceInfo.IpPort 가 아니다)는 BuildCategoryDto 가 이 값을 쓰지 않으므로
+        // 범위 검사해 봐야 아무 데도 안 닿는다(등록 창은 ShowsConnection 으로 입력 자체를 막지만, Validate 를
+        // 직접 부르는 호출자에게는 "검사를 통과했다"가 "전달된다"를 뜻하지 않는 거짓 안전감을 준다).
+        // (D-21 수정) 센서·스피커·함체도 서버 ConnectionAxis 를 실제로 받는다 — "접속 축이 없다"는 결함이었다.
         if (HasConnectionAxis(preset.Category) && info.IpPort is { } port && (port < 1 || port > 65535))
             problems.Add($"접속 포트({port})는 1~65535 범위여야 합니다.");
 
@@ -256,6 +257,9 @@ public static class PresetRequestBuilder
                 dto.TypeSensorAxis = type;
                 dto.HardwareSpec = spec;
                 dto.Description = info.Description;
+                // (D-21) IP 기반 센서만 쓴다 — RS485 버스 주소는 이 창이 아직 받지 않는다(향후 확장).
+                dto.IpAddress = info.IpAddress;
+                dto.IpPort = info.IpPort;
                 return dto;
             }
 
@@ -286,10 +290,16 @@ public static class PresetRequestBuilder
                     Description = info.Description,
                     // 스피커만 종류축이 둘이다 — 역할(speaker_role)은 부가 축에서 온다.
                     SpeakerType = extra ?? "NORMAL",
+                    // (D-21) 서버 SpeakerCreate.connection 은 선택 축이다 — 방송서버(server_id) 경유와 별개로
+                    // IP_DIRECT 접속도 받는다(app/schemas/device.py:718).
+                    IpAddress = info.IpAddress,
+                    IpPort = info.IpPort,
                 };
                 var dto = model.ToSpeakerDeviceDto();
                 dto.TypeSpeaker = type;   // 하우징 형상 축
                 dto.HardwareSpec = spec;
+                dto.IpAddress = info.IpAddress;
+                dto.IpPort = info.IpPort;
                 return dto;
             }
 
@@ -299,11 +309,17 @@ public static class PresetRequestBuilder
                 {
                     DeviceNumber = info.DeviceNumber,
                     DeviceName = info.DeviceName,
+                    // (D-21) 서버 EnclosureCreate.connection 은 선택 축이지만 실제로 IP_DIRECT 를 받는다
+                    // (app/schemas/device.py:776) — 이 두 칸이 빠져 있던 것이 라이브 하네스 FAIL 3b2 의 원인이었다.
+                    IpAddress = info.IpAddress,
+                    IpPort = info.IpPort,
                 };
                 var dto = model.ToEnclosureDeviceDto();
                 dto.TypeEnclosure = type;
                 dto.HardwareSpec = spec;
                 dto.Description = info.Description;
+                dto.IpAddress = info.IpAddress;
+                dto.IpPort = info.IpPort;
                 return dto;
             }
 
@@ -392,12 +408,21 @@ public static class PresetRequestBuilder
 
     /// <summary>
     /// 이 카테고리의 DTO 가 접속(IP/포트) 축을 실제로 갖는가 — <see cref="BuildCategoryDto"/> 가 <c>IpAddress</c>·
-    /// <c>IpPort</c> 를 채우는 세 카테고리와 정확히 같다(<c>ControllerDeviceDto</c>·<c>CameraDeviceDto</c>·
-    /// <c>LampDeviceDto</c> 만 그 필드를 선언한다). 센서·스피커·함체·통문은 접속 축이 <b>애초에 없다</b>
-    /// (서버 계약에 접속 개념이 없는 카테고리 — 버그가 아니라 설계다).
+    /// <c>IpPort</c> 를 <see cref="PresetInstanceInfo"/> 에서 채우는 카테고리와 정확히 같다.
     /// </summary>
+    /// <remarks>
+    /// <para><b>D-21 정정(2026-09-23)</b> — "센서·스피커·함체·통문은 서버 계약에 접속 축이 없다"는 예전 결론은
+    /// <b>틀렸다</b>. 서버 스키마(<c>app/schemas/device.py:97-109</c>)는 <b>7 카테고리 전부</b>에 <c>connection</c>
+    /// 을 선언한다 — 실제로 없었던 것은 <b>클라 쪽 구현</b>이다(8.0 이 접속을 <c>connection{}</c> 축으로 옮기며
+    /// 우리 <c>ConnectionAxis</c> 는 <c>Controller</c>·<c>Camera</c>·<c>Gate</c>·<c>Lamp</c> DTO 4개에만 붙었고
+    /// 함체·센서·스피커는 빠졌다 — 라이브 하네스 FAIL 3b2 로 실측 확인).</para>
+    /// <para><b>통문만 제외</b>한다 — 통문의 결선(<c>link_info</c>·<c>channel</c>)은 <see cref="PresetInstanceInfo"/>
+    /// 의 <c>IpAddress</c>·<c>IpPort</c> 를 쓰지 않고 프리셋 쪽에서 오므로, 이 게이트("<c>info</c> 의 IP 를
+    /// 이 카테고리가 쓰는가")의 대상이 아니다.</para>
+    /// </remarks>
     private static bool HasConnectionAxis(EnumDeviceCategory category)
-        => category is EnumDeviceCategory.Controller or EnumDeviceCategory.Camera or EnumDeviceCategory.Lamp;
+        => category is EnumDeviceCategory.Controller or EnumDeviceCategory.Camera or EnumDeviceCategory.Lamp
+            or EnumDeviceCategory.Enclosure or EnumDeviceCategory.Speaker or EnumDeviceCategory.Sensor;
 
     private static string CategoryText(EnumDeviceCategory category) => category switch
     {

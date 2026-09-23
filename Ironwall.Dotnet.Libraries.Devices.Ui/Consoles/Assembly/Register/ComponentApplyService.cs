@@ -50,6 +50,10 @@ public sealed record ComponentApplyResult(bool IsSuccess, bool IsConflict, strin
 /// 제어기·카메라 <c>connection</c>(빈 껍데기) · 함체 <c>device_config.thresholds</c> ·
 /// 카메라 <c>device_config.modes</c>. 통문의 <c>connection</c> 은 null 이면 키째 빠져 병합에서는 무해했지만,
 /// 같은 이유로 받은 값을 채워 통째 교체 해석에도 견디게 했다.</para>
+/// <para><b>D-21 추가(2026-09-23)</b> — 함체·스피커도 <c>connection</c> 을 받게 되면서 같은 함정이 생겼다.
+/// 다만 이 둘은 <b>선택 축</b>이라 getter 가 "IP 가 없으면 <c>null</c>" 로 스스로 키를 빼므로(통문과 같은 관례),
+/// 조건 없이 나가는 제어기·카메라·경광등과 달리 빈 껍데기 위험은 없다 — 그래도 받은 IP 는 채워서
+/// 부품 적용이 기존 접속 정보를 되돌리지 않게 한다.</para>
 /// </remarks>
 public sealed class ComponentApplyService
 {
@@ -281,9 +285,15 @@ public sealed class ComponentApplyService
 
             case EnumDeviceCategory.Sensor:
             {
+                var origin = (SensorDeviceDto)source;
                 var dto = new SensorDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;   // type_sensor 는 값이 없으면 나가지 않는다
+                // (D-21) connection 은 값이 있을 때만 나간다(선택 축) — IP 기반 센서면 IP 를, 없으면
+                // RS485 버스 주소를 그대로 채워 부품 적용이 접속 정보를 되돌리지 않게 한다.
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
+                dto.Channel = origin.Channel;
                 dto.HardwareSpec = spec;
                 return await Send(dto, _api.PatchSensorAsync).ConfigureAwait(false);
             }
@@ -319,6 +329,10 @@ public sealed class ComponentApplyService
                 dto.SpeakerType = origin.SpeakerType;
                 // description 은 조건이 하나도 없어 null 이면 "description": null 로 나간다 = 서버에서 삭제.
                 dto.Description = origin.Description;
+                // (D-21) connection 은 값이 있을 때만 나간다(선택 축) — 받은 IP 를 그대로 채워 둬야
+                // IP 가 있던 스피커는 그 값을 유지하고, 비어 있던 스피커는 여전히 키가 빠진다.
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
                 dto.HardwareSpec = spec;
                 return await Send(dto, _api.PatchSpeakerAsync).ConfigureAwait(false);
             }
@@ -334,6 +348,10 @@ public sealed class ComponentApplyService
                 dto.FanEnabled = origin.FanEnabled;
                 // 임계치도 같은 축이다 — 빼고 보내면 통째 교체 해석에서 온도·습도 임계치가 전부 사라진다.
                 dto.ThresholdConfig = origin.ThresholdConfig;
+                // (D-21) connection 도 선택 축이다 — 받은 IP 를 채워 둬야 부품 적용 PATCH 가 함체의
+                // 접속 정보를 지우지 않는다(3d "all fields" 약속).
+                dto.IpAddress = origin.IpAddress;
+                dto.IpPort = origin.IpPort;
                 dto.HardwareSpec = spec;
                 return await Send(dto, _api.PatchEnclosureAsync).ConfigureAwait(false);
             }
