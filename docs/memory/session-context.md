@@ -1,5 +1,96 @@
 # 세션 컨텍스트
 
+## ▶▶ 재개 포인트 (2026-09-23 — **봉투 all-windows-console-redesign 전 노드 완료 · 예산 14/14 · 양 레포 정본 반영 끝**)
+
+- **봉투가 닫혔다.** `charter` 가 N-01~N-14 를 전부 ✅ 로 보고한다(예산 14/14 · 지문 일치 · 만료 2026-12-31). 각 노드는 PRD 승인 → Plan → dev → test → report → 원장 → complete 를 실제로 통과했고, PRD 14건 상태줄이 전부 `Completed` 다.
+- **앱 반영 상태 — 들어갔다.** 라이브러리 `v2.6` = `7a0200c3` → **`4785d422`**(fast-forward), 호스트 `v0.5` = `3d86db5` → **`185d15f`**(fast-forward). 롤백 태그 `before-all-windows-merge`(라이브러리) · `before-all-windows-host-merge`(호스트).
+- **마지막 검증 수치**(통합 브랜치에서 직접 재실행): Devices.Ui 1288/0 · Events.Ui 1138/15(기존 실패 15 동일) · Messages 374/0 · Utils 193/0 · Reports.Ui 166/0 · Accounts 148/0 · 호스트 Tests 257/0(skip 8) · UiTests 단위 171/1(기존 `DbProbeTests` 실패). 라이브러리 48개 프로젝트를 개별 빌드해 `Api.Aligo`(18) · `Db`(58)만 실패하는데, 둘 다 착수 전 기준선 `7a0200c3` 에서 **똑같이** 실패한다.
+- **살아 있는 서버 왕복**(loopback 전용 · 운영 요청 0): Docker `pids-api-server` `https://127.0.0.1:8000`(8.0.1) 상대로 28 PASS / 1 FAIL / 1 BLOCKED. V-19 해소 — `"wiring": null` 이 실제로 키를 지우고 `spec` 형제 키는 살아남는다.
+- **아직 안 고친 제품 결함 1건**: `PresetRequestBuilder.BuildCategoryDto` 가 카테고리에 따라 사용자가 입력한 `description` · 접속(IP/포트)을 통째로 버리고, `Validate()` 는 보내지도 않는 포트를 범위 검사한다. 근본 원인은 `BaseDeviceDto` 에 `description` 이 없는데 서버 8.0.1 은 7 카테고리 공통 필드로 둔 것. 등록 창에는 설명 입력 칸 자체가 없다.
+- **N-14 는 라이브러리 쪽이 문서뿐이다.** 본체는 호스트 `n14` 브랜치이고, 이 저장소에 남은 것은 `CHANGELOG.md` · `README.md` 뿐이라 PRD 의 `scope_files` 도 그 둘로 좁혔다(호스트 경로는 `- **호스트 구현 파일**` 줄로 분리해 남겼다). 봉투 판정은 이 저장소만 본다.
+- **라이브러리 숙제 3건**(호스트 `N14-library-follow-up.md`): ① `ConsolePrefEntry` 를 열 것 — `sealed` · 칸 4개 · `[JsonExtensionData]` 없음이라 모르는 칸이 다음 `Save()` 한 번에 영구 소실 ② `SurfaceFrame` + `SurfaceMath` 승격(복사가 아니라 **이관 + 원본 삭제**) ③ 금지 구역(좌측 스트립 54 · 이벤트 드로어 300)을 상수가 아니라 셸의 런타임 실폭으로.
+- **미확인(통과로 적지 않는다)**: 실제 앱 기동 · 실제 마우스 끌어 놓기(UIA 에 드래그 패턴이 없다) · 운영 6.3.2 동작 · 호스트 UiTests 의 UiSmoke/UiFunctional 카테고리 실행.
+- **다음 후보**: 위 `PresetRequestBuilder` 결함 수정 · 라이브러리 숙제 3건 · 시각 QA 잔여 항목.
+
+## (이전) 재개 포인트 (2026-09-21 — **봉투 all-windows-console-redesign · N-04~N-13 병렬 구현 · 통합 브랜치 `v2.14.0`**)
+
+- **앱 반영 상태**: 라이브러리 정본 `v2.6` = `7a0200c3`(N-01·02·03 까지) · 호스트 `v0.5` = `3d86db5`. **N-04 이후는 아직 앱에 안 들어갔다** — 전부 브랜치에 있다.
+- **통합 브랜치 `v2.14.0`**(워크트리 `worktrees/v2.14.0` · 정션이 여기를 가리킨다): N-09 · N-04 · N-06 · N-07 · N-12 머지 + 커널 여백 수정(`f3ac8f79`) + N-10 커널 2건. 내가 직접 재실행한 수치 — Devices.Ui **1087** · Accounts **146** · Reports **166** · Events **778**(기존 실패 15 동일).
+- **아직 `v2.14.0` 밖**: `n05`(다이얼로그 가족) · `n08`(억제) · `n11`(부대) · `n13`(맵핑 워크벤치) · 호스트 `n10`(설정 창 + UiTests 재지정, `v0.5` 대비 13커밋 이상).
+- **병합 충돌은 딱 두 곳**이었다 — `tools/device-console-preview/App.xaml.cs` 와 `Devices.Ui/Modules/DeviceUiModule.cs`. 둘 다 "양쪽이 블록을 덧붙임" 이라 **양쪽을 다 남기는 것이 정답**(python 으로 base↔ours↔theirs 를 비교해 블록만 삽입).
+- **검증 3중**: ① 가짜를 끼운 헤드리스 테스트 ② 오프라인 미리보기 PNG 를 **픽셀로 측정**(Pillow, `scratchpad/visual-qa/qa.py`) ③ **loopback 로컬 8.0.1 서버 왕복 하네스**(`scratchpad/live-roundtrip/`, 28 PASS / 1 FAIL / 1 BLOCKED, 만든 14건 전부 삭제). 운영 서버에는 요청 0.
+- **로컬 왕복이 잡은 제품 결함 1건**: `PresetRequestBuilder.BuildCategoryDto` 가 카테고리에 따라 사용자가 입력한 `description` · 접속(IP/포트)을 **통째로 버린다**(함체 · 통문은 둘 다 없음). `Validate()` 는 포트 범위를 검사해 놓고 그 값을 보내지 않는다. 근본 원인은 `BaseDeviceDto` 에 `description` 이 없는데 서버 8.0.1 은 7 카테고리 공통 필드로 둔 것. **아직 미수정.**
+- **V-19 해소**: 배치 해제가 보내는 `"wiring": null` 이 서버에서 실제로 키를 지우고 `spec` 의 형제 키(manufacturer/model/serial/sibling)는 살아남는 것을 실측했다.
+- **시각 QA 44건**(측정 기반, `scratchpad/visual-qa/`): 최우선은 **다크에서 글자가 사라지는 4건** — 설정 창 라벨/제목 `#000000` on `#161D26` = **1.24:1**(17장 전부) · 억제 서랍 입력/콤보 1.40 · 결선 칸 번호 1.40. 그 다음이 커널 근본원인 10건(K-01 꺼진 상태를 `Opacity 0.45` 로 표현해 대비가 2:1 로 붕괴 · K-02 `Console.Button*` 이 앱 스코프에 없어 MDIX `#009688` 이 샘 · K-07 열에 `CellStyle` 을 안 주면 선택행이 MDIX 회색으로 바뀜 — 보고서 · 서버는 **선택 표시가 아예 없다**).
+- **지금 도는 에이전트 8기**(워크트리를 갈라 충돌 0): `vq-theme`(테마·커널 근본원인) · `vq-devacc`(장비+계정 시각) · `vq-repev`(보고서+이벤트 시각) · `sol-n10`(설정 창 D-01) · `n08`(검토 20건+시각) · `n11`(검토 13건+시각) · N-05 검토 · N-13 검토.
+- **다음**: 에이전트 결과를 `v2.14.0` 로 모아 재검증 → N-14(셸 표면) 착수 → 노드별 PRD 승인·Plan·원장·완료 → 타 세션 파일과 겹침 확인 후 `v2.6` · `v0.5` 로 ff 병합.
+- **미확인(통과로 적지 않는다)**: 실제 앱 기동 · 실제 마우스 끌어 놓기(UIA 에 드래그 패턴이 없다) · 운영 6.3.2 동작 · 호스트 UiTests 실행(컴파일만 했고 앱을 띄우지 않았다).
+
+## (이전) 재개 포인트 (2026-09-19 밤 — **봉투 all-windows-console-redesign · N-03 조립기 · 프리셋 완료(3/14) → N-04 결선맵 착수 전**)
+
+- **N-02 완료**: Libraries `v2.12.0` → `v2.6` = `bd90afd8`(ff · 타 세션 파일과 겹침 0 · 롤백 `before-device-console-redesign` = `c0efffde`). 문서: PRD `docs/prds/device-console-redesign-prd.md`(Completed) · 결과 `docs/tests/device-console-redesign-test-result.md` · 리포트 `docs/reports/device-console-redesign-report.md` · 캡처 `docs/assets/device-console/`(16장) · 원장 `D-2026-09-19-4bcb70`.
+- **무엇이 생겼나**(`Devices.Ui/Consoles/**`): `Properties`(정규화된 속성 명세 `DevicePropertyCatalog` + 접근자) · `Forms`(명세에서 만들어지는 폼 — 손댄 칸만, 전부 아니면 전무) · `Lists`(열 명세 · 레일 개수) · `Groups`(장비 → 그룹 끌어 놓기 + 그룹 폼 명세) · `ByComponent`(부품으로 찾기) · `DeviceConsoleSource`(패널 뷰모델 어댑터) · `ConsoleIconToken`. `DeviceDashboardViewModel`/`View` 재작성. DTO 설정 축 쓰기 통로(`AllowDeviceConfigWrite`). 도구 `tools/device-console-preview`(`--snapshot` · `--legacy` · `--dark`).
+- **꼭 기억할 것**: ① 패널의 버튼 경로는 `async void` — 끝남은 작업 스레드에서 올 수 있고(7종), 거절은 말이 없다 → 어댑터가 UI 스레드로 옮기고 `Save()`/`Reload()` 는 시작 여부를 돌려준다. 삭제는 아무것도 걸지 않는다 ② 코드로 추가한 DataGrid 열에는 MDIX 가 제 셀 스타일을 물린다 → 열에 `Console.DataGrid.Cell` 을 직접 건다 ③ 눈으로 봐야 보이는 결함이 있다 — 새 창은 미리보기 도구로 캡처부터 뜬다.
+- **미확인(통과로 적지 않는다)**: 호스트 앱 안 표시 · 어도너 · **실제 마우스 끌어 놓기** · 살아 있는 서버 쓰기 · 삭제 뒤 진행 팝업 닫힘(UI 스레드 이동의 실기) · 재배선한 호스트 UI 테스트의 실행.
+- **호스트 레포**: 워크트리 `sol-v0.6.0`(브랜치 `v0.6.0`) — 앱 코드 변경 0 · 새 라이브러리로 빌드 오류 0 · UI 테스트(장비 창)를 탭 → 레일로 재배선(에이전트 작업 · 실행 미확인). 정션 `C:\workspace_app\worktrees\Ironwall.Dotnet.Libraries` → `v2.12.0`(지울 때는 `rmdir` 만).
+- **N-03 완료(2026-09-19 밤)**: Libraries `v2.13.0` → `v2.6` = `7a0200c3`(ff · 롤백 `before-device-assembly` = `bd90afd8`) · 호스트 `v0.5` = `3d86db5`(앱 코드 변경 0 — `DestructiveGuard` + 문서) · 문서: PRD `docs/prds/device-assembly-preset-prd.md` · 결과 `docs/tests/device-assembly-preset-test-result.md` · 리포트 `docs/reports/device-assembly-preset-report.md` · 캡처 `docs/assets/device-assembly/`(16장) · 원장 `D-2026-09-19-5bff38`. `Devices.Ui/Consoles/Assembly/**`(Model · Catalog · Blocks · Presets · Register · 창 6쌍 · `AssemblyLauncher`). Devices.Ui 778/778 · Messages 281/281. **미확인**: 실제 마우스 끌어 놓기 · 호스트에서 창 열기(첫 모달 창) · 서버 등록/적용. 정션 `worktrees\Ironwall.Dotnet.Libraries` → `v2.13.0`. 남은 워크트리 `n02-*` · `n03-*`(병합 끝 — 지워도 된다).
+- **병렬 개발 중(2026-09-19 심야 · 사용자 지시 "계속 개발 · 에이전트 최대 병렬")**: 파일이 안 겹치는 다섯 노드를 에이전트가 각자 워크트리에서 끝까지(PRD 초안 → 구현 → 테스트 → 캡처 → 커밋) 만든다 — `n04`(결선맵 · `Devices.Ui/Consoles/Wiring/**`) · `n06`(계정) · `n07`(이벤트) · `n09`(보고서) · 호스트 `sol-n10`(설정 창). 기준 커밋 Libraries `7a0200c3` · 호스트 `3d86db5`. PRD 초안은 스크래치패드 `prd-drafts/` 에, 캡처는 `node-shots/<노드>/` 에 온다(docs 에 바로 넣지 않는다 — `approve prd` 가 최신 mtime 을 집는 함정). 통합은 내가 한 노드씩: PRD 를 `docs/prds/` 로 옮겨 봉투 승인 → Plan → 에이전트 브랜치 검토(적대 검토 3렌즈) → 통합 브랜치로 가져와 빌드/테스트 → CHANGELOG/README → ff 머지 → 사이클 완료. `CHANGELOG.md`/`README.md`/`*.sln` 은 에이전트가 안 만진다.
+- **다음**: N-04 결선맵(접속 방식 · 상위 장비 · 채널 — 받은 접속 축을 그대로 되보내는 DTO 통로가 `Messages` 에 필요) → N-05 다이얼로그 가족. 둘 다 `Devices.Ui/**` 를 쓰므로 직렬. N-06(계정) · N-07(이벤트) · N-09(보고서) · N-10(설정)은 파일이 안 겹친다.
+
+## (이전) 재개 포인트 — N-01 콘솔 커널
+
+- (당시 머리글) 재개 포인트 (2026-09-19 심야 — **봉투 all-windows-console-redesign · N-01 콘솔 커널 완료(1/14) → N-02 장비 콘솔 착수 전, 사용자 결정 4건 대기**)
+
+- **사용자 지시(누적)**: 직전 결과는 "UI 가 별로 개선되지 않았다 · 와이어프레임 구조도 아니다" → 스토리보드·와이어프레임이 초안, **전체 창 다 반영** · 드래그로 장비 등록·그룹 배정·순서·구성·부품 구성 변경 · **레고처럼** 끼우는 조립 창 + 프리셋 + 프리셋으로 등록 · **Device 의 각 속성을 변경 가능하게(정규화된 포맷)** · **에이전트 최대한 활용**.
+- **N-01 완료**: Libraries `v2.11.0` → `v2.6` = `c0efffde`(ff · 타 세션 스테이징 무접촉 · 롤백 `before-console-kernel`). 기존 창 무변경. `Utils/Console/**`(ConsoleShell · Rail · Toolbar · DetailHost · Section · Field · NotReceivedBox · Columns · Prefs · LayoutMath) · `Utils/Behaviors/Drag/**`(DragHandle · CaptureDragBehavior · DropZone · DropZoneChrome · 어도너 · ReorderKeyboardBehavior · DragMath · DragPointer) · `ViewModel/ViewModels/Consoles/**`(상태기계 · DirtyFieldTracker · NavigationGuard · DraftTray · Presenter) · `Theme/Styles.Console.xaml` · `tools/console-gallery`.
+  - 검증: Utils.Tests 100 · ViewModel.Tests 52 · Theme.Tests 18 · 14/14 빌드 · 호스트 빌드 0 오류 · 갤러리 PNG 20장 + 재현 16행(`docs/assets/console-kernel/`). **실제 마우스 · 호스트 안 어도너 · RDP 미검증.** [테스트](../tests/console-kernel-test-result.md) · [리포트](../reports/console-kernel-report.md)
+  - ★ 배운 것: `Thumb` 의 이동량은 **손잡이 기준 좌표** — 손잡이가 같이 움직이면 증분이 된다. 순수 함수 테스트가 전부 초록이어도 배선이 틀릴 수 있다(적대 검토가 잡음). 재현은 이동량에 0 을 넣는다.
+- **다음(N-02 · N-03) 입력은 이미 있다**: [`device-console-n02-n03-design-input-analysis.md`](../analyses/device-console-n02-n03-design-input-analysis.md)(정규화 속성 명세 · 이전 설계 · 레고 조립 설계) · [`all-windows-inventory-n05-n14-analysis.md`](../analyses/all-windows-inventory-n05-n14-analysis.md)(나머지 창 전수).
+  - ★ 큰 발견: C# DTO 에 `device_config` 를 **쓸 통로가 함체 히터/팬 + 카메라 modes 뿐**(5개 카테고리는 속성 자체가 없다) → 부품 제거 시 override `null` 동반(D-A12)이 대부분 구현 불가. 선행 작업 후보.
+  - 그룹 드래그는 `AssignDevicesToGroupAsync` 로 **그룹당 1회 · 즉시**. 부대 드래그는 `UnitScopeGate` 가 **클라 자신의 부대**를 찍어서 다부대 모델 선결. 서버 드래그는 스피커만 통로 + 허용 표 없음.
+- **사용자 결정 대기 4건**: ① 부대 · 서버 드래그 범위(N-02 는 그룹까지만?) ② `device_config` 통로 선행 여부 ③ 프리셋 등록 = 독립 창 vs 기존 등록 흐름에 붙이기 ④ 등록 전 Draft 행을 목록에서 감출지.
+- **하네스 함정(실측)**: 보호 경로(`docs/charters/**` · 상태 파일 경로 문자열)가 명령 텍스트에 보이기만 해도 셸 쓰기 차단 → Write/Edit 도구로 · 봉투 불변식은 **단일 파일**만(게이트가 글롭을 평가 못 한다) · 워크트리 작업은 `complete` 전에 `touch reconcile --mine <경로>` 를 파일마다 · 셸 heredoc 안의 C# · JSON 은 따옴표/역슬래시가 깨진다 → 소스는 Write 도구, 패치는 파이썬 파일로.
+- **정리 대상**: 정션 `C:\workspace_app\worktrees\Ironwall.Dotnet.Libraries`(→ `v2.11.0`) — 정션만 `rmdir`. 워크트리 `v2.10.0` · `v2.11.0` · `sol-v0.6.0` 은 남겨 둠.
+
+## (이전) 재개 포인트 — device-console-v8
+
+- **★ 최신 상태 (2026-09-19 저녁)**: 사용자 지시 "커밋 및 머지 / Phase 3까지 쭉 진행" + "각 git 에 Readme·Changelog 갱신" → **전부 수행**.
+  - **머지(둘 다 fast-forward · 타 세션 WIP 무접촉)**: Libraries `v2.10.0` → `v2.6` = `99aad36d` (롤백 태그 `before-device-console-v8-phase3-merge`) · Solution `v0.6.0` → `v0.5` = `5d2f73f` (롤백 태그 `before-device-console-v8-merge`). 머지 뒤 메인 트리에서 호스트 빌드 **오류 0**.
+  - **화면 구현**: 통문 패널(7번째 탭) `e1a00bc5` · 종류축 열 + 카탈로그 필터 `1b2cb9a0` · 상세 9절 `0eca4ac3` · 문서 `14834541` · BOM `99aad36d`. Solution: 카드 1280×760 · 할당 다이얼로그 2열 · `SYNC_CATALOG` → 카탈로그 재조회 · 어셈블리 2.9.0.
+  - **테스트**: [`docs/tests/device-console-v8-test-result.md`](../tests/device-console-v8-test-result.md) — 14/14 빌드 · Devices.Ui 247 · Messages 238 · Db 순수 17 · GMaps 문 개폐 8 · Events.Ui 15 / Models 1 은 기준선과 동일. Devices.Api 86 실패는 **실서버 통합 테스트를 서버 없이 돌린 것**(이번 사이클 무접촉).
+  - **열린 태스크 6**: TEST-15(8.0.1 실기) · TEST-16(운영 6.3.2 읽기 스모크) · TEST-17(UIA 덤프) — 앱 실행 + 데스크톱 독점 필요. DOC-01~03 은 내용은 반영했으나 DAG 가 실기에 의존해 하네스가 닫기를 거부(강제 안 함).
+  - **사용자에게 남은 결정**: 접속 방식·상위 장비·채널 **편집**(IMPL-20)을 열 것인가 — 지금은 읽기 표시만(PRD FR-11② 축소 기록).
+  - **정리 대상**: 정션 `C:\workspace_app\worktrees\Ironwall.Dotnet.Libraries`(→ `v2.10.0`) — 워크트리를 지우기 전에 `rmdir` 로 **정션만** 제거. 워크트리·브랜치는 실기 수정에 대비해 남겨 둠.
+  - **범위 밖 기록**: 이벤트 파이프라인이 통문을 센서로 해석(`DeviceModelConverter.cs:55` · 호스트 `NatsBrokerService.cs:410,470`) · 서버 요청 R-17(`PUT` 축 소실에 `warnings[]`) 우선순위 표 반영.
+
+- **현재 Phase**: complete
+- **★ 진행 현황 (2026-09-19 dev)**: PRD v1.0 **사용자 승인**("승인") → v1.1(FR-15 추가, 재승인 없이 기록) · Plan 62태스크 로드 · 원장 3행(`0f5434` 승인 결정 · `b5fce8` 워크트리 검증 방식 · `fd8c9a` PUT→PATCH)
+  - **워크트리**: Libraries `C:\workspace_app\worktrees\v2.10.0`(브랜치 `v2.10.0`, 커밋 8개 `17ba879e`→`677572f0`) · Solution `C:\workspace_app\worktrees\sol-v0.6.0`(브랜치 `v0.6.0`, CHANGELOG 만 수정·미커밋). 롤백 태그 `before-device-console-v8` 양 레포. 스테일 라벨 `v2.10.0`·`v2.10.1`(6월, HEAD 에 완전 포함)은 `-d` 로 제거 후 재생성. **워크트리에 고아 소스 복사함**(OnvifSolution 49파일 · `GMap.NET/Directory.Build.props`·`sn.snk`) — 없으면 Devices.Ui 빌드 실패
+  - **완료**: VER-01~08(03 은 `[-]`) · SETUP-01~03 · RISK-02·03 · FR-06(DB TryParse) · FR-02(해석기 `Messages/Helpers/DeviceTypeResolver` 이관) · FR-03(축 묶음 `Axes` + DTO 수신 원본 `ReceivedConnection`/`ReceivedDeviceConfig` + `DeviceAxesMapper` + meta 주입 20곳) · FR-04(병합 키 `(Id, 판별자)` · 통문 분기 · 축 복사) · FR-01(통문 Api CRUD 3종 · `GateDeviceProvider` · 삭제 메시지 · 위치 게이트웨이 · SYNC 판별자 라우팅) · **FR-15(축 계약 저장 PUT→PATCH + `AllowComponentsWrite`)**
+  - **남은 기반**: RISK-01(6.3 스냅샷) · TEST-07/IMPL-09(카탈로그 캐시 + `SYNC_CATALOG`) · TEST-08/IMPL-10(계약 게이팅 + 프로브 배너) · TEST-09 · RISK-04(Phase 게이트 — **v2.6 머지는 사용자 확인 필요**: 메인 작업트리에 타 세션 WIP 205건)
+  - **★ dev 중 실측 발견 (정본 [`docs/tests/device-console-v8-verification.md`](../tests/device-console-v8-verification.md))**
+    1. **`PUT` 은 축을 통째 교체** — 현행 6패널 저장(전부 PUT)이 8.0 서버에서 `connection.type`→`IP_DIRECT` 초기화·`channel` 소실, 카메라는 `components` 전부 소실(200·무경고). 같은 본문 PATCH 는 전부 보존. → FR-15 로 수정(`677572f0`). **서버팀 R-17 후보**(무경고 200)
+    2. `PATCH` 도 `components` 배열은 통째 교체(2개 중 1개 → 나머지 무경고 삭제) / 스칼라만이면 보존 → 다음 사이클에서 형상 **스칼라** 쓰기는 열 수 있다
+    3. DTO 의 `ConnectionAxis`·`DeviceConfigAxis` getter 는 **재조립본** — 서버가 준 `type`·`parent`·`channel` 이 없다 → 읽기는 수신 원본으로
+    4. v7.0+ 통문은 옛 매핑에서 `DeviceType=NONE` → **개폐 항상 거부**였다(FR-02 가 해소). ISSUE-20·21 은 **불성립/도달 불가**로 판명(코드 변경 없음)
+    5. SYNC_DEVICE: `SmartMultisensor2` 누락 · 스피커 삭제 통지 `"Speaker"≠IpSpeaker` 영구 미매칭 · 종류축 변경 시 중복 추가 — 판별자 라우팅으로 해소
+    6. 형상 4축 생략 POST → `Unknown` 배정(201) / 카메라는 `type_camera` 필수 · 메인 솔루션은 통문 패널에 **필수 변경 0**(`RegisterModule(DeviceUiModule)` · `ILoadable` 제네릭)
+    7. 센서 패널은 **8컬럼**(9 아님) · 장비명 정렬 버그는 제어기·센서·카메라 **3곳**
+  - **기준선(워크트리 HEAD `5b299329`)**: Events.Ui 15건 기존 실패(stash 대조로 동일 집합 확인, 목록 스크래치패드 `baseline_events_ui_fails.txt`) · Models 1건(`CameraInfoModel 9→10`, 메인 작업트리에 수정 대기) · Devices.Ui `CameraUrls/CameraSetting passthrough` 2건은 **flaky**(같은 바이너리 0~2건)
+  - **하네스 주의**: `verify` 는 메인 레포에서만 돌아 워크트리 코드를 못 본다 → 태스크는 `--no-test --reason <워크트리 결과>` 로 닫는다(원장 `b5fce8`). 전체 `verify` 는 Phase 게이트에서 머지 후
+- **사용자 지시**: "일단 우리 창을 업데이트를 진행해줘 … 두 프로젝트 동일하게 적용" (Libraries + `C:\workspace_app\Dotnet.Monitoring.Solution`) · "Overlay Window 빼고 모든 창" · AskUserQuestion 결정: pidsgroup 사이클 "실기 검증 보류로 닫기" · 1차 = **장비 콘솔부터**
+- **선행 산출물(전부 완료)**:
+  - 시나리오 분석 [`docs/analyses/device-console-v8-scenario-analysis.md`](../analyses/device-console-v8-scenario-analysis.md) **v1.3** — 323건(T132·C18·S30·A64·D2·G9·W25·B14·P9·K4·X8·H8) · PASS 172 · ISSUE 151 · 코드 25종 · 적대 검증 3기 반영(WRONG-CLAIM 8 · WRONG-LINE 8 · 가짜 ISSUE-5 폐기 · ISSUE-3/4 메커니즘 `ParseCameraType→NONE` 정정 · G-6 강등 G-6′)
+  - 카탈로그 [`docs/tests/device-console-v8-scenarios.md`](../tests/device-console-v8-scenarios.md) · 로그 [`docs/tests/device-console-v8-simulation-log.md`](../tests/device-console-v8-simulation-log.md)
+  - 시뮬레이터 스크래치패드 `sim_device_console_v8.py`(제품 코드 불변)
+- **PRD**: [`docs/prds/device-console-v8-prd.md`](../prds/device-console-v8-prd.md) **v1.0 Draft** — FR 14(Phase 1 FR-01~07 기반 / Phase 2 FR-08~14 화면) · NFR 7 · AD-1~10 · V-01/03/04/05/07/08/09/10 · 5-B 인과 6건 · 리스크 7 · **사용자 결정 G-1~G-12**(G-12 = PRD 분할 권고 (a))
+- **핵심 결정(PRD)**: 옛 `DeviceType` 파생 유지(AD-1) · 종류축 카탈로그 문자열(AD-2) · 판별자 편집 불가(AD-3) · 형상·부품·상태·설정 절 **읽기 전용**(AD-4, `components` 통째 교체 회신) · 계약 게이팅 `>=` + 프로브 실패 배너(AD-5) · 미수신 파선(AD-6) · 통문 Lamp 복제 + Api CRUD 3종 선행(AD-7)
+- **다음 할 일**: ① 사용자 PRD 검토 + G-1~G-12 결정 → "승인" 발화 + `node .claude/hooks/advance-phase.js approve prd` ② G-12(a)면 PRD를 Phase 1/2 로 분할 후 Phase 1 승인 ③ plan — 양 레포 worktree(Libraries `../worktrees/v2.10.0` / Solution `../worktrees/sol-v0.6.0`, G-10) + `git tag before-device-console-v8` 양쪽 + CHANGELOG 동일 PRD 링크 ④ dev
+- **하네스 주의**: 승인 발화는 짧게("승인"/"ok") — 긴 붙여넣기·자모 분리·시스템 알림 텍스트는 미인식. PRD 상태줄 literal `Draft` 일 때만 ack 기록
+- **이월**: pidsgroup 실기 검증 5건(VER-01/02/05·RISK-01·TEST-08) 별도 배터리 · 서버 되물음 Q-a~Q-d 회신 대기 · R-16 프리셋 리소스 일정 회신 대기
+
+---
+
 ## ▶▶ 재개 포인트 (2026-09-18 — GOP 서버 API 계약 동기화 · Track C · **✅ 구현 + 실연동 검증 완료 / ❌ 실기 UI · 운영 쓰기 미검증 / ✅ 커밋 `d1801ee0`**)
 
 ### ★ 최신 회차: 실연동 검증(Phase 3) — 2026-09-18
@@ -1328,7 +1419,7 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - **호스트 경로 판단**: 맵 오버레이는 `LayerPanelControl.cs:342` `MaxPanelWidth=375`라 3-Pane 불가 → **좌측 메뉴 Conductor 패널(경로 B)** 뿐. 이 때문에 메인솔루션 변경이 불가피하다.
 
 ## ▶▶ 재개 포인트 (2026-09-03 — 27일 만의 재검증: "playwright로 검증 가능한 부분" 식별·재실행)
-- **마지막 업데이트**: 2026-09-03 14:40
+- **마지막 업데이트**: 2026-09-23 06:29
 
 **⚠ 용어 확정** — 이 프로젝트에서 "playwright"라 불러온 것은 FlaUI(UIA3) 하네스다. **진짜 Playwright는 WPF 본체를 못 건드리고 웹 표면 3종**(매뉴얼 HTML · 보고서 미리보기 HTML · GOP REST)만 대상([[project_playwright_verification_surfaces]]).
 
@@ -1590,8 +1681,8 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - ⚠ 파이프라인 `plan→prd→(approve)→plan` 전환 완료. `approve prd`는 mtime 최신을 집으므로 **타 세션 `installer-prd.md`(이미 Approved)가 먼저 집혀 1차 실패** → 내 PRD touch 후 재실행으로 해소. 타 세션 PRD 오승인 없음. [[project_approve_prd_picks_newest_mtime]] [[feedback_never_force_gates]]
 
 ## ▶▶ 재개 포인트 (2026-08-04, 이 세션 — 메인솔루션 Inno 인스톨러 기획→PRD) — Track C, ✅ 기획서 v1.2 + **PRD Draft**, 🔲 **사용자 PRD 검토·승인 → plan**
-- **활성 PRD**: `docs/prds/installer-prd.md` (**Approved** v1.0, 2026-08-04 사용자 "계속"=승인, touch+approve 한 명령 처리) — FR 13 · NFR 7 · V-01~08 · 리스크 7(R-01 mbtiles 169GB publish 유입=높음). Q1~Q5 기본안 확정.
-- **활성 Plan**: `docs/plans/installer-prd-plan.md` — **35태스크, 진행 24/35(69%)**. ⚠ VER-04·TEST-05는 재부팅 필요(사용자 협조). 현재 Phase: dev.
+- **활성 PRD**: 없음
+- **활성 Plan**: 없음
 - **✅ 2026-08-04 구현 1차 완성 — 설치기 빌드 성공**: `C:\workspace_app\Dotnet.Monitoring.Solution\Installer\` 신설(v0.5 브랜치 위, 태그 `before-installer`, 미커밋). 구성: IronwallMonitoring.iss(본체)+Pages.iss(설치유형·구성6화면·요약·프리필·검증)+ConfigWriter.iss(UTF8 치환+백업원복)+appsettings.template.json(감사후 스키마+토큰 28종)+build.bat(Datas격리 self-heal+fail-closed 크기가드+ISCC)+fix-autostart.bat/.ps1+Assets\sounds 3종+Korean.isl(선행품 복사 — Inno에 한국어 없음). **산출물 `Output\IronwallMonitoring_Setup_v2.6.0.0.exe` 83.8MB**(버전 자동추출·와치독 합류·mbtiles 0 확인). .iss 3종은 **UTF-8 BOM 필수**(없으면 ISCC가 ANSI 오독→UI mojibake).
 - **빌드 함정 해결 3건**: ① build.bat 자체 `cd /d %~dp0` 필요(호출 cwd 무관) ② 고아 체크아웃 실명=`Ironwall.Dotnet.Libraries.OnvifSolution`(OnvifSolution 아님) ③ 배치 for /f+PS 파이프 조합이 0MB 오측 → 파일 경유+fail-closed(100MB 미만/1GB 초과/측정실패 모두 중단)로 교체.
 - **최종 사용자 정책 반영**: 지도=외부 C:\maps 분리(Datas 미생성, 화면12 필수·기본값 C:\maps — PRD v2.1) · 사운드=번들+자동구성(FR-14).
@@ -1639,7 +1730,7 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 ## ▶▶ 재개 포인트 (2026-08-03, 이 세션 — Playwright 자체검증 가능성 조사 → FlaUI UI 자동화 PRD) — Track A→C, ✅ 분석 2건 + PRD Draft, 🔲 **사용자 PRD 검토·승인**
 - **활성 PRD**: `docs/prds/UI_Automation_FlaUI_Smoke-prd.md` (**Approved** 2026-08-03, v1.0) — FR 8개 · NFR 6개 · V 8건 · 리스크 7건.
 - **활성 Plan**: `docs/plans/UI_Automation_FlaUI_Smoke-prd-plan.md` — **38태스크 / 30h**. Phase0 선결검증 11(VER-00~08+RISK-01~02) · Phase1 하네스골격 6(SETUP-01~06) · Phase2 핵심 14(계측 IMPL-01~05 + TDD TEST-01~03/IMPL-06~10) · Phase3 테스트 4 · Phase4 문서 3 · EXT 2(메인솔루션 계측 15건+빌드검증). 순환의존 0·미존재 참조 0.
-- **현재 Phase**: dev
+- **현재 Phase**: prd
 - ⚠ **실행 순서 주의**: VER-01~07은 **Phase 1 완료 후** 실행한다(검증 수단 = 하네스 자체). **계측을 눈감고 시작하지 않는다** — 트리 덤프 1회로 V-01~V-06 해소 후 IMPL-01 착수. 안 지키면 peer 없는 요소에 ID 붙이는 헛작업 발생.
 - **✅ 2026-08-04 진행 — 계측 97건 완료 + 하네스 완성 + 계측 exe 런타임 검증 (18/38, 47%)**:
   - **worktree**: `C:\workspace_app\worktrees\ui-automation\` 아래 두 레포 **같은 부모·원래 폴더명**(ProjectReference `..\..\` 상대경로 제약). 브랜치 Library **v2.9.23**(v2.9.1은 기존재로 폐기) / Solution **v0.5.2**. GMap `Directory.Build.props`+`sn.snk` **미추적이라 복사 필수**(CS0281) — [[project_gmap_orphan_submodule]] 기존 기록 재확인.
@@ -3743,9 +3834,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-89612
+- **현재 세션 ID**: ppid-127264
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-89612
+- **활성 세션 목록**: ppid-127264
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
@@ -4661,3 +4752,40 @@ Q1 미확정 동안에는 **편집 경로를 `PATCH` 로 고정하고 교체 적
 
 **교훈**: 명세서 §5.0.1 은 산문 단락이라 표·스키마만 훑으면 놓친다. **후속 태그·FE 절차 같은 계약이 단락 안에 박혀 있다** —
 새 기능 기획 전에 그 절의 산문을 끝까지 읽어야 한다(이번에 프리셋 요청서를 쓰다가 우연히 발견했다).
+
+#### [2026-09-19] 서버 회신 수신 — D-A9 무효화, 부품 쓰기 설계 정정
+
+서버팀이 요청 16건에 회신(44 판정: ALREADY 13 · ANSWER 16 · PM 6 · SPEC_ONLY 4 · SMALL 3 · BLOCKED 2).
+
+**★ 내 설계 전제가 틀렸다 — R-16 Q1**
+- **서버에 「가산 적용」 모드가 없다. `PATCH` 도 가산이 아니다.**
+  `hardware_spec.components` 는 **배열**이라 RFC 7396 PATCH 에서도 **통째 교체**된다.
+  PATCH 가 보존하는 것은 `hardware_spec` 의 **형제 스칼라**뿐 → **부품 하나만 담아 PATCH 하면 나머지가 전부 사라진다.**
+- `PUT` 은 축 문서 전체 교체(부품+형제키). 단 **본문에서 생략한 축**(`connection`·`device_config`)은 **현재 값 유지**.
+- 부품이 배열에서 빠지면 서버가 **관측(`device_status.components.<key>`)을 삭제** + `warnings[].READ_ONLY_IGNORED`.
+- 그 부품의 `component_overrides.<key>` 가 남으면 **요청 전체가 422 `VALUE_NOT_ALLOWED`** → 같은 본문에 `null` 동봉 필수.
+- 내가 제안한 "PATCH 안에서 override null 로 교체 표현" 은 **기각** — override 삭제일 뿐 부품 제거 수단이 아니다.
+- 서버 결론: **가산이든 교체든 클라가 현재 배열을 읽어 로컬 병합 후 전체 배열 전송이 유일한 방법.**
+  명세 문장에 **주어가 없어** 서버 동작으로 읽혔고 서버팀이 명세를 고치기로 했다.
+
+→ **D-A9 폐기**(지우지 않고 기각 이력으로 남김), **D-A11**(부품 쓰기는 예외 없이 read-modify-write ·
+저장 직전 현재 `components` 재조회 필수 · [가산]/[교체]는 **화면 용어일 뿐 전송 방식이 아니다**) ·
+**D-A12**(부품 제거 시 `component_overrides.<key>: null` 동봉) · **D-A13**(미리보기에 "관측 기록도 함께 삭제" 명시) 신설.
+**D-A7 의 "`PATCH` 로 고정" 은 보호 장치가 아니었다** — 보호하는 것은 동사가 아니라 재조회 후 전체 배열 전송이다.
+
+**Q2 는 내 판정이 맞았다** — 서버가 잇는 축은 `key` 하나. `channel`·`position` 은 저장·응답만 되고
+**매칭에 쓰는 코드 0건**. `key` 유일성은 강제하지만 **`channel` 유일성은 강제하지 않는다**(구분은 FE 몫) → D-A10 유효.
+
+**다른 창에 걸리는 확정 6건(§14-11)**: ADMIN `modules:{}` 는 정상이고 **`role` 을 먼저 봐야 한다**(서버 변경 없이 오늘 가능) ·
+장비 쓰기 422 는 extra 가 아니라 **제거키 게이트**이고 **`moved_to` 가 새 위치를 준다** ·
+**`status` 는 살아 있다**(우리 요청서 오류 — 정정선 그음) · 억제 `all` 은 **미래 등록분 포함·OR 평가** ·
+**`{id, code}` 프로필은 실재하지 않는다** · 보고서 `error_message` 19키 확정.
+**R-07 통지 2종은 `NATS_REVOKE_ENABLED=false` 라 아무것도 발행되지 않는다** — 화면이 이 통지에 의존하면 안 된다(가속 신호이지 권위 아님).
+
+**서버가 우리에게 되물은 것 4건(§14-12)**: ⓐ 구클라가 싣는 키 목록 ⓑ 6.3.2 `EnumDeviceStatus` 값 ⓒ 보고서 실패 사유 표기(①원문/②닫힌 어휘+한국어 — **무응답 시 ②**) ⓓ 어안 축 A/B + 쓸 화면.
+
+**이미 되어 있던 것 5건**(스냅샷 시점 차이): R-09 409 선언 완료(단 `error.code`=`CONFLICT`) · R-11 null 안 나감 ·
+R-12 v8.0.1 해소 · R-13 forbid + `unit_id` 게이트 정확 · R-10 목록 경로엔 빈 `{}` 없음 → 후속 작업 없음.
+
+**교훈**: 명세 산문에 **주어가 없으면 서버 동작으로 읽힌다.** "FE 가 한다" 인지 "서버가 해 준다" 인지는
+추측하지 말고 물어야 한다 — 이번엔 물어서 **데이터 소실 설계를 착수 전에 잡았다.**

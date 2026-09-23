@@ -1,8 +1,8 @@
 ﻿<!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-08-06 (advance-phase 자동)
-- **총 문서 수**: 486개
+- **마지막 갱신**: 2026-09-23 (advance-phase 자동)
+- **총 문서 수**: 617개
 
 ---
 
@@ -10,46 +10,42 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [gop-api-v8-window-impact-analysis.md](analyses/gop-api-v8-window-impact-analysis.md) | **GOP API v8.0.1 → 창 구조 재기획 영향 분석** (Track A, 코드 무수정). 정본 = `C:\workspace_python\api-test-server\GOP_Restful_Api_연동설계.md`(v8.0.1, 16,519행). 판본 상황(운영 6.3.2 / 개발 7.0.1 / 명세 8.0.1) → **계약 세대를 UI 가시성 조건으로 승격**. 클라 필수 변경 15건(C-1~15: `type_device` 폐지→카테고리+종류 2축 · 장비 id 전역 유일 · 표현 3종(형상·의도·관측) 분리 · 부품 모델+`component-status` · `/spec` 카탈로그 정본 · 문·통문 스칼라 폐지 · `/control` 2경로 410→NATS 직행 · 카메라 `/settings` 410 · `server_id`·`unit_id`·`group_ids` · 이벤트는 장비 참조 2키 · `action_reported` boolean · 권한 16종 전체교체 · datetime 마이크로초 6자리 · 엄격 쓰기 422 9코드 · `error.details`). 창별 재기획 9절(장비 콘솔 6축 상세+변경 미리보기+부품 찾기 · 이벤트 콘솔 운영 탭·통계 3보정·조치 경로 통일 · **부대 콘솔 신설**(편제 트리+관계도+소속 픽커) · 계정/권한 · 보고서 · 서버 모니터(생존 REST 판정 금지) · 연동 워크벤치 자체 검증 · 지도 2축·문 명령 · 공통 오류·시각·캐시). 단계 0~4차 · 결정 A-D1~12 · 미확인 U-1~7. **§8 API 요구 정리(09-18)**: ① 창→호출 입구 매트릭스 12행(장비·부속·그룹·이벤트·억제·문구·계정·인증·보고서·서버·부대·연동·추적) ② **서버에 요청할 것 S-1~S-10**(조치보고 벌크 · 매핑 재정렬 · 부대 형제 순서 · 인접 방위 라벨 · AI 객체 집계 · 미조치 집계 · unit_id 필터 · 장비 부분 수정 · 워치독 · 권한 카탈로그) ③ **확인 U-1~U-8**(부대 필터 모순 · 카메라 부품 · 권한 15/16 · 삭제 409 counts · 그룹 PUT · 맵핑 config id · **서버 판본** · 경로 권한) ④ 클라가 만들 것(DTO·서비스·캐시·공통·게이팅·수선) ⑤ 호출 규약 체크리스트 7항 **§9 속성 전수 대조표(09-18)**: Swagger 를 `contract/v8.0` 대신 **FastAPI 앱에서 직접 생성**(`app.openapi()` → 8.0.1 · paths 153 · schemas 457, 리포 `_openapi_*.json` 6개는 06-22 자 v6 판이라 배제) 후 명세서와 교차 검증 — 9-1 장비 공통 20속성 + 카테고리 전용(스피커 **축 2개** `speaker_role`+`type_speaker`) · 9-2 3축 하위(접속 13 · 형상 11 · **부품 14열** · 상태 4 · 설정 4) · 9-3 목록 쿼리와 **제거 파라미터 422 목록** · 9-4 이벤트 5종 속성표(연결엔 `action_reported` **없음** · 조치엔 `category_event` 없음) · 9-5 `detail` 알려진 키(탐지 8 · 장애 4 = **케이블 위치** · 운영 개폐/임계치 2형) · 9-6 통계 **7계열**(`alert`·`operation` 포함, `total`=6종 합 operation 제외, by-device **4묶음** controllers/cameras/enclosures/gates) · 9-7 탭별 필터 · **9-8 누락 19건 M-1~M-19** · **9-9 적용 결과**(전부 반영 + 기존 결함 B-1 클래스 충돌 `.lgd.cam`↔`.cam` · B-2 총계 외 계열 비율 오표시 · 결정 P-D1~P-D6). Playwright 실측: JS 오류 0 · 잘림 0 · 가로 넘침 0 · `총계 267 = 128+34+19+9+21+56` **§9-1a 정정(09-18)**: `category_device` 는 선택 축이 아니라 **폴리모픽 판별자**(Joined Table Inheritance) — 값은 **경로가 정본**, 보내면 같은 값=버림+`warnings[].READ_ONLY_IGNORED` / 다른 값=**422 `IMMUTABLE_FIELD`**, **불변**(카테고리 변경 편집 없음) · **목록 필터 없음** · 쓰이는 곳은 리소스 선택·되물을 경로·`SYNC_DEVICE` 라우팅. 고르는 종류축은 `type_<category>` 하나(스피커만 역할축 하나 더). 판별자 3종(`category_device`·`category_event`·`category_server`) · 결론은 **P-6** | 2026-09-18 |
-| [window-layout-redesign-analysis.md](analyses/window-layout-redesign-analysis.md) | **전 창 레이아웃·디자인 재설계 분석 — Console Layout System** (Track A, 코드 무수정). 창 30종 → 템플릿 6종(T1 목록+상세 15 · T2 설정 5 · T3 분석 2 · T4 작업 창 10 · T5 시스템 알림 · T6 맵 오버레이 2차). 장비 창 3단 콘솔(레일 184/56 · 목록 가변 · 상세 340 · 상태 6 · 열 우선순위 · 반응형 3단계) · 결함 D-1~5. **§11 이벤트 창 묶음(09-14 추가)**: 이벤트 창 8종 지도 + 확정 설계 준수표 · 결함 E-1~8(선택 편집기 265가 요약 탭 200과 같은 `Grid.Row="0"` · 목록 260~280 고정 · 차트 두 벌 · 조치 연결 단방향(RowDetails 미구현) · 주 액션이 추가·저장 · 같은 이름 `조치보고` 열 2개 · 드로어 일괄 버튼 툴팁/휴지통 아이콘 불일치 · 권한 `?? true`) · 이벤트 콘솔(레일 개요·탐지·장애·연결·조치·억제 스케줄 / 기간 칩 / 주 액션 조치보고 / 신호 상대 막대·AI “—” / 조치 기록 Id+타입 역조회) · 드로어=실시간 vs 콘솔=기록 · **틀과 호스팅 분리**(조치보고 T4+Float, 탐지 신호 이력 T3+모달 유지) · 억제 스케줄=읽기 칸 + 780px 서랍(확정 두 칸 폼). **§12 전 창 확장(09-18)**: 실측 정정 3건(설정 **9탭**(10 오기)·고아 VM 4종 · 서버 모니터 **UI 0건** · 제어기 추가 **빈 스텁**) · 창 가족별 결론표(계정 6 · 권한 매트릭스 16종 · 보고서 3 · 설정 9 · 서버 신설 · 부대·이벤트맵핑은 **확정도 채택** · 다이얼로그 13 → S400/M560/L720 · 시스템 알림 5(진행 팝업 취소 버튼) · 셸 드로어 폭 불일치) · **판본 전제 상충**(운영 6.3.2 vs v8.0.1 라이브 교체 — 확인 전 게이팅 유지) · 결정 L-D7~L-D14 · 맵 오버레이 20종만 제외. 정정 2건(이벤트 “이중 축” 오기 · 억제 폼 오른쪽 칸 이동 불가). **09-14 2차 보강**: E-3 정정(차트는 중복이 아니라 제어기별 막대·유형 파이·카메라 KPI·시간대 추이 4종) → **개요 4카드**(유형 도넛·제어기별 가로 누적 막대·시간대 추이·카메라 탐지+카메라별 상위 5) · 계열색 토큰화 · 목록/카드 **탐지 스냅샷** 복원 · E-4 재작성(중복 조치 이미 허용·원본별 조치 API 존재·미사용) · **E-9 수정 경계 누수**(상태 콤보 저장 DTO 미포함·측정값/조치 작성자 수정 가능) · **§11-9 편집 경계표**(판정만 수정 · 발생 기록 잠금 · 대응은 추가) · **§11-10 조치 1→N**(상세 타임라인 · [조치보고 추가] · 우클릭 조치내역 보기 · 같은 Float 창 · 열 때 1회 GET). **정정**: 장애 고장 구간 = 제어기 루프(1차 나감 → 2차 들어옴) 위 지점, 시각 아님. **카메라 탐지 융합**: 카메라 탐지 = AI 탐지, 탐지의 두 번째 출처로 전 차트 통합(주황+빗금·추이 점선 · 칩 "탐지" 묶음 · 도넛 5조각 · 장비별 [제어기\|카메라] 탭 · 카메라 탭 KPI 3 → 탐지 출처 비교 카드 · 목록 출처 칩+AI 꼬리표) · 객체 분류 서버 집계 요청. 결정 L-D1~6 · E-D1~15 **§13 속성 누락 0(09-18)**: 장비 창·이벤트 창을 Swagger(8.0.1 직생성)+명세서로 전수 대조. 새 사실 5(13-A 통계 **7계열** — 사전 경보 `alert` 가 §11 어디에도 없었다 / 13-B `total`=**6종 합**, operation 제외 / 13-C 탐지 분류 **3분기** — `Alert` 이 카테고리보다 우선이라 **카메라가 낸 Alert 은 `camera_detection` 이 아니다** / 13-D by-device **4묶음**, 운영은 함체·통문에만 / 13-E 스피커만 종류축 2개). 결정 **E-D16~E-D19**(사전 경보 1급 계열 · 운영은 총계 제외하되 화면에선 유지 · 연결 탭 조치 자리 없앰 · 탐지 `유형` 열) · **L-D15~L-D18**(**통문 카테고리 신설** · 상세 3축 절 분리(설정은 맨 밑) · **미수신≠빈 값** · 제거 필드 새 자리 이전). 기존 결함 2건 동시 수선(B-1·B-2). 대조표 정본은 `gop-api-v8-window-impact-analysis.md` §9 **§14 부품 조립기·프리셋(09-18)**: 조립 **드래그 드롭** · API 선확인 4(생성 1회에 부품 동봉 가능 → 프리셋 적용 = **POST 1건** / 팔레트 = `/spec` 32종 / 드래그 중 왕복 0 / **프리셋 리소스 서버 0건** → 클라 보관 + **S-12**) · 제약 3(유형 공통 8개 **422** · `key` 유일·계약 아님 · `applies_to` 필터) · **제어기는 부품 2종뿐**(센서는 별개 장비) → 프리셋의 값은 **채널 수·번호 규칙** + **반복 펼치기** · `enabled` 함정 · 결정 **D-A1~D-A8** | 2026-09-18 |
-| [map-tilt-25d-scenario-analysis.md](analyses/map-tilt-25d-scenario-analysis.md) | 지도 카드 틸트 **시나리오 기반 분석**(사용자 결정 ①살짝 비스듬 ②줌 게이트 ③마커 정립) — 영향면 6축 전수(file:line), V-02 헤드리스 실측(Viewport3D 비등방 승계 확정), 시뮬 4,096+22 전량(정책 불변식 위반 0), 결함 D1~D6 · 결정③ R3 · 정책 공백 G1~G10(제안값 승인) → PRD 입력 | 2026-09-08 |
-| [map-25d-tilt-feasibility-analysis.md](analyses/map-25d-tilt-feasibility-analysis.md) | 지도 자체 2.5D(틸트) 표시 타당성 — 아핀 카드 틸트(A) · `Viewport2DVisual3D` 원근(B) · **하이브리드(C, 권고: 높이 과장·피치 SSOT·스냅샷 틸트 스파이크)**. RenderTransform 은 아핀 전용(원근 불가)·필수-060 단일 축척·RDP Tier 0 충돌, 조사 4축 + 설계 3안 + 적대 검증 | 2026-09-08 |
-| [gopdb-0907-deploy-impact-analysis.md](analyses/gopdb-0907-deploy-impact-analysis.md) | GOPDB 09-07 배포 2건(조치보고 `POST /reorder` · 억제 주간반복) 클라 영향 — **"제일 중요"라던 해제 타이머는 고칠 코드 0건**(`window_end` 소비처=표시 2곳). 🔴 마감: 권한 키 소멸(운영서버 6.3.3 확인 후 동시 배포 필요) · 서버측 결함 1건(단발창 `suppressing` 오발행) · 구현 함정 7종. 적대검증 2기 | 2026-09-07 |
-| [drag-reorder-infra-analysis.md](analyses/drag-reorder-infra-analysis.md) | 공용 드래그 정렬 인프라 타당성 v1.1 — **적대검증 3기 전원 fatal**. 구조는 생존, 동작 3대 축(Button 핸들 자멸·DataTemplate measure 크래시·로컬값 삽입선 지터) 재설계 필요. 서버 블로커는 `/reorder` 신설로 **해소**. 키보드 `Key.System`/`SystemKey` 실측 · UIA 드래그 패턴 부재 | 2026-09-07 |
-| [window-architecture-analysis.md](analyses/window-architecture-analysis.md) | **창(Window) 아키텍처 전면 재설계 기획서 — Surface Kernel** · 실측 8축 + 설계 4안 + 심사 12렌즈 + 적대검증 4렌즈(29 에이전트, 8.07M 토큰). 근본원인 확정: 모달 3층이 `LeftMenuSectionView.xaml:271` 자식이라 좌표 부여 지점 0 · 층당 1개 + 풀스크린 스크림(#88000000) 3장. **P0 7건**(Progress 팝업 닫기 요소 0개 → 앱 하드락 · 확인 팝업 '취소' 미전달 · `_pending*` 13파일 워크어라운드 · Info-finally 즉시닫기 2건). 표면 6분류(Modal/Float/Detached/Toast/Cover/MapAnchored) + 전수 배치표 24종 · `IDialogService.ConfirmAsync` 전문 · 마이그 252 편집점 · 로드맵 Phase 0~4(A 4~5주 / B 11~14주 / C 17~21주) · 리스크 24 · **GAP 11(사용자 결정 대기)**. 부록 B 독립 재검증 5/5 + **자산 발견: `LayerPanelControl` 이 이미 드래그 패널 구현** | 2026-09-06 |
-|[action-report-custom-template-scenario-analysis.md](analyses/action-report-custom-template-scenario-analysis.md) | 조치보고 커스텀 문구 시나리오 기반 분석 v1.0 — 영향면 6축 · 시나리오 235건 · **이슈 42종**(결함 32·정책공백 6·마이그 4) · 적대검증으로 가짜이슈 3건 교정. **선행 결함 2건이 핵심**: 클라 `events:control` vs 서버 `events:edit` 불일치(OPERATOR 조치보고 403) + 매트릭스에서 control 부여 불가 | 2026-08-07 |
-| [gop-api-contract-sync-analysis.md](analyses/gop-api-contract-sync-analysis.md) | **GOP 서버 API 계약 동기화 전수 분석** — 도메인 6축 멀티에이전트(보고 222KB) + 메인 재검증. ★핵심: 맞출 대상이 **셋**(운영 6.3.2 · 개발 7.0.1 · 명세 v8.0)이고 우리는 운영에 정렬돼 있다 — 명세대로 고치면 운영 파손. 장비 쓰기는 `type_device`(6.3 필수) vs `additionalProperties:false`(7.0 금지)로 **한 본문 양립 불가** → 런타임 버전 분기 필요. 권한 저장은 세 처방이 모두 422(서버 문서 처방 포함) → **원본 ∪ 카탈로그**가 유일 해법. **§0-B 최종 결과 추가(9/18)**: 안 C 구현 완료(빌드 0 · Messages 198/198 · Accounts.Api 144/144 · Events.Ui 691P/15F = HEAD 기준선 동일) · 로컬이 작업 중 **7.0.1→8.0.1** 승격(분기는 `>=`) · **분석이 예측 못 한 층 = "고친 코드가 실제로 실행되는가"**(죽은 코드 2건 · `StatusCode` 미충전 · `ShouldSerialize` 전역 적용) · ❌ 쓰기 실호출·실기 UI·권한 3종 소실 규명은 여전히 미확인. **§0-C 2차 라운드 추가(9/18)**: FR-21~27(F-03·F-22·`Api.Messages` 해소 · 장비 API 통로 · `unit_id` 주입 · 에러 출구 · 권한 게이트) + **방법론 발견 3**(①인터페이스 파라미터 목록 정확 일치 — optional 추가도 목 깸 ②**검증 방법의 구멍** — 솔루션 빌드가 WPF 테스트를 안 타 CS0535 반복 누락 ③**과잉 게이트** — 운영 6.3.2 의 `group_id`/`server_id` 4곳을 게이트 뒤에 숨겨 잃고 있었다) · 검증 = **프로젝트별 빌드 15개 오류 0 / 테스트 1225P·20F(전부 기준선)** | 2026-09-18 |
-| [current-problems-audit-20260903.md](analyses/current-problems-audit-20260903.md) | "현재 문제 없나?" 전수 감사 — 6차원 조사+차원별 반박 검증+완결성 비평(13 에이전트, 읽기 전용): 68건 → 확정 58·하향 9·미검증 1·반박 0 + 비평 8. 🔴 E2E 3종 운영 API/NATS 기본값(VF-07, 오늘 커밋 포함) · 🔴 라벨오프셋 D-2+마이그레이션 부재 · 🟠 **신규** LiveCharts XAxes 예외 매 실행(VF-12 유력 원인) · 🟠 설치본 Url=localhost(08-31~, 의도 확인) · 🟠 업그레이드 설치본 ClientId 미적용 · 정정: VF-04 17/17 재현(FlaUI 타임아웃) · 장부 소음 원인 확정(훅 첫 매치 4종) | 2026-09-03 |
-| [symbol-3d-housing-storyboard.html](design/symbol-3d-housing-storyboard.html) | **v2.0** — **사용자 확정 방향(군대부호 제외 · 사실적 형태 3D 유지 · 단순화 · 회전 동기)** 스토리보드 v1.0 — 하우징 8종(돔/PTZ/스마트센서/다중/스피커/제어기/조명/함체)+펜스 표식을 **박스·실린더·절두체 프리미티브 코드 합성**으로 CSS-3D 렌더, θ 슬라이더로 yaw=Bearing−θ 회전·화면 고정 광원 플랫 셰이딩·피치 슬라이더·30/50/100 사다리·지도 위 미리보기(다크/라이트) · WGS-84/Web Mercator 등각성 답변 · 모델 스펙 표 · 구현 배선 표(검증 완료) · **v1.2 §1-B 확장 심볼 24종**(차량 5·건물/인프라 11·아트 없던 PIDS 8) · **v1.5 §0 SVG 원본 대조 7종**(스마트센서·돔 카메라·혼 스피커·함체·제어기·경광등 = 원본 비율/실측 색, 펜스 = 현행 XAML 기준) yaw 0/45/90/180 + 30/50px · 체인링크 메쉬 패턴 · 경광등 타입 신설 후보 · **CSS-3D 피치 부호 교정**(종전엔 아래서 올려다보는 뷰라 돔이 사발로 보였음) — 원본 사본 `docs/assets/svgref/` | 2026-09-04 · **§6 심볼 팔레트(탭 5종 전환 — PIDS 17·기반시설 12·도형 8·기본 2·차량 5 비노출, 미리보기 선택 + 드래그 배치) · §6-B 드래그 4단계 · §6-D 속성 ↔ 3D 매칭 · **§6-E DB 컬럼 전수 매핑(안 쓰이는 필드 0) · **§8 실물 와이어프레임**(실제 XAML 구조·Tokens.Dark 실측 — 편집 스트립 현행/신규 · 속성 패널 5섹션 · 팔레트 크롬 · 드래그 상태 전이) · §7 라이브 에디터**(7-A PIDS 점 심볼 · 7-B PIDS 그룹 철책 · 7-C 기반시설, 슬라이더 조작 → 3D 즉시 반영, 브라우저 검증 30/30)**(2026-09-04 추가) |
-| [gate-enclosure-door-and-symbol-detail-wireframe.html](design/gate-enclosure-door-and-symbol-detail-wireframe.html) | **통문·함체 개폐 버튼 + PIDS 심볼 상세 보기 와이어프레임 v2** — ① 속성창 접점 체크박스 → `[열림][닫힘]` 세그먼트(현행/제안 대조) ② 우클릭 '상세 보기' 창(좌 심볼 / 우 5탭 / 하단 액션 바) · 3D 45°×8단 자동회전 + **드래그 시 점선 구 가이드**(구·적도·자오선) ③ 스피커 마이크 PTT(마이크는 방송서버 소유 — 입력장치·레벨미터 제외) ④ **RBAC 매핑표**(개폐=`devices:control`·마이크=`broadcast:control`·fail-closed 경고) ⑤ 신규 규격 필요 항목표. 라이트/다크·장비 연결·미연결·3D 드래그 상태를 버튼으로 전환 비교. Tokens.Light/Dark 실측색 | 2026-09-08 |
-| [pidsgroup-3d-fence-gate-storyboard.html](design/pidsgroup-3d-fence-gate-storyboard.html) | **PIDS 그룹 3D 철망(기둥 간격 2/3/5m) · 통문 개폐 · 함체 개폐 와이어프레임 스토리보드 v0.1 Draft** — 사용자 요청(2026-09-07 "선을 드래그해서 그리면 철망이 3D 로 이어지고, 통문·함체는 이벤트로 열림/닫힘"). 인터랙티브 기둥 배치·LOD·상태 머신(ContactOn/Off→DoorState)·DB/계약 영향·결정 D1~D9(D2 확정: 통문=신규 enum `Gate`+전용 3D) · 사용자 확인 중 | 2026-09-07 |
-| [symbol-design-system.html](design/symbol-design-system.html) | 지도 심볼 디자인 개선안 v1.0 — **현행 XAML 실물 vs 제안 픽토그램을 30/50/100px 다크/라이트로 나란히** · 진단 7건(일러스트 vs 아이콘·시점 5종 혼재·하드코딩 색으로 다크에서 검정 실루엣 실종·Trigger 199 상태 덮어쓰기·제어기 250×90→50×50 2.8배 왜곡·방향 노즈 부재·SVG 소스 부재) · 원칙 6(24-grid 2px 실루엣 · 배지+글리프 2층 · 토큰 바인딩 · 톱다운 통일 · 노즈 · SVG→XAML 생성기) · 상태 5종×크기 3 배지 · 30px 지도 미리보기 · 단계 D-1~D-4 | 2026-08-07 |
-| [symbol-current-inventory.html](design/symbol-current-inventory.html) | 현행 PIDS 심볼 6종 **실물 인벤토리** — `PidsMarkerStyle.xaml` Path/Shape 를 파서로 SVG 변환해 30/50/100/200px 다크/라이트 렌더(도형 수·숨김·경고 표기). 생성기 `scratchpad/extract_symbols.py`, 데이터 `design/symbol-current.js` | 2026-08-07 |
-| [symbol-3d-storyboard.html](design/symbol-3d-storyboard.html) | 지도 심볼 3D화 와이어프레임·스토리보드 v1.1(반증 반영) — 심볼 12종 현행 2D→제안 2.5D 카탈로그(회전 프레임 태그) · **bearing 슬라이더로 직접 돌려보는 지도 목업(다크/라이트, 5축 분해: 발판·FOV 지오고정 / 압출·그림자·라벨 화면고정 / 아이콘 현행)** · 0/45/90/180 4프레임 · 3D 턴테이블 픽커 와이어프레임 · 렌더 경로 E1~E5 판정 · 단계 A/0/1/2 · 결정 질문 Q1~Q4 | 2026-08-07 |
-| [suppression-schedule-form-redesign.html](design/suppression-schedule-form-redesign.html) | 억제 스케줄 생성 폼 디자인 개선안 v1.0 — 진단 8종(입력 언어 2종 혼재·좌우 높이 불일치·카드 경계 소실·주액션 유령·위계 부재·빈 트레이 구멍·액션바 부재·선택행 투박) + 다크/라이트 목업 + 적용범위 7항 (⑦ 목록 열 통합은 사용자 확인 대기) | 2026-08-07 |
-| [group-symbol-transform-scenario-analysis.md](analyses/group-symbol-transform-scenario-analysis.md) | 그룹 심볼 변환 **시나리오 기반 분석 v2.0** — 영향면 7축(9기 1.4M)+3D/틸트 재정찰 5축(7기 1.08M) + 시뮬 6세대 5,255건 + **적대검증 4+2렌즈**. ⚠자기교정 2회: v3.1 진리값≡후보 자기참조(L2 반증) · v5 "1/cos 역보정 필요"가 실은 이중보정 버그. 결함 17 · GAP 22 | 2026-09-08 |
-| [symbol-3d-wip-propagation-analysis.md](analyses/symbol-3d-wip-propagation-analysis.md) | **3D 심볼 WIP 반영 실패 진단 + §8-5 팔레트 40종 드래그 순회·D-18/19(어도너 위 드롭)·D-21(하프스텝 줌 소실)** — 7렌즈 추적 + 렌즈별 적대 반증(15에이전트·872툴콜), 132항목. BROKEN 5 · PARTIAL 9 · RISK 17 · 정상확인 21. **최상위 공통원인 D-1** = `GMapBaseMarker.cs:231` 로컬값 대입이 3D 의 OneWay W/H 바인딩을 영구 파괴 (어도너·그룹편집·Undo 3발화원, 재바인딩 경로 0, 테스트가 되레 잠금). D-2 FOV Canvas 가 IpCamera MultiTrigger 로만 열려 비카메라 8종 영구 불가(3D OFF 에도 폴백 경로로 2D 회귀) · D-3 DetectionBearing 컬럼 0건 미영속 · D-4 층수 텍스트 소멸 · D-5 안테나 등 재질 토큰 부재로 색 미도달 · D-12 Infra3D 상태색이 사용자색 바인딩 영구 파괴. **3D 플래그는 bin/Debug 에만 존재 → 다음 빌드에 꺼짐**, 배포본 키 없음. 수정 순서 12단계 + 금기 6건. **§8 적용 완료(09-07)**: D-1·2·3·4·5·7·9·10·12 + R-4·10·17 = 12건, 14파일, 빌드 2종 ✅ · 테스트 23/23 ✅(회귀 테스트 신설) · 롤백 `wip-symbol-3d-20260907-before-fix`(322f8c5). **§8-2 보류 8건 결정·구현 완료**(D-6 층수→높이+슬라이더 게이트 · D-8 면적→XZ 배율 · **D-11 고정/돔 헤드 제거, PTZ 만** · 나머지 의도 명시) · appsettings 소스 ON/템플릿 OFF · 테스트 **39/39** · **§8-3 실기 구동 PASS**(하네스 UiDiagnostic: 안양발전소 이동 → 55/55 3D 컨트롤 · 설치 높이→DB 60 · 비카메라 FOV 표시 · Undo 후 너비 반영 · 예외 0) · **§8-4 속성 전수 스윕 3회**(크기·색·링·회전·설치높이·FOV 4종·탐지 3종·모델변형 3종·건물종류 6종·층수/지하/용도·어도너→속성창·지도 줌 = 전부 3D 반영 확인, 면적/기준방향은 미세 한계) · **§8-4-1 사용자 지적 2건 해결**(제목 탐색 = 하네스 결함 수정 후 DB 왕복 확인 · **링=마커 박스 비례**로 변경, 대조표 검증) | 2026-09-07 |
-| [pidsgroup-3d-fence-gate-scenario-analysis.md](analyses/pidsgroup-3d-fence-gate-scenario-analysis.md) | **PIDS 그룹 3D 철망·통문(Gate)·함체 개폐 시나리오 분석** — 6축 코드 조사(144 fact) → 결론 12(2.5D 지면 단축 보정, `gate` 키 충돌→`fencegate`, 서버 정본 정렬 R1, 접점 이벤트 큐 오염, 팬 경로 재생성 금지, COLUMN_SPECS 부팅 크래시 함정), 영향면 6절, 데스크 시뮬 22, 이슈 20, 결정 D1~D9/R1~R5 | 2026-09-07 |
-| [symbol-3d-housing-handoff-review-analysis.md](analyses/symbol-3d-housing-handoff-review-analysis.md) | **인계 문서 검토·검증** — 7축 병렬 + 축별 적대 재검증(15에이전트·555툴콜), 주장 62건 대조(CONFIRMED 44·결함 17·불가 6). **판정: 그대로 넘기면 안 됨 — 수정 후 가능**. high 5건 — D-1 "코드 변경 0"이 거짓(미커밋 신규 19경로+수정 27파일, 베이스 3멤버 이미 랜딩, HEAD 히트 0) · D-2 "드래그 0건"이 자기 인용 규칙과 배치(캡처 드래그 22파일, OLE 만 0) + `SymbolPaletteView.cs:158` DoDragDrop 이 Must Never 위반 · D-3 가산성 이미 깨짐(군대부호 DP 이관·W/H 바인딩 모드 조건부) · D-4 금지문이 안전한 GMaps.Db 지목, 진짜 위험은 Accounts.Db DROP DATABASE · D-5 성능 계측 실재(0.100ms@N=100 오프스크린). 누락 최상위 = window-arch PRD 불가침 경계(§12 D-1 "즉시 동결") 미반영. §3 앵커 14/14·정정 E-1~E-4·결정 15건·수치 2,032/중복0 은 **검증 통과** | 2026-09-07 |
-| [symbol-3d-housing-scenario-analysis.md](analyses/symbol-3d-housing-scenario-analysis.md) | 3D 심볼 하우징 **시나리오 기반 분석** — 영향면 6축 103건(차단 19) · 정본 §7-2 오류 4건(E-1~E-4) 정정 · 시뮬 3회(1,299→1,812→1,933건) · 정책 P-1~P-16 · Gap G-1~G-15(전건 확정) · PRD 적대적 검증 55건 반영 · §4-B 팔레트/드래그 배치·속성 매칭 | 2026-09-04 |
-| [symbol-3d-catalog-analysis.md](analyses/symbol-3d-catalog-analysis.md) | 심볼 3D **전수 카탈로그**(군대부호 제외 42종) — 실측: PIDS 21종 중 전용 아트 6종뿐 · `VEHICLES` 카테고리는 아트 0 + **배치 경로 미구현**(MapViewModel 4340, VF-15) · 건물 `Factory` 1종 · 처리 등급 A 하우징/B 2.5D 리본/C 그림자/D 제외 · 신규 24종(차량 5 · 건물/인프라 11 · PIDS 8) 모델 스펙 · OBJ 자산 규약 · 결정 4건 | 2026-09-04 |
-| [symbol-3d-feasibility-analysis.md](analyses/symbol-3d-feasibility-analysis.md) | 지도 심볼 3D화 실현성 — 6축 조사 + 반증 5건 **전부 뒤집힘**: 마커 템플릿 내부 Viewport3D 하우징은 히트·어도너·드래그 계약 0줄 유지+회전 자동 상속(Shape 교체만 금지) · 단일 3D 층은 타일과만 정합(마커 ±1px) · 스프라이트 기각은 양자화라 연속회전 3D엔 무관(조준 정확도=FOV 벡터) · (A) 임계경로=코드(enum 절차 합성→3D 합성기) · 회전 기본값 결정 이미 확정. 권고: A-1 2D 회전 갤러리(자산 0) → PoC-E1′(N=100/350/500 계측) → Phase 1 2.5D+하우징 6종. **§7 사용자 방향 확정(사실적 3D 하우징)+WGS-84 답+배선 직접 검증** | 2026-08-07 |
-| [report-template-is-public-analysis.md](analyses/report-template-is-public-analysis.md) | 보고서 템플릿 공개/비공개(is_public) — 설계 의도=**읽기전용 공유**(소유자+공개만 목록, 비공개 상세 403, 수정·삭제는 소유자 전용)이나 **3계층 전부 미집행**(서버 목록 WHERE 없음·owner_id 영구 NULL·클라 분기 0건) → 현재는 순수 메타데이터. 부수결함 I-1 PATCH lost update · I-2 생성응답 is_public 침묵 false · I-3 RBAC 게이팅 미배선. **§8 서버 준비도**: 인프라 완비(코드 ~10줄)·실차단 2건(기존 owner NULL·클라 breaking). **→ D안 UI 제거 적용 완료** | 2026-08-07 |
-| [event-mapping-unit-console-storyboard.html](design/event-mapping-unit-console-storyboard.html) | 이벤트 맵핑 워크벤치 + 부대 콘솔 **스토리보드 v1.0** (API v8.0.1 기준). 3-Pane 드래그 워크벤치 · 드래그 3종(투입/해제/정렬) · Draft→적용 · 부분실패 4분류 · **서버가 검사 안 하는 경고 6종** · 부대 편제 트리(제대 5단계·인접) · 409 삭제차단 · 코드 불변. 시나리오 S1~S11 · **서버협의 3건** · 미결 Q1~Q5 | 2026-09-18 |
-| [event-mapping-unit-console-wireframe.html](design/event-mapping-unit-console-wireframe.html) | 짝 문서 — 치수(헤더40·행38·입력32·상세340·다이얼로그 S400/M560/L720) · 컨트롤 트리 · **DnD 계약**(캡처 상태기계·데드존8.0·유효성 매트릭스·시각어휘 충돌회피·키보드폴백) · API매핑 · 검증 10+10 · 토큰 · AutomationId · **기존자산 승계/갱신/폐기 판정** · 착수전 클라결함 D1/D2/D7 | 2026-09-18 |
-| [server-contract-drift-resilience-analysis.md](analyses/server-contract-drift-resilience-analysis.md) | 서버 계약 대폭 변경 대비 — GIS 무음 실패 지점 전수(두 솔루션). **취약점 34건**(무음24·삼킴6·표면4). 🔴 최우선: **우리 요청(S-4 종류값 전환)이 스피커 동기화를 죽인다**(`FetchDeviceByIdAsync`에 `IpSpeaker` 케이스 부재) · `Enum.Parse` 10곳(이미 터진 전례, 침입이 조용히 사라짐) · `?? "CLOSED"`가 Unknown 안전장치 무력화. 뿌리=`MissingMemberHandling.Ignore` 전역. Phase3 제거필드 9종 개별 판정 + 대비 우선순위 13단계 | 2026-09-10 |
-| [devicetype-sensortype-split-scenario-analysis.md](analyses/devicetype-sensortype-split-scenario-analysis.md) | `EnumDeviceType` 22값에 혼재된 장비종류/센서종류 분화 영향 분석 — 6축 실측 + 시뮬 942건. **결론: 안 B(비파괴 파생) 권고**(ISSUE 현행149→22, A안200). 위험축은 정수가 아니라 **이름**(라이브 영속은 `PidsSymbols.DeviceType` 하나뿐·전부 문자열). 서버는 `category_device`를 **거의 미노출**(273스키마 중 1곳). 선행결함 DF-1~14 · 정책공백 G-1~9. **v1.1 부록 A**: 카테고리별 enum 분화 타당성 — 서버는 Camera/Speaker만 2축 완성, 클라는 `EnumCameraType`만 생존(`EnumSpeakerType`은 고아), 심볼이 카테고리를 몰라 그대로는 불가 → **안 B′(2단계 하이브리드)** 권고 · 신규결함 DF-A1~A8. **v1.2 부록 B**: 사용자 원칙 **"Device 모델 ≠ Symbol 모델"** 확정 → A의 핵심 역설 **소멸**(심볼엔 카테고리가 아니라 **형상 축** `EnumSymbolShape`가 필요) · 결정 D-B1~D-B4 · 미결 M-1~M-7. **v1.3 부록 C**: **`type_device`=카테고리 재정의 + `type_<category>` 종류 필드** — **서버팀 전달용 제안서**(요청 10건·R-1~R-6). 🔴 전환은 **클라 이중수용 선배포 → 서버 전환** 순서 필수(역순이면 NATS 탐지 이벤트 전량 소실). **v1.4 부록 D**: NATS 계약 변화 전수 — 주제·`cmd` 불변, `body.device` 필드 2개만 변경 · 파싱 7곳 · ⚠D-6 이미 이벤트 유실 가능(로그 확인). **v1.5**: `Enclosure≠IoController` 확정(접점제어기=Sensor), 서버 기본값은 결함. **v1.6 부록 E**: 카테고리별 종류 enum 값 정리안 — **확정 22값**(Sensor14·Camera3·Speaker4) + 신규 `SPEED_DOME` + **제안 10값은 근거 0**. **v1.8 부록 G**: 서버 협의 5왕복 — 정정 3건(`EnumDeviceCategory`는 서버가 뺐던 축·축1=A확정·openapi 스냅샷 낡음) · **신규결함 2건**(Speaker 유령잔존 · **`OPERATION_EVENT` 100% 유실**) · 종류축 7종 확정 · **배타축=enum/가산축=hardware_spec**. **v1.7 부록 F**: 종류축 정의 — 형상 기준은 **주관적이지 않고 현행이 무기준**(센서 14값에 4축 혼재), **4문 판정 기준** + **3층 분리**(형상/역할/JSONB). `speaker_type`은 역할축·`SmartSensor` 3값은 형상 동일. **D-B6: `IoController`=Controller 확정**(이관 5건) | 2026-09-09 |
-| [event-mapping-workbench-scenario-analysis.md](analyses/event-mapping-workbench-scenario-analysis.md) | 이벤트 매핑 워크벤치 시나리오 기반 분석 v1.1 — 영향면 6축(파생객체 SET NULL 고아 7경로 포함) · **결함 DF-1~28**(D1 config PK 부재·D2 nested 침묵오염 실증) · **정책공백 G-1~10**(사용자 결정) · 마이그레이션 MG-1~5 · 적대 검증 3기로 자체 오진 3건 정정 | 2026-08-07 |
-| [single-instance-guard-scenario-analysis.md](analyses/single-instance-guard-scenario-analysis.md) | 뮤텍스 가드(v2.8.1) 시나리오 사후검증 — 카탈로그 44행·적대 8가설(전부 기각)·실측 10/10 PASS. **P1 확정: 빠른 재기동 데드존(SIM-M005a 재현)→v2.8.2 WaitOne 인수인계 수정**, P2 백로그 5건(와치독 강행 체인·크로스유저 fail-open 등) | 2026-08-07 |
-| [redundant-execution-boot-race-analysis.md](analyses/redundant-execution-boot-race-analysis.md) | 재부팅 후 Redundant 2창 — 최소 3기동(1생존+2자멸) 타임라인 확정, 구조 결함=뮤텍스 없는 이름카운트+모달 블로킹(상호 자멸), 잉여 주체는 계측 부재로 미확정, 권고 R1~R5 | 2026-08-07 |
-| [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-06 |
+| [all-windows-inventory-n05-n14-analysis.md](analyses/all-windows-inventory-n05-n14-analysis.md) | all-windows-inventory-n05-n14 | 2026-09-19 |
+| [device-console-n02-n03-design-input-analysis.md](analyses/device-console-n02-n03-design-input-analysis.md) | device-console-n02-n03-design-input | 2026-09-19 |
+| [all-windows-console-redesign-analysis.md](analyses/all-windows-console-redesign-analysis.md) | all-windows-console-redesign | 2026-09-19 |
+| [device-console-v8-scenario-analysis.md](analyses/device-console-v8-scenario-analysis.md) | device-console-v8-scenario | 2026-09-18 |
+| [window-layout-redesign-analysis.md](analyses/window-layout-redesign-analysis.md) | window-layout-redesign | 2026-09-18 |
+| [gop-api-v8-window-impact-analysis.md](analyses/gop-api-v8-window-impact-analysis.md) | gop-api-v8-window-impact | 2026-09-18 |
+| [gop-api-contract-sync-analysis.md](analyses/gop-api-contract-sync-analysis.md) | gop-api-contract-sync | 2026-09-18 |
+| [server-contract-drift-resilience-analysis.md](analyses/server-contract-drift-resilience-analysis.md) | server-contract-drift-resilience | 2026-09-10 |
+| [devicetype-sensortype-split-scenario-analysis.md](analyses/devicetype-sensortype-split-scenario-analysis.md) | devicetype-sensortype-split-scenario | 2026-09-09 |
+| [group-symbol-transform-scenario-analysis.md](analyses/group-symbol-transform-scenario-analysis.md) | group-symbol-transform-scenario | 2026-09-08 |
+| [map-25d-rotation-sync-analysis.md](analyses/map-25d-rotation-sync-analysis.md) | map-25d-rotation-sync | 2026-09-08 |
+| [map-tilt-25d-scenario-analysis.md](analyses/map-tilt-25d-scenario-analysis.md) | map-tilt-25d-scenario | 2026-09-07 |
+| [map-25d-tilt-feasibility-analysis.md](analyses/map-25d-tilt-feasibility-analysis.md) | map-25d-tilt-feasibility | 2026-09-07 |
+| [symbol-3d-wip-propagation-analysis.md](analyses/symbol-3d-wip-propagation-analysis.md) | symbol-3d-wip-propagation | 2026-09-07 |
+| [gopdb-0907-deploy-impact-analysis.md](analyses/gopdb-0907-deploy-impact-analysis.md) | gopdb-0907-deploy-impact | 2026-09-07 |
+| [pidsgroup-3d-fence-gate-scenario-analysis.md](analyses/pidsgroup-3d-fence-gate-scenario-analysis.md) | pidsgroup-3d-fence-gate-scenario | 2026-09-07 |
+| [drag-reorder-infra-analysis.md](analyses/drag-reorder-infra-analysis.md) | drag-reorder-infra | 2026-09-07 |
+| [action-report-custom-template-scenario-analysis.md](analyses/action-report-custom-template-scenario-analysis.md) | action-report-custom-template-scenario | 2026-09-07 |
+| [symbol-3d-housing-handoff-review-analysis.md](analyses/symbol-3d-housing-handoff-review-analysis.md) | symbol-3d-housing-handoff-review | 2026-09-07 |
+| [window-architecture-analysis.md](analyses/window-architecture-analysis.md) | window-architecture | 2026-09-06 |
+| [symbol-3d-housing-scenario-analysis.md](analyses/symbol-3d-housing-scenario-analysis.md) | symbol-3d-housing-scenario | 2026-09-06 |
+| [symbol-3d-feasibility-analysis.md](analyses/symbol-3d-feasibility-analysis.md) | symbol-3d-feasibility | 2026-09-04 |
+| [symbol-3d-catalog-analysis.md](analyses/symbol-3d-catalog-analysis.md) | symbol-3d-catalog | 2026-09-04 |
+| [current-problems-audit-20260903.md](analyses/current-problems-audit-20260903.md) | current-problems-audit-20260903.md | 2026-09-03 |
+| [event-chart-theme-scenario-analysis.md](analyses/event-chart-theme-scenario-analysis.md) | event-chart-theme-scenario | 2026-08-07 |
+| [report-template-is-public-analysis.md](analyses/report-template-is-public-analysis.md) | report-template-is-public | 2026-08-07 |
+| [single-instance-guard-scenario-analysis.md](analyses/single-instance-guard-scenario-analysis.md) | single-instance-guard-scenario | 2026-08-07 |
+| [redundant-execution-boot-race-analysis.md](analyses/redundant-execution-boot-race-analysis.md) | redundant-execution-boot-race | 2026-08-07 |
+| [event-mapping-workbench-scenario-analysis.md](analyses/event-mapping-workbench-scenario-analysis.md) | event-mapping-workbench-scenario | 2026-08-07 |
+| [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-07 |
 | [detection-history-bughunt-scenario-analysis.md](analyses/detection-history-bughunt-scenario-analysis.md) | detection-history-bughunt-scenario | 2026-08-06 |
 | [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | gmap-label-offset-domain-mismatch | 2026-08-06 |
 | [zoom-float-halfstep-scenario-analysis.md](analyses/zoom-float-halfstep-scenario-analysis.md) | zoom-float-halfstep-scenario | 2026-08-06 |
 | [event-panel-silent-load-failure-analysis.md](analyses/event-panel-silent-load-failure-analysis.md) | event-panel-silent-load-failure | 2026-08-04 |
 | [harness-customization-manifest.md](analyses/harness-customization-manifest.md) | harness-customization-manifest.md | 2026-08-04 |
 | [theme-contrast-audit-analysis.md](analyses/theme-contrast-audit-analysis.md) | theme-contrast-audit | 2026-08-04 |
-| [map-25d-rotation-sync-analysis.md](analyses/map-25d-rotation-sync-analysis.md) | map-25d-rotation-sync | 2026-08-03 |
 | [logout-on-exit-analysis.md](analyses/logout-on-exit-analysis.md) | logout-on-exit | 2026-08-03 |
 | [map-3d-visualization-analysis.md](analyses/map-3d-visualization-analysis.md) | map-3d-visualization | 2026-08-03 |
 | [ui-automation-scenario-spec-analysis.md](analyses/ui-automation-scenario-spec-analysis.md) | ui-automation-scenario-spec | 2026-08-03 |
@@ -105,45 +101,60 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [window-architecture-prd.md](prds/window-architecture-prd.md) | **창 아키텍처 재설계 — Surface Kernel(범위 B)** · 근거=[analysis](analyses/window-architecture-analysis.md) · 동반 [스토리보드 v2.0](design/window-surface-kernel-storyboard.html). **FR-01~40**(구조·API·테마, 150점) + **§11 권한 FR-41~66**(전수감사 → 대장 181행, 164점) + **§12 맵 OverlayWindow 불가침 경계**(사용자 지시). §12 = 3중 판정식(시각트리 부모 ∩ 디렉터리 ∩ Themes 프리픽스) · **동결 59파일**(구현 29+스타일 29+`PropertyPanelCanvas` 서브트리) · `MapView.xaml` 3구역(A수정허용/B개별승인/C전면금지) · **침범 FR 24건**(직접 9·간접 9·문서모순 6) + 수정지시문 A-01~A-24 · 무침범 확인 41건 · 집행 7겹(제안, 미적용) · 부작용 9종 · 타PRD 충돌 매트릭스 · 별건 후보 B-1~B-7. **최대 위험 A-06**: `SurfaceHostView`가 `Background` 규정 없이 ColumnSpan=4 → **표면 0개 상태에서 오버레이 전멸**(파일 무수정 경로). **A-05**: 드로어 400px가 `MapZoomControl` `Margin=5,5,300,5` 하드코딩을 덮음 → 범위 200~300 축소. 실측 정정 4건(무음차단 6→7 · 무음실패 59 · 감사공수 178→164 · 경계목록 누락 3계열+`LineDrawingHud` 오분류). 공수 **314→316점**(FR-24 6→8), 계획선 12.5→**13.0주**. 결정 대기: 범위 Tier(§11-8) · Q-01~14 · **D-1~D-7** | **Review** | 2026-09-07 |
-| [symbol-detail-and-door-control-prd.md](prds/symbol-detail-and-door-control-prd.md) | **PIDS 심볼 상세 보기 + 통문·함체 개폐 제어** — 사용자 요구 4건(개폐 버튼·상세 창·3D 자유 회전·마이크 방송). 근거=[와이어프레임](design/gate-enclosure-door-and-symbol-detail-wireframe.html) + 서버 규격 대조. **핵심 발견: 개폐 명령 경로가 서버에 이미 완비**(`POST /api/devices/{gates|enclosures}/{id}/control` → `pg_notify` → `db_monitor` → NATS `GATE_DOOR_SET`(from=DBApi) → 매니저 → `PATCH /status` → `OPERATION_EVENT` → GIS) — **클라만 비어 있음**(`IDeviceApiService` 70메서드 중 Gate 0건). **FR-01~28**: 접점 체크박스 제거·개폐 세그먼트 3상태(열림/닫힘/**명령 대기 중**, 낙관적 상태변경 금지)·Gate REST 4종·`SYNC_DEVICE` Gate 분기(통문 부팅 상태 복원)·상세 창 5탭(장비 미연결이어도 **심볼 탭은 활성**)·3D 오빗+점선 구 가이드·액션 바(기존 메뉴 단일 출처)·`BROADCAST_STATUS` 구독(규격 존재·클라 0건)·마이크 PTT·**명령류 권한 fail-closed**(현행 `?? true` = 권한 부재 시 전체 허용). 결정 D-1~D-12 · 리스크 R-1(`ShowMarkerContextMenu` 타 세션 충돌) · **서버 요청 1건**(`BROADCAST_MIC_START/STOP`) · 별건 보고(함체 control 권한 데코레이터 누락) | **Approved** 2026-09-08 | 2026-09-08 |
-| [map-tilt-25d-prd.md](prds/map-tilt-25d-prd.md) | **지도 카드 틸트(2.5D)** — 사용자 결정 ①살짝 비스듬(아핀 ScaleY=cosφ, 각도 조절, 오버스캔) ②줌 게이트(MinZoom 18.0, 히스테리시스 0.5) ③베어링 회전 시 아이콘 정립(빌보드). 근거=[시나리오 분석](analyses/map-tilt-25d-scenario-analysis.md)(시뮬 4,096+22·V-02 헤드리스 확정). **FR-01~16**: 뷰 변환 단일 빌더·`TiltMath.Decide` 순수 판정·게이트 3지점 배선·레이아웃 오버스캔(150 ms 커밋)·InnerToOuter 확장·스냅샷 TiltCos·설정/영속(메인 SetupModel 1줄)·UI(툴바 토글+슬라이더·Ctrl+Shift+T·Ctrl+↑/↓)·축척 배지·`IsBillboard` 계약+FOV 1회 합성+히트 파리티·Tier0 강등·3D 정책(i)·테스트·문서. 결정 G1~G10 승인값 §0 | **Review** | 2026-09-08 |
-| [action-report-custom-template-prd.md](prds/action-report-custom-template-prd.md) | Draft **v1.1** | 조치보고 커스텀 문구 — 하드코딩 5종 → 서버 템플릿 + 문구 관리 패널 + 정형문구 자유편집. FR-18 · NFR-07 · V-07 · **미결 G1~G8** | 2026-08-07 |
-| [event-suppression-recurrence-prd.md](prds/event-suppression-recurrence-prd.md) | **이벤트 억제 주간 반복 대응**(서버 API 6.3.3) — 베이스라인 [event-suppression-schedule-prd](prds/event-suppression-schedule-prd.md) v1.4 의 증분. FR-01~18 · NFR-01~07 · **D-1~D-8**(D-7/D-8만 사용자 결정) · V-01~06 · **함정 13종**. ★ 서버가 "제일 중요"라 한 `window_end`→`occurrence_end` 타이머는 **GIS에 고칠 코드 0건**(소비처=표시 2곳) — 실제 무게는 **표시 정직성**(`status`≠억제중, 유효기간의 62.2%가 active면서 미억제) + **반복 생성 UI** + **기존 결함 B-1~B-6 정리**(사문 Monitor·stale 배너·fail-open 부재·중복경고 시간미비교·SYNC 핸들러 부재·PATCH UI 부재). **FR-18 = POST/PATCH DTO 공유 잠복함정**(반복필드 추가 시 전 PATCH 422). ⚠ 메인솔루션 1케이스(FR-17, 사전통지). **UI 와이어프레임·스토리보드 동반**(사용자 지시) | **Approved** 2026-09-07 | 2026-09-07 |
-| [group-symbol-transform-prd.md](prds/group-symbol-transform-prd.md) | **그룹 심볼 변환**(러버밴드 전체선택 → 선택영역 중심 회전/확대·축소) — inner 공간 base 스냅샷 1회 합성 · 계열별 분기 · 배치 트랜잭션 · 세션 가드. **v2.0(9/8): 3D 심볼·틸트 도입 재검토** — 빌보드 분기를 데이터 기준으로(설치별 3D 플래그), base 스냅샷을 투영픽셀로(오버스캔이 로컬 px를 Δ 이동), 3D 프리뷰는 2D 고스트. FR-01~19 · NFR 6 · V-01~05 · GAP 22(착수 전 결정 10건) | **Draft** | 2026-09-08 |
-| [gop-api-contract-sync-prd.md](prds/gop-api-contract-sync-prd.md) | **GOP API 계약 동기화 v3.0** — FR-01~12 전부 완료 + **추가 승격 FR-13~20**(공통 계약 에러코드 16종·목록 절단 감지 · 계정·권한(`login_id` 제거로 무조건 422 해소·100명 절단·`photo_url`·권한 권위 서버 이관) · 장비 DTO/UI(`view=full` 14곳·함체 임계치 7경계·축 역투영) · 이벤트(409 분기 9곳) · 보고서(조치보고 템플릿 7경로 + `/reorder`) · **문 개폐 REST→NATS `GATE_DOOR_SET`** · `/api/units` 7경로 `>= V8_0`) · 인프라 `IServerContractProbe`+`ServerContractBootService`(Order −1000). **검증: 빌드 0 · Messages 198/198 · Accounts.Api 144/144 · Events.Ui 691P/15F(HEAD 기준선 동일=신규 회귀 0)**. 교훈 4(①판정은 배포 스웨거 ②분기는 `==` 아니라 `>=` ③**죽은 코드 2건**—`ResolveAsync` 호출부 0건·DI 팩토리 미전달 ④**`ShouldSerialize` 는 전역**—NATS 본문 파손, 플래그 게이트로) · 함정 12종. **v3.0 2차 라운드(9/18)**: **FR-21~27** 승격 — F-03(이벤트 장비 전부 '센서' 폴백 → 판본별 `device` shape: 6.3.2 전문객체+`type_device` / 8.0.1 `DeviceReference` `{id, category_device}`, 복원 `type_device`→`category_device`→'알 수 없음', **`sensor` 는 의도적 미매핑**) · F-22(탐지·장애 서버측 필터, Moq 28→팩토리 5곳) · 장비 API 통로(`by-component`·`component-status`·`/config`·`/spec`) · `unit_id` 주입(`IUnitScopeService`+`UnitScopeGate` 쓰기 14곳 단일 관문) · 에러 출구 · `Api.Messages` `Details`→`JToken?`(**삭제 금지** — `.sln:98`+worktree 56사본이 되살린다) · `CanViewUnits()`. **교훈 5~7 · 함정 13~15**: ⑤인터페이스 파라미터 목록 정확 일치(optional 추가도 목 깸, 15종 복구) ⑥**검증 방법의 구멍** — 솔루션 빌드가 WPF 테스트를 안 타 CS0535 반복 누락 ⇒ **프로젝트별 빌드** ⑦**과잉 게이트** — 판정은 "신설 여부" 아닌 "판본별 실존". 검증 = **프로젝트별 15개 오류 0 / 1225P·20F(전부 기준선)**. ⚠ **쓰기 왕복·실기 UI·8.0.1 `DeviceReference` 실물 미검증** | **Completed** (쓰기·실기 미검증) | 2026-09-18 |
-| [symbol-3d-housing-prd.md](prds/symbol-3d-housing-prd.md) | 지도 심볼 **3D 하우징** — 베이스 seam·`RotatesIn2D` 플래그 분리·FOV 동기 보정·W/H 3채널 차단·N3 정규화·OBJ 로더·kill-switch. **v2.7** FR-01~20(예상 태스크 56) · **미결 0**(G-1~15 전부 코드 근거로 확정, G-15 철회) — 3D 하우징 + **팔레트 미리보기·드래그 배치**(FR-16~18) + 속성 ↔ 3D 매칭(FR-19) · V-01~15 · 채택 G-1/2/7/9/10/**13** + 미사용 필드 6종 신규 매핑 · 형상 재설계 2회(고정형/돔/PTZ 분리 · 스피커 실물 비율) · 인계: [symbol-3d-housing-handoff.md](coordination/symbol-3d-housing-handoff.md) | **Draft** | 2026-09-04 |
-| [pidsgroup-3d-fence-gate-prd.md](prds/pidsgroup-3d-fence-gate-prd.md) | **PIDS 그룹 3D 철망 · 통문 개폐 · 함체 개폐 PRD v1.0 Draft** — FR-01~20(Phase 1: 드래그 드로잉·FenceLayout 순수함수·슬라이더 지연 커밋·기둥/센서 형태·FenceRunVisual·LOD(px 기준)·Gate enum 21 전수·fencegate/enclosure 관절·DoorState 비영속 3채널 수렴(SYNC_DEVICE/OPERATION_EVENT/ContactOn 폴백)·접점 큐 제외·DB 자가치유·설정·하네스·서버 5싱크) + Phase 2(구간 상태·정점 편집·차량) · V-01~08 · 리스크 7 · DoD | 2026-09-07 |
-| [event-mapping-workbench-prd.md](prds/event-mapping-workbench-prd.md) | 이벤트 매핑 워크벤치 — EventMapping 4리소스(본체/카메라/스피커/경광등) CRUD + **Drag&Drop 멀티셀렉션 + Draft 커밋**. 착수 전 결함 D1~D10 해소 · 실측 8항목 선행 · **결정 10건(G-1~G-10) + 메인솔루션 4파일 승인 대기** | **Draft** | 2026-08-07 |
+| [shell-surface-prd.md](prds/shell-surface-prd.md) | shell-surface | Completed | 2026-09-23 |
+| [event-mapping-workbench-console-prd.md](prds/event-mapping-workbench-console-prd.md) | event-mapping-workbench-console | Completed | 2026-09-23 |
+| [server-monitor-prd.md](prds/server-monitor-prd.md) | server-monitor | Completed | 2026-09-23 |
+| [unit-console-prd.md](prds/unit-console-prd.md) | unit-console | Completed | 2026-09-23 |
+| [reports-console-prd.md](prds/reports-console-prd.md) | reports-console | Completed | 2026-09-23 |
+| [suppression-schedule-prd.md](prds/suppression-schedule-prd.md) | suppression-schedule | Completed | 2026-09-23 |
+| [events-console-prd.md](prds/events-console-prd.md) | events-console | Completed | 2026-09-23 |
+| [accounts-console-prd.md](prds/accounts-console-prd.md) | accounts-console | Completed | 2026-09-23 |
+| [dialog-family-prd.md](prds/dialog-family-prd.md) | dialog-family | Completed | 2026-09-23 |
+| [device-wiring-setup-prd.md](prds/device-wiring-setup-prd.md) | device-wiring-setup | Completed | 2026-09-23 |
+| [settings-window-prd.md](prds/settings-window-prd.md) | settings-window | Completed | 2026-09-21 |
+| [device-assembly-preset-prd.md](prds/device-assembly-preset-prd.md) | device-assembly-preset | Completed | 2026-09-19 |
+| [device-console-redesign-prd.md](prds/device-console-redesign-prd.md) | device-console-redesign | Completed | 2026-09-19 |
+| [console-kernel-prd.md](prds/console-kernel-prd.md) | console-kernel | Completed | 2026-09-19 |
+| [device-console-v8-prd.md](prds/device-console-v8-prd.md) | device-console-v8 | Completed | 2026-09-19 |
+| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Completed | 2026-09-18 |
+| [gop-api-contract-sync-prd.md](prds/gop-api-contract-sync-prd.md) | gop-api-contract-sync | — | 2026-09-18 |
+| [event-suppression-recurrence-prd.md](prds/event-suppression-recurrence-prd.md) | event-suppression-recurrence | — | 2026-09-08 |
+| [symbol-detail-and-door-control-prd.md](prds/symbol-detail-and-door-control-prd.md) | symbol-detail-and-door-control | — | 2026-09-08 |
+| [group-symbol-transform-prd.md](prds/group-symbol-transform-prd.md) | group-symbol-transform | Draft | 2026-09-08 |
+| [map-tilt-25d-prd.md](prds/map-tilt-25d-prd.md) | map-tilt-25d | Approved | 2026-09-08 |
+| [symbol-3d-housing-prd.md](prds/symbol-3d-housing-prd.md) | symbol-3d-housing | Draft | 2026-09-07 |
+| [pidsgroup-3d-fence-gate-prd.md](prds/pidsgroup-3d-fence-gate-prd.md) | pidsgroup-3d-fence-gate | Draft | 2026-09-07 |
+| [action-report-custom-template-prd.md](prds/action-report-custom-template-prd.md) | action-report-custom-template | Approved | 2026-09-07 |
+| [window-architecture-prd.md](prds/window-architecture-prd.md) | window-architecture | — | 2026-09-06 |
+| [event-mapping-workbench-prd.md](prds/event-mapping-workbench-prd.md) | event-mapping-workbench | — | 2026-08-07 |
 | [map-topbar-trafficlight-prd.md](prds/map-topbar-trafficlight-prd.md) | map-topbar-trafficlight | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
-| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
-| [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI_Automation_Instrumentation_Phase2 | Draft | 2026-08-05 |
+| [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI_Automation_Instrumentation_Phase2 | — | 2026-08-05 |
 | [Overlay_Image_Canonical_Join-prd.md](prds/Overlay_Image_Canonical_Join-prd.md) | Overlay_Image_Canonical_Join | Draft | 2026-08-05 |
-| [Event_Silent_Failure_Elimination-prd.md](prds/Event_Silent_Failure_Elimination-prd.md) | Event_Silent_Failure_Elimination | Draft | 2026-08-05 |
+| [Event_Silent_Failure_Elimination-prd.md](prds/Event_Silent_Failure_Elimination-prd.md) | Event_Silent_Failure_Elimination | — | 2026-08-05 |
 | [installer-prd.md](prds/installer-prd.md) | installer | Approved | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd.md](prds/GMap_Schema_Migration_Idempotency-prd.md) | GMap_Schema_Migration_Idempotency | Approved | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd.md](prds/UI_Functional_Testing_Layer-prd.md) | UI_Functional_Testing_Layer | Approved | 2026-08-04 |
-| [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | Event_Edit_Save_Pipeline | Draft | 2026-08-03 |
+| [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | Event_Edit_Save_Pipeline | — | 2026-08-03 |
 | [UI_Automation_FlaUI_Smoke-prd.md](prds/UI_Automation_FlaUI_Smoke-prd.md) | UI_Automation_FlaUI_Smoke | Approved | 2026-08-03 |
 | [GMap_PidsGroup_DoubleClick_ActionReport-prd.md](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | GMap_PidsGroup_DoubleClick_ActionReport | Approved | 2026-08-03 |
-| [logout-on-exit-prd.md](prds/logout-on-exit-prd.md) | logout-on-exit | Draft | 2026-08-03 |
+| [logout-on-exit-prd.md](prds/logout-on-exit-prd.md) | logout-on-exit | — | 2026-08-03 |
 | [Event_Enum_Korean_Display-prd.md](prds/Event_Enum_Korean_Display-prd.md) | Event_Enum_Korean_Display | Approved | 2026-08-03 |
 | [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-08-03 |
 | [event-suppression-schedule-prd.md](prds/event-suppression-schedule-prd.md) | event-suppression-schedule | Draft | 2026-08-03 |
 | [session-management-overhaul-prd.md](prds/session-management-overhaul-prd.md) | session-management-overhaul | Approved | 2026-08-03 |
-| [Controller_Fault_AutoRecovery_Extension-prd.md](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | Controller_Fault_AutoRecovery_Extension | Draft | 2026-07-31 |
+| [Controller_Fault_AutoRecovery_Extension-prd.md](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | Controller_Fault_AutoRecovery_Extension | — | 2026-07-31 |
 | [GMap_Controller_Blackout_Runtime_Fix-prd.md](prds/GMap_Controller_Blackout_Runtime_Fix-prd.md) | GMap_Controller_Blackout_Runtime_Fix | Draft | 2026-07-31 |
-| [action-report-origin-thumbnail-prd.md](prds/action-report-origin-thumbnail-prd.md) | action-report-origin-thumbnail | Draft | 2026-07-31 |
+| [action-report-origin-thumbnail-prd.md](prds/action-report-origin-thumbnail-prd.md) | action-report-origin-thumbnail | — | 2026-07-31 |
 | [detection-sync-thumbnail-prd.md](prds/detection-sync-thumbnail-prd.md) | detection-sync-thumbnail | Approved | 2026-07-31 |
-| [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | GMap_Controller_Blackout | Draft | 2026-07-31 |
+| [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | GMap_Controller_Blackout | — | 2026-07-31 |
 | [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | malfunction-autoreport-setting | Approved | 2026-07-31 |
-| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | GMap_Map_Instruments | Draft | 2026-07-31 |
+| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | GMap_Map_Instruments | — | 2026-07-31 |
 | [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | GOP_Logging_Observability_P0 | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | GOP_Nats_Req_Failure_UX | Approved | 2026-07-30 |
-| [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | GMap_Compass_Control | Draft | 2026-07-30 |
+| [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | GMap_Compass_Control | — | 2026-07-30 |
 | [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS_Nats_v152_Req_Transition | Approved | 2026-07-30 |
-| [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-30 |
+| [GIS.md](prds/GIS.md) | GIS.md | — | 2026-07-30 |
 | [line-drawing-hud-redesign-prd.md](prds/line-drawing-hud-redesign-prd.md) | line-drawing-hud-redesign | Draft | 2026-07-28 |
 | [Measure_Tools-prd.md](prds/Measure_Tools-prd.md) | Measure_Tools | Approved | 2026-07-27 |
 | [CameraPopup_ControlHub-prd.md](prds/CameraPopup_ControlHub-prd.md) | CameraPopup_ControlHub | Approved | 2026-07-27 |
@@ -152,11 +163,11 @@
 | [CameraPopup_PanClamp_Badge_OnvifPtz-prd.md](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) | CameraPopup_PanClamp_Badge_OnvifPtz | Approved | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | Symbol_ContextMenu_ViewMode_Lock | Approved | 2026-07-23 |
 | [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-07-23 |
-| [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | Draft | 2026-07-23 |
-| [GOP_AuditLog_DateFilter_Pagination-prd.md](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | GOP_AuditLog_DateFilter_Pagination | Draft | 2026-07-23 |
-| [GMap_Symbol_Visibility_Master-prd.md](prds/GMap_Symbol_Visibility_Master-prd.md) | GMap_Symbol_Visibility_Master | Draft | 2026-07-20 |
+| [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | — | 2026-07-23 |
+| [GOP_AuditLog_DateFilter_Pagination-prd.md](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | GOP_AuditLog_DateFilter_Pagination | — | 2026-07-23 |
+| [GMap_Symbol_Visibility_Master-prd.md](prds/GMap_Symbol_Visibility_Master-prd.md) | GMap_Symbol_Visibility_Master | — | 2026-07-20 |
 | [MyPage_SelfPhoto_Delete_Fix-prd.md](prds/MyPage_SelfPhoto_Delete_Fix-prd.md) | MyPage_SelfPhoto_Delete_Fix | Draft | 2026-07-20 |
-| [GMap_Symbol_Visibility_Restore-prd.md](prds/GMap_Symbol_Visibility_Restore-prd.md) | GMap_Symbol_Visibility_Restore | Draft | 2026-07-20 |
+| [GMap_Symbol_Visibility_Restore-prd.md](prds/GMap_Symbol_Visibility_Restore-prd.md) | GMap_Symbol_Visibility_Restore | — | 2026-07-20 |
 | [Admin_Photo_Upload-prd.md](prds/Admin_Photo_Upload-prd.md) | Admin_Photo_Upload | Draft | 2026-07-20 |
 | [Grant_LiveCutoff_NATS_Push-prd.md](prds/Grant_LiveCutoff_NATS_Push-prd.md) | Grant_LiveCutoff_NATS_Push | Draft | 2026-07-20 |
 | [Grant_LiveCutoff_Client-prd.md](prds/Grant_LiveCutoff_Client-prd.md) | Grant_LiveCutoff_Client | Draft | 2026-07-20 |
@@ -165,24 +176,24 @@
 | [GMap_Anchor_Viewport_Lock-prd.md](prds/GMap_Anchor_Viewport_Lock-prd.md) | GMap_Anchor_Viewport_Lock | Approved | 2026-07-19 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-prd.md](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | GMap_PidsCamera_FOV_Toggle_Persistence | Approved | 2026-07-18 |
 | [GMap_Lock_Selection_ZOrder_Integrity-prd.md](prds/GMap_Lock_Selection_ZOrder_Integrity-prd.md) | GMap_Lock_Selection_ZOrder_Integrity | Approved | 2026-07-15 |
-| [DeviceStatusSync_ActionReportPropagation-prd.md](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | DeviceStatusSync_ActionReportPropagation | Draft | 2026-07-15 |
+| [DeviceStatusSync_ActionReportPropagation-prd.md](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | DeviceStatusSync_ActionReportPropagation | — | 2026-07-15 |
 | [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority | Approved | 2026-07-15 |
-| [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
+| [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | — | 2026-07-13 |
 | [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator | Approved | 2026-07-13 |
-| [GOP_Server_API_GIS_v6.3_전달통지.md](prds/GOP_Server_API_GIS_v6.3_전달통지.md) | GOP_Server_API_GIS_v6.3_전달통지.md | Draft | 2026-07-13 |
+| [GOP_Server_API_GIS_v6.3_전달통지.md](prds/GOP_Server_API_GIS_v6.3_전달통지.md) | GOP_Server_API_GIS_v6.3_전달통지.md | — | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
 | [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |
-| [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | Draft | 2026-07-13 |
+| [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | — | 2026-07-13 |
 | [Watchdog_Modern_Rebuild-prd.md](prds/Watchdog_Modern_Rebuild-prd.md) | Watchdog_Modern_Rebuild | Approved | 2026-07-13 |
-| [Startup_Unresolved_Fault_Reconciliation-prd.md](prds/Startup_Unresolved_Fault_Reconciliation-prd.md) | Startup_Unresolved_Fault_Reconciliation | Draft | 2026-07-11 |
-| [GMap_RDP_Overlay_Desync-prd.md](prds/GMap_RDP_Overlay_Desync-prd.md) | GMap_RDP_Overlay_Desync | Draft | 2026-07-11 |
+| [Startup_Unresolved_Fault_Reconciliation-prd.md](prds/Startup_Unresolved_Fault_Reconciliation-prd.md) | Startup_Unresolved_Fault_Reconciliation | — | 2026-07-11 |
+| [GMap_RDP_Overlay_Desync-prd.md](prds/GMap_RDP_Overlay_Desync-prd.md) | GMap_RDP_Overlay_Desync | — | 2026-07-11 |
 | [EventCard_Detection_Malfunction_Refinement-prd.md](prds/EventCard_Detection_Malfunction_Refinement-prd.md) | EventCard_Detection_Malfunction_Refinement | Draft | 2026-07-11 |
-| [Action_Report_Nats_FullDto_Contract-prd.md](prds/Action_Report_Nats_FullDto_Contract-prd.md) | Action_Report_Nats_FullDto_Contract | Draft | 2026-07-11 |
-| [Device_Event_API_NATS_SSOT_Sync-prd.md](prds/Device_Event_API_NATS_SSOT_Sync-prd.md) | Device_Event_API_NATS_SSOT_Sync | Draft | 2026-07-07 |
+| [Action_Report_Nats_FullDto_Contract-prd.md](prds/Action_Report_Nats_FullDto_Contract-prd.md) | Action_Report_Nats_FullDto_Contract | — | 2026-07-11 |
+| [Device_Event_API_NATS_SSOT_Sync-prd.md](prds/Device_Event_API_NATS_SSOT_Sync-prd.md) | Device_Event_API_NATS_SSOT_Sync | — | 2026-07-07 |
 | [Account_Lock_Management-prd.md](prds/Account_Lock_Management-prd.md) | Account_Lock_Management | Approved | 2026-07-07 |
-| [Account_Permission_CRUD_Hardening-prd.md](prds/Account_Permission_CRUD_Hardening-prd.md) | Account_Permission_CRUD_Hardening | Draft | 2026-07-06 |
+| [Account_Permission_CRUD_Hardening-prd.md](prds/Account_Permission_CRUD_Hardening-prd.md) | Account_Permission_CRUD_Hardening | — | 2026-07-06 |
 | [GOP_Force_Logout_Propagation-prd.md](prds/GOP_Force_Logout_Propagation-prd.md) | GOP_Force_Logout_Propagation | Approved | 2026-07-05 |
 | [DataGridPanel_CRUD_Standard_Convention-prd.md](prds/DataGridPanel_CRUD_Standard_Convention-prd.md) | DataGridPanel_CRUD_Standard_Convention | Draft | 2026-07-05 |
 | [Report_Client_v6_Integration-prd.md](prds/Report_Client_v6_Integration-prd.md) | Report_Client_v6_Integration | Draft | 2026-07-05 |
@@ -199,60 +210,60 @@
 | [Camera_Aim_Overlay_Animation-prd.md](prds/Camera_Aim_Overlay_Animation-prd.md) | Camera_Aim_Overlay_Animation | Approved | 2026-07-02 |
 | [GMap_Delete_EditMode_BugFix-prd.md](prds/GMap_Delete_EditMode_BugFix-prd.md) | GMap_Delete_EditMode_BugFix | Approved | 2026-07-02 |
 | [Grant_Scheduling_Client-prd.md](prds/Grant_Scheduling_Client-prd.md) | Grant_Scheduling_Client | Approved | 2026-07-01 |
-| [Login_Gated_GIS_Init-prd.md](prds/Login_Gated_GIS_Init-prd.md) | Login_Gated_GIS_Init | Draft | 2026-06-30 |
-| [GUIDE_Grant_Scheduling_Client_v5.2.md](prds/GUIDE_Grant_Scheduling_Client_v5.2.md) | GUIDE_Grant_Scheduling_Client_v5.2.md | Draft | 2026-06-30 |
+| [Login_Gated_GIS_Init-prd.md](prds/Login_Gated_GIS_Init-prd.md) | Login_Gated_GIS_Init | — | 2026-06-30 |
+| [GUIDE_Grant_Scheduling_Client_v5.2.md](prds/GUIDE_Grant_Scheduling_Client_v5.2.md) | GUIDE_Grant_Scheduling_Client_v5.2.md | — | 2026-06-30 |
 | [Symbol_Lock_And_RenameSync-prd.md](prds/Symbol_Lock_And_RenameSync-prd.md) | Symbol_Lock_And_RenameSync | Draft | 2026-06-30 |
 | [LayerPanel_SymbolNesting_Resize-prd.md](prds/LayerPanel_SymbolNesting_Resize-prd.md) | LayerPanel_SymbolNesting_Resize | Draft | 2026-06-30 |
 | [tracking-ptz-publisher-prd.md](prds/tracking-ptz-publisher-prd.md) | tracking-ptz-publisher | Draft | 2026-06-29 |
 | [GatewayEvent_Group_Resurrection_Fix-prd.md](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | GatewayEvent_Group_Resurrection_Fix | Approved | 2026-06-29 |
-| [CameraPopup_PTZ_Responsiveness_Speed-prd.md](prds/CameraPopup_PTZ_Responsiveness_Speed-prd.md) | CameraPopup_PTZ_Responsiveness_Speed | Draft | 2026-06-29 |
+| [CameraPopup_PTZ_Responsiveness_Speed-prd.md](prds/CameraPopup_PTZ_Responsiveness_Speed-prd.md) | CameraPopup_PTZ_Responsiveness_Speed | — | 2026-06-29 |
 | [GOP_Session_Settings_Admin-prd.md](prds/GOP_Session_Settings_Admin-prd.md) | GOP_Session_Settings_Admin | Draft | 2026-06-29 |
 | [Symbol_Apply_DeviceLocation_Api-prd.md](prds/Symbol_Apply_DeviceLocation_Api-prd.md) | Symbol_Apply_DeviceLocation_Api | Approved | 2026-06-29 |
-| [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | CameraPopup_PressHold_PtzZoomFocus | Draft | 2026-06-29 |
+| [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | CameraPopup_PressHold_PtzZoomFocus | — | 2026-06-29 |
 | [Camera_PTZ_AimLocation_Nats-prd.md](prds/Camera_PTZ_AimLocation_Nats-prd.md) | Camera_PTZ_AimLocation_Nats | Approved | 2026-06-29 |
 | [GOP_Permission_Enforcement-prd.md](prds/GOP_Permission_Enforcement-prd.md) | GOP_Permission_Enforcement | Draft | 2026-06-29 |
-| [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | GOP_Permission_Gate_Feature | Draft | 2026-06-29 |
-| [Tracking_Playback_DataSource_Toggle-prd.md](prds/Tracking_Playback_DataSource_Toggle-prd.md) | Tracking_Playback_DataSource_Toggle | Draft | 2026-06-26 |
+| [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | GOP_Permission_Gate_Feature | — | 2026-06-29 |
+| [Tracking_Playback_DataSource_Toggle-prd.md](prds/Tracking_Playback_DataSource_Toggle-prd.md) | Tracking_Playback_DataSource_Toggle | — | 2026-06-26 |
 | [GOP_Profile_Photo_Upload-prd.md](prds/GOP_Profile_Photo_Upload-prd.md) | GOP_Profile_Photo_Upload | Draft | 2026-06-26 |
-| [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | Tracking_GIS_Visualization_Playback | Draft | 2026-06-25 |
-| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP_Account_Auth_Integration | Draft | 2026-06-25 |
+| [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | Tracking_GIS_Visualization_Playback | — | 2026-06-25 |
+| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP_Account_Auth_Integration | — | 2026-06-25 |
 | [UI_ModernTheme_DesignSystem-prd.md](prds/UI_ModernTheme_DesignSystem-prd.md) | UI_ModernTheme_DesignSystem | Draft | 2026-06-24 |
 | [CameraPopup_PTZ_Control-prd.md](prds/CameraPopup_PTZ_Control-prd.md) | CameraPopup_PTZ_Control | Draft | 2026-06-23 |
-| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts_Ui_Library_Extraction | Draft | 2026-06-23 |
+| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts_Ui_Library_Extraction | — | 2026-06-23 |
 | [CameraPopup_DigitalZoom_Alignment-prd.md](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | CameraPopup_DigitalZoom_Alignment | Draft | 2026-06-23 |
-| [CameraPopup_Snapshot_UX-prd.md](prds/CameraPopup_Snapshot_UX-prd.md) | CameraPopup_Snapshot_UX | Draft | 2026-06-23 |
-| [CameraPopup_Streaming_Settings-prd.md](prds/CameraPopup_Streaming_Settings-prd.md) | CameraPopup_Streaming_Settings | Draft | 2026-06-23 |
-| [Event_FollowupAction_ContextMenu-prd.md](prds/Event_FollowupAction_ContextMenu-prd.md) | Event_FollowupAction_ContextMenu | Draft | 2026-06-22 |
-| [EventPanel_Immutable_Guard-prd.md](prds/EventPanel_Immutable_Guard-prd.md) | EventPanel_Immutable_Guard | Draft | 2026-06-22 |
+| [CameraPopup_Snapshot_UX-prd.md](prds/CameraPopup_Snapshot_UX-prd.md) | CameraPopup_Snapshot_UX | — | 2026-06-23 |
+| [CameraPopup_Streaming_Settings-prd.md](prds/CameraPopup_Streaming_Settings-prd.md) | CameraPopup_Streaming_Settings | — | 2026-06-23 |
+| [Event_FollowupAction_ContextMenu-prd.md](prds/Event_FollowupAction_ContextMenu-prd.md) | Event_FollowupAction_ContextMenu | — | 2026-06-22 |
+| [EventPanel_Immutable_Guard-prd.md](prds/EventPanel_Immutable_Guard-prd.md) | EventPanel_Immutable_Guard | — | 2026-06-22 |
 | [Rtsp_Map_Popup-prd.md](prds/Rtsp_Map_Popup-prd.md) | Rtsp_Map_Popup | Approved | 2026-06-22 |
-| [EventPanel_CRUD_Api_Alignment-prd.md](prds/EventPanel_CRUD_Api_Alignment-prd.md) | EventPanel_CRUD_Api_Alignment | Draft | 2026-06-22 |
+| [EventPanel_CRUD_Api_Alignment-prd.md](prds/EventPanel_CRUD_Api_Alignment-prd.md) | EventPanel_CRUD_Api_Alignment | — | 2026-06-22 |
 | [BaseMap_NoData_DefaultTile-prd.md](prds/BaseMap_NoData_DefaultTile-prd.md) | BaseMap_NoData_DefaultTile | Approved | 2026-06-22 |
-| [EnclosureThresholdDialog-prd.md](prds/EnclosureThresholdDialog-prd.md) | EnclosureThresholdDialog | Draft | 2026-06-22 |
-| [SpeakerServerAssignment-prd.md](prds/SpeakerServerAssignment-prd.md) | SpeakerServerAssignment | Draft | 2026-06-22 |
-| [DevicePropertyPanel_Layout_Redesign-prd.md](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | DevicePropertyPanel_Layout_Redesign | Draft | 2026-06-22 |
-| [DevicePanel_TempState_Unification-prd.md](prds/DevicePanel_TempState_Unification-prd.md) | DevicePanel_TempState_Unification | Draft | 2026-06-20 |
-| [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | GOP_UserSession_AuditLog_UI | Draft | 2026-06-20 |
-| [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | GOP_PreAuth_Overlay_NatsGate | Draft | 2026-06-20 |
-| [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | GOP_Menu_Role_Visibility | Draft | 2026-06-20 |
-| [DataGridPanel_Delete_Centralization-prd.md](prds/DataGridPanel_Delete_Centralization-prd.md) | DataGridPanel_Delete_Centralization | Draft | 2026-06-20 |
-| [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | GOP_Session_Resilience_Lifecycle | Draft | 2026-06-20 |
-| [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | GOP_MyPage_UI | Draft | 2026-06-20 |
-| [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | GOP_AccountManager_UI | Draft | 2026-06-20 |
+| [EnclosureThresholdDialog-prd.md](prds/EnclosureThresholdDialog-prd.md) | EnclosureThresholdDialog | — | 2026-06-22 |
+| [SpeakerServerAssignment-prd.md](prds/SpeakerServerAssignment-prd.md) | SpeakerServerAssignment | — | 2026-06-22 |
+| [DevicePropertyPanel_Layout_Redesign-prd.md](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | DevicePropertyPanel_Layout_Redesign | — | 2026-06-22 |
+| [DevicePanel_TempState_Unification-prd.md](prds/DevicePanel_TempState_Unification-prd.md) | DevicePanel_TempState_Unification | — | 2026-06-20 |
+| [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | GOP_UserSession_AuditLog_UI | — | 2026-06-20 |
+| [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | GOP_PreAuth_Overlay_NatsGate | — | 2026-06-20 |
+| [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | GOP_Menu_Role_Visibility | — | 2026-06-20 |
+| [DataGridPanel_Delete_Centralization-prd.md](prds/DataGridPanel_Delete_Centralization-prd.md) | DataGridPanel_Delete_Centralization | — | 2026-06-20 |
+| [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | GOP_Session_Resilience_Lifecycle | — | 2026-06-20 |
+| [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | GOP_MyPage_UI | — | 2026-06-20 |
+| [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | GOP_AccountManager_UI | — | 2026-06-20 |
 | [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
-| [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | Draft | 2026-06-19 |
-| [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | Draft | 2026-06-17 |
-| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | Draft | 2026-06-15 |
+| [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | — | 2026-06-19 |
+| [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | — | 2026-06-17 |
+| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | — | 2026-06-15 |
 | [GridSnap_System-prd.md](prds/GridSnap_System-prd.md) | GridSnap_System | Approved | 2026-06-15 |
-| [DigitalZoom_RenderTransform-prd.md](prds/DigitalZoom_RenderTransform-prd.md) | DigitalZoom_RenderTransform | Draft | 2026-06-15 |
+| [DigitalZoom_RenderTransform-prd.md](prds/DigitalZoom_RenderTransform-prd.md) | DigitalZoom_RenderTransform | — | 2026-06-15 |
 | [GMap_Zoom_Improvements-prd.md](prds/GMap_Zoom_Improvements-prd.md) | GMap_Zoom_Improvements | Approved | 2026-06-12 |
 | [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Completed | 2026-06-10 |
 | [OverlayImage_Rotation_Editing-prd.md](prds/OverlayImage_Rotation_Editing-prd.md) | OverlayImage_Rotation_Editing | Approved | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-prd.md](prds/OverlayImage_ZOrder_Independence-prd.md) | OverlayImage_ZOrder_Independence | Approved | 2026-06-10 |
-| [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | Draft | 2026-06-10 |
+| [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | — | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | LayerVisibility_Persistence_Fix | Approved | 2026-06-08 |
-| [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | DeviceApi_ProviderPropagation_Fix | Draft | 2026-06-08 |
-| [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen_MonitoringSolution | Draft | 2026-06-08 |
-| [SplashScreen_LibraryComponent-prd.md](prds/SplashScreen_LibraryComponent-prd.md) | SplashScreen_LibraryComponent | Draft | 2026-06-08 |
+| [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | DeviceApi_ProviderPropagation_Fix | — | 2026-06-08 |
+| [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen_MonitoringSolution | — | 2026-06-08 |
+| [SplashScreen_LibraryComponent-prd.md](prds/SplashScreen_LibraryComponent-prd.md) | SplashScreen_LibraryComponent | — | 2026-06-08 |
 | [SymbolTextSeparation_LabelPositioning-prd.md](prds/SymbolTextSeparation_LabelPositioning-prd.md) | SymbolTextSeparation_LabelPositioning | Approved | 2026-06-05 |
 | [WebServer_Enable_Feature-prd.md](prds/WebServer_Enable_Feature-prd.md) | WebServer_Enable_Feature | Completed | 2026-06-05 |
 | [MapSetup_Panel_Refactor-prd.md](prds/MapSetup_Panel_Refactor-prd.md) | MapSetup_Panel_Refactor | Approved | 2026-06-05 |
@@ -262,24 +273,24 @@
 | [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix | Completed | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd.md](prds/Multisensor_Symbol_Fix-prd.md) | Multisensor_Symbol_Fix | Completed | 2026-06-04 |
 | [BatchReport_SymbolRestore_Fix-prd.md](prds/BatchReport_SymbolRestore_Fix-prd.md) | BatchReport_SymbolRestore_Fix | Approved | 2026-06-04 |
-| [EventCardPerformance-prd.md](prds/EventCardPerformance-prd.md) | EventCardPerformance | Draft | 2026-06-04 |
+| [EventCardPerformance-prd.md](prds/EventCardPerformance-prd.md) | EventCardPerformance | — | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-prd.md](prds/OverlayMap_MBTiles_Provider-prd.md) | OverlayMap_MBTiles_Provider | Approved | 2026-06-02 |
 | [RedisDomainService_DoubleStop_Fix-prd.md](prds/RedisDomainService_DoubleStop_Fix-prd.md) | RedisDomainService_DoubleStop_Fix | Approved | 2026-06-01 |
 | [NatsShutdown_SubscriptionHang_Fix-prd.md](prds/NatsShutdown_SubscriptionHang_Fix-prd.md) | NatsShutdown_SubscriptionHang_Fix | Approved | 2026-06-01 |
 | [AppShutdown_Blocking_Fix-prd.md](prds/AppShutdown_Blocking_Fix-prd.md) | AppShutdown_Blocking_Fix | Approved | 2026-06-01 |
 | [DetectionPulse_Ripple_Enlargement-prd.md](prds/DetectionPulse_Ripple_Enlargement-prd.md) | DetectionPulse_Ripple_Enlargement | Approved | 2026-05-28 |
-| [PRD_SplashScreen_Startup_Gating.md](prds/PRD_SplashScreen_Startup_Gating.md) | PRD_SplashScreen_Startup_Gating.md | Draft | 2026-05-27 |
-| [SymbolUpdate_Threading_And_LeakFix-prd.md](prds/SymbolUpdate_Threading_And_LeakFix-prd.md) | SymbolUpdate_Threading_And_LeakFix | Draft | 2026-05-27 |
-| [OverlayMap_Performance_Optimization-prd.md](prds/OverlayMap_Performance_Optimization-prd.md) | OverlayMap_Performance_Optimization | Draft | 2026-05-27 |
+| [PRD_SplashScreen_Startup_Gating.md](prds/PRD_SplashScreen_Startup_Gating.md) | PRD_SplashScreen_Startup_Gating.md | — | 2026-05-27 |
+| [SymbolUpdate_Threading_And_LeakFix-prd.md](prds/SymbolUpdate_Threading_And_LeakFix-prd.md) | SymbolUpdate_Threading_And_LeakFix | — | 2026-05-27 |
+| [OverlayMap_Performance_Optimization-prd.md](prds/OverlayMap_Performance_Optimization-prd.md) | OverlayMap_Performance_Optimization | — | 2026-05-27 |
 | [MalfunctionCard_ControllerNumber_BindingFix-prd.md](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | MalfunctionCard_ControllerNumber_BindingFix | Approved | 2026-05-27 |
 | [MapSymbol_PulseAnimation_Performance_Fix-prd.md](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | MapSymbol_PulseAnimation_Performance_Fix | Approved | 2026-05-26 |
-| [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | Event_Performance_Optimization | Draft | 2026-05-22 |
-| [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | AutoActionReport_DualPath_Fix | Draft | 2026-05-22 |
-| [BatchReport_Sound_Stop_Fix-prd.md](prds/BatchReport_Sound_Stop_Fix-prd.md) | BatchReport_Sound_Stop_Fix | Draft | 2026-05-21 |
-| [PRD_PidsSymbol_Transparency_Blink.md](prds/PRD_PidsSymbol_Transparency_Blink.md) | PRD_PidsSymbol_Transparency_Blink.md | Draft | 2026-05-20 |
-| [SoundTypeSwitch_ImmediateStop_Fix-prd.md](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | SoundTypeSwitch_ImmediateStop_Fix | Draft | 2026-05-20 |
-| [Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | Device_CompositeState_SSOT_And_FaultAutoRecovery | Draft | 2026-05-19 |
-| [FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md](prds/FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md) | FenceGroup_Blink_And_Sound_DualPlay_Fix | Draft | 2026-05-19 |
+| [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | Event_Performance_Optimization | — | 2026-05-22 |
+| [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | AutoActionReport_DualPath_Fix | — | 2026-05-22 |
+| [BatchReport_Sound_Stop_Fix-prd.md](prds/BatchReport_Sound_Stop_Fix-prd.md) | BatchReport_Sound_Stop_Fix | — | 2026-05-21 |
+| [PRD_PidsSymbol_Transparency_Blink.md](prds/PRD_PidsSymbol_Transparency_Blink.md) | PRD_PidsSymbol_Transparency_Blink.md | — | 2026-05-20 |
+| [SoundTypeSwitch_ImmediateStop_Fix-prd.md](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | SoundTypeSwitch_ImmediateStop_Fix | — | 2026-05-20 |
+| [Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | Device_CompositeState_SSOT_And_FaultAutoRecovery | — | 2026-05-19 |
+| [FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md](prds/FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md) | FenceGroup_Blink_And_Sound_DualPlay_Fix | — | 2026-05-19 |
 | [Malfunction_CompositeState_And_FenceGroup_Visualization-prd.md](prds/Malfunction_CompositeState_And_FenceGroup_Visualization-prd.md) | Malfunction_CompositeState_And_FenceGroup_Visualization | Completed | 2026-05-19 |
 | [BatchReport_DualInsert_And_MalfunctionRestore_Fix-prd.md](prds/BatchReport_DualInsert_And_MalfunctionRestore_Fix-prd.md) | BatchReport_DualInsert_And_MalfunctionRestore_Fix | Completed | 2026-05-19 |
 | [GatewayEvent_Group_NtoN_Migration-prd.md](prds/GatewayEvent_Group_NtoN_Migration-prd.md) | GatewayEvent_Group_NtoN_Migration | Completed | 2026-05-19 |
@@ -292,14 +303,29 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [gop-api-contract-sync-prd-plan.md](plans/gop-api-contract-sync-prd-plan.md) | **GOP API 계약 동기화 구현 플랜 — 완료 48 / 미실시 4** (태스크 37 + 추가 승격 8 + **2차 승격 7**(Phase 2c, IMPL-21~27) = **52**). 에이전트 **13기 병렬** + 메인 통합. FR-08 버전 프로브가 FR-09~12 의 **선행 관문**(`>=` 경계 비교, **동치 비교 0건**). **결정 대기 D-1~D-3 전부 해소**(문 개폐 채널 전환→FR-19 · 조치보고 템플릿 7경로→FR-18 · 계정 100명 절단→FR-14). 🔴 **통합 발견 4종**(`ResolveAsync` 호출부 0건 · DI 팩토리 프로브 미전달 · `StatusCode` 성공경로 미충전으로 202≠201 불가 · `ShouldSerialize` 가 NATS 본문까지 차단) — 전부 빌드·테스트 통과 상태로 숨어 있었다. ❌ **미실시: LIVE-01/02/04(쓰기 왕복) · LIVE-05(실기 UI) · REG-03(UI 하네스)**. 보고서별 미확인 **48건** 대부분 열린 채 · 함정 **18건**. **Phase 2c(2차 승격, IMPL-21~27) 완료** + 🔴 **2차 발견 3건**(①인터페이스 파라미터 목록 정확 일치 — optional 추가도 목 깸, 15종 복구 ②**검증 방법의 구멍** — 솔루션 빌드가 WPF 임시 프로젝트를 안 타 `Devices.Ui/Tests` CS0535 를 여러 차례 놓치고 "빌드 0"을 거짓 보고 ⇒ **프로젝트별 빌드 15개** ③**과잉 게이트** — 운영 6.3.2 에도 있는 `group_id`/`server_id` 4곳이 `>= V7_0` 뒤에 숨어 필터 상실 → `AddLegacySafeFilter`). 테스트 **1225P / 20F(전부 기준선)** | **48 / 52** | 2026-09-18 |
-| [symbol-detail-and-door-control-prd-plan.md](plans/symbol-detail-and-door-control-prd-plan.md) | **PIDS 심볼 상세 보기 + 통문·함체 개폐 제어** 구현 계획 — 총 42태스크(Phase0 검증 5 · 준비 3 · 구현 24(A Gate REST / B 개폐 UI / C 상세 창 / D 방송 / E 권한) · 테스트 7 · 문서 3). 사용자 지시 *"누락없이 다 개발"* → **요구사항 추적표로 FR 28 + NFR 5 = 33/33 전수 매핑**(기계 검산 통과 — 추적표·태스크 태그 양쪽). 순서 자유이되 **A→B 선후**(B가 A의 API 호출) · **C-10(컨텍스트 메뉴)은 맨 마지막**(타 세션 `pidsgroup-rightclick` 충돌 R-1). OQ 5건 중 그룹 A·B·C·E 를 차단하는 것은 **없음** — 마이크(D)만 서버 회신 대기, 그마저 UI 선구현 | 2026-09-08 |
-| [map-tilt-25d-prd-plan.md](plans/map-tilt-25d-prd-plan.md) | **지도 카드 틸트 구현 플랜 v1.0** — [PRD](prds/map-tilt-25d-prd.md) Approved · 44태스크: Phase 0 VER-01~07(V-02 확정)/RISK 2 → SETUP 3 → 구현 2-A 판정 · 2-B 오버스캔 수식/정착기 · 2-C 설정(+메인 SetupModel 1줄·템플릿 키, 사전 통지) · 2-D 스냅샷 · 2-E Tier → 2-F 맵 컨트롤 배선 · 2-G VM/XAML/배지 · 2-H 3D 정책 · 2-I 빌보드(TDD) → TEST 5 → DOC 3. 롤백 태그 `before-map-tilt-25d` + WIP 백업 패치. 기반 5그룹 병렬 착수(2026-09-08 07:3x) | 2/44 | 2026-09-08 |
-| [event-suppression-recurrence-prd-plan.md](plans/event-suppression-recurrence-prd-plan.md) | **억제 주간반복 구현 플랜 v1.0** — 61태스크/52h · **2단 게이트**(A 라이브러리 55 / B 실기·메인 6). S0 게이트+V-08 스파이크 → S1 헤드리스 3트랙 → S2 서비스·투영 → **S3 패널VM 순차(718행)** → **S4 XAML 순차(963행)** → S5 테스트·하네스 → S6 메인·문서. **적대검증 fatal 6 반영**: DTO 개명이 15h간 빌드 불가(T-B04 병합) · `IsDrag` Utils 이관이 NU1201로 불가(DEFER) · `FormErrorText` 미신설로 기존 30일 경고 **조용히 소멸**(T-E05b) · stale 배너가 폴링 실패 시 통째 소멸(HasActiveBanner) · **메인 편집 4건**(통지 확장). major 반영 10건(ToggleButton Style 부재·FR-06 출력 태스크 부재·RowHeight 고정·운영 쓰기 가드 부재 등). **착수 전 사용자 확인 3건**(worktree deviation·메인 4건·목록 열 폭) | 2026-09-07 |
-| [pidsgroup-3d-fence-gate-prd-plan.md](plans/pidsgroup-3d-fence-gate-prd-plan.md) | 3D 철망·통문·함체 구현 플랜 — 46 태스크(VER 8·리스크 3·순수함수 A·Enum/모델/DB B·3D C·이벤트 D·컨트롤/속성창/드로잉 E·메인 M·서버 S·테스트·문서), 병렬 순서 S0~S5, 의존 그래프(순환 없음) | 2026-09-07 |
-| [map-topbar-trafficlight-prd-plan.md](plans/map-topbar-trafficlight-prd-plan.md) | [PRD](prds/map-topbar-trafficlight-prd.md) | 6/21 | 2026-08-06 |
+| [shell-surface-prd-plan.md](plans/shell-surface-prd-plan.md) | [PRD](prds/shell-surface-prd.md) | 2/2 | 2026-09-23 |
+| [event-mapping-workbench-console-prd-plan.md](plans/event-mapping-workbench-console-prd-plan.md) | [PRD](prds/event-mapping-workbench-console-prd.md) | 2/2 | 2026-09-23 |
+| [server-monitor-prd-plan.md](plans/server-monitor-prd-plan.md) | [PRD](prds/server-monitor-prd.md) | 2/2 | 2026-09-23 |
+| [unit-console-prd-plan.md](plans/unit-console-prd-plan.md) | [PRD](prds/unit-console-prd.md) | 2/2 | 2026-09-23 |
+| [reports-console-prd-plan.md](plans/reports-console-prd-plan.md) | [PRD](prds/reports-console-prd.md) | 2/2 | 2026-09-23 |
+| [suppression-schedule-prd-plan.md](plans/suppression-schedule-prd-plan.md) | [PRD](prds/suppression-schedule-prd.md) | 2/2 | 2026-09-23 |
+| [events-console-prd-plan.md](plans/events-console-prd-plan.md) | [PRD](prds/events-console-prd.md) | 2/2 | 2026-09-23 |
+| [accounts-console-prd-plan.md](plans/accounts-console-prd-plan.md) | [PRD](prds/accounts-console-prd.md) | 2/2 | 2026-09-23 |
+| [dialog-family-prd-plan.md](plans/dialog-family-prd-plan.md) | [PRD](prds/dialog-family-prd.md) | 2/2 | 2026-09-23 |
+| [device-wiring-setup-prd-plan.md](plans/device-wiring-setup-prd-plan.md) | [PRD](prds/device-wiring-setup-prd.md) | 2/2 | 2026-09-23 |
+| [settings-window-prd-plan.md](plans/settings-window-prd-plan.md) | [PRD](prds/settings-window-prd.md) | 2/2 | 2026-09-21 |
+| [device-assembly-preset-prd-plan.md](plans/device-assembly-preset-prd-plan.md) | [PRD](prds/device-assembly-preset-prd.md) | 9/9 | 2026-09-19 |
+| [device-console-redesign-prd-plan.md](plans/device-console-redesign-prd-plan.md) | [PRD](prds/device-console-redesign-prd.md) | 12/12 | 2026-09-19 |
+| [console-kernel-prd-plan.md](plans/console-kernel-prd-plan.md) | [PRD](prds/console-kernel-prd.md) | 23/23 | 2026-09-19 |
+| [device-console-v8-prd-plan.md](plans/device-console-v8-prd-plan.md) | [PRD](prds/device-console-v8-prd.md) | 57/57 | 2026-09-19 |
+| [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 36/45 | 2026-09-18 |
+| [gop-api-contract-sync-prd-plan.md](plans/gop-api-contract-sync-prd-plan.md) | [PRD](prds/gop-api-contract-sync-prd.md) | 58/66 | 2026-09-18 |
+| [symbol-detail-and-door-control-prd-plan.md](plans/symbol-detail-and-door-control-prd-plan.md) | [PRD](prds/symbol-detail-and-door-control-prd.md) | 50/64 | 2026-09-08 |
+| [event-suppression-recurrence-prd-plan.md](plans/event-suppression-recurrence-prd-plan.md) | [PRD](prds/event-suppression-recurrence-prd.md) | 68/76 | 2026-09-08 |
+| [map-tilt-25d-prd-plan.md](plans/map-tilt-25d-prd-plan.md) | [PRD](prds/map-tilt-25d-prd.md) | 54/56 | 2026-09-08 |
+| [pidsgroup-3d-fence-gate-prd-plan.md](plans/pidsgroup-3d-fence-gate-prd-plan.md) | [PRD](prds/pidsgroup-3d-fence-gate-prd.md) | 71/81 | 2026-09-07 |
+| [map-topbar-trafficlight-prd-plan.md](plans/map-topbar-trafficlight-prd-plan.md) | [PRD](prds/map-topbar-trafficlight-prd.md) | 15/21 | 2026-08-06 |
 | [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 28/32 | 2026-08-06 |
-| [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 36/50 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd-plan.md](plans/GMap_Schema_Migration_Idempotency-prd-plan.md) | [PRD](prds/GMap_Schema_Migration_Idempotency-prd.md) | 19/47 | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 | 2026-08-04 |
@@ -417,43 +443,56 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
-| [gop-api-contract-sync-live-verification.md](tests/gop-api-contract-sync-live-verification.md) | **실연동 검증 — 관문 104 중 OK 96 · 비결함 FAIL 2 · SKIP/INFO 6**. 라이브러리 실물(모의 0)을 로컬 8.0.1 · 운영 6.3.2 · NATS 4222 에 붙여 실행. 판본 판정이 같은 바이너리에서 `V8_0`/`V6_3` 로 갈림 · `Alert` 왕복 → `MessageType=Alert(160)` · **장비 7종 쓰기 전면 통과**(`type_device` 미전송·422 없음) · 권한 전체 교체 16종 무손실 · NATS `GATE_DOOR_SET` 도달 + `global.>` 실수신 + `requested_at` aware ISO-8601. 🔴 **실측으로 결함 2건 발견·수정**(희소 PATCH `controller_id:0` → 404 / `limit` 상한 미클램프 → 빈 목록 침묵 실패). 서버팀 신규 2건(억제 #97 영구 수정 불가 · 억제 응답 `data` 부재 미문서화). 함정 19~23(빈 응답 공허 통과 · DTO 재직렬화 복제가 축 게이트로 필드 탈락 · NATS 구독은 `ExecuteAsync` · JToken `ToString()` 로 와이어 판정 금지 · 하네스 실패≠제품 결함) | 서버 상태 원복 확인(잔존 0 · 억제창 2→2) · ❌ 실기 UI · 운영 인증 경로 · FR-24 `unit_id` 실주입 미검증 | 2026-09-18 |
-| [map-tilt-25d-scenarios.md](tests/map-tilt-25d-scenarios.md) | 지도 카드 틸트 시나리오 카탈로그 4,096(기계: 8줌×플래그×앵커×베어링×각도4×Tier × 입력 8) + 교차 22 | 정책 파라미터 제안값(35°/20°/게이트 18.0/히스테리시스 0.5) | 2026-09-08 |
-| [map-tilt-25d-simulation-log.md](tests/map-tilt-25d-simulation-log.md) | 전량 로그 — 제안 정책 불변식 위반 0 · 현행 결함 D1~D4 · 결정③ 차이 R3 · 정책 공백 G1~G8 | 생성기 scratchpad/sim/map_tilt_sim.py | 2026-09-08 |
-|[action-report-custom-template-simulation-log.md](tests/action-report-custom-template-simulation-log.md) | 시뮬레이션 전량 로그 — PASS 167 / ISSUE·GAP 68 / 고유 42종 | 2026-08-07 |
-|[action-report-custom-template-scenarios.md](tests/action-report-custom-template-scenarios.md) | 시나리오 카탈로그 235건 (L75/C28/E29/O12/P28/S10/D14/M6/X10/U23) | 2026-08-07 |
-| [pidsgroup-3d-fence-gate-scenarios.md](tests/pidsgroup-3d-fence-gate-scenarios.md) | 3D 철망·통문·함체 시나리오 카탈로그 40건(정상 12·경계 10·실패 12·회귀 6, 검증 방식 H/S/U/D) | 2026-09-07 |
-| [group-symbol-transform-scenarios.md](tests/group-symbol-transform-scenarios.md) | 그룹 심볼 변환 시나리오 카탈로그 v4 — 5,144건(회전 4,320·누적 192·스케일 452·래스터 48·계열 45·부가 24·영속 30·생명주기 18·GAP 15), 진리값 2종×후보 5종 성적표 | 2026-09-04 |
-| [group-symbol-transform-simulation-log.md](tests/group-symbol-transform-simulation-log.md) | 그룹 심볼 변환 시뮬 **전량 로그 v4**(5,144건, PASS 3,012·ISSUE 2,117·GAP 15) | 2026-09-04 |
-| [symbol-3d-housing-scenarios.md](tests/symbol-3d-housing-scenarios.md) | 3D 하우징 시나리오 카탈로그 — 라운드 3 최종 **2,032건** · 패밀리 85(+ DND/PAL/PROP/R2) · SIM ID 유일(생성기 검증) · PRD FR 역참조 | - | 2026-09-04 |
-| [symbol-3d-housing-simulation-log.md](tests/symbol-3d-housing-simulation-log.md) | 3D 하우징 시뮬 전량 로그 — 라운드 3(PASS 1,348 · ISSUE 628 · GAP 40 · MEASURE 16) + 라운드 1 재실행본(1,299) | - | 2026-09-04 |
-| [devicetype-sensortype-split-scenarios.md](tests/devicetype-sensortype-split-scenarios.md) | 시나리오 카탈로그 — **942건**(W/S/D/G/N/U/K/L/T/C/V/M/X 13계열) · 실기검증 V-1~V-6 | - | 2026-09-09 |
-| [devicetype-sensortype-split-simulation-log.md](tests/devicetype-sensortype-split-simulation-log.md) | 시뮬 전량 로그 — PASS 608 / ISSUE 334 / 21종. **안별: AS-IS 149 · A 200 · B 22 · C 70**. 시뮬레이터 [devicetype-sensortype-split-simulator.py](tests/devicetype-sensortype-split-simulator.py) 부속 | 64.5% | 2026-09-09 |
-| [event-mapping-workbench-scenarios.md](tests/event-mapping-workbench-scenarios.md) | 시나리오 카탈로그 v1.1 — **633건**(P/E/D/C/B/N/M/R/G/O/T + v1.1 신설 X·L·Z) · 실기 검증 V-1~V-8 | - | 2026-08-07 |
-| [event-mapping-workbench-simulation-log.md](tests/event-mapping-workbench-simulation-log.md) | 시뮬 전량 로그 — **PASS 523 / ISSUE 110 / 이슈 33종**. 시뮬레이터 [event-mapping-workbench-simulator.py](tests/event-mapping-workbench-simulator.py) 부속 | 82.6% | 2026-08-07 |
+| [settings-window-test-result.md](tests/settings-window-test-result.md) | -% | -% | 2026-09-21 |
+| [device-assembly-preset-test-result.md](tests/device-assembly-preset-test-result.md) | -% | -% | 2026-09-19 |
+| [device-console-redesign-test-result.md](tests/device-console-redesign-test-result.md) | -% | -% | 2026-09-19 |
+| [console-kernel-test-result.md](tests/console-kernel-test-result.md) | -% | -% | 2026-09-19 |
+| [device-console-v8-test-result.md](tests/device-console-v8-test-result.md) | -% | -% | 2026-09-19 |
+| [device-console-v8-phase1-gate.md](tests/device-console-v8-phase1-gate.md) | -% | -% | 2026-09-19 |
+| [device-console-v8-verification.md](tests/device-console-v8-verification.md) | -% | -% | 2026-09-19 |
+| [device-console-v8-simulation-log.md](tests/device-console-v8-simulation-log.md) | -% | -% | 2026-09-18 |
+| [device-console-v8-scenarios.md](tests/device-console-v8-scenarios.md) | -% | -% | 2026-09-18 |
+| [gop-api-contract-sync-live-verification.md](tests/gop-api-contract-sync-live-verification.md) | -% | -% | 2026-09-18 |
+| [devicetype-sensortype-split-simulation-log.md](tests/devicetype-sensortype-split-simulation-log.md) | -% | -% | 2026-09-09 |
+| [devicetype-sensortype-split-scenarios.md](tests/devicetype-sensortype-split-scenarios.md) | -% | -% | 2026-09-09 |
+| [group-symbol-transform-scenarios.md](tests/group-symbol-transform-scenarios.md) | -% | -% | 2026-09-08 |
+| [group-symbol-transform-simulation-log.md](tests/group-symbol-transform-simulation-log.md) | -% | -% | 2026-09-08 |
+| [map-tilt-25d-simulation-log.md](tests/map-tilt-25d-simulation-log.md) | -% | -% | 2026-09-07 |
+| [map-tilt-25d-scenarios.md](tests/map-tilt-25d-scenarios.md) | -% | -% | 2026-09-07 |
+| [pidsgroup-3d-fence-gate-scenarios.md](tests/pidsgroup-3d-fence-gate-scenarios.md) | -% | -% | 2026-09-07 |
+| [action-report-custom-template-scenarios.md](tests/action-report-custom-template-scenarios.md) | -% | -% | 2026-09-07 |
+| [symbol-3d-housing-simulation-log.md](tests/symbol-3d-housing-simulation-log.md) | -% | -% | 2026-09-06 |
+| [symbol-3d-housing-scenarios.md](tests/symbol-3d-housing-scenarios.md) | -% | -% | 2026-09-06 |
+| [action-report-custom-template-simulation-log.md](tests/action-report-custom-template-simulation-log.md) | -% | -% | 2026-09-04 |
+| [gis-test-master-checklist.md](tests/gis-test-master-checklist.md) | -% | -% | 2026-09-03 |
+| [event-chart-theme-scenarios.md](tests/event-chart-theme-scenarios.md) | -% | -% | 2026-08-07 |
+| [event-chart-theme-simulation-log.md](tests/event-chart-theme-simulation-log.md) | -% | -% | 2026-08-07 |
+| [single-instance-guard-simulation-log.md](tests/single-instance-guard-simulation-log.md) | -% | -% | 2026-08-07 |
+| [single-instance-guard-scenarios.md](tests/single-instance-guard-scenarios.md) | -% | -% | 2026-08-07 |
+| [event-mapping-workbench-scenarios.md](tests/event-mapping-workbench-scenarios.md) | -% | -% | 2026-08-07 |
+| [event-mapping-workbench-simulation-log.md](tests/event-mapping-workbench-simulation-log.md) | -% | -% | 2026-08-07 |
+| [simlog.md](tests/simlog.md) | -% | -% | 2026-08-07 |
 | [gmap-control-capability-interaction.md](tests/gmap-control-capability-interaction.md) | -% | -% | 2026-08-07 |
 | [gmap-control-capability-modes.md](tests/gmap-control-capability-modes.md) | -% | -% | 2026-08-07 |
 | [gmap-control-capability-drawing.md](tests/gmap-control-capability-drawing.md) | -% | -% | 2026-08-07 |
 | [gmap-control-capability-viewport.md](tests/gmap-control-capability-viewport.md) | -% | -% | 2026-08-07 |
 | [gmap-control-capability-markers.md](tests/gmap-control-capability-markers.md) | -% | -% | 2026-08-07 |
 | [gmaps-xaml-capability-overlays.md](tests/gmaps-xaml-capability-overlays.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-account-auth.md](tests/gis-test-catalog-account-auth.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-data-integrity.md](tests/gis-test-catalog-data-integrity.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-overlay-image.md](tests/gis-test-catalog-overlay-image.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-map-core.md](tests/gis-test-catalog-map-core.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-label-adorner.md](tests/gis-test-catalog-label-adorner.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-device-crud.md](tests/gis-test-catalog-device-crud.md) | -% | -% | 2026-08-07 |
-| [gis-test-master-checklist.md](tests/gis-test-master-checklist.md) | -% | -% | 2026-08-07 |
-| [gmaps-xaml-capability-mapview.md](tests/gmaps-xaml-capability-mapview.md) | -% | -% | 2026-08-07 |
 | [gmaps-xaml-capability-markers.md](tests/gmaps-xaml-capability-markers.md) | -% | -% | 2026-08-07 |
-| [gmaps-xaml-capability-overlays.md](tests/gmaps-xaml-capability-overlays.md) | -% | -% | 2026-08-07 |
 | [gmaps-xaml-capability-property.md](tests/gmaps-xaml-capability-property.md) | -% | -% | 2026-08-07 |
 | [gmaps-xaml-capability-instruments.md](tests/gmaps-xaml-capability-instruments.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-drawing-measure.md](tests/gis-test-catalog-drawing-measure.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-events-panel.md](tests/gis-test-catalog-events-panel.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-layer-panel.md](tests/gis-test-catalog-layer-panel.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-symbol-crud.md](tests/gis-test-catalog-symbol-crud.md) | -% | -% | 2026-08-07 |
-| [gis-test-catalog-symbol-property.md](tests/gis-test-catalog-symbol-property.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-mapview.md](tests/gmaps-xaml-capability-mapview.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-symbol-property.md](tests/gis-test-catalog-symbol-property.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-account-auth.md](tests/gis-test-catalog-account-auth.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-data-integrity.md](tests/gis-test-catalog-data-integrity.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-events-panel.md](tests/gis-test-catalog-events-panel.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-overlay-image.md](tests/gis-test-catalog-overlay-image.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-map-core.md](tests/gis-test-catalog-map-core.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-label-adorner.md](tests/gis-test-catalog-label-adorner.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-drawing-measure.md](tests/gis-test-catalog-drawing-measure.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-symbol-crud.md](tests/gis-test-catalog-symbol-crud.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-device-crud.md](tests/gis-test-catalog-device-crud.md) | -% | -% | 2026-08-06 |
+| [gis-test-catalog-layer-panel.md](tests/gis-test-catalog-layer-panel.md) | -% | -% | 2026-08-06 |
 | [detection-history-bughunt-scenarios.md](tests/detection-history-bughunt-scenarios.md) | -% | -% | 2026-08-06 |
 | [detection-history-bughunt-simulation-log.md](tests/detection-history-bughunt-simulation-log.md) | -% | -% | 2026-08-06 |
 | [zoom-float-halfstep-scenarios.md](tests/zoom-float-halfstep-scenarios.md) | -% | -% | 2026-08-06 |
@@ -470,10 +509,15 @@
 ## 완료 리포트 (docs/reports/)
 
 | 파일 | 문서 연결 체인 | 날짜 |
-| [symbol-detail-and-door-control-report.md](reports/symbol-detail-and-door-control-report.md) | **PIDS 심볼 상세 보기 + 통문·함체 개폐 제어 완료 리포트** — 요구 4건 대비 결과표 · 설계 판단 4건(오빗 카메라를 지도와 분리한 이유 · 액션 바 단일 출처 · 명령은 상태를 안 바꾼다 · 권한 폴백 비대칭) · **스스로 찾아 고친 결함 4건**(재개봉 시 `⟲ 정면` 사망 · 숨은 창 타이머 잔존 · `cameras:control` fail-closed 누락 · 메뉴/버튼 탐지이력 조건 불일치) · 검증 **877 green**(헤드리스 707 · STA 렌더 18 · 3D 회귀 152) · 남은 실기 3건과 차단 사유(계정 env 미설정 · 로컬 통문이 전부 장비 미연결) · 서버 대기 1건 | 2026-09-08 |
-| [map-tilt-25d-report.md](reports/map-tilt-25d-report.md) | **지도 카드 틸트 완료 리포트** — [PRD v1.2](prds/map-tilt-25d-prd.md) → [플랜](plans/map-tilt-25d-prd-plan.md) 45/47 → 기반 5 + 배선 5 그룹(적대 리뷰 10 PASS) → 헤드리스 566/150/4/94 → **실기 6차 틸트 ✅12/ⓘ3/✖0 + 3D 회귀 ✅26/✖0**(OFF 픽셀 diff 0 · 게이트 왕복 · Tier 0x20000). 편차 7 · 잔여 VER-06/07 · 코드 미커밋(태그 `before-map-tilt-25d`) | 2026-09-08 |
-| [pidsgroup-3d-fence-gate-report.md](reports/pidsgroup-3d-fence-gate-report.md) | 3D 철망·통문·함체 구현 리포트 1차(2026-09-07) — 라이브러리·메인·서버·하네스 green, 실기 대조표(화면 잠금으로 미실행)·PRD 편차·통지 |
 |------|------------|------|
+| [settings-window-report.md](reports/settings-window-report.md) | [PRD](prds/settings-window-prd.md) → [Plan](plans/settings-window-prd-plan.md) | 2026-09-21 |
+| [device-assembly-preset-report.md](reports/device-assembly-preset-report.md) | [PRD](prds/device-assembly-preset-prd.md) → [Plan](plans/device-assembly-preset-prd-plan.md) | 2026-09-19 |
+| [device-console-redesign-report.md](reports/device-console-redesign-report.md) | [PRD](prds/device-console-redesign-prd.md) → [Plan](plans/device-console-redesign-prd-plan.md) | 2026-09-19 |
+| [console-kernel-report.md](reports/console-kernel-report.md) | [PRD](prds/console-kernel-prd.md) → [Plan](plans/console-kernel-prd-plan.md) | 2026-09-19 |
+| [device-console-v8-report.md](reports/device-console-v8-report.md) | [PRD](prds/device-console-v8-prd.md) → [Plan](plans/device-console-v8-prd-plan.md) | 2026-09-19 |
+| [symbol-detail-and-door-control-report.md](reports/symbol-detail-and-door-control-report.md) | [PRD](prds/symbol-detail-and-door-control-prd.md) → [Plan](plans/symbol-detail-and-door-control-prd-plan.md) | 2026-09-08 |
+| [map-tilt-25d-report.md](reports/map-tilt-25d-report.md) | [PRD](prds/map-tilt-25d-prd.md) → [Plan](plans/map-tilt-25d-prd-plan.md) | 2026-09-08 |
+| [pidsgroup-3d-fence-gate-report.md](reports/pidsgroup-3d-fence-gate-report.md) | [PRD](prds/pidsgroup-3d-fence-gate-prd.md) → [Plan](plans/pidsgroup-3d-fence-gate-prd-plan.md) | 2026-09-07 |
 | [session-management-overhaul-report.md](reports/session-management-overhaul-report.md) | [PRD](prds/session-management-overhaul-prd.md) → [Plan](plans/session-management-overhaul-prd-plan.md) | 2026-08-03 |
 | [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) → [Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-27 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-report.md](reports/CameraPopup_PanClamp_Badge_OnvifPtz-report.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) → [Plan](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | 2026-07-23 |
