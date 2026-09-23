@@ -1,6 +1,26 @@
 # 세션 컨텍스트
 
-## ▶▶ 재개 포인트 (2026-09-23 — **봉투 all-windows-console-redesign 전 노드 완료 · 예산 14/14 · 양 레포 정본 반영 끝**)
+## ▶▶ 재개 포인트 (2026-09-23 저녁 — **PC 재부팅으로 중단. UI 결함 전수 수정 중 · 에이전트 8기 강제 중단 · 작업트리에 미완성 파일 있음**)
+
+**사용자가 재부팅하려고 세션을 끊었다.** 에이전트 8기를 `TaskStop` 으로 멈췄다 — 반쯤 쓰인 파일은 없지만 **각 작업이 끝나지 않았다.** 요청 큐는 `docs/memory/ui-request-queue.md`(U-01~U-10 · D-01~D-27). **새 요청은 거기 먼저 적고 시작한다.**
+
+- **커밋된 것(16건, 모두 `v2.6`)**: 프리셋 설명 통로 `e8fd8c1c` · 개요 차트 `dcc08034`→LiveCharts2 `984daea4` · 커널 서랍겹침+고스트 `55d257a4` · 커널 실효폭 알림 `180fbbf8` · 서버 선택+부대 사유 `dd76dd73` · 영문 enum `5cce15d3` · 보고서 열 `8fa2cb5e` · 계정 날짜칸 `92eff333` · 부대 소속 표시+덮어쓰기 차단(D-13·D-14) · 날짜 범위 팝업(U-01) · ConsolePrefs(D-08) · live-api-roundtrip 승격 · CHANGELOG 정정 2건. 호스트 앱은 상대경로로 `v2.6` 을 직접 참조 → **호스트 빌드 오류 0 · Tests 257/0/8** 확인.
+- **원장 2행**: `D-2026-09-23-129e41`(프리셋 DTO) · **`D-2026-09-23-1b2e76`(★ 서버 데이터에 닿는 변경은 loopback 실서버로 검증, 목만으로는 완료 아님)**.
+- **⚠ 작업트리에 남은 미완성 편집(중단된 에이전트 것 · 커밋하지 않음 · 서로 컴파일 안 될 수 있음 → 재개 전 프로젝트별 빌드 먼저)**:
+  - **D-21 ConnectionAxis(함체·센서·스피커)**: `Messages/Dto/Devices/{Enclosure,Sensor,Speaker}DeviceDto.cs` · `Monitoring.Models/Devices/{EnclosureDeviceModel,IEnclosureDeviceModel,ISensorDeviceModel,ISpeakerDeviceModel,SpeakerDeviceModel}.cs` · `Devices.Ui/Consoles/Assembly/Register/PresetRequestBuilder.cs` · `Devices.Ui/Helpers/DtoToModelHelper.cs`. 중단 시점: "ShowsConnection 게이트를 함체·스피커에 열기(센서는 RS485/IP 모호로 제외)". **합격 기준 = `tools/live-api-roundtrip` FAIL 3b2 → PASS.**
+  - **D-22 서버 DTO 계약**: `Messages/Dto/Devices/ServerDto.cs` · `Devices.Api/Services/{IServerApiService,ServerApiService}.cs`. 중단 시점: 빌드 통과, 테스트 추가 전. `IServerApiService` 가 바뀌었으면 **목 파손 확인 필수**.
+  - **D-24/25 + 탐지이력 피커**: `Events.Ui/Consoles/Overview/EventOverviewViewModel.cs` · `Consoles/Suppression/SuppressionTimeText.cs` · `Views/Dialogs/DetectionHistoryDialogView.xaml`. 중단 시점: 별 열 바닥(D-27 Events) 착수 전.
+  - **D-26 이벤트 단일선택**: `Events.Ui/Tests/EventConsoleSingleSelectionDetailTests.cs`(신규). 중단 시점: 빌드 통과, **판정 테스트 실행 직전** — 제품 결함인지 하네스 아티팩트인지 아직 모름.
+  - **D-27 Accounts 별 열**: `Accounts.Ui/Views/Panels/{AccountConsolePanelView,AuditLogPanelView,GrantManagementPanelView,PermissionMatrixPanelView,UserSessionPanelView}.xaml`. 중단 시점: 최종 전수 스캔 중 — **거의 완료**, 빌드+148 테스트+렌더 확인만 남음.
+  - **D-05/D-07 서버 첫프레임+콤보 확인**: `tools/device-console-preview/App.xaml.cs`. 중단 시점: 재렌더 직전.
+  - **D-23 툴바 가로 밀림**: 파일 변경 0(before 스냅샷만 봄). **D-16 MahApps 인벤토리**: 읽기 전용, 산출물 0.
+  - 스테이징된 `M ` 파일들(`.gitignore` · `Api.csproj` · `Monitoring.Models/Tests/UnitTest.cs` · `tests/unit/*.js`)은 **타 세션 것 — 불가침.**
+- **확인대기(사용자 답 필요, 추측 금지)**: **U-02 "구역"**(장비 그룹 `group_ids` 인지 지도 영역 Area 인지) · **U-03 인접 관계도**(그림을 지금 붙일지) · **D-20 툴바 높이**(현재 빌드 6개 폭에서 재현 불가 — 여전히 나면 창 크기).
+- **실기 검증 경로**: `bin/Debug/appsettings.json` 의 Url 이 **운영 `123.141.236.253:8136`** 이라 그대로 켜면 운용자 세션을 끊는다. 소스는 `localhost:8000`(Docker 8.0.x). 켜려면 bin 을 **백업 후 loopback 으로** 바꾸고 끝나면 복원. 사용자에게 A(내가 loopback 으로 켬)/B(사용자가 직접) 물어 둔 상태.
+- **캡처 함정 2**: ① 다른 세션 창이 전경을 빼앗음 → 전경 창 제목 검사 후 불일치면 중단, 정식은 **DISPLAY3(−1920,1) 보조 모니터**에 띄움(U-10) ② Win11 `GetWindowRect` 가 보이지 않는 테두리를 포함해 창 밖 픽셀이 섞임.
+- **이번 세션의 교훈**: 클라이언트 코드만 보고 "서버에 없다" 결론 내지 말 것(접속 축 두 번 정정) · 에이전트 "통과" 보고와 화면이 다른 경우 3건(차트 색 · 고스트 클램프 지시 · 서버 선택 측정) → 매번 숫자 재실행 + 화면 재확인 · 빈 4xx 응답을 0건으로 세는 공허 검증(D-17).
+
+## (이전) 재개 포인트 (2026-09-23 — **봉투 all-windows-console-redesign 전 노드 완료 · 예산 14/14 · 양 레포 정본 반영 끝**)
 
 - **봉투가 닫혔다.** `charter` 가 N-01~N-14 를 전부 ✅ 로 보고한다(예산 14/14 · 지문 일치 · 만료 2026-12-31). 각 노드는 PRD 승인 → Plan → dev → test → report → 원장 → complete 를 실제로 통과했고, PRD 14건 상태줄이 전부 `Completed` 다.
 - **앱 반영 상태 — 들어갔다.** 라이브러리 `v2.6` = `7a0200c3` → **`4785d422`**(fast-forward), 호스트 `v0.5` = `3d86db5` → **`185d15f`**(fast-forward). 롤백 태그 `before-all-windows-merge`(라이브러리) · `before-all-windows-host-merge`(호스트).
@@ -1419,7 +1439,7 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - **호스트 경로 판단**: 맵 오버레이는 `LayerPanelControl.cs:342` `MaxPanelWidth=375`라 3-Pane 불가 → **좌측 메뉴 Conductor 패널(경로 B)** 뿐. 이 때문에 메인솔루션 변경이 불가피하다.
 
 ## ▶▶ 재개 포인트 (2026-09-03 — 27일 만의 재검증: "playwright로 검증 가능한 부분" 식별·재실행)
-- **마지막 업데이트**: 2026-09-23 06:29
+- **마지막 업데이트**: 2026-09-23 09:36
 
 **⚠ 용어 확정** — 이 프로젝트에서 "playwright"라 불러온 것은 FlaUI(UIA3) 하네스다. **진짜 Playwright는 WPF 본체를 못 건드리고 웹 표면 3종**(매뉴얼 HTML · 보고서 미리보기 HTML · GOP REST)만 대상([[project_playwright_verification_surfaces]]).
 
@@ -3834,9 +3854,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-127264
+- **현재 세션 ID**: ppid-58288
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-127264
+- **활성 세션 목록**: ppid-58288
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
