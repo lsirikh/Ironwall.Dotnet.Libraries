@@ -403,27 +403,49 @@ public sealed class MatrixWindow : Window
             { merged.RemoveAt(i); break; }
     }
 
+    /// <summary>
+    /// D-05(2026-09-23, device/accounts/reports/events 콘솔에서 먼저 잡음) — VisualBrush 간접 합성은 창을 막
+    /// 띄운 첫 캡처에서 내용이 통째로 빠질 수 있다(실측). 그래서 여기서도 VisualBrush 를 걷어내고 직접
+    /// Render 한다. <c>_root</c> 는 <c>ScrollViewer.Content</c> 로 <c>Margin="18"</c> 을 얹고 있어 부모 안에서의
+    /// 위치가 (0,0) 이 아니다 — 곧이곧대로 Render 하면(요소의 ActualWidth/Height 로 잰 캔버스에) 그 18px
+    /// 오프셋만큼 내용이 밀려 오른쪽·아래가 잘린다. 부모 기준 오프셋만큼 캔버스를 더 크게 잡아 직접 Render 한
+    /// 뒤 <c>_root</c> 자신의 사각만 오려낸다 — <c>_root.ActualHeight</c> 는 스크롤 뷰포트가 아니라 전체 콘텐츠
+    /// 높이이므로(ScrollViewer 는 넘친 부분을 가릴 뿐 레이아웃 자체는 전체를 재는 것) 스크롤과 무관하게
+    /// 전체 행렬이 한 장에 다 찍힌다.
+    /// </summary>
     private async Task Capture(string directory, string name)
     {
         await Settle();
         var width = _root.ActualWidth;
         var height = _root.ActualHeight;
         var dpi = VisualTreeHelper.GetDpi(_root);
-        var bitmap = new RenderTargetBitmap(
-            (int)Math.Ceiling(width * dpi.DpiScaleX), (int)Math.Ceiling(height * dpi.DpiScaleY),
-            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-            // TileBrush 기본 정렬은 Center 다 — 그대로 두면 내용이 가운데로 밀려 좌표표와 그림이 어긋난다(실측 x+80).
-            dc.DrawRectangle(new VisualBrush(_root)
-            {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top,
-            }, null, new Rect(0, 0, width, height));
-        bitmap.Render(visual);
+
+        var parent = VisualTreeHelper.GetParent(_root) as Visual;
+        var offset = parent != null ? _root.TransformToAncestor(parent).Transform(new Point(0, 0)) : new Point(0, 0);
+        var canvasWidth = offset.X + width;
+        var canvasHeight = offset.Y + height;
+        var pixelWidth = Math.Max(1, (int)Math.Ceiling(canvasWidth * dpi.DpiScaleX));
+        var pixelHeight = Math.Max(1, (int)Math.Ceiling(canvasHeight * dpi.DpiScaleY));
+
+        var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+
+        var background = _root.Background;
+        var backdrop = new DrawingVisual();
+        using (var dc = backdrop.RenderOpen())
+            dc.DrawRectangle(background, null, new Rect(0, 0, canvasWidth, canvasHeight));
+        bitmap.Render(backdrop);
+        bitmap.Render(_root);
+
+        var cropX = Math.Max(0, (int)Math.Round(offset.X * dpi.DpiScaleX));
+        var cropY = Math.Max(0, (int)Math.Round(offset.Y * dpi.DpiScaleY));
+        var cropW = Math.Max(1, Math.Min((int)Math.Ceiling(width * dpi.DpiScaleX), pixelWidth - cropX));
+        var cropH = Math.Max(1, Math.Min((int)Math.Ceiling(height * dpi.DpiScaleY), pixelHeight - cropY));
+        BitmapSource final = cropX == 0 && cropY == 0 && cropW == pixelWidth && cropH == pixelHeight
+            ? bitmap
+            : new CroppedBitmap(bitmap, new Int32Rect(cropX, cropY, cropW, cropH));
+
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Frames.Add(BitmapFrame.Create(final));
         using (var file = File.Create(IoPath.Combine(directory, name + ".png")))
             encoder.Save(file);
 

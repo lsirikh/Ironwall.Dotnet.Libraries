@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace ConsoleGallery;
 
@@ -353,19 +354,7 @@ public partial class MainWindow : Window, IDragDropHandler
             arrange();
             await Task.Delay(350);
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            var dpi = VisualTreeHelper.GetDpi(Stage);
-            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
-                (int)Math.Ceiling(Stage.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(Stage.ActualHeight * dpi.DpiScaleY),
-                dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
-            // Stage 를 곧바로 Render 하면 부모 안에서의 위치만큼 밀려 잘린다 — VisualBrush 로 원점에 다시 그린다.
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-                dc.DrawRectangle(new VisualBrush(Stage) { Stretch = Stretch.None }, null, new Rect(0, 0, Stage.ActualWidth, Stage.ActualHeight));
-            bitmap.Render(visual);
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-            using var file = System.IO.File.Create(System.IO.Path.Combine(directory, name + ".png"));
-            encoder.Save(file);
+            SaveVisual(System.IO.Path.Combine(directory, name + ".png"), Stage, Background);
         }
 
         await Shot("01-docked-none-light", 1280, () => OnStateNone(this, new RoutedEventArgs()));
@@ -383,6 +372,54 @@ public partial class MainWindow : Window, IDragDropHandler
         await Shot("11-docked-dirty-dark", 1280, () => OnStateDirty(this, new RoutedEventArgs()));
         await Shot("12-docked-multiple-dark", 1280, () => OnStateMultiple(this, new RoutedEventArgs()));
         await Shot("13-compact-dark", 900, () => OnStateNone(this, new RoutedEventArgs()));
+    }
+
+    /// <summary>
+    /// 어떤 요소든, 제 부모 안에서의 배치 위치(오프셋)에 상관없이 정확히 찍는다.
+    /// <c>Stage</c> 는 <c>DockPanel</c> 안에서 <c>Margin="16"</c> + 가운데 정렬이라 부모 안에서의 위치가 (0,0) 이
+    /// 아니다 — <see cref="RenderTargetBitmap.Render(Visual)"/> 는 요소를 새 루트인 것처럼 그리지만, 그 배치
+    /// 오프셋은 요소 자신의 시각에 그대로 실려 있어서, 곧이곧대로 Render 하면(요소의 ActualWidth/Height 로 잰
+    /// 캔버스에) 그 오프셋만큼 내용이 밀려 오른쪽·아래가 잘린다(실측). VisualBrush 로 우회하면 오프셋 문제는
+    /// 없앨 수 있지만 D-05 가 device/accounts/reports 콘솔에서 잡은 "창을 막 띄운 첫 캡처에서 내용이 통째로
+    /// 빠지는" 결함이 있다. 그래서 여기서는 요소의 부모 기준 오프셋만큼 캔버스를 <b>더 크게</b> 잡아 직접
+    /// Render 한 뒤, 요소 자신의 사각만 오려낸다(VisualBrush 없이, 오프셋 문제도 없이).
+    /// </summary>
+    private static void SaveVisual(string path, FrameworkElement element, Brush background)
+    {
+        var width = element.ActualWidth;
+        var height = element.ActualHeight;
+        if (width <= 0 || height <= 0) return;
+
+        var parent = VisualTreeHelper.GetParent(element) as Visual;
+        var offset = parent != null ? element.TransformToAncestor(parent).Transform(new Point(0, 0)) : new Point(0, 0);
+
+        var dpi = VisualTreeHelper.GetDpi(element);
+        var canvasWidth = offset.X + width;
+        var canvasHeight = offset.Y + height;
+        var pixelWidth = Math.Max(1, (int)Math.Ceiling(canvasWidth * dpi.DpiScaleX));
+        var pixelHeight = Math.Max(1, (int)Math.Ceiling(canvasHeight * dpi.DpiScaleY));
+
+        var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+
+        var backdrop = new DrawingVisual();
+        using (var dc = backdrop.RenderOpen())
+            dc.DrawRectangle(background, null, new Rect(0, 0, canvasWidth, canvasHeight));
+        bitmap.Render(backdrop);
+        bitmap.Render(element);
+
+        var cropX = Math.Max(0, (int)Math.Round(offset.X * dpi.DpiScaleX));
+        var cropY = Math.Max(0, (int)Math.Round(offset.Y * dpi.DpiScaleY));
+        var cropW = Math.Max(1, Math.Min((int)Math.Ceiling(width * dpi.DpiScaleX), pixelWidth - cropX));
+        var cropH = Math.Max(1, Math.Min((int)Math.Ceiling(height * dpi.DpiScaleY), pixelHeight - cropY));
+
+        BitmapSource final = cropX == 0 && cropY == 0 && cropW == pixelWidth && cropH == pixelHeight
+            ? bitmap
+            : new CroppedBitmap(bitmap, new Int32Rect(cropX, cropY, cropW, cropH));
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(final));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
     }
     #endregion
 

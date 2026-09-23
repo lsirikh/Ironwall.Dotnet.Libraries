@@ -207,13 +207,15 @@
 										Padding="10,2"
 										Click="OnDraftRevert"
 										Content="되돌리기"
-										IsEnabled="{Binding Tray.CanRevert}" />
+										IsEnabled="{Binding Tray.CanRevert}"
+										Style="{StaticResource Console.Button}" />
 									<Button
 										Margin="6,0,0,0"
 										Padding="10,2"
 										Click="OnDraftApply"
 										Content="적용"
-										IsEnabled="{Binding Tray.CanApply}" />
+										IsEnabled="{Binding Tray.CanApply}"
+										Style="{StaticResource Console.Button.Primary}" />
 								</StackPanel>
 								<TextBlock
 									VerticalAlignment="Center"

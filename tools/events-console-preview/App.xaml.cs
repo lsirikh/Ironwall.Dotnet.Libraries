@@ -567,6 +567,10 @@ public partial class App : Application
         if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(DarkTokens) });
         foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Dark;
+        // 호스트(ThemeService.SyncMaterialDesignAndMahApps)는 MD 색만이 아니라 MahApps 크롬도 같이 바꾼다
+        // (ThemeManager.Current.ChangeTheme(app, "Dark.Cyan")). 여기선 그 한 줄만 그대로 거울처럼 부른다 —
+        // 안 부르면 이 콘솔이 쓰는 MahApps 스타일 컨트롤이 다크에서도 라이트 크롬으로 남는다.
+        ControlzEx.Theming.ThemeManager.Current.ChangeTheme(this, "Dark.Cyan");
     }
 
     private static Task Settle(int ms = 480) => Task.Delay(ms);
@@ -587,68 +591,72 @@ public partial class App : Application
 
     /// <summary>
     /// <c>Popup</c> 본문처럼 창의 시각 트리 밖(자기 렌더 계층)에 떠 있는 요소를 직접 찍는다 —
-    /// <see cref="Save"/> 의 <c>_window.Content</c> VisualBrush 경로로는 안 닿는다(실측).
+    /// <see cref="Save"/> 의 <c>_window.Content</c> 경로로는 안 닿는다(실측).
+    /// D-05 이후로는 VisualBrush 를 쓰지 않는다(창을 막 띄운 첫 캡처에서 내용이 통째로 빠지는 사고 —
+    /// device/accounts/reports 콘솔에서 실측). 대신 <see cref="SaveVisual"/> 로 직접 Render 한다 —
+    /// 이 요소(<c>PART_PopupContent</c>)는 <c>Margin="0,4,0,0"</c> 을 얹은 채 Popup 의 바로 밑 자식이라
+    /// 그 4px 오프셋이 요소 자신에 실린다. 오프셋만큼 캔버스를 넉넉히 잡아 찍은 뒤 요소의 사각만 오려낸다.
     /// </summary>
     private static void SaveElement(string directory, string name, FrameworkElement element, Brush background)
-    {
-        var width = (int)Math.Ceiling(element.ActualWidth);
-        var height = (int)Math.Ceiling(element.ActualHeight);
-        if (width <= 0 || height <= 0) return;
+        => SaveVisual(Path.Combine(directory, name + ".png"), element, background);
 
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle(background, null, new Rect(0, 0, width, height));
-            var source = new VisualBrush(element)
-            {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top,
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Viewbox = new Rect(0, 0, width, height),
-            };
-            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(directory, name + ".png"));
-        encoder.Save(stream);
-    }
-
+    /// <summary>
+    /// D-05(2026-09-23, device/accounts/reports 콘솔에서 먼저 잡음) — VisualBrush 간접 합성은 창을 막 띄운
+    /// 첫 캡처에서 내용이 통째로 빠질 수 있다(실측). 그래서 배경을 채운 뒤 요소를 VisualBrush 없이 직접
+    /// Render 한다. 바깥 여백 Border 가 아니라 <c>.Child</c> 를 찍는 이유는 그대로다 — Margin 이 Border
+    /// 자신의 오프셋으로 실려 그림이 오른쪽·아래로 잘리기 때문이다.
+    /// </summary>
     private void Save(string directory, string name)
     {
-        // ★ 바깥 여백을 두른 Border 가 아니라 콘솔 자체를 찍는다 — Border 를 찍으면 제 Margin 이 그림 안에
-        //   들어오면서 오른쪽·아래가 그만큼 잘려, 그림에서 잰 치수가 12px 씩 거짓말을 했다.
         var content = (FrameworkElement)((Border)_window.Content).Child;
-        var width = (int)Math.Ceiling(content.ActualWidth);
-        var height = (int)Math.Ceiling(content.ActualHeight);
+        SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
+    }
+
+    /// <summary>
+    /// 어떤 요소든, 제 부모 안에서의 배치 위치(오프셋)에 상관없이 정확히 찍는다.
+    /// <see cref="RenderTargetBitmap.Render(Visual)"/> 는 요소를 새 루트인 것처럼 그리지만, 그 요소가 부모로부터
+    /// 받은 배치 오프셋(Margin 등)은 요소 자신의 시각에 그대로 실려 있다 — 그래서 곧이곧대로 Render 하면
+    /// (요소의 ActualWidth/Height 로 잰 캔버스에) 그 오프셋만큼 내용이 밀려 오른쪽·아래가 잘린다(실측:
+    /// console-gallery 의 Stage/행렬 무대). VisualBrush 로 우회하면 그 오프셋 문제는 없앨 수 있지만 D-05 가
+    /// 잡은 "창을 막 띄운 첫 캡처에서 내용이 통째로 빠지는" 결함이 있다. 그래서 여기서는 요소의 부모 기준
+    /// 오프셋만큼 캔버스를 <b>더 크게</b> 잡아 직접 Render 한 뒤, 요소 자신의 사각만 오려낸다(VisualBrush 없이,
+    /// 오프셋 문제도 없이).
+    /// </summary>
+    private static void SaveVisual(string path, FrameworkElement element, Brush background)
+    {
+        var width = element.ActualWidth;
+        var height = element.ActualHeight;
         if (width <= 0 || height <= 0) return;
 
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            // ★ Viewbox 를 절대 좌표로 못박는다 — 기본(RelativeToBoundingBox)이면 자식 경계가 요소보다
-            //   크거나 작을 때 Stretch.None 이 가운데로 맞추느라 그림이 몇 px 어긋나 찍힌다(치수 측정이 거짓말한다).
-            var source = new VisualBrush(content)
-            {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top,
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Viewbox = new Rect(0, 0, width, height),
-            };
-            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
+        var parent = VisualTreeHelper.GetParent(element) as Visual;
+        var offset = parent != null ? element.TransformToAncestor(parent).Transform(new Point(0, 0)) : new Point(0, 0);
+
+        var dpi = VisualTreeHelper.GetDpi(element);
+        var canvasWidth = offset.X + width;
+        var canvasHeight = offset.Y + height;
+        var pixelWidth = Math.Max(1, (int)Math.Ceiling(canvasWidth * dpi.DpiScaleX));
+        var pixelHeight = Math.Max(1, (int)Math.Ceiling(canvasHeight * dpi.DpiScaleY));
+
+        var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+
+        var backdrop = new DrawingVisual();
+        using (var dc = backdrop.RenderOpen())
+            dc.DrawRectangle(background, null, new Rect(0, 0, canvasWidth, canvasHeight));
+        bitmap.Render(backdrop);
+        bitmap.Render(element);
+
+        var cropX = Math.Max(0, (int)Math.Round(offset.X * dpi.DpiScaleX));
+        var cropY = Math.Max(0, (int)Math.Round(offset.Y * dpi.DpiScaleY));
+        var cropW = Math.Max(1, Math.Min((int)Math.Ceiling(width * dpi.DpiScaleX), pixelWidth - cropX));
+        var cropH = Math.Max(1, Math.Min((int)Math.Ceiling(height * dpi.DpiScaleY), pixelHeight - cropY));
+
+        BitmapSource final = cropX == 0 && cropY == 0 && cropW == pixelWidth && cropH == pixelHeight
+            ? bitmap
+            : new CroppedBitmap(bitmap, new Int32Rect(cropX, cropY, cropW, cropH));
 
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(directory, name + ".png"));
+        encoder.Frames.Add(BitmapFrame.Create(final));
+        using var stream = File.Create(path);
         encoder.Save(stream);
     }
     #endregion

@@ -236,6 +236,10 @@ public partial class App : Application
         if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(DarkTokens) });
         foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Dark;
+        // 호스트(ThemeService.SyncMaterialDesignAndMahApps)는 MD 색만이 아니라 MahApps 크롬도 같이 바꾼다
+        // (ThemeManager.Current.ChangeTheme(app, "Dark.Cyan")). 여기선 그 한 줄만 그대로 거울처럼 부른다 —
+        // 안 부르면 이 콘솔이 쓰는 MahApps 스타일 컨트롤이 다크에서도 라이트 크롬으로 남는다.
+        ControlzEx.Theming.ThemeManager.Current.ChangeTheme(this, "Dark.Cyan");
     }
 
     private static Task Settle() => Task.Delay(420);
