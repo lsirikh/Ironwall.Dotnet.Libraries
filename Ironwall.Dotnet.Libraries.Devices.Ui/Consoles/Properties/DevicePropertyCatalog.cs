@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json.Linq;
 using System;
@@ -58,11 +59,20 @@ public static class DevicePropertyCatalog
     /// 카테고리 · 계약 세대로 걸러 <b>화면 순서</b>(절 순서 → 선언 순서)로 돌려준다.
     /// <see cref="OrderBy{TSource, TKey}"/> 는 안정 정렬이라 같은 절 안에서는 <see cref="All"/> 의 선언 순서가 그대로 남는다.
     /// </summary>
-    public static IReadOnlyList<DevicePropertySpec> For(EnumDeviceCategory category, bool isAxisContract)
+    /// <param name="isAxisContract">v7.0+ 축 계약이면 참.</param>
+    /// <param name="isUnitEra">
+    /// v8.0+ 부대 편제 계약이면 참(D-14). 거짓이면 <see cref="UNIT_FIELD_KEY"/> 칸을 걸러낸다 — <c>unit_id</c> 는
+    /// <see cref="DevicePropertySpec.AxisContractOnly"/>(v7.0 경계)가 아니라 v8.0 경계가 필요해 키로 따로 거른다.
+    /// </param>
+    public static IReadOnlyList<DevicePropertySpec> For(EnumDeviceCategory category, bool isAxisContract, bool isUnitEra = false)
         => All.Where(s => s.Categories.Contains(category))
               .Where(s => isAxisContract ? !s.LegacyContractOnly : !s.AxisContractOnly)
+              .Where(s => isUnitEra || s.Key != UNIT_FIELD_KEY)
               .OrderBy(s => SectionIndex(s.Section))
               .ToList();
+
+    /// <summary>"부대"(<c>unit_id</c>) 칸의 안정 키 — v8.0 미만에서 <see cref="For"/> 가 이 키로 걸러낸다.</summary>
+    private const string UNIT_FIELD_KEY = "unit_id";
 
     public static IReadOnlyList<DevicePropertySection> SectionOrder { get; } = new[]
     {
@@ -110,6 +120,17 @@ public static class DevicePropertyCatalog
         for (var i = 0; i < SectionOrder.Count; i++)
             if (SectionOrder[i] == section) return i;
         return SectionOrder.Count;
+    }
+
+    /// <summary>
+    /// D-14: <c>unit_id</c> → 부대 이름(목록 열의 <c>DeviceViewModel.UnitDisplay</c> 와 같은 정본,
+    /// <see cref="UnitNameDirectory.Display"/>). 폼은 <c>Load()</c> 시점에 한 번만 읽으므로 그때 캐시가 비어
+    /// 있으면 이 칸은 원값 id 로 남는다 — 이름이 필요하면 행을 다시 고른다(재조회로 다시 읽힌다).
+    /// </summary>
+    private static string? UnitDisplayName(int? unitId)
+    {
+        try { return Caliburn.Micro.IoC.Get<UnitNameDirectory>().Display(unitId); }
+        catch { return unitId?.ToString(CultureInfo.InvariantCulture) ?? UnitNameDirectory.Unassigned; }
     }
 
     private static IReadOnlyList<DevicePropertySpec> Build()
@@ -176,12 +197,14 @@ public static class DevicePropertyCatalog
             },
             new()
             {
-                Key = "unit_id", Label = "부대", ApiPath = "unit_id",
+                Key = UNIT_FIELD_KEY, Label = "소속 부대", ApiPath = "unit_id",
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
                 LockReason = "소속 부대는 저장할 때 이 클라이언트의 부대로 찍힌다 — 다부대 편집은 다음 판",
-                Categories = All7, AxisReader = m => m.UnitId?.ToString(CultureInfo.InvariantCulture),
-                AxisContractOnly = true,
+                // D-14: 이름을 우선 보이고, 못 구하면 원값 id(지어내지 않는다). AxisReader 는 한 번 읽고 끝이라
+                // 캐시가 그때까지 안 채워졌으면 이 칸은 id 로 남는다 — 행을 다시 고르면(재조회) 이름으로 갱신된다.
+                Categories = All7, AxisReader = m => UnitDisplayName(m.UnitId),
+                // ⚠ v7.0 경계용 AxisContractOnly 가 아니라 v8.0 경계가 필요해 For() 가 UNIT_FIELD_KEY 로 따로 거른다.
             },
             new()
             {

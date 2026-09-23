@@ -588,6 +588,64 @@ public class PresetRegisterTests
         Assert.True(result.IsSuccess);
         Assert.Equal(42, (int?)JObject.Parse(Wire(api.Patched!))["unit_id"]);
     }
+
+    /// <summary>
+    /// D-13 회귀 가드 — 다른 부대(7) 소속 장비를 이 클라이언트(42 부대)에서 편집해도
+    /// <c>unit_id</c> 가 42 로 재귀속되면 안 된다. 관문이 "언제나 내 부대" 였을 때는 여기서 42 가 나갔다.
+    /// </summary>
+    [Fact]
+    public async Task should_preserve_a_foreign_unit_id_when_applying_component_changes()
+    {
+        using var scope = new UnitScope(unitId: 42);
+        var api = new FakeApi { Fetched = FilledDto(EnumDeviceCategory.Enclosure, Component("door", "DOOR_SENSOR")) };
+        api.Fetched!.UnitId = 7;   // 다시 받은 이 장비는 원래 7 부대 소속
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(
+            Device(),
+            baseline: new[] { Component("door", "DOOR_SENSOR") },
+            desired: new[] { Component("door", "DOOR_SENSOR"), Component("temp", "TEMPERATURE_SENSOR") },
+            overridesToSend: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(7, (int?)JObject.Parse(Wire(api.Patched!))["unit_id"]);
+    }
+
+    /// <summary>관문을 직접 부른다 — 신규(값 없음)는 이 클라이언트 부대를 찍는다.</summary>
+    [Fact]
+    public async Task should_stamp_the_client_unit_when_the_dto_has_no_unit_yet()
+    {
+        using var scope = new UnitScope(unitId: 42);
+        var dto = new EnclosureDeviceDto();   // UnitId == null — 신규 등록과 같은 모양
+
+        await UnitScopeGate.StampAsync(dto, nameof(should_stamp_the_client_unit_when_the_dto_has_no_unit_yet));
+
+        Assert.Equal(42, dto.UnitId);
+    }
+
+    /// <summary>관문을 직접 부른다 — 이미 실린 값(다른 부대)은 이 클라이언트 부대로 덮이지 않는다.</summary>
+    [Fact]
+    public async Task should_preserve_the_dto_unit_when_it_already_has_one()
+    {
+        using var scope = new UnitScope(unitId: 42);
+        var dto = new EnclosureDeviceDto { UnitId = 7 };
+
+        await UnitScopeGate.StampAsync(dto, nameof(should_preserve_the_dto_unit_when_it_already_has_one));
+
+        Assert.Equal(7, dto.UnitId);
+    }
+
+    /// <summary>8.0 미만 계약에서는 이미 실린 값이 있어도 무조건 지운다(6.3/7.0 스키마에 없는 키 — 422 회피).</summary>
+    [Fact]
+    public async Task should_clear_the_unit_even_if_one_was_set_when_the_contract_is_below_8_0()
+    {
+        using var scope = new UnitScope(unitId: 42, isUnitEra: false);
+        var dto = new EnclosureDeviceDto { UnitId = 7 };
+
+        await UnitScopeGate.StampAsync(dto, nameof(should_clear_the_unit_even_if_one_was_set_when_the_contract_is_below_8_0));
+
+        Assert.Null(dto.UnitId);
+    }
     #endregion
 
     #region - ComponentApplyService -
@@ -1036,13 +1094,13 @@ public class PresetRegisterTests
         private readonly Func<Type, IEnumerable<object>> _getAllInstances;
         private readonly Action<object> _buildUp;
 
-        public UnitScope(int unitId)
+        public UnitScope(int unitId, bool isUnitEra = true)
         {
             _getInstance = IoC.GetInstance;
             _getAllInstances = IoC.GetAllInstances;
             _buildUp = IoC.BuildUp;
 
-            var scope = new FakeUnitScope(unitId);
+            var scope = new FakeUnitScope(unitId, isUnitEra);
             IoC.GetInstance = (type, key) => type == typeof(IUnitScopeService) ? scope : null!;
             IoC.GetAllInstances = type => Enumerable.Empty<object>();
             IoC.BuildUp = obj => { };
@@ -1058,9 +1116,9 @@ public class PresetRegisterTests
         private sealed class FakeUnitScope : IUnitScopeService
         {
             private readonly int _unitId;
-            public FakeUnitScope(int unitId) => _unitId = unitId;
+            public FakeUnitScope(int unitId, bool isUnitEra = true) { _unitId = unitId; IsUnitEra = isUnitEra; }
 
-            public bool IsUnitEra => true;
+            public bool IsUnitEra { get; }
             public string? UnitCode => "unit001";
             public int? CurrentUnitId => _unitId;
             public bool IsResolved => true;

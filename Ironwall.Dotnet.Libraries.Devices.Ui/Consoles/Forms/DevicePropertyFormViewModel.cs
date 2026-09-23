@@ -76,8 +76,8 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
     /// <summary>
     /// 고른 행들로 폼을 만든다. 손댄 칸은 비운다 — 미적용 변경을 버려도 되는지는 부르는 쪽이 먼저 확인한다(<see cref="NavigationGuard"/>).
     /// </summary>
-    public void Load(IReadOnlyList<object> rows, EnumDeviceCategory category, bool isAxisContract, bool isCreating, bool isReadOnly)
-        => Load(rows, DevicePropertyCatalog.For(category, isAxisContract), category, isCreating, isReadOnly);
+    public void Load(IReadOnlyList<object> rows, EnumDeviceCategory category, bool isAxisContract, bool isCreating, bool isReadOnly, bool isUnitEra = false)
+        => Load(rows, DevicePropertyCatalog.For(category, isAxisContract, isUnitEra), category, isCreating, isReadOnly);
 
     /// <summary>명세 목록을 직접 받아 폼을 만든다 — 장비가 아닌 것(그룹)도 같은 폼을 쓴다.</summary>
     public void Load(IReadOnlyList<object> rows, IReadOnlyList<DevicePropertySpec> specs, EnumDeviceCategory category, bool isCreating, bool isReadOnly)

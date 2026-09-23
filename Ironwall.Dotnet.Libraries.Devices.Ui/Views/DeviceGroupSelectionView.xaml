@@ -205,26 +205,31 @@
 							Binding="{Binding DeviceNumber}"
 							Header="번호"
 							IsReadOnly="True"
+							MinWidth="60"
 							Width="60" />
 						<DataGridTextColumn
 							Binding="{Binding DeviceName}"
 							Header="장비명"
 							IsReadOnly="True"
+							MinWidth="140"
 							Width="3*" />
 						<DataGridTextColumn
 							Binding="{Binding DeviceType}"
 							Header="장비유형"
 							IsReadOnly="True"
+							MinWidth="90"
 							Width="1*" />
 						<DataGridTextColumn
 							Binding="{Binding Status}"
 							Header="상태"
 							IsReadOnly="True"
+							MinWidth="90"
 							Width="1*" />
 						<DataGridCheckBoxColumn
 							Binding="{Binding IsEnable}"
 							Header="활성화"
 							IsReadOnly="True"
+							MinWidth="70"
 							Width="1*" />
 					</DataGrid.Columns>
 				</DataGrid>

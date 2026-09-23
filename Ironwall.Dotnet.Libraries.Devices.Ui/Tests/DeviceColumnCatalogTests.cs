@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -214,6 +215,26 @@ public class DeviceColumnCatalogTests : IDisposable
         Assert.Empty(DeviceColumnCatalog.For(category, isAxisContract: false));
     }
 
+    [Theory]
+    [MemberData(nameof(AllCategoryContractCombinations))]
+    public void should_hide_unit_column_when_not_unit_era(EnumDeviceCategory category, bool isAxisContract)
+    {
+        var columns = DeviceColumnCatalog.For(category, isAxisContract, isUnitEra: false);
+
+        Assert.DoesNotContain(columns, c => c.Key == "unit");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllCategoryContractCombinations))]
+    public void should_show_unit_column_bound_to_unit_display_when_unit_era(EnumDeviceCategory category, bool isAxisContract)
+    {
+        var columns = DeviceColumnCatalog.For(category, isAxisContract, isUnitEra: true);
+
+        var unit = Assert.Single(columns, c => c.Key == "unit");
+        Assert.Equal(nameof(DeviceViewModel.UnitDisplay), unit.BindingPath);
+        Assert.False(unit.IsDefault);
+    }
+
     [Fact]
     public void should_return_three_columns_with_name_star_when_groups_requested()
     {
@@ -312,5 +333,25 @@ public class DeviceColumnCatalogTests : IDisposable
         var vm = new SpeakerDeviceViewModel(new SpeakerDeviceModel { Server = new ServerModel { Name = "BRD-01" } });
 
         Assert.Equal("BRD-01", vm.ServerDisplay);
+    }
+
+    // ── D-14: 소속 부대 표시 — UnitNameDirectory 가 IoC 로 못 잡히는 이 스코프(TestIoCScope 는
+    // IEventAggregator 만 채운다)에서는 항상 폴백(원값 id · "미배치")을 본다. 이름 해석 자체는
+    // UnitNameDirectoryTests 가 별도로 잡는다.
+
+    [Fact]
+    public void should_show_unassigned_when_unit_id_is_null()
+    {
+        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { UnitId = null });
+
+        Assert.Equal(UnitNameDirectory.Unassigned, vm.UnitDisplay);
+    }
+
+    [Fact]
+    public void should_show_raw_id_when_unit_directory_is_unavailable()
+    {
+        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { UnitId = 7 });
+
+        Assert.Equal("7", vm.UnitDisplay);
     }
 }

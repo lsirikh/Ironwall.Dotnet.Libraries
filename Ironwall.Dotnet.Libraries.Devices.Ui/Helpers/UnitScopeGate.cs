@@ -27,18 +27,24 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 /// 실리는 순간 422 다. <c>DeviceApiService.ShapeWrite</c> 가 같은 소거를 한 번 더 하지만
 /// 방어를 두 겹으로 두는 편이 낫다(서버 쓰기 경로가 하나가 아니다).</para>
 ///
-/// <para>⚠ <b>수정(PUT/PATCH) 시의 의미</b> — 장비 <b>모델</b>에는 <c>unit_id</c> 축이 없어
-/// 편집 본문에 실리는 값은 언제나 <b>"이 클라이언트의 현재 부대"</b>다. 단일 부대 전개
-/// (실측 2026-09-18: <c>total=1</c>, <c>unit001</c>)에서는 무해하지만, 다부대로 가면
-/// <b>모델·읽기 경로에 <c>unit_id</c> 축을 먼저 신설</b>해야 한다(그때까지 타 부대 장비를 이 화면에서 편집하면 안 된다).
-/// 값을 아예 생략하는 쪽은 더 나쁘다 — 8.0 서버가 <b>기본 부대로 재귀속</b>시키고 응답에는 신호를 남기지 않는다.</para>
+/// <para><b>수정(PUT/PATCH) 시의 의미 — "보존 우선"</b> — 8.0 이상에서는 <b>DTO 에 이미 실린 값을
+/// 그대로 둔다</b>. 장비 모델은 읽기 경로(<see cref="Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel.UnitId"/>)에
+/// 서버가 준 소속 부대를 그대로 들고 있고, Model→Dto 변환(<c>DtoToModelHelper.ToXxxDeviceDto</c> ·
+/// <c>ComponentApplyService.CopyCommon</c> · <c>WiringApplyService.PatchAsync</c>)이 그 값을 미리
+/// <c>dto.UnitId</c> 에 옮겨 싣는다 — 그래서 이 관문에 도달했을 때 <c>dto.UnitId</c> 가 <b>이미 채워져 있으면
+/// 그 장비가 원래 속한 부대</b>이고, 우리가 임의로 "이 클라이언트의 부대"로 덮어써서는 안 된다(다른 부대
+/// 장비를 편집하면 조용히 재귀속되던 결함 — D-13). <c>dto.UnitId</c> 가 <c>null</c> 일 때만
+/// (신규 등록 · 소속을 정말 모르는 장비) 이 클라이언트의 부대를 찍는다.</para>
 /// </remarks>
 internal static class UnitScopeGate
 {
     /// <summary>
-    /// 쓰기 직전 DTO 에 <c>unit_id</c> 를 싣는다. 8.0 미만이거나 해석 실패면 <b>싣지 않고</b> 경고를 남긴다.
+    /// 쓰기 직전 DTO 의 <c>unit_id</c> 를 정리한다. 8.0 미만이거나 미등록이면 <b>무조건 지운다</b>.
+    /// 8.0 이상에서는 <b>DTO 에 이미 값이 있으면 보존</b>하고, 없을 때만(신규 등록 등) 이 클라이언트의
+    /// 부대를 해석해 싣는다 — 해석 실패면 <b>싣지 않고</b> 경고를 남긴다.
     /// </summary>
-    /// <param name="dto">장비 쓰기 DTO(<see cref="BaseDeviceDto"/> 파생 전부).</param>
+    /// <param name="dto">장비 쓰기 DTO(<see cref="BaseDeviceDto"/> 파생 전부). 호출부가 원본 소속 부대를
+    /// 알고 있으면(재조회·모델 보존값) 이 메서드를 부르기 전에 <c>dto.UnitId</c> 에 미리 실어 둔다.</param>
     /// <param name="caller">진단용 호출부 이름(로그에 그대로 찍힌다).</param>
     /// <param name="log">호출부 로거(선택).</param>
     internal static async Task StampAsync(
@@ -54,6 +60,12 @@ internal static class UnitScopeGate
         {
             // 8.0 미만·미등록 — 키 자체가 나가지 않게 확실히 지운다(운영 6.3.2 무회귀).
             dto.UnitId = null;
+            return;
+        }
+
+        if (dto.UnitId != null)
+        {
+            // 호출부가 이미 원래 소속 부대를 실어 놨다 — 이 클라이언트 부대로 덮어쓰지 않고 보존한다.
             return;
         }
 

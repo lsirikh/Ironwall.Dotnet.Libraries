@@ -552,7 +552,7 @@
 							</DataGrid.RowStyle>
 							<DataGrid.Columns>
 								<!--  Draft 표시 — 색이 아니라 글자로(＋ 새 줄 · ✎ 고친 줄)  -->
-								<DataGridTemplateColumn Width="34" CellStyle="{StaticResource Console.DataGrid.Cell}">
+								<DataGridTemplateColumn Width="34" MinWidth="34" CellStyle="{StaticResource Console.DataGrid.Cell}">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBlock
@@ -566,7 +566,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="90" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="번호">
+								<DataGridTemplateColumn Width="90" MinWidth="90" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="번호">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBox
@@ -576,7 +576,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="*" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="이름">
+								<DataGridTemplateColumn Width="*" MinWidth="140" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="이름">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBox
@@ -586,7 +586,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="150" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="종류">
+								<DataGridTemplateColumn Width="150" MinWidth="150" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="종류">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<ComboBox
@@ -599,7 +599,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="160" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="구역">
+								<DataGridTemplateColumn Width="160" MinWidth="160" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="구역">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBox
@@ -609,7 +609,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="96" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="주소">
+								<DataGridTemplateColumn Width="96" MinWidth="96" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="주소">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBlock
@@ -621,7 +621,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="90" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="결선">
+								<DataGridTemplateColumn Width="90" MinWidth="90" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="결선">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBlock

@@ -92,6 +92,26 @@ public partial class ServerMonitorView : UserControl
     #endregion
 
     #region - Columns -
+    /// <summary>
+    /// 별(*) 열의 바닥 폭 — 이 밑으로는 DataGrid 가 가로 스크롤을 낸다. 고정 열도 제 폭을 바닥으로 걸어 둔다
+    /// (보고서 콘솔 실측, 8fa2cb5e): 리사이즈가 아주 좁은 과도 폭을 지나가면 DataGrid 가 그 순간의 최소값에
+    /// 열을 영구히 고정해 버릴 수 있다 — 별 열만의 문제가 아니다.
+    /// </summary>
+    private const double StarColumnMinWidth = 140;
+
+    /// <summary>
+    /// <paramref name="specWidth"/>(0 이하 = 별 열) → 실제로 그리드 열에 걸 (Width, MinWidth) 한 쌍.
+    /// WPF <see cref="DataGrid"/> 인스턴스 없이도 검증할 수 있게 순수 함수로 뺐다(테스트: 서버 모니터 회귀).
+    /// </summary>
+    internal static (DataGridLength Width, double MinWidth) ResolveColumnSize(double specWidth)
+    {
+        var isStar = specWidth <= 0;
+        var width = isStar ? new DataGridLength(1, DataGridLengthUnitType.Star) : new DataGridLength(specWidth);
+        // 고정 열도 제 폭을 MinWidth 로 건다 — 안 걸면 DataGrid 의 기본 MinWidth(20) 까지 눌어붙을 수 있다(위 remarks).
+        var minWidth = isStar ? StarColumnMinWidth : specWidth;
+        return (width, minWidth);
+    }
+
     private void RebuildColumns()
     {
         if (_grid is null || _viewModel is null) return;
@@ -105,7 +125,9 @@ public partial class ServerMonitorView : UserControl
         {
             var column = CreateColumn(spec);
             column.Header = spec.Header;
-            column.Width = spec.Width > 0 ? new DataGridLength(spec.Width) : new DataGridLength(1, DataGridLengthUnitType.Star);
+            var (width, minWidth) = ResolveColumnSize(spec.Width);
+            column.Width = width;
+            column.MinWidth = minWidth;
             column.CellStyle = cellStyle;
             ConsoleColumns.SetKey(column, spec.Key);
             ConsoleColumns.SetIsDefault(column, spec.IsDefault);
@@ -134,6 +156,7 @@ public partial class ServerMonitorView : UserControl
         => new DataGridTemplateColumn
         {
             Width = 26,
+            MinWidth = 26,
             CanUserResize = false,
             CellStyle = cellStyle,
             CellTemplate = ParseTemplate(

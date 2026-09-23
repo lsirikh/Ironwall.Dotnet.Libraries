@@ -139,6 +139,47 @@ public class DevicePropertyCatalogTests : IDisposable
     }
     #endregion
 
+    #region - Rule 4b: 소속 부대(unit_id) — v8.0 경계(D-14) -
+    [Theory]
+    [MemberData(nameof(CategoryAndContractCases))]
+    public void should_hide_unit_id_field_when_not_unit_era(EnumDeviceCategory category, bool isAxisContract)
+    {
+        var specs = DevicePropertyCatalog.For(category, isAxisContract, isUnitEra: false);
+
+        Assert.DoesNotContain(specs, s => s.Key == "unit_id");
+    }
+
+    [Theory]
+    [MemberData(nameof(CategoryAndContractCases))]
+    public void should_show_unit_id_field_in_common_section_when_unit_era(EnumDeviceCategory category, bool isAxisContract)
+    {
+        var specs = DevicePropertyCatalog.For(category, isAxisContract, isUnitEra: true);
+
+        var unit = Assert.Single(specs, s => s.Key == "unit_id");
+        Assert.Equal(DevicePropertySection.Common, unit.Section);
+        Assert.Equal(DevicePropertyEditor.ReadOnly, unit.Editor);
+        Assert.Equal(DevicePropertyWritable.No, unit.Writable);
+    }
+
+    [Fact]
+    public void should_read_unassigned_text_when_unit_id_is_null()
+    {
+        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { UnitId = null });
+        var spec = Spec("unit_id", EnumDeviceCategory.Controller);
+
+        Assert.Equal(Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory.Unassigned, DevicePropertyAccessor.ReadText(vm, spec));
+    }
+
+    [Fact]
+    public void should_read_raw_id_text_when_unit_directory_is_unavailable()
+    {
+        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { UnitId = 12 });
+        var spec = Spec("unit_id", EnumDeviceCategory.Controller);
+
+        Assert.Equal("12", DevicePropertyAccessor.ReadText(vm, spec));
+    }
+    #endregion
+
     #region - Rule 5: 필수 절 커버리지(축 계약) -
     [Theory]
     [MemberData(nameof(CategoriesOnly))]

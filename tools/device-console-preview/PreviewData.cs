@@ -1,6 +1,10 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Providers;
+﻿using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace DeviceConsolePreview;
@@ -22,6 +26,9 @@ internal static class PreviewData
                 Id = i, DeviceNumber = i, DeviceName = $"제어기 {i}", IpAddress = $"10.10.1.{10 + i}", Port = 5000 + i,
                 Status = i == 2 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, IsEnable = true,
                 TypeAxisCode = isAxis ? "pids_controller" : null, DeviceGroups = new List<int> { 1 },
+                // D-14: 1·2번은 부대 편제(unit_id)가 실려 있다 — 소속 부대 열·칸이 이름으로 뜨는지 눈으로 본다.
+                // 3번은 UnitId 를 비워 둔다 — "미배치" 폴백도 같은 화면에서 확인한다.
+                UnitId = isAxis ? (i == 1 ? 1 : i == 2 ? 2 : (int?)null) : null,
             };
             controllers.Add(controller);
             devices.Add(controller);
@@ -48,6 +55,8 @@ internal static class PreviewData
                 IsEnable = i != 6, TypeAxisCode = isAxis ? (i % 2 == 0 ? "fixed" : "ptz") : null, DeviceType = EnumDeviceType.IpCamera,
                 Location = "동측 3번 폴", Latitude = 37.5 + i * 0.001, Longitude = 127.03 + i * 0.001, Heading = 45 * i % 360,
                 DeviceGroups = i <= 2 ? new List<int> { 1, 3 } : new List<int>(),
+                // D-14: 4번은 부대 그래프에 없는 id(999) — 이름을 지어내지 않고 원값 id 로 남는 경로를 눈으로 본다.
+                UnitId = isAxis ? (i == 1 ? 1 : i == 4 ? 999 : (int?)null) : null,
             };
 
             if (isAxis)
@@ -72,6 +81,38 @@ internal static class PreviewData
         devices.Add(new LampDeviceModel { Id = 501, DeviceNumber = 1, DeviceName = "정문 경광등", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true });
         devices.Add(new GateDeviceModel { Id = 601, DeviceNumber = 1, DeviceName = "1통문", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true });
     }
+}
+
+/// <summary>
+/// D-14: "소속 부대" 열·칸이 실제 이름으로 뜨는 모습을 보려는 가짜 부대 그래프 — id 1·2 만 있다.
+/// <see cref="PreviewData.Fill"/> 이 심는 <c>UnitId</c>(1·2·999·null)와 짝지어 이름 해석 · id 폴백 ·
+/// "미배치" 세 경로가 한 화면에 다 나오게 한다.
+/// </summary>
+internal sealed class PreviewUnitGraphApi : IUnitGraphApi
+{
+    public bool IsAvailable => true;
+
+    public Task<ApiResponse<UnitGraphDto>> GetGraphAsync(CancellationToken token = default)
+        => Task.FromResult(ApiResponse<UnitGraphDto>.CreateSuccess(new UnitGraphDto
+        {
+            Nodes = new List<UnitListDto>
+            {
+                new() { Id = 1, Code = "unit001", Name = "1소초", EchelonRaw = "Company", IsEnable = true },
+                new() { Id = 2, Code = "unit002", Name = "2소초", EchelonRaw = "Company", IsEnable = true },
+            },
+        }));
+
+    public Task<ApiResponse<UnitDetailDto>> GetDetailAsync(int unitId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<UnitDetailDto>.CreateSuccess(new UnitDetailDto { Id = unitId }));
+
+    public Task<ApiResponse<UnitDto>> CreateAsync(UnitCreateDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<UnitDto>.CreateSuccess(new UnitDto()));
+
+    public Task<ApiResponse<UnitDto>> PatchAsync(int unitId, UnitUpdateDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<UnitDto>.CreateSuccess(new UnitDto()));
+
+    public Task<ApiResponse<UnitDeleteResultDto>> DeleteAsync(int unitId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<UnitDeleteResultDto>.CreateSuccess(new UnitDeleteResultDto()));
 }
 
 /// <summary>종류 축 어휘 몇 개만 가진 가짜 카탈로그 — 콤보가 채워진 모습을 보려고.</summary>

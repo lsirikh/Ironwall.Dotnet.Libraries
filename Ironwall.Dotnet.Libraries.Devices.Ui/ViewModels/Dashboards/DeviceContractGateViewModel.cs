@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using System;
@@ -33,6 +34,12 @@ public sealed class DeviceContractGateViewModel : PropertyChangedBase
 
     /// <summary>6.3 화면 그대로 — 새 요소는 하나도 보이지 않는다.</summary>
     public bool IsLegacyUi => !IsAxisUi;
+
+    /// <summary>
+    /// v8.0+ 부대 편제(<c>unit_id</c>) UI 를 보인다(D-14) — "소속 부대" 열·상세 칸. ⚠ <see cref="IsAxisUi"/> 와
+    /// 다른 경계다(7.0 vs 8.0) — 비교는 <c>==</c> 가 아니라 <c>&gt;=</c>, 9.0 이 와도 켜진 채 유지된다.
+    /// </summary>
+    public bool IsUnitEra => _policy.Contract >= EnumServerContract.V8_0;
 
     /// <summary>판본 확인에 실패해 옛 화면으로 표시 중 — 배너를 띄운다.</summary>
     public bool IsProbeFallback => _policy.IsProbeFallback;
@@ -94,6 +101,7 @@ public sealed class DeviceContractGateViewModel : PropertyChangedBase
             IsRefreshing = false;
             NotifyOfPropertyChange(nameof(IsAxisUi));
             NotifyOfPropertyChange(nameof(IsLegacyUi));
+            NotifyOfPropertyChange(nameof(IsUnitEra));
             NotifyOfPropertyChange(nameof(IsProbeFallback));
             NotifyOfPropertyChange(nameof(ContractText));
         }

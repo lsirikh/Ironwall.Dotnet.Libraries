@@ -40,6 +40,19 @@ public class ContractGatingTests
         Assert.False(gate.IsProbeFallback);
     }
 
+    [Theory]
+    [InlineData(EnumServerContract.V6_3, false)]
+    [InlineData(EnumServerContract.V7_0, false)]
+    [InlineData(EnumServerContract.V8_0, true)]
+    public void should_gate_unit_era_when_contract_given(EnumServerContract contract, bool expected)
+    {
+        // D-14: 소속 부대(unit_id) UI 는 IsAxisUi(v7.0 경계)와 다른 경계(v8.0)다 — 7.0 은 축 UI 는 보이되
+        // 부대 열/칸은 여전히 감춘다.
+        var gate = Create(new ScriptedProbe(contract, resolved: true));
+
+        Assert.Equal(expected, gate.IsUnitEra);
+    }
+
     [Fact]
     public void should_show_fallback_banner_when_probe_could_not_resolve()
     {
@@ -76,9 +89,11 @@ public class ContractGatingTests
         Assert.True(ok);
         Assert.Equal(1, probe.RefreshCount);
         Assert.True(gate.IsAxisUi);
+        Assert.True(gate.IsUnitEra);
         Assert.False(gate.IsProbeFallback);
         Assert.Contains("8.0.1", gate.ContractText);
         Assert.Contains(nameof(DeviceContractGateViewModel.IsAxisUi), raised);
+        Assert.Contains(nameof(DeviceContractGateViewModel.IsUnitEra), raised);
         Assert.Contains(nameof(DeviceContractGateViewModel.IsProbeFallback), raised);
         Assert.Contains(nameof(DeviceContractGateViewModel.ContractText), raised);
     }

@@ -308,6 +308,8 @@ public sealed class WiringApplyService
             Status = server.Status,
             IsEnable = server.IsEnable,
             UseAxisWrite = true,
+            // (D-13) 방금 다시 받은 장비의 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = server.UnitId,
             // 종류는 바뀌었을 때만 싣는다(빈 값이면 type_sensor 가 나가지 않는다).
             TypeDevice = string.Equals(row.Facts.TypeText, row.Baseline.TypeText, StringComparison.Ordinal)
                 ? string.Empty

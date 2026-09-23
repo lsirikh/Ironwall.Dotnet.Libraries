@@ -398,6 +398,8 @@ public sealed class ComponentApplyService
         target.NameDevice = source.NameDevice;
         target.Status = source.Status;
         target.IsEnable = source.IsEnable;
+        // (D-13) 방금 다시 받은 장비의 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+        target.UnitId = source.UnitId;
 
         target.UseAxisWrite = true;
         if (carrier != null)

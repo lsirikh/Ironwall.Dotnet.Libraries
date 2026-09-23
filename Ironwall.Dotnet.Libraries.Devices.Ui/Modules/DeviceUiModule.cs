@@ -107,6 +107,14 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
                    .SingleInstance();
+            // D-14: unit_id → 부대 이름 읽기 전용 사전. IUnitGraphApi 위에서 id→이름을 1회 적재해 캐시한다 —
+            // 장비 목록 "소속 부대" 열 · 상세 "부대" 칸이 원값 id 대신 이름을 보이는 유일한 경로.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
+                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory>()
+                   .SingleInstance();
 
 
             // N-12 server monitor — 서버 모니터 콘솔(레일 · 목록 + 지표 띠 · 상세).

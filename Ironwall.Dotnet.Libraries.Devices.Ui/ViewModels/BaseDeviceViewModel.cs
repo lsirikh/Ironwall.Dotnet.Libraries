@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -68,6 +69,30 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
                     provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
             }
             catch { return string.Join(", ", DeviceGroups); }
+        }
+    }
+
+    /// <summary>
+    /// 소속 부대(서버 8.0+ <c>unit_id</c>) 표시 문구(D-14). 부대 콘솔에서 끌어 놓은 배정이
+    /// 장비 쪽에서도 이름으로 확인된다 — 이름을 못 구하면 원값 id, 배정 자체가 없으면 "미배치".
+    /// </summary>
+    /// <remarks>
+    /// 목록 열 · 상세 칸 모두 이 값을 그대로 쓴다(단일 정본). 6.3·7.0 계약에서는 이 값을 보이는 열/칸 자체를
+    /// 카탈로그가 걸러내므로(<see cref="Consoles.Lists.DeviceColumnCatalog"/> · <see cref="Consoles.Properties.DevicePropertyCatalog"/>)
+    /// 여기서 다시 계약을 확인하지 않는다 — 안 불리면 안 그려진다.
+    /// </remarks>
+    public string UnitDisplay
+    {
+        get
+        {
+            try
+            {
+                return IoC.Get<UnitNameDirectory>().Display(_model.UnitId, () => NotifyOfPropertyChange(() => UnitDisplay));
+            }
+            catch
+            {
+                return _model.UnitId?.ToString() ?? UnitNameDirectory.Unassigned;
+            }
         }
     }
 

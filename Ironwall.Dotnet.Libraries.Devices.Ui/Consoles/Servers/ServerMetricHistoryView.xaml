@@ -42,22 +42,27 @@
 				<DataGrid.Columns>
 					<DataGridTextColumn
 						Width="130"
+						MinWidth="130"
 						Binding="{Binding TimeText}"
 						Header="관측 시각" />
 					<DataGridTextColumn
 						Width="*"
+						MinWidth="90"
 						Binding="{Binding Cpu}"
 						Header="CPU" />
 					<DataGridTextColumn
 						Width="*"
+						MinWidth="90"
 						Binding="{Binding Ram}"
 						Header="메모리" />
 					<DataGridTextColumn
 						Width="*"
+						MinWidth="90"
 						Binding="{Binding Disk}"
 						Header="디스크" />
 					<DataGridTextColumn
 						Width="1.6*"
+						MinWidth="140"
 						Binding="{Binding Network}"
 						Header="네트워크" />
 				</DataGrid.Columns>

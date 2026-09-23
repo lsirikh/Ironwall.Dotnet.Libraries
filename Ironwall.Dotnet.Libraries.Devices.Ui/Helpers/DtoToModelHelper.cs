@@ -177,7 +177,9 @@ public static class DtoToModelHelper
             UserPassword = model.UserPassword ?? string.Empty,
             Mode = model.Mode.ToString(),
             Category = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.Category),
-            IsRecord = model.IsRecord
+            IsRecord = model.IsRecord,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
         MapGeolocationToDto(model, dto);
         if (model.Urls != null)
@@ -258,7 +260,9 @@ public static class DtoToModelHelper
             TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
-            ControllerId = model.Controller?.Id ?? 0
+            ControllerId = model.Controller?.Id ?? 0,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
 
         MapGeolocationToDto(model, dto);
@@ -313,7 +317,9 @@ public static class DtoToModelHelper
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             IpAddress = model.IpAddress ?? string.Empty,
-            IpPort = model.Port
+            IpPort = model.Port,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
         MapGeolocationToDto(model, dto);
         return dto;
@@ -385,7 +391,9 @@ public static class DtoToModelHelper
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             SpeakerType = model.SpeakerType ?? "NORMAL",
-            Description = model.Description
+            Description = model.Description,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
 
         MapGeolocationToDto(model, dto);
@@ -450,6 +458,8 @@ public static class DtoToModelHelper
             TypeGate = string.IsNullOrWhiteSpace(model.TypeAxisCode) ? null : model.TypeAxisCode!.Trim(),
             Urls = ParseJsonObjectOrNull(model.UrlsJson),
             LinkInfo = ParseJsonObjectOrNull(model.LinkInfoJson),
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
         MapGeolocationToDto(model, dto);
         return dto;
@@ -509,7 +519,9 @@ public static class DtoToModelHelper
             // 7.0+ 에서는 DeviceApiService 가 UseAxisWrite=true 로 켜 이 키 자체를 직렬화하지 않는다.
             DoorStatus = string.IsNullOrWhiteSpace(model.DoorStatus) ? "CLOSED" : model.DoorStatus,
             HeaterEnabled = model.HeaterEnabled,
-            FanEnabled = model.FanEnabled
+            FanEnabled = model.FanEnabled,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
         // 강타입 임계값 모델 → threshold_config JObject (이전엔 드롭 → 저장 무효).
         // (리뷰 M1) 전 필드 null인 '빈 임계값'은 미전송 — 다이얼로그가 주입한 빈 객체가 서버 값을 null로 덮어쓰는 것 방지.
@@ -710,7 +722,9 @@ public static class DtoToModelHelper
             IpPort = model.IpPort,
             UserName = model.UserName,
             UserPassword = model.UserPassword,
-            Description = model.Description
+            Description = model.Description,
+            // (D-13) 편집 대상의 원래 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
+            UnitId = model.UnitId
         };
         MapGeolocationToDto(model, dto);
         return dto;

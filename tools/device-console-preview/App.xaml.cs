@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System.IO;
@@ -118,17 +119,26 @@ public partial class App : Application
         var events = new EventAggregator();
         var api = new MockDeviceApiService();
         var providerService = new MockDeviceProviderService();
-        var policy = new DeviceQueryPolicy(new FixedProbe(isAxis), log);
+        var probe = new FixedProbe(isAxis);
+        var policy = new DeviceQueryPolicy(probe, log);
         var catalog = new PreviewCatalog();
+        // D-14: "소속 부대" 열·칸이 실제 이름으로 뜨는지 눈으로 보려면 UnitNameDirectory 도 IoC 로 잡혀야 한다 —
+        // 실제 앱과 같은 probe(V8.0/V6.3)를 공유해 IsUnitEra 판정이 정책과 어긋나지 않는다.
+        var unitDirectory = new UnitNameDirectory(new PreviewUnitGraphApi(), probe, log);
 
         // 패널 · 계약 게이트 · 종류 축 지원이 정적 IoC 로 의존을 찾는다 — 컨테이너 대신 여기서 대 준다.
         IoC.GetInstance = (type, _) =>
             type == typeof(IEventAggregator) ? events
             : type == typeof(ICatalogService) ? catalog
             : type == typeof(DeviceQueryPolicy) ? policy
+            : type == typeof(UnitNameDirectory) ? unitDirectory
             : null!;
         IoC.GetAllInstances = type => type == typeof(DeviceQueryPolicy) ? new object[] { policy } : Array.Empty<object>();
         IoC.BuildUp = _ => { };
+
+        // 렌더 전에 미리 채운다 — 스냅샷·첫 화면이 배경 재조회의 비동기 갱신(re-notify)에 기대지 않고
+        // 곧장 실제 이름을 보이게 한다(1소초·2소초). id 999(그래프에 없음)·null(미배치)은 의도적으로 남겨 둔다.
+        unitDirectory.EnsureLoadedAsync().GetAwaiter().GetResult();
 
         // 호스트는 부트스트래퍼가 해 준다 — 없으면 Execute.BeginOnUIThread 가 제자리(작업 스레드)에서 돌아 콘솔이 교차 스레드로 화면을 만진다.
         PlatformProvider.Current = new XamlPlatformProvider();
@@ -166,6 +176,21 @@ public partial class App : Application
         Save(directory, $"{prefix}-02-camera-list");
 
         var grid = FindGrid();
+
+        // D-14: "소속 부대" 는 선택 열(IsDefault=false)이라 열 메뉴를 거치지 않고는 기본 화면에 없다 —
+        // ConsolePrefs(디스크 파일)를 건드리지 않고 그리드 열의 Visibility 만 직접 펼쳐 한 장 남긴다.
+        // 카메라 1(부대 1·"1소초") · 4(부대 999·그래프에 없음 → 원값 id) · 나머지(UnitId 없음 → "미배치")가
+        // 한 화면에 세 경로를 다 보인다.
+        var hiddenByDefault = grid.Columns.Where(c => c.Visibility != Visibility.Visible).ToList();
+        foreach (var c in hiddenByDefault) c.Visibility = Visibility.Visible;
+        await Settle();
+        // 그리드가 가로 스크롤 상태다 — "소속 부대" 열까지 스크롤해 실제로 프레임에 들어오게 한다.
+        var unitColumn = grid.Columns.FirstOrDefault(c => ConsoleColumns.GetKey(c) == "unit");
+        if (unitColumn is not null && grid.Items.Count > 0) grid.ScrollIntoView(grid.Items[0], unitColumn);
+        await Settle();
+        Save(directory, $"{prefix}-02b-camera-list-unit-column");
+        foreach (var c in hiddenByDefault) c.Visibility = Visibility.Collapsed;
+
         grid.SelectedItem = grid.Items[0];
         await Settle();
         Save(directory, $"{prefix}-03-camera-single");
@@ -212,6 +237,23 @@ public partial class App : Application
 
         await _viewModel.SelectRailAsync(DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Camera));
         await Settle();
+        grid.SelectedItem = grid.Items[0];
+        await Settle();
+
+        // D-14 다크: 소속 부대 열 · 칸이 다크에서도 글자가 안 죽는지(라이트/다크 가장 흔한 불만) 확인한다.
+        // ⚠ 레일 전환(SelectRailAsync)이 RebuildColumns 로 그리드 열을 통째로 새로 만든다 — 위에서 잡아 둔
+        // hiddenByDefault 는 이제 옛 열 인스턴스라 다시 그리드에서 새로 찾는다.
+        var hiddenByDefaultDark = grid.Columns.Where(c => c.Visibility != Visibility.Visible).ToList();
+        var unitColumnDark = grid.Columns.FirstOrDefault(c => ConsoleColumns.GetKey(c) == "unit");
+        if (unitColumnDark is not null)
+        {
+            foreach (var c in hiddenByDefaultDark) c.Visibility = Visibility.Visible;
+            grid.ScrollIntoView(grid.Items[0], unitColumnDark);
+            await Settle();
+            Save(directory, $"{prefix}-09b-dark-camera-list-unit-column");
+            foreach (var c in hiddenByDefaultDark) c.Visibility = Visibility.Collapsed;
+        }
+
         grid.SelectedItem = grid.Items[1];
         await Settle();
         _viewModel.Form.Fields.First(f => f.Key == "name_device").Text += " (수정)";
@@ -369,6 +411,9 @@ public partial class App : Application
 
         var (tableView, _) = preview.TableWithSelection();
         await Show(tableView, 1280, 820, "02-table-selection");
+        // Job 2 회귀 확인 — 별 열("이름")이 좁은 폭에서 MinWidth(140) 를 지키는지 눈으로 본다.
+        // (결선맵이 고정 360 을 먹는 두 칸 레이아웃이라 너무 좁으면 표 자체가 접힌다 — 1000 으로 잡는다.)
+        await Show(tableView, 1000, 820, "02b-narrow-1000");
 
         var (wiredView, _) = preview.Wired();
         await Show(wiredView, 1280, 820, "03-wiring-placed");
@@ -426,6 +471,15 @@ public partial class App : Application
         await preview.LoadAsync();
         await Settle();
         Save(directory, $"servers-{theme}-02-loaded");
+
+        // Job 2 회귀 확인 — 별 열("이름")이 좁은 폭에서 MinWidth(140) 를 지키는지 눈으로 본다
+        // (900 = 장비 콘솔과 같은 "접힘" 경계 — 그보다 좁으면 셸 자체가 레일까지 못 그린다).
+        var wideServers = _window.Width;
+        _window.Width = 900;
+        await Settle();
+        Save(directory, $"servers-{theme}-02b-narrow-900");
+        _window.Width = wideServers;
+        await Settle();
 
         preview.Select(preview.Row("방송서버-01"));       // 지표가 붙어 있는 행
         await Settle();

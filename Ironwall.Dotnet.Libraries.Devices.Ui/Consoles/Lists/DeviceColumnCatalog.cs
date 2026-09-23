@@ -31,7 +31,13 @@ public static class DeviceColumnCatalog
     /// <summary>카테고리 + 계약 → 그 화면이 실제로 그릴 열 목록(기본 6열 + 선택 열), 표시 순서 그대로.</summary>
     /// <param name="category">레일이 고른 카테고리. 그룹은 <see cref="ForGroups"/> 로 별도.</param>
     /// <param name="isAxisContract">v7.0+ 축 계약이면 참(<c>DeviceQueryPolicy.IsAxisContract</c>) — 6.3 이면 거짓.</param>
-    public static IReadOnlyList<DeviceColumnSpec> For(EnumDeviceCategory category, bool isAxisContract)
+    /// <param name="isUnitEra">
+    /// v8.0+ 부대 편제 계약이면 참(<c>IUnitScopeService.IsUnitEra</c>·<c>DeviceContractGateViewModel.IsUnitEra</c>) —
+    /// 거짓이면 "소속 부대"(<see cref="UNIT_COLUMN_KEY"/>) 열을 <b>레코드 계약을 늘리지 않고</b> 여기서 걸러낸다(D-14).
+    /// <see cref="DeviceColumnSpec.AxisContractOnly"/>/<see cref="DeviceColumnSpec.LegacyContractOnly"/> 는 v7.0 경계
+    /// 전용이라 v8.0 경계에는 쓸 수 없다 — 그렇다고 계약이 고정된 레코드에 세 번째 플래그를 늘리지 않는다.
+    /// </param>
+    public static IReadOnlyList<DeviceColumnSpec> For(EnumDeviceCategory category, bool isAxisContract, bool isUnitEra = false)
     {
         var raw = category switch
         {
@@ -45,8 +51,14 @@ public static class DeviceColumnCatalog
             _ => Array.Empty<DeviceColumnSpec>(),
         };
 
-        return raw.Where(s => !(isAxisContract ? s.LegacyContractOnly : s.AxisContractOnly)).ToArray();
+        return raw
+            .Where(s => !(isAxisContract ? s.LegacyContractOnly : s.AxisContractOnly))
+            .Where(s => isUnitEra || s.Key != UNIT_COLUMN_KEY)
+            .ToArray();
     }
+
+    /// <summary>"소속 부대" 열의 안정 키 — v8.0 미만에서 <see cref="For"/> 가 이 키로 걸러낸다.</summary>
+    private const string UNIT_COLUMN_KEY = "unit";
 
     /// <summary>장비 그룹 목록 — 카테고리 축과 무관한 별개 리소스라 계약 분기가 없다.</summary>
     public static IReadOnlyList<DeviceColumnSpec> ForGroups() => new[]
@@ -88,6 +100,9 @@ public static class DeviceColumnCatalog
         new DeviceColumnSpec("groups", "그룹", nameof(DeviceViewModel.DeviceGroupsText), DeviceColumnKind.Text, IsDefault: false, Width: 160),
         // v7.0+ 은 형상축 hardware_spec.firmware 가 이 자리를 대신한다 — 옛 화면에만 열로 남긴다.
         new DeviceColumnSpec("version", "버전", nameof(DeviceViewModel.Version), DeviceColumnKind.Text, IsDefault: false, Width: 90, LegacyContractOnly: true),
+        // D-14: 소속 부대(서버 8.0+ unit_id). 6.3·7.0 에서는 For() 가 UNIT_COLUMN_KEY 로 걸러낸다(레코드에
+        // 세 번째 계약 플래그를 늘리지 않는다) — 여기 선언은 계약 무관하게 항상 있지만 걸러지면 화면에 안 나온다.
+        new DeviceColumnSpec(UNIT_COLUMN_KEY, "소속 부대", nameof(DeviceViewModel.UnitDisplay), DeviceColumnKind.Text, IsDefault: false, Width: 140),
     };
 
     // ── 카테고리별 조립 ──

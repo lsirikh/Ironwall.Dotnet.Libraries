@@ -247,7 +247,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
             Detail.TypeName = RailEntries.First(e => e.Key == key).Label;
             Columns = key == GroupsRailKey ? DeviceColumnCatalog.ForGroups()
-                    : Category is { } category ? DeviceColumnCatalog.For(category, ContractGate.IsAxisUi)
+                    : Category is { } category ? DeviceColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra)
                     : Array.Empty<DeviceColumnSpec>();
         }
         catch (Exception ex)
@@ -510,7 +510,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         if (_railKey == GroupsRailKey)
             Form.Load(rows, DeviceGroupPropertySpecs.All, default, isCreating, readOnly);
         else if (Category is { } category)
-            Form.Load(rows, category, ContractGate.IsAxisUi, isCreating, readOnly);
+            Form.Load(rows, category, ContractGate.IsAxisUi, isCreating, readOnly, ContractGate.IsUnitEra);
         else
             Form.Clear();
 
@@ -717,8 +717,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     public async void OnClickRefreshContract()
     {
         var wasAxis = ContractGate.IsAxisUi;
+        var wasUnitEra = ContractGate.IsUnitEra;
         var ok = await ContractGate.RefreshContractAsync();
-        if (!ok || ContractGate.IsAxisUi == wasAxis) return;
+        // D-14: 7.0 → 8.0 처럼 IsAxisUi 는 그대로인데 IsUnitEra 만 바뀌는 전환도 다시 그린다 —
+        // 안 그러면 "소속 부대" 열/칸이 재확인 한 번으로는 안 나타나고 다음 레일 전환까지 기다려야 한다.
+        if (!ok || (ContractGate.IsAxisUi == wasAxis && ContractGate.IsUnitEra == wasUnitEra)) return;
 
         try
         {
