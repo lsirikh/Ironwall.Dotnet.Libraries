@@ -569,13 +569,13 @@
 									AutomationProperties.AutomationId="Console.Events.Overview.Group.Controller"
 									Content="제어기"
 									IsChecked="{Binding IsControllerGroup, Mode=OneWay}"
-									Style="{StaticResource MaterialDesignTabRadioButton}"
+									Style="{StaticResource Console.Tab}"
 									Click="OnControllerGroup" />
 								<RadioButton
 									AutomationProperties.AutomationId="Console.Events.Overview.Group.Camera"
 									Content="카메라"
 									IsChecked="{Binding IsCameraGroup, Mode=OneWay}"
-									Style="{StaticResource MaterialDesignTabRadioButton}"
+									Style="{StaticResource Console.Tab}"
 									Click="OnCameraGroup" />
 							</StackPanel>
 						</DockPanel>

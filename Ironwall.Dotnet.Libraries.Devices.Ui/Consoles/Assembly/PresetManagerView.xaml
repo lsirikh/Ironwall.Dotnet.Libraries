@@ -105,32 +105,32 @@
 					Click="OnRename"
 					Content="이름 바꾸기"
 					IsEnabled="{Binding CanEditSelected}"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button}" />
 				<Button
 					Margin="0,0,0,6"
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.Duplicate"
 					Click="OnDuplicate"
 					Content="복제"
 					IsEnabled="{Binding CanEditSelected}"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button}" />
 				<Button
 					Margin="0,0,0,14"
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.Delete"
 					Click="OnDelete"
 					Content="삭제"
 					IsEnabled="{Binding CanEditSelected}"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button.Danger}" />
 				<Button
 					Margin="0,0,0,6"
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.Export"
 					Click="OnExport"
 					Content="내보내기…"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button}" />
 				<Button
 					AutomationProperties.AutomationId="Devices.Assembly.Presets.Import"
 					Click="OnImport"
 					Content="가져오기…"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button}" />
 			</StackPanel>
 		</Grid>
 	</DockPanel>

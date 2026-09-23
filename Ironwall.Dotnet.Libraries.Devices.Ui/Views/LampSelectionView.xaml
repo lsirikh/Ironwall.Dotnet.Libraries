@@ -380,8 +380,7 @@
 				<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
 					<Button
 						x:Name="ApplyButton"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />

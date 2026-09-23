@@ -289,9 +289,8 @@
 				Grid.Row="1"
 				Margin="0,10,0,0"
 				HorizontalAlignment="Right"
-				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 				IsEnabled="{Binding IsEditable}"
-				Style="{StaticResource MaterialDesignFlatButton}">
+				Style="{StaticResource Console.Button.Primary}">
 				<Button.Content>
 					<StackPanel Orientation="Horizontal">
 						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />

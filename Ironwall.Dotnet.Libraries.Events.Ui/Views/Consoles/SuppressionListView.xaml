@@ -213,16 +213,14 @@
 					<DataTemplate>
 						<Button
 							Margin="0,0,6,0"
-							Padding="6,1"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowCancel.{0}}"
 							AutomationProperties.Name="취소 예약"
 							Click="OnCancelRow"
 							Content="취소"
-							FontSize="11"
 							IsEnabled="{Binding IsCancellable}"
-							Style="{StaticResource MaterialDesignOutlinedButton}"
+							Style="{StaticResource Console.Button.Mini}"
 							ToolTip="이 억제 창을 취소합니다 — 이력(revoked_at)은 남습니다"
 							Visibility="{Binding IsCancellable, Converter={StaticResource BoolToVis}}" />
 					</DataTemplate>

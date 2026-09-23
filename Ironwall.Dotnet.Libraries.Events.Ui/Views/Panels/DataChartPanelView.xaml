@@ -77,11 +77,11 @@
 					x:Name="ClickSearch"
 					Grid.Row="0"
 					Grid.Column="4"
-					Style="{StaticResource IconButtonStyle}">
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Search" />
 					</Button.Content>
 				</Button>
@@ -89,11 +89,11 @@
 					x:Name="ClickCancel"
 					Grid.Row="0"
 					Grid.Column="6"
-					Style="{StaticResource IconButtonStyle}">
+					Style="{StaticResource Console.Button.Icon}">
 					<Button.Content>
 						<md:PackIcon
-							Width="30"
-							Height="30"
+							Width="20"
+							Height="20"
 							Kind="Cancel" />
 					</Button.Content>
 				</Button>

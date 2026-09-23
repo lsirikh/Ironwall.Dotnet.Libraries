@@ -422,7 +422,7 @@
 						x:Name="DetailButton"
 						Margin="0,0,8,0"
 						IsEnabled="{Binding IsSingleSelected}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="InformationOutline" Style="{StaticResource ButtonIcon}" />
@@ -432,8 +432,7 @@
 					</Button>
 					<Button
 						x:Name="ApplyButton"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />

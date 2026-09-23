@@ -245,18 +245,17 @@
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Mapping"
 						Click="OnOpenMappingWorkbench"
 						Content="이벤트 맵핑"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="이벤트가 났을 때 움직일 카메라 · 스피커 · 경광등을 정합니다"
 						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
 					<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Console.Suppression.Toolbar.Cleanup"
 						Click="OnSuppressionCleanup"
 						Content="{Binding Suppression.CleanupText}"
-						FontSize="11.5"
 						IsEnabled="{Binding Suppression.CanCleanupAll}"
-						Style="{StaticResource MaterialDesignOutlinedButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="목록의 취소 · 종료 항목을 모두 지웁니다 — 되돌릴 수 없습니다"
 						Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}" />
 					<Button

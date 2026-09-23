@@ -342,7 +342,7 @@
 						x:Name="ThresholdButton"
 						Margin="0,0,8,0"
 						IsEnabled="{Binding IsSingleSelected}"
-						Style="{StaticResource MaterialDesignFlatButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="단일 선택 시 임계값 설정">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
@@ -353,8 +353,7 @@
 					</Button>
 					<Button
 						x:Name="ApplyButton"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />

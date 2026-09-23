@@ -53,7 +53,7 @@
 					Content="다시 확인"
 					DockPanel.Dock="Right"
 					IsEnabled="{Binding ContractGate.CanRefreshContract}"
-					Style="{StaticResource MaterialDesignOutlinedButton}" />
+					Style="{StaticResource Console.Button}" />
 				<md:PackIcon
 					Width="20"
 					Height="20"
@@ -129,43 +129,43 @@
 						<StackPanel Orientation="Horizontal">
 						<!--  장비 배정 창(N-05) — 그룹 레일에서 그룹 하나를 골랐을 때만 눌린다. 6.3 서버에서도 쓴다.  -->
 						<Button
-							Margin="0,0,6,0"
+							Margin="0,0,8,0"
 							AutomationProperties.AutomationId="Console.Devices.Toolbar.Assign"
 							Click="OnOpenDeviceAssign"
 							Content="장비 배정"
 							IsEnabled="{Binding CanOpenAssign}"
-							Style="{StaticResource MaterialDesignOutlinedButton}"
+							Style="{StaticResource Console.Button}"
 							ToolTip="{Binding AssignBlockedReason}"
 							ToolTipService.ShowOnDisabled="True"
 							Visibility="{Binding IsGroupsRail, Converter={StaticResource BoolToVisibility}}" />
 						<StackPanel Orientation="Horizontal" Visibility="{Binding CanAssemble, Converter={StaticResource BoolToVisibility}}">
 							<Button
-								Margin="0,0,6,0"
+								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Assembly"
 								Click="OnOpenAssembly"
 								Content="조립기"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="부품을 끌어 조립해 장비를 만들거나 프리셋으로 굳힌다" />
 							<Button
-								Margin="0,0,6,0"
+								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.RegisterFromPreset"
 								Click="OnRegisterFromPreset"
 								Content="프리셋으로 등록"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="프리셋을 고르고 번호 · 이름 · 접속만 넣으면 부품까지 한 번에 등록된다" />
 							<Button
-								Margin="0,0,6,0"
+								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Presets"
 								Click="OnManagePresets"
 								Content="프리셋…"
-								Style="{StaticResource MaterialDesignFlatButton}" />
+								Style="{StaticResource Console.Button.Ghost}" />
 							<!--  셋업 · 결선(N-04) — 제어기 한 대를 골랐을 때만 눌린다  -->
 							<Button
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Wiring"
 								Click="OnOpenWiring"
 								Content="셋업 · 결선"
 								IsEnabled="{Binding CanOpenWiring}"
-								Style="{StaticResource MaterialDesignOutlinedButton}"
+								Style="{StaticResource Console.Button}"
 								ToolTip="{Binding WiringBlockedReason}"
 								ToolTipService.ShowOnDisabled="True" />
 						</StackPanel>
@@ -354,7 +354,7 @@
 							AutomationProperties.AutomationId="Console.Devices.Detail.EditComponents"
 							Click="OnEditComponents"
 							Content="부품 구성 바꾸기 (조립기)"
-							Style="{StaticResource MaterialDesignOutlinedButton}"
+							Style="{StaticResource Console.Button}"
 							Visibility="{Binding CanEditComponents, Converter={StaticResource BoolToVisibility}}" />
 						<forms:DevicePropertyFormView DataContext="{Binding Form}" />
 					</StackPanel>

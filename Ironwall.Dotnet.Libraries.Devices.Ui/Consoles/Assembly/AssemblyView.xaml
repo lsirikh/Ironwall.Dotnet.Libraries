@@ -62,31 +62,31 @@
 			<DockPanel LastChildFill="True">
 				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Assembly.RepeatExpand"
 						Click="OnRepeatExpand"
 						Content="반복 펼치기…"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
+						Style="{StaticResource Console.Button}" />
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Assembly.Renumber"
 						Click="OnRenumber"
 						Content="채널 다시 번호"
 						IsEnabled="{Binding CanRenumberChannels}"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
+						Style="{StaticResource Console.Button}" />
 					<Button
-						Margin="0,0,6,0"
+						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Devices.Assembly.Undo"
 						Click="OnUndo"
 						Content="되돌리기"
 						IsEnabled="{Binding CanUndo}"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
+						Style="{StaticResource Console.Button}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Assembly.SaveAsPreset"
 						Click="OnSaveAsPreset"
 						Content="프리셋으로 저장"
 						IsEnabled="{Binding CanSaveAsPreset}"
-						Style="{StaticResource MaterialDesignOutlinedButton}" />
+						Style="{StaticResource Console.Button}" />
 				</StackPanel>
 				<StackPanel Orientation="Horizontal">
 					<TextBlock
@@ -273,7 +273,7 @@
 								Content="고른 것 빼기"
 								DockPanel.Dock="Right"
 								IsEnabled="{Binding CanRemoveSelected}"
-								Style="{StaticResource MaterialDesignFlatButton}" />
+								Style="{StaticResource Console.Button.Ghost}" />
 							<md:PackIcon
 								Width="16"
 								Height="16"
@@ -530,7 +530,7 @@
 												HorizontalContentAlignment="Left"
 												AutomationProperties.AutomationId="{Binding Id, StringFormat=Devices.Assembly.Preset.{0}}"
 												Click="OnLoadPreset"
-												Style="{StaticResource MaterialDesignOutlinedButton}"
+												Style="{StaticResource Console.Button}"
 												ToolTip="보드에 올린다(교체) — 되돌리기 한 번으로 돌아올 수 있다">
 												<TextBlock FontSize="12.5">
 													<Run Text="{Binding Name, Mode=OneWay}" /><Run Foreground="{DynamicResource TextMutedBrush}" Text="{Binding Components.Count, Mode=OneWay, StringFormat='  · 부품 {0}'}" />

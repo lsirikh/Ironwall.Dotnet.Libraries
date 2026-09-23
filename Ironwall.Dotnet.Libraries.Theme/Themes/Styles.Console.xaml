@@ -38,6 +38,13 @@
 		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
 		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
+		<!--
+			U-14 — 가로 정렬은 템플릿이 박지 않고 속성으로 받는다. 옛 템플릿은 Center 를 못박아
+			목록형 버튼(프리셋 목록 · 그룹 체크 행처럼 HorizontalContentAlignment=Left/Stretch 를 주는 자리)이
+			커널로 옮겨 오면 조용히 가운데로 몰렸다. 기본값은 여전히 Center 라 기존 버튼의 겉모습은 그대로다.
+		-->
+		<Setter Property="HorizontalContentAlignment" Value="Center" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
 		<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
 		<Setter Property="Template">
@@ -67,8 +74,8 @@
 							Visibility="Collapsed" />
 						<ContentPresenter
 							Margin="{TemplateBinding Padding}"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
+							HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+							VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
 							RecognizesAccessKey="True" />
 					</Grid>
 					<ControlTemplate.Triggers>
@@ -130,8 +137,8 @@
 							Visibility="Collapsed" />
 						<ContentPresenter
 							Margin="{TemplateBinding Padding}"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
+							HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+							VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
 							RecognizesAccessKey="True" />
 					</Grid>
 					<ControlTemplate.Triggers>
@@ -147,10 +154,14 @@
 							<Setter TargetName="FocusOuter" Property="Visibility" Value="Visible" />
 							<Setter TargetName="FocusInner" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<!--  꺼진 Primary 는 채움을 버린다 — 켜진 것과 형태가 다르다  -->
+						<!--
+							꺼진 Primary 는 채움을 버린다 — 켜진 것과 형태가 다르다.
+							U-14 — 굵기는 바꾸지 않는다. 옛 판은 꺼질 때 FontWeight 를 Normal 로 내려, 행을 고를 때마다
+							켜지고 꺼지는 버튼(예: 이벤트 콘솔의 [조치보고 (N)])이 그때마다 몇 px 씩 넓어졌다 줄었다 했다 —
+							"고를 때마다 버튼 크기가 바뀐다" 신고의 한 갈래. 꺼짐은 채움 · 글자색(형태)으로 이미 충분히 말한다.
+						-->
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-							<Setter Property="FontWeight" Value="Normal" />
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
 							<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 							<Setter Property="Cursor" Value="No" />
@@ -179,6 +190,62 @@
 		<Setter Property="Padding" Value="4,0" />
 		<Setter Property="FontSize" Value="11" />
 		<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+	</Style>
+
+	<!--
+		U-14 — 아이콘만 있는 버튼. 이 키가 없어 창마다 MaterialDesignIconButton(48 원형 · 물결)을 쓰는 바람에
+		같은 줄에서 커널 버튼(32 사각)과 MD 버튼(48 원형)이 섞였다. 새 치수를 만들지 않는다 — 한 변은
+		Console.Button 의 높이(32 = ConsoleLayoutMath.InputHeight) 그대로, 템플릿 · 두 겹 포커스 고리 ·
+		hover/pressed/꺼짐은 Ghost 를 그대로 물려받는다(정의는 한 곳뿐).
+		MinWidth 를 0 으로 푸는 이유: 칩 안의 ✕ 처럼 자리에서 Width/Height 를 16~18 로 줄여야 하는 곳이 있는데,
+		WPF 는 MinWidth 가 Width 를 이긴다 — Ghost 의 56 을 물려받으면 작은 ✕ 가 56 폭으로 부풀어 칩을 밀어낸다.
+	-->
+	<Style
+		x:Key="Console.Button.Icon"
+		BasedOn="{StaticResource Console.Button.Ghost}"
+		TargetType="ButtonBase">
+		<Setter Property="Width" Value="32" />
+		<Setter Property="MinWidth" Value="0" />
+		<Setter Property="Height" Value="32" />
+		<Setter Property="Padding" Value="0" />
+	</Style>
+
+	<!--
+		U-14 — Primary 로 채운 머리(옛 이벤트 카드의 ColorZone 머리) 위에 앉는 아이콘 버튼. 옛 자리는
+		MaterialDesignToolForegroundButton 이었다. Console.Button.Icon 을 그대로 얹으면 hover 판이 SurfaceHover
+		(밝은 회색)라 그 위의 OnPrimaryFixed 글리프(라이트=흰색)가 hover 순간 사라진다 — 그래서 Primary 버튼의
+		템플릿(hover = PrimaryHover · 누름 = 테두리 TextPrimary · 두 겹 고리)을 물려받고 채움만 비운다.
+		글리프는 OnPrimaryFixed(라이트 흰색 · 다크 짙은 잉크) — 같은 머리의 제목 글자와 같은 토큰이다.
+	-->
+	<Style
+		x:Key="Console.Button.Icon.OnPrimary"
+		BasedOn="{StaticResource Console.Button.Primary}"
+		TargetType="ButtonBase">
+		<Setter Property="Width" Value="32" />
+		<Setter Property="MinWidth" Value="0" />
+		<Setter Property="Height" Value="32" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="FontWeight" Value="Normal" />
+		<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderBrush" Value="Transparent" />
+	</Style>
+
+	<!--
+		U-14 — 되돌릴 수 없는 동작(삭제 등). 위험은 색 하나가 아니라 테두리(형태) + 바탕으로 말한다.
+		왜 커널에 두나: Accounts(Acc.Btn.Danger) · Reports(Local.Button.Mini.Danger) 가 이미 같은 것을 뷰마다
+		따로 만들었고, 부대 콘솔은 Outlined 버튼에 Foreground 를 로컬로 박아 두었다 — 로컬 값은 템플릿 트리거를
+		이기므로 꺼져도 빨간 글자가 남아 K-01(꺼짐 = 형태) 이 깨졌다. Style Setter 로 주면 꺼짐 트리거가 이긴다.
+		모양은 Accounts 의 선례(테두리 StatusCritical · 바탕 DangerSurface · SemiBold)를 그대로 옮겼다.
+	-->
+	<Style
+		x:Key="Console.Button.Danger"
+		BasedOn="{StaticResource Console.Button}"
+		TargetType="ButtonBase">
+		<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+		<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+		<Setter Property="FontWeight" Value="SemiBold" />
 	</Style>
 
 	<!--

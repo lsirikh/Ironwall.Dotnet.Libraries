@@ -61,6 +61,9 @@ public class ConsoleStyleContractTests
     [InlineData("Console.Button.Primary")]
     [InlineData("Console.Button.Ghost")]
     [InlineData("Console.Button.Mini")]
+    [InlineData("Console.Button.Icon")]
+    [InlineData("Console.Button.Icon.OnPrimary")]
+    [InlineData("Console.Button.Danger")]
     [InlineData("Console.SearchBox")]
     [InlineData("Console.CheckBox")]
     [InlineData("Console.RadioButton")]
@@ -157,6 +160,96 @@ public class ConsoleStyleContractTests
 
         // Assert — 하나라도 있으면 그 요소는 런타임에 MD3 암시 스타일(틸 채움)로 떨어진다(U-12 실측 계열)
         Assert.True(offenders.Count == 0, $"Style/Template 이 없는 버튼 계열: {string.Join("; ", offenders)}");
+    }
+    #endregion
+
+    #region - U-14 one button language in Devices.Ui / Events.Ui -
+    // U-14 — 같은 화면에 MD3 틸 Flat/Outlined 버튼과 커널 Console.Button* 이 섞여 "버튼 언어가 둘" 이었다
+    // (예: 부대 콘솔 상세의 [최상위로] 틸 글자 · [옮기기] 틸 윤곽 옆에 커널 [되돌리기]/[적용]).
+    // 두 프로젝트의 XAML 은 MaterialDesign*Button 계열 스타일 키를 참조하지 않는다 — 커널 키만 쓴다.
+    // IconButtonStyle 도 금지한다: 라이브러리 Resources.xaml 은 앱에 병합되지 않아, 뷰가 그 키를 부르면
+    // 런타임에는 호스트 앱의 사본(BasedOn MaterialDesignIconButton — 48 원형 · 물결)으로 풀린다.
+    private static readonly Regex MaterialDesignButtonStyleRef = new(
+        @"\{(?:StaticResource|DynamicResource)\s+(MaterialDesign\w*Button|IconButtonStyle)\s*\}",
+        RegexOptions.Compiled);
+
+    // "상대경로:키" → 남겨 두는 이유. 이유 없이 추가하지 않는다(지금은 비어 있다 — 전부 옮겼다).
+    // 단, 라이브러리 Resources.xaml 의 IconButtonStyle '정의' 자체는 x:Key 라 이 정규식에 걸리지 않는다.
+    private static readonly Dictionary<string, string> MaterialDesignButtonAllowList = new(StringComparer.Ordinal)
+    {
+    };
+
+    internal static IReadOnlyList<string> FindMaterialDesignButtonRefs(string root, IEnumerable<string> projects)
+    {
+        var offenders = new List<string>();
+        foreach (var project in projects)
+        {
+            var dir = Path.Combine(root, project);
+            if (!Directory.Exists(dir)) continue;
+
+            foreach (var file in Directory.EnumerateFiles(dir, "*.xaml", SearchOption.AllDirectories))
+            {
+                if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
+                    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+
+                var text = File.ReadAllText(file);
+                var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+                foreach (Match m in MaterialDesignButtonStyleRef.Matches(text))
+                {
+                    if (MaterialDesignButtonAllowList.ContainsKey($"{relative}:{m.Groups[1].Value}")) continue;
+                    var lineNo = text[..m.Index].Count(c => c == '\n') + 1;
+                    offenders.Add($"{relative}:{lineNo} {m.Groups[1].Value}");
+                }
+            }
+        }
+        return offenders;
+    }
+
+    [Fact]
+    public void should_not_reference_materialdesign_button_styles_when_view_is_in_devices_or_events_ui()
+    {
+        // Arrange
+        var projects = new[] { "Ironwall.Dotnet.Libraries.Devices.Ui", "Ironwall.Dotnet.Libraries.Events.Ui" };
+
+        // Act
+        var offenders = FindMaterialDesignButtonRefs(RepoRoot(), projects);
+
+        // Assert — 하나라도 있으면 그 버튼은 런타임에 MD3 틸 chrome 으로 그려져 커널 버튼과 섞인다
+        Assert.True(offenders.Count == 0, $"MaterialDesign 버튼 스타일 참조: {string.Join("; ", offenders)}");
+    }
+
+    [Fact]
+    public void should_justify_every_materialdesign_button_allow_list_entry()
+    {
+        // 허용 목록 항목은 반드시 이유를 적는다 — 빈 이유로 조용히 예외를 늘리지 못하게
+        Assert.All(MaterialDesignButtonAllowList, kv => Assert.False(string.IsNullOrWhiteSpace(kv.Value), kv.Key));
+    }
+
+    [Theory]
+    [InlineData("Console.Button.Icon", "Console.Button.Ghost")]
+    [InlineData("Console.Button.Icon.OnPrimary", "Console.Button.Primary")]
+    [InlineData("Console.Button.Danger", "Console.Button")]
+    public void should_inherit_the_kernel_button_template_when_style_is_a_button_variant(string key, string basedOn)
+    {
+        // Arrange — 변형은 치수 · 색 토큰만 바꾸고 템플릿(두 겹 포커스 고리 · 꺼짐 트리거)은 물려받는다.
+        // 자기 Template 을 가지면 K-01/K-10 계약을 따로 다시 지켜야 하고, 그러다 어긋난다.
+        var block = StyleBlock(ThemeFile("Styles.Console.xaml"), key);
+
+        // Assert
+        Assert.Contains($"BasedOn=\"{{StaticResource {basedOn}}}\"", block);
+        Assert.DoesNotContain("Property=\"Template\"", block);
+        Assert.DoesNotContain("Opacity", block);
+        Assert.DoesNotMatch("#[0-9A-Fa-f]{6}", block);   // 색은 토큰(DynamicResource)으로만
+    }
+
+    [Fact]
+    public void should_keep_the_primary_font_weight_when_primary_button_is_disabled()
+    {
+        // Arrange + Act — U-14: 꺼질 때 굵기를 내리면 켜짐 ↔ 꺼짐마다 버튼 폭이 흔들린다
+        var disabled = DisabledTrigger(StyleBlock(ThemeFile("Styles.Console.xaml"), "Console.Button.Primary"));
+
+        // Assert
+        Assert.DoesNotContain("FontWeight", disabled);
     }
     #endregion
 

@@ -261,10 +261,10 @@
 		<Setter Property="Margin" Value="10,0,0,0" />
 	</Style>
 
-	<!--  Material Design 스타일 기반 버튼  -->
+	<!--  U-14 — 아이콘 버튼은 커널(Console.Button.Icon, 32 사각)을 잇는다. 뷰는 이 키 대신 커널 키를 직접 쓴다 — 이 사전은 앱에 병합되지 않는다.  -->
 	<Style
 		x:Key="IconButtonStyle"
-		BasedOn="{StaticResource MaterialDesignIconButton}"
+		BasedOn="{StaticResource Console.Button.Icon}"
 		TargetType="Button">
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="Margin" Value="2,2" />

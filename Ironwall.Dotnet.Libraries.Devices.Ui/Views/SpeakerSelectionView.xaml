@@ -219,10 +219,8 @@
 						<Button
 							x:Name="RefreshServers"
 							Grid.Column="6"
-							Width="28"
-							Height="28"
 							VerticalAlignment="Center"
-							Style="{StaticResource MaterialDesignIconButton}"
+							Style="{StaticResource Console.Button.Icon}"
 							ToolTip="서버목록 새로고침">
 							<md:PackIcon
 								Width="18"
@@ -351,8 +349,7 @@
 				<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
 					<Button
 						x:Name="ApplyButton"
-						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-						Style="{StaticResource MaterialDesignFlatButton}">
+						Style="{StaticResource Console.Button.Primary}">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />

@@ -837,18 +837,18 @@
 					<!--  [설정 수정] [지표 이력] — 스토리보드는 절 <b>뒤</b>에 둔다(SB L1351).  -->
 					<StackPanel Margin="0,12,0,0" Orientation="Horizontal">
 						<Button
-							Margin="0,0,6,0"
+							Margin="0,0,8,0"
 							AutomationProperties.AutomationId="Console.Servers.Detail.BeginEdit"
 							Click="OnBeginEdit"
 							Content="설정 수정"
 							IsEnabled="{Binding CanBeginEdit}"
-							Style="{StaticResource MaterialDesignOutlinedButton}" />
+							Style="{StaticResource Console.Button}" />
 						<Button
 							AutomationProperties.AutomationId="Console.Servers.Detail.MetricHistory"
 							Click="OnShowHistory"
 							Content="지표 이력"
 							IsEnabled="{Binding CanShowHistory}"
-							Style="{StaticResource MaterialDesignFlatButton}" />
+							Style="{StaticResource Console.Button.Ghost}" />
 					</StackPanel>
 				</StackPanel>
 			</c:ConsoleDetailHost>

@@ -79,11 +79,9 @@
 		<Style x:Key="W.Cable" TargetType="Rectangle">
 			<Setter Property="Margin" Value="4,36,68,0" />
 		</Style>
-		<Style x:Key="W.Chip" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-			<Setter Property="Height" Value="28" />
-			<Setter Property="Padding" Value="10,0" />
-			<Setter Property="Margin" Value="0,0,6,6" />
-			<Setter Property="FontSize" Value="12" />
+		<!--  U-14 — 커널 버튼 규격(32 · 글자 13) 그대로 쓴다. 이 창이 정하는 것은 자리 간격(8 — 집 규칙)뿐이다.  -->
+		<Style x:Key="W.Chip" TargetType="Button" BasedOn="{StaticResource Console.Button}">
+			<Setter Property="Margin" Value="0,0,8,8" />
 		</Style>
 
 		<!--  선의 칸 목록 — 가상화를 끈다(화면 밖 칸은 드롭 자리가 될 수 없다). 제어기 한 대분이라 전량 로딩이 전제다.  -->
@@ -250,7 +248,7 @@
 						Click="OnRemoveSlot"
 						Content="✕"
 						FontSize="9"
-						Style="{StaticResource MaterialDesignFlatButton}"
+						Style="{StaticResource Console.Button.Icon}"
 						ToolTip="선에서 빼기"
 						Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}" />
 				</Grid>
@@ -377,23 +375,32 @@
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Step.Sensors"
 						Click="OnGoSensors"
-						Style="{StaticResource MaterialDesignFlatButton}">
-						<TextBlock FontSize="12.5" Text="{Binding StepSensorsGlyph, StringFormat={}{0} 센서}">
-							<TextBlock.Style>
-								<Style TargetType="TextBlock">
-									<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding IsSensorStep}" Value="True">
-											<Setter Property="FontWeight" Value="Bold" />
-											<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-										</DataTrigger>
-										<DataTrigger Binding="{Binding IsSensorStepDone}" Value="True">
-											<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</TextBlock.Style>
-						</TextBlock>
+						Style="{StaticResource Console.Button.Ghost}">
+						<Grid>
+							<!--  U-14 — 굵은 폭 예약(커널 Console.Tab 과 같은 고스트) — 지금 단계가 바뀌어 굵어져도 띠가 흔들리지 않는다.  -->
+							<TextBlock
+								FontSize="12.5"
+								FontWeight="Bold"
+								IsHitTestVisible="False"
+								Opacity="0"
+								Text="{Binding StepSensorsGlyph, StringFormat={}{0} 센서}" />
+							<TextBlock FontSize="12.5" Text="{Binding StepSensorsGlyph, StringFormat={}{0} 센서}">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsSensorStep}" Value="True">
+												<Setter Property="FontWeight" Value="Bold" />
+												<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+											</DataTrigger>
+											<DataTrigger Binding="{Binding IsSensorStepDone}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Grid>
 					</Button>
 					<TextBlock
 						Margin="8,0"
@@ -403,23 +410,32 @@
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Step.Wiring"
 						Click="OnGoWiring"
-						Style="{StaticResource MaterialDesignFlatButton}">
-						<TextBlock FontSize="12.5" Text="{Binding StepWiringGlyph, StringFormat={}{0} 결선}">
-							<TextBlock.Style>
-								<Style TargetType="TextBlock">
-									<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding IsWiringStep}" Value="True">
-											<Setter Property="FontWeight" Value="Bold" />
-											<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-										</DataTrigger>
-										<DataTrigger Binding="{Binding IsWiringStepDone}" Value="True">
-											<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</TextBlock.Style>
-						</TextBlock>
+						Style="{StaticResource Console.Button.Ghost}">
+						<Grid>
+							<!--  U-14 — 굵은 폭 예약(커널 Console.Tab 과 같은 고스트) — 지금 단계가 바뀌어 굵어져도 띠가 흔들리지 않는다.  -->
+							<TextBlock
+								FontSize="12.5"
+								FontWeight="Bold"
+								IsHitTestVisible="False"
+								Opacity="0"
+								Text="{Binding StepWiringGlyph, StringFormat={}{0} 결선}" />
+							<TextBlock FontSize="12.5" Text="{Binding StepWiringGlyph, StringFormat={}{0} 결선}">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsWiringStep}" Value="True">
+												<Setter Property="FontWeight" Value="Bold" />
+												<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+											</DataTrigger>
+											<DataTrigger Binding="{Binding IsWiringStepDone}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Grid>
 					</Button>
 					<TextBlock
 						Margin="8,0"
@@ -503,22 +519,20 @@
 						BorderBrush="{DynamicResource DividerBrush}"
 						BorderThickness="0,0,0,1"
 						DockPanel.Dock="Top">
+						<!--
+							U-14 — 버튼이 먼저 자리를 잡고 안내 글이 남는 폭을 쓴다. 옛 판은 안내 글을 오른쪽에 먼저 도킹해
+							1000 폭에서 [엑셀에서 붙여넣기] 가 "엑셀에서 붙" 에서 글자 중간이 잘렸다(wiring-light-02b-narrow-1000).
+						-->
 						<DockPanel LastChildFill="True">
-							<TextBlock
-								Margin="12,0,0,0"
-								VerticalAlignment="Center"
-								DockPanel.Dock="Right"
-								Style="{StaticResource W.Hint}"
-								Text="줄을 Ctrl 로 여러 개 고르면 오른쪽에서 한꺼번에 채웁니다" />
-							<StackPanel Orientation="Horizontal">
+							<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
 								<Button
-									Margin="0,0,6,0"
+									Margin="0,0,8,0"
 									AutomationProperties.AutomationId="Devices.Wiring.MakeSensors"
 									Click="OnMakeSensors"
 									Content="＋ 센서 여러 개 만들기"
 									Style="{StaticResource Console.Button.Primary}" />
 								<Button
-									Margin="0,0,6,0"
+									Margin="0,0,8,0"
 									AutomationProperties.AutomationId="Devices.Wiring.AddRow"
 									Click="OnAddRow"
 									Content="＋ 한 줄"
@@ -529,6 +543,14 @@
 									Content="엑셀에서 붙여넣기"
 									Style="{StaticResource Console.Button}" />
 							</StackPanel>
+							<TextBlock
+								Margin="12,0,0,0"
+								VerticalAlignment="Center"
+								Style="{StaticResource W.Hint}"
+								Text="줄을 Ctrl 로 여러 개 고르면 오른쪽에서 한꺼번에 채웁니다"
+								TextTrimming="CharacterEllipsis"
+								TextWrapping="WrapWithOverflow"
+								ToolTip="줄을 Ctrl 로 여러 개 고르면 오른쪽에서 한꺼번에 채웁니다" />
 						</DockPanel>
 					</Border>
 
@@ -840,7 +862,7 @@
 													HorizontalContentAlignment="Stretch"
 													AutomationProperties.AutomationId="{Binding Id, StringFormat=Devices.Wiring.Group.{0}}"
 													Click="OnToggleGroup"
-													Style="{StaticResource MaterialDesignFlatButton}">
+													Style="{StaticResource Console.Button.Ghost}">
 													<DockPanel LastChildFill="True">
 														<CheckBox
 															Margin="0,0,8,0"

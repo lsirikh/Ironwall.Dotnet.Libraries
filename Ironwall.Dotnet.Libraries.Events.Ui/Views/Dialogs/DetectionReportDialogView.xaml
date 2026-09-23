@@ -166,18 +166,16 @@
 				x:Name="ClickOk"
 				Grid.Column="0"
 				Margin="10,0"
-				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 				Content="확인"
 				IsDefault="True"
-				Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+				Style="{StaticResource Console.Button.Primary}" />
 			<Button
 				x:Name="ClickCancel"
 				Grid.Column="1"
 				Margin="10,0"
-				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 				Content="취소"
 				IsCancel="True"
-				Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+				Style="{StaticResource Console.Button}" />
 		</Grid>
 	</Grid>
 </UserControl>

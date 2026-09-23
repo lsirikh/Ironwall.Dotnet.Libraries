@@ -67,14 +67,14 @@
 				<Button
 					Grid.Column="7"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="추가하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="AddBox" />
 				</Button>
 
@@ -82,14 +82,14 @@
 				<Button
 					Grid.Column="9"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="삭제하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
 					<md:PackIcon
-						Width="30"
-						Height="30"
+						Width="20"
+						Height="20"
 						Kind="MinusBox" />
 				</Button>
 
@@ -97,7 +97,7 @@
 				<Button
 					Grid.Column="11"
 					IsEnabled="{Binding IsButtonEnable, UpdateSourceTrigger=PropertyChanged}"
-					Style="{StaticResource IconButtonStyle}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="갱신하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
@@ -105,14 +105,14 @@
 					<Button.Content>
 						<Grid IsEnabled="{Binding IsButtonEnable}">
 							<ProgressBar
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								IsIndeterminate="True"
 								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="CircleArrows"
 								ToolTip="갱신하기"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -127,7 +127,7 @@
 					Margin="2,2"
 					VerticalAlignment="Center"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource MaterialDesignIconButton}"
+					Style="{StaticResource Console.Button.Icon}"
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
@@ -135,15 +135,15 @@
 					<Button.Content>
 						<Grid IsEnabled="{Binding IsButtonEnable}">
 							<ProgressBar
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								IsIndeterminate="True"
 								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding IsSaving, Converter={StaticResource BooleanToVisibilityConverter}}"
 								Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
+								Width="20"
+								Height="20"
 								Kind="Floppy"
 								ToolTip="저장하기"
 								Visibility="{Binding IsSaving, Converter={StaticResource BoolToInverseVisibleConverter}}" />

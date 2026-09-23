@@ -290,7 +290,7 @@
 						VerticalAlignment="Center"
 						Command="{Binding RefreshCommand}"
 						DockPanel.Dock="Right"
-						Style="{StaticResource MaterialDesignToolButton}"
+						Style="{StaticResource Console.Button.Icon}"
 						ToolTip="새로고침">
 						<md:PackIcon
 							Width="20"
@@ -445,11 +445,10 @@
 					ToAutomationId="Events.DetectionHistory.CustomEnd" />
 				<Button
 					Margin="10,0,0,0"
-					Padding="14,4"
 					VerticalAlignment="Center"
 					Command="{Binding ApplyCustomCommand}"
 					Content="적용"
-					Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+					Style="{StaticResource Console.Button.Primary}" />
 			</StackPanel>
 		</Border>
 
@@ -747,12 +746,11 @@
 					Text="{Binding RangeText}" />
 				<Button
 					Margin="10,0,0,0"
-					Padding="10,2"
 					VerticalAlignment="Center"
 					Command="{Binding RefreshCommand}"
 					Content="재시도"
 					DockPanel.Dock="Left"
-					Style="{StaticResource MaterialDesignFlatDarkBgButton}"
+					Style="{StaticResource Console.Button}"
 					Visibility="{Binding HasLoadError, Converter={StaticResource BoolToVis}}" />
 				<TextBlock
 					VerticalAlignment="Center"

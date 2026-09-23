@@ -63,9 +63,8 @@
 							<Button
 								x:Name="ButtonActionAll"
 								md:RippleAssist.IsCentered="True"
-								Foreground="{DynamicResource PrimaryBrush}"
 								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
-								Style="{StaticResource MaterialDesignIconForegroundButton}"
+								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="전체 조치보고"
 								Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibleConverter}}">
 								<cal:Message.Attach>

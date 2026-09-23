@@ -65,35 +65,9 @@
 		</Style>
 
 		<!--
-			비활성 버튼 임시 보정 — 라이트에서는 흐린 흰 글자가 연한 바탕에 얹혀 읽히지 않고,
-			다크에서는 비활성이 활성과 같은 단색 청록으로 떴다. 커널이 Console.Button* 을
-			Theme/Themes/Styles.Console.xaml 로 승격하면 이 스타일을 지우고 그것을 쓴다(중복 정의 금지).
+			U-14 — 옛 LocalPrimaryButton/LocalGhostButton(MD Raised/Flat 위의 꺼짐 임시 보정)은 커널
+			Console.Button.Primary/.Ghost 로 옮기고 지웠다 — 그 주석이 약속한 대로(중복 정의 금지).
 		-->
-		<Style
-			x:Key="LocalPrimaryButton"
-			BasedOn="{StaticResource MaterialDesignRaisedButton}"
-			TargetType="Button">
-			<Style.Triggers>
-				<Trigger Property="IsEnabled" Value="False">
-					<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-					<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
-					<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-					<Setter Property="Opacity" Value="1" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
-
-		<Style
-			x:Key="LocalGhostButton"
-			BasedOn="{StaticResource MaterialDesignFlatButton}"
-			TargetType="Button">
-			<Style.Triggers>
-				<Trigger Property="IsEnabled" Value="False">
-					<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-					<Setter Property="Opacity" Value="1" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
 
 		<!--  칸 제목 (SB .bx 의 라벨)  -->
 		<Style x:Key="BoxLabel" TargetType="TextBlock">
@@ -176,11 +150,9 @@
 						</StackPanel>
 						<Button
 							Grid.Column="1"
-							Width="30"
-							Height="30"
 							AutomationProperties.AutomationId="Console.Suppression.Drawer.Close"
 							Click="OnClose"
-							Style="{StaticResource MaterialDesignIconButton}"
+							Style="{StaticResource Console.Button.Icon}"
 							ToolTip="닫기 (Esc)">
 							<md:PackIcon Kind="Close" />
 						</Button>
@@ -350,10 +322,15 @@
 										Text="{Binding WindowEndText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
 										VerticalContentAlignment="Center"
 										Visibility="{Binding IsUnlimited, Converter={StaticResource NotBoolToVis}}" />
+									<!--
+										U-14 — 옆 입력칸과 같은 높이(32 — 옛 MinHeight 36 은 한 줄에서 4px 튀었다). 좁은 서랍(900)에서는
+										칸이 글자보다 좁아 "없음" 이 글자 중간에서 잘렸다 — 말줄임 + 툴팁으로 전체 문장을 남긴다.
+									-->
 									<Border
-										MinHeight="36"
+										Height="32"
 										Background="{DynamicResource SurfaceSunkenBrush}"
 										CornerRadius="5"
+										ToolTip="무제한 — 종료일 없음"
 										Visibility="{Binding IsUnlimited, Converter={StaticResource BoolToVis}}">
 										<TextBlock
 											Margin="9,0"
@@ -361,7 +338,8 @@
 											AutomationProperties.AutomationId="Console.Suppression.Form.UnlimitedPlaceholder"
 											FontSize="12.5"
 											Foreground="{DynamicResource TextMutedBrush}"
-											Text="무제한 — 종료일 없음" />
+											Text="무제한 — 종료일 없음"
+											TextTrimming="CharacterEllipsis" />
 									</Border>
 								</Grid>
 							</Grid>
@@ -585,13 +563,11 @@
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="{Binding TrayCountText}" />
 								<Button
-									Padding="8,1"
 									AutomationProperties.AutomationId="Console.Suppression.Tray.Clear"
 									Click="OnClearChips"
 									Content="모두 빼기"
 									DockPanel.Dock="Right"
-									FontSize="11.5"
-									Style="{StaticResource MaterialDesignFlatButton}" />
+									Style="{StaticResource Console.Button.Mini}" />
 							</DockPanel>
 
 							<!--  드롭존 — 끄는 동안 형태로 가능 · 불가를 보인다(색이 아니라 윤곽)  -->
@@ -661,7 +637,7 @@
 															Padding="0"
 															AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.ChipRemove.{0}}"
 															Click="OnRemoveChip"
-															Style="{StaticResource MaterialDesignIconButton}"
+															Style="{StaticResource Console.Button.Icon}"
 															ToolTip="이 대상을 뺍니다 (Delete)">
 															<md:PackIcon
 																Width="11"
@@ -773,8 +749,7 @@
 									AutomationProperties.AutomationId="Console.Suppression.Picker.Add"
 									Click="OnAddSelected"
 									Content="추가 ▶"
-									FontSize="12"
-									Style="{StaticResource MaterialDesignOutlinedButton}"
+									Style="{StaticResource Console.Button}"
 									ToolTip="고른 대상을 트레이에 담습니다 — 끌어 놓는 것과 같은 일입니다 (Enter)" />
 							</StackPanel>
 						</StackPanel>
@@ -812,27 +787,24 @@
 							Orientation="Horizontal">
 							<Button
 								Margin="0,0,8,0"
-								Padding="14,3"
 								AutomationProperties.AutomationId="Console.Suppression.Drawer.Revert"
 								Click="OnRevert"
 								Content="되돌리기"
 								IsEnabled="{Binding CanRevert}"
-								Style="{StaticResource LocalGhostButton}"
+								Style="{StaticResource Console.Button.Ghost}"
 								ToolTip="연 시점으로 되돌립니다 — 서버 호출 0" />
 							<Button
 								Margin="0,0,8,0"
-								Padding="14,3"
 								AutomationProperties.AutomationId="Console.Suppression.Drawer.Cancel"
 								Click="OnClose"
 								Content="취소"
-								Style="{StaticResource MaterialDesignOutlinedButton}" />
+								Style="{StaticResource Console.Button}" />
 							<Button
-								Padding="16,3"
 								AutomationProperties.AutomationId="Console.Suppression.Drawer.Save"
 								Click="OnSave"
 								Content="저장"
 								IsEnabled="{Binding CanSave}"
-								Style="{StaticResource LocalPrimaryButton}"
+								Style="{StaticResource Console.Button.Primary}"
 								ToolTip="서버를 한 번 부릅니다 — 대상이 몇 개든 요청은 하나입니다" />
 						</StackPanel>
 					</Grid>

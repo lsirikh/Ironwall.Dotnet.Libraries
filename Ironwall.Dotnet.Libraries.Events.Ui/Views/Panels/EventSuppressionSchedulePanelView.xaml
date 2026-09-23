@@ -320,7 +320,7 @@
 						DockPanel.Dock="Left"
 						Margin="0,0,8,0"
 						IsEnabled="{Binding CanDeleteSelected}"
-						Style="{StaticResource MaterialDesignFlatButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="체크한 취소/종료 항목을 목록에서 완전 삭제(복구 불가)"
 						AutomationProperties.AutomationId="Events.SuppressionSchedule.DeleteSelectedButton">
 						<cal:Message.Attach>[Event Click] = [Action OnClickDeleteSelected()]</cal:Message.Attach>
@@ -342,7 +342,7 @@
 						Margin="0,0,14,0"
 						Content="취소·종료 모두 정리"
 						IsEnabled="{Binding CanCleanupAll}"
-						Style="{StaticResource MaterialDesignFlatButton}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="현재 목록의 취소/종료 항목을 모두 삭제(복구 불가)"
 						AutomationProperties.AutomationId="Events.SuppressionSchedule.CleanupAllButton">
 						<cal:Message.Attach>[Event Click] = [Action OnClickCleanupAll()]</cal:Message.Attach>
@@ -814,9 +814,8 @@
 												VerticalAlignment="Center"
 												Content="모두 지우기"
 												DockPanel.Dock="Right"
-												FontSize="10"
 												IsEnabled="{Binding HasSelectedDevices}"
-												Style="{StaticResource MaterialDesignFlatButton}"
+												Style="{StaticResource Console.Button.Mini}"
 												ToolTip="선택한 장비를 전부 해제"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.ClearDevicesButton">
 												<cal:Message.Attach>[Event Click] = [Action ClearDevices()]</cal:Message.Attach>
@@ -964,9 +963,8 @@
 												VerticalAlignment="Center"
 												Content="모두 지우기"
 												DockPanel.Dock="Right"
-												FontSize="10"
 												IsEnabled="{Binding HasSelectedGroups}"
-												Style="{StaticResource MaterialDesignFlatButton}"
+												Style="{StaticResource Console.Button.Mini}"
 												ToolTip="선택한 그룹을 전부 해제"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.ClearGroupsButton">
 												<cal:Message.Attach>[Event Click] = [Action ClearGroups()]</cal:Message.Attach>

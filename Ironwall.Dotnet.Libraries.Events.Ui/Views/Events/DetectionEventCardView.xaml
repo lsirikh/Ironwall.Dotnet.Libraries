@@ -58,7 +58,7 @@
 								Command="{x:Static md:Flipper.FlipCommand}"
 								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
-								Style="{StaticResource MaterialDesignToolForegroundButton}">
+								Style="{StaticResource Console.Button.Icon.OnPrimary}">
 								<md:PackIcon
 									Width="25"
 									Height="25"
@@ -184,11 +184,10 @@
 							</Grid.ColumnDefinitions>
 							<Button
 								Grid.Column="0"
-								Padding="4 0"
 								VerticalAlignment="Center"
 								VerticalContentAlignment="Center"
 								md:RippleAssist.IsCentered="True"
-								Style="{StaticResource MaterialDesignFlatButton}"
+								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="{DynamicResource EventRemove_Title}">
 								<cal:Message.Attach>
 									[Event Click] = [Action OnButtonAction($source, $eventArgs)];
@@ -229,8 +228,9 @@
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
-								Style="{StaticResource MaterialDesignToolForegroundButton}">
+								Style="{StaticResource Console.Button.Icon.OnPrimary}">
 								<md:PackIcon
 									Width="25"
 									Height="25"
