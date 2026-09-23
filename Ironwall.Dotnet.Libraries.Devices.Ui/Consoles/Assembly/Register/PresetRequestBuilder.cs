@@ -69,8 +69,11 @@ public static class PresetRequestBuilder
         if (preset.Category == EnumDeviceCategory.Sensor && (info.Controller == null || info.Controller.Id <= 0))
             problems.Add("센서는 소속 제어기를 지정해야 합니다(제어기 없이 등록하면 서버가 404 로 거절합니다).");
 
-        // 포트는 "넣었을 때만" 본다 — 접속이 없는 카테고리(센서·스피커·함체)는 이 칸 자체를 묻지 않는다.
-        if (info.IpPort is { } port && (port < 1 || port > 65535))
+        // 포트는 "그 카테고리가 접속 칸을 보낼 때만" 본다 — 접속 축이 없는 카테고리(센서·스피커·함체·통문)는
+        // BuildCategoryDto 가 애초에 포트를 실어 보내지 않으므로, 그 값을 범위 검사해 봐야 아무 데도 안 닿는다
+        // (등록 창은 ShowsConnection 으로 입력 자체를 막아 이 죽은 길이 UI 로는 발화하지 않지만, Validate 를 직접
+        // 부르는 호출자에게는 "검사를 통과했다"가 "전달된다"를 뜻하지 않는 거짓 안전감을 준다).
+        if (HasConnectionAxis(preset.Category) && info.IpPort is { } port && (port < 1 || port > 65535))
             problems.Add($"접속 포트({port})는 1~65535 범위여야 합니다.");
 
         var loaded = catalog is { IsLoaded: true };
@@ -235,6 +238,7 @@ public static class PresetRequestBuilder
                 var dto = model.ToControllerDeviceDto();
                 dto.TypeControllerAxis = type;   // setter 가 TypeDevice 로 되돌려 실어 준다
                 dto.HardwareSpec = spec;
+                dto.Description = info.Description;
                 return dto;
             }
 
@@ -251,6 +255,7 @@ public static class PresetRequestBuilder
                 dto.ControllerId = info.Controller?.Id ?? 0;   // 0 이면 ShouldSerializeControllerId 가 뺀다
                 dto.TypeSensorAxis = type;
                 dto.HardwareSpec = spec;
+                dto.Description = info.Description;
                 return dto;
             }
 
@@ -268,6 +273,7 @@ public static class PresetRequestBuilder
                 var dto = model.ToCameraDeviceDto();
                 dto.TypeCameraAxis = type;
                 dto.HardwareSpec = spec;
+                dto.Description = info.Description;
                 return dto;
             }
 
@@ -297,6 +303,7 @@ public static class PresetRequestBuilder
                 var dto = model.ToEnclosureDeviceDto();
                 dto.TypeEnclosure = type;
                 dto.HardwareSpec = spec;
+                dto.Description = info.Description;
                 return dto;
             }
 
@@ -328,6 +335,7 @@ public static class PresetRequestBuilder
                 };
                 var dto = model.ToGateDeviceDto();
                 dto.HardwareSpec = spec;
+                dto.Description = info.Description;
                 return dto;
             }
 
@@ -381,6 +389,15 @@ public static class PresetRequestBuilder
         new("^[a-z][a-z0-9_]*$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// 이 카테고리의 DTO 가 접속(IP/포트) 축을 실제로 갖는가 — <see cref="BuildCategoryDto"/> 가 <c>IpAddress</c>·
+    /// <c>IpPort</c> 를 채우는 세 카테고리와 정확히 같다(<c>ControllerDeviceDto</c>·<c>CameraDeviceDto</c>·
+    /// <c>LampDeviceDto</c> 만 그 필드를 선언한다). 센서·스피커·함체·통문은 접속 축이 <b>애초에 없다</b>
+    /// (서버 계약에 접속 개념이 없는 카테고리 — 버그가 아니라 설계다).
+    /// </summary>
+    private static bool HasConnectionAxis(EnumDeviceCategory category)
+        => category is EnumDeviceCategory.Controller or EnumDeviceCategory.Camera or EnumDeviceCategory.Lamp;
 
     private static string CategoryText(EnumDeviceCategory category) => category switch
     {

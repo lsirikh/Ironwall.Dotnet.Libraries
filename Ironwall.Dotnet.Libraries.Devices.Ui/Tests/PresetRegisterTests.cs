@@ -14,6 +14,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -151,6 +152,46 @@ public class PresetRegisterTests
         Assert.NotNull(body.SelectToken("hardware_spec.components"));
     }
 
+    /// <summary>
+    /// ★ 리플렉션 전수 감사(등록 경로) — <c>description</c> 이 일곱 카테고리 DTO 에 전부 선언돼 있고
+    /// 본문에 그 값 그대로 실리는지 못 박는다. <c>BaseDeviceDto</c> 에 <c>description</c> 이 없어
+    /// 제어기·센서·카메라·함체·통문 다섯 카테고리가 이 값을 <b>서버까지 닿지 못하고</b> 버리고 있었다
+    /// (실측 — device-assembly-preset 왕복 하네스, CHANGELOG "🔴 알려진 문제" 절).
+    /// 누가 이 프로퍼티를 지우거나 이름을 바꾸면 서버가 422 로 죽기 전에 여기서 먼저 깨진다.
+    /// </summary>
+    [Theory]
+    [InlineData(EnumDeviceCategory.Controller)]
+    [InlineData(EnumDeviceCategory.Sensor)]
+    [InlineData(EnumDeviceCategory.Camera)]
+    [InlineData(EnumDeviceCategory.Speaker)]
+    [InlineData(EnumDeviceCategory.Enclosure)]
+    [InlineData(EnumDeviceCategory.Lamp)]
+    [InlineData(EnumDeviceCategory.Gate)]
+    public void should_carry_the_description_in_the_create_body_for_every_category(EnumDeviceCategory category)
+    {
+        var preset = new DevicePreset
+        {
+            Id = "p1",
+            Name = "t",
+            Category = category,
+            Components = new[] { Component("nic", "NETWORK_INTERFACE") },
+        };
+        var controller = category == EnumDeviceCategory.Sensor
+            ? new ControllerDeviceModel { Id = 12, DeviceNumber = 1, DeviceName = "CTL" }
+            : null;
+
+        var request = PresetRequestBuilder.Build(preset, Instance() with { Description = "북측 9구간", Controller = controller });
+
+        var property = request.Dto.GetType().GetProperty("Description");
+        Assert.NotNull(property);
+        var jsonAttr = property!.GetCustomAttribute<JsonPropertyAttribute>();
+        Assert.NotNull(jsonAttr);
+        Assert.Equal("description", jsonAttr!.PropertyName);
+
+        var body = JObject.Parse(request.PreviewJson);
+        Assert.Equal("북측 9구간", (string?)body["description"]);
+    }
+
     [Fact]
     public void should_carry_both_speaker_axes_when_preset_declares_role_and_shape()
     {
@@ -265,12 +306,30 @@ public class PresetRegisterTests
             p => p.Contains("제어기", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// 제어기·카메라·경광등만 접속(IP/포트) 축을 실제로 보낸다(<c>PresetRequestBuilder.HasConnectionAxis</c>) —
+    /// 그래서 포트 범위 검사도 그 세 카테고리에서만 뜻이 있다.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(70000)]
-    public void should_block_when_port_is_outside_the_server_range(int port)
-        => Assert.Contains(
-            PresetRequestBuilder.Validate(EnclosurePreset(), Instance() with { IpPort = port }, Catalog()),
+    public void should_block_when_port_is_outside_the_server_range_for_a_category_with_connection(int port)
+    {
+        var preset = new DevicePreset { Id = "p1", Name = "t", Category = EnumDeviceCategory.Controller };
+
+        Assert.Contains(
+            PresetRequestBuilder.Validate(preset, Instance() with { IpPort = port }, Catalog()),
+            p => p.Contains("포트", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// ★ 함체는 접속 축이 없다 — <c>BuildCategoryDto</c> 가 포트를 절대 실어 보내지 않으므로, 범위 밖 값이라도
+    /// 막을 이유가 없다("검사를 통과했다"가 "전달된다"를 뜻하지 않는 죽은 길을 없앤다).
+    /// </summary>
+    [Fact]
+    public void should_not_block_an_out_of_range_port_when_the_category_has_no_connection_axis()
+        => Assert.DoesNotContain(
+            PresetRequestBuilder.Validate(EnclosurePreset(), Instance() with { IpPort = 70000 }, Catalog()),
             p => p.Contains("포트", StringComparison.Ordinal));
 
     [Fact]

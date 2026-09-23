@@ -32,6 +32,13 @@ public class SensorDeviceDto : BaseDeviceDto
     [JsonProperty("controller", Order = 15)]
     public ControllerDeviceDto? Controller { get; set; }
 
+    /// <summary>
+    /// 장비 설명 — 서버 8.0.1 은 7 카테고리 공통으로 저장한다(하네스가 함체에 raw PATCH 로 실측 확인,
+    /// device-assembly-preset 왕복 하네스). <c>null</c> 이면 생략한다("값 없음" ≠ "지워라" — <c>NullValueHandling.Ignore</c>).
+    /// </summary>
+    [JsonProperty("description", Order = 16, NullValueHandling = NullValueHandling.Ignore)]
+    public string? Description { get; set; }
+
     #region - 7.0 축(axis) 투영 (FR-09) -
     /// <summary>
     /// 7.0 필수 <c>type_sensor</c>(<c>EnumSensorType</c>) — 6.3 <c>type_device</c> 를 <b>그대로</b> 보낸다.

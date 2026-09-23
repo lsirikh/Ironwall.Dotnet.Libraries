@@ -51,6 +51,13 @@ public class GateDeviceDto : BaseDeviceDto
     [JsonProperty("link_info", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
     public JObject? LinkInfo { get; set; }
 
+    /// <summary>
+    /// 장비 설명 — 서버 8.0.1 은 7 카테고리 공통으로 저장한다(하네스가 함체에 raw PATCH 로 실측 확인,
+    /// device-assembly-preset 왕복 하네스). <c>null</c> 이면 생략한다("값 없음" ≠ "지워라" — <c>NullValueHandling.Ignore</c>).
+    /// </summary>
+    [JsonProperty("description", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    public string? Description { get; set; }
+
     #region - 7.0 축(axis) 투영 (FR-09) -
     /// <summary>
     /// 7.0 <c>type_gate</c>(<c>EnumGateType</c> = Sliding·Swing·Barrier·Unknown) — <b>개폐 방식</b> 축.
