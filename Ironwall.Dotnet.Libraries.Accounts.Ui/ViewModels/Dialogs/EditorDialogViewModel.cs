@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
@@ -69,9 +69,17 @@ public class EditorDialogViewModel : BasePanelViewModel
             RestoreDirectory = true
         };
         if (dlg.ShowDialog() != true) return;
+        await UploadPictureAsync(dlg.FileName);
+    }
 
+    /// <summary>
+    /// 고른 파일을 대상 계정 사진으로 올린다 — 파일 고르기(<see cref="ClickAddPicture"/>)와 분리해
+    /// 헤드리스 시험 · 라이브 왕복 하네스가 창을 띄우지 않고 같은 경로를 탄다.
+    /// </summary>
+    public async Task UploadPictureAsync(string filePath)
+    {
         // 이미지 검증만 수행(로컬 복사 없이) — 실패 업로드마다 로컬 orphan 이 쌓이던 문제 제거. 원본 경로를 그대로 서버 전송.
-        if (!ProfileImageHelper.IsValid(dlg.FileName, out var error))
+        if (!ProfileImageHelper.IsValid(filePath, out var error))
         {
             _log?.Warning(error);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = error });
@@ -82,7 +90,7 @@ public class EditorDialogViewModel : BasePanelViewModel
         try
         {
             // ⚠ 반드시 대상 계정 {id} 로 업로드(=본인 /me 금지). 성공=서버 photo_url(절대 URL).
-            var url = await _gateway.UploadPhotoAsync(ViewModel.Model.Id, dlg.FileName, CancellationToken.None);
+            var url = await _gateway.UploadPhotoAsync(ViewModel.Model.Id, filePath, CancellationToken.None);
             if (!string.IsNullOrEmpty(url))
             {
                 ViewModel.Image = url;

@@ -10,6 +10,12 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 /// </summary>
 public interface IAccountApiService
 {
+    /// <summary>
+    /// 접속한 API 주소(예: <c>https://host:8000/api</c>). 서버가 상대 경로로 주는 사진 주소(<c>/api/users/photo/…</c>)를
+    /// 화면이 그릴 수 있는 절대 URL 로 만들 때 쓴다(<c>ServerPhotoUrl.ToDisplay</c>). 기본구현=null(=변환하지 않음, 테스트 스텁 무수정).
+    /// </summary>
+    string? ServerBaseUrl => null;
+
     /// <summary>POST /api/auth/login — data.access_token + data.user(권한 포함).</summary>
     Task<ApiResponse<LoginResponseDataDto>> LoginAsync(string loginId, string password, CancellationToken ct = default);
 

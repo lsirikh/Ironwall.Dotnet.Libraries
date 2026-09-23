@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Monitoring.Models.Accounts;
+﻿using Ironwall.Dotnet.Monitoring.Models.Accounts;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Gateways;
 
@@ -17,6 +17,15 @@ public interface IUserDirectoryGateway
 
     /// <summary>관리자에 의한 계정 정보 수정(비밀번호 제외).</summary>
     Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default);
+
+    /// <summary>
+    /// 관리자에 의한 계정 정보 <b>부분</b> 수정 — 손댄 칸(서버 필드 이름: name · email · department · position ·
+    /// employee_number · phone · role · is_active)만 보낸다. 비운 칸은 비운다.
+    /// 기본구현=<see cref="UpdateAccountAsync"/>(전체 모델 저장 — DB 모드는 행 전체를 쓰므로 결과가 같다).
+    /// Api 구현은 PUT /users/{id} 에 그 키들만 싣는다(바꾸지 않은 role 이 딸려 가 비-ADMIN 편집자가 403 받던 결함 방지).
+    /// </summary>
+    Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)
+        => UpdateAccountAsync(acc, ct);
 
     /// <summary>계정 삭제. currentPassword가 비어있지 않으면 검증 후 삭제.</summary>
     Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default);

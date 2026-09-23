@@ -428,9 +428,12 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         var failed = new List<string>();
         try
         {
+            // 손댄 칸만 보낸다 — 전체 모델을 실으면 상태(is_active)가 빠지고, 비운 칸이 생략되고,
+            // 바꾸지 않은 role 이 딸려 가 users:edit 만 가진 편집자가 403 을 받았다(라이브 실측 2026-09-24).
+            var fields = commit.WrittenApiFields;
             foreach (var row in Form.Rows)
             {
-                var result = await _gateway.UpdateAccountAsync(row.Model).ConfigureAwait(true);
+                var result = await _gateway.UpdateAccountFieldsAsync(row.Model, fields).ConfigureAwait(true);
                 if (result is null) failed.Add(row.Username);
                 else row.Insert(result);
             }
@@ -585,12 +588,22 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         }
     }
 
+    /// <summary>
+    /// 최근 로그인 — <b>서버 <c>last_login_at</c></b> 이 정본이다(<see cref="LoadGroupsAsync"/> 가 사용자 목록과 함께 읽는다).
+    /// </summary>
+    /// <remarks>
+    /// 종전에는 세션 목록(기본 "활성만", 한 페이지 100건)에서 그 사용자의 세션을 찾아 만들었다 — 로그아웃한 사용자나
+    /// 100건 밖의 사용자는 서버에 기록이 있어도 "기록 없음" 이었다(라이브 실측 2026-09-24: 활성 세션 100건 로드, 서버 값 있음).
+    /// 서버 목록을 아직 못 읽었을 때만 세션 목록으로 대신한다.
+    /// </remarks>
     public string LastLoginText
     {
         get
         {
             var user = SingleUser;
             if (user is null) return "—";
+            if (_lastLoginOfUser.TryGetValue(user.Id, out var serverLast))
+                return FormatServerTime(serverLast) ?? "기록 없음";
             var last = UserSessionPanelViewModel.Items
                 .Where(s => string.Equals(s.LoginId, user.Username, StringComparison.OrdinalIgnoreCase))
                 .Select(s => s.CreatedAt)
@@ -598,6 +611,16 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
                 .FirstOrDefault();
             return string.IsNullOrEmpty(last) ? "기록 없음" : last!;
         }
+    }
+
+    /// <summary>서버 시각(ISO 8601, 오프셋 포함) → 이 PC 시각 "yyyy-MM-dd HH:mm:ss". 읽을 수 없으면 원문, 비었으면 null.</summary>
+    internal static string? FormatServerTime(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return DateTimeOffset.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
+            ? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
+            : raw;
     }
 
     public string LockStateText => SingleUser is null ? "—" : SingleUser.IsLocked ? "잠김" : "정상";
@@ -706,6 +729,13 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         {
             var groupsResponse = await _api.GetAllUserGroupsAsync(ct).ConfigureAwait(true);
             var usersResponse = await _api.GetAllUsersAsync(ct).ConfigureAwait(true);
+            // 최근 로그인도 계정 모델에 없는 서버 값이라 같은 조회에서 받아 둔다(LastLoginText 의 정본).
+            // 그룹 조회가 막혀도(user_groups:view 없음) 이 값은 살린다 — 그래서 그룹 판정보다 먼저 둔다.
+            if (usersResponse.Success && usersResponse.Data is not null)
+            {
+                _lastLoginOfUser = usersResponse.Data.GroupBy(u => u.Id).ToDictionary(g => g.Key, g => g.First().LastLoginAt);
+                NotifyOfPropertyChange(nameof(LastLoginText));
+            }
             if (!groupsResponse.Success || groupsResponse.Data is null) return;
 
             var groups = groupsResponse.Data;
@@ -713,6 +743,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
             _groupOfUser = usersResponse.Success && usersResponse.Data is not null
                 ? usersResponse.Data.Where(u => u.GroupId.HasValue).ToDictionary(u => u.Id, u => u.GroupId!.Value)
                 : new Dictionary<int, int>();
+
 
             // 계정 관리(users:edit)를 쥔 그룹 — 마지막 구성원을 끌어내지 못하게 막는 근거.
             _adminGroupId = groups
@@ -1011,6 +1042,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private IReadOnlyList<AccountViewModel> _selectedRows = Array.Empty<AccountViewModel>();
     private HashSet<int> _selectedIds = new();
     private Dictionary<int, int> _groupOfUser = new();
+    private Dictionary<int, string?> _lastLoginOfUser = new();
     private Dictionary<int, string> _groupNameById = new();
     private int _adminGroupId;
     private UserSessionDto? _selectedSession;

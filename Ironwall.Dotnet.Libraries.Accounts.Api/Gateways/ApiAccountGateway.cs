@@ -71,7 +71,7 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         _lifecycle?.ResetForLogin();   // FR-FL-04: 새 로그인 → 강제 로그아웃 once-guard 재무장
         _lifecycle?.NotifyLoginSucceeded();   // B 연계: 로그인 게이팅 — GIS init/Device fetch 트리거(토큰·권한 적용 후)
 
-        var account = AccountDtoMapper.ToAccountModel(user);
+        var account = AccountDtoMapper.ToAccountModel(user, _api.ServerBaseUrl);
         var permissions = PermissionsFlattener.Flatten(user.Permissions);
         var expiresAt = _tokenStore.AccessExpiresAtUtc ?? DateTime.UtcNow.AddHours(24); // exp 미상 시 기본 24h(§2.3.1)
 
@@ -127,19 +127,30 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     {
         var res = await _api.GetAllUsersAsync(ct).ConfigureAwait(false);
         if (!res.Success || res.Data is null) return null;
-        return res.Data.Select(d => (IAccountModel)AccountDtoMapper.ToAccountModel(d)).ToList();
+        return res.Data.Select(d => (IAccountModel)AccountDtoMapper.ToAccountModel(d, _api.ServerBaseUrl)).ToList();
     }
 
     public async Task<IAccountModel?> CreateAccountAsync(IAccountModel acc, CancellationToken ct = default)
     {
         var res = await _api.CreateUserAsync(AccountDtoMapper.ToUserCreateDto(acc), ct).ConfigureAwait(false);
-        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data) : null;
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
     public async Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default)
     {
         var res = await _api.UpdateUserAsync(acc.Id, AccountDtoMapper.ToUserUpdateDto(acc), ct).ConfigureAwait(false);
-        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data) : null;
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
+    }
+
+    /// <summary>
+    /// 손댄 칸만 PUT /users/{id} — 콘솔 [적용] 경로. 비운 칸은 <c>"키": null</c> 로 실어 서버가 해제한다
+    /// (<see cref="AccountDtoMapper.ToUserUpdateDto(IAccountModel, IEnumerable{string})"/>).
+    /// </summary>
+    public async Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)
+    {
+        var res = await _api.UpdateUserAsync(acc.Id, AccountDtoMapper.ToUserUpdateDto(acc, changedFields), ct).ConfigureAwait(false);
+        if (!res.Success) _log?.Warning($"[ApiAccountGateway] 계정 {acc.Id} 부분 수정 실패: {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
     /// <summary>서버 DELETE 엔 비번 게이트/본문 없음(§2.4.4) — currentPassword 서버 미적용(권한은 서버 403). 자기삭제 가드는 호스트 책임.</summary>
@@ -194,21 +205,21 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     public async Task<IAccountModel?> GetProfileAsync(int accountId, CancellationToken ct = default)
     {
         var res = await _api.GetMyProfileAsync(ct).ConfigureAwait(false);
-        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data) : null;
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
     /// <summary>PUT /users/me. ⚠ photo_url 은 서버 미반영 버그(C-5, v4.7 핫픽스 전).</summary>
     public async Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default)
     {
         var res = await _api.UpdateMyProfileAsync(AccountDtoMapper.ToUserSelfUpdateDto(acc), ct).ConfigureAwait(false);
-        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data) : null;
+        return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
-    /// <summary>POST /users/me/photo — 사진 업로드, 서버가 photo_url 갱신. 갱신된 절대 URL 반환(실패 null).</summary>
+    /// <summary>POST /users/me/photo — 사진 업로드, 서버가 photo_url(상대 경로) 갱신. 접속 주소 기준 절대 URL 로 만들어 반환(실패 null).</summary>
     public async Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default)
     {
         var res = await _api.UploadMyPhotoAsync(filePath, ct).ConfigureAwait(false);
-        return res.Success ? res.Data?.PhotoUrl : null;
+        return res.Success ? ServerPhotoUrl.ToDisplay(res.Data?.PhotoUrl, _api.ServerBaseUrl) : null;
     }
 
     /// <summary>DELETE /users/me/photo — 본인 사진 삭제(idempotent). 성공=true(default 아바타 복귀). 실패=false. — MyPage_SelfPhoto_Delete_Fix</summary>
@@ -218,11 +229,11 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success;
     }
 
-    /// <summary>관리자: 대상 계정 사진 업로드 — POST /users/{id}/photo. 성공 시 서버 photo_url(절대 URL). 403/실패=null. — Admin_Photo_Upload</summary>
+    /// <summary>관리자: 대상 계정 사진 업로드 — POST /users/{id}/photo. 성공 시 서버 photo_url(상대 경로)을 접속 주소 기준 절대 URL 로 반환. 403/실패=null. — Admin_Photo_Upload</summary>
     public async Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
     {
         var res = await _api.UploadUserPhotoAsync(userId, filePath, ct).ConfigureAwait(false);
-        return res.Success ? res.Data?.PhotoUrl : null;
+        return res.Success ? ServerPhotoUrl.ToDisplay(res.Data?.PhotoUrl, _api.ServerBaseUrl) : null;
     }
 
     /// <summary>관리자: 대상 계정 사진 삭제 — DELETE /users/{id}/photo. 성공=true(default 아바타 복귀). 403/실패=false. — Admin_Photo_Upload</summary>

@@ -84,13 +84,36 @@ internal sealed class FakeDirectoryGateway : IUserDirectoryGateway
     public bool FailUpdate { get; set; }
     public int UnlockCallCount { get; private set; }
 
+    /// <summary>부분 수정이 받은 서버 필드 이름(호출마다 한 줄).</summary>
+    public List<IReadOnlyCollection<string>> UpdatedFields { get; } = new();
+
+    /// <summary>생성 결과를 바꾼다(서버 모드 흉내 — 새 인스턴스 · 서버 사진 주소). null 이면 입력 모델을 그대로 돌려준다(DB 모드).</summary>
+    public Func<IAccountModel, IAccountModel>? CreateResult { get; set; }
+
+    /// <summary>사진 업로드 호출(대상 Id · 파일 경로) · 돌려줄 주소(null 이면 실패).</summary>
+    public List<(int UserId, string Path)> PhotoUploads { get; } = new();
+    public string? PhotoUploadResult { get; set; } = "https://h/api/users/photo/9_new.png";
+
     public Task<List<IAccountModel>?> GetAllAccountsAsync(CancellationToken ct = default)
         => Task.FromResult<List<IAccountModel>?>(Accounts.ToList());
 
     public Task<IAccountModel?> CreateAccountAsync(IAccountModel acc, CancellationToken ct = default)
     {
-        Accounts.Add(acc);
-        return Task.FromResult<IAccountModel?>(acc);
+        var created = CreateResult?.Invoke(acc) ?? acc;
+        Accounts.Add(created);
+        return Task.FromResult<IAccountModel?>(created);
+    }
+
+    public Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)
+    {
+        UpdatedFields.Add(changedFields.ToList());
+        return UpdateAccountAsync(acc, ct);
+    }
+
+    public Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+    {
+        PhotoUploads.Add((userId, filePath));
+        return Task.FromResult(PhotoUploadResult);
     }
 
     public Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default)

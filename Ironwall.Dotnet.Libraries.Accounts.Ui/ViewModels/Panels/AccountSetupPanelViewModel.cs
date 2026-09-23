@@ -76,7 +76,8 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 LockoutThreshold = LockoutThreshold,
                 LockoutDurationMinutes = LockoutDurationMinutes,
                 SessionEnabled = SessionPolicyEnabled,
-                // v6.3 동시성 5키(읽기전용 auth_mode/jwt_algorithm은 미포함 = null 전송 안 함, 부분 PUT)
+                // v6.3 동시성 5키. 읽기전용 auth_mode/jwt_algorithm 은 채우지 않는다 — DTO 가 null 키를 싣지 않아야
+                // 서버(8.0 extra="forbid")가 422 UNKNOWN_FIELD 로 저장 전체를 거부하지 않는다(SessionSettingsDto 주석, 라이브 실측).
                 SessionConcurrencyPolicy = ConcurrencyPolicy,
                 MaxConcurrentSessions = MaxConcurrentSessions,
                 SessionSelfReplaceEnabled = SessionSelfReplaceEnabled,
@@ -95,7 +96,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 // 403(비-ADMIN)/422(제약위반)을 전용 안내로 표면화(rbac-audit-15 / settings-put-13)
                 string explain;
                 if (res.Error?.Code == "FORBIDDEN" || res.StatusCode == 403)
-                    explain = "권한이 없습니다 — 세션 설정 저장은 ADMIN 전용입니다.";
+                    explain = ForbiddenSaveText;
                 // (FR-06) 날 JSON 대신 정본 포맷터가 만든 사람이 읽는 문장.
                 //   종전 `res.Error?.Details`(압축 JSON 뷰)를 그대로 실어 운영자에게 `[{"field":…}]` 가 노출됐다.
                 //   422 다필드는 전건을 줄바꿈으로, 그 외는 details[].message→error.message→top-level message 순서.
@@ -151,7 +152,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 // 실패 원인 분기 — 401/403을 "미배포"로 오분류 금지(rbac-audit-04)
                 var msg = res.StatusCode switch
                 {
-                    403 => "권한이 없습니다 — 세션 설정은 ADMIN 전용입니다.",
+                    403 => ForbiddenLoadText,
                     401 => "인증이 만료되었습니다 — 다시 로그인해 주세요.",
                     404 => "서버 세션설정 API 미배포 — 편집 비활성(기본값 표시). 서버 배포 후 활성화됩니다.",
                     _ => "서버 세션설정을 불러오지 못했습니다 — 편집 비활성(기본값 표시).",
@@ -187,6 +188,14 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     }
     #endregion
     #region - Properties -
+    /// <summary>
+    /// 403 안내 — 서버는 역할(ADMIN)이 아니라 권한 매트릭스로 판정한다
+    /// (GET = <c>setup_system:view</c>, PUT = <c>setup_system:edit</c>, ADMIN 은 우회). "ADMIN 전용" 이라 쓰면
+    /// 권한을 받은 운영자에게도, 권한을 뺏긴 사람에게도 틀린 말이 된다.
+    /// </summary>
+    public const string ForbiddenSaveText = "권한이 없습니다 — 세션 설정 저장에는 '시스템 설정(setup_system)' 편집 권한이 필요합니다.";
+    public const string ForbiddenLoadText = "권한이 없습니다 — 세션 설정 조회에는 '시스템 설정(setup_system)' 보기 권한이 필요합니다.";
+
     private int _timeoutHours = 24;
     public int TimeoutHours { get => _timeoutHours; set { _timeoutHours = value; NotifyOfPropertyChange(() => TimeoutHours); } }
 

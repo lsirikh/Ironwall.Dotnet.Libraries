@@ -26,7 +26,12 @@ public sealed class AccountSectionViewModel
 /// <param name="RowCount">값을 쓴 행 수.</param>
 /// <param name="FieldCount">쓴 칸 수.</param>
 /// <param name="Message">못 썼을 때의 한 줄.</param>
-public sealed record AccountFormCommit(bool IsWritten, int RowCount, int FieldCount, string? Message);
+/// <param name="ApiFields">쓴 칸의 서버 필드 이름(<see cref="AccountFieldSpec.ApiPath"/>) — 전송은 이 키들만 싣는다.</param>
+public sealed record AccountFormCommit(bool IsWritten, int RowCount, int FieldCount, string? Message, IReadOnlyList<string>? ApiFields = null)
+{
+    /// <summary>쓴 칸의 서버 필드 이름(없으면 빈 목록).</summary>
+    public IReadOnlyList<string> WrittenApiFields => ApiFields ?? Array.Empty<string>();
+}
 
 /// <summary>
 /// 명세(<see cref="AccountFieldCatalog"/>)에서 <b>만들어지는</b> 사용자 상세 폼.
@@ -123,7 +128,8 @@ public sealed class AccountFormViewModel : PropertyChangedBase
             foreach (var field in touched) field.WriteTo(row);
             row.RefreshDisplay();
         }
-        return new AccountFormCommit(true, _rows.Count, touched.Count, null);
+        return new AccountFormCommit(true, _rows.Count, touched.Count, null,
+            touched.Select(f => f.ApiPath).Distinct(StringComparer.Ordinal).ToList());
     }
 
     /// <summary>전송이 끝났다 — 지금 글을 새 원본으로 삼고 손댄 칸을 비운다.</summary>

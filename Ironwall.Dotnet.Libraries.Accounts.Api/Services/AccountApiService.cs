@@ -25,6 +25,9 @@ public class AccountApiService : IAccountApiService
         _log = log;
     }
 
+    /// <inheritdoc/>
+    public string? ServerBaseUrl => _api.Url;
+
     public async Task<ApiResponse<LoginResponseDataDto>> LoginAsync(string loginId, string password, CancellationToken ct = default)
     {
         try
