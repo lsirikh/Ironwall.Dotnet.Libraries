@@ -19,6 +19,7 @@ using Moq;
 using System.IO;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using System.Text;
 using System.Windows.Controls.Primitives;
 using System.Windows;
@@ -231,8 +232,50 @@ public partial class App : Application
         await Settle();
         Save(directory, $"{theme}-01-overview");
 
+        // 1b) 기간 "직접" — 범위 팝업 트리거(닫힘)
+        _viewModel.Period = "직접";
+        await Settle();
+        Save(directory, $"{theme}-01b-period-custom");
+
+        // 1c) 트리거를 열어 팝업(달력+시각+미리보기)을 그대로 찍는다.
+        //     Popup 은 창의 시각 트리 밖(자기 렌더 계층)에 뜨므로 SaveElement 로 팝업 본문을 직접 찍는다.
+        var rangeField = Descendants<DateTimeRangeField>(_view).FirstOrDefault();
+        if (rangeField is not null)
+        {
+            rangeField.IsDropDownOpen = true;
+            await Settle(300);
+            if (rangeField.PopupContent is FrameworkElement popupContent)
+                SaveElement(directory, $"{theme}-01c-period-popup", popupContent, Brushes.Transparent);
+            rangeField.IsDropDownOpen = false;
+            await Settle();
+
+            // 1d) 오늘(실제 시스템 날짜)이 선택 범위 밖일 때 — 고리(오늘)와 채움(선택)이 따로 보이는지 확인.
+            //     22~23 은 오늘을 포함해 버려서(오늘=23) 둘이 겹쳤다 — 같은 달 안에서 오늘을 피한 며칠로 옮긴다
+            //     (DisplayDate 가 시작일을 따라가므로 다른 달로 밀면 오늘 자체가 화면에서 사라진다).
+            var sameMonthNotToday = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 10);
+            rangeField.RangeStart = sameMonthNotToday;
+            rangeField.RangeEnd = sameMonthNotToday.AddDays(1);
+            rangeField.IsDropDownOpen = true;
+            await Settle(300);
+            if (rangeField.PopupContent is FrameworkElement futurePopup)
+                SaveElement(directory, $"{theme}-01d-period-popup-today-not-selected", futurePopup, Brushes.Transparent);
+            rangeField.IsDropDownOpen = false;
+            await Settle();
+        }
+        _viewModel.Period = "24시간";
+        await Settle();
+
         // 2) 탐지 목록 — 선택 없음
         await _viewModel.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        await Settle();
+
+        // 2z) 툴바 높이 비교 — 기간 칩(7일)과 "직접"(DateTimeRangeField) 사이에서 툴바 띠와 그 아래
+        //     탭 줄(전체·침입·사전 경보…)이 같은 y 에 있는지 픽셀로 확인한다(사용자 신고: 커지고 잘림).
+        Save(directory, $"{theme}-02z-toolbar-7day");
+        _viewModel.Period = "직접";
+        await Settle();
+        Save(directory, $"{theme}-02z-toolbar-custom");
+        _viewModel.Period = "24시간";
         await Settle();
         Save(directory, $"{theme}-02-detection-list");
 
@@ -331,6 +374,13 @@ public partial class App : Application
         _window.Width = 1150;
         await Settle();
         Save(directory, $"{theme}-11-drawer-1150");
+
+        // 11z) 좁은 폭에서도 툴바 높이가 "직접" 때문에 안 자란다 — 가로 여유가 줄어든 상태로 재확인.
+        _viewModel.Period = "직접";
+        await Settle();
+        Save(directory, $"{theme}-11z-drawer-1150-custom");
+        _viewModel.Period = "24시간";
+        await Settle();
 
         _window.Width = 900;
         await Settle();
@@ -533,6 +583,39 @@ public partial class App : Application
             if (Find(child) is { } found) return found;
         }
         return null;
+    }
+
+    /// <summary>
+    /// <c>Popup</c> 본문처럼 창의 시각 트리 밖(자기 렌더 계층)에 떠 있는 요소를 직접 찍는다 —
+    /// <see cref="Save"/> 의 <c>_window.Content</c> VisualBrush 경로로는 안 닿는다(실측).
+    /// </summary>
+    private static void SaveElement(string directory, string name, FrameworkElement element, Brush background)
+    {
+        var width = (int)Math.Ceiling(element.ActualWidth);
+        var height = (int)Math.Ceiling(element.ActualHeight);
+        if (width <= 0 || height <= 0) return;
+
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(background, null, new Rect(0, 0, width, height));
+            var source = new VisualBrush(element)
+            {
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top,
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(0, 0, width, height),
+            };
+            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
+        }
+        bitmap.Render(visual);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(directory, name + ".png"));
+        encoder.Save(stream);
     }
 
     private void Save(string directory, string name)

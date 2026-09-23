@@ -313,26 +313,16 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
-						<!--  직접 지정 — 드래그의 폴백이자 정확한 입력 수단  -->
-						<StackPanel Orientation="Horizontal" Visibility="{Binding ShowCustomPeriod, Converter={StaticResource BoolToVis}}">
-							<mah:DateTimePicker
-								Width="170"
-								Margin="6,0,0,0"
-								AutomationProperties.AutomationId="Console.Events.Period.From"
-								FontSize="12"
-								SelectedDateTime="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-							<TextBlock
-								Margin="6,0"
-								VerticalAlignment="Center"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="~" />
-							<mah:DateTimePicker
-								Width="170"
-								AutomationProperties.AutomationId="Console.Events.Period.To"
-								DisplayDateStart="{Binding EndDateDisplay, Mode=TwoWay}"
-								FontSize="12"
-								SelectedDateTime="{Binding EndDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-						</StackPanel>
+						<!--  직접 지정 — 팝업 달력(연속 범위) + 시작/종료 시각. 드래그의 폴백이자 정확한 입력 수단이며,
+						     트리거는 계속 포커스 가능해 자동화가 좌표 클릭에 묶이지 않는다(요구사항 3).  -->
+						<c:DateTimeRangeField
+							Margin="6,0,0,0"
+							VerticalAlignment="Center"
+							FromAutomationId="Console.Events.Period.From"
+							RangeEnd="{Binding EndDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+							RangeStart="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+							ToAutomationId="Console.Events.Period.To"
+							Visibility="{Binding ShowCustomPeriod, Converter={StaticResource BoolToVis}}" />
 					</StackPanel>
 				</c:ConsoleToolbar.Filters>
 
