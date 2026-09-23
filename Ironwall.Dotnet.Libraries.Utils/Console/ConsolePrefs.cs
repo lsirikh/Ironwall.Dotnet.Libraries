@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
 
@@ -16,6 +17,14 @@ public sealed class ConsolePrefEntry
 
     /// <summary>마지막으로 본 레일 항목.</summary>
     public string? LastRailKey { get; set; }
+
+    /// <summary>
+    /// 이 빌드가 모르는 키(다른 빌드가 넣은 필드 · 아직 여기 선언되지 않은 미래 필드).
+    /// <b>지워지지 않고 그대로 들고 있다가 그대로 되돌려 쓴다</b>(D-08 — 이게 없으면
+    /// 알 수 없는 키가 다음 <see cref="ConsolePrefs.Save"/> 에서 영구 소실된다).
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>
@@ -25,12 +34,19 @@ public sealed class ConsolePrefEntry
 /// <para><b><c>appsettings.json</c> 에 넣지 않는다.</b> 그 파일은 실행 중 비원자적 쓰기로 깨진 전례가 있다.
 /// 전용 파일에, <b>임시 파일에 쓰고 교체</b>한다 — 쓰다 죽어도 옛 파일이 남는다.</para>
 /// <para>파일이 깨졌으면 조용히 기본값으로 시작한다(표시 설정일 뿐이다). 스레드: 호출은 UI 스레드에서만.</para>
+/// <para><b>저장은 load-merge-write.</b> 콘솔마다 별도 <see cref="ConsolePrefs"/> 인스턴스를 들고 있어
+/// 서로의 저장 시점을 모른다 — <see cref="Save"/> 는 메모리 스냅샷을 그대로 덮어쓰지 않고, 저장 직전
+/// 디스크를 다시 읽어 <b>이 인스턴스가 <see cref="Get"/> 으로 실제 건드린 키만</b> 얹는다. 건드리지 않은
+/// 키(다른 콘솔이 그 사이 저장한 값 포함)는 디스크의 최신 값을 그대로 보존한다.</para>
 /// </remarks>
 public sealed class ConsolePrefs
 {
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly string _path;
     private Dictionary<string, ConsolePrefEntry> _entries = new(StringComparer.Ordinal);
+
+    /// <summary>이 인스턴스가 <see cref="Get"/> 으로 실제 건드린 콘솔 키 — <see cref="Save"/> 의 병합 범위.</summary>
+    private readonly HashSet<string> _touchedKeys = new(StringComparer.Ordinal);
 
     public ConsolePrefs(string path)
     {
@@ -50,6 +66,7 @@ public sealed class ConsolePrefs
 
     public ConsolePrefEntry Get(string consoleKey)
     {
+        _touchedKeys.Add(consoleKey);
         if (!_entries.TryGetValue(consoleKey, out var entry))
             _entries[consoleKey] = entry = new ConsolePrefEntry();
         entry.DetailWidth = ConsoleLayoutMath.ClampDetailWidth(entry.DetailWidth);
@@ -57,7 +74,14 @@ public sealed class ConsolePrefs
         return entry;
     }
 
-    /// <summary>저장한다. 실패하면 false — 표시 설정 때문에 창이 죽어서는 안 된다.</summary>
+    /// <summary>
+    /// 저장한다. 실패하면 false — 표시 설정 때문에 창이 죽어서는 안 된다.
+    /// </summary>
+    /// <remarks>
+    /// load-merge-write: 저장 직전 디스크를 다시 읽고, 이 인스턴스가 <see cref="Get"/> 으로 건드린 키만
+    /// 그 위에 얹어 쓴다. 다른 <see cref="ConsolePrefs"/> 인스턴스(다른 콘솔 · 다른 프로세스)가 그 사이
+    /// 저장해 놓은, 이 인스턴스가 모르는 키는 그대로 보존된다 — 메모리 스냅샷을 통째로 덮어쓰지 않는다.
+    /// </remarks>
     public bool Save()
     {
         // 임시 이름은 프로세스마다 다르게 — 앱이 둘 떠 있으면(개발본 + 배포본) 같은 .tmp 를 두고 다툰다.
@@ -67,8 +91,15 @@ public sealed class ConsolePrefs
             var directory = Path.GetDirectoryName(_path);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-            File.WriteAllText(temp, JsonSerializer.Serialize(_entries, Json));
+            var merged = ReadFromDisk();
+            foreach (var key in _touchedKeys)
+            {
+                if (_entries.TryGetValue(key, out var entry)) merged[key] = entry;
+            }
+
+            File.WriteAllText(temp, JsonSerializer.Serialize(merged, Json));
             File.Move(temp, _path, overwrite: true);          // 같은 볼륨 안의 교체 — 중간 상태가 보이지 않는다
+            _entries = merged;
             LastSaveError = null;
             return true;
         }
@@ -92,6 +123,26 @@ public sealed class ConsolePrefs
         {
             WasCorrupt = true;
             _entries = new Dictionary<string, ConsolePrefEntry>(StringComparer.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// 디스크의 현재 내용을 읽는다. 파일이 없거나 깨졌으면 빈 사전을 돌려준다(예외를 던지지 않는다) —
+    /// <see cref="Save"/> 의 병합 기준이므로, 저장이 읽기 실패 때문에 죽어서는 안 된다.
+    /// </summary>
+    private Dictionary<string, ConsolePrefEntry> ReadFromDisk()
+    {
+        try
+        {
+            if (!File.Exists(_path)) return new Dictionary<string, ConsolePrefEntry>(StringComparer.Ordinal);
+            var loaded = JsonSerializer.Deserialize<Dictionary<string, ConsolePrefEntry>>(File.ReadAllText(_path));
+            return loaded != null
+                ? new Dictionary<string, ConsolePrefEntry>(loaded.Where(p => p.Value != null), StringComparer.Ordinal)
+                : new Dictionary<string, ConsolePrefEntry>(StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException or System.Security.SecurityException)
+        {
+            return new Dictionary<string, ConsolePrefEntry>(StringComparer.Ordinal);
         }
     }
 }
