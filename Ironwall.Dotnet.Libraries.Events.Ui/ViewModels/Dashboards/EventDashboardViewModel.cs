@@ -323,7 +323,17 @@ public class EventDashboardViewModel : BasePanelViewModel
             _searchText = string.Empty;          // 레일을 바꾸면 거르기도 처음으로
             NotifyOfPropertyChange(nameof(SearchText));
             RebuildChips();                      // 칩은 레일마다 다르다(정본 L2310-2313)
-            DetailView.Load(CurrentKind, Array.Empty<object>(), CanEdit, CanReport, 0);
+
+            // (D-26) AttachRows 가 그리드에 새 ItemsSource(ListCollectionView)를 물리면 WPF 가
+            // CurrentItem(=첫 행)으로 그리드를 자동 동기화해 SelectionChanged 를 스스로 울린다 —
+            // 그 경로로 SetSelection(rows=[첫 행])이 우리 모르게 먼저 불려 SelectedRows 가 1건으로
+            // 차 버린다. 바로 다음 줄의 Detail 초기화는 상세 칸만 비우고 SelectedRows 는 못 건드려
+            // "바닥 줄 선택 1건 vs 상세 선택 없음" 불일치가 남는다. 레일을 바꿨으면 선택도
+            // 명시적으로 함께 비운다(그리드의 자동 동기화를 신뢰하지 않는다).
+            SelectedRows = Array.Empty<object>();
+            _current?.Select(SelectedRows);      // 자동 동기화가 켠 행의 IsSelected 도 함께 끈다
+            DetailView.Load(CurrentKind, SelectedRows, CanEdit, CanReport, 0);
+            NotifyOfPropertyChange(nameof(SelectedRows));
             RefreshRailCounts();
             RaiseShellState();
         }
@@ -629,6 +639,11 @@ public class EventDashboardViewModel : BasePanelViewModel
         //   목록을 비우면 CollectionView 가 "발송자 스레드가 다르다" 로 터진다(NotSupportedException).
         //   자기 뷰를 만들고 떠날 때 DetachFromSourceCollection() 으로 말끔히 뗀다(장비 콘솔 선례).
         var view = new ListCollectionView((IList)source.Rows) { Filter = PassesFilter };
+        // (D-26) 새 ListCollectionView 는 CurrentItem 이 첫 행이다 — 이 뷰를 공유하는 그리드가
+        // Selector.IsSynchronizedWithCurrentItem(기본값 자동)로 그 CurrentItem 에 스스로 동기화해
+        // 우리가 시키지 않은 SelectionChanged(1건 선택)를 낸다. 아무도 고르지 않은 채로 그리드를
+        // 붙이는 것이므로 CurrentItem 을 미리 "없음"으로 돌려 자동 동기화가 아무것도 못 고르게 한다.
+        view.MoveCurrentToPosition(-1);
         _view = view;
 
         NotifyOfPropertyChange(nameof(Rows));
@@ -637,7 +652,13 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private void DetachRows()
     {
-        if (_attached is not null) _attached.RowsChanged.CollectionChanged -= OnRowsChanged;
+        if (_attached is not null)
+        {
+            _attached.RowsChanged.CollectionChanged -= OnRowsChanged;
+            // (D-26) 뜨는 레일의 행 IsSelected 도 같이 끈다 — 안 그러면 그 레일로 되돌아오지 않는 한
+            // 그 행은 영원히 "고른 것처럼" 보인다(모델의 IsSelected 는 그리드가 다시 안 그려도 남는다).
+            _attached.Select(Array.Empty<object>());
+        }
 
         // 안 떼면 버린 뷰가 패널의 목록에 매달려 남아, 그 패널을 다시 열 때
         // 다른 스레드의 변경을 받아 터진다.
