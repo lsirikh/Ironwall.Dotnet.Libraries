@@ -111,15 +111,30 @@ public interface IServerApiService : IService
         string? include = null,
         CancellationToken token = default);
 
+    /// <summary>
+    /// 서버 등록. <b>6.3 계약에서만</b> 평면 <see cref="ServerDto"/> 를 그대로 본문으로 보낸다.
+    /// <para>⚠ <b>7.0+ 축 계약에서는 호출하지 않는다</b>(D-22) — <c>category_id</c>·<c>ip_address</c>·<c>port</c>·
+    /// <c>hostname</c>·<c>threshold_config</c> 는 축 계약의 <c>extra="forbid"</c> 에 걸려 전부 422 다
+    /// (<c>app/schemas/server.py:59-66,328-339</c>). 네트워크에 나가기 전에 <c>AXIS_SHAPE_REQUIRED</c> 오류로
+    /// 막고 <c>Devices.Api.Servers.IServerAxisApiService</c>(서버 콘솔이 실제로 쓰는 판본 인식 통로)를 안내한다.</para>
+    /// </summary>
     Task<ApiResponse<ServerDto>> CreateServerAsync(
         ServerDto dto,
         CancellationToken token = default);
 
+    /// <summary>
+    /// 서버 부분 수정. <b>6.3 계약에서만</b> 평면 <see cref="ServerDto"/> 를 그대로 본문으로 보낸다.
+    /// 7.0+ 에서는 <see cref="CreateServerAsync"/> 와 같은 이유로 <c>AXIS_SHAPE_REQUIRED</c> 를 돌려준다(D-22).
+    /// </summary>
     Task<ApiResponse<ServerDto>> PatchServerAsync(
         int id,
         ServerDto dto,
         CancellationToken token = default);
 
+    /// <summary>
+    /// 서버 전체 교체. <b>6.3 계약에서만</b> 평면 <see cref="ServerDto"/> 를 그대로 본문으로 보낸다.
+    /// 7.0+ 에서는 <see cref="CreateServerAsync"/> 와 같은 이유로 <c>AXIS_SHAPE_REQUIRED</c> 를 돌려준다(D-22).
+    /// </summary>
     Task<ApiResponse<ServerDto>> UpdateServerAsync(
         int id,
         ServerDto dto,

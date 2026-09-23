@@ -96,6 +96,27 @@ public class ServerApiService : IServerApiService
         _log?.Error($"[{nameof(ServerApiService)}] ENDPOINT_REMOVED {message}");
         return ApiResponse<T>.CreateError("ENDPOINT_REMOVED", message, replacement);
     }
+
+    /// <summary>
+    /// 축 계약(7.0+)에서 평면 <see cref="ServerDto"/> 그대로는 등록·수정 본문을 보낼 수 없다(D-22) —
+    /// <c>category_id</c>·<c>ip_address</c>·<c>port</c>·<c>hostname</c>·<c>user_name</c>·<c>user_password</c>·
+    /// <c>threshold_config</c> 전부가 서버의 <c>extra="forbid"</c> 축 계약에서 즉시 422 를 받는 레거시 키다
+    /// (<c>app/schemas/server.py:59-66</c> <c>SERVER_REMOVED_FIELDS</c> · <c>:328-339</c> <c>_ServerWriteBase</c>).
+    /// <para>이 서비스는 <c>category_id</c>(정수) 하나로 서버 분류를 받는데, 축 계약은 문자열 판별자
+    /// <c>category_server</c> 를 요구한다 — 정수 → 문자열 변환은 <c>GET /api/servers/categories</c> 조회가
+    /// 선행돼야 하는 <b>비동기 자원 해석</b>이라 이 얇은 매핑 계층에 넣으면 판본 분기가 두 곳(여기 +
+    /// <c>ServerAxisWriter</c>)으로 갈라진다("판본 분기는 통로 한 곳에만" — N-12).
+    /// 이미 그 해석까지 끝낸 완전한 통로가 있다 — <b>네트워크로 나가기 전에</b> 막고 그리로 보낸다.</para>
+    /// </summary>
+    private ApiResponse<ServerDto> AxisShapeRequired(string what)
+    {
+        var message = $"{what} 은(는) 현재 서버 계약({Contract})에서 평면 ServerDto 로 보낼 수 없습니다 — " +
+                       "category_id·ip_address·port·hostname·threshold_config 는 7.0+ 축 계약에서 422(UNKNOWN_FIELD)입니다. " +
+                       "Devices.Api.Servers.IServerAxisApiService(서버 콘솔의 IServerConsoleService 가 쓰는 통로)를 사용하십시오.";
+        _log?.Error($"[{nameof(ServerApiService)}] AXIS_SHAPE_REQUIRED {message}");
+        return ApiResponse<ServerDto>.CreateError("AXIS_SHAPE_REQUIRED", message,
+            "Ironwall.Dotnet.Libraries.Devices.Api.Servers.IServerAxisApiService");
+    }
     #endregion
 
     #region - Implementation of IService -
@@ -340,6 +361,8 @@ public class ServerApiService : IServerApiService
     public async Task<ApiResponse<ServerDto>> CreateServerAsync(
         ServerDto dto, CancellationToken token = default)
     {
+        if (IsAxisEra) return AxisShapeRequired("POST /servers (평면 ServerDto)");
+
         try
         {
             var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/servers", dto);
@@ -356,6 +379,8 @@ public class ServerApiService : IServerApiService
     public async Task<ApiResponse<ServerDto>> PatchServerAsync(
         int id, ServerDto dto, CancellationToken token = default)
     {
+        if (IsAxisEra) return AxisShapeRequired($"PATCH /servers/{id} (평면 ServerDto)");
+
         try
         {
             var patchBody = JObject.FromObject(dto, JsonSerializer.Create(new JsonSerializerSettings
@@ -382,6 +407,8 @@ public class ServerApiService : IServerApiService
     public async Task<ApiResponse<ServerDto>> UpdateServerAsync(
         int id, ServerDto dto, CancellationToken token = default)
     {
+        if (IsAxisEra) return AxisShapeRequired($"PUT /servers/{id} (평면 ServerDto)");
+
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/servers/{id}", dto);
