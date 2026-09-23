@@ -80,6 +80,15 @@ public static class ConsoleLayoutMath
         => mode == ConsoleLayoutMode.Docked || selectedCount > 0 || isCreating;
 
     /// <summary>
+    /// 서랍(또는 컴팩트)이 목록 위에 떠 있을 때, 목록 · 상태바가 <b>실제로</b> 피해야 할 오른쪽 폭(DIU).
+    /// 도킹이면 상세가 제 칸에 있어 겹치지 않으므로 0 — 서랍이 닫혀 있어도(선택 없음) 덮을 게 없으므로 0.
+    /// 이 값만큼 목록 쪽 컨테이너에 오른쪽 여백을 주면, 목록은 덮인 채로 전체 폭을 잰 척하지 않고
+    /// 실제로 줄어든 폭으로 다시 잰다(열이 접히거나 스크롤이 생긴다 — 잘려서 사라지지 않는다).
+    /// </summary>
+    public static double ListRightInset(ConsoleLayout layout, bool isDetailOpen)
+        => !layout.IsDetailDocked && isDetailOpen ? layout.DetailWidth : 0;
+
+    /// <summary>
     /// 경계가 <paramref name="splitterDelta"/> 만큼 움직인 뒤의 상세 폭. 경계가 왼쪽(음수)으로 가면 상세가 넓어진다.
     /// </summary>
     public static double DetailWidthAfterSplitterMove(double currentDetailWidth, double splitterDelta)

@@ -179,4 +179,54 @@ public class DragMathTests
         Assert.Equal(0, DragMath.AutoScrollVelocity(10, viewportLength: 40));
     }
     #endregion
+
+    #region 고스트 사각형 클램프
+    [Fact]
+    public void should_place_ghost_at_cursor_offset_when_it_fits_inside_bounds()
+    {
+        var rect = DragMath.ClampGhostRect(new Point(0, 0), new Size(100, 40), new Size(400, 300));
+
+        Assert.Equal(new Rect(12, 10, 100, 40), rect);
+    }
+
+    [Fact]
+    public void should_flip_left_when_right_edge_would_overflow()
+    {
+        // 400 폭 안에서 커서(350) + 오프셋(12) + 라벨(100) = 462 > 400 → 왼쪽으로 뒤집는다
+        var rect = DragMath.ClampGhostRect(new Point(350, 10), new Size(100, 40), new Size(400, 300));
+
+        Assert.Equal(238, rect.X, 3);    // 350 - 12 - 100
+        Assert.Equal(20, rect.Y, 3);     // 세로는 안 넘쳐 그대로
+    }
+
+    [Fact]
+    public void should_flip_up_when_bottom_edge_would_overflow()
+    {
+        // 300 높이 안에서 커서(280) + 오프셋(10) + 라벨(30) = 320 > 300 → 위로 뒤집는다
+        var rect = DragMath.ClampGhostRect(new Point(10, 280), new Size(80, 30), new Size(400, 300));
+
+        Assert.Equal(22, rect.X, 3);     // 10 + 12
+        Assert.Equal(240, rect.Y, 3);    // 280 - 10 - 30
+    }
+
+    [Fact]
+    public void should_pin_inside_bounds_when_label_is_wider_than_the_surface_even_after_flipping()
+    {
+        // 라벨(450) 이 표면 폭(400) 보다 넓다 — 뒤집어도 넘친다. 안쪽(0)으로 눌러 붙인다.
+        var rect = DragMath.ClampGhostRect(new Point(5, 5), new Size(450, 50), new Size(400, 300));
+
+        Assert.Equal(0, rect.X, 3);
+    }
+
+    [Fact]
+    public void should_not_clamp_when_bounds_are_unknown()
+    {
+        // 레이어를 못 찾았을 때(폭 정보 없음) — 예전처럼 커서 오른쪽 아래에 그냥 띄운다
+        var bounds = new Size(double.PositiveInfinity, double.PositiveInfinity);
+        var rect = DragMath.ClampGhostRect(new Point(1000, 1000), new Size(50, 50), bounds);
+
+        Assert.Equal(1012, rect.X, 3);
+        Assert.Equal(1010, rect.Y, 3);
+    }
+    #endregion
 }

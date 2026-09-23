@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 [assembly: ThemeInfo(ResourceDictionaryLocation.None, ResourceDictionaryLocation.SourceAssembly)]
 
@@ -34,6 +35,7 @@ public class ConsoleShell : Control
     private ColumnDefinition? _railColumn;
     private ColumnDefinition? _detailColumn;
     private FrameworkElement? _detailHost;
+    private FrameworkElement? _contentHost;
     private Thumb? _splitter;
     private FrameworkElement? _splitLabel;
     private bool _splitPressed;
@@ -134,6 +136,7 @@ public class ConsoleShell : Control
         _detailHost = GetTemplateChild(PartDetailHost) as FrameworkElement;
         _splitter = GetTemplateChild(PartSplitter) as Thumb;
         _splitLabel = GetTemplateChild(PartSplitLabel) as FrameworkElement;
+        _contentHost = FindContentHost();
 
         if (_splitter != null)
         {
@@ -158,8 +161,10 @@ public class ConsoleShell : Control
         SetValue(IsDetailDockedKey, layout.IsDetailDocked);
         _railColumn.Width = new GridLength(layout.RailWidth);
 
+        bool open;
         if (layout.IsDetailDocked)
         {
+            open = false;
             _detailColumn.Width = new GridLength(layout.DetailWidth);
             Grid.SetColumn(_detailHost, 2);
             _detailHost.Width = double.NaN;
@@ -169,7 +174,7 @@ public class ConsoleShell : Control
         }
         else
         {
-            var open = ConsoleLayoutMath.IsDetailOpen(layout.Mode, IsDetailRequested ? 1 : 0, false);
+            open = ConsoleLayoutMath.IsDetailOpen(layout.Mode, IsDetailRequested ? 1 : 0, false);
             _detailColumn.Width = new GridLength(0);
             Grid.SetColumn(_detailHost, 1);                     // 목록 위에 겹친다 — 목록을 밀지 않는다
             _detailHost.Width = layout.DetailWidth;
@@ -178,7 +183,35 @@ public class ConsoleShell : Control
             SetValue(IsDrawerOpenKey, open);
         }
 
+        // 서랍이 목록 위에 겹치는 동안, 목록 · 상태바는 덮인 채로 전체 폭을 잰 척하지 않는다 —
+        // 실제로 줄어든 폭으로 다시 재서 잘림(스크롤 없는 소실) 대신 접힘 · 스크롤로 넘어가게 한다.
+        if (_contentHost != null)
+        {
+            var inset = ConsoleLayoutMath.ListRightInset(layout, open);
+            _contentHost.Margin = new Thickness(0, 0, inset, 0);
+        }
+
         if (_splitter != null) _splitter.Visibility = layout.IsSplitterVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 목록 · 툴바 · 상태바를 담은 칸(가운데 열, PART_DetailHost 와 같은 칸을 공유) — 템플릿에 이름이 없어
+    /// (자동화 식별자로 쓰라고 <c>x:Name</c> 을 늘리지 않는다) 시각 트리에서 형제로 찾는다.
+    /// </summary>
+    private FrameworkElement? FindContentHost()
+    {
+        if (_detailHost == null || VisualTreeHelper.GetParent(_detailHost) is not Panel parent) return null;
+
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            if (VisualTreeHelper.GetChild(parent, i) is Grid child
+                && !ReferenceEquals(child, _detailHost) && !ReferenceEquals(child, _splitter) && !ReferenceEquals(child, _splitLabel)
+                && Grid.GetColumn(child) == 1)
+            {
+                return child;
+            }
+        }
+        return null;
     }
     #endregion
 

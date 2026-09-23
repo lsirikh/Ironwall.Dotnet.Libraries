@@ -105,4 +105,22 @@ public static class DragMath
     /// <summary><paramref name="elapsed"/> 동안 스크롤할 양(px). 시간 기반이라 프레임레이트에 기대지 않는다.</summary>
     public static double AutoScrollDelta(double y, double viewportLength, TimeSpan elapsed)
         => AutoScrollVelocity(y, viewportLength) * elapsed.TotalSeconds;
+
+    /// <summary>
+    /// 드래그 고스트 툴팁의 사각형 — 커서에서 <paramref name="offsetX"/>·<paramref name="offsetY"/> 만큼 떨어져
+    /// 뜨되, <paramref name="bounds"/>(꾸미는 표면의 가용 폭 · 높이, 원점은 커서 좌표계와 같다) 밖으로 넘치면
+    /// 반대편(커서 왼쪽 · 위쪽)으로 뒤집는다. 뒤집어도 넘치면(라벨이 표면보다 큰 구석) 안쪽으로 눌러 붙인다.
+    /// </summary>
+    /// <remarks><paramref name="bounds"/> 의 각 변이 <see cref="double.IsInfinity(double)"/> 이면 그 축은 뒤집지도 누르지도 않는다
+    /// — 가용 폭을 모를 때(레이어를 못 찾았을 때)는 예전처럼 커서 오른쪽 아래에 그냥 띄운다.</remarks>
+    public static Rect ClampGhostRect(Point cursor, Size size, Size bounds, double offsetX = 12, double offsetY = 10)
+        => new(ClampAxis(cursor.X, size.Width, offsetX, bounds.Width), ClampAxis(cursor.Y, size.Height, offsetY, bounds.Height), size.Width, size.Height);
+
+    private static double ClampAxis(double cursor, double extent, double offset, double boundExtent)
+    {
+        if (double.IsInfinity(boundExtent)) return cursor + offset;
+
+        var preferred = cursor + offset + extent <= boundExtent ? cursor + offset : cursor - offset - extent;
+        return Math.Max(0, Math.Min(boundExtent - extent, preferred));
+    }
 }

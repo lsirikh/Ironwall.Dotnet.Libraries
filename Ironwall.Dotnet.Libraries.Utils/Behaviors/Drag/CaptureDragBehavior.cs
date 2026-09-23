@@ -183,7 +183,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _ghostLayer = AdornerLayer.GetAdornerLayer(AssociatedObject);
         if (_ghostLayer != null)
         {
-            _ghost = new DragGhostAdorner(AssociatedObject, _payload.Label, _payload.Count);
+            _ghost = new DragGhostAdorner(AssociatedObject, _ghostLayer, _payload.Label, _payload.Count);
             _ghostLayer.Add(_ghost);
         }
 

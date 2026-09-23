@@ -100,4 +100,40 @@ public class ConsoleLayoutMathTests
         Assert.True(ConsoleLayoutMath.Resolve(200).ListWidth >= 0);
         Assert.True(ConsoleLayoutMath.Resolve(0).ListWidth >= 0);
     }
+
+    #region 목록 오른쪽 인셋 — 서랍이 덮을 때 목록이 피해야 할 폭
+    [Fact]
+    public void should_return_zero_inset_when_docked_because_detail_has_its_own_column()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1280);
+
+        Assert.Equal(0, ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: true));
+    }
+
+    [Fact]
+    public void should_return_zero_inset_when_drawer_is_closed_because_nothing_to_avoid()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1100);
+
+        Assert.Equal(0, ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: false));
+    }
+
+    [Fact]
+    public void should_return_drawer_width_as_inset_when_drawer_is_open()
+    {
+        var layout = ConsoleLayoutMath.Resolve(1100);
+
+        Assert.Equal(layout.DetailWidth, ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: true));
+        Assert.True(ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: true) > 0);
+    }
+
+    [Fact]
+    public void should_return_drawer_width_as_inset_when_compact_and_open()
+    {
+        var layout = ConsoleLayoutMath.Resolve(900);
+
+        Assert.Equal(ConsoleLayoutMode.Compact, layout.Mode);
+        Assert.Equal(layout.DetailWidth, ConsoleLayoutMath.ListRightInset(layout, isDetailOpen: true));
+    }
+    #endregion
 }

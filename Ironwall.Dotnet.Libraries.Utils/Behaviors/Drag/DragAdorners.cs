@@ -12,15 +12,23 @@ namespace Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 /// <para>식별력을 배경색에 걸지 않는다(라이트에서 표면색 차이가 1.09:1) — 1.5px 주색 테두리로 구분한다.</para>
 /// <para>토큰은 그릴 때마다 다시 해석한다. 한 번 해석해 두면 테마 전환 뒤 옛 색으로 굳는다.</para>
 /// <para><c>AdornerManagerService</c> 에 등록하지 않는다 — 그 서비스의 주기 타이머가 배선을 깬 이력이 있다.</para>
+/// <para>
+/// 꾸미는 요소는 손잡이(작은 <see cref="Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragHandle"/>)라
+/// 그 자체의 <see cref="Adorner.RenderSize"/> 로는 넘침을 재지 못한다 — 실제로 잘리는 경계는 이 어도너가
+/// 얹힌 <see cref="AdornerLayer"/>(콘솔 전체) 의 가장자리다. 그래서 레이어를 넘겨받아 렌더할 때마다
+/// 손잡이 기준 좌표로 가용 폭 · 높이를 다시 잰다(<see cref="DragMath.ClampGhostRect"/>).
+/// </para>
 /// </remarks>
 public sealed class DragGhostAdorner : Adorner
 {
+    private readonly AdornerLayer? _layer;
     private readonly string _label;
     private readonly int _count;
     private Point _position;
 
-    public DragGhostAdorner(UIElement adornedElement, string label, int count) : base(adornedElement)
+    public DragGhostAdorner(UIElement adornedElement, AdornerLayer? layer, string label, int count) : base(adornedElement)
     {
+        _layer = layer;
         _label = label;
         _count = count;
         IsHitTestVisible = false;      // 드롭존 HitTest 를 가리지 않는다
@@ -55,7 +63,8 @@ public sealed class DragGhostAdorner : Adorner
 
         const double padX = 10, padY = 6, gap = 8, badgePadX = 6;
         var badgeWidth = badge == null ? 0 : badge.Width + badgePadX * 2 + gap;
-        var rect = new Rect(_position.X + 12, _position.Y + 10, label.Width + padX * 2 + badgeWidth, Math.Max(label.Height, 16) + padY * 2);
+        var size = new Size(label.Width + padX * 2 + badgeWidth, Math.Max(label.Height, 16) + padY * 2);
+        var rect = DragMath.ClampGhostRect(_position, size, AvailableBounds());
 
         // 그림자(형태) — DropShadowEffect 는 어도너 전체를 비트맵으로 만들어 RDP 에서 무겁다. 어두운 사각형 두 겹으로 흉내 낸다.
         var shadow = new SolidColorBrush(Color.FromArgb(0x30, 0, 0, 0));
@@ -74,6 +83,18 @@ public sealed class DragGhostAdorner : Adorner
     }
 
     private Brush Brush(string key, Brush fallback) => TryFindResource(key) as Brush ?? fallback;
+
+    /// <summary>
+    /// 손잡이(<see cref="Adorner.AdornedElement"/>) 기준 좌표계에서, 실제로 잘리는 경계(레이어 가장자리)까지
+    /// 남는 폭 · 높이. 레이어를 못 찾으면 <see cref="double.PositiveInfinity"/> — 클램프하지 않는다.
+    /// </summary>
+    private Size AvailableBounds()
+    {
+        if (_layer == null) return new Size(double.PositiveInfinity, double.PositiveInfinity);
+
+        var origin = AdornedElement.TransformToVisual(_layer).Transform(new Point(0, 0));
+        return new Size(Math.Max(0, _layer.RenderSize.Width - origin.X), Math.Max(0, _layer.RenderSize.Height - origin.Y));
+    }
 }
 
 /// <summary>
