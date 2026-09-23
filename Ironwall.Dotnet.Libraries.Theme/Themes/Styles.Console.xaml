@@ -1,7 +1,9 @@
 ﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	xmlns:sys="clr-namespace:System;assembly=mscorlib">
+	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes">
 	<!--
 		콘솔(T1) 공용 스타일 (console-kernel PRD · IMPL-05, K-02 승격 2026-09-21).
 		· 키는 전부 "Console." 접두. 암시적 스타일(키 없는 TargetType) 0 — 기존 그리드 · 버튼을 건드리지 않는다.
@@ -872,5 +874,100 @@
 		<Setter Property="Margin" Value="0,0,6,0" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+	</Style>
+
+	<!--  ═════════ 날짜/시각 입력 ═════════
+	     K-11 — mah:DateTimePicker 내부 달력 토글 버튼은 자기 Style 이 없는 게 아니라
+	     Style="{DynamicResource MahApps.Styles.Button.Chromeless}" 로 MahApps 자신의 키를 명시로 찾는다(실측:
+	     GitHub MahApps.Metro 2.4.10 Styles/Controls.DatePicker.xaml). 이 앱은 MDIX + Theme.Current 만 병합하고
+	     MahApps 자신의 Controls.Buttons.xaml 은 병합하지 않으므로 그 DynamicResource 가 어디서도 안 풀린다 →
+	     Style 이 끝내 비어 WPF 가 암시 스타일 탐색으로 떨어지고, 앱 스코프에 있는 MDIX 의 암시 Button 스타일
+	     (Teal500 #009688)이 대신 먹힌다(실측: 통짜 사각형, 글리프 없음). 고치는 법은 그 정확한 키 이름으로
+	     우리 정의를 Style.Resources 에 두는 것 — 이 컨트롤 스코프 DynamicResource 조회가 Application 보다
+	     먼저 이 사전을 본다. Template 은 손대지 않는다(Background/BorderThickness 만 비우면 컨트롤 자신의
+	     테마 스타일이 글리프까지 그대로 그려진다 — Style setter 는 그 Style 이 정의하지 않은 속성에 한해
+	     테마 스타일로 떨어진다).
+	     Culture 를 비워 두면 WPF FrameworkElement.Language 기본값(en-US)으로 떨어져 9/16/2026 3:52:12 PM 처럼
+	     미국식 · 초 포함 · AM/PM 으로 렌더링된다(실측). ConsoleDateTimeFormat.FixedCulture(불변 문화권 복제 +
+	     yyyy-MM-dd / HH:mm 패턴 + AM/PM 디자이네이터 제거) + SelectedDateFormat=Short + SelectedTimeFormat=Short 로
+	     화면 전체 한 표기 yyyy-MM-dd HH:mm(FR-29b, docs/prds/suppression-schedule-prd.md)에 고정한다.
+	     워터마크는 MahApps 에 ko 위성 리소스가 없어 영문 "Select a date" 로 뜬다 — Setter 로 명시해 이긴다.
+	     ⚠ 이 컨트롤은 워터마크를 입력 위 캡션 줄로 '항상' 그린다(값이 있어도 사라지지 않는다 — TextBox 의
+	     사라지는 플레이스홀더와 다르다, 실측: 이 저장소의 실제 결함 스크린샷도 캡션+값 두 줄이 같이 찍혀 있다).
+	     그래서 Height 를 32 로 못박지 않는다 — 캡션 줄까지 눌러 겹치는 게 바로 사용자가 신고한 4번째 결함이다.
+	     치수: MinHeight=50 은 캡션+값 두 줄이 라이트 · 다크 모두에서 겹치지 않고 렌더링으로 실측한 값
+	     (Console.SearchBox 의 Height=32 규약을 그대로 못 쓰는 이유 — FormDateTimePicker 선례도 같은 이유로
+	     고정 Height 대신 MinHeight 를 쓴다). Width=188 은 yyyy-MM-dd HH:mm(16자) + 달력 아이콘 버튼이
+	     잘리지 않는 값이다.
+	-->
+	<Style x:Key="Console.DateTimePicker" TargetType="mah:DateTimePicker">
+		<Style.Resources>
+			<!--  MahApps 자신이 찾는 정확한 키 — 위 주석 참조. 이 컨트롤 스코프 안에서만 재정의한다(전역 아님).  -->
+			<!--  달력 토글 버튼의 Content 는 MahApps 자신의 테마 기본 스타일이 달력 Path 데이터 문자열("M34…")로
+			     채운다(TemplateBinding, 병합 여부와 무관하게 항상 채워진다 — 실측). 문제는 그 문자열을 Geometry 로
+			     그려주는 ContentTemplate 쪽이다 — 그 템플릿 내부의 중첩 ContentControl 이 다시
+			     Style="{DynamicResource MahApps.Styles.ContentControl.PathIcon}" 를 찾는데, DataTemplate 안쪽
+			     깊숙한 곳이라 이 사전을 안 뒤지는 것으로 보인다(실측: PathIcon 키를 똑같이 정의해도 문자열이
+			     그대로 글자로 찍힘). 그래서 ContentTemplate 체인에 기대지 않고, 이 버튼 자신의 Template 에서
+			     Content(=Path 데이터 문자열)를 직접 Geometry 로 그린다 — 문자열→Geometry 자동 변환은
+			     TemplateBinding 이 아니라 일반 Binding 이라야 GeometryConverter 폴백이 걸린다(실측).  -->
+			<Style x:Key="MahApps.Styles.Button.Chromeless" TargetType="ButtonBase">
+				<Setter Property="Background" Value="Transparent" />
+				<Setter Property="BorderThickness" Value="0" />
+				<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+				<Setter Property="Cursor" Value="Hand" />
+				<Setter Property="Template">
+					<Setter.Value>
+						<ControlTemplate TargetType="ButtonBase">
+							<Border Background="{TemplateBinding Background}">
+								<Viewbox
+									Width="15"
+									Height="15"
+									Stretch="Uniform">
+									<Path Data="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Fill="{TemplateBinding Foreground}" />
+								</Viewbox>
+							</Border>
+						</ControlTemplate>
+					</Setter.Value>
+				</Setter>
+			</Style>
+
+			<!--  다크 배경 결함(4번째) — PART_TextBox 는 WPF 내장 DatePickerTextBox(TextBox 파생)다.
+			     실측(시각 트리 덤프): 바깥 mah:DateTimePicker.Background 를 SurfaceBrush 로 바꿔도 'Base' Border 만
+			     따라가고, PART_TextBox 는 항상 #FFFFFFFF 고정 — 이 내장 컨트롤의 기본 ControlTemplate 은
+			     Background 를 TemplateBinding 하지 않는 것으로 보인다(실측, WPF 소스 미확인). 암시 스타일
+			     (키 없는 TargetType)로 재정의하면 이 Style 이 걸린 mah:DateTimePicker 인스턴스가 자기 스코프
+			     Resources(=이 Style.Resources)를 템플릿 자식까지 상속시켜 PART_TextBox 에도 닿는다(K-11 의
+			     Chromeless 버튼과 같은 스코프 경로). Foreground/CaretBrush 도 같이 재정의하지 않으면 다크에서
+			     흰 배경이 사라져도 글자·캐럿이 기본 검정/흰 그대로 남아 대비가 뒤집힌다.  -->
+			<Style TargetType="DatePickerTextBox">
+				<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+				<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+				<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+				<Setter Property="BorderThickness" Value="0" />
+			</Style>
+		</Style.Resources>
+		<Setter Property="Width" Value="188" />
+		<Setter Property="MinHeight" Value="50" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
+		<Setter Property="FontSize" Value="12" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="mah:TextBoxHelper.Watermark" Value="날짜 선택" />
+		<!--  ⚠ Culture/SelectedDateFormat/SelectedTimeFormat/PickerVisibility 는 평범한 <Setter> 로 걸면
+		     실측상 무시된다(en-US · 초 포함 그대로) — 같은 값을 호출부에 로컬 속성으로 쓰면 즉시 반영된다.
+		     TimePickerBase 가 이 값들을 내부 파트 최초 구성 시점에만 읽고 Style-Setter 적용 시점의 재평가를
+		     타지 않는 것으로 보인다(실측, 정확한 내부 원인은 MahApps 2.4.10 소스 미확인). Trigger 안의 Setter 는
+		     별도 재평가 경로를 타 반영된다 — 조건은 이 컨트롤이 항상 참인 IsEnabled=True 로 건다.  -->
+		<Style.Triggers>
+			<Trigger Property="IsEnabled" Value="True">
+				<Setter Property="Culture" Value="{x:Static theme:ConsoleDateTimeFormat.FixedCulture}" />
+				<Setter Property="SelectedDateFormat" Value="Short" />
+				<Setter Property="SelectedTimeFormat" Value="Short" />
+				<Setter Property="PickerVisibility" Value="HourMinute" />
+			</Trigger>
+		</Style.Triggers>
 	</Style>
 </ResourceDictionary>

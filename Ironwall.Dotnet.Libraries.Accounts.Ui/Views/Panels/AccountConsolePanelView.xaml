@@ -1440,20 +1440,20 @@
 								<c:ConsoleField ApiName="valid_from" Header="시작">
 									<!--  날짜만 고르면 자정이 되어 "오늘 몇 시부터 몇 시까지" 한시 부여가 불가능해진다  -->
 									<mah:DateTimePicker
-										Width="180"
 										HorizontalAlignment="Left"
 										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_from"
-										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
+										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}"
+										Style="{StaticResource Console.DateTimePicker}" />
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="valid_until"
 									Header="종료"
 									Note="비우면 상시입니다.">
 									<mah:DateTimePicker
-										Width="180"
 										HorizontalAlignment="Left"
 										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_until"
-										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}" />
+										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}"
+										Style="{StaticResource Console.DateTimePicker}" />
 								</c:ConsoleField>
 							</StackPanel>
 						</c:ConsoleSection>
