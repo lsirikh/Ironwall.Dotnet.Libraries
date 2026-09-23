@@ -12,6 +12,9 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+// ↓ 조치보고 문구 관리 콘솔 미리보기(--action-report-templates) 전용. 보고서 콘솔과 같은 진짜 뷰 + 진짜 뷰모델 +
+//   가짜 API 패턴을 그대로 따른다(§Build/§RunSnapshotsAsync 참고) — DI 변경 없이 이 파일 하나만 늘린다.
+
 namespace ReportsConsolePreview;
 
 /// <summary>
@@ -30,6 +33,9 @@ public partial class App : Application
     private ReportConsoleView _view = null!;
     private Window _window = null!;
 
+    private ActionReportTemplateConsoleViewModel _artViewModel = null!;
+    private ActionReportTemplateConsoleView _artView = null!;
+
     private async void OnStartup(object sender, StartupEventArgs e)
     {
         var snapshotAt = System.Array.IndexOf(e.Args, "--snapshot");
@@ -38,6 +44,15 @@ public partial class App : Application
         try
         {
             if (e.Args.Contains("--dark")) ApplyDark();
+
+            // 조치보고 문구 관리 콘솔은 보고서 콘솔과는 별개의 독립 콘솔이라(각자 자기 ConsoleShell)
+            // 창을 따로 띄운다 — DI·본 콘솔 코드는 건드리지 않는다.
+            if (e.Args.Contains("--action-report-templates"))
+            {
+                await RunActionReportTemplatesFlowAsync(e.Args, directory);
+                if (directory is not null) Shutdown();
+                return;
+            }
 
             _viewModel = Build(e.Args.Contains("--readonly"));
             _view = new ReportConsoleView { DataContext = _viewModel };
@@ -92,6 +107,83 @@ public partial class App : Application
             new ReportTemplateViewModel(events, log, api),
             new ReportPreviewViewModel(events, log, api),
             new ReportTemplateEditViewModel(events, log, api));
+    }
+    #endregion
+
+    #region - 조치보고 문구 관리 콘솔 미리보기 -
+    private async Task RunActionReportTemplatesFlowAsync(string[] args, string? directory)
+    {
+        _artViewModel = BuildActionReportTemplates(args.Contains("--readonly"), args.Contains("--empty"));
+        _artView = new ActionReportTemplateConsoleView { DataContext = _artViewModel };
+        _window = new Window
+        {
+            Title = "조치보고 문구 관리 콘솔 미리보기",
+            Width = 1200,
+            Height = 760,
+            Background = (Brush)FindResource("SurfaceBrush"),
+            Content = new Border { Margin = new Thickness(12), Child = _artView },
+        };
+        _window.Show();
+
+        await ((IActivate)_artViewModel).ActivateAsync();
+
+        if (directory is null) return;
+        Directory.CreateDirectory(directory);
+        await RunActionReportTemplateSnapshotsAsync(directory, args.Contains("--dark") ? "dark" : "light", args.Contains("--empty"));
+    }
+
+    private static ActionReportTemplateConsoleViewModel BuildActionReportTemplates(bool readOnly, bool empty)
+    {
+        var log = new FakeLogService();
+        var events = new EventAggregator();
+        var api = new FakeActionReportTemplateApiService { FailList = empty };
+        var permission = new FakePermissionService { Edit = !readOnly };
+
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? events : null!;
+        IoC.GetAllInstances = _ => System.Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();
+
+        if (!empty)
+        {
+            api.Templates.Add(ActionReportTemplateSeed.Template(1, "야생동물출현", 0));
+            api.Templates.Add(ActionReportTemplateSeed.Template(2, "강풍/폭우", 1));
+            api.Templates.Add(ActionReportTemplateSeed.Template(3, "울타리 점검/작업", 2));
+            api.Templates.Add(ActionReportTemplateSeed.Template(4, "침입발생 특경출동조치", 3));
+            api.Templates.Add(ActionReportTemplateSeed.Template(5, "오경보", 4));
+        }
+
+        return new ActionReportTemplateConsoleViewModel(events, log, permission, api);
+    }
+
+    /// <summary>
+    /// 목록 · 손잡이 · ▲▼ 폴백 단추 · 선택 상세(수정 폼) · 등록 폼 · 빈 상태를 찍는다.
+    /// ★ 삽입선(AdornerLayer)은 실제 마우스 캡처 드래그 중에만 뜨는 순간 시각효과라 VM 레벨 시뮬로는
+    /// 재현할 수 없다 — 여기서는 "찍지 못했다"로 정직하게 남긴다(찍은 걸 검증됐다고 적지 않는다).
+    /// </summary>
+    private async Task RunActionReportTemplateSnapshotsAsync(string directory, string theme, bool empty)
+    {
+        await Settle();
+        Save(directory, empty ? $"{theme}-art-00-empty-state" : $"{theme}-art-01-list-none");
+        if (empty) return;
+
+        _artViewModel.OnRowSelected(_artViewModel.Items.First(i => i.Id == 3));
+        await Settle();
+        Save(directory, $"{theme}-art-02-list-selected");
+
+        await _artViewModel.AddAsync();
+        await Settle();
+        Save(directory, $"{theme}-art-03-create-empty");
+
+        _artViewModel.DraftContent = "차량 통제";
+        await Settle();
+        Save(directory, $"{theme}-art-04-create-filled");
+        _artViewModel.Revert();
+
+        // 드래그 · Alt+↑/↓ · ▲ 단추가 공유하는 같은 커밋 경로의 결과 상태(되돌리기 단추가 켜진다).
+        _artViewModel.MoveSelected(_artViewModel.Items.First(i => i.Id == 5), -1);
+        await Settle();
+        Save(directory, $"{theme}-art-05-reordered-undo-available");
     }
     #endregion
 
@@ -195,41 +287,73 @@ public partial class App : Application
         if (Resources.MergedDictionaries.Any(d => d.Source?.OriginalString == DarkTokens)) return;
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new System.Uri(DarkTokens) });
         foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Dark;
+        // 호스트(ThemeService.SyncMaterialDesignAndMahApps)는 MD 색만이 아니라 MahApps 크롬도 같이 바꾼다
+        // (ThemeManager.Current.ChangeTheme(app, "Dark.Cyan")). 여기선 그 한 줄만 그대로 거울처럼 부른다 —
+        // 안 부르면 이 콘솔이 쓰는 MahApps 스타일 컨트롤이 다크에서도 라이트 크롬으로 남는다.
+        ControlzEx.Theming.ThemeManager.Current.ChangeTheme(this, "Dark.Cyan");
     }
 
     private static Task Settle() => Task.Delay(420);
 
+    /// <summary>
+    /// D-05(2026-09-23, device/accounts 콘솔에서 먼저 잡음) — <c>VisualBrush(content){Stretch=None}</c> 로
+    /// 간접 합성하던 옛 방식은 창을 막 띄운 <b>첫 캡처</b>에서 자식의 최근 레이아웃 변경분을 브러시가 못
+    /// 따라가는 경우가 있었다(실측: 제품 바인딩·레이아웃은 처음부터 맞았는데 그 방식으로 뜬 PNG 에서만
+    /// 일부 내용이 통째로 빠졌다). <c>RenderTargetBitmap.Render(element)</c> 로 직접 찍으면 그대로 나온다 —
+    /// 그래서 지금은 배경 사각형을 그린 뒤 <c>content</c> 를 VisualBrush 없이 직접 Render 한다.
+    /// (바깥 여백 Border 가 아니라 <c>.Child</c> 를 찍는 이유는 그대로다 — Margin 이 Border 자신의 오프셋으로
+    /// 실려 그림이 오른쪽·아래로 잘리기 때문이다.)
+    /// ⚠ <c>.Child</c> 로 옮겨도 안심할 수 없다(device 콘솔의 다이얼로그 갤러리에서 실측) — 자식이
+    /// <c>HorizontalAlignment/VerticalAlignment=Center</c> 라 Border 를 꽉 채우지 않으면, 그 자식도 제
+    /// 부모(Border) 안에서 가운데로 밀린 만큼 제 오프셋을 갖는다 — 곧이곧대로 Render 하면 이번엔 자식 자신이
+    /// 잘린다. 그래서 <see cref="SaveVisual"/> 로 그 오프셋만큼 캔버스를 더 크게 잡아 찍은 뒤 자식의 사각만
+    /// 오려낸다 — Stretch 로 꽉 채우는 화면(오프셋 0)이든 가운데 정렬(오프셋 ≠0)이든 같은 경로로 항상 옳다.
+    /// </summary>
     private void Save(string directory, string name)
     {
-        // ★ 바깥 여백을 두른 Border 가 아니라 콘솔 자체를 찍는다 — Border 를 찍으면 제 Margin 이 그림 안에
-        //   들어오면서 오른쪽·아래가 그만큼 잘려, 그림에서 잰 치수가 12px 씩 거짓말을 했다.
         var content = (FrameworkElement)((Border)_window.Content).Child;
-        var width = (int)System.Math.Ceiling(content.ActualWidth);
-        var height = (int)System.Math.Ceiling(content.ActualHeight);
+        SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
+    }
+
+    /// <summary>
+    /// 어떤 요소든, 제 부모 안에서의 배치 위치(오프셋)에 상관없이 정확히 찍는다. 요소의 부모 기준 오프셋만큼
+    /// 캔버스를 더 크게 잡아 직접 Render 한 뒤, 요소 자신의 사각만 오려낸다(VisualBrush 없이).
+    /// </summary>
+    private static void SaveVisual(string path, FrameworkElement element, Brush background)
+    {
+        var width = element.ActualWidth;
+        var height = element.ActualHeight;
         if (width <= 0 || height <= 0) return;
 
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle(_window.Background, null, new Rect(0, 0, width, height));
-            // ★ Viewbox 를 절대 좌표로 못박는다 — 기본(RelativeToBoundingBox)이면 자식 경계가 요소보다
-            //   크거나 작을 때 Stretch.None 이 가운데로 맞추느라 그림이 몇 px 어긋나 찍힌다(치수 측정이 거짓말한다).
-            var source = new VisualBrush(content)
-            {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top,
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Viewbox = new Rect(0, 0, width, height),
-            };
-            dc.DrawRectangle(source, null, new Rect(0, 0, width, height));
-        }
-        bitmap.Render(visual);
+        var parent = VisualTreeHelper.GetParent(element) as Visual;
+        var offset = parent != null ? element.TransformToAncestor(parent).Transform(new Point(0, 0)) : new Point(0, 0);
+
+        var dpi = VisualTreeHelper.GetDpi(element);
+        var canvasWidth = offset.X + width;
+        var canvasHeight = offset.Y + height;
+        var pixelWidth = System.Math.Max(1, (int)System.Math.Ceiling(canvasWidth * dpi.DpiScaleX));
+        var pixelHeight = System.Math.Max(1, (int)System.Math.Ceiling(canvasHeight * dpi.DpiScaleY));
+
+        var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+
+        var backdrop = new DrawingVisual();
+        using (var dc = backdrop.RenderOpen())
+            dc.DrawRectangle(background, null, new Rect(0, 0, canvasWidth, canvasHeight));
+        bitmap.Render(backdrop);
+        bitmap.Render(element);
+
+        var cropX = System.Math.Max(0, (int)System.Math.Round(offset.X * dpi.DpiScaleX));
+        var cropY = System.Math.Max(0, (int)System.Math.Round(offset.Y * dpi.DpiScaleY));
+        var cropW = System.Math.Max(1, System.Math.Min((int)System.Math.Ceiling(width * dpi.DpiScaleX), pixelWidth - cropX));
+        var cropH = System.Math.Max(1, System.Math.Min((int)System.Math.Ceiling(height * dpi.DpiScaleY), pixelHeight - cropY));
+
+        BitmapSource final = cropX == 0 && cropY == 0 && cropW == pixelWidth && cropH == pixelHeight
+            ? bitmap
+            : new CroppedBitmap(bitmap, new Int32Rect(cropX, cropY, cropW, cropH));
 
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(directory, name + ".png"));
+        encoder.Frames.Add(BitmapFrame.Create(final));
+        using var stream = File.Create(path);
         encoder.Save(stream);
     }
     #endregion

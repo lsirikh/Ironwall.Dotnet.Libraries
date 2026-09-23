@@ -127,6 +127,8 @@ public class CallDeleteMapLayerProcessMessageModel : IMessageModel { }
 public class CallCancelReportGenerationProcessMessageModel : IMessageModel { }
 public class CallDeleteReportGenerationProcessMessageModel : IMessageModel { }
 public class CallDeleteReportTemplateProcessMessageModel : IMessageModel { }
+/// <summary>조치보고 문구 삭제 확인 트리거 — 확인 팝업 '확인' 시 발행. ActionReportTemplateConsoleViewModel이 IHandle로 수신해 서버 삭제.</summary>
+public class CallDeleteActionReportTemplateProcessMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }

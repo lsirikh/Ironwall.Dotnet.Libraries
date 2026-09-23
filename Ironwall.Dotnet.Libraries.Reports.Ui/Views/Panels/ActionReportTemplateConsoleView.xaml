@@ -1,0 +1,325 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ActionReportTemplateConsoleView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.Root"
+	FontFamily="{DynamicResource MaterialDesignFont}">
+	<!--
+		조치보고 문구 관리 콘솔 — 목록(드래그 재정렬) + 상세(등록 · 수정). 커널만 쓴다: ConsoleShell · ConsoleRail ·
+		ConsoleToolbar · ConsoleDetailHost(여섯 상태 · 고정 적용 막대) · 드래그 behaviors(CaptureDragBehavior ·
+		ReorderKeyboardBehavior · DropZone · DragHandle). 정본 참조: Reports.Ui/Views/Panels/ReportTemplateDetailView.xaml
+		(드래그 재사용의 실제 레퍼런스) · docs/design/action-report-custom-template-wireframe.html §3(치수 근거,
+		840×640 바운드 박스 — 순서 변경만 ▲▼ 대신 드래그로 갱신, 2026-09-06 전사 방침).
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId 만.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<local:BoolInverseConverter x:Key="BoolInverse" />
+		<local:NotEmptyToVisibilityConverter x:Key="NotEmptyToVisibility" />
+
+		<Style x:Key="Form.TextBox" TargetType="TextBox">
+			<Setter Property="Padding" Value="8,6" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
+		<!--  Console.Button.Mini 에는 위험색 변형이 없다 — 삭제는 형태(확인 팝업 2단)로 보호되므로
+		      색만 뷰 로컬로 덧댄다(Theme 은 건드리지 않는다).  -->
+		<Style
+			x:Key="Local.Button.Mini.Danger"
+			BasedOn="{StaticResource Console.Button.Mini}"
+			TargetType="ButtonBase">
+			<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+		</Style>
+	</UserControl.Resources>
+
+	<c:ConsoleShell
+		Title="조치보고 문구"
+		ConsoleKey="ActionReportTemplates"
+		DetailWidth="360"
+		IsDetailRequested="{Binding Detail.IsDetailRequested}"
+		Subtitle="문구 관리">
+
+		<!--  머리 오른쪽 — 닫기(호스트가 이 패널을 모달로 띄운다)  -->
+		<c:ConsoleShell.HeaderContent>
+			<StackPanel Orientation="Horizontal">
+				<!--  커널 머리의 제목 글에는 계측 이름이 없다 — 옛 id 를 여기서 되살린다(ReportConsoleView.xaml 동일 패턴).
+				      ★ 이전에 여기 있던 "문구를 모두 삭제하고 서버를 재기동하면 기본 5건이 복원됩니다" 문구는
+				      제거했다 — 그건 시드 스크립트(init_action_report_data.py)가 있는 테스트/개발 서버의 동작이지
+				      운용자가 제품 화면에서 봐야 할 안내가 아니다(코디네이터 확인, 2026-09-24).  -->
+				<TextBlock
+					Margin="0,0,10,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.TitleText"
+					FontSize="12"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="문구 관리" />
+				<Button
+					AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.CloseButton"
+					Click="OnClose"
+					Content="닫기"
+					Style="{StaticResource Console.Button.Ghost}" />
+			</StackPanel>
+		</c:ConsoleShell.HeaderContent>
+
+		<!--  레일 — 항목 1개. 다중 모드가 없는 화면에서도 커널 크롬(제목 · 부제)을 일관되게 쓴다.  -->
+		<c:ConsoleShell.Rail>
+			<c:ConsoleRail
+				AutomationProperties.AutomationId="Console.ActionReportTemplates.Rail"
+				ConsoleKey="ActionReportTemplates"
+				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				ItemsSource="{Binding RailEntries}"
+				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Footer>
+					<TextBlock
+						AutomationProperties.AutomationId="Console.ActionReportTemplates.Rail.Footer"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding RailFooterText}"
+						TextWrapping="Wrap" />
+				</c:ConsoleRail.Footer>
+			</c:ConsoleRail>
+		</c:ConsoleShell.Rail>
+
+		<!--  툴바 — [+ 문구 추가] · [삭제] · [갱신] · 검색(문구) · [되돌리기](Extra, 마지막 재정렬 1회분)  -->
+		<c:ConsoleShell.Toolbar>
+			<c:ConsoleToolbar
+				AddClick="OnAdd"
+				AddDisabledReason="{Binding AddBlockedReason}"
+				AddText="새 문구"
+				CanAdd="{Binding CanAdd}"
+				CanDelete="{Binding CanDelete}"
+				CanRefresh="{Binding CanReload}"
+				ConsoleKey="ActionReportTemplates"
+				DeleteClick="OnDelete"
+				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				RefreshClick="OnReload"
+				ShowSearch="False">
+				<c:ConsoleToolbar.Extra>
+					<Button
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.UndoReorderButton"
+						Click="OnUndoReorder"
+						Content="↶ 순서 되돌리기"
+						IsEnabled="{Binding CanUndoReorder}"
+						Style="{StaticResource Console.Button.Ghost}"
+						ToolTip="{Binding UndoReorderText}"
+						ToolTipService.ShowOnDisabled="True" />
+				</c:ConsoleToolbar.Extra>
+			</c:ConsoleToolbar>
+		</c:ConsoleShell.Toolbar>
+
+		<!--  목록 — 전량 로딩(가상화·무한스크롤 없음). 드래그 손잡이는 handle-only.  -->
+		<c:ConsoleShell.List>
+			<Grid ClipToBounds="True" IsEnabled="{Binding IsReordering, Converter={StaticResource BoolInverse}}">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+
+				<!--  키보드 · 단추 폴백 — 목록 위에 둔다(아래 두면 긴 목록에 밀려 화면 밖으로 나간다).  -->
+				<DockPanel Grid.Row="0" Margin="12,8,12,4" LastChildFill="True">
+					<Button
+						Margin="4,0,0,0"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.MoveDownButton"
+						Click="OnMoveDown"
+						Content="▼"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding CanEdit}"
+						Style="{StaticResource Console.Button.Mini}"
+						ToolTip="고른 문구를 아래로 (Alt+↓)" />
+					<Button
+						Margin="4,0,0,0"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.MoveUpButton"
+						Click="OnMoveUp"
+						Content="▲"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding CanEdit}"
+						Style="{StaticResource Console.Button.Mini}"
+						ToolTip="고른 문구를 위로 (Alt+↑)" />
+					<TextBlock
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.ReorderHint"
+						FontSize="11"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="문구를 고른 뒤 끌거나 Alt+↑ · Alt+↓ · 위 단추로 순서를 바꿉니다."
+						TextWrapping="Wrap" />
+				</DockPanel>
+
+				<Grid Grid.Row="1">
+					<ListBox
+						Padding="12,0,12,12"
+						drag:DropZone.Handler="{Binding Drop}"
+						drag:DropZone.IsReorder="True"
+						drag:DropZone.Key="action-report-template"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.List"
+						ItemsSource="{Binding Items}"
+						Loaded="OnListLoaded"
+						SelectionChanged="OnListSelectionChanged"
+						SelectionMode="Single"
+						Style="{StaticResource Console.ReorderList}">
+						<b:Interaction.Behaviors>
+							<!--  손잡이에서만 끌기가 시작된다 · 데드존 8.0 미만은 클릭 폴백  -->
+							<drag:CaptureDragBehavior
+								DisplayMemberPath="Display"
+								Handler="{Binding Drop}"
+								IsDragEnabled="{Binding CanEdit}"
+								KeyboardFallback="문구를 고른 뒤 Alt+↑ · Alt+↓ 로 옮긴다" />
+							<!--  키보드 폴백 — 드래그 · ▲▼ 단추와 같은 담당을 부른다(회귀 단언은 이 경로로)  -->
+							<drag:ReorderKeyboardBehavior Handler="{Binding Drop}" IsReorderEnabled="{Binding CanEdit}" />
+						</b:Interaction.Behaviors>
+
+						<ListBox.ItemTemplate>
+							<DataTemplate>
+								<DockPanel Height="38" LastChildFill="True">
+									<drag:DragHandle
+										Width="20"
+										Margin="0,0,6,0"
+										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.DragHandle.{0}}"
+										DockPanel.Dock="Left"
+										ToolTip="끌어서 순서를 바꿉니다 · Alt+↑ / Alt+↓ 로도 됩니다" />
+									<TextBlock
+										Width="30"
+										VerticalAlignment="Center"
+										DockPanel.Dock="Left"
+										FontSize="11"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="{Binding DisplayOrder}" />
+									<StackPanel VerticalAlignment="Center" DockPanel.Dock="Right" Orientation="Horizontal">
+										<Button
+											Margin="4,0,0,0"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.EditButton.{0}}"
+											Click="OnEditRow"
+											Content="수정"
+											Style="{StaticResource Console.Button.Mini}" />
+										<Button
+											Margin="4,0,0,0"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.DeleteButton.{0}}"
+											Click="OnDeleteRow"
+											Content="삭제"
+											Style="{StaticResource Local.Button.Mini.Danger}" />
+									</StackPanel>
+									<TextBlock
+										Margin="4,0,8,0"
+										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="{Binding AutomationId}"
+										FontSize="12.5"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding Display}"
+										TextTrimming="CharacterEllipsis"
+										ToolTip="{Binding Display}" />
+								</DockPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+
+					<TextBlock
+						MaxWidth="360"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.EmptyStateText"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding EmptyStateText}"
+						TextAlignment="Center"
+						TextWrapping="Wrap"
+						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+				</Grid>
+			</Grid>
+		</c:ConsoleShell.List>
+
+		<!--  상태 띠 — 건수 + 방금 한 일  -->
+		<c:ConsoleShell.StatusBar>
+			<Border
+				Padding="12,5"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="0,1,0,0">
+				<DockPanel LastChildFill="True">
+					<TextBlock
+						Margin="12,0,0,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Console.ActionReportTemplates.Status.Message"
+						DockPanel.Dock="Right"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding StatusText}"
+						TextTrimming="CharacterEllipsis" />
+					<TextBlock
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.CountText"
+						DockPanel.Dock="Left"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="{Binding CountText}" />
+				</DockPanel>
+			</Border>
+		</c:ConsoleShell.StatusBar>
+
+		<!--  상세 — 여섯 상태 + 고정 적용 막대. 등록 · 수정 한 폼뿐이라 레일 분기 없이 그대로 얹는다.  -->
+		<c:ConsoleShell.Detail>
+			<c:ConsoleDetailHost
+				ApplyClick="OnApply"
+				ApplyText="{Binding Detail.ApplyText}"
+				Banner="{Binding Detail.Banner}"
+				CanApply="{Binding DetailCanApply}"
+				CanRevert="{Binding Detail.CanRevert}"
+				ConsoleKey="ActionReportTemplates"
+				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
+				FooterText="{Binding Detail.FooterText}"
+				IsDirty="{Binding Detail.IsDirty}"
+				IsReadOnly="{Binding Detail.IsReadOnly}"
+				Kind="{Binding Detail.Kind}"
+				RevertClick="OnRevert"
+				RevertText="{Binding Detail.RevertText}"
+				ShakeToken="{Binding Detail.ShakeToken}"
+				ShowButtons="{Binding Detail.ShowButtons}"
+				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
+				Title="{Binding Detail.Title}">
+				<StackPanel Margin="0,4,0,0">
+					<c:ConsoleSection Header="문구">
+						<StackPanel>
+							<c:ConsoleField
+								ApiName="content"
+								Header="문구 *"
+								IsTouched="{Binding IsContentTouched}">
+								<TextBox
+									MinHeight="120"
+									AcceptsReturn="True"
+									AutomationProperties.AutomationId="Reports.ActionReportTemplate.ContentTextBox"
+									IsEnabled="{Binding Detail.IsReadOnly, Converter={StaticResource BoolInverse}}"
+									MaxLength="500"
+									Style="{StaticResource Form.TextBox}"
+									Text="{Binding DraftContent, UpdateSourceTrigger=PropertyChanged}"
+									TextWrapping="Wrap" />
+							</c:ConsoleField>
+							<DockPanel Margin="0,4,0,0" LastChildFill="False">
+								<TextBlock
+									AutomationProperties.AutomationId="Reports.ActionReportTemplate.CharCountText"
+									DockPanel.Dock="Left"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{Binding DraftContentCountText}" />
+							</DockPanel>
+							<TextBlock
+								Margin="0,4,0,0"
+								AutomationProperties.AutomationId="Reports.ActionReportTemplate.ValidationText"
+								FontSize="11"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Text="{Binding DraftValidationError}"
+								TextWrapping="Wrap"
+								Visibility="{Binding DraftValidationError, Converter={StaticResource NotEmptyToVisibility}}" />
+						</StackPanel>
+					</c:ConsoleSection>
+				</StackPanel>
+			</c:ConsoleDetailHost>
+		</c:ConsoleShell.Detail>
+	</c:ConsoleShell>
+</UserControl>

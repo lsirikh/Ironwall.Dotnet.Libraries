@@ -43,6 +43,9 @@ public class ReportUiModule : Module
             builder.RegisterType<ReportPreviewViewModel>().SingleInstance();
             builder.RegisterType<ReportConsoleViewModel>().SingleInstance();
 
+            // 3) 조치보고 문구 관리 콘솔(독립 콘솔 — ReportConsoleViewModel 과 같은 커널 부품을 재사용한다)
+            builder.RegisterType<ActionReportTemplateConsoleViewModel>().SingleInstance();
+
             _log?.Info($"[{nameof(ReportUiModule)}] Module loaded successfully.");
         }
         catch (Exception ex)

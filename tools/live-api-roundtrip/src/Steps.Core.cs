@@ -63,6 +63,9 @@ public static partial class Steps
 
         // ---- item 9: the mandated fix (D-17) - verify cleanup for real, never let an
         //      unreachable listing endpoint read as "clean" ----
+        // ---- D-34: 조치보고 문구 — 등록 · 단일 /reorder · 두 번째 /reorder 로 되돌리기 · 삭제 ----
+        await Item_ActionReportTemplates(boot, rec, raw).ConfigureAwait(false);
+
         await Item9_CleanupSweep(boot, rec, raw).ConfigureAwait(false);
 
         return $"https://127.0.0.1:8000 (contract {boot.Probe.Contract}, info.version {version})";

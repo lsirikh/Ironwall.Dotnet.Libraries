@@ -57,6 +57,8 @@ public static partial class Steps
             // item 10 (D-22) seeds a server — a category the sweep cannot see is exactly the D-17
             // vacuous-clean hole, so it joins the list the moment the harness starts creating them.
             ("server",          "servers?page=1&limit=100",              d => Str(d["name"])),
+            // D-34 seeds action-report templates; the list has no name field, the text lives in "content".
+            ("action-report-template", "events/action-report-templates", d => Str(d["content"])),
         };
 
         var unverifiable = new List<string>();
@@ -72,7 +74,8 @@ public static partial class Steps
                 continue;
             }
 
-            var totalPages = (int?)jo["pagination"]?["total_pages"] ?? 1;
+            // "pagination": null (unpaged lists such as action-report templates) is a JValue, not C# null.
+            var totalPages = (int?)(jo["pagination"] as JObject)?["total_pages"] ?? 1;
             if (totalPages > 1)
             {
                 unverifiable.Add($"{t.Kind}({totalPages}페이지, limit=100 로 전수 확인 불가)");
