@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -17,7 +18,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 public sealed record WiringRowResult(int Key, int Number, string Display, bool IsCreate, bool Ok, string Message, int? NewId = null);
 
 /// <summary>그룹 호출 한 건의 결과 — 그룹 하나 · 방향 하나(W2).</summary>
-public sealed record WiringGroupResult(int GroupId, bool Add, int DeviceCount, bool Ok, string Message);
+/// <param name="DeviceIds">서버가 이 호출로 그 그룹 소속을 맞춰 준 장비 id — 성공한 호출에서만 채운다(보드가 이 줄들만 그룹 기준선을 옮긴다).</param>
+public sealed record WiringGroupResult(int GroupId, bool Add, int DeviceCount, bool Ok, string Message, IReadOnlyList<int>? DeviceIds = null);
 
 /// <summary>저장 한 번의 결과.</summary>
 public sealed record WiringApplyResult(
@@ -143,7 +145,8 @@ public sealed class WiringApplyService
             var ok = results.Count(r => r.Ok);
             var failed = results.Count - ok + groupResults.Count(g => !g.Ok);
 
-            if (ok > 0 && _providerService is not null)
+            // 그룹만 바꾼 저장도 캐시(다른 창의 소속 표시)를 맞춘다.
+            if ((ok > 0 || groupResults.Any(g => g.Ok)) && _providerService is not null)
             {
                 try { await _providerService.FetchAllDevicesAsync(token).ConfigureAwait(false); }
                 catch (OperationCanceledException) { throw; }
@@ -187,13 +190,20 @@ public sealed class WiringApplyService
                 {
                     var response = await _gateway.AssignToGroupAsync(call.GroupId, call.DeviceIds, token).ConfigureAwait(false);
                     results.Add(new WiringGroupResult(call.GroupId, true, call.DeviceIds.Count, response.Success,
-                        response.Success ? "그룹에 넣었습니다" : Text(response, "그룹에 넣지 못했습니다")));
+                        response.Success ? "그룹에 넣었습니다" : Text(response, "그룹에 넣지 못했습니다"),
+                        response.Success ? call.DeviceIds : null));
                 }
                 else
                 {
-                    var response = await _gateway.RemoveFromGroupAsync(call.GroupId, call.DeviceIds, token).ConfigureAwait(false);
-                    results.Add(new WiringGroupResult(call.GroupId, false, call.DeviceIds.Count, response.Success,
-                        response.Success ? "그룹에서 뺐습니다" : Text(response, "그룹에서 빼지 못했습니다")));
+                    // 빼기는 서버가 한 번에 100대까지만 받는다(device_ids max_length=100) — 넘기면 422 로 한 대도 안 빠진다.
+                    //   배정 창과 같은 크기로 나눠 보내고, 된 묶음만 성공으로 센다.
+                    foreach (var chunk in AssignDelta.ChunkRemovals(call.DeviceIds))
+                    {
+                        var response = await _gateway.RemoveFromGroupAsync(call.GroupId, chunk, token).ConfigureAwait(false);
+                        results.Add(new WiringGroupResult(call.GroupId, false, chunk.Count, response.Success,
+                            response.Success ? "그룹에서 뺐습니다" : Text(response, "그룹에서 빼지 못했습니다"),
+                            response.Success ? chunk : null));
+                    }
                 }
             }
             catch (OperationCanceledException) { throw; }

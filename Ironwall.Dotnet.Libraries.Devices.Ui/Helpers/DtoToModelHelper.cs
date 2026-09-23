@@ -26,7 +26,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -48,6 +48,7 @@ public static class DtoToModelHelper
         if (dto.Urls != null)
             model.Urls = ToCameraUrlsModel(dto.Urls);
 
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -167,6 +168,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -219,7 +224,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -245,6 +250,7 @@ public static class DtoToModelHelper
             model.Controller = new ControllerDeviceModel { Id = dto.ControllerId };
         }
 
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -260,6 +266,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
@@ -295,7 +305,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -305,6 +315,7 @@ public static class DtoToModelHelper
         };
         MapGeolocationToModel(dto, model);
         DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Controller, dto.TypeDevice, dto.HardwareSpec);
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -320,6 +331,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = DeviceAxesMapper.TypeAxisForWrite(model.TypeAxisCode, model.DeviceType),
             Version = model.Version ?? string.Empty,
@@ -343,7 +358,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -366,6 +381,7 @@ public static class DtoToModelHelper
         else if (dto.ServerId is > 0)
             model.Server = new ServerModel { Id = dto.ServerId.Value };
 
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -397,6 +413,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -433,7 +453,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -447,6 +467,7 @@ public static class DtoToModelHelper
         };
         MapGeolocationToModel(dto, model);
         DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Gate, dto.TypeGate, dto.HardwareSpec);
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -465,6 +486,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -496,7 +521,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -521,6 +546,7 @@ public static class DtoToModelHelper
         // (통째 교체 위험 없이) component_overrides.<declared key> 를 계산할 수 있다(ToEnclosureDeviceDto 참조).
         model.HeaterComponentKey = FindComponentKeyByType(dto.HardwareSpec, ComponentTypeNames.Heater);
         model.FanComponentKey = FindComponentKeyByType(dto.HardwareSpec, ComponentTypeNames.Fan);
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -548,6 +574,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -738,7 +768,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceGroups = GroupMembershipBaseline.ReadIds(dto),   // 7.0+ group_ids · 6.3 device_groups
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto),
             Version = dto.Version ?? string.Empty,
@@ -751,6 +781,7 @@ public static class DtoToModelHelper
         };
         MapGeolocationToModel(dto, model);
         DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Lamp, dto.TypeLamp, dto.HardwareSpec);
+        GroupMembershipBaseline.Capture(model);   // 읽은 소속 = 서버와 맞춘 기준선(상세 저장이 고치지 않은 소속을 되보내지 않게)
         return model;
     }
 
@@ -763,6 +794,10 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupIds = model.DeviceGroups,
+            // 7.0+ group_ids 는 통째 교체다 — 소속을 고치지 않았으면 싣지 않는다(BaseDeviceDto.GroupIdsUnchanged).
+            GroupIdsUnchanged = GroupMembershipBaseline.IsUnchanged(model),
+            // 저장된 connection.type 을 그대로 되싣는다 — 재조립 축이 IP_DIRECT 로 덮지 않게(BaseDeviceDto.ConnectionTypeHint).
+            ConnectionTypeHint = model.Axes?.Connection?.Type,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,

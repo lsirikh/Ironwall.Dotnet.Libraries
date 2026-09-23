@@ -1049,13 +1049,21 @@ public class DeviceProviderService : IDeviceProviderService
         // 공통 속성 업데이트
         existing.DeviceName = newDevice.DeviceName;
         // FR-D3: 리스트 참조 재할당 대신 in-place 갱신(기존 참조 유지) — DeviceGroups 참조를 잡고 있는
-        //   심볼/바인딩이 stale되지 않도록. newDevice.DeviceGroups==null이면 빈 목록으로 정리.
-        if (existing.DeviceGroups == null)
-            existing.DeviceGroups = newDevice.DeviceGroups == null ? null : new List<int>(newDevice.DeviceGroups);
-        else
+        //   심볼/바인딩이 stale되지 않도록.
+        //   ★ newDevice.DeviceGroups==null 은 "소속 없음"이 아니라 "소속을 받지 못함"이다 — 비우지 않고 그대로 둔다.
+        //     종전엔 빈 목록으로 정리했고, 그 빈 목록이 다음 상세 저장의 group_ids:[] 가 되어 서버 소속을 전부 지웠다
+        //     (라이브 실측 2026-09-24 · 7.0+ 는 소속을 group_ids 로 싣는데 매핑이 device_groups 만 읽던 때).
+        if (newDevice.DeviceGroups != null)
         {
-            existing.DeviceGroups.Clear();
-            if (newDevice.DeviceGroups != null) existing.DeviceGroups.AddRange(newDevice.DeviceGroups);
+            if (existing.DeviceGroups == null)
+                existing.DeviceGroups = new List<int>(newDevice.DeviceGroups);
+            else
+            {
+                existing.DeviceGroups.Clear();
+                existing.DeviceGroups.AddRange(newDevice.DeviceGroups);
+            }
+            // 새로 받은 소속이 곧 서버와 맞춘 기준선이다 — 캐시에 남는 인스턴스로 옮긴다.
+            GroupMembershipBaseline.CopyFrom(newDevice, existing);
         }
         existing.DeviceNumber = newDevice.DeviceNumber;
         existing.Status = newDevice.Status;

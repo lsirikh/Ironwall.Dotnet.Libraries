@@ -68,7 +68,7 @@ public class ControllerDeviceDto : BaseDeviceDto
         ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public ConnectionAxisDto? ConnectionAxis
     {
-        get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort);
+        get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort, storedType: PreservedConnectionType);
         set
         {
             ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)

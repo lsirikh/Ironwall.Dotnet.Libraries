@@ -66,6 +66,16 @@ public sealed class WiringSensorRow
     /// <summary>저장이 끝난 그룹을 새 기준으로.</summary>
     internal void MarkGroupBaseline() => BaselineGroups = new HashSet<int>(Groups);
 
+    /// <summary>서버가 맞춰 준 <b>그룹 하나</b>만 기준선에 옮긴다 — 실패한 다른 그룹 변경은 그대로 "바뀐 것"으로 남는다.</summary>
+    internal void MarkGroupBaseline(int groupId, bool member)
+    {
+        if (member) BaselineGroups.Add(groupId);
+        else BaselineGroups.Remove(groupId);
+    }
+
+    /// <summary>다른 줄 객체의 그룹 기준선을 그대로 가져온다(저장으로 Id 를 받은 줄을 갈아 끼울 때).</summary>
+    internal void CopyGroupBaselineFrom(WiringSensorRow other) => BaselineGroups = new HashSet<int>(other.BaselineGroups);
+
     /// <summary>이름이 비면 번호로 부른다 — 고스트·문장에서 빈 칸이 보이지 않게.</summary>
     public string Display => string.IsNullOrWhiteSpace(Facts.Name) ? $"센서 {Facts.Number}" : Facts.Name;
 
@@ -354,7 +364,12 @@ public sealed class WiringBoard
     /// <b>되돌리기 스택을 버린다</b>(C3) — 저장 전의 장면에는 <b>서버 Id 를 받기 전의 줄 객체</b>(Id=0)가 들어 있어,
     /// 저장 뒤에 되돌리면 이미 만든 센서가 다시 "새 줄"로 되살아나 같은 번호로 한 번 더 POST 된다.
     /// </remarks>
-    public void MarkBaseline(IEnumerable<int>? keys = null)
+    /// <param name="keys">새 기준으로 삼을 줄(<c>null</c> 이면 전부).</param>
+    /// <param name="includeGroups">
+    /// 그룹도 함께 기준으로 삼을지. 저장 결과를 받을 때는 <c>false</c> 로 부르고 그룹은 <see cref="MarkGroupsSaved"/> 로 옮긴다 —
+    /// 그룹은 장비 PATCH 와 <b>따로</b> 나가서, 행 PATCH 가 됐어도 그룹 호출은 실패했을 수 있다(그때 그룹 변경이 조용히 사라졌다).
+    /// </param>
+    public void MarkBaseline(IEnumerable<int>? keys = null, bool includeGroups = true)
     {
         _undo.Clear();
         var set = keys is null ? null : new HashSet<int>(keys);
@@ -363,9 +378,34 @@ public sealed class WiringBoard
             if (set is not null && !set.Contains(row.Key)) continue;
             row.Baseline = row.Facts;
             row.BaselinePlacement = PlacementOf(row.Key);
-            row.MarkGroupBaseline();
+            if (includeGroups) row.MarkGroupBaseline();
             row.LoadIssue = null;
         }
+    }
+
+    /// <summary>
+    /// 서버가 맞춰 준 그룹 호출(<paramref name="saved"/>: 그룹 · 방향 · 장비 id)만 그룹 기준선으로 옮긴다.
+    /// </summary>
+    /// <remarks>
+    /// 그룹만 바꾼 저장은 장비 호출이 없어 <see cref="MarkBaseline"/> 에 걸리는 줄이 없다 — 이것을 부르지 않으면
+    /// 저장이 끝나도 창이 계속 "바뀐 것 있음"이고 다음 저장이 같은 그룹 호출을 다시 보냈다.
+    /// 되돌리기 스택은 버린다(<see cref="MarkBaseline"/> 과 같은 까닭 — 저장 전 장면으로 돌아가면 이미 보낸 것을 다시 보낸다).
+    /// </remarks>
+    public void MarkGroupsSaved(IEnumerable<(int GroupId, bool Add, IReadOnlyList<int> DeviceIds)>? saved)
+    {
+        if (saved is null) return;
+        var any = false;
+        foreach (var (groupId, add, deviceIds) in saved)
+        {
+            if (deviceIds is null || deviceIds.Count == 0) continue;
+            var ids = new HashSet<int>(deviceIds);
+            foreach (var row in _rows.Where(r => r.Id > 0 && ids.Contains(r.Id)))
+            {
+                row.MarkGroupBaseline(groupId, add);
+                any = true;
+            }
+        }
+        if (any) _undo.Clear();
     }
 
     /// <summary>저장으로 서버 Id 를 받은 새 줄을 기존 줄로 바꿔 단다(키는 유지한다 — 화면이 쥐고 있다).</summary>
@@ -375,6 +415,8 @@ public sealed class WiringBoard
         if (old is null || newId <= 0) return null;
 
         var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups);
+        // 그룹 기준선은 옛 줄 것을 그대로 — 새 줄의 그룹 넣기가 실패했으면 "바뀐 것"으로 남아야 한다(생성자는 Groups 로 채운다).
+        promoted.CopyGroupBaselineFrom(old);
         _rows[_rows.IndexOf(old)] = promoted;
         return promoted;
     }

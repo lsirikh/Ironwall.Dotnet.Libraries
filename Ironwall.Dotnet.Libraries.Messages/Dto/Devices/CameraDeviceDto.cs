@@ -140,7 +140,8 @@ public class CameraDeviceDto : BaseDeviceDto
         get => DeviceAxisWrite.BuildIpConnection(
             IpAddress, IpPort, UserName, UserPassword,
             DeviceAxisWrite.NullIfEmpty(Mode) ?? CAMERA_PROTOCOL_FALLBACK,
-            Urls);
+            Urls,
+            storedType: PreservedConnectionType);
         set
         {
             ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)

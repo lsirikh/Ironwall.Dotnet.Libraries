@@ -103,7 +103,7 @@ public class SensorDeviceDto : BaseDeviceDto
         get
         {
             var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
-            if (ip != null) return DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0);
+            if (ip != null) return DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0, storedType: PreservedConnectionType);
             if (Channel.HasValue) return new ConnectionAxisDto { Type = EnumConnectionTypeNames.Rs485, Channel = Channel };
             return null;
         }

@@ -1,5 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
@@ -139,28 +141,48 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         finally { IsBusy = false; }
     }
 
-    /// <summary>방금 넣은 것을 뺀다(일괄 제거 한 번).</summary>
+    /// <summary>
+    /// 방금 넣은 것을 뺀다 — 서버가 한 번에 <b>100대</b>까지만 받으므로(<c>DeviceUnassignRequest.device_ids max_length=100</c>)
+    /// 배정 창과 같은 크기(<see cref="AssignDelta.ChunkRemovals"/>)로 나눠 보낸다.
+    /// </summary>
+    /// <remarks>
+    /// 넘겨 보내면 422 로 <b>한 대도</b> 빠지지 않았다(라이브 실측 2026-09-24, 101대 → 422 CONSTRAINT).
+    /// 일부 묶음만 실패하면 된 것만 반영하고, 남은 것으로 되돌리기 정보를 다시 돌려준다(다시 누르면 나머지만 보낸다).
+    /// </remarks>
     public async Task<string> UndoAsync(GroupDropUndo undo, CancellationToken token = default)
     {
         if (undo is null || undo.DeviceIds.Count == 0) return Finish("되돌릴 것이 없다", null);
         if (IsBusy) return Finish("앞선 그룹 넣기가 아직 끝나지 않았다", undo);
 
         IsBusy = true;
+        var done = new List<int>();
+        string? failure = null;
         try
         {
-            var response = await _api.RemoveDevicesFromGroupAsync(undo.GroupId, new DeviceGroupAssignRequestDto { DeviceIds = undo.DeviceIds.ToList() }, token).ConfigureAwait(true);
-            if (!response.Success) return Finish($"되돌리지 못했다 — {response.Message}", undo);
-
-            Reflect(undo.GroupId, undo.DeviceIds, add: false);
-            return Finish($"'{undo.GroupName}' 에 넣은 {undo.DeviceIds.Count}대를 되돌렸다", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
+            foreach (var chunk in AssignDelta.ChunkRemovals(undo.DeviceIds))
+            {
+                var response = await _api.RemoveDevicesFromGroupAsync(undo.GroupId, new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() }, token).ConfigureAwait(true);
+                if (!response.Success) { failure = response.Message; continue; }
+                done.AddRange(chunk);   // removed · skipped(이미 아님) · not_found 모두 "이제 그 그룹에 없다"
+            }
         }
-        catch (OperationCanceledException) { return Finish("되돌리기를 취소했다", undo); }
+        catch (OperationCanceledException) { failure ??= "취소했다"; }
         catch (Exception ex)
         {
             _log?.Error($"[GroupDrop] undo group={undo.GroupId}: {ex.Message}");
-            return Finish("되돌리지 못했다 — 서버에 닿지 못했다", undo);
+            failure ??= "서버에 닿지 못했다";
         }
         finally { IsBusy = false; }
+
+        if (done.Count > 0) Reflect(undo.GroupId, done, add: false);
+        if (failure is null)
+            return Finish($"'{undo.GroupName}' 에 넣은 {undo.DeviceIds.Count}대를 되돌렸다", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
+
+        var remaining = undo.DeviceIds.Except(done).ToList();
+        var left = remaining.Count > 0 ? new GroupDropUndo(undo.GroupId, undo.GroupName, remaining) : null;
+        return done.Count == 0
+            ? Finish($"되돌리지 못했다 — {failure}", undo)
+            : Finish($"'{undo.GroupName}' 에서 {done.Count}대만 되돌렸다 · {remaining.Count}대는 남았다 — {failure}", left, undo.GroupId, done, -done.Count);
     }
 
     /// <summary>끌어 온 행(뷰모델)에서 모델을 꺼낸다.</summary>
@@ -173,12 +195,9 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
     private void Reflect(int groupId, IReadOnlyCollection<int> deviceIds, bool add)
     {
         var ids = deviceIds.ToHashSet();
+        // 서버가 해 준 변화다 — 모델과 소속 기준선을 함께 옮겨, 다음 상세 저장이 이것을 되보내지(덮어쓰지) 않게 한다.
         foreach (var model in _allDevices().Where(m => ids.Contains(m.Id)))
-        {
-            model.DeviceGroups ??= new List<int>();
-            if (add) { if (!model.DeviceGroups.Contains(groupId)) model.DeviceGroups.Add(groupId); }
-            else model.DeviceGroups.Remove(groupId);
-        }
+            GroupMembershipBaseline.ApplyConfirmed(model, groupId, add);
     }
 
     private string Finish(string line, GroupDropUndo? undo, int groupId = 0, IReadOnlyList<int>? deviceIds = null, int delta = 0)

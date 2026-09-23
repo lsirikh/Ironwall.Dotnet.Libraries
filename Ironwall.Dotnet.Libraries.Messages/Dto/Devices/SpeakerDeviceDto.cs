@@ -83,7 +83,7 @@ public class SpeakerDeviceDto : BaseDeviceDto
         {
             var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
             var port = DeviceAxisWrite.PortOrNull(IpPort ?? 0);
-            return ip == null && port == null ? null : DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0);
+            return ip == null && port == null ? null : DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0, storedType: PreservedConnectionType);
         }
         set
         {

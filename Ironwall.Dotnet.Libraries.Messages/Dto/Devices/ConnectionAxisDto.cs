@@ -152,19 +152,24 @@ internal static class DeviceAxisWrite
     public static int? PortOrNull(int port) => port > 0 && port <= 65535 ? port : null;
 
     /// <summary>IP 계열 장비의 <c>connection</c> 축을 만든다(카메라·제어기·경광등 공용).</summary>
+    /// <param name="storedType">
+    /// 이 장비에 <b>이미 저장된</b> 결선 방식(<see cref="BaseDeviceDto.PreservedConnectionType"/>). 있으면 그대로 싣는다 —
+    /// PATCH 는 객체 병합이라 여기서 <c>IP_DIRECT</c> 를 실으면 저장된 <c>IP_CONVERTER</c>·<c>SERVER_MANAGED</c> 가 덮인다.
+    /// </param>
     public static ConnectionAxisDto BuildIpConnection(
         string? ipAddress,
         int ipPort,
         string? userName = null,
         string? userPassword = null,
         string? protocol = null,
-        object? urls = null)
+        object? urls = null,
+        string? storedType = null)
     {
         var ip = NullIfEmpty(ipAddress);
         return new ConnectionAxisDto
         {
-            // IP 가 있으면 IP_DIRECT 를 명시한다(서버 런타임이 어차피 그렇게 덮어쓴다 — D-29).
-            Type = ip != null ? EnumConnectionTypeNames.IpDirect : null,
+            // IP 가 있으면: 저장된 방식이 있으면 그것, 없으면(새 장비) IP_DIRECT 를 명시한다(D-29).
+            Type = ip != null ? (NullIfEmpty(storedType) ?? EnumConnectionTypeNames.IpDirect) : null,
             IpAddress = ip,
             IpPort = PortOrNull(ipPort),
             Credentials = ConnectionCredentialsDto.Create(userName, userPassword),

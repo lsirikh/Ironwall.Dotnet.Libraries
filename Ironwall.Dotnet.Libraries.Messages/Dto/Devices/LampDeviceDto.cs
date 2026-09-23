@@ -55,7 +55,7 @@ public class LampDeviceDto : BaseDeviceDto
         ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public ConnectionAxisDto? ConnectionAxis
     {
-        get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort, UserName, UserPassword);
+        get => DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort, UserName, UserPassword, storedType: PreservedConnectionType);
         set
         {
             ReceivedConnection = value;   // raw capture for read mapping (device-console-v8 FR-03)

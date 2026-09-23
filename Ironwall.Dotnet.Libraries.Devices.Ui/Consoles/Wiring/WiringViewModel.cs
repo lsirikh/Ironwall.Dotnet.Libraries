@@ -984,7 +984,11 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             foreach (var row in result.Rows.Where(r => r.Ok && r.IsCreate && r.NewId is { } id && id > 0))
                 _board.Promote(row.Key, row.NewId!.Value);
 
-            if (result.OkKeys.Count > 0) _board.MarkBaseline(result.OkKeys);
+            // 표·결선은 PATCH/POST 가 된 줄만, 그룹은 서버가 맞춰 준 그룹 호출만 새 기준으로 — 따로 나가므로 따로 옮긴다.
+            //   (종전: 그룹만 바꾼 저장은 기준선이 안 옮겨져 창이 계속 더러웠고, 행 PATCH 성공 + 그룹 실패는 그룹 변경을 조용히 먹었다.)
+            if (result.OkKeys.Count > 0) _board.MarkBaseline(result.OkKeys, includeGroups: false);
+            _board.MarkGroupsSaved(result.Groups.Where(g => g.Ok && g.DeviceIds is { Count: > 0 })
+                                                .Select(g => (g.GroupId, g.Add, g.DeviceIds!)));
             if (result.IsSuccess && !_board.IsDirty) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
 
             SyncAll();

@@ -2104,11 +2104,13 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
+    // 그룹 쓰기(POST · PATCH · PUT)는 응답 DTO 가 아니라 DeviceGroupWriteDto(name · description)를 보낸다 —
+    //   서버 스키마가 extra="forbid" 라 id · device_count · created_at 이 실리면 422 UNKNOWN_FIELD 다(라이브 실측 2026-09-24).
     public async Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(DeviceGroupDto dto, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups", DeviceGroupWriteDto.From(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)
@@ -2122,7 +2124,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/groups/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/groups/{id}", DeviceGroupWriteDto.From(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)
@@ -2136,7 +2138,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/groups/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/groups/{id}", DeviceGroupWriteDto.From(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)

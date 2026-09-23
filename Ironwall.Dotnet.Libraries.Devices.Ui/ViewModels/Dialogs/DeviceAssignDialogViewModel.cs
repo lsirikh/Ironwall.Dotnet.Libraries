@@ -495,16 +495,10 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             else _baseline.Remove(id);
         }
 
+        // 모델과 소속 기준선을 함께 옮긴다 — 다음 상세 저장이 이 변화를 group_ids 로 되보내(덮어쓰지) 않게.
         var wanted = new HashSet<int>(ids);
         foreach (var model in _deviceSource().Where(m => m is not null && wanted.Contains(m.Id)))
-        {
-            model.DeviceGroups ??= new List<int>();
-            if (joined)
-            {
-                if (!model.DeviceGroups.Contains(_groupId)) model.DeviceGroups.Add(_groupId);
-            }
-            else model.DeviceGroups.Remove(_groupId);
-        }
+            GroupMembershipBaseline.ApplyConfirmed(model, _groupId, joined);
     }
 
     public Task CancelAsync() => TryCloseAsync(false);

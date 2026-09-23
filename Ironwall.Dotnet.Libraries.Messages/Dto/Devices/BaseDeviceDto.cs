@@ -121,6 +121,40 @@ public class BaseDeviceDto : BaseDto
 
     /// <summary>응답 전용 키 — 7.0 쓰기 스키마 properties 에 없어 실으면 422. 쓰기는 <see cref="GroupIds"/> 를 쓴다.</summary>
     public bool ShouldSerializeDeviceGroups() => !UseAxisWrite && DeviceGroups != null;
+
+    /// <summary>
+    /// <see cref="GroupIds"/> 가 <b>서버에서 읽은 그대로</b>인가 — 사람이 소속을 고치지 않았다는 표시. 직렬화되지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>7.0+ 장비 쓰기의 <c>group_ids</c> 는 <b>통째 교체</b>다(<c>replace_group_mappings</c> — 기존 소속을 지우고
+    /// 보낸 것만 넣는다). 생략(<c>None</c>)이 "소속을 건드리지 않음"이다. 그래서 소속을 고치지 않은 상세 저장이
+    /// 읽어 둔 목록을 되보내면, 그 사이 다른 창 · 드래그 · 배정 창이 바꾼 소속을 <b>조용히 되돌린다</b>
+    /// (라이브 실측 2026-09-24: A·B 소속 센서를 C 로 끌어 넣고 이름만 고쳐 저장 → 서버 소속 [C]).</para>
+    /// <para>그룹 소속은 전용 통로(<c>POST/DELETE /devices/groups/{id}/devices</c>)가 정본이다 — 상세 저장은
+    /// 사람이 소속을 실제로 바꿨을 때만 <c>group_ids</c> 를 싣는다.</para>
+    /// <para>6.3(<see cref="UseAxisWrite"/>=false) 본문은 바이트 그대로 둔다 — 6.3 의 생략 의미는 실측하지 못했다.</para>
+    /// </remarks>
+    [JsonIgnore]
+    public bool GroupIdsUnchanged { get; set; }
+
+    /// <summary>축 모드에서 소속을 고치지 않았으면 <c>group_ids</c> 를 싣지 않는다(<see cref="GroupIdsUnchanged"/>).</summary>
+    public bool ShouldSerializeGroupIds() => GroupIds != null && !(UseAxisWrite && GroupIdsUnchanged);
+
+    /// <summary>
+    /// 이 장비에 <b>저장돼 있는</b> <c>connection.type</c> — 모델이 읽어 둔 값을 쓰기 DTO 로 옮기는 자리. 직렬화되지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 파생 DTO 의 <c>ConnectionAxis</c> getter 는 평면 필드(IP·포트)에서 축을 <b>재조립</b>한다. 예전에는 IP 가 있으면
+    /// <c>type</c> 을 무조건 <c>IP_DIRECT</c> 로 실어, PATCH(객체 병합)가 저장된 <c>IP_CONVERTER</c>·<c>SERVER_MANAGED</c> 를
+    /// 덮어썼다(라이브 실측 2026-09-24). 이 값이 있으면 그것을, 없으면 응답으로 받은 <see cref="ReceivedConnection"/> 의
+    /// 값을 싣고, 둘 다 없을 때(새 장비)만 <c>IP_DIRECT</c> 다.
+    /// </remarks>
+    [JsonIgnore]
+    public string? ConnectionTypeHint { get; set; }
+
+    /// <summary>재조립 <c>connection</c> 에 실을 저장된 결선 방식(<see cref="ConnectionTypeHint"/> → 받은 값 순).</summary>
+    protected internal string? PreservedConnectionType
+        => DeviceAxisWrite.NullIfEmpty(ConnectionTypeHint) ?? DeviceAxisWrite.NullIfEmpty(ReceivedConnection?.Type);
     #endregion
 
     #region - 축(axis) 응답 수용 (A-devices D-24) -

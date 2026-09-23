@@ -2,6 +2,8 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -181,23 +183,28 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
                 var groupId = _selection[0].Id;
-                // v4.3 벌크 해제: 등록(배치 POST 1콜)의 반대 방향 — 단건 N콜 루프 제거, body-DELETE 1콜
-                var dto = new DeviceGroupAssignRequestDto { DeviceIds = targets.Select(d => d.Id).ToList() };
-                _log?.Info($"[DeviceGroupSelectionVM] Bulk removing {targets.Count} devices from group {groupId} (1-call)");
-                var resp = await _apiService.RemoveDevicesFromGroupAsync(groupId, dto);
-                if (resp.Success && resp.Data != null)
+                // v4.3 벌크 해제: body-DELETE — 서버가 한 번에 100대까지만 받는다(device_ids max_length=100).
+                //   넘겨 보내면 422 로 한 대도 빠지지 않으므로 배정 창과 같은 크기로 나눠 보낸다(AssignDelta.ChunkRemovals).
+                var ids = targets.Select(d => d.Id).ToList();
+                _log?.Info($"[DeviceGroupSelectionVM] Bulk removing {ids.Count} devices from group {groupId} ({AssignDelta.RemoveCallCount(ids.Count)}-call)");
+                foreach (var chunk in AssignDelta.ChunkRemovals(ids))
                 {
-                    var removed = resp.Data.RemovedDeviceIds ?? new List<int>();
-                    foreach (var id in removed)
+                    var dto = new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() };
+                    var resp = await _apiService.RemoveDevicesFromGroupAsync(groupId, dto);
+                    if (resp.Success && resp.Data != null)
                     {
-                        var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == id);
-                        model?.DeviceGroups?.Remove(groupId);
+                        var removed = resp.Data.RemovedDeviceIds ?? new List<int>();
+                        foreach (var id in removed)
+                        {
+                            var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == id);
+                            if (model != null) GroupMembershipBaseline.ApplyConfirmed(model, groupId, member: false);
+                        }
+                        _log?.Info($"[DeviceGroupSelectionVM] Bulk removed OK: removed={removed.Count}, skipped={resp.Data.SkippedDeviceIds?.Count ?? 0}, notFound={resp.Data.NotFoundDeviceIds?.Count ?? 0}");
                     }
-                    _log?.Info($"[DeviceGroupSelectionVM] Bulk removed OK: removed={removed.Count}, skipped={resp.Data.SkippedDeviceIds?.Count ?? 0}, notFound={resp.Data.NotFoundDeviceIds?.Count ?? 0}");
-                }
-                else
-                {
-                    _log?.Warning($"[DeviceGroupSelectionVM] Bulk remove failed: {resp.Error?.Code} - {resp.Message}");
+                    else
+                    {
+                        _log?.Warning($"[DeviceGroupSelectionVM] Bulk remove failed: {resp.Error?.Code} - {resp.Message}");
+                    }
                 }
                 SelectedAssignedDevices.Clear();
                 await LoadAssignedDevicesAsync();
