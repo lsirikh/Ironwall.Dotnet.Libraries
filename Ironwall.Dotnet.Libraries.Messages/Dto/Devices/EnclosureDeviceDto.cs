@@ -173,8 +173,8 @@ public class EnclosureDeviceDto : BaseDeviceDto
                 ? (JObject)_componentOverrides.DeepClone()
                 : new JObject();
 
-            SetEnabledIfPresent(overrides, ComponentTypeNames.Heater, HEATER_KEY_FALLBACK, HeaterEnabled);
-            SetEnabledIfPresent(overrides, ComponentTypeNames.Fan, FAN_KEY_FALLBACK, FanEnabled);
+            SetEnabledIfPresent(overrides, ComponentTypeNames.Heater, HeaterComponentKeyHint, HeaterEnabled);
+            SetEnabledIfPresent(overrides, ComponentTypeNames.Fan, FanComponentKeyHint, FanEnabled);
 
             var thresholds = DeviceThresholdAxis.ToAxis(ThresholdConfig);
 
@@ -266,24 +266,55 @@ public class EnclosureDeviceDto : BaseDeviceDto
     private const string FAN_KEY_FALLBACK = "fan";
 
     /// <summary>
-    /// 그 부품이 <b>선언돼 있을 때만</b> <c>enabled</c> 의도를 싣는다. 선언 목록 자체를 모르면 관례 key 로 싣는다.
+    /// 히터 부품 key <b>조회 전용 힌트</b> — 쓰기 채널(<see cref="HardwareSpec"/>/<c>HardwareSpecStore</c>)과
+    /// 완전히 분리된 자리다. <b><c>[JsonIgnore]</c> — 본문에 절대 실리지 않는다.</b>
     /// </summary>
     /// <remarks>
-    /// <c>component_overrides</c> 의 키는 <b>그 장비가 선언한 부품 key</b> 여야 하고 아니면 422 다
-    /// ("'x' 는 이 장비가 선언한 부품이 아닙니다 — <c>hardware_spec.components</c> 에 먼저 넣으십시오").
-    /// 히터·팬이 <b>없는</b> 함체에 6.3 처럼 무조건 <c>heater</c>·<c>fan</c> 을 실으면 이름만 바꾸는
-    /// 수정까지 전부 422 로 죽는다. 그래서 선언을 아는 경우(<c>components</c> 가 실려 온 경우)에는
-    /// <b>선언에 있는 부품만</b> 싣고, 선언을 못 받았으면(<c>view=basic</c>·신규 생성) 6.3 의도대로
-    /// 관례 key 로 실어 서버가 판정하게 둔다.
+    /// (D-31 후속 수정, 2026-09-23) 패널의 평범한 편집 경로(<c>DtoToModelHelper.ToEnclosureDeviceDto</c>)는
+    /// <c>hardware_spec</c> 을 쓰기 채널에 실은 적이 없다 — 실으면 축소판 문제가 생긴다: 서버는
+    /// <b><c>PATCH</c> 에서도 <c>hardware_spec.components</c> 배열을 통째 교체</b>한다(레포 메모
+    /// <c>device_six_axes_and_component_catalog</c> — "components 는 PATCH 도 통째 교체"). 조회 목적으로
+    /// 채운 값이 실수로 실려 나가면 실제 형상 선언을 덮어쓸 위험이 있다. 그래서 "이 부품이 선언돼 있다면
+    /// 그 key" 를 <see cref="SetEnabledIfPresent"/> 에 전달하는 통로를 <b>쓰기 채널과 별도로</b> 둔다 —
+    /// 호출부(<c>DtoToModelHelper.ToEnclosureDeviceDto</c>)가 모델의 읽기-시점 캐시
+    /// (<c>EnclosureDeviceModel.HeaterComponentKey</c> — <c>DtoToModelHelper.ToEnclosureDeviceModel</c> 이
+    /// 직전 GET 응답의 <c>hardware_spec.components</c> 에서 채워 둔 값)를 여기 채운다.
     /// </remarks>
-    private void SetEnabledIfPresent(JObject overrides, string componentType, string fallbackKey, bool enabled)
-    {
-        var declared = FindComponentKeyByType(componentType);
-        if (declared == null && HardwareSpecStore?.Components != null) return;   // 선언을 아는데 그 부품이 없다
+    [JsonIgnore]
+    public string? HeaterComponentKeyHint { get; set; }
 
-        var key = declared ?? fallbackKey;
-        if (overrides[key] is JObject existing) existing["enabled"] = enabled;
-        else overrides[key] = new JObject { ["enabled"] = enabled };
+    /// <summary>팬 부품 key 조회 전용 힌트 — <see cref="HeaterComponentKeyHint"/> 와 같은 계약.</summary>
+    [JsonIgnore]
+    public string? FanComponentKeyHint { get; set; }
+
+    /// <summary>
+    /// 그 부품이 <b>선언돼 있다고 확인됐을 때만</b> <c>enabled</c> 의도를 싣는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>(D-31 수정, 2026-09-23) <c>component_overrides</c> 의 키는 <b>그 장비가 선언한 부품 key</b>
+    /// 여야 하고 아니면 422 다("'x' 는 이 장비가 선언한 부품이 아닙니다 — <c>hardware_spec.components</c>
+    /// 에 먼저 넣으십시오") — 서버 <c>app/schemas/device_axes.py:1004-1013</c>, <b>v7.0.0 부터</b>
+    /// (CHANGELOG.md:411, 모듈 <c>device_axes_io.py</c> 머리 "v7.0 에서 바뀐 것 · D10") 계속 적용된다.
+    /// 축 쓰기(<c>UseAxisWrite</c>)는 계약 7.0+ 에서만 켜지므로 이 메서드가 불릴 때는 이미 이 규칙
+    /// 아래다 — 판본 분기는 필요 없다.</para>
+    /// <para><b>판정 순서</b>: ① 이 DTO 인스턴스 자체가 쓰기 채널에 <c>HardwareSpec</c> 을 들고 있으면
+    /// (예: 응답을 그대로 들고 있는 DTO) 그 선언이 <b>최우선</b>이다 — 가장 신선한 신호다.
+    /// ② 없으면 <paramref name="keyHint"/>(조회 전용, 본문에 안 실림)로 폴백한다.
+    /// ③ 그래도 없으면 <b>아예 싣지 않는다</b> — 관례 key(<c>heater</c>/<c>fan</c>)로 추측하지 않는다.</para>
+    /// <para><b>왜 ③이 필요한가(D-31 원인)</b> — 예전엔 선언을 전혀 모를 때도 관례 key 를 무조건 실어
+    /// <c>HeaterEnabled</c>/<c>FanEnabled</c> 기본값(<c>false</c>)까지 실려 나갔고, 아무 것도 선언하지 않은
+    /// <b>평범한 함체를 생성하기만 해도</b>(체크 하나 안 건드려도) 매번 422 였다(실 API 왕복 하네스 11b0).</para>
+    /// <para><b>왜 ②가 필요한가(D-31 후속)</b> — ③만 있으면 <b>선언된</b> 부품(프리셋·조립기로 등록된
+    /// 히터·팬)조차 패널 편집에서 매번 무시돼, 저장은 성공하는데 조작이 조용히 사라진다(루프백 API
+    /// 왕복 하네스 11d 가 이 경로를 검증한다). ②는 <c>hardware_spec</c> 을 본문에 싣지 않고도 그 실패를 막는다.</para>
+    /// </remarks>
+    private void SetEnabledIfPresent(JObject overrides, string componentType, string? keyHint, bool enabled)
+    {
+        var declared = FindComponentKeyByType(componentType) ?? keyHint;
+        if (declared == null) return;   // 선언도 힌트도 없다 — 관례 key 로 추측하지 않는다.
+
+        if (overrides[declared] is JObject existing) existing["enabled"] = enabled;
+        else overrides[declared] = new JObject { ["enabled"] = enabled };
     }
 
     private static bool? ReadEnabled(JObject overrides, string key)

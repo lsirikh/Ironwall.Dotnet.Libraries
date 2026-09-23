@@ -1,8 +1,10 @@
 ﻿using System.Reflection;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
@@ -38,7 +40,7 @@ public static partial class Steps
         Bootstrap boot, Recorder rec, Raw raw, IDeviceApiService deviceApi, IUnitApiService unitApi, DeviceQueryPolicy policy)
     {
         const string TAG = "D-13";
-        int unitBId = 0, ctrlId = 0, encId = 0, negCtrlId = 0;
+        int unitBId = 0, ctrlId = 0, encId = 0, negCtrlId = 0, declaredEncId = 0;
         try
         {
             // ---------- 11.0: arrange a SECOND unit, distinct from the client's own ----------
@@ -190,6 +192,114 @@ public static partial class Steps
                     seqs: SeqsSince(rec, reproBefore));
             }
 
+            // ---- 11d/11e: D-31 FOLLOW-UP - the fix above (component-key hint) must not just avoid
+            // 422 on a PLAIN enclosure, it must ALSO let a DECLARED heater/fan actually be toggled
+            // through the panel's real write path, and must not silently drop the toggle. 11d proves
+            // the declared case end to end (real DtoToModelHelper.ToEnclosureDeviceModel -> edit ->
+            // ToEnclosureDeviceDto -> IDeviceApiService.UpdateEnclosureAsync, exactly what
+            // EnclosureDevicePanelViewModel.UpdateEnclosureAsync does) with wire + re-GET proof, and
+            // that hardware_spec is NOT re-sent (PATCH replaces components wholesale - repo memory
+            // device_six_axes_and_component_catalog). 11e proves the undeclared case is not silent:
+            // the VM-level gate (EnclosureDeviceViewModel.IsHeaterToggleEnabled) is visibly off.
+            boot.Wire.CurrentTag = TAG + "/declared-heater-toggle";
+            var preset2 = new DevicePreset
+            {
+                Id = "lrtpreset0011",
+                Name = "LRT-N11-ENC-PRESET",
+                Category = EnumDeviceCategory.Enclosure,
+                TypeAxisCode = "Outdoor",
+                Components = new List<MonModels.ComponentDefinitionModel>
+                {
+                    new() { Key = "heater_1", Type = "HEATER", Label = "히터 1" },
+                    new() { Key = "fan_1",    Type = "FAN",    Label = "팬 1" },
+                },
+                ComponentOverrides = new JObject
+                {
+                    ["heater_1"] = new JObject { ["enabled"] = false },
+                    ["fan_1"] = new JObject { ["enabled"] = false },
+                },
+            };
+            var info2 = new PresetInstanceInfo
+            {
+                DeviceNumber = 96512,
+                DeviceName = "LRT-N11-ENC-DECL",
+                IpAddress = "10.66.5.10",
+                IpPort = 9660,
+            };
+            var registrar2 = new PresetRegistrar(deviceApi, new NullDeviceProvider(), boot.Log, policy);
+            var reg2 = await registrar2.RegisterAsync(PresetRequestBuilder.Build(preset2, info2)).ConfigureAwait(false);
+            declaredEncId = reg2.NewDeviceId ?? 0;
+
+            if (declaredEncId <= 0)
+            {
+                rec.Add("11d", TAG, "arrange: preset-declared enclosure (heater_1/fan_1) for the panel-path toggle proof", Verdict.BLOCKED,
+                    $"register success={reg2.IsSuccess} msg='{reg2.Message}'", blocked: "fixture setup failed");
+            }
+            else
+            {
+                rec.Created("enclosure", declaredEncId);
+
+                // ---- the PANEL's real write path: Dto(GET, view=full by default for a single device)
+                // -> Model (read-time key capture: ToEnclosureDeviceModel) -> edit -> Dto (write-time
+                // hint carry: ToEnclosureDeviceDto) -> IDeviceApiService.UpdateEnclosureAsync (PATCH
+                // on an axis contract - see DeviceApiService.WriteExistingDeviceAsync). ----
+                var declaredBefore = rec.LastSeq();
+                var got2 = await deviceApi.GetEnclosureByIdAsync(declaredEncId).ConfigureAwait(false);
+                var model2 = got2.Success && got2.Data != null ? got2.Data.ToEnclosureDeviceModel() : null;
+                var heaterKeyCaptured = model2?.HeaterComponentKey;
+                var fanKeyCaptured = model2?.FanComponentKey;
+
+                // VM-level: the toggle must show as AVAILABLE for a device that declares the component
+                // (contrast with 11e below, which proves the opposite for a plain enclosure).
+                var vmDeclared = model2 == null ? null : new EnclosureDeviceViewModel(model2, policy);
+                var vmShowedAvailable = vmDeclared != null && vmDeclared.IsHeaterToggleEnabled && vmDeclared.IsFanToggleEnabled;
+
+                if (model2 != null) model2.HeaterEnabled = true;   // operator ticks "히터 사용" in the grid
+                var editDto2 = model2?.ToEnclosureDeviceDto();
+                if (editDto2 != null)
+                    await StampUnitAsync(editDto2, nameof(Item11_UnitPreservation) + "/declared-heater-toggle", boot.Log).ConfigureAwait(false);
+                var patched2 = editDto2 == null
+                    ? null
+                    : await deviceApi.UpdateEnclosureAsync(declaredEncId, editDto2).ConfigureAwait(false);
+                var patchWire2 = rec.Since(declaredBefore).FirstOrDefault(w => w.Method == "PATCH" || w.Method == "PUT");
+                JObject? sentBody2 = null;
+                try { if (!string.IsNullOrEmpty(patchWire2?.RequestBody)) sentBody2 = JObject.Parse(patchWire2!.RequestBody); } catch { /* leave null - reported below */ }
+                var sentOverrideEnabled = (bool?)sentBody2?.SelectToken("device_config.component_overrides.heater_1.enabled");
+                var sentHasHardwareSpec = sentBody2?["hardware_spec"] != null;
+
+                var (_, after2) = await raw.Get($"devices/enclosures/{declaredEncId}").ConfigureAwait(false);
+                var heaterEnabledAfter = (bool?)Obj(Obj(Obj(after2["data"])?["device_config"])?["component_overrides"])?["heater_1"]?["enabled"];
+
+                var declaredOk = heaterKeyCaptured == "heater_1" && fanKeyCaptured == "fan_1" && vmShowedAvailable
+                    && patched2?.Success == true && sentOverrideEnabled == true && !sentHasHardwareSpec && heaterEnabledAfter == true;
+                rec.Add("11d", TAG,
+                    "D-31 후속: 선언된 히터·팬을 가진 함체를 패널의 실제 편집 경로로 고치면 component_overrides.heater_1.enabled 가 실제로 바뀌고 hardware_spec 은 전혀 실리지 않는다",
+                    declaredOk ? Verdict.PASS : Verdict.FAIL,
+                    $"read-time key capture: heater={heaterKeyCaptured ?? "(null)"} fan={fanKeyCaptured ?? "(null)"}; VM shows both toggles available(before edit)={vmShowedAvailable}; " +
+                    $"patch success={patched2?.Success} msg='{patched2?.Message}'; sent override enabled={sentOverrideEnabled}; sent hardware_spec present={sentHasHardwareSpec}; " +
+                    $"server heater_1.enabled after re-GET={heaterEnabledAfter}; PATCH body = {(patchWire2 == null ? "(none)" : Recorder.Trunc(patchWire2.RequestBodyRedacted, 500))}",
+                    defectAt: declaredOk ? "" : "Devices.Ui/Helpers/DtoToModelHelper.cs ToEnclosureDeviceModel/ToEnclosureDeviceDto (component key hint) or Messages/Dto/Devices/EnclosureDeviceDto.cs SetEnabledIfPresent",
+                    seqs: SeqsSince(rec, declaredBefore));
+
+                // ---- 11e: negative control - a PLAIN enclosure (nothing declared, same shape 11b0
+                // creates) must show the toggle as VISIBLY UNAVAILABLE at the VM level, not silently
+                // accept a toggle that then gets dropped. The "save doesn't 422" half is already
+                // proven end to end by 11b0 above through the same real CreateEnclosureAsync path -
+                // repeating that wire round trip here would be redundant, so this item asserts only
+                // the UI-facing gate itself (explicitly a VM-level assertion, not a fresh POST).
+                boot.Wire.CurrentTag = TAG + "/plain-toggle-unavailable";
+                var plainModel = new MonModels.EnclosureDeviceModel { DeviceNumber = 96513, DeviceName = "LRT-N11-ENC-PLAIN" };
+                var vmPlain = new EnclosureDeviceViewModel(plainModel, policy);
+                var plainGateOk = !vmPlain.IsHeaterToggleEnabled && !vmPlain.IsFanToggleEnabled
+                    && !string.IsNullOrWhiteSpace(vmPlain.HeaterToggleUnavailableReason) && !string.IsNullOrWhiteSpace(vmPlain.FanToggleUnavailableReason);
+                rec.Add("11e", TAG,
+                    "D-31 후속: 부품 미선언 함체는 히터·팬 토글이 VM 레벨에서 꺼져 있고 이유가 보인다 — 저장이 조용히 무시하지 않는다(애초에 조작 불가, save-not-422 는 11b0 이 실측)",
+                    plainGateOk ? Verdict.PASS : Verdict.FAIL,
+                    $"IsHeaterToggleEnabled={vmPlain.IsHeaterToggleEnabled} reason='{vmPlain.HeaterToggleUnavailableReason}'; " +
+                    $"IsFanToggleEnabled={vmPlain.IsFanToggleEnabled} reason='{vmPlain.FanToggleUnavailableReason}'",
+                    defectAt: plainGateOk ? "" : "Devices.Ui/ViewModels/EnclosureDeviceViewModel.cs IsHeaterToggleEnabled/IsFanToggleEnabled");
+            }
+
             var (encStatus, encJson) = await raw.Post("devices/enclosures", new
             {
                 number_device = 96510,
@@ -274,6 +384,11 @@ public static partial class Steps
             {
                 var (s, _) = await raw.Delete($"devices/enclosures/{encId}").ConfigureAwait(false);
                 if (s == 200 || s == 204) rec.Deleted("enclosure", encId); else rec.Leftover("enclosure", encId, $"DELETE {s}");
+            }
+            if (declaredEncId > 0)
+            {
+                var (s, _) = await raw.Delete($"devices/enclosures/{declaredEncId}").ConfigureAwait(false);
+                if (s == 200 || s == 204) rec.Deleted("enclosure", declaredEncId); else rec.Leftover("enclosure", declaredEncId, $"DELETE {s}");
             }
             if (ctrlId > 0)
             {

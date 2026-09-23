@@ -515,7 +515,28 @@ public static class DtoToModelHelper
         model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
         MapGeolocationToModel(dto, model);
         DeviceAxesMapper.MapToModel(dto, model, EnumDeviceCategory.Enclosure, dto.TypeEnclosure, dto.HardwareSpec);
+        // (D-31 후속) 읽기 시점 캐시 — dto.HardwareSpec 은 축 계약 + 서버가 view=full 을 실제로 실어 준
+        // 응답에만 채워진다(단건 GET 은 기본이 full, 목록은 DeviceQueryPolicy.View 가 axis 계약에서
+        // "full" 을 붙인다). 여기서 캐시해 두면 패널의 편집 경로가 hardware_spec 을 다시 싣지 않고도
+        // (통째 교체 위험 없이) component_overrides.<declared key> 를 계산할 수 있다(ToEnclosureDeviceDto 참조).
+        model.HeaterComponentKey = FindComponentKeyByType(dto.HardwareSpec, ComponentTypeNames.Heater);
+        model.FanComponentKey = FindComponentKeyByType(dto.HardwareSpec, ComponentTypeNames.Fan);
         return model;
+    }
+
+    /// <summary>
+    /// <c>hardware_spec.components[]</c> 에서 주어진 유형의 부품 key 를 찾는다(대소문자 무시) —
+    /// <see cref="BaseDeviceDto.FindComponentKeyByType"/> 와 같은 규칙이지만, 이 헬퍼는 DTO 밖(정적
+    /// 확장 메서드)에서 호출되므로 그 protected 멤버 대신 <see cref="HardwareSpecDto.Components"/> 를 직접 본다.
+    /// </summary>
+    private static string? FindComponentKeyByType(HardwareSpecDto? spec, string componentType)
+    {
+        var list = spec?.Components;
+        if (list == null) return null;
+        foreach (var c in list)
+            if (c != null && string.Equals(c.Type, componentType, StringComparison.OrdinalIgnoreCase))
+                return c.Key;
+        return null;
     }
 
     public static EnclosureDeviceDto ToEnclosureDeviceDto(this EnclosureDeviceModel model)
@@ -537,6 +558,14 @@ public static class DtoToModelHelper
             DoorStatus = string.IsNullOrWhiteSpace(model.DoorStatus) ? "CLOSED" : model.DoorStatus,
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled,
+            // (D-31 후속) 조회 전용 힌트만 옮긴다 — dto.HardwareSpec(쓰기 채널)은 절대 채우지 않는다.
+            // 채우면 ShouldSerializeHardwareSpecCore() 가 축 모드에서 hardware_spec 을 본문에 실어,
+            // PATCH 가 hardware_spec.components 를 통째 교체하는 서버 규칙(레포 메모
+            // device_six_axes_and_component_catalog)에 걸려 형상 선언을 덮어쓸 위험이 생긴다.
+            // 이 힌트는 [JsonIgnore] 라 본문에 나가지 않고, EnclosureDeviceDto.SetEnabledIfPresent 가
+            // "선언된 부품이면 그 key 로 override 를 싣는다" 판정에만 쓴다.
+            HeaterComponentKeyHint = model.HeaterComponentKey,
+            FanComponentKeyHint = model.FanComponentKey,
             // (D-21) 서버 EnclosureCreate.connection 은 선택 축이지만 IP_DIRECT 를 받는다(app/schemas/device.py:776).
             IpAddress = model.IpAddress,
             IpPort = model.IpPort,

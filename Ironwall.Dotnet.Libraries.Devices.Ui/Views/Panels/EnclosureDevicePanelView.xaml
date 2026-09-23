@@ -396,15 +396,22 @@
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
 								IsChecked="{Binding HeaterEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								IsHitTestVisible="False" />
+								IsEnabled="{Binding IsHeaterToggleEnabled}"
+								IsHitTestVisible="False"
+								ToolTip="{Binding HeaterToggleUnavailableReason}" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 					<DataGridTemplateColumn.CellEditingTemplate>
 						<DataTemplate>
+							<!--  D-31 후속: 히터 부품이 선언되지 않은 함체는 토글을 끈다 — 저장은 성공해도  -->
+							<!--  본문에 표현할 자리가 없어(component_overrides 가 선언된 key 만 받는다) 조작이 조용히 사라지던 것을 막는다.  -->
 							<CheckBox
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
-								IsChecked="{Binding HeaterEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								IsChecked="{Binding HeaterEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								IsEnabled="{Binding IsHeaterToggleEnabled}"
+								ToolTip="{Binding HeaterToggleUnavailableReason}"
+								ToolTipService.ShowOnDisabled="True" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
@@ -426,15 +433,21 @@
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
 								IsChecked="{Binding FanEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								IsHitTestVisible="False" />
+								IsEnabled="{Binding IsFanToggleEnabled}"
+								IsHitTestVisible="False"
+								ToolTip="{Binding FanToggleUnavailableReason}" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 					<DataGridTemplateColumn.CellEditingTemplate>
 						<DataTemplate>
+							<!--  D-31 후속: 팬 부품이 선언되지 않은 함체는 토글을 끈다(위 히터와 같은 이유).  -->
 							<CheckBox
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
-								IsChecked="{Binding FanEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								IsChecked="{Binding FanEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								IsEnabled="{Binding IsFanToggleEnabled}"
+								ToolTip="{Binding FanToggleUnavailableReason}"
+								ToolTipService.ShowOnDisabled="True" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>

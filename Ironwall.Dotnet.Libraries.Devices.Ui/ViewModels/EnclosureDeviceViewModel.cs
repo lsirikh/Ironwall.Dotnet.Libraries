@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 
@@ -8,9 +9,17 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewModel
 {
     #region - Ctors -
-    public EnclosureDeviceViewModel(IEnclosureDeviceModel model)
+    /// <param name="model">행 데이터.</param>
+    /// <param name="policy">
+    /// 서버 계약 정책(D-31 후속, 히터·팬 토글 가용성 판정용). <c>null</c> 이면
+    /// <see cref="DeviceQueryPolicy.Resolve()"/> — 실제 앱은 DI 컨테이너가 등록한 정책을 돌려주고
+    /// (<c>DeviceUiModule</c>), 컨테이너가 없는 맥락(헤드리스 하네스·단위테스트)에서는 안전한
+    /// 6.3 기본값으로 폴백한다. 하네스처럼 결정적 판정이 필요하면 명시적으로 넘긴다.
+    /// </param>
+    public EnclosureDeviceViewModel(IEnclosureDeviceModel model, DeviceQueryPolicy? policy = null)
         : base(model)
     {
+        _policy = policy ?? DeviceQueryPolicy.Resolve();
     }
     #endregion
     #region - Properties -
@@ -69,5 +78,22 @@ public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewMod
             return $"T:{tc.TempHigh ?? 0}/{tc.TempLow ?? 0} H:{tc.HumidityHigh ?? 0} C:{tc.CurrentHigh ?? 0} V:{tc.VoltageLow ?? 0} Vib:{tc.VibrationHigh ?? 0}";
         }
     }
+
+    /// <summary>(D-31 후속) 6.3 은 평면 필드가 곧 계약이라 항상 켤 수 있다 — 축 계약만 선언 여부를 따진다.</summary>
+    public bool IsHeaterToggleEnabled
+        => _policy.IsLegacyContract || !string.IsNullOrEmpty((_model as IEnclosureDeviceModel)!.HeaterComponentKey);
+
+    public string? HeaterToggleUnavailableReason
+        => IsHeaterToggleEnabled ? null : UNDECLARED_REASON;
+
+    public bool IsFanToggleEnabled
+        => _policy.IsLegacyContract || !string.IsNullOrEmpty((_model as IEnclosureDeviceModel)!.FanComponentKey);
+
+    public string? FanToggleUnavailableReason
+        => IsFanToggleEnabled ? null : UNDECLARED_REASON;
+    #endregion
+    #region - Attributes -
+    private const string UNDECLARED_REASON = "이 함체는 이 부품이 선언되지 않았습니다 — 조립기(부품 구성)에서 먼저 등록해야 사용할 수 있습니다.";
+    private readonly DeviceQueryPolicy _policy;
     #endregion
 }
