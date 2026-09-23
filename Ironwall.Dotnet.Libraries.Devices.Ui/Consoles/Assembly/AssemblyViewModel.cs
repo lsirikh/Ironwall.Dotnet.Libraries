@@ -488,11 +488,25 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         };
     }
 
-    /// <summary>프리셋에는 "뺀 key 의 null" 을 담지 않는다 — 그것은 기존 장비에 보낼 때만 뜻이 있다.</summary>
-    private static JObject? StripNulls(JObject? overrides)
+    /// <summary>
+    /// 프리셋에는 "뺀 key 의 null" 도 "비운 값 칸의 null" 도 담지 않는다 — 둘 다 기존 장비에 PATCH 로 보낼 때만 뜻이 있다
+    /// (<see cref="AssemblyBoard.ToOverrides"/>). 값 칸이 전부 걷히면 그 key 도 뺀다.
+    /// </summary>
+    internal static JObject? StripNulls(JObject? overrides)
     {
         if (overrides is null) return null;
-        var kept = new JObject(overrides.Properties().Where(p => p.Value.Type != JTokenType.Null).Select(p => new JProperty(p.Name, p.Value.DeepClone())));
+        var kept = new JObject();
+        foreach (var property in overrides.Properties())
+        {
+            if (property.Value.Type == JTokenType.Null) continue;
+            if (property.Value is JObject entry)
+            {
+                var values = new JObject(entry.Properties().Where(p => p.Value.Type != JTokenType.Null).Select(p => new JProperty(p.Name, p.Value.DeepClone())));
+                if (values.HasValues) kept[property.Name] = values;
+                continue;
+            }
+            kept[property.Name] = property.Value.DeepClone();
+        }
         return kept.HasValues ? kept : null;
     }
     #endregion

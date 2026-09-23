@@ -135,8 +135,10 @@ public static class DevicePresetSeeds
             Component("HEATER", "heater", "하우징"),
             Component("NETWORK_INTERFACE", "nic", null),
         },
+        // camera_mode 는 영상 모드(NORMAL · STABILIZATION · BLC · NIGHT_ENHANCE)다 — "AUTO" 는 주야간 모드의 값이라
+        // 서버가 422(VALUE_NOT_ALLOWED)로 거절했다(라이브 하네스 asm.R5a, 8.0.2 실측). 주야간 모드만 AUTO 를 받는다.
         Modes = JObject.Parse("""
-            { "camera_mode": "AUTO", "day_night_mode": "AUTO", "is_record": true }
+            { "camera_mode": "NORMAL", "day_night_mode": "AUTO", "is_record": true }
             """),
         ComponentOverrides = JObject.Parse("""
             { "heater": { "enabled": true } }
@@ -159,6 +161,25 @@ public static class DevicePresetSeeds
             Component("NETWORK_INTERFACE", "nic", null),
         },
     };
+
+    /// <summary>Id 로 지금 판의 씨앗을 새로 만든다. 씨앗이 아니면 null.</summary>
+    public static DevicePreset? Find(string? id)
+        => string.IsNullOrWhiteSpace(id) ? null : All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// 파일에서 읽은 씨앗이 <b>손대지 않은 그대로</b>면(씨앗 표시 + 심은 시각 그대로) 지금 판의 씨앗으로 바꾼다.
+    /// </summary>
+    /// <remarks>
+    /// 씨앗은 첫 실행 때 파일에 한 번 쓰이고 다시 심지 않는다 — 씨앗의 값이 틀렸다면(예: 카메라 <c>camera_mode:"AUTO"</c>,
+    /// 서버 422) 고쳐도 이미 쓰인 파일에는 옛 값이 남는다. 이름을 바꾸거나 저장한 적이 있으면 <see cref="DevicePreset.UpdatedAt"/> 이
+    /// 바뀌거나 씨앗 표시가 꺼지므로 사용자의 손이 닿은 줄은 건드리지 않는다.
+    /// </remarks>
+    public static DevicePreset RefreshIfUntouched(DevicePreset preset)
+    {
+        if (preset is null || !preset.IsSeed || preset.UpdatedAt != SeededAt) return preset!;
+        var current = Find(preset.Id);
+        return current is null || current.Category != preset.Category ? preset : current;
+    }
 
     private static ComponentDefinitionModel Component(string type, string key, string? position, int? channel = null)
         => new()

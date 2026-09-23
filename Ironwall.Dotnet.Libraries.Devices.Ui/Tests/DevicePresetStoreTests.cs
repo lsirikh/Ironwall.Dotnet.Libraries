@@ -294,6 +294,59 @@ public class DevicePresetStoreTests : IDisposable
         Assert.False(loaded.ComponentOverrides!["door"]!["enabled"]!.Value<bool>());  // enabled:false 가 살아 있다
     }
 
+    /// <summary>
+    /// 카메라 씨앗의 <c>camera_mode</c> 는 영상 모드 어휘여야 한다 — "AUTO" 는 서버 8.0.2 가 422 로 거절했다
+    /// (라이브 하네스 asm.R5a: 허용 NORMAL · STABILIZATION · BLC · NIGHT_ENHANCE).
+    /// </summary>
+    [Fact]
+    public void should_seed_the_camera_with_a_camera_mode_the_server_accepts()
+    {
+        var camera = DevicePresetSeeds.All.Single(p => p.Id == DevicePresetSeeds.CameraPtzColdId);
+
+        Assert.Contains((string?)camera.Modes!["camera_mode"], new[] { "NORMAL", "STABILIZATION", "BLC", "NIGHT_ENHANCE" });
+        Assert.Equal("AUTO", (string?)camera.Modes!["day_night_mode"]);   // 주야간 모드는 AUTO 를 받는다
+    }
+
+    /// <summary>이미 파일에 쓰인 옛 씨앗(손대지 않은 것)은 읽을 때 지금 판의 씨앗으로 바뀐다.</summary>
+    [Fact]
+    public void should_refresh_an_untouched_seed_when_the_file_still_holds_the_old_seed_value()
+    {
+        NewStore().Load();
+        RewriteCameraMode("AUTO");                  // 고치기 전 판이 심어 둔 파일
+
+        var reopened = NewStore();
+        reopened.Load();
+
+        var camera = reopened.Presets.Single(p => p.Id == DevicePresetSeeds.CameraPtzColdId);
+        Assert.Equal("NORMAL", (string?)camera.Modes!["camera_mode"]);
+        Assert.True(camera.IsSeed);
+    }
+
+    /// <summary>사용자의 손이 닿은 씨앗(이름 바꾸기 → 시각이 바뀜)은 건드리지 않는다.</summary>
+    [Fact]
+    public void should_leave_a_seed_alone_when_the_user_has_touched_it()
+    {
+        var store = NewStore();
+        store.Load();
+        Assert.True(store.Rename(DevicePresetSeeds.CameraPtzColdId, "우리 현장 PTZ").IsSuccess);
+        RewriteCameraMode("BLC");
+
+        var reopened = NewStore();
+        reopened.Load();
+
+        var camera = reopened.Presets.Single(p => p.Id == DevicePresetSeeds.CameraPtzColdId);
+        Assert.Equal("BLC", (string?)camera.Modes!["camera_mode"]);
+        Assert.Equal("우리 현장 PTZ", camera.Name);
+    }
+
+    private void RewriteCameraMode(string value)
+    {
+        var file = JObject.Parse(File.ReadAllText(_path));
+        var entry = ((JArray)file["presets"]!).Single(p => (string?)p["id"] == DevicePresetSeeds.CameraPtzColdId);
+        entry["modes"]!["camera_mode"] = value;
+        File.WriteAllText(_path, file.ToString());
+    }
+
     [Fact]
     public void should_round_trip_seed_thresholds_when_value_is_null()
     {

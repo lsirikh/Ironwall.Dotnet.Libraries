@@ -135,6 +135,18 @@ public static class PresetRequestBuilder
         var config = BuildDeviceConfig(preset);
         var dto = BuildCategoryDto(preset, info, spec);
 
+        // 함체는 DTO 가 히터 · 팬 enabled 를 스스로 계산해 싣는다 — 프리셋이 말하지 않은 부품에 false 를 지어내지 않게 못 박는다.
+        if (preset.Category == EnumDeviceCategory.Enclosure)
+        {
+            var overrides = config?.ComponentOverrides ?? new JObject();
+            PinComputedEnabled(overrides, spec.Components, received: null);
+            if (overrides.Count > 0)
+            {
+                config ??= new DeviceConfigAxisDto();
+                config.ComponentOverrides = overrides;
+            }
+        }
+
         // ① 축 쓰기 ② 부품 배열 ③ 설정 축 — 셋 다 인스턴스 플래그다(정적 아님).
         dto.UseAxisWrite = true;
         dto.AllowDeviceConfigWrite = true;
@@ -181,23 +193,59 @@ public static class PresetRequestBuilder
     }
 
     /// <summary>부품 선언 한 개 — <b>장비별 사실만</b>. 유형 공통 사실은 담을 자리가 애초에 없다.</summary>
+    /// <remarks>
+    /// <b>경계에서 빈 글을 <c>null</c> 로 접는다</b> — <c>ComponentDefinitionDto</c> 는 <c>null</c> 만 생략하고 <c>""</c> 는 그대로 싣는데,
+    /// 서버는 빈 문자열을 422(<c>EMPTY_STRING</c>)로 거절한다. 조립기 속성 칸을 비운 경우 · 손으로 고친 프리셋 파일 모두 여기를 지난다
+    /// (등록 · 적용 · 경합 비교의 지문이 한 규칙을 쓴다).
+    /// </remarks>
     internal static ComponentDefinitionDto ToComponentDto(ComponentDefinitionModel c) => new()
     {
         Key = c.Key,
         Type = c.Type,
-        Label = c.Label,
+        Label = NullIfBlank(c.Label),
         InService = c.InService,
         Channel = c.Channel,
-        Position = c.Position,
-        Manufacturer = c.Manufacturer,
-        Model = c.Model,
-        Serial = c.Serial,
-        Firmware = c.Firmware,
-        HardwareRev = c.HardwareRev,
-        InstalledAt = c.InstalledAt,
-        ReplacedAt = c.ReplacedAt,
+        Position = NullIfBlank(c.Position),
+        Manufacturer = NullIfBlank(c.Manufacturer),
+        Model = NullIfBlank(c.Model),
+        Serial = NullIfBlank(c.Serial),
+        Firmware = NullIfBlank(c.Firmware),
+        HardwareRev = NullIfBlank(c.HardwareRev),
+        InstalledAt = NullIfBlank(c.InstalledAt),
+        ReplacedAt = NullIfBlank(c.ReplacedAt),
         Spec = c.Spec,
     };
+
+    /// <summary>
+    /// 함체 DTO 가 스스로 계산해 싣는 <c>component_overrides.&lt;첫 HEATER/FAN key&gt;.enabled</c> 를 <b>명시적 값으로 못 박는다</b>.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>EnclosureDeviceDto.DeviceConfigAxis</c> 는 선언된 첫 히터 · 팬 key 에 평면 <c>HeaterEnabled</c>/<c>FanEnabled</c>
+    /// (그냥 <c>bool</c> — "의도 없음"을 말할 수 없다)을 <b>무조건</b> 싣는다. 그 key 가 이번에 새로 단 부품이면 값은 모델의
+    /// 기본값 <c>false</c> 다 — 프리셋도 카탈로그(<c>override_params.enabled</c> 에 default 없음)도 말하지 않은 <c>enabled:false</c>
+    /// 가 조용히 저장된다(라이브 하네스 asm.R4a · asm.R4b1).</para>
+    /// <para>병합은 <b>key 단위로 호출자 조각이 이긴다</b>(<c>DeviceAxisWrite.MergeJObjectOverride</c>) — 그래서 그 key 에
+    /// 조각이 없을 때만 채운다: 받은 서버 값(<paramref name="received"/>)이 있으면 그대로(제자리 유지), 없으면 JSON <c>null</c>
+    /// (PATCH = 없는 키 삭제 = 무동작, POST = 저장하지 않음 — <c>DeviceConfigAxis</c> 계약). 조각이 이미 있으면 손대지 않는다.</para>
+    /// </remarks>
+    internal static void PinComputedEnabled(JObject overrides, IEnumerable<ComponentDefinitionDto>? components, JObject? received)
+    {
+        ArgumentNullException.ThrowIfNull(overrides);
+        if (components == null) return;
+
+        foreach (var type in new[] { ComponentTypeNames.Heater, ComponentTypeNames.Fan })
+        {
+            string? key = null;
+            foreach (var c in components)
+            {
+                // EnclosureDeviceDto.FindComponentKeyByType 와 같은 규칙 — 유형으로 첫 번째(대소문자 무시).
+                if (c != null && string.Equals(c.Type, type, StringComparison.OrdinalIgnoreCase)) { key = c.Key; break; }
+            }
+
+            if (string.IsNullOrEmpty(key) || overrides.ContainsKey(key)) continue;
+            overrides[key] = received?[key] is JObject kept ? kept.DeepClone() : JValue.CreateNull();
+        }
+    }
 
     /// <summary>
     /// 임계치 · 모드 · 부품 재정의를 공통 통로(<see cref="BaseDeviceDto.DeviceConfigWrite"/>)에 담는다.
@@ -405,6 +453,9 @@ public static class PresetRequestBuilder
         new("^[a-z][a-z0-9_]*$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>빈 글 · 공백뿐인 글은 <c>null</c> — 값이 있으면 그대로(자르지 않는다).</summary>
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
     /// 이 카테고리의 DTO 가 접속(IP/포트) 축을 실제로 갖는가 — <see cref="BuildCategoryDto"/> 가 <c>IpAddress</c>·

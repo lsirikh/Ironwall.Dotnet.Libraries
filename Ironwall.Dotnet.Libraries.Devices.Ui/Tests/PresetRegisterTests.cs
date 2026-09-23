@@ -954,6 +954,105 @@ public class PresetRegisterTests
     }
     #endregion
 
+    #region - 지어낸 enabled · 빈 글 (라이브 하네스 assembly-vm R2 · R4 회귀) -
+    /// <summary>
+    /// 프리셋이 말하지 않은 팬에 <c>enabled:false</c> 를 지어내지 않는다 — 함체 DTO 는 첫 FAN key 에 평면 <c>FanEnabled</c>
+    /// (기본 false)를 무조건 싣는다(asm.R4b1 실측: POST 가 fan_1 {"enabled":false} 를 보냈다).
+    /// </summary>
+    [Fact]
+    public void should_not_invent_enabled_false_when_a_preset_fan_has_no_override()
+    {
+        var preset = EnclosurePreset() with
+        {
+            Components = new[] { Component("heater_1", "HEATER"), Component("fan_1", "FAN") },
+            ComponentOverrides = new JObject { ["heater_1"] = new JObject { ["enabled"] = true } },
+        };
+
+        var body = JObject.Parse(PresetRequestBuilder.Build(preset, Instance()).PreviewJson);
+
+        Assert.True(body.SelectToken("device_config.component_overrides.heater_1.enabled")!.Value<bool>());
+        var fan = body.SelectToken("device_config.component_overrides.fan_1");
+        Assert.NotNull(fan);
+        Assert.Equal(JTokenType.Null, fan!.Type);      // null = 생성에서 저장하지 않음 — 의도 없음 그대로
+    }
+
+    /// <summary>팔레트로 단 새 팬에 받은 장비의 기본값 false 를 옮겨 적지 않는다(asm.R4a 실측).</summary>
+    [Fact]
+    public async Task should_not_write_enabled_false_when_a_new_fan_is_added_by_apply()
+    {
+        var door = Component("door", "DOOR_SENSOR");
+        var fan = Component("fan", "FAN");
+        var api = new FakeApi { Fetched = Fetched(door) };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(Device(), new[] { door }, new[] { door, fan }, overridesToSend: null);
+
+        Assert.True(result.IsSuccess);
+        var body = JObject.Parse(Wire(api.Patched!));
+        var sent = body.SelectToken("device_config.component_overrides.fan");
+        Assert.NotNull(sent);
+        Assert.Equal(JTokenType.Null, sent!.Type);     // PATCH null = 없는 키 삭제 = 무동작
+    }
+
+    /// <summary>
+    /// 한 히터의 의도를 새로 단 다른 히터에 옮겨 적지 않는다 — 계산은 "첫 HEATER key" 에 싣는데,
+    /// 새 히터가 앞에 오면 받은 heater_1 의 true 가 heater_2 로 새었다.
+    /// </summary>
+    [Fact]
+    public async Task should_not_copy_one_heaters_intent_onto_a_newly_added_heater_when_applying()
+    {
+        var heater1 = Component("heater_1", "HEATER");
+        var heater2 = Component("heater_2", "HEATER");
+        var fetched = Fetched(heater1);
+        fetched.DeviceConfigAxis = new DeviceConfigAxisDto { ComponentOverrides = new JObject { ["heater_1"] = new JObject { ["enabled"] = true } } };
+        var api = new FakeApi { Fetched = fetched };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(Device(), new[] { heater1 }, new[] { heater2, heater1 },
+            overridesToSend: new JObject { ["heater_1"] = new JObject { ["enabled"] = true } });
+
+        Assert.True(result.IsSuccess);
+        var overrides = (JObject)JObject.Parse(Wire(api.Patched!)).SelectToken("device_config.component_overrides")!;
+        Assert.Equal(JTokenType.Null, overrides["heater_2"]!.Type);
+        Assert.True(overrides["heater_1"]!["enabled"]!.Value<bool>());
+    }
+
+    /// <summary>보드가 아무 말도 하지 않은 히터는 받은 서버 값 그대로 — 되돌리지도 지우지도 않는다.</summary>
+    [Fact]
+    public async Task should_keep_the_received_heater_intent_when_the_board_says_nothing_about_it()
+    {
+        var heater = Component("heater_1", "HEATER");
+        var fetched = Fetched(heater);
+        fetched.DeviceConfigAxis = new DeviceConfigAxisDto { ComponentOverrides = new JObject { ["heater_1"] = new JObject { ["enabled"] = true } } };
+        var api = new FakeApi { Fetched = fetched };
+        var service = new ComponentApplyService(api, new FakeProvider(), new MockLogService(), AxisPolicy());
+
+        var result = await service.ApplyAsync(Device(), new[] { heater }, new[] { heater, Component("nic", "NETWORK_INTERFACE") }, overridesToSend: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(JObject.Parse(Wire(api.Patched!)).SelectToken("device_config.component_overrides.heater_1.enabled")!.Value<bool>());
+    }
+
+    /// <summary>
+    /// 빈 글은 경계에서 null — 서버는 <c>""</c> 를 422 <c>EMPTY_STRING</c> 으로 거절한다(asm.R2 실측:
+    /// 속성 칸을 비운 label 이 <c>hardware_spec.components.1.label</c> 로 나가 적용이 실패했다).
+    /// </summary>
+    [Fact]
+    public void should_omit_blank_text_fields_when_a_component_goes_on_the_wire()
+    {
+        var model = new ComponentDefinitionModel
+        {
+            Key = "heater_1", Type = "HEATER", Label = "", Position = "   ", Manufacturer = "", Model = "M-1",
+            Serial = "", Firmware = "", HardwareRev = "", InstalledAt = "", ReplacedAt = "",
+        };
+
+        var json = JObject.Parse(Wire(PresetRequestBuilder.ToComponentDto(model)));
+
+        Assert.Equal(new[] { "key", "type", "model" }, json.Properties().Select(p => p.Name).ToArray());
+        Assert.Equal("M-1", (string?)json["model"]);    // 값이 있으면 그대로(자르지 않는다)
+    }
+    #endregion
+
     #region - Fixtures -
     private static string Wire(object dto) => JsonConvert.SerializeObject(dto, PresetRequestBuilder.WireSettings);
 

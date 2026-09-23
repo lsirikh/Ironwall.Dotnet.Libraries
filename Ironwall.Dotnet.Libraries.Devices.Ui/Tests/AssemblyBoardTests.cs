@@ -662,6 +662,59 @@ public class AssemblyBoardTests
         Assert.DoesNotContain("temp", json); // 재정의가 없는 슬롯은 아예 싣지 않는다
     }
 
+    /// <summary>
+    /// 재정의 칸을 비우고 적용하면 서버에서도 지워져야 한다 — PATCH 는 병합이라 안 보낸 key 는 그대로 남는다
+    /// (라이브 하네스 asm.R6: 비웠는데 heater_1 {"enabled":true} 가 다시 실려 나갔다).
+    /// </summary>
+    [Fact]
+    public void should_emit_null_when_a_kept_slots_override_is_cleared()
+    {
+        var board = Board();
+        board.Load(new[] { Def("heater_1", "HEATER") }, JObject.Parse("{\"heater_1\":{\"enabled\":true}}"));
+
+        board.Slots[0].Overrides = null;           // 재정의 칸의 유일한 값을 비웠다(OverrideRowViewModel 이 하는 일)
+
+        var overrides = board.ToOverrides()!;
+        Assert.Equal(JTokenType.Null, overrides["heater_1"]!.Type);
+        Assert.True(board.IsDirty);
+    }
+
+    [Fact]
+    public void should_emit_a_null_value_when_one_of_several_override_values_is_cleared()
+    {
+        var board = Board();
+        board.Load(new[] { Def("heater_1", "HEATER") }, JObject.Parse("{\"heater_1\":{\"enabled\":true,\"on_below_c\":5}}"));
+
+        board.Slots[0].Overrides = JObject.Parse("{\"enabled\":true}");
+
+        var entry = (JObject)board.ToOverrides()!["heater_1"]!;
+        Assert.True(entry["enabled"]!.Value<bool>());
+        Assert.Equal(JTokenType.Null, entry["on_below_c"]!.Type);
+    }
+
+    [Fact]
+    public void should_not_emit_null_for_a_slot_that_never_had_an_override()
+    {
+        var board = Board();
+        board.Load(new[] { Def("heater_1", "HEATER") }, null);
+
+        board.Add("HEATER");
+
+        Assert.Null(board.ToOverrides());           // 새 슬롯 · 원래 없던 재정의 — 보낼 것이 없다
+    }
+
+    [Fact]
+    public void should_fold_blank_text_to_null_when_a_slot_becomes_a_definition()
+    {
+        var slot = new AssemblySlot("HEATER", "heater_1") { Label = "", Position = "  ", Manufacturer = "ACME" };
+
+        var definition = slot.ToDefinition();
+
+        Assert.Null(definition.Label);             // TextBox 를 비우면 "" 가 온다 — 값 없음이다
+        Assert.Null(definition.Position);
+        Assert.Equal("ACME", definition.Manufacturer);
+    }
+
     [Fact]
     public void should_send_nothing_when_no_slot_has_an_override_and_nothing_was_removed()
     {

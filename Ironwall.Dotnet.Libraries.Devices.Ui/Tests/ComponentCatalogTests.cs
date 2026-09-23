@@ -162,6 +162,33 @@ public class ComponentCatalogTests
         Assert.False(info.IsDeprecated);
     }
 
+    /// <summary>
+    /// ★ 실제 서버 모양 — 로컬 8.0.2 의 <c>GET /api/devices/spec</c> 응답에서 그대로 옮긴 줄이다(라이브 하네스 asm.0, 2026-09-24).
+    /// <c>override_params</c> 는 <b>이름을 키로 삼는 사전</b>이다(<c>component_definition.py</c>: <c>dict[str, ParameterDefinition]</c>).
+    /// 배열 픽스처만 있던 동안 이 모양은 한 객체로 읽혀 이름이 0개였고, 조립기 속성 칸의 재정의 줄이 실서버에서 늘 비었다(asm.R1).
+    /// </summary>
+    [Theory]
+    [InlineData("""{"deprecated_at":null,"code":"HEATER","label":"히터","applies_to":["enclosure","camera"],"definition":{"states":["ON","OFF"],"commands":["ON","OFF"],"readable":true,"controllable":true,"override_params":{"enabled":{"value_type":"bool"}}}}""", "enabled")]
+    [InlineData("""{"deprecated_at":null,"code":"LAMP_LIGHT","label":"경광등","applies_to":["lamp"],"definition":{"states":["ON","OFF"],"commands":["ON","OFF","SET_COLOR","SET_MODE"],"readable":true,"controllable":true,"command_params":{"SET_MODE":{"mode":{"required":true,"value_type":"enum","enum_values":["steady","blinking"]}},"SET_COLOR":{"color":{"required":true,"value_type":"enum","enum_values":["Red","Orange","Green","Blue","White"]}}},"override_params":{"color":{"value_type":"enum","enum_values":["Red","Orange","Green","Blue","White"]}}}}""", "color")]
+    public void should_read_override_param_names_when_the_live_server_sends_them_as_a_dictionary(string entryJson, string expected)
+    {
+        var entry = Newtonsoft.Json.JsonConvert.DeserializeObject<VocabularyEntryDto>(entryJson)!;
+
+        var info = ComponentCatalogReader.Read(entry);
+
+        Assert.Equal(new[] { expected }, info.OverrideParams);
+        Assert.Equal(new[] { "ON", "OFF" }, info.States);       // 배열 칸은 예전 그대로
+    }
+
+    [Fact]
+    public void should_read_every_key_in_order_when_a_definition_list_is_a_dictionary()
+    {
+        var names = ComponentCatalogReader.ReadNames(
+            JObject.Parse("""{ "override_params": { "enabled": {"value_type":"bool"}, "on_below_c": {"value_type":"number"} } }"""), "override_params");
+
+        Assert.Equal(new[] { "enabled", "on_below_c" }, names);
+    }
+
     [Theory]
     [InlineData("""{ "states": ["OPEN","CLOSED"] }""")]                                   // 문자열 배열
     [InlineData("""{ "states": [{"code":"OPEN"},{"code":"CLOSED"}] }""")]                 // {code} 객체 배열

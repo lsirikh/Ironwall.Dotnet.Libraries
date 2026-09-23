@@ -169,23 +169,31 @@ public sealed class AssemblySlot : INotifyPropertyChanged
     }
 
     /// <summary>보낼 선언 한 줄. 부를 때마다 <b>새 객체</b>라 baseline 과 섞이지 않는다.</summary>
+    /// <remarks>
+    /// 빈 글(<c>""</c> · 공백뿐)은 <c>null</c> 로 낸다 — 속성 칸의 TextBox 는 비우면 <c>""</c> 를 돌려주고(TargetNullValue 없음),
+    /// 서버는 빈 문자열을 값으로 받지 않는다(<c>device_axes.py _reject_empty_strings</c> → 422 <c>EMPTY_STRING</c>).
+    /// "칸을 비웠다"의 뜻은 "값 없음"이다 — 실측 2026-09-24 라이브 하네스 asm.R2.
+    /// </remarks>
     public ComponentDefinitionModel ToDefinition() => new()
     {
         Key = Key,
         Type = TypeCode,
-        Label = Label,
+        Label = NullIfBlank(Label),
         InService = InService,
         Channel = Channel,
-        Position = Position,
-        Manufacturer = Manufacturer,
-        Model = Model,
-        Serial = Serial,
-        Firmware = Firmware,
-        HardwareRev = HardwareRev,
-        InstalledAt = InstalledAt,
-        ReplacedAt = ReplacedAt,
+        Position = NullIfBlank(Position),
+        Manufacturer = NullIfBlank(Manufacturer),
+        Model = NullIfBlank(Model),
+        Serial = NullIfBlank(Serial),
+        Firmware = NullIfBlank(Firmware),
+        HardwareRev = NullIfBlank(HardwareRev),
+        InstalledAt = NullIfBlank(InstalledAt),
+        ReplacedAt = NullIfBlank(ReplacedAt),
         Spec = Spec?.DeepClone() as JObject,
     };
+
+    /// <summary>빈 글 · 공백뿐인 글은 값이 아니다.</summary>
+    internal static string? NullIfBlank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text;
 
     /// <summary>깊은 복사. <see cref="KeyError"/> 는 보드가 다시 채우므로 옮기지 않는다.</summary>
     public AssemblySlot Clone() => new(TypeCode, Key)

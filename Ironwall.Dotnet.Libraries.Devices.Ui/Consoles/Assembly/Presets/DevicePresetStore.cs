@@ -178,7 +178,13 @@ public sealed class DevicePresetStore
                 return;
             }
 
-            _presets.AddRange(presets);
+            // 손대지 않은 씨앗은 지금 판의 씨앗으로 — 씨앗 값이 틀렸던 것을 고쳐도 이미 쓰인 파일에 옛 값이 남는다
+            // (카메라 camera_mode "AUTO" → 서버 422, 라이브 하네스 asm.R5a). 파일은 다음 저장 때 같이 고쳐진다.
+            _presets.AddRange(presets.Select(p =>
+            {
+                var current = DevicePresetSeeds.RefreshIfUntouched(p);
+                return ReferenceEquals(current, p) ? p : DevicePresetSanitizer.Sanitize(current);
+            }));
             Publish();
             State = PresetStoreState.Ready;
             StateMessage = skippedNote;

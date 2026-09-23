@@ -377,9 +377,32 @@ public sealed class AssemblyBoard
     /// 보낼 <c>component_overrides</c>. 보드의 재정의에 더해, <b>빠진 baseline key 에는 JSON null 을 명시</b>한다 —
     /// 안 보내면 서버가 주인 없는 재정의를 그대로 들고 있는다.
     /// </summary>
+    /// <remarks>
+    /// <b>비운 재정의도 보낸다</b> — 서버 <c>PATCH</c> 는 RFC 7396 병합이라 안 보낸 key 는 <b>그대로 남는다</b>.
+    /// baseline 에 재정의가 있던 슬롯을 사람이 비웠으면 그 key 에 <c>null</c>(전부 비움)을, 값 칸 일부만 비웠으면
+    /// 그 값 칸에 <c>null</c> 을 싣는다. 안 그러면 "재정의 칸을 비우고 적용" 이 성공 문구와 함께 아무 일도 하지 않는다
+    /// (라이브 하네스 asm.R6). 프리셋으로 저장할 때는 이 <c>null</c> 들을 걷어 낸다(<c>AssemblyViewModel.StripNulls</c>).
+    /// </remarks>
     public JObject? ToOverrides()
     {
-        var result = CurrentOverrides() ?? new JObject();
+        var result = new JObject();
+
+        foreach (var slot in Slots)
+        {
+            var was = _baselineOverrides?[slot.Key] as JObject;
+            if (slot.Overrides is null)
+            {
+                if (was is { HasValues: true } && !result.ContainsKey(slot.Key)) result[slot.Key] = JValue.CreateNull();
+                continue;
+            }
+
+            var entry = (JObject)slot.Overrides.DeepClone();
+            foreach (var property in was?.Properties() ?? Enumerable.Empty<JProperty>())
+            {
+                if (!entry.ContainsKey(property.Name)) entry[property.Name] = JValue.CreateNull();
+            }
+            result[slot.Key] = entry;
+        }
 
         foreach (var key in RemovedKeys)
         {

@@ -63,7 +63,8 @@ public static class ComponentCatalogReader
 
     /// <summary>
     /// <c>definition[name]</c> 의 이름 목록을 읽는다. 모양을 가리지 않는다 —
-    /// 문자열 배열 · <c>{code}</c>/<c>{name}</c> 객체 배열 · 문자열 하나 · 없음 · 엉뚱한 타입 전부 받는다.
+    /// 문자열 배열 · <c>{code}</c>/<c>{name}</c> 객체 배열 · <b>이름을 키로 삼는 사전</b>(<c>override_params</c> 의 실제 모양) ·
+    /// 문자열 하나 · 없음 · 엉뚱한 타입 전부 받는다.
     /// 무엇도 못 읽으면 <b>빈 목록</b>(절대 <c>null</c> 도 예외도 아니다).
     /// </summary>
     public static IReadOnlyList<string> ReadNames(JObject? definition, string name)
@@ -117,11 +118,29 @@ public static class ComponentCatalogReader
 
             case JTokenType.Object:
                 {
-                    var text = PickString((JObject)token, "code")
-                            ?? PickString((JObject)token, "name")
-                            ?? PickString((JObject)token, "key")
-                            ?? PickString((JObject)token, "value");
-                    if (text != null) sink.Add(text);
+                    var holder = (JObject)token;
+                    var text = PickString(holder, "code")
+                            ?? PickString(holder, "name")
+                            ?? PickString(holder, "key")
+                            ?? PickString(holder, "value");
+                    if (text != null)
+                    {
+                        sink.Add(text);
+                        return;
+                    }
+
+                    // 이름을 키로 삼는 사전 — 서버 8.x 의 override_params 가 이 모양이다
+                    // (component_definition.py: dict[str, ParameterDefinition], 실측 /devices/spec
+                    // "override_params": {"enabled": {"value_type": "bool"}}). 한 겹째(정의 칸 그 자체)에서만
+                    // 키를 이름으로 읽는다 — 배열 속 객체는 위의 {code}/{name} 규칙만 따른다.
+                    if (depth == 0)
+                    {
+                        foreach (var property in holder.Properties())
+                        {
+                            if (sink.Count > 256) break;
+                            if (!string.IsNullOrWhiteSpace(property.Name)) sink.Add(property.Name.Trim());
+                        }
+                    }
                     return;
                 }
 

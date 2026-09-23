@@ -217,6 +217,32 @@ public class AssemblyViewModelTests : IDisposable
         Assert.Null(slot.Overrides);                           // 비우면 재정의하지 않음
     }
 
+    /// <summary>
+    /// 기존 장비에서 재정의 칸을 비우면 적용 본문에는 null 이 가야 하지만(asm.R6), 그 null 을 프리셋에 담으면 안 된다 —
+    /// 프리셋의 null 은 새 장비에 보낼 뜻이 없고, 값 칸의 null 은 다음 등록 본문을 더럽힌다.
+    /// </summary>
+    [Fact]
+    public async Task should_keep_cleared_override_nulls_out_of_a_preset_when_saved_from_a_device()
+    {
+        var store = NewStore();
+        var axes = AxesWith(Part("heater", "HEATER"), Part("fan", "FAN"));
+        axes.DeviceConfig = new DeviceConfigModel
+        {
+            ComponentOverrides = JObject.Parse("{\"heater\":{\"enabled\":true,\"on_below_c\":5},\"fan\":{\"enabled\":true}}"),
+        };
+        var device = new EnclosureDeviceModel { Id = 7, DeviceNumber = 1, DeviceName = "함체", Axes = axes };
+        var vm = await OpenAsync(AssemblyViewModel.ForDevice(device, EnumDeviceCategory.Enclosure, new FakeCatalog(), store, NewApplyService(), new FakeDialogs { TextAnswer = "비운 재정의" }));
+
+        vm.OnBoardSelectionChanged(new[] { vm.BoardItems.Single(i => i.Slot.Key == "heater") });
+        vm.OverrideRows.Single(r => r.Name == "on_below_c").Text = "";
+        vm.OnBoardSelectionChanged(new[] { vm.BoardItems.Single(i => i.Slot.Key == "fan") });
+        vm.OverrideRows.Single(r => r.Name == "enabled").Text = "";
+        await vm.SaveAsPresetAsync();
+
+        var saved = store.ForCategory(EnumDeviceCategory.Enclosure).Single(p => p.Name == "비운 재정의");
+        Assert.Equal("{\"heater\":{\"enabled\":true}}", saved.ComponentOverrides!.ToString(Newtonsoft.Json.Formatting.None));
+    }
+
     [Fact]
     public async Task should_save_structure_only_when_saved_as_a_preset()
     {

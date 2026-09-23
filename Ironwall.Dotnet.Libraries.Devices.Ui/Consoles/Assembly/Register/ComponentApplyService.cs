@@ -263,8 +263,16 @@ public sealed class ComponentApplyService
             AllowComponentsWrite = true,
         };
 
-        var carrier = overridesToSend is { Count: > 0 }
-            ? new DeviceConfigAxisDto { ComponentOverrides = (JObject)overridesToSend.DeepClone() }
+        var overrides = overridesToSend != null ? (JObject)overridesToSend.DeepClone() : new JObject();
+
+        // 함체 DTO 는 첫 히터 · 팬 key 에 평면 HeaterEnabled/FanEnabled 를 무조건 싣는다. 그 key 가 이번에 새로 단 부품이면
+        // 값은 받은 장비의 기본값 false 다(라이브 하네스 asm.R4a: 팔레트로 단 FAN 이 enabled:false 로 저장됐다).
+        // 보드가 그 key 에 아무것도 말하지 않으면 받은 서버 값 그대로(없으면 null = 무동작)로 못 박는다.
+        if (category == EnumDeviceCategory.Enclosure)
+            PresetRequestBuilder.PinComputedEnabled(overrides, spec.Components, source.ReceivedDeviceConfig?.ComponentOverrides);
+
+        var carrier = overrides.Count > 0
+            ? new DeviceConfigAxisDto { ComponentOverrides = overrides }
             : null;
 
         switch (category)
@@ -343,7 +351,8 @@ public sealed class ComponentApplyService
                 var dto = new EnclosureDeviceDto();
                 CopyCommon(source, dto, carrier);
                 dto.TypeDevice = string.Empty;
-                // device_config 는 축 모드에서 무조건 나간다 — 선언된 히터·팬의 의도를 받은 값 그대로 유지한다.
+                // device_config 는 축 모드에서 무조건 나간다. 첫 히터·팬 key 의 값은 위에서 조각(carrier)으로 못 박았으므로
+                // 이 두 값은 병합에서 진다(조각이 key 단위로 이긴다) — 남겨 두어도 해가 없다.
                 dto.HeaterEnabled = origin.HeaterEnabled;
                 dto.FanEnabled = origin.FanEnabled;
                 // 임계치도 같은 축이다 — 빼고 보내면 통째 교체 해석에서 온도·습도 임계치가 전부 사라진다.
