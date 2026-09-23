@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Live API round-trip harness (D-2026-09-23-1b2e76): drives the library's REAL services
+    (AccountApi.LoginAsync, DeviceApiService, WiringApplyService, ComponentApplyService,
+    PresetRegistrar, DeviceGroupDropHandler, UnitScopeService, PermissionMatrixPanelViewModel,
+    ReportApiService, UnitApiService, ...) against a LOOPBACK-only server, so the product's own
+    serialization/deserialization is what gets exercised - never a hand-rolled HTTP client and
+    never an in-memory mock standing in for the server contract.
+
+    Promoted from a one-off scratchpad harness (see docs/reports for the D-17 cleanup-sweep fix
+    and the wire evidence it captured). Preserves what already worked there:
+      - WireCaptureHandler: captures the REAL bytes ApiService put on the wire (not a re-serialized DTO)
+      - LoopbackGuard: asserts host is loopback on EVERY request, not just at startup
+      - Raw: an arrange/assert-only JSON client, kept separate from the client under test
+
+    Run:      dotnet run (with the "project" option pointing at) tools\live-api-roundtrip\LiveApiRoundTrip.csproj
+    Target:   https://127.0.0.1:8000 (the already-running pids-api-server Docker container - not ours to start/stop)
+    Login:    the locally-seeded admin/admin123 (see Bootstrap.cs)
+    Output:   tools\live-api-roundtrip\results.json (also printed as PASS/FAIL/BLOCKED to stdout)
+
+    Safety: every request is asserted loopback-only before it goes out (Safety.cs). This harness
+    creates only data it deletes, under an "LRT-" / "lrt_" prefix, and its cleanup sweep (Steps.Cleanup.cs)
+    re-queries the live server AFTER the run and distinguishes a verified-clean listing (HTTP 200,
+    zero prefixed rows) from a listing it could not verify (any non-200 status -> BLOCKED / "확인 불가"),
+    never reporting the latter as clean.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LiveApiRoundTrip</AssemblyName>
+    <RootNamespace>LiveApiRoundTrip</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS0618;CS8632;NU1701;MSB3277</NoWarn>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Api\Ironwall.Dotnet.Libraries.Api.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Devices.Ui\Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Accounts.Ui\Ironwall.Dotnet.Libraries.Accounts.Ui.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Reports.Api\Ironwall.Dotnet.Libraries.Reports.Api.csproj" />
+    <ProjectReference Include="..\..\Ironwall.Dotnet.Libraries.Reports.Ui\Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
+  </ItemGroup>
+
+</Project>
