@@ -68,6 +68,24 @@ public static class UiKoreanMap
         [EnumDoorStatus.OPEN]   = "열림",
     };
 
+    // ── 카메라 유형 (EnumCameraType) — 장비 상세 폼 "카메라 유형(레거시)" 콤보 ─
+    private static readonly IReadOnlyDictionary<EnumCameraType, string> _cameraType = new Dictionary<EnumCameraType, string>
+    {
+        [EnumCameraType.NONE]  = "없음",
+        [EnumCameraType.FIXED] = "고정형",
+        [EnumCameraType.PTZ]   = "PTZ",
+    };
+
+    // ── 카메라 제어 모드 (EnumCameraMode) — 장비 상세 폼 "제어 모드" 콤보 ────
+    private static readonly IReadOnlyDictionary<EnumCameraMode, string> _cameraMode = new Dictionary<EnumCameraMode, string>
+    {
+        [EnumCameraMode.NONE]         = "없음",
+        [EnumCameraMode.ONVIF]        = "ONVIF",
+        [EnumCameraMode.EMSTONE_API]  = "엠스톤 API",
+        [EnumCameraMode.INNODEP_API]  = "이노뎁 API",
+        [EnumCameraMode.ETC]          = "기타",
+    };
+
     /// <summary>
     /// enum 값 → 한글 표시 라벨. 매핑에 없거나 다른 타입이면 원문(ToString())으로 폴백,
     /// null이면 빈 문자열. 표시 전용이며 원본 값은 어떤 경우에도 변경하지 않는다.
@@ -81,6 +99,8 @@ public static class UiKoreanMap
             EnumDeviceStatus v   => _deviceStatus.TryGetValue(v, out var s) ? s : v.ToString(),
             EnumSpeakerType v    => _speakerType.TryGetValue(v, out var s) ? s : v.ToString(),
             EnumDoorStatus v     => _doorStatus.TryGetValue(v, out var s) ? s : v.ToString(),
+            EnumCameraType v     => _cameraType.TryGetValue(v, out var s) ? s : v.ToString(),
+            EnumCameraMode v     => _cameraMode.TryGetValue(v, out var s) ? s : v.ToString(),
             _                    => value.ToString() ?? string.Empty,
         };
     }

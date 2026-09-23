@@ -104,6 +104,12 @@
 									Style="{StaticResource Reg.TextBox}"
 									Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
+							<c:ConsoleField ApiName="description" Header="설명">
+								<TextBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.description"
+									Style="{StaticResource Reg.TextBox}"
+									Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
 							<c:ConsoleField
 								ApiName="controller_id"
 								Header="소속 제어기 *"

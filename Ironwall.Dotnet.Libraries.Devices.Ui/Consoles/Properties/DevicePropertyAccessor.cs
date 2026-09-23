@@ -1,4 +1,6 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Devices;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
 using System;
 using System.Collections.Concurrent;
@@ -73,6 +75,11 @@ public static class DevicePropertyAccessor
                 return server.Name ?? string.Empty;
             case IBaseDeviceModel device:
                 return device.DeviceName ?? string.Empty;
+            // 읽기 전용 "카테고리" 칸(category_device, Writable=No, OptionSource=None) 전용 — 이 축은
+            // 콤보/Options 을 거치지 않고 여기서 바로 한글을 낸다. 쓰기 축이 아니므로 TryWrite 의
+            // Enum.TryParse 를 건드릴 위험이 없다(Devices.Ui.Helpers.DeviceEnumDisplay 가 정본).
+            case EnumDeviceCategory category:
+                return DeviceEnumDisplay.CategoryKorean(category);
             case IFormattable formattable:
                 return formattable.ToString(null, CultureInfo.InvariantCulture);
             default:

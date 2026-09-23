@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -197,7 +198,13 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
                 return Array.Empty<PropertyOption>();
 
             case DevicePropertyOptionSource.ClrEnum when spec.EnumType is { IsEnum: true } enumType:
-                return Enum.GetNames(enumType).Select(name => new PropertyOption(name, name)).ToList();
+                // Display 는 "한국어 (코드)" 병기(device-console-v8 목업 규칙), Text 는 원래 enum 이름 그대로
+                // — 저장 때 Enum.TryParse 가 읽는 값은 바뀌지 않는다(DevicePropertyAccessor.TryWrite 참조).
+                return Enum.GetNames(enumType)
+                    .Select(name => new PropertyOption(
+                        DeviceEnumDisplay.EnumBilingual((Enum)Enum.Parse(enumType, name)),
+                        name))
+                    .ToList();
 
             default:
                 return _options?.OptionsFor(spec, category) ?? Array.Empty<PropertyOption>();

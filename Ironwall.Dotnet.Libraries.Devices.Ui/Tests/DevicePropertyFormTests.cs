@@ -278,8 +278,56 @@ public class DevicePropertyFormTests : IDisposable
 
         var status = Field(form, "status");
 
+        // Text 는 wire value(원문 enum 이름) — 저장 때 Enum.TryParse 가 읽는 값이라 바뀌면 안 된다.
         Assert.Equal(Enum.GetNames(typeof(EnumDeviceStatus)), status.Options.Select(o => o.Text).ToArray());
         Assert.NotNull(status.SelectedOption);
+    }
+
+    /// <summary>
+    /// "운영 상태" 콤보의 Display 는 한글이어야 한다(구 버그: raw enum 이름 ACTIVATED/DEACTIVATED 그대로 노출).
+    /// Text(wire value)는 그대로 원문이라 저장 로직은 전혀 바뀌지 않는다.
+    /// </summary>
+    [Fact]
+    public void should_show_korean_display_when_status_combo_options_are_built()
+    {
+        var form = NewForm(out _);
+        form.Load(new object[] { Controller(1, 1, "A") }, EnumDeviceCategory.Controller, true, false, false);
+
+        var status = Field(form, "status");
+
+        var activated = status.Options.Single(o => o.Text == nameof(EnumDeviceStatus.ACTIVATED));
+        var error = status.Options.Single(o => o.Text == nameof(EnumDeviceStatus.ERROR));
+        var deactivated = status.Options.Single(o => o.Text == nameof(EnumDeviceStatus.DEACTIVATED));
+
+        Assert.Equal("운영 (ACTIVATED)", activated.Display);
+        Assert.Equal("오류 (ERROR)", error.Display);
+        Assert.Equal("중지 (DEACTIVATED)", deactivated.Display);
+    }
+
+    /// <summary>"종류(레거시)" 콤보(EnumDeviceType)도 같은 규칙으로 한글을 보인다 — 그리드·상세 폼이 갈리지 않는다.</summary>
+    [Fact]
+    public void should_show_korean_display_for_legacy_device_type_options()
+    {
+        var form = NewForm(out _);
+        var camera = new CameraDeviceViewModel(new CameraDeviceModel { Id = 1, DeviceNumber = 1, DeviceName = "C1" });
+        form.Load(new object[] { camera }, EnumDeviceCategory.Camera, isAxisContract: false, isCreating: false, isReadOnly: false);
+
+        var type = Field(form, "device_type");
+        var ipCamera = type.Options.Single(o => o.Text == nameof(EnumDeviceType.IpCamera));
+
+        Assert.Equal("카메라 (IpCamera)", ipCamera.Display);
+    }
+
+    /// <summary>읽기 전용 "카테고리" 칸도 raw enum 이름("Controller") 대신 한글을 보인다.</summary>
+    [Fact]
+    public void should_show_korean_category_text_when_category_field_is_read_only()
+    {
+        var form = NewForm(out _);
+        form.Load(new object[] { Controller(1, 1, "A") }, EnumDeviceCategory.Controller, true, false, false);
+
+        var category = Field(form, "category_device");
+
+        Assert.Equal("제어기", category.DisplayText);
     }
 
     [Fact]

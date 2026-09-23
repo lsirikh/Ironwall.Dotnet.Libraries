@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -130,7 +131,20 @@ public sealed class MakeSensorsViewModel : Screen
     public string StartNumber { get => _startNumber; set { _startNumber = value ?? string.Empty; NotifyOfPropertyChange(); Rebuild(); } }
     public string Step { get => _step; set { _step = value ?? string.Empty; NotifyOfPropertyChange(); Rebuild(); } }
     public string NameRule { get => _nameRule; set { _nameRule = value ?? string.Empty; NotifyOfPropertyChange(); Rebuild(); } }
-    public string TypeText { get => _typeText; set { _typeText = value ?? string.Empty; NotifyOfPropertyChange(); Rebuild(); } }
+    public string TypeText
+    {
+        get => _typeText;
+        set { _typeText = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(TypeTextDisplay)); Rebuild(); }
+    }
+
+    /// <summary>종류 콤보가 실제로 그리는 칸 — "한국어 (코드)". 서버로 나가는 값은 <see cref="TypeText"/> 그대로다
+    /// (<see cref="SensorRowViewModel.TypeDisplayText"/> 와 같은 계약).</summary>
+    public string TypeTextDisplay
+    {
+        get => DeviceEnumDisplay.SensorTypeBilingual(TypeText);
+        set => TypeText = DeviceEnumDisplay.ExtractSensorTypeCode(value);
+    }
+
     public string Zone { get => _zone; set { _zone = value ?? string.Empty; NotifyOfPropertyChange(); Rebuild(); } }
 
     /// <summary>이미 있는 번호를 건너뛸 것인가 — 끄면 충돌이 하나라도 있을 때 만들 수 없다(전부 아니면 하나도).</summary>

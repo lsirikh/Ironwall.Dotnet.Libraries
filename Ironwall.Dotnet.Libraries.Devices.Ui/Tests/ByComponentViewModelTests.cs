@@ -121,13 +121,47 @@ public class ByComponentViewModelTests
         vm.SelectedComponentType = vm.ComponentTypes.Single(o => o.Code == "DOOR_SENSOR");
         api.ResponseFactory = _ => Task.FromResult(Ok());
 
-        vm.SelectedHealth = "FAULT";
+        vm.SelectedHealth = vm.HealthChips.Single(o => o.Code == "FAULT");
         await vm.SearchAsync();
         Assert.Equal("FAULT", api.Calls.Last().Health);
 
-        vm.SelectedHealth = ByComponentViewModel.AllChip;
+        vm.SelectedHealth = vm.HealthChips.Single(o => o.Code == ByComponentViewModel.AllChip);
         await vm.SearchAsync();
         Assert.Null(api.Calls.Last().Health);
+    }
+
+    /// <summary>
+    /// 건강 칩은 화면에 한글("정상"·"주의"·"고장"·"미확인")을 보이지만, 서버로는 항상 원문 코드가 나가야
+    /// 한다(하드 규칙: 필터 칩은 라벨이 아니라 wire value 를 보낸다). 칩 4종 전부를 한 번에 검증한다.
+    /// </summary>
+    [Theory]
+    [InlineData("OK", "정상")]
+    [InlineData("DEGRADED", "주의")]
+    [InlineData("FAULT", "고장")]
+    [InlineData("UNKNOWN", "미확인")]
+    public async Task should_send_wire_code_when_korean_health_chip_is_selected(string code, string korean)
+    {
+        var (vm, api) = await CreateAsync(EnumServerContract.V8_0);
+        vm.SelectedComponentType = vm.ComponentTypes.Single(o => o.Code == "DOOR_SENSOR");
+        api.ResponseFactory = _ => Task.FromResult(Ok());
+
+        var chip = vm.HealthChips.Single(o => o.Code == code);
+        Assert.Equal(korean, chip.Label);   // 화면에 보이는 라벨은 한글
+        Assert.Equal($"{korean} ({code})", chip.Display);
+
+        vm.SelectedHealth = chip;
+        await vm.SearchAsync();
+
+        Assert.Equal(code, api.Calls.Last().Health);   // 서버로는 원문 코드(wire value)만 나간다
+    }
+
+    [Fact]
+    public async Task should_show_only_korean_without_code_when_all_health_chip_is_selected()
+    {
+        // "전체" 는 Code==Label 이라 CatalogOption.Display 규칙상 괄호 병기가 없다(목업 규칙: 같으면 코드 숨김).
+        var (vm, _) = await CreateAsync(EnumServerContract.V8_0);
+        var chip = vm.HealthChips.Single(o => o.Code == ByComponentViewModel.AllChip);
+        Assert.Equal("전체", chip.Display);
     }
 
     [Fact]

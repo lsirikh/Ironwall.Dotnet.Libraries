@@ -195,3 +195,25 @@ public sealed class IssueLevelGlyphConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }
+
+/// <summary>
+/// 센서 종류 코드 → "한국어 (코드)" — 목록 렌더 전용(device-console enum-korean-consistency).
+/// </summary>
+/// <remarks>
+/// <b>왜 <c>Text</c> 바인딩은 그대로 두는가</b> — 종류 콤보는 <c>IsEditable="True"</c> +
+/// <c>Text="{Binding TypeText}"</c> 로 서버에 보낼 원문 코드를 직접 나른다(빈 값을 지어내지 않고
+/// 카탈로그 밖 값도 그대로 보내 422 로 진단하는 설계, <c>WiringLauncher.SensorTypeCodes</c> remarks 참조).
+/// 편집형 <see cref="ComboBox"/> 는 항목이 <see cref="string"/> 이면 선택 시 <c>Text</c> 에 그 문자열을
+/// 그대로 채운다 — <c>ItemTemplate</c> 은 드롭다운의 <b>겉보기 렌더</b>만 바꿀 뿐 항목 자체(=Text 로 들어갈 값)는
+/// 여전히 원문 코드이므로, 이 컨버터를 <c>ItemTemplate</c>·읽기전용 표시에만 물리면 wire value 는 바뀌지 않는다.
+/// </remarks>
+public sealed class SensorTypeDisplayConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is string code
+            ? Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.SensorTypeBilingual(code)
+            : value;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException("표시 전용 — Text 바인딩은 원문 코드를 그대로 쓴다.");
+}

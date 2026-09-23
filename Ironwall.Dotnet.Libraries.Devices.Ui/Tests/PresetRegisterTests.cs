@@ -192,6 +192,41 @@ public class PresetRegisterTests
         Assert.Equal("북측 9구간", (string?)body["description"]);
     }
 
+    /// <summary>
+    /// ★ 이 테스트가 잡은 실제 결함 — Lamp · Speaker 두 DTO 만 <c>description</c> 의
+    /// <c>JsonProperty.NullValueHandling</c> 이 <c>Ignore</c> 가 아니어서(다섯 카테고리는 있음),
+    /// 비워 두면 키가 빠지는 대신 <c>"description": null</c> 이 그대로 나가고 있었다.
+    /// 등록 창은 설명을 선택 항목으로 다루므로(비우면 "안 보낸다"), 일곱 카테고리 전부 같아야 한다.
+    /// </summary>
+    [Theory]
+    [InlineData(EnumDeviceCategory.Controller)]
+    [InlineData(EnumDeviceCategory.Sensor)]
+    [InlineData(EnumDeviceCategory.Camera)]
+    [InlineData(EnumDeviceCategory.Speaker)]
+    [InlineData(EnumDeviceCategory.Enclosure)]
+    [InlineData(EnumDeviceCategory.Lamp)]
+    [InlineData(EnumDeviceCategory.Gate)]
+    public void should_omit_the_description_key_for_every_category_when_left_blank(EnumDeviceCategory category)
+    {
+        var preset = new DevicePreset
+        {
+            Id = "p1",
+            Name = "t",
+            Category = category,
+            Components = new[] { Component("nic", "NETWORK_INTERFACE") },
+        };
+        var controller = category == EnumDeviceCategory.Sensor
+            ? new ControllerDeviceModel { Id = 12, DeviceNumber = 1, DeviceName = "CTL" }
+            : null;
+
+        // Description 을 아예 안 주면(Instance() 기본값) PresetInstanceInfo.Description 은 null 이다 —
+        // 창이 빈 칸을 그대로 두고 보내는 그 경로.
+        var request = PresetRequestBuilder.Build(preset, Instance() with { Controller = controller });
+
+        var body = JObject.Parse(request.PreviewJson);
+        Assert.False(body.ContainsKey("description"), "description 키 자체가 없어야 한다 — null 이나 빈 문자열이 아니라.");
+    }
+
     [Fact]
     public void should_carry_both_speaker_axes_when_preset_declares_role_and_shape()
     {

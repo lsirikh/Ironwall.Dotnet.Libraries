@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Api.Models;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using System;
 using System.Collections.Generic;
@@ -146,16 +147,19 @@ public sealed class ByComponentRowViewModel
         return StateLabels.TryGetValue(trimmed, out var label) ? label : trimmed;
     }
 
+    // 한글 라벨의 정본은 DeviceEnumDisplay.ComponentHealthKorean 하나뿐이다 — 필터 칩(ByComponentViewModel)도
+    // 같은 표를 읽는다. 여기서는 색·점 모양(Kind)만 이 행 전용으로 분류한다(표시 문구가 아니다).
     private static (string Text, EnumComponentHealthKind Kind) ToHealth(string? health)
     {
         var trimmed = health?.Trim().ToUpperInvariant();
-        return trimmed switch
+        var kind = trimmed switch
         {
-            "OK" => ("정상", EnumComponentHealthKind.Ok),
-            "DEGRADED" => ("주의", EnumComponentHealthKind.Warn),
-            "FAULT" => ("고장", EnumComponentHealthKind.Crit),
-            _ => ("미확인", EnumComponentHealthKind.Unknown),
+            "OK" => EnumComponentHealthKind.Ok,
+            "DEGRADED" => EnumComponentHealthKind.Warn,
+            "FAULT" => EnumComponentHealthKind.Crit,
+            _ => EnumComponentHealthKind.Unknown,
         };
+        return (DeviceEnumDisplay.ComponentHealthKorean(trimmed), kind);
     }
     #endregion
 }

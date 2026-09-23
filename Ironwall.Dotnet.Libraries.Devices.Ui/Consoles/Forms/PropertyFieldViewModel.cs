@@ -62,8 +62,24 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
 
     public string Placeholder => IsMixed ? ConsoleDetailStateMachine.MixedValuesText : string.Empty;
 
-    /// <summary>읽기 전용으로 보일 글(여러 값이면 그 표기).</summary>
-    public string DisplayText => IsMixed ? ConsoleDetailStateMachine.MixedValuesText : _text;
+    /// <summary>
+    /// 읽기 전용으로 보일 글(여러 값이면 그 표기). 선택 칸이 잠겨(다중편집·읽기전용 등) 콤보 대신
+    /// 평문으로 그릴 때도, 이미 만들어 둔 <see cref="Options"/> 의 한글 표시를 그대로 재사용한다 —
+    /// 잠긴 enum 칸만 raw 이름("ACTIVATED" 등)으로 새는 세 번째 표시 경로를 만들지 않는다.
+    /// </summary>
+    public string DisplayText
+    {
+        get
+        {
+            if (IsMixed) return ConsoleDetailStateMachine.MixedValuesText;
+            if (Spec.Editor == DevicePropertyEditor.Choice && Options.Count > 0)
+            {
+                var match = Options.FirstOrDefault(o => string.Equals(o.Text, _text, StringComparison.Ordinal));
+                if (match is not null) return match.Display;
+            }
+            return _text;
+        }
+    }
 
     public bool IsTouched => _tracker.IsTouched(Key);
 

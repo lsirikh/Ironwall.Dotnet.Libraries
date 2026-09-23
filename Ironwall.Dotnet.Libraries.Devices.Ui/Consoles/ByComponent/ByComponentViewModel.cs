@@ -65,9 +65,19 @@ public sealed class ByComponentViewModel : Screen
         ComponentTypes = new BindableCollection<CatalogOption>();
         StateChips = new BindableCollection<string> { AllChip };
         Rows = new BindableCollection<ByComponentRowViewModel>();
-        HealthChips = new[] { AllChip, "OK", "DEGRADED", "FAULT", "UNKNOWN" };
+        // Code 는 서버로 보내는 원문("OK" 등 — DestructiveGuard/서버가 아는 값), Label 은 화면 전용 한글
+        // (ByComponentRowViewModel.ToHealth 와 같은 표, DeviceEnumDisplay.ComponentHealthKorean 이 정본).
+        // ComponentTypes 콤보와 같은 관용구(CatalogOption + DisplayMemberPath) — 라벨을 바꿔도 보내는 값은 그대로다.
+        HealthChips = new[]
+        {
+            AllHealthChip,
+            new CatalogOption("OK", DeviceEnumDisplay.ComponentHealthKorean("OK")),
+            new CatalogOption("DEGRADED", DeviceEnumDisplay.ComponentHealthKorean("DEGRADED")),
+            new CatalogOption("FAULT", DeviceEnumDisplay.ComponentHealthKorean("FAULT")),
+            new CatalogOption("UNKNOWN", DeviceEnumDisplay.ComponentHealthKorean("UNKNOWN")),
+        };
         _selectedState = AllChip;
-        _selectedHealth = AllChip;
+        _selectedHealth = AllHealthChip;
 
         if (IsAvailable)
         {
@@ -127,16 +137,16 @@ public sealed class ByComponentViewModel : Screen
         }
     }
 
-    /// <summary>건강은 서버가 강한(strict) 4값 어휘라 카탈로그와 무관하게 고정 목록이다.</summary>
-    public IReadOnlyList<string> HealthChips { get; }
+    /// <summary>건강은 서버가 강한(strict) 4값 어휘라 카탈로그와 무관하게 고정 목록이다. Code=서버로 보내는 값, Display=한글.</summary>
+    public IReadOnlyList<CatalogOption> HealthChips { get; }
 
-    public string SelectedHealth
+    public CatalogOption SelectedHealth
     {
         get => _selectedHealth;
         set
         {
-            var next = value ?? AllChip;
-            if (string.Equals(_selectedHealth, next, StringComparison.Ordinal)) return;
+            var next = value ?? AllHealthChip;
+            if (Equals(_selectedHealth, next)) return;
             _selectedHealth = next;
             NotifyOfPropertyChange(() => SelectedHealth);
         }
@@ -198,7 +208,7 @@ public sealed class ByComponentViewModel : Screen
         try
         {
             var state = string.Equals(SelectedState, AllChip, StringComparison.Ordinal) ? null : SelectedState;
-            var health = string.Equals(SelectedHealth, AllChip, StringComparison.Ordinal) ? null : SelectedHealth;
+            var health = string.Equals(SelectedHealth.Code, AllChip, StringComparison.Ordinal) ? null : SelectedHealth.Code;
 
             ApiListResponse<ComponentStateRowDto> response;
             try
@@ -302,6 +312,9 @@ public sealed class ByComponentViewModel : Screen
     /// <summary>"필터 없음"을 뜻하는 칩 값 — 상태·건강 공통.</summary>
     public const string AllChip = "전체";
 
+    /// <summary>건강 칩의 "전체" 항목 — Code=Label 이라 <see cref="CatalogOption.Display"/> 가 괄호 없이 "전체"만 보인다.</summary>
+    private static readonly CatalogOption AllHealthChip = new(AllChip, AllChip);
+
     private readonly IDeviceApiService _api;
     private readonly ICatalogService _catalog;
     private readonly ILogService _log;
@@ -309,7 +322,7 @@ public sealed class ByComponentViewModel : Screen
 
     private CatalogOption? _selectedComponentType;
     private string _selectedState;
-    private string _selectedHealth;
+    private CatalogOption _selectedHealth;
     private bool _isBusy;
     private string _statusText;
     private CancellationTokenSource? _searchCts;

@@ -39,7 +39,7 @@ public class LampDeviceDto : BaseDeviceDto
     /// <summary>
     /// 장비 설명
     /// </summary>
-    [JsonProperty("description", Order = 15)]
+    [JsonProperty("description", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
     public string? Description { get; set; }
 
     #region - 7.0 축(axis) 쓰기 투영 (FR-09) -

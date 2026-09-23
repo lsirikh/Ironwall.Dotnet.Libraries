@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System;
 using System.Collections.Generic;
@@ -488,13 +489,24 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     #region - Bulk edit (WS L595-646) -
     public string EditNumber { get => _editNumber ?? string.Empty; set { _editNumber = value ?? string.Empty; AfterEdit(nameof(EditNumber)); } }
     public string EditName { get => _editName ?? string.Empty; set { _editName = value ?? string.Empty; AfterEdit(nameof(EditName)); } }
-    public string EditType { get => _editType ?? string.Empty; set { _editType = value ?? string.Empty; AfterEdit(nameof(EditType)); } }
+    public string EditType { get => _editType ?? string.Empty; set { _editType = value ?? string.Empty; AfterEdit(nameof(EditType)); NotifyOfPropertyChange(nameof(EditTypeDisplay)); } }
     public string EditZone { get => _editZone ?? string.Empty; set { _editZone = value ?? string.Empty; AfterEdit(nameof(EditZone)); } }
+
+    /// <summary>
+    /// "한꺼번에 채우기" 종류 콤보가 실제로 그리는 칸 — "한국어 (코드)". 서버로 나가는 값은
+    /// <see cref="EditType"/>(<see cref="CurrentEdit"/> 가 읽는 값) 그대로다 — 병기 표시를 그대로 저장하지
+    /// 않도록 set 에서 코드만 추린다(<see cref="SensorRowViewModel.TypeDisplayText"/> 와 같은 계약).
+    /// </summary>
+    public string EditTypeDisplay
+    {
+        get => DeviceEnumDisplay.SensorTypeBilingual(EditType);
+        set => EditType = DeviceEnumDisplay.ExtractSensorTypeCode(value);
+    }
 
     /// <summary>손대지 않은 칸에 보이는 글자 — 값이 줄마다 다르면 "— 여러 값 —"(WS L597).</summary>
     public string NumberHint => Hint(SensorTableEdit.CommonNumberText(SelectedFacts()));
     public string NameHint => Hint(SensorTableEdit.CommonText(SelectedFacts(), f => f.Name));
-    public string TypeHint => Hint(SensorTableEdit.CommonText(SelectedFacts(), f => f.TypeText));
+    public string TypeHint => Hint(BilingualOrNull(SensorTableEdit.CommonText(SelectedFacts(), f => f.TypeText)));
     public string ZoneHint => Hint(SensorTableEdit.CommonText(SelectedFacts(), f => f.Zone));
 
     public bool IsNumberTouched => _editNumber is not null;
@@ -634,6 +646,9 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
     private static string Hint(string? common) => common ?? SensorTableEdit.MULTI_VALUE_TEXT;
 
+    /// <summary>종류 힌트 전용 — 공통값이 있으면 "한국어 (코드)"로, 줄마다 다르면(<c>null</c>) 그대로 <see cref="Hint"/> 에 맡긴다.</summary>
+    private static string? BilingualOrNull(string? code) => code is null ? null : DeviceEnumDisplay.SensorTypeBilingual(code);
+
     private void ResetEdit()
     {
         _editNumber = _editName = _editType = _editZone = null;
@@ -642,6 +657,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(EditNumber));
         NotifyOfPropertyChange(nameof(EditName));
         NotifyOfPropertyChange(nameof(EditType));
+        NotifyOfPropertyChange(nameof(EditTypeDisplay));
         NotifyOfPropertyChange(nameof(EditZone));
         RefreshHints();
     }

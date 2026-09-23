@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using System;
 using System.Globalization;
 
@@ -85,7 +86,20 @@ public sealed class SensorRowViewModel : PropertyChangedBase
             if (string.Equals(text, Row.Facts.TypeText, StringComparison.Ordinal)) return;
             Row.Facts = Row.Facts with { TypeText = text };
             Edited();
+            NotifyOfPropertyChange(nameof(TypeDisplayText));
         }
+    }
+
+    /// <summary>
+    /// 종류 콤보가 실제로 그리는 칸 — "한국어 (코드)"(<see cref="DeviceEnumDisplay.SensorTypeBilingual"/>).
+    /// 서버로 나가는 값은 <see cref="TypeText"/> 그대로다: 드롭다운에서 병기 표시를 고르든 코드를 직접
+    /// 타이핑하든, set 이 <see cref="DeviceEnumDisplay.ExtractSensorTypeCode"/> 로 코드만 추려 <see cref="TypeText"/>
+    /// 에 쓴다(raw enum 이름이 칸에 남지 않으면서도 wire value 는 바뀌지 않는다).
+    /// </summary>
+    public string TypeDisplayText
+    {
+        get => DeviceEnumDisplay.SensorTypeBilingual(TypeText);
+        set => TypeText = DeviceEnumDisplay.ExtractSensorTypeCode(value);
     }
 
     public string Zone
@@ -130,6 +144,7 @@ public sealed class SensorRowViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(HasNumberError));
         NotifyOfPropertyChange(nameof(Name));
         NotifyOfPropertyChange(nameof(TypeText));
+        NotifyOfPropertyChange(nameof(TypeDisplayText));
         NotifyOfPropertyChange(nameof(Zone));
         NotifyOfPropertyChange(nameof(ChannelText));
         NotifyOfPropertyChange(nameof(PlacementText));

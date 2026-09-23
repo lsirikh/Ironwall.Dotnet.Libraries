@@ -13,6 +13,7 @@
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<wiring:PasteColumnTextConverter x:Key="ColumnText" />
+		<wiring:SensorTypeDisplayConverter x:Key="SensorTypeKorean" />
 	</UserControl.Resources>
 	<!--  T4 · M 560. ESC · Enter · 첫 포커스는 틀이 정한다. 옛 AutomationId 유지.  -->
 	<dlg:ConsoleDialogFrame
@@ -196,7 +197,7 @@
 									DockPanel.Dock="Right"
 									FontSize="11.5"
 									Foreground="{DynamicResource TextMutedBrush}"
-									Text="{Binding Facts.TypeText}"
+									Text="{Binding Facts.TypeText, Converter={StaticResource SensorTypeKorean}}"
 									TextTrimming="CharacterEllipsis" />
 								<TextBlock
 									FontSize="12.5"

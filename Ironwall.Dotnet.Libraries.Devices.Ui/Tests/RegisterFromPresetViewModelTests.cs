@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Presets;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Register;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -98,6 +99,36 @@ public class RegisterFromPresetViewModelTests : IDisposable
 
         Assert.True(vm.HasProblems);
         Assert.False(vm.CanRegister);
+    }
+
+    /// <summary>
+    /// ★ 이 창에 설명 입력칸이 없어 <c>ReadInfo()</c> 가 <c>Description</c> 을 채우지 않던 결함(e8fd8c1c 의 절반)
+    /// — DTO 파이프는 7개 카테고리 전부에서 이미 동작하지만(<c>PresetRegisterTests</c>), 창이 아무것도 태우지 않았다.
+    /// </summary>
+    [Fact]
+    public void should_carry_the_typed_description_into_the_request_body_when_registering_from_a_preset()
+    {
+        var vm = NewVm(NewStore(LampPreset()), EnumDeviceCategory.Lamp);
+
+        vm.Description = "북측 9구간 경광등";
+
+        var body = JObject.Parse(vm.PreviewJson);
+        Assert.Equal("북측 9구간 경광등", (string?)body["description"]);
+        Assert.True(vm.CanRegister);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void should_omit_the_description_key_when_left_blank_or_whitespace(string text)
+    {
+        var vm = NewVm(NewStore(LampPreset()), EnumDeviceCategory.Lamp);
+
+        vm.Description = text;
+
+        var body = JObject.Parse(vm.PreviewJson);
+        Assert.Null(body["description"]);   // null 이나 빈 문자열이 아니라 키 자체가 없어야 한다
+        Assert.True(vm.CanRegister);        // 선택 항목 — 비워도 등록을 막지 않는다
     }
 
     [Fact]

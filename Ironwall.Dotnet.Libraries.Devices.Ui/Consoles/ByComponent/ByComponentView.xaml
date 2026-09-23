@@ -108,6 +108,7 @@
 					AutomationProperties.AutomationId="Console.Devices.ByComponent.Health"
 					BorderThickness="0"
 					Background="Transparent"
+					DisplayMemberPath="Display"
 					ItemContainerStyle="{StaticResource ByComponent.Chip}"
 					ItemsSource="{Binding HealthChips}"
 					SelectedItem="{Binding SelectedHealth, Mode=TwoWay}"

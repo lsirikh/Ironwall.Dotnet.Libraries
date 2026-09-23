@@ -98,8 +98,16 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.DeviceType = value;
             NotifyOfPropertyChange(() => DeviceType);
+            NotifyOfPropertyChange(() => DeviceTypeDisplay);
         }
     }
+
+    /// <summary>
+    /// 콘솔 목록 "종류" 열(레거시 6.3 계약)의 표시 문구 — <see cref="TypeAxisDisplay"/>(축 계약)와 같은
+    /// "한국어 (코드)" 형식이다(<see cref="Helpers.DeviceEnumDisplay.EnumBilingual"/>). raw enum 이름
+    /// ("IpCamera" 등)이 그리드에 그대로 새지 않게 한다.
+    /// </summary>
+    public string DeviceTypeDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.EnumBilingual(DeviceType);
 
     /// <summary>
     /// 판별자(<c>category_device</c>) — 읽기 전용. 경로가 정하고 바뀌지 않는다.
@@ -187,17 +195,11 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
     /// </summary>
     /// <remarks>
     /// 라벨은 목업(<c>docs/design/window-layout-system-storyboard.html</c> <c>DEV_ST</c> 표)을 그대로
-    /// 따른다 — 화면마다 다른 말을 새로 짓지 않는다: <c>ACTIVATED</c>="운영", <c>ERROR</c>="오류",
-    /// <c>DEACTIVATED</c>="중지". enum 이 나중에 늘어나도 하네스가 조용히 빈칸을 내지 않도록,
-    /// 못 알아보는 값은 원문 이름을 그대로 보인다.
+    /// 따른다 — 화면마다 다른 말을 새로 짓지 않는다. 매핑 정본은
+    /// <see cref="Helpers.DeviceEnumDisplay.StatusKorean"/> 하나뿐이다 — 상세 폼의 "운영 상태" 콤보도
+    /// 같은 표를 읽는다(둘이 따로 놀며 갈라지지 않게).
     /// </remarks>
-    public string StatusDisplay => Status switch
-    {
-        EnumDeviceStatus.ACTIVATED => "운영",
-        EnumDeviceStatus.ERROR => "오류",
-        EnumDeviceStatus.DEACTIVATED => "중지",
-        _ => Status.ToString(),
-    };
+    public string StatusDisplay => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.StatusKorean(Status);
 
     /// <summary>
     /// 장애 배지 판정 — <see cref="EnumDeviceStatus.ERROR"/> 하나만 장애다. 레일 카운터

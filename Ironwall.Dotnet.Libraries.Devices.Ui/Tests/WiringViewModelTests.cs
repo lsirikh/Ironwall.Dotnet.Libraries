@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -279,7 +280,8 @@ public class WiringViewModelTests
         vm.OnSelectionChanged(new[] { vm.Rows[0], vm.Rows[1] });
 
         Assert.Equal(SensorTableEdit.MULTI_VALUE_TEXT, vm.NameHint);
-        Assert.Equal("Fence", vm.TypeHint);                      // 공통값이면 그 값을 보인다
+        // 공통값이면 그 값을 보인다 — raw 코드가 아니라 "한국어 (코드)"(device-console enum-korean-consistency).
+        Assert.Equal("펜스센서 (Fence)", vm.TypeHint);
     }
 
     [Fact]
@@ -485,6 +487,99 @@ public class WiringViewModelTests
 
         Assert.False(vm.CanSave);
         Assert.NotNull(vm.SaveBlockedReason);
+    }
+    #endregion
+
+    #region - "종류" 콤보 표시(구 버그: raw 코드 노출) -
+    /// <summary>
+    /// 종류 콤보는 <c>IsEditable="True"</c> + <c>Text="{Binding TypeText}"</c> 로 서버에 보낼 원문 코드를
+    /// 직접 나른다(<see cref="SensorTypeDisplayConverter"/> remarks 참조) — 이 컨버터는 드롭다운 항목의
+    /// <b>겉보기 렌더에만</b> 쓰이고 <c>Text</c> 바인딩 자체는 건드리지 않으니, 여기서 원문이 그대로
+    /// 남는지를 직접 확인해 둔다(바인딩을 실제로 거는 것은 WPF 런타임이라 여기선 컨버터 계약만 본다).
+    /// </summary>
+    [Theory]
+    [InlineData("Fence", "펜스센서 (Fence)")]
+    [InlineData("PIR", "PIR센서 (PIR)")]
+    [InlineData("DOOR_SENSOR_X1", "DOOR_SENSOR_X1")]   // 카탈로그 코드 — 지어내지 않고 원문 보존
+    public void should_show_korean_display_but_keep_raw_code_untouched_when_sensor_type_converter_runs(string code, string expectedDisplay)
+    {
+        var converter = new SensorTypeDisplayConverter();
+
+        var display = converter.Convert(code, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        Assert.Equal(expectedDisplay, display);
+    }
+
+    [Fact]
+    public void should_throw_when_sensor_type_converter_back_is_used()
+    {
+        var converter = new SensorTypeDisplayConverter();
+        Assert.Throws<NotSupportedException>(() =>
+            converter.ConvertBack("펜스센서 (Fence)", typeof(string), null!, CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// 그리드 종류 콤보의 실제 렌더 칸(<c>SensorRowViewModel.TypeDisplayText</c>) — 쉬고 있을 때도(로드 직후)
+    /// "펜스센서 (Fence)" 처럼 한글이 보여야 한다(구 버그: raw "Fence" 그대로 노출). wire value
+    /// (<c>TypeText</c>)는 이 표시와 별개로 그대로다.
+    /// </summary>
+    [Fact]
+    public void should_show_korean_at_rest_when_row_type_display_text_is_read()
+    {
+        var vm = Open(sensors: 1);
+        var row = vm.Rows[0];
+
+        Assert.Equal("펜스센서 (Fence)", row.TypeDisplayText);
+        Assert.Equal("Fence", row.TypeText);   // wire value 는 raw 코드 그대로
+    }
+
+    [Fact]
+    public void should_write_raw_code_when_row_type_display_text_is_set_from_dropdown_pick()
+    {
+        var vm = Open(sensors: 1);
+        var row = vm.Rows[0];
+
+        row.TypeDisplayText = "PIR센서 (PIR)";   // 드롭다운에서 병기 항목을 고른 흉내
+
+        Assert.Equal("PIR", row.TypeText);       // 서버로 나가는 값은 코드만
+        Assert.Equal("PIR센서 (PIR)", row.TypeDisplayText);
+    }
+
+    [Fact]
+    public void should_write_typed_code_verbatim_when_row_type_display_text_has_no_bilingual_suffix()
+    {
+        var vm = Open(sensors: 1);
+        var row = vm.Rows[0];
+
+        row.TypeDisplayText = "DOOR_SENSOR_X1";   // 카탈로그 코드를 직접 타이핑한 흉내(병기 형식 아님)
+
+        Assert.Equal("DOOR_SENSOR_X1", row.TypeText);
+    }
+
+    [Fact]
+    public void should_show_korean_hint_and_write_raw_code_when_bulk_edit_type_display_is_used()
+    {
+        var vm = Open(sensors: 2);
+        vm.OnSelectionChanged(vm.Rows.ToList());   // 둘 다 "Fence" — 공통값 힌트 확인
+
+        Assert.Equal("펜스센서 (Fence)", vm.TypeHint);
+
+        vm.EditTypeDisplay = "지중센서 (Underground)";
+
+        Assert.Equal("Underground", vm.EditType);   // CurrentEdit.TypeText 가 읽는 wire value
+        Assert.Equal("Underground", vm.CurrentEdit.TypeText);
+    }
+
+    [Fact]
+    public void should_write_raw_code_when_make_sensors_type_display_is_used()
+    {
+        var dialogVm = new MakeSensorsViewModel(new[] { "Fence", "PIR", "Underground" }, "Fence", "북측", Array.Empty<int>(), 1);
+
+        Assert.Equal("펜스센서 (Fence)", dialogVm.TypeTextDisplay);
+
+        dialogVm.TypeTextDisplay = "PIR센서 (PIR)";
+
+        Assert.Equal("PIR", dialogVm.TypeText);
     }
     #endregion
 }

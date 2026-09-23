@@ -162,12 +162,16 @@ public class DeviceColumnCatalogTests : IDisposable
         Assert.False(kind.LegacyContractOnly);
     }
 
+    /// <summary>
+    /// raw enum 이름("IpCamera" 등)이 그리드에 새지 않도록, 레거시 "종류" 열은 <see cref="DeviceViewModel.DeviceType"/>
+    /// 이 아니라 한글 병기 표시 전용 프로퍼티(device-console enum-korean-consistency)에 묶인다.
+    /// </summary>
     [Fact]
-    public void should_bind_kind_column_to_device_type_when_legacy_contract()
+    public void should_bind_kind_column_to_device_type_display_when_legacy_contract()
     {
         var kind = DeviceColumnCatalog.For(EnumDeviceCategory.Controller, isAxisContract: false).Single(c => c.Key == "kind");
 
-        Assert.Equal(nameof(DeviceViewModel.DeviceType), kind.BindingPath);
+        Assert.Equal(nameof(DeviceViewModel.DeviceTypeDisplay), kind.BindingPath);
         Assert.True(kind.LegacyContractOnly);
         Assert.False(kind.AxisContractOnly);
     }

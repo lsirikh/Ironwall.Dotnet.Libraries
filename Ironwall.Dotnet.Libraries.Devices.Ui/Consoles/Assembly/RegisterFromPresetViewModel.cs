@@ -32,6 +32,7 @@ public sealed class RegisterFromPresetViewModel : Screen
     private DevicePreset? _selectedPreset;
     private string _deviceNumber = string.Empty;
     private string _deviceName = string.Empty;
+    private string _description = string.Empty;
     private string _ipAddress = string.Empty;
     private string _ipPort = string.Empty;
     private string _userName = string.Empty;
@@ -111,6 +112,8 @@ public sealed class RegisterFromPresetViewModel : Screen
     #region - 개체 정보(프리셋이 담지 않는 것) -
     public string DeviceNumber { get => _deviceNumber; set => Assign(ref _deviceNumber, value, rebuild: true); }
     public string DeviceName { get => _deviceName; set => Assign(ref _deviceName, value, rebuild: true); }
+    /// <summary>비워 두면 안 보낸다(DTO 가 <c>NullValueHandling.Ignore</c>) — 필수 아님.</summary>
+    public string Description { get => _description; set => Assign(ref _description, value, rebuild: true); }
     public string IpAddress { get => _ipAddress; set => Assign(ref _ipAddress, value, rebuild: true); }
     public string IpPort { get => _ipPort; set => Assign(ref _ipPort, value, rebuild: true); }
     public string UserName { get => _userName; set => Assign(ref _userName, value, rebuild: true); }
@@ -196,6 +199,7 @@ public sealed class RegisterFromPresetViewModel : Screen
         {
             DeviceNumber = number,
             DeviceName = _deviceName?.Trim() ?? string.Empty,
+            Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
             IpAddress = ShowsConnection && !string.IsNullOrWhiteSpace(_ipAddress) ? _ipAddress.Trim() : null,
             IpPort = port,
             UserName = ShowsCredentials && !string.IsNullOrWhiteSpace(_userName) ? _userName.Trim() : null,

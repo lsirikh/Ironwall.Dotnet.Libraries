@@ -21,7 +21,7 @@ public class SpeakerDeviceDto : BaseDeviceDto
     /// <summary>
     /// 장비 설명
     /// </summary>
-    [JsonProperty("description", Order = 12)]
+    [JsonProperty("description", Order = 12, NullValueHandling = NullValueHandling.Ignore)]
     public string? Description { get; set; }
 
     /// <summary>

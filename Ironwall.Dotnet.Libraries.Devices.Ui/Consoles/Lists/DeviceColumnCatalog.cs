@@ -73,7 +73,7 @@ public static class DeviceColumnCatalog
         new("kind", "종류", nameof(DeviceViewModel.TypeAxisDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 130, AxisContractOnly: true);
 
     private static DeviceColumnSpec KindLegacy() =>
-        new("kind", "종류", nameof(DeviceViewModel.DeviceType), DeviceColumnKind.Text, IsDefault: true, Width: 130, LegacyContractOnly: true);
+        new("kind", "종류", nameof(DeviceViewModel.DeviceTypeDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 130, LegacyContractOnly: true);
 
     private static DeviceColumnSpec Enabled() =>
         new("enabled", "활성화", nameof(DeviceViewModel.IsEnable), DeviceColumnKind.Check, IsDefault: true, Width: 72);

@@ -20,6 +20,12 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<wiring:IssueLevelBrushConverter x:Key="IssueBrush" />
 		<wiring:IssueLevelGlyphConverter x:Key="IssueGlyph" />
+		<wiring:SensorTypeDisplayConverter x:Key="SensorTypeKorean" />
+
+		<!--  종류 콤보 드롭다운 항목 — 겉보기만 "한국어 (코드)". Text 바인딩은 그대로 원문 코드를 나른다.  -->
+		<DataTemplate x:Key="W.SensorTypeItem">
+			<TextBlock Text="{Binding Converter={StaticResource SensorTypeKorean}}" />
+		</DataTemplate>
 
 		<Style x:Key="W.Title" TargetType="TextBlock">
 			<Setter Property="FontSize" Value="13" />
@@ -587,8 +593,9 @@
 												AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Wiring.Cell.Type.{0}}"
 												FontSize="12.5"
 												IsEditable="True"
+												ItemTemplate="{StaticResource W.SensorTypeItem}"
 												ItemsSource="{Binding DataContext.SensorTypes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-												Text="{Binding TypeText, UpdateSourceTrigger=LostFocus}" />
+												Text="{Binding TypeDisplayText, UpdateSourceTrigger=LostFocus}" />
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
@@ -768,9 +775,10 @@
 										Margin="0,4"
 										AutomationProperties.AutomationId="Devices.Wiring.Edit.Type"
 										IsEditable="True"
+										ItemTemplate="{StaticResource W.SensorTypeItem}"
 										ItemsSource="{Binding SensorTypes}"
 										md:HintAssist.Hint="{Binding TypeHint}"
-										Text="{Binding EditType, UpdateSourceTrigger=PropertyChanged}" />
+										Text="{Binding EditTypeDisplay, UpdateSourceTrigger=PropertyChanged}" />
 									<TextBlock Grid.Row="3" VerticalAlignment="Center" Style="{StaticResource W.Hint}" Text="구역" />
 									<Grid
 										Grid.Row="3"
