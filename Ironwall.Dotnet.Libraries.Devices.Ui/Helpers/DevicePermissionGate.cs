@@ -29,10 +29,7 @@ internal static class DevicePermissionGate
     /// <para>모듈 키는 <see cref="PermissionCatalog.ServerKey(EnumPermissionModule)"/> 로 얻는다(문자열 리터럴 중복 금지).
     /// 서버 백필이 <c>devices:view</c> 보유 그룹에 <c>units:view</c> 를 함께 켰으므로 정상 배포에서는 통과한다.</para>
     /// </remarks>
-    internal static bool CanViewUnits()
-        => PermissionUiPolicy.Allowed(Resolve(),
-                                      PermissionCatalog.ServerKey(EnumPermissionModule.Units),
-                                      EnumPermissionVerb.View);
+    internal static bool CanViewUnits() => UnitPermissionGate.CanView();   // 단일 출처 — 부대 콘솔과 같은 판정
 
     /// <summary>
     /// IPermissionService IoC lazy 해석. 미등록(오프라인/테스트/DI 미설정) 시 null 반환.

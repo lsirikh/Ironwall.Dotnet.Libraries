@@ -860,4 +860,139 @@ public class UnitConsoleViewModelTests
         Assert.Equal(0, Row(console, 1).DeviceCount);
     }
     #endregion
+
+    #region - 권한 기본값 — 서버와 같은 모듈(units:view · units:edit · units:delete / 배치는 devices:edit) -
+    // 서버(app/security/permission_map.py): GET /api/units* = units:view · POST/PATCH/PUT = units:edit ·
+    // DELETE = units:delete. 장비를 부대에 두는 것은 PATCH /api/devices/… 라 devices:edit 다.
+    // 이 절은 게이트를 주입하지 않고 **기본값**(호스트 launcher 가 쓰는 그대로)을 진짜 PermissionService 로 검증한다.
+
+    private sealed class PermissionScope : IDisposable
+    {
+        private readonly Func<Type, string, object> _getInstance = IoC.GetInstance;
+        private readonly Func<Type, IEnumerable<object>> _getAllInstances = IoC.GetAllInstances;
+        private readonly Action<object> _buildUp = IoC.BuildUp;
+
+        public PermissionScope(string modulesJson)
+        {
+            var permission = new Ironwall.Dotnet.Libraries.Accounts.Api.Services.PermissionService();
+            permission.Apply(new Ironwall.Dotnet.Libraries.Messages.Dto.Accounts.AuthUserDto
+            {
+                Role = "OPERATOR",
+                Permissions = JObject.Parse(modulesJson),
+            });
+
+            IoC.GetInstance = (type, key) =>
+                type == typeof(Ironwall.Dotnet.Libraries.Accounts.Api.Services.IPermissionService) ? permission
+                : type == typeof(IEventAggregator) ? new EventAggregator()
+                : null!;
+            IoC.GetAllInstances = type => Enumerable.Empty<object>();
+            IoC.BuildUp = obj => { };
+        }
+
+        public void Dispose()
+        {
+            IoC.GetInstance = _getInstance;
+            IoC.GetAllInstances = _getAllInstances;
+            IoC.BuildUp = _buildUp;
+        }
+    }
+
+    private static string Modules(string devices, string units)
+        => $@"{{""modules"":{{""devices"":{{{devices}}},""units"":{{{units}}}}}}}";
+
+    private const string VIEW = @"""view"":true";
+    private const string VIEW_EDIT = @"""view"":true,""edit"":true";
+    private const string ALL = @"""view"":true,""edit"":true,""delete"":true";
+
+    /// <summary>게이트를 넘기지 않는다 — 기본값이 무엇을 보는지가 시험 대상이다.</summary>
+    private static async Task<(UnitConsoleViewModel Console, FakeUnitApi Units, FakeDeviceApi Devices)> OpenWithDefaultGatesAsync(
+        IEnumerable<UnitDeviceItem>? devices = null)
+    {
+        var units = new FakeUnitApi() { Graph = Sample() };
+        var deviceApi = new FakeDeviceApi();
+        if (devices is not null) deviceApi.Items.AddRange(devices);
+
+        var console = new UnitConsoleViewModel(units, deviceApi, log: null, myUnitCode: () => "c06");
+        await ((IActivate)console).ActivateAsync();
+        return (console, units, deviceApi);
+    }
+
+    [Fact]
+    public async Task should_block_unit_writes_when_the_account_holds_devices_edit_but_not_units_edit()
+    {
+        using var scope = new PermissionScope(Modules(devices: ALL, units: VIEW));
+        var (console, units, _) = await OpenWithDefaultGatesAsync();
+
+        await console.SelectByIdAsync(6);
+        var moved = await console.MoveAsync(6, 8);
+
+        Assert.False(console.CanEditUnits);
+        Assert.False(console.CanAdd);
+        Assert.False(console.CanDeleteUnit);
+        Assert.False(moved);
+        Assert.Empty(units.Patches);                           // 서버가 403 을 낼 요청을 보내지 않는다
+    }
+
+    [Fact]
+    public async Task should_allow_unit_writes_when_the_account_holds_units_edit_without_devices_edit()
+    {
+        using var scope = new PermissionScope(Modules(devices: VIEW, units: ALL));
+        var (console, units, _) = await OpenWithDefaultGatesAsync();
+
+        await console.SelectByIdAsync(6);
+        Assert.True(console.CanEditUnits);
+        Assert.True(console.CanAdd);
+        Assert.True(console.CanDeleteUnit);
+
+        var moved = await console.MoveAsync(6, 8);
+
+        Assert.True(moved);
+        Assert.Single(units.Patches);
+    }
+
+    [Fact]
+    public async Task should_not_read_the_graph_when_the_account_lacks_units_view()
+    {
+        using var scope = new PermissionScope(Modules(devices: ALL, units: ""));
+        var (console, units, devices) = await OpenWithDefaultGatesAsync();
+
+        Assert.Equal(0, units.GraphReads);                     // GET /api/units/graph 는 units:view — 403 왕복을 만들지 않는다
+        Assert.Equal(0, devices.Loads);
+        Assert.False(console.CanReload);
+        Assert.Contains("units:view", console.StatusText);
+    }
+
+    [Fact]
+    public async Task should_keep_device_placement_on_devices_edit_when_the_account_lacks_units_edit()
+    {
+        using var scope = new PermissionScope(Modules(devices: VIEW_EDIT, units: VIEW));
+        var (console, _, _) = await OpenWithDefaultGatesAsync(devices: new[] { Device(1, null) });
+        await console.ReloadAsync();
+        console.SetSelectedDevices(console.DeviceRows.ToList());
+        console.AssignTargetUnitId = 6;
+
+        var verdict = console.Drop.Verdict(PayloadOf(console.DeviceRows[0]), new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 6), -1));
+
+        Assert.False(console.CanEditUnits);
+        Assert.True(console.CanAssignSelectedDevices);          // 배치는 장비 쓰기다 — units:edit 가 없어도 된다
+        Assert.True(verdict.IsAllowed, verdict.Reason);
+    }
+
+    [Fact]
+    public async Task should_block_device_placement_when_the_account_lacks_devices_edit()
+    {
+        using var scope = new PermissionScope(Modules(devices: VIEW, units: ALL));
+        var (console, _, _) = await OpenWithDefaultGatesAsync(devices: new[] { Device(1, null) });
+        await console.ReloadAsync();
+        console.SetSelectedDevices(console.DeviceRows.ToList());
+        console.AssignTargetUnitId = 6;
+
+        var verdict = console.Drop.Verdict(PayloadOf(console.DeviceRows[0]), new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 6), -1));
+
+        Assert.True(console.CanEditUnits);
+        Assert.False(console.CanAssignSelectedDevices);
+        Assert.False(verdict.IsAllowed);
+        Assert.Contains("devices:edit", verdict.Reason);
+    }
+    #endregion
 }

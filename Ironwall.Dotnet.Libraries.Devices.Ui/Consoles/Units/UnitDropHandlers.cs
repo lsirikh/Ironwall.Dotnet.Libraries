@@ -40,14 +40,21 @@ public sealed class UnitDropHandler : IDragDropHandler
     private readonly Func<bool> _isBusy;
     private readonly Action<UnitDropRequest> _onDrop;
     private readonly Action<string>? _onBlocked;
+    private readonly Func<bool> _canPlaceDevices;
 
+    /// <summary>장비 배치가 막힌 까닭 — 배치는 장비 쓰기(<c>PATCH /api/devices/…</c>)라 <c>devices:edit</c> 다.</summary>
+    public const string PlaceDeniedReason = "장비를 부대에 둘 권한이 없습니다(devices:edit).";
+
+    /// <param name="canEdit">부대 쓰기(<c>units:edit</c>) — 상위 바꾸기 · 인접.</param>
+    /// <param name="canPlaceDevices">장비 배치(<c>devices:edit</c>). 생략하면 <paramref name="canEdit"/> 를 따른다.</param>
     public UnitDropHandler(
         Func<UnitTreeModel?> tree,
         Func<int> selectedUnitId,
         Func<bool> canEdit,
         Func<bool> isBusy,
         Action<UnitDropRequest> onDrop,
-        Action<string>? onBlocked = null)
+        Action<string>? onBlocked = null,
+        Func<bool>? canPlaceDevices = null)
     {
         _tree = tree ?? throw new ArgumentNullException(nameof(tree));
         _selectedUnitId = selectedUnitId ?? throw new ArgumentNullException(nameof(selectedUnitId));
@@ -55,6 +62,7 @@ public sealed class UnitDropHandler : IDragDropHandler
         _isBusy = isBusy ?? throw new ArgumentNullException(nameof(isBusy));
         _onDrop = onDrop ?? throw new ArgumentNullException(nameof(onDrop));
         _onBlocked = onBlocked;
+        _canPlaceDevices = canPlaceDevices ?? _canEdit;
     }
 
     public bool CanDrop(DragPayload payload, DropTarget target)
@@ -92,11 +100,15 @@ public sealed class UnitDropHandler : IDragDropHandler
     {
         if (items == null || target == null) return UnitDropVerdict.Block("끌어 온 것이 없습니다.");
         if (_isBusy()) return UnitDropVerdict.Block("앞선 작업이 아직 끝나지 않았습니다.");
-        if (!_canEdit()) return UnitDropVerdict.Block("부대를 바꿀 권한이 없습니다(units:edit).");
 
         var tree = _tree();
         var units = UnitsOf(items);
         var devices = DevicesOf(items);
+
+        // 서버가 지키는 모듈이 다르다 — 장비를 두는 것은 devices:edit, 부대를 옮기고 잇는 것은 units:edit.
+        var placingDevices = target.ZoneKey == UnitDropRules.ZONE_PARENT && devices.Count > 0;
+        if (placingDevices && !_canPlaceDevices()) return UnitDropVerdict.Block(PlaceDeniedReason);
+        if (!placingDevices && !_canEdit()) return UnitDropVerdict.Block("부대를 바꿀 권한이 없습니다(units:edit).");
 
         switch (target.ZoneKey)
         {

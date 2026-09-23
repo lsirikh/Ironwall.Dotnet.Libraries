@@ -165,7 +165,8 @@ public sealed class ServerConsoleService : IServerConsoleService
         var errors = ServerRequestBuilder.Validate(intent, fetched, Contract);
         if (errors.Count > 0) return new ServerWriteResult(false, string.Join(" · ", errors.Select(e => e.Message)));
 
-        await StampUnitAsync(intent, token).ConfigureAwait(false);
+        // 수정은 소속을 옮기지 않는다 — 자기 부대를 찍지 않고 방금 다시 받은 서버의 부대를 싣는다(D-13 과 같은 규칙).
+        PreserveUnitForEdit(intent, fetched);
 
         var result = await _axis.PatchServerAsync(id, intent, token).ConfigureAwait(false);
         return new ServerWriteResult(result.IsSuccess, result.IsSuccess ? "설정을 저장했습니다" : result.Message);
@@ -190,17 +191,37 @@ public sealed class ServerConsoleService : IServerConsoleService
             : (new ServerWriteResult(false, result.Message), 0);
     }
 
+    /// <remarks>
+    /// 배정은 <c>server_id</c> 하나만 바꾸는 병합 패치다 — <b><c>unit_id</c> 를 싣지 않는다</b>.
+    /// 예전에는 이 클라이언트의 부대를 실어, 다른 부대 장비를 배정·되돌리기 하면 그 장비가 조용히 내 부대로 옮겨졌다
+    /// (실측: 본문 <c>{"server_id":18,"unit_id":1}</c> → 부대 B 의 제어기가 부대 1 로). 서버의 수정 경로는
+    /// 미전송 키를 그대로 둔다(<c>device_axes_io.apply_scalar_fields</c> · <c>unit_scope.assert_unit_exists</c>) —
+    /// 등록과 달리 기본 부대로 귀속시키지 않는다. 화면이 쥔 장비 모델의 부대는 낡았을 수 있어 싣지 않는다.
+    /// </remarks>
     public async Task<ServerWriteResult> AssignDeviceAsync(
         EnumDeviceCategory category, int deviceId, int? serverId, CancellationToken token = default)
     {
-        var unitId = await ResolveUnitAsync(token).ConfigureAwait(false);
-        var result = await _axis.AssignDeviceServerAsync(category, deviceId, serverId, unitId, token).ConfigureAwait(false);
+        var result = await _axis.AssignDeviceServerAsync(category, deviceId, serverId, unitId: null, token).ConfigureAwait(false);
         return new ServerWriteResult(result.IsSuccess, result.Message);
     }
 
     /// <summary>
-    /// 8.0 이상이면 이 클라이언트의 부대를 본문에 싣는다 — 생략하면 서버가 <b>기본 부대로 귀속</b>시키고
+    /// 수정 본문의 부대 — 사람이 고른 부대가 있으면 그것을, 없으면 <b>저장 직전에 다시 받은 서버의 부대</b>를 싣는다.
+    /// 이 클라이언트의 부대는 <b>찍지 않는다</b> — 찍으면 다른 부대 서버의 임계만 고쳐도 서버가 내 부대로 옮겨진다
+    /// (실측: 본문 <c>{"server_config":…,"unit_id":1}</c> → 부대 B 의 서버가 부대 1 로). 받은 부대가 없으면
+    /// 키를 싣지 않는다 — PATCH 에서 미전송은 "그대로 두라" 다.
+    /// </summary>
+    private void PreserveUnitForEdit(ServerWriteIntent intent, ServerAxisView fetched)
+    {
+        if (!IsUnitEra) { intent.UnitId = null; return; }
+        if (intent.UnitId is > 0) return;            // 사람이 고른 부대가 있으면 그것을 존중한다
+        intent.UnitId = fetched.UnitId is > 0 ? fetched.UnitId : null;
+    }
+
+    /// <summary>
+    /// <b>등록 전용</b> — 8.0 이상이면 이 클라이언트의 부대를 본문에 싣는다. 생략하면 서버가 <b>기본 부대로 귀속</b>시키고
     /// 응답에 아무 신호도 남기지 않는다(장비 쓰기의 <see cref="UnitScopeGate"/> 와 같은 규칙).
+    /// 수정·배정에는 쓰지 않는다 — <see cref="PreserveUnitForEdit"/> · <see cref="AssignDeviceAsync"/>.
     /// </summary>
     private async Task StampUnitAsync(ServerWriteIntent intent, CancellationToken token)
     {

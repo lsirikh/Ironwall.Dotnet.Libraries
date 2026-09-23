@@ -565,7 +565,7 @@
 									Margin="0,4,0,0"
 									AutomationProperties.AutomationId="Units.Devices.TargetCombo"
 									DisplayMemberPath="Label"
-									IsEnabled="{Binding CanEditUnits}"
+									IsEnabled="{Binding CanPlaceDevices}"
 									ItemsSource="{Binding AssignTargets}"
 									SelectedValue="{Binding AssignTargetUnitId, Mode=TwoWay}"
 									SelectedValuePath="Id"
@@ -603,7 +603,7 @@
 									<drag:CaptureDragBehavior
 										DisplayMemberPath="Name"
 										Handler="{Binding Drop}"
-										IsDragEnabled="{Binding CanEditUnits}"
+										IsDragEnabled="{Binding CanPlaceDevices}"
 										KeyboardFallback="장비를 고르고 아래 [이 부대에 배치]" />
 								</b:Interaction.Behaviors>
 								<ListBox.ItemContainerStyle>

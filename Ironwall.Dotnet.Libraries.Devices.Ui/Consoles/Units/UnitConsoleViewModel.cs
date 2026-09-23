@@ -47,20 +47,26 @@ public sealed class UnitConsoleViewModel : Screen
         ILogService? log = null,
         Func<string?>? myUnitCode = null,
         Func<bool>? canEdit = null,
-        Func<bool>? canDelete = null)
+        Func<bool>? canDelete = null,
+        Func<bool>? canView = null,
+        Func<bool>? canPlaceDevices = null)
     {
         _units = units ?? throw new ArgumentNullException(nameof(units));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         _log = log;
         _myUnitCode = myUnitCode ?? (() => null);
-        _canEdit = canEdit ?? DevicePermissionGate.CanEdit;
-        _canDelete = canDelete ?? DevicePermissionGate.CanDelete;
+        // 서버가 부대 편제를 지키는 모듈 그대로 — units:edit · units:delete · units:view(permission_map.py).
+        // 장비를 부대에 두는 것만 장비 쓰기(PATCH /api/devices/…)라 devices:edit 다.
+        _canEdit = canEdit ?? UnitPermissionGate.CanEdit;
+        _canDelete = canDelete ?? UnitPermissionGate.CanDelete;
+        _canView = canView ?? UnitPermissionGate.CanView;
+        _canPlaceDevices = canPlaceDevices ?? DevicePermissionGate.CanEdit;
 
         Detail = new ConsoleDetailPresenter { TypeName = "부대" };
         Form = new UnitDetailFormViewModel(Detail);
         Tray = new DraftTrayViewModel();
         Drop = new UnitDropHandler(() => Tree, () => SelectedRow?.Id ?? 0, () => _canEdit(), () => IsBusy, OnDropped,
-                                   reason => StatusText = reason);
+                                   reason => StatusText = reason, () => _canPlaceDevices());
 
         // 아이콘은 이름만 쥔 토큰이다 — 싱글턴이 아닌 창이어도 뷰모델이 시각 요소를 쥐지 않는다(장비 콘솔 선례).
         RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리", new ConsoleIconToken("FileTree")) { ShowCount = true });
@@ -180,9 +186,13 @@ public sealed class UnitConsoleViewModel : Screen
     public string AddBlockedReason => !IsAvailable ? "이 서버 판본에는 부대 편제가 없습니다." : "부대를 등록할 권한이 없습니다(units:edit).";
     public bool CanDeleteUnit => IsAvailable && _canDelete() && SelectedRow is not null && !Form.IsCreating && !IsBusy;
     public string DeleteBlockedReason => SelectedRow is null ? "지울 부대를 먼저 고르세요." : "부대를 지울 권한이 없습니다(units:delete).";
-    public bool CanReload => IsAvailable && !IsBusy;
+    public bool CanViewUnits => _canView();
+    public bool CanReload => IsAvailable && CanViewUnits && !IsBusy;
     public bool CanMoveSelected => IsAvailable && CanEditUnits && SelectedRow is not null && !IsBusy;
-    public bool CanAssignSelectedDevices => IsAvailable && CanEditUnits && SelectedDevices.Count > 0 && AssignTargetId > 0 && !IsBusy;
+
+    /// <summary>장비를 부대에 두는 것은 장비 쓰기다(<c>devices:edit</c>) — <c>units:edit</c> 가 아니다.</summary>
+    public bool CanPlaceDevices => IsAvailable && _canPlaceDevices();
+    public bool CanAssignSelectedDevices => CanPlaceDevices && SelectedDevices.Count > 0 && AssignTargetId > 0 && !IsBusy;
 
     /// <summary>장비를 놓을 부대 — 트리 선택을 따르되 콤보로도 고른다(드래그의 버튼 · 키보드 경로).</summary>
     public int? AssignTargetUnitId
@@ -231,6 +241,12 @@ public sealed class UnitConsoleViewModel : Screen
         if (!IsAvailable)
         {
             StatusText = "이 서버 판본에는 부대 편제가 없습니다 — 서버 8.0 이상에서만 보입니다.";
+            return;
+        }
+        if (!CanViewUnits)
+        {
+            // GET /api/units/graph 는 units:view 다 — 권한이 없으면 부르기 전에 접는다(403 왕복을 만들지 않는다).
+            StatusText = "부대 편제를 볼 권한이 없습니다(units:view).";
             return;
         }
 
@@ -814,6 +830,8 @@ public sealed class UnitConsoleViewModel : Screen
         if (Tree.Find(targetUnitId) is not { } target) return;
         if (Tray.IsApplying) { StatusText = "적용 중에는 더 쌓을 수 없습니다."; return; }
 
+        if (!CanPlaceDevices) { StatusText = UnitDropHandler.PlaceDeniedReason; return; }
+
         var verdict = UnitDropRules.CanAssignDevices(Tree, targetUnitId, devices.Select(d => d.Item.UnitId).ToList());
         if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return; }
 
@@ -994,6 +1012,8 @@ public sealed class UnitConsoleViewModel : Screen
         NotifyOfPropertyChange(nameof(AssignTargetText));
         NotifyOfPropertyChange(nameof(CanUndoMove));
         NotifyOfPropertyChange(nameof(CanEditUnits));
+        NotifyOfPropertyChange(nameof(CanViewUnits));
+        NotifyOfPropertyChange(nameof(CanPlaceDevices));
         NotifyOfPropertyChange(nameof(IsAvailable));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
@@ -1011,6 +1031,8 @@ public sealed class UnitConsoleViewModel : Screen
     private readonly Func<string?> _myUnitCode;
     private readonly Func<bool> _canEdit;
     private readonly Func<bool> _canDelete;
+    private readonly Func<bool> _canView;
+    private readonly Func<bool> _canPlaceDevices;
 
     private readonly Dictionary<int, UnitNodeRowViewModel> _rowCache = new();
     private readonly Dictionary<int, UnitDeviceRowViewModel> _deviceRowCache = new();
