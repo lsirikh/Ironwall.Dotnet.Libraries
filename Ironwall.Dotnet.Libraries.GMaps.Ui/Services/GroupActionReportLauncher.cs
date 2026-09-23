@@ -58,8 +58,9 @@ public class GroupActionReportLauncher : IGroupActionReportLauncher
                 return false;
             }
 
-            // FR-07 — 조치보고 권한(events control). 서버 RBAC이 권위이고 여기는 보조 게이트.
-            if (!CanControlEvents())
+            // FR-07 — 조치보고 권한. 서버 POST /events/actions 는 events:edit 를 요구한다(6.3.2 · 8.0.2 동일) —
+            // 이벤트 창과 같은 판정(ActionReportRules)을 쓴다. 서버 RBAC이 권위이고 여기는 보조 게이트.
+            if (!CanReportEvents())
             {
                 _log?.Info($"[GroupActionReport] 권한 없음 — 스킵: {title}(group={groupId})");
                 Notify("권한 없음", "조치보고 권한이 없습니다.");
@@ -191,10 +192,10 @@ public class GroupActionReportLauncher : IGroupActionReportLauncher
         => Resolve<DetectionReportDialogViewModel>()?.IsActive == true
         || Resolve<MalfunctionReportDialogViewModel>()?.IsActive == true;
 
-    /// <summary>events 도메인 control 권한. PermissionService 미해석(오프라인/테스트)이면 전체허용 폴백.</summary>
-    private bool CanControlEvents()
+    /// <summary>조치보고 권한(events:edit — ActionReportTemplate 이 아닌 조치 생성). PermissionService 미해석(오프라인/테스트)이면 전체허용 폴백.</summary>
+    private bool CanReportEvents()
     {
-        try { return Resolve<IPermissionService>()?.CanControl("events") ?? true; }
+        try { return Ironwall.Dotnet.Libraries.Events.Ui.Helpers.ActionReportRules.CanReport(Resolve<IPermissionService>()); }
         catch { return true; }
     }
 

@@ -163,11 +163,16 @@ public class GroupActionReportLauncherTests : IDisposable
         Assert.Null(Published<OpenEventReportDialogMessageModel>());     // 창 안 열림
     }
 
+    /// <summary>
+    /// 서버 POST /events/actions 는 events:edit 를 요구한다(6.3.2 · 8.0.2 동일). 운영자 프리셋은 events 가
+    /// view + control 이라 control 만으로 열어 주면 창은 뜨고 서버가 403 으로 거절한다.
+    /// </summary>
     [Fact]
-    public void should_skip_when_events_control_permission_denied()
+    public void should_skip_when_events_edit_permission_is_missing_even_with_control()
     {
         var perm = new Mock<IPermissionService>();
-        perm.Setup(p => p.CanControl("events")).Returns(false);
+        perm.Setup(p => p.CanControl("events")).Returns(true);
+        perm.Setup(p => p.CanEdit("events")).Returns(false);
         _permission = perm.Object;
         Enqueue(10, EnumEventType.Intrusion);
         AddDetectionModel(10, DateTime.Now);
@@ -177,6 +182,22 @@ public class GroupActionReportLauncherTests : IDisposable
         Assert.False(result);
         Assert.NotNull(Published<OpenInfoPopupMessageModel>());          // 권한 없음 안내 (S-38)
         Assert.Null(Published<OpenEventReportDialogMessageModel>());
+    }
+
+    [Fact]
+    public void should_open_report_when_events_edit_permission_is_granted_without_control()
+    {
+        var perm = new Mock<IPermissionService>();
+        perm.Setup(p => p.CanControl("events")).Returns(false);
+        perm.Setup(p => p.CanEdit("events")).Returns(true);
+        _permission = perm.Object;
+        Enqueue(10, EnumEventType.Intrusion);
+        AddDetectionModel(10, DateTime.Now);
+
+        var result = NewLauncher().TryOpenForGroup(NewMarker());
+
+        Assert.True(result);
+        Assert.NotNull(Published<OpenEventReportDialogMessageModel>());
     }
 
     [Fact]
