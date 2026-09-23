@@ -35,36 +35,43 @@ public static partial class Steps
         UnitScope = new UnitScopeService(unitApi, nats, boot.Probe, boot.Log);
         InstallIoC(UnitScope);
 
-        // ---- item 2 ----
-        await Item2_Wiring(boot, rec, raw, deviceApi, policy).ConfigureAwait(false);
+        // 기본 점검 — LRT_ONLY 가 있으면 건너뛴다(Steps.Extra.cs).
+        if (RunCoreItems)
+        {
+            // ---- item 2 ----
+            await Item2_Wiring(boot, rec, raw, deviceApi, policy).ConfigureAwait(false);
 
-        // ---- item 4 ----
-        await Item4_Groups(boot, rec, raw, deviceApi).ConfigureAwait(false);
+            // ---- item 4 ----
+            await Item4_Groups(boot, rec, raw, deviceApi).ConfigureAwait(false);
 
-        // ---- item 7 ----
-        await Item7_UnitScope(boot, rec, raw, nats).ConfigureAwait(false);
+            // ---- item 7 ----
+            await Item7_UnitScope(boot, rec, raw, nats).ConfigureAwait(false);
 
-        // ---- item 3 / 5 / 6 ----
-        await Item3_Components(boot, rec, raw, deviceApi, policy).ConfigureAwait(false);
-        await Item5_Accounts(boot, rec, raw).ConfigureAwait(false);
-        await Item6_Reports(boot, rec, raw).ConfigureAwait(false);
+            // ---- item 3 / 5 / 6 ----
+            await Item3_Components(boot, rec, raw, deviceApi, policy).ConfigureAwait(false);
+            await Item5_Accounts(boot, rec, raw).ConfigureAwait(false);
+            await Item6_Reports(boot, rec, raw).ConfigureAwait(false);
 
-        // ---- item 8: unit create/delete round trip through the real service ----
-        await Item8_Unit(boot, rec, raw, unitApi).ConfigureAwait(false);
+            // ---- item 8: unit create/delete round trip through the real service ----
+            await Item8_Unit(boot, rec, raw, unitApi).ConfigureAwait(false);
 
-        // ---- item 10: server axis round trip (D-22) - the real ServerAxisApiService writes the
-        //      8.0 shape, the legacy ServerApiService refuses on axis-era before touching the wire ----
-        await Item10_ServerAxis(boot, rec, raw).ConfigureAwait(false);
+            // ---- item 10: server axis round trip (D-22) - the real ServerAxisApiService writes the
+            //      8.0 shape, the legacy ServerApiService refuses on axis-era before touching the wire ----
+            await Item10_ServerAxis(boot, rec, raw).ConfigureAwait(false);
 
-        // ---- item 11: unit preservation on edit (D-13, ledger D-2026-09-23-1b2e76) - a SECOND
-        //      unit proves editing another unit's device does not silently reassign it to this
-        //      client's own unit. Must run before the cleanup sweep (item 9 stays last). ----
-        await Item11_UnitPreservation(boot, rec, raw, deviceApi, unitApi, policy).ConfigureAwait(false);
+            // ---- item 11: unit preservation on edit (D-13, ledger D-2026-09-23-1b2e76) - a SECOND
+            //      unit proves editing another unit's device does not silently reassign it to this
+            //      client's own unit. Must run before the cleanup sweep (item 9 stays last). ----
+            await Item11_UnitPreservation(boot, rec, raw, deviceApi, unitApi, policy).ConfigureAwait(false);
 
-        // ---- item 9: the mandated fix (D-17) - verify cleanup for real, never let an
-        //      unreachable listing endpoint read as "clean" ----
-        // ---- D-34: 조치보고 문구 — 등록 · 단일 /reorder · 두 번째 /reorder 로 되돌리기 · 삭제 ----
-        await Item_ActionReportTemplates(boot, rec, raw).ConfigureAwait(false);
+            // ---- item 9: the mandated fix (D-17) - verify cleanup for real, never let an
+            //      unreachable listing endpoint read as "clean" ----
+            // ---- D-34: 조치보고 문구 — 등록 · 단일 /reorder · 두 번째 /reorder 로 되돌리기 · 삭제 ----
+            await Item_ActionReportTemplates(boot, rec, raw).ConfigureAwait(false);
+        }
+
+        // ---- 확장 점검(Steps.Extra.cs 의 [ExtraStep]) — 작업자마다 새 파일로 더한다. 정리 스윕 직전. ----
+        await RunExtraSteps(new ExtraContext(boot, rec, raw, deviceApi, unitApi, policy)).ConfigureAwait(false);
 
         await Item9_CleanupSweep(boot, rec, raw).ConfigureAwait(false);
 
