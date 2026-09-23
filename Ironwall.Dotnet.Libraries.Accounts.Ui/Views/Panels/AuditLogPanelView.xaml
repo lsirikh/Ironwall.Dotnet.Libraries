@@ -89,14 +89,14 @@
 				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
-				<DataGridTextColumn Width="150" Binding="{Binding CreatedAt}" Header="시각" />
-				<DataGridTextColumn Width="130" Binding="{Binding ActionType}" Header="동작" />
-				<DataGridTextColumn Width="70" Binding="{Binding ActionStatus}" Header="상태" />
-				<DataGridTextColumn Width="120" Binding="{Binding ResourceType}" Header="대상" />
-				<DataGridTextColumn Width="150" Binding="{Binding ResourceName}" Header="대상명" />
-				<DataGridTextColumn Width="120" Binding="{Binding ActorLoginId}" Header="행위자" />
-				<DataGridTextColumn Width="120" Binding="{Binding IpAddress}" Header="IP" />
-				<DataGridTextColumn Width="*" Binding="{Binding Description}" Header="설명" />
+				<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding CreatedAt}" Header="시각" />
+				<DataGridTextColumn Width="130" MinWidth="130" Binding="{Binding ActionType}" Header="동작" />
+				<DataGridTextColumn Width="70" MinWidth="70" Binding="{Binding ActionStatus}" Header="상태" />
+				<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding ResourceType}" Header="대상" />
+				<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding ResourceName}" Header="대상명" />
+				<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding ActorLoginId}" Header="행위자" />
+				<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding IpAddress}" Header="IP" />
+				<DataGridTextColumn Width="*" MinWidth="140" Binding="{Binding Description}" Header="설명" />
 			</DataGrid.Columns>
 		</DataGrid>
 	</Grid>

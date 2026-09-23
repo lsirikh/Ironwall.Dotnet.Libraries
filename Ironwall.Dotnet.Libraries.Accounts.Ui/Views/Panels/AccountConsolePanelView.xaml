@@ -334,7 +334,7 @@
 							KeyboardFallback="행을 고른 뒤 아래 권한 그룹 칩을 누른다" />
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
-						<DataGridTemplateColumn Width="26" CanUserResize="False" CellStyle="{StaticResource Console.DataGrid.Cell.Flush}">
+						<DataGridTemplateColumn Width="26" MinWidth="26" CanUserResize="False" CellStyle="{StaticResource Console.DataGrid.Cell.Flush}">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<drag:DragHandle AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Accounts.DragHandle.{0}}" />
@@ -344,6 +344,7 @@
 
 						<DataGridTemplateColumn
 							Width="64"
+							MinWidth="64"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="lock"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
@@ -368,6 +369,7 @@
 
 						<DataGridTemplateColumn
 							Width="168"
+							MinWidth="168"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="identity"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
@@ -398,6 +400,7 @@
 
 						<DataGridTextColumn
 							Width="110"
+							MinWidth="110"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="name"
 							Binding="{Binding Name, Mode=OneWay}"
@@ -405,6 +408,7 @@
 							Header="성명" />
 						<DataGridTextColumn
 							Width="92"
+							MinWidth="92"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="role"
 							Binding="{Binding RoleText, Mode=OneWay}"
@@ -412,6 +416,7 @@
 							Header="구분" />
 						<DataGridTextColumn
 							Width="*"
+							MinWidth="140"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="org"
 							Binding="{Binding OrgText, Mode=OneWay}"
@@ -419,6 +424,7 @@
 							Header="부서·직급" />
 						<DataGridTextColumn
 							Width="80"
+							MinWidth="80"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="used"
 							Binding="{Binding UsedText, Mode=OneWay}"
@@ -427,6 +433,7 @@
 
 						<DataGridTextColumn
 							Width="130"
+							MinWidth="130"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="group"
 							Binding="{Binding GroupText, Mode=OneWay}"
@@ -434,6 +441,7 @@
 							Header="권한 그룹" />
 						<DataGridTextColumn
 							Width="100"
+							MinWidth="100"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="employee"
 							Binding="{Binding EmployeeNumber, Mode=OneWay}"
@@ -441,6 +449,7 @@
 							Header="사번" />
 						<DataGridTextColumn
 							Width="120"
+							MinWidth="120"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="phone"
 							Binding="{Binding Phone, Mode=OneWay}"
@@ -448,6 +457,7 @@
 							Header="전화" />
 						<DataGridTextColumn
 							Width="180"
+							MinWidth="180"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="email"
 							Binding="{Binding EMail, Mode=OneWay}"
@@ -455,6 +465,7 @@
 							Header="이메일" />
 						<DataGridTextColumn
 							Width="70"
+							MinWidth="70"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="no"
 							Binding="{Binding Id, Mode=OneWay}"
@@ -551,7 +562,7 @@
 							</Style>
 						</DataGrid.RowStyle>
 						<DataGrid.Columns>
-							<DataGridTemplateColumn Width="*" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="모듈">
+							<DataGridTemplateColumn Width="*" MinWidth="140" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="모듈">
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
 										<StackPanel Orientation="Horizontal">
@@ -579,7 +590,7 @@
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
 							<DataGridTemplateColumn
-								Width="62" matrix:PermissionColumn.Verb="0"
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="0"
 								CellStyle="{StaticResource Console.DataGrid.Cell}"
 								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
@@ -614,7 +625,7 @@
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
 							<DataGridTemplateColumn
-								Width="62" matrix:PermissionColumn.Verb="1"
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="1"
 								CellStyle="{StaticResource Console.DataGrid.Cell}"
 								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
@@ -645,7 +656,7 @@
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
 							<DataGridTemplateColumn
-								Width="62" matrix:PermissionColumn.Verb="2"
+								Width="62" MinWidth="62" matrix:PermissionColumn.Verb="2"
 								CellStyle="{StaticResource Console.DataGrid.Cell}"
 								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
@@ -676,7 +687,7 @@
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
 							<DataGridTemplateColumn
-								Width="110" matrix:PermissionColumn.Verb="3"
+								Width="110" MinWidth="110" matrix:PermissionColumn.Verb="3"
 								CellStyle="{StaticResource Console.DataGrid.Cell}"
 								HeaderStyle="{StaticResource Matrix.VerbColumnHeader}">
 								<DataGridTemplateColumn.Header>
@@ -734,10 +745,10 @@
 						Style="{StaticResource Console.DataGrid}"
 						Visibility="{Binding Matrix.ShowMembers, Converter={StaticResource BoolToVisibility}}">
 						<DataGrid.Columns>
-							<DataGridTextColumn Width="160" Binding="{Binding LoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="로그인 ID" />
-							<DataGridTextColumn Width="160" Binding="{Binding Name}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="이름" />
-							<DataGridTextColumn Width="*" Binding="{Binding Role}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="역할" />
-							<DataGridTemplateColumn Width="80" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="해제">
+							<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding LoginId}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="로그인 ID" />
+							<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding Name}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="이름" />
+							<DataGridTextColumn Width="*" MinWidth="140" Binding="{Binding Role}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="역할" />
+							<DataGridTemplateColumn Width="80" MinWidth="80" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="해제">
 								<DataGridTemplateColumn.CellTemplate>
 									<DataTemplate>
 										<Button
@@ -769,6 +780,7 @@
 						<!--  자기 세션은 형태(알약)로 표시한다 — 강제 종료가 자기를 쫓아내지 않게  -->
 						<DataGridTemplateColumn
 							Width="56"
+							MinWidth="56"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="current"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
@@ -841,6 +853,7 @@
 							Header="사유" />
 						<DataGridCheckBoxColumn
 							Width="54"
+							MinWidth="54"
 							c:ConsoleColumns.IsDefault="False"
 							c:ConsoleColumns.Key="active"
 							Binding="{Binding IsActive}"
@@ -877,11 +890,11 @@
 						<behavior:DataGridScrollEndBehavior Command="{Binding GrantManagementPanelViewModel.LoadMoreCommand}" Threshold="50" />
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
-						<DataGridTextColumn Width="130" Binding="{Binding UserLogin}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="계정" />
-						<DataGridTextColumn Width="150" Binding="{Binding GroupName}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="그룹" />
-						<DataGridTextColumn Width="150" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 시작" />
-						<DataGridTextColumn Width="150" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 종료" />
-						<DataGridTextColumn Width="*" Binding="{Binding Status}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="상태" />
+						<DataGridTextColumn Width="130" MinWidth="130" Binding="{Binding UserLogin}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="계정" />
+						<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding GroupName}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="그룹" />
+						<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 시작" />
+						<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="유효 종료" />
+						<DataGridTextColumn Width="*" MinWidth="140" Binding="{Binding Status}" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="상태" />
 					</DataGrid.Columns>
 				</DataGrid>
 

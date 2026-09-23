@@ -89,10 +89,10 @@
 				SelectedItem="{Binding SelectedGroup}"
 				Style="{StaticResource ModernDataGrid}">
 				<DataGrid.Columns>
-					<DataGridTextColumn Width="200" Binding="{Binding GroupName}" Header="그룹" />
-					<DataGridTextColumn Width="90" Binding="{Binding UserCount}" Header="사용자" />
-					<DataGridTextColumn Width="80" Binding="{Binding Active}" Header="활성" />
-					<DataGridTextColumn Width="*" Binding="{Binding Summary}" Header="권한 요약" />
+					<DataGridTextColumn Width="200" MinWidth="200" Binding="{Binding GroupName}" Header="그룹" />
+					<DataGridTextColumn Width="90" MinWidth="90" Binding="{Binding UserCount}" Header="사용자" />
+					<DataGridTextColumn Width="80" MinWidth="80" Binding="{Binding Active}" Header="활성" />
+					<DataGridTextColumn Width="*" MinWidth="140" Binding="{Binding Summary}" Header="권한 요약" />
 				</DataGrid.Columns>
 			</DataGrid>
 			<TextBlock
@@ -136,35 +136,35 @@
 				<DataGrid.Columns>
 					<!--  행 집합은 서버가 권위(원본 키 ∪ 그 서버 세대 어휘) — 사전에 없는 모듈은 서버 키가 그대로 표시된다.
 					      ToolTip 으로 항상 서버 키를 보여 준다(서버 문서·감사 로그와 대조용).  -->
-					<DataGridTextColumn Width="220" Binding="{Binding ModuleDisplay}" Header="모듈">
+					<DataGridTextColumn Width="220" MinWidth="220" Binding="{Binding ModuleDisplay}" Header="모듈">
 						<DataGridTextColumn.ElementStyle>
 							<Style TargetType="TextBlock">
 								<Setter Property="ToolTip" Value="{Binding ModuleKey}" />
 							</Style>
 						</DataGridTextColumn.ElementStyle>
 					</DataGridTextColumn>
-					<DataGridTemplateColumn Width="90" Header="조회">
+					<DataGridTemplateColumn Width="90" MinWidth="90" Header="조회">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ViewEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
-					<DataGridTemplateColumn Width="90" Header="편집">
+					<DataGridTemplateColumn Width="90" MinWidth="90" Header="편집">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding EditEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
-					<DataGridTemplateColumn Width="90" Header="삭제">
+					<DataGridTemplateColumn Width="90" MinWidth="90" Header="삭제">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DeleteEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
-					<DataGridTemplateColumn Width="90" Header="제어">
+					<DataGridTemplateColumn Width="90" MinWidth="90" Header="제어">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ControlEnabled}" />
@@ -247,11 +247,11 @@
 				RowStyle="{StaticResource ModernDataGridRow}"
 				Style="{StaticResource ModernDataGrid}">
 				<DataGrid.Columns>
-					<DataGridTextColumn Width="160" Binding="{Binding LoginId}" Header="로그인 ID" />
-					<DataGridTextColumn Width="160" Binding="{Binding Name}" Header="이름" />
-					<DataGridTextColumn Width="120" Binding="{Binding Role}" Header="역할" />
+					<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding LoginId}" Header="로그인 ID" />
+					<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding Name}" Header="이름" />
+					<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding Role}" Header="역할" />
 					<DataGridTextColumn Width="*" Header="" />
-					<DataGridTemplateColumn Width="90" Header="해제">
+					<DataGridTemplateColumn Width="90" MinWidth="90" Header="해제">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<Button

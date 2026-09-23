@@ -94,13 +94,13 @@
 				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
-				<DataGridTextColumn Width="130" Binding="{Binding UserLogin}" Header="계정" />
-				<DataGridTextColumn Width="150" Binding="{Binding GroupName}" Header="그룹" />
-				<DataGridTextColumn Width="160" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 시작" />
-				<DataGridTextColumn Width="160" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 종료" />
-				<DataGridTextColumn Width="100" Binding="{Binding Status}" Header="상태" />
-				<DataGridTextColumn Width="160" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="부여시각" />
-				<DataGridTemplateColumn Width="80" Header="회수">
+				<DataGridTextColumn Width="130" MinWidth="130" Binding="{Binding UserLogin}" Header="계정" />
+				<DataGridTextColumn Width="150" MinWidth="150" Binding="{Binding GroupName}" Header="그룹" />
+				<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 시작" />
+				<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 종료" />
+				<DataGridTextColumn Width="100" MinWidth="100" Binding="{Binding Status}" Header="상태" />
+				<DataGridTextColumn Width="160" MinWidth="160" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="부여시각" />
+				<DataGridTemplateColumn Width="80" MinWidth="80" Header="회수">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
 							<Button

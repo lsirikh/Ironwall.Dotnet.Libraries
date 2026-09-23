@@ -72,7 +72,7 @@
 				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
-				<DataGridTemplateColumn Width="84" Header="현재">
+				<DataGridTemplateColumn Width="84" MinWidth="84" Header="현재">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<Border Padding="8,2" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource PrimaryHueLightBrush}" CornerRadius="9">
@@ -91,11 +91,11 @@
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
-					<DataGridTextColumn Width="120" Binding="{Binding LoginId}" Header="사용자" />
-				<DataGridTextColumn Width="80" Binding="{Binding Role}" Header="역할" />
-					<DataGridTextColumn Width="110" Binding="{Binding ClientId, TargetNullValue=-}" Header="클라이언트" />
-				<DataGridTextColumn Width="120" Binding="{Binding IpAddress}" Header="IP" />
-					<DataGridTextColumn Width="90" Binding="{Binding UserAgent}" Header="단말">
+					<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding LoginId}" Header="사용자" />
+				<DataGridTextColumn Width="80" MinWidth="80" Binding="{Binding Role}" Header="역할" />
+					<DataGridTextColumn Width="110" MinWidth="110" Binding="{Binding ClientId, TargetNullValue=-}" Header="클라이언트" />
+				<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding IpAddress}" Header="IP" />
+					<DataGridTextColumn Width="90" MinWidth="90" Binding="{Binding UserAgent}" Header="단말">
 						<DataGridTextColumn.ElementStyle>
 							<Style TargetType="TextBlock">
 								<Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -103,12 +103,12 @@
 							</Style>
 						</DataGridTextColumn.ElementStyle>
 					</DataGridTextColumn>
-				<DataGridCheckBoxColumn Width="60" Binding="{Binding IsActive}" Header="활성" />
-				<DataGridTextColumn Width="140" Binding="{Binding ExpiresAt, Converter={StaticResource IsoDateStringConverter}}" Header="만료" />
-				<DataGridTextColumn Width="140" Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그아웃" />
-				<DataGridTextColumn Width="120" Binding="{Binding LogoutReason, Converter={StaticResource LogoutReasonConverter}}" Header="사유" />
-				<DataGridTextColumn Width="140" Binding="{Binding CreatedAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그인시각" />
-				<DataGridTemplateColumn Width="120" Header="관리">
+				<DataGridCheckBoxColumn Width="60" MinWidth="60" Binding="{Binding IsActive}" Header="활성" />
+				<DataGridTextColumn Width="140" MinWidth="140" Binding="{Binding ExpiresAt, Converter={StaticResource IsoDateStringConverter}}" Header="만료" />
+				<DataGridTextColumn Width="140" MinWidth="140" Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그아웃" />
+				<DataGridTextColumn Width="120" MinWidth="120" Binding="{Binding LogoutReason, Converter={StaticResource LogoutReasonConverter}}" Header="사유" />
+				<DataGridTextColumn Width="140" MinWidth="140" Binding="{Binding CreatedAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그인시각" />
+				<DataGridTemplateColumn Width="120" MinWidth="120" Header="관리">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
 							<StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
