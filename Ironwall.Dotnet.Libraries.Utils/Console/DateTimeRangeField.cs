@@ -38,18 +38,36 @@ public class DateTimeRangeField : Control
     static DateTimeRangeField()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(DateTimeRangeField), new FrameworkPropertyMetadata(typeof(DateTimeRangeField)));
+        // D-30 — 기본 제한폭. 툴바 왼쪽(필터) 칸은 Grid 의 Auto 열이라 폭이 모자라도 줄지 않는다
+        // (ConsoleLayoutMath.ResolveToolbarSearchMinWidth 주석) — 그래서 이 컨트롤 스스로 "쉬는 상태"의
+        // 요구폭을 줄여야 오버플로가 없어진다. 소비자가 XAML 에 로컬 MaxWidth 를 주면 그 값이 이긴다
+        // (WPF 값 우선순위 — 타입 기본 메타데이터는 로컬 값보다 낮다).
+        MaxWidthProperty.OverrideMetadata(typeof(DateTimeRangeField), new FrameworkPropertyMetadata(DateTimeRangeText.DefaultMaxWidth));
     }
 
     #region - Properties -
     public static readonly DependencyProperty RangeStartProperty = DependencyProperty.Register(
         nameof(RangeStart), typeof(DateTime), typeof(DateTimeRangeField),
-        new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+        new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangeChanged));
     public DateTime RangeStart { get => (DateTime)GetValue(RangeStartProperty); set => SetValue(RangeStartProperty, value); }
 
     public static readonly DependencyProperty RangeEndProperty = DependencyProperty.Register(
         nameof(RangeEnd), typeof(DateTime), typeof(DateTimeRangeField),
-        new FrameworkPropertyMetadata(DateTime.Today.AddHours(1), FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+        new FrameworkPropertyMetadata(DateTime.Today.AddHours(1), FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangeChanged));
     public DateTime RangeEnd { get => (DateTime)GetValue(RangeEndProperty); set => SetValue(RangeEndProperty, value); }
+
+    private static readonly DependencyPropertyKey DisplayStartTextPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(DisplayStartText), typeof(string), typeof(DateTimeRangeField), new PropertyMetadata(string.Empty));
+    public static readonly DependencyProperty DisplayStartTextProperty = DisplayStartTextPropertyKey.DependencyProperty;
+    /// <summary>트리거에 실제로 찍히는 시작쪽 글자(D-30) — 배정받은 폭에 따라 짧아진 tier 표기.
+    /// 전체 정밀도는 항상 <c>ToolTip</c>(<see cref="DateTimeRangeText.RangeText"/>)에 있다.</summary>
+    public string DisplayStartText { get => (string)GetValue(DisplayStartTextProperty); private set => SetValue(DisplayStartTextPropertyKey, value); }
+
+    private static readonly DependencyPropertyKey DisplayEndTextPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(DisplayEndText), typeof(string), typeof(DateTimeRangeField), new PropertyMetadata(string.Empty));
+    public static readonly DependencyProperty DisplayEndTextProperty = DisplayEndTextPropertyKey.DependencyProperty;
+    /// <summary>트리거에 실제로 찍히는 종료쪽 글자(D-30) — <see cref="DisplayStartText"/> 와 같은 tier 로 맞춘다.</summary>
+    public string DisplayEndText { get => (string)GetValue(DisplayEndTextProperty); private set => SetValue(DisplayEndTextPropertyKey, value); }
 
     public static readonly DependencyProperty FromAutomationIdProperty = Reg(nameof(FromAutomationId), string.Empty);
     /// <summary>트리거의 시작 텍스트에 붙는 AutomationId — 옛 두 피커 시절의 값을 그대로 물려받는다.</summary>
@@ -75,6 +93,12 @@ public class DateTimeRangeField : Control
     private UIElement? _popupContent;
     private DateTime _draftStart;
     private DateTime _draftEnd;
+
+    /// <summary>
+    /// D-30 — 지금까지 관찰한 실제 배정폭. 첫 Arrange 이전에도 <see cref="DisplayStartText"/> 가 비어 있지
+    /// 않도록 기본 <c>MaxWidth</c>(<see cref="DateTimeRangeText.DefaultMaxWidth"/>)로 씨앗을 둔다.
+    /// </summary>
+    private double _arrangedWidth = DateTimeRangeText.DefaultMaxWidth;
 
     /// <summary>
     /// 팝업 본문(<c>PART_PopupContent</c>) — <c>Popup</c> 은 자기 자신의 렌더 계층에 뜨므로
@@ -104,6 +128,48 @@ public class DateTimeRangeField : Control
         if (GetTemplateChild("PART_Apply") is ButtonBase apply) { apply.Click += OnApplyClick; _apply = apply; }
         if (GetTemplateChild("PART_Cancel") is ButtonBase cancel) { cancel.Click += OnCancelClick; _cancel = cancel; }
         if (_popupContent is not null) _popupContent.PreviewKeyDown += OnPopupPreviewKeyDown;
+
+        // D-30 — 템플릿이 막 붙었으면 트리거 글자도 바로 채운다(다음 Arrange 를 기다리지 않는다).
+        RefreshDisplayText();
+    }
+
+    /// <summary>
+    /// D-30 — 부모가 실제로 제안한 폭(<c>MeasureOverride</c> 의 <paramref name="availableSize"/>)을 관찰해
+    /// 다시 잰다. <b>Arrange 의 finalSize 가 아니라 Measure 의 availableSize 를 쓴다</b> — 이 컨트롤은
+    /// 자기 내용에 맞춰 스스로 줄어드는(shrink-to-fit) Auto 열의 자식이라, Arrange 의 finalSize 는 "지금
+    /// 고른 tier 자신이 필요로 하는 크기"를 그대로 되돌려줄 뿐이다(자기참조). 그 값으로 다음 tier 를
+    /// 판정하면 매 패스마다 "방금 고른 tier 도 못 담는다"는 착시가 반복돼 Compact 까지 무조건 굴러떨어진다
+    /// (실측: 1360px 에서도 9/22~9/23 로 끝까지 줄어들었다 — 09-22 17:00 처럼 더 긴 tier 가 맞는데도).
+    /// availableSize 는 부모(무제한 StackPanel)와 <c>MaxWidth</c>(기본 <see cref="DateTimeRangeText.DefaultMaxWidth"/>,
+    /// 소비자가 로컬로 더 주면 그 값)의 교집합이라 내용과 무관하게 고정된 "예산"이다 — 그래서 idempotent 하다.
+    /// 0.5px 미만 흔들림은 무시한다(레이아웃 진동 방지).
+    /// </summary>
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (!double.IsPositiveInfinity(availableSize.Width) && Math.Abs(availableSize.Width - _arrangedWidth) > 0.5)
+        {
+            _arrangedWidth = availableSize.Width;
+            RefreshDisplayText();
+        }
+        return base.MeasureOverride(availableSize);
+    }
+
+    private static void OnRangeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is DateTimeRangeField field) field.RefreshDisplayText();
+    }
+
+    /// <summary>
+    /// <see cref="DateTimeRangeText.ResolveTier"/> 로 지금 폭에 맞는 tier 를 고르고, 양쪽 글자를 다시
+    /// 채운다. 값이 실제로 바뀔 때만 <c>SetValue</c> 한다 — 불필요한 바인딩 재평가·재측정을 막는다.
+    /// </summary>
+    private void RefreshDisplayText()
+    {
+        var now = DateTime.Now;
+        var tier = DateTimeRangeText.ResolveTier(RangeStart, RangeEnd, _arrangedWidth, now);
+        var (start, end) = DateTimeRangeText.FormatPair(RangeStart, RangeEnd, tier, now);
+        if (!string.Equals(start, DisplayStartText, StringComparison.Ordinal)) DisplayStartText = start;
+        if (!string.Equals(end, DisplayEndText, StringComparison.Ordinal)) DisplayEndText = end;
     }
 
     private ButtonBase? _apply;

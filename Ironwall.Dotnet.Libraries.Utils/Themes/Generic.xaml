@@ -1309,6 +1309,17 @@
 
 	<Style TargetType="{x:Type c:DateTimeRangeField}">
 		<Setter Property="Height" Value="32" />
+		<!--  D-30 — 전체값은 항상 ToolTip 에 있다(트리거 글자가 tier 로 짧아져도 정보는 새지 않는다).
+		     각 Binding 이 개별로 Console.FixedDateTime 을 거쳐 이미 문자열이 된 뒤, MultiBinding.StringFormat
+		     은 그 문자열 둘을 "{0} ~ {1}" 로 잇기만 한다(문화권 재해석 없음).  -->
+		<Setter Property="ToolTip">
+			<Setter.Value>
+				<MultiBinding StringFormat="{}{0} ~ {1}">
+					<Binding Converter="{StaticResource Console.FixedDateTime}" Path="RangeStart" RelativeSource="{RelativeSource Self}" />
+					<Binding Converter="{StaticResource Console.FixedDateTime}" Path="RangeEnd" RelativeSource="{RelativeSource Self}" />
+				</MultiBinding>
+			</Setter.Value>
+		</Setter>
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type c:DateTimeRangeField}">
@@ -1350,13 +1361,16 @@
 								</ControlTemplate>
 							</ToggleButton.Template>
 							<StackPanel Orientation="Horizontal">
+								<!--  D-30 — DisplayStartText/DisplayEndText 는 이 컨트롤이 실제로 배정받은 폭에 맞춰
+								     이미 tier 로 짧아진 글자다(RangeStart/RangeEnd 를 직접 포매팅하지 않는다).
+								     전체 정밀도는 이 요소 트리 루트의 ToolTip 에 항상 있다.  -->
 								<TextBlock
 									x:Name="PART_StartText"
 									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="{Binding FromAutomationId, RelativeSource={RelativeSource TemplatedParent}}"
 									FontSize="12"
 									Foreground="{DynamicResource TextPrimaryBrush}"
-									Text="{Binding RangeStart, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource Console.FixedDateTime}}" />
+									Text="{Binding DisplayStartText, RelativeSource={RelativeSource TemplatedParent}}" />
 								<TextBlock
 									Margin="6,0"
 									VerticalAlignment="Center"
@@ -1368,7 +1382,7 @@
 									AutomationProperties.AutomationId="{Binding ToAutomationId, RelativeSource={RelativeSource TemplatedParent}}"
 									FontSize="12"
 									Foreground="{DynamicResource TextPrimaryBrush}"
-									Text="{Binding RangeEnd, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource Console.FixedDateTime}}" />
+									Text="{Binding DisplayEndText, RelativeSource={RelativeSource TemplatedParent}}" />
 								<Path
 									Width="13"
 									Height="13"
