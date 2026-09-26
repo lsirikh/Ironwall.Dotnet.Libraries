@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Monitoring.Models.Accounts;
+﻿using Ironwall.Dotnet.Monitoring.Models.Accounts;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Gateways;
 
@@ -11,6 +11,13 @@ public interface IProfileGateway
 {
     /// <summary>PK 기준 본인 계정 조회.</summary>
     Task<IAccountModel?> GetProfileAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 본인이 사원번호(군번)를 바꿀 수 있는가. 기본=true(DB 모드 — 행 전체를 저장한다).
+    /// Api 구현은 false — 서버 본인 수정(PUT /users/me) 본문에는 <c>employee_number</c> 가 없고(보내면 422),
+    /// 사원번호는 관리자 경로(PUT /users/{id})로만 바뀐다.
+    /// </summary>
+    bool CanSelfEditEmployeeNumber => true;
 
     /// <summary>본인 프로필 정보 저장(비밀번호 제외).</summary>
     Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default);

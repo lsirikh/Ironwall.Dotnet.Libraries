@@ -44,24 +44,11 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             { Title = "세션 정책", Explain = "서버 세션설정 API가 아직 적용되지 않아 저장할 수 없습니다.\n(서버 배포 후 활성화)" });
             return;
         }
-        if (TimeoutHours is < 1 or > 168 || RefreshDays is < 1 or > 90 || LockoutThreshold is < 0 or > 20
-            || LockoutDurationMinutes is < 0 or > 1440)
+        var invalid = ValidatePolicy(TimeoutHours, RefreshDays, LockoutThreshold, LockoutDurationMinutes,
+            ConcurrencyPolicy, MaxConcurrentSessions, SessionHistoryRetentionDays);
+        if (invalid is not null)
         {
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "세션 정책", Explain = "값 범위를 확인하세요. 세션 만료 1~168h, refresh 1~90일, 잠금 임계 0~20, 자동해제 0~1440분." });
-            return;
-        }
-        // v6.3 동시성 5키 클라 검증(서버 422 선제 차단)
-        if (ConcurrencyPolicy is not ("evict_all" or "allow"))
-        {
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "세션 정책", Explain = "동시 세션 정책은 '단일(evict_all)' 또는 '다중(allow)'만 가능합니다." });
-            return;
-        }
-        if (MaxConcurrentSessions is < 0 or > 100 || SessionHistoryRetentionDays is < 0 or > 3650)
-        {
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "세션 정책", Explain = "값 범위를 확인하세요. 최대 동시 세션 0~100(0=무제한), 세션 이력 보존 0~3650일(0=정리 안 함)." });
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "세션 정책", Explain = invalid });
             return;
         }
 
@@ -118,6 +105,28 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     }
     #endregion
     #region - Processes -
+    /// <summary>
+    /// 저장 전 범위 검사 — 서버 <c>SessionSettingsUpdate</c>(app/schemas/settings.py)와 같은 규칙. 어긋난 첫 칸의 안내를,
+    /// 모두 맞으면 null 을 돌려준다.
+    /// </summary>
+    /// <remarks>
+    /// 잠금 임계는 0~20 이 아니라 <b>0 또는 3~20</b> 이다(1~2 는 서버 검증기가 422). 종전 0~20 검사로 1~2 가 통과해
+    /// 서버에서 영어 422("lockout_threshold must be 0 (disabled) or between 3 and 20")로 되돌아왔다(라이브 실측 2026-09-26).
+    /// </remarks>
+    public static string? ValidatePolicy(int timeoutHours, int refreshDays, int lockoutThreshold, int lockoutDurationMinutes,
+        string? concurrencyPolicy, int maxConcurrentSessions, int sessionHistoryRetentionDays)
+    {
+        if (timeoutHours is < 1 or > 168) return "세션 만료 시간은 1~168시간만 가능합니다.";
+        if (refreshDays is < 1 or > 90) return "refresh 토큰 유효기간은 1~90일만 가능합니다.";
+        if (lockoutThreshold != 0 && lockoutThreshold is < 3 or > 20)
+            return "로그인 잠금 임계는 0(사용 안 함) 또는 3~20회만 가능합니다.";
+        if (lockoutDurationMinutes is < 0 or > 1440) return "잠금 자동해제 시간은 0(영구) 또는 1~1440분만 가능합니다.";
+        if (concurrencyPolicy is not ("evict_all" or "allow")) return "동시 세션 정책은 '단일(evict_all)' 또는 '다중(allow)'만 가능합니다.";
+        if (maxConcurrentSessions is < 0 or > 100) return "최대 동시 세션 수는 0~100(0=무제한)만 가능합니다.";
+        if (sessionHistoryRetentionDays is < 0 or > 3650) return "세션 이력 보존 기간은 0~3650일(0=정리 안 함)만 가능합니다.";
+        return null;
+    }
+
     /// <summary>GET /settings/session 로드. 성공→편집 활성. 실패(404 미배포/비ADMIN)→기본값 표시 + 편집 비활성 + 안내.</summary>
     private async Task LoadServerSettingsAsync()
     {

@@ -27,6 +27,15 @@ public interface IUserDirectoryGateway
     Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)
         => UpdateAccountAsync(acc, ct);
 
+    /// <summary>
+    /// 로컬 계정 목록이 비어 있으면 "첫 등록자 = ADMIN" 으로 정해도 되는가. 기본=true(DB 모드 — 로컬 DB 가 곧 계정 전체다).
+    /// Api 구현은 false — 서버 모드의 로컬 목록은 서버 목록을 불러온 <b>사본</b>이라 아직 안 불렀거나
+    /// 불러오기에 실패해도(예: users:edit 만 있고 users:view 는 없는 운영자) 비어 있다. 그 빈 목록으로 ADMIN 을 추론하면
+    /// 관리자가 만든 일반 계정이 조용히 ADMIN 이 되고, 비-ADMIN 운영자의 등록은 403 으로 막혔다(라이브 실측 2026-09-26).
+    /// 서버 모드에서 역할은 서버 기본값(USER)이거나 관리자가 명시한 값뿐이다.
+    /// </summary>
+    bool CanInferFirstAccountAdmin => true;
+
     /// <summary>계정 삭제. currentPassword가 비어있지 않으면 검증 후 삭제.</summary>
     Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default);
 

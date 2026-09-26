@@ -1,10 +1,12 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Microsoft.Win32;
 using System;
 using System.IO;
@@ -39,7 +41,29 @@ public class EditorDialogViewModel : BasePanelViewModel
         _profileGateway = profileGateway;
     }
     #endregion
+    #region - Overrides -
+    /// <summary>
+    /// 호스트(ConductorControlViewModel)가 다이얼로그를 띄울 때. <see cref="BeginEdit"/> 를 거치지 않고 누가
+    /// <see cref="ViewModel"/> 에 직접 채워 넣었더라도 여기서 편집 전 기준을 잡는다(다른 계정이면 새로 잡는다).
+    /// </summary>
+    protected override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        if (_baseline is null || _baseline.Id != ViewModel.Model.Id) CaptureBaseline();
+        return base.OnActivateAsync(cancellationToken);
+    }
+    #endregion
     #region - Binding Methods -
+    /// <summary>
+    /// 편집할 계정을 싣고 <b>편집 전 기준</b>을 잡는다 — [확인] 은 이 기준과 달라진 칸만 서버에 보낸다.
+    /// 계정 관리 패널(행 더블클릭)이 다이얼로그를 열기 직전에 부른다.
+    /// </summary>
+    public void BeginEdit(IAccountModel account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        ViewModel.Insert(account);
+        CaptureBaseline();
+    }
+
     public async Task ClickOk()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
@@ -155,7 +179,7 @@ public class EditorDialogViewModel : BasePanelViewModel
 
             // 관리자 강제 초기화(현재 비밀번호 검증 없음). 초기 비밀번호는 설정에서 주입(하드코딩 제거).
             var updated = await _gateway.ResetAccountPasswordAsync(ViewModel.Model, _session.AdminResetPassword, cancellationToken);
-            if (updated != null) ViewModel.Insert(updated);
+            if (updated != null) { ViewModel.Insert(updated); CaptureBaseline(); }
 
             await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "사용자 비밀번호가 변경되었습니다." }, cancellationToken);
@@ -172,9 +196,23 @@ public class EditorDialogViewModel : BasePanelViewModel
     {
         try
         {
+            // 바뀐 칸만 보낸다(편집 전 기준과 견줌). 전체 모델을 실으면 ① 바꾸지 않은 role 이 딸려 가 users:edit 만 가진
+            // 비-ADMIN 편집자는 부서 하나 고쳐도 403("Only ADMIN role can change role or group assignment") 이었고
+            // ② 상태(is_active)는 아예 실리지 않아 "미사용" 이 서버에 반영되지 않았다(라이브 실측 2026-09-26).
+            // 비운 칸은 서버가 null 로 비운다. DB 모드 게이트웨이는 기본구현이 행 전체 저장이라 결과가 같다.
+            var changed = _baseline is null ? null : AccountDtoMapper.ChangedFields(_baseline, ViewModel.Model);
+            if (changed is { Count: 0 })
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "계정 편집", Explain = NothingChangedText }, cancellationToken);
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseDialogMessageModel(), cancellationToken);
+                return;
+            }
+
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
 
-            var ret = await _gateway.UpdateAccountAsync(ViewModel.Model, cancellationToken);
+            var ret = changed is null
+                ? await _gateway.UpdateAccountAsync(ViewModel.Model, cancellationToken)   // 기준 없음(열기 경로 밖) — 종전 전체 저장
+                : await _gateway.UpdateAccountFieldsAsync(ViewModel.Model, changed, cancellationToken);
             if (ret == null)   // 저장 실패(null)인데 "완료"+닫힘으로 오인시키던 버그 — 실패 노출, 다이얼로그 유지
             {
                 _log?.Warning("계정 정보 변경 실패 — 서버가 저장하지 못함(null)");
@@ -182,6 +220,7 @@ public class EditorDialogViewModel : BasePanelViewModel
                 return;
             }
             ViewModel.Insert(ret);
+            CaptureBaseline();
 
             await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
             _log?.Info("사용자 정보 변경작업 성공");
@@ -195,7 +234,19 @@ public class EditorDialogViewModel : BasePanelViewModel
         }
     }
     #endregion
+    #region - Processes -
+    /// <summary>지금 <see cref="ViewModel"/> 값을 편집 전 기준으로 복사해 둔다(행 모델과 분리된 사본).</summary>
+    private void CaptureBaseline()
+    {
+        var copy = new AccountModel();
+        copy.Update(ViewModel.Model);
+        _baseline = copy;
+    }
+    #endregion
     #region - Properties -
+    /// <summary>[확인] 을 눌렀지만 바뀐 칸이 없을 때의 안내.</summary>
+    public const string NothingChangedText = "변경된 내용이 없습니다.";
+
     /// <summary>관리자 초기화 기본 비밀번호 (설정 주입, 하드코딩 제거).</summary>
     public string ResetPassword => _session.AdminResetPassword;
     public AccountViewModel ViewModel { get; }
@@ -205,5 +256,7 @@ public class EditorDialogViewModel : BasePanelViewModel
     private readonly ISessionConfigService _session;
     private readonly IProfileImageService _profileImage;
     private readonly IProfileGateway _profileGateway;
+    /// <summary>편집 전 기준(<see cref="BeginEdit"/> · 활성화 · 저장 성공 때 갱신). null = 아직 못 잡음.</summary>
+    private AccountModel? _baseline;
     #endregion
 }

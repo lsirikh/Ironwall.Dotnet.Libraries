@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -137,6 +137,7 @@ public class MyPagePanelViewModel : BasePanelViewModel
         try
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+            var requestedEmployeeNumber = ViewModel.Model.EmployeeNumber;   // 서버 에코와 견줘 "저장 안 된 사원번호" 를 알린다
             var ret = await _gateway.UpdateProfileAsync(ViewModel.Model, cancellationToken);
             if (ret == null)   // 서버 저장 실패(null)인데 "완료"로 오인 표시하던 버그 — 실패 노출 후 종료
             {
@@ -148,6 +149,10 @@ public class MyPagePanelViewModel : BasePanelViewModel
                 ViewModel.Insert(ret);   // 서버 에코(저장된 실제 값)로 화면 갱신
                 _log?.Info("사용자 정보 변경작업 성공");
                 explain = "사용자 정보 변경이 정상적으로 완료되었습니다.";
+                // 서버 본인 수정(PUT /users/me)은 사원번호를 받지 않는다 — 고친 값이 에코에 없으면 "완료" 만 말하지 않는다
+                // (라이브 실측 2026-09-26: 칸을 고쳐도 서버 값 그대로인데 "정상적으로 완료").
+                if (!string.Equals(NullIfBlank(requestedEmployeeNumber), NullIfBlank(ret.EmployeeNumber), StringComparison.Ordinal))
+                    explain += EmployeeNumberNotSavedNote;
             }
         }
         catch (OperationCanceledException)   // (INV-9) 취소/타임아웃 분리
@@ -192,6 +197,16 @@ public class MyPagePanelViewModel : BasePanelViewModel
     }
     #endregion
     #region - Properties -
+    /// <summary>사원번호를 고쳤지만 서버가 반영하지 않았을 때 완료 안내에 덧붙이는 한 줄.</summary>
+    public const string EmployeeNumberNotSavedNote = "\n(사원번호는 본인이 변경할 수 없어 저장되지 않았습니다 — 관리자에게 요청하세요.)";
+
+    /// <summary>
+    /// 사원번호 칸이 읽기 전용인가 — 서버 모드는 true(본인 수정 본문에 없음, 관리자 경로 전용). DB 모드는 편집 가능.
+    /// </summary>
+    public bool IsEmployeeNumberReadOnly => !_gateway.CanSelfEditEmployeeNumber;
+
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
     public LoginViewModel ViewModel { get; }
     #endregion
     #region - Attributes -

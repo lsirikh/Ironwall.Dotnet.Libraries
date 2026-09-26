@@ -232,6 +232,7 @@
 										Grid.Column="1"
 										md:HintAssist.Hint="사원번호"
 										md:ValidationAssist.HorizontalAlignment="Left"
+										IsReadOnly="{Binding IsEmployeeNumberReadOnly, Mode=OneWay}"
 										Style="{StaticResource TextBoxInput}"
 										Text="{Binding ViewModel.EmployeeNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>

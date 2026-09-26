@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
@@ -197,7 +197,7 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     public async void OnClickAccountDetail(object sender, RoutedEventArgs e)
     {
         if (SelectedItem == null) return;
-        _editorDialogViewModel.ViewModel.Insert(SelectedItem.Model);
+        _editorDialogViewModel.BeginEdit(SelectedItem.Model);   // 싣기 + 편집 전 기준(=[확인] 은 바뀐 칸만 보낸다)
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenEditAccountDialogMessageModel());
     }
 

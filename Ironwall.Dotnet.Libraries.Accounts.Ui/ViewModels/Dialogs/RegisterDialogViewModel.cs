@@ -130,8 +130,11 @@ public class RegisterDialogViewModel : BasePanelViewModel
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
 
-            // 첫 등록자는 ADMIN, 그 외 USER
-            if (AccountProvider.Count() == 0)
+            // 첫 등록자는 ADMIN, 그 외 USER — DB 모드만. 서버 모드의 로컬 목록은 서버 목록의 사본이라 아직 안 불렀거나
+            // 불러오기에 실패해도(users:edit 만 있고 users:view 는 없는 운영자 등) 비어 있다. 그 빈 목록으로 추론하면
+            // 관리자가 만든 일반 계정이 조용히 ADMIN 으로 저장되고, 비-ADMIN 운영자의 등록은 role=ADMIN 때문에 403 이었다
+            // (라이브 실측 2026-09-26). 서버 모드는 활성화 때 잡은 USER 그대로 보낸다 — 역할 승격은 관리자가 편집에서 명시한다.
+            if (_gateway.CanInferFirstAccountAdmin && AccountProvider.Count() == 0)
                 ViewModel.Level = EnumLevelType.ADMIN;
 
             var created = await _gateway.CreateAccountAsync(ViewModel.Model, ct);

@@ -102,6 +102,37 @@ public static class AccountDtoMapper
         return dto;
     }
 
+    /// <summary>
+    /// 편집 전(<paramref name="before"/>)과 편집 후(<paramref name="after"/>)를 견주어 <b>바뀐 서버 필드 이름</b>을 돌려준다 —
+    /// <see cref="ToUserUpdateDto(IAccountModel, IEnumerable{string})"/> 에 그대로 넘기는 목록.
+    /// </summary>
+    /// <remarks>
+    /// <para>편집 다이얼로그 [확인] 이 전체 모델을 싣던 결함(라이브 실측 2026-09-26)의 짝: 바꾸지 않은 <c>role</c> 이 실려
+    /// <c>users:edit</c> 만 가진 비-ADMIN 편집자는 부서 하나 고쳐도 403 이었고, 상태(<c>is_active</c>)는 아예 실리지 않아
+    /// "미사용" 으로 바꿔도 서버 값이 그대로인데 "정상적으로 완료" 라고 했다.</para>
+    /// <para>글 칸은 빈 글과 null 을 같게 본다(화면 입력 칸은 비우면 빈 글을 준다). <c>role</c> 은 서버 어휘(ADMIN · USER)로 견준다 —
+    /// 레거시 5단계 값이 USER 로 정규화돼도 "바뀌었다" 고 보지 않는다. 사진은 업로드 · 삭제 전용 경로가 있어 견주지 않는다.</para>
+    /// </remarks>
+    public static IReadOnlyList<string> ChangedFields(IAccountModel before, IAccountModel after)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+        var changed = new List<string>();
+        void Text(string field, string? a, string? b)
+        {
+            if (!string.Equals(NullIfBlank(a), NullIfBlank(b), StringComparison.Ordinal)) changed.Add(field);
+        }
+        Text("name", before.Name, after.Name);
+        Text("email", before.EMail, after.EMail);
+        Text("department", before.Department, after.Department);
+        Text("position", before.Position, after.Position);
+        Text("employee_number", before.EmployeeNumber, after.EmployeeNumber);
+        Text("phone", before.Phone, after.Phone);
+        if (ToServerRole(before) != ToServerRole(after)) changed.Add("role");
+        if ((before.Used == EnumUsedType.USED) != (after.Used == EnumUsedType.USED)) changed.Add("is_active");
+        return changed;
+    }
+
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static bool IsBlankValue(UserUpdateDto dto, string field) => field switch

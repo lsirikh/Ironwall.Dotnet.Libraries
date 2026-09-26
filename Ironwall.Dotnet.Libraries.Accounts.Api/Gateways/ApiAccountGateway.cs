@@ -142,8 +142,14 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
+    /// <summary>서버 모드: 로컬 목록(서버 목록의 사본)으로 "첫 등록자 = ADMIN" 을 추론하지 않는다 — 역할은 서버 기본값(USER) 또는 관리자 명시값.</summary>
+    public bool CanInferFirstAccountAdmin => false;
+
+    /// <summary>서버 모드: 본인 수정(PUT /users/me) 본문에 employee_number 가 없다 — 사원번호는 관리자 경로로만 바뀐다.</summary>
+    public bool CanSelfEditEmployeeNumber => false;
+
     /// <summary>
-    /// 손댄 칸만 PUT /users/{id} — 콘솔 [적용] 경로. 비운 칸은 <c>"키": null</c> 로 실어 서버가 해제한다
+    /// 손댄 칸만 PUT /users/{id} — 콘솔 [적용] · 편집 다이얼로그 [확인] 경로. 비운 칸은 <c>"키": null</c> 로 실어 서버가 해제한다
     /// (<see cref="AccountDtoMapper.ToUserUpdateDto(IAccountModel, IEnumerable{string})"/>).
     /// </summary>
     public async Task<IAccountModel?> UpdateAccountFieldsAsync(IAccountModel acc, IReadOnlyCollection<string> changedFields, CancellationToken ct = default)

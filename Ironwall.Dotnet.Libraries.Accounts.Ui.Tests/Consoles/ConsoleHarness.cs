@@ -84,6 +84,9 @@ internal sealed class FakeDirectoryGateway : IUserDirectoryGateway
     public bool FailUpdate { get; set; }
     public int UnlockCallCount { get; private set; }
 
+    /// <summary>"첫 등록자 = ADMIN" 추론 허용(DB 모드=true, 서버 모드=false 흉내).</summary>
+    public bool CanInferFirstAccountAdmin { get; set; } = true;
+
     /// <summary>부분 수정이 받은 서버 필드 이름(호출마다 한 줄).</summary>
     public List<IReadOnlyCollection<string>> UpdatedFields { get; } = new();
 
