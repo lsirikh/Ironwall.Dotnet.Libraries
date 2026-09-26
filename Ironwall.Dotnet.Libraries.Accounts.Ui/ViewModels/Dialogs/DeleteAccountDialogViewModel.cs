@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Providers;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
@@ -65,7 +65,7 @@ public class DeleteAccountDialogViewModel : BasePanelViewModel
         catch (Exception ex)
         {
             _log?.Error(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = ex.Message });
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "계정 삭제", Explain = "계정을 삭제하지 못했습니다. 잠시 뒤 다시 시도하세요." });
         }
     }
 

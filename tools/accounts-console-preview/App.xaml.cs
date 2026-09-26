@@ -169,7 +169,15 @@ public partial class App : Application
             // ⑥ 권한 설정 — 가운데 칸 = 그룹 칩 + [그룹|구성원] + 매트릭스, 상세 300 = 요약 · 주의 · 저장(목업 L1205-L1234)
             await _viewModel.SelectRailAsync(AccountConsoleKeys.Permissions);
             await Settle();
-            _viewModel.Matrix.SelectedGroup = _viewModel.Matrix.Groups.FirstOrDefault();
+            // ⑥-a 그룹을 고르기 전 — 빈 매트릭스 대신 빈 상태 안내(A-7)
+            Save(directory, $"{theme}-06a-permissions-nogroup");
+            // ⑥-b 그룹을 고르기 전 [+ 새 그룹] — 상세가 열리고 "새 권한 그룹" 폼(A-9 · A-10)
+            _viewModel.Add();
+            await Settle();
+            Save(directory, $"{theme}-06b-permissions-newgroup");
+            _viewModel.PermissionMatrixPanelViewModel.ClickCancelGroupForm();
+            await Settle();
+            _viewModel.Matrix.SelectedGroup = _viewModel.Matrix.Groups.First(g => g.GroupName == "야간 관제");
             await Settle();
             Save(directory, $"{theme}-06-permissions-matrix");
 
@@ -184,10 +192,18 @@ public partial class App : Application
             Save(directory, $"{theme}-08-permissions-blocked");
             _viewModel.Revert();
 
-            // ⑨ 구성원 칩
+            // ⑨ 구성원 — 위에 [구성원 추가](A-18)
             _viewModel.Matrix.ShowMembers = true;
             await Settle();
+            _viewModel.PermissionMatrixPanelViewModel.SelectedAddAccount = _viewModel.PermissionMatrixPanelViewModel.AddableAccounts.FirstOrDefault();
+            await Settle();
             Save(directory, $"{theme}-09-permissions-members");
+            _viewModel.Matrix.ShowMembers = false;
+            // ⑨-b 구성원이 없는 그룹 — 빈 상태 안내
+            _viewModel.Matrix.SelectedGroup = _viewModel.Matrix.Groups.FirstOrDefault(g => g.UserCount == 0) ?? _viewModel.Matrix.Groups.Last();
+            _viewModel.Matrix.ShowMembers = true;
+            await Settle();
+            Save(directory, $"{theme}-09b-permissions-members-empty");
             _viewModel.Matrix.ShowMembers = false;
 
             // ⑨ 세션 관리
@@ -198,8 +214,11 @@ public partial class App : Application
             await Settle();
             Save(directory, $"{theme}-10-sessions");
 
-            // ⑩ 권한 부여
+            // ⑩ 권한 부여 — 새 부여 폼(상세, 늘 열림) + 고른 부여(A-29 · A-34)
             await _viewModel.SelectRailAsync(AccountConsoleKeys.Grants);
+            await Settle();
+            var grants = FindGrid("Console.Accounts.Grid.Grants");
+            if (grants.Items.Count > 0) grants.SelectedItem = grants.Items[0];
             await Settle();
             Save(directory, $"{theme}-11-grants");
 
@@ -211,10 +230,17 @@ public partial class App : Application
             await Settle();
             Save(directory, $"{theme}-12-audit");
 
-            // ⑫ 세션 설정(상세 칸 없음)
+            // ⑫ 세션 설정(상세 칸 없음) — 바꾼 것이 없으면 [저장] 이 꺼져 있다(A-45)
             await _viewModel.SelectRailAsync(AccountConsoleKeys.SessionSetup);
             await Settle();
             Save(directory, $"{theme}-13-session-setup");
+            var setup = _viewModel.AccountSetupPanelViewModel;
+            var before = setup.TimeoutHours;
+            setup.TimeoutHours = before + 1;
+            await Settle();
+            Save(directory, $"{theme}-13b-session-setup-dirty");
+            setup.TimeoutHours = before;
+            await Settle();
 
             // 좁은 폭 — 서랍(960~1279) · 접힘(<960), 상세 열림/닫힘. --surface 면 콘솔 폭 자체를 줄인다.
             var wideView = _view.Width;
@@ -339,6 +365,7 @@ public static class PreviewData
         api.Groups.Add(Group(10, "야간 관제", devices: true, events: true));
         api.Groups.Add(Group(11, "정비 지원", devices: true, events: false));
         api.Groups.Add(Group(12, "조회 전용", devices: false, events: false));
+        api.Groups.Add(Group(13, "당직 보조", devices: false, events: false));   // 구성원 0명 — 빈 상태 확인용
 
         for (var i = 0; i < 6; i++)
         {
@@ -358,20 +385,32 @@ public static class PreviewData
             });
         }
 
-        var actions = new[] { "USER_LOGIN", "USER_CREATED", "PASSWORD_RESET", "SESSION_FORCED_LOGOUT", "USER_DELETED" };
+        // 감사 동작 · 대상 · 결과는 서버의 닫힌 어휘(8.0.2 실측) — 마지막 하나는 사전에 없는 옛 값("알 수 없음" 표시 확인용).
+        var actions = new[] { "USER_UPDATED", "USER_CREATED", "PASSWORD_RESET", "SESSION_FORCED_LOGOUT", "PERMISSION_CHANGED", "USER_DELETED", "USER_LOGIN" };
         for (var i = 0; i < 8; i++)
         {
+            var action = actions[i % actions.Length];
             api.AuditLogs.Add(new AuditLogDto
             {
                 Id = 500 + i,
-                CreatedAt = $"2026-09-{12 + (i % 6):00} 14:2{i}:11",
-                ActionType = actions[i % actions.Length],
+                CreatedAt = $"2026-09-{12 + (i % 6):00}T14:2{i}:11.000000+09:00",
+                ActionType = action,
                 ActionStatus = i % 4 == 3 ? "FAILURE" : "SUCCESS",
-                ResourceType = "User",
+                ResourceType = action.StartsWith("PERMISSION") ? "USER_GROUP" : action.StartsWith("SESSION") ? "USER_SESSION" : "USER",
                 ResourceName = people[i % people.Length].Login,
                 ActorLoginId = "admin",
+                ActorName = "김관리",
                 IpAddress = "10.20.4.11",
                 Description = i % 4 == 3 ? "비밀번호가 정책에 맞지 않습니다" : "정상 처리",
+                Changes = action switch
+                {
+                    "USER_UPDATED" => Newtonsoft.Json.Linq.JObject.Parse(
+                        "{\"before\":{\"is_active\":true,\"department\":null,\"role\":\"USER\"},\"after\":{\"is_active\":false,\"department\":\"경비1과\",\"role\":\"ADMIN\"}}"),
+                    "PERMISSION_CHANGED" => Newtonsoft.Json.Linq.JObject.Parse(
+                        "{\"before\":{\"permissions\":{\"modules\":{\"devices\":{\"view\":true,\"edit\":false,\"delete\":false,\"control\":false},\"events\":{\"view\":false,\"edit\":false,\"delete\":false,\"control\":false}}}},"
+                        + "\"after\":{\"permissions\":{\"modules\":{\"devices\":{\"view\":true,\"edit\":true,\"delete\":false,\"control\":true},\"events\":{\"view\":true,\"edit\":false,\"delete\":false,\"control\":false}}}}}"),
+                    _ => null,
+                },
             });
         }
 
@@ -385,7 +424,8 @@ public static class PreviewData
                 GroupId = 10,
                 GroupName = "야간 관제",
                 ValidFrom = new DateTime(2026, 9, 18, 18, 0, 0),
-                ValidUntil = i == 2 ? null : new DateTime(2026, 9, 21 + i, 6, 0, 0),
+                // 첫 부여는 곧 끝난다(24시간 안) — "곧 만료" 알약 확인용.
+                ValidUntil = i == 2 ? null : i == 0 ? DateTime.Now.AddHours(6) : new DateTime(2026, 9, 21 + i, 6, 0, 0),
                 Status = i == 0 ? "ACTIVE" : i == 1 ? "PENDING" : "ACTIVE",
                 CreatedAt = new DateTime(2026, 9, 17, 10, 0, 0),
             });

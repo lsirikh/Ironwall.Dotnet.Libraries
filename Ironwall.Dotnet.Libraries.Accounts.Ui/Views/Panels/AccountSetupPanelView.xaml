@@ -11,6 +11,10 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+	</UserControl.Resources>
+
 	<!--  세션 정책 — GET/PUT /settings/session. 폼(스크롤) ↔ 액션바(하단 고정) 분리: 필드 6→11개로 늘어 버튼이 스크롤에 묻히지 않게 Grid Row0=* ScrollViewer / Row1=Auto 액션바.  -->
 	<Grid>
 		<Grid.RowDefinitions>
@@ -40,7 +44,7 @@
 					Margin="0,0,0,16"
 					FontSize="12"
 					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="서버가 발급하는 세션/토큰 정책. 변경은 신규 발급 토큰부터 적용됩니다." />
+					Text="바꾼 값은 다음 로그인부터 적용됩니다." />
 
 				<!--  상태 배너(미배포/미가용)  -->
 				<Border
@@ -70,7 +74,7 @@
 				<Grid IsEnabled="{Binding ServerSettingsAvailable}">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="180" />
+						<ColumnDefinition Width="220" />
 					</Grid.ColumnDefinitions>
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
@@ -84,19 +88,19 @@
 						<RowDefinition Height="Auto" />
 					</Grid.RowDefinitions>
 
-					<TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="세션(액세스 토큰) 만료 — 시간 (1~168)" />
+					<TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="로그인 유지 시간 — 시간 (1~168)" />
 					<TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
 
-					<TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Refresh 유효기간 — 일 (1~90)" />
+					<TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="자동 재로그인 허용 기간 — 일 (1~90)" />
 					<TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
 
-					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="로그인 잠금 임계 — 횟수 (0=비활성, 3~20)" />
+					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="잠금까지 비밀번호 오류 횟수 (0=잠그지 않음, 3~20)" />
 					<TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
 
-					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="잠금 자동해제 — 분 (0=영구, 1~1440)" />
+					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="잠금 자동 해제 — 분 (0=직접 풀 때까지, 1~1440)" />
 					<TextBox Grid.Row="6" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
 
-					<TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="세션 만료 사용" />
+					<TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="로그인 유지 시간 적용" />
 					<ToggleButton Grid.Row="8" Grid.Column="1" HorizontalAlignment="Left" IsChecked="{Binding SessionPolicyEnabled}" Style="{StaticResource Console.ToggleSwitch}" />
 				</Grid>
 
@@ -106,13 +110,13 @@
 					FontSize="13"
 					FontWeight="Bold"
 					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="동시 세션 정책 (서버 v6.3)" />
+					Text="동시 로그인" />
 				<Separator Margin="0,0,0,10" Background="{DynamicResource DividerBrush}" />
 
-				<Grid IsEnabled="{Binding ServerSettingsAvailable}">
+									<Grid IsEnabled="{Binding ServerSettingsAvailable}">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="180" />
+						<ColumnDefinition Width="220" />
 					</Grid.ColumnDefinitions>
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
@@ -128,21 +132,21 @@
 
 					<!--  ① 동시 세션 정책  -->
 					<TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
-						Text="동시 세션 정책"
-						ToolTip="allow로 바꾸면 같은 계정이 여러 곳에서 동시에 로그인해 있어도 서로 로그아웃되지 않습니다. 신규 로그인부터 적용." />
+						Text="같은 계정의 동시 로그인"
+						ToolTip="여러 곳 동시 로그인을 허용하면 같은 계정이 여러 곳에서 로그인해 있어도 서로 끊기지 않습니다. 다음 로그인부터 적용됩니다." />
 					<ComboBox Grid.Row="0" Grid.Column="1"
 						SelectedValuePath="Tag"
 						SelectedValue="{Binding ConcurrencyPolicy, Mode=TwoWay}">
-						<!--  서버 기본값이 allow(다중 공존)라 첫 항목도 allow — 목록 순서가 기본값을 오인시키지 않게 한다.  -->
-						<ComboBoxItem Tag="allow" Content="다중 (allow)" />
-						<ComboBoxItem Tag="evict_all" Content="단일 (evict_all)" />
+						<!--  서버 기본값이 allow(다중 공존)라 첫 항목도 allow — 목록 순서가 기본값을 오인시키지 않게 한다. 저장 값은 Tag, 글은 운영자 말(A-40).  -->
+						<ComboBoxItem Content="여러 곳 동시 로그인 허용" Tag="allow" />
+						<ComboBoxItem Content="새 로그인 시 기존 로그인 종료" Tag="evict_all" />
 					</ComboBox>
 
 					<!--  ② 최대 동시 세션 수 — allow일 때만 활성  -->
 					<TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"
 						IsEnabled="{Binding IsAllowPolicy}"
-						Text="최대 동시 세션 수 (0=무제한, 0~100)"
-						ToolTip="0=무제한. allow에서 이 수를 넘으면 가장 오래된 세션부터 자동 정리. (다중 세션 허용 시 적용)" />
+													Text="최대 동시 로그인 수 (0=제한 없음, 0~100)"
+							ToolTip="여러 곳 동시 로그인을 허용할 때만 적용됩니다. 이 수를 넘으면 가장 오래된 로그인부터 끊습니다." />
 					<TextBox Grid.Row="2" Grid.Column="1"
 						IsEnabled="{Binding IsAllowPolicy}"
 						Style="{StaticResource TextBoxInput}"
@@ -151,8 +155,9 @@
 					<!--  ③ 자기 세션 교체 허용 — allow일 때만 활성  -->
 					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center"
 						IsEnabled="{Binding IsAllowPolicy}"
-						Text="자기 세션 교체 허용"
-						ToolTip="같은 클라이언트(client_id)가 재로그인하면 그 클라의 옛 세션만 교체. ⚠ 여러 커넥션이 같은 client_id를 공유하면 서로 재축출되니, 켤 때는 커넥션별 고유 client_id를 먼저 적용하세요. (다중 세션 허용 시 적용)" />
+													Text="같은 프로그램에서 다시 로그인하면 이전 로그인 교체"
+							TextWrapping="Wrap"
+							ToolTip="같은 프로그램에서 다시 로그인하면 그 프로그램의 이전 로그인만 끊습니다. 여러 곳 동시 로그인을 허용할 때만 적용됩니다." />
 					<ToggleButton Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left"
 						IsEnabled="{Binding IsAllowPolicy}"
 						IsChecked="{Binding SessionSelfReplaceEnabled}"
@@ -160,56 +165,53 @@
 
 					<!--  ④ 세션 이력 보존 — 일  -->
 					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center"
-						Text="세션 이력 보존 — 일 (0=정리 안 함, 0~3650)"
-						ToolTip="0=정리 안 함. >0이면 로그아웃/만료된 오래된 세션 행을 주기적으로 삭제." />
+													Text="로그인 기록 보존 — 일 (0=지우지 않음, 0~3650)"
+							ToolTip="0이면 지우지 않습니다. 그보다 크면 로그아웃 · 만료된 오래된 기록을 정해진 날수가 지난 뒤 지웁니다." />
 					<TextBox Grid.Row="6" Grid.Column="1"
 						Style="{StaticResource TextBoxInput}"
 						Text="{Binding SessionHistoryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
 
-					<!--  ⑤ 로그인 이상탐지 이벤트 (예약)  -->
-					<TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center"
-						Text="로그인 이상탐지 이벤트 (예약)"
-						ToolTip="(예약) 신규 IP/단말 로그인 시 보안 이벤트 발행. 서버 배선 후속 — 지금은 켜도 동작 없음." />
-					<ToggleButton Grid.Row="8" Grid.Column="1" HorizontalAlignment="Left"
-						IsChecked="{Binding LoginAnomalyEventEnabled}"
-						Style="{StaticResource Console.ToggleSwitch}" />
+					<!--
+						⑤ 로그인 이상탐지 이벤트 — 서버 기능이 아직 없어(켜도 동작 없음) 숨겼다(A-42). 값은 VM 이 불러온 그대로 되돌려 보낸다.
+						인증 모드(읽기 전용 배포 설정) 줄도 운영자가 쓸 데가 없어 뺐다(A-43).
+					-->
 				</Grid>
-
-				<!--  읽기전용(배포/.env)  -->
-				<Border
-					Margin="0,20,0,0"
-					Padding="10,8"
-					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="0,1,0,0">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock VerticalAlignment="Center" Text="인증 모드 (읽기전용, 배포 설정): " />
-						<TextBlock VerticalAlignment="Center" FontWeight="Bold" Text="{Binding AuthMode}" />
-					</StackPanel>
-				</Border>
 
 			</StackPanel>
 		</ScrollViewer>
 
 		<!--  ── 하단 고정 액션바(스크롤 밖) ──  -->
+		<!--  바뀐 것이 있을 때만 켜지는 저장 막대(T2) — 왼쪽에 "변경 N건", 오른쪽에 [저장](A-45). 콘솔 안에서는 [새로고침] 을 접는다(툴바 [갱신], A-46).  -->
 		<Border
 			Grid.Row="1"
 			Padding="24,12"
 			Background="{DynamicResource SurfaceBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,1,0,0">
-			<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-				<Button
-					x:Name="ClickReload"
-					Width="100"
-					Margin="0,0,8,0"
-					Content="새로고침"
-					Style="{StaticResource Console.Button.Ghost}" />
-				<Button
-					x:Name="ClickSave"
-					Width="120"
-					Content="저장"
-					Style="{StaticResource Console.Button.Primary}" />
-			</StackPanel>
+			<DockPanel LastChildFill="True">
+				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+					<Button
+						x:Name="ClickReload"
+						Width="100"
+						Margin="0,0,8,0"
+						Content="새로고침"
+						Style="{StaticResource Console.Button.Ghost}"
+						Visibility="{Binding ShowReloadButton, Converter={StaticResource BoolToVisibility}}" />
+					<Button
+						x:Name="ClickSave"
+						Width="120"
+						AutomationProperties.AutomationId="Console.Accounts.SessionSetup.Save"
+						Content="저장"
+						Style="{StaticResource Console.Button.Primary}" />
+				</StackPanel>
+				<TextBlock
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Console.Accounts.SessionSetup.Changes"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding ChangeSummaryText}"
+					TextTrimming="CharacterEllipsis" />
+			</DockPanel>
 		</Border>
 	</Grid>
 </UserControl>

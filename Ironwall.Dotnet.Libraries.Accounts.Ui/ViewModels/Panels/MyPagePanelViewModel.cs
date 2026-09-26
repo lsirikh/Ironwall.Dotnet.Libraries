@@ -69,7 +69,7 @@ public class MyPagePanelViewModel : BasePanelViewModel
         catch (ArgumentException ex)
         {
             _log?.Warning(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = ex.Message });
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진", Explain = Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers.ProfileImageHelper.RejectedText });
         }
     }
 
@@ -120,7 +120,7 @@ public class MyPagePanelViewModel : BasePanelViewModel
         catch (Exception ex)
         {
             _log?.Error(ex.Message);
-            explain = ex.Message;
+            explain = "내 정보를 다시 불러오지 못했습니다. 잠시 뒤 다시 시도하세요.";
         }
         finally
         {

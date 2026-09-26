@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
 
@@ -12,6 +12,11 @@ public static class ProfileImageHelper
     // 서버 허용(jpeg/png/webp/gif)과 정렬. bmp/tiff 는 서버가 400 으로 거부하므로 클라에서 선제 배제, webp/gif 추가.
     public static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
     public const long MaxBytes = 5 * 1024 * 1024;   // 5MB
+
+    /// <summary>
+    /// 사진으로 쓸 수 없는 파일을 골랐을 때의 팝업 문장(고정). 검증 원문 · 예외 원문(" (Parameter 'sourcePath')" 등)은 로그로만 남긴다(A-51).
+    /// </summary>
+    public const string RejectedText = "이 파일은 사진으로 쓸 수 없습니다. JPG · PNG · WebP · GIF 형식의 5MB 이하 파일을 고르세요.";
 
     /// <summary>경로의 이미지가 허용 확장자/크기를 만족하는지 검증.</summary>
     public static bool IsValid(string path, out string? error)

@@ -80,8 +80,9 @@ public class AuditLogPanelViewModel : BasePanelViewModel
             }
             else
             {
+                _log?.Warning($"[AuditLog] 조회 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "감사 로그", Explain = $"불러오기 실패: {res.Error?.Message ?? res.Message}" }, ct);
+                { Title = "감사 로그", Explain = "감사 기록을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요." }, ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -159,6 +160,9 @@ public class AuditLogPanelViewModel : BasePanelViewModel
 
     /// <summary>로드된 건수 / 전체 건수 표시.</summary>
     public string LoadedCountText => $"{Items.Count} / {_totalCount}건";
+
+    /// <summary>서버가 알려 준 전체 건수 — 콘솔의 상태 띠가 쓴다.</summary>
+    public int TotalCount => _totalCount;
 
     /// <summary>다음 페이지 존재 여부 — 무한 스크롤 종료 판정.</summary>
     public bool HasMorePages => _currentPage < _totalPages;

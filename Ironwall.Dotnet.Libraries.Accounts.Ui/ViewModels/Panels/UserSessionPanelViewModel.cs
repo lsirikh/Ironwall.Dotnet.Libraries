@@ -84,7 +84,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 강제로그아웃 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중(401→teardown)이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = $"강제 로그아웃 실패: {ExplainFailure(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message)}" });
+                { Title = "세션 관리", Explain = ExplainFailure("세션 종료", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message) });
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 강제로그아웃 실패: {ex.Message}"); }
     }
@@ -117,7 +117,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 전체종료 후 첫 페이지부터 재조회
             else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = $"전체 세션 종료 실패: {ExplainFailure(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message)}" });   // (R-2) 409 ADMIN 락아웃 안내
+                { Title = "세션 관리", Explain = ExplainFailure("전체 세션 종료", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message) });   // (R-2) 409 ADMIN 락아웃 안내
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 전체세션 종료 실패: {ex.Message}"); }
     }
@@ -151,8 +151,11 @@ public class UserSessionPanelViewModel : BasePanelViewModel
             // 자기 세션 강제로그아웃 직후 재조회는 토큰 teardown과 레이스 → 취소(합성504). 로그아웃 전환 중
             //   (IsAuthenticated=false)이면 폐기 세션 재조회 실패는 정상 → '불러오기 실패' 팝업 억제(스샷 010431).
             else if (!res.Success && _tokenStore.IsAuthenticated)
+            {
+                _log?.Warning($"[UserSession] 조회 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 관리", Explain = $"불러오기 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "세션 관리", Explain = "세션 목록을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요." });
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[UserSession] 로드 실패: {ex.Message}"); }
@@ -269,6 +272,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     /// <summary>로드된 건수 / 전체 건수 표시.</summary>
     public string LoadedCountText => $"{Items.Count} / {_totalCount}건";
 
+    /// <summary>서버가 알려 준 전체 건수(한 페이지 100건이 아니라) — 콘솔의 배지 · 상태 띠가 쓴다(A-36).</summary>
+    public int TotalCount => _totalCount;
+
     /// <summary>다음 페이지 존재 여부 — 무한 스크롤 종료 판정.</summary>
     public bool HasMorePages => _currentPage < _totalPages;
 
@@ -280,10 +286,14 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     /// <para>배포 8.0.1 은 <c>DELETE /api/user-sessions/{session_id}</c>·<c>/user/{user_id}</c> 양쪽에 409 를 선언한다
     /// ("마지막 활성 ADMIN 세션은 강제 로그아웃할 수 없음"). 운영 6.3.2 는 선언이 없어 이 분기에 닿지 않는다(무회귀).</para>
     /// </summary>
-    private static string ExplainFailure(int statusCode, string? code, string? serverMessage)
-        => (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
-            ? "마지막으로 남은 활성 관리자(ADMIN) 세션은 종료할 수 없습니다. 다른 관리자가 로그인한 뒤 다시 시도해 주세요."
-            : (serverMessage ?? "서버가 요청을 거부했습니다.");
+    /// <remarks>409 가 아니면 고정 문장 — 서버 원문은 로그로만 남긴다(A-38).</remarks>
+    private string ExplainFailure(string what, int statusCode, string? code, string? serverMessage)
+    {
+        _log?.Warning($"[UserSession] {what} 거부: {statusCode} {code} {serverMessage}");
+        return (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
+            ? "마지막으로 남은 관리자 세션은 종료할 수 없습니다. 다른 관리자가 로그인한 뒤 다시 시도하세요."
+            : $"{what}에 실패했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.";
+    }
 
     #region - Attributes -
     private const int PAGE_SIZE = 100;   // 서버 limit 최대치

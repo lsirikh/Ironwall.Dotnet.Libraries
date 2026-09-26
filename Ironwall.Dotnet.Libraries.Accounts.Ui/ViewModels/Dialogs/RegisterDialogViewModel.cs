@@ -116,7 +116,7 @@ public class RegisterDialogViewModel : BasePanelViewModel
         catch (ArgumentException ex)
         {
             _log?.Warning(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = ex.Message });
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진", Explain = Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers.ProfileImageHelper.RejectedText });
         }
     }
 

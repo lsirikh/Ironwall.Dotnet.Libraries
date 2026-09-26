@@ -85,7 +85,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         if (ValidUntil.HasValue && ValidUntil.Value <= _clock.Now)
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 부여", Explain = "종료 일시는 현재보다 미래여야 합니다. (서버가 과거 종료일을 거부합니다)" });
+            { Title = "권한 부여", Explain = "종료 일시는 지금보다 뒤여야 합니다." });
             return;
         }
         try
@@ -104,8 +104,11 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
                 await LoadAllGrantsAsync();   // 새 부여를 전체 목록에 즉시 반영
             }
             else
+            {
+                _log?.Warning($"[GrantMgmt] 부여 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 부여", Explain = $"부여 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "권한 부여", Explain = "권한을 부여하지 못했습니다. 계정 · 그룹 · 기간을 확인한 뒤 다시 시도하세요." });
+            }
         }
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 부여 실패: {ex.Message}"); }
     }
@@ -117,7 +120,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "권한 회수",
-            Explain = $"'{grant.GroupName ?? grant.GroupId.ToString()}' 부여(#{grant.Id})를 회수하시겠습니까?",
+            Explain = $"‘{grant.UserLogin}’에게 준 ‘{grant.GroupName}’ 그룹 부여를 회수하시겠습니까?",
             MessageModel = new CallRevokeGrantMessageModel { Grant = grant }
         });
     }
@@ -131,8 +134,12 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         {
             var res = await _api.DeleteGrantAsync(grant.Id);
             if (res.Success) await LoadAllGrantsAsync();
-            else await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 회수", Explain = $"회수 실패: {res.Error?.Message ?? res.Message}" });
+            else
+            {
+                _log?.Warning($"[GrantMgmt] 회수 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "권한 회수", Explain = "부여를 회수하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요." });
+            }
         }
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 회수 실패: {ex.Message}"); }
         finally
@@ -156,8 +163,11 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             if (usersRes.Success && usersRes.Data is not null)
                 foreach (var u in usersRes.Data) Accounts.Add(u);
             else
+            {
+                _log?.Warning($"[GrantMgmt] 계정 조회 거부: {usersRes.StatusCode} {usersRes.Error?.Code} {usersRes.Error?.Message ?? usersRes.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 부여", Explain = $"계정 목록 불러오기 실패: {usersRes.Error?.Message ?? usersRes.Message}" });
+                { Title = "권한 부여", Explain = "계정 목록을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요." });
+            }
 
             var groupsRes = await _api.GetAllUserGroupsAsync(ct);   // 그룹도 limit 상한 100 → page 순회
             Groups.Clear();
@@ -196,8 +206,11 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
                 });
             }
             else if (!res.Success)
+            {
+                _log?.Warning($"[GrantMgmt] 부여 목록 조회 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 부여", Explain = $"부여 목록 불러오기 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "권한 부여", Explain = "부여 목록을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요." });
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 전체 부여 로드 실패: {ex.Message}"); }
@@ -274,6 +287,9 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
 
     /// <summary>로드된 건수 / 전체 건수 표시.</summary>
     public string LoadedCountText => $"{Grants.Count} / {_totalCount}건";
+
+    /// <summary>서버가 알려 준 전체 건수(한 페이지 100건이 아니라) — 콘솔의 배지 · 상태 띠가 쓴다.</summary>
+    public int TotalCount => _totalCount;
 
     /// <summary>다음 페이지 존재 여부 — 무한 스크롤 종료 판정.</summary>
     public bool HasMorePages => _currentPage < _totalPages;

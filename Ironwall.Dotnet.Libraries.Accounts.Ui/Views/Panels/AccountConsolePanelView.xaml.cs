@@ -24,6 +24,7 @@ public partial class AccountConsolePanelView : UserControl
     private DataGrid? _usersGrid;
     private DataGrid? _sessionsGrid;
     private DataGrid? _auditGrid;
+    private DataGrid? _grantsGrid;
     private ConsoleToolbar? _toolbar;
     private ConsolePrefs? _prefs;
     private bool _isSyncingSelection;
@@ -50,6 +51,7 @@ public partial class AccountConsolePanelView : UserControl
         _viewModel.Matrix.SelectionRestoreRequested += OnGroupSelectionRestoreRequested;
         _viewModel.SearchChanged += OnSearchChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _viewModel.GrantFormFocusRequested += OnGrantFormFocusRequested;
         HookUsersFilter();
         ApplyColumnPrefs();
     }
@@ -61,6 +63,7 @@ public partial class AccountConsolePanelView : UserControl
         _viewModel.Matrix.SelectionRestoreRequested -= OnGroupSelectionRestoreRequested;
         _viewModel.SearchChanged -= OnSearchChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.GrantFormFocusRequested -= OnGrantFormFocusRequested;
         _viewModel = null;
     }
 
@@ -100,10 +103,45 @@ public partial class AccountConsolePanelView : UserControl
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(AccountConsolePanelViewModel.ShowColumnsButton) or nameof(AccountConsolePanelViewModel.IsUsersRail)
-            or nameof(AccountConsolePanelViewModel.IsSessionsRail) or nameof(AccountConsolePanelViewModel.IsAuditRail))
+            or nameof(AccountConsolePanelViewModel.IsSessionsRail) or nameof(AccountConsolePanelViewModel.IsAuditRail)
+            or nameof(AccountConsolePanelViewModel.IsGrantsRail) or nameof(AccountConsolePanelViewModel.IsDetailRequested))
             ApplyColumnPrefs();
         if (e.PropertyName is nameof(AccountConsolePanelViewModel.IsPermissionsRail) or nameof(AccountConsolePanelViewModel.IsUsersRail))
             ApplyDetailWidth();
+        if (e.PropertyName is nameof(AccountConsolePanelViewModel.ShowAddButton) or nameof(AccountConsolePanelViewModel.ShowDeleteButton))
+            ApplyToolbarShape();
+    }
+
+    /// <summary>
+    /// 추가 · 삭제할 것이 없는 레일(세션 · 감사 · 세션 설정)에서는 툴바의 [+ 추가] · [삭제] 를 숨긴다(A-37) —
+    /// 커널 툴바에 "보이기" 속성이 없어 템플릿 부품의 표시만 여기서 바꾼다(단추 · 자동화 식별자는 그대로).
+    /// </summary>
+    private void ApplyToolbarShape()
+    {
+        if (_toolbar is null || _viewModel is null) return;
+        _toolbar.ApplyTemplate();
+        if (_toolbar.Template?.FindName("PART_Add", _toolbar) is UIElement add)
+            add.Visibility = _viewModel.ShowAddButton ? Visibility.Visible : Visibility.Collapsed;
+        if (_toolbar.Template?.FindName("PART_Delete", _toolbar) is UIElement delete)
+            delete.Visibility = _viewModel.ShowDeleteButton ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>권한 부여 레일의 [+ 새 부여] — 상세 칸 폼의 첫 칸(계정)에 초점을 준다.</summary>
+    private void OnGrantFormFocusRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() => FindByAutomationId(this, "Accounts.Detail.Field.grant_user")?.Focus()),
+                               System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private static UIElement? FindByAutomationId(DependencyObject parent, string id)
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is UIElement element && System.Windows.Automation.AutomationProperties.GetAutomationId(element) == id) return element;
+            if (FindByAutomationId(child, id) is { } found) return found;
+        }
+        return null;
     }
 
     /// <summary>
@@ -137,6 +175,7 @@ public partial class AccountConsolePanelView : UserControl
     {
         _toolbar = (ConsoleToolbar)sender;
         ApplyColumnPrefs();
+        ApplyToolbarShape();
     }
 
     private void OnSessionsGridLoaded(object sender, RoutedEventArgs e)
@@ -148,6 +187,12 @@ public partial class AccountConsolePanelView : UserControl
     private void OnAuditGridLoaded(object sender, RoutedEventArgs e)
     {
         _auditGrid = (DataGrid)sender;
+        ApplyColumnPrefs();
+    }
+
+    private void OnGrantsGridLoaded(object sender, RoutedEventArgs e)
+    {
+        _grantsGrid = (DataGrid)sender;
         ApplyColumnPrefs();
     }
 
@@ -175,6 +220,8 @@ public partial class AccountConsolePanelView : UserControl
         if (_viewModel.IsUsersRail) return (_usersGrid, "users");
         if (_viewModel.IsSessionsRail) return (_sessionsGrid, "sessions");
         if (_viewModel.IsAuditRail) return (_auditGrid, "audit");
+        // 권한 부여 — 새 부여 폼(상세)이 늘 열려 목록이 좁다. 좁으면 유효 시작부터 접는다.
+        if (_viewModel.IsGrantsRail) return (_grantsGrid, "grants");
         return null;
     }
 
@@ -355,6 +402,31 @@ public partial class AccountConsolePanelView : UserControl
     private void OnShowMembers(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) vm.Matrix.ShowMembers = true;
+    }
+
+    /// <summary>행 [전체] — 그 모듈의 켤 수 있는 칸을 한꺼번에 켜거나 끈다(드래그 페인팅의 키보드 폴백, A-11).</summary>
+    private void OnToggleRow(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && (sender as FrameworkElement)?.DataContext is ModulePermRowViewModel row)
+            vm.Matrix.ToggleRow(row);
+    }
+
+    /// <summary>그룹 칩 줄 — 세로 휠을 가로 이동으로 바꾼다(칩 줄은 한 줄이라 세로로 굴릴 것이 없다).</summary>
+    private void OnGroupStripWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer strip || strip.ScrollableWidth <= 0) return;
+        strip.ScrollToHorizontalOffset(strip.HorizontalOffset - e.Delta / 2.0);
+        e.Handled = true;
+    }
+
+    private async void OnAddMember(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.AddMemberAsync();
+    }
+
+    private async void OnEndUserSessions(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.EndUserSessionsAsync();
     }
 
     /// <summary>열 머리글 — 그 동작을 켤 수 있는 모든 모듈에 같은 값을 준다(드래그 페인팅의 폴백).</summary>

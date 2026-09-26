@@ -66,7 +66,7 @@ public class PermissionMatrixConsoleTests
         console.Matrix.SelectedGroup = console.Matrix.Groups.First();
 
         Assert.True(console.Matrix.HasCatalogWarning);
-        Assert.Contains("사전에 없는 서버 모듈", console.DetailBanner);
+        Assert.Contains("새로 추가된 모듈이 1개", console.DetailBanner);
     }
 
     [Fact]
@@ -110,13 +110,13 @@ public class PermissionMatrixConsoleTests
     }
 
     [Fact]
-    public async Task should_show_the_full_replacement_notice_in_the_status_bar()
+    public async Task should_show_enabled_modules_and_the_hatch_legend_when_a_group_is_selected()
     {
         var console = await OpenAsync();
         console.Matrix.SelectedGroup = console.Matrix.Groups.First();
 
-        Assert.Contains("전체 교체 저장", console.MatrixStatusText);
-        Assert.Contains("모듈", console.MatrixStatusText);
+        Assert.Contains($"켜진 모듈 {console.Matrix.EnabledModuleText}", console.MatrixStatusText);
+        Assert.Contains("▨ 이 모듈에 없는 동작", console.MatrixStatusText);
     }
 
     [Fact]

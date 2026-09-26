@@ -240,11 +240,11 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
     }
     #endregion
     #region - Console display (N-06) -
-    /// <summary>목록 '구분' 칸 — 역할 그대로. 색이 아니라 글자로 뜻을 전한다.</summary>
-    public string RoleText => Role.ToString();
+    /// <summary>목록 '구분' 칸 — 역할을 표시 사전으로("관리자" · "사용자"). 저장 값(열거형)은 그대로다.</summary>
+    public string RoleText => Consoles.AccountDisplay.Role(Role);
 
     /// <summary>목록 '상태' 칸.</summary>
-    public string UsedText => Used == EnumUsedType.USED ? "사용" : "미사용";
+    public string UsedText => Consoles.AccountDisplay.Used(Used);
 
     /// <summary>목록 '부서·직급' 칸 — 둘 중 하나가 비면 남은 것만 보인다(빈 가운뎃점을 남기지 않는다).</summary>
     public string OrgText

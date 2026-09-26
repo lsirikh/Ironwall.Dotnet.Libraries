@@ -86,6 +86,25 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         // 콘솔의 DetailIsDirty · DetailCanApply 는 <b>여기서 만든 파생 값</b>이라 이어 주지 않으면
         // 적용 막대가 "변경 없음" 인 채 [되돌리기] · [적용] 이 꺼져 있었다(D-10 실측: 깨끗한 화면과 픽셀 동일).
         Detail.PropertyChanged += OnDetailPresenterChanged;
+        // 그룹 이름/설명 폼은 패널 뷰모델이 쥔다 — 폼이 열리면 상세 칸도 열려야 한다(A-9: 그룹을 고르기 전 [+ 새 그룹] 이 아무 일도 안 보였다).
+        permissionMatrix.PropertyChanged += OnPermissionPanelChanged;
+        permissionMatrix.Members.CollectionChanged += (_, _) => Execute.BeginOnUIThread(RaiseMatrixShape);
+        DraftTray.PropertyChanged += (_, _) => NotifyOfPropertyChange(nameof(DraftTrayText));
+        // 세션 설정 화면은 콘솔 툴바의 [갱신] 하나로 다시 읽는다 — 폼 바닥의 [새로고침] 은 접는다(A-46).
+        accountSetup.IsHostedInConsole = true;
+    }
+
+    private void OnPermissionPanelChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PermissionMatrixPanelViewModel.IsGroupFormOpen) or nameof(PermissionMatrixPanelViewModel.FormTitle))
+        {
+            RaiseDetail();
+            RaiseMatrixShape();
+        }
+        else if (e.PropertyName is nameof(PermissionMatrixPanelViewModel.CanAddMember) or nameof(PermissionMatrixPanelViewModel.SelectedAddAccount))
+        {
+            NotifyOfPropertyChange(nameof(CanAddMember));
+        }
     }
 
     private bool _raisingDetail;
@@ -110,6 +129,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         PermissionMatrixPanelViewModel.Groups.CollectionChanged += OnRailCountSourceChanged;
         UserSessionPanelViewModel.Items.CollectionChanged += OnRailCountSourceChanged;
         GrantManagementPanelViewModel.Grants.CollectionChanged += OnRailCountSourceChanged;
+        AuditLogPanelViewModel.Items.CollectionChanged += OnRailCountSourceChanged;
 
         BuildRail();
 
@@ -133,6 +153,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         PermissionMatrixPanelViewModel.Groups.CollectionChanged -= OnRailCountSourceChanged;
         UserSessionPanelViewModel.Items.CollectionChanged -= OnRailCountSourceChanged;
         GrantManagementPanelViewModel.Grants.CollectionChanged -= OnRailCountSourceChanged;
+        AuditLogPanelViewModel.Items.CollectionChanged -= OnRailCountSourceChanged;
 
         // 싱글턴 — 다음에 열 때 옛 선택 · 미적용 변경 · Draft 가 남아 있으면 안 된다.
         DraftTray.Revert();
@@ -226,8 +247,9 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         SetCount(AccountConsoleKeys.Users, AccountManagerPanelViewModel.ViewModelProvider.Count,
                  AccountManagerPanelViewModel.ViewModelProvider.Count(u => u.IsLocked));
         SetCount(AccountConsoleKeys.Permissions, PermissionMatrixPanelViewModel.Groups.Count, 0);
-        SetCount(AccountConsoleKeys.Sessions, UserSessionPanelViewModel.Items.Count, 0);
-        SetCount(AccountConsoleKeys.Grants, GrantManagementPanelViewModel.Grants.Count, 0);
+        // 세션 · 부여는 한 페이지(100)만 불러온다 — 배지는 불러온 수가 아니라 서버 전체 건수를 보인다(A-36).
+        SetCount(AccountConsoleKeys.Sessions, Math.Max(UserSessionPanelViewModel.TotalCount, UserSessionPanelViewModel.Items.Count), 0);
+        SetCount(AccountConsoleKeys.Grants, Math.Max(GrantManagementPanelViewModel.TotalCount, GrantManagementPanelViewModel.Grants.Count), 0);
         NotifyOfPropertyChange(nameof(RailFooterText));
 
         void SetCount(string key, int total, int bad)
@@ -320,10 +342,15 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         if (!CanAdd) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
 
-        // 등록은 다이얼로그로 남는다(450×550 · T4) — 결정 L-D4.
+        // 등록은 다이얼로그로 남는다(T4) — 결정 L-D4.
         if (IsUsersRail) AccountManagerPanelViewModel.OnClickInsertButton(this, new System.Windows.RoutedEventArgs());
         else if (IsPermissionsRail) PermissionMatrixPanelViewModel.OnClickNewGroup();
+        // 권한 부여는 상세 칸의 '새 부여' 폼이 본문이다 — [+ 새 부여] 는 그 폼의 첫 칸으로 초점을 옮긴다(A-29).
+        else if (IsGrantsRail) GrantFormFocusRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>권한 부여 레일의 [+ 새 부여] — 화면이 상세 칸 폼의 첫 칸(계정)에 초점을 준다.</summary>
+    public event EventHandler? GrantFormFocusRequested;
 
     public async Task DeleteAsync()
     {
@@ -373,11 +400,19 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         RefreshStatus();
     }
 
-    public bool CanAdd => (IsUsersRail && CanEditUsers) || (IsPermissionsRail && CanEditUsers);
+    public bool CanAdd => (IsUsersRail && CanEditUsers) || (IsPermissionsRail && CanEditUsers) || (IsGrantsRail && CanSeeGrants);
 
     public string? AddBlockedReason
-        => !IsUsersRail && !IsPermissionsRail ? "이 화면에서는 추가할 수 없습니다."
-         : !CanEditUsers ? "권한이 없습니다." : null;
+        => !IsUsersRail && !IsPermissionsRail && !IsGrantsRail ? "이 화면에서는 추가할 수 없습니다."
+         : !CanEditUsers && !IsGrantsRail ? "권한이 없습니다." : null;
+
+    /// <summary>
+    /// 툴바 [+ 추가] 를 보일 것인가 — 추가할 것이 없는 화면(세션 · 감사 · 세션 설정)에서는 늘 꺼진 단추를 세워 두지 않고 숨긴다(A-37).
+    /// </summary>
+    public bool ShowAddButton => IsUsersRail || IsPermissionsRail || IsGrantsRail;
+
+    /// <summary>툴바 [삭제] 를 보일 것인가 — 사용자 · 권한 설정에서만 뜻이 있다(A-37).</summary>
+    public bool ShowDeleteButton => IsUsersRail || IsPermissionsRail;
 
     public bool CanDelete
         => (IsUsersRail && CanDeleteUsers && _selectedRows.Count > 0)
@@ -390,7 +425,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
 
     public bool CanReload => true;
 
-    public string AddText => IsPermissionsRail ? "새 그룹" : "추가";
+    public string AddText => IsPermissionsRail ? "새 그룹" : IsGrantsRail ? "새 부여" : "추가";
     public string SearchPlaceholder => "아이디 · 성명 · 사번 · 부서 검색";
     public bool ShowSearch => IsUsersRail;
     #endregion
@@ -485,11 +520,12 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         : IsUsersRail ? Detail.Kind
         : AccountConsoleKeys.LabelOf(_railKey ?? AccountConsoleKeys.Users);
 
-    public string DetailTitle => IsPermissionsRail ? Matrix.GroupTitle
+    public string DetailTitle => IsPermissionsRail
+            ? (Matrix.SelectedGroup is null && PermissionMatrixPanelViewModel.IsGroupFormOpen ? PermissionMatrixPanelViewModel.FormTitle : Matrix.GroupTitle)
         : IsUsersRail ? Detail.Title
         : IsSessionsRail ? (SelectedSession is null ? "선택한 세션 없음" : SelectedSession.LoginId ?? "세션")
         : IsGrantsRail ? "권한 한시 부여"
-        : IsAuditRail ? (SelectedAuditLog is null ? "선택한 기록 없음" : SelectedAuditLog.ActionType ?? "기록")
+        : IsAuditRail ? (SelectedAuditLog is null ? "선택한 기록 없음" : AccountDisplay.AuditAction(SelectedAuditLog.ActionType))
         : "세션 정책";
 
     public string DetailBanner => IsPermissionsRail
@@ -507,7 +543,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         ? (_blockedNotice && Matrix.IsDirty ? BlockedNoticeShort
             : Matrix.IsDirty
                 ? $"변경 {Matrix.DirtyCount}건 미적용" + (string.IsNullOrEmpty(Matrix.LastMessage) ? string.Empty : $" — {Matrix.LastMessage}")
-                : Matrix.LastMessage ?? "저장 = 전체 교체")
+                : Matrix.LastMessage ?? NoChangesText)
         : IsUsersRail ? Detail.FooterText : string.Empty;
 
     public bool DetailIsDirty => IsPermissionsRail ? Matrix.IsDirty : IsUsersRail && Detail.IsDirty;
@@ -520,7 +556,24 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     /// <summary>방금 한 일 · 막힌 까닭 한 줄(바닥 막대는 미적용 건수를 우선해 보인다).</summary>
     public string? DetailMessage => IsPermissionsRail ? Matrix.LastMessage : Detail.LastMessage;
     public int DetailShakeToken => Detail.ShakeToken;
-    public bool IsDetailRequested => IsPermissionsRail ? Matrix.SelectedGroup is not null : Detail.IsDetailRequested;
+
+    /// <summary>권한 설정 레일의 바닥 막대 — 바꾼 것이 없을 때(사용자 레일과 같은 말).</summary>
+    public const string NoChangesText = "변경 없음";
+
+    /// <summary>
+    /// 상세 칸을 열어 달라는가 — <b>레일마다 다르다</b>(A-29 · A-30 · A-31).
+    /// 종전에는 사용자 · 권한 설정만 따져서, 세션 · 부여 · 감사 레일에서는 서랍 모드(폭 1280 미만)에서 상세가 끝내 열리지 않았다 —
+    /// 강제 종료 단추 · 새 부여 폼 · 변경 전후 표가 거기 있었다.
+    /// </summary>
+    public bool IsDetailRequested => _railKey switch
+    {
+        AccountConsoleKeys.Users => Detail.IsDetailRequested,
+        AccountConsoleKeys.Permissions => Matrix.SelectedGroup is not null || PermissionMatrixPanelViewModel.IsGroupFormOpen,
+        AccountConsoleKeys.Sessions => SelectedSession is not null,
+        AccountConsoleKeys.Grants => true,        // 새 부여 폼이 상세의 본문이다
+        AccountConsoleKeys.Audit => SelectedAuditLog is not null,
+        _ => false,                               // 세션 설정은 폼 하나라 상세 칸을 쓰지 않는다
+    };
 
     private void RaiseDetail()
     {
@@ -549,6 +602,24 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(ForceLogoutAllText));
         NotifyOfPropertyChange(nameof(CanOpenUserDialog));
         NotifyOfPropertyChange(nameof(UserDialogBlockedReason));
+        NotifyOfPropertyChange(nameof(LockedAtText));
+        NotifyOfPropertyChange(nameof(CanEndUserSessions));
+        NotifyOfPropertyChange(nameof(SingleUser));
+        NotifyOfPropertyChange(nameof(AuditTimeText));
+        NotifyOfPropertyChange(nameof(AuditActionText));
+        NotifyOfPropertyChange(nameof(AuditActionToolTip));
+        NotifyOfPropertyChange(nameof(AuditResourceText));
+        NotifyOfPropertyChange(nameof(AuditStatusText));
+        NotifyOfPropertyChange(nameof(AuditActorText));
+        NotifyOfPropertyChange(nameof(AuditChanges));
+        NotifyOfPropertyChange(nameof(HasAuditChanges));
+        NotifyOfPropertyChange(nameof(AuditNoChangesText));
+        NotifyOfPropertyChange(nameof(AuditErrorText));
+        NotifyOfPropertyChange(nameof(HasAuditError));
+        NotifyOfPropertyChange(nameof(SelectedGrantSummary));
+        NotifyOfPropertyChange(nameof(HasSelectedGrant));
+        NotifyOfPropertyChange(nameof(CanRevokeSelectedGrant));
+        RaiseMatrixShape();
         RefreshStatus();
     }
 
@@ -583,9 +654,43 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         {
             var user = SingleUser;
             if (user is null) return "—";
-            var active = UserSessionPanelViewModel.Items.Count(s => s.IsActive && string.Equals(s.LoginId, user.Username, StringComparison.OrdinalIgnoreCase));
-            return $"활성 {active}건";
+            // 라벨이 이미 "활성 세션" 이다 — 값은 건수만(A-28: "활성 세션 — 활성 0건").
+            return $"{ActiveSessionCount(user)}건";
         }
+    }
+
+    private int ActiveSessionCount(AccountViewModel user)
+        => UserSessionPanelViewModel.Items.Count(s => s.IsActive && string.Equals(s.LoginId, user.Username, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>잠긴 시각 — 서버 <c>locked_at</c>(사용자 목록 조회에서 함께 받는다). 잠기지 않았으면 "—".</summary>
+    public string LockedAtText
+    {
+        get
+        {
+            var user = SingleUser;
+            if (user is null || !user.IsLocked) return "—";
+            return _lockedAtOfUser.TryGetValue(user.Id, out var raw) && !string.IsNullOrWhiteSpace(raw)
+                ? AccountDisplay.Time(raw)
+                : "기록 없음";
+        }
+    }
+
+    /// <summary>상세 칸의 [세션 모두 종료] — 이 사용자에게 활성 세션이 있고 세션을 끊을 수 있을 때.</summary>
+    public bool CanEndUserSessions
+        => SingleUser is { } user && CanSeeSession && ActiveSessionCount(user) > 0;
+
+    /// <summary>
+    /// 이 사용자의 활성 세션을 모두 끊는다 — 세션 관리 화면의 [이 사용자 전체 종료] 와 같은 경로(확인 팝업 → 서버).
+    /// 자기 계정이면 확인 팝업이 "본인도 로그아웃된다" 고 알린다.
+    /// </summary>
+    public async Task EndUserSessionsAsync()
+    {
+        var user = SingleUser;
+        if (user is null || !CanEndUserSessions) return;
+        var session = UserSessionPanelViewModel.Items.FirstOrDefault(s => s.IsActive
+                          && string.Equals(s.LoginId, user.Username, StringComparison.OrdinalIgnoreCase))
+                      ?? new UserSessionDto { UserId = user.Id, LoginId = user.Username, IsActive = true };
+        await UserSessionPanelViewModel.OnClickForceLogoutAllUserSessions(session);
     }
 
     /// <summary>
@@ -734,7 +839,9 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
             if (usersResponse.Success && usersResponse.Data is not null)
             {
                 _lastLoginOfUser = usersResponse.Data.GroupBy(u => u.Id).ToDictionary(g => g.Key, g => g.First().LastLoginAt);
+                _lockedAtOfUser = usersResponse.Data.GroupBy(u => u.Id).ToDictionary(g => g.Key, g => g.First().LockedAt);
                 NotifyOfPropertyChange(nameof(LastLoginText));
+                NotifyOfPropertyChange(nameof(LockedAtText));
             }
             if (!groupsResponse.Success || groupsResponse.Data is null) return;
 
@@ -797,6 +904,63 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         get => _selectedGrant;
         set { _selectedGrant = value; NotifyOfPropertyChange(); RaiseDetail(); }
     }
+
+    // ── 감사 기록 상세(A-31) — 시각 · 행위자 · 대상 · 결과 + 변경 전후 표 ─────────────────────
+    public string AuditTimeText => AccountDisplay.Time(SelectedAuditLog?.CreatedAt);
+    public string AuditActionText => AccountDisplay.AuditAction(SelectedAuditLog?.ActionType);
+    public string? AuditActionToolTip => AccountDisplay.RawIfUnknown(AccountDisplay.AuditActions, SelectedAuditLog?.ActionType);
+
+    /// <summary>대상 — "사용자 · 홍길동 (operator01)". 이름이 없으면 종류만.</summary>
+    public string AuditResourceText
+    {
+        get
+        {
+            var log = SelectedAuditLog;
+            if (log is null) return string.Empty;
+            var kind = AccountDisplay.AuditResource(log.ResourceType);
+            return string.IsNullOrWhiteSpace(log.ResourceName) ? kind : $"{kind} · {log.ResourceName}";
+        }
+    }
+
+    public string AuditStatusText => AccountDisplay.AuditStatus(SelectedAuditLog?.ActionStatus);
+
+    /// <summary>행위자 — "관리자(admin)". 이름이 없으면 아이디만.</summary>
+    public string AuditActorText
+    {
+        get
+        {
+            var log = SelectedAuditLog;
+            if (log is null) return string.Empty;
+            return string.IsNullOrWhiteSpace(log.ActorName) || log.ActorName == log.ActorLoginId
+                ? log.ActorLoginId ?? string.Empty
+                : $"{log.ActorName}({log.ActorLoginId})";
+        }
+    }
+
+    /// <summary>변경 전후 표 — 항목 / 전 / 후. 값이 바뀐 칸만.</summary>
+    public IReadOnlyList<AuditChangeRow> AuditChanges => AccountDisplay.Changes(SelectedAuditLog?.Changes);
+    public bool HasAuditChanges => AuditChanges.Count > 0;
+    public string AuditNoChangesText => SelectedAuditLog is null ? string.Empty : "이 기록에는 바뀐 값이 없습니다.";
+    public string AuditErrorText => SelectedAuditLog?.ErrorMessage ?? string.Empty;
+    public bool HasAuditError => !string.IsNullOrWhiteSpace(SelectedAuditLog?.ErrorMessage);
+
+    // ── 고른 부여 — 회수 대상 확인용 한 줄 ─────────────────────────────────────────────
+    public bool HasSelectedGrant => SelectedGrant is not null;
+
+    public string SelectedGrantSummary
+    {
+        get
+        {
+            var grant = SelectedGrant;
+            if (grant is null) return string.Empty;
+            var until = grant.ValidUntil is { } end ? end.ToString("yyyy-MM-dd HH:mm") : "상시";
+            return $"{grant.UserLogin} → {grant.GroupName} · {grant.ValidFrom:yyyy-MM-dd HH:mm} ~ {until} · {AccountDisplay.GrantStatus(grant.Status)}";
+        }
+    }
+
+    /// <summary>회수할 수 있는 부여인가 — 이미 만료 · 회수된 것은 아니다.</summary>
+    public bool CanRevokeSelectedGrant
+        => SelectedGrant is { } grant && grant.Status is not ("EXPIRED" or "REVOKED");
     #endregion
 
     #region - Status -
@@ -812,19 +976,111 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         private set { _listStatusText = value; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>권한 설정 레일의 오른쪽 글 — "모듈 N · 표시 N" + 전체 교체 안내.</summary>
-    public string MatrixStatusText => IsPermissionsRail && Matrix.SelectedGroup is not null
-        ? $"{Matrix.ModuleCountText} · 전체 교체 저장 — 끄는 모듈도 키를 실어야 합니다"
+    /// <summary>
+    /// 권한 설정 레일의 오른쪽 글 — 켜진 모듈 수와 사선 칸의 뜻(A-3 · A-13).
+    /// 저장 방식(전체 교체 · 키를 싣는다)은 운영자가 알 일이 아니라 적지 않는다.
+    /// </summary>
+    public string MatrixStatusText => IsPermissionsRail && Matrix.SelectedGroup is not null && Matrix.Modules.Count > 0
+        ? $"켜진 모듈 {Matrix.EnabledModuleText} · ▨ 이 모듈에 없는 동작"
         : string.Empty;
+
+    /// <summary>상태 띠의 그룹 배정 대기 줄 — 커널 트레이의 문구(구현어)를 운영자 말로 바꿔 보인다(A-24).</summary>
+    public string DraftTrayText
+    {
+        get
+        {
+            if (DraftTray.IsApplying) return $"옮기는 중 {DraftTray.ProgressDone}/{DraftTray.ProgressTotal}";
+            if (!DraftTray.HasEntries) return string.Empty;
+            var failed = DraftTray.Entries.Count(e => !string.IsNullOrEmpty(e.FailureReason));
+            return failed > 0
+                ? $"{failed}명을 옮기지 못했습니다. [적용]을 다시 누르거나 [버리기]를 누르세요."
+                : $"{DraftTray.Count}명을 옮길 준비가 됐습니다. [적용]을 누르세요.";
+        }
+    }
+
+    // ── 빈 목록(X3) — 커널 ConsoleEmptyState 에 싣는 "무엇이 비었고 무엇을 하면 되는지" ───────────
+    public bool ShowListEmpty => _railKey switch
+    {
+        AccountConsoleKeys.Users => AccountManagerPanelViewModel.ViewModelProvider.Count(MatchesSearch) == 0,
+        AccountConsoleKeys.Sessions => UserSessionPanelViewModel.Items.Count == 0,
+        AccountConsoleKeys.Grants => GrantManagementPanelViewModel.Grants.Count == 0,
+        AccountConsoleKeys.Audit => AuditLogPanelViewModel.Items.Count == 0,
+        _ => false,
+    };
+
+    public string ListEmptyTitle => _railKey switch
+    {
+        AccountConsoleKeys.Users => AccountManagerPanelViewModel.ViewModelProvider.Count == 0 ? "등록된 사용자가 없습니다" : "검색에 맞는 사용자가 없습니다",
+        AccountConsoleKeys.Sessions => "로그인해 있는 세션이 없습니다",
+        AccountConsoleKeys.Grants => "한시 부여가 없습니다",
+        AccountConsoleKeys.Audit => "이 기간의 감사 기록이 없습니다",
+        _ => string.Empty,
+    };
+
+    public string ListEmptyHint => _railKey switch
+    {
+        AccountConsoleKeys.Users => AccountManagerPanelViewModel.ViewModelProvider.Count == 0 ? "[+ 추가]로 새 계정을 등록하세요." : "검색어를 바꾸거나 지워 보세요.",
+        AccountConsoleKeys.Sessions => "새로 불러오기(⟳)를 누르면 다시 불러옵니다.",
+        AccountConsoleKeys.Grants => "오른쪽 ‘새 부여’에서 계정과 그룹을 골라 [부여]를 누르세요.",
+        AccountConsoleKeys.Audit => "시작일을 앞당겨 [검색]을 누르세요.",
+        _ => string.Empty,
+    };
+
+    // ── 권한 설정 가운데 칸의 모양(A-7 · A-18) ───────────────────────────────────────
+    /// <summary>그룹을 골랐는가 — 고르지 않았으면 매트릭스 대신 빈 상태 안내를 보인다.</summary>
+    public bool HasSelectedGroup => Matrix.SelectedGroup is not null;
+    public bool ShowMatrixGrid => HasSelectedGroup && Matrix.ShowMatrix;
+    public bool ShowMembersPane => HasSelectedGroup && Matrix.ShowMembers;
+    public bool ShowNoGroupState => IsPermissionsRail && !HasSelectedGroup;
+    public bool ShowNoMembersState => ShowMembersPane && Matrix.Members.Count == 0;
+
+    /// <summary>그룹이 하나도 없으면 "먼저 만드세요", 있으면 "고르세요".</summary>
+    public string NoGroupTitle => Matrix.Groups.Count == 0 ? "권한 그룹이 없습니다" : "권한 그룹을 고르세요";
+    public string NoGroupHint => Matrix.Groups.Count == 0
+        ? "[+ 새 그룹]으로 첫 권한 그룹을 만드세요."
+        : "위 ‘권한 그룹’에서 그룹을 고르면 모듈별 권한이 여기에 나옵니다.";
+
+    /// <summary>구성원 추가 — 이 그룹에 넣을 수 있는 계정(지금 구성원이 아닌 계정)이 있고 편집 권한이 있을 때.</summary>
+    public bool CanAddMember => CanEditUsers && PermissionMatrixPanelViewModel.CanAddMember;
+
+    /// <summary>[구성원 추가] — 기존 구성원 관리 경로(<c>PUT /users/{id}</c> group_id) 그대로. 칩 · 사용자 목록도 다시 센다.</summary>
+    public async Task AddMemberAsync()
+    {
+        if (!CanAddMember) return;
+        await PermissionMatrixPanelViewModel.ClickAddMember();
+        await LoadGroupsAsync(CancellationToken.None);
+        RaiseMatrixShape();
+    }
+
+    private void RaiseMatrixShape()
+    {
+        NotifyOfPropertyChange(nameof(HasSelectedGroup));
+        NotifyOfPropertyChange(nameof(ShowMatrixGrid));
+        NotifyOfPropertyChange(nameof(ShowMembersPane));
+        NotifyOfPropertyChange(nameof(ShowNoGroupState));
+        NotifyOfPropertyChange(nameof(ShowNoMembersState));
+        NotifyOfPropertyChange(nameof(NoGroupTitle));
+        NotifyOfPropertyChange(nameof(NoGroupHint));
+        NotifyOfPropertyChange(nameof(CanAddMember));
+    }
 
     private void RefreshStatus()
     {
         var shown = _railKey == AccountConsoleKeys.Users
             ? AccountManagerPanelViewModel.ViewModelProvider.Count(MatchesSearch)
-            : TotalOfRail();
+            : LoadedOfRail();
         var total = TotalOfRail();
         ApplyStatus(shown, total);
     }
+
+    /// <summary>화면에 불러온 수 — 세션 · 부여 · 감사는 한 페이지씩 불러온다.</summary>
+    private int LoadedOfRail() => _railKey switch
+    {
+        AccountConsoleKeys.Sessions => UserSessionPanelViewModel.Items.Count,
+        AccountConsoleKeys.Grants => GrantManagementPanelViewModel.Grants.Count,
+        AccountConsoleKeys.Audit => AuditLogPanelViewModel.Items.Count,
+        _ => TotalOfRail(),
+    };
 
     private int TotalOfRail()
     {
@@ -832,9 +1088,10 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         {
             AccountConsoleKeys.Users => AccountManagerPanelViewModel.ViewModelProvider.Count,
             AccountConsoleKeys.Permissions => PermissionMatrixPanelViewModel.Groups.Count,
-            AccountConsoleKeys.Sessions => UserSessionPanelViewModel.Items.Count,
-            AccountConsoleKeys.Grants => GrantManagementPanelViewModel.Grants.Count,
-            AccountConsoleKeys.Audit => AuditLogPanelViewModel.Items.Count,
+            // 서버 전체 건수(한 페이지 100건이 아니라) — "목록 100건" 이 실제 세션 수로 읽히지 않게(A-36).
+            AccountConsoleKeys.Sessions => Math.Max(UserSessionPanelViewModel.TotalCount, UserSessionPanelViewModel.Items.Count),
+            AccountConsoleKeys.Grants => Math.Max(GrantManagementPanelViewModel.TotalCount, GrantManagementPanelViewModel.Grants.Count),
+            AccountConsoleKeys.Audit => Math.Max(AuditLogPanelViewModel.TotalCount, AuditLogPanelViewModel.Items.Count),
             _ => 0,
         };
     }
@@ -847,6 +1104,9 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
             : shown == total ? $"목록 {total}건{selected}"
             : $"목록 {shown}건(전체 {total}){selected}";
         NotifyOfPropertyChange(nameof(MatrixStatusText));
+        NotifyOfPropertyChange(nameof(ShowListEmpty));
+        NotifyOfPropertyChange(nameof(ListEmptyTitle));
+        NotifyOfPropertyChange(nameof(ListEmptyHint));
     }
     #endregion
 
@@ -873,6 +1133,8 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(ShowSearch));
         NotifyOfPropertyChange(nameof(AddText));
         NotifyOfPropertyChange(nameof(AddBlockedReason));
+        NotifyOfPropertyChange(nameof(ShowAddButton));
+        NotifyOfPropertyChange(nameof(ShowDeleteButton));
         NotifyOfPropertyChange(nameof(DeleteBlockedReason));
         RaiseDetail();
     }
@@ -921,7 +1183,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
 
     /// <summary>다른 레일의 목록이 채워졌다 — 배지와 상태 띠만 다시 센다(끝남도 작업 스레드에서 올 수 있다).</summary>
     private void OnRailCountSourceChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => Execute.BeginOnUIThread(() => { RefreshRailCounts(); RefreshStatus(); });
+        => Execute.BeginOnUIThread(() => { RefreshRailCounts(); RefreshStatus(); RaiseMatrixShape(); });
 
     private void ReconcileUsers()
     {
@@ -1043,6 +1305,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private HashSet<int> _selectedIds = new();
     private Dictionary<int, int> _groupOfUser = new();
     private Dictionary<int, string?> _lastLoginOfUser = new();
+    private Dictionary<int, string?> _lockedAtOfUser = new();
     private Dictionary<int, string> _groupNameById = new();
     private int _adminGroupId;
     private UserSessionDto? _selectedSession;

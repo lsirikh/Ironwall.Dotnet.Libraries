@@ -63,7 +63,7 @@ public sealed record AccountFieldSpec(
 public static class AccountFieldCatalog
 {
     public const string IdentityLockReason = "아이디는 만든 뒤 바꿀 수 없습니다.";
-    public const string GroupNote = "상태 띠의 권한 그룹 칩에 끌어 놓거나 칩을 눌러 바꿉니다.";
+    public const string GroupNote = "목록 아래 ‘권한 그룹’ 칩에 끌어 놓거나 칩을 눌러 바꿉니다.";
 
     public static IReadOnlyList<AccountFieldSection> SectionOrder { get; } = new[]
     {
@@ -95,11 +95,14 @@ public static class AccountFieldCatalog
         _ => null,
     };
 
-    /// <summary>고를 수 있는 역할 — 서버 v5.4 가 발행하는 두 가지만(레거시 5등급은 생성 시 422).</summary>
+    /// <summary>
+    /// 고를 수 있는 역할 — 서버 v5.4 가 발행하는 두 가지만(레거시 5등급은 생성 시 422).
+    /// 화면에는 <b>표시 글</b>("관리자" · "사용자")을 싣고, 쓸 때 열거형으로 되돌린다(<see cref="WriteRole"/>).
+    /// </summary>
     public static IReadOnlyList<string> RoleOptions { get; } = new[]
     {
-        nameof(EnumUserRole.ADMIN),
-        nameof(EnumUserRole.USER),
+        AccountDisplay.Role(EnumUserRole.ADMIN),
+        AccountDisplay.Role(EnumUserRole.USER),
     };
 
     public static IReadOnlyList<string> UsedOptions { get; } = new[] { "사용", "미사용" };
@@ -128,7 +131,7 @@ public static class AccountFieldCatalog
 
         // ── 소속 · 역할 ───────────────────────────────────────────────────
         new AccountFieldSpec("role", "구분", AccountFieldSection.Role, AccountFieldEditor.Choice,
-            "role", r => r.Role.ToString(), WriteRole, AllowMultiEdit: true, Required: true, Options: RoleOptions),
+            "role", r => r.RoleText, WriteRole, AllowMultiEdit: true, Required: true, Options: RoleOptions),
         new AccountFieldSpec("group", "권한 그룹", AccountFieldSection.Role, AccountFieldEditor.ReadOnly,
             "group_id", r => string.IsNullOrEmpty(r.GroupText) ? "(없음)" : r.GroupText, null, LockReason: GroupNote),
         new AccountFieldSpec("used", "상태", AccountFieldSection.Role, AccountFieldEditor.Choice,
@@ -139,7 +142,7 @@ public static class AccountFieldCatalog
 
     private static void WriteRole(AccountViewModel row, string text)
     {
-        if (Enum.TryParse<EnumUserRole>(text, ignoreCase: false, out var role)) row.Role = role;
+        if (AccountDisplay.TryParseRole(text, out var role)) row.Role = role;
     }
 
     private static void WriteUsed(AccountViewModel row, string text)

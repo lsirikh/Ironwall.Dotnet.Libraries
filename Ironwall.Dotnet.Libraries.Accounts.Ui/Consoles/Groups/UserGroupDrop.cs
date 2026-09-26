@@ -120,16 +120,30 @@ public static class UserGroupDrop
         return new GroupAssignPlan(groupId, groupName, moving, alreadyIn, unsaved, reason, self, adminGuard);
     }
 
-    /// <summary>드롭 직후 상태 띠에 남길 한 줄 — 호출이 N회로 번지므로 곧바로 보내지 않는다.</summary>
+    /// <summary>
+    /// 드롭 직후 상태 띠에 남길 한 줄 — 곧바로 보내지 않고 [적용] 을 기다린다는 것을 운영자 말로 적는다
+    /// (몇 번 보내는지 · 임시 목록 같은 구현 사정은 적지 않는다).
+    /// </summary>
     public static string DropLine(GroupAssignPlan plan, int draftCount)
     {
-        var parts = new List<string> { $"Draft {draftCount}건 — 호출은 {draftCount}회로 번지므로 [적용] 때 모아 보냅니다" };
-        if (plan.AlreadyIn > 0) parts.Add($"이미 '{plan.GroupName}' 인 {plan.AlreadyIn}명은 담지 않았습니다");
-        if (plan.Unsaved > 0) parts.Add($"저장 전 {plan.Unsaved}명은 뺐습니다");
-        if (plan.SelfExcluded > 0) parts.Add("자기 계정은 뺐습니다");
-        if (plan.AdminGuardExcluded > 0) parts.Add($"계정 관리 그룹의 마지막 {plan.AdminGuardExcluded}명은 뺐습니다");
-        return string.Join(" · ", parts);
+        var parts = new List<string> { $"{draftCount}명을 ‘{plan.GroupName}’ 그룹으로 옮길 준비가 됐습니다. [적용]을 누르세요." };
+        if (plan.AlreadyIn > 0) parts.Add($"이미 ‘{plan.GroupName}’ 그룹인 {plan.AlreadyIn}명은 뺐습니다.");
+        if (plan.Unsaved > 0) parts.Add($"저장 전 계정 {plan.Unsaved}명은 뺐습니다.");
+        if (plan.SelfExcluded > 0) parts.Add("자기 계정은 뺐습니다.");
+        if (plan.AdminGuardExcluded > 0) parts.Add($"계정 관리 그룹의 마지막 {plan.AdminGuardExcluded}명은 뺐습니다.");
+        return string.Join(" ", parts);
     }
+
+    /// <summary>[적용] 이 끝난 뒤의 한 줄.</summary>
+    public static string AppliedLine(DraftApplySummary summary)
+    {
+        if (summary.WasCancelled) return $"중단했습니다(적용 {summary.Applied}명).";
+        var head = summary.Applied > 0 ? $"적용했습니다({summary.Applied}명)." : "바뀐 계정이 없습니다.";
+        var failed = summary.Failed + summary.Missing;
+        return failed > 0 ? $"{head} {failed}명은 옮기지 못했습니다 — [적용]을 다시 누르세요." : head;
+    }
+
+    public const string RevertedLine = "옮기려던 것을 취소했습니다.";
 }
 
 /// <summary>되돌리기에 필요한 것 — 방금 바뀐 사용자와 그 이전 그룹.</summary>
@@ -218,15 +232,15 @@ public sealed class UserGroupDropHandler : IDragDropHandler
         var summary = await _tray.ApplyAsync(token).ConfigureAwait(true);
         // 남은 Draft 가 없으면 이 묶음은 끝났다 — 다음에 담는 것은 새 묶음이다.
         _settled = !_tray.HasEntries;
-        Announce(summary.ToMessage() + (summary.Applied > 0 ? " (벌크 입구가 있으면 1회)" : string.Empty));
+        Announce(UserGroupDrop.AppliedLine(summary));
         return summary;
     }
 
-    /// <summary>Draft 를 버린다 — 서버 호출 0.</summary>
+    /// <summary>담아 둔 것을 버린다 — 서버에는 아무것도 보내지 않는다.</summary>
     public void Revert()
     {
         _tray.Revert();
-        Announce("Draft 를 버렸습니다 — 서버 호출 0");
+        Announce(UserGroupDrop.RevertedLine);
     }
 
     /// <summary>방금 적용한 것을 되돌린다(역방향 N회). 되돌린 뒤에는 다시 되돌릴 것이 없다.</summary>
@@ -252,7 +266,7 @@ public sealed class UserGroupDropHandler : IDragDropHandler
                 _log?.Error($"[AccountGroupDrop] undo user={item.UserId}: {ex.Message}");
             }
         }
-        Announce($"되돌렸습니다 — {done}회 호출" + (failed > 0 ? $" · 실패 {failed}" : string.Empty));
+        Announce(failed > 0 ? $"되돌렸습니다({done}명). {failed}명은 되돌리지 못했습니다." : $"되돌렸습니다({done}명).");
     }
 
     /// <summary>끌어 온 행에서 계정 뷰모델만 고른다.</summary>

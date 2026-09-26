@@ -29,7 +29,7 @@ public class PermissionMatrixReviewTests
         Assert.Equal(dirtyBefore, console.Matrix.DirtyCount);
         Assert.True(console.DetailIsDirty);
         Assert.True(console.DetailCanApply);                       // 다시 시도할 수 있다
-        Assert.Contains("403", console.DetailMessage);
+        Assert.Equal(Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels.PermissionMatrixPanelViewModel.SaveRejectedShort, console.DetailMessage);   // 서버 원문(403 · 영문)은 싣지 않는다(A-38)
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class PermissionMatrixReviewTests
 
         Assert.Empty(api.PermissionSaves);                         // 전체 교체라 덮으면 남의 변경이 사라진다
         Assert.True(console.Matrix.IsDirty);
-        Assert.Contains("다른 곳에서 바뀌었습니다", console.DetailMessage);
+        Assert.Contains("다른 곳에서 먼저 바뀌어", console.DetailMessage);
     }
 
     // ── A2: 재조회가 선택을 놓지 않는다 ────────────────────────────────
@@ -191,13 +191,16 @@ public class PermissionMatrixReviewTests
         Assert.False(console.Matrix.Modules.Single(m => m.ModuleKey == "reports").IsControlServerEnforced);
     }
 
+    // 저장 방식 안내("모듈 N종 전부를 한 번에 보냅니다" · "전체 교체 저장")는 운영자 화면에서 뺐다
+    // (원장 D-2026-09-26-648420 · 감사 A-2 · A-3) — 상태 띠는 켜진 모듈 수와 사선 칸의 뜻만 말한다.
     [Fact]
-    public async Task should_announce_that_every_module_is_sent_at_once()
+    public async Task should_show_enabled_module_count_without_transport_notes_when_a_group_is_open()
     {
         var (console, _) = await OpenAsync();
 
-        Assert.Contains("전부를 한 번에 보냅니다", console.Matrix.SendAllNote);
-        Assert.Contains("전체 교체 저장", console.MatrixStatusText);
+        Assert.StartsWith("켜진 모듈 ", console.MatrixStatusText);
+        Assert.DoesNotContain("전체 교체", console.MatrixStatusText);
+        Assert.DoesNotContain("키", console.MatrixStatusText);
     }
 
     private static FakePermissionService PermissionOf(TestAccountConsole console)

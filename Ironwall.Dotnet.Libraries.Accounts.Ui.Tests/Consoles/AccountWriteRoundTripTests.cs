@@ -185,8 +185,10 @@ public class AccountWriteRoundTripTests
     [Fact]
     public void should_name_the_setup_system_permission_when_session_setup_is_forbidden()
     {
-        Assert.Contains("setup_system", AccountSetupPanelViewModel.ForbiddenSaveText);
-        Assert.Contains("setup_system", AccountSetupPanelViewModel.ForbiddenLoadText);
+        // 권한 이름은 운영자가 보는 이름으로(키 이름 setup_system 은 싣지 않는다 — 원장 D-2026-09-26-648420).
+        Assert.Contains("‘시스템 설정’", AccountSetupPanelViewModel.ForbiddenSaveText);
+        Assert.Contains("‘시스템 설정’", AccountSetupPanelViewModel.ForbiddenLoadText);
+        Assert.DoesNotContain("setup_system", AccountSetupPanelViewModel.ForbiddenSaveText);
         Assert.DoesNotContain("ADMIN 전용", AccountSetupPanelViewModel.ForbiddenSaveText);
     }
 }

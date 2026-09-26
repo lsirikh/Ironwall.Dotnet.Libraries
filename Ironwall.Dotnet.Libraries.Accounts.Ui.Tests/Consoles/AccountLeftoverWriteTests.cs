@@ -130,7 +130,7 @@ public class AccountLeftoverWriteTests
     [InlineData(24, 91, 5, 30, "allow", 0, 0, "1~90")]
     [InlineData(24, 7, 5, 1441, "allow", 0, 0, "1~1440")]
     [InlineData(24, 7, 5, -1, "allow", 0, 0, "1~1440")]
-    [InlineData(24, 7, 5, 30, "single", 0, 0, "evict_all")]
+    [InlineData(24, 7, 5, 30, "single", 0, 0, "동시 로그인")]
     [InlineData(24, 7, 5, 30, "allow", 101, 0, "0~100")]
     [InlineData(24, 7, 5, 30, "allow", 0, 3651, "0~3650")]
     public void should_name_the_offending_range_when_a_session_policy_value_is_out_of_the_server_range(

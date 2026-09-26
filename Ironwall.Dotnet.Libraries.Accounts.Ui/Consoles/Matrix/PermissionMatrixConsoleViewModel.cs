@@ -127,14 +127,8 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
     public string? CatalogWarning => _panel.CatalogWarning;
     public bool HasCatalogWarning => _panel.HasCatalogWarning;
 
-    /// <summary>가운데 칸 머리의 안내 — 목업 L1207 "모듈 16종 전부를 한 번에 보냅니다".</summary>
-    public string SendAllNote => _panel.Modules.Count == 0 ? string.Empty : $"모듈 {_panel.Modules.Count}종 전부를 한 번에 보냅니다";
-
     /// <summary>요약의 미적용 건수.</summary>
     public string DirtyCountText => IsDirty ? $"{DirtyCount}건" : "없음";
-
-    /// <summary>상태 띠 — "모듈 N · 표시 N".</summary>
-    public string ModuleCountText => _panel.Modules.Count == 0 ? string.Empty : $"모듈 {_panel.Modules.Count} · 표시 {_panel.Modules.Count}";
 
     /// <summary>요약 — 켜진 모듈 수 / 전체.</summary>
     public string EnabledModuleText
@@ -253,6 +247,10 @@ public sealed class PermissionMatrixConsoleViewModel : PropertyChangedBase, IPer
             foreach (var cell in cells) Set(cell, turnOn);
         return true;
     }
+
+    /// <summary>행 [전체] 단추 — 그 행(모듈)의 켤 수 있는 칸을 한꺼번에 뒤집는다(A-11). 행을 못 찾으면 false.</summary>
+    public bool ToggleRow(ModulePermRowViewModel? row)
+        => row is not null && ToggleRow(_panel.Modules.IndexOf(row));
 
     /// <summary>열 전체 토글 — 머리글을 누르면 그 동작을 켤 수 있는 모든 모듈에 같은 값을 준다.</summary>
     public bool ToggleVerb(int verb)

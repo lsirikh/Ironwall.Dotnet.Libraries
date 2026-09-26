@@ -60,14 +60,17 @@ public class UserGroupDropTests
     }
 
     [Fact]
-    public void should_say_how_many_calls_the_draft_will_make_in_the_result_line()
+    public void should_say_how_many_people_wait_for_apply_without_developer_words_when_dropping()
     {
         var plan = UserGroupDrop.Plan(7, "야간조", new[] { Row(1, "op1"), Row(2, "op2") });
 
         var line = UserGroupDrop.DropLine(plan, plan.Targets.Count);
 
-        Assert.Contains("Draft 2건", line);
-        Assert.Contains("2회로 번지므로 [적용] 때 모아 보냅니다", line);
+        // A-24 — "Draft 2건 — 호출은 2회로 번지므로…" 는 구현어였다. 몇 명이 어디로 가는지와 할 일만.
+        Assert.Contains("2명을 ‘야간조’ 그룹으로 옮길 준비가 됐습니다", line);
+        Assert.Contains("[적용]", line);
+        Assert.DoesNotContain("Draft", line);
+        Assert.DoesNotContain("호출", line);
     }
 
     // ── 트레이 · 전송 ──────────────────────────────────────────────────

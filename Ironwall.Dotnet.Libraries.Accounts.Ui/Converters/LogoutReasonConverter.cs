@@ -6,7 +6,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Converters;
 
 /// <summary>
 /// 세션 종료 사유 코드 → 한글 표시(표시 전용). 서버 logout_reason(EnumUserSessionLogoutReason / SESSION_REVOKED reason).
-/// 미지 코드는 원문 그대로, null/빈값은 "".
+/// 미지 코드는 "알 수 없음", null/빈값은 "".
 /// </summary>
 public sealed class LogoutReasonConverter : IValueConverter
 {
@@ -21,7 +21,8 @@ public sealed class LogoutReasonConverter : IValueConverter
             "EXPIRED" => "세션 만료",
             "REFRESH_ROTATION" => "토큰 갱신",
             null or "" => string.Empty,
-            var other => other,
+            // 모르는 코드는 원문 대신 "알 수 없음" — 원문은 칸의 툴팁이 보인다(운영자 화면에 영문 코드를 찍지 않는다).
+            _ => Consoles.AccountDisplay.Unknown,
         };
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

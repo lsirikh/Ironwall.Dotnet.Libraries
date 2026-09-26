@@ -3,6 +3,7 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Converters"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
@@ -18,6 +19,8 @@
 
 	<UserControl.Resources>
 		<utils:ImageConverter x:Key="ImageConverter" />
+		<conv:RoleDisplayConverter x:Key="RoleText" />
+		<conv:UsedDisplayConverter x:Key="UsedText" />
 	</UserControl.Resources>
 
 		<md:Card
@@ -162,7 +165,7 @@
 							Grid.Row="2"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
-							Text="등급" />
+							Text="구분" />
 						<StackPanel
 							Grid.Row="2"
 							Grid.Column="1"
@@ -179,7 +182,8 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding}" />
+										<!--  저장 값은 열거형 그대로, 글은 "관리자 · 사용자"(A-21)  -->
+										<TextBlock Text="{Binding Converter={StaticResource RoleText}}" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>
@@ -193,13 +197,13 @@
 							Grid.Row="3"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
-							Text="이름" />
+							Text="성명" />
 
 						<TextBox
 							Grid.Row="3"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="이름"
+							md:HintAssist.Hint="성명"
 							md:ValidationAssist.HorizontalAlignment="Left"
 							Style="{StaticResource TextBoxInput}">
 							<TextBox.Text>
@@ -226,7 +230,7 @@
 							Grid.Row="4"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="사원번호"
+							md:HintAssist.Hint="사번"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.EmployeeNumber}" />
 
@@ -235,13 +239,13 @@
 							Grid.Row="5"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
-							Text="전화번호" />
+							Text="전화" />
 						<TextBox
 							x:Name="EditorPhone"
 							Grid.Row="5"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="전화번호"
+							md:HintAssist.Hint="전화"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.Phone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
 							<i:Interaction.Behaviors>
@@ -378,7 +382,8 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding}" />
+										<!--  USED / NOT_USED 가 아니라 "사용 / 미사용"(A-48) — 콘솔 목록과 같은 말  -->
+										<TextBlock Text="{Binding Converter={StaticResource UsedText}}" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>

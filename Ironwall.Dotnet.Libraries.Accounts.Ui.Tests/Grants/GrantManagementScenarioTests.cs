@@ -160,7 +160,7 @@ internal static class GrantScenarios
                 // 종전 기대("클라 미차단 → 서버 422 영문 노출")는 VM 이 굳어지기 전의 것이다 —
                 // 지금은 클라가 먼저 막고 한글로 알린다(영문 422 누출을 없앤 하드닝, ClickCreateGrant 주석 ②).
                 log.Check("D2a", "과거종료: 클라가 먼저 막는다(서버 미도달)", s.CreateCallCount == 0);
-                log.Check("D2b", "과거종료: 한글 안내(미래여야)", HasInfo(ea, "종료 일시는 현재보다 미래여야 합니다"));
+                log.Check("D2b", "과거종료: 한글 안내(지금보다 뒤)", HasInfo(ea, "종료 일시는 지금보다 뒤여야 합니다"));
                 log.Check("D2c", "과거종료: 서버 부여행 미생성", s.GrantRows.Count == 0);
             }
             // D3: 과거 시작 + 상시 → 성공(ACTIVE) — 서버는 valid_from 과거를 허용
@@ -197,7 +197,7 @@ internal static class GrantScenarios
                 s.Users.RemoveAll(u => u.Id == 2);   // 선택 후 서버에서 계정 소멸
                 ea.ClearPublished();
                 await vm.ClickCreateGrant();
-                log.Check("D5a", "계정없음: 404 실패 안내", HasInfo(ea, "User not found"));
+                log.Check("D5a", "계정없음: 404 고정 한글 안내(서버 원문 없음)", HasInfo(ea, "권한을 부여하지 못했습니다") && !HasInfo(ea, "User not found"));
                 log.Check("D5b", "계정없음: 부여행 미생성", s.GrantRows.Count == 0);
             }
             // D6: 대상 그룹 없음 → 404
@@ -210,7 +210,7 @@ internal static class GrantScenarios
                 s.Groups.RemoveAll(g => g.Id == 10);
                 ea.ClearPublished();
                 await vm.ClickCreateGrant();
-                log.Check("D6a", "그룹없음: 404 실패 안내", HasInfo(ea, "User group not found"));
+                log.Check("D6a", "그룹없음: 404 고정 한글 안내(서버 원문 없음)", HasInfo(ea, "권한을 부여하지 못했습니다") && !HasInfo(ea, "User group not found"));
                 log.Check("D6b", "그룹없음: 부여행 미생성", s.GrantRows.Count == 0);
             }
             // D7: 비ADMIN 부여 → 403
@@ -223,7 +223,7 @@ internal static class GrantScenarios
                 s.ActorRole = "OPERATOR";
                 ea.ClearPublished();
                 await vm.ClickCreateGrant();
-                log.Check("D7a", "비ADMIN: 403 실패 안내(role)", HasInfo(ea, "Insufficient role"));
+                log.Check("D7a", "비ADMIN: 403 고정 한글 안내(서버 원문 없음)", HasInfo(ea, "권한을 부여하지 못했습니다") && !HasInfo(ea, "Insufficient role"));
                 log.Check("D7b", "비ADMIN: 부여행 미생성", s.GrantRows.Count == 0);
             }
             // D8: 성공 후 폼 리셋
@@ -276,7 +276,7 @@ internal static class GrantScenarios
                 log.Check("F2b", "확인팝업 payload=CallRevokeGrant", call is not null);
                 log.Check("F3a", "payload.Grant.Id 일치", call?.Grant?.Id == seeded.Id);
                 log.Check("F3b", "확인문구에 그룹명 포함", (confirm?.Explain ?? "").Contains("야간조"));
-                log.Check("F3c", "확인문구에 부여#id 포함", (confirm?.Explain ?? "").Contains($"#{seeded.Id}"));
+                log.Check("F3c", "확인문구에 내부 번호(#id) 없음 · 계정 포함", !(confirm?.Explain ?? "").Contains("#") && (confirm?.Explain ?? "").Contains(row.UserLogin ?? " "));
                 log.Check("F4", "확인 전 서버행 여전히 active", s.GrantRows.First(g => g.Id == seeded.Id).RevokedAt is null);
 
                 ea.ClearPublished();
@@ -320,7 +320,7 @@ internal static class GrantScenarios
                 s.GrantRows.RemoveAll(g => g.Id == seeded.Id);   // 타 세션이 먼저 삭제
                 ea.ClearPublished();
                 await vm.HandleAsync(new CallRevokeGrantMessageModel { Grant = row }, ct);
-                log.Check("F10a", "404: 회수 실패 안내", HasInfo(ea, "회수 실패"));
+                log.Check("F10a", "404: 회수 실패 안내", HasInfo(ea, "부여를 회수하지 못했습니다"));
                 log.Check("F10b", "404: ClosePopup 여전히 발행", N<ClosePopupMessageModel>(ea) == 1);
             }
             // F11: 비ADMIN 회수 → 403
@@ -333,7 +333,7 @@ internal static class GrantScenarios
                 s.ActorRole = "OPERATOR";
                 ea.ClearPublished();
                 await vm.HandleAsync(new CallRevokeGrantMessageModel { Grant = row }, ct);
-                log.Check("F11a", "403: 회수 실패 안내(role)", HasInfo(ea, "회수 실패"));
+                log.Check("F11a", "403: 회수 실패 안내(role)", HasInfo(ea, "부여를 회수하지 못했습니다"));
                 log.Check("F11b", "403: 서버행 미변경(active)", s.GrantRows.First(g => g.Id == seeded.Id).RevokedAt is null);
                 log.Check("F11c", "403: ClosePopup 발행", N<ClosePopupMessageModel>(ea) == 1);
             }
@@ -463,7 +463,7 @@ internal static class GrantScenarios
                 var s = GrantFixtures.NewServer(); s.FailUsersLoad = true;
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("I1a", "계정 로드 실패 안내", HasInfo(ea, "계정 목록 불러오기 실패"));
+                log.Check("I1a", "계정 로드 실패 안내", HasInfo(ea, "계정 목록을 불러오지 못했습니다"));
                 log.Check("I1b", "계정 목록 비어있음", vm.Accounts.Count == 0);
             }
             {
@@ -484,7 +484,7 @@ internal static class GrantScenarios
                 var s = GrantFixtures.NewServer(); s.FailListAll = true;
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("I4a", "부여 목록 500 실패 안내", HasInfo(ea, "부여 목록 불러오기 실패"));
+                log.Check("I4a", "부여 목록 500 실패 안내", HasInfo(ea, "부여 목록을 불러오지 못했습니다"));
                 log.Check("I4b", "부여 목록 비어있음", vm.Grants.Count == 0);
             }
         }

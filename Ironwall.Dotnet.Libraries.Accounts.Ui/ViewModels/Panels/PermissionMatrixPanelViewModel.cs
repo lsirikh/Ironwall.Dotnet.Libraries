@@ -122,9 +122,22 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
 
     // ── 그룹 생성/이름수정 폼 ──
     private bool _isGroupFormOpen;
-    public bool IsGroupFormOpen { get => _isGroupFormOpen; set { _isGroupFormOpen = value; NotifyOfPropertyChange(() => IsGroupFormOpen); } }
+    public bool IsGroupFormOpen
+    {
+        get => _isGroupFormOpen;
+        set
+        {
+            _isGroupFormOpen = value;
+            NotifyOfPropertyChange(() => IsGroupFormOpen);
+            NotifyOfPropertyChange(() => FormTitle);
+            NotifyOfPropertyChange(() => FormSaveText);
+        }
+    }
     private int _formGroupId;   // 0 = 신규, >0 = 수정
+    /// <summary>폼 머리 — 새로 만드는지 고치는지 구분한다(A-10).</summary>
     public string FormTitle => _formGroupId > 0 ? "그룹 이름/설명 수정" : "새 권한 그룹";
+    /// <summary>폼 저장 단추의 글 — 만들기 / 저장.</summary>
+    public string FormSaveText => _formGroupId > 0 ? "저장" : "만들기";
     private string _formName = string.Empty;
     public string FormName { get => _formName; set { _formName = value; NotifyOfPropertyChange(() => FormName); NotifyOfPropertyChange(() => CanSaveGroupForm); } }
     private string _formDescription = string.Empty;
@@ -160,9 +173,6 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     }
 
     public bool HasCatalogWarning => !string.IsNullOrEmpty(_catalogWarning);
-
-    /// <summary>상태 띠에 찍을 글 — "모듈 N · 표시 M".</summary>
-    public string ModuleCountText => $"모듈 {Modules.Count} · 표시 {Modules.Count}";
 
     /// <summary>지금 매트릭스가 걸려 있는 그룹(0이면 없음).</summary>
     public int DetailGroupId => _detailGroupId;
@@ -241,7 +251,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             Modules.Add(new ModulePermRowViewModel
             {
                 ModuleKey = key,
-                ModuleDisplay = PermissionCatalog.DisplayName(m),
+                ModuleDisplay = Consoles.AccountModuleNames.Of(m),
                 View = mp?.View ?? false,
                 Edit = mp?.Edit ?? false,
                 Delete = mp?.Delete ?? false,
@@ -263,7 +273,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             Modules.Add(new ModulePermRowViewModel
             {
                 ModuleKey = kv.Key,
-                ModuleDisplay = kv.Key,
+                // 사전에 없는 모듈 — 서버 이름(영문 키)을 화면에 찍지 않는다. 키는 칸 툴팁이 보인다.
+                ModuleDisplay = UnknownModuleName,
                 View = kv.Value?.View ?? false,
                 Edit = kv.Value?.Edit ?? false,
                 Delete = kv.Value?.Delete ?? false,
@@ -279,7 +290,6 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         }
 
         CatalogWarning = BuildCatalogWarning();
-        NotifyOfPropertyChange(nameof(ModuleCountText));
     }
 
     /// <summary>
@@ -291,11 +301,11 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         var notes = new List<string>();
         if (_contractProbe is null || !_contractProbe.IsResolved)
             // 배너 폭(278px)에 맞춰 짧게 — 길면 마지막 줄에 글자 하나만 남는다(D-17: 셋째 줄 12px 실측).
-            notes.Add("서버 판본 미확정 — 새 모듈이 빠지면 저장이 422 로 막힐 수 있습니다");
+            notes.Add(UnresolvedServerNote);
 
         var unknown = Modules.Count(m => m.IsUnknownModule);
         if (unknown > 0)
-            notes.Add($"사전에 없는 서버 모듈 {unknown}종을 키 그대로 싣습니다 — 표시명·동작 적용성은 확인되지 않았습니다");
+            notes.Add($"새로 추가된 모듈이 {unknown}개 있습니다. 이름은 확인 중입니다.");
 
         return notes.Count == 0 ? null : string.Join(" · ", notes);
     }
@@ -350,12 +360,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             if (_formGroupId > 0)
             {
                 var res = await _api.UpdateUserGroupAsync(_formGroupId, new UserGroupUpdateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info($"수정 실패: {Explain(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName)}"); return; }
+                if (!res.Success) { await Info(Explain("그룹 수정", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName, "그룹 정보를 저장하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
             }
             else
             {
                 var res = await _api.CreateUserGroupAsync(new UserGroupCreateDto { Name = FormName.Trim(), Description = FormDescription });
-                if (!res.Success) { await Info($"생성 실패: {Explain(res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName)}"); return; }
+                if (!res.Success) { await Info(Explain("그룹 생성", res.StatusCode, res.Error?.Code, res.Error?.Message ?? res.Message, DuplicateGroupName, "새 권한 그룹을 만들지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.")); return; }
             }
             IsGroupFormOpen = false;
             await Info(_formGroupId > 0 ? "그룹 정보를 수정했습니다." : "새 권한 그룹을 생성했습니다.");   // 성공 피드백(grant 생성 패턴 정합·진단)
@@ -384,7 +394,11 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         {
             var res = await _api.DeleteUserGroupAsync(message.GroupId);
             if (res.Success) await ReloadAsync(CancellationToken.None);
-            else await Info($"삭제 실패: {res.Error?.Message ?? res.Message}");
+            else
+            {
+                _log?.Warning($"[PermGroup] 그룹 삭제 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info("권한 그룹을 삭제하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.");
+            }
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 그룹 삭제 실패: {ex.Message}"); }
         finally
@@ -448,9 +462,9 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto, ct).ConfigureAwait(true);
             if (!res.Success)
             {
-                var reason = res.Error?.Message ?? res.Message;
-                await Info($"저장 실패: {reason}");
-                return PermissionSaveOutcome.Fail(reason);
+                _log?.Warning($"[PermGroup] 권한 저장 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info(SaveRejectedText);
+                return PermissionSaveOutcome.Fail(SaveRejectedShort);
             }
 
             await Info($"'{DetailGroupName}' 그룹의 권한을 저장했습니다.");
@@ -483,7 +497,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var server = now.Permissions?.Modules ?? new Dictionary<string, ModulePermissionDto>();
             if (SameModules(_originModules, server)) return null;
 
-            return $"'{DetailGroupName}' 의 권한이 그 사이 다른 곳에서 바뀌었습니다 — 아무것도 보내지 않았습니다. [갱신] 뒤 다시 편집하세요.";
+            return $"‘{DetailGroupName}’ 그룹의 권한이 다른 곳에서 먼저 바뀌어 저장하지 않았습니다. 새로 불러오기(⟳)를 누른 뒤 다시 고치세요.";
         }
         catch (Exception ex)
         {
@@ -525,7 +539,11 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         {
             var res = await _api.AssignUserGroupAsync(acc.Id, _membersGroupId);
             if (res.Success) await ReloadMembersAsync();
-            else await Info($"추가 실패: {res.Error?.Message ?? res.Message}");
+            else
+            {
+                _log?.Warning($"[PermGroup] 구성원 추가 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info("구성원을 추가하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.");
+            }
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 구성원 추가 실패: {ex.Message}"); }
     }
@@ -539,10 +557,16 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         try
         {
             var res = await _api.AssignUserGroupAsync(member.Id, null);
-            if (!res.Success) { await Info($"해제 실패: {res.Error?.Message ?? res.Message}"); return; }
+            if (!res.Success)
+            {
+                _log?.Warning($"[PermGroup] 구성원 해제 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info("구성원을 그룹에서 빼지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.");
+                return;
+            }
             if (res.Data?.GroupId == _membersGroupId)
             {
-                await Info("서버가 그룹 해제(group_id=null)를 반영하지 않습니다. 서버 수정이 필요합니다(구성원 해제 보류).");
+                _log?.Warning("[PermGroup] 서버가 group_id=null 을 반영하지 않았다(구성원 해제 미지원 판본).");
+                await Info(RemoveUnsupportedText);
                 return;
             }
             await ReloadMembersAsync();
@@ -565,7 +589,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var res = await _api.GetAllUserGroupsAsync(ct);   // 그룹도 limit 상한 100 — page 순회로 전량(100개 초과 무증상 절단 제거)
             if (!res.Success || res.Data is null)   // (MC-PM-1/INV-13) swap-on-success — 실패 시 Groups.Clear 전 return(기존 목록 보존, 화면 공백 방지)
             {
-                await Info($"불러오기 실패: {res.Error?.Message ?? res.Message}");
+                _log?.Warning($"[PermGroup] 그룹 조회 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info("권한 그룹을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.");
                 return;
             }
             _raw = res.Data;
@@ -642,7 +667,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             var res = await _api.GetUserGroupUsersAsync(_membersGroupId);
             if (!res.Success || res.Data is null)   // (MC-PM-1/INV-13) 실패 시 Members.Clear 전 return(기존 구성원 보존)
             {
-                await Info($"구성원 불러오기 실패: {res.Error?.Message ?? res.Message}");
+                _log?.Warning($"[PermGroup] 구성원 조회 거부: {res.StatusCode} {res.Error?.Code} {res.Error?.Message ?? res.Message}");
+                await Info("구성원을 불러오지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.");
                 return;
             }
             var members = res.Data;
@@ -673,10 +699,28 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     /// <para>409 는 배포 8.0.1 에서 계정·그룹·세션 경로에 실제로 선언돼 있다(그룹 이름 중복, 마지막 ADMIN 보호,
     /// 자기 계정 삭제 등). 운영 6.3.2 는 선언이 없으므로 이 분기에 도달하지 않고 종전 문구가 그대로 쓰인다(무회귀).</para>
     /// </summary>
-    private static string Explain(int statusCode, string? code, string? serverMessage, string conflict)
-        => (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase))
-            ? conflict
-            : (serverMessage ?? "서버가 요청을 거부했습니다.");
+    /// <remarks>
+    /// 409 가 아니면 고정 문장 <paramref name="fallback"/> — 서버 원문은 팝업에 붙이지 않고 로그로만 남긴다
+    /// (A-38: 영문 원문 · 코드가 운영자 팝업에 떴다).
+    /// </remarks>
+    private string Explain(string what, int statusCode, string? code, string? serverMessage, string conflict, string fallback)
+    {
+        _log?.Warning($"[PermGroup] {what} 거부: {statusCode} {code} {serverMessage}");
+        return (statusCode == 409 || string.Equals(code, "CONFLICT", StringComparison.OrdinalIgnoreCase)) ? conflict : fallback;
+    }
+
+    /// <summary>사전에 없는 모듈의 표시명 — 서버 키는 칸의 툴팁으로만 보인다.</summary>
+    public const string UnknownModuleName = "알 수 없는 모듈";
+
+    /// <summary>서버 판본을 확인하지 못했을 때의 배너(상세 칸 폭에 두 줄 안).</summary>
+    public const string UnresolvedServerNote = "서버 버전을 확인하지 못했습니다. 저장이 거부되면 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.";
+
+    /// <summary>권한 저장을 서버가 거부했을 때 — 팝업(긴 글)과 바닥 막대(짧은 글).</summary>
+    public const string SaveRejectedText = "권한을 저장하지 못했습니다. 새로 불러오기(⟳)를 누른 뒤 다시 시도하세요.";
+    public const string SaveRejectedShort = "저장하지 못했습니다";
+
+    /// <summary>서버가 구성원 해제를 받아들이지 않는 판본일 때(A-17).</summary>
+    public const string RemoveUnsupportedText = "이 서버 버전에서는 구성원을 그룹에서 뺄 수 없습니다. 관리자에게 문의하세요.";
     #endregion
 }
 
