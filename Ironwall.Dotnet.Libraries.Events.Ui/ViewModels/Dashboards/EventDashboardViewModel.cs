@@ -956,6 +956,16 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// </remarks>
     private void OnDashboardUpdated(DateTime start, DateTime end)
     {
+        // 🔴 이 신호는 차트 패널의 Task.Run 안(finally)에서 울린다 — 작업 스레드다.
+        //    Overview.Load 는 조각 · 막대 컬렉션을 비우고 다시 채우는데, 그 컬렉션은 UI 스레드에서 만든
+        //    CollectionView 에 묶여 있어 "발송자 스레드와 다른 스레드에서의 변경" 으로 터졌다
+        //    (실창 log-2026-09-27.txt:779, 스레드 [11]). 목록 변경 신호(OnRowsChanged)와 같은 마샤러로 올린다.
+        if (!_uiThread.IsOnUiThread)
+        {
+            _uiThread.Post(() => OnDashboardUpdated(start, end));
+            return;
+        }
+
         try
         {
             Overview.IsLoading = false;

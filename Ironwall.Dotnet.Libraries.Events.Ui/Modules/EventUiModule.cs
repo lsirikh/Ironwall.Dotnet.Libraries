@@ -42,7 +42,7 @@ public class EventUiModule : Module
     {
         builder.RegisterModule(new EventModule(_eventSetup, _log, _count++));
             //builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
-            builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
+            builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), EventApiName, count: _count++));
 
             // 썸네일 절대 URL 조합용 base URL seam — DetectionSelectionViewModel이 IoC로 조달
             // (탐지 detail 썸네일이 상대경로 "/api/thumbnails/…" 로 와서 host 결합 필요). 실패해도 default 이미지로 폴백.
@@ -270,7 +270,16 @@ public class EventUiModule : Module
 
             // N-13 mapping workbench — 이벤트 맵핑 워크벤치(3-Pane · 팔레트 → 액션 보드 · Draft + [적용]).
             // 창 뷰모델은 여기 등록하지 않는다 — 입구가 열 때마다 새로 만든다(Draft 가 창을 넘어 살아남지 않게).
-            builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchGateway>()
+            // 🔴 RegisterType 으로 두면 안 된다 — IApiService · ApiSetupModel 은 ApiModule 이 <b>이름으로만</b>
+            //    등록한다("EventApi" · "DeviceApi" …). 이름 없는 해석은 호스트에서 늘 실패해 입구가 감춰졌다
+            //    (실창 log-2026-09-27.txt:778 "activating MappingWorkbenchLauncher -> MappingWorkbenchGateway").
+            //    EventApiService 가 Initialize() 하고 Bearer 를 붙이는 그 "EventApi" 클라이언트를 그대로 쓴다.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchGateway(
+                        c.ResolveNamed<Ironwall.Dotnet.Libraries.Api.Services.IApiService>(EventApiName),
+                        c.ResolveNamed<ApiSetupModel>(EventApiName),
+                        c.ResolveOptionalNamed<Ironwall.Dotnet.Libraries.Api.Services.IServerContractProbe>(EventApiName)
+                            ?? c.ResolveOptional<Ironwall.Dotnet.Libraries.Api.Services.IServerContractProbe>(),
+                        c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchGateway>()
                    .SingleInstance();
             builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingDeviceSource>()
@@ -292,6 +301,9 @@ public class EventUiModule : Module
     #region - Properties -
     #endregion
     #region - Attributes -
+    /// <summary>이 모듈이 올리는 EventApiModule 의 등록 이름 — 이름으로만 등록된 IApiService · ApiSetupModel 을 찾는 열쇠.</summary>
+    private const string EventApiName = "EventApi";
+
     private ILogService? _log;
     private IApiSetupModel _apiSetup;
     private IEventSetupModel _eventSetup;
