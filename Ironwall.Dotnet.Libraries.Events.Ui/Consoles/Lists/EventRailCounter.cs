@@ -43,4 +43,7 @@ public static class EventRailCounter
 
     /// <summary>레일 아래 요약 "장애 진행 N건".</summary>
     public static int FaultInProgress(RailBadge malfunction) => malfunction.BadCount;
+
+    /// <summary>"장애 진행 N건" 을 경고색으로 칠할 것인가 — 0건은 보통 색이다(0 을 빨갛게 칠하면 경보처럼 읽힌다).</summary>
+    public static bool IsFaultAlarm(int faultInProgress) => faultInProgress > 0;
 }

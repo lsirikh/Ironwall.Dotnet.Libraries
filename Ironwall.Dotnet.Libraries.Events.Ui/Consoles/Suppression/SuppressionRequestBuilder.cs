@@ -105,8 +105,12 @@ public static class SuppressionRequestBuilder
     }
 
     /// <summary>
-    /// 저장 성공 뒤 보여 줄 대상 확인 문구 — 서버가 확정한 id 를 <b>이름</b>으로 되풀이한다.
+    /// 저장 성공 뒤 보여 줄 대상 확인 문구 — 서버가 확정한 id 를 <b>이름</b>으로 되풀이하고, 지금 상태를 괄호로 붙인다.
     /// </summary>
+    /// <remarks>
+    /// 예전엔 "…에 억제 스케줄을 적용했습니다" 였다 — 시작 전(예정) 스케줄에도 '적용' 이라고 해 지금 억제가 걸린 것처럼
+    /// 읽혔다(실창 검토 #27). 저장은 저장이다: "저장했습니다" + 상태(<see cref="SavedStateNote"/>).
+    /// </remarks>
     public static string TargetEcho(EventSuppressionScheduleDto saved,
                                     Func<int, string>? resolveDevice = null,
                                     Func<int, string>? resolveGroup = null,
@@ -127,17 +131,34 @@ public static class SuppressionRequestBuilder
                 return Sentence("그룹", ids.Count, ids.Take(nameLimit).Select(id => resolveGroup?.Invoke(id) ?? $"#{id}"));
             }
             default:
-                return $"전체 대상 · {SideLabel(saved.TargetSide)}에 억제 스케줄을 적용했습니다.";
+                return $"전체 대상 · {SideLabel(saved.TargetSide)}에 억제 스케줄을 저장했습니다{SavedStateNote(saved)}.";
         }
 
-        static string Sentence(string kind, int total, IEnumerable<string> sample)
+        string Sentence(string kind, int total, IEnumerable<string> sample)
         {
             var names = sample.ToList();
             if (total == 0) return $"대상 {kind}이(가) 없습니다.";
             var rest = total - names.Count;
             var subject = rest > 0 ? $"{string.Join(", ", names)} 외 {rest}개 {kind}" : $"{string.Join(", ", names)}({kind} {total}개)";
-            return $"{subject}에 억제 스케줄을 적용했습니다.";
+            return $"{subject}에 억제 스케줄을 저장했습니다{SavedStateNote(saved)}.";
         }
+    }
+
+    /// <summary>
+    /// 저장한 스케줄의 지금 상태 — 확인 문구 끝 괄호. 서버가 준 상태(<c>status</c> · <c>is_suppressing_now</c>)만 읽는다
+    /// (화면이 시각으로 다시 계산하지 않는다 — 억제 여부의 권위는 서버다). 모르면 붙이지 않는다.
+    /// </summary>
+    public static string SavedStateNote(EventSuppressionScheduleDto saved)
+    {
+        if (saved is null || string.IsNullOrWhiteSpace(saved.Status)) return string.Empty;
+        return SuppressionStatusView.Resolve(saved.Status, saved.IsSuppressingNow == true) switch
+        {
+            SuppressionStatusShape.Scheduled => "(시작 전)",
+            SuppressionStatusShape.Suppressing => "(지금 억제 중)",
+            SuppressionStatusShape.InWindow => "(진행중 · 지금은 억제 시간 밖)",
+            SuppressionStatusShape.Ended => "(이미 끝난 기간)",
+            _ => string.Empty,
+        };
     }
 
     /// <summary>감지/감시 코드 → 표시 문구.</summary>

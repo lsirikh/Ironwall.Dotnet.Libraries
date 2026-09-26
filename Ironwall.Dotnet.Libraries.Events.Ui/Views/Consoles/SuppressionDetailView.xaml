@@ -28,16 +28,18 @@
 	</UserControl.Resources>
 
 	<Grid>
-		<!--  선택 없음 (SB L2694)  -->
+		<!--
+			선택 없음 (SB L2694) — 머리 제목("선택한 항목 없음")과 바닥("선택 대기")은 콘솔이 채운다.
+			안내 줄은 이벤트 상세와 같은 자리(왼쪽 위)에 둔다 — 한가운데 홀로 떠 있으면 제목 없는 빈 칸처럼 보였다(실창 검토 #24).
+		-->
 		<TextBlock
-			Margin="16"
-			HorizontalAlignment="Center"
-			VerticalAlignment="Center"
+			Margin="14,10,12,10"
+			HorizontalAlignment="Left"
+			VerticalAlignment="Top"
 			AutomationProperties.AutomationId="Console.Suppression.Detail.Empty"
 			FontSize="12.5"
 			Foreground="{DynamicResource TextMutedBrush}"
-			Text="스케줄을 고르면 반복 요약과 대상이 열립니다."
-			TextAlignment="Center"
+			Text="왼쪽 목록에서 스케줄을 고르면 반복 요약과 대상이 열립니다."
 			TextWrapping="Wrap">
 			<TextBlock.Style>
 				<Style TargetType="TextBlock">

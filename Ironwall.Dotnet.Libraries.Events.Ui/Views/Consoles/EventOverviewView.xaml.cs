@@ -7,6 +7,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using LvcCartesianChart = LiveChartsCore.SkiaSharpView.WPF.CartesianChart;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles;
@@ -227,5 +228,39 @@ public partial class EventOverviewView : UserControl
     private void OnBarClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: EventDeviceBarViewModel bar }) Model?.Drill(bar);
+    }
+
+    /// <summary>
+    /// 아래에 더 있으면 본문 끝을 흐린다(<see cref="OverviewScrollFade"/>). 흐림은 <b>내용 칸에만</b> 건다 —
+    /// 스크롤 막대까지 흐리면 끝이 어디인지 막대가 알려 주지 못한다. 흐림은 테마 색이 아니라 불투명도라
+    /// 라이트/다크 어디서나 배경을 따라간다.
+    /// </summary>
+    private void OnOverviewScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scroller) return;
+
+        var target = scroller.Template?.FindName("PART_ScrollContentPresenter", scroller) as UIElement ?? scroller;
+        var height = target is FrameworkElement fe ? fe.ActualHeight : scroller.ViewportHeight;
+        var start = OverviewScrollFade.FadeStart(height);
+
+        if (!OverviewScrollFade.HasMoreBelow(scroller.ScrollableHeight, scroller.VerticalOffset) || start >= 1)
+        {
+            target.ClearValue(UIElement.OpacityMaskProperty);
+            return;
+        }
+
+        // ★ 절대 좌표로 건다 — 상대(경계 상자) 좌표면 상자가 보이는 칸이 아니라 스크롤되는 내용 전체(화면 밖까지)라
+        //   흐림이 화면 밖 맨 끝에 그려져 보이지 않았다(오프스크린 실측: 칸 647 · 내용 967).
+        target.OpacityMask = new LinearGradientBrush(
+            new GradientStopCollection
+            {
+                new GradientStop(Colors.Black, 0),
+                new GradientStop(Colors.Black, start),
+                new GradientStop(Colors.Transparent, 1),
+            },
+            new Point(0, 0), new Point(0, height))
+        {
+            MappingMode = BrushMappingMode.Absolute,
+        };
     }
 }

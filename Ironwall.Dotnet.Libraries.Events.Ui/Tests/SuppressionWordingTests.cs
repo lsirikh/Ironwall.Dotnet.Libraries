@@ -364,7 +364,7 @@ public class SuppressionWordingTests
         messages.AddRange(SuppressionFormRules.Validate(pastOneShot, Now, new[] { overlapping }).Warnings);
 
         // Assert
-        Assert.Contains(messages, m => m.Contains("억제 스케줄을 적용했습니다"));
+        Assert.Contains(messages, m => m.Contains("억제 스케줄을 저장했습니다"));
         Assert.All(messages, AssertClean);
     }
 

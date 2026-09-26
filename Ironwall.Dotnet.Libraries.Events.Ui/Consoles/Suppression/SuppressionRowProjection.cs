@@ -172,6 +172,23 @@ public sealed class SuppressionConsoleRow : EventSuppressionScheduleItemViewMode
         ? SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)
         : $"{SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}";
 
+    /// <summary>
+    /// 목록 '범위' 칸 — 억제 범위 <b>하나만</b>(전체 · 탐지 · 장애 · 연결 · 운영).
+    /// </summary>
+    /// <remarks>
+    /// 예전 목록 칸은 <see cref="ScopeDetailText"/>(범위 · 감지/감시)를 실었는데, 전체 대상 행은 '대상' 칸도
+    /// "전체 · 감지+감시" 라 같은 글이 두 칸에 두 번 찍혔고, 그 두 칸이 넓게 자리를 잡아 작업명이 늘 잘렸다(실창 검토 #22).
+    /// 감지/감시는 대상의 성질이다 — <see cref="TargetListText"/> 로 옮긴다. 상세 칸은 그대로 <see cref="ScopeDetailText"/> 를 쓴다.
+    /// </remarks>
+    public string ScopeListText => SuppressionRequestBuilder.ScopeLabel(Dto.EventScope);
+
+    /// <summary>
+    /// 목록 '대상' 칸 — 대상 요약. 그룹 대상은 감지/감시를 뒤에 붙인다(전체 대상은 요약에 이미 들어 있다 · 장비는 해당 없음).
+    /// </summary>
+    public string TargetListText => Dto.TargetType == SuppressionTargetDrop.ModeGroup && TargetSummary != NoTargetsText
+        ? $"{TargetSummary} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}"
+        : TargetSummary;
+
     /// <summary>범위 칸 툴팁 — 화면이 모르는 범위면 서버가 보낸 원문을 여기에만 덧붙인다.</summary>
     public string ScopeToolTip => SuppressionRequestBuilder.IsKnownScope(Dto.EventScope) || Dto.EventScope is null
         ? ScopeDetailText

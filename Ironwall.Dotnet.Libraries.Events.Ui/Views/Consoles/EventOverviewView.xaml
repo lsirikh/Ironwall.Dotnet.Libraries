@@ -95,9 +95,11 @@
 			과 같은 처방으로 나머지 12 를 <b>이 ScrollViewer 자신의 Margin</b> 에 얹는다. 이 뷰는 그 커널
 			템플릿을 안 쓰는 평범한 ScrollViewer 라 D-37 이 자동으로 못 미쳤다 — 여기서 같은 값을 반복한다.
 		-->
+		<!--  아래에 더 있으면 끝을 흐린다 — 다음 카드 제목이 칸 아랫변에서 글자 한가운데가 잘려 결함처럼 보였다(실창 검토 #20)  -->
 		<ScrollViewer
 			Margin="0,0,0,12"
 			HorizontalScrollBarVisibility="Disabled"
+			ScrollChanged="OnOverviewScrollChanged"
 			Style="{StaticResource Console.ScrollViewer}"
 			VerticalScrollBarVisibility="Auto"
 			Visibility="{Binding IsLoading, Converter={StaticResource NotBoolToVis}}">

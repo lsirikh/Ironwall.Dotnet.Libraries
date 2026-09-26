@@ -78,6 +78,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     private int _currentPage;
     private int _totalPages = 1;
     private int _totalCount;
+    private int? _allTotalCount;
 
     public SuppressionConsoleViewModel(IEventAggregator events,
                                        ILogService? log,
@@ -203,6 +204,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             NotifyOfPropertyChange(nameof(CanEditSelected));
             NotifyOfPropertyChange(nameof(CanCancelSelected));
             NotifyOfPropertyChange(nameof(DetailTitle));
+            NotifyOfPropertyChange(nameof(DetailFooterText));
             NotifyOfPropertyChange(nameof(DetailKind));
             NotifyOfPropertyChange(nameof(DetailTargets));
             NotifyOfPropertyChange(nameof(IsDetailTargetsEmpty));
@@ -239,7 +241,16 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     /// <summary>목록을 마지막으로 받아 온 시각(시계에서 온 값).</summary>
     private DateTime? _loadedAt;
 
-    /// <summary>레일 배지 — 지금 억제 중인 창의 수(정본 SB L2361).</summary>
+    /// <summary>
+    /// 레일 배지 — 등록된 억제 스케줄 수('전체' 로 받은 서버 합계). 아직 한 번도 불러오지 않았으면 null(배지를 숨긴다).
+    /// </summary>
+    /// <remarks>
+    /// 예전 배지는 '지금 억제중' 수(정본 SB L2361)라 목록이 55건인데 레일에 0 이 떠 "비었다" 로 읽혔다(실창 검토 #23).
+    /// 다른 레일처럼 목록 건수를 싣는다 — 억제중 수는 상태 띠와 '억제중' 칩이 말한다.
+    /// </remarks>
+    public int? ScheduleTotal => _allTotalCount;
+
+    /// <summary>지금 억제 중인 창의 수 — 상태 띠 · '억제중' 칩의 뜻.</summary>
     public int SuppressingCount => Schedules.Count(s => s.Shape == SuppressionStatusShape.Suppressing);
 
     /// <summary>예정 + 진행중 — 레일 배지 합계.</summary>
@@ -263,7 +274,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); }
+        set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(DetailFooterText)); }
     }
 
     /// <summary>목록을 처음부터 다시 부른다.</summary>
@@ -296,6 +307,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             {
                 _loadedAt = at;
                 _totalCount = total;
+                // 레일 배지는 '전체' 칩으로 받은 합계만 쓴다 — 상태 칩은 서버에서 거르므로 그 합계는 부분 집합이다.
+                if (_filterKey == SuppressionStatusView.FilterAll) _allTotalCount = total;
                 _currentPage = page;
                 _totalPages = total > 0 ? (int)Math.Ceiling(total / (double)PageSize) : 1;
                 Replace(rows);
@@ -541,7 +554,22 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
 
     public string DetailKind => "억제 스케줄";
 
-    public string DetailTitle => _selected?.Name ?? string.Empty;
+    /// <summary>상세 머리 제목 — 고른 것이 없으면 다른 콘솔과 같은 "선택한 항목 없음"(실창 검토 #24).</summary>
+    public string DetailTitle => _selected?.Name ?? NoSelectionTitle;
+
+    /// <summary>고른 것이 없을 때의 상세 제목 — 커널 상세(ConsoleDetailPresenter)와 같은 말.</summary>
+    public const string NoSelectionTitle = "선택한 항목 없음";
+
+    /// <summary>고른 것이 없고 알릴 것도 없을 때의 바닥 한 줄 — 커널 상세와 같은 말.</summary>
+    public const string IdleFooterText = "선택 대기";
+
+    /// <summary>
+    /// 상세 바닥 막대의 한 줄 — 알릴 것(저장 · 취소 결과 등)이 있으면 그것, 없고 고른 것도 없으면 "선택 대기".
+    /// 바닥이 통째로 비어 있으면 다른 콘솔과 달리 '고장난 칸' 처럼 보였다(실창 검토 #24).
+    /// </summary>
+    public string DetailFooterText => _statusText.Length > 0 ? _statusText
+        : _selected is null ? IdleFooterText
+        : string.Empty;
 
     /// <summary>대상 칩(읽기 전용).</summary>
     public IReadOnlyList<SuppressionTargetChip> DetailTargets

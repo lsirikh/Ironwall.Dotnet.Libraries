@@ -412,9 +412,13 @@ public class EventDashboardViewModel : BasePanelViewModel
         RailEntries.Add(new ConsoleRailEntry(MalfunctionRailKey, "장애", new EventConsoleIcon("AlertOutline")));
         RailEntries.Add(new ConsoleRailEntry(ConnectionRailKey, "연결", new EventConsoleIcon("LanConnect")));
         RailEntries.Add(new ConsoleRailEntry(ActionRailKey, "조치", new EventConsoleIcon("ClipboardCheckOutline")));
-        // 억제 스케줄 — 배지는 '지금 억제 중' 건수다(정본 SB L2361).
+        // 억제 스케줄 — 배지는 등록된 스케줄 수다. 한 번도 불러오기 전에는 숨긴다("0" 은 거짓이다 — 실창 검토 #23).
         if (Suppression is not null)
-            RailEntries.Add(new ConsoleRailEntry(SuppressionRailKey, "억제 스케줄", new EventConsoleIcon("ClockAlertOutline")));
+            RailEntries.Add(new ConsoleRailEntry(SuppressionRailKey, "억제 스케줄", new EventConsoleIcon("ClockAlertOutline"))
+            {
+                ShowCount = Suppression.ScheduleTotal is not null,
+                Count = Suppression.ScheduleTotal ?? 0,
+            });
     }
 
     private void OnSuppressionCountsChanged()
@@ -422,8 +426,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         var entry = RailEntries.FirstOrDefault(e => e.Key == SuppressionRailKey);
         if (entry is not null && Suppression is not null)
         {
-            // 정본 SB L2361 은 '억제중' 건수 하나만 배지로 낸다 — 합계는 상태 띠에 있다.
-            entry.Count = Suppression.SuppressingCount;
+            // 다른 레일처럼 목록 건수를 싣는다 — '억제중 0' 이 목록 55건 옆에 떠 "비었다" 로 읽혔다(실창 검토 #23).
+            // 억제중 수는 상태 띠 · '억제중' 칩이 말한다. 아직 모르면 숫자를 숨긴다.
+            entry.ShowCount = Suppression.ScheduleTotal is not null;
+            entry.Count = Suppression.ScheduleTotal ?? 0;
             entry.BadCount = 0;
         }
         NotifyOfPropertyChange(nameof(ListStatusText));
@@ -488,7 +494,13 @@ public class EventDashboardViewModel : BasePanelViewModel
     public string FaultCountText { get => _faultCountText; private set { _faultCountText = value; NotifyOfPropertyChange(); } }
 
     public int OpenCount { get => _openCount; private set { _openCount = value; NotifyOfPropertyChange(); } }
-    public int FaultCount { get => _faultCount; private set { _faultCount = value; NotifyOfPropertyChange(); } }
+    public int FaultCount { get => _faultCount; private set { _faultCount = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasFaultInProgress)); } }
+
+    /// <summary>
+    /// 진행 중인 장애가 있는가 — 레일 아래 "장애 진행 N건" 을 경고색으로 칠할 조건. 0건을 빨갛게 칠하면
+    /// 아무 일 없는데도 경보처럼 읽힌다(GIS 실창 육안 검토 #18).
+    /// </summary>
+    public bool HasFaultInProgress => EventRailCounter.IsFaultAlarm(_faultCount);
 
     /// <summary>미조치 · 장애 진행 수를 셀 수 있게 되었는가(탐지나 장애 목록을 한 번이라도 불러왔는가).</summary>
     public bool HasRailCounts

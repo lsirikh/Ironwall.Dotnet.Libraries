@@ -479,6 +479,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         if (!_draft.Targets.Remove(chip)) return;
         Tray.Remove(chip);
         StatusLine = $"{chip.Label} 을(를) 뺐습니다.";
+        RebuildPicker();                            // 뺀 대상은 다시 '담을 수 있는 대상' 으로 돌아온다
         RaiseAll();
     }
 
@@ -490,6 +491,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         _draft.Targets.Clear();
         SyncChips(Tray, _draft.Targets);
         StatusLine = $"대상 {n}개를 모두 뺐습니다.";
+        RebuildPicker();
         RaiseAll();
     }
 
@@ -497,6 +499,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     {
         foreach (var chip in plan.Accepted) _draft.Targets.Add(chip);
         SyncChips(Tray, _draft.Targets);
+        RebuildPicker();                            // 담은 대상은 '담을 수 있는 대상' 에서 빠진다
         RaiseAll();
     }
 
@@ -517,6 +520,12 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
                 .Select(g => SuppressionTargetCandidateFactory.From(g))
                 .Where(c => c is not null)
                 .Select(c => c!));
+
+        // 이미 담은 대상은 '담을 수 있는 대상' 에 남기지 않는다 — 트레이와 목록 양쪽에 같은 이름이 떠
+        // 담긴 건지 아닌지 헷갈렸다(실창 검토 #26). 판정은 칩 기록 전체가 아니라 키(종류 + id)로 한다:
+        // 수정으로 연 초안의 칩은 이름을 서버 원본에서 풀어 와 부가 설명이 후보와 다를 수 있다.
+        var taken = new HashSet<string>(_draft.Targets.Select(t => t.Key), StringComparer.Ordinal);
+        want = want.Where(c => !taken.Contains(c.Key)).ToList();
 
         if (!string.IsNullOrWhiteSpace(_pickerSearch))
         {

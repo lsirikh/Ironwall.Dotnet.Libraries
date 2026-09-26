@@ -134,10 +134,15 @@
 				32+78+92+128+128+92+98+98+50 = 796 — 1340 표면의 목록 보이는 폭 816(세로 스크롤바 제외)에 든다.
 				★ 네 칸의 별 비율을 바닥 비율(0.92 : 1.28 : 1.28 : 0.92)과 같게 둔다 — 비율이 바닥과 어긋나면 WPF 가 한 칸을 바닥으로
 				끌어올리면서 합이 넘쳐 1340 에서도 6px 가로 스크롤이 섰다(잘림 감사 after 1차). 같은 비율이면 어느 칸도 바닥에 먼저 걸리지 않는다.
+				실창 검토 #22 — 그래도 작업명은 모든 행이 잘렸고("[시드] 다…") 반복은 두 줄 다 잘렸다. 까닭은 대상 · 범위가 같은
+				"전체 · 감지+감시" 를 두 번 싣느라 128 씩 차지한 것이다. 범위 칸은 억제 범위 하나만 싣고(ScopeListText — 감지/감시는
+				대상 칸 TargetListText 로), 좁힌 폭(80)과 시작 · 종료(98→90, "09-20 09:00" 64 + 여백 24)에서 번 폭을 반복(136)에 준다.
+				글자가 정해진 칸은 고정 폭, 별은 작업명 하나 — 창을 넓히면 남는 폭은 전부 작업명이 받는다.
+				바닥 합 = 32+78+120+128+80+136+90+90+50 = 804 — 806(816 − 세로 스크롤바) 안에 든다.
 			-->
 			<DataGridTextColumn
-				Width="0.92*"
-				MinWidth="92"
+				Width="*"
+				MinWidth="120"
 				Binding="{Binding Name}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="작업명">
@@ -150,23 +155,23 @@
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="1.28*"
+				Width="128"
 				MinWidth="128"
-				Binding="{Binding TargetSummary}"
+				Binding="{Binding TargetListText}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="대상">
 				<DataGridTextColumn.ElementStyle>
 					<Style TargetType="TextBlock">
-						<Setter Property="ToolTip" Value="{Binding TargetSummary}" />
+						<Setter Property="ToolTip" Value="{Binding TargetListText}" />
 						<Setter Property="TextTrimming" Value="CharacterEllipsis" />
 					</Style>
 				</DataGridTextColumn.ElementStyle>
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="1.28*"
-				MinWidth="128"
-				Binding="{Binding ScopeDetailText}"
+				Width="80"
+				MinWidth="80"
+				Binding="{Binding ScopeListText}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="범위">
 				<DataGridTextColumn.ElementStyle>
@@ -177,10 +182,11 @@
 				</DataGridTextColumn.ElementStyle>
 			</DataGridTextColumn>
 
-			<!--  U-18 — 88 이면 "다음 09-20 22:00"(79 + 안쪽 24)이 1px 모자라 늘 줄임표가 찍혔다(잘림 감사) → 104.  -->
+			<!--  U-18 — 88 이면 "다음 09-20 22:00"(79 + 안쪽 24)이 1px 모자라 늘 줄임표가 찍혔다(잘림 감사) → 104.
+			     실창 검토 #22 — "월~금 08:00~18:00"(약 108 + 24)도 잘렸다 → 136.  -->
 			<DataGridTemplateColumn
-				Width="0.92*"
-				MinWidth="92"
+				Width="136"
+				MinWidth="136"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="반복">
 				<DataGridTemplateColumn.CellTemplate>
@@ -211,8 +217,8 @@
 			</DataGridTemplateColumn>
 
 			<DataGridTemplateColumn
-				Width="98"
-				MinWidth="98"
+				Width="90"
+				MinWidth="90"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="시작(KST)">
 				<DataGridTemplateColumn.CellTemplate>
@@ -229,8 +235,8 @@
 			</DataGridTemplateColumn>
 
 			<DataGridTemplateColumn
-				Width="98"
-				MinWidth="98"
+				Width="90"
+				MinWidth="90"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="종료(KST)">
 				<DataGridTemplateColumn.CellTemplate>

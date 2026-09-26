@@ -169,7 +169,18 @@
 						<TextBlock FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}">
 							<Run Text="미조치 " /><Run Text="{Binding OpenCountText, Mode=OneWay}" />
 						</TextBlock>
-						<TextBlock FontSize="12.5" Foreground="{DynamicResource StatusCriticalBrush}">
+						<!--  0건이면 보통 색 — 아무 일 없는데 빨갛게 칠하면 경보처럼 읽힌다(실창 검토 #18)  -->
+						<TextBlock AutomationProperties.AutomationId="Console.Events.Rail.Footer.Fault" FontSize="12.5">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding HasFaultInProgress}" Value="True">
+											<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
 							<Run Text="장애 진행 " /><Run Text="{Binding FaultCountText, Mode=OneWay}" />
 						</TextBlock>
 					</StackPanel>
@@ -775,7 +786,7 @@
 					CanRevert="{Binding Suppression.CanCancelSelected}"
 					ConsoleKey="Suppression"
 					DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
-					FooterText="{Binding Suppression.StatusText}"
+					FooterText="{Binding Suppression.DetailFooterText}"
 					Kind="{Binding Suppression.DetailKind}"
 					RevertClick="OnSuppressionCancelBooking"
 					RevertText="취소 예약"

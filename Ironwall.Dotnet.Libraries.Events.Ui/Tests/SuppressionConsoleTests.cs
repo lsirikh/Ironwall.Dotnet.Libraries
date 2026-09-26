@@ -483,7 +483,9 @@ public class SuppressionConsoleViewModelTests
         await _console.Drawer.SaveAsync();
 
         Assert.False(_console.Drawer.IsOpen);
-        Assert.Contains("억제 스케줄을 적용했습니다", _console.StatusText);
+        // 예정 스케줄에 '적용' 이라고 하면 지금 억제가 걸린 것처럼 읽힌다 — 저장 + 상태(실창 검토 #27).
+        Assert.Contains("억제 스케줄을 저장했습니다(시작 전)", _console.StatusText);
+        Assert.DoesNotContain("적용", _console.StatusText);
     }
 
     [Fact]

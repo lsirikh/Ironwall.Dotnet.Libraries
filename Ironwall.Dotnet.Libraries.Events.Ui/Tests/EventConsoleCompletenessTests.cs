@@ -188,16 +188,38 @@ public class SuppressionGridColumnTests
         // 비율이 바닥과 어긋나면 WPF 가 한 칸을 바닥으로 끌어올리며 합이 넘쳐 6px 가로 스크롤이 섰다(잘림 감사 after 1차).
         var stars = Columns().Where(c => c.Width.EndsWith("*", StringComparison.Ordinal)).ToList();
         Assert.NotEmpty(stars);
-        var ratios = stars.Select(c => c.Min / double.Parse(c.Width.TrimEnd('*'), System.Globalization.CultureInfo.InvariantCulture)).ToList();
+        // "*" 는 "1*" 이다.
+        var ratios = stars.Select(c => c.Min / (c.Width == "*" ? 1 : double.Parse(c.Width.TrimEnd('*'), System.Globalization.CultureInfo.InvariantCulture))).ToList();
         Assert.All(ratios, r => Assert.InRange(r, ratios[0] - 0.5, ratios[0] + 0.5));
     }
 
     [Fact]
-    public void should_leave_room_for_the_whole_target_label_when_the_scope_and_target_columns_render()
+    public void should_leave_room_for_the_whole_target_label_when_the_target_column_renders()
     {
-        // "전체 · 감지+감시" 는 글자 약 104 + 칸 여백 24 — 대상 · 범위 칸이 그 아래로 줄면 잘린다(E-7 #8).
-        var mins = Columns().Select(c => c.Min).ToList();
-        Assert.True(mins.Count(m => m >= 128) >= 2);
+        // "전체 · 감지+감시" 는 글자 약 104 + 칸 여백 24 — 대상 칸이 그 아래로 줄면 잘린다(E-7 #8).
+        // 범위 칸은 이제 억제 범위 하나만 싣는다(감지/감시는 대상 칸 — 실창 검토 #22).
+        Assert.True(HeaderMin("대상") >= 128, $"대상 바닥 {HeaderMin("대상")}");
+        Assert.True(HeaderMin("범위") >= 80, $"범위 바닥 {HeaderMin("범위")}");   // "알 수 없음" 약 55 + 여백 24
+    }
+
+    [Fact]
+    public void should_give_the_leftover_width_to_the_name_column_only_when_the_list_widens()
+    {
+        // 실창 검토 #22 — 모든 작업명이 "[시드] 다…" 로 잘리는데 대상 · 범위는 넓었다. 남는 폭은 작업명 하나가 받는다.
+        var stars = Columns().Where(c => c.Width.EndsWith("*", StringComparison.Ordinal)).ToList();
+        var name = Assert.Single(stars);
+        Assert.True(name.Min >= 120, $"작업명 바닥 {name.Min}");
+        Assert.True(HeaderMin("반복") >= 136, $"반복 바닥 {HeaderMin("반복")}");   // "월~금 08:00~18:00" 약 108 + 여백 24
+    }
+
+    private static double HeaderMin(string header)
+    {
+        var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Views", "Consoles", "SuppressionListView.xaml");
+        var xaml = System.IO.File.ReadAllText(path);
+        var column = System.Text.RegularExpressions.Regex.Matches(xaml, @"<DataGrid(?:Text|Template)Column\b[^>]*>", System.Text.RegularExpressions.RegexOptions.Singleline)
+            .Select(m => m.Value)
+            .Single(v => v.Contains($"Header=\"{header}\"", StringComparison.Ordinal));
+        return double.Parse(System.Text.RegularExpressions.Regex.Match(column, @"MinWidth=""([^""]+)""").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
     }
 }
 #endregion
@@ -378,6 +400,41 @@ public class EventConsoleCompletenessTests : IDisposable
         public Task HandleAsync(OpenConfirmPopupMessageModel m, CancellationToken ct) { Confirms.Add(m); return Task.CompletedTask; }
         public Task HandleAsync(ClosePanelMessageModel m, CancellationToken ct) { ClosePanels++; return Task.CompletedTask; }
         public Task HandleAsync(OpenDetectionHistoryDialogMessageModel m, CancellationToken ct) { Histories.Add(m); return Task.CompletedTask; }
+    }
+
+    // ── 실창 검토 #18 레일 바닥 · #23 억제 레일 배지 ──
+    [Fact]
+    public async Task should_not_paint_the_fault_line_red_when_no_fault_is_in_progress()
+    {
+        await Activate();
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+
+        Assert.True(_console.HasRailCounts);
+        Assert.Equal(0, _console.FaultCount);
+        Assert.False(_console.HasFaultInProgress);
+    }
+
+    [Fact]
+    public async Task should_show_the_schedule_count_on_the_suppression_rail_when_none_is_suppressing_now()
+    {
+        var rows = Enumerable.Range(1, 3).Select(i => new EventSuppressionScheduleDto
+        {
+            Id = i, Name = $"정비-{i}", Status = "pending", IsSuppressingNow = false,
+            TargetType = "all", WindowStart = "2026-09-20T09:00:00.000+09:00", WindowEnd = "2026-09-20T18:00:00.000+09:00",
+        }).ToList();
+        _suppression.Setup(s => s.GetSuppressionSchedulesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                                                               It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ApiListResponse<EventSuppressionScheduleDto>
+            {
+                Success = true, Data = rows, Pagination = new PaginationDto { Page = 1, Limit = 100, Total = rows.Count, TotalPages = 1 },
+            });
+        await Activate();
+        var rail = _console.RailEntries.Single(e => e.Key == EventDashboardViewModel.SuppressionRailKey);
+        Assert.Equal(string.Empty, rail.CountText);                  // 한 번도 불러오기 전에는 "0" 이라고 거짓말하지 않는다
+
+        await _console.SelectRailAsync(EventDashboardViewModel.SuppressionRailKey);
+
+        Assert.Equal("3", rail.CountText);                           // 예전엔 '억제중 0'(목록 55건 옆에 0 — 실창 #23)
     }
 
     // ── E-2 #1 · #2 거르기 탭 ──

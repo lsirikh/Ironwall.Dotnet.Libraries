@@ -185,10 +185,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         {
             _inFlightKey = null;
             var summary = await Draft.ApplyAsync(_cts.Token).ConfigureAwait(true);
-            StatusLine = summary.ToMessage();
-            if (summary.Failed > 0) StatusLine += " — 실패한 줄은 트레이에 남습니다. [조치 적용] 을 다시 누르면 그것만 보냅니다.";
-            if (summary.WasCancelled && UnverifiedKey is not null)
-                StatusLine += " — ⚠ 중단 순간 보내는 중이던 1건은 결과 미확인입니다. 다시 [조치 적용] 하면 중복될 수 있습니다.";
+            StatusLine = ApplyResultLine(summary, summary.WasCancelled && UnverifiedKey is not null);
             RaiseAll();
             return summary;
         }
@@ -197,6 +194,35 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
             _cts?.Dispose();
             _cts = null;
         }
+    }
+
+    /// <summary>
+    /// [조치 적용] 뒤의 한 줄 — 운영자 말로(무엇을 몇 건 보냈고, 못 보낸 것은 어떻게 하면 되는지).
+    /// </summary>
+    /// <remarks>
+    /// 커널 <see cref="DraftApplySummary.ToMessage"/>("적용 완료 — 적용 1")는 집계 표기라 이 트레이에서는
+    /// 무엇이 적용됐는지 말하지 않았다(실창 검토 #21). 커널 문구는 그대로 두고 여기서 이 트레이의 말로 옮긴다.
+    /// </remarks>
+    /// <param name="summary">적용 결과.</param>
+    /// <param name="hasUnverified">중단 순간 보내던 줄이 있어 결과를 모르는가.</param>
+    public static string ApplyResultLine(DraftApplySummary summary, bool hasUnverified = false)
+    {
+        if (summary is null) return string.Empty;
+
+        var parts = new List<string>();
+        if (summary.WasCancelled)
+            parts.Add(summary.Applied > 0 ? $"보내기를 멈췄습니다. 조치보고 {summary.Applied}건은 보냈습니다." : "보내기를 멈췄습니다.");
+        else if (summary.Applied > 0)
+            parts.Add($"조치보고 {summary.Applied}건을 보냈습니다.");
+        else
+            parts.Add("보낸 조치보고가 없습니다.");
+
+        if (summary.Skipped > 0) parts.Add($"{summary.Skipped}건은 다른 곳에서 이미 조치보고 중이라 건너뛰었습니다.");
+        if (summary.Missing > 0) parts.Add($"{summary.Missing}건은 목록에서 사라져 보내지 않았습니다.");
+        if (summary.Failed > 0) parts.Add($"{summary.Failed}건은 보내지 못해 트레이에 남았습니다. [조치 적용]을 다시 누르면 남은 것만 보냅니다.");
+        if (hasUnverified) parts.Add("멈출 때 보내던 1건은 결과를 확인하지 못했습니다. 다시 보내기 전에 조치 내역을 확인하세요.");
+
+        return string.Join(" ", parts);
     }
 
     /// <summary>적용을 멈춘다 — 아직 안 보낸 줄은 그대로 남는다(보낸 것은 되돌리지 않는다).</summary>
