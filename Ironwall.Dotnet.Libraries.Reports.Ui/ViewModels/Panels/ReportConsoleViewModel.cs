@@ -375,7 +375,25 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     /// 고정 막대를 낼 것인가. 생성 이력 화면의 상세는 <b>미리보기</b>라 적용 막대가 없고
     /// 자기 동작 줄([크게 보기] · [PDF 내려받기] · [상세 CSV] · [취소] · [삭제])을 갖는다(WL L1269 · L1280).
     /// </summary>
-    public bool ShowDetailButtons => !IsListRail;
+    /// <remarks>V-29 — 템플릿을 고르지 않았으면(새로 만드는 중도 아니면) 막대도 내지 않는다. 빈 폼 밑의 꺼진
+    /// [되돌리기] · [적용] 이 "새 항목을 적는 중" 처럼 읽혔다.</remarks>
+    public bool ShowDetailButtons => !IsListRail && !IsTemplateDetailEmpty;
+
+    /// <summary>
+    /// V-29 — 템플릿 레일에서 고른 것도, 만드는 중인 것도 없다. 빈 편집 폼(이름* · 기간 · 구성 요소 ▲▼) 대신
+    /// 커널 빈 상태(무엇이 비었고 무엇을 하면 되는지)를 보인다. 왼쪽 레일 바닥의 "템플릿을 고르면 편집 칸이 열립니다" 와 같은 말이다.
+    /// </summary>
+    public bool IsTemplateDetailEmpty => IsTemplateRail && Detail.SelectedCount == 0 && !Detail.IsCreating;
+
+    /// <summary>템플릿 편집 폼을 보일 때 — 빈 상태의 반대.</summary>
+    public bool IsTemplateFormVisible => IsTemplateRail && !IsTemplateDetailEmpty;
+
+    public const string TemplateDetailEmptyTitle = "템플릿을 고르세요";
+
+    /// <summary>빈 상세의 둘째 줄 — 편집 권한이 없으면 "만들라" 고 하지 않는다.</summary>
+    public string TemplateDetailEmptyHint => CanEditReports
+        ? "목록에서 템플릿을 고르면 이름 · 기간 · 구성 요소를 여기서 고칩니다. 새로 만들려면 [새 템플릿]을 누르세요."
+        : "목록에서 템플릿을 고르면 내용을 여기서 볼 수 있습니다.";
 
     public string DetailApplyText => IsCreateRail ? "생성" : EditViewModel.IsCreate ? "등록" : "적용";
 
@@ -768,6 +786,9 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     private void RaiseDetail()
     {
         NotifyOfPropertyChange(nameof(ShowDetailButtons));
+        NotifyOfPropertyChange(nameof(IsTemplateDetailEmpty));
+        NotifyOfPropertyChange(nameof(IsTemplateFormVisible));
+        NotifyOfPropertyChange(nameof(TemplateDetailEmptyHint));
         NotifyOfPropertyChange(nameof(DetailApplyText));
         NotifyOfPropertyChange(nameof(DetailRevertText));
         NotifyOfPropertyChange(nameof(DetailCanApply));

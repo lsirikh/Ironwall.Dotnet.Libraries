@@ -94,9 +94,13 @@
 			</StackPanel>
 		</c:ConsoleSection>
 
-		<!--  ② 메타 — 유형 · 기간 · 템플릿 · 요청자(L1268)  -->
-		<c:ConsoleSection Header="정보">
-			<StackPanel Visibility="{Binding PreviewViewModel.HasRow, Converter={StaticResource BoolToVisibility}}">
+		<!--
+			② 메타 — 유형 · 기간 · 템플릿 · 요청자(L1268).
+			V-30 — 고른 보고서가 없으면 절째로 접는다(②⑤⑥). 머리 "정보" 만 서고 내용이 비었고, 꺼진 [크게 보기] · [삭제] 가
+			할 수 있는 일처럼 늘어서 있었다. 그때 남는 것은 미리보기 자리의 안내("보고서를 고르면 여기에 미리보기가 나옵니다") 하나다.
+		-->
+		<c:ConsoleSection Header="정보" Visibility="{Binding PreviewViewModel.HasRow, Converter={StaticResource BoolToVisibility}}">
+			<StackPanel>
 				<DockPanel Margin="0,1">
 					<TextBlock DockPanel.Dock="Left" Style="{StaticResource MetaLabel}" Text="유형" />
 					<TextBlock
@@ -164,7 +168,7 @@
 		</Border>
 
 		<!--  ⑤ 동작 줄 — [크게 보기] 만 별도 창, 나머지는 제자리(L1269 · L1278)  -->
-		<c:ConsoleSection Header="보기 · 내려받기">
+		<c:ConsoleSection Header="보기 · 내려받기" Visibility="{Binding PreviewViewModel.HasRow, Converter={StaticResource BoolToVisibility}}">
 			<StackPanel>
 				<WrapPanel>
 					<Button
@@ -242,7 +246,11 @@
 		</c:ConsoleSection>
 
 		<!--  ⑥ 파괴적 동작 묶음 — 행 안 인라인 취소를 없애고 여기로 모았다(L1280)  -->
-		<c:ConsoleSection Header="되돌릴 수 없는 동작" TagKind="Custom" TagText="확인 후 실행">
+		<c:ConsoleSection
+			Header="되돌릴 수 없는 동작"
+			TagKind="Custom"
+			TagText="확인 후 실행"
+			Visibility="{Binding PreviewViewModel.HasRow, Converter={StaticResource BoolToVisibility}}">
 			<StackPanel>
 				<WrapPanel>
 					<Button

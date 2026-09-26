@@ -134,10 +134,15 @@
 		</Style>
 	</UserControl.Resources>
 
+	<!--
+		V-38 · V-39 — 부제는 다른 콘솔처럼 지금 레일 이름이다(종전엔 내 부대 코드 "unit001").
+		Loaded 에서 창 제목 줄을 테마 색에 맞추고, 도킹 폭(1280)이 창 테두리에 먹혀 상세 칸이 서랍으로 숨지 않게 창 폭을 보정한다(코드 비하인드).
+	-->
 	<c:ConsoleShell
 		AutomationProperties.AutomationId="Units.Console.Panel"
 		ConsoleKey="Units"
-		Subtitle="{Binding MyUnitCode}"
+		Loaded="OnShellLoaded"
+		Subtitle="{Binding RailSubtitle}"
 		Title="부대 편제">
 
 		<!--
@@ -173,10 +178,17 @@
 					</DataTemplate>
 				</c:ConsoleRail.Resources>
 				<c:ConsoleRail.Footer>
+					<!--  V-39 — 내 부대를 이름으로 못 찾으면 정렬 안내(한 줄보다 길다)를 낸다 — 184 폭에서 잘리지 않게 줄을 바꾼다.  -->
 					<Label
 						AutomationProperties.AutomationId="Console.Units.Rail.Footer"
 						Content="{Binding RailFooterText}"
-						Style="{StaticResource Unit.Readout}" />
+						Style="{StaticResource Unit.Readout}">
+						<Label.ContentTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding}" TextWrapping="Wrap" />
+							</DataTemplate>
+						</Label.ContentTemplate>
+					</Label>
 				</c:ConsoleRail.Footer>
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
@@ -293,7 +305,7 @@
 											VerticalAlignment="Center"
 											FontSize="11.5"
 											Foreground="{DynamicResource TextMutedBrush}"
-											Text="여기에 놓으면 최상위로 옮깁니다 — 또는 부대를 고르고 누르세요" />
+											Text="부대를 여기에 끌어 놓거나, 고른 뒤 이 줄을 누르면 최상위로 옮깁니다" />
 									</Border>
 								</ControlTemplate>
 							</Button.Template>

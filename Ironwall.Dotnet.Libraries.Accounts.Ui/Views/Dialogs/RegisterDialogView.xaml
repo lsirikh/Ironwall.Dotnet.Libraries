@@ -23,15 +23,31 @@
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="RegisterDialog">
-		<md:Card
+		<!--
+			V-36 — 콘솔 다이얼로그 규격(커널 ConsoleDialogFrame 과 같은 모양 — 카드 테두리 TextMuted · 모서리 10 · 그림자)으로 맞춘다: 머리 40 · SurfaceAlt · 굵은 제목 ·
+			스크롤하는 몸통 · SurfaceAlt 바닥 줄에 오른쪽 정렬 [취소](Console.Button) → [확인](Console.Button.Primary).
+			옛 모양은 청록 머리 띠(ModernDialogHeader) + 전폭 두 칸 버튼이라 콘솔 안에서 혼자 다른 창처럼 보였다.
+			틀(ConsoleDialogFrame) 자체를 쓰지 않는 까닭: 호스트 DialogHost 가 이 뷰를 띄우고, 확인 · 취소 · 아이디 · 비밀번호 칸이
+			x:Name(Caliburn 바인딩 · 호스트 UiTests 의 식별자)으로 묶여 있어 그 이름들을 그대로 두어야 한다.
+		-->
+		<Border
 			x:Name="CardContents"
 			Width="560"
-			Height="550"
-			MinWidth="350"
-			MinHeight="550"
-			Padding="20"
-			Opacity="1"
-			UniformCornerRadius="8">
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center"
+			Background="{DynamicResource SurfaceBrush}"
+			TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
+			BorderBrush="{DynamicResource TextMutedBrush}"
+			BorderThickness="1"
+			CornerRadius="10">
+			<Border.Effect>
+				<DropShadowEffect
+					BlurRadius="18"
+					Direction="270"
+					Opacity="0.28"
+					ShadowDepth="4"
+					Color="Black" />
+			</Border.Effect>
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
@@ -40,28 +56,28 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
-				<!--  시안 헤더 바 (LayerPanel 패턴)  -->
+				<!--  머리 — SurfaceAlt · 아래 구분선(ConsoleDialogFrame ① 과 같은 치수)  -->
 				<Border
 					Grid.Row="0"
-					Margin="-20,-20,-20,8"
-					Style="{StaticResource ModernDialogHeader}">
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<md:PackIcon
-							Width="20"
-							Height="20"
-							Margin="0,0,8,0"
-							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Kind="AccountAdd" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="사용자 추가" />
-					</StackPanel>
+					MinHeight="40"
+					Padding="20,10"
+					Background="{DynamicResource SurfaceAltBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1"
+					CornerRadius="9,9,0,0">
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="15"
+						FontWeight="Bold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="사용자 추가" />
 				</Border>
 				<ScrollViewer
 					Grid.Row="2"
-					Height="400"
+					MaxHeight="440"
 					VerticalScrollBarVisibility="Auto">
 
-					<Grid Margin="10,0">
+					<Grid Margin="10,12,20,8">
 						<Grid.RowDefinitions>
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
@@ -318,40 +334,27 @@
 					</Grid>
 				</ScrollViewer>
 
-				<Separator
-					Grid.Row="3"
-					Margin="0,10"
-					Background="{DynamicResource DividerBrush}"
-					Style="{StaticResource MaterialDesignLightSeparator}" />
-
-				<!--  Button Group  -->
-				<Grid Grid.Row="4" VerticalAlignment="Center">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="5*" />
-						<ColumnDefinition Width="5*" />
-					</Grid.ColumnDefinitions>
-					<Button
-						x:Name="ClickOk"
-						Grid.Column="0"
-						Margin="10,0"
-						VerticalAlignment="Center"
-						Style="{StaticResource Console.Button.Primary}">
-						<Button.Content>
-							<TextBlock Style="{StaticResource ButtonTextBlock}" Text="확인" />
-						</Button.Content>
-					</Button>
-					<Button
-						x:Name="ClickCancel"
-						Grid.Column="1"
-						Margin="10,0"
-						VerticalAlignment="Center"
-						Style="{StaticResource Console.Button}">
-						<Button.Content>
-							<TextBlock Style="{StaticResource ButtonTextBlock}" Text="취소" />
-						</Button.Content>
-					</Button>
-				</Grid>
+				<!--  바닥 줄 — SurfaceAlt · 위 구분선 · 오른쪽 끝에 보조 → 주 동작(ConsoleDialogFrame ③ 과 같은 치수)  -->
+				<Border
+					Grid.Row="4"
+					Padding="20,12"
+					Background="{DynamicResource SurfaceAltBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,1,0,0"
+					CornerRadius="0,0,9,9">
+					<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+						<Button
+							x:Name="ClickCancel"
+							Margin="0,0,8,0"
+							Content="취소"
+							Style="{StaticResource Console.Button}" />
+						<Button
+							x:Name="ClickOk"
+							Content="확인"
+							Style="{StaticResource Console.Button.Primary}" />
+					</StackPanel>
+				</Border>
 			</Grid>
-		</md:Card>
+		</Border>
 	</md:DialogHost>
 </UserControl>

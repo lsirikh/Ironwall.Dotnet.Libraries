@@ -242,6 +242,16 @@ public partial class App : Application
             setup.TimeoutHours = before;
             await Settle();
 
+            // ⑫-b 세션 설정 되돌리기(V-35) — 바꾼 뒤 [되돌리기][저장] 이 켜진 바닥 막대
+            setup.TimeoutHours = before + 1;
+            await Settle();
+            Save(directory, $"{theme}-13c-session-setup-revert-ready");
+            setup.ClickRevert();
+            await Settle();
+
+            // ⑫-c 사용자 추가 다이얼로그(V-36) — 호스트 DialogHost 가 띄우는 그 뷰를 따로 그린다(화면 밖 창).
+            await SaveRegisterDialogAsync(directory, $"{theme}-16-register-dialog");
+
             // 좁은 폭 — 서랍(960~1279) · 접힘(<960), 상세 열림/닫힘. --surface 면 콘솔 폭 자체를 줄인다.
             var wideView = _view.Width;
             var wideWindow = _window.Width;
@@ -263,6 +273,36 @@ public partial class App : Application
             else _window.Width = wideWindow;
             await Settle();
         }
+    }
+
+    /// <summary>사용자 추가 다이얼로그를 제 창(화면 밖)에 띄워 PNG 로 뜬다 — 호스트의 DialogHost 스크림 대신 콘솔 바탕 위.</summary>
+    private async Task SaveRegisterDialogAsync(string directory, string name)
+    {
+        var events = new EventAggregator();
+        var log = new PreviewLog();
+        var register = new RegisterDialogViewModel(events, log,
+            new RegisterViewModel(events, log, new AccountModel()), new AccountProvider(), new PreviewDirectory(), new PreviewProfileImages());
+        var view = new Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs.RegisterDialogView { DataContext = register };
+        var host = new Border { Padding = new Thickness(24), Child = view };
+        host.SetResourceReference(Border.BackgroundProperty, "BgBrush");
+        var window = new Window { Width = 640, Height = 640, Content = host, Title = "사용자 추가 미리보기" };
+        PreviewTools.Shared.OffscreenStage.Hide(window).Show();
+        try
+        {
+            await Settle();
+            var width = (int)Math.Ceiling(host.ActualWidth);
+            var height = (int)Math.Ceiling(host.ActualHeight);
+            if (width <= 0 || height <= 0) return;
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(host);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var stream = File.Create(Path.Combine(directory, name + ".png")))
+                encoder.Save(stream);
+            PreviewTools.Shared.ClipAudit.Frame(directory, name, host);
+        }
+        // 닫지 않고 숨긴다 — 렌더 직후 창을 닫으면 드물게 렌더 스레드가 네이티브 접근 위반으로 죽었다(1/3 실측). 끝날 때 한꺼번에 정리된다.
+        finally { window.Hide(); }
     }
 
     private void ApplyDark()

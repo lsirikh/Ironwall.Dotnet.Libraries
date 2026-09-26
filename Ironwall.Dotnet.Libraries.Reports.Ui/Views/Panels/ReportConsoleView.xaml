@@ -21,9 +21,13 @@
 		<local:RailIconKindConverter x:Key="IconKind" />
 		<local:RowAutomationNameConverter x:Key="RowAutomationName" />
 
-		<!--  상태 칩 — 색이 아니라 눌림 형태(굵은 윤곽 + ● 표지)로 고른 것을 보인다  -->
+		<!--
+			상태 칩 — 색이 아니라 눌림 형태(굵은 윤곽 + ● 표지)로 고른 것을 보인다.
+			V-30 — 칩 다섯 개가 툴바를 먹어 도킹 1280(가운데 716)에서도 검색이 아이콘 단추로 접혔다(다른 콘솔은 검색칸).
+			안쪽 여백 9→6 · 사이 5→4 로 좁혀(합 35px) 검색칸이 제 폭(120)을 받게 한다.
+		-->
 		<Style x:Key="StatusChip" TargetType="Button">
-			<Setter Property="Margin" Value="0,0,5,0" />
+			<Setter Property="Margin" Value="0,0,4,0" />
 			<Setter Property="Padding" Value="0" />
 			<Setter Property="Cursor" Value="Hand" />
 			<Setter Property="Background" Value="Transparent" />
@@ -33,7 +37,7 @@
 					<ControlTemplate TargetType="Button">
 						<Border
 							x:Name="Chip"
-							Padding="9,3"
+							Padding="6,3"
 							Background="{DynamicResource SurfaceAltBrush}"
 							BorderBrush="{DynamicResource BorderBrush}"
 							BorderThickness="1"
@@ -346,7 +350,20 @@
 				<Grid>
 					<local:ReportGenerationDetailView Visibility="{Binding IsListRail, Converter={StaticResource BoolToVisibility}}" />
 					<local:ReportCreateDetailView Visibility="{Binding IsCreateRail, Converter={StaticResource BoolToVisibility}}" />
-					<local:ReportTemplateDetailView Visibility="{Binding IsTemplateRail, Converter={StaticResource BoolToVisibility}}" />
+					<local:ReportTemplateDetailView Visibility="{Binding IsTemplateFormVisible, Converter={StaticResource BoolToVisibility}}" />
+					<!--
+						V-29 — 템플릿을 고르지 않았으면 빈 편집 폼 대신 빈 상태(무엇이 비었고 무엇을 하면 되는지).
+						빈 폼은 이름* · 기간 · 구성 요소 ▲▼ · [되돌리기][적용] 까지 그대로 서서 새 항목을 적는 중처럼 읽혔다.
+					-->
+					<c:ConsoleEmptyState
+						Padding="16,48,16,16"
+						VerticalAlignment="Top"
+						AutomationProperties.AutomationId="Reports.Detail.TemplateEmptyState"
+						Glyph="M6,3 H14 L18,7 V21 H6 Z M14,3 V7 H18 M9,12 H15 M9,16 H15"
+						Hint="{Binding TemplateDetailEmptyHint}"
+						IsHitTestVisible="False"
+						Title="{x:Static vm:ReportConsoleViewModel.TemplateDetailEmptyTitle}"
+						Visibility="{Binding IsTemplateDetailEmpty, Converter={StaticResource BoolToVisibility}}" />
 				</Grid>
 			</c:ConsoleDetailHost>
 		</c:ConsoleShell.Detail>

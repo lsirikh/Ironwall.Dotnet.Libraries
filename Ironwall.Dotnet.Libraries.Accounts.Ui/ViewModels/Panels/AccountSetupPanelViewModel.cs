@@ -102,6 +102,29 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             { Title = "세션 정책", Explain = "저장 중 오류가 발생했습니다." });
         }
     }
+
+    /// <summary>
+    /// [되돌리기] — 바꾼 칸을 마지막으로 불러온 값으로 되돌린다. 서버 호출 0(V-35: 다른 콘솔의 바닥 막대처럼
+    /// [되돌리기][저장] 한 쌍을 둔다 — 종전엔 [저장] 만 홀로 있어 잘못 바꾼 값을 되돌릴 길이 [갱신] 뿐이었다).
+    /// </summary>
+    public void ClickRevert()
+    {
+        if (_baseline is not { } b) return;
+        TimeoutHours = b.Item1;
+        RefreshDays = b.Item2;
+        LockoutThreshold = b.Item3;
+        LockoutDurationMinutes = b.Item4;
+        SessionPolicyEnabled = b.Item5;
+        ConcurrencyPolicy = b.Item6;
+        MaxConcurrentSessions = b.Item7;
+        SessionSelfReplaceEnabled = b.Item8;
+        SessionHistoryRetentionDays = b.Item9;
+        LoginAnomalyEventEnabled = b.Item10;
+        RaiseChanges();
+    }
+
+    /// <summary>Caliburn 버튼 가드 — 되돌릴 것이 있을 때만.</summary>
+    public bool CanClickRevert => ChangedCount > 0;
     #endregion
     #region - Processes -
     /// <summary>
@@ -229,6 +252,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(ChangedCount));
         NotifyOfPropertyChange(nameof(ChangeSummaryText));
         NotifyOfPropertyChange(nameof(CanClickSave));
+        NotifyOfPropertyChange(nameof(CanClickRevert));
     }
 
     private IAccountApiService? ResolveApi()

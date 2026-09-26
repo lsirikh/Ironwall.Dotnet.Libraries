@@ -43,6 +43,43 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
     }
 
     [Fact]
+    public async Task should_show_an_empty_state_instead_of_a_blank_content_box_when_nothing_is_chosen()
+    {
+        // V-32 — 고르지 않았는데 빈 문구 칸 · "0 / 500자" 가 서 있었다.
+        var rig = await OpenAsync();
+
+        Assert.True(rig.Console.IsDetailEmpty);
+        Assert.False(rig.Console.IsDetailFormVisible);
+        Assert.False(rig.Console.Detail.ShowButtons);
+        Assert.Contains("[새 문구]", rig.Console.DetailEmptyHint);
+    }
+
+    [Fact]
+    public async Task should_open_the_form_when_a_line_is_chosen_or_a_new_one_begins()
+    {
+        var rig = await OpenAsync();
+
+        rig.Console.OnRowSelected(rig.Console.Items[1]);
+        Assert.False(rig.Console.IsDetailEmpty);
+        Assert.True(rig.Console.IsDetailFormVisible);
+
+        rig.Console.OnRowSelected(null);
+        Assert.True(rig.Console.IsDetailEmpty);
+
+        await rig.Console.AddAsync();
+        Assert.False(rig.Console.IsDetailEmpty);
+        Assert.True(rig.Console.Detail.ShowButtons);
+    }
+
+    [Fact]
+    public async Task should_not_ask_to_register_in_the_empty_state_when_editing_is_not_allowed()
+    {
+        var rig = await OpenAsync(canEdit: false);
+
+        Assert.DoesNotContain("[새 문구]", rig.Console.DetailEmptyHint);
+    }
+
+    [Fact]
     public async Task should_load_templates_ordered_by_display_order_when_opened()
     {
         var rig = await OpenAsync();

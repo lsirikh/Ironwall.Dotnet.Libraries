@@ -28,18 +28,20 @@ public enum ReportColumnKind
 public sealed record ReportColumnSpec(string Key, string Header, string BindingPath, ReportColumnKind Kind, double Width, bool IsDefault);
 
 /// <summary>
-/// 보고서 콘솔의 열 명세 — 목업의 <b>기본 6열</b>(WL L1264)과 "열" 메뉴로 켜는 추가 열.
+/// 보고서 콘솔의 열 명세 — 목업의 기본 6열(WL L1264)에서 아이디를 뺀 <b>기본 5열</b>과 "열" 메뉴로 켜는 추가 열.
 /// </summary>
 /// <remarks>
 /// 추가 열의 근거: 목업이 상세 칸에 요청자 · 진행 · 템플릿을 적었으므로(WL L1268) 목록에서도
-/// 찾아볼 수 있어야 한다. 다만 <b>기본은 6열</b>이다 — 기본을 늘리면 목업과 어긋난다.
+/// 찾아볼 수 있어야 한다. 다만 기본 열은 늘리지 않는다 — 아이디(서버 내부 번호)는 운영자가 쓰지 않아 기본에서 뺐다(V-31, 2026-09-27).
 /// </remarks>
 public static class ReportColumnCatalog
 {
-    /// <summary>생성 이력 — 기본 6열(WL L1264) + 추가 5열.</summary>
+    /// <summary>생성 이력 — 기본 5열(WL L1264 의 6열에서 아이디를 뺐다, V-31) + 추가 6열.</summary>
     public static IReadOnlyList<ReportColumnSpec> Generations { get; } = new[]
     {
-        new ReportColumnSpec("id", "아이디", "Id", ReportColumnKind.Mono, 68, true),
+        // V-31 — 아이디(서버 내부 번호)는 운영자가 쓸 데가 없다 → 기본에서 빼고 "열" 메뉴로만 켠다.
+        //        맨 앞에 두는 것은 그대로 — 켜면 예전 자리(첫 열)에 선다.
+        new ReportColumnSpec("id", "아이디", "Id", ReportColumnKind.Mono, 68, false),
         new ReportColumnSpec("title", "제목", "Title", ReportColumnKind.Text, 0, true),
         new ReportColumnSpec("report_type", "유형", "ReportTypeLabel", ReportColumnKind.Text, 84, true),
         // U-18 — 76 이면 "최근 7일"(51 + 안쪽 여백 24 + 글 여백 4)이 끝 글자를 잃었다(잘림 감사) → 84.
@@ -57,9 +59,10 @@ public static class ReportColumnCatalog
     /// <summary>템플릿 목록(WL L1282 의 왼쪽 칸). 구성 수는 <c>component_count</c> 로만 적는다.</summary>
     public static IReadOnlyList<ReportColumnSpec> Templates { get; } = new[]
     {
-        new ReportColumnSpec("id", "아이디", "Id", ReportColumnKind.Mono, 68, true),
+        new ReportColumnSpec("id", "아이디", "Id", ReportColumnKind.Mono, 68, false),
         new ReportColumnSpec("name", "이름", "Name", ReportColumnKind.Text, 0, true),
-        new ReportColumnSpec("report_type", "유형", "ReportType", ReportColumnKind.ReportTypeCode, 90, true),
+        // V-28 — 90 이면 "사용자 정의" 가 "사용자…" 로 잘렸다(이름 열은 380 이 남았다) → 글이 다 드는 폭.
+        new ReportColumnSpec("report_type", "유형", "ReportType", ReportColumnKind.ReportTypeCode, 108, true),
         new ReportColumnSpec("default_period", "기본기간", "DefaultPeriod", ReportColumnKind.PeriodCode, 92, true),
         new ReportColumnSpec("component_count", "구성 수", "EffectiveComponentCount", ReportColumnKind.Mono, 74, true),
 

@@ -443,6 +443,22 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     public bool IsContentTouched => Detail.Tracker.IsTouched(FieldContent);
 
+    /// <summary>
+    /// V-32 — 고른 문구도, 새로 적는 문구도 없다. 빈 문구 칸 · "0 / 500자" 대신 커널 빈 상태를 보인다
+    /// (빈 칸은 무엇을 적으라는 것인지 모르는 채 "새 문구" 처럼 읽혔다).
+    /// </summary>
+    public bool IsDetailEmpty => Detail.SelectedCount == 0 && !Detail.IsCreating;
+
+    /// <summary>문구 폼을 보일 때 — 빈 상태의 반대.</summary>
+    public bool IsDetailFormVisible => !IsDetailEmpty;
+
+    public const string DetailEmptyTitle = "문구를 고르세요";
+
+    /// <summary>빈 상세의 둘째 줄 — 쓸 수 없으면(권한 · 서버) "등록하라" 고 하지 않는다.</summary>
+    public string DetailEmptyHint => CanEdit
+        ? "목록에서 문구를 고르면 여기서 고칩니다. 새로 등록하려면 [새 문구]를 누르세요."
+        : "목록에서 문구를 고르면 내용을 여기서 볼 수 있습니다.";
+
     /// <summary>커널의 [적용] — 미적용 변경이 있어도 <b>클라 검증을 통과해야</b> 켜진다.</summary>
     public bool DetailCanApply => Detail.CanApply && DraftValidationError == null;
 
@@ -514,6 +530,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     {
         NotifyOfPropertyChange(nameof(DetailCanApply));
         NotifyOfPropertyChange(nameof(DetailFooterText));
+        NotifyOfPropertyChange(nameof(IsDetailEmpty));
+        NotifyOfPropertyChange(nameof(IsDetailFormVisible));
     }
 
     /// <summary>
@@ -660,6 +678,9 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         NotifyOfPropertyChange(nameof(RowEditText));
         NotifyOfPropertyChange(nameof(RowDeleteToolTip));
         NotifyOfPropertyChange(nameof(DetailFooterText));
+        NotifyOfPropertyChange(nameof(IsDetailEmpty));
+        NotifyOfPropertyChange(nameof(IsDetailFormVisible));
+        NotifyOfPropertyChange(nameof(DetailEmptyHint));
     }
     #endregion
 

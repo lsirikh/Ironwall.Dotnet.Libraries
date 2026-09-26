@@ -1860,12 +1860,12 @@
 						</c:ConsoleSection>
 					</StackPanel>
 
-					<!--  ⑥ 세션 설정 — 이 화면은 폼 하나라 상세 칸에는 할 일 한 줄만(도킹 폭에서 빈 칸으로 남지 않게)  -->
+					<!--  ⑥ 세션 설정 — 이 화면은 입력 칸 한 묶음이라 상세 칸에는 할 일 한 줄만(도킹 폭에서 빈 칸으로 남지 않게). V-34 — "폼" 같은 개발 말을 쓰지 않는다.  -->
 					<TextBlock
 						AutomationProperties.AutomationId="Console.Accounts.Detail.NoDetail"
 						FontSize="12.5"
 						Foreground="{DynamicResource TextMutedBrush}"
-						Text="값은 왼쪽 폼에서 바꾼 뒤 아래 [저장]을 누르세요. 바꾼 값은 다음 로그인부터 적용됩니다."
+						Text="왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요. 잘못 바꿨으면 [되돌리기]를 누르세요. 바꾼 값은 다음 로그인부터 적용됩니다."
 						TextWrapping="Wrap"
 						Visibility="{Binding IsSessionSetupRail, Converter={StaticResource BoolToVisibility}}" />
 

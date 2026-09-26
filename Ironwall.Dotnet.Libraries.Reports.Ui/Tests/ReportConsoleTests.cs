@@ -212,7 +212,50 @@ public class ReportConsoleTests : IDisposable
         Assert.False(rig.Console.ShowDetailButtons);
 
         await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
         Assert.True(rig.Console.ShowDetailButtons);
+    }
+
+    [Fact]
+    public async Task should_show_an_empty_state_instead_of_a_blank_form_when_no_template_is_chosen()
+    {
+        // V-29 — 템플릿을 안 골랐는데 빈 편집 폼(이름* · 기간 · [되돌리기][적용])이 새 항목처럼 보였다.
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+
+        Assert.True(rig.Console.IsTemplateDetailEmpty);
+        Assert.False(rig.Console.IsTemplateFormVisible);
+        Assert.False(rig.Console.ShowDetailButtons);
+        Assert.Contains("[새 템플릿]", rig.Console.TemplateDetailEmptyHint);
+    }
+
+    [Fact]
+    public async Task should_open_the_form_when_a_template_is_chosen_or_a_new_one_begins()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        Assert.False(rig.Console.IsTemplateDetailEmpty);
+        Assert.True(rig.Console.IsTemplateFormVisible);
+
+        rig.Console.OnRowSelected(null);
+        Assert.True(rig.Console.IsTemplateDetailEmpty);
+
+        await rig.Console.AddAsync();
+        Assert.False(rig.Console.IsTemplateDetailEmpty);
+        Assert.True(rig.Console.ShowDetailButtons);
+    }
+
+    [Fact]
+    public async Task should_not_be_template_empty_on_the_other_rails()
+    {
+        var rig = await OpenAsync();
+
+        Assert.False(rig.Console.IsTemplateDetailEmpty);   // 생성 이력
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        Assert.False(rig.Console.IsTemplateDetailEmpty);
+        Assert.True(rig.Console.ShowDetailButtons);          // 생성 화면의 [비우기][생성]
     }
     #endregion
 

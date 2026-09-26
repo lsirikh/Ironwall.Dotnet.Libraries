@@ -19,6 +19,16 @@
 		<ResourceDictionary>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
+		<!--  V-33 — ▲▼ 는 켜져도 테두리를 두른다(커널 Mini 는 켜지면 글자만 · 꺼지면 테두리라 모양이 거꾸로 읽혔다).  -->
+		<Style
+			x:Key="Reorder.Button"
+			BasedOn="{StaticResource Console.Button.Mini}"
+			TargetType="Button">
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
+
 		<Style x:Key="Form.TextBox" TargetType="TextBox">
 			<Setter Property="Height" Value="30" />
 			<Setter Property="Padding" Value="6,0" />
@@ -97,7 +107,7 @@
 						Content="▼"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding EditViewModel.CanMoveComponent}"
-						Style="{StaticResource Console.Button.Mini}"
+						Style="{StaticResource Reorder.Button}"
 						ToolTip="{Binding EditViewModel.MoveComponentToolTip}" />
 					<Button
 						Margin="4,0,0,0"
@@ -106,7 +116,7 @@
 						Content="▲"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding EditViewModel.CanMoveComponent}"
-						Style="{StaticResource Console.Button.Mini}"
+						Style="{StaticResource Reorder.Button}"
 						ToolTip="{Binding EditViewModel.MoveComponentToolTip}" />
 					<TextBlock
 						VerticalAlignment="Center"

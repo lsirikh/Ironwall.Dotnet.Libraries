@@ -12,22 +12,41 @@ namespace Ironwall.Dotnet.Libraries.Reports.Ui.Tests;
 public class ReportColumnCatalogTests
 {
     [Fact]
-    public void should_show_exactly_the_six_mockup_columns_by_default_when_listing_generations()
+    public void should_show_the_mockup_columns_without_the_internal_id_by_default_when_listing_generations()
     {
+        // V-31 — 목업 6열에서 아이디(서버 내부 번호)만 뺐다. 운영자는 제목 · 상태로 찾는다.
         var defaults = ReportColumnCatalog.Generations.Where(c => c.IsDefault).Select(c => c.Key).ToArray();
 
-        Assert.Equal(new[] { "id", "title", "report_type", "period_type", "status", "created_at" }, defaults);
+        Assert.Equal(new[] { "title", "report_type", "period_type", "status", "created_at" }, defaults);
+    }
+
+    [Fact]
+    public void should_hide_the_internal_id_by_default_but_keep_it_in_the_columns_menu_when_listing_templates()
+    {
+        var id = ReportColumnCatalog.Templates.Single(c => c.Key == "id");
+
+        Assert.False(id.IsDefault);
+        Assert.Equal("id", ReportColumnCatalog.Templates[0].Key);   // 켜면 예전 자리(첫 열)에 선다
+    }
+
+    [Fact]
+    public void should_give_the_type_column_room_for_the_longest_label_when_listing_templates()
+    {
+        // V-28 — 90 이면 "사용자 정의"(글 약 70 + 칸 안쪽 여백 24 + 글 여백 4)가 "사용자…" 로 잘렸다.
+        var type = ReportColumnCatalog.Templates.Single(c => c.Key == "report_type");
+
+        Assert.True(type.Width >= 104, $"width={type.Width}");
     }
 
     [Fact]
     public void should_offer_the_rest_only_through_the_columns_menu_when_listing_generations()
     {
-        // 목업이 기본 6열이라고 못박았으므로(L1264) 나머지는 전부 메뉴 뒤에 있어야 한다.
-        var expectedExtra = new[] { "generator_name", "completed_at", "progress_pct", "template_id", "severity_filter" };
+        // 기본 열(목업 L1264 에서 아이디를 뺀 5열) 밖은 전부 메뉴 뒤에 있어야 한다.
+        var expectedExtra = new[] { "id", "generator_name", "completed_at", "progress_pct", "template_id", "severity_filter" };
         var extra = ReportColumnCatalog.Generations.Where(c => !c.IsDefault).Select(c => c.Key).ToArray();
 
         Assert.Equal(expectedExtra, extra);
-        Assert.Equal(6, ReportColumnCatalog.Generations.Count(c => c.IsDefault));
+        Assert.Equal(5, ReportColumnCatalog.Generations.Count(c => c.IsDefault));
     }
 
     [Fact]

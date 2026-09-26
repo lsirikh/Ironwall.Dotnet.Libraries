@@ -309,11 +309,28 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     {
         var rows = selected?.Cast<object>().OfType<AccountViewModel>().ToList() ?? new List<AccountViewModel>();
         if (SameRows(rows, Form.Rows)) return true;
+
+        // V-37 — 목록 재조회(Clear + Add)가 고른 행을 치우면 그리드가 "선택 없음" 을 알린다. 그것을 사람이 선택을 푼 것으로
+        //        받으면 기억한 Id 까지 지워져, [적용] 뒤(재조회) 편집하던 행 선택이 풀리고 상세가 "선택한 항목 없음" 으로 돌아갔다.
+        //        고른 행이 목록에서 <b>사라져서</b> 빈 선택이 된 것이면 아무것도 바꾸지 않는다 — 다시 채워지면 ReconcileUsers 가
+        //        같은 Id 의 새 행으로 맞추고, 정말 지워진 계정이면 그때 선택을 비운다.
+        if (IsSelectionLostToListChurn(rows)) return true;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return false;
 
         SetSelection(rows);
         LoadForm(rows);
         return true;
+    }
+
+    /// <summary>
+    /// 빈 선택이 사람의 조작이 아니라 목록 변동(고른 행이 컬렉션에서 빠짐) 때문인가. 검색으로 가려진 행은 컬렉션에 남아 있으므로
+    /// 여기에 걸리지 않는다(그때는 평소대로 선택을 푼다).
+    /// </summary>
+    private bool IsSelectionLostToListChurn(IReadOnlyList<AccountViewModel> rows)
+    {
+        if (rows.Count > 0 || _selectedRows.Count == 0) return false;
+        var current = AccountManagerPanelViewModel.ViewModelProvider;
+        return !_selectedRows.Any(current.Contains);
     }
 
     /// <summary>되돌리려던 행 일부가 검색에 가려져 그리드에 없다 — 실제 선택에 맞춘다.</summary>

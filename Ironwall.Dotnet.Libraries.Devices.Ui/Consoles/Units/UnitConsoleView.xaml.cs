@@ -35,6 +35,23 @@ public partial class UnitConsoleView : UserControl
 
     private UnitConsoleViewModel? Vm => DataContext as UnitConsoleViewModel;
 
+    #region - Window -
+    private bool _chromeApplied;
+
+    /// <summary>
+    /// V-38 — 이 콘솔이 <b>제 창의 뿌리</b>일 때(부대 편제 OS 창) 한 번: 테두리에 먹힌 도킹 폭을 되돌리고 제목 줄을 테마 색으로 칠한다.
+    /// 미리보기 · 다른 창 안에 얹힌 경우(뿌리가 아닐 때)는 남의 창을 건드리지 않는다.
+    /// </summary>
+    private void OnShellLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_chromeApplied || sender is not FrameworkElement shell) return;
+        var window = Window.GetWindow(this);
+        if (window is null || !ReferenceEquals(window.Content, this)) return;
+        _chromeApplied = true;
+        UnitWindowChrome.Apply(window, shell);
+    }
+    #endregion
+
     #region - Toolbar -
     private async void OnAdd(object sender, RoutedEventArgs e) => await Guard(() => { Vm?.BeginCreate(); return System.Threading.Tasks.Task.CompletedTask; });
 

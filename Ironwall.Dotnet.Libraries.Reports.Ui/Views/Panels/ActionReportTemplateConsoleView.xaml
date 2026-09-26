@@ -50,6 +50,18 @@
 			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		</Style>
+		<!--
+			V-33 — ▲▼ 도 [순서 되돌리기] 와 같은 까닭으로 늘 테두리를 두른다. 커널 Mini 는 Ghost 바탕이라 켜지면 글자만,
+			꺼지면 테두리 · 판이 생겨 "누를 수 있을 때가 덜 단추처럼" 보였다(모양이 거꾸로).
+		-->
+		<Style
+			x:Key="Reorder.Button"
+			BasedOn="{StaticResource Console.Button.Mini}"
+			TargetType="Button">
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		</Style>
 		<Style
 			x:Key="Row.Button.Danger"
 			BasedOn="{StaticResource Console.Button.Mini.Danger}"
@@ -112,7 +124,11 @@
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
 
-		<!--  툴바 — [+ 문구 추가] · [삭제] · [갱신] · 검색(문구) · [되돌리기](Extra, 마지막 재정렬 1회분)  -->
+		<!--
+			툴바 — [+ 문구 추가] · [삭제] · [갱신] · [되돌리기](Extra, 마지막 재정렬 1회분).
+			V-33 — [순서 되돌리기] 는 테두리 있는 보통 단추(Console.Button)다. Ghost 는 꺼지면 테두리 · 판이 생기고 켜지면
+			글자만 남아, 누를 수 있을 때가 오히려 덜 단추처럼 보였다(꺼짐=테두리 · 켜짐=글자, 모양이 거꾸로).
+		-->
 		<c:ConsoleShell.Toolbar>
 			<c:ConsoleToolbar
 				AddClick="OnAdd"
@@ -132,7 +148,7 @@
 						Click="OnUndoReorder"
 						Content="↶ 순서 되돌리기"
 						IsEnabled="{Binding CanUndoReorder}"
-						Style="{StaticResource Console.Button.Ghost}"
+						Style="{StaticResource Console.Button}"
 						ToolTip="{Binding UndoReorderText}"
 						ToolTipService.ShowOnDisabled="True" />
 				</c:ConsoleToolbar.Extra>
@@ -156,7 +172,7 @@
 						Content="▼"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding CanMoveSelected}"
-						Style="{StaticResource Console.Button.Mini}"
+						Style="{StaticResource Reorder.Button}"
 						ToolTip="{Binding MoveDownToolTip}" />
 					<Button
 						Margin="4,0,0,0"
@@ -165,7 +181,7 @@
 						Content="▲"
 						DockPanel.Dock="Right"
 						IsEnabled="{Binding CanMoveSelected}"
-						Style="{StaticResource Console.Button.Mini}"
+						Style="{StaticResource Reorder.Button}"
 						ToolTip="{Binding MoveUpToolTip}" />
 					<TextBlock
 						VerticalAlignment="Center"
@@ -339,7 +355,21 @@
 				ShowButtons="{Binding Detail.ShowButtons}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				Title="{Binding Detail.Title}">
-				<StackPanel Margin="0,4,0,0">
+				<Grid>
+				<!--
+					V-32 — 고른 문구도 새로 적는 문구도 없으면 빈 문구 칸 · "0 / 500자" 대신 빈 상태(무엇이 비었고 무엇을 하면 되는지).
+					바닥 막대는 커널 여섯 상태가 이미 접는다(선택 없음 = 단추 없음).
+				-->
+				<c:ConsoleEmptyState
+					Padding="16,48,16,16"
+					VerticalAlignment="Top"
+					AutomationProperties.AutomationId="Reports.ActionReportTemplate.DetailEmptyState"
+					Glyph="M4,5 H20 V16 H9 L5,20 V16 H4 Z M8,9 H16 M8,12 H13"
+					Hint="{Binding DetailEmptyHint}"
+					IsHitTestVisible="False"
+					Title="{x:Static vm:ActionReportTemplateConsoleViewModel.DetailEmptyTitle}"
+					Visibility="{Binding IsDetailEmpty, Converter={StaticResource BoolToVisibility}}" />
+				<StackPanel Margin="0,4,0,0" Visibility="{Binding IsDetailFormVisible, Converter={StaticResource BoolToVisibility}}">
 					<c:ConsoleSection Header="문구">
 						<StackPanel>
 							<c:ConsoleField
@@ -375,6 +405,7 @@
 						</StackPanel>
 					</c:ConsoleSection>
 				</StackPanel>
+				</Grid>
 			</c:ConsoleDetailHost>
 		</c:ConsoleShell.Detail>
 	</c:ConsoleShell>

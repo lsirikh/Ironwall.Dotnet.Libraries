@@ -169,13 +169,35 @@ public sealed class UnitConsoleViewModel : Screen
 
     public string DeviceHeaderText => $"미배치 장비 {DeviceRows.Count}";
 
+    /// <remarks>V-39 — "인접 쌍 N" 을 뺐다. 인접 관계도 칸은 숨겼으므로(아래 RailEntries) 그 수는 운영자가 볼 곳이 없다.</remarks>
     public string ListStatusText => IsDeviceView
         ? $"미배치 장비 {DeviceRows.Count}"
-        : $"부대 {Tree.Count} · 인접 쌍 {AdjacencyPairCount}";
+        : $"부대 {Tree.Count}";
 
-    public string RailFooterText => string.IsNullOrEmpty(MyUnitCode)
-        ? "같은 단계의 부대는 코드 순으로 표시됩니다."
-        : $"내 부대 · {MyUnitCode}";
+    /// <summary>
+    /// 레일 바닥 — 내 부대를 <b>이름</b>으로 말한다(V-39: 종전엔 "내 부대 · unit001" 처럼 코드를 그대로 냈다).
+    /// 편제에서 그 코드를 못 찾으면(아직 안 읽었거나 다른 서버) 내 부대를 말하지 않고 정렬 안내를 낸다.
+    /// </summary>
+    public string RailFooterText => MyUnitName is { Length: > 0 } name
+        ? $"내 부대 · {name}"
+        : "같은 단계의 부대는 코드 순으로 표시됩니다.";
+
+    /// <summary>편제에서 찾은 내 부대 이름 — 없으면 <c>null</c>.</summary>
+    public string? MyUnitName
+    {
+        get
+        {
+            var code = MyUnitCode;
+            if (string.IsNullOrEmpty(code)) return null;
+            var node = Tree.Ordered.FirstOrDefault(n => string.Equals(n.Code, code, StringComparison.Ordinal));
+            return string.IsNullOrWhiteSpace(node?.Name) ? null : node!.Name;
+        }
+    }
+
+    /// <summary>
+    /// 머리 부제 — 다른 콘솔처럼 <b>지금 레일 이름</b>(V-38 · V-39). 종전엔 내 부대 코드("unit001")를 부제로 냈다.
+    /// </summary>
+    public string RailSubtitle => _selectedRail.Label;
 
     public string? MyUnitCode => _myUnitCode();
 
@@ -349,6 +371,7 @@ public sealed class UnitConsoleViewModel : Screen
 
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(RailFooterText));
+        NotifyOfPropertyChange(nameof(MyUnitName));
         NotifyOfPropertyChange(nameof(IsTreeEmpty));
         NotifyOfPropertyChange(nameof(IsDeviceListEmpty));
         NotifyOfPropertyChange(nameof(DeviceHeaderText));
@@ -1035,6 +1058,7 @@ public sealed class UnitConsoleViewModel : Screen
 
     private void RaiseViewFlags()
     {
+        NotifyOfPropertyChange(nameof(RailSubtitle));
         NotifyOfPropertyChange(nameof(IsTreeView));
         NotifyOfPropertyChange(nameof(IsDeviceView));
         NotifyOfPropertyChange(nameof(IsAdjacencyView));
