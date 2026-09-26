@@ -99,6 +99,36 @@ public class ConsoleShellTests
     }
 
     [Fact]
+    public void should_give_the_detail_width_to_the_list_when_the_screen_has_no_detail()
+    {
+        // 이벤트 개요처럼 고를 행이 없는 화면 — 도킹 폭이어도 상세 340 을 접고 목록이 쓴다(실창 육안 검토 #19).
+        var (effective, detailShown) = OnSta(() =>
+        {
+            var shell = ArrangedShell(1400);
+            shell.IsDetailAvailable = false;
+            var host = (FrameworkElement)shell.Template.FindName("PART_DetailHost", shell);
+            return (shell.EffectiveListWidth, host.Visibility == Visibility.Visible);
+        });
+
+        Assert.Equal(1400 - 184, effective);
+        Assert.False(detailShown);
+    }
+
+    [Fact]
+    public void should_not_open_the_drawer_when_the_screen_has_no_detail_even_if_requested()
+    {
+        var drawer = OnSta(() =>
+        {
+            var shell = ArrangedShell(1100);
+            shell.IsDetailAvailable = false;
+            shell.IsDetailRequested = true;
+            return shell.IsDrawerOpen;
+        });
+
+        Assert.False(drawer);
+    }
+
+    [Fact]
     public void should_report_full_list_width_when_drawer_is_closed()
     {
         var effective = OnSta(() => ArrangedShell(1100).EffectiveListWidth);

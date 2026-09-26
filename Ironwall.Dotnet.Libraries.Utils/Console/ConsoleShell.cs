@@ -106,6 +106,14 @@ public class ConsoleShell : Control
     /// <summary>행을 골랐거나 등록 중인가. 서랍 모드에서 이 값이 참일 때만 상세가 밀려 나온다(도킹이면 늘 보인다).</summary>
     public bool IsDetailRequested { get => (bool)GetValue(IsDetailRequestedProperty); set => SetValue(IsDetailRequestedProperty, value); }
 
+    public static readonly DependencyProperty IsDetailAvailableProperty = DependencyProperty.Register(
+        nameof(IsDetailAvailable), typeof(bool), typeof(ConsoleShell), new PropertyMetadata(true, (d, _) => ((ConsoleShell)d).ApplyLayout()));
+    /// <summary>
+    /// 이 화면에 상세 칸이 있는가(기본 참). 거짓이면 도킹 폭에서도 상세 열 · 경계를 접고 목록이 그 폭을 쓴다 —
+    /// 고를 행이 없는 화면(이벤트 개요)에서 340 짜리 빈 칸이 늘 떠 있던 것(2026-09-27 실창 육안 검토 #19).
+    /// </summary>
+    public bool IsDetailAvailable { get => (bool)GetValue(IsDetailAvailableProperty); set => SetValue(IsDetailAvailableProperty, value); }
+
     private static readonly DependencyPropertyKey LayoutModeKey = DependencyProperty.RegisterReadOnly(
         nameof(LayoutMode), typeof(ConsoleLayoutMode), typeof(ConsoleShell), new PropertyMetadata(ConsoleLayoutMode.Docked));
     public static readonly DependencyProperty LayoutModeProperty = LayoutModeKey.DependencyProperty;
@@ -200,6 +208,17 @@ public class ConsoleShell : Control
         _railColumn.Width = new GridLength(layout.RailWidth);
 
         bool open;
+        if (!IsDetailAvailable)
+        {
+            // 상세 칸 없음 — 도킹이든 서랍이든 접고 목록이 전부 쓴다.
+            _detailColumn.Width = new GridLength(0);
+            _detailHost.Visibility = Visibility.Collapsed;
+            SetValue(IsDrawerOpenKey, false);
+            if (_contentHost != null) _contentHost.Margin = new Thickness(0);
+            if (_splitter != null) _splitter.Visibility = Visibility.Collapsed;
+            AnnounceEffectiveListWidthIfChanged(Math.Max(0, width - layout.RailWidth));
+            return;
+        }
         if (layout.IsDetailDocked)
         {
             open = false;

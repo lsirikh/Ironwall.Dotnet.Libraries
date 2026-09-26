@@ -143,6 +143,7 @@
 	<Grid>
 		<c:ConsoleShell
 			ConsoleKey="Events"
+		IsDetailAvailable="{Binding IsDetailAvailable}"
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Subtitle="{Binding Subtitle}"
 		Title="이벤트">

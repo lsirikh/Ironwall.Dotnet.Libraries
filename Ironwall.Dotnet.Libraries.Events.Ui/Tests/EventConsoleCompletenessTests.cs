@@ -467,6 +467,22 @@ public class EventConsoleCompletenessTests : IDisposable
         Assert.DoesNotContain("탐지", _console.DetailView.EmptyHint);
     }
 
+    // ── 실창 육안 검토 #19 — 개요는 고를 행이 없어 상세 340 이 늘 비었다 ──
+    [Fact]
+    public async Task should_fold_the_detail_column_only_on_the_overview_rail()
+    {
+        await Activate();
+
+        await _console.SelectRailAsync(EventDashboardViewModel.OverviewRailKey);
+        Assert.False(_console.IsDetailAvailable);
+
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        Assert.True(_console.IsDetailAvailable);
+
+        await _console.SelectRailAsync(EventDashboardViewModel.SuppressionRailKey);
+        Assert.True(_console.IsDetailAvailable);
+    }
+
     // ── E-2 #3 상태 줄 ──
     [Fact]
     public async Task should_clear_the_status_message_when_the_rail_changes()

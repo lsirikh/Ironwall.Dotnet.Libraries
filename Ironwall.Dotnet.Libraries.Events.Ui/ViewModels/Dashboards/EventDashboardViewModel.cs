@@ -578,6 +578,9 @@ public class EventDashboardViewModel : BasePanelViewModel
     public bool IsListVisible => _current is not null;
     public bool IsOverview => _current is null && !IsSuppressionRail;
 
+    /// <summary>상세 칸이 있는 화면인가 — 개요는 고를 행이 없어 상세 340 을 접는다(커널 ConsoleShell.IsDetailAvailable, 실창 육안 검토 #19).</summary>
+    public bool IsDetailAvailable => !IsOverview;
+
     /// <summary>억제 스케줄 레일인가 — 목록 · 상세 · 툴바가 통째로 바뀐다.</summary>
     public bool IsSuppressionRail => _railKey == SuppressionRailKey && Suppression is not null;
 
@@ -1470,6 +1473,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(Rows));
         NotifyOfPropertyChange(nameof(IsListVisible));
         NotifyOfPropertyChange(nameof(IsOverview));
+        NotifyOfPropertyChange(nameof(IsDetailAvailable));
         NotifyOfPropertyChange(nameof(IsDetectionRail));
         NotifyOfPropertyChange(nameof(IsMalfunctionRail));
         NotifyOfPropertyChange(nameof(IsConnectionRail));
