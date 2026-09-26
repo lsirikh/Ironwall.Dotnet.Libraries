@@ -96,7 +96,8 @@ public partial class EventOverviewView : UserControl
         _chart = chart;
         chart.UpdateFinished -= OnChartUpdateFinished;   // 해제-후-구독(재로드 중복 방지)
         chart.UpdateFinished += OnChartUpdateFinished;
-        PushChartRect();
+        // 즉시 읽지 않고 한 박자 미룬다 — 이 Loaded 가 차트 자신의 Loaded(코어 생성)보다 먼저 올 수 있다.
+        chart.Dispatcher.BeginInvoke(PushChartRect, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnChartUpdateFinished(IChartView chartView)
@@ -109,9 +110,34 @@ public partial class EventOverviewView : UserControl
     private void PushChartRect()
     {
         if (_chart is null || Model is null) return;
-        var core = _chart.CoreChart;
-        Model.Resize(core.DrawMarginLocation.X, core.DrawMarginLocation.Y, core.DrawMarginSize.Width, core.DrawMarginSize.Height);
+        if (!TryReadDrawMargin(_chart, out var x, out var y, out var w, out var h)) return;   // 다음 UpdateFinished 가 다시 부른다
+        Model.Resize(x, y, w, h);
     }
+
+    /// <summary>
+    /// 차트가 실제로 잰 그림 영역을 읽는다. 코어가 아직 없으면 false.
+    /// <para>★ 이벤트 창을 닫았다 다시 열면 이 뷰의 Loaded 가 차트의 코어 생성보다 먼저 와서
+    /// <c>CoreChart</c> 가 "Core not set yet." 을 던졌고, 처리되지 않은 예외로 <b>GIS 앱 전체가 종료</b>됐다
+    /// (실창 로그 2026-09-26 22:44:14, PushChartRect ← OnChartLoaded). LiveCharts2 는 준비 여부를 묻는 공개
+    /// 속성이 없어 그 한 가지 예외만 좁게 거른다.</para>
+    /// </summary>
+    internal static bool TryReadDrawMargin(LvcCartesianChart chart, out double x, out double y, out double w, out double h)
+    {
+        x = y = w = h = 0;
+        try
+        {
+            var core = chart.CoreChart;
+            x = core.DrawMarginLocation.X; y = core.DrawMarginLocation.Y;
+            w = core.DrawMarginSize.Width; h = core.DrawMarginSize.Height;
+            return true;
+        }
+        catch (Exception ex) when (IsCoreNotReady(ex))
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsCoreNotReady(Exception ex) => ex.Message.StartsWith("Core not set", StringComparison.Ordinal);
 
     private void OnTrendLoaded(object sender, RoutedEventArgs e)
     {
