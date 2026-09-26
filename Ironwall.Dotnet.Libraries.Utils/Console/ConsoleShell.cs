@@ -54,6 +54,7 @@ public class ConsoleShell : Control
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(ConsoleShell), new FrameworkPropertyMetadata(typeof(ConsoleShell)));
         FocusableProperty.OverrideMetadata(typeof(ConsoleShell), new FrameworkPropertyMetadata(false));
+        KoreanWordWrap.Install();   // 콘솔이 하나라도 뜨면 한글을 띄어쓰기에서만 줄바꿈(호스트도 따로 부른다 — 여러 번 불러도 한 번)
     }
 
     public ConsoleShell()
