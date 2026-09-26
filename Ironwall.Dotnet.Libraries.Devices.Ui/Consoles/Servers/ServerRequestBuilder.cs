@@ -92,5 +92,5 @@ public static class ServerRequestBuilder
 
     /// <summary>6.3 에서 비우기가 막히는 까닭 — 칸 주석과 오류 문구가 같은 문장을 쓴다.</summary>
     public static string CannotClear(string label)
-        => $"현재 서버에서는 {label}을(를) 비울 수 없습니다. 다른 값으로 바꾸기만 할 수 있습니다";
+        => Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanParticles.Resolve($"현재 서버에서는 {label}을(를) 비울 수 없습니다. 다른 값으로 바꾸기만 할 수 있습니다");
 }

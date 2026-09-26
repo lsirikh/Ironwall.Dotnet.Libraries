@@ -94,12 +94,13 @@ public static class KoreanWordWrap
 
     private static void Apply(TextBlock tb)
     {
-        if (tb.TextWrapping == TextWrapping.NoWrap) return;
         // 인라인으로 만든 글(<Run> 여럿 · Hyperlink 등)은 Text 를 쓰면 인라인이 사라진다 — 건드리지 않는다.
         if (DependencyPropertyHelper.GetValueSource(tb, TextBlock.TextProperty).BaseValueSource == BaseValueSource.Default) return;
         var current = tb.Text;
-        var joined = Join(current);
-        if (!string.Equals(current, joined, StringComparison.Ordinal))
-            tb.SetCurrentValue(TextBlock.TextProperty, joined);
+        // 조사 병기("을(를)")는 줄바꿈과 무관하게 모든 글에서 고른다(KoreanParticles).
+        var next = KoreanParticles.Resolve(current);
+        if (tb.TextWrapping != TextWrapping.NoWrap) next = Join(next);
+        if (!string.Equals(current, next, StringComparison.Ordinal))
+            tb.SetCurrentValue(TextBlock.TextProperty, next);
     }
 }

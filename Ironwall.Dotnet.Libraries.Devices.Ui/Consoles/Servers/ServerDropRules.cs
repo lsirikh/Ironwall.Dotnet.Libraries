@@ -88,8 +88,10 @@ public static class ServerDropRules
             return $"{CategoryLabel(deviceCategory)}에는 관리 서버가 없습니다. 소속 제어기를 따릅니다.";
 
         var names = string.Join(" · ", allowed.Select(t => ServerTypeCatalog.TypeLabel(t)));
-        return $"{CategoryLabel(deviceCategory)}은(는) {names} 서버에만 배정할 수 있습니다. "
-             + $"'{ServerTypeCatalog.TypeLabel(serverType)}' 서버에는 놓을 수 없습니다.";
+        // 상태 줄이 TextBox 라 화면 쪽 조사 고르기(KoreanParticles)가 닿지 않는다 — 여기서 고른다.
+        return Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanParticles.Resolve(
+            $"{CategoryLabel(deviceCategory)}은(는) {names} 서버에만 배정할 수 있습니다. "
+            + $"'{ServerTypeCatalog.TypeLabel(serverType)}' 서버에는 놓을 수 없습니다.");
     }
 
     /// <summary>6.3 에서 이 배정을 보낼 수 있는가 — 그 판본의 클라 계약은 스피커만 서버를 쓴다.</summary>
