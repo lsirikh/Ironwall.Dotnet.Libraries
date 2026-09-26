@@ -799,6 +799,7 @@
 						<Border
 							x:Name="PART_Footer"
 							Grid.Row="3"
+							MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
 							Padding="16,10"
 							AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Detail.ApplyBar}"
 							Background="{DynamicResource SurfaceAltBrush}"
