@@ -316,8 +316,15 @@
 					DataContext="{Binding Overview}"
 					Visibility="{Binding DataContext.IsOverview, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}" />
 
-				<!--  탐지 내역 — 고정 높이 없음 · 무한 스크롤 유지 · 정렬/열 재정렬 없음  -->
+				<!--
+					탐지 내역 — 고정 높이 없음 · 무한 스크롤 유지 · 정렬/열 재정렬 없음.
+					U-18 — 고정 열 합(954)이 실창 표면(1340 도킹: 목록 816)보다 넓어 결과 · 신호가 가로 스크롤 밖으로 밀렸다(GIS 실창 · 잘림 감사).
+					조치 · 발생시각 · 유형 · 구역 · 결과는 제 값을 다 보이는 고정 폭, 장비 하나만 남는 폭을 갖는 별(최소 120 — 별 열이 여럿이면
+					반올림이 쌓여 2px 가로 스크롤이 섰다), 그리고 덜 중요한 열부터
+					목록 실효 폭 문턱 아래에서 접는다(신호 960 · 스냅샷 780 · 구역 700 · 유형 640 · 결과 520 — 접힌 값은 상세 칸이 보여 준다).
+				-->
 				<DataGrid
+					c:ConsoleColumns.AutoCollapse="True"
 					AutomationProperties.AutomationId="Console.Events.Grid.Detection"
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
@@ -366,7 +373,13 @@
 							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="발생시각" />
-						<DataGridTemplateColumn Width="76" MinWidth="76" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="스냅샷">
+						<DataGridTemplateColumn
+							Width="76"
+							MinWidth="76"
+							c:ConsoleColumns.CollapseBelow="780"
+							c:ConsoleColumns.Key="snapshot"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="스냅샷">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<Grid Width="46" Height="30">
@@ -387,34 +400,47 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 						<DataGridTextColumn
-							Width="100"
-							MinWidth="100"
+							Width="84"
+							MinWidth="84"
+							c:ConsoleColumns.CollapseBelow="640"
+							c:ConsoleColumns.Key="type"
 							Binding="{Binding MessageType, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="유형" />
 						<DataGridTextColumn
 							Width="*"
-							MinWidth="140"
+							MinWidth="120"
 							Binding="{Binding DeviceLabel}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="장비" />
 						<DataGridTextColumn
-							Width="120"
-							MinWidth="120"
+							Width="80"
+							MinWidth="80"
+							c:ConsoleColumns.CollapseBelow="700"
+							c:ConsoleColumns.Key="zone"
 							Binding="{Binding Device, Converter={StaticResource Zone}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="구역" />
 						<DataGridTextColumn
-							Width="130"
-							MinWidth="130"
+							Width="96"
+							MinWidth="96"
+							c:ConsoleColumns.CollapseBelow="520"
+							c:ConsoleColumns.Key="result"
 							Binding="{Binding Result, Converter={StaticResource Korean}}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="결과" />
 						<DataGridTextColumn
 							Width="80"
 							MinWidth="80"
+							c:ConsoleColumns.CollapseBelow="960"
+							c:ConsoleColumns.Key="signal"
 							Binding="{Binding SignalText}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="신호" />
 					</DataGrid.Columns>
 					<DataGrid.RowStyle>

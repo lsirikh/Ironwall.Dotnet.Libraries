@@ -26,6 +26,7 @@ public partial class DeviceDashboardView : UserControl
     private DataGrid? _grid;
     private ConsoleToolbar? _toolbar;
     private ConsolePrefs? _prefs;
+    private ConsoleShell? _shell;
     private bool _isSyncingSelection;
 
     public DeviceDashboardView()
@@ -61,10 +62,18 @@ public partial class DeviceDashboardView : UserControl
 
     private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
+        // U-18 — 목록 실효 폭이 바뀔 때마다(서랍 열림 · 표면 크기) 덜 중요한 열을 접었다 편다.
+        if (_shell is not null) _shell.EffectiveListWidthChanged -= OnListWidthChanged;
+        _shell = sender as ConsoleShell;
+        if (_shell is not null) _shell.EffectiveListWidthChanged += OnListWidthChanged;
+
         // Unloaded 에서 뗐다가 같은 뷰가 다시 붙는 경우(탭 · 패널 재표시).
         if (_viewModel is null && ViewModel is { } vm)
             OnDataContextChanged(this, new DependencyPropertyChangedEventArgs(DataContextProperty, null, vm));
+        ApplyColumnPrefs();
     }
+
+    private void OnListWidthChanged(object? sender, double width) => ApplyColumnPrefs();
 
     private void OnGridLoaded(object sender, RoutedEventArgs e)
     {
@@ -139,11 +148,26 @@ public partial class DeviceDashboardView : UserControl
             column.CellStyle = cellStyle;
             ConsoleColumns.SetKey(column, spec.Key);
             ConsoleColumns.SetIsDefault(column, spec.IsDefault);
+            ConsoleColumns.SetCollapseBelow(column, CollapseBelowFor(spec.Key));
             _grid.Columns.Add(column);
         }
 
         ApplyColumnPrefs();
     }
+
+    /// <summary>
+    /// U-18 — 목록 칸이 이 폭보다 좁으면 그 열을 접는다(<see cref="ConsoleColumns.CollapseBelowProperty"/>).
+    /// 기본 6열 합(핸들 포함 약 680)이 서랍이 열린 1150(목록 606) · 900(484)에서 넘쳐 가로 스크롤이 섰다(잘림 감사).
+    /// 식별 열(상태 · 장비번호 · 장비명)은 끝까지 남고, 활성화 → 종류 → 카테고리 열(IP:포트 · 제어기 · 방송서버 · 문 위치) 순으로 접힌다 —
+    /// 접힌 값은 상세 칸이 보여 준다. 사용자가 "열" 메뉴로 숨긴 것과 합집합이고 설정 파일에는 쓰지 않는다(넓어지면 돌아온다).
+    /// </summary>
+    internal static double CollapseBelowFor(string key) => key switch
+    {
+        "enabled" => 700,
+        "kind" => 620,
+        "address" or "controller" or "server" or "door" => 540,
+        _ => 0,
+    };
 
     private static DataGridColumn CreateColumn(DeviceColumnSpec spec)
     {
@@ -176,13 +200,15 @@ public partial class DeviceDashboardView : UserControl
 
             default:
                 var text = new System.Windows.Controls.DataGridTextColumn { Binding = new Binding(spec.BindingPath) { Mode = BindingMode.OneWay } };
+                // U-18 — 칸보다 긴 값은 줄임표로 끝내고 잘렸을 때만 전체 값을 툴팁으로(예전엔 칸 끝에서 칼로 자른 듯 잘렸다 —
+                // 레거시 "카메라 (IpCamera)" · 실서버 긴 이름. 잘림 감사).
+                var style = new Style(typeof(TextBlock));
                 if (spec.Kind == DeviceColumnKind.Mono)
-                {
-                    var style = new Style(typeof(TextBlock));
                     style.Setters.Add(new Setter(TextBlock.FontFamilyProperty, new System.Windows.Media.FontFamily("Consolas")));
-                    style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
-                    text.ElementStyle = style;
-                }
+                style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
+                style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+                style.Setters.Add(new Setter(Ironwall.Dotnet.Libraries.Theme.Themes.TrimmedToolTip.IsEnabledProperty, true));
+                text.ElementStyle = style;
                 return text;
         }
     }
@@ -206,7 +232,10 @@ public partial class DeviceDashboardView : UserControl
     {
         if (_grid is null) return;
         var prefs = ColumnPrefs();
-        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, prefs?.HiddenColumns);
+        var hidden = new List<string>(prefs?.HiddenColumns ?? new List<string>());
+        foreach (var key in ConsoleColumns.CollapsedAt(_grid.Columns, _shell?.EffectiveListWidth ?? 0))
+            if (!hidden.Contains(key)) hidden.Add(key);
+        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, hidden);
         // 열이 없는 화면(부품으로 찾기)에서는 "열 0/0" 단추를 내지 않는다 — 빈 글자면 툴바가 단추를 접는다.
         if (_grid.Columns.All(c => string.IsNullOrEmpty(ConsoleColumns.GetKey(c)))) text = string.Empty;
         if (_toolbar is not null) _toolbar.ColumnsText = text;

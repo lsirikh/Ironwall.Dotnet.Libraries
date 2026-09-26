@@ -132,6 +132,7 @@
 				<c:ConsoleShell.List>
 					<DataGrid
 						x:Name="DeviceGrid"
+						c:ConsoleColumns.AutoCollapse="True"
 						IsReadOnly="True"
 						ItemsSource="{Binding Rows}"
 						PreviewMouseLeftButtonDown="OnGridPreviewMouseDown"
@@ -153,12 +154,12 @@
 									</DataTemplate>
 								</DataGridTemplateColumn.CellTemplate>
 							</DataGridTemplateColumn>
-							<DataGridTextColumn Width="70" Binding="{Binding Status}" Header="상태" />
-							<DataGridTextColumn Width="90" Binding="{Binding Number}" Header="장비번호" />
-							<DataGridTextColumn Width="*" Binding="{Binding Name}" Header="장비명" />
-							<DataGridTextColumn Width="110" Binding="{Binding Kind}" Header="종류" />
-							<DataGridTextColumn Width="110" Binding="{Binding Unit}" Header="부대" />
-							<DataGridTextColumn Width="110" Binding="{Binding Group}" Header="그룹" />
+							<DataGridTextColumn Width="70" MinWidth="70" Binding="{Binding Status}" Header="상태" />
+							<DataGridTextColumn Width="90" MinWidth="90" Binding="{Binding Number}" Header="장비번호" />
+							<DataGridTextColumn Width="*" MinWidth="120" Binding="{Binding Name}" ElementStyle="{StaticResource Console.DataGrid.CellText}" Header="장비명" />
+							<DataGridTextColumn Width="110" MinWidth="110" c:ConsoleColumns.CollapseBelow="500" Binding="{Binding Kind}" Header="종류" />
+							<DataGridTextColumn Width="110" MinWidth="110" c:ConsoleColumns.CollapseBelow="560" Binding="{Binding Unit}" Header="부대" />
+							<DataGridTextColumn Width="110" MinWidth="110" c:ConsoleColumns.CollapseBelow="640" Binding="{Binding Group}" Header="그룹" />
 						</DataGrid.Columns>
 					</DataGrid>
 				</c:ConsoleShell.List>

@@ -82,9 +82,22 @@ public class ConsoleToolbar : Control
     /// <summary>"열 6/12". 비우면 버튼을 숨긴다.</summary>
     public string ColumnsText { get => (string)GetValue(ColumnsTextProperty); set => SetValue(ColumnsTextProperty, value); }
 
-    public static readonly DependencyProperty FiltersProperty = Reg<object?>(nameof(Filters), null);
-    /// <summary>필터 칩 자리(검색 앞).</summary>
+    public static readonly DependencyProperty FiltersProperty = DependencyProperty.Register(
+        nameof(Filters), typeof(object), typeof(ConsoleToolbar), new PropertyMetadata(null, (d, _) => ((ConsoleToolbar)d).OnFiltersChanged()));
+    /// <summary>필터 칩 자리(검색 앞). Extra 를 접어도 모자라면 [⋯] 팝업으로 옮겨진다(<see cref="IsFiltersOverflow"/>).</summary>
     public object? Filters { get => GetValue(FiltersProperty); set => SetValue(FiltersProperty, value); }
+
+    private static readonly DependencyPropertyKey IsFiltersOverflowPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsFiltersOverflow), typeof(bool), typeof(ConsoleToolbar), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsFiltersOverflowProperty = IsFiltersOverflowPropertyKey.DependencyProperty;
+    /// <summary>U-18 — <see cref="Filters"/> 가 [⋯] 뒤로 접혔는가(읽기 전용, <see cref="ConsoleLayoutMath.ResolveToolbarOverflow"/>).</summary>
+    public bool IsFiltersOverflow { get => (bool)GetValue(IsFiltersOverflowProperty); private set => SetValue(IsFiltersOverflowPropertyKey, value); }
+
+    private static readonly DependencyPropertyKey IsColumnsOverflowPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsColumnsOverflow), typeof(bool), typeof(ConsoleToolbar), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsColumnsOverflowProperty = IsColumnsOverflowPropertyKey.DependencyProperty;
+    /// <summary>U-18 — [열 n/m] 이 [⋯] 뒤로 접혔는가(읽기 전용). 접힌 동안에는 팝업 안의 같은 글자 버튼이 <see cref="ColumnsClick"/> 를 낸다.</summary>
+    public bool IsColumnsOverflow { get => (bool)GetValue(IsColumnsOverflowProperty); private set => SetValue(IsColumnsOverflowPropertyKey, value); }
 
     public static readonly DependencyProperty ExtraProperty = DependencyProperty.Register(
         nameof(Extra), typeof(object), typeof(ConsoleToolbar), new PropertyMetadata(null, (d, _) => ((ConsoleToolbar)d).OnExtraChanged()));
@@ -192,17 +205,32 @@ public class ConsoleToolbar : Control
     {
         if (_leftCluster is null || _rightCluster is null) return;
 
-        // U-17 — 먼저 오른쪽 묶음을 [⋯] 로 접을지 정한다(상태와 무관한 폭으로 — 진동하지 않는다).
-        // 그 결과로 정해지는 오른쪽 폭을 검색 예산에 쓴다: 실제 ActualWidth 는 접힘을 바꾼 다음 레이아웃에서야 바뀐다.
+        // U-17/U-18 — 먼저 무엇을 [⋯] 로 접을지 정한다(모두 "제자리일 때의 폭" 으로 — 진동하지 않는다).
+        // 그 결과로 정해지는 왼쪽 · 오른쪽 폭을 검색 예산에 쓴다: 실제 ActualWidth 는 접힘을 바꾼 다음 레이아웃에서야 바뀐다.
+        // 빈 자리(필터 · Extra 가 없는데도 제 여백 10 · 8 을 차지하는 ContentPresenter)는 옮길 것이 없는 고정 폭이다 —
+        // 0 으로 세면 그 여백만큼 검색이 더 넓어져 오른쪽 끝 버튼이 정확히 그만큼 잘린다(잘림 감사: 셋업 · 결선 10 · [⋯] 8).
+        var emptyLeft = EmptySlotMargin(_filtersPresenter, Filters);
+        var emptyRight = EmptySlotMargin(_extraPresenter, Extra);
+        var fixedLeft = FixedLeftWidth() + emptyLeft;
+        var filtersWidth = FiltersNaturalWidth();
         var columnsWidth = ColumnsButtonWidth();
         var extraWidth = ExtraNaturalWidth();
-        var overflow = ConsoleLayoutMath.ShouldOverflowToolbarExtra(ActualWidth, _leftCluster.ActualWidth, columnsWidth, extraWidth, ShowSearch);
-        ApplyExtraOverflow(overflow);
+        var overflow = _overflowButton is null
+            ? ConsoleToolbarOverflow.None
+            : ConsoleLayoutMath.ResolveToolbarOverflow(ActualWidth, fixedLeft + emptyRight, filtersWidth, columnsWidth, extraWidth, ShowSearch);
+        ApplyOverflow(overflow);
+
+        var leftWidth = _filtersPresenter is null
+            ? _leftCluster.ActualWidth
+            : fixedLeft + (overflow.HasFlag(ConsoleToolbarOverflow.Filters) ? 0 : filtersWidth);
         var rightWidth = _extraPresenter is null
             ? _rightCluster.ActualWidth
-            : columnsWidth + (overflow ? ConsoleLayoutMath.ToolbarOverflowButtonWidth : extraWidth);
+            : (overflow.HasFlag(ConsoleToolbarOverflow.Columns) ? 0 : columnsWidth)
+              + (overflow.HasFlag(ConsoleToolbarOverflow.Extra) ? 0 : extraWidth)
+              + emptyRight
+              + (overflow != ConsoleToolbarOverflow.None ? ConsoleLayoutMath.ToolbarOverflowButtonWidth : 0);
 
-        var resolved = ConsoleLayoutMath.ResolveToolbarSearchMinWidth(ActualWidth, _leftCluster.ActualWidth, rightWidth);
+        var resolved = ConsoleLayoutMath.ResolveToolbarSearchMinWidth(ActualWidth, leftWidth, rightWidth);
         if (Math.Abs(resolved - _searchMinWidth) < 0.5) return; // 거의 그대로면 다시 쓰지 않는다 — 레이아웃 진동 방지
         _searchMinWidth = resolved;
 
@@ -224,27 +252,41 @@ public class ConsoleToolbar : Control
         _grid.ColumnDefinitions[1].MinWidth = _searchMinWidth + ConsoleLayoutMath.ToolbarSearchLeftMargin;
     }
 
-    #region - U-17 오른쪽 묶음 넘침([⋯]) -
+    #region - U-17/U-18 넘침([⋯]) — Extra → 필터 → [열 n/m] 순으로 옮긴다 -
     // 템플릿을 늘리지 않는다(x:Name 신설 금지) — 오른쪽 묶음(StackPanel, Grid.Column 2)에 코드로 [⋯] 버튼과 팝업을 붙이고,
-    // Extra 를 담는 ContentPresenter 는 그 묶음의 마지막 ContentPresenter 로 찾는다.
+    // Extra 를 담는 ContentPresenter 는 그 묶음의 마지막 ContentPresenter 로, 필터 자리는 왼쪽 묶음의 ContentPresenter 로 찾는다.
     private FrameworkElement? _columnsButton;
     private ContentPresenter? _extraPresenter;
+    private ContentPresenter? _filtersPresenter;
     private ButtonBase? _overflowButton;
     private Popup? _overflowPopup;
     private ContentPresenter? _overflowHost;
+    private ContentPresenter? _overflowFiltersHost;
+    private ButtonBase? _overflowColumnsButton;
+    private ConsoleToolbarOverflow _overflow;
+    private double _columnsNaturalWidth;
 
     private void BuildOverflowParts()
     {
         if (_overflowButton is not null) _overflowButton.Click -= OnOverflowClick;
+        if (_overflowColumnsButton is not null) _overflowColumnsButton.Click -= OnOverflowColumnsClick;
         _overflowButton = null;
         _overflowPopup = null;
         _overflowHost = null;
+        _overflowFiltersHost = null;
+        _overflowColumnsButton = null;
         _extraPresenter = null;
+        _filtersPresenter = null;
+        _overflow = ConsoleToolbarOverflow.None;
+        _columnsNaturalWidth = 0;
         IsExtraOverflow = false;
+        IsFiltersOverflow = false;
+        IsColumnsOverflow = false;
 
         if (_rightCluster is not Panel panel) return;
         _extraPresenter = panel.Children.OfType<ContentPresenter>().LastOrDefault();
         if (_extraPresenter is null) return;
+        _filtersPresenter = (_leftCluster as Panel)?.Children.OfType<ContentPresenter>().LastOrDefault();
 
         var more = new Button
         {
@@ -260,19 +302,39 @@ public class ConsoleToolbar : Control
             new Binding(nameof(ConsoleKey)) { Source = this, StringFormat = "Console.{0}.Toolbar.More" });
         more.Click += OnOverflowClick;
 
-        _overflowHost = new ContentPresenter { VerticalAlignment = VerticalAlignment.Center };
+        // 팝업 안: 필터(한 줄) · 창 고유 동작 · [열 n/m] — 옮겨진 것만 보인다.
+        _overflowFiltersHost = new ContentPresenter { HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
+        _overflowHost = new ContentPresenter { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
+        var columns = new Button { HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed, ToolTip = "기본 열 / 전체 열" };
+        columns.SetResourceReference(StyleProperty, "Console.Button.Ghost");
+        columns.SetResourceReference(FontFamilyProperty, "MonoFont");
+        BindingOperations.SetBinding(columns, ContentControl.ContentProperty, new Binding(nameof(ColumnsText)) { Source = this });
+        BindingOperations.SetBinding(columns, AutomationProperties.AutomationIdProperty,
+            new Binding(nameof(ConsoleKey)) { Source = this, StringFormat = "Console.{0}.Toolbar.ColumnsOverflow" });
+        columns.Click += OnOverflowColumnsClick;
+        _overflowColumnsButton = columns;
+
+        var stack = new StackPanel();
+        stack.Children.Add(_overflowFiltersHost);
+        stack.Children.Add(_overflowHost);
+        stack.Children.Add(columns);
+
         var plate = new Border
         {
             Padding = new Thickness(8),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(4),
-            Child = _overflowHost,
+            Child = stack,
         };
         plate.SetResourceReference(Border.BackgroundProperty, "SurfaceAltBrush");
         plate.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         plate.SetResourceReference(TextElement.ForegroundProperty, "TextPrimaryBrush");
-        // 안의 동작을 누르면 닫는다(처리기가 Handled 를 세워도) · Esc 는 닫고 [⋯] 로 초점을 돌린다.
-        plate.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((_, _) => CloseOverflow(false)), handledEventsToo: true);
+        // 안의 동작을 누르면 닫는다(처리기가 Handled 를 세워도) — 단, 필터 칩은 여러 번 누를 수 있게 열어 둔다.
+        plate.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source && IsWithin(source, _overflowFiltersHost)) return;
+            CloseOverflow(false);
+        }), handledEventsToo: true);
         plate.PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape) return;
@@ -280,7 +342,7 @@ public class ConsoleToolbar : Control
             CloseOverflow(true);
         };
 
-        // 팝업을 묶음 안에 둔다 — 그래야 옮겨 간 Extra 가 창의 DataContext(바인딩)를 그대로 물려받는다.
+        // 팝업을 묶음 안에 둔다 — 그래야 옮겨 간 Extra · 필터가 창의 DataContext(바인딩)를 그대로 물려받는다.
         var popup = new Popup
         {
             AllowsTransparency = true,
@@ -301,6 +363,13 @@ public class ConsoleToolbar : Control
         _overflowPopup = popup;
     }
 
+    private static bool IsWithin(DependencyObject? element, DependencyObject? container)
+    {
+        for (var d = element; d is not null; d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, container)) return true;
+        return false;
+    }
+
     private void OnOverflowClick(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
@@ -309,6 +378,14 @@ public class ConsoleToolbar : Control
         _overflowPopup.Child?.Dispatcher.BeginInvoke(new Action(() =>
             _overflowPopup.Child?.MoveFocus(new TraversalRequest(FocusNavigationDirection.First))),
             System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>팝업 안의 [열 n/m] — 제자리 버튼과 같은 이벤트를 낸다(창은 차이를 모른다).</summary>
+    private void OnOverflowColumnsClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        CloseOverflow(false);
+        RaiseEvent(new RoutedEventArgs(ColumnsClickEvent, this));
     }
 
     private void CloseOverflow(bool refocus)
@@ -328,9 +405,56 @@ public class ConsoleToolbar : Control
         }
     }
 
-    /// <summary>열 버튼이 차지하는 폭(간격 포함). 숨었으면 0.</summary>
+    private void OnFiltersChanged()
+    {
+        if (IsFiltersOverflow && _overflowFiltersHost is not null)
+        {
+            _overflowFiltersHost.Content = null;
+            _overflowFiltersHost.Content = Filters;
+            _overflowFiltersHost.ApplyTemplate();
+        }
+    }
+
+    /// <summary>[추가] · [삭제] · [갱신] 등 왼쪽 묶음에서 옮기지 않는 부분의 폭(간격 포함).</summary>
+    private double FixedLeftWidth()
+    {
+        if (_leftCluster is not Panel panel) return _leftCluster?.ActualWidth ?? 0;
+        double width = 0;
+        foreach (var child in panel.Children.OfType<FrameworkElement>())
+        {
+            if (ReferenceEquals(child, _filtersPresenter) || child.Visibility == Visibility.Collapsed) continue;
+            width += child.ActualWidth + child.Margin.Left + child.Margin.Right;
+        }
+        return width;
+    }
+
+    /// <summary>슬롯에 내용이 없는데 제자리 ContentPresenter 가 보이면 그 여백만 차지한다(옮길 것이 없다).</summary>
+    private static double EmptySlotMargin(ContentPresenter? home, object? content)
+        => home is { Visibility: Visibility.Visible } && (content is null || content is UIElement { Visibility: Visibility.Collapsed })
+            ? home.Margin.Left + home.Margin.Right
+            : 0;
+
+    /// <summary>필터가 제자리에 있을 때의 폭(간격 포함) — 접혀 있는 동안에도 같은 값을 낸다. 내용이 없으면 0(여백은 <see cref="EmptySlotMargin"/>).</summary>
+    private double FiltersNaturalWidth()
+    {
+        if (_filtersPresenter is null || EmptySlotMargin(_filtersPresenter, Filters) > 0) return 0;
+        var gap = _filtersPresenter.Margin.Left + _filtersPresenter.Margin.Right;
+
+        if (!IsFiltersOverflow) return _filtersPresenter.Visibility == Visibility.Visible ? _filtersPresenter.ActualWidth + gap : 0;
+
+        if (Filters is not UIElement element || element.Visibility == Visibility.Collapsed) return 0;
+        element.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return element.DesiredSize.Width > 0 ? element.DesiredSize.Width + gap : 0;
+    }
+
+    /// <summary>열 버튼이 차지하는 폭(간격 포함). 글자가 없어 숨었으면 0 — 접혀 있으면 마지막으로 잰 제자리 폭.</summary>
     private double ColumnsButtonWidth()
-        => _columnsButton is { Visibility: Visibility.Visible } columns ? columns.ActualWidth + columns.Margin.Left + columns.Margin.Right : 0;
+    {
+        if (_columnsButton is null || string.IsNullOrEmpty(ColumnsText)) return 0;
+        if (!IsColumnsOverflow && _columnsButton.Visibility == Visibility.Visible && _columnsButton.ActualWidth > 0)
+            _columnsNaturalWidth = _columnsButton.ActualWidth + _columnsButton.Margin.Left + _columnsButton.Margin.Right;
+        return _columnsNaturalWidth;
+    }
 
     /// <summary>
     /// Extra 가 제자리에 있을 때의 폭(간격 포함) — 접혀 있는 동안에도 같은 값을 내야 판정이 진동하지 않는다.
@@ -341,38 +465,71 @@ public class ConsoleToolbar : Control
         if (_extraPresenter is null) return 0;
         var gap = _extraPresenter.Margin.Left + _extraPresenter.Margin.Right;
 
-        if (!IsExtraOverflow) return _extraPresenter.ActualWidth > 0 ? _extraPresenter.ActualWidth + gap : 0;
+        if (!IsExtraOverflow) return _extraPresenter.Visibility == Visibility.Visible ? _extraPresenter.ActualWidth + gap : 0;
 
         if (Extra is not UIElement element || element.Visibility == Visibility.Collapsed) return 0;
         element.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         return element.DesiredSize.Width > 0 ? element.DesiredSize.Width + gap : 0;
     }
 
-    private void ApplyExtraOverflow(bool overflow)
+    private void ApplyOverflow(ConsoleToolbarOverflow overflow)
     {
         if (_extraPresenter is null || _overflowButton is null || _overflowHost is null) return;
-        if (overflow == IsExtraOverflow) return;
+        if (overflow == _overflow) return;
+        if (overflow == ConsoleToolbarOverflow.None) CloseOverflow(false);
 
-        if (overflow)
+        // 한 요소는 부모를 하나만 가진다 — 제자리에서 먼저 떼고 팝업에 싣는다(돌아올 때는 거꾸로).
+        // 닫힌 팝업 안의 ContentPresenter 는 레이아웃을 타지 않아 내용을 제 자식으로 붙이지 않는다 — 그러면 옮긴 요소가
+        // 부모 없이 떠서 DataContext 를 못 물려받고(바인딩이 풀려 숨었던 버튼이 다 보인다: 실측 폭 368 → 457) 폭 판정도 틀린다.
+        Move(overflow.HasFlag(ConsoleToolbarOverflow.Extra), _extraPresenter, _overflowHost, Extra);
+        if (_filtersPresenter is not null && _overflowFiltersHost is not null)
+            Move(overflow.HasFlag(ConsoleToolbarOverflow.Filters), _filtersPresenter, _overflowFiltersHost, Filters);
+
+        if (_columnsButton is not null && _overflowColumnsButton is not null)
         {
-            // 한 요소는 부모를 하나만 가진다 — 제자리에서 먼저 떼고 팝업에 싣는다.
-            _extraPresenter.Content = null;
-            _extraPresenter.Visibility = Visibility.Collapsed;
-            _overflowHost.Content = Extra;
-            // 닫힌 팝업 안의 ContentPresenter 는 레이아웃을 타지 않아 내용을 제 자식으로 붙이지 않는다 — 그러면 Extra 가
-            // 부모 없이 떠서 DataContext 를 못 물려받고(바인딩이 풀려 숨었던 버튼이 다 보인다: 실측 폭 368 → 457) 폭 판정도 틀린다.
-            _overflowHost.ApplyTemplate();
-            _overflowButton.Visibility = Visibility.Visible;
+            if (overflow.HasFlag(ConsoleToolbarOverflow.Columns))
+            {
+                _columnsButton.Visibility = Visibility.Collapsed;
+                _overflowColumnsButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _columnsButton.ClearValue(VisibilityProperty);                 // 템플릿 트리거(글자 없으면 숨김)로 돌아간다
+                _overflowColumnsButton.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // 팝업 안에서 둘 이상이 보이면 사이를 띄운다.
+        _overflowHost.Margin = new Thickness(0, overflow.HasFlag(ConsoleToolbarOverflow.Filters) && overflow.HasFlag(ConsoleToolbarOverflow.Extra) ? 8 : 0, 0, 0);
+        if (_overflowColumnsButton is not null)
+            _overflowColumnsButton.Margin = new Thickness(0, (overflow & ~ConsoleToolbarOverflow.Columns) != ConsoleToolbarOverflow.None ? 8 : 0, 0, 0);
+
+        _overflowButton.Visibility = overflow == ConsoleToolbarOverflow.None ? Visibility.Collapsed : Visibility.Visible;
+        _overflow = overflow;
+        IsExtraOverflow = overflow.HasFlag(ConsoleToolbarOverflow.Extra);
+        IsFiltersOverflow = overflow.HasFlag(ConsoleToolbarOverflow.Filters);
+        IsColumnsOverflow = overflow.HasFlag(ConsoleToolbarOverflow.Columns);
+    }
+
+    private static void Move(bool toOverflow, ContentPresenter home, ContentPresenter host, object? content)
+    {
+        var isOut = host.Content is not null && ReferenceEquals(host.Content, content);
+        if (toOverflow == isOut) return;
+
+        if (toOverflow)
+        {
+            home.Content = null;
+            home.Visibility = Visibility.Collapsed;
+            host.Content = content;
+            host.Visibility = Visibility.Visible;
+            host.ApplyTemplate();
         }
         else
         {
-            CloseOverflow(false);
-            _overflowHost.Content = null;
-            _extraPresenter.ClearValue(ContentPresenter.ContentProperty);   // 템플릿의 TemplateBinding 으로 돌아간다
-            _extraPresenter.ClearValue(VisibilityProperty);
-            _overflowButton.Visibility = Visibility.Collapsed;
+            host.Content = null;
+            home.ClearValue(ContentPresenter.ContentProperty);   // 템플릿의 TemplateBinding 으로 돌아간다
+            home.ClearValue(VisibilityProperty);
         }
-        IsExtraOverflow = overflow;
     }
     #endregion
 

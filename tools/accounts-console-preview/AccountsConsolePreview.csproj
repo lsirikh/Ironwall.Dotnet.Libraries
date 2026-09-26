@@ -35,6 +35,7 @@
   <!--  2026-09-26: preview windows render off-screen (never visible) - see tools/shared/OffscreenStage.cs.  -->
   <ItemGroup>
     <Compile Include="..\shared\OffscreenStage.cs" Link="OffscreenStage.cs" />
+    <Compile Include="..\shared\ClipAudit.cs" Link="ClipAudit.cs" />
   </ItemGroup>
 
 </Project>

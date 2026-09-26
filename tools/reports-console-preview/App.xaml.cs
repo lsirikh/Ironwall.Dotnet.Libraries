@@ -186,6 +186,15 @@ public partial class App : Application
         _artViewModel.MoveSelected(_artViewModel.Items.First(i => i.Id == 5), -1);
         await Settle();
         Save(directory, $"{theme}-art-05-reordered-undo-available");
+
+        // 좁은 폭 — 상세가 서랍으로 겹친 모습과 닫힌 모습. --surface 면 콘솔 폭 자체를 줄인다.
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _artView, 900);
+        _artViewModel.OnRowSelected(_artViewModel.Items.First(i => i.Id == 3));
+        await Settle();
+        Save(directory, $"{theme}-art-06-narrow-900-selected");
+        _artViewModel.OnRowSelected(null);
+        await Settle();
+        Save(directory, $"{theme}-art-07-narrow-900-none");
     }
     #endregion
 
@@ -260,14 +269,14 @@ public partial class App : Application
         // 좁은 폭에서는 공역 때문에 어차피 자리표시자다 — 폭을 먼저 줄여 서랍으로 바뀐 <b>뒤에</b> 런타임을 되살려
         // "창이 좁아…" 문구 그대로를 찍는다. 순서를 바꾸면 잠깐 도킹으로 판정돼 WebView2 를 만들려다
         // 실패하고(오프스크린) 런타임 문구로 되돌아간다.
-        _window.Width = 1150;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 1150);
         await Settle();
         _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(true);
         _viewModel.PreviewViewModel.ProbeRuntime();
         await Settle();
         Save(directory, $"{theme}-13-drawer-1150");
 
-        _window.Width = 900;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 900);
         await Settle();
         _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(true);
         _viewModel.PreviewViewModel.ProbeRuntime();
@@ -279,7 +288,7 @@ public partial class App : Application
         await Settle();
         Save(directory, $"{theme}-15-compact-900-nodrawer");
 
-        _window.Width = 1150;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 1150);
         await Settle();
         Save(directory, $"{theme}-16-drawer-1150-nodrawer");
     }
@@ -315,6 +324,7 @@ public partial class App : Application
     {
         var content = (FrameworkElement)((Border)_window.Content).Child;
         SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
+        PreviewTools.Shared.ClipAudit.Frame(directory, name, content);
     }
 
     /// <summary>

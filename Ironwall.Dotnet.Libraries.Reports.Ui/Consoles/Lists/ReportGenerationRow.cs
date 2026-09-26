@@ -48,6 +48,20 @@ public sealed class ReportGenerationRow : PropertyChangedBase
 
     public string PeriodLabel => PeriodDisplay(Dto.PeriodType);
 
+    /// <summary>
+    /// U-18 — 서버 시각(ISO 8601, 예 <c>2026-09-07T09:54:41.449371+09:00</c>)을 다른 콘솔과 같은 고정 표기
+    /// <c>yyyy-MM-dd HH:mm</c>(이 PC 의 현지 시각, 문화권 무관)로. 실창 GIS 에서 원문이 그대로 목록에 찍혔다.
+    /// 읽을 수 없는 값은 버리지 않고 원문을 그대로 돌려준다(빈 값은 "—").
+    /// </summary>
+    public static string ServerTimeDisplay(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "—";
+        return System.DateTimeOffset.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.AssumeLocal, out var at)
+            ? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+            : raw;
+    }
+
     public string TemplateLabel => Dto.TemplateId.HasValue ? $"#{Dto.TemplateId.Value}" : "—";
 
     public string SeverityLabel => Dto.SeverityFilter is { Count: > 0 }

@@ -49,6 +49,10 @@ public class ConsoleChipSizeContractTests
         if (start >= 0)
             xaml = xaml[..start] + "</ResourceDictionary>";
 
+        // 원문은 컴파일(같은 어셈블리)용이라 theme: 네임스페이스에 어셈블리가 없다 — 느슨한 파싱은 그걸 테스트 어셈블리에서 찾는다.
+        xaml = xaml.Replace("clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes\"",
+                            "clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme\"", StringComparison.Ordinal);
+
         return (ResourceDictionary)XamlReader.Parse(xaml);
     }
 

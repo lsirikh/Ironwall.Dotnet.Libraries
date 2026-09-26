@@ -215,25 +215,28 @@ public partial class App : Application
             await _viewModel.SelectRailAsync(AccountConsoleKeys.SessionSetup);
             await Settle();
             Save(directory, $"{theme}-13-session-setup");
+
+            // 좁은 폭 — 서랍(960~1279) · 접힘(<960), 상세 열림/닫힘. --surface 면 콘솔 폭 자체를 줄인다.
+            var wideView = _view.Width;
+            var wideWindow = _window.Width;
+            await _viewModel.SelectRailAsync(AccountConsoleKeys.Users);
+            await Settle();
+            var users = FindGrid("Console.Accounts.Grid.Users");
+            foreach (var width in new[] { 1150.0, 900.0 })
+            {
+                if (_surface && width >= wideView) continue;       // 표면보다 넓은 "좁은 폭" 은 뜻이 없다
+                PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, width);
+                users.SelectedItem = users.Items[0];
+                await Settle();
+                Save(directory, $"{theme}-14-users-{width:0}-open");
+                users.SelectedItems.Clear();
+                await Settle();
+                Save(directory, $"{theme}-15-users-{width:0}-closed");
+            }
+            if (_surface) PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, wideView);
+            else _window.Width = wideWindow;
+            await Settle();
         }
-
-        // --surface 면 콘솔 크기를 못 박았다 — 창 폭으로 서랍 · 접힘을 흉내 낼 수 없다.
-        if (_surface) return;
-
-        // 좁은 폭 — 서랍(960~1279) · 접힘(<960). 다크 상태 그대로.
-        await _viewModel.SelectRailAsync(AccountConsoleKeys.Users);
-        await Settle();
-        var users = FindGrid("Console.Accounts.Grid.Users");
-        users.SelectedItem = users.Items[0];
-        await Settle();
-
-        _window.Width = 1150;
-        await Settle();
-        Save(directory, "dark-14-drawer-1150");
-
-        _window.Width = 900;
-        await Settle();
-        Save(directory, "dark-15-compact-900");
     }
 
     private void ApplyDark()
@@ -285,8 +288,10 @@ public partial class App : Application
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(directory, name + ".png"));
-        encoder.Save(stream);
+        using (var stream = File.Create(Path.Combine(directory, name + ".png")))
+            encoder.Save(stream);
+
+        PreviewTools.Shared.ClipAudit.Frame(directory, name, _view);
     }
     #endregion
 }

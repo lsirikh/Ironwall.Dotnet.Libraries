@@ -8,6 +8,7 @@
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		서버 모니터(N-12) — 레일 184 · 목록 + 지표 띠 · 상세 340.
@@ -21,6 +22,7 @@
 		<local:InverseBoolConverter x:Key="NotBool" />
 		<local:TextToVisibilityConverter x:Key="TextToVisibility" />
 		<local:MetricBarWidthConverter x:Key="BarWidth" />
+		<local:MetricBandColumnsConverter x:Key="BandColumns" />
 
 		<Style x:Key="Servers.FieldBox" TargetType="TextBox">
 			<Setter Property="Height" Value="28" />
@@ -59,6 +61,18 @@
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Loaded="OnShellLoaded"
 		Subtitle="{Binding ListStatusText}">
+
+		<!--
+			패널 닫기 ✕ — 다른 콘솔(계정 · 보고서 · 조치 문구)과 같은 커널 Console.Button.Close 하나(U-18).
+			이 콘솔만 머리에 닫기가 없어 호스트 틀의 닫기에만 기대고 있었다. 닫기는 Screen.TryCloseAsync — 호스트 컨덕터가 받는다.
+		-->
+		<c:ConsoleShell.HeaderContent>
+			<Button
+				AutomationProperties.AutomationId="Console.Servers.CloseButton"
+				AutomationProperties.Name="서버 닫기"
+				Click="OnClose"
+				Style="{StaticResource Console.Button.Close}" />
+		</c:ConsoleShell.HeaderContent>
 
 		<!--  레일 — 전체 · 유형 4 + 기타 · ─ · 시스템 이벤트 (SB L1340-1342). 아래는 합계와 부대 필터.  -->
 		<c:ConsoleShell.Rail>
@@ -155,7 +169,8 @@
 								ItemsSource="{Binding MetricCells}">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>
-										<UniformGrid Columns="4" />
+										<!--  U-18 — 좁으면(서랍 · 접힘) 2칸 두 줄. 4칸 고정이면 배지 · 값이 칸 밖으로 잘렸다(MetricBandColumnsConverter).  -->
+										<UniformGrid Columns="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BandColumns}}" />
 									</ItemsPanelTemplate>
 								</ItemsControl.ItemsPanel>
 								<ItemsControl.ItemTemplate>
@@ -172,7 +187,9 @@
 													<TextBlock
 														FontSize="12"
 														Foreground="{DynamicResource TextMutedBrush}"
-														Text="{Binding Label}" />
+														Text="{Binding Label}"
+														TextTrimming="CharacterEllipsis"
+														theme:TrimmedToolTip.IsEnabled="True" />
 													<!--
 														임계 배지 — 서버가 판정해 보낸 것만. 위험과 경고를 <b>형태</b>로 가른다:
 														위험 = 채운 배경 + ▲ · 경고 = 테두리만 + ◆.
@@ -212,7 +229,9 @@
 															<TextBlock
 																FontSize="10.5"
 																Foreground="{DynamicResource TextPrimaryBrush}"
-																Text="{Binding BadgeText}" />
+																Text="{Binding BadgeText}"
+																TextTrimming="CharacterEllipsis"
+																theme:TrimmedToolTip.IsEnabled="True" />
 														</StackPanel>
 													</Border>
 												</DockPanel>
@@ -221,7 +240,9 @@
 													FontFamily="Consolas"
 													FontSize="17"
 													Foreground="{DynamicResource TextPrimaryBrush}"
-													Text="{Binding ValueText}" />
+													Text="{Binding ValueText}"
+													TextTrimming="CharacterEllipsis"
+													theme:TrimmedToolTip.IsEnabled="True" />
 												<Border
 													Height="4"
 													Margin="0,5,0,0"
@@ -244,7 +265,9 @@
 													Margin="0,4,0,0"
 													FontSize="11"
 													Foreground="{DynamicResource TextMutedBrush}"
-													Text="{Binding DetailText}" />
+													Text="{Binding DetailText}"
+													TextTrimming="CharacterEllipsis"
+													theme:TrimmedToolTip.IsEnabled="True" />
 											</StackPanel>
 										</Border>
 									</DataTemplate>

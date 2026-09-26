@@ -9,6 +9,7 @@
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:sup="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	AutomationProperties.AutomationId="Console.Suppression.Drawer"
 	Focusable="True"
@@ -788,7 +789,8 @@
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="{Binding StatusLine}"
-							TextTrimming="CharacterEllipsis" />
+							TextTrimming="CharacterEllipsis"
+							theme:TrimmedToolTip.IsEnabled="True" />
 						<StackPanel
 							Grid.Column="1"
 							Margin="12,0,0,0"

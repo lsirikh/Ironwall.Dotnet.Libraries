@@ -214,19 +214,22 @@ public partial class ReportConsoleView : UserControl
                 {
                     ReportColumnKind.PeriodCode => new PeriodCodeConverter(),
                     ReportColumnKind.ReportTypeCode => new ReportTypeCodeConverter(),
+                    ReportColumnKind.ServerTime => new ServerTimeConverter(),
                     _ => null,
                 };
                 var text = new System.Windows.Controls.DataGridTextColumn
                 {
                     Binding = new Binding(spec.BindingPath) { Mode = BindingMode.OneWay, Converter = converter },
                 };
+                // U-18 — 칸보다 긴 값(좁은 폭의 제목 등)은 줄임표로 끝내고 잘렸을 때만 전체 값을 툴팁으로 —
+                // 예전엔 칸 끝에서 칼로 자른 듯 잘렸다(잘림 감사: 900 접힘 "통문 개폐 이력 주간 보…").
+                var style = new Style(typeof(TextBlock));
                 if (spec.Kind == ReportColumnKind.Mono)
-                {
-                    var style = new Style(typeof(TextBlock));
                     style.Setters.Add(new Setter(TextBlock.FontFamilyProperty, new System.Windows.Media.FontFamily("Consolas")));
-                    style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
-                    text.ElementStyle = style;
-                }
+                style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
+                style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+                style.Setters.Add(new Setter(Ironwall.Dotnet.Libraries.Theme.Themes.TrimmedToolTip.IsEnabledProperty, true));
+                text.ElementStyle = style;
                 return text;
         }
     }
@@ -413,6 +416,15 @@ public sealed class PeriodCodeConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         => ReportGenerationRow.DefaultPeriodDisplay(value as string);
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>서버 시각(ISO 8601) → <c>yyyy-MM-dd HH:mm</c>(U-18, <see cref="ReportGenerationRow.ServerTimeDisplay"/>).</summary>
+public sealed class ServerTimeConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => ReportGenerationRow.ServerTimeDisplay(value as string);
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

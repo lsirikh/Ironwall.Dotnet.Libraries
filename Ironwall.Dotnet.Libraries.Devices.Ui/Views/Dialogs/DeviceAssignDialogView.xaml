@@ -5,6 +5,7 @@
 	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--
@@ -90,6 +91,8 @@
 			<Setter Property="FontSize" Value="12.5" />
 			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+			<!--  U-18 — 줄임표로 잘렸을 때만 전체 이름을 툴팁으로(잘림 감사: "북측 울타리 센서 12").  -->
+			<Setter Property="theme:TrimmedToolTip.IsEnabled" Value="True" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
 
@@ -98,6 +101,7 @@
 			<Setter Property="FontSize" Value="11.5" />
 			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+			<Setter Property="theme:TrimmedToolTip.IsEnabled" Value="True" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
 

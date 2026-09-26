@@ -84,8 +84,10 @@ public static class DeviceColumnCatalog
     private static DeviceColumnSpec KindAxis() =>
         new("kind", "종류", nameof(DeviceViewModel.TypeAxisDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 120, AxisContractOnly: true);
 
+    // U-18 — 6.3 의 종류 값은 "카메라 (IpCamera)" · "펜스센서 (Fence)" 처럼 영문 형식명을 괄호로 붙인다(약 108 + 안쪽 여백 24).
+    // 120 이면 괄호 뒤가 잘렸다(잘림 감사) — 레거시 판만 140. 축 판(형식 · 모델)은 120 으로 충분하다.
     private static DeviceColumnSpec KindLegacy() =>
-        new("kind", "종류", nameof(DeviceViewModel.DeviceTypeDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 120, LegacyContractOnly: true);
+        new("kind", "종류", nameof(DeviceViewModel.DeviceTypeDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 140, LegacyContractOnly: true);
 
     private static DeviceColumnSpec Enabled() =>
         new("enabled", "활성화", nameof(DeviceViewModel.IsEnable), DeviceColumnKind.Check, IsDefault: true, Width: 68);

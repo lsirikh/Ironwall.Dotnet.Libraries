@@ -40,6 +40,7 @@
 				HeadersVisibility="Column"
 				IsReadOnly="True"
 				ItemsSource="{Binding Rows}">
+				<!--  U-18 — 최소폭 합(540)이 이력 창 안쪽(536)보다 4 넓어 가로 스크롤이 섰다. 지표 칸(값 "91.5%")은 80 이면 넉넉하다.  -->
 				<DataGrid.Columns>
 					<DataGridTextColumn
 						Width="130"
@@ -48,17 +49,17 @@
 						Header="관측 시각" />
 					<DataGridTextColumn
 						Width="*"
-						MinWidth="90"
+						MinWidth="80"
 						Binding="{Binding Cpu}"
 						Header="CPU" />
 					<DataGridTextColumn
 						Width="*"
-						MinWidth="90"
+						MinWidth="80"
 						Binding="{Binding Ram}"
 						Header="메모리" />
 					<DataGridTextColumn
 						Width="*"
-						MinWidth="90"
+						MinWidth="80"
 						Binding="{Binding Disk}"
 						Header="디스크" />
 					<DataGridTextColumn

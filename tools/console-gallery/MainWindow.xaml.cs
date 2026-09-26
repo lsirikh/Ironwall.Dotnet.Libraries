@@ -355,6 +355,7 @@ public partial class MainWindow : Window, IDragDropHandler
             await Task.Delay(350);
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             SaveVisual(System.IO.Path.Combine(directory, name + ".png"), Stage, Background);
+            PreviewTools.Shared.ClipAudit.Frame(directory, name, Stage);
         }
 
         await Shot("01-docked-none-light", 1280, () => OnStateNone(this, new RoutedEventArgs()));

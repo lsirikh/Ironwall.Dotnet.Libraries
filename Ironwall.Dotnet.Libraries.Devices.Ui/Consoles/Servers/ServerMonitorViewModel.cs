@@ -139,6 +139,9 @@ public class ServerMonitorViewModel : Screen
 
         await base.OnDeactivateAsync(close, cancellationToken).ConfigureAwait(true);
     }
+
+    /// <summary>머리 ✕(U-18) — 보고서 · 조치 문구 콘솔과 같은 닫기: 호스트 컨덕터가 받아 패널을 내린다.</summary>
+    public Task Close() => TryCloseAsync();
     #endregion
 
     #region - Rail -

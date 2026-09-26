@@ -4,6 +4,7 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:dash="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Dashboards"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
 	AutomationProperties.AutomationId="Console.Suppression.Panel"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
@@ -149,9 +150,10 @@
 				</DataGridTextColumn.ElementStyle>
 			</DataGridTextColumn>
 
+			<!--  U-18 — 88 이면 "다음 09-20 22:00"(79 + 안쪽 24)이 1px 모자라 늘 줄임표가 찍혔다(잘림 감사) → 104.  -->
 			<DataGridTemplateColumn
 				Width="1.1*"
-				MinWidth="88"
+				MinWidth="104"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="반복">
 				<DataGridTemplateColumn.CellTemplate>
@@ -173,7 +175,8 @@
 								LineHeight="13"
 								LineStackingStrategy="BlockLineHeight"
 								Text="{Binding OccurrenceText}"
-								TextTrimming="CharacterEllipsis" />
+								TextTrimming="CharacterEllipsis"
+								theme:TrimmedToolTip.IsEnabled="True" />
 						</StackPanel>
 					</DataTemplate>
 				</DataGridTemplateColumn.CellTemplate>

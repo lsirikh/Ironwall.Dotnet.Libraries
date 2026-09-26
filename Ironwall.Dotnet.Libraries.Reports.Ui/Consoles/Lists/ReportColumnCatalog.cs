@@ -14,6 +14,8 @@ public enum ReportColumnKind
     PeriodCode,
     /// <summary>서버 보고서 유형 코드(<c>CUSTOM</c>) 를 화면 글자로 바꿔 보인다.</summary>
     ReportTypeCode,
+    /// <summary>서버 시각(ISO 8601 · 오프셋 포함)을 다른 콘솔과 같은 <c>yyyy-MM-dd HH:mm</c> 로 보인다(U-18).</summary>
+    ServerTime,
 }
 
 /// <summary>목록 열 한 줄의 명세.</summary>
@@ -40,12 +42,13 @@ public static class ReportColumnCatalog
         new ReportColumnSpec("id", "아이디", "Id", ReportColumnKind.Mono, 68, true),
         new ReportColumnSpec("title", "제목", "Title", ReportColumnKind.Text, 0, true),
         new ReportColumnSpec("report_type", "유형", "ReportTypeLabel", ReportColumnKind.Text, 84, true),
-        new ReportColumnSpec("period_type", "기간", "PeriodLabel", ReportColumnKind.Text, 76, true),
+        // U-18 — 76 이면 "최근 7일"(51 + 안쪽 여백 24 + 글 여백 4)이 끝 글자를 잃었다(잘림 감사) → 84.
+        new ReportColumnSpec("period_type", "기간", "PeriodLabel", ReportColumnKind.Text, 84, true),
         new ReportColumnSpec("status", "상태", "Status", ReportColumnKind.StatusChip, 132, true),
-        new ReportColumnSpec("created_at", "생성일시", "CreatedAt", ReportColumnKind.Text, 150, true),
+        new ReportColumnSpec("created_at", "생성일시", "CreatedAt", ReportColumnKind.ServerTime, 150, true),
 
         new ReportColumnSpec("generator_name", "요청자", "GeneratorName", ReportColumnKind.Text, 110, false),
-        new ReportColumnSpec("completed_at", "완료일시", "CompletedAt", ReportColumnKind.Text, 150, false),
+        new ReportColumnSpec("completed_at", "완료일시", "CompletedAt", ReportColumnKind.ServerTime, 150, false),
         new ReportColumnSpec("progress_pct", "진행률", "ProgressText", ReportColumnKind.Mono, 74, false),
         new ReportColumnSpec("template_id", "템플릿", "TemplateLabel", ReportColumnKind.Text, 88, false),
         new ReportColumnSpec("severity_filter", "심각도", "SeverityLabel", ReportColumnKind.Text, 110, false),
@@ -61,7 +64,7 @@ public static class ReportColumnCatalog
         new ReportColumnSpec("component_count", "구성 수", "EffectiveComponentCount", ReportColumnKind.Mono, 74, true),
 
         new ReportColumnSpec("description", "설명", "Description", ReportColumnKind.Text, 200, false),
-        new ReportColumnSpec("created_at", "만든 날", "CreatedAt", ReportColumnKind.Text, 150, false),
+        new ReportColumnSpec("created_at", "만든 날", "CreatedAt", ReportColumnKind.ServerTime, 150, false),
     };
 
     /// <summary>레일 키 → 그 화면의 열 명세.</summary>

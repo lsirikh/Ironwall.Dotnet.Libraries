@@ -22,7 +22,26 @@ public static class OffscreenStage
         window.Top = Offset;
         window.ShowActivated = false;
         window.ShowInTaskbar = false;
+        StartGuard();
         return window;
+    }
+
+    private static System.Windows.Threading.DispatcherTimer? _guard;
+    private static readonly System.Text.StringBuilder GuardLog = new();
+
+    /// <summary>
+    /// 스냅숏 실행 중에는 25ms 마다 화면 위에 뜬 창(팝업 포함)을 찾아 곧바로 숨긴다 — 흐름이 팝업을 열지 않는 것이
+    /// 1차 방어이고, 이것은 그 약속이 어긋났을 때를 위한 뒷받침이다. 찾은 것은 <see cref="GuardOffscreen"/> 가 기록한다.
+    /// </summary>
+    private static void StartGuard()
+    {
+        if (_guard is not null || !Environment.GetCommandLineArgs().Contains("--snapshot")) return;
+        _guard = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Send)
+        {
+            Interval = TimeSpan.FromMilliseconds(25),
+        };
+        _guard.Tick += (_, _) => HideOnScreen("timer", GuardLog);
+        _guard.Start();
     }
 
     /// <summary>
@@ -48,4 +67,63 @@ public static class OffscreenStage
         window.Height = height + 100;
         return true;
     }
+
+    /// <summary>
+    /// 좁은 폭을 흉내 낸다. <c>--surface</c> 로 콘솔 폭을 못 박았으면 창 폭을 바꿔도 콘솔이 안 줄어든다 —
+    /// 그때는 콘솔(표면) 폭을 <paramref name="width"/> 로 바꾸고, 아니면 예전처럼 창 폭을 바꾼다.
+    /// </summary>
+    public static void SetWidth(Window window, FrameworkElement? view, double width)
+    {
+        if (view is not null && !double.IsNaN(view.Width))
+        {
+            view.Width = width;
+            window.Width = width + 80;
+            return;
+        }
+        window.Width = width;
+    }
+
+    /// <summary>화면 밖이 아닌 곳에 떠 있는 이 프로세스의 창(팝업 포함)을 찾아 <c>offscreen-guard.txt</c> 에 적는다.</summary>
+    /// <remarks>팝업(드롭다운 · 툴팁)은 화면 밖 창을 따라가지 않고 모니터 안쪽으로 밀려 나온다 — 감사 중에 그런 것이
+    /// 하나라도 뜨면 "창이 보이지 않는다" 약속이 깨진 것이다. 발견하면 즉시 숨긴다(SW_HIDE).</remarks>
+    public static void GuardOffscreen(string directory, string frame)
+    {
+        var lines = new System.Text.StringBuilder();
+        HideOnScreen(frame, lines);
+        lock (GuardLog)
+        {
+            lines.Append(GuardLog);
+            GuardLog.Clear();
+        }
+        var windows = string.Join(" ", System.Windows.PresentationSource.CurrentSources.OfType<System.Windows.Interop.HwndSource>()
+            .Where(s => s.Handle != IntPtr.Zero && GetWindowRect(s.Handle, out _))
+            .Select(s => { GetWindowRect(s.Handle, out var r); return $"{s.RootVisual?.GetType().Name}({r.Left},{r.Top})vis={IsWindowVisible(s.Handle)}"; }));
+        System.IO.File.AppendAllText(System.IO.Path.Combine(directory, "offscreen-guard.txt"),
+            lines.Length > 0 ? lines.ToString() : $"{frame}: ok {windows}{Environment.NewLine}");
+    }
+
+    private static void HideOnScreen(string frame, System.Text.StringBuilder log)
+    {
+        var screen = new NativeRect { Left = GetSystemMetrics(76), Top = GetSystemMetrics(77) };
+        screen.Right = screen.Left + GetSystemMetrics(78);
+        screen.Bottom = screen.Top + GetSystemMetrics(79);
+
+        foreach (var source in System.Windows.PresentationSource.CurrentSources.OfType<System.Windows.Interop.HwndSource>())
+        {
+            var handle = source.Handle;
+            if (handle == IntPtr.Zero || !IsWindowVisible(handle) || !GetWindowRect(handle, out var r)) continue;
+            var onScreen = r.Right > screen.Left && r.Left < screen.Right && r.Bottom > screen.Top && r.Top < screen.Bottom;
+            if (!onScreen) continue;
+            ShowWindow(handle, 0);
+            lock (log) log.AppendLine($"{frame}: ON-SCREEN {source.RootVisual?.GetType().Name} rect=({r.Left},{r.Top})-({r.Right},{r.Bottom}) -> hidden");
+        }
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeRect { public int Left, Top, Right, Bottom; }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr handle);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr handle, out NativeRect rect);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr handle, int command);
 }

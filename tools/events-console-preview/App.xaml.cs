@@ -42,6 +42,7 @@ public partial class App : Application
     private Window _window = null!;
     private static bool _suppression;
     private bool _surfaceMode;
+    private double _surfaceWidth = double.NaN;
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
@@ -74,6 +75,7 @@ public partial class App : Application
                 Content = new Border { Margin = new Thickness(12), Child = _view, ClipToBounds = true },
             };
             _surfaceMode = PreviewTools.Shared.OffscreenStage.ApplySurface(e.Args, _view, _window);
+            _surfaceWidth = _view.Width;
             PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
             await ((IActivate)_viewModel).ActivateAsync();
@@ -233,32 +235,24 @@ public partial class App : Application
             await SuppressionShots.RunAsync(
                 _viewModel, _window,
                 name => { Save(directory, $"{theme}-surface-{name}"); return Task.CompletedTask; },
-                Settle);
+                Settle,
+                width => PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, width ?? _surfaceWidth));
             return;
         }
 
         await _viewModel.SelectRailAsync(EventDashboardViewModel.OverviewRailKey);
         await Settle();
-        Save(directory, $"{theme}-surface-01-overview");
 
         // 개요 본문을 끝까지 굴린 모습 — 아래 카드가 스크롤로 닿는가(고정 높이로 잘리는가) 확인.
         foreach (var scroller in Descendants<ScrollViewer>(_view).Where(s => s.IsVisible && s.ScrollableHeight > 0))
             scroller.ScrollToEnd();
         await Settle();
         Save(directory, $"{theme}-surface-01b-overview-scrolled");
+        foreach (var scroller in Descendants<ScrollViewer>(_view).Where(s => s.IsVisible && s.ScrollableHeight > 0))
+            scroller.ScrollToHome();
 
-        await _viewModel.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
-        await Settle();
-        Save(directory, $"{theme}-surface-02-detection-list");
-
-        var grid = FindGrid("Console.Events.Grid.Detection");
-        if (grid.Items.Count > 0)
-        {
-            grid.SelectedItem = grid.Items[0];
-            await Settle();
-            Save(directory, $"{theme}-surface-03-detection-single");
-            grid.SelectedItems.Clear();
-        }
+        // 나머지는 기본 촬영과 같은 상태들 — 팝업(기간 달력)만 건너뛴다(화면 밖 창을 따라가지 않고 모니터에 뜬다).
+        await Shot(directory, $"{theme}-surface");
     }
 
     /// <summary>억제 모드면 억제 상태만, 아니면 이벤트 콘솔 상태를 찍는다.</summary>
@@ -288,7 +282,7 @@ public partial class App : Application
         // 1c) 트리거를 열어 팝업(달력+시각+미리보기)을 그대로 찍는다.
         //     Popup 은 창의 시각 트리 밖(자기 렌더 계층)에 뜨므로 SaveElement 로 팝업 본문을 직접 찍는다.
         var rangeField = Descendants<DateTimeRangeField>(_view).FirstOrDefault();
-        if (rangeField is not null)
+        if (rangeField is not null && !_surfaceMode)
         {
             rangeField.IsDropDownOpen = true;
             await Settle(300);
@@ -416,12 +410,22 @@ public partial class App : Application
             actionGrid.SelectedItems.Clear();
         }
 
-        // 11~12) 좁은 폭 — 서랍(960~1279) · 접힘(<960)
+        // 11~12) 좁은 폭 — 서랍(960~1279) · 접힘(<960). --surface 면 콘솔 폭 자체를 줄인다.
         await _viewModel.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
         await Settle();
-        _window.Width = 1150;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 1150);
         await Settle();
         Save(directory, $"{theme}-11-drawer-1150");
+
+        var narrowGrid = FindGrid("Console.Events.Grid.Detection");
+        if (narrowGrid.Items.Count > 0)
+        {
+            narrowGrid.SelectedItem = narrowGrid.Items[0];
+            await Settle();
+            Save(directory, $"{theme}-11b-drawer-1150-open");
+            narrowGrid.SelectedItems.Clear();
+            await Settle();
+        }
 
         // 11z) 좁은 폭에서도 툴바 높이가 "직접" 때문에 안 자란다 — 가로 여유가 줄어든 상태로 재확인.
         _viewModel.Period = "직접";
@@ -430,11 +434,19 @@ public partial class App : Application
         _viewModel.Period = "24시간";
         await Settle();
 
-        _window.Width = 900;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 900);
         await Settle();
         Save(directory, $"{theme}-12-compact-900");
 
-        _window.Width = 1360;
+        if (narrowGrid.Items.Count > 0)
+        {
+            narrowGrid.SelectedItem = narrowGrid.Items[0];
+            await Settle();
+            Save(directory, $"{theme}-12b-compact-900-open");
+            narrowGrid.SelectedItems.Clear();
+        }
+
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, _surfaceMode ? _surfaceWidth : 1360);
         await Settle();
     }
 
@@ -658,6 +670,7 @@ public partial class App : Application
     {
         var content = (FrameworkElement)((Border)_window.Content).Child;
         SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
+        PreviewTools.Shared.ClipAudit.Frame(directory, name, content);
     }
 
     /// <summary>

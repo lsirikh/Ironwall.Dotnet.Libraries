@@ -283,14 +283,27 @@ public partial class App : Application
         _viewModel.Revert();
         await Settle();
 
-        // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
-        _window.Width = 1150;
+        // 좁은 폭 — 서랍(960~1279) · 접힘(<960). --surface 면 콘솔 폭 자체를 줄인다(SetWidth).
+        var wideView = _view.Width;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 1150);
         await Settle();
         Save(directory, $"{prefix}-11-dark-drawer-1150");
 
-        _window.Width = 900;
+        // 상세(서랍)를 닫은 좁은 폭 — 목록 · 툴바만 남은 모습.
+        grid.SelectedItems.Clear();
+        await Settle();
+        Save(directory, $"{prefix}-11b-dark-drawer-1150-closed");
+        grid.SelectedItem = grid.Items[0];
+
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 900);
         await Settle();
         Save(directory, $"{prefix}-12-dark-compact-900");
+
+        grid.SelectedItems.Clear();
+        await Settle();
+        Save(directory, $"{prefix}-12b-dark-compact-900-closed");
+
+        if (!double.IsNaN(wideView)) PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, wideView);
     }
 
     private async Task RunAssemblyAsync(string? directory, string theme)
@@ -498,10 +511,12 @@ public partial class App : Application
         // Job 2 회귀 확인 — 별 열("이름")이 좁은 폭에서 MinWidth(140) 를 지키는지 눈으로 본다
         // (900 = 장비 콘솔과 같은 "접힘" 경계 — 그보다 좁으면 셸 자체가 레일까지 못 그린다).
         var wideServers = _window.Width;
-        _window.Width = 900;
+        var wideServersView = view.Width;
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, view, 900);
         await Settle();
         Save(directory, $"servers-{theme}-02b-narrow-900");
-        _window.Width = wideServers;
+        if (!double.IsNaN(wideServersView)) PreviewTools.Shared.OffscreenStage.SetWidth(_window, view, wideServersView);
+        else _window.Width = wideServers;
         await Settle();
 
         preview.Select(preview.Row("방송서버-01"));       // 지표가 붙어 있는 행
@@ -563,6 +578,7 @@ public partial class App : Application
         _window.Width = 1320;
         _window.Height = 820;
         _window.Content = new Border { Margin = new Thickness(12), Child = legacyView };
+        PreviewTools.Shared.OffscreenStage.ApplySurface(Environment.GetCommandLineArgs(), legacyView, _window);
         await Settle();
         legacy.Select(legacy.Row("방송서버-01"));
         await Settle();
@@ -600,6 +616,7 @@ public partial class App : Application
             Background = (Brush)FindResource("SurfaceBrush"),
             Content = new Border { Margin = new Thickness(12), Child = view },
         };
+        PreviewTools.Shared.OffscreenStage.ApplySurface(Environment.GetCommandLineArgs(), view, _window);
         PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
         await ((IActivate)console).ActivateAsync();
 
@@ -665,13 +682,16 @@ public partial class App : Application
             await Shot($"units-{theme}-12-filtered");
             console.SelectEchelon(console.EchelonFilters.First(f => f.Echelon is null));
 
-            // 좁은 폭 — 서랍(960~1279) · 접힘(<960)
+            // 좁은 폭 — 서랍(960~1279) · 접힘(<960). --surface 면 콘솔 폭 자체를 줄인다.
             var wide = _window.Width;
-            _window.Width = 1150;
+            var unitsView = ((Border)_window.Content).Child as FrameworkElement;
+            var wideView = unitsView?.Width ?? double.NaN;
+            PreviewTools.Shared.OffscreenStage.SetWidth(_window, unitsView, 1150);
             await Shot($"units-{theme}-13-drawer-1150");
-            _window.Width = 900;
+            PreviewTools.Shared.OffscreenStage.SetWidth(_window, unitsView, 900);
             await Shot($"units-{theme}-14-compact-900");
-            _window.Width = wide;
+            if (!double.IsNaN(wideView)) PreviewTools.Shared.OffscreenStage.SetWidth(_window, unitsView, wideView);
+            else _window.Width = wide;
             await Settle();
         }
 
@@ -679,7 +699,9 @@ public partial class App : Application
 
         // 옛 계약(6.3) — 부대 편제 자체가 없는 서버. 화면이 빈 채로 까닭을 말해야 한다.
         var legacy = preview.Build(legacy: true);
-        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = legacy };
+        var legacyUnitsView = new UnitConsoleView { DataContext = legacy };
+        PreviewTools.Shared.OffscreenStage.ApplySurface(Environment.GetCommandLineArgs(), legacyUnitsView, _window);
+        ((Border)_window.Content).Child = legacyUnitsView;
         await ((IActivate)legacy).ActivateAsync();
         await Shot("units-light-10-legacy-empty");
 
@@ -687,7 +709,9 @@ public partial class App : Application
         _window.Background = (Brush)FindResource("SurfaceBrush");
         var dark = new UnitsPreview();
         var darkConsole = dark.Build();
-        ((Border)_window.Content).Child = new UnitConsoleView { DataContext = darkConsole };
+        var darkUnitsView = new UnitConsoleView { DataContext = darkConsole };
+        PreviewTools.Shared.OffscreenStage.ApplySurface(Environment.GetCommandLineArgs(), darkUnitsView, _window);
+        ((Border)_window.Content).Child = darkUnitsView;
         await ((IActivate)darkConsole).ActivateAsync();
 
         var savedPreview = preview;
@@ -755,6 +779,7 @@ public partial class App : Application
         var content = (FrameworkElement)((Border)_window.Content).Child;
         SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
         ProbeToolbar(directory, name, content);
+        PreviewTools.Shared.ClipAudit.Frame(directory, name, content);
     }
 
     /// <summary>

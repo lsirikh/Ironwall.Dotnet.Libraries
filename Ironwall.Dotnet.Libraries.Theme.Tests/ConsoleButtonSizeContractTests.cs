@@ -31,6 +31,9 @@ public class ConsoleButtonSizeContractTests
         // mah:DateTimePicker 는 pack URI 없이 못 푼다 — 파일의 마지막 Style 이라 그 앞에서 사전을 닫는다(칩 테스트와 같다).
         var start = xaml.IndexOf("<Style x:Key=\"Console.DateTimePicker\"", StringComparison.Ordinal);
         if (start >= 0) xaml = xaml[..start] + "</ResourceDictionary>";
+        // 원문은 컴파일(같은 어셈블리)용이라 theme: 네임스페이스에 어셈블리가 없다 — 느슨한 파싱은 그걸 테스트 어셈블리에서 찾는다.
+        xaml = xaml.Replace("clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes\"",
+                            "clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme\"", StringComparison.Ordinal);
         return (ResourceDictionary)XamlReader.Parse(xaml);
     }
 

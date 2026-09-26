@@ -56,6 +56,72 @@ public static class ConsoleColumns
             .Select(c => GetKey(c)!)
             .ToList();
 
+    /// <summary>
+    /// U-18 — "열" 메뉴가 없는 목록(이벤트 · 억제 등)용: 참이면 그리드가 자기를 담은 <see cref="ConsoleShell"/> 의
+    /// <see cref="ConsoleShell.EffectiveListWidth"/> 를 따라 <see cref="CollapseBelowProperty"/> 가 걸린 열만 스스로 접었다 편다.
+    /// "열" 메뉴가 있는 목록은 이것을 쓰지 않는다 — 그쪽은 <see cref="CollapsedAt"/> 를 사용자 숨김과 합쳐 <see cref="Apply"/> 로 넘긴다.
+    /// </summary>
+    /// <remarks>조상 탐색은 <c>Loaded</c> 에서 한다(템플릿 인플레이션 중에는 부모 사슬이 없다 — drag-first-ux 규칙).</remarks>
+    public static readonly DependencyProperty AutoCollapseProperty = DependencyProperty.RegisterAttached(
+        "AutoCollapse", typeof(bool), typeof(ConsoleColumns), new PropertyMetadata(false, OnAutoCollapseChanged));
+    public static bool GetAutoCollapse(DependencyObject grid) => (bool)grid.GetValue(AutoCollapseProperty);
+    public static void SetAutoCollapse(DependencyObject grid, bool value) => grid.SetValue(AutoCollapseProperty, value);
+
+    // 그리드마다 붙인 셸과 처리기 — 떼어 낼 때 필요하다.
+    private static readonly DependencyProperty AutoCollapseLinkProperty = DependencyProperty.RegisterAttached(
+        "AutoCollapseLink", typeof(Tuple<ConsoleShell, EventHandler<double>>), typeof(ConsoleColumns), new PropertyMetadata(null));
+
+    /// <summary>문턱이 걸린 열만 목록 폭 <paramref name="listWidth"/> 에 맞춰 보이거나 숨긴다(문턱 없는 열은 건드리지 않는다).</summary>
+    public static void ApplyCollapse(IEnumerable<DataGridColumn> columns, double listWidth)
+    {
+        foreach (var column in columns)
+        {
+            var below = GetCollapseBelow(column);
+            if (below <= 0) continue;
+            var visibility = ShouldCollapse(below, listWidth) ? Visibility.Collapsed : Visibility.Visible;
+            if (column.Visibility != visibility) column.Visibility = visibility;
+        }
+    }
+
+    private static void OnAutoCollapseChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not DataGrid grid) return;
+        grid.Loaded -= OnAutoCollapseLoaded;
+        grid.Unloaded -= OnAutoCollapseUnloaded;
+        Detach(grid);
+        if (e.NewValue is not true) return;
+
+        grid.Loaded += OnAutoCollapseLoaded;
+        grid.Unloaded += OnAutoCollapseUnloaded;
+        if (grid.IsLoaded) Attach(grid);
+    }
+
+    private static void OnAutoCollapseLoaded(object sender, RoutedEventArgs e) => Attach((DataGrid)sender);
+
+    private static void OnAutoCollapseUnloaded(object sender, RoutedEventArgs e) => Detach((DataGrid)sender);
+
+    private static void Attach(DataGrid grid)
+    {
+        Detach(grid);
+        ConsoleShell? shell = null;
+        for (var d = System.Windows.Media.VisualTreeHelper.GetParent(grid); d is not null && shell is null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+            shell = d as ConsoleShell;
+
+        if (shell is null) return;
+
+        EventHandler<double> handler = (_, width) => ApplyCollapse(grid.Columns, width);
+        shell.EffectiveListWidthChanged += handler;
+        grid.SetValue(AutoCollapseLinkProperty, Tuple.Create(shell, handler));
+        ApplyCollapse(grid.Columns, shell.EffectiveListWidth);
+    }
+
+    private static void Detach(DataGrid grid)
+    {
+        if (grid.GetValue(AutoCollapseLinkProperty) is not Tuple<ConsoleShell, EventHandler<double>> link) return;
+        link.Item1.EffectiveListWidthChanged -= link.Item2;
+        grid.ClearValue(AutoCollapseLinkProperty);
+    }
+
     /// <summary>한 열이 보여야 하는가 — 순수 판정.</summary>
     public static bool ShouldShow(bool isSupported, bool isDefault, bool showAll, bool isHiddenByUser)
         => isSupported && (isDefault || showAll) && !isHiddenByUser;

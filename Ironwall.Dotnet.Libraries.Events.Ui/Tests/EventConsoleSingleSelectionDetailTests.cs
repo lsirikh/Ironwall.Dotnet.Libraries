@@ -240,7 +240,13 @@ public class EventConsoleSingleSelectionDetailTests : IDisposable
                 // Selector 의 CurrentItem 동기화는 컨테이너가 실제로 만들어져야(= 레이아웃 패스를
                 // 한 번 거쳐야) 반영된다 — Window 없이 속성만 건드리면 절대 안 일어난다.
                 // 실제 뷰와 같은 조건(Window.Show)으로 세운다.
-                var window = new System.Windows.Window { Content = grid, Width = 400, Height = 300, ShowInTaskbar = false, WindowStyle = System.Windows.WindowStyle.None };
+                // U-18 — 화면 밖(-20000)에 활성화 없이 띄운다: 레이아웃 패스는 똑같이 돌고, 사용자가 일하는 화면에 창이 튀지 않으며
+                // 같은 PC 에서 돌고 있는 UI 자동화(SendInput)의 포커스를 빼앗지 않는다(tools/shared/OffscreenStage.cs 와 같은 원칙).
+                var window = new System.Windows.Window
+                {
+                    Content = grid, Width = 400, Height = 300, ShowInTaskbar = false, WindowStyle = System.Windows.WindowStyle.None,
+                    WindowStartupLocation = System.Windows.WindowStartupLocation.Manual, Left = -20000, Top = -20000, ShowActivated = false,
+                };
                 window.Show();
 
                 void Pump(System.Windows.Threading.DispatcherPriority priority)

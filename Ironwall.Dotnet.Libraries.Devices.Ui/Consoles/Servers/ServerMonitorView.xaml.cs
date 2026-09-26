@@ -65,6 +65,9 @@ public partial class ServerMonitorView : UserControl
         _viewModel = null;
     }
 
+    /// <summary>머리 ✕ — 보고서 · 조치 문구 콘솔과 같은 길(Screen.TryCloseAsync → 호스트 컨덕터).</summary>
+    private void OnClose(object sender, RoutedEventArgs e) => _ = ViewModel?.Close();
+
     private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
         // U-17 — 목록 실효 폭이 바뀔 때마다(서랍 열림 · 표면 크기) 좁은 열을 접었다 편다.
@@ -381,6 +384,23 @@ public sealed class TextToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         => string.IsNullOrWhiteSpace(value as string) ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>
+/// U-18 — 지표 띠의 칸 수. 한 칸(라벨 + 임계 배지 한 줄 · 값 17pt)이 제대로 들어가려면 약 190 이 필요하다 —
+/// 띠가 <see cref="FourColumnMinWidth"/> 보다 좁으면(서랍이 열린 1120 · 900) 4칸 대신 2칸 두 줄로 놓는다.
+/// 예전에는 늘 4칸이라 "임계 초과 · 90 초과" 배지와 "↓124.6 / ↑12.3" 값이 칸 밖으로 잘렸다(GIS 실창 · 잘림 감사).
+/// </summary>
+public sealed class MetricBandColumnsConverter : IValueConverter
+{
+    public const double FourColumnMinWidth = 760;
+
+    public static int ColumnsFor(double width) => double.IsNaN(width) || width <= 0 || width >= FourColumnMinWidth ? 4 : 2;
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => ColumnsFor(value is double width ? width : double.NaN);
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

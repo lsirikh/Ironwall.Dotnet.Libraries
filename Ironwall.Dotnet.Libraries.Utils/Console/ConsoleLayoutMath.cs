@@ -192,5 +192,69 @@ public static class ConsoleLayoutMath
                      - Clean(leftClusterWidth) - Clean(rightFixedWidth) - extraWidth;
         return budget < (showSearch ? ToolbarSearchCompactMinWidth : 0);
     }
+
+    /// <summary>
+    /// 툴바에서 [⋯] 뒤로 접을 묶음들 — <see cref="ShouldOverflowToolbarExtra"/> 를 넓힌 단계형 판정(U-18).
+    /// <para>
+    /// Extra 만 접어서는 모자랄 때가 있다(보고서 1120 서랍: 상태 칩 다섯 개가 왼쪽 묶음을 키워 [열 n/m] 이 반쯤 잘렸다 ·
+    /// 이벤트 900 접힘: 기간 칩 때문에 [⋯] 자신이 테두리 밖으로 밀렸다 — 잘림 감사 실측). Grid 의 Auto 칸은 줄지 않으므로
+    /// 줄일 수 없는 것을 옮기는 수밖에 없다. 순서는 창 고유 동작(Extra) → 필터 칩 → [열 n/m] 이다 — [추가] · [삭제] · [갱신] 은
+    /// 모든 콘솔의 기본 동작이라 옮기지 않는다.
+    /// </para>
+    /// <para>입력은 모두 <b>제자리일 때의 폭</b>(간격 포함)이다 — 접힘 상태에 따라 달라지는 실제 폭을 넣으면 진동한다.</para>
+    /// </summary>
+    /// <param name="fixedLeftWidth">[추가] · [삭제] · [갱신] 의 폭(간격 포함) — 옮기지 않는 부분.</param>
+    public static ConsoleToolbarOverflow ResolveToolbarOverflow(
+        double toolbarWidth, double fixedLeftWidth, double filtersWidth, double columnsWidth, double extraWidth, bool showSearch)
+    {
+        static double Clean(double v) => double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
+        toolbarWidth = Clean(toolbarWidth);
+        fixedLeftWidth = Clean(fixedLeftWidth);
+        filtersWidth = Clean(filtersWidth);
+        columnsWidth = Clean(columnsWidth);
+        extraWidth = Clean(extraWidth);
+        if (toolbarWidth <= 0) return ConsoleToolbarOverflow.None;      // 아직 재지 못했다
+
+        var available = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin - (showSearch ? ToolbarSearchCompactMinWidth : 0);
+
+        double Need(ConsoleToolbarOverflow moved)
+        {
+            var need = fixedLeftWidth;
+            var anyMoved = false;
+            if (moved.HasFlag(ConsoleToolbarOverflow.Filters)) anyMoved |= filtersWidth > 0; else need += filtersWidth;
+            if (moved.HasFlag(ConsoleToolbarOverflow.Columns)) anyMoved |= columnsWidth > 0; else need += columnsWidth;
+            if (moved.HasFlag(ConsoleToolbarOverflow.Extra)) anyMoved |= extraWidth > 0; else need += extraWidth;
+            return need + (anyMoved ? ToolbarOverflowButtonWidth : 0);
+        }
+
+        var result = ConsoleToolbarOverflow.None;
+        if (Need(result) <= available) return result;
+
+        if (extraWidth > 0)
+        {
+            result |= ConsoleToolbarOverflow.Extra;
+            if (Need(result) <= available) return result;
+        }
+        if (filtersWidth > 0)
+        {
+            result |= ConsoleToolbarOverflow.Filters;
+            if (Need(result) <= available) return result;
+        }
+        if (columnsWidth > 0) result |= ConsoleToolbarOverflow.Columns;
+        return result;
+    }
     #endregion
+}
+
+/// <summary>툴바에서 [⋯] 팝업으로 옮겨진 묶음(<see cref="ConsoleLayoutMath.ResolveToolbarOverflow"/>).</summary>
+[Flags]
+public enum ConsoleToolbarOverflow
+{
+    None = 0,
+    /// <summary>창 고유 동작(Extra).</summary>
+    Extra = 1,
+    /// <summary>필터 칩(Filters).</summary>
+    Filters = 2,
+    /// <summary>[열 n/m].</summary>
+    Columns = 4,
 }

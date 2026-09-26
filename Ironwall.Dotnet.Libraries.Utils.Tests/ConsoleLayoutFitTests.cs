@@ -145,5 +145,111 @@ public class ConsoleLayoutFitTests
         Assert.Equal("열 2/4", text);
         Assert.Equal(new[] { "employee" }, userHidden);   // 설정 쪽 목록은 그대로 — 넓어지면 돌아온다
     }
+
+    [Fact]
+    public void should_toggle_only_threshold_columns_when_auto_collapse_applies_a_width()
+    {
+        // Arrange — 이벤트 탐지 목록(U-18): 신호 960 · 구역 700, 장비는 문턱 없음(끝까지 남는다)
+        var signal = Column("signal", 960);
+        var zone = Column("zone", 700);
+        var device = Column("device");
+        var columns = new List<DataGridColumn> { signal, zone, device };
+
+        // Act — 도킹 1340(목록 816) → 서랍 1150(목록 606) → 다시 넓게(966)
+        ConsoleColumns.ApplyCollapse(columns, 816);
+        var at816 = (signal.Visibility, zone.Visibility);
+        ConsoleColumns.ApplyCollapse(columns, 606);
+        var at606 = (signal.Visibility, zone.Visibility);
+        ConsoleColumns.ApplyCollapse(columns, 966);
+
+        // Assert
+        Assert.Equal((System.Windows.Visibility.Collapsed, System.Windows.Visibility.Visible), at816);
+        Assert.Equal((System.Windows.Visibility.Collapsed, System.Windows.Visibility.Collapsed), at606);
+        Assert.Equal(System.Windows.Visibility.Visible, signal.Visibility);
+        Assert.Equal(System.Windows.Visibility.Visible, zone.Visibility);
+        Assert.Equal(System.Windows.Visibility.Visible, device.Visibility);
+    }
+    #endregion
+
+    #region ③ 툴바 단계형 넘침 (U-18)
+    // 보고서 콘솔 1120 + 서랍(목록 576) 잘림 감사 실측에 가까운 폭: [추가][삭제][갱신] 216 · 상태 칩 다섯 270 · [열 n/m] 81 · Extra 없음.
+    private const double FixedLeft = 216, Chips = 270;
+
+    [Fact]
+    public void should_keep_everything_inline_when_the_toolbar_has_room()
+    {
+        // Act — 목록 936(서랍 닫힘): 216 + 270 + 81 + 검색 아이콘 32 + 여백 36 = 635 ≤ 936
+        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(936, FixedLeft, Chips, Columns, 0, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, overflow);
+    }
+
+    [Fact]
+    public void should_fold_the_filter_chips_when_there_is_no_extra_and_the_columns_button_would_be_cut()
+    {
+        // Arrange — 서랍이 열린 576: 칩까지 두면 [열 4/11] 이 반쯤 잘렸다(잘림 감사). Extra 가 없으니 칩이 첫 번째로 접힌다.
+
+        // Act
+        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(576, FixedLeft, Chips, Columns, 0, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.Filters, overflow);
+    }
+
+    [Fact]
+    public void should_fold_extra_first_and_filters_only_when_extra_alone_is_not_enough()
+    {
+        // Arrange — Extra 130(창 고유 동작 한 개)
+        const double extra = 130;
+        var extraOnlyWidth = 24 + 12 + 32 + FixedLeft + Chips + Columns + ConsoleLayoutMath.ToolbarOverflowButtonWidth;   // Extra 만 옮기면 딱 맞는 폭
+
+        // Act
+        var enough = ConsoleLayoutMath.ResolveToolbarOverflow(extraOnlyWidth, FixedLeft, Chips, Columns, extra, showSearch: true);
+        var tooNarrow = ConsoleLayoutMath.ResolveToolbarOverflow(extraOnlyWidth - 1, FixedLeft, Chips, Columns, extra, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.Extra, enough);
+        Assert.Equal(ConsoleToolbarOverflow.Extra | ConsoleToolbarOverflow.Filters, tooNarrow);
+    }
+
+    [Fact]
+    public void should_fold_the_columns_button_last_so_the_more_button_itself_is_never_cut()
+    {
+        // Arrange — 극단적으로 좁은 툴바(300): 칩 · Extra 를 다 옮겨도 [열] + [⋯] 가 안 들어간다(이벤트 900 접힘에서 [⋯] 자신이 잘렸다)
+
+        // Act
+        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(300, FixedLeft, Chips, Columns, 130, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.Extra | ConsoleToolbarOverflow.Filters | ConsoleToolbarOverflow.Columns, overflow);
+    }
+
+    [Fact]
+    public void should_agree_with_the_extra_only_rule_when_there_are_no_filters()
+    {
+        // Arrange — U-17 판정(ShouldOverflowToolbarExtra)과 같은 입력이면 같은 답이어야 한다(장비 콘솔 실측 폭).
+        foreach (var width in new double[] { 696, 756, 800, 1000 })
+        {
+            // Act
+            var staged = ConsoleLayoutMath.ResolveToolbarOverflow(width, Left, 0, Columns, Extra, showSearch: true);
+            var legacy = ConsoleLayoutMath.ShouldOverflowToolbarExtra(width, Left, Columns, Extra, showSearch: true);
+
+            // Assert
+            Assert.Equal(legacy, staged.HasFlag(ConsoleToolbarOverflow.Extra));
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(double.NaN)]
+    public void should_not_fold_anything_before_the_toolbar_is_measured(double toolbarWidth)
+    {
+        // Act
+        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(toolbarWidth, FixedLeft, Chips, Columns, 130, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, overflow);
+    }
     #endregion
 }

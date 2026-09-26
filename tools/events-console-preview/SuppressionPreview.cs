@@ -194,8 +194,11 @@ internal static class SuppressionShots
     public static async Task RunAsync(EventDashboardViewModel model,
                                       Window window,
                                       Func<string, Task> save,
-                                      Func<int, Task> settle)
+                                      Func<int, Task> settle,
+                                      Action<double?>? setWidth = null)
     {
+        // --surface 면 창 폭이 아니라 콘솔 폭을 줄여야 좁은 폭이 된다 — 호출부가 그 방법을 준다(null = 원래 폭).
+        setWidth ??= width => window.Width = width ?? 1360;
         var console = model.Suppression!;
         var drawer = console.Drawer;
 
@@ -290,17 +293,22 @@ internal static class SuppressionShots
         await save("11-drawer-edit-locked");
 
         // 12) 좁은 폭 — 서랍이 창을 따라 줄어든다(min(780, 창폭 − 24))
-        window.Width = 900;
+        setWidth(900);
         await settle(420);
         await save("12-drawer-narrow-900");
 
-        window.Width = 1150;
+        setWidth(1150);
         await settle(420);
         await save("13-drawer-narrow-1150");
 
         drawer.Revert();
         drawer.Close();
-        window.Width = 1360;
+        await settle(320);
+        await save("13b-list-narrow-1150-closed");
+        setWidth(900);
+        await settle(420);
+        await save("13c-list-narrow-900-closed");
+        setWidth(null);
         await settle(320);
 
         // 14) 취소 · 종료 행을 고른 상태 — [선택 삭제] · [모두 정리] 가 켜진다
