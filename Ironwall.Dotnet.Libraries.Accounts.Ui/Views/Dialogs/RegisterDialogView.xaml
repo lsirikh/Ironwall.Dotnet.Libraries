@@ -188,6 +188,7 @@
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Accounts.Register.NameInput"
 							md:HintAssist.Hint="성명"
 							md:ValidationAssist.HorizontalAlignment="Left"
 							Style="{StaticResource TextBoxInput}">

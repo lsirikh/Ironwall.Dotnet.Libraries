@@ -95,7 +95,7 @@
 					<TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
 
 					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="잠금까지 비밀번호 오류 횟수 (0=잠그지 않음, 3~20)" />
-					<TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
+					<TextBox Grid.Row="4" Grid.Column="1" AutomationProperties.AutomationId="Console.Accounts.SessionSetup.LockoutThreshold" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
 
 					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="잠금 자동 해제 — 분 (0=직접 풀 때까지, 1~1440)" />
 					<TextBox Grid.Row="6" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
