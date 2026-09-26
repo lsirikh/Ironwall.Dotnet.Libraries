@@ -934,15 +934,21 @@
 						</Trigger>
 						<Trigger Property="TagKind" Value="Observed">
 							<Setter TargetName="TagHost" Property="Visibility" Value="Visible" />
-							<Setter TargetName="TagLabel" Property="Text" Value="관측 · 읽기 전용" />
+							<!--  운영자 말(원장 D-2026-09-26-648420): '관측' 은 개발 용어 — 뜻만 남긴다.  -->
+							<Setter TargetName="TagLabel" Property="Text" Value="읽기 전용" />
 						</Trigger>
-						<Trigger Property="TagKind" Value="Intent">
+						<!--  '의도 · 쓰기 가능' 은 계약 대조용 — 운영 화면에서는 쓰기가 기본이라 꼬리표가 소음이다. API 이름을 켤 때만 보인다.  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="TagKind" Value="Intent" />
+								<Condition Property="c:ConsoleField.ShowApiNames" Value="True" />
+							</MultiTrigger.Conditions>
 							<Setter TargetName="TagHost" Property="Visibility" Value="Visible" />
 							<Setter TargetName="TagHost" Property="Background" Value="{DynamicResource TintInfoBrush}" />
 							<Setter TargetName="TagLabel" Property="Text" Value="의도 · 쓰기 가능" />
 							<Setter TargetName="TagLabel" Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
 							<Setter TargetName="TagLabel" Property="FontWeight" Value="SemiBold" />
-						</Trigger>
+						</MultiTrigger>
 						<Trigger Property="TagKind" Value="Custom">
 							<Setter TargetName="TagHost" Property="Visibility" Value="Visible" />
 						</Trigger>

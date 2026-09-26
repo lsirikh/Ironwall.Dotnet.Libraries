@@ -72,7 +72,8 @@ public static class ServerRailCounter
 
         var all = counts.FirstOrDefault(c => string.Equals(c.Key, ServerTypeCatalog.AllKey, StringComparison.Ordinal))
                   ?? new ServerRailCount(ServerTypeCatalog.AllKey, 0, 0, 0);
-        return $"전체 {all.Total}대 / 장애 {all.Fault}대 / 보고 없음 {all.NotReported}대";
+        // 두 줄 — 레일 184 에서 한 줄이면 한글이 음절 사이에서 끊겼다("보 / 고 없음", 2026-09-27 실창).
+        return $"전체 {all.Total}대 · 장애 {all.Fault}대\n보고 없음 {all.NotReported}대";
     }
 
     private static void Add(IDictionary<string, (int Total, int Fault, int NotReported)> map, string key, int fault, int silent)

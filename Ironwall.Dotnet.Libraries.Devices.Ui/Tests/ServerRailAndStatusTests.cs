@@ -148,7 +148,7 @@ public class ServerRailCounterTests
             new RailItem(ServerTypeCatalog.NvrKey, ServerStatusKind.NotReported),
         });
 
-        Assert.Equal("전체 2대 / 장애 1대 / 보고 없음 1대", ServerRailCounter.FooterText(counts));
+        Assert.Equal("전체 2대 · 장애 1대\n보고 없음 1대", ServerRailCounter.FooterText(counts));
     }
 
     [Fact]

@@ -428,8 +428,11 @@
 							AutomationProperties.AutomationId="Console.Servers.Assign.Tray"
 							Background="Transparent"
 							BorderThickness="0"
+							MaxHeight="96"
 							ItemsSource="{Binding AssignCandidates}"
 							Loaded="OnTrayLoaded"
+							ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+							ScrollViewer.VerticalScrollBarVisibility="Auto"
 							SelectionMode="Extended">
 							<ListBox.ItemContainerStyle>
 								<Style TargetType="ListBoxItem">
