@@ -65,7 +65,7 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
         "cancelled" => "취소",
         _ => Status,
     };
-    /// <summary>대상 요약(예: "장비 3 · FN-0312 외 2" / "그룹 2 · A·B" / "전체(both)").</summary>
+    /// <summary>대상 요약(예: "장비 3 · FN-0312 외 2" / "그룹 2 · A·B" / "전체 · 감지+감시").</summary>
     public string TargetSummary { get; }
     /// <summary>억제 범위 한글 표기.</summary>
     public string ScopeText { get; }
@@ -119,8 +119,9 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
         "connection" => "연결",
         "detection" => "탐지",
         "malfunction" => "장애",
+        "operation" => "운영",
         "all" => "전체",
-        _ => scope,
+        _ => "알 수 없음",
     };
 
     /// <summary>
@@ -183,7 +184,8 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
             case "device":
             {
                 var ids = dto.TargetDeviceIds ?? new();
-                if (ids.Count == 0) return "장비 0";
+                // "장비 0" 은 개수 버그처럼 읽힌다 — 비었다는 사실을 말로 쓴다.
+                if (ids.Count == 0) return NoTargetsText;
                 var first = dp?.CollectionEntity.FirstOrDefault(x => x.Id == ids[0])?.DeviceName
                             ?? $"#{ids[0]}";
                 return ids.Count > 1 ? $"장비 {ids.Count} · {first} 외 {ids.Count - 1}"
@@ -192,13 +194,18 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
             case "group":
             {
                 var ids = dto.TargetGroupIds ?? new();
-                if (ids.Count == 0) return "그룹 0";
+                if (ids.Count == 0) return NoTargetsText;
                 var names = ids.Select(id => gp?.CollectionEntity.FirstOrDefault(x => x.Id == id)?.Name ?? $"#{id}");
                 return $"그룹 {ids.Count} · {string.Join("·", names.Take(2))}{(ids.Count > 2 ? " 외 " + (ids.Count - 2) : string.Empty)}";
             }
             default:
-                return $"전체({dto.TargetSide})";
+                // 서버 원값(both/detection/surveillance)을 그대로 찍지 않는다 — 표시 사전은 SideLabel 하나다.
+                var side = global::Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression.SuppressionRequestBuilder.SideLabel(dto.TargetSide);
+                return $"전체 · {side}";
         }
     }
+
+    /// <summary>개별 대상 스케줄인데 담긴 대상이 없을 때의 표기.</summary>
+    public const string NoTargetsText = "대상 없음";
     #endregion
 }

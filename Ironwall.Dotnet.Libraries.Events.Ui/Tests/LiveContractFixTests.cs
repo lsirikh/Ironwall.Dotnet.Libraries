@@ -368,8 +368,18 @@ public class EventDetailCarryTests : IoCStubbedTestBase   // 행 뷰모델은 �
             "{\"id\":6,\"type_event\":\"Intrusion\",\"result\":\"PIR_SENSOR\",\"device\":null,\"device_description\":\"[sensor:PIR] 북측 1 (number: 3, id: 9)\"}")!;
         var row = new DetectionEventViewModel(dto.ToDetectionEventModel(null));
 
-        Assert.Equal(EventDeviceSnapshot.DeletedPrefix + "[sensor:PIR] 북측 1 (number: 3, id: 9)", row.DeviceLabel);
+        // 목록 · 제목은 짧게(종류 코드 · 번호 없이), 원문은 툴팁으로 남는다(완성도 감사 E-4 #3).
+        Assert.Equal("삭제된 장비 (북측 1)", row.DeviceLabel);
+        Assert.Equal(EventDeviceSnapshot.DeletedPrefix + "[sensor:PIR] 북측 1 (number: 3, id: 9)", row.DeviceSnapshotText);
     }
+
+    [Theory]
+    [InlineData("[sensor:PIR] 북측 1 (number: 3, id: 9)", "북측 1")]
+    [InlineData("정문 카메라", "정문 카메라")]
+    [InlineData("[camera:PTZ] 남문 돔", "남문 돔")]
+    [InlineData("(id: 9)", "(id: 9)")]
+    public void should_strip_kind_tag_and_trailing_numbers_when_shortening_snapshot(string snapshot, string expected)
+        => Assert.Equal(expected, EventDeviceSnapshot.ShortName(snapshot));
 }
 #endregion
 

@@ -104,7 +104,7 @@
 							FontSize="15"
 							Foreground="{DynamicResource AccentBrush}"
 							Opacity="0.80"
-							Text="{Binding ViewModelProvider.Count, FallbackValue=1000}" />
+							Text="{Binding ViewModelProvider.Count, FallbackValue=0}" />
 					</StackPanel>
 				</Grid>
 			</Border>

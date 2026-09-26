@@ -71,6 +71,26 @@ public class ActionEventViewModel : BaseEventViewModel<IActionEventModel>, IActi
     /// <summary>원본이 탐지 이벤트인가.</summary>
     public bool IsDetectionOrigin => _model.OriginEvent is IDetectionEventModel;
 
+    /// <summary>
+    /// 원본 열의 글자 — "탐지 · 607" / "장애 · 31". 번호만 보이면 탐지와 장애의 번호가 겹쳐 무엇의 조치인지 모른다
+    /// (정본 SB L2422, 완성도 감사 E-4 #4). 원본을 모르면 "—".
+    /// </summary>
+    public string OriginLabel => _model.OriginEvent switch
+    {
+        null => "—",
+        IDetectionEventModel d => $"탐지 · {d.Id}",
+        IMalfunctionEventModel m => $"장애 · {m.Id}",
+        var other => $"이벤트 · {other.Id}",
+    };
+
+    /// <summary>행 한 줄 요약 — 화면 읽기 프로그램용("2026-09-27 00:57:10 · 탐지 · 607 · 오경보").</summary>
+    public string RowSummary => $"{DateTime:yyyy-MM-dd HH:mm:ss} · {OriginLabel} · {Content}";
+
+    /// <summary>원본 장비 이름 — 지워진 장비면 스냅샷 이름으로 짧게.</summary>
+    public string OriginDeviceLabel => _model.OriginEvent is { } origin
+        ? EventDeviceSnapshot.ShortLabel(origin.Device, origin) ?? "—"
+        : "—";
+
     /// <summary>원본 탐지의 썸네일 절대 URI(host를 API base로 rebase). 장애/부재면 null.</summary>
     public Uri? OriginThumbnailUri => ThumbnailUriResolver.Resolve((_model.OriginEvent as IDetectionEventModel)?.Thumbnail);
 

@@ -30,7 +30,7 @@
 				<TextBlock
 					Margin="5,0"
 					VerticalAlignment="Center"
-					Text="장애보고 속성" />
+					Text="장애 속성" />
 			</StackPanel>
 		</GroupBox.Header>
 

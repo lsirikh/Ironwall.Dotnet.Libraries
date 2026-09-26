@@ -99,7 +99,7 @@ public static class MappingWarnings
             .SelectMany(board.LiveRows)
             .Count(r => !r.IsEnable);
         if (disabled > 0)
-            list.Add(new(MappingWarningLevel.Info, $"사용 안 함으로 둔 배선이 {disabled}건 있습니다."));
+            list.Add(new(MappingWarningLevel.Info, $"사용 안 함으로 둔 연동이 {disabled}건 있습니다."));
 
         // ⑦ 감시금지구역 프리셋.
         var restricted = board.LiveRows(MappingActionKind.Camera).Count(r => r.TargetPresetRestricted);

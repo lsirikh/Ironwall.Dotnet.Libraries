@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -200,11 +201,11 @@ public class ActionSelectionViewModel : BasePanelViewModel
     public string OriginDateTimeText => OriginEvent is { } e ? e.DateTime.ToString("yyyy-MM-dd HH:mm:ss") : "—";
 
     /// <summary>탐지 origin 결과(Result). 장애/부재면 "—".</summary>
-    public string OriginResultText => (OriginEvent as IDetectionEventModel)?.Result.ToString() ?? "—";
+    public string OriginResultText => OriginEvent is IDetectionEventModel detection ? EnumKoreanMap.To(detection.Result) : "—";
     /// <summary>탐지 origin 신호(signal). 0/부재/장애면 "—".</summary>
     public string OriginSignalText => (OriginEvent as IDetectionEventModel)?.Signal is int s and > 0 ? s.ToString("N0") : "—";
     /// <summary>장애 origin 사유(Reason). 탐지/부재면 "—".</summary>
-    public string OriginReasonText => (OriginEvent as IMalfunctionEventModel)?.Reason.ToString() ?? "—";
+    public string OriginReasonText => OriginEvent is IMalfunctionEventModel malfunction ? EnumKoreanMap.To(malfunction.Reason) : "—";
 
     // 썸네일: origin=탐지만. 장애=null → Default. host-rebase 리졸버 + OnLoad 캐시 재사용.
     public Uri? OriginThumbnailUri => ThumbnailUriResolver.Resolve((OriginEvent as IDetectionEventModel)?.Thumbnail);

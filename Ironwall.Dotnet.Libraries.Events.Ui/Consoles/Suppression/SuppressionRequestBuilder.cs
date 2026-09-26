@@ -127,7 +127,7 @@ public static class SuppressionRequestBuilder
                 return Sentence("그룹", ids.Count, ids.Take(nameLimit).Select(id => resolveGroup?.Invoke(id) ?? $"#{id}"));
             }
             default:
-                return $"전체 대상 · {SideLabel(saved.TargetSide)} 에 억제 창을 적용했습니다.";
+                return $"전체 대상 · {SideLabel(saved.TargetSide)}에 억제 스케줄을 적용했습니다.";
         }
 
         static string Sentence(string kind, int total, IEnumerable<string> sample)
@@ -136,7 +136,7 @@ public static class SuppressionRequestBuilder
             if (total == 0) return $"대상 {kind}이(가) 없습니다.";
             var rest = total - names.Count;
             var subject = rest > 0 ? $"{string.Join(", ", names)} 외 {rest}개 {kind}" : $"{string.Join(", ", names)}({kind} {total}개)";
-            return $"{subject}에 억제 창을 적용했습니다.";
+            return $"{subject}에 억제 스케줄을 적용했습니다.";
         }
     }
 
@@ -166,8 +166,12 @@ public static class SuppressionRequestBuilder
         "operation" => "운영",
         "all" => "전체",
         null => "전체",
-        _ => scope,            // 모르는 값은 지어내지 않고 원값을 보인다
+        // 모르는 값은 지어내지 않되, 서버 원문을 운영자 화면에 찍지도 않는다 — 원문은 툴팁(ScopeToolTip)이 보인다.
+        _ => UnknownLabel,
     };
+
+    /// <summary>표시 사전에 없는 값의 표기.</summary>
+    public const string UnknownLabel = "알 수 없음";
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

@@ -146,7 +146,7 @@
 								VerticalAlignment="Center"
 								FontSize="12"
 								Foreground="{DynamicResource TextMutedBrush}"
-								Text="같은 창 안 서랍 · 저장할 때 한 번만 보냅니다"
+								Text="저장 전까지는 적용되지 않습니다"
 								TextTrimming="CharacterEllipsis" />
 						</StackPanel>
 						<Button
@@ -295,6 +295,11 @@
 									<ColumnDefinition Width="Auto" />
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
+								<!--
+									LostFocus 는 일부러 둔다(E-8 #7 검토) — VM setter 가 읽히는 순간 "yyyy-MM-dd HH:mm" 으로 고쳐 쓴다.
+									PropertyChanged(+Delay) 로 바꾸면 "2026-09-2" 를 치다 멈춘 순간 2026-09-02 00:00 으로 바뀌어
+									입력 중인 글자를 빼앗는다. 요약 줄은 칸을 떠날 때(Tab · 다른 칸 클릭) 따라온다.
+								-->
 								<TextBox
 									Height="32"
 									md:HintAssist.Hint="YYYY-MM-DD HH:MM"
@@ -659,7 +664,7 @@
 										FontSize="12"
 										Foreground="{DynamicResource TextMutedBrush}"
 										IsHitTestVisible="False"
-										Text="아래 목록에서 손잡이를 끌어 놓거나, 고른 뒤 [추가 ▶] 를 누르세요"
+										Text="아래 목록에서 손잡이를 끌어 놓거나, 고른 뒤 [추가 ▶]를 누르세요"
 										TextWrapping="Wrap"
 										Visibility="{Binding IsTrayEmpty, Converter={StaticResource BoolToVis}}" />
 								</Grid>
@@ -672,7 +677,7 @@
 								FontSize="12"
 								Foreground="{DynamicResource TextMutedBrush}"
 								AutomationProperties.AutomationId="Console.Suppression.Tray.AllTargetNotice"
-								Text="전체 대상 스케줄입니다 — 개별 장비 · 그룹을 담지 않습니다."
+								Text="전체 대상 스케줄에는 개별 장비나 그룹을 담지 않습니다."
 								TextWrapping="Wrap"
 								Visibility="{Binding AcceptsTargets, Converter={StaticResource NotBoolToVis}}" />
 
@@ -704,7 +709,7 @@
 										Content="추가 ▶"
 										DockPanel.Dock="Right"
 										Style="{StaticResource Console.Button}"
-										ToolTip="고른 대상을 트레이에 담습니다 — 끌어 놓는 것과 같은 일입니다 (Enter)" />
+										ToolTip="고른 대상을 위 대상 칸에 담습니다 (Enter)" />
 									<TextBox
 										Height="28"
 										Margin="8,0,0,0"
@@ -742,7 +747,7 @@
 													Margin="0,0,6,0"
 													AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.PickerHandle.{0}}"
 													DockPanel.Dock="Left"
-													ToolTip="끌어서 위 대상 트레이에 담기" />
+													ToolTip="끌어서 위 대상 칸에 담기" />
 												<TextBlock
 													VerticalAlignment="Center"
 													DockPanel.Dock="Left"
@@ -802,7 +807,7 @@
 								Content="되돌리기"
 								IsEnabled="{Binding CanRevert}"
 								Style="{StaticResource Console.Button.Ghost}"
-								ToolTip="연 시점으로 되돌립니다 — 서버 호출 0" />
+								ToolTip="처음 상태로 되돌립니다" />
 							<Button
 								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Suppression.Drawer.Cancel"
@@ -815,7 +820,7 @@
 								Content="저장"
 								IsEnabled="{Binding CanSave}"
 								Style="{StaticResource Console.Button.Primary}"
-								ToolTip="서버를 한 번 부릅니다 — 대상이 몇 개든 요청은 하나입니다" />
+								ToolTip="저장합니다" />
 						</StackPanel>
 					</Grid>
 				</Border>

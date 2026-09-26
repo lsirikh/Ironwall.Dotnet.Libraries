@@ -49,4 +49,37 @@ public static class EventDeviceSnapshot
         var snapshot = Of(model);
         return snapshot is null ? null : DeletedPrefix + snapshot;
     }
+
+    /// <summary>
+    /// 목록 · 상세 제목에 쓰는 짧은 이름 — 장비가 살아 있으면 그 이름, 지워졌으면 "삭제된 장비 (이름)".
+    /// </summary>
+    /// <remarks>
+    /// 스냅샷 원문("[sensor:PIR] 북측 1 (number: 3, id: 9)")을 그대로 목록에 찍으면 운영자가 모르는 종류 코드 · 번호가 보이고
+    /// 열이 넘친다(완성도 감사 E-4 #3). 앞의 [종류] 꼬리표와 뒤의 (…) 괄호만 걷어 사람이 읽는 이름을 남긴다 —
+    /// 값을 해석해 쓰지는 않는다(서버 규범: 파싱해 쓰지 않는다). 원문은 <see cref="Label"/> 로 툴팁에 남는다.
+    /// 걷고 나서 비면 원문 전체를 쓴다.
+    /// </remarks>
+    public static string? ShortLabel(IBaseDeviceModel? device, object? model)
+    {
+        if (!string.IsNullOrWhiteSpace(device?.DeviceName)) return device!.DeviceName;
+        var snapshot = Of(model);
+        return snapshot is null ? null : $"삭제된 장비 ({ShortName(snapshot)})";
+    }
+
+    /// <summary>스냅샷에서 사람이 읽는 이름만 — 앞의 [..] 과 뒤의 (..) 를 걷는다.</summary>
+    public static string ShortName(string snapshot)
+    {
+        var text = snapshot?.Trim() ?? string.Empty;
+        if (text.StartsWith('['))
+        {
+            var close = text.IndexOf(']');
+            if (close > 0) text = text[(close + 1)..].TrimStart();
+        }
+        if (text.EndsWith(')'))
+        {
+            var open = text.LastIndexOf('(');
+            if (open > 0) text = text[..open].TrimEnd();
+        }
+        return text.Length > 0 ? text : snapshot?.Trim() ?? string.Empty;
+    }
 }

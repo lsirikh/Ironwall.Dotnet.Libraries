@@ -433,8 +433,8 @@ public class SuppressionRequestBuilderTests
         => Assert.False(SuppressionRequestBuilder.IsKnownScope("something_new"));
 
     [Fact]
-    public void should_show_an_unknown_scope_as_its_raw_value()
-        => Assert.Equal("something_new", SuppressionRequestBuilder.ScopeLabel("something_new"));
+    public void should_show_unknown_instead_of_the_raw_value_when_the_scope_is_new()
+        => Assert.Equal(SuppressionRequestBuilder.UnknownLabel, SuppressionRequestBuilder.ScopeLabel("something_new"));
 
     [Fact]
     public void should_carry_an_operation_scope_through_a_patch()

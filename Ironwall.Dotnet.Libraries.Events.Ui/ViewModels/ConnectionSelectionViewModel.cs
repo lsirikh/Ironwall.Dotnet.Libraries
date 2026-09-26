@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -144,7 +145,7 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
     // ── 장비 필수정보 읽기 전용 표시 — 연결 이벤트는 서버 관측값(device_id 불변, PUT=type_event만).
     //    탐지/장애 SelectionView와 동일한 구역/종류/장비/번호만 노출(Type·상태·시각 불필요). ──
     public string DeviceNameText   => Device?.DeviceName is string n && n.Length > 0 ? n : "—";
-    public string DeviceTypeText   => Device != null ? Device.DeviceType.ToString() : "—";
+    public string DeviceTypeText   => Device != null ? EnumKoreanMap.To(Device.DeviceType) : "—";
     public string DeviceNumberText => Device is { } d ? d.DeviceNumber.ToString() : "—";
 
     /// <summary>장비 소속 구역(그룹) 이름 — DeviceGroups(Id)→DeviceGroupProvider 변환(DetectionSelection 패턴 미러).</summary>

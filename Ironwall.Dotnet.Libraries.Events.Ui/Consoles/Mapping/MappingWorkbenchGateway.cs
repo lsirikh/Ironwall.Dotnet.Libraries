@@ -37,7 +37,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
     private const int MAX_PAGES = 200;      // 2만 건. 이보다 많으면 경고하고 멈춘다(무한 루프 금지)
 
     /// <summary>이 화면이 읽고 쓰는 연동 계약이 없는 판본에서 쓰는 거절 문구.</summary>
-    public const string ContractRefusal = "이 서버 판본에는 이벤트 맵핑 연동 계약이 없습니다.";
+    public const string ContractRefusal = "이 서버에서는 이벤트 맵핑을 지원하지 않습니다.";
 
     private readonly IApiService _api;
     private readonly ApiSetupModel _setup;
@@ -121,7 +121,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
 
         var dto = ReadOne<EventMappingReadDto>(result.Value);
         return dto is null
-            ? MappingCallResult<EventMappingReadDto>.Fail("맵핑을 만들었지만 응답을 읽지 못했습니다. 목록을 새로 고치십시오.", "data was empty", result.StatusCode)
+            ? MappingCallResult<EventMappingReadDto>.Fail("맵핑을 만들었지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.", "data was empty", result.StatusCode)
             : MappingCallResult<EventMappingReadDto>.Ok(dto, result.StatusCode);
     }
 
@@ -136,7 +136,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
 
         var dto = ReadOne<EventMappingReadDto>(result.Value);
         return dto is null
-            ? MappingCallResult<EventMappingReadDto>.Fail("저장했지만 응답을 읽지 못했습니다. 목록을 새로 고치십시오.", "data was empty", result.StatusCode)
+            ? MappingCallResult<EventMappingReadDto>.Fail("저장했지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.", "data was empty", result.StatusCode)
             : MappingCallResult<EventMappingReadDto>.Ok(dto, result.StatusCode);
     }
     #endregion
@@ -159,7 +159,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
         if (!IsSupported) return Refuse<IReadOnlyList<T>>();
         var label = MappingKindText.Label(kind);
         var url = $"{Root}/{mappingId}/{MappingKindText.Segment(kind)}";
-        var result = await SendAsync(() => _api.GetRequestAsync(url), $"{label} 배선을 불러오지 못했습니다.").ConfigureAwait(false);
+        var result = await SendAsync(() => _api.GetRequestAsync(url), $"{label} 연동 목록을 불러오지 못했습니다.").ConfigureAwait(false);
         if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<T>>.Fail(result.Message, result.RawError, result.StatusCode);
         // 주의: IApiService 에 토큰 오버로드가 없어 요청 자체는 취소되지 않는다 — 늦게 온 결과를 버릴 뿐이다.
         if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<T>>.Fail("취소되었습니다.", "cancelled", 0);
@@ -194,7 +194,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
         int mappingId, MappingActionKind kind, IReadOnlyList<int> configIds, CancellationToken token = default)
     {
         if (!IsSupported) return Refuse<MappingBulkUnassignResultDto>();
-        if (configIds.Count == 0) return MappingCallResult<MappingBulkUnassignResultDto>.Fail("해제할 배선이 없습니다.");
+        if (configIds.Count == 0) return MappingCallResult<MappingBulkUnassignResultDto>.Fail("해제할 항목이 없습니다.");
         if (configIds.Count > EventMappingRules.CHUNK_SIZE)
             return MappingCallResult<MappingBulkUnassignResultDto>.Fail($"한 번에 {EventMappingRules.CHUNK_SIZE}건까지만 해제할 수 있습니다.");
 
@@ -218,7 +218,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
         if (!IsSupported) return Refuse<bool>();
         var label = MappingKindText.Label(kind);
         var url = $"{Root}/{mappingId}/{MappingKindText.Segment(kind)}/{configId}";
-        var result = await SendAsync(() => _api.PatchRequestAsync(url, body), $"{label} 배선을 저장하지 못했습니다.").ConfigureAwait(false);
+        var result = await SendAsync(() => _api.PatchRequestAsync(url, body), $"{label} 연동 설정을 저장하지 못했습니다.").ConfigureAwait(false);
         return result.IsSuccess
             ? MappingCallResult<bool>.Ok(true, result.StatusCode)
             : MappingCallResult<bool>.Fail(result.Message, result.RawError, result.StatusCode);
@@ -265,12 +265,12 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
 
     private static string Explain(int status, string fallback) => status switch
     {
-        401 => "로그인이 만료되었습니다. 변경한 내용은 그대로 있습니다 — 다시 로그인한 뒤 [적용]하십시오.",
+        401 => "로그인이 만료되었습니다. 변경한 내용은 그대로 있습니다. 다시 로그인한 뒤 [적용]을 누르세요.",
         403 => "이 작업을 할 권한이 없습니다.",
-        404 => "서버에서 찾을 수 없습니다. 목록을 새로 고치십시오.",
+        404 => "서버에서 찾을 수 없습니다. 목록을 새로 고치세요.",
         409 => "이미 등록되어 있습니다.",
-        422 => fallback + " 입력값을 확인하십시오.",
-        >= 500 => "서버가 응답하지 못했습니다. 잠시 뒤 다시 시도하십시오.",
+        422 => fallback + " 입력값을 확인하세요.",
+        >= 500 => "서버가 응답하지 못했습니다. 잠시 뒤 다시 시도하세요.",
         _ => fallback,
     };
 

@@ -484,7 +484,7 @@ public class SuppressionDrawerViewModelTests
         Assert.True(slow.IsSaving);
 
         await slow.SaveAsync();                       // 두 번째 누름
-        Assert.Contains("보내는 중", slow.StatusLine);
+        Assert.Contains("저장하는 중", slow.StatusLine);
         Assert.DoesNotContain("바뀐 것이 없습니다", slow.StatusLine);
 
         gate.SetResult(new SuppressionSaveOutcome(true, "저장했습니다.", null));
@@ -518,7 +518,8 @@ public class SuppressionDrawerViewModelTests
         await _drawer.SaveAsync();
 
         Assert.Empty(_saved);
-        Assert.Contains("모르는 억제 범위", _drawer.StatusLine);
+        Assert.Contains("지원하지 않는 억제 범위", _drawer.StatusLine);
+        Assert.DoesNotContain("something_new", _drawer.StatusLine);      // 서버 원문은 화면에 싣지 않는다
     }
 
     [Fact]

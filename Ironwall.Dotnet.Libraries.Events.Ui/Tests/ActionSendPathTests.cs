@@ -27,6 +27,7 @@ public class ActionSendPathTests : IDisposable
     private readonly Mock<IEventApiService> _api = new(MockBehavior.Loose) { DefaultValue = DefaultValue.Empty };
     private readonly ActionReportGuard _guard = new();
     private bool _serverAccepts = true;
+    private int _refusalStatus = 500;
 
     public ActionSendPathTests()
     {
@@ -36,7 +37,7 @@ public class ActionSendPathTests : IDisposable
                 _sent.Add(dto);
                 return Task.FromResult(_serverAccepts
                     ? new ApiResponse<ActionEventDto> { Success = true, Data = new ActionEventDto { Id = 9000 + _sent.Count } }
-                    : new ApiResponse<ActionEventDto> { Success = false, Message = "서버가 거절했습니다" });
+                    : new ApiResponse<ActionEventDto> { Success = false, StatusCode = _refusalStatus, Message = "value_error.missing: body.content" });
             });
 
         var account = new Mock<IAccountModel>();
@@ -92,7 +93,25 @@ public class ActionSendPathTests : IDisposable
         var result = await DetectionCard(42).SendActionDetailed("순찰 인원 출동", "user");
 
         Assert.Equal(ActionSendOutcome.Failed, result.Outcome);
-        Assert.Contains("거절", result.Reason);
+        Assert.Contains("받지 않았습니다", result.Reason);
+    }
+
+    [Theory]
+    [InlineData(403, "권한")]
+    [InlineData(422, "내용을 확인")]
+    [InlineData(404, "원본 이벤트")]
+    public async Task should_show_a_fixed_korean_reason_instead_of_the_server_text_when_the_server_refuses(int status, string expected)
+    {
+        // 서버 원문은 영어 · 필드명일 수 있다 — 화면(트레이 줄 · 조치보고 창)에는 할 일을 말하는 고정 문장만(완성도 수정 패스).
+        _serverAccepts = false;
+        _refusalStatus = status;
+
+        var result = await MalfunctionCard(44).SendActionDetailed("현장 확인", "user");
+
+        Assert.Equal(ActionSendOutcome.Failed, result.Outcome);
+        Assert.Contains(expected, result.Reason);
+        Assert.DoesNotContain("value_error", result.Reason);
+        Assert.DoesNotContain("body.content", result.Reason);
     }
 
     [Fact]

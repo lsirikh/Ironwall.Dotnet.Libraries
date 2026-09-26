@@ -260,7 +260,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    saveFailures.Add($"수정(Id={model.Id}): {ex.Message}");
+                    saveFailures.Add($"{model.Id}번 수정");   // 예외 원문은 아래 로그로만
                     _log?.Error($"UpdateMalfunctionEventAsync 실패 Id={model.Id}: {ex.Message}");
                 }
             }
@@ -272,7 +272,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    saveFailures.Add($"추가: {ex.Message}");
+                    saveFailures.Add("새 이벤트 추가");   // 예외 원문은 아래 로그로만
                     _log?.Error($"InsertMalfunctionEventAsync 실패: {ex.Message}");
                 }
             }
@@ -281,7 +281,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             {
                 var sb = new System.Text.StringBuilder();
                 if (saveFailures.Count > 0)
-                    sb.AppendLine($"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n" + string.Join("\n", saveFailures.Take(5)));
+                    sb.AppendLine($"{saveFailures.Count}건을 저장하지 못했습니다({string.Join(", ", saveFailures.Take(5))}). 고친 내용은 그대로 두었습니다. 잠시 뒤 다시 저장하세요.");
                 if (held > 0)
                     sb.AppendLine($"{held}건은 장비 미선택으로 보류했습니다. 장비를 선택한 뒤 다시 저장하세요.");
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel

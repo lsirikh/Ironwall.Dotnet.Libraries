@@ -91,7 +91,7 @@
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="19"
 							Opacity="1"
-							Text="{Binding ZoneDeviceText, FallbackValue=구역 - 센서 01}"
+							Text="{Binding ZoneDeviceText, FallbackValue=—}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -200,7 +200,7 @@
 								VerticalAlignment="Center"
 								FontSize="12"
 								Opacity="1"
-								Text="{Binding DateTime, Mode=OneWay, StringFormat=yyyy-MM-dd HH:mm:ss, FallbackValue=2020-11-20 12:30:10}" />
+								Text="{Binding DateTime, Mode=OneWay, StringFormat=yyyy-MM-dd HH:mm:ss, FallbackValue=—}" />
 						</Grid>
 					</StackPanel>
 				</Grid>

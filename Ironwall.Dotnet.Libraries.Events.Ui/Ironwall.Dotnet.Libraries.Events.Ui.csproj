@@ -51,6 +51,9 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
     <!-- FR-EN-10/11: IPermissionService 게이팅 (순환 없음 — Accounts.Api는 Events.Ui 미참조) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <!-- 완성도 수정 패스: 조치 트레이 · 조치보고 창의 문구를 조치보고 문구 관리 목록(IActionReportTemplateApiService)에서 읽는다
+         (순환 없음 — Reports.Api 는 Accounts.Api · Api · Base · Messages 만 참조한다). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Reports.Api\Ironwall.Dotnet.Libraries.Reports.Api.csproj" />
   </ItemGroup>
 
 </Project>

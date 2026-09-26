@@ -149,6 +149,12 @@ public sealed class SuppressionConsoleRow : EventSuppressionScheduleItemViewMode
     /// <summary>반복 요약이 있으면 그것, 없으면 단발 표기.</summary>
     public string RepeatText => string.IsNullOrEmpty(RecurrenceSummary) ? "단발" : RecurrenceSummary;
 
+    /// <summary>
+    /// 회차 줄을 낼 것인가 — 비어 있는데 자리를 잡으면 반복 칸이 두 줄 높이가 되어
+    /// "단발" 이 옆 칸보다 위로 떠 보인다(실창 캡처).
+    /// </summary>
+    public bool HasOccurrence => !string.IsNullOrEmpty(OccurrenceText);
+
     /// <summary>목록 열은 좀다 — 해가 아니라 월·일부터 보인다(전체 값은 툴팁 · 상세 칸에 그대로 있다).</summary>
     public string WindowStartShort => Shorten(WindowStartText);
 
@@ -165,4 +171,9 @@ public sealed class SuppressionConsoleRow : EventSuppressionScheduleItemViewMode
     public string ScopeDetailText => Dto.TargetType == SuppressionTargetDrop.ModeDevice
         ? SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)
         : $"{SuppressionRequestBuilder.ScopeLabel(Dto.EventScope)} · {SuppressionRequestBuilder.SideLabel(Dto.TargetSide)}";
+
+    /// <summary>범위 칸 툴팁 — 화면이 모르는 범위면 서버가 보낸 원문을 여기에만 덧붙인다.</summary>
+    public string ScopeToolTip => SuppressionRequestBuilder.IsKnownScope(Dto.EventScope) || Dto.EventScope is null
+        ? ScopeDetailText
+        : $"{ScopeDetailText} (원문: {Dto.EventScope})";
 }

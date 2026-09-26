@@ -16,6 +16,7 @@ using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
+using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
@@ -45,6 +46,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 /// 구독은 <c>OnActivateAsync</c> 에서만 건다(생성자에서 걸면 두 번째 열기부터 무음 사망).</para>
 /// </remarks>
 public class EventDashboardViewModel : BasePanelViewModel
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel>
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel>
+                                     , IHandle<CallCloseEventConsoleMessageModel>
 {
     public const string ConsoleKey = "Events";
 
@@ -76,9 +80,12 @@ public class EventDashboardViewModel : BasePanelViewModel
                                 , DeviceProvider? deviceProvider = null
                                 , DeviceGroupProvider? deviceGroupProvider = null
                                 , IClock? clock = null
+                                // 조치 트레이 문구 — 조치보고 문구 관리 목록(서버). 없으면 기본 문구로 간다.
+                                , IActionReportPhraseSource? phraseSource = null
                                 ) : base(eventAggregator, log)
     {
         _mappingFactory = mappingLauncher;
+        _phrases = phraseSource ?? new ActionReportPhraseSource(ResolveTemplateApi, log);
         TabControlViewModel = tabControlViewModel;
         DetectionPanelViewModel = detectionEventPanelViewModel;
         MalfunctionPanelViewModel = malfunctionEventPanelViewModel;
@@ -135,8 +142,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         Detail = new ConsoleDetailPresenter();
         // 조치 내역은 이미 있는 원본별 조회 API 를 열 때 한 번 부른다(정본 E-D4) — API 는 늦게 해석한다.
         DetailView = new EventDetailViewModel(Detail, new EventActionHistoryViewModel(ResolveEventApi, log));
+        DetailView.ActionRequested += OnDetailAction;
         Overview = new EventOverviewViewModel();
         Tray = new ActionTrayViewModel(SendActionAsync);
+        Tray.ApplyPhrases(_phrases.LastKnown);
         Tray.PropertyChanged += (_, _) =>
         {
             NotifyOfPropertyChange(nameof(IsTrayVisible));
@@ -192,9 +201,56 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(EventProvider));
 
         RefreshMappingEntry();      // N-13 mapping workbench — 판본·권한은 열릴 때마다 다시 본다
+        _closeConfirmed = false;
+
+        // 문구는 열 때마다 다시 읽는다 — 조치보고 문구 콘솔에서 방금 고친 목록이 바로 보이도록(창을 막지 않는다).
+        _ = RefreshPhrasesAsync();
 
         await SwitchRailAsync(_railKey, force: true);
     }
+
+    /// <summary>
+    /// 창을 닫아도 되는가 — 보내지 않은 조치 트레이 · 적용하지 않은 상세 판정 · 억제 서랍 초안이 있으면
+    /// <b>먼저 묻는다</b>(완성도 감사 E-2 #9). 확인 팝업은 다른 콘솔과 같은 길(<see cref="OpenConfirmPopupMessageModel"/>)이고,
+    /// [확인] 이 오면 <see cref="CallCloseEventConsoleMessageModel"/> 으로 돌아와 버리고 닫는다.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ 호스트의 창 틀(EventPanelViewModel)이 이 판정을 물어야 실제로 막힌다 — 그 한 줄은 호스트 담당이다.
+    /// 묻지 않는 호스트에서는 <see cref="OnDeactivateAsync"/> 가 닫힌 뒤 버린 것을 알린다(예전 동작).
+    /// </remarks>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = PendingWorkSummary();
+        if (_closeConfirmed || pending is null) return true;
+
+        await _eventAggregator!.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "이벤트 창 닫기",
+            Explain = $"{pending}\n닫으면 이 내용은 사라집니다. 버리고 닫을까요?",
+            MessageModel = new CallCloseEventConsoleMessageModel(),
+        }, cancellationToken);
+        return false;
+    }
+
+    /// <summary>닫으면 사라질 것 — 없으면 null. 확인 문장에 그대로 쓴다.</summary>
+    public string? PendingWorkSummary()
+    {
+        var parts = new List<string>();
+        if (Tray.HasEntries) parts.Add($"보내지 않은 조치보고 {Tray.Count}건");
+        if (Detail.IsDirty) parts.Add("적용하지 않은 상세 변경");
+        if (Suppression?.Drawer is { IsOpen: true, IsDirty: true }) parts.Add("저장하지 않은 억제 스케줄");
+        return parts.Count == 0 ? null : string.Join(" · ", parts) + "이(가) 있습니다.";
+    }
+
+    /// <summary>닫기 확인에서 [확인] — 이번 닫기만 묻지 않고 통과시킨다(다음 열기에서 다시 초기화).</summary>
+    public async Task HandleAsync(CallCloseEventConsoleMessageModel message, CancellationToken cancellationToken)
+    {
+        _closeConfirmed = true;
+        await _eventAggregator!.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePanelMessageModel(), cancellationToken);
+    }
+
+    private bool _closeConfirmed;
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
@@ -214,20 +270,22 @@ public class EventDashboardViewModel : BasePanelViewModel
         DetachRows();
 
         // 싱글턴 — 다음에 열 때 옛 선택 · 미적용 변경 · Draft 가 남아 있으면 안 된다.
-        // (R7) 담은 것을 소리 없이 버리지 않는다 — 몇 건을 버렸는지 알린다(서버 호출 0).
-        if (Tray.HasEntries)
+        // (R7) 담은 것을 소리 없이 버리지 않는다 — 닫기 확인을 거치지 않고 닫혔으면(호스트가 CanCloseAsync 를 묻지 않는 경로)
+        //      몇 건을 버렸는지 뒤늦게라도 알린다. 확인을 받고 닫은 것이면 다시 말하지 않는다.
+        if (Tray.HasEntries && !_closeConfirmed)
         {
             var discarded = Tray.Count;
-            _log?.Warning($"[EventConsole] 조치 트레이에 남은 Draft {discarded}건을 창을 닫으며 버렸습니다 — 서버 호출 0");
-            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            _log?.Warning($"[EventConsole] 조치 트레이에 남은 Draft {discarded}건을 창을 닫으며 버렸습니다(확인 없이 닫힘)");
+            await _eventAggregator!.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "조치 트레이 안내",
-                Explain = $"보내지 않은 조치보고 {discarded}건이 창을 닫으면서 사라졌습니다. 서버에는 아무것도 보내지 않았습니다."
+                Explain = $"보내지 않은 조치보고 {discarded}건이 창을 닫으면서 사라졌습니다. 필요하면 다시 담아 보내세요."
             }, cancellationToken);
         }
+        _closeConfirmed = false;
         Tray.Revert();
         Detail.Reset();
-        DetailView.Load(EventDetailKind.Detection, Array.Empty<object>(), true, true, 0);
+        DetailView.Load(EventDetailKind.Overview, Array.Empty<object>(), true, true, 0);
         SearchText = string.Empty;
         StatusText = string.Empty;
 
@@ -322,6 +380,8 @@ public class EventDashboardViewModel : BasePanelViewModel
 
             _searchText = string.Empty;          // 레일을 바꾸면 거르기도 처음으로
             NotifyOfPropertyChange(nameof(SearchText));
+            // 앞 레일의 한 줄(“적용 완료 …”)을 다음 레일로 끌고 가지 않는다(완성도 감사 E-2 #3).
+            StatusText = string.Empty;
             RebuildChips();                      // 칩은 레일마다 다르다(정본 L2310-2313)
 
             // (D-26) AttachRows 가 그리드에 새 ItemsSource(ListCollectionView)를 물리면 WPF 가
@@ -391,6 +451,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         var counted = detection.Count > 0 || malfunction.Count > 0;
         OpenCountText = counted ? $"{EventRailCounter.OpenTotal(detection, malfunction)}건" : "—";
         FaultCountText = counted ? $"{EventRailCounter.FaultInProgress(malfunction)}건" : "—";
+        // "—" 는 '빠진 값' 처럼 읽힌다(완성도 감사 E-2 #4) — 세기 전에는 줄 자체를 숨긴다.
+        HasRailCounts = counted;
         OpenCount = EventRailCounter.OpenTotal(detection, malfunction);
         FaultCount = EventRailCounter.FaultInProgress(malfunction);
 
@@ -427,6 +489,17 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     public int OpenCount { get => _openCount; private set { _openCount = value; NotifyOfPropertyChange(); } }
     public int FaultCount { get => _faultCount; private set { _faultCount = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>미조치 · 장애 진행 수를 셀 수 있게 되었는가(탐지나 장애 목록을 한 번이라도 불러왔는가).</summary>
+    public bool HasRailCounts
+    {
+        get => _hasRailCounts;
+        private set { if (_hasRailCounts == value) return; _hasRailCounts = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(ShowRailFooter)); }
+    }
+    private bool _hasRailCounts;
+
+    /// <summary>레일 아래 요약 줄을 보일 것인가 — 센 뒤에만, 그리고 억제 스케줄 레일에서는 보이지 않는다(그 레일과 무관한 숫자다).</summary>
+    public bool ShowRailFooter => HasRailCounts && !IsSuppressionRail;
     #endregion
 
     #region - 목록 -
@@ -440,7 +513,11 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>지금 레일의 필터 칩들(정본 L2310-2313). 조치 내역엔 칩이 없다.</summary>
     public IReadOnlyList<EventFilterChipOption> FilterChips { get; private set; } = Array.Empty<EventFilterChipOption>();
 
-    public bool HasFilterChips => FilterChips.Count > 0;
+    /// <summary>
+    /// 거르기 탭 줄을 보일 것인가 — <b>목록이 있는 레일에서만</b>. 개요 · 억제 스케줄에서는 아무것도 거르지 않는데
+    /// 누를 수 있게 떠 있었고, 억제 서랍의 이름 칸과 겹쳤다(완성도 감사 E-2 #1 · #2).
+    /// </summary>
+    public bool HasFilterChips => FilterChips.Count > 0 && IsListVisible;
 
     /// <summary>고른 칩. 기본값은 전체.</summary>
     public string FilterChipKey
@@ -464,7 +541,8 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private void RebuildChips()
     {
-        var chips = EventListFilter.ChipsFor(CurrentKind);
+        // 목록이 없는 레일(개요 · 억제 스케줄)은 칩이 없다 — CurrentKind 가 Overview 라 ChipsFor 도 빈 목록을 준다.
+        var chips = IsListVisible ? EventListFilter.ChipsFor(CurrentKind) : Array.Empty<EventFilterChip>();
         FilterChips = chips.Select(c => new EventFilterChipOption(c.Key, c.Label)).ToList();
         _chipKey = EventListFilter.ChipAll;
         foreach (var chip in FilterChips) chip.IsSelected = chip.Key == _chipKey;
@@ -497,19 +575,36 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>툴바 [추가] 의 글자 — 억제 레일에서는 '새 스케줄'(정본 SB L2392).</summary>
     public string AddButtonText => IsSuppressionRail ? "새 스케줄" : "이벤트 추가";
 
+    /// <summary>
+    /// 툴바 [추가] 를 보일 것인가 — <b>억제 스케줄 레일에서만</b>.
+    /// </summary>
+    /// <remarks>
+    /// 이벤트 목록의 [이벤트 추가] 는 새로운-순 무한 목록의 <b>맨 끝</b>에 빈 행을 붙이고, 상세가 장비 · 발생시각을
+    /// 잠가 채울 방법이 없었다(완성도 감사 E-2 #10). 이벤트는 장비가 만드는 발생 기록이다 — 운영자 콘솔에서는 감춘다
+    /// (늘 꺼진 버튼으로 두지 않는다). 기존 패널 경로(<c>OnClickInsertButton</c>)는 그대로 둔다.
+    /// </remarks>
+    public bool ShowAdd => IsSuppressionRail;
+
+    /// <summary>툴바 [삭제] 를 보일 것인가 — 개요에는 지울 행이 없다(완성도 감사 E-3 #7).</summary>
+    public bool ShowDelete => IsListVisible || IsSuppressionRail;
+
     /// <summary>검색 칸을 낼 것인가 — 억제 목록은 서버 검색이 없다(상태 칩으로 거른다).</summary>
     public bool ShowSearch => IsListVisible && !IsSuppressionRail;
 
     /// <summary>기간 칩을 낼 것인가 — 억제 스케줄은 부제에서도 기간을 뺀다(정본 SB L2396).</summary>
     public bool ShowPeriodChips => !IsSuppressionRail;
 
-    /// <summary>지금 레일의 종류 — 상세 · 트레이 판정에 쓴다.</summary>
+    /// <summary>
+    /// 지금 레일의 종류 — 상세 · 칩 판정에 쓴다. 개요 · 억제 스케줄은 <see cref="EventDetailKind.Overview"/> 다
+    /// (예전엔 탐지로 떨어져 개요 상세가 "탐지 행을 고르면…" 을 말하고 탐지 칩이 떴다 — 완성도 감사 E-3 #6 · E-2 #1).
+    /// </summary>
     public EventDetailKind CurrentKind => _railKey switch
     {
+        DetectionRailKey => EventDetailKind.Detection,
         MalfunctionRailKey => EventDetailKind.Malfunction,
         ConnectionRailKey => EventDetailKind.Connection,
         ActionRailKey => EventDetailKind.Action,
-        _ => EventDetailKind.Detection,
+        _ => EventDetailKind.Overview,
     };
 
     public bool IsDetectionRail => _railKey == DetectionRailKey;
@@ -529,7 +624,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>끌 수 없는 레일에서는 줄이진 요약만 보인다.</summary>
     public bool IsTrayCollapsed => !CanDragToTray && Tray.HasEntries;
 
-    public string TraySummaryText => $"조치 트레이 {Tray.Count}건 — 탐지 · 장애 내역에서 [조치 적용] 할 수 있습니다";
+    public string TraySummaryText => $"조치 트레이에 {Tray.Count}건이 있습니다. 탐지 · 장애 내역에서 [조치 적용]을 누르세요.";
 
     public string ListStatusText
     {
@@ -563,8 +658,8 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// WPF 는 한글을 음절 단위로 끊어, 긴 문장은 마지막 줄에 음절 하나만 남긴다.
     /// </summary>
     public string EmptyStateHint => IsFiltered
-        ? "검색어를 지우거나 거르기를 [전체] 로"
-        : "기간을 넓히거나 [갱신] 을 눌러 보세요";
+        ? "검색어를 지우거나 [전체]를 누르세요"
+        : "기간을 넓히거나 [새로 불러오기]를 누르세요";
 
     /// <summary>목록 상태 한 벌 — 건수 줄과 빈 칸 안내는 늘 같은 순간에 바뀐다.</summary>
     private void RaiseListState()
@@ -778,21 +873,12 @@ public class EventDashboardViewModel : BasePanelViewModel
         }
     }
 
-    /// <summary>수동 이벤트 추가 — 기존 패널의 [추가] 경로 그대로(권한 검사 포함).</summary>
-    public bool CanAdd => IsSuppressionRail ? Suppression!.CanAdd : _current is not null && !_current.IsBusy && _railKey switch
-    {
-        DetectionRailKey => DetectionPanelViewModel.CanInsertEvent,
-        MalfunctionRailKey => MalfunctionPanelViewModel.CanInsertEvent,
-        ConnectionRailKey => ConnectionPanelViewModel.CanInsertEvent,
-        ActionRailKey => ActionPanelViewModel.CanInsertEvent,
-        _ => false,
-    };
+    /// <summary>[새 스케줄] — 억제 스케줄 레일에서만 뜬다(<see cref="ShowAdd"/>). 이벤트 목록은 추가하지 않는다.</summary>
+    public bool CanAdd => IsSuppressionRail && Suppression!.CanAdd;
 
     public string AddBlockedReason => IsSuppressionRail
         ? Suppression!.AddBlockedReason
-        : _current is null
-        ? "개요에서는 이벤트를 추가하지 않습니다 — 내역을 먼저 고르세요."
-        : "권한이 없습니다.";
+        : "이벤트는 장비가 만드는 기록이라 여기서 추가하지 않습니다.";
 
     /// <summary>선택한 행 삭제 — 패널이 확인 팝업을 띄우고, 취소하면 아무 일도 없다.</summary>
     public bool CanDelete => IsSuppressionRail ? Suppression!.CanDeleteSelected : _current is not null && !_current.IsBusy && SelectedRows.Count > 0 && _railKey switch
@@ -813,9 +899,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     public void Add()
     {
         if (!CanAdd || !Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
-        if (IsSuppressionRail) { Suppression!.AddNew(); return; }
-        _current!.Insert();
-        StatusText = "새 행을 더했습니다 — 저장하기 전까지는 서버에 가지 않습니다.";
+        Suppression!.AddNew();
     }
 
     public void Delete()
@@ -890,7 +974,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         {
             // 패널이 받아들이지 않았다 — 끝남이 오지 않으므로 여기서 끝낸다.
             DetailView.RollbackWriteBack();
-            Detail.LastMessage = "저장을 시작하지 못했습니다 — 권한이나 진행 중인 작업을 확인하세요";
+            Detail.LastMessage = "저장을 시작하지 못했습니다. 권한이나 진행 중인 작업을 확인하세요.";
             return;
         }
 
@@ -917,7 +1001,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         // 행 뷰모델 계보가 제네릭이라 공통 기반으로 단언한다 — 네 종류 전부 BaseEventViewModel<T> 파생이다.
         if (IsRowStillEdited(pending.Row))
         {
-            Detail.LastMessage = "서버가 저장하지 못했습니다 — 고친 칸은 그대로 두었습니다. [되돌리기] 로 무를 수 있습니다";
+            Detail.LastMessage = "서버가 저장하지 못했습니다. 고친 칸은 그대로 두었으니 다시 [적용]하거나 [되돌리기]로 되돌리세요.";
             DetailView.RollbackWriteBack();
             return;
         }
@@ -939,6 +1023,120 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private void OnNavigationBlocked(object? sender, ConsoleNavigation navigation)
         => StatusText = ConsoleDetailStateMachine.BlockedNotice;
+
+    /// <summary>
+    /// 상세 동작 줄(정본 SB L2703-2731) — 새 전송 경로를 만들지 않는다. 이미 있는 길을 그대로 부른다:
+    /// 조치보고 = 패널의 우클릭 경로(조치보고 창) · 트레이 담기 = 툴바와 같은 담기 함수 ·
+    /// 탐지 신호 이력 = 호스트가 이미 받는 <see cref="OpenDetectionHistoryDialogMessageModel"/> ·
+    /// 원본 열기 = 원본 레일로 옮겨 그 행을 고른다.
+    /// </summary>
+    private void OnDetailAction(EventDetailAction action)
+    {
+        try
+        {
+            switch (action)
+            {
+                case EventDetailAction.Report:
+                    ReportSelected();
+                    break;
+                case EventDetailAction.QueueToTray:
+                    QueueSelection();
+                    break;
+                case EventDetailAction.DetectionHistory:
+                    _ = OpenDetectionHistoryAsync();
+                    break;
+                case EventDetailAction.OpenOrigin:
+                    OpenOriginAsync().ContinueWith(
+                        t => _log?.Error($"[EventConsole] 원본 열기 실패: {t.Exception?.GetBaseException().Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[EventConsole] 상세 동작 실패({action}): {ex}");
+            StatusText = "요청을 처리하지 못했습니다. 잠시 뒤 다시 시도하세요.";
+        }
+    }
+
+    /// <summary>한 건 [조치보고] — 행 우클릭 '조치보고' 와 같은 명령(권한 · 저장 전 행 검사 포함).</summary>
+    private void ReportSelected()
+    {
+        if (SelectedRows.Count != 1) return;
+        var row = SelectedRows[0];
+        var command = row switch
+        {
+            DetectionEventViewModel => DetectionPanelViewModel.ReportCommand,
+            MalfunctionEventViewModel => MalfunctionPanelViewModel.ReportCommand,
+            _ => null,
+        };
+        if (command?.CanExecute(row) == true) command.Execute(row);
+    }
+
+    /// <summary>[탐지 신호 이력] — 그 센서의 이력 창(호스트가 이미 처리하는 메시지). 행 우클릭과 같은 명령.</summary>
+    private Task OpenDetectionHistoryAsync()
+    {
+        if (SelectedRows.Count == 1) RowHistoryCommand.Execute(SelectedRows[0]);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 뷰가 이 행을 골라 보이게 해 달라는 요청 — 뷰모델은 그리드를 모른다(선택은 그리드가 다시 알려 온다).
+    /// </summary>
+    public event Action<object>? RowFocusRequested;
+
+    /// <summary>행 우클릭 '조치 내역 보기' — 그 행을 골라 상세의 조치 내역을 연다(서랍 모드면 상세가 밀려 나온다).</summary>
+    public System.Windows.Input.ICommand RowActionsCommand => _rowActionsCommand ??= new Ironwall.Dotnet.Libraries.Events.Ui.Models.SimpleParamCommand(row =>
+    {
+        if (row is not null) FocusRow(row);
+        return Task.CompletedTask;
+    });
+    private System.Windows.Input.ICommand? _rowActionsCommand;
+
+    /// <summary>행 우클릭 '탐지 신호 이력' — 그 센서의 이력 창.</summary>
+    public System.Windows.Input.ICommand RowHistoryCommand => _rowHistoryCommand ??= new Ironwall.Dotnet.Libraries.Events.Ui.Models.SimpleParamCommand(async row =>
+    {
+        if (row is not DetectionEventViewModel { Device: Ironwall.Dotnet.Monitoring.Models.Devices.ISensorDeviceModel sensor }) return;
+        await _eventAggregator!.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
+        {
+            DeviceId = sensor.Id,
+            DeviceName = sensor.DeviceName,
+            DeviceNumber = sensor.DeviceNumber,
+        });
+    });
+    private System.Windows.Input.ICommand? _rowHistoryCommand;
+
+    /// <summary>이 행을 고른다 — 뷰가 있으면 그리드에서(선택이 그리드를 거쳐 돌아온다), 없으면 직접.</summary>
+    private void FocusRow(object row)
+    {
+        if (RowFocusRequested is null) SetSelection(new[] { row });
+        else RowFocusRequested.Invoke(row);
+    }
+
+    /// <summary>
+    /// [원본 열기] — 조치 행의 원본(탐지 · 장애)이 있는 레일로 옮기고 그 행을 고른다.
+    /// 원본이 불러온 기간 밖이면 옮긴 뒤 그 사실을 말한다(없는 행을 고른 척하지 않는다).
+    /// </summary>
+    public async Task OpenOriginAsync()
+    {
+        if (SelectedRows.Count != 1 || SelectedRows[0] is not ActionEventViewModel { OriginEvent: { } origin }) return;
+
+        var isDetection = origin is Ironwall.Dotnet.Monitoring.Models.Events.IDetectionEventModel;
+        var rail = isDetection ? DetectionRailKey : MalfunctionRailKey;
+        if (!await SelectRailAsync(rail)) return;
+
+        object? row = isDetection
+            ? DetectionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == origin.Id)
+            : MalfunctionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == origin.Id);
+
+        if (row is null)
+        {
+            StatusText = $"원본({(isDetection ? "탐지" : "장애")} · {origin.Id})이 지금 기간에 없습니다. 기간을 넓혀 보세요.";
+            return;
+        }
+
+        FocusRow(row);
+    }
     #endregion
 
     #region - 개요 -
@@ -1018,42 +1216,94 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>드래그의 키보드 · 버튼 폴백 — 같은 담기 함수를 부른다(정본 DW L423).</summary>
     public bool CanQueueSelection => CanDragToTray && SelectedRows.Count > 0 && !Tray.IsApplying;
 
+    /// <summary>
+    /// 툴바 주 버튼 글자 — 이 버튼은 보고를 <b>보내지 않고</b> 트레이에 담기만 한다. "조치보고" 라고 쓰면
+    /// 누른 순간 보고된 줄 안다(완성도 감사 E-2 #6). 보내는 것은 트레이의 [조치 적용] 이다.
+    /// </summary>
     public string QueueButtonText => SelectedRows.Count > 1
-        ? $"{SelectedRows.Count}건 조치보고"
-        : "조치보고";
+        ? $"{SelectedRows.Count}건 트레이에 담기"
+        : "트레이에 담기";
 
+    /// <remarks>담은 결과는 트레이 자기 상태 줄이 말한다 — 바닥 상태 띠에 같은 말을 한 번 더 찍지 않는다(E-6 #5).</remarks>
     public void QueueSelection()
     {
         if (!CanQueueSelection) return;
-        StatusText = TrayDrop.Queue(SelectedRows);
+        TrayDrop.Queue(SelectedRows);
     }
 
     public async void ApplyTray()
     {
         try
         {
-            var summary = await Tray.ApplyAsync();
-            StatusText = summary.ToMessage();
-            RefreshRailCounts();
+            await ApplyTrayAsync();
         }
         catch (Exception ex)
         {
-            _log?.Error($"[EventConsole] 조치 트레이 적용 실패: {ex.Message}");
-            StatusText = $"적용에 실패했습니다 — {ex.Message}";
+            // 예외 원문은 로그로만 — 화면에는 무엇이 안 됐고 어떻게 하면 되는지만(E-2 #8).
+            _log?.Error($"[EventConsole] 조치 트레이 적용 실패: {ex}");
+            StatusText = "조치 적용에 실패했습니다. 잠시 뒤 다시 시도하세요.";
         }
     }
 
-    public void RevertTray() => StatusText = RevertTrayCore();
-
-    private string RevertTrayCore()
+    /// <summary>
+    /// [조치 적용] — 트레이를 보내고, 보낸 뒤의 사실을 화면에 다시 들인다(완성도 감사 E-5 #1).
+    /// 목록 행은 카드가 모델 상태를 맞춰 두었으니 다시 그리기만 하고, 상세는 '상태' 와 조치 내역을 서버에 다시 묻는다.
+    /// </summary>
+    public async Task<DraftApplySummary> ApplyTrayAsync()
     {
-        Tray.Revert();
-        return Tray.StatusLine;
+        var summary = await Tray.ApplyAsync();
+        RefreshRailCounts();
+        RaiseListState();
+        RefreshDetailAfterReport();
+        return summary;
     }
+
+    public void RevertTray() => Tray.Revert();
 
     public void CancelTray() => Tray.Cancel();
 
-    private void OnTrayCompleted(string line) => StatusText = line;
+    /// <summary>드래그 담기가 끝났다 — 결과 한 줄은 트레이가 이미 보인다(여기서 되풀이하지 않는다).</summary>
+    private void OnTrayCompleted(string line) => NotifyOfPropertyChange(nameof(CanQueueSelection));
+
+    /// <summary>
+    /// 조치보고가 방금 만들어졌다 — 고른 한 건이 그 대상이면 상세의 '상태' · 조치 내역을 다시 보인다.
+    /// 목록을 통째로 다시 부르지 않는다(선택 · 스크롤 · 적용 전 편집을 지킨다).
+    /// </summary>
+    private void RefreshDetailAfterReport()
+    {
+        if (SelectedRows.Count != 1 || SelectedRows[0] is not ExEventViewModel ex) return;
+        (ex as Caliburn.Micro.PropertyChangedBase)?.Refresh();
+        DetailView.RefreshAfterReport(ex.IsActionReported ? 1 : 0);
+    }
+
+    /// <summary>행 우클릭 · 상세 [조치보고] 창 경로로 보고가 만들어졌다(카드가 알린다).</summary>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel message, CancellationToken cancellationToken)
+    {
+        OnReported(message.ViewModel?.Model?.Id, ActionTrayDrop.KindDetection);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc cref="HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel, CancellationToken)"/>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel message, CancellationToken cancellationToken)
+    {
+        OnReported(message.ViewModel?.Model?.Id, ActionTrayDrop.KindMalfunction);
+        return Task.CompletedTask;
+    }
+
+    private void OnReported(int? eventId, string kind)
+    {
+        if (eventId is not { } id || id <= 0) return;
+        // 트레이가 보내는 중이면 트레이가 끝날 때 한 번에 다시 그린다 — 줄마다 조치 내역을 다시 부르지 않는다.
+        if (Tray.IsApplying) return;
+
+        var candidate = new ActionTrayCandidate(id, kind, string.Empty, true);
+        FindOriginRow(candidate)?.Refresh();
+        if (SelectedRows.Count == 1 && SelectedRows[0] is ExEventViewModel ex && ex.Model?.Id == id
+            && (kind == ActionTrayDrop.KindDetection ? ex is DetectionEventViewModel : ex is MalfunctionEventViewModel))
+            RefreshDetailAfterReport();
+        RefreshRailCounts();
+        RaiseListState();
+    }
 
     /// <summary>
     /// 조치 한 건을 실제로 보낸다 — <b>기존 경로 그대로</b>(임시 카드 뷰모델의 <c>SendAction</c>).
@@ -1107,6 +1357,37 @@ public class EventDashboardViewModel : BasePanelViewModel
         {
             _log?.Warning($"[EventConsole] IEventApiService 미해석 — 조치 내역을 부르지 않습니다: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>조치보고 문구 API — 컨테이너에 없으면(시험 · 미리보기 · 구 호스트) null → 기본 문구.</summary>
+    private IActionReportTemplateApiService? ResolveTemplateApi()
+    {
+        try { return IoC.Get<IActionReportTemplateApiService>(); }
+        catch (Exception ex)
+        {
+            _log?.Info($"[EventConsole] 조치보고 문구 API 미해석 — 기본 문구를 씁니다: {ex.Message}");
+            return null;
+        }
+    }
+
+    private readonly IActionReportPhraseSource _phrases;
+
+    /// <summary>
+    /// 트레이 문구를 조치보고 문구 관리 목록(서버)으로 갈아 끼운다. 못 읽으면 기본 문구 그대로다.
+    /// 작업 스레드에서 끝나도 화면 반영은 UI 스레드에서 한다.
+    /// </summary>
+    public async Task RefreshPhrasesAsync()
+    {
+        try
+        {
+            var set = await _phrases.LoadAsync().ConfigureAwait(false);
+            if (_uiThread.IsOnUiThread) Tray.ApplyPhrases(set);
+            else _uiThread.Post(() => Tray.ApplyPhrases(set));
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[EventConsole] 조치보고 문구를 갈아 끼우지 못했습니다 — 기본 문구를 씁니다: {ex.Message}");
         }
     }
 
@@ -1201,6 +1482,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(CanDelete));
         NotifyOfPropertyChange(nameof(AddBlockedReason));
         NotifyOfPropertyChange(nameof(DeleteBlockedReason));
+        NotifyOfPropertyChange(nameof(ShowAdd));
+        NotifyOfPropertyChange(nameof(ShowDelete));
+        NotifyOfPropertyChange(nameof(ShowRailFooter));
+        NotifyOfPropertyChange(nameof(HasFilterChips));
     }
 
     /// <summary>시험이 결정론적으로 목록을 갈아 끼우는 이음매 — 제품 경로는 쓰지 않는다.</summary>
@@ -1288,6 +1573,11 @@ public class EventDashboardViewModel : BasePanelViewModel
     public void RefreshMappingEntry() => NotifyOfPropertyChange(nameof(CanOpenMappingWorkbench));
     #endregion
 }
+
+/// <summary>
+/// 이벤트 창 닫기 확인에서 [확인] — <b>이 콘솔 전용</b>(다른 창의 확인 메시지를 재사용하면 같은 확인 한 번에 두 창이 반응한다).
+/// </summary>
+public sealed class CallCloseEventConsoleMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }
 
 /// <summary>기간 칩 한 칸 — 선택 표시를 스스로 든다(라디오 버튼이 직접 묶을 것을 가진다).</summary>
 public sealed class EventPeriodOption : Caliburn.Micro.PropertyChangedBase

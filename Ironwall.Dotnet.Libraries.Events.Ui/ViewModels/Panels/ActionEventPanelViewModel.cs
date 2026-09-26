@@ -208,7 +208,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    saveFailures.Add($"수정(Id={model.Id}): {ex.Message}");
+                    saveFailures.Add($"{model.Id}번 수정");   // 예외 원문은 아래 로그로만
                     _log?.Error($"UpdateActionEventAsync 실패 Id={model.Id}: {ex.Message}");
                 }
             }
@@ -220,7 +220,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    saveFailures.Add($"추가: {ex.Message}");
+                    saveFailures.Add("새 이벤트 추가");   // 예외 원문은 아래 로그로만
                     _log?.Error($"InsertActionEventAsync 실패: {ex.Message}");
                 }
             }
@@ -229,7 +229,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             {
                 var sb = new System.Text.StringBuilder();
                 if (saveFailures.Count > 0)
-                    sb.AppendLine($"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n" + string.Join("\n", saveFailures.Take(5)));
+                    sb.AppendLine($"{saveFailures.Count}건을 저장하지 못했습니다({string.Join(", ", saveFailures.Take(5))}). 고친 내용은 그대로 두었습니다. 잠시 뒤 다시 저장하세요.");
                 if (held > 0)
                     sb.AppendLine($"{held}건은 원본 이벤트 미지정으로 보류했습니다. 원본 이벤트를 지정한 뒤 다시 저장하세요.");
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel

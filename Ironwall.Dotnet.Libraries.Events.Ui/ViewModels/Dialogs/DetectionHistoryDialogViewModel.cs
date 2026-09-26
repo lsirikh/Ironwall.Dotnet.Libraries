@@ -429,7 +429,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             ApplyFilters();
             var failNote = _failedSensorNames.Count > 0 ? $" · 조회 실패: {string.Join(", ", _failedSensorNames)}" : string.Empty;
             RangeText = $"{start:yyyy-MM-dd HH:mm} ~ {end:yyyy-MM-dd HH:mm} · {_all.Count}건"
-                        + (truncated ? " (상한 500건 — 기간을 줄여주세요)" : string.Empty)
+                        + (truncated ? " (최대 500건까지 표시합니다. 기간을 줄여 보세요)" : string.Empty)
                         + failNote;
             LastUpdatedText = $"마지막 갱신 {DateTime.Now:HH:mm:ss}";
         }
@@ -449,7 +449,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
                 Title = "탐지 이력 조회 실패",
-                Explain = "서버에서 탐지 이력을 가져오지 못했습니다.\n네트워크/서버 상태 확인 후 새로고침으로 다시 시도해 주세요."
+                Explain = "서버에서 탐지 이력을 가져오지 못했습니다.\n잠시 뒤 [새로고침]을 눌러 다시 시도하세요."
             });
         }
         finally

@@ -59,6 +59,16 @@ public class EventUiModule : Module
             // (Phase3) 조치보고 멱등 가드 — 자동/자동복구/배치(EventCardListPanel) + 수동(EventCard.SendAction) 공유 싱글톤
             builder.RegisterType<ActionReportGuard>().As<IActionReportGuard>().SingleInstance();
 
+            // 조치보고 문구 — 조치 트레이 · 조치보고 창이 같은 목록을 쓴다(서버 조치보고 문구 관리 목록, 못 읽으면 기본 문구).
+            //   문구 API 는 Reports 모듈이 등록한다 — 없으면(구 호스트) ResolveOptional 이 null → 기본 문구. 늦게 푼다.
+            builder.Register(c =>
+            {
+                var context = c.Resolve<IComponentContext>();
+                return new Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray.ActionReportPhraseSource(
+                    () => context.ResolveOptional<Ironwall.Dotnet.Libraries.Reports.Api.Services.IActionReportTemplateApiService>(),
+                    c.ResolveOptional<ILogService>());
+            }).As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Tray.IActionReportPhraseSource>().SingleInstance();
+
             builder.RegisterType<EventDashboardViewModel>().SingleInstance();
             builder.RegisterType<EventTabControlViewModel>().SingleInstance();
             builder.RegisterType<DetectionEventPanelViewModel>().SingleInstance();

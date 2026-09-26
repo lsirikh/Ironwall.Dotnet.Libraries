@@ -44,7 +44,7 @@ public static class MappingEligibility
     public const string ReadOnlyReason = "이벤트 맵핑 편집 권한이 없습니다.";
 
     /// <summary>매핑을 아직 고르지 않았을 때.</summary>
-    public const string NoMappingReason = "먼저 왼쪽에서 이벤트 맵핑을 고르십시오.";
+    public const string NoMappingReason = "먼저 왼쪽에서 이벤트 맵핑을 고르세요.";
 
     /// <summary>
     /// 팔레트 → 액션 보드(투입).
@@ -75,7 +75,7 @@ public static class MappingEligibility
     {
         if (isReadOnly) return MappingDropVerdict.Block(ReadOnlyReason);
         if (sourceKind != zoneKind)
-            return MappingDropVerdict.Block("다른 탭으로는 옮길 수 없습니다. 해제한 뒤 그 탭에서 다시 넣으십시오.");
+            return MappingDropVerdict.Block("다른 탭으로는 옮길 수 없습니다. 해제한 뒤 그 탭에서 다시 넣으세요.");
         if (rowCount <= 0) return MappingDropVerdict.Block("옮길 행이 없습니다.");
         return MappingDropVerdict.Allow();
     }
@@ -86,7 +86,7 @@ public static class MappingEligibility
     public static MappingDropVerdict BoardToPalette(bool isReadOnly, bool canDelete, int rowCount)
     {
         if (isReadOnly) return MappingDropVerdict.Block(ReadOnlyReason);
-        if (!canDelete) return MappingDropVerdict.Block("배선을 해제할 권한이 없습니다.");
+        if (!canDelete) return MappingDropVerdict.Block("연동을 해제할 권한이 없습니다.");
         if (rowCount <= 0) return MappingDropVerdict.Block("해제할 행이 없습니다.");
         return MappingDropVerdict.Allow();
     }
@@ -102,7 +102,7 @@ public static class MappingEligibility
     public static MappingDropVerdict PresetToRow(int presetCameraId, int? rowCameraId, bool isReadOnly)
     {
         if (isReadOnly) return MappingDropVerdict.Block(ReadOnlyReason);
-        if (rowCameraId is null) return MappingDropVerdict.Block("장비가 끊긴 행입니다. 먼저 카메라를 다시 지정하십시오.");
+        if (rowCameraId is null) return MappingDropVerdict.Block("장비가 끊긴 행입니다. 먼저 카메라를 다시 지정하세요.");
         if (presetCameraId != rowCameraId.Value) return MappingDropVerdict.Block("다른 카메라의 프리셋입니다.");
         return MappingDropVerdict.Allow();
     }

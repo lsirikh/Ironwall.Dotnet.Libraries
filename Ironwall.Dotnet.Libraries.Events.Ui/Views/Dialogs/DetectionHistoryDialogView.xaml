@@ -278,7 +278,7 @@
 								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('30d')]</cal:Message.Attach>
 							</RadioButton>
 							<RadioButton
-								Content="기간지정"
+								Content="직접"
 								GroupName="Period"
 								Style="{StaticResource PeriodSegButton}">
 								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('custom')]</cal:Message.Attach>

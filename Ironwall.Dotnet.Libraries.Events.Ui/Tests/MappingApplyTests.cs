@@ -356,7 +356,7 @@ public class MappingApplyTests
         await vm.ReloadAsync();
 
         Assert.Empty(vm.Mappings);
-        Assert.Contains("판본", vm.StatusText);
+        Assert.Contains("지원하지", vm.StatusText);
     }
     #endregion
 

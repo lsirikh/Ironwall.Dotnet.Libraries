@@ -42,6 +42,22 @@ public partial class MappingWorkbenchView : UserControl
     private void OnSaveMapping(object sender, RoutedEventArgs e) => _ = Model?.SaveMappingAsync();
 
     private void OnCancelCreate(object sender, RoutedEventArgs e) => Model?.CancelCreateMapping();
+
+    /// <summary>
+    /// 툴바의 [삭제] 를 숨긴다 — 이 창은 맵핑 삭제를 제공하지 않는다(PRD 범위 밖).
+    /// </summary>
+    /// <remarks>
+    /// 늘 꺼진 채 "제공하지 않습니다" 를 말하는 버튼은 동작하는 척하는 자리표시다(감사 E-10 #3).
+    /// 커널 <c>ConsoleToolbar</c> 에는 아직 삭제 버튼을 끄는 속성이 없어, 템플릿 부품(<c>PART_Delete</c>)을
+    /// 여기서 접는다. Loaded 는 창을 다시 붙일 때마다 오므로 템플릿이 다시 입혀져도 다시 접힌다.
+    /// </remarks>
+    private void OnToolbarLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Control toolbar) return;
+        toolbar.ApplyTemplate();
+        if (toolbar.Template?.FindName("PART_Delete", toolbar) is UIElement delete)
+            delete.Visibility = Visibility.Collapsed;
+    }
     #endregion
 
     #region - 보드 버튼 (드래그의 짝) -

@@ -112,7 +112,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         if (CanLeave) return true;
 
         StatusLine = IsSaving
-            ? "보내는 중입니다 — 끝날 때까지 기다리세요."
+            ? SavingText
             : "저장하거나 되돌린 뒤 이동하세요.";
         ShakeToken++;
         NotifyOfPropertyChange(nameof(StatusLine));
@@ -125,9 +125,18 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         if (!TryLeave()) return false;
 
         Load(SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now)));
-        StatusLine = "저장하기 전에는 서버에 가지 않습니다.";
+        StatusLine = OpenNewHintText;
         return true;
     }
+
+    /// <summary>새로 열었을 때 바닥 한 줄.</summary>
+    public const string OpenNewHintText = "입력한 뒤 [저장]을 누르세요.";
+
+    /// <summary>반복 규칙을 고칠 수 없다는 안내 — 열 때 바닥 줄과 반복 칸 아래에 같은 문장을 쓴다.</summary>
+    public const string RecurrenceLockedText = "반복 규칙은 수정할 수 없습니다. 바꾸려면 새 스케줄을 만드세요.";
+
+    /// <summary>저장이 진행 중일 때의 한 줄.</summary>
+    public const string SavingText = "저장하는 중입니다. 끝날 때까지 기다리세요.";
 
     /// <summary>
     /// 받아 온 스케줄을 고치러 연다 — 초안은 <b>원본에서</b> 채운다(PATCH 는 RFC 7396).
@@ -139,9 +148,8 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         if (!TryLeave()) return false;
 
         Load(SuppressionDraft.FromDto(dto, DeviceName, GroupName));
-        StatusLine = _draft.CanEditRecurrence
-            ? string.Empty
-            : "반복 규칙은 수정할 수 없습니다 — 서버 수정 스키마에 반복 칸이 없습니다(바꾸려면 새로 만드세요).";
+        // 서버 수정 요청에는 반복 칸이 없다 — 까닭은 운영자 몫이 아니라서 화면에는 할 일만 쓴다.
+        StatusLine = _draft.CanEditRecurrence ? string.Empty : RecurrenceLockedText;
         return true;
     }
 
@@ -182,7 +190,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
         Load(baseline is null
             ? SuppressionDraft.NewSchedule(new DateTimeOffset(_clock.Now))
             : SuppressionDraft.FromDto(baseline, DeviceName, GroupName));
-        StatusLine = "되돌렸습니다 — 서버에는 아무것도 보내지 않았습니다.";
+        StatusLine = "되돌렸습니다.";
     }
 
     /// <summary>묻지 않고 닫는다(저장 성공 · 콘솔을 떠남).</summary>
@@ -267,9 +275,9 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <summary>화면이 모르는 억제 범위인가 — 그런 스케줄은 범위를 건드리지 않은 채로도 저장할 수 없다.</summary>
     public bool IsScopeUnknown => !SuppressionRequestBuilder.IsKnownScope(_draft.EventScope);
 
-    /// <summary>모르는 범위 안내 — 무엇이 실려 있는지 그대로 보여 준다.</summary>
+    /// <summary>모르는 범위 안내. 서버 원문 값은 화면에 싣지 않는다(범위 칸 툴팁 · 로그 몫이다).</summary>
     public string UnknownScopeText => IsScopeUnknown
-        ? $"이 화면이 모르는 억제 범위입니다({_draft.EventScope}) — 서버가 새 값을 추가했습니다. 저장할 수 없습니다."
+        ? "지원하지 않는 억제 범위라 수정할 수 없습니다."
         : string.Empty;
 
     /// <summary>감지/감시 — 그룹 · 전체에서만 뜻이 있다.</summary>
@@ -319,7 +327,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <summary>반복 잠금 안내 — 왜 못 고치는지.</summary>
     public string RecurrenceLockText => CanEditRecurrence
         ? string.Empty
-        : "수정 요청에는 반복 칸이 없습니다 — 반복을 바꾸려면 새 스케줄을 만드세요.";
+        : RecurrenceLockedText;
 
     /// <summary>
     /// 유효기간 시작 * — <b>글자로 받는다</b>(<c>yyyy-MM-dd HH:mm</c>).
@@ -369,7 +377,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
 
     /// <summary>어느 칸이 읽히지 않았는지.</summary>
     public string UnreadableTimeText => HasUnreadableTime
-        ? $"시각을 읽을 수 없습니다 — {SuppressionTimeText.DateTimeHint} 형식으로 적으세요."
+        ? $"시각을 읽을 수 없습니다. {SuppressionTimeText.DateTimeHint} 형식으로 적으세요."
         : string.Empty;
 
     private string? _windowStartText;
@@ -573,12 +581,12 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     {
         // ⚠ 순서가 중요하다 — CanSave 가 !_isSaving 을 품고 있어, 보내는 중에 또 누르면
         //   "바뀐 것이 없습니다" 라는 거짓말이 뜬다(두 번 보내지는 않는다).
-        if (IsSaving) { StatusLine = "보내는 중입니다 — 끝날 때까지 기다리세요."; return; }
+        if (IsSaving) { StatusLine = SavingText; return; }
 
         if (!CanSave)
         {
             StatusLine = !_canEdit()
-                ? "이벤트 편집 권한(events:edit)이 없습니다."
+                ? SuppressionPermissionText.EditDenied
                 : IsScopeUnknown ? UnknownScopeText
                 : HasUnreadableTime ? UnreadableTimeText
                 : Verdict.CanSave ? "바뀐 것이 없습니다." : Verdict.FirstErrorText;
@@ -606,7 +614,7 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
             Execute.OnUIThread(() =>
             {
                 IsSaving = false;
-                StatusLine = "저장하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.";
+                StatusLine = "저장하지 못했습니다. 잠시 뒤 다시 시도하세요.";
                 ShakeToken++;
             });
             return;

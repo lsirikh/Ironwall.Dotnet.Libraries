@@ -185,7 +185,7 @@
 							Grid.Row="9"
 							Grid.Column="1"
 							Margin="0,2"
-							md:HintAssist.Hint="admin"
+							md:HintAssist.Hint="작성자"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding User, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -194,7 +194,7 @@
 							Grid.Row="10"
 							Grid.Column="1"
 							Margin="0,2"
-							md:HintAssist.Hint="Action report contents"
+							md:HintAssist.Hint="조치 내용"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding Content, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 							TextWrapping="Wrap" />

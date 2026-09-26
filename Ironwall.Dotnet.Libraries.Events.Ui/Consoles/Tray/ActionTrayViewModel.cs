@@ -23,18 +23,14 @@ public delegate Task<DraftOutcome> ActionReportSender(ActionTrayCandidate candid
 /// </remarks>
 public sealed class ActionTrayViewModel : PropertyChangedBase
 {
-    /// <summary>조치보고 다이얼로그와 <b>같은</b> 문구 목록(<c>EventReportDialogViewModel.IninializeDialog</c>).</summary>
-    public static readonly IReadOnlyList<string> Phrases = new[]
-    {
-        "야생동물출현",
-        "강풍/폭우",
-        "울타리 점검/작업",
-        "침입발생 특경출동조치",
-        "오경보",
-    };
+    /// <summary>
+    /// 기본 문구 — 서버의 조치보고 문구 관리 목록을 못 읽을 때만 쓴다(<see cref="ActionReportPhraseSource.Fallback"/>).
+    /// 실제로 보이는 목록은 <see cref="PhraseOptions"/> 다(<see cref="ApplyPhrases"/> 가 서버 목록으로 갈아 끼운다).
+    /// </summary>
+    public static IReadOnlyList<string> Phrases => ActionReportPhraseSource.Fallback;
 
     /// <summary>'기타' 를 고르면 메모가 문구가 된다.</summary>
-    public const string EtcPhrase = "기타";
+    public const string EtcPhrase = ActionReportPhraseSource.EtcPhrase;
 
     private readonly ActionReportSender _send;
     private readonly Dictionary<string, ActionTrayCandidate> _queued = new(StringComparer.Ordinal);
@@ -79,7 +75,36 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         ? (IsEtc ? "기타 내용을 적어야 보낼 수 있습니다" : "문구를 먼저 고르세요")
         : Helpers.ActionReportRules.ValidateContent(EffectiveContent) ?? string.Empty;
 
-    public IReadOnlyList<string> PhraseOptions { get; } = Phrases.Concat(new[] { EtcPhrase }).ToList();
+    /// <summary>고를 수 있는 문구 — 조치보고 문구 관리 목록(순서 그대로) + 맨 끝 '기타'.</summary>
+    public IReadOnlyList<string> PhraseOptions
+    {
+        get => _phraseOptions;
+        private set { _phraseOptions = value; NotifyOfPropertyChange(); }
+    }
+    private IReadOnlyList<string> _phraseOptions = WithEtc(Phrases);
+
+    /// <summary>문구가 조치보고 문구 관리 목록에서 왔는가(아니면 기본 문구).</summary>
+    public bool PhrasesFromServer { get; private set; }
+
+    /// <summary>
+    /// 문구 목록을 갈아 끼운다(서버의 조치보고 문구 관리 목록 또는 기본 문구).
+    /// 고른 문구가 새 목록에도 있으면 그대로 두고, 없어졌으면 비운다 — 사라진 문구로 조치보고가 나가지 않게.
+    /// '기타' 와 그 메모는 늘 살아 있다.
+    /// </summary>
+    public void ApplyPhrases(ActionReportPhraseSet set)
+    {
+        if (set is null) return;
+        var next = WithEtc(set.Phrases is { Count: > 0 } p ? p : Phrases);
+        PhrasesFromServer = set.FromServer && set.Phrases is { Count: > 0 };
+        NotifyOfPropertyChange(nameof(PhrasesFromServer));
+        if (next.SequenceEqual(_phraseOptions, StringComparer.Ordinal)) return;
+
+        PhraseOptions = next;
+        if (_phrase.Length > 0 && !next.Contains(_phrase, StringComparer.Ordinal)) Phrase = string.Empty;
+    }
+
+    private static IReadOnlyList<string> WithEtc(IEnumerable<string> phrases)
+        => phrases.Where(p => !string.Equals(p, EtcPhrase, StringComparison.Ordinal)).Concat(new[] { EtcPhrase }).ToList();
 
     public int Count => Draft.Count;
     public bool HasEntries => Draft.HasEntries;
@@ -191,7 +216,7 @@ public sealed class ActionTrayViewModel : PropertyChangedBase
         Draft.Revert();
         _queued.Clear();
         UnverifiedKey = null;
-        StatusLine = "조치 트레이를 비웠습니다 — 서버 호출 0";
+        StatusLine = "조치 트레이를 비웠습니다.";
         RaiseAll();
     }
 

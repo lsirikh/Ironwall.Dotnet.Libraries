@@ -94,7 +94,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         if (!CanViewEvents())
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 없음", Explain = "이벤트 조회 권한(events:view)이 없습니다." });
+            { Title = "권한 없음", Explain = SuppressionPermissionText.ViewDenied });
             return;
         }
         await LoadAllAsync(_cancellationTokenSource?.Token ?? cancellationToken);
@@ -151,8 +151,8 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     {
         get
         {
-            if (CanCreate) return "입력한 대상·시간창으로 억제 창을 생성합니다.";
-            if (!CanEditEvents()) return "이벤트 편집 권한(events:edit)이 없습니다.";
+            if (CanCreate) return "입력한 대상·시간으로 억제 스케줄을 만듭니다.";
+            if (!CanEditEvents()) return SuppressionPermissionText.EditDenied;
             if (string.IsNullOrWhiteSpace(Name)) return "작업명을 입력하세요.";
             if (!IsWindowLengthValid) return WindowLengthWarningText.TrimStart('⚠', ' ') + ".";
             if (WeeklyFormError is { } we) return we + ".";
@@ -290,16 +290,16 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         if (!CanEditEvents())
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 없음", Explain = "이벤트 편집 권한(events:edit)이 없습니다." });
+            { Title = "권한 없음", Explain = SuppressionPermissionText.EditDenied });
             return;
         }
         if (!CanCreate)
         {
             var why = !IsWindowLengthValid
                 ? $"억제 기간이 너무 깁니다. 최대 {MAX_WINDOW_DAYS}일까지 지정할 수 있습니다."
-                : "작업명·대상(≥1)·시간창(종료>시작)을 확인하세요.";
+                : "작업명, 대상(1개 이상), 시간(종료가 시작보다 뒤)을 확인하세요.";
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "억제 창 생성", Explain = why });
+            { Title = "억제 스케줄 만들기", Explain = why });
             return;
         }
         try
@@ -338,11 +338,15 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 await LoadAllAsync();
                 if (!string.IsNullOrEmpty(echo))
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                    { Title = "억제 창 생성 완료", Explain = echo! });
+                    { Title = "억제 스케줄 만들기 완료", Explain = echo! });
             }
             else
+            {
+                // 서버 원문은 로그로만 — 팝업에는 무엇이 안 됐고 어떻게 하면 되는지만 쓴다.
+                _log?.Warning($"[Suppression] 생성 거절: {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "억제 창 생성", Explain = $"생성 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "억제 스케줄 만들기", Explain = "억제 스케줄을 만들지 못했습니다. 입력한 내용을 확인하고 다시 시도하세요." });
+            }
         }
         catch (Exception ex) { _log?.Error($"[Suppression] 생성 실패: {ex.Message}"); }
     }
@@ -354,13 +358,13 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         if (!CanDelEvents())
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 없음", Explain = "이벤트 삭제 권한(events:delete)이 없습니다." });
+            { Title = "권한 없음", Explain = SuppressionPermissionText.DeleteDenied });
             return;
         }
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
-            Title = "억제 창 취소",
-            Explain = $"'{item.Name}' 억제 창(#{item.Id})을 취소하시겠습니까?\n취소해도 이력은 보존(revoked_at)됩니다.",
+            Title = SuppressionConsoleViewModel.CancelConfirmTitle,
+            Explain = SuppressionConsoleViewModel.CancelConfirmText(item.Name),
             MessageModel = new CallCancelSuppressionMessageModel { ScheduleId = item.Id }
         });
     }
@@ -384,13 +388,17 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 if (residual > 0)
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                     {
-                        Title = "억제 창 취소",
-                        Explain = $"취소했지만 아직 진행 중인 억제 창이 {residual}건 남아 있습니다.\n"
+                        Title = SuppressionConsoleViewModel.CancelConfirmTitle,
+                        Explain = $"취소했지만 아직 진행 중인 억제 스케줄이 {residual}건 남아 있습니다.\n"
                                 + "해당 장비가 계속 억제될 수 있으니 목록에서 '진행중' 항목을 확인하세요."
                     });
             }
-            else await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "억제 창 취소", Explain = $"취소 실패: {res.Error?.Message ?? res.Message}" });
+            else
+            {
+                _log?.Warning($"[Suppression] 취소 거절(#{message.ScheduleId}): {res.Error?.Message ?? res.Message}");
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = SuppressionConsoleViewModel.CancelConfirmTitle, Explain = SuppressionConsoleViewModel.CancelFailedText });
+            }
         }
         catch (Exception ex) { _log?.Error($"[Suppression] 취소 실패: {ex.Message}"); }
         finally
@@ -405,7 +413,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         if (!CanDelEvents())
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 없음", Explain = "이벤트 삭제 권한(events:delete)이 없습니다." });
+            { Title = "권한 없음", Explain = SuppressionPermissionText.DeleteDenied });
             return;
         }
         var ids = Schedules.Where(s => s.IsSelected && s.IsDeletable).Select(s => s.Id).ToList();
@@ -429,7 +437,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         if (!CanDelEvents())
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "권한 없음", Explain = "이벤트 삭제 권한(events:delete)이 없습니다." });
+            { Title = "권한 없음", Explain = SuppressionPermissionText.DeleteDenied });
             return;
         }
         var ids = Schedules.Where(s => s.IsDeletable).Select(s => s.Id).ToList();
@@ -461,7 +469,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 await LoadAllAsync();
                 if (skipped > 0 || notFound > 0)
                 {
-                    var msg = $"{deleted}건 삭제.";
+                    var msg = $"{deleted}건을 삭제했습니다.";
                     if (skipped > 0) msg += $"\n{skipped}건은 진행 중/예정이라 삭제할 수 없습니다. 먼저 취소하세요.";
                     if (notFound > 0) msg += $"\n{notFound}건은 이미 삭제된 항목이라 제외했습니다.";
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
@@ -470,12 +478,13 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             }
             else
             {
-                // 404/405 = 서버에 /bulk-delete 미배포(구버전 서버) — 원인을 바로 알 수 있게 안내.
-                var hint = res.StatusCode is 404 or 405
-                    ? "\n\n※ 서버에 일괄삭제 기능이 아직 배포되지 않았습니다(서버 업데이트 필요)."
-                    : string.Empty;
+                // 404/405 = 이 서버에 /bulk-delete 가 없다(구버전 서버). 서버 원문은 로그로만 남긴다.
+                _log?.Warning($"[Suppression] 일괄 삭제 거절({res.StatusCode}): {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "억제 스케줄 삭제", Explain = $"삭제 실패: {res.Error?.Message ?? res.Message}{hint}" });
+                {
+                    Title = "억제 스케줄 삭제",
+                    Explain = SuppressionConsoleViewModel.BulkDeleteFailedText(res.StatusCode is 404 or 405),
+                });
             }
         }
         catch (Exception ex) { _log?.Error($"[Suppression] 일괄 삭제 실패: {ex.Message}"); }
@@ -568,7 +577,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                     DeviceGroupProvider?.CollectionEntity.FirstOrDefault(g => g.Id == id)?.Name is string n && !string.IsNullOrEmpty(n)
                         ? n : $"#{id}"));
             default:
-                return $"전체 대상 · {SideLabel(dto.TargetSide)}에 억제 창을 생성했습니다.";
+                return $"전체 대상 · {SideLabel(dto.TargetSide)}에 억제 스케줄을 만들었습니다.";
         }
     }
 
@@ -581,7 +590,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         var head = string.Join(", ", names);
         var rest = total - names.Count;
         var subject = rest > 0 ? $"{head} 외 {rest}개 {kindLabel}" : $"{head}({kindLabel} {total}개)";
-        return $"{subject}에 억제 창을 생성했습니다.\n대상이 맞는지 아래 목록에서 확인하세요.";
+        return $"{subject}에 억제 스케줄을 만들었습니다.\n대상이 맞는지 아래 목록에서 확인하세요.";
     }
 
     /// <summary>side 코드 → 표시 문구.</summary>
@@ -636,8 +645,11 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 await RefreshActiveAsync(ct).ConfigureAwait(false);   // (§5-B/§7) 활성 창 캐시 동기 갱신
             }
             else if (!res.Success)
+            {
+                _log?.Warning($"[Suppression] 목록 거절: {res.Error?.Message ?? res.Message}");
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "억제 스케줄", Explain = $"목록 불러오기 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "억제 스케줄", Explain = "목록을 불러오지 못했습니다. 갱신 버튼으로 다시 시도하세요." });
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[Suppression] 전체 로드 실패: {ex.Message}"); }
@@ -730,7 +742,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     public bool HasWindowLengthWarning => !IsWindowLengthValid;
     /// <summary>기간 상한 경고 문구(모드별).</summary>
     public string WindowLengthWarningText => IsWeeklyMode
-        ? $"⚠ 유효기간이 {EffectiveMaxWindowDays}일을 초과했습니다 — 무제한을 쓰세요"
+        ? $"⚠ 유효기간이 {EffectiveMaxWindowDays}일을 넘었습니다. 더 길게 하려면 무제한을 쓰세요"
         : $"⚠ 억제 기간이 최대 {EffectiveMaxWindowDays}일을 초과했습니다";
 
     #region - 주간 반복 폼 상태 (API 6.3.3) -
@@ -1016,7 +1028,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     /// <summary>상단 활성 억제 요약 — 은폐 방지(정비 중임을 상시 인지).</summary>
     public string ActiveCountText => ActiveWindows.Count == 0
         ? string.Empty
-        : $"⚠ 현재 억제 중 {ActiveWindows.Count}건 — 정비 창이 진행 중입니다"
+        : $"⚠ 현재 억제 중인 스케줄 {ActiveWindows.Count}건"
           + (IsActiveStale ? $" · {ActiveStaleText}" : string.Empty);
 
     /// <summary>정리할 취소/종료 항목이 있는가('모두 정리' 버튼 활성).</summary>
@@ -1032,7 +1044,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 SelectedDevices.Select(d => d.Id),
                 SelectedGroups.Select(g => g.Id));
             return dup > 0
-                ? $"⚠ 같은 대상에 진행 중인 억제 창이 이미 {dup}건 있습니다 (중복 생성 시 하나만 취소해도 억제가 계속됩니다)"
+                ? $"⚠ 같은 대상에 진행 중인 억제 스케줄이 이미 {dup}건 있습니다 (중복으로 만들면 하나를 취소해도 억제가 계속됩니다)"
                 : string.Empty;
         }
     }

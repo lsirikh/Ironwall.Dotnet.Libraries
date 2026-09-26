@@ -38,6 +38,8 @@ public sealed class EventOverviewViewModelSeriesColorTests : IDisposable
         ["StatusCriticalBrush"] = Color.FromArgb(255, 0x77, 0x88, 0x99),
         ["PrimaryBrush"] = Color.FromArgb(255, 0xAA, 0xBB, 0xCC),
         ["StatusNormalBrush"] = Color.FromArgb(255, 0xDD, 0xEE, 0xFF),
+        // 사전 경보 — 센서 탐지(StatusWarningBrush)와 갈라 정보색을 쓴다(감사 E-3 #5).
+        ["StatusInfoBrush"] = Color.FromArgb(255, 0x12, 0x34, 0x56),
     };
 
     public EventOverviewViewModelSeriesColorTests()

@@ -61,7 +61,7 @@ public class EventSuppressionScheduleTests
     public void should_show_whole_when_target_type_all()
     {
         var vm = new EventSuppressionScheduleItemViewModel(Dto("all", side: "detection"), null, null);
-        Assert.Equal("전체(detection)", vm.TargetSummary);
+        Assert.Equal("전체 · 감지", vm.TargetSummary);
     }
 
     // ── 상태/범위 표기 ──

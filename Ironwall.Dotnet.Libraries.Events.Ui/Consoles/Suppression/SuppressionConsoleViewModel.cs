@@ -26,7 +26,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 
-/// <summary>억제 창 취소(soft-cancel) 확인 트리거 — <b>콘솔 전용</b>.</summary>
+/// <summary>억제 스케줄 취소(soft-cancel) 확인 트리거 — <b>콘솔 전용</b>.</summary>
 /// <remarks>
 /// 옛 패널의 메시지 타입을 다시 쓰지 않는다 — 두 화면이 같이 살아 있으면 같은 확인 한 번에
 /// DELETE 가 <b>두 번</b> 나간다(패널 · 콘솔이 둘 다 <c>IHandle</c> 이라서).
@@ -205,6 +205,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             NotifyOfPropertyChange(nameof(DetailTitle));
             NotifyOfPropertyChange(nameof(DetailKind));
             NotifyOfPropertyChange(nameof(DetailTargets));
+            NotifyOfPropertyChange(nameof(IsDetailTargetsEmpty));
+            NotifyOfPropertyChange(nameof(DetailTargetsEmptyText));
             NotifyOfPropertyChange(nameof(DetailNote));
             NotifyOfPropertyChange(nameof(HasDetailNote));
             NotifyOfPropertyChange(nameof(StatusLineText));
@@ -218,8 +220,8 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
 
     /// <summary>빈 목록 안내 — 왜 비었는지에 따라 말이 달라진다.</summary>
     public string EmptyText => _filterKey == SuppressionStatusView.FilterAll
-        ? "등록된 억제 스케줄이 없습니다 — [새 스케줄] 로 만드세요."
-        : "이 상태에 맞는 스케줄이 없습니다 — 필터를 '전체' 로 바꿔 보세요.";
+        ? "등록된 억제 스케줄이 없습니다. [새 스케줄]로 만드세요."
+        : "이 상태에 맞는 스케줄이 없습니다. 필터를 '전체'로 바꿔 보세요.";
 
     /// <summary>
     /// 상태 띠 — 불러온 수 · 전체 수 · 억제중 수 · <b>기준 시각</b>.
@@ -231,7 +233,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     /// </remarks>
     public string StatusLineText
         => $"불러온 {Schedules.Count} / {_totalCount}건 · 억제중 {SuppressingCount}건"
-         + (_loadedAt is { } at ? $" · {at:HH:mm} 기준([갱신]으로 최신화)" : string.Empty)
+         + (_loadedAt is { } at ? $" · {at:HH:mm} 기준([새로 불러오기]로 최신화)" : string.Empty)
          + (_selected is null ? string.Empty : $" · 선택 {_selected.Name}");
 
     /// <summary>목록을 마지막으로 받아 온 시각(시계에서 온 값).</summary>
@@ -279,7 +281,9 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
 
             if (!res.Success || res.Data is null)
             {
-                Post(() => StatusText = $"목록을 불러오지 못했습니다 — {res.Error?.Message ?? res.Message}");
+                // 서버 원문은 로그로만 — 화면에는 무엇이 안 됐고 어떻게 하면 되는지만 쓴다.
+                _log?.Warning($"[SuppressionConsole] 목록 거절: {res.Error?.Message ?? res.Message}");
+                Post(() => StatusText = LoadFailedText);
                 return;
             }
 
@@ -304,13 +308,16 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         {
             // 예외 본문은 로그로만 — 화면 문장에 서버 주소가 실리면 안 된다.
             _log?.Error($"[SuppressionConsole] 목록 실패: {ex}");
-            Post(() => StatusText = "목록을 불러오지 못했습니다 — 서버에 닿지 못했습니다. [갱신] 으로 다시 시도하세요.");
+            Post(() => StatusText = LoadFailedText);
         }
         finally
         {
             Post(() => IsBusy = false);
         }
     }
+
+    /// <summary>목록을 받지 못했을 때의 한 줄.</summary>
+    public const string LoadFailedText = "목록을 불러오지 못했습니다. [새로 불러오기]로 다시 시도하세요.";
 
     /// <summary>다음 페이지(아래로 내렸을 때).</summary>
     public async Task LoadMoreAsync(CancellationToken token = default)
@@ -441,7 +448,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     /// <summary>[새 스케줄] — 정본 SB L2392.</summary>
     public bool CanAdd => _canEdit() && !IsBusy;
 
-    public string AddBlockedReason => _canEdit() ? "목록을 불러오는 중입니다." : "이벤트 편집 권한(events:edit)이 없습니다.";
+    public string AddBlockedReason => _canEdit() ? "목록을 불러오는 중입니다." : SuppressionPermissionText.EditDenied;
 
     public void AddNew()
     {
@@ -460,7 +467,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     public async Task EditSelectedAsync(CancellationToken token = default)
     {
         if (_selected is null) return;
-        if (!_canEdit()) { StatusText = "이벤트 편집 권한(events:edit)이 없습니다."; return; }
+        if (!_canEdit()) { StatusText = SuppressionPermissionText.EditDenied; return; }
         // 초안이 살아 있으면 열기 전에 막는다 — 응답을 기다린 뒤 막으면 그 사이 화면이 바뀐다.
         if (!Drawer.TryLeave()) { StatusText = Drawer.StatusLine; return; }
 
@@ -506,18 +513,27 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             var unitId = await SuppressionUnitStamp.ResolveForCreateAsync(_unitScope(), _log, "SuppressionConsole", token).ConfigureAwait(false);
             var res = await _api.CreateSuppressionScheduleAsync(SuppressionRequestBuilder.BuildCreate(draft, unitId), token)
                                 .ConfigureAwait(false);
-            return res.Success
-                ? new SuppressionSaveOutcome(true, "억제 스케줄을 만들었습니다.", res.Data)
-                : new SuppressionSaveOutcome(false, $"만들지 못했습니다 — {res.Error?.Message ?? res.Message}", null);
+            if (res.Success) return new SuppressionSaveOutcome(true, "억제 스케줄을 만들었습니다.", res.Data);
+
+            // 서버 원문(검증 메시지 · 상태 코드)은 로그로만 — 화면 문장은 고정이다.
+            _log?.Warning($"[SuppressionConsole] 생성 거절: {res.Error?.Message ?? res.Message}");
+            return new SuppressionSaveOutcome(false, CreateFailedText, null);
         }
 
         var patch = await _api.PatchSuppressionScheduleAsync(draft.Id!.Value,
                                                              SuppressionRequestBuilder.BuildUpdate(draft),
                                                              token).ConfigureAwait(false);
-        return patch.Success
-            ? new SuppressionSaveOutcome(true, "억제 스케줄을 고쳤습니다.", patch.Data)
-            : new SuppressionSaveOutcome(false, $"고치지 못했습니다 — {patch.Error?.Message ?? patch.Message}", null);
+        if (patch.Success) return new SuppressionSaveOutcome(true, "억제 스케줄을 수정했습니다.", patch.Data);
+
+        _log?.Warning($"[SuppressionConsole] 수정 거절(#{draft.Id}): {patch.Error?.Message ?? patch.Message}");
+        return new SuppressionSaveOutcome(false, UpdateFailedText, null);
     }
+
+    /// <summary>생성을 서버가 받지 않았을 때의 한 줄.</summary>
+    public const string CreateFailedText = "억제 스케줄을 만들지 못했습니다. 입력한 내용을 확인하고 다시 저장하세요.";
+
+    /// <summary>수정을 서버가 받지 않았을 때의 한 줄.</summary>
+    public const string UpdateFailedText = "억제 스케줄을 수정하지 못했습니다. [새로 불러오기]로 최신 내용을 확인한 뒤 다시 저장하세요.";
 
     #endregion
 
@@ -543,6 +559,14 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         }
     }
 
+    /// <summary>고른 행에 대상 칩이 하나도 없는가 — 그러면 칩 자리에 안내 한 줄을 낸다.</summary>
+    public bool IsDetailTargetsEmpty => _selected is not null && DetailTargets.Count == 0;
+
+    /// <summary>칩 자리가 비었을 때의 안내 — 전체 대상 스케줄은 원래 칩이 없다.</summary>
+    public string DetailTargetsEmptyText => _selected?.Dto.TargetType == SuppressionTargetDrop.ModeAll
+        ? "모든 장비에 적용되는 스케줄입니다."
+        : "담긴 대상이 없습니다.";
+
     /// <summary>'진행중' 이 '지금 억제 중' 이 아니라는 안내(SB L2738).</summary>
     public string DetailNote => _selected?.Shape == SuppressionStatusShape.InWindow
         ? "진행중은 유효기간 안이라는 뜻이고, 지금 억제 중인 것은 아닙니다."
@@ -560,16 +584,25 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     public async Task CancelSelectedAsync()
     {
         if (_selected is null) return;
-        if (!_canDelete()) { StatusText = "이벤트 삭제 권한(events:delete)이 없습니다."; return; }
+        if (!_canDelete()) { StatusText = SuppressionPermissionText.DeleteDenied; return; }
         if (!_selected.IsCancellable) { StatusText = "이미 끝났거나 취소된 스케줄입니다."; return; }
 
         await _events.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
         {
-            Title = "억제 창 취소",
-            Explain = $"'{_selected.Name}' 억제 창(#{_selected.Id})을 취소하시겠습니까?\n취소해도 이력은 보존(revoked_at)됩니다.",
+            Title = CancelConfirmTitle,
+            Explain = CancelConfirmText(_selected.Name),
             MessageModel = new CallCancelConsoleSuppressionMessageModel { ScheduleId = _selected.Id, Name = _selected.Name },
         }).ConfigureAwait(false);
     }
+
+    /// <summary>취소 확인 팝업 제목 — 콘솔과 옛 억제창이 같은 말을 쓴다.</summary>
+    public const string CancelConfirmTitle = "억제 스케줄 취소";
+
+    /// <summary>
+    /// 취소 확인 본문. 내부 번호(#id)와 필드 이름(<c>revoked_at</c>)은 싣지 않는다 — 운영자가 알아볼 것은 이름이다.
+    /// </summary>
+    public static string CancelConfirmText(string? name)
+        => $"'{name}' 억제 스케줄을 취소할까요?\n취소해도 기록은 남습니다.";
 
     /// <summary>체크된 취소/종료 행.</summary>
     public int SelectedDeleteCount => Schedules.Count(s => s.IsSelected && s.IsDeletable);
@@ -589,7 +622,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
 
     public async Task DeleteSelectedAsync()
     {
-        if (!_canDelete()) { StatusText = "이벤트 삭제 권한(events:delete)이 없습니다."; return; }
+        if (!_canDelete()) { StatusText = SuppressionPermissionText.DeleteDenied; return; }
 
         var ids = Schedules.Where(s => s.IsSelected && s.IsDeletable).Select(s => s.Id).ToList();
         if (ids.Count == 0) { StatusText = "삭제할 취소/종료 항목을 체크하세요."; return; }
@@ -601,13 +634,14 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     public bool CanCleanupAll => _canDelete() && Schedules.Any(s => s.IsDeletable);
 
     /// <summary>
-    /// [정리] 버튼 글자. 칩이 여섯이라 툴바가 빡빡하다 — 짧게 쓰고 무엇을 지우는지는 ToolTip 이 말한다.
+    /// [정리] 버튼 글자. "정리 (51)" 만으로는 무엇을 지우는지 몰랐다(감사 E-7 #11) — 대상을 앞에 붙인다.
+    /// 칩이 여섯이라 툴바가 빡빡해 가운뎃점으로 짧게 쓴다.
     /// </summary>
-    public string CleanupText => $"정리 ({Schedules.Count(s => s.IsDeletable)})";
+    public string CleanupText => $"종료·취소 정리 ({Schedules.Count(s => s.IsDeletable)})";
 
     public async Task CleanupAllAsync()
     {
-        if (!_canDelete()) { StatusText = "이벤트 삭제 권한(events:delete)이 없습니다."; return; }
+        if (!_canDelete()) { StatusText = SuppressionPermissionText.DeleteDenied; return; }
 
         var ids = Schedules.Where(s => s.IsDeletable).Select(s => s.Id).ToList();
         if (ids.Count == 0) { StatusText = "정리할 취소/종료 항목이 없습니다."; return; }
@@ -636,15 +670,19 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
                 // 하나를 취소해도 다른 활성 창이 계속 억제할 수 있다 — 방금 서버가 확인해 준 값으로 센다.
                 var residual = _active.Count;
                 Post(() => StatusText = residual > 0
-                    ? $"'{message.Name}' 을(를) 취소했습니다 — 아직 진행 중인 억제 창이 {residual}건 남아 있습니다."
+                    ? $"'{message.Name}' 을(를) 취소했습니다. 아직 진행 중인 억제 스케줄이 {residual}건 남아 있습니다."
                     : $"'{message.Name}' 을(를) 취소했습니다.");
             }
-            else Post(() => StatusText = $"취소하지 못했습니다 — {res.Error?.Message ?? res.Message}");
+            else
+            {
+                _log?.Warning($"[SuppressionConsole] 취소 거절(#{message.ScheduleId}): {res.Error?.Message ?? res.Message}");
+                Post(() => StatusText = CancelFailedText);
+            }
         }
         catch (Exception ex)
         {
             _log?.Error($"[SuppressionConsole] 취소 실패: {ex}");
-            Post(() => StatusText = "취소하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.");
+            Post(() => StatusText = CancelFailedText);
         }
         finally
         {
@@ -670,11 +708,11 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
                 var res = await _api.BulkDeleteSuppressionSchedulesAsync(batch, cancellationToken).ConfigureAwait(false);
                 if (!res.Success)
                 {
-                    // 404/405 = 서버에 /bulk-delete 미배포 — 원인을 바로 알 수 있게 밝힌다.
-                    var hint = res.StatusCode is 404 or 405 ? " (서버에 일괄삭제가 아직 배포되지 않았습니다)" : string.Empty;
-                    var partial = deleted.Count > 0 ? $" 앞선 {deleted.Count}건은 이미 지워졌습니다." : string.Empty;
-                    var reason = res.Error?.Message ?? res.Message;
-                    Post(() => StatusText = $"삭제하지 못했습니다 — {reason}{hint}{partial}");
+                    // 서버 원문은 로그로만. 404/405 = 이 서버에 /bulk-delete 가 없다 — 그 사실만 운영자 말로 알린다.
+                    _log?.Warning($"[SuppressionConsole] 일괄 삭제 거절({res.StatusCode}): {res.Error?.Message ?? res.Message}");
+                    var head = BulkDeleteFailedText(res.StatusCode is 404 or 405);
+                    var partial = deleted.Count > 0 ? $" 앞선 {deleted.Count}건은 이미 삭제됐습니다." : string.Empty;
+                    Post(() => StatusText = head + partial);
                     if (deleted.Count > 0) await LoadAsync(cancellationToken).ConfigureAwait(false);
                     return;
                 }
@@ -695,13 +733,21 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         catch (Exception ex)
         {
             _log?.Error($"[SuppressionConsole] 일괄 삭제 실패: {ex}");
-            Post(() => StatusText = "삭제하지 못했습니다 — 서버에 닿지 못했습니다. 잠시 뒤 다시 시도하세요.");
+            Post(() => StatusText = BulkDeleteFailedText(unsupported: false));
         }
         finally
         {
             await _events.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>취소를 서버가 받지 않았을 때의 한 줄.</summary>
+    public const string CancelFailedText = "억제 스케줄을 취소하지 못했습니다. 잠시 뒤 다시 시도하세요.";
+
+    /// <summary>일괄 삭제 실패 문장. <paramref name="unsupported"/> = 이 서버에 일괄 삭제 기능이 없다(404/405).</summary>
+    public static string BulkDeleteFailedText(bool unsupported) => unsupported
+        ? "삭제하지 못했습니다. 이 서버에서는 일괄 삭제를 지원하지 않습니다."
+        : "삭제하지 못했습니다. 잠시 뒤 다시 시도하세요.";
 
     #endregion
 
@@ -717,6 +763,17 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
     private static void Post(System.Action action) => Execute.OnUIThread(action);
 
     #endregion
+}
+
+/// <summary>
+/// 권한이 없을 때 운영자에게 보이는 문장 — 권한 키(<c>events:edit</c> 등)는 화면에 싣지 않는다.
+/// 콘솔 · 서랍 · 트레이 · 옛 억제창이 같은 문장을 쓴다.
+/// </summary>
+public static class SuppressionPermissionText
+{
+    public const string ViewDenied = "이벤트 조회 권한이 없습니다.";
+    public const string EditDenied = "이벤트 편집 권한이 없습니다.";
+    public const string DeleteDenied = "이벤트 삭제 권한이 없습니다.";
 }
 
 /// <summary>상태 필터 칩 하나.</summary>

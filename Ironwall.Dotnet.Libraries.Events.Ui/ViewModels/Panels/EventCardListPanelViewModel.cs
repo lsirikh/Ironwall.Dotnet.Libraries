@@ -460,11 +460,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
             catch (Exception ex)
             {
-                // API 실패 시 즉시 중단하고 에러 팝업 표시 (남은 카드는 유지)
+                // API 실패 시 즉시 중단하고 에러 팝업 표시 (남은 카드는 유지).
+                // 예외 원문(스택 추적 · 서버 메시지)은 로그로만 — 팝업에는 무엇이 안 됐고 어떻게 하면 되는지만(완성도 수정 패스).
+                _log?.Error($"[EventCardList] 전체 조치보고 중단: {ex}");
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "전체 조치보고 오류",
-                    Explain = $"{ex}"
+                    Explain = "조치보고를 보내는 중에 멈췄습니다. 보내지 못한 카드는 그대로 남아 있으니 잠시 뒤 다시 [전체 조치보고]를 누르세요."
                 });
             }
             finally

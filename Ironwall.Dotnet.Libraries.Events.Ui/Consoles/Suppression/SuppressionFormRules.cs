@@ -79,12 +79,12 @@ public static class SuppressionFormRules
             if (mine.Count == 0)
                 errors.Add(new SuppressionFormError(FieldTargets,
                     wanted == SuppressionTargetKind.Device
-                        ? "대상 장비를 1개 이상 담으세요 — 목록에서 끌어 놓거나 [추가 ▶] 를 누릅니다."
-                        : "대상 그룹을 1개 이상 담으세요 — 목록에서 끌어 놓거나 [추가 ▶] 를 누릅니다."));
+                        ? "대상 장비를 1개 이상 담으세요. 목록에서 끌어 놓거나 [추가 ▶]를 누르세요."
+                        : "대상 그룹을 1개 이상 담으세요. 목록에서 끌어 놓거나 [추가 ▶]를 누르세요."));
 
             if (mine.Count > SuppressionTargetDrop.MaxTargets)
                 errors.Add(new SuppressionFormError(FieldTargets,
-                    $"대상은 한 스케줄에 {SuppressionTargetDrop.MaxTargets}개까지입니다 — 지금 {mine.Count}개."));
+                    $"대상은 한 스케줄에 {SuppressionTargetDrop.MaxTargets}개까지 담을 수 있습니다(지금 {mine.Count}개)."));
 
             if (mine.Select(t => t.Key).Distinct(StringComparer.Ordinal).Count() != mine.Count)
                 errors.Add(new SuppressionFormError(FieldTargets, "같은 대상이 두 번 담겼습니다."));
@@ -93,7 +93,7 @@ public static class SuppressionFormRules
         // ── 시간창 ──────────────────────────────────────────────────────
         // 무제한은 주간 반복 전용이다 — 단발 + 종료 없음은 서버가 422 로 막는다.
         if (draft.IsUnlimited && !draft.IsWeekly)
-            errors.Add(new SuppressionFormError(FieldWindow, "단발 억제에는 종료 시각이 있어야 합니다 — 무제한은 주간 반복에서만 됩니다."));
+            errors.Add(new SuppressionFormError(FieldWindow, "단발 억제에는 종료 시각이 있어야 합니다. 기간 제한 없음은 주간 반복에서만 쓸 수 있습니다."));
         else if (!draft.IsUnlimited && draft.WindowEnd is { } end && end <= draft.WindowStart)
             errors.Add(new SuppressionFormError(FieldWindow, "종료가 시작보다 뒤여야 합니다."));
 
@@ -105,7 +105,7 @@ public static class SuppressionFormRules
             var max = SuppressionRules.MaxWindowDaysFor(draft.RecurrenceMode);
             errors.Add(new SuppressionFormError(FieldWindow,
                 draft.IsWeekly
-                    ? $"유효기간이 {max}일을 넘었습니다 — 무제한을 쓰세요."
+                    ? $"유효기간은 최대 {max}일입니다. 더 길게 하려면 [기간 제한 없음]을 켜세요."
                     : $"억제 기간은 최대 {max}일입니다."));
         }
 
@@ -129,15 +129,15 @@ public static class SuppressionFormRules
         // ── 경고(막지 않는다) ───────────────────────────────────────────
         var overlapping = CountOverlapping(draft, others);
         if (overlapping > 0)
-            warnings.Add($"같은 대상에 진행 중인 억제 창이 이미 {overlapping}건 있습니다 — "
-                       + "중복으로 만들면 하나만 취소해도 억제가 계속됩니다.");
+            warnings.Add($"같은 대상에 진행 중인 억제 스케줄이 이미 {overlapping}건 있습니다. "
+                       + "중복으로 만들면 하나를 취소해도 억제가 계속됩니다.");
 
         if (draft.IsWeekly
             && SuppressionRules.ClassifyDailyTime(draft.DailyStart, draft.DailyEnd) == SuppressionRules.DailyTimeVerdict.Overnight)
-            warnings.Add($"자정을 넘깁니다 — 다음날 {draft.DailyEnd:hh\\:mm} 에 끝납니다.");
+            warnings.Add($"자정을 넘깁니다. 다음날 {draft.DailyEnd:hh\\:mm}에 끝납니다.");
 
         if (!draft.IsWeekly && !draft.IsUnlimited && draft.WindowEnd is { } past && past <= now)
-            warnings.Add("종료 시각이 이미 지났습니다 — 만들자마자 '종료' 로 보입니다.");
+            warnings.Add("종료 시각이 이미 지났습니다. 저장하면 바로 '종료'로 표시됩니다.");
 
         return new SuppressionFormVerdict(errors, warnings);
     }

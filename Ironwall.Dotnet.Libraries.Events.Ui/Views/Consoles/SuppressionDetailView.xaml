@@ -164,6 +164,16 @@
 					Margin="0,14,0,0"
 					AxisName="target_device_ids / target_group_ids"
 					Header="대상">
+					<StackPanel>
+					<!--  칩이 없으면 빈 자리만 남았다(E-7 #13) — 비었다는 사실을 말한다  -->
+					<TextBlock
+						Margin="0,6,0,0"
+						AutomationProperties.AutomationId="Console.Suppression.Detail.ChipsEmpty"
+						FontSize="12"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding DetailTargetsEmptyText}"
+						TextWrapping="Wrap"
+						Visibility="{Binding IsDetailTargetsEmpty, Converter={StaticResource BoolToVis}}" />
 					<ItemsControl
 						Margin="0,6,0,0"
 						AutomationProperties.AutomationId="Console.Suppression.Detail.Chips"
@@ -188,6 +198,7 @@
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
+					</StackPanel>
 				</c:ConsoleSection>
 
 				<!--  '진행중' 은 '지금 억제 중' 이 아니다 (SB L2738)  -->

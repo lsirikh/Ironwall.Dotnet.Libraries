@@ -467,7 +467,9 @@ public class SuppressionConsoleViewModelTests
 
         // 거절은 조용하면 안 된다 — 서랍은 열린 채 남고 한 줄이 뜬다.
         Assert.True(_console.Drawer.IsOpen);
-        Assert.Contains("거절", _console.Drawer.StatusLine);
+        Assert.Equal(SuppressionConsoleViewModel.CreateFailedText, _console.Drawer.StatusLine);
+        // 서버 원문("서버가 거절했습니다")은 로그로만 간다 — 화면 문장은 고정이다.
+        Assert.DoesNotContain("서버가 거절했습니다", _console.Drawer.StatusLine);
     }
 
     [Fact]
@@ -481,7 +483,7 @@ public class SuppressionConsoleViewModelTests
         await _console.Drawer.SaveAsync();
 
         Assert.False(_console.Drawer.IsOpen);
-        Assert.Contains("억제 창을 적용했습니다", _console.StatusText);
+        Assert.Contains("억제 스케줄을 적용했습니다", _console.StatusText);
     }
 
     [Fact]

@@ -170,7 +170,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public bool HasMapping => _selectedMapping is not null;
 
     /// <summary>보드 머리에 쓸 제목.</summary>
-    public string MappingTitle => _selectedMapping?.Name ?? "맵핑을 고르십시오";
+    public string MappingTitle => _selectedMapping?.Name ?? "맵핑을 고르세요";
 
     /// <summary>매핑 목록 검색어.</summary>
     public string SearchText
@@ -207,7 +207,44 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public bool IsBusy
     {
         get => _isBusy;
-        private set { _isBusy = value; NotifyOfPropertyChange(); RaiseCommandStates(); }
+        private set { _isBusy = value; NotifyOfPropertyChange(); RaiseCommandStates(); RaiseEmptyStates(); }
+    }
+
+    private bool _listLoadFailed;
+
+    /// <summary>맵핑 목록 빈 자리를 보일까 — 불러오는 동안에는 "없다" 고 말하지 않는다.</summary>
+    public bool IsMappingListEmpty => Mappings.Count == 0 && !IsBusy;
+
+    /// <summary>맵핑 목록 빈 자리 제목 — 못 불러온 것 · 한 건도 없는 것 · 검색에 걸린 것이 없는 것을 가른다.</summary>
+    public string MappingEmptyTitle =>
+        _listLoadFailed ? "맵핑 목록을 불러오지 못했습니다"
+        : _allMappings.Count == 0 ? "등록된 맵핑이 없습니다"
+        : "검색 조건에 맞는 맵핑이 없습니다";
+
+    /// <summary>맵핑 목록 빈 자리 힌트 — 다음에 무엇을 하면 되는지.</summary>
+    public string MappingEmptyHint =>
+        _listLoadFailed ? "[새로 고침]을 눌러 다시 시도하세요."
+        : _allMappings.Count == 0 ? (CanEdit ? "[맵핑 등록]으로 만드세요." : "편집 권한이 있는 사용자가 만들 수 있습니다.")
+        : "검색어를 바꿔 보세요.";
+
+    /// <summary>팔레트 빈 자리를 보일까.</summary>
+    public bool IsPaletteEmpty => PaletteItems.Count == 0;
+
+    /// <summary>팔레트 빈 자리 제목.</summary>
+    public string PaletteEmptyTitle => "조건에 맞는 장비가 없습니다";
+
+    /// <summary>팔레트 빈 자리 힌트.</summary>
+    public string PaletteEmptyHint => string.IsNullOrWhiteSpace(PaletteSearch)
+        ? $"등록된 {KindLabel} 장비가 없습니다."
+        : "검색어를 바꿔 보세요.";
+
+    private void RaiseEmptyStates()
+    {
+        NotifyOfPropertyChange(nameof(IsMappingListEmpty));
+        NotifyOfPropertyChange(nameof(MappingEmptyTitle));
+        NotifyOfPropertyChange(nameof(MappingEmptyHint));
+        NotifyOfPropertyChange(nameof(IsPaletteEmpty));
+        NotifyOfPropertyChange(nameof(PaletteEmptyHint));
     }
 
     /// <summary>적용하는 중인가 — 이 동안 화면 전체가 입력 잠금이다.</summary>
@@ -243,8 +280,9 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     /// <summary>편집 권한이 있는가(드래그 가능 여부와 같은 값 — 바인딩 이름을 나눠 둔다).</summary>
     public bool IsDragEnabled => CanEdit && HasMapping;
 
-    /// <summary>권한 안내 한 줄 — 상태줄 오른쪽.</summary>
-    public string PermissionText => CanEdit ? $"{PermissionModule}:edit ✓" : "읽기 전용";
+    /// <summary>권한 안내 한 줄 — 상태줄 오른쪽. 권한 키 원문(<c>integrations:edit</c>)은 내지 않는다(감사 E-10 #1).</summary>
+    /// <remarks>적용 중에는 <see cref="CanEdit"/> 가 잠깐 꺼지므로 권한 자체(<see cref="IsReadOnly"/> 와 별개)를 본다.</remarks>
+    public string PermissionText => (_permissions?.CanEdit(PermissionModule) ?? true) ? "편집 가능" : "읽기 전용";
     #endregion
 
     #region - 생명주기 -
@@ -290,6 +328,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(IsDragEnabled));
         NotifyOfPropertyChange(nameof(PermissionText));
         NotifyOfPropertyChange(nameof(BannerText));
+        NotifyOfPropertyChange(nameof(MappingEmptyHint));
         Detail.IsReadOnly = IsReadOnly;
         RaiseCommandStates();
     }
@@ -316,9 +355,11 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             {
                 // 🔴 실패에 캐시를 비우지 않는다 — 비우면 500/503 이 "0건" 으로 보인다.
                 StatusText = result.Message;
+                _listLoadFailed = true;
                 return;
             }
 
+            _listLoadFailed = false;
             _allMappings.Clear();
             _allMappings.AddRange(result.Value ?? Array.Empty<EventMappingReadDto>());
             RebuildMappingList();
@@ -452,6 +493,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
             if (existing is null) Mappings.Insert(Math.Min(i, Mappings.Count), new MappingListItemViewModel(rows[i]));
             else existing.Replace(rows[i]);
         }
+        RaiseEmptyStates();
     }
 
     private void RebuildBoardRows()
@@ -496,6 +538,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         PaletteItems.Clear();
         foreach (var item in filtered) PaletteItems.Add(item);
         NotifyOfPropertyChange(nameof(PaletteItems));
+        RaiseEmptyStates();
     }
 
     private void OnBoardChanged(object? sender, EventArgs e)
@@ -735,7 +778,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         EditDescription = string.Empty;
         EditStatus = true;
         MappingFormError = string.Empty;
-        StatusText = "새 맵핑의 이름과 조건을 정한 뒤 [등록] 을 누르십시오.";
+        StatusText = "새 맵핑의 이름과 조건을 정한 뒤 [등록]을 누르세요.";
     }
 
     /// <summary>새 맵핑 만들기를 접는다.</summary>
@@ -758,7 +801,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         if (!CanSaveMapping) return;
         if (!EventMappingRules.TryValidateMapping(EditName, EditCategory, EditDescription, out var error))
         {
-            MappingFormError = error ?? "입력값을 확인하십시오.";
+            MappingFormError = error ?? "입력값을 확인하세요.";
             return;
         }
         MappingFormError = string.Empty;
@@ -902,6 +945,10 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
                 await ApplyKindAsync(mapping.Id, kindPlan, outcome);
             }
 
+            // 서버 원문은 화면에 내지 않는다 — 진단용으로만 남긴다.
+            foreach (var raw in outcome.RawFailureDetails)
+                System.Diagnostics.Trace.WriteLine($"[MappingWorkbench] apply item failed: {raw}");
+
             StatusText = outcome.ToMessage();
         }
         catch (Exception ex)
@@ -1001,7 +1048,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
 
     /// <summary>동시 편집 안내 — 부모든 배선이든 같은 문구를 쓴다.</summary>
     private const string DriftNotice =
-        "다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하십시오. 변경한 내용은 그대로 있습니다.";
+        "다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하세요. 변경한 내용은 그대로 있습니다.";
 
     /// <summary>
     /// 배선 행이 내가 읽은 뒤에 바뀌었는가 — <c>config_id</c> 별 <c>updated_at</c> 대조.
@@ -1047,7 +1094,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     public MappingDropVerdict Verdict(DragPayload payload, DropTarget target)
     {
         if (IsApplying) return MappingDropVerdict.Block("적용하는 중입니다.");
-        if (IsCreatingMapping) return MappingDropVerdict.Block("새 맵핑을 먼저 등록하십시오.");
+        if (IsCreatingMapping) return MappingDropVerdict.Block("새 맵핑을 먼저 등록하세요.");
 
         if (target.ZoneKey == MappingKindText.PaletteZone)
         {

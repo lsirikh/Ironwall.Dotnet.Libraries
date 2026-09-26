@@ -160,7 +160,7 @@ public class GroupDetectionHistoryTests
         // 최신순 절단 — 남은 500건의 최소 시각이 잘려나간 100건의 최대 시각보다 뒤
         var oldestKept = vm.FilteredItems.Min(i => i.DateTime);
         Assert.True(oldestKept > baseTime.AddMinutes(49));
-        Assert.Contains("상한 500", vm.RangeText);
+        Assert.Contains("최대 500건", vm.RangeText);
     }
 
     [Fact]

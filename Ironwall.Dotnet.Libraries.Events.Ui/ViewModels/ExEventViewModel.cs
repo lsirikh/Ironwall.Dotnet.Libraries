@@ -55,7 +55,11 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
     /// 표시용 장비 이름 — 장비가 지워졌으면 서버 스냅샷(<c>device_description</c>)을 "삭제된 장비 · …" 로 보인다(E8).
     /// 목록 열 · 드래그 고스트 · 상세 제목이 이 값을 쓴다.
     /// </summary>
-    public string? DeviceLabel => Helpers.EventDeviceSnapshot.Label(_model.Device, _model);
+    /// <remarks>지워진 장비는 짧게 "삭제된 장비 (이름)" — 서버 스냅샷 원문은 <see cref="DeviceSnapshotText"/>(툴팁)에 남는다.</remarks>
+    public string? DeviceLabel => Helpers.EventDeviceSnapshot.ShortLabel(_model.Device, _model);
+
+    /// <summary>장비 이름의 원문 — 지워진 장비면 "삭제된 장비 · {서버 스냅샷 원문}". 툴팁용.</summary>
+    public string? DeviceSnapshotText => Helpers.EventDeviceSnapshot.Label(_model.Device, _model);
 
     public IBaseDeviceModel? Device
     {
@@ -79,6 +83,12 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
     }
 
     public bool IsActionReported => Status == EnumTrueFalse.True;
+
+    /// <summary>장비가 (살아 있는) 센서인가 — '탐지 신호 이력' 은 센서 기준으로 조회한다.</summary>
+    public bool IsSensorDevice => Device is ISensorDeviceModel { Id: > 0 };
+
+    /// <summary>행 한 줄 요약 — 화면 읽기 프로그램이 형 이름 대신 읽는다("2026-09-27 00:57:10 · 북측 1").</summary>
+    public string RowSummary => $"{DateTime:yyyy-MM-dd HH:mm:ss} · {DeviceLabel ?? "장비 없음"}";
 
     public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
     public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;

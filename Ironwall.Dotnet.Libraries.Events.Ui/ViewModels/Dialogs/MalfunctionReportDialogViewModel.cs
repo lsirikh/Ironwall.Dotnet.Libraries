@@ -84,8 +84,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
                 {
                     Title = "조치보고 실패",
                     Explain = string.IsNullOrWhiteSpace(result.Reason)
-                        ? "조치보고 저장에 실패했습니다. 네트워크/서버 상태를 확인 후 다시 시도하세요."
-                        : $"조치보고 저장에 실패했습니다 — {result.Reason}"
+                        ? "조치보고를 저장하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도하세요."
+                        : $"조치보고를 저장하지 못했습니다. {result.Reason}"
                 });
                 return;
             }

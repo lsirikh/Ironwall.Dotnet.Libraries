@@ -18,9 +18,66 @@ public partial class EventDashboardView : UserControl
     public EventDashboardView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+        Loaded += (_, _) => BindToolbarParts();
     }
 
     private EventDashboardViewModel? Model => DataContext as EventDashboardViewModel;
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is EventDashboardViewModel old) old.RowFocusRequested -= OnRowFocusRequested;
+        if (e.NewValue is EventDashboardViewModel next) next.RowFocusRequested += OnRowFocusRequested;
+    }
+
+    /// <summary>
+    /// 뷰모델이 "이 행을 골라 보여 달라" 고 했다([원본 열기] · '조치 내역 보기'). 레일을 막 옮긴 직후일 수 있어
+    /// 그리드의 보임이 정해진 뒤(Loaded 우선순위)에 고른다 — 선택은 평소처럼 그리드를 거쳐 뷰모델로 돌아간다.
+    /// </summary>
+    private void OnRowFocusRequested(object row)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var grid = Descendants<DataGrid>(this).FirstOrDefault(g => g.IsVisible && g.Items.Contains(row));
+            if (grid is null) { Model?.SetSelection(new[] { row }); return; }
+            grid.SelectedItems.Clear();
+            grid.SelectedItem = row;
+            grid.ScrollIntoView(row);
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// 툴바 [추가] · [삭제] 의 보임을 뷰모델에 묶는다 — 커널 툴바에는 아직 보임 스위치가 없어, 템플릿 부품에 직접 건다
+    /// (이벤트 목록의 [이벤트 추가] 는 감추고 억제 스케줄의 [새 스케줄] 만 보인다 · 개요에는 [삭제] 가 없다 — 완성도 감사 E-2 #10 · E-3 #7).
+    /// 로컬 값이라 커널에 스위치가 생기면 그쪽으로 옮기면 된다.
+    /// </summary>
+    private void BindToolbarParts()
+    {
+        foreach (var toolbar in Descendants<Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleToolbar>(this))
+        {
+            toolbar.ApplyTemplate();
+            Bind(toolbar, "PART_Add", nameof(EventDashboardViewModel.ShowAdd));
+            Bind(toolbar, "PART_Delete", nameof(EventDashboardViewModel.ShowDelete));
+        }
+
+        static void Bind(Control toolbar, string part, string path)
+        {
+            if (toolbar.Template?.FindName(part, toolbar) is not FrameworkElement element) return;
+            if (BindingOperations.GetBindingExpression(element, VisibilityProperty) is not null) return;
+            BindingOperations.SetBinding(element, VisibilityProperty,
+                new Binding(path) { Converter = new BooleanToVisibilityConverter(), FallbackValue = Visibility.Visible });
+        }
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T hit) yield return hit;
+            foreach (var deep in Descendants<T>(child)) yield return deep;
+        }
+    }
 
     private bool _restoringSelection;
 

@@ -184,7 +184,7 @@
 							IsEnabled="{Binding IsDetailEditable}"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding SignalEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-							ToolTip="탐지 신호 크기(detail.signal)" />
+							ToolTip="탐지 신호 크기" />
 
 						<TextBlock Grid.Row="8" Grid.Column="0" Text="AI" />
 						<Grid Grid.Row="8" Grid.Column="1">
@@ -199,7 +199,7 @@
 								IsEnabled="{Binding IsDetailEditable}"
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding AiModelEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-								ToolTip="AI 모델명(detail.model)" />
+								ToolTip="AI 모델명" />
 							<TextBlock
 								Grid.Column="1"
 								Margin="8,0,4,0"
@@ -213,7 +213,7 @@
 								IsEnabled="{Binding IsDetailEditable}"
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding InferenceMsEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-								ToolTip="추론 시간 ms(detail.inference_ms)" />
+								ToolTip="추론 시간(ms)" />
 						</Grid>
 
 						<TextBlock Grid.Row="9" Grid.Column="0" Text="프레임" />
@@ -230,7 +230,7 @@
 								IsEnabled="{Binding IsDetailEditable}"
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding FrameWidthEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-								ToolTip="프레임 가로 px(detail.frame_width) — 객체 bbox 좌표 해석 기준" />
+								ToolTip="프레임 가로(px)" />
 							<TextBlock
 								Grid.Column="1"
 								Margin="6,0"
@@ -244,7 +244,7 @@
 								IsEnabled="{Binding IsDetailEditable}"
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding FrameHeightEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-								ToolTip="프레임 세로 px(detail.frame_height)" />
+								ToolTip="프레임 세로(px)" />
 						</Grid>
 
 						<!--  객체(objects[])는 배열이라 편집 대상 아님 — 읽기 전용 표시  -->

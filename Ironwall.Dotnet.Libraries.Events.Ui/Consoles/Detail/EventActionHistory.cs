@@ -91,6 +91,7 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
         Cancel();
         Lines.Clear();
         FailureReason = string.Empty;
+        _last = null;
         State = ActionHistoryState.NotRequested;
     }
 
@@ -104,6 +105,7 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
         Cancel();
         Lines.Clear();
         FailureReason = string.Empty;
+        _last = (kind, originId, hasActions);
 
         if (originId <= 0 || !hasActions || kind is not (EventDetailKind.Detection or EventDetailKind.Malfunction))
         {
@@ -132,7 +134,9 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
 
             if (response is null || !response.Success)
             {
-                FailureReason = response?.Message is { Length: > 0 } m ? m : "서버에 닿지 못했습니다";
+                // 서버 원문은 로그로만 — 화면에는 무엇이 안 됐고 어떻게 하면 되는지만 적는다.
+                _log?.Warning($"[EventConsole] 조치 내역 조회 거절(origin={originId}): {response?.Message}");
+                FailureReason = FailureText;
                 State = ActionHistoryState.Failed;
                 return;
             }
@@ -148,10 +152,19 @@ public sealed class EventActionHistoryViewModel : PropertyChangedBase
         {
             if (mine != _token) return;
             _log?.Error($"[EventConsole] 조치 내역 조회 실패(origin={originId}): {ex.Message}");
-            FailureReason = ex.Message;
+            FailureReason = FailureText;
             State = ActionHistoryState.Failed;
         }
     }
+
+    /// <summary>불러오지 못했을 때의 안내 — 서버 · 예외 원문은 싣지 않는다.</summary>
+    public const string FailureText = "조치 내역을 불러오지 못했습니다. [다시 불러오기]를 누르세요.";
+
+    private (EventDetailKind Kind, int OriginId, bool HasActions)? _last;
+
+    /// <summary>마지막으로 부른 원본을 다시 부른다(실패 뒤 [다시 불러오기] · 조치 적용 뒤 재조회).</summary>
+    public Task ReloadAsync()
+        => _last is { } last ? LoadAsync(last.Kind, last.OriginId, last.HasActions) : Task.CompletedTask;
 
     private void Fill(List<ActionEventDto>? data)
     {

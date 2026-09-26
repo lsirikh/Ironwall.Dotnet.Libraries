@@ -94,6 +94,33 @@ public sealed class EventDetailField : PropertyChangedBase
         NotifyOfPropertyChange(nameof(Text));
         NotifyOfPropertyChange(nameof(IsChanged));
     }
+
+    /// <summary>
+    /// 기록 칸(잠긴 칸)의 값을 새 사실로 바꾼다 — 조치보고 뒤 '상태' 처럼 서버가 바꾼 값을 다시 보일 때.
+    /// 원래 값도 함께 옮겨 '손댄 칸' 으로 세지 않는다.
+    /// </summary>
+    internal void ReplaceRecorded(string text)
+    {
+        _text = text ?? string.Empty;
+        Original = _text;
+        NotifyOfPropertyChange(nameof(Text));
+        NotifyOfPropertyChange(nameof(IsChanged));
+    }
+}
+
+/// <summary>상세 칸 동작 줄의 단추(정본 SB L2703-2731).</summary>
+public enum EventDetailAction
+{
+    /// <summary>[조치보고] / [조치보고 추가] — 한 건: 조치보고 창.</summary>
+    Report,
+    /// <summary>[N건 트레이에 담기] — 여러 건: 조치 트레이.</summary>
+    QueueToTray,
+    /// <summary>[탐지 신호 이력] — 그 센서의 이력 창.</summary>
+    DetectionHistory,
+    /// <summary>[조치 내역 n건] — 상세 안의 조치 내역 절로 내려간다.</summary>
+    JumpToActions,
+    /// <summary>[원본 열기] — 조치 행의 원본 이벤트를 그 목록에서 연다.</summary>
+    OpenOrigin,
 }
 
 /// <summary>상세 칸의 한 절 — 머리 + 잠금 꼬리표 + 줄들.</summary>
@@ -180,11 +207,61 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     public string BannerText => !_canEdit && _rows.Count > 0
         ? ConsoleDetailPresenter.ReadOnlyBanner
         : IsMultiple
-            ? $"{_rows.Count}건을 한꺼번에 조치보고합니다. 이벤트 자체는 기록이라 일괄로 고치지 않습니다."
+            ? (_kind is EventDetailKind.Detection or EventDetailKind.Malfunction && _canReport
+                ? $"{_rows.Count}건을 골랐습니다. 조치 트레이에 담아 한꺼번에 조치보고할 수 있습니다."
+                : $"{_rows.Count}건을 골랐습니다. 여러 건은 한꺼번에 고치지 않습니다.")
             : string.Empty;
 
     /// <summary>범례 — 고칠 수 있는 칸과 발생 기록을 형태로 가른다.</summary>
     public bool ShowLegend => Sections.Any(s => s.Fields.Any(f => f.IsEditable));
+
+    #region - 동작 줄 (정본 SB L2703-2731) -
+    // 동작이 있는 단추만 보인다 — 구현이 없는 [지도에서 보기] 는 두지 않는다(지도 쪽에 장비로 옮기는 메시지가 없다).
+
+    /// <summary>단추를 눌렀다 — 대시보드가 실제 일을 한다(이 칸은 전송 경로를 갖지 않는다).</summary>
+    public event Action<EventDetailAction>? ActionRequested;
+
+    /// <summary>뷰가 부른다.</summary>
+    public void Request(EventDetailAction action) => ActionRequested?.Invoke(action);
+
+    private ExEventViewModel? SingleReportable
+        => _rows.Count == 1 && _rows[0] is ExEventViewModel ex && ex.Model is { Id: > 0 }
+           && _kind is EventDetailKind.Detection or EventDetailKind.Malfunction ? ex : null;
+
+    /// <summary>[조치보고] — 한 건 · 저장된 탐지/장애 · 권한이 있을 때.</summary>
+    public bool ShowReportAction => _canReport && SingleReportable is not null;
+
+    /// <summary>[N건 트레이에 담기] — 여러 건을 골랐을 때.</summary>
+    public bool ShowQueueAction => CanShowReport && _rows.Count > 1;
+
+    /// <summary>[탐지 신호 이력] — 한 건의 탐지이고 그 장비가 센서일 때(이력 창은 센서 기준으로 조회한다).</summary>
+    public bool ShowHistoryAction
+        => _rows.Count == 1 && _rows[0] is DetectionEventViewModel { Device: Ironwall.Dotnet.Monitoring.Models.Devices.ISensorDeviceModel { Id: > 0 } };
+
+    /// <summary>[원본 열기] — 한 건의 조치이고 원본을 안다.</summary>
+    public bool ShowOpenOriginAction => _rows.Count == 1 && _rows[0] is ActionEventViewModel { OriginEvent: not null };
+
+    /// <summary>동작 줄을 그릴 것이 하나라도 있는가.</summary>
+    public bool HasActionRow => ShowReportAction || ShowHistoryAction || ShowOpenOriginAction;
+
+    /// <summary>
+    /// 조치보고가 방금 만들어졌다 — '상태' 와 조치 내역을 다시 보인다(목록 행은 대시보드가 다시 그린다).
+    /// 손댄 판정 칸은 건드리지 않는다: 통째로 다시 불러오면 적용 전 편집이 소리 없이 사라진다.
+    /// </summary>
+    public void RefreshAfterReport(int actionCount)
+    {
+        _actionCount = Math.Max(0, actionCount);
+        foreach (var field in Sections.SelectMany(s => s.Fields).Where(f => f.Key == "status" && !f.IsEditable))
+            field.ReplaceRecorded(EventDetailProjection.StatusText(_actionCount));
+
+        NotifyOfPropertyChange(nameof(ReportButtonText));
+        NotifyOfPropertyChange(nameof(ShowReportAction));
+
+        // 조치 내역은 서버에 다시 묻는다 — 방금 만든 줄이 서버에 정말 있는지는 서버만 안다.
+        if (SingleReportable is { } ex)
+            _ = Actions.LoadAsync(_kind, ex.Model!.Id, ex.IsActionReported || _actionCount > 0);
+    }
+    #endregion
 
     public void Load(EventDetailKind kind, IReadOnlyList<object> rows, bool canEdit, bool canReport, int actionCount)
     {
@@ -313,7 +390,9 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     private void BuildDetection(DetectionEventViewModel row)
     {
         _presenter.SingleTitle = row.DeviceLabel ?? "(장비 없음)";
-        _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
+        // 머리 윗줄은 "탐지 · {구역}"(정본 SB L2705) — 번호는 아래 '번호' 칸에 이미 있다. 구역을 모르면 번호로 둔다.
+        var zone = ZoneTextOf(row.Device);
+        _presenter.SingleNumber = zone != "—" ? zone : row.Model?.Id.ToString() ?? string.Empty;
 
         // 빈 상태 안내가 약속한 "스냅샷" — 없으면 없다고 보이고, 있으면 그림을 낸다(R5).
         ShowSnapshotBox = true;
@@ -336,7 +415,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("ai_model", "AI 모델", string.IsNullOrWhiteSpace(row.AiModel) ? "—" : row.AiModel!),
             Locked("inference", "추론", row.InferenceMs is > 0 ? $"{row.InferenceMs} ms" : "—"),
             Locked("frame", "프레임", row.FrameWidth is > 0 ? $"{row.FrameWidth} × {row.FrameHeight}" : "—"),
-        }, "틀린 값은 고치지 않고 조치보고 메모로 남깁니다."));
+        }, "잰 값이 틀렸다면 조치보고 메모로 남기세요."));
     }
 
     private void BuildMalfunction(MalfunctionEventViewModel row)
@@ -358,7 +437,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         {
             Locked("fault_section", "1차 선", row.FirstStart == 0 && row.FirstEnd == 0 ? "— 해당 없음" : $"{row.FirstStart} → {row.FirstEnd}"),
             Locked("fault_section", "2차 선", row.SecondStart == 0 && row.SecondEnd == 0 ? "— 해당 없음" : $"{row.SecondStart} → {row.SecondEnd}"),
-        }, "제어기 선은 1차로 나가 센서를 거쳐 2차로 들어오는 루프입니다. 숫자는 그 선 위의 지점이고 시각이 아닙니다. 0 은 해당 없음."));
+        }, "제어기 선은 1차로 나가 센서를 거쳐 2차로 들어오는 루프입니다. 숫자는 그 선 위의 지점이며 시각이 아닙니다."));
     }
 
     private void BuildConnection(ConnectionEventViewModel row)
@@ -394,7 +473,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("origin", "원본", origin is null ? "불러온 범위 밖"
                 : $"{EventDetailProjection.KindLabel(originKind)} · {origin.Id}"),
             Locked("origin_time", "발생", origin?.DateTime.ToString("yyyy-MM-dd HH:mm:ss") ?? "—"),
-            Locked("device", "원본 장비", origin?.Device?.DeviceName ?? "—"),
+            Locked("device", "원본 장비", origin is null ? "—" : Helpers.EventDeviceSnapshot.ShortLabel(origin.Device, origin) ?? "—"),
         }));
 
         Add(new EventDetailSection("조치 속성", null, new[]
@@ -402,7 +481,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("user", "사용자", string.IsNullOrWhiteSpace(row.User) ? "—" : row.User!),
             Editable(EventDetailProjection.FieldContent, "내용", row.Content ?? string.Empty, null),
             Locked("datetime", "시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
-        }, "판단이 바뀌었으면 고치지 말고 조치보고를 한 건 더 쌓습니다."));
+        }, "판단이 바뀌었으면 내용을 고치지 말고 원본에 조치보고를 한 건 더 추가하세요."));
     }
 
     private EventDetailField Locked(string key, string label, string text)
@@ -474,5 +553,10 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(Snapshot));
         NotifyOfPropertyChange(nameof(HasSnapshot));
         NotifyOfPropertyChange(nameof(ShowSnapshotBox));
+        NotifyOfPropertyChange(nameof(ShowReportAction));
+        NotifyOfPropertyChange(nameof(ShowQueueAction));
+        NotifyOfPropertyChange(nameof(ShowHistoryAction));
+        NotifyOfPropertyChange(nameof(ShowOpenOriginAction));
+        NotifyOfPropertyChange(nameof(HasActionRow));
     }
 }

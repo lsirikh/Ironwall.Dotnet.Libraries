@@ -42,4 +42,22 @@ public readonly record struct ActionSendResult(ActionSendOutcome Outcome, string
     public static ActionSendResult GuardSkipped(string reason) => new(ActionSendOutcome.GuardSkipped, reason);
 
     public static ActionSendResult Failed(string reason) => new(ActionSendOutcome.Failed, reason);
+
+    /// <summary>
+    /// 서버가 받지 않았다 — 까닭을 <b>고정 한국어 문장</b>으로 낸다. 서버 원문은 화면에 싣지 않고 호출부가 로그로 남긴다
+    /// (완성도 수정 패스 문구 규칙: "무엇이 안 됐고 어떻게 하면 되는지"). 상태 코드로 사람이 할 일을 가른다 —
+    /// 예전엔 원문을 그대로 붙여 403 · 422 를 가리지 않으려 했는데, 그 원문이 영어 · 필드명이었다.
+    /// </summary>
+    public static ActionSendResult ServerRefused(int statusCode) => Failed(RefusalText(statusCode));
+
+    /// <summary>상태 코드 → 사람이 할 일.</summary>
+    public static string RefusalText(int statusCode) => statusCode switch
+    {
+        401 => "로그인이 만료되었습니다. 다시 로그인한 뒤 보내세요.",
+        403 => "조치보고 권한(이벤트 편집)이 없습니다.",
+        404 => "원본 이벤트가 서버에 없습니다. 목록을 [새로 불러오기] 하세요.",
+        409 => "같은 조치보고가 이미 처리 중입니다. 잠시 뒤 [새로 불러오기] 하세요.",
+        400 or 422 => "서버가 조치 내용을 받지 않았습니다. 내용을 확인하세요.",
+        _ =>"서버가 조치보고를 받지 않았습니다. 잠시 뒤 다시 보내세요.",
+    };
 }

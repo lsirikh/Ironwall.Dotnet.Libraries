@@ -433,7 +433,7 @@
 							Margin="0,0,0,8"
 							FontWeight="Bold"
 							Foreground="{DynamicResource PrimaryBrush}"
-							Text="＋ 억제 창 추가" />
+							Text="＋ 억제 스케줄 추가" />
 
 						<!--  (§5-B) 같은 대상 중복 창 사전 경고  -->
 						<TextBlock
@@ -560,6 +560,8 @@
 										<ComboBoxItem Content="연결" Tag="connection" />
 										<ComboBoxItem Content="탐지" Tag="detection" />
 										<ComboBoxItem Content="장애" Tag="malfunction" />
+										<!--  서버 5번째 값(E-9 #1) — 없으면 운영 억제 스케줄을 여기서 만들 수 없고, 고른 값이 비어 보인다  -->
+										<ComboBoxItem Content="운영" Tag="operation" />
 									</ComboBox>
 								</StackPanel>
 
@@ -572,7 +574,7 @@
 									Grid.Column="1"
 									Margin="16,0,0,10"
 									Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVisInv}}">
-									<TextBlock Style="{StaticResource FormLabel}" Text="대상 측(side)" />
+									<TextBlock Style="{StaticResource FormLabel}" Text="감지 / 감시" />
 									<ComboBox
 										Width="200"
 										HorizontalAlignment="Left"
@@ -581,8 +583,8 @@
 										Style="{StaticResource FormComboBox}"
 										AutomationProperties.AutomationId="Events.SuppressionSchedule.TargetSideComboBox">
 										<ComboBoxItem Content="전체(감지+감시)" Tag="both" />
-										<ComboBoxItem Content="감지(detection)" Tag="detection" />
-										<ComboBoxItem Content="감시(surveillance)" Tag="surveillance" />
+										<ComboBoxItem Content="감지" Tag="detection" />
+										<ComboBoxItem Content="감시" Tag="surveillance" />
 									</ComboBox>
 								</StackPanel>
 
@@ -1138,7 +1140,7 @@
 								</Button>
 								<Button
 									Margin="8,0,0,0"
-									Content="＋ 억제 창 생성"
+									Content="＋ 억제 스케줄 만들기"
 									IsEnabled="{Binding CanCreate}"
 									Style="{StaticResource PrimaryActionButton}"
 									ToolTip="{Binding CreateHintText}"
@@ -1307,7 +1309,7 @@
 										VerticalAlignment="Center"
 										IsEnabled="{Binding IsCancellable}"
 										Style="{StaticResource ModernToolbarButton}"
-										ToolTip="억제 창 취소(soft-cancel)"
+										ToolTip="억제 스케줄 취소"
 										AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowCancelButton.{0}}">
 										<cal:Message.Attach>[Event Click] = [Action OnClickCancel($dataContext)]</cal:Message.Attach>
 										<md:PackIcon Width="18" Height="18" Kind="CalendarRemoveOutline" />

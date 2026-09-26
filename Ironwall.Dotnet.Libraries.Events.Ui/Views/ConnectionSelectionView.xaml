@@ -28,7 +28,7 @@
 				<TextBlock
 					Margin="5,0"
 					VerticalAlignment="Center"
-					Text="연결보고 속성" />
+					Text="연결 속성" />
 			</StackPanel>
 		</GroupBox.Header>
 

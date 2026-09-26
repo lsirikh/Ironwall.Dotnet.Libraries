@@ -63,12 +63,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             {
                 _log?.Info($"[ACTION_REPORT] Detection Event({Model.Id}) 조치보고 진행 중 — 수동 중복 스킵");
                 // 만들지 않았다 — "적용" 이 아니라 "건너뜀" 이다.
-                return ActionSendResult.GuardSkipped("다른 경로가 같은 이벤트를 보고 중입니다 — 보내지 않았습니다");
+                return ActionSendResult.GuardSkipped("다른 곳에서 같은 이벤트를 조치보고하는 중이라 보내지 않았습니다.");
             }
             try
             {
                 if (token.IsCancellationRequested)
-                    return new ActionSendResult(ActionSendOutcome.Cancelled, "중단됐습니다 — 보냈는지는 이 자리에서 알 수 없습니다");
+                    return new ActionSendResult(ActionSendOutcome.Cancelled, "중단했습니다. 보냈는지는 목록을 [새로 불러오기] 해 확인하세요.");
 
                 var apiService = IoC.Get<IEventApiService>();
                 // ⚠ ActionEventCreateDto 에는 원본 종류 식별자가 없다 {User, Content, FromEventId} —
@@ -83,7 +83,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 if (!response.Success)
                 {
                     _log?.Error($"[ACTION_REPORT] Detection INSERT 실패: {response.Message}");
-                    return ActionSendResult.Failed(string.IsNullOrWhiteSpace(response.Message) ? "서버가 거절했습니다" : response.Message!);
+                    // 서버 원문(영어 · 필드명일 수 있다)은 위 로그로만 — 화면에는 상태 코드로 가른 고정 문장.
+                    return ActionSendResult.ServerRefused(response.StatusCode);
                 }
 
                 await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
@@ -108,7 +109,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             }
             catch (OperationCanceledException)
             {
-                return new ActionSendResult(ActionSendOutcome.Cancelled, "중단됐습니다 — 보냈는지는 이 자리에서 알 수 없습니다");
+                return new ActionSendResult(ActionSendOutcome.Cancelled, "중단했습니다. 보냈는지는 목록을 [새로 불러오기] 해 확인하세요.");
             }
             finally
             {

@@ -36,9 +36,13 @@ public sealed class MappingCommitOutcome
     /// <summary>실패 건수.</summary>
     public int Failed { get; private set; }
 
-    /// <summary>사용자에게 보여 줄 실패 사유(한국어 라벨 + 짧은 원문). 중복 없이 모은다.</summary>
+    /// <summary>사용자에게 보여 줄 실패 사유(고정 한국어 문장). 중복 없이 모은다.</summary>
     public IReadOnlyList<string> FailureNotes => _failures;
     private readonly List<string> _failures = new();
+
+    /// <summary>서버가 준 실패 원문 — 화면에는 내지 않고 로그로만 남긴다.</summary>
+    public IReadOnlyList<string> RawFailureDetails => _rawFailures;
+    private readonly List<string> _rawFailures = new();
 
     /// <summary>실패한 행 — 화면에 남겨 두고 배지를 붙인다.</summary>
     public IReadOnlyList<MappingBoardRow> FailedRows => _failedRows;
@@ -107,8 +111,12 @@ public sealed class MappingCommitOutcome
             _settled.Add((rows[i], 0));
         }
 
+        // 서버의 항목별 오류는 영문 원문이다 — 화면에는 고정 문장만, 원문은 RawFailureDetails(로그)로.
         foreach (var failure in result.FailedItems ?? new List<MappingBulkFailedItemDto>())
-            AddFailure("등록", failure.Error);
+        {
+            if (!string.IsNullOrWhiteSpace(failure.Error)) _rawFailures.Add($"등록 #{failure.Index}: {Shorten(failure.Error!)}");
+            AddFailure("등록", "서버가 이 장비의 등록을 받아들이지 않았습니다");
+        }
 
         if (notFoundDevices.Count > 0)
         {
@@ -139,7 +147,7 @@ public sealed class MappingCommitOutcome
             {
                 Failed++;
                 _failedRows.Add(row);
-                AddFailure("해제", "다른 이벤트 맵핑에 속한 배선");
+                AddFailure("해제", "다른 이벤트 맵핑에 속한 항목입니다");
             }
         }
     }
@@ -160,7 +168,7 @@ public sealed class MappingCommitOutcome
 
     private void AddFailure(string stage, string? reason)
     {
-        // 서버 원문은 영문이라 그대로 내지 않는다 — 한국어 라벨을 앞에 붙이고 원문은 괄호로 짧게 남긴다.
+        // reason 은 이 클래스가 정한 한국어 문장이거나, 게이트웨이가 이미 한국어로 바꾼 사유(MappingCallResult.Message)다.
         var text = string.IsNullOrWhiteSpace(reason)
             ? $"{stage} 실패"
             : $"{stage} 실패 — {Shorten(reason!)}";

@@ -77,11 +77,10 @@ public static class SuppressionDeletionCheck
         var confirmed = survivors.Count == 0 && !totalMismatch;
 
         var message = confirmed
-            ? $"{deleted.Count}건을 삭제했습니다 — 전체 {totalAfter}건."
+            ? $"{deleted.Count}건을 삭제했습니다. 남은 스케줄은 {totalAfter}건입니다."
             : survivors.Count > 0
-                ? $"{deleted.Count}건 삭제 요청 중 {survivors.Count}건이 목록에 남아 있습니다 — 다시 불러와 확인하세요."
-                : $"{deleted.Count}건을 삭제했지만 전체 건수가 기대({expected})와 다릅니다(지금 {totalAfter}) — "
-                  + "다른 세션이 같은 목록을 고쳤을 수 있습니다.";
+                ? $"{deleted.Count}건 삭제 요청 중 {survivors.Count}건이 목록에 남아 있습니다. [새로 불러오기]로 다시 확인하세요."
+                : $"{deleted.Count}건을 삭제했습니다. 다른 사용자가 같은 목록을 함께 고치고 있을 수 있으니 [새로 불러오기]로 확인하세요.";
 
         return new SuppressionDeletionVerdict(confirmed, survivors, totalMismatch, message);
     }

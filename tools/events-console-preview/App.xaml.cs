@@ -146,7 +146,25 @@ public partial class App : Application
             suppressionApi: suppressionApi,
             deviceProvider: suppressionDevices,
             deviceGroupProvider: suppressionGroups,
-            clock: withSuppression ? new PreviewClock() : null);
+            clock: withSuppression ? new PreviewClock() : null,
+            // 조치 트레이 문구 — 실창은 서버의 조치보고 문구 관리 목록을 읽는다. 미리보기는 그 목록을 흉내 낸다.
+            phraseSource: new PreviewPhraseSource());
+    }
+
+    /// <summary>조치보고 문구 관리 목록(서버)을 흉내 낸다 — 기본 문구와 달라야 트레이가 서버 목록을 쓰는지 그림으로 보인다.</summary>
+    private sealed class PreviewPhraseSource : IActionReportPhraseSource
+    {
+        private static readonly ActionReportPhraseSet Managed = new(new[]
+        {
+            "현장 확인 결과 이상 없음",
+            "야생동물 출현",
+            "강풍 · 폭우에 의한 오경보",
+            "순찰조 출동 조치",
+        }, true);
+
+        public ActionReportPhraseSet LastKnown => Managed;
+
+        public Task<ActionReportPhraseSet> LoadAsync(CancellationToken token = default) => Task.FromResult(Managed);
     }
 
     /// <summary>가짜 서버 — 네 목록과 통계만 답한다. 나머지는 부르지 않는다.</summary>
@@ -336,7 +354,7 @@ public partial class App : Application
             Save(directory, $"{theme}-04-detection-multi");
 
             // 5) 트레이에 Draft 를 담은 상태(드래그의 폴백 경로 = 같은 함수)
-            _viewModel.Tray.Phrase = ActionTrayViewModel.Phrases[0];   // 문구를 명시적으로 고른다(R14)
+            _viewModel.Tray.Phrase = _viewModel.Tray.PhraseOptions[0];   // 문구를 명시적으로 고른다(R14) — 조치보고 문구 관리 목록의 첫 줄
             _viewModel.QueueSelection();
             await Settle();
             Save(directory, $"{theme}-05-tray-drafts");
@@ -348,6 +366,23 @@ public partial class App : Application
             _viewModel.RevertTray();
             grid.SelectedItems.Clear();
             await Settle();
+
+            // 6e) 한 건을 담아 [조치 적용] — 상세의 '상태' 가 '미조치' 에서 '조치 n건' 으로, 조치 내역이 다시 불린다(완성도 감사 E-5 #1).
+            var untouched = grid.Items.Cast<object>().OfType<Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.DetectionEventViewModel>()
+                                .FirstOrDefault(r => !r.IsActionReported);
+            if (untouched is not null)
+            {
+                grid.SelectedItem = untouched;
+                await Settle();
+                _viewModel.QueueSelection();
+                _viewModel.Tray.Phrase = _viewModel.Tray.PhraseOptions[0];
+                await _viewModel.ApplyTrayAsync();
+                await Settle(700);
+                Save(directory, $"{theme}-06e-single-applied-detail");
+                _viewModel.RevertTray();
+                grid.SelectedItems.Clear();
+                await Settle();
+            }
         }
 
         // 6b) 거르기 — 칩 + 검색
@@ -389,7 +424,7 @@ public partial class App : Application
         {
             keep.SelectedItems.Clear();
             foreach (var row in keep.Items.Cast<object>().Take(2)) keep.SelectedItems.Add(row);
-            _viewModel.Tray.Phrase = ActionTrayViewModel.Phrases[0];
+            _viewModel.Tray.Phrase = _viewModel.Tray.PhraseOptions[0];
             _viewModel.QueueSelection();
             await Settle();
             await _viewModel.SelectRailAsync(EventDashboardViewModel.ConnectionRailKey);

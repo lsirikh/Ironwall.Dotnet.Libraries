@@ -51,10 +51,35 @@ public class EventDetailProjectionTests
     }
 
     [Fact]
-    public void should_explain_that_the_server_sets_the_status_when_that_field_is_locked()
+    public void should_explain_that_reporting_sets_the_status_when_that_field_is_locked()
     {
+        // 운영자 말로 — "서버가 스스로 켭니다 — 여기서 고치지 않습니다" 같은 구현 설명이 아니라 무엇을 하면 바뀌는지(완성도 감사 E-5 #5).
         var reason = EventDetailProjection.LockReason(EventDetailKind.Detection, "status", true);
-        Assert.Contains("서버", reason);
+        Assert.Contains("조치보고", reason);
+        Assert.DoesNotContain("서버", reason);
+    }
+
+    [Theory]
+    [InlineData("device")]
+    [InlineData("datetime")]
+    [InlineData("number")]
+    [InlineData("signal")]
+    [InlineData("fault_section")]
+    public void should_use_plain_operator_wording_when_a_field_is_locked(string field)
+    {
+        var reason = EventDetailProjection.LockReason(EventDetailKind.Detection, field, true)!;
+        Assert.EndsWith(".", reason);
+        Assert.DoesNotContain(" — ", reason);            // 개발 메모식 줄표 설명 금지
+        Assert.DoesNotContain("추적성", reason);
+        Assert.DoesNotContain("고치지 않습니다", reason);
+    }
+
+    [Fact]
+    public void should_describe_the_overview_as_its_own_kind_when_no_list_is_shown()
+    {
+        // 개요에서 상세가 "탐지 행을 고르면…" 을 말하던 결함(완성도 감사 E-3 #6).
+        Assert.Equal("개요", EventDetailProjection.KindLabel(EventDetailKind.Overview));
+        Assert.DoesNotContain("탐지", EventDetailProjection.EmptyHint(EventDetailKind.Overview));
     }
 
     [Fact]
@@ -70,7 +95,8 @@ public class EventDetailProjectionTests
         // 중복 조치보고가 허용이라 버튼은 꺼지지 않고 문구만 바뀐다.
         Assert.Equal("조치보고", EventDetailProjection.ReportButtonText(1, 0));
         Assert.Equal("조치보고 추가", EventDetailProjection.ReportButtonText(1, 2));
-        Assert.Equal("4건 조치보고", EventDetailProjection.ReportButtonText(4, 0));
+        // 여러 건은 창을 띄우지 않고 조치 트레이에 담는다 — 글자도 그 일을 말한다.
+        Assert.Equal("4건 트레이에 담기", EventDetailProjection.ReportButtonText(4, 0));
     }
 
     [Fact]

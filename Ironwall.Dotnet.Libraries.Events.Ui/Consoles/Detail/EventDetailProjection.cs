@@ -11,6 +11,8 @@ public enum EventDetailKind
     Malfunction,
     Connection,
     Action,
+    /// <summary>개요 레일 — 고를 행이 없다(정본 SB L2691: 머리 "개요" + 빈 본문).</summary>
+    Overview,
 }
 
 /// <summary>
@@ -53,12 +55,11 @@ public static class EventDetailProjection
 
         return field switch
         {
-            "status" => "조치보고 여부는 서버가 조치를 만들 때 스스로 켭니다 — 여기서 고치지 않습니다.",
-            "signal" or "ai_model" or "inference" or "frame" => "센서 · AI 가 잰 값입니다 — 틀렸다면 조치보고 메모로 남깁니다.",
-            "fault_section" => "제어기 루프 위의 지점입니다 — 발생 기록이라 고치지 않습니다.",
+            "status" => "조치보고를 하면 자동으로 바뀝니다.",
+            "signal" or "ai_model" or "inference" or "frame" => "센서 · AI 가 잰 값이라 수정할 수 없습니다. 틀렸다면 조치보고 메모로 남기세요.",
+            "fault_section" => "제어기 선 위의 지점이라 수정할 수 없습니다.",
             "user" => "작성자는 자동으로 붙습니다.",
-            "device" or "datetime" or "number" or "zone" or "kind" => "발생 기록입니다 — 추적성 때문에 고치지 않습니다.",
-            _ => "발생 기록입니다 — 고치지 않습니다.",
+            _ => "발생 기록은 수정할 수 없습니다.",
         };
     }
 
@@ -67,8 +68,9 @@ public static class EventDetailProjection
         => actionCount > 0 ? $"조치 {actionCount}건" : "미조치";
 
     /// <summary>주 버튼 문구 — 중복 조치보고가 허용이라 조치가 있어도 꺼지지 않는다.</summary>
+    /// <remarks>여러 건이면 한 건씩 창을 띄우지 않고 조치 트레이에 담는다 — 글자도 그 일을 말한다.</remarks>
     public static string ReportButtonText(int selectedCount, int actionCountOfFirst)
-        => selectedCount > 1 ? $"{selectedCount}건 조치보고"
+        => selectedCount > 1 ? $"{selectedCount}건 트레이에 담기"
          : actionCountOfFirst > 0 ? "조치보고 추가"
          : "조치보고";
 
@@ -96,6 +98,7 @@ public static class EventDetailProjection
         EventDetailKind.Detection => "탐지 행을 고르면 스냅샷 · 판정 · 조치 내역이 열립니다. Ctrl 로 여러 건을 골라 조치 트레이에 끌어 담으면 한꺼번에 조치보고합니다.",
         EventDetailKind.Malfunction => "장애 행을 고르면 사유 · 고장 구간 · 조치 내역이 열립니다. Ctrl 로 여러 건을 골라 조치 트레이에 끌어 담을 수 있습니다.",
         EventDetailKind.Connection => "연결 행을 고르면 장비 정보가 열립니다. 연결 이벤트에는 조치보고가 없습니다.",
+        EventDetailKind.Overview => "개요에서는 고를 행이 없습니다. 왼쪽에서 내역을 고르세요.",
         _ => "조치 행을 고르면 원본 이벤트가 함께 열립니다.",
     };
 
@@ -105,6 +108,7 @@ public static class EventDetailProjection
         EventDetailKind.Detection => "탐지",
         EventDetailKind.Malfunction => "장애",
         EventDetailKind.Connection => "연결",
+        EventDetailKind.Overview => "개요",
         _ => "조치",
     };
 }

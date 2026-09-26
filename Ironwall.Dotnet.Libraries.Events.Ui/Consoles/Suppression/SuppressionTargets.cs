@@ -116,9 +116,9 @@ public static class SuppressionTargetDrop
         var have = existing?.Where(c => c is not null).Select(c => c.Key).ToHashSet(StringComparer.Ordinal)
                    ?? new HashSet<string>(StringComparer.Ordinal);
 
-        if (!canEdit) return Blocked("이벤트 편집 권한(events:edit)이 없습니다.");
+        if (!canEdit) return Blocked(SuppressionPermissionText.EditDenied);
         if (!AcceptsTargets(mode))
-            return Blocked("'전체 대상' 스케줄에는 개별 대상을 담지 않습니다 — 대상 유형을 장비나 그룹으로 바꾸세요.");
+            return Blocked("'전체 대상' 스케줄에는 개별 대상을 담지 않습니다. 대상 유형을 장비나 그룹으로 바꾸세요.");
         if (rows.Count == 0) return Blocked("담을 대상이 없습니다.");
 
         var want = KindFor(mode)!.Value;

@@ -43,6 +43,31 @@
 			<Setter Property="TextWrapping" Value="Wrap" />
 			<Setter Property="Margin" Value="0,8,0,0" />
 		</Style>
+
+		<!--
+			계열 견본 · 막대 칸 — 색이 아니라 형태로 가른다(꽉 찬 면 / 빗금 / 속이 빈 윤곽, 감사 E-3 #5).
+			★ TokenBrushAssist.FillToken 은 SetResourceReference 로 Fill 을 <b>로컬 값</b>으로 건다 — 트리거의
+			Fill 세터보다 우선이라, 트리거가 FillToken 을 먼저 비워야(null → ClearValue) 빗금 · 윤곽이 실제로 보인다.
+			예전엔 이걸 안 비워 카메라 빗금이 한 번도 그려지지 않았다.
+			DataContext = EventSliceViewModel 또는 EventBarSegment(둘 다 BrushKey · IsHatched · IsOutline).
+		-->
+		<Style x:Key="SeriesSwatch" TargetType="Rectangle">
+			<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
+			<Setter Property="RadiusX" Value="2" />
+			<Setter Property="RadiusY" Value="2" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsHatched}" Value="True">
+					<Setter Property="conv:TokenBrushAssist.FillToken" Value="{x:Null}" />
+					<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding IsOutline}" Value="True">
+					<Setter Property="conv:TokenBrushAssist.FillToken" Value="{x:Null}" />
+					<Setter Property="Fill" Value="Transparent" />
+					<Setter Property="conv:TokenBrushAssist.StrokeToken" Value="{Binding BrushKey}" />
+					<Setter Property="StrokeThickness" Value="2" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
 	</UserControl.Resources>
 
 	<Grid>
@@ -172,7 +197,7 @@
 								DockPanel.Dock="Right"
 								FontSize="11.5"
 								Foreground="{DynamicResource TextMutedBrush}"
-								Text="가로로 끌면 그 구간이 기간이 됩니다 · Esc 로 취소 · 기간 칩으로도 같은 일을 합니다" />
+								Text="끌어서 기간 선택 (Esc 취소)" />
 						</DockPanel>
 
 						<!--
@@ -300,23 +325,11 @@
 													CornerRadius="11">
 													<StackPanel Orientation="Horizontal">
 														<Rectangle
-															Width="10"
+															Width="16"
 															Height="10"
 															Margin="0,0,6,0"
 															VerticalAlignment="Center"
-															RadiusX="2"
-															RadiusY="2">
-															<Rectangle.Style>
-																<Style TargetType="Rectangle">
-																	<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
-																	<Style.Triggers>
-																		<DataTrigger Binding="{Binding IsHatched}" Value="True">
-																			<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
-																		</DataTrigger>
-																	</Style.Triggers>
-																</Style>
-															</Rectangle.Style>
-														</Rectangle>
+															Style="{StaticResource SeriesSwatch}" />
 														<TextBlock
 															VerticalAlignment="Center"
 															FontSize="12"
@@ -381,17 +394,14 @@
 												</Border.Width>
 												<Border.Style>
 													<Style TargetType="Border">
-														<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
 														<Style.Triggers>
-															<DataTrigger Binding="{Binding IsHatched}" Value="True">
-																<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
-															</DataTrigger>
 															<DataTrigger Binding="{Binding IsOn}" Value="False">
 																<Setter Property="Opacity" Value="0.25" />
 															</DataTrigger>
 														</Style.Triggers>
 													</Style>
 												</Border.Style>
+												<Rectangle RadiusX="0" RadiusY="0" Style="{StaticResource SeriesSwatch}" />
 											</Border>
 										</DataTemplate>
 									</ItemsControl.ItemTemplate>
@@ -403,24 +413,12 @@
 									<DataTemplate>
 										<DockPanel Margin="0,3" LastChildFill="False">
 											<Rectangle
-												Width="10"
+												Width="16"
 												Height="10"
 												Margin="0,0,7,0"
 												VerticalAlignment="Center"
 												DockPanel.Dock="Left"
-												RadiusX="2"
-												RadiusY="2">
-												<Rectangle.Style>
-													<Style TargetType="Rectangle">
-														<Setter Property="conv:TokenBrushAssist.FillToken" Value="{Binding BrushKey}" />
-														<Style.Triggers>
-															<DataTrigger Binding="{Binding IsHatched}" Value="True">
-																<Setter Property="Fill" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
-															</DataTrigger>
-														</Style.Triggers>
-													</Style>
-												</Rectangle.Style>
-											</Rectangle>
+												Style="{StaticResource SeriesSwatch}" />
 											<TextBlock
 												VerticalAlignment="Center"
 												DockPanel.Dock="Left"
@@ -550,7 +548,7 @@
 
 							<TextBlock
 								Style="{StaticResource CardNote}"
-								Text="카메라 탐지는 따로 떨어진 탭이 아니라 탐지의 두 번째 출처입니다 — 도넛 · 막대 · 추이에 같은 계열로 들어갑니다." />
+								Text="카메라 탐지도 탐지 합계에 포함됩니다." />
 						</StackPanel>
 					</Border>
 				</Grid>
@@ -606,7 +604,7 @@
 										Cursor="Hand"
 										HorizontalContentAlignment="Stretch"
 										Template="{StaticResource Console.Button.TransparentRow}"
-										ToolTip="이 장비의 내역으로">
+										ToolTip="이 장비의 내역으로 이동합니다">
 										<Grid>
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="150" />
@@ -640,16 +638,7 @@
 																		<Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
 																	</MultiBinding>
 																</Border.Width>
-																<Border.Style>
-																	<Style TargetType="Border">
-																		<Setter Property="conv:TokenBrushAssist.BackgroundToken" Value="{Binding BrushKey}" />
-																		<Style.Triggers>
-																			<DataTrigger Binding="{Binding IsHatched}" Value="True">
-																				<Setter Property="Background" Value="{Binding BrushKey, Converter={StaticResource HatchBrush}}" />
-																			</DataTrigger>
-																		</Style.Triggers>
-																	</Style>
-																</Border.Style>
+																<Rectangle RadiusX="0" RadiusY="0" Style="{StaticResource SeriesSwatch}" />
 															</Border>
 														</DataTemplate>
 													</ItemsControl.ItemTemplate>

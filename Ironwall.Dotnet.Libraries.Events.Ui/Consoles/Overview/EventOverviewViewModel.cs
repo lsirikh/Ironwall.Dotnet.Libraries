@@ -94,9 +94,12 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     /// <summary>운영 이벤트 — 서버가 총계 밖에서 따로 센 건수(<c>summary.operation</c>).</summary>
     public int OperationCount { get; private set; }
 
-    /// <summary>운영 이벤트는 총계에서 빠진다는 서버 규칙을 화면에 그대로 적는다 — 그리고 그 수를 숨기지 않는다.</summary>
-    public string TotalNote => $"총계는 6종 합(센서 탐지 · 카메라 탐지 · 사전 경보 · 장애 · 연결 · 조치)입니다 · "
-                             + $"운영 {OperationCount:N0}건은 서버 규칙상 총계 밖(별도 집계) · 조회 기간 {Days}일";
+    /// <summary>
+    /// 총계가 무엇의 합인지 한 줄로 — 운영 이벤트는 총계에 들지 않지만 그 수를 숨기지 않는다.
+    /// 운영자용 문장이다(서버 규칙 · 집계 방식 같은 구현 설명은 넣지 않는다, 감사 E-3 #1).
+    /// </summary>
+    public string TotalNote => $"센서·카메라 탐지, 사전 경보, 장애, 연결, 조치 합계입니다 · "
+                             + $"운영 {OperationCount:N0}건(문 개폐·환경 경보)은 따로 셉니다";
     #endregion
 
     #region - ① 유형별 비중 -
@@ -130,11 +133,11 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     public bool IsCameraGroup => _deviceGroup == OverviewDeviceGroup.Camera;
     public bool IsFacilityGroup => _deviceGroup == OverviewDeviceGroup.Facility;
 
+    /// <summary>장비별 막대 아래 한 줄 — 무엇을 누르면 무엇이 되는지만 적는다(감사 E-3 #3).</summary>
     public string DeviceGroupNote => _deviceGroup switch
     {
-        OverviewDeviceGroup.Controller => "제어기 막대의 탐지는 센서 탐지만 — 카메라 탐지는 제어기에 속하지 않아 카메라 탭에서 봅니다 · 막대를 누르면 그 장비의 내역",
-        OverviewDeviceGroup.Camera => "카메라 묶음이 받는 계열은 카메라 탐지 · 사전 경보입니다 · 막대를 누르면 그 장비의 내역",
-        _ => "함체 · 통문 막대에는 운영 이벤트(문 개폐 · 환경 경보)가 함께 실립니다 — 운영은 총계 밖입니다 · 막대를 누르면 그 장비의 내역",
+        OverviewDeviceGroup.Facility => "막대를 누르면 그 장비의 내역으로 이동합니다. 운영 이벤트도 함께 셉니다.",
+        _ => "막대를 누르면 그 장비의 내역으로 이동합니다.",
     };
 
     public bool HasBars => Bars.Count > 0;

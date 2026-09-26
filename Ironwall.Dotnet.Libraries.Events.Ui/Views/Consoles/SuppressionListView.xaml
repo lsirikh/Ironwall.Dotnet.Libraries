@@ -51,6 +51,27 @@
 				MinWidth="32"
 				CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
 				IsReadOnly="True">
+				<!--
+					커널 머리 템플릿의 여백(Border Padding 12,8 — 템플릿에 박혀 있어 Padding 세터가 닿지 않는다)이
+					32 폭 열에서 전체선택 상자를 잘랐다("[" 만 보임). 셀처럼 머리도 여백을 걷는다 — 색 · 밑줄은 커널 그대로.
+				-->
+				<DataGridTemplateColumn.HeaderStyle>
+					<Style BasedOn="{StaticResource Console.DataGrid.ColumnHeader}" TargetType="DataGridColumnHeader">
+						<Setter Property="Template">
+							<Setter.Value>
+								<ControlTemplate TargetType="DataGridColumnHeader">
+									<Border
+										Padding="0,8"
+										Background="{TemplateBinding Background}"
+										BorderBrush="{DynamicResource DividerBrush}"
+										BorderThickness="0,0,0,1">
+										<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+									</Border>
+								</ControlTemplate>
+							</Setter.Value>
+						</Setter>
+					</Style>
+				</DataGridTemplateColumn.HeaderStyle>
 				<DataGridTemplateColumn.HeaderTemplate>
 					<DataTemplate>
 						<CheckBox
@@ -107,10 +128,16 @@
 				오른쪽이 가로 스크롤 밖으로 밀렸고, 대상 104 · 범위 76 은 실데이터("전체(both)" · "전체 · 감지+감시")를 잘랐다(실창 캡처).
 				글자를 싣는 네 칸(작업명 · 대상 · 범위 · 반복)을 비율 별로 바꿔 남는 폭을 나눠 갖게 하고, 바닥은 한 줄이 읽히는 폭으로 둔다.
 				바닥 합 = 32+78+150+100+72+88+98+98+60 = 776 — 788 안에 든다.
+				완성도 패스(E-7 #1 · #8) — 대상 · 범위가 둘 다 "전체 · 감지+감시"(약 110)를 싣게 되어 바닥을 110/112 로 올리고,
+				그만큼 작업명 바닥(비율 2* 라 남는 폭은 가장 많이 받는다)과 동작 칸을 줄여 합을 792 로 유지한다:
+				그래도 "전체 · 감지+감시" 는 잘렸다(글자 약 104 + 칸 여백 24) — 대상 · 범위 바닥을 128 로 올리고 작업명 · 반복을 92, 동작을 50 으로:
+				32+78+92+128+128+92+98+98+50 = 796 — 1340 표면의 목록 보이는 폭 816(세로 스크롤바 제외)에 든다.
+				★ 네 칸의 별 비율을 바닥 비율(0.92 : 1.28 : 1.28 : 0.92)과 같게 둔다 — 비율이 바닥과 어긋나면 WPF 가 한 칸을 바닥으로
+				끌어올리면서 합이 넘쳐 1340 에서도 6px 가로 스크롤이 섰다(잘림 감사 after 1차). 같은 비율이면 어느 칸도 바닥에 먼저 걸리지 않는다.
 			-->
 			<DataGridTextColumn
-				Width="2*"
-				MinWidth="150"
+				Width="0.92*"
+				MinWidth="92"
 				Binding="{Binding Name}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="작업명">
@@ -123,8 +150,8 @@
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="1.3*"
-				MinWidth="100"
+				Width="1.28*"
+				MinWidth="128"
 				Binding="{Binding TargetSummary}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="대상">
@@ -137,14 +164,14 @@
 			</DataGridTextColumn>
 
 			<DataGridTextColumn
-				Width="1*"
-				MinWidth="72"
+				Width="1.28*"
+				MinWidth="128"
 				Binding="{Binding ScopeDetailText}"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="범위">
 				<DataGridTextColumn.ElementStyle>
 					<Style TargetType="TextBlock">
-						<Setter Property="ToolTip" Value="{Binding ScopeDetailText}" />
+						<Setter Property="ToolTip" Value="{Binding ScopeToolTip}" />
 						<Setter Property="TextTrimming" Value="CharacterEllipsis" />
 					</Style>
 				</DataGridTextColumn.ElementStyle>
@@ -152,8 +179,8 @@
 
 			<!--  U-18 — 88 이면 "다음 09-20 22:00"(79 + 안쪽 24)이 1px 모자라 늘 줄임표가 찍혔다(잘림 감사) → 104.  -->
 			<DataGridTemplateColumn
-				Width="1.1*"
-				MinWidth="104"
+				Width="0.92*"
+				MinWidth="92"
 				CellStyle="{StaticResource Console.DataGrid.Cell}"
 				Header="반복">
 				<DataGridTemplateColumn.CellTemplate>
@@ -176,6 +203,7 @@
 								LineStackingStrategy="BlockLineHeight"
 								Text="{Binding OccurrenceText}"
 								TextTrimming="CharacterEllipsis"
+								Visibility="{Binding HasOccurrence, Converter={StaticResource BoolToVis}}"
 								theme:TrimmedToolTip.IsEnabled="True" />
 						</StackPanel>
 					</DataTemplate>
@@ -220,12 +248,12 @@
 
 			<!--  회차 — 열을 따로 두기에는 폭이 모자라 반복 칸 아래에 같이 낸다(자동화 식별자는 그대로 살아 있다)  -->
 
-			<!--  취소 예약 — 누르면 확인 팝업이 먼저 뜬다(즉시 삭제하지 않는다)  -->
+			<!--  취소 예약 — 누르면 확인 팝업이 먼저 뜬다(즉시 삭제하지 않는다). 빈 머리글은 무슨 칸인지 몰랐다(E-7 #10).  -->
 			<DataGridTemplateColumn
-				Width="60"
-				MinWidth="60"
+				Width="50"
+				MinWidth="50"
 				CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
-				Header="">
+				Header="동작">
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
 						<Button
@@ -238,7 +266,7 @@
 							Content="취소"
 							IsEnabled="{Binding IsCancellable}"
 							Style="{StaticResource Console.Button.Mini}"
-							ToolTip="이 억제 창을 취소합니다 — 이력(revoked_at)은 남습니다"
+							ToolTip="이 스케줄을 취소합니다 (기록은 남습니다)"
 							Visibility="{Binding IsCancellable, Converter={StaticResource BoolToVis}}" />
 					</DataTemplate>
 				</DataGridTemplateColumn.CellTemplate>
