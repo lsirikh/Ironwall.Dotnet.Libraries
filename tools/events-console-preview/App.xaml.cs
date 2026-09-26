@@ -41,6 +41,7 @@ public partial class App : Application
     private EventDashboardView _view = null!;
     private Window _window = null!;
     private static bool _suppression;
+    private bool _surfaceMode;
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
@@ -72,7 +73,8 @@ public partial class App : Application
                 Background = (Brush)FindResource("SurfaceBrush"),
                 Content = new Border { Margin = new Thickness(12), Child = _view, ClipToBounds = true },
             };
-            _window.Show();
+            _surfaceMode = PreviewTools.Shared.OffscreenStage.ApplySurface(e.Args, _view, _window);
+            PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
             await ((IActivate)_viewModel).ActivateAsync();
 
@@ -202,6 +204,12 @@ public partial class App : Application
     #region - Snapshots -
     private async Task RunSnapshotsAsync(string directory, bool startedDark)
     {
+        if (_surfaceMode)
+        {
+            await SurfaceShotsAsync(directory, startedDark ? "dark" : "light");
+            return;
+        }
+
         await Shot(directory, startedDark ? "dark" : "light");
         await ShotAll(directory, startedDark ? "dark" : "light");
 
@@ -211,6 +219,46 @@ public partial class App : Application
         _window.Background = (Brush)FindResource("SurfaceBrush");
         await Shot(directory, "dark");
         await ShotAll(directory, "dark");
+    }
+
+    /// <summary>
+    /// <c>--surface WxH</c> — 실창 표면 크기로 못 박은 콘솔을 찍는다. <b>팝업을 열지 않는다</b>(팝업은 화면 밖 창을 따라가지 않고
+    /// 모니터 안쪽으로 밀려 나와 사용자에게 보인다). 억제 모드면 억제 상태만.
+    /// </summary>
+    private async Task SurfaceShotsAsync(string directory, string theme)
+    {
+        if (_suppression)
+        {
+            SuppressionShots.AssertRailExists(_viewModel);
+            await SuppressionShots.RunAsync(
+                _viewModel, _window,
+                name => { Save(directory, $"{theme}-surface-{name}"); return Task.CompletedTask; },
+                Settle);
+            return;
+        }
+
+        await _viewModel.SelectRailAsync(EventDashboardViewModel.OverviewRailKey);
+        await Settle();
+        Save(directory, $"{theme}-surface-01-overview");
+
+        // 개요 본문을 끝까지 굴린 모습 — 아래 카드가 스크롤로 닿는가(고정 높이로 잘리는가) 확인.
+        foreach (var scroller in Descendants<ScrollViewer>(_view).Where(s => s.IsVisible && s.ScrollableHeight > 0))
+            scroller.ScrollToEnd();
+        await Settle();
+        Save(directory, $"{theme}-surface-01b-overview-scrolled");
+
+        await _viewModel.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        await Settle();
+        Save(directory, $"{theme}-surface-02-detection-list");
+
+        var grid = FindGrid("Console.Events.Grid.Detection");
+        if (grid.Items.Count > 0)
+        {
+            grid.SelectedItem = grid.Items[0];
+            await Settle();
+            Save(directory, $"{theme}-surface-03-detection-single");
+            grid.SelectedItems.Clear();
+        }
     }
 
     /// <summary>억제 모드면 억제 상태만, 아니면 이벤트 콘솔 상태를 찍는다.</summary>
@@ -406,7 +454,7 @@ public partial class App : Application
             Background = (Brush)FindResource("BgBrush"),
             Content = new Border { Child = view, ClipToBounds = true },
         };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
         await ((IActivate)model).ActivateAsync();
         await Settle();
 

@@ -161,5 +161,36 @@ public static class ConsoleLayoutMath
         => ResolveToolbarSearchMinWidth(toolbarWidth, leftClusterWidth, rightClusterWidth) >= ToolbarSearchFullMinWidth
             ? ConsoleToolbarSearchMode.Full
             : ConsoleToolbarSearchMode.IconOnly;
+
+    /// <summary>검색이 아이콘으로 접혀도 이 폭은 남아야 누를 수 있다(<c>Console.Button.Icon</c> 한 변과 같다).</summary>
+    public const double ToolbarSearchCompactMinWidth = 32;
+
+    /// <summary>오른쪽 묶음을 접었을 때 그 자리에 서는 [⋯] 버튼 — 한 변 32 + 왼쪽 간격 8.</summary>
+    public const double ToolbarOverflowButtonWidth = 40;
+
+    /// <summary>
+    /// 오른쪽 묶음(Extra = 창 고유 동작)을 [⋯] 뒤로 접어야 하는가 — <b>마지막 수단</b>이다(U-17).
+    /// <para>
+    /// D-23 은 "기본 액션은 줄이지 않는다" 고 정했다 — 그래서 먼저 검색이 아이콘으로, 그다음 0 까지 접힌다.
+    /// 그래도 모자라면 Grid 의 Auto 칸은 줄지 않으므로 오른쪽 끝 버튼이 <b>테두리 밖으로 잘려 나가</b> 누를 수 없게 된다
+    /// (장비 콘솔 1240 서랍 실창: "셋업 · 결선" 이 반쯤 잘렸다). 누를 수 없는 버튼보다 한 번 더 누르는 버튼이 낫다 —
+    /// 이 판정이 참이면 Extra 전체를 [⋯] 팝업으로 옮긴다. 폭이 돌아오면 제자리로 돌아온다.
+    /// </para>
+    /// <para>
+    /// 입력은 <b>상태와 무관한 폭</b>이어야 한다(접힘 여부에 따라 달라지는 오른쪽 묶음의 실제 폭을 넣으면 접었다 폈다 진동한다):
+    /// <paramref name="rightFixedWidth"/> = 열 버튼(간격 포함), <paramref name="extraWidth"/> = Extra 가 제자리에 있을 때의 폭(간격 포함).
+    /// </para>
+    /// </summary>
+    public static bool ShouldOverflowToolbarExtra(double toolbarWidth, double leftClusterWidth, double rightFixedWidth, double extraWidth, bool showSearch)
+    {
+        static double Clean(double v) => double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
+        toolbarWidth = Clean(toolbarWidth);
+        extraWidth = Clean(extraWidth);
+        if (toolbarWidth <= 0 || extraWidth <= 0) return false;       // 아직 재지 못했거나 접을 것이 없다
+
+        var budget = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin
+                     - Clean(leftClusterWidth) - Clean(rightFixedWidth) - extraWidth;
+        return budget < (showSearch ? ToolbarSearchCompactMinWidth : 0);
+    }
     #endregion
 }

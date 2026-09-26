@@ -34,6 +34,28 @@ public static class ConsoleColumns
     public static bool GetIsSupported(DependencyObject column) => (bool)column.GetValue(IsSupportedProperty);
     public static void SetIsSupported(DependencyObject column, bool value) => column.SetValue(IsSupportedProperty, value);
 
+    /// <summary>
+    /// U-17 — 목록 칸이 이 폭(DIU)보다 좁으면 이 열을 접는다(0 = 접지 않는다). 좁아질 때 <b>덜 중요한 열부터</b> 접어,
+    /// 사람이 읽는 식별 열(아이디 · 이름)이 줄임표로 잘리거나 오른쪽 열이 가로 스크롤 밖으로 밀려나지 않게 한다.
+    /// 폭은 <see cref="ConsoleShell.EffectiveListWidth"/> 로 준다(서랍이 겹치면 셸 폭은 그대로다 — D-03).
+    /// 사용자가 "열" 메뉴로 숨긴 것과는 합집합이다 — 넓어지면 돌아온다. (선례: 보고서 콘솔 ReportColumnPriority)
+    /// </summary>
+    public static readonly DependencyProperty CollapseBelowProperty = DependencyProperty.RegisterAttached(
+        "CollapseBelow", typeof(double), typeof(ConsoleColumns), new PropertyMetadata(0.0));
+    public static double GetCollapseBelow(DependencyObject column) => (double)column.GetValue(CollapseBelowProperty);
+    public static void SetCollapseBelow(DependencyObject column, double value) => column.SetValue(CollapseBelowProperty, value);
+
+    /// <summary>폭 <paramref name="listWidth"/> 에서 문턱 <paramref name="collapseBelow"/> 인 열을 접는가 — 순수 판정. 아직 재지 못한 폭(0 이하)이면 접지 않는다.</summary>
+    public static bool ShouldCollapse(double collapseBelow, double listWidth)
+        => collapseBelow > 0 && listWidth > 0 && !double.IsNaN(listWidth) && listWidth < collapseBelow;
+
+    /// <summary>목록 폭 <paramref name="listWidth"/> 에서 접어야 할 열 키 — <see cref="Apply"/> 의 숨김 목록에 합쳐 넘긴다.</summary>
+    public static IReadOnlyList<string> CollapsedAt(IEnumerable<DataGridColumn> columns, double listWidth)
+        => columns
+            .Where(c => !string.IsNullOrEmpty(GetKey(c)) && ShouldCollapse(GetCollapseBelow(c), listWidth))
+            .Select(c => GetKey(c)!)
+            .ToList();
+
     /// <summary>한 열이 보여야 하는가 — 순수 판정.</summary>
     public static bool ShouldShow(bool isSupported, bool isDefault, bool showAll, bool isHiddenByUser)
         => isSupported && (isDefault || showAll) && !isHiddenByUser;

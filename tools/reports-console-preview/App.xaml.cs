@@ -66,7 +66,8 @@ public partial class App : Application
                 Background = (Brush)FindResource("SurfaceBrush"),
                 Content = new Border { Margin = new Thickness(12), Child = _view },
             };
-            _window.Show();
+            PreviewTools.Shared.OffscreenStage.ApplySurface(e.Args, _view, _window);
+            PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
             await ((IActivate)_viewModel).ActivateAsync();
 
@@ -123,7 +124,8 @@ public partial class App : Application
             Background = (Brush)FindResource("SurfaceBrush"),
             Content = new Border { Margin = new Thickness(12), Child = _artView },
         };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.ApplySurface(args, _artView, _window);
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
         await ((IActivate)_artViewModel).ActivateAsync();
 

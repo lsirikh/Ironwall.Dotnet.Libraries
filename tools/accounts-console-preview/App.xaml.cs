@@ -29,6 +29,7 @@ public partial class App : Application
     private AccountConsolePanelViewModel _viewModel = null!;
     private AccountConsolePanelView _view = null!;
     private Window _window = null!;
+    private bool _surface;
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
@@ -49,7 +50,8 @@ public partial class App : Application
                 Background = (Brush)FindResource("SurfaceBrush"),
                 Content = new Border { Padding = new Thickness(12), Background = (Brush)FindResource("SurfaceBrush"), Child = _view },
             };
-            _window.Show();
+            _surface = PreviewTools.Shared.OffscreenStage.ApplySurface(e.Args, _view, _window);
+            PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
             await ((IActivate)_viewModel).ActivateAsync();
 
@@ -215,6 +217,9 @@ public partial class App : Application
             Save(directory, $"{theme}-13-session-setup");
         }
 
+        // --surface 면 콘솔 크기를 못 박았다 — 창 폭으로 서랍 · 접힘을 흉내 낼 수 없다.
+        if (_surface) return;
+
         // 좁은 폭 — 서랍(960~1279) · 접힘(<960). 다크 상태 그대로.
         await _viewModel.SelectRailAsync(AccountConsoleKeys.Users);
         await Settle();
@@ -300,6 +305,9 @@ public static class PreviewData
             (5, "guard07", "정경비", EnumUserRole.USER, "경비과", "사원", false, null),
             (6, "guard08", "한경비", EnumUserRole.USER, "경비과", "사원", false, null),
             (7, "viewer01", "오조회", EnumUserRole.USER, "지휘통제실", "주임", false, 12),
+            // 실서버에 있는 긴 값(2026-09-26 실창 캡처) — 아이디 · 성명 열이 잘리는지 보려면 이 길이가 필요하다.
+            (8, "BroadcastingManager", "Broadcasting 매니저", EnumUserRole.ADMIN, "", "", false, null),
+            (9, "EnclosureManager", "Enclosure 매니저", EnumUserRole.ADMIN, "", "", false, null),
         };
 
         foreach (var p in people)

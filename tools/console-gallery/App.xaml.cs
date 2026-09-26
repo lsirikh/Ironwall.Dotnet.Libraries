@@ -12,7 +12,7 @@ public partial class App : Application
         if (matrix >= 0 && matrix + 1 < e.Args.Length)
         {
             var stage = new MatrixWindow();
-            stage.Show();
+            PreviewTools.Shared.OffscreenStage.Hide(stage).Show();
             try
             {
                 await Task.Delay(600);
@@ -28,7 +28,7 @@ public partial class App : Application
         }
 
         var window = new MainWindow();
-        window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(window).Show();
 
         var index = Array.IndexOf(e.Args, "--snapshot");
         if (index < 0 || index + 1 >= e.Args.Length) return;

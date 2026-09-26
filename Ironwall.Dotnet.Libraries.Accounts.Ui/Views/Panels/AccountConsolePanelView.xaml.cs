@@ -66,8 +66,11 @@ public partial class AccountConsolePanelView : UserControl
 
     private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
+        if (_shell is not null) _shell.EffectiveListWidthChanged -= OnListWidthChanged;
         _shell = sender as ConsoleShell;
+        if (_shell is not null) _shell.EffectiveListWidthChanged += OnListWidthChanged;
         ApplyDetailWidth();
+        ApplyColumnPrefs();
         // Unloaded 에서 뗐다가 같은 뷰가 다시 붙는 경우(패널 재표시).
         if (_viewModel is null && ViewModel is { } vm)
             OnDataContextChanged(this, new DependencyPropertyChangedEventArgs(DataContextProperty, null, vm));
@@ -190,8 +193,15 @@ public partial class AccountConsolePanelView : UserControl
             _toolbar.ColumnsText = string.Empty;    // 빈 글자면 툴바가 단추를 접는다
             return;
         }
-        _toolbar.ColumnsText = ConsoleColumns.Apply(grid.Columns, prefs.ShowAllColumns, prefs.HiddenColumns);
+        // U-17 — 좁으면(서랍이 겹친 1120 등) 덜 중요한 열(CollapseBelow)부터 접는다. 사용자가 숨긴 것과 합집합 —
+        // 설정 파일에는 쓰지 않는다(넓어지면 돌아온다). 폭은 셸의 실효 목록 폭이다(서랍이 겹쳐도 셸 폭은 그대로다).
+        var hidden = new List<string>(prefs.HiddenColumns);
+        foreach (var key in ConsoleColumns.CollapsedAt(grid.Columns, _shell?.EffectiveListWidth ?? 0))
+            if (!hidden.Contains(key)) hidden.Add(key);
+        _toolbar.ColumnsText = ConsoleColumns.Apply(grid.Columns, prefs.ShowAllColumns, hidden);
     }
+
+    private void OnListWidthChanged(object? sender, double width) => ApplyColumnPrefs();
 
     private void OnColumns(object sender, RoutedEventArgs e)
     {

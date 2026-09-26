@@ -8,6 +8,7 @@
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.Root"
+	AutomationProperties.Name="조치보고 문구 관리"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		조치보고 문구 관리 콘솔 — 목록(드래그 재정렬) + 상세(등록 · 수정). 커널만 쓴다: ConsoleShell · ConsoleRail ·
@@ -39,26 +40,19 @@
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Subtitle="문구 관리">
 
-		<!--  머리 오른쪽 — 닫기(호스트가 이 패널을 모달로 띄운다)  -->
+		<!--
+			머리 오른쪽 — 닫기 ✕ 하나(호스트가 이 패널을 모달로 띄운다).
+			U-17 — 옛 머리는 "문구 관리 · 닫기" 였다. 바로 왼쪽 부제가 이미 "문구 관리" 라 같은 말이 한 줄에 두 번 섰고,
+			닫기만 글자 버튼이라 다른 콘솔과 모양이 달랐다. 자동화용 이름은 뿌리의 AutomationProperties.Name 으로 옮겼다.
+			★ 예전에 여기 있던 "문구를 모두 삭제하고 서버를 재기동하면 기본 5건이 복원됩니다" 문구는 제거한 그대로다 —
+			  시드 스크립트가 있는 테스트/개발 서버의 동작이지 운용자가 볼 안내가 아니다(코디네이터 확인, 2026-09-24).
+		-->
 		<c:ConsoleShell.HeaderContent>
-			<StackPanel Orientation="Horizontal">
-				<!--  커널 머리의 제목 글에는 계측 이름이 없다 — 옛 id 를 여기서 되살린다(ReportConsoleView.xaml 동일 패턴).
-				      ★ 이전에 여기 있던 "문구를 모두 삭제하고 서버를 재기동하면 기본 5건이 복원됩니다" 문구는
-				      제거했다 — 그건 시드 스크립트(init_action_report_data.py)가 있는 테스트/개발 서버의 동작이지
-				      운용자가 제품 화면에서 봐야 할 안내가 아니다(코디네이터 확인, 2026-09-24).  -->
-				<TextBlock
-					Margin="0,0,10,0"
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.TitleText"
-					FontSize="12"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Text="문구 관리" />
-				<Button
-					AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.CloseButton"
-					Click="OnClose"
-					Content="닫기"
-					Style="{StaticResource Console.Button.Ghost}" />
-			</StackPanel>
+			<Button
+				AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.CloseButton"
+				AutomationProperties.Name="조치보고 문구 닫기"
+				Click="OnClose"
+				Style="{StaticResource Console.Button.Close}" />
 		</c:ConsoleShell.HeaderContent>
 
 		<!--  레일 — 항목 1개. 다중 모드가 없는 화면에서도 커널 크롬(제목 · 부제)을 일관되게 쓴다.  -->

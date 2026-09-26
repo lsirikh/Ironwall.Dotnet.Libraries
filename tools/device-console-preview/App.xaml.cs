@@ -94,7 +94,8 @@ public partial class App : Application
                 Background = (Brush)FindResource("SurfaceBrush"),
                 Content = new Border { Margin = new Thickness(12), Child = _view },
             };
-            _window.Show();
+            PreviewTools.Shared.OffscreenStage.ApplySurface(e.Args, _view, _window);
+            PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
             await ((IActivate)_viewModel).ActivateAsync();
 
@@ -157,7 +158,11 @@ public partial class App : Application
             new LampDevicePanelViewModel(events, log, api, new LampDeviceProvider(log, devices), providerService),
             new GateDevicePanelViewModel(events, log, api, new GateDeviceProvider(log, devices), providerService),
             new DeviceGroupPanelViewModel(events, log, api, groups, devices),
-            devices, groups, controllers, servers, api, catalog);
+            devices, groups, controllers, servers, api, catalog,
+            policy,
+            // 실앱처럼 조립기 · 프리셋 · 결선 입구가 툴바에 서야 툴바 폭(오버플로)을 실창과 같은 조건으로 본다 — 누르면 아무 일도 없다.
+            assemblyLauncher: isAxis ? new Lazy<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher>(() => new PreviewAssemblyLauncher()) : null,
+            wiringLauncher: isAxis ? new Lazy<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher>(() => new PreviewWiringLauncher()) : null);
 
         // 카테고리별 프로바이더는 만들어진 뒤의 추가만 따라간다 — 실제 앱처럼 프로바이더가 다 선 뒤에 장비를 넣는다.
         PreviewData.Fill(devices, groups, isAxis);
@@ -302,7 +307,7 @@ public partial class App : Application
 
         var preview = new AssemblyPreview(work);
         _window = new Window { Title = "조립기 미리보기", Width = 1320, Height = 820, Background = (Brush)FindResource("SurfaceBrush") };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
         async Task Show(FrameworkElement view, double width, double height, string name)
         {
@@ -340,7 +345,7 @@ public partial class App : Application
 
         var preview = new DialogPreview();
         _window = new Window { Title = "다이얼로그 가족 미리보기", Width = 1320, Height = 860, Background = (Brush)FindResource("BgBrush") };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
         async Task Show(FrameworkElement view, double width, double height, string name)
         {
@@ -410,7 +415,7 @@ public partial class App : Application
 
         var preview = new WiringPreview();
         _window = new Window { Title = "셋업 · 결선 미리보기", Width = 1320, Height = 860, Background = (Brush)FindResource("SurfaceBrush") };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
 
         async Task Show(FrameworkElement view, double width, double height, string name)
         {
@@ -476,7 +481,8 @@ public partial class App : Application
             Background = (Brush)FindResource("SurfaceBrush"),
             Content = new Border { Margin = new Thickness(12), Child = view },
         };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.ApplySurface(Environment.GetCommandLineArgs(), view, _window);
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
         await Settle();
 
         if (directory is null) return;      // 손으로 써 볼 때는 띄워만 둔다
@@ -594,7 +600,7 @@ public partial class App : Application
             Background = (Brush)FindResource("SurfaceBrush"),
             Content = new Border { Margin = new Thickness(12), Child = view },
         };
-        _window.Show();
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
         await ((IActivate)console).ActivateAsync();
 
         if (directory is null) return;
@@ -748,6 +754,33 @@ public partial class App : Application
     {
         var content = (FrameworkElement)((Border)_window.Content).Child;
         SaveVisual(Path.Combine(directory, name + ".png"), content, _window.Background);
+        ProbeToolbar(directory, name, content);
+    }
+
+    /// <summary>
+    /// U-17 — 툴바 폭 판정(검색 접힘 · 오른쪽 묶음 [⋯])을 숫자로 남긴다. 그림만으로는 "왜 접혔나" 가 안 보인다.
+    /// </summary>
+    private static void ProbeToolbar(string directory, string name, DependencyObject root)
+    {
+        foreach (var toolbar in Descendants<ConsoleToolbar>(root))
+        {
+            var grid = (VisualTreeHelper.GetChild(toolbar, 0) as Border)?.Child as Grid;
+            var widths = grid?.Children.OfType<FrameworkElement>().Select(c => $"col{Grid.GetColumn(c)}={c.ActualWidth:0.#}") ?? Enumerable.Empty<string>();
+            var extra = toolbar.Extra as FrameworkElement;
+            File.AppendAllText(Path.Combine(directory, "toolbar-probe.txt"),
+                $"{name}: toolbar={toolbar.ActualWidth:0.#} overflow={toolbar.IsExtraOverflow} searchCompact={toolbar.IsSearchCompact} "
+                + $"extraDesired={extra?.DesiredSize.Width:0.#} extraActual={extra?.ActualWidth:0.#} dc={extra?.DataContext?.GetType().Name ?? "null"} vparent={(extra is null ? "" : VisualTreeHelper.GetParent(extra)?.GetType().Name)} lparent={(extra is null ? "" : LogicalTreeHelper.GetParent(extra)?.GetType().Name)} {string.Join(" ", widths)}{Environment.NewLine}");
+        }
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T hit) yield return hit;
+            foreach (var deep in Descendants<T>(child)) yield return deep;
+        }
     }
 
     /// <summary>
@@ -805,5 +838,20 @@ public partial class App : Application
         public bool IsResolved => true;
         public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
         public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
+    }
+
+    private sealed class PreviewAssemblyLauncher : Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IAssemblyLauncher
+    {
+        public bool IsAvailable => true;
+        public Task<int?> ComposeAsync(EnumDeviceCategory category) => Task.FromResult<int?>(null);
+        public Task<bool> EditDeviceAsync(IBaseDeviceModel device, EnumDeviceCategory category) => Task.FromResult(false);
+        public Task<int?> RegisterFromPresetAsync(EnumDeviceCategory category) => Task.FromResult<int?>(null);
+        public Task ManagePresetsAsync(EnumDeviceCategory category) => Task.CompletedTask;
+    }
+
+    private sealed class PreviewWiringLauncher : Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher
+    {
+        public bool IsAvailable => true;
+        public Task<bool> OpenAsync(IBaseDeviceModel controller) => Task.FromResult(false);
     }
 }

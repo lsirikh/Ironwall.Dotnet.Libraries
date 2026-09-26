@@ -131,47 +131,10 @@
 		</Style>
 
 		<!--
-			패널 닫기 ✕ — 앱 표준 ModernPanelCloseButton 은 시안 머리 위를 가정해 OnPrimaryFixed 를 박아 둔다.
-			콘솔 머리는 SurfaceAlt 라 라이트에서 흰 글리프가 흰 바탕 위에 놓여 <b>잉크 0%</b>, 다크는 1.35:1 이었다(D-30 실측).
-			여기서는 머리 바탕에 맞는 토큰을 쓴다. Theme 쪽 스타일 자체는 다른 창도 쓰므로 건드리지 않는다.
+			패널 닫기 ✕ — 옛 로컬 Acc.CloseButton(D-30: 머리 바탕 SurfaceAlt 에 맞춘 토큰)은 커널 Console.Button.Close 로 옮겼다(U-17).
+			같은 버튼이 보고서 · 조치 문구 · 호스트 장비/이벤트 창에도 선다. 커널 판은 도움말("닫기")을 왼쪽에 띄운다 —
+			기본 위치(마우스 아래)면 콘솔 오른쪽 가장자리 밖으로 흰 사각형이 삐져나와 상세 칸 머리에 걸렸다(실창 캡처).
 		-->
-		<Style x:Key="Acc.CloseButton" TargetType="Button">
-			<Setter Property="Width" Value="26" />
-			<Setter Property="Height" Value="26" />
-			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="ToolTip" Value="닫기" />
-			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="Button">
-						<Border
-							x:Name="Bd"
-							Background="Transparent"
-							CornerRadius="13">
-							<Path
-								x:Name="Glyph"
-								Width="11"
-								Height="11"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Data="M0.9,0 L5.5,4.6 L10.1,0 L11,0.9 L6.4,5.5 L11,10.1 L10.1,11 L5.5,6.4 L0.9,11 L0,10.1 L4.6,5.5 L0,0.9z"
-								Fill="{TemplateBinding Foreground}"
-								Stretch="Uniform" />
-						</Border>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-								<Setter TargetName="Glyph" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
-							</Trigger>
-							<Trigger Property="IsKeyboardFocused" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
 	</UserControl.Resources>
 
 	<c:ConsoleShell
@@ -185,7 +148,7 @@
 			<Button
 				x:Name="ClickClose"
 				AutomationProperties.AutomationId="Console.Accounts.CloseButton"
-				Style="{StaticResource Acc.CloseButton}" />
+				Style="{StaticResource Console.Button.Close}" />
 		</c:ConsoleShell.HeaderContent>
 
 		<!--  레일 — 상단 탭 6 → 레일 6(세션 설정만 구분선 뒤). 권한이 없으면 항목 자체가 없다  -->
@@ -297,9 +260,15 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 
+						<!--
+							U-17 — 열 폭(실창 1120 캡처: 아이디 "BroadcastingManag" · 성명 "Camera 매니ㅈ" 가 잘리고 부서·직급은 넓게 비어 있었고,
+							서랍이 열리면 상태 열이 가로 스크롤 밖으로 밀렸다). 고정 열은 글자에 맞게 줄이고(잠금 64→60 · 구분 92→80 · 상태 80→72),
+							아이디 · 성명은 비율 별(1.5 : 1.2)로 남는 폭을 먼저 가져간다. 부서·직급은 1 비율 + 좁으면 접는다(CollapseBelow) —
+							서랍이 겹친 576 에서도 다섯 열이 잘림 없이 선다. 바닥(MinWidth)은 긴 실데이터 값이 한 줄로 읽히는 폭.
+						-->
 						<DataGridTemplateColumn
-							Width="64"
-							MinWidth="64"
+							Width="60"
+							MinWidth="60"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="lock"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
@@ -323,21 +292,23 @@
 						</DataGridTemplateColumn>
 
 						<DataGridTemplateColumn
-							Width="168"
-							MinWidth="168"
+							Width="1.5*"
+							MinWidth="150"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="identity"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="아이디">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
-									<StackPanel Orientation="Horizontal">
+									<!--  DockPanel — StackPanel 이면 글자가 무한 폭으로 재여 줄임표 없이 칸 끝에서 잘린다  -->
+									<DockPanel LastChildFill="True">
 										<Border
 											Width="22"
 											Height="22"
 											Margin="0,0,7,0"
 											Background="{DynamicResource SurfaceSunkenBrush}"
-											CornerRadius="11">
+											CornerRadius="11"
+											DockPanel.Dock="Left">
 											<Image
 												Source="{Binding Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
 												Stretch="UniformToFill" />
@@ -347,39 +318,58 @@
 											FontFamily="Consolas"
 											FontSize="12.5"
 											Foreground="{DynamicResource TextPrimaryBrush}"
-											Text="{Binding Username, Mode=OneWay}" />
-									</StackPanel>
+											Text="{Binding Username, Mode=OneWay}"
+											TextTrimming="CharacterEllipsis"
+											ToolTip="{Binding Username, Mode=OneWay}" />
+									</DockPanel>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 
 						<DataGridTextColumn
-							Width="110"
+							Width="1.2*"
 							MinWidth="110"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="name"
 							Binding="{Binding Name, Mode=OneWay}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
-							Header="성명" />
+							Header="성명">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="VerticalAlignment" Value="Center" />
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding Name, Mode=OneWay}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
 						<DataGridTextColumn
-							Width="92"
-							MinWidth="92"
+							Width="80"
+							MinWidth="80"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="role"
 							Binding="{Binding RoleText, Mode=OneWay}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
 							Header="구분" />
 						<DataGridTextColumn
-							Width="*"
-							MinWidth="140"
+							Width="1*"
+							MinWidth="96"
+							c:ConsoleColumns.CollapseBelow="640"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="org"
 							Binding="{Binding OrgText, Mode=OneWay}"
 							CellStyle="{StaticResource Console.DataGrid.Cell}"
-							Header="부서·직급" />
+							Header="부서·직급">
+							<DataGridTextColumn.ElementStyle>
+								<Style TargetType="TextBlock">
+									<Setter Property="VerticalAlignment" Value="Center" />
+									<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+									<Setter Property="ToolTip" Value="{Binding OrgText, Mode=OneWay}" />
+								</Style>
+							</DataGridTextColumn.ElementStyle>
+						</DataGridTextColumn>
 						<DataGridTextColumn
-							Width="80"
-							MinWidth="80"
+							Width="72"
+							MinWidth="72"
 							c:ConsoleColumns.IsDefault="True"
 							c:ConsoleColumns.Key="used"
 							Binding="{Binding UsedText, Mode=OneWay}"

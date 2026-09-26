@@ -69,6 +69,7 @@ public class ConsoleButtonSizeContractTests
     [InlineData("Console.Button.Danger")]
     [InlineData("Console.Button.Icon")]
     [InlineData("Console.Button.Icon.OnPrimary")]
+    [InlineData("Console.Button.Close")]
     public void should_share_the_input_height_when_style_is_a_kernel_button(string styleKey)
     {
         // Act — 같은 줄에 놓이는 버튼은 높이가 하나여야 한다(ConsoleLayoutMath.InputHeight = 32)
@@ -81,6 +82,7 @@ public class ConsoleButtonSizeContractTests
     [Theory]
     [InlineData("Console.Button.Icon")]
     [InlineData("Console.Button.Icon.OnPrimary")]
+    [InlineData("Console.Button.Close")]
     public void should_be_a_square_of_the_input_height_when_style_is_an_icon_button(string styleKey)
     {
         // Act
@@ -140,5 +142,24 @@ public class ConsoleButtonSizeContractTests
 
         // Assert — Padding 왼쪽(12) 에서 시작한다. 가운데 정렬이었다면 100 을 훌쩍 넘는다.
         Assert.Equal(12, offset, 3);
+    }
+
+    [Fact]
+    public void should_open_the_tooltip_to_the_left_and_name_itself_when_style_is_the_console_close_button()
+    {
+        // Arrange + Act — U-17: 콘솔 머리 오른쪽 끝의 ✕. 도움말이 기본 위치(마우스 아래)면 콘솔 가장자리 밖으로
+        // 흰 사각형("닫기")이 삐져나왔다(계정 콘솔 실창). 글자 없는 버튼이라 UIA 이름도 스타일이 준다.
+        var (placement, name, tip) = OnSta(() =>
+        {
+            var button = new Button { Style = (Style)LoadConsoleStyles()["Console.Button.Close"] };
+            return (ToolTipService.GetPlacement(button),
+                    System.Windows.Automation.AutomationProperties.GetName(button),
+                    button.ToolTip as string);
+        });
+
+        // Assert
+        Assert.Equal(System.Windows.Controls.Primitives.PlacementMode.Left, placement);
+        Assert.Equal("닫기", name);
+        Assert.Equal("닫기", tip);
     }
 }

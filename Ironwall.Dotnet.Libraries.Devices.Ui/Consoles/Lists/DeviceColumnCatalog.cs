@@ -76,19 +76,19 @@ public static class DeviceColumnCatalog
         new("status", "상태", nameof(DeviceViewModel.StatusDisplay), DeviceColumnKind.StatusPill, IsDefault: true, Width: 88);
 
     private static DeviceColumnSpec Number() =>
-        new("number", "장비번호", nameof(DeviceViewModel.DeviceNumber), DeviceColumnKind.Mono, IsDefault: true, Width: 96);
+        new("number", "장비번호", nameof(DeviceViewModel.DeviceNumber), DeviceColumnKind.Mono, IsDefault: true, Width: 84);
 
     private static DeviceColumnSpec Name() =>
         new("name", "장비명", nameof(DeviceViewModel.DeviceName), DeviceColumnKind.Text, IsDefault: true, Width: 0);
 
     private static DeviceColumnSpec KindAxis() =>
-        new("kind", "종류", nameof(DeviceViewModel.TypeAxisDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 130, AxisContractOnly: true);
+        new("kind", "종류", nameof(DeviceViewModel.TypeAxisDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 120, AxisContractOnly: true);
 
     private static DeviceColumnSpec KindLegacy() =>
-        new("kind", "종류", nameof(DeviceViewModel.DeviceTypeDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 130, LegacyContractOnly: true);
+        new("kind", "종류", nameof(DeviceViewModel.DeviceTypeDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 120, LegacyContractOnly: true);
 
     private static DeviceColumnSpec Enabled() =>
-        new("enabled", "활성화", nameof(DeviceViewModel.IsEnable), DeviceColumnKind.Check, IsDefault: true, Width: 72);
+        new("enabled", "활성화", nameof(DeviceViewModel.IsEnable), DeviceColumnKind.Check, IsDefault: true, Width: 68);
 
     // ── 카테고리 공통 선택 열(위치/좌표/그룹/버전) — 전 카테고리가 BaseDeviceViewModel 을 통해 갖는다 ──
 
@@ -154,11 +154,14 @@ public static class DeviceColumnCatalog
     private static DeviceColumnSpec AddressColumn() =>
         new("address", "IP:포트", "AddressDisplay", DeviceColumnKind.Mono, IsDefault: true, Width: 150);
 
+    // U-17 — 제어기 · 방송서버는 이름(고정폭 글꼴)을 싣는 칸이다. 130 이면 실서버 이름 "LRT-UI-CTRL-225246" 이
+    // "LRT-UI-CTRL-225" 로 잘렸다(실창 캡처). 160 으로 넓히고, 그 몫은 글자보다 넓던 장비번호 96→84 · 종류 130→120 ·
+    // 활성화 72→68 에서 가져온다 — 별 열(장비명)의 몫은 줄지 않는다.
     private static DeviceColumnSpec ControllerColumn() =>
-        new("controller", "제어기", nameof(SensorDeviceViewModel.ControllerDisplay), DeviceColumnKind.Mono, IsDefault: true, Width: 130);
+        new("controller", "제어기", nameof(SensorDeviceViewModel.ControllerDisplay), DeviceColumnKind.Mono, IsDefault: true, Width: 160);
 
     private static DeviceColumnSpec ServerColumn() =>
-        new("server", "방송서버", nameof(SpeakerDeviceViewModel.ServerDisplay), DeviceColumnKind.Mono, IsDefault: true, Width: 130);
+        new("server", "방송서버", nameof(SpeakerDeviceViewModel.ServerDisplay), DeviceColumnKind.Mono, IsDefault: true, Width: 160);
 
     private static DeviceColumnSpec DoorColumn(string bindingPath) =>
         new("door", "문 위치", bindingPath, DeviceColumnKind.StatusPill, IsDefault: true, Width: 110);

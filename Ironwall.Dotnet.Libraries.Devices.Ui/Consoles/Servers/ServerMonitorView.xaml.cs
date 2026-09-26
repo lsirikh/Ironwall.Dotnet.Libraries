@@ -32,6 +32,7 @@ public partial class ServerMonitorView : UserControl
     private ListBox? _tray;
     private ConsolePrefs? _prefs;
     private bool _isSyncingSelection;
+    private ConsoleShell? _shell;
 
     public ServerMonitorView()
     {
@@ -66,10 +67,18 @@ public partial class ServerMonitorView : UserControl
 
     private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
+        // U-17 — 목록 실효 폭이 바뀔 때마다(서랍 열림 · 표면 크기) 좁은 열을 접었다 편다.
+        if (_shell is not null) _shell.EffectiveListWidthChanged -= OnListWidthChanged;
+        _shell = sender as ConsoleShell;
+        if (_shell is not null) _shell.EffectiveListWidthChanged += OnListWidthChanged;
+
         // Unloaded 에서 뗐다가 같은 뷰가 다시 붙는 경우(탭 · 패널 재표시).
         if (_viewModel is null && ViewModel is { } vm)
             OnDataContextChanged(this, new DependencyPropertyChangedEventArgs(DataContextProperty, null, vm));
+        ApplyColumnPrefs();
     }
+
+    private void OnListWidthChanged(object? sender, double width) => ApplyColumnPrefs();
 
     private void OnGridLoaded(object sender, RoutedEventArgs e)
     {
@@ -131,6 +140,7 @@ public partial class ServerMonitorView : UserControl
             column.CellStyle = cellStyle;
             ConsoleColumns.SetKey(column, spec.Key);
             ConsoleColumns.SetIsDefault(column, spec.IsDefault);
+            ConsoleColumns.SetCollapseBelow(column, CollapseBelowFor(spec.Key));
             _grid.Columns.Add(column);
         }
 
@@ -224,11 +234,26 @@ public partial class ServerMonitorView : UserControl
         return _prefs.Get($"{ServerMonitorViewModel.ConsoleKey}.{rail.Key}");
     }
 
+    /// <summary>
+    /// U-17 — 목록 칸이 이 폭보다 좁으면 그 열을 접는다(<see cref="ConsoleColumns.CollapseBelowProperty"/>).
+    /// 표면 기본 1120 에서 행을 고르면 서랍(360)이 겹쳐 목록이 576 이 된다 — 고정 합 658(부대 열까지 768)이 넘쳐
+    /// "마지막 변화" 가 가로 스크롤 밖으로 밀렸다(미리보기 1120 실측). 이름 · 유형 · 주소 · 상태는 남는다.
+    /// </summary>
+    internal static double CollapseBelowFor(string key) => key switch
+    {
+        "last_change" => 680,
+        "unit" => 780,
+        _ => 0,
+    };
+
     private void ApplyColumnPrefs()
     {
         if (_grid is null) return;
         var prefs = ColumnPrefs();
-        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, prefs?.HiddenColumns);
+        var hidden = new List<string>(prefs?.HiddenColumns ?? new List<string>());
+        foreach (var key in ConsoleColumns.CollapsedAt(_grid.Columns, _shell?.EffectiveListWidth ?? 0))
+            if (!hidden.Contains(key)) hidden.Add(key);
+        var text = ConsoleColumns.Apply(_grid.Columns, prefs?.ShowAllColumns ?? false, hidden);
         if (_grid.Columns.All(c => string.IsNullOrEmpty(ConsoleColumns.GetKey(c)))) text = string.Empty;
         if (_toolbar is not null) _toolbar.ColumnsText = text;
     }

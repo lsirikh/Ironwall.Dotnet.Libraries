@@ -7,6 +7,7 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:vm="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels"
 	AutomationProperties.AutomationId="Reports.Console.Root"
+	AutomationProperties.Name="보고서 관리"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		보고서 콘솔 — 레일 · 목록 · 상세 3단. 정본 목업:
@@ -77,23 +78,18 @@
 		Loaded="OnShellLoaded"
 		Subtitle="{Binding RailSubtitle}">
 
-		<!--  머리 오른쪽 — 닫기(호스트가 이 패널을 모달로 띄운다)  -->
+		<!--
+			머리 오른쪽 — 닫기 ✕ 하나(호스트가 이 패널을 모달로 띄운다).
+			U-17 — 옛 머리는 "보고서 관리 · 닫기" 였다. 틀 머리(보고서) · 콘솔 머리(보고서 · 생성 이력) 에 이어 세 번째로 같은 이름을
+			되풀이했고, 닫기만 글자 버튼이라 다른 콘솔(계정 ✕)과 모양이 달랐다. 이름은 틀 · 콘솔 머리가 이미 말한다 —
+			자동화용 이름은 뿌리(Reports.Console.Root)의 AutomationProperties.Name 으로 옮겼다(T-REP003).
+		-->
 		<c:ConsoleShell.HeaderContent>
-			<StackPanel Orientation="Horizontal">
-				<!--  커널 머리의 제목 글에는 계측 이름이 없다 — 옛 id 를 여기서 되살린다.  -->
-				<TextBlock
-					Margin="0,0,10,0"
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Reports.Console.TitleText"
-					FontSize="12"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Text="보고서 관리" />
-					<Button
-					AutomationProperties.AutomationId="Reports.Console.CloseButton"
-					Click="OnClose"
-					Content="닫기"
-					Style="{StaticResource Console.Button.Ghost}" />
-			</StackPanel>
+			<Button
+				AutomationProperties.AutomationId="Reports.Console.CloseButton"
+				AutomationProperties.Name="보고서 닫기"
+				Click="OnClose"
+				Style="{StaticResource Console.Button.Close}" />
 		</c:ConsoleShell.HeaderContent>
 
 		<!--  레일 — 탭 3 이 레일 3 이 된다(L1260-1262). 생성 이력에는 진행 중 건수 배지.  -->

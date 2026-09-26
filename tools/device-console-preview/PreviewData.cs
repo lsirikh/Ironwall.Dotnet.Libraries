@@ -23,7 +23,8 @@ internal static class PreviewData
         {
             var controller = new ControllerDeviceModel
             {
-                Id = i, DeviceNumber = i, DeviceName = $"제어기 {i}", IpAddress = $"10.10.1.{10 + i}", Port = 5000 + i,
+                // 3 = 실서버에 있던 긴 이름(2026-09-26 실창) — 목록 · 상세의 열 폭을 실데이터 길이로 본다.
+                Id = i, DeviceNumber = i, DeviceName = i == 3 ? "LRT-UI-CTRL-225246" : $"제어기 {i}", IpAddress = $"10.10.1.{10 + i}", Port = 5000 + i,
                 Status = i == 2 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, IsEnable = true,
                 TypeAxisCode = isAxis ? "pids_controller" : null, DeviceGroups = new List<int> { 1 },
                 // D-14: 1·2번은 부대 편제(unit_id)가 실려 있다 — 소속 부대 열·칸이 이름으로 뜨는지 눈으로 본다.
@@ -38,7 +39,7 @@ internal static class PreviewData
         {
             devices.Add(new SensorDeviceModel
             {
-                Id = 100 + i, DeviceNumber = i, DeviceName = $"광망 센서 {i}", Controller = controllers[i % 3],
+                Id = 100 + i, DeviceNumber = i == 8 ? 97935 : i, DeviceName = i == 8 ? "LRT-UI-SENSOR-225246-R" : $"광망 센서 {i}", Controller = controllers[i % 3],
                 Status = i == 5 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, IsEnable = i != 7,
                 TypeAxisCode = isAxis ? "fence" : null, DeviceType = EnumDeviceType.Fence,
                 DeviceGroups = new List<int> { i <= 4 ? 1 : 2 },

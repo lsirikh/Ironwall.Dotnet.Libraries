@@ -691,6 +691,19 @@
 										FontSize="11.5"
 										Foreground="{DynamicResource TextMutedBrush}"
 										Text="{Binding PickerCountText}" />
+									<!--
+										U-17 — [추가 ▶] 는 목록 머리 오른쪽(검색 옆)에 둔다. 전에는 고정 높이(190) 목록 <b>아래</b>에 있어,
+										후보가 한두 건이면 빈 목록 밑 허공에 떠 무엇에 딸린 버튼인지 안 보였다(실창 캡처).
+										같은 줄의 검색 · 건수와 한 몸이 되고, 목록이 몇 건이든 자리가 같다.
+									-->
+									<Button
+										Margin="8,0,0,0"
+										AutomationProperties.AutomationId="Console.Suppression.Picker.Add"
+										Click="OnAddSelected"
+										Content="추가 ▶"
+										DockPanel.Dock="Right"
+										Style="{StaticResource Console.Button}"
+										ToolTip="고른 대상을 트레이에 담습니다 — 끌어 놓는 것과 같은 일입니다 (Enter)" />
 									<TextBox
 										Height="28"
 										Margin="8,0,0,0"
@@ -703,8 +716,12 @@
 										VerticalContentAlignment="Center" />
 								</DockPanel>
 
+								<!--  목록의 영역이 보이게 가라앉은 판 + 선 — 후보가 적어도 "여기가 목록" 이 읽힌다  -->
 								<ListBox
 									Height="190"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource DividerBrush}"
+									BorderThickness="1"
 									AutomationProperties.AutomationId="Console.Suppression.Picker"
 									ItemsSource="{Binding PickerItems}"
 									PreviewKeyDown="OnPickerKeyDown"
@@ -742,15 +759,6 @@
 										</DataTemplate>
 									</ListBox.ItemTemplate>
 								</ListBox>
-
-								<Button
-									Margin="0,8,0,0"
-									HorizontalAlignment="Right"
-									AutomationProperties.AutomationId="Console.Suppression.Picker.Add"
-									Click="OnAddSelected"
-									Content="추가 ▶"
-									Style="{StaticResource Console.Button}"
-									ToolTip="고른 대상을 트레이에 담습니다 — 끌어 놓는 것과 같은 일입니다 (Enter)" />
 							</StackPanel>
 						</StackPanel>
 					</Grid>
