@@ -281,10 +281,34 @@ public sealed class RegisterFromPresetViewModel : Screen
     public Task CancelAsync() => TryCloseAsync(false);
     #endregion
 
-    private static string Indent(string json)
+    /// <summary>
+    /// 화면용으로 들여쓴다. <b>비밀번호 값은 가린다</b> — 입력칸은 PasswordBox 로 가려 놓고 이 미리보기에는
+    /// connection.credentials.user_password 가 평문으로 찍혀 있었다(완성도 점검 R1). 보내는 본문(request.PreviewJson ·
+    /// request.Dto)은 그대로다 — 가리는 것은 사람에게 보여 주는 이 글자뿐이다.
+    /// </summary>
+    internal static string Indent(string json)
     {
-        try { return Newtonsoft.Json.Linq.JToken.Parse(json).ToString(Newtonsoft.Json.Formatting.Indented); }
-        catch (Newtonsoft.Json.JsonException) { return json; }
+        try
+        {
+            var token = Newtonsoft.Json.Linq.JToken.Parse(json);
+            MaskSecrets(token);
+            return token.ToString(Newtonsoft.Json.Formatting.Indented);
+        }
+        catch (Newtonsoft.Json.JsonException) { return string.Empty; }   // 못 읽는 본문은 보여 주지 않는다(비밀이 섞였을 수 있다)
+    }
+
+    internal const string MaskedSecret = "••••••";
+
+    /// <summary>이름에 password · secret · token 이 든 문자열 값을 가린다(빈 값 · null 은 그대로).</summary>
+    internal static void MaskSecrets(Newtonsoft.Json.Linq.JToken token)
+    {
+        foreach (var prop in token.SelectTokens("$..*").OfType<Newtonsoft.Json.Linq.JValue>().Select(v => v.Parent).OfType<Newtonsoft.Json.Linq.JProperty>().ToList())
+        {
+            var name = prop.Name.ToLowerInvariant();
+            if (!(name.Contains("password") || name.Contains("secret") || name.Contains("token"))) continue;
+            if (prop.Value is Newtonsoft.Json.Linq.JValue { Type: Newtonsoft.Json.Linq.JTokenType.String } v && !string.IsNullOrEmpty((string?)v))
+                prop.Value = MaskedSecret;
+        }
     }
 
     private void RefreshPresets()
