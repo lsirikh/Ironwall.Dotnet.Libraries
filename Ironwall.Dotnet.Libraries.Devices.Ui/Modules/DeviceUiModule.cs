@@ -26,6 +26,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Modules;
 ****************************************************************************/
 public class DeviceUiModule : Module
 {
+    /// <summary>장비 API 클라이언트의 등록 이름(DeviceApiModule 기본값과 같다) — 이름 없이 IApiService 를 찾으면 호스트에서 실패한다.</summary>
+    public const string DeviceApiName = "DeviceApi";
+
     #region - Ctors -
     public DeviceUiModule( IApiSetupModel apiSetup, ILogService? log = default, int count = default)
     {
@@ -41,7 +44,7 @@ public class DeviceUiModule : Module
         {
             builder.RegisterModule(new DeviceModule(_log, _count++));
             //builder.RegisterModule(new DeviceDbModule(_log, _apiSetup, _count++));
-            builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
+            builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), DeviceApiName, count: _count++));
             // 디바이스 위치 저장 게이트웨이(Symbol_Apply_DeviceLocation) — 맵 심볼 현재위치를 디바이스 API로 저장.
             // IDeviceApiService(위 DeviceApiModule 등록)에 의존. GMaps.Ui가 lazy 해석.
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Services.DeviceLocationGateway>()
@@ -119,10 +122,13 @@ public class DeviceUiModule : Module
 
             // N-12 server monitor — 서버 모니터 콘솔(레일 · 목록 + 지표 띠 · 상세).
             // 판본(6.3 평면 ↔ 7.0/8.0 축)을 아는 통로는 Devices.Api 의 새 인터페이스다 — 기존 IServerApiService 는 그대로 둔다.
+            // ★ IApiService 는 ApiModule 이 <b>이름으로만</b> 등록한다("DeviceApi" 등) — 이름 없이 Resolve 하면 호스트에서
+            //   "Cannot resolve parameter IApiService" 로 서버 모니터 콘솔이 열리지 않는다(이벤트 맵핑 워크벤치가 같은 결함으로
+            //   실창에서 숨겨졌던 것과 같은 원인). DeviceApiModule(기본 이름 "DeviceApi")이 로그인 토큰을 붙이는 그 클라이언트를 쓴다.
             builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Api.Servers.ServerAxisApiService(
-                        c.Resolve<Ironwall.Dotnet.Libraries.Api.Services.IApiService>(),
+                        c.ResolveNamed<Ironwall.Dotnet.Libraries.Api.Services.IApiService>(DeviceApiName),
                         new ApiSetupModel(_apiSetup),
-                        c.ResolveOptional<IServerContractProbe>(),
+                        c.ResolveOptionalNamed<IServerContractProbe>(DeviceApiName) ?? c.ResolveOptional<IServerContractProbe>(),
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Api.Servers.IServerAxisApiService>()
                    .SingleInstance();
