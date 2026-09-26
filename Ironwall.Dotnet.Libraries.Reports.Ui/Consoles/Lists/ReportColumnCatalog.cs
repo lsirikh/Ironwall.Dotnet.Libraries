@@ -63,11 +63,11 @@ public static class ReportColumnCatalog
         new ReportColumnSpec("name", "이름", "Name", ReportColumnKind.Text, 0, true),
         // V-28 — 90 이면 "사용자 정의" 가 "사용자…" 로 잘렸다(이름 열은 380 이 남았다) → 글이 다 드는 폭.
         new ReportColumnSpec("report_type", "유형", "ReportType", ReportColumnKind.ReportTypeCode, 108, true),
-        new ReportColumnSpec("default_period", "기본기간", "DefaultPeriod", ReportColumnKind.PeriodCode, 92, true),
+        new ReportColumnSpec("default_period", "기본 기간", "DefaultPeriod", ReportColumnKind.PeriodCode, 92, true),
         new ReportColumnSpec("component_count", "구성 수", "EffectiveComponentCount", ReportColumnKind.Mono, 74, true),
 
         new ReportColumnSpec("description", "설명", "Description", ReportColumnKind.Text, 200, false),
-        // R7 — 생성 이력과 같은 말("생성일시")로. ※ "기본기간" 은 호스트 UiTests(T-REP035)가 머리글을 그대로 짚어 둔다.
+        // R7 — 생성 이력과 같은 말("생성일시")로. "기본 기간" 은 호스트 UiTests(T-REP035)가 머리글을 그대로 짚는다 — 바꾸면 거기도 함께.
         new ReportColumnSpec("created_at", "생성일시", "CreatedAt", ReportColumnKind.ServerTime, 150, false),
     };
 
