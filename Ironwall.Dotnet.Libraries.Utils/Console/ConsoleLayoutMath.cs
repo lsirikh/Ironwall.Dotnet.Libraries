@@ -51,6 +51,12 @@ public static class ConsoleLayoutMath
     /// <summary>머리의 S · M · L 버튼.</summary>
     public const double DetailSmall = 300, DetailMedium = 340, DetailLarge = 480;
 
+    /// <summary>
+    /// 세 칸 바닥 띠(레일 바닥 · 목록 상태 줄 · 상세 적용 막대)의 최소 높이 — 상세 막대(위 여백 10 + 단추 32 + 아래 10 + 윗선 1)와 같다.
+    /// 띠마다 제 높이로 서면 윗선이 계단처럼 어긋났다(2026-09-27 실창: 장비 716 / 733 / 707).
+    /// </summary>
+    public const double FooterBandHeight = 53;
+
     public const double DrawerMax = 360;
     public const double DrawerRatio = 0.86;
 

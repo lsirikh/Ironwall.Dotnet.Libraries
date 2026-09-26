@@ -208,7 +208,11 @@
 										</Grid.RowDefinitions>
 										<ContentPresenter Content="{TemplateBinding Toolbar}" />
 										<ContentPresenter Grid.Row="1" Content="{TemplateBinding List}" />
-										<ContentPresenter Grid.Row="2" Content="{TemplateBinding StatusBar}" />
+										<!--  상태 줄도 상세 적용 막대와 같은 높이 이상(FooterBandHeight) — 세 칸 바닥 띠 윗선이 한 줄로 선다.  -->
+										<ContentPresenter
+											Grid.Row="2"
+											MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
+											Content="{TemplateBinding StatusBar}" />
 									</Grid>
 
 									<Border
@@ -319,10 +323,15 @@
 						<Border
 							x:Name="FooterHost"
 							Grid.Row="1"
-							Padding="16,12,16,14"
+							MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
+							Padding="16,8"
 							BorderBrush="{DynamicResource DividerBrush}"
 							BorderThickness="0,1,0,0">
-							<ContentPresenter Content="{TemplateBinding Footer}" TextElement.Foreground="{DynamicResource TextMutedBrush}" />
+							<!--  세 칸 바닥 띠 윗선을 맞춘다(FooterBandHeight) — 내용은 띠 가운데.  -->
+							<ContentPresenter
+								VerticalAlignment="Center"
+								Content="{TemplateBinding Footer}"
+								TextElement.Foreground="{DynamicResource TextMutedBrush}" />
 						</Border>
 					</Grid>
 					<ControlTemplate.Triggers>
