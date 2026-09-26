@@ -554,6 +554,14 @@ public partial class App : Application
         await Settle();
         Save(directory, $"servers-{theme}-03-selected-metrics");
 
+        // 좁힌 서랍(표면 1000) — 고른 채로 지표 띠가 2칸 두 줄이 돼도 목록이 다섯 줄 이상 남는지 본다(GIS 실창 #1).
+        PreviewTools.Shared.OffscreenStage.SetWidth(_window, view, 1000);
+        await Settle();
+        Save(directory, $"servers-{theme}-03b-selected-narrow-1000");
+        if (!double.IsNaN(wideServersView)) PreviewTools.Shared.OffscreenStage.SetWidth(_window, view, wideServersView);
+        else _window.Width = wideServers;
+        await Settle();
+
         preview.Select(preview.Row("백업서버"));           // 한 번도 보고가 없는 행(status_observed_at = null)
         await Settle();
         ServersPreview.ScrollDetailToEnd(view);            // "상태(관측)" 절의 미수신 상자를 보이게 굴린다

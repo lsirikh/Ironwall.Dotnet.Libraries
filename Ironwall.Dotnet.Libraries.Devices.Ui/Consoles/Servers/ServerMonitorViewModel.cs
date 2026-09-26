@@ -85,6 +85,7 @@ public class ServerMonitorViewModel : Screen
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         Rows = new ObservableCollection<ServerRowViewModel>();
         MetricCells = new ObservableCollection<ServerMetricCell>();
+        MetricCells.CollectionChanged += (_, _) => NotifyOfPropertyChange(nameof(HasMetricValues));
         AssignCandidates = new ObservableCollection<ServerAssignCandidateViewModel>();
         UnitOptions = new ObservableCollection<ServerUnitOption>();
         CategoryOptions = new ObservableCollection<ServerCategoryOption>();
@@ -341,7 +342,7 @@ public class ServerMonitorViewModel : Screen
         finally
         {
             _isBusy = false;
-            NotifyOfPropertyChange(nameof(CanReload));
+            NotifyBusyChanged();
         }
     }
 
@@ -392,6 +393,9 @@ public class ServerMonitorViewModel : Screen
     /// <summary>상세에 그릴 것이 있는가 — 없으면 <b>빈 편집 폼을 그리지 않는다</b>.</summary>
     public bool HasDetail => _detail is not null || Detail.IsCreating;
 
+    /// <summary>고른 것이 없을 때 상세 칸의 안내 — 다른 콘솔처럼 "무엇을 하면 무엇이 나오는지"(GIS 실창 #11).</summary>
+    public string DetailEmptyHint => "목록에서 서버를 고르면 접속 정보 · 설정 · 상태가 여기에 나옵니다. 새 서버는 [추가]를 누르세요.";
+
     /// <summary>뷰가 알린 선택 변경. 막혔으면 false — 뷰가 선택을 되돌린다.</summary>
     public bool OnRowsSelected(IList? selected)
     {
@@ -404,7 +408,8 @@ public class ServerMonitorViewModel : Screen
         IsEditing = false;
         Detail.SelectedCount = rows.Count;
         Detail.SingleTitle = rows.Count == 1 ? rows[0].Name : string.Empty;
-        Detail.SingleNumber = rows.Count == 1 ? rows[0].Id.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        // 머리 꼬리표는 내부 id("서버 · 44")가 아니라 운영자가 읽는 유형("서버 · 프록시")이다(GIS 실창 #10).
+        Detail.SingleNumber = rows.Count == 1 ? rows[0].TypeText : string.Empty;
 
         // 커널의 ReadOnly 상태는 쓰지 않는다 — 그 배너가 "편집 권한이 없어" 라 여기서는 거짓말이 된다.
         Detail.IsReadOnly = false;
@@ -484,6 +489,14 @@ public class ServerMonitorViewModel : Screen
 
     /// <summary>선택한 한 대가 있을 때만 지표 띠가 뜬다(스토리보드 L1345).</summary>
     public bool IsMetricBandVisible => MetricCells.Count > 0 && SelectedRow is not null;
+
+    /// <summary>
+    /// 서버가 지표를 하나라도 보냈는가. 하나도 없으면 "보고 없음" 네 칸(약 60px) 대신 한 줄(<see cref="MetricEmptyText"/>)로 말한다 —
+    /// 목록의 높이를 아낀다(GIS 실창 #1: 네 칸 모두 "보고 없음" 인 띠가 목록을 굶겼다).
+    /// </summary>
+    public bool HasMetricValues => MetricCells.Any(c => c.HasValue);
+
+    public string MetricEmptyText => "이 서버의 CPU · 메모리 · 디스크 · 네트워크 지표를 아직 받지 못했습니다.";
 
     public ObservableCollection<ServerMetricCell> MetricCells { get; }
 
@@ -582,6 +595,9 @@ public class ServerMonitorViewModel : Screen
     /// <summary>운용 모드 보기 — 화면은 한국어(<see cref="ServerModeOption.Display"/>), 저장 값은 코드(<see cref="ServerModeOption.Code"/>).</summary>
     public IReadOnlyList<ServerModeOption> OperationModeOptions { get; } = ServerModeDisplay.OperationModes;
     public IReadOnlyList<ServerModeOption> WindyModeOptions { get; } = ServerModeDisplay.WindyModes;
+
+    /// <summary>모드 값이 아직 없을 때 콤보에 보이는 안내 — 빈 칸만 두면 고장인지 미설정인지 모른다(GIS 실창 #10).</summary>
+    public string ModeHint => IsEditing ? "고르세요" : "정하지 않음";
 
     /// <summary>6.3 전용 — 프록시 설정 경로에서 읽은 모드 글자.</summary>
     public string OperationModeText
@@ -719,7 +735,7 @@ public class ServerMonitorViewModel : Screen
     public bool IsEditing
     {
         get => _isEditing;
-        private set { _isEditing = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanBeginEdit)); }
+        private set { _isEditing = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanBeginEdit)); NotifyOfPropertyChange(nameof(ModeHint)); }
     }
 
     /// <summary>[추가] — 등록 폼에는 <b>상태 칸이 없다</b>(관측 필드를 쓰면 422).</summary>
@@ -759,8 +775,8 @@ public class ServerMonitorViewModel : Screen
             if (Detail.IsCreating)
             {
                 var (created, newId) = await _service.CreateAsync(SelectedCategory!, _intent, token).ConfigureAwait(true);
-                StatusText = created.Message;
-                if (!created.IsSuccess) return;
+                // 성공 문장은 상세 바닥 막대 하나에만 — 상태 띠에도 쓰면 같은 말이 두 번 뜬다(GIS 실창 #7). 실패만 상태 띠에.
+                if (!created.IsSuccess) { StatusText = created.Message; return; }
 
                 Detail.IsCreating = false;
                 IsEditing = false;
@@ -773,8 +789,7 @@ public class ServerMonitorViewModel : Screen
             if (SelectedRow is not { } row) return;
 
             var saved = await _service.SaveAsync(row.Id, _intent, token).ConfigureAwait(true);
-            StatusText = saved.Message;
-            if (!saved.IsSuccess) return;
+            if (!saved.IsSuccess) { StatusText = saved.Message; return; }
 
             IsEditing = false;
             Detail.Settle("설정을 저장했습니다.");
@@ -790,8 +805,18 @@ public class ServerMonitorViewModel : Screen
         finally
         {
             _isBusy = false;
-            NotifyOfPropertyChange(nameof(CanReload));
+            NotifyBusyChanged();
         }
+    }
+
+    /// <summary>
+    /// 바쁨이 풀렸다 — [갱신] 만이 아니라 [추가] 도 다시 판정하게 알린다. 적재 도중(<c>_isBusy</c>=true)에 알린
+    /// <see cref="CanAdd"/> 는 거짓이라 예전에는 [추가] 가 영영 꺼진 회색 테두리로 남았다(GIS 실창 2026-09-27 #8).
+    /// </summary>
+    private void NotifyBusyChanged()
+    {
+        NotifyOfPropertyChange(nameof(CanReload));
+        NotifyOfPropertyChange(nameof(CanAdd));
     }
 
     public void Revert()
@@ -963,10 +988,15 @@ public class ServerMonitorViewModel : Screen
             NotifyOfPropertyChange(name);
     }
 
+    /// <summary>
+    /// 적용 · 등록 뒤 다시 읽은 목록에서 그 서버를 <b>뷰모델에서도</b> 고른다. 예전에는 그리드의 선택만 되살려
+    /// (뷰가 되돌림 중에는 선택 변경을 뷰모델에 알리지 않는다) 행은 강조된 채 상세가 "선택한 항목 없음" 이었다(GIS 실창 #7).
+    /// </summary>
     private void SelectAfterReload(int id)
     {
         var row = Rows.FirstOrDefault(r => r.Id == id);
         if (row is null) return;
+        OnRowsSelected(new List<object> { row });
         SelectionRestoreRequested?.Invoke(this, new object[] { row });
     }
 

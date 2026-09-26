@@ -490,7 +490,9 @@ public class ServerMonitorViewModelTests
         Assert.Single(service.Creates);
         Assert.Equal(3, service.Creates[0].Category.Id);
         Assert.Equal("새 서버", service.Creates[0].Intent.Name);
-        Assert.Equal(ServerStatusRules.JustRegisteredNotice, vm.StatusText);
+        // 성공 문장은 상세 바닥 막대 한 곳에만(GIS 실창 #7 — 상태 띠에도 쓰면 두 번 뜬다).
+        Assert.Equal(ServerStatusRules.JustRegisteredNotice, vm.Detail.LastMessage);
+        Assert.Equal(string.Empty, vm.StatusText);
     }
 
     [Fact]

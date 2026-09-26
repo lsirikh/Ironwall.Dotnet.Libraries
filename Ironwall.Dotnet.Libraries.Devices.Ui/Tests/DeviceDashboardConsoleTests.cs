@@ -361,6 +361,90 @@ public class DeviceDashboardConsoleTests : IDisposable
     }
 
     [Fact]
+    public async Task should_select_the_new_row_as_soon_as_it_appears_before_the_panel_finishes()
+    {
+        // Arrange — GIS 실창 #16: 새 그룹이 목록에 떴는데도 상세가 "새 그룹 등록 · 아직 등록 전" 이었다
+        // (패널은 저장 뒤 2초를 더 기다렸다가 끝남을 알린다).
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.Add();
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Apply();
+        var created = Lamp(42, "새로 단 경광등");
+
+        // Act — 끝남(Finish) 전에 목록만 바뀐다
+        source.ReplaceWith(Lamp(11, "경광등 1"), created);
+
+        // Assert
+        Assert.False(console.Detail.IsCreating);
+        Assert.Same(created, console.Form.Rows.Single());
+        Assert.Equal("등록했습니다.", console.Detail.LastMessage);
+
+        source.Finish();                                      // 늦게 온 끝남도 같은 행을 쥔다
+        Assert.Same(created, console.Form.Rows.Single());
+        Assert.False(console.IsOperationRunning);
+    }
+
+    [Fact]
+    public async Task should_not_pick_an_unrelated_new_row_early_when_it_does_not_match_the_draft()
+    {
+        // Arrange
+        ScriptedSource source = null!;
+        var (console, _) = await OpenAsync(panel => source = new ScriptedSource(panel, Lamp(11, "경광등 1")));
+        await console.SelectRailAsync(LampRail);
+        console.Add();
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Apply();
+
+        // Act — 다른 곳에서 동시에 만든 행이 먼저 들어왔다(번호도 이름도 다르다)
+        source.ReplaceWith(Lamp(11, "경광등 1"), Lamp(77, "남이 만든 경광등"));
+
+        // Assert — 확실하지 않으면 끝남을 기다린다
+        Assert.True(console.Detail.IsCreating);
+    }
+
+    [Fact]
+    public async Task should_use_the_right_subject_particle_when_a_create_form_opens()
+    {
+        // Arrange — GIS 실창 #15: "새 그룹이(가) 만들어집니다". 그룹 레일은 진짜 그룹 패널이 [추가]를 작업 스레드에서
+        // 끝내 시험 호스트에서는 교차 스레드가 된다 — 같은 문장 틀을 경광등 레일로 본다(그룹 자체는 조사 시험이 본다).
+        var (console, _) = await OpenAsync();
+        await console.SelectRailAsync(LampRail);
+
+        // Act
+        console.Add();
+
+        // Assert
+        Assert.Equal(ConsoleDetailState.Create, console.Detail.State);
+        Assert.Contains("새 경광등이 만들어집니다", console.Detail.CreateBanner);
+        Assert.DoesNotContain("이(가)", console.Detail.CreateBanner);
+    }
+
+    [Fact]
+    public async Task should_keep_the_component_button_in_place_but_disabled_when_a_field_is_touched()
+    {
+        // Arrange — GIS 실창 #13: 단추가 사라지면 폼 전체가 38px 튄다
+        var launcher = new FakeLauncher { IsAvailable = true };
+        var (console, _) = await OpenAsync(launcher: new Lazy<Consoles.Assembly.IAssemblyLauncher>(() => launcher));
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(RowsOf(console).Take(1).ToList());
+        Assert.True(console.IsEditComponentsVisible);
+        Assert.Null(console.EditComponentsBlockedReason);
+        var announced = new List<string?>();
+        console.PropertyChanged += (_, e) => announced.Add(e.PropertyName);
+
+        // Act
+        console.Form.Fields.Single(f => f.Key == "name_device").Text = "바꾼 이름";
+
+        // Assert — 바인딩이 알아야 단추가 실제로 꺼진다(예전에는 적용 · 이동 때만 알렸다)
+        Assert.Contains(nameof(DeviceDashboardViewModel.CanEditComponents), announced);
+        Assert.True(console.IsEditComponentsVisible);
+        Assert.False(console.CanEditComponents);
+        Assert.False(string.IsNullOrWhiteSpace(console.EditComponentsBlockedReason));
+    }
+
+    [Fact]
     public async Task should_ignore_completion_of_another_rail_when_it_arrives_late()
     {
         ScriptedSource source = null!;

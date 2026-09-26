@@ -111,6 +111,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         };
 
         Detail = new ConsoleDetailPresenter();
+        // 손댄 칸이 생기거나 사라지면 "손댄 칸이 있으면 못 연다" 입구들(부품 구성 · 결선 · 장비 배정)을 다시 판정한다 —
+        // 예전에는 적용 · 레일 이동 때만 알려 칸을 고쳐도 단추가 켜진 채였다(누르면 말없이 돌아왔다).
+        Detail.Tracker.Changed += (_, _) => RefreshToolbar();
         Form = new DevicePropertyFormViewModel(Detail, this);
         _deviceApiService = deviceApiService;
         _catalogService = catalogService;
@@ -368,7 +371,46 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Rows = null;
     }
 
-    private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshStatus();
+    private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshStatus();
+
+        // [등록] 을 기다리는 중에 새 행이 목록에 들어왔다 — 패널의 끝남(저장 뒤 2초 지연 + 결과 안내)을 기다리지 않고
+        // 그 행을 곧바로 고른다. 예전에는 새 그룹이 목록에 떴는데도 상세가 한참 "새 그룹 등록 · 아직 등록 전" 이었다(GIS 실창 #16).
+        if (_pending is { Kind: PendingKind.Create, ResolvedId: null }
+            && e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset)
+            Caliburn.Micro.Execute.BeginOnUIThread(ResolveCreatedEarly);
+    }
+
+    /// <summary>등록한 행을 확실히 가려낼 수 있을 때만(번호나 이름이 같다) 고른다 — 남이 동시에 만든 행을 고르지 않는다.</summary>
+    private void ResolveCreatedEarly()
+    {
+        if (_pending is not { Kind: PendingKind.Create, ResolvedId: null } pending || _current is null || _draft is null) return;
+
+        var created = FindCreated(_current.Rows.Cast<object>().ToList(), pending, exactOnly: true);
+        if (created is null) return;
+
+        pending.ResolvedId = RowId(created);
+        _draft = null;
+        Reselect(new[] { created }, "등록했습니다.");
+    }
+
+    /// <summary>
+    /// 저장 전에는 없던 Id 의 행 가운데 등록한 것. 번호 → 이름 순으로 맞춰 보고, <paramref name="exactOnly"/> 가 아니면
+    /// 맞는 것이 없을 때 새 행 아무것이나(예전 동작) — 가장 큰 Id 를 고르면 필터에 가려졌을 때 엉뚱한 장비를 "등록했다"며 고른다.
+    /// </summary>
+    private object? FindCreated(IReadOnlyList<object> rows, PendingOperation pending, bool exactOnly)
+    {
+        var fresh = rows.Where(r => RowId(r) > 0 && !pending.KnownIds.Contains(RowId(r))).ToList();
+        if (pending.ResolvedId is { } resolved)
+            return fresh.FirstOrDefault(r => RowId(r) == resolved) ?? (exactOnly ? null : fresh.FirstOrDefault());
+
+        var number = _draft is null ? null : RowText(_draft, "DeviceNumber");
+        var name = _draft is null ? null : RowText(_draft, "DeviceName") ?? RowText(_draft, "Name");
+        var exact = (string.IsNullOrEmpty(number) ? null : fresh.FirstOrDefault(r => RowText(r, "DeviceNumber") == number))
+            ?? (string.IsNullOrEmpty(name) ? null : fresh.FirstOrDefault(r => (RowText(r, "DeviceName") ?? RowText(r, "Name")) == name));
+        return exact ?? (exactOnly ? null : fresh.FirstOrDefault());
+    }
 
     private bool MatchesSearch(object row)
     {
@@ -450,6 +492,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CanReload));
         NotifyOfPropertyChange(nameof(CanAssemble));
         NotifyOfPropertyChange(nameof(CanEditComponents));
+        NotifyOfPropertyChange(nameof(IsEditComponentsVisible));
+        NotifyOfPropertyChange(nameof(EditComponentsBlockedReason));
         NotifyOfPropertyChange(nameof(CanOpenWiring));
         NotifyOfPropertyChange(nameof(IsWiringVisible));
         NotifyOfPropertyChange(nameof(WiringBlockedReason));
@@ -537,7 +581,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Detail.SelectedCount = isCreating ? 0 : rows.Count;
         Detail.SingleTitle = rows.Count == 1 ? RowText(rows[0], "DeviceName") ?? RowText(rows[0], "Name") ?? string.Empty : string.Empty;
         Detail.SingleNumber = rows.Count == 1 ? RowText(rows[0], "DeviceNumber") ?? string.Empty : string.Empty;
-        Detail.CreateBanner = $"필수 항목(*)을 채우고 [등록]을 누르면 새 {Detail.TypeName}이(가) 만들어집니다.";
+        Detail.CreateBanner = $"필수 항목(*)을 채우고 [등록]을 누르면 새 {Detail.TypeName}{SubjectParticle(Detail.TypeName)} 만들어집니다.";
         Detail.LastMessage = null;
     }
 
@@ -637,10 +681,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                     break;
                 }
 
-                // 새로 생긴 행 = 저장 전에는 없던 Id. 가장 큰 Id 를 고르면 필터에 가려졌을 때 엉뚱한 장비를 "등록했다"며 고른다.
-                var number = _draft is null ? null : RowText(_draft, "DeviceNumber");
-                var fresh = rows.Where(r => RowId(r) > 0 && !pending.KnownIds.Contains(RowId(r))).ToList();
-                var created = fresh.FirstOrDefault(r => RowText(r, "DeviceNumber") == number) ?? fresh.FirstOrDefault();
+                // 새로 생긴 행 = 저장 전에는 없던 Id(목록에 뜨자마자 이미 골랐으면 그 Id — ResolveCreatedEarly).
+                var created = FindCreated(rows, pending, exactOnly: false);
                 _draft = null;
                 Reselect(created is null ? Array.Empty<object>() : new[] { created },
                     created is null ? "등록했습니다 — 지금 검색 조건에서는 목록에 보이지 않습니다." : "등록했습니다.");
@@ -871,13 +913,21 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             : "[추가]로 새 장비를 등록하세요";
     }
 
-    /// <summary>주격 조사 — 받침이 있으면 "이", 없으면 "가"(한글이 아니면 "이(가)").</summary>
+    /// <summary>
+    /// 주격 조사 — 받침이 있으면 "이", 없으면 "가". 끝이 숫자 · 영문이면 읽는 소리로 가른다
+    /// ("센서 3" → 삼 → 이, "arm2" → 이 → 가, "GATE" → 이 → 가, "L" → 엘 → 이). 그 밖(기호 · 빈 글)은 "이(가)".
+    /// </summary>
     internal static string SubjectParticle(string word)
     {
-        if (string.IsNullOrEmpty(word)) return "이(가)";
-        var last = word[^1];
-        if (last < '\uAC00' || last > '\uD7A3') return "이(가)";
-        return (last - 0xAC00) % 28 == 0 ? "가" : "이";
+        var trimmed = (word ?? string.Empty).TrimEnd(' ', '\'', '"', ')', ']');
+        if (trimmed.Length == 0) return "이(가)";
+        var last = trimmed[^1];
+        if (last >= '\uAC00' && last <= '\uD7A3') return (last - 0xAC00) % 28 == 0 ? "가" : "이";
+        // 숫자: 영 일 이 삼 사 오 육 칠 팔 구 — 받침은 0 1 3 6 7 8.
+        if (last is >= '0' and <= '9') return "013678".IndexOf(last) >= 0 ? "이" : "가";
+        // 영문 글자 이름: 엘 · 엠 · 엔 · 알 만 받침이 있다.
+        if (char.IsAsciiLetter(last)) return "LMNRlmnr".IndexOf(last) >= 0 ? "이" : "가";
+        return "이(가)";
     }
 
     /// <summary>목록이 비었다(검색 결과 없음 포함) — 빈 상태 안내를 띄운다.</summary>
@@ -965,8 +1015,20 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     public bool CanAssemble => _assembly?.IsAvailable == true && Category is not null && DevicePermissionGate.CanEdit();
 
     /// <summary>고른 장비 하나의 부품 구성을 조립기로 바꿀 수 있는가(저장된 장비 · 미적용 변경 없음).</summary>
-    public bool CanEditComponents => CanAssemble && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
-        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+    public bool CanEditComponents => IsEditComponentsVisible && !IsOperationRunning && !Detail.Tracker.IsDirty;
+
+    /// <summary>
+    /// [부품 구성 바꾸기] 를 <b>보일</b> 것인가 — 저장된 장비 한 대를 골랐을 때. 적용 중 · 손댄 칸이 있을 때는 숨기지 않고 끈다
+    /// (숨기면 폼 전체가 38px 튀었다 — GIS 실창 #13). 까닭은 <see cref="EditComponentsBlockedReason"/>.
+    /// </summary>
+    public bool IsEditComponentsVisible => CanAssemble && !Detail.IsCreating && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    /// <summary>꺼져 있는 까닭 — 거절은 말없이 하지 않는다.</summary>
+    public string? EditComponentsBlockedReason
+        => !IsEditComponentsVisible ? null
+        : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
+        : Detail.Tracker.IsDirty ? "손댄 칸을 먼저 적용하거나 되돌리세요."
+        : null;
 
     public async Task OpenAssemblyAsync()
     {
@@ -1249,6 +1311,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         /// <summary>축 값 편집 뒤의 재조회면, 다시 고른 뒤 보일 한 줄(맞춰 보기가 어긋나면 그 한 줄로 바뀐다).</summary>
         public string? AfterAxisMessage { get; init; }
+
+        /// <summary>등록한 행이 끝남보다 먼저 목록에 떠서 이미 골랐다 — 그 행의 Id.</summary>
+        public int? ResolvedId { get; set; }
     }
 
     private readonly DeviceAxisWriter _axisWriter;

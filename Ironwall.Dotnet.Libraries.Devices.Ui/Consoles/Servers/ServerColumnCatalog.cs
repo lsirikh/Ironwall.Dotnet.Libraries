@@ -51,7 +51,7 @@ public static class ServerColumnCatalog
     {
         new ServerColumnSpec("name", "이름", nameof(ServerRowViewModel.Name), ServerColumnKind.Text, IsDefault: true, Width: 0),
         new ServerColumnSpec("type", "유형", nameof(ServerRowViewModel.TypeText), ServerColumnKind.Text, IsDefault: true, Width: 110),
-        new ServerColumnSpec("address", "주소", nameof(ServerRowViewModel.AddressText), ServerColumnKind.Mono, IsDefault: true, Width: 150),
+        new ServerColumnSpec("address", "주소", nameof(ServerRowViewModel.AddressText), ServerColumnKind.Mono, IsDefault: true, Width: 164),
         new ServerColumnSpec("status", "상태", nameof(ServerRowViewModel.StatusText), ServerColumnKind.StatusPill, IsDefault: true, Width: 112),
         new ServerColumnSpec("last_change", LastChangeHeader, nameof(ServerRowViewModel.LastChangeText), ServerColumnKind.Text, IsDefault: true, Width: 120),
         new ServerColumnSpec("unit", "부대", nameof(ServerRowViewModel.UnitText), ServerColumnKind.Text, IsDefault: true, Width: 110, UnitEraOnly: true),

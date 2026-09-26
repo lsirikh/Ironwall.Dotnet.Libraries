@@ -252,7 +252,7 @@ public class ServerMetricBandTests
 
         Assert.Equal("12.8 / 32 GB", cells.Single(c => c.Key == "ram").DetailText);
         Assert.Equal("↓120.4 / ↑8", cells.Single(c => c.Key == "network").ValueText);
-        Assert.Equal("Mbps (수신 / 송신)", cells.Single(c => c.Key == "network").DetailText);
+        Assert.Equal("Mbps", cells.Single(c => c.Key == "network").DetailText);
 
         // 네트워크는 상한이 없어 비율을 만들지 않는다.
         Assert.Null(cells.Single(c => c.Key == "network").Ratio);

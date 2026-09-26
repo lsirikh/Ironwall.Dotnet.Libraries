@@ -186,6 +186,10 @@ internal sealed class ServersPreview
 
         // 축 계약에서는 카메라도 NVR 에 배정할 수 있다(서버 표 app/schemas/device.py:85-93).
         _devices.CollectionEntity.Add(new CameraDeviceModel { Id = 201, DeviceName = "정문 카메라", CategoryDevice = EnumDeviceCategory.Camera });
+
+        // 현장 밀도 — GIS 실창(2026-09-27)에는 배정 칩이 약 40개였다. 칩 칸이 목록을 굶기지 않는지 여기서 본다.
+        for (var i = 1; i <= 36; i++)
+            _devices.CollectionEntity.Add(new CameraDeviceModel { Id = 300 + i, DeviceName = $"GOP-CAM-{i:00}", CategoryDevice = EnumDeviceCategory.Camera });
     }
 
     private static ServerMetricDto Metric(double cpu, double ram, double disk, string observedAt) => new()
@@ -210,8 +214,9 @@ internal sealed class ServersPreview
             HasStatusKey = true,
             StatusObservedAt = observedAt,
             HasStatusObservedAtKey = true,
-            IpAddress = $"10.0.{id / 10}.{id % 10 + 1}",
-            Port = 8000 + id,
+            // 프록시는 현장 최장 주소 모양("192.168.100.100:8100") — 주소 열이 줄임표 없이 잘리지 않는지 본다(GIS 실창 #3).
+            IpAddress = type == EnumServerType.PROXY ? "192.168.100.100" : $"10.0.{id / 10}.{id % 10 + 1}",
+            Port = type == EnumServerType.PROXY ? 8100 : 8000 + id,
             Hostname = $"host-{id}",
             UserName = "admin",
             HasConnectionSection = true,

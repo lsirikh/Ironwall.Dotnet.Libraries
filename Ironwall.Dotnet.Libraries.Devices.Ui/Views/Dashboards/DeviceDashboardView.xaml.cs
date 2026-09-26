@@ -324,6 +324,15 @@ public partial class DeviceDashboardView : UserControl
     private void OnRevert(object sender, RoutedEventArgs e) => ViewModel?.Revert();
     private void OnRefreshContract(object sender, RoutedEventArgs e) => ViewModel?.OnClickRefreshContract();
 
+    /// <summary>[조립 · 프리셋 ▾] — 단추 아래에 세 입구 메뉴를 연다(키보드: 단추에서 Enter/Space).</summary>
+    private void OnOpenAssemblyMenu(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement button || button.ContextMenu is not { } menu) return;
+        menu.PlacementTarget = button;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
     private async void OnOpenAssembly(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.OpenAssemblyAsync();

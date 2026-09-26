@@ -112,11 +112,12 @@ public static class ServerMetricBand
         var (badgeText, isCritical) = Badge(NetworkKey, badges);
         var hasValue = metric?.NetworkInMbps is not null || metric?.NetworkOutMbps is not null;
 
+        // 부가 값은 단위만 — 압축형 띠(2026-09-27)에서 "Mbps (수신 / 송신)" 은 값 옆에 들지 않았다. 수신 · 송신은 값의 ↓ · ↑ 가 말한다.
         // 네트워크는 상한이 없어 비율을 만들지 않는다 — 막대를 그리면 눈금 없는 그래프가 된다.
         return new ServerMetricCell(
             NetworkKey, "네트워크",
             hasValue ? NetworkText(metric?.NetworkInMbps, metric?.NetworkOutMbps) : ServerStatusRules.NotReportedText,
-            hasValue ? "Mbps (수신 / 송신)" : string.Empty, null, badgeText, isCritical, hasValue);
+            hasValue ? "Mbps" : string.Empty, null, badgeText, isCritical, hasValue);
     }
 
     private static (string? Text, bool IsCritical) Badge(string key, IReadOnlyDictionary<string, ServerThresholdExceededDto> badges)

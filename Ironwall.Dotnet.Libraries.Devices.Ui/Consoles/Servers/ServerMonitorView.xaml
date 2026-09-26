@@ -60,7 +60,7 @@
 		ConsoleKey="Servers"
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Loaded="OnShellLoaded"
-		Subtitle="{Binding ListStatusText}">
+		Subtitle="{Binding SelectedRail.Label}">
 
 		<!--
 			패널 닫기 ✕ — 다른 콘솔(계정 · 보고서 · 조치 문구)과 같은 커널 Console.Button.Close 하나(U-18).
@@ -153,20 +153,41 @@
 					<c:NotReceivedBox ReloadHint="{Binding SystemEventsNote}" SectionName="시스템 이벤트" />
 				</Border>
 
-				<DockPanel LastChildFill="True" Visibility="{Binding IsServerList, Converter={StaticResource BoolToVisibility}}">
+				<!--
+					목록 + 지표 띠 — 2026-09-27 GIS 실창(052): 서버를 고르면 목록이 0행이 되고 지표 타일이 열 머리 위에 겹쳐 그려졌다.
+					원인은 DockPanel 이었다 — 아래(Dock=Bottom)에 붙인 띠의 원하는 높이(2×2 타일 약 170)가 남은 높이보다 크면
+					DockPanel 은 띠를 y=0 에서부터 원래 높이로 배치하고(음수 좌표로 밀지 않는다) 마지막 칸(목록)에는 0 을 준다 —
+					그래서 띠가 목록 머리 위에 올라앉았다. 이제 Grid 두 줄로 목록 줄에 바닥 높이(머리 + 다섯 줄)를 걸어
+					모자라면 띠 쪽이 아래에서 잘린다. 띠 자체도 한 줄 4칸 압축형으로 줄였다(약 170 → 76).
+				-->
+				<Grid Visibility="{Binding IsServerList, Converter={StaticResource BoolToVisibility}}">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="*" MinHeight="{x:Static local:ServerMonitorLayout.MinListHeight}" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+
 					<!--  지표 띠 — 한 대를 고르면 목록 아래에 붙는다(SB L1345-1346).  -->
 					<Border
-						Padding="12,8"
+						Grid.Row="1"
+						Padding="12,6"
 						Background="{DynamicResource SurfaceAltBrush}"
 						BorderBrush="{DynamicResource DividerBrush}"
 						BorderThickness="0,1,0,0"
-						DockPanel.Dock="Bottom"
 						Visibility="{Binding IsMetricBandVisible, Converter={StaticResource BoolToVisibility}}">
 						<StackPanel>
+							<!--  지표를 한 번도 받지 못한 서버 — "보고 없음" 네 칸 대신 한 줄로 말한다(목록 높이를 아낀다).  -->
+							<TextBlock
+								Margin="2,2,0,2"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{Binding MetricEmptyText}"
+								TextWrapping="Wrap"
+								Visibility="{Binding HasMetricValues, Converter={StaticResource NotBool}}" />
 							<ItemsControl
 								AutomationProperties.AutomationId="Console.Servers.MetricBand"
 								Focusable="False"
-								ItemsSource="{Binding MetricCells}">
+								ItemsSource="{Binding MetricCells}"
+								Visibility="{Binding HasMetricValues, Converter={StaticResource BoolToVisibility}}">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>
 										<!--  U-18 — 좁으면(서랍 · 접힘) 2칸 두 줄. 4칸 고정이면 배지 · 값이 칸 밖으로 잘렸다(MetricBandColumnsConverter).  -->
@@ -176,8 +197,8 @@
 								<ItemsControl.ItemTemplate>
 									<DataTemplate>
 										<Border
-											Margin="0,0,10,0"
-											Padding="10,6"
+											Margin="0,2,8,2"
+											Padding="10,4"
 											Background="{DynamicResource SurfaceBrush}"
 											BorderBrush="{DynamicResource BorderBrush}"
 											BorderThickness="1"
@@ -185,7 +206,7 @@
 											<StackPanel>
 												<DockPanel LastChildFill="False">
 													<TextBlock
-														FontSize="12"
+														FontSize="11.5"
 														Foreground="{DynamicResource TextMutedBrush}"
 														Text="{Binding Label}"
 														TextTrimming="CharacterEllipsis"
@@ -235,17 +256,29 @@
 														</StackPanel>
 													</Border>
 												</DockPanel>
-												<TextBlock
-													Margin="0,2,0,0"
-													FontFamily="Consolas"
-													FontSize="17"
-													Foreground="{DynamicResource TextPrimaryBrush}"
-													Text="{Binding ValueText}"
-													TextTrimming="CharacterEllipsis"
-													theme:TrimmedToolTip.IsEnabled="True" />
+												<!--  값과 부가 값(용량 · 단위)을 한 줄에 — 부가 값은 남는 폭만 쓰고 모자라면 줄임표 + 툴팁.  -->
+												<DockPanel Margin="0,1,0,0" LastChildFill="True">
+													<TextBlock
+														VerticalAlignment="Bottom"
+														FontFamily="Consolas"
+														FontSize="15"
+														Foreground="{DynamicResource TextPrimaryBrush}"
+														Text="{Binding ValueText}"
+														TextTrimming="CharacterEllipsis"
+														theme:TrimmedToolTip.IsEnabled="True" />
+													<TextBlock
+														Margin="8,0,0,1"
+														VerticalAlignment="Bottom"
+														FontSize="11"
+														Foreground="{DynamicResource TextMutedBrush}"
+														Text="{Binding DetailText}"
+														TextAlignment="Right"
+														TextTrimming="CharacterEllipsis"
+														theme:TrimmedToolTip.IsEnabled="True" />
+												</DockPanel>
 												<Border
-													Height="4"
-													Margin="0,5,0,0"
+													Height="3"
+													Margin="0,4,0,2"
 													Background="{DynamicResource SurfaceSunkenBrush}"
 													CornerRadius="2">
 													<Rectangle
@@ -261,13 +294,6 @@
 														</Rectangle.Width>
 													</Rectangle>
 												</Border>
-												<TextBlock
-													Margin="0,4,0,0"
-													FontSize="11"
-													Foreground="{DynamicResource TextMutedBrush}"
-													Text="{Binding DetailText}"
-													TextTrimming="CharacterEllipsis"
-													theme:TrimmedToolTip.IsEnabled="True" />
 											</StackPanel>
 										</Border>
 									</DataTemplate>
@@ -277,6 +303,7 @@
 					</Border>
 
 					<DataGrid
+						Grid.Row="0"
 						AutomationProperties.AutomationId="Console.Servers.Grid"
 						IsReadOnly="True"
 						ItemsSource="{Binding Rows}"
@@ -304,7 +331,7 @@
 							</Style>
 						</DataGrid.RowStyle>
 					</DataGrid>
-				</DockPanel>
+				</Grid>
 			</Grid>
 		</c:ConsoleShell.List>
 
@@ -434,6 +461,10 @@
 							ScrollViewer.HorizontalScrollBarVisibility="Disabled"
 							ScrollViewer.VerticalScrollBarVisibility="Auto"
 							SelectionMode="Extended">
+							<!--  칩이 많으면(현장 약 40개) 세로 스크롤이 선다 — 콘솔의 얇은 막대로(기본 막대는 화살표 · 회색 판이 튀었다).  -->
+							<ListBox.Resources>
+								<Style BasedOn="{StaticResource Console.ScrollBar}" TargetType="ScrollBar" />
+							</ListBox.Resources>
 							<ListBox.ItemContainerStyle>
 								<Style TargetType="ListBoxItem">
 									<!--  ListBoxItem 은 peer 가 실재한다 — 칩의 식별자는 여기 단다.  -->
@@ -505,6 +536,16 @@
 				ShowButtons="{Binding Detail.ShowButtons}"
 				ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				Title="{Binding Detail.Title}">
+				<Grid>
+				<!--  고른 것이 없으면 할 일 한 줄 — 다른 콘솔(계정 · 억제)처럼 "무엇을 하면 무엇이 나오는지".  -->
+				<TextBlock
+					Margin="16,14,16,8"
+					AutomationProperties.AutomationId="Console.Servers.Detail.Empty"
+					FontSize="12.5"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="{Binding DetailEmptyHint}"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasDetail, Converter={StaticResource NotBool}}" />
 				<!--  고른 것이 없으면 절을 그리지 않는다 — 빈 편집 폼은 "고칠 수 있다" 는 거짓말이다.  -->
 				<StackPanel Margin="14,10,14,8" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
 					<!--  등록 폼의 분류 — 서버 유형은 분류가 쥔다. 상태 칸은 없다(관측 필드를 쓰면 422).  -->
@@ -613,6 +654,7 @@
 										DisplayMemberPath="Display"
 										IsEnabled="{Binding IsEditing}"
 										ItemsSource="{Binding OperationModeOptions}"
+										md:HintAssist.Hint="{Binding ModeHint}"
 										SelectedValue="{Binding OperationModeValue, Mode=TwoWay}"
 										SelectedValuePath="Code" />
 								</c:ConsoleField>
@@ -622,6 +664,7 @@
 										DisplayMemberPath="Display"
 										IsEnabled="{Binding IsEditing}"
 										ItemsSource="{Binding WindyModeOptions}"
+										md:HintAssist.Hint="{Binding ModeHint}"
 										SelectedValue="{Binding WindyModeValue, Mode=TwoWay}"
 										SelectedValuePath="Code" />
 								</c:ConsoleField>
@@ -895,9 +938,10 @@
 							Click="OnShowHistory"
 							Content="지표 이력"
 							IsEnabled="{Binding CanShowHistory}"
-							Style="{StaticResource Console.Button.Ghost}" />
+							Style="{StaticResource Console.Button}" />
 					</StackPanel>
 				</StackPanel>
+				</Grid>
 			</c:ConsoleDetailHost>
 		</c:ConsoleShell.Detail>
 	</c:ConsoleShell>

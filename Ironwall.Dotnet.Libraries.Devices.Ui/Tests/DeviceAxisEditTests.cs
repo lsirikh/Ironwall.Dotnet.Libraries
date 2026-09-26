@@ -250,6 +250,18 @@ public class DeviceAxisEditTests : IDisposable
         Assert.Equal("이", DeviceDashboardViewModel.SubjectParticle("경광등"));
         Assert.Equal("가", DeviceDashboardViewModel.SubjectParticle("센서"));
     }
+
+    [Theory]
+    [InlineData("그룹", "이")]
+    [InlineData("센서 3", "이")]      // 삼
+    [InlineData("arm2", "가")]        // 이
+    [InlineData("GATE", "가")]        // 이
+    [InlineData("L", "이")]           // 엘
+    [InlineData("'카메라'", "가")]    // 따옴표 뒤의 낱말로 본다
+    [InlineData("", "이(가)")]
+    [InlineData("#", "이(가)")]
+    public void should_read_digits_and_latin_letters_aloud_when_subject_particle_is_picked(string word, string expected)
+        => Assert.Equal(expected, DeviceDashboardViewModel.SubjectParticle(word));
     #endregion
 
     #region - 폼 -

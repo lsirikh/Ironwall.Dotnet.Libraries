@@ -144,11 +144,14 @@ public partial class ServerMonitorView : UserControl
         _grid.Columns.Clear();
         // 코드로 더한 열에는 셀 스타일을 직접 건다 — 비워 두면 MDIX 가 제 셀 스타일을 물려 다크에서 선택 행이 갈라진다.
         var cellStyle = TryFindResource("Console.DataGrid.Cell") as Style;
+        // 글 칸은 줄임표 + 잘렸을 때만 툴팁(커널 Console.DataGrid.CellText) — 예전에는 맨 TextBlock 이라
+        // 주소 "192.168.1.100:810(" 처럼 글자 중간에서 말없이 잘렸다(GIS 실창 #3).
+        var textStyle = TryFindResource("Console.DataGrid.CellText") as Style;
         _grid.Columns.Add(CreateDropMarkerColumn(TryFindResource("Console.DataGrid.Cell.Flush") as Style));
 
         foreach (var spec in _viewModel.Columns)
         {
-            var column = CreateColumn(spec);
+            var column = CreateColumn(spec, textStyle);
             column.Header = spec.Header;
             var (width, minWidth) = ResolveColumnSize(spec.Width);
             column.Width = width;
@@ -201,7 +204,7 @@ public partial class ServerMonitorView : UserControl
                 + "</Grid>"),
         };
 
-    private static DataGridColumn CreateColumn(ServerColumnSpec spec)
+    private static DataGridColumn CreateColumn(ServerColumnSpec spec, Style? textStyle)
     {
         switch (spec.Kind)
         {
@@ -227,10 +230,14 @@ public partial class ServerMonitorView : UserControl
                 var text = new System.Windows.Controls.DataGridTextColumn { Binding = new Binding(spec.BindingPath) { Mode = BindingMode.OneWay } };
                 if (spec.Kind == ServerColumnKind.Mono)
                 {
-                    var style = new Style(typeof(TextBlock));
+                    var style = new Style(typeof(TextBlock), textStyle);
                     style.Setters.Add(new Setter(TextBlock.FontFamilyProperty, new System.Windows.Media.FontFamily("Consolas")));
                     style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
                     text.ElementStyle = style;
+                }
+                else if (textStyle is not null)
+                {
+                    text.ElementStyle = textStyle;
                 }
                 return text;
         }
@@ -257,13 +264,18 @@ public partial class ServerMonitorView : UserControl
     /// </summary>
     /// <remarks>
     /// 2026-09-27 — 좁힌 서랍(표면 1000)에서는 목록이 456 남짓이라 이름 · 유형 · 주소 · 상태(538)도 넘쳤다. 유형은 레일이 이미
-    /// 거르고 상세에도 있어 먼저 접는다(540 미만). 이름 · 주소 · 상태는 끝까지 남는다.
+    /// 거르고 상세에도 있어 먼저 접는다(564 미만). 이름 · 주소 · 상태는 끝까지 남는다.
+    /// </remarks>
+    /// <remarks>
+    /// 2026-09-27(2) — 주소 열을 150 → 164 로 넓혔다("192.168.1.100:8100" 이 150 에서 잘렸다). 문턱은 남는 열 합
+    /// (손잡이 26 + 이름 바닥 140 + 주소 164 + 상태 112 = 442 · + 유형 110 = 552 · + 마지막 변화 120 = 672 · + 부대 110 = 782)
+    /// + 세로 스크롤 막대 10 바로 위로 옮겼다 — 문턱 폭에서도 가로 스크롤이 없다(ServerNarrowColumnTests).
     /// </remarks>
     internal static double CollapseBelowFor(string key) => key switch
     {
-        "last_change" => 680,
-        "unit" => 780,
-        "type" => 540,
+        "last_change" => 684,
+        "unit" => 794,
+        "type" => 564,
         _ => 0,
     };
 
@@ -413,7 +425,11 @@ public sealed class TextToVisibilityConverter : IValueConverter
 /// </summary>
 public sealed class MetricBandColumnsConverter : IValueConverter
 {
-    public const double FourColumnMinWidth = 760;
+    /// <remarks>
+    /// 2026-09-27 — 760 이면 1280 도킹(목록 756 − 여백 24 = 732)에서도 2칸 두 줄(약 170px)이 돼 목록을 굶겼다(GIS 실창 #1).
+    /// 칸을 압축형(값 · 부가 값 한 줄)으로 줄이면서 문턱을 640 으로 내렸다 — 한 칸 약 150.
+    /// </remarks>
+    public const double FourColumnMinWidth = 640;
 
     public static int ColumnsFor(double width) => double.IsNaN(width) || width <= 0 || width >= FourColumnMinWidth ? 4 : 2;
 
