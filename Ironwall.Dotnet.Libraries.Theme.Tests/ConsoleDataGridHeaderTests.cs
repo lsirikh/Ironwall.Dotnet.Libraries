@@ -20,6 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Theme.Tests;
 /// <para><b>고침</b>: <c>Console.DataGrid</c> 의 <c>Style.Resources</c> 에 <c>Console.DataGrid.ColumnHeader</c> 를 바탕으로 한
 /// <b>암시 스타일</b>을 둔다 — 머리의 암시 스타일 탐색이 앱 사전보다 그리드 스타일 사전을 먼저 만난다(스크롤바를 이미 같은 방식으로 건다).</para>
 /// </remarks>
+[Collection(WpfRenderCollection.Name)]
 public class ConsoleDataGridHeaderTests
 {
     private static T OnSta<T>(Func<T> body)

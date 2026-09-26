@@ -19,6 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Theme.Tests;
 /// 측정 방식은 <see cref="ConsoleChipSizeContractTests"/> 와 같다(전용 STA 스레드 · XamlReader 로 원문 파싱 ·
 /// 상태는 생성 시점에 준다). 색 토큰(DynamicResource)은 못 찾아도 치수와는 무관하다.
 /// </remarks>
+[Collection(WpfRenderCollection.Name)]
 public class ConsoleButtonSizeContractTests
 {
     private static string RepoRoot([CallerFilePath] string? thisFile = null)

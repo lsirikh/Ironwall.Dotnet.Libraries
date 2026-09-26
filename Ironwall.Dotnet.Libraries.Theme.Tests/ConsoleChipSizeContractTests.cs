@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -31,6 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Theme.Tests;
 /// 만들면 이 문제를 원천적으로 피한다.
 /// </para>
 /// </remarks>
+[Collection(WpfRenderCollection.Name)]
 public class ConsoleChipSizeContractTests
 {
     private static string RepoRoot([CallerFilePath] string? thisFile = null)
