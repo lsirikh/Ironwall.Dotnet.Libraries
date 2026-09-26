@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Gateway.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:console="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:converter="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -34,113 +35,104 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  상단 버튼  -->
-		<StackPanel Grid.Row="0" Orientation="Vertical">
-			<Grid Grid.Row="0" Margin="10,0">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-				</Grid.ColumnDefinitions>
-				<!--  Add Button  -->
+		<!--
+			상단 버튼 — S16(설정 창 '외부 연동' 절): 예전에는 글자 없는 아이콘 넷(도움말 "추가하기/삭제하기/갱신하기/저장하기")이
+			고정 폭 칸에 흩어져 있어 무슨 단추인지 눌러 봐야 알았다. 커널 테두리 단추(높이 32) + 아이콘 + 한국어 글자로 오른쪽에 모은다.
+			동작 배선(ButtonClickBehavior)은 그대로다.
+		-->
+		<StackPanel
+			Grid.Row="0"
+			Margin="0,4,0,0"
+			HorizontalAlignment="Right"
+			Orientation="Horizontal">
 				<Button
-					Grid.Column="7"
+					Margin="8,0,0,0"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource Console.Button.Icon}"
-					ToolTip="추가하기">
+					Style="{StaticResource Console.Button}"
+					ToolTip="연동 이벤트를 한 줄 추가합니다">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
-					<md:PackIcon
-						Width="20"
-						Height="20"
-						Kind="AddBox" />
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,6,0"
+								VerticalAlignment="Center"
+								Kind="Plus" />
+							<TextBlock VerticalAlignment="Center" Text="추가" />
+						</StackPanel>
 				</Button>
-
-				<!--  Remove Button  -->
 				<Button
-					Grid.Column="9"
+					Margin="8,0,0,0"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource Console.Button.Icon}"
-					ToolTip="삭제하기">
+					Style="{StaticResource Console.Button}"
+					ToolTip="고른 연동 이벤트를 지웁니다">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
-					<md:PackIcon
-						Width="20"
-						Height="20"
-						Kind="MinusBox" />
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,6,0"
+								VerticalAlignment="Center"
+								Kind="Delete" />
+							<TextBlock VerticalAlignment="Center" Text="삭제" />
+						</StackPanel>
 				</Button>
-
-				<!--  Refresh Button  -->
 				<Button
-					Grid.Column="11"
+					Margin="8,0,0,0"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource Console.Button.Icon}"
-					ToolTip="갱신하기">
+					Style="{StaticResource Console.Button}"
+					ToolTip="목록을 다시 불러옵니다">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
 					</i:Interaction.Behaviors>
-					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="20"
-								Height="20"
+								Width="16"
+								Height="16"
 								IsIndeterminate="True"
 								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
-							<md:PackIcon
-								Width="20"
-								Height="20"
-								Kind="CircleArrows"
-								ToolTip="갱신하기"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+							<StackPanel Orientation="Horizontal" Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}">
+								<md:PackIcon
+									Width="16"
+									Height="16"
+									Margin="0,0,6,0"
+									VerticalAlignment="Center"
+									Kind="Refresh" />
+								<TextBlock VerticalAlignment="Center" Text="새로 고침" />
+							</StackPanel>
 						</Grid>
-					</Button.Content>
-
 				</Button>
-
-				<!--  Save Button  -->
 				<Button
-					Grid.Column="13"
-					Margin="2,2"
-					VerticalAlignment="Center"
+					Margin="8,0,0,0"
 					IsEnabled="{Binding IsButtonEnable}"
-					Style="{StaticResource Console.Button.Icon}"
-					ToolTip="저장하기">
+					Style="{StaticResource Console.Button}"
+					ToolTip="바꾼 내용을 바로 저장합니다">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 					</i:Interaction.Behaviors>
-					<Button.Content>
-						<Grid IsEnabled="{Binding IsButtonEnable}">
+						<Grid>
 							<ProgressBar
-								Width="20"
-								Height="20"
+								Width="16"
+								Height="16"
 								IsIndeterminate="True"
 								Style="{DynamicResource MaterialDesignCircularProgressBar}"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
-								Value="44" />
-							<md:PackIcon
-								Width="20"
-								Height="20"
-								Kind="Floppy"
-								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<StackPanel Orientation="Horizontal" Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}">
+								<md:PackIcon
+									Width="16"
+									Height="16"
+									Margin="0,0,6,0"
+									VerticalAlignment="Center"
+									Kind="ContentSave" />
+								<TextBlock VerticalAlignment="Center" Text="저장" />
+							</StackPanel>
 						</Grid>
-					</Button.Content>
 				</Button>
-			</Grid>
 		</StackPanel>
 
 		<!--  DataGrid 및 ProgressBar 영역  -->
@@ -278,6 +270,28 @@
 
 				</DataGrid.Columns>
 			</DataGrid>
+
+			<!--  S16 — 빈 목록은 아무 안내 없는 빈 판이었다. 무엇이 비었고 무엇을 하면 되는지 말한다(불러오는 중에는 숨긴다).  -->
+			<console:ConsoleEmptyState
+				Margin="0,36,0,0"
+				Hint="[추가]를 눌러 연동 이벤트를 만드세요"
+				IsHitTestVisible="False"
+				Title="등록된 연동 이벤트가 없습니다">
+				<console:ConsoleEmptyState.Style>
+					<Style TargetType="console:ConsoleEmptyState">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<MultiDataTrigger>
+								<MultiDataTrigger.Conditions>
+									<Condition Binding="{Binding ViewModelProvider.Count}" Value="0" />
+									<Condition Binding="{Binding ReloadButtonEnable}" Value="True" />
+								</MultiDataTrigger.Conditions>
+								<Setter Property="Visibility" Value="Visible" />
+							</MultiDataTrigger>
+						</Style.Triggers>
+					</Style>
+				</console:ConsoleEmptyState.Style>
+			</console:ConsoleEmptyState>
 		</Grid>
 
 		<!--  하단 상태 영역  -->

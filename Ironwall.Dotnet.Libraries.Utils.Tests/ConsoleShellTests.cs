@@ -25,6 +25,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// 는 올라오지 않는다(실측 — 실제 창에서는 문제 없다). 그래서 <see cref="ArrangedShell"/> 이 Arrange 뒤
 /// <see cref="ConsoleShell.IsDetailRequested"/> 를 한 번 켰다 꺼서 지금의(올바른) 폭으로 재판정을 강제한다.
 /// </remarks>
+[Collection(WpfApplicationCollection.Name)]
 public class ConsoleShellTests
 {
     private static T OnSta<T>(Func<T> body)

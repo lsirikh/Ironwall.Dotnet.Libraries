@@ -1159,6 +1159,15 @@
 	<Style x:Key="Console.DataGrid" TargetType="DataGrid">
 		<Style.Resources>
 			<Style BasedOn="{StaticResource Console.ScrollBar}" TargetType="ScrollBar" />
+			<!--
+				X2 — 열 머리 스타일은 아래 ColumnHeaderStyle Setter 만으로는 실창에서 안 먹는다. 머리의 Style 은 강제(coerce)로
+				'머리 자신 · 열 HeaderStyle · 그리드 ColumnHeaderStyle' 중 값의 출처가 가장 높은 것이 이기는데
+				(DataGridHelper.GetCoercedTransferPropertyValue), 앱이 병합한 MaterialDesign 기본 사전의 암시 스타일
+				(ImplicitStyleReference)이 스타일 Setter(Style)보다 높다 — 그래서 명시 HeaderStyle(Local) 을 준 열만 흰 띠였다.
+				여기 둔 암시 스타일은 머리의 암시 스타일 탐색이 앱 사전보다 먼저 만난다(ScrollBar 와 같은 방식).
+				잠금: Theme.Tests ConsoleDataGridHeaderTests.
+			-->
+			<Style BasedOn="{StaticResource Console.DataGrid.ColumnHeader}" TargetType="DataGridColumnHeader" />
 		</Style.Resources>
 		<Setter Property="Background" Value="Transparent" />
 		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />

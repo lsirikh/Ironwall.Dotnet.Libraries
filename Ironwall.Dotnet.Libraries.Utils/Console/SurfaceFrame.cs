@@ -138,6 +138,22 @@ public class SurfaceFrame : ContentControl
     /// </summary>
     public string Title { get => (string)GetValue(TitleProperty); set => SetValue(TitleProperty, value); }
 
+    /// <summary>
+    /// 틀의 이동 손잡이가 <b>콘솔 머리 위에 겹쳐 앉는</b> 폭(X1 — 창 제목 두 겹 제거). <b>상속</b>이라 틀이 한 번 주면
+    /// 그 안의 콘솔 머리(커널 <see cref="ConsoleShell"/> 템플릿 · 호스트 카드 머리)가 이 값만큼 제목을 오른쪽으로 비킨다.
+    /// 기본 0 — 틀 밖(미리보기 · 별도 창)의 콘솔은 아무것도 비키지 않는다.
+    /// <see cref="ConsoleShell"/> 은 자기 본문에서 이 값을 0 으로 끊는다 — 안에 든 다른 콘솔 머리까지 비키면 안 된다.
+    /// </summary>
+    public static readonly DependencyProperty HeadGripWidthProperty = DependencyProperty.RegisterAttached(
+        "HeadGripWidth", typeof(double), typeof(SurfaceFrame),
+        new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.Inherits));
+
+    public static double GetHeadGripWidth(DependencyObject element)
+        => (double)(element ?? throw new ArgumentNullException(nameof(element))).GetValue(HeadGripWidthProperty);
+
+    public static void SetHeadGripWidth(DependencyObject element, double value)
+        => (element ?? throw new ArgumentNullException(nameof(element))).SetValue(HeadGripWidthProperty, value);
+
     /// <summary>자리를 기억하는 곳. 시험은 가짜 구현을 준다.</summary>
     public ISurfaceLayoutStore? Store { get; set; }
     #endregion

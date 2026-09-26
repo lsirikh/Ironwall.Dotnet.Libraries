@@ -352,6 +352,11 @@ public class ConsoleShell : Control
             shell._slotChildren.Add(added);
             shell.AddLogicalChild(added);
         }
+
+        // X1 — 표면 틀의 손잡이 폭(상속)은 이 셸의 머리에서 끝난다. 슬롯 요소는 논리 자식이라 템플릿을 건너뛰고
+        // 셸에서 곧장 상속받으므로, 여기서 0 으로 끊지 않으면 안에 든 다른 콘솔 머리까지 제목을 비킨다.
+        if (e.NewValue is DependencyObject slot && e.Property != HeaderContentProperty)
+            slot.SetValue(SurfaceFrame.HeadGripWidthProperty, 0d);
     }
 
     protected override System.Collections.IEnumerator LogicalChildren => _slotChildren.GetEnumerator();

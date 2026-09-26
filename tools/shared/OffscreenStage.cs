@@ -22,8 +22,19 @@ public static class OffscreenStage
         window.Top = Offset;
         window.ShowActivated = false;
         window.ShowInTaskbar = false;
+        ApplyApiNames(window);
         StartGuard();
         return window;
+    }
+
+    /// <summary>
+    /// <c>--api-names</c> 를 받았을 때만 API 필드명 캡션 · 절 축 이름을 켠다(커널 <c>ConsoleField.ShowApiNames</c>, 상속).
+    /// 기본은 꺼짐 — 운영자 화면과 같은 모습을 그려야 잘림 감사가 실창과 같은 조건이 된다.
+    /// </summary>
+    public static void ApplyApiNames(Window window)
+    {
+        if (Environment.GetCommandLineArgs().Contains("--api-names"))
+            Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleField.SetShowApiNames(window, true);
     }
 
     private static System.Windows.Threading.DispatcherTimer? _guard;
@@ -45,7 +56,7 @@ public static class OffscreenStage
     }
 
     /// <summary>
-    /// <c>--surface 1120x700</c> — 실제 앱의 표면(틀 안쪽) 크기 그대로 콘솔을 못 박는다. 창 크기와 상관없이
+    /// <c>--surface 1280x760</c> — 실제 앱의 표면(틀 안쪽) 크기 그대로 콘솔을 못 박는다. 창 크기와 상관없이
     /// 뷰가 그 크기로 재고 배치되므로(서랍/도킹 판정 · 열 폭 · 툴바 예산) 실창 캡처와 같은 조건이 된다.
     /// </summary>
     public static bool ApplySurface(string[] args, FrameworkElement view, Window window)

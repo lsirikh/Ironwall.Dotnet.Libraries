@@ -27,7 +27,10 @@ public class ConsoleSection : HeaderedContentControl
     }
 
     public static readonly DependencyProperty AxisNameProperty = Reg(nameof(AxisName), string.Empty);
-    /// <summary>API 축 이름 — 제목 옆에 고정폭 글꼴로.</summary>
+    /// <summary>
+    /// API 축 이름 — 제목 옆에 고정폭 글꼴로. <b>개발자용</b>이라 기본은 숨는다 —
+    /// <see cref="ConsoleField.ShowApiNamesProperty"/> 가 켜진 곳(미리보기 도구 <c>--api-names</c>)에서만 보인다.
+    /// </summary>
     public string AxisName { get => (string)GetValue(AxisNameProperty); set => SetValue(AxisNameProperty, value); }
 
     public static readonly DependencyProperty TagKindProperty = Reg(nameof(TagKind), ConsoleSectionTag.None);
@@ -56,7 +59,26 @@ public class ConsoleField : HeaderedContentControl
     }
 
     public static readonly DependencyProperty ApiNameProperty = Reg(nameof(ApiName), string.Empty);
+    /// <summary>
+    /// 라벨 아랫줄의 API 필드명(<c>users.role</c> · <c>IsAutoEventDiscard</c>). <b>개발자용</b>이라 기본은 숨는다 —
+    /// 운영자 화면에서는 뜻 없는 영문 식별자다(원장 D-2026-09-26-648420). 값은 지우지 않는다 —
+    /// <see cref="ShowApiNamesProperty"/> 를 켠 개발 · 미리보기 도구에서 대조용으로 다시 보인다.
+    /// </summary>
     public string ApiName { get => (string)GetValue(ApiNameProperty); set => SetValue(ApiNameProperty, value); }
+
+    /// <summary>
+    /// API 필드명 캡션(<see cref="ApiName"/>) · 절 축 이름(<see cref="ConsoleSection.AxisName"/>)을 보일지. 기본 <c>false</c>(운영자 화면).
+    /// <b>상속</b>이라 창 뿌리에 한 번만 켜면 그 아래 모든 칸 · 절이 따른다 — 미리보기 도구는 <c>--api-names</c> 를 받았을 때만 켠다.
+    /// </summary>
+    public static readonly DependencyProperty ShowApiNamesProperty = DependencyProperty.RegisterAttached(
+        "ShowApiNames", typeof(bool), typeof(ConsoleField),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits));
+
+    public static bool GetShowApiNames(DependencyObject element)
+        => (bool)(element ?? throw new System.ArgumentNullException(nameof(element))).GetValue(ShowApiNamesProperty);
+
+    public static void SetShowApiNames(DependencyObject element, bool value)
+        => (element ?? throw new System.ArgumentNullException(nameof(element))).SetValue(ShowApiNamesProperty, value);
 
     public static readonly DependencyProperty IsTouchedProperty = Reg(nameof(IsTouched), false);
     /// <summary>손댄 칸 — 좌측에 경고색 3px 표시(형태).</summary>

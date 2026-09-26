@@ -61,12 +61,16 @@ public static class ConsoleDetailStateMachine
            && navigation is (ConsoleNavigation.SelectRow or ConsoleNavigation.SwitchRail
                              or ConsoleNavigation.BeginCreate or ConsoleNavigation.Refresh);
 
+    /// <summary>등록 폼의 바닥 막대 글 — 서랍 막대(단추 둘 옆 약 170px)에 한 줄로 들어가는 길이.</summary>
+    public const string CreateFooter = "아직 등록 전입니다";
+
     /// <summary>바닥 막대 문구.</summary>
     public static string FooterText(ConsoleDetailState state, int dirtyCount, string? lastMessage = null) => state switch
     {
         ConsoleDetailState.None => string.IsNullOrEmpty(lastMessage) ? "선택 대기" : lastMessage!,
         ConsoleDetailState.ReadOnly => "읽기 전용",
-        ConsoleDetailState.Create => "등록 전에는 목록에 나타나지 않습니다",
+        // 서랍 360 의 막대(단추 둘 옆)에서 "않습 / 니다" 로 갈렸다(한글은 음절마다 줄바꿈 자리) — 짧게.
+        ConsoleDetailState.Create => CreateFooter,
         ConsoleDetailState.Dirty => $"변경 {dirtyCount}건 미적용",
         _ => string.IsNullOrEmpty(lastMessage) ? "변경 없음" : lastMessage!,
     };

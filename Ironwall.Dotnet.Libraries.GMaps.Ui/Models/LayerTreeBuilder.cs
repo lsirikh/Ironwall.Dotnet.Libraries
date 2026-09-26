@@ -104,6 +104,15 @@ public static class LayerTreeBuilder
 
     #endregion
 
+    /// <summary>섹션 이름(L2) — 화면에 그대로 보인다. 섹션은 이름이 아니라 순서 · <c>OverlayLayerType</c> 로 구분한다.</summary>
+    public const string OverlayMapSectionName = "오버레이 지도";
+
+    /// <inheritdoc cref="OverlayMapSectionName"/>
+    public const string OverlayImageSectionName = "오버레이 이미지";
+
+    /// <inheritdoc cref="OverlayMapSectionName"/>
+    public const string SymbolsSectionName = "심볼";
+
     /// <summary>기존 시그니처 호환 — 개별 심볼 없이 카테고리 단위 Leaf만 빌드.</summary>
     public static ObservableCollection<LayerTreeNode> Build(IEnumerable<IMapLayerModel> layers)
         => Build(layers, null);
@@ -118,22 +127,22 @@ public static class LayerTreeBuilder
         var result = new ObservableCollection<LayerTreeNode>();
         var layerList = layers.ToList();
 
-        // Section 1: OVERLAY MAP
-        var overlayMapSection = LayerTreeNode.CreateSection("OVERLAY MAP", "Map");
+        // Section 1: 오버레이 지도 (L2 — 영문 대문자 띠 이름 "OVERLAY MAP" 을 운영자 말로)
+        var overlayMapSection = LayerTreeNode.CreateSection(OverlayMapSectionName, "Map");
         overlayMapSection.OverlayLayerType = "OverlayMap";      // 순서 바꾸기 가능 섹션(D-36)
         foreach (var layer in layerList.Where(l => l.LayerType == "OverlayMap"))
             overlayMapSection.AddChild(LayerTreeNode.FromModel(layer, layer.Name ?? "지도", "Map"));
         result.Add(overlayMapSection);
 
-        // Section 2: OVERLAY IMAGE
-        var overlayImageSection = LayerTreeNode.CreateSection("OVERLAY IMAGE", "Image");
+        // Section 2: 오버레이 이미지
+        var overlayImageSection = LayerTreeNode.CreateSection(OverlayImageSectionName, "Image");
         overlayImageSection.OverlayLayerType = "OverlayImage";  // 순서 바꾸기 가능 섹션(D-36)
         foreach (var layer in layerList.Where(l => l.LayerType == "OverlayImage"))
             overlayImageSection.AddChild(LayerTreeNode.FromModel(layer, layer.Name ?? "이미지", "Image"));
         result.Add(overlayImageSection);
 
-        // Section 3: SYMBOLS
-        var symbolsSection = LayerTreeNode.CreateSection("SYMBOLS", "Drawing");
+        // Section 3: 심볼
+        var symbolsSection = LayerTreeNode.CreateSection(SymbolsSectionName, "Drawing");
         var symbolLayers = layerList.Where(l => l.LayerType == "Symbol").ToList();
 
         if (symbols == null)

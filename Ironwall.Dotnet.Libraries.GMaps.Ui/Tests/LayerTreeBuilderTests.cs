@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
@@ -23,9 +23,10 @@ public class LayerTreeBuilderTests
 
         // Assert: 3개 Section
         Assert.Equal(3, tree.Count);
-        Assert.Equal("OVERLAY MAP", tree[0].Name);
-        Assert.Equal("OVERLAY IMAGE", tree[1].Name);
-        Assert.Equal("SYMBOLS", tree[2].Name);
+        // L2 — 섹션 이름은 운영자 말(한국어)이다
+        Assert.Equal("오버레이 지도", tree[0].Name);
+        Assert.Equal("오버레이 이미지", tree[1].Name);
+        Assert.Equal("심볼", tree[2].Name);
 
         // SYMBOLS Section 자식: PIDS 장비(Group) + 독립 6개 = 7개
         var symbols = tree[2];

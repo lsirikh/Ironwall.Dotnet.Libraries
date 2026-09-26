@@ -65,7 +65,7 @@ public class ConsoleDetailStateTests
     [InlineData(ConsoleDetailState.Single, 0, "되돌렸습니다", "되돌렸습니다")]
     [InlineData(ConsoleDetailState.Dirty, 3, "되돌렸습니다", "변경 3건 미적용")]
     [InlineData(ConsoleDetailState.ReadOnly, 0, null, "읽기 전용")]
-    [InlineData(ConsoleDetailState.Create, 0, null, "등록 전에는 목록에 나타나지 않습니다")]
+    [InlineData(ConsoleDetailState.Create, 0, null, "아직 등록 전입니다")]
     public void should_word_footer_by_state(ConsoleDetailState state, int dirty, string? last, string expected)
     {
         Assert.Equal(expected, ConsoleDetailStateMachine.FooterText(state, dirty, last));

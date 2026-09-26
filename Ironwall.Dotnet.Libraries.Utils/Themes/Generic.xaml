@@ -161,6 +161,14 @@
 											VerticalAlignment="Center"
 											Content="{TemplateBinding HeaderContent}"
 											DockPanel.Dock="Right" />
+										<!--
+											X1 — 셸 표면 틀은 제목을 따로 찍지 않고 이동 손잡이만 이 머리 왼쪽 위에 겹쳐 둔다(제목은 여기 하나).
+											틀이 상속으로 준 손잡이 폭만큼 제목을 비킨다 — 틀 밖(미리보기 · 별도 창)에서는 0 이라 예전 그대로다.
+										-->
+										<FrameworkElement
+											Width="{Binding Path=(c:SurfaceFrame.HeadGripWidth), RelativeSource={RelativeSource TemplatedParent}}"
+											DockPanel.Dock="Left"
+											IsHitTestVisible="False" />
 										<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 											<TextBlock
 												FontSize="15"
@@ -176,7 +184,8 @@
 									</DockPanel>
 								</Border>
 
-								<Grid Grid.Row="1">
+								<!--  손잡이 폭 상속은 이 머리에서 끝난다 — 안에 든 다른 콘솔 머리까지 비키면 안 된다  -->
+								<Grid Grid.Row="1" c:SurfaceFrame.HeadGripWidth="0">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition x:Name="PART_RailColumn" Width="184" />
 										<ColumnDefinition Width="*" />
@@ -499,13 +508,31 @@
 									Content="삭제"
 									IsEnabled="{TemplateBinding CanDelete}"
 									Style="{DynamicResource Console.Button}" />
+								<!--
+									X4 — 같은 줄의 [+ 추가](채움) · [삭제](테두리) 옆에서 '갱신' 만 글자뿐이라 버튼 모양이 셋이었다.
+									테두리 버튼(Console.Button, 높이 32)으로 맞추고 글자 대신 새로 고침 글리프 + 한국어 도움말을 준다
+									(폭 32 — 서랍 모드 툴바 예산을 예전 글자 버튼보다 덜 먹는다).
+								-->
 								<Button
 									x:Name="PART_Refresh"
+									Width="32"
+									MinWidth="0"
 									Margin="8,0,0,0"
+									Padding="0"
 									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Refresh}"
-									Content="갱신"
+									AutomationProperties.Name="새로 고침"
 									IsEnabled="{TemplateBinding CanRefresh}"
-									Style="{DynamicResource Console.Button.Ghost}" />
+									Style="{DynamicResource Console.Button}"
+									ToolTip="새로 불러오기">
+									<Path
+										Width="14"
+										Height="14"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
+										Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+										Stretch="Uniform" />
+								</Button>
 								<ContentPresenter
 									Margin="10,0,0,0"
 									VerticalAlignment="Center"
@@ -673,21 +700,46 @@
 								Grid.Column="1"
 								VerticalAlignment="Top"
 								Orientation="Horizontal">
+								<!--  X5 — 영어 한 글자(S · M · L) 대신 칸 모양 글리프(오른쪽 채움 = 상세 칸 폭) + 한국어 도움말  -->
 								<Button
 									x:Name="PART_WidthS"
-									Content="S"
+									AutomationProperties.Name="상세 칸 좁게"
 									Style="{DynamicResource Console.Button.Mini}"
-									ToolTip="상세 폭 300" />
+									ToolTip="상세 칸 좁게">
+									<Grid Width="14" Height="11">
+										<Rectangle Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" StrokeThickness="1" />
+										<Rectangle
+											Width="4"
+											HorizontalAlignment="Right"
+											Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" />
+									</Grid>
+								</Button>
 								<Button
 									x:Name="PART_WidthM"
-									Content="M"
+									AutomationProperties.Name="상세 칸 보통"
 									Style="{DynamicResource Console.Button.Mini}"
-									ToolTip="상세 폭 340" />
+									ToolTip="상세 칸 보통">
+									<Grid Width="14" Height="11">
+										<Rectangle Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" StrokeThickness="1" />
+										<Rectangle
+											Width="6"
+											HorizontalAlignment="Right"
+											Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" />
+									</Grid>
+								</Button>
 								<Button
 									x:Name="PART_WidthL"
-									Content="L"
+									AutomationProperties.Name="상세 칸 넓게"
 									Style="{DynamicResource Console.Button.Mini}"
-									ToolTip="상세 폭 480" />
+									ToolTip="상세 칸 넓게">
+									<Grid Width="14" Height="11">
+										<Rectangle Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" StrokeThickness="1" />
+										<Rectangle
+											Width="9"
+											HorizontalAlignment="Right"
+											Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}" />
+									</Grid>
+								</Button>
 							</StackPanel>
 						</Grid>
 
@@ -840,13 +892,16 @@
 								TextElement.FontSize="13"
 								TextElement.FontWeight="SemiBold"
 								TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+							<!--  축 이름은 개발자용 — ConsoleField.ShowApiNames(상속, 기본 끔)가 켜진 곳에서만 보인다  -->
 							<TextBlock
+								x:Name="Axis"
 								Margin="8,0,0,0"
 								VerticalAlignment="Center"
 								FontFamily="{DynamicResource MonoFont}"
 								FontSize="11"
 								Foreground="{DynamicResource TextMutedBrush}"
-								Text="{TemplateBinding AxisName}" />
+								Text="{TemplateBinding AxisName}"
+								Visibility="Collapsed" />
 							<Border
 								x:Name="CountHost"
 								Margin="8,0,0,0"
@@ -870,6 +925,12 @@
 					<ControlTemplate.Triggers>
 						<Trigger Property="CountText" Value="{x:Static sys:String.Empty}">
 							<Setter TargetName="CountHost" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+						<Trigger Property="c:ConsoleField.ShowApiNames" Value="True">
+							<Setter TargetName="Axis" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="AxisName" Value="{x:Static sys:String.Empty}">
+							<Setter TargetName="Axis" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 						<Trigger Property="TagKind" Value="Observed">
 							<Setter TargetName="TagHost" Property="Visibility" Value="Visible" />
@@ -934,6 +995,7 @@
 								</ContentPresenter>
 							</DockPanel>
 							<!--  API 이름은 단어가 아니라 식별자다 — 중간에서 자르면(IsAutoEventDiscar/d) 뜻이 죽는다. 줄임표 + 전문은 ToolTip.  -->
+							<!--  API 이름은 개발자용 — ShowApiNames(상속, 기본 끔)가 켜진 곳(미리보기 도구의 api-names 옵션)에서만 보인다  -->
 							<TextBlock
 								x:Name="Api"
 								FontFamily="{DynamicResource MonoFont}"
@@ -942,7 +1004,8 @@
 								Text="{TemplateBinding ApiName}"
 								TextTrimming="CharacterEllipsis"
 								TextWrapping="NoWrap"
-								ToolTip="{TemplateBinding ApiName}" />
+								ToolTip="{TemplateBinding ApiName}"
+								Visibility="Collapsed" />
 						</StackPanel>
 						<Grid Grid.Column="1">
 							<Grid.RowDefinitions>
@@ -968,6 +1031,9 @@
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
+						<Trigger Property="c:ConsoleField.ShowApiNames" Value="True">
+							<Setter TargetName="Api" Property="Visibility" Value="Visible" />
+						</Trigger>
 						<Trigger Property="ApiName" Value="{x:Static sys:String.Empty}">
 							<Setter TargetName="Api" Property="Visibility" Value="Collapsed" />
 						</Trigger>

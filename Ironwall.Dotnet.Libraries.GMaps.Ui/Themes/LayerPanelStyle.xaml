@@ -30,9 +30,10 @@
             VerticalAlignment="Center"
 			Background="{DynamicResource SurfaceAltBrush}"
 			CornerRadius="8">
+			<!--  L5 — 9px 는 읽기 한계 아래였다 → 11  -->
 			<TextBlock
 				HorizontalAlignment="Center"
-				FontSize="9"
+				FontSize="11"
 				FontWeight="Bold"
 				Foreground="{DynamicResource PrimaryBrush}"
 				Text="{Binding}" />
@@ -47,7 +48,7 @@
 			<!-- 개별 심볼 리프 컨텍스트(이동만 활성, NavigateCommand 게이팅). 카테고리 단위 레거시 Leaf에선 비활성(FR-04). -->
 			<Grid.ContextMenu>
 				<ContextMenu>
-					<MenuItem Header="중앙으로 이동" Command="{Binding NavigateCommand}">
+					<MenuItem Header="지도 가운데로 이동" Command="{Binding NavigateCommand}">
 						<MenuItem.Icon>
 							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
 						</MenuItem.Icon>
@@ -94,14 +95,18 @@
 				Command="{Binding ToggleLockCommand}"
 				Background="Transparent"
 				BorderThickness="0"
-				Cursor="Hand"
-				ToolTip="잠금/잠금해제">
+				Cursor="Hand">
 				<Button.Style>
 					<Style TargetType="Button">
+						<!--  L6 — 도움말은 늘 "잠금/잠금해제" 였다: 지금 누르면 무엇이 되는지(잠금 · 잠금 해제), 꺼졌으면 그 까닭  -->
+						<Setter Property="ToolTip" Value="{Binding LockToggleHeader}" />
+						<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+						<Setter Property="AutomationProperties.Name" Value="{Binding LockToggleHeader}" />
 						<Style.Triggers>
 							<!-- 맵 편집 권한 없음(CanExecute=false) → 자물쇠 흐림 처리(비활성 가시화) -->
 							<Trigger Property="IsEnabled" Value="False">
 								<Setter Property="Opacity" Value="0.35" />
+								<Setter Property="ToolTip" Value="편집 권한이 없습니다" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -201,7 +206,7 @@
 						</MenuItem.Icon>
 					</MenuItem>
 					<Separator />
-					<MenuItem Header="이동" Command="{Binding NavigateCommand}">
+					<MenuItem Header="지도 가운데로 이동" Command="{Binding NavigateCommand}">
 						<MenuItem.Icon>
 							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
 						</MenuItem.Icon>
@@ -261,14 +266,18 @@
 				Command="{Binding ToggleLockCommand}"
 				Background="Transparent"
 				BorderThickness="0"
-				Cursor="Hand"
-				ToolTip="잠금/잠금해제">
+				Cursor="Hand">
 				<Button.Style>
 					<Style TargetType="Button">
+						<!--  L6 — 도움말은 늘 "잠금/잠금해제" 였다: 지금 누르면 무엇이 되는지(잠금 · 잠금 해제), 꺼졌으면 그 까닭  -->
+						<Setter Property="ToolTip" Value="{Binding LockToggleHeader}" />
+						<Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+						<Setter Property="AutomationProperties.Name" Value="{Binding LockToggleHeader}" />
 						<Style.Triggers>
 							<!-- 맵 편집 권한 없음(CanExecute=false) → 자물쇠 흐림 처리(비활성 가시화) -->
 							<Trigger Property="IsEnabled" Value="False">
 								<Setter Property="Opacity" Value="0.35" />
+								<Setter Property="ToolTip" Value="편집 권한이 없습니다" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -299,7 +308,6 @@
 				<TextBlock
 					VerticalAlignment="Center"
 					FontSize="12"
-					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="{Binding Name}"
 					TextOptions.TextRenderingMode="ClearType"
 					TextOptions.TextFormattingMode="Display"
@@ -307,9 +315,14 @@
 					<TextBlock.Style>
 						<Style TargetType="TextBlock">
 							<Setter Property="Visibility" Value="Visible" />
+							<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Style.Triggers>
 								<DataTrigger Binding="{Binding IsEditing}" Value="True">
 									<Setter Property="Visibility" Value="Collapsed" />
+								</DataTrigger>
+								<!--  L4 — 끈 오버레이는 이름도 흐리게(심볼 리프와 같은 규칙)  -->
+								<DataTrigger Binding="{Binding IsChecked}" Value="False">
+									<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 								</DataTrigger>
 							</Style.Triggers>
 						</Style>
@@ -347,12 +360,23 @@
 				TickFrequency="10"
 				IsSnapToTickEnabled="True"
 				Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource OpacityToPercent}}" />
+			<!--  L4 · L5 — 끈 오버레이는 투명도 대신 "끔"(슬라이더는 이미 꺼진다). 글자 9 → 11  -->
 			<TextBlock
 				Grid.Column="5"
 				VerticalAlignment="Center"
-				FontSize="9"
-				Foreground="{DynamicResource TextMutedBrush}"
-				Text="{Binding Opacity, StringFormat={}{0:P0}}" />
+				FontSize="11"
+				Foreground="{DynamicResource TextMutedBrush}">
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="Text" Value="{Binding Opacity, StringFormat={}{0:P0}}" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsChecked}" Value="False">
+								<Setter Property="Text" Value="끔" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
 		</Grid>
 	</DataTemplate>
 
@@ -629,69 +653,122 @@
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="SectionNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<StackPanel Margin="0,4,0,0">
-			<!-- 섹션 헤더 바 (클릭 시 접기/펼치기) -->
-			<Grid>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="Auto" />
-				</Grid.ColumnDefinitions>
-				<Border
-					Grid.Column="0"
-					Padding="8,4"
-					Background="{DynamicResource PrimaryBrush}"
-					CornerRadius="4">
-					<TextBlock
-						VerticalAlignment="Center"
-						FontSize="10.5"
-						FontWeight="Bold"
-						Foreground="{DynamicResource OnPrimaryFixedBrush}"
-						Text="{Binding Name}"
-						TextOptions.TextRenderingMode="ClearType"
-						TextOptions.TextFormattingMode="Display" />
-				</Border>
-				<ToggleButton
-					Grid.Column="1"
-					Width="20"
-					Height="20"
-					Margin="2,0,0,0"
-					IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-					Background="Transparent"
-					BorderThickness="0"
-					Cursor="Hand">
-					<ToggleButton.Style>
-						<Style TargetType="ToggleButton">
-							<Setter Property="Template">
-								<Setter.Value>
-									<ControlTemplate TargetType="ToggleButton">
-										<Border Background="Transparent">
-											<md:PackIcon
-												x:Name="Arrow"
-												Width="14"
-												Height="14"
-												Foreground="{DynamicResource TextMutedBrush}"
-												Kind="ChevronDown"
-												RenderTransformOrigin="0.5,0.5">
-												<md:PackIcon.RenderTransform>
-													<RotateTransform Angle="0" />
-												</md:PackIcon.RenderTransform>
-											</md:PackIcon>
-										</Border>
-										<ControlTemplate.Triggers>
-											<Trigger Property="IsChecked" Value="False">
-												<Setter TargetName="Arrow" Property="RenderTransform">
-													<Setter.Value>
-														<RotateTransform Angle="-90" />
-													</Setter.Value>
-												</Setter>
-											</Trigger>
-										</ControlTemplate.Triggers>
-									</ControlTemplate>
-								</Setter.Value>
-							</Setter>
-						</Style>
-					</ToggleButton.Style>
-				</ToggleButton>
-			</Grid>
+			<!--
+				섹션 머리(L1 · L3 · L5) — 예전에는 파란 띠가 이름 칸(*)에만 있고 셰브런이 띠 밖 22px 흰 여백에 떨어져
+				"머리 띠가 폭 일부만 덮는" 모양이었다. 이제 띠 하나가 행 전체를 덮는다:
+				[전체 체크] [이름 (개수)] ………… [셰브런]. 체크를 뺀 나머지 전체가 접기/펼치기 단추다.
+				전체 체크는 그룹 행과 같은 tri-state(IsChecked — 자식으로 내려가고 자식에서 올라온다). 자식이 없으면 숨긴다.
+				색이 아니라 형태로: 채운 파랑 대신 SurfaceAlt 띠 + 왼쪽 Primary 세로 바.
+			-->
+			<Border
+				MinHeight="28"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="0,0,0,1"
+				CornerRadius="4,4,0,0">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<Rectangle
+						Grid.Column="0"
+						Width="3"
+						Margin="0,4"
+						Fill="{DynamicResource PrimaryBrush}"
+						RadiusX="1.5"
+						RadiusY="1.5" />
+					<CheckBox
+						Grid.Column="1"
+						Margin="6,0,2,0"
+						AutomationProperties.Name="{Binding Name, StringFormat={}{0} 전체 보이기}"
+						IsChecked="{Binding IsChecked, Mode=TwoWay}"
+						IsThreeState="True"
+						ToolTip="이 묶음 전체를 켜거나 끕니다">
+						<CheckBox.Style>
+							<Style BasedOn="{StaticResource LayerCheckBox}" TargetType="CheckBox">
+								<Style.Triggers>
+									<!--  심볼 섹션은 전체 체크를 두지 않는다 — 수백 개 심볼 가시성을 한 번에 바꾸는 것은 카테고리 · 그룹 행이 맡는다  -->
+									<DataTrigger Binding="{Binding IsReorderSection}" Value="False">
+										<Setter Property="Visibility" Value="Collapsed" />
+									</DataTrigger>
+									<DataTrigger Binding="{Binding Children.Count}" Value="0">
+										<Setter Property="Visibility" Value="Hidden" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</CheckBox.Style>
+					</CheckBox>
+					<ToggleButton
+						Grid.Column="2"
+						Padding="4,0,6,0"
+						HorizontalContentAlignment="Stretch"
+						AutomationProperties.Name="{Binding Name, StringFormat={}{0} 접기 · 펼치기}"
+						Cursor="Hand"
+						IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+						<ToggleButton.Style>
+							<Style TargetType="ToggleButton">
+								<Setter Property="Template">
+									<Setter.Value>
+										<ControlTemplate TargetType="ToggleButton">
+											<Border Padding="{TemplateBinding Padding}" Background="Transparent">
+												<DockPanel LastChildFill="True">
+													<md:PackIcon
+														x:Name="Arrow"
+														Width="16"
+														Height="16"
+														VerticalAlignment="Center"
+														DockPanel.Dock="Right"
+														Foreground="{DynamicResource TextSecondaryBrush}"
+														Kind="ChevronDown"
+														RenderTransformOrigin="0.5,0.5">
+														<md:PackIcon.RenderTransform>
+															<RotateTransform Angle="0" />
+														</md:PackIcon.RenderTransform>
+													</md:PackIcon>
+													<ContentPresenter VerticalAlignment="Center" />
+												</DockPanel>
+											</Border>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsChecked" Value="False">
+													<Setter TargetName="Arrow" Property="RenderTransform">
+														<Setter.Value>
+															<RotateTransform Angle="-90" />
+														</Setter.Value>
+													</Setter>
+												</Trigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Setter.Value>
+								</Setter>
+							</Style>
+						</ToggleButton.Style>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock
+								VerticalAlignment="Center"
+								FontSize="12"
+								FontWeight="SemiBold"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="{Binding Name}"
+								TextOptions.TextFormattingMode="Display"
+								TextOptions.TextRenderingMode="ClearType"
+								TextTrimming="CharacterEllipsis" />
+							<ContentPresenter Content="{Binding Children.Count}" ContentTemplate="{StaticResource CountBadge}">
+								<ContentPresenter.Style>
+									<Style TargetType="ContentPresenter">
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsReorderSection}" Value="False">
+												<Setter Property="Visibility" Value="Collapsed" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</ContentPresenter.Style>
+							</ContentPresenter>
+						</StackPanel>
+					</ToggleButton>
+				</Grid>
+			</Border>
 			<!-- 자식 목록 (접기 가능) -->
 			<StackPanel Margin="4,2,0,0">
 				<StackPanel.Style>
@@ -718,9 +795,10 @@
 					</ContentPresenter.Style>
 				</ContentPresenter>
 				<!-- 빈 상태 메시지 -->
+				<!--  L5 — 10px 기울임은 읽기 한계 아래였다 → 11.5  -->
 				<TextBlock
 					Margin="4,2,0,2"
-					FontSize="10"
+					FontSize="11.5"
 					FontStyle="Italic"
 					Foreground="{DynamicResource TextMutedBrush}"
 					Text="등록된 항목이 없습니다">
