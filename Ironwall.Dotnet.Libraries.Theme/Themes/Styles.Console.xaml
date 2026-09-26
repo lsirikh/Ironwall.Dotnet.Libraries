@@ -93,7 +93,9 @@
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-							<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+							<!--  꺼짐 = 테두리 없는 가라앉은 판(형태). 테두리를 남기면 다크에서 켜진 테두리 단추와 거의 같아 보였다(2026-09-27 실창).
+							     두께는 1 그대로 두고 색만 투명 — 두께를 바꾸면 켜짐 ↔ 꺼짐에서 크기가 흔들린다(U-12).  -->
+							<Setter TargetName="Bd" Property="BorderBrush" Value="Transparent" />
 							<Setter TargetName="Bd" Property="BorderThickness" Value="1" />
 							<Setter Property="Cursor" Value="No" />
 						</Trigger>
@@ -163,7 +165,7 @@
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-							<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+							<Setter TargetName="Bd" Property="BorderBrush" Value="Transparent" />
 							<Setter Property="Cursor" Value="No" />
 						</Trigger>
 					</ControlTemplate.Triggers>
