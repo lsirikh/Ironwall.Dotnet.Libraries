@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
@@ -122,7 +123,9 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         {
             var response = await _api.AssignDevicesToGroupAsync(groupId, new DeviceGroupAssignRequestDto { DeviceIds = plan.DeviceIds.ToList() }, token).ConfigureAwait(true);
             if (!response.Success)
-                return Finish($"'{groupName}' 에 넣지 못했다 — {response.Message}", null);
+                // 오류 봉투에서는 Message 가 비고 까닭은 Error 에 있다 — 예전엔 "넣지 못했다 — " 로 끝나 사람이 까닭을 몰랐다
+                // (라이브 하네스 dl.2c: 부대 범위 밖 장비 422 "그룹의 부대(1) 또는 그 예하 부대의 장비만 …" 이 사라졌다).
+                return Finish($"'{groupName}' 에 넣지 못했다 — {ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 거부했다")}", null);
 
             // 서버가 실제로 넣었다고 답한 것만 로컬에 반영한다(응답에 없으면 보낸 것 전부).
             var assigned = response.Data?.AssignedDeviceIds ?? plan.DeviceIds.ToList();
@@ -162,7 +165,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             foreach (var chunk in AssignDelta.ChunkRemovals(undo.DeviceIds))
             {
                 var response = await _api.RemoveDevicesFromGroupAsync(undo.GroupId, new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() }, token).ConfigureAwait(true);
-                if (!response.Success) { failure = response.Message; continue; }
+                if (!response.Success) { failure = ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 거부했다"); continue; }
                 done.AddRange(chunk);   // removed · skipped(이미 아님) · not_found 모두 "이제 그 그룹에 없다"
             }
         }

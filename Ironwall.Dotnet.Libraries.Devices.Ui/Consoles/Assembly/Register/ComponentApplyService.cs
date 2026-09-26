@@ -355,6 +355,8 @@ public sealed class ComponentApplyService
                 // 이 두 값은 병합에서 진다(조각이 key 단위로 이긴다) — 남겨 두어도 해가 없다.
                 dto.HeaterEnabled = origin.HeaterEnabled;
                 dto.FanEnabled = origin.FanEnabled;
+                dto.HeaterEnabledKnown = origin.HeaterEnabledKnown;   // 설정 없는 부품에 false 를 지어내지 않는다
+                dto.FanEnabledKnown = origin.FanEnabledKnown;
                 // 임계치도 같은 축이다 — 빼고 보내면 통째 교체 해석에서 온도·습도 임계치가 전부 사라진다.
                 dto.ThresholdConfig = origin.ThresholdConfig;
                 // (D-21) connection 도 선택 축이다 — 받은 IP 를 채워 둬야 부품 적용 PATCH 가 함체의
@@ -427,6 +429,12 @@ public sealed class ComponentApplyService
         target.IsEnable = source.IsEnable;
         // (D-13) 방금 다시 받은 장비의 소속 부대를 보존한다 — UnitScopeGate 가 null 일 때만 이 클라이언트 부대로 채운다.
         target.UnitId = source.UnitId;
+        // 저장된 connection.type 을 새 DTO 로 옮긴다 — 새 DTO 는 받은 축이 없어서, 옮기지 않으면 재조립 connection 이
+        // IP 가 있으면 IP_DIRECT, 채널만 있으면 RS485 로 나가 저장된 IP_CONVERTER · CONTROLLER_CONTACT 를 덮었다
+        // (라이브 하네스 dl.3c, 2026-09-26). 모델 경로의 BaseDeviceDto.ConnectionTypeHint 와 같은 통로다.
+        target.ConnectionTypeHint = string.IsNullOrWhiteSpace(source.ConnectionTypeHint)
+            ? source.ReceivedConnection?.Type
+            : source.ConnectionTypeHint;
 
         target.UseAxisWrite = true;
         if (carrier != null)

@@ -536,6 +536,10 @@ public static class DtoToModelHelper
             IpAddress = dto.IpAddress,
             IpPort = dto.IpPort
         };
+        // "설정 없음"을 옮긴다 — 위 초기화의 HeaterEnabled/FanEnabled 대입이 "알려짐"을 켜므로 그 뒤에 적는다.
+        //   설정 없는 팬을 아무것도 고치지 않고 저장해도 enabled:false 를 지어내지 않게 한다(라이브 하네스 dl.4).
+        model.HeaterEnabledKnown = dto.HeaterEnabledKnown;
+        model.FanEnabledKnown = dto.FanEnabledKnown;
         // 임계값(threshold_config JObject) → 강타입 모델 (이전엔 드롭 → 재조회 시 임계값 소실)
         model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
         MapGeolocationToModel(dto, model);
@@ -588,6 +592,9 @@ public static class DtoToModelHelper
             DoorStatus = string.IsNullOrWhiteSpace(model.DoorStatus) ? "CLOSED" : model.DoorStatus,
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled,
+            // 설정 없는 부품(…EnabledKnown=false)은 component_overrides 에 enabled 를 싣지 않는다.
+            HeaterEnabledKnown = model.HeaterEnabledKnown,
+            FanEnabledKnown = model.FanEnabledKnown,
             // (D-31 후속) 조회 전용 힌트만 옮긴다 — dto.HardwareSpec(쓰기 채널)은 절대 채우지 않는다.
             // 채우면 ShouldSerializeHardwareSpecCore() 가 축 모드에서 hardware_spec 을 본문에 실어,
             // PATCH 가 hardware_spec.components 를 통째 교체하는 서버 규칙(레포 메모

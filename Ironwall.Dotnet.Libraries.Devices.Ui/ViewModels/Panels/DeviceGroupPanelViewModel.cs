@@ -257,7 +257,9 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     {
         try
         {
-            var r = await _apiService.CreateDeviceGroupAsync(model.ToDeviceGroupDto(), token);
+            // (8.0) 이 클라이언트의 부대를 싣는다 — 빼면 기본 부대로 가서 이 부대 장비를 넣을 수 없다(DeviceGroupWriteRequest).
+            var body = await DeviceGroupWriteRequest.ForCreateAsync(model, _log, token);
+            var r = await _apiService.CreateDeviceGroupAsync(body, token);
             if (r.Success && r.Data != null)
                 model.Id = r.Data.ToDeviceGroupModel().Id;   // (R2/H2) 서버 Id write-back — 선택 에디터의 stale Id(0) 방지 → CanAddAssign 정상화
             // (FR-06) 날 JSON 대신 사람이 읽는 문장 — 422 다필드는 줄바꿈으로 전건 표기.

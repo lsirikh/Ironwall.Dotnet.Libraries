@@ -91,6 +91,8 @@ public static class UnitAssignRequestBuilder
     {
         HeaterEnabled = origin.HeaterEnabled,
         FanEnabled = origin.FanEnabled,
+        HeaterEnabledKnown = origin.HeaterEnabledKnown,   // 설정 없는 부품에 false 를 지어내지 않는다
+        FanEnabledKnown = origin.FanEnabledKnown,
         ThresholdConfig = origin.ThresholdConfig,
     };
 
@@ -119,6 +121,11 @@ public static class UnitAssignRequestBuilder
         target.IsEnable = source.IsEnable;
         // 종류축(type_device)은 값이 없으면 나가지 않는다 — 기본 생성자가 넣은 값을 지워 덮어쓰기를 막는다.
         target.TypeDevice = string.Empty;
+        // 저장된 connection.type 을 옮긴다 — 안 옮기면 재조립 connection 이 IP_DIRECT 로 나가 저장된 IP_CONVERTER ·
+        // SERVER_MANAGED 를 덮는다(라이브 하네스 dl.3d, 2026-09-26: IP_CONVERTER 제어기를 부대만 옮겼는데 IP_DIRECT 가 됐다).
+        target.ConnectionTypeHint = string.IsNullOrWhiteSpace(source.ConnectionTypeHint)
+            ? source.ReceivedConnection?.Type
+            : source.ConnectionTypeHint;
         target.UseAxisWrite = true;
     }
     #endregion

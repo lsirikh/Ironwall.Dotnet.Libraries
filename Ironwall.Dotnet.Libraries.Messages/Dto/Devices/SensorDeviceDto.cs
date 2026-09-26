@@ -92,7 +92,8 @@ public class SensorDeviceDto : BaseDeviceDto
 
     /// <summary>
     /// 7.0 <c>connection</c> — 필수가 아니다(<c>SensorCreate.connection: Optional[SensorConnectionAxis]</c>).
-    /// IP 가 있으면 IP_DIRECT 를 우선하고, 없고 <see cref="Channel"/> 만 있으면 RS485 를 싣는다.
+    /// IP 가 있으면 IP 축(저장된 방식, 없으면 IP_DIRECT)을 우선하고, 없고 <see cref="Channel"/> 만 있으면
+    /// 저장된 채널 방식(<c>CONTROLLER_CONTACT</c> 등), 없으면 RS485 를 싣는다(<see cref="ChannelConnectionType"/>).
     /// 둘 다 없으면 <c>null</c> 로 키를 뺀다.
     /// </summary>
     /// <remarks>setter 는 7.0+ 응답 역투영(D-24) — 없으면 센서 접속 정보가 화면에서 사라진다.</remarks>
@@ -104,7 +105,7 @@ public class SensorDeviceDto : BaseDeviceDto
         {
             var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
             if (ip != null) return DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0, storedType: PreservedConnectionType);
-            if (Channel.HasValue) return new ConnectionAxisDto { Type = EnumConnectionTypeNames.Rs485, Channel = Channel };
+            if (Channel.HasValue) return new ConnectionAxisDto { Type = ChannelConnectionType(PreservedConnectionType), Channel = Channel };
             return null;
         }
         set
@@ -118,6 +119,25 @@ public class SensorDeviceDto : BaseDeviceDto
     }
 
     public bool ShouldSerializeConnectionAxis() => UseAxisWrite && ConnectionAxis != null;
+
+    /// <summary>
+    /// IP 없이 채널만 있는 센서의 결선 방식 — 저장된 방식이 있으면 그것, 없으면(새 장비) <c>RS485</c>.
+    /// </summary>
+    /// <remarks>
+    /// 채널은 RS485 버스 주소이기도 하고 제어기 접점 번호이기도 하다(<c>ConnectionAxis.channel</c> — "접점 채널 번호 / RS485 버스 주소").
+    /// 예전에는 채널만 있으면 무조건 <c>RS485</c> 를 실어, PATCH(객체 병합)가 저장된 <c>CONTROLLER_CONTACT</c> 를 덮었다
+    /// (라이브 실측 2026-09-26: 접점 결선 센서의 이름만 고쳐 저장 → 서버 <c>RS485</c>). IP 계열 방식(<c>IP_DIRECT</c>·<c>IP_CONVERTER</c>)은
+    /// IP 가 없는 이 가지에서는 뜻이 없으므로 이어받지 않는다.
+    /// </remarks>
+    internal static string ChannelConnectionType(string? storedType)
+    {
+        var stored = DeviceAxisWrite.NullIfEmpty(storedType);
+        if (stored == null
+            || stored == EnumConnectionTypeNames.IpDirect
+            || stored == EnumConnectionTypeNames.IpConverter)
+            return EnumConnectionTypeNames.Rs485;
+        return stored;
+    }
 
     /// <summary>7.0+ <c>hardware_spec</c> — 센서는 <c>max_detection_range</c> 를 쓸 수 있는 두 카테고리 중 하나다.</summary>
     [JsonProperty("hardware_spec", Order = 31, NullValueHandling = NullValueHandling.Ignore,

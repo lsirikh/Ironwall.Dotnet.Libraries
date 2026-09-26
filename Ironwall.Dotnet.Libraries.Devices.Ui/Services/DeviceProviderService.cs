@@ -1140,6 +1140,8 @@ public class DeviceProviderService : IDeviceProviderService
             existingEnclosure.DoorStatus = newEnclosure.DoorStatus;
             existingEnclosure.HeaterEnabled = newEnclosure.HeaterEnabled;
             existingEnclosure.FanEnabled = newEnclosure.FanEnabled;
+            existingEnclosure.HeaterEnabledKnown = newEnclosure.HeaterEnabledKnown;   // 값 대입이 켠 "알려짐"을 재조회 값으로 되돌린다
+            existingEnclosure.FanEnabledKnown = newEnclosure.FanEnabledKnown;
             existingEnclosure.ThresholdConfig = newEnclosure.ThresholdConfig;   // 임계값 — FetchAll 후 갱신 반영(누락 시 stale)
             existingEnclosure.IsEnable = newEnclosure.IsEnable;
             existingEnclosure.Location = newEnclosure.Location;

@@ -2104,13 +2104,21 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
-    // 그룹 쓰기(POST · PATCH · PUT)는 응답 DTO 가 아니라 DeviceGroupWriteDto(name · description)를 보낸다 —
+    // 그룹 쓰기(POST · PATCH · PUT)는 응답 DTO 가 아니라 DeviceGroupWriteDto(name · description · unit_id)를 보낸다 —
     //   서버 스키마가 extra="forbid" 라 id · device_count · created_at 이 실리면 422 UNKNOWN_FIELD 다(라이브 실측 2026-09-24).
+    //   unit_id 는 8.0 부터의 키라 그 미만에서는 지운다(장비 쓰기의 ShapeWrite 와 같은 규칙).
+    private DeviceGroupWriteDto GroupWriteBody(DeviceGroupDto dto)
+    {
+        var body = DeviceGroupWriteDto.From(dto);
+        if (!IsUnitScopedContract) body.UnitId = null;
+        return body;
+    }
+
     public async Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(DeviceGroupDto dto, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups", DeviceGroupWriteDto.From(dto));
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups", GroupWriteBody(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)
@@ -2124,7 +2132,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/groups/{id}", DeviceGroupWriteDto.From(dto));
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/groups/{id}", GroupWriteBody(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)
@@ -2138,7 +2146,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/groups/{id}", DeviceGroupWriteDto.From(dto));
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/groups/{id}", GroupWriteBody(dto));
             return await response.ToApiResponseAsync<DeviceGroupDto>();
         }
         catch (Exception ex)

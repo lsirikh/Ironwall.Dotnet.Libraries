@@ -54,19 +54,43 @@ internal static class UnitScopeGate
         CancellationToken token = default)
     {
         if (dto == null) return;
+        dto.UnitId = await ResolveStampAsync(dto.UnitId, caller, log, token).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// <b>새 장비 그룹</b> 등록 본문의 <c>unit_id</c> 를 정한다 — 장비와 같은 규칙(8.0 미만이면 지우고, 값이 있으면 보존,
+    /// 없으면 이 클라이언트의 부대).
+    /// </summary>
+    /// <remarks>
+    /// 서버 8.0 은 그룹도 부대에 속하고 구성원은 그룹의 부대이거나 그 예하 부대여야 한다(<c>assert_members_in_unit_scope</c>).
+    /// <c>unit_id</c> 를 빼고 등록하면 그룹이 기본 부대(<c>unit001</c>)로 가서, 기본 부대의 예하가 아닌 이 클라이언트 부대의
+    /// 장비를 그 그룹에 넣는 순간 422 다(라이브 하네스 dl.2, 2026-09-26). 수정(PUT·PATCH)에는 부르지 않는다 —
+    /// 빼면 서버가 현재 부대를 유지하고, 다른 부대 그룹을 고치다 이 클라이언트 부대로 옮기면 안 된다(D-13 과 같은 이유).
+    /// </remarks>
+    internal static async Task StampGroupAsync(
+        DeviceGroupDto? dto,
+        string caller,
+        ILogService? log = null,
+        CancellationToken token = default)
+    {
+        if (dto == null) return;
+        dto.UnitId = await ResolveStampAsync(dto.UnitId, caller, log, token).ConfigureAwait(false);
+    }
+
+    /// <summary>쓰기 본문에 실을 <c>unit_id</c> — 장비 · 그룹 공용 판정.</summary>
+    private static async Task<int?> ResolveStampAsync(int? current, string caller, ILogService? log, CancellationToken token)
+    {
         var scope = Resolve();
         if (scope == null || !scope.IsUnitEra)
         {
             // 8.0 미만·미등록 — 키 자체가 나가지 않게 확실히 지운다(운영 6.3.2 무회귀).
-            dto.UnitId = null;
-            return;
+            return null;
         }
 
-        if (dto.UnitId != null)
+        if (current != null)
         {
             // 호출부가 이미 원래 소속 부대를 실어 놨다 — 이 클라이언트 부대로 덮어쓰지 않고 보존한다.
-            return;
+            return current;
         }
 
         int? unitId;
@@ -79,14 +103,12 @@ internal static class UnitScopeGate
         {
             log?.Warning($"[{caller}] 부대 id 해석 중 예외 — unit_id 를 생략합니다"
                        + $"(서버가 기본 부대로 귀속시킵니다): {ex.Message}");
-            dto.UnitId = null;
-            return;
+            return null;
         }
-
-        dto.UnitId = unitId;
 
         if (unitId == null)
             WarnOmitted(caller, scope.UnitCode, log);
+        return unitId;
     }
 
     /// <summary>

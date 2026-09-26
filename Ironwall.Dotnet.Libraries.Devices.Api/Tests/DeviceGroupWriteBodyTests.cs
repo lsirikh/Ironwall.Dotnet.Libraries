@@ -64,6 +64,29 @@ public class DeviceGroupWriteBodyTests
     }
 
     [Fact]
+    public async Task should_post_unit_id_when_creating_group_with_a_unit_on_unit_contract()
+    {
+        var (service, http) = Create(EnumServerContract.V8_0);
+
+        await service.CreateDeviceGroupAsync(new DeviceGroupDto { Name = "G", Description = "d", UnitId = 12 });
+
+        Assert.Equal(new[] { "name", "description", "unit_id" }, http.Body!.Properties().Select(p => p.Name).ToArray());
+        Assert.Equal(12, (int?)http.Body!["unit_id"]);
+    }
+
+    [Theory]
+    [InlineData(EnumServerContract.V6_3)]
+    [InlineData(EnumServerContract.V7_0)]
+    public async Task should_strip_unit_id_when_creating_group_below_unit_contract(EnumServerContract contract)
+    {
+        var (service, http) = Create(contract);
+
+        await service.CreateDeviceGroupAsync(new DeviceGroupDto { Name = "G", Description = "d", UnitId = 12 });
+
+        Assert.Equal(new[] { "name", "description" }, http.Body!.Properties().Select(p => p.Name).ToArray());
+    }
+
+    [Fact]
     public async Task should_keep_stored_connection_type_when_response_dto_is_patched_back()
     {
         var (service, http) = Create(EnumServerContract.V8_0);

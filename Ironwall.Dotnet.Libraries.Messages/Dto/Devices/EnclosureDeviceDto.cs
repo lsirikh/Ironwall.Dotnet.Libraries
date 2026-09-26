@@ -66,6 +66,23 @@ public class EnclosureDeviceDto : BaseDeviceDto
     public bool FanEnabled { get; set; }
 
     /// <summary>
+    /// <see cref="HeaterEnabled"/> 가 실제 의도인가 — <c>false</c> 면 이 부품에 <c>enabled</c> 설정이 없다("설정 없음").
+    /// 그때는 7.0+ <c>component_overrides</c> 에 <c>enabled</c> 를 싣지 않는다. 직렬화되지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 7.0+ 응답(<see cref="DeviceConfigAxis"/> setter)이 이 칸을 정한다: 받은 <c>component_overrides</c> 에 그 부품의
+    /// <c>enabled</c> 가 있으면 <c>true</c>, 없으면 <c>false</c>. 기본값 <c>true</c> 는 종전 동작 그대로다(코드가 직접
+    /// 만든 DTO · 6.3 평면 응답은 늘 값이 있다). 이 칸이 없을 때는 설정 없는 팬을 저장할 때마다 <c>enabled:false</c> 가
+    /// 지어내졌다(라이브 하네스 dl.4, 2026-09-26).
+    /// </remarks>
+    [JsonIgnore]
+    public bool HeaterEnabledKnown { get; set; } = true;
+
+    /// <summary><see cref="FanEnabled"/> 가 실제 의도인가 — <see cref="HeaterEnabledKnown"/> 과 같은 계약.</summary>
+    [JsonIgnore]
+    public bool FanEnabledKnown { get; set; } = true;
+
+    /// <summary>
     /// 장비 설명 — 서버 8.0.1 은 7 카테고리 공통으로 저장한다(하네스가 함체에 raw PATCH 로 실측 확인,
     /// device-assembly-preset 왕복 하네스). <c>null</c> 이면 생략한다("값 없음" ≠ "지워라" — <c>NullValueHandling.Ignore</c>).
     /// </summary>
@@ -173,8 +190,9 @@ public class EnclosureDeviceDto : BaseDeviceDto
                 ? (JObject)_componentOverrides.DeepClone()
                 : new JObject();
 
-            SetEnabledIfPresent(overrides, ComponentTypeNames.Heater, HeaterComponentKeyHint, HeaterEnabled);
-            SetEnabledIfPresent(overrides, ComponentTypeNames.Fan, FanComponentKeyHint, FanEnabled);
+            // "설정 없음"(…EnabledKnown=false)인 부품에는 enabled 를 지어내지 않는다 — 받은 항목은 _componentOverrides 로 그대로 간다.
+            if (HeaterEnabledKnown) SetEnabledIfPresent(overrides, ComponentTypeNames.Heater, HeaterComponentKeyHint, HeaterEnabled);
+            if (FanEnabledKnown) SetEnabledIfPresent(overrides, ComponentTypeNames.Fan, FanComponentKeyHint, FanEnabled);
 
             var thresholds = DeviceThresholdAxis.ToAxis(ThresholdConfig);
 
@@ -193,19 +211,29 @@ public class EnclosureDeviceDto : BaseDeviceDto
         set
         {
             ReceivedDeviceConfig = value;   // raw capture for read mapping (device-console-v8 FR-03)
-            if (value == null) return;
+            if (value == null)
+            {
+                // 7.0+ 가 device_config 를 비워 보냈다 — 어떤 부품에도 설정이 없다.
+                HeaterEnabledKnown = false;
+                FanEnabledKnown = false;
+                return;
+            }
 
             // 임계치 역투영 — 7.0+ 응답에 평면 threshold_config 가 없다(D-24).
             if (DeviceThresholdAxis.FromAxis(value.Thresholds) is { } legacy) ThresholdConfig = legacy;
 
             _componentOverrides = value.ComponentOverrides;
-            if (value.ComponentOverrides == null) return;
 
             var heaterKey = FindComponentKeyByType(ComponentTypeNames.Heater) ?? HEATER_KEY_FALLBACK;
             var fanKey = FindComponentKeyByType(ComponentTypeNames.Fan) ?? FAN_KEY_FALLBACK;
 
-            if (ReadEnabled(value.ComponentOverrides, heaterKey) is { } heater) HeaterEnabled = heater;
-            if (ReadEnabled(value.ComponentOverrides, fanKey) is { } fan) FanEnabled = fan;
+            // 받은 설정이 없으면 "설정 없음"으로 적는다 — false(기본값)를 의도로 되보내지 않게(HeaterEnabledKnown).
+            var heater = value.ComponentOverrides == null ? null : ReadEnabled(value.ComponentOverrides, heaterKey);
+            var fan = value.ComponentOverrides == null ? null : ReadEnabled(value.ComponentOverrides, fanKey);
+            HeaterEnabledKnown = heater.HasValue;
+            FanEnabledKnown = fan.HasValue;
+            if (heater is { } h) HeaterEnabled = h;
+            if (fan is { } f) FanEnabled = f;
         }
     }
 
