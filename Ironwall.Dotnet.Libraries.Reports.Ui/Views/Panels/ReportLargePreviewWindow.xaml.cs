@@ -19,10 +19,22 @@ public partial class ReportLargePreviewWindow : Window
 
     public ReportLargePreviewWindow(string? html, string title)
     {
+        // 머리 글이 바인딩하므로 InitializeComponent 전에 채운다(평범한 CLR 속성 — 한 번 읽고 끝난다).
+        ReportTitle = string.IsNullOrWhiteSpace(title) ? "미리보기" : title;
         InitializeComponent();
         _html = html;
-        Title = string.IsNullOrWhiteSpace(title) ? "미리보기" : title;
+        Title = WindowTitleFor(title);
     }
+
+    /// <summary>머리에 보일 보고서 제목.</summary>
+    public string ReportTitle { get; }
+
+    /// <summary>
+    /// R32 — OS 제목 줄(작업 전환 · Alt+Tab)에 무슨 창인지 함께 보인다. 옛 제목은 보고서 제목만이라
+    /// 무엇의 창인지 알 수 없었다.
+    /// </summary>
+    public static string WindowTitleFor(string? reportTitle)
+        => string.IsNullOrWhiteSpace(reportTitle) ? "보고서 미리보기" : $"보고서 미리보기 — {reportTitle}";
 
     private async void OnHostLoaded(object sender, RoutedEventArgs e)
     {
@@ -45,7 +57,7 @@ public partial class ReportLargePreviewWindow : Window
         {
             // 런타임 미설치 등 — 빈 칸을 내지 않고 까닭을 적는다.
             _browser = null;
-            host.Child = Placeholder("이 PC 에 WebView2 런타임이 없어 미리보기를 그릴 수 없습니다.\n[PDF 내려받기] 로 내용을 확인하세요.");
+            host.Child = Placeholder($"{Consoles.Preview.ReportPreviewSurfaceRules.RuntimeMissingReason}.\n{Consoles.Preview.ReportPreviewSurfaceRules.RuntimeMissingHint}.");
         }
     }
 

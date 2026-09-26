@@ -91,6 +91,10 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         PreviewViewModel.ProbeRuntime();
         RefreshPermissions();
         await SelectRailAsync(ReportConsoleRails.List, force: true);
+        // R17 — 생성 이력의 "템플릿" 을 번호(#5)가 아니라 이름으로 보이려면 템플릿 목록이 있어야 한다.
+        //        생성 화면 콤보가 쓰는 목록을 한 번 받아 두고 이력에 이름을 꽂는다(GET /templates 1회).
+        await RefreshCreateTemplatesAsync();
+        RaiseAll();
     }
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -218,6 +222,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
                     else await CreateViewModel.LoadTemplatesAsync();
                     if (ListViewModel.IsActive) await ListViewModel.LoadAsync();   // 왼쪽 칸에 최근 생성 이력
                     else await ScreenExtensions.TryActivateAsync(ListViewModel);
+                    PushTemplateNames();   // 방금 받은 템플릿 목록으로 이력의 템플릿 이름도 맞춘다
                     break;
 
                 case ReportConsoleRails.Template:
@@ -238,16 +243,20 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     {
         var listEntry = RailEntries.First(r => r.Key == ReportConsoleRails.List);
         listEntry.Count = ListViewModel.InProgressCount;
+        // R4 — 0 은 보이지 않는다. "생성 이력 0" 이 "보고서 0건" 으로 읽혔다(배지는 진행 중 건수다 — 상태 띠가 글로도 말한다).
+        listEntry.ShowCount = listEntry.Count > 0;
     }
 
     /// <summary>머리 부제 — 짧게. 같은 문장을 레일 바닥 · 자리표시자와 겹쳐 놓지 않는다.</summary>
     public string RailSubtitle => IsTemplateRail ? "템플릿" : IsCreateRail ? "새 보고서" : "생성 이력";
 
     /// <summary>레일 바닥(184 폭) — 한 줄에 들어가는 길이로.</summary>
+    /// <remarks>R5 — 끊긴 메모("오른쪽 아래 [생성]") 대신 할 일을 존댓말로. 서랍 폭에서는 오른쪽 칸이 없으므로 방향을 말하지 않는다.</remarks>
+    /// 두 줄이 되는 글은 뜻 단위로 직접 끊는다 — 맡겨 두면 184 폭에서 "…미리보기 / 가 열립니다" 로 갈렸다.
     public string RailFooterText => IsTemplateRail
-        ? "오른쪽 칸에서 고칩니다"
-        : IsCreateRail ? "오른쪽 아래 [생성]"
-        : "고르면 오른쪽에 미리보기";
+        ? "템플릿을 고르면\n편집 칸이 열립니다"
+        : IsCreateRail ? "입력 후 [생성]을 누르세요"
+        : "보고서를 고르면\n미리보기가 열립니다";
     #endregion
 
     #region - List slot -
@@ -290,6 +299,9 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     }
 
     public bool ShowSearch => !IsCreateRail;
+
+    /// <summary>R6 — 검색창 안내 글은 지금 목록의 이름 칸을 따른다(템플릿 목록은 "이름").</summary>
+    public string SearchPlaceholder => IsTemplateRail ? "이름 검색" : "제목 검색";
 
     public string AddText => IsTemplateRail ? "새 템플릿" : "새 보고서";
 
@@ -385,6 +397,11 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
             if (IsCreateRail)
                 return string.IsNullOrEmpty(CreateViewModel.StatusText) ? CreateFormFooter : CreateViewModel.StatusText;
             if (IsTemplateRail && EditViewModel.HasStatus && !Detail.IsDirty) return EditViewModel.StatusText;
+            // 생성 이력 칸은 고칠 것이 없는 미리보기다 — "변경 없음" 은 뜻이 없다(적용 막대도 없다).
+            if (IsListRail) return string.Empty;
+            if (Detail.State == ConsoleDetailState.Create
+                && Detail.FooterText == ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Create, 0))
+                return CreateFooterText;
             return Detail.FooterText;
         }
     }
@@ -582,7 +599,12 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
 
     #region - Status bar -
     /// <summary>상태 띠 왼쪽 — 건수(WL L1266 아래 30px 띠).</summary>
-    public string ListStatusText => IsTemplateRail ? TemplateViewModel.CountText : ListViewModel.CountText;
+    /// <remarks>R4 — 레일 배지가 무엇을 세는지 글로도 말한다("6건 · 진행 중 2건").</remarks>
+    public string ListStatusText => IsTemplateRail
+        ? TemplateViewModel.CountText
+        : ListViewModel.InProgressCount > 0
+            ? $"{ListViewModel.CountText} · 진행 중 {ListViewModel.InProgressCount}건"
+            : ListViewModel.CountText;
 
     private string _statusText = string.Empty;
     /// <summary>상태 띠 오른쪽 — 방금 한 일 한 줄.</summary>
@@ -634,7 +656,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
 
     private void OnGenerationDeleted(int id)
     {
-        StatusText = $"보고서 #{id} 를 지웠습니다";
+        StatusText = $"보고서(#{id})를 삭제했습니다";
         RefreshRailCounts();
         RaiseAll();
     }
@@ -663,6 +685,19 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     {
         try { await CreateViewModel.LoadTemplatesAsync(); }
         catch (Exception ex) { _log?.Error($"[ReportConsole] 생성 화면 템플릿 갱신: {ex.Message}"); }
+        PushTemplateNames();
+    }
+
+    /// <summary>
+    /// R17 — 받은 템플릿 목록을 생성 이력에 이름으로 꽂는다. 목록을 못 받았으면 <c>null</c> 을 꽂아
+    /// "삭제된 템플릿" 이라고 단정하지 않게 한다(번호만 보인다).
+    /// </summary>
+    private void PushTemplateNames()
+    {
+        ListViewModel.TemplateNames = CreateViewModel.TemplatesLoaded
+            ? CreateViewModel.Templates.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First().Name ?? string.Empty)
+            : null;
+        PreviewViewModel.RefreshMeta();
     }
 
     /// <summary>생성이 끝났다 — 목록을 갱신하고 그 보고서를 골라 상세 칸에 미리보기를 올린다.</summary>
@@ -676,7 +711,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
             if (row != null)
             {
                 ListViewModel.SelectedItem = row;
-                StatusText = $"보고서 #{generationId} 를 만들었습니다";
+                StatusText = $"보고서(#{generationId})를 만들었습니다";
             }
         }
         catch (Exception ex) { _log?.Error($"[ReportConsole] 생성 완료 처리: {ex.Message}"); }
@@ -726,6 +761,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         NotifyOfPropertyChange(nameof(RailSubtitle));
         NotifyOfPropertyChange(nameof(SearchText));
         NotifyOfPropertyChange(nameof(ShowSearch));
+        NotifyOfPropertyChange(nameof(SearchPlaceholder));
         NotifyOfPropertyChange(nameof(AddText));
     }
 
@@ -782,12 +818,24 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     public string PanelTitle => "보고서";
 
     public Task Close() => TryCloseAsync();
+
+    /// <summary>
+    /// 템플릿 편집 칸에 적용하지 않은 변경이 있으면 닫지 않는다 — 바닥 막대가 흔들리며 "적용하거나 되돌린 뒤 이동하세요" 라고
+    /// 말한다(저장 안 한 변경을 말없이 버리지 않는다. 선례: 이벤트 매핑 워크벤치). 편집 권한이 없으면 붙잡지 않는다.
+    /// </summary>
+    public override Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(!Detail.Tracker.IsDirty || !CanEditReports || Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
     #endregion
 
     #region - Attributes -
     internal const string CreateFormFooter = "왼쪽 목록에서 진행됩니다";
-    internal const string CreateFormBanner = "제목과 기간을 정하면 보고서를 만들 수 있습니다. 진행 상황은 왼쪽 목록에서 볼 수 있습니다.";
-    internal const string TemplateCreateBanner = "이름과 구성 요소를 고르면 템플릿을 등록할 수 있습니다.";
+    // 안내 띠는 상세 칸(서랍 360 · 도킹 380)에서 두 줄이 된다 — 한글이 음절 중간("진 / 행", "있습 / 니다")에서
+    // 갈리지 않게 문장 단위로 직접 끊는다(한 줄은 22자 안쪽).
+    internal const string CreateFormBanner = "제목과 기간을 정하고 [생성]을 누르세요.\n진행 상황은 왼쪽 목록에 나옵니다.";
+    internal const string TemplateCreateBanner = "이름을 적고 구성 요소를 고른 뒤\n[등록]을 누르세요.";
+
+    /// <summary>등록 폼 바닥 막대 — 커널 글("등록 전에는 목록에 나타나지 않습니다")이 막대에서 "않습 / 니다" 로 갈렸다.</summary>
+    internal const string CreateFooterText = "등록해야 목록에 나타납니다";
 
     private readonly IPermissionService _permission;
     private int _overlayDepth;

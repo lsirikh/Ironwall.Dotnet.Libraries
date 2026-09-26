@@ -18,7 +18,8 @@ internal static class PreviewData
             Generation(104, "9월 3주 정기 보고서", "COMPLETED"),
             Generation(103, "장애 원인 분석 보고서", "GENERATING", 62, "collecting"),
             Generation(102, "8월 종합 보고서", "FAILED"),
-            Generation(101, "8월 4주 정기 보고서", "COMPLETED"),
+            // 직접 지정 기간 — 상세 메타가 실제 날짜 범위를 보이는지(R18) 찍는다.
+            Generation(101, "8월 4주 정기 보고서", "COMPLETED", period: "custom"),
         });
 
         api.Templates.AddRange(new[]
@@ -64,7 +65,7 @@ internal static class PreviewData
         });
     }
 
-    private static ReportGenerationDto Generation(int id, string title, string status, int progress = 0, string? stage = null)
+    private static ReportGenerationDto Generation(int id, string title, string status, int progress = 0, string? stage = null, string period = "7d")
         => new()
         {
             Id = id,
@@ -72,13 +73,16 @@ internal static class PreviewData
             Status = status,
             ReportType = id % 2 == 0 ? "STANDARD" : "CUSTOM",
             TemplateId = id % 2 == 0 ? null : 201,
-            PeriodType = "7d",
-            CreatedAt = $"2026-09-{id - 90:00} 09:12",
-            CompletedAt = status == "COMPLETED" ? $"2026-09-{id - 90:00} 09:14" : null,
+            PeriodType = period,
+            StartDate = period == "custom" ? "2026-08-24T00:00:00+09:00" : null,
+            EndDate = period == "custom" ? "2026-08-30T00:00:00+09:00" : null,
+            // 서버와 같은 모양(ISO 8601 · 마이크로초 · 오프셋) — 화면이 원문을 그대로 찍는지 여기서 드러난다(R2 · R19).
+            CreatedAt = $"2026-09-{id - 90:00}T09:12:41.449371+09:00",
+            CompletedAt = status == "COMPLETED" ? $"2026-09-{id - 90:00}T09:14:02.100000+09:00" : null,
             GeneratorName = "김관제",
             ProgressPct = progress,
             ProgressStage = stage,
-            ProgressUpdatedAt = progress > 0 ? $"2026-09-{id - 90:00} 09:13" : null,
+            ProgressUpdatedAt = progress > 0 ? $"2026-09-{id - 90:00}T09:13:05.123+09:00" : null,
         };
 
     private static ReportTemplateDto Template(int id, string name, string description, string period, params string[] components)

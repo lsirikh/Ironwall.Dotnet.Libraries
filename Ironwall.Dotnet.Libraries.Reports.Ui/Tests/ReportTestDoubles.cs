@@ -92,8 +92,13 @@ public sealed class FakeReportApiService : IReportApiService
 
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
 
+    /// <summary>구성 요소 카탈로그 조회를 실패시킨다(R28).</summary>
+    public bool FailComponents { get; set; }
+
     public Task<ApiResponse<List<ReportComponentCategoryDto>>> GetComponentsAsync(CancellationToken token = default)
-        => Task.FromResult(new ApiResponse<List<ReportComponentCategoryDto>> { Success = true, Data = Components });
+        => Task.FromResult(FailComponents
+            ? new ApiResponse<List<ReportComponentCategoryDto>> { Success = false }
+            : new ApiResponse<List<ReportComponentCategoryDto>> { Success = true, Data = Components });
 
     public Task<ApiResponse<ReportStatusDto>> GetStatusAsync(CancellationToken token = default)
         => Task.FromResult(new ApiResponse<ReportStatusDto> { Success = true, Data = new ReportStatusDto() });
@@ -203,8 +208,11 @@ public sealed class FakeReportApiService : IReportApiService
 
     public Task<string?> GetPreviewHtmlAsync(int id, CancellationToken token = default) => Task.FromResult(PreviewHtml);
 
+    /// <summary>내려받기 실패 때 서비스가 돌려줄 글(서버 원문 · 예외 문구 흉내).</summary>
+    public string DownloadError { get; set; } = "시험에서는 내려받지 않습니다.";
+
     public Task<ReportPdfResult> DownloadPdfAsync(int id, CancellationToken token = default)
-        => Task.FromResult(ReportPdfResult.Fail("시험에서는 내려받지 않습니다."));
+        => Task.FromResult(ReportPdfResult.Fail(DownloadError));
 
     public Task<ReportPdfResult> DownloadDetailCsvAsync(int id, string type, CancellationToken token = default)
         => Task.FromResult(ReportPdfResult.Fail("시험에서는 내려받지 않습니다."));

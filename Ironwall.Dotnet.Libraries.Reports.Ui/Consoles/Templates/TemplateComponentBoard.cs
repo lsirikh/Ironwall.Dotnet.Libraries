@@ -49,8 +49,12 @@ public sealed class TemplateComponentItem : PropertyChangedBase
         "BAR" => "막대",
         "LINE" => "추이",
         null or "" => "표/요약",
-        _ => ChartType!,
+        _ => "기타",               // 모르는 서버 코드를 원문으로 내지 않는다
     };
+
+    /// <summary>저장돼 있으나 서버가 더 이상 제공하지 않는 구성 요소의 이름 · 분류.</summary>
+    public const string OrphanDisplay = "더 이상 제공되지 않는 항목";
+    public const string OrphanCategory = "제공 중단";
 
     /// <summary>계측 이름 — 바인딩식이라 인스턴스마다 다르다(템플릿에 고정 리터럴을 쓰지 않는다).</summary>
     public string AutomationId => $"Reports.Detail.Component.{Id}";
@@ -157,7 +161,12 @@ public sealed class TemplateComponentBoard
         // 저장된 구성 중 카탈로그에 없는 것 — 말없이 빼면 [적용] 때 조용히 사라진다. 보이게 두고 저장값 그대로 둔다.
         foreach (var id in savedList.Where(id => built.All(b => !string.Equals(b.Id, id, StringComparison.Ordinal))))
         {
-            var orphan = new TemplateComponentItem(id, id, "서버 카탈로그에 없음") { Saved = savedById[id] };
+            // R30 — 화면에는 코드(id)를 이름처럼 내지 않는다. 원래 코드는 도움말에만 남긴다.
+            var orphan = new TemplateComponentItem(id, TemplateComponentItem.OrphanDisplay, TemplateComponentItem.OrphanCategory)
+            {
+                Saved = savedById[id],
+                Description = $"원래 항목 코드: {id}",
+            };
             orphan.SetEnabledQuiet(savedEntryEnabled(id));
             built.Add(orphan);
         }

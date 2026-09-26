@@ -205,8 +205,8 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
 
         Assert.False(rig.Console.CanAdd);
         Assert.True(rig.Console.Detail.IsReadOnly);
-        Assert.Contains("지원하지 않습니다", rig.Console.EmptyStateText);
-        Assert.Contains("지원하지 않습니다", rig.Console.AddBlockedReason);
+        Assert.Equal(ActionReportTemplateConsoleViewModel.UnsupportedText, rig.Console.EmptyStateText);
+        Assert.Equal(ActionReportTemplateConsoleViewModel.UnsupportedText, rig.Console.AddBlockedReason);
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.Empty(rig.Api.CreateCalls);
         Assert.Empty(rig.Api.UpdateCalls);
         Assert.DoesNotContain("다른 곳에서 삭제된", rig.Console.Detail.LastMessage ?? string.Empty);
-        Assert.Contains("지원하지 않습니다", rig.Console.Detail.LastMessage ?? string.Empty);
+        Assert.Equal(ActionReportTemplateConsoleViewModel.UnsupportedText, rig.Console.Detail.LastMessage);
     }
 
     [Fact]

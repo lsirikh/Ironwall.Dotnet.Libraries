@@ -54,7 +54,7 @@ public partial class App : Application
                 return;
             }
 
-            _viewModel = Build(e.Args.Contains("--readonly"));
+            _viewModel = Build(e.Args.Contains("--readonly"), e.Args.Contains("--empty"));
             _view = new ReportConsoleView { DataContext = _viewModel };
             _window = new Window
             {
@@ -74,7 +74,7 @@ public partial class App : Application
             if (directory is null) return;
 
             Directory.CreateDirectory(directory);
-            await RunSnapshotsAsync(directory, e.Args.Contains("--dark") ? "dark" : "light");
+            await RunSnapshotsAsync(directory, e.Args.Contains("--dark") ? "dark" : "light", e.Args.Contains("--empty"));
         }
         catch (System.Exception ex)
         {
@@ -86,7 +86,7 @@ public partial class App : Application
     }
 
     #region - Composition -
-    private static ReportConsoleViewModel Build(bool readOnly)
+    private static ReportConsoleViewModel Build(bool readOnly, bool empty = false)
     {
         var log = new FakeLogService();
         var events = new EventAggregator();
@@ -99,7 +99,7 @@ public partial class App : Application
         IoC.BuildUp = _ => { };
         PlatformProvider.Current = new XamlPlatformProvider();
 
-        PreviewData.Fill(api);
+        if (!empty) PreviewData.Fill(api);
 
         return new ReportConsoleViewModel(
             events, log, permission,
@@ -199,18 +199,33 @@ public partial class App : Application
     #endregion
 
     #region - Snapshots -
-    private async Task RunSnapshotsAsync(string directory, string theme)
+    private async Task RunSnapshotsAsync(string directory, string theme, bool empty = false)
     {
         // WebView2 는 오프스크린에서 그려지지 않는다 — 런타임이 없을 때와 같은 길로 내려 자리표시자를 찍는다.
         _viewModel.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(false);
         _viewModel.PreviewViewModel.ProbeRuntime();
 
         await Settle();
+        if (empty)
+        {
+            // 빈 상태(커널 ConsoleEmptyState) — 생성 이력 · 템플릿 두 목록.
+            Save(directory, $"{theme}-00-empty-history");
+            await _viewModel.SelectRailAsync(ReportConsoleRails.Template);
+            await Settle();
+            Save(directory, $"{theme}-00-empty-templates");
+            return;
+        }
         Save(directory, $"{theme}-01-list-none");
 
         _viewModel.OnRowSelected(_viewModel.ListViewModel.Rows.First(r => r.Id == 104));
         await Settle();
         Save(directory, $"{theme}-02-list-selected");
+        WriteSurfaceDecision(directory, $"{theme}-02-list-selected");
+
+        // 직접 지정 기간 + 템플릿 기반 — 메타의 기간 범위(R18) · 템플릿 이름(R17).
+        _viewModel.OnRowSelected(_viewModel.ListViewModel.Rows.First(r => r.Id == 101));
+        await Settle();
+        Save(directory, $"{theme}-02b-list-custom-period");
 
         _viewModel.OnRowSelected(_viewModel.ListViewModel.Rows.First(r => r.Id == 103));
         await Settle();
@@ -234,6 +249,11 @@ public partial class App : Application
         _viewModel.CreateViewModel.Severities[2].IsSelected = true;
         await Settle();
         Save(directory, $"{theme}-07-create-filled");
+
+        // 직접 지정 — 시작 · 종료 날짜 칸이 값 칸 안에 들어오는지(R23: 종료일 칸이 잘렸다).
+        _viewModel.CreateViewModel.IsCustomRange = true;
+        await Settle();
+        Save(directory, $"{theme}-07b-create-custom-range");
         _viewModel.Revert();
 
         await _viewModel.SelectRailAsync(ReportConsoleRails.Template);
@@ -275,6 +295,7 @@ public partial class App : Application
         _viewModel.PreviewViewModel.ProbeRuntime();
         await Settle();
         Save(directory, $"{theme}-13-drawer-1150");
+        WriteSurfaceDecision(directory, $"{theme}-13-drawer-1150");
 
         PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 900);
         await Settle();
@@ -291,6 +312,33 @@ public partial class App : Application
         PreviewTools.Shared.OffscreenStage.SetWidth(_window, _view, 1150);
         await Settle();
         Save(directory, $"{theme}-16-drawer-1150-nodrawer");
+    }
+
+    /// <summary>
+    /// R1 — 미리보기 칸의 판정을 글로 남긴다. WebView2 는 화면 밖에서 그려지지 않으므로 캡처로는 "살아 있는 미리보기" 를
+    /// 볼 수 없다 — 대신 커널 폭 판정(도킹 · 서랍)과 그 폭에서 런타임이 있을 때 내려질 판정(Live · 자리표시자)을 적는다.
+    /// </summary>
+    private void WriteSurfaceDecision(string directory, string frame)
+    {
+        var shell = FindShell(_view);
+        var mode = _viewModel.LayoutMode;
+        var ifRuntime = ReportPreviewSurfaceRules.Resolve(mode, _viewModel.PreviewViewModel.IsLargeViewOpen,
+            _viewModel.PreviewViewModel.IsOverlayOpen, isRuntimeReady: true, _viewModel.PreviewViewModel.Content);
+        File.AppendAllText(Path.Combine(directory, "preview-surface.txt"),
+            $"{frame}\tshellWidth={shell?.ActualWidth:0}\tlayout={mode}\tcontent={_viewModel.PreviewViewModel.Content}" +
+            $"\tifRuntime={(ifRuntime.IsLive ? "Live" : "Placeholder: " + ifRuntime.Reason + " / " + ifRuntime.Hint)}" +
+            $"\tcanOpenLarge={ReportPreviewSurfaceRules.CanOpenLargeView(true, _viewModel.PreviewViewModel.Content)}{System.Environment.NewLine}");
+    }
+
+    private static Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleShell? FindShell(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleShell shell) return shell;
+            if (FindShell(child) is { } found) return found;
+        }
+        return null;
     }
 
     private void ApplyDark()

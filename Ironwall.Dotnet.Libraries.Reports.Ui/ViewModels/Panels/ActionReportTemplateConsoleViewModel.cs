@@ -60,12 +60,14 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         Board.Changed += OnBoardChanged;
         Drop = new ActionReportTemplateDropHandler(Board, () => CanEdit && !IsReordering && !IsBusy);
 
-        Detail = new ConsoleDetailPresenter { TypeName = "문구" };
+        // 칸이 하나뿐인 폼이라 커널 기본 안내("나머지는 등록 후 채워도 됩니다")는 맞지 않는다.
+        Detail = new ConsoleDetailPresenter { TypeName = "문구", CreateBanner = "문구를 입력하고 [등록]을 누르세요." };
         Detail.Tracker.MarkIdentity(FieldContent);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>
         {
-            new ConsoleRailEntry(RailKey, "문구 목록") { ShowCount = true },
+            // 아이콘이 없으면 좁은 폭(레일 56 접힘)에서 빈 칸만 남았다 — 보고서 콘솔과 같은 아이콘 토큰을 준다.
+            new ConsoleRailEntry(RailKey, "문구 목록", new ReportRailIcon("FormatListNumbered")) { ShowCount = true },
         };
         _selectedRail = RailEntries[0];
 
@@ -121,7 +123,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         set { if (value != null) { _selectedRail = value; NotifyOfPropertyChange(); } }
     }
 
-    public string RailFooterText => "고르면 오른쪽에서 고칩니다. 끌어서 순서를 바꿀 수 있습니다.";
+    /// <summary>레일 바닥(184 폭) — 한 줄에 들어가는 길이로(A2: 세 줄로 음절 중간이 갈렸다). 나머지 안내는 목록 위 힌트가 한다.</summary>
+    public string RailFooterText => "끌어서 순서를 바꿉니다";
     #endregion
 
     #region - List · 드래그 재정렬 -
@@ -150,6 +153,19 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     public bool IsEmpty => Board.Count == 0 && !IsBusy;
     public string CountText => $"{Board.Count}건";
 
+    /// <summary>▲▼ 단추 — 고른 줄이 있을 때만 켠다(A9: 아무것도 안 골랐는데 켜져 눌러도 아무 일이 없었다).</summary>
+    public bool CanMoveSelected => CanEdit && SelectedItem != null && !IsReordering;
+    public string MoveBlockedReason => !CanEdit ? AddBlockedReason : "옮길 문구를 먼저 고르세요.";
+    public string MoveUpToolTip => CanMoveSelected ? "고른 문구를 위로 (Alt+↑)" : MoveBlockedReason;
+    public string MoveDownToolTip => CanMoveSelected ? "고른 문구를 아래로 (Alt+↓)" : MoveBlockedReason;
+
+    /// <summary>줄 안의 [수정] — 읽기 전용이면 고칠 수 없으므로 "보기" 라고 말한다.</summary>
+    public string RowEditText => CanEdit ? "수정" : "보기";
+
+    /// <summary>줄 안의 [삭제] 도움말 — 꺼져 있으면 까닭을 말한다(A4).</summary>
+    public string RowDeleteToolTip => CanDeletePermission ? "이 문구를 삭제합니다"
+        : IsUnsupported ? UnsupportedText : "문구를 삭제할 권한이 없습니다.";
+
     private bool _isBusy;
     public bool IsBusy
     {
@@ -170,7 +186,21 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     /// <summary>G1 ⓑ — 조회 실패와 "정말 없음"을 다른 글로 가른다. 하드코딩 폴백은 쓰지 않는다
     /// (서버에서 지운 문구가 되살아나 저장되는 결함을 반복하지 않는다).</summary>
-    public string EmptyStateText => LoadError ?? "등록된 문구가 없습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
+    public string EmptyStateText => LoadError ?? "등록된 문구가 없습니다.";
+
+    /// <summary>빈 상태의 둘째 줄 — 다음에 무엇을 하면 되는지.</summary>
+    public string EmptyStateHint
+    {
+        get
+        {
+            if (IsUnsupported) return string.Empty;
+            if (!CanViewPermission) return "관리자에게 조치보고 조회 권한을 요청하세요.";
+            if (LoadError != null) return "툴바의 새로 고침(⟳)을 눌러 다시 시도하세요. 문구 없이도 조치보고는 직접 입력으로 쓸 수 있습니다.";
+            return CanAdd
+                ? "[새 문구]로 등록하세요. 문구 없이도 조치보고는 직접 입력으로 쓸 수 있습니다."
+                : "문구 없이도 조치보고는 직접 입력으로 쓸 수 있습니다.";
+        }
+    }
 
     private ActionReportTemplateItem? _selectedItem;
     public ActionReportTemplateItem? SelectedItem
@@ -189,6 +219,9 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     private void OnSelectionChanged()
     {
+        // 앞 줄에서 한 일("등록을 취소했습니다." 등)을 다른 줄의 바닥 막대에 남겨 두지 않는다.
+        // (등록 · 수정 뒤에는 SelectById 다음에 Settle 이 오므로 그 알림은 지워지지 않는다.)
+        Detail.LastMessage = null;
         Detail.IsCreating = false;
         Detail.SelectedCount = SelectedItem is null ? 0 : 1;
         Detail.SingleTitle = SelectedItem?.Content ?? string.Empty;
@@ -244,7 +277,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             else
             {
                 _log?.Warning($"[ActionReportTemplate] Reorder 실패: {res.ErrorText()}");
-                StatusText = "순서 변경 중 오류가 발생했습니다. 서버 순서를 다시 불러옵니다.";
+                StatusText = "순서를 바꾸지 못해 목록을 다시 불러왔습니다. 잠시 후 다시 시도하세요.";
                 _undoOrder = null;
                 await LoadAsync();
             }
@@ -252,7 +285,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         catch (Exception ex)
         {
             _log?.Error($"[ActionReportTemplate] Reorder: {ex.Message}");
-            StatusText = "순서 변경 중 오류가 발생했습니다. 서버 순서를 다시 불러옵니다.";
+            StatusText = "순서를 바꾸지 못해 목록을 다시 불러왔습니다. 잠시 후 다시 시도하세요.";
             _undoOrder = null;
             await LoadAsync();
         }
@@ -326,9 +359,10 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 await LoadAsync();
                 StatusText = "문구를 삭제했습니다.";
             }
+            else _log?.Warning($"[ActionReportTemplate] 삭제 실패({res.StatusCode}): {res.ErrorText()}");
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "문구를 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = MapError(res.StatusCode, res.ErrorText("삭제하지 못했습니다.")) };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = MapError(res.StatusCode, "문구를 삭제하지 못했습니다.") };
         }
         catch (Exception ex)
         {
@@ -361,16 +395,34 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             NotifyOfPropertyChange(nameof(DraftContentCountText));
             NotifyOfPropertyChange(nameof(DraftValidationError));
             NotifyOfPropertyChange(nameof(IsContentTouched));
-            if (!_isLoadingDraft) Detail.Tracker.Touch(FieldContent, original, _draftContent, hasOriginal: !wasCreate);
+            if (!_isLoadingDraft)
+            {
+                _showValidation = true;   // 사람이 한 글자라도 손댄 뒤부터 검증 문구를 보인다(A6)
+                Detail.Tracker.Touch(FieldContent, original, _draftContent, hasOriginal: !wasCreate);
+            }
+            NotifyOfPropertyChange(nameof(DraftValidationMessage));
         }
     }
 
     private void SetDraftContentQuiet(string value)
     {
         _isLoadingDraft = true;
-        try { DraftContent = value; }
+        try
+        {
+            _showValidation = false;      // 새로 연 폼은 아직 아무것도 안 적었다 — 빨간 글로 맞이하지 않는다
+            DraftContent = value;
+            NotifyOfPropertyChange(nameof(DraftValidationMessage));
+        }
         finally { _isLoadingDraft = false; }
     }
+
+    /// <summary>
+    /// 화면에 보일 검증 문구 — 첫 입력 또는 [등록]/[적용] 시도 <b>뒤에만</b> 보인다(A6: 새 문구 폼을 열자마자
+    /// "문구를 입력하세요." 가 빨갛게 떴다). [등록] 단추는 그 전에도 <see cref="DetailCanApply"/> 로 조용히 꺼져 있다.
+    /// </summary>
+    public string? DraftValidationMessage => _showValidation ? DraftValidationError : null;
+
+    private bool _showValidation;
 
     public string DraftContentCountText => $"{(DraftContent ?? string.Empty).Trim().Length} / {MaxContentLength}자";
 
@@ -398,7 +450,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     public async Task ApplyAsync()
     {
         if (!CanEdit) { Detail.Settle(IsUnsupported ? UnsupportedText : "편집 권한이 없습니다."); RaiseAll(); return; }
-        if (DraftValidationError != null) { Detail.Settle(DraftValidationError); RaiseAll(); return; }
+        if (DraftValidationError != null) { _showValidation = true; Detail.Settle(DraftValidationError); RaiseAll(); return; }
         if (IsBusy) return;
 
         var content = DraftContent.Trim();
@@ -411,7 +463,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 var res = await _api.CreateTemplateAsync(new ActionReportTemplateCreateDto { Content = content, DisplayOrder = nextOrder });
                 if (!res.Success || res.Data is null)
                 {
-                    Detail.Settle(MapError(res.StatusCode, res.ErrorText("등록하지 못했습니다.")));
+                    _log?.Warning($"[ActionReportTemplate] 등록 실패({res.StatusCode}): {res.ErrorText()}");
+                    Detail.Settle(MapError(res.StatusCode, "문구를 등록하지 못했습니다."));
                     return;
                 }
                 IsBusy = false;   // LoadAsync 가 자기 재진입 가드로 스스로 막지 않도록 먼저 내린다.
@@ -427,7 +480,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 var res = await _api.UpdateTemplateAsync(item.Id, new ActionReportTemplateUpdateDto { Content = content });
                 if (!res.Success || res.Data is null)
                 {
-                    Detail.Settle(MapError(res.StatusCode, res.ErrorText("적용하지 못했습니다.")));
+                    _log?.Warning($"[ActionReportTemplate] 수정 실패({res.StatusCode}): {res.ErrorText()}");
+                    Detail.Settle(MapError(res.StatusCode, "문구를 고치지 못했습니다."));
                     return;
                 }
                 IsBusy = false;
@@ -457,7 +511,21 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     }
 
     private void OnDetailChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        => NotifyOfPropertyChange(nameof(DetailCanApply));
+    {
+        NotifyOfPropertyChange(nameof(DetailCanApply));
+        NotifyOfPropertyChange(nameof(DetailFooterText));
+    }
+
+    /// <summary>
+    /// 바닥 막대 글. 등록 폼의 커널 기본 글("등록 전에는 목록에 나타나지 않습니다")은 360 서랍의 막대(단추 둘 옆)에서
+    /// "않습 / 니다" 로 갈렸다 — 같은 뜻을 한 줄 길이로 말한다. 나머지 상태는 커널 글 그대로.
+    /// </summary>
+    public string DetailFooterText => Detail.State == ConsoleDetailState.Create
+                                      && Detail.FooterText == ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Create, 0)
+        ? CreateFooterText
+        : Detail.FooterText;
+
+    public const string CreateFooterText = "등록해야 목록에 나타납니다";
     #endregion
 
     #region - Status bar -
@@ -496,9 +564,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 _log?.Warning($"[ActionReportTemplate] 조회 실패: {res.ErrorText()}");
                 // 구 서버(운영 6.3.2)는 이 라우터가 없다 — 목록 404 를 서비스가 NOT_SUPPORTED 로 번역한다.
                 // "불러오지 못했다"(일시 장애)로 뭉개면 [추가] 가 켜진 채 남아 누를 때마다 404 가 된다.
-                LoadError = IsUnsupported
-                    ? UnsupportedText
-                    : "문구 목록을 불러오지 못했습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
+                LoadError = IsUnsupported ? UnsupportedText : LoadFailedText;
             }
             if (keepId.HasValue) SelectById(keepId.Value);
         }
@@ -506,7 +572,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         {
             _log?.Error($"[ActionReportTemplate] Load: {ex.Message}");
             Board.Load(Enumerable.Empty<ActionReportTemplateDto>());
-            LoadError = "문구 목록을 불러오지 못했습니다. 직접 입력으로 조치보고를 계속할 수 있습니다.";
+            LoadError = LoadFailedText;
         }
         finally
         {
@@ -527,7 +593,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             404 => "다른 곳에서 삭제된 문구입니다. 목록을 다시 불러옵니다.",
             422 => "문구는 1~500자여야 합니다.",
             403 => "문구 편집 권한이 없습니다.",
-            _ => string.IsNullOrWhiteSpace(fallback) ? "요청을 처리하지 못했습니다." : fallback,
+            // 서버 원문은 화면에 붙이지 않는다(호출부가 로그에 남긴다) — 무엇이 안 됐고 어떻게 하면 되는지만.
+            _ => $"{fallback} 잠시 후 다시 시도하세요.",
         };
     }
 
@@ -538,7 +605,10 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// </summary>
     public bool IsUnsupported => _api.IsSupported == false;
 
-    public const string UnsupportedText = "이 서버는 조치보고 문구 관리를 지원하지 않습니다. 서버를 업그레이드한 뒤 사용할 수 있습니다.";
+    /// <summary>A8 — 판본 · 업그레이드 같은 공급사 쪽 사정은 말하지 않는다. 운영자가 할 수 있는 일만.</summary>
+    public const string UnsupportedText = "이 서버에서는 조치보고 문구 관리를 사용할 수 없습니다. 관리자에게 문의하세요.";
+
+    public const string LoadFailedText = "문구 목록을 불러오지 못했습니다.";
     #endregion
 
     #region - Permissions -
@@ -581,11 +651,28 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         NotifyOfPropertyChange(nameof(DraftContentCountText));
         NotifyOfPropertyChange(nameof(DraftValidationError));
         NotifyOfPropertyChange(nameof(StatusText));
+        NotifyOfPropertyChange(nameof(DraftValidationMessage));
+        NotifyOfPropertyChange(nameof(EmptyStateHint));
+        NotifyOfPropertyChange(nameof(CanMoveSelected));
+        NotifyOfPropertyChange(nameof(MoveBlockedReason));
+        NotifyOfPropertyChange(nameof(MoveUpToolTip));
+        NotifyOfPropertyChange(nameof(MoveDownToolTip));
+        NotifyOfPropertyChange(nameof(RowEditText));
+        NotifyOfPropertyChange(nameof(RowDeleteToolTip));
+        NotifyOfPropertyChange(nameof(DetailFooterText));
     }
     #endregion
 
     #region - Attributes -
     public Task Close() => TryCloseAsync();
+
+    /// <summary>
+    /// 적용하지 않은 문구가 있으면 닫지 않는다 — 바닥 막대가 흔들리며 "적용하거나 되돌린 뒤 이동하세요" 라고 말한다
+    /// (저장 안 한 변경을 말없이 버리지 않는다. 선례: 이벤트 매핑 워크벤치). 읽기 전용이면 붙잡지 않는다 —
+    /// 저장할 길이 없는데 닫기까지 막으면 창을 닫을 방법이 사라진다.
+    /// </summary>
+    public override Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(!Detail.IsDirty || Detail.IsReadOnly || Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow));
     public string PanelTitle => "조치보고 문구";
 
     private readonly IPermissionService _permission;

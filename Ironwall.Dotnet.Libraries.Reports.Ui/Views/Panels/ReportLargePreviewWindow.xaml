@@ -30,12 +30,14 @@
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,0,0,1">
 			<DockPanel LastChildFill="True">
+				<!--  R32 — 다른 콘솔과 같은 ✕(커널 Console.Button.Close). 글자 "닫기" 고스트 단추는 이 창에만 있었다.  -->
 				<Button
+					Margin="6,0,0,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.CloseButton"
+					AutomationProperties.Name="미리보기 닫기"
 					Click="OnClose"
-					Content="닫기"
 					DockPanel.Dock="Right"
-					Style="{StaticResource Console.Button.Ghost}" />
+					Style="{StaticResource Console.Button.Close}" />
 				<Button
 					Margin="0,0,6,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.ZoomResetButton"
@@ -63,7 +65,7 @@
 					FontSize="13"
 					FontWeight="Medium"
 					Foreground="{DynamicResource TextPrimaryBrush}"
-					Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+					Text="{Binding ReportTitle, RelativeSource={RelativeSource AncestorType=Window}}"
 					TextTrimming="CharacterEllipsis" />
 			</DockPanel>
 		</Border>

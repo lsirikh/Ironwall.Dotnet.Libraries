@@ -27,7 +27,7 @@
 	</UserControl.Resources>
 
 	<StackPanel>
-		<c:ConsoleSection Header="무엇을 만들까">
+		<c:ConsoleSection Header="보고서 종류">
 			<StackPanel>
 				<c:ConsoleField ApiName="report_type" Header="유형">
 					<StackPanel>
@@ -67,7 +67,7 @@
 							Margin="0,4,0,0"
 							FontSize="11"
 							Foreground="{DynamicResource TextMutedBrush}"
-							Text="저장된 템플릿이 없습니다 — 레일의 [템플릿] 에서 먼저 만듭니다"
+							Text="저장된 템플릿이 없습니다. 왼쪽 [템플릿]에서 먼저 만드세요."
 							TextWrapping="Wrap">
 							<TextBlock.Style>
 								<Style TargetType="TextBlock">
@@ -115,7 +115,7 @@
 				</c:ConsoleField>
 
 				<c:ConsoleField
-					ApiName="period_type 값"
+					ApiName="period_type"
 					Header="기간"
 					Visibility="{Binding CreateViewModel.IsPreset, Converter={StaticResource BoolToVisibility}}">
 					<ComboBox
@@ -127,25 +127,53 @@
 						SelectedItem="{Binding CreateViewModel.SelectedPeriod}" />
 				</c:ConsoleField>
 
+				<!--
+					R23 — 시작 · 종료를 한 줄에 128 + 128 로 나란히 두면 값 칸(도킹 380 → 약 246, 서랍 360 → 약 226)보다
+					넓어(약 276) 종료일 칸이 잘렸다. 두 줄로 쌓고 칸 폭을 값 칸에 맞춘다 — 어느 폭에서도 잘리지 않는다.
+				-->
 				<c:ConsoleField
 					ApiName="start_date · end_date"
-					Header="시작 · 끝"
+					Header="시작 · 종료"
 					Visibility="{Binding CreateViewModel.IsCustomRange, Converter={StaticResource BoolToVisibility}}">
-					<StackPanel Orientation="Horizontal">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Margin="0,0,8,0"
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="시작" />
 						<DatePicker
-							Width="128"
+							Grid.Row="0"
+							Grid.Column="1"
 							AutomationProperties.AutomationId="Reports.Create.StartDatePicker"
+							AutomationProperties.Name="시작일"
 							SelectedDate="{Binding CreateViewModel.StartDate}" />
 						<TextBlock
-							Margin="6,0"
+							Grid.Row="1"
+							Grid.Column="0"
+							Margin="0,6,8,0"
 							VerticalAlignment="Center"
-							Foreground="{DynamicResource TextMutedBrush}"
-							Text="~" />
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="종료" />
 						<DatePicker
-							Width="128"
+							Grid.Row="1"
+							Grid.Column="1"
+							Margin="0,6,0,0"
 							AutomationProperties.AutomationId="Reports.Create.EndDatePicker"
+							AutomationProperties.Name="종료일"
 							SelectedDate="{Binding CreateViewModel.EndDate}" />
-					</StackPanel>
+					</Grid>
 				</c:ConsoleField>
 			</StackPanel>
 		</c:ConsoleSection>

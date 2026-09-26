@@ -686,7 +686,7 @@ public class ReportConsoleTests : IDisposable
 
         Assert.True(rig.Console.Detail.IsDirty);
         Assert.Equal("고친 이름", rig.Console.EditViewModel.Name);
-        Assert.Contains("저장 실패", rig.Console.EditViewModel.StatusText);
+        Assert.Contains("저장하지 못했습니다", rig.Console.EditViewModel.StatusText);
     }
 
     [Fact]
@@ -867,7 +867,7 @@ public class ReportConsoleTests : IDisposable
         await rig.Console.ApplyAsync();
 
         Assert.Null(rig.Api.LastGenerate);
-        Assert.Contains("끝일", rig.Console.CreateViewModel.StatusText);
+        Assert.Contains("종료일", rig.Console.CreateViewModel.StatusText);
     }
 
     [Fact]

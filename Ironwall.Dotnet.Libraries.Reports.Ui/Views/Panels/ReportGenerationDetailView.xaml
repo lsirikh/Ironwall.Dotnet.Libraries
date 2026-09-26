@@ -182,34 +182,62 @@
 						Content="PDF 내려받기"
 						IsEnabled="{Binding CanDownloadPdf}"
 						Style="{StaticResource Console.Button}" />
+				</WrapPanel>
+
+				<!--
+					R21 — 상세 CSV 는 [유형 ▾] 와 [내려받기] 가 한 묶음이다. 한 WrapPanel 에 섞어 두면 좁은 칸에서
+					[상세 CSV] 만 다음 줄로 떨어져 제 콤보와 갈라졌다. 제 줄 하나를 주고 이름표를 붙인다.
+				-->
+				<DockPanel Margin="0,0,0,6" LastChildFill="False">
+					<TextBlock
+						Margin="0,0,8,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="상세 CSV" />
 					<ComboBox
-						Width="92"
-						Margin="0,0,6,6"
+						Width="96"
+						Margin="0,0,6,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Reports.Preview.CsvTypeComboBox"
+						AutomationProperties.Name="상세 CSV 유형"
 						DisplayMemberPath="Display"
+						DockPanel.Dock="Left"
 						FontSize="12"
 						ItemsSource="{Binding PreviewViewModel.CsvTypes}"
 						SelectedItem="{Binding PreviewViewModel.SelectedCsvType}"
-						ToolTip="상세 CSV 유형(8종)" />
+						ToolTip="내려받을 상세 자료의 종류" />
 					<Button
-						Margin="0,0,6,6"
 						AutomationProperties.AutomationId="Reports.Preview.DownloadCsvButton"
 						Click="OnDownloadCsv"
-						Content="상세 CSV"
+						Content="내려받기"
+						DockPanel.Dock="Left"
 						IsEnabled="{Binding CanDownloadPdf}"
-						Style="{StaticResource Console.Button}" />
-				</WrapPanel>
+						Style="{StaticResource Console.Button}"
+						ToolTip="고른 종류의 상세 자료를 CSV 파일로 내려받습니다" />
+				</DockPanel>
 
 				<!--  결과 안내는 팝업이 아니라 인라인 — WebView2 가 팝업을 가린다(L1290)  -->
+				<!--  R16 — 성공은 보조 글자 + ✓, 실패만 위험색 + ▲. 예전엔 "저장했습니다" 도 빨갛게 찍혔다.  -->
 				<TextBlock
 					Margin="0,2,0,0"
 					AutomationProperties.AutomationId="Reports.Detail.ActionStatusText"
 					FontSize="11.5"
-					Foreground="{DynamicResource StatusCriticalBrush}"
-					Text="{Binding ListViewModel.ActionStatus}"
 					TextWrapping="Wrap"
-					Visibility="{Binding ListViewModel.HasActionStatus, Converter={StaticResource BoolToVisibility}}" />
+					Visibility="{Binding ListViewModel.HasActionStatus, Converter={StaticResource BoolToVisibility}}">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding ListViewModel.ActionStatusIsError}" Value="True">
+									<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+					<Run Text="{Binding ListViewModel.ActionStatusGlyph, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding ListViewModel.ActionStatus, Mode=OneWay}" />
+				</TextBlock>
 			</StackPanel>
 		</c:ConsoleSection>
 
@@ -224,7 +252,7 @@
 						Content="생성 취소"
 						IsEnabled="{Binding CanCancelGeneration}"
 						Style="{StaticResource Console.Button}"
-						ToolTip="대기 · 생성중인 보고서만 취소할 수 있습니다" />
+						ToolTip="대기 · 생성 중인 보고서만 취소할 수 있습니다" />
 					<Button
 						AutomationProperties.AutomationId="Reports.List.DeleteButton"
 						Click="OnDeleteGeneration"
@@ -233,11 +261,12 @@
 						Style="{StaticResource Console.Button}"
 						ToolTip="보고서 기록과 PDF 파일을 지웁니다" />
 				</WrapPanel>
+				<!--  R14 — 미리보기(공역) 사정은 운영자에게 설명하지 않는다. 확인을 받는다는 사실만.  -->
 				<TextBlock
 					Margin="0,6,0,0"
 					FontSize="11"
 					Foreground="{DynamicResource TextMutedBrush}"
-					Text="확인 창이 먼저 뜹니다. 그동안 미리보기는 내려갑니다."
+					Text="생성 취소 · 삭제는 확인을 받은 뒤 실행합니다."
 					TextWrapping="Wrap" />
 			</StackPanel>
 		</c:ConsoleSection>

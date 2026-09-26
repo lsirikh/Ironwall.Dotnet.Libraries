@@ -72,7 +72,7 @@ public class ReportStatusChipTests
         var chips = ReportStatusChipRules.Create();
 
         Assert.Equal(new[] { "PENDING", "GENERATING", "COMPLETED", "FAILED", "CANCELLED" }, chips.Select(c => c.Value).ToArray());
-        Assert.Equal(new[] { "대기", "생성중", "완료", "실패", "취소" }, chips.Select(c => c.Display).ToArray());
+        Assert.Equal(new[] { "대기", "생성 중", "완료", "실패", "취소" }, chips.Select(c => c.Display).ToArray());
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class ReportGenerationRowTests
         // 배포본 생성 이력 응답에는 error_message 키가 없다(18키 실측) — 공백으로 뭉개지 않는다.
         var row = new ReportGenerationRow(ReportSeed.Generation(1, "a", "FAILED"));
 
-        Assert.Contains("사유를 제공하지 않았습니다", row.FailureText);
+        Assert.Equal(ReportGenerationRow.MissingFailureReasonText, row.FailureText);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public class ReportGenerationRowTests
         var dto = ReportSeed.Generation(1, "a", "GENERATING", 30);
         dto.ProgressUpdatedAt = null;
 
-        Assert.Contains("갱신 시각 미제공", new ReportGenerationRow(dto).ProgressDetailText);
+        Assert.Contains(ReportGenerationRow.MissingProgressTimeText, new ReportGenerationRow(dto).ProgressDetailText);
     }
 
     [Fact]

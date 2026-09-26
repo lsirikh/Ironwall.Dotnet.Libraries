@@ -70,23 +70,24 @@ public readonly record struct ReportPreviewSurface(ReportPreviewMode Mode, strin
 /// </remarks>
 public static class ReportPreviewSurfaceRules
 {
+    // 문구 원칙(완성도 패스 R15) — 운영자에게 구현 사정(WebView2 · 네이티브 창 · 공역)을 설명하지 않는다.
+    // 무엇이 안 보이는지와 무엇을 하면 되는지만 말한다.
     public const string NoSelectionReason = "보고서를 고르면 여기에 미리보기가 나옵니다";
-    public const string RuntimeMissingReason = "이 PC 에 WebView2 런타임이 없어 미리보기를 그릴 수 없습니다";
-    public const string RuntimeMissingHint = "[PDF 내려받기] 로 내용을 확인하세요";
+    public const string RuntimeMissingReason = "이 PC에서는 미리보기를 표시할 수 없습니다";
+    public const string RuntimeMissingHint = "[PDF 내려받기]로 내용을 확인하세요";
     public const string LargeViewReason = "큰 창에서 보고 있습니다";
     public const string LargeViewHint = "그 창을 닫으면 미리보기가 이 자리로 돌아옵니다";
-    public const string OverlayReason = "확인 창이 열려 있는 동안 미리보기를 잠시 내렸습니다";
-    public const string OverlayHint = "미리보기가 네이티브 창이라 확인 창을 가리기 때문입니다";
+    public const string OverlayReason = "확인 창을 닫으면 미리보기가 다시 나타납니다";
     // 짧게 둔다 — WPF 는 한글을 음절 단위로 끊으므로, 좁은 칸에서 긴 문장은 마지막 줄에
     // 음절 하나만 남긴다(접힘 900 에서 "…없습니 / 다" 로 갈라졌다).
-    public const string NarrowReason = "창이 좁아 여기서는 미리보기를 못 그립니다";
-    public const string NarrowHint = "[크게 보기] 를 누르면 큰 창으로 봅니다";
+    public const string NarrowReason = "창이 좁아 이 칸에는 미리보기를 싣지 않습니다";
+    public const string NarrowHint = "[크게 보기]를 누르면 별도 창으로 볼 수 있습니다";
     public const string InProgressReason = "아직 만들어지는 중입니다";
-    public const string InProgressHint = "아래 진행 상황이 단계와 퍼센트를 보여 줍니다";
+    public const string InProgressHint = "아래 진행 상황에서 단계와 진행률을 볼 수 있습니다";
     public const string FailedReason = "생성에 실패한 보고서입니다";
     public const string FailedHint = "아래 사유를 확인하고 다시 생성하세요";
     public const string CancelledReason = "생성이 취소된 보고서입니다";
-    public const string CancelledHint = "[새 보고서] 에서 다시 만들 수 있습니다";
+    public const string CancelledHint = "[새 보고서]에서 다시 만들 수 있습니다";
     public const string LoadingReason = "미리보기를 불러오는 중입니다";
 
     /// <summary>
@@ -115,19 +116,23 @@ public static class ReportPreviewSurfaceRules
             return ReportPreviewSurface.Placeholder(LargeViewReason, LargeViewHint);
 
         if (isBlockingOverlayOpen)
-            return ReportPreviewSurface.Placeholder(OverlayReason, OverlayHint);
+            return ReportPreviewSurface.Placeholder(OverlayReason);
+
+        // 애초에 그릴 것이 없는 보고서(진행 중 · 실패 · 취소)는 폭과 상관없이 그 까닭을 먼저 말한다 —
+        // 좁은 창에서 "[크게 보기]를 누르세요" 라고 하면 꺼져 있는 단추를 가리키게 된다(큰 창은 완료본만 연다).
+        switch (content)
+        {
+            case ReportPreviewContent.InProgress: return ReportPreviewSurface.Placeholder(InProgressReason, InProgressHint);
+            case ReportPreviewContent.Failed: return ReportPreviewSurface.Placeholder(FailedReason, FailedHint);
+            case ReportPreviewContent.Cancelled: return ReportPreviewSurface.Placeholder(CancelledReason, CancelledHint);
+        }
 
         if (layout != ConsoleLayoutMode.Docked)
             return ReportPreviewSurface.Placeholder(NarrowReason, NarrowHint);
 
-        return content switch
-        {
-            ReportPreviewContent.InProgress => ReportPreviewSurface.Placeholder(InProgressReason, InProgressHint),
-            ReportPreviewContent.Failed => ReportPreviewSurface.Placeholder(FailedReason, FailedHint),
-            ReportPreviewContent.Cancelled => ReportPreviewSurface.Placeholder(CancelledReason, CancelledHint),
-            ReportPreviewContent.Loading => ReportPreviewSurface.Placeholder(LoadingReason),
-            _ => ReportPreviewSurface.Live,
-        };
+        return content == ReportPreviewContent.Loading
+            ? ReportPreviewSurface.Placeholder(LoadingReason)
+            : ReportPreviewSurface.Live;
     }
 
     /// <summary>

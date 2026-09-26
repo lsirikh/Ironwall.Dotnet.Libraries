@@ -69,13 +69,18 @@ public class ReportTemplateViewModel : BasePanelViewModel
             {
                 // 사유는 ApiErrorTextHelper 로 — 배포본 400·404 봉투에는 top-level message 가 없다.
                 _log?.Warning($"[ReportTemplate] 조회 실패: {res.ErrorText()}");
-                LoadError = "서버에 연결하지 못했습니다. 잠시 후 [갱신]을 눌러 다시 시도하세요.";
+                LoadError = "서버에 연결하지 못했습니다. 잠시 후 툴바의 새로 고침(⟳)을 눌러 다시 시도하세요.";
             }
             ApplyFilter();
             // 선택은 Id 로 되살린다 — 재적재한 항목은 다른 인스턴스라 참조로 두면 선택이 풀린다.
             if (keepId.HasValue) SelectById(keepId.Value);
         }
-        catch (Exception ex) { _log?.Error($"[ReportTemplate] Load: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ReportTemplate] Load: {ex.Message}");
+            LoadError = "템플릿 목록을 불러오지 못했습니다. 잠시 후 툴바의 새로 고침(⟳)을 눌러 다시 시도하세요.";
+            ApplyFilter();
+        }
         finally { IsBusy = false; }
     }
 
@@ -102,6 +107,8 @@ public class ReportTemplateViewModel : BasePanelViewModel
         if (keep != null && !Rows.Contains(keep)) SelectedItem = null;
         NotifyOfPropertyChange(nameof(IsEmpty));
         NotifyOfPropertyChange(nameof(CountText));
+        NotifyOfPropertyChange(nameof(EmptyStateText));
+        NotifyOfPropertyChange(nameof(EmptyStateHint));
     }
 
     private bool Matches(ReportTemplateDto t)
@@ -151,7 +158,8 @@ public class ReportTemplateViewModel : BasePanelViewModel
             }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "템플릿을 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.ErrorText("삭제하지 못했습니다.") };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = "템플릿을 삭제하지 못했습니다. 잠시 후 다시 시도하세요." };
+            if (!res.Success) _log?.Warning($"[ReportTemplate] 삭제 실패(id={item.Id}): {res.ErrorText()}");
         }
         catch (Exception ex)
         {
@@ -200,8 +208,14 @@ public class ReportTemplateViewModel : BasePanelViewModel
 
     private string? _loadError;
     /// <summary>조회 실패 사유 — 빈 목록을 "템플릿 없음"과 구분해 안내.</summary>
-    public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); } }
+    public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); NotifyOfPropertyChange(nameof(EmptyStateHint)); } }
     public string EmptyStateText => LoadError ?? (string.IsNullOrWhiteSpace(SearchText) ? "저장된 템플릿이 없습니다." : "검색과 맞는 템플릿이 없습니다.");
+
+    /// <summary>빈 상태의 둘째 줄 — 다음에 무엇을 하면 되는지.</summary>
+    public string EmptyStateHint => !CanView ? "관리자에게 보고서 조회 권한을 요청하세요."
+        : LoadError != null ? string.Empty
+        : !string.IsNullOrWhiteSpace(SearchText) ? "검색어를 바꾸거나 지워 보세요."
+        : "[새 템플릿]으로 자주 쓰는 구성을 저장할 수 있습니다.";
 
     private ReportTemplateDto? _selectedItem;
     public ReportTemplateDto? SelectedItem

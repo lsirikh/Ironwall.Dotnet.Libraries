@@ -77,6 +77,7 @@ public class ReportListViewModel : BasePanelViewModel
             if (res.Success && res.Data != null)
             {
                 foreach (var row in ReportGenerationRow.From(res.Data)) Items.Add(row);
+                ApplyTemplateNames();
                 LoadError = null;
                 // v8.0 배포본은 pagination 을 실제 총계로 채운다(실측). 구 판본은 null → 화면 건수로 대체한다.
                 TotalCount = res.Pagination?.Total ?? res.Total;
@@ -88,12 +89,18 @@ public class ReportListViewModel : BasePanelViewModel
                 TotalCount = null;
                 LoadError = res.Error?.Code == "VALUE_NOT_ALLOWED"
                     ? "상태 필터 값이 올바르지 않습니다. 칩을 다시 눌러 보세요."
-                    : "서버에 연결하지 못했습니다. 잠시 후 [갱신]을 눌러 다시 시도하세요.";
+                    : "서버에 연결하지 못했습니다. 잠시 후 툴바의 새로 고침(⟳)을 눌러 다시 시도하세요.";
             }
             ApplyFilter();
             _log?.Info($"[ReportList] 목록 로드 — 표시 {Rows.Count}건 / 받은 {Items.Count}건 / 총 {TotalCount?.ToString() ?? "미제공"}(필터={status ?? ReportStatusChipRules.AllLabel})");
         }
-        catch (Exception ex) { _log?.Error($"[ReportList] LoadAsync: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ReportList] LoadAsync: {ex.Message}");
+            // 예외로 끝났는데 빈 목록을 "생성된 보고서가 없습니다" 로 보이면 거짓이다.
+            LoadError = "보고서 목록을 불러오지 못했습니다. 잠시 후 툴바의 새로 고침(⟳)을 눌러 다시 시도하세요.";
+            ApplyFilter();
+        }
         finally { IsBusy = false; }
     }
 
@@ -123,6 +130,8 @@ public class ReportListViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(IsEmpty));
         NotifyOfPropertyChange(nameof(CountText));
         NotifyOfPropertyChange(nameof(InProgressCount));
+        NotifyOfPropertyChange(nameof(EmptyStateText));
+        NotifyOfPropertyChange(nameof(EmptyStateHint));
     }
 
     /// <summary>선택 보고서 다운로드(PDF) → SaveFileDialog → 저장.</summary>
@@ -139,7 +148,7 @@ public class ReportListViewModel : BasePanelViewModel
                 // ⚠ 팝업을 쓰지 않는다 — 상세 칸에 미리보기(WebView2)가 떠 있으면 팝업이 그 뒤로 깔린다.
                 //    미완료(400)와 파일 유실(410 PDF_FILE_MISSING)은 API 서비스가 이미 다른 문구로 갈라 준다(WL L1281).
                 _log?.Warning($"[ReportList] 다운로드 실패: {result.Error}");
-                ActionStatus = ApiErrorTextHelper.Or(result.Error, "다운로드하지 못했습니다.");
+                SetActionStatus(DownloadFailureText(result.Error, "PDF"), isError: true);
                 return;
             }
             var dlg = new Microsoft.Win32.SaveFileDialog
@@ -152,11 +161,11 @@ public class ReportListViewModel : BasePanelViewModel
             if (dlg.ShowDialog() == true)
             {
                 await File.WriteAllBytesAsync(dlg.FileName, result.Bytes);
-                ActionStatus = "PDF 를 저장했습니다.";
+                SetActionStatus("PDF를 저장했습니다.", isError: false);
                 _log?.Info($"[ReportList] 저장 완료: {dlg.FileName}");
             }
         }
-        catch (Exception ex) { _log?.Error($"[ReportList] Download: {ex.Message}"); ActionStatus = "다운로드 중 오류가 발생했습니다."; }
+        catch (Exception ex) { _log?.Error($"[ReportList] Download: {ex.Message}"); SetActionStatus("PDF를 내려받지 못했습니다. 잠시 후 다시 시도하세요.", isError: true); }
     }
 
     /// <summary>상세 CSV 다운로드(선택 유형, 8종 닫힌 값 — WL L1283).</summary>
@@ -171,7 +180,7 @@ public class ReportListViewModel : BasePanelViewModel
             if (!result.Success || result.Bytes is null)
             {
                 _log?.Warning($"[ReportList] CSV 실패: {result.Error}");
-                ActionStatus = "CSV 실패 — " + ApiErrorTextHelper.Or(result.Error, "다운로드하지 못했습니다.");
+                SetActionStatus(DownloadFailureText(result.Error, "CSV"), isError: true);
                 return;
             }
             var dlg = new Microsoft.Win32.SaveFileDialog
@@ -183,11 +192,11 @@ public class ReportListViewModel : BasePanelViewModel
             if (dlg.ShowDialog() == true)
             {
                 await File.WriteAllBytesAsync(dlg.FileName, result.Bytes);
-                ActionStatus = "CSV 를 저장했습니다.";
+                SetActionStatus("CSV를 저장했습니다.", isError: false);
                 _log?.Info($"[ReportList] CSV 저장: {dlg.FileName}");
             }
         }
-        catch (Exception ex) { _log?.Error($"[ReportList] DownloadCsv: {ex.Message}"); ActionStatus = "CSV 다운로드 중 오류가 발생했습니다."; }
+        catch (Exception ex) { _log?.Error($"[ReportList] DownloadCsv: {ex.Message}"); SetActionStatus("CSV를 내려받지 못했습니다. 잠시 후 다시 시도하세요.", isError: true); }
     }
 
     /// <summary>삭제 — 확인 팝업(확인 시 CallDelete… 발행 → IHandle 에서 수행).</summary>
@@ -247,7 +256,8 @@ public class ReportListViewModel : BasePanelViewModel
                         ? "취소로 표시했습니다. 진행 중이던 작업이 곧바로 멈추지 않을 수 있어 목록에서 상태를 확인하세요."
                         : "보고서 생성을 취소했습니다."
                 }
-                : new OpenInfoPopupMessageModel { Title = "취소 실패", Explain = res.ErrorText("취소하지 못했습니다.") };
+                : new OpenInfoPopupMessageModel { Title = "취소 실패", Explain = "보고서 생성을 취소하지 못했습니다. 목록을 새로 불러와 상태를 확인하세요." };
+            if (!res.Success) _log?.Warning($"[ReportList] 취소 실패(id={item.Id}): {res.ErrorText()}");
         }
         catch (Exception ex)
         {
@@ -281,7 +291,8 @@ public class ReportListViewModel : BasePanelViewModel
             }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "보고서를 삭제했습니다." }
-                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.ErrorText("삭제하지 못했습니다.") };
+                : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = "보고서를 삭제하지 못했습니다. 잠시 후 다시 시도하세요." };
+            if (!res.Success) _log?.Warning($"[ReportList] 삭제 실패(id={item.Id}): {res.ErrorText()}");
         }
         catch (Exception ex)
         {
@@ -360,16 +371,18 @@ public class ReportListViewModel : BasePanelViewModel
 
     private string? _loadError;
     /// <summary>목록 조회 실패 사유 — 빈 목록을 "보고서 없음"과 구분해 안내.</summary>
-    public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); } }
+    public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); NotifyOfPropertyChange(nameof(EmptyStateHint)); } }
 
     /// <summary>
     /// 빈 상태 문구. 검색은 <b>받아 온 최근 100건 안에서만</b> 거르므로 "없습니다" 라고 단정하지 않는다
     /// (더 오래된 보고서는 애초에 화면에 와 있지 않다).
     /// </summary>
     public string EmptyStateText => LoadError
-        ?? (string.IsNullOrWhiteSpace(SearchText)
-            ? "생성된 보고서가 없습니다."
-            : $"최근 {PageLimit}건 안에서 찾지 못했습니다. 더 오래된 보고서는 이 목록에 없습니다.");
+        ?? (!string.IsNullOrWhiteSpace(SearchText)
+            ? $"최근 {PageLimit}건 안에서 찾지 못했습니다. 더 오래된 보고서는 이 목록에 없습니다."
+            : StatusChips.Any(c => c.IsSelected)
+                ? $"'{FilterSummary}' 상태인 보고서가 없습니다."
+                : "생성된 보고서가 없습니다.");
 
     /// <summary>조회 권한 - 콘솔이 꽂아 준다. 거짓이면 목록도 내려받기도 하지 않는다.</summary>
     public bool CanView { get; set; } = true;
@@ -386,6 +399,71 @@ public class ReportListViewModel : BasePanelViewModel
         set { _actionStatus = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasActionStatus)); }
     }
     public bool HasActionStatus => !string.IsNullOrEmpty(ActionStatus);
+
+    private bool _actionStatusIsError;
+    /// <summary>
+    /// R16 — 결과 한 줄이 실패인가. 예전에는 "PDF 를 저장했습니다." 같은 성공도 위험색(빨강)으로 찍혔다.
+    /// 성공 = 보조 글자 + ✓, 실패 = 위험색 + ▲ (색만이 아니라 형태로도 가른다).
+    /// </summary>
+    public bool ActionStatusIsError
+    {
+        get => _actionStatusIsError;
+        private set { _actionStatusIsError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(ActionStatusGlyph)); }
+    }
+
+    public string ActionStatusGlyph => ActionStatusIsError ? "▲" : "✓";
+
+    private void SetActionStatus(string text, bool isError)
+    {
+        ActionStatusIsError = isError;
+        ActionStatus = text;
+    }
+
+    /// <summary>
+    /// 내려받기 실패 한 줄. API 서비스가 운영자용으로 따로 만든 "파일 유실"(410) 안내만 그대로 보이고, 나머지(서버 원문 ·
+    /// 예외 문구 — 호스트 · TLS 사정이 묻어 나온다)는 고정 문장으로 바꾼다. 원문은 호출부가 로그에 남긴다.
+    /// </summary>
+    internal static string DownloadFailureText(string? serviceError, string what)
+        => serviceError != null && serviceError.StartsWith(PdfMissingPrefix, StringComparison.Ordinal)
+            ? serviceError
+            : $"{what}를 내려받지 못했습니다. 완료된 보고서인지 확인하고 잠시 후 다시 시도하세요.";
+
+    /// <summary>Reports.Api <c>ReportApiService</c> 가 410 PDF_FILE_MISSING 에 싣는 운영자용 문장의 머리.</summary>
+    internal const string PdfMissingPrefix = "PDF 파일이 서버 저장소에서 사라졌습니다";
+
+    private IReadOnlyDictionary<int, string>? _templateNames;
+    /// <summary>
+    /// R17 — 템플릿 번호 → 이름. 콘솔이 템플릿 목록을 받은 뒤 꽂아 준다(<c>null</c> = 아직 모름 · 조회 실패).
+    /// 목록 · 상세의 "템플릿" 이 <c>#5</c> 대신 "월간 종합 보고서 (#5)" 가 된다.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? TemplateNames
+    {
+        get => _templateNames;
+        set { _templateNames = value; ApplyTemplateNames(); }
+    }
+
+    private void ApplyTemplateNames()
+    {
+        foreach (var row in Items)
+        {
+            string? name = null;
+            if (row.Dto.TemplateId is { } id) _templateNames?.TryGetValue(id, out name);
+            row.SetTemplateName(name, catalogKnown: _templateNames != null);
+        }
+    }
+
+    /// <summary>빈 상태의 둘째 줄 — 다음에 무엇을 하면 되는지.</summary>
+    public string EmptyStateHint
+    {
+        get
+        {
+            if (!CanView) return "관리자에게 보고서 조회 권한을 요청하세요.";
+            if (LoadError != null) return string.Empty;             // 조회 실패 문구가 이미 할 일을 말한다
+            if (!string.IsNullOrWhiteSpace(SearchText)) return "검색어를 바꾸거나 지워 보세요.";
+            if (StatusChips.Any(c => c.IsSelected)) return "상태 칩을 다시 눌러 전체 보고서를 보세요.";
+            return "[새 보고서]에서 보고서를 만들 수 있습니다.";
+        }
+    }
 
     private ReportGenerationRow? _selectedItem;
     public ReportGenerationRow? SelectedItem

@@ -64,7 +64,8 @@ public static class ReportColumnCatalog
         new ReportColumnSpec("component_count", "구성 수", "EffectiveComponentCount", ReportColumnKind.Mono, 74, true),
 
         new ReportColumnSpec("description", "설명", "Description", ReportColumnKind.Text, 200, false),
-        new ReportColumnSpec("created_at", "만든 날", "CreatedAt", ReportColumnKind.ServerTime, 150, false),
+        // R7 — 생성 이력과 같은 말("생성일시")로. ※ "기본기간" 은 호스트 UiTests(T-REP035)가 머리글을 그대로 짚어 둔다.
+        new ReportColumnSpec("created_at", "생성일시", "CreatedAt", ReportColumnKind.ServerTime, 150, false),
     };
 
     /// <summary>레일 키 → 그 화면의 열 명세.</summary>

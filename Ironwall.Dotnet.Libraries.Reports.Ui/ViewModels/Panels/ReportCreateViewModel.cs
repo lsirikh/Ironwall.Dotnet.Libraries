@@ -61,15 +61,23 @@ public class ReportCreateViewModel : BasePanelViewModel
             var prevId = SelectedTemplate?.Id;          // Clear 이전에 확보(바인딩이 null 로 되돌린다)
             var res = await _api.GetTemplatesAsync(1, 100);
             Templates.Clear();
+            TemplatesLoaded = res.Success && res.Data != null;
             if (res.Success && res.Data != null)
                 foreach (var t in res.Data) Templates.Add(t);
+            else _log?.Warning($"[ReportCreate] 템플릿 목록 조회 실패: {res.ErrorText()}");
 
             SelectedTemplate = (prevId.HasValue ? Templates.FirstOrDefault(t => t.Id == prevId.Value) : null)
                                ?? (Templates.Count > 0 ? Templates[0] : null);
             NotifyOfPropertyChange(nameof(HasTemplates));
         }
-        catch (Exception ex) { _log?.Error($"[ReportCreate] LoadTemplates: {ex.Message}"); }
+        catch (Exception ex) { TemplatesLoaded = false; _log?.Error($"[ReportCreate] LoadTemplates: {ex.Message}"); }
     }
+
+    /// <summary>
+    /// 템플릿 목록을 제대로 받았는가(마지막 시도 기준). 거짓이면 <see cref="Templates"/> 가 비어 있어도 "템플릿이 없다" 가
+    /// 아니라 "모른다" 다 — 생성 이력의 템플릿 이름 표시가 "삭제된 템플릿" 이라고 단정하지 않게 콘솔이 본다.
+    /// </summary>
+    public bool TemplatesLoaded { get; private set; }
 
     /// <summary>보고서 생성 요청 → 폴링(COMPLETED/FAILED).</summary>
     public async Task Generate()
@@ -80,15 +88,15 @@ public class ReportCreateViewModel : BasePanelViewModel
         if (IsTemplateBased && SelectedTemplate is null) { StatusText = "템플릿을 선택하세요."; return; }
         if (IsCustomRange)
         {
-            if (StartDate is null || EndDate is null) { StatusText = "시작일과 끝일을 지정하세요."; return; }
-            if (EndDate < StartDate) { StatusText = "끝일이 시작일보다 빠릅니다."; return; }
+            if (StartDate is null || EndDate is null) { StatusText = "시작일과 종료일을 지정하세요."; return; }
+            if (EndDate < StartDate) { StatusText = "종료일이 시작일보다 빠릅니다. 날짜를 다시 고르세요."; return; }
         }
 
         try
         {
             IsGenerating = true;
             GenProgress = 0;
-            StatusText = "보고서 생성 요청 중…";
+            StatusText = "보고서 생성을 요청하는 중…";
             var req = new ReportGenerateRequestDto
             {
                 ReportType = IsTemplateBased ? "CUSTOM" : "STANDARD",
@@ -105,15 +113,22 @@ public class ReportCreateViewModel : BasePanelViewModel
             var genRes = await _api.GenerateAsync(req);
             // 사유는 ApiErrorTextHelper 로 — 배포본 400·404 봉투에는 top-level message 가 없고(error.message 에만 있다)
             // 빈 문자열은 ?? 를 통과해 "생성 요청 실패: " 로 끝나 버린다.
-            if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.ErrorText("서버가 요청을 거부했습니다.")}"; IsGenerating = false; return; }
+            if (!genRes.Success || genRes.Data is null)
+            {
+                // 서버 원문은 로그로만 — 화면에는 무엇이 안 됐고 무엇을 하면 되는지(완성도 패스 문구 규칙).
+                _log?.Warning($"[ReportCreate] 생성 요청 거부: {genRes.ErrorText()}");
+                StatusText = GenerateRejectedText;
+                IsGenerating = false;
+                return;
+            }
 
             var id = genRes.Data.Id;
-            StatusText = "생성 중… (GENERATING)";
+            StatusText = "생성 중…";
             var completed = await PollUntilDoneAsync(id);
-            if (completed != null && completed.IsCompleted) { GenProgress = 100; StatusText = "완료됨."; Generated?.Invoke(id); }
+            if (completed != null && completed.IsCompleted) { GenProgress = 100; StatusText = "보고서를 만들었습니다."; Generated?.Invoke(id); }
             else if (completed != null && completed.IsCancelled) StatusText = CancelledStatus(completed);
-            else if (completed != null && completed.IsFailed) StatusText = $"실패: {new ReportGenerationRow(completed).FailureText}";
-            else StatusText = "시간 초과(폴링 중단). 목록에서 상태를 확인하세요.";
+            else if (completed != null && completed.IsFailed) StatusText = $"생성에 실패했습니다: {new ReportGenerationRow(completed).FailureText}";
+            else StatusText = PollTimeoutText;
         }
         catch (Exception ex)
         {
@@ -136,7 +151,7 @@ public class ReportCreateViewModel : BasePanelViewModel
             if (res.Success && res.Data != null)
             {
                 var d = res.Data;
-                if (d.IsInProgress) { GenProgress = d.ProgressPct; StatusText = $"생성 중… {d.ProgressPct}% · {d.ProgressStageLabel}"; }
+                if (d.IsInProgress) { GenProgress = d.ProgressPct; StatusText = ProgressStatus(d); }
                 if (d.IsCompleted || d.IsFailed || d.IsCancelled) return d;
             }
         }
@@ -156,6 +171,22 @@ public class ReportCreateViewModel : BasePanelViewModel
         var reason = new ReportGenerationRow(dto).FailureText;
         return string.IsNullOrEmpty(reason) ? "취소됨." : $"취소됨: {reason}";
     }
+
+    /// <summary>
+    /// 폴링 중 진행 한 줄 — "생성 중… 30% · 자료 모으는 중". 단계 이름이 비면 꼬리 " · " 를 붙이지 않는다(R26).
+    /// 단계 이름은 목록 · 상세와 같은 사전(<see cref="ReportGenerationRow.StageDisplay"/>)에서 온다.
+    /// </summary>
+    internal static string ProgressStatus(ReportGenerationDto d)
+    {
+        var stage = string.IsNullOrWhiteSpace(d.ProgressStage) ? string.Empty : ReportGenerationRow.StageDisplay(d.ProgressStage, d.ProgressStageLabel);
+        return string.IsNullOrEmpty(stage) ? $"생성 중… {d.ProgressPct}%" : $"생성 중… {d.ProgressPct}% · {stage}";
+    }
+
+    /// <summary>R25 — 기다리기를 멈췄을 때. "폴링" 같은 구현어를 쓰지 않는다.</summary>
+    public const string PollTimeoutText = "응답이 늦어 기다리기를 멈췄습니다. 왼쪽 목록에서 상태를 확인하세요.";
+
+    /// <summary>서버가 생성 요청을 받지 않았을 때(원문은 로그).</summary>
+    public const string GenerateRejectedText = "보고서 생성을 요청하지 못했습니다. 입력을 확인하고 잠시 후 다시 시도하세요.";
 
     /// <summary>
     /// [비우기] — 폼을 처음 상태로 돌린다(서버 미호출). 상세 칸 고정 막대의 되돌리기 자리다(WL L1499 T2).

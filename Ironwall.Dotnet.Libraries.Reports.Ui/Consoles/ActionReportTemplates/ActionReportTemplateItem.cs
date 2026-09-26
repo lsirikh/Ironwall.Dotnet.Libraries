@@ -41,6 +41,17 @@ public sealed class ActionReportTemplateItem : PropertyChangedBase
         set { if (_displayOrder == value) return; _displayOrder = value; NotifyOfPropertyChange(); }
     }
 
+    private int _position;
+    /// <summary>
+    /// 화면 순번(1부터) — 목록의 순번 칸이 이것을 보인다. 서버 <c>display_order</c> 는 0부터라(A1: 목록이 0 · 1 · 2 … 로
+    /// 찍혔다) 그대로 보이지 않고, 보드가 화면 순서대로 매긴다(<see cref="ActionReportTemplateBoard"/>).
+    /// </summary>
+    public int Position
+    {
+        get => _position;
+        set { if (_position == value) return; _position = value; NotifyOfPropertyChange(); }
+    }
+
     public string Display => Content;
 
     /// <summary>바인딩식 자동화 식별자 — 고정 리터럴은 인스턴스마다 복제된다.</summary>

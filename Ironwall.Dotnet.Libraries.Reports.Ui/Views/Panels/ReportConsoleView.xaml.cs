@@ -228,7 +228,11 @@ public partial class ReportConsoleView : UserControl
                     style.Setters.Add(new Setter(TextBlock.FontFamilyProperty, new System.Windows.Media.FontFamily("Consolas")));
                 style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
                 style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
-                style.Setters.Add(new Setter(Ironwall.Dotnet.Libraries.Theme.Themes.TrimmedToolTip.IsEnabledProperty, true));
+                // R18 — 직접 지정 기간은 칸에 "직접 지정" 만 보이므로 실제 날짜 범위를 도움말로 준다(잘림 도움말과 겹치지 않게 대신 건다).
+                if (spec.Key == "period_type" && spec.BindingPath == nameof(ReportGenerationRow.PeriodLabel))
+                    style.Setters.Add(new Setter(ToolTipProperty, new Binding(nameof(ReportGenerationRow.PeriodToolTip)) { Mode = BindingMode.OneWay }));
+                else
+                    style.Setters.Add(new Setter(Ironwall.Dotnet.Libraries.Theme.Themes.TrimmedToolTip.IsEnabledProperty, true));
                 text.ElementStyle = style;
                 return text;
         }
@@ -397,6 +401,22 @@ public partial class ReportConsoleView : UserControl
 }
 
 /// <summary>
+/// R11 — 목록 줄의 UIA 이름. 생성 이력 줄은 제목 · 상태, 템플릿 줄은 이름 — 비워 두면 화면 읽기 프로그램이
+/// 클래스 이름(Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Lists.ReportGenerationRow)을 읽었다.
+/// </summary>
+public sealed class RowAutomationNameConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
+    {
+        ReportGenerationRow row => $"보고서 {row.Title}, {row.StatusLabel}",
+        Ironwall.Dotnet.Libraries.Messages.Dto.Reports.ReportTemplateDto template => $"템플릿 {template.Name}",
+        _ => string.Empty,
+    };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>
 /// 아이콘 이름(문자열) → <see cref="PackIconKind"/>. 없는 이름이면 작은 점 —
 /// 엉뚱한 기본 아이콘(열거형의 첫 값)이 뜨지 않게 한다.
 /// </summary>
@@ -432,12 +452,15 @@ public sealed class ServerTimeConverter : IValueConverter
 /// <summary>서버 보고서 유형 코드(<c>CUSTOM</c> · <c>STANDARD</c>) → 화면 글자.</summary>
 public sealed class ReportTypeCodeConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value as string switch
+    /// <remarks>R31 — 템플릿 목록 안에서 CUSTOM 을 "템플릿" 이라 부르면 뜻이 겹친다 → "사용자 정의". 모르는 코드는 원문 대신 "알 수 없음".</remarks>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => Display(value as string);
+
+    public static string Display(string? code) => code switch
     {
-        "CUSTOM" => "템플릿",
+        "CUSTOM" => "사용자 정의",
         "STANDARD" => "표준",
         null or "" => "—",
-        var other => other,
+        _ => ReportGenerationRow.UnknownText,
     };
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;

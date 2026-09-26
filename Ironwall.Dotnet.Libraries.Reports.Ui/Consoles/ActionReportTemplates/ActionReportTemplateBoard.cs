@@ -32,7 +32,14 @@ public sealed class ActionReportTemplateBoard
         Items.Clear();
         foreach (var t in (templates ?? Enumerable.Empty<ActionReportTemplateDto>()).OrderBy(t => t.DisplayOrder).ThenBy(t => t.Id))
             Items.Add(new ActionReportTemplateItem(t.Id, t.Content, t.DisplayOrder));
+        Renumber();
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>화면 순번(1부터)을 지금 순서대로 다시 매긴다 — 서버의 0부터 세는 <c>display_order</c> 를 화면에 내지 않는다(A1).</summary>
+    private void Renumber()
+    {
+        for (var i = 0; i < Items.Count; i++) Items[i].Position = i + 1;
     }
 
     /// <summary>서버가 확인해 준 순서로 다시 맞춘다(재정렬 커밋 성공 · 실패 후 재조회 양쪽에서 쓴다).</summary>
@@ -67,6 +74,7 @@ public sealed class ActionReportTemplateBoard
         var after = Items.Select(i => i.Id).ToList();
         if (before.SequenceEqual(after)) return false;
 
+        Renumber();
         Changed?.Invoke(this, EventArgs.Empty);
         return true;
     }

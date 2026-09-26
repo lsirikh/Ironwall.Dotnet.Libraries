@@ -52,11 +52,11 @@ public static class ReportStatusChipRules
     public static string DisplayOf(string status) => status switch
     {
         ReportGenerationStatus.Pending => "대기",
-        ReportGenerationStatus.Generating => "생성중",
+        ReportGenerationStatus.Generating => "생성 중",   // R8 — 다른 라벨처럼 띄어 쓴다
         ReportGenerationStatus.Completed => "완료",
         ReportGenerationStatus.Failed => "실패",
         ReportGenerationStatus.Cancelled => "취소",
-        _ => status,
+        _ => ReportGenerationRow.UnknownText,            // 서버 상태 원문을 화면에 내지 않는다
     };
 
     /// <summary>칩 5종을 목업 순서(수명주기)대로 만든다.</summary>

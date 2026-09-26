@@ -174,8 +174,13 @@ public class ReportPreviewViewModel : BasePanelViewModel
 
     // 메타(WL L1268): 유형 · 기간 · 템플릿 · 요청자
     public string MetaTypeText => _row?.ReportTypeLabel ?? "—";
-    public string MetaPeriodText => _row?.PeriodLabel ?? "—";
+    /// <summary>R18 — 직접 지정 기간이면 실제 날짜 범위까지(예 "2026-09-01 ~ 2026-09-07").</summary>
+    public string MetaPeriodText => _row?.PeriodDetailLabel ?? "—";
+    /// <summary>R17 — 템플릿 번호가 아니라 이름("월간 종합 보고서 (#5)").</summary>
     public string MetaTemplateText => _row?.TemplateLabel ?? "—";
+
+    /// <summary>줄의 템플릿 이름이 늦게 채워지면(템플릿 목록 적재 후) 메타를 다시 읽게 한다.</summary>
+    public void RefreshMeta() => NotifyOfPropertyChange(nameof(MetaTemplateText));
     public string MetaRequesterText => string.IsNullOrWhiteSpace(_row?.GeneratorName) ? "—" : _row!.GeneratorName!;
 
     // 진행(WL L1291): 단계 + 퍼센트 + 갱신 시각
@@ -283,15 +288,18 @@ public class ReportPreviewViewModel : BasePanelViewModel
     private int _loadSequence;
     private CancellationTokenSource? _loadCts;
 
-    internal const string TimeoutHtml =
-        "<html><head><meta charset='utf-8'></head><body style='margin:0;background:#0c1117;color:#e5c07b;" +
-        "font-family:\"Malgun Gothic\",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'>" +
-        "미리보기를 불러오는 데 너무 오래 걸립니다. 잠시 후 다시 고르거나 [PDF 내려받기] 로 확인하세요.</body></html>";
+    // R20 — 안내 페이지는 테마를 타지 않는 밝은 종이 한 장으로 둔다. 미리보기 칸 자체가 흰 바탕(보고서 HTML 과 같은
+    // 종이)이라, 예전의 짙은(#0c1117) 페이지는 라이트 테마에서 갑자기 검은 판이 튀어나왔다. 문구는 무엇을 하면 되는지만.
+    private const string NoticeHtmlHead =
+        "<html><head><meta charset='utf-8'></head><body style='margin:0;background:#ffffff;color:#555555;font-size:13px;" +
+        "font-family:\"Malgun Gothic\",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;" +
+        "text-align:center;padding:0 16px;box-sizing:border-box'>";
 
-    internal const string FailHtml =
-        "<html><head><meta charset='utf-8'></head><body style='margin:0;background:#0c1117;color:#e06c75;" +
-        "font-family:\"Malgun Gothic\",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'>" +
-        "미리보기를 불러오지 못했습니다. (권한 또는 서버 상태 확인)</body></html>";
+    internal const string TimeoutHtml = NoticeHtmlHead +
+        "미리보기를 불러오는 데 시간이 오래 걸립니다.<br/>잠시 후 보고서를 다시 고르거나 [PDF 내려받기]로 확인하세요.</body></html>";
+
+    internal const string FailHtml = NoticeHtmlHead +
+        "미리보기를 불러오지 못했습니다.<br/>[PDF 내려받기]로 확인하세요.</body></html>";
     #endregion
 }
 

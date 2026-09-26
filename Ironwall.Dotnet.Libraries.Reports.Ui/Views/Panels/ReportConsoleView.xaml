@@ -19,6 +19,7 @@
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<local:RailIconKindConverter x:Key="IconKind" />
+		<local:RowAutomationNameConverter x:Key="RowAutomationName" />
 
 		<!--  상태 칩 — 색이 아니라 눌림 형태(굵은 윤곽 + ● 표지)로 고른 것을 보인다  -->
 		<Style x:Key="StatusChip" TargetType="Button">
@@ -115,7 +116,7 @@
 						FontSize="12"
 						Foreground="{DynamicResource TextSecondaryBrush}"
 						Text="{Binding RailFooterText}"
-						TextWrapping="Wrap" />
+						TextWrapping="WrapWithOverflow" />
 				</c:ConsoleRail.Footer>
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
@@ -135,7 +136,7 @@
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
 				Loaded="OnToolbarLoaded"
 				RefreshClick="OnReload"
-				SearchPlaceholder="제목 검색"
+				SearchPlaceholder="{Binding SearchPlaceholder}"
 				SearchText="{Binding SearchText, Mode=TwoWay}"
 				ShowSearch="{Binding ShowSearch}">
 				<!--  상태 칩 5종 — 콤보를 대신한다(L1279). "전체"는 아무것도 안 누른 상태이고 서버에 값을 보내지 않는다.  -->
@@ -154,6 +155,7 @@
 							<DataTemplate>
 								<Button
 									AutomationProperties.AutomationId="{Binding AutomationId}"
+									AutomationProperties.Name="{Binding Display}"
 									Click="OnStatusChip"
 									Style="{StaticResource StatusChip}"
 									ToolTip="다시 누르면 전체로 돌아갑니다" />
@@ -200,23 +202,21 @@
 						<DataGrid.RowStyle>
 							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
 								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Reports.Row.{0}}" />
+								<!--  R11 — 화면 읽기 프로그램이 클래스 이름 대신 제목 · 이름을 읽게 한다.  -->
+								<Setter Property="AutomationProperties.Name" Value="{Binding Converter={StaticResource RowAutomationName}}" />
 							</Style>
 						</DataGrid.RowStyle>
 					</DataGrid>
 
-					<!--  빈 상태 — 조회 실패와 "없음"을 다른 글로 가른다  -->
-					<TextBlock
-						MaxWidth="420"
-						HorizontalAlignment="Center"
-						VerticalAlignment="Center"
-						AutomationProperties.AutomationId="Reports.List.EmptyStateText"
-						Foreground="{DynamicResource TextMutedBrush}"
-						TextAlignment="Center"
-						TextWrapping="Wrap">
-						<TextBlock.Style>
-							<Style TargetType="TextBlock">
+					<!--
+						빈 상태 — 커널 ConsoleEmptyState(글리프 + 무엇이 비었나 + 다음 할 일). 조회 실패와 "없음" 을 다른 글로 가른다.
+						제목 글은 옛 자동화 식별자(Reports.List.EmptyStateText — 호스트 T-REP013 이 읽는다)를 지닌 TextBlock 으로
+						Action 자리에 싣는다 — ConsoleEmptyState 는 UIA 피어가 없어 거기 붙인 식별자는 자동화 트리에 나오지 않는다.
+					-->
+					<c:ConsoleEmptyState AutomationProperties.AutomationId="Reports.List.EmptyState" IsHitTestVisible="False">
+						<c:ConsoleEmptyState.Style>
+							<Style BasedOn="{StaticResource {x:Type c:ConsoleEmptyState}}" TargetType="c:ConsoleEmptyState">
 								<Setter Property="Visibility" Value="Collapsed" />
-								<Setter Property="Text" Value="{Binding ListViewModel.EmptyStateText}" />
 								<Style.Triggers>
 									<MultiDataTrigger>
 										<MultiDataTrigger.Conditions>
@@ -231,12 +231,55 @@
 											<Condition Binding="{Binding TemplateViewModel.IsEmpty}" Value="True" />
 										</MultiDataTrigger.Conditions>
 										<Setter Property="Visibility" Value="Visible" />
-										<Setter Property="Text" Value="{Binding TemplateViewModel.EmptyStateText}" />
 									</MultiDataTrigger>
 								</Style.Triggers>
 							</Style>
-						</TextBlock.Style>
-					</TextBlock>
+						</c:ConsoleEmptyState.Style>
+						<c:ConsoleEmptyState.Action>
+							<StackPanel Margin="0,-2,0,0">
+								<TextBlock
+									MaxWidth="320"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.List.EmptyStateText"
+									FontSize="13.5"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Text" Value="{Binding ListViewModel.EmptyStateText}" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTemplateRail}" Value="True">
+													<Setter Property="Text" Value="{Binding TemplateViewModel.EmptyStateText}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+								<TextBlock
+									MaxWidth="320"
+									Margin="0,5,0,0"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.List.EmptyStateHint"
+									FontSize="12.5"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Text" Value="{Binding ListViewModel.EmptyStateHint}" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTemplateRail}" Value="True">
+													<Setter Property="Text" Value="{Binding TemplateViewModel.EmptyStateHint}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+							</StackPanel>
+						</c:ConsoleEmptyState.Action>
+					</c:ConsoleEmptyState>
 				</Grid>
 			</Grid>
 		</c:ConsoleShell.List>
@@ -249,8 +292,9 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="0,1,0,0">
 				<DockPanel LastChildFill="True">
+					<!--  R13 — 오른쪽 18 은 호스트 틀의 크기 조절 손잡이(16×16) 자리다. 없으면 글 끝이 손잡이에 닿았다.  -->
 					<TextBlock
-						Margin="12,0,0,0"
+						Margin="12,0,18,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Console.Reports.Status.Message"
 						DockPanel.Dock="Right"

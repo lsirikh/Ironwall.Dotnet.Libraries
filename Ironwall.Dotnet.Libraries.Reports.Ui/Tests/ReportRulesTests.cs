@@ -370,7 +370,10 @@ public class ProgressStageDisplayTests
     [Theory]
     [InlineData("collecting", "자료 모으는 중")]
     [InlineData("aggregating", "집계 중")]
-    [InlineData("rendering", "그리는 중")]
+    [InlineData("rendering", "문서 만드는 중")]
+    [InlineData("master_data", "자료 모으는 중")]
+    [InlineData("html", "문서 만드는 중")]
+    [InlineData("pdf", "PDF 만드는 중")]
     [InlineData(null, "진행 중")]
     [InlineData("", "진행 중")]
     public void should_translate_the_known_stages(string? stage, string expected)
@@ -379,15 +382,25 @@ public class ProgressStageDisplayTests
     }
 
     [Fact]
-    public void should_show_the_raw_code_in_brackets_when_the_stage_is_unknown()
+    public void should_not_show_the_raw_code_when_the_stage_is_unknown()
     {
-        Assert.Equal("진행 중 (quantum_folding)", ReportGenerationRow.StageDisplay("quantum_folding"));
+        // R22 — 예전에는 "진행 중 (quantum_folding)" 처럼 서버 코드 원문을 괄호로 붙였다.
+        Assert.Equal("진행 중", ReportGenerationRow.StageDisplay("quantum_folding"));
+        // DTO 라벨이 모르는 코드를 그대로 되돌려 준 경우도 원문이다.
+        Assert.Equal("진행 중", ReportGenerationRow.StageDisplay("quantum_folding", "quantum_folding"));
     }
 
     [Fact]
-    public void should_prefer_a_human_label_the_server_already_provided()
+    public void should_prefer_a_human_label_when_the_stage_code_is_unknown()
     {
-        Assert.Equal("서버가 쓴 말", ReportGenerationRow.StageDisplay("collecting", "서버가 쓴 말"));
+        Assert.Equal("서버가 쓴 말", ReportGenerationRow.StageDisplay("quantum_folding", "서버가 쓴 말"));
+    }
+
+    [Fact]
+    public void should_not_show_the_render_jargon_for_the_html_stage_when_the_dto_label_says_so()
+    {
+        // DTO 의 ProgressStageLabel 은 html → "문서 렌더"(구현어). 아는 코드는 화면 사전이 이긴다.
+        Assert.Equal("문서 만드는 중", ReportGenerationRow.StageDisplay("html", "문서 렌더"));
     }
 
     [Fact]

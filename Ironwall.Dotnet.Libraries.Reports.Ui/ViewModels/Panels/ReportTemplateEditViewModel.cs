@@ -156,6 +156,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
             }
             catch (Exception ex) { _log?.Error($"[ReportTemplateEdit] LoadComponents: {ex.Message}"); }
         }
+        // R28 — 카탈로그를 못 받았으면 목록이 말없이 비지 않게 표시한다(다음 적재 때 다시 시도한다).
+        CatalogLoadFailed = _catalog is null;
         Board.Load(_catalog, saved);
     }
 
@@ -197,9 +199,9 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     StatusText = "등록했습니다.";
                     return res.Data.Id;
                 }
-                var why = res.ErrorText("서버가 등록을 거부했습니다.");
-                StatusText = $"등록 실패: {why}";
-                _log?.Warning($"[ReportTemplateEdit] 등록 실패: {why}");
+                // 서버 원문은 로그로만 — 화면엔 무엇이 안 됐고 무엇을 하면 되는지.
+                _log?.Warning($"[ReportTemplateEdit] 등록 실패: {res.ErrorText()}");
+                StatusText = "템플릿을 등록하지 못했습니다. 입력을 확인하고 잠시 후 다시 시도하세요.";
                 return null;
             }
             else
@@ -225,9 +227,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     StatusText = "저장했습니다.";
                     return TemplateId;
                 }
-                var why = res.ErrorText("서버가 저장을 거부했습니다.");
-                StatusText = $"저장 실패: {why}";
-                _log?.Warning($"[ReportTemplateEdit] 저장 실패: {why}");
+                _log?.Warning($"[ReportTemplateEdit] 저장 실패: {res.ErrorText()}");
+                StatusText = "템플릿을 저장하지 못했습니다. 잠시 후 다시 시도하세요.";
                 return null;
             }
         }
@@ -299,7 +300,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     public bool CanEdit
     {
         get => _canEdit && !_isLoading;
-        set { _canEdit = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanEdit)); }
+        set { _canEdit = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanEdit)); NotifyOfPropertyChange(nameof(CanMoveComponent)); NotifyOfPropertyChange(nameof(MoveComponentToolTip)); }
     }
 
     private string? _name;
@@ -364,7 +365,31 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     public string ComponentSummary => $"구성 {Board.EnabledCount}개 / 전체 {Board.Count}개";
 
     /// <summary>구성 순서를 끌어 바꿀 수 있다는 안내(키보드 폴백을 글로도 알린다).</summary>
-    public const string ReorderHint = "손잡이를 끌거나 Alt+↑ / Alt+↓";
+    public const string ReorderHint = "끌거나 Alt+↑/↓ 로 순서를 바꿉니다";
+
+    private bool _catalogLoadFailed;
+    /// <summary>구성 요소 목록(서버 카탈로그)을 받지 못했다 — 상세 칸이 까닭을 말한다(R28).</summary>
+    public bool CatalogLoadFailed
+    {
+        get => _catalogLoadFailed;
+        private set { _catalogLoadFailed = value; NotifyOfPropertyChange(); }
+    }
+
+    public const string CatalogLoadFailedText = "구성 요소 목록을 불러오지 못했습니다. 잠시 후 템플릿을 다시 골라 보세요.";
+
+    private bool _hasSelectedComponent;
+    /// <summary>구성 목록에서 고른 줄이 있는가 — 뷰가 목록 선택이 바뀔 때 알려 준다.</summary>
+    public bool HasSelectedComponent
+    {
+        get => _hasSelectedComponent;
+        set { _hasSelectedComponent = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanMoveComponent)); NotifyOfPropertyChange(nameof(MoveComponentToolTip)); }
+    }
+
+    /// <summary>R29 — ▲▼ 는 고른 줄이 있을 때만 켠다(예전엔 늘 켜져 눌러도 아무 일이 없었다).</summary>
+    public bool CanMoveComponent => CanEdit && HasSelectedComponent;
+
+    public string MoveComponentToolTip => !CanEdit ? "편집 권한이 없습니다."
+        : HasSelectedComponent ? "고른 줄을 옮깁니다 (Alt+↑ / Alt+↓)" : "구성 요소를 먼저 고르세요.";
     #endregion
 
     #region - Attributes -
@@ -398,6 +423,8 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
     {
         NotifyOfPropertyChange(nameof(ComponentSummary));
         NotifyOfPropertyChange(nameof(CanEdit));
+        NotifyOfPropertyChange(nameof(CanMoveComponent));
+        NotifyOfPropertyChange(nameof(MoveComponentToolTip));
     }
 
     private void SetQuiet(ref string? field, string value, string propertyName)

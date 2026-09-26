@@ -96,18 +96,18 @@
 						Click="OnMoveDown"
 						Content="▼"
 						DockPanel.Dock="Right"
-						IsEnabled="{Binding EditViewModel.CanEdit}"
+						IsEnabled="{Binding EditViewModel.CanMoveComponent}"
 						Style="{StaticResource Console.Button.Mini}"
-						ToolTip="고른 줄을 아래로 (Alt+↓)" />
+						ToolTip="{Binding EditViewModel.MoveComponentToolTip}" />
 					<Button
 						Margin="4,0,0,0"
 						AutomationProperties.AutomationId="Reports.Detail.MoveUpButton"
 						Click="OnMoveUp"
 						Content="▲"
 						DockPanel.Dock="Right"
-						IsEnabled="{Binding EditViewModel.CanEdit}"
+						IsEnabled="{Binding EditViewModel.CanMoveComponent}"
 						Style="{StaticResource Console.Button.Mini}"
-						ToolTip="고른 줄을 위로 (Alt+↑)" />
+						ToolTip="{Binding EditViewModel.MoveComponentToolTip}" />
 					<TextBlock
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Reports.Detail.ReorderHint"
@@ -123,6 +123,7 @@
 					drag:DropZone.Key="report-template-component"
 					AutomationProperties.AutomationId="Reports.Detail.ComponentList"
 					ItemsSource="{Binding EditViewModel.Board.Items}"
+					SelectionChanged="OnComponentSelectionChanged"
 					SelectionMode="Extended"
 					Style="{StaticResource Console.ReorderList}">
 					<b:Interaction.Behaviors>
@@ -131,7 +132,7 @@
 							DisplayMemberPath="Display"
 							Handler="{Binding EditViewModel.Drop}"
 							IsDragEnabled="{Binding EditViewModel.CanEdit}"
-							KeyboardFallback="줄을 고른 뒤 Alt+↑ · Alt+↓ 로 옮긴다" />
+							KeyboardFallback="줄을 고른 뒤 Alt+↑ · Alt+↓ 로 옮깁니다" />
 						<!--  키보드 폴백 — 드래그와 같은 담당을 부른다(회귀 단언은 이 경로로)  -->
 						<drag:ReorderKeyboardBehavior
 							Handler="{Binding EditViewModel.Drop}"
@@ -181,6 +182,16 @@
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>
+
+				<!--  R28 — 서버에서 구성 요소 목록을 못 받았으면 빈 목록 대신 까닭을 말한다.  -->
+				<TextBlock
+					Margin="0,6,0,0"
+					AutomationProperties.AutomationId="Reports.Detail.ComponentCatalogError"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding EditViewModel.CatalogLoadFailedText, Mode=OneTime}"
+					TextWrapping="Wrap"
+					Visibility="{Binding EditViewModel.CatalogLoadFailed, Converter={StaticResource BoolToVisibility}}" />
 			</StackPanel>
 		</c:ConsoleSection>
 

@@ -7,6 +7,7 @@
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:vm="clr-namespace:Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels"
 	AutomationProperties.AutomationId="Reports.ActionReportTemplate.Console.Root"
 	AutomationProperties.Name="조치보고 문구 관리"
 	FontFamily="{DynamicResource MaterialDesignFont}">
@@ -22,6 +23,7 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		<local:BoolInverseConverter x:Key="BoolInverse" />
 		<local:NotEmptyToVisibilityConverter x:Key="NotEmptyToVisibility" />
+		<local:RailIconKindConverter x:Key="IconKind" />
 
 		<Style x:Key="Form.TextBox" TargetType="TextBox">
 			<Setter Property="Padding" Value="8,6" />
@@ -31,14 +33,41 @@
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
 		</Style>
+
+		<!--
+			A5 — 줄 안의 [수정] · [삭제] 를 같은 모양(테두리 · 높이 26 · 본문 글꼴)으로 맞춘다. 옛 것은 [수정]이 테두리 없는
+			11px 고정폭 글자, [삭제]만 빨간 테두리라 한 줄에 두 모양이 섰다. 위험은 테두리 색(형태)으로만 더 말한다.
+		-->
+		<Style
+			x:Key="Row.Button"
+			BasedOn="{StaticResource Console.Button.Mini}"
+			TargetType="Button">
+			<Setter Property="Height" Value="26" />
+			<Setter Property="MinWidth" Value="44" />
+			<Setter Property="Padding" Value="8,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="FontFamily" Value="{DynamicResource MaterialDesignFont}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		</Style>
+		<Style
+			x:Key="Row.Button.Danger"
+			BasedOn="{StaticResource Console.Button.Mini.Danger}"
+			TargetType="Button">
+			<Setter Property="Height" Value="26" />
+			<Setter Property="MinWidth" Value="44" />
+			<Setter Property="Padding" Value="8,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="FontFamily" Value="{DynamicResource MaterialDesignFont}" />
+		</Style>
 	</UserControl.Resources>
 
+	<!--  A10 — 부제 "문구 관리" 를 뺀다. 제목 "조치보고 문구" 뒤에 붙어 "문구" 가 한 줄에 세 번 섰다.  -->
 	<c:ConsoleShell
 		Title="조치보고 문구"
 		ConsoleKey="ActionReportTemplates"
 		DetailWidth="360"
-		IsDetailRequested="{Binding Detail.IsDetailRequested}"
-		Subtitle="문구 관리">
+		IsDetailRequested="{Binding Detail.IsDetailRequested}">
 
 		<!--
 			머리 오른쪽 — 닫기 ✕ 하나(호스트가 이 패널을 모달로 띄운다).
@@ -63,13 +92,22 @@
 				IsCompact="{Binding IsRailCompact, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 				ItemsSource="{Binding RailEntries}"
 				SelectedItem="{Binding SelectedRail, Mode=TwoWay}">
+				<c:ConsoleRail.Resources>
+					<!--  아이콘 토큰 → PackIcon(보고서 콘솔과 같은 방식 — 싱글턴 뷰모델이 시각 요소를 쥐지 않는다).  -->
+					<DataTemplate DataType="{x:Type vm:ReportRailIcon}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
+					</DataTemplate>
+				</c:ConsoleRail.Resources>
 				<c:ConsoleRail.Footer>
 					<TextBlock
 						AutomationProperties.AutomationId="Console.ActionReportTemplates.Rail.Footer"
 						FontSize="12"
 						Foreground="{DynamicResource TextSecondaryBrush}"
 						Text="{Binding RailFooterText}"
-						TextWrapping="Wrap" />
+						TextWrapping="WrapWithOverflow" />
 				</c:ConsoleRail.Footer>
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
@@ -117,24 +155,24 @@
 						Click="OnMoveDown"
 						Content="▼"
 						DockPanel.Dock="Right"
-						IsEnabled="{Binding CanEdit}"
+						IsEnabled="{Binding CanMoveSelected}"
 						Style="{StaticResource Console.Button.Mini}"
-						ToolTip="고른 문구를 아래로 (Alt+↓)" />
+						ToolTip="{Binding MoveDownToolTip}" />
 					<Button
 						Margin="4,0,0,0"
 						AutomationProperties.AutomationId="Reports.ActionReportTemplate.MoveUpButton"
 						Click="OnMoveUp"
 						Content="▲"
 						DockPanel.Dock="Right"
-						IsEnabled="{Binding CanEdit}"
+						IsEnabled="{Binding CanMoveSelected}"
 						Style="{StaticResource Console.Button.Mini}"
-						ToolTip="고른 문구를 위로 (Alt+↑)" />
+						ToolTip="{Binding MoveUpToolTip}" />
 					<TextBlock
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Reports.ActionReportTemplate.ReorderHint"
 						FontSize="11"
 						Foreground="{DynamicResource TextMutedBrush}"
-						Text="문구를 고른 뒤 끌거나 Alt+↑ · Alt+↓ · 위 단추로 순서를 바꿉니다."
+						Text="문구를 끌거나, 고른 뒤 Alt+↑/↓ 또는 오른쪽 ▲▼ 로 순서를 바꿉니다."
 						TextWrapping="Wrap" />
 				</DockPanel>
 
@@ -156,7 +194,7 @@
 								DisplayMemberPath="Display"
 								Handler="{Binding Drop}"
 								IsDragEnabled="{Binding CanEdit}"
-								KeyboardFallback="문구를 고른 뒤 Alt+↑ · Alt+↓ 로 옮긴다" />
+								KeyboardFallback="문구를 고른 뒤 Alt+↑ · Alt+↓ 로 옮깁니다" />
 							<!--  키보드 폴백 — 드래그 · ▲▼ 단추와 같은 담당을 부른다(회귀 단언은 이 경로로)  -->
 							<drag:ReorderKeyboardBehavior Handler="{Binding Drop}" IsReorderEnabled="{Binding CanEdit}" />
 						</b:Interaction.Behaviors>
@@ -171,26 +209,34 @@
 										AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.DragHandle.{0}}"
 										DockPanel.Dock="Left"
 										ToolTip="끌어서 순서를 바꿉니다 · Alt+↑ / Alt+↓ 로도 됩니다" />
+									<!--  A1 — 순번은 화면 순서(1부터). 서버 display_order(0부터)를 그대로 내지 않는다.  -->
 									<TextBlock
-										Width="30"
+										Width="24"
+										Margin="0,0,8,0"
 										VerticalAlignment="Center"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.PositionText.{0}}"
 										DockPanel.Dock="Left"
-										FontSize="11"
+										FontFamily="{DynamicResource MonoFont}"
+										FontSize="11.5"
 										Foreground="{DynamicResource TextMutedBrush}"
-										Text="{Binding DisplayOrder}" />
+										Text="{Binding Position}"
+										TextAlignment="Right" />
+									<!--  A4 · A5 — 두 단추 같은 모양, [삭제]는 권한 · 서버 지원이 있을 때만 켠다(꺼지면 까닭을 도움말로).  -->
 									<StackPanel VerticalAlignment="Center" DockPanel.Dock="Right" Orientation="Horizontal">
 										<Button
 											Margin="4,0,0,0"
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.EditButton.{0}}"
 											Click="OnEditRow"
-											Content="수정"
-											Style="{StaticResource Console.Button.Mini}" />
+											Content="{Binding DataContext.RowEditText, RelativeSource={RelativeSource AncestorType=ListBox}}"
+											Style="{StaticResource Row.Button}" />
 										<Button
 											Margin="4,0,0,0"
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.ActionReportTemplate.DeleteButton.{0}}"
 											Click="OnDeleteRow"
 											Content="삭제"
-											Style="{StaticResource Console.Button.Mini.Danger}" />
+											IsEnabled="{Binding DataContext.CanDeletePermission, RelativeSource={RelativeSource AncestorType=ListBox}}"
+											Style="{StaticResource Row.Button.Danger}"
+											ToolTip="{Binding DataContext.RowDeleteToolTip, RelativeSource={RelativeSource AncestorType=ListBox}}" />
 									</StackPanel>
 									<TextBlock
 										Margin="4,0,8,0"
@@ -206,16 +252,40 @@
 						</ListBox.ItemTemplate>
 					</ListBox>
 
-					<TextBlock
-						MaxWidth="360"
-						HorizontalAlignment="Center"
-						VerticalAlignment="Center"
-						AutomationProperties.AutomationId="Reports.ActionReportTemplate.EmptyStateText"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="{Binding EmptyStateText}"
-						TextAlignment="Center"
-						TextWrapping="Wrap"
-						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+					<!--
+						빈 상태 — 커널 ConsoleEmptyState(글리프 + 무엇이 비었나 + 다음 할 일). 제목 글은 옛 자동화 식별자
+						(Reports.ActionReportTemplate.EmptyStateText)를 지닌 TextBlock 으로 Action 자리에 싣는다 —
+						ConsoleEmptyState 는 UIA 피어가 없어 거기 붙인 식별자는 자동화 트리에 나오지 않는다.
+					-->
+					<c:ConsoleEmptyState
+						AutomationProperties.AutomationId="Reports.ActionReportTemplate.EmptyState"
+						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+						<c:ConsoleEmptyState.Action>
+							<StackPanel Margin="0,-2,0,0">
+								<TextBlock
+									MaxWidth="320"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.ActionReportTemplate.EmptyStateText"
+									FontSize="13.5"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding EmptyStateText}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow" />
+								<TextBlock
+									MaxWidth="320"
+									Margin="0,5,0,0"
+									HorizontalAlignment="Center"
+									AutomationProperties.AutomationId="Reports.ActionReportTemplate.EmptyStateHint"
+									FontSize="12.5"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding EmptyStateHint}"
+									TextAlignment="Center"
+									TextWrapping="WrapWithOverflow"
+									Visibility="{Binding EmptyStateHint, Converter={StaticResource NotEmptyToVisibility}}" />
+							</StackPanel>
+						</c:ConsoleEmptyState.Action>
+					</c:ConsoleEmptyState>
 				</Grid>
 			</Grid>
 		</c:ConsoleShell.List>
@@ -228,8 +298,9 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="0,1,0,0">
 				<DockPanel LastChildFill="True">
+					<!--  A11 — 오른쪽 18 은 호스트 틀의 크기 조절 손잡이(16×16) 자리다. 없으면 글 끝이 손잡이에 닿았다.  -->
 					<TextBlock
-						Margin="12,0,0,0"
+						Margin="12,0,18,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Console.ActionReportTemplates.Status.Message"
 						DockPanel.Dock="Right"
@@ -258,7 +329,7 @@
 				CanRevert="{Binding Detail.CanRevert}"
 				ConsoleKey="ActionReportTemplates"
 				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
-				FooterText="{Binding Detail.FooterText}"
+				FooterText="{Binding DetailFooterText}"
 				IsDirty="{Binding Detail.IsDirty}"
 				IsReadOnly="{Binding Detail.IsReadOnly}"
 				Kind="{Binding Detail.Kind}"
@@ -298,9 +369,9 @@
 								AutomationProperties.AutomationId="Reports.ActionReportTemplate.ValidationText"
 								FontSize="11"
 								Foreground="{DynamicResource StatusCriticalBrush}"
-								Text="{Binding DraftValidationError}"
+								Text="{Binding DraftValidationMessage, StringFormat='▲ {0}'}"
 								TextWrapping="Wrap"
-								Visibility="{Binding DraftValidationError, Converter={StaticResource NotEmptyToVisibility}}" />
+								Visibility="{Binding DraftValidationMessage, Converter={StaticResource NotEmptyToVisibility}}" />
 						</StackPanel>
 					</c:ConsoleSection>
 				</StackPanel>

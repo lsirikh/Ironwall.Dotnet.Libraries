@@ -18,6 +18,13 @@ public partial class ReportTemplateDetailView : UserControl
 
     private ReportConsoleViewModel? ViewModel => DataContext as ReportConsoleViewModel;
 
+    /// <summary>R29 — 고른 줄이 있는지 뷰모델에 알린다(▲▼ 를 그때만 켠다). 목록을 다시 채우면 선택이 풀리며 여기로 온다.</summary>
+    private void OnComponentSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is ListBox list)
+            vm.EditViewModel.HasSelectedComponent = list.SelectedItems.Count > 0;
+    }
+
     private void OnMoveUp(object sender, RoutedEventArgs e) => Move(-1);
 
     private void OnMoveDown(object sender, RoutedEventArgs e) => Move(1);
