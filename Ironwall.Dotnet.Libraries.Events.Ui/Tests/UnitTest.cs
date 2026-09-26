@@ -65,7 +65,7 @@ public class DtoToModelHelperTests
     }
 
     [Fact]
-    public void ToDetectionEventDto_ShouldConvertModelToDto()
+    public void should_convert_model_to_dto_with_offset_aware_created_at_when_detection_event()
     {
         // Arrange
         var model = new DetectionEventModel
@@ -84,7 +84,10 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(1, dto.Id);
-        Assert.Equal("2025-11-24T10:30:00.000Z", dto.CreatedAt);
+        // 계약(de3f8c4d): 서버 전송 datetime 은 offset 포함 aware ISO-8601 — 리터럴 'Z' 아님. Kind=Utc → +00:00.
+        Assert.Equal("2025-11-24T10:30:00.000+00:00", dto.CreatedAt);
+        Assert.Equal(new DateTimeOffset(2025, 11, 24, 10, 30, 0, TimeSpan.Zero),
+            DateTimeOffset.Parse(dto.CreatedAt, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Equal("Intrusion", dto.TypeEvent);
         Assert.Equal("True", dto.ActionReported);
         Assert.Equal("THERMAL_SENSOR", dto.Result);
@@ -133,7 +136,7 @@ public class DtoToModelHelperTests
     }
 
     [Fact]
-    public void ToMalfunctionEventDto_ShouldConvertModelToDto()
+    public void should_convert_model_to_dto_with_offset_aware_created_at_when_malfunction_event()
     {
         // Arrange
         var model = new MalfunctionEventModel
@@ -156,7 +159,10 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(2, dto.Id);
-        Assert.Equal("2025-11-24T11:00:00.000Z", dto.CreatedAt);
+        // 계약(de3f8c4d): 서버 전송 datetime 은 offset 포함 aware ISO-8601 — 리터럴 'Z' 아님. Kind=Utc → +00:00.
+        Assert.Equal("2025-11-24T11:00:00.000+00:00", dto.CreatedAt);
+        Assert.Equal(new DateTimeOffset(2025, 11, 24, 11, 0, 0, TimeSpan.Zero),
+            DateTimeOffset.Parse(dto.CreatedAt, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Equal("Fault", dto.TypeEvent);
         Assert.Equal("FAULT_FENCE", dto.Reason);
         Assert.NotNull(dto.Detail);
@@ -194,7 +200,7 @@ public class DtoToModelHelperTests
     }
 
     [Fact]
-    public void ToConnectionEventDto_ShouldConvertModelToDto()
+    public void should_convert_model_to_dto_with_offset_aware_created_at_when_connection_event()
     {
         // Arrange
         var model = new ConnectionEventModel
@@ -212,7 +218,10 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(3, dto.Id);
-        Assert.Equal("2025-11-24T12:00:00.000Z", dto.CreatedAt);
+        // 계약(de3f8c4d): 서버 전송 datetime 은 offset 포함 aware ISO-8601 — 리터럴 'Z' 아님. Kind=Utc → +00:00.
+        Assert.Equal("2025-11-24T12:00:00.000+00:00", dto.CreatedAt);
+        Assert.Equal(new DateTimeOffset(2025, 11, 24, 12, 0, 0, TimeSpan.Zero),
+            DateTimeOffset.Parse(dto.CreatedAt, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Equal("Connection", dto.TypeEvent);
         Assert.NotNull(dto.Device);
         Assert.Equal(300, dto.Device.Id);
@@ -245,7 +254,7 @@ public class DtoToModelHelperTests
     }
 
     [Fact]
-    public void ToActionEventDto_ShouldConvertModelToDto()
+    public void should_convert_model_to_dto_with_offset_aware_created_at_when_action_event()
     {
         // Arrange
         var model = new ActionEventModel
@@ -263,7 +272,10 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(4, dto.Id);
-        Assert.Equal("2025-11-24T13:00:00.000Z", dto.CreatedAt);
+        // 계약(de3f8c4d): 서버 전송 datetime 은 offset 포함 aware ISO-8601 — 리터럴 'Z' 아님. Kind=Utc → +00:00.
+        Assert.Equal("2025-11-24T13:00:00.000+00:00", dto.CreatedAt);
+        Assert.Equal(new DateTimeOffset(2025, 11, 24, 13, 0, 0, TimeSpan.Zero),
+            DateTimeOffset.Parse(dto.CreatedAt, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Equal("Action", dto.TypeEvent);
         Assert.Equal("Reset system", dto.Content);
         Assert.Equal("admin", dto.User);
@@ -2105,35 +2117,43 @@ public class DeviceSymbolLookupModelTests
     }
     #endregion
 
-    #region Test 12.1.3: ConvertZoomToAngle - 줌 100% (1x)
-    [Fact]
-    public void ConvertZoomToAngle_WithZoom100_ShouldReturnBaseAngle()
+    // 줌 계약(7c284cc1, DeviceSymbolLookupModel.cs:168-209): zoom 은 정규화 0~100(100 = NVR 최대 줌).
+    //   각도 80°(zoom 0) → 5°(zoom 100), 거리 10m(zoom 0) → 3000m(zoom 100) 선형 보간, 범위 밖은 클램프.
+    //   (구 계약 "100 = 1x, 배율로 나눔/곱함" 은 폐기됨)
+
+    #region Test 12.1.3: ConvertZoomToAngle - 0~100 선형 보간
+    [Theory]
+    [InlineData(0f, 80.0)]     // 광각 끝
+    [InlineData(25f, 61.25)]   // 80 - 0.25*75
+    [InlineData(50f, 42.5)]    // 80 - 0.5*75
+    [InlineData(100f, 5.0)]    // NVR 최대 줌
+    public void should_interpolate_angle_from_80_to_5_when_zoom_within_0_to_100(float zoom, double expected)
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 100f;  // 1x
 
         // Act
         var angle = lookup.TestConvertZoomToAngle(zoom);
 
         // Assert
-        Assert.Equal(80.0, angle);  // BaseDetectionAngle = 80
+        Assert.Equal(expected, angle, 6);
     }
     #endregion
 
-    #region Test 12.1.4: ConvertZoomToAngle - 줌 200% (2x)
-    [Fact]
-    public void ConvertZoomToAngle_WithZoom200_ShouldReturnHalfAngle()
+    #region Test 12.1.4: ConvertZoomToAngle - 범위 밖 클램프
+    [Theory]
+    [InlineData(200f, 5.0)]    // 100 초과 → 최소 각도
+    [InlineData(-10f, 80.0)]   // 0 미만 → 최대 각도
+    public void should_clamp_angle_when_zoom_outside_0_to_100(float zoom, double expected)
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 200f;  // 2x
 
         // Act
         var angle = lookup.TestConvertZoomToAngle(zoom);
 
         // Assert
-        Assert.Equal(40.0, angle);  // 80 / 2 = 40
+        Assert.Equal(expected, angle, 6);
     }
     #endregion
 
@@ -2143,7 +2163,7 @@ public class DeviceSymbolLookupModelTests
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 2000f;  // 20x → 80/20 = 4 < MinDetectionAngle(5)
+        float zoom = 2000f;  // 정규화 범위(0~100) 초과 → 100 으로 클램프 → MinDetectionAngle(5)
 
         // Act
         var angle = lookup.TestConvertZoomToAngle(zoom);
@@ -2153,51 +2173,40 @@ public class DeviceSymbolLookupModelTests
     }
     #endregion
 
-    #region Test 12.1.6: ConvertZoomToRange - 줌 100% (1x)
-    [Fact]
-    public void ConvertZoomToRange_WithZoom100_ShouldReturnBaseRange()
+    #region Test 12.1.6: ConvertZoomToRange - 0~100 선형 보간
+    [Theory]
+    [InlineData(0f, 10.0)]      // 최소 거리
+    [InlineData(25f, 757.5)]    // 10 + 0.25*2990
+    [InlineData(50f, 1505.0)]   // 10 + 0.5*2990
+    [InlineData(100f, 3000.0)]  // NVR 최대 줌 = 3km
+    public void should_interpolate_range_from_10_to_3000_when_zoom_within_0_to_100(float zoom, double expected)
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 100f;  // 1x
 
         // Act
         var range = lookup.TestConvertZoomToRange(zoom);
 
         // Assert
-        Assert.Equal(30.0, range);  // BaseDetectionRange = 30, zoom 1x
+        Assert.Equal(expected, range, 6);
     }
     #endregion
 
-    #region Test 12.1.7: ConvertZoomToRange - 줌 400% (4x)
-    [Fact]
-    public void ConvertZoomToRange_WithZoom400_ShouldReturn4xRange()
+    #region Test 12.1.7: ConvertZoomToRange - 범위 밖 클램프
+    [Theory]
+    [InlineData(400f, 3000.0)]   // 100 초과 → 최대 거리
+    [InlineData(3000f, 3000.0)]  // 100 초과 → 최대 거리
+    [InlineData(-10f, 10.0)]     // 0 미만 → 최소 거리
+    public void should_clamp_range_when_zoom_outside_0_to_100(float zoom, double expected)
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 400f;  // 4x
 
         // Act
         var range = lookup.TestConvertZoomToRange(zoom);
 
         // Assert
-        Assert.Equal(120.0, range);  // 30 * 4 = 120
-    }
-    #endregion
-
-    #region Test 12.1.8: ConvertZoomToRange - 최대값 제한
-    [Fact]
-    public void ConvertZoomToRange_WithZoom3000_ShouldClampToMaxRange()
-    {
-        // Arrange
-        var lookup = CreateTestLookup();
-        float zoom = 3000f;  // 30x → 30*30 = 900 (under MaxDetectionRange 2000)
-
-        // Act
-        var range = lookup.TestConvertZoomToRange(zoom);
-
-        // Assert
-        Assert.Equal(900.0, range);  // 30 * 30 = 900
+        Assert.Equal(expected, range, 6);
     }
     #endregion
 
@@ -2219,25 +2228,25 @@ public class DeviceSymbolLookupModelTests
 
     #region Test 12.1.10: UpdateFOV - 정상 동작
     [Fact]
-    public void UpdateFOV_WithValidPidsSymbol_ShouldUpdateAllProperties()
+    public void should_set_bearing_angle_range_and_notify_when_ptz_applied_to_pids_symbol()
     {
         // Arrange
         var lookup = CreateTestLookup();
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
-        mockPidsSymbol.SetupAllProperties();  // Allow property setters
+        mockPidsSymbol.SetupAllProperties();  // Allow property setters (BaseBearing 기본 0)
         lookup.SymbolModel = mockPidsSymbol.Object;
 
-        // Act
-        lookup.TestUpdateFOV(pan: 180f, tilt: 45f, zoom: 200f);
+        // Act — zoom 50 = 정규화 범위(0~100)의 중간
+        lookup.TestUpdateFOV(pan: 180f, tilt: 45f, zoom: 50f);
 
         // Assert
-        // DetectionBearing = 180 (pan 180 → bearing 180)
+        // DetectionBearing = BaseBearing(0) + 180 (pan 180 → bearing 180)
         mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
-        // DetectionAngle = 40 (80 / 2)
-        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);
-        // DetectionRange = 60 (30 * 2)
-        mockPidsSymbol.VerifySet(s => s.DetectionRange = 60.0, Times.Once);
-        // SetUpdate() should be called once
+        // DetectionAngle = 80 - 0.5*(80-5) = 42.5
+        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 42.5, Times.Once);
+        // DetectionRange = 10 + 0.5*(3000-10) = 1505
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 1505.0, Times.Once);
+        // 헤드리스(Application 없음) → MarshalUpdate 동기 폴백으로 SetUpdate 1회
         mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
     }
     #endregion
@@ -3544,63 +3553,130 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 
-    #region Test 2.3: MalfunctionEventCardView_DeviceTypeName_ShowsNewDeviceTypes
-    [Fact]
-    public void MalfunctionEventCardView_DeviceTypeName_ShowsNewDeviceTypes()
-    {
-        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
-        var xamlContent = File.ReadAllText(xamlPath);
+    // 카드 1행 계약(47c2bcc8): 구역(DeviceGroupsText)·장비타입(DeviceTypeName)을 따로 그리던 TextBlock 들을
+    //   단일 VM 파생값 ZoneDeviceText("그룹 - 장비타입 번호")로 통합했다 — 좁은 카드에서 구역·장비명이 잘리던 사용자 보고.
+    //   (EventCardViewModel.ZoneDeviceText 가 DeviceGroupsText + DeviceTypeName + DeviceNumber 를 합성)
+    //   따라서 XAML 은 ZoneDeviceText 에 바인딩하고, 장비타입·구역 이름은 그 값 안에 실려야 한다.
 
-        // Assert: DeviceTypeName 바인딩이 존재해야 함
-        Assert.Contains("DeviceTypeName", xamlContent);
+    #region Test 2.3: MalfunctionEventCardView — 장비타입이 ZoneDeviceText 로 표시
+    [Theory]
+    [InlineData(EnumDeviceType.Controller, "제어기")]
+    [InlineData(EnumDeviceType.Enclosure, "함체")]
+    [InlineData(EnumDeviceType.Gate, "통문")]
+    public void should_show_device_type_in_zone_device_text_when_malfunction_card_bound(EnumDeviceType deviceType, string expectedTypeName)
+    {
+        // Arrange
+        var xamlContent = ReadEventCardXaml("MalfunctionEventCardView.xaml");
+        var vm = new MalfunctionEventCardViewModel(new MalfunctionEventModel
+        {
+            Device = new BaseDeviceModel { Id = 1, DeviceNumber = 2, DeviceType = deviceType },
+            MessageType = EnumEventType.Fault,
+            DateTime = System.DateTime.Now,
+            Reason = EnumFaultType.FAULT_CONTROLLER
+        });
+
+        // Act
+        var text = vm.ZoneDeviceText;
+
+        // Assert: 카드가 합성 속성에 바인딩하고, 그 값이 장비타입 이름을 싣는다
+        Assert.Contains("{Binding ZoneDeviceText", xamlContent);
+        Assert.Equal(expectedTypeName, vm.DeviceTypeName);
+        Assert.Equal($"{expectedTypeName} 2", text);   // 그룹 없음 → "장비타입 번호"
     }
     #endregion
 
-    #region Test 2.4: DetectionEventCardView_DeviceTypeName_ShowsNewDeviceTypes
-    [Fact]
-    public void DetectionEventCardView_DeviceTypeName_ShowsNewDeviceTypes()
+    #region Test 2.4: DetectionEventCardView — 장비타입이 ZoneDeviceText 로 표시
+    [Theory]
+    [InlineData(EnumDeviceType.Fence, "센서")]
+    [InlineData(EnumDeviceType.IpCamera, "카메라")]
+    [InlineData(EnumDeviceType.Lamp, "경고등")]
+    [InlineData(EnumDeviceType.Gate, "통문")]
+    public void should_show_device_type_in_zone_device_text_when_detection_card_bound(EnumDeviceType deviceType, string expectedTypeName)
     {
-        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
-        var xamlContent = File.ReadAllText(xamlPath);
+        // Arrange
+        var xamlContent = ReadEventCardXaml("DetectionEventCardView.xaml");
+        var vm = new DetectionEventCardViewModel(new DetectionEventModel
+        {
+            Device = new BaseDeviceModel { Id = 1, DeviceNumber = 4, DeviceType = deviceType },
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now,
+            Result = EnumDetectionType.VIBRATION_SENSOR
+        });
 
-        // Assert: DeviceTypeName 바인딩이 존재해야 함
-        Assert.Contains("DeviceTypeName", xamlContent);
+        // Act
+        var text = vm.ZoneDeviceText;
+
+        // Assert
+        Assert.Contains("{Binding ZoneDeviceText", xamlContent);
+        Assert.Equal(expectedTypeName, vm.DeviceTypeName);
+        Assert.Equal($"{expectedTypeName} 4", text);
     }
     #endregion
 
-    #region Test 2.5: DetectionEventCardView — 구역이 VM DeviceGroupsText(이름 변환)에 바인딩
+    #region Test 2.5: DetectionEventCardView — 구역이 ZoneDeviceText 안에서 그룹 이름으로 표시
     [Fact]
-    public void DetectionEventCardView_ZoneBindsToViewModelDeviceGroupsText()
+    public void should_show_group_name_not_id_in_zone_device_text_when_detection_card_bound()
     {
-        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
-        var xamlContent = File.ReadAllText(xamlPath);
+        // Arrange
+        var xamlContent = ReadEventCardXaml("DetectionEventCardView.xaml");
+        var vm = new DetectionEventCardViewModel(new DetectionEventModel
+        {
+            Device = new SensorDeviceModel { Id = 1, DeviceNumber = 1, DeviceType = EnumDeviceType.Fence, DeviceGroups = new List<int> { 7 } },
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now,
+            Result = EnumDetectionType.VIBRATION_SENSOR
+        });
 
-        // Assert: 그룹 Id 숫자를 그대로 노출하는 모델 바인딩(Device.DeviceGroupsText)이 없어야 함
+        // Act
+        var text = ReadZoneDeviceTextWithGroup(vm, id: 7, name: "A구역");
+
+        // Assert: 그룹 Id 숫자를 그대로 노출하는 모델 바인딩·존재하지 않는 Device.Name 바인딩이 없어야 함
         Assert.DoesNotContain("Device.DeviceGroupsText", xamlContent);
-        // Assert: 존재하지 않는 Device.Name 바인딩이 없어야 함
         Assert.DoesNotContain("{Binding Device.Name}", xamlContent);
-        // Assert: 대신 이름 변환 VM 속성(DeviceGroupsText)에 바인딩되어야 함
-        Assert.Contains("{Binding DeviceGroupsText}", xamlContent);
+        // Assert: 카드는 합성 속성에 바인딩하고, 구역은 Id(7)가 아니라 이름으로 실린다
+        Assert.Contains("{Binding ZoneDeviceText", xamlContent);
+        Assert.Equal("A구역 - 센서 1", text);
     }
     #endregion
 
-    #region Test 2.6: MalfunctionEventCardView — 구역이 VM DeviceGroupsText(이름 변환)에 바인딩
+    #region Test 2.6: MalfunctionEventCardView — 구역이 ZoneDeviceText 안에서 그룹 이름으로 표시
     [Fact]
-    public void MalfunctionEventCardView_ZoneBindsToViewModelDeviceGroupsText()
+    public void should_show_group_name_not_id_in_zone_device_text_when_malfunction_card_bound()
     {
-        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
-        var xamlContent = File.ReadAllText(xamlPath);
+        // Arrange
+        var xamlContent = ReadEventCardXaml("MalfunctionEventCardView.xaml");
+        var vm = new MalfunctionEventCardViewModel(new MalfunctionEventModel
+        {
+            Device = new ControllerDeviceModel { Id = 1, DeviceNumber = 3, DeviceType = EnumDeviceType.Controller, DeviceGroups = new List<int> { 7 } },
+            MessageType = EnumEventType.Fault,
+            DateTime = System.DateTime.Now,
+            Reason = EnumFaultType.FAULT_CONTROLLER
+        });
 
-        // Assert: 그룹 Id 숫자를 그대로 노출하는 모델 바인딩(Device.DeviceGroupsText)이 없어야 함
+        // Act
+        var text = ReadZoneDeviceTextWithGroup(vm, id: 7, name: "A구역");
+
+        // Assert
         Assert.DoesNotContain("Device.DeviceGroupsText", xamlContent);
-        // Assert: 대신 이름 변환 VM 속성(DeviceGroupsText)에 바인딩되어야 함
-        Assert.Contains("{Binding DeviceGroupsText}", xamlContent);
+        Assert.Contains("{Binding ZoneDeviceText", xamlContent);
+        Assert.Equal("A구역 - 제어기 3", text);
     }
     #endregion
+
+    private static string ReadEventCardXaml(string fileName)
+        => File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", fileName));
+
+    /// <summary>DeviceGroupProvider 에 그룹 1건을 실어 IoC 로 노출한 상태에서 ZoneDeviceText 를 한 번 읽는다(Id→이름 변환 경로).</summary>
+    private static string ReadZoneDeviceTextWithGroup<T>(EventCardViewModel<T> vm, int id, string name) where T : IExEventModel
+    {
+        var groups = new DeviceGroupProvider(new Mock<ILogService>().Object);
+        groups.Add(new DeviceGroupModel { Id = id, Name = name });
+        var previous = IoC.GetInstance;
+        IoC.GetInstance = (type, key) => type == typeof(DeviceGroupProvider) ? groups : previous(type, key);
+        try { return vm.ZoneDeviceText; }
+        finally { IoC.GetInstance = previous; }
+    }
 
     #region Test 3.1: DetectionEventPanelView — 구역 컬럼 없음 + 조치보고 컬럼 있음
     [Fact]

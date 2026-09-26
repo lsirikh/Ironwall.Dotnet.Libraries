@@ -23,6 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 public class MalfunctionNatsSyncServiceTests
 {
     private Func<MessageArgsModel, Task>? _capturedHandler;
+    private readonly Mock<IEventAggregator> _mockEa = new();
 
     private MalfunctionNatsSyncService CreateService(
         IEventSetupModel eventSetup,
@@ -30,7 +31,6 @@ public class MalfunctionNatsSyncServiceTests
     {
         var mockNats = new Mock<INatsService>();
         var mockManager = new Mock<ISymbolEventManager>();
-        var mockEa = new Mock<IEventAggregator>();
         mockQueue = new Mock<IEventQueueManager>();
 
         mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<MessageArgsModel, Task>>())
@@ -41,7 +41,7 @@ public class MalfunctionNatsSyncServiceTests
 
         // tokenStorage 미전달 → 로그인 게이트 비활성(테스트에서 이벤트 통과)
         return new MalfunctionNatsSyncService(
-            null, mockNats.Object, mockManager.Object, mockQueue.Object, eventSetup, mockEa.Object);
+            null, mockNats.Object, mockManager.Object, mockQueue.Object, eventSetup, _mockEa.Object);
     }
 
     /// <summary>장애/탐지 필드를 개별 지정한 IEventSetupModel 목 생성.</summary>
@@ -73,6 +73,32 @@ public class MalfunctionNatsSyncServiceTests
           }
         }
         """);
+
+    /// <summary>
+    /// 카드 1:1 매칭 신호(EventEntryEnqueuedMessage)가 WPF Application 없는 실행(헤드리스)에서 조용히 버려지던 결함(3e78d574)의 회귀망 —
+    /// DetectionNatsSyncService 와 같은 규약: Dispatcher 가 없으면 현재 스레드에서 발행한다.
+    /// </summary>
+    [Fact]
+    public async Task should_publish_entry_enqueued_message_when_malfunction_received_without_wpf_application()
+    {
+        // Arrange
+        var service = CreateService(BuildSetup(malfunctionOn: true, malfunctionSec: 30), out _);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(MalfunctionMessage());
+
+        // Assert
+        _mockEa.Verify(ea => ea.PublishAsync(
+            It.Is<EventEntryEnqueuedMessage>(m =>
+                m.EntryId == "test-entry-id" &&
+                m.EventId == 55 &&
+                m.DeviceId == 8 &&
+                m.EventType == EnumEventType.Fault),
+            It.IsAny<Func<Func<Task>, Task>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 
     [Fact]
     public async Task should_stamp_entry_with_malfunction_timeout_when_malfunction_received()

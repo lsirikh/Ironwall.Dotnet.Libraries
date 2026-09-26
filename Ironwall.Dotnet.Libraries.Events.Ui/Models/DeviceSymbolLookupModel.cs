@@ -157,7 +157,7 @@ public class DeviceSymbolLookupModel : BaseModel
     /// </summary>
     /// <param name="pan">Pan 각도 (0.0 ~ 360.0)</param>
     /// <param name="tilt">Tilt 각도 (사용 안 함, 향후 확장용)</param>
-    /// <param name="zoom">줌 백분율 (100 = 1x)</param>
+    /// <param name="zoom">정규화된 줌 (0~100, 100=NVR 최대줌) — 범위 밖은 양 끝으로 고정</param>
     public void ProcessPtz(float pan, float tilt, float zoom)
     {
         UpdateFOV(pan, tilt, zoom);
@@ -213,7 +213,7 @@ public class DeviceSymbolLookupModel : BaseModel
     /// </summary>
     /// <param name="pan">Pan 각도 (0.0 ~ 360.0)</param>
     /// <param name="tilt">Tilt 각도 (사용 안 함, 향후 확장용)</param>
-    /// <param name="zoom">줌 백분율 (100 = 1x)</param>
+    /// <param name="zoom">정규화된 줌 (0~100, 100=NVR 최대줌) — 범위 밖은 양 끝으로 고정</param>
     protected void UpdateFOV(float pan, float tilt, float zoom)
     {
         _log?.Info($"[UpdateFOV] 진입: SymbolModel={SymbolModel?.GetType().Name ?? "null"}, Title={SymbolModel?.Title ?? "null"}");

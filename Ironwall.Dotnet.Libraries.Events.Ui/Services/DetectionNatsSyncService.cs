@@ -157,16 +157,29 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             _log?.Info($"DETECTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
             // entryId + eventId를 EventAggregator로 발행 → 카드 1:1 매칭에 사용
-            // Background(4) 우선순위: PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발 → Background로 하강
-            Application.Current?.Dispatcher.InvokeAsync(
-                () => _eventAggregator!.PublishOnCurrentThreadAsync(
-                    new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType)),
-                DispatcherPriority.Background);
+            return PublishEnqueued(new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType));
         }
         catch (Exception ex)
         {
             _log?.Error($"OnNatsDetectionAsync 오류: {ex.Message}");
         }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// EventEntryEnqueuedMessage 발행. UI 스레드 Background(4) 우선순위 — PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발(3e78d574).
+    /// 헤드리스(Application 없음: 테스트/DB모드)면 현재 스레드 발행 폴백 — Dispatcher 가 없다고 발행을 조용히 버리지 않는다
+    /// (DetectionSyncNatsService 와 동일 규약).
+    /// </summary>
+    private Task PublishEnqueued(EventEntryEnqueuedMessage message)
+    {
+        var ea = _eventAggregator;
+        if (ea == null) return Task.CompletedTask;
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null) return ea.PublishOnCurrentThreadAsync(message);
+
+        dispatcher.InvokeAsync(() => ea.PublishOnCurrentThreadAsync(message), DispatcherPriority.Background);
         return Task.CompletedTask;
     }
 

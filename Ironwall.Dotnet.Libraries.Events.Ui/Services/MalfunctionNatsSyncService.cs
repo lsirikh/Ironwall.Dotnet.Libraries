@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
@@ -135,16 +135,29 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
 
             _log?.Info($"MALFUNCTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
-            // Background(4) 우선순위: PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발 → Background로 하강
-            Application.Current?.Dispatcher.InvokeAsync(
-                () => _eventAggregator!.PublishOnCurrentThreadAsync(
-                    new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, EnumEventType.Fault)),
-                DispatcherPriority.Background);
+            return PublishEnqueued(new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, EnumEventType.Fault));
         }
         catch (Exception ex)
         {
             _log?.Error($"OnNatsMalfunctionAsync 오류: {ex.Message}");
         }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// EventEntryEnqueuedMessage 발행. UI 스레드 Background(4) 우선순위 — PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발(3e78d574).
+    /// 헤드리스(Application 없음: 테스트/DB모드)면 현재 스레드 발행 폴백 — Dispatcher 가 없다고 발행을 조용히 버리지 않는다
+    /// (DetectionNatsSyncService 와 동일 규약).
+    /// </summary>
+    private Task PublishEnqueued(EventEntryEnqueuedMessage message)
+    {
+        var ea = _eventAggregator;
+        if (ea == null) return Task.CompletedTask;
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null) return ea.PublishOnCurrentThreadAsync(message);
+
+        dispatcher.InvokeAsync(() => ea.PublishOnCurrentThreadAsync(message), DispatcherPriority.Background);
         return Task.CompletedTask;
     }
     #endregion
