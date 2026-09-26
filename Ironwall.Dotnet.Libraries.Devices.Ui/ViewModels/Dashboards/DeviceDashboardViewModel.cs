@@ -123,6 +123,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
         ContractGate = new DeviceContractGateViewModel(_queryPolicy, log);
         GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log);
+        _axisWriter = new DeviceAxisWriter(deviceApiService, _queryPolicy, log);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         GroupChips = new ObservableCollection<DeviceGroupViewModel>();
@@ -144,6 +145,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         BuildRail();            // 계약 세대가 바뀌었을 수 있다(부품으로 찾기는 축 계약에서만).
         RefreshRailCounts();
         RefreshGroupChips();
+
+        // "소속 부대" 선택지가 부대 이름으로 뜨도록 미리 읽어 둔다(8.0 미만이면 서버를 부르지 않는다 · 실패해도 창은 연다).
+        _ = UnitDirectory()?.EnsureLoadedAsync();
 
         await TabControlViewModel.ActivateAsync();
         await SwitchRailAsync(_railKey ?? GroupsRailKey, force: true);
@@ -386,7 +390,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var draft = _current.CreateDraft();
         if (draft is null)
         {
-            StatusText = "지금은 추가할 수 없다 — 처리 중이거나 권한이 없다";
+            StatusText = "지금은 추가할 수 없습니다 — 다른 작업 중이거나 권한이 없습니다.";
             return;
         }
 
@@ -419,7 +423,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         if (_current.Reload())
             _pending = new PendingOperation(PendingKind.Reload, 0, 0, RowIds(Form.Rows), Array.Empty<int>(), Array.Empty<(DevicePropertySpec, string)>());
         else
-            StatusText = "지금은 갱신할 수 없다 — 다른 처리가 끝난 뒤 다시 누른다";
+            StatusText = "지금은 새로 불러올 수 없습니다 — 잠시 후 다시 [갱신]을 누르세요.";
         RefreshToolbar();
     }
 
@@ -447,7 +451,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CanAssemble));
         NotifyOfPropertyChange(nameof(CanEditComponents));
         NotifyOfPropertyChange(nameof(CanOpenWiring));
+        NotifyOfPropertyChange(nameof(IsWiringVisible));
         NotifyOfPropertyChange(nameof(WiringBlockedReason));
+        NotifyOfPropertyChange(nameof(CanOpenCameraDetail));
+        NotifyOfPropertyChange(nameof(IsCameraDetailVisible));
     }
     #endregion
 
@@ -466,7 +473,15 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
 
         // 저장이 끝난 뒤 서버 값과 맞춰 보려고 무엇을 썼는지 적어 둔다 — 패널의 저장은 성공 여부를 돌려주지 않는다.
-        var written = Form.Fields.Where(f => f.IsTouched && !f.IsLocked).Select(f => (f.Spec, f.Text)).ToList();
+        var written = Form.Fields.Where(f => f.IsTouched && !f.IsLocked && !f.WritesAxis).Select(f => (f.Spec, f.Text)).ToList();
+        var axisEdits = commit.AxisEdits ?? Array.Empty<(DevicePropertySpec Spec, string Text)>();
+
+        // 축 값 칸(접속 · 하드웨어 · 부대 · 운용 설정)만 고쳤다 — 패널 저장 없이 좁은 PATCH 로 보낸다.
+        if (!commit.HasRowWrites && axisEdits.Count > 0 && !creating)
+        {
+            _ = ApplyAxisEditsAsync(Form.Rows.ToList(), axisEdits, commit.RowCount, commit.FieldCount);
+            return;
+        }
 
         var knownIds = RowIds(_current.Rows.Cast<object>());
         if (creating && _draft is not null) _current.AdoptDraft(_draft);
@@ -476,12 +491,15 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         if (!_current.Save())
         {
             if (creating && _draft is not null) _current.ReleaseDraft(_draft);
-            Detail.LastMessage = "지금은 저장할 수 없다 — 처리 중이거나 권한이 없다. 손댄 칸은 그대로 있다";
+            Detail.LastMessage = "지금은 저장할 수 없습니다 — 다른 작업 중이거나 권한이 없습니다. 고친 값은 그대로 있습니다.";
             RefreshToolbar();
             return;
         }
 
-        _pending = new PendingOperation(creating ? PendingKind.Create : PendingKind.Update, commit.RowCount, commit.FieldCount, RowIds(Form.Rows), knownIds, written);
+        _pending = new PendingOperation(creating ? PendingKind.Create : PendingKind.Update, commit.RowCount, commit.FieldCount, RowIds(Form.Rows), knownIds, written)
+        {
+            AxisEdits = axisEdits,
+        };
         Detail.Settle(creating ? "등록하는 중…" : "적용하는 중…");
         RefreshToolbar();
     }
@@ -500,7 +518,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
 
         Form.Revert();
-        Detail.Settle("되돌렸다");
+        Detail.Settle("되돌렸습니다.");
     }
 
     private void LoadForm(IReadOnlyList<object> rows, bool isCreating)
@@ -519,8 +537,68 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         Detail.SelectedCount = isCreating ? 0 : rows.Count;
         Detail.SingleTitle = rows.Count == 1 ? RowText(rows[0], "DeviceName") ?? RowText(rows[0], "Name") ?? string.Empty : string.Empty;
         Detail.SingleNumber = rows.Count == 1 ? RowText(rows[0], "DeviceNumber") ?? string.Empty : string.Empty;
-        Detail.CreateBanner = $"새 {Detail.TypeName} — 필수 칸을 채우고 [등록] 을 누르면 그때 서버에 만든다.";
+        Detail.CreateBanner = $"필수 항목(*)을 채우고 [등록]을 누르면 새 {Detail.TypeName}이(가) 만들어집니다.";
         Detail.LastMessage = null;
+    }
+
+    /// <summary>
+    /// 축 값 칸(접속 · 하드웨어 · 부대 · 운용 설정)을 장비마다 좁은 PATCH 한 건으로 보내고, 목록을 다시 읽어 맞춰 본다.
+    /// </summary>
+    /// <remarks>
+    /// 도는 동안 걸어 둔 일(<see cref="PendingKind.AxisPatch"/>)로 이동 · 명령을 막는다. 실패하면 목록을 다시 읽지 않고 한 줄로 알린다 —
+    /// 폼의 고친 값은 행 칸을 같이 저장한 경우가 아니면 그대로 남아 다시 [적용]할 수 있다.
+    /// </remarks>
+    private async Task ApplyAxisEditsAsync(IReadOnlyList<object> rows, IReadOnlyList<(DevicePropertySpec Spec, string Text)> edits, int rowCount, int fieldCount)
+    {
+        var models = DeviceGroupDropHandler.ModelsOf(rows).ToList();
+        _pending = new PendingOperation(PendingKind.AxisPatch, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits);
+        Detail.Settle("적용하는 중…");
+        RefreshToolbar();
+
+        DeviceAxisWriteResult result;
+        try
+        {
+            result = await _axisWriter.ApplyAsync(models, edits);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceConsole] 축 값 저장 실패 — {ex.Message}");
+            result = new DeviceAxisWriteResult(0, models.Count, "저장하지 못했습니다. 잠시 후 다시 [적용]하세요.");
+        }
+
+        _pending = null;
+        if (result.SentCount == 0)
+        {
+            Detail.LastMessage = result.Message;
+            RefreshToolbar();
+            return;
+        }
+
+        // 보낸 값이 목록에 보이도록 다시 읽는다 — 끝남(OnSourceBusyEnded)이 다시 고르고, 보낸 값과 맞춰 본다.
+        var applied = result.IsSuccess ? ConsoleDetailStateMachine.AppliedMessage(rowCount, fieldCount) : result.Message;
+        if (_current?.Reload() == true)
+        {
+            _pending = new PendingOperation(PendingKind.Reload, rowCount, fieldCount, RowIds(rows), Array.Empty<int>(), edits)
+            {
+                AfterAxisMessage = applied,
+            };
+        }
+        else
+        {
+            Detail.LastMessage = applied + " 목록은 [갱신]으로 다시 불러오세요.";
+        }
+        RefreshToolbar();
+    }
+
+    private static string MismatchMessage(string label) => $"'{label}' 값이 저장되지 않았습니다. 다시 확인한 뒤 [적용]하세요.";
+
+    /// <summary>숫자는 "45" 와 "45.0" 을 같은 값으로 본다 — 나머지는 글 그대로.</summary>
+    private static bool SameAxisText(string read, string written)
+    {
+        if (string.Equals(read.Trim(), written.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+        return double.TryParse(read, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var a)
+            && double.TryParse(written, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b)
+            && a.Equals(b);
     }
 
     private void OnNavigationBlocked(object? sender, ConsoleNavigation navigation)
@@ -555,7 +633,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 if (leftover)
                 {
                     LoadForm(new[] { _draft! }, isCreating: true);
-                    Detail.LastMessage = "등록되지 않았다 — 안내를 확인하고 다시 [등록] 한다";
+                    Detail.LastMessage = "등록하지 못했습니다. 입력한 값을 확인한 뒤 다시 [등록]하세요.";
                     break;
                 }
 
@@ -565,7 +643,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 var created = fresh.FirstOrDefault(r => RowText(r, "DeviceNumber") == number) ?? fresh.FirstOrDefault();
                 _draft = null;
                 Reselect(created is null ? Array.Empty<object>() : new[] { created },
-                    created is null ? "등록했다 — 지금 목록의 필터에서는 보이지 않는다" : "등록했다");
+                    created is null ? "등록했습니다 — 지금 검색 조건에서는 목록에 보이지 않습니다." : "등록했습니다.");
                 break;
             }
 
@@ -577,18 +655,37 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                     .Select(w => w.Spec.Label)
                     .FirstOrDefault();
 
+                // 행 칸이 제대로 저장됐고 축 값 칸이 함께 있으면 이어서 보낸다(패널 저장 뒤 — 패널 저장이 받은 축을 되싣기 때문).
+                if (mismatch is null && pending.AxisEdits.Count > 0 && again.Count > 0)
+                {
+                    _ = ApplyAxisEditsAsync(again, pending.AxisEdits, pending.RowCount, pending.FieldCount);
+                    break;
+                }
+
                 Reselect(again, mismatch is null
                     ? ConsoleDetailStateMachine.AppliedMessage(pending.RowCount, pending.FieldCount)
-                    : $"'{mismatch}' 이(가) 서버 값과 다르다 — 저장이 거절됐을 수 있다. 안내를 확인한다");
+                    : MismatchMessage(mismatch));
                 break;
             }
 
             default:
-                // 조립기 · 등록 창이 서버에 쓰고 돌아온 재조회면 그 장비를 고르고, 상태 띠의 한 줄("등록했다")은 그대로 둔다.
+            {
+                // 조립기 · 등록 창이 서버에 쓰고 돌아온 재조회면 그 장비를 고르고, 상태 띠의 한 줄("등록했습니다")은 그대로 둔다.
                 var afterWindow = _selectAfterReload is not null;
                 _selectAfterReload = null;
-                Reselect(rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList(), afterWindow ? null : "갱신했다");
+                var reselected = rows.Where(r => pending.RowIds.Contains(RowId(r))).ToList();
+
+                // 축 값 편집 뒤의 재조회 — 다시 읽은 값이 보낸 값과 같은지 맞춰 본다(서버가 받았다고 답해도 값이 다를 수 있다).
+                var axisMismatch = reselected.Count == 0 ? null : pending.Written
+                    .Where(w => reselected.Any(r => !SameAxisText(DevicePropertyAccessor.ReadText(r, w.Spec), w.Text)))
+                    .Select(w => w.Spec.Label)
+                    .FirstOrDefault();
+                var message = pending.AfterAxisMessage is null
+                    ? (afterWindow ? null : "새로 불러왔습니다.")
+                    : axisMismatch is null ? pending.AfterAxisMessage : MismatchMessage(axisMismatch);
+                Reselect(reselected, message);
                 break;
+            }
         }
 
         RefreshStatus();
@@ -615,7 +712,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
 
         var lost = Form.Rows.Count - again.Count;
-        Reselect(again, lost > 0 ? $"고르던 {lost}건이 목록에서 사라졌다" : null);
+        Reselect(again, lost > 0 ? $"고른 장비 {lost}대가 목록에서 사라졌습니다." : null);
     }
 
     /// <summary>재조회로 행 인스턴스가 바뀐다 — 같은 Id 의 새 행을 다시 고른다.</summary>
@@ -685,9 +782,23 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 return _typeAxis.TryGetValue(category, out var extra)
                     ? extra.ExtraAxes.Where(a => spec.VocabularyName is null || a.Field == spec.VocabularyName || a.Field == spec.ApiPath)
                            .SelectMany(a => a.Values)
-                           .Select(o => new PropertyOption(o.Display, o.Code))
+                           .Select(o => new PropertyOption(DeviceEnumDisplay.SpeakerRoleKorean(o.Code, o.Label), o.Code))
                            .ToList()
                     : Array.Empty<PropertyOption>();
+
+            case DevicePropertyOptionSource.Units:
+            {
+                // 값 = 부대 id, 화면 = 부대 이름. 이름을 아직 못 읽었으면 지금 고른 장비들의 부대 id 만이라도 싣는다(지어내지 않는다).
+                var directory = UnitDirectory();
+                var units = directory?.Snapshot() ?? Array.Empty<(int Id, string Name)>();
+                var options = units.Select(u => new PropertyOption(u.Name, u.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+                foreach (var id in DeviceGroupDropHandler.ModelsOf(Form.Rows).Select(m => m.UnitId).OfType<int>().Distinct())
+                {
+                    var code = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (options.All(o => o.Text != code)) options.Add(new PropertyOption(directory?.Display(id) ?? code, code));
+                }
+                return options;
+            }
 
             case DevicePropertyOptionSource.Controllers:
                 // 저장 전 제어기(Id≤0)는 고를 수 없다 — 고르면 센서 등록이 말없이 보류된다(패널도 같은 필터를 쓴다).
@@ -748,20 +859,68 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         ListStatusText = IsByComponent ? string.Empty
             : shown == total ? $"목록 {total}건 · 선택 {Form.Rows.Count}"
             : $"목록 {shown}건(전체 {total}) · 선택 {Form.Rows.Count}";
+
+        // 빈 목록 안내 — 첫 읽기 · 재조회가 도는 동안에는 띄우지 않는다("없다"와 "아직 모른다"는 다르다).
+        var label = SelectedRail?.Label ?? "장비";
+        IsListEmpty = _current is not null && !IsByComponent && shown == 0 && _current.IsBusy == false;
+        EmptyTitle = total > 0 ? "검색 결과가 없습니다"
+            : IsGroupsRail ? "등록된 그룹이 없습니다"
+            : $"등록된 {label}{SubjectParticle(label)} 없습니다";
+        EmptyHint = total > 0 ? "검색어를 지우거나 바꿔 보세요"
+            : IsGroupsRail ? "[추가]로 새 그룹을 만드세요"
+            : "[추가]로 새 장비를 등록하세요";
     }
+
+    /// <summary>주격 조사 — 받침이 있으면 "이", 없으면 "가"(한글이 아니면 "이(가)").</summary>
+    internal static string SubjectParticle(string word)
+    {
+        if (string.IsNullOrEmpty(word)) return "이(가)";
+        var last = word[^1];
+        if (last < '\uAC00' || last > '\uD7A3') return "이(가)";
+        return (last - 0xAC00) % 28 == 0 ? "가" : "이";
+    }
+
+    /// <summary>목록이 비었다(검색 결과 없음 포함) — 빈 상태 안내를 띄운다.</summary>
+    public bool IsListEmpty
+    {
+        get => _isListEmpty;
+        private set { if (_isListEmpty == value) return; _isListEmpty = value; NotifyOfPropertyChange(); }
+    }
+
+    public string EmptyTitle
+    {
+        get => _emptyTitle;
+        private set { if (_emptyTitle == value) return; _emptyTitle = value; NotifyOfPropertyChange(); }
+    }
+
+    public string EmptyHint
+    {
+        get => _emptyHint;
+        private set { if (_emptyHint == value) return; _emptyHint = value; NotifyOfPropertyChange(); }
+    }
+
+    private bool _isListEmpty;
+    private string _emptyTitle = string.Empty;
+    private string _emptyHint = string.Empty;
     #endregion
 
     #region - Wiring setup (device-wiring-setup N-04 FR-03 · FR-04) -
     /// <summary>
     /// 셋업 · 결선 입구를 낼 것인가 — 결선을 담을 자리가 있는 서버(7.0+)에서 <b>제어기 한 대</b>를 골랐을 때만.
     /// </summary>
+    /// <summary>
+    /// 셋업 · 결선 입구를 툴바에 둘 것인가 — 결선을 담을 수 있는 서버의 <b>제어기 목록</b>에서만(다른 레일에서는 늘 꺼져 있어 자리만 차지했다).
+    /// 제어기 목록에서 제어기를 아직 안 골랐으면 보이되 꺼져 있고 툴팁이 까닭을 말한다.
+    /// </summary>
+    public bool IsWiringVisible => _wiring?.IsAvailable == true && Category == EnumDeviceCategory.Controller;
+
     public bool CanOpenWiring => _wiring?.IsAvailable == true
         && Category == EnumDeviceCategory.Controller
         && DevicePermissionGate.CanEdit()
         && !IsOperationRunning && !Detail.IsCreating && !Detail.Tracker.IsDirty
         && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
 
-    public string? WiringBlockedReason => _wiring?.IsAvailable != true ? "이 서버 판본에는 결선을 담을 자리가 없습니다."
+    public string? WiringBlockedReason => _wiring?.IsAvailable != true ? "현재 서버에서는 결선을 저장할 수 없습니다."
         : Category != EnumDeviceCategory.Controller ? "제어기 목록에서 제어기 한 대를 고르세요."
         : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
         : IsOperationRunning ? "하던 작업이 끝난 뒤에 열 수 있습니다."
@@ -778,7 +937,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
         if (model is null) return;
 
-        if (await _wiring!.OpenAsync(model)) SelectAfterReload(model.Id, "센서 · 결선을 저장했다");
+        if (await _wiring!.OpenAsync(model)) SelectAfterReload(model.Id, "센서 · 결선을 저장했습니다.");
     }
 
     private readonly Lazy<IWiringLauncher>? _wiringFactory;
@@ -813,14 +972,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     {
         if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
-        SelectAfterReload(await _assembly!.ComposeAsync(category), "등록했다");
+        SelectAfterReload(await _assembly!.ComposeAsync(category), "등록했습니다.");
     }
 
     public async Task RegisterFromPresetAsync()
     {
         if (!CanAssemble || Category is not { } category || IsOperationRunning) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
-        SelectAfterReload(await _assembly!.RegisterFromPresetAsync(category), "프리셋으로 등록했다");
+        SelectAfterReload(await _assembly!.RegisterFromPresetAsync(category), "프리셋으로 등록했습니다.");
     }
 
     public async Task ManagePresetsAsync()
@@ -835,7 +994,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var model = DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault();
         if (model is null) return;
 
-        if (await _assembly!.EditDeviceAsync(model, category)) SelectAfterReload(model.Id, "부품 구성을 적용했다");
+        if (await _assembly!.EditDeviceAsync(model, category)) SelectAfterReload(model.Id, "부품 구성을 적용했습니다.");
     }
 
     /// <summary>창이 서버에 쓰고 프로바이더를 다시 읽었다 — 이 목록도 다시 읽고 그 장비를 고른다.</summary>
@@ -849,6 +1008,35 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         else
             _selectAfterReload = null;
         RefreshToolbar();
+    }
+    #endregion
+
+    #region - Camera detail (6.3) -
+    /// <summary>
+    /// 카메라 [상세보기] — 6.3 서버에서만. 카메라 설정(/settings) · 링크를 고치는 기존 창을 연다(호스트가 창을 띄운다).
+    /// 7.0 이상에서는 같은 값(하드웨어 · 동작 모드)을 상세 칸에서 바로 고치고, 그 창의 설정 탭은 서버에 없는 입구라 열지 않는다.
+    /// </summary>
+    public bool IsCameraDetailVisible => Category == EnumDeviceCategory.Camera && !ContractGate.IsAxisUi;
+
+    public bool CanOpenCameraDetail => IsCameraDetailVisible && !IsOperationRunning && !Detail.IsCreating
+        && Form.Rows.Count == 1 && RowId(Form.Rows[0]) > 0;
+
+    public void OpenCameraDetail()
+    {
+        if (!CanOpenCameraDetail) return;
+        if (DeviceGroupDropHandler.ModelsOf(Form.Rows).FirstOrDefault() is not ICameraDeviceModel camera) return;
+        try
+        {
+            _eventAggregator?.PublishOnUIThreadAsync(new Ironwall.Dotnet.Libraries.ViewModel.Models.OpenCameraDetailDialogMessageModel
+            {
+                Dialog = new Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs.CameraDetailDialogViewModel(camera),
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceConsole] 카메라 상세보기를 열지 못했습니다 — {ex.Message}");
+            StatusText = "카메라 상세보기를 열지 못했습니다. 잠시 후 다시 누르세요.";
+        }
     }
     #endregion
 
@@ -879,8 +1067,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         if (await _assign!.OpenAsync(groupId, RowText(row, "Name")))
         {
-            StatusText = "그룹 소속을 저장했다";
-            if (_current?.Reload() != true) StatusText = "그룹 소속을 저장했다 — 목록은 [갱신] 으로 다시 읽으세요";
+            StatusText = "그룹 소속을 저장했습니다.";
+            if (_current?.Reload() != true) StatusText = "그룹 소속을 저장했습니다 — 목록은 [갱신]으로 다시 불러오세요.";
             RefreshToolbar();
         }
     }
@@ -898,7 +1086,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             catch (Exception ex)
             {
                 _assignFailed = true;
-                _log?.Error($"[DeviceConsole] 장비 배정 입구를 만들지 못했다 — 입구를 감춘다: {ex.Message}");
+                _log?.Error($"[DeviceConsole] 장비 배정 입구를 만들지 못해 감춥니다: {ex.Message}");
                 return null;
             }
         }
@@ -962,6 +1150,13 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         EnumDeviceCategory.Gate => "Gate",
         _ => "Devices",
     };
+
+    /// <summary>부대 이름 사전(컨테이너에 있을 때만) — 없으면 부대 칸은 id 로 보인다.</summary>
+    private static UnitNameDirectory? UnitDirectory()
+    {
+        try { return IoC.Get<UnitNameDirectory>(); }
+        catch { return null; }
+    }
 
     private static bool SameRows(IReadOnlyList<object> a, IReadOnlyList<object> b)
         => a.Count == b.Count && !a.Except(b).Any();
@@ -1045,9 +1240,18 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     #endregion
 
     #region - Attributes -
-    private enum PendingKind { Create, Update, Reload }
+    private enum PendingKind { Create, Update, Reload, AxisPatch }
 
-    private sealed record PendingOperation(PendingKind Kind, int RowCount, int FieldCount, IReadOnlyList<int> RowIds, IReadOnlyList<int> KnownIds, IReadOnlyList<(DevicePropertySpec Spec, string Text)> Written);
+    private sealed record PendingOperation(PendingKind Kind, int RowCount, int FieldCount, IReadOnlyList<int> RowIds, IReadOnlyList<int> KnownIds, IReadOnlyList<(DevicePropertySpec Spec, string Text)> Written)
+    {
+        /// <summary>행 칸 저장이 끝난 뒤 이어 보낼 축 값 칸.</summary>
+        public IReadOnlyList<(DevicePropertySpec Spec, string Text)> AxisEdits { get; init; } = Array.Empty<(DevicePropertySpec, string)>();
+
+        /// <summary>축 값 편집 뒤의 재조회면, 다시 고른 뒤 보일 한 줄(맞춰 보기가 어긋나면 그 한 줄로 바뀐다).</summary>
+        public string? AfterAxisMessage { get; init; }
+    }
+
+    private readonly DeviceAxisWriter _axisWriter;
 
     private readonly Dictionary<string, IDeviceConsoleSource> _sources;
     private readonly Dictionary<EnumDeviceCategory, TypeAxisPanelSupport> _typeAxis;

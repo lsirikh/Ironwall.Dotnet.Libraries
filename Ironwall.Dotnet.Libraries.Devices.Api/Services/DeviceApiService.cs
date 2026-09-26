@@ -850,6 +850,64 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
+    /// <summary>축 값 부분 수정 본문에 실을 수 있는 최상위 키 — 이 밖은 보내기 전에 막는다.</summary>
+    private static readonly HashSet<string> AxisPatchTopKeys = new(StringComparer.Ordinal)
+    {
+        "connection", "hardware_spec", "device_config", "unit_id",
+    };
+
+    /// <summary>
+    /// <inheritdoc cref="IDeviceApiService.PatchDeviceAxesAsync" path="/summary"/>
+    /// </summary>
+    public async Task<ApiResponse<object>> PatchDeviceAxesAsync(
+        string deviceTypePath,
+        int deviceId,
+        Newtonsoft.Json.Linq.JObject body,
+        CancellationToken token = default)
+    {
+        if (!DeviceTypePaths.IsValid(deviceTypePath))
+            return InvalidDeviceTypePath<object>(nameof(PatchDeviceAxesAsync), deviceTypePath);
+
+        if (deviceId <= 0)
+            return ApiResponse<object>.CreateError("VALIDATION_ERROR", "아직 서버에 없는 장비입니다.");
+
+        if (!IsAxisContract)
+        {
+            return AxisEndpointUnavailable<object>(
+                $"PATCH /api/devices/{deviceTypePath}/{{id}} (축 값 부분 수정)",
+                "6.3 에는 접속 · 형상 · 설정 축이 없습니다 — 장비 본문의 평면 필드를 사용하십시오.");
+        }
+
+        var shaped = (Newtonsoft.Json.Linq.JObject?)body?.DeepClone() ?? new Newtonsoft.Json.Linq.JObject();
+
+        // 8.0 미만에는 unit_id 가 쓰기 스키마에 없다 — 실리면 422 라 확실히 뺀다(ShapeWrite 와 같은 규칙).
+        if (!IsUnitScopedContract) shaped.Remove("unit_id");
+
+        var unknown = shaped.Properties().Select(p => p.Name).Where(name => !AxisPatchTopKeys.Contains(name)).ToList();
+        string? blocked = unknown.Count > 0 ? $"축 값 부분 수정에 실을 수 없는 키입니다: {string.Join(", ", unknown)}"
+            : shaped.SelectToken("hardware_spec.components") != null ? "부품 배열은 PATCH 에서도 통째로 바뀝니다 — 부품 구성은 조립기로만 보냅니다."
+            : shaped.Count == 0 ? "보낼 값이 없습니다."
+            : null;
+        if (blocked != null)
+        {
+            _log?.Error($"[{nameof(PatchDeviceAxesAsync)}] 차단 — {blocked}");
+            return ApiResponse<object>.CreateError("VALIDATION_ERROR", blocked);
+        }
+
+        try
+        {
+            var url = $"{_setupModel.Url}/devices/{deviceTypePath.Trim().ToLowerInvariant()}/{deviceId}";
+            _log?.Info($"[{nameof(PatchDeviceAxesAsync)}] PATCH {url} keys={string.Join(",", shaped.Properties().Select(p => p.Name))}");
+            var response = await _apiService.PatchRequestAsync(url, shaped);
+            return await response.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchDeviceAxesAsync)}] Error: {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"Failed to patch axes {deviceTypePath}/{deviceId}", ex.Message);
+        }
+    }
+
     /// <summary>
     /// GOP API를 통해 특정 Camera의 전체 정보를 수정합니다(전체 업데이트).
     /// <para>PUT /devices/cameras/{id} 엔드포인트를 호출</para>

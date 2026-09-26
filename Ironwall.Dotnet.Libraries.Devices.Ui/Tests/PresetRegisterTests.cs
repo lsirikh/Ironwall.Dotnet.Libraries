@@ -419,7 +419,7 @@ public class PresetRegisterTests
 
         Assert.Contains(
             PresetRequestBuilder.Validate(preset, Instance(), Catalog()),
-            p => p.Contains("카탈로그에 없습니다", StringComparison.Ordinal));
+            p => p.Contains("목록에 없습니다", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -442,7 +442,7 @@ public class PresetRegisterTests
 
         Assert.Contains(
             PresetRequestBuilder.Validate(preset, Instance(), Catalog()),
-            p => p.Contains("중복", StringComparison.Ordinal));
+            p => p.Contains("겹칩니다", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -572,7 +572,7 @@ public class PresetRegisterTests
 
         Assert.False(result.IsSuccess);
         Assert.Null(result.NewDeviceId);
-        Assert.Contains("부품 모델이 없다", result.Message, StringComparison.Ordinal);
+        Assert.Contains("부품 구성을 지원하지 않아", result.Message, StringComparison.Ordinal);
         Assert.Equal(0, api.CallCount);          // 왕복 한 번도 없다
         Assert.Equal(0, provider.FetchCount);
     }
@@ -593,7 +593,7 @@ public class PresetRegisterTests
 
         Assert.False(result.IsSuccess);
         Assert.False(result.IsConflict);         // 경합이 아니라 판본 문제다 — 다시 받아도 달라지지 않는다
-        Assert.Contains("부품 모델이 없다", result.Message, StringComparison.Ordinal);
+        Assert.Contains("부품 구성을 지원하지 않아", result.Message, StringComparison.Ordinal);
         Assert.Equal(0, api.CallCount);
         Assert.Equal(0, provider.FetchCount);
     }

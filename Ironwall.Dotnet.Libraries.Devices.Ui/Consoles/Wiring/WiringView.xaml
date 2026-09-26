@@ -608,7 +608,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="150" MinWidth="150" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="종류">
+								<DataGridTemplateColumn Width="130" MinWidth="130" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="종류">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<ComboBox
@@ -621,7 +621,7 @@
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
-								<DataGridTemplateColumn Width="160" MinWidth="160" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="구역">
+								<DataGridTemplateColumn Width="140" MinWidth="140" CellStyle="{StaticResource Console.DataGrid.Cell}" Header="구역">
 									<DataGridTemplateColumn.CellTemplate>
 										<DataTemplate>
 											<TextBox
@@ -904,7 +904,7 @@
 									<TextBlock
 										Margin="0,5,0,0"
 										Style="{StaticResource W.Hint}"
-										Text="체크를 바꾼 그룹만 더하거나 뺍니다 — 나머지 그룹은 줄마다 그대로 둡니다. 저장할 때 그룹 하나에 호출 한 번입니다." />
+										Text="체크를 바꾼 그룹만 더하거나 뺍니다 — 나머지 그룹은 줄마다 그대로 둡니다." />
 								</StackPanel>
 
 								<Border
@@ -1321,8 +1321,11 @@
 									Text="{Binding ChangePreview}"
 									TextWrapping="Wrap" />
 
-								<TextBlock Style="{StaticResource W.SectionHead}" Text="저장 방식" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding SaveNoteText}" />
+								<!--  U-18 D-9 9.1 — 저장 위치 · 요청 횟수 설명을 빼고 "몇 대를 저장하는지" 만 말한다. 바뀐 것이 없으면 접는다.  -->
+								<StackPanel Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}">
+									<TextBlock Style="{StaticResource W.SectionHead}" Text="저장 방식" />
+									<TextBlock Style="{StaticResource W.Hint}" Text="{Binding SaveNoteText}" />
+								</StackPanel>
 
 								<StackPanel Margin="0,10,0,0" Visibility="{Binding HasSaveResults, Converter={StaticResource BoolToVisibility}}">
 									<TextBlock Style="{StaticResource W.SectionHead}" Text="저장하지 못한 줄" />

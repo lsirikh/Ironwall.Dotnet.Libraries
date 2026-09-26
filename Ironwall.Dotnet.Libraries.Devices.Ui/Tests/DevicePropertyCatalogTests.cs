@@ -93,7 +93,8 @@ public class DevicePropertyCatalogTests : IDisposable
     public void should_have_view_model_path_when_fully_writable()
     {
         var missing = DevicePropertyCatalog.All
-            .Where(s => s.Writable == DevicePropertyWritable.Yes && string.IsNullOrWhiteSpace(s.ViewModelPath))
+            // 축 값 칸은 행 뷰모델이 아니라 축 값 부분 수정(AxisWritePath)으로 쓴다 — 둘 중 하나는 있어야 한다.
+            .Where(s => s.Writable == DevicePropertyWritable.Yes && string.IsNullOrWhiteSpace(s.ViewModelPath) && string.IsNullOrWhiteSpace(s.AxisWritePath))
             .Select(s => s.Key)
             .ToList();
 
@@ -157,8 +158,10 @@ public class DevicePropertyCatalogTests : IDisposable
 
         var unit = Assert.Single(specs, s => s.Key == "unit_id");
         Assert.Equal(DevicePropertySection.Common, unit.Section);
-        Assert.Equal(DevicePropertyEditor.ReadOnly, unit.Editor);
-        Assert.Equal(DevicePropertyWritable.No, unit.Writable);
+        // 2026-09-27: 소속 부대는 고를 수 있다(부대 목록 콤보 → 축 값 부분 수정). 전에는 "다부대 편집은 다음 판" 으로 잠겨 있었다.
+        Assert.Equal(DevicePropertyEditor.Choice, unit.Editor);
+        Assert.Equal(DevicePropertyWritable.Yes, unit.Writable);
+        Assert.Equal("unit_id", unit.AxisWritePath);
     }
 
     [Fact]
@@ -167,7 +170,9 @@ public class DevicePropertyCatalogTests : IDisposable
         var vm = new ControllerDeviceViewModel(new ControllerDeviceModel { UnitId = null });
         var spec = Spec("unit_id", EnumDeviceCategory.Controller);
 
-        Assert.Equal(Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory.Unassigned, DevicePropertyAccessor.ReadText(vm, spec));
+        // 저장 값은 비어 있고, 화면 글은 명세의 빈 값 표시("미배치")가 맡는다.
+        Assert.Equal(string.Empty, DevicePropertyAccessor.ReadText(vm, spec));
+        Assert.Equal(Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory.Unassigned, spec.EmptyDisplay);
     }
 
     [Fact]

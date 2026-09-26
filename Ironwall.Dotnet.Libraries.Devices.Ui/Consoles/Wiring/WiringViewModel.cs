@@ -337,6 +337,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(CanSave));
         NotifyOfPropertyChange(nameof(SaveBlockedReason));
         NotifyOfPropertyChange(nameof(ChangePreview));
+        NotifyOfPropertyChange(nameof(SaveNoteText));
         NotifyOfPropertyChange(nameof(HasChanges));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
@@ -367,9 +368,18 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     /// <summary>고장 구간 예시(WS L709-712).</summary>
     public string FaultText => WiringValidation.FaultHint(_board);
 
-    /// <summary>저장 방식 안내(WS L424).</summary>
-    public string SaveNoteText =>
-        "회선·순번을 담는 서버 필드가 아직 없어 장비의 벤더 확장 칸(hardware_spec.spec.wiring)에 함께 저장합니다. 센서 한 대당 1회 호출이라 [저장하기] 를 누를 때 한 번에 보냅니다.";
+    /// <summary>
+    /// 저장 방식 안내(WS L424). 저장 위치 · 요청 횟수 같은 구현 설명은 운영자에게 보이지 않는다(U-18 D-9 9.1) —
+    /// 몇 대가 저장되는지만 말한다. 바뀐 줄이 없으면 빈 글자라 뷰가 절을 접는다.
+    /// </summary>
+    public string SaveNoteText
+    {
+        get
+        {
+            var count = _board.Diff().ToSend.Count;
+            return count == 0 ? string.Empty : $"센서별로 저장합니다(센서 {count}대).";
+        }
+    }
 
     /// <summary>저장 전 변경 미리보기(WS L450).</summary>
     public string ChangePreview
@@ -383,7 +393,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             if (diff.Created.Count > 0) lines.Add($"만들 줄 {diff.Created.Count}: {Join(diff.Created)}");
             if (diff.FactChanged.Count > 0) lines.Add($"값이 바뀐 줄 {diff.FactChanged.Count}: {Join(diff.FactChanged)}");
             if (diff.WiringChanged.Count > 0) lines.Add($"결선이 바뀐 줄 {diff.WiringChanged.Count}: {string.Join(", ", diff.WiringChanged.Select(r => $"{r.Display}({Describe(r.BaselinePlacement)}→{Describe(_board.PlacementOf(r.Key))})"))}");
-            lines.Add($"보낼 호출 {diff.ToSend.Count}회(센서 한 대당 1회)");
+            lines.Add($"저장할 센서 {diff.ToSend.Count}대");
             return string.Join(Environment.NewLine, lines);
 
             static string Join(IReadOnlyList<WiringSensorRow> rows)
@@ -431,7 +441,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         var facts = new SensorFacts(next, $"센서 {next}", SensorTypes.FirstOrDefault() ?? string.Empty, LastZone());
         _board.AddRow(facts);
         SyncAll();
-        StatusText = "한 줄을 Draft 로 더했습니다.";
+        StatusText = "한 줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다.";
     }
 
     /// <summary>센서 여러 개 만들기(WS L348, L649-654).</summary>
@@ -450,14 +460,14 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
         if (facts.Count == 0)
         {
-            StatusText = "만들 줄이 없습니다 — 번호가 모두 겹칩니다.";
+            StatusText = "만들 줄이 없습니다. 번호가 모두 이미 있습니다.";
             return;
         }
 
         _board.PushUndo();
         foreach (var f in facts) _board.AddRow(f);
         SyncAll();
-        StatusText = $"{facts.Count}줄을 Draft 로 만들었습니다 — [저장하기] 를 누르면 서버에 보냅니다.";
+        StatusText = $"{facts.Count}줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다.";
     }
 
     /// <summary>엑셀에서 붙여넣기(WS L350, L659-664).</summary>
@@ -482,7 +492,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         _board.PushUndo();
         foreach (var row in report.Accepted) _board.AddRow(row.Facts);
         SyncAll();
-        StatusText = $"붙여넣기 {report.Accepted.Count}줄을 Draft 로 만들었습니다" + (report.Rejected.Count > 0 ? $" · {report.Rejected.Count}줄은 건너뛰었습니다." : ".");
+        StatusText = $"붙여넣은 {report.Accepted.Count}줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다" + (report.Rejected.Count > 0 ? $" · {report.Rejected.Count}줄은 건너뛰었습니다." : ".");
     }
     #endregion
 
@@ -947,7 +957,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     public bool CanSave => !IsBusy && _apply is not null && _board.IsDirty && !WiringValidation.BlocksSave(Issues);
 
     public string? SaveBlockedReason => IsBusy ? "저장 중입니다."
-        : _apply is null ? "이 서버 판본에서는 저장할 수 없습니다."
+        : _apply is null ? "현재 서버에서는 결선을 저장할 수 없습니다."
         : !_board.IsDirty ? "바뀐 줄이 없습니다."
         : WiringValidation.BlocksSave(Issues) ? Issues.First(i => i.Level == WiringIssueLevel.Critical).Message
         : null;
@@ -962,7 +972,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             (unplaced > 0
                 ? $"센서 {unplaced}대는 아직 선에 없습니다 — 그 센서의 결선은 저장하지 않습니다(표 값은 저장됩니다)." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
-            "보내기 직전에 각 센서를 다시 받아 그 사이 바뀌지 않았는지 확인합니다.";
+            "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?";
 
         if (!await _dialogs.ConfirmAsync("결선 저장", message)) return;
 

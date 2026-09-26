@@ -88,14 +88,10 @@
 						IsEnabled="{Binding CanSaveAsPreset}"
 						Style="{StaticResource Console.Button}" />
 				</StackPanel>
+				<!--  U-18 D-10 10.7 — 창 제목("부품 조립기")을 머리에서 한 번 더 찍지 않는다. 무엇을 조립하는지만 적는다.  -->
 				<StackPanel Orientation="Horizontal">
 					<TextBlock
-						VerticalAlignment="Center"
-						FontSize="15"
-						FontWeight="Bold"
-						Text="부품 조립기" />
-					<TextBlock
-						Margin="10,0,16,0"
+						Margin="0,0,16,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Assembly.Subject"
 						FontSize="13"
@@ -172,7 +168,7 @@
 						<TextBlock
 							Margin="0,2,0,8"
 							Style="{StaticResource Asm.Hint}"
-							Text="카탈로그에서 이 카테고리에 달 수 있는 것만 · 핸들을 끌어 보드에 놓거나 Enter 로 끝에 단다" />
+							Text="이 카테고리에 달 수 있는 부품만 보입니다 · 손잡이를 끌어 보드에 놓거나 Enter 로 끝에 다세요" />
 						<Grid Margin="0,0,0,8">
 							<TextBox
 								AutomationProperties.AutomationId="Devices.Assembly.PaletteSearch"
@@ -249,7 +245,7 @@
 					<TextBlock
 						Margin="0,2,0,8"
 						Style="{StaticResource Asm.Hint}"
-						Text="핸들 ⣿ 을 끌어 순서를 바꾼다 · 팔레트 블록을 끌어 놓으면 그 자리에 들어간다 · Alt+↑ Alt+↓ 로도 옮긴다 · Delete 로 뺀다 · 드래그 중 Esc 는 제자리 복귀" />
+						Text="손잡이 ⣿ 를 끌어 순서를 바꾸세요 · 팔레트 블록을 끌어 놓으면 그 자리에 들어갑니다 · Alt+↑ Alt+↓ 로도 옮깁니다 · Delete 로 뺍니다 · 끄는 중 Esc 는 제자리로 돌아갑니다" />
 				</StackPanel>
 
 				<!--  빼는 곳 — 늘 보인다(끄는 동안만 열면 드롭존 등록에서 빠진다)  -->
@@ -284,7 +280,7 @@
 							<TextBlock
 								VerticalAlignment="Center"
 								Style="{StaticResource Asm.Hint}"
-								Text="빼는 곳 — 보드의 블록을 여기에 끌어 놓으면 빠진다. [되돌리기] 로 도로 넣을 수 있다" />
+								Text="빼는 곳 — 보드의 블록을 여기에 끌어 놓으면 빠집니다. [되돌리기]로 다시 넣을 수 있습니다" />
 						</DockPanel>
 					</Border>
 				</drag:DropZoneChrome>
@@ -376,7 +372,7 @@
 						<TextBlock
 							Margin="0,8,0,0"
 							Style="{StaticResource Asm.Hint}"
-							Text="보드에서 블록 하나를 고르면 그 부품의 사실을 고칠 수 있다">
+							Text="보드에서 블록 하나를 고르면 그 부품 정보를 고칠 수 있습니다">
 							<TextBlock.Visibility>
 								<Binding Path="HasInspected">
 									<Binding.Converter>
@@ -388,9 +384,9 @@
 
 						<StackPanel Visibility="{Binding HasInspected, Converter={StaticResource BoolToVisibility}}">
 							<!--  부품 칸(형상) — 장비별 사실  -->
-							<c:ConsoleSection AxisName="hardware_spec.components[]" Header="이 부품의 사실">
+							<c:ConsoleSection AxisName="hardware_spec.components[]" Header="이 부품 정보">
 								<StackPanel>
-									<c:ConsoleField ApiName="key" Header="key" Note="{Binding Inspected.Slot.KeyError}">
+									<c:ConsoleField ApiName="key" Header="식별 이름" Note="{Binding Inspected.Slot.KeyError}">
 										<TextBox
 											AutomationProperties.AutomationId="Devices.Assembly.Field.key"
 											FontFamily="Consolas"
@@ -401,7 +397,7 @@
 										ApiName="type"
 										Header="유형"
 										IsLocked="True"
-										Note="유형을 바꾸려면 빼고 다시 단다">
+										Note="유형을 바꾸려면 빼고 다시 다세요">
 										<TextBlock
 											VerticalAlignment="Center"
 											FontFamily="Consolas"
@@ -447,7 +443,7 @@
 									<c:ConsoleField
 										ApiName="serial"
 										Header="일련번호"
-										Note="프리셋에는 담기지 않는다 — 그 장비만의 것">
+										Note="프리셋에는 담기지 않습니다 — 그 장비만의 값입니다">
 										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Serial, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
 								</StackPanel>
@@ -455,14 +451,14 @@
 
 							<!--  재정의 칸(의도) — 부품 칸과 갈라 놓는다: enabled 는 부품에 실으면 422, 여기서만 정상  -->
 							<c:ConsoleSection
-								Header="이 부품의 재정의"
+								Header="이 부품 설정"
 								TagKind="Intent">
 								<StackPanel>
 									<TextBlock
 										Style="{StaticResource Asm.Hint}"
-										Text="비워 두면 유형의 기본값을 쓴다. 부품을 빼면 이 재정의도 null 로 같이 지운다."
+										Text="비워 두면 유형 기본값을 씁니다. 부품을 빼면 이 설정도 함께 지워집니다."
 										Visibility="{Binding HasOverrideRows, Converter={StaticResource BoolToVisibility}}" />
-									<TextBlock Style="{StaticResource Asm.Hint}" Text="이 유형은 재정의할 수 있는 설정이 없다">
+									<TextBlock Style="{StaticResource Asm.Hint}" Text="이 유형은 따로 바꿀 수 있는 설정이 없습니다">
 										<TextBlock.Visibility>
 											<Binding Path="HasOverrideRows">
 												<Binding.Converter>
@@ -488,14 +484,14 @@
 							</c:ConsoleSection>
 
 							<!--  카탈로그 사실 — 보여 주기만 한다  -->
-							<c:ConsoleSection Header="카탈로그 사실 (읽기 전용)" TagKind="Observed">
+							<c:ConsoleSection Header="부품 유형 정보 (읽기 전용)" TagKind="Observed">
 								<StackPanel>
-									<TextBlock Style="{StaticResource Asm.Hint}" Text="유형 공통 값이다 — 장비마다 되풀이해 갖지 않는다. 요청에 실으면 서버가 422 로 거절한다." />
+									<TextBlock Style="{StaticResource Asm.Hint}" Text="같은 유형의 부품이 모두 함께 쓰는 값입니다." />
 									<Border Style="{StaticResource Asm.FactBox}">
 										<StackPanel>
-											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="states    " /><Run Text="{Binding CatalogStates, Mode=OneWay}" /></TextBlock>
-											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="commands  " /><Run Text="{Binding CatalogCommands, Mode=OneWay}" /></TextBlock>
-											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run FontFamily="Consolas" Text="produces  " /><Run Text="{Binding CatalogProduces, Mode=OneWay}" /></TextBlock>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run Text="상태  " /><Run Text="{Binding CatalogStates, Mode=OneWay}" /></TextBlock>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run Text="명령  " /><Run Text="{Binding CatalogCommands, Mode=OneWay}" /></TextBlock>
+											<TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"><Run Text="출력  " /><Run Text="{Binding CatalogProduces, Mode=OneWay}" /></TextBlock>
 										</StackPanel>
 									</Border>
 									<TextBlock
@@ -513,7 +509,7 @@
 									Style="{StaticResource Asm.Hint}"
 									Text="{Binding PresetStoreMessage}"
 									Visibility="{Binding PresetStoreMessage, Converter={x:Static asm:NullToCollapsedConverter.Instance}}" />
-								<TextBlock Style="{StaticResource Asm.Hint}" Text="아직 없다 — 보드를 조립하고 [프리셋으로 저장]">
+								<TextBlock Style="{StaticResource Asm.Hint}" Text="아직 없습니다 — 보드를 조립한 뒤 [프리셋으로 저장]을 누르세요">
 									<TextBlock.Visibility>
 										<Binding Path="HasCategoryPresets">
 											<Binding.Converter>
@@ -531,7 +527,7 @@
 												AutomationProperties.AutomationId="{Binding Id, StringFormat=Devices.Assembly.Preset.{0}}"
 												Click="OnLoadPreset"
 												Style="{StaticResource Console.Button}"
-												ToolTip="보드에 올린다(교체) — 되돌리기 한 번으로 돌아올 수 있다">
+												ToolTip="보드에 올립니다(지금 보드를 바꿉니다) — [되돌리기] 한 번으로 돌아올 수 있습니다">
 												<TextBlock FontSize="12.5">
 													<Run Text="{Binding Name, Mode=OneWay}" /><Run Foreground="{DynamicResource TextMutedBrush}" Text="{Binding Components.Count, Mode=OneWay, StringFormat='  · 부품 {0}'}" />
 												</TextBlock>

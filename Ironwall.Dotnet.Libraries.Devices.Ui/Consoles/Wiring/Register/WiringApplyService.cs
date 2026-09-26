@@ -109,12 +109,15 @@ public sealed class WiringApplyService
                 token.ThrowIfCancellationRequested();
                 var response = await _gateway.GetAsync(row.Id, token).ConfigureAwait(false);
                 if (!response.Success || response.Data is null)
-                    return WiringApplyResult.Stop($"{row.Display} 을(를) 다시 받지 못해 아무것도 보내지 않았습니다 — {Text(response, "다시 받기 실패")}");
+                {
+                    _log?.Warning($"[{nameof(WiringApplyService)}] {row.Display} 재조회 실패: {Text(response, "재조회 실패")}");
+                    return WiringApplyResult.Stop($"{row.Display} 정보를 다시 불러오지 못해 저장하지 않았습니다. 잠시 후 다시 시도하세요.");
+                }
 
                 var server = response.Data;
                 if (DriftOf(row, server) is { } drift)
                     return WiringApplyResult.Stop(
-                        $"다른 사람이 {row.Display} 의 {drift} — 아무것도 보내지 않았습니다. 창을 닫고 다시 열어 확인하십시오.",
+                        $"다른 사용자가 {row.Display}의 {drift} — 저장하지 않았습니다. 창을 닫고 다시 열어 확인하세요.",
                         conflict: true);
 
                 fetched[row.Key] = server;
@@ -153,10 +156,10 @@ public sealed class WiringApplyService
                 catch (Exception ex) { _log?.Warning($"[{nameof(WiringApplyService)}] 저장 뒤 재조회 실패: {ex.Message}"); }
             }
 
-            var groupNote = groupResults.Count == 0 ? string.Empty : $" · 그룹 호출 {groupResults.Count}회";
+            var groupNote = groupResults.Count == 0 ? string.Empty : $" · 그룹 변경 {groupResults.Count}건";
             var message = failed == 0
-                ? $"저장했습니다 — 센서 {ok}대(대당 1회){groupNote} · 실패 0"
-                : $"센서 {ok}대를 저장하고 {failed}건은 실패했습니다{groupNote} — 실패한 것만 남겨 두었습니다.";
+                ? $"저장했습니다 — 센서 {ok}대{groupNote}."
+                : $"센서 {ok}대를 저장했고 {failed}건은 저장하지 못했습니다{groupNote}. 저장하지 못한 것만 남겨 두었습니다.";
 
             return new WiringApplyResult(failed == 0, false, false, message, results, groupResults);
         }
@@ -166,8 +169,9 @@ public sealed class WiringApplyService
         }
         catch (Exception ex)
         {
+            // 예외 원문은 화면에 붙이지 않는다 — 로그로 보낸다(U-18 공통 규칙).
             _log?.Error($"[{nameof(WiringApplyService)}] {ex.Message}");
-            return WiringApplyResult.Stop(ex.Message);
+            return WiringApplyResult.Stop("저장하지 못했습니다. 서버 연결을 확인하고 다시 시도하세요.");
         }
     }
 
@@ -254,7 +258,7 @@ public sealed class WiringApplyService
             {
                 _log?.Warning($"[{nameof(WiringApplyService)}] 번호 {row.Facts.Number} 센서를 만들었지만 id 를 확인하지 못했습니다.");
                 return new WiringRowResult(row.Key, row.Facts.Number, row.Display, true, false,
-                    "저장됨 · 번호 확인 필요 — 서버가 id 를 알려 주지 않았습니다. [갱신] 뒤 이 줄이 있는지 확인하십시오(다시 저장하면 같은 번호가 두 번 만들어질 수 있습니다).");
+                    "저장됨 · 확인 필요 — 저장 결과를 확인하지 못했습니다. [갱신] 뒤 이 줄이 있는지 확인하세요(다시 저장하면 같은 번호가 두 번 만들어질 수 있습니다).");
             }
         }
 

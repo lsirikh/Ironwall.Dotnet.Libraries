@@ -47,19 +47,19 @@ public static class RepeatExpand
     /// <summary>null = 통과.</summary>
     public static string? Validate(RepeatExpandSpec spec)
     {
-        if (spec is null) return "펼칠 내용이 없다";
-        if (string.IsNullOrWhiteSpace(spec.TypeCode)) return "유형을 고르지 않았다";
-        if (spec.Count < 1 || spec.Count > MaxCount) return $"개수는 1 과 {MaxCount} 사이여야 한다";
-        if (string.IsNullOrWhiteSpace(spec.KeyFormat)) return "key 규칙이 비어 있다";
-        if (!_placeholder.IsMatch(spec.KeyFormat)) return "key 규칙에 {d} 또는 {02d} 같은 번호 자리가 있어야 한다";
+        if (spec is null) return "펼칠 내용이 없습니다.";
+        if (string.IsNullOrWhiteSpace(spec.TypeCode)) return "유형을 고르세요.";
+        if (spec.Count < 1 || spec.Count > MaxCount) return $"개수는 1에서 {MaxCount} 사이로 입력하세요.";
+        if (string.IsNullOrWhiteSpace(spec.KeyFormat)) return "식별 이름 규칙을 입력하세요.";
+        if (!_placeholder.IsMatch(spec.KeyFormat)) return "식별 이름 규칙에 {d} 또는 {02d} 같은 번호 자리를 넣으세요.";
 
         foreach (Match match in _placeholder.Matches(spec.KeyFormat))
         {
             if (!TryReadWidth(match, out _))
-                return $"key 규칙의 자릿수는 1 과 {MaxKeyPadWidth} 사이여야 한다";
+                return $"식별 이름 규칙의 자릿수는 1에서 {MaxKeyPadWidth} 사이로 정하세요.";
         }
 
-        if (spec.StartChannel < 0) return "시작 채널은 0 이상이어야 한다";
+        if (spec.StartChannel < 0) return "시작 채널은 0 이상으로 입력하세요.";
         return null;
     }
 
@@ -80,8 +80,8 @@ public static class RepeatExpand
             var key = FormatKey(spec.KeyFormat, number);
 
             var error = AssemblyKeyRules.ValidateFormat(key);
-            if (error is null && onBoard.Contains(key)) error = "이미 보드에 있는 key 다";
-            if (error is null && !inPreview.Add(key)) error = "펼칠 목록 안에서 겹친다";
+            if (error is null && onBoard.Contains(key)) error = "이미 보드에 있는 식별 이름입니다";
+            if (error is null && !inPreview.Add(key)) error = "펼칠 목록 안에서 겹칩니다";
 
             rows.Add(new RepeatPreviewRow(key, number, error is not null, error));
         }

@@ -61,7 +61,7 @@ public static class UnitDropRules
         if (targetParentId is null)
         {
             return moving.ParentId is null
-                ? UnitDropVerdict.Block($"'{moving.Name}' 은 이미 최상위 부대입니다.")
+                ? UnitDropVerdict.Block($"'{moving.Name}'은(는) 이미 최상위 부대입니다.")
                 : UnitDropVerdict.Allow();
         }
 
@@ -72,20 +72,20 @@ public static class UnitDropRules
         if (parent == null) return UnitDropVerdict.Block("상위로 삼을 부대를 편제에서 찾지 못했습니다.");
 
         if (moving.ParentId == target)
-            return UnitDropVerdict.Block($"'{moving.Name}' 은 이미 '{parent.Name}' 소속입니다.");
+            return UnitDropVerdict.Block($"'{moving.Name}'은(는) 이미 '{parent.Name}' 소속입니다.");
 
         if (tree.IsDescendantOf(target, movingId))
-            return UnitDropVerdict.Block($"'{parent.Name}' 은 '{moving.Name}' 의 하위 부대입니다 — 자기 밑으로는 옮길 수 없습니다.");
+            return UnitDropVerdict.Block($"'{parent.Name}'은(는) '{moving.Name}'의 하위 부대입니다. 자기 하위로는 옮길 수 없습니다.");
 
         if (moving.Echelon is not EnumUnitEchelon movingEchelon)
-            return UnitDropVerdict.Block($"'{moving.Name}' 의 제대('{moving.EchelonRaw}')를 이 판본이 알지 못합니다 — 옮기지 않습니다.");
+            return UnitDropVerdict.Block($"'{moving.Name}'의 제대를 알 수 없어 옮기지 않습니다.");
 
         if (parent.Echelon is not EnumUnitEchelon parentEchelon)
-            return UnitDropVerdict.Block($"'{parent.Name}' 의 제대('{parent.EchelonRaw}')를 이 판본이 알지 못합니다 — 옮기지 않습니다.");
+            return UnitDropVerdict.Block($"'{parent.Name}'의 제대를 알 수 없어 옮기지 않습니다.");
 
         if (!UnitRules.IsAllowedParent(parentEchelon, movingEchelon))
             return UnitDropVerdict.Block(
-                $"{EchelonText(movingEchelon)}는 {EchelonText(parentEchelon)}에 붙일 수 없습니다 — 엄격히 상위 제대에만 놓을 수 있습니다.");
+                $"{EchelonText(movingEchelon)}는 {EchelonText(parentEchelon)} 아래에 둘 수 없습니다. 더 높은 제대 아래에만 둘 수 있습니다.");
 
         return UnitDropVerdict.Allow();
     }
@@ -97,20 +97,20 @@ public static class UnitDropRules
     public static UnitDropVerdict CanAdjoin(UnitTreeModel? tree, int sourceId, int targetId)
     {
         if (tree == null) return UnitDropVerdict.Block("편제를 아직 읽지 못했습니다.");
-        if (sourceId == targetId) return UnitDropVerdict.Block("자기 자신과는 인접이 될 수 없습니다.");
+        if (sourceId == targetId) return UnitDropVerdict.Block("자기 자신과는 인접 부대가 될 수 없습니다.");
 
         var source = tree.Find(sourceId);
         var target = tree.Find(targetId);
         if (source == null || target == null) return UnitDropVerdict.Block("인접으로 이을 부대를 편제에서 찾지 못했습니다.");
 
         if (source.Echelon is not EnumUnitEchelon a || target.Echelon is not EnumUnitEchelon b)
-            return UnitDropVerdict.Block("제대를 알 수 없는 부대는 인접으로 잇지 않습니다.");
+            return UnitDropVerdict.Block("제대를 알 수 없는 부대는 인접으로 이을 수 없습니다.");
 
         if (!UnitRules.IsAllowedAdjacency(a, b))
-            return UnitDropVerdict.Block($"인접은 같은 제대끼리만 됩니다 — {EchelonText(a)} ↔ {EchelonText(b)}.");
+            return UnitDropVerdict.Block($"인접 부대는 같은 제대끼리만 이을 수 있습니다({EchelonText(a)} ↔ {EchelonText(b)}).");
 
         if (target.AdjacentIds.Contains(sourceId))
-            return UnitDropVerdict.Block($"'{source.Name}' 과 '{target.Name}' 은 이미 인접입니다.");
+            return UnitDropVerdict.Block($"'{source.Name}'과(와) '{target.Name}'은(는) 이미 인접 부대입니다.");
 
         return UnitDropVerdict.Allow();
     }

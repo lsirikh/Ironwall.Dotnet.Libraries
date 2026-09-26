@@ -139,13 +139,15 @@ public sealed class TypeAxisPanelSupport : PropertyChangedBase
         {
             if (IsRequired) return "선택 필요";
             var fallback = _catalog?.TypeAxis(Category)?.DefaultCode;
-            return string.IsNullOrEmpty(fallback) ? "—" : $"{fallback} (서버 기본값)";
+            return string.IsNullOrEmpty(fallback) ? "—" : $"{DeviceEnumDisplay.TypeAxisKorean(fallback)} (기본값)";
         }
 
         var option = Options.FirstOrDefault(o => string.Equals(o.Code, code!.Trim(), StringComparison.OrdinalIgnoreCase));
         if (option != null) return option.ToString();
 
-        return IsAxisUi && _catalog?.IsLoaded == true ? $"미대응: {code!.Trim()}" : code!.Trim();
+        // 카탈로그에 없는 값 — 원문 영문 코드 대신 "알 수 없음"(원문은 상세 칸의 툴팁 · 로그). 카탈로그를 못 읽었으면
+        // 판정할 근거가 없으니 아는 사전으로만 옮긴다(모르면 원문).
+        return IsAxisUi && _catalog?.IsLoaded == true ? DeviceEnumDisplay.UnknownValue : DeviceEnumDisplay.TypeAxisKorean(code!.Trim());
     }
 
     /// <summary>현재 필터에 걸리는가.</summary>
@@ -161,9 +163,12 @@ public sealed class TypeAxisPanelSupport : PropertyChangedBase
 
     private void Rebuild()
     {
-        var values = IsAxisUi && _catalog != null ? _catalog.TypeAxisValues(Category) : Array.Empty<CatalogOption>();
+        // 서버 카탈로그 라벨이 코드와 같으면(한국어 라벨 없음) 목업 AX 표의 한국어로 바꿔 보인다 — 저장 값(Code)은 그대로다.
+        var values = (IsAxisUi && _catalog != null ? _catalog.TypeAxisValues(Category) : Array.Empty<CatalogOption>())
+            .Select(o => o with { Label = DeviceEnumDisplay.TypeAxisKorean(o.Code, o.Label) })
+            .ToArray();
         Options = values;
-        FilterOptions = values.Count == 0
+        FilterOptions = values.Length == 0
             ? Array.Empty<CatalogOption>()
             : new[] { new CatalogOption(AllFilterCode, "전체") }.Concat(values).ToArray();
         ExtraAxes = IsAxisUi && _catalog != null ? _catalog.ExtraAxes(Category) : Array.Empty<CatalogExtraAxis>();

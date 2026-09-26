@@ -28,7 +28,7 @@ internal static class AssemblyWriteGuard
 {
     /// <summary>사람에게 보일 한 줄 — 왜 아무 일도 일어나지 않았는지가 문장에 들어 있어야 한다.</summary>
     internal const string LEGACY_CONTRACT_MESSAGE =
-        "이 서버 판본(6.3)에는 부품 모델이 없다 — 등록/적용하지 않았다";
+        "현재 서버에서는 부품 구성을 지원하지 않아 등록하거나 적용하지 않았습니다.";
 
     /// <summary>축 계약(7.0+)이 아니면 <c>true</c> — 부르는 쪽은 즉시 실패를 돌려준다.</summary>
     internal static bool IsBlocked(DeviceQueryPolicy policy) => !policy.IsAxisContract;

@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
@@ -25,6 +25,9 @@ public class DeviceGroupViewModel : PropertyChangedBase, IDeviceGroupViewModel, 
         }
     }
 
+    /// <summary>목록의 "설명" 열 — 비었으면 "—"(빈 칸을 값이 없는 것으로 읽게 한다).</summary>
+    public string DescriptionDisplay => string.IsNullOrWhiteSpace(Description) ? "—" : Description!;
+
     public string? Description
     {
         get => _model.Description;
@@ -32,6 +35,7 @@ public class DeviceGroupViewModel : PropertyChangedBase, IDeviceGroupViewModel, 
         {
             _model.Description = value;
             NotifyOfPropertyChange(() => Description);
+            NotifyOfPropertyChange(() => DescriptionDisplay);
         }
     }
 

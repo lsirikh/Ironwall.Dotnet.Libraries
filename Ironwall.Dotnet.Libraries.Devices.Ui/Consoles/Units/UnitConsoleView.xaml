@@ -137,11 +137,25 @@
 	<c:ConsoleShell
 		AutomationProperties.AutomationId="Units.Console.Panel"
 		ConsoleKey="Units"
-		IsDetailRequested="{Binding IsDetailRequested}"
 		Subtitle="{Binding MyUnitCode}"
 		Title="부대 편제">
 
-		<!--  레일 — 보기 3종(스토리보드 화면 G L306-310). 인접 관계도는 이 노드 범위 밖이라 자리만 둔다.  -->
+		<!--
+			상세 칸 — 좁은 폭(서랍)의 미배치 장비 보기에서는 접는다(트리가 짓눌려 부대 이름이 잘렸다, 감사 D-8 8.10).
+			ConsoleShell 자신의 IsDetailDocked 를 읽으므로 Self 바인딩이다.
+		-->
+		<c:ConsoleShell.IsDetailRequested>
+			<MultiBinding>
+				<MultiBinding.Converter>
+					<units:UnitDetailRequestConverter />
+				</MultiBinding.Converter>
+				<Binding Path="IsDetailRequested" />
+				<Binding Path="IsDeviceView" />
+				<Binding Path="IsDetailDocked" RelativeSource="{RelativeSource Self}" />
+			</MultiBinding>
+		</c:ConsoleShell.IsDetailRequested>
+
+		<!--  레일 — 편제 트리 · 미배치 장비. 인접 관계도는 그림이 생길 때까지 감춘다(인접 편집은 상세 칸에 있다).  -->
 		<c:ConsoleShell.Rail>
 			<c:ConsoleRail
 				AutomationProperties.AutomationId="Console.Units.Rail"
@@ -220,13 +234,21 @@
 						BorderBrush="{DynamicResource DividerBrush}"
 						BorderThickness="0,0,0,1"
 						DockPanel.Dock="Top">
+						<!--
+							U-18 D-8 8.10 — 좁은 폭(미배치 장비 칸이 열려 트리가 ≈430)에서 칩이 두 줄로 접혀 트리를 밀어냈다.
+							한 줄로 두고, 넘치면 가로로 밀어 본다(스크롤 막대는 넘칠 때만).
+						-->
+						<ScrollViewer
+							Focusable="False"
+							HorizontalScrollBarVisibility="Auto"
+							VerticalScrollBarVisibility="Disabled">
 						<ItemsControl
 							AutomationProperties.AutomationId="Units.Toolbar.EchelonChips"
 							Focusable="False"
 							ItemsSource="{Binding EchelonFilters}">
 							<ItemsControl.ItemsPanel>
 								<ItemsPanelTemplate>
-									<WrapPanel Orientation="Horizontal" />
+									<StackPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
 							</ItemsControl.ItemsPanel>
 							<ItemsControl.ItemTemplate>
@@ -241,6 +263,7 @@
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
+						</ScrollViewer>
 					</Border>
 
 					<!--  "루트로" 드롭존 — 트리 최상단. 끌지 않을 때도 자리를 지켜 레이아웃이 튀지 않는다.  -->
@@ -261,7 +284,7 @@
 							Cursor="Hand"
 							IsEnabled="{Binding CanMoveSelected}"
 							Style="{x:Null}"
-							ToolTip="고른 부대를 최상위로 올립니다 — 부대를 여기에 끌어다 놓아도 됩니다.">
+							ToolTip="고른 부대를 최상위로 올립니다. 부대를 여기에 끌어다 놓아도 됩니다.">
 							<Button.Template>
 								<ControlTemplate TargetType="Button">
 									<Border Background="Transparent">
@@ -270,7 +293,7 @@
 											VerticalAlignment="Center"
 											FontSize="11.5"
 											Foreground="{DynamicResource TextMutedBrush}"
-											Text="여기에 놓으면 최상위(루트)로 — 또는 부대를 고르고 누르십시오" />
+											Text="여기에 놓으면 최상위로 옮깁니다 — 또는 부대를 고르고 누르세요" />
 									</Border>
 								</ControlTemplate>
 							</Button.Template>
@@ -280,7 +303,7 @@
 					<Label
 						Margin="16,10,16,0"
 						AutomationProperties.AutomationId="Units.Tree.Empty"
-						Content="편제가 비어 있습니다 — 툴바의 [부대 등록] 으로 첫 부대를 만드십시오."
+						Content="편제가 비어 있습니다. 툴바의 [부대 등록]으로 첫 부대를 만드세요."
 						DockPanel.Dock="Top"
 						Foreground="{DynamicResource TextMutedBrush}"
 						Style="{StaticResource Unit.Readout}"
@@ -304,7 +327,7 @@
 								DisplayMemberPath="Name"
 								Handler="{Binding Drop}"
 								IsDragEnabled="{Binding CanEditUnits}"
-								KeyboardFallback="Alt+↑ 상위로 · Alt+↓ 바로 위 형제 밑으로 · 상세 칸의 '상위 부대' 콤보 + [옮기기]" />
+								KeyboardFallback="Alt+↑ 한 단계 위로 · Alt+↓ 바로 위 부대 아래로 · 상세 칸의 '상위 부대'에서 고르고 [옮기기]" />
 						</b:Interaction.Behaviors>
 						<ListBox.ItemTemplate>
 							<DataTemplate>
@@ -368,7 +391,7 @@
 											Margin="2,0,4,0"
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Tree.Handle.{0}}"
 											AutomationProperties.Name="부대 옮기기 손잡이"
-											ToolTip="잡아 끌면 다른 부대 아래로 옮깁니다 · Esc 로 취소" />
+											ToolTip="끌어서 다른 부대 아래로 옮기세요 · Esc 로 취소" />
 
 										<Border
 											Grid.Column="2"
@@ -417,7 +440,7 @@
 											<Border
 												Margin="0,0,4,0"
 												Style="{StaticResource Console.Pill}"
-												ToolTip="운용 중지된 부대입니다(is_enable=false)."
+												ToolTip="운용 중지된 부대입니다."
 												Visibility="{Binding IsEnable, Converter={StaticResource NotBoolToVisibility}}">
 												<StackPanel Orientation="Horizontal">
 													<Ellipse
@@ -448,7 +471,7 @@
 					</ListBox>
 				</DockPanel>
 
-				<!--  ③ 인접 관계도 — 이 노드의 범위 밖(봉투: "관계도는 뒤"). 트리 위를 덮되 사실을 적는다.  -->
+				<!--  ③ 인접 관계도 — 이 노드의 범위 밖(봉투: "관계도는 뒤"). 레일 칸을 내지 않아 지금은 보이지 않는다(U-18 D-8 8.2).  -->
 				<Border
 					Grid.Column="0"
 					Padding="18"
@@ -457,7 +480,7 @@
 					<StackPanel VerticalAlignment="Top">
 						<Label
 							AutomationProperties.AutomationId="Units.Adjacency.Placeholder"
-							Content="인접 관계도는 다음 단계입니다"
+							Content="인접 관계도를 아직 제공하지 않습니다"
 							FontSize="13"
 							FontWeight="Bold"
 							Foreground="{DynamicResource TextPrimaryBrush}"
@@ -466,7 +489,7 @@
 							Margin="0,6,0,0"
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="인접 연결·해제는 지금도 됩니다 — 편제 트리에서 부대를 고르고 상세 칸의 '인접 부대' 에서 잇거나 끊으십시오. 그림으로 보는 관계도만 뒤로 미뤘습니다."
+							Text="인접 부대는 편제 트리에서 부대를 고른 뒤 상세 칸의 '인접 부대'에서 잇거나 끊을 수 있습니다."
 							TextWrapping="Wrap" />
 					</StackPanel>
 				</Border>
@@ -504,11 +527,11 @@
 							<TextBlock
 								FontSize="11"
 								Foreground="{DynamicResource TextPrimaryBrush}"
-								Text="소속이 비었거나 편제에 없는 부대를 가리키는 장비입니다. 서버에 이 질의가 없어 전량을 읽어 여기서 가릅니다 — 대개 비어 있는 것이 정상입니다."
+								Text="소속 부대가 없거나 편제에 없는 부대에 속한 장비입니다."
 								TextWrapping="Wrap" />
 						</Border>
 
-						<!--  Draft 트레이 — 쌓인 배치와 [적용] · [되돌리기]  -->
+						<!--  배치 대기 목록 — 쌓인 배치와 [적용] · [되돌리기]  -->
 						<Border
 							Padding="10,6"
 							Background="{DynamicResource SurfaceAltBrush}"
@@ -519,7 +542,7 @@
 							<StackPanel>
 								<Label
 									AutomationProperties.AutomationId="Units.Devices.TrayMessage"
-									Content="{Binding Tray.Message}"
+									Content="{Binding TrayMessageText}"
 									Foreground="{DynamicResource TextPrimaryBrush}"
 									Style="{StaticResource Unit.Readout}" />
 								<ProgressBar
@@ -570,7 +593,7 @@
 									SelectedValue="{Binding AssignTargetUnitId, Mode=TwoWay}"
 									SelectedValuePath="Id"
 									Style="{StaticResource Unit.Combo}"
-									ToolTip="비워 두면 편제 트리에서 고른 부대로 갑니다." />
+									ToolTip="비워 두면 편제 트리에서 고른 부대에 배치합니다." />
 								<Button
 									Margin="0,6,0,0"
 									HorizontalAlignment="Stretch"
@@ -579,7 +602,7 @@
 									Content="이 부대에 배치"
 									IsEnabled="{Binding CanAssignSelectedDevices}"
 									Style="{StaticResource Console.Button}"
-									ToolTip="고른 장비를 위 부대에 쌓습니다 — 손잡이를 끌어 트리에 놓아도 같습니다." />
+									ToolTip="고른 장비를 위 부대의 배치 대기 목록에 담습니다. 손잡이를 끌어 트리에 놓아도 됩니다." />
 							</StackPanel>
 						</Border>
 
@@ -588,7 +611,7 @@
 								Margin="12,12,12,0"
 								VerticalAlignment="Top"
 								AutomationProperties.AutomationId="Units.Devices.Empty"
-								Content="미배치 장비가 없습니다."
+								Content="미배치 장비가 없습니다. 모든 장비가 부대에 배치되어 있습니다."
 								Foreground="{DynamicResource TextMutedBrush}"
 								Style="{StaticResource Unit.Readout}"
 								Visibility="{Binding IsDeviceListEmpty, Converter={StaticResource BoolToVisibility}}" />
@@ -604,7 +627,7 @@
 										DisplayMemberPath="Name"
 										Handler="{Binding Drop}"
 										IsDragEnabled="{Binding CanPlaceDevices}"
-										KeyboardFallback="장비를 고르고 아래 [이 부대에 배치]" />
+										KeyboardFallback="장비를 고르고 아래 [이 부대에 배치]를 누르세요." />
 								</b:Interaction.Behaviors>
 								<ListBox.ItemContainerStyle>
 									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
@@ -636,7 +659,7 @@
 													Margin="2,0,6,0"
 													AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Devices.Handle.{0}}"
 													AutomationProperties.Name="장비 배치 손잡이"
-													ToolTip="잡아 끌어 왼쪽 편제 트리의 부대 위에 놓습니다 · Esc 로 취소" />
+													ToolTip="끌어서 왼쪽 편제 트리의 부대 위에 놓으세요 · Esc 로 취소" />
 												<Border
 													Grid.Column="1"
 													Margin="0,0,7,0"
@@ -729,7 +752,7 @@
 					<Label
 						Grid.Column="2"
 						AutomationProperties.AutomationId="Units.Status.Permission"
-						Content="읽기 전용 — units:edit 없음"
+						Content="읽기 전용 (편집 권한 없음)"
 						Foreground="{DynamicResource TextMutedBrush}"
 						Style="{StaticResource Unit.Readout}"
 						Visibility="{Binding CanEditUnits, Converter={StaticResource NotBoolToVisibility}}" />
@@ -763,7 +786,7 @@
 						VerticalAlignment="Top"
 						FontSize="12"
 						Foreground="{DynamicResource TextMutedBrush}"
-						Text="왼쪽 편제에서 부대를 고르면 여기에 상세가 뜹니다. 새로 만들려면 툴바의 [부대 등록] 을 누르십시오."
+						Text="왼쪽 편제에서 부대를 고르면 여기에 상세가 표시됩니다. 새로 만들려면 툴바의 [부대 등록]을 누르세요."
 						TextWrapping="Wrap"
 						Visibility="{Binding IsDetailRequested, Converter={StaticResource NotBoolToVisibility}}" />
 
@@ -805,7 +828,7 @@
 									Margin="0,6,0,0"
 									FontSize="11.5"
 									Foreground="{DynamicResource TextSecondaryBrush}"
-									Text="운용을 멈추려면 삭제 대신 운용 중지를 쓰십시오 — 이력과 소속은 보존됩니다."
+									Text="운용을 멈추려면 삭제 대신 [운용 중지]를 쓰세요. 이력과 소속은 그대로 남습니다."
 									TextWrapping="Wrap" />
 								<StackPanel
 									Margin="0,8,0,0"
@@ -939,7 +962,7 @@
 										IsChecked="{Binding IsEnable, Mode=TwoWay}"
 										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
 										Style="{StaticResource Console.CheckBox}"
-										ToolTip="퇴역은 삭제가 아니라 운용 중지(is_enable=false)입니다." />
+										ToolTip="퇴역은 삭제가 아니라 운용 중지입니다." />
 								</c:ConsoleField>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -975,7 +998,7 @@
 										Content="옮기기"
 										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
 										Style="{StaticResource Console.Button}"
-										ToolTip="고른 상위 부대로 옮깁니다 — 호출 1회, 되돌리기 있음." />
+										ToolTip="고른 상위 부대 아래로 옮깁니다. 툴바의 [이동 되돌리기]로 되돌릴 수 있습니다." />
 								</StackPanel>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -1057,7 +1080,7 @@
 									Margin="0,4,0,0"
 									FontSize="11"
 									Foreground="{DynamicResource TextMutedBrush}"
-									Text="인접은 양방향으로 연결됩니다 — 상대 부대 상세에도 나타납니다. 보내기 직전에 서버 목록을 다시 읽어 다른 세션의 변경을 덮지 않습니다."
+									Text="인접은 양방향으로 연결됩니다. 상대 부대의 상세에도 함께 표시됩니다."
 									TextWrapping="Wrap" />
 							</StackPanel>
 						</c:ConsoleSection>

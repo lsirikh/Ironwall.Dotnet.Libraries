@@ -45,16 +45,24 @@ public static class ServerTypeCatalog
     public const string SystemEventsKey = "system-events";
 
     /// <summary>레일은 서버가 0대여도 늘 이 순서로 같은 칸이 떠 있다(빈 칸도 "지금 비었다"는 정보다).</summary>
+    /// <remarks>
+    /// "시스템 이벤트" 칸(<see cref="SystemEventsKey"/>)은 <b>내지 않는다</b> — 서버 API 에 시스템 이벤트 입구가 없어
+    /// 칸을 누르면 자리표시 상자만 떴다(U-18 감사 D-7 7.1). 입구가 생기면 <see cref="SystemEventsSpec"/> 를 여기 다시 넣는다.
+    /// 키 상수와 <see cref="IsServerList"/> 판정은 그대로 둔다 — 없는 칸을 고르면 <see cref="SpecOf"/> 가 null 이라 "전체" 로 떨어진다.
+    /// </remarks>
     public static readonly IReadOnlyList<ServerRailSpec> RailOrder = new[]
     {
         new ServerRailSpec(AllKey,          "전체",        "ServerNetwork",     ShowCount: true,  HasSeparatorAbove: false),
-        new ServerRailSpec(ProxyKey,        "PROXY",       "SwapHorizontal",    ShowCount: true,  HasSeparatorAbove: true),
-        new ServerRailSpec(NvrKey,          "NVR",         "Cctv",              ShowCount: true,  HasSeparatorAbove: false),
+        new ServerRailSpec(ProxyKey,        "프록시",      "SwapHorizontal",    ShowCount: true,  HasSeparatorAbove: true),
+        new ServerRailSpec(NvrKey,          "NVR(영상)",   "Cctv",              ShowCount: true,  HasSeparatorAbove: false),
         new ServerRailSpec(SpeakerKey,      "스피커",      "Bullhorn",          ShowCount: true,  HasSeparatorAbove: false),
         new ServerRailSpec(EnclosureKey,    "함체",        "PackageVariant",    ShowCount: true,  HasSeparatorAbove: false),
         new ServerRailSpec(EtcKey,          "기타",        "DotsHorizontal",    ShowCount: true,  HasSeparatorAbove: false),
-        new ServerRailSpec(SystemEventsKey, "시스템 이벤트", "Timeline",          ShowCount: false, HasSeparatorAbove: true),
     };
+
+    /// <summary>숨겨 둔 "시스템 이벤트" 칸의 선언 — 서버 입구가 생기면 <see cref="RailOrder"/> 끝에 다시 붙인다.</summary>
+    public static readonly ServerRailSpec SystemEventsSpec =
+        new(SystemEventsKey, "시스템 이벤트", "Timeline", ShowCount: false, HasSeparatorAbove: true);
 
     /// <summary>서버 목록을 그리는 칸인가 — "시스템 이벤트" 만 아니다.</summary>
     public static bool IsServerList(string? railKey)
@@ -121,7 +129,7 @@ public static class ServerTypeCatalog
         [EnumServerType.PIDS_API] = "PIDS",
         [EnumServerType.WEB] = "웹",
         [EnumServerType.AUTH] = "인증",
-        [EnumServerType.PROXY] = "PROXY",
+        [EnumServerType.PROXY] = "프록시",
         [EnumServerType.BROKER] = "브로커",
         [EnumServerType.GATEWAY] = "게이트웨이",
         [EnumServerType.PUSH] = "푸시",

@@ -76,11 +76,18 @@
 				Height="30"
 				md:HintAssist.Hint="{Binding Placeholder}"
 				AutomationProperties.AutomationId="{Binding Key, StringFormat=Devices.Detail.Field.{0}}"
-				DisplayMemberPath="Display"
 				FontSize="13"
 				Foreground="{DynamicResource TextPrimaryBrush}"
 				ItemsSource="{Binding Options}"
-				SelectedItem="{Binding SelectedOption}" />
+				SelectedItem="{Binding SelectedOption}"
+				ToolTip="{Binding SelectedOption.Display}">
+				<!--  긴 항목(제어기 이름 · 번호)은 글자 중간이 아니라 말줄임으로 자르고 전체는 툴팁으로 보인다  -->
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Display}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
 		</DataTemplate>
 
 		<DataTemplate x:Key="Editor.Password">
@@ -104,7 +111,8 @@
 				FontSize="13"
 				Foreground="{DynamicResource TextSecondaryBrush}"
 				Text="{Binding DisplayText}"
-				TextWrapping="Wrap" />
+				TextWrapping="Wrap"
+				ToolTip="{Binding RawToolTip}" />
 		</DataTemplate>
 
 		<forms:PropertyEditorTemplateSelector

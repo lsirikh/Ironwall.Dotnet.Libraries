@@ -54,7 +54,7 @@ public sealed class BoardSlotViewModel : PropertyChangedBase
     public bool IsOutOfService => !Slot.InService;
     public bool IsUnknownType => Info is null;
     public bool HasError => Slot.HasKeyError || IsUnknownType;
-    public string? ErrorText => Slot.KeyError ?? (IsUnknownType ? $"'{Slot.TypeCode}' 는 카탈로그에 없는 유형이다" : null);
+    public string? ErrorText => Slot.KeyError ?? (IsUnknownType ? $"'{Slot.TypeCode}'은(는) 목록에 없는 부품 유형입니다." : null);
 
     /// <summary>
     /// 채널 입력 — 글로 받는다. 정수 칸에 곧바로 묶으면 "1a" 같은 글은 변환에 실패한 채 화면에만 남고
@@ -68,7 +68,7 @@ public sealed class BoardSlotViewModel : PropertyChangedBase
             var text = (value ?? string.Empty).Trim();
             if (text.Length == 0) { _channelInput = null; ChannelError = null; Slot.Channel = null; }
             else if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var channel)) { _channelInput = null; ChannelError = null; Slot.Channel = channel; }
-            else { _channelInput = text; ChannelError = "채널은 0 이상의 정수다 — 값은 바꾸지 않았다"; }
+            else { _channelInput = text; ChannelError = "채널은 0 이상의 정수로 입력하세요. 값은 바꾸지 않았습니다."; }
             Refresh();
         }
     }

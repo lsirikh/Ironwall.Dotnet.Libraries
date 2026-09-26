@@ -152,7 +152,8 @@ public class ServerDropRulesTests
     {
         Assert.False(ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1) }).IsMultiCall);
         Assert.True(ServerDropRules.Plan(7, EnumServerType.SPEAKER_API, new[] { Speaker(1), Speaker(2) }).IsMultiCall);
-        Assert.Contains("2회", ServerDropRules.ConfirmText("방송서버", 2));
+        Assert.Contains("2대를 배정할까요?", ServerDropRules.ConfirmText("방송서버", 2));
+        Assert.DoesNotContain("회", ServerDropRules.ConfirmText("방송서버", 2));
     }
     #endregion
 
@@ -163,7 +164,7 @@ public class ServerDropRulesTests
         var plan = ServerDropRules.Plan(7, EnumServerType.NVR_API, new[] { Camera(2) }, EnumServerContract.V6_3);
 
         Assert.False(plan.CanSend);
-        Assert.Contains("6.3", plan.BlockReason);
+        Assert.Contains("현재 서버에서는", plan.BlockReason);
     }
 
     [Fact]
@@ -179,16 +180,17 @@ public class ServerDropRulesTests
     #endregion
 
     [Fact]
-    public void should_state_the_write_count_when_the_result_line_is_built()
+    public void should_state_what_was_assigned_without_write_counts_when_the_result_line_is_built()
     {
         var plan = ServerDropRules.Plan(7, EnumServerType.SPEAKER_API,
             new IBaseDeviceModel[] { Speaker(1), Speaker(2), Speaker(3, serverId: 7), Speaker(0) });
 
         var line = ServerDropRules.ResultLine("방송서버", plan, assigned: 1, failed: 1);
 
-        Assert.Contains("서버 쓰기 1회", line);
-        Assert.Contains("멈췄습니다", line);
-        Assert.Contains("이미 붙어 있던 1대", line);
+        Assert.Contains("1대를 배정했습니다", line);
+        Assert.DoesNotContain("쓰기", line);
+        Assert.Contains("배정하지 못했습니다", line);
+        Assert.Contains("이미 배정된 1대", line);
         Assert.Contains("등록 전 1대", line);
     }
 

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,6 +54,11 @@ public sealed class UnitNameDirectory
     public string? TryGetName(int unitId) => _names.TryGetValue(unitId, out var name) ? name : null;
 
     /// <summary>
+    /// 캐시한 부대 전체(편제 순서) — 상세의 "소속 부대" 선택지가 쓴다. 아직 못 읽었으면 빈 목록(네트워크에 나가지 않는다).
+    /// </summary>
+    public IReadOnlyList<(int Id, string Name)> Snapshot() => _ordered;
+
+    /// <summary>
     /// <paramref name="unitId"/> 를 이름으로 푼다 — 배정 없음은 "미배치", 캐시에 있으면 이름,
     /// 없고 아직 못 채웠으면 <b>원값 id 문자열</b>을 우선 돌려주고 배경에서 채운 뒤 <paramref name="onResolved"/> 를 부른다.
     /// </summary>
@@ -99,8 +105,14 @@ public sealed class UnitNameDirectory
             var tree = UnitTreeBuilder.Build(response.Data);
             // 이름이 빈 노드는 캐시에 넣지 않는다 — TryGetName 이 null 을 돌려줘야 호출부가 id 로 폴백한다
             // ("이름을 지어내지 않는다"의 반대쪽: 빈 문자열을 이름인 양 보이지도 않는다).
+            var ordered = new List<(int Id, string Name)>();
             foreach (var node in tree.Ordered)
-                if (!string.IsNullOrWhiteSpace(node.Name)) _names[node.Id] = node.Name;
+            {
+                if (string.IsNullOrWhiteSpace(node.Name)) continue;
+                _names[node.Id] = node.Name;
+                ordered.Add((node.Id, node.Name));
+            }
+            _ordered = ordered;
             _loaded = true;
         }
         catch (OperationCanceledException)
@@ -131,6 +143,7 @@ public sealed class UnitNameDirectory
     private readonly ConcurrentDictionary<int, string> _names = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private volatile bool _loaded;
+    private volatile IReadOnlyList<(int Id, string Name)> _ordered = Array.Empty<(int, string)>();
     private long _lastAttemptTick;
     #endregion
 }

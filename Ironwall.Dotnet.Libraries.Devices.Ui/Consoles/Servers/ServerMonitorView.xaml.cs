@@ -92,7 +92,20 @@ public partial class ServerMonitorView : UserControl
     private void OnToolbarLoaded(object sender, RoutedEventArgs e)
     {
         _toolbar = (ConsoleToolbar)sender;
+        HideDeleteButton(_toolbar);
         ApplyColumnPrefs();
+    }
+
+    /// <summary>
+    /// 이 콘솔은 서버를 지우지 않는다(<see cref="ServerMonitorViewModel.CanDelete"/> 는 늘 false) — 늘 꺼진 [삭제] 는
+    /// 자리표시라 템플릿 부품을 접는다(U-18 감사 D-7 7.9). 커널 툴바에 "삭제 숨김" 스위치가 없어 부품 이름으로 찾는다.
+    /// 못 찾으면(템플릿이 바뀜) 꺼진 버튼과 사유 툴팁이 그대로 남는다 — 안전한 쪽이다.
+    /// </summary>
+    private static void HideDeleteButton(ConsoleToolbar toolbar)
+    {
+        toolbar.ApplyTemplate();
+        if (toolbar.Template?.FindName("PART_Delete", toolbar) is UIElement delete)
+            delete.Visibility = Visibility.Collapsed;
     }
 
     private void OnTrayLoaded(object sender, RoutedEventArgs e) => _tray = sender as ListBox;
@@ -242,10 +255,15 @@ public partial class ServerMonitorView : UserControl
     /// 표면 기본 1120 에서 행을 고르면 서랍(360)이 겹쳐 목록이 576 이 된다 — 고정 합 658(부대 열까지 768)이 넘쳐
     /// "마지막 변화" 가 가로 스크롤 밖으로 밀렸다(미리보기 1120 실측). 이름 · 유형 · 주소 · 상태는 남는다.
     /// </summary>
+    /// <remarks>
+    /// 2026-09-27 — 좁힌 서랍(표면 1000)에서는 목록이 456 남짓이라 이름 · 유형 · 주소 · 상태(538)도 넘쳤다. 유형은 레일이 이미
+    /// 거르고 상세에도 있어 먼저 접는다(540 미만). 이름 · 주소 · 상태는 끝까지 남는다.
+    /// </remarks>
     internal static double CollapseBelowFor(string key) => key switch
     {
         "last_change" => 680,
         "unit" => 780,
+        "type" => 540,
         _ => 0,
     };
 

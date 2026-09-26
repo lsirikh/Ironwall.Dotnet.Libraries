@@ -191,8 +191,8 @@ public class AssemblyBoardTests
         board.Load(new[] { Def("ghost", "GHOST_UNIT"), Def("ptz", "PTZ_UNIT") }, null);
 
         Assert.True(board.HasErrors);
-        Assert.Contains(board.Problems, p => p.Contains("카탈로그에 없는"));
-        Assert.Contains(board.Problems, p => p.Contains("달 수 없다"));
+        Assert.Contains(board.Problems, p => p.Contains("목록에 없는 부품 유형"));
+        Assert.Contains(board.Problems, p => p.Contains("달 수 없습니다"));
     }
 
     #endregion

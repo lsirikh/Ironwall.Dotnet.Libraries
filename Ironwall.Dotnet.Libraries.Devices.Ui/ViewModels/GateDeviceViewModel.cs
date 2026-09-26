@@ -38,6 +38,10 @@ public class GateDeviceViewModel : DeviceViewModel, IGateDeviceViewModel
         }
     }
 
+    /// <summary>문 위치의 <b>화면 글</b> — 열림 · 닫힘 · 구동 중 · 미상(목록 열 · 상세 칸). 원값은 <see cref="DoorPosition"/>.</summary>
+    public string DoorPositionDisplay
+        => Ironwall.Dotnet.Libraries.Devices.Ui.Helpers.DeviceEnumDisplay.DoorStateKorean(DoorPosition == Unknown ? null : DoorPosition);
+
     public string? ConnectionType => _model.Axes?.Connection?.Type;
     public int? ParentDeviceId => _model.Axes?.Connection?.ParentDeviceId;
     public int? Channel => _model.Axes?.Connection?.Channel;

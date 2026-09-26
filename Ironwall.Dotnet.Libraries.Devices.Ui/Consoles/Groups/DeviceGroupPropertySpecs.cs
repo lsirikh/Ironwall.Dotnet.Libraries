@@ -17,22 +17,22 @@ public static class DeviceGroupPropertySpecs
         new DevicePropertySpec
         {
             Key = "group.name", Label = "그룹 이름", ApiPath = "name",
-            Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Text,
+            Section = DevicePropertySection.GroupInfo, Editor = DevicePropertyEditor.Text,
             Categories = NoCategory, ViewModelPath = "Name",
             IsRequiredOnCreate = true, AllowMultiEdit = false, MaxLength = 100,
         },
         new DevicePropertySpec
         {
             Key = "group.description", Label = "설명", ApiPath = "description",
-            Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Text,
+            Section = DevicePropertySection.GroupInfo, Editor = DevicePropertyEditor.Text,
             Categories = NoCategory, ViewModelPath = "Description", MaxLength = 500,
         },
         new DevicePropertySpec
         {
             Key = "group.device_count", Label = "장비 수", ApiPath = "device_count",
-            Section = DevicePropertySection.Groups, Editor = DevicePropertyEditor.ReadOnly,
+            Section = DevicePropertySection.GroupInfo, Editor = DevicePropertyEditor.ReadOnly,
             Writable = DevicePropertyWritable.No,
-            LockReason = "장비를 이 그룹의 칩에 끌어 놓으면 늘어난다",
+            LockReason = "목록의 장비를 이 그룹 칩에 끌어 놓으면 추가됩니다.",
             Categories = NoCategory, ViewModelPath = "DeviceCount",
         },
     };

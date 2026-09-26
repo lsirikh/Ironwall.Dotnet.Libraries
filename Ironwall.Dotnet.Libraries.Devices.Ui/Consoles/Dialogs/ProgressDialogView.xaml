@@ -41,7 +41,7 @@
 				Margin="0,12,0,0"
 				FontSize="12"
 				Foreground="{DynamicResource TextMutedBrush}"
-				Text="취소해도 보낸 것은 되돌리지 않습니다."
+				Text="취소해도 이미 저장된 것은 되돌리지 않습니다."
 				TextWrapping="Wrap" />
 		</StackPanel>
 	</dlg:ConsoleDialogFrame>

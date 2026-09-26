@@ -98,9 +98,9 @@ public class TypeAxisSupportTests : IDisposable
     }
 
     [Theory]
-    [InlineData("FIXED", "고정형 (FIXED)")]
-    [InlineData("PTZ", "PTZ")]                     // 라벨=코드면 코드를 두 번 쓰지 않는다
-    [InlineData("THERMAL", "미대응: THERMAL")]      // 원값을 숨기지 않는다
+    [InlineData("FIXED", "고정형")]          // 운영자 화면에 코드를 병기하지 않는다
+    [InlineData("PTZ", "PTZ")]
+    [InlineData("THERMAL", "알 수 없음")]         // 카탈로그 밖 값 — 원문은 상세 칸 툴팁 · 로그로만
     [InlineData(null, "선택 필요")]
     public async Task should_describe_type_axis_value_for_display(string? code, string expected)
     {
@@ -114,7 +114,7 @@ public class TypeAxisSupportTests : IDisposable
     {
         var support = await Create(EnumDeviceCategory.Lamp, EnumServerContract.V8_0);
 
-        Assert.Equal("Unknown (서버 기본값)", support.Describe(null));
+        Assert.Equal("미지정 (기본값)", support.Describe(null));
     }
 
     [Fact]

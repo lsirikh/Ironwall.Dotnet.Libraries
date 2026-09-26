@@ -115,7 +115,7 @@ public sealed class UnitGraphApiAdapter : IUnitGraphApi
         => _api is null ? Task.FromResult(Refused<UnitDeleteResultDto>()) : _api.DeleteUnitAsync(unitId, token);
 
     private static ApiResponse<T> Refused<T>()
-        => ApiResponse<T>.CreateError(ApiErrorCodes.EndpointRemoved, "이 서버 판본에는 부대 편제가 없습니다.");
+        => ApiResponse<T>.CreateError(ApiErrorCodes.EndpointRemoved, "현재 서버는 부대 편제를 지원하지 않습니다.");
 }
 
 /// <summary>
@@ -173,27 +173,27 @@ public sealed class UnitDeviceApiAdapter : IUnitDeviceApi
         ArgumentNullException.ThrowIfNull(device);
 
         if (_api is null || !IsAvailable)
-            return new UnitDeviceAssignResult(false, "이 서버 판본에는 부대 편제가 없습니다 — 아무것도 보내지 않았습니다.");
+            return new UnitDeviceAssignResult(false, "현재 서버는 부대 편제를 지원하지 않습니다.");
         if (device.Id <= 0)
-            return new UnitDeviceAssignResult(false, $"'{device.Name}' 은 아직 서버에 없는 장비입니다.");
+            return new UnitDeviceAssignResult(false, $"'{device.Name}'은(는) 아직 등록되지 않은 장비입니다.");
 
         try
         {
             var fetched = await RefetchAsync(device, token).ConfigureAwait(false);
-            if (fetched == null) return new UnitDeviceAssignResult(false, $"'{device.Name}' 을 다시 받지 못했습니다.");
+            if (fetched == null) return new UnitDeviceAssignResult(false, $"'{device.Name}' 정보를 다시 불러오지 못했습니다.");
 
             var body = UnitAssignRequestBuilder.Build(fetched, unitId);
             var response = await PatchAsync(device.Category, device.Id, body, token).ConfigureAwait(false);
 
             return response.Success
-                 ? new UnitDeviceAssignResult(true, $"'{device.Name}' 의 소속을 바꿨습니다.")
-                 : new UnitDeviceAssignResult(false, $"'{device.Name}' — {Reason(response)}");
+                 ? new UnitDeviceAssignResult(true, $"'{device.Name}'의 소속을 바꿨습니다.")
+                 : new UnitDeviceAssignResult(false, $"'{device.Name}'의 소속을 바꾸지 못했습니다. {Reason(response)}");
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _log?.Error($"[UnitDeviceApi] assign {device.Id} → unit {unitId}: {ex.Message}");
-            return new UnitDeviceAssignResult(false, $"'{device.Name}' — 서버에 닿지 못했습니다.");
+            return new UnitDeviceAssignResult(false, $"'{device.Name}'의 소속을 바꾸지 못했습니다. 서버 연결을 확인하세요.");
         }
     }
 
@@ -237,10 +237,13 @@ public sealed class UnitDeviceApiAdapter : IUnitDeviceApi
     private static BaseDeviceDto? Read<T>(ApiResponse<T> response) where T : BaseDeviceDto
         => response.Success ? response.Data : null;
 
-    private static string Reason<T>(ApiResponse<T> response)
-        => string.IsNullOrWhiteSpace(response.Error?.Message)
-         ? (string.IsNullOrWhiteSpace(response.Message) ? "서버가 거절했습니다." : response.Message)
-         : response.Error!.Message;
+    /// <summary>서버 거절 원문은 로그로 보내고 화면에는 고정 문장을 준다(U-18 공통 규칙).</summary>
+    private string Reason<T>(ApiResponse<T> response)
+    {
+        var raw = string.IsNullOrWhiteSpace(response.Error?.Message) ? response.Message : response.Error!.Message;
+        if (!string.IsNullOrWhiteSpace(raw)) _log?.Warning($"[UnitDeviceApi] 서버 거절 원문: {raw}");
+        return "잠시 후 다시 시도하세요.";
+    }
 
     private static async Task<(bool Ok, string Message, List<BaseDeviceDto> Data)> Wrap<T>(Task<ApiListResponse<T>> call) where T : BaseDeviceDto
     {

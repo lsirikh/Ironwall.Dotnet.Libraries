@@ -38,7 +38,7 @@
 		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Register"
 		IsPrimaryEnabled="{Binding CanRegister}"
-		Kind="프리셋이 구조를 대고 여기서는 그 장비만의 것(번호 · 이름 · 접속)을 넣는다 — 보내는 것은 POST 1건"
+		Kind="프리셋이 부품 구성을 채웁니다 — 여기서는 그 장비만의 값(번호 · 이름 · 접속)을 입력하세요"
 		Message="{Binding Message}"
 		PrimaryAutomationId="Devices.Assembly.Register.Submit"
 		PrimaryInvoked="OnRegister"
@@ -192,27 +192,44 @@
 						<TextBlock
 							FontSize="13"
 							FontWeight="SemiBold"
-							Text="보낼 내용" />
+							Text="등록할 내용" />
 						<TextBlock
 							Margin="0,2,0,8"
 							Style="{StaticResource Reg.Hint}"
-							Text="이 프리셋으로 만들면 이렇게 나간다 — POST 1건. 유형 공통 사실(states · commands …)과 관측값은 실리지 않는다." />
+							Text="[등록]을 누르면 아래 내용으로 장비를 만듭니다." />
+						<!--  U-18 D-10 10.3 — 사람이 읽는 요약을 먼저, 요청 본문(JSON)은 펼쳐야 보인다. 비밀번호 가림은 그대로다.  -->
+						<TextBox
+							Margin="0,0,0,8"
+							AutomationProperties.AutomationId="Devices.Assembly.Register.Summary"
+							Background="Transparent"
+							BorderThickness="0"
+							FontSize="12.5"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							IsReadOnly="True"
+							IsReadOnlyCaretVisible="False"
+							Text="{Binding RequestSummary, Mode=OneWay}"
+							TextWrapping="Wrap" />
 					</StackPanel>
-					<Border
-						Background="{DynamicResource SurfaceSunkenBrush}"
-						BorderBrush="{DynamicResource DividerBrush}"
-						BorderThickness="1"
-						CornerRadius="4">
-						<ScrollViewer HorizontalScrollBarVisibility="Auto" Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
-							<TextBlock
-								Margin="10"
-								AutomationProperties.AutomationId="Devices.Assembly.Register.Preview"
-								FontFamily="Consolas"
-								FontSize="12"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								Text="{Binding PreviewJson}" />
-						</ScrollViewer>
-					</Border>
+					<Expander
+						AutomationProperties.AutomationId="Devices.Assembly.Register.PreviewExpander"
+						Header="요청 본문 보기"
+						IsExpanded="False">
+						<Border
+							Background="{DynamicResource SurfaceSunkenBrush}"
+							BorderBrush="{DynamicResource DividerBrush}"
+							BorderThickness="1"
+							CornerRadius="4">
+							<ScrollViewer HorizontalScrollBarVisibility="Auto" Style="{StaticResource Console.ScrollViewer}" VerticalScrollBarVisibility="Auto">
+								<TextBlock
+									Margin="10"
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Preview"
+									FontFamily="Consolas"
+									FontSize="12"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding PreviewJson}" />
+							</ScrollViewer>
+						</Border>
+					</Expander>
 				</DockPanel>
 			</Border>
 		</Grid>

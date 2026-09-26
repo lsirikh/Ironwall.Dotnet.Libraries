@@ -78,8 +78,11 @@ internal sealed class FakeServerConsoleService : IServerConsoleService
 
     public Task<ServerMetricDto?> LatestMetricAsync(int id, CancellationToken token = default) => Task.FromResult(LatestMetric);
 
-    public Task<IReadOnlyList<ServerMetricDto>> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
-        => Task.FromResult<IReadOnlyList<ServerMetricDto>>(Array.Empty<ServerMetricDto>());
+    /// <summary>true 면 이력 조회가 실패한다(null) — 빈 기록과 실패를 가르는지 본다.</summary>
+    public bool HistoryFails { get; set; }
+
+    public Task<IReadOnlyList<ServerMetricDto>?> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
+        => Task.FromResult<IReadOnlyList<ServerMetricDto>?>(HistoryFails ? null : Array.Empty<ServerMetricDto>());
 
     public Task<(ProxySettingDto? Setting, string? Note)> LegacyOperationModeAsync(int id, CancellationToken token = default)
         => Task.FromResult<(ProxySettingDto?, string?)>((null, null));
@@ -169,7 +172,7 @@ public class ServerMonitorViewModelTests
 
         await ActivateAsync(vm);
 
-        Assert.Equal(7, vm.RailEntries.Count);
+        Assert.Equal(6, vm.RailEntries.Count);   // 시스템 이벤트 칸은 숨긴다(U-18 D-7 7.1)
         Assert.Equal(3, vm.RailEntries.Single(e => e.Key == ServerTypeCatalog.AllKey).Count);
         Assert.Equal(1, vm.RailEntries.Single(e => e.Key == ServerTypeCatalog.NvrKey).BadCount);
         Assert.Equal(1, vm.RailEntries.Single(e => e.Key == ServerTypeCatalog.EtcKey).Count);
@@ -192,17 +195,28 @@ public class ServerMonitorViewModelTests
     }
 
     [Fact]
-    public async Task should_stop_showing_the_list_when_the_system_events_rail_is_selected()
+    public async Task should_keep_showing_the_server_list_when_the_hidden_system_events_key_is_selected()
     {
+        // "시스템 이벤트" 칸은 서버 입구가 없어 내지 않는다(U-18 D-7 7.1) — 그 키로 골라도 자리표시가 아니라 "전체" 목록이다.
         var (vm, service, _, _) = Build();
         service.Servers.Add(Entry(1, "스피커서버", EnumServerType.SPEAKER_API));
         await ActivateAsync(vm);
 
         vm.SelectRail(ServerTypeCatalog.SystemEventsKey);
 
-        Assert.True(vm.IsSystemEvents);
-        Assert.False(vm.IsServerList);
-        Assert.Contains("받은 것이 없어", vm.SystemEventsNote);
+        Assert.False(vm.IsSystemEvents);
+        Assert.True(vm.IsServerList);
+        Assert.Equal(ServerTypeCatalog.AllKey, vm.SelectedRail?.Key);
+        Assert.Single(vm.Rows);
+    }
+
+    [Fact]
+    public void should_not_offer_system_events_rail_entry_when_console_is_built()
+    {
+        var (vm, _, _, _) = Build();
+
+        Assert.DoesNotContain(vm.RailEntries, e => e.Key == ServerTypeCatalog.SystemEventsKey);
+        Assert.DoesNotContain(vm.RailEntries, e => e.Label.Contains("시스템 이벤트"));
     }
 
     [Fact]
@@ -243,7 +257,7 @@ public class ServerMonitorViewModelTests
         await ActivateAsync(vm);
 
         Assert.Equal("—", vm.Rows[0].LastChangeText);
-        Assert.Contains("전이 시각이 없습니다", vm.LastChangeNote);
+        Assert.Contains("상태가 바뀐 시각을 제공하지 않습니다", vm.LastChangeNote);
     }
 
     [Fact]
@@ -254,7 +268,7 @@ public class ServerMonitorViewModelTests
 
         Assert.False(vm.IsUnitEra);
         Assert.DoesNotContain(vm.Columns, c => c.Key == "unit");
-        Assert.Contains("부대 편제가 없습니다", vm.UnitSectionText);
+        Assert.Contains("부대 편제를 지원하지 않습니다", vm.UnitSectionText);
     }
     #endregion
 
@@ -443,7 +457,7 @@ public class ServerMonitorViewModelTests
 
         Assert.True(vm.Detail.IsCreating);
         Assert.True(vm.HasDetail);
-        Assert.Contains("상태는 서버가 보고합니다", vm.Detail.CreateBanner);
+        Assert.Equal("이름 · 주소 · 포트 · 분류를 입력하세요.", vm.Detail.CreateBanner);
         Assert.DoesNotContain(typeof(ServerWriteIntent).GetProperties(), p => p.Name.Contains("Status", StringComparison.Ordinal));
     }
 
@@ -454,7 +468,7 @@ public class ServerMonitorViewModelTests
         await ActivateAsync(vm);
 
         Assert.False(vm.CanAdd);
-        Assert.Contains("분류를 받지 못해", vm.AddBlockedReason);
+        Assert.Contains("분류를 불러오지 못해", vm.AddBlockedReason);
 
         vm.Add();
         Assert.False(vm.Detail.IsCreating);
@@ -564,7 +578,7 @@ public class ServerMonitorViewModelTests
 
         Assert.Empty(service.Assigns);        // 아직 0회
         Assert.Equal(2, vm.Tray.Count);
-        Assert.Contains("지금은 0회", vm.StatusText);
+        Assert.Contains("대기 목록에 담았습니다", vm.StatusText);
     }
 
     [Fact]
@@ -580,7 +594,7 @@ public class ServerMonitorViewModelTests
         await vm.AssignSelectionAsync(vm.AssignCandidates.ToList());
         await vm.ApplyTrayAsync();
 
-        Assert.Contains("2회", dialogs.Asked.Single());
+        Assert.Contains("2건을 저장할까요?", dialogs.Asked.Single());
         Assert.Equal(2, service.Assigns.Count);
         Assert.True(vm.CanUndoAssign);
     }
@@ -600,7 +614,7 @@ public class ServerMonitorViewModelTests
 
         Assert.Empty(service.Assigns);
         Assert.Empty(vm.Tray.Entries);
-        Assert.Contains("서버 호출 0회", vm.StatusText);
+        Assert.Contains("대기 목록을 비웠습니다", vm.StatusText);
     }
 
     [Fact]
@@ -645,7 +659,7 @@ public class ServerMonitorViewModelTests
         await ActivateAsync(vm);
 
         Assert.Equal(new[] { 1 }, vm.AssignCandidates.Select(c => c.Id));
-        Assert.Contains("6.3", vm.AssignHint);
+        Assert.Contains("스피커만 배정할 수 있습니다", vm.AssignHint);
     }
 
     [Fact]
@@ -696,7 +710,7 @@ public class ServerMonitorViewModelTests
         await vm.UndoAssignAsync();
 
         Assert.Empty(service.Assigns);
-        Assert.Contains("해제 입구가 없어", vm.StatusText);
+        Assert.Contains("배정 해제를 지원하지 않아", vm.StatusText);
     }
 
     [Fact]
@@ -738,17 +752,19 @@ public class ServerMonitorViewModelTests
         await ActivateAsync(vm);
 
         Assert.False(vm.CanDelete);
-        Assert.Contains("제공하지 않습니다", vm.DeleteBlockedReason);
+        Assert.Equal("이 화면에서는 서버를 삭제할 수 없습니다.", vm.DeleteBlockedReason);
     }
 
     [Fact]
-    public async Task should_say_no_liveness_signal_is_connected()
+    public async Task should_not_carry_developer_liveness_note_when_detail_is_shown()
     {
+        // 생존 신호 설계 메모(REST · NATS)는 운영자 화면에서 뺐다(U-18 D-7 7.2).
         var (vm, _, _, _) = Build();
         await ActivateAsync(vm);
 
-        Assert.Contains("생존 신호", vm.LivenessNote);
-        Assert.Contains("REST 로는", vm.LivenessNote);
+        Assert.Null(typeof(ServerMonitorViewModel).GetProperty("LivenessNote"));
+        Assert.DoesNotContain("NATS", vm.SystemEventsNote);
+        Assert.DoesNotContain("REST", vm.SystemEventsNote);
     }
 
     [Fact]

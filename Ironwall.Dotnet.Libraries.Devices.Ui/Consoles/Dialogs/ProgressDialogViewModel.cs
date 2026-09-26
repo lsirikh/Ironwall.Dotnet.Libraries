@@ -74,7 +74,7 @@ public sealed class ProgressDialogViewModel : Screen, IDisposable
     {
         if (_cancelRequested || _isDone) return;
         IsCancelRequested = true;
-        Message = "멈추는 중… (보낸 것은 되돌리지 않습니다)";
+        Message = "멈추는 중입니다… (이미 저장된 것은 되돌리지 않습니다)";
         try { _cts.Cancel(); }
         catch (ObjectDisposedException) { /* 이미 끝났다 */ }
     }
@@ -87,7 +87,7 @@ public sealed class ProgressDialogViewModel : Screen, IDisposable
         OnUi(() =>
         {
             IsDone = true;
-            Message = summary ?? (_cancelRequested ? $"중단 — {_done}건 완료" : $"끝 — {_done}건 완료");
+            Message = summary ?? (_cancelRequested ? $"중단했습니다 — {_done}건 완료" : $"완료했습니다 — {_done}건");
             Notify();
         });
     }

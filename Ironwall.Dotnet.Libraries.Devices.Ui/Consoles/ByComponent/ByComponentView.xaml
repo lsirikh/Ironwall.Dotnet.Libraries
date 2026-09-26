@@ -61,8 +61,10 @@
 					BorderThickness="0"
 					Background="Transparent"
 					ItemContainerStyle="{StaticResource Console.Chip.ListBoxItem}"
+					DisplayMemberPath="Display"
 					ItemsSource="{Binding StateChips}"
-					SelectedItem="{Binding SelectedState, Mode=TwoWay}"
+					SelectedValue="{Binding SelectedState, Mode=TwoWay}"
+					SelectedValuePath="Code"
 					SelectionChanged="OnFilterSelectionChanged"
 					SelectionMode="Single">
 					<ListBox.ItemsPanel>
@@ -104,22 +106,27 @@
 				ItemsSource="{Binding Rows}"
 				Style="{StaticResource Console.DataGrid}">
 			<DataGrid.Columns>
+				<!--  U-18 D-4 4.5 — 장비 열이 남은 폭을 받고 이름은 말줄임 + 툴팁(예전: 140 고정 · 잘림 · 가로 스크롤).  -->
 				<DataGridTemplateColumn
-					Width="140"
+					Width="*"
+					MinWidth="80"
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
 					Header="장비">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
-							<StackPanel Orientation="Horizontal">
+							<DockPanel LastChildFill="True">
 								<TextBlock
 									VerticalAlignment="Center"
+									DockPanel.Dock="Left"
 									FontFamily="{DynamicResource MonoFont}"
 									Text="{Binding DeviceNumber}" />
 								<TextBlock
 									Margin="6,0,0,0"
 									VerticalAlignment="Center"
-									Text="{Binding DeviceName}" />
-							</StackPanel>
+									Text="{Binding DeviceName}"
+									TextTrimming="CharacterEllipsis"
+									ToolTip="{Binding DeviceName}" />
+							</DockPanel>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
@@ -129,10 +136,10 @@
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
 					Header="카테고리" />
 				<DataGridTextColumn
-					Width="130"
+					Width="110"
 					Binding="{Binding ComponentKey}"
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
-					Header="부품 key">
+					Header="부품 이름">
 					<DataGridTextColumn.ElementStyle>
 						<Style TargetType="TextBlock">
 							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
@@ -140,10 +147,17 @@
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
 				<DataGridTextColumn
-					Width="100"
+					Width="90"
 					Binding="{Binding StateText}"
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
-					Header="상태" />
+					Header="상태">
+					<!--  모르는 상태는 "알 수 없음" 으로 적고 받은 원문은 툴팁으로만 보인다.  -->
+					<DataGridTextColumn.ElementStyle>
+						<Style TargetType="TextBlock">
+							<Setter Property="ToolTip" Value="{Binding StateTooltip}" />
+						</Style>
+					</DataGridTextColumn.ElementStyle>
+				</DataGridTextColumn>
 				<DataGridTemplateColumn
 					Width="100"
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
@@ -179,8 +193,8 @@
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
 				<DataGridTextColumn
-					Width="*"
-					MinWidth="160"
+					Width="150"
+					MinWidth="150"
 					Binding="{Binding LastChangeText}"
 					CellStyle="{StaticResource Console.DataGrid.Cell}"
 					Header="마지막 변화">
@@ -188,6 +202,8 @@
 						<Style TargetType="TextBlock">
 							<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
 							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+							<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+							<Setter Property="ToolTip" Value="{Binding LastChangeText}" />
 						</Style>
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>

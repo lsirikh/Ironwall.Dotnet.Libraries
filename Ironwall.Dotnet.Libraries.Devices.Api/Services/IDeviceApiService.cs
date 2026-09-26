@@ -338,6 +338,29 @@ public interface IDeviceApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// 장비 한 대의 <b>축 값 몇 개만</b> 고친다 — <c>PATCH /devices/{종류}/{id}</c> 에 호출자가 만든 좁은 본문을 그대로 싣는다
+    /// (예: <c>{"connection":{"channel":3}}</c>). 7.0 이상 축 계약에서만 보낸다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜 DTO 가 아니라 JSON 조각인가</b> — 장비 DTO 는 축 모드에서 조건 없이 직렬화되는 키(재조립 <c>connection</c> ·
+    /// <c>description</c> 등)가 있어, 빈 DTO 로 PATCH 를 만들면 null 키가 서버 값을 지운다(RFC 7396). 여기서는 보낸 키만 바뀐다 —
+    /// 축은 객체 병합이라 안 보낸 칸은 그대로 남는다.</para>
+    /// <para><b>보낼 수 없는 것</b>은 보내기 전에 막는다: <c>hardware_spec.components</c>(배열은 PATCH 에서도 통째 교체 — 조립기 전용) ·
+    /// <c>device_status</c>(관측 — 서버 422) · 네 축(<c>connection</c> · <c>hardware_spec</c> · <c>device_config</c> · <c>unit_id</c>) 밖의 키.
+    /// <c>unit_id</c> 는 8.0 미만이면 뺀다(쓰기 스키마에 없는 키).</para>
+    /// <para>기본 구현은 "지원하지 않음" 오류다 — 시험 대역 · 옛 구현이 이 멤버 때문에 깨지지 않게 한다.</para>
+    /// </remarks>
+    /// <param name="deviceTypePath">복수형 경로 세그먼트(<c>controllers</c> · <c>sensors</c> …).</param>
+    /// <param name="deviceId">장비 id.</param>
+    /// <param name="body">보낼 키만 담은 본문. 값이 JSON <c>null</c> 이면 그 칸을 지운다.</param>
+    Task<ApiResponse<object>> PatchDeviceAxesAsync(
+        string deviceTypePath,
+        int deviceId,
+        Newtonsoft.Json.Linq.JObject body,
+        CancellationToken token = default)
+        => Task.FromResult(ApiResponse<object>.CreateError("NOT_SUPPORTED", "이 장비 서비스는 축 값 부분 수정을 지원하지 않습니다."));
+
+    /// <summary>
     /// GOP API를 통해 Camera의 전체 데이터를 교체합니다 (PUT).
     /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
     /// </summary>

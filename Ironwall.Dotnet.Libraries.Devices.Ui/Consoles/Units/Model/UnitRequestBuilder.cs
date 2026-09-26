@@ -101,7 +101,7 @@ public static class UnitRequestBuilder
     public static bool TryValidateEdit(UnitEditValues values, out string? error)
     {
         var name = (values?.Name ?? string.Empty).Trim();
-        if (name.Length == 0) { error = "부대 이름을 입력하십시오."; return false; }
+        if (name.Length == 0) { error = "부대 이름을 입력하세요."; return false; }
         if (name.Length > UnitRules.NAME_MAX_LENGTH) { error = $"부대 이름이 {UnitRules.NAME_MAX_LENGTH}자를 넘습니다(현재 {name.Length}자)."; return false; }
 
         var description = values!.Description?.Trim();
@@ -152,7 +152,7 @@ public static class UnitRequestBuilder
 
         if (existingCodes != null && existingCodes.Contains(code, StringComparer.Ordinal))
         {
-            error = $"부대 코드 '{code}' 는 이미 쓰고 있습니다 — 코드는 전역에서 하나뿐이어야 합니다.";
+            error = $"부대 코드 '{code}'는 이미 쓰고 있습니다. 다른 코드를 입력하세요.";
             return false;
         }
 
@@ -168,12 +168,12 @@ public static class UnitRequestBuilder
             }
             if (parent.Echelon is not EnumUnitEchelon parentEchelon)
             {
-                error = $"'{parent.Name}' 의 제대('{parent.EchelonRaw}')를 이 판본이 알지 못합니다 — 상위로 삼지 않습니다.";
+                error = $"'{parent.Name}'의 제대를 알 수 없어 상위 부대로 정할 수 없습니다.";
                 return false;
             }
             if (!UnitRules.IsAllowedParent(parentEchelon, values.Echelon))
             {
-                error = $"{UnitDropRules.EchelonText(values.Echelon)}는 {UnitDropRules.EchelonText(parentEchelon)}에 붙일 수 없습니다 — 엄격히 상위 제대여야 합니다.";
+                error = $"{UnitDropRules.EchelonText(values.Echelon)}는 {UnitDropRules.EchelonText(parentEchelon)} 아래에 둘 수 없습니다. 더 높은 제대를 상위 부대로 고르세요.";
                 return false;
             }
         }

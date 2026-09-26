@@ -28,7 +28,7 @@ public class AssignDeltaTests
 
         Assert.False(plan.HasChanges);
         Assert.False(plan.CanSend);
-        Assert.Equal("바뀐 것이 없다", plan.BlockReason);
+        Assert.Equal(AssignDelta.NoChangeText, plan.BlockReason);
         Assert.Equal(0, plan.CallCount);
     }
 
@@ -66,7 +66,7 @@ public class AssignDeltaTests
 
         Assert.Equal(new[] { 7 }, plan.Added);
         Assert.Equal(2, plan.DraftExcluded);
-        Assert.Contains("저장 전 2대", AssignDelta.Summary(plan));
+        Assert.Contains("등록 전 장비 2대", AssignDelta.Summary(plan));
     }
 
     [Fact]
@@ -144,16 +144,16 @@ public class AssignDeltaTests
         var drift = AssignDelta.Drift(new[] { 1, 2 }, new[] { 2, 5 });
 
         Assert.NotNull(drift);
-        Assert.Contains("1대가 더 들어와 있다", drift);
-        Assert.Contains("1대가 빠져 있다", drift);
-        Assert.Contains("아무것도 보내지 않았다", drift);
+        Assert.Contains("1대가 더 들어와 있습니다", drift);
+        Assert.Contains("1대가 빠져 있습니다", drift);
+        Assert.Contains("저장하지 않았습니다", drift);
     }
 
     [Fact]
     public void should_report_drift_by_count_when_the_number_moved()
     {
-        Assert.Contains("1대가 더 들어와 있다", AssignDelta.DriftByCount(2, 3));
-        Assert.Contains("2대가 빠져 있다", AssignDelta.DriftByCount(4, 2));
+        Assert.Contains("1대가 더 들어와 있습니다", AssignDelta.DriftByCount(2, 3));
+        Assert.Contains("2대가 빠져 있습니다", AssignDelta.DriftByCount(4, 2));
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class AssignDeltaTests
         var reason = AssignDelta.DriftByCount(2, null);
 
         Assert.NotNull(reason);
-        Assert.Contains("다시 읽지 못해", reason);
+        Assert.Contains("다시 불러오지 못해", reason);
     }
 
     [Fact]
@@ -171,8 +171,8 @@ public class AssignDeltaTests
     {
         var line = AssignDelta.ResultLine("동측 1구역", new AssignLegOutcome(5, 3, 2, Failed: false), null);
 
-        Assert.Contains("3대를 넣었다", line);
-        Assert.Contains("2대는 서버가 건너뛰었다", line);
+        Assert.Contains("3대를 넣었습니다", line);
+        Assert.Contains("2대는 처리되지 않았습니다", line);
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class AssignDeltaTests
     {
         var line = AssignDelta.ResultLine("동측 1구역", null, new AssignLegOutcome(4, 0, 0, Failed: true));
 
-        Assert.Contains("4대를 빼지 못했다", line);
+        Assert.Contains("4대를 빼지 못했습니다", line);
     }
 
     [Fact]
@@ -462,7 +462,7 @@ public class DeviceAssignDialogViewModelTests
 
         Assert.False(called);
         Assert.False(vm.Saved);
-        Assert.Contains("다른 곳에서 그룹이 바뀌었다", vm.Message);
+        Assert.Contains("다른 사용자가 이 그룹을 바꿨습니다", vm.Message);
         Assert.Equal(DialogMessageSeverity.Warning, vm.MessageSeverity);
     }
 
@@ -479,7 +479,7 @@ public class DeviceAssignDialogViewModelTests
 
         Assert.False(called);
         Assert.False(vm.Saved);
-        Assert.Contains("다시 읽지 못해", vm.Message);
+        Assert.Contains("다시 불러오지 못해", vm.Message);
         Assert.Equal(DialogMessageSeverity.Critical, vm.MessageSeverity);
     }
     #endregion
@@ -524,7 +524,7 @@ public class DeviceAssignDialogViewModelTests
         Assert.Equal(new[] { 1, 2, 3, 4 }, again.Assigned.Select(i => i.Id));
         Assert.Empty(again.Available);
         Assert.False(again.IsDirty);                 // 보낼 것이 없다 — 되풀이 고리가 끊긴다
-        Assert.Equal("바뀐 것이 없다", again.CurrentPlan.BlockReason);
+        Assert.Equal(AssignDelta.NoChangeText, again.CurrentPlan.BlockReason);
     }
 
     [Fact]
@@ -542,7 +542,7 @@ public class DeviceAssignDialogViewModelTests
 
         Assert.False(vm.Saved);
         Assert.Null(vm.ClosedWith);                                    // 창은 열려 있다
-        Assert.Contains("서버가 건너뛰었다", vm.Message);
+        Assert.Contains("처리되지 않았습니다", vm.Message);
         Assert.Equal(DialogMessageSeverity.Warning, vm.MessageSeverity);   // 회색 안내로 주저앉지 않는다
         Assert.Equal(4, vm.Assigned.Count);                            // 손으로 옮긴 것은 그대로다
         Assert.Empty(vm.Available);
@@ -562,7 +562,7 @@ public class DeviceAssignDialogViewModelTests
         await vm.SaveAsync();
 
         Assert.False(vm.Saved);
-        Assert.Contains("넣지 못했다", vm.Message);
+        Assert.Contains("넣지 못했습니다", vm.Message);
         // 한 번의 타임아웃이 끌어다 놓은 것을 전부 지우지 않는다.
         Assert.Equal(4, vm.Assigned.Count);
         Assert.Equal(new[] { 2, 3 }, vm.CurrentPlan.Added);
@@ -647,7 +647,7 @@ public class DeviceAssignDialogViewModelTests
 
         Assert.False(called);
         Assert.False(vm.Saved);
-        Assert.Contains("다른 곳에서 그룹이 바뀌었다", vm.Message);
+        Assert.Contains("다른 사용자가 이 그룹을 바꿨습니다", vm.Message);
     }
 
     [Fact]

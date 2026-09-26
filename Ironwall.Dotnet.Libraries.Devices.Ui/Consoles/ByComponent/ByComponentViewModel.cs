@@ -63,7 +63,7 @@ public sealed class ByComponentViewModel : Screen
         _policy = policy ?? DeviceQueryPolicy.Resolve();
 
         ComponentTypes = new BindableCollection<CatalogOption>();
-        StateChips = new BindableCollection<string> { AllChip };
+        StateChips = new BindableCollection<CatalogOption> { AllStateChip };
         Rows = new BindableCollection<ByComponentRowViewModel>();
         // Code 는 서버로 보내는 원문("OK" 등 — DestructiveGuard/서버가 아는 값), Label 은 화면 전용 한글
         // (ByComponentRowViewModel.ToHealth 와 같은 표, DeviceEnumDisplay.ComponentHealthKorean 이 정본).
@@ -90,7 +90,7 @@ public sealed class ByComponentViewModel : Screen
         else
         {
             // 6.3 서버 — HTTP 왕복 없이 즉시 안내(IDeviceApiService.GetDevicesByComponentAsync 와 같은 게이트).
-            _statusText = "이 서버 버전에서는 부품으로 찾기를 사용할 수 없습니다(계약 7.0 이상 필요).";
+            _statusText = NotSupportedText;
         }
     }
     #endregion
@@ -113,7 +113,7 @@ public sealed class ByComponentViewModel : Screen
 
             // 종류가 바뀌면 이전 종류에서 관측된 상태값은 의미가 없다 — 전체로 되돌리고 칩도 비운다(remarks 참조).
             StateChips.Clear();
-            StateChips.Add(AllChip);
+            StateChips.Add(AllStateChip);
             if (!string.Equals(_selectedState, AllChip, StringComparison.Ordinal))
             {
                 _selectedState = AllChip;
@@ -122,8 +122,12 @@ public sealed class ByComponentViewModel : Screen
         }
     }
 
-    /// <summary>첫 항목은 항상 "전체" — 나머지는 직전 결과에서 관측된 상태값(remarks 참조).</summary>
-    public BindableCollection<string> StateChips { get; }
+    /// <summary>
+    /// 첫 항목은 항상 "전체" — 나머지는 직전 결과에서 관측된 상태값(remarks 참조).
+    /// Code = 서버로 보내는 원문(OPEN 등), Display = 한국어(열림) — 칩이 영문 원문을 보이던 결함(U-18 D-4 4.1).
+    /// 뷰는 <c>SelectedValuePath="Code"</c> 로 <see cref="SelectedState"/>(코드 문자열)와 묶는다.
+    /// </summary>
+    public BindableCollection<CatalogOption> StateChips { get; }
 
     public string SelectedState
     {
@@ -186,7 +190,7 @@ public sealed class ByComponentViewModel : Screen
     {
         if (!IsAvailable)
         {
-            StatusText = "이 서버 버전에서는 부품으로 찾기를 사용할 수 없습니다(계약 7.0 이상 필요).";
+            StatusText = NotSupportedText;
             return;
         }
 
@@ -228,7 +232,7 @@ public sealed class ByComponentViewModel : Screen
                 if (myToken.IsCancellationRequested) return;   // 취소 도중의 부수 예외 — 역시 버린다
                 _log.Error($"[ByComponent] 조회 예외 — {ex.Message}");
                 Rows.Clear();
-                StatusText = $"부품 조회 중 오류가 발생했습니다 ({ex.Message}).";
+                StatusText = LoadFailedText;   // 예외 원문은 빈 상태 제목에 붙이지 않는다 — 로그에만(U-18 D-4 4.4)
                 return;
             }
 
@@ -239,7 +243,7 @@ public sealed class ByComponentViewModel : Screen
                 Rows.Clear();
                 var code = response.Error?.Code ?? "UNKNOWN";
                 _log.Warning($"[ByComponent] 조회 실패 — {code}: {response.Error?.Message ?? response.Message}");
-                StatusText = $"부품 조회에 실패했습니다 ({code}).";
+                StatusText = LoadFailedText;
                 return;
             }
 
@@ -249,7 +253,7 @@ public sealed class ByComponentViewModel : Screen
 
             RebuildStateChips(response.Data);
 
-            StatusText = Rows.Count > 0 ? $"조건에 맞는 부품 {Rows.Count}건" : "조건에 맞는 부품이 없습니다";
+            StatusText = Rows.Count > 0 ? $"조건에 맞는 부품 {Rows.Count}건" : "조건에 맞는 부품이 없습니다.";
         }
         finally
         {
@@ -299,11 +303,11 @@ public sealed class ByComponentViewModel : Screen
 
         var previousSelection = SelectedState;
         StateChips.Clear();
-        StateChips.Add(AllChip);
-        foreach (var s in distinct) StateChips.Add(s);
+        StateChips.Add(AllStateChip);
+        foreach (var s in distinct) StateChips.Add(new CatalogOption(s, ByComponentRowViewModel.StateLabel(s)));
 
         // 직전 선택이 새 칩 목록에 없으면(예: 그 상태의 결과가 0건이 됨) 전체로 되돌린다 — 매달린 필터 방지.
-        if (!StateChips.Contains(previousSelection, StringComparer.Ordinal))
+        if (!StateChips.Any(c => string.Equals(c.Code, previousSelection, StringComparison.Ordinal)))
             SelectedState = AllChip;
     }
     #endregion
@@ -314,6 +318,15 @@ public sealed class ByComponentViewModel : Screen
 
     /// <summary>건강 칩의 "전체" 항목 — Code=Label 이라 <see cref="CatalogOption.Display"/> 가 괄호 없이 "전체"만 보인다.</summary>
     private static readonly CatalogOption AllHealthChip = new(AllChip, AllChip);
+
+    /// <summary>상태 칩의 "전체" 항목.</summary>
+    private static readonly CatalogOption AllStateChip = new(AllChip, AllChip);
+
+    /// <summary>현재 서버가 부품 조회를 모를 때(판본 번호는 보이지 않는다 — U-18 D-4 4.3).</summary>
+    public const string NotSupportedText = "현재 서버에서는 부품으로 찾기를 지원하지 않습니다.";
+
+    /// <summary>조회 실패 — 예외 · 서버 코드 대신 할 일을 말한다(U-18 D-4 4.4).</summary>
+    public const string LoadFailedText = "부품을 불러오지 못했습니다. 잠시 후 [갱신]을 누르세요.";
 
     private readonly IDeviceApiService _api;
     private readonly ICatalogService _catalog;

@@ -108,11 +108,11 @@ public sealed class ServerAssignHandler : IDragDropHandler
     /// </summary>
     public async Task<string> AssignAsync(IServerAssignTarget server, IReadOnlyList<IBaseDeviceModel> devices, CancellationToken token = default)
     {
-        if (server is null) return Finish("대상 서버가 없습니다", null);
+        if (server is null) return Finish("배정할 서버가 없습니다.", null);
 
         var plan = ServerDropRules.Plan(server.Id, server.Type, devices, _service.Contract);
-        if (!plan.CanSend) return Finish(plan.BlockReason ?? "보낼 것이 없습니다", null);
-        if (IsBusy) return Finish("앞선 배정이 아직 끝나지 않았습니다", null);
+        if (!plan.CanSend) return Finish(plan.BlockReason ?? "배정할 장비가 없습니다.", null);
+        if (IsBusy) return Finish("앞선 배정이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요.", null);
 
         // N 회로 번지는 배정은 즉시 보내지 않는다 — Draft 트레이에 쌓고 [적용] 한 번에 보낸다.
         if (plan.IsMultiCall) return Finish(Queue(server, plan), null);
@@ -125,17 +125,21 @@ public sealed class ServerAssignHandler : IDragDropHandler
             var result = await SendAsync(device, server.Id, token).ConfigureAwait(true);
 
             if (!result.IsSuccess)
-                return Finish($"'{server.Name}' 에 배정하지 못했습니다 — {result.Message}", null);
+            {
+                // 서버 원문은 화면에 붙이지 않는다 — 로그로 보낸다(U-18 공통 규칙).
+                _log?.Warning($"[ServerAssign] server={server.Id} device={device.Id} 거절: {result.Message}");
+                return Finish($"'{server.Name}'에 배정하지 못했습니다. 잠시 후 다시 시도하세요.", null);
+            }
 
             Reflect(device, server);
             var undo = new ServerAssignUndo(server.Id, server.Name, new[] { (device, previous) });
             return Finish(ServerDropRules.ResultLine(server.Name, plan, 1, 0), undo, new[] { device.Id });
         }
-        catch (OperationCanceledException) { return Finish("배정을 취소했습니다", null); }
+        catch (OperationCanceledException) { return Finish("배정을 취소했습니다.", null); }
         catch (Exception ex)
         {
             _log?.Error($"[ServerAssign] server={server.Id}: {ex.Message}");
-            return Finish($"'{server.Name}' 에 배정하지 못했습니다 — 서버에 닿지 못했습니다", null);
+            return Finish($"'{server.Name}'에 배정하지 못했습니다. 서버 연결을 확인하세요.", null);
         }
         finally { IsBusy = false; }
     }
@@ -166,13 +170,13 @@ public sealed class ServerAssignHandler : IDragDropHandler
         }
 
         _lastQueued = new ServerAssignUndo(server.Id, server.Name, moved);
-        return $"'{server.Name}' 에 {plan.WriteCount}대를 트레이에 담았습니다 — [적용] 에서 서버 쓰기 {plan.WriteCount}회가 나갑니다(지금은 0회)";
+        return $"'{server.Name}'에 배정할 {plan.WriteCount}대를 대기 목록에 담았습니다 — [적용]을 누르면 저장됩니다.";
     }
 
     /// <summary>트레이를 적용한 뒤 그 결과를 알린다(되돌리기는 실제로 나간 것만 대상이다).</summary>
     public async Task<string> ApplyTrayAsync(CancellationToken token = default)
     {
-        if (!_tray.HasEntries) return Finish("담아 둔 것이 없습니다", null);
+        if (!_tray.HasEntries) return Finish("대기 중인 배정이 없습니다.", null);
 
         var summary = await _tray.ApplyAsync(token).ConfigureAwait(true);
         var undo = _lastQueued is { Count: > 0 } queued ? queued : null;
@@ -187,22 +191,22 @@ public sealed class ServerAssignHandler : IDragDropHandler
         var count = _tray.Count;
         _tray.Revert();
         _lastQueued = null;
-        return Finish($"담아 둔 {count}건을 버렸습니다 — 서버 호출 0회", null);
+        return Finish($"대기 목록을 비웠습니다({count}건). 저장하지 않았습니다.", null);
     }
 
     /// <summary>방금 배정한 것을 되돌린다. 축 계약에서는 이전이 없던 장비를 <b>해제</b>로 되돌린다.</summary>
     public async Task<string> UndoAsync(ServerAssignUndo undo, CancellationToken token = default)
     {
-        if (undo is null || undo.Moved.Count == 0) return Finish("되돌릴 것이 없습니다", null);
-        if (IsBusy) return Finish("앞선 배정이 아직 끝나지 않았습니다", undo);
+        if (undo is null || undo.Moved.Count == 0) return Finish("되돌릴 배정이 없습니다.", null);
+        if (IsBusy) return Finish("앞선 배정이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요.", undo);
 
         var canDetach = _service.IsAxisEra;
         var restorable = undo.Moved.Where(m => m.PreviousServerId is > 0 || canDetach).ToList();
         var stuck = undo.Moved.Count - restorable.Count;
 
         if (restorable.Count == 0)
-            return Finish($"되돌릴 수 없습니다 — 이 서버 판본(6.3)에는 배정 해제 입구가 없어 "
-                        + $"배정 전 서버가 없던 {stuck}대를 되돌릴 수 없습니다", null);
+            return Finish($"되돌릴 수 없습니다. 현재 서버에서는 배정 해제를 지원하지 않아 "
+                        + $"배정 전에 서버가 없던 {stuck}대를 되돌릴 수 없습니다.", null);
 
         IsBusy = true;
         try
@@ -219,15 +223,15 @@ public sealed class ServerAssignHandler : IDragDropHandler
             }
 
             var parts = new List<string> { $"{restored.Count}대를 되돌렸습니다" };
-            if (stuck > 0) parts.Add($"배정 전 서버가 없던 {stuck}대는 이 판본에서 해제할 수 없습니다");
-            if (restored.Count < restorable.Count) parts.Add($"{restorable.Count - restored.Count}대에서 멈췄습니다");
-            return Finish(string.Join(" · ", parts), null, restored);
+            if (stuck > 0) parts.Add($"배정 전에 서버가 없던 {stuck}대는 현재 서버에서 해제할 수 없습니다");
+            if (restored.Count < restorable.Count) parts.Add($"{restorable.Count - restored.Count}대는 되돌리지 못했습니다");
+            return Finish(string.Join(" · ", parts) + ".", null, restored);
         }
-        catch (OperationCanceledException) { return Finish("되돌리기를 취소했습니다", undo); }
+        catch (OperationCanceledException) { return Finish("되돌리기를 취소했습니다.", undo); }
         catch (Exception ex)
         {
             _log?.Error($"[ServerAssign] undo server={undo.ServerId}: {ex.Message}");
-            return Finish("되돌리지 못했습니다 — 서버에 닿지 못했습니다", undo);
+            return Finish("되돌리지 못했습니다. 서버 연결을 확인하세요.", undo);
         }
         finally { IsBusy = false; }
     }

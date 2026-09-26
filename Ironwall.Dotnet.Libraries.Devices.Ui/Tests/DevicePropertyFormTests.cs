@@ -188,7 +188,8 @@ public class DevicePropertyFormTests : IDisposable
         form.Load(new object[] { Controller(1, 1, "A") }, EnumDeviceCategory.Controller, true, false, isReadOnly: true);
 
         Assert.All(form.Fields, f => Assert.True(f.IsLocked));
-        Assert.All(form.Fields, f => Assert.False(string.IsNullOrWhiteSpace(f.LockReason)));
+        // 표시 전용 요약(장비 링크 · 부품별 설정)은 자물쇠만 보이고 까닭 문장은 띄우지 않는다 — 나머지는 까닭이 있다.
+        Assert.All(form.Fields.Where(f => f.Spec.ShowLockReason), f => Assert.False(string.IsNullOrWhiteSpace(f.LockReason)));
     }
 
     [Fact]
@@ -299,9 +300,9 @@ public class DevicePropertyFormTests : IDisposable
         var error = status.Options.Single(o => o.Text == nameof(EnumDeviceStatus.ERROR));
         var deactivated = status.Options.Single(o => o.Text == nameof(EnumDeviceStatus.DEACTIVATED));
 
-        Assert.Equal("운영 (ACTIVATED)", activated.Display);
-        Assert.Equal("오류 (ERROR)", error.Display);
-        Assert.Equal("중지 (DEACTIVATED)", deactivated.Display);
+        Assert.Equal("운영", activated.Display);
+        Assert.Equal("오류", error.Display);
+        Assert.Equal("중지", deactivated.Display);
     }
 
     /// <summary>"종류(레거시)" 콤보(EnumDeviceType)도 같은 규칙으로 한글을 보인다 — 그리드·상세 폼이 갈리지 않는다.</summary>
@@ -315,7 +316,7 @@ public class DevicePropertyFormTests : IDisposable
         var type = Field(form, "device_type");
         var ipCamera = type.Options.Single(o => o.Text == nameof(EnumDeviceType.IpCamera));
 
-        Assert.Equal("카메라 (IpCamera)", ipCamera.Display);
+        Assert.Equal("카메라", ipCamera.Display);
     }
 
     /// <summary>읽기 전용 "카테고리" 칸도 raw enum 이름("Controller") 대신 한글을 보인다.</summary>

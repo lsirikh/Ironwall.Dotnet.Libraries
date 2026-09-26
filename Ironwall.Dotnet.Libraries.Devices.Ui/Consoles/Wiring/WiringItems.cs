@@ -126,9 +126,9 @@ public sealed class SensorRowViewModel : PropertyChangedBase
     /// <summary>색이 아니라 글자로 — 새 줄 ＋ · 고친 줄 ● · 그대로면 빈 칸.</summary>
     public string StateGlyph => Row.IsNew ? "＋" : IsDraft ? "●" : string.Empty;
 
-    public string StateTip => Row.IsNew ? "새로 만들 줄입니다 — [저장하기] 때 서버에 만듭니다."
-        : IsDraft ? "고친 줄입니다 — [저장하기] 때 보냅니다."
-        : "서버와 같습니다.";
+    public string StateTip => Row.IsNew ? "새로 만들 줄입니다 — [저장하기]를 누르면 등록됩니다."
+        : IsDraft ? "고친 줄입니다 — [저장하기]를 누르면 저장됩니다."
+        : "저장된 상태입니다.";
 
     public string Display => Row.Display;
 

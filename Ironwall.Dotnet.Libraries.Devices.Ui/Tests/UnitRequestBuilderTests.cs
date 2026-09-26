@@ -181,7 +181,7 @@ public class UnitRequestBuilderTests
         var values = new UnitCreateValues("b0207", "3대대", EnumUnitEchelon.Battalion, 3, null, true);
 
         Assert.False(UnitRequestBuilder.TryValidateCreate(values, null, BattalionNode(), out var error));
-        Assert.Contains("상위 제대", error);
+        Assert.Contains("더 높은 제대", error);
     }
 
     [Fact]

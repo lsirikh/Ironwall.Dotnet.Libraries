@@ -61,7 +61,8 @@ public sealed class ByComponentRowViewModel
         ComponentTypeLabel = string.IsNullOrWhiteSpace(dto.ComponentType)
             ? Dash
             : catalog.LabelOf(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE, dto.ComponentType);
-        StateText = ToStateText(dto.State);
+        StateText = StateLabel(dto.State);
+        StateTooltip = UnknownStateTooltip(dto.State);
         var (healthText, healthKind) = ToHealth(dto.Health);
         HealthText = healthText;
         HealthKind = healthKind;
@@ -89,8 +90,11 @@ public sealed class ByComponentRowViewModel
     /// <summary>부품 유형의 카탈로그 표시명. 유형이 없으면(옛 데이터) "—".</summary>
     public string ComponentTypeLabel { get; }
 
-    /// <summary>상태 한글 표시. 어휘 밖 값은 원문 그대로, 축 자체가 없으면 "—".</summary>
+    /// <summary>상태 한글 표시. 어휘 밖 값은 "알 수 없음"(원문은 <see cref="StateTooltip"/>), 축 자체가 없으면 "—".</summary>
     public string StateText { get; }
+
+    /// <summary>어휘 밖 상태일 때만 원문을 담은 툴팁 글 — 아는 값이면 <c>null</c>(툴팁을 띄우지 않는다).</summary>
+    public string? StateTooltip { get; }
 
     /// <summary>건강 한글 표시.</summary>
     public string HealthText { get; }
@@ -127,7 +131,7 @@ public sealed class ByComponentRowViewModel
     {
         ["OPEN"] = "열림",
         ["CLOSED"] = "닫힘",
-        ["RUNNING"] = "구동중",
+        ["RUNNING"] = "구동 중",
         ["ON"] = "켜짐",
         ["OFF"] = "꺼짐",
         ["IDLE"] = "대기",
@@ -140,12 +144,24 @@ public sealed class ByComponentRowViewModel
         return CategoryLabels.TryGetValue(trimmed, out var label) ? label : trimmed;
     }
 
-    private static string ToStateText(string? state)
+    /// <summary>모르는 상태 값의 화면 글 — 영문 원문을 그대로 보이지 않는다(U-18 D-4 4.1).</summary>
+    public const string UnknownState = "알 수 없음";
+
+    /// <summary>
+    /// 부품 상태 코드 → 한국어. 결과 열과 상태 필터 칩이 <b>같은 표</b>를 쓴다(칩만 영문이던 결함 — U-18 D-4 4.1).
+    /// 비었으면 "—", 어휘 밖이면 "알 수 없음".
+    /// </summary>
+    public static string StateLabel(string? state)
     {
         if (string.IsNullOrWhiteSpace(state)) return Dash;
-        var trimmed = state.Trim();
-        return StateLabels.TryGetValue(trimmed, out var label) ? label : trimmed;
+        return StateLabels.TryGetValue(state.Trim(), out var label) ? label : UnknownState;
     }
+
+    /// <summary>어휘 밖 상태일 때 원문을 보여 줄 툴팁 글. 아는 값 · 빈 값이면 <c>null</c>.</summary>
+    public static string? UnknownStateTooltip(string? state)
+        => string.IsNullOrWhiteSpace(state) || StateLabels.ContainsKey(state.Trim())
+            ? null
+            : $"받은 값: {state.Trim()}";
 
     // 한글 라벨의 정본은 DeviceEnumDisplay.ComponentHealthKorean 하나뿐이다 — 필터 칩(ByComponentViewModel)도
     // 같은 표를 읽는다. 여기서는 색·점 모양(Kind)만 이 행 전용으로 분류한다(표시 문구가 아니다).

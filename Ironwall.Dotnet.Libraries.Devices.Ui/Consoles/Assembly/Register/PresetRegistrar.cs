@@ -85,7 +85,7 @@ public sealed class PresetRegistrar
 
             // (FR-14) 성공 → 프로바이더 재조회. 콘솔이 새 장비를 고를 수 있어야 한다.
             await _providerService.FetchAllDevicesAsync(token).ConfigureAwait(false);
-            return new PresetRegisterResult(true, id, $"{request.Category} 장비를 등록했습니다(Id={id}).");
+            return new PresetRegisterResult(true, id, "장비를 등록했습니다.");
         }
         catch (OperationCanceledException)
         {
@@ -95,7 +95,7 @@ public sealed class PresetRegistrar
         {
             // 예외 메시지는 남기되 창에는 문장만 — 스택 트레이스를 사용자에게 보이지 않는다.
             _log?.Error($"[{nameof(RegisterAsync)}] {ex.Message}");
-            return new PresetRegisterResult(false, null, ex.Message);
+            return new PresetRegisterResult(false, null, "장비를 등록하지 못했습니다. 서버 연결을 확인하고 다시 시도하세요.");
         }
     }
 

@@ -85,12 +85,28 @@ public partial class DeviceDashboardView : UserControl
     {
         _toolbar = (ConsoleToolbar)sender;
         ApplyColumnPrefs();
+        ApplyAddDeleteVisibility();
+    }
+
+    /// <summary>
+    /// "부품으로 찾기" 에서는 [추가] · [삭제] 가 할 일이 없다(늘 꺼진 채 자리만 차지했다) — 그 레일에서는 감춘다.
+    /// 커널 툴바에 감추기 스위치가 없어 템플릿 부품을 직접 접는다(서버 모니터의 [삭제] 와 같은 방식).
+    /// </summary>
+    private void ApplyAddDeleteVisibility()
+    {
+        if (_toolbar is null || ViewModel is not { } vm) return;
+        _toolbar.ApplyTemplate();
+        var visibility = vm.IsByComponent ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var part in new[] { "PART_Add", "PART_Delete" })
+            if (_toolbar.Template?.FindName(part, _toolbar) is UIElement element) element.Visibility = visibility;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(DeviceDashboardViewModel.Columns) or nameof(DeviceDashboardViewModel.CanDragToGroup))
             RebuildColumns();
+        if (e.PropertyName == nameof(DeviceDashboardViewModel.IsByComponent))
+            ApplyAddDeleteVisibility();
     }
     #endregion
 
@@ -338,6 +354,8 @@ public partial class DeviceDashboardView : UserControl
     {
         if (ViewModel is { } vm) await vm.EditComponentsAsync();
     }
+
+    private void OnOpenCameraDetail(object sender, RoutedEventArgs e) => ViewModel?.OpenCameraDetail();
 
     private async void OnUndoGroupDrop(object sender, RoutedEventArgs e)
     {

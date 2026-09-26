@@ -227,7 +227,7 @@ public class DeviceGroupMembershipTests
 
         Assert.Equal(new[] { 100, 50 }, calls);
         Assert.All(models, m => Assert.DoesNotContain(9, m.DeviceGroups!));
-        Assert.Contains("150대를 되돌렸다", line);
+        Assert.Contains("150대를 되돌렸습니다", line);
     }
 
     [Fact]

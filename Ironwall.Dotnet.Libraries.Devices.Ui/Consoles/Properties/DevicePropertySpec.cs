@@ -16,6 +16,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
 /// <summary>상세 폼의 절(섹션) — 이 순서가 곧 화면 순서다(FR-08, 고정). 타입 특화 설정은 맨 밑.</summary>
 public enum DevicePropertySection
 {
+    /// <summary>장비 그룹 폼 전용 절(이름 · 설명 · 장비 수) — 장비 폼에는 나오지 않는다.</summary>
+    GroupInfo,
     Common,
     Connection,
     HardwareSpec,
@@ -66,6 +68,19 @@ public enum DevicePropertyOptionSource
     Controllers,
     /// <summary>서버 목록에서 고른다(스피커의 관리 서버).</summary>
     Servers,
+    /// <summary>부대 목록에서 고른다(<c>unit_id</c>, 서버 8.0+) — 값은 부대 id, 표시는 부대 이름.</summary>
+    Units,
+    /// <summary>클라 고정 표시 사전(<see cref="DevicePropertySpec.FixedOptions"/>) — 저장 값은 코드, 화면은 한국어.</summary>
+    Fixed,
+}
+
+/// <summary>축 값 부분 수정(<see cref="DevicePropertySpec.AxisWritePath"/>)으로 보낼 때의 JSON 값 형.</summary>
+public enum DeviceAxisValueKind
+{
+    Text,
+    Integer,
+    Number,
+    Boolean,
 }
 
 /// <summary>
@@ -143,4 +158,33 @@ public sealed record DevicePropertySpec
 
     /// <summary>추가 설명(선택) — 폼이 도움말로 보일 수 있다.</summary>
     public string? Note { get; init; }
+
+    /// <summary>
+    /// 이 칸을 행 뷰모델이 아니라 <b>축 값 부분 수정</b>(<c>PATCH /devices/{종류}/{id}</c>)으로 보내는 경로 —
+    /// 점으로 이은 본문 경로다(예: <c>connection.channel</c> · <c>hardware_spec.model</c> ·
+    /// <c>device_config.thresholds.temperature.high</c> · <c>unit_id</c>). <c>null</c> 이면 기존 저장 경로(행 뷰모델)를 탄다.
+    /// </summary>
+    /// <remarks>
+    /// 값은 <see cref="AxisReader"/> 로 읽는다 — 그래서 <see cref="AxisReader"/> 는 표시 문장이 아니라 <b>저장 값 그대로</b>
+    /// (코드 · 숫자)를 돌려줘야 한다. 한국어 표시는 선택지(<see cref="FixedOptions"/> 등)가 맡는다.
+    /// </remarks>
+    public string? AxisWritePath { get; init; }
+
+    /// <summary><see cref="AxisWritePath"/> 로 보낼 때의 JSON 값 형.</summary>
+    public DeviceAxisValueKind AxisValueKind { get; init; } = DeviceAxisValueKind.Text;
+
+    /// <summary>빈 칸을 "지운다"(JSON <c>null</c>)로 보내도 되는가. 서버가 NOT NULL 로 받는 칸(접속 방식 · 카메라 프로토콜 · 부대)은 <c>false</c>.</summary>
+    public bool AxisAllowsClear { get; init; } = true;
+
+    /// <summary>
+    /// 잠긴 칸의 까닭(<see cref="LockReason"/>)을 화면에 띄울 것인가. 표시 전용 요약(장비 링크 · 부품별 설정)처럼
+    /// 운영자에게 할 말이 없는 칸은 <c>false</c> — 까닭은 명세 문서로만 남는다.
+    /// </summary>
+    public bool ShowLockReason { get; init; } = true;
+
+    /// <summary>값이 비었을 때 읽기 전용 표시로 보일 글(예: 소속 부대 "미배치"). <c>null</c> 이면 빈 칸.</summary>
+    public string? EmptyDisplay { get; init; }
+
+    /// <summary><see cref="DevicePropertyOptionSource.Fixed"/> 일 때의 선택지 — (저장 코드, 한국어 표시).</summary>
+    public IReadOnlyList<(string Code, string Display)>? FixedOptions { get; init; }
 }

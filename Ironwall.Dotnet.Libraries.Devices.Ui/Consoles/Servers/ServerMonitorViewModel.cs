@@ -285,15 +285,11 @@ public class ServerMonitorViewModel : Screen
         private set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>"시스템 이벤트" 칸의 안내 — 이 라이브러리 API 면에는 시스템 이벤트 입구가 없다.</summary>
-    public string SystemEventsNote =>
-        "시스템 이벤트 입구가 이 판의 서버 API 에 없습니다 — 받은 것이 없어 목록을 그리지 않습니다. "
-        + "서버가 경로를 내면 이 칸과 상세의 '최근 시스템 이벤트' 가 같은 자료를 씁니다.";
-
-    /// <summary>생존 신호 — 스토리보드 L1357 이 말한 "NATS 수신 간격 등 별도 신호". 아직 연결된 것이 없다.</summary>
-    public string LivenessNote =>
-        "생존 신호: 이 콘솔에 연결된 신호가 없습니다 — REST 로는 살아 있는지 판정하지 않습니다. "
-        + "NATS 수신 간격 같은 별도 신호가 붙어야 생존을 말할 수 있습니다.";
+    /// <summary>
+    /// "시스템 이벤트" 칸의 안내. 그 칸과 상세 절은 지금 <b>내지 않는다</b>(서버 API 에 입구가 없다 — U-18 감사 D-7 7.1).
+    /// 입구가 생겨 다시 켤 때 쓸 운영자 문장만 남긴다. 생존 신호 안내(REST · NATS 설계 메모)는 화면에서 뺐다(7.2).
+    /// </summary>
+    public string SystemEventsNote => "시스템 이벤트를 아직 제공하지 않습니다.";
 
     private void ApplyFilter()
     {
@@ -377,7 +373,7 @@ public class ServerMonitorViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[ServerConsole] 적재 실패 — {ex.Message}");
-            StatusText = "서버 목록을 받지 못했습니다";
+            StatusText = "서버 목록을 불러오지 못했습니다. 잠시 후 [갱신]을 누르세요.";
         }
     }
 
@@ -460,7 +456,9 @@ public class ServerMonitorViewModel : Screen
             {
                 var (proxy, _) = await _service.LegacyOperationModeAsync(row.Id, cts.Token).ConfigureAwait(true);
                 if (generation != _generation) return;
-                OperationModeText = proxy is not null ? $"{proxy.OperationMode} · {proxy.WindyMode}" : "—";
+                OperationModeText = proxy is not null
+                    ? $"{ServerModeDisplay.OperationLabel(proxy.OperationMode)} · {ServerModeDisplay.WindyLabel(proxy.WindyMode)}"
+                    : "—";
             }
         }
         catch (OperationCanceledException) { return; }
@@ -489,7 +487,6 @@ public class ServerMonitorViewModel : Screen
 
     public ObservableCollection<ServerMetricCell> MetricCells { get; }
 
-    public string MetricNote => "서버가 보낸 계측만 그립니다 — 임계 배지는 서버가 판정해 보낸 것만 뜹니다.";
     #endregion
 
     #region - Detail fields -
@@ -582,8 +579,9 @@ public class ServerMonitorViewModel : Screen
         set { _intent.WindyMode = string.IsNullOrWhiteSpace(value) ? null : value; Touch("modes.windy_mode", ServerRequestBuilder.ReadMode(_detail?.Modes, "windy_mode"), _intent.WindyMode, nameof(WindyModeValue)); }
     }
 
-    public IReadOnlyList<string> OperationModeOptions { get; } = new[] { "NORMAL", "REGISTER" };
-    public IReadOnlyList<string> WindyModeOptions { get; } = new[] { "wind0", "wind1", "wind2", "wind3" };
+    /// <summary>운용 모드 보기 — 화면은 한국어(<see cref="ServerModeOption.Display"/>), 저장 값은 코드(<see cref="ServerModeOption.Code"/>).</summary>
+    public IReadOnlyList<ServerModeOption> OperationModeOptions { get; } = ServerModeDisplay.OperationModes;
+    public IReadOnlyList<ServerModeOption> WindyModeOptions { get; } = ServerModeDisplay.WindyModes;
 
     /// <summary>6.3 전용 — 프록시 설정 경로에서 읽은 모드 글자.</summary>
     public string OperationModeText
@@ -690,12 +688,15 @@ public class ServerMonitorViewModel : Screen
     public bool CanAdd => IsServerList && !_isBusy && CategoryOptions.Count > 0;
 
     public string AddBlockedReason => CategoryOptions.Count == 0
-        ? "서버 분류를 받지 못해 등록할 수 없습니다"
-        : "등록할 수 없습니다";
+        ? "서버 분류를 불러오지 못해 등록할 수 없습니다. [갱신]을 누르세요."
+        : "지금은 서버를 등록할 수 없습니다.";
 
-    /// <summary>서버 삭제는 내지 않는다 — 장비가 참조하고 있고 되돌릴 방법이 없다.</summary>
+    /// <summary>
+    /// 서버 삭제는 내지 않는다 — 장비가 참조하고 있고 되돌릴 방법이 없다. 뷰가 툴바의 [삭제] 를 아예 접는다
+    /// (늘 꺼진 버튼은 자리표시다 — U-18 감사 D-7 7.9). 사유는 접지 못하는 경로를 위해 남긴다.
+    /// </summary>
     public bool CanDelete => false;
-    public string DeleteBlockedReason => "서버 삭제는 이 화면에서 제공하지 않습니다 — 장비의 서버 참조가 끊깁니다";
+    public string DeleteBlockedReason => "이 화면에서는 서버를 삭제할 수 없습니다.";
 
     public ObservableCollection<ServerCategoryOption> CategoryOptions { get; }
 
@@ -737,7 +738,7 @@ public class ServerMonitorViewModel : Screen
         Detail.IsReadOnly = false;
         Detail.SelectedCount = 0;
         Detail.IsCreating = true;
-        Detail.CreateBanner = "이름 · 주소 · 포트 · 분류를 채우면 등록할 수 있습니다. 상태는 서버가 보고합니다 — 등록 폼에 없습니다.";
+        Detail.CreateBanner = "이름 · 주소 · 포트 · 분류를 입력하세요.";
         IsEditing = true;
 
         ClearGridSelectionRequested?.Invoke(this, EventArgs.Empty);
@@ -776,7 +777,7 @@ public class ServerMonitorViewModel : Screen
             if (!saved.IsSuccess) return;
 
             IsEditing = false;
-            Detail.Settle("설정을 저장했습니다");
+            Detail.Settle("설정을 저장했습니다.");
             await LoadCoreAsync(token).ConfigureAwait(true);
             SelectAfterReload(row.Id);
         }
@@ -784,7 +785,7 @@ public class ServerMonitorViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[ServerConsole] 적용 실패 — {ex.Message}");
-            StatusText = "적용하지 못했습니다";
+            StatusText = "저장하지 못했습니다. 잠시 후 다시 시도하세요.";
         }
         finally
         {
@@ -806,7 +807,7 @@ public class ServerMonitorViewModel : Screen
 
         IsEditing = false;
         Detail.IsReadOnly = false;
-        Detail.Settle("되돌렸습니다");
+        Detail.Settle("되돌렸습니다.");
         NotifyAllFields();
     }
 
@@ -832,18 +833,17 @@ public class ServerMonitorViewModel : Screen
     public bool HasAssignCandidates => AssignCandidates.Count > 0;
 
     public string AssignHint => IsAxisEra
-        ? "장비를 끌어 목록의 허용 유형 서버 행에 놓습니다 — 여러 대는 트레이에 쌓였다가 [적용] 때 나갑니다. "
-          + "화면 밖 행에는 끌 수 없으니 그때는 행을 고르고 [배정] 을 누릅니다"
-        : "이 서버 판본(6.3)에서는 스피커만 배정할 수 있습니다 — 행을 고르고 [배정] 을 눌러도 같습니다";
+        ? "장비를 서버 행에 끌어 놓거나, 행을 고르고 [배정]을 누르세요."
+        : "현재 서버에서는 스피커만 배정할 수 있습니다. 서버 행을 고르고 [배정]을 누르세요.";
 
     public bool CanAssignSelection => SelectedRow is { AcceptsDevices: true } && AssignCandidates.Count > 0;
 
     /// <summary>끌기의 버튼 폴백 — 트레이에서 고른 장비를 지금 고른 서버 행에 배정한다.</summary>
     public async Task AssignSelectionAsync(IReadOnlyList<ServerAssignCandidateViewModel>? candidates)
     {
-        if (SelectedRow is not { } row) { StatusText = "먼저 서버 행을 고르십시오"; return; }
+        if (SelectedRow is not { } row) { StatusText = "먼저 서버 행을 고르세요."; return; }
         var models = (candidates ?? Array.Empty<ServerAssignCandidateViewModel>()).Select(c => c.Model).ToList();
-        if (models.Count == 0) { StatusText = "배정할 장비를 먼저 고르십시오"; return; }
+        if (models.Count == 0) { StatusText = "배정할 장비를 먼저 고르세요."; return; }
 
         await Assign.AssignAsync(row, models).ConfigureAwait(true);
     }
@@ -853,8 +853,8 @@ public class ServerMonitorViewModel : Screen
         if (!Tray.HasEntries) return;
         if (DialogsOrNull() is { } dialogs)
         {
-            var accepted = await dialogs.ConfirmAsync("서버 배정", ServerDropRules.ConfirmText("트레이", Tray.Count)).ConfigureAwait(true);
-            if (!accepted) { StatusText = "적용을 취소했습니다 — 서버 호출 0회"; return; }
+            var accepted = await dialogs.ConfirmAsync("서버 배정", ServerDropRules.TrayConfirmText(Tray.Count)).ConfigureAwait(true);
+            if (!accepted) { StatusText = ServerDropRules.CancelledText; return; }
         }
         await Assign.ApplyTrayAsync().ConfigureAwait(true);
     }

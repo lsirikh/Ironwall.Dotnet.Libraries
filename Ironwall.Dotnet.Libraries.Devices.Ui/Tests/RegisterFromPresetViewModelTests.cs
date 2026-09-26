@@ -73,7 +73,7 @@ public class RegisterFromPresetViewModelTests : IDisposable
 
         vm.DeviceNumber = "1";
 
-        Assert.Contains(vm.Problems, p => p.Contains("이미 쓰이고"));
+        Assert.Contains(vm.Problems, p => p.Contains("이미 쓰고 있습니다"));
         Assert.False(vm.CanRegister);
     }
 

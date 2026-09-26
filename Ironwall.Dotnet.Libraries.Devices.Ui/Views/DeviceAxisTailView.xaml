@@ -22,7 +22,7 @@
 	<StackPanel>
 		<!--  ⑧ 설정 축  -->
 		<StackPanel Orientation="Horizontal">
-			<TextBlock Style="{StaticResource AxisTitle}" Text="설정 (device_config)" />
+			<TextBlock Style="{StaticResource AxisTitle}" Text="운용 설정" />
 			<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
 		</StackPanel>
 		<ContentControl
@@ -32,9 +32,9 @@
 			Template="{StaticResource AxisSectionBody}" />
 
 		<!--  ⑨ 이 응답이 무엇을 실었는가 — 위 절들의 "미수신" 판정 근거  -->
-		<TextBlock Style="{StaticResource AxisTitle}" Text="응답 프로필 (meta)" />
+		<TextBlock Style="{StaticResource AxisTitle}" Text="응답 정보" />
 		<StackPanel Orientation="Horizontal">
-			<TextBlock Style="{StaticResource AxisCellMuted}" Text="view" />
+			<TextBlock Style="{StaticResource AxisCellMuted}" Text="표현 방식" />
 			<TextBlock
 				AutomationProperties.AutomationId="Devices.Detail.Meta.View"
 				FontFamily="Consolas"

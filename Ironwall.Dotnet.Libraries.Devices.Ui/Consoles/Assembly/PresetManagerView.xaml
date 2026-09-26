@@ -17,7 +17,7 @@
 		Backdrop="{DynamicResource BgBrush}"
 		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Presets"
-		Kind="구조(부품 · 설정)만 담는다 — 번호 · 이름 · 접속 · 일련번호는 담지 않는다"
+		Kind="구조(부품 · 설정)만 담습니다 — 번호 · 이름 · 접속 · 일련번호는 담지 않습니다"
 		Message="{Binding Message}"
 		PrimaryText=""
 		SecondaryAutomationId="Devices.Assembly.Presets.Close"
@@ -31,7 +31,7 @@
 				Margin="0,0,0,8"
 				FontSize="11.5"
 				Foreground="{DynamicResource TextMutedBrush}"
-				Text="이 컴퓨터에만 저장된다 — 옮기려면 내보내기."
+				Text="프리셋은 이 PC에만 저장됩니다 — 다른 PC로 옮기려면 [내보내기]를 쓰세요."
 				TextWrapping="Wrap" />
 			<!--  파일이 더 새 판이거나 깨져서 옮겼을 때 — 색이 아니라 세로 바 + 글로 알린다  -->
 			<Border

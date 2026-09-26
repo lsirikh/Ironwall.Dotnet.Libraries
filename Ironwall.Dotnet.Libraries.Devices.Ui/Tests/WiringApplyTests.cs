@@ -83,7 +83,7 @@ public class WiringApplyTests
 
         Assert.False(result.IsSuccess);
         Assert.True(result.IsConflict);
-        Assert.Contains("다른 사람이", result.Message);
+        Assert.Contains("다른 사용자가", result.Message);
         Assert.Equal(0, gateway.PatchCount);
     }
 
@@ -311,7 +311,7 @@ public class WiringApplyTests
         Assert.Equal(1, result.FailedCount);
         Assert.Equal(2, result.OkKeys.Count);
         Assert.DoesNotContain(102, result.OkKeys);
-        Assert.Contains("실패", result.Message);
+        Assert.Contains("저장하지 못했습니다", result.Message);
     }
 
     [Fact]

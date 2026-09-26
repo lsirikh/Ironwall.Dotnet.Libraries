@@ -85,11 +85,11 @@ public static class ServerDropRules
         if (Accepts(serverType, deviceCategory)) return null;
 
         if (!AllowedServerTypes.TryGetValue(deviceCategory, out var allowed))
-            return $"{CategoryLabel(deviceCategory)} 에는 관리 서버가 없습니다 — 소속 제어기를 따릅니다";
+            return $"{CategoryLabel(deviceCategory)}에는 관리 서버가 없습니다. 소속 제어기를 따릅니다.";
 
         var names = string.Join(" · ", allowed.Select(t => ServerTypeCatalog.TypeLabel(t)));
-        return $"{CategoryLabel(deviceCategory)} 의 관리 서버는 {names} 입니다 — "
-             + $"'{ServerTypeCatalog.TypeLabel(serverType)}' 유형에는 놓을 수 없습니다";
+        return $"{CategoryLabel(deviceCategory)}은(는) {names} 서버에만 배정할 수 있습니다. "
+             + $"'{ServerTypeCatalog.TypeLabel(serverType)}' 서버에는 놓을 수 없습니다.";
     }
 
     /// <summary>6.3 에서 이 배정을 보낼 수 있는가 — 그 판본의 클라 계약은 스피커만 서버를 쓴다.</summary>
@@ -103,8 +103,8 @@ public static class ServerDropRules
     {
         var list = devices?.Where(d => d is not null).ToList() ?? new List<IBaseDeviceModel>();
 
-        if (serverId <= 0) return Blocked(serverId, "아직 서버에 등록되지 않은 행입니다 — 먼저 등록하십시오");
-        if (list.Count == 0) return Blocked(serverId, "끌어 온 장비가 없습니다");
+        if (serverId <= 0) return Blocked(serverId, "아직 등록되지 않은 서버입니다. 먼저 등록하세요.");
+        if (list.Count == 0) return Blocked(serverId, "끌어 온 장비가 없습니다.");
 
         var eligible = new List<IBaseDeviceModel>();
         var ineligible = 0;
@@ -115,7 +115,7 @@ public static class ServerDropRules
             var category = DeviceAxesMapper.CategoryOf(device);
             var reason = RefusalReason(serverType, category)
                          ?? (contract < EnumServerContract.V7_0 && !IsSupportedOnLegacy(category)
-                             ? $"이 서버 판본(6.3)에서는 {CategoryLabel(category)} 의 서버 배정 입구가 없습니다"
+                             ? $"현재 서버에서는 {CategoryLabel(category)} 장비를 서버에 배정할 수 없습니다."
                              : null);
 
             if (reason is null) { eligible.Add(device); continue; }
@@ -124,7 +124,7 @@ public static class ServerDropRules
         }
 
         if (eligible.Count == 0)
-            return Blocked(serverId, firstRefusal ?? "이 서버가 받지 않는 장비입니다", ineligible);
+            return Blocked(serverId, firstRefusal ?? "이 서버에는 배정할 수 없는 장비입니다.", ineligible);
 
         var drafts = eligible.Count(d => d.Id <= 0);
         var saved = eligible.Where(d => d.Id > 0).ToList();
@@ -134,24 +134,31 @@ public static class ServerDropRules
 
         string? block = null;
         if (sending.Count == 0)
-            block = saved.Count == 0 ? "아직 등록되지 않은 장비입니다 — 장비를 먼저 등록하십시오" : "이미 이 서버에 배정돼 있습니다";
+            block = saved.Count == 0 ? "아직 등록되지 않은 장비입니다. 장비를 먼저 등록하세요." : "이미 이 서버에 배정되어 있습니다.";
 
         return new ServerAssignPlan(serverId, sending, drafts, already, ineligible, block);
     }
 
-    /// <summary>확인 문구 — 호출 횟수를 반드시 포함한다.</summary>
+    /// <summary>확인 문구 — 몇 대를 어디에 배정하는지 말한다(요청 횟수 같은 구현어는 쓰지 않는다 — U-18 D-7 7.4).</summary>
     public static string ConfirmText(string serverName, int writeCount)
-        => $"'{serverName}' 에 {writeCount}대를 배정합니다 — 서버 쓰기 {writeCount}회가 나갑니다. 계속할까요?";
+        => $"'{serverName}'에 장비 {writeCount}대를 배정할까요?";
+
+    /// <summary>배정 대기 목록을 한꺼번에 저장할 때의 확인 문구.</summary>
+    public static string TrayConfirmText(int count)
+        => $"대기 중인 배정 {count}건을 저장할까요?";
+
+    /// <summary>확인 창에서 [취소] 를 눌렀을 때.</summary>
+    public const string CancelledText = "취소했습니다. 저장하지 않았습니다.";
 
     /// <summary>상태 띠에 남길 한 줄.</summary>
     public static string ResultLine(string serverName, ServerAssignPlan plan, int assigned, int failed)
     {
-        var parts = new List<string> { $"'{serverName}' 에 {assigned}대를 배정했습니다(서버 쓰기 {assigned}회)" };
-        if (failed > 0) parts.Add($"{failed}대에서 멈췄습니다");
-        if (plan.AlreadyOn > 0) parts.Add($"이미 붙어 있던 {plan.AlreadyOn}대는 보내지 않았습니다");
-        if (plan.Ineligible > 0) parts.Add($"받지 않는 {plan.Ineligible}대는 뺐습니다");
+        var parts = new List<string> { $"'{serverName}'에 {assigned}대를 배정했습니다" };
+        if (failed > 0) parts.Add($"{failed}대는 배정하지 못했습니다");
+        if (plan.AlreadyOn > 0) parts.Add($"이미 배정된 {plan.AlreadyOn}대는 그대로 두었습니다");
+        if (plan.Ineligible > 0) parts.Add($"배정할 수 없는 {plan.Ineligible}대는 뺐습니다");
         if (plan.DraftExcluded > 0) parts.Add($"등록 전 {plan.DraftExcluded}대는 뺐습니다");
-        return string.Join(" · ", parts);
+        return string.Join(" · ", parts) + ".";
     }
 
     /// <summary>

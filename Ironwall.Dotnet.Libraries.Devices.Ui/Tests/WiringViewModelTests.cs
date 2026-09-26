@@ -455,7 +455,7 @@ public class WiringViewModelTests
         vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
 
         Assert.Contains("결선이 바뀐 줄", vm.ChangePreview);
-        Assert.Contains("보낼 호출 1회", vm.ChangePreview);
+        Assert.Contains("저장할 센서 1대", vm.ChangePreview);
     }
 
     [Fact]

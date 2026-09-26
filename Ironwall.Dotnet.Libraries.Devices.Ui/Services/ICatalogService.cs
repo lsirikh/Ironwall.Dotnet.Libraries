@@ -15,8 +15,11 @@ public sealed record CatalogOption(string Code, string Label, bool IsDeprecated 
     /// <summary>라벨이 코드와 같으면 코드를 따로 보일 필요가 없다(목업 규칙: "라벨+코드 병기, 같으면 코드 숨김").</summary>
     public bool HasDistinctLabel => !string.Equals(Code, Label, StringComparison.Ordinal);
 
-    /// <summary>Combo display text: "Label (Code)" when they differ, otherwise just the label (also covers the code-less "all" filter item).</summary>
-    public string Display => HasDistinctLabel && Code.Length > 0 ? $"{Label} ({Code})" : Label;
+    /// <summary>
+    /// 콤보 · 칩 · 목록의 화면 글 — <b>라벨만</b> 보인다(운영자 화면에 영문 코드를 병기하지 않는다, 2026-09-27 완성도 수정).
+    /// 저장 · 전송 값은 <see cref="Code"/> 가 따로 쥔다.
+    /// </summary>
+    public string Display => Label;
 
     public override string ToString() => Display;
 }

@@ -88,7 +88,7 @@ public class ServerRequestBuilderTests
         var legacy = ServerRequestBuilder.Validate(intent, Fetched(), EnumServerContract.V6_3);
         Assert.Contains(legacy, e => e.Key == ServerRequestBuilder.HostnameKey);
         Assert.Contains(legacy, e => e.Key == ServerRequestBuilder.UserNameKey);
-        Assert.All(legacy, e => Assert.Contains("6.3", e.Message));
+        Assert.All(legacy, e => Assert.Contains("비울 수 없습니다", e.Message));
 
         Assert.Empty(ServerRequestBuilder.Validate(intent, Fetched(), EnumServerContract.V8_0));
     }

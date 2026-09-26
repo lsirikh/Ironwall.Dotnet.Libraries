@@ -269,7 +269,9 @@ public static class DevicePropertyAccessor
         }
         catch (Exception ex)
         {
-            error = $"{spec.Label} 값을 적용하지 못했습니다: {ex.Message}";
+            // 예외 원문은 운영자 화면에 싣지 않는다(개발 용어 · 영문) — 형식 이름만 진단용으로 남긴다.
+            System.Diagnostics.Debug.WriteLine($"[DevicePropertyAccessor] {spec.Key}: {ex.Message}");
+            error = $"{spec.Label} 값을 적용하지 못했습니다. 값 형식을 확인하세요.";
             return false;
         }
     }
@@ -314,7 +316,9 @@ public static class DevicePropertyAccessor
         }
         catch (Exception ex)
         {
-            error = $"{spec.Label} 값을 적용하지 못했습니다: {ex.Message}";
+            // 예외 원문은 운영자 화면에 싣지 않는다(개발 용어 · 영문) — 형식 이름만 진단용으로 남긴다.
+            System.Diagnostics.Debug.WriteLine($"[DevicePropertyAccessor] {spec.Key}: {ex.Message}");
+            error = $"{spec.Label} 값을 적용하지 못했습니다. 값 형식을 확인하세요.";
             return false;
         }
     }

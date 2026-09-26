@@ -106,7 +106,7 @@ public sealed class RegisterFromPresetViewModel : Screen
     }
 
     public string PresetSummary => SelectedPreset is { } preset
-        ? $"{preset.Name} — 부품 {preset.Components.Count} · 재정의 {preset.ComponentOverrides?.Count ?? 0}"
+        ? $"{preset.Name} — 부품 {preset.Components.Count}개 · 설정 {preset.ComponentOverrides?.Count ?? 0}개"
         : "프리셋을 고르세요";
 
     #region - 개체 정보(프리셋이 담지 않는 것) -
@@ -166,6 +166,34 @@ public sealed class RegisterFromPresetViewModel : Screen
         private set { _previewJson = value; NotifyOfPropertyChange(); }
     }
 
+    /// <summary>
+    /// 등록할 내용을 사람이 읽는 말로 — 카테고리 · 번호 · 이름 · 부품 수 · 접속(U-18 D-10 10.3).
+    /// 요청 본문(<see cref="PreviewJson"/>)은 "요청 본문 보기" 를 펼쳐야 보인다.
+    /// </summary>
+    public string RequestSummary
+    {
+        get => _requestSummary;
+        private set { _requestSummary = value ?? string.Empty; NotifyOfPropertyChange(); }
+    }
+
+    private string _requestSummary = string.Empty;
+
+    internal static string Summarize(DevicePreset preset, PresetInstanceInfo info, EnumDeviceCategory category)
+    {
+        var lines = new List<string>
+        {
+            $"{DeviceCategoryText.Of(category)} · 장비번호 {info.DeviceNumber} · 이름 '{info.DeviceName}'",
+            $"부품 {preset.Components.Count}개" + (preset.ComponentOverrides is { Count: > 0 } o ? $" · 부품 설정 {o.Count}개" : string.Empty),
+        };
+        if (!string.IsNullOrWhiteSpace(info.IpAddress))
+            lines.Add(info.IpPort is int port ? $"접속 {info.IpAddress}:{port}" : $"접속 {info.IpAddress}");
+        if (!string.IsNullOrWhiteSpace(info.UserName))
+            lines.Add($"사용자명 {info.UserName} · 비밀번호 {(string.IsNullOrEmpty(info.UserPassword) ? "없음" : "입력함")}");
+        if (info.Controller is { } controller)
+            lines.Add($"소속 제어기 {controller.DeviceName}");
+        return string.Join(Environment.NewLine, lines);
+    }
+
     public string Message
     {
         get => _message;
@@ -190,7 +218,7 @@ public sealed class RegisterFromPresetViewModel : Screen
     {
         if (!int.TryParse(_deviceNumber, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
         {
-            problems.Add("장비번호는 숫자여야 한다");
+            problems.Add("장비번호는 숫자로 입력하세요.");
             return null;
         }
 
@@ -198,10 +226,10 @@ public sealed class RegisterFromPresetViewModel : Screen
         if (ShowsConnection && !string.IsNullOrWhiteSpace(_ipPort))
         {
             if (int.TryParse(_ipPort, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)) port = parsed;
-            else { problems.Add("포트는 숫자여야 한다"); return null; }
+            else { problems.Add("포트는 숫자로 입력하세요."); return null; }
         }
 
-        if (_usedNumbers(_category).Contains(number)) problems.Add($"장비번호 {number} 은(는) 이미 쓰이고 있다");
+        if (_usedNumbers(_category).Contains(number)) problems.Add($"장비번호 {number}은(는) 이미 쓰고 있습니다. 다른 번호를 입력하세요.");
 
         return new PresetInstanceInfo
         {
@@ -226,6 +254,7 @@ public sealed class RegisterFromPresetViewModel : Screen
         if (preset is null)
         {
             PreviewJson = string.Empty;
+            RequestSummary = string.Empty;
             Finish();
             return;
         }
@@ -242,14 +271,19 @@ public sealed class RegisterFromPresetViewModel : Screen
             {
                 var request = PresetRequestBuilder.Build(preset, info);
                 PreviewJson = Indent(request.PreviewJson);     // 같은 내용을 읽기 좋게만 — 보내는 것은 request 그대로다
+                RequestSummary = Summarize(preset, info, _category);
                 if (Problems.Count == 0) _request = request;
             }
             catch (ArgumentException ex)
             {
-                Problems.Add(ex.Message);
+                // 예외 원문(형식 이름 · 매개변수 이름이 붙는다)은 문제 목록에 싣지 않는다 — U-18 D-10 10.6.
+                System.Diagnostics.Debug.WriteLine($"[RegisterFromPreset] 본문 생성 실패: {ex.Message}");
+                Problems.Add(BuildFailedProblem);
                 PreviewJson = string.Empty;
+                RequestSummary = string.Empty;
             }
         }
+        else RequestSummary = string.Empty;
 
         Finish();
 
@@ -298,6 +332,9 @@ public sealed class RegisterFromPresetViewModel : Screen
     }
 
     internal const string MaskedSecret = "••••••";
+
+    /// <summary>본문을 만들지 못했을 때 문제 목록에 싣는 고정 문장.</summary>
+    internal const string BuildFailedProblem = "입력값을 확인하세요 — 이 프리셋과 카테고리로는 장비를 만들 수 없습니다.";
 
     /// <summary>이름에 password · secret · token 이 든 문자열 값을 가린다(빈 값 · null 은 그대로).</summary>
     internal static void MaskSecrets(Newtonsoft.Json.Linq.JToken token)

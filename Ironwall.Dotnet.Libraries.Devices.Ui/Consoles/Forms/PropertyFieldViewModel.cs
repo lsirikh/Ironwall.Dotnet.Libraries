@@ -16,9 +16,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 /// </remarks>
 public sealed class PropertyFieldViewModel : PropertyChangedBase
 {
-    public const string MultiIdentityReason = "여러 대를 골랐을 때는 바꿀 수 없다 — 장비마다 달라야 하는 값이다";
-    public const string ReadOnlyReason = "편집 권한이 없다";
-    public const string CreateOnlyReason = "등록할 때만 정할 수 있다";
+    public const string MultiIdentityReason = "여러 대를 골랐을 때는 바꿀 수 없습니다.";
+    public const string ReadOnlyReason = "편집 권한이 없습니다.";
+    public const string CreateOnlyReason = "등록할 때만 정할 수 있습니다.";
+    public const string AfterCreateReason = "등록한 뒤에 정할 수 있습니다.";
 
     private readonly DirtyFieldTracker _tracker;
     private string _originalText = string.Empty;
@@ -72,14 +73,26 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
         get
         {
             if (IsMixed) return ConsoleDetailStateMachine.MixedValuesText;
+            if (string.IsNullOrEmpty(_text) && Spec.EmptyDisplay is not null) return Spec.EmptyDisplay;
             if (Spec.Editor == DevicePropertyEditor.Choice && Options.Count > 0)
             {
-                var match = Options.FirstOrDefault(o => string.Equals(o.Text, _text, StringComparison.Ordinal));
+                var match = Options.FirstOrDefault(o => string.Equals(o.Text, _text, StringComparison.OrdinalIgnoreCase));
                 if (match is not null) return match.Display;
             }
-            return _text;
+            return IsUnknownFixedValue ? Helpers.DeviceEnumDisplay.UnknownValue : _text;
         }
     }
+
+    /// <summary>
+    /// 고정 표시 사전에 없는 저장 값이다 — 화면에는 "알 수 없음", 원문은 <see cref="RawToolTip"/> 로만 보인다
+    /// (운영자 화면에 영문 코드를 내지 않는다).
+    /// </summary>
+    private bool IsUnknownFixedValue
+        => Spec.OptionSource == DevicePropertyOptionSource.Fixed && !string.IsNullOrEmpty(_text)
+           && !Options.Any(o => string.Equals(o.Text, _text, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>표시 사전에 없는 값의 원문(툴팁). 알아본 값이면 null.</summary>
+    public string? RawToolTip => IsUnknownFixedValue ? $"저장된 값: {_text}" : null;
 
     public bool IsTouched => _tracker.IsTouched(Key);
 
@@ -102,6 +115,7 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
             OnEdited();
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(DisplayText));
+            NotifyOfPropertyChange(nameof(RawToolTip));
             NotifyOfPropertyChange(nameof(BoolValue));
         }
     }
@@ -137,6 +151,9 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
     /// <summary>적용 때 객체로 써야 하는 값. 글로 쓰는 칸이면 null.</summary>
     public object? PendingObject => _selectedOption?.Value;
 
+    /// <summary>행 뷰모델이 아니라 축 값 부분 수정(<see cref="DevicePropertySpec.AxisWritePath"/>)으로 보내는 칸인가.</summary>
+    public bool WritesAxis => Spec.AxisWritePath is not null;
+
     /// <summary>객체로 쓰는 칸인가(제어기 · 서버).</summary>
     public bool WritesObject => Spec.OptionSource is DevicePropertyOptionSource.Controllers or DevicePropertyOptionSource.Servers;
 
@@ -159,7 +176,10 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
             IsRequired = isCreating && Spec.IsRequiredOnCreate;
             Options = options;
 
-            (IsLocked, LockReason) = ResolveLock(rows.Count, isCreating, isReadOnly);
+            var (locked, reason) = ResolveLock(rows.Count, isCreating, isReadOnly);
+            IsLocked = locked;
+            // 표시 전용 칸은 까닭을 띄우지 않는다 — 자물쇠만으로 충분하다(명세 ShowLockReason).
+            LockReason = locked && reason == Spec.LockReason && !Spec.ShowLockReason ? null : reason;
 
             _selectedOption = IsMixed ? null : MatchOption(rows.Count > 0 ? DevicePropertyAccessor.Read(rows[0], Spec) : null);
         }
@@ -191,7 +211,7 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
         // 객체로 쓰는 칸은 글 검증이 뜻이 없다 — 등록 때 비어 있으면 안 된다는 것만 본다.
         if (WritesObject)
         {
-            Error = isCreating && Spec.IsRequiredOnCreate && PendingObject is null ? $"{Label}을(를) 골라야 한다" : null;
+            Error = isCreating && Spec.IsRequiredOnCreate && PendingObject is null ? $"{Label}을(를) 고르세요." : null;
             return !HasError;
         }
 
@@ -207,7 +227,7 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
             ? DevicePropertyAccessor.TryWriteObject(row, Spec, PendingObject, out error)
             : DevicePropertyAccessor.TryWrite(row, Spec, _text, out error);
 
-        if (!written) Error = error ?? "값을 쓸 수 없다";
+        if (!written) Error = error ?? "값을 쓸 수 없습니다.";
         return written;
     }
 
@@ -222,6 +242,8 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
     private (bool, string?) ResolveLock(int rowCount, bool isCreating, bool isReadOnly)
     {
         if (Spec.Writable == DevicePropertyWritable.No || Spec.Editor == DevicePropertyEditor.ReadOnly) return (true, Spec.LockReason);
+        // 축 값 부분 수정은 서버에 있는 장비 id 가 있어야 보낼 수 있다 — 등록 중에는 잠근다(등록 뒤 상세에서 고친다).
+        if (isCreating && Spec.AxisWritePath is not null) return (true, AfterCreateReason);
         if (Spec.Writable == DevicePropertyWritable.CreateOnly && !isCreating) return (true, Spec.LockReason ?? CreateOnlyReason);
         if (isReadOnly) return (true, ReadOnlyReason);
         if (rowCount > 1 && !Spec.AllowMultiEdit) return (true, MultiIdentityReason);

@@ -76,9 +76,9 @@ public sealed class RepeatExpandViewModel : Screen
         Spec = null;
         Error = null;
 
-        if (_selectedType is null) Error = "유형을 고른다";
-        else if (!int.TryParse(_count, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)) Error = "개수는 숫자여야 한다";
-        else if (!int.TryParse(_startChannel, NumberStyles.Integer, CultureInfo.InvariantCulture, out var start)) Error = "시작 채널은 숫자여야 한다";
+        if (_selectedType is null) Error = "유형을 고르세요.";
+        else if (!int.TryParse(_count, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)) Error = "개수는 숫자로 입력하세요.";
+        else if (!int.TryParse(_startChannel, NumberStyles.Integer, CultureInfo.InvariantCulture, out var start)) Error = "시작 채널은 숫자로 입력하세요.";
         else
         {
             var spec = new RepeatExpandSpec(_selectedType.Code, count, start, _keyFormat);
@@ -214,13 +214,13 @@ public sealed class PresetManagerViewModel : Screen
         {
             if (_selected is null || !_catalog.IsLoaded) return null;
             var missing = _selected.Components.Select(c => c.Type).Where(t => _catalog.Find(t) is null).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            return missing.Count == 0 ? null : $"카탈로그에 없는 유형이 들어 있다: {string.Join(", ", missing)} — 조립기에서 빼야 등록할 수 있다";
+            return missing.Count == 0 ? null : $"목록에 없는 부품 유형이 들어 있습니다({string.Join(", ", missing)}). 조립기에서 빼야 등록할 수 있습니다.";
         }
     }
 
     public string SelectedSummary => _selected is null
         ? "프리셋을 고르세요"
-        : $"부품 {_selected.Components.Count} · 재정의 {_selected.ComponentOverrides?.Count ?? 0} · 종류 {_selected.TypeAxisCode ?? "미지정"}" + (_selected.IsSeed ? " · 본보기" : string.Empty);
+        : $"부품 {_selected.Components.Count}개 · 부품 설정 {_selected.ComponentOverrides?.Count ?? 0}개 · 종류 {_selected.TypeAxisCode ?? "미지정"}" + (_selected.IsSeed ? " · 본보기" : string.Empty);
 
     /// <summary>조립기로 열어 달라 — 창을 여는 것은 부른 쪽(콘솔)의 몫이다.</summary>
     public event EventHandler<DevicePreset>? OpenInAssemblyRequested;
@@ -235,29 +235,29 @@ public sealed class PresetManagerViewModel : Screen
         if (!CanEditSelected) return;
         var name = await _dialogs.AskTextAsync("이름 바꾸기", "프리셋 이름", _selected!.Name);
         if (string.IsNullOrWhiteSpace(name)) return;
-        Report(_store.Rename(_selected.Id, name!), $"이름을 '{name}' (으)로 바꿨다", _selected.Id);
+        Report(_store.Rename(_selected.Id, name!), $"이름을 '{name}'(으)로 바꿨습니다.", _selected.Id);
     }
 
     public void Duplicate()
     {
         if (!CanEditSelected) return;
         var result = _store.Duplicate(_selected!.Id, out var copy);
-        Report(result, copy is null ? string.Empty : $"'{copy.Name}' 을(를) 만들었다", copy?.Id);
+        Report(result, copy is null ? string.Empty : $"'{copy.Name}'을(를) 만들었습니다.", copy?.Id);
     }
 
     public async Task DeleteAsync()
     {
         if (!CanEditSelected) return;
-        if (!await _dialogs.ConfirmAsync("프리셋 삭제", $"'{_selected!.Name}' 을(를) 지운다. 이 프리셋으로 이미 만든 장비에는 영향이 없다.")) return;
-        Report(_store.Delete(_selected.Id), "지웠다", null);
+        if (!await _dialogs.ConfirmAsync("프리셋 삭제", $"'{_selected!.Name}'을(를) 삭제할까요? 이 프리셋으로 이미 만든 장비에는 영향이 없습니다.")) return;
+        Report(_store.Delete(_selected.Id), "삭제했습니다.", null);
     }
 
-    public void Export(string filePath) => Report(_store.Export(filePath), $"내보냈다 — {filePath}", _selected?.Id);
+    public void Export(string filePath) => Report(_store.Export(filePath), $"내보냈습니다 — {filePath}", _selected?.Id);
 
     public void Import(string filePath)
     {
         var result = _store.Import(filePath);
-        Report(result, result.Message ?? "가져왔다", _selected?.Id);
+        Report(result, result.Message ?? "가져왔습니다.", _selected?.Id);
     }
 
     public Task CloseAsync() => TryCloseAsync(true);
@@ -271,7 +271,7 @@ public sealed class PresetManagerViewModel : Screen
 
     private void Report(PresetStoreResult result, string success, string? selectId)
     {
-        Message = result.IsSuccess ? (string.IsNullOrEmpty(result.Message) ? success : result.Message!) : result.Message ?? "하지 못했다";
+        Message = result.IsSuccess ? (string.IsNullOrEmpty(result.Message) ? success : result.Message!) : result.Message ?? "처리하지 못했습니다.";
         if (!result.IsSuccess) return;
         Refresh();
         Selected = selectId is null ? Presets.FirstOrDefault() : Presets.FirstOrDefault(p => p.Id == selectId) ?? Presets.FirstOrDefault();

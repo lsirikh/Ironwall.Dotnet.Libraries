@@ -1,4 +1,6 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json.Linq;
@@ -50,7 +52,16 @@ public static class DevicePropertyCatalog
     private static readonly IReadOnlyCollection<EnumDeviceCategory> HeadingApplicable = new[]
     { EnumDeviceCategory.Camera, EnumDeviceCategory.Speaker, EnumDeviceCategory.Sensor };
 
-    private const string AxisReadOnlyReason = "이번 판에서는 읽기 전용 — 모델에서 서버로 보내는 경로가 아직 없다";
+    // 표시 전용 칸의 까닭 — 목록에는 남기되(명세 규칙: Writable=No 는 까닭을 동반) 화면에는 띄우지 않는다
+    // (ShowLockReason=false). 운영자에게 "아직 안 된다"는 개발 메모를 보이지 않는다(2026-09-27 완성도 수정).
+    private const string DisplayOnlyReason = "표시 전용 값";
+
+    // 임계값 칸 자리표시 — Build() 가 이 자리에 계약별 명세 두 벌을 끼운다(목록 초기화식은 IEnumerable 을 못 받는다).
+    private static readonly DevicePropertySpec ThresholdAnchor = new()
+    {
+        Key = "#threshold-anchor", Label = "#", ApiPath = "#", Section = DevicePropertySection.DeviceConfig,
+        Editor = DevicePropertyEditor.ReadOnly, Categories = Array.Empty<EnumDeviceCategory>(),
+    };
 
     #region - Public API -
     public static IReadOnlyList<DevicePropertySpec> All { get; } = Build();
@@ -76,6 +87,7 @@ public static class DevicePropertyCatalog
 
     public static IReadOnlyList<DevicePropertySection> SectionOrder { get; } = new[]
     {
+        DevicePropertySection.GroupInfo,
         DevicePropertySection.Common,
         DevicePropertySection.Connection,
         DevicePropertySection.HardwareSpec,
@@ -89,14 +101,15 @@ public static class DevicePropertyCatalog
 
     public static string SectionTitle(DevicePropertySection section) => section switch
     {
+        DevicePropertySection.GroupInfo => "그룹 정보",
         DevicePropertySection.Common => "장비 공통",
-        DevicePropertySection.Connection => "접속 축",
-        DevicePropertySection.HardwareSpec => "형상 축",
+        DevicePropertySection.Connection => "접속 정보",
+        DevicePropertySection.HardwareSpec => "하드웨어 정보",
         DevicePropertySection.Components => "부품",
-        DevicePropertySection.DeviceStatus => "상태 축",
+        DevicePropertySection.DeviceStatus => "부품 상태",
         DevicePropertySection.Location => "위치 정보",
         DevicePropertySection.Groups => "그룹",
-        DevicePropertySection.DeviceConfig => "설정 축",
+        DevicePropertySection.DeviceConfig => "운용 설정",
         DevicePropertySection.Extra => "부가",
         _ => section.ToString(),
     };
@@ -122,17 +135,6 @@ public static class DevicePropertyCatalog
         return SectionOrder.Count;
     }
 
-    /// <summary>
-    /// D-14: <c>unit_id</c> → 부대 이름(목록 열의 <c>DeviceViewModel.UnitDisplay</c> 와 같은 정본,
-    /// <see cref="UnitNameDirectory.Display"/>). 폼은 <c>Load()</c> 시점에 한 번만 읽으므로 그때 캐시가 비어
-    /// 있으면 이 칸은 원값 id 로 남는다 — 이름이 필요하면 행을 다시 고른다(재조회로 다시 읽힌다).
-    /// </summary>
-    private static string? UnitDisplayName(int? unitId)
-    {
-        try { return Caliburn.Micro.IoC.Get<UnitNameDirectory>().Display(unitId); }
-        catch { return unitId?.ToString(CultureInfo.InvariantCulture) ?? UnitNameDirectory.Unassigned; }
-    }
-
     private static IReadOnlyList<DevicePropertySpec> Build()
     {
         var list = new List<DevicePropertySpec>
@@ -143,7 +145,7 @@ public static class DevicePropertyCatalog
                 Key = "category_device", Label = "카테고리", ApiPath = "category_device",
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "경로가 정본이다 — 바꾸려면 지우고 다시 만든다",
+                LockReason = "카테고리는 바꿀 수 없습니다. 다른 카테고리로 옮기려면 삭제한 뒤 다시 등록하세요.",
                 Categories = All7, ViewModelPath = "CategoryDevice",
             },
             new()
@@ -159,24 +161,11 @@ public static class DevicePropertyCatalog
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Text,
                 Categories = All7, ViewModelPath = "DeviceName", IsRequiredOnCreate = true,
             },
+            // 종류축은 카테고리마다 필드 이름이 다르다(type_sensor · type_camera …) — 캡션이 "type_<category>" 로 새지 않게
+            // 카테고리마다 한 줄씩 만든다(TypeAxisSpecs, 이 자리 = "device_type" 바로 앞). 생성 필수 여부도 카테고리마다 다르다.
             new()
             {
-                Key = "type_axis", Label = "종류", ApiPath = "type_<category>",
-                Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
-                Categories = TypeAxisRequired, ViewModelPath = "TypeAxisCode",
-                OptionSource = DevicePropertyOptionSource.TypeAxis, AxisContractOnly = true,
-                IsRequiredOnCreate = true,
-            },
-            new()
-            {
-                Key = "type_axis", Label = "종류", ApiPath = "type_<category>",
-                Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
-                Categories = TypeAxisOptional, ViewModelPath = "TypeAxisCode",
-                OptionSource = DevicePropertyOptionSource.TypeAxis, AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "device_type", Label = "종류(레거시)", ApiPath = "device_type",
+                Key = "device_type", Label = "종류", ApiPath = "device_type",
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
                 Categories = All7, ViewModelPath = "DeviceType",
                 OptionSource = DevicePropertyOptionSource.ClrEnum, EnumType = typeof(EnumDeviceType),
@@ -184,7 +173,7 @@ public static class DevicePropertyCatalog
             },
             new()
             {
-                Key = "speaker_role", Label = "종류(방송)", ApiPath = "speaker_role",
+                Key = "speaker_role", Label = "스피커 역할", ApiPath = "speaker_role",
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
                 Categories = Cat(EnumDeviceCategory.Speaker), ViewModelPath = "SpeakerType",
                 OptionSource = DevicePropertyOptionSource.ExtraAxis, VocabularyName = "speaker_role",
@@ -198,12 +187,12 @@ public static class DevicePropertyCatalog
             new()
             {
                 Key = UNIT_FIELD_KEY, Label = "소속 부대", ApiPath = "unit_id",
-                Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "소속 부대는 저장할 때 이 클라이언트의 부대로 찍힌다 — 다부대 편집은 다음 판",
-                // D-14: 이름을 우선 보이고, 못 구하면 원값 id(지어내지 않는다). AxisReader 는 한 번 읽고 끝이라
-                // 캐시가 그때까지 안 채워졌으면 이 칸은 id 로 남는다 — 행을 다시 고르면(재조회) 이름으로 갱신된다.
-                Categories = All7, AxisReader = m => UnitDisplayName(m.UnitId),
+                Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
+                OptionSource = DevicePropertyOptionSource.Units,
+                // 값은 부대 id(저장 값), 화면은 부대 이름(선택지 · UnitNameDirectory). 이름을 모르는 id 는 id 그대로 보인다(지어내지 않는다).
+                Categories = All7, AxisReader = m => m.UnitId?.ToString(CultureInfo.InvariantCulture),
+                AxisWritePath = "unit_id", AxisValueKind = DeviceAxisValueKind.Integer, AxisAllowsClear = false,
+                EmptyDisplay = UnitNameDirectory.Unassigned,
                 // ⚠ v7.0 경계용 AxisContractOnly 가 아니라 v8.0 경계가 필요해 For() 가 UNIT_FIELD_KEY 로 따로 거른다.
             },
             new()
@@ -273,43 +262,61 @@ public static class DevicePropertyCatalog
                 Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Password,
                 Categories = Cat(EnumDeviceCategory.Camera, EnumDeviceCategory.Lamp), ViewModelPath = "UserPassword",
             },
+            // ── 접속 축 편집(7.0+) — 행 뷰모델이 아니라 축 값 부분 수정(PATCH, 보낸 키만 바뀐다)으로 보낸다 ──
             new()
             {
                 Key = "connection.type", Label = "접속 방식", ApiPath = "connection.type",
-                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
+                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Choice,
+                OptionSource = DevicePropertyOptionSource.Fixed, FixedOptions = DeviceEnumDisplay.ConnectionTypes,
                 Categories = All7, AxisReader = m => m.Axes?.Connection?.Type,
+                AxisWritePath = "connection.type", AxisAllowsClear = false,
                 AxisSection = "connection", AxisContractOnly = true,
             },
             new()
             {
-                Key = "connection.parent_device_id", Label = "상위 장비", ApiPath = "connection.parent_device_id",
-                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.Connection?.ParentDeviceId?.ToString(CultureInfo.InvariantCulture),
+                // 센서의 상위는 소속 제어기 하나뿐이다 — 센서에 parent_device_id 를 보내면 서버가 거부한다(D13).
+                Key = "connection.parent_device_id", Label = "상위 장비 번호", ApiPath = "connection.parent_device_id",
+                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Integer,
+                Categories = Cat(EnumDeviceCategory.Controller, EnumDeviceCategory.Camera, EnumDeviceCategory.Speaker,
+                                 EnumDeviceCategory.Enclosure, EnumDeviceCategory.Lamp, EnumDeviceCategory.Gate),
+                AxisReader = m => m.Axes?.Connection?.ParentDeviceId?.ToString(CultureInfo.InvariantCulture),
+                AxisWritePath = "connection.parent_device_id", AxisValueKind = DeviceAxisValueKind.Integer, Min = 1,
                 AxisSection = "connection", AxisContractOnly = true,
             },
             new()
             {
                 Key = "connection.channel", Label = "채널", ApiPath = "connection.channel",
-                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
+                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Integer,
                 Categories = All7, AxisReader = m => m.Axes?.Connection?.Channel?.ToString(CultureInfo.InvariantCulture),
+                AxisWritePath = "connection.channel", AxisValueKind = DeviceAxisValueKind.Integer, Min = 0,
+                AllowMultiEdit = false,
+                AxisSection = "connection", AxisContractOnly = true,
+            },
+            new()
+            {
+                // 카메라는 제어 프로토콜이 필수 어휘(없음 · ONVIF · 엠스톤 · 이노뎁 · 기타)라 지울 수 없다.
+                Key = "connection.protocol", Label = "제어 프로토콜", ApiPath = "connection.protocol",
+                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Choice,
+                OptionSource = DevicePropertyOptionSource.Fixed, FixedOptions = DeviceEnumDisplay.CameraProtocols,
+                Categories = Cat(EnumDeviceCategory.Camera), AxisReader = m => m.Axes?.Connection?.Protocol,
+                AxisWritePath = "connection.protocol", AxisAllowsClear = false,
                 AxisSection = "connection", AxisContractOnly = true,
             },
             new()
             {
                 Key = "connection.protocol", Label = "프로토콜", ApiPath = "connection.protocol",
-                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.Connection?.Protocol,
+                Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Text, MaxLength = 50,
+                Categories = Cat(EnumDeviceCategory.Controller, EnumDeviceCategory.Sensor, EnumDeviceCategory.Speaker,
+                                 EnumDeviceCategory.Enclosure, EnumDeviceCategory.Lamp, EnumDeviceCategory.Gate),
+                AxisReader = m => m.Axes?.Connection?.Protocol,
+                AxisWritePath = "connection.protocol",
                 AxisSection = "connection", AxisContractOnly = true,
             },
             new()
             {
                 Key = "connection.urls", Label = "장비 링크", ApiPath = "connection.urls",
                 Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
+                Writable = DevicePropertyWritable.No, LockReason = DisplayOnlyReason, ShowLockReason = false,
                 Categories = All7, AxisReader = ReadConnectionUrls,
                 AxisSection = "connection", AxisContractOnly = true,
             },
@@ -336,72 +343,23 @@ public static class DevicePropertyCatalog
                 Categories = Cat(EnumDeviceCategory.Camera), ViewModelPath = "IsRecord", LegacyContractOnly = true,
             },
 
-            // ── 3. 형상 축 hardware_spec (읽기 전용) ─────────────────────
-            new()
-            {
-                Key = "hardware_spec.manufacturer", Label = "제조사", ApiPath = "hardware_spec.manufacturer",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.Manufacturer,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "hardware_spec.model", Label = "모델", ApiPath = "hardware_spec.model",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.Model,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "hardware_spec.serial", Label = "일련번호", ApiPath = "hardware_spec.serial",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.Serial,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "hardware_spec.firmware", Label = "펌웨어", ApiPath = "hardware_spec.firmware",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.Firmware,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "hardware_spec.hardware_rev", Label = "HW 리비전", ApiPath = "hardware_spec.hardware_rev",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.HardwareRev,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "hardware_spec.mac_address", Label = "MAC", ApiPath = "hardware_spec.mac_address",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = All7, AxisReader = m => m.Axes?.HardwareSpec?.MacAddress,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
+            // ── 3. 형상 축 hardware_spec — 스칼라만 편집(PATCH 는 축 객체 병합이라 components[] 는 그대로 남는다) ──
+            HardwareText("hardware_spec.manufacturer", "제조사", All7, m => m.Axes?.HardwareSpec?.Manufacturer, maxLength: 200),
+            HardwareText("hardware_spec.model", "모델", All7, m => m.Axes?.HardwareSpec?.Model, maxLength: 200),
+            HardwareText("hardware_spec.serial", "일련번호", All7, m => m.Axes?.HardwareSpec?.Serial, maxLength: 200, multiEdit: false),
+            HardwareText("hardware_spec.firmware", "펌웨어", All7, m => m.Axes?.HardwareSpec?.Firmware, maxLength: 50),
+            HardwareText("hardware_spec.hardware_rev", "HW 리비전", All7, m => m.Axes?.HardwareSpec?.HardwareRev, maxLength: 200),
+            HardwareText("hardware_spec.mac_address", "MAC", All7, m => m.Axes?.HardwareSpec?.MacAddress, maxLength: 17, multiEdit: false),
             new()
             {
                 Key = "hardware_spec.max_detection_range", Label = "탐지거리(m)", ApiPath = "hardware_spec.max_detection_range",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
+                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.Number, Min = 0,
                 Categories = Cat(EnumDeviceCategory.Camera, EnumDeviceCategory.Sensor),
                 AxisReader = m => m.Axes?.HardwareSpec?.MaxDetectionRange?.ToString(CultureInfo.InvariantCulture),
+                AxisWritePath = "hardware_spec.max_detection_range", AxisValueKind = DeviceAxisValueKind.Number,
                 AxisSection = "hardware_spec", AxisContractOnly = true,
             },
-            new()
-            {
-                Key = "hardware_spec.onvif_version", Label = "ONVIF 버전", ApiPath = "hardware_spec.onvif_version",
-                Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No, LockReason = AxisReadOnlyReason,
-                Categories = Cat(EnumDeviceCategory.Camera), AxisReader = m => m.Axes?.HardwareSpec?.OnvifVersion,
-                AxisSection = "hardware_spec", AxisContractOnly = true,
-            },
+            HardwareText("hardware_spec.onvif_version", "ONVIF 버전", Cat(EnumDeviceCategory.Camera), m => m.Axes?.HardwareSpec?.OnvifVersion, maxLength: 50),
 
             // ── 4. 부품 components[] (읽기 전용 — 조립기 전용) ───────────
             new()
@@ -409,7 +367,7 @@ public static class DevicePropertyCatalog
                 Key = "components", Label = "부품", ApiPath = "hardware_spec.components",
                 Section = DevicePropertySection.Components, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "부품은 조립기에서만 고친다 — 서버가 배열을 통째로 바꿔 일부만 보내면 나머지가 지워진다",
+                LockReason = "부품 구성은 [부품 구성 바꾸기]에서 바꿉니다.",
                 Categories = All7, AxisReader = ReadComponentsSummary,
                 AxisSection = "components", AxisContractOnly = true,
             },
@@ -420,7 +378,7 @@ public static class DevicePropertyCatalog
                 Key = "device_status", Label = "부품 상태", ApiPath = "device_status",
                 Section = DevicePropertySection.DeviceStatus, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "관측값이다 — 요청에 실으면 서버가 거부한다(422 OBSERVED_FIELD)",
+                LockReason = "장비가 보고한 값입니다.",
                 Categories = All7, AxisReader = ReadDeviceStatusSummary,
                 AxisSection = "device_status", AxisContractOnly = true,
             },
@@ -429,7 +387,7 @@ public static class DevicePropertyCatalog
                 Key = "device_status.door", Label = "문 위치", ApiPath = "device_status.components.door.state",
                 Section = DevicePropertySection.DeviceStatus, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "관측값이다 — 개폐 명령은 지도에서 보낸다",
+                LockReason = "장비가 보고한 값입니다. 문 열기 · 닫기는 지도에서 합니다.",
                 Categories = Cat(EnumDeviceCategory.Enclosure), ViewModelPath = "DoorStatusDisplay",
                 AxisSection = "device_status",
             },
@@ -438,8 +396,8 @@ public static class DevicePropertyCatalog
                 Key = "device_status.door", Label = "문 위치", ApiPath = "device_status.components.door.state",
                 Section = DevicePropertySection.DeviceStatus, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "관측값이다 — 개폐 명령은 지도에서 보낸다",
-                Categories = Cat(EnumDeviceCategory.Gate), ViewModelPath = "DoorPosition",
+                LockReason = "장비가 보고한 값입니다. 문 열기 · 닫기는 지도에서 합니다.",
+                Categories = Cat(EnumDeviceCategory.Gate), ViewModelPath = "DoorPositionDisplay",
                 AxisSection = "device_status",
             },
 
@@ -481,36 +439,33 @@ public static class DevicePropertyCatalog
                 Key = "group_ids", Label = "그룹", ApiPath = "group_ids",
                 Section = DevicePropertySection.Groups, Editor = DevicePropertyEditor.ReadOnly,
                 Writable = DevicePropertyWritable.No,
-                LockReason = "그룹은 아래 칩에 끌어 놓거나 그룹 패널에서 바꾼다",
+                LockReason = "목록 아래 그룹 칩에 장비를 끌어 놓아 바꿉니다.",
                 Categories = All7, ViewModelPath = "DeviceGroupsText",
             },
 
-            // ── 8. 설정 축 device_config ──────────────────────────────────
+            // ── 8. 운용 설정 device_config — 함체 임계값 · 카메라 모드는 칸으로 고친다(7.0+ 는 축 값 부분 수정, 빈 칸 = 삭제) ──
+            // (임계값 칸은 한 줄이 계약별 두 명세라 Build() 끝에서 이 자리에 끼운다.)
+            ThresholdAnchor,
+            CameraMode("weather_mode", "기상 모드", DeviceEnumDisplay.WeatherModes),
+            CameraMode("camera_mode", "영상 모드", DeviceEnumDisplay.CameraVideoModes),
+            CameraMode("day_night_mode", "주야 모드", DeviceEnumDisplay.DayNightModes),
+            CameraMode("focus_mode", "초점", DeviceEnumDisplay.AutoManualModes),
+            CameraMode("iris_mode", "조리개", DeviceEnumDisplay.AutoManualModes),
+            CameraMode("palette", "열상 색상", DeviceEnumDisplay.Palettes),
             new()
             {
-                Key = "device_config.thresholds", Label = "임계치", ApiPath = "device_config.thresholds",
-                Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "설정 축 편집은 다음 판 — 지금은 카메라 설정·함체 임계값 창에서 고친다",
-                Categories = All7, AxisReader = m => FlattenKeys(m.Axes?.DeviceConfig?.Thresholds),
-                AxisSection = "device_config", AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "device_config.modes", Label = "동작 모드", ApiPath = "device_config.modes",
-                Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "설정 축 편집은 다음 판 — 지금은 카메라 설정·함체 임계값 창에서 고친다",
-                Categories = Cat(EnumDeviceCategory.Camera), AxisReader = m => FlattenKeys(m.Axes?.DeviceConfig?.Modes),
+                Key = "device_config.modes.is_record", Label = "녹화", ApiPath = "device_config.modes.is_record",
+                Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.Boolean,
+                Categories = Cat(EnumDeviceCategory.Camera), AxisReader = m => ReadMode(m, "is_record"),
+                AxisWritePath = "device_config.modes.is_record", AxisValueKind = DeviceAxisValueKind.Boolean,
                 AxisSection = "device_config", AxisContractOnly = true,
             },
             new()
             {
                 Key = "device_config.component_overrides", Label = "부품별 설정", ApiPath = "device_config.component_overrides",
                 Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "설정 축 편집은 다음 판 — 지금은 카메라 설정·함체 임계값 창에서 고친다",
-                Categories = All7, AxisReader = m => FlattenKeys(m.Axes?.DeviceConfig?.ComponentOverrides),
+                Writable = DevicePropertyWritable.No, LockReason = DisplayOnlyReason, ShowLockReason = false,
+                Categories = All7, AxisReader = ReadComponentOverrides,
                 AxisSection = "device_config", AxisContractOnly = true,
             },
             new()
@@ -526,64 +481,197 @@ public static class DevicePropertyCatalog
                 Categories = Cat(EnumDeviceCategory.Enclosure), ViewModelPath = "FanEnabled",
             },
 
-            // ── 9. 부가 ────────────────────────────────────────────────────
-            new()
-            {
-                Key = "meta.view", Label = "응답 프로필", ApiPath = "meta.view",
-                Section = DevicePropertySection.Extra, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "이 값은 서버 응답 메타데이터다 — 편집 대상이 아니다",
-                Categories = All7, AxisReader = m => m.Axes?.Meta?.View, AxisContractOnly = true,
-            },
-            new()
-            {
-                Key = "meta.sections", Label = "실린 절", ApiPath = "meta.sections",
-                Section = DevicePropertySection.Extra, Editor = DevicePropertyEditor.ReadOnly,
-                Writable = DevicePropertyWritable.No,
-                LockReason = "이 값은 서버 응답 메타데이터다 — 편집 대상이 아니다",
-                Categories = All7, AxisReader = ReadMetaSections, AxisContractOnly = true,
-            },
         };
 
+        list.InsertRange(list.FindIndex(x => x.Key == "device_type"), TypeAxisSpecs());
+        var anchor = list.IndexOf(ThresholdAnchor);
+        list.RemoveAt(anchor);
+        list.InsertRange(anchor, new[]
+        {
+            Threshold(DeviceThresholdAxis.Temperature, "high", "온도 상한(°C)", "ThresholdTempHigh"),
+            Threshold(DeviceThresholdAxis.Temperature, "low", "온도 하한(°C)", "ThresholdTempLow"),
+            Threshold(DeviceThresholdAxis.Humidity, "high", "습도 상한(%)", "ThresholdHumidityHigh"),
+            Threshold(DeviceThresholdAxis.Current, "high", "전류 상한(A)", "ThresholdCurrentHigh"),
+            Threshold(DeviceThresholdAxis.Voltage, "low", "전압 하한(V)", "ThresholdVoltageLow"),
+            Threshold(DeviceThresholdAxis.Vibration, "high", "진동 상한", "ThresholdVibrationHigh"),
+            Threshold(DeviceThresholdAxis.UpsBatteryLevel, "low", "UPS 배터리 하한(%)", null),
+        }.SelectMany(x => x));
         return list;
     }
 
+    /// <summary>종류축 — 카테고리마다 한 줄(필드 이름 · 생성 필수 여부가 카테고리마다 다르다).</summary>
+    private static IEnumerable<DevicePropertySpec> TypeAxisSpecs()
+        => All7.Select(category => new DevicePropertySpec
+        {
+            Key = "type_axis", Label = "종류", ApiPath = "type_" + category.ToString().ToLowerInvariant(),
+            Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Choice,
+            Categories = Cat(category), ViewModelPath = "TypeAxisCode",
+            OptionSource = DevicePropertyOptionSource.TypeAxis, AxisContractOnly = true,
+            IsRequiredOnCreate = TypeAxisRequired.Contains(category),
+        });
+
+    /// <summary>형상 축 스칼라 한 칸 — 글자 편집, 빈 칸은 서버에서 지운다(JSON null).</summary>
+    private static DevicePropertySpec HardwareText(string path, string label, IReadOnlyCollection<EnumDeviceCategory> categories,
+        Func<IBaseDeviceModel, string?> reader, int maxLength, bool multiEdit = true) => new()
+    {
+        Key = path, Label = label, ApiPath = path,
+        Section = DevicePropertySection.HardwareSpec, Editor = DevicePropertyEditor.Text, MaxLength = maxLength,
+        Categories = categories, AxisReader = reader, AxisWritePath = path, AllowMultiEdit = multiEdit,
+        AxisSection = "hardware_spec", AxisContractOnly = true,
+    };
+
+    /// <summary>
+    /// 함체 임계값 한 칸. 7.0+ 는 <c>device_config.thresholds.{metric}.{bound}</c> 로 축 값 부분 수정(빈 칸 = 삭제),
+    /// 6.3 은 행 뷰모델의 평면 칸(<paramref name="legacyPath"/>)을 패널 저장이 보낸다. <paramref name="legacyPath"/> 가 없으면 7.0+ 에만 있다.
+    /// </summary>
+    private static IEnumerable<DevicePropertySpec> Threshold(string metric, string bound, string label, string? legacyPath)
+    {
+        var path = $"device_config.thresholds.{metric}.{bound}";
+        yield return new DevicePropertySpec
+        {
+            Key = path, Label = label, ApiPath = path,
+            Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.Number,
+            Categories = Cat(EnumDeviceCategory.Enclosure), AxisReader = m => ReadThreshold(m, metric, bound),
+            AxisWritePath = path, AxisValueKind = DeviceAxisValueKind.Number,
+            AxisSection = "device_config", AxisContractOnly = true,
+        };
+        if (legacyPath is null) yield break;
+        yield return new DevicePropertySpec
+        {
+            Key = path, Label = label, ApiPath = "threshold_config",
+            Section = DevicePropertySection.DeviceConfig,
+            Editor = legacyPath == "ThresholdVibrationHigh" ? DevicePropertyEditor.Integer : DevicePropertyEditor.Number,
+            Categories = Cat(EnumDeviceCategory.Enclosure), ViewModelPath = legacyPath, LegacyContractOnly = true,
+        };
+    }
+
+    /// <summary>카메라 동작 모드 한 칸 — 고정 어휘 콤보. "지정 안 함" = 키 삭제.</summary>
+    private static DevicePropertySpec CameraMode(string key, string label, IReadOnlyList<(string Code, string Display)> options) => new()
+    {
+        Key = "device_config.modes." + key, Label = label, ApiPath = "device_config.modes." + key,
+        Section = DevicePropertySection.DeviceConfig, Editor = DevicePropertyEditor.Choice,
+        OptionSource = DevicePropertyOptionSource.Fixed, FixedOptions = options,
+        Categories = Cat(EnumDeviceCategory.Camera), AxisReader = m => ReadMode(m, key),
+        AxisWritePath = "device_config.modes." + key,
+        AxisSection = "device_config", AxisContractOnly = true,
+    };
+
     private static IReadOnlyCollection<EnumDeviceCategory> Cat(params EnumDeviceCategory[] categories) => categories;
+
+    // ── 표시 전용 요약 — 운영자가 읽는 한국어 문장으로(영문 키 목록을 그대로 늘어놓지 않는다) ──
+
+    private static readonly (string Key, string Label)[] UrlLabels =
+    {
+        ("homepage", "장비 홈"), ("management", "관리 화면"), ("image", "정지 영상"),
+        ("onvif", "ONVIF"), ("streams", "영상 스트림"), ("snapshot", "채널 스냅샷"),
+    };
 
     private static string? ReadConnectionUrls(IBaseDeviceModel model)
     {
         var urls = model.Axes?.Connection?.Urls;
         if (urls == null) return null;
-        var present = urls.Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).Select(kv => kv.Key).ToList();
-        return present.Count == 0 ? "—" : string.Join(", ", present);
+        var present = UrlLabels.Where(u => urls.TryGetValue(u.Key, out var value) && !string.IsNullOrWhiteSpace(value))
+                               .Select(u => u.Label).ToList();
+        var extra = urls.Count(kv => !string.IsNullOrWhiteSpace(kv.Value) && UrlLabels.All(u => u.Key != kv.Key));
+        if (extra > 0) present.Add($"기타 {extra}개");
+        return present.Count == 0 ? "등록된 링크가 없습니다" : string.Join(" · ", present);
     }
 
+    /// <summary>부품 목록 — 한 줄에 하나(이름 · 유형 · 채널 · 위치). 이름은 부품의 label, 없으면 key.</summary>
     private static string? ReadComponentsSummary(IBaseDeviceModel model)
     {
         var list = model.Axes?.HardwareSpec?.Components;
         if (list == null) return null;
-        return list.Count == 0 ? "형상 미입력" : $"{list.Count}개";
+        if (list.Count == 0) return "등록된 부품이 없습니다 — [부품 구성 바꾸기]에서 추가하세요";
+        return string.Join(Environment.NewLine, list.Where(c => c != null).Select(c =>
+        {
+            var parts = new List<string> { string.IsNullOrWhiteSpace(c.Label) ? c.Key : c.Label!, ComponentTypeLabel(c.Type) };
+            if (c.Channel is { } channel) parts.Add($"채널 {channel.ToString(CultureInfo.InvariantCulture)}");
+            if (!string.IsNullOrWhiteSpace(c.Position)) parts.Add(c.Position!);
+            if (c.InService == false) parts.Add("사용 안 함");
+            return string.Join(" · ", parts);
+        }));
     }
 
+    /// <summary>부품 상태 — 한 줄에 하나(부품 · 동작 상태 · 건강 · 고장 사유 · 관측 시각).</summary>
     private static string? ReadDeviceStatusSummary(IBaseDeviceModel model)
     {
         var components = model.Axes?.DeviceStatus?.Components;
         if (components == null) return null;
-        return components.Count == 0 ? "관측 없음" : $"{components.Count}건 관측";
+        if (components.Count == 0) return "아직 보고된 부품 상태가 없습니다";
+        return string.Join(Environment.NewLine, components.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv =>
+        {
+            var status = kv.Value;
+            var parts = new List<string> { kv.Key };
+            if (!string.IsNullOrWhiteSpace(status?.State)) parts.Add(DeviceEnumDisplay.DoorStateKorean(status!.State));
+            parts.Add(DeviceEnumDisplay.ComponentHealthKorean(status?.Health));
+            if (!string.IsNullOrWhiteSpace(status?.FaultReason)) parts.Add(status!.FaultReason!);
+            if (TryShortTime(status?.ObservedAt, out var when)) parts.Add(when);
+            return string.Join(" · ", parts);
+        }));
     }
 
-    private static string? ReadMetaSections(IBaseDeviceModel model)
+    /// <summary>부품별 설정(component_overrides) — "히터 켜기 · 경광등 색 Red" 처럼 한국어 한 줄씩.</summary>
+    private static string? ReadComponentOverrides(IBaseDeviceModel model)
     {
-        var sections = model.Axes?.Meta?.Sections;
-        if (sections == null) return null;
-        return sections.Count == 0 ? "—" : string.Join(", ", sections);
+        var config = model.Axes?.DeviceConfig;
+        if (config == null) return null;
+        var overrides = config.ComponentOverrides;
+        if (overrides == null || overrides.Count == 0) return "따로 정한 부품 설정이 없습니다";
+        return string.Join(Environment.NewLine, overrides.Properties().Select(p =>
+        {
+            var entry = p.Value as JObject;
+            var enabled = entry?["enabled"]?.Type == JTokenType.Boolean ? (bool?)entry["enabled"] : null;
+            var color = entry?["color"]?.ToString();
+            var what = enabled is { } on ? (on ? "켜기" : "끄기") : !string.IsNullOrWhiteSpace(color) ? $"색 {color}" : "설정 있음";
+            return $"{p.Name} · {what}";
+        }));
     }
 
-    // 임계치·모드·부품 덮어쓰기는 카탈로그가 정한 자유 키다 — 값까지 펴지 않고 "어떤 키가 실렸는가"만 요약한다.
-    private static string? FlattenKeys(JObject? token)
+    /// <summary>함체 임계값 한 경계의 저장 값(숫자 글). 없으면 null(빈 칸).</summary>
+    private static string? ReadThreshold(IBaseDeviceModel model, string metric, string bound)
     {
-        if (token == null) return null;
-        return token.Count == 0 ? "—" : string.Join(", ", token.Properties().Select(p => p.Name));
+        var token = model.Axes?.DeviceConfig?.Thresholds?[metric]?[bound];
+        return token is JValue { Value: not null } value && (value.Type is JTokenType.Integer or JTokenType.Float)
+            ? Convert.ToDouble(value.Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture)
+            : null;
+    }
+
+    /// <summary>카메라 모드 한 키의 저장 값 — 코드 글(모드) 또는 "true"/"false"(녹화).</summary>
+    private static string? ReadMode(IBaseDeviceModel model, string key)
+    {
+        var token = model.Axes?.DeviceConfig?.Modes?[key];
+        return token switch
+        {
+            null => null,
+            { Type: JTokenType.Null } => null,
+            { Type: JTokenType.Boolean } => (bool)token ? "true" : "false",
+            _ => token.ToString(),
+        };
+    }
+
+    /// <summary>부품 유형 코드 → 카탈로그의 한국어 이름. 카탈로그를 못 쓰면 코드 그대로(부품 유형은 서버 어휘가 앞서 간다).</summary>
+    private static string ComponentTypeLabel(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return DeviceEnumDisplay.UnknownValue;
+        try
+        {
+            if (Caliburn.Micro.IoC.Get<ICatalogService>() is Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IComponentCatalog catalog
+                && catalog.Find(code) is { } info && !string.IsNullOrWhiteSpace(info.Label))
+                return info.Label;
+        }
+        catch { /* 컨테이너 미구성(시험 · 미리보기) — 코드 그대로 */ }
+        return code!;
+    }
+
+    /// <summary>관측 시각(ISO 8601, 오프셋 포함) → "MM-dd HH:mm". 못 읽으면 false.</summary>
+    private static bool TryShortTime(string? iso, out string text)
+    {
+        text = string.Empty;
+        if (string.IsNullOrWhiteSpace(iso)) return false;
+        if (!DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)) return false;
+        text = at.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return true;
     }
     #endregion
 }

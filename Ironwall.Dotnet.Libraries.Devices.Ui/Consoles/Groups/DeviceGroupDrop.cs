@@ -48,8 +48,8 @@ public static class DeviceGroupDrop
     {
         var list = devices?.Where(d => d is not null).ToList() ?? new List<IBaseDeviceModel>();
 
-        if (groupId <= 0) return new GroupDropPlan(groupId, Array.Empty<int>(), 0, 0, "아직 저장되지 않은 그룹이다 — 그룹을 먼저 저장한다");
-        if (list.Count == 0) return new GroupDropPlan(groupId, Array.Empty<int>(), 0, 0, "끌어 온 장비가 없다");
+        if (groupId <= 0) return new GroupDropPlan(groupId, Array.Empty<int>(), 0, 0, "아직 저장되지 않은 그룹입니다 — 그룹을 먼저 등록하세요.");
+        if (list.Count == 0) return new GroupDropPlan(groupId, Array.Empty<int>(), 0, 0, "끌어 온 장비가 없습니다.");
 
         var drafts = list.Count(d => d.Id <= 0);
         var saved = list.Where(d => d.Id > 0).ToList();
@@ -58,7 +58,7 @@ public static class DeviceGroupDrop
 
         string? reason = null;
         if (ids.Count == 0)
-            reason = saved.Count == 0 ? "아직 저장되지 않은 장비다 — 장비를 먼저 등록한다" : "이미 이 그룹에 들어 있다";
+            reason = saved.Count == 0 ? "아직 저장되지 않은 장비입니다 — 장비를 먼저 등록하세요." : "이미 이 그룹에 들어 있습니다.";
 
         return new GroupDropPlan(groupId, ids, drafts, already, reason);
     }
@@ -66,10 +66,10 @@ public static class DeviceGroupDrop
     /// <summary>상태 띠에 남길 한 줄.</summary>
     public static string ResultLine(string groupName, GroupDropPlan plan, IReadOnlyCollection<int> assigned, IReadOnlyCollection<int> skipped)
     {
-        var parts = new List<string> { $"'{groupName}' 에 {assigned.Count}대를 넣었다" };
-        if (skipped.Count > 0) parts.Add($"서버가 {skipped.Count}대를 건너뛰었다");
-        if (plan.AlreadyIn > 0) parts.Add($"이미 들어 있던 {plan.AlreadyIn}대는 보내지 않았다");
-        if (plan.DraftExcluded > 0) parts.Add($"저장 전 {plan.DraftExcluded}대는 뺐다");
+        var parts = new List<string> { $"'{groupName}'에 {assigned.Count}대를 넣었습니다" };
+        if (skipped.Count > 0) parts.Add($"{skipped.Count}대는 넣지 못했습니다");
+        if (plan.AlreadyIn > 0) parts.Add($"{plan.AlreadyIn}대는 이미 들어 있어 건너뛰었습니다");
+        if (plan.DraftExcluded > 0) parts.Add($"저장 전 {plan.DraftExcluded}대는 뺐습니다");
         return string.Join(" · ", parts);
     }
 }
@@ -116,7 +116,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
     {
         var plan = DeviceGroupDrop.Plan(groupId, devices);
         if (!plan.CanSend) return Finish(plan.BlockReason!, null);
-        if (IsBusy) return Finish("앞선 그룹 넣기가 아직 끝나지 않았다", null);
+        if (IsBusy) return Finish("앞선 그룹 넣기가 아직 끝나지 않았습니다. 잠시 후 다시 하세요.", null);
 
         IsBusy = true;
         try
@@ -125,7 +125,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             if (!response.Success)
                 // 오류 봉투에서는 Message 가 비고 까닭은 Error 에 있다 — 예전엔 "넣지 못했다 — " 로 끝나 사람이 까닭을 몰랐다
                 // (라이브 하네스 dl.2c: 부대 범위 밖 장비 422 "그룹의 부대(1) 또는 그 예하 부대의 장비만 …" 이 사라졌다).
-                return Finish($"'{groupName}' 에 넣지 못했다 — {ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 거부했다")}", null);
+                return Finish($"'{groupName}'에 넣지 못했습니다 — {ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 받지 않았습니다")}", null);
 
             // 서버가 실제로 넣었다고 답한 것만 로컬에 반영한다(응답에 없으면 보낸 것 전부).
             var assigned = response.Data?.AssignedDeviceIds ?? plan.DeviceIds.ToList();
@@ -135,11 +135,11 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             var undo = assigned.Count > 0 ? new GroupDropUndo(groupId, groupName, assigned.ToList()) : null;
             return Finish(DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped), undo, groupId, assigned.ToList(), assigned.Count);
         }
-        catch (OperationCanceledException) { return Finish("그룹 넣기를 취소했다", null); }
+        catch (OperationCanceledException) { return Finish("그룹 넣기를 취소했습니다.", null); }
         catch (Exception ex)
         {
             _log?.Error($"[GroupDrop] group={groupId}: {ex.Message}");
-            return Finish($"'{groupName}' 에 넣지 못했다 — 서버에 닿지 못했다", null);
+            return Finish($"'{groupName}'에 넣지 못했습니다 — 서버에 연결하지 못했습니다.", null);
         }
         finally { IsBusy = false; }
     }
@@ -154,8 +154,8 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
     /// </remarks>
     public async Task<string> UndoAsync(GroupDropUndo undo, CancellationToken token = default)
     {
-        if (undo is null || undo.DeviceIds.Count == 0) return Finish("되돌릴 것이 없다", null);
-        if (IsBusy) return Finish("앞선 그룹 넣기가 아직 끝나지 않았다", undo);
+        if (undo is null || undo.DeviceIds.Count == 0) return Finish("되돌릴 것이 없습니다.", null);
+        if (IsBusy) return Finish("앞선 그룹 넣기가 아직 끝나지 않았습니다. 잠시 후 다시 하세요.", undo);
 
         IsBusy = true;
         var done = new List<int>();
@@ -165,27 +165,27 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             foreach (var chunk in AssignDelta.ChunkRemovals(undo.DeviceIds))
             {
                 var response = await _api.RemoveDevicesFromGroupAsync(undo.GroupId, new DeviceGroupAssignRequestDto { DeviceIds = chunk.ToList() }, token).ConfigureAwait(true);
-                if (!response.Success) { failure = ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 거부했다"); continue; }
+                if (!response.Success) { failure = ApiErrorTextHelper.Resolve(response.Error, response.Message, "서버가 받지 않았습니다"); continue; }
                 done.AddRange(chunk);   // removed · skipped(이미 아님) · not_found 모두 "이제 그 그룹에 없다"
             }
         }
-        catch (OperationCanceledException) { failure ??= "취소했다"; }
+        catch (OperationCanceledException) { failure ??= "취소했습니다"; }
         catch (Exception ex)
         {
             _log?.Error($"[GroupDrop] undo group={undo.GroupId}: {ex.Message}");
-            failure ??= "서버에 닿지 못했다";
+            failure ??= "서버에 연결하지 못했습니다";
         }
         finally { IsBusy = false; }
 
         if (done.Count > 0) Reflect(undo.GroupId, done, add: false);
         if (failure is null)
-            return Finish($"'{undo.GroupName}' 에 넣은 {undo.DeviceIds.Count}대를 되돌렸다", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
+            return Finish($"'{undo.GroupName}'에 넣은 {undo.DeviceIds.Count}대를 되돌렸습니다.", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
 
         var remaining = undo.DeviceIds.Except(done).ToList();
         var left = remaining.Count > 0 ? new GroupDropUndo(undo.GroupId, undo.GroupName, remaining) : null;
         return done.Count == 0
-            ? Finish($"되돌리지 못했다 — {failure}", undo)
-            : Finish($"'{undo.GroupName}' 에서 {done.Count}대만 되돌렸다 · {remaining.Count}대는 남았다 — {failure}", left, undo.GroupId, done, -done.Count);
+            ? Finish($"되돌리지 못했습니다 — {failure}", undo)
+            : Finish($"'{undo.GroupName}'에서 {done.Count}대만 되돌렸고 {remaining.Count}대는 남았습니다 — {failure}", left, undo.GroupId, done, -done.Count);
     }
 
     /// <summary>끌어 온 행(뷰모델)에서 모델을 꺼낸다.</summary>

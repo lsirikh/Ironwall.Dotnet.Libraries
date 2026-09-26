@@ -44,7 +44,7 @@ public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewMod
     /// 명시적으로 미상임을 적는다. 원본 <see cref="DoorStatus"/> 값은 바꾸지 않는다.
     /// </remarks>
     public string DoorStatusDisplay
-        => string.IsNullOrWhiteSpace(DoorStatus) ? "미상" : DoorStatus;
+        => DeviceEnumDisplay.DoorStateKorean(DoorStatus);
 
     public bool HeaterEnabled
     {
@@ -68,6 +68,28 @@ public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewMod
 
     public IEnclosureThresholdConfigModel? ThresholdConfig
         => (_model as IEnclosureDeviceModel)!.ThresholdConfig;
+
+    // ── 임계값 여섯 칸(6.3 평면 threshold_config) — 상세 폼이 행 뷰모델 경로로 고치고 패널의 저장이 보낸다.
+    //    7.0+ 는 이 칸들 대신 device_config.thresholds 를 축 값 부분 수정으로 보낸다(DevicePropertyCatalog, 빈 칸 = 삭제).
+    //    값을 넣을 때 임계값 묶음이 없으면 새로 만든다 — 없는 묶음에 쓰려다 조용히 버려지지 않게.
+    public double? ThresholdTempHigh { get => ThresholdConfig?.TempHigh; set => SetThreshold(t => t.TempHigh = value, value); }
+    public double? ThresholdTempLow { get => ThresholdConfig?.TempLow; set => SetThreshold(t => t.TempLow = value, value); }
+    public double? ThresholdHumidityHigh { get => ThresholdConfig?.HumidityHigh; set => SetThreshold(t => t.HumidityHigh = value, value); }
+    public double? ThresholdCurrentHigh { get => ThresholdConfig?.CurrentHigh; set => SetThreshold(t => t.CurrentHigh = value, value); }
+    public double? ThresholdVoltageLow { get => ThresholdConfig?.VoltageLow; set => SetThreshold(t => t.VoltageLow = value, value); }
+    public int? ThresholdVibrationHigh { get => ThresholdConfig?.VibrationHigh; set => SetThreshold(t => t.VibrationHigh = value, value); }
+
+    private void SetThreshold(Action<IEnclosureThresholdConfigModel> assign, object? value)
+    {
+        var model = (_model as IEnclosureDeviceModel)!;
+        if (model.ThresholdConfig == null)
+        {
+            if (value == null) return;       // 없는 묶음을 비우는 것은 할 일이 없다
+            model.ThresholdConfig = new EnclosureThresholdConfigModel();
+        }
+        assign(model.ThresholdConfig!);
+        NotifyOfPropertyChange(nameof(ThresholdSummary));
+    }
 
     public string ThresholdSummary
     {

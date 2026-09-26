@@ -103,7 +103,9 @@ public class ByComponentViewModelTests
             Row(2, "gate", "door", "DOOR_SENSOR", "CLOSED", "OK")));
 
         await vm.SearchAsync();   // 결과에서 상태 칩(전체·CLOSED·OPEN — 정렬)을 얻는다
-        Assert.Equal(new[] { ByComponentViewModel.AllChip, "CLOSED", "OPEN" }, vm.StateChips);
+        Assert.Equal(new[] { ByComponentViewModel.AllChip, "CLOSED", "OPEN" }, vm.StateChips.Select(c => c.Code));
+        // 칩 글은 한국어다 — 보내는 값(Code)은 원문 그대로(U-18 D-4 4.1).
+        Assert.Equal(new[] { ByComponentViewModel.AllChip, "닫힘", "열림" }, vm.StateChips.Select(c => c.Display));
 
         vm.SelectedState = "OPEN";
         await vm.SearchAsync();
@@ -131,14 +133,14 @@ public class ByComponentViewModelTests
     }
 
     /// <summary>
-    /// 건강 칩은 화면에 한글("정상"·"주의"·"고장"·"미확인")을 보이지만, 서버로는 항상 원문 코드가 나가야
+    /// 건강 칩은 화면에 한글("정상"·"저하"·"고장"·"미상")을 보이지만, 서버로는 항상 원문 코드가 나가야
     /// 한다(하드 규칙: 필터 칩은 라벨이 아니라 wire value 를 보낸다). 칩 4종 전부를 한 번에 검증한다.
     /// </summary>
     [Theory]
     [InlineData("OK", "정상")]
-    [InlineData("DEGRADED", "주의")]
+    [InlineData("DEGRADED", "저하")]
     [InlineData("FAULT", "고장")]
-    [InlineData("UNKNOWN", "미확인")]
+    [InlineData("UNKNOWN", "미상")]
     public async Task should_send_wire_code_when_korean_health_chip_is_selected(string code, string korean)
     {
         var (vm, api) = await CreateAsync(EnumServerContract.V8_0);
@@ -147,7 +149,7 @@ public class ByComponentViewModelTests
 
         var chip = vm.HealthChips.Single(o => o.Code == code);
         Assert.Equal(korean, chip.Label);   // 화면에 보이는 라벨은 한글
-        Assert.Equal($"{korean} ({code})", chip.Display);
+        Assert.Equal(korean, chip.Display);   // 화면 글에 영문 코드를 병기하지 않는다(U-18)
 
         vm.SelectedHealth = chip;
         await vm.SearchAsync();
@@ -174,7 +176,7 @@ public class ByComponentViewModelTests
         vm.SelectedComponentType = vm.ComponentTypes.Single(o => o.Code == "DOOR_ACTUATOR");
 
         Assert.Equal(ByComponentViewModel.AllChip, vm.SelectedState);
-        Assert.Equal(new[] { ByComponentViewModel.AllChip }, vm.StateChips);
+        Assert.Equal(new[] { ByComponentViewModel.AllChip }, vm.StateChips.Select(c => c.Code));
     }
 
     [Fact]
@@ -219,7 +221,7 @@ public class ByComponentViewModelTests
         await vm.SearchAsync();   // 절대 던지지 않는다
 
         Assert.Empty(vm.Rows);
-        Assert.Contains("실패", vm.StatusText, StringComparison.Ordinal);
+        Assert.Equal(ByComponentViewModel.LoadFailedText, vm.StatusText);
     }
 
     [Fact]

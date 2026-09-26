@@ -64,21 +64,138 @@ public static class DeviceEnumDisplay
     public static string CategoryKorean(EnumDeviceCategory category)
         => _category.TryGetValue(category, out var s) ? s : category.ToString();
 
-    // ── 부품 건강 — "부품으로 찾기" 결과 행 배지(구 ByComponentRowViewModel.ToHealth)의 정본 ──
+    // ── 부품 건강 — "부품으로 찾기" 결과 행 배지 · 상세의 부품 상태 줄의 정본(목업 HEALTH 표: 정상 · 저하 · 고장 · 미상) ──
     private static readonly IReadOnlyDictionary<string, string> _componentHealth = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["OK"]       = "정상",
-        ["DEGRADED"] = "주의",
+        ["DEGRADED"] = "저하",
         ["FAULT"]    = "고장",
-        ["UNKNOWN"]  = "미확인",
+        ["UNKNOWN"]  = "미상",
     };
 
-    /// <summary>서버 건강 코드(대소문자 무관) → 한글. 빈 값·어휘 밖 값은 "미확인"(서버 강한 4값 어휘 중 하나로 귀결).</summary>
+    /// <summary>서버 건강 코드(대소문자 무관) → 한글. 빈 값은 "미상", 어휘 밖 값은 <see cref="UnknownValue"/>.</summary>
     public static string ComponentHealthKorean(string? health)
     {
         var trimmed = health?.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return "미확인";
-        return _componentHealth.TryGetValue(trimmed, out var s) ? s : trimmed;
+        if (string.IsNullOrEmpty(trimmed)) return "미상";
+        return _componentHealth.TryGetValue(trimmed, out var s) ? s : UnknownValue;
+    }
+
+    /// <summary>표시 사전에 없는 값의 화면 글 — 원문은 툴팁 · 로그로만 보인다(운영자 화면에 영문 코드를 내지 않는다).</summary>
+    public const string UnknownValue = "알 수 없음";
+
+    // ── 문 · 통문 위치(부품 state) — DOOR_SENSOR(OPEN/CLOSED) · DOOR_ACTUATOR(OPEN/CLOSED/RUNNING) ──
+    private static readonly IReadOnlyDictionary<string, string> _doorState = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["OPEN"]    = "열림",
+        ["CLOSED"]  = "닫힘",
+        ["RUNNING"] = "구동 중",
+        ["ON"]      = "켜짐",
+        ["OFF"]     = "꺼짐",
+    };
+
+    /// <summary>문 · 부품 동작 상태 코드 → 한글. 빈 값은 "미상", 모르는 값은 <see cref="UnknownValue"/>.</summary>
+    public static string DoorStateKorean(string? state)
+    {
+        var trimmed = state?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return "미상";
+        return _doorState.TryGetValue(trimmed, out var s) ? s : UnknownValue;
+    }
+
+    // ── 종류축(type_<category>) — 목업 AX 표. 서버 카탈로그 라벨이 코드와 같을 때(한국어 라벨이 없을 때) 쓴다 ──
+    private static readonly IReadOnlyDictionary<string, string> _typeAxis = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // 제어기
+        ["Controller"] = "일반", ["SmartController"] = "스마트", ["IoController"] = "IO",
+        // 센서
+        ["Multi"] = "복합", ["Fence"] = "펜스", ["Underground"] = "지중", ["Contact"] = "접점", ["PIR"] = "PIR",
+        ["Laser"] = "레이저", ["Radar"] = "레이더", ["OpticalCable"] = "광케이블", ["SmartSensor"] = "스마트",
+        ["SmartSensor2"] = "스마트2", ["SmartCompound"] = "스마트복합", ["SmartMultisensor2"] = "스마트멀티2",
+        // 카메라
+        ["FIXED"] = "고정", ["PTZ"] = "PTZ", ["SPEED_DOME"] = "스피드돔",
+        // 스피커 · 함체 · 경광등 · 통문(형상 축의 Unknown = "등록됐으나 현장 미확인")
+        ["Horn"] = "혼", ["Pillar"] = "컬럼", ["Outdoor"] = "옥외", ["Indoor"] = "옥내",
+        ["Beacon"] = "회전", ["Strobe"] = "점멸", ["LedBar"] = "LED바",
+        ["Sliding"] = "슬라이딩", ["Swing"] = "스윙", ["Barrier"] = "바리어",
+        ["Unknown"] = "미지정",
+    };
+
+    /// <summary>
+    /// 종류축 값의 화면 글. 서버 카탈로그가 한국어 라벨을 주면(<paramref name="serverLabel"/> ≠ 코드) 그것을, 아니면 이 표를,
+    /// 둘 다 없으면 서버 라벨(=코드) 그대로 돌려준다 — 카탈로그에 있는 값을 "알 수 없음"으로 뭉개지 않는다.
+    /// </summary>
+    public static string TypeAxisKorean(string code, string? serverLabel = null)
+    {
+        var trimmed = code?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(serverLabel) && !string.Equals(serverLabel.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
+            return serverLabel.Trim();
+        return _typeAxis.TryGetValue(trimmed, out var s) ? s : (serverLabel?.Trim() is { Length: > 0 } label ? label : trimmed);
+    }
+
+    // ── 스피커 역할(speaker_role) — 목업 AX.speaker.x 표 ──
+    private static readonly IReadOnlyDictionary<string, string> _speakerRole = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["NORMAL"] = "일반", ["ADMIN"] = "관리", ["MONITOR"] = "감시", ["DEV"] = "개발",
+    };
+
+    /// <summary>스피커 역할 코드 → 한국어. 서버 라벨이 코드와 다르면(한국어 라벨) 그것을 쓴다.</summary>
+    public static string SpeakerRoleKorean(string code, string? serverLabel = null)
+    {
+        var trimmed = code?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(serverLabel) && !string.Equals(serverLabel.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
+            return serverLabel.Trim();
+        return _speakerRole.TryGetValue(trimmed, out var s) ? s : (string.IsNullOrEmpty(trimmed) ? string.Empty : UnknownValue);
+    }
+
+    // ── 접속 방식(connection.type) — 목업 CONN_T 표(EnumConnectionType 7값, 엄격) ──
+    public static readonly IReadOnlyList<(string Code, string Display)> ConnectionTypes = new[]
+    {
+        ("IP_DIRECT", "IP 직결"), ("IP_CONVERTER", "IP 변환기"), ("CONTROLLER_CONTACT", "제어기 접점"),
+        ("RS485", "RS485"), ("ENCLOSURE_CONTACT", "함체 접점"), ("SERVER_MANAGED", "서버 관리"), ("NONE", "없음"),
+    };
+
+    // ── 카메라 제어 프로토콜(connection.protocol, 카메라 필수) — 목업 CAM_P 표 ──
+    public static readonly IReadOnlyList<(string Code, string Display)> CameraProtocols = new[]
+    {
+        ("NONE", "없음"), ("ONVIF", "ONVIF"), ("EMSTONE_API", "엠스톤"), ("INNODEP_API", "이노뎁"), ("ETC", "기타"),
+    };
+
+    // ── 카메라 동작 모드(device_config.modes) — 서버 CAMERA_MODE_ENUMS 어휘. 첫 항목(빈 코드)은 "지정 안 함" = 키 삭제 ──
+    public const string NotSetDisplay = "지정 안 함";
+
+    public static readonly IReadOnlyList<(string Code, string Display)> WeatherModes = new[]
+    {
+        ("", NotSetDisplay), ("NORMAL", "평시"), ("FOG", "안개"), ("SEA_FOG", "해무"), ("YELLOW_DUST", "황사"), ("RAIN", "강우"), ("SNOW", "강설"),
+    };
+
+    public static readonly IReadOnlyList<(string Code, string Display)> CameraVideoModes = new[]
+    {
+        ("", NotSetDisplay), ("NORMAL", "보통"), ("STABILIZATION", "흔들림 보정"), ("BLC", "역광 보정"), ("NIGHT_ENHANCE", "야간 영상 개선"),
+    };
+
+    public static readonly IReadOnlyList<(string Code, string Display)> DayNightModes = new[]
+    {
+        ("", NotSetDisplay), ("AUTO", "자동"), ("DAY", "주간"), ("NIGHT", "야간"),
+    };
+
+    public static readonly IReadOnlyList<(string Code, string Display)> AutoManualModes = new[]
+    {
+        ("", NotSetDisplay), ("AUTO", "자동"), ("MANUAL", "수동"),
+    };
+
+    public static readonly IReadOnlyList<(string Code, string Display)> Palettes = new[]
+    {
+        ("", NotSetDisplay), ("WHITE_HOT", "백색 열상"), ("BLACK_HOT", "흑색 열상"), ("RAINBOW", "무지개"), ("IRONBOW", "철 색상"),
+    };
+
+    /// <summary>고정 표시 사전에서 코드의 화면 글을 찾는다. 없으면 <see cref="UnknownValue"/>, 빈 코드는 빈 글.</summary>
+    public static string FixedKorean(IReadOnlyList<(string Code, string Display)> table, string? code)
+    {
+        var trimmed = code?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return string.Empty;
+        foreach (var (c, d) in table)
+            if (string.Equals(c, trimmed, StringComparison.OrdinalIgnoreCase)) return d;
+        return UnknownValue;
     }
 
     /// <summary>enum 값 → 한글. 타입별 정본 표로 나눠 읽는다(이 파일 remarks 참조).</summary>
@@ -101,8 +218,11 @@ public static class DeviceEnumDisplay
             ? korean
             : $"{korean} ({code})";
 
-    /// <summary>CLR enum 콤보(<c>DevicePropertyFormViewModel.ResolveOptions</c> 의 <c>ClrEnum</c> 선택지)의 "한국어 (코드)" 표시.</summary>
-    public static string EnumBilingual(Enum value) => Bilingual(KoreanOf(value), value.ToString());
+    /// <summary>
+    /// CLR enum 콤보(<c>DevicePropertyFormViewModel.ResolveOptions</c> 의 <c>ClrEnum</c> 선택지)의 화면 글 — <b>한국어만</b>.
+    /// 저장 값(코드)은 선택지의 Text 가 따로 쥔다. 한국어가 없는 값은 원문 이름 그대로(지어내지 않는다).
+    /// </summary>
+    public static string EnumBilingual(Enum value) => KoreanOf(value);
 
     /// <summary>
     /// 셋업·결선맵 "종류" 열·콤보의 센서 종류 코드 → "한국어 (코드)". 레거시(6.3) 코드는

@@ -126,6 +126,8 @@ public partial class App : Application
         // D-14: "소속 부대" 열·칸이 실제 이름으로 뜨는지 눈으로 보려면 UnitNameDirectory 도 IoC 로 잡혀야 한다 —
         // 실제 앱과 같은 probe(V8.0/V6.3)를 공유해 IsUnitEra 판정이 정책과 어긋나지 않는다.
         var unitDirectory = new UnitNameDirectory(new PreviewUnitGraphApi(), probe, log);
+        // 상세의 "그룹" 칸이 그룹 이름으로 뜨도록(실앱은 컨테이너가 준다) — 행 뷰모델이 IoC 로 찾는다.
+        var groups = new DeviceGroupProvider(log);
 
         // 패널 · 계약 게이트 · 종류 축 지원이 정적 IoC 로 의존을 찾는다 — 컨테이너 대신 여기서 대 준다.
         IoC.GetInstance = (type, _) =>
@@ -133,6 +135,7 @@ public partial class App : Application
             : type == typeof(ICatalogService) ? catalog
             : type == typeof(DeviceQueryPolicy) ? policy
             : type == typeof(UnitNameDirectory) ? unitDirectory
+            : type == typeof(DeviceGroupProvider) ? groups
             : null!;
         IoC.GetAllInstances = type => type == typeof(DeviceQueryPolicy) ? new object[] { policy } : Array.Empty<object>();
         IoC.BuildUp = _ => { };
@@ -145,7 +148,6 @@ public partial class App : Application
         PlatformProvider.Current = new XamlPlatformProvider();
 
         var devices = new DeviceProvider();
-        var groups = new DeviceGroupProvider(log);
         var servers = new ServerProvider(log);
         var controllers = new ControllerDeviceProvider(log, devices);
         var viewModel = new DeviceDashboardViewModel(
@@ -236,6 +238,35 @@ public partial class App : Application
         grid.SelectedItem = grid.Items[0];
         await Settle();
         Save(directory, $"{prefix}-08-sensor-single");
+
+        // 제어기 레일 — [셋업 · 결선] 은 여기서만 보인다(다른 레일에서는 숨긴다). 폭이 모자라면 [⋯] 로 옮겨진다.
+        await _viewModel.SelectRailAsync(DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Controller));
+        await Settle();
+        grid.SelectedItem = grid.Items[0];
+        await Settle();
+        Save(directory, $"{prefix}-08b-controller-single");
+
+        // 함체 — 접속(제어기 접점) · 부품 · 부품 상태 · 임계값 · 부품별 설정. 상세를 끝까지 굴려 아래 절도 본다.
+        await _viewModel.SelectRailAsync(DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Enclosure));
+        await Settle();
+        grid.SelectedItem = grid.Items[0];
+        await Settle();
+        Save(directory, $"{prefix}-08c-enclosure-single");
+        ServersPreview.ScrollDetailToEnd(_view);
+        await Settle();
+        Save(directory, $"{prefix}-08d-enclosure-detail-scrolled");
+        ServersPreview.ScrollDetailToTop(_view);
+        await Settle();
+
+        // 빈 목록 안내 — 검색 결과가 없을 때.
+        _viewModel.SearchText = "없는 장비";
+        await Settle();
+        Save(directory, $"{prefix}-08e-empty-search");
+        _viewModel.SearchText = string.Empty;
+        await Settle();
+
+        await _viewModel.SelectRailAsync(DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Sensor));
+        await Settle();
 
         if (_viewModel.RailEntries.Any(r => r.Key == DeviceDashboardViewModel.ByComponentRailKey))
         {
@@ -667,8 +698,7 @@ public partial class App : Application
             await Shot($"units-{theme}-08-devices-draft");
             console.RevertAssigns();
 
-            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
-            await Shot($"units-{theme}-09-adjacency-placeholder");
+            // 인접 관계도 레일은 그림이 생길 때까지 감췄다(2026-09-27) — 자리표시 화면을 찍지 않는다.
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_TREE);
 
             // 막힌 드롭 — 같은 제대 위에 놓으려 하면 까닭이 상태 띠에 뜬다.

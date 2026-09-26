@@ -93,8 +93,8 @@ public static class AssignDelta
         var removed = before.Except(after).OrderBy(id => id).ToList();
 
         string? reason = null;
-        if (groupId <= 0) reason = "아직 저장되지 않은 그룹이다 — 그룹을 먼저 저장한다";
-        else if (added.Count == 0 && removed.Count == 0) reason = "바뀐 것이 없다";
+        if (groupId <= 0) reason = "아직 저장되지 않은 그룹입니다. 그룹을 먼저 저장하세요.";
+        else if (added.Count == 0 && removed.Count == 0) reason = NoChangeText;
 
         return new AssignPlan(groupId, added, removed, draftExcluded, reason);
     }
@@ -111,9 +111,9 @@ public static class AssignDelta
         var appeared = now.Except(before).Count();
         var vanished = before.Except(now).Count();
         var parts = new List<string>();
-        if (appeared > 0) parts.Add($"{appeared}대가 더 들어와 있다");
-        if (vanished > 0) parts.Add($"{vanished}대가 빠져 있다");
-        return $"이 창을 연 뒤 다른 곳에서 그룹이 바뀌었다 — {string.Join(" · ", parts)}. 아무것도 보내지 않았다, 다시 읽고 고쳐 주세요.";
+        if (appeared > 0) parts.Add($"{appeared}대가 더 들어와 있습니다");
+        if (vanished > 0) parts.Add($"{vanished}대가 빠져 있습니다");
+        return $"다른 사용자가 이 그룹을 바꿨습니다({string.Join(" · ", parts)}). 저장하지 않았습니다. 창을 닫고 다시 여세요.";
     }
 
     /// <summary>
@@ -125,24 +125,29 @@ public static class AssignDelta
     /// </remarks>
     public static string? DriftByCount(int baselineCount, int? serverCount)
     {
-        if (serverCount is not { } now) return "그룹을 다시 읽지 못해 보내지 않았다 — 잠시 뒤 다시 시도하세요.";
+        if (serverCount is not { } now) return "그룹 정보를 다시 불러오지 못해 저장하지 않았습니다. 잠시 후 다시 시도하세요.";
         if (now == baselineCount) return null;
 
         var delta = now - baselineCount;
-        var what = delta > 0 ? $"{delta}대가 더 들어와 있다" : $"{-delta}대가 빠져 있다";
-        return $"이 창을 연 뒤 다른 곳에서 그룹이 바뀌었다 — {what}. 아무것도 보내지 않았다, 다시 읽고 고쳐 주세요.";
+        var what = delta > 0 ? $"{delta}대가 더 들어와 있습니다" : $"{-delta}대가 빠져 있습니다";
+        return $"다른 사용자가 이 그룹을 바꿨습니다({what}). 저장하지 않았습니다. 창을 닫고 다시 여세요.";
     }
 
-    /// <summary>버튼 줄에 적을 한 줄 — 무엇을 보낼 참인지.</summary>
+    /// <summary>바뀐 것이 없을 때의 한 줄.</summary>
+    public const string NoChangeText = "바뀐 내용이 없습니다.";
+
+    /// <summary>
+    /// 버튼 줄에 적을 한 줄 — 무엇을 저장할 참인지. 요청 횟수 같은 구현어는 쓰지 않는다(U-18 D-5 5.1).
+    /// </summary>
     public static string Summary(AssignPlan plan)
     {
         if (plan.BlockReason is not null && !plan.HasChanges) return plan.BlockReason;
 
         var parts = new List<string>();
-        if (plan.Added.Count > 0) parts.Add($"＋{plan.Added.Count}");
-        if (plan.Removed.Count > 0) parts.Add($"−{plan.Removed.Count}");
-        var head = parts.Count == 0 ? "바뀐 것이 없다" : $"보낼 변화 {string.Join(" · ", parts)} (호출 {plan.CallCount}회)";
-        if (plan.DraftExcluded > 0) head += $" · 저장 전 {plan.DraftExcluded}대는 뺀다";
+        if (plan.Added.Count > 0) parts.Add($"추가 {plan.Added.Count}대");
+        if (plan.Removed.Count > 0) parts.Add($"제외 {plan.Removed.Count}대");
+        var head = parts.Count == 0 ? NoChangeText : $"{string.Join(" · ", parts)}를 저장합니다.";
+        if (plan.DraftExcluded > 0) head += $" 등록 전 장비 {plan.DraftExcluded}대는 뺍니다.";
         return head;
     }
 
@@ -154,13 +159,13 @@ public static class AssignDelta
         var good = new List<string>();
         var bad = new List<string>();
 
-        Describe(add, "넣었다", "넣지 못했다");
-        Describe(remove, "뺐다", "빼지 못했다");
+        Describe(add, "넣었습니다", "넣지 못했습니다");
+        Describe(remove, "뺐습니다", "빼지 못했습니다");
 
-        if (good.Count == 0 && bad.Count == 0) return "보낸 것이 없다";
-        var line = good.Count > 0 ? $"'{groupName}' 에서 {string.Join(" · ", good)}" : $"'{groupName}' — {string.Join(" · ", bad)}";
+        if (good.Count == 0 && bad.Count == 0) return "저장한 내용이 없습니다.";
+        var line = good.Count > 0 ? $"'{groupName}'에 {string.Join(" · ", good)}" : $"'{groupName}' — {string.Join(" · ", bad)}";
         if (good.Count > 0 && bad.Count > 0) line += $" · {string.Join(" · ", bad)}";
-        return line;
+        return line + ".";
 
         void Describe(AssignLegOutcome? leg, string okWord, string failWord)
         {
@@ -168,7 +173,7 @@ public static class AssignDelta
             if (leg.Failed) { bad.Add($"{leg.Requested}대를 {failWord}"); return; }
             if (leg.Applied > 0) good.Add($"{leg.Applied}대를 {okWord}");
             var missed = leg.Requested - leg.Applied;
-            if (missed > 0) bad.Add($"{missed}대는 서버가 건너뛰었다");
+            if (missed > 0) bad.Add($"{missed}대는 처리되지 않았습니다");
         }
     }
 

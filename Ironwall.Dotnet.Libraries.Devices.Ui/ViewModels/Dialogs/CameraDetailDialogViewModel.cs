@@ -32,7 +32,7 @@ public class CameraDetailDialogViewModel : Conductor<BasePanelViewModel>.Collect
     public CameraDetailDialogViewModel(ICameraDeviceModel model)
     {
         _model = model;
-        DisplayName = $"{model.DeviceName}";
+        DisplayName = $"{model.DeviceName} 상세";
     }
 
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -57,17 +57,17 @@ public class CameraDetailDialogViewModel : Conductor<BasePanelViewModel>.Collect
         if (_model.HardwareSpec == null)
             _model.HardwareSpec = new CameraInfoModel();
         var infoVm = new CameraInfoViewModel(_model.HardwareSpec);
-        infoVm.DisplayName = "HW Spec";
+        infoVm.DisplayName = "하드웨어 정보";
         await ActivateItemAsync(infoVm, cancellationToken);
 
         _setting = await LoadSettingAsync(cancellationToken);
         var settingVm = new CameraSettingViewModel(_setting);
-        settingVm.DisplayName = "Setting";
+        settingVm.DisplayName = "카메라 설정";
         await ActivateItemAsync(settingVm, cancellationToken);
 
         _workingUrls = CloneUrls(_model.Urls);
         var urlsVm = new CameraUrlsViewModel(_workingUrls);
-        urlsVm.DisplayName = "URLs";
+        urlsVm.DisplayName = "링크";
         await ActivateItemAsync(urlsVm, cancellationToken);
     }
 

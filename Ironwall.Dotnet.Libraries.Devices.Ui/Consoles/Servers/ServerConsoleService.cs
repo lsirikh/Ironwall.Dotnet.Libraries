@@ -67,7 +67,8 @@ public interface IServerConsoleService
 
     Task<ServerMetricDto?> LatestMetricAsync(int id, CancellationToken token = default);
 
-    Task<IReadOnlyList<ServerMetricDto>> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default);
+    /// <summary>계측 이력. <b><c>null</c> = 불러오지 못함</b>(원문은 로그) · 빈 목록 = 기록 없음 — 화면이 둘을 다른 문장으로 말한다.</summary>
+    Task<IReadOnlyList<ServerMetricDto>?> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default);
 
     /// <summary>운용 모드. 6.3 이면 프록시 설정 경로, 7.0+ 는 <c>server_config.modes</c> 라 여기서는 <c>null</c>.</summary>
     Task<(ProxySettingDto? Setting, string? Note)> LegacyOperationModeAsync(int id, CancellationToken token = default);
@@ -125,8 +126,8 @@ public sealed class ServerConsoleService : IServerConsoleService
         return new ServerLoadResult(
             result.Servers, units, categories, result.IsTruncated,
             result.IsSuccess
-                ? result.IsTruncated ? "서버가 총계를 주지 않아 목록이 끊겼을 수 있습니다 — 첫 페이지만 보입니다" : null
-                : result.Message);
+                ? result.IsTruncated ? "목록의 앞부분만 표시했습니다. 부대 필터나 검색으로 범위를 좁히세요." : null
+                : Plain(result.Message, 0, "서버 목록을 불러오지 못했습니다. 잠시 후 [갱신]을 누르세요."));
     }
 
     private async Task<IReadOnlyList<ServerUnitOption>> UnitsAsync(CancellationToken token)
@@ -155,12 +156,12 @@ public sealed class ServerConsoleService : IServerConsoleService
     #region - Write -
     public async Task<ServerWriteResult> SaveAsync(int id, ServerWriteIntent intent, CancellationToken token = default)
     {
-        if (id <= 0) return new ServerWriteResult(false, "아직 등록되지 않은 서버입니다");
-        if (intent is null) return new ServerWriteResult(false, "바뀐 것이 없습니다");
+        if (id <= 0) return new ServerWriteResult(false, "아직 등록되지 않은 서버입니다.");
+        if (intent is null) return new ServerWriteResult(false, "바뀐 내용이 없습니다.");
 
         // 빈 DTO 에서 본문을 만들지 않는다 — 보내기 직전에 다시 받아 검사의 기준선으로 쓴다.
         var fetched = await _axis.GetServerAsync(id, token).ConfigureAwait(false);
-        if (fetched is null) return new ServerWriteResult(false, "저장 전에 서버를 다시 받지 못했습니다 — 아무것도 보내지 않았습니다");
+        if (fetched is null) return new ServerWriteResult(false, "서버 정보를 다시 불러오지 못해 저장하지 않았습니다. 잠시 후 다시 시도하세요.");
 
         var errors = ServerRequestBuilder.Validate(intent, fetched, Contract);
         if (errors.Count > 0) return new ServerWriteResult(false, string.Join(" · ", errors.Select(e => e.Message)));
@@ -169,14 +170,16 @@ public sealed class ServerConsoleService : IServerConsoleService
         PreserveUnitForEdit(intent, fetched);
 
         var result = await _axis.PatchServerAsync(id, intent, token).ConfigureAwait(false);
-        return new ServerWriteResult(result.IsSuccess, result.IsSuccess ? "설정을 저장했습니다" : result.Message);
+        return new ServerWriteResult(result.IsSuccess, result.IsSuccess
+            ? "설정을 저장했습니다."
+            : Plain(result.Message, result.StatusCode, "설정을 저장하지 못했습니다. 입력값을 확인하고 다시 시도하세요."));
     }
 
     public async Task<(ServerWriteResult Result, int NewId)> CreateAsync(
         ServerCategoryOption category, ServerWriteIntent intent, CancellationToken token = default)
     {
-        if (category is null || category.Id <= 0) return (new ServerWriteResult(false, "분류를 고르십시오"), 0);
-        if (intent is null) return (new ServerWriteResult(false, "채운 값이 없습니다"), 0);
+        if (category is null || category.Id <= 0) return (new ServerWriteResult(false, "분류를 고르세요."), 0);
+        if (intent is null) return (new ServerWriteResult(false, "입력한 값이 없습니다."), 0);
 
         var errors = ServerRequestBuilder.Validate(intent, null, Contract);
         if (errors.Count > 0) return (new ServerWriteResult(false, string.Join(" · ", errors.Select(e => e.Message))), 0);
@@ -188,7 +191,7 @@ public sealed class ServerConsoleService : IServerConsoleService
         var result = await _axis.CreateServerAsync(intent, token).ConfigureAwait(false);
         return result.IsSuccess
             ? (new ServerWriteResult(true, ServerStatusRules.JustRegisteredNotice), result.Id)
-            : (new ServerWriteResult(false, result.Message), 0);
+            : (new ServerWriteResult(false, Plain(result.Message, result.StatusCode, "서버를 등록하지 못했습니다. 입력값을 확인하고 다시 시도하세요.")), 0);
     }
 
     /// <remarks>
@@ -202,7 +205,19 @@ public sealed class ServerConsoleService : IServerConsoleService
         EnumDeviceCategory category, int deviceId, int? serverId, CancellationToken token = default)
     {
         var result = await _axis.AssignDeviceServerAsync(category, deviceId, serverId, unitId: null, token).ConfigureAwait(false);
-        return new ServerWriteResult(result.IsSuccess, result.Message);
+        return new ServerWriteResult(result.IsSuccess, result.IsSuccess
+            ? result.Message
+            : Plain(result.Message, result.StatusCode, "서버가 요청을 받아들이지 않았습니다."));
+    }
+
+    /// <summary>
+    /// 서버 · 통로의 원문 사유(HTTP 코드 · 서버 메시지)는 <b>화면에 붙이지 않는다</b> — 로그로 보내고 고정 문장을 돌려준다
+    /// (U-18 감사 공통 규칙). 같은 이름 충돌(409)만 운영자가 고칠 수 있는 까닭이라 따로 말한다.
+    /// </summary>
+    private string Plain(string? raw, int statusCode, string fixedText)
+    {
+        if (!string.IsNullOrWhiteSpace(raw)) _log?.Warning($"[ServerConsole] 서버 응답 원문({statusCode}): {raw}");
+        return statusCode == 409 ? "같은 이름의 서버가 이미 있습니다. 다른 이름을 쓰세요." : fixedText;
     }
 
     /// <summary>
@@ -272,13 +287,19 @@ public sealed class ServerConsoleService : IServerConsoleService
         }
     }
 
-    public async Task<IReadOnlyList<ServerMetricDto>> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
+    public async Task<IReadOnlyList<ServerMetricDto>?> MetricHistoryAsync(int id, int limit = 50, CancellationToken token = default)
     {
         if (id <= 0) return Array.Empty<ServerMetricDto>();
         try
         {
             var response = await _servers.GetServerMetricsAsync(id, limit: Math.Clamp(limit, 1, 500), token: token).ConfigureAwait(false);
-            return response.Success && response.Data is { Count: > 0 }
+            if (!response.Success)
+            {
+                // 실패와 "기록 없음" 을 섞지 않는다 — 실패는 null 로 돌려 화면이 다른 문장을 쓰게 한다.
+                _log?.Warning($"[ServerConsole] 서버 {id} 계측 이력 응답 실패");
+                return null;
+            }
+            return response.Data is { Count: > 0 }
                 ? response.Data.Where(m => m is not null).ToList()
                 : Array.Empty<ServerMetricDto>();
         }
@@ -286,7 +307,7 @@ public sealed class ServerConsoleService : IServerConsoleService
         catch (Exception ex)
         {
             _log?.Warning($"[ServerConsole] 서버 {id} 계측 이력 실패 — {ex.Message}");
-            return Array.Empty<ServerMetricDto>();
+            return null;
         }
     }
 

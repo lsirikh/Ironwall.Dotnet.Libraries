@@ -314,10 +314,10 @@ public class AssemblyViewModelTests : IDisposable
         vm.AddFromPalette(vm.Palette.Single(p => p.Code == "FAN"));
         vm.BoardItems.Single(i => i.Slot.Key == "door").Slot.Label = "정문";
 
-        Assert.Contains("더함 1: fan", vm.DiffSummary);
-        Assert.Contains("뺌 1: heater", vm.DiffSummary);
-        Assert.Contains("관측 기록이 함께 삭제", vm.DiffSummary);
-        Assert.Contains("고침 1: door(label)", vm.DiffSummary);
+        Assert.Contains("추가 1개: fan", vm.DiffSummary);
+        Assert.Contains("제거 1개: heater", vm.DiffSummary);
+        Assert.Contains("상태 기록도 함께 지워집니다", vm.DiffSummary);
+        Assert.Contains("변경 1개: door(이름)", vm.DiffSummary);
         Assert.True(vm.CanCommit);
     }
 

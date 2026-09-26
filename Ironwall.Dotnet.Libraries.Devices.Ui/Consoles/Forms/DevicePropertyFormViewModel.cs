@@ -32,11 +32,23 @@ public sealed class PropertySectionViewModel
 }
 
 /// <summary>[적용] · [등록] 을 눌렀을 때 폼이 한 일.</summary>
-/// <param name="IsWritten">행에 값을 썼다 — 이제 패널의 저장을 부르면 된다.</param>
+/// <param name="IsWritten">보낼 것이 있다 — 행에 값을 썼거나(<see cref="HasRowWrites"/>) 축 값 편집(<see cref="AxisEdits"/>)이 있다.</param>
 /// <param name="RowCount">값을 쓴 행 수.</param>
-/// <param name="FieldCount">쓴 칸 수.</param>
+/// <param name="FieldCount">쓴 칸 수(축 값 칸 포함).</param>
 /// <param name="Message">못 썼을 때의 한 줄.</param>
-public sealed record PropertyFormCommit(bool IsWritten, int RowCount, int FieldCount, string? Message);
+/// <param name="AxisEdits">
+/// 행 뷰모델이 아니라 축 값 부분 수정으로 보낼 칸들(명세 · 입력 글). 행에는 쓰지 않았다 — 콘솔이 패널 저장 <b>뒤에</b> 보낸다
+/// (패널 저장이 받은 축을 되싣기 때문에, 먼저 보내면 뒤의 패널 저장이 옛 값으로 되돌릴 수 있다).
+/// </param>
+public sealed record PropertyFormCommit(bool IsWritten, int RowCount, int FieldCount, string? Message,
+    IReadOnlyList<(DevicePropertySpec Spec, string Text)>? AxisEdits = null)
+{
+    /// <summary>행 뷰모델에 값을 썼다 — 패널의 저장을 불러야 한다.</summary>
+    public bool HasRowWrites { get; init; } = IsWritten && (AxisEdits is null || AxisEdits.Count == 0);
+
+    /// <summary>축 값 부분 수정으로 보낼 칸이 있다.</summary>
+    public bool HasAxisEdits => AxisEdits is { Count: > 0 };
+}
 
 /// <summary>
 /// 정규화된 속성 명세에서 <b>만들어지는</b> 상세 폼. 장비 종류마다 폼을 손으로 짜지 않는다.
@@ -140,7 +152,7 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
     /// </summary>
     public PropertyFormCommit Commit()
     {
-        if (_rows.Count == 0) return new PropertyFormCommit(false, 0, 0, "고른 장비가 없다");
+        if (_rows.Count == 0) return new PropertyFormCommit(false, 0, 0, "고른 장비가 없습니다.");
 
         var touchedKeys = Presenter.Tracker.ChangesFor(_rows.Count).Select(change => change.Key).ToHashSet(StringComparer.Ordinal);
         var touched = Fields.Where(f => !f.IsLocked && touchedKeys.Contains(f.Key)).ToList();
@@ -151,14 +163,26 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
         if (invalid.Count > 0)
             return new PropertyFormCommit(false, 0, 0, $"{invalid[0].Label}: {invalid[0].Error}" + (invalid.Count > 1 ? $" 외 {invalid.Count - 1}건" : string.Empty));
 
-        if (touched.Count == 0 && !IsCreating) return new PropertyFormCommit(false, 0, 0, "바꾼 칸이 없다");
+        if (touched.Count == 0 && !IsCreating) return new PropertyFormCommit(false, 0, 0, "바꾼 칸이 없습니다.");
+
+        // 축 값 칸은 행에 쓰지 않는다 — 콘솔이 축 값 부분 수정으로 따로 보낸다. 빈 칸을 지울 수 없는 칸은 여기서 막는다.
+        var axisFields = touched.Where(f => f.WritesAxis).ToList();
+        var rowFields = touched.Where(f => !f.WritesAxis).ToList();
+        foreach (var field in axisFields)
+        {
+            if (!DeviceAxisPatchBuilder.TryConvert(field.Spec, field.Text, out _, out var axisError))
+            {
+                field.Error = axisError;
+                return new PropertyFormCommit(false, 0, 0, $"{field.Label}: {axisError}");
+            }
+        }
 
         // 2) 쓰기 — 전부 아니면 전무. 검증은 글자만 본다(빈 값을 받을 수 있는지는 속성의 형이 정한다)라서 쓰는 순간에야
         //    거절되는 값이 있다. 그때 앞서 쓴 칸을 그대로 두면 반쯤 고친 행이 남아, 나중의 어떤 저장이든 그것을 서버로 보낸다.
         var written = new List<(object Row, PropertyFieldViewModel Field, object? Original)>();
         foreach (var row in _rows)
         {
-            foreach (var field in touched)
+            foreach (var field in rowFields)
             {
                 var original = DevicePropertyAccessor.Read(row, field.Spec);
                 if (field.WriteTo(row))
@@ -172,13 +196,17 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
             }
         }
 
-        return new PropertyFormCommit(true, _rows.Count, touched.Count, null);
+        var axisEdits = axisFields.Select(f => (f.Spec, f.Text)).ToList();
+        return new PropertyFormCommit(true, _rows.Count, touched.Count, null, axisEdits)
+        {
+            HasRowWrites = rowFields.Count > 0 || IsCreating,
+        };
     }
 
     /// <summary>행을 같은 Id 의 새 인스턴스로 바꿔 끼운다(재조회로 행이 새로 만들어졌을 때) — 칸의 글과 손댄 표지는 그대로 둔다.</summary>
     public void RebindRows(IReadOnlyList<object> rows)
     {
-        if (rows is null || rows.Count != _rows.Count) throw new ArgumentException("같은 수의 행으로만 바꿔 끼울 수 있다", nameof(rows));
+        if (rows is null || rows.Count != _rows.Count) throw new ArgumentException("같은 수의 행으로만 바꿔 끼울 수 있습니다.", nameof(rows));
         _rows = rows;
         NotifyOfPropertyChange(nameof(Rows));
     }
@@ -197,8 +225,12 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
             case DevicePropertyOptionSource.None:
                 return Array.Empty<PropertyOption>();
 
+            case DevicePropertyOptionSource.Fixed when spec.FixedOptions is { } fixedOptions:
+                // 저장 값은 코드, 화면은 한국어(표시 사전) — 빈 코드는 "지정 안 함"(= 지운다).
+                return fixedOptions.Select(o => new PropertyOption(o.Display, o.Code)).ToList();
+
             case DevicePropertyOptionSource.ClrEnum when spec.EnumType is { IsEnum: true } enumType:
-                // Display 는 "한국어 (코드)" 병기(device-console-v8 목업 규칙), Text 는 원래 enum 이름 그대로
+                // Display 는 한국어(운영자 화면에 코드를 병기하지 않는다), Text 는 원래 enum 이름 그대로
                 // — 저장 때 Enum.TryParse 가 읽는 값은 바뀌지 않는다(DevicePropertyAccessor.TryWrite 참조).
                 return Enum.GetNames(enumType)
                     .Select(name => new PropertyOption(

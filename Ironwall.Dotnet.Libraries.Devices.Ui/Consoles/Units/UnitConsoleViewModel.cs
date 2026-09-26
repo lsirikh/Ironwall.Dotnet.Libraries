@@ -40,6 +40,15 @@ public sealed class UnitConsoleViewModel : Screen
     public const string RAIL_ADJACENCY = "adjacency";
     public const string RAIL_DEVICES = "devices";
 
+    /// <summary>창 제목(<see cref="Screen.DisplayName"/>).</summary>
+    public const string WINDOW_TITLE = "부대 편제";
+
+    /// <summary>편집 권한이 없을 때 상태 띠 · 툴팁에 쓰는 말(권한 키 이름은 보이지 않는다 — U-18 D-8 8.4).</summary>
+    public const string NO_EDIT_PERMISSION = "부대를 편집할 권한이 없습니다.";
+
+    /// <summary>서버가 부대 편제를 모를 때(판본 번호는 보이지 않는다 — U-18 D-8 8.9).</summary>
+    public const string NOT_SUPPORTED = "현재 서버는 부대 편제를 지원하지 않습니다.";
+
     #region - Ctors -
     public UnitConsoleViewModel(
         IUnitGraphApi units,
@@ -62,6 +71,9 @@ public sealed class UnitConsoleViewModel : Screen
         _canView = canView ?? UnitPermissionGate.CanView;
         _canPlaceDevices = canPlaceDevices ?? DevicePermissionGate.CanEdit;
 
+        // 창 제목 — Caliburn 창 관리자가 DisplayName 을 Title 로 묶는다. 비우면 타입 이름이 뜬다(U-18 D-0 0.2 · D-8 8.1).
+        DisplayName = WINDOW_TITLE;
+
         Detail = new ConsoleDetailPresenter { TypeName = "부대" };
         Form = new UnitDetailFormViewModel(Detail);
         Tray = new DraftTrayViewModel();
@@ -69,8 +81,9 @@ public sealed class UnitConsoleViewModel : Screen
                                    reason => StatusText = reason, () => _canPlaceDevices());
 
         // 아이콘은 이름만 쥔 토큰이다 — 싱글턴이 아닌 창이어도 뷰모델이 시각 요소를 쥐지 않는다(장비 콘솔 선례).
+        // "인접 관계도" 칸은 내지 않는다 — 그림 관계도가 아직 없어 칸을 누르면 "다음 단계" 자리표시만 떴다(U-18 D-8 8.2).
+        // 인접 편집은 상세 칸에서 그대로 한다. 관계도가 생기면 RAIL_ADJACENCY 칸을 여기 다시 넣는다.
         RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리", new ConsoleIconToken("FileTree")) { ShowCount = true });
-        RailEntries.Add(new ConsoleRailEntry(RAIL_ADJACENCY, "인접 관계도", new ConsoleIconToken("GraphOutline")) { ShowCount = true });
         RailEntries.Add(new ConsoleRailEntry(RAIL_DEVICES, "미배치 장비", new ConsoleIconToken("Devices")) { ShowCount = true });
         _selectedRail = RailEntries[0];
 
@@ -117,7 +130,7 @@ public sealed class UnitConsoleViewModel : Screen
     public bool IsTreeView => _selectedRail.Key == RAIL_TREE;
     public bool IsDeviceView => _selectedRail.Key == RAIL_DEVICES;
 
-    /// <summary>인접 관계도는 <b>이 노드의 범위 밖</b>이다(봉투: "관계도는 뒤"). 자리만 두고 준비 중으로 보인다.</summary>
+    /// <summary>인접 관계도는 <b>이 노드의 범위 밖</b>이다(봉투: "관계도는 뒤"). 레일 칸을 내지 않아 이 값은 늘 false 다.</summary>
     public bool IsAdjacencyView => _selectedRail.Key == RAIL_ADJACENCY;
 
     public string SearchText
@@ -161,7 +174,7 @@ public sealed class UnitConsoleViewModel : Screen
         : $"부대 {Tree.Count} · 인접 쌍 {AdjacencyPairCount}";
 
     public string RailFooterText => string.IsNullOrEmpty(MyUnitCode)
-        ? "형제 순서는 서버에 저장할 자리가 없어 코드 순으로 고정합니다."
+        ? "같은 단계의 부대는 코드 순으로 표시됩니다."
         : $"내 부대 · {MyUnitCode}";
 
     public string? MyUnitCode => _myUnitCode();
@@ -183,9 +196,9 @@ public sealed class UnitConsoleViewModel : Screen
     public bool IsAvailable => _units.IsAvailable;
     public bool CanEditUnits => _canEdit();
     public bool CanAdd => IsAvailable && CanEditUnits && !IsBusy;
-    public string AddBlockedReason => !IsAvailable ? "이 서버 판본에는 부대 편제가 없습니다." : "부대를 등록할 권한이 없습니다(units:edit).";
+    public string AddBlockedReason => !IsAvailable ? NOT_SUPPORTED : "부대를 등록할 권한이 없습니다.";
     public bool CanDeleteUnit => IsAvailable && _canDelete() && SelectedRow is not null && !Form.IsCreating && !IsBusy;
-    public string DeleteBlockedReason => SelectedRow is null ? "지울 부대를 먼저 고르세요." : "부대를 지울 권한이 없습니다(units:delete).";
+    public string DeleteBlockedReason => SelectedRow is null ? "지울 부대를 먼저 고르세요." : "부대를 지울 권한이 없습니다.";
     public bool CanViewUnits => _canView();
     public bool CanReload => IsAvailable && CanViewUnits && !IsBusy;
     public bool CanMoveSelected => IsAvailable && CanEditUnits && SelectedRow is not null && !IsBusy;
@@ -206,8 +219,8 @@ public sealed class UnitConsoleViewModel : Screen
 
     public string AssignTargetText
         => AssignTargetId <= 0
-         ? "놓을 부대를 고르십시오"
-         : $"'{Tree.Find(AssignTargetId)?.Name ?? $"#{AssignTargetId}"}' 에 배치";
+         ? "놓을 부대를 고르세요"
+         : $"'{Tree.Find(AssignTargetId)?.Name ?? $"부대 {AssignTargetId}번"}'에 배치";
 
     /// <summary>피커가 고를 수 있는 부대 전부.</summary>
     public BindableCollection<UnitOptionViewModel> AssignTargets { get; } = new();
@@ -240,13 +253,13 @@ public sealed class UnitConsoleViewModel : Screen
         if (IsBusy) return;                 // 스스로 막는다 — 호출부가 IsBusy 를 내려놓고 부르는 길이 여럿이다
         if (!IsAvailable)
         {
-            StatusText = "이 서버 판본에는 부대 편제가 없습니다 — 서버 8.0 이상에서만 보입니다.";
+            StatusText = NOT_SUPPORTED;
             return;
         }
         if (!CanViewUnits)
         {
             // GET /api/units/graph 는 units:view 다 — 권한이 없으면 부르기 전에 접는다(403 왕복을 만들지 않는다).
-            StatusText = "부대 편제를 볼 권한이 없습니다(units:view).";
+            StatusText = "부대 편제를 볼 권한이 없습니다.";
             return;
         }
 
@@ -256,7 +269,7 @@ public sealed class UnitConsoleViewModel : Screen
             var response = await _units.GetGraphAsync(token).ConfigureAwait(true);
             if (!response.Success)
             {
-                StatusText = $"편제를 읽지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
+                StatusText = $"편제를 불러오지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
                 return;
             }
 
@@ -276,13 +289,13 @@ public sealed class UnitConsoleViewModel : Screen
             Project();
             // 고른 행의 통지는 Project 뒤다 — 목록에 아직 없는 인스턴스를 밀면 ListBox 가 그냥 버린다.
             NotifyOfPropertyChange(nameof(SelectedRow));
-            if (!quiet) StatusText = $"편제 {Tree.Count}개를 읽었습니다.";
+            if (!quiet) StatusText = $"부대 {Tree.Count}개를 불러왔습니다.";
         }
-        catch (OperationCanceledException) { StatusText = "읽기를 취소했습니다."; }
+        catch (OperationCanceledException) { StatusText = "불러오기를 취소했습니다."; }
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] reload: {ex.Message}");
-            StatusText = "편제를 읽지 못했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"편제를 불러오지 못했습니다. {UNREACHABLE}";
         }
         finally
         {
@@ -329,9 +342,10 @@ public sealed class UnitConsoleViewModel : Screen
         Sync(DeviceRows, deviceRows);
 
         SyncAssignTargets();
-        RailEntries[0].Count = Tree.Count;
-        RailEntries[1].Count = AdjacencyPairCount;
-        RailEntries[2].Count = DeviceRows.Count;
+        // 칸을 순번이 아니라 키로 찾는다 — "인접 관계도" 칸을 숨긴 뒤로 칸 수가 바뀌었다(U-18 D-8 8.2).
+        SetRailCount(RAIL_TREE, Tree.Count);
+        SetRailCount(RAIL_ADJACENCY, AdjacencyPairCount);
+        SetRailCount(RAIL_DEVICES, DeviceRows.Count);
 
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(RailFooterText));
@@ -460,13 +474,13 @@ public sealed class UnitConsoleViewModel : Screen
                 Form.RefreshChildEchelonWarning(Tree);
                 return;
             }
-            StatusText = $"'{row.Name}' 상세를 읽지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
+            StatusText = $"'{row.Name}' 상세를 불러오지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _log?.Warning($"[UnitConsole] detail {row.Id}: {ex.Message}");
-            StatusText = $"'{row.Name}' 상세를 읽지 못했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"'{row.Name}' 상세를 불러오지 못했습니다. {UNREACHABLE}";
         }
 
         // 상세를 못 받았어도 트리가 아는 만큼은 채운다 — 빈 칸으로 두면 편집이 원본 없이 시작된다.
@@ -507,7 +521,7 @@ public sealed class UnitConsoleViewModel : Screen
         Detail.Reset();
         Detail.IsCreating = true;
         Detail.IsReadOnly = false;
-        Detail.CreateBanner = "부대 코드는 등록 뒤 절대 바꿀 수 없습니다 — NATS subject 의 두 번째 토큰이라 바꾸면 구독자가 메시지를 잃습니다.";
+        Detail.CreateBanner = "부대 코드는 등록 후 바꿀 수 없습니다. 신중히 입력하세요.";
         Form.BeginCreate(Tree, null);
         RaiseDetail();
     }
@@ -529,14 +543,14 @@ public sealed class UnitConsoleViewModel : Screen
         {
             Detail.Reset();
             Form.Clear();
-            StatusText = "등록을 취소했습니다 — 서버 호출 0.";
+            StatusText = "등록을 취소했습니다.";
         }
         else if (SelectedRow is { } row)
         {
             var detail = Form.Original as UnitDetailDto;
             if (detail is not null) Form.Load(detail, Tree, Form.DeviceCount);
             Detail.Tracker.Clear();
-            StatusText = $"'{row.Name}' 의 변경을 되돌렸습니다 — 서버 호출 0.";
+            StatusText = $"'{row.Name}'의 변경을 되돌렸습니다.";
         }
         RaiseDetail();
     }
@@ -559,12 +573,12 @@ public sealed class UnitConsoleViewModel : Screen
             var response = await _units.CreateAsync(UnitRequestBuilder.Create(values), token).ConfigureAwait(true);
             if (!response.Success)
             {
-                Form.ErrorText = Reason(response.Error?.Message, response.Message);
+                Form.ErrorText = $"등록하지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
                 return;
             }
 
-            Detail.Settle($"'{values.Name}' 을 등록했습니다.");
-            StatusText = $"'{values.Name}'({values.Code}) 을 등록했습니다.";
+            Detail.Settle($"'{values.Name}'을(를) 등록했습니다.");
+            StatusText = $"'{values.Name}'({values.Code})을(를) 등록했습니다.";
             _pendingSelectId = response.Data?.Id ?? 0;
             IsBusy = false;
             await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
@@ -574,7 +588,7 @@ public sealed class UnitConsoleViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] create: {ex.Message}");
-            Form.ErrorText = "등록하지 못했습니다 — 서버에 닿지 못했습니다.";
+            Form.ErrorText = $"등록하지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -585,16 +599,16 @@ public sealed class UnitConsoleViewModel : Screen
         if (!UnitRequestBuilder.TryValidateEdit(Form.EditValues, out var error)) { Form.ErrorText = error; return; }
 
         var dto = UnitRequestBuilder.Edit(Form.Original, Form.EditValues);
-        if (dto is null) { Detail.Settle("바뀐 것이 없습니다 — 보내지 않았습니다."); RaiseDetail(); return; }
+        if (dto is null) { Detail.Settle("바뀐 내용이 없습니다."); RaiseDetail(); return; }
 
         IsBusy = true;
         try
         {
             var response = await _units.PatchAsync(row.Id, dto, token).ConfigureAwait(true);
-            if (!response.Success) { Form.ErrorText = Reason(response.Error?.Message, response.Message); return; }
+            if (!response.Success) { Form.ErrorText = $"저장하지 못했습니다. {Reason(response.Error?.Message, response.Message)}"; return; }
 
-            Detail.Settle($"'{Form.Name}' 을 저장했습니다.");
-            StatusText = $"'{Form.Name}' 을 저장했습니다.";
+            Detail.Settle($"'{Form.Name}'을(를) 저장했습니다.");
+            StatusText = $"'{Form.Name}'을(를) 저장했습니다.";
             IsBusy = false;
             await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
             await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
@@ -603,7 +617,7 @@ public sealed class UnitConsoleViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] save {row.Id}: {ex.Message}");
-            Form.ErrorText = "저장하지 못했습니다 — 서버에 닿지 못했습니다.";
+            Form.ErrorText = $"저장하지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -617,12 +631,12 @@ public sealed class UnitConsoleViewModel : Screen
     {
         var verdict = UnitDropRules.CanMove(Tree, movingId, targetParentId);
         if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return false; }
-        if (!CanEditUnits) { StatusText = "부대를 바꿀 권한이 없습니다(units:edit)."; return false; }
-        if (IsBusy) { StatusText = "앞선 작업이 아직 끝나지 않았습니다."; return false; }
+        if (!CanEditUnits) { StatusText = NO_EDIT_PERMISSION; return false; }
+        if (IsBusy) { StatusText = "앞선 작업이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요."; return false; }
 
         var moving = Tree.Find(movingId)!;
         var previousParentId = moving.ParentId;
-        var targetName = targetParentId is int id ? Tree.Find(id)?.Name ?? $"#{id}" : "최상위";
+        var targetName = targetParentId is int id ? Tree.Find(id)?.Name ?? $"부대 {id}번" : "최상위";
 
         IsBusy = true;
         try
@@ -630,14 +644,14 @@ public sealed class UnitConsoleViewModel : Screen
             var response = await _units.PatchAsync(movingId, UnitRequestBuilder.Move(targetParentId), token).ConfigureAwait(true);
             if (!response.Success)
             {
-                StatusText = $"'{moving.Name}' 을 옮기지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
+                StatusText = $"'{moving.Name}'을(를) 옮기지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
                 IsBusy = false;
                 await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);   // 실패 복구는 재조회다(화면과 서버를 다시 맞춘다)
                 return false;
             }
 
             _lastMove = new UnitMoveUndo(movingId, moving.Name, previousParentId);
-            StatusText = $"'{moving.Name}' 을 '{targetName}' 으로 옮겼습니다.";
+            StatusText = $"'{moving.Name}'을(를) '{targetName}'(으)로 옮겼습니다.";
             IsBusy = false;
             await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
             await SelectByIdAsync(movingId, token, force: true).ConfigureAwait(true);
@@ -647,7 +661,7 @@ public sealed class UnitConsoleViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] move {movingId} → {targetParentId}: {ex.Message}");
-            StatusText = $"'{moving.Name}' 을 옮기지 못했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"'{moving.Name}'을(를) 옮기지 못했습니다. {UNREACHABLE}";
             return false;
         }
         finally { IsBusy = false; RaiseCommands(); }
@@ -661,7 +675,7 @@ public sealed class UnitConsoleViewModel : Screen
         // 표를 미리 버리지 않는다 — 되돌리기가 실패하면 되돌릴 방법이 영영 사라진다.
         var ok = await MoveAsync(undo.UnitId, undo.PreviousParentId, token).ConfigureAwait(true);
         _lastMove = ok ? null : undo;
-        if (ok) StatusText = $"'{undo.UnitName}' 의 이동을 되돌렸습니다.";
+        if (ok) StatusText = $"'{undo.UnitName}'의 이동을 되돌렸습니다.";
         NotifyOfPropertyChange(nameof(CanUndoMove));
     }
 
@@ -670,7 +684,7 @@ public sealed class UnitConsoleViewModel : Screen
     {
         if (SelectedRow is not { } row) return Task.CompletedTask;
         var node = Tree.Find(row.Id);
-        if (node?.ParentId is not int parentId) { StatusText = $"'{row.Name}' 은 이미 최상위 부대입니다."; return Task.CompletedTask; }
+        if (node?.ParentId is not int parentId) { StatusText = $"'{row.Name}'은(는) 이미 최상위 부대입니다."; return Task.CompletedTask; }
 
         var grandParentId = Tree.Find(parentId)?.ParentId;
         return MoveAsync(row.Id, grandParentId, token);
@@ -688,7 +702,7 @@ public sealed class UnitConsoleViewModel : Screen
             if (UnitDropRules.CanMove(Tree, row.Id, candidate.Id).IsAllowed) return MoveAsync(row.Id, candidate.Id, token);
         }
 
-        StatusText = $"'{row.Name}' 을 받을 수 있는 상위 부대가 바로 위에 없습니다.";
+        StatusText = $"'{row.Name}'을(를) 받을 수 있는 상위 부대가 바로 위에 없습니다.";
         return Task.CompletedTask;
     }
     #endregion
@@ -701,7 +715,7 @@ public sealed class UnitConsoleViewModel : Screen
     public async Task ChangeAdjacencyAsync(int? add, int? remove, CancellationToken token = default)
     {
         if (SelectedRow is not { } row) return;
-        if (!CanEditUnits) { StatusText = "인접을 바꿀 권한이 없습니다(units:edit)."; return; }
+        if (!CanEditUnits) { StatusText = "인접 부대를 바꿀 권한이 없습니다."; return; }
         if (IsBusy) return;
 
         if (add is int addId)
@@ -717,38 +731,38 @@ public sealed class UnitConsoleViewModel : Screen
             var fresh = await _units.GetDetailAsync(row.Id, token).ConfigureAwait(true);
             if (!fresh.Success || fresh.Data is null)
             {
-                StatusText = $"인접을 바꾸기 전에 '{row.Name}' 을 다시 읽지 못했습니다 — 아무것도 보내지 않았습니다.";
+                StatusText = $"'{row.Name}' 정보를 다시 불러오지 못해 인접 부대를 바꾸지 않았습니다. 잠시 후 다시 시도하세요.";
                 return;
             }
 
             var current = fresh.Data.AdjacentUnitIds ?? new List<int>();
             var known = Form.AdjacentIds;
             if (!current.OrderBy(x => x).SequenceEqual(known.OrderBy(x => x)))
-                StatusText = $"'{row.Name}' 의 인접이 그 사이 바뀌었습니다 — 서버의 최신 목록에 이어서 보냅니다.";
+                StatusText = $"'{row.Name}'의 인접 부대가 그사이 바뀌어 최신 목록에 이어서 저장합니다.";
 
             var merged = UnitDropRules.MergeAdjacency(current, row.Id, add, remove);
             var response = await _units.PatchAsync(row.Id, UnitRequestBuilder.Adjacency(merged, row.Id), token).ConfigureAwait(true);
             if (!response.Success)
             {
-                StatusText = $"인접을 바꾸지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
+                StatusText = $"인접 부대를 바꾸지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
                 return;
             }
 
             var other = add ?? remove;
-            var otherName = other is int id ? Tree.Find(id)?.Name ?? $"#{id}" : string.Empty;
+            var otherName = other is int id ? Tree.Find(id)?.Name ?? $"부대 {id}번" : string.Empty;
             StatusText = add is not null
-                ? $"'{row.Name}' 과 '{otherName}' 을 인접으로 이었습니다 — 양방향으로 연결됩니다."
-                : $"'{row.Name}' 과 '{otherName}' 의 인접을 끊었습니다.";
+                ? $"'{row.Name}'과(와) '{otherName}'을(를) 인접 부대로 이었습니다. 양쪽에 함께 표시됩니다."
+                : $"'{row.Name}'과(와) '{otherName}'의 인접 관계를 끊었습니다.";
 
             IsBusy = false;
             await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
             await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
         }
-        catch (OperationCanceledException) { StatusText = "인접 변경을 취소했습니다."; }
+        catch (OperationCanceledException) { StatusText = "인접 부대 변경을 취소했습니다."; }
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] adjacency {row.Id}: {ex.Message}");
-            StatusText = "인접을 바꾸지 못했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"인접 부대를 바꾸지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -765,7 +779,7 @@ public sealed class UnitConsoleViewModel : Screen
             var response = await _units.DeleteAsync(row.Id, token).ConfigureAwait(true);
             if (response.Success)
             {
-                StatusText = $"'{row.Name}' 을 지웠습니다.";
+                StatusText = $"'{row.Name}'을(를) 삭제했습니다.";
                 DeleteBlock = null;
                 SelectedRow = null;
                 Form.Clear();
@@ -777,14 +791,14 @@ public sealed class UnitConsoleViewModel : Screen
 
             DeleteBlock = UnitRequestBuilder.ParseDeleteConflict(response.Error);
             StatusText = IsDeleteBlocked
-                ? $"'{row.Name}' 에 매달린 것이 있어 지울 수 없습니다 — 운용 중지를 쓰십시오."
-                : $"'{row.Name}' 을 지우지 못했습니다 — {Reason(response.Error?.Message, response.Message)}";
+                ? $"'{row.Name}'에 연결된 항목이 있어 삭제할 수 없습니다. 대신 [운용 중지]를 쓰세요."
+                : $"'{row.Name}'을(를) 삭제하지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
         }
         catch (OperationCanceledException) { StatusText = "삭제를 취소했습니다."; }
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] delete {row.Id}: {ex.Message}");
-            StatusText = "지우지 못했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"삭제하지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -799,8 +813,8 @@ public sealed class UnitConsoleViewModel : Screen
         {
             var response = await _units.PatchAsync(row.Id, new UnitUpdateDto { IsEnable = false }, token).ConfigureAwait(true);
             StatusText = response.Success
-                ? $"'{row.Name}' 을 운용 중지했습니다 — 이력과 소속은 그대로입니다."
-                : $"운용 중지에 실패했습니다 — {Reason(response.Error?.Message, response.Message)}";
+                ? $"'{row.Name}'을(를) 운용 중지했습니다. 이력과 소속은 그대로 남습니다."
+                : $"운용 중지하지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
             if (!response.Success) return;
 
             DeleteBlock = null;
@@ -812,7 +826,7 @@ public sealed class UnitConsoleViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] disable {row.Id}: {ex.Message}");
-            StatusText = "운용 중지에 실패했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"운용 중지하지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -828,7 +842,7 @@ public sealed class UnitConsoleViewModel : Screen
     public void QueueAssign(int targetUnitId, IReadOnlyList<UnitDeviceRowViewModel> devices)
     {
         if (Tree.Find(targetUnitId) is not { } target) return;
-        if (Tray.IsApplying) { StatusText = "적용 중에는 더 쌓을 수 없습니다."; return; }
+        if (Tray.IsApplying) { StatusText = "저장하는 중에는 대기 목록에 더 담을 수 없습니다."; return; }
 
         if (!CanPlaceDevices) { StatusText = UnitDropHandler.PlaceDeniedReason; return; }
 
@@ -849,8 +863,8 @@ public sealed class UnitConsoleViewModel : Screen
 
         var dropped = devices.Count - capped.Count;
         StatusText = dropped > 0
-            ? $"'{target.Name}' 에 {capped.Count}대를 쌓았습니다 — 한 번에 {MAX_ASSIGN_PER_APPLY}대까지만 보냅니다({dropped}대는 제외)."
-            : $"'{target.Name}' 에 {capped.Count}대를 쌓았습니다 — [적용] 때 {capped.Count}번 보냅니다.";
+            ? $"'{target.Name}'에 배치할 {capped.Count}대를 대기 목록에 담았습니다. 한 번에 {MAX_ASSIGN_PER_APPLY}대까지만 담을 수 있어 {dropped}대는 뺐습니다."
+            : $"'{target.Name}'에 배치할 {capped.Count}대를 대기 목록에 담았습니다 — [적용]을 누르면 저장됩니다.";
         RaiseTray();
     }
 
@@ -882,8 +896,8 @@ public sealed class UnitConsoleViewModel : Screen
         {
             var summary = await Tray.ApplyAsync(token).ConfigureAwait(true);
             var line = summary.ToMessage();
-            if (_assignFailure is not null) line += $" · 첫 실패에서 멈췄습니다 — {_assignFailure}";
-            if (_assignSkipped.Count > 0) line += $" · 앞선 실패로 보내지 않은 {_assignSkipped.Count}대는 트레이에 남아 있습니다(다시 [적용] 하면 그것만 보냅니다)";
+            if (_assignFailure is not null) line += $" · 처음 실패한 곳에서 멈췄습니다 — {_assignFailure}";
+            if (_assignSkipped.Count > 0) line += $" · 저장하지 않은 {_assignSkipped.Count}대는 대기 목록에 남아 있습니다([적용]을 다시 누르면 그것만 저장합니다)";
             StatusText = line;
 
             IsBusy = false;
@@ -893,7 +907,7 @@ public sealed class UnitConsoleViewModel : Screen
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] apply assigns: {ex.Message}");
-            StatusText = "배치에 실패했습니다 — 서버에 닿지 못했습니다.";
+            StatusText = $"배치하지 못했습니다. {UNREACHABLE}";
         }
         finally { IsBusy = false; RaiseTray(); RaiseCommands(); }
     }
@@ -902,7 +916,7 @@ public sealed class UnitConsoleViewModel : Screen
     {
         Tray.Revert();
         foreach (var row in DeviceRows) row.PendingUnitName = null;
-        StatusText = "쌓아 둔 배치를 버렸습니다 — 서버 호출 0.";
+        StatusText = "대기 목록을 비웠습니다.";
         RaiseTray();
     }
 
@@ -910,7 +924,7 @@ public sealed class UnitConsoleViewModel : Screen
     public void QueueAssignSelected()
     {
         var target = AssignTargetId;
-        if (target <= 0) { StatusText = "놓을 부대를 트리에서 고르거나 아래 콤보에서 고르십시오."; return; }
+        if (target <= 0) { StatusText = "놓을 부대를 트리나 아래 목록에서 고르세요."; return; }
         QueueAssign(target, SelectedDevices);
     }
     #endregion
@@ -945,7 +959,7 @@ public sealed class UnitConsoleViewModel : Screen
             catch (Exception ex)
             {
                 _log?.Error($"[UnitConsole] drop {request.ZoneKey}: {ex.Message}");
-                StatusText = "놓은 것을 처리하지 못했습니다.";
+                StatusText = "끌어 놓은 항목을 처리하지 못했습니다. 다시 시도하세요.";
             }
         });
     }
@@ -976,10 +990,22 @@ public sealed class UnitConsoleViewModel : Screen
         Project();
     }
 
-    private static string Reason(string? errorMessage, string? message)
-        => string.IsNullOrWhiteSpace(errorMessage)
-         ? (string.IsNullOrWhiteSpace(message) ? "서버가 거절했습니다." : message!)
-         : errorMessage!;
+    /// <summary>서버에 닿지 못했을 때 붙이는 말.</summary>
+    internal const string UNREACHABLE = "서버 연결을 확인하세요.";
+
+    /// <summary>서버가 거절했을 때 붙이는 말 — 서버 원문 대신 이 문장을 보인다.</summary>
+    internal const string REJECTED = "잠시 후 다시 시도하세요.";
+
+    /// <summary>
+    /// 서버 거절 사유. 원문(영문 코드 · 서버 메시지)은 <b>화면에 붙이지 않고</b> 로그로 보낸다(U-18 공통 규칙) —
+    /// 화면에는 운영자가 할 일을 담은 고정 문장만 남는다.
+    /// </summary>
+    private string Reason(string? errorMessage, string? message)
+    {
+        var raw = string.IsNullOrWhiteSpace(errorMessage) ? message : errorMessage;
+        if (!string.IsNullOrWhiteSpace(raw)) _log?.Warning($"[UnitConsole] 서버 거절 원문: {raw}");
+        return REJECTED;
+    }
 
     private void RaiseDetail()
     {
@@ -987,11 +1013,25 @@ public sealed class UnitConsoleViewModel : Screen
         RaiseCommands();
     }
 
+    private void SetRailCount(string key, int count)
+    {
+        var entry = RailEntries.FirstOrDefault(e => e.Key == key);
+        if (entry is not null) entry.Count = count;
+    }
+
     private void RaiseTray()
     {
         NotifyOfPropertyChange(nameof(Tray));
+        NotifyOfPropertyChange(nameof(TrayMessageText));
         RaiseCommands();
     }
+
+    /// <summary>
+    /// 배치 대기 목록의 안내 한 줄. 커널 트레이의 문구("Draft …")는 운영자 말이 아니라 여기서 따로 만든다(U-18 D-8 8.7).
+    /// </summary>
+    public string TrayMessageText => Tray.IsApplying
+        ? $"저장하는 중입니다… ({Tray.ProgressDone}/{Tray.ProgressTotal})"
+        : $"배치 대기 {Tray.Count}건 — [적용]을 누르면 저장됩니다.";
 
     private void RaiseViewFlags()
     {

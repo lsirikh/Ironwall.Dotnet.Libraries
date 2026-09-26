@@ -68,8 +68,9 @@ internal static class PreviewData
                              : new[] { "connection" };
                 camera.Axes = new DeviceAxesModel
                 {
-                    Connection = new ConnectionAxisModel { Type = "network", IpAddress = camera.IpAddress, IpPort = 80, Protocol = "onvif" },
+                    Connection = new ConnectionAxisModel { Type = "IP_DIRECT", IpAddress = camera.IpAddress, IpPort = 80, Protocol = "ONVIF" },
                     HardwareSpec = i == 1 ? new HardwareSpecModel { Manufacturer = "Hanwha", Model = "XNP-6400RW", Serial = "ZK1A7R0", Firmware = "2.21.04", MacAddress = "00:09:18:AA:BB:01", MaxDetectionRange = 250, OnvifVersion = "21.12" } : null,
+                    DeviceConfig = i == 1 ? new DeviceConfigModel { Modes = Newtonsoft.Json.Linq.JObject.Parse("{\"weather_mode\":\"FOG\",\"day_night_mode\":\"AUTO\",\"is_record\":true}") } : null,
                     Meta = new ResponseMeta("detail", sections),
                 };
             }
@@ -77,7 +78,31 @@ internal static class PreviewData
         }
 
         devices.Add(new SpeakerDeviceModel { Id = 301, DeviceNumber = 1, DeviceName = "정문 스피커", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true, DeviceGroups = new List<int> { 3 } });
-        devices.Add(new EnclosureDeviceModel { Id = 401, DeviceNumber = 1, DeviceName = "동측 함체 1", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true });
+        var enclosure = new EnclosureDeviceModel { Id = 401, DeviceNumber = 1, DeviceName = "동측 함체 1", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true, DoorStatus = "CLOSED", UnitId = isAxis ? 1 : null };
+        if (isAxis)
+        {
+            // 함체 1 — 부품(문 · 히터 · 팬) · 부품 상태 · 임계값 · 부품별 설정을 다 받은 모습(상세 아래쪽 절들을 눈으로 본다).
+            var spec = new HardwareSpecModel { Manufacturer = "Sensorway", Model = "ENC-200", Firmware = "1.4.0" };
+            spec.Components.Add(new ComponentDefinitionModel { Key = "door", Type = "DOOR_SENSOR", Channel = 1, Position = "전면" });
+            spec.Components.Add(new ComponentDefinitionModel { Key = "heater_1", Type = "HEATER" });
+            spec.Components.Add(new ComponentDefinitionModel { Key = "fan_1", Type = "FAN", InService = false });
+            var status = new DeviceStatusModel();
+            status.Components["door"] = new ComponentStatusModel { State = "CLOSED", Health = "OK", ObservedAt = "2026-09-27T09:12:00+09:00" };
+            status.Components["heater_1"] = new ComponentStatusModel { Health = "DEGRADED", FaultReason = "전류 낮음", ObservedAt = "2026-09-27T08:40:00+09:00" };
+            enclosure.Axes = new DeviceAxesModel
+            {
+                Connection = new ConnectionAxisModel { Type = "CONTROLLER_CONTACT", ParentDeviceId = 1, Channel = 3 },
+                HardwareSpec = spec,
+                DeviceStatus = status,
+                DeviceConfig = new DeviceConfigModel
+                {
+                    Thresholds = Newtonsoft.Json.Linq.JObject.Parse("{\"temperature\":{\"high\":45,\"low\":-15},\"humidity\":{\"high\":80}}"),
+                    ComponentOverrides = Newtonsoft.Json.Linq.JObject.Parse("{\"heater_1\":{\"enabled\":true}}"),
+                },
+                Meta = new ResponseMeta("full", new[] { "connection", "hardware_spec", "components", "device_status", "device_config" }),
+            };
+        }
+        devices.Add(enclosure);
         devices.Add(new EnclosureDeviceModel { Id = 402, DeviceNumber = 2, DeviceName = "동측 함체 2", Status = EnumDeviceStatus.ERROR, IsEnable = true });
         devices.Add(new LampDeviceModel { Id = 501, DeviceNumber = 1, DeviceName = "정문 경광등", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true });
         devices.Add(new GateDeviceModel { Id = 601, DeviceNumber = 1, DeviceName = "1통문", Status = EnumDeviceStatus.ACTIVATED, IsEnable = true });

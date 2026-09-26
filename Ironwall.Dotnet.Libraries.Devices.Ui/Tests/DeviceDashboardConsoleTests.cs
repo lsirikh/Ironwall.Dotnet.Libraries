@@ -321,7 +321,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         source.Finish();
 
         Assert.Contains("이름", console.Detail.LastMessage);
-        Assert.Contains("서버 값과 다르다", console.Detail.LastMessage);
+        Assert.Contains("값이 저장되지 않았습니다", console.Detail.LastMessage);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         source.Finish();                                      // 패널은 실패한 Draft(Id≤0)를 목록에 남긴다
 
         Assert.True(console.Detail.IsCreating);
-        Assert.Contains("등록되지 않았다", console.Detail.LastMessage);
+        Assert.Contains("등록하지 못했습니다", console.Detail.LastMessage);
     }
 
     [Fact]
@@ -357,7 +357,7 @@ public class DeviceDashboardConsoleTests : IDisposable
 
         Assert.False(console.Detail.IsCreating);
         Assert.Same(created, console.Form.Rows.Single());
-        Assert.Equal("등록했다", console.Detail.LastMessage);
+        Assert.Equal("등록했습니다.", console.Detail.LastMessage);
     }
 
     [Fact]
@@ -389,11 +389,11 @@ public class DeviceDashboardConsoleTests : IDisposable
         Assert.Single(source.Items);                           // 넣었던 Draft 를 도로 뺐다
         Assert.True(console.Detail.IsCreating);
         Assert.True(console.Detail.Tracker.IsDirty);           // 손댄 칸은 그대로
-        Assert.False(console.IsOperationRunning);              // 걸어 둔 일이 없다 — 다음 끝남이 "등록했다"로 읽히지 않는다
+        Assert.False(console.IsOperationRunning);              // 걸어 둔 일이 없다 — 다음 끝남이 "등록했습니다."로 읽히지 않는다
 
         source.Finish();
         Assert.True(console.Detail.IsCreating);
-        Assert.DoesNotContain("등록했다", console.Detail.LastMessage ?? string.Empty);
+        Assert.DoesNotContain("등록했습니다.", console.Detail.LastMessage ?? string.Empty);
     }
 
     [Fact]
@@ -425,7 +425,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         source.Finish();
 
         Assert.Same(survivor, console.Form.Rows.Single());
-        Assert.Contains("1건이 목록에서 사라졌다", console.Detail.LastMessage);
+        Assert.Contains("1대가 목록에서 사라졌습니다", console.Detail.LastMessage);
     }
 
     [Fact]

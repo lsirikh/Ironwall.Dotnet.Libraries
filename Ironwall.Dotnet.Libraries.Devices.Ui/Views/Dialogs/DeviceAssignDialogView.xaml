@@ -149,7 +149,7 @@
 				<drag:DragHandle
 					AutomationProperties.AutomationId="{Binding Id, StringFormat=Devices.Assign.Handle.{0}}"
 					DockPanel.Dock="Left"
-					ToolTip="끌어서 옮기기" />
+					ToolTip="끌어서 옮기세요" />
 				<TextBlock
 					Width="44"
 					Margin="8,0,0,0"
@@ -190,7 +190,7 @@
 				Content="되돌리기"
 				IsEnabled="{Binding CanRevert}"
 				Style="{StaticResource Assign.FooterButton}"
-				ToolTip="창을 연 상태로 되돌린다 (서버는 건드리지 않는다)" />
+				ToolTip="창을 처음 연 상태로 되돌립니다" />
 		</dlg:ConsoleDialogFrame.FooterExtra>
 
 		<!--  창이 작아지면 카드가 눌린다 — 높이를 고정하지 않고 목록이 제 안에서 스크롤하게 둔다(C8).  -->
@@ -256,14 +256,14 @@
 					Content="▶"
 					IsEnabled="{Binding CanAssignSelected}"
 					Style="{StaticResource Assign.MoveButton}"
-					ToolTip="고른 장비를 그룹에 넣는다 (왼쪽 목록에서 Enter)" />
+					ToolTip="선택한 장비를 그룹에 넣습니다 (왼쪽 목록에서 Enter)" />
 				<Button
 					AutomationProperties.AutomationId="Devices.Assign.MoveAllRight"
 					Click="OnMoveAllRight"
 					Content="▶▶"
 					IsEnabled="{Binding CanAssignAll}"
 					Style="{StaticResource Assign.MoveButton}"
-					ToolTip="후보를 모두 넣는다" />
+					ToolTip="후보를 모두 넣습니다" />
 				<Border
 					Height="1"
 					Margin="4,8"
@@ -274,14 +274,14 @@
 					Content="◀"
 					IsEnabled="{Binding CanUnassignSelected}"
 					Style="{StaticResource Assign.MoveButton}"
-					ToolTip="고른 장비를 그룹에서 뺀다 (오른쪽 목록에서 Delete)" />
+					ToolTip="선택한 장비를 그룹에서 뺍니다 (오른쪽 목록에서 Delete)" />
 				<Button
 					AutomationProperties.AutomationId="Devices.Assign.MoveAllLeft"
 					Click="OnMoveAllLeft"
 					Content="◀◀"
 					IsEnabled="{Binding CanUnassignAll}"
 					Style="{StaticResource Assign.MoveButton}"
-					ToolTip="배정을 모두 뺀다" />
+					ToolTip="배정된 장비를 모두 뺍니다" />
 			</StackPanel>
 
 			<!--  ── 오른쪽: 이 그룹 ──  -->

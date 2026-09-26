@@ -28,7 +28,7 @@
 		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Repeat"
 		IsPrimaryEnabled="{Binding CanExpand}"
-		Kind="규칙적인 부품을 한 번에 만든다"
+		Kind="규칙적인 부품을 한 번에 만듭니다"
 		PrimaryAutomationId="Devices.Assembly.Repeat.Expand"
 		PrimaryInvoked="OnExpand"
 		PrimaryText="펼치기"
@@ -60,7 +60,7 @@
 			</c:ConsoleField>
 			<c:ConsoleField
 				ApiName="key"
-				Header="key 규칙"
+				Header="식별 이름 규칙"
 				Note="{}{02d} = 두 자리 번호 · {d} = 그대로">
 				<TextBox
 					AutomationProperties.AutomationId="Devices.Assembly.Repeat.KeyFormat"

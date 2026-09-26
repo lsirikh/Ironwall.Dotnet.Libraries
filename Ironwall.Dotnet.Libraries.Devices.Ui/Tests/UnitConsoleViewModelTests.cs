@@ -190,7 +190,7 @@ public class UnitConsoleViewModelTests
         Assert.Equal(0, units.GraphReads);
         Assert.Equal(0, devices.Loads);
         Assert.Equal(0, console.Rows.Count);
-        Assert.Contains("부대 편제가 없습니다", console.StatusText);
+        Assert.Equal(UnitConsoleViewModel.NOT_SUPPORTED, console.StatusText);
         // 쓰기 입구도 전부 닫혀 있어야 한다 — 6.3 운영에서 새 요소가 하나도 보이지 않는 계약.
         Assert.False(console.CanAdd);
         Assert.False(console.CanReload);
@@ -243,7 +243,7 @@ public class UnitConsoleViewModelTests
 
         Assert.False(ok);
         Assert.Empty(units.Patches);
-        Assert.Contains("상위 제대", console.StatusText);
+        Assert.Contains("더 높은 제대", console.StatusText);
     }
 
     [Fact]
@@ -269,7 +269,9 @@ public class UnitConsoleViewModelTests
 
         Assert.False(ok);
         Assert.Equal(before + 1, units.GraphReads);         // 실패 복구 = 재조회
-        Assert.Contains("제대가 맞지 않습니다", console.StatusText);
+        // 서버 원문은 화면에 붙이지 않는다(U-18 공통 규칙) — 무엇이 안 됐는지와 할 일만 남는다.
+        Assert.DoesNotContain("제대가 맞지 않습니다", console.StatusText);
+        Assert.Contains("옮기지 못했습니다", console.StatusText);
         Assert.False(console.CanUndoMove);                  // 실패한 이동은 되돌릴 것이 없다
     }
 
@@ -351,7 +353,7 @@ public class UnitConsoleViewModelTests
         var verdict = console.Drop.Verdict(PayloadOf(Row(console, 6)), new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 8), -1));
 
         Assert.False(verdict.IsAllowed);
-        Assert.Contains("units:edit", verdict.Reason);
+        Assert.Equal(UnitConsoleViewModel.NO_EDIT_PERMISSION, verdict.Reason);
     }
 
     [Fact]
@@ -393,7 +395,7 @@ public class UnitConsoleViewModelTests
         // 5 는 트리에서도 후보라 허용된다 — 보낸 집합은 서버의 현재 값 + 새것이다.
         var sent = units.Patches.Single().Dto.AdjacentUnitIds;
         Assert.Equal(new[] { 5 }, sent);
-        Assert.Contains("양방향", console.StatusText);
+        Assert.Contains("인접 부대로 이었습니다", console.StatusText);
     }
 
     [Fact]
@@ -503,7 +505,7 @@ public class UnitConsoleViewModelTests
         await console.ApplyAssignsAsync();
 
         Assert.Single(devices.Assigns);                                  // 첫 실패에서 멈춘다 — 2·3 은 보내지 않았다
-        Assert.Contains("첫 실패에서 멈췄습니다", console.StatusText);
+        Assert.Contains("처음 실패한 곳에서 멈췄습니다", console.StatusText);
 
         // ★ 보내지 않은 것은 트레이에 남는다. 커널은 Skipped 를 목록에서 지우므로,
         //   "남겨 뒀다" 고 알리려면 멈춘 항목을 Failed 로 돌려주어야 한다.
@@ -539,7 +541,7 @@ public class UnitConsoleViewModelTests
         console.QueueAssign(6, console.DeviceRows.ToList());
 
         Assert.Equal(UnitConsoleViewModel.MAX_ASSIGN_PER_APPLY, console.Tray.Count);
-        Assert.Contains("제외", console.StatusText);
+        Assert.Contains("뺐습니다", console.StatusText);
     }
 
     [Fact]
@@ -654,7 +656,7 @@ public class UnitConsoleViewModelTests
         console.Drop.Drop(new object[] { Row(console, 6) },
                           new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 5), -1));
 
-        Assert.Contains("상위 제대", console.StatusText);         // 조용히 끝나지 않는다
+        Assert.Contains("더 높은 제대", console.StatusText);         // 조용히 끝나지 않는다
     }
 
     [Fact]
@@ -959,7 +961,7 @@ public class UnitConsoleViewModelTests
         Assert.Equal(0, units.GraphReads);                     // GET /api/units/graph 는 units:view — 403 왕복을 만들지 않는다
         Assert.Equal(0, devices.Loads);
         Assert.False(console.CanReload);
-        Assert.Contains("units:view", console.StatusText);
+        Assert.Equal("부대 편제를 볼 권한이 없습니다.", console.StatusText);
     }
 
     [Fact]
@@ -992,7 +994,7 @@ public class UnitConsoleViewModelTests
         Assert.True(console.CanEditUnits);
         Assert.False(console.CanAssignSelectedDevices);
         Assert.False(verdict.IsAllowed);
-        Assert.Contains("devices:edit", verdict.Reason);
+        Assert.Equal(UnitDropHandler.PlaceDeniedReason, verdict.Reason);
     }
     #endregion
 }

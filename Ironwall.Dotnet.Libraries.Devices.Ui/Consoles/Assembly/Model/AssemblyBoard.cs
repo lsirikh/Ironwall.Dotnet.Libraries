@@ -332,7 +332,7 @@ public sealed class AssemblyBoard
             {
                 var format = AssemblyKeyRules.ValidateFormat(slot.Key);
                 if (format is null) continue;
-                problems.Add(string.IsNullOrWhiteSpace(slot.Key) ? format : $"key '{slot.Key}' 는 쓸 수 없다 — {format}");
+                problems.Add(string.IsNullOrWhiteSpace(slot.Key) ? format : $"식별 이름 '{slot.Key}'은(는) 쓸 수 없습니다 — {format}");
             }
 
             foreach (var group in Slots.Where(s => AssemblyKeyRules.ValidateFormat(s.Key) is null)
@@ -345,8 +345,8 @@ public sealed class AssemblyBoard
             foreach (var code in Slots.Select(s => s.TypeCode).Distinct(StringComparer.Ordinal))
             {
                 var info = Lookup(code);
-                if (info is null) problems.Add($"'{code}' 는 카탈로그에 없는 유형이다");
-                else if (!info.AppliesToCategory(Category)) problems.Add($"'{code}' 은 이 카테고리에 달 수 없다");
+                if (info is null) problems.Add($"'{code}'은(는) 목록에 없는 부품 유형입니다.");
+                else if (!info.AppliesToCategory(Category)) problems.Add($"'{code}'은(는) 이 카테고리에 달 수 없습니다.");
             }
 
             return problems;
@@ -489,7 +489,7 @@ public sealed class AssemblyBoard
     private static string DuplicateMessage(string key, int count)
     {
         var times = count switch { 2 => "두 번", 3 => "세 번", _ => $"{count}번" };
-        return $"key '{key}' 가 {times} 쓰였다";
+        return $"식별 이름 '{key}'이(가) {times} 쓰였습니다.";
     }
 
     private void Attach(AssemblySlot slot) => slot.PropertyChanged += OnSlotPropertyChanged;

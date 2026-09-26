@@ -47,9 +47,9 @@ public class DeviceEnumDisplayTests
     [Theory]
     [InlineData("OK", "정상")]
     [InlineData("ok", "정상")]        // 대소문자 무관
-    [InlineData("DEGRADED", "주의")]
+    [InlineData("DEGRADED", "저하")]
     [InlineData("FAULT", "고장")]
-    [InlineData("UNKNOWN", "미확인")]
+    [InlineData("UNKNOWN", "미상")]
     public void should_map_korean_when_component_health_is_known(string health, string korean)
         => Assert.Equal(korean, DeviceEnumDisplay.ComponentHealthKorean(health));
 
@@ -58,11 +58,11 @@ public class DeviceEnumDisplayTests
     [InlineData("")]
     [InlineData("   ")]
     public void should_return_unknown_text_when_component_health_is_empty(string? health)
-        => Assert.Equal("미확인", DeviceEnumDisplay.ComponentHealthKorean(health));
+        => Assert.Equal("미상", DeviceEnumDisplay.ComponentHealthKorean(health));
 
     [Fact]
-    public void should_preserve_original_when_component_health_is_not_in_vocabulary()
-        => Assert.Equal("WEIRD", DeviceEnumDisplay.ComponentHealthKorean("WEIRD"));
+    public void should_show_unknown_instead_of_raw_code_when_component_health_is_not_in_vocabulary()
+        => Assert.Equal(DeviceEnumDisplay.UnknownValue, DeviceEnumDisplay.ComponentHealthKorean("WEIRD"));
 
     [Fact]
     public void should_build_bilingual_display_when_korean_differs_from_code()
@@ -82,7 +82,7 @@ public class DeviceEnumDisplayTests
 
     [Fact]
     public void should_build_enum_bilingual_display_for_clr_enum_combo()
-        => Assert.Equal("카메라 (IpCamera)", DeviceEnumDisplay.EnumBilingual(EnumDeviceType.IpCamera));
+        => Assert.Equal("카메라", DeviceEnumDisplay.EnumBilingual(EnumDeviceType.IpCamera));
 
     [Theory]
     [InlineData("Fence", "펜스센서 (Fence)")]

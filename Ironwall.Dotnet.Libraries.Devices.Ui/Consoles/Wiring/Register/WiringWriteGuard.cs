@@ -18,7 +18,7 @@ internal static class WiringWriteGuard
 {
     /// <summary>사람에게 보일 한 줄 — 왜 아무 일도 일어나지 않았는지가 문장에 들어 있어야 한다.</summary>
     internal const string LEGACY_CONTRACT_MESSAGE =
-        "이 서버 판본(6.3)에는 결선을 담을 자리가 없습니다 — 아무것도 보내지 않았습니다.";
+        "현재 서버에서는 결선을 저장할 수 없습니다. 저장하지 않았습니다.";
 
     /// <summary>축 계약(7.0+)이 아니면 <c>true</c>.</summary>
     internal static bool IsBlocked(DeviceQueryPolicy policy) => !policy.IsAxisContract;

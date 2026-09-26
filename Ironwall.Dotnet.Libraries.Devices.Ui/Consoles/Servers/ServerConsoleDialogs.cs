@@ -43,10 +43,18 @@ public sealed class ServerMetricHistoryViewModel : Screen
 
     public ObservableCollection<ServerMetricHistoryRow> Rows { get; }
 
-    /// <summary>이력 화면이 늘 달고 있는 한 줄 — 왜 배지가 없는지 화면이 스스로 말한다.</summary>
-    public string Note => "지난 계측은 다시 판정하지 않습니다 — 임계 배지를 그리지 않습니다.";
+    /// <summary>
+    /// 이력 화면 머리 줄. 운영자에게 설계 메모("다시 판정하지 않는다")를 보이지 않는다(U-18 감사 D-7 7.11) —
+    /// 빈 글자면 뷰가 줄을 접는다.
+    /// </summary>
+    public string Note => string.Empty;
 
-    public string EmptyText { get; private set; } = "불러오는 중입니다…";
+    /// <summary>불러오는 중 · 기록 없음 · 불러오기 실패를 <b>서로 다른 문장</b>으로 말한다.</summary>
+    public string EmptyText { get; private set; } = LoadingText;
+
+    public const string LoadingText = "불러오는 중입니다…";
+    public const string NoRecordsText = "계측 기록이 없습니다.";
+    public const string LoadFailedText = "지표 이력을 불러오지 못했습니다. 잠시 후 창을 다시 여세요.";
 
     public bool IsEmpty => Rows.Count == 0;
 
@@ -54,11 +62,15 @@ public sealed class ServerMetricHistoryViewModel : Screen
     {
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
 
+        // null = 불러오지 못함(서비스가 원문을 로그에 남겼다) · 빈 목록 = 기록이 없음.
         var metrics = await _service.MetricHistoryAsync(_serverId, 50, cancellationToken).ConfigureAwait(true);
         Rows.Clear();
-        foreach (var row in ServerMetricBand.History(metrics, _clock)) Rows.Add(row);
+        if (metrics is not null)
+            foreach (var row in ServerMetricBand.History(metrics, _clock)) Rows.Add(row);
 
-        EmptyText = Rows.Count == 0 ? "받은 계측이 없습니다 — 보고 없음" : string.Empty;
+        EmptyText = metrics is null ? LoadFailedText
+                  : Rows.Count == 0 ? NoRecordsText
+                  : string.Empty;
         NotifyOfPropertyChange(nameof(EmptyText));
         NotifyOfPropertyChange(nameof(IsEmpty));
     }

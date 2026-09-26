@@ -43,7 +43,7 @@ public sealed class UnitDropHandler : IDragDropHandler
     private readonly Func<bool> _canPlaceDevices;
 
     /// <summary>장비 배치가 막힌 까닭 — 배치는 장비 쓰기(<c>PATCH /api/devices/…</c>)라 <c>devices:edit</c> 다.</summary>
-    public const string PlaceDeniedReason = "장비를 부대에 둘 권한이 없습니다(devices:edit).";
+    public const string PlaceDeniedReason = "장비를 부대에 배치할 권한이 없습니다.";
 
     /// <param name="canEdit">부대 쓰기(<c>units:edit</c>) — 상위 바꾸기 · 인접.</param>
     /// <param name="canPlaceDevices">장비 배치(<c>devices:edit</c>). 생략하면 <paramref name="canEdit"/> 를 따른다.</param>
@@ -99,7 +99,7 @@ public sealed class UnitDropHandler : IDragDropHandler
     public UnitDropVerdict Verdict(IReadOnlyList<object>? items, DropTarget? target)
     {
         if (items == null || target == null) return UnitDropVerdict.Block("끌어 온 것이 없습니다.");
-        if (_isBusy()) return UnitDropVerdict.Block("앞선 작업이 아직 끝나지 않았습니다.");
+        if (_isBusy()) return UnitDropVerdict.Block("앞선 작업이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요.");
 
         var tree = _tree();
         var units = UnitsOf(items);
@@ -108,7 +108,7 @@ public sealed class UnitDropHandler : IDragDropHandler
         // 서버가 지키는 모듈이 다르다 — 장비를 두는 것은 devices:edit, 부대를 옮기고 잇는 것은 units:edit.
         var placingDevices = target.ZoneKey == UnitDropRules.ZONE_PARENT && devices.Count > 0;
         if (placingDevices && !_canPlaceDevices()) return UnitDropVerdict.Block(PlaceDeniedReason);
-        if (!placingDevices && !_canEdit()) return UnitDropVerdict.Block("부대를 바꿀 권한이 없습니다(units:edit).");
+        if (!placingDevices && !_canEdit()) return UnitDropVerdict.Block(UnitConsoleViewModel.NO_EDIT_PERMISSION);
 
         switch (target.ZoneKey)
         {
@@ -131,7 +131,7 @@ public sealed class UnitDropHandler : IDragDropHandler
             case UnitDropRules.ZONE_ADJACENCY:
             {
                 var selfId = _selectedUnitId();
-                if (selfId <= 0) return UnitDropVerdict.Block("먼저 부대를 고르십시오.");
+                if (selfId <= 0) return UnitDropVerdict.Block("먼저 부대를 고르세요.");
                 if (units.Count != 1) return UnitDropVerdict.Block("부대 한 개만 인접으로 이을 수 있습니다.");
                 return UnitDropRules.CanAdjoin(tree, units[0].Id, selfId);
             }

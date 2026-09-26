@@ -171,8 +171,8 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
 
     /// <summary>코드 칸 밑에 붙는 한 줄 — 등록에서는 경고, 그 뒤로는 불변 사실.</summary>
     public string CodeNote => IsCreating
-        ? "이 값은 나중에 바꿀 수 없습니다 — 바꾸면 그 부대 구독자가 메시지를 잃습니다."
-        : "등록 뒤 바꿀 수 없습니다(NATS subject 의 두 번째 토큰).";
+        ? "등록 후에는 바꿀 수 없습니다. 신중히 입력하세요."
+        : "등록 후에는 바꿀 수 없습니다.";
 
     public string AdjacencyCountText => AdjacencyChips.Count == 0 ? string.Empty : AdjacencyChips.Count.ToString();
     public string DescriptionCounter => $"{_description.Length} / {UnitRules.DESCRIPTION_MAX_LENGTH}";
@@ -314,7 +314,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
             .ToList();
 
         if (conflicting.Count > 0)
-            ChildEchelonWarning = $"하위 부대 {conflicting.Count}개({string.Join(" · ", conflicting.Take(3))})가 이 제대 아래에 올 수 없습니다 — 서버가 거절합니다.";
+            ChildEchelonWarning = $"하위 부대 {conflicting.Count}개({string.Join(" · ", conflicting.Take(3))})는 이 제대 아래에 둘 수 없어 저장되지 않습니다.";
 
         RaiseWarning();
     }

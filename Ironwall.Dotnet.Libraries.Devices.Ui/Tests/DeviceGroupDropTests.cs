@@ -41,7 +41,7 @@ public class DeviceGroupDropTests
         var plan = DeviceGroupDrop.Plan(9, new[] { Lamp(1, 9), Lamp(2, 9) });
 
         Assert.False(plan.CanSend);
-        Assert.Equal("이미 이 그룹에 들어 있다", plan.BlockReason);
+        Assert.Equal("이미 이 그룹에 들어 있습니다.", plan.BlockReason);
     }
 
     [Fact]
@@ -76,9 +76,9 @@ public class DeviceGroupDropTests
 
         var line = DeviceGroupDrop.ResultLine("동측", plan, assigned: new[] { 1 }, skipped: new[] { 2 });
 
-        Assert.Contains("'동측' 에 1대", line);
-        Assert.Contains("건너뛰었다", line);
-        Assert.Contains("이미 들어 있던 1대", line);
+        Assert.Contains("'동측'에 1대를 넣었습니다", line);
+        Assert.Contains("1대는 넣지 못했습니다", line);
+        Assert.Contains("1대는 이미 들어 있어 건너뛰었습니다", line);
         Assert.Contains("저장 전 1대", line);
     }
 

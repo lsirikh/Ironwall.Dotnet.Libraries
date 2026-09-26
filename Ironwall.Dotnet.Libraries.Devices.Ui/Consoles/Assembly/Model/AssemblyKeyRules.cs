@@ -67,8 +67,8 @@ public static class AssemblyKeyRules
     /// <summary>형식 검사. null = 통과.</summary>
     public static string? ValidateFormat(string? key)
     {
-        if (string.IsNullOrWhiteSpace(key)) return "key 가 비어 있다";
-        return _pattern.IsMatch(key) ? null : "key 는 소문자로 시작하고 소문자 · 숫자 · 밑줄만 쓴다";
+        if (string.IsNullOrWhiteSpace(key)) return "식별 이름을 입력하세요.";
+        return _pattern.IsMatch(key) ? null : "식별 이름은 영문 소문자로 시작하고 영문 소문자 · 숫자 · 밑줄(_)만 쓸 수 있습니다.";
     }
 
     /// <summary>

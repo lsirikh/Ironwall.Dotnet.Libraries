@@ -59,7 +59,8 @@ public sealed class ServerRowViewModel : PropertyChangedBase, IServerRailItem, I
         StatusGlyph = ServerStatusRules.StatusGlyph(Status);
         LastChangeText = ServerStatusRules.LastChangeText(view, contract, clock);
         LastEditText = ServerStatusRules.LastEditText(view, clock);
-        UnitText = unitName ?? (view.UnitId is { } unitId ? $"#{unitId}" : "—");
+        // 이름을 모르는 부대는 "#7" 같은 기호 대신 말로 적는다(U-18 D-7 7.12).
+        UnitText = unitName ?? (view.UnitId is { } unitId ? $"부대 {unitId}번" : "—");
     }
 
     public ServerAxisView View { get; }

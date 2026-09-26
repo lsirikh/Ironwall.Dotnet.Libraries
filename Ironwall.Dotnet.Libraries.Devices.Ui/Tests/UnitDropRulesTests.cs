@@ -57,7 +57,7 @@ public class UnitDropRulesTests
         var verdict = UnitDropRules.CanMove(Tree(), moving, target);
 
         Assert.False(verdict.IsAllowed);
-        Assert.Contains("상위 제대", verdict.Reason);
+        Assert.Contains("더 높은 제대", verdict.Reason);
     }
 
     [Fact]

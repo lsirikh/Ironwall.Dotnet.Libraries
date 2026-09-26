@@ -67,7 +67,7 @@
 		<StackPanel Visibility="{Binding IsSingle, Converter={StaticResource BooleanToVisibilityConverter}}">
 			<!--  ② 접속 축  -->
 			<StackPanel Orientation="Horizontal">
-				<TextBlock Style="{StaticResource AxisTitle}" Text="접속 (connection)" />
+				<TextBlock Style="{StaticResource AxisTitle}" Text="접속 정보" />
 				<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
 			</StackPanel>
 			<ContentControl
@@ -78,7 +78,7 @@
 
 			<!--  ③ 형상 축  -->
 			<StackPanel Orientation="Horizontal">
-				<TextBlock Style="{StaticResource AxisTitle}" Text="형상 (hardware_spec)" />
+				<TextBlock Style="{StaticResource AxisTitle}" Text="하드웨어 정보" />
 				<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
 			</StackPanel>
 			<ContentControl
@@ -89,7 +89,7 @@
 
 			<!--  ④ 부품  -->
 			<StackPanel Orientation="Horizontal">
-				<TextBlock Style="{StaticResource AxisTitle}" Text="부품 (components)" />
+				<TextBlock Style="{StaticResource AxisTitle}" Text="부품" />
 				<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
 			</StackPanel>
 			<ContentControl
@@ -120,7 +120,7 @@
 
 			<!--  ⑤ 상태(관측)  -->
 			<StackPanel Orientation="Horizontal">
-				<TextBlock Style="{StaticResource AxisTitle}" Text="상태 (device_status)" />
+				<TextBlock Style="{StaticResource AxisTitle}" Text="부품 상태" />
 				<TextBlock Style="{StaticResource AxisReadOnlyTag}" />
 			</StackPanel>
 			<ContentControl

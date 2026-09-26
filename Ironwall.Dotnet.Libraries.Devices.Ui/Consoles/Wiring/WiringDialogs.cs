@@ -163,7 +163,7 @@ public sealed class MakeSensorsViewModel : Screen
     public string Summary => HasError ? Error!
         : HasConflict && SkipConflicts ? $"{MakeCount}줄을 만듭니다 — 이미 있는 번호 {ConflictCount}줄은 건너뜁니다."
         : HasConflict ? $"이미 있는 번호 {ConflictCount}줄이 있습니다 — 건너뛰기를 켜거나 시작 번호를 바꾸세요."
-        : $"{MakeCount}줄을 Draft 로 만듭니다 — [저장하기] 를 눌러야 서버에 갑니다.";
+        : $"{MakeCount}줄을 추가합니다 — [저장하기]를 눌러야 저장됩니다.";
 
     public bool CanMake => !HasError && MakeCount > 0 && (SkipConflicts || !HasConflict);
 

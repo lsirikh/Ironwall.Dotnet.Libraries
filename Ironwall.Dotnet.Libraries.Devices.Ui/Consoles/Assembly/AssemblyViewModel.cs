@@ -122,7 +122,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
         if (!_board.IsDirty || _closeWithoutAsking) return true;
-        return await _dialogs.ConfirmAsync("조립기 닫기", $"미저장 변경 {_board.UnsavedChangeCount}건이 있다. 버리고 닫을까?");
+        return await _dialogs.ConfirmAsync("조립기 닫기", $"저장하지 않은 변경 {_board.UnsavedChangeCount}건이 있습니다. 버리고 닫을까요?");
     }
 
     private void OnCatalogChanged(object? sender, EventArgs e) => Execute.BeginOnUIThread(() =>
@@ -180,8 +180,8 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public bool IsPaletteEmpty => Palette.Count == 0;
 
     public string PaletteEmptyText => !_catalog.IsLoaded
-        ? "부품 카탈로그를 읽지 못했다 — 서버 판본이 7.0 미만이거나 연결이 끊겼다"
-        : "이 카테고리에 달 수 있는 부품이 없다";
+        ? "부품 목록을 불러오지 못했습니다. 서버 연결을 확인하세요."
+        : "이 카테고리에 달 수 있는 부품이 없습니다.";
 
     private void RebuildPalette()
     {
@@ -270,7 +270,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     {
         if (item is null || IsBusy) return;
         var slot = _board.Add(item.Code);
-        StatusText = slot is null ? $"'{item.Label}' 은(는) 이 카테고리에 달 수 없다" : $"'{item.Label}' 을(를) 달았다 — key {slot.Key}";
+        StatusText = slot is null ? $"'{item.Label}'은(는) 이 카테고리에 달 수 없습니다." : $"'{item.Label}'을(를) 추가했습니다({slot.Key}).";
         if (slot is not null) SelectOnly(slot);
     }
 
@@ -281,7 +281,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         var slots = BoardItems.Where(i => i.IsSelected).Select(i => i.Slot).ToList();
         if (slots.Count == 0 || IsBusy) return;
         _board.Remove(slots);
-        StatusText = $"{slots.Count}개를 뺐다 — [되돌리기] 로 도로 넣을 수 있다";
+        StatusText = $"{slots.Count}개를 뺐습니다 — [되돌리기]로 다시 넣을 수 있습니다.";
     }
 
     public bool CanUndo => _board.CanUndo && !IsBusy;
@@ -290,7 +290,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     {
         if (!CanUndo) return;
         _board.Undo();
-        StatusText = "되돌렸다";
+        StatusText = "되돌렸습니다.";
     }
 
     public bool CanRenumberChannels => BoardItems.Any(i => i.Slot.Channel.HasValue) && !IsBusy;
@@ -299,7 +299,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     {
         if (!CanRenumberChannels) return;
         _board.RenumberChannels(1);
-        StatusText = "채널을 보드 순서대로 1번부터 다시 매겼다";
+        StatusText = "채널을 보드 순서대로 1번부터 다시 매겼습니다.";
     }
 
     public async Task RepeatExpandAsync()
@@ -311,7 +311,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         if (spec is null) return;
 
         var added = _board.Expand(spec);
-        StatusText = added.Count == 0 ? "펼치지 못했다 — key 가 겹치거나 규칙이 틀렸다" : $"{added.Count}개를 펼쳤다";
+        StatusText = added.Count == 0 ? "펼치지 못했습니다. 식별 이름이 겹치거나 규칙이 올바르지 않습니다." : $"{added.Count}개를 펼쳤습니다.";
     }
 
     private void SelectOnly(AssemblySlot slot)
@@ -349,7 +349,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         {
             var removed = payload.Items.OfType<BoardSlotViewModel>().Select(i => i.Slot).ToList();
             _board.Remove(removed);
-            StatusText = $"{removed.Count}개를 뺐다 — [되돌리기] 로 도로 넣을 수 있다";
+            StatusText = $"{removed.Count}개를 뺐습니다 — [되돌리기]로 다시 넣을 수 있습니다.";
             return;
         }
 
@@ -385,8 +385,8 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public string CatalogCommands => AssemblyPalette.Join(_inspected?.Info?.Commands ?? Array.Empty<string>());
     public string CatalogProduces => AssemblyPalette.Join(_inspected?.Info?.Produces ?? Array.Empty<string>());
     public string CatalogNote => _inspected?.Info is null
-        ? "카탈로그에 없는 유형이다 — 등록 · 적용할 수 없다"
-        : _inspected.Info.ReportsState ? "이 유형은 동작 상태를 보고한다" : "이 유형은 상태를 보고하지 않는다 — 건강(health)만 온다";
+        ? "목록에 없는 부품 유형입니다. 등록하거나 적용할 수 없습니다."
+        : _inspected.Info.ReportsState ? "이 유형은 동작 상태를 보고합니다." : "이 유형은 동작 상태를 보고하지 않고 정상 · 고장 여부만 보고합니다.";
 
     private void Inspect(BoardSlotViewModel? item)
     {
@@ -424,11 +424,11 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public async Task LoadPresetAsync(DevicePreset? preset)
     {
         if (preset is null || IsBusy || preset.Category != _category) return;
-        if (_board.Slots.Count > 0 && !await _dialogs.ConfirmAsync("프리셋 올리기", $"보드의 부품 {_board.Slots.Count}개를 '{preset.Name}' 의 부품으로 바꾼다. [되돌리기] 로 돌아올 수 있다."))
+        if (_board.Slots.Count > 0 && !await _dialogs.ConfirmAsync("프리셋 올리기", $"보드의 부품 {_board.Slots.Count}개를 '{preset.Name}'의 부품으로 바꿀까요? [되돌리기]로 돌아올 수 있습니다."))
             return;
 
         _board.ReplaceAll(preset.Components, preset.ComponentOverrides);
-        StatusText = $"'{preset.Name}' 을(를) 보드에 올렸다";
+        StatusText = $"'{preset.Name}'을(를) 보드에 올렸습니다.";
     }
 
     public bool CanSaveAsPreset => !_board.HasErrors && _board.Slots.Count > 0 && CanWritePresets && !IsBusy;
@@ -443,7 +443,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
         var preset = BuildPreset(editing?.Id ?? DevicePresetStore.NewId(), name!.Trim(), editing);
         var result = _presets.Save(preset);
-        StatusText = result.IsSuccess ? $"프리셋 '{preset.Name}' 을(를) 저장했다" : result.Message ?? "프리셋을 저장하지 못했다";
+        StatusText = result.IsSuccess ? $"프리셋 '{preset.Name}'을(를) 저장했습니다." : result.Message ?? "프리셋을 저장하지 못했습니다.";
         if (!result.IsSuccess) return;
 
         if (Mode == AssemblyMode.EditPreset) EditingPreset = _presets.Find(preset.Id) ?? preset;
@@ -521,9 +521,9 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
     public string PrimaryHint => Mode switch
     {
-        AssemblyMode.EditDevice => "다시 받아 비교한 뒤 PATCH 1건",
-        AssemblyMode.EditPreset => "이 컴퓨터의 프리셋 파일에 저장",
-        _ => "개체 정보만 넣으면 POST 1건",
+        AssemblyMode.EditDevice => "저장 전에 최신 상태와 비교합니다",
+        AssemblyMode.EditPreset => "이 PC의 프리셋에 저장합니다",
+        _ => "번호 · 이름만 입력하면 한 번에 등록됩니다",
     };
 
     public bool CanCommit => !IsBusy && !_board.HasErrors && Mode switch
@@ -535,8 +535,8 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
     public string? CommitBlockedReason => IsBusy ? "처리 중입니다."
         : _board.HasErrors ? _board.Problems.FirstOrDefault()
-        : Mode == AssemblyMode.Compose ? (_board.Slots.Count == 0 ? "보드에 부품을 먼저 단다" : null)
-        : !_board.IsDirty ? "바뀐 것이 없다"
+        : Mode == AssemblyMode.Compose ? (_board.Slots.Count == 0 ? "보드에 부품을 먼저 다세요." : null)
+        : !_board.IsDirty ? NoChangeText
         : Mode == AssemblyMode.EditPreset && !CanWritePresets ? _presets.StateMessage
         : null;
 
@@ -575,11 +575,11 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         get
         {
             var diff = _board.Diff();
-            if (diff.IsEmpty) return "바뀐 것이 없다";
+            if (diff.IsEmpty) return NoChangeText;
             var lines = new List<string>();
-            if (diff.Added.Count > 0) lines.Add($"더함 {diff.Added.Count}: {string.Join(", ", diff.Added.Select(e => e.Key))}");
-            if (diff.Removed.Count > 0) lines.Add($"뺌 {diff.Removed.Count}: {string.Join(", ", diff.Removed.Select(e => e.Key))} — 이 부품의 관측 기록이 함께 삭제된다");
-            if (diff.Changed.Count > 0) lines.Add($"고침 {diff.Changed.Count}: {string.Join(", ", diff.Changed.Select(e => $"{e.Key}({string.Join("/", e.ChangedFields)})"))}");
+            if (diff.Added.Count > 0) lines.Add($"추가 {diff.Added.Count}개: {string.Join(", ", diff.Added.Select(e => e.Key))}");
+            if (diff.Removed.Count > 0) lines.Add($"제거 {diff.Removed.Count}개: {string.Join(", ", diff.Removed.Select(e => e.Key))} (이 부품의 상태 기록도 함께 지워집니다)");
+            if (diff.Changed.Count > 0) lines.Add($"변경 {diff.Changed.Count}개: {string.Join(", ", diff.Changed.Select(e => $"{e.Key}({string.Join("/", e.ChangedFields.Select(FieldLabel))})"))}");
             return string.Join(Environment.NewLine, lines);
         }
     }
@@ -587,7 +587,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     private async Task ApplyToDeviceAsync()
     {
         if (_applyService is null || EditingDevice is null) return;
-        if (!await _dialogs.ConfirmAsync("부품 구성 적용", DiffSummary + Environment.NewLine + Environment.NewLine + "서버는 부품 배열을 통째로 바꾼다. 보내기 직전에 장비를 다시 받아 그 사이 바뀌지 않았는지 확인한다."))
+        if (!await _dialogs.ConfirmAsync("부품 구성 적용", DiffSummary + Environment.NewLine + Environment.NewLine + "부품 구성을 저장할까요? 저장하기 전에 그사이 장비가 바뀌지 않았는지 확인합니다."))
             return;
 
         IsBusy = true;
@@ -605,7 +605,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             }
             else if (result.IsConflict)
             {
-                StatusText = result.Message + " — 조립기를 닫고 다시 연다(그 사이의 변경을 덮어쓰지 않는다)";
+                StatusText = result.Message;
             }
         }
         finally { IsBusy = false; }
@@ -634,7 +634,29 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     };
 
     public string FooterText => $"부품 {_board.Slots.Count} · 미저장 변경 {_board.UnsavedChangeCount}";
-    public string FooterNote => "저장 전에는 서버에 아무것도 보내지 않습니다";
+    public string FooterNote => "저장하기 전에는 아무것도 바뀌지 않습니다";
+
+    /// <summary>바뀐 것이 없을 때의 한 줄.</summary>
+    public const string NoChangeText = "바뀐 내용이 없습니다.";
+
+    /// <summary>부품 칸 이름(와이어 키) → 화면 글. 모르는 칸은 그대로 둔다(부품 식별 이름처럼 사람이 정한 말이 아니다).</summary>
+    internal static string FieldLabel(string field) => field switch
+    {
+        "key" => "식별 이름",
+        "type" => "유형",
+        "label" => "이름",
+        "channel" => "채널",
+        "position" => "위치",
+        "in_service" => "가동",
+        "manufacturer" => "제조사",
+        "model" => "모델",
+        "serial" => "일련번호",
+        "firmware" => "펌웨어",
+        "hardware_rev" => "하드웨어 버전",
+        "spec" => "세부 사양",
+        "overrides" => "부품 설정",
+        _ => field,
+    };
     public IReadOnlyList<string> Problems => _board.Problems;
     public bool HasProblems => _board.Problems.Count > 0;
 

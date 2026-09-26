@@ -80,7 +80,6 @@ public class ServerRailCounterTests
     {
         ServerTypeCatalog.AllKey, ServerTypeCatalog.ProxyKey, ServerTypeCatalog.NvrKey,
         ServerTypeCatalog.SpeakerKey, ServerTypeCatalog.EnclosureKey, ServerTypeCatalog.EtcKey,
-        ServerTypeCatalog.SystemEventsKey,
     };
 
     [Fact]
@@ -135,7 +134,8 @@ public class ServerRailCounterTests
             new RailItem(ServerTypeCatalog.SystemEventsKey, ServerStatusKind.Normal),
         });
 
-        Assert.Equal(0, counts.Single(c => c.Key == ServerTypeCatalog.SystemEventsKey).Total);
+        // 시스템 이벤트 칸은 레일에 없다(U-18 D-7 7.1) — 그 키를 단 행은 "기타" 로 센다.
+        Assert.DoesNotContain(counts, c => c.Key == ServerTypeCatalog.SystemEventsKey);
         Assert.Equal(1, counts.Single(c => c.Key == ServerTypeCatalog.EtcKey).Total);
     }
 
@@ -204,14 +204,25 @@ public class ServerTypeCatalogTests
     }
 
     [Fact]
-    public void should_keep_the_storyboard_rail_order_when_rail_built()
+    public void should_keep_the_storyboard_rail_order_without_system_events_when_rail_built()
     {
+        // 시스템 이벤트 칸은 서버 입구가 생길 때까지 숨긴다(U-18 D-7 7.1) — 선언만 따로 남는다.
         Assert.Equal(
-            new[] { "all", "proxy", "nvr", "speaker", "enclosure", "etc", "system-events" },
+            new[] { "all", "proxy", "nvr", "speaker", "enclosure", "etc" },
             ServerTypeCatalog.RailOrder.Select(r => r.Key));
 
-        Assert.False(ServerTypeCatalog.RailOrder.Single(r => r.Key == ServerTypeCatalog.SystemEventsKey).ShowCount);
-        Assert.True(ServerTypeCatalog.RailOrder.Single(r => r.Key == ServerTypeCatalog.SystemEventsKey).HasSeparatorAbove);
+        Assert.Null(ServerTypeCatalog.SpecOf(ServerTypeCatalog.SystemEventsKey));
+        Assert.False(ServerTypeCatalog.SystemEventsSpec.ShowCount);
+        Assert.True(ServerTypeCatalog.SystemEventsSpec.HasSeparatorAbove);
+    }
+
+    [Fact]
+    public void should_show_korean_rail_labels_when_rail_built()
+    {
+        // 레일에 영문 "PROXY" 를 섞지 않는다(U-18 D-7 7.7).
+        Assert.Equal("프록시", ServerTypeCatalog.SpecOf(ServerTypeCatalog.ProxyKey)!.Label);
+        Assert.Equal("프록시", ServerTypeCatalog.TypeLabel(EnumServerType.PROXY));
+        Assert.DoesNotContain(ServerTypeCatalog.RailOrder, r => r.Label == "PROXY");
     }
 }
 
@@ -270,7 +281,8 @@ public class ServerStatusRulesTests
         var view = AxisViews.Legacy("NORMAL", hasStatusKey: true, updatedAt: "2026-09-20T09:04:30+09:00");
 
         Assert.Equal("—", ServerStatusRules.LastChangeText(view, EnumServerContract.V6_3, Clock));
-        Assert.Contains("전이 시각이 없습니다", ServerStatusRules.NoTransitionClockNote);
+        Assert.Contains("상태가 바뀐 시각을 제공하지 않습니다", ServerStatusRules.NoTransitionClockNote);
+        Assert.DoesNotContain("6.3", ServerStatusRules.NoTransitionClockNote);
     }
 
     [Fact]

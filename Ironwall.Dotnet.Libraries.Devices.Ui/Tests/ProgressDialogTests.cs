@@ -68,7 +68,7 @@ public class ProgressDialogViewModelTests
 
         vm.Finish();
 
-        Assert.Equal("중단 — 7건 완료", vm.Message);
+        Assert.Equal("중단했습니다 — 7건 완료", vm.Message);
         Assert.True(vm.IsDone);
         Assert.Equal("닫기", vm.PrimaryText);
         Assert.Equal(string.Empty, vm.SecondaryText);      // 끝난 뒤에는 취소할 것이 없다
@@ -82,7 +82,7 @@ public class ProgressDialogViewModelTests
 
         vm.Finish();
 
-        Assert.Equal("끝 — 16건 완료", vm.Message);
+        Assert.Equal("완료했습니다 — 16건", vm.Message);
         Assert.True(vm.IsClosable);
     }
 
@@ -109,6 +109,6 @@ public class ProgressDialogViewModelTests
         vm.RequestCancel();
 
         Assert.False(vm.IsCancelRequested);
-        Assert.Equal("끝 — 16건 완료", vm.Message);
+        Assert.Equal("완료했습니다 — 16건", vm.Message);
     }
 }

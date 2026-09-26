@@ -178,7 +178,8 @@ public class DevicePresetStoreTests : IDisposable
 
         Assert.Equal(PresetStoreState.ReadOnlyNewerSchema, store.State);
         Assert.True(store.IsReadOnly);
-        Assert.Contains("schema 3", store.StateMessage);
+        Assert.Contains("새 버전", store.StateMessage);
+        Assert.DoesNotContain("schema", store.StateMessage);
         Assert.Single(store.Presets);
 
         var exported = Path.Combine(_dir, "exported.json");
@@ -687,7 +688,7 @@ public class DevicePresetStoreTests : IDisposable
         var kept = Assert.Single(store.Presets);
         Assert.Equal("아는 것", kept.Name);
         Assert.Contains("2", store.StateMessage);
-        Assert.Contains("건너뛰었다", store.StateMessage);
+        Assert.Contains("건너뛰었습니다", store.StateMessage);
     }
 
     /// <summary>
@@ -725,7 +726,7 @@ public class DevicePresetStoreTests : IDisposable
 
         var store = NewStore();
         store.Load();
-        Assert.Contains("건너뛰었다", store.StateMessage);
+        Assert.Contains("건너뛰었습니다", store.StateMessage);
 
         Assert.True(store.Save(BuildPreset("새로 만든 것", EnumDeviceCategory.Lamp)).IsSuccess);
 

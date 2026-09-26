@@ -64,7 +64,7 @@ public static class DeviceColumnCatalog
     public static IReadOnlyList<DeviceColumnSpec> ForGroups() => new[]
     {
         new DeviceColumnSpec("name", "이름", nameof(DeviceGroupViewModel.Name), DeviceColumnKind.Text, IsDefault: true, Width: 0),
-        new DeviceColumnSpec("description", "설명", nameof(DeviceGroupViewModel.Description), DeviceColumnKind.Text, IsDefault: true, Width: 220),
+        new DeviceColumnSpec("description", "설명", nameof(DeviceGroupViewModel.DescriptionDisplay), DeviceColumnKind.Text, IsDefault: true, Width: 220),
         new DeviceColumnSpec("count", "장비수", nameof(DeviceGroupViewModel.DeviceCount), DeviceColumnKind.Mono, IsDefault: true, Width: 90),
     };
 
@@ -146,7 +146,7 @@ public static class DeviceColumnCatalog
         })
         .ToArray();
 
-    private static IReadOnlyList<DeviceColumnSpec> Gate() => Base(DoorColumn(nameof(GateDeviceViewModel.DoorPosition))).ToArray();
+    private static IReadOnlyList<DeviceColumnSpec> Gate() => Base(DoorColumn(nameof(GateDeviceViewModel.DoorPositionDisplay))).ToArray();
 
     /// <summary>기본 6열(4번째 자리는 카테고리마다 다른 <paramref name="fifth"/>) + 공통 선택 열.</summary>
     private static IEnumerable<DeviceColumnSpec> Base(DeviceColumnSpec fifth) =>

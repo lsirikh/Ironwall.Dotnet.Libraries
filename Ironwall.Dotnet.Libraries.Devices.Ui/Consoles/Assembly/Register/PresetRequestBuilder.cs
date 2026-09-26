@@ -61,13 +61,13 @@ public static class PresetRequestBuilder
         var problems = new List<string>();
 
         if (string.IsNullOrWhiteSpace(info.DeviceName))
-            problems.Add("장비 이름을 입력해야 합니다.");
+            problems.Add("장비 이름을 입력하세요.");
 
         if (info.DeviceNumber < 1)
-            problems.Add("장비 번호는 1 이상이어야 합니다.");
+            problems.Add("장비 번호는 1 이상으로 입력하세요.");
 
         if (preset.Category == EnumDeviceCategory.Sensor && (info.Controller == null || info.Controller.Id <= 0))
-            problems.Add("센서는 소속 제어기를 지정해야 합니다(제어기 없이 등록하면 서버가 404 로 거절합니다).");
+            problems.Add("센서는 소속 제어기를 고르세요.");
 
         // 포트는 "그 카테고리가 접속 칸을 보낼 때만" 본다 — 접속 축이 아예 없는 카테고리(통문 — 결선은
         // link_info/channel 이지 PresetInstanceInfo.IpPort 가 아니다)는 BuildCategoryDto 가 이 값을 쓰지 않으므로
@@ -75,7 +75,7 @@ public static class PresetRequestBuilder
         // 직접 부르는 호출자에게는 "검사를 통과했다"가 "전달된다"를 뜻하지 않는 거짓 안전감을 준다).
         // (D-21 수정) 센서·스피커·함체도 서버 ConnectionAxis 를 실제로 받는다 — "접속 축이 없다"는 결함이었다.
         if (HasConnectionAxis(preset.Category) && info.IpPort is { } port && (port < 1 || port > 65535))
-            problems.Add($"접속 포트({port})는 1~65535 범위여야 합니다.");
+            problems.Add($"접속 포트({port})는 1~65535 사이로 입력하세요.");
 
         var loaded = catalog is { IsLoaded: true };
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -86,9 +86,9 @@ public static class PresetRequestBuilder
 
             var key = component.Key ?? string.Empty;
             if (!ComponentKeyPattern.IsMatch(key))
-                problems.Add($"부품 key '{key}' 는 형식이 올바르지 않습니다 — ^[a-z][a-z0-9_]*$ 만 받습니다.");
+                problems.Add($"부품 식별 이름 '{key}'의 형식이 올바르지 않습니다. 영문 소문자로 시작하고 영문 소문자 · 숫자 · 밑줄(_)만 쓸 수 있습니다.");
             else if (!seen.Add(key))
-                problems.Add($"부품 key '{key}' 가 중복입니다 — 한 장비 안에서 유일해야 합니다.");
+                problems.Add($"부품 식별 이름 '{key}'이(가) 겹칩니다. 한 장비 안에서 서로 달라야 합니다.");
 
             var type = component.Type;
             if (string.IsNullOrWhiteSpace(type))
@@ -99,19 +99,19 @@ public static class PresetRequestBuilder
             {
                 var info2 = catalog.Find(type);
                 if (info2 == null)
-                    problems.Add($"부품 유형 '{type}' 이(가) 카탈로그에 없습니다 — 프리셋을 고쳐야 등록할 수 있습니다.");
+                    problems.Add($"부품 유형 '{type}'이(가) 목록에 없습니다. 프리셋을 고쳐야 등록할 수 있습니다.");
                 else if (!info2.AppliesToCategory(preset.Category))
                     problems.Add($"부품 유형 '{type}' 은(는) {CategoryText(preset.Category)} 에 달 수 없습니다.");
             }
 
             // 유형 공통 사실 8개 — 부품 칸에 섞여 있으면 첫 POST 가 422 로 죽는다(AS L213-215).
             foreach (var forbidden in ForbiddenOnComponent(component.Spec))
-                problems.Add($"부품 '{key}' 에 유형 공통 사실 '{forbidden}' 이(가) 들어 있습니다 — 요청에 실으면 422 입니다.");
+                problems.Add($"부품 '{key}'에 유형이 정하는 값('{forbidden}')이 들어 있어 등록할 수 없습니다. 프리셋을 고치세요.");
         }
 
         // component_overrides 의 enabled 는 정상이다(같은 낱말이 부품 칸에서는 금지 · 재정의 칸에서는 정본).
         foreach (var (overrideKey, forbidden) in ForbiddenInOverrides(preset.ComponentOverrides))
-            problems.Add($"재정의 '{overrideKey}' 에 유형 공통 사실 '{forbidden}' 이(가) 들어 있습니다 — 요청에 실으면 422 입니다.");
+            problems.Add($"부품 설정 '{overrideKey}'에 유형이 정하는 값('{forbidden}')이 들어 있어 등록할 수 없습니다. 프리셋을 고치세요.");
 
         return problems;
     }

@@ -108,21 +108,25 @@
 								Click="OnOpenAssembly"
 								Content="조립기"
 								Style="{StaticResource Console.Button}"
-								ToolTip="부품을 끌어 조립해 장비를 만들거나 프리셋으로 굳힌다" />
+								ToolTip="부품을 조립해 장비를 만들거나 프리셋으로 저장합니다" />
 							<Button
 								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.RegisterFromPreset"
 								Click="OnRegisterFromPreset"
 								Content="프리셋으로 등록"
 								Style="{StaticResource Console.Button}"
-								ToolTip="프리셋을 고르고 번호 · 이름 · 접속만 넣으면 부품까지 한 번에 등록된다" />
+								ToolTip="프리셋을 고르고 번호 · 이름 · 접속만 넣으면 부품까지 한 번에 등록합니다" />
 							<Button
 								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Presets"
 								Click="OnManagePresets"
-								Content="프리셋…"
-								Style="{StaticResource Console.Button.Ghost}" />
-							<!--  셋업 · 결선(N-04) — 제어기 한 대를 골랐을 때만 눌린다  -->
+								Content="프리셋 관리"
+								Style="{StaticResource Console.Button}"
+								ToolTip="저장한 프리셋을 보고 이름을 바꾸거나 지웁니다" />
+							<!--
+								셋업 · 결선(N-04) — 제어기 목록에서만 보인다(다른 레일에서는 늘 꺼진 채 자리만 차지해 툴바 끝을 잘랐다).
+								제어기 한 대를 골랐을 때만 눌리고, 아니면 툴팁이 까닭을 말한다. 폭이 모자라면 커널 툴바가 Extra 묶음을 [⋯] 로 옮긴다.
+							-->
 							<Button
 								AutomationProperties.AutomationId="Console.Devices.Toolbar.Wiring"
 								Click="OnOpenWiring"
@@ -130,7 +134,8 @@
 								IsEnabled="{Binding CanOpenWiring}"
 								Style="{StaticResource Console.Button}"
 								ToolTip="{Binding WiringBlockedReason}"
-								ToolTipService.ShowOnDisabled="True" />
+								ToolTipService.ShowOnDisabled="True"
+								Visibility="{Binding IsWiringVisible, Converter={StaticResource BoolToVisibility}}" />
 						</StackPanel>
 						</StackPanel>
 					</c:ConsoleToolbar.Extra>
@@ -178,9 +183,9 @@
 								VerticalAlignment="Center"
 								AutomationProperties.AutomationId="Devices.Dashboard.ProbeBanner.Text"
 								Foreground="{DynamicResource TextPrimaryBrush}"
-								TextWrapping="Wrap">
-								<Run Text="서버 판본을 확인하지 못했습니다 — 옛 화면(" /><Run Text="{Binding ContractGate.ContractText, Mode=OneWay}" /><Run Text=")으로 표시 중입니다. 서버가 새 판본이면 장비 목록이 비어 보일 수 있습니다." />
-							</TextBlock>
+								Text="서버 버전을 확인하지 못해 기본 화면으로 표시합니다. 목록이 비어 보이면 [다시 확인]을 누르세요."
+								TextWrapping="Wrap"
+								ToolTip="{Binding ContractGate.ContractText, Mode=OneWay}" />
 						</DockPanel>
 					</Border>
 
@@ -197,6 +202,15 @@
 						<DataGrid.RowStyle>
 							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">
 								<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Devices.Row.{0}}" />
+								<!--  화면 낭독기가 형식 이름 대신 장비 이름(그룹이면 그룹 이름)을 읽게 한다  -->
+								<Setter Property="AutomationProperties.Name">
+									<Setter.Value>
+										<PriorityBinding>
+											<Binding Path="DeviceName" />
+											<Binding Path="Name" />
+										</PriorityBinding>
+									</Setter.Value>
+								</Setter>
 							</Style>
 						</DataGrid.RowStyle>
 						<b:Interaction.Behaviors>
@@ -205,9 +219,19 @@
 								DisplayMemberPath="DeviceName"
 								Handler="{Binding GroupDrop}"
 								IsDragEnabled="{Binding CanDragToGroup}"
-								KeyboardFallback="행을 고른 뒤 아래 그룹 칩을 누른다" />
+								KeyboardFallback="행을 고른 뒤 아래 그룹 칩을 누르세요" />
 						</b:Interaction.Behaviors>
 					</DataGrid>
+
+					<!--  빈 목록 — 무엇이 비었고 무엇을 하면 되는지(커널 ConsoleEmptyState). 첫 읽기 중에는 띄우지 않는다.  -->
+					<c:ConsoleEmptyState
+						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Devices.Empty"
+						Glyph="M4,6 H20 M4,12 H20 M4,18 H14"
+						Hint="{Binding EmptyHint}"
+						IsHitTestVisible="False"
+						Title="{Binding EmptyTitle}"
+						Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVisibility}}" />
 
 					<!--  부품으로 찾기 — 축 계약에서만 레일에 나온다  -->
 					<ContentControl
@@ -251,7 +275,8 @@
 								FontSize="12"
 								Foreground="{DynamicResource TextSecondaryBrush}"
 								Text="{Binding StatusText}"
-								TextTrimming="CharacterEllipsis" />
+								TextTrimming="CharacterEllipsis"
+								ToolTip="{Binding StatusText}" />
 							<TextBlock
 								VerticalAlignment="Center"
 								AutomationProperties.AutomationId="Console.Devices.Status.Count"
@@ -278,7 +303,7 @@
 									VerticalAlignment="Center"
 									FontSize="12"
 									Foreground="{DynamicResource TextMutedBrush}"
-									Text="그룹이 없다 — 레일의 '그룹' 에서 먼저 만든다">
+									Text="그룹이 없습니다 — 왼쪽 '그룹'에서 먼저 만드세요">
 									<TextBlock.Style>
 										<Style TargetType="TextBlock">
 											<Setter Property="Visibility" Value="Collapsed" />
@@ -290,12 +315,17 @@
 										</Style>
 									</TextBlock.Style>
 								</TextBlock>
+								<!--  칩은 한 줄로 두고 넘치면 가로로 굴린다 — 그룹이 많아도 상태 띠가 두세 줄로 불어 목록을 밀어 올리지 않는다  -->
+								<ScrollViewer
+									Focusable="False"
+									HorizontalScrollBarVisibility="Auto"
+									VerticalScrollBarVisibility="Disabled">
 								<ItemsControl
 									Focusable="False"
 									ItemsSource="{Binding GroupChips}">
 									<ItemsControl.ItemsPanel>
 										<ItemsPanelTemplate>
-											<WrapPanel />
+											<StackPanel Orientation="Horizontal" />
 										</ItemsPanelTemplate>
 									</ItemsControl.ItemsPanel>
 									<ItemsControl.ItemTemplate>
@@ -315,7 +345,8 @@
 													Click="OnGroupChipClick"
 													Cursor="Hand"
 													Style="{x:Null}"
-													ToolTip="고른 장비를 이 그룹에 넣는다 — 목록의 핸들을 끌어 놓아도 된다">
+													AutomationProperties.Name="{Binding Name}"
+													ToolTip="선택한 장비를 이 그룹에 넣습니다 (행 손잡이를 끌어 놓아도 됩니다)">
 													<Button.Template>
 														<ControlTemplate TargetType="Button">
 															<Border Style="{StaticResource GroupChip}">
@@ -330,6 +361,7 @@
 										</DataTemplate>
 									</ItemsControl.ItemTemplate>
 								</ItemsControl>
+								</ScrollViewer>
 							</Grid>
 						</DockPanel>
 					</StackPanel>
@@ -357,6 +389,17 @@
 					ShowWidthTools="{Binding IsDetailDocked, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}}"
 					Title="{Binding Detail.Title}">
 					<StackPanel>
+						<!--  카메라 상세보기(6.3 서버) — 카메라 설정 · 링크 창. 7.0 이상은 같은 값을 아래 칸에서 바로 고친다  -->
+						<Button
+							Margin="0,6,0,0"
+							HorizontalAlignment="Left"
+							AutomationProperties.AutomationId="Console.Devices.Detail.CameraDetail"
+							Click="OnOpenCameraDetail"
+							Content="상세보기"
+							IsEnabled="{Binding CanOpenCameraDetail}"
+							Style="{StaticResource Console.Button}"
+							ToolTip="카메라 설정과 링크를 확인하고 바꿉니다"
+							Visibility="{Binding IsCameraDetailVisible, Converter={StaticResource BoolToVisibility}}" />
 						<!--  부품은 폼에서 못 고친다(서버가 배열을 통째로 바꾼다) — 조립기로 보낸다  -->
 						<Button
 							Margin="0,6,0,0"

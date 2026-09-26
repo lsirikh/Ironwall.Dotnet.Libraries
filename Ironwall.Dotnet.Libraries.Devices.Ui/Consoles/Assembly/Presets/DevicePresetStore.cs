@@ -147,7 +147,7 @@ public sealed class DevicePresetStore
             }
             catch (Exception ex) when (IsIoFailure(ex))
             {
-                Unavailable($"프리셋 파일을 읽지 못했다 — {ex.Message}");
+                Unavailable(Plain("프리셋 파일을 읽지 못했습니다. 파일이 다른 프로그램에서 열려 있는지 확인하세요.", ex));
                 return;
             }
 
@@ -167,14 +167,14 @@ public sealed class DevicePresetStore
             // 건너뛴 줄은 세고 알리되 버리지 않는다 — 다음 저장에서 원문 그대로 되쓴다.
             _unknownEntries.AddRange(skippedEntries);
 
-            var skippedNote = skipped > 0 ? $"프리셋 {skipped}건은 모르는 카테고리라 건너뛰었다" : null;
+            var skippedNote = skipped > 0 ? $"프리셋 {skipped}건은 알 수 없는 카테고리라 건너뛰었습니다." : null;
 
             if (file.Schema > CurrentSchema)
             {
                 _presets.AddRange(presets);
                 Publish();
                 State = PresetStoreState.ReadOnlyNewerSchema;
-                StateMessage = Join($"프리셋 파일이 더 새 판(schema {file.Schema})이다 — 읽기 전용으로 열었다", skippedNote);
+                StateMessage = Join("프리셋 파일이 이 프로그램보다 새 버전에서 만들어져 읽기 전용으로 열었습니다.", skippedNote);
                 return;
             }
 
@@ -191,7 +191,7 @@ public sealed class DevicePresetStore
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            Unavailable($"프리셋 파일을 열지 못했다 — {ex.Message}");
+            Unavailable(Plain("프리셋 파일을 열지 못했습니다. 파일이 다른 프로그램에서 열려 있는지 확인하세요.", ex));
         }
     }
 
@@ -205,12 +205,12 @@ public sealed class DevicePresetStore
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            Unavailable($"프리셋 파일이 깨졌는데 옮기지도 못했다 — {ex.Message}");
+            Unavailable(Plain("프리셋 파일이 손상되었고 다른 이름으로 옮기지도 못했습니다.", ex));
             return;
         }
 
         SeedAndWrite(PresetStoreState.RecoveredFromCorruption,
-                     $"프리셋 파일이 깨져 있어 '{movedName}' 로 옮겼다");
+                     $"프리셋 파일이 손상되어 '{movedName}'(으)로 옮기고 본보기 프리셋으로 새로 시작했습니다.");
     }
 
     private string MoveAside()
@@ -237,7 +237,7 @@ public sealed class DevicePresetStore
         var error = Persist();
         if (error is not null)
         {
-            Unavailable(Join(note, $"본보기 프리셋을 쓰지 못했다 — {error}"));
+            Unavailable(Join(note, "본보기 프리셋을 저장하지 못했습니다."));
             return;
         }
 
@@ -278,9 +278,9 @@ public sealed class DevicePresetStore
     /// </remarks>
     public PresetStoreResult Save(DevicePreset preset)
     {
-        if (preset is null) return Fail("저장할 프리셋이 없다.");
+        if (preset is null) return Fail("저장할 프리셋이 없습니다.");
         if (IsReadOnly) return Fail(ReadOnlyReason("저장할"));
-        if (string.IsNullOrWhiteSpace(preset.Id)) return Fail("프리셋에 식별자가 없다.");
+        if (string.IsNullOrWhiteSpace(preset.Id)) return Fail("프리셋을 식별할 수 없습니다.");
 
         var clean = DevicePresetSanitizer.Sanitize(preset);
         var invalid = ValidateName(clean.Name, clean.Category, clean.Id);
@@ -301,7 +301,7 @@ public sealed class DevicePresetStore
         if (IsReadOnly) return Fail(ReadOnlyReason("이름을 바꿀"));
 
         var index = IndexOf(id);
-        if (index < 0) return Fail("그 프리셋이 없다.");
+        if (index < 0) return Fail(NotFoundText);
 
         var name = (newName ?? string.Empty).Trim();
         var invalid = ValidateName(name, _presets[index].Category, _presets[index].Id);
@@ -319,7 +319,7 @@ public sealed class DevicePresetStore
         if (IsReadOnly) return Fail(ReadOnlyReason("복제할"));
 
         var source = Find(id);
-        if (source is null) return Fail("그 프리셋이 없다.");
+        if (source is null) return Fail(NotFoundText);
 
         var backup = Snapshot();
         var record = DevicePresetSanitizer.Sanitize(source) with
@@ -341,7 +341,7 @@ public sealed class DevicePresetStore
         if (IsReadOnly) return Fail(ReadOnlyReason("삭제할"));
 
         var index = IndexOf(id);
-        if (index < 0) return Fail("그 프리셋이 없다.");
+        if (index < 0) return Fail(NotFoundText);
 
         var backup = Snapshot();
         _presets.RemoveAt(index);
@@ -380,10 +380,10 @@ public sealed class DevicePresetStore
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            return Fail($"프리셋을 내보내지 못했다 — {ex.Message}");
+            return Fail(Plain("프리셋을 내보내지 못했습니다. 저장 위치를 확인하세요.", ex));
         }
 
-        return new PresetStoreResult(true, $"프리셋 {list.Count}건을 내보냈다.");
+        return new PresetStoreResult(true, $"프리셋 {list.Count}건을 내보냈습니다.");
     }
 
     /// <summary>
@@ -394,7 +394,7 @@ public sealed class DevicePresetStore
     {
         if (IsReadOnly) return Fail(ReadOnlyReason("가져올"));
         if (!TryFullPath(filePath, out var source, out var reason)) return Fail(reason!);
-        if (!File.Exists(source)) return Fail("가져올 파일이 없다.");
+        if (!File.Exists(source)) return Fail("가져올 파일이 없습니다.");
 
         DevicePresetFile file;
         try
@@ -403,15 +403,15 @@ public sealed class DevicePresetStore
         }
         catch (Exception ex) when (ex is JsonException or ArgumentException or FormatException)
         {
-            return Fail("가져올 파일이 깨져 있어 아무것도 가져오지 않았다.");
+            return Fail("가져올 파일이 손상되어 아무것도 가져오지 않았습니다.");
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            return Fail($"가져올 파일을 읽지 못했다 — {ex.Message}");
+            return Fail(Plain("가져올 파일을 읽지 못했습니다. 파일이 다른 프로그램에서 열려 있는지 확인하세요.", ex));
         }
 
         if (file.Schema > CurrentSchema)
-            return Fail($"가져올 파일이 더 새 판(schema {file.Schema})이라 가져오지 않았다.");
+            return Fail("가져올 파일이 이 프로그램보다 새 버전에서 만들어져 가져오지 않았습니다.");
 
         var incoming = file.ToPresets(out var skippedCategory);
         var backup = Snapshot();
@@ -443,14 +443,14 @@ public sealed class DevicePresetStore
             imported++;
         }
 
-        var note = $"프리셋 {imported}건을 가져왔다.";
+        var note = $"프리셋 {imported}건을 가져왔습니다.";
         if (renamed > 0)
         {
             var suffix = firstRenamed is null ? "(2)" : SuffixOf(firstRenamed);
-            note += $" 가져온 {imported}건 중 {renamed}건은 같은 이름이 있어 '{suffix}' 를 붙였다.";
+            note += $" 가져온 {imported}건 중 {renamed}건은 같은 이름이 있어 '{suffix}'를 붙였습니다.";
         }
-        if (skippedCategory > 0) note += $" {skippedCategory}건은 모르는 카테고리라 건너뛰었다.";
-        if (skippedName > 0) note += $" {skippedName}건은 이름이 없어 건너뛰었다.";
+        if (skippedCategory > 0) note += $" {skippedCategory}건은 알 수 없는 카테고리라 건너뛰었습니다.";
+        if (skippedName > 0) note += $" {skippedName}건은 이름이 없어 건너뛰었습니다.";
 
         if (imported == 0)
         {
@@ -476,7 +476,8 @@ public sealed class DevicePresetStore
         if (error is not null)
         {
             Restore(backup);
-            return Fail($"프리셋을 저장하지 못했다 — {error}");
+            System.Diagnostics.Debug.WriteLine($"[DevicePresetStore] 저장 실패: {error}");
+            return Fail("프리셋을 저장하지 못했습니다. 파일이 다른 프로그램에서 열려 있는지 확인하세요.");
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
@@ -536,8 +537,18 @@ public sealed class DevicePresetStore
 
     private string ReadOnlyReason(string action)
         => State == PresetStoreState.ReadOnlyNewerSchema
-            ? $"프리셋 파일이 더 새 판이라 {action} 수 없다."
-            : $"프리셋 파일을 다룰 수 없어 {action} 수 없다.";
+            ? $"프리셋 파일이 이 프로그램보다 새 버전에서 만들어져 {action} 수 없습니다."
+            : $"프리셋 파일을 사용할 수 없어 {action} 수 없습니다.";
+
+    /// <summary>찾는 프리셋이 없을 때.</summary>
+    private const string NotFoundText = "그 프리셋이 없습니다.";
+
+    /// <summary>예외 원문은 화면 문장에 붙이지 않는다 — 진단 출력으로만 보낸다(U-18 공통 규칙).</summary>
+    private static string Plain(string text, Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"[DevicePresetStore] {text} — {ex.Message}");
+        return text;
+    }
 
     private int IndexOf(string? id)
         => string.IsNullOrWhiteSpace(id)
@@ -547,9 +558,9 @@ public sealed class DevicePresetStore
     private string? ValidateName(string? name, EnumDeviceCategory category, string id)
     {
         var text = (name ?? string.Empty).Trim();
-        if (text.Length == 0) return "프리셋 이름이 비어 있다.";
-        if (text.Length > MaxNameLength) return $"프리셋 이름이 {MaxNameLength}자를 넘는다.";
-        if (NameTaken(category, text, id)) return "같은 카테고리에 같은 이름의 프리셋이 이미 있다.";
+        if (text.Length == 0) return "프리셋 이름을 입력하세요.";
+        if (text.Length > MaxNameLength) return $"프리셋 이름은 {MaxNameLength}자까지 쓸 수 있습니다.";
+        if (NameTaken(category, text, id)) return "같은 카테고리에 같은 이름의 프리셋이 이미 있습니다.";
         return null;
     }
 
@@ -631,7 +642,7 @@ public sealed class DevicePresetStore
         reason = null;
         if (string.IsNullOrWhiteSpace(path))
         {
-            reason = "파일 경로가 비어 있다.";
+            reason = "파일 경로를 입력하세요.";
             return false;
         }
 
@@ -642,7 +653,7 @@ public sealed class DevicePresetStore
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            reason = $"쓸 수 없는 파일 경로다 — {ex.Message}";
+            reason = Plain("쓸 수 없는 파일 경로입니다.", ex);
             return false;
         }
     }

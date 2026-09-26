@@ -38,7 +38,7 @@
 		BodyScroll="Disabled"
 		DialogKey="Devices.Wiring.Make"
 		IsPrimaryEnabled="{Binding CanMake}"
-		Kind="규칙은 한 번만 정하면 전부에 들어갑니다 — 만든 줄은 저장 전까지 Draft"
+		Kind="규칙은 모든 줄에 적용됩니다 — [저장하기]를 눌러야 저장됩니다"
 		PrimaryAutomationId="Devices.Wiring.Make.Accept"
 		PrimaryInvoked="OnAccept"
 		PrimaryText="만들기"

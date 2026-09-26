@@ -244,7 +244,7 @@ public class WiringReviewTests
 
         Assert.Equal(1, gateway.ListCount);            // 번호로 되찾아 본다
         Assert.True(vm.HasSaveResults);                 // 못 찾았으면 실패로 남긴다
-        Assert.Contains("번호 확인 필요", vm.SaveResults[0].Message);
+        Assert.Contains("확인 필요", vm.SaveResults[0].Message);
     }
 
     [Fact]

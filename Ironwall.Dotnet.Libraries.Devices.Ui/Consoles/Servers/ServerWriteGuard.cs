@@ -37,13 +37,13 @@ internal static class ServerWriteGuard
 
     /// <summary>프록시 설정 창이 사라진 판본에서 "설정" 절에 적는 한 줄(스토리보드 L1361).</summary>
     internal const string PROXY_ABSORBED_NOTE =
-        "프록시 설정 창은 없어졌습니다(410) — 운용 모드는 이 서버의 server_config 로 옮겨졌습니다.";
+        "운용 모드는 [설정 수정]에서 바꿉니다.";
 
     /// <summary>부대 축이 없는 판본에서 "소속 부대" 절에 적는 한 줄.</summary>
     internal const string UNIT_NOT_IN_CONTRACT_NOTE =
-        "이 서버 판본에는 부대 편제가 없습니다(8.0 이상에서만).";
+        "현재 서버는 부대 편제를 지원하지 않습니다.";
 
     /// <summary>상태는 이 콘솔이 쓰지 않는다 — 어디서든 같은 문장을 쓴다.</summary>
     internal const string STATUS_IS_OBSERVED_NOTE =
-        "상태는 관측 값입니다 — 서버 매니저가 보고합니다. 이 화면에서는 고칠 수 없습니다.";
+        "상태는 서버가 스스로 보고합니다. 이 화면에서는 바꿀 수 없습니다.";
 }

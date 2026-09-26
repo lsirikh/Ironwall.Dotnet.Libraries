@@ -109,7 +109,7 @@ public sealed class ComponentApplyService
             }
 
             if (id <= 0)
-                return new ComponentApplyResult(false, false, "아직 서버에 없는 장비입니다 — 먼저 등록해야 부품을 바꿀 수 있습니다.");
+                return new ComponentApplyResult(false, false, "아직 등록되지 않은 장비입니다. 먼저 등록해야 부품을 바꿀 수 있습니다.");
 
             var (fetched, fetchMessage) = await RefetchAsync(category, id, token).ConfigureAwait(false);
             if (fetched == null) return new ComponentApplyResult(false, false, fetchMessage);
@@ -119,7 +119,7 @@ public sealed class ComponentApplyService
             {
                 _log?.Warning($"[{nameof(ApplyAsync)}] Id={id} 부품 구성이 그 사이 바뀌어 적용을 멈췄습니다.");
                 return new ComponentApplyResult(false, true,
-                    "보드를 연 뒤에 이 장비의 부품 구성이 바뀌었습니다 — 아무것도 보내지 않았습니다. 다시 받아 확인한 뒤 적용하십시오.");
+                    "조립기를 연 뒤에 다른 곳에서 이 장비의 부품 구성이 바뀌었습니다. 저장하지 않았습니다. 조립기를 닫고 다시 여세요.");
             }
 
             var (ok, message) = await PatchAsync(category, id, fetched, desired, overridesToSend, token).ConfigureAwait(false);

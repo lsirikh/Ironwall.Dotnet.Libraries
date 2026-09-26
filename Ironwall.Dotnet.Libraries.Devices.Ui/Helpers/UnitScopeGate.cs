@@ -77,6 +77,13 @@ internal static class UnitScopeGate
         dto.UnitId = await ResolveStampAsync(dto.UnitId, caller, log, token).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// DTO 가 아닌 좁은 PATCH 본문(<c>DeviceAxisWriter</c>)에 실을 <c>unit_id</c> — 규칙은 <see cref="StampAsync"/> 와 같다
+    /// (8.0 미만이면 <c>null</c> = 싣지 않는다, 장비의 지금 부대가 있으면 그것을, 없을 때만 이 단말의 부대).
+    /// </summary>
+    internal static Task<int?> ResolveForExistingAsync(int? current, string caller, ILogService? log = null, CancellationToken token = default)
+        => ResolveStampAsync(current, caller, log, token);
+
     /// <summary>쓰기 본문에 실을 <c>unit_id</c> — 장비 · 그룹 공용 판정.</summary>
     private static async Task<int?> ResolveStampAsync(int? current, string caller, ILogService? log, CancellationToken token)
     {
