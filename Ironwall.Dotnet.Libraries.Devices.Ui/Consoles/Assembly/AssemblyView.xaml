@@ -8,6 +8,7 @@
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	c:ConsoleWindowChrome.DressWindow="True"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	Foreground="{DynamicResource TextPrimaryBrush}">

@@ -24,6 +24,8 @@ public partial class ReportLargePreviewWindow : Window
         InitializeComponent();
         _html = html;
         Title = WindowTitleFor(title);
+        // B2 — OS 기본 크림색 제목 줄 대신 콘솔 창 공용 겉(토큰 제목 줄 · 창 단추). 직접 만드는 창이라 여기서 부른다.
+        Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleWindowChrome.Apply(this);
     }
 
     /// <summary>머리에 보일 보고서 제목.</summary>

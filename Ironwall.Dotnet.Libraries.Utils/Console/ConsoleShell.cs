@@ -60,6 +60,8 @@ public class ConsoleShell : Control
     public ConsoleShell()
     {
         SizeChanged += (_, _) => ApplyLayout();
+        // B2 — 이 셸이 제 OS 창의 뿌리면(부대 편제 · 맵핑 워크벤치) 그 창의 제목 줄을 토큰으로 칠한다. 호스트 카드 안에서는 아무것도 하지 않는다.
+        ConsoleWindowChrome.Enlist(this);
     }
 
     #region - Slots -

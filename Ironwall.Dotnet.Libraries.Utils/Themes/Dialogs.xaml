@@ -303,6 +303,11 @@
 												x:Name="PART_Primary"
 												Content="{TemplateBinding PrimaryText}"
 												Style="{StaticResource Dialog.Button.Primary}" />
+											<!--  창이 제 버튼(x:Name 을 지켜야 하는 옛 버튼)을 직접 놓는 자리 — 비우면 없다(기존 창 불변)  -->
+											<ContentPresenter
+												x:Name="FooterActionsHost"
+												VerticalAlignment="Center"
+												Content="{TemplateBinding FooterActions}" />
 										</StackPanel>
 									</Grid>
 								</Border>
@@ -310,6 +315,9 @@
 						</Border>
 					</Grid>
 					<ControlTemplate.Triggers>
+						<Trigger Property="FooterActions" Value="{x:Null}">
+							<Setter TargetName="FooterActionsHost" Property="Visibility" Value="Collapsed" />
+						</Trigger>
 						<!--  버튼 줄 왼쪽에 끼운 것이 없으면 여백도 없다 — 안내 글이 본문보다 들여쓰이지 않게(S1).  -->
 						<Trigger Property="FooterExtra" Value="{x:Null}">
 							<Setter TargetName="FooterExtraHost" Property="Visibility" Value="Collapsed" />

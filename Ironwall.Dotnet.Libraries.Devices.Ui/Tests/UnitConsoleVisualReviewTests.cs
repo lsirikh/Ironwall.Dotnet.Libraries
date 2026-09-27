@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -75,15 +76,37 @@ public class UnitConsoleVisualReviewTests
     public void should_widen_the_unit_window_only_by_the_border_share_when_it_misses_the_docking_width(
         double console, double window, double workArea, double expected)
     {
-        Assert.Equal(expected, UnitWindowChrome.DockingDeficit(console, window, workArea));
+        Assert.Equal(expected, ConsoleWindowChrome.DockingDeficit(console, window, workArea));
     }
 
     [Fact]
     public void should_pick_a_dark_caption_for_the_dark_header_and_a_light_one_for_the_light_header()
     {
-        Assert.True(UnitWindowChrome.IsDark(Color.FromRgb(0x1C, 0x24, 0x2E)));
-        Assert.False(UnitWindowChrome.IsDark(Color.FromRgb(0xF4, 0xF6, 0xF9)));
-        Assert.Equal(0x00332211, UnitWindowChrome.ToColorRef(Color.FromRgb(0x11, 0x22, 0x33)));   // COLORREF = 0x00BBGGRR
+        Assert.True(ConsoleWindowChrome.IsDark(Color.FromRgb(0x1C, 0x24, 0x2E)));
+        Assert.False(ConsoleWindowChrome.IsDark(Color.FromRgb(0xF4, 0xF6, 0xF9)));
+        Assert.Equal(0x00332211, ConsoleWindowChrome.ToColorRef(Color.FromRgb(0x11, 0x22, 0x33)));   // COLORREF = 0x00BBGGRR
+    }
+
+    /// <summary>
+    /// B2 — 부대 편제 창의 겉은 커널 한 곳(<see cref="ConsoleWindowChrome"/>)이 입힌다. 옛 <c>UnitWindowChrome</c> 은
+    /// <b>옮기고 지웠다</b>(승격 = 이관 + 원본 삭제 + 호출부 갱신) — 사본이 되살아나면 두 겉이 갈라진다.
+    /// </summary>
+    [Fact]
+    public void should_dress_the_unit_window_with_the_kernel_chrome_when_the_old_copy_was_moved()
+    {
+        // Arrange
+        var codeBehind = File.ReadAllText(Path.Combine(UnitsFolder(), "UnitConsoleView.xaml.cs"));
+        var view = File.ReadAllText(Path.Combine(UnitsFolder(), "UnitConsoleView.xaml"));
+
+        // Act
+        var oldType = typeof(UnitConsoleViewModel).Assembly.GetTypes().FirstOrDefault(t => t.Name == "UnitWindowChrome");
+
+        // Assert
+        Assert.Null(oldType);
+        Assert.False(File.Exists(Path.Combine(UnitsFolder(), "UnitWindowChrome.cs")));
+        Assert.Contains("ConsoleWindowChrome.Apply(window, shell)", codeBehind);
+        Assert.Contains("Loaded=\"OnShellLoaded\"", view);                       // 배선이 살아 있다
+        Assert.Contains("<c:ConsoleShell", view);                                // 뿌리가 커널 셸이라 자동으로도 입혀진다
     }
 
     #region - Fixtures -

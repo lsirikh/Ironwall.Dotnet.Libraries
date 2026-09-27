@@ -58,6 +58,11 @@ public class ConsoleDialogFrame : ContentControl
     public ConsoleDialogFrame()
     {
         Loaded += OnLoaded;
+        // B2 — 이 틀이 제 OS 창의 뿌리면(확인 · 배정 · 프리셋 창) 그 창의 제목 줄을 토큰으로 칠한다. 호스트 팝업층 안에서는 아무것도 하지 않는다.
+        ConsoleWindowChrome.Enlist(this);
+        // 호스트 팝업층은 SingleInstance 뷰모델의 뷰를 다시 쓴다(Caliburn 뷰 캐시) — 템플릿은 한 번만 붙으므로
+        // 내려갈 때 풀어 두지 않으면 두 번째 표시부터 첫 포커스가 오지 않아 ESC · Enter 가 창에 닿지 않는다.
+        Unloaded += (_, _) => _focusApplied = false;
     }
 
     #region - Events -
@@ -165,6 +170,20 @@ public class ConsoleDialogFrame : ContentControl
     /// <summary>버튼 줄 왼쪽, 안내 글 옆에 끼우는 것 — 되돌리기 같은 보조 버튼.</summary>
     public object? FooterExtra { get => GetValue(FooterExtraProperty); set => SetValue(FooterExtraProperty, value); }
 
+    public static readonly DependencyProperty FooterActionsProperty = DependencyProperty.Register(
+        nameof(FooterActions), typeof(object), typeof(ConsoleDialogFrame), new PropertyMetadata(null));
+
+    /// <summary>
+    /// 버튼 줄 <b>오른쪽</b>(보조 → 주 동작 자리)에 창이 제 버튼을 직접 놓을 때 — 틀의 버튼(<see cref="PrimaryText"/> ·
+    /// <see cref="SecondaryText"/>)을 비우고 이것을 쓴다. 기존 창의 <c>x:Name</c>(Caliburn 바인딩 지시자) 버튼을 그대로 두고
+    /// 틀에 앉힐 때 쓴다(계정 셀프서비스 B3). 비우면(기본) 자리도 없다 — 기존 창은 달라지지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// Caliburn 의 이름 관례는 뷰를 붙이는 순간 템플릿이 없는 이 틀의 <b>자기 속성</b> 안을 들여다보지 않는다 — 여기 놓는 버튼은
+    /// <c>cal:Message.Attach</c> 로 동작을 잇는다(커널 ConsoleShell.HeaderContent 와 같은 까닭).
+    /// </remarks>
+    public object? FooterActions { get => GetValue(FooterActionsProperty); set => SetValue(FooterActionsProperty, value); }
+
     public static readonly DependencyProperty BodyPaddingProperty = DependencyProperty.Register(
         nameof(BodyPadding), typeof(Thickness), typeof(ConsoleDialogFrame), new PropertyMetadata(new Thickness(20, 16, 20, 16)));
 
@@ -176,6 +195,15 @@ public class ConsoleDialogFrame : ContentControl
 
     /// <summary>몸통이 스스로 스크롤을 가지면(목록 · 표) <c>Disabled</c> 로 둔다 — 스크롤이 두 겹이 되지 않게.</summary>
     public ScrollBarVisibility BodyScroll { get => (ScrollBarVisibility)GetValue(BodyScrollProperty); set => SetValue(BodyScrollProperty, value); }
+
+    public static readonly DependencyProperty FocusOnLoadProperty = DependencyProperty.Register(
+        nameof(FocusOnLoad), typeof(bool), typeof(ConsoleDialogFrame), new PropertyMetadata(true));
+
+    /// <summary>
+    /// 뜰 때 첫 포커스(<see cref="DialogFocusRules"/>)를 가져오는가. 기본은 가져온다.
+    /// 끄는 곳은 <b>잠깐 덮었다 사라지는 진행 알림</b>뿐이다 — 목록 새로고침마다 입력칸의 포커스를 빼앗지 않게.
+    /// </summary>
+    public bool FocusOnLoad { get => (bool)GetValue(FocusOnLoadProperty); set => SetValue(FocusOnLoadProperty, value); }
     #endregion
 
     #region - Identifier overrides -
@@ -286,7 +314,7 @@ public class ConsoleDialogFrame : ContentControl
     #region - Keys and focus -
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (_focusApplied) return;
+        if (_focusApplied || !FocusOnLoad) return;
         _focusApplied = true;
 
         // T4: 첫 포커스는 취소. 파괴적 동작이 Enter 한 번에 나가지 않게 한다.

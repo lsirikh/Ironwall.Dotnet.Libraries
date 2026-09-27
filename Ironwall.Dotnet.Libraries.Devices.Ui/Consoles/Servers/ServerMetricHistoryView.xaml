@@ -2,7 +2,9 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerMetricHistoryView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers"
+	c:ConsoleWindowChrome.DressWindow="True"
 	Background="{DynamicResource SurfaceBrush}"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--

@@ -1,0 +1,156 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles">
+	<!--
+		콘솔 OS 창의 겉 (window-design-inventory B2) — ConsoleWindowChrome.Apply 가 창의 Template 으로 꽂는다.
+		제목 줄 32 · 창 단추 46×32 · 창 테두리 1. 창 단추는 OS 제목 줄과 같게 ResizeMode 를 따른다(NoResize = ✕ 만).
+		규칙: ① 색은 전부 DynamicResource 토큰(캐싱 금지) ② 요소에 이름을 달지 않는다 — 단추는 명령 · 바인딩으로만 배선한다
+		③ 식별자는 peer 가 있는 Button 에만(Console.Window.Minimize/Maximize/Close) ④ 창 단추는 포커스를 받지 않는다 —
+		  다이얼로그 틀의 첫 포커스(취소) · ESC · Enter 판정을 흔들지 않게. 키보드 닫기는 Alt+F4 · 틀의 ✕ 가 맡는다.
+		⑤ 이 사전은 Generic.xaml 이 Source= 로 병합한다 — 위쪽 사전의 키를 StaticResource 로 볼 수 없어 단추 스타일을 여기 둔다.
+	-->
+
+	<!--  ───────── 창 단추 ─────────  -->
+	<Style x:Key="ConsoleWindow.CaptionButton" TargetType="{x:Type Button}">
+		<Setter Property="Width" Value="46" />
+		<Setter Property="Height" Value="{x:Static c:ConsoleWindowChrome.CaptionHeight}" />
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="IsTabStop" Value="False" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type Button}">
+					<Border Background="{TemplateBinding Background}">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+				<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			</Trigger>
+			<Trigger Property="IsPressed" Value="True">
+				<Setter Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
+	<!--  닫기 — 위험 표면 + 위험색 글리프(흰 글자 하드코딩 없이 두 테마 모두 토큰으로)  -->
+	<Style
+		x:Key="ConsoleWindow.CloseButton"
+		BasedOn="{StaticResource ConsoleWindow.CaptionButton}"
+		TargetType="{x:Type Button}">
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Setter Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+				<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+			</Trigger>
+			<Trigger Property="IsPressed" Value="True">
+				<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+				<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
+	<!--  ───────── 창 템플릿 ─────────  -->
+	<ControlTemplate x:Key="{ComponentResourceKey TypeInTargetAssembly={x:Type c:ConsoleWindowChrome}, ResourceId=WindowTemplate}" TargetType="{x:Type Window}">
+		<Border
+			Margin="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MaximizedInset}}"
+			Background="{TemplateBinding Background}"
+			BorderBrush="{DynamicResource BorderBrush}"
+			BorderThickness="1">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+
+				<!--  ① 제목 줄 — 끌어 옮기기 · 더블클릭 최대화 · 우클릭 시스템 메뉴는 WindowChrome(CaptionHeight) 이 OS 에 맡긴다  -->
+				<Border
+					Grid.Row="0"
+					Height="{x:Static c:ConsoleWindowChrome.CaptionHeight}"
+					Background="{DynamicResource SurfaceAltBrush}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,0,0,1">
+					<DockPanel LastChildFill="True">
+						<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+							<Button
+								AutomationProperties.AutomationId="{x:Static c:ConsoleWindowChrome.MinimizeAutomationId}"
+								AutomationProperties.Name="최소화"
+								Command="{x:Static c:ConsoleWindowChrome.MinimizeCommand}"
+								CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+								Style="{StaticResource ConsoleWindow.CaptionButton}"
+								ToolTip="최소화"
+								Visibility="{Binding ResizeMode, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MinimizeVisibility}}">
+								<Path
+									Width="10"
+									Height="10"
+									Data="M0,5.5 L10,5.5"
+									SnapsToDevicePixels="True"
+									Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+									StrokeThickness="1" />
+							</Button>
+							<Button
+								AutomationProperties.AutomationId="{x:Static c:ConsoleWindowChrome.MaximizeAutomationId}"
+								AutomationProperties.Name="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MaximizeName}}"
+								Command="{x:Static c:ConsoleWindowChrome.MaximizeRestoreCommand}"
+								CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+								Style="{StaticResource ConsoleWindow.CaptionButton}"
+								ToolTip="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MaximizeName}}"
+								Visibility="{Binding ResizeMode, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MaximizeVisibility}}">
+								<Grid Width="10" Height="10">
+									<!--  최대화: 네모 하나 / 이전 크기로: 겹친 네모 두 개 — 상태를 색이 아니라 형태로  -->
+									<Rectangle
+										SnapsToDevicePixels="True"
+										Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+										StrokeThickness="1"
+										Visibility="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.StateGlyphVisibility}, ConverterParameter=Normal}" />
+									<Path
+										Data="M2,0.5 L9.5,0.5 L9.5,8 M0.5,2.5 L7.5,2.5 L7.5,9.5 L0.5,9.5 Z"
+										SnapsToDevicePixels="True"
+										Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+										StrokeThickness="1"
+										Visibility="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.StateGlyphVisibility}, ConverterParameter=Maximized}" />
+								</Grid>
+							</Button>
+							<Button
+								AutomationProperties.AutomationId="{x:Static c:ConsoleWindowChrome.CloseAutomationId}"
+								AutomationProperties.Name="닫기"
+								Command="{x:Static c:ConsoleWindowChrome.CloseCommand}"
+								CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+								Style="{StaticResource ConsoleWindow.CloseButton}"
+								ToolTip="닫기 (Alt+F4)">
+								<Path
+									Width="10"
+									Height="10"
+									Data="M0.5,0.5 L9.5,9.5 M9.5,0.5 L0.5,9.5"
+									Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+									StrokeThickness="1" />
+							</Button>
+						</StackPanel>
+
+						<!--  창 제목 — OS 제목(Window.Title) 그대로. 작업 전환 · UIA 창 이름과 같은 글자다  -->
+						<TextBlock
+							Margin="12,0,8,0"
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{TemplateBinding Title}"
+							TextTrimming="CharacterEllipsis" />
+					</DockPanel>
+				</Border>
+
+				<!--  ② 본문 — 기본 창 템플릿처럼 AdornerDecorator 로 감싼다(끌기 고스트 · 삽입선 · 검증 표시가 여기에 뜬다)  -->
+				<AdornerDecorator Grid.Row="1">
+					<ContentPresenter />
+				</AdornerDecorator>
+			</Grid>
+		</Border>
+	</ControlTemplate>
+</ResourceDictionary>
