@@ -1,7 +1,9 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
 
@@ -90,6 +92,45 @@ public class ConsoleRail : ListBox
     protected override DependencyObject GetContainerForItemOverride() => new ConsoleRailItem();
 
     protected override bool IsItemItsOwnContainerOverride(object item) => item is ConsoleRailItem;
+
+    /// <summary>템플릿의 바닥 띠(요약 · 부대 필터 등). 없으면 null.</summary>
+    internal UIElement? FooterElement => GetTemplateChild("FooterHost") as UIElement;
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new ConsoleRailAutomationPeer(this);
+}
+
+/// <summary>
+/// 레일 자동화 peer — 목록 항목 뒤에 <b>바닥 띠의 내용</b>도 자식으로 내놓는다.
+/// </summary>
+/// <remarks>
+/// <see cref="ListBoxAutomationPeer"/> 는 항목만 자식으로 내놓아, 템플릿 바닥 띠(Console.{K}.Rail.Footer · 서버 부대 필터 ·
+/// 예하 포함)가 UIA 트리 · 화면 읽기 프로그램에 한 번도 나오지 않았다(2026-09-27 헤디드 시험 SC-SRV-006/007).
+/// </remarks>
+internal sealed class ConsoleRailAutomationPeer : ListBoxAutomationPeer
+{
+    public ConsoleRailAutomationPeer(ConsoleRail owner) : base(owner) { }
+
+    protected override List<AutomationPeer> GetChildrenCore()
+    {
+        var children = base.GetChildrenCore() ?? new List<AutomationPeer>();
+        if (((ConsoleRail)Owner).FooterElement is { Visibility: Visibility.Visible } footer)
+            AddPeers(footer, children);
+        return children;
+    }
+
+    /// <summary>peer 가 있는 요소는 그 peer 를, 없으면 그 아래를 — UIElementAutomationPeer 가 자식을 모으는 방식과 같다.</summary>
+    private static void AddPeers(DependencyObject parent, List<AutomationPeer> into)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is UIElement ui && UIElementAutomationPeer.CreatePeerForElement(ui) is { } peer)
+                into.Add(peer);
+            else
+                AddPeers(child, into);
+        }
+    }
 }
 
 /// <summary>레일 항목 컨테이너.</summary>
