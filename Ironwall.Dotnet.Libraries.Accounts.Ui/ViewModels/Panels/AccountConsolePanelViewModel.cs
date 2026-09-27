@@ -184,39 +184,19 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     #region - Rail -
     public ObservableCollection<ConsoleRailEntry> RailEntries { get; }
 
+    /// <summary>
+    /// 지금 레일. 미적용 변경이 있으면 <b>바꾸지 않는다</b>(<see cref="SelectRailAsync"/> 가 막고 알린다).
+    /// 화면 목록을 원래 레일로 되돌리는 일은 커널 <see cref="ConsoleRail"/> 이 한다 — 여기서 게터 속임수 · 한 박자 뒤 알림을 따로 두지 않는다
+    /// (2026-09-28 SC-ACC-006, 실제 뷰 시험 AccountConsoleRailViewTests).
+    /// </summary>
     public ConsoleRailEntry? SelectedRail
     {
-        get => _refusedRail ?? RailEntries.FirstOrDefault(e => e.Key == _railKey);
+        get => RailEntries.FirstOrDefault(e => e.Key == _railKey);
         set
         {
             if (value is null || value.Key == _railKey) return;
-            if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
-            {
-                RefuseRail(value);
-                return;
-            }
-            _ = SelectRailAsync(value.Key, force: true);
+            _ = SelectRailAsync(value.Key);
         }
-    }
-
-    /// <summary>화면 레일이 고르려다 막힌 항목 — 목록이 자기 선택 변경을 마칠 때까지만 <see cref="SelectedRail"/> 이 그대로 돌려준다.</summary>
-    private ConsoleRailEntry? _refusedRail;
-
-    /// <summary>
-    /// 막힌 레일 선택을 화면에서 되돌린다 — <b>목록이 선택 변경을 마친 뒤에</b>.
-    /// <para>ListBox 의 TwoWay 갱신 안에서는 WPF 가 원본을 다시 읽어(값이 다르면) SelectedItem 만 '사용자'로 되돌리고,
-    /// 목록 안의 실제 선택(SelectedItems · 항목 컨테이너)은 막힌 '권한 설정'에 남는다 — 화면은 막힌 레일을 고른 채였다
-    /// (2026-09-28 헤디드 SC-ACC-006, 실제 뷰 시험 AccountConsoleRailViewTests: SelectedItem=users · SelectedItems=[permissions]).
-    /// 그래서 그 갱신 동안은 고르려던 값을 그대로 돌려줘 목록을 한 가지 상태로 두고, 한 박자 뒤 평범한 선택 변경으로 되돌린다.</para>
-    /// </summary>
-    private void RefuseRail(ConsoleRailEntry requested)
-    {
-        _refusedRail = requested;
-        Execute.BeginOnUIThread(() =>
-        {
-            _refusedRail = null;
-            NotifyOfPropertyChange(nameof(SelectedRail));
-        });
     }
 
     /// <summary>레일에서 항목을 골랐다. 미적용 변경이 있으면 막고 false — 뷰는 선택을 되돌린다.</summary>

@@ -154,7 +154,8 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     private ConsoleRailEntry _selectedRail;
     /// <summary>
     /// 지금 레일. 미적용 변경이 있으면 <b>바꾸지 않고</b> 바닥 막대가 까닭을 말한다(WL L928).
-    /// 뷰의 <c>ConsoleRail</c> 이 TwoWay 로 묶으므로, 막았을 때 알림을 다시 울려 목록 선택을 되돌린다.
+    /// 뷰의 <c>ConsoleRail</c> 이 TwoWay 로 묶는다 — 막았을 때 화면 목록(SelectedItems · 항목 컨테이너까지)을 원래 레일로 되돌리는 일은
+    /// 커널 레일이 한다. 예전의 "곧바로 + 한 박자 뒤" 알림은 실제 뷰에서 컨테이너를 되돌리지 못했다(ReportConsoleRailViewTests).
     /// </summary>
     public ConsoleRailEntry SelectedRail
     {
@@ -164,10 +165,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
             if (value is null || ReferenceEquals(value, _selectedRail)) return;
             if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
             {
-                // 막았다 — 목록 선택을 지금 레일로 되돌린다. ListBox 가 자기 TwoWay 갱신 도중이라
-                // 그 자리의 알림만으로는 되돌아가지 않을 수 있어, 한 박자 뒤에 한 번 더 울린다.
                 NotifyOfPropertyChange();
-                Execute.BeginOnUIThread(() => NotifyOfPropertyChange(nameof(SelectedRail)));
                 return;
             }
             _ = SelectRailAsync(value.Key);

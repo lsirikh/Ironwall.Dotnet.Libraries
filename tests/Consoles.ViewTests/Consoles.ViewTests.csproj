@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    콘솔 실제 뷰 시험(보고서 · 장비 · 이벤트 · 서버 · 부대) — 뷰를 화면 밖 창에 띄워 Caliburn 결선을 호스트와 같은 길로 세운다.
+    Application 이 상주해야 하므로(뷰가 앱 사전의 Console.* 키를 StaticResource 로 찾는다) 각 UI 어셈블리 안의 헤드리스 시험과
+    어셈블리를 나눈다 — 그 시험들은 "Application.Current == null" 을 전제로 한다(Accounts.Ui.ViewTests 선례).
+    실행: dotnet test tests/Consoles.ViewTests
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Devices.Ui/Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Events.Ui/Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Reports.Ui/Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
+  </ItemGroup>
+
+  <!-- 화면 밖 호스트(Application 상주 · 호스트 App.xaml 과 같은 병합 순서)는 계정 뷰 시험의 것을 그대로 쓴다(사본을 만들지 않는다) -->
+  <ItemGroup>
+    <Compile Include="../Accounts.Ui.ViewTests/AppHost.cs" Link="Linked/AppHost.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" Version="4.20.72" />
+  </ItemGroup>
+
+</Project>

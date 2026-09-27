@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
@@ -88,6 +89,58 @@ public class ConsoleRail : ListBox
     public static readonly DependencyProperty ConsoleKeyProperty = DependencyProperty.Register(
         nameof(ConsoleKey), typeof(string), typeof(ConsoleRail), new FrameworkPropertyMetadata("Console", FrameworkPropertyMetadataOptions.Inherits));
     public string ConsoleKey { get => (string)GetValue(ConsoleKeyProperty); set => SetValue(ConsoleKeyProperty, value); }
+
+    /// <summary>
+    /// 선택 변경이 끝난 뒤 — 목록 안의 선택(SelectedItems · 항목 컨테이너)이 <see cref="Selector.SelectedItem"/> 과 갈라졌으면 SelectedItem 쪽으로 맞춘다.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>왜 갈라지는가</b> — 레일은 SelectedItem 을 콘솔 뷰모델에 TwoWay 로 묶고, 뷰모델은 미적용 변경이 있으면 레일 전환을 <b>거절</b>한다.
+    /// WPF 는 TwoWay 로 원본에 쓴 직후 원본을 무조건 다시 읽는데, 그 다시 읽기(원래 레일)는 목록의 선택 변경이 아직 진행 중일 때 와서
+    /// Selector 가 무시한다 — SelectedItem 만 원래 레일이 되고 SelectedItems · 컨테이너는 누른 레일에 남는다. 화면 · UIA 는 막힌 레일을 고른 채였다
+    /// (2026-09-28 헤디드 SC-ACC-006 · SC-DEV-008). 거절을 알리든 안 알리든, 한 박자 뒤 다시 알리든 같다 — 한 박자 뒤에는 SelectedItem 이
+    /// 이미 같은 값이라 아무 변경도 일어나지 않는다.</para>
+    /// <para><b>왜 여기서 · 이렇게</b> — 이 시점(선택 변경 이벤트 뒤)에는 진행 중인 변경이 끝났다. <see cref="Selector.SelectedIndex"/> 를
+    /// SelectedItem 의 자리로 옮기면 평범한 선택 변경 한 번으로 컨테이너까지 되돌아오고, SelectedItem 은 이미 그 값이라 원본에 다시 쓰지 않는다
+    /// (거절 → 되쓰기 → 거절의 되풀이가 없다). 같은 입력 처리 안에서 끝나 막힌 레일이 한 번도 그려지지 않는다. 뷰모델마다 게터 속임수 ·
+    /// 한 박자 뒤 알림을 따로 짜지 않아도 된다 — 레일을 쓰는 모든 콘솔에 한 번에 걸린다.</para>
+    /// </remarks>
+    protected override void OnSelectionChanged(SelectionChangedEventArgs e)
+    {
+        // 처리기(자동화 이벤트 포함)가 먼저 사용자의 변경을 보고, 그다음 되돌림을 본다 — 마지막으로 보는 것이 실제 상태가 된다.
+        base.OnSelectionChanged(e);
+        ReconcileSelection(e);
+    }
+
+    private bool _reconciling;
+
+    private void ReconcileSelection(SelectionChangedEventArgs e)
+    {
+        if (_reconciling || SelectionMode != SelectionMode.Single) return;
+
+        var bound = SelectedItem;
+        var shown = SelectedItems.Count > 0 ? SelectedItems[0] : null;
+        if (Equals(bound, shown)) return;       // 한 가지 상태 — 평소의 모든 선택 변경
+
+        var index = bound is null ? -1 : Items.IndexOf(bound);
+        if (bound is not null && index < 0) return;   // 목록에 없는 값 — 맞출 자리가 없다
+
+        // 누른 항목에 있던 키보드 초점도 원래 항목으로 옮긴다(화살표가 막힌 레일에서 출발하지 않게).
+        var focusWasOnPick = e.AddedItems.Count > 0
+                             && ItemContainerGenerator.ContainerFromItem(e.AddedItems[0]) is UIElement { IsKeyboardFocusWithin: true };
+
+        _reconciling = true;
+        try
+        {
+            SetCurrentValue(SelectedIndexProperty, index);
+        }
+        finally
+        {
+            _reconciling = false;
+        }
+
+        if (focusWasOnPick && bound is not null && ItemContainerGenerator.ContainerFromItem(bound) is UIElement original)
+            original.Focus();
+    }
 
     protected override DependencyObject GetContainerForItemOverride() => new ConsoleRailItem();
 
