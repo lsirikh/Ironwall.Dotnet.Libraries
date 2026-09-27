@@ -77,6 +77,172 @@ public class DragHitTestTests
         Assert.Null(hit);
     }
 
+    // ── 행 안의 드롭존(부대 편제 트리 · 2026-09-27 실창 기록) ──
+    // 행의 드롭존(DropZoneChrome)은 배경이 없고 행 컨테이너(ListBoxItem)의 안쪽 여백보다 작다.
+    // 그래서 행의 빈 곳 · 행 사이 틈에서 HitTest 는 ListBoxItem 의 Border#Bd 를 집었고 판정이 꺼졌다
+    // (hit=Border#Bd < Grid < ListBoxItem, zone=(none)) — 놓으면 말없이 사라지고 끄는 동안 윤곽이 깜빡였다.
+
+    [Fact]
+    public void should_resolve_the_row_zone_when_the_pointer_is_in_the_row_padding_outside_the_zone()
+    {
+        var found = OnSta(() => WithRowList(1, (window, list, zones) =>
+        {
+            var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var origin = container.TranslatePoint(new Point(0, 0), window);
+            var inPadding = new Point(origin.X + 2, origin.Y + container.ActualHeight / 2);   // 행 안 · 드롭존 여백 밖
+            return DragHitTest.ZoneFrom(DragHitTest.Top(window, inPadding)) == zones[0];
+        }));
+
+        Assert.True(found);
+    }
+
+    [Fact]
+    public void should_resolve_the_row_zone_when_the_pointer_is_in_the_hollow_part_of_the_zone()
+    {
+        var found = OnSta(() => WithRowList(1, (window, list, zones) =>
+        {
+            var zone = zones[0];
+            var origin = zone.TranslatePoint(new Point(0, 0), window);
+            var hollow = new Point(origin.X + zone.ActualWidth - 10, origin.Y + zone.ActualHeight / 2);   // 글자 오른쪽 빈 곳
+            return DragHitTest.ZoneFrom(DragHitTest.Top(window, hollow)) == zone;
+        }));
+
+        Assert.True(found);
+    }
+
+    [Fact]
+    public void should_resolve_each_row_to_its_own_zone_when_several_rows_carry_zones()
+    {
+        var (first, second) = OnSta(() => WithRowList(2, (window, list, zones) =>
+        {
+            FrameworkElement? At(int index)
+            {
+                var c = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(index);
+                var o = c.TranslatePoint(new Point(0, 0), window);
+                return DragHitTest.ZoneFrom(DragHitTest.Top(window, new Point(o.X + 2, o.Y + c.ActualHeight / 2)));
+            }
+            return (At(0) == zones[0], At(1) == zones[1]);
+        }));
+
+        Assert.True(first);
+        Assert.True(second);
+    }
+
+    [Fact]
+    public void should_not_guess_a_zone_when_the_row_holds_two_zones()
+    {
+        var hit = OnSta(() => WithRowList(1, (window, list, zones) =>
+        {
+            var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var origin = container.TranslatePoint(new Point(0, 0), window);
+            return DragHitTest.ZoneFrom(DragHitTest.Top(window, new Point(origin.X + 2, origin.Y + container.ActualHeight / 2)));
+        }, zonesPerRow: 2));
+
+        // 한 행에 드롭존이 둘이면(칩 여럿) 빈 곳이 어느 쪽인지 모른다 — 짐작하지 않는다.
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public void should_keep_the_list_zone_when_the_list_itself_is_the_reorder_zone()
+    {
+        var isList = OnSta(() => WithRowList(1, (window, list, _) =>
+        {
+            DropZone.SetKey(list, "reorder");
+            var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var origin = container.TranslatePoint(new Point(0, 0), window);
+            // 행 안에 드롭존이 없으면 행의 빈 곳은 목록(순서 드롭존)이다 — 새 규칙이 순서 드롭을 가로채면 안 된다.
+            return DragHitTest.ZoneFrom(DragHitTest.Top(window, new Point(origin.X + 2, origin.Y + container.ActualHeight / 2))) is ListBox;
+        }, zonesPerRow: 0));
+
+        Assert.True(isList);
+    }
+
+    [Fact]
+    public void should_not_route_a_row_header_into_a_nested_reorder_list_when_the_row_holds_one()
+    {
+        // 지도 레이어 패널 모양: 바깥 목록의 행(섹션) 안에 순서 드롭존 ListBox 가 들어 있다. 섹션 머리 위는 그 목록이 아니다 —
+        // 목록으로 치면 삽입 위치가 "맨 끝"이 되어, 머리 위(목록 위쪽)에서 놓은 행이 맨 아래로 간다.
+        var hit = OnSta(() =>
+        {
+            var inner = new ListBox { Height = 60 };
+            inner.Items.Add("레이어 1");
+            DropZone.SetKey(inner, "layer-reorder");
+            DropZone.SetIsReorder(inner, true);
+            var section = new StackPanel();
+            section.Children.Add(new Border { Height = 30, Background = Brushes.LightGray, Child = new TextBlock { Text = "섹션 머리" } });
+            section.Children.Add(inner);
+            var outer = new ListBox { Width = 300 };
+            outer.Items.Add(section);
+            var window = new Window { Content = outer, Width = 400, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                var header = section.Children[0];
+                var point = header.TranslatePoint(new Point(40, 15), window);
+                return DragHitTest.ZoneFrom(DragHitTest.Top(window, point));
+            }
+            finally { window.Close(); }
+        });
+
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public void should_resolve_zones_when_another_ui_thread_still_holds_a_drop_zone()
+    {
+        // 드롭존 장부는 프로세스 전역이다. 다른 UI 스레드가 만든 드롭존이 살아 있으면(별도 스레드 창) 그것을 읽는 순간
+        // "다른 스레드가 이 개체를 소유" 로 던졌다 — 끄는 도중 입력 처리 한가운데서.
+        var foreign = OnSta(() => { var b = new Border(); DropZone.SetKey(b, "foreign"); return b; });
+
+        var found = OnSta(() => WithRowList(1, (window, list, zones) =>
+        {
+            var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var origin = container.TranslatePoint(new Point(0, 0), window);
+            return DragHitTest.ZoneFrom(DragHitTest.Top(window, new Point(origin.X + 2, origin.Y + container.ActualHeight / 2))) == zones[0];
+        }));
+
+        Assert.True(found);
+        GC.KeepAlive(foreign);
+    }
+
+    /// <summary>
+    /// 부대 편제 트리 모양: 행(ListBoxItem, 안쪽 여백 8)마다 <b>배경 없는</b> 드롭존(Border, 여백 6) 안에 왼쪽 글자 하나.
+    /// </summary>
+    private static T WithRowList<T>(int rows, Func<Window, ListBox, List<FrameworkElement>, T> body, int zonesPerRow = 1)
+    {
+        var zones = new List<FrameworkElement>();
+        var list = new ListBox { Width = 400 };
+        var itemStyle = new Style(typeof(ListBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8)));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        list.ItemContainerStyle = itemStyle;
+        for (var i = 0; i < rows; i++)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            for (var z = 0; z < Math.Max(1, zonesPerRow); z++)
+            {
+                var zone = new Border
+                {
+                    Margin = new Thickness(6),
+                    Width = zonesPerRow <= 1 ? 300 : 120,
+                    Child = new TextBlock { Text = $"부대 {i}", HorizontalAlignment = HorizontalAlignment.Left },
+                };
+                if (zonesPerRow > 0) { DropZone.SetKey(zone, "unit-parent"); zones.Add(zone); }
+                row.Children.Add(zone);
+            }
+            list.Items.Add(row);
+        }
+        var window = new Window { Content = list, Width = 500, Height = 300, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            return body(window, list, zones);
+        }
+        finally { window.Close(); }
+    }
+
     /// <summary>셸 모양: 내용 위에 창 전체를 덮는 덮개 Grid(배경 있음) — MetroWindow 템플릿의 PART_OverlayBox 와 같은 배치.</summary>
     private static (Grid Root, Border Content) ShellLike(Visibility overlayVisibility, bool overlayHitTestVisible)
     {

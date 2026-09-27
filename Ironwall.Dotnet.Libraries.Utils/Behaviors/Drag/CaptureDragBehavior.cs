@@ -94,6 +94,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         // 배선은 Loaded 에서 — DataTemplate 인플레이션 시점에는 부모 체인이 없다.
         AssociatedObject.Loaded += OnLoaded;
         AssociatedObject.Unloaded += OnUnloaded;
+        AssociatedObject.PreviewMouseDown += OnPreviewMouseDown;
         AssociatedObject.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnDragStarted));
         AssociatedObject.AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnDragDelta));
         AssociatedObject.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnDragCompleted));
@@ -104,6 +105,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         FinishDrag(commit: false);
         AssociatedObject.Loaded -= OnLoaded;
         AssociatedObject.Unloaded -= OnUnloaded;
+        AssociatedObject.PreviewMouseDown -= OnPreviewMouseDown;
         AssociatedObject.RemoveHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnDragStarted));
         AssociatedObject.RemoveHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnDragDelta));
         AssociatedObject.RemoveHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnDragCompleted));
@@ -128,6 +130,37 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     #endregion
 
     #region - Thumb events -
+    /// <summary>
+    /// DataGrid 행의 손잡이를 누르기 직전(터널) — 이미 골라 둔 행이면 그 칸에 초점을 먼저 준다.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>DataGridCell</c> 은 <c>MouseLeftButtonDown</c> 클래스 처리기를 <b>handledEventsToo</b> 로 건다(WPF 원본).
+    /// 손잡이(Thumb)가 눌림을 처리해도 칸은 "초점이 칸 밖"이면 선택을 그 행 하나로 접었다 — 여러 행을 골라 끌면
+    /// 잡은 행만 실려 "잡은 행이 선택에 들어 있으면 선택 전부를" 계약이 깨졌다(ListBox 는 괜찮다: ListBoxItem 의 선택은
+    /// 가상 메서드라 처리된 눌림에서 불리지 않는다). 초점이 칸 안 · 선택됨 · 처리됨이면 칸은 아무것도 바꾸지 않는다.</para>
+    /// <para>고르지 않은 행을 잡으면 DataGrid 가 그 행을 고른다 — 탐색기와 같고, 실리는 것도 그 행 하나라 계약과 결과가 같다.
+    /// Ctrl · Shift 가 눌렸으면 DataGrid 의 선택 규칙에 맡긴다.</para>
+    /// </remarks>
+    private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || !IsDragEnabled || _pressed) return;
+        if (Keyboard.Modifiers != ModifierKeys.None) return;
+        if (e.OriginalSource is not DependencyObject source) return;
+
+        var handle = AncestorOf<DragHandle>(source);
+        if (handle == null) return;
+        var cell = AncestorOf<DataGridCell>(handle);
+        if (cell == null || !cell.IsSelected || cell.IsKeyboardFocusWithin) return;
+        cell.Focus();
+    }
+
+    private static T? AncestorOf<T>(DependencyObject start) where T : DependencyObject
+    {
+        for (var d = start; d != null; d = ParentOf(d))
+            if (d is T hit) return hit;
+        return null;
+    }
+
     private void OnDragStarted(object sender, DragStartedEventArgs e)
     {
         if (e.OriginalSource is not DragHandle handle) return;          // 열 머리 · 스크롤바의 Thumb 은 남의 것
@@ -392,10 +425,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         // 숨은 덮개(MetroWindow PART_OverlayBox) · 우리 고스트 · 삽입선을 거른다 — DragHitTest 주석.
         hit = DragHitTest.Top(_root, pointInRoot);
-        for (var d = hit; d != null; d = ParentOf(d))
-            if (d is FrameworkElement fe && !string.IsNullOrEmpty(DropZone.GetKey(fe)))
-                return fe;
-        return null;
+        return DragHitTest.ZoneFrom(hit);
     }
 
     /// <summary>

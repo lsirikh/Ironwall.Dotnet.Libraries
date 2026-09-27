@@ -121,8 +121,10 @@ public static class DropZone
         lock (Registry)
         {
             Registry.RemoveAll(w => !w.TryGetTarget(out _));
+            // 장부는 프로세스 전역이다 — 다른 UI 스레드의 드롭존은 읽기만 해도 던진다(끄는 도중 입력 처리 한가운데서).
+            // 그 스레드의 드롭존은 어차피 이 창의 자손이 될 수 없으니 건너뛴다.
             foreach (var w in Registry)
-                if (w.TryGetTarget(out var fe) && fe.IsLoaded && fe.IsVisible && !string.IsNullOrEmpty(GetKey(fe)) && fe.IsDescendantOf(root))
+                if (w.TryGetTarget(out var fe) && fe.CheckAccess() && fe.IsLoaded && fe.IsVisible && !string.IsNullOrEmpty(GetKey(fe)) && fe.IsDescendantOf(root))
                     live.Add(fe);
         }
         return live;
