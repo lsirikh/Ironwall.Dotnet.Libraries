@@ -291,9 +291,10 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
     /// <summary>
     /// 팬 범위 제한 자리 — 조직 경계가 화면에 최소 20% 남게(원장 D-2026-09-27-6615ba). 수식은 레인 A 의 <c>GraphViewport</c>
-    /// 가 가진다 — 그 함수가 들어오면 여기 한 줄로 부른다. 그 전에는 제한 없이 통과한다.
+    /// 가 가진다(<see cref="GraphViewport.ClampPan"/>). 크기가 아직 없으면(첫 레이아웃 전) 그대로 통과한다.
     /// </summary>
-    private GraphViewport ClampPan(GraphViewport view) => view;
+    private GraphViewport ClampPan(GraphViewport view)
+        => ViewportSize.Width > 0 && ViewportSize.Height > 0 ? view.ClampPan(Scene.WorldBounds, ViewportSize) : view;
 
     /// <summary>크기가 아직 없으면(첫 레이아웃 전) 요청을 미뤄 두고 <c>true</c>. 마지막 요청만 남는다.</summary>
     private bool DeferUntilSized(Action request)

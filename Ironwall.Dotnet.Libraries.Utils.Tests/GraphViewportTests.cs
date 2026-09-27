@@ -241,6 +241,80 @@ public class GraphViewportTests
     }
     #endregion
 
+    #region - 팬 한계 (조정자 결정 D-2026-09-27-6615ba · ISSUE-40 · SIM-V079 · V080) -
+    private static readonly Rect Org = new(100, 0, 7000, 1160);     // 200 부대 자동 배치의 노드 중심 경계
+    private static readonly Size Canvas = new(756, 560);
+
+    /// <summary>그림(경계 × 배율)이 뷰포트와 겹치는 가로 · 세로 길이.</summary>
+    private static (double X, double Y) Overlap(GraphViewport v, Rect world, Size viewport)
+    {
+        var a = v.WorldToScreen(world.TopLeft);
+        var b = v.WorldToScreen(world.BottomRight);
+        return (Math.Min(b.X, viewport.Width) - Math.Max(a.X, 0), Math.Min(b.Y, viewport.Height) - Math.Max(a.Y, 0));
+    }
+
+    [Fact]
+    public void should_leave_viewport_unchanged_when_org_is_well_inside()
+    {
+        var viewport = GraphViewport.Fit(Org, Canvas);
+
+        Assert.Equal(viewport, viewport.ClampPan(Org, Canvas));
+    }
+
+    [Theory]
+    [InlineData(5000, 0)]        // 빈 곳 끌기로 +5,000 DIU(SIM-V079)
+    [InlineData(-5000, 0)]
+    [InlineData(0, 3000)]
+    [InlineData(0, -3000)]
+    [InlineData(-9000, 9000)]
+    public void should_keep_at_least_20_percent_of_org_visible_when_panned_far(double dx, double dy)
+    {
+        var viewport = new GraphViewport(0.5, new Vector(0, 0)).Pan(dx, dy);
+
+        var clamped = viewport.ClampPan(Org, Canvas);
+
+        var (x, y) = Overlap(clamped, Org, Canvas);
+        var width = Math.Min(Org.Width * 0.5, Canvas.Width);
+        var height = Math.Min(Org.Height * 0.5, Canvas.Height);
+        Assert.True(x >= 0.2 * width - 1e-6, $"가로 {x} < {0.2 * width}");
+        Assert.True(y >= 0.2 * height - 1e-6, $"세로 {y} < {0.2 * height}");
+        Assert.Equal(0.5, clamped.Scale, 9);
+    }
+
+    [Fact]
+    public void should_stop_at_limit_when_ctrl_arrow_repeats_100_times()
+    {
+        // SIM-V080 — Ctrl+→ 100회: 한계에서 멈춘다(더 밀어도 그대로)
+        var viewport = new GraphViewport(0.5, new Vector(0, 0));
+        for (var i = 0; i < 100; i++) viewport = viewport.PanStep(Canvas, 1, 0).ClampPan(Org, Canvas);
+        var once = viewport.PanStep(Canvas, 1, 0).ClampPan(Org, Canvas);
+
+        Assert.Equal(viewport, once);
+        Assert.True(Overlap(viewport, Org, Canvas).X > 0);
+    }
+
+    [Fact]
+    public void should_keep_single_point_inside_viewport_when_org_has_no_extent()
+    {
+        var point = new Rect(new Point(300, 160), new Size(0, 0));
+        var viewport = new GraphViewport(1.0, new Vector(-4000, 2500));
+
+        var clamped = viewport.ClampPan(point, Canvas);
+        var screen = clamped.WorldToScreen(point.TopLeft);
+
+        Assert.InRange(screen.X, 0, Canvas.Width);
+        Assert.InRange(screen.Y, 0, Canvas.Height);
+    }
+
+    [Fact]
+    public void should_return_same_viewport_when_bounds_empty()
+    {
+        var viewport = new GraphViewport(0.3, new Vector(-99999, 99999));
+
+        Assert.Equal(viewport, viewport.ClampPan(Rect.Empty, Canvas));
+    }
+    #endregion
+
     #region - 좌표 변환 -
     [Theory]
     [InlineData(1.0, 0, 0, 0, 0)]

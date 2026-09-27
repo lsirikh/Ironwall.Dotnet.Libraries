@@ -335,6 +335,42 @@ public class UnitMapLayoutTests
         Assert.Equal(H + 2 * P + 50, layout.Bounds.Bottom);
     }
 
+    #region - 골든 배치 (조정자 #8 · ISSUE-8 · D-6) -
+    /// <summary>배치 결과를 판 번호와 함께 한 줄 지문으로 — 부대 id 순 "id:x,y;".</summary>
+    private static string Fingerprint(UnitMapLayoutResult layout)
+    {
+        var text = string.Join(";", layout.Positions.OrderBy(kv => kv.Key)
+            .Select(kv => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{kv.Key}:{kv.Value.X:0.###},{kv.Value.Y:0.###}")));
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text));
+        return Convert.ToHexString(hash)[..16];
+    }
+
+    /// <summary>
+    /// 자동 배치 출력을 <c>layout_version = 1</c> 에 못 박는다. <b>이 시험이 깨지면</b> 공유 배치의 Δ 기준이 바뀐 것이다 —
+    /// 알고리즘을 되돌리거나, <see cref="UnitMapLayout.LayoutVersion"/> 을 올리고 이관을 PRD 로 정한 뒤 지문을 새로 적는다(D-6).
+    /// </summary>
+    [Theory]
+    [InlineData("standard200", "7E58400301293FAE")]
+    [InlineData("mixed", "25E5F9140672BA83")]
+    [InlineData("multiRoot", "36F60950CAE7137B")]
+    [InlineData("orphan", "82EFA2D300AD8D6D")]
+    public void should_match_golden_layout_pinned_to_layout_version_1(string fixture, string expected)
+    {
+        var f = fixture switch
+        {
+            "standard200" => UnitMapTestData.Standard200(),
+            "mixed" => UnitMapTestData.Mixed(),
+            "multiRoot" => UnitMapTestData.MultiRoot(),
+            _ => UnitMapTestData.OrphanParent(),
+        };
+
+        var layout = UnitMapLayout.Compute(f.Tree);
+
+        Assert.Equal(1, UnitMapLayout.LayoutVersion);
+        Assert.Equal(expected, Fingerprint(layout));
+    }
+    #endregion
+
     [Fact]
     public void should_report_layout_version_1()
     {

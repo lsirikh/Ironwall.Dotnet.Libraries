@@ -25,7 +25,7 @@ public sealed record UnitMapDropPolicy(bool CanView, bool CanEdit, UnitMapLayout
 /// </summary>
 /// <remarks>
 /// <list type="table">
-/// <item><term>빈 곳 · <c>Ctrl</c></term><description>위치 — 배치 상태 · 권한이 허락할 때만</description></item>
+/// <item><term>빈 곳 · <c>Ctrl</c> · 자기 · 예하 위</term><description>위치 — 배치 상태 · 권한이 허락할 때만</description></item>
 /// <item><term>상위(또는 하위 · 모르는) 제대 위</term><description><see cref="UnitDropRules.CanMove"/> 그대로 — 허락이면 상위 바꾸기</description></item>
 /// <item><term>같은 제대 위</term><description><see cref="UnitDropRules.CanAdjoin"/> 그대로 — 허락이면 인접 연결. 같은 제대는 상위가 될 수 없어(서버 422) 모호하지 않다</description></item>
 /// </list>
@@ -52,6 +52,9 @@ public static class UnitMapDropClassifier
 
         if (!policy.CanView) return UnitMapDropDecision.Blocked(UnitMapText.NoPermission, hoverId);
         if (moving.Echelon is null) return UnitMapDropDecision.Blocked(UnitMapText.UnknownEchelonDrag, hoverId);
+
+        // 자기 · 예하 위(원래 자리 잔상 위) = 빈 곳 = 위치(조정자 결정 D-2026-09-27-215b6d · ISSUE-14).
+        if (hoverId is int self && (self == movingId || tree.IsDescendantOf(self, movingId))) hoverId = null;
 
         if (hoverId is not int targetId || ctrl) return ClassifyPosition(policy);
         if (!policy.CanEdit) return UnitMapDropDecision.Blocked(UnitMapText.NoPermission, targetId);

@@ -59,22 +59,16 @@ public class UnitMapDropClassifierTests
         Assert.Contains("이미", decision.Reason);
     }
 
-    [Fact]
-    public void should_block_when_dropped_on_own_descendant()
+    [Theory]
+    [InlineData("2대대", "6중대")]     // 예하
+    [InlineData("2대대", "61소초")]    // 예하의 예하
+    [InlineData("8중대", "8중대")]     // 자기(원래 자리 잔상)
+    [InlineData("8중대", "81소초")]
+    public void should_move_position_when_dropped_on_self_or_descendant(string moving, string hover)
     {
-        var decision = Drop("2대대", "6중대");
-
-        Assert.Equal(UnitMapDropKind.Blocked, decision.Kind);
-        Assert.Equal(UnitDropRules.CanMove(F.Tree, F.IdOf("2대대"), F.IdOf("6중대")).Reason, decision.Reason);
-    }
-
-    [Fact]
-    public void should_block_when_dropped_on_self()
-    {
-        var decision = Drop("8중대", "8중대");
-
-        Assert.Equal(UnitMapDropKind.Blocked, decision.Kind);
-        Assert.Equal(UnitDropRules.CanAdjoin(F.Tree, F.IdOf("8중대"), F.IdOf("8중대")).Reason, decision.Reason);
+        // 조정자 결정 D-2026-09-27-215b6d · ISSUE-14 — 잔상 위로 조금 옮기는 흔한 조작을 막지 않는다
+        Assert.Equal(UnitMapDropDecision.Position(), Drop(moving, hover));
+        Assert.Equal(UnitMapDropDecision.Blocked(UnitMapText.NoPermission), Drop(moving, hover, policy: ViewShared));
     }
 
     [Fact]
@@ -89,7 +83,7 @@ public class UnitMapDropClassifierTests
 
     [Theory]
     [InlineData("8중대", "11소초")]
-    [InlineData("1연대", "3대대")]
+    [InlineData("1연대", "4대대")]
     public void should_block_when_dropped_on_lower_echelon(string moving, string target)
     {
         var decision = Drop(moving, target);
@@ -263,6 +257,11 @@ public class UnitMapDropClassifierTests
             var mover = F.Tree.Find(moving)!;
             foreach (var hover in ids)
             {
+                if (hover == moving || F.Tree.IsDescendantOf(hover, moving))
+                {
+                    Assert.Equal(UnitMapDropDecision.Position(), UnitMapDropClassifier.Classify(F.Tree, moving, hover, false, EditShared));
+                    continue;
+                }
                 var decision = UnitMapDropClassifier.Classify(F.Tree, moving, hover, false, EditShared);
                 var target = F.Tree.Find(hover)!;
                 var sameEchelon = mover.Echelon == target.Echelon;

@@ -129,6 +129,34 @@ public readonly record struct GraphViewport(double Scale, Vector Offset)
         return true;
     }
 
+    /// <summary>팬 한계에서 늘 보이는 그림의 몫(조정자 결정 D-2026-09-27-6615ba · 시나리오 ISSUE-40).</summary>
+    public const double MinVisibleFraction = 0.2;
+
+    /// <summary>
+    /// 팬 한계 — 그림(<paramref name="worldBounds"/> × 배율)이 축마다 <b>최소 <paramref name="minVisibleFraction"/></b> 만큼 뷰포트 안에 남도록
+    /// 오프셋을 자른다. 그림이 뷰포트보다 크면 뷰포트 폭의 그 몫이 기준이다(그림 전체를 끝없이 화면 밖으로 밀지 못하게 — SIM-V079 · V080).
+    /// 배율은 바꾸지 않는다. 경계가 비었으면 그대로.
+    /// </summary>
+    /// <remarks>경계 폭이 0(부대 1개 · 한 줄)이면 그 점이 뷰포트 안에 남는다.</remarks>
+    public GraphViewport ClampPan(Rect worldBounds, Size viewport, double minVisibleFraction = MinVisibleFraction)
+    {
+        if (worldBounds.IsEmpty || !IsFinite(worldBounds) || viewport.IsEmpty || viewport.Width <= 0 || viewport.Height <= 0) return this;
+
+        var fraction = Math.Clamp(double.IsFinite(minVisibleFraction) ? minVisibleFraction : MinVisibleFraction, 0, 1);
+        var x = ClampAxis(worldBounds.Left * Scale + Offset.X, worldBounds.Width * Scale, viewport.Width, fraction);
+        var y = ClampAxis(worldBounds.Top * Scale + Offset.Y, worldBounds.Height * Scale, viewport.Height, fraction);
+        return new GraphViewport(Scale, new Vector(Offset.X + x, Offset.Y + y));
+
+        // 그림 왼쪽 끝 left 가 [need − extent, viewportLength − need] 안에 들도록 옮길 양.
+        static double ClampAxis(double left, double extent, double viewportLength, double fraction)
+        {
+            var need = fraction * Math.Min(extent, viewportLength);
+            var min = need - extent;
+            var max = viewportLength - need;
+            return left < min ? min - left : left > max ? max - left : 0;
+        }
+    }
+
     private static bool IsFinite(Rect r)
         => double.IsFinite(r.X) && double.IsFinite(r.Y) && double.IsFinite(r.Width) && double.IsFinite(r.Height);
 }

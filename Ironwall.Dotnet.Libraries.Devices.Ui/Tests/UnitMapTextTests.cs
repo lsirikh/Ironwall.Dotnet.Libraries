@@ -239,12 +239,22 @@ public class UnitMapTextTests
     [InlineData("7중대", 3, 2, "7중대 장비 5 중 3 을 지도에 표시했습니다 · 2 는 지도에 없음")]
     [InlineData("7중대", 2, 3, "7중대 장비 5 중 2 를 지도에 표시했습니다 · 3 은 지도에 없음")]
     [InlineData("7중대", 16, 0, "7중대 장비 16 을 지도에 표시했습니다")]
-    [InlineData("7중대", 0, 4, "7중대 장비 4 중 지도에 있는 것이 없습니다")]
+    [InlineData("7중대", 0, 4, "7중대 장비 4 중 지도에 보이는 것이 없습니다")]
     public void should_report_shown_and_missing_when_map_locate_result(string title, int shown, int missing, string expected)
     {
         Assert.Equal(expected, UnitMapText.MapLocateResult(title, shown, missing));
     }
     #endregion
+
+    [Theory]
+    [InlineData(11, 5, 2, 0, "7중대 장비 16 중 11 을 지도에 표시했습니다 · 5 는 지도에 없음(레이어에서 숨김 2)")]
+    [InlineData(11, 5, 0, 3, "7중대 장비 16 중 11 을 지도에 표시했습니다 · 5 는 지도에 없음 · 3 은 사이트 구역 밖")]
+    [InlineData(0, 4, 4, 0, "7중대 장비 4 중 지도에 보이는 것이 없습니다(레이어에서 숨김 4)")]
+    public void should_mention_hidden_and_outside_anchor_when_map_reports_them(int shown, int missing, int hidden, int outside, string expected)
+    {
+        // 레인 B 회신(MapLocateResult.Hidden · OutsideAnchor) — Missing 은 Hidden 을 포함한다
+        Assert.Equal(expected, UnitMapText.MapLocateResult("7중대", shown, missing, hidden, outside));
+    }
 
     #region - 확인 오버레이 (FR-32 · SB S6 · S7) -
     [Fact]

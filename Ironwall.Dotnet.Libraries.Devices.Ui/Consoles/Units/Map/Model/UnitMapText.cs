@@ -187,17 +187,127 @@ public static class UnitMapText
         => $"다른 운영자가 {Quote(unitName)} 배치를 바꿔 되돌리지 않았습니다.";
     #endregion
 
+    /// <summary>배치 쓰기가 시간 초과 — 반영됐을 수 있다(ISSUE-6): 다시 읽은 서버 상태로 그렸음을 말한다.</summary>
+    public static string LayoutWriteUnknownBar(string unitName)
+        => $"{Quote(unitName)} 위치 저장 결과를 확인하지 못했습니다 — 서버 배치를 다시 불러와 그대로 보입니다.";
+
+    /// <summary>위치 되돌림.</summary>
+    public static string PositionUndoneBar(string unitName) => $"{Quote(unitName)} 위치를 되돌렸습니다.";
+
+    /// <summary>상위 바꿈 되돌림.</summary>
+    public static string ReparentUndoneBar(string unitName)
+        => KoreanParticles.Resolve($"{Quote(unitName)}의 상위 변경을 되돌렸습니다.");
+
+    /// <summary>상위 되돌리기 거절 — 그 사이 다른 곳에서 상위가 또 바뀌었다(ISSUE-21).</summary>
+    public static string ReparentUndoRefusedBar(string unitName)
+        => $"다른 곳에서 {Quote(unitName)} 상위를 바꿔 되돌리지 않았습니다.";
+
+    /// <summary>되돌릴 부대가 편제에서 사라졌다(SIM-F119).</summary>
+    public static string UndoUnitGoneBar(string unitName)
+        => $"{Quote(unitName)} 부대가 편제에 없어 되돌리지 않았습니다.";
+
+    /// <summary>인접 되돌림.</summary>
+    public static string AdjacencyUndoneBar(string unitName, string otherName)
+        => KoreanParticles.Resolve($"{Quote(unitName)}과(와) {Quote(otherName)}의 인접 연결을 되돌렸습니다.");
+
+    /// <summary>되돌릴 인접 조작이 이미 다른 곳에서 반영돼 있다(SIM-F120).</summary>
+    public static string AdjacencyAlreadyBar(string unitName, string otherName, bool wasAdded)
+        => KoreanParticles.Resolve(wasAdded
+            ? $"{Quote(unitName)}과(와) {Quote(otherName)}은(는) 이미 인접이 끊겨 있습니다 — 되돌릴 것이 없습니다."
+            : $"{Quote(unitName)}과(와) {Quote(otherName)}은(는) 이미 인접입니다 — 되돌릴 것이 없습니다.");
+
+    /// <summary>상세가 더럽고 그 부대가 이 조작의 영향 부대다(조정자 필수 항목 5 · ISSUE-20).</summary>
+    public const string DirtyDetailBlocked = "상세에 적용하지 않은 변경이 있습니다 — 먼저 [적용]하거나 되돌린 뒤 옮기세요";
+
+    /// <summary>편제 쓰기 실패의 일반 사유(콘솔이 상태 띠에 자세한 사유를 적는다).</summary>
+    public const string OrgWriteFailedReason = "서버가 거절했거나 응답하지 않았습니다.";
+
+    /// <summary>[배치 초기화] 확인 오버레이.</summary>
+    public static UnitMapConfirmText ConfirmResetLayout(bool sessionOnly) => new(
+        "배치 초기화",
+        sessionOnly
+            ? new[] { "이 창에서 옮긴 위치를 모두 자동 배치로 돌립니다.", "되돌리기 가능" }
+            : new[] { "모든 운영자의 배치가 자동 배치로 돌아갑니다.", "서버에 바로 저장됩니다 · 되돌리기 가능" },
+        "초기화");
+
+    /// <summary>[배치 초기화] 완료.</summary>
+    public static string LayoutResetBar(bool sessionOnly)
+        => sessionOnly ? "이 창의 배치를 초기화했습니다 — 창을 닫으면 원래대로 사라집니다." : "배치를 초기화했습니다 — 모든 운영자에게 보입니다.";
+
+    /// <summary>[이 부대 배치 초기화] 완료.</summary>
+    public static string NodeLayoutResetBar(string unitName) => $"{Quote(unitName)} 배치를 초기화했습니다.";
+
+    /// <summary>초기화 되돌림 — 편제에서 사라진 부대는 건너뛰었다(조정자 필수 항목 4).</summary>
+    public static string LayoutResetUndoneBar(int skipped)
+        => skipped > 0
+            ? string.Create(CultureInfo.InvariantCulture, $"배치 초기화를 되돌렸습니다 — 편제에서 사라진 {skipped}곳은 건너뛰었습니다.")
+            : "배치 초기화를 되돌렸습니다.";
+
+    /// <summary>초기화 되돌리기 거절 — 그 사이 누가 배치를 바꿨다(전부 아니면 전무).</summary>
+    public const string LayoutResetUndoRefusedBar = "그 사이 다른 운영자가 배치를 바꿔 초기화를 되돌리지 않았습니다.";
+
+    /// <summary>초기화 되돌리기 — 항목이 일괄 쓰기 상한(1000)을 넘는다.</summary>
+    public const string LayoutResetTooLargeBar = "되돌릴 부대가 너무 많아(1000 초과) 초기화를 되돌리지 않았습니다.";
+
+    /// <summary>초기화 되돌리기 — 되돌릴 부대가 하나도 편제에 남지 않았다.</summary>
+    public const string LayoutResetNothingToRestoreBar = "되돌릴 부대가 편제에 남아 있지 않습니다.";
+
+    /// <summary>[이 부대 배치 초기화] — 옮긴 적이 없다.</summary>
+    public static string NodeNotMovedStatus(string unitName) => KoreanParticles.Resolve($"{Quote(unitName)}은(는) 옮긴 적이 없습니다.");
+
+    /// <summary>쓰기 실패 사유(배치).</summary>
+    public static string LayoutFailureReason(Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind kind) => kind switch
+    {
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.Unauthorized => "로그인이 만료되었습니다(401).",
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.Forbidden => "권한이 없습니다(403).",
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.Unreachable => "서버에 연결하지 못했습니다.",
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.Server => "서버 오류입니다.",
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.Parse => "응답을 읽지 못했습니다.",
+        Ironwall.Dotnet.Libraries.Devices.Api.Services.UnitLayoutFailureKind.PreconditionRequired => "버전 확인이 빠진 요청이었습니다(428).",
+        _ => "잠시 후 다시 시도하세요.",
+    };
+
+    /// <summary>배치 쓰기가 서버 규칙에 맞지 않았다(422 — 재시도 유도 금지).</summary>
+    public const string LayoutRejectedReason = "서버 규칙에 맞지 않아 거절됐습니다.";
+
+    /// <summary>검색 — 일치 없음(조정자 필수 항목 2).</summary>
+    public static string SearchNoMatch(string query)
+        => KoreanParticles.Resolve($"{Quote(query.Trim())}과(와) 일치하는 부대가 없습니다.");
+
+    /// <summary>M 위치 이동 모드 안내(<c>Units.Map.MoveMode</c>).</summary>
+    public static string MoveModeStatus(string unitName)
+        => $"{Quote(unitName)} 위치 이동 — 화살표 20 · Shift+화살표 5 · Enter 확정 · Esc 취소";
+
+    /// <summary>Alt+↑ — 이미 최상위.</summary>
+    public static string AlreadyTopStatus(string unitName) => KoreanParticles.Resolve($"{Quote(unitName)}은(는) 이미 최상위 부대입니다.");
+
+    /// <summary>Alt+↑ — 상위의 상위가 없다(최상위로 올리기는 편제 트리에서).</summary>
+    public static string NoGrandParentStatus(string unitName)
+        => KoreanParticles.Resolve($"{Quote(unitName)}을(를) 최상위로 올리는 것은 편제 트리에서 합니다.");
+
+    /// <summary>Alt+↓ — 바로 앞에 받을 상위가 없다.</summary>
+    public static string NoParentCandidateBelowStatus(string unitName)
+        => KoreanParticles.Resolve($"{Quote(unitName)}을(를) 받을 수 있는 상위 부대가 바로 위에 없습니다.");
+
     #region - 지도 회신 (FR-45) -
     /// <summary>
     /// [지도에서 보기] 회신 — "7중대 장비 16 중 11 을 지도에 표시했습니다 · 5 는 지도에 없음".
     /// </summary>
-    public static string MapLocateResult(string title, int shown, int missing)
+    public static string MapLocateResult(string title, int shown, int missing, int hidden = 0, int outsideAnchor = 0)
     {
         var total = shown + missing;
-        if (shown <= 0) return $"{title} 장비 {total} 중 지도에 있는 것이 없습니다";
-        if (missing <= 0) return $"{title} 장비 {shown} {Particle(shown, "을(를)")} 지도에 표시했습니다";
-        return $"{title} 장비 {total} 중 {shown} {Particle(shown, "을(를)")} 지도에 표시했습니다 · {missing} {Particle(missing, "은(는)")} 지도에 없음";
+        if (shown <= 0) return $"{title} 장비 {total} 중 지도에 보이는 것이 없습니다" + HiddenTail(missing, hidden);
+
+        var text = missing <= 0
+            ? $"{title} 장비 {shown} {Particle(shown, "을(를)")} 지도에 표시했습니다"
+            : $"{title} 장비 {total} 중 {shown} {Particle(shown, "을(를)")} 지도에 표시했습니다 · {missing} {Particle(missing, "은(는)")} 지도에 없음{HiddenTail(missing, hidden)}";
+        if (outsideAnchor > 0) text += $" · {outsideAnchor} {Particle(outsideAnchor, "은(는)")} 사이트 구역 밖";
+        return text;
     }
+
+    /// <summary>"지도에 없음" 중 레이어에서 숨긴 수(회신의 <c>Hidden</c> — <c>Missing</c> 에 포함된다).</summary>
+    private static string HiddenTail(int missing, int hidden)
+        => hidden > 0 && missing > 0 ? string.Create(CultureInfo.InvariantCulture, $"(레이어에서 숨김 {Math.Min(hidden, missing)})") : string.Empty;
     #endregion
 
     #region - 확인 오버레이 (FR-32 · SB S6 · S7) -
