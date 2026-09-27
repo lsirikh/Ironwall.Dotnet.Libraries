@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
@@ -6,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -64,16 +66,21 @@ public sealed class WiringApplyService
     private readonly IDeviceProviderService? _providerService;
     private readonly ILogService? _log;
     private readonly DeviceQueryPolicy _policy;
+    private readonly IEventAggregator? _eventAggregator;
 
+    /// <param name="eventAggregator">그룹 호출이 소속을 실제로 바꾸면 <see cref="DeviceGroupMembershipChangedMessage"/> 를 알릴 곳.
+    /// 없으면(단위 테스트 · 라이브 하네스) 알리지 않는다 — 지도의 구역선 조회표는 이 알림으로 새 소속을 안다.</param>
     public WiringApplyService(ISensorWriteGateway gateway,
                               IDeviceProviderService? providerService = null,
                               ILogService? log = null,
-                              DeviceQueryPolicy? policy = null)
+                              DeviceQueryPolicy? policy = null,
+                              IEventAggregator? eventAggregator = null)
     {
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _providerService = providerService;
         _log = log;
         _policy = policy ?? DeviceQueryPolicy.Resolve();
+        _eventAggregator = eventAggregator;
     }
 
     /// <summary>
@@ -156,6 +163,9 @@ public sealed class WiringApplyService
                 catch (Exception ex) { _log?.Warning($"[{nameof(WiringApplyService)}] 저장 뒤 재조회 실패: {ex.Message}"); }
             }
 
+            // 서버가 소속을 맞춰 준 그룹만 알린다 — 재조회 뒤라 캐시가 새 소속을 담고 있다(재조회가 없거나 실패해도 알린다).
+            await AnnounceMembershipAsync(groupResults).ConfigureAwait(false);
+
             var groupNote = groupResults.Count == 0 ? string.Empty : $" · 그룹 변경 {groupResults.Count}건";
             var message = failed == 0
                 ? $"저장했습니다 — 센서 {ok}대{groupNote}."
@@ -176,6 +186,19 @@ public sealed class WiringApplyService
     }
 
     #region - Groups (W2) -
+    /// <summary>
+    /// 소속이 바뀌었다고 알린다 — 지도가 그 그룹들의 구역선만 다시 등록(비면 해제)한다.
+    /// 알림 실패는 저장 결과를 바꾸지 않는다. 이 서비스는 작업 스레드에서 끝날 수 있다 — 받는 쪽(지도)이 UI 로 넘긴다.
+    /// </summary>
+    private async Task AnnounceMembershipAsync(IReadOnlyList<WiringGroupResult> groupResults)
+    {
+        if (_eventAggregator is null) return;
+        var changed = groupResults.Where(g => g.Ok && g.DeviceIds is { Count: > 0 }).Select(g => g.GroupId);
+        if (DeviceGroupMembershipChangedMessage.For(changed) is not { } message) return;
+        try { await _eventAggregator.PublishOnCurrentThreadAsync(message).ConfigureAwait(false); }
+        catch (Exception ex) { _log?.Error($"[{nameof(WiringApplyService)}] 소속 변경 알림 실패 groups={string.Join(",", message.GroupIds)}: {ex.Message}"); }
+    }
+
     /// <summary>
     /// 그룹 변화분을 보낸다 — <b>그룹 하나 · 방향 하나에 배치 호출 한 번</b>. 성공한 그룹만 기준을 옮긴다.
     /// </summary>

@@ -40,6 +40,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     private readonly DeviceQueryPolicy _policy;
     private readonly ICatalogService? _catalog;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _eventAggregator;
 
     public WiringLauncher(IWindowManager windows,
                           IDeviceApiService api,
@@ -48,7 +49,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                           DeviceQueryPolicy policy,
                           DeviceGroupProvider? groups = null,
                           ICatalogService? catalog = null,
-                          ILogService? log = null)
+                          ILogService? log = null,
+                          IEventAggregator? eventAggregator = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _api = api ?? throw new ArgumentNullException(nameof(api));
@@ -58,6 +60,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _catalog = catalog;
         _log = log;
+        _eventAggregator = eventAggregator;
     }
 
     public bool IsAvailable => _policy.IsAxisContract;
@@ -70,7 +73,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var seeds = SeedsFor(controller.Id);
         var types = SensorTypeCodes(seeds);
 
-        var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy);
+        var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy, _eventAggregator);
         var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor());
 
         var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
