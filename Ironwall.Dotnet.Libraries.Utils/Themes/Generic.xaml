@@ -485,20 +485,23 @@
 					-->
 					<StackPanel>
 						<!--
-							첫째 줄 — 높이 고정(Height) + ClipToBounds. Padding 12,8 이 위아래 16 을 먹고 남는 32 가 버튼·검색 높이와 같다.
+							첫째 줄 — 높이 고정(Height) + ClipToBounds. 안쪽 높이 = 48 − 위 여백 − 아래 여백 − 아래 선 = 32(버튼·검색 높이).
+							⚠ 아래 선 1px 도 높이를 먹는다 — 예전 Padding 8,8 + 선 1 은 안쪽 31 이라 32 짜리 단추 · 검색칸 아랫 테두리가
+							1px 잘렸다(2026-09-27 사용자 캡처). 선이 있으면 아래 여백 7, 없으면 8.
 							아래 선은 필터 줄이 없을 때만 긋는다(있으면 필터 줄이 툴바 전체의 아래 선을 긋는다 — 두 줄이 한 띠로 읽힌다).
 						-->
 						<Border
 							Height="{x:Static c:ConsoleLayoutMath.ToolbarHeight}"
-							Padding="12,8"
 							BorderBrush="{DynamicResource DividerBrush}"
 							ClipToBounds="True">
 							<Border.Style>
 								<Style TargetType="Border">
 									<Setter Property="BorderThickness" Value="0,0,0,1" />
+									<Setter Property="Padding" Value="12,8,12,7" />
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding HasFilterRow, RelativeSource={RelativeSource AncestorType={x:Type c:ConsoleToolbar}}}" Value="True">
 											<Setter Property="BorderThickness" Value="0" />
+											<Setter Property="Padding" Value="12,8" />
 										</DataTrigger>
 									</Style.Triggers>
 								</Style>

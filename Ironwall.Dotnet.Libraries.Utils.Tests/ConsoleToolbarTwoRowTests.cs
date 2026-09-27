@@ -77,6 +77,33 @@ public class ConsoleToolbarTwoRowTests
 
     private static TextBox SearchBox(ConsoleToolbar toolbar) => (TextBox)toolbar.Template.FindName("Search", toolbar);
 
+    /// <summary>
+    /// 첫째 줄 안쪽 높이 = 48 − 여백 − 아래 선. 예전 여백 8,8 + 선 1 은 안쪽 31 이라 32 짜리 단추 · 검색칸의 아랫 테두리가
+    /// ClipToBounds 에 1px 잘렸다(2026-09-27 사용자 캡처: 부대 편제 [부대 등록] · [⟳] · 검색칸 아래가 구분선에 먹힘).
+    /// 필터 줄이 있을 때(선 0)와 없을 때(선 1) 둘 다 본다.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void should_leave_the_full_input_height_inside_the_action_row_when_the_row_draws_its_divider_or_not(bool withFilters)
+    {
+        var (inner, addHeight) = OnSta(() =>
+        {
+            var toolbar = NewToolbar();
+            if (withFilters) toolbar.Filters = Chips(2);
+            Settle(toolbar, 756);
+            var stack = (Panel)System.Windows.Media.VisualTreeHelper.GetChild(toolbar, 0);
+            var row = (Border)stack.Children[0];
+            var innerHeight = row.ActualHeight - row.Padding.Top - row.Padding.Bottom - row.BorderThickness.Top - row.BorderThickness.Bottom;
+            var add = (FrameworkElement)toolbar.Template.FindName("PART_Add", toolbar);
+            return (innerHeight, add.ActualHeight);
+        });
+
+        Assert.True(inner >= ConsoleLayoutMath.InputHeight - 0.01,
+            $"첫째 줄 안쪽 {inner} < 입력 높이 {ConsoleLayoutMath.InputHeight} — 단추 · 검색칸 아래가 잘린다");
+        Assert.Equal(ConsoleLayoutMath.InputHeight, addHeight, 1);
+    }
+
     [Fact]
     public void should_not_show_the_filter_row_when_the_toolbar_has_no_filters()
     {
