@@ -165,18 +165,18 @@
 				ShowSearch="{Binding ShowSearch}">
 				<!--  상태 칩 5종 — 콤보를 대신한다(L1279). "전체"는 아무것도 안 누른 상태이고 서버에 값을 보내지 않는다.  -->
 				<c:ConsoleToolbar.Filters>
-					<ItemsControl
+					<c:ConsoleChipGroup
 						AutomationProperties.AutomationId="Console.Reports.Filters"
 						Focusable="False"
 						ItemsSource="{Binding ListViewModel.StatusChips}"
 						Visibility="{Binding IsListRail, Converter={StaticResource BoolToVisibility}}">
 						<!--  좁으면 다음 줄로 넘긴다 — 칩을 누르거나 글자 중간에서 자르지 않는다  -->
-						<ItemsControl.ItemsPanel>
+						<c:ConsoleChipGroup.ItemsPanel>
 							<ItemsPanelTemplate>
 								<WrapPanel Orientation="Horizontal" />
 							</ItemsPanelTemplate>
-						</ItemsControl.ItemsPanel>
-						<ItemsControl.ItemTemplate>
+						</c:ConsoleChipGroup.ItemsPanel>
+						<c:ConsoleChipGroup.ItemTemplate>
 							<DataTemplate>
 								<Button
 									AutomationProperties.AutomationId="{Binding AutomationId}"
@@ -185,8 +185,8 @@
 									Style="{StaticResource StatusChip}"
 									ToolTip="다시 누르면 전체로 돌아갑니다" />
 							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
+						</c:ConsoleChipGroup.ItemTemplate>
+					</c:ConsoleChipGroup>
 				</c:ConsoleToolbar.Filters>
 			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>

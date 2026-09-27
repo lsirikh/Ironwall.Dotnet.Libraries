@@ -212,16 +212,16 @@
 				<c:ConsoleToolbar.Filters>
 					<WrapPanel Orientation="Horizontal">
 						<!--  억제 스케줄 상태 칩 (정본 SB L2313) — 기간 칩 대신 뜬다  -->
-						<ItemsControl
+						<c:ConsoleChipGroup
 							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Filter"
 							ItemsSource="{Binding Suppression.Filters}"
 							Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}">
-							<ItemsControl.ItemsPanel>
+							<c:ConsoleChipGroup.ItemsPanel>
 								<ItemsPanelTemplate>
 									<WrapPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
-							</ItemsControl.ItemsPanel>
-							<ItemsControl.ItemTemplate>
+							</c:ConsoleChipGroup.ItemsPanel>
+							<c:ConsoleChipGroup.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
 										Margin="0,2,6,2"
@@ -233,19 +233,19 @@
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
 										Style="{StaticResource Console.Chip}" />
 								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+							</c:ConsoleChipGroup.ItemTemplate>
+						</c:ConsoleChipGroup>
 
-						<ItemsControl
+						<c:ConsoleChipGroup
 							AutomationProperties.AutomationId="Console.Events.Toolbar.Period"
 							ItemsSource="{Binding PeriodOptions}"
 							Visibility="{Binding ShowPeriodChips, Converter={StaticResource BoolToVis}}">
-							<ItemsControl.ItemsPanel>
+							<c:ConsoleChipGroup.ItemsPanel>
 								<ItemsPanelTemplate>
 									<WrapPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
-							</ItemsControl.ItemsPanel>
-							<ItemsControl.ItemTemplate>
+							</c:ConsoleChipGroup.ItemsPanel>
+							<c:ConsoleChipGroup.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
 										Margin="0,2,6,2"
@@ -256,8 +256,8 @@
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
 										Style="{StaticResource Console.Chip}" />
 								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+							</c:ConsoleChipGroup.ItemTemplate>
+						</c:ConsoleChipGroup>
 
 						<!--  직접 지정 — 팝업 달력(연속 범위) + 시작/종료 시각. 드래그의 폴백이자 정확한 입력 수단이며,
 						     트리거는 계속 포커스 가능해 자동화가 좌표 클릭에 묶이지 않는다(요구사항 3).  -->
@@ -331,17 +331,17 @@
 					DockPanel.Dock="Top"
 					Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
 						<!--  필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다  -->
-						<ItemsControl
+						<c:ConsoleChipGroup
 							Margin="0"
 							AutomationProperties.AutomationId="Console.Events.Toolbar.Filters"
 							ItemsSource="{Binding FilterChips}"
 							Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
-							<ItemsControl.ItemsPanel>
+							<c:ConsoleChipGroup.ItemsPanel>
 								<ItemsPanelTemplate>
 									<StackPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
-							</ItemsControl.ItemsPanel>
-							<ItemsControl.ItemTemplate>
+							</c:ConsoleChipGroup.ItemsPanel>
+							<c:ConsoleChipGroup.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
 										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
@@ -351,8 +351,8 @@
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
 										Style="{StaticResource Console.Tab}" />
 								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+							</c:ConsoleChipGroup.ItemTemplate>
+						</c:ConsoleChipGroup>
 				</Border>
 
 			<Grid ClipToBounds="True">

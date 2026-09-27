@@ -84,11 +84,16 @@
 				</DataGridTemplateColumn.HeaderTemplate>
 				<DataGridTemplateColumn.CellTemplate>
 					<DataTemplate>
+						<!--
+							UpdateSourceTrigger=PropertyChanged 는 빼지 않는다 — DataGrid 는 행마다 BindingGroup 을 두고, 기본 트리거의 바인딩이
+							거기 들면 WPF 가 트리거를 Explicit 으로 바꾼다. 그러면 체크는 화면에만 켜지고 행 VM 의 IsSelected 는 그대로라
+							[삭제] 가 끝내 꺼져 있었다(2026-09-28 헤디드 SC-SUP-015). 옛 억제 패널 · 계정 목록의 체크 칸도 같은 이유로 명시한다.
+						-->
 						<CheckBox
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Suppression.RowSelect.{0}}"
-							IsChecked="{Binding IsSelected, Mode=TwoWay}"
+							IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 							ToolTip="삭제 대상으로 고릅니다(취소 · 종료 행만)"
 							Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVis}}" />
 					</DataTemplate>

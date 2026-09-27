@@ -91,7 +91,7 @@ public class ReportStatusChipStyleTests
         var filters = view.IndexOf("AutomationProperties.AutomationId=\"Console.Reports.Filters\"", StringComparison.Ordinal);
 
         // Act
-        var panel = view[filters..view.IndexOf("</ItemsControl.ItemsPanel>", filters, StringComparison.Ordinal)];
+        var panel = view[filters..view.IndexOf("</c:ConsoleChipGroup.ItemsPanel>", filters, StringComparison.Ordinal)];
 
         // Assert
         Assert.Contains("<WrapPanel", panel);

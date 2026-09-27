@@ -61,6 +61,37 @@ public class ConsoleAutomationExposureTests
         Assert.True(isConsoleText);
     }
 
+    [Fact]
+    public void should_put_the_range_start_and_end_texts_in_the_control_view_when_the_range_field_is_templated()
+    {
+        // 2026-09-28 헤디드 SC-EVT-013 — 추이 끌기로 '직접' 기간이 되고 직접 지정 칸도 떴는데, 자동화는 그 칸
+        // (Console.Events.Period.From/To)을 찾지 못했다: 두 글이 템플릿 안 TextBlock 이라 기본 보기에서 빠졌다.
+        var controlView = OnSta(() =>
+        {
+            var field = new DateTimeRangeField
+            {
+                Style = KernelStyle(typeof(DateTimeRangeField)),
+                FromAutomationId = "Test.Range.From",
+                ToAutomationId = "Test.Range.To",
+            };
+            Arrange(field, 360, 40);
+
+            // 두 글을 시각 트리에서 AutomationId 로 찾아 그 peer 가 기본 보기에 드는지 묻는다(범위 칸 자신은 peer 가 없다).
+            var found = new Dictionary<string, bool>();
+            void Walk(DependencyObject node)
+            {
+                if (node is UIElement element && AutomationProperties.GetAutomationId(element) is "Test.Range.From" or "Test.Range.To")
+                    found[AutomationProperties.GetAutomationId(element)] = UIElementAutomationPeer.CreatePeerForElement(element)?.IsControlElement() == true;
+                for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) Walk(VisualTreeHelper.GetChild(node, i));
+            }
+            Walk(field);
+            return found;
+        });
+
+        Assert.True(controlView.TryGetValue("Test.Range.From", out var from) && from, "시작 글이 기본 보기에 없다");
+        Assert.True(controlView.TryGetValue("Test.Range.To", out var to) && to, "끝 글이 기본 보기에 없다");
+    }
+
     private static bool TemplatedTextIsControl(FrameworkElementFactory text)
     {
         text.Name = "T";

@@ -1575,10 +1575,12 @@
 								</ControlTemplate>
 							</ToggleButton.Template>
 							<StackPanel Orientation="Horizontal">
+								<!--  두 글은 ConsoleText — 템플릿 안 TextBlock 은 UIA 기본 보기에서 빠져 Console.Events.Period.From/To 를
+								     자동화 · 화면 읽기가 찾지 못했다(2026-09-28 헤디드 SC-EVT-013 "직접 칸 보임=False").  -->
 								<!--  D-30 — DisplayStartText/DisplayEndText 는 이 컨트롤이 실제로 배정받은 폭에 맞춰
 								     이미 tier 로 짧아진 글자다(RangeStart/RangeEnd 를 직접 포매팅하지 않는다).
 								     전체 정밀도는 이 요소 트리 루트의 ToolTip 에 항상 있다.  -->
-								<TextBlock
+								<c:ConsoleText
 									x:Name="PART_StartText"
 									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="{Binding FromAutomationId, RelativeSource={RelativeSource TemplatedParent}}"
@@ -1590,7 +1592,7 @@
 									VerticalAlignment="Center"
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="~" />
-								<TextBlock
+								<c:ConsoleText
 									x:Name="PART_EndText"
 									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="{Binding ToAutomationId, RelativeSource={RelativeSource TemplatedParent}}"
