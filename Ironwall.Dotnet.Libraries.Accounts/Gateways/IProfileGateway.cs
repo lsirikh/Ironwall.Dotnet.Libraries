@@ -19,6 +19,14 @@ public interface IProfileGateway
     /// </summary>
     bool CanSelfEditEmployeeNumber => true;
 
+    /// <summary>
+    /// 내 정보에서 본인 계정을 (비밀번호를 확인한 뒤) 지울 수 있는가. 기본=true(DB 모드 — 게이트웨이가 로컬 해시로 비밀번호를 확인한다).
+    /// Api 구현은 false — ① 서버 <c>DELETE /users/{id}</c> 는 비밀번호를 받지 않고 ② 비밀번호만 확인하는 엔드포인트가 없으며
+    /// ③ <c>POST /auth/login</c> 으로 확인하면 단일 세션 정책에서 지금 세션이 쫓겨나고 틀린 입력이 잠금 횟수에 쌓이고
+    /// ④ 서버는 본인 계정 삭제 자체를 409 로 거절한다. 확인할 수 없는 비밀번호를 받는 척하지 않는다.
+    /// </summary>
+    bool CanSelfDeleteAccount => true;
+
     /// <summary>본인 프로필 정보 저장(비밀번호 제외).</summary>
     Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default);
 

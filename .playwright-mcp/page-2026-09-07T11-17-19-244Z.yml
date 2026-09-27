@@ -1,0 +1,954 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - button "다크" [ref=e3] [cursor=pointer]
+    - button "라이트" [ref=e4] [cursor=pointer]
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - heading "이벤트 억제 — 주간 반복 UI 와이어프레임" [level=1] [ref=e7]
+      - generic [ref=e8]: 치수 · 바인딩 · 직렬화 계약 · 검증 매트릭스 | v1.0 · 2026-09-07
+      - generic [ref=e9]:
+        - generic [ref=e10]: PRD event-suppression-recurrence v1.0 (Approved)
+        - generic [ref=e11]: 서버 API 6.3.3
+        - generic [ref=e12]: Track C
+        - generic [ref=e13]: 적대검증 fatal 10 반영본
+    - generic [ref=e14]:
+      - text: 이 문서의 역할 — 치수 · 바인딩 · API 계약 · 검증 규칙만 다룬다. 화면 흐름과 안내 문구는
+      - code [ref=e15]: event-suppression-recurrence-storyboard.html
+      - text: "에 있다 (역할 분리 규약:"
+      - code [ref=e16]: action-report-custom-template-storyboard.html:129
+      - text: ).
+    - heading "0. 두괄식 — 무엇이 바뀌고, 무엇이 절대 안 바뀌는가" [level=2] [ref=e17]
+    - generic [ref=e18]:
+      - text: 단발 모드(기본)에서 이 화면은 1px도 바뀌지 않는다. 반복 섹션은
+      - code [ref=e19]: Row3
+      - text: 하나로 격리되고
+      - code [ref=e20]: "Visibility={Binding IsWeeklyMode}"
+      - text: 로 통째로
+      - code [ref=e21]: Collapsed
+      - text: 된다. 폼 세로 원가 315 유지 → DataGrid 293 유지.
+    - table [ref=e22]:
+      - rowgroup [ref=e23]:
+        - row [ref=e24]:
+          - columnheader "축" [ref=e25]
+          - columnheader "단발 (현행)" [ref=e26]
+          - columnheader "주간 반복 (신규)" [ref=e27]
+        - row [ref=e28]:
+          - cell "폼 세로" [ref=e29]
+          - cell "315 (변화 0)" [ref=e30]
+          - cell "363 (+48)" [ref=e31]
+        - row [ref=e32]:
+          - cell "DataGrid 가용" [ref=e33]
+          - cell "293 ≈ 7행" [ref=e34]
+          - cell "245 ≈ 5행" [ref=e35]
+        - row [ref=e36]:
+          - cell "좌우 바닥선" [ref=e37]
+          - cell "좌 182 / 우 202 (현행 유지)" [ref=e38]
+          - cell "Row3는 좌우 분할 아래 전폭이라 정렬 불변" [ref=e39]
+        - row [ref=e40]:
+          - cell "408 정렬 계약" [ref=e41]
+          - cell "양쪽 모두 불변 — 좌측 Grid 컬럼 정의를 건드리지 않는다" [ref=e42]
+        - row [ref=e43]:
+          - cell "356 트레이" [ref=e44]
+          - cell "양쪽 모두 불변" [ref=e45]
+        - row [ref=e46]:
+          - cell "목록 컬럼" [ref=e47]
+          - cell "추가·삭제 0건 — 상태 90→132 / 대상 200→170 폭만 조정" [ref=e48]
+    - generic [ref=e49]: 세로는 제로섬이다. 본문 3행이 나눠 갖는 총 예산은 648 (= 720 − 2 border − 46 헤더 − 24 margin)이고 패널에 ScrollViewer가 없다. 폼이 608을 넘기면 DataGrid가 0이 되고 에러 없이 조용히 잘린다. 경고 배너 3종이 전부 뜨면(36+38+22) 반복 모드 DataGrid 잔여는 ≈149다.
+    - heading "1. 폼 배치 — 단발 (현행 무변경 확인용)" [level=2] [ref=e50]
+    - generic [ref=e51]:
+      - generic [ref=e52]: 1050 × 720 · 단발 모드 · 폼 315 / DataGrid 293
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]: 이벤트 억제 스케줄
+          - generic [ref=e56]: ✕
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: 진행 중인 억제 2건
+            - generic [ref=e60]:
+              - generic [ref=e61]:
+                - generic [ref=e62]:
+                  - generic [ref=e63]:
+                    - generic [ref=e64]: 작업명 *
+                    - generic [ref=e65]: "예: GOP 3구역 정기 점검"
+                  - generic [ref=e66]:
+                    - generic [ref=e67]: 대상 유형
+                    - generic [ref=e68]: ◉ 장비 ○ 그룹 ○ 전체
+                - generic [ref=e69]:
+                  - generic [ref=e70]:
+                    - generic [ref=e71]: 억제 범위
+                    - generic [ref=e72]: 전체
+                  - generic [ref=e73]:
+                    - generic [ref=e74]: 대상 측
+                    - generic [ref=e75]: both
+                - generic [ref=e76]:
+                  - generic [ref=e77]:
+                    - generic [ref=e78]: 억제 시간창 (KST) * — 시작 ~ 종료
+                    - generic [ref=e79]: 반복
+                  - generic [ref=e80]:
+                    - generic [ref=e81]: 2026-09-07 09:00
+                    - generic [ref=e82]: ~
+                    - generic [ref=e83]: 2026-09-07 18:00
+                    - generic [ref=e84]: ◉ 단발 ○ 주간 반복
+              - generic [ref=e86]:
+                - generic [ref=e87]: 대상 장비 선택 0개
+                - generic [ref=e88]:
+                  - generic [ref=e89]: ＋
+                  - generic [ref=e90]: 선택된 장비가 없습니다
+                  - generic [ref=e91]: 아래에서 추가하세요
+                - generic [ref=e92]: 장비 추가…
+            - generic [ref=e93]:
+              - generic [ref=e94]: 초기화
+              - generic [ref=e95]: ＋ 억제 창 생성
+          - generic [ref=e96]: 목록 DataGrid — 가용 293 (≈7행 × 38)
+    - generic [ref=e97]:
+      - text: 단발에서 유일한 시각 변화는 시간창 라벨이 2열 라벨 밴드로 쪼개지고 오른쪽 여유 218에 "반복" 라디오가 인라인으로 들어간 것뿐이다. 세로 비용 0(Row2 높이 불변). 좌측 라벨 문자열은 현행 그대로
+      - code [ref=e98]: "\"억제 시간창 (KST) * — 시작 ~ 종료\""
+      - text: 다.
+    - heading "반복 라디오 폭 검산" [level=3] [ref=e99]
+    - generic [ref=e100]: Row2 가용폭 = 626 (좌측 Grid 408 + 218) 피커 3종 점유 = 408 (196 + 8+8 + 196) ──────────────────────────────── 남는 폭 = 218 라디오 Border 필요 = 12(Margin) + 12(Padding-L) + 55("단발") + 14(Gap) + 80("주간 반복") + 12(Padding-R) = 185 ≤ 218 여유 33 ✔ 기하는 대상 유형 Border(:389-395)와 동일 — MinHeight 36 · Padding 12,0 · CornerRadius 4
+    - heading "2. 폼 배치 — 주간 반복 (Row3 전개)" [level=2] [ref=e101]
+    - generic [ref=e102]:
+      - generic [ref=e103]: 주간 반복 ON · 폼 363 (+48) / DataGrid 245
+      - generic [ref=e104]:
+        - generic [ref=e105]:
+          - generic [ref=e106]: 이벤트 억제 스케줄
+          - generic [ref=e107]: ✕
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - generic [ref=e110]: 진행 중인 억제 2건
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]:
+                    - generic [ref=e115]: 작업명 *
+                    - generic [ref=e116]: GOP 3구역 정기 점검
+                  - generic [ref=e117]:
+                    - generic [ref=e118]: 대상 유형
+                    - generic [ref=e119]: ○ 장비 ○ 그룹 ◉ 전체
+                - generic [ref=e120]:
+                  - generic [ref=e121]:
+                    - generic [ref=e122]: 억제 범위
+                    - generic [ref=e123]: 전체
+                  - generic [ref=e124]:
+                    - generic [ref=e125]: 대상 측
+                    - generic [ref=e126]: both
+                - generic [ref=e127]:
+                  - generic [ref=e128]:
+                    - generic [ref=e129]: 유효기간 (KST) * — 시작 ~ 종료
+                    - generic [ref=e130]: 반복
+                  - generic [ref=e131]:
+                    - generic [ref=e132]: 2026-08-09 00:00
+                    - generic [ref=e133]: ~
+                    - generic [ref=e134]: 무제한 — 종료일 없음
+                    - generic [ref=e135]:
+                      - text: ○ 단발
+                      - generic [ref=e136]: ◉ 주간 반복
+                - generic [ref=e137]:
+                  - generic [ref=e138]:
+                    - generic [ref=e139]: 요일 *
+                    - generic [ref=e140]:
+                      - generic [ref=e141] [cursor=pointer]: 월
+                      - generic [ref=e142] [cursor=pointer]: 화
+                      - generic [ref=e143] [cursor=pointer]: 수
+                      - generic [ref=e144] [cursor=pointer]: 목
+                      - generic [ref=e145] [cursor=pointer]: 금
+                      - generic [ref=e146] [cursor=pointer]: 토
+                      - generic [ref=e147] [cursor=pointer]: 일
+                  - generic [ref=e148]:
+                    - generic [ref=e149]: 일일 시각 *
+                    - generic [ref=e150]:
+                      - generic [ref=e151]: 08:00:00
+                      - generic [ref=e152]: ~
+                      - generic [ref=e153]: 21:00:00
+                  - generic [ref=e154]:
+                    - generic [ref=e155]: 유효기간 끝
+                    - generic [ref=e156]: ☑ 기간 제한 없음
+                - generic [ref=e157]: → 월~금 08:00~21:00 · 무제한 · 2026-08-09 시작
+              - generic [ref=e159]:
+                - generic [ref=e160]: 대상
+                - generic [ref=e161]:
+                  - generic [ref=e162]: ⚠
+                  - generic [ref=e163]: 전체 대상
+                  - generic [ref=e164]: 모든 장비의 이벤트가 억제됩니다
+            - generic [ref=e165]:
+              - generic [ref=e166]: 초기화
+              - generic [ref=e167]: ＋ 억제 창 생성
+          - generic [ref=e168]: 목록 DataGrid — 가용 245 (≈5행)
+    - heading "Row3 3구역 치수 (합 626 = 좌측 Grid 폭)" [level=3] [ref=e169]
+    - generic [ref=e170]: "Row3 Grid.Row=\"3\" Grid.ColumnSpan=\"2\" Margin=\"0,10,0,0\" Visibility=\"{Binding IsWeeklyMode, Converter={StaticResource BoolToVis}}\" ┌─ 246 ────────────────┬ 12 ┬─ 216 ──────────┬ 12 ┬─ 140 ────────┐ │ 요일 스트립 │gap │ 일일 시각 │gap │ 무제한 체크 │ │ ToggleButton ×7 │ │ TimePicker ×2 │ │ CheckBox │ └───────────────────────┴────┴─────────────────┴────┴───────────────┘ 246 + 12 + 216 + 12 + 140 = 626 ✔ (좌측 Grid 408 + 218 = 626) 세로: 라벨 18 + 컨트롤 36 = 54 → Row3 Margin 10 포함 +48 실효 (라벨 밴드가 Row2 와 리듬 공유, 요약 줄 +14 는 Margin 흡수)"
+    - heading "3. 요일 스트립 — 드래그 우선 (전사 방침)" [level=2] [ref=e171]
+    - heading "3-1. 컨트롤과 기하" [level=3] [ref=e172]
+    - generic [ref=e173]: "Border Width=246 MinHeight=36 Padding=\"4,0\" BorderThickness=1 CornerRadius=4 BorderBrush={DynamicResource BorderBrush} ← 대상 유형 Border(:389-395) 동일 어휘 └ StackPanel Orientation=\"Horizontal\" └ ToggleButton ×7 Width=32 Height=26 간격 2 내부 가용폭 = 246 − 2(border) − 8(padding) = 236 ToggleButton 224 (32×7) + 간격 12 (2×6) = 236 ✔ 정확히 일치"
+    - generic [ref=e174]:
+      - generic [ref=e175]:
+        - text: 왜
+        - code [ref=e176]: ToggleButton
+        - text: 인가
+      - text: —
+      - code [ref=e177]: ToggleButtonAutomationPeer
+      - text: 가 실재해 UIA 트리에 노출된다.
+      - code [ref=e178]: Border
+      - text: /
+      - code [ref=e179]: StackPanel
+      - text: /
+      - code [ref=e180]: Grid
+      - text: 는 peer가 없어 AutomationId를 붙여도 트리에 안 나온다.
+      - generic [ref=e181]:
+        - text: 바인딩은
+        - code [ref=e182]: IsChecked
+        - code [ref=e183]: Mode=TwoWay
+        - text: 순수 바인딩이고
+        - code [ref=e184]: Command
+        - text: 를 걸지 않는다
+      - text: —
+      - code [ref=e185]: IsChecked=OneWay + Command
+      - text: 구조는 UIA
+      - code [ref=e186]: TogglePattern.Toggle()
+      - text: 이 시각만 뒤집고 VM을 안 바꾸는 실증된 함정이다(
+      - code [ref=e187]: MapView.xaml:375-383
+      - text: EditModeToggle).
+    - heading "3-2. 드래그 계약 — 범위 페인팅" [level=3] [ref=e188]
+    - table [ref=e189]:
+      - rowgroup [ref=e190]:
+        - row [ref=e191]:
+          - columnheader "단계" [ref=e192]
+          - columnheader "동작" [ref=e193]
+          - columnheader "근거 / 주의" [ref=e194]
+        - row [ref=e195]:
+          - cell "누름" [ref=e196]
+          - cell [ref=e197]:
+            - text: 셀
+            - code [ref=e198]: i
+            - text: 에서
+            - code [ref=e199]: MouseLeftButtonDown
+            - text: → 시작 인덱스 기록 + 의도 결정(그 셀이 OFF면 "칠하기", ON이면 "지우기")
+          - cell "레포에 Preview 기반 캡처 드래그 0건 → 버블로 간다. 스트립은 자족적이라 부모와 경합 없음" [ref=e200]
+        - row [ref=e201]:
+          - cell "이동" [ref=e202]
+          - cell "누적 이동이 8.0 초과면 드래그 진입. 시작~현재 인덱스 구간에 의도를 일괄 적용" [ref=e203]
+          - cell [ref=e204]:
+            - code [ref=e205]: CameraPopupHubMath.IsDrag(dx,dy,8.0)
+            - text: 재사용(새 상수 금지). ⚠ 정확히 8.0은 드래그 아님 —
+            - code [ref=e206]: CameraPopupHubMathTests.cs:35
+            - text: 가 고정
+        - row [ref=e207]:
+          - cell "종료" [ref=e208]
+          - cell [ref=e209]:
+            - text: 단일
+            - code [ref=e210]: FinishDrag(bool commit)
+            - text: —
+            - code [ref=e211]: MouseLeftButtonUp
+            - text: 과
+            - code [ref=e212]: LostMouseCapture
+            - text: 양쪽에서 호출
+          - cell [ref=e213]:
+            - text: 정본
+            - code [ref=e214]: LabelAdorner.cs:433/:449/:460
+            - text: . ⚠ 레포 20파일 중 12파일이 LostCapture 누락 — 복사 금지
+        - row [ref=e215]:
+          - cell "데드존 미만" [ref=e216]
+          - cell "클릭 폴백 — 해당 셀 1개만 토글" [ref=e217]
+          - cell [ref=e218]:
+            - code [ref=e219]: _pressed
+            - text: 와
+            - code [ref=e220]: _dragging
+            - text: 을 분리
+        - row [ref=e221]:
+          - cell "ESC" [ref=e222]
+          - cell [ref=e223]:
+            - generic [ref=e224]:
+              - code [ref=e225]: PreviewKeyDown
+              - text: (터널)
+            - text: 에서 드래그 중일 때만 소비 → 시작 시점 비트마스크로 복원
+          - cell [ref=e226]:
+            - text: ⚠
+            - code [ref=e227]: ClearSelectionOnEscBehavior(:19,38,40)
+            - text: 가 버블 KeyDown에서 ESC를 무조건 소비하고
+            - code [ref=e228]: Items.Refresh()
+            - text: 로 컨테이너를 전량 재생성한다
+    - heading "3-3. 🔴 시각 피드백 — 적대검증이 잡은 것" [level=3] [ref=e229]
+    - generic [ref=e230]:
+      - text: FATAL-05 — 초안은 "선택 = 셀 채움(
+      - code [ref=e231]: PrimaryBrush
+      - text: ) / 제스처 범위 = 하단 2px 바(
+      - code [ref=e232]: PrimaryBrush
+      - text: )"였다. 그런데 지배적 제스처인 "칠하기"에서는 범위 셀이 즉시 checked가 되어 채워지고, 그 위에 같은 브러시로 바가 그려진다 → Primary on Primary = 문자 그대로 1.00:1. 범위 표시가 가장 필요한 순간에 원리적으로 안 보인다.
+    - generic [ref=e233]:
+      - text: 수정 — 제스처 표식을 채움과 다른 브러시 축으로 분리한다(
+      - code [ref=e234]: MultiDataTrigger
+      - text: 2분기).
+    - table [ref=e235]:
+      - rowgroup [ref=e236]:
+        - row [ref=e237]:
+          - columnheader "상태" [ref=e238]
+          - columnheader "표현 (형태)" [ref=e239]
+          - columnheader "브러시" [ref=e240]
+          - columnheader "대비 (Light / Dark)" [ref=e241]
+        - row [ref=e242]:
+          - cell "미선택" [ref=e243]
+          - cell "배경·테두리 없음" [ref=e244]
+          - cell [ref=e245]:
+            - code [ref=e246]: TextSecondaryBrush
+          - cell "—" [ref=e247]
+        - row [ref=e248]:
+          - cell "hover(미선택)" [ref=e249]
+          - cell "은은한 면" [ref=e250]
+          - cell [ref=e251]:
+            - code [ref=e252]: SurfaceHoverBrush
+          - cell "⚠ 드래그 신호로는 절대 쓰지 않음" [ref=e253]
+        - row [ref=e254]:
+          - cell "선택(영속)" [ref=e255]
+          - cell "셀 전체 채움 + Bold" [ref=e256]
+          - cell [ref=e257]:
+            - code [ref=e258]: PrimaryBrush
+            - text: /
+            - code [ref=e259]: OnPrimaryFixedBrush
+          - cell "6.03 / 7.85" [ref=e260]
+        - row [ref=e261]:
+          - cell "범위 ∧ 선택" [ref=e262]
+          - cell "하단 2px 바" [ref=e263]
+          - cell [ref=e264]:
+            - code [ref=e266]: OnPrimaryFixedBrush
+            - text: (채움 위)
+          - cell "6.03 / 7.85 ✔" [ref=e267]
+        - row [ref=e268]:
+          - cell "범위 ∧ 미선택" [ref=e269]
+          - cell "하단 2px 바" [ref=e270]
+          - cell [ref=e271]:
+            - code [ref=e273]: PrimaryBrush
+            - text: (카드 위)
+          - cell "6.03 / 6.35 ✔" [ref=e274]
+    - generic [ref=e275]:
+      - generic [ref=e276]: 축이 직교한다 — 채움(면) vs 하단 바(선). 테마 토글로 양쪽 확인할 것
+      - generic [ref=e277]:
+        - generic [ref=e278]:
+          - generic [ref=e279]: 미선택 + 범위
+          - generic [ref=e280]:
+            - generic [ref=e281] [cursor=pointer]: 월
+            - generic [ref=e282] [cursor=pointer]: 화
+            - generic [ref=e283] [cursor=pointer]: 수
+        - generic [ref=e284]:
+          - generic [ref=e285]: 선택 + 범위
+          - generic [ref=e286]:
+            - generic [ref=e287] [cursor=pointer]: 월
+            - generic [ref=e288] [cursor=pointer]: 화
+            - generic [ref=e289] [cursor=pointer]: 수
+        - generic [ref=e290]:
+          - generic [ref=e291]: 확정(월~금)
+          - generic [ref=e292]:
+            - generic [ref=e293] [cursor=pointer]: 월
+            - generic [ref=e294] [cursor=pointer]: 화
+            - generic [ref=e295] [cursor=pointer]: 수
+            - generic [ref=e296] [cursor=pointer]: 목
+            - generic [ref=e297] [cursor=pointer]: 금
+            - generic [ref=e298] [cursor=pointer]: 토
+            - generic [ref=e299] [cursor=pointer]: 일
+    - heading "3-4. 키보드 폴백 (드래그 6종 계약 ①)" [level=3] [ref=e300]
+    - table [ref=e301]:
+      - rowgroup [ref=e302]:
+        - row [ref=e303]:
+          - columnheader "키" [ref=e304]
+          - columnheader "동작" [ref=e305]
+        - row [ref=e306]:
+          - cell "Tab" [ref=e307]
+          - cell [ref=e308]:
+            - text: 스트립 전체가 탭스톱 1개 (
+            - code [ref=e309]: KeyboardNavigation.TabNavigation="Once"
+            - text: )
+        - row [ref=e310]:
+          - cell "← →" [ref=e311]
+          - cell [ref=e312]:
+            - text: 셀 간 이동 (
+            - code [ref=e313]: DirectionalNavigation="Contained"
+            - text: )
+        - row [ref=e314]:
+          - cell "Space" [ref=e315]
+          - cell "포커스 셀 토글" [ref=e316]
+        - row [ref=e317]:
+          - cell "Shift+←/→" [ref=e318]
+          - cell "범위 확장 — 드래그와 동일한 결과를 키보드로 (회귀 단언 경로)" [ref=e319]
+    - generic [ref=e320]:
+      - text: 회귀 단언은 반드시 이 폴백 경로로 잡는다. .NET 8 WPF
+      - code [ref=e321]: UIAutomationProvider.dll
+      - text: 에
+      - code [ref=e322]: IDragProvider
+      - text: /
+      - code [ref=e323]: IDropTargetProvider
+      - text: 타입 자체가 없어 드래그는 UIA로 단언할 수 없다. FlaUI에 패턴 클래스가 있다는 사실에 속지 말 것.
+    - heading "3-5. 빠른 선택 (드래그 6종 계약 ⑤ 되돌리기 보조)" [level=3] [ref=e324]
+    - paragraph [ref=e325]:
+      - text: 스트립 우측 바깥에 두지 않는다(246 폭이 꽉 참). ToolTip + 컨텍스트 메뉴로 제공한다 —
+      - code [ref=e326]: 평일(31)
+      - text: ·
+      - code [ref=e327]: 주말(96)
+      - text: ·
+      - code [ref=e328]: 매일(127)
+      - text: ·
+      - code [ref=e329]: 모두 해제(0)
+      - text: .
+    - heading "4. 🔴 일일 시각 — 적대검증이 뒤집은 컨트롤 선택" [level=2] [ref=e330]
+    - generic [ref=e331]:
+      - text: FATAL-01 / 06 / 09 (독립 반증 3기 수렴) — 초안은
+      - code [ref=e332]: mah:TimePicker
+      - text: 의
+      - code [ref=e333]: SelectedTime
+      - text: 에
+      - code [ref=e334]: TimeSpan?
+      - text: 을 바인딩하고 "
+      - code [ref=e335]: TimeSpan
+      - text: 은 offset을 담을 수 없으니 422가 구조적으로 불가능"이라고 주장했다. 그런 프로퍼티가 없다.
+    - generic [ref=e336]: 실측 — MahApps.Metro 2.4.10 XML 문서 (MahApps.Metro.xml) P:MahApps.Metro.Controls.TimePickerBase.Culture P:MahApps.Metro.Controls.TimePickerBase.IsClockVisible P:MahApps.Metro.Controls.TimePickerBase.PickerVisibility P:MahApps.Metro.Controls.TimePickerBase.SelectedDateTime ← 실재 (DateTime?) P:MahApps.Metro.Controls.TimePickerBase.SelectedTimeFormat ← 실재 P:MahApps.Metro.Controls.TimePickerBase.SourceHours / SourceMinutes / SourceSeconds SelectedTime — 0건. 존재하지 않는다.
+    - generic [ref=e337]:
+      - text: FATAL-02 / 08 — 그리고 이 레포의 요청 직렬화는 전 API 공통 단일 설정을 탄다.
+      - code [ref=e338]: ApiService.cs:23-27
+      - text: 의
+      - code [ref=e339]: DateTimeZoneHandling = DateTimeZoneHandling.Local
+      - text: 이
+      - code [ref=e340]: :144/:219/:251/:283
+      - text: 의 모든 POST/PATCH에 적용된다. ⇒
+      - generic [ref=e341]:
+        - code [ref=e342]: DateTime
+        - text: 을 DTO에 그대로 노출하면
+        - code [ref=e343]: "\"08:00:00+09:00\""
+        - text: 으로 직렬화되어 즉시 422
+      - text: 다.
+    - heading "수정된 계약 — 3층 분리" [level=3] [ref=e344]
+    - generic [ref=e345]: "① View mah:TimePicker SelectedDateTime=\"{Binding DailyStart, Mode=TwoWay}\" SelectedTimeFormat=\"Long\" (= HH:mm:ss) Width=100 ② VM public DateTime? DailyStart / DailyEnd ← DateTime? (TimeSpan 아님) ③ DTO [JsonProperty(\"daily_start\", NullValueHandling = NullValueHandling.Ignore)] public string? DailyStart { get; set; } ← string 이어야 한다 VM→DTO 변환은 단 한 지점: dto.DailyStart = vm.DailyStart?.TimeOfDay.ToString(@\"hh\\:mm\\:ss\"); // ⚠ 여기서 offset/Z 가 붙으면 즉시 422. DateTime 을 DTO 에 노출 금지."
+    - generic [ref=e346]: 같은 폼 안에서 시간 규약이 정반대다. 직렬화 헬퍼를 공유하면 반드시 한쪽이 깨진다.
+    - table [ref=e347]:
+      - rowgroup [ref=e348]:
+        - row [ref=e349]:
+          - columnheader "필드" [ref=e350]
+          - columnheader "규약" [ref=e351]
+          - columnheader "DTO 타입" [ref=e352]
+          - columnheader "위반 시" [ref=e353]
+        - row [ref=e354]:
+          - cell [ref=e355]:
+            - code [ref=e356]: window_start
+            - text: /
+            - code [ref=e357]: window_end
+          - cell [ref=e358]:
+            - text: offset 필수
+            - code [ref=e359]: yyyy-MM-ddTHH:mm:sszzz
+          - cell [ref=e360]:
+            - code [ref=e361]: string
+            - text: (기존)
+          - cell "naive면 저장은 맞고 응답만 +9h 어긋남 → \"억제가 안 걸렸다\" 오인" [ref=e362]
+        - row [ref=e363]:
+          - cell [ref=e364]:
+            - code [ref=e365]: daily_start
+            - text: /
+            - code [ref=e366]: daily_end
+          - cell [ref=e367]:
+            - text: offset 금지
+            - code [ref=e368]: "\"HH:mm:ss\""
+          - cell [ref=e369]:
+            - code [ref=e371]: string?
+          - cell [ref=e372]:
+            - text: 422 (
+            - code [ref=e373]: schemas:81-91
+            - text: )
+    - heading "모드별 필드 제거 — Newtonsoft 경로" [level=3] [ref=e374]
+    - generic [ref=e375]:
+      - text: FATAL-08 — 초안이 제시한
+      - code [ref=e376]: JsonIgnoreCondition
+      - text: 은 System.Text.Json 타입이라 이 경로에 존재하지 않는다. 이 레포의 요청 DTO는 전부 Newtonsoft(
+      - code [ref=e377]: "[JsonProperty]"
+      - text: +
+      - code [ref=e378]: JsonConvert.SerializeObject
+      - text: )다.
+    - generic [ref=e379]:
+      - text: "단발일 때 반복 4필드를 본문에서 제거해야 한다 (보내면 422 — \"only allowed when recurrence_type=weekly\") 방법 A — 속성 단위 Ignore + null 대입: [JsonProperty(\"days_of_week\", NullValueHandling = NullValueHandling.Ignore)] public int? DaysOfWeek { get; set; } // 단발이면 null → 키 소멸 방법 B (더 확실) — 레포 선례 SpeakerDeviceDto.cs:40 패턴: public bool ShouldSerializeDaysOfWeek() => RecurrenceType == \"weekly\"; public bool ShouldSerializeDailyStart() => RecurrenceType == \"weekly\"; public bool ShouldSerializeDailyEnd() => RecurrenceType == \"weekly\"; 🔴"
+      - generic [ref=e380]:
+        - code [ref=e381]: window_end
+        - text: 에는 Ignore 를 붙이면 안 된다.
+      - text: 무제한 창은 키를 명시적 null로 보내야 하고, 키가 없으면 422다 (
+      - code [ref=e382]: schemas:110-114
+      - text: — model_fields_set 검사로 오타 무기한 침묵을 막는 장치).
+    - heading "5. 🔴 무제한 — 게이트 불일치 (적대검증)" [level=2] [ref=e383]
+    - generic [ref=e384]:
+      - text: FATAL-03 / 07 (독립 반증 2기 수렴) — 체크박스는 Row3(
+      - code [ref=e385]: IsWeeklyMode
+      - text: 게이트)에 있고, 종료 피커↔플레이스홀더 전환은 Row2(
+      - code [ref=e386]: IsWindowEndUnlimited
+      - text: "게이트)에 있다. 게이트가 다르다. 파괴 시나리오: ① 주간 반복 선택 → ② \"기간 제한 없음\" 체크("
+      - code [ref=e387]: WindowEnd=null
+      - text: ) → ③ 단발로 되돌림 → Row3가 Collapse되어 체크박스가 사라지는데 플래그는 남는다 → 종료 자리에 "무제한" 플레이스홀더가 남고
+      - code [ref=e388]: WindowEnd=null
+      - text: 인 단발 창이 전송된다 → 서버 422("window_end is required when recurrence_type=none").
+    - heading "수정 — 파생 플래그 + 모드 전환 정리 + 3중 방어" [level=3] [ref=e389]
+    - generic [ref=e390]: "① 파생 플래그로 게이트 일치 public bool IsUnlimitedEffective => IsWeeklyMode && IsWindowEndUnlimited; Row2 피커/플레이스홀더 Visibility 를 원시 플래그가 아니라 이 파생값에 건다. ② 모드 전환 시 상태 정리 (IsWeeklyMode setter) 반복 → 단발 : IsWindowEndUnlimited = false; WindowEnd = _windowEndBackup; 단발 → 반복 : DaysOfWeek = 31(평일 프리셋); IsWindowEndUnlimited = false; ③ CanCreate 최종 방어 !(IsOneShotMode && WindowEnd is null) ← 어떤 경로로도 빠져나갈 수 없게"
+    - heading "종료 피커 ↔ 플레이스홀더 — \"비활성화\"가 아니라 \"대체\"" [level=3] [ref=e391]
+    - generic [ref=e392]: "<Grid> ← 크기 = 보이는 자식(196×36), 자리 이동 0 <mah:DateTimePicker Width=\"196\" … ← 기존 것 그대로 Visibility=\"{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVisInv}}\" /> <Border Width=\"196\" MinHeight=\"36\" CornerRadius=\"4\" BorderThickness=\"1\" Background=\"{DynamicResource SurfaceSunkenBrush}\" Visibility=\"{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVis}}\"> <TextBlock Text=\"무제한 — 종료일 없음\" FontSize=\"11\" FontStyle=\"Italic\" Foreground=\"{DynamicResource TextMutedBrush}\" AutomationProperties.AutomationId=\"Events.SuppressionSchedule.UnlimitedPlaceholder\" /> </Border> </Grid>"
+    - generic [ref=e393]:
+      - text: 반전 컨버터는
+      - generic [ref=e394]:
+        - text: 반드시
+        - code [ref=e395]: utils:BoolToInverseVisibleConverter
+      - text: (
+      - code [ref=e396]: :21
+      - text: )를 쓴다. 내장
+      - code [ref=e397]: BooleanToVisibilityConverter
+      - text: 는
+      - code [ref=e398]: ConverterParameter
+      - text: 를 무시한다(
+      - code [ref=e399]: :438-439
+      - text: 실증 버그).
+    - heading "6. 검증 매트릭스 — 서버가 안 막아주는 것" [level=2] [ref=e400]
+    - generic [ref=e401]: 서버 소스 직독 확정(2026-09-07) — 아래 2건은 서버가 422를 내지 않는다. UI가 유일한 방어선이다.
+    - table [ref=e402]:
+      - rowgroup [ref=e403]:
+        - row [ref=e404]:
+          - columnheader "#" [ref=e405]
+          - columnheader "조건" [ref=e406]
+          - columnheader "서버 실제 동작" [ref=e407]
+          - columnheader "UI 처리" [ref=e408]
+        - row [ref=e409]:
+          - cell "V1" [ref=e410]
+          - cell [ref=e411]:
+            - code [ref=e412]: days_of_week = 0
+            - text: (요일 미선택)
+          - 'cell "안 막음 검증자가 is None만 검사(schemas:103-107) → 0은 통과. 이후 if not dow: return None(service:119)로 빠져 영원히 발동 안 하는 창이 생성된다" [ref=e413]':
+            - generic [ref=e414]: 안 막음
+            - text: 검증자가
+            - code [ref=e415]: is None
+            - text: 만 검사(
+            - code [ref=e416]: schemas:103-107
+            - text: ) →
+            - code [ref=e417]: "0"
+            - text: 은 통과. 이후
+            - code [ref=e418]: "if not dow: return None"
+            - text: (
+            - code [ref=e419]: service:119
+            - text: )로 빠져 영원히 발동 안 하는 창이 생성된다
+          - cell "생성 차단 + 폼 오류 \"요일을 1개 이상 선택하세요\"" [ref=e420]
+        - row [ref=e421]:
+          - cell "V2" [ref=e422]
+          - cell [ref=e423]:
+            - code [ref=e424]: daily_start == daily_end
+          - cell "안 막음 24시간 종일로 수용(service:135-140 주석 \"de == ds → 24시간 종일(D-B 확정)\"). ⚠ RECURRENCE §10 D-B의 \"PM 결정 대기\"는 낡은 기술" [ref=e425]:
+            - generic [ref=e426]: 안 막음
+            - text: 24시간 종일로 수용(
+            - code [ref=e427]: service:135-140
+            - text: 주석 "de == ds → 24시간 종일(D-B 확정)"). ⚠ RECURRENCE §10 D-B의 "PM 결정 대기"는 낡은 기술
+          - cell "생성 차단 + \"시작과 종료가 같으면 24시간 종일 억제가 됩니다\"" [ref=e428]
+        - row [ref=e429]:
+          - cell "V3" [ref=e430]
+          - cell [ref=e431]:
+            - code [ref=e432]: daily_end < daily_start
+          - cell "정상 입력 자정 넘김(service:137-140)" [ref=e433]:
+            - generic [ref=e434]: 정상 입력
+            - text: 자정 넘김(
+            - code [ref=e435]: service:137-140
+            - text: )
+          - cell [ref=e436]:
+            - text: 허용 + 안내 "익일 06:00 종료". 요약도
+            - code [ref=e437]: "\"익일\""
+            - text: 표기
+        - row [ref=e438]:
+          - cell "V4" [ref=e439]
+          - cell "유효기간 길이" [ref=e440]
+          - cell "weekly 만 (e−s).days > 366(schemas:115-121). 정확히 366일은 통과. 단발은 서버 상한 없음. 무제한은 검사 스킵" [ref=e441]:
+            - generic [ref=e442]: weekly 만
+            - code [ref=e443]: (e−s).days > 366
+            - text: (
+            - code [ref=e444]: schemas:115-121
+            - text: ). 정확히 366일은 통과. 단발은 서버 상한 없음. 무제한은 검사 스킵
+          - cell "단발 30일(순수 클라 방어) / 반복 366일(서버 게이트) / 무제한 검사 스킵" [ref=e445]
+        - row [ref=e446]:
+          - cell "V5" [ref=e447]
+          - cell [ref=e448]:
+            - text: 무제한인데
+            - code [ref=e449]: window_end
+            - text: 키 누락
+          - cell "422 model_fields_set 검사" [ref=e450]:
+            - generic [ref=e451]: "422"
+            - code [ref=e452]: model_fields_set
+            - text: 검사
+          - cell [ref=e453]:
+            - text: DTO에서
+            - code [ref=e454]: window_end
+            - text: 에
+            - generic [ref=e455]:
+              - code [ref=e456]: Ignore
+              - text: 금지
+            - text: — 명시적 null 전송
+        - row [ref=e457]:
+          - cell "V6" [ref=e458]
+          - cell "단발인데 반복 필드 전송" [ref=e459]
+          - cell "422 \"only allowed when recurrence_type=weekly\"" [ref=e460]:
+            - generic [ref=e461]: "422"
+            - text: "\"only allowed when recurrence_type=weekly\""
+          - cell [ref=e462]:
+            - code [ref=e463]: ShouldSerializeXxx()
+            - text: 로 구조적 차단
+    - generic [ref=e464]:
+      - text: 새 경고 줄을 만들지 않는다. 기존
+      - code [ref=e465]: StatusCritical
+      - text: 한 줄(
+      - code [ref=e466]: :332-337
+      - text: )을 "폼 오류 1줄"로 일반화해 V1·V2·V4를 전부 흡수한다 → 세로 비용 0.
+    - heading "7. 요일 비트마스크 — 원점이 다르다" [level=2] [ref=e467]
+    - generic [ref=e468]:
+      - text: 서버는 월=0, .NET은 일=0.
+      - code [ref=e469]: (int)dt.DayOfWeek
+      - text: 로 그냥 시프트하면 요일이 통째로 어긋난다.
+    - generic [ref=e470]: "서버: 1 << date.weekday() (Python — 월=0 화=1 … 일=6) service:133 .NET: (int)DayOfWeek (일=0 월=1 … 토=6) 변환: int Mon0(DayOfWeek d) => ((int)d + 6) % 7; // Sunday(0) → 6 · Monday(1) → 0 · Saturday(6) → 5 비트: 월 1 · 화 2 · 수 4 · 목 8 · 금 16 · 토 32 · 일 64 평일 31 · 주말 96 · 매일 127 · 월수금 21"
+    - heading "8. 목록 — 컬럼 추가 0건" [level=2] [ref=e471]
+    - generic [ref=e472]:
+      - text: 새 컬럼을 넣을 자리가 없다. 고정 컬럼 합이 750이라 작업명
+      - code [ref=e473]: "*"
+      - text: 가 ≈255다.
+      - code [ref=e474]: "\"월~금 08:00~21:00\""
+      - text: 는 최소 ~140이 필요해, 컬럼을 만들면 작업명이 붕괴한다. ⚠ 게다가 CHANGELOG ⑦에 "목록 열 구성 변경은 사용자 확인 대기"가 이미 걸려 있다.
+    - table [ref=e475]:
+      - rowgroup [ref=e476]:
+        - row [ref=e477]:
+          - columnheader "컬럼" [ref=e478]
+          - columnheader "현행" [ref=e479]
+          - columnheader "제안" [ref=e480]
+          - columnheader "내용" [ref=e481]
+        - row [ref=e482]:
+          - cell "선택" [ref=e483]
+          - cell "60" [ref=e484]
+          - cell "60" [ref=e485]
+          - cell "불변" [ref=e486]
+        - row [ref=e487]:
+          - cell "상태" [ref=e488]
+          - cell "90" [ref=e489]
+          - cell "132 (+42)" [ref=e490]
+          - cell "상태 알약 + 억제중 표식(FR-03) — 같은 셀 안, 컬럼 신설 0" [ref=e491]
+        - row [ref=e492]:
+          - cell "작업명" [ref=e493]
+          - cell "* ≈255" [ref=e494]
+          - cell "* ≈243" [ref=e495]
+          - cell "2줄 — 1줄 작업명 / 2줄 반복 요약(FR-05, 11px muted). 폭 아닌 높이 소비" [ref=e496]
+        - row [ref=e497]:
+          - cell "대상" [ref=e498]
+          - cell "200" [ref=e499]
+          - cell "170 (−30)" [ref=e500]
+          - cell "요약 문자열이라 축약 가능" [ref=e501]
+        - row [ref=e502]:
+          - cell "범위" [ref=e503]
+          - cell "70" [ref=e504]
+          - cell "70" [ref=e505]
+          - cell "불변" [ref=e506]
+        - row [ref=e507]:
+          - cell "시작" [ref=e508]
+          - cell "130" [ref=e509]
+          - cell "130" [ref=e510]
+          - cell "불변" [ref=e511]
+        - row [ref=e512]:
+          - cell "종료" [ref=e513]
+          - cell "130" [ref=e514]
+          - cell "130" [ref=e515]
+          - cell [ref=e516]:
+            - text: 무제한이면 "무제한"(FR-04) —
+            - code [ref=e517]: "null"
+            - text: /파싱실패/값없음 3종 구분
+        - row [ref=e518]:
+          - cell "취소" [ref=e519]
+          - cell "70" [ref=e520]
+          - cell "70" [ref=e521]
+          - cell "불변" [ref=e522]
+        - row [ref=e523]:
+          - columnheader "합" [ref=e524]
+          - columnheader "750 + *" [ref=e525]
+          - columnheader "762 + *" [ref=e526]
+          - columnheader "+12 (작업명에서 흡수)" [ref=e527]
+    - generic [ref=e528]:
+      - generic [ref=e529]: 상태 셀 — 배지(status)와 억제중 표식(is_suppressing_now)이 분리된다
+      - table [ref=e530]:
+        - rowgroup [ref=e531]:
+          - row [ref=e532]:
+            - columnheader "상태" [ref=e533]
+            - columnheader "is_suppressing_now" [ref=e534]
+            - columnheader "렌더" [ref=e535]
+            - columnheader "의미" [ref=e536]
+          - row [ref=e537]:
+            - cell "active" [ref=e538]
+            - cell "true" [ref=e539]
+            - cell "진행중 억제중" [ref=e540]:
+              - generic [ref=e541]: 진행중
+              - text: 억제중
+            - cell "유효기간 안 + 지금 회차 진행 중" [ref=e543]
+          - row [ref=e544]:
+            - cell "active" [ref=e545]
+            - cell "false" [ref=e546]
+            - cell "진행중" [ref=e547]
+            - cell "유효기간 안이지만 지금은 미억제 (토요일 새벽 등) — 실측 62.2%" [ref=e549]
+          - row [ref=e550]:
+            - cell "active" [ref=e551]
+            - cell "null" [ref=e552]
+            - cell "진행중 억제중" [ref=e553]:
+              - generic [ref=e554]: 진행중
+              - text: 억제중
+            - cell [ref=e556]:
+              - text: 구버전 서버 응답 →
+              - code [ref=e557]: status=="active"
+              - text: 폴백
+          - row [ref=e558]:
+            - cell "pending" [ref=e559]
+            - cell "false" [ref=e560]
+            - cell "예정" [ref=e561]
+            - cell "아직 시작 전" [ref=e563]
+    - generic [ref=e564]:
+      - generic [ref=e565]:
+        - code [ref=e566]: occurrence_end
+        - text: 를 재계산하지 말 것.
+      - text: 서버는 유효기간 경계에서 회차를 자른다(
+      - code [ref=e567]: service:143-147
+      - text: 클램프). 마지막 날에는 요약 문자열(규칙)과 실제
+      - code [ref=e568]: occurrence_end
+      - text: 가 달라질 수 있다. ⇒ 요약(FR-05)은 규칙을 말하고, 회차 정보(FR-06)는 서버 값을 그대로 말한다.
+    - heading "9. 🔴 배너 — 로컬 값이 Trigger를 이긴다" [level=2] [ref=e569]
+    - generic [ref=e570]:
+      - text: FATAL-04 — 배너에 상태별 색을 주려면
+      - code [ref=e571]: DataTrigger
+      - text: 가 필요한데, 현행 배너는
+      - code [ref=e572]: Border
+      - text: 인스턴스에 로컬 값으로 색이 박혀 있다 (
+      - code [ref=e573]: :307-309
+      - code [ref=e574]: Background
+      - text: /
+      - code [ref=e575]: BorderBrush
+      - text: ","
+      - code [ref=e576]: :314
+      - code [ref=e577]: Foreground
+      - text: ). WPF 의존속성 우선순위에서 로컬 값(3) > Style Trigger(5) — "현행 그대로 두고 Trigger를 추가"하면 Trigger가 영원히 안 먹는다.
+    - generic [ref=e578]: "수정: ① :307-309 의 Background / BorderBrush 로컬 값 삭제 ② :314 의 Foreground 로컬 값 삭제 ③ 전부 Border.Style 의 기본 Setter 로 이관 (:902-925 배지 구조 복제) ④ 글자색 Setter 는 반드시 TextElement.Foreground — 본문 TextBlock 에는 Foreground 를 주지 않는다(상속)"
+    - table [ref=e579]:
+      - rowgroup [ref=e580]:
+        - row [ref=e581]:
+          - columnheader "배너 상태" [ref=e582]
+          - columnheader "렌더" [ref=e583]
+          - columnheader "토큰" [ref=e584]
+        - row [ref=e585]:
+          - cell "억제 진행 중" [ref=e586]
+          - cell "진행 중인 억제 2건 · 21:00 까지" [ref=e587]
+          - cell [ref=e589]:
+            - code [ref=e590]: TintWarning
+            - text: /
+            - code [ref=e591]: StatusWarning
+        - row [ref=e592]:
+          - cell "대기(다음 회차)" [ref=e593]
+          - cell "억제 예정 1건 · 다음 08-11 08:00" [ref=e594]
+          - cell [ref=e596]:
+            - code [ref=e597]: TintInfo
+            - text: /
+            - code [ref=e598]: StatusInfo
+        - row [ref=e599]:
+          - cell "stale (FR-14)" [ref=e600]
+          - cell "⚠ 갱신 실패 — 3분 전 기준 · 억제 2건" [ref=e601]
+          - cell [ref=e603]:
+            - code [ref=e604]: TextMuted
+            - text: + 테두리 제거
+    - generic [ref=e605]: stale에서 목록을 버리지 않는다. 이 배너의 존재 이유가 억제 은폐 방지다 — 조용한 소멸은 그 목적을 정면으로 배반하고, 조용한 유지는 거짓말한다. 병기가 정답이다. TTL = 폴링주기 × 3 = 90초.
+    - heading "10. AutomationId 대장" [level=2] [ref=e606]
+    - table [ref=e607]:
+      - rowgroup [ref=e608]:
+        - row [ref=e609]:
+          - columnheader "AutomationId" [ref=e610]
+          - columnheader "컨트롤" [ref=e611]
+          - columnheader "peer" [ref=e612]
+          - columnheader "용도" [ref=e613]
+        - row [ref=e614]:
+          - cell [ref=e615]:
+            - code [ref=e616]: …RecurrenceOneShotRadio
+          - cell "RadioButton" [ref=e617]
+          - cell "있음" [ref=e618]
+          - cell "단발 선택" [ref=e620]
+        - row [ref=e621]:
+          - cell [ref=e622]:
+            - code [ref=e623]: …RecurrenceWeeklyRadio
+          - cell "RadioButton" [ref=e624]
+          - cell "있음" [ref=e625]
+          - cell "반복 전환 트리거" [ref=e627]
+        - row [ref=e628]:
+          - cell [ref=e629]:
+            - code [ref=e630]: "…DayToggle.{0}"
+            - text: ×7
+          - cell "ToggleButton" [ref=e631]
+          - cell "있음" [ref=e632]
+          - cell [ref=e634]:
+            - text: 요일 개별 — 바인딩식 ID(
+            - code [ref=e635]: Mon
+            - text: …
+            - code [ref=e636]: Sun
+            - text: )
+        - row [ref=e637]:
+          - cell [ref=e638]:
+            - code [ref=e639]: …UnlimitedCheckBox
+          - cell "CheckBox" [ref=e640]
+          - cell "있음" [ref=e641]
+          - cell "무제한 토글" [ref=e643]
+        - row [ref=e644]:
+          - cell [ref=e645]:
+            - code [ref=e646]: …UnlimitedPlaceholder
+          - cell "TextBlock" [ref=e647]
+          - cell "있음" [ref=e648]
+          - cell "무제한 상태 단언" [ref=e650]
+        - row [ref=e651]:
+          - cell [ref=e652]:
+            - code [ref=e653]: …RecurrenceSummaryText
+          - cell "TextBlock" [ref=e654]
+          - cell "있음" [ref=e655]
+          - cell "★ 값 단언 1차 경로 — 아래 참조" [ref=e657]
+        - row [ref=e658]:
+          - cell [ref=e659]:
+            - code [ref=e660]: …DailyStartPicker
+            - text: /
+            - code [ref=e661]: …DailyEndPicker
+          - cell "mah:TimePicker" [ref=e662]
+          - cell "없음" [ref=e663]
+          - cell "🔴 UIA에 안 뜬다 — 아래 참조" [ref=e665]
+    - generic [ref=e666]:
+      - text: FATAL-10 —
+      - code [ref=e667]: mah:TimePicker
+      - text: 는
+      - code [ref=e668]: mah:DateTimePicker
+      - text: 와 같은
+      - code [ref=e669]: TimePickerBase
+      - text: "파생이고, 이 계열이 UIA에 안 뜬다는 것이 하네스 테스트 코드에 이미 못 박혀 있다:"
+      - code [ref=e670]: UiTests/Pages/SuppressionSchedulePage.cs:70
+      - text: — "mah:DateTimePicker 가 UIA 미노출이라(V-03 실측)"
+      - code [ref=e671]: UiTests/Functional/SuppressionSweepTests.cs:216
+      - text: — "mah:DateTimePicker 는 AutomationId 를 peer 로 올리지 않는다" ⇒ 피커에 AutomationId를 붙여도 죽은 계측이다.
+    - generic [ref=e672]:
+      - text: 수정 — 텍스트 미러를 1차 단언 경로로 삼는다. Row3 아래 요약 줄(
+      - code [ref=e673]: …RecurrenceSummaryText
+      - text: ")이 전송될 페이로드를 그대로 렌더한다:"
+      - code [ref=e674]: "\"월~금 08:00~21:00 · 무제한 · 2026-08-09 시작\""
+      - text: "이 한 줄로 요일·시각·무제한·유효기간을 전부 단언할 수 있고, 운용자에게도 확인 수단이 된다. (보조:"
+      - code [ref=e675]: FormTimePicker
+      - text: 를 재템플릿해
+      - code [ref=e676]: PART_TextBox
+      - text: 에 직접 AutomationId 부여 — 외부 Style Setter로는 템플릿 파트에 첨부속성을 못 건다.)
+    - heading "11. 적대검증 반영표 (fatal 10 / major 15 / minor 8)" [level=2] [ref=e677]
+    - table [ref=e678]:
+      - rowgroup [ref=e679]:
+        - row [ref=e680]:
+          - columnheader "#" [ref=e681]
+          - columnheader "반증" [ref=e682]
+          - columnheader "반영" [ref=e683]
+        - row [ref=e684]:
+          - cell "F-01/06/09" [ref=e685]
+          - cell [ref=e686]:
+            - code [ref=e687]: mah:TimePicker.SelectedTime
+            - text: 부재 (MahApps XML 실측)
+          - cell [ref=e688]:
+            - text: §4 —
+            - code [ref=e689]: SelectedDateTime
+            - text: +
+            - code [ref=e690]: DateTime?
+            - text: + DTO
+            - code [ref=e691]: string
+        - row [ref=e692]:
+          - cell "F-02" [ref=e693]
+          - cell [ref=e694]:
+            - code [ref=e695]: DateTimeZoneHandling.Local
+            - text: 이 전 요청에 적용
+          - cell [ref=e696]:
+            - text: §4 — DTO에
+            - code [ref=e697]: DateTime
+            - text: 노출 금지, 단일 변환 지점
+        - row [ref=e698]:
+          - cell "F-03/07" [ref=e699]
+          - cell "무제한 게이트 불일치 → 단발+null 전송" [ref=e700]
+          - cell [ref=e701]:
+            - text: §5 —
+            - code [ref=e702]: IsUnlimitedEffective
+            - text: 파생 + 전환 정리 +
+            - code [ref=e703]: CanCreate
+            - text: 3중
+        - row [ref=e704]:
+          - cell "F-04" [ref=e705]
+          - cell "배너 로컬 값이 Trigger를 이김" [ref=e706]
+          - cell "§9 — 로컬 값 삭제 후 Style Setter 이관" [ref=e707]
+        - row [ref=e708]:
+          - cell "F-05" [ref=e709]
+          - cell "제스처 바 = 채움과 같은 브러시 → 1.00:1" [ref=e710]
+          - cell [ref=e711]:
+            - text: §3-3 —
+            - code [ref=e712]: MultiDataTrigger
+            - text: 2분기로 브러시 축 분리
+        - row [ref=e713]:
+          - cell "F-08" [ref=e714]
+          - cell [ref=e715]:
+            - code [ref=e716]: JsonIgnoreCondition
+            - text: 은 STJ 타입 (경로 불일치)
+          - cell [ref=e717]:
+            - text: §4 —
+            - code [ref=e718]: ShouldSerializeXxx()
+            - text: (
+            - code [ref=e719]: SpeakerDeviceDto.cs:40
+            - text: 선례)
+        - row [ref=e720]:
+          - cell "F-10" [ref=e721]
+          - cell [ref=e722]:
+            - code [ref=e723]: TimePickerBase
+            - text: 계열 UIA 미노출(테스트에 명기)
+          - cell "§10 — 텍스트 미러를 1차 단언 경로로" [ref=e724]
+    - heading "12. 미검증 — \"통과\"로 적지 않는다" [level=2] [ref=e725]
+    - table [ref=e726]:
+      - rowgroup [ref=e727]:
+        - row [ref=e728]:
+          - columnheader "ID" [ref=e729]
+          - columnheader "항목" [ref=e730]
+          - columnheader "왜 못 했나 / 어떻게 검증하나" [ref=e731]
+        - row [ref=e732]:
+          - cell "V-07" [ref=e733]
+          - cell [ref=e734]:
+            - generic [ref=e735]:
+              - text: 맵 밖
+              - code [ref=e736]: AdornerLayer
+              - text: 가용성
+          - cell [ref=e737]:
+            - code [ref=e738]: AdornerDecorator
+            - text: 는
+            - code [ref=e739]: MapView.xaml:1087
+            - text: 에서 맵만 감싼다. 맵 밖 패널 위 선례 0건. ⇒ 이 설계는 어도너를 쓰지 않는다(스트립 내부 렌더) — 회피했으므로 블로커 아님
+        - row [ref=e740]:
+          - cell "V-08" [ref=e741]
+          - cell [ref=e742]:
+            - code [ref=e743]: Thumb
+            - text: 없이
+            - code [ref=e744]: ToggleButton
+            - text: 에 8.0 데드존 + 클릭 폴백
+          - cell [ref=e745]:
+            - text: 레포 유일
+            - code [ref=e746]: Thumb
+            - text: 선례(
+            - code [ref=e747]: SymbolPaletteView.cs:123-127
+            - text: )는 클릭 폴백 자체가 없다. 스파이크 필요
+        - row [ref=e748]:
+          - cell "V-09" [ref=e749]
+          - cell [ref=e750]:
+            - text: MDIX Outlined
+            - code [ref=e751]: IsFloating=False
+            - text: 의 자연 높이가
+            - code [ref=e752]: MinHeight 36
+            - text: 보다 큰가
+          - cell "크면 좌측 컬럼이 182를 넘어 트레이 202 대비 여유가 사라진다. 실기 렌더 필요" [ref=e753]
+        - row [ref=e754]:
+          - cell "V-10" [ref=e755]
+          - cell [ref=e756]:
+            - code [ref=e757]: FormTimePicker
+            - text: 재템플릿으로
+            - code [ref=e758]: PART_TextBox
+            - text: UIA 노출
+          - cell "MahApps 템플릿 복사 후 확인. 미시도" [ref=e759]
+        - row [ref=e760]:
+          - cell "V-11" [ref=e761]
+          - cell "반복 모드 + 배너 3종 동시 = DataGrid ≈149 (약 3.9행)" [ref=e762]
+          - cell "계산값. 실기 확인 필요 — 실사용상 견딜 만한지" [ref=e763]
+        - row [ref=e764]:
+          - cell "V-12" [ref=e765]
+          - cell "라이트/다크 실렌더 대비" [ref=e766]
+          - cell "이 문서의 테마 토글은 CSS 근사다. WPF 실기 캡처로 확인해야 한다" [ref=e767]
+    - contentinfo [ref=e768]:
+      - text: event-suppression-recurrence-wireframe.html v1.0 · 2026-09-07 · PRD
+      - code [ref=e769]: docs/prds/event-suppression-recurrence-prd.md
+      - text: (Approved) · 흐름·문구는
+      - code [ref=e770]: event-suppression-recurrence-storyboard.html
+      - text: "· 근거: 실측 5축(78 제약) + 설계 3안 심사 + 적대검증 4렌즈(fatal 10/major 15/minor 8) + 메인세션 서버소스 직독"

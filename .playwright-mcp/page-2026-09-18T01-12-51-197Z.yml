@@ -1,0 +1,1244 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - text: Ironwall GIS
+      - generic [ref=f1e6]: · GOP API v8.0.1 창 재기획
+    - group "테마" [ref=f1e7]:
+      - button "시스템" [pressed] [ref=f1e8] [cursor=pointer]
+      - button "라이트" [ref=f1e9] [cursor=pointer]
+      - button "다크" [ref=f1e10] [cursor=pointer]
+  - generic [ref=f1e11]:
+    - generic [ref=f1e12]:
+      - paragraph [ref=f1e13]: Wireframe + Storyboard · WPF-ready
+      - heading "여섯 축과 부품, 그리고 부대" [level=1] [ref=f1e14]
+      - paragraph [ref=f1e15]: v7.0 이 장비 모델을 갈아엎고 v8.0 이 부대를 1급 리소스로 올렸습니다. 이 문서는 그 변화를 치수와 컨트롤이 정해진 와이어프레임과 조작 흐름 스토리보드로 옮긴 것이며, 모든 요소에 대응 WPF 컨트롤·토큰·바인딩을 붙였습니다. 목업에서 클릭·선택·저장이 실제로 동작합니다.
+    - generic [ref=f1e16]:
+      - term [ref=f1e17]: 정본 문서
+      - definition [ref=f1e18]: GOP_Restful_Api_연동설계.md v8.0.1
+      - term [ref=f1e19]: 기획 분석
+      - definition [ref=f1e20]:
+        - link "gop-api-v8-window-impact-analysis.md" [ref=f1e21] [cursor=pointer]:
+          - /url: ../analyses/gop-api-v8-window-impact-analysis.md
+      - term [ref=f1e22]: 레이아웃 정본
+      - definition [ref=f1e23]:
+        - link "window-layout-system-storyboard.html" [ref=f1e24] [cursor=pointer]:
+          - /url: window-layout-system-storyboard.html
+      - term [ref=f1e25]: 판본
+      - definition [ref=f1e26]: 운영 6.3.2 · 개발 7.0.1 · 명세 8.0.1
+      - term [ref=f1e27]: 치수 단위
+      - definition [ref=f1e28]: DIU(WPF 논리 픽셀) — 목업 px = DIU 1:1
+  - region [ref=f1e29]:
+    - generic [ref=f1e30]:
+      - heading "WPF 적용 규약 — 목업의 모든 조각에 대응물이 있다" [level=2] [ref=f1e31]
+      - paragraph [ref=f1e32]: 색은 토큰, 구조는 컨트롤, 웹 전용 기법은 대체안
+    - paragraph [ref=f1e33]:
+      - text: 이 목업은 브라우저에서 보지만 구현 대상은 WPF입니다. 그래서 색은 전부 테마 토큰 키에 대응시키고, 레이아웃은
+      - code [ref=f1e34]: Grid
+      - text: 로 옮길 수 있는 고정 치수로만 잡았으며, 웹에서만 되는 기법은 쓰지 않거나 대체안을 함께 적었습니다.
+    - generic [ref=f1e35]:
+      - heading "① 색 토큰 대응" [level=3] [ref=f1e36]
+      - generic [ref=f1e37]: "Tokens.{Light,Dark}.xaml · DynamicResource"
+    - table [ref=f1e39]:
+      - rowgroup [ref=f1e40]:
+        - row [ref=f1e41]:
+          - columnheader "목업 변수" [ref=f1e42]
+          - columnheader "WPF 키" [ref=f1e43]
+          - columnheader "쓰이는 곳" [ref=f1e44]
+      - rowgroup [ref=f1e45]:
+        - row [ref=f1e46]:
+          - cell "--bg / --surface / --alt / --sunken" [ref=f1e47]
+          - cell "BgBrush / SurfaceBrush / SurfaceAltBrush / SurfaceSunkenBrush" [ref=f1e48]
+          - cell "창 바탕 · 목록 · 카드 · 입력 바탕" [ref=f1e49]
+        - row [ref=f1e50]:
+          - cell "--hover / --pressed" [ref=f1e51]
+          - cell "SurfaceHoverBrush / SurfacePressedBrush" [ref=f1e52]
+          - cell "행 호버 · 선택 행" [ref=f1e53]
+        - row [ref=f1e54]:
+          - cell "--border / --divider / --hair" [ref=f1e55]
+          - cell "BorderBrush / DividerBrush / DividerBrush(투명도)" [ref=f1e56]
+          - cell "테두리 · 구분선 · 헤어라인" [ref=f1e57]
+        - row [ref=f1e58]:
+          - cell "--tx1 / --tx2 / --tx3" [ref=f1e59]
+          - cell "TextPrimaryBrush / TextSecondaryBrush / TextMutedBrush" [ref=f1e60]
+          - cell "값 · 본문 · 라벨" [ref=f1e61]
+        - row [ref=f1e62]:
+          - cell "--pri / --priHi / --onPri" [ref=f1e63]
+          - cell "PrimaryBrush / PrimaryHoverBrush / OnPrimaryBrush" [ref=f1e64]
+          - cell "주 버튼 · 헤더 · 선택 바" [ref=f1e65]
+        - row [ref=f1e66]:
+          - cell "--acc" [ref=f1e67]
+          - cell "AccentBrush" [ref=f1e68]
+          - cell "인접 간선 · 제안 표지" [ref=f1e69]
+        - row [ref=f1e70]:
+          - cell "--crit / --warn / --ok / --info" [ref=f1e71]
+          - cell "StatusCriticalBrush / StatusWarningBrush / StatusNormalBrush / StatusInfoBrush" [ref=f1e72]
+          - cell "건강 FAULT · DEGRADED · OK · 구동중" [ref=f1e73]
+        - row [ref=f1e74]:
+          - cell "--tCrit / --tWarn / --tOk / --tInfo" [ref=f1e75]
+          - cell "TintCriticalBrush / TintWarningBrush / TintSuccessBrush / TintInfoBrush" [ref=f1e76]
+          - cell "배지 바탕" [ref=f1e77]
+        - row [ref=f1e78]:
+          - cell "--scrim" [ref=f1e79]
+          - cell "ScrimModalBrush" [ref=f1e80]
+          - cell "모달 뒤 어둡게" [ref=f1e81]
+        - row [ref=f1e82]:
+          - cell "(차트 계열 1~8)" [ref=f1e83]
+          - cell "ChartSeries1~8Brush" [ref=f1e84]
+          - cell "이벤트 개요 차트 계열색 — 코드 고정값 대체" [ref=f1e85]
+        - row [ref=f1e86]:
+          - cell "--f-head / --f-body / --f-mono" [ref=f1e87]
+          - cell "UiFont / MaterialDesignFont / MonoFont" [ref=f1e88]
+          - cell "제목 · 본문 · 숫자·코드" [ref=f1e89]
+    - generic [ref=f1e90]:
+      - heading "토큰 사용 규칙" [level=4] [ref=f1e91]
+      - generic [ref=f1e92]:
+        - term [ref=f1e93]: 해석 시점
+        - definition [ref=f1e94]:
+          - code [ref=f1e95]: DynamicResource
+          - text: 로만 참조합니다.
+          - code [ref=f1e96]: StaticResource
+          - text: ·
+          - code [ref=f1e97]: static readonly
+          - text: Frozen 브러시로 캐싱하면 테마 전환 때 옛 색으로 고착됩니다(어도너 실증 버그).
+        - term [ref=f1e98]: 라이트 주의
+        - definition [ref=f1e99]:
+          - text: 라이트에서
+          - code [ref=f1e100]: PrimaryBrush
+          - text: ·
+          - code [ref=f1e101]: SelectionBrush
+          - text: ·
+          - code [ref=f1e102]: FocusRingBrush
+          - text: 가 같은 색이라 색으로 상태를 구분하지 않습니다 — 선택은 좌측 3px 바, 인접선은 파선처럼 형태로 구분합니다.
+        - term [ref=f1e103]: 새 표면
+        - definition [ref=f1e104]: 새 창·패널이 테마 딕셔너리를 로컬 병합하면 안 됩니다(앱이 죽은 전례). 테마는 Application 스코프로 상속됩니다.
+    - generic [ref=f1e105]:
+      - heading "② 구조 · 컨트롤 대응" [level=3] [ref=f1e106]
+      - generic [ref=f1e107]: MahApps 2.4.10 · MaterialDesignInXaml 5.2.1
+    - table [ref=f1e109]:
+      - rowgroup [ref=f1e110]:
+        - row [ref=f1e111]:
+          - columnheader "목업 요소" [ref=f1e112]
+          - columnheader "WPF 컨트롤" [ref=f1e113]
+          - columnheader "메모" [ref=f1e114]
+      - rowgroup [ref=f1e115]:
+        - row [ref=f1e116]:
+          - cell "창 프레임 · 머리 40" [ref=f1e117]
+          - cell "SurfaceFrame(신설) / MetroWindow" [ref=f1e118]
+          - cell "Surface Kernel 기획의 드래그·리사이즈 프레임. 헤더 40 DIU" [ref=f1e119]
+        - row [ref=f1e120]:
+          - cell "좌측 레일 184 / 접힘 56" [ref=f1e121]
+          - cell "ListBox(ItemsSource) + ItemContainerStyle" [ref=f1e122]
+          - cell [ref=f1e123]:
+            - text: 선택 표시는 좌측 3px 바. 아이콘은
+            - code [ref=f1e124]: md:PackIcon
+        - row [ref=f1e125]:
+          - cell "목록" [ref=f1e126]
+          - cell "DataGrid" [ref=f1e127]
+          - cell [ref=f1e128]:
+            - code [ref=f1e129]: CanUserSortColumns=False
+            - text: ·
+            - code [ref=f1e130]: CanUserReorderColumns=False
+            - text: (서버 정렬 고정) · 무한 스크롤은 기존
+            - code [ref=f1e131]: DataGridScrollEndBehavior
+        - row [ref=f1e132]:
+          - cell "상세 칸 340(300–480)" [ref=f1e133]
+          - cell "ScrollViewer + StackPanel" [ref=f1e134]
+          - cell [ref=f1e135]:
+            - text: 경계는
+            - code [ref=f1e136]: GridSplitter
+            - text: . 섹션 =
+            - code [ref=f1e137]: GroupBox
+            - text: 아닌 라벨 + 구분선
+        - row [ref=f1e138]:
+          - cell "부품 목록" [ref=f1e139]
+          - cell "ItemsControl + DataTemplate" [ref=f1e140]
+          - cell [ref=f1e141]:
+            - text: 카탈로그로 만드는 동적 목록. 행 안 토글은
+            - code [ref=f1e142]: mah:ToggleSwitch
+        - row [ref=f1e143]:
+          - cell "닫힌 어휘 콤보" [ref=f1e144]
+          - cell "ComboBox(ItemsSource = 카탈로그)" [ref=f1e145]
+          - cell [ref=f1e146]:
+            - text: 값 목록을 코드 enum 에 박지 않습니다(§5.0.1
+            - code [ref=f1e147]: type_axis
+            - text: )
+        - row [ref=f1e148]:
+          - cell "상태 · 건강 배지" [ref=f1e149]
+          - cell "Border + TextBlock (Style)" [ref=f1e150]
+          - cell [ref=f1e151]:
+            - text: 어휘는
+            - code [ref=f1e152]: component_state
+            - text: ·
+            - code [ref=f1e153]: component_health
+        - row [ref=f1e154]:
+          - cell "편제 트리" [ref=f1e155]
+          - cell "TreeView + HierarchicalDataTemplate" [ref=f1e156]
+          - cell [ref=f1e157]:
+            - text: 지연 로딩은
+            - code [ref=f1e158]: Expanded
+            - text: 에서 자식 조회
+        - row [ref=f1e159]:
+          - cell "관계도" [ref=f1e160]
+          - cell "ItemsControl(Canvas) + Path" [ref=f1e161]
+          - cell [ref=f1e162]:
+            - text: 간선은
+            - code [ref=f1e163]: Path.StrokeDashArray
+            - text: (인접) / 실선(계층)
+        - row [ref=f1e164]:
+          - cell "변경 미리보기 · 소속 픽커" [ref=f1e165]
+          - cell "T4 다이얼로그(Modal 560 / 400)" [ref=f1e166]
+          - cell [ref=f1e167]:
+            - text: Surface Kernel
+            - code [ref=f1e168]: IDialogService.ShowDialogAsync
+        - row [ref=f1e169]:
+          - cell "토스트 · 경고" [ref=f1e170]
+          - cell "IDialogService.Notify" [ref=f1e171]
+          - cell "권한 없음은 한 줄만(\"권한이 없습니다.\")" [ref=f1e172]
+    - generic [ref=f1e173]:
+      - heading "③ 웹 전용 기법 → WPF 대체" [level=3] [ref=f1e174]
+      - generic [ref=f1e175]: 이 목업이 의도적으로 피한 것들
+    - table [ref=f1e177]:
+      - rowgroup [ref=f1e178]:
+        - row [ref=f1e179]:
+          - columnheader "웹에서 쉬운 것" [ref=f1e180]
+          - columnheader "WPF 대체" [ref=f1e181]
+          - columnheader "판정" [ref=f1e182]
+      - rowgroup [ref=f1e183]:
+        - row [ref=f1e184]:
+          - cell "color-mix() 로 색 섞기" [ref=f1e185]
+          - cell "미리 계산한 토큰 값 2개를 Light/Dark 에 각각 선언" [ref=f1e186]
+          - cell "대체함" [ref=f1e187]
+        - row [ref=f1e188]:
+          - cell "CSS 빗금 그라디언트" [ref=f1e189]
+          - cell [ref=f1e190]:
+            - code [ref=f1e191]: DrawingBrush
+            - text: (GeometryDrawing 사선) 또는
+            - code [ref=f1e192]: TileBrush
+          - cell "가능" [ref=f1e193]
+        - row [ref=f1e194]:
+          - cell "점선 테두리 · 파선" [ref=f1e195]
+          - cell [ref=f1e196]:
+            - code [ref=f1e197]: StrokeDashArray
+            - text: — 단
+            - code [ref=f1e198]: "{4,3}"
+            - text: ·
+            - code [ref=f1e199]: "{5,3}"
+            - text: 은 그룹 선택·드로잉이 선점한 어휘라
+            - code [ref=f1e200]: "{6,4}"
+            - text: 사용
+          - cell "가능" [ref=f1e201]
+        - row [ref=f1e202]:
+          - cell "카드 3D 뒤집기" [ref=f1e203]
+          - cell [ref=f1e204]:
+            - code [ref=f1e205]: md:Flipper
+            - text: (이벤트 카드에 이미 선례)
+          - cell "선례 있음" [ref=f1e206]
+        - row [ref=f1e207]:
+          - cell "스켈레톤 반짝임" [ref=f1e208]
+          - cell [ref=f1e209]:
+            - code [ref=f1e210]: Storyboard
+            - text: +
+            - code [ref=f1e211]: DoubleAnimation
+            - text: (Opacity) · 또는
+            - code [ref=f1e212]: ProgressBar
+            - text: Indeterminate(현행)
+          - cell "가능" [ref=f1e213]
+        - row [ref=f1e214]:
+          - cell "grid-template-areas" [ref=f1e215]
+          - cell [ref=f1e216]:
+            - code [ref=f1e217]: Grid.RowDefinitions
+            - text: /
+            - code [ref=f1e218]: ColumnDefinitions
+            - text: + 고정 DIU(치수표 참조)
+          - cell "대체함" [ref=f1e219]
+        - row [ref=f1e220]:
+          - cell "aspect-ratio" [ref=f1e221]
+          - cell [ref=f1e222]:
+            - code [ref=f1e223]: Viewbox
+            - text: 또는 고정 Width/Height
+          - cell "대체함" [ref=f1e224]
+        - row [ref=f1e225]:
+          - cell "backdrop-filter(유리 효과)" [ref=f1e226]
+          - cell "없음 — 쓰지 않았습니다" [ref=f1e227]
+          - cell "미사용" [ref=f1e228]
+        - row [ref=f1e229]:
+          - 'cell "position: sticky 헤더" [ref=f1e230]'
+          - cell [ref=f1e231]:
+            - code [ref=f1e232]: DataGrid
+            - text: 머리글이 기본 고정
+          - cell "기본" [ref=f1e233]
+    - generic [ref=f1e234]:
+      - heading "구현 계약 3가지" [level=4] [ref=f1e235]
+      - generic [ref=f1e236]:
+        - term [ref=f1e237]: x:Name
+        - definition [ref=f1e238]:
+          - text: Caliburn.Micro 바인딩 지시자입니다. 자동화 식별자로 쓰지 않고, 계측은
+          - code [ref=f1e239]: AutomationProperties.AutomationId
+          - text: (
+          - code [ref=f1e240]: Devices.Console.*
+          - text: 형식)로만 답니다.
+        - term [ref=f1e241]: 치수
+        - definition [ref=f1e242]: 목업 px = DIU 입니다. 레일 184/56 · 상세 340(300–480) · 다이얼로그 S400·M560·L720 · 행 높이 38 · 입력 32.
+        - term [ref=f1e243]: 드래그
+        - definition [ref=f1e244]: 경계 이동은 캡처 드래그(데드존 8.0 DIU) + 키보드 폴백. 목록 행 드래그 정렬은 넣지 않습니다(가상화·무한 스크롤).
+  - region [ref=f1e245]:
+    - generic [ref=f1e246]:
+      - heading "장비 콘솔 와이어프레임 — 치수와 섹션 순서" [level=2] [ref=f1e247]
+      - paragraph [ref=f1e248]: 1280×760 기준 · 상세 칸이 여섯 축을 드러낸다
+    - generic [ref=f1e250]:
+      - generic [ref=f1e251]:
+        - text: 장비 · 함체
+        - generic [ref=f1e252]: SurfaceFrame 헤더 40
+      - generic [ref=f1e253]:
+        - generic [ref=f1e254]:
+          - generic [ref=f1e255]: 레일 184
+          - generic [ref=f1e256]: ListBox
+          - list [ref=f1e257]:
+            - listitem [ref=f1e258]: 제어기 · 센서 · 카메라
+            - listitem [ref=f1e259]: 스피커 · 함체 · 경광등 · 통문
+            - listitem [ref=f1e260]: ─
+            - listitem [ref=f1e261]: 부품으로 찾기(신설)
+            - listitem [ref=f1e262]: 그룹
+          - generic [ref=f1e263]: 접힘 56 (<960)
+        - generic [ref=f1e264]:
+          - generic [ref=f1e265]: 목록 (가변)
+          - generic [ref=f1e266]: 툴바 40 + DataGrid(행 38) + 상태줄 30
+          - list [ref=f1e267]:
+            - listitem [ref=f1e268]: "툴바: 종류 칩 · 부대(예하 토글) · 서버 · 그룹 · 검색 · [＋ 등록] · ⋯"
+            - listitem [ref=f1e269]: "열: 번호 · 이름 · 종류(2축) · 상태 · 소속 · 부품 건강 · 위치"
+            - listitem [ref=f1e270]:
+              - text: 정렬 UI 없음 — 서버가
+              - code [ref=f1e271]: id
+              - text: 오름차순 고정
+        - generic [ref=f1e272]:
+          - generic [ref=f1e273]: 상세 340 (300–480)
+          - generic [ref=f1e274]: ScrollViewer · 섹션 9
+          - list [ref=f1e275]:
+            - listitem [ref=f1e276]: 1 장비 공통
+            - listitem [ref=f1e277]: 2 종류 카테고리+종류
+            - listitem [ref=f1e278]: 3 접속 connection
+            - listitem [ref=f1e279]: 4 위치 geolocation
+            - listitem [ref=f1e280]: 5 소속 부대·서버·그룹
+            - listitem [ref=f1e281]: 6 형상·부품 hardware_spec
+            - listitem [ref=f1e282]: 7 설정(의도) device_config
+            - listitem [ref=f1e283]: 8 상태(관측) 읽기 전용 device_status
+            - listitem [ref=f1e284]: 9 카테고리 특화
+          - generic [ref=f1e285]: "하단: 변경 막대 [되돌리기][저장]"
+      - generic [ref=f1e286]:
+        - generic [ref=f1e287]: "184"
+        - generic [ref=f1e289]: 가변
+        - generic [ref=f1e291]: 340 · 최소 300 최대 480
+    - paragraph [ref=f1e293]: 섹션 순서는 현행 편집기 순서를 유지합니다 — 고칠 수 있는 칸을 위로 올리지 않습니다(속성창 순서 계약). 여섯 축이 섹션 2·3·6·7·8 에 1:1 로 대응하고, 카테고리는 경로가 정하므로 섹션 2 안에서 생성 시에만 고를 수 있습니다.
+    - generic [ref=f1e294]:
+      - heading "Grid 로 옮길 때" [level=4] [ref=f1e295]
+      - generic [ref=f1e296]:
+        - term [ref=f1e297]: 3단
+        - definition [ref=f1e298]:
+          - code [ref=f1e299]: <ColumnDefinition Width="184"/><ColumnDefinition Width="*" MinWidth="360"/><ColumnDefinition Width="340" MinWidth="300" MaxWidth="480"/>
+        - term [ref=f1e300]: 반응형
+        - definition [ref=f1e301]:
+          - text: 1280↑ 3단 도킹 · 960–1279 상세 서랍 · 960↓ 레일 56 — 판정은
+          - code [ref=f1e302]: ConsoleLayoutMath.Resolve(width)
+          - text: 한 곳
+        - term [ref=f1e303]: 세대 게이팅
+        - definition [ref=f1e304]:
+          - text: 부품·부대·2축 UI 는
+          - code [ref=f1e305]: IServerContractProbe
+          - text: 판정이
+          - code [ref=f1e306]: ">= V7_0"
+          - text: (부대는
+          - code [ref=f1e307]: ">= V8_0"
+          - text: )일 때만 표시합니다(비활성 아님)
+  - region [ref=f1e308]:
+    - generic [ref=f1e309]:
+      - heading "장비 콘솔 스토리보드 — 만져 보는 목업" [level=2] [ref=f1e310]
+      - paragraph [ref=f1e311]: 카테고리 전환 · 종류 2축 · 부품 편집 · 변경 미리보기
+    - generic [ref=f1e312]:
+      - generic [ref=f1e313]:
+        - checkbox "장비 수정 권한 없는 계정으로 보기" [ref=f1e314]
+        - text: 장비 수정 권한 없는 계정으로 보기
+      - generic [ref=f1e315]: 레일에서 카테고리를 바꾸고, 행을 고르고, 종류·설정·부품을 고쳐 보세요. [저장]을 누르면 변경 미리보기가 뜹니다.
+    - generic [ref=f1e317]:
+      - generic [ref=f1e318]:
+        - strong [ref=f1e320]: 장비
+        - generic [ref=f1e321]: 함체
+        - generic [aria-hidden] [ref=f1e322]:
+          - generic [ref=f1e323]: ─
+          - generic [ref=f1e324]: ▢
+          - generic [ref=f1e325]: ✕
+      - generic [ref=f1e326]:
+        - complementary "장비 카테고리" [ref=f1e327]:
+          - navigation [ref=f1e328]:
+            - button "제어기 2" [ref=f1e329] [cursor=pointer]:
+              - generic [ref=f1e330]: 제어기
+              - generic [ref=f1e331]: "2"
+            - button "센서 2" [ref=f1e332] [cursor=pointer]:
+              - generic [ref=f1e333]: 센서
+              - generic [ref=f1e334]: "2"
+            - button "카메라 2" [ref=f1e335] [cursor=pointer]:
+              - generic [ref=f1e336]: 카메라
+              - generic [ref=f1e337]: "2"
+            - button "스피커 1" [ref=f1e338] [cursor=pointer]:
+              - generic [ref=f1e339]: 스피커
+              - generic [ref=f1e340]: "1"
+            - button "함체 3" [ref=f1e341] [cursor=pointer]:
+              - generic [ref=f1e342]: 함체
+              - generic [ref=f1e343]: "3"
+            - button "경광등 1" [ref=f1e344] [cursor=pointer]:
+              - generic [ref=f1e345]: 경광등
+              - generic [ref=f1e346]: "1"
+            - button "통문 2" [ref=f1e347] [cursor=pointer]:
+              - generic [ref=f1e348]: 통문
+              - generic [ref=f1e349]: "2"
+            - button "부품으로 찾기 신규" [ref=f1e351] [cursor=pointer]:
+              - generic [ref=f1e352]: 부품으로 찾기
+              - generic [ref=f1e353]: 신규
+            - button "그룹 4" [ref=f1e354] [cursor=pointer]:
+              - generic [ref=f1e355]: 그룹
+              - generic [ref=f1e356]: "4"
+          - generic [ref=f1e357]:
+            - generic [ref=f1e358]: 불러온 장비 13
+            - generic [ref=f1e359]: 부품 고장 3
+        - generic [ref=f1e360]:
+          - generic [ref=f1e361]:
+            - generic [ref=f1e362]:
+              - button "종류 전체" [pressed] [ref=f1e363] [cursor=pointer]
+              - button "Outdoor" [ref=f1e364] [cursor=pointer]
+              - button "Indoor" [ref=f1e365] [cursor=pointer]
+              - button "Unknown" [ref=f1e366] [cursor=pointer]
+            - generic [ref=f1e367]:
+              - generic [ref=f1e368]: ⌕
+              - textbox "⌕" [ref=f1e369]:
+                - /placeholder: 이름 · 번호 · 부대
+            - button "＋ 등록" [ref=f1e370] [cursor=pointer]
+            - button "⋯" [ref=f1e371] [cursor=pointer]
+          - table [ref=f1e373]:
+            - rowgroup [ref=f1e374]:
+              - row [ref=f1e375] [cursor=pointer]:
+                - columnheader "번호" [ref=f1e376]
+                - columnheader "이름" [ref=f1e377]
+                - columnheader "종류" [ref=f1e378]
+                - columnheader "상태" [ref=f1e379]
+                - columnheader "소속" [ref=f1e380]
+                - columnheader "부품" [ref=f1e381]
+                - columnheader "위치" [ref=f1e382]
+            - rowgroup [ref=f1e383]:
+              - row [selected] [ref=f1e384] [cursor=pointer]:
+                - cell "2" [ref=f1e385]
+                - cell "북측 7구간 함체" [ref=f1e386]
+                - cell "함체 / Outdoor" [ref=f1e387]
+                - cell "운용" [ref=f1e388]
+                - cell "5중대 · ENC-API-1" [ref=f1e391]
+                - cell [ref=f1e392]:
+                  - generic [ref=f1e393]: 고장
+                  - text: "6"
+                - cell "북측 7구간 지주" [ref=f1e395]
+              - row [ref=f1e396] [cursor=pointer]:
+                - cell "3" [ref=f1e397]
+                - cell "정문 함체" [ref=f1e398]
+                - cell "함체 / Indoor" [ref=f1e399]
+                - cell "운용" [ref=f1e400]
+                - cell "6중대 · ENC-API-1" [ref=f1e403]
+                - cell [ref=f1e404]:
+                  - generic [ref=f1e405]: 정상
+                  - text: "3"
+                - cell "정문 초소" [ref=f1e407]
+              - row [ref=f1e408] [cursor=pointer]:
+                - cell "4" [ref=f1e409]
+                - cell "남문 함체" [ref=f1e410]
+                - cell "함체 / Unknown" [ref=f1e411]
+                - cell "중지" [ref=f1e412]
+                - cell "6중대 · —" [ref=f1e414]
+                - cell [ref=f1e415]:
+                  - generic [ref=f1e416]: 미확인
+                  - text: "2"
+                - cell "남문 게이트" [ref=f1e418]
+          - generic [ref=f1e419]:
+            - generic [ref=f1e420]: 목록 3건
+            - generic [ref=f1e421]: 선택 1
+            - generic [ref=f1e422]: 예시 데이터 · 정렬은 서버 고정
+        - complementary "선택 장비 상세" [ref=f1e423]:
+          - generic [ref=f1e424]:
+            - generic [ref=f1e425]: 함체 · 5중대
+            - heading "북측 7구간 함체" [level=3] [ref=f1e426]
+          - generic [ref=f1e427]:
+            - generic [ref=f1e428]:
+              - heading "장비 공통 —" [level=4] [ref=f1e429]:
+                - text: 장비 공통
+                - generic [ref=f1e430]: —
+              - generic [ref=f1e431]:
+                - generic [ref=f1e432]: 번호
+                - generic [ref=f1e433]: "2"
+              - generic [ref=f1e434]:
+                - generic [ref=f1e435]: 이름
+                - textbox "이름" [ref=f1e436]: 북측 7구간 함체
+              - generic [ref=f1e437]:
+                - generic [ref=f1e438]: id
+                - generic [ref=f1e439]: 412 전역 유일
+            - generic [ref=f1e440]:
+              - heading "종류 category_device + type_enclosure" [level=4] [ref=f1e441]:
+                - text: 종류
+                - generic [ref=f1e442]: category_device + type_enclosure
+              - generic [ref=f1e443]:
+                - generic [ref=f1e444]: 카테고리
+                - generic [ref=f1e445]: 함체 생성 시 확정
+              - generic [ref=f1e446]:
+                - generic [ref=f1e447]: 종류
+                - combobox "종류" [ref=f1e448]:
+                  - option "Outdoor" [selected]
+                  - option "Indoor"
+                  - option "Unknown"
+            - generic [ref=f1e449]:
+              - heading "접속 connection" [level=4] [ref=f1e450]:
+                - text: 접속
+                - generic [ref=f1e451]: connection
+              - generic [ref=f1e452]:
+                - generic [ref=f1e453]: IP
+                - textbox "IP" [ref=f1e454]: 10.20.5.12
+              - generic [ref=f1e455]:
+                - generic [ref=f1e456]: 링크
+                - generic [ref=f1e457]: connection.urls
+            - generic [ref=f1e458]:
+              - heading "위치 geolocation" [level=4] [ref=f1e459]:
+                - text: 위치
+                - generic [ref=f1e460]: geolocation
+              - generic [ref=f1e461]:
+                - generic [ref=f1e462]: 설명
+                - generic [ref=f1e463]: 북측 7구간 지주
+              - generic [ref=f1e464]:
+                - generic [ref=f1e465]: 좌표
+                - generic [ref=f1e466]: 37.4231 · 127.1219
+            - generic [ref=f1e467]:
+              - heading "소속 unit · server · groups" [level=4] [ref=f1e468]:
+                - text: 소속
+                - generic [ref=f1e469]: unit · server · groups
+              - generic [ref=f1e470]:
+                - generic [ref=f1e471]: 부대
+                - combobox "부대" [ref=f1e472]:
+                  - option "1사단 (d01)"
+                  - option "1연대 (r01)"
+                  - option "3대대 (b03)"
+                  - option "5중대 (c0305)" [selected]
+                  - option "6중대 (c0306)"
+                  - option "소초 1 (op0301)"
+                  - option "소초 2 (op0302)"
+                  - option "2연대 (r02)"
+                  - option "2대대 (b02)"
+                  - option "6중대 (c0206)"
+              - generic [ref=f1e473]:
+                - generic [ref=f1e474]: 서버
+                - generic [ref=f1e475]: ENC-API-1
+              - generic [ref=f1e476]:
+                - generic [ref=f1e477]: 그룹
+                - generic [ref=f1e478]: 북측
+            - generic [ref=f1e479]:
+              - heading "형상 · 부품 카탈로그 기반 hardware_spec" [level=4] [ref=f1e480]:
+                - text: 형상 · 부품
+                - generic [ref=f1e481]: 카탈로그 기반
+                - generic [ref=f1e482]: hardware_spec
+              - generic [ref=f1e483]:
+                - generic [ref=f1e484]:
+                  - generic [ref=f1e485]:
+                    - generic [ref=f1e486]: door_sensor
+                    - generic [ref=f1e487]: DOOR_SENSOR
+                    - generic [ref=f1e488]: 도어 센서
+                    - button "부품 제거" [ref=f1e489] [cursor=pointer]: ✕
+                  - generic [ref=f1e490]:
+                    - generic [ref=f1e491]: 열림
+                    - generic [ref=f1e492]: 정상
+                    - generic [ref=f1e494]: 마지막 변화 09-18 13:58
+                - generic [ref=f1e495]:
+                  - generic [ref=f1e496]:
+                    - generic [ref=f1e497]: heater
+                    - generic [ref=f1e498]: HEATER
+                    - generic [ref=f1e499]: 히터
+                    - button "부품 제거" [ref=f1e500] [cursor=pointer]: ✕
+                  - generic [ref=f1e501]:
+                    - generic [ref=f1e502]: 꺼짐
+                    - generic [ref=f1e503]: 정상
+                    - generic [ref=f1e505]: 마지막 변화 09-18 11:02
+                  - generic [ref=f1e507]:
+                    - generic [ref=f1e508]: 사용
+                    - button "사용" [pressed] [ref=f1e509] [cursor=pointer]
+                    - generic [ref=f1e510]: device_config.component_overrides
+                - generic [ref=f1e511]:
+                  - generic [ref=f1e512]:
+                    - generic [ref=f1e513]: fan
+                    - generic [ref=f1e514]: FAN
+                    - generic [ref=f1e515]: 팬
+                    - button "부품 제거" [ref=f1e516] [cursor=pointer]: ✕
+                  - generic [ref=f1e517]:
+                    - generic [ref=f1e518]: 켜짐
+                    - generic [ref=f1e519]: 주의
+                    - generic [ref=f1e521]: 마지막 변화 09-18 12:40
+                  - generic [ref=f1e523]:
+                    - generic [ref=f1e524]: 사용
+                    - button "사용" [pressed] [ref=f1e525] [cursor=pointer]
+                    - generic [ref=f1e526]: device_config.component_overrides
+                - generic [ref=f1e527]:
+                  - generic [ref=f1e528]:
+                    - generic [ref=f1e529]: humidity_sensor
+                    - generic [ref=f1e530]: HUMIDITY_SENSOR
+                    - generic [ref=f1e531]: 습도 센서
+                    - button "부품 제거" [ref=f1e532] [cursor=pointer]: ✕
+                  - generic [ref=f1e533]:
+                    - generic [ref=f1e534]: 상태 없음
+                    - generic [ref=f1e535]: 정상
+                    - generic [ref=f1e537]: 마지막 변화 09-18 13:00
+                - generic [ref=f1e538]:
+                  - generic [ref=f1e539]:
+                    - generic [ref=f1e540]: ups
+                    - generic [ref=f1e541]: UPS
+                    - generic [ref=f1e542]: 무정전 전원장치
+                    - button "부품 제거" [ref=f1e543] [cursor=pointer]: ✕
+                  - generic [ref=f1e544]:
+                    - generic [ref=f1e545]: 상태 없음
+                    - generic [ref=f1e546]: 고장
+                    - generic [ref=f1e548]: 마지막 변화 09-18 09:12
+                - generic [ref=f1e549]:
+                  - generic [ref=f1e550]:
+                    - generic [ref=f1e551]: network_interface
+                    - generic [ref=f1e552]: NETWORK_INTERFACE
+                    - generic [ref=f1e553]: 네트워크 인터페이스
+                    - button "부품 제거" [ref=f1e554] [cursor=pointer]: ✕
+                  - generic [ref=f1e555]:
+                    - generic [ref=f1e556]: 상태 없음
+                    - generic [ref=f1e557]: 정상
+                    - generic [ref=f1e559]: 마지막 변화 09-18 07:30
+              - generic [ref=f1e560]:
+                - combobox [ref=f1e561]:
+                  - option "도어 센서 (DOOR_SENSOR)" [selected]
+                  - option "문 구동부 (DOOR_ACTUATOR)"
+                  - option "히터 (HEATER)"
+                  - option "팬 (FAN)"
+                  - option "전조등 (HEADLIGHT)"
+                  - option "경광등 (LAMP_LIGHT)"
+                  - option "부저 (BUZZER)"
+                  - option "습도 센서 (HUMIDITY_SENSOR)"
+                  - option "무정전 전원장치 (UPS)"
+                  - option "진동 센서 (VIBRATION_SENSOR)"
+                  - option "PIR 센서 (PIR_SENSOR)"
+                  - option "PTZ 구동부 (PTZ_UNIT)"
+                  - option "적외선 LED (IR_LED)"
+                  - option "와이퍼 (WIPER)"
+                  - option "접점 입력 (CONTACT_INPUT)"
+                  - option "네트워크 인터페이스 (NETWORK_INTERFACE)"
+                  - option "앰프 (AMPLIFIER)"
+                  - option "마이크 (MIC)"
+                - button "＋ 부품 추가" [ref=f1e562] [cursor=pointer]
+              - paragraph [ref=f1e563]: 상태가 없는 유형은 건강만 보고합니다 — state 를 보내면 422.
+            - generic [ref=f1e564]:
+              - heading "설정 (의도) device_config" [level=4] [ref=f1e565]:
+                - text: 설정 (의도)
+                - generic [ref=f1e566]: device_config
+              - generic [ref=f1e567]:
+                - generic [ref=f1e568]: 온도 임계
+                - textbox [ref=f1e569]: "45"
+              - generic [ref=f1e570]:
+                - generic [ref=f1e571]: 습도 임계
+                - textbox [ref=f1e572]: "80"
+            - generic [ref=f1e573]:
+              - heading "상태 (관측) 읽기 전용 · 매니저 보고 device_status" [level=4] [ref=f1e574]:
+                - text: 상태 (관측)
+                - generic [ref=f1e575]: 읽기 전용 · 매니저 보고
+                - generic [ref=f1e576]: device_status
+              - generic [ref=f1e577]:
+                - generic [ref=f1e578]: 장비 상태
+                - generic [ref=f1e579]: 운용 중
+              - generic [ref=f1e580]:
+                - generic [ref=f1e581]: door_sensor
+                - generic [ref=f1e582]:
+                  - generic [ref=f1e583]: 열림
+                  - generic [ref=f1e584]: 정상
+              - generic [ref=f1e586]:
+                - generic [ref=f1e587]: heater
+                - generic [ref=f1e588]:
+                  - generic [ref=f1e589]: 꺼짐
+                  - generic [ref=f1e590]: 정상
+              - generic [ref=f1e592]:
+                - generic [ref=f1e593]: fan
+                - generic [ref=f1e594]:
+                  - generic [ref=f1e595]: 켜짐
+                  - generic [ref=f1e596]: 주의
+              - generic [ref=f1e598]:
+                - generic [ref=f1e599]: humidity_sensor
+                - generic [ref=f1e600]:
+                  - generic [ref=f1e601]: 상태 없음
+                  - generic [ref=f1e602]: 정상
+              - generic [ref=f1e604]:
+                - generic [ref=f1e605]: ups
+                - generic [ref=f1e606]:
+                  - generic [ref=f1e607]: 상태 없음
+                  - generic [ref=f1e608]: 고장
+              - generic [ref=f1e610]:
+                - generic [ref=f1e611]: network_interface
+                - generic [ref=f1e612]:
+                  - generic [ref=f1e613]: 상태 없음
+                  - generic [ref=f1e614]: 정상
+              - paragraph [ref=f1e616]: 이 섹션을 저장 본문에 실으면 422 OBSERVED_FIELD 입니다. 문·통문 위치도 여기 부품 한 줄입니다.
+            - generic [ref=f1e617]:
+              - heading "함체 특화 카테고리별" [level=4] [ref=f1e618]:
+                - text: 함체 특화
+                - generic [ref=f1e619]: 카테고리별
+              - paragraph [ref=f1e620]: 계측 이력 · 임계 판정
+            - generic [ref=f1e621]:
+              - generic [ref=f1e622]: 고칠 수 있는 칸
+              - generic [ref=f1e624]: 발생·관측 기록
+          - generic [ref=f1e626]:
+            - generic [ref=f1e627]: 변경 없음
+            - button "문 개폐 명령" [ref=f1e628] [cursor=pointer]
+    - paragraph [ref=f1e629]:
+      - text: 관측(상태) 섹션은 입력이 없습니다 — 편집 폼에 실어 보내면 서버가 422(
+      - code [ref=f1e630]: OBSERVED_FIELD
+      - text: )로 거부합니다. 문·통문 위치도 이 섹션의 부품 한 줄이며, 값을 바꾸는 입구는 매니저 보고(
+      - code [ref=f1e631]: PATCH …/component-status
+      - text: )뿐입니다.
+  - region [ref=f1e632]:
+    - generic [ref=f1e633]:
+      - heading "부품 영역은 카탈로그가 만든다" [level=2] [ref=f1e634]
+      - paragraph [ref=f1e635]: 고정 폼이 아니라 동적 목록 · 저장 전 미리보기
+    - generic [ref=f1e636]:
+      - generic [ref=f1e637]:
+        - heading "카탈로그를 캐싱한다" [level=4] [ref=f1e638]
+        - paragraph [ref=f1e639]:
+          - text: 기동 시
+          - code [ref=f1e640]: GET /api/devices/spec
+          - text: 전량 — 부품 유형 32종의 상태·명령·설정 파라미터와 카테고리별 종류축이 여기서 온다.
+          - code [ref=f1e641]: SYNC_CATALOG
+          - text: 를 받으면 판 번호 비교 없이 전체를 다시 읽는다.
+      - generic [ref=f1e642]:
+        - heading "행을 만든다" [level=4] [ref=f1e643]
+        - paragraph [ref=f1e644]:
+          - text: 장비의
+          - code [ref=f1e645]: hardware_spec.components[]
+          - text: 한 항목 = 한 줄. 유형 라벨·상태 어휘·설정 값 키는 카탈로그에서 가져오고, 지금 값은
+          - code [ref=f1e646]: device_status.components[key]
+          - text: 에서 읽는다.
+      - generic [ref=f1e647]:
+        - heading "저장 전에 보여 준다" [level=4] [ref=f1e648]
+        - paragraph [ref=f1e649]:
+          - text: 추가·제거될 부품, 함께 지워질 관측, 설정 override 변경, 접속 병합 결과를 미리보기 창에 나열한 뒤
+          - code [ref=f1e650]: PATCH
+          - text: 로 바뀐 키만 보낸다.
+    - generic [ref=f1e651]:
+      - heading "부품 유형 — 화면에 그대로 쓰는 값" [level=3] [ref=f1e652]
+      - generic [ref=f1e653]: 카탈로그 32종 중 발췌 · 상태 없는 유형은 건강만
+    - table [ref=f1e655]:
+      - rowgroup [ref=f1e656]:
+        - row [ref=f1e657]:
+          - columnheader "유형" [ref=f1e658]
+          - columnheader "라벨" [ref=f1e659]
+          - columnheader "적용 카테고리" [ref=f1e660]
+          - columnheader "상태(state)" [ref=f1e661]
+          - columnheader "설정 값 키" [ref=f1e662]
+          - columnheader "화면 처리" [ref=f1e663]
+      - rowgroup [ref=f1e664]:
+        - row [ref=f1e665]:
+          - cell "DOOR_SENSOR" [ref=f1e666]
+          - cell "도어 센서" [ref=f1e667]
+          - cell "함체 · 통문" [ref=f1e668]
+          - cell "OPEN · CLOSED" [ref=f1e669]
+          - cell "—" [ref=f1e670]
+          - cell "문 열림 배지. 지도 심볼과 같은 어휘" [ref=f1e671]
+        - row [ref=f1e672]:
+          - cell "DOOR_ACTUATOR" [ref=f1e673]
+          - cell "문 구동부" [ref=f1e674]
+          - cell "통문 · 함체" [ref=f1e675]
+          - cell "OPEN · CLOSED · RUNNING" [ref=f1e676]
+          - cell "—" [ref=f1e677]
+          - cell "구동중 표시 신설 — 명령 후 보고까지의 중간 상태" [ref=f1e678]
+        - row [ref=f1e679]:
+          - cell "HEATER / FAN / HEADLIGHT" [ref=f1e680]
+          - cell "히터 / 팬 / 전조등" [ref=f1e681]
+          - cell "함체 · 카메라" [ref=f1e682]
+          - cell "ON · OFF" [ref=f1e683]
+          - cell "enabled" [ref=f1e684]
+          - cell "설정 섹션에 토글(의도), 상태 섹션에 배지(관측)" [ref=f1e685]
+        - row [ref=f1e686]:
+          - cell "LAMP_LIGHT" [ref=f1e687]
+          - cell "경광등" [ref=f1e688]
+          - cell "경광등" [ref=f1e689]
+          - cell "ON · OFF" [ref=f1e690]
+          - cell "color" [ref=f1e691]
+          - cell [ref=f1e692]:
+            - text: 색 어휘의 정본은 카탈로그
+            - code [ref=f1e693]: SET_COLOR.color.enum_values
+        - row [ref=f1e694]:
+          - cell "VIBRATION_SENSOR · PIR_SENSOR · RADAR_UNIT" [ref=f1e695]
+          - cell "진동 · PIR · 레이더" [ref=f1e696]
+          - cell "센서" [ref=f1e697]
+          - cell "IDLE · RUNNING" [ref=f1e698]
+          - cell "—" [ref=f1e699]
+          - cell "상태 배지만(명령 없음)" [ref=f1e700]
+        - row [ref=f1e701]:
+          - cell "TEMP · HUMIDITY · VOLTAGE · UPS …" [ref=f1e702]
+          - cell "온·습도 · 전압 · 무정전" [ref=f1e703]
+          - cell "함체" [ref=f1e704]
+          - cell "— (건강만)" [ref=f1e705]
+          - cell "—" [ref=f1e706]
+          - cell "state 를 보내면 422 — 건강 배지만 그린다. 계측값은 임계 판정용" [ref=f1e707]
+        - row [ref=f1e708]:
+          - cell "PTZ_UNIT · IR_LED · WIPER · TRACKER" [ref=f1e709]
+          - cell "PTZ 구동부 · 적외선 · 와이퍼 · 트래커" [ref=f1e710]
+          - cell "카메라" [ref=f1e711]
+          - cell "IDLE·RUNNING / ON·OFF / ACTIVE·LOST·IDLE" [ref=f1e712]
+          - cell "—" [ref=f1e713]
+          - cell "카메라 선언 여부는 서버 결정 대기(U-2)" [ref=f1e714]
+        - row [ref=f1e715]:
+          - cell "NETWORK_INTERFACE" [ref=f1e716]
+          - cell "네트워크 인터페이스" [ref=f1e717]
+          - cell "전 카테고리" [ref=f1e718]
+          - cell "— (건강만)" [ref=f1e719]
+          - cell "—" [ref=f1e720]
+          - cell "모든 장비 공통 행" [ref=f1e721]
+    - generic [ref=f1e722]:
+      - heading "부품 목록 구현" [level=4] [ref=f1e723]
+      - generic [ref=f1e724]:
+        - term [ref=f1e725]: 컨트롤
+        - definition [ref=f1e726]:
+          - code [ref=f1e727]: ItemsControl
+          - text: +
+          - code [ref=f1e728]: DataTemplate
+          - text: (행) — 유형별 폼은
+          - code [ref=f1e729]: ContentControl
+          - text: +
+          - code [ref=f1e730]: DataTemplateSelector
+          - text: (상태 있음 / 건강만 / 설정 있음 3종)
+        - term [ref=f1e731]: 관측 라벨
+        - definition [ref=f1e732]:
+          - code [ref=f1e733]: observed_at
+          - text: 은 "마지막 변화"로 적습니다. 값이 바뀔 때만 움직이고 워치독이 없어 "마지막 보고"로 읽으면 거짓입니다.
+        - term [ref=f1e734]: 제거 규약
+        - definition [ref=f1e735]:
+          - text: 부품을 빼면 같은 본문에
+          - code [ref=f1e736]: "device_config.component_overrides.<key>: null"
+          - text: 을 함께 보냅니다. 미리보기가 "지워질 관측"을 함께 보여 주는 이유입니다.
+        - term [ref=f1e737]: 짝 맞추기
+        - definition [ref=f1e738]: 같은 유형이 여럿이면 자동 대응하지 않고 사용자가 짝을 고릅니다(카탈로그 지침).
+  - region [ref=f1e739]:
+    - generic [ref=f1e740]:
+      - heading "부품으로 장비를 찾는다 (신설 탭)" [level=2] [ref=f1e741]
+      - paragraph [ref=f1e742]: 지금 열려 있는 문 · 고장 난 히터
+    - paragraph [ref=f1e743]:
+      - text: 부품이 1급이 되면서
+      - code [ref=f1e744]: GET /api/devices/by-component
+      - text: 라는 새 조회 표면이 생겼습니다. 유형 또는 부품 key 하나에 상태·건강을 얹어 장비를 거릅니다. 위 목업의 레일 맨 아래 부품으로 찾기 를 눌러 보세요.
+    - table [ref=f1e746]:
+      - rowgroup [ref=f1e747]:
+        - row [ref=f1e748]:
+          - columnheader "쓰임" [ref=f1e749]
+          - columnheader "조건" [ref=f1e750]
+          - columnheader "화면" [ref=f1e751]
+      - rowgroup [ref=f1e752]:
+        - row [ref=f1e753]:
+          - cell "지금 열려 있는 문" [ref=f1e754]
+          - cell "component_type=DOOR_SENSOR&state=OPEN" [ref=f1e755]
+          - cell "함체·통문 목록 + 마지막 변화 시각" [ref=f1e756]
+        - row [ref=f1e757]:
+          - cell "구동 중인 통문" [ref=f1e758]
+          - cell "component_type=DOOR_ACTUATOR&state=RUNNING" [ref=f1e759]
+          - cell "명령 직후 확인용" [ref=f1e760]
+        - row [ref=f1e761]:
+          - cell "고장 부품" [ref=f1e762]
+          - cell "health=FAULT" [ref=f1e763]
+          - cell [ref=f1e764]:
+            - text: 전 카테고리 + 사유(
+            - code [ref=f1e765]: fault_reason
+            - text: )
+        - row [ref=f1e766]:
+          - cell "한 번도 보고 없는 부품" [ref=f1e767]
+          - cell [ref=f1e768]:
+            - text: 관측
+            - code [ref=f1e769]: observed_at
+            - text: 이 빈 행
+          - cell "설치 확인 목록(서버가 판정해 주지 않음)" [ref=f1e770]
+  - region [ref=f1e771]:
+    - generic [ref=f1e772]:
+      - heading "부대 콘솔 (신설) — 편제와 관계도" [level=2] [ref=f1e773]
+      - paragraph [ref=f1e774]: 트리 · 인접 · 소속 이동 · 코드는 등록 후 불변
+    - paragraph [ref=f1e775]:
+      - text: v8.0 에서 부대가 1급 리소스가 됐고 장비·서버·그룹·이벤트가 모두
+      - code [ref=f1e776]: unit_id
+      - text: 로 부대를 가리킵니다. 우리 창 30종에는 대응 화면이 없어 새로 만듭니다. 트리에서 부대를 고르고, 관계도 탭에서 인접 관계를 보세요.
+    - generic [ref=f1e778]:
+      - generic [ref=f1e779]:
+        - strong [ref=f1e781]: 부대
+        - generic [ref=f1e782]: 편제
+        - generic [aria-hidden] [ref=f1e783]:
+          - generic [ref=f1e784]: ─
+          - generic [ref=f1e785]: ▢
+          - generic [ref=f1e786]: ✕
+      - generic [ref=f1e787]:
+        - complementary "부대 보기" [ref=f1e788]:
+          - navigation [ref=f1e789]:
+            - button "편제" [ref=f1e790] [cursor=pointer]
+            - button "관계도" [ref=f1e792] [cursor=pointer]
+          - generic [ref=f1e794]:
+            - generic [ref=f1e795]: 부대 10
+            - generic [ref=f1e796]: 인접 쌍 2
+        - generic [ref=f1e797]:
+          - generic [ref=f1e798]:
+            - generic [ref=f1e799]:
+              - button "제대 전체" [pressed] [ref=f1e800] [cursor=pointer]
+              - button "사단" [ref=f1e801] [cursor=pointer]
+              - button "연대" [ref=f1e802] [cursor=pointer]
+              - button "대대" [ref=f1e803] [cursor=pointer]
+              - button "중대" [ref=f1e804] [cursor=pointer]
+              - button "소초" [ref=f1e805] [cursor=pointer]
+            - generic [ref=f1e806]:
+              - generic [ref=f1e807]: ⌕
+              - textbox "⌕" [ref=f1e808]:
+                - /placeholder: 부대명 · 코드
+            - button "＋ 부대" [ref=f1e809] [cursor=pointer]
+          - list [ref=f1e812]:
+            - listitem [ref=f1e813]:
+              - generic [ref=f1e814] [cursor=pointer]:
+                - button "펼치기" [ref=f1e815]: ▾
+                - generic [ref=f1e816]: 1사단 사단
+                - generic [ref=f1e817]: d01
+              - list [ref=f1e818]:
+                - listitem [ref=f1e819]:
+                  - generic [ref=f1e820] [cursor=pointer]:
+                    - button "펼치기" [ref=f1e821]: ▾
+                    - generic [ref=f1e822]: 1연대 연대
+                    - generic [ref=f1e823]: r01
+                  - list [ref=f1e824]:
+                    - listitem [ref=f1e825]:
+                      - generic [ref=f1e826] [cursor=pointer]:
+                        - button "펼치기" [ref=f1e827]: ▾
+                        - generic [ref=f1e828]: 3대대 대대
+                        - generic [ref=f1e829]: b03
+                      - list [ref=f1e830]:
+                        - listitem [ref=f1e831]:
+                          - generic [ref=f1e832] [cursor=pointer]:
+                            - button "펼치기" [ref=f1e833]: ▸
+                            - generic [ref=f1e834]: 5중대 중대
+                            - generic [ref=f1e835]: c0305
+                        - listitem [ref=f1e836]:
+                          - generic [ref=f1e837] [cursor=pointer]:
+                            - generic [ref=f1e838]: 6중대 중대
+                            - generic [ref=f1e839]: c0306
+                - listitem [ref=f1e840]:
+                  - generic [ref=f1e841] [cursor=pointer]:
+                    - button "펼치기" [ref=f1e842]: ▾
+                    - generic [ref=f1e843]: 2연대 연대
+                    - generic [ref=f1e844]: r02
+                  - list [ref=f1e845]:
+                    - listitem [ref=f1e846]:
+                      - generic [ref=f1e847] [cursor=pointer]:
+                        - button "펼치기" [ref=f1e848]: ▾
+                        - generic [ref=f1e849]: 2대대 대대
+                        - generic [ref=f1e850]: b02
+                      - list [ref=f1e851]:
+                        - listitem [ref=f1e852]:
+                          - generic [ref=f1e853] [cursor=pointer]:
+                            - generic [ref=f1e854]: 6중대 중대
+                            - generic [ref=f1e855]: c0206
+          - generic [ref=f1e856]:
+            - generic [ref=f1e857]: 제대 5단계 · 상위는 더 상위 제대만
+            - generic [ref=f1e858]: 인접은 같은 제대끼리 · 예시 데이터
+        - complementary "선택 부대 상세" [ref=f1e859]:
+          - generic [ref=f1e860]:
+            - generic [ref=f1e861]: 중대
+            - heading "5중대" [level=3] [ref=f1e862]
+          - generic [ref=f1e863]:
+            - generic [ref=f1e864]:
+              - heading "편제 unit" [level=4] [ref=f1e865]:
+                - text: 편제
+                - generic [ref=f1e866]: unit
+              - generic [ref=f1e867]:
+                - generic [ref=f1e868]: 코드
+                - generic [ref=f1e869]: c0305 🔒 등록 후 불변
+              - generic [ref=f1e870]:
+                - generic [ref=f1e871]: 제대
+                - generic [ref=f1e872]: 중대
+              - generic [ref=f1e873]:
+                - generic [ref=f1e874]: 상위
+                - generic [ref=f1e875]: 3대대
+              - generic [ref=f1e876]:
+                - generic [ref=f1e877]: 예하
+                - generic [ref=f1e878]: 소초 1 · 소초 2
+            - generic [ref=f1e879]:
+              - heading "인접 같은 제대끼리 직접 지정" [level=4] [ref=f1e880]:
+                - text: 인접
+                - generic [ref=f1e881]: 같은 제대끼리 직접 지정
+              - generic [ref=f1e882]:
+                - generic [ref=f1e883]: 부대
+                - generic [ref=f1e884]: 6중대
+              - paragraph [ref=f1e885]: 형제 관계에서 자동으로 생기지 않습니다 — 대대 경계를 넘는 인접 중대를 담기 위한 수평 관계입니다.
+            - generic [ref=f1e886]:
+              - heading "이 부대의 자원" [level=4] [ref=f1e887]
+              - generic [ref=f1e888]:
+                - generic [ref=f1e889]: 장비
+                - generic [ref=f1e890]: "7"
+              - generic [ref=f1e891]:
+                - generic [ref=f1e892]: NATS 토큰
+                - generic [ref=f1e893]: …c0305…
+              - paragraph [ref=f1e894]: 부대 필터는 조회 조건입니다 — 접근 통제가 아닙니다.
+          - generic [ref=f1e895]:
+            - generic [ref=f1e896]: 코드는 수정 화면에서 읽기 전용
+            - button "수정" [ref=f1e897] [cursor=pointer]
+            - button "삭제" [ref=f1e898] [cursor=pointer]
+    - generic [ref=f1e899]:
+      - heading "부대 화면 구현 메모" [level=4] [ref=f1e900]
+      - generic [ref=f1e901]:
+        - term [ref=f1e902]: 트리
+        - definition [ref=f1e903]:
+          - code [ref=f1e904]: TreeView
+          - text: +
+          - code [ref=f1e905]: HierarchicalDataTemplate
+          - text: (ItemsSource=
+          - code [ref=f1e906]: Children
+          - text: ). 지연 로딩은
+          - code [ref=f1e907]: TreeViewItem.Expanded
+          - text: 에서
+          - code [ref=f1e908]: "?parent_id="
+          - text: 조회.
+        - term [ref=f1e909]: 관계도
+        - definition [ref=f1e910]:
+          - code [ref=f1e911]: ItemsControl
+          - text: (ItemsPanel=
+          - code [ref=f1e912]: Canvas
+          - text: ) + 노드
+          - code [ref=f1e913]: Border
+          - text: · 간선
+          - code [ref=f1e914]: Path
+          - text: . 계층=실선, 인접=
+          - code [ref=f1e915]: StrokeDashArray="6 4"
+          - text: +
+          - code [ref=f1e916]: AccentBrush
+          - text: — 색이 아니라 형태로 구분합니다.
+        - term [ref=f1e917]: 코드 불변
+        - definition [ref=f1e918]:
+          - text: 생성 다이얼로그에만
+          - code [ref=f1e919]: TextBox
+          - text: ", 수정 화면은"
+          - code [ref=f1e920]: TextBlock
+          - text: + 자물쇠. 패턴 검사
+          - code [ref=f1e921]: "^[a-z0-9][a-z0-9_-]{0,31}$"
+          - text: ","
+          - code [ref=f1e922]: global
+          - text: 예약.
+        - term [ref=f1e923]: 소속 픽커
+        - definition [ref=f1e924]:
+          - text: 장비·서버·그룹 편집 폼에서 같은 트리를
+          - code [ref=f1e925]: T4·S 400
+          - text: 다이얼로그로 재사용. 목록 툴바에는 예하 포함
+          - code [ref=f1e926]: mah:ToggleSwitch
+          - text: .
+        - term [ref=f1e927]: 기본값
+        - definition [ref=f1e928]: 부대 필터는 조회 조건이지 접근 통제가 아닙니다 — 기본을 "내 부대 + 예하"로 두고 전체 보기는 명시 선택(결정 A-D7).
+  - region [ref=f1e929]:
+    - generic [ref=f1e930]:
+      - heading "이벤트 콘솔 델타 — 네 가지만 고친다" [level=2] [ref=f1e931]
+      - paragraph [ref=f1e932]:
+        - text: 통계 계약은 그대로 ·
+        - link "기존 이벤트 콘솔 목업" [ref=f1e933] [cursor=pointer]:
+          - /url: window-layout-system-storyboard.html#events
+    - table [ref=f1e935]:
+      - rowgroup [ref=f1e936]:
+        - row [ref=f1e937]:
+          - columnheader "고칠 것" [ref=f1e938]
+          - columnheader "지금 목업" [ref=f1e939]
+          - columnheader "바뀌는 모습" [ref=f1e940]
+          - columnheader "WPF" [ref=f1e941]
+      - rowgroup [ref=f1e942]:
+        - row [ref=f1e943]:
+          - cell "운영 탭 신설" [ref=f1e944]
+          - cell "레일 = 개요·탐지·장애·연결·조치·억제" [ref=f1e945]
+          - cell "레일에 운영 추가 — 문 개폐·환경 임계치가 운영 이벤트로 오고 조치보고도 가능" [ref=f1e946]
+          - cell "ListBox 항목 1개 + 패널 VM 1종" [ref=f1e947]
+        - row [ref=f1e948]:
+          - cell "총 이벤트 수치" [ref=f1e949]
+          - cell [ref=f1e950]:
+            - text: 머리줄 =
+            - code [ref=f1e951]: summary.total
+          - cell [ref=f1e952]:
+            - code [ref=f1e953]: total
+            - text: 은 운영 제외 6종 합 → 운영은 별도 타일, 합계 문구는 "6종 합"으로 명시
+          - cell "TextBlock 2개" [ref=f1e954]
+        - row [ref=f1e955]:
+          - cell "추이 0 채움" [ref=f1e956]
+          - cell "버킷이 연속이라 가정" [ref=f1e957]
+          - cell "0건 버킷은 응답에 없다 → 시간축을 클라가 만들고 0 채움" [ref=f1e958]
+          - cell "ChartHelper 에 축 생성 함수" [ref=f1e959]
+        - row [ref=f1e960]:
+          - cell "장비별 탭" [ref=f1e961]
+          - cell "[제어기 │ 카메라]" [ref=f1e962]
+          - cell "[제어기 │ 카메라 │ 함체 │ 통문] — v7.0 신규 집계" [ref=f1e963]
+          - cell "TabControl 항목 2개 추가" [ref=f1e964]
+        - row [ref=f1e965]:
+          - cell "장비 정보" [ref=f1e966]
+          - cell "이벤트가 장비 요약을 준다고 가정" [ref=f1e967]
+          - cell "이벤트는 참조 2키만 준다 → 장비 캐시 조인. 삭제 장비는 스냅샷 문자열만(파싱 금지)" [ref=f1e968]
+          - cell "DeviceProvider 조인 · Converter" [ref=f1e969]
+        - row [ref=f1e970]:
+          - cell "조치 조회 경로" [ref=f1e971]
+          - cell "원본별 하위 경로 사용" [ref=f1e972]
+          - cell [ref=f1e973]:
+            - text: 연결 이벤트엔 하위 경로가 없다 →
+            - code [ref=f1e974]: "?from_event_id="
+            - text: 로 통일
+          - cell "EventApiService 1곳" [ref=f1e975]
+        - row [ref=f1e976]:
+          - cell "일괄 조치보고" [ref=f1e977]
+          - cell "\"N건 조치보고\" 한 번" [ref=f1e978]
+          - cell "벌크 API 없음 → 건별 반복 + 진행률, 또는 서버에 벌크 요청(A-D5)" [ref=f1e979]
+          - cell "진행 다이얼로그 T4·S" [ref=f1e980]
+        - row [ref=f1e981]:
+          - cell "억제 배지" [ref=f1e982]
+          - cell [ref=f1e983]:
+            - code [ref=f1e984]: status
+            - text: 로 판정
+          - cell [ref=f1e985]:
+            - text: "\"지금 억제 중\"은"
+            - code [ref=f1e986]: is_suppressing_now
+            - text: · 취소 스케줄의 다음 예정은 항상 빈 값
+          - cell "Converter 교체" [ref=f1e987]
+  - region [ref=f1e988]:
+    - generic [ref=f1e989]:
+      - heading "공통 오류 표면 — 422 · 410 · 경고" [level=2] [ref=f1e990]
+      - paragraph [ref=f1e991]: 코드로 분기하고 문구로 분기하지 않는다
+    - generic [ref=f1e992]:
+      - generic [ref=f1e993]:
+        - heading "422 — 필드별 인라인" [level=4] [ref=f1e994]
+        - paragraph [ref=f1e995]:
+          - code [ref=f1e996]: error.details[]
+          - text: 의
+          - code [ref=f1e997]: field
+          - text: 경로를 폼 컨트롤에 매핑합니다. 분기는 닫힌 9종
+          - code [ref=f1e998]: code
+          - text: 로.
+        - generic [ref=f1e999]:
+          - generic [ref=f1e1000]: connection.ip_address
+          - textbox "비어 있음" [ref=f1e1001]
+          - generic [ref=f1e1002]: EMPTY_STRING — 빈 문자열은 보낼 수 없습니다. 값을 지우려면 항목을 생략하세요.
+        - generic [ref=f1e1003]:
+          - generic [ref=f1e1004]: type_enclosure
+          - textbox [ref=f1e1005]: "null"
+          - generic [ref=f1e1006]: NULL_NOT_ALLOWED — 축 자리는 비울 수 없습니다.
+        - paragraph [ref=f1e1007]: UNKNOWN_FIELD · REMOVED_FIELD(+moved_to) · MISSING_FIELD · VALUE_NOT_ALLOWED · CONSTRAINT · OBSERVED_FIELD · IMMUTABLE_FIELD
+      - generic [ref=f1e1008]:
+        - heading "410 — 이동 안내" [level=4] [ref=f1e1009]
+        - generic [ref=f1e1010]:
+          - text: 이 기능은 자리를 옮겼습니다.카메라 설정은 이제 설정(의도) 과 부품 상태 로 나뉘어 저장됩니다.
+          - link "설정 섹션에서 열기" [ref=f1e1011] [cursor=pointer]:
+            - /url: "#dev"
+        - paragraph [ref=f1e1012]:
+          - text: "묘비 11경로: 카메라"
+          - code [ref=f1e1013]: /settings
+          - text: 3 · 함체
+          - code [ref=f1e1014]: /status
+          - text: ·
+          - code [ref=f1e1015]: /control
+          - text: 2 · 통문
+          - code [ref=f1e1016]: /status
+          - text: ·
+          - code [ref=f1e1017]: /control
+          - text: 2 ·
+          - code [ref=f1e1018]: proxy-settings
+          - text: 3 · 서버별 시스템 이벤트 1. 401·403 이 먼저 걸러지므로 권한 오류와 구분해 표시합니다.
+      - generic [ref=f1e1019]:
+        - heading "쓰기 경고 4종" [level=4] [ref=f1e1020]
+        - paragraph [ref=f1e1021]:
+          - text: 응답
+          - code [ref=f1e1022]: warnings[]
+          - text: "중 사용자에게 보일 것:"
+        - generic [ref=f1e1023]: OBSERVED_AT_DEFAULTED — 관측 시각을 생략해 수신 시각으로 채웠습니다.
+        - generic [ref=f1e1024]: UNMATCHED_THRESHOLD — 임계 설정이 이 부품의 계측과 짝이 맞지 않습니다.
+        - paragraph [ref=f1e1025]:
+          - code [ref=f1e1026]: READ_ONLY_IGNORED
+          - text: ·
+          - code [ref=f1e1027]: SERVER_ID_MISSING
+          - text: 는 로그로만. 옛
+          - code [ref=f1e1028]: UNKNOWN_COMPONENT
+          - text: ·
+          - code [ref=f1e1029]: DETAIL_SCHEMA
+          - text: 경고는 폐지되어 이제 422 입니다.
+      - generic [ref=f1e1030]:
+        - heading "시각 표기" [level=4] [ref=f1e1031]
+        - paragraph [ref=f1e1032]:
+          - text: 전 창 공통 — 표시·요청 모두
+          - code [ref=f1e1033]: +09:00
+          - text: 마이크로초 6자리. 관측 시각(
+          - code [ref=f1e1034]: observed_at
+          - text: ·
+          - code [ref=f1e1035]: installed_at
+          - text: ·
+          - code [ref=f1e1036]: replaced_at
+          - text: )은 오프셋 필수입니다.
+        - paragraph [ref=f1e1037]: 2026-09-18T14:03:07.482913+09:00
+        - paragraph [ref=f1e1038]:
+          - text: 우리 헬퍼는 지금 밀리초 3자리(
+          - code [ref=f1e1039]: fff
+          - text: ) →
+          - code [ref=f1e1040]: ffffff
+          - text: 로 바꿔야 합니다.
+  - region [ref=f1e1041]:
+    - generic [ref=f1e1042]:
+      - heading "정해 주실 것 · 확인해야 할 것" [level=2] [ref=f1e1043]
+      - paragraph [ref=f1e1044]: 분석 문서 §6 · §7
+    - table [ref=f1e1046]:
+      - rowgroup [ref=f1e1047]:
+        - row [ref=f1e1048]:
+          - columnheader "#" [ref=f1e1049]
+          - columnheader "내용" [ref=f1e1050]
+          - columnheader "권고" [ref=f1e1051]
+      - rowgroup [ref=f1e1052]:
+        - row [ref=f1e1053]:
+          - cell "A-D1" [ref=f1e1054]
+          - cell "계약 세대 미달 기능을 감출지, 비활성으로 보일지" [ref=f1e1055]
+          - cell "감추기(권한 잠금과 구분)" [ref=f1e1056]
+        - row [ref=f1e1057]:
+          - cell "A-D2" [ref=f1e1058]
+          - cell "종류 콤보를 카탈로그 동적 생성으로" [ref=f1e1059]
+          - cell "채택 · enum 은 형상 매핑용만" [ref=f1e1060]
+        - row [ref=f1e1061]:
+          - cell "A-D3" [ref=f1e1062]
+          - cell "부품 영역을 완전 동적 폼으로" [ref=f1e1063]
+          - cell "동적 폼 + 문·히터는 전용 위젯" [ref=f1e1064]
+        - row [ref=f1e1065]:
+          - cell "A-D4" [ref=f1e1066]
+          - cell "변경 미리보기를 언제 띄울지" [ref=f1e1067]
+          - cell "부품·override 변경 포함 시 필수" [ref=f1e1068]
+        - row [ref=f1e1069]:
+          - cell "A-D5" [ref=f1e1070]
+          - cell "일괄 조치보고 벌크 API 서버 요청" [ref=f1e1071]
+          - cell "요청(문구 정렬 선례)" [ref=f1e1072]
+        - row [ref=f1e1073]:
+          - cell "A-D6" [ref=f1e1074]
+          - cell "이벤트 목록 부대 필터" [ref=f1e1075]
+          - cell "U-1 실측 후" [ref=f1e1076]
+        - row [ref=f1e1077]:
+          - cell "A-D7" [ref=f1e1078]
+          - cell "부대 필터 기본값" [ref=f1e1079]
+          - cell "내 부대 + 예하" [ref=f1e1080]
+        - row [ref=f1e1081]:
+          - cell "A-D8" [ref=f1e1082]
+          - cell "관계도를 1차에 넣을지" [ref=f1e1083]
+          - cell "3차(트리 먼저)" [ref=f1e1084]
+        - row [ref=f1e1085]:
+          - cell "A-D9" [ref=f1e1086]
+          - cell "문 개폐 NATS 직행 전환 시점" [ref=f1e1087]
+          - cell "REST 는 410 이므로 조기 제거" [ref=f1e1088]
+        - row [ref=f1e1089]:
+          - cell "A-D10" [ref=f1e1090]
+          - cell "서버·부품 생존 표시 근거" [ref=f1e1091]
+          - cell "NATS 수신 간격 + \"마지막 변화\" 라벨" [ref=f1e1092]
+        - row [ref=f1e1093]:
+          - cell "A-D11" [ref=f1e1094]
+          - cell "카메라 부품(히터·팬·전조등·트래커) 영역" [ref=f1e1095]
+          - cell "서버 결정(U-2) 후" [ref=f1e1096]
+        - row [ref=f1e1097]:
+          - cell "A-D12" [ref=f1e1098]
+          - cell "보고서 \"전체\" 필터" [ref=f1e1099]
+          - cell "파라미터 생략(빈 문자열 금지)" [ref=f1e1100]
+    - paragraph [ref=f1e1101]:
+      - text: "실측 필요: U-1 탐지·장애·연결 목록의 부대 필터(문서 모순) · U-2 카메라 부품 선언 · U-3 권한 모듈 15 vs 16 · U-4 부대 삭제 409 범위 · U-5 그룹 PUT 의"
+      - code [ref=f1e1102]: unit_id
+      - text: · U-6 경로별 권한 285 전수 · U-7 현장 서버 판본 로드맵. 확인 방법은 개발 서버
+      - code [ref=f1e1103]: GET /openapi.json
+      - text: 대조입니다.
+  - contentinfo [ref=f1e1104]:
+    - generic [ref=f1e1105]: 와이어프레임 + 스토리보드 · 자체완결 HTML · 예시 데이터 · 치수 = DIU
+    - generic [ref=f1e1106]: "정본: GOP_Restful_Api_연동설계.md v8.0.1 · 기획: docs/analyses/gop-api-v8-window-impact-analysis.md"

@@ -24,12 +24,14 @@ public class DeleteAccountDialogViewModel : BasePanelViewModel
                                         , ILogService log
                                         , LoginViewModel loginViewModel
                                         , AccountProvider accountProvider
-                                        , IUserDirectoryGateway gateway)
+                                        , IUserDirectoryGateway gateway
+                                        , IProfileGateway profileGateway)
                                         : base(eventAggregator, log)
     {
         ViewModel = loginViewModel;
         _gateway = gateway;
         _accountProvider = accountProvider;
+        _profileGateway = profileGateway;
     }
     #endregion
     #region - Overrides -
@@ -43,6 +45,16 @@ public class DeleteAccountDialogViewModel : BasePanelViewModel
     public async Task ClickOk()
     {
         var ct = _cancellationTokenSource?.Token ?? CancellationToken.None;
+
+        // 서버 모드는 입력한 비밀번호를 확인할 길이 없다(서버 삭제는 비밀번호를 받지 않는다) — 확인 없이 지우지 않는다.
+        // 내 정보의 [계정 삭제] 가 이미 꺼져 있지만, 다른 경로로 창이 열려도 여기서 한 번 더 막는다.
+        if (!IsSelfDeleteAvailable)
+        {
+            _log?.Warning("[DeleteAccount] 서버 모드 — 비밀번호를 확인할 수 없어 본인 계정 삭제를 막았다(서버 호출 없음).");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "계정 삭제", Explain = SelfDeleteUnavailableText });
+            return;
+        }
+
         try
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
@@ -88,8 +100,16 @@ public class DeleteAccountDialogViewModel : BasePanelViewModel
     }
 
     public LoginViewModel ViewModel { get; }
+
+    /// <summary>본인 계정 삭제를 쓸 수 있는가 — DB 모드만(게이트웨이가 비밀번호를 확인한다). 서버 모드는 false.</summary>
+    public bool IsSelfDeleteAvailable => _profileGateway.CanSelfDeleteAccount;
+
+    /// <summary>서버 모드에서 본인 계정 삭제를 막을 때의 안내(내 정보 [계정 삭제] 툴팁과 같은 문장).</summary>
+    public const string SelfDeleteUnavailableText =
+        "서버 계정은 내 정보에서 삭제할 수 없습니다. 입력한 비밀번호를 서버에서 확인할 방법이 없어 막아 두었습니다. 계정 삭제가 필요하면 관리자에게 요청하세요.";
     #endregion
     #region - Attributes -
+    private readonly IProfileGateway _profileGateway;
     private readonly IUserDirectoryGateway _gateway;
     private readonly AccountProvider _accountProvider;
     private string? _password;

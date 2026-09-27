@@ -1001,6 +1001,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
                                                 .Select(g => (g.GroupId, g.Add, g.DeviceIds!)));
             if (result.IsSuccess && !_board.IsDirty) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
 
+            // 서버에 한 줄이라도 쓰였으면 기억한다 — 창은 OS ✕ 로만 닫혀 대화 결과가 늘 비므로(false),
+            // 입구(WiringLauncher)는 이 값으로 "저장했다" 를 판정해 콘솔 목록을 다시 읽고 안내를 띄운다.
+            if (result.OkKeys.Count > 0 || result.Groups.Any(g => g.Ok)) HasSaved = true;
+
             SyncAll();
         }
         finally
@@ -1009,6 +1013,12 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             ProgressText = string.Empty;
         }
     }
+
+    /// <summary>
+    /// 이 창에서 서버에 무언가 저장했는가(센서 표 · 결선 · 그룹 중 하나라도). 일부만 성공해도 true —
+    /// 콘솔은 저장된 만큼 다시 읽어야 한다.
+    /// </summary>
+    public bool HasSaved { get; private set; }
 
     /// <summary>미저장 변경이 있으면 닫기 전에 묻는다.</summary>
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)

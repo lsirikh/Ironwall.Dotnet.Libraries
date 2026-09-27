@@ -4,11 +4,11 @@
 const assert = require('assert');
 const config = require('../../.claude/hooks/_config');
 
-let passed = 0, failed = 0;
-function test(name, fn) {
-  try { fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (e) { failed++; console.log(`  ❌ ${name}: ${e.message}`); }
-}
+// [v4/N-01] 결과 형식은 tests/run.js 의 공용 리포터가 만든다 —
+//   형식을 만드는 쪽과 parseCounts 로 읽는 쪽이 갈라지지 않게.
+const { makeReporter } = require('../run.js');
+const R = makeReporter();
+const test = (name, fn) => R.test(name, fn);
 
 // ── deepMerge ──────────────────────────────────────────────────────
 
@@ -205,5 +205,4 @@ test('reads CLAUDE_SOURCE_DIRS env', () => {
 
 // ── 결과 ──────────────────────────────────────────────────────────
 
-console.log(`\n══ 결과: ${passed} passed, ${failed} failed ══`);
-if (failed > 0) process.exit(1);
+R.done();

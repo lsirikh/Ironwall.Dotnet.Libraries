@@ -9,19 +9,11 @@ const agents = require('../../.claude/hooks/_agents');
 
 console.log('=== _agents.js Unit Tests ===\n');
 
-let passed = 0;
-let failed = 0;
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`  ✅ ${name}`);
-    passed++;
-  } catch (e) {
-    console.log(`  ❌ ${name}: ${e.message}`);
-    failed++;
-  }
-}
+// [v4/N-01] 결과 형식은 tests/run.js 의 공용 리포터가 만든다 —
+//   형식을 만드는 쪽과 parseCounts 로 읽는 쪽이 갈라지지 않게.
+const { makeReporter } = require('../run.js');
+const R = makeReporter();
+const test = (name, fn) => R.test(name, fn);
 
 // ── parseFrontmatter ────────────────────────────────────────────────
 
@@ -197,5 +189,5 @@ test('clearCaches works without error', () => {
 });
 
 // ── Summary ────────────────────────────────────────────────────────
-console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
-process.exit(failed > 0 ? 1 : 0);
+console.log(`\n=== Results: ${R.pass} passed, ${R.fail} failed ===`);
+R.done();

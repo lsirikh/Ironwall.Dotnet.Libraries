@@ -381,33 +381,44 @@ healthchecksdb
 
 # ── Claude Skill Harness ──
 # 이 섹션은 claude-skill-harness install.js가 자동 생성합니다.
-# 하네스/스킬/MCP 관련 파일을 git 추적에서 제외합니다.
+# 판단의 기록은 git 이 보게 두고, 실행의 부산물만 무시합니다.
 
-# Harness core
-.claude/*
-# 단, 고아 가드 매니페스트만 git 추적 — 외부삭제/IDE Clean 생존 보장
-# (orphan-gitlink-protection PRD Layer 1). .claude/* 는 직접 자식만 무시하므로
-# 디렉터리째 무시(.claude/)와 달리 이 파일 하나만 negation 으로 되살릴 수 있다.
-!.claude/orphan-guard.json
-CLAUDE.md
-CHANGELOG.md
+# ── 런타임 상태만 무시 — 로직은 추적한다 ──
+# [v5/N-05] 예전에는 .claude/* 로 통째로 무시하고 매니페스트 하나만 negation 으로
+#   되살렸다. 그런데 .claude/ 아래에는 세 갈래가 있다 — 판단·**로직**·부산물이고,
+#   훅(hooks/)·스킬(skills/)·규칙(rules/)은 로직이다. 그것들이 부산물 쪽에 묶여 있어서
+#   고친 훅이 커밋되지 않았고, 재설치하면 조용히 사라졌다. 되살아난 버그를 아무도 모른다.
+#   부정 패턴(!)은 상위 디렉터리가 무시되면 동작하지 않으므로,
+#   .claude/* + negation 이 아니라 **무시할 것을 열거**한다.
+.claude/.branch-*/
+.claude/.pending-*
+.claude/install-logs/
+.claude/mailbox/
+.claude/worktrees/
+.claude/sessions/
+.claude/*.lock
+.claude/*.log
+.claude/wizard-state.json
+.claude/settings.local.json
+# 추적되는 것: hooks/ · skills/ · rules/ · agents/ · settings.json · orphan-guard.json
+#   재설치가 git diff 로 드러난다 — 조용히 되돌아가지 않는다.
+docs/memory/sessions/
+docs/memory/state-backups/
+docs/memory/*.lock
+docs/memory/*.bak
+docs/memory/session-guard.json
+docs/memory/pipeline-state.json
+docs/memory/cost-log.jsonl
+docs/memory/compact-log.jsonl
 UPGRADE.md
 
-# Harness documents
-docs/memory/
-docs/analyses/
-docs/prds/
-docs/plans/
-docs/tests/
-docs/reports/
-docs/coordination/
-docs/design/
-docs/assets/
-docs/archive/
-docs/INDEX.md
-docs/Manual.md
+# ── 판단의 기록 (추적) ──
+# docs/memory/decisions.jsonl  ← 의사결정 원장. LOOPS.md 가 "이것이 진실이다" 라고 부른다
+# docs/memory/dev-journal.md · session-context.md · audit-log*
+# docs/{analyses,prds,plans,tests,reports,charters}/ · CLAUDE.md · CHANGELOG.md
+# 위 목록은 **의도적으로 무시하지 않는다.** 다음 세션이 읽어야 하는 것들이다.
 
-# Harness installer / backup
+# ── 설치기 자신 ──
 install.js
 claude-skill-harness*/
 .skill-set-backup*

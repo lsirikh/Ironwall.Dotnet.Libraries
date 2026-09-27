@@ -4119,11 +4119,42 @@ public partial class MapViewModel : BasePanelViewModel,
     private bool CanExecuteExitApplication(object arg) => true;
 
     /// <summary>
-    /// 애플리케이션 종료 실행
+    /// 애플리케이션 종료 실행 — 메뉴 '종료' · Ctrl+E.
+    /// 타이틀바 ✕ 와 <b>같은 경로</b>를 탄다: 호스트 셸이 띄우는 것과 같은 종료 확인 팝업을 열고,
+    /// [확인] 이면 팝업이 <see cref="ExitProgramMessageModel"/> 을 발행해 호스트 셸(ShellViewModel)이
+    /// 와치독 정상 종료 신호 후 앱을 닫는다. 종전에는 본문이 비어 있어 눌러도 아무 일이 없었다.
     /// </summary>
-    private void ExecuteExitApplication(object obj)
+    private async void ExecuteExitApplication(object obj)
     {
-        // TODO: 애플리케이션 종료 로직 구현 필요
+        try
+        {
+            await RequestApplicationExitAsync(_eventAggregator);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Exit] 종료 확인 팝업 표시 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>종료 확인 팝업 제목 — 호스트 셸의 ✕ 경로와 같은 문구.</summary>
+    internal const string ExitConfirmTitle = "종료 확인";
+
+    /// <summary>종료 확인 팝업 본문 — 호스트 셸의 ✕ 경로와 같은 문구.</summary>
+    internal const string ExitConfirmExplain = "프로그램을 종료하시겠습니까?";
+
+    /// <summary>
+    /// 앱의 정상 종료 경로(확인 팝업 → <see cref="ExitProgramMessageModel"/>)를 요청한다.
+    /// 앱을 곧바로 끄지 않는다 — 끄는 일은 확인을 받은 뒤 호스트가 한다.
+    /// </summary>
+    internal static Task RequestApplicationExitAsync(IEventAggregator? eventAggregator)
+    {
+        if (eventAggregator is null) return Task.CompletedTask;
+        return eventAggregator.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = ExitConfirmTitle,
+            Explain = ExitConfirmExplain,
+            MessageModel = new ExitProgramMessageModel()
+        });
     }
     #endregion
 

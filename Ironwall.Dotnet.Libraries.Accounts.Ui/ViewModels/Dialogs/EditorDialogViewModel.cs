@@ -179,16 +179,25 @@ public class EditorDialogViewModel : BasePanelViewModel
 
             // 관리자 강제 초기화(현재 비밀번호 검증 없음). 초기 비밀번호는 설정에서 주입(하드코딩 제거).
             var updated = await _gateway.ResetAccountPasswordAsync(ViewModel.Model, _session.AdminResetPassword, cancellationToken);
-            if (updated != null) { ViewModel.Insert(updated); CaptureBaseline(); }
+            if (updated == null)
+            {
+                // 서버가 초기화하지 못했다(권한 · 서버 오류 · 연결). 종전엔 이 경우에도 "변경되었습니다" 를 띄우고 창을 닫았다.
+                // 서버 원문은 게이트웨이가 로그에 남긴다 — 팝업에는 고정 문장만, 창은 열어 둔다(다시 누를 수 있게).
+                _log?.Warning($"[EditorDialog] 계정 {ViewModel.Model.Id} 비밀번호 초기화 실패 — 서버가 초기화하지 못함(null)");
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = ResetPasswordTitle, Explain = ResetPasswordFailedText }, cancellationToken);
+                return;
+            }
+            ViewModel.Insert(updated);
+            CaptureBaseline();
 
             await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "사용자 비밀번호가 변경되었습니다." }, cancellationToken);
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = ResetPasswordTitle, Explain = ResetPasswordDoneText }, cancellationToken);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseDialogMessageModel(), cancellationToken);
         }
         catch (Exception ex)
         {
-            _log?.Error(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "사용자 정보 변경이 실패하였습니다." }, cancellationToken);
+            _log?.Error($"[EditorDialog] 계정 {ViewModel.Model.Id} 비밀번호 초기화 예외: {ex}");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = ResetPasswordTitle, Explain = ResetPasswordFailedText }, cancellationToken);
         }
     }
 
@@ -246,6 +255,15 @@ public class EditorDialogViewModel : BasePanelViewModel
     #region - Properties -
     /// <summary>[확인] 을 눌렀지만 바뀐 칸이 없을 때의 안내.</summary>
     public const string NothingChangedText = "변경된 내용이 없습니다.";
+
+    /// <summary>비밀번호 초기화 안내 팝업 제목.</summary>
+    public const string ResetPasswordTitle = "비밀번호 초기화";
+
+    /// <summary>서버가 비밀번호를 초기화했을 때만 띄우는 안내.</summary>
+    public const string ResetPasswordDoneText = "사용자 비밀번호가 변경되었습니다.";
+
+    /// <summary>초기화에 실패했을 때의 고정 안내 — 서버 · 예외 원문은 로그로만 보낸다.</summary>
+    public const string ResetPasswordFailedText = "비밀번호를 초기화하지 못했습니다. 권한과 서버 연결을 확인한 뒤 다시 시도하세요.";
 
     /// <summary>관리자 초기화 기본 비밀번호 (설정 주입, 하드코딩 제거).</summary>
     public string ResetPassword => _session.AdminResetPassword;

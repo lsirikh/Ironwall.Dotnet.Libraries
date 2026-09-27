@@ -8,11 +8,11 @@ const assert = require('assert');
 const { gitRun, detectGit } = require('../../.claude/hooks/_git');
 
 // ── 테스트 헬퍼 ───────────────────────────────────────────────────────
-let passed = 0, failed = 0;
-function test(name, fn) {
-  try { fn(); passed++; console.log(`  ✅ ${name}`); }
-  catch (e) { failed++; console.log(`  ❌ ${name}: ${e.message}`); }
-}
+// [v4/N-01] 결과 형식은 tests/run.js 의 공용 리포터가 만든다 —
+//   형식을 만드는 쪽과 parseCounts 로 읽는 쪽이 갈라지지 않게.
+const { makeReporter } = require('../run.js');
+const R = makeReporter();
+const test = (name, fn) => R.test(name, fn);
 
 // ── 테스트 시작 ───────────────────────────────────────────────────────
 console.log('\nTEST-11: _git.js');
@@ -77,36 +77,43 @@ test('should_return_true_when_in_git_repo', () => {
 //   '; rm -rf /' 는 커밋 메시지 리터럴 문자열로만 전달됨 (shell 실행 없음)
 // ─────────────────────────────────────────────────────────────────────
 test('should_not_inject_special_chars_when_git_run_uses_array', () => {
-  // git repo이므로 --allow-empty commit 성공 → 마지막 커밋 메시지로 검증
-  // '; rm -rf /' 가 shell로 실행됐다면 git log 조회 자체가 실패하거나
-  // 다른 커밋 메시지가 남을 것임 (주입 성공 시 rm이 실행되어 파일 삭제)
+  // [v3 격리 수정] 이 테스트는 원래 cwd 를 넘기지 않아 **실제 저장소**에
+  //   커밋을 남겼다. 실행할 때마다 `; echo INJECTED ...` 제목의 빈 커밋이
+  //   git 히스토리에 쌓였고(관측: 6개), git 히스토리는 사용자의 멀티세션
+  //   복구 기반이므로 단순 소음이 아니었다.
+  //   gitRun(args, cwd) 는 cwd 를 받으므로 임시 저장소에서 검증한다.
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gitrun-inj-'));
   const injectionMsg = '; echo INJECTED > /tmp/injection_proof.txt';
-  let commitSucceeded = false;
+  const injectionFile = '/tmp/injection_proof.txt';
+  const preExisting = fs.existsSync(injectionFile);
+
   try {
-    gitRun(['commit', '--allow-empty', '-m', injectionMsg]);
-    commitSucceeded = true;
-  } catch (e) {
-    // git 오류면 테스트는 throw 경로로 처리 (여전히 injection 없음)
-  }
-  // 커밋이 성공했다면 메시지가 리터럴로 기록됐는지 확인
-  if (commitSucceeded) {
-    const lastMsg = gitRun(['log', '-1', '--pretty=%s']);
+    gitRun(['init'], tmp);
+    gitRun(['config', 'user.email', 'test@example.com'], tmp);
+    gitRun(['config', 'user.name', 'test'], tmp);
+
+    gitRun(['commit', '--allow-empty', '-m', injectionMsg], tmp);
+
+    // 메시지가 **리터럴 문자열**로 기록됐는가 = 셸을 거치지 않았다는 증거
+    const lastMsg = gitRun(['log', '-1', '--pretty=%s'], tmp);
     assert.strictEqual(
-      lastMsg.trim(),
-      injectionMsg,
-      `Last commit message should be the literal string, got: "${lastMsg.trim()}"`
+      lastMsg.trim(), injectionMsg,
+      `커밋 메시지가 리터럴이어야 함, 실제: "${lastMsg.trim()}"`
     );
-    // /tmp/injection_proof.txt 가 없으면 injection 차단 확인
-    const fs = require('fs');
-    const injectionFile = '/tmp/injection_proof.txt';
+
+    // 주입이 성공했다면 /tmp/injection_proof.txt 가 새로 생겼을 것
     assert.ok(
-      !fs.existsSync(injectionFile),
-      'Shell injection was NOT blocked — injection_proof.txt was created'
+      preExisting || !fs.existsSync(injectionFile),
+      'Shell injection 차단 실패 — injection_proof.txt 가 생성됨'
     );
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
   }
-  // threw이든 성공이든: shell injection 없이 배열 인수로 처리됨
 });
 
 // ── 결과 출력 ─────────────────────────────────────────────────────────
-console.log(`\n══ 결과: ${passed} passed, ${failed} failed ══\n`);
-if (failed > 0) process.exit(1);
+R.done();

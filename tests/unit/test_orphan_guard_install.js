@@ -67,10 +67,14 @@ function main() {
     const settingsPath = path.join(TGT, '.claude', 'settings.json');
     let s = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 
-    check('OG-01 UserPromptSubmit 에 orphan-guard-check 등록',
-      hasScript(s, 'UserPromptSubmit', 'orphan-guard-check.js'));
-    check('OG-01 Stop 에 orphan-guard-check 등록',
-      hasScript(s, 'Stop', 'orphan-guard-check.js'));
+    // [v3/FR-2.4] 정책 변경: orphan-guard-check 자동 등록 폐지.
+    //   매니페스트(.claude/orphan-guard.json)가 없는 프로젝트에서는 확정적 no-op이면서
+    //   턴당 ~152ms(UserPromptSubmit+Stop 2회)를 소모했다. 파일 자체는 계속 동봉되므로
+    //   필요한 프로젝트는 settings.json에 직접 등록해 쓸 수 있다.
+    check('OG-01 UserPromptSubmit 에 orphan-guard-check 미등록(v3 정책)',
+      !hasScript(s, 'UserPromptSubmit', 'orphan-guard-check.js'));
+    check('OG-01 Stop 에 orphan-guard-check 미등록(v3 정책)',
+      !hasScript(s, 'Stop', 'orphan-guard-check.js'));
 
     const hooksDir = path.join(TGT, '.claude', 'hooks');
     check('OG-02 orphan-guard.js 동봉', fs.existsSync(path.join(hooksDir, 'orphan-guard.js')));
@@ -93,13 +97,17 @@ function main() {
 
     s = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     // 회귀: orphan-guard-check 가 살아있어야 함 (과거엔 이벤트당 1개만 남기고 삭제됨)
-    check('OG-03 재설치 후 orphan-guard-check 생존 (UserPromptSubmit)',
-      hasScript(s, 'UserPromptSubmit', 'orphan-guard-check.js'));
-    check('OG-03 재설치 후 orphan-guard-check 생존 (Stop)',
-      hasScript(s, 'Stop', 'orphan-guard-check.js'));
-    // 커스텀 timeout 보존(기본 5/8 보다 큰 10/12)
-    check('OG-04 session-gate 커스텀 timeout=10 보존',
-      timeoutOf(s, 'UserPromptSubmit', 'session-gate.js') === 10,
+    // [v3/FR-2.4] orphan-guard-check 는 더 이상 하네스 정의가 아니므로 재설치 시
+    //   settings 에서 정리된다. 이는 회귀가 아니라 의도된 정책이다.
+    check('OG-03 재설치 후 orphan-guard-check 제거됨 (UserPromptSubmit)',
+      !hasScript(s, 'UserPromptSubmit', 'orphan-guard-check.js'));
+    check('OG-03 재설치 후 orphan-guard-check 제거됨 (Stop)',
+      !hasScript(s, 'Stop', 'orphan-guard-check.js'));
+    // [v3/FR-2.4] session-gate 기본 timeout 이 5 → 15 로 상향됐다.
+    //   보존 규칙은 `(기존 > 기본) ? 기존 : 기본` 이므로 커스텀 10 은 기본 15 보다 작아
+    //   15 가 적용된다. 이는 타임아웃 부족으로 주입이 유실되던 문제의 근본 수정이다.
+    check('OG-04 session-gate timeout 은 기본 15 이상',
+      timeoutOf(s, 'UserPromptSubmit', 'session-gate.js') >= 15,
       `actual=${timeoutOf(s, 'UserPromptSubmit', 'session-gate.js')}`);
     check('OG-04 pre-tool-gate 커스텀 timeout=12 보존',
       timeoutOf(s, 'PreToolUse', 'pre-tool-gate.js') === 12,
@@ -108,12 +116,45 @@ function main() {
     const upsCmds = (s.hooks.UserPromptSubmit || []).flatMap(e => (e.hooks || []).map(h => h.command));
     check('OG-05 사용자 훅 보존', upsCmds.some(c => c.includes('/my/custom/user-hook.js')));
 
-    // ── .gitignore 매니페스트 추적 라인 ───────────────────────────
-    console.log('[OG] .gitignore 매니페스트 추적 라인');
+    // ── .gitignore: 무엇이 추적되고 무엇이 무시되는가 (v5/N-05) ────
+    //   예전에는 `.gitignore` 의 **문자열**을 봤다 — `.claude/*` 줄이 있는가,
+    //   `!.claude/orphan-guard.json` negation 이 있는가. 그것은 규칙의 **표기**이지
+    //   결과가 아니다. 그리고 그 표기가 정확히 결함이었다: `.claude/*` 는 훅·스킬·규칙
+    //   까지 무시했고, 다운스트림은 `advance-phase.js` 의 치명 버그를 고친 뒤
+    //   `git status` 가 깨끗하게 나오는 것을 겪었다. 고친 것이 재설치로 조용히 사라진다.
+    //
+    //   그래서 **실제 git 에게 묻는다.** 부정 패턴은 상위가 무시되면 무력하다는 것처럼,
+    //   gitignore 의 의미는 표기만 봐서는 알 수 없다.
+    console.log('[OG] .gitignore — 로직은 추적, 부산물은 무시 (실제 git 판정)');
     const gi = fs.readFileSync(path.join(TGT, '.gitignore'), 'utf8');
-    check('OG-06 .claude/* 패턴(디렉터리째 무시 아님)', /^\.claude\/\*\s*$/m.test(gi));
-    check('OG-06 !.claude/orphan-guard.json negation 존재',
-      gi.includes('!.claude/orphan-guard.json'));
+    check('OG-06 .claude/* 통째 무시 줄이 없다', !/^\.claude\/\*\s*$/m.test(gi),
+      (gi.match(/^\.claude\/[^\n]*/gm) || []).join(' | ').slice(0, 200));
+
+    const gitInit = spawnSync('git', ['init', '-q'], { cwd: TGT, encoding: 'utf8' });
+    check('OG-06 git 저장소로 판정 가능', gitInit.status === 0, String(gitInit.stderr || '').slice(0, 200));
+    if (gitInit.status === 0) {
+      const ignored = rel => {
+        const abs = path.join(TGT, rel);
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        if (!fs.existsSync(abs)) fs.writeFileSync(abs, '');
+        return spawnSync('git', ['check-ignore', '-q', '--', rel], { cwd: TGT, encoding: 'utf8' }).status === 0;
+      };
+      // 로직 — 부산물이 아니다. 고치면 커밋되어야 하고, 재설치가 diff 로 드러나야 한다.
+      for (const rel of [
+        '.claude/hooks/advance-phase.js',
+        '.claude/skills/process/SKILL.md',
+        '.claude/rules/common/security.md',
+        '.claude/settings.json',
+        '.claude/orphan-guard.json',
+      ]) check(`OG-06 추적 가능: ${rel}`, !ignored(rel));
+      // 부산물 — 이것들은 계속 무시된다. 완화가 여기까지 오면 런타임 상태가 커밋된다.
+      for (const rel of [
+        '.claude/.branch-x/pipeline-state.json',
+        '.claude/install-logs/a.log',
+        '.claude/settings.local.json',
+        '.claude/mailbox/x.json',
+      ]) check(`OG-06 무시됨: ${rel}`, ignored(rel));
+    }
   } finally {
     rmRecursive(TEMP_BASE);
   }

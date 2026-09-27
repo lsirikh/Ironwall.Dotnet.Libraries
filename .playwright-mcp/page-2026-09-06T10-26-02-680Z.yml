@@ -1,0 +1,753 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: ◈ SURFACE KERNEL창 아키텍처 재설계 스토리보드 / 와이어프레임 v1.0
+    - generic [ref=e5]:
+      - button "🌙 다크" [ref=e6] [cursor=pointer]
+      - button "☀ 라이트" [ref=e7] [cursor=pointer]
+  - generic [ref=e8]:
+    - heading "창(Window) 아키텍처 재설계 — Surface Kernel" [level=1] [ref=e9]
+    - paragraph [ref=e10]:
+      - text: 근거
+      - link "window-architecture-analysis.md" [ref=e11] [cursor=pointer]:
+        - /url: ../analyses/window-architecture-analysis.md
+      - text: · PRD
+      - link "window-architecture-prd.md" [ref=e12] [cursor=pointer]:
+        - /url: ../prds/window-architecture-prd.md
+      - text: · 승인 범위 B(창 이동까지) — 별도 OS 창(Detached) 제외 · 2026-09-06
+    - generic [ref=e13]:
+      - text: 이 문서는 실제 토큰으로 그려졌다. 모든 색은
+      - code [ref=e14]: Tokens.Light.xaml
+      - text: /
+      - code [ref=e15]: Tokens.Dark.xaml
+      - text: 실측값이고, 스크림 알파는 WPF
+      - code [ref=e16]: "#AARRGGBB"
+      - text: 를 CSS
+      - code [ref=e17]: rgba()
+      - text: 로 변환했다 (
+      - code [ref=e18]: "#88000000"
+      - text: →.53 ·
+      - code [ref=e19]: "#8C0E161F"
+      - text: →.55 ·
+      - code [ref=e20]: "#B8040810"
+      - text: →.72). 우상단 토글로 다크/라이트를 바꾸면 모든 목업이 동시에 전환된다 — 실제 앱에서 테마가
+      - code [ref=e21]: Application.Current.Resources
+      - text: 스코프로 전파되는 것과 같은 방식이다.
+    - generic [ref=e22]:
+      - link "1. 현행 구조" [ref=e23] [cursor=pointer]:
+        - /url: "#s1"
+      - link "2. 목표 구조" [ref=e24] [cursor=pointer]:
+        - /url: "#s2"
+      - link "3. 와이어프레임(조작 가능)" [ref=e25] [cursor=pointer]:
+        - /url: "#s3"
+      - link "4. 표면 5종" [ref=e26] [cursor=pointer]:
+        - /url: "#s4"
+      - link "5. 스크림 Before/After" [ref=e27] [cursor=pointer]:
+        - /url: "#s5"
+      - link "6. 라이트 카드 뒤집기" [ref=e28] [cursor=pointer]:
+        - /url: "#s6"
+      - link "7. 스크림 4조합" [ref=e29] [cursor=pointer]:
+        - /url: "#s7"
+      - link "8. 권한 UX ★" [ref=e30] [cursor=pointer]:
+        - /url: "#s8"
+      - link "9. 다이얼로그 API" [ref=e31] [cursor=pointer]:
+        - /url: "#s9"
+      - link "10. 결정 요청" [ref=e32] [cursor=pointer]:
+        - /url: "#s10"
+    - generic [ref=e33]:
+      - heading "1. 현행 구조 — 모달이 좌측 메뉴의 자식이다" [level=2] [ref=e34]
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - heading "시각 트리 실측" [level=4] [ref=e37]
+          - generic [ref=e38]:
+            - generic [ref=e39]:
+              - text: ShellView (MetroWindow)
+              - generic [ref=e40]: 앱에서 유일한 실제 Window · 1250×850 · MinWidth/MinHeight 없음
+            - generic [ref=e41]:
+              - text: CanvasSectionView → MapView
+              - generic [ref=e42]: ColumnSpan=4 풀블리드 · AdornerDecorator + GMapCustomControl
+            - generic [ref=e43]:
+              - text: 이벤트 드로어
+              - generic [ref=e44]: ColumnSpan=4 · Storyboard 342행 · GridSplitter 0건(MinWidth/MaxWidth는 죽은 선언)
+            - generic [ref=e45]:
+              - text: LeftMenuSectionView
+              - generic [ref=e46]: ColumnSpan=4 오버레이 · mah:HamburgerMenu
+            - generic [ref=e47]:
+              - text: ConductorControlView
+              - generic [ref=e48]:
+                - text: xaml:264-271 —
+                - code [ref=e49]: Do not change order!!!Layer hierarchy is important to control view layer!
+            - generic [ref=e50]:
+              - text: 로그인 커버
+              - generic [ref=e51]: 하드코딩 8색(#0A1014 등)
+            - generic [ref=e52]:
+              - text: PanelShell
+              - generic [ref=e53]: "OneActive(1개만) · 스크림 #88000000 풀스크린"
+            - generic [ref=e54]:
+              - text: DialogShell
+              - generic [ref=e55]: "OneActive · 스크림 #88000000"
+            - generic [ref=e56]:
+              - text: PopupDialogShell
+              - generic [ref=e57]: "OneActive · 스크림 #88000000"
+        - generic [ref=e58]:
+          - heading "그래서 생기는 일" [level=4] [ref=e59]
+          - generic [ref=e60]:
+            - text: 창 이동이 원천 불가. 패널·다이얼로그 View 전체에서
+            - code [ref=e61]: <Thumb
+            - text: /
+            - code [ref=e62]: DragMove(
+            - text: /
+            - code [ref=e63]: DragDelta
+            - text: 0건. 좌표를 줄 수 있는 지점이 한 곳도 없다. (11건은 전부
+            - code [ref=e64]: GMaps.Ui
+            - text: 지도 오버레이 쪽 — §2 참조)
+          - generic [ref=e65]: 패널 하나가 앱 전체를 잠근다. 3층이 각각 풀스크린 히트테스트 면이라 지도·드로어·메뉴가 전부 입력 불가. UI 하네스 실측 좌측 메뉴 7건 중 6건 45초 타임아웃.
+          - generic [ref=e66]:
+            - text: Progress 팝업은 닫을 수단이 없다.
+            - code [ref=e67]: ProgressPopupDialogView.xaml
+            - text: 44행 전체에서 버튼 매치가
+            - code [ref=e68]: CloseOnClickAway="False"
+            - text: 1건뿐. 예외가 나면 앱 재시작 외 탈출 불가(11개 패널 동일 경로).
+          - generic [ref=e69]:
+            - text: "'취소'가 어디에도 전달되지 않는다."
+            - code [ref=e70]: ClickOk()
+            - text: 는 중첩 메시지를 재발행할 뿐 자기를 닫지도 않는다 → 삭제 대상을
+            - code [ref=e71]: _pending*
+            - text: 필드에 보관하는 워크어라운드가 13파일로 번졌다.
+      - heading "현행 화면 — 패널을 열면 지도가 죽는다" [level=4] [ref=e72]
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - generic [ref=e75]: Pids Monitoring System
+          - generic [ref=e76]: ◐ ─ ▢ ✕
+        - generic [ref=e78]: C
+        - generic [ref=e79]: "!"
+        - generic [ref=e80]: S
+        - generic [ref=e82]:
+          - generic [ref=e83] [cursor=pointer]: ☰
+          - generic [ref=e84] [cursor=pointer]: EVT
+          - generic [ref=e85] [cursor=pointer]: DEV
+          - generic [ref=e86] [cursor=pointer]: RPT
+          - generic [ref=e87] [cursor=pointer]: ACC
+          - generic [ref=e88] [cursor=pointer]: SET
+        - generic [ref=e89]:
+          - heading "이벤트 패널" [level=5] [ref=e90]
+          - generic [ref=e91]:
+            - generic [ref=e92]: 침입 감지
+            - text: 3구역 · 12:04:11
+          - generic [ref=e93]:
+            - generic [ref=e94]: 통신 장애
+            - text: 제어기 7 · 11:58
+        - generic: "← 스크림 #88000000 (53%) 이 지도·드로어·메뉴를 전부 삼킨다"
+        - generic [ref=e96]:
+          - generic [ref=e97]: 장비 정보
+          - paragraph [ref=e104]: 1050×700 고정. 이동 불가 · 리사이즈 불가 · 지도 대조 불가 · 다른 패널과 동시 표시 불가
+      - generic [ref=e105]: "현행: 장비 정보 패널을 연 상태. 알람 심볼이 깜빡이고 있지만 지도를 클릭할 수 없고, 드로어의 신규 이벤트도 만질 수 없다."
+    - generic [ref=e106]:
+      - heading "2. 목표 구조 — 표면(Surface)을 셸 루트가 소유한다" [level=2] [ref=e107]
+      - generic [ref=e108]:
+        - generic [ref=e109]:
+          - heading "새 시각 트리" [level=4] [ref=e110]
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - text: ShellView (MetroWindow)
+              - generic [ref=e113]: 타이틀바·테마 토글은 Window.Content 밖 → 어떤 표면도 못 덮음
+            - generic [ref=e114]:
+              - text: "[0] CanvasSectionView (지도)"
+              - generic [ref=e115]:
+                - text: 논리 부모 불변 — 재부모화 금지(
+                - code [ref=e116]: INonReparentable
+                - text: )
+            - generic [ref=e117]: "[1] 이벤트 드로어"
+            - generic [ref=e118]:
+              - text: "[2] GridSplitter ★신설"
+              - generic [ref=e119]:
+                - text: ShellView.xaml:86의
+                - code [ref=e120]: Tag="Splitter"
+                - text: 빈 컬럼에 컨트롤만 넣는다 — 컬럼 신설 불필요
+            - generic [ref=e121]:
+              - text: "[3] LeftMenuSectionView"
+              - generic [ref=e122]: ConductorControlView 자식 관계 제거
+            - generic [ref=e123]:
+              - text: "[4] SurfaceHostView ★신설"
+              - generic [ref=e124]: 루트 마지막 자식 · Conductor<Screen>.Collection.AllActive
+            - generic [ref=e125]:
+              - text: FloatCanvas
+              - generic [ref=e126]: z=1000+n · 스크림 없음 · N개(상한 6)
+            - generic [ref=e127]:
+              - text: CoverLayer
+              - generic [ref=e128]: z=2000 · 로그인 게이팅
+            - generic [ref=e129]:
+              - text: ModalStack
+              - generic [ref=e130]: z=3000 · 스크림 최상단 1장 · 요청 큐(스택 off)
+            - generic [ref=e131]:
+              - text: ToastLayer
+              - generic [ref=e132]: z=4000 · 큐 3
+            - generic [ref=e133]:
+              - text: AlarmLayer
+              - generic [ref=e134]: z=5000 · 모달 위 · 자동소멸 없음
+        - generic [ref=e135]:
+          - heading "핵심 사상" [level=4] [ref=e136]
+          - generic [ref=e137]:
+            - paragraph [ref=e138]: 호출부는 "무엇을"만 말한다. "어디에 어떻게 뜨는지"는 카탈로그가 정한다.
+            - paragraph [ref=e139]:
+              - text: 창의 수명은 여는 쪽이 아니라 창 자신이 소유한다(
+              - code [ref=e140]: TaskCompletionSource
+              - text: ). 그래서
+              - code [ref=e141]: await
+              - text: 가 끝나는 시점 = 창이 닫힌 시점이 되고, 호출부의 명시적
+              - code [ref=e142]: ClosePopup
+              - text: 발행 46곳이 통째로 사라진다.
+          - generic [ref=e143]:
+            - text: 드래그 패널은 이미 만들어져 있다.
+            - code [ref=e144]: GMaps.Ui/GMapControls/LayerPanelControl.cs
+            - text: 가 헤더 드래그 이동을
+            - code [ref=e145]: Canvas.SetLeft
+            - text: 로컬 값 직접 쓰기로 구현해 프로덕션에서 돌고 있다(Thumb 2건 + 스타일 6건).
+            - code [ref=e146]: SurfaceFrame
+            - text: 은 신규 발명이 아니라 이 코드의 일반화다 — 양 테마에서 이미 동작하므로 테마 리스크도 낮다.
+          - generic [ref=e147]:
+            - text: 테마는 걸림돌이 아니다.
+            - code [ref=e148]: ThemeService
+            - text: 가
+            - code [ref=e149]: Application.Current.Resources.MergedDictionaries
+            - text: 스왑 +
+            - code [ref=e150]: PaletteHelper.SetTheme
+            - text: +
+            - code [ref=e151]: ThemeManager.ChangeTheme(app,…)
+            - text: "— 셋 다 Application 스코프. 지켜야 할 규칙은 하나: 새 표면은 테마 딕셔너리를 로컬 병합하지 않는다(커밋"
+            - code [ref=e152]: f811588
+            - text: revert 전례).
+    - generic [ref=e153]:
+      - heading "3. 와이어프레임 — 실제로 움직여 보라" [level=2] [ref=e154]
+      - paragraph [ref=e155]: 아래 목업의 Float 패널은 헤더를 드래그하면 실제로 움직이고, 우하단 그립으로 리사이즈된다. 이것이 승인된 범위 B의 목표 동작이다(셸 안 이동 + 리사이즈 + 위치·크기 영속).
+      - generic [ref=e156]:
+        - generic [ref=e157]: "표면 열기:"
+        - button "장비 정보" [ref=e158] [cursor=pointer]
+        - button "조치보고" [active] [ref=e159] [cursor=pointer]
+        - button "탐지 신호 이력" [ref=e160] [cursor=pointer]
+        - generic [ref=e161]: "데모:"
+        - button "모달 띄우기" [ref=e162] [cursor=pointer]
+        - button "Toast" [ref=e163] [cursor=pointer]
+        - button "P0 알람" [ref=e164] [cursor=pointer]
+        - button "창 목록" [ref=e165] [cursor=pointer]
+        - button "초기화" [ref=e166] [cursor=pointer]
+        - generic [ref=e167]: "타일:"
+        - generic [ref=e168]:
+          - button "야간" [ref=e169] [cursor=pointer]
+          - button "주간" [ref=e170] [cursor=pointer]
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - generic [ref=e173]: Pids Monitoring System
+          - generic [ref=e174]: ◐ ─ ▢ ✕
+        - generic [ref=e176]: C
+        - generic [ref=e177]: "!"
+        - generic [ref=e178]: S
+        - generic [ref=e179]: P
+        - generic [ref=e181]:
+          - generic [ref=e182] [cursor=pointer]: ☰
+          - generic [ref=e183] [cursor=pointer]: EVT
+          - generic [ref=e184] [cursor=pointer]: DEV
+          - generic [ref=e185] [cursor=pointer]: RPT
+          - generic [ref=e186] [cursor=pointer]: ACC
+          - generic [ref=e187] [cursor=pointer]: SET
+        - generic "GridSplitter — 드로어 폭 조절(FR-10)" [ref=e188]
+        - generic [ref=e189]:
+          - heading "이벤트 패널" [level=5] [ref=e190]
+          - generic [ref=e191]:
+            - generic [ref=e192]: 침입 감지
+            - text: 3구역 · 12:04:11 · 미조치
+          - generic [ref=e193]:
+            - generic [ref=e194]: 통신 장애
+            - text: 제어기 7 · 11:58
+          - generic [ref=e195]:
+            - generic [ref=e196]: 함체 개방
+            - text: 구역 2 · 11:41
+        - generic [ref=e628]:
+          - text: 장비 정보
+          - generic [ref=e629]:
+            - button "─" [ref=e630] [cursor=pointer]
+            - button "▭" [ref=e631] [cursor=pointer]
+            - button "✕" [ref=e632] [cursor=pointer]
+        - generic [ref=e641]:
+          - text: "조치보고 — 침입 감지 #4821"
+          - generic [ref=e642]:
+            - button "─" [ref=e643] [cursor=pointer]
+            - button "▭" [ref=e644] [cursor=pointer]
+            - button "✕" [ref=e645] [cursor=pointer]
+      - generic [ref=e197]: Float 표면은 스크림을 만들지 않는다 — 패널을 띄운 채 지도를 팬/줌하고 드로어의 라이브 알람을 계속 볼 수 있다.
+      - generic [ref=e198]:
+        - generic [ref=e199]: Float 헤더(드래그 존)
+        - generic [ref=e201]:
+          - text: Float 테두리(신설 토큰
+          - code [ref=e203]: FloatingSurfaceBorderBrush
+          - text: )
+        - generic [ref=e204]: P0 알람 z=5000
+        - generic [ref=e206]: Toast z=4000
+      - generic [ref=e208]: Float 클램프 금지 구역이 있다. 이벤트 드로어 컬럼과 좌측 햄버거 스트립 위로는 Float가 갈 수 없다 — 그렇지 않으면 라이브 알람이 완전히 가려진다(현행 53% 스크림은 카드가 비치기라도 한다). 헤더는 항상 최소 120×28이 캔버스 안에 남는다.
+    - generic [ref=e209]:
+      - heading "4. 표면 5종 — 무엇이 어디로 가는가" [level=2] [ref=e210]
+      - table [ref=e212]:
+        - rowgroup [ref=e213]:
+          - row [ref=e214]:
+            - columnheader "종류" [ref=e215]
+            - columnheader "스크림" [ref=e216]
+            - columnheader "동시" [ref=e217]
+            - columnheader "이동/리사이즈" [ref=e218]
+            - columnheader "판정 규칙" [ref=e219]
+            - columnheader "배치" [ref=e220]
+          - row [ref=e221]:
+            - cell "Modal z=3000" [ref=e222]
+            - cell "최상단 1장" [ref=e223]
+            - cell "큐(스택 off)" [ref=e224]
+            - cell "없음 · 중앙 고정" [ref=e225]
+            - cell "결과 없이 다음 코드를 진행할 수 없다" [ref=e226]
+            - cell "14종 — 확인/안내/진행/로그인/계정 5종/함체/장비배정/WINDY/카메라속성/About" [ref=e227]
+          - row [ref=e228]:
+            - cell "Float z=1000+n" [ref=e229]
+            - cell "없음" [ref=e230]
+            - cell "N (상한 6)" [ref=e231]
+            - cell "드래그·4방향·스냅·최대화" [ref=e232]
+            - cell "지도와 대조한다 또는 편집 세션이 있다" [ref=e233]
+            - cell "8종 — 조치보고(탐지/장애) · 탐지 신호 이력 · 장비 정보 · 이벤트 대시보드 · 억제 스케줄 · 보고서 콘솔 · 계정 콘솔" [ref=e234]
+          - row [ref=e235]:
+            - cell "Toast z=4000" [ref=e236]
+            - cell "없음" [ref=e237]
+            - cell "큐 3" [ref=e238]
+            - cell "—" [ref=e239]
+            - cell "읽지 않아도 흐름이 옳다" [ref=e240]
+            - cell "신설 — Info 138곳 중 58곳 · 권한 거부 통지(§8)" [ref=e241]
+          - row [ref=e242]:
+            - cell "Alarm z=5000" [ref=e243]
+            - cell "없음" [ref=e244]
+            - cell "N" [ref=e245]
+            - cell "—" [ref=e246]
+            - cell "확인이 필요한 P0" [ref=e247]
+            - cell "신설 — NATS 탐지/장애. 모달 중에도 보인다" [ref=e248]
+          - row [ref=e249]:
+            - cell "Cover z=2000" [ref=e250]
+            - cell "자기 자신" [ref=e251]
+            - cell "1" [ref=e252]
+            - cell "—" [ref=e253]
+            - cell "로그인 게이팅 전용" [ref=e254]
+            - cell [ref=e255]:
+              - text: 기존 커버 분리(
+              - code [ref=e256]: CoverViewModel
+              - text: )
+          - row [ref=e257]:
+            - cell "Detached" [ref=e258]
+            - cell [ref=e259]:
+              - text: 범위 밖(N-1). 사용자 결정 — 별도 OS 창 미채택.
+              - code [ref=e260]: SurfaceKind
+              - text: 열거에 멤버를 정의하지 않는다(죽은 분기 방지)
+          - row [ref=e261]:
+            - cell "MapAnchored" [ref=e262]
+            - cell "비목표. 지도 오버레이 17종은 흡수하지 않는다 — 위경도 앵커·리더선이 맵 좌표계에 결박" [ref=e263]
+      - heading "Float 프레임 해부 (SurfaceFrame)" [level=4] [ref=e264]
+      - generic [ref=e265]:
+        - generic [ref=e267]:
+          - generic [ref=e270]:
+            - text: "조치보고 — 침입 감지 #4821"
+            - generic [ref=e271]:
+              - button "─" [ref=e272] [cursor=pointer]
+              - button "▢" [ref=e273] [cursor=pointer]
+              - button "✕" [ref=e274] [cursor=pointer]
+          - generic: 헤더 = 드래그 존
+          - generic: 그립 = 리사이즈
+        - generic [ref=e281]:
+          - heading "계약" [level=4] [ref=e282]
+          - list [ref=e283]:
+            - listitem [ref=e284]:
+              - text: 프레임은 호스트가 제공한다. 콘텐츠 View는 본문만 채운다 — 고정
+              - code [ref=e285]: Width/Height
+              - text: 를
+              - code [ref=e286]: MinWidth/MinHeight
+              - text: 로 바꾸고 자기 크롬·헤더·닫기 버튼을 제거(24개 View).
+            - listitem [ref=e287]:
+              - generic [ref=e288]:
+                - text: 드래그 존은 오버레이가 아니라
+                - code [ref=e289]: e.OriginalSource
+                - text: 필터
+              - text: 로 판정한다. 투명
+              - code [ref=e290]: PART_DragZone
+              - text: 을 얹으면 콘텐츠의 닫기 버튼을 물리적으로 흡수하는데,
+              - generic [ref=e291]:
+                - text: UIA
+                - code [ref=e292]: InvokePattern
+                - text: 은 히트테스트를 우회하므로 하네스는 계속 green
+              - text: 이다 — "테스트는 통과하는데 요원은 창을 못 닫는다".
+            - listitem [ref=e293]: ESC는 Float를 닫지 않는다. 지도가 드로잉/측정/조준/앵커 모드면 ESC를 지도에 양보한다(GMaps ESC 소비 9곳). Float 닫기는 Ctrl+W 또는 헤더 X.
+            - listitem [ref=e294]:
+              - generic [ref=e295]:
+                - text: 중복 열기 = 포커스 +
+                - code [ref=e296]: Configure
+                - text: 재실행
+              - text: . 같은 표면 2개는 열지 않는다(전량
+              - code [ref=e297]: SingleInstance
+              - text: 유지 — 사용자 결정).
+            - listitem [ref=e298]:
+              - text: 스냅 산술은 순수 함수(
+              - code [ref=e299]: SurfaceSnapCalculator
+              - text: )로 분리해 xUnit 헤드리스 검증 — UIA가 데스크톱 독점을 요구하는 이 프로젝트에서 자동화 가능한 유일한 축.
+    - generic [ref=e300]:
+      - heading "5. Before / After — 같은 작업, 다른 결과" [level=2] [ref=e301]
+      - generic [ref=e302]:
+        - generic [ref=e303]:
+          - heading "현행 조치보고 작성 중" [level=4] [ref=e304]:
+            - generic [ref=e305]: 현행
+            - text: 조치보고 작성 중
+          - generic [ref=e306]:
+            - generic [ref=e307]:
+              - generic [ref=e308]: Pids Monitoring
+              - generic [ref=e309]: ◐ ─ ▢ ✕
+            - generic [ref=e311]: "!"
+            - generic [ref=e312]:
+              - heading "이벤트" [level=5] [ref=e313]
+              - generic [ref=e314]:
+                - generic [ref=e315]: 침입 감지
+                - text: 3구역
+            - generic [ref=e317]: 조치보고
+          - generic [ref=e323]: 알람 위치를 확인하려면 보고서를 닫아야 한다. 닫으면 입력이 날아간다.
+        - generic [ref=e324]:
+          - heading "목표 조치보고 작성 중" [level=4] [ref=e325]:
+            - generic [ref=e326]: 목표
+            - text: 조치보고 작성 중
+          - generic [ref=e327]:
+            - generic [ref=e328]:
+              - generic [ref=e329]: Pids Monitoring
+              - generic [ref=e330]: ◐ ─ ▢ ✕
+            - generic [ref=e332]: "!"
+            - generic [ref=e333]:
+              - heading "이벤트" [level=5] [ref=e334]
+              - generic [ref=e335]:
+                - generic [ref=e336]: 침입 감지
+                - text: 3구역
+            - generic [ref=e338]:
+              - text: 조치보고
+              - generic [ref=e339]:
+                - button "─" [ref=e340] [cursor=pointer]
+                - button "✕" [ref=e341] [cursor=pointer]
+          - generic [ref=e347]: 알람 심볼이 계속 보이고 지도를 팬/줌할 수 있다. 드로어의 신규 이벤트도 살아 있다.
+    - generic [ref=e348]:
+      - heading "6. GAP-2 결정 — 라이트에서 밝은 카드로 뒤집기 승인됨" [level=2] [ref=e349]:
+        - text: 6. GAP-2 결정 — 라이트에서 밝은 카드로 뒤집기
+        - generic [ref=e350]: 승인됨
+      - paragraph [ref=e351]:
+        - text: 현행 확인/안내/에디터/로그인 팝업은 라이트 테마에서도 다크 카드다 (
+        - code [ref=e352]: md:ThemeAssist.Theme="Dark"
+        - text: 4곳 +
+        - code [ref=e353]: MaterialDesignFlatDarkBgButton
+        - text: 16파일). 감사 결과 라이트에서 대비 1.05:1 — 글씨가 사실상 보이지 않는다. 라이트 테마로 전환해서 아래 두 카드를 비교하라.
+      - generic [ref=e354]:
+        - generic [ref=e355]:
+          - heading "현행 ThemeAssist=Dark 고정" [level=4] [ref=e356]:
+            - generic [ref=e357]: 현행
+            - text: ThemeAssist=Dark 고정
+          - generic [ref=e361]:
+            - generic [ref=e362]: 삭제 확인
+            - generic [ref=e363]: 선택한 카메라 장비 3건을 삭제하시겠습니까?
+            - generic [ref=e364]:
+              - button "취소" [ref=e365] [cursor=pointer]
+              - button "확인" [ref=e366] [cursor=pointer]
+          - generic [ref=e367]:
+            - text: 라이트 테마에서도 카드가 검다. 버튼 전경
+            - code [ref=e368]: "#8493A2"
+            - text: vs 배경
+            - code [ref=e369]: "#1E2832"
+            - text: = 1.05:1
+        - generic [ref=e370]:
+          - heading "제안 토큰 추종 + 파괴적 액션 강조" [level=4] [ref=e371]:
+            - generic [ref=e372]: 제안
+            - text: 토큰 추종 + 파괴적 액션 강조
+          - generic [ref=e376]:
+            - generic [ref=e377]: 삭제 확인
+            - generic [ref=e378]: 선택한 카메라 장비 3건을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            - generic [ref=e379]:
+              - button "취소" [ref=e380] [cursor=pointer]
+              - button "삭제" [ref=e381] [cursor=pointer]
+          - generic [ref=e382]:
+            - text: 양 테마 토큰 추종.
+            - code [ref=e383]: IsDestructive
+            - text: 면 확인 버튼이
+            - code [ref=e384]: StatusCriticalBrush
+            - text: ", 기본 포커스는 취소"
+      - generic [ref=e385]:
+        - text: 원자 묶음이어야 한다.
+        - code [ref=e386]: ThemeAssist
+        - text: 4곳만 떼면 라이트에서 "밝은 카드 + 밝은 글씨"가 된다 —
+        - code [ref=e387]: MaterialDesignFlatDarkBgButton
+        - text: 16파일 치환 +
+        - code [ref=e388]: md:PackIcon
+        - text: 전경 재지정까지 한 커밋으로 가야 한다.
+        - generic [ref=e389]: R-19
+    - generic [ref=e390]:
+      - heading "7. GAP-9 — 스크림 강도 4조합 승인 대기" [level=2] [ref=e391]:
+        - text: 7. GAP-9 — 스크림 강도 4조합
+        - generic [ref=e392]: 승인 대기
+      - paragraph [ref=e393]:
+        - text: 현행
+        - code [ref=e394]: "#88000000"
+        - text: (순흑 53%) → 제안
+        - code [ref=e395]: ScrimModalBrush
+        - text: (Light
+        - code [ref=e396]: "#8C0E161F"
+        - text: 남색 55% / Dark
+        - code [ref=e397]: "#B8040810"
+        - text: 72%). 다크에서 눈에 띄게 짙어진다. 동시에 Float에는 스크림이 없어지므로 "모달일 때만, 지금보다 훨씬 어둡게"라는 새 시각 언어가 된다.
+      - generic [ref=e398]:
+        - generic [ref=e399]:
+          - heading [level=4] [ref=e400]:
+            - text: 현행
+            - code [ref=e401]: "#88000000"
+            - text: = rgba(0,0,0,.53)
+          - generic [ref=e402]:
+            - generic [ref=e404]: "!"
+            - generic [ref=e406]:
+              - generic [ref=e407]: 확인
+              - generic [ref=e408]: 진행하시겠습니까?
+        - generic [ref=e409]:
+          - heading [level=4] [ref=e410]:
+            - text: 제안
+            - code [ref=e411]: ScrimModalBrush
+          - generic [ref=e412]:
+            - generic [ref=e414]: "!"
+            - generic [ref=e416]:
+              - generic [ref=e417]: 확인
+              - generic [ref=e418]: 진행하시겠습니까?
+      - generic [ref=e419]:
+        - generic [ref=e420]: "4조합 검증:"
+        - button "주간 타일" [ref=e421] [cursor=pointer]
+        - button "야간 타일" [ref=e422] [cursor=pointer]
+        - generic [ref=e423]: × 우상단 테마 토글 = 4조합
+      - generic [ref=e424]:
+        - text: "판단 포인트: 다크 + 야간 타일 조합에서 72%가 과한가? 과하면 소비처 0인"
+        - code [ref=e425]: ScrimSplitBrush
+        - text: 를 재정의하거나 전용 키 1개를 신설한다. 이 화면 4조합 스크린샷으로 승인해 주시면 확정한다.
+    - generic [ref=e426]:
+      - heading "8. 권한 UX — 무음 실패를 전건 제거한다 ★" [level=2] [ref=e427]
+      - generic [ref=e428]:
+        - text: 현행은 권한 차단이 완전히 무음이다. 공통 가드
+        - code [ref=e429]: CanOpenPanel
+        - text: /
+        - code [ref=e430]: CanOpenSetup
+        - text: 의 무음
+        - code [ref=e431]: return
+        - text: 호출부가 7곳(
+        - code [ref=e432]: ConductorControlViewModel.cs:320
+        - text: SETUP ·
+        - code [ref=e433]: :336
+        - text: ·
+        - code [ref=e434]: :353
+        - text: adminOnly ·
+        - code [ref=e435]: :387
+        - text: devices ·
+        - code [ref=e436]: :403
+        - text: /
+        - code [ref=e437]: :417
+        - text: events ·
+        - code [ref=e438]: :433
+        - text: reports). 가드 본체는
+        - code [ref=e439]: _log?.Warning
+        - text: 만 하고 사용자에게 아무것도 보이지 않는다 — 메뉴를 눌렀는데 그냥 아무 일도 안 일어난다. 통지 수단이 모달뿐이라 팝업을 띄우면 남의 Progress를 오폐쇄하기 때문에 무음을 택할 수밖에 없었다. Toast 채널이 생기면 이 제약이 사라진다.
+      - heading "역할을 바꿔 보라 — 메뉴 가시성과 통지가 어떻게 달라지는가" [level=4] [ref=e440]
+      - generic [ref=e441]:
+        - generic [ref=e442]: "로그인 역할:"
+        - generic [ref=e443]:
+          - button "ADMIN" [ref=e444] [cursor=pointer]
+          - button "OPERATOR" [ref=e445] [cursor=pointer]
+          - button "VIEWER" [ref=e446] [cursor=pointer]
+        - generic [ref=e447]: 잠긴 메뉴를 클릭해 보라
+      - generic [ref=e448]:
+        - generic [ref=e449]:
+          - generic [ref=e450]: Pids Monitoring System
+          - generic [ref=e451]:
+            - generic [ref=e452]: ADMIN
+            - text: ◐ ─ ▢ ✕
+        - generic [ref=e454]: C
+        - generic [ref=e455]: "!"
+        - generic [ref=e456]:
+          - generic [ref=e457] [cursor=pointer]: ☰
+          - generic [ref=e458] [cursor=pointer]: EVT
+          - generic [ref=e459] [cursor=pointer]: DEV
+          - generic [ref=e460] [cursor=pointer]: RPT
+          - generic [ref=e461] [cursor=pointer]: ACC
+          - generic [ref=e462] [cursor=pointer]: SET
+        - generic [ref=e463]:
+          - heading "이벤트 패널" [level=5] [ref=e464]
+          - generic [ref=e465]:
+            - generic [ref=e466]: 침입 감지
+            - text: 3구역 · 12:04:11
+      - generic [ref=e467]: 권한 없는 메뉴는 흐리게 + 자물쇠 배지(disable 모델), 그래도 눌리면 Toast로 사유를 알린다 — 무음 0.
+      - generic [ref=e468]:
+        - generic [ref=e469]:
+          - heading "표시 규칙" [level=4] [ref=e470]
+          - table [ref=e472]:
+            - rowgroup [ref=e473]:
+              - row [ref=e474]:
+                - columnheader "상태" [ref=e475]
+                - columnheader "표시" [ref=e476]
+                - columnheader "클릭 시" [ref=e477]
+              - row [ref=e478]:
+                - cell "권한 있음" [ref=e479]
+                - cell "정상" [ref=e480]
+                - cell "표면 열림" [ref=e481]
+              - row [ref=e482]:
+                - cell "권한 없음" [ref=e483]
+                - cell "흐림 + 🔒 disable 모델" [ref=e484]:
+                  - text: 흐림 + 🔒
+                  - generic [ref=e485]: disable 모델
+                - cell "Toast(Warning) — 무음 0" [ref=e486]
+              - row [ref=e487]:
+                - cell "미인증/강제로그인 중" [ref=e488]
+                - cell "전체 차단" [ref=e489]
+                - cell "Toast 없음(커버가 이미 설명)" [ref=e490]
+              - row [ref=e491]:
+                - cell "DB 인증 모드" [ref=e492]
+                - cell "정상(인가 생략)" [ref=e493]
+                - cell [ref=e494]:
+                  - text: 하위호환 —
+                  - code [ref=e495]: _permission
+                  - text: "null"
+        - generic [ref=e496]:
+          - heading "보안 — 사유를 얼마나 말할 것인가" [level=4] [ref=e497]
+          - generic [ref=e498]:
+            - code [ref=e499]: .claude/rules/common/security.md
+            - text: ": \"계정 존재 여부를 드러내는 서로 다른 오류 메시지를 반환하지 말 것\". 권한 거부 Toast도 같은 원칙을 따른다 — \"권한이 없습니다\"까지만 말하고 모듈이 존재하는지 · 누가 가지고 있는지 · 어떤 역할이면 되는지는 말하지 않는다."
+          - generic [ref=e500]: // 좋음 _dialog.Notify(NotifyLevel.Warning, "권한이 없습니다."); // 나쁨 — 모듈 존재·역할 체계를 누설 _dialog.Notify(NotifyLevel.Warning, "reports:view 권한이 필요합니다. 관리자에게 문의하세요.");
+      - heading "새 구조에서 권한이 반드시 다뤄져야 하는 지점" [level=4] [ref=e501]
+      - table [ref=e503]:
+        - rowgroup [ref=e504]:
+          - row [ref=e505]:
+            - columnheader "#" [ref=e506]
+            - columnheader "지점" [ref=e507]
+            - columnheader "왜 누락되기 쉬운가" [ref=e508]
+            - columnheader "처리" [ref=e509]
+          - row [ref=e510]:
+            - cell "1" [ref=e511]
+            - cell [ref=e512]:
+              - text: 인가 단일 지점화 —
+              - code [ref=e513]: OpenAsync
+              - text: /
+              - code [ref=e514]: ShowAsync
+            - cell "현행은 7곳 + 무가드 다이얼로그로 흩어져 있어 \"다 옮겼다\"고 착각하기 쉽다" [ref=e515]
+            - cell "서비스 진입점 2곳에서만 인가. 우회 경로(단축키·프로그래매틱 발행) 봉쇄" [ref=e516]
+          - row [ref=e517]:
+            - cell "2" [ref=e518]
+            - cell "무가드 다이얼로그 전건 가드 신설" [ref=e519]
+            - cell "패널만 보고 다이얼로그를 잊는다 — 실제로 최초 분석이 SETUP(:320)을 빠뜨렸다" [ref=e520]
+            - cell "카탈로그 항목마다 요구 권한을 필수 필드로 — 빠뜨리면 컴파일이 안 되게" [ref=e521]
+          - row [ref=e522]:
+            - cell "3" [ref=e523]
+            - cell "세션 만료 시 열려 있는 Float 전건 강제 종료" [ref=e524]
+            - cell "현행이 안전한 유일한 이유가 OneActive의 우연한 교체다. Float N개는 그 안전망을 없앤다" [ref=e525]
+            - cell [ref=e526]:
+              - code [ref=e527]: EnterForcedLoginAsync()
+              - text: 가
+              - code [ref=e528]: CanDismiss
+              - text: 무시하고 타이머·구독·CTS까지 정리
+          - row [ref=e529]:
+            - cell "4" [ref=e530]
+            - cell "레이아웃 복원이 권한 우회가 되지 않게" [ref=e531]
+            - cell "재시작 시 저장된 Float를 자동 복원하면 그 사이 권한이 박탈된 표면이 열린다. 새 기능이라 기존 감사에 안 잡힌다" [ref=e532]
+            - cell "복원 시점에 재인가. 실패한 항목은 조용히 건너뛰고 레이아웃에서 제거" [ref=e533]
+          - row [ref=e534]:
+            - cell "5" [ref=e535]
+            - cell "계정별 레이아웃 격리" [ref=e536]
+            - cell "레이아웃 파일 하나면 다른 계정이 이전 사용자의 작업 구성을 본다" [ref=e537]
+            - cell [ref=e538]:
+              - text: 계정별 키 + 저장 파일에 민감정보 배제 + 원자적 쓰기(temp→
+              - code [ref=e539]: File.Replace
+              - text: )
+          - row [ref=e540]:
+            - cell "6" [ref=e541]
+            - cell "창 목록 UI의 표면 제목" [ref=e542]
+            - cell "Float N개를 관리하려고 만든 새 UI라 권한 관점 검토가 누락된다" [ref=e543]
+            - cell "권한 없는 표면은 목록에 노출하지 않는다" [ref=e544]
+          - row [ref=e545]:
+            - cell "7" [ref=e546]
+            - cell "권한 변경 시 가시성 실시간 갱신" [ref=e547]
+            - cell [ref=e548]:
+              - text: 바인딩이
+              - code [ref=e549]: PropertyChanged
+              - text: 를 못 받으면 재시작 전까지 낡은 메뉴가 남는다
+            - cell "권한 변경 이벤트 → 메뉴 가시성 재평가" [ref=e550]
+      - generic [ref=e551]: 전수 감사 진행 중. 위 7지점은 설계 관점 목록이고, 실제 코드의 권한 지점 전수 대장은 별도 5축 감사(표면 열림 지점 · 메뉴 가시성 · 패널 내부 액션 · 세션/RBAC 계약 · 새 구조 신규 지점)로 뽑는 중이다. 결과는 FR-41부터 PRD에 편입된다.
+    - generic [ref=e552]:
+      - heading [level=2] [ref=e553]:
+        - text: 9. 다이얼로그 API —
+        - code [ref=e554]: await
+        - text: 하나로 끝난다
+      - generic [ref=e555]:
+        - generic [ref=e556]:
+          - heading "Before — 40곳이 이렇게 생겼다" [level=4] [ref=e557]:
+            - generic [ref=e558]: Before
+            - text: — 40곳이 이렇게 생겼다
+          - generic [ref=e559]: "_pendingDeleteItems = SelectedItems.ToList(); // INV-14 워크어라운드 await _eventAggregator.PublishOnCurrentThreadAsync( new OpenConfirmPopupMessageModel { Explain = \"정말로 삭제하시겠습니까?\", MessageModel = new CallDeleteCameraDeviceProcessMessageModel() }); // … 다른 파일, 다른 클래스에서 … public async Task HandleAsync( CallDeleteCameraDeviceProcessMessageModel m, CancellationToken ct) { var snapshot = _pendingDeleteItems ?? SelectedItems.ToList(); _pendingDeleteItems = null; await RunDeleteOperationAsync(snapshot, …); } // ★ '취소'는 어디에도 도달하지 않는다 — _pendingDeleteItems 도 안 지워진다"
+        - generic [ref=e560]:
+          - heading "After — 핸들러·IHandle·필드가 통째로 소멸" [level=4] [ref=e561]:
+            - generic [ref=e562]: After
+            - text: — 핸들러·IHandle·필드가 통째로 소멸
+          - generic [ref=e563]: "if (!DevicePermissionGate.CanDelete()) { _dialog.Notify(NotifyLevel.Warning, \"권한이 없습니다.\"); return; // ★ 무음 → 통지 } var targets = SelectedItems.ToList(); if (!await _dialog.ConfirmAsync(\"삭제 확인\", $\"카메라 장비 {targets.Count}건을 삭제하시겠습니까?\", new ConfirmOptions { IsDestructive = true })) return; // ★ 취소 경로가 처음으로 코드에 존재 await RunDeleteOperationAsync(targets, …);"
+          - generic [ref=e564]:
+            - text: 소멸 물량 —
+            - code [ref=e565]: Call*ProcessMessageModel
+            - text: 29종 ·
+            - code [ref=e566]: IHandle
+            - text: 29개 ·
+            - code [ref=e567]: _pending*
+            - text: 13파일 · 호출부의
+            - code [ref=e568]: ClosePopup
+            - text: 발행 46곳. 편집점 총 252곳(Info 138 · Confirm 40 · Progress 28 · Close 46).
+      - heading "진행(Progress) — 프레임이 수명을 소유한다" [level=4] [ref=e569]
+      - generic [ref=e570]: "await _dialog.RunWithProgressAsync(\"삭제 중…\", async (p, ct) => { p.Report(0.4, \"서버 반영\"); await _api.DeleteAsync(ids, ct); }, new ProgressOptions { Watchdog = TimeSpan.FromSeconds(120) }); // work 가 예외로 이탈해도 · 타임아웃돼도 · 취소돼도 진행 오버레이는 반드시 해제된다. // P0-1(앱 하드락, 11개 패널 동일 경로)이 구조적으로 소멸한다."
+    - generic [ref=e571]:
+      - heading "10. 확인 요청" [level=2] [ref=e572]
+      - table [ref=e574]:
+        - rowgroup [ref=e575]:
+          - row [ref=e576]:
+            - columnheader "#" [ref=e577]
+            - columnheader "항목" [ref=e578]
+            - columnheader "이 문서에서 볼 곳" [ref=e579]
+            - columnheader "권고" [ref=e580]
+            - columnheader "상태" [ref=e581]
+          - row [ref=e582]:
+            - cell "GAP-2" [ref=e583]
+            - cell "라이트에서 밝은 카드로 뒤집기(16파일 원자 묶음)" [ref=e584]
+            - cell "§6 — 라이트 테마로 전환 후 두 카드 비교" [ref=e585]
+            - cell "뒤집기" [ref=e586]
+            - cell "승인됨" [ref=e587]
+          - row [ref=e589]:
+            - cell "GAP-9" [ref=e590]
+            - cell "스크림 강도(다크 53%→72%)" [ref=e591]
+            - cell "§7 — 주간/야간 × 다크/라이트 4조합" [ref=e592]
+            - cell "승인하되 다크가 과하면 전용 키 1개" [ref=e593]
+            - cell "대기" [ref=e594]
+          - row [ref=e596]:
+            - cell "GAP-3" [ref=e597]
+            - cell "로그인 커버 테마 대응" [ref=e598]
+            - cell "—" [ref=e599]
+            - cell "테마 불변 다크 고정(액센트만 라이트로 바꾸면 8.18:1→3.19:1 AA 미달)" [ref=e600]
+            - cell "대기" [ref=e601]
+          - row [ref=e603]:
+            - cell "W-1" [ref=e604]
+            - cell "Float 기본 크기·초기 위치(표면 8종)" [ref=e605]
+            - cell "§3 와이어프레임에서 직접 옮겨 보고 판단" [ref=e606]
+            - cell [ref=e607]:
+              - text: 현행 고정 크기를
+              - code [ref=e608]: MinWidth/MinHeight
+              - text: 로, 초기 위치는 캐스케이드
+            - cell "대기" [ref=e609]
+          - row [ref=e611]:
+            - cell "W-2" [ref=e612]
+            - cell "Float 동시 상한 6개가 적절한가" [ref=e613]
+            - cell "§3 — 3개까지 열어 보라" [ref=e614]
+            - cell "6 (창 목록 + 최소화가 안전장치)" [ref=e615]
+            - cell "대기" [ref=e616]
+          - row [ref=e618]:
+            - cell "W-3" [ref=e619]
+            - cell "권한 거부 Toast 문안" [ref=e620]
+            - cell "§8 — 역할 전환 후 잠긴 메뉴 클릭" [ref=e621]
+            - cell "\"권한이 없습니다.\"까지만(모듈·역할 비노출)" [ref=e622]
+            - cell "대기" [ref=e623]
+    - paragraph [ref=e625]:
+      - text: Surface Kernel 스토리보드 v1.0 · 2026-09-06 · 토큰 출처
+      - code [ref=e626]: "Ironwall.Dotnet.Libraries.Theme/Themes/Tokens.{Light,Dark}.xaml"
+      - text: · 이 문서의 목업은 실제 앱 렌더가 아니라 디자인 검토용 HTML 재현이다.

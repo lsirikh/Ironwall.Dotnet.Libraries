@@ -1,0 +1,197 @@
+- generic [active] [ref=e1]:
+  - heading "통문·함체 개폐 버튼 + PIDS 심볼 상세 보기" [level=1] [ref=e2]
+  - paragraph [ref=e3]: 와이어프레임 · 2026-09-08 · 색은 Tactical Command 토큰 실제값(Tokens.Light / Tokens.Dark)
+  - generic [ref=e4]:
+    - button "라이트 / 다크 전환" [ref=e5] [cursor=pointer]
+    - button "장비 연결 / 미연결 전환" [ref=e6] [cursor=pointer]
+    - generic [ref=e7]: 클릭해서 두 상태를 비교하세요
+  - heading "① 마커 속성 — 접점 체크박스를 개폐 버튼으로 교체" [level=2] [ref=e8]
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - paragraph [ref=e11]:
+        - text: 현행
+        - generic [ref=e12]: 지금
+      - generic [ref=e13]:
+        - generic [ref=e14]: 통문 · 속성
+        - generic [ref=e15]:
+          - generic [ref=e16]: 3D 통문
+          - generic [ref=e17]:
+            - generic [ref=e18]: 통문 폭
+            - generic [ref=e19]: 3.5 m
+          - generic [ref=e22]:
+            - generic [ref=e23]: 열림 판정
+            - generic [ref=e24]:
+              - generic [ref=e25]: ✓
+              - text: 접점 ON = 열림 (해제 시 반전)
+          - generic [ref=e26]:
+            - generic [ref=e27]: 연결디바이스
+            - generic [ref=e28]: 통문-01 ▾
+      - generic [ref=e29]: 문제 — 접점 배선이 어떻게 돼 있는지는 설치자만 아는 값인데 운영자에게 노출돼 있고, 정작 지금 문이 열렸는지 닫혔는지는 속성창에서 볼 수도 바꿀 수도 없다.
+    - generic [ref=e30]:
+      - paragraph [ref=e31]:
+        - text: 제안
+        - generic [ref=e32]: 변경
+      - generic [ref=e33]:
+        - generic [ref=e34]: 통문 · 속성
+        - generic [ref=e35]:
+          - generic [ref=e36]: 3D 통문
+          - generic [ref=e37]:
+            - generic [ref=e38]: 통문 폭
+            - generic [ref=e39]: 3.5 m
+          - generic [ref=e42]:
+            - generic [ref=e43]: 문 상태
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - button "열림" [pressed] [ref=e46] [cursor=pointer]
+                - button "닫힘" [ref=e47] [cursor=pointer]
+              - text: ● 열림
+          - generic [ref=e48]:
+            - generic [ref=e49]: 연결디바이스
+            - generic [ref=e50]: 통문-01 ▾
+      - paragraph [ref=e51]:
+        - text: · 두 버튼 중 현재 상태 하나만 활성(세그먼트 토글) — 누르면 3D 문짝이 그 자리에서 400 ms 스윙 · 상태 미수신이면 둘 다 비활성 + “상태 미수신(?)” — 지금의 Unknown 을 정직하게 표기 · 장비 미연결이면 버튼 전체 비활성(위 토글 버튼으로 확인) · 접점 반전(
+        - code [ref=e52]: OpenOnContactOn
+        - text: )은 UI 에서 빼고 설치 설정으로 이동
+  - generic [ref=e53]:
+    - text: "⚠ 먼저 정해야 하는 것 — 이 버튼이 “무엇”을 하는가 현재 시스템에 문을 여닫는 명령 채널이 없습니다. GIS 가 NATS 로 내보내는 건 조치보고 · TTS 방송 · 카메라 조준 3개뿐이고, 개폐는 수신 전용(접점 DETECT / SYNC_DEVICE / OPERATION_EVENT)입니다. 그래서 버튼의 의미가 둘 중 하나여야 합니다:"
+    - table [ref=e54]:
+      - rowgroup [ref=e55]:
+        - row [ref=e56]:
+          - columnheader "안" [ref=e57]
+          - columnheader "동작" [ref=e58]
+          - columnheader "필요한 것" [ref=e59]
+        - row [ref=e60]:
+          - cell "A. 표시 보정" [ref=e61]
+          - cell "버튼 = 화면 상태만 바꾼다(3D 문짝 + DB 저장). 실제 장비는 안 움직인다. 서버에서 상태가 오면 그 값이 덮어쓴다." [ref=e62]
+          - cell "클라이언트만. 지금 바로 가능" [ref=e63]
+        - row [ref=e64]:
+          - cell "B. 실제 제어" [ref=e65]
+          - cell "버튼 = 장비에 열어라/닫아라 명령. 명령→응답→상태수신까지 왕복." [ref=e66]
+          - cell [ref=e67]:
+            - text: "서버와 신규 규격: subject·페이로드·권한(RBAC)·실패 응답·타임아웃. 통문은"
+            - code [ref=e68]: /api/gates
+            - text: 도 아직 없음
+    - text: 이 와이어프레임은 A(표시 보정) 기준으로 그렸습니다. B 를 원하시면 서버 규격부터 잡아야 합니다.
+  - heading "함체도 동일 — 통문 폭만 없음" [level=3] [ref=e69]
+  - generic [ref=e71]:
+    - generic [ref=e72]: 함체 · 속성
+    - generic [ref=e73]:
+      - generic [ref=e74]: 3D 함체
+      - generic [ref=e75]:
+        - generic [ref=e76]: 문 상태
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - button "열림" [ref=e79] [cursor=pointer]
+            - button "닫힘" [pressed] [ref=e80] [cursor=pointer]
+          - text: ● 닫힘
+  - heading "② 우클릭 → “상세 보기” 창 (편집 모드 아닐 때)" [level=2] [ref=e81]
+  - generic [ref=e82]:
+    - generic [ref=e83]:
+      - paragraph [ref=e84]: 컨텍스트 메뉴 — 맨 위에 신설
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - text: 🔍 상세 보기
+          - generic [ref=e87]: 신설
+        - separator [ref=e88]
+        - generic [ref=e89]: ▤ 감지센서페이지
+        - generic [ref=e90]: ⓘ 감지센서상세
+        - generic [ref=e91]:
+          - text: ✎ 편집
+          - generic [ref=e92]: (편집 모드 전용)
+      - paragraph [ref=e93]: · 모든 PIDS 심볼 공통(제어기·감지센서·카메라·스피커·경광등·통문·함체) · 편집 모드가 아닐 때 우클릭 → 맨 위 항목 · 잠긴 심볼은 기존 규칙대로 메뉴 자체가 안 뜸
+      - generic [ref=e94]:
+        - text: 주의 —
+        - code [ref=e95]: ShowMarkerContextMenu
+        - text: 는 다른 세션이 진행 중인
+        - code [ref=e96]: pidsgroup-rightclick
+        - text: PRD(36/50)가 같이 건드리는 코드입니다. 착수 전 조율 필요.
+    - generic [ref=e97]:
+      - paragraph [ref=e98]: 창 레이아웃 — 좌 심볼 / 우 장비 속성
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: 감지센서 · 외곽-07
+          - generic [ref=e102]: ✕
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - generic [ref=e113]: 외곽-07
+            - generic [ref=e114]: 3D 심볼 · 45°씩 8단계 회전
+          - generic [ref=e116]:
+            - heading "장비 정보" [level=4] [ref=e117]
+            - generic [ref=e118]:
+              - term [ref=e119]: 번호
+              - definition [ref=e120]: "142"
+              - term [ref=e121]: 장비번호
+              - definition [ref=e122]: "7"
+              - term [ref=e123]: 장비명
+              - definition [ref=e124]: 외곽-07
+              - term [ref=e125]: 유형
+              - definition [ref=e126]: 감지센서
+              - term [ref=e127]: 제어기
+              - definition [ref=e128]: 제어기-03
+              - term [ref=e129]: 위치
+              - definition [ref=e130]: 서측 외곽 3구간
+              - term [ref=e131]: 장비그룹
+              - definition [ref=e132]: 구역-01
+              - term [ref=e133]: 상태
+              - definition [ref=e134]: ● 정상 / 활성화
+              - term [ref=e135]: 버전
+              - definition [ref=e136]: v1.4.2
+      - paragraph [ref=e137]: "· 왼쪽: 3D 심볼이면 45°씩 8단계로 천천히 한 바퀴(16초). 2D 심볼이면 고정 · 오른쪽: 장비정보 창과 같은 속성 · 장비 미연결이면 오른쪽 전체 비활성(위 토글 버튼으로 확인) — 왼쪽 심볼은 그대로 보임"
+  - heading "2D 심볼일 때 (고정)" [level=3] [ref=e138]
+  - generic [ref=e140]:
+    - generic [ref=e141]:
+      - generic [ref=e142]: 경광등 · 경광-02
+      - generic [ref=e143]: ✕
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - generic [ref=e146]: ◉
+        - generic [ref=e148]: 경광-02
+        - generic [ref=e149]: 2D 심볼 · 회전 없음
+      - generic [ref=e150]:
+        - heading "장비 정보" [level=4] [ref=e151]
+        - generic [ref=e152]:
+          - term [ref=e153]: 번호
+          - definition [ref=e154]: "88"
+          - term [ref=e155]: 장비번호
+          - definition [ref=e156]: "21"
+          - term [ref=e157]: 장비명
+          - definition [ref=e158]: 경광-02
+          - term [ref=e159]: 유형
+          - definition [ref=e160]: 경광등
+          - term [ref=e161]: IP 주소
+          - definition [ref=e162]: 192.168.10.51
+          - term [ref=e163]: 포트
+          - definition [ref=e164]: "8080"
+          - term [ref=e165]: 위치
+          - definition [ref=e166]: 정문 초소
+          - term [ref=e167]: 상태
+          - definition [ref=e168]: ● 정상 / 활성화
+  - heading "타입별 오른쪽 속성 (장비정보 창 컬럼과 동일)" [level=3] [ref=e169]
+  - table [ref=e170]:
+    - rowgroup [ref=e171]:
+      - row [ref=e172]:
+        - columnheader "유형" [ref=e173]
+        - columnheader "표시 필드" [ref=e174]
+      - row [ref=e175]:
+        - cell "공통" [ref=e176]
+        - cell "번호 · 장비번호 · 장비명 · 유형 · 위치 · 장비그룹 · 상태 · 활성화 · 버전" [ref=e177]
+      - row [ref=e178]:
+        - cell "감지센서" [ref=e179]
+        - cell "+ 제어기 · 탐지 이력" [ref=e180]
+      - row [ref=e181]:
+        - cell "카메라" [ref=e182]
+        - cell "+ IP 주소 · 포트 · 모드 · 카테고리 · 녹화" [ref=e183]
+      - row [ref=e184]:
+        - cell "제어기 · 경광등 · 스피커" [ref=e185]
+        - cell "+ IP 주소 · 포트" [ref=e186]
+      - row [ref=e187]:
+        - cell "함체" [ref=e188]
+        - cell "+ 도어 상태 · 히터 · 팬" [ref=e189]
+      - row [ref=e190]:
+        - cell "통문" [ref=e191]
+        - cell [ref=e192]:
+          - text: + 게이트 상태
+          - generic [ref=e193]:
+            - text: 클라 모델·
+            - code [ref=e194]: /api/gates
+            - text: 미구현

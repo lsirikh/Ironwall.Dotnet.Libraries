@@ -1,0 +1,564 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - button "다크" [ref=f1e3] [cursor=pointer]
+    - button "라이트" [ref=f1e4] [cursor=pointer]
+  - generic [ref=f1e5]:
+    - banner [ref=f1e6]:
+      - heading "이벤트 억제 — 주간 반복 스토리보드" [level=1] [ref=f1e7]
+      - generic [ref=f1e8]: 운용자 흐름 · 안내 문구 · 실패 경로 | v1.0 · 2026-09-07
+      - generic [ref=f1e9]:
+        - generic [ref=f1e10]: PRD event-suppression-recurrence v1.0 (Approved)
+        - generic [ref=f1e11]: 시나리오 S1~S12
+        - generic [ref=f1e12]: 치수·바인딩은 wireframe 참조
+    - generic [ref=f1e13]:
+      - text: 이 문서의 역할 — 흐름과 안내 문구만 다룬다. 치수·바인딩·직렬화 계약은
+      - code [ref=f1e14]: event-suppression-recurrence-wireframe.html
+      - text: 에 있다.
+    - generic [ref=f1e15]:
+      - text: 운용자에게 이 기능이 무엇인가 — 지금까지는 "9월 7일 09:00부터 18:00까지 억제"처럼 한 번 쓰고 끝나는 창만 만들 수 있었다. 이제
+      - generic [ref=f1e16]: "\"8월 9일부터 9월 20일까지, 매주 월~금 08:00~21:00\""
+      - text: 을 창 하나로 만든다. 6주치를 30번 만들 필요가 없다. 기간을 무제한으로 둘 수도 있다.
+    - heading "S1. 단발 창 만들기 — 아무것도 바뀌지 않았음을 확인" [level=2] [ref=f1e17]
+    - generic [ref=f1e18]:
+      - generic [ref=f1e19]:
+        - generic [ref=f1e20]: S1
+        - generic [ref=f1e21]: 기존 사용자는 변화를 느끼지 않는다
+        - generic [ref=f1e22]: FR-07 회귀
+      - generic [ref=f1e23]:
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]:
+            - generic [ref=f1e26]: "1"
+            - generic [ref=f1e27]: 패널을 연다
+            - generic [ref=f1e28]: 폼이 예전 그대로다. 반복 섹션은 어디에도 없다.목록도 7행 그대로 보인다.
+          - generic [ref=f1e29]:
+            - generic [ref=f1e30]: "2"
+            - generic [ref=f1e31]: 눈에 띄는 유일한 차이
+            - generic [ref=f1e32]:
+              - text: 시간창 오른쪽 빈 자리에 작은 라디오가 생겼다.
+              - generic [ref=f1e33]: 반복 ◉ 단발 ○ 주간 반복
+              - text: 기본이 단발이라 건드릴 일이 없다.
+          - generic [ref=f1e34]:
+            - generic [ref=f1e35]: "3"
+            - generic [ref=f1e36]: 평소처럼 생성
+            - generic [ref=f1e37]: 작업명 → 대상 → 시간창 → ＋ 억제 창 생성.동작·문구·결과 전부 동일.
+        - generic [ref=f1e38]: 설계 목표 — 반복을 안 쓰는 사람에게 이 릴리스는 보이지 않아야 한다. 폼 세로 원가 0 증가, 목록 행 수 불변.
+    - heading "S2. 주간 반복 창 만들기 — 주 흐름" [level=2] [ref=f1e39]
+    - generic [ref=f1e40]:
+      - generic [ref=f1e41]:
+        - generic [ref=f1e42]: S2
+        - generic [ref=f1e43]: "\"8/9~9/20, 매주 월~금 08:00~21:00\""
+        - generic [ref=f1e44]: FR-07·08·09·12
+      - generic [ref=f1e45]:
+        - generic [ref=f1e46]:
+          - generic [ref=f1e47]:
+            - generic [ref=f1e48]: "1"
+            - generic [ref=f1e49]: 주간 반복 선택
+            - generic [ref=f1e50]:
+              - text: "라디오를 주간 반복으로. 아래에 반복 줄이 펼쳐진다. 동시에 시간창 라벨이 바뀐다:"
+              - generic [ref=f1e51]: 억제 시간창 → 유효기간
+              - text: 의미가 달라졌음을 라벨로 말한다
+          - generic [ref=f1e52]:
+            - generic [ref=f1e53]: "2"
+            - generic [ref=f1e54]: 기본값이 미리 채워진다
+            - generic [ref=f1e55]:
+              - generic [ref=f1e56]:
+                - generic [ref=f1e57]: 월
+                - generic [ref=f1e58]: 화
+                - generic [ref=f1e59]: 수
+                - generic [ref=f1e60]: 목
+                - generic [ref=f1e61]: 금
+                - generic [ref=f1e62]: 토
+                - generic [ref=f1e63]: 일
+              - text: 요일 평일(31) · 시각 08:00~21:00. 가장 흔한 정비 패턴이라 그대로 두면 끝.
+          - generic [ref=f1e64]:
+            - generic [ref=f1e65]: "3"
+            - generic [ref=f1e66]: 요일을 바꾼다 — 끌어서
+            - generic [ref=f1e67]:
+              - text: 월을 누른 채 수까지 끌면 월·화·수가 한 번에 잡힌다.
+              - generic [ref=f1e68]:
+                - generic [ref=f1e69]: 월
+                - generic [ref=f1e70]: 화
+                - generic [ref=f1e71]: 수
+                - generic [ref=f1e72]: 목
+                - generic [ref=f1e73]: 금
+                - generic [ref=f1e74]: 토
+                - generic [ref=f1e75]: 일
+              - text: 끄는 동안 하단 바로 범위가 보인다.한 칸만 바꾸려면 그냥 클릭.
+          - generic [ref=f1e76]:
+            - generic [ref=f1e77]: "4"
+            - generic [ref=f1e78]: 유효기간을 넣는다
+            - generic [ref=f1e79]:
+              - text: 시작
+              - code [ref=f1e80]: 2026-08-09
+              - text: · 종료
+              - code [ref=f1e81]: 2026-09-20
+              - text: .
+              - generic [ref=f1e82]: 날짜만 넣어도 서버가 9/20 하루 전체를 포함한다
+          - generic [ref=f1e83]:
+            - generic [ref=f1e84]: "5"
+            - generic [ref=f1e85]: 요약으로 확인하고 생성
+            - generic [ref=f1e86]:
+              - generic [ref=f1e87]: → 월~수 08:00~21:00 · 2026-08-09 ~ 09-20
+              - text: 한 줄로 전송될 내용이 보인다. ＋ 억제 창 생성.
+        - generic [ref=f1e88]: 요약 줄이 왜 중요한가 — 요일 7칸과 시각 2개를 각각 눈으로 검산하는 대신 "내가 만들려던 그 문장"인지만 보면 된다. 자동화 테스트도 이 줄 하나로 전부 단언한다.
+    - heading "S3. 무제한 — 끝을 정하지 않는 창" [level=2] [ref=f1e89]
+    - generic [ref=f1e90]:
+      - generic [ref=f1e91]:
+        - generic [ref=f1e92]: S3
+        - generic [ref=f1e93]: "\"언제까지인지 모르겠다\""
+        - generic [ref=f1e94]: FR-10
+      - generic [ref=f1e95]:
+        - generic [ref=f1e96]:
+          - generic [ref=f1e97]:
+            - generic [ref=f1e98]: "1"
+            - generic [ref=f1e99]: 종료일을 못 정한다
+            - generic [ref=f1e100]: 공사가 언제 끝날지 모른다. 일단 걸어두고 싶다.
+          - generic [ref=f1e101]:
+            - generic [ref=f1e102]: "2"
+            - generic [ref=f1e103]: 기간 제한 없음 체크
+            - generic [ref=f1e104]:
+              - text: "체크하는 순간 종료일 피커가 사라지고 그 자리에 안내가 들어온다:"
+              - generic [ref=f1e105]: 무제한 — 종료일 없음
+              - generic [ref=f1e106]: 비활성 회색이 아니라 대체다. 자리가 흔들리지 않는다.
+          - generic [ref=f1e107]:
+            - generic [ref=f1e108]: "3"
+            - generic [ref=f1e109]: 요약이 경고한다
+            - generic [ref=f1e110]:
+              - generic [ref=f1e111]: → 월~금 08:00~21:00 · 무제한 · 2026-08-09 시작
+              - text: "\"무제한\"이 요약에 그대로 나온다. 실수로 켜졌으면 여기서 보인다."
+          - generic [ref=f1e112]:
+            - generic [ref=f1e113]: "4"
+            - generic [ref=f1e114]: 목록에서도 구분된다
+            - generic [ref=f1e115]:
+              - text: 종료 칸이
+              - code [ref=f1e116]: —
+              - text: 가 아니라 "무제한"이다.
+              - generic [ref=f1e117]:
+                - text: 예전엔 무제한·파싱실패·값없음이 전부
+                - code [ref=f1e118]: —
+                - text: 로 똑같아 보였다
+        - generic [ref=f1e119]: 무제한은 단발에는 없다. 단발 창은 서버가 종료일을 필수로 요구한다 — "실수로 영구히 억제되는" 사고를 막는 장치다. 그래서 체크박스는 주간 반복에서만 나타난다.
+    - heading "S4. 야간 창 — 자정을 넘긴다" [level=2] [ref=f1e120]
+    - generic [ref=f1e121]:
+      - generic [ref=f1e122]:
+        - generic [ref=f1e123]: S4
+        - generic [ref=f1e124]: "\"밤 10시부터 새벽 6시까지\""
+        - generic [ref=f1e125]: FR-11 ③
+      - generic [ref=f1e127]:
+        - generic [ref=f1e128]:
+          - generic [ref=f1e129]: "1"
+          - generic [ref=f1e130]: 종료가 시작보다 이르다
+          - generic [ref=f1e131]:
+            - text: 시작
+            - code [ref=f1e132]: 22:00:00
+            - text: · 종료
+            - code [ref=f1e133]: 06:00:00
+            - text: . 숫자만 보면 거꾸로다.
+        - generic [ref=f1e134]:
+          - generic [ref=f1e135]: "2"
+          - generic [ref=f1e136]: 막지 않고 설명한다
+          - generic [ref=f1e137]:
+            - generic [ref=f1e138]: ⓘ 자정을 넘깁니다 — 다음날 06:00에 종료됩니다
+            - text: 정상 입력이다. 야간 정비를 못 만들면 안 된다.
+        - generic [ref=f1e139]:
+          - generic [ref=f1e140]: "3"
+          - generic [ref=f1e141]: 요약이 "익일"로 말한다
+          - generic [ref=f1e142]: → 월~금 22:00~익일 06:00
+        - generic [ref=f1e144]:
+          - generic [ref=f1e145]: "4"
+          - generic [ref=f1e146]: 알아둘 것
+          - generic [ref=f1e147]:
+            - text: 금요일 22:00에 시작한 회차는 토요일 06:00까지 이어진다 — 토요일을 선택하지 않았어도 그렇다.
+            - generic [ref=f1e148]: 요일은 시작일 기준이다.
+    - heading "S5. 막아야 하는 입력 — 서버가 안 막아준다" [level=2] [ref=f1e149]
+    - generic [ref=f1e150]: 아래 두 가지는 서버가 422를 내지 않고 그냥 받는다. 막는 곳은 이 화면뿐이다.
+    - generic [ref=f1e151]:
+      - generic [ref=f1e152]:
+        - generic [ref=f1e153]: S5-a
+        - generic [ref=f1e154]: 요일을 하나도 안 골랐다
+        - generic [ref=f1e155]: FR-11 ① · 검증 V1
+      - generic [ref=f1e157]:
+        - generic [ref=f1e158]:
+          - generic [ref=f1e159]: "1"
+          - generic [ref=f1e160]: 전부 해제
+          - generic [ref=f1e162]:
+            - generic [ref=f1e163]: 월
+            - generic [ref=f1e164]: 화
+            - generic [ref=f1e165]: 수
+            - generic [ref=f1e166]: 목
+            - generic [ref=f1e167]: 금
+            - generic [ref=f1e168]: 토
+            - generic [ref=f1e169]: 일
+        - generic [ref=f1e170]:
+          - generic [ref=f1e171]: "2"
+          - generic [ref=f1e172]: 즉시 차단
+          - generic [ref=f1e173]:
+            - generic [ref=f1e174]: 요일을 1개 이상 선택하세요
+            - text: 생성 버튼이 흐려지고, 호버하면 같은 이유가 뜬다.
+        - generic [ref=f1e175]:
+          - generic [ref=f1e176]: "3"
+          - generic [ref=f1e177]: 막지 않으면 무슨 일이
+          - generic [ref=f1e178]: 서버가 그대로 저장한다. 그리고 그 창은 영원히 발동하지 않는다 — 목록엔 "진행중"으로 보이는데 실제로는 아무것도 억제하지 않는 유령 창이 된다.
+    - generic [ref=f1e179]:
+      - generic [ref=f1e180]:
+        - generic [ref=f1e181]: S5-b
+        - generic [ref=f1e182]: 시작과 종료를 같게 넣었다
+        - generic [ref=f1e183]: FR-11 ② · 검증 V2
+      - generic [ref=f1e185]:
+        - generic [ref=f1e186]:
+          - generic [ref=f1e187]: "1"
+          - generic [ref=f1e188]: 08:00 ~ 08:00
+          - generic [ref=f1e189]: "\"08시에 잠깐\"이라는 뜻으로 넣었다."
+        - generic [ref=f1e190]:
+          - generic [ref=f1e191]: "2"
+          - generic [ref=f1e192]: 차단 + 진짜 의미 고지
+          - generic [ref=f1e193]:
+            - generic [ref=f1e194]: 시작과 종료가 같으면 24시간 종일 억제가 됩니다
+            - generic [ref=f1e195]: 서버는 이걸 하루 종일로 해석한다. 오타 한 번이 종일 침묵이 된다.
+        - generic [ref=f1e196]:
+          - generic [ref=f1e197]: "3"
+          - generic [ref=f1e198]: 정말 종일이 필요하면
+          - generic [ref=f1e199]:
+            - text: 시각을
+            - code [ref=f1e200]: 00:00:00 ~ 23:59:59
+            - text: 로 넣으면 의도가 드러난다.
+    - generic [ref=f1e201]:
+      - generic [ref=f1e202]:
+        - generic [ref=f1e203]: S5-c
+        - generic [ref=f1e204]: 유효기간이 너무 길다
+        - generic [ref=f1e205]: FR-12 · 검증 V4
+      - table [ref=f1e207]:
+        - rowgroup [ref=f1e208]:
+          - row [ref=f1e209]:
+            - columnheader "모드" [ref=f1e210]
+            - columnheader "상한" [ref=f1e211]
+            - columnheader "안내" [ref=f1e212]
+            - columnheader "근거" [ref=f1e213]
+          - row [ref=f1e214]:
+            - cell "단발" [ref=f1e215]
+            - cell "30일" [ref=f1e216]
+            - cell "⚠ 억제 기간이 최대 30일을 초과했습니다" [ref=f1e217]
+            - cell "순수 클라 방어 — 서버는 단발에 상한이 없다" [ref=f1e219]
+          - row [ref=f1e220]:
+            - cell "주간 반복" [ref=f1e221]
+            - cell "366일" [ref=f1e222]
+            - cell "⚠ 유효기간이 366일을 초과했습니다 — 무제한을 쓰세요" [ref=f1e223]
+            - cell "서버 하드 게이트. 정확히 366일은 통과" [ref=f1e225]
+          - row [ref=f1e226]:
+            - cell "무제한" [ref=f1e227]
+            - cell "검사 없음" [ref=f1e228]
+            - cell "—" [ref=f1e229]
+            - cell "서버도 검사하지 않는다" [ref=f1e230]
+    - heading "S6. 되돌리기 — 반복을 켰다가 껐다" [level=2] [ref=f1e231]
+    - generic [ref=f1e232]:
+      - generic [ref=f1e233]:
+        - generic [ref=f1e234]: S6
+        - generic [ref=f1e235]: 마음이 바뀌어 단발로 돌아간다
+        - generic [ref=f1e236]: FR-10 · 적대검증 F-03/07
+      - generic [ref=f1e237]:
+        - generic [ref=f1e238]:
+          - generic [ref=f1e239]:
+            - generic [ref=f1e240]: "1"
+            - generic [ref=f1e241]: 반복 + 무제한을 켰다
+            - generic [ref=f1e242]: 주간 반복 선택 → "기간 제한 없음" 체크.종료일 자리에 "무제한" 안내가 있다.
+          - generic [ref=f1e243]:
+            - generic [ref=f1e244]: "2"
+            - generic [ref=f1e245]: 단발로 되돌린다
+            - generic [ref=f1e246]: 라디오를 단발로.반복 줄이 접히고 체크박스도 사라진다.
+          - generic [ref=f1e247]:
+            - generic [ref=f1e248]: "3"
+            - generic [ref=f1e249]: 종료일이 되살아난다
+            - generic [ref=f1e250]: "\"무제한\" 안내가 사라지고 종료일 피커가 돌아온다. 이전에 넣었던 값도 복원된다."
+        - generic [ref=f1e251]: 이 프레임 3이 없으면 무슨 일이 벌어지는가 (적대검증이 잡은 실제 결함) — 체크박스는 사라지는데 "무제한" 상태는 남는다. 화면엔 되돌릴 수단이 없고, 종료일 없는 단발 창이 전송되어 서버가 422로 거절한다. 사용자는 왜 거절당했는지 알 방법이 없다 — 원인이 화면에서 사라졌기 때문이다.
+    - heading "S7. 목록 읽기 — \"진행중\"이 억제중은 아니다" [level=2] [ref=f1e252]
+    - generic [ref=f1e253]:
+      - generic [ref=f1e254]:
+        - generic [ref=f1e255]: S7
+        - generic [ref=f1e256]: 토요일 새벽에 목록을 본다
+        - generic [ref=f1e257]: FR-03
+      - generic [ref=f1e258]:
+        - generic [ref=f1e259]:
+          - generic [ref=f1e260]:
+            - generic [ref=f1e261]: "1"
+            - generic [ref=f1e262]: 지금까지의 화면
+            - generic [ref=f1e263]:
+              - text: 평일 08~21시 창이 토요일 새벽 3시에도
+              - generic [ref=f1e264]: 진행중
+              - text: 으로 보였다.
+              - generic [ref=f1e265]: "실측: 유효기간의 62.2%가 이 상태다"
+          - generic [ref=f1e266]:
+            - generic [ref=f1e267]: "2"
+            - generic [ref=f1e268]: 바뀐 화면
+            - generic [ref=f1e269]:
+              - text: 배지는 그대로 "진행중"이되(유효기간 안이니까), "억제중" 표식이 붙지 않는다.
+              - generic [ref=f1e270]: 두 정보가 분리됐다.
+          - generic [ref=f1e271]:
+            - generic [ref=f1e272]: "3"
+            - generic [ref=f1e273]: 월요일 09시
+            - generic [ref=f1e274]:
+              - text: "같은 행에 억제중 표식이 붙는다. 작업명 아래 둘째 줄:"
+              - generic [ref=f1e275]: 월~금 08:00~21:00
+          - generic [ref=f1e276]:
+            - generic [ref=f1e277]: "4"
+            - generic [ref=f1e278]: 언제까지인지
+            - generic [ref=f1e279]: 진행 중이면 "~21:00 까지", 대기 중이면 "다음 08-11 08:00".
+        - generic [ref=f1e280]:
+          - text: 왜 배지를 안 바꾸고 표식을 더했나 —
+          - code [ref=f1e281]: status
+          - text: (예정/진행중/종료/취소)는 창의 생애주기를 말하고, "억제중"은 지금 이 순간을 말한다. 서로 다른 축이라 합치면 둘 다 잃는다. 운용자는 "유효기간 안인데 지금은 안 걸려 있다"를 구분할 수 있어야 한다.
+    - heading "S8. 배너 — 억제 사실을 숨기지 않는다" [level=2] [ref=f1e282]
+    - generic [ref=f1e283]:
+      - generic [ref=f1e284]:
+        - generic [ref=f1e285]: S8
+        - generic [ref=f1e286]: 패널을 열어둔 채 회차가 끝난다
+        - generic [ref=f1e287]: FR-06·13·14
+      - generic [ref=f1e288]:
+        - generic [ref=f1e289]:
+          - generic [ref=f1e290]:
+            - generic [ref=f1e291]: "1"
+            - generic [ref=f1e292]: 20:55 — 진행 중
+            - generic [ref=f1e293]: 진행 중인 억제 2건 · 21:00 까지
+          - generic [ref=f1e295]:
+            - generic [ref=f1e296]: "2"
+            - generic [ref=f1e297]: 21:00 — 자동 전환
+            - generic [ref=f1e298]:
+              - generic [ref=f1e299]: 억제 예정 1건 · 다음 08-11 08:00
+              - generic [ref=f1e300]: 패널을 다시 열지 않아도 30초 안에 바뀐다
+          - generic [ref=f1e301]:
+            - generic [ref=f1e302]: "3"
+            - generic [ref=f1e303]: 서버가 안 잡힐 때
+            - generic [ref=f1e304]:
+              - generic [ref=f1e305]: ⚠ 갱신 실패 — 3분 전 기준 · 억제 2건
+              - text: 목록을 지우지 않는다. 대신 언제 기준인지 밝힌다.
+        - generic [ref=f1e306]: 왜 stale에서 배너를 지우지 않나 — 이 배너가 존재하는 이유가 "정비 중임을 숨기지 않기"다. 조용히 사라지면 그 목적을 정면으로 배반하고, 아무 말 없이 남으면 거짓말이 된다. 남기되 언제 기준인지 밝히는 것이 유일하게 정직한 선택이다.
+        - generic [ref=f1e307]: 지금은 이 배너가 갱신되지 않는다. 패널을 열 때 한 번 조회하고 끝이라, 열어둔 채 창이 끝나도 배너가 그대로 남는다. 이번에 30초 폴링에 연결한다 (그 폴링 서비스는 이미 돌고 있는데 아무도 안 듣고 있었다).
+    - heading "S9. 키보드만으로 — 접근성 · 자동화" [level=2] [ref=f1e308]
+    - generic [ref=f1e309]:
+      - generic [ref=f1e310]:
+        - generic [ref=f1e311]: S9
+        - generic [ref=f1e312]: 마우스 없이 요일을 고른다
+        - generic [ref=f1e313]: 드래그 6종 계약 ①
+      - generic [ref=f1e314]:
+        - table [ref=f1e315]:
+          - rowgroup [ref=f1e316]:
+            - row [ref=f1e317]:
+              - columnheader "키" [ref=f1e318]
+              - columnheader "동작" [ref=f1e319]
+            - row [ref=f1e320]:
+              - cell "Tab" [ref=f1e321]
+              - cell "요일 스트립으로 진입 (스트립 전체가 탭 정거장 하나 — 7번 눌러 지나갈 필요 없다)" [ref=f1e322]
+            - row [ref=f1e323]:
+              - cell "← →" [ref=f1e324]
+              - cell "요일 간 이동" [ref=f1e325]
+            - row [ref=f1e326]:
+              - cell "Space" [ref=f1e327]
+              - cell "현재 요일 켜기/끄기" [ref=f1e328]
+            - row [ref=f1e329]:
+              - cell "Shift+←/→" [ref=f1e330]
+              - cell "범위 선택 — 드래그와 완전히 같은 결과" [ref=f1e331]
+            - row [ref=f1e332]:
+              - cell "Esc (드래그 중)" [ref=f1e333]
+              - cell "드래그 취소 — 시작 전 상태로 되돌린다" [ref=f1e334]
+            - row [ref=f1e335]:
+              - cell "우클릭" [ref=f1e336]
+              - cell "빠른 선택 — 평일 · 주말 · 매일 · 모두 해제" [ref=f1e337]
+        - generic [ref=f1e338]: 이건 편의 기능이 아니라 필수다. WPF 자동화(UIA)에는 드래그를 확인할 방법이 아예 없다 — .NET 8에 해당 타입 자체가 없다. 회귀 테스트는 전부 이 키보드 경로로 잡는다. 드래그만 있는 UI는 자동화가 좌표 클릭에 영구히 묶인다.
+    - heading "S10. 구버전 서버에 붙었을 때" [level=2] [ref=f1e339]
+    - generic [ref=f1e340]:
+      - generic [ref=f1e341]:
+        - generic [ref=f1e342]: S10
+        - generic [ref=f1e343]: 원격(6.3.2)으로 전환된 상태
+        - generic [ref=f1e344]: FR-03 폴백
+      - generic [ref=f1e345]:
+        - generic [ref=f1e346]:
+          - generic [ref=f1e347]:
+            - generic [ref=f1e348]: "1"
+            - generic [ref=f1e349]: 응답에 새 필드가 없다
+            - generic [ref=f1e350]:
+              - text: 구버전 서버는
+              - code [ref=f1e351]: is_suppressing_now
+              - text: 를 안 준다.
+          - generic [ref=f1e352]:
+            - generic [ref=f1e353]: "2"
+            - generic [ref=f1e354]: 폴백이 작동한다
+            - generic [ref=f1e355]:
+              - text: 값이 없으면
+              - code [ref=f1e356]: status=="active"
+              - text: 로 판단한다. = 예전과 똑같이 동작한다.
+          - generic [ref=f1e357]:
+            - generic [ref=f1e358]: "3"
+            - generic [ref=f1e359]: 반복 창 생성만 막힌다
+            - generic [ref=f1e360]: 구버전엔 반복 기능 자체가 없어 422로 거절된다. 단발 창 생성은 정상.
+        - generic [ref=f1e361]:
+          - generic [ref=f1e362]:
+            - text: 왜
+            - code [ref=f1e363]: bool
+            - text: 이 아니라
+            - code [ref=f1e364]: bool?
+            - text: 인가
+          - text: —
+          - code [ref=f1e365]: bool
+          - text: 로 선언하면 필드가 없을 때 조용히
+          - generic [ref=f1e366]:
+            - code [ref=f1e367]: "false"
+            - text: (억제 안 함)
+          - text: 로 굳는다. 그건 안전한 방향의 반대다. "모르겠으면 억제 중으로 보이게" 두는 편이 은폐보다 낫다.
+    - heading "S11. 잘못 만들었을 때 — 고칠 수 없다" [level=2] [ref=f1e368]
+    - generic [ref=f1e369]:
+      - generic [ref=f1e370]:
+        - generic [ref=f1e371]: S11
+        - generic [ref=f1e372]: 요일을 잘못 골라 저장했다
+        - generic [ref=f1e373]: D-7 (범위 제외) · 결함 B-6
+      - generic [ref=f1e374]:
+        - generic [ref=f1e375]:
+          - generic [ref=f1e376]:
+            - generic [ref=f1e377]: "1"
+            - generic [ref=f1e378]: 수정 수단이 없다
+            - generic [ref=f1e379]: 이 패널에는 편집 기능이 아예 없다(반복 이전부터 그랬다).
+          - generic [ref=f1e380]:
+            - generic [ref=f1e381]: "2"
+            - generic [ref=f1e382]: 유일한 방법
+            - generic [ref=f1e383]: 취소(soft-cancel) → 다시 생성.
+          - generic [ref=f1e384]:
+            - generic [ref=f1e385]: "3"
+            - generic [ref=f1e386]: 취소한 행은 남는다
+            - generic [ref=f1e387]: 목록에 "취소"로 남는다. 정리하려면 체크 후 선택 삭제.
+        - generic [ref=f1e388]: 왜 편집을 안 만드나 — 서버의 수정 스키마에 반복 필드가 없다. 편집 화면을 만들어도 반복 규칙 자체는 못 고친다. 반쪽짜리 편집은 오히려 오해를 부른다. 사용자 결정 사항으로 남긴다 — 재생성 비용을 감수할지, 서버에 수정 스키마 확장을 요청할지.
+    - heading "S12. 안내 문구 전량" [level=2] [ref=f1e389]
+    - table [ref=f1e390]:
+      - rowgroup [ref=f1e391]:
+        - row [ref=f1e392]:
+          - columnheader "위치" [ref=f1e393]
+          - columnheader "조건" [ref=f1e394]
+          - columnheader "문구" [ref=f1e395]
+          - columnheader "톤" [ref=f1e396]
+        - row [ref=f1e397]:
+          - cell "라벨" [ref=f1e398]
+          - cell "단발" [ref=f1e399]
+          - cell "억제 시간창 (KST) * — 시작 ~ 종료" [ref=f1e400]
+          - cell "중립" [ref=f1e401]
+        - row [ref=f1e402]:
+          - cell "라벨" [ref=f1e403]
+          - cell "주간 반복" [ref=f1e404]
+          - cell "유효기간 (KST) * — 시작 ~ 종료" [ref=f1e405]
+          - cell "중립" [ref=f1e406]
+        - row [ref=f1e407]:
+          - cell "라벨" [ref=f1e408]
+          - cell "Row3" [ref=f1e409]
+          - cell "요일 * / 일일 시각 * / 유효기간 끝" [ref=f1e410]
+          - cell "중립" [ref=f1e411]
+        - row [ref=f1e412]:
+          - cell "대체" [ref=f1e413]
+          - cell "무제한 체크" [ref=f1e414]
+          - cell "무제한 — 종료일 없음" [ref=f1e415]
+          - cell "중립" [ref=f1e416]
+        - row [ref=f1e417]:
+          - cell "요약" [ref=f1e418]
+          - cell "항상(반복 모드)" [ref=f1e419]
+          - cell "→ 월~금 08:00~21:00 · 무제한 · 2026-08-09 시작" [ref=f1e420]
+          - cell "정보" [ref=f1e421]
+        - row [ref=f1e422]:
+          - cell "요약" [ref=f1e423]
+          - cell "자정 넘김" [ref=f1e424]
+          - cell "→ 월~금 22:00~익일 06:00" [ref=f1e425]
+          - cell "정보" [ref=f1e426]
+        - row [ref=f1e427]:
+          - cell "안내" [ref=f1e428]
+          - cell [ref=f1e429]:
+            - code [ref=f1e430]: daily_end < daily_start
+          - cell "ⓘ 자정을 넘깁니다 — 다음날 06:00에 종료됩니다" [ref=f1e431]
+          - cell "정보" [ref=f1e432]
+        - row [ref=f1e433]:
+          - cell "오류" [ref=f1e434]
+          - cell "요일 0개" [ref=f1e435]
+          - cell "요일을 1개 이상 선택하세요" [ref=f1e436]
+          - cell "차단" [ref=f1e437]
+        - row [ref=f1e438]:
+          - cell "오류" [ref=f1e439]
+          - cell [ref=f1e440]:
+            - code [ref=f1e441]: daily_start == daily_end
+          - cell "시작과 종료가 같으면 24시간 종일 억제가 됩니다" [ref=f1e442]
+          - cell "차단" [ref=f1e443]
+        - row [ref=f1e444]:
+          - cell "오류" [ref=f1e445]
+          - cell "단발 30일 초과" [ref=f1e446]
+          - cell "⚠ 억제 기간이 최대 30일을 초과했습니다" [ref=f1e447]
+          - cell "차단" [ref=f1e448]
+        - row [ref=f1e449]:
+          - cell "오류" [ref=f1e450]
+          - cell "반복 366일 초과" [ref=f1e451]
+          - cell "⚠ 유효기간이 366일을 초과했습니다 — 무제한을 쓰세요" [ref=f1e452]
+          - cell "차단" [ref=f1e453]
+        - row [ref=f1e454]:
+          - cell "배너" [ref=f1e455]
+          - cell "억제 진행 중" [ref=f1e456]
+          - cell "진행 중인 억제 N건 · 21:00 까지" [ref=f1e457]
+          - cell "경고" [ref=f1e458]
+        - row [ref=f1e459]:
+          - cell "배너" [ref=f1e460]
+          - cell "대기" [ref=f1e461]
+          - cell "억제 예정 N건 · 다음 08-11 08:00" [ref=f1e462]
+          - cell "정보" [ref=f1e463]
+        - row [ref=f1e464]:
+          - cell "배너" [ref=f1e465]
+          - cell "TTL 90초 초과" [ref=f1e466]
+          - cell "⚠ 갱신 실패 — N분 전 기준 · 억제 N건" [ref=f1e467]
+          - cell "약화" [ref=f1e468]
+        - row [ref=f1e469]:
+          - cell "목록" [ref=f1e470]
+          - cell [ref=f1e471]:
+            - code [ref=f1e472]: window_end == null
+          - cell "무제한" [ref=f1e473]
+          - cell "중립" [ref=f1e474]
+        - row [ref=f1e475]:
+          - cell "목록" [ref=f1e476]
+          - cell "2번째 줄(반복 창)" [ref=f1e477]
+          - cell "월~금 08:00~21:00" [ref=f1e478]
+          - cell "약화" [ref=f1e479]
+        - row [ref=f1e480]:
+          - cell "툴팁" [ref=f1e481]
+          - cell "생성 불가" [ref=f1e482]
+          - cell [ref=f1e483]:
+            - text: 기존
+            - code [ref=f1e484]: CreateHintText
+            - text: 5분기에 +3분기(요일·시각·유효기간)
+          - cell "중립" [ref=f1e485]
+    - heading "S13. 이 스토리보드가 답하지 않는 것" [level=2] [ref=f1e486]
+    - table [ref=f1e487]:
+      - rowgroup [ref=f1e488]:
+        - row [ref=f1e489]:
+          - columnheader "ID" [ref=f1e490]
+          - columnheader "미결" [ref=f1e491]
+          - columnheader "누가 정하나" [ref=f1e492]
+        - row [ref=f1e493]:
+          - cell "D-7" [ref=f1e494]
+          - cell "반복 창 편집(PATCH) UI를 만들 것인가 (S11)" [ref=f1e495]
+          - cell "사용자 — PRD는 제외 권고" [ref=f1e496]
+        - row [ref=f1e497]:
+          - cell "D-8" [ref=f1e498]
+          - cell "Phase 2 라이브 억제(카드 딤/필터)" [ref=f1e499]
+          - cell "서버 PM 결재 대기" [ref=f1e500]
+        - row [ref=f1e501]:
+          - cell "L-1" [ref=f1e502]
+          - cell "목록 열 구성 변경(상태 90→132 / 대상 200→170)" [ref=f1e503]
+          - cell "사용자 — CHANGELOG ⑦에 이미 확인 대기로 걸려 있음" [ref=f1e504]
+        - row [ref=f1e505]:
+          - cell "V-08" [ref=f1e506]
+          - cell [ref=f1e507]:
+            - code [ref=f1e508]: ToggleButton
+            - text: 에 8.0 데드존 + 클릭 폴백이 성립하는가
+          - cell "스파이크 — 레포에 선례 없음" [ref=f1e509]
+        - row [ref=f1e510]:
+          - cell "V-11" [ref=f1e511]
+          - cell "반복 + 배너 3종 = 목록 ≈3.9행. 실사용상 견디는가" [ref=f1e512]
+          - cell "실기 확인" [ref=f1e513]
+        - row [ref=f1e514]:
+          - cell "V-12" [ref=f1e515]
+          - cell "라이트/다크 실기 렌더 대비" [ref=f1e516]
+          - cell "실기 캡처 — 이 문서의 토글은 CSS 근사" [ref=f1e517]
+    - contentinfo [ref=f1e518]:
+      - text: event-suppression-recurrence-storyboard.html v1.0 · 2026-09-07 · 치수·바인딩·직렬화 계약은
+      - code [ref=f1e519]: event-suppression-recurrence-wireframe.html
+      - text: · PRD
+      - code [ref=f1e520]: docs/prds/event-suppression-recurrence-prd.md
+      - text: (Approved) · ⚠ 미검증 항목은 S13에 명시 — 통과로 적지 않는다

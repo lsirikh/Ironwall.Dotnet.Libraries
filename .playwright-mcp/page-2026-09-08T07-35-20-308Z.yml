@@ -1,0 +1,357 @@
+- generic [active] [ref=f3e1]:
+  - heading "통문·함체 개폐 버튼 + PIDS 심볼 상세 보기" [level=1] [ref=f3e2]
+  - paragraph [ref=f3e3]: 와이어프레임 v2 · 2026-09-08 · 색은 Tactical Command 토큰 실제값
+  - generic [ref=f3e4]:
+    - button "라이트 / 다크 전환" [ref=f3e5] [cursor=pointer]
+    - button "장비 연결 / 미연결 전환" [ref=f3e6] [cursor=pointer]
+    - button "3D 드래그 중 / 자동회전 전환" [ref=f3e7] [cursor=pointer]
+  - heading "① 마커 속성 — 접점 체크박스를 개폐 버튼으로 교체" [level=2] [ref=f3e8]
+  - generic [ref=f3e9]:
+    - generic [ref=f3e10]:
+      - paragraph [ref=f3e11]:
+        - text: 현행
+        - generic [ref=f3e12]: 지금
+      - generic [ref=f3e13]:
+        - generic [ref=f3e14]: 통문 · 속성
+        - generic [ref=f3e15]:
+          - generic [ref=f3e16]: 3D 통문
+          - generic [ref=f3e17]:
+            - generic [ref=f3e18]: 통문 폭
+            - generic [ref=f3e19]: 3.5 m
+          - generic [ref=f3e22]:
+            - generic [ref=f3e23]: 열림 판정
+            - generic [ref=f3e24]:
+              - generic [ref=f3e25]: ✓
+              - text: 접점 ON = 열림 (해제 시 반전)
+          - generic [ref=f3e26]:
+            - generic [ref=f3e27]: 연결디바이스
+            - generic [ref=f3e28]: 통문-01 ▾
+      - generic [ref=f3e29]: 문제 — 접점 배선 방향은 설치자만 아는 값인데 운영자에게 노출돼 있고, 정작 지금 문이 열렸는지는 속성창에서 볼 수도 바꿀 수도 없다.
+    - generic [ref=f3e30]:
+      - paragraph [ref=f3e31]:
+        - text: 제안
+        - generic [ref=f3e32]: 변경
+      - generic [ref=f3e33]:
+        - generic [ref=f3e34]: 통문 · 속성
+        - generic [ref=f3e35]:
+          - generic [ref=f3e36]: 3D 통문
+          - generic [ref=f3e37]:
+            - generic [ref=f3e38]: 통문 폭
+            - generic [ref=f3e39]: 3.5 m
+          - generic [ref=f3e42]:
+            - generic [ref=f3e43]: 문 상태
+            - generic [ref=f3e44]:
+              - generic [ref=f3e45]:
+                - button "열림" [pressed] [ref=f3e46] [cursor=pointer]
+                - button "닫힘" [ref=f3e47] [cursor=pointer]
+              - text: ● 열림
+          - generic [ref=f3e48]:
+            - generic [ref=f3e49]: 연결디바이스
+            - generic [ref=f3e50]: 통문-01 ▾
+      - paragraph [ref=f3e51]: · 현재 상태 하나만 활성 — 누르면 3D 문짝이 400 ms 스윙 · 상태 미수신이면 둘 다 비활성 + "상태 미수신(?)"(현재 Unknown 을 정직 표기) · 장비 미연결이면 전체 비활성 · 접점 반전은 UI 에서 빼고 설치 설정으로 이동
+  - generic [ref=f3e52]:
+    - text: ⚠ 먼저 정해야 함 — 이 버튼이 "무엇"을 하는가 개폐 명령 채널이 없습니다. GIS 가 NATS 로 내보내는 건 조치보고 · TTS · 카메라 조준뿐이고 개폐는 수신 전용입니다.
+    - table [ref=f3e53]:
+      - rowgroup [ref=f3e54]:
+        - row [ref=f3e55]:
+          - columnheader "안" [ref=f3e56]
+          - columnheader "동작" [ref=f3e57]
+          - columnheader "필요한 것" [ref=f3e58]
+        - row [ref=f3e59]:
+          - cell "A. 표시 보정" [ref=f3e60]
+          - cell "버튼 = 화면 상태만 변경(3D 문짝 + DB). 실제 장비는 안 움직이고 서버 상태가 오면 덮어씀" [ref=f3e61]
+          - cell "클라이언트만 — 지금 가능" [ref=f3e62]
+        - row [ref=f3e63]:
+          - cell "B. 실제 제어" [ref=f3e64]
+          - cell "버튼 = 장비에 열어라/닫아라 명령. 명령→응답→상태수신 왕복" [ref=f3e65]
+          - cell [ref=f3e66]:
+            - text: 서버 신규 규격(subject·페이로드·RBAC·실패 응답). 통문은
+            - code [ref=f3e67]: /api/gates
+            - text: 도 없음
+    - text: 이 와이어프레임은 A 기준입니다.
+  - heading "② 우클릭 → \"상세 보기\" 창 (편집 모드 아닐 때)" [level=2] [ref=f3e68]
+  - generic [ref=f3e69]:
+    - paragraph [ref=f3e70]: 컨텍스트 메뉴 — 맨 위에 신설
+    - generic [ref=f3e71]:
+      - generic [ref=f3e72]:
+        - text: 🔍 상세 보기
+        - generic [ref=f3e73]: 신설
+      - separator [ref=f3e74]
+      - generic [ref=f3e75]: ▤ 감지센서페이지
+      - generic [ref=f3e76]: ⓘ 감지센서상세
+      - generic [ref=f3e77]: ✎ 감지센서수정
+      - generic [ref=f3e78]: 📈 탐지 이력
+    - paragraph [ref=f3e79]: 기존 메뉴는 그대로 두고, 같은 기능을 상세 창 안에서도 버튼으로 제공합니다.
+  - heading "상세 창 — 감지센서(3D 심볼 · 장비 연결됨)" [level=3] [ref=f3e80]
+  - generic [ref=f3e81]:
+    - generic [ref=f3e82]:
+      - generic [ref=f3e83]: 🔍 상세 보기 — 감지센서 · 외곽-07
+      - generic [ref=f3e84]: ✕
+    - generic [ref=f3e85]:
+      - generic [ref=f3e86]:
+        - generic [ref=f3e95]: 외곽-07
+        - generic [ref=f3e96]: 3D 심볼 · 45°씩 자동 회전드래그로 자유 회전 · 놓으면 재개
+        - generic [ref=f3e97]:
+          - button "⟲ 정면" [ref=f3e98] [cursor=pointer]
+          - button "⏸ 회전 멈춤" [ref=f3e99] [cursor=pointer]
+      - generic [ref=f3e100]:
+        - generic [ref=f3e101]:
+          - button "기본" [ref=f3e102] [cursor=pointer]
+          - button "통신" [ref=f3e103] [cursor=pointer]
+          - button "상태" [ref=f3e104] [cursor=pointer]
+          - button "심볼" [ref=f3e105] [cursor=pointer]
+          - button "최근 이벤트" [ref=f3e106] [cursor=pointer]
+        - generic [ref=f3e109]:
+          - term [ref=f3e110]: 번호
+          - definition [ref=f3e111]: "142"
+          - term [ref=f3e112]: 장비번호
+          - definition [ref=f3e113]: "7"
+          - term [ref=f3e114]: 장비명
+          - definition [ref=f3e115]: 외곽-07
+          - term [ref=f3e116]: 유형
+          - definition [ref=f3e117]: 감지센서
+          - term [ref=f3e118]: 소속 제어기
+          - definition [ref=f3e119]: 제어기-03
+          - term [ref=f3e120]: 장비그룹
+          - definition [ref=f3e121]: 구역-01
+          - term [ref=f3e122]: 위치
+          - definition [ref=f3e123]: 서측 외곽 3구간
+          - term [ref=f3e124]: 상태
+          - definition [ref=f3e125]: ● 정상 · 활성화
+          - term [ref=f3e126]: 버전
+          - definition [ref=f3e127]: v1.4.2
+        - generic [ref=f3e128]:
+          - button "🌐 감지센서페이지" [ref=f3e129] [cursor=pointer]
+          - button "ⓘ 상세" [ref=f3e130] [cursor=pointer]
+          - button "✎ 수정" [ref=f3e131] [cursor=pointer]
+          - button "📈 탐지 이력" [ref=f3e132] [cursor=pointer]
+          - button "지도에서 보기" [ref=f3e133] [cursor=pointer]
+  - paragraph [ref=f3e134]: "· 3D 조작 — 잡고 끌면 점선 구(球) 가이드(적도·자오선)가 뜨고 자유 회전, 놓으면 1.5초 뒤 자동 회전 재개. 위 툴바의 \"3D 드래그 중 / 자동회전 전환\" 버튼으로 두 상태를 비교하세요. 2D 심볼은 가이드도 회전도 없음 · 탭 — 상세 창이니 최대한 많이: 기본 / 통신 / 상태 / 심볼 / 최근 이벤트 · 심볼 탭만은 장비 미연결이어도 활성 — 심볼 자체 정보(제목·좌표·회전·크기·최소표시줌·레이어·잠금)는 장비와 무관 · 액션 바 — 기존 컨텍스트 메뉴 기능을 그대로 버튼화. 장비 미연결이면 전부 비활성"
+  - heading "탭별 내용 · 액션 버튼 노출 규칙" [level=3] [ref=f3e135]
+  - generic [ref=f3e136]:
+    - generic [ref=f3e137]:
+      - paragraph [ref=f3e138]: 탭
+      - table [ref=f3e139]:
+        - rowgroup [ref=f3e140]:
+          - row [ref=f3e141]:
+            - columnheader "탭" [ref=f3e142]
+            - columnheader "내용" [ref=f3e143]
+          - row [ref=f3e144]:
+            - cell "기본" [ref=f3e145]
+            - cell "번호 · 장비번호 · 장비명 · 유형 · 소속 제어기 · 장비그룹 · 위치 · 상태 · 활성화 · 버전" [ref=f3e146]
+          - row [ref=f3e147]:
+            - cell "통신" [ref=f3e148]
+            - cell "IP 주소 · 포트 · 모드 · 카테고리 · 녹화(카메라) — 해당 없는 타입은 탭 자체를 숨김" [ref=f3e149]
+          - row [ref=f3e150]:
+            - cell "상태" [ref=f3e151]
+            - 'cell "현재 상태 · 최근 변경 시각 · 함체: 도어 상태 · 히터 · 팬 · 임계 설정 / 통문: 게이트 상태 미구현" [ref=f3e152]':
+              - text: "현재 상태 · 최근 변경 시각 · 함체: 도어 상태 · 히터 · 팬 · 임계 설정 / 통문: 게이트 상태"
+              - generic [ref=f3e153]: 미구현
+          - row [ref=f3e154]:
+            - cell "심볼" [ref=f3e155]
+            - cell "심볼 제목 · 위경도 · 고도 · 회전 · 크기 · 최소표시줌 · 레이어 · 잠금 · 라벨 장비 미연결이어도 활성" [ref=f3e156]: 심볼 제목 · 위경도 · 고도 · 회전 · 크기 · 최소표시줌 · 레이어 · 잠금 · 라벨장비 미연결이어도 활성
+          - row [ref=f3e157]:
+            - cell "최근 이벤트" [ref=f3e158]
+            - cell "최근 N건 요약(시각 · 종류 · 내용) + [탐지 이력] 로 전체 조회" [ref=f3e159]
+    - generic [ref=f3e160]:
+      - paragraph [ref=f3e161]: 액션 버튼 (기존 컨텍스트 메뉴 = 단일 출처)
+      - table [ref=f3e162]:
+        - rowgroup [ref=f3e163]:
+          - row [ref=f3e164]:
+            - columnheader "버튼" [ref=f3e165]
+            - columnheader "대상" [ref=f3e166]
+            - columnheader "비활성 조건" [ref=f3e167]
+          - row [ref=f3e168]:
+            - 'cell "{장비}페이지" [ref=f3e169]'
+            - cell "전 타입" [ref=f3e170]
+            - cell "웹서버 OFF" [ref=f3e171]
+          - row [ref=f3e172]:
+            - 'cell "{장비}상세 / 수정" [ref=f3e173]'
+            - cell "전 타입" [ref=f3e174]
+            - cell "웹서버 OFF · 장비 미연결" [ref=f3e175]
+          - row [ref=f3e176]:
+            - cell "📈 탐지 이력" [ref=f3e177]
+            - cell "감지센서" [ref=f3e178]
+            - cell "장비 미연결" [ref=f3e179]
+          - row [ref=f3e180]:
+            - cell "🌐 제어기 홈페이지" [ref=f3e181]
+            - cell "제어기" [ref=f3e182]
+            - cell "IP/포트 없음" [ref=f3e183]
+          - row [ref=f3e184]:
+            - cell "🌐 카메라 홈페이지" [ref=f3e185]
+            - cell "카메라" [ref=f3e186]
+            - cell "IP/포트 없음" [ref=f3e187]
+          - row [ref=f3e188]:
+            - cell "🎯 특정 위치 확인" [ref=f3e189]
+            - cell "PTZ 카메라" [ref=f3e190]
+            - cell "장비 미연결" [ref=f3e191]
+          - row [ref=f3e192]:
+            - cell "🔊 음원 / TTS / Stop" [ref=f3e193]
+            - cell "스피커" [ref=f3e194]
+            - cell "장비 미연결" [ref=f3e195]
+          - row [ref=f3e196]:
+            - cell "🎤 누르고 말하기 미구현" [ref=f3e197]:
+              - text: 🎤 누르고 말하기
+              - generic [ref=f3e198]: 미구현
+            - cell "스피커" [ref=f3e199]
+            - cell "장비 미연결 · 권한 없음 · 다른 방송 중" [ref=f3e200]
+          - row [ref=f3e201]:
+            - cell "🚪 열림 / 닫힘" [ref=f3e202]
+            - cell "통문 · 함체" [ref=f3e203]
+            - cell "장비 미연결 · 상태 미수신" [ref=f3e204]
+  - heading "2D 심볼 · 장비 미연결 (회전 없음, 심볼 탭만 활성)" [level=3] [ref=f3e205]
+  - generic [ref=f3e206]:
+    - generic [ref=f3e207]:
+      - generic [ref=f3e208]: 🔍 상세 보기 — 경광등 · 경광-02
+      - generic [ref=f3e209]: ✕
+    - generic [ref=f3e210]:
+      - generic [ref=f3e211]:
+        - generic [ref=f3e212]: ◉
+        - generic [ref=f3e214]: 경광-02
+        - generic [ref=f3e215]: 2D 심볼 · 회전 없음
+      - generic [ref=f3e216]:
+        - generic [ref=f3e217]:
+          - button "기본" [ref=f3e218] [cursor=pointer]
+          - button "통신" [ref=f3e219] [cursor=pointer]
+          - button "상태" [ref=f3e220] [cursor=pointer]
+          - button "심볼" [ref=f3e221] [cursor=pointer]
+          - button "최근 이벤트" [ref=f3e222] [cursor=pointer]
+        - generic [ref=f3e223]:
+          - generic [ref=f3e224]:
+            - term [ref=f3e225]: 심볼 제목
+            - definition [ref=f3e226]: 경광-02
+            - term [ref=f3e227]: 위도
+            - definition [ref=f3e228]: "37.394330"
+            - term [ref=f3e229]: 경도
+            - definition [ref=f3e230]: "126.966457"
+            - term [ref=f3e231]: 회전
+            - definition [ref=f3e232]: 0°
+            - term [ref=f3e233]: 최소표시줌
+            - definition [ref=f3e234]: "16"
+            - term [ref=f3e235]: 레이어
+            - definition [ref=f3e236]: PIDS 장비
+            - term [ref=f3e237]: 잠금
+            - definition [ref=f3e238]: 해제
+          - generic [ref=f3e239]: 장비가 연결되지 않아 기본 · 통신 · 상태 · 최근 이벤트 탭은 비활성입니다. 심볼 정보는 장비와 무관하므로 그대로 볼 수 있습니다.
+        - generic [ref=f3e240]:
+          - button "🌐 경광등페이지" [disabled] [ref=f3e241]
+          - button "ⓘ 상세" [disabled] [ref=f3e242]
+          - button "✎ 수정" [disabled] [ref=f3e243]
+          - button "지도에서 보기" [ref=f3e244] [cursor=pointer]
+  - heading "통문 — 상세 창에서도 개폐" [level=3] [ref=f3e245]
+  - generic [ref=f3e246]:
+    - generic [ref=f3e247]:
+      - generic [ref=f3e248]: 🔍 상세 보기 — 통문 · 통문-01
+      - generic [ref=f3e249]: ✕
+    - generic [ref=f3e250]:
+      - generic [ref=f3e251]:
+        - generic [ref=f3e260]: 통문-01
+        - generic [ref=f3e261]: 3D 심볼 · 문짝 개폐 반영
+      - generic [ref=f3e262]:
+        - generic [ref=f3e263]:
+          - button "기본" [ref=f3e264] [cursor=pointer]
+          - button "상태" [ref=f3e265] [cursor=pointer]
+          - button "심볼" [ref=f3e266] [cursor=pointer]
+          - button "최근 이벤트" [ref=f3e267] [cursor=pointer]
+        - generic [ref=f3e269]:
+          - term [ref=f3e270]: 문 상태
+          - definition [ref=f3e271]:
+            - generic [ref=f3e272]:
+              - button "열림" [pressed] [ref=f3e273] [cursor=pointer]
+              - button "닫힘" [ref=f3e274] [cursor=pointer]
+            - text: ● 열림
+          - term [ref=f3e275]: 최근 변경
+          - definition [ref=f3e276]: 2026-09-08 15:24:37 · 접점 DETECT
+          - term [ref=f3e277]: 통문 폭
+          - definition [ref=f3e278]: 3.5 m
+          - term [ref=f3e279]: 게이트 상태
+          - definition [ref=f3e280]:
+            - text: —
+            - generic [ref=f3e281]:
+              - text: 클라 모델·
+              - code [ref=f3e282]: /api/gates
+              - text: 미구현
+        - generic [ref=f3e283]:
+          - button "🌐 통문페이지" [ref=f3e284] [cursor=pointer]
+          - button "ⓘ 상세" [ref=f3e285] [cursor=pointer]
+          - button "✎ 수정" [ref=f3e286] [cursor=pointer]
+          - button "지도에서 보기" [ref=f3e287] [cursor=pointer]
+  - heading "스피커 — 방송 제어 + 마이크(누르고 말하기)" [level=3] [ref=f3e288]
+  - generic [ref=f3e289]:
+    - generic [ref=f3e290]:
+      - generic [ref=f3e291]: 🔍 상세 보기 — 스피커 · 스피커-04
+      - generic [ref=f3e292]: ✕
+    - generic [ref=f3e293]:
+      - generic [ref=f3e294]:
+        - generic [ref=f3e295]: 🔊
+        - generic [ref=f3e297]: 스피커-04
+        - generic [ref=f3e298]: 2D 심볼 · 회전 없음
+      - generic [ref=f3e299]:
+        - generic [ref=f3e300]:
+          - button "기본" [ref=f3e301] [cursor=pointer]
+          - button "통신" [ref=f3e302] [cursor=pointer]
+          - button "방송" [ref=f3e303] [cursor=pointer]
+          - button "심볼" [ref=f3e304] [cursor=pointer]
+          - button "최근 이벤트" [ref=f3e305] [cursor=pointer]
+        - generic [ref=f3e306]:
+          - generic [ref=f3e307]:
+            - term [ref=f3e308]: 송출 상태
+            - definition [ref=f3e309]:
+              - generic [ref=f3e310]: 마이크 송출 중
+            - term [ref=f3e319]: 대상
+            - definition [ref=f3e320]: 스피커-04 (이 심볼 1대)
+            - term [ref=f3e321]: 입력 장치
+            - definition [ref=f3e322]: 기본 마이크 (Realtek Audio) ▾
+            - term [ref=f3e323]: 최근 방송
+            - definition [ref=f3e324]: 2026-09-08 14:02 · 음원 "대피 안내" 2회
+          - generic [ref=f3e325]:
+            - text: 🎤 마이크 방송은 현재 시스템에 경로가 없습니다. 방송은 GIS → 서버
+            - code [ref=f3e326]: broadcast_manager
+            - text: 경유이고 명령 어휘는
+            - code [ref=f3e327]: BROADCAST_PLAY
+            - text: ·
+            - code [ref=f3e328]: BROADCAST_STOP
+            - text: 둘뿐입니다. 실시간 오디오 채널도, 마이크 캡처 코드도 0건입니다.
+        - generic [ref=f3e329]:
+          - button "🔊 음원 실행" [ref=f3e330] [cursor=pointer]
+          - button "🗣 TTS 실행" [ref=f3e331] [cursor=pointer]
+          - button "⏹ Stop" [ref=f3e332] [cursor=pointer]
+          - button "🎤 누르고 말하기 신규" [ref=f3e333] [cursor=pointer]:
+            - text: 🎤 누르고 말하기
+            - generic [ref=f3e334]: 신규
+          - button "지도에서 보기" [ref=f3e335] [cursor=pointer]
+  - paragraph [ref=f3e336]: · 누르고 있는 동안만 송출(push-to-talk) — 토글이 아님. 손을 떼면 즉시 중단 · 누르는 동안 빨간 "송출 중" 표시 + 입력 레벨 미터, 대상 스피커를 명시 · 음원·TTS 재생 중이면 선점 규칙이 필요(중단 후 마이크 / 거부 중 하나) · 방송은 되돌릴 수 없는 외부 행위 → 권한(RBAC) 게이트 필수
+  - heading "신규 규격이 필요한 3건 (클라이언트만으로는 불가)" [level=2] [ref=f3e337]
+  - table [ref=f3e338]:
+    - rowgroup [ref=f3e339]:
+      - row [ref=f3e340]:
+        - columnheader "항목" [ref=f3e341]
+        - columnheader "지금 상태" [ref=f3e342]
+        - columnheader "필요한 것" [ref=f3e343]
+      - row [ref=f3e344]:
+        - cell "🚪 개폐 명령 (B안 선택 시)" [ref=f3e345]: 🚪 개폐 명령(B안 선택 시)
+        - cell "수신 전용. GIS 가 내보내는 건 조치보고·TTS·카메라 조준뿐" [ref=f3e346]
+        - cell [ref=f3e347]:
+          - text: 서버 명령 규격(subject·페이로드·RBAC·실패 응답·타임아웃). 통문은
+          - code [ref=f3e348]: /api/gates
+          - text: 도 없음
+      - row [ref=f3e349]:
+        - cell "🎤 마이크 방송" [ref=f3e350]
+        - cell [ref=f3e351]:
+          - text: 명령 어휘
+          - code [ref=f3e352]: BROADCAST_PLAY/STOP
+          - text: 뿐. 마이크 캡처 0건, SIP/RTP 0건
+        - cell [ref=f3e353]:
+          - text: ① 클라 캡처(NAudio
+          - code [ref=f3e354]: WasapiCapture
+          - text: 로 가능)② 실시간 오디오 전송 채널 — NATS 는 지속 오디오에 부적합③ 서버
+          - code [ref=f3e355]: BROADCAST_LIVE_START/STOP
+          - text: 또는 스피커 직결 프로토콜(SIP/HTTP push) 확정④ 선점 규칙 · RBAC
+      - row [ref=f3e356]:
+        - cell "🚪 통문 상태" [ref=f3e357]
+        - cell "SYNC_DEVICE 에서 Gate 는 경고만 남기고 생략" [ref=f3e358]
+        - cell [ref=f3e359]:
+          - text: 클라 Gate 장비 모델 +
+          - code [ref=f3e360]: /api/gates
+          - text: 조회 경로
+  - paragraph [ref=f3e361]: 나머지(상세 보기 창 · 3D 자유 회전 · 탭 · 기존 메뉴 버튼화 · 개폐 A안)는 클라이언트만으로 가능합니다.

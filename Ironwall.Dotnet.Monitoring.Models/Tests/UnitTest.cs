@@ -834,12 +834,14 @@ public class CameraGhostRemovalVerificationTests
         Assert.Null(typeof(CameraDeviceModel).GetProperty("Presets"));
     }
 
-    [Fact(DisplayName = "Tidy-2.12-4: CameraInfoModel has 9 properties (Uri removed)")]
-    public void CameraInfoModel_Has9Properties()
+    // 2026-09-19: MaxDetectionRange(23f6f4ba, HardwareSpec.max_detection_range) 신설로 9 → 10.
+    // 이 테스트의 목적은 개수 자체가 아니라 "Uri 가 사라진 정리 형상"을 잠그는 것이다.
+    [Fact(DisplayName = "Tidy-2.12-4: CameraInfoModel has 10 properties (Uri removed)")]
+    public void CameraInfoModel_Has10Properties()
     {
         var props = typeof(CameraInfoModel)
             .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
-        Assert.Equal(9, props.Length);
+        Assert.Equal(10, props.Length);
         Assert.Null(typeof(CameraInfoModel).GetProperty("Uri"));
     }
 }

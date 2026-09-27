@@ -6,6 +6,12 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>AnyCPU;x86;x64</Platforms>
+    <!-- 이 프로젝트는 출하 라이브러리다 — [Fact] 0건·using Xunit 0건인데 xunit.runner.visualstudio 가
+         남아 있어 vstest 가 테스트 어셈블리로 오인해 실행하다 Autofac 해석 실패로 죽었다.
+         Microsoft.NET.Test.Sdk 가 없어 테스트 호스트 의존성이 출력에 복사되지 않기 때문이다.
+         PackageReference 는 건드리지 않는다(출하 DLL 이 xunit.core 를 하드 참조 —
+         project_shipping_dlls_reference_xunit). 탐색에서만 제외한다. -->
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>

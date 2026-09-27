@@ -91,8 +91,22 @@ public class MyPagePanelViewModel : BasePanelViewModel
     public async Task ClickApplyAccount()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel { Explain = "사용자 정보를 변경하시겠습니까?", MessageModel = new CallEditProcessMessageModel() });
 
+    /// <summary>
+    /// [계정 삭제] — 비밀번호를 확인할 수 있는 DB 모드에서만 창을 연다. 서버 모드는 버튼이 꺼져 있고
+    /// 툴팁(<see cref="DeleteAccountBlockedReason"/>)이 까닭을 말한다(확인 없이 지우는 창을 열지 않는다).
+    /// </summary>
     public async Task ClickDeleteAccount()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenDeleteAccountDialogMessageModel());
+    {
+        if (!CanClickDeleteAccount) return;
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenDeleteAccountDialogMessageModel());
+    }
+
+    /// <summary>Caliburn 가드 — [계정 삭제] 버튼(x:Name=ClickDeleteAccount)의 IsEnabled.</summary>
+    public bool CanClickDeleteAccount => _gateway.CanSelfDeleteAccount;
+
+    /// <summary>[계정 삭제] 가 꺼진 까닭(툴팁). 쓸 수 있으면 null.</summary>
+    public string? DeleteAccountBlockedReason
+        => CanClickDeleteAccount ? null : Dialogs.DeleteAccountDialogViewModel.SelfDeleteUnavailableText;
 
     public async Task ClickCancel()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());

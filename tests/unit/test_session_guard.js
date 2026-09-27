@@ -379,88 +379,12 @@ test('UT-30: guardLock — 타임아웃 시 false (zombie lock 포함)', () => {
   assert(typeof ok === 'boolean', 'lock 결과는 boolean');
 });
 
-// UT-31: updateLastFiles — lastFiles 업데이트
-test('UT-31: updateLastFiles — 파일 목록 갱신', () => {
-  const id = 'test-session-uf';
-  process.env.SESSION_GUARD_ID = id;
-  const registry = {
-    version: 1,
-    sessions: {
-      [id]: { sessionId: id, pid: process.pid, lastHeartbeat: new Date().toISOString(), lastFiles: [] },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  guardModule.updateLastFiles(id, ['src/a.js', 'src/b.js']);
-  const updated = guardModule._readRegistry();
-  assert(updated.sessions[id], '세션 존재');
-  const files = updated.sessions[id].lastFiles || [];
-  assert(files.includes('src/a.js'), 'a.js 포함');
-  assert(files.includes('src/b.js'), 'b.js 포함');
-});
-
-// UT-32: updateLastFiles — MAX_FILES(20) 초과 시 잘림
-test('UT-32: updateLastFiles — 20개 초과 시 잘림', () => {
-  const id = 'test-session-max';
-  process.env.SESSION_GUARD_ID = id;
-  const existing = Array.from({ length: 18 }, (_, i) => `file${i}.js`);
-  const registry = {
-    version: 1,
-    sessions: {
-      [id]: { sessionId: id, pid: process.pid, lastHeartbeat: new Date().toISOString(), lastFiles: existing },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  guardModule.updateLastFiles(id, ['new1.js', 'new2.js', 'new3.js', 'new4.js']);
-  const updated = guardModule._readRegistry();
-  const files = updated.sessions[id].lastFiles || [];
-  assert(files.length <= 20, `최대 20개: 현재 ${files.length}개`);
-});
-
-// UT-33: checkFileConflict — 타 세션이 편집한 파일 → 충돌 반환
-test('UT-33: checkFileConflict — 타 세션 파일 충돌 감지', () => {
-  const otherId = 'other-session-x';
-  process.env.SESSION_GUARD_ID = 'my-session-x';
-  const registry = {
-    version: 1,
-    sessions: {
-      'my-session-x': { sessionId: 'my-session-x', lastFiles: [] },
-      [otherId]: { sessionId: otherId, lastFiles: ['install.js', 'config.json'] },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  const conflict = guardModule.checkFileConflict('install.js');
-  assert(conflict !== null, '충돌이 감지되어야 함');
-  assertContains(conflict.warning, 'install.js');
-});
-
-// UT-34: checkFileConflict — 충돌 없는 파일 → null
-test('UT-34: checkFileConflict — 충돌 없음 → null', () => {
-  process.env.SESSION_GUARD_ID = 'my-session-y';
-  const registry = {
-    version: 1,
-    sessions: {
-      'my-session-y': { sessionId: 'my-session-y', lastFiles: [] },
-      'other-session-y': { sessionId: 'other-session-y', lastFiles: ['other-file.js'] },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  const conflict = guardModule.checkFileConflict('safe-file.js');
-  assert(conflict === null, '충돌 없어야 함');
-});
-
-// UT-35: checkFileConflict — 자신의 파일 → null
-test('UT-35: checkFileConflict — 자신의 lastFiles → null', () => {
-  process.env.SESSION_GUARD_ID = 'self-session-z';
-  const registry = {
-    version: 1,
-    sessions: {
-      'self-session-z': { sessionId: 'self-session-z', lastFiles: ['my-file.js'] },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  const conflict = guardModule.checkFileConflict('my-file.js');
-  assert(conflict === null, '자신의 파일은 충돌 아님');
-});
+// [v3.6/N-07/IMPL-05] UT-31~UT-35 제거 — updateLastFiles·checkFileConflict 가 없어졌다.
+//   그 함수들은 **작성자가 0곳**이라 lastFiles 가 영원히 [] 였고, 그래서 충돌 감지는
+//   원리적으로 발화할 수 없었다(실사용 세션 115개 중 112개가 (없음)).
+//   테스트가 통과하고 있었던 것은 픽스처가 lastFiles 를 손으로 심었기 때문이다 —
+//   프로덕션에서 한 번도 성립한 적 없는 전제를 초록으로 고정하고 있었다.
+//   같은 정보는 cycle.touched 의 소유권 레코드에 있고 배너가 그것을 읽는다.
 
 // UT-36: removeSession — 세션 삭제
 test('UT-36: removeSession — 세션 삭제 확인', () => {
@@ -550,7 +474,6 @@ console.log('\n[Session Guard] IT (통합 테스트) 실행 중...\n');
 test('IT-01: session-guard가 session-gate 환경에서 로드 가능', () => {
   const g = require('../../.claude/hooks/_session-guard.js');
   assert(typeof g.runSessionGuard === 'function');
-  assert(typeof g.updateLastFiles === 'function');
 });
 
 // IT-02: advance-phase.js session-status 명령
@@ -624,45 +547,7 @@ test('IT-06: 동일 세션 재등록 → 멱등', () => {
   assertEqual(count, 1, '중복 등록 없음');
 });
 
-// IT-07: 파일 충돌 → runSessionGuard 후 checkFileConflict
-test('IT-07: runSessionGuard 후 checkFileConflict 동작', () => {
-  const otherId = 'writer-it07';
-  const registry = {
-    version: 1,
-    sessions: {
-      [otherId]: {
-        sessionId: otherId,
-        pid: process.pid,
-        startedAt: new Date().toISOString(),
-        lastHeartbeat: new Date().toISOString(),
-        branch: 'main',
-        phase: 'dev',
-        lastFiles: ['install.js'],
-      },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  process.env.SESSION_GUARD_ID = 'reader-it07';
-  guardModule.runSessionGuard({ branch: 'main', phase: 'dev' });
-  const conflict = guardModule.checkFileConflict('install.js');
-  assert(conflict !== null, '파일 충돌 감지됨');
-});
 
-// IT-08: updateLastFiles 후 checkFileConflict 감지
-test('IT-08: updateLastFiles → checkFileConflict 감지', () => {
-  process.env.SESSION_GUARD_ID = 'checker-it08';
-  const registry = {
-    version: 1,
-    sessions: {
-      'checker-it08': { sessionId: 'checker-it08', lastFiles: [] },
-      'writer-it08':  { sessionId: 'writer-it08',  lastFiles: [] },
-    },
-  };
-  guardModule._writeRegistry(registry);
-  guardModule.updateLastFiles('writer-it08', ['shared.js']);
-  const conflict = guardModule.checkFileConflict('shared.js');
-  assert(conflict !== null, '충돌 감지됨');
-});
 
 // IT-09: MAX_SESSIONS(8) 초과 시 폴백
 test('IT-09: MAX_SESSIONS 초과 → 폴백 처리', () => {
@@ -834,25 +719,8 @@ test('IT-20: detectConflicts — ageMin 계산 (0이상)', () => {
 
 // IT-21~30: 추가 통합 시나리오 (간략화)
 
-test('IT-21: updateLastFiles — 빈 배열 무시', () => {
-  const id = 'empty-files-it21';
-  process.env.SESSION_GUARD_ID = id;
-  const registry = { version: 1, sessions: { [id]: { sessionId: id, pid: process.pid, lastHeartbeat: new Date().toISOString(), lastFiles: ['existing.js'] } } };
-  guardModule._writeRegistry(registry);
-  guardModule.updateLastFiles(id, []);
-  const after = guardModule._readRegistry();
-  assert(after.sessions[id].lastFiles.includes('existing.js'), '기존 파일 보존');
-});
 
-test('IT-22: checkFileConflict — 빈 filePath → null', () => {
-  const result = guardModule.checkFileConflict('');
-  assert(result === null);
-});
 
-test('IT-23: checkFileConflict — null → null', () => {
-  const result = guardModule.checkFileConflict(null);
-  assert(result === null);
-});
 
 test('IT-24: readRegistry — sessions 필드 없는 JSON → 빈 레지스트리', () => {
   overrideGuardFile(JSON.stringify({ version: 1 }));
@@ -946,19 +814,7 @@ test('EC-08: removeSession — 레지스트리 파일 없어도 오류 없음', 
   // 오류 없으면 통과
 });
 
-test('EC-09: updateLastFiles — 세션 없으면 무시', () => {
-  process.env.SESSION_GUARD_ID = 'no-session-ec09';
-  guardModule._writeRegistry({ version: 1, sessions: {} });
-  guardModule.updateLastFiles('no-session-ec09', ['file.js']);
-  // 오류 없으면 통과
-});
 
-test('EC-10: checkFileConflict — 레지스트리 없을 때 null 반환', () => {
-  cleanGuardFile();
-  process.env.SESSION_GUARD_ID = 'ec10-id';
-  const result = guardModule.checkFileConflict('any-file.js');
-  assert(result === null);
-});
 
 test('EC-11: buildWarningBanner — ageMin 0인 세션', () => {
   const c = [{ sessionId: 'new-session', pid: 1, branch: 'main', phase: 'dev', ageMin: 0 }];
@@ -1012,17 +868,6 @@ test('EC-17: runSessionGuard — branch가 긴 문자열 (100자)', () => {
   assert(!result.error || result.error !== undefined, '오류 처리됨');
 });
 
-test('EC-18: updateLastFiles — 중복 파일 path → deduplicated', () => {
-  const id = 'dedup-ec18';
-  process.env.SESSION_GUARD_ID = id;
-  const registry = { version: 1, sessions: { [id]: { sessionId: id, pid: process.pid, lastHeartbeat: new Date().toISOString(), lastFiles: [] } } };
-  guardModule._writeRegistry(registry);
-  guardModule.updateLastFiles(id, ['dup.js', 'dup.js', 'dup.js']);
-  const r = guardModule._readRegistry();
-  const files = r.sessions[id].lastFiles || [];
-  const dupCount = files.filter(f => f === 'dup.js').length;
-  assertEqual(dupCount, 1, '중복 제거됨');
-});
 
 test('EC-19: detectConflicts — sessions가 빈 객체', () => {
   const r = { version: 1, sessions: {} };

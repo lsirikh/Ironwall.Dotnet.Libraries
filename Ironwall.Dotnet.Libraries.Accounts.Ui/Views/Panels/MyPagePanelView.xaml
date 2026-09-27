@@ -332,7 +332,9 @@
 						Grid.Row="0"
 						Grid.Column="0"
 						Margin="10,0"
-						Style="{StaticResource Console.Button}">
+						Style="{StaticResource Console.Button}"
+						ToolTip="{Binding DeleteAccountBlockedReason}"
+						ToolTipService.ShowOnDisabled="True">
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="AccountRemove" Style="{StaticResource ButtonIcon}" />

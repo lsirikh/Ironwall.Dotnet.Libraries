@@ -1,0 +1,903 @@
+- generic [ref=f16e2]:
+  - heading "遺��� 議곕┰湲곗� �꾨━��" [level=1] [ref=f16e3]
+  - paragraph [ref=f16e4]: �쒖뼱湲걔룹꽱�쑣룹뭅硫붾씪쨌�⑥껜쨌�듬Ц쨌�ㅽ뵾而ㅒ룰꼍愿묐벑 �� 遺��덉쓣 �뚯뼱�� 議곕┰�섍퀬, 洹� 援ъ“瑜� �꾨━���쇰줈 援논� �λ퉬 �앹꽦�� 洹몃�濡� �쒖슦�� �� 李�.
+  - paragraph [ref=f16e5]:
+    - text: 洹쇨굅�� Swagger(FastAPI �� 吏곸깮��
+    - code [ref=f16e6]: 8.0.1
+    - text: 쨌 paths 153 쨌 schemas 457)�� 紐낆꽭��
+    - code [ref=f16e7]: GOP_Restful_Api_�곕룞�ㅺ퀎.md
+    - text: v8.0.1�대떎. �꾨옒 議곕┰湲걔룻봽由ъ뀑 紐⑸줉�� �ㅼ젣濡� �뚯뼱 蹂� �� �덈떎(留덉슦�� �쒕옒洹� 쨌 �ㅻ낫�� Alt+��/�� 쨌 Esc 痍⑥냼).
+  - separator [ref=f16e8]
+  - heading "0. 癒쇱� �� API媛� �닿구 �대뵒源뚯� 諛쏆퀜 二쇰뒗媛�" [level=2] [ref=f16e9]
+  - paragraph [ref=f16e10]: 湲고쉷 �꾩뿉 �� 媛�吏�瑜� �뺤씤�덈떎. �뗭� �좊━�섍퀬, �섎굹�� �쒕쾭�� �붿껌�댁빞 �쒕떎.
+  - generic [ref=f16e11]:
+    - generic [ref=f16e12]:
+      - heading "�좊━ �앹꽦 1�뚯뿉 遺��덉쓣 �� �ㅼ쓣 �� �덈떎" [level=4] [ref=f16e13]:
+        - generic [ref=f16e14]: �좊━
+        - text: �앹꽦 1�뚯뿉 遺��덉쓣 �� �ㅼ쓣 �� �덈떎
+      - paragraph [ref=f16e15]:
+        - code [ref=f16e16]: POST /api/devices/controllers
+        - text: 媛�
+        - code [ref=f16e17]: hardware_spec
+        - text: (=
+        - code [ref=f16e18]: components[]
+        - text: �ы븿) 怨�
+        - code [ref=f16e19]: device_config
+        - text: (=
+        - code [ref=f16e20]: component_overrides
+        - text: �ы븿) 瑜� 媛숈� 蹂몃Ц�� 諛쏅뒗��. 利� �꾨━�� �곸슜 = POST 1嫄��쇰줈 �앸궃��. 遺��덈쭏�� �뺣났�섎뒗 援ъ“媛� �꾨땲�쇱꽌 諛곗튂 �붾뱶�ъ씤�몃� �덈줈 諛쏆쓣 �꾩슂�� �녿떎.
+    - generic [ref=f16e21]:
+      - heading "�좊━ �붾젅�� �먯쿇�� �대� �덈떎" [level=4] [ref=f16e22]:
+        - generic [ref=f16e23]: �좊━
+        - text: �붾젅�� �먯쿇�� �대� �덈떎
+      - paragraph [ref=f16e24]:
+        - code [ref=f16e25]: GET /api/devices/spec
+        - text: �� 遺��� �좏삎 32醫���
+        - code [ref=f16e26]: applies_to
+        - text: 쨌
+        - code [ref=f16e27]: states
+        - text: 쨌
+        - code [ref=f16e28]: commands
+        - text: 쨌
+        - code [ref=f16e29]: produces
+        - text: 쨌
+        - code [ref=f16e30]: override_params
+        - text: 쨌
+        - code [ref=f16e31]: spec
+        - text: 源뚯� 以���. �붾젅�몃� 肄붾뱶 �곸닔濡� 諛뺤� �딄퀬 移댄깉濡쒓렇�먯꽌 洹몃┛��. DB 移댄깉濡쒓렇�� 媛믪씠 �섏뼱�� �쒕쾭 諛고룷媛� �꾩슂 �녿떎.
+    - generic [ref=f16e32]:
+      - heading "�좊━ �쒕옒洹� 以� �쒕쾭 �뺣났�� 0嫄댁씠��" [level=4] [ref=f16e33]:
+        - generic [ref=f16e34]: �좊━
+        - text: �쒕옒洹� 以� �쒕쾭 �뺣났�� 0嫄댁씠��
+      - paragraph [ref=f16e35]: 議곕┰�� ���� �� Draft �먯꽌 �쇱뼱�섍퀬 留덉�留� [�깅줉] 1��濡� 而ㅻ컠�쒕떎. �щ궡 �쒕옒洹� 洹쒖튃�� �붽뎄�섎뒗 "�쒕쾭 �곌린媛� �곕Ⅴ�� �쒕옒洹몃뒗 諛곗튂 �붾뱶�ъ씤�� �좏솗蹂�"媛� 援ъ“�곸쑝濡� 異⑹”�쒕떎 �� �됰쭏�� PATCH 媛� �섍��� �꾪뿕�� �먮━�곸쑝濡� �녿떎.
+    - generic [ref=f16e36]:
+      - heading "�놁쓬 �꾨━��(�쒗뵆由�) 由ъ냼�ㅻ뒗 �쒕쾭�� �녿떎" [level=4] [ref=f16e37]:
+        - generic [ref=f16e38]: �놁쓬
+        - text: �꾨━��(�쒗뵆由�) 由ъ냼�ㅻ뒗 �쒕쾭�� �녿떎
+      - paragraph [ref=f16e39]:
+        - text: �λ퉬 遺��� �쒗뵆由� 寃쎈줈媛� 0嫄��대떎.
+        - code [ref=f16e40]: "/api/devices/cameras/{id}/presets"
+        - text: �� PTZ �꾨━��(�꾪� �ㅻⅨ 寃�)�닿퀬, �쒗뵆由� 由ъ냼�ㅻ뒗 議곗튂蹂닿퀬 臾멸뎄쨌蹂닿퀬�쒕퓧�대떎. 寃뚮떎媛� 紐낆꽭�쒓� "�쒕쾭 遺��� 議곕┰�� �대쾲 踰붿쐞 諛�"�대씪怨� 紐� 諛뺤븯��(짠 87��). �� �꾨━�뗭� �대씪�댁뼵�멸� 蹂닿��섍퀬, 怨듭쑀媛� �꾩슂�댁�硫� S-12濡� �붿껌�쒕떎(짠6).
+  - heading "�덈� 蹂대궡硫� �� �섎뒗 寃� �� �꾨━�� �ㅺ퀎�� 1踰� �쒖빟" [level=3] [ref=f16e41]
+  - generic [ref=f16e42]:
+    - text: �좏삎 怨듯넻 �ъ떎�� �붿껌�� �ㅼ쑝硫� �꾨� 422�� ��
+    - code [ref=f16e43]: states
+    - text: 쨌
+    - code [ref=f16e44]: commands
+    - text: 쨌
+    - code [ref=f16e45]: command_params
+    - text: 쨌
+    - code [ref=f16e46]: readable
+    - text: 쨌
+    - code [ref=f16e47]: controllable
+    - text: 쨌
+    - code [ref=f16e48]: produces
+    - text: 쨌
+    - code [ref=f16e49]: critical
+    - text: 쨌
+    - code [ref=f16e50]: enabled
+    - text: . �닿쾬�ㅼ� 移댄깉濡쒓렇媛� �뺣낯�닿퀬 �λ퉬媛� �섑��댄빐 媛뽯뒗 媛믪씠 �꾨땲��. �� 議곕┰湲곕뒗 �� 媛믪쓣 移댄깉濡쒓렇�먯꽌 �쎌뼱 蹂댁뿬二쇨린留� �쒕떎(�ㅻⅨ履� �⑤꼸�� �뚯깋 移댄깉濡쒓렇 �ъ떎 �곸옄). �꾨━�뗫룄 �� 8媛쒕� �댁� �딅뒗�� �� �댁쑝硫� 洹� �꾨━�뗭쑝濡� 留뚮뱺 紐⑤뱺 �λ퉬媛� 泥� POST �먯꽌 422 濡� 二쎈뒗��.
+  - heading [level=3] [ref=f16e51]:
+    - text: 遺���
+    - code [ref=f16e52]: key
+    - text: �� 怨꾩빟�� �꾨땲�� 洹� �λ퉬�� �ъ떎�대떎
+  - table [ref=f16e53]:
+    - rowgroup [ref=f16e54]:
+      - row [ref=f16e55]:
+        - columnheader "洹쒖튃" [ref=f16e56]
+        - columnheader "�댁슜" [ref=f16e57]
+        - columnheader "�닿린硫�" [ref=f16e58]
+      - row [ref=f16e59]:
+        - cell [ref=f16e60]:
+          - code [ref=f16e61]: key
+          - text: �뺤떇
+        - cell "^[a-z][a-z0-9_]*$" [ref=f16e62]
+        - cell "422" [ref=f16e63]
+      - row [ref=f16e64]:
+        - cell [ref=f16e65]:
+          - code [ref=f16e66]: key
+          - text: �좎씪��
+        - cell "�� �λ퉬 �덉뿉�� �좎씪 �� �뺤긽 �� �곹깭 �� �ㅼ젙�� �뉖뒗 異뺤씠��" [ref=f16e67]
+        - cell "422 (以묐났)" [ref=f16e68]
+      - row [ref=f16e69]:
+        - cell [ref=f16e70]:
+          - code [ref=f16e71]: type
+        - cell [ref=f16e72]:
+          - text: 移댄깉濡쒓렇
+          - code [ref=f16e73]: component_type
+          - text: code(��臾몄옄 �뺢퇋��) 쨌
+          - generic [ref=f16e74]:
+            - code [ref=f16e75]: applies_to
+            - text: �� �� 移댄뀒怨좊━媛� �덉뼱�� �쒕떎
+        - cell "422 'PTZ_UNIT' �� camera �꾩슜�낅땲�� �� enclosure �먮뒗 �� �� �놁뒿�덈떎" [ref=f16e76]
+      - row [ref=f16e77]:
+        - cell [ref=f16e78]:
+          - code [ref=f16e79]: state
+          - text: 蹂닿퀬
+        - cell [ref=f16e80]:
+          - code [ref=f16e81]: states
+          - text: 媛� �녿뒗 �좏삎�� �숈옉 �곹깭瑜� 蹂닿퀬�� �� �녿떎(嫄닿컯留�)
+        - cell "422" [ref=f16e82]
+  - generic [ref=f16e83]:
+    - text: key 瑜� 肄붾뱶�� 諛뺤� 留먮씪 �� �ъ씠�몃쭏�� �ㅻⅤ��. 臾� �꾩튂 遺��덉쓽 愿�濡� key 媛�
+    - generic [ref=f16e84]:
+      - text: �⑥껜��
+      - code [ref=f16e85]: door
+      - text: ", �듬Ц��"
+      - code [ref=f16e86]: actuator
+    - text: ��.
+    - code [ref=f16e87]: door
+    - text: �섎굹濡� �듭씪�� �덈떎怨� 媛��뺥븯硫� �듬Ц 臾� �곹깭媛� �곸썝��
+    - code [ref=f16e88]: "null"
+    - text: �대떎(紐낆꽭�쒓� GIS �대씪�� 吏��� D-1 濡� 紐낆떆). 李얠쓣 �뚮뒗
+    - generic [ref=f16e89]:
+      - code [ref=f16e90]: component_type
+      - text: �쇰줈
+    - text: 李얜뒗��. �� 洹몃옒�� 議곕┰湲곕뒗 key 瑜� �쒖븞�섎릺(�좏삎�먯꽌 �좊룄 + 以묐났 ��
+    - code [ref=f16e91]: _2
+    - text: ) �꾩옣�� 怨좎튌 �� �덇쾶 �댁뼱 �붾떎. �꾨━�뗭� 愿�濡� key 瑜� �댁�留� �곸슜 �� �몄쭛 媛����섎떎.
+  - separator [ref=f16e92]
+  - heading "1. 移댄뀒怨좊━留덈떎 遺숈씪 �� �덈뒗 遺��덉씠 �꾪� �ㅻⅤ��" [level=2] [ref=f16e93]
+  - paragraph [ref=f16e94]:
+    - text: �붾젅�몃뒗
+    - code [ref=f16e95]: applies_to
+    - text: 濡� 嫄몃윭�� �쒕떎. 嫄몃윭 蹂대㈃ "�쒖뼱湲곗뿉 遺��덉쓣 議곕┰�쒕떎"�� 湲곕��� 移댄깉濡쒓렇 �꾩떎�� �닿툔�쒕떎 �� �닿굔 湲고쉷 �④퀎�먯꽌 吏싳뼱�� �쒕떎.
+  - table [ref=f16e97]:
+    - rowgroup [ref=f16e98]:
+      - row [ref=f16e99]:
+        - columnheader "移댄뀒怨좊━" [ref=f16e100]
+        - columnheader "媛���" [ref=f16e101]
+        - columnheader "遺숈씪 �� �덈뒗 遺��� �좏삎 (applies_to)" [ref=f16e102]
+      - row [ref=f16e103]:
+        - cell "�쒖뼱湲�" [ref=f16e104]
+        - cell "2醫�" [ref=f16e105]
+        - cell "CONTACT_INPUT 쨌 NETWORK_INTERFACE" [ref=f16e106]
+      - row [ref=f16e107]:
+        - cell "�쇱꽌" [ref=f16e108]
+        - cell "8醫�" [ref=f16e109]
+        - cell "PIR_SENSOR 쨌 ULTRASONIC_SENSOR 쨌 RADAR_UNIT 쨌 VIBRATION_SENSOR 쨌 OPTICAL_FIBER_SENSOR 쨌 THERMAL_CAMERA 쨌 EO_CAMERA 쨌 NETWORK_INTERFACE" [ref=f16e110]
+      - row [ref=f16e111]:
+        - cell "移대찓��" [ref=f16e112]
+        - cell "12醫�" [ref=f16e113]
+        - cell "HEATER 쨌 FAN 쨌 HEADLIGHT 쨌 THERMAL_CAMERA 쨌 EO_CAMERA 쨌 THERMAL_SENSOR 쨌 PTZ_UNIT 쨌 IR_LED 쨌 WIPER 쨌 OPTICAL_LENS 쨌 TRACKER 쨌 NETWORK_INTERFACE" [ref=f16e114]
+      - row [ref=f16e115]:
+        - cell "�⑥껜" [ref=f16e116]
+        - cell "15醫�" [ref=f16e117]
+        - cell "DOOR_SENSOR 쨌 DOOR_LOCK 쨌 DOOR_ACTUATOR 쨌 TEMPERATURE_SENSOR 쨌 HUMIDITY_SENSOR 쨌 VOLTAGE_SENSOR 쨌 CURRENT_SENSOR 쨌 VIBRATION_METER 쨌 UPS 쨌 HEATER 쨌 FAN 쨌 HEADLIGHT 쨌 CONTACT_INPUT 쨌 BUZZER 쨌 NETWORK_INTERFACE" [ref=f16e118]
+      - row [ref=f16e119]:
+        - cell "�듬Ц" [ref=f16e120]
+        - cell "6醫�" [ref=f16e121]
+        - cell "DOOR_SENSOR 쨌 DOOR_LOCK 쨌 DOOR_ACTUATOR 쨌 LIMIT_SWITCH 쨌 CONTACT_INPUT 쨌 NETWORK_INTERFACE" [ref=f16e122]
+      - row [ref=f16e123]:
+        - cell "�ㅽ뵾而�" [ref=f16e124]
+        - cell "3醫�" [ref=f16e125]
+        - cell "AMPLIFIER 쨌 MIC 쨌 NETWORK_INTERFACE" [ref=f16e126]
+      - row [ref=f16e127]:
+        - cell "寃쎄킅��" [ref=f16e128]
+        - cell "3醫�" [ref=f16e129]
+        - cell "LAMP_LIGHT 쨌 BUZZER 쨌 NETWORK_INTERFACE" [ref=f16e130]
+  - generic [ref=f16e131]:
+    - text: "吏싳뼱�� �� ��: �쒖뼱湲곕뒗 移댄깉濡쒓렇�� 遺��덉씠 2醫낅퓧�대떎. �꾩옣 媛먭컖�쇰줈�� �쒖뼱湲곌� \"媛��� 議곕┰�� 寃� 留롮� �λ퉬\"�몃뜲, API 紐⑤뜽�먯꽌 �쇱꽌�� �쒖뼱湲곗쓽 遺��덉씠 �꾨땲�� 蹂꾧컻 �λ퉬("
+    - code [ref=f16e132]: sensor.controller_id
+    - text: ")��. 洹몃옒�� �쒖뼱湲� 議곕┰湲곌� �ㅼ젣濡� �섎뒗 �쇱� �묒젏 �낅젰 梨꾨꼸 N媛� + �ㅽ듃�뚰겕 �명꽣�섏씠�� 諛곗튂�닿퀬, �닿쾶 怨� 寃곗꽑留듭쓽 �묒젏 梨꾨꼸怨� 留욌Ъ由곕떎. �� 洹몃옒�� �쒖뼱湲� �꾨━�뗭쓽 媛믪� \"遺��� 醫낅쪟\"媛� �꾨땲�� 梨꾨꼸 �섏� 踰덊샇 洹쒖튃�� �덈떎(��: \"IO �쒖뼱湲� 16梨꾨꼸\" ="
+    - code [ref=f16e133]: CONTACT_INPUT
+    - text: 16媛�,
+    - code [ref=f16e134]: channel
+    - text: 1..16, key
+    - code [ref=f16e135]: ci_01
+    - text: ..
+    - code [ref=f16e136]: ci_16
+    - text: ). 議곕┰湲곕뒗 �닿구 �� 踰덉뿉 �쇱튂�� �꾧뎄�ъ빞 �쒕떎 �� 16踰� �뚭쾶 �섎㈃ �� �쒕떎(짠3 諛섎났 �쇱튂湲�).
+  - separator [ref=f16e137]
+  - heading "2. 李� A �� 遺��� 議곕┰湲� �쒕옒洹� �쒕∼" [level=2] [ref=f16e138]:
+    - text: 2. 李� A �� 遺��� 議곕┰湲�
+    - generic [ref=f16e139]: �쒕옒洹� �쒕∼
+  - paragraph [ref=f16e140]: �쇱そ �붾젅��(移댄깉濡쒓렇�먯꽌 移댄뀒怨좊━濡� 嫄몃윭 洹몃┛��) �� 媛��대뜲 議곕┰ 蹂대뱶(�뚯뼱�� �볤퀬, �뚯뼱�� �쒖꽌 諛붽씔��) �� �ㅻⅨ履� �띿꽦(�λ퉬蹂� �ъ떎留� �몄쭛 쨌 移댄깉濡쒓렇 �ъ떎�� �뚯깋 �쎄린 �꾩슜). �꾨옒�� �ㅼ젣濡� �숈옉�쒕떎.
+  - generic [ref=f16e141]:
+    - generic [ref=f16e142]:
+      - generic [ref=f16e143]: 遺��� 議곕┰湲�
+      - generic [ref=f16e144]: �⑥껜 쨌 �� �λ퉬
+      - generic [ref=f16e145]:
+        - generic [ref=f16e146]: 1280 횞 760
+        - generic [ref=f16e147]: T2
+    - generic [ref=f16e148]:
+      - generic [ref=f16e149]:
+        - text: 移댄뀒怨좊━
+        - combobox "移댄뀒怨좊━" [ref=f16e150]:
+          - option "�쒖뼱湲�"
+          - option "�쇱꽌"
+          - option "移대찓��"
+          - option "�⑥껜" [selected]
+          - option "�듬Ц"
+          - option "�ㅽ뵾而�"
+          - option "寃쎄킅��"
+      - button "諛섎났 �쇱튂湲겸��" [ref=f16e151] [cursor=pointer]
+      - button "梨꾨꼸 �ㅼ떆 踰덊샇" [ref=f16e152] [cursor=pointer]
+      - generic [ref=f16e153]:
+        - button "�꾨━�뗭쑝濡� ����" [ref=f16e154] [cursor=pointer]
+        - button "�깅줉 POST 1嫄�" [ref=f16e155] [cursor=pointer]:
+          - text: �깅줉
+          - generic [ref=f16e156]: POST 1嫄�
+    - generic [ref=f16e157]:
+      - complementary "遺��� �붾젅��" [ref=f16e158]:
+        - generic [ref=f16e159]:
+          - generic [ref=f16e160]: 遺��� �붾젅��
+          - text: applies_to = �⑥껜 �� 15醫낅쭔 蹂댁엯�덈떎
+        - listbox "遺숈씪 �� �덈뒗 遺��� �좏삎" [ref=f16e161]:
+          - option "�꾩뼱 �쇱꽌 異붽�" [ref=f16e162]:
+            - generic [aria-hidden] [ref=f16e163]: 授�
+            - generic [ref=f16e164]:
+              - generic [ref=f16e165]: �꾩뼱 �쇱꽌
+              - generic [ref=f16e166]: DOOR_SENSOR
+          - option "�꾩뼱 �좉툑 異붽�" [ref=f16e167]:
+            - generic [aria-hidden] [ref=f16e168]: 授�
+            - generic [ref=f16e169]:
+              - generic [ref=f16e170]: �꾩뼱 �좉툑
+              - generic [ref=f16e171]: DOOR_LOCK
+          - option "臾� 援щ룞遺� 異붽�" [ref=f16e172]:
+            - generic [aria-hidden] [ref=f16e173]: 授�
+            - generic [ref=f16e174]:
+              - generic [ref=f16e175]: 臾� 援щ룞遺�
+              - generic [ref=f16e176]: DOOR_ACTUATOR
+          - option "�⑤룄 �쇱꽌 異붽�" [ref=f16e177]:
+            - generic [aria-hidden] [ref=f16e178]: 授�
+            - generic [ref=f16e179]:
+              - generic [ref=f16e180]: �⑤룄 �쇱꽌
+              - generic [ref=f16e181]: TEMPERATURE_SENSOR
+          - option "�듬룄 �쇱꽌 異붽�" [ref=f16e182]:
+            - generic [aria-hidden] [ref=f16e183]: 授�
+            - generic [ref=f16e184]:
+              - generic [ref=f16e185]: �듬룄 �쇱꽌
+              - generic [ref=f16e186]: HUMIDITY_SENSOR
+          - option "�꾩븬 �쇱꽌 異붽�" [ref=f16e187]:
+            - generic [aria-hidden] [ref=f16e188]: 授�
+            - generic [ref=f16e189]:
+              - generic [ref=f16e190]: �꾩븬 �쇱꽌
+              - generic [ref=f16e191]: VOLTAGE_SENSOR
+          - option "�꾨쪟 �쇱꽌 異붽�" [ref=f16e192]:
+            - generic [aria-hidden] [ref=f16e193]: 授�
+            - generic [ref=f16e194]:
+              - generic [ref=f16e195]: �꾨쪟 �쇱꽌
+              - generic [ref=f16e196]: CURRENT_SENSOR
+          - option "吏꾨룞 怨꾩륫湲� 異붽�" [ref=f16e197]:
+            - generic [aria-hidden] [ref=f16e198]: 授�
+            - generic [ref=f16e199]:
+              - generic [ref=f16e200]: 吏꾨룞 怨꾩륫湲�
+              - generic [ref=f16e201]: VIBRATION_METER
+          - option "臾댁젙�� �꾩썝�μ튂 異붽�" [ref=f16e202]:
+            - generic [aria-hidden] [ref=f16e203]: 授�
+            - generic [ref=f16e204]:
+              - generic [ref=f16e205]: 臾댁젙�� �꾩썝�μ튂
+              - generic [ref=f16e206]: UPS
+          - option "�덊꽣 異붽�" [ref=f16e207]:
+            - generic [aria-hidden] [ref=f16e208]: 授�
+            - generic [ref=f16e209]:
+              - generic [ref=f16e210]: �덊꽣
+              - generic [ref=f16e211]: HEATER
+          - option "�� 異붽�" [ref=f16e212]:
+            - generic [aria-hidden] [ref=f16e213]: 授�
+            - generic [ref=f16e214]:
+              - generic [ref=f16e215]: ��
+              - generic [ref=f16e216]: FAN
+          - option "�꾩“�� 異붽�" [ref=f16e217]:
+            - generic [aria-hidden] [ref=f16e218]: 授�
+            - generic [ref=f16e219]:
+              - generic [ref=f16e220]: �꾩“��
+              - generic [ref=f16e221]: HEADLIGHT
+          - option "�묒젏 �낅젰 異붽�" [ref=f16e222]:
+            - generic [aria-hidden] [ref=f16e223]: 授�
+            - generic [ref=f16e224]:
+              - generic [ref=f16e225]: �묒젏 �낅젰
+              - generic [ref=f16e226]: CONTACT_INPUT
+          - option "遺��� 異붽�" [ref=f16e227]:
+            - generic [aria-hidden] [ref=f16e228]: 授�
+            - generic [ref=f16e229]:
+              - generic [ref=f16e230]: 遺���
+              - generic [ref=f16e231]: BUZZER
+          - option "�ㅽ듃�뚰겕 �명꽣�섏씠�� 異붽�" [ref=f16e232]:
+            - generic [aria-hidden] [ref=f16e233]: 授�
+            - generic [ref=f16e234]:
+              - generic [ref=f16e235]: �ㅽ듃�뚰겕 �명꽣�섏씠��
+              - generic [ref=f16e236]: NETWORK_INTERFACE
+      - region "議곕┰ 蹂대뱶" [ref=f16e237]:
+        - generic [ref=f16e238]:
+          - generic [ref=f16e239]: 議곕┰ 蹂대뱶
+          - generic [ref=f16e240]: �⑥껜 쨌 遺��� 7媛�
+        - list "�� �λ퉬�� 遺���" [ref=f16e241]:
+          - listitem [ref=f16e242]:
+            - button "�꾩뼱 �쇱꽌 �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e243]: 授�
+            - generic [ref=f16e244]: door
+            - generic [ref=f16e245]:
+              - generic [ref=f16e246]: �꾩뼱 �쇱꽌
+              - generic [ref=f16e247]: DOOR_SENSOR
+            - generic [ref=f16e248]: ��
+            - button "�꾩뼱 �쇱꽌 �쒓굅" [ref=f16e249] [cursor=pointer]: 횞
+          - listitem [ref=f16e250]:
+            - button "�⑤룄 �쇱꽌 �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e251]: 授�
+            - generic [ref=f16e252]: temp
+            - generic [ref=f16e253]:
+              - generic [ref=f16e254]: �⑤룄 �쇱꽌
+              - generic [ref=f16e255]: TEMPERATURE_SENSOR 쨌 嫄닿컯留�
+            - generic [ref=f16e256]: ��
+            - button "�⑤룄 �쇱꽌 �쒓굅" [ref=f16e257] [cursor=pointer]: 횞
+          - listitem [ref=f16e258]:
+            - button "�듬룄 �쇱꽌 �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e259]: 授�
+            - generic [ref=f16e260]: humid
+            - generic [ref=f16e261]:
+              - generic [ref=f16e262]: �듬룄 �쇱꽌
+              - generic [ref=f16e263]: HUMIDITY_SENSOR 쨌 嫄닿컯留�
+            - generic [ref=f16e264]: ��
+            - button "�듬룄 �쇱꽌 �쒓굅" [ref=f16e265] [cursor=pointer]: 횞
+          - listitem [ref=f16e266]:
+            - button "�덊꽣 �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e267]: 授�
+            - generic [ref=f16e268]: heater
+            - generic [ref=f16e269]:
+              - generic [ref=f16e270]: �덊꽣
+              - generic [ref=f16e271]: HEATER
+            - generic [ref=f16e272]: ��
+            - button "�덊꽣 �쒓굅" [ref=f16e273] [cursor=pointer]: 횞
+          - listitem [ref=f16e274]:
+            - button "�� �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e275]: 授�
+            - generic [ref=f16e276]: fan
+            - generic [ref=f16e277]:
+              - generic [ref=f16e278]: ��
+              - generic [ref=f16e279]: FAN
+            - generic [ref=f16e280]: ��
+            - button "�� �쒓굅" [ref=f16e281] [cursor=pointer]: 횞
+          - listitem [ref=f16e282]:
+            - button "臾댁젙�� �꾩썝�μ튂 �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e283]: 授�
+            - generic [ref=f16e284]: ups
+            - generic [ref=f16e285]:
+              - generic [ref=f16e286]: 臾댁젙�� �꾩썝�μ튂
+              - generic [ref=f16e287]: UPS 쨌 嫄닿컯留�
+            - generic [ref=f16e288]: ��
+            - button "臾댁젙�� �꾩썝�μ튂 �쒓굅" [ref=f16e289] [cursor=pointer]: 횞
+          - listitem [ref=f16e290]:
+            - button "�ㅽ듃�뚰겕 �명꽣�섏씠�� �쒖꽌 諛붽씀湲� �� Alt �꾩븘��" [ref=f16e291]: 授�
+            - generic [ref=f16e292]: nic
+            - generic [ref=f16e293]:
+              - generic [ref=f16e294]: �ㅽ듃�뚰겕 �명꽣�섏씠��
+              - generic [ref=f16e295]: NETWORK_INTERFACE 쨌 嫄닿컯留�
+            - generic [ref=f16e296]: ��
+            - button "�ㅽ듃�뚰겕 �명꽣�섏씠�� �쒓굅" [ref=f16e297] [cursor=pointer]: 횞
+        - paragraph [ref=f16e298]: �먯옟�� 授� 瑜� �뚯뼱 �쒖꽌瑜� 諛붽퓠�덈떎 쨌 �붾젅�� 移⑹쓣 蹂대뱶濡� �뚮㈃ 洹� �먮━�� �ㅼ뼱媛묐땲�� 쨌 Alt+�� Alt+�� 濡쒕룄 ��퉩�덈떎 쨌 �쒕옒洹� 以� Esc �� �쒖옄由� 蹂듦�(�쒕쾭 誘명샇異�)
+      - complementary "遺��� �띿꽦" [ref=f16e299]:
+        - generic [ref=f16e300]: 蹂대뱶�먯꽌 遺��덉쓣 怨좊Ⅴ硫��ш린�� 洹� �λ퉬留뚯쓽 �ъ떎�� 怨좎묩�덈떎.
+    - generic [ref=f16e301]:
+      - generic [ref=f16e302]: 遺��� 7
+      - generic [ref=f16e303]: 誘몄��� 蹂�寃� 0
+      - generic [ref=f16e304]: ���� �꾩뿉�� �쒕쾭�� �꾨Т寃껊룄 蹂대궡吏� �딆뒿�덈떎
+  - heading "蹂대뱶媛� 吏��ㅻ뒗 洹쒖튃" [level=3] [ref=f16e305]
+  - table [ref=f16e306]:
+    - rowgroup [ref=f16e307]:
+      - row [ref=f16e308]:
+        - columnheader "洹쒖튃" [ref=f16e309]
+        - columnheader "��" [ref=f16e310]
+      - row [ref=f16e311]:
+        - cell "移댄뀒怨좊━ 諛� �좏삎�� �붾젅�몄뿉 �녿떎" [ref=f16e312]
+        - cell [ref=f16e313]:
+          - text: 遺숈��ㅺ� 422 瑜� 諛쏅뒗 ���� �좎큹�� 紐� 怨좊Ⅴ寃� �쒕떎(
+          - code [ref=f16e314]: applies_to
+          - text: ). 移댄뀒怨좊━瑜� 諛붽씀硫� �붾젅�멸� 利됱떆 諛붾�먮떎.
+      - row [ref=f16e315]:
+        - cell [ref=f16e316]:
+          - generic [ref=f16e317]:
+            - code [ref=f16e318]: key
+            - text: �먮룞 �쒖븞 + 異⑸룎 �뚰뵾
+        - cell [ref=f16e319]:
+          - text: �좏삎�먯꽌 �좊룄(
+          - code [ref=f16e320]: DOOR_SENSOR
+          - text: ��
+          - code [ref=f16e321]: door
+          - text: )�섍퀬 �대� �덉쑝硫�
+          - code [ref=f16e322]: _2
+          - text: . �� �λ퉬 �� 以묐났�� 422 �� �낅젰 利됱떆 遺됯쾶 �쒖떆�쒕떎.
+      - row [ref=f16e323]:
+        - cell "移댄깉濡쒓렇 �ъ떎�� �뚯깋 �곸옄" [ref=f16e324]
+        - cell [ref=f16e325]:
+          - code [ref=f16e326]: states
+          - text: 쨌
+          - code [ref=f16e327]: commands
+          - text: 쨌
+          - code [ref=f16e328]: produces
+          - text: �� 蹂댁뿬二쇨린留� �쒕떎 �� �몄쭛移몄쑝濡� 留뚮뱾硫� 蹂대궡寃� �섍퀬 洹멸굔 422��.
+      - row [ref=f16e329]:
+        - cell [ref=f16e330]:
+          - generic [ref=f16e331]:
+            - code [ref=f16e332]: state
+            - text: �녿뒗 �좏삎 �쒖떆
+        - cell "怨꾩륫쨌�섎룞 遺��덉� 嫄닿컯留� 蹂닿퀬�쒕떎. 議곕┰ �쒖젏�� �뚮젮 以섏빞 �섏쨷�� \"�곹깭媛� �� �� �ㅻ깘\"媛� �� �앷릿��." [ref=f16e333]
+      - row [ref=f16e334]:
+        - cell "�쒖꽌�� �섎�媛� �녿떎 �� 蹂닿린 �쒖꽌��" [ref=f16e335]
+        - cell [ref=f16e336]:
+          - text: �쒕쾭
+          - code [ref=f16e337]: components[]
+          - text: �� �쒖꽌 怨꾩빟�� �녿떎. 洹몃옒�� �쒕옒洹� �뺣젹�� �щ엺�� �쎄린 醫뗪쾶 �섎뒗 寃껋씠怨�, �뺣젹留� 諛붽씔 蹂�寃쎌� 誘몄��� 蹂�寃쎌쑝濡� �몄� �딅뒗��(짠5 D-A4).
+  - separator [ref=f16e338]
+  - heading "3. 諛섎났 �쇱튂湲� �� 16梨꾨꼸�� 16踰� �뚭쾶 �섏� �딅뒗��" [level=2] [ref=f16e339]
+  - paragraph [ref=f16e340]: �쒖뼱湲걔룻븿泥댁쓽 �묒젏�� �섍� 留롪퀬 洹쒖튃�곸씠��. �쒕옒洹몃뒗 1~2媛쒕� �뺥솗�� �볦쓣 �� 醫뗪퀬, 16媛쒕� 洹쒖튃��濡� 留뚮뱾 ���� 理쒖븙�대떎. 洹몃옒�� 媛숈� 李쎌뿉 �쇱튂湲�瑜� �붾떎 �� 寃곌낵�� �묎컳�� �щ’�대씪 �댄썑 �몄쭛쨌�뺣젹�� �쒕옒洹몃줈 怨꾩냽�쒕떎.
+  - generic [ref=f16e341]:
+    - generic [ref=f16e342]:
+      - text: "1"
+      - generic [ref=f16e343]: �좏삎 怨좊Ⅴ湲�
+      - paragraph [ref=f16e344]:
+        - text: �붾젅�몄뿉��
+        - code [ref=f16e345]: CONTACT_INPUT
+    - generic [ref=f16e346]:
+      - text: "2"
+      - generic [ref=f16e347]: 媛쒖닔 쨌 �쒖옉 踰덊샇
+      - paragraph [ref=f16e348]:
+        - code [ref=f16e349]: "16"
+        - text: 媛� 쨌 梨꾨꼸
+        - code [ref=f16e350]: "1"
+        - text: 遺���
+    - generic [ref=f16e351]:
+      - text: "3"
+      - generic [ref=f16e352]: key 洹쒖튃
+      - paragraph [ref=f16e353]:
+        - code [ref=f16e354]: "ci_{02d}"
+        - text: ��
+        - code [ref=f16e355]: ci_01
+        - text: ��
+        - code [ref=f16e356]: ci_16
+    - generic [ref=f16e357]:
+      - text: "4"
+      - generic [ref=f16e358]: 誘몃━蹂닿린 �� �쇱튂湲�
+      - paragraph [ref=f16e359]: 異⑸룎 key �� 誘몃━ 遺됯쾶 �� �쇱튇 �ㅼ뿏 蹂댄넻 �щ’
+  - generic [ref=f16e360]: �쒕옒洹몃� 1�쒖쐞濡� �먮뒗 �щ궡 諛⑹묠怨� 異⑸룎�섏� �딅뒗��. �꾩튂媛� �섎�瑜� 媛뽯뒗 議곗옉(�대뒓 �먮━�� �볥굹, �쒖꽌)�� �쒕옒洹멸� 1�쒖쐞�닿퀬, 洹쒖튃�� ���� �앹꽦�� �쒕옒洹멸� �좎큹�� �섑븯�� �쇱씠 �꾨땲��. �쇱튂湲곕뒗 �쒕옒洹몄쓽 �대갚�� �꾨땲�� 蹂댁셿�대ŉ, 留뚮뱾�댁쭊 寃곌낵�� �숈씪�� �쒕옒洹� ���곸씠��.
+  - separator [ref=f16e361]
+  - heading "4. 李� B �� �꾨━�� 愿�由� 쨌 李� C �� �꾨━�뗭쑝濡� �앹꽦" [level=2] [ref=f16e362]
+  - paragraph [ref=f16e363]:
+    - text: 議곕┰ 寃곌낵瑜� �꾨━���쇰줈 援논엺��. �꾨━�뗭�
+    - code [ref=f16e364]: category_device
+    - text: �� 醫낅쪟異��� 臾띠씤�� �� �⑥껜 �꾨━�뗭쓣 移대찓�쇱뿉 �곸슜�� �� �놁뼱�� �섍퀬(遺���
+    - code [ref=f16e365]: applies_to
+    - text: 媛� �ㅻⅤ��), 醫낅쪟異뺤쓣 �댁븘 �먮㈃ �앹꽦 �쇱씠 �� 移� �� 臾삳뒗��.
+  - generic [ref=f16e366]:
+    - generic [ref=f16e367]:
+      - generic [ref=f16e368]: �꾨━�뗭쑝濡� �λ퉬 留뚮뱾湲�
+      - generic [ref=f16e369]: 李� B 紐⑸줉 + 李� C �앹꽦
+      - generic [ref=f16e370]:
+        - generic [ref=f16e371]: M 560
+        - generic [ref=f16e372]: T4
+    - generic [ref=f16e373]:
+      - complementary "�꾨━�� 紐⑸줉" [ref=f16e374]:
+        - generic [ref=f16e375]:
+          - generic [ref=f16e376]: �꾨━��
+          - text: �대씪�댁뼵�� 蹂닿� 쨌 移댄뀒怨좊━蹂�
+        - generic [ref=f16e377]:
+          - button "�쒖� �μ쇅 �⑥껜 �⑥껜 쨌 Outdoor �� �꾩뼱쨌�⑥뒿�꽷룻엳�걔룻뙩쨌UPS 7" [ref=f16e378] [cursor=pointer]:
+            - generic [ref=f16e379]:
+              - generic [ref=f16e380]: �쒖� �μ쇅 �⑥껜
+              - generic [ref=f16e381]: �⑥껜 쨌 Outdoor �� �꾩뼱쨌�⑥뒿�꽷룻엳�걔룻뙩쨌UPS
+            - generic [ref=f16e382]: "7"
+          - button "IO �쒖뼱湲� 16梨꾨꼸 �쒖뼱湲� 쨌 IoController �� �묒젏 16 + NIC 17" [ref=f16e383] [cursor=pointer]:
+            - generic [ref=f16e384]:
+              - generic [ref=f16e385]: IO �쒖뼱湲� 16梨꾨꼸
+              - generic [ref=f16e386]: �쒖뼱湲� 쨌 IoController �� �묒젏 16 + NIC
+            - generic [ref=f16e387]: "17"
+          - button "�щ씪�대뵫 �듬Ц �듬Ц 쨌 Sliding �� 援щ룞遺�쨌�꾩뼱�쇱꽌쨌由щ��� 2 5" [ref=f16e388] [cursor=pointer]:
+            - generic [ref=f16e389]:
+              - generic [ref=f16e390]: �щ씪�대뵫 �듬Ц
+              - generic [ref=f16e391]: �듬Ц 쨌 Sliding �� 援щ룞遺�쨌�꾩뼱�쇱꽌쨌由щ��� 2
+            - generic [ref=f16e392]: "5"
+          - button "PTZ 移대찓�� (�쒕옲吏�) 移대찓�� 쨌 PTZ �� PTZ쨌IR쨌���댄띁쨌�덊꽣 5" [ref=f16e393] [cursor=pointer]:
+            - generic [ref=f16e394]:
+              - generic [ref=f16e395]: PTZ 移대찓�� (�쒕옲吏�)
+              - generic [ref=f16e396]: 移대찓�� 쨌 PTZ �� PTZ쨌IR쨌���댄띁쨌�덊꽣
+            - generic [ref=f16e397]: "5"
+          - button "�쒖뒪 吏꾨룞 �쇱꽌 �쇱꽌 쨌 Fence �� 吏꾨룞 媛먯�遺� + NIC 2" [ref=f16e398] [cursor=pointer]:
+            - generic [ref=f16e399]:
+              - generic [ref=f16e400]: �쒖뒪 吏꾨룞 �쇱꽌
+              - generic [ref=f16e401]: �쇱꽌 쨌 Fence �� 吏꾨룞 媛먯�遺� + NIC
+            - generic [ref=f16e402]: "2"
+      - generic [ref=f16e403]:
+        - generic [ref=f16e404]:
+          - generic [ref=f16e405]: 蹂대궪 �댁슜
+          - generic [ref=f16e406]:
+            - text: �� �꾨━�뗭쑝濡� 留뚮뱾硫� �대젃寃� �섍컩�덈떎 ��
+            - code [ref=f16e407]: POST /api/devices/<category>s
+            - text: 1嫄�
+        - paragraph [ref=f16e409]: �쇱そ�먯꽌 �꾨━�뗭쓣 怨좊Ⅴ硫� 媛쒖껜 �뺣낫留� 臾산퀬, 蹂대궪 �댁슜�� 洹몃�濡� 蹂댁뿬以띾땲��.
+    - generic [ref=f16e411]:
+      - generic [ref=f16e412]: �꾨━�뗭쓣 怨좊Ⅴ�몄슂
+      - generic [ref=f16e413]: 遺��� 0 쨌 �ъ젙�� 0
+  - heading "�꾨━�뗭씠 �대뒗 寃� / �댁� �딅뒗 寃�" [level=3] [ref=f16e414]
+  - generic [ref=f16e415]:
+    - generic [ref=f16e416]:
+      - heading "�대뒗�� 援ъ“" [level=4] [ref=f16e417]:
+        - generic [ref=f16e418]: �대뒗��
+        - text: 援ъ“
+      - paragraph [ref=f16e419]:
+        - code [ref=f16e420]: category_device
+        - text: 쨌 醫낅쪟異�(
+        - code [ref=f16e421]: type_<category>
+        - text: ", �ㅽ뵾而ㅻ뒗"
+        - code [ref=f16e422]: speaker_role
+        - text: 源뚯�) 쨌
+        - code [ref=f16e423]: components[]
+        - text: �� �λ퉬蹂� �ъ떎(
+        - code [ref=f16e424]: key
+        - text: 쨌
+        - code [ref=f16e425]: type
+        - text: 쨌
+        - code [ref=f16e426]: label
+        - text: 쨌
+        - code [ref=f16e427]: channel
+        - text: 쨌
+        - code [ref=f16e428]: position
+        - text: 쨌
+        - code [ref=f16e429]: in_service
+        - text: ) 쨌
+        - code [ref=f16e430]: hardware_spec
+        - text: �쒖썝 湲곕낯媛�(�쒖“��룸え�� ��) 쨌
+        - code [ref=f16e431]: device_config
+        - text: ��
+        - code [ref=f16e432]: thresholds
+        - text: 쨌
+        - code [ref=f16e433]: component_overrides
+        - text: 湲곕낯媛� 쨌 移대찓�쇰㈃
+        - code [ref=f16e434]: modes
+        - text: .
+    - generic [ref=f16e435]:
+      - heading "�댁� �딅뒗�� 洹� �λ퉬留뚯쓽 寃� 쨌 �쒕쾭�� 寃�" [level=4] [ref=f16e436]:
+        - generic [ref=f16e437]: �댁� �딅뒗��
+        - text: 洹� �λ퉬留뚯쓽 寃� 쨌 �쒕쾭�� 寃�
+      - paragraph [ref=f16e438]:
+        - text: 媛쒖껜 �앸퀎(
+        - code [ref=f16e439]: id
+        - text: 쨌
+        - code [ref=f16e440]: number_device
+        - text: 쨌
+        - code [ref=f16e441]: name_device
+        - text: ) 쨌 諛곗튂(
+        - code [ref=f16e442]: geolocation
+        - text: 쨌
+        - code [ref=f16e443]: unit_id
+        - text: 쨌
+        - code [ref=f16e444]: group_ids
+        - text: ) 쨌 �묒냽(
+        - code [ref=f16e445]: ip_address
+        - text: 쨌
+        - code [ref=f16e446]: credentials
+        - text: 쨌
+        - code [ref=f16e447]: channel
+        - text: 以� 踰꾩뒪 二쇱냼) 쨌 �쇰젴踰덊샇쨌MAC 쨌 愿�痢�(
+        - code [ref=f16e448]: device_status
+        - text: �� �곕㈃ 422
+        - code [ref=f16e449]: OBSERVED_FIELD
+        - text: ) 쨌 �좏삎 怨듯넻 �ъ떎 8媛�(짠0) 쨌
+        - code [ref=f16e450]: category_device
+        - text: 瑜� 蹂몃Ц�� �ｋ뒗 寃�(寃쎈줈媛� �뺣낯).
+  - generic [ref=f16e451]:
+    - generic [ref=f16e452]:
+      - code [ref=f16e453]: enabled
+      - text: �� �⑥젙
+    - text: ":"
+    - code [ref=f16e454]: components[].enabled
+    - text: �� 422 �닿퀬,
+    - code [ref=f16e455]: device_config.component_overrides.<key>.enabled
+    - text: �� �뺤긽�대떎. 媛숈� �깅쭚�� �쒖そ�먯꽑 湲덉�, �ㅻⅨ 履쎌뿉�� �뺣낯�대떎 �� �꾨━�� 吏곷젹�붽� �� �섏쓣 �욎쑝硫� �곸슜 利됱떆 422媛� �쒕떎. 議곕┰湲곕뒗 遺��� 移�(�뺤긽)怨� �ъ젙�� 移�(�섎룄)�� �붾㈃�먯꽌遺��� 媛덈씪 �볥뒗��.
+  - heading "�앹꽦 �먮쫫 �� �뺣났 1��" [level=3] [ref=f16e456]
+  - generic [ref=f16e457]:
+    - generic [ref=f16e458]:
+      - text: "1"
+      - generic [ref=f16e459]: �꾨━�� �좏깮
+      - paragraph [ref=f16e460]: 移댄뀒怨좊━쨌醫낅쪟異뺤씠 �④퍡 �곕씪�⑤떎
+    - generic [ref=f16e461]:
+      - text: "2"
+      - generic [ref=f16e462]: 媛쒖껜 �뺣낫留� �낅젰
+      - paragraph [ref=f16e463]: 踰덊샇쨌�대쫫쨌遺���쨌�묒냽 �� �꾨━�뗭씠 �� �대뒗 寃껊뱾
+    - generic [ref=f16e464]:
+      - text: "3"
+      - generic [ref=f16e465]: 蹂대궪 �댁슜 �뺤씤
+      - paragraph [ref=f16e466]: �ㅻⅨ履� JSON 洹몃�濡� �섍컙��
+    - generic [ref=f16e467]:
+      - text: "4"
+      - generic [ref=f16e468]:
+        - code [ref=f16e469]: POST
+        - text: 1嫄�
+      - paragraph [ref=f16e470]:
+        - text: 遺��댟룹꽕�뺢퉴吏� �� 踰덉뿉 �� �ㅽ뙣�대룄
+        - generic [ref=f16e471]: 遺�遺� �앹꽦�� �녿떎
+  - generic [ref=f16e472]:
+    - text: �뺣났 1�뚮씪�� 寃� �덉쟾�μ튂��. 遺��덈쭏�� PATCH 瑜� �좊━�� 援ъ“�쇰㈃ 3踰덉㎏�먯꽌 �딄린硫� 諛섏� 議곕┰�� �λ퉬媛� �쒕쾭�� �⑤뒗��.
+    - code [ref=f16e473]: POST
+    - text: �� 嫄댁씠硫� �깃났 �꾨땲硫� �꾨Т寃껊룄 �놁쓬�대떎 �� 洹몃옒�� 議곕┰�� �앷퉴吏� Draft 濡� �ㅺ퀬 �덈떎媛� 留덉�留됱뿉 �� 踰� 蹂대궦��.
+  - separator [ref=f16e474]
+  - heading "5. WPF �곸슜 洹쒖빟" [level=2] [ref=f16e475]
+  - paragraph [ref=f16e476]: �� 紐⑹뾽�� �� �쒗쁽�� WPF �먯꽌 臾댁뾿�� �섎뒗吏� 쨌 �덊룷�� �쒕옒洹� 怨꾩빟�� �대뵒�� 吏��ㅻ뒗吏�.
+  - table [ref=f16e478]:
+    - rowgroup [ref=f16e479]:
+      - row [ref=f16e480]:
+        - columnheader "�� 紐⑹뾽" [ref=f16e481]
+        - columnheader "WPF" [ref=f16e482]
+        - columnheader "吏�耳쒖빞 �섎뒗 寃�" [ref=f16e483]
+      - row [ref=f16e484]:
+        - cell "�붾젅�� 移�" [ref=f16e485]
+        - cell "ItemsControl + DataTemplate �쒕옒洹� �먯옟�� = Thumb" [ref=f16e486]: ItemsControl + DataTemplate�쒕옒洹� �먯옟�� = Thumb
+        - cell [ref=f16e487]:
+          - text: �먯옟�대뒗
+          - code [ref=f16e489]: Thumb
+          - text: .
+          - code [ref=f16e490]: Button
+          - text: 쨌
+          - code [ref=f16e491]: ToggleButton
+          - text: 쨌
+          - code [ref=f16e492]: CheckBox
+          - text: �� �꾨�
+          - code [ref=f16e493]: ButtonBase
+          - text: �뚯깮�대씪 踰꾨툝�먯꽌
+          - code [ref=f16e494]: CaptureMouse()
+          - text: 濡� 罹≪쿂瑜� 媛뺥깉�섍퀬
+          - code [ref=f16e495]: LostMouseCapture
+          - text: =痍⑥냼 洹쒖젙�� 嫄몃젮 留덉슦�ㅻ떎�� �쒓컙 �먮㈇�쒕떎.
+          - code [ref=f16e496]: Border
+          - text: 쨌
+          - code [ref=f16e497]: Path
+          - text: �� AutomationPeer 媛� �놁뼱 UIA �몃━�� �� �섏삩��.
+      - row [ref=f16e498]:
+        - cell "蹂대뱶 �щ’ 紐⑸줉" [ref=f16e499]
+        - cell "ItemsControl (媛��곹솕 OFF) �꾨웾 濡쒕뵫" [ref=f16e500]: ItemsControl (媛��곹솕 OFF)�꾨웾 濡쒕뵫
+        - cell "遺��덉� �λ퉬�� �섏떗 媛쒕씪 �꾨웾 濡쒕뵫 + �섏씠吏��ㅼ씠�� �놁쓬�� �꾩젣��. 媛��곹솕 + 臾댄븳�ㅽ겕濡ㅼ뿉 �쒕옒洹� �뺣젹�� �대㈃ �붾㈃ 諛� �됱씠 �쒕∼ ��源껋씠 紐� �섍퀬 �ㅽ넗�ㅽ겕濡ㅼ씠 LoadMore 瑜� 遺덈윭 �몃뜳�ㅺ� 臾댄슚�붾맂��." [ref=f16e501]
+      - row [ref=f16e502]:
+        - cell "�뚯꽑 �쎌엯��" [ref=f16e503]
+        - cell "AdornerLayer �ㅻ쾭�덉씠 StrokeDashArray 6,4" [ref=f16e504]: AdornerLayer �ㅻ쾭�덉씠StrokeDashArray 6,4
+        - cell [ref=f16e505]:
+          - text: 而⑦뀒�대꼫�� 濡쒖뺄 媛믪쓣 �곗� �딅뒗�� �� Style Trigger(�좏깮 �쒖떆
+          - code [ref=f16e506]: BorderThickness="3,0,0,0"
+          - text: )瑜� �닿린怨�, �덉씠�꾩썐�� 李몄뿬�� 2px 吏��곌� �앷린怨�, 而⑦뀒�대꼫 �ы솢�� �� �ㅻⅨ �됱쑝濡� �곕씪媛꾨떎. �먯꽑
+          - code [ref=f16e507]: "{4,3}"
+          - text: 쨌
+          - code [ref=f16e508]: "{5,3}"
+          - text: �� 洹몃９ �좏깮 諛뺤뒪쨌�щ쾭諛대뱶�� �대� 諛곗젙�� �댄쐶��
+          - code [ref=f16e509]: "{6,4}"
+          - text: 瑜� �대떎.
+      - row [ref=f16e510]:
+        - cell "�좏깮 = 醫뚯륫 3px 諛� �쒕∼ = 媛�濡� �쎌엯��" [ref=f16e511]: �좏깮 = 醫뚯륫 3px 諛��쒕∼ = 媛�濡� �쎌엯��
+        - cell "Style Trigger / Adorner" [ref=f16e512]
+        - cell [ref=f16e513]:
+          - text: �쇱씠�몄뿉��
+          - code [ref=f16e514]: PrimaryBrush
+          - text: =
+          - code [ref=f16e515]: SelectionBrush
+          - text: =
+          - code [ref=f16e516]: FocusRingBrush
+          - text: 媛�
+          - generic [ref=f16e517]:
+            - text: �꾨�
+            - code [ref=f16e518]: "#0C6B89"
+            - text: 濡� �숈씪
+          - text: (��鍮� 1.00:1)�섎떎. �됱씠 �꾨땲�� �뺥깭濡� 援щ텇�쒕떎 �� �좏깮�� �몃줈 諛�, �쒕∼�� 媛�濡쒖꽑(異뺤씠 吏곴탳).
+      - row [ref=f16e519]:
+        - cell "Alt+��/��" [ref=f16e520]
+        - cell "PreviewKeyDown" [ref=f16e521]
+        - cell [ref=f16e522]:
+          - code [ref=f16e523]: Alt+��
+          - text: ��
+          - code [ref=f16e524]: Key.System
+          - text: �쇰줈 �꾩갑�섍퀬 �ㅼ젣 �ㅻ뒗
+          - code [ref=f16e525]: e.SystemKey
+          - text: �� �닿릿��. 踰꾨툝
+          - code [ref=f16e526]: KeyDown
+          - text: �� DataGrid 媛� �뚮퉬�쒕떎 ��
+          - code [ref=f16e527]: e.Key == Key.Up
+          - text: �쇰줈 吏� �대갚�� �곸썝�� �� �щ떎.
+      - row [ref=f16e528]:
+        - cell "Esc 痍⑥냼" [ref=f16e529]
+        - cell "PreviewKeyDown (�곕꼸)" [ref=f16e530]
+        - cell [ref=f16e531]:
+          - text: �쒕옒洹� 以묒씪 �뚮쭔
+          - code [ref=f16e532]: e.Handled=true
+          - text: . 臾댁“嫄� �뚮퉬�섎㈃
+          - code [ref=f16e533]: ClearSelectionOnEscBehavior
+          - text: 瑜� 源④퀬, 諛섎�濡� �쒕옒洹� 以묒뿉 洹� 寃쎈줈濡� 媛�硫�
+          - code [ref=f16e534]: Items.Refresh()
+          - text: 媛� 而⑦뀒�대꼫瑜� �꾨웾 �ъ깮�깊빐 �쒕옒洹� �곹깭媛� 利됱궗�쒕떎.
+      - row [ref=f16e535]:
+        - cell "�쒕옒洹� 媛쒖떆" [ref=f16e536]
+        - cell "PreviewMouseDown �� MouseMove" [ref=f16e537]
+        - cell [ref=f16e538]:
+          - text: �곕뱶議� 8.0 DIU 怨좎젙(�� �곸닔 湲덉�),
+          - code [ref=f16e539]: _pressed
+          - text: ��
+          - code [ref=f16e540]: _dragging
+          - text: 遺꾨━�� 誘몃쭔�� �대┃�쇰줈 �대갚. 醫낅즺�� �⑥씪
+          - code [ref=f16e541]: FinishDrag(bool commit)
+          - text: �� 紐⑥쑝怨�
+          - code [ref=f16e542]: MouseLeftButtonUp
+          - text: 怨�
+          - code [ref=f16e543]: LostMouseCapture
+          - text: "�묒そ�먯꽌 遺�瑜몃떎(�쒖꽌: �뚮옒洹� clear �� �쒓컖 蹂듭썝 �� 援щ룆 �댁젣 ��"
+          - code [ref=f16e544]: ReleaseMouseCapture
+          - text: �� 而ㅻ컠 �듭�).
+      - row [ref=f16e545]:
+        - cell "�쒕∼ �꾩튂 怨꾩궛" [ref=f16e546]
+        - cell "HitTest �� ContainerFromElement" [ref=f16e547]
+        - cell [ref=f16e548]:
+          - code [ref=f16e549]: ContainerFromIndex(i)
+          - text: �� off-screen �먯꽌 null �닿퀬 y/洹좎씪�됰넂�� �곗닠�� 濡쒖뺄 �ㅻ쾭�쇱씠�� �뚮Ц�� ��由곕떎. �� �믪씠�� �고���
+          - code [ref=f16e550]: ActualHeight
+          - text: 濡쒕쭔 �곕떎.
+      - row [ref=f16e551]:
+        - cell "OLE �쒕옒洹�" [ref=f16e552]
+        - cell "�곗� �딅뒗��" [ref=f16e553]
+        - cell [ref=f16e554]:
+          - text: �덊룷 1李� 肄붾뱶��
+          - code [ref=f16e555]: System.Windows.DragDrop
+          - text: �좊�媛� 0嫄��닿퀬, 罹≪쿂 �쒕옒洹몃뒗 18~20怨녹뿉 �뺣┰�� �덈떎. �먯껜 紐⑤떖 猷⑦봽媛� CM �쇱슦�끒텺DIX �ㅻ쾭�덉씠�� 誘멸�利앹씠��.
+      - row [ref=f16e556]:
+        - cell "移댄깉濡쒓렇 �ъ떎 �뚯깋 �곸옄" [ref=f16e557]
+        - cell "IsEnabled=False �꾨떂 �� TextBlock �쒖떆" [ref=f16e558]: IsEnabled=False �꾨떂 ��TextBlock �쒖떆
+        - cell "鍮꾪솢�� �낅젰移몄쑝濡� 留뚮뱾硫� \"�� 紐� 怨좎튂��\"媛� �섍퀬 諛붿씤�⑹씠 媛믪쓣 �섎낫�� �ъ�媛� �앷릿��. �낅젰 而⑦듃濡� �먯껜瑜� �먯� �딅뒗��." [ref=f16e559]
+      - row [ref=f16e560]:
+        - cell "�먮룞��" [ref=f16e561]
+        - cell "AutomationProperties.AutomationId" [ref=f16e562]
+        - cell [ref=f16e563]:
+          - code [ref=f16e564]: x:Name
+          - text: �� Caliburn.Micro 諛붿씤�� 吏��쒖옄�� 怨꾩륫�⑹쑝濡� �꾩슜�섎㈃ 諛붿씤�⑹씠 �딄릿��. 諛섎났 �붿냼�� 諛붿씤�⑹떇 ID(
+          - code [ref=f16e565]: "{Binding Key, StringFormat=Devices.Assembly.Slot.{0}}"
+          - text: ). �� UIA �� �쒕옒洹� �⑦꽩�� �녿떎 �� .NET 8 WPF ��
+          - code [ref=f16e566]: IDragProvider
+          - text: ���� �먯껜媛� 遺��щ씪 �쒕옒洹몃뒗 UIA 濡� �⑥뼵 遺덇�. �뚭� �⑥뼵�� �ㅻ낫�� �대갚 寃쎈줈�� �쒖닔 �⑥닔 �ㅻ뱶由ъ뒪 �뚯뒪�몃줈 �〓뒗��.
+  - separator [ref=f16e567]
+  - heading "6. �쒕쾭�� �붿껌�� 寃� 쨌 寃곗젙�� 寃�" [level=2] [ref=f16e568]
+  - heading "S-12 �� �λ퉬 遺��� �꾨━��(�쒗뵆由�) 由ъ냼�� �좎꽕 �붿껌" [level=3] [ref=f16e569]:
+    - text: S-12 �� �λ퉬 遺��� �꾨━��(�쒗뵆由�) 由ъ냼��
+    - generic [ref=f16e570]: �좎꽕 �붿껌
+  - paragraph [ref=f16e571]:
+    - text: �대씪 蹂닿��쇰줈 1李⑤� �� �� �덉�留�, �댁슜�� �ъ씠�� 媛� 怨듭쑀쨌�쒖���媛� �꾩슂�댁�硫� �쒕쾭 �먯썝�댁뼱�� �쒕떎. �좊�媛� �덈떎 �� 議곗튂蹂닿퀬 臾멸뎄 �뺣젹�먯꽌 �붿껌�덈뜑�� �쒕쾭����
+    - code [ref=f16e572]: POST ��/action-report-templates/reorder
+    - text: 瑜� �좎꽕�� 以щ떎.
+  - table [ref=f16e573]:
+    - rowgroup [ref=f16e574]:
+      - row [ref=f16e575]:
+        - columnheader "��ぉ" [ref=f16e576]
+        - columnheader "�붿껌 �댁슜" [ref=f16e577]
+      - row [ref=f16e578]:
+        - cell "寃쎈줈" [ref=f16e579]
+        - 'cell "GET/POST /api/devices/component-presets 쨌 GET/PATCH/PUT/DELETE /api/devices/component-presets/{id}" [ref=f16e580]'
+      - row [ref=f16e581]:
+        - cell "蹂몃Ц" [ref=f16e582]
+        - cell [ref=f16e583]:
+          - code [ref=f16e584]: name
+          - text: 쨌
+          - code [ref=f16e585]: category_device
+          - text: 쨌
+          - code [ref=f16e586]: type_<category>
+          - text: (�좏깮) 쨌
+          - code [ref=f16e587]: components[]
+          - text: (�λ퉬蹂� �ъ떎留�) 쨌
+          - code [ref=f16e588]: hardware_spec
+          - text: 湲곕낯媛� 쨌
+          - code [ref=f16e589]: device_config
+          - text: 湲곕낯媛� 쨌
+          - code [ref=f16e590]: description
+      - row [ref=f16e591]:
+        - cell "寃�利�" [ref=f16e592]
+        - cell [ref=f16e593]:
+          - text: ���� �쒖젏��
+          - code [ref=f16e594]: applies_to
+          - text: 쨌
+          - code [ref=f16e595]: key
+          - text: �뺤떇쨌以묐났쨌�좏삎 怨듯넻 �ъ떎 湲덉�瑜� 寃��ы빐 �щ씪 �� �곸슜 �쒖젏(�λ퉬 �앹꽦)�� 泥섏쓬 �곗�硫� �꾨━�뗭씠 �섎せ�먮뒗吏� �낅젰�� �섎せ�먮뒗吏�瑜� �ъ슜�먭� 遺꾧컙�� �� �녿떎.
+      - row [ref=f16e596]:
+        - cell "沅뚰븳" [ref=f16e597]
+        - cell [ref=f16e598]:
+          - text: �쎄린
+          - code [ref=f16e599]: devices:view
+          - text: / �곌린
+          - code [ref=f16e600]: devices:edit
+          - text: . 沅뚰븳 ���μ� 16媛� 紐⑤뱢 �꾩껜 援먯껜�� 紐⑤뱢�� �덈줈 留뚮뱾吏� 留먭퀬
+          - code [ref=f16e601]: devices
+          - text: �덉뿉 �붾떎.
+      - row [ref=f16e602]:
+        - cell "�놁뼱�� �섎뒗 寃�" [ref=f16e603]
+        - cell [ref=f16e604]:
+          - text: �곸슜 API �� �꾩슂 �녿떎. �곸슜�� �대씪媛� �꾨━�뗭쓣 �쇱퀜 湲곗〈
+          - code [ref=f16e605]: POST /api/devices/<category>s
+          - text: 1嫄댁쑝濡� 蹂대궡硫� �쒕떎 �� �쒕쾭�� �� �숈옉�� �붽뎄�섏� �딅뒗 寃� �� �ㅺ퀎�� �μ젏�대떎.
+  - heading "寃곗젙��" [level=3] [ref=f16e606]
+  - table [ref=f16e607]:
+    - rowgroup [ref=f16e608]:
+      - row [ref=f16e609]:
+        - columnheader "#" [ref=f16e610]
+        - columnheader "寃곗젙" [ref=f16e611]
+        - columnheader "沅뚭퀬" [ref=f16e612]
+      - row [ref=f16e613]:
+        - cell "D-A1" [ref=f16e614]
+        - cell [ref=f16e615]:
+          - text: �꾨━�� 1李⑤뒗 �대씪�댁뼵�� 蹂닿��쇰줈 �몃떎(�쒕쾭 由ъ냼�� 0嫄� 쨌 紐낆꽭�쒓� "�쒕쾭 遺��� 議곕┰�� 踰붿쐞 諛�"�대씪 紐낆떆). 怨듭쑀媛� �붽뎄�섎㈃ S-12. 蹂닿���
+          - code [ref=f16e616]: appsettings.json
+          - text: 諛��� �꾩슜 �뚯씪濡� �� 洹� �뚯씪�� �고��� 鍮꾩썝�먯쟻 �곌린濡� 源⑥쭊 �대젰�� �덈떎
+        - cell "梨꾪깮 沅뚭퀬" [ref=f16e617]
+      - row [ref=f16e618]:
+        - cell "D-A2" [ref=f16e619]
+        - cell [ref=f16e620]:
+          - text: �꾨━�뗭�
+          - generic [ref=f16e621]:
+            - code [ref=f16e622]: category_device
+            - text: + 醫낅쪟異뺤뿉 臾띕뒗��
+          - text: �� 移댄뀒怨좊━媛� �ㅻⅤ硫� 紐⑸줉�� �꾩삁 �� 蹂댁씤��(遺���
+          - code [ref=f16e623]: applies_to
+          - text: 媛� �щ씪 �곸슜�� �먮━�곸쑝濡� 遺덇�)
+        - cell "梨꾪깮 沅뚭퀬" [ref=f16e624]
+      - row [ref=f16e625]:
+        - cell "D-A3" [ref=f16e626]
+        - cell [ref=f16e627]:
+          - text: �꾨━�뗭뿉
+          - generic [ref=f16e628]:
+            - text: �좏삎 怨듯넻 �ъ떎 8媛쒖�
+            - code [ref=f16e629]: device_status
+            - text: 瑜� �댁� �딅뒗��
+          - text: �� �댁쑝硫� 洹� �꾨━�뗭쑝濡� 留뚮뱺 �λ퉬媛� �꾨� 泥� POST �먯꽌 422
+        - cell "梨꾪깮 (�꾩닔)" [ref=f16e630]
+      - row [ref=f16e631]:
+        - cell "D-A4" [ref=f16e632]
+        - cell [ref=f16e633]:
+          - text: 遺��� �쒖꽌�� �쒖떆���대떎(�쒕쾭
+          - code [ref=f16e634]: components[]
+          - text: �� �쒖꽌 怨꾩빟 �놁쓬) �� �뺣젹留� 諛붽씔 蹂�寃쎌� 誘몄��� 蹂�寃쎌쑝濡� �몄� �딄퀬 ���λ룄 �꾩슂 �녿떎. ���� �뺣젹 �곹깭瑜� 濡쒖뺄�� 湲곗뼲�� �ㅼ떆 �� �� 媛숈� �쒖꽌濡� 蹂댁뿬以���
+        - cell "�뺤씤 �꾩슂" [ref=f16e635]
+      - row [ref=f16e636]:
+        - cell "D-A5" [ref=f16e637]
+        - cell "�쒖뼱湲� �꾨━�뗭쓽 媛믪� 遺��� 醫낅쪟媛� �꾨땲�� 梨꾨꼸 �샕룸쾲�� 洹쒖튃�대떎 �� 諛섎났 �쇱튂湲�瑜� 議곕┰湲� 1湲� 湲곕뒫�쇰줈 �붾떎(16梨꾨꼸�� 16踰� �뚭쾶 �섏� �딅뒗��)" [ref=f16e638]
+        - cell "梨꾪깮 沅뚭퀬" [ref=f16e639]
+      - row [ref=f16e640]:
+        - cell "D-A6" [ref=f16e641]
+        - cell [ref=f16e642]:
+          - code [ref=f16e643]: key
+          - text: �� �쒖븞�섎릺 �몄쭛 媛����섍쾶 �붾떎 �� 愿�濡� key �� 怨꾩빟�� �꾨땲怨� �ъ씠�몃쭏�� �ㅻⅤ��(�⑥껜
+          - code [ref=f16e644]: door
+          - text: vs �듬Ц
+          - code [ref=f16e645]: actuator
+          - text: ). 議고쉶�� ��
+          - code [ref=f16e646]: component_type
+          - text: �쇰줈
+        - cell "梨꾪깮 (�꾩닔)" [ref=f16e647]
+      - row [ref=f16e648]:
+        - cell "D-A7" [ref=f16e649]
+        - cell [ref=f16e650]:
+          - text: 議곕┰湲곕� 湲곗〈 �λ퉬 �몄쭛�먮룄 媛숈� �붾㈃�쇰줈 �대떎(�앹꽦 �꾩슜�쇰줈 留뚮뱾吏� �딅뒗��). �몄쭛��
+          - code [ref=f16e651]: PATCH
+          - text: 濡� 蹂대궦 異뺣쭔 援먯껜 �� ��
+          - code [ref=f16e652]: PUT
+          - text: �� 異� �듭㎏ 援먯껜�� 遺��덉씠 議곗슜�� �щ씪吏� �� �덉뼱 議곕┰湲곕뒗
+          - code [ref=f16e653]: PATCH
+          - text: 濡� 怨좎젙
+        - cell "梨꾪깮 沅뚭퀬" [ref=f16e654]
+      - row [ref=f16e655]:
+        - cell "D-A8" [ref=f16e656]
+        - cell [ref=f16e657]:
+          - text: ���� �� 蹂�寃� 誘몃━蹂닿린(異붽�쨌�쒓굅�� 遺��� 쨌 �④퍡 吏��뚯쭏 愿�痢� 쨌 諛붾�� �ъ젙��)瑜� 蹂댁뿬以��� �� 紐낆꽭�쒓� FE �� �붽뎄�� ��ぉ�닿퀬, 遺��덉쓣 吏��곕㈃ 洹�
+          - code [ref=f16e658]: key
+          - text: �� �곹깭쨌�ㅼ젙�� 媛숈씠 �щ씪吏꾨떎
+        - cell "梨꾪깮 (�꾩닔)" [ref=f16e659]
+  - generic [ref=f16e660]:
+    - text: "洹쇨굅 �� Swagger: FastAPI �� 吏곸깮��"
+    - code [ref=f16e661]: 8.0.1
+    - text: (paths 153 쨌 schemas 457) 쨌
+    - code [ref=f16e662]: "{Cat}Create.hardware_spec"
+    - text: /
+    - code [ref=f16e663]: device_config
+    - text: �숈떆 �섏슜 쨌
+    - code [ref=f16e664]: ComponentDefinition
+    - text: 14�꾨뱶 쨌 �꾨━�� 寃쎈줈 0嫄� 쨌 紐낆꽭��
+    - code [ref=f16e665]: GOP_Restful_Api_�곕룞�ㅺ퀎.md
+    - text: "v8.0.1: 짠87(�쒕쾭 遺��� 議곕┰ 踰붿쐞 諛�) 쨌 짠2415("
+    - code [ref=f16e666]: key
+    - text: �뺤떇쨌�좎씪�� 쨌
+    - code [ref=f16e667]: type
+    - text: 쨌
+    - code [ref=f16e668]: applies_to
+    - text: 422) 쨌 짠2650(遺��� �좏삎 32醫� �꾩닔) 쨌 臾� �꾩튂 key �⑥젙 D-1. 愿��� �뺣낯 �� ��議고몴
+    - code [ref=f16e669]: docs/analyses/gop-api-v8-window-impact-analysis.md
+    - text: 짠9 쨌 �덉씠�꾩썐
+    - code [ref=f16e670]: window-layout-redesign-analysis.md
+    - text: 쨌 �λ퉬 肄섏넄 紐⑹뾽
+    - code [ref=f16e671]: window-layout-system-storyboard.html
+    - text: 쨌 寃곗꽑 �뚰듃
+    - code [ref=f16e672]: device-setup-wiring-storyboard.html
+    - text: 쨌 �쒕옒洹� 洹쒖튃
+    - code [ref=f16e673]: .claude/rules/common/drag-first-ux.md
+    - text: .

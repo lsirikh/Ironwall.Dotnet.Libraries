@@ -1,0 +1,908 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - text: Ironwall GIS
+      - generic [ref=f1e6]: · 전 창 드래그 와이어프레임
+    - group "테마" [ref=f1e7]:
+      - button "시스템" [pressed] [ref=f1e8] [cursor=pointer]
+      - button "라이트" [ref=f1e9] [cursor=pointer]
+      - button "다크" [ref=f1e10] [cursor=pointer]
+  - generic [ref=f1e11]:
+    - generic [ref=f1e12]:
+      - paragraph [ref=f1e13]: All windows · drag-first · WPF-ready
+      - heading "끌어서 옮기는 것이 더 쉬운 자리에만 끌게 한다" [level=1] [ref=f1e14]
+      - paragraph [ref=f1e15]: 전 창(맵 오버레이 제외)을 한 장에 펼친 와이어프레임입니다. 드래그를 1순위로 놓되, 저장이 안 되거나 가상화 목록처럼 구조적으로 깨지는 자리는 드래그를 만들지 않습니다. 각 드래그에는 키보드 폴백·삽입 표시·ESC 취소·실패 복구·확정 단계·형태 기반 시각이 함께 붙습니다. 아래 데모는 실제 WPF 캡처 드래그와 같은 규칙(데드존 8 DIU · 핸들 전용 · 삽입선)으로 동작합니다.
+    - generic [ref=f1e16]:
+      - term [ref=f1e17]: 범위
+      - definition [ref=f1e18]: 창 18묶음 · 맵 OverlayWindow 20종 제외(2차)
+      - term [ref=f1e19]: 치수
+      - definition [ref=f1e20]: px = DIU · 헤더 40 · 툴바 40 · 행 38 · 입력 32 · 레일 184/56 · 상세 340(300–480)
+      - term [ref=f1e21]: 드래그 규약
+      - definition [ref=f1e22]: 캡처 드래그 · 데드존 8.0 DIU · 핸들 전용 · OLE 미사용
+      - term [ref=f1e23]: 정본
+      - definition [ref=f1e24]:
+        - link "레이아웃 분석" [ref=f1e25] [cursor=pointer]:
+          - /url: ../analyses/window-layout-redesign-analysis.md
+        - text: ·
+        - link "콘솔 스토리보드" [ref=f1e26] [cursor=pointer]:
+          - /url: window-layout-system-storyboard.html
+        - text: ·
+        - link "API v8 부록" [ref=f1e27] [cursor=pointer]:
+          - /url: gop-api-v8-console-wireframe.html
+  - region [ref=f1e28]:
+    - generic [ref=f1e29]:
+      - heading "드래그 규약 — 여섯 가지가 같이 붙어야 기획이 끝난다" [level=2] [ref=f1e30]
+      - paragraph [ref=f1e31]: 하나라도 빠지면 드래그를 넣지 않습니다
+    - generic [ref=f1e32]:
+      - generic [ref=f1e33]:
+        - heading "① 핸들과 데드존" [level=4] [ref=f1e34]
+        - generic [ref=f1e35]:
+          - generic [ref=f1e36]: 행 본체는 선택 · 핸들만 드래그
+          - generic [ref=f1e45]:
+            - text: 8 DIU 미만 움직임 =
+            - generic [ref=f1e46]: 클릭
+        - paragraph [ref=f1e47]:
+          - text: 행 본체 좌드래그는 범위 선택·셀 편집과 충돌합니다. 그립 아이콘(
+          - code [ref=f1e48]: DragVertical
+          - text: )만 잡습니다. 8 DIU 미만은 클릭으로 되돌립니다.
+      - generic [ref=f1e49]:
+        - heading "② 삽입 위치와 고스트" [level=4] [ref=f1e50]
+        - generic [ref=f1e51]:
+          - generic [ref=f1e52]: 정문 PTZ
+          - generic [ref=f1e54]: 후문 고정
+          - generic [ref=f1e55]:
+            - generic [ref=f1e56]: 2건
+            - text: 끌고 있는 항목
+        - paragraph [ref=f1e57]: 삽입선은 행 사이 가로 2px, 고스트는 1.5px 테두리 + 그림자입니다. 배경 틴트로 구분하지 않습니다 — 라이트에서 표면색 차이가 1.09:1 입니다.
+      - generic [ref=f1e58]:
+        - heading "③ 드롭 가능 · 불가" [level=4] [ref=f1e59]
+        - generic [ref=f1e60]:
+          - generic [ref=f1e61]: 여기에 놓기 — 카메라 2건
+          - generic [ref=f1e62]: ✕ 스피커 탭에는 놓을 수 없음
+        - paragraph [ref=f1e63]: 색이 아니라 형태로 구분합니다(파선 vs 사선 해치). 라이트에서 Primary·Selection·Focus 가 같은 색이라 색 구분이 성립하지 않습니다.
+      - generic [ref=f1e64]:
+        - heading "④ 키보드 폴백" [level=4] [ref=f1e65]
+        - generic [ref=f1e66]:
+          - generic [ref=f1e67]:
+            - text: 5중대
+            - generic [ref=f1e68]: 선택
+          - generic [ref=f1e69]:
+            - generic [ref=f1e70]: Alt
+            - generic [ref=f1e71]: ↑ ↓
+            - generic [ref=f1e72]: 상위 이동
+            - generic [ref=f1e73]: Esc
+            - generic [ref=f1e74]: 취소
+        - paragraph [ref=f1e75]: 드래그 전용 UI 는 만들지 않습니다. 같은 동작을 Alt+방향키와 메뉴로도 제공합니다 — 접근성과 자동화가 좌표 클릭에 묶이지 않게.
+      - generic [ref=f1e76]:
+        - heading "⑤ 확정과 복구" [level=4] [ref=f1e77]
+        - generic [ref=f1e78]:
+          - generic [ref=f1e79]: Draft — 아직 서버에 안 보냄
+          - generic [ref=f1e80]:
+            - generic [ref=f1e81]: 2건 변경
+            - generic [ref=f1e82]: 되돌리기
+            - generic [ref=f1e83]: 적용
+        - paragraph [ref=f1e84]: 드롭 즉시 서버를 때리지 않습니다. Draft → [적용] 한 번이 기본이고, 호출이 1회로 끝나는 동작(부모 변경 등)만 즉시 전송합니다. 실패는 원위치 + 사유 한 줄.
+      - generic [ref=f1e85]:
+        - heading "⑥ 만들지 않는 드래그" [level=4] [ref=f1e86]
+        - generic [ref=f1e87]:
+          - generic [ref=f1e88]: 가상화 + 무한 스크롤 목록 정렬
+          - generic [ref=f1e89]: DataGrid 열 재정렬 · 정렬
+          - generic [ref=f1e90]: 서버에 순서 필드가 없는 정렬
+        - paragraph [ref=f1e91]: 화면 밖 행은 드롭 타깃이 될 수 없고, 오토스크롤이 다음 페이지를 불러 인덱스가 무효화됩니다. 저장되지 않는 순서 드래그는 거짓 UI 입니다.
+    - generic [ref=f1e92]:
+      - heading "WPF 구현 계약" [level=4] [ref=f1e93]
+      - generic [ref=f1e94]:
+        - term [ref=f1e95]: 방식
+        - definition [ref=f1e96]:
+          - code [ref=f1e97]: PreviewMouseLeftButtonDown
+          - text: (압력) →
+          - code [ref=f1e98]: MouseMove
+          - text: (데드존 8.0 통과) →
+          - code [ref=f1e99]: MouseLeftButtonUp
+          - text: /
+          - code [ref=f1e100]: LostMouseCapture
+          - text: . 종료는 단일
+          - code [ref=f1e101]: FinishDrag(bool commit)
+          - text: 로 모읍니다.
+          - generic [ref=f1e102]:
+            - text: OLE
+            - code [ref=f1e103]: DoDragDrop
+            - text: 미사용
+          - text: .
+        - term [ref=f1e104]: 핸들
+        - definition [ref=f1e105]:
+          - code [ref=f1e106]: Thumb
+          - text: 또는
+          - code [ref=f1e107]: ToggleButton
+          - text: + 컨테이너의
+          - code [ref=f1e108]: PreviewMouseDown
+          - text: 선점(
+          - code [ref=f1e109]: ButtonBase
+          - text: 가 캡처를 강탈하므로 필수).
+          - code [ref=f1e110]: Border
+          - text: ·
+          - code [ref=f1e111]: Grid
+          - text: 는 UIA peer 가 없어 핸들로 쓰지 않습니다.
+        - term [ref=f1e112]: 삽입선
+        - definition [ref=f1e113]:
+          - code [ref=f1e114]: AdornerLayer
+          - text: 오버레이. 컨테이너에 로컬 값을 쓰면 선택 표시와 충돌하고 가상화에서 다른 행으로 따라갑니다.
+        - term [ref=f1e115]: 인덱스
+        - definition [ref=f1e116]:
+          - text: HitTest →
+          - code [ref=f1e117]: ContainerFromElement
+          - text: →
+          - code [ref=f1e118]: ItemFromContainer
+          - text: →
+          - code [ref=f1e119]: IndexOf
+          - text: . y 좌표 산술·
+          - code [ref=f1e120]: ContainerFromIndex
+          - text: 금지.
+        - term [ref=f1e121]: 키보드
+        - definition [ref=f1e122]:
+          - code [ref=f1e123]: PreviewKeyDown
+          - text: 에서
+          - code [ref=f1e124]: Key.System
+          - text: +
+          - code [ref=f1e125]: e.SystemKey
+          - text: (Alt 조합은 버블
+          - code [ref=f1e126]: KeyDown
+          - text: 으로 오지 않습니다). ESC 는 드래그 중일 때만 소비.
+        - term [ref=f1e127]: 오토스크롤
+        - definition [ref=f1e128]: px/sec(시간 기반). 프레임당 N px 는 RDP·저사양에서 속도가 달라집니다.
+        - term [ref=f1e129]: 자동화
+        - definition [ref=f1e130]: UIA 에 드래그 패턴이 없습니다 — 회귀 단언은 키보드·버튼 폴백 경로로 잡고, 판정 로직은 순수 함수로 분리해 헤드리스 테스트합니다.
+  - region [ref=f1e131]:
+    - generic [ref=f1e132]:
+      - heading "전 창 한눈에 — 창 18묶음" [level=2] [ref=f1e133]
+      - paragraph [ref=f1e134]: 파랑 칩 = 이 창에서 끌 수 있는 것 · 취소선 칩 = 일부러 안 만드는 것
+    - generic [ref=f1e135]:
+      - generic [ref=f1e136]:
+        - heading [level=3] [ref=f1e137]:
+          - text: 셸
+          - emphasis [ref=f1e138]: 1250×850
+        - generic [ref=f1e157]:
+          - generic [ref=f1e158]: 표면 이동 · 크기
+          - generic [ref=f1e159]: 드로어 폭
+          - generic [ref=f1e160]: 콘솔 경계
+          - generic [ref=f1e161]: 메뉴 순서
+        - paragraph [ref=f1e162]: 콘솔이 셸 안 표면으로 떠서 머리를 끌어 옮기고 모서리로 크기를 바꿉니다. 드로어는 200~300 사이 조절.
+      - generic [ref=f1e163]:
+        - heading [level=3] [ref=f1e164]:
+          - text: 장비 콘솔
+          - emphasis [ref=f1e165]: T1
+        - generic [ref=f1e187]:
+          - generic [ref=f1e188]: 장비 → 그룹
+          - generic [ref=f1e189]: 장비 → 부대
+          - generic [ref=f1e190]: 장비 → 서버
+          - generic [ref=f1e191]: 부품 팔레트 → 부품 목록
+          - generic [ref=f1e192]: 행 정렬
+          - generic [ref=f1e193]: 열 재정렬
+        - paragraph [ref=f1e194]: 목록에서 장비를 집어 그룹·부대·서버에 떨어뜨립니다. 부품은 카탈로그 팔레트에서 끌어 넣고 [적용] 때 한 번에 보냅니다.
+      - generic [ref=f1e195]:
+        - heading [level=3] [ref=f1e196]:
+          - text: 부품으로 찾기
+          - emphasis [ref=f1e197]: 신설
+        - generic [ref=f1e211]: 드래그 없음
+        - paragraph [ref=f1e213]: 조회 전용 화면입니다. "지금 열린 문 · 고장난 히터" 를 거르는 목록이라 끌 대상이 없습니다.
+      - generic [ref=f1e214]:
+        - heading [level=3] [ref=f1e215]:
+          - text: 이벤트 — 내역 목록
+          - emphasis [ref=f1e216]: T1
+        - generic [ref=f1e237]:
+          - generic [ref=f1e238]: 선택 → 조치 트레이
+          - generic [ref=f1e239]: 행 정렬
+          - generic [ref=f1e240]: 열 재정렬
+        - paragraph [ref=f1e241]: 가상화 + 무한 스크롤이라 행 정렬을 열지 않습니다. 대신 여러 건을 골라 조치 트레이에 떨어뜨려 일괄 조치보고를 만듭니다.
+      - generic [ref=f1e242]:
+        - heading [level=3] [ref=f1e243]:
+          - text: 이벤트 — 개요
+          - emphasis [ref=f1e244]: T3
+        - generic [ref=f1e259]:
+          - generic [ref=f1e260]: 차트에서 기간 끌어 선택
+          - generic [ref=f1e261]: 계열 칩 켜기·끄기
+          - generic [ref=f1e262]: 카드 위치 변경
+        - paragraph [ref=f1e263]: 추이 차트를 좌우로 끌면 그 구간이 기간 칩 '직접' 으로 들어갑니다. 차트 내부 조작이라 지도 규칙과 무관합니다.
+      - generic [ref=f1e264]:
+        - heading [level=3] [ref=f1e265]:
+          - text: 실시간 드로어
+          - emphasis [ref=f1e266]: 셸 우측
+        - generic [ref=f1e277]:
+          - generic [ref=f1e278]: 카드 → 조치 트레이
+          - generic [ref=f1e279]: 카드 → 지도 위치
+          - generic [ref=f1e280]: 드로어 폭
+          - generic [ref=f1e281]: 카드 정렬
+        - paragraph [ref=f1e282]: 카드를 조치 트레이로 끌면 대기열에 쌓이고, 지도로 끌면 그 장비로 이동합니다. 카드 순서는 발생 시각 고정입니다.
+      - generic [ref=f1e283]:
+        - heading [level=3] [ref=f1e284]:
+          - text: 억제 스케줄
+          - emphasis [ref=f1e285]: T1 + 서랍
+        - generic [ref=f1e303]:
+          - generic [ref=f1e304]: 장비 팔레트 → 대상 칩
+          - generic [ref=f1e305]: 그룹 → 대상 칩
+          - generic [ref=f1e306]: 스케줄 순서
+        - paragraph [ref=f1e307]: 확정된 두 칸 폼의 칩 트레이에 장비를 끌어 담습니다. 여러 건을 한 번에 집어 넣고 [저장] 때 한 번 보냅니다.
+      - generic [ref=f1e308]:
+        - heading [level=3] [ref=f1e309]:
+          - text: 조치보고 창
+          - emphasis [ref=f1e310]: T4 · Float
+        - generic [ref=f1e319]:
+          - generic [ref=f1e320]: 창 이동(머리)
+          - generic [ref=f1e321]: 문구 정렬(여기선)
+        - paragraph [ref=f1e322]: 문구 라디오와 메모뿐이라 드래그가 필요 없습니다. 창 자체는 머리를 끌어 옮기며 뒤를 막지 않습니다.
+      - generic [ref=f1e323]:
+        - heading [level=3] [ref=f1e324]:
+          - text: 조치보고 문구 관리
+          - emphasis [ref=f1e325]: 840×640
+        - generic [ref=f1e335]: 문구 순서 드래그
+        - paragraph [ref=f1e337]: 서버에 정렬 입구가 있는 유일한 목록입니다(단일 트랜잭션). 그래서 여기서는 순서 드래그를 제공합니다.
+      - generic [ref=f1e338]:
+        - heading [level=3] [ref=f1e339]:
+          - text: 탐지 신호 이력
+          - emphasis [ref=f1e340]: T3 · 모달
+        - generic [ref=f1e349]:
+          - generic [ref=f1e350]: 차트 드래그 = 이동
+          - generic [ref=f1e351]: 목록 정렬
+        - paragraph [ref=f1e352]: 휠 확대 · 드래그 이동 · 더블클릭 전체 보기는 확정 설계 그대로입니다.
+      - generic [ref=f1e353]:
+        - heading [level=3] [ref=f1e354]:
+          - text: 계정 — 사용자
+          - emphasis [ref=f1e355]: T1
+        - generic [ref=f1e374]:
+          - generic [ref=f1e375]: 사용자 → 권한 그룹
+          - generic [ref=f1e376]: 행 정렬
+        - paragraph [ref=f1e377]: 사용자를 집어 권한 그룹에 떨어뜨리면 구성원 배정 Draft 가 됩니다. 여러 명을 한 번에 담고 [적용].
+      - generic [ref=f1e378]:
+        - heading [level=3] [ref=f1e379]:
+          - text: 계정 — 권한 매트릭스
+          - emphasis [ref=f1e380]: 16×4
+        - generic [ref=f1e401]:
+          - generic [ref=f1e402]: 칸 끌어서 여러 개 켜기
+          - generic [ref=f1e403]: 모듈 순서
+        - paragraph [ref=f1e404]: 체크 칸을 가로·세로로 끌어 한 번에 켭니다(드래그 페인팅). 모듈 순서는 서버 enum 순서라 고정입니다.
+      - generic [ref=f1e405]:
+        - heading [level=3] [ref=f1e406]:
+          - text: 보고서 콘솔
+          - emphasis [ref=f1e407]: T1
+        - generic [ref=f1e422]:
+          - generic [ref=f1e423]: 템플릿 구성 순서(확인)
+          - generic [ref=f1e424]: 생성 목록 정렬
+        - paragraph [ref=f1e425]: 템플릿 구성 요소 순서는 서버에 순서 필드가 있는지 확인 후 결정합니다 — 없으면 만들지 않습니다.
+      - generic [ref=f1e426]:
+        - heading [level=3] [ref=f1e427]:
+          - text: 설정 창
+          - emphasis [ref=f1e428]: T2 · 9탭
+        - generic [ref=f1e444]: 드래그 없음
+        - paragraph [ref=f1e446]: 값 입력 폼이라 끌 것이 없습니다. 파일·폴더 선택에 파일 끌어다 놓기만 후보입니다.
+      - generic [ref=f1e447]:
+        - heading [level=3] [ref=f1e448]:
+          - text: 서버 모니터
+          - emphasis [ref=f1e449]: 신설
+        - generic [ref=f1e465]:
+          - generic [ref=f1e466]: 장비 → 서버 배정
+          - generic [ref=f1e467]: 서버 순서
+        - paragraph [ref=f1e468]: 장비 목록에서 끌어 서버에 배정합니다. 카테고리별 허용 서버 유형이 아니면 드롭 불가로 막습니다.
+      - generic [ref=f1e469]:
+        - heading [level=3] [ref=f1e470]:
+          - text: 부대 콘솔
+          - emphasis [ref=f1e471]: v8 신규
+        - generic [ref=f1e487]:
+          - generic [ref=f1e488]: 트리 상위 이동
+          - generic [ref=f1e489]: 인접 연결
+          - generic [ref=f1e490]: 미배치 장비 → 부대
+          - generic [ref=f1e491]: 형제 순서
+        - paragraph [ref=f1e492]: 노드를 끌어 상위 부대를 바꿉니다(호출 1회). 인접은 같은 제대 노드에 떨어뜨려 연결합니다. 형제 순서는 서버 필드가 없어 제공하지 않습니다.
+      - generic [ref=f1e493]:
+        - heading [level=3] [ref=f1e494]:
+          - text: 이벤트 맵핑 워크벤치
+          - emphasis [ref=f1e495]: 3-Pane
+        - generic [ref=f1e514]:
+          - generic [ref=f1e515]: 팔레트 → 액션 보드(투입)
+          - generic [ref=f1e516]: 보드 → 팔레트(해제)
+          - generic [ref=f1e517]: 우선순위 정렬
+        - paragraph [ref=f1e518]: 확정 설계 3종 드래그입니다. 재정렬 API 가 없어 정렬은 Draft 안에서만 하고 [적용] 때 바뀐 행만 보냅니다.
+      - generic [ref=f1e519]:
+        - heading [level=3] [ref=f1e520]:
+          - text: 장비 배정 창
+          - emphasis [ref=f1e521]: T4 · L 720
+        - generic [ref=f1e533]:
+          - generic [ref=f1e534]: 좌 → 우 끌어 배정
+          - generic [ref=f1e535]: 우 → 좌 끌어 해제
+          - generic [ref=f1e536]: 버튼 폴백 유지
+        - paragraph [ref=f1e537]: 좌우 두 목록 사이를 끌어 옮깁니다. ▶ ◀ 버튼도 그대로 둡니다 — 키보드·자동화 경로입니다.
+  - region [ref=f1e538]:
+    - generic [ref=f1e539]:
+      - heading "드래그 카탈로그 — 무엇을 어디에, 무슨 호출로" [level=2] [ref=f1e540]
+      - paragraph [ref=f1e541]: 서버 호출 횟수가 드래그 허용의 기준입니다
+    - table [ref=f1e543]:
+      - rowgroup [ref=f1e544]:
+        - row [ref=f1e545]:
+          - columnheader "창" [ref=f1e546]
+          - columnheader "끄는 것" [ref=f1e547]
+          - columnheader "놓는 곳" [ref=f1e548]
+          - columnheader "서버 호출" [ref=f1e549]
+          - columnheader "폴백" [ref=f1e550]
+          - columnheader "판정" [ref=f1e551]
+      - rowgroup [ref=f1e552]:
+        - row [ref=f1e553]:
+          - cell "부대 콘솔" [ref=f1e554]
+          - cell "부대 노드(핸들)" [ref=f1e555]
+          - cell "상위 부대 노드 · \"루트로\" 드롭존" [ref=f1e556]
+          - 'cell "PATCH /units/{id} 1회" [ref=f1e557]'
+          - cell "Alt+↑↓ · 우클릭 \"상위 바꾸기\"" [ref=f1e558]
+          - cell "즉시 전송" [ref=f1e559]
+        - row [ref=f1e560]:
+          - cell "부대 콘솔" [ref=f1e561]
+          - cell "부대 노드" [ref=f1e562]
+          - cell "같은 제대 노드(인접 연결)" [ref=f1e563]
+          - cell "PATCH adjacent 1회(전체 교체)" [ref=f1e564]
+          - cell "상세 칸 \"인접 추가\" 콤보" [ref=f1e565]
+          - cell "즉시 · 저장 전 재조회" [ref=f1e566]
+        - row [ref=f1e567]:
+          - cell "부대 콘솔" [ref=f1e568]
+          - cell "미배치 장비 N건" [ref=f1e569]
+          - cell "부대 노드" [ref=f1e570]
+          - 'cell "PATCH /devices/{id} N회" [ref=f1e571]'
+          - cell "장비 상세 부대 픽커" [ref=f1e572]
+          - cell "Draft + 진행률" [ref=f1e573]
+        - row [ref=f1e574]:
+          - cell "장비 콘솔" [ref=f1e575]
+          - cell "장비 N건" [ref=f1e576]
+          - cell "그룹 칩 · 그룹 레일" [ref=f1e577]
+          - cell "PATCH group_ids N회" [ref=f1e578]
+          - cell "상세 \"그룹\" 편집" [ref=f1e579]
+          - cell "Draft + [적용]" [ref=f1e580]
+        - row [ref=f1e581]:
+          - cell "장비 콘솔" [ref=f1e582]
+          - cell "장비 N건" [ref=f1e583]
+          - cell "부대 트리 · 서버 행" [ref=f1e584]
+          - cell "PATCH unit_id / server_id N회" [ref=f1e585]
+          - cell "상세 \"소속\" 편집" [ref=f1e586]
+          - cell "Draft + [적용]" [ref=f1e587]
+        - row [ref=f1e588]:
+          - cell "장비 콘솔" [ref=f1e589]
+          - cell "부품 유형(카탈로그 팔레트)" [ref=f1e590]
+          - cell "부품 목록" [ref=f1e591]
+          - cell "PATCH hardware_spec 1회" [ref=f1e592]
+          - cell "\"＋ 부품 추가\" 콤보" [ref=f1e593]
+          - cell "Draft → 미리보기 → 1회" [ref=f1e594]
+        - row [ref=f1e595]:
+          - cell "이벤트 맵핑" [ref=f1e596]
+          - cell "장비 N건(팔레트)" [ref=f1e597]
+          - cell "액션 보드(카메라·스피커·경광등 탭)" [ref=f1e598]
+          - cell "벌크 등록 1회(1~100)" [ref=f1e599]
+          - cell "\"＋ 추가\" 버튼" [ref=f1e600]
+          - cell "Draft → 1회" [ref=f1e601]
+        - row [ref=f1e602]:
+          - cell "이벤트 맵핑" [ref=f1e603]
+          - cell "보드 행" [ref=f1e604]
+          - cell "팔레트 방향(해제)" [ref=f1e605]
+          - cell "벌크 해제 1회" [ref=f1e606]
+          - cell "행 \"해제\" 버튼" [ref=f1e607]
+          - cell "Draft → 1회" [ref=f1e608]
+        - row [ref=f1e609]:
+          - cell "이벤트 맵핑" [ref=f1e610]
+          - cell "보드 행(핸들)" [ref=f1e611]
+          - cell "행 사이(우선순위)" [ref=f1e612]
+          - cell "PATCH priority — 바뀐 행만" [ref=f1e613]
+          - cell "Alt+↑↓" [ref=f1e614]
+          - cell "Draft 안에서만 · 재정렬 API 요청(S-2)" [ref=f1e615]
+        - row [ref=f1e616]:
+          - cell "억제 스케줄" [ref=f1e617]
+          - cell "장비·그룹 N건" [ref=f1e618]
+          - cell "대상 칩 트레이" [ref=f1e619]
+          - cell "스케줄 저장에 포함 1회" [ref=f1e620]
+          - cell "\"＋ 장비 추가\" 다이얼로그" [ref=f1e621]
+          - cell "폼 저장 때 1회" [ref=f1e622]
+        - row [ref=f1e623]:
+          - cell "계정 콘솔" [ref=f1e624]
+          - cell "사용자 N건" [ref=f1e625]
+          - cell "권한 그룹 행" [ref=f1e626]
+          - cell "구성원 추가 N회" [ref=f1e627]
+          - cell "\"그룹에 배정\" 콤보" [ref=f1e628]
+          - cell "Draft + 진행률" [ref=f1e629]
+        - row [ref=f1e630]:
+          - cell "권한 매트릭스" [ref=f1e631]
+          - cell "체크 칸(드래그 페인팅)" [ref=f1e632]
+          - cell "같은 행·열의 칸들" [ref=f1e633]
+          - cell "저장 때 전체 교체 1회" [ref=f1e634]
+          - cell "Space · 행·열 전체 토글" [ref=f1e635]
+          - cell "저장 1회" [ref=f1e636]
+        - row [ref=f1e637]:
+          - cell "실시간 드로어 · 이벤트 목록" [ref=f1e638]
+          - cell "카드·행 N건" [ref=f1e639]
+          - cell "조치 트레이" [ref=f1e640]
+          - cell "조치 생성 N회 (벌크 없음)" [ref=f1e641]
+          - cell "[N건 조치보고] 버튼" [ref=f1e642]
+          - cell "Draft + 진행률 · 벌크 요청(S-1)" [ref=f1e643]
+        - row [ref=f1e644]:
+          - cell "장비 배정 창" [ref=f1e645]
+          - cell "좌·우 목록 항목" [ref=f1e646]
+          - cell "반대쪽 목록" [ref=f1e647]
+          - cell "저장 때 1회" [ref=f1e648]
+          - cell "▶ ◀ 버튼" [ref=f1e649]
+          - cell "저장 1회" [ref=f1e650]
+        - row [ref=f1e651]:
+          - cell "문구 관리" [ref=f1e652]
+          - cell "문구 행(핸들)" [ref=f1e653]
+          - cell "행 사이" [ref=f1e654]
+          - cell "POST /reorder 1회" [ref=f1e655]
+          - cell "Alt+↑↓" [ref=f1e656]
+          - cell "즉시 1회" [ref=f1e657]
+        - row [ref=f1e658]:
+          - cell "셸 · 콘솔" [ref=f1e659]
+          - cell "창 머리 · 모서리 · 경계" [ref=f1e660]
+          - cell "셸 안 아무 곳" [ref=f1e661]
+          - cell "없음(로컬 저장)" [ref=f1e662]
+          - cell "최대화 버튼 · 폭 입력" [ref=f1e663]
+          - cell "Surface Kernel" [ref=f1e664]
+        - row [ref=f1e665]:
+          - cell "이벤트 개요" [ref=f1e666]
+          - cell "차트 위 좌우 드래그" [ref=f1e667]
+          - cell "기간 구간" [ref=f1e668]
+          - cell "통계 재조회 1회" [ref=f1e669]
+          - cell "기간 칩 · 직접 입력" [ref=f1e670]
+          - cell "차트 내부 조작" [ref=f1e671]
+        - row [ref=f1e672]:
+          - cell "설정 창" [ref=f1e673]
+          - cell "파일·폴더(OS 에서)" [ref=f1e674]
+          - cell "경로 입력 칸" [ref=f1e675]
+          - cell "없음" [ref=f1e676]
+          - cell "\"찾아보기\"" [ref=f1e677]
+          - cell "후보 — OS 드롭은 별도 검토" [ref=f1e678]
+    - paragraph [ref=f1e679]: "판정 규칙: 호출이 1회로 끝나면 즉시 전송, N회로 번지면 Draft + [적용](진행률·부분 실패 4분류). 서버에 정렬 입구가 없으면 Draft 안에서만 정렬하고 바뀐 행만 보냅니다."
+  - region [ref=f1e680]:
+    - generic [ref=f1e681]:
+      - heading "일부러 만들지 않는 드래그" [level=2] [ref=f1e682]
+      - paragraph [ref=f1e683]: 넣으면 조용히 깨지거나 거짓 UI가 되는 자리
+    - table [ref=f1e685]:
+      - rowgroup [ref=f1e686]:
+        - row [ref=f1e687]:
+          - columnheader "자리" [ref=f1e688]
+          - columnheader "왜 안 되는가" [ref=f1e689]
+          - columnheader "대신" [ref=f1e690]
+      - rowgroup [ref=f1e691]:
+        - row [ref=f1e692]:
+          - cell "이벤트 내역 4종 행 정렬" [ref=f1e693]
+          - cell [ref=f1e694]:
+            - text: 가상화 + 무한 스크롤 — 화면 밖 행이 드롭 타깃이 될 수 없고, 오토스크롤이 다음 페이지를 불러 인덱스가 무효화됨. 서버 정렬도
+            - code [ref=f1e695]: created_at
+            - text: 내림차순 고정
+          - cell "필터·검색·기간 칩" [ref=f1e696]
+        - row [ref=f1e697]:
+          - cell "DataGrid 열 재정렬·정렬" [ref=f1e698]
+          - cell "화면 순서 ≠ 저장 순서가 되어 의미와 자동화 단언이 동시에 붕괴" [ref=f1e699]
+          - cell "\"열\" 메뉴로 표시 열 선택" [ref=f1e700]
+        - row [ref=f1e701]:
+          - cell "부대 형제 순서" [ref=f1e702]
+          - cell "API 에 순서 필드가 없다 — 끌어도 저장되지 않는 거짓 UI" [ref=f1e703]
+          - cell "코드 기준 정렬 · 서버에 필드 요청(S-3)" [ref=f1e704]
+        - row [ref=f1e705]:
+          - cell "보고서 생성 이력 정렬" [ref=f1e706]
+          - cell "서버 정렬 고정 · 순서에 의미 없음" [ref=f1e707]
+          - cell "상태 칩 필터" [ref=f1e708]
+        - row [ref=f1e709]:
+          - cell "지도 위 새 드래그" [ref=f1e710]
+          - cell "좌클릭이 팬에 선점돼 있고 실효 임계값 2px 로 8 DIU 데드존이 항상 짐" [ref=f1e711]
+          - cell "어도너 이동 핸들 · 방향키(기존)" [ref=f1e712]
+        - row [ref=f1e713]:
+          - cell "맵 마커 본체 드래그" [ref=f1e714]
+          - cell "팬으로 해석됨 — 2차 범위에서도 유지" [ref=f1e715]
+          - cell "편집 모드 + 어도너" [ref=f1e716]
+        - row [ref=f1e717]:
+          - cell "카드·행을 삭제 영역으로 끌기" [ref=f1e718]
+          - cell "오조작이 곧 파괴 — 되돌리기가 없다" [ref=f1e719]
+          - cell "선택 + 확인 다이얼로그" [ref=f1e720]
+  - region [ref=f1e721]:
+    - generic [ref=f1e722]:
+      - heading "만져 보는 드래그 넷 — WPF 규칙 그대로" [level=2] [ref=f1e723]
+      - paragraph [ref=f1e724]: 핸들(⣿)만 잡힘 · 8 DIU 데드존 · 삽입선 · Esc 취소 · 키보드 폴백
+    - generic [ref=f1e725]:
+      - generic [ref=f1e726]:
+        - generic [ref=f1e727]:
+          - strong [ref=f1e728]: ① 부대 편제 — 상위 이동
+          - emphasis [ref=f1e729]: 드롭 즉시 전송(호출 1회) · 상위 제대만
+          - generic [ref=f1e730]:
+            - button "Alt+↑ 상위로" [ref=f1e731] [cursor=pointer]
+            - button "되돌리기" [ref=f1e732] [cursor=pointer]
+        - generic [ref=f1e733]:
+          - generic [ref=f1e734]:
+            - generic [ref=f1e735]:
+              - text: 편제 트리
+              - generic [ref=f1e736]: "10"
+            - list [ref=f1e739]:
+              - listitem [ref=f1e740]:
+                - generic [ref=f1e741]:
+                  - button "끌기 핸들" [ref=f1e742]
+                  - button "▾" [ref=f1e743] [cursor=pointer]
+                  - generic [ref=f1e744]: 제○○사단 사단
+                  - generic [ref=f1e745]: d01
+                - list [ref=f1e746]:
+                  - listitem [ref=f1e747]:
+                    - generic [ref=f1e748]:
+                      - button "끌기 핸들" [ref=f1e749]
+                      - button "▾" [ref=f1e750] [cursor=pointer]
+                      - generic [ref=f1e751]: 1연대 연대
+                      - generic [ref=f1e752]: r01
+                    - list [ref=f1e753]:
+                      - listitem [ref=f1e754]:
+                        - generic [ref=f1e755]:
+                          - button "끌기 핸들" [ref=f1e756]
+                          - button "▾" [ref=f1e757] [cursor=pointer]
+                          - generic [ref=f1e758]: 3대대 대대
+                          - generic [ref=f1e759]: b03
+                        - list [ref=f1e760]:
+                          - listitem [ref=f1e761]:
+                            - generic [ref=f1e762]:
+                              - button "끌기 핸들" [ref=f1e763]
+                              - button "▾" [ref=f1e764] [cursor=pointer]
+                              - generic [ref=f1e765]: 5중대 중대
+                              - generic [ref=f1e766]: c0305
+                            - list [ref=f1e767]:
+                              - listitem [ref=f1e768]:
+                                - generic [ref=f1e769]:
+                                  - button "끌기 핸들" [ref=f1e770]
+                                  - button
+                                  - generic [ref=f1e771]: 3소초 소초
+                                  - generic [ref=f1e772]: op01
+                          - listitem [ref=f1e773]:
+                            - generic [ref=f1e774]:
+                              - button "끌기 핸들" [ref=f1e775]
+                              - button
+                              - generic [ref=f1e776]: 6중대 중대
+                              - generic [ref=f1e777]: c0306
+                  - listitem [ref=f1e778]:
+                    - generic [ref=f1e779]:
+                      - button "끌기 핸들" [ref=f1e780]
+                      - button "▾" [ref=f1e781] [cursor=pointer]
+                      - generic [ref=f1e782]: 2연대 연대
+                      - generic [ref=f1e783]: r02
+                    - list [ref=f1e784]:
+                      - listitem [ref=f1e785]:
+                        - generic [ref=f1e786]:
+                          - button "끌기 핸들" [ref=f1e787]
+                          - button "▾" [ref=f1e788] [cursor=pointer]
+                          - generic [ref=f1e789]: 2대대 대대
+                          - generic [ref=f1e790]: b02
+                        - list [ref=f1e791]:
+                          - listitem [ref=f1e792]:
+                            - generic [ref=f1e793]:
+                              - button "끌기 핸들" [ref=f1e794]
+                              - button "▾" [ref=f1e795] [cursor=pointer]
+                              - generic [ref=f1e796]: 6중대 중대
+                              - generic [ref=f1e797]: c0206
+                            - list [ref=f1e798]:
+                              - listitem [ref=f1e799]:
+                                - generic [ref=f1e800]:
+                                  - button "끌기 핸들" [ref=f1e801]
+                                  - button
+                                  - generic [ref=f1e802]: 1소초 소초
+                                  - generic [ref=f1e803]: op02
+          - generic [ref=f1e804]:
+            - generic [ref=f1e805]: 규칙
+            - generic [ref=f1e806]:
+              - generic [ref=f1e807]: · 중대는 대대·연대·사단 에만 붙습니다. 같은 제대·하위는 드롭 불가(422 예방)
+              - generic [ref=f1e808]: · 드래그가 시작되면 가능한 노드만 윤곽, 나머지는 사선 해치로 흐립니다
+              - generic [ref=f1e809]:
+                - text: · 호출은
+                - code [ref=f1e810]: "PATCH /api/units/{id}"
+                - text: 1회 — 폭발반경 1 이라 드롭 즉시 보냅니다
+              - generic [ref=f1e811]: · 실패하면 원위치 + 사유 한 줄. 되돌리기는 마지막 이동 1회
+              - generic [ref=f1e812]: · 형제 순서는 없습니다 — 순서 드래그를 제공하지 않습니다
+        - generic [ref=f1e813]: 핸들을 잡고 다른 부대 위로 끌어 보세요 · Esc 취소 · 노드 선택 후 Alt+↑ 로도 이동
+        - generic [ref=f1e814]:
+          - generic [ref=f1e815]: 부대 10
+          - generic [ref=f1e816]: 인접 쌍 2
+          - generic [ref=f1e817]: —
+      - generic [ref=f1e818]:
+        - generic [ref=f1e819]:
+          - strong [ref=f1e820]: ② 장비 소속 배정 — 여러 건 한 번에
+          - emphasis [ref=f1e821]: N회 호출이라 Draft → [적용]
+          - generic [ref=f1e822]:
+            - button "전체 선택" [ref=f1e823] [cursor=pointer]
+            - button "선택 해제" [ref=f1e824] [cursor=pointer]
+        - generic [ref=f1e825]:
+          - generic [ref=f1e826]:
+            - generic [ref=f1e827]:
+              - text: 함체 · 통문 목록
+              - generic [ref=f1e828]: 선택 0
+            - generic [ref=f1e829]:
+              - generic [ref=f1e830]:
+                - button "끌기 핸들" [ref=f1e831]
+                - generic [ref=f1e832]: 북측 7구간 함체
+                - generic [ref=f1e833]: 함체 · 5중대 · ENC-API-1
+              - generic [ref=f1e834]:
+                - button "끌기 핸들" [ref=f1e835]
+                - generic [ref=f1e836]: 정문 함체
+                - generic [ref=f1e837]: 함체 · 6중대 · ENC-API-1
+              - generic [ref=f1e838]:
+                - button "끌기 핸들" [ref=f1e839]
+                - generic [ref=f1e840]: 남문 함체
+                - generic [ref=f1e841]: 함체 · 6중대 · —
+              - generic [ref=f1e842]:
+                - button "끌기 핸들" [ref=f1e843]
+                - generic [ref=f1e844]: 북측 통문
+                - generic [ref=f1e845]: 통문 · 5중대 · PROXY-1
+              - generic [ref=f1e846]:
+                - button "끌기 핸들" [ref=f1e847]
+                - generic [ref=f1e848]: 북측 7구간 펜스
+                - generic [ref=f1e849]: 센서 · 5중대 · 서버 없음
+              - generic [ref=f1e850]:
+                - button "끌기 핸들" [ref=f1e851]
+                - generic [ref=f1e852]: 탄약고 지중 1
+                - generic [ref=f1e853]: 센서 · 6중대 · 서버 없음
+          - generic [ref=f1e854]:
+            - generic [ref=f1e855]: 놓을 곳
+            - generic [ref=f1e856]:
+              - generic [ref=f1e857]: 부대
+              - generic [ref=f1e858]:
+                - generic [ref=f1e859]:
+                  - text: 5중대
+                  - generic [ref=f1e860]: c0305
+                - generic [ref=f1e861]:
+                  - text: 6중대
+                  - generic [ref=f1e862]: c0306
+                - generic [ref=f1e863]:
+                  - text: 6중대
+                  - generic [ref=f1e864]: c0206
+              - generic [ref=f1e865]: 그룹
+              - generic [ref=f1e866]:
+                - generic [ref=f1e867]: 북측
+                - generic [ref=f1e868]: 탄약고
+                - generic [ref=f1e869]: 정문
+              - generic [ref=f1e870]: 서버 (허용 유형만)
+              - generic [ref=f1e871]:
+                - generic [ref=f1e872]:
+                  - text: ENC-API-1
+                  - generic [ref=f1e873]: 함체
+                - generic [ref=f1e874]:
+                  - text: PROXY-1
+                  - generic [ref=f1e875]: 통문·controller·lamp
+        - generic [ref=f1e876]:
+          - generic [ref=f1e877]:
+            - text: Draft
+            - generic [ref=f1e878]: 0건
+            - generic [ref=f1e879]:
+              - button "되돌리기" [disabled] [ref=f1e880]
+              - button "적용" [disabled] [ref=f1e881]
+          - paragraph [ref=f1e882]: 칩 위로 끌어다 놓으면 여기에 쌓입니다 — 서버 전송은 [적용] 한 번
+        - generic [ref=f1e884]: 여러 행을 Ctrl 로 고른 뒤 핸들을 잡아 칩 위로 끌면 Draft 가 쌓입니다 · 센서는 서버에 배정할 수 없어 드롭 불가로 막힙니다
+        - generic [ref=f1e885]:
+          - generic [ref=f1e886]: 목록 6
+          - generic [ref=f1e887]: —
+      - generic [ref=f1e888]:
+        - generic [ref=f1e889]:
+          - strong [ref=f1e890]: ③ 부품 추가 — 카탈로그 팔레트
+          - emphasis [ref=f1e891]: Draft → 변경 미리보기 → PATCH 1회
+          - button "변경 미리보기" [ref=f1e893] [cursor=pointer]
+        - generic [ref=f1e894]:
+          - generic [ref=f1e895]:
+            - generic [ref=f1e896]:
+              - text: 부품 카탈로그
+              - generic [ref=f1e897]: 32유형
+            - generic [ref=f1e898]:
+              - generic [ref=f1e899]:
+                - button "끌기 핸들" [ref=f1e900]
+                - generic [ref=f1e901]: 도어 센서
+                - generic [ref=f1e902]: 함체 가능
+              - generic [ref=f1e903]:
+                - button "끌기 핸들" [ref=f1e904]
+                - generic [ref=f1e905]: 문 구동부
+                - generic [ref=f1e906]: 함체 가능
+              - generic [ref=f1e907]:
+                - button "끌기 핸들" [ref=f1e908]
+                - generic [ref=f1e909]: 히터
+                - generic [ref=f1e910]: 함체 가능
+              - generic [ref=f1e911]:
+                - button "끌기 핸들" [ref=f1e912]
+                - generic [ref=f1e913]: 팬
+                - generic [ref=f1e914]: 함체 가능
+              - generic [ref=f1e915]:
+                - button "끌기 핸들" [ref=f1e916]
+                - generic [ref=f1e917]: 습도 센서
+                - generic [ref=f1e918]: 함체 가능
+              - generic [ref=f1e919]:
+                - button "끌기 핸들" [ref=f1e920]
+                - generic [ref=f1e921]: 무정전 전원장치
+                - generic [ref=f1e922]: 함체 가능
+              - generic [ref=f1e923]:
+                - button "끌기 핸들" [ref=f1e924]
+                - generic [ref=f1e925]: PTZ 구동부
+                - generic [ref=f1e926]: 적용 불가
+              - generic [ref=f1e927]:
+                - button "끌기 핸들" [ref=f1e928]
+                - generic [ref=f1e929]: 적외선 LED
+                - generic [ref=f1e930]: 적용 불가
+              - generic [ref=f1e931]:
+                - button "끌기 핸들" [ref=f1e932]
+                - generic [ref=f1e933]: 네트워크 인터페이스
+                - generic [ref=f1e934]: 함체 가능
+              - generic [ref=f1e935]:
+                - button "끌기 핸들" [ref=f1e936]
+                - generic [ref=f1e937]: 부저
+                - generic [ref=f1e938]: 함체 가능
+          - generic [ref=f1e939]:
+            - generic [ref=f1e940]:
+              - text: 북측 7구간 함체 — 부품
+              - generic [ref=f1e941]: "6"
+            - generic [ref=f1e942]:
+              - generic [ref=f1e943]:
+                - generic [ref=f1e944]: door_sensor
+                - generic [ref=f1e945]: DOOR_SENSOR
+              - generic [ref=f1e946]:
+                - generic [ref=f1e947]: heater
+                - generic [ref=f1e948]: HEATER
+              - generic [ref=f1e949]:
+                - generic [ref=f1e950]: fan
+                - generic [ref=f1e951]: FAN
+              - generic [ref=f1e952]:
+                - generic [ref=f1e953]: humidity_sensor
+                - generic [ref=f1e954]: HUMIDITY_SENSOR
+              - generic [ref=f1e955]:
+                - generic [ref=f1e956]: ups
+                - generic [ref=f1e957]: UPS
+              - generic [ref=f1e958]:
+                - generic [ref=f1e959]: network_interface
+                - generic [ref=f1e960]: NETWORK_INTERFACE
+        - generic [ref=f1e961]:
+          - text: 팔레트의 유형을 부품 목록으로 끌면 key 가 자동 생성되고(중복이면
+          - code [ref=f1e962]: _2
+          - text: ) 앰버 파선 Draft 가 됩니다 · 적용 카테고리가 아니면 드롭 불가
+        - generic [ref=f1e963]:
+          - generic [ref=f1e964]: Draft 0
+          - generic [ref=f1e965]: —
+      - generic [ref=f1e966]:
+        - generic [ref=f1e967]:
+          - strong [ref=f1e968]: ④ 조치보고 문구 — 순서 드래그
+          - emphasis [ref=f1e969]: 서버에 정렬 입구가 있는 유일한 목록
+          - generic [ref=f1e970]:
+            - button "Alt+↑" [ref=f1e971] [cursor=pointer]
+            - button "Alt+↓" [ref=f1e972] [cursor=pointer]
+        - generic [ref=f1e974]:
+          - generic [ref=f1e975]:
+            - text: 문구
+            - generic [ref=f1e976]: "6"
+          - generic [ref=f1e977]:
+            - generic [ref=f1e978]:
+              - button "끌기 핸들" [ref=f1e979]
+              - generic [ref=f1e980]: "1"
+              - generic [ref=f1e981]: 현장 확인 결과 이상 없음
+            - generic [ref=f1e982]:
+              - button "끌기 핸들" [ref=f1e983]
+              - generic [ref=f1e984]: "2"
+              - generic [ref=f1e985]: 순찰 인원 출동
+            - generic [ref=f1e986]:
+              - button "끌기 핸들" [ref=f1e987]
+              - generic [ref=f1e988]: "3"
+              - generic [ref=f1e989]: 동물 등 오탐
+            - generic [ref=f1e990]:
+              - button "끌기 핸들" [ref=f1e991]
+              - generic [ref=f1e992]: "4"
+              - generic [ref=f1e993]: 장비 점검 요청
+            - generic [ref=f1e994]:
+              - button "끌기 핸들" [ref=f1e995]
+              - generic [ref=f1e996]: "5"
+              - generic [ref=f1e997]: 상황실 보고 완료
+            - generic [ref=f1e998]:
+              - button "끌기 핸들" [ref=f1e999]
+              - generic [ref=f1e1000]: "6"
+              - generic [ref=f1e1001]: 추가 확인 필요
+        - generic [ref=f1e1002]:
+          - text: 핸들을 잡고 행 사이로 끌면 가로 삽입선이 섭니다 · 놓으면
+          - code [ref=f1e1003]: POST /reorder
+          - text: 1회(전건 한 트랜잭션) · Esc 취소
+        - generic [ref=f1e1004]:
+          - generic [ref=f1e1005]: 문구 6
+          - generic [ref=f1e1006]: —
+    - paragraph [ref=f1e1007]: 네 데모 모두 핸들만 드래그를 시작하고, 8px(=8 DIU) 를 넘겨야 시작되며, 그 미만은 클릭으로 되돌아갑니다. 드롭 가능·불가는 파선 윤곽 vs 사선 해치로 구분합니다 — 라이트 테마에서 색으로는 구분되지 않기 때문입니다.
+  - region [ref=f1e1008]:
+    - generic [ref=f1e1009]:
+      - heading "이 데모를 WPF 로 옮기면" [level=2] [ref=f1e1010]
+      - paragraph [ref=f1e1011]: 데모의 각 조각에 대응물이 있습니다
+    - table [ref=f1e1013]:
+      - rowgroup [ref=f1e1014]:
+        - row [ref=f1e1015]:
+          - columnheader "데모 조각" [ref=f1e1016]
+          - columnheader "WPF" [ref=f1e1017]
+          - columnheader "주의" [ref=f1e1018]
+      - rowgroup [ref=f1e1019]:
+        - row [ref=f1e1020]:
+          - cell [ref=f1e1021]:
+            - text: 핸들
+            - code [ref=f1e1022]: ⣿
+          - cell "Thumb · 또는 ToggleButton + 컨테이너 PreviewMouseDown 선점" [ref=f1e1023]
+          - cell [ref=f1e1024]:
+            - code [ref=f1e1025]: Button
+            - text: ·맨
+            - code [ref=f1e1026]: ToggleButton
+            - text: 은 버블에서 캡처를 강탈해 마우스다운 순간 자멸
+        - row [ref=f1e1027]:
+          - cell "데드존 8px" [ref=f1e1028]
+          - cell "제곱 비교(CameraPopupHubMath.IsDrag 수식)" [ref=f1e1029]
+          - cell [ref=f1e1030]:
+            - text: 새 상수 만들지 않음 ·
+            - code [ref=f1e1031]: _pressed
+            - text: /
+            - code [ref=f1e1032]: _dragging
+            - text: 분리
+        - row [ref=f1e1033]:
+          - cell "고스트(테두리+그림자+N건)" [ref=f1e1034]
+          - cell "AdornerLayer 어도너 · DropShadowEffect" [ref=f1e1035]
+          - cell [ref=f1e1036]:
+            - text: 배경 틴트로 식별하지 않음(표면 대비 1.09:1) ·
+            - code [ref=f1e1037]: AdornerManagerService
+            - text: 에 등록 금지(5분 타이머가 배선을 깬 이력)
+        - row [ref=f1e1038]:
+          - cell "가로 삽입선" [ref=f1e1039]
+          - cell "AdornerLayer 오버레이(2px Path)" [ref=f1e1040]
+          - cell "컨테이너 로컬 값 쓰기 금지 — 선택 표시와 충돌·가상화에서 따라감" [ref=f1e1041]
+        - row [ref=f1e1042]:
+          - cell "드롭 가능·불가" [ref=f1e1043]
+          - cell "파선 = StrokeDashArray \"6 4\" · 불가 = DrawingBrush 사선 해치" [ref=f1e1044]
+          - cell [ref=f1e1045]:
+            - code [ref=f1e1046]: "{4,3}"
+            - text: ·
+            - code [ref=f1e1047]: "{5,3}"
+            - text: 은 그룹 선택·러버밴드가 선점
+        - row [ref=f1e1048]:
+          - cell "트리 노드 위 드롭" [ref=f1e1049]
+          - cell "TreeViewItem + HitTest → ContainerFromElement" [ref=f1e1050]
+          - cell "노드 높이 30(드롭 타깃 확보) · y 산술 금지" [ref=f1e1051]
+        - row [ref=f1e1052]:
+          - cell "다중 선택 드래그" [ref=f1e1053]
+          - cell "DataGrid SelectionMode=Extended + 핸들 열" [ref=f1e1054]
+          - cell "행 본체 드래그는 범위 선택·셀 편집과 3중 충돌" [ref=f1e1055]
+        - row [ref=f1e1056]:
+          - cell "칩 드롭존" [ref=f1e1057]
+          - cell "ItemsControl + Border(AllowDrop 아님 — 캡처 드래그라 HitTest 로 판정)" [ref=f1e1058]
+          - cell [ref=f1e1059]:
+            - text: OLE 미사용이므로
+            - code [ref=f1e1060]: DragOver
+            - text: 이벤트가 아니라 좌표 판정
+        - row [ref=f1e1061]:
+          - cell "Draft 트레이 + [적용]" [ref=f1e1062]
+          - cell "Temp-state(Draft) 정본 패턴 + 진행 다이얼로그" [ref=f1e1063]
+          - cell "부분 실패 4분류(생성·실패·건너뜀·없음) 표시" [ref=f1e1064]
+        - row [ref=f1e1065]:
+          - cell "Esc 취소" [ref=f1e1066]
+          - cell "PreviewKeyDown 에서 드래그 중일 때만 소비" [ref=f1e1067]
+          - cell "무조건 소비하면 선택 해제 동작(Items.Refresh)이 깨짐" [ref=f1e1068]
+        - row [ref=f1e1069]:
+          - cell "Alt+↑↓ 폴백" [ref=f1e1070]
+          - cell "PreviewKeyDown + Key.System / e.SystemKey" [ref=f1e1071]
+          - cell [ref=f1e1072]:
+            - text: 버블
+            - code [ref=f1e1073]: KeyDown
+            - text: +
+            - code [ref=f1e1074]: Key.Up
+            - text: 으로는 영원히 안 옴(DataGrid 가 소비)
+        - row [ref=f1e1075]:
+          - cell "오토스크롤(경계 근처)" [ref=f1e1076]
+          - cell "DispatcherTimer · px/sec" [ref=f1e1077]
+          - cell "프레임당 N px 금지(RDP 에서 속도 달라짐)" [ref=f1e1078]
+        - row [ref=f1e1079]:
+          - cell "판정 로직" [ref=f1e1080]
+          - cell "순수 함수 분리(유효 부모·삽입 인덱스·데드존)" [ref=f1e1081]
+          - cell "UIA 에 드래그 패턴이 없어 헤드리스 단위테스트 + 폴백 경로 단언이 유일한 회귀망" [ref=f1e1082]
+  - contentinfo [ref=f1e1083]:
+    - generic [ref=f1e1084]:
+      - text: 전 창 드래그 와이어프레임 · 2026-09-18 · px = DIU · 색은
+      - code [ref=f1e1085]: "Tokens.{Light,Dark}.xaml"
+      - text: 토큰
+    - generic [ref=f1e1086]:
+      - text: 규약 근거
+      - code [ref=f1e1087]: .claude/rules/common/drag-first-ux.md
+      - text: · 레이아웃
+      - link "분석 §1·§12" [ref=f1e1088] [cursor=pointer]:
+        - /url: ../analyses/window-layout-redesign-analysis.md
+      - text: · API
+      - link "v8 §8" [ref=f1e1089] [cursor=pointer]:
+        - /url: ../analyses/gop-api-v8-window-impact-analysis.md
+    - generic [ref=f1e1090]:
+      - text: 부대·이벤트 맵핑의 상세 정본은
+      - link "확정 스토리보드" [ref=f1e1091] [cursor=pointer]:
+        - /url: event-mapping-unit-console-storyboard.html
+      - text: ·
+      - link "와이어프레임" [ref=f1e1092] [cursor=pointer]:
+        - /url: event-mapping-unit-console-wireframe.html
+      - text: 입니다. 이 문서는 전 창의 드래그 판정과 자리를 정합니다.

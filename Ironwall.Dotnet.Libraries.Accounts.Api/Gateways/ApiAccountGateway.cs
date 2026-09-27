@@ -149,6 +149,13 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     public bool CanSelfEditEmployeeNumber => false;
 
     /// <summary>
+    /// 서버 모드: 내 정보의 본인 계정 삭제를 막는다(<see cref="IProfileGateway.CanSelfDeleteAccount"/>).
+    /// DELETE /users/{id} 는 비밀번호를 받지 않아 <see cref="RemoveAccountAsync"/> 가 currentPassword 를 확인하지 못하고,
+    /// 확인용 재로그인은 지금 세션을 쫓아내며(단일 세션 정책) 실패가 잠금 횟수에 쌓인다. 서버도 본인 삭제를 409 로 거절한다.
+    /// </summary>
+    public bool CanSelfDeleteAccount => false;
+
+    /// <summary>
     /// 손댄 칸만 PUT /users/{id} — 콘솔 [적용] · 편집 다이얼로그 [확인] 경로. 비운 칸은 <c>"키": null</c> 로 실어 서버가 해제한다
     /// (<see cref="AccountDtoMapper.ToUserUpdateDto(IAccountModel, IEnumerable{string})"/>).
     /// </summary>
@@ -159,7 +166,8 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data, _api.ServerBaseUrl) : null;
     }
 
-    /// <summary>서버 DELETE 엔 비번 게이트/본문 없음(§2.4.4) — currentPassword 서버 미적용(권한은 서버 403). 자기삭제 가드는 호스트 책임.</summary>
+    /// <summary>서버 DELETE 엔 비번 게이트/본문 없음(§2.4.4) — currentPassword 서버 미적용(권한은 서버 403).
+    /// 그래서 본인 삭제(비밀번호 확인이 전제인 경로)는 <see cref="CanSelfDeleteAccount"/>=false 로 화면에서 막는다 — 관리자 삭제 전용.</summary>
     public async Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default)
     {
         var res = await _api.DeleteUserAsync(acc.Id, ct).ConfigureAwait(false);
@@ -195,6 +203,8 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     public async Task<IAccountModel?> ResetAccountPasswordAsync(IAccountModel acc, string newPassword, CancellationToken ct = default)
     {
         var res = await _api.ResetUserPasswordAsync(acc.Id, newPassword, ct).ConfigureAwait(false);
+        // 실패 원문(코드 · 메시지)은 로그로만 — 화면은 호출자가 고정 문장으로 안내한다.
+        if (!res.Success) _log?.Warning($"[ApiAccountGateway] 계정 {acc.Id} 비밀번호 초기화 실패: {res.Error?.Code} {res.Error?.Message ?? res.Message}");
         return res.Success ? acc : null;   // 서버 {success:true}(user 본문 없음) → 입력 모델 에코
     }
 

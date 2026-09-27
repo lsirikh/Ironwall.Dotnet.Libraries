@@ -7,18 +7,11 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-let passed = 0, failed = 0;
-
-function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (e) {
-    failed++;
-    console.log(`  ❌ ${name}: ${e.message}`);
-  }
-}
+// [v4/N-01] 결과 형식은 tests/run.js 의 공용 리포터가 만든다 —
+//   형식을 만드는 쪽과 parseCounts 로 읽는 쪽이 갈라지지 않게.
+const { makeReporter } = require('../run.js');
+const R = makeReporter();
+const test = (name, fn) => R.test(name, fn);
 
 console.log('\n=== Critical Regression Tests (FR-16, FR-17) ===\n');
 
@@ -59,25 +52,30 @@ test('should_restore_session_context_from_bak_when_file_corrupted', () => {
 // TC-3 (S-37 정적 검증): advance-phase.js에서 STATE_FILE 관련 더 넓은 직접 쓰기 패턴 없음
 // path.join(...)으로 STATE_FILE에 준하는 경로를 직접 writeFileSync하는 패턴도 검출
 // ─────────────────────────────────────────────────────────────────────────────
-test('should_not_call_writeFileSync_directly_on_state_file', () => {
-  const src = fs.readFileSync(
-    path.join(__dirname, '../../.claude/hooks/advance-phase.js'), 'utf8'
-  );
+// [v3.6/N-08/TEST-02] TC-3 를 **행동 검사**로 바꿨다.
+//   예전 TC-3 는 TC-1 과 글자 그대로 같은 단언(`writeFileSync(STATE_FILE` 0건)을 한 번 더
+//   세고, 추가 검사는 주석 줄을 걸러내지 않았다 — 실측으로 **동작 변경 없이 주석 한 줄만
+//   덧붙여도 실패**했다(거짓 빨강). 반대로 `atomicStateUpdate` 안에서 상태를 깨뜨려도
+//   이 파일은 전부 초록이었다. 이제 실제로 상태를 갱신해 보고 결과를 본다.
+test('should_update_state_through_atomic_helper', () => {
+  const SB = require('./_sandbox.js');
+  const d = SB.makeSandbox({ prefix: 'tc3' });
+  try {
+    SB.cli(d, ['status']);
+    const before = SB.readState(d);
+    assert.ok(before && before.phase, '상태가 시딩되어야 한다');
 
-  // 패턴 1: writeFileSync(STATE_FILE
-  const pattern1 = (src.match(/writeFileSync\s*\(\s*STATE_FILE/g) || []).length;
+    // phase 전이는 atomicStateUpdate 를 통과한다 — 그 결과가 디스크에 남아야 한다.
+    const r = SB.cli(d, ['set-track', 'B']);
+    assert.strictEqual(r.code, 0, `set-track 실패: ${r.out}`);
+    const after = SB.readState(d);
+    assert.strictEqual(after.track, 'B', `track 이 반영되지 않았다: ${JSON.stringify(after.track)}`);
+    assert.ok(after.updated_at && after.updated_at !== before.updated_at, 'updated_at 이 갱신되어야 한다');
 
-  // 패턴 2: writeFileSync(path.join(...), ...pipeline-state... 형태
-  // pipeline-state.json을 직접 쓰는 줄 검출
-  const lines = src.split('\n');
-  const suspiciousLines = lines.filter(line =>
-    /writeFileSync/.test(line) && /pipeline-state/.test(line)
-  );
-
-  assert.strictEqual(pattern1, 0,
-    `advance-phase.js에서 STATE_FILE 직접 writeFileSync ${pattern1}개 — atomicStateUpdate 사용 필요`);
-  assert.strictEqual(suspiciousLines.length, 0,
-    `advance-phase.js에서 pipeline-state 직접 쓰기 의심 라인 발견:\n  ${suspiciousLines.join('\n  ')}`);
+    // 잠금 파일이 남지 않아야 한다 — 남으면 다음 쓰기가 조용히 막힌다
+    const lock = path.join(path.dirname(SB.stateFile(d)), '_state.lock');
+    assert.ok(!fs.existsSync(lock), '_state.lock 이 남았다');
+  } finally { SB.cleanup(d); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,5 +108,4 @@ test('should_have_graceful_degradation_removed_from_atomicStateUpdate', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-console.log(`\n결과: ${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+R.done();

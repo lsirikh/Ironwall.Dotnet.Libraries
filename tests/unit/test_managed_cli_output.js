@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('fs'),os=require('os'),path=require('path'),assert=require('assert/strict'),{execFileSync}=require('child_process');
+const {git}=require('../../.claude/hooks/_harness-store'),root=fs.mkdtempSync(path.join(os.tmpdir(),'harness-cli-output-')),cli=path.resolve(__dirname,'../../.claude/hooks/advance-phase.js');let checks=0;
+git(root,['init']);git(root,['-c','user.name=Test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','fixture']);
+fs.writeFileSync(path.join(root,'prd.md'),'SENTINEL_LARGE_DOCUMENT_'+ 'x'.repeat(100000));fs.writeFileSync(path.join(root,'plan.md'),'Plan');
+const graph={track:'C',title:'Output budget test',prd:'prd.md',plan:'plan.md',nodes:[{id:'one',prompt:'NODE_PROMPT_SENTINEL',files:['one.txt'],tests:[{mode:'automated',command:[process.execPath,'-e','process.exit(0)']}]}]};
+const file=path.join(root,'graph.json');fs.writeFileSync(file,JSON.stringify(graph));
+const run=args=>execFileSync(process.execPath,[cli,...args],{cwd:root,encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']});
+const created=run(['work','create','--file',file,'--request-ref','automated output contract fixture']),work=JSON.parse(created);
+assert.ok(!created.includes('SENTINEL_LARGE_DOCUMENT'));assert.ok(work.documents.prd.hash);checks++;
+const status=run(['work','status',work.work_id]);assert.ok(!status.includes('SENTINEL_LARGE_DOCUMENT'));assert.ok(!status.includes('NODE_PROMPT_SENTINEL'));assert.equal(JSON.parse(status).nodes.length,1);checks++;
+const context=run(['work','context',work.work_id]);assert.ok(!context.includes('SENTINEL_LARGE_DOCUMENT'));assert.ok(context.length<5000);checks++;
+console.log('결과: '+checks+' PASS / 0 FAIL');

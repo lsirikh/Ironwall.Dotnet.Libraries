@@ -1,0 +1,70 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+const {repository,git}=require('../../.claude/hooks/_harness-store'),{startServer}=require('../../.claude/hooks/_ui-server'),managed=require('../../.claude/hooks/_managed-work'),{CDP}=require('./test_ui_browser');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),mode=process.env.HARNESS_TEST_MODE||'headless';
+async function main(){
+ if(!['headless','headed'].includes(mode))throw Error('BROWSER_MODE_REQUIRED');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'harness-workflow-browser-')),repoDir=path.join(root,'repo'),out=process.env.HARNESS_BROWSER_EVIDENCE||path.join(root,'evidence');fs.mkdirSync(repoDir);fs.mkdirSync(out,{recursive:true});
+ fs.cpSync(path.resolve(__dirname,'../../.claude/hooks'),path.join(repoDir,'.claude/hooks'),{recursive:true});
+ fs.writeFileSync(path.join(repoDir,'value.txt'),'zero');git(repoDir,['init']);git(repoDir,['add','.']);git(repoDir,['-c','user.name=Harness Test','-c','user.email=harness@example.invalid','commit','-m','fixture']);
+ const repo=repository(repoDir),server=await startServer(repoDir,{context:repo});let child,client,checks=0;
+ const browser=process.env.HARNESS_BROWSER||['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
+ try{
+  if(!browser)throw Error('UNVERIFIED: actual browser unavailable');
+  const profile=path.join(root,mode);fs.mkdirSync(profile);child=spawn(browser,['--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--no-default-browser-check','--disable-background-networking','--window-size=1600,1100',...(mode==='headless'?['--headless=new']:[]),'about:blank'],{windowsHide:mode==='headless',stdio:'ignore'});
+  const portFile=path.join(profile,'DevToolsActivePort'),deadline=Date.now()+15000;while(!fs.existsSync(portFile)&&Date.now()<deadline)await sleep(100);if(!fs.existsSync(portFile))throw Error('BROWSER_START_FAILED');
+  const port=Number(fs.readFileSync(portFile,'utf8').split('\n')[0]),targets=await(await fetch('http://127.0.0.1:'+port+'/json')).json();client=await CDP.connect(targets.find(t=>t.type==='page').webSocketDebuggerUrl);
+  // A reload acknowledgement is not a new document. Never assert against the old DOM.
+  async function reload(){const marker=String(Date.now())+Math.random();await client.eval('window.__harnessReload='+JSON.stringify(marker));await client.call('Page.reload');await client.wait('window.__harnessReload!=='+JSON.stringify(marker)+' && document.readyState==="complete"');}
+  const set=async(id,value)=>client.eval('(()=>{const e=document.getElementById('+JSON.stringify(id)+');e.value='+JSON.stringify(value)+';e.dispatchEvent(new Event("input"));e.dispatchEvent(new Event("change"));})()');
+  const click=selector=>client.eval('document.querySelector('+JSON.stringify(selector)+').click()');
+  await client.call('Page.navigate',{url:server.url+'/models'});await client.wait("document.querySelectorAll('#role-rows tr').length===8");checks++;
+  const switchRole=async(runtime,model,effort)=>client.eval('(()=>{const r=document.querySelector("#role-rows tr");const selects=r.querySelectorAll("select");selects[0].value='+JSON.stringify(runtime)+';selects[0].dispatchEvent(new Event("change"));if('+JSON.stringify(model)+'!==null){const id='+JSON.stringify(model)+';if(!Array.from(selects[1].options).some(o=>o.value===id)){const o=document.createElement("option");o.value=id;o.textContent=id;selects[1].append(o);}selects[1].value=id;selects[1].dispatchEvent(new Event("change"));selects[2].value='+JSON.stringify(effort)+';selects[2].dispatchEvent(new Event("change"));}})()');
+  await switchRole('claude','opus','xhigh');await switchRole('codex','codex-fixture-model','high');await switchRole('claude',null,null);
+  assert.equal(await client.eval('document.querySelector("#role-rows tr").querySelectorAll("select")[1].value'),'opus');assert.equal(await client.eval('document.querySelector("#role-rows tr").querySelectorAll("select")[2].value'),'xhigh');checks++;
+  await click('#model-form button[type=submit]');await client.wait("document.getElementById('alert').textContent.includes('설정을 저장했습니다')");
+  await reload();await client.wait("document.querySelectorAll('#role-rows tr').length===8");await switchRole('codex',null,null);assert.equal(await client.eval('document.querySelector("#role-rows tr").querySelectorAll("select")[1].value'),'codex-fixture-model');checks++;
+  await switchRole('claude',null,null);await click('#model-form button[type=submit]');await client.wait("document.getElementById('alert').textContent.includes('설정을 저장했습니다')");
+  await set('model-launcher','codex');assert.equal(await client.eval("document.querySelectorAll('#role-rows tr')[2].querySelector('select').value"),'codex');checks++;
+  await set('registered-skill-name','browser-review');await set('registered-skill-description','Review UI changes');await set('registered-skill-content','Review the registered acceptance criteria.');await click('#save-registered-skill');
+  await client.wait("document.getElementById('registered-skills').textContent.includes('browser-review')");checks++;
+  await set('model-preset','lean');await click('#model-form button[type=submit]');await client.wait("document.getElementById('alert').textContent.includes('설정을 저장했습니다')");checks++;
+  const cfg=server.models.read().value;assert.equal(cfg.launchers.claude.roles.analysis.model,'opus');assert.equal(cfg.launchers.codex.roles.analysis.model,'current');checks++;
+  await client.call('Page.navigate',{url:server.url+'/workflows'});await client.wait("document.querySelectorAll('#preset-select option').length>=4");
+  await click('#edit-preset');await click('#clone-preset');await set('preset-name','런타임별 개발');await click('[data-variant=codex]');await click('#inherit-common');
+  const before=await client.eval("document.querySelectorAll('.designer-node').length");await click('#add-step');assert.equal(await client.eval("document.querySelectorAll('.designer-node').length"),before+1);checks++;
+  await click('[data-variant=claude]');assert.equal(await client.eval("document.querySelectorAll('.designer-node').length"),before);assert.equal(await client.eval("document.getElementById('inherit-common').checked"),true);checks++;
+  await click('[data-variant=codex]');
+  await client.eval('document.querySelector("[data-edge-from=implement][data-edge-to=review]").dispatchEvent(new MouseEvent("click",{bubbles:true}))');await click('#designer-delete');await click('[data-preset-node=plan] [data-port=out]');await click('[data-preset-node=review] [data-port=in]');
+  assert.deepEqual(await client.eval("presetDraft.variants.codex.steps.find(s=>s.id==='review').deps"),['plan']);assert.equal(await client.eval('presetDraft.variants.claude.steps'),null);checks++;
+  await client.eval('document.querySelector("[data-edge-from=plan][data-edge-to=review]").dispatchEvent(new MouseEvent("click",{bubbles:true}))');await click('#designer-delete');await click('[data-preset-node=implement] [data-port=out]');await click('[data-preset-node=review] [data-port=in]');assert.deepEqual(await client.eval("presetDraft.variants.codex.steps.find(s=>s.id==='review').deps"),['implement']);checks++;
+  await click('[data-preset-node=analysis]');
+  await click('#preset-steps .step-card>label input');
+  await client.eval("(()=>{const e=document.querySelector('#preset-steps .binding-line>select');e.value='claude';e.dispatchEvent(new Event('change'));})()");
+  await click('#save-preset');await client.wait("document.getElementById('alert').textContent.includes('프리셋을 저장했습니다')");checks++;
+  const id=await client.eval("document.getElementById('preset-select').value"),p=(await(await fetch(server.url+'/api/workflow-presets')).json()).find(p=>p.id===id);
+  assert.equal(p.variants.codex.steps.length,before+1);assert.equal(p.variants.claude.inherit_common,true);assert.equal(p.variants.codex.models.analysis.runtime,'claude');checks++;
+  await reload();await client.wait("document.querySelectorAll('#preset-select option').length>=5");await set('preset-select',id);await click('#edit-preset');await click('[data-variant=codex]');assert.equal(await client.eval("document.getElementById('inherit-common').checked"),false);checks++;
+  let shot=await client.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,mode+'-presets.png'),Buffer.from(shot.data,'base64'));
+  await click('#designer-close');
+  const draft=managed.draft(repo,{title:'현재 Codex 분석 준비',launch_runtime:'codex',request_ref:'browser preparation'}, {source:'user',runtime:'ui'});
+  await client.wait("document.getElementById('preparing-work').textContent.includes('현재 Codex 분석 준비')");checks++;
+  await set('runtime-filter','claude');assert.ok(!(await client.eval("document.getElementById('preparing-work').textContent")).includes('현재 Codex 분석 준비'));await set('runtime-filter','codex');checks++;
+  await set('preset-select','quick-fix');await click('#new-work');await set('work-title','브라우저에서 등록한 작업');
+  await client.eval("(()=>{const c=document.querySelector('#work-tasks .task-card');c.querySelector('[data-field=prompt]').value='Update value';c.querySelector('[data-field=files]').value='value.txt';c.querySelector('[data-field=automated]').value=JSON.stringify(['node','-e',\"console.log(JSON.stringify({status:'passed',checks:1}))\"]);})()");
+  await click('#work-builder button[type=submit]');await client.wait("document.getElementById('alert').textContent.includes('작업을 등록했습니다')");checks++;
+  const created=repo.store.list('work/').map(r=>r.value).find(w=>w.title==='브라우저에서 등록한 작업');assert.equal(created.workflow.preset_id,'quick-fix');assert.equal(created.launch_runtime,'codex');checks++;
+  const command=text=>[process.execPath,'-e',text],work=managed.create(repo,{track:'B',launch_runtime:'codex',title:'실제 브라우저 실행',nodes:[{id:'write',title:'실제 파일 변경',executor:'command',files:['value.txt'],command:command("require('fs').writeFileSync('value.txt','one');setTimeout(()=>{},1700)"),tests:[{mode:'automated',format:'json',command:command("require('assert').equal(require('fs').readFileSync('value.txt','utf8'),'one');console.log(JSON.stringify({status:'passed',checks:1}))")}]}]},'browser run fixture',{source:'user',runtime:'ui'});
+  await client.wait("Array.from(document.querySelectorAll('#work-select option')).some(o=>o.value==='"+work.work_id+"')");await set('work-select',work.work_id);await click('#work-summary button');await client.wait("document.querySelector('.node.active-node')!==null");await click('#focus-active');assert.ok(await client.eval("document.querySelector('.node.selected.active-node')!==null"));checks++;
+  assert.ok((await client.eval("document.getElementById('work-summary').textContent")).includes('실행 중'));assert.equal(await client.eval("document.querySelector('#work-summary button').disabled"),true);checks++;
+  await client.wait("document.querySelector('.node.verified')!==null");checks++;
+  await client.wait("document.getElementById('work-summary').textContent.includes('검증 완료') && !document.querySelector('#work-summary button')");checks++;
+  repo.store.transaction(tx=>{tx.put('agent/recovered-preparation',{agent_id:'recovered-preparation',work_id:work.work_id,node_id:'write',session_id:'closed-fixture',status:'preparing'});tx.event('agent.fixture_recovered',{work_id:work.work_id});});
+  await reload();await client.wait("document.querySelector('.node.verified')!==null");assert.equal(await client.eval("!!document.querySelector('.node.active-node')"),false);assert.ok((await client.eval("document.getElementById('work-summary').textContent")).includes('검증 완료'));checks++;
+  await click('.node');assert.ok((await client.eval("document.getElementById('node-detail').textContent")).includes('Codex'));assert.ok((await client.eval("document.getElementById('node-detail').textContent")).includes('모델 호출 없음'));checks++;
+  assert.equal(fs.readFileSync(path.join(repoDir,'value.txt'),'utf8'),'zero');assert.equal(repo.store.get('work/'+draft.work_id).value.status,'preparing');assert.equal(client.errors.length,0);checks++;
+  shot=await client.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,mode+'-workflow.png'),Buffer.from(shot.data,'base64'));
+  fs.writeFileSync(path.join(out,mode+'-evidence.json'),JSON.stringify({mode,status:'passed',checks,browser,at:new Date().toISOString()},null,2));console.log('결과: '+checks+' PASS / 0 FAIL');
+ }finally{if(client){await client.call('Browser.close').catch(()=>{});client.close();}if(child&&child.exitCode===null)child.kill();await server.close();repo.store.close();}
+}
+if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=1;});

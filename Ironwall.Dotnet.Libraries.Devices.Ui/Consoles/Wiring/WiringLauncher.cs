@@ -73,8 +73,15 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy);
         var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor());
 
-        return await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true)) == true;
+        var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
+        return SavedAnything(closedWith, vm);
     }
+
+    /// <summary>
+    /// 창이 무언가 저장했는가. 창에는 닫기 단추가 없어 OS ✕ 로 닫히고 그때 대화 결과는 <c>false</c> 다 —
+    /// 대화 결과만 보던 종전에는 저장에 성공해도 콘솔이 다시 읽지 않고 "센서 · 결선을 저장했습니다." 도 뜨지 않았다.
+    /// </summary>
+    internal static bool SavedAnything(bool? closedWith, WiringViewModel vm) => closedWith == true || vm.HasSaved;
 
     #region - Seeds -
     /// <summary>제어기에 달린 센서를 프로바이더 캐시에서 모은다 — 결선맵은 캐시만으로 그린다(WS L476).</summary>
