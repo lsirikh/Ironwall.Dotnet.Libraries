@@ -73,6 +73,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 public partial class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
                             IHandle<DeviceGroupMembershipChangedMessage>,
+                            IHandle<MapLocateRequest>,                        // [지도에서 보기] — MapViewModel.Locate.cs
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
                             IHandle<CallDeleteGroupSymbolsProcessMessageModel>,
@@ -6199,7 +6200,7 @@ public partial class MapViewModel : BasePanelViewModel,
             if (marker == null) return;
             if (_symbolDetailVm == null)
             {
-                _symbolDetailVm = new SymbolDetailViewModel();
+                _symbolDetailVm = new SymbolDetailViewModel(ResolveUnitDirectory(), _eventAggregator);   // 소속 부대 줄(FR-46) — MapViewModel.Locate.cs
                 _symbolDetailVm.CloseRequested += HideSymbolDetail;
                 _symbolDetailVm.ActionRequested += OnSymbolDetailAction;
                 _symbolDetailVm.MicPressed += OnMicPressed;
@@ -6511,6 +6512,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 menu.Items.Add(detailViewItem);
                 menu.Items.Add(new Separator());
             }
+            AddUnitLineMenuItem(menu, marker);   // 소속 부대 · [관계도에서 보기](FR-46) — MapViewModel.Locate.cs
 
             // ── PIDS 전용 메뉴 ──
             if (marker is IPidsEditableMarker pidsMarker)

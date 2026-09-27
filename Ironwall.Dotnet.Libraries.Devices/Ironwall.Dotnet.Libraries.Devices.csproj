@@ -10,6 +10,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
+    <!-- FR-49: DeviceProvider 가 DeviceUnitChangedMessage 를 받는다. ViewModel 은 Base · Enums 만 참조 — 순환 없음. -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

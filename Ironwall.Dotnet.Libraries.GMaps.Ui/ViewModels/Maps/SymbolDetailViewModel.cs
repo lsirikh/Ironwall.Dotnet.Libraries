@@ -1,10 +1,12 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Devices.Units;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Detail;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Door;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Utils.Converters;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System;
@@ -28,6 +30,40 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /// <param name="Value">표시 값. 값이 없으면 "—".</param>
 /// <param name="Tone">null·"ok"·"warn"·"fault" 중 하나.</param>
 public sealed record SymbolDetailField(string Label, string Value, string? Tone = null);
+
+/// <summary>"소속 부대" 한 줄의 상태(FR-46).</summary>
+/// <param name="IsVisible">줄을 보이는가 — 부대 사전이 없거나 서버가 8.0 미만이면 숨긴다.</param>
+/// <param name="Text">줄 문구("소속 부대 7중대 · 2대대 › 1연대 › 제○○사단").</param>
+/// <param name="UnitId">장비의 소속 부대 id(없으면 <c>null</c>).</param>
+/// <param name="CanOpen">[관계도에서 보기]를 누를 수 있는가 — 편제에서 찾은 부대만.</param>
+public sealed record SymbolDetailUnitLineState(bool IsVisible, string Text, int? UnitId, bool CanOpen)
+{
+    public static SymbolDetailUnitLineState Hidden { get; } = new(false, string.Empty, null, false);
+}
+
+/// <summary>"소속 부대" 줄의 순수 판정(FR-46) — 상세 창 · 마커 우클릭 메뉴가 같은 문구를 쓴다.</summary>
+public static class SymbolDetailUnitLine
+{
+    public const string Prefix = "소속 부대";
+    public const string NoUnitText = "소속 부대 정보 없음";
+    public const string LoadingText = "소속 부대 불러오는 중…";
+
+    /// <param name="unitId">장비 모델의 <c>UnitId</c>(심볼의 <b>연결 장비 객체</b>에서 읽는다 — 장비 미연결이면 <c>null</c>).</param>
+    /// <param name="directory">부대 사전(<c>null</c> = DI 미등록).</param>
+    /// <param name="loadAttempted">사전 적재를 한 번 기다렸는가 — 그 뒤에도 못 찾으면 "불러오는 중" 대신 "편제에서 찾지 못함".</param>
+    public static SymbolDetailUnitLineState Evaluate(int? unitId, IUnitDirectory? directory, bool loadAttempted)
+    {
+        if (directory is null || !directory.IsAvailable) return SymbolDetailUnitLineState.Hidden;
+        if (unitId is not int id || id <= 0) return new(true, NoUnitText, null, false);
+
+        var described = directory.Describe(id);
+        if (!string.IsNullOrWhiteSpace(described)) return new(true, $"{Prefix} {described}", id, true);
+
+        return loadAttempted
+            ? new(true, $"{Prefix} #{id} — 편제에서 찾지 못했습니다", id, false)   // 이름을 지어내지 않는다
+            : new(true, LoadingText, id, false);
+    }
+}
 
 /// <summary>탭 하나 — 헤더·활성 여부·내용.</summary>
 public sealed class SymbolDetailTabModel : PropertyChangedBase
@@ -83,8 +119,13 @@ public sealed class SymbolDetailActionModel : PropertyChangedBase
 /// </summary>
 public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
 {
-    public SymbolDetailViewModel()
+    /// <param name="unitDirectory">부대 이름 · 경로 사전(선택 — 없으면 "소속 부대" 줄을 숨긴다).</param>
+    /// <param name="events">[관계도에서 보기]를 보낼 곳(선택 — 없으면 단추가 눌리지 않는다).</param>
+    public SymbolDetailViewModel(IUnitDirectory? unitDirectory = null, IEventAggregator? events = null)
     {
+        _unitDirectory = unitDirectory;
+        _events = events;
+        OpenUnitMapCommand = new RelayCommand(_ => OpenUnitMap(), _ => UnitLine.CanOpen && _events != null);
         CloseCommand = new RelayCommand(_ => CloseRequested?.Invoke());
         ResetViewCommand = new RelayCommand(_ => ResetViewRequested?.Invoke());
         ToggleAutoRotateCommand = new RelayCommand(_ => IsAutoRotating = !IsAutoRotating);
@@ -112,11 +153,16 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
     public RelayCommand ResetViewCommand { get; }
     public RelayCommand ToggleAutoRotateCommand { get; }
     public RelayCommand SelectTabCommand { get; }
+    /// <summary>[관계도에서 보기] — 부대 콘솔을 관계도 레일로 열고 그 부대를 고른다(<c>OpenUnitConsoleRequest</c>).</summary>
+    public RelayCommand OpenUnitMapCommand { get; }
     private readonly RelayCommand _actionCommand;
 
     #endregion
 
     #region - Fields -
+
+    private readonly IUnitDirectory? _unitDirectory;
+    private readonly IEventAggregator? _events;
 
     private IPidsEditableMarker? _marker;
     private INotifyPropertyChanged? _markerNotifier;
@@ -205,6 +251,27 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
     /// <summary>장비 연결 여부 — 미연결 안내 문구 표시에 쓴다.</summary>
     public bool HasDevice { get => _hasDevice; private set { _hasDevice = value; NotifyOfPropertyChange(nameof(HasDevice)); } }
 
+    private SymbolDetailUnitLineState _unitLine = SymbolDetailUnitLineState.Hidden;
+    /// <summary>"소속 부대" 줄(FR-46). 바뀌면 문구 · 표시 · 단추가 함께 바뀐다.</summary>
+    public SymbolDetailUnitLineState UnitLine
+    {
+        get => _unitLine;
+        private set
+        {
+            _unitLine = value;
+            NotifyOfPropertyChange(nameof(UnitLine));
+            NotifyOfPropertyChange(nameof(IsUnitLineVisible));
+            NotifyOfPropertyChange(nameof(UnitLineText));
+            OpenUnitMapCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool IsUnitLineVisible => _unitLine.IsVisible;
+    public string UnitLineText => _unitLine.Text;
+
+    /// <summary>가장 최근 사전 적재 대기(시험용).</summary>
+    internal Task PendingUnitLoad { get; private set; } = Task.CompletedTask;
+
     #endregion
 
     #region - Load -
@@ -243,10 +310,71 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
                 ? $"연결된 장비(#{marker.LinkedDeviceId}) 정보를 찾지 못했습니다 — 장비 목록에 없거나 아직 불러오지 못했습니다."
                 : "이 심볼은 장비와 연결되지 않아 심볼 탭만 볼 수 있습니다.";
 
+        RefreshUnitLine(device?.UnitId);
         BuildTabs(marker, device, layerName, groupNames);
         BuildActions(marker.DeviceType);
         RefreshActionStates();
         Subscribe(marker);
+    }
+
+    private int? _unitLineUnitId;
+    private bool _unitLoadAttempted;
+    private bool _unitDirectoryHooked;
+
+    /// <summary>"소속 부대" 줄을 다시 계산한다 — 사전에 이름이 없으면 한 번 읽게 하고, 읽은 뒤 다시 계산한다. 호출 스레드: UI.</summary>
+    private void RefreshUnitLine(int? unitId)
+    {
+        _unitLineUnitId = unitId;
+        _unitLoadAttempted = false;
+        HookUnitDirectory();
+        UnitLine = SymbolDetailUnitLine.Evaluate(unitId, _unitDirectory, _unitLoadAttempted);
+
+        if (_unitDirectory is { IsAvailable: true } directory && unitId is > 0 && !UnitLine.CanOpen)
+            PendingUnitLoad = LoadUnitDirectoryAsync(directory, unitId);
+    }
+
+    private async Task LoadUnitDirectoryAsync(IUnitDirectory directory, int? unitId)
+    {
+        try { await directory.EnsureLoadedAsync(); }
+        catch (Exception) { /* 사전이 스스로 로그를 남긴다 — 여기서는 "찾지 못함" 으로 떨어진다 */ }
+
+        if (_unitLineUnitId != unitId || _marker is null) return;   // 그 사이 다른 심볼을 열었다
+        _unitLoadAttempted = true;
+        UnitLine = SymbolDetailUnitLine.Evaluate(unitId, _unitDirectory, _unitLoadAttempted);
+    }
+
+    /// <summary>사전이 편제를 다시 읽었다(SYNC_UNIT) — 문구만 다시 계산한다. 사전은 UI 스레드로 옮겨 발화한다.</summary>
+    private void OnUnitDirectoryChanged(object? sender, EventArgs e)
+    {
+        if (_marker is null) return;
+        UnitLine = SymbolDetailUnitLine.Evaluate(_unitLineUnitId, _unitDirectory, loadAttempted: true);
+    }
+
+    private void HookUnitDirectory()
+    {
+        if (_unitDirectory is null || _unitDirectoryHooked) return;
+        _unitDirectory.Changed += OnUnitDirectoryChanged;
+        _unitDirectoryHooked = true;
+    }
+
+    private void UnhookUnitDirectory()
+    {
+        if (_unitDirectory is null || !_unitDirectoryHooked) return;
+        _unitDirectory.Changed -= OnUnitDirectoryChanged;
+        _unitDirectoryHooked = false;
+    }
+
+    /// <summary>[관계도에서 보기] — 부대 콘솔(런처)이 받아 창을 열거나 활성화하고 관계도 레일에서 그 부대를 고른다.</summary>
+    private void OpenUnitMap()
+    {
+        if (_events is null || !UnitLine.CanOpen || UnitLine.UnitId is not int unitId) return;
+        _ = PublishOpenUnitConsoleAsync(new OpenUnitConsoleRequest(unitId, OpenMap: true));
+    }
+
+    private async Task PublishOpenUnitConsoleAsync(OpenUnitConsoleRequest request)
+    {
+        try { await _events!.PublishOnCurrentThreadAsync(request); }
+        catch (Exception) { /* 받는 쪽(런처)의 실패는 받는 쪽이 알린다 */ }
     }
 
     /// <summary>권한·문 상태가 바뀌었을 때 액션 활성만 다시 계산한다(창을 다시 열 필요 없이).</summary>
@@ -599,6 +727,8 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
     {
         EndMic();               // 마이크를 누른 채로 창이 닫히면 중지가 안 나간다
         Unsubscribe();
+        UnhookUnitDirectory();  // 닫힌 창이 사전(싱글턴)에 붙잡히지 않게
+        UnitLine = SymbolDetailUnitLineState.Hidden;
         _marker = null;
         IsBroadcasting = false;
     }

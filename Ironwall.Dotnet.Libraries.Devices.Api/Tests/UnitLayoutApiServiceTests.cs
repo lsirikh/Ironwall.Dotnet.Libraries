@@ -336,13 +336,15 @@ public class UnitLayoutApiServiceTests
     }
 
     [Fact]
-    public async Task should_return_unsupported_when_patch_422_names_path_unit_id()
+    public async Task should_treat_every_write_422_as_rejected_even_when_it_names_path_unit_id()
     {
+        // FR-50(PRD v1.2 · 분석 ISSUE-1): 422 → 미지원 해석은 **프로브 GET 한정**. 쓰기의 422 는 검증 실패다 —
+        // 미지원으로 읽으면 세션 전용으로 조용히 넘어가 서버 거절이 숨는다. 시나리오 SIM-F062 · F073 · F084 · F095.
         var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.UnprocessableEntity, RouteShadow422);
 
         var result = await Create(http).PatchAsync(13, MovePatch());
 
-        Assert.IsType<UnitLayoutWriteResult.Unsupported>(result);
+        Assert.IsType<UnitLayoutWriteResult.Rejected>(result);
     }
 
     [Theory]

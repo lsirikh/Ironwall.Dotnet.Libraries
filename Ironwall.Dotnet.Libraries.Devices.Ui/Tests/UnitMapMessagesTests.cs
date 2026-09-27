@@ -68,4 +68,21 @@ public class UnitMapMessagesTests
         Assert.Equal(new OpenUnitConsoleRequest(27, OpenMap: true), new OpenUnitConsoleRequest(27, true));
         Assert.Equal(new UnitLayoutChangedMessage(14), new UnitLayoutChangedMessage(14));
     }
+
+    [Theory]
+    [InlineData(14L, null, 14L)]     // 클라 요청서 모양 {action, version}          — SIM-N074
+    [InlineData(null, 14L, 14L)]     // 서버 PRD 초안 모양 {action, resource_id:<v>} — SIM-N073
+    [InlineData(15L, 14L, 15L)]      // 둘 다 오면 version 이 이긴다
+    [InlineData(0L, 14L, 14L)]       // version 이 비정상이면 resource_id 로
+    public void should_read_the_layout_version_from_either_body_key(long? version, long? resourceId, long expected)
+    {
+        Assert.Equal(expected, UnitLayoutChangedMessage.FromBody(version, resourceId)!.Version);
+    }
+
+    [Fact]
+    public void should_return_null_when_the_layout_notice_carries_no_version()
+    {
+        Assert.Null(UnitLayoutChangedMessage.FromBody(null, null));
+        Assert.Null(UnitLayoutChangedMessage.FromBody(0, -1));
+    }
 }

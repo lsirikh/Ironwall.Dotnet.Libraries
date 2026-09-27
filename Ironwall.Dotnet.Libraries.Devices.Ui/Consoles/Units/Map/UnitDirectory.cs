@@ -91,6 +91,9 @@ public sealed class UnitDirectory : IUnitDirectory, IHandle<UnitTopologyChangedM
     public async Task EnsureLoadedAsync(bool force = false, CancellationToken token = default)
         => await LoadAsync(force, token).ConfigureAwait(false);
 
+    /// <summary><see cref="IUnitDirectory"/> 의 적재 입구 — 아직 읽지 않았을 때만 나간다.</summary>
+    Task IUnitDirectory.EnsureLoadedAsync(CancellationToken token) => EnsureLoadedAsync(force: false, token);
+
     /// <summary>편제가 다른 곳에서 바뀌었다 — 합침 창을 연다(곧바로 돌아온다).</summary>
     public Task HandleAsync(UnitTopologyChangedMessage message, CancellationToken cancellationToken)
     {

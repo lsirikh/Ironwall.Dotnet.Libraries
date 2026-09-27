@@ -110,6 +110,58 @@ public abstract record UnitMapUndoCheck
     public sealed record Refused(UnitMapConflictReason Reason, IReadOnlyList<int> ChangedUnitIds) : UnitMapUndoCheck;
 }
 
+/// <summary>상위 바꾸기가 성공한 뒤 그 부대의 배치를 정리할지(FR-08 · 분석 ISSUE-4).</summary>
+public abstract record UnitMapReparentCleanup
+{
+    private UnitMapReparentCleanup() { }
+
+    /// <summary>할 일 없음 — <paramref name="Reason"/> 은 로그용.</summary>
+    public sealed record Skip(UnitMapReparentCleanupReason Reason) : UnitMapReparentCleanup;
+
+    /// <summary>서버 배치에 행이 남아 있다 — 방금 읽은 버전으로 <c>clear</c> 1회.</summary>
+    public sealed record Clear(long IfMatchVersion) : UnitMapReparentCleanup;
+
+    /// <summary>세션 전용 — 메모리에서 지운다(서버 · 디스크 0).</summary>
+    public sealed record ClearInMemory : UnitMapReparentCleanup;
+}
+
+/// <summary>정리를 건너뛴 까닭.</summary>
+public enum UnitMapReparentCleanupReason
+{
+    /// <summary>행이 없다 — 서버가 상위 변경과 같은 트랜잭션에서 이미 지웠거나(S-1 ⑦) 원래 없었다. <b>충돌이 아니다</b>.</summary>
+    NoRow,
+
+    /// <summary>쓰기 금지 상태(읽는 중 · 읽기 실패 · 판 불일치) — 모르는 채로 쓰지 않는다.</summary>
+    WritesBlocked,
+
+    /// <summary>방금 읽기가 실패했다 — 다음 재조회가 맞춘다.</summary>
+    Unreadable,
+
+    /// <summary>경로가 사라졌다 — 세션 전용으로 넘어간다.</summary>
+    Unsupported,
+}
+
+/// <summary>[배치 초기화] 되돌리기 계획(FR-35 · 분석 ISSUE-50 · 결정 D-2026-09-27-215b6d).</summary>
+/// <param name="Change">보낼 변경 — 되살릴 부대가 없거나 막혔으면 <c>null</c>.</param>
+/// <param name="IfMatchVersion">방금 읽은 문서 버전.</param>
+/// <param name="Restored">되살릴 부대.</param>
+/// <param name="SkippedDeleted">그 사이 편제에서 사라진 부대 — 보내면 서버가 422 로 <b>전체</b>를 되돌린다.</param>
+/// <param name="SkippedChanged">그 사이 다른 운영자가 배치를 준 부대 — 남의 변경을 덮지 않는다.</param>
+/// <param name="IsTooLarge">항목이 일괄 쓰기 상한을 넘는다 — 나눠 보내지 않고 되돌리기를 막는다.</param>
+/// <param name="LayoutVersionChanged">문서의 판이 이 클라와 다르다 — 되돌리지 않는다.</param>
+public sealed record UnitMapResetUndoPlan(
+    UnitLayoutChange? Change,
+    long IfMatchVersion,
+    IReadOnlyList<int> Restored,
+    IReadOnlyList<int> SkippedDeleted,
+    IReadOnlyList<int> SkippedChanged,
+    bool IsTooLarge,
+    bool LayoutVersionChanged)
+{
+    /// <summary>막대 문구용 — 되살리지 않은 부대 수.</summary>
+    public int SkippedCount => SkippedDeleted.Count + SkippedChanged.Count;
+}
+
 /// <summary>
 /// 공유 배치 동기화의 <b>순수 판정</b> — I/O 없음 · 스레드 무관(NFR-11).
 /// </summary>
@@ -254,6 +306,89 @@ public static class UnitMapLayoutSync
             return new UnitMapUndoCheck.Refused(UnitMapConflictReason.ClearedAll, ChangedUnits(expected, latest, null));
 
         return new UnitMapUndoCheck.Allowed(latest.Version);
+    }
+    #endregion
+
+    #region - 상위 변경 뒤 정리 (FR-08) -
+    /// <summary>
+    /// 상위 바꾸기가 성공한 뒤 — 그 부대의 Δ 를 지울지 정한다(FR-08 · ISSUE-4).
+    /// </summary>
+    /// <param name="mode">지금 배치 상태.</param>
+    /// <param name="latest">상위 변경 <b>뒤에</b> 새로 읽은 문서(공유 모드). 세션 전용이면 무시.</param>
+    /// <param name="session">세션 전용 저장소의 지금 문서(세션 전용일 때만).</param>
+    /// <param name="unitId">상위가 바뀐 부대.</param>
+    /// <remarks>
+    /// <para>옛 버전으로 <c>clear</c> 를 보내지 않는다 — 서버가 S-1 ⑦ 로 같은 트랜잭션에서 행을 지우고 버전을 올렸다면 옛 If-Match 는 412 가 되고,
+    /// FR-52 가 그것을 "다른 운영자가 바꿨습니다" 로 <b>오보</b>한다. 그래서 먼저 읽고: 행이 없으면 무동작(충돌 아님), 있으면 <b>방금 읽은 버전</b>으로 지운다.</para>
+    /// <para>그 <c>clear</c> 가 또 412 면 부르는 쪽이 다시 읽어 이 함수를 한 번 더 부른다(그래도 412 면 멈춘다) — 충돌 막대를 띄우지 않는다.</para>
+    /// </remarks>
+    public static UnitMapReparentCleanup PlanReparentCleanup(UnitMapLayoutState mode, UnitLayoutRead? latest, UnitLayoutSnapshot? session, int unitId)
+    {
+        switch (mode)
+        {
+            case UnitMapLayoutState.SessionOnly:
+                return session?.DeltaOf(unitId) is null
+                    ? new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.NoRow)
+                    : new UnitMapReparentCleanup.ClearInMemory();
+
+            case UnitMapLayoutState.Shared:
+                return latest switch
+                {
+                    UnitLayoutRead.Supported { Snapshot: var now } when now.DeltaOf(unitId) is null
+                        => new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.NoRow),     // 서버가 이미 지웠다 — 충돌 아님
+                    UnitLayoutRead.Supported { Snapshot: var now }
+                        => new UnitMapReparentCleanup.Clear(now.Version),                           // 방금 읽은 버전으로
+                    UnitLayoutRead.Unsupported => new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.Unsupported),
+                    _ => new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.Unreadable),
+                };
+
+            default:
+                return new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.WritesBlocked);
+        }
+    }
+    #endregion
+
+    #region - 배치 초기화 되돌리기 (FR-35 · ISSUE-50) -
+    /// <summary>한 번의 일괄 쓰기 상한(S-1 ③).</summary>
+    public const int MaxBatchItems = 1000;
+
+    /// <summary>
+    /// [배치 초기화] 를 되돌린다 — <b>지금 편제에 있고</b>, 초기화 뒤로 <b>아무도 손대지 않은</b> 부대만 되살린다(결정 D-2026-09-27-215b6d = Q-11 ⓐ).
+    /// </summary>
+    /// <param name="entry">되돌리기 표의 초기화 항목(초기화 전 Δ · 초기화 직후 문서).</param>
+    /// <param name="latest">지금 문서(공유 = 방금 읽은 것, 세션 전용 = 저장소).</param>
+    /// <param name="tree">지금 편제.</param>
+    public static UnitMapResetUndoPlan PlanResetUndo(UnitMapLayoutResetUndo entry, UnitLayoutSnapshot latest, UnitTreeModel tree,
+                                                     int clientLayoutVersion = UnitMapLayout.LayoutVersion)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(latest);
+        ArgumentNullException.ThrowIfNull(tree);
+
+        var none = Array.Empty<int>();
+        if (latest.LayoutVersion != clientLayoutVersion)
+            return new UnitMapResetUndoPlan(null, latest.Version, none, none, none, IsTooLarge: false, LayoutVersionChanged: true);
+        if (entry.Before.Count > MaxBatchItems)
+            return new UnitMapResetUndoPlan(null, latest.Version, none, none, none, IsTooLarge: true, LayoutVersionChanged: false);
+
+        var restored = new List<int>();
+        var deleted = new List<int>();
+        var changed = new List<int>();
+        var set = new Dictionary<int, Vector>();
+        foreach (var (unitId, delta) in entry.Before.OrderBy(kv => kv.Key))
+        {
+            if (tree.Find(unitId) is null) { deleted.Add(unitId); continue; }          // 없는 unit_id 하나면 서버가 422 로 전체를 되돌린다
+
+            // 초기화 직후의 값(공유 = 저장 직후 문서, 세션 전용 = 비었다)과 지금 값이 다르면 그 사이 누가 손댔다 — 덮지 않는다.
+            var afterReset = entry.Saved?.DeltaOf(unitId);
+            if (!SameDelta(afterReset, latest.DeltaOf(unitId))) { changed.Add(unitId); continue; }
+
+            restored.Add(unitId);
+            set[unitId] = delta;
+        }
+
+        var change = set.Count == 0 ? null : new UnitLayoutChange(set, Array.Empty<int>(), ClearAll: false);
+        return new UnitMapResetUndoPlan(change, latest.Version, restored, deleted, changed, IsTooLarge: false, LayoutVersionChanged: false);
     }
     #endregion
 

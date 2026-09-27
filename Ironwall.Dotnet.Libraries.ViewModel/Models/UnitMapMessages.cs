@@ -35,8 +35,11 @@ public sealed record MapLocateRequest(Guid RequestId, IReadOnlyList<int> DeviceI
 
 /// <summary>지도의 회신 — 요청 장비 중 지도에 보인 수와 없는 수.</summary>
 /// <param name="Shown">강조한 장비 수(장비 기준 — 한 장비에 심볼이 둘이어도 1).</param>
-/// <param name="Missing">지도에 심볼이 없는 장비 수.</param>
-public sealed record MapLocateResult(Guid RequestId, int Shown, int Missing);
+/// <param name="Missing">지도에서 보이지 않는 장비 수 — 심볼이 없거나(지도에 없음) 레이어에서 숨김(<paramref name="Hidden"/> 포함).</param>
+/// <param name="Hidden"><paramref name="Missing"/> 중 심볼은 있으나 레이어에서 숨긴 수(문구 "숨김 N" 용, 선택).</param>
+/// <param name="OutsideAnchor"><paramref name="Shown"/> 중 사이트 고정 구역 밖이라 맞춤에서 빠진 수(선택).</param>
+/// <remarks>뒤의 둘은 기본값 0 의 위치 매개변수다 — 세 인자로 만드는 쪽은 그대로 컴파일된다.</remarks>
+public sealed record MapLocateResult(Guid RequestId, int Shown, int Missing, int Hidden = 0, int OutsideAnchor = 0);
 
 /// <summary>지도 심볼 [관계도에서 보기] → 부대 콘솔 런처: 창을 열거나 활성화하고 그 부대를 고른다.</summary>
 /// <param name="OpenMap">관계도 레일로 열지(<c>false</c> 면 트리 레일).</param>
@@ -45,7 +48,19 @@ public sealed record OpenUnitConsoleRequest(int UnitId, bool OpenMap);
 /// <summary>
 /// 공유 배치 문서가 바뀌었다 — 서버 <c>SYNC_UNIT_LAYOUT</c>(S-1 ⑥)을 호스트가 옮긴다. 가진 버전보다 클 때만 다시 읽는다(FR-53).
 /// </summary>
-public sealed record UnitLayoutChangedMessage(long Version);
+public sealed record UnitLayoutChangedMessage(long Version)
+{
+    /// <summary>
+    /// 알림 본문의 버전 — <c>version</c> 을 먼저, 없으면 <c>resource_id</c>(서버 PRD 초안 FR-05 가 버전을 이 키에 싣는다).
+    /// 둘 다 없거나 0 이하면 <c>null</c>(보낼 것이 없다).
+    /// </summary>
+    /// <remarks>분석 ISSUE-2 — 클라 요청서는 <c>{action, version}</c>, 서버 초안은 <c>{action, resource_id:&lt;version&gt;}</c>.
+    /// S-1 에서 키를 합의할 때까지 두 모양을 모두 받는다. 호스트 라우터가 본문 두 값을 읽어 이 함수로 만든다(SIM-N073 · N074).</remarks>
+    public static UnitLayoutChangedMessage? FromBody(long? version, long? resourceId)
+        => version is > 0 ? new UnitLayoutChangedMessage(version.Value)
+         : resourceId is > 0 ? new UnitLayoutChangedMessage(resourceId.Value)
+         : null;
+}
 
 /// <summary>
 /// 이 클라이언트가 장비의 소속 부대를 바꿨다 — <c>DeviceProvider</c> 장비 모델의 <c>UnitId</c> 를 고친다(FR-49).

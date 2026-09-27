@@ -25,6 +25,12 @@ public interface IUnitDirectory
     /// <summary>"이름 · 상위 › 그 상위 › … › 뿌리". 모르는 id · 아직 못 읽음이면 <c>null</c>.</summary>
     string? Describe(int unitId);
 
+    /// <summary>
+    /// 아직 읽지 않았으면 편제를 1회 읽는다(이미 읽었으면 나가지 않는다). 실패해도 던지지 않는다 — <see cref="Describe"/> 가 계속 <c>null</c> 일 뿐이다.
+    /// </summary>
+    /// <remarks>지도 쪽이 "불러오는 중" 을 끝낼 방법이다 — <see cref="Describe"/> 는 네트워크에 나가지 않으므로 누군가 한 번은 불러야 한다.</remarks>
+    Task EnsureLoadedAsync(CancellationToken token = default);
+
     /// <summary>편제를 다시 읽었다(이름 · 경로가 바뀌었을 수 있다).</summary>
     event EventHandler? Changed;
 }

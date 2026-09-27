@@ -206,6 +206,24 @@ public class UnitDirectoryTests
     }
 
     [Fact]
+    public async Task should_reread_only_the_graph_when_a_topology_notice_arrives()
+    {
+        // 분석 ISSUE-28 · SIM-N001 — 편제 알림 뒤 재조회는 /graph 한 번뿐이다(장비 7 카테고리 전량을 다시 읽지 않는다).
+        // 이 사전은 IUnitGraphApi 만 받는다 — 상세 · 쓰기 경로가 불리면 OtherCalls 가 센다.
+        var api = new GraphApi(Org.Graph);
+        var delay = new ManualDelay();
+        var directory = new UnitDirectory(api, delay: delay.Delay, dispatch: a => a());
+        await directory.EnsureLoadedAsync();
+
+        await Handle(directory, "UPDATED", 12);
+        delay.ReleaseAll();
+        await directory.PendingReload;
+
+        Assert.Equal(2, api.Reads);
+        Assert.Equal(0, api.OtherCalls);
+    }
+
+    [Fact]
     public void should_be_an_iunitdirectory_for_the_map_side()
     {
         Assert.IsAssignableFrom<IUnitDirectory>(new UnitDirectory(null));
@@ -255,10 +273,11 @@ public class UnitDirectoryTests
                 : ApiResponse<UnitGraphDto>.CreateSuccess(_graph));
         }
 
-        public Task<ApiResponse<UnitDetailDto>> GetDetailAsync(int unitId, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<ApiResponse<UnitDto>> CreateAsync(UnitCreateDto dto, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<ApiResponse<UnitDto>> PatchAsync(int unitId, UnitUpdateDto dto, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<ApiResponse<UnitDeleteResultDto>> DeleteAsync(int unitId, CancellationToken token = default) => throw new NotSupportedException();
+        public int OtherCalls { get; private set; }
+        public Task<ApiResponse<UnitDetailDto>> GetDetailAsync(int unitId, CancellationToken token = default) { OtherCalls++; throw new NotSupportedException(); }
+        public Task<ApiResponse<UnitDto>> CreateAsync(UnitCreateDto dto, CancellationToken token = default) { OtherCalls++; throw new NotSupportedException(); }
+        public Task<ApiResponse<UnitDto>> PatchAsync(int unitId, UnitUpdateDto dto, CancellationToken token = default) { OtherCalls++; throw new NotSupportedException(); }
+        public Task<ApiResponse<UnitDeleteResultDto>> DeleteAsync(int unitId, CancellationToken token = default) { OtherCalls++; throw new NotSupportedException(); }
     }
     #endregion
 }

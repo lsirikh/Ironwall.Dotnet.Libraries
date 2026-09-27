@@ -20,8 +20,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Services;
 
 /// <summary><see cref="IUnitLayoutApiService"/> 구현.</summary>
 /// <remarks>
-/// <para><b>지원 판정</b>(FR-50) — 200 = 지원 · 404 / 405 / <c>ENDPOINT_REMOVED</c> / <b>422 + <c>path.unit_id</c></b> = 미지원 ·
-/// 그 밖 = 읽기 실패. 422 갈래는 V-06 실측(8.0.3 이 <c>/units/layout</c> 을 <c>/{unit_id}</c> 로 읽는다)에서 왔다.
+/// <para><b>지원 판정</b>(FR-50 v1.2, <b>프로브 GET 한정</b>) — 200 = 지원 · 404 / 405 / 410 / <c>ENDPOINT_REMOVED</c> /
+/// <b>422 + <c>path.unit_id</c></b> = 미지원 · 그 밖 = 읽기 실패. 쓰기의 422 는 언제나 검증 실패(<see cref="UnitLayoutWriteResult.Rejected"/>). 422 갈래는 V-06 실측(8.0.3 이 <c>/units/layout</c> 을 <c>/{unit_id}</c> 로 읽는다)에서 왔다.
 /// 판본 번호를 상수로 비교하지 않는다 — 경로의 실존으로 판정한다(메모리 <c>api_spec_ahead_of_deployment</c>).</para>
 /// <para><b>조건부 쓰기</b> — 모든 PATCH 는 <c>If-Match: "&lt;version&gt;"</c> 를 싣는다. 전송 계층이 요청 헤더를 실을 수 없으면
 /// (<see cref="IApiHeaderRequestService"/> 없음) <b>보내지 않는다</b> — 조건 없는 쓰기는 말없는 덮어쓰기다(NFR-15).</para>
@@ -120,14 +120,17 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
             if (status == 412)
                 return new UnitLayoutWriteResult.Conflict(ReadCurrentVersion(envelope.Error));
 
-            if (IsRouteAbsent(status, envelope.Error))
-                return new UnitLayoutWriteResult.Unsupported(status, "이 서버는 배치 저장을 지원하지 않습니다.");
-
+            // 422 는 먼저 본다 — 쓰기의 422 는 언제나 검증 실패다(FR-50 v1.2: 422 → 미지원 해석은 프로브 GET 한정).
+            //   path.unit_id 를 짚는 422 라도 미지원으로 읽으면 세션 전용으로 조용히 넘어가 서버 거절이 숨는다.
             if (status == 422)
             {
                 _log?.Warning($"[{nameof(UnitLayoutApiService)}] 배치 쓰기 거절(422): {envelope.Error?.Message} {envelope.Error?.Details}");
                 return new UnitLayoutWriteResult.Rejected(envelope.Error?.Message ?? "서버 규칙에 맞지 않아 거절됐습니다.");
             }
+
+            // 지원 중이던 경로가 사라졌다(404 · 405 · 410 · ENDPOINT_REMOVED) → 부르는 쪽이 세션 전용으로 넘긴다(SIM-F059 · 분석 ISSUE-6).
+            if (IsRouteAbsent(status, envelope.Error))
+                return new UnitLayoutWriteResult.Unsupported(status, "이 서버는 배치 저장을 지원하지 않습니다.");
 
             if (status == 428)
             {

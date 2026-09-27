@@ -316,6 +316,166 @@ public class UnitMapLayoutSyncTests
     }
     #endregion
 
+    #region - 상위 변경 뒤 배치 정리 (FR-08 · 분석 ISSUE-4) -
+    [Fact]
+    public void should_do_nothing_and_not_call_it_a_conflict_when_the_server_already_cleared_the_row()
+    {
+        // SIM-Q046 · F100 — 서버가 상위 변경과 같은 트랜잭션에서 행을 지우고 버전을 올렸다(S-1 ⑦). 옛 버전으로 clear 를 보내면 412 → 오보.
+        var afterMove = new UnitLayoutRead.Supported(Snap(15, (Unrelated, 1, 1)));
+
+        var plan = UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.Shared, afterMove, null, X);
+
+        Assert.Equal(UnitMapReparentCleanupReason.NoRow, Assert.IsType<UnitMapReparentCleanup.Skip>(plan).Reason);
+    }
+
+    [Fact]
+    public void should_clear_with_the_freshly_read_version_when_the_row_is_still_there()
+    {
+        // SIM-Q047 — 서버가 S-1 ⑦ 를 아직 안 한다: 방금 읽은 버전(옛 버전이 아니라)으로 clear 1회.
+        var afterMove = new UnitLayoutRead.Supported(Snap(16, (X, 5, 5)));
+
+        var plan = UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.Shared, afterMove, null, X);
+
+        Assert.Equal(16, Assert.IsType<UnitMapReparentCleanup.Clear>(plan).IfMatchVersion);
+    }
+
+    [Fact]
+    public void should_clear_in_memory_only_when_session_only_and_the_unit_was_moved()
+    {
+        // SIM-Q048 — 세션 전용이면 서버 0 · 메모리에서만.
+        var session = Snap(0, (X, 5, 5));
+
+        Assert.IsType<UnitMapReparentCleanup.ClearInMemory>(UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.SessionOnly, null, session, X));
+        Assert.Equal(UnitMapReparentCleanupReason.NoRow,
+            Assert.IsType<UnitMapReparentCleanup.Skip>(UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.SessionOnly, null, Snap(0), X)).Reason);
+    }
+
+    [Theory]
+    [InlineData(UnitMapLayoutState.Loading)]
+    [InlineData(UnitMapLayoutState.ReadFailed)]
+    [InlineData(UnitMapLayoutState.VersionMismatch)]
+    public void should_not_write_blind_when_layout_writes_are_blocked(UnitMapLayoutState mode)
+    {
+        var plan = UnitMapLayoutSync.PlanReparentCleanup(mode, new UnitLayoutRead.Supported(Snap(3, (X, 1, 1))), null, X);
+
+        Assert.Equal(UnitMapReparentCleanupReason.WritesBlocked, Assert.IsType<UnitMapReparentCleanup.Skip>(plan).Reason);
+    }
+
+    [Fact]
+    public void should_skip_when_the_fresh_read_failed_or_the_route_vanished()
+    {
+        var failed = UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.Shared, new UnitLayoutRead.Failed(UnitLayoutFailureKind.Timeout, "t"), null, X);
+        var gone = UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.Shared, new UnitLayoutRead.Unsupported("x"), null, X);
+
+        Assert.Equal(UnitMapReparentCleanupReason.Unreadable, Assert.IsType<UnitMapReparentCleanup.Skip>(failed).Reason);
+        Assert.Equal(UnitMapReparentCleanupReason.Unsupported, Assert.IsType<UnitMapReparentCleanup.Skip>(gone).Reason);
+    }
+
+    [Fact]
+    public async Task should_never_send_a_stale_if_match_after_the_server_bumped_the_version_itself()
+    {
+        // 끝까지: 가짜 서버가 상위 변경 트랜잭션에서 X 의 행을 지우고 버전을 올린다 → 정리는 쓰기 0 · 충돌 0.
+        var server = new FakeUnitLayoutApi(version: 10);
+        server.SimulateOtherWrite(X, 5, 5, "시드");                          // v11 — X 는 옮겨져 있었다
+        server.SimulateOther(UnitLayoutChange.ClearOne(X), "서버(S-1 ⑦)");    // v12 — 상위 변경과 같은 트랜잭션
+
+        var plan = UnitMapLayoutSync.PlanReparentCleanup(UnitMapLayoutState.Shared, await server.ReadAsync(), null, X);
+
+        Assert.IsType<UnitMapReparentCleanup.Skip>(plan);
+        Assert.Empty(server.Writes);
+    }
+    #endregion
+
+    #region - [배치 초기화] 되돌리기 (FR-35 · 분석 ISSUE-50) -
+    private static UnitMapLayoutResetUndo ResetOf(UnitLayoutSnapshot saved, params (int Id, double Dx, double Dy)[] before)
+        => new(before.ToDictionary(b => b.Id, b => new Vector(b.Dx, b.Dy)), All: true, saved, SessionOnly: false);
+
+    [Fact]
+    public void should_restore_every_unit_when_nothing_changed_since_the_reset()
+    {
+        var entry = ResetOf(Snap(21), (X, 5, 5), (Unrelated, 1, 1));
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, Snap(21), Org.Tree);
+
+        Assert.Equal(new[] { X, Unrelated }.OrderBy(i => i), plan.Restored);
+        Assert.Equal(21, plan.IfMatchVersion);
+        Assert.Equal(new Vector(5, 5), plan.Change!.Set[X]);
+        Assert.Empty(plan.Change.Clear);
+        Assert.False(plan.Change.ClearAll);
+    }
+
+    [Fact]
+    public void should_leave_out_units_deleted_since_the_reset_so_the_batch_is_not_rolled_back()
+    {
+        // 없는 unit_id 하나면 서버가 422 로 전체를 되돌린다(S-1 ⑤) — 보내기 전에 뺀다.
+        var entry = ResetOf(Snap(21), (X, 5, 5), (999_999, 2, 2));
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, Snap(21), Org.Tree);
+
+        Assert.Equal(new[] { 999_999 }, plan.SkippedDeleted);
+        Assert.Equal(new[] { X }, plan.Change!.Set.Keys);
+        Assert.Equal(1, plan.SkippedCount);
+    }
+
+    [Fact]
+    public void should_leave_out_units_another_operator_moved_since_the_reset()
+    {
+        // Q-11 ⓐ — 바뀐 부대만 빼고 나머지 적용 + 막대에 뺀 수.
+        var entry = ResetOf(Snap(21), (X, 5, 5), (Unrelated, 1, 1));
+        var latest = Snap(22, (Unrelated, 9, 9));
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, latest, Org.Tree);
+
+        Assert.Equal(new[] { Unrelated }, plan.SkippedChanged);
+        Assert.Equal(new[] { X }, plan.Restored);
+        Assert.Equal(22, plan.IfMatchVersion);
+    }
+
+    [Fact]
+    public void should_send_nothing_when_every_unit_was_deleted_or_changed()
+    {
+        var entry = ResetOf(Snap(21), (999_999, 2, 2), (Unrelated, 1, 1));
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, Snap(22, (Unrelated, 3, 3)), Org.Tree);
+
+        Assert.Null(plan.Change);
+        Assert.Empty(plan.Restored);
+    }
+
+    [Fact]
+    public void should_refuse_instead_of_splitting_when_the_reset_touched_more_than_the_batch_limit()
+    {
+        var before = Enumerable.Range(1, UnitMapLayoutSync.MaxBatchItems + 1).Select(i => (i, 1.0, 1.0)).ToArray();
+        var entry = ResetOf(Snap(21), before);
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, Snap(21), Org.Tree);
+
+        Assert.True(plan.IsTooLarge);
+        Assert.Null(plan.Change);
+    }
+
+    [Fact]
+    public void should_refuse_when_the_layout_version_changed()
+    {
+        var plan = UnitMapLayoutSync.PlanResetUndo(ResetOf(Snap(21), (X, 5, 5)), Snap(22, layoutVersion: 2), Org.Tree);
+
+        Assert.True(plan.LayoutVersionChanged);
+        Assert.Null(plan.Change);
+    }
+
+    [Fact]
+    public void should_compare_against_an_empty_document_when_the_reset_was_session_only()
+    {
+        // 세션 전용 초기화에는 서버 문서가 없다(Saved = null) — 초기화 뒤 Δ 가 없는 부대가 "안 바뀐" 부대다.
+        var entry = new UnitMapLayoutResetUndo(new Dictionary<int, Vector> { [X] = new(5, 5), [Unrelated] = new(1, 1) }, All: true, Saved: null, SessionOnly: true);
+
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, Snap(0, (Unrelated, 4, 4)), Org.Tree);
+
+        Assert.Equal(new[] { X }, plan.Restored);
+        Assert.Equal(new[] { Unrelated }, plan.SkippedChanged);
+    }
+    #endregion
+
     #region - NFR-15: 2클라이언트 엇갈림 전수 -
     public static IEnumerable<object[]> TwoClientCases()
     {
