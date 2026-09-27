@@ -232,7 +232,8 @@ public class DevicePropertyFormTests : IDisposable
     [Fact]
     public void should_allow_commit_without_touched_fields_when_creating_with_valid_defaults()
     {
-        var draft = new LampDeviceViewModel(new LampDeviceModel { DeviceNumber = 3, DeviceName = "새 경고등 3" });
+        // 경광등은 포트가 등록 필수다(WP-2 SC-DEV-014) — 포트까지 채운 초안이면 손대지 않아도 기본값만으로 등록된다.
+        var draft = new LampDeviceViewModel(new LampDeviceModel { DeviceNumber = 3, DeviceName = "새 경고등 3", IpPort = 8080 });
         var form = NewForm(out _);
         form.Load(new object[] { draft }, EnumDeviceCategory.Lamp, true, isCreating: true, false);
 

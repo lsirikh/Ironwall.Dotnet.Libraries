@@ -394,6 +394,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             CategoryId = dto.CategoryId,
+            CategoryServer = dto.CategoryServer,
             Name = dto.Name,
             Status = dto.Status,
             IpAddress = dto.IpAddress,

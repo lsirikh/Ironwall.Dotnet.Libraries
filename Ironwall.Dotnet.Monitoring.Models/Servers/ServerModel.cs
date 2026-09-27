@@ -10,6 +10,7 @@ public class ServerModel : BaseModel, IServerModel
     public ServerModel(IServerModel model) : base(model)
     {
         CategoryId = model.CategoryId;
+        if (model is ServerModel server) CategoryServer = server.CategoryServer;
         Name = model.Name;
         Status = model.Status;
         IpAddress = model.IpAddress;
@@ -22,6 +23,13 @@ public class ServerModel : BaseModel, IServerModel
 
     [JsonProperty("category_id", Order = 2)]
     public int CategoryId { get; set; }
+
+    /// <summary>
+    /// 7.0+ 서버 유형 판별자(<c>category_server</c> — 예: <c>SPEAKER_API</c> · <c>VMS</c>). 표시 · 판정용이라 직렬화하지 않는다.
+    /// 6.3 응답에는 없어 <c>null</c> 이다 — 그때는 유형으로 거르지 못한다(장비 콘솔의 관리 서버 선택지 · 기본값 판정).
+    /// </summary>
+    [JsonIgnore]
+    public string? CategoryServer { get; set; }
 
     [JsonProperty("name", Order = 3)]
     public string Name { get; set; } = string.Empty;

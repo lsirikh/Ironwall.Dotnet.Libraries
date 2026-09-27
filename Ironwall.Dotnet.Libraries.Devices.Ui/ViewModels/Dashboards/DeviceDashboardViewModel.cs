@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Groups;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Lists;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
@@ -376,7 +377,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var rows = selected?.Cast<object>().ToList() ?? new List<object>();
         if (SameRows(rows, Form.Rows) && !Detail.IsCreating) return true;
 
-        if (IsOperationRunning) return false;   // 저장이 행을 돌고 있다 — 패널의 선택을 바꾸면 안 된다
+        if (IsOperationRunning)
+        {
+            // 저장 · 재조회가 도는 중 — 패널의 선택을 바꾸면 안 된다. 거절은 말없이 하지 않는다: 예전에는 [갱신] 뒤 2초 동안 고른 행이
+            // 조용히 원래 선택으로 튕겨 돌아가, 운영자가 고른 줄 안 장비와 상세 칸의 장비가 달랐다(GIS 실창 WP-2 SC-DEV-033).
+            // 목록이 다시 만들어질 때 선택이 풀리는 것(빈 선택)은 운영자의 조작이 아니다 — 그때는 알리지 않는다.
+            if (rows.Count > 0) StatusText = SelectionRefusedWhileBusyText;
+            return false;
+        }
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return false;
 
         _draft = null;
@@ -896,9 +904,17 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                     .ToList();
 
             case DevicePropertyOptionSource.Servers:
-                return _serverProvider.CollectionEntity
-                    .Select(s => new PropertyOption(s.Name ?? $"서버 {s.Id}", null, s))
-                    .ToList();
+            {
+                // 이 카테고리를 받는 유형의 서버만 낸다(스피커 → SPEAKER_API) — 예전에는 전부 늘어놓아 VMS 를 고르면 서버가 422 로 거절했다
+                // (GIS 실창 WP-2 SC-DEV-015). 고른 장비가 이미 쥔 서버는 유형이 어긋나도 싣는다 — 빠지면 칸이 비어 보인다(감추지 않는다).
+                var allowed = DeviceServerChoice.Allowed(_serverProvider.CollectionEntity, category).ToList();
+                foreach (var current in DeviceGroupDropHandler.ModelsOf(Form.Rows).OfType<ISpeakerDeviceModel>().Select(m => m.Server).OfType<Ironwall.Dotnet.Monitoring.Models.Servers.IServerModel>())
+                {
+                    if (allowed.Any(s => s.Id == current.Id)) continue;
+                    allowed.Add(_serverProvider.CollectionEntity.FirstOrDefault(s => s.Id == current.Id) ?? current);
+                }
+                return allowed.Select(s => new PropertyOption(s.Name ?? $"서버 {s.Id}", null, s)).ToList();
+            }
 
             default:
                 return Array.Empty<PropertyOption>();
@@ -1321,6 +1337,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         get => _listStatusText;
         private set { _listStatusText = value; NotifyOfPropertyChange(); }
     }
+
+    /// <summary>저장 · 재조회 중에 행을 골랐다 — 받지 않은 까닭(상태 띠).</summary>
+    public const string SelectionRefusedWhileBusyText = "목록을 불러오거나 저장하는 중이라 고른 행을 받지 않았습니다 — 끝난 뒤 다시 고르세요.";
 
     /// <summary>상태 띠의 한 줄 소식(그룹 넣기 결과 등).</summary>
     public string StatusText

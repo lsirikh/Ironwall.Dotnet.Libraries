@@ -242,6 +242,9 @@ public static class DevicePropertyCatalog
                 Key = "connection.ip_port", Label = "포트", ApiPath = "connection.ip_port",
                 Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Integer,
                 Categories = Cat(EnumDeviceCategory.Controller), ViewModelPath = "Port", Min = 1, Max = 65535,
+                // 패널의 등록은 포트가 1 이상이어야 보낸다(ControllerDevicePanelViewModel 등록 조건) — 폼이 필수로 말하지 않으면
+                // [등록] 뒤 "1건은 필수값(제어기/IP 등) 미충족으로 보류했습니다" 한 줄만 뜨고 어느 칸인지 모른다(GIS 실창 WP-2 SC-DEV-012).
+                IsRequiredOnCreate = true,
             },
             new()
             {
@@ -249,6 +252,7 @@ public static class DevicePropertyCatalog
                 Section = DevicePropertySection.Connection, Editor = DevicePropertyEditor.Integer,
                 Categories = Cat(EnumDeviceCategory.Camera, EnumDeviceCategory.Lamp), ViewModelPath = "IpPort",
                 Min = 1, Max = 65535,
+                IsRequiredOnCreate = true,   // 카메라 · 경광등 패널도 포트 1 이상일 때만 등록한다(위 제어기와 같은 까닭 — SC-DEV-014)
             },
             new()
             {

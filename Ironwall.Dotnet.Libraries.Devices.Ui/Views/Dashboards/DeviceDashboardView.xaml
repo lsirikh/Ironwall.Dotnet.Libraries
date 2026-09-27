@@ -212,11 +212,17 @@
 						Grid.Row="1"
 						AutomationProperties.AutomationId="Console.Devices.Grid"
 						IsReadOnly="True"
+						IsSynchronizedWithCurrentItem="False"
 						ItemsSource="{Binding Rows}"
 						Loaded="OnGridLoaded"
 						SelectionChanged="OnGridSelectionChanged"
 						Style="{StaticResource Console.DataGrid}"
 						Visibility="{Binding IsListVisible, Converter={StaticResource BoolToVisibility}}">
+						<!--
+							IsSynchronizedWithCurrentItem=False — 목록은 ListCollectionView(검색 필터)라, 기본값(null)이면 DataGrid 가 현재 항목(첫 행)을
+							선택으로 따라가 레일을 열거나 [갱신]할 때마다 아무도 고르지 않은 첫 장비가 상세 칸에 올라왔다(GIS 실창 WP-2 SC-DEV-033:
+							운영자가 고른 줄 안 행 대신 첫 장비가 편집 대상이 됐다). 선택은 운영자만 한다 — 설계의 "선택 대기" 상태가 기본이다.
+						-->
 						<!--  행마다 Id — 자동화가 "방금 만든 행"을 짚을 수 있어야 삭제 안전 계약(자기가 만든 행만)을 지킬 수 있다  -->
 						<DataGrid.RowStyle>
 							<Style BasedOn="{StaticResource Console.DataGrid.Row}" TargetType="DataGridRow">

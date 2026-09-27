@@ -398,6 +398,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         await console.SelectRailAsync(LampRail);
         console.Add();
         console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Form.Fields.Single(f => f.Key == "connection.ip_port").Text = "8080";   // 경광등은 포트가 있어야 등록된다(등록 필수 — WP-2 SC-DEV-014)
 
         console.Apply();
         Assert.Equal(2, source.Items.Count);                  // [등록] 때 비로소 목록에 들어간다
@@ -415,6 +416,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         await console.SelectRailAsync(LampRail);
         console.Add();
         console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Form.Fields.Single(f => f.Key == "connection.ip_port").Text = "8080";   // 경광등은 포트가 있어야 등록된다(등록 필수 — WP-2 SC-DEV-014)
         console.Apply();
 
         var created = Lamp(42, "새로 단 경광등");
@@ -436,6 +438,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         await console.SelectRailAsync(LampRail);
         console.Add();
         console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Form.Fields.Single(f => f.Key == "connection.ip_port").Text = "8080";   // 경광등은 포트가 있어야 등록된다(등록 필수 — WP-2 SC-DEV-014)
         console.Apply();
         var created = Lamp(42, "새로 단 경광등");
 
@@ -461,6 +464,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         await console.SelectRailAsync(LampRail);
         console.Add();
         console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Form.Fields.Single(f => f.Key == "connection.ip_port").Text = "8080";   // 경광등은 포트가 있어야 등록된다(등록 필수 — WP-2 SC-DEV-014)
         console.Apply();
 
         // Act — 다른 곳에서 동시에 만든 행이 먼저 들어왔다(번호도 이름도 다르다)
@@ -533,6 +537,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         await console.SelectRailAsync(LampRail);
         console.Add();
         console.Form.Fields.Single(f => f.Key == "name_device").Text = "새로 단 경광등";
+        console.Form.Fields.Single(f => f.Key == "connection.ip_port").Text = "8080";   // 경광등은 포트가 있어야 등록된다(등록 필수 — WP-2 SC-DEV-014)
 
         console.Apply();
 

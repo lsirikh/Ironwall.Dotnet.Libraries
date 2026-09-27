@@ -4,7 +4,9 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -94,15 +96,18 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             int number = 1; while (existing.Contains(number)) number++;
             var model = new SpeakerDeviceModel { DeviceNumber = number, DeviceName = $"새 스피커 {number}" };
 
-            // (D3) 기본 방송서버 자동배정 — 첫 서버(최소 Id). 서버 0개면 Inform 안내(serverless 등록은 API상 허용).
-            var servers = IoC.Get<ServerProvider>().OfType<IServerModel>().OrderBy(s => s.Id).ToList();
-            if (servers.Count > 0)
-                model.Server = servers[0];
-            else
+            // (D3) 기본 방송서버 자동배정 — 스피커를 받는 서버(SPEAKER_API)가 꼭 하나일 때만 그것을 고른다.
+            //   예전에는 유형을 보지 않고 첫 서버(최소 Id)를 골라 VMS 서버가 들어가 서버가 422 로 거절했다(GIS 실창 WP-2 SC-DEV-015).
+            //   여럿이면 비워 두고 운영자가 고른다(serverless 등록은 API상 허용). 유형을 모르는 6.3 은 예전대로 첫 서버.
+            var servers = IoC.Get<ServerProvider>()?.OfType<IServerModel>().ToList() ?? new List<IServerModel>();
+            var chosen = DeviceServerChoice.DefaultFor(servers, EnumDeviceCategory.Speaker);
+            if (chosen is not null)
+                model.Server = chosen;
+            else if (DeviceServerChoice.Allowed(servers, EnumDeviceCategory.Speaker).Count == 0)
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "방송서버 없음",
-                    Explain = "등록된 방송서버가 없습니다. 서버를 먼저 등록한 뒤 스피커에 배정하세요."
+                    Explain = "스피커를 맡을 방송서버가 없습니다. 방송서버를 먼저 등록한 뒤 스피커에 배정하세요."
                 });
 
             ViewModelProvider.Add(new SpeakerDeviceViewModel(model));
