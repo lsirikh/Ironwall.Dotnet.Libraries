@@ -114,7 +114,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 var assignedIds = AssignedDevices.Select(d => d.Id);
 
                 var dialog = new DeviceAssignDialogViewModel(_apiService, () => _deviceProvider.OfType<IBaseDeviceModel>(),
-                    new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.DeviceGroupMembershipProbe(_apiService, _log), _log);
+                    new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs.DeviceGroupMembershipProbe(_apiService, _log), _log, _eventAggregator);
                 dialog.Initialize(groupId, _selection[0].Name, assignedIds);
 
                 await _eventAggregator.PublishOnUIThreadAsync(
@@ -186,6 +186,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 // v4.3 벌크 해제: body-DELETE — 서버가 한 번에 100대까지만 받는다(device_ids max_length=100).
                 //   넘겨 보내면 422 로 한 대도 빠지지 않으므로 배정 창과 같은 크기로 나눠 보낸다(AssignDelta.ChunkRemovals).
                 var ids = targets.Select(d => d.Id).ToList();
+                var anyRemoved = false;
                 _log?.Info($"[DeviceGroupSelectionVM] Bulk removing {ids.Count} devices from group {groupId} ({AssignDelta.RemoveCallCount(ids.Count)}-call)");
                 foreach (var chunk in AssignDelta.ChunkRemovals(ids))
                 {
@@ -194,6 +195,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                     if (resp.Success && resp.Data != null)
                     {
                         var removed = resp.Data.RemovedDeviceIds ?? new List<int>();
+                        anyRemoved |= removed.Count > 0;
                         foreach (var id in removed)
                         {
                             var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == id);
@@ -206,6 +208,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                         _log?.Warning($"[DeviceGroupSelectionVM] Bulk remove failed: {resp.Error?.Code} - {resp.Message}");
                     }
                 }
+                // 소속이 바뀌었다고 알린다 — 지도의 구역선 조회표가 이 그룹을 다시 맞춘다(비면 해제).
+                if (anyRemoved && DeviceGroupMembershipChangedMessage.For(new[] { groupId }) is { } membership)
+                    await _eventAggregator.PublishOnCurrentThreadAsync(membership, cancellationToken);
                 SelectedAssignedDevices.Clear();
                 await LoadAssignedDevicesAsync();
                 _log?.Info($"[DeviceGroupSelectionVM] Remove completed, AssignedDevices.Count={AssignedDevices.Count}");

@@ -146,6 +146,42 @@ public record DeviceFetchProgressMessage(string Step, int StepIndex, int TotalSt
 /// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
 public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
 
+/// <summary>
+/// 장비 그룹 소속이 바뀌었다 — <see cref="GroupIds"/> 는 소속이 달라진 그룹들(넣은 그룹 · 뺀 그룹 모두).
+/// </summary>
+/// <remarks>
+/// <para>소속은 공용 <c>DeviceProvider</c> 장비 모델의 <c>DeviceGroups</c> 를 제자리에서 고치는 평범한 목록이라
+/// 바뀌어도 아무도 모른다. 지도의 구역선(PidsGroup) 이벤트 조회표는 부팅 · 전량 재조회 때만 만들어져,
+/// 부팅 때 비어 있던 그룹에 콘솔로 장비를 넣어도 그 구역선은 탐지 · 장애 · 제어기 무통신 색을 끝내 받지 못했다.
+/// 이 알림을 받은 지도는 <b>그 그룹들의 구역선만</b> 다시 등록(소속이 비면 해제)한다.</para>
+/// <para>발행: 장비 콘솔 그룹 넣기 · 되돌리기, 장비 배정 창 저장, 옛 그룹 패널의 빼기, 호스트의 NATS
+/// <c>SYNC_DEVICE</c>(소속이 달라졌을 때) · <c>SYNC_DEVICE_GROUP</c>. 수신 스레드는 정하지 않는다 — 받는 쪽이 마샬링한다.</para>
+/// </remarks>
+public sealed record DeviceGroupMembershipChangedMessage(System.Collections.Generic.IReadOnlyList<int> GroupIds)
+{
+    /// <summary>유효한(양수) 그룹만 겹침 없이 담는다. 남는 것이 없으면 null — 보낼 것이 없다.</summary>
+    public static DeviceGroupMembershipChangedMessage? For(System.Collections.Generic.IEnumerable<int>? groupIds)
+    {
+        if (groupIds is null) return null;
+        var ids = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Distinct(System.Linq.Enumerable.Where(groupIds, id => id > 0)));
+        return ids.Count == 0 ? null : new DeviceGroupMembershipChangedMessage(ids);
+    }
+
+    /// <summary>
+    /// 한 장비의 소속 전후를 견줘 달라진 그룹(대칭차)을 담는다. 같으면 null.
+    /// </summary>
+    /// <remarks><paramref name="after"/> 가 null 이면 "소속 없음"이 아니라 "소속을 받지 못함"이다 — 캐시도 그 목록을
+    /// 비우지 않으므로(<c>DeviceProviderService.UpdateDeviceProperties</c>) 바뀐 것이 없다고 본다.</remarks>
+    public static DeviceGroupMembershipChangedMessage? FromDiff(System.Collections.Generic.IEnumerable<int>? before, System.Collections.Generic.IEnumerable<int>? after)
+    {
+        if (after is null) return null;
+        var was = new System.Collections.Generic.HashSet<int>(before ?? System.Array.Empty<int>());
+        var now = new System.Collections.Generic.HashSet<int>(after);
+        was.SymmetricExceptWith(now);
+        return For(was);
+    }
+}
+
 /// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
 public record WebServerEnabledChangedMessage(bool IsEnabled);
 

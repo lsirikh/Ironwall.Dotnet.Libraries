@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
@@ -6,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -86,12 +88,16 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
     private readonly IDeviceApiService _api;
     private readonly Func<IEnumerable<IBaseDeviceModel>> _allDevices;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _eventAggregator;
 
-    public DeviceGroupDropHandler(IDeviceApiService api, Func<IEnumerable<IBaseDeviceModel>> allDevices, ILogService? log = null)
+    /// <param name="eventAggregator">소속이 실제로 바뀌면 <see cref="DeviceGroupMembershipChangedMessage"/> 를 알릴 곳.
+    /// 없으면(단위 테스트 · 라이브 하네스) 알리지 않는다 — 지도의 구역선 조회표는 이 알림으로만 새 소속을 안다.</param>
+    public DeviceGroupDropHandler(IDeviceApiService api, Func<IEnumerable<IBaseDeviceModel>> allDevices, ILogService? log = null, IEventAggregator? eventAggregator = null)
     {
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _allDevices = allDevices ?? throw new ArgumentNullException(nameof(allDevices));
         _log = log;
+        _eventAggregator = eventAggregator;
     }
 
     /// <summary>끝났다(성공이든 아니든) — 무엇이 바뀌었는지 담아 알린다.</summary>
@@ -131,6 +137,7 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
             var assigned = response.Data?.AssignedDeviceIds ?? plan.DeviceIds.ToList();
             var skipped = response.Data?.SkippedDeviceIds ?? new List<int>();
             Reflect(groupId, assigned, add: true);
+            if (assigned.Count > 0) await AnnounceAsync(groupId).ConfigureAwait(true);
 
             var undo = assigned.Count > 0 ? new GroupDropUndo(groupId, groupName, assigned.ToList()) : null;
             return Finish(DeviceGroupDrop.ResultLine(groupName, plan, assigned, skipped), undo, groupId, assigned.ToList(), assigned.Count);
@@ -177,7 +184,11 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         }
         finally { IsBusy = false; }
 
-        if (done.Count > 0) Reflect(undo.GroupId, done, add: false);
+        if (done.Count > 0)
+        {
+            Reflect(undo.GroupId, done, add: false);
+            await AnnounceAsync(undo.GroupId).ConfigureAwait(true);
+        }
         if (failure is null)
             return Finish($"'{undo.GroupName}'에 넣은 {undo.DeviceIds.Count}대를 되돌렸습니다.", null, undo.GroupId, undo.DeviceIds, -undo.DeviceIds.Count);
 
@@ -201,6 +212,17 @@ public sealed class DeviceGroupDropHandler : IDragDropHandler
         // 서버가 해 준 변화다 — 모델과 소속 기준선을 함께 옮겨, 다음 상세 저장이 이것을 되보내지(덮어쓰지) 않게 한다.
         foreach (var model in _allDevices().Where(m => ids.Contains(m.Id)))
             GroupMembershipBaseline.ApplyConfirmed(model, groupId, add);
+    }
+
+    /// <summary>
+    /// 소속이 바뀌었다고 알린다 — 지도가 그 그룹의 구역선만 다시 등록(비면 해제)한다.
+    /// 알림 실패는 넣기 · 되돌리기의 결과를 바꾸지 않는다(서버와 로컬 모델은 이미 맞다).
+    /// </summary>
+    private async Task AnnounceAsync(int groupId)
+    {
+        if (_eventAggregator is null || DeviceGroupMembershipChangedMessage.For(new[] { groupId }) is not { } message) return;
+        try { await _eventAggregator.PublishOnCurrentThreadAsync(message).ConfigureAwait(true); }
+        catch (Exception ex) { _log?.Error($"[GroupDrop] 소속 변경 알림 실패 group={groupId}: {ex.Message}"); }
     }
 
     private string Finish(string line, GroupDropUndo? undo, int groupId = 0, IReadOnlyList<int>? deviceIds = null, int delta = 0)

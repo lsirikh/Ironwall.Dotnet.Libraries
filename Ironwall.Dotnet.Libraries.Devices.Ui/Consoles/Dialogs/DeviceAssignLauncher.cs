@@ -40,21 +40,23 @@ public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
     private readonly IDeviceProviderService _providerService;
     private readonly DeviceProvider _devices;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _eventAggregator;
 
     public DeviceAssignLauncher(IWindowManager windows, IDeviceApiService api, IDeviceProviderService providerService,
-        DeviceProvider devices, ILogService? log = null)
+        DeviceProvider devices, ILogService? log = null, IEventAggregator? eventAggregator = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _providerService = providerService ?? throw new ArgumentNullException(nameof(providerService));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         _log = log;
+        _eventAggregator = eventAggregator;
     }
 
     public async Task<bool> OpenAsync(int groupId, string? groupName, CancellationToken token = default)
     {
         var vm = new DeviceAssignDialogViewModel(_api, () => _devices.OfType<IBaseDeviceModel>(),
-            new DeviceGroupMembershipProbe(_api, _log), _log)
+            new DeviceGroupMembershipProbe(_api, _log), _log, _eventAggregator)
         {
             // 저장하지 않은 배정을 두고 닫으면 묻는 창 — 조립기 · 부대 창과 같은 확인 창(작은 모달, 이 창을 소유자로).
             Confirm = ConfirmAsync,

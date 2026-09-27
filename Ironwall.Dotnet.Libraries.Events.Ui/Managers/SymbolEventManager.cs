@@ -114,6 +114,27 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         //_log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
     }
 
+    /// <summary>
+    /// 그룹 심볼(구역선) 등록 해제 — 그룹의 마지막 장비가 빠졌거나 그 그룹을 가리키는 구역선이 없어졌을 때.
+    /// </summary>
+    /// <remarks>
+    /// <para>해제한 뒤에는 누구도 이 선을 복원하지 않으므로(큐의 복원 신호는 미등록 no-op) 색을 <b>Normal 로 되돌린다</b>.
+    /// 단 같은 선이 다른 그룹으로 아직 등록돼 있으면(속성창에서 연결 그룹을 바꾼 직후) 그 그룹의 색이므로 건드리지 않는다.</para>
+    /// <para>인터페이스(<see cref="ISymbolEventManager"/>)에는 넣지 않는다 — 멤버를 늘리면 목 · 페이크가 전부 깨진다.</para>
+    /// </remarks>
+    /// <returns>등록돼 있어 내렸으면 true.</returns>
+    public bool UnregisterGroupSymbol(int deviceGroup)
+    {
+        if (!_groupSymbolLookup.TryRemove(deviceGroup, out var removed)) return false;
+
+        var stillLinked = removed.SymbolModel is not null
+            && _groupSymbolLookup.Values.Any(l => ReferenceEquals(l.SymbolModel, removed.SymbolModel));
+        if (!stillLinked) removed.ApplyCompositeStatus(EnumCompositeEventStatus.Normal);
+
+        _log?.Info($"그룹 심볼 해제: DeviceGroup({deviceGroup}) (선 색 {(stillLinked ? "유지 — 다른 그룹으로 등록됨" : "Normal 복원")})");
+        return true;
+    }
+
     // 센서 이벤트 처리 (deviceId + deviceType: 개별 마커, deviceGroups: 그룹 마커)
     public void ProcessDeviceEvent(int deviceId, EnumDeviceType deviceType, List<int>? deviceGroups, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
     {

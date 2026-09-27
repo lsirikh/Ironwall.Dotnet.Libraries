@@ -72,6 +72,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 ****************************************************************************/
 public partial class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
+                            IHandle<DeviceGroupMembershipChangedMessage>,
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
                             IHandle<CallDeleteGroupSymbolsProcessMessageModel>,
@@ -454,6 +455,37 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         await InitializeDeviceSymbolIntegration();
         EnsureUniqueZOrder();
+    }
+
+    /// <summary>
+    /// 장비 그룹 소속이 바뀌었다(콘솔 그룹 넣기 · 배정 창 · 다른 클라의 SYNC_DEVICE 등) — 그 그룹들의 구역선만
+    /// 이벤트 조회표에 다시 등록하고, 소속이 비었으면 내린다.
+    /// </summary>
+    /// <remarks>
+    /// 종전엔 조회표가 부팅 · 전량 재조회 · 편집 모드 해제 때만 만들어져, 부팅 때 비어 있던 그룹에 콘솔로 장비를 넣어도
+    /// 그 구역선은 탐지 · 장애 · 제어기 무통신 색을 끝내 받지 못했다("그룹 심볼 미등록 … no-op").
+    /// 구독은 발행 스레드(<c>SubscribeOnPublishedThread</c>)라 NATS 스레드에서도 올 수 있다 — 지도 마커 목록을 읽으므로
+    /// UI 스레드로 넘긴다(전량 재구성 <see cref="InitializeDeviceSymbolIntegration"/> 도 UI 에서 돌아 서로 겹치지 않는다).
+    /// </remarks>
+    public Task HandleAsync(DeviceGroupMembershipChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (message?.GroupIds is not { Count: > 0 } groupIds) return Task.CompletedTask;
+        return OnUiAsync(() => SyncZoneLineRegistration(groupIds));
+    }
+
+    /// <summary>주어진 그룹들의 구역선 등록을 현재 소속에 맞춘다. 호출 스레드: UI.</summary>
+    private void SyncZoneLineRegistration(IEnumerable<int> groupIds)
+    {
+        try
+        {
+            var zoneLines = MainMap?.Markers.OfType<GMapPidsGroupMarker>().Select(m => m.Model).ToList()
+                            ?? new List<IPidsGroupSymbolModel>();
+            ZoneLineRegistration.Sync(_symbolEventManager, DeviceProvider.OfType<IBaseDeviceModel>().ToList(), zoneLines, groupIds, _log);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[구역 소속 동기] 실패 (groups={string.Join(",", groupIds)}): {ex.Message}");
+        }
     }
 
     private void InitializeLineDrawingService()
@@ -8739,17 +8771,15 @@ public partial class MapViewModel : BasePanelViewModel,
 
             // LinkedDeviceGroup 변경 → _groupSymbolLookup 즉시 재등록 (FR-01, 근본원인 A)
             // 신규/재지정 구역이 제어기 고장 Blackout·그룹 이벤트 대상에 즉시 포함되도록 — 맵 리로드/AllDevicesLoadedMessage 대기 불필요.
-            // (그룹 상태는 SymbolModel만 사용하므로 device 인자는 non-null 만족용 대표 장비. 소속 장비 없으면 블랙아웃 대상도 없어 스킵 안전.)
-            if (e.PropertyName == "LinkedDeviceGroup"
-                && e.Marker is GMapPidsGroupMarker groupMarker
-                && groupMarker.LinkedDeviceGroup > 0)
+            // (그룹 상태는 SymbolModel만 사용하므로 device 인자는 non-null 만족용 대표 장비.)
+            // 소속 장비가 아직 없으면 지금은 등록하지 않는다 — 나중에 콘솔이 첫 장비를 넣으면
+            // DeviceGroupMembershipChangedMessage 가 같은 경로(ZoneLineRegistration)로 등록한다.
+            // 옛 연결 그룹도 함께 맞춘다 — 종전엔 옛 그룹의 등록이 이 선을 계속 가리켜 옛 그룹 이벤트가 이 선을 칠했다.
+            if (e.PropertyName == "LinkedDeviceGroup" && e.Marker is GMapPidsGroupMarker groupMarker)
             {
-                var repDevice = DeviceProvider.FirstOrDefault(
-                    d => d.DeviceGroups != null && d.DeviceGroups.Contains(groupMarker.LinkedDeviceGroup));
-                if (repDevice != null)
-                    _symbolEventManager.RegisterGroupSymbol(groupMarker.LinkedDeviceGroup, repDevice, groupMarker.Model);
-                else
-                    _log?.Warning($"[구역 재등록] Group({groupMarker.LinkedDeviceGroup}) 소속 장비 없음 — 블랙아웃 대상 미존재, 등록 스킵");
+                var affected = new List<int> { groupMarker.LinkedDeviceGroup };
+                if (e.OldValue is int oldGroup) affected.Add(oldGroup);
+                SyncZoneLineRegistration(affected);
             }
 
             // OverlayImage Title/Opacity/Visibility 변경 → MapLayers 동기화

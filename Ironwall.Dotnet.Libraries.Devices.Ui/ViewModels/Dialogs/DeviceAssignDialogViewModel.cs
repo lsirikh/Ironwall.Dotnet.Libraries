@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -55,13 +56,16 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     public DeviceAssignDialogViewModel(IDeviceApiService apiService
                                       , Func<IEnumerable<IBaseDeviceModel>> deviceSource
                                       , IGroupMembershipProbe membershipProbe
-                                      , ILogService? log = null)
+                                      , ILogService? log = null
+                                      , IEventAggregator? eventAggregator = null)
     {
         _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
         _deviceSource = deviceSource ?? throw new ArgumentNullException(nameof(deviceSource));
         // 눈이 없으면 남의 변경을 말없이 덮어쓴다 — 빠뜨릴 수 있는 선택 인자로 두지 않는다.
         _probe = membershipProbe ?? throw new ArgumentNullException(nameof(membershipProbe));
         _log = log;
+        // 저장이 소속을 실제로 바꾸면 알릴 곳 — 지도의 구역선 조회표는 이 알림으로만 새 소속을 안다. 없으면 알리지 않는다.
+        _eventAggregator = eventAggregator;
 
         Available = new BindableCollection<DeviceAssignItemViewModel>();
         Assigned = new BindableCollection<DeviceAssignItemViewModel>();
@@ -391,6 +395,8 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             Absorb(_lastSkippedAssign, joined: true);      // 이미 그 그룹에 있었다
             Absorb(_lastRemoved, joined: false);
             Absorb(_lastSkippedRemove, joined: false);     // 애초에 그 그룹이 아니었다
+            if (_lastAssigned.Count + _lastSkippedAssign.Count + _lastRemoved.Count + _lastSkippedRemove.Count > 0)
+                await AnnounceMembershipAsync().ConfigureAwait(true);
 
             if (stayOpen)
             {
@@ -501,6 +507,17 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
             GroupMembershipBaseline.ApplyConfirmed(model, _groupId, joined);
     }
 
+    /// <summary>
+    /// 소속이 바뀌었다고 알린다(창을 닫든 열어 두든 — 된 것은 이미 서버와 공용 캐시에 들어갔다).
+    /// 알림 실패는 저장 결과를 바꾸지 않는다.
+    /// </summary>
+    private async Task AnnounceMembershipAsync()
+    {
+        if (_eventAggregator is null || DeviceGroupMembershipChangedMessage.For(new[] { _groupId }) is not { } message) return;
+        try { await _eventAggregator.PublishOnCurrentThreadAsync(message).ConfigureAwait(true); }
+        catch (Exception ex) { _log?.Error($"[Assign] 소속 변경 알림 실패 group={_groupId}: {ex.Message}"); }
+    }
+
     public Task CancelAsync() => TryCloseAsync(false);
 
     /// <summary>
@@ -564,6 +581,7 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     private readonly Func<IEnumerable<IBaseDeviceModel>> _deviceSource;
     private readonly IGroupMembershipProbe _probe;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _eventAggregator;
 
     private int _groupId;
     private HashSet<int> _baseline = new();

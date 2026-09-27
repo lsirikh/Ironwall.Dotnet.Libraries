@@ -1315,8 +1315,10 @@ public class MockDeviceApiService : IDeviceApiService
     // ──────────────────────────── DeviceGroup ────────────────────────────
     public Task<ApiListResponse<DeviceGroupDto>> GetDeviceGroupsAsync(string? name = null, int page = 1, int limit = 20, CancellationToken token = default)
         => Task.FromResult(ApiListResponse<DeviceGroupDto>.CreateSuccess(new List<DeviceGroupDto>()));
+    /// <summary>그룹 단건 재조회를 가로챈다(배정 창의 보내기 직전 탐침). 걸어 두지 않으면 옛 동작 그대로(오류).</summary>
+    public Func<int, ApiResponse<DeviceGroupDto>>? GroupByIdHook;
     public Task<ApiResponse<DeviceGroupDto>> GetDeviceGroupByIdAsync(int id, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+        => Task.FromResult(GroupByIdHook?.Invoke(id) ?? ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(DeviceGroupDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<DeviceGroupDto>> PatchDeviceGroupAsync(int id, DeviceGroupDto dto, CancellationToken token = default)

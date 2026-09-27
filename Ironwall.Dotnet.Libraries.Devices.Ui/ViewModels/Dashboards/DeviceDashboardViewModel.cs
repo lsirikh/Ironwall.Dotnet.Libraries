@@ -127,7 +127,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         // 컨테이너가 주면 그것을, 아니면(단위 테스트 · 디자인 타임) 정적 해석의 6.3 기본값을 둘 다 같이 쓴다.
         _queryPolicy = queryPolicy ?? DeviceQueryPolicy.Resolve();
         ContractGate = new DeviceContractGateViewModel(_queryPolicy, log);
-        GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log);
+        // 집계기를 넘긴다 — 소속을 바꾸면 지도의 구역선 조회표가 그 그룹을 다시 등록한다(DeviceGroupMembershipChangedMessage).
+        GroupDrop = new DeviceGroupDropHandler(deviceApiService, () => DeviceProvider.OfType<IBaseDeviceModel>(), log, eventAggregator);
         _axisWriter = new DeviceAxisWriter(deviceApiService, _queryPolicy, log);
 
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
