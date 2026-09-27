@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
@@ -39,4 +39,15 @@ public class AuthUserDto
     [JsonProperty("last_login_ip")] public string? LastLoginIp { get; set; }
     [JsonProperty("created_at")] public string? CreatedAt { get; set; }
     [JsonProperty("updated_at")] public string? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// 콤보 항목 · 화면 읽기 프로그램 이름 — <c>DisplayMemberPath</c> 는 그리는 글자만 바꾸고 UIA 이름은 이 값을 쓴다.
+    /// 계정 콘솔 [부여] · [권한 매트릭스] 콤보가 <c>DisplayMemberPath="LoginId"</c> 로 이 DTO 를 직접 보여 주는데
+    /// 항목이 전부 타입 이름으로 읽혔다(ReportTemplateDto · UnitListDto 와 같은 방식). 화면 글자와 같은 로그인 ID,
+    /// 비면 이름, 그것도 비면 "사용자 #id".
+    /// </summary>
+    public override string ToString()
+        => !string.IsNullOrWhiteSpace(LoginId) ? LoginId
+         : !string.IsNullOrWhiteSpace(Name) ? Name!
+         : $"사용자 #{Id}";
 }
