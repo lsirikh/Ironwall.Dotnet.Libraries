@@ -134,6 +134,12 @@ public class ServerMonitorViewModel : Screen
         _closeConfirmed = false;
         IsEditing = false;
         SearchText = string.Empty;
+        // 부대 필터도 검색어처럼 비운다 — 2026-09-28 실창(WP-4 SC-SRV-008): 다른 부대로 걸러 둔 채 닫았다 다시 열고 등록하면
+        // 새 서버(이 클라이언트 부대로 귀속)가 걸러져 목록에 없고 '등록했습니다' 만 보였다. 조회는 다음 활성화가 한다(여기서 부르지 않는다).
+        _selectedUnit = null;
+        _includeDescendants = false;
+        NotifyOfPropertyChange(nameof(SelectedUnit));
+        NotifyOfPropertyChange(nameof(IncludeDescendants));
         StatusText = string.Empty;
         Detail.Reset();
         NotifyOfPropertyChange(nameof(CanUndoAssign));
