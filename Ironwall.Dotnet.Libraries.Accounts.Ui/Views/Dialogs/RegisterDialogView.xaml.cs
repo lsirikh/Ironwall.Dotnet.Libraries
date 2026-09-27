@@ -22,5 +22,11 @@ public partial class RegisterDialogView : UserControl
     public RegisterDialogView()
     {
         InitializeComponent();
+        // 첫 포커스는 아이디 칸(옛 창과 같다) — 커널 틀이 뜰 때 머리 ✕ 에 준 첫 포커스보다 뒤(Input 우선순위)에 돌려 둔다.
+        Loaded += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => Username.Focus()));
     }
+
+    /// <summary>틀의 취소(ESC · 머리 ✕)를 이 창의 [취소] 버튼(x:Name="ClickCancel")으로 넘긴다 — <see cref="DialogCancelRoute"/>.</summary>
+    private void OnSecondaryInvoked(object sender, RoutedEventArgs e) => DialogCancelRoute.Invoke(ClickCancel);
 }
+

@@ -2,125 +2,81 @@
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.LogoutPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	xmlns:sys="clr-namespace:System;assembly=mscorlib"
 	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}"
 	mc:Ignorable="d">
+	<!--
+		로그아웃 확인 — B3(window-design-inventory-analysis.md #9). 커널 다이얼로그 틀 T4 · S 400.
+		옛 모양: md:Card 400×220 + 시안 머리(ModernDialogHeader). 확인 · 취소는 x:Name 버튼 그대로(FooterActions + Message.Attach).
+		ESC · 머리 ✕ = [취소](코드 숨김 → DialogCancelRoute). 확인 문구 "정말로 로그아웃" 은 UI 시험(SC-SHL-010)이 글로 읽는다 — 뷰에 직접 놓인 TextBlock.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</UserControl.Resources>
+
 	<md:DialogHost
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="LogoutPanel">
-
-		<md:Card
+		<dlg:ConsoleDialogFrame
 			x:Name="CardContents"
-			Width="400"
-			Height="220"
-			MinWidth="300"
-			MinHeight="200"
-			Padding="20"
-			Opacity="1"
-			UniformCornerRadius="8">
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="1*" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
+			DialogKey="Accounts.Logout"
+			PrimaryText=""
+			SecondaryInvoked="OnSecondaryInvoked"
+			SecondaryText=""
+			Size="Small"
+			Title="로그아웃">
 
-				<!--  시안 헤더 바 (LayerPanel 패턴)  -->
-				<Border
-					Grid.Row="0"
-					Margin="-20,-20,-20,8"
-					Style="{StaticResource ModernDialogHeader}">
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<md:PackIcon
-							Width="20"
-							Height="20"
-							Margin="0,0,8,0"
-							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Kind="LogoutVariant" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="로그아웃" />
-					</StackPanel>
-				</Border>
-
-				<Grid
-					Grid.Row="2"
-					Margin="10"
-					VerticalAlignment="Top">
-
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto" />
-					</Grid.RowDefinitions>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="Auto" />
-						<ColumnDefinition Width="*" />
-					</Grid.ColumnDefinitions>
-					<md:PackIcon
-						Grid.Row="0"
-						Grid.Column="0"
-						Kind="Alert"
-						Style="{StaticResource SubDialogIcon}" />
-					<TextBlock
-						Grid.Row="0"
-						Grid.Column="1"
-						Style="{StaticResource SubDialogText}"
-						Text="정말로 로그아웃 하시겠습니까?" />
-				</Grid>
-
-				<Separator
-					Grid.Row="3"
-					Background="{DynamicResource DividerBrush}"
-					Style="{StaticResource MaterialDesignLightSeparator}" />
-
-
-				<Grid Grid.Row="4" Margin="0,10,0,0">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition />
-						<ColumnDefinition />
-					</Grid.ColumnDefinitions>
-					<Button
-						x:Name="ClickOk"
-						Grid.Column="0"
-						Margin="10,0,5,0"
-						VerticalAlignment="Center"
-						Style="{StaticResource Console.Button.Primary}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
-								<TextBlock
-									Style="{StaticResource ButtonTextBlock}"
-									Text="확인"
-									TextAlignment="Center" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
+			<dlg:ConsoleDialogFrame.FooterActions>
+				<StackPanel Orientation="Horizontal">
 					<Button
 						x:Name="ClickCancel"
-						Grid.Column="1"
-						Margin="5,0,10,0"
-						VerticalAlignment="Center"
-						Style="{StaticResource Console.Button}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Cancel" Style="{StaticResource ButtonIcon}" />
-								<TextBlock
-									Style="{StaticResource ButtonTextBlock}"
-									Text="취소"
-									TextAlignment="Center" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-				</Grid>
-			</Grid>
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,8,0"
+						cal:Message.Attach="ClickCancel"
+						Content="취소"
+						Style="{StaticResource Console.Button}" />
+					<Button
+						x:Name="ClickOk"
+						Height="34"
+						MinWidth="92"
+						cal:Message.Attach="ClickOk"
+						Content="로그아웃"
+						Style="{StaticResource Console.Button.Primary}" />
+				</StackPanel>
+			</dlg:ConsoleDialogFrame.FooterActions>
 
-		</md:Card>
+			<DockPanel Margin="0,4" LastChildFill="True">
+				<!--  무게는 색이 아니라 글리프로 — 글자는 대비가 높은 토큰  -->
+				<md:PackIcon
+					Width="22"
+					Height="22"
+					Margin="0,0,12,0"
+					VerticalAlignment="Top"
+					DockPanel.Dock="Left"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Kind="AlertOutline" />
+				<StackPanel>
+					<TextBlock
+						FontWeight="SemiBold"
+						Style="{StaticResource Acct.BodyText}"
+						Text="정말로 로그아웃 하시겠습니까?" />
+					<TextBlock
+						Margin="0,6,0,0"
+						Style="{StaticResource Acct.Hint}"
+						Text="로그아웃하면 로그인 화면으로 돌아갑니다." />
+				</StackPanel>
+			</DockPanel>
+		</dlg:ConsoleDialogFrame>
 	</md:DialogHost>
-
-
 </UserControl>

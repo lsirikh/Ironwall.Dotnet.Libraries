@@ -3,115 +3,132 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	d:Background="#88000000"
+	AutomationProperties.AutomationId="Accounts.Login.Panel"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	mc:Ignorable="d"
-	AutomationProperties.AutomationId="Accounts.Login.Panel">
+	Foreground="{DynamicResource TextPrimaryBrush}"
+	mc:Ignorable="d">
+	<!--
+		로그인 — B3(window-design-inventory-analysis.md #8). 커널 다이얼로그 틀 T4 · S 400.
+		옛 모양: md:Card(Theme=Dark 고정) + 시안 머리(ModernDialogHeader) — 셸 표면 틀 머리와 겹쳐 머리가 두 겹이었다.
+		· 머리 · 버튼 줄은 틀이 그린다. 확인 · 취소는 x:Name 버튼(Caliburn 바인딩 지시자 · UI 시험 앵커)이라 틀 버튼을 비우고
+		  그 버튼을 틀의 버튼 줄 오른쪽(FooterActions)에 앉힌다 — 틀의 자기 속성 안은 Caliburn 이름 관례가 닿지 않으므로 Message.Attach 로 잇는다.
+		· ESC · 머리 ✕ 는 [취소] 버튼으로 간다(코드 숨김 → DialogCancelRoute). 강제 로그인(CanClickCancel=false)이면 ✕ 도 숨고 ESC 도 닫지 않는다.
+		· Enter = [확인] 하나. 옛 창은 [확인] · [취소] 가 둘 다 IsDefault=True 라 Enter 가 비결정적이었다(ui-automation.md) — [취소] 의 IsDefault 를 뺐다.
+		· AutomationId(Accounts.Login.*) · x:Name 은 전부 그대로다.
+	-->
+	<UserControl.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+
+			<!--  로그인 결과 띠 — 색만으로 말하지 않는다: 왼쪽 3px 막대 + 글리프(✓ · ⚠) + 글  -->
+			<Style x:Key="Login.ResultBand" TargetType="Border">
+				<Setter Property="Margin" Value="0,12,0,0" />
+				<Setter Property="Padding" Value="10,7" />
+				<Setter Property="BorderThickness" Value="3,0,0,0" />
+				<Setter Property="CornerRadius" Value="0,4,4,0" />
+				<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+				<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+				<Setter Property="Visibility" Value="Collapsed" />
+				<Style.Triggers>
+					<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+						<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+						<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+						<Setter Property="Background" Value="{DynamicResource TintCriticalBrush}" />
+						<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+					</DataTrigger>
+				</Style.Triggers>
+			</Style>
+			<Style x:Key="Login.ResultGlyph" TargetType="TextBlock">
+				<Setter Property="Margin" Value="0,0,8,0" />
+				<Setter Property="VerticalAlignment" Value="Top" />
+				<Setter Property="FontSize" Value="13" />
+				<Setter Property="FontWeight" Value="Bold" />
+				<Style.Triggers>
+					<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+						<Setter Property="Text" Value="✓" />
+						<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+						<Setter Property="Text" Value="⚠" />
+						<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+					</DataTrigger>
+				</Style.Triggers>
+			</Style>
+		</ResourceDictionary>
+	</UserControl.Resources>
 
 	<md:DialogHost
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="LoginPanel">
-		<md:Card
+		<dlg:ConsoleDialogFrame
 			x:Name="CardContents"
-			HorizontalAlignment="Center"
-			VerticalAlignment="Center">
-			<!--  애니메이션 트리거  -->
-			<md:Card.Style>
-				<Style BasedOn="{StaticResource MaterialDesignElevatedCard}" TargetType="md:Card">
-					<!--  기본 BorderBrush 설정  -->
-					<Setter Property="Width" Value="400" />
-					<Setter Property="MinHeight" Value="300" />
-					<Setter Property="VerticalAlignment" Value="Center" />
-					<Setter Property="Padding" Value="20" />
-					<Setter Property="Opacity" Value="1" />
-					<Setter Property="UniformCornerRadius" Value="8" />
-					<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-					<Setter Property="md:ElevationAssist.Elevation" Value="Dp0" />
-					<Setter Property="md:ThemeAssist.Theme" Value="Dark" />
-					<Style.Triggers>
+			DialogKey="Accounts.Login"
+			PrimaryText=""
+			SecondaryInvoked="OnSecondaryInvoked"
+			SecondaryText=""
+			ShowClose="{Binding IsEnabled, ElementName=ClickCancel}"
+			Size="Small"
+			Title="로그인">
 
-						<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
-							<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
-							<Setter Property="BorderThickness" Value="3" />
-							<Setter Property="Width" Value="406" />
-							<Setter Property="UniformCornerRadius" Value="8" />
-						</DataTrigger>
-						<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
-							<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
-							<Setter Property="BorderThickness" Value="3" />
-							<Setter Property="Width" Value="406" />
-							<Setter Property="UniformCornerRadius" Value="8" />
-						</DataTrigger>
-					</Style.Triggers>
-				</Style>
-			</md:Card.Style>
+			<dlg:ConsoleDialogFrame.FooterActions>
+				<StackPanel Orientation="Horizontal">
+					<Button
+						x:Name="ClickCancel"
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,8,0"
+						AutomationProperties.AutomationId="Accounts.Login.CancelButton"
+						cal:Message.Attach="ClickCancel"
+						Content="취소"
+						Style="{StaticResource Console.Button}" />
+					<Button
+						x:Name="ClickOk"
+						Height="34"
+						MinWidth="92"
+						AutomationProperties.AutomationId="Accounts.Login.SubmitButton"
+						cal:Message.Attach="ClickOk"
+						Content="확인"
+						IsDefault="True"
+						Style="{StaticResource Console.Button.Primary}" />
+				</StackPanel>
+			</dlg:ConsoleDialogFrame.FooterActions>
 
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
-
-				<!--  시안 헤더 바 (LayerPanel 표준 패턴, 네거티브 마진으로 카드 가장자리까지)  -->
-				<Border
-					Grid.Row="0"
-					Margin="-20,-20,-20,14"
-					Style="{StaticResource ModernDialogHeader}">
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<md:PackIcon
-							Width="20"
-							Height="20"
-							Margin="0,0,8,0"
-							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Kind="AccountKey" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="로그인" />
-					</StackPanel>
-				</Border>
-
-				<Grid Grid.Row="1" VerticalAlignment="Center">
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-					</Grid.RowDefinitions>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="Auto" />
-						<ColumnDefinition Width="16" />
-						<ColumnDefinition Width="*" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						Style="{StaticResource TextBlockTitle}"
-						Text="아이디(ID)" />
+			<StackPanel>
+				<c:ConsoleField>
+					<c:ConsoleField.Header>
+						<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="아이디(ID)" />
+					</c:ConsoleField.Header>
 					<TextBox
 						x:Name="TextBoxID"
 						AutomationProperties.AutomationId="Accounts.Login.IdTextBox"
-						Grid.Column="2"
-						Style="{StaticResource TextBoxInput}"
+						Style="{StaticResource Acct.TextBox}"
 						Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}">
 						<i:Interaction.Behaviors>
 							<behavior:TextBoxFocusAndCaretBehavior />
 						</i:Interaction.Behaviors>
 					</TextBox>
-					<TextBlock
-						Grid.Row="2"
-						Grid.Column="0"
-						Style="{StaticResource TextBlockTitle}"
-						Text="비밀번호(PW)" />
-					<Grid Grid.Row="2" Grid.Column="2">
+				</c:ConsoleField>
+
+				<c:ConsoleField>
+					<c:ConsoleField.Header>
+						<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="비밀번호(PW)" />
+					</c:ConsoleField.Header>
+					<Grid>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*" />
 							<ColumnDefinition Width="Auto" />
@@ -119,11 +136,10 @@
 						<!--  마스킹 PW (눈 버튼 누르는 동안 숨김)  -->
 						<PasswordBox
 							x:Name="TextBoxPW"
-							AutomationProperties.AutomationId="Accounts.Login.PasswordBox"
 							Grid.Column="0"
-							PasswordChar="*">
+							AutomationProperties.AutomationId="Accounts.Login.PasswordBox">
 							<PasswordBox.Style>
-								<Style BasedOn="{StaticResource PasswordBoxInput}" TargetType="PasswordBox">
+								<Style BasedOn="{StaticResource Acct.PasswordBox}" TargetType="PasswordBox">
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
 											<Setter Property="Visibility" Value="Collapsed" />
@@ -138,11 +154,11 @@
 						<!--  평문 PW (눈 버튼 누르는 동안만 표시, 읽기전용)  -->
 						<TextBox
 							Grid.Column="0"
+							AutomationProperties.AutomationId="Accounts.Login.PasswordPlainTextBox"
 							IsReadOnly="True"
-							Text="{Binding Password, Mode=OneWay}"
-							AutomationProperties.AutomationId="Accounts.Login.PasswordPlainTextBox">
+							Text="{Binding Password, Mode=OneWay}">
 							<TextBox.Style>
-								<Style BasedOn="{StaticResource TextBoxInput}" TargetType="TextBox">
+								<Style BasedOn="{StaticResource Acct.TextBox}" TargetType="TextBox">
 									<Setter Property="Visibility" Value="Collapsed" />
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
@@ -155,150 +171,89 @@
 						<!--  눈알 아이콘 — 누르고 있는 동안 평문 표시(hold-to-reveal)  -->
 						<Button
 							x:Name="EyePeek"
-							AutomationProperties.AutomationId="Accounts.Login.RevealPasswordButton"
 							Grid.Column="1"
 							Width="32"
+							Height="30"
+							MinWidth="0"
 							Margin="4,0,0,0"
 							Padding="0"
-							Background="Transparent"
-							BorderThickness="0"
+							AutomationProperties.AutomationId="Accounts.Login.RevealPasswordButton"
+							AutomationProperties.Name="비밀번호 보기"
 							Focusable="False"
-							MinWidth="0"
 							Style="{StaticResource Console.Button.Ghost}"
 							ToolTip="누르고 있는 동안 비밀번호 표시">
 							<md:PackIcon
-								Width="20"
-								Height="20"
+								Width="18"
+								Height="18"
 								Foreground="{DynamicResource TextSecondaryBrush}"
 								Kind="EyeOutline" />
 						</Button>
 					</Grid>
+				</c:ConsoleField>
 
-				</Grid>
-				<Grid Grid.Row="2">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1*" />
-						<ColumnDefinition Width="1*" />
-						<ColumnDefinition Width="1*" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						Grid.ColumnSpan="2"
-						Style="{StaticResource TextBlockTitle}"
-						Text="아이디를 저장하시겠습니까?" />
+				<c:ConsoleField>
 					<CheckBox
-						Grid.Column="2"
-						Margin="10,0"
-						HorizontalAlignment="Right"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Accounts.Login.SaveIdCheckBox"
+						Content="아이디 저장"
 						IsChecked="{Binding IsUsernameSaved, Mode=TwoWay}"
-						AutomationProperties.AutomationId="Accounts.Login.SaveIdCheckBox" />
-				</Grid>
+						Style="{StaticResource Console.CheckBox}" />
+				</c:ConsoleField>
 
+				<!--  로그인 결과 — 글은 뷰에 직접 놓인 TextBlock(UIA Text) — 자동화가 AutomationId 로 읽는다  -->
+				<Border Style="{StaticResource Login.ResultBand}">
+					<DockPanel LastChildFill="True">
+						<TextBlock DockPanel.Dock="Left" Style="{StaticResource Login.ResultGlyph}" />
+						<TextBlock AutomationProperties.AutomationId="Accounts.Login.ResultText" Text="{Binding Result}">
+							<TextBlock.Style>
+								<Style TargetType="TextBlock">
+									<Setter Property="FontSize" Value="13" />
+									<Setter Property="FontWeight" Value="SemiBold" />
+									<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+									<Setter Property="TextWrapping" Value="Wrap" />
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+										<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBlock.Style>
+						</TextBlock>
+					</DockPanel>
+				</Border>
 
-				<Grid
-					Grid.Row="3"
-					Margin="0,5"
-					VerticalAlignment="Center">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition />
-						<ColumnDefinition />
-					</Grid.ColumnDefinitions>
-					<Button
-						x:Name="ClickOk"
-						AutomationProperties.AutomationId="Accounts.Login.SubmitButton"
-						Grid.Column="0"
-						Margin="5,0"
-						VerticalAlignment="Center"
-						IsDefault="True"
-						Style="{StaticResource Console.Button.Primary}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
-								<TextBlock
-									Width="50"
-									Style="{StaticResource ButtonTextBlock}"
-									Text="확인"
-									TextAlignment="Center" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-					<Button
-						x:Name="ClickCancel"
-						AutomationProperties.AutomationId="Accounts.Login.CancelButton"
-						Grid.Column="1"
-						Margin="5,0"
-						VerticalAlignment="Center"
-						IsDefault="True"
-						Style="{StaticResource Console.Button}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Cancel" Style="{StaticResource ButtonIcon}" />
-								<TextBlock
-									Width="50"
-									Style="{StaticResource ButtonTextBlock}"
-									Text="취소"
-									TextAlignment="Center" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-				</Grid>
-
-				<Separator
-					Grid.Row="4"
-					Margin="0,5"
-					Background="{DynamicResource DividerBrush}"
-					Style="{StaticResource MaterialDesignLightSeparator}" />
-
-				<Grid Grid.Row="5" Margin="0,0">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="7*" />
-						<ColumnDefinition Width="5.5*" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						VerticalAlignment="Center"
-						Style="{StaticResource MaterialDesignBody2TextBlock}"
-						Text="※ 회원가입이 필요하시면..." />
+				<Rectangle
+					Height="1"
+					Margin="0,16,0,10"
+					Fill="{DynamicResource DividerBrush}" />
+				<DockPanel LastChildFill="True">
 					<Button
 						x:Name="ClickRegister"
+						Height="30"
 						AutomationProperties.AutomationId="Accounts.Login.RegisterButton"
-						Grid.Column="1"
-						VerticalAlignment="Center"
-						md:RippleAssist.IsCentered="True"
+						DockPanel.Dock="Right"
 						Style="{StaticResource Console.Button.Ghost}"
 						ToolTip="가입하기">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Register" Style="{StaticResource ButtonIcon}" />
-								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="가입하기" />
-							</StackPanel>
-						</Button.Content>
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="16"
+								Height="16"
+								Margin="0,0,6,0"
+								VerticalAlignment="Center"
+								Kind="Register" />
+							<TextBlock VerticalAlignment="Center" Text="가입하기" />
+						</StackPanel>
 					</Button>
-				</Grid>
-				<!--  Result TextBlock with conditional coloring  -->
-				<StackPanel Grid.Row="6" VerticalAlignment="Bottom">
-					<TextBlock Text="{Binding Result}" AutomationProperties.AutomationId="Accounts.Login.ResultText">
-						<TextBlock.Style>
-							<Style BasedOn="{StaticResource MaterialDesignBody2TextBlock}" TargetType="TextBlock">
-								<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-								<Setter Property="FontWeight" Value="Bold" />
-								<Setter Property="Visibility" Value="Collapsed"/>
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
-										<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
-										<Setter Property="Visibility" Value="Visible"/>
-									</DataTrigger>
-									<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
-										<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
-										<Setter Property="Visibility" Value="Visible"/>
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</TextBlock.Style>
-					</TextBlock>
-				</StackPanel>
-			</Grid>
-
-		</md:Card>
+					<TextBlock
+						VerticalAlignment="Center"
+						Style="{StaticResource Acct.Hint}"
+						Text="회원가입이 필요하시면" />
+				</DockPanel>
+			</StackPanel>
+		</dlg:ConsoleDialogFrame>
 	</md:DialogHost>
 </UserControl>

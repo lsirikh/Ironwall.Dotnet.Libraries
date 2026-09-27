@@ -22,5 +22,11 @@ public partial class ResetPassDialogView : UserControl
     public ResetPassDialogView()
     {
         InitializeComponent();
+        // 창이 뜨면 첫 칸(현재 비밀번호)에서 바로 입력한다 — 틀의 첫 포커스(✕)보다 뒤(Input 우선순위)에 준다.
+        Loaded += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => InputPassword.Focus()));
     }
+
+    /// <summary>틀의 취소(ESC · 머리 ✕)를 이 창의 [취소] 버튼(x:Name="ClickCancel")으로 넘긴다 — <see cref="DialogCancelRoute"/>.</summary>
+    private void OnSecondaryInvoked(object sender, RoutedEventArgs e) => DialogCancelRoute.Invoke(ClickCancel);
 }
+

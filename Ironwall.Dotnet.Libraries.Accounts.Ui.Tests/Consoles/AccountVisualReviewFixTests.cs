@@ -104,8 +104,9 @@ public class AccountVisualReviewFixTests
         // 옛 청록 머리 띠 · 전폭 두 칸 버튼이 아니다.
         Assert.DoesNotContain("ModernDialogHeader", xaml);
         Assert.DoesNotContain("ColumnDefinition Width=\"5*\"", xaml);
-        // 머리는 SurfaceAlt, 버튼 줄은 오른쪽 정렬 · 보조([취소]) → 주 동작([확인]) 순서.
-        Assert.Contains("SurfaceAltBrush", xaml);
+        // 머리(SurfaceAlt) · 버튼 줄은 커널 틀이 그린다(B3 — V-36 의 손 베낌을 진짜 틀로). 버튼 줄은 보조([취소]) → 주 동작([확인]) 순서.
+        Assert.Contains("<dlg:ConsoleDialogFrame", xaml);
+        Assert.Contains("<dlg:ConsoleDialogFrame.FooterActions>", xaml);
         var cancel = xaml.IndexOf("x:Name=\"ClickCancel\"", StringComparison.Ordinal);
         var ok = xaml.IndexOf("x:Name=\"ClickOk\"", StringComparison.Ordinal);
         Assert.True(cancel > 0 && ok > cancel, "버튼 순서는 [취소] → [확인] 이어야 한다");
