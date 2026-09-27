@@ -13,5 +13,6 @@
 	-->
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Devices.Ui;component/Consoles/Assembly/Blocks/ComponentBlock.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Devices.Ui;component/Consoles/Units/Map/UnitMapStyles.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

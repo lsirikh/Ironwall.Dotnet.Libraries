@@ -25,11 +25,36 @@ public static class DragSession
     /// <summary>진행 중인 캡처 드래그가 하나라도 있다(눌림 포함 — 데드존을 넘기 전에도 곧 끌기가 된다).</summary>
     public static bool IsActive => Volatile.Read(ref _active) > 0;
 
+    /// <summary>
+    /// 커널 밖의 캡처 드래그(예: 부대 관계도 캔버스)가 "끄는 중" 을 알린다. 돌려받은 토큰을 <b>한 번</b> 버리면 끝난다 —
+    /// 두 번째 <see cref="IDisposable.Dispose"/> 는 아무것도 하지 않는다(다른 끌기를 끝내 버리지 않게).
+    /// </summary>
+    /// <remarks>
+    /// 누름 · 뗌 · 캡처 상실 · <c>Esc</c> · 언로드 — 끝나는 모든 길에서 같은 토큰을 버리면 된다. 표는 <b>프로세스 전역</b>이라
+    /// 한 콘솔의 끌기가 다른 콘솔의 다시 읽기도 잠깐 미룬다(끌기는 짧아 받아들인다).
+    /// </remarks>
+    public static IDisposable Begin()
+    {
+        Enter();
+        return new Token();
+    }
+
     internal static void Enter() => Interlocked.Increment(ref _active);
 
     internal static void Exit()
     {
         // 짝이 안 맞아도 음수로 내려가지 않는다 — 음수면 이후 끌기가 영영 "진행 중 아님" 으로 읽힌다.
         if (Interlocked.Decrement(ref _active) < 0) Interlocked.Exchange(ref _active, 0);
+    }
+
+    /// <summary><see cref="Begin"/> 의 짝 — 버림은 한 번만 센다.</summary>
+    private sealed class Token : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0) Exit();
+        }
     }
 }
