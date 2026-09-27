@@ -1201,6 +1201,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         SyncPeriodChips();
         NotifyOfPropertyChange(nameof(Period));
         NotifyOfPropertyChange(nameof(IsCustomPeriod));
+        // 직접 지정 두 칸(드래그의 폴백 · 정확한 입력)도 함께 띄운다 — 알리지 않으면 칩만 '직접' 이고 칸은 숨은 채였다.
+        NotifyOfPropertyChange(nameof(ShowCustomPeriod));
         StartDate = range.From;
         EndDate = range.To;
         StatusText = $"기간을 {range.Label()} 로 바꿨습니다";
@@ -1213,8 +1215,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         // async void 는 예외가 그대로 터지면 앱을 내린다 — 여기서 감싼다(R12).
         try
         {
+            // 레일을 먼저 옮기고 검색어는 그 뒤에 넣는다 — 레일 전환은 "거르기도 처음으로" 검색어를 비우므로,
+            // 먼저 넣으면 탐지 레일에 도착했을 때 장비명이 지워져 있었다(2026-09-27 헤디드 SC-EVT-012b).
+            if (!await SelectRailAsync(railKey == "det" ? DetectionRailKey : railKey)) return;
             SearchText = query;
-            await SelectRailAsync(railKey == "det" ? DetectionRailKey : railKey);
         }
         catch (Exception ex)
         {

@@ -363,13 +363,16 @@
 									Margin="0,14,0,3"
 									Style="{StaticResource BoxLabel}"
 									Text="요일 *" />
-								<!--  StackPanel 은 자동화 peer 가 없어 앵커가 되지 못한다 — ItemsControl 로 담는다  -->
-								<ItemsControl AutomationProperties.AutomationId="Console.Suppression.Form.Days">
-									<ItemsControl.ItemsPanel>
-										<ItemsPanelTemplate>
-											<StackPanel Orientation="Horizontal" />
-										</ItemsPanelTemplate>
-									</ItemsControl.ItemsPanel>
+								<!--
+									StackPanel 은 자동화 peer 가 없어 앵커가 되지 못한다. 예전엔 ItemsControl 로 담았는데, 그러면 WPF 가 칩마다
+									항목 peer(ItemsControlItem)로 감싸 AutomationId 만 넘기고 토글 패턴은 버렸다 — 자동화 · 화면 읽기가
+									요일을 켜고 끌 수 없었다(2026-09-27 헤디드 SC-SUP-007). UserControl 은 peer 가 있고 자식을 그대로 내놓는다.
+								-->
+								<UserControl
+									AutomationProperties.AutomationId="Console.Suppression.Form.Days"
+									Focusable="False"
+									IsTabStop="False">
+									<StackPanel Orientation="Horizontal">
 									<ToggleButton
 										AutomationProperties.AutomationId="Console.Suppression.Form.Day.Mon"
 										Content="월"
@@ -412,7 +415,8 @@
 										IsChecked="{Binding IsSunChecked, Mode=TwoWay}"
 										IsEnabled="{Binding CanEditRecurrence}"
 										Style="{StaticResource DayChip}" />
-								</ItemsControl>
+									</StackPanel>
+								</UserControl>
 
 								<TextBlock
 									Margin="0,14,0,3"

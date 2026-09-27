@@ -172,6 +172,27 @@ public class EventConsoleNavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task should_show_the_custom_range_fields_when_a_trend_band_is_committed()
+    {
+        // 추이 차트를 끌어 기간을 고르면 칩은 '직접' 이 되는데, 직접 지정 두 칸(시작 · 끝 — 드래그의 폴백이자 정확한 입력 수단)은
+        // 뜨지 않았다: 보임 여부(ShowCustomPeriod)를 알리지 않았다(2026-09-27 실창: 놓은 뒤 From '' To '').
+        await Activate();
+        var changed = new List<string?>();
+        _console.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        _console.Overview.Resize(0, 0, 1000, 200);
+        _console.Overview.Load(null, DateTime.Today, DateTime.Today.AddDays(1));
+
+        var range = _console.Overview.CommitBand(100, 600);
+
+        Assert.True(range.IsCommittable);
+        Assert.Equal("직접", _console.Period);
+        Assert.True(_console.ShowCustomPeriod);
+        Assert.Contains(nameof(EventDashboardViewModel.ShowCustomPeriod), changed);
+        Assert.Equal(range.From, _console.StartDate);
+        Assert.Equal(range.To, _console.EndDate);
+    }
+
+    [Fact]
     public async Task should_refuse_the_rail_switch_when_changes_are_unapplied()
     {
         await Activate();
@@ -228,6 +249,30 @@ public class EventConsoleNavigationTests : IDisposable
         _console.SearchText = "북측";
 
         Assert.Equal("북측", _console.SearchText);
+        Assert.True(_console.IsFiltered);
+    }
+
+    [Fact]
+    public async Task should_keep_the_device_name_in_search_when_an_overview_bar_is_drilled()
+    {
+        // 2026-09-27 헤디드 SC-EVT-012b — 막대 드릴이 탐지 레일로는 갔지만 검색칸이 비어 있었다:
+        // 검색어를 먼저 넣고 레일을 바꾸면 레일 전환이 "거르기도 처음으로" 검색어를 지운다.
+        await Activate();
+        Assert.Equal(EventDashboardViewModel.OverviewRailKey, _console.SelectedRail?.Key);
+
+        _console.Overview.Drill(new Consoles.Overview.EventDeviceBarViewModel("7", "북측 센서 7", 3,
+            Array.Empty<Consoles.Overview.EventBarSegment>()));
+
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        // 레일 키는 전환 도중에 먼저 바뀐다 — 패널 활성화 · 목록 부착(전환의 끝)까지 기다린다.
+        while (DateTime.UtcNow < deadline && !(_console.SelectedRail?.Key == EventDashboardViewModel.DetectionRailKey
+                                               && ReferenceEquals(_console.TabControlViewModel.ActiveItem, _console.DetectionPanelViewModel)
+                                               && _console.Rows is not null))
+            await Task.Delay(20);
+        await Task.Delay(300);
+
+        Assert.Equal(EventDashboardViewModel.DetectionRailKey, _console.SelectedRail?.Key);
+        Assert.Equal("북측 센서 7", _console.SearchText);
         Assert.True(_console.IsFiltered);
     }
 
