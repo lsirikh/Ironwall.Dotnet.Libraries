@@ -634,6 +634,49 @@ public class EventConsoleCompletenessTests : IDisposable
         Assert.Equal(ActionReportPhraseSource.Fallback.Concat(new[] { ActionTrayViewModel.EtcPhrase }), _console.Tray.PhraseOptions);
     }
 
+    // ── SYNC_ACTION_REPORT_TEMPLATE — 다른 곳에서 문구 목록이 바뀌었다 ──
+    private (Mock<IActionReportPhraseSource> Source, Func<int> Loads, Action<string[]> Serve) PhraseSourceServing(params string[] first)
+    {
+        var current = new ActionReportPhraseSet(first, true);
+        var loads = 0;
+        var source = new Mock<IActionReportPhraseSource>();
+        source.SetupGet(s => s.LastKnown).Returns(new ActionReportPhraseSet(ActionReportPhraseSource.Fallback, false));
+        source.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => { loads++; return current; });
+        return (source, () => loads, phrases => current = new ActionReportPhraseSet(phrases, true));
+    }
+
+    [Fact]
+    public async Task should_swap_the_tray_phrases_when_the_templates_change_elsewhere_and_nothing_waits_in_the_tray()
+    {
+        var (source, _, serve) = PhraseSourceServing("현장 확인 완료");
+        Build(source.Object);
+        await Activate();
+        serve(new[] { "현장 확인 완료", "순찰 출동" });
+
+        await _console.HandleAsync(new ActionReportTemplatesChangedMessage("CREATED", 9), CancellationToken.None);
+        await _console.PhraseRefreshTask;
+
+        Assert.Equal(new[] { "현장 확인 완료", "순찰 출동", ActionTrayViewModel.EtcPhrase }, _console.Tray.PhraseOptions);
+    }
+
+    [Fact]
+    public async Task should_leave_the_tray_phrases_alone_when_reports_wait_in_the_tray()
+    {
+        var (source, loads, serve) = PhraseSourceServing("현장 확인 완료", "순찰 출동");
+        Build(source.Object);
+        await Activate();
+        _console.Tray.Enqueue(ActionTrayDrop.Plan(new[] { new ActionTrayCandidate(41, ActionTrayDrop.KindDetection, "센서-41", false) }, canControl: true));
+        _console.Tray.Phrase = "순찰 출동";
+        var before = loads();
+        serve(new[] { "현장 확인 완료" });                       // 고른 문구가 다른 곳에서 지워졌다
+
+        await _console.HandleAsync(new ActionReportTemplatesChangedMessage("DELETED", 2), CancellationToken.None);
+        await _console.PhraseRefreshTask;
+
+        Assert.Equal(before, loads());
+        Assert.Equal("순찰 출동", _console.Tray.Phrase);          // 보내기 직전의 선택을 비우지 않는다
+    }
+
     // ── E-5 #2 상세 동작 줄 ──
     [Fact]
     public async Task should_offer_report_and_history_actions_when_one_sensor_detection_is_selected()

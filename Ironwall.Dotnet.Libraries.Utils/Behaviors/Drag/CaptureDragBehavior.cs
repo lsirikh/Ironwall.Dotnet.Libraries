@@ -58,6 +58,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private int _hoverIndex = -1;
     private readonly EdgeAutoScroller _autoScroller = new();
     private string? _traceLastHit;
+    // DragSession 에 올렸는가 — 눌림에서 올리고 FinishDrag(또는 BeginDrag 실패)에서 한 번만 내린다.
+    private bool _inSession;
 
     #region - Properties -
     /// <summary>판정 · 처리 담당(보통 패널 뷰모델). 드롭존에 담당이 따로 없으면 이것을 쓴다.</summary>
@@ -175,6 +177,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _handle = handle;
         _pressedItem = item;
         _pressPoint = DragPointer.GetPosition(AssociatedObject);
+        EnterSession();
         e.Handled = true;
         if (DragTrace.IsOn) DragTrace.Write($"[capture] start list={DragTrace.Chain(AssociatedObject, 2)} item={item} captured={DragTrace.Captured()}");
     }
@@ -209,10 +212,10 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private void BeginDrag()
     {
         var items = PayloadItems();
-        if (items.Count == 0) { _pressed = false; return; }
+        if (items.Count == 0) { _pressed = false; ExitSession(); return; }
 
         _root = Window.GetWindow(AssociatedObject) as FrameworkElement ?? TopVisual(AssociatedObject);
-        if (_root == null) { _pressed = false; return; }
+        if (_root == null) { _pressed = false; ExitSession(); return; }
 
         _payload = new DragPayload(AssociatedObject, items, LabelOf(items[0]));
         _dragging = true;
@@ -287,6 +290,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     /// </summary>
     private void FinishDrag(bool commit)
     {
+        ExitSession();      // 드롭 통지(④) 전에 내린다 — 담당이 드롭 처리 중에 목록을 다시 읽을 수 있어야 한다
         if (!_pressed && !_dragging) return;
 
         // ① 플래그
@@ -346,6 +350,20 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     #endregion
 
     #region - Helpers -
+    private void EnterSession()
+    {
+        if (_inSession) return;
+        _inSession = true;
+        DragSession.Enter();
+    }
+
+    private void ExitSession()
+    {
+        if (!_inSession) return;
+        _inSession = false;
+        DragSession.Exit();
+    }
+
     private IReadOnlyList<object> PayloadItems()
     {
         if (_pressedItem == null) return Array.Empty<object>();

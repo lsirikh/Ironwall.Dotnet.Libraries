@@ -35,7 +35,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /// 매 건 재시도는 그대로 요청 폭증이 된다. 시계는 <see cref="Environment.TickCount64"/>(단조 증가)를 쓴다
 /// (<c>DateTime.Now</c> 직접 호출 금지 규칙 · 시각 역행 내성).</para>
 /// </remarks>
-public class UnitScopeService : IUnitScopeService
+public class UnitScopeService : IUnitScopeService, IUnitTopologyCache
 {
     #region - Ctors -
     /// <param name="unitApiService">
@@ -98,13 +98,15 @@ public class UnitScopeService : IUnitScopeService
         // ① 계약 게이트 — 8.0 미만에서는 네트워크에 나가지 않는다(운영 6.3.2 에 /api/units 는 0건).
         if (!IsUnitEra) return null;
 
-        // ② 캐시 히트 — 부대 id 는 세션 중 바뀌지 않는다(코드 불변 · id 불변).
+        // ② 캐시 히트 — 부대 id 는 코드 · id 모두 불변이다. 단, 다른 곳에서 편제가 바뀌었다는 알림(SYNC_UNIT)을
+        //    받았으면(_stale) 한 번 다시 확인한다 — 우리 부대가 지워지고 같은 코드로 다시 만들어지면 id 가 바뀐다.
         var cached = Resolved;
-        if (cached.HasValue) return cached;
+        if (cached.HasValue && !_stale) return cached;
 
         var code = UnitCode;
         if (code == null)
         {
+            if (cached.HasValue) return cached;
             WarnOnce($"부대 코드(GroupNats)가 설정되지 않아 unit_id 를 해석할 수 없습니다 — "
                    + $"서버 계약 {Contract} 에서 unit_id 를 생략하면 서버가 기본 부대로 귀속시킵니다(응답에 신호 없음).");
             return null;
@@ -112,6 +114,7 @@ public class UnitScopeService : IUnitScopeService
 
         if (_unitApiService == null)
         {
+            if (cached.HasValue) return cached;
             WarnOnce($"부대 API(IUnitApiService)가 등록되지 않아 unit_id 를 해석할 수 없습니다(부대 코드: {code}) — "
                    + $"서버 계약 {Contract} 에서 unit_id 생략은 기본 부대 귀속으로 처리됩니다.");
             return null;
@@ -122,6 +125,7 @@ public class UnitScopeService : IUnitScopeService
         //    다음 쓰기에서 즉시 재시도돼야 한다(스로틀 뒤에 두면 60초 동안 막힌다).
         if (!DevicePermissionGate.CanViewUnits())
         {
+            if (cached.HasValue) return cached;      // 다시 확인할 수 없으면 알던 값을 쓴다(기본 부대로 흘려보내지 않는다)
             if (!_permWarned)
             {
                 _permWarned = true;
@@ -133,25 +137,44 @@ public class UnitScopeService : IUnitScopeService
 
         // ④ 재시도 스로틀 — 저장 1회에 수십 건이 돌 수 있어 건마다 재시도하면 요청 폭증이 된다.
         if (_lastAttemptTick != 0 && Environment.TickCount64 - _lastAttemptTick < RETRY_INTERVAL_MS)
-            return null;
+            return cached;
 
         await _gate.WaitAsync(token).ConfigureAwait(false);
         try
         {
             // 게이트 통과를 기다리는 동안 다른 호출이 해석했을 수 있다(이중 조회 방지).
             cached = Resolved;
-            if (cached.HasValue) return cached;
+            if (cached.HasValue && !_stale) return cached;
             if (_lastAttemptTick != 0 && Environment.TickCount64 - _lastAttemptTick < RETRY_INTERVAL_MS)
-                return null;
+                return cached;
 
             _lastAttemptTick = Environment.TickCount64;
-            return await ResolveCoreAsync(code, token).ConfigureAwait(false);
+            _stale = false;          // 이번 확인으로 갚는다 — 실패해도 같은 알림으로 매 쓰기마다 다시 나가지 않는다(스로틀이 다음을 맡는다)
+            var resolved = await ResolveCoreAsync(code, token).ConfigureAwait(false);
+            // 다시 확인이 실패하면 알던 값을 쓴다 — 없는 값(null)은 서버가 기본 부대로 조용히 묶는다.
+            return resolved ?? cached;
         }
         finally
         {
             _gate.Release();
         }
     }
+    #endregion
+
+    #region - Implementation of IUnitTopologyCache -
+    /// <summary>
+    /// 다른 곳에서 편제가 바뀌었다(서버 <c>SYNC_UNIT</c>). 네트워크에 나가지 않고 표시만 한다 —
+    /// 다음 <see cref="ResolveAsync"/>(다음 장비 쓰기)가 한 번 다시 확인한다. 그때까지는 알던 id 를 그대로 쓴다.
+    /// </summary>
+    public void Invalidate()
+    {
+        if (!Resolved.HasValue) return;      // 아직 모른다 — 다음 쓰기가 어차피 해석한다
+        _stale = true;
+        _lastAttemptTick = 0;
+    }
+
+    /// <summary>다른 곳의 편제 변경을 받고 아직 다시 확인하지 않았다(진단 · 시험).</summary>
+    public bool IsStale => _stale;
     #endregion
 
     #region - Implementation of IService -
@@ -258,6 +281,7 @@ public class UnitScopeService : IUnitScopeService
     private volatile int _resolvedIdOrZero;
 
     private long _lastAttemptTick;
+    private volatile bool _stale;
     private bool _configWarned;
     private bool _permWarned;
     #endregion

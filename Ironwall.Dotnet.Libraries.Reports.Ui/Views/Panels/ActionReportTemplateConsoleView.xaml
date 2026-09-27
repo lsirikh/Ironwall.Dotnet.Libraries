@@ -324,6 +324,28 @@
 						Foreground="{DynamicResource TextSecondaryBrush}"
 						Text="{Binding StatusText}"
 						TextTrimming="CharacterEllipsis" />
+					<!--  다른 곳에서 문구 목록이 바뀌었는데(서버 SYNC_ACTION_REPORT_TEMPLATE) 적고 있던 문구 · 끌기 때문에 다시 읽지 않았다 — 덮지 않고 알린다  -->
+					<StackPanel
+						Margin="12,0,0,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Right"
+						Orientation="Horizontal"
+						Visibility="{Binding IsExternallyChanged, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.ActionReportTemplates.Status.ExternalChange"
+							FontSize="12"
+							Foreground="{DynamicResource StatusWarningBrush}"
+							Text="{Binding ExternalChangeText}" />
+						<Button
+							Margin="6,0,0,0"
+							AutomationProperties.AutomationId="Console.ActionReportTemplates.Status.ExternalChangeReload"
+							Click="OnReload"
+							Content="{Binding ExternalChangeActionText}"
+							IsEnabled="{Binding CanReload}"
+							Style="{StaticResource Console.Button.Mini}"
+							ToolTip="서버의 지금 문구 목록을 다시 읽습니다. 적용하지 않은 문구가 있으면 먼저 적용하거나 되돌려야 합니다." />
+					</StackPanel>
 					<TextBlock
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Reports.ActionReportTemplate.CountText"

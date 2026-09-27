@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.ActionReportTemplates;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -32,7 +33,8 @@ namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 /// 행마다 PATCH 를 반복하지 않는다(드래그 규칙). 실패하면 서버를 다시 불러오고, 성공하면 그 직전 순서를
 /// 들고 있다가 [되돌리기]에서 같은 엔드포인트로 한 번 더 보낸다(Undo = 두 번째 reorder 호출).</para>
 /// </remarks>
-public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<CallDeleteActionReportTemplateProcessMessageModel>
+public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<CallDeleteActionReportTemplateProcessMessageModel>,
+                                                    IHandle<ActionReportTemplatesChangedMessage>
 {
     public const string ConsoleKey = "ActionReportTemplates";
     public const string RailKey = "templates";
@@ -71,6 +73,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         };
         _selectedRail = RailEntries[0];
 
+        // SYNC_ACTION_REPORT_TEMPLATE 는 몰려올 수 있다 — 창(500 ms) 안의 알림을 다시 읽기 한 번으로 합친다.
+        //   지연은 속성(ExternalChangeDelay)을 늦게 읽는다 — 컨테이너가 만드는 VM 이라 생성자 인자를 늘리지 않는다.
+        _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync,
+                                                delay: (window, token) => (ExternalChangeDelay ?? Task.Delay)(window, token),
+                                                onError: ex => _log?.Error($"[ActionReportTemplate] 외부 변경 재조회: {ex.Message}"));
+
         // ⚠ 이벤트 구독은 생성자가 아니라 OnActivateAsync 에서 한다 — 이 VM 은 SingleInstance 라
         //   생성자는 앱 수명당 1회만 실행된다(Reports 콘솔과 같은 함정 회피).
     }
@@ -88,6 +96,9 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
         Unsubscribe();
+        _externalChange.Cancel();
+        IsExternallyChanged = false;
+        _lastCommittedOrder = null;
         Detail.Reset();
         _selectedItem = null;
         _undoOrder = null;
@@ -271,6 +282,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             if (res.Success && res.Data != null)
             {
                 Board.ApplyServerOrder(res.Data);
+                _lastCommittedOrder = Board.OrderedIds;   // 곧 올 SYNC 알림이 "우리 것의 메아리" 인지 가르는 기준
                 StatusText = isUndo ? "순서를 되돌렸습니다." : "순서를 바꿨습니다.";
                 _undoOrder = isUndo ? null : undoTarget;
             }
@@ -546,6 +558,81 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     public const string CreateFooterText = "등록해야 목록에 나타납니다";
     #endregion
 
+    #region - 다른 곳에서 바뀐 목록 (SYNC_ACTION_REPORT_TEMPLATE) -
+    /// <summary>다른 곳에서 문구 목록이 바뀌었는데 지금 다시 읽지 못할 때 상태 띠에 보이는 말.</summary>
+    public const string ExternalChangeNotice = "다른 곳에서 문구 목록이 바뀌었습니다.";
+    public const string ExternalChangeAction = "다시 읽기";
+
+    public string ExternalChangeText => ExternalChangeNotice;
+    public string ExternalChangeActionText => ExternalChangeAction;
+
+    private bool _isExternallyChanged;
+    /// <summary>
+    /// 다른 곳에서 목록이 바뀌었는데 <b>다시 읽지 않았다</b> — 적용하지 않은 문구 · 끌기 · 순서 저장 중이라서.
+    /// 상태 띠에 <see cref="ExternalChangeText"/> 와 [<see cref="ExternalChangeAction"/>] 단추가 뜬다.
+    /// </summary>
+    public bool IsExternallyChanged
+    {
+        get => _isExternallyChanged;
+        private set { if (_isExternallyChanged == value) return; _isExternallyChanged = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>창 지연(시험이 바꿔 끼운다). null 이면 실제 시간.</summary>
+    internal Func<TimeSpan, CancellationToken, Task>? ExternalChangeDelay { get; set; }
+
+    /// <summary>지금 캡처 드래그 중인가(시험이 바꿔 끼운다).</summary>
+    internal Func<bool> IsDragging { get; set; } = () => DragSession.IsActive;
+
+    /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
+    internal Task ExternalChangeTask => _externalChangeTask;
+
+    /// <summary>
+    /// 서버 <c>SYNC_ACTION_REPORT_TEMPLATE</c> — 호스트가 옮겨 온다(같은 봉투는 한 번만). 신호만 세고 곧바로 돌아간다.
+    /// 창이 떠 있을 때만 듣는다(기반 클래스가 활성화 동안만 구독한다).
+    /// </summary>
+    public Task HandleAsync(ActionReportTemplatesChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (!IsActive) return Task.CompletedTask;
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnExternalChangeSettledAsync(CancellationToken token)
+    {
+        if (!IsActive) return;
+
+        // 끌기 · 순서 저장 · 적재 중이면 잠깐 미룬다 — 곧 끝나고, 끝나면 다음 창에서 알아서 다시 읽는다.
+        if (IsDragging() || IsReordering || IsBusy)
+        {
+            IsExternallyChanged = true;
+            _externalChangeTask = _externalChange.Pulse();
+            return;
+        }
+
+        // 사람이 적고 있는 문구는 덮지 않는다 — 알리고 사람이 [다시 읽기]로 고른다.
+        if (Detail.IsDirty)
+        {
+            IsExternallyChanged = true;
+            return;
+        }
+
+        var committed = _lastCommittedOrder;
+        await LoadAsync();
+
+        // 되돌리기는 "우리가 보낸 순서"가 아직 서버 순서일 때만 산다 — 다른 사람이 또 바꿨다면
+        // 되돌리기가 그 사람의 순서를 말없이 덮어쓴다. (우리 reorder 의 메아리면 순서가 같아 그대로 둔다.)
+        if (_undoOrder != null && (committed is null || !Board.OrderedIds.SequenceEqual(committed)))
+        {
+            _undoOrder = null;
+            NotifyOfPropertyChange(nameof(CanUndoReorder));
+        }
+    }
+
+    private readonly CoalescingTrigger _externalChange;
+    private Task _externalChangeTask = Task.CompletedTask;
+    private IReadOnlyList<int>? _lastCommittedOrder;
+    #endregion
+
     #region - Status bar -
     private string _statusText = string.Empty;
     public string StatusText { get => _statusText; set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); } }
@@ -573,6 +660,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             {
                 Board.Load(res.Data);
                 LoadError = null;
+                IsExternallyChanged = false;      // 방금 서버의 지금 목록을 받았다
             }
             else
             {

@@ -78,9 +78,11 @@ public enum EnumGopCommand
     //     정수는 유일성만 갖는다(SYNC_* 라우팅은 이름 기반). 메인 라우터 Unknown 경고 회피용.
     // 카탈로그(장비유형·카테고리 등) 동기화.
     SYNC_CATALOG = 31,
-    // 조치보고 문구 템플릿 동기화 (API 6.3 후속 — /reorder 포함).
+    // 조치보고 문구 템플릿 동기화 (API 6.3 후속 — /reorder 는 {UPDATED, 0} 한 건).
+    //   처리=호스트 라우터 → ActionReportTemplatesChangedMessage. 전환기에는 부대 subject 로도 같은 봉투 id 가 와서 id 로 한 번만 옮긴다.
     SYNC_ACTION_REPORT_TEMPLATE = 32,
-    // 부대 편제 동기화 (API v8.0 — 배포 대기. 지금은 수신 시 조용히 무시하기 위한 정의).
+    // 부대 편제 동기화 (API v8.0). 처리=호스트 라우터 → UnitTopologyChangedMessage + 부대 캐시 무효화.
+    //   ⚠ 인접 추가/제거의 resource_id 는 인접 행 id 다(부대 id 아님 — 서버 명세 불일치, 보고됨).
     SYNC_UNIT = 33,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,

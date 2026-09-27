@@ -81,6 +81,7 @@ public class DeviceUiModule : Module
                    // ParentBootstrapper 의 OrderBy 는 안정 정렬이라 같은 값이면 등록 순서가 유지돼
                    // 이 서비스가 DeviceProviderService 보다 먼저 시작한다(장비 적재 전에 부대 해석).
                    .As<IUnitScopeService>().As<IService>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.IUnitTopologyCache>()   // SYNC_UNIT 수신 시 호스트가 무효화한다
                    .SingleInstance().WithMetadata("Order", _count);
 
             builder.RegisterType<DeviceProviderService>().As<IDeviceProviderService>().As<IService>()
@@ -107,7 +108,8 @@ public class DeviceUiModule : Module
                         c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
                         c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>(),
                         c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
-                        c.ResolveOptional<ILogService>()))
+                        c.ResolveOptional<ILogService>(),
+                        c.ResolveOptional<Caliburn.Micro.IEventAggregator>()))   // 떠 있는 동안 SYNC_UNIT 를 듣는다
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
                    .SingleInstance();
             // D-14: unit_id → 부대 이름 읽기 전용 사전. IUnitGraphApi 위에서 id→이름을 1회 적재해 캐시한다 —
@@ -117,6 +119,7 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<IServerContractProbe>(),
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory>()
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.IUnitTopologyCache>()   // SYNC_UNIT 수신 시 호스트가 무효화한다
                    .SingleInstance();
 
 

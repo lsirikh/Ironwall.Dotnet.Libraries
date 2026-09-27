@@ -732,6 +732,7 @@
 						<ColumnDefinition Width="Auto" />
 						<ColumnDefinition Width="*" />
 						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
 					</Grid.ColumnDefinitions>
 					<Label
 						AutomationProperties.AutomationId="Units.Status.Count"
@@ -761,8 +762,32 @@
 							</DataTemplate>
 						</Label.ContentTemplate>
 					</Label>
-					<Label
+					<!--
+						다른 곳에서 편제가 바뀌었는데(서버 SYNC_UNIT) 적용하지 않은 편집 · 배치 대기 · 끌기 때문에 다시 읽지 않았다.
+						덮지 않고 알린다 — [다시 읽기]는 툴바 [갱신]과 같은 길(미적용 관문 포함)이다.
+					-->
+					<StackPanel
 						Grid.Column="2"
+						Margin="0,0,12,0"
+						VerticalAlignment="Center"
+						Orientation="Horizontal"
+						Visibility="{Binding IsExternallyChanged, Converter={StaticResource BoolToVisibility}}">
+						<Label
+							AutomationProperties.AutomationId="Units.Status.ExternalChange"
+							Content="{Binding ExternalChangeText}"
+							Foreground="{DynamicResource StatusWarningBrush}"
+							Style="{StaticResource Unit.Readout}" />
+						<Button
+							Margin="6,0,0,0"
+							AutomationProperties.AutomationId="Units.Status.ExternalChangeReload"
+							Click="OnReload"
+							Content="{Binding ExternalChangeActionText}"
+							IsEnabled="{Binding CanReload}"
+							Style="{StaticResource Console.Button.Mini}"
+							ToolTip="서버의 지금 편제를 다시 읽습니다. 적용하지 않은 변경이 있으면 먼저 묻습니다." />
+					</StackPanel>
+					<Label
+						Grid.Column="3"
 						AutomationProperties.AutomationId="Units.Status.Permission"
 						Content="읽기 전용 (편집 권한 없음)"
 						Foreground="{DynamicResource TextMutedBrush}"

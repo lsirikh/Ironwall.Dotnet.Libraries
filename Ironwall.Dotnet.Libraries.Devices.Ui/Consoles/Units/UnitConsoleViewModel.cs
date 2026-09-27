@@ -4,7 +4,9 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
 using System.Collections.Generic;
@@ -34,7 +36,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 /// <para><b>형제 순서 드래그는 없다</b> — 서버 계약에 순서 필드가 아예 없어 끌어도 저장되지 않는다
 /// (스토리보드 L359-361 · 드래그 와이어프레임 L446).</para>
 /// </remarks>
-public sealed class UnitConsoleViewModel : Screen
+public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMessage>
 {
     public const string RAIL_TREE = "tree";
     public const string RAIL_ADJACENCY = "adjacency";
@@ -49,6 +51,12 @@ public sealed class UnitConsoleViewModel : Screen
     /// <summary>서버가 부대 편제를 모를 때(판본 번호는 보이지 않는다 — U-18 D-8 8.9).</summary>
     public const string NOT_SUPPORTED = "현재 서버는 부대 편제를 지원하지 않습니다.";
 
+    /// <summary>다른 곳(다른 창 · 다른 운영자)에서 편제가 바뀌었는데 지금은 다시 읽지 못할 때 상태 띠에 보이는 말.</summary>
+    public const string EXTERNAL_CHANGE_NOTICE = "다른 곳에서 편제가 바뀌었습니다.";
+
+    /// <summary>그 옆 단추의 글 — 누르면 [갱신]과 같은 길(미적용 관문 포함)로 다시 읽는다.</summary>
+    public const string EXTERNAL_CHANGE_ACTION = "다시 읽기";
+
     #region - Ctors -
     public UnitConsoleViewModel(
         IUnitGraphApi units,
@@ -58,7 +66,10 @@ public sealed class UnitConsoleViewModel : Screen
         Func<bool>? canEdit = null,
         Func<bool>? canDelete = null,
         Func<bool>? canView = null,
-        Func<bool>? canPlaceDevices = null)
+        Func<bool>? canPlaceDevices = null,
+        IEventAggregator? events = null,
+        Func<bool>? isDragging = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _units = units ?? throw new ArgumentNullException(nameof(units));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
@@ -70,6 +81,11 @@ public sealed class UnitConsoleViewModel : Screen
         _canDelete = canDelete ?? UnitPermissionGate.CanDelete;
         _canView = canView ?? UnitPermissionGate.CanView;
         _canPlaceDevices = canPlaceDevices ?? DevicePermissionGate.CanEdit;
+        _events = events;
+        _isDragging = isDragging ?? (() => DragSession.IsActive);
+        // SYNC_UNIT 는 PUT 한 번에 여러 건이 몰려온다 — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
+        _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync, delay: delay,
+                                                onError: ex => _log?.Error($"[UnitConsole] 외부 변경 재조회: {ex.Message}"));
 
         // 창 제목 — Caliburn 창 관리자가 DisplayName 을 Title 로 묶는다. 비우면 타입 이름이 뜬다(U-18 D-0 0.2 · D-8 8.1).
         DisplayName = WINDOW_TITLE;
@@ -272,9 +288,23 @@ public sealed class UnitConsoleViewModel : Screen
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        _closed = false;
+        // 창이 떠 있는 동안만 듣는다 — 열 때마다 새로 만드는 창이라 닫힌 뒤 구독이 남으면 창이 수거되지 않는다.
+        _events?.SubscribeOnUIThread(this);
         if (_loadedOnce) return;
         _loadedOnce = true;
         await ReloadAsync(cancellationToken);
+    }
+
+    protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        if (close)
+        {
+            _closed = true;
+            _events?.Unsubscribe(this);
+            _externalChange.Cancel();
+        }
+        await base.OnDeactivateAsync(close, cancellationToken);
     }
 
     /// <summary>편제 전체를 한 번에 읽는다 — <c>/graph</c> 는 페이지네이션이 없다(와이어프레임 L314).</summary>
@@ -315,6 +345,7 @@ public sealed class UnitConsoleViewModel : Screen
             }
 
             Tree = UnitTreeBuilder.Build(response.Data);
+            IsExternallyChanged = false;          // 방금 서버의 지금 편제를 받았다 — "바뀌었다" 안내는 더 이상 참이 아니다
             AdjacencyPairCount = response.Data?.Edges?.AdjacencyPairs.Count() ?? 0;
 
             if (_devices.IsAvailable)
@@ -343,6 +374,77 @@ public sealed class UnitConsoleViewModel : Screen
             IsBusy = false;
             RaiseCommands();
         }
+    }
+    #endregion
+
+    #region - 다른 곳에서 바뀐 편제 (SYNC_UNIT) -
+    /// <summary>
+    /// 다른 곳에서 편제가 바뀌었는데 <b>지금 다시 읽지 않았다</b> — 적용하지 않은 편집 · 배치 대기 · 끌기 중이라서.
+    /// 상태 띠에 <see cref="ExternalChangeText"/> 와 [<see cref="EXTERNAL_CHANGE_ACTION"/>] 단추가 뜬다.
+    /// </summary>
+    public bool IsExternallyChanged
+    {
+        get => _isExternallyChanged;
+        private set { if (_isExternallyChanged == value) return; _isExternallyChanged = value; NotifyOfPropertyChange(); }
+    }
+
+    public string ExternalChangeText => EXTERNAL_CHANGE_NOTICE;
+    public string ExternalChangeActionText => EXTERNAL_CHANGE_ACTION;
+
+    /// <summary>
+    /// 서버 <c>SYNC_UNIT</c> — 호스트가 옮겨 온다. 여기서는 신호만 세고 곧바로 돌아간다
+    /// (호스트의 NATS 처리 줄이 창의 재조회를 기다리지 않도록). 실제 판단은 창이 끝난 뒤 한 번 한다.
+    /// </summary>
+    /// <remarks><c>ResourceId</c> 는 보지 않는다 — 인접 알림에서는 부대 id 가 아니라 인접 행 id 다. 늘 편제 전체를 다시 읽는다.</remarks>
+    public Task HandleAsync(UnitTopologyChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (_closed) return Task.CompletedTask;
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
+    internal Task ExternalChangeTask => _externalChangeTask;
+
+    /// <summary>적용하지 않은 것이 있다 — 다시 읽으면 사라지거나(상세 · 등록 폼) 행 표시가 풀린다(배치 대기).</summary>
+    private bool HasUnappliedWork => Detail.IsDirty || Tray.HasEntries || Tray.IsApplying;
+
+    private async Task OnExternalChangeSettledAsync(CancellationToken token)
+    {
+        if (_closed || !_loadedOnce) return;
+
+        // 끌기 · 다른 작업 중이면 잠깐 뒤로 미룬다 — 곧 끝나는 일이고, 끝나면 다음 창에서 알아서 다시 읽는다.
+        if (_isDragging() || IsBusy)
+        {
+            IsExternallyChanged = true;
+            _externalChangeTask = _externalChange.Pulse();
+            return;
+        }
+
+        // 사람이 손댄 것은 덮지 않는다 — 알리고 사람이 [다시 읽기]로 고른다.
+        if (HasUnappliedWork)
+        {
+            IsExternallyChanged = true;
+            return;
+        }
+
+        var selectedId = SelectedRow?.Id;
+        var before = Tree;
+        // 조용히 · 관문 없이 — 방금 한 일의 결과 문장을 지우지 않고, 미적용 관문은 위에서 이미 확인했다.
+        await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+        if (ReferenceEquals(Tree, before) || Detail.IsCreating || selectedId is not int id) return;   // 못 읽었거나 등록 중
+
+        if (SelectedRow is null)
+        {
+            // 고른 부대가 다른 곳에서 지워졌다 — 없는 부대의 상세를 붙들고 있으면 다음 적용이 404 로 간다.
+            Form.Clear();
+            Detail.Reset();
+            RaiseDetail();
+            StatusText = "고른 부대가 다른 곳에서 삭제되었습니다.";
+            return;
+        }
+        // 같은 부대라도 다시 읽는다 — 옛 상세를 붙들면 다음 PATCH 가 이미 바뀐 칸을 옛 값으로 되돌린다.
+        await SelectByIdAsync(id, token, force: true).ConfigureAwait(true);
     }
     #endregion
 
@@ -1118,6 +1220,12 @@ public sealed class UnitConsoleViewModel : Screen
     private readonly Func<bool> _canDelete;
     private readonly Func<bool> _canView;
     private readonly Func<bool> _canPlaceDevices;
+    private readonly IEventAggregator? _events;
+    private readonly Func<bool> _isDragging;
+    private readonly CoalescingTrigger _externalChange;
+    private Task _externalChangeTask = Task.CompletedTask;
+    private bool _isExternallyChanged;
+    private bool _closed;
 
     private readonly Dictionary<int, UnitNodeRowViewModel> _rowCache = new();
     private readonly Dictionary<int, UnitDeviceRowViewModel> _deviceRowCache = new();

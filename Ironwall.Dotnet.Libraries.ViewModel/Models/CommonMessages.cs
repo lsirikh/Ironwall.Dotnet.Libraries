@@ -182,6 +182,36 @@ public sealed record DeviceGroupMembershipChangedMessage(System.Collections.Gene
     }
 }
 
+/// <summary>
+/// 부대 편제가 <b>다른 곳에서</b> 바뀌었다 — 서버 NATS <c>SYNC_UNIT</c>(<c>sensorway.global.all.sync.unit</c>)를 호스트가 옮긴다.
+/// </summary>
+/// <param name="Action">서버가 보낸 <c>body.action</c> 원문 — <c>CREATED</c> · <c>UPDATED</c> · <c>DELETED</c>(모르면 빈 문자열).</param>
+/// <param name="ResourceId">서버가 보낸 <c>body.resource_id</c> 원문.</param>
+/// <remarks>
+/// <para><b>"다시 읽어라" 는 신호일 뿐이다.</b> 무엇이 바뀌었는지는 싣지 않는다 — 받는 쪽은 편제(<c>GET /api/units/graph</c>)를
+/// <b>통째로</b> 다시 읽는다.</para>
+/// <para>⚠ <see cref="ResourceId"/> 를 부대 id 로 믿지 않는다 — 부대 생성 · 수정(상위 바꾸기 포함) · 삭제에서는 부대 id 지만,
+/// <b>인접 추가 · 제거에서는 인접 행(row) id</b> 다(서버 명세와 어긋남 — 서버팀에 보고됨).
+/// 그래서 <c>GET /api/units/{ResourceId}</c> 로 한 건만 읽는 최적화를 하지 않는다. 로그 · 진단용이다.</para>
+/// <para>PUT 한 번이 여러 건을 <b>몰아서</b> 낼 수 있다 — 받는 쪽이 짧은 창(약 500 ms)으로 합친다
+/// (<c>Ironwall.Dotnet.Libraries.Utils.Consoles.CoalescingTrigger</c>). 호스트는 같은 봉투 id 를 한 번만 옮긴다.</para>
+/// <para>수신 스레드는 정하지 않는다 — 받는 쪽이 마샬링한다(<c>SubscribeOnUIThread</c> 등).
+/// 받는 쪽: 부대 편제 콘솔(열려 있을 때) · 부대 관계도. 부대 캐시(<c>UnitNameDirectory</c> · <c>UnitScopeService</c>)는 호스트가 직접 무효화한다.</para>
+/// </remarks>
+public sealed record UnitTopologyChangedMessage(string Action, int ResourceId);
+
+/// <summary>
+/// 조치보고 문구 목록이 <b>다른 곳에서</b> 바뀌었다 — 서버 NATS <c>SYNC_ACTION_REPORT_TEMPLATE</c> 를 호스트가 옮긴다.
+/// </summary>
+/// <param name="Action">서버가 보낸 <c>body.action</c> 원문 — <c>CREATED</c> · <c>UPDATED</c> · <c>DELETED</c>.</param>
+/// <param name="ResourceId">서버가 보낸 <c>body.resource_id</c> 원문. 순서 바꾸기(<c>/reorder</c>)는 <c>UPDATED</c> + <c>0</c> 한 건이다.</param>
+/// <remarks>
+/// <para>받는 쪽은 목록을 통째로 다시 읽는다(<c>GET /api/events/action-report-templates</c>).</para>
+/// <para>전환기에는 서버가 같은 봉투를 전역 subject 와 부대 subject 로 <b>두 번</b> 보낸다 — 호스트가 봉투 id 로 한 번만 옮긴다.</para>
+/// <para>받는 쪽: 조치보고 문구 콘솔 · 이벤트 콘솔 조치 트레이 · 조치보고 창(열려 있을 때). 적용하지 않은 편집은 덮지 않는다.</para>
+/// </remarks>
+public sealed record ActionReportTemplatesChangedMessage(string Action, int ResourceId);
+
 /// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
 public record WebServerEnabledChangedMessage(bool IsEnabled);
 

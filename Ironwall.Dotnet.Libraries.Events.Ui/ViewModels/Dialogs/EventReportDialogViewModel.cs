@@ -20,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
        Company      : Sensorway Co., Ltd.                                       
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
-    public abstract class EventReportDialogViewModel : BasePanelViewModel
+    public abstract class EventReportDialogViewModel : BasePanelViewModel, IHandle<ActionReportTemplatesChangedMessage>
     {
         #region - Ctors -
         public EventReportDialogViewModel()
@@ -75,13 +75,36 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             if (source is not null) _ = RefreshPhrasesAsync(source);
         }
 
-        private async Task RefreshPhrasesAsync(IActionReportPhraseSource source)
+        /// <summary>
+        /// 창이 떠 있는 동안 다른 곳에서 문구 목록이 바뀌었다(서버 <c>SYNC_ACTION_REPORT_TEMPLATE</c>) — 다시 읽어 갈아 끼운다.
+        /// 단, 사람이 고른 문구가 새 목록에서 빠졌으면 <b>갈아 끼우지 않는다</b>(고른 것을 말없이 다른 문구로 바꾸지 않는다).
+        /// </summary>
+        /// <remarks>기다리지 않고 돌아간다 — 호스트의 NATS 처리 줄이 서버 왕복을 기다리지 않도록.</remarks>
+        public Task HandleAsync(ActionReportTemplatesChangedMessage message, CancellationToken cancellationToken)
+        {
+            if (!IsActive) return Task.CompletedTask;
+            var source = ResolvePhraseSource();
+            if (source is not null) PhraseRefreshTask = RefreshPhrasesAsync(source, protectSelection: true);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>가장 최근 알림이 시작한 문구 다시 읽기(시험용).</summary>
+        internal Task PhraseRefreshTask { get; private set; } = Task.CompletedTask;
+
+        private async Task RefreshPhrasesAsync(IActionReportPhraseSource source, bool protectSelection = false)
         {
             try
             {
                 var set = await source.LoadAsync().ConfigureAwait(true);
                 var current = CollectionActionItem?.Select(i => i.Name).ToList() ?? new List<string?>();
                 if (!IsActive || set.Phrases.SequenceEqual(current)) return;
+                if (protectSelection && SelectableItemViewModel is { } chosen
+                    && !ReferenceEquals(chosen, EtcViewModel)
+                    && !set.Phrases.Contains(chosen.Name ?? string.Empty, StringComparer.Ordinal))
+                {
+                    _log?.Info($"[{GetType().Name}] 고른 문구 '{chosen.Name}' 이(가) 새 목록에 없어 창의 문구를 그대로 둡니다.");
+                    return;
+                }
                 Execute.OnUIThread(() =>
                 {
                     BuildItems(set.Phrases, keepSelection: true);

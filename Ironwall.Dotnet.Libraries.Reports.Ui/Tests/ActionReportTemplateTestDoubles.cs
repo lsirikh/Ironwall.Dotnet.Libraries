@@ -38,8 +38,12 @@ public sealed class FakeActionReportTemplateApiService : IActionReportTemplateAp
     public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
 
+    /// <summary>목록 GET 이 실제로 나간 횟수 — 알림 합치기(한 번만 다시 읽기)를 단언하는 데 쓴다.</summary>
+    public int ListReads { get; private set; }
+
     public Task<ApiListResponse<ActionReportTemplateDto>> GetTemplatesAsync(CancellationToken token = default)
     {
+        ListReads++;
         if (Unsupported)
         {
             IsSupported = false;

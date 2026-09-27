@@ -49,6 +49,7 @@ public class EventDashboardViewModel : BasePanelViewModel
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel>
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel>
                                      , IHandle<CallCloseEventConsoleMessageModel>
+                                     , IHandle<ActionReportTemplatesChangedMessage>
 {
     public const string ConsoleKey = "Events";
 
@@ -1391,6 +1392,23 @@ public class EventDashboardViewModel : BasePanelViewModel
     }
 
     private readonly IActionReportPhraseSource _phrases;
+
+    /// <summary>
+    /// 다른 곳(조치보고 문구 콘솔 · 다른 운영자)에서 문구 목록이 바뀌었다(서버 <c>SYNC_ACTION_REPORT_TEMPLATE</c>).
+    /// 콘솔이 떠 있으면 트레이 문구를 곧바로 갈아 끼운다 — 단, <b>트레이에 보내지 않은 조치가 있으면 건드리지 않는다</b>
+    /// (고른 문구가 목록에서 빠지면 그 선택이 비워진다). 그때는 다음에 콘솔을 열 때 다시 읽는다.
+    /// </summary>
+    /// <remarks>기다리지 않고 돌아간다 — 호스트의 NATS 처리 줄이 서버 왕복을 기다리지 않도록.</remarks>
+    public Task HandleAsync(ActionReportTemplatesChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (!IsActive || Tray.HasEntries || Tray.IsApplying) return Task.CompletedTask;
+        _phraseRefresh = RefreshPhrasesAsync();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>가장 최근 알림이 시작한 문구 다시 읽기(시험용).</summary>
+    internal Task PhraseRefreshTask => _phraseRefresh;
+    private Task _phraseRefresh = Task.CompletedTask;
 
     /// <summary>
     /// 트레이 문구를 조치보고 문구 관리 목록(서버)으로 갈아 끼운다. 못 읽으면 기본 문구 그대로다.

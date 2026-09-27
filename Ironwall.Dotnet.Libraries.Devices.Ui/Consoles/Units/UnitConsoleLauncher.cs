@@ -40,19 +40,23 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher
     private readonly IUnitDeviceApi _devices;
     private readonly INatsSetupModel? _nats;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _events;
 
+    /// <param name="events">있으면 콘솔이 떠 있는 동안 <c>UnitTopologyChangedMessage</c>(서버 <c>SYNC_UNIT</c>)를 듣고 편제를 다시 읽는다.</param>
     public UnitConsoleLauncher(
         IWindowManager windows,
         IUnitGraphApi units,
         IUnitDeviceApi devices,
         INatsSetupModel? nats = null,
-        ILogService? log = null)
+        ILogService? log = null,
+        IEventAggregator? events = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _units = units ?? throw new ArgumentNullException(nameof(units));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         _nats = nats;
         _log = log;
+        _events = events;
     }
 
     public bool IsAvailable => _units.IsAvailable;
@@ -66,7 +70,7 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher
         }
 
         // GroupNats 가 '내 부대 코드' 의 유일한 출처다 — 트리에서 그 부대를 강조하는 데만 쓴다.
-        var viewModel = new UnitConsoleViewModel(_units, _devices, _log, () => _nats?.GroupNats)
+        var viewModel = new UnitConsoleViewModel(_units, _devices, _log, () => _nats?.GroupNats, events: _events)
         {
             // 삭제 · 운용 중지 · 닫기 전에 묻는 창 — 조립기와 같은 확인 창(작은 모달, 부대 창을 소유자로).
             Confirm = ConfirmAsync,

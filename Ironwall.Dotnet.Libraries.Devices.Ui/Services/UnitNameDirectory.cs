@@ -2,10 +2,12 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,17 +32,22 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /// <para><b>왜 <see cref="IService"/> 가 아닌가</b> — <c>CatalogService</c> 와 같은 이유다: 부팅 때 읽지 않고
 /// 화면이 처음 필요로 할 때 1회 읽는다(로그인 전에는 토큰이 없다). 8.0 미만이면 애초에 서버를 부르지 않는다.</para>
 /// </remarks>
-public sealed class UnitNameDirectory
+public sealed class UnitNameDirectory : IUnitTopologyCache
 {
     #region - Ctors -
     /// <param name="api">부대 편제 창구. <b>선택 주입</b> — 없으면 해석을 포기한다.</param>
     /// <param name="probe">서버 계약 세대 프로브. <b>선택 주입</b> — 없으면 6.3 으로 간주해 서버를 부르지 않는다.</param>
     /// <param name="log">진단 로그(선택).</param>
-    public UnitNameDirectory(IUnitGraphApi? api = null, IServerContractProbe? probe = null, ILogService? log = null)
+    /// <param name="delay">무효화 알림을 합치는 창의 지연(시험용). 생략하면 실제 시간.</param>
+    public UnitNameDirectory(IUnitGraphApi? api = null, IServerContractProbe? probe = null, ILogService? log = null,
+                             Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _api = api;
         _probe = probe;
         _log = log;
+        // SYNC_UNIT 는 몰려온다 — 창 안의 무효화를 다시 읽기 한 번으로 합친다.
+        _reload = new CoalescingTrigger(token => EnsureLoadedAsync(token), delay: delay,
+                                        onError: ex => _log?.Warning($"[{nameof(UnitNameDirectory)}] 다시 읽기 실패: {ex.Message}"));
     }
     #endregion
 
@@ -112,6 +119,9 @@ public sealed class UnitNameDirectory
                 _names[node.Id] = node.Name;
                 ordered.Add((node.Id, node.Name));
             }
+            // 다른 곳에서 지워진 부대는 사전에서도 뺀다 — 남겨 두면 없는 부대의 이름이 계속 보인다.
+            var live = new HashSet<int>(ordered.Select(o => o.Id));
+            foreach (var gone in _names.Keys.Where(k => !live.Contains(k)).ToList()) _names.TryRemove(gone, out _);
             _ordered = ordered;
             _loaded = true;
         }
@@ -128,6 +138,24 @@ public sealed class UnitNameDirectory
             _gate.Release();
         }
     }
+
+    /// <summary>
+    /// 다른 곳에서 편제가 바뀌었다(서버 <c>SYNC_UNIT</c>) — 부대 이름 · 목록을 다시 읽는다.
+    /// </summary>
+    /// <remarks>
+    /// 이미 한 번 채운 적이 있을 때만 배경에서 다시 읽는다(창 500 ms 로 합친다) — 아무도 쓰지 않은 사전을 위해 서버를 부르지 않는다.
+    /// 다시 읽는 동안에도 옛 이름은 그대로 보인다(빈 칸 · id 로 깜빡이지 않는다).
+    /// </remarks>
+    public void Invalidate()
+    {
+        _lastAttemptTick = 0;              // 재시도 스로틀도 풀어 준다 — 서버가 바뀌었다고 알려 준 참이다
+        if (!_loaded) return;
+        _loaded = false;
+        _pendingReload = _reload.Pulse();
+    }
+
+    /// <summary>가장 최근 배경 다시 읽기(시험용).</summary>
+    internal Task PendingReload => _pendingReload;
     #endregion
 
     #region - Attributes -
@@ -145,5 +173,7 @@ public sealed class UnitNameDirectory
     private volatile bool _loaded;
     private volatile IReadOnlyList<(int Id, string Name)> _ordered = Array.Empty<(int, string)>();
     private long _lastAttemptTick;
+    private readonly CoalescingTrigger _reload;
+    private Task _pendingReload = Task.CompletedTask;
     #endregion
 }
