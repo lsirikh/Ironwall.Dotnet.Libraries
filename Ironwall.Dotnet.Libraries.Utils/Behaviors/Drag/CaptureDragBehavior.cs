@@ -57,6 +57,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private FrameworkElement? _hoverZone;
     private int _hoverIndex = -1;
     private readonly EdgeAutoScroller _autoScroller = new();
+    private string? _traceLastHit;
 
     #region - Properties -
     /// <summary>판정 · 처리 담당(보통 패널 뷰모델). 드롭존에 담당이 따로 없으면 이것을 쓴다.</summary>
@@ -111,7 +112,11 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
     private void OnLoaded(object sender, RoutedEventArgs e) => AssertHasFallback();
 
-    private void OnUnloaded(object sender, RoutedEventArgs e) => FinishDrag(commit: false);
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (DragTrace.IsOn && (_pressed || _dragging)) DragTrace.Write($"[capture] unloaded while pressed list={DragTrace.Chain(AssociatedObject, 2)}");
+        FinishDrag(commit: false);
+    }
 
     [Conditional("DEBUG")]
     private void AssertHasFallback()
@@ -138,6 +143,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _pressedItem = item;
         _pressPoint = DragPointer.GetPosition(AssociatedObject);
         e.Handled = true;
+        if (DragTrace.IsOn) DragTrace.Write($"[capture] start list={DragTrace.Chain(AssociatedObject, 2)} item={item} captured={DragTrace.Captured()}");
     }
 
     private void OnDragDelta(object sender, DragDeltaEventArgs e)
@@ -161,6 +167,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     {
         if (!_pressed || !ReferenceEquals(e.OriginalSource, _handle)) return;
         e.Handled = true;
+        if (DragTrace.IsOn) DragTrace.Write($"[capture] completed canceled={e.Canceled} dragging={_dragging} hover={(_hoverZone == null ? "(none)" : DropZone.GetKey(_hoverZone))} index={_hoverIndex} captured={DragTrace.Captured()}");
         FinishDrag(commit: !e.Canceled);
     }
     #endregion
@@ -179,6 +186,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         _zoneAccepts.Clear();
         foreach (var zone in DropZone.ZonesUnder(_root)) Probe(zone);
+        if (DragTrace.IsOn) DragTrace.Write($"[capture] begin root={DragTrace.Chain(_root, 1)} zones=[{string.Join(", ", _zoneAccepts.Select(z => $"{DropZone.GetKey(z.Key)}:{z.Value}"))}]");
 
         _ghostLayer = AdornerLayer.GetAdornerLayer(AssociatedObject);
         if (_ghostLayer != null)
@@ -199,6 +207,15 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _ghost?.MoveTo(DragPointer.GetPosition(AssociatedObject));
 
         var zone = ZoneAt(DragPointer.GetPosition(_root), out var hit);
+        if (DragTrace.IsOn)
+        {
+            var chain = DragTrace.Chain(hit, 10);
+            if (chain != _traceLastHit)
+            {
+                _traceLastHit = chain;
+                DragTrace.Write($"[capture] at root={DragPointer.GetPosition(_root)} list={DragPointer.GetPosition(AssociatedObject)} zone={(zone == null ? "(none)" : DropZone.GetKey(zone))} hit={chain}");
+            }
+        }
         var index = -1;
         var lineY = double.NaN;
 
@@ -221,6 +238,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         // 후보가 바뀔 때만 시각을 고친다 — 마우스 이동마다 다시 그리지 않는다(RDP 에서 증폭된다).
         if (!ReferenceEquals(newHover, _hoverZone))
         {
+            if (DragTrace.IsOn) DragTrace.Write($"[capture] hover {(newHover == null ? "(none)" : DropZone.GetKey(newHover))} zone={(zone == null ? "(none)" : DropZone.GetKey(zone))} index={index} hit={DragTrace.Chain(hit)}");
             if (_hoverZone != null) DropZone.SetState(_hoverZone, _zoneAccepts.TryGetValue(_hoverZone, out var was) && was ? DropZoneState.Available : DropZoneState.Blocked);
             if (newHover != null) DropZone.SetState(newHover, DropZoneState.Hover);
             MoveLineTo(newHover);
@@ -280,7 +298,9 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
         var handler = HandlerFor(zone);
         // 시각 · 구독은 위에서 이미 다 풀었다 — 담당(창)의 Drop 이 던져도 커널 상태는 깨끗하다. 예외는 삼키지 않는다.
-        if (handler != null && SafeCanDrop(handler, payload, target)) handler.Drop(payload, target);
+        var canDrop = handler != null && SafeCanDrop(handler, payload, target);
+        if (DragTrace.IsOn) DragTrace.Write($"[capture] drop zone={target.ZoneKey} index={index} handler={handler?.GetType().Name ?? "(none)"} canDrop={canDrop}");
+        if (canDrop) handler!.Drop(payload, target);
     }
 
     private void OnRootPreviewKeyDown(object sender, KeyEventArgs e)
@@ -370,8 +390,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         hit = null;
         if (_root == null) return null;
 
-        var result = VisualTreeHelper.HitTest(_root, pointInRoot);
-        hit = result?.VisualHit;
+        // 숨은 덮개(MetroWindow PART_OverlayBox) · 우리 고스트 · 삽입선을 거른다 — DragHitTest 주석.
+        hit = DragHitTest.Top(_root, pointInRoot);
         for (var d = hit; d != null; d = ParentOf(d))
             if (d is FrameworkElement fe && !string.IsNullOrEmpty(DropZone.GetKey(fe)))
                 return fe;

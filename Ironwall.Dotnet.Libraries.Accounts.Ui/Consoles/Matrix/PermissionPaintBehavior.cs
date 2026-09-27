@@ -23,7 +23,7 @@ public static class PermissionColumn
 /// </summary>
 /// <remarks>
 /// <para>캡처 드래그다: <c>PreviewMouseLeftButtonDown</c>(압력) → <c>MouseMove</c>(데드존 8.0 DIU 통과) →
-/// <c>MouseLeftButtonUp</c>/<c>LostMouseCapture</c>. 종료는 <see cref="FinishPaint"/> 한 곳으로 모은다.
+/// <c>PreviewMouseLeftButtonUp</c>/<c>LostMouseCapture</c>. 종료는 <see cref="FinishPaint"/> 한 곳으로 모은다.
 /// OLE <c>DoDragDrop</c> 은 쓰지 않는다.</para>
 /// <para>순서: ① 플래그 ② 구독 해제 ③ 캡처 해제 ④ 통지 — 캡처를 먼저 풀면 재진입한다.</para>
 /// <para>판정(어느 축 · 어느 칸)은 <see cref="PermissionPaintMath"/> 의 순수 함수가 한다 — 여기서는 좌표만 고른다.</para>
@@ -56,7 +56,9 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
         base.OnAttached();
         AssociatedObject.PreviewMouseLeftButtonDown += OnPress;
         AssociatedObject.MouseMove += OnMove;
-        AssociatedObject.MouseLeftButtonUp += OnRelease;
+        // 뗌은 터널(Preview)에서 받는다 — DataGrid 는 버블 MouseUp 의 클래스 처리기에서 캡처를 먼저 풀어,
+        // 버블에서 받으면 LostMouseCapture(= 취소)가 먼저 와 칠한 것이 전부 되돌아갔다(2026-09-27 실창 기록).
+        AssociatedObject.PreviewMouseLeftButtonUp += OnRelease;
         AssociatedObject.LostMouseCapture += OnLostCapture;
         AssociatedObject.Unloaded += OnUnloaded;
     }
@@ -66,7 +68,7 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
         FinishPaint(commit: false);
         AssociatedObject.PreviewMouseLeftButtonDown -= OnPress;
         AssociatedObject.MouseMove -= OnMove;
-        AssociatedObject.MouseLeftButtonUp -= OnRelease;
+        AssociatedObject.PreviewMouseLeftButtonUp -= OnRelease;
         AssociatedObject.LostMouseCapture -= OnLostCapture;
         AssociatedObject.Unloaded -= OnUnloaded;
         base.OnDetaching();
@@ -109,13 +111,21 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
         using (Matrix.BeginPaintBatch()) Matrix.Painter.MoveTo(cell);
     }
 
-    private void OnRelease(object sender, MouseButtonEventArgs e) => FinishPaint(commit: true);
+    private void OnRelease(object sender, MouseButtonEventArgs e)
+    {
+        if (Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.IsOn) Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.Write($"[paint] release source={Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.Chain(e.OriginalSource as DependencyObject, 3)}");
+        FinishPaint(commit: true);
+    }
 
     /// <summary>
     /// 캡처 상실 = <b>취소</b>다. 커널의 드래그 계약과 <see cref="PermissionPainter.Cancel"/> 의 문서가 그렇게 적혀 있고,
     /// 모달·포커스 도둑질로 캡처를 잃었을 때 "칠한 대로 굳히는" 것은 사용자가 의도한 적 없는 변경이다.
     /// </summary>
-    private void OnLostCapture(object sender, MouseEventArgs e) => FinishPaint(commit: false);
+    private void OnLostCapture(object sender, MouseEventArgs e)
+    {
+        if (Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.IsOn) Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.Write($"[paint] lost capture now={Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragTrace.Captured()} button={Mouse.LeftButton}");
+        FinishPaint(commit: false);
+    }
 
     private void OnRootPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -154,7 +164,7 @@ public class PermissionPaintBehavior : Behavior<DataGrid>
     }
 
     private DependencyObject? HitTest(Point point)
-        => VisualTreeHelper.HitTest(AssociatedObject, point)?.VisualHit;
+        => Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DragHitTest.Top(AssociatedObject, point);
 
     /// <summary>
     /// 좌표 아래의 칸 — HitTest → <see cref="DataGridCell"/> → 행은 <c>ItemContainerGenerator</c> 로 역산한다.
