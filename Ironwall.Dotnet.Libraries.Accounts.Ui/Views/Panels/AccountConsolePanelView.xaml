@@ -1216,11 +1216,21 @@
 
 		<!--  상태 띠 — 건수 · 방금 한 일 · 권한 그룹 칩(드롭존) · Draft 트레이  -->
 		<c:ConsoleShell.StatusBar>
+			<!--  세션 설정 레일은 가운데 칸에 제 저장 막대가 있다 — 빈 상태 줄 띠를 겹쳐 두지 않는다.  -->
 			<Border
 				Padding="12,5"
 				Background="{DynamicResource SurfaceAltBrush}"
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="0,1,0,0">
+				<Border.Style>
+					<Style TargetType="Border">
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsSessionSetupRail}" Value="True">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
 				<StackPanel>
 					<!--
 						U-18 — 건수(왼쪽)가 먼저 제 폭을 갖고, 안내(오른쪽)가 남는 폭을 쓴다. 예전에는 안내가 먼저 도킹돼 긴 Draft 안내가

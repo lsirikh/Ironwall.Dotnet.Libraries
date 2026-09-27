@@ -209,10 +209,23 @@
 										<ContentPresenter Content="{TemplateBinding Toolbar}" />
 										<ContentPresenter Grid.Row="1" Content="{TemplateBinding List}" />
 										<!--  상태 줄도 상세 적용 막대와 같은 높이 이상(FooterBandHeight) — 세 칸 바닥 띠 윗선이 한 줄로 선다.  -->
-										<ContentPresenter
-											Grid.Row="2"
-											MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
-											Content="{TemplateBinding StatusBar}" />
+										<ContentPresenter Grid.Row="2" Content="{TemplateBinding StatusBar}">
+											<!--  상태 줄이 없는 화면(계정 세션 설정 등)에서는 빈 띠를 만들지 않는다 — 최소 높이는 내용이 있을 때만.  -->
+											<ContentPresenter.Style>
+												<Style TargetType="ContentPresenter">
+													<Setter Property="MinHeight" Value="{x:Static c:ConsoleLayoutMath.FooterBandHeight}" />
+													<Style.Triggers>
+														<Trigger Property="Content" Value="{x:Null}">
+															<Setter Property="MinHeight" Value="0" />
+														</Trigger>
+														<!--  화면이 제 상태 줄을 접은 경우(Visibility=Collapsed)도 빈 띠를 두지 않는다.  -->
+														<DataTrigger Binding="{Binding Content.Visibility, RelativeSource={RelativeSource Self}}" Value="Collapsed">
+															<Setter Property="MinHeight" Value="0" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</ContentPresenter.Style>
+										</ContentPresenter>
 									</Grid>
 
 									<Border
