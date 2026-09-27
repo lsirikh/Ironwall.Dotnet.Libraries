@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -122,6 +122,7 @@ public class DateTimeRangeField : Control
             _calendar.SelectedDatesChanged += OnCalendarSelectionChanged;
             // ⚠ 달력 낱칸 재도색(RestyleCalendarChildren) 배선 — 아래 그 메서드의 주석(K-13) 참조.
             _calendar.DisplayDateChanged += OnCalendarDisplayDateChanged;
+            _calendar.PreviewMouseUp += OnCalendarPreviewMouseUp;
         }
         if (_startTime is not null) _startTime.SelectedTimeChanged += OnTimeChanged;
         if (_endTime is not null) _endTime.SelectedTimeChanged += OnTimeChanged;
@@ -181,6 +182,7 @@ public class DateTimeRangeField : Control
         {
             _calendar.SelectedDatesChanged -= OnCalendarSelectionChanged;
             _calendar.DisplayDateChanged -= OnCalendarDisplayDateChanged;
+            _calendar.PreviewMouseUp -= OnCalendarPreviewMouseUp;
         }
         if (_startTime is not null) _startTime.SelectedTimeChanged -= OnTimeChanged;
         if (_endTime is not null) _endTime.SelectedTimeChanged -= OnTimeChanged;
@@ -192,64 +194,16 @@ public class DateTimeRangeField : Control
     private void OnCalendarDisplayDateChanged(object? sender, CalendarDateChangedEventArgs e) => RestyleCalendarChildrenDeferred();
 
     /// <summary>
-    /// K-13 — CalendarDayButton/CalendarButton/Button(헤더·화살표)은 Style.Resources 도, Calendar 인스턴스
-    /// 자신의 Resources 도, CalendarItem 자신의 ControlTemplate.Resources 도 전부 무력했다(실측 5종:
-    /// Lime/Red 배경 · Visibility=Collapsed · CalendarItem 자체 Background 까지 반영 0). Aero2 가 이 내부
-    /// 타입들의 Style 을 자기 자신의 테마 사전에서 성공적으로(=조용히 실패가 아니라) 찾아 명시로 물려서
-    /// 어떤 암시/스코프 리소스도 끼어들 여지가 없다 — 유일하게 이기는 것은 <b>로컬 값</b> 뿐이다(WPF 속성
-    /// 우선순위 최상단). 그래서 달력이 실제로 그 낱칸들을 만든 뒤(초기 · 월 이동 · 새로 열 때마다) 시각
-    /// 트리를 걸어 Style 을 인스턴스별로 직접 대입한다. 이 메서드가 '진짜로 먹히는' 유일한 경로다(실측).
+    /// K-13 — 달력 낱칸 재도색. 경로와 실측 근거는 <see cref="ConsoleCalendarSkin"/> 에 있다(B7 — 단일 날짜 칸
+    /// <see cref="DateTimeField"/> 와 나눠 쓰려고 옮겼다. 동작은 같다).
     /// </summary>
     private void RestyleCalendarChildrenDeferred()
-        => Dispatcher.BeginInvoke(new Action(RestyleCalendarChildren), System.Windows.Threading.DispatcherPriority.Loaded);
-
-    /// <summary>
-    /// K-13 실측 계속 — <c>this.TryFindResource(...)</c> 조차 "Console.DateTimeRange.CalendarDayCell" 를 못
-    /// 찾는다(진단: dayStyle=False, day=42 — 42개를 다 찾아 로컬 값(Background=Red)을 주는 건 즉시 반영됐다).
-    /// DefaultStyleKey 테마 해석은 그 컨트롤 자신의 키(<c>{x:Type DateTimeRangeField}</c>)만 낱개로 찾아줄 뿐,
-    /// Generic.xaml 사전 전체를 인스턴스의 앰비언트 Resources 에 병합하지 않는다 — 그래서 같은 사전 안의
-    /// "형제" 키를 FindResource 로 조회할 방법이 없다. 사전을 직접 로드해서 읽는다(로컬 값 대입은 실측으로
-    /// 확실히 이긴다 — 위 Background=Red 진단).
-    /// </summary>
-    private static readonly ResourceDictionary CalendarResources = new()
     {
-        Source = new Uri("pack://application:,,,/Ironwall.Dotnet.Libraries.Utils;component/Themes/Generic.xaml"),
-    };
-
-    private void RestyleCalendarChildren()
-    {
-        if (_calendar is null) return;
-        var dayStyle = CalendarResources["Console.DateTimeRange.CalendarDayCell"] as Style;
-        var monthStyle = CalendarResources["Console.DateTimeRange.CalendarButtonCell"] as Style;
-        var chromeStyle = CalendarResources["Console.DateTimeRange.CalendarButtonChrome"] as Style;
-
-        foreach (var child in Descendants(_calendar))
-        {
-            switch (child)
-            {
-                case CalendarDayButton dayButton when dayStyle is not null:
-                    dayButton.Style = dayStyle;
-                    break;
-                case CalendarButton monthButton when monthStyle is not null:
-                    monthButton.Style = monthStyle;
-                    break;
-                case Button plainButton when chromeStyle is not null:
-                    plainButton.Style = chromeStyle;
-                    break;
-            }
-        }
+        if (_calendar is not null) ConsoleCalendarSkin.RestyleDeferred(_calendar);
     }
 
-    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
-    {
-        var count = VisualTreeHelper.GetChildrenCount(root);
-        for (var i = 0; i < count; i++)
-        {
-            var child = VisualTreeHelper.GetChild(root, i);
-            yield return child;
-            foreach (var grandchild in Descendants(child)) yield return grandchild;
-        }
-    }
+    /// <summary>날짜를 누른 뒤 달력이 쥔 마우스 캡처를 푼다 — [적용] 이 첫 클릭에 먹도록(<see cref="ConsoleCalendarSkin.ReleaseCalendarCapture"/>).</summary>
+    private void OnCalendarPreviewMouseUp(object sender, MouseButtonEventArgs e) => ConsoleCalendarSkin.ReleaseCalendarCapture();
 
     private static void OnIsDropDownOpenChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {

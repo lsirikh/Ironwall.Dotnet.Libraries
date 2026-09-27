@@ -152,12 +152,20 @@
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="시작" />
-						<DatePicker
+						<!--
+							B7(#51) — WPF DatePicker(MDIX 기본 달력 · Teal)를 커널 단일 날짜 칸(c:DateTimeField)으로. 날짜만 · 글자로도 적는다(yyyy-MM-dd).
+							식별자 · 이름은 그대로(칸 자신이 이 AutomationId 로 나오고, 안쪽 글자 칸이 Edit 로 나온다 — AppSweep T-ACT009).
+							옛 피커처럼 비울 수 있다(뷰모델 DateTime?) — 비우거나 역전(종료 &lt; 시작)하면 [생성] 때 뷰모델이 막는다(검증은 그대로 뷰모델).
+						-->
+						<c:DateTimeField
 							Grid.Row="0"
 							Grid.Column="1"
+							Height="30"
+							HorizontalAlignment="Left"
+							AllowEmpty="True"
 							AutomationProperties.AutomationId="Reports.Create.StartDatePicker"
 							AutomationProperties.Name="시작일"
-							SelectedDate="{Binding CreateViewModel.StartDate}" />
+							Value="{Binding CreateViewModel.StartDate}" />
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
@@ -166,13 +174,16 @@
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="종료" />
-						<DatePicker
+						<c:DateTimeField
 							Grid.Row="1"
 							Grid.Column="1"
+							Height="30"
 							Margin="0,6,0,0"
+							HorizontalAlignment="Left"
+							AllowEmpty="True"
 							AutomationProperties.AutomationId="Reports.Create.EndDatePicker"
 							AutomationProperties.Name="종료일"
-							SelectedDate="{Binding CreateViewModel.EndDate}" />
+							Value="{Binding CreateViewModel.EndDate}" />
 					</Grid>
 				</c:ConsoleField>
 			</StackPanel>

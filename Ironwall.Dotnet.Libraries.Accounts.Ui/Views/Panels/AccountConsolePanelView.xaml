@@ -11,7 +11,6 @@
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:forms="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Forms"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
-	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:matrix="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Consoles.Matrix"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:theme="clr-namespace:Ironwall.Dotnet.Libraries.Theme.Themes;assembly=Ironwall.Dotnet.Libraries.Theme"
@@ -211,23 +210,30 @@
 				SearchText="{Binding SearchText, Mode=TwoWay}"
 				ShowSearch="{Binding ShowSearch}">
 				<!--  감사 로그의 기간 — 서버가 닫힌 어휘를 주는지 확인하기 전까지 자유 입력은 두지 않는다  -->
+				<!--
+					B7(#49) — 옛 WPF DatePicker 두 개(스타일 미지정 → MDIX 기본 달력 · Teal)를 커널 단일 날짜 칸(c:DateTimeField)으로.
+					날짜만 다룬다(뷰모델이 시작일 00:00 ~ 종료일 23:59:59 로 넓힌다 — BuildDateRange) · 비울 수 없다(뷰모델 속성이 DateTime).
+					식별자는 그대로 — 칸 자신이 이 AutomationId 로 UIA 에 나온다(T-ACC028).
+				-->
 				<c:ConsoleToolbar.Filters>
 					<StackPanel Orientation="Horizontal" Visibility="{Binding IsAuditRail, Converter={StaticResource BoolToVisibility}}">
-						<DatePicker
+						<c:DateTimeField
 							Width="126"
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Console.Accounts.Audit.StartDate"
-							SelectedDate="{Binding AuditLogPanelViewModel.StartDate, Mode=TwoWay}" />
+							AutomationProperties.Name="감사 로그 시작일"
+							Value="{Binding AuditLogPanelViewModel.StartDate, Mode=TwoWay}" />
 						<TextBlock
 							Margin="6,0"
 							VerticalAlignment="Center"
 							Foreground="{DynamicResource TextMutedBrush}"
 							Text="~" />
-						<DatePicker
+						<c:DateTimeField
 							Width="126"
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Console.Accounts.Audit.EndDate"
-							SelectedDate="{Binding AuditLogPanelViewModel.EndDate, Mode=TwoWay}" />
+							AutomationProperties.Name="감사 로그 종료일"
+							Value="{Binding AuditLogPanelViewModel.EndDate, Mode=TwoWay}" />
 						<Button
 							Margin="6,0,0,0"
 							AutomationProperties.AutomationId="Console.Accounts.Audit.Search"
@@ -1801,23 +1807,33 @@
 										ItemsSource="{Binding GrantManagementPanelViewModel.Groups}"
 										SelectedItem="{Binding GrantManagementPanelViewModel.SelectedGroup, Mode=TwoWay}" />
 								</c:ConsoleField>
+								<!--
+									B7(#50) — mah:DateTimePicker(입력칸만 콘솔 스타일, 펼친 달력은 MahApps 기본)를 커널 날짜+시각 칸으로.
+									날짜만 고르면 자정이 되어 "오늘 몇 시부터 몇 시까지" 한시 부여가 불가능해진다 — 그래서 IncludeTime.
+									시작은 비울 수 없고(뷰모델 DateTime) 종료는 비울 수 있다(DateTime? — 비우면 기한 없음). 검증(종료 ≤ 시작 · 지난 종료)은 그대로 뷰모델.
+								-->
 								<c:ConsoleField ApiName="valid_from" Header="시작">
-									<!--  날짜만 고르면 자정이 되어 "오늘 몇 시부터 몇 시까지" 한시 부여가 불가능해진다  -->
-									<mah:DateTimePicker
+									<c:DateTimeField
+										Height="30"
 										HorizontalAlignment="Left"
 										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_from"
-										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}"
-										Style="{StaticResource Console.DateTimePicker}" />
+										AutomationProperties.Name="부여 시작"
+										IncludeTime="True"
+										Value="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="valid_until"
 									Header="종료"
 									Note="비우면 기한 없이 부여합니다.">
-									<mah:DateTimePicker
+									<c:DateTimeField
+										Height="30"
 										HorizontalAlignment="Left"
+										AllowEmpty="True"
 										AutomationProperties.AutomationId="Accounts.Detail.Field.grant_until"
-										SelectedDateTime="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}"
-										Style="{StaticResource Console.DateTimePicker}" />
+										AutomationProperties.Name="부여 종료"
+										IncludeTime="True"
+										Placeholder="기한 없음"
+										Value="{Binding GrantManagementPanelViewModel.ValidUntil, Mode=TwoWay}" />
 								</c:ConsoleField>
 								<WrapPanel Margin="0,6,0,0">
 									<Button

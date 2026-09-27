@@ -2,195 +2,207 @@
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.AccountSetupPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	d:DesignHeight="560"
 	d:DesignWidth="700"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
-
+	<!--
+		세션 설정 — 계정 콘솔의 [세션 설정] 레일이 가운데 칸에 그대로 얹는 뷰(AccountConsolePanelView 의 cal:View.Model).
+		B10(window-design-inventory-analysis.md #12a) — 둘레(콘솔)는 커널인데 안쪽만 옛 모양이었다: 호스트 전용 TextBoxInput(MDIX 밑줄 칸) ×6 ·
+		아이콘 머리 · 손으로 짠 두 칸 Grid. 이제 콘솔 상세와 같은 말로 쓴다 — ConsoleSection(절) · ConsoleField(라벨 + 값 + 덧말) ·
+		Acct.TextBox(토큰 글 칸, B3 공용 사전). 색은 토큰만.
+		지키는 것: x:Name(ClickReload · ClickSave — Caliburn 지시자 · 호스트 UiTests 앵커) · AutomationId(Console.Accounts.SessionSetup.*) ·
+		라벨 글(호스트 UiTests 의 EditBesideLabel 폴백이 "잠금까지 비밀번호 오류 횟수" 로 칸을 찾는다 — 그래서 라벨은 Header 에 직접 놓은 TextBlock) ·
+		콤보는 이 뷰에 하나뿐(T-ACC034 가 첫 콤보를 정책 콤보로 읽는다).
+	-->
 	<UserControl.Resources>
-		<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+			<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+			<!--  숫자 칸 — 값은 1~4자리라 칸 전폭을 쓰지 않는다  -->
+			<Style
+				x:Key="Setup.Number"
+				BasedOn="{StaticResource Acct.TextBox}"
+				TargetType="TextBox">
+				<Setter Property="Width" Value="120" />
+				<Setter Property="HorizontalAlignment" Value="Left" />
+			</Style>
+		</ResourceDictionary>
 	</UserControl.Resources>
 
-	<!--  세션 정책 — GET/PUT /settings/session. 폼(스크롤) ↔ 액션바(하단 고정) 분리: 필드 6→11개로 늘어 버튼이 스크롤에 묻히지 않게 Grid Row0=* ScrollViewer / Row1=Auto 액션바.  -->
+	<!--  세션 정책 — GET/PUT /settings/session. 입력(스크롤) ↔ 저장 막대(하단 고정) 분리: 칸이 늘어도 단추가 스크롤에 묻히지 않게 Row0=* / Row1=Auto.  -->
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  ── 폼(스크롤) ──  -->
-		<ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-			<StackPanel Margin="24,20,24,16">
-
-				<!--  헤더  -->
-				<StackPanel Margin="0,0,0,4" Orientation="Horizontal">
-					<md:PackIcon
-						Width="22"
-						Height="22"
-						Margin="0,0,8,0"
-						VerticalAlignment="Center"
-						Foreground="{DynamicResource TextSecondaryBrush}"
-						Kind="ShieldLockOutline" />
+		<ScrollViewer
+			Grid.Row="0"
+			Focusable="False"
+			HorizontalScrollBarVisibility="Disabled"
+			Style="{StaticResource Console.ScrollViewer}"
+			VerticalScrollBarVisibility="Auto">
+			<!--
+				라벨이 길다(운영자 말) — 라벨 칸을 넓힌다(ConsoleField.LabelWidth 는 상속된다).
+				폭은 설정 콘솔과 같은 수법으로 묶는다 — 별 칸(*)에 MaxWidth 760: 좁으면 줄고 넓으면 760 에 멈춘 채 왼쪽에 붙는다(절 구분선이 늘 같은 폭).
+			-->
+			<Grid Margin="20,4,20,16">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MaxWidth="760" />
+				</Grid.ColumnDefinitions>
+				<StackPanel c:ConsoleField.LabelWidth="220">
 					<TextBlock
-						FontSize="18"
-						FontWeight="Bold"
-						Text="세션 정책" />
+						Margin="0,10,0,0"
+						Style="{StaticResource Acct.Hint}"
+						Text="바꾼 값은 다음 로그인부터 적용됩니다." />
+
+					<!--  상태 안내(미배포 · 권한 없음) — 위험 틴트 판 + 왼쪽 굵은 막대(형태). 글은 운영자 말 그대로.  -->
+					<Border
+						Margin="0,10,0,0"
+						Padding="10,7"
+						Background="{DynamicResource TintCriticalBrush}"
+						BorderBrush="{DynamicResource StatusCriticalBrush}"
+						BorderThickness="3,0,0,0"
+						CornerRadius="3">
+						<Border.Style>
+							<Style TargetType="Border">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasServerStatus}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Border.Style>
+						<TextBlock
+							FontSize="12.5"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding ServerStatus}"
+							TextWrapping="Wrap" />
+					</Border>
+
+					<!--  ① 기본 세션 · 잠금  -->
+					<c:ConsoleSection Header="세션 정책">
+						<StackPanel IsEnabled="{Binding ServerSettingsAvailable}">
+							<c:ConsoleField Note="1~168시간">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 유지 시간 — 시간" />
+								</c:ConsoleField.Header>
+								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<c:ConsoleField Note="1~90일">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="자동 재로그인 허용 기간 — 일" />
+								</c:ConsoleField.Header>
+								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<c:ConsoleField Note="0 = 잠그지 않음 · 3~20회">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="잠금까지 비밀번호 오류 횟수" />
+								</c:ConsoleField.Header>
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.LockoutThreshold"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<c:ConsoleField Note="0 = 직접 풀 때까지 · 1~1440분">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="잠금 자동 해제 — 분" />
+								</c:ConsoleField.Header>
+								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<c:ConsoleField>
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 유지 시간 적용" />
+								</c:ConsoleField.Header>
+								<ToggleButton
+									HorizontalAlignment="Left"
+									IsChecked="{Binding SessionPolicyEnabled}"
+									Style="{StaticResource Console.ToggleSwitch}" />
+							</c:ConsoleField>
+						</StackPanel>
+					</c:ConsoleSection>
+
+					<!--  ② 동시 로그인 (v6.3)  -->
+					<c:ConsoleSection Header="동시 로그인">
+						<StackPanel IsEnabled="{Binding ServerSettingsAvailable}">
+							<c:ConsoleField ToolTip="여러 곳 동시 로그인을 허용하면 같은 계정이 여러 곳에서 로그인해 있어도 서로 끊기지 않습니다. 다음 로그인부터 적용됩니다.">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="같은 계정의 동시 로그인" />
+								</c:ConsoleField.Header>
+								<!--  서버 기본값이 allow(다중 공존)라 첫 항목도 allow — 목록 순서가 기본값을 오인시키지 않게 한다. 저장 값은 Tag, 글은 운영자 말(A-40).  -->
+								<ComboBox
+									Width="260"
+									Height="30"
+									HorizontalAlignment="Left"
+									FontSize="13"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									SelectedValue="{Binding ConcurrencyPolicy, Mode=TwoWay}"
+									SelectedValuePath="Tag">
+									<ComboBoxItem Content="여러 곳 동시 로그인 허용" Tag="allow" />
+									<ComboBoxItem Content="새 로그인 시 기존 로그인 종료" Tag="evict_all" />
+								</ComboBox>
+							</c:ConsoleField>
+
+							<!--  최대 동시 세션 수 — allow 일 때만 켜진다  -->
+							<c:ConsoleField
+								IsEnabled="{Binding IsAllowPolicy}"
+								Note="0 = 제한 없음 · 0~100"
+								ToolTip="여러 곳 동시 로그인을 허용할 때만 적용됩니다. 이 수를 넘으면 가장 오래된 로그인부터 끊습니다.">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="최대 동시 로그인 수" />
+								</c:ConsoleField.Header>
+								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding MaxConcurrentSessions, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<!--  자기 세션 교체 — allow 일 때만 켜진다  -->
+							<c:ConsoleField IsEnabled="{Binding IsAllowPolicy}" ToolTip="같은 프로그램에서 다시 로그인하면 그 프로그램의 이전 로그인만 끊습니다. 여러 곳 동시 로그인을 허용할 때만 적용됩니다.">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="같은 프로그램에서 다시 로그인하면 이전 로그인 교체" />
+								</c:ConsoleField.Header>
+								<ToggleButton
+									HorizontalAlignment="Left"
+									IsChecked="{Binding SessionSelfReplaceEnabled}"
+									Style="{StaticResource Console.ToggleSwitch}" />
+							</c:ConsoleField>
+
+							<c:ConsoleField Note="0 = 지우지 않음 · 0~3650일" ToolTip="0이면 지우지 않습니다. 그보다 크면 로그아웃 · 만료된 오래된 기록을 정해진 날수가 지난 뒤 지웁니다.">
+								<c:ConsoleField.Header>
+									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 기록 보존 — 일" />
+								</c:ConsoleField.Header>
+								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding SessionHistoryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+
+							<!--
+								로그인 이상탐지 이벤트 — 서버 기능이 아직 없어(켜도 동작 없음) 숨겼다(A-42). 값은 VM 이 불러온 그대로 되돌려 보낸다.
+								인증 모드(읽기 전용 배포 설정) 줄도 운영자가 쓸 데가 없어 뺐다(A-43).
+							-->
+						</StackPanel>
+					</c:ConsoleSection>
 				</StackPanel>
-				<TextBlock
-					Margin="0,0,0,16"
-					FontSize="12"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="바꾼 값은 다음 로그인부터 적용됩니다." />
-
-				<!--  상태 배너(미배포/미가용)  -->
-				<Border
-					Margin="0,0,0,16"
-					Padding="10,8"
-					Background="{DynamicResource SurfaceBrush}"
-					BorderBrush="{DynamicResource StatusCriticalBrush}"
-					BorderThickness="1"
-					CornerRadius="4">
-					<Border.Style>
-						<Style TargetType="Border">
-							<Setter Property="Visibility" Value="Collapsed" />
-							<Style.Triggers>
-								<DataTrigger Binding="{Binding HasServerStatus}" Value="True">
-									<Setter Property="Visibility" Value="Visible" />
-								</DataTrigger>
-							</Style.Triggers>
-						</Style>
-					</Border.Style>
-					<TextBlock
-						Foreground="{DynamicResource StatusCriticalBrush}"
-						Text="{Binding ServerStatus}"
-						TextWrapping="Wrap" />
-				</Border>
-
-				<!--  기본 세션·잠금 (기존)  -->
-				<Grid IsEnabled="{Binding ServerSettingsAvailable}">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="220" />
-					</Grid.ColumnDefinitions>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-					</Grid.RowDefinitions>
-
-					<TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="로그인 유지 시간 — 시간 (1~168)" />
-					<TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
-
-					<TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="자동 재로그인 허용 기간 — 일 (1~90)" />
-					<TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
-
-					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="잠금까지 비밀번호 오류 횟수 (0=잠그지 않음, 3~20)" />
-					<TextBox Grid.Row="4" Grid.Column="1" AutomationProperties.AutomationId="Console.Accounts.SessionSetup.LockoutThreshold" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
-
-					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="잠금 자동 해제 — 분 (0=직접 풀 때까지, 1~1440)" />
-					<TextBox Grid.Row="6" Grid.Column="1" Style="{StaticResource TextBoxInput}" Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
-
-					<TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="로그인 유지 시간 적용" />
-					<ToggleButton Grid.Row="8" Grid.Column="1" HorizontalAlignment="Left" IsChecked="{Binding SessionPolicyEnabled}" Style="{StaticResource Console.ToggleSwitch}" />
-				</Grid>
-
-				<!--  동시 세션 정책 (v6.3 신규)  -->
-				<TextBlock
-					Margin="0,22,0,10"
-					FontSize="13"
-					FontWeight="Bold"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="동시 로그인" />
-				<Separator Margin="0,0,0,10" Background="{DynamicResource DividerBrush}" />
-
-									<Grid IsEnabled="{Binding ServerSettingsAvailable}">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="220" />
-					</Grid.ColumnDefinitions>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-						<RowDefinition Height="10" />
-						<RowDefinition Height="Auto" />
-					</Grid.RowDefinitions>
-
-					<!--  ① 동시 세션 정책  -->
-					<TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
-						Text="같은 계정의 동시 로그인"
-						ToolTip="여러 곳 동시 로그인을 허용하면 같은 계정이 여러 곳에서 로그인해 있어도 서로 끊기지 않습니다. 다음 로그인부터 적용됩니다." />
-					<ComboBox Grid.Row="0" Grid.Column="1"
-						SelectedValuePath="Tag"
-						SelectedValue="{Binding ConcurrencyPolicy, Mode=TwoWay}">
-						<!--  서버 기본값이 allow(다중 공존)라 첫 항목도 allow — 목록 순서가 기본값을 오인시키지 않게 한다. 저장 값은 Tag, 글은 운영자 말(A-40).  -->
-						<ComboBoxItem Content="여러 곳 동시 로그인 허용" Tag="allow" />
-						<ComboBoxItem Content="새 로그인 시 기존 로그인 종료" Tag="evict_all" />
-					</ComboBox>
-
-					<!--  ② 최대 동시 세션 수 — allow일 때만 활성  -->
-					<TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"
-						IsEnabled="{Binding IsAllowPolicy}"
-													Text="최대 동시 로그인 수 (0=제한 없음, 0~100)"
-							ToolTip="여러 곳 동시 로그인을 허용할 때만 적용됩니다. 이 수를 넘으면 가장 오래된 로그인부터 끊습니다." />
-					<TextBox Grid.Row="2" Grid.Column="1"
-						IsEnabled="{Binding IsAllowPolicy}"
-						Style="{StaticResource TextBoxInput}"
-						Text="{Binding MaxConcurrentSessions, UpdateSourceTrigger=PropertyChanged}" />
-
-					<!--  ③ 자기 세션 교체 허용 — allow일 때만 활성  -->
-					<TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center"
-						IsEnabled="{Binding IsAllowPolicy}"
-													Text="같은 프로그램에서 다시 로그인하면 이전 로그인 교체"
-							TextWrapping="Wrap"
-							ToolTip="같은 프로그램에서 다시 로그인하면 그 프로그램의 이전 로그인만 끊습니다. 여러 곳 동시 로그인을 허용할 때만 적용됩니다." />
-					<ToggleButton Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left"
-						IsEnabled="{Binding IsAllowPolicy}"
-						IsChecked="{Binding SessionSelfReplaceEnabled}"
-						Style="{StaticResource Console.ToggleSwitch}" />
-
-					<!--  ④ 세션 이력 보존 — 일  -->
-					<TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center"
-													Text="로그인 기록 보존 — 일 (0=지우지 않음, 0~3650)"
-							ToolTip="0이면 지우지 않습니다. 그보다 크면 로그아웃 · 만료된 오래된 기록을 정해진 날수가 지난 뒤 지웁니다." />
-					<TextBox Grid.Row="6" Grid.Column="1"
-						Style="{StaticResource TextBoxInput}"
-						Text="{Binding SessionHistoryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
-
-					<!--
-						⑤ 로그인 이상탐지 이벤트 — 서버 기능이 아직 없어(켜도 동작 없음) 숨겼다(A-42). 값은 VM 이 불러온 그대로 되돌려 보낸다.
-						인증 모드(읽기 전용 배포 설정) 줄도 운영자가 쓸 데가 없어 뺐다(A-43).
-					-->
-				</Grid>
-
-			</StackPanel>
+			</Grid>
 		</ScrollViewer>
 
-		<!--  ── 하단 고정 액션바(스크롤 밖) ──  -->
 		<!--
 			바뀐 것이 있을 때만 켜지는 저장 막대(T2) — 왼쪽에 "변경 N건", 오른쪽에 [되돌리기][저장](A-45). 콘솔 안에서는 [새로고침] 을 접는다(툴바 [갱신], A-46).
 			V-35 — 콘솔 상세 칸의 바닥 막대와 같은 규격으로 맞춘다: 위아래 여백 10 · 단추 32(고정 폭 없음) · 오른쪽 끝에 보조 → 주 동작.
-			종전엔 폭 120 의 [저장] 만 홀로 서 있어 잘못 바꾼 값을 되돌릴 길이 툴바 [갱신] 뿐이었다.
 			[되돌리기] 는 x:Name 을 새로 쓰지 않고 cal:Message.Attach 로 잇는다(CanClickRevert 가드가 그대로 붙는다).
 		-->
 		<Border
 			Grid.Row="1"
-			Padding="24,10,16,10"
+			Padding="20,10,16,10"
 			Background="{DynamicResource SurfaceBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,1,0,0">

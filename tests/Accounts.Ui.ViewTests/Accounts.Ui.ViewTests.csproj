@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Accounts.Ui/Ironwall.Dotnet.Libraries.Accounts.Ui.csproj" />
+    <!-- B7 · B10 — 콘솔 안의 날짜 칸 · 옛 입력 뷰(보고서 생성 · 외부 연동)도 같은 화면 밖 호스트로 띄운다 -->
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Reports.Ui/Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Gateway/Ironwall.Dotnet.Libraries.Gateway.csproj" />
   </ItemGroup>
 
   <ItemGroup>
