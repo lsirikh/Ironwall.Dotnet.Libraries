@@ -16,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.Api.Services;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class ApiService : IApiService
+public class ApiService : IApiService, IApiHeaderRequestService
 {
     // 요청 body 직렬화 공통 설정 — DateTime 필드를 aware ISO8601로 내보낸다(Unspecified/Local → 로컬 KST offset 부착).
     //
@@ -330,6 +330,45 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] PUT 요청 실패: {ex.Message}");
+            return BuildExceptionResponse(ex);
+        }
+    }
+
+    /// <summary>
+    /// 헤더를 이 요청에만 실어 JSON 을 보낸다(<see cref="IApiHeaderRequestService"/>) — 조건부 쓰기(<c>If-Match</c>)용.
+    /// </summary>
+    /// <remarks>기본 헤더(<c>DefaultRequestHeaders</c>)는 건드리지 않는다 — 다른 호출에 헤더가 새지 않는다.</remarks>
+    public async Task<HttpResponseMessage> SendJsonAsync(
+        HttpMethod method,
+        string endpoint,
+        object? body,
+        IReadOnlyDictionary<string, string>? headers,
+        CancellationToken token = default)
+    {
+        try
+        {
+            if (_client == null)
+                throw new InvalidOperationException("HttpClient 인스턴스가 생성되지 않았습니다.");
+
+            if (string.IsNullOrWhiteSpace(endpoint))
+                throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
+
+            using var request = new HttpRequestMessage(method, endpoint);
+            if (body != null)
+            {
+                var json = JsonConvert.SerializeObject(body, _jsonSettings);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+            return await _client.SendAsync(request, token);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ApiService] {method} 요청 실패: {ex.Message}");
             return BuildExceptionResponse(ex);
         }
     }

@@ -52,8 +52,23 @@ public interface IUnitDeviceApi
     Task<UnitDeviceAssignResult> AssignAsync(UnitDeviceItem device, int unitId, CancellationToken token = default);
 }
 
+/// <summary>장비 목록의 <c>status</c> 를 부대 콘솔이 쓰는 세 갈래로(FR-03 — 관계도 L2 "▲오류 N" 의 원천, 읽은 시점 스냅샷).</summary>
+public enum UnitDeviceStatus
+{
+    /// <summary><c>ACTIVATED</c> — 그리고 모르는 값 · 빈 값(서버가 새 상태를 더해도 오류로 부풀리지 않는다).</summary>
+    Normal = 0,
+
+    /// <summary><c>ERROR</c>.</summary>
+    Error = 1,
+
+    /// <summary><c>DEACTIVATED</c>.</summary>
+    Deactivated = 2,
+}
+
 /// <summary>장비 한 대 — 부대 콘솔이 아는 만큼만.</summary>
-public sealed record UnitDeviceItem(int Id, int NumberDevice, string Name, EnumDeviceCategory Category, int? UnitId)
+/// <param name="Status">목록의 <c>status</c>(<see cref="UnitDeviceText.StatusOf"/>). 위치 매개변수 <b>기본값</b>이라 기존 생성 지점은 그대로 컴파일된다(NFR-10).</param>
+public sealed record UnitDeviceItem(int Id, int NumberDevice, string Name, EnumDeviceCategory Category, int? UnitId,
+                                    UnitDeviceStatus Status = UnitDeviceStatus.Normal)
 {
     public string CategoryText => UnitDeviceText.CategoryText(Category);
     public override string ToString() => $"{Name} (#{NumberDevice})";
@@ -81,6 +96,14 @@ public static class UnitDeviceText
         EnumDeviceCategory.Lamp => "경광등",
         EnumDeviceCategory.Gate => "통문",
         _ => category.ToString(),
+    };
+
+    /// <summary>목록 <c>status</c> 문자열 → <see cref="UnitDeviceStatus"/>. 대소문자 · 앞뒤 공백 무시, 모르면 정상.</summary>
+    public static UnitDeviceStatus StatusOf(string? raw) => raw?.Trim().ToUpperInvariant() switch
+    {
+        "ERROR" => UnitDeviceStatus.Error,
+        "DEACTIVATED" => UnitDeviceStatus.Deactivated,
+        _ => UnitDeviceStatus.Normal,
     };
 }
 
@@ -274,7 +297,8 @@ public sealed class UnitDeviceApiAdapter : IUnitDeviceApi
 
                 foreach (var dto in data)
                     if (dto != null && dto.Id > 0)
-                        sink.Add(new UnitDeviceItem(dto.Id, dto.NumberDevice, Label(dto), category, dto.UnitId));
+                        sink.Add(new UnitDeviceItem(dto.Id, dto.NumberDevice, Label(dto), category, dto.UnitId,
+                                                    UnitDeviceText.StatusOf(dto.Status)));   // FR-03 — 읽은 시점 상태(관계도 L2 ▲오류)
 
                 if (data.Count < PAGE_LIMIT) return;
             }

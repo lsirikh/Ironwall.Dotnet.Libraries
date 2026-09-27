@@ -190,9 +190,9 @@ public sealed record DeviceGroupMembershipChangedMessage(System.Collections.Gene
 /// <remarks>
 /// <para><b>"다시 읽어라" 는 신호일 뿐이다.</b> 무엇이 바뀌었는지는 싣지 않는다 — 받는 쪽은 편제(<c>GET /api/units/graph</c>)를
 /// <b>통째로</b> 다시 읽는다.</para>
-/// <para>⚠ <see cref="ResourceId"/> 를 부대 id 로 믿지 않는다 — 부대 생성 · 수정(상위 바꾸기 포함) · 삭제에서는 부대 id 지만,
-/// <b>인접 추가 · 제거에서는 인접 행(row) id</b> 다(서버 명세와 어긋남 — 서버팀에 보고됨).
-/// 그래서 <c>GET /api/units/{ResourceId}</c> 로 한 건만 읽는 최적화를 하지 않는다. 로그 · 진단용이다.</para>
+/// <para>⚠ <see cref="ResourceId"/> 로 한 건만 읽는 최적화를 하지 않는다 — 로그 · 진단용이다. 부대 생성 · 수정 · 삭제에서는 부대 id 이고,
+/// 인접 추가 · 제거에서는 판본에 따라 다르다: 8.0.3 부터는 쌍의 낮은 쪽 부대 id(+ 본문 <c>unit_ids:[low,high]</c>),
+/// 그 전 판은 인접 <b>행</b> id 였다(서버 요청 R-3, 2026-09-28 실측 VER-11).</para>
 /// <para>PUT 한 번이 여러 건을 <b>몰아서</b> 낼 수 있다 — 받는 쪽이 짧은 창(약 500 ms)으로 합친다
 /// (<c>Ironwall.Dotnet.Libraries.Utils.Consoles.CoalescingTrigger</c>). 호스트는 같은 봉투 id 를 한 번만 옮긴다.</para>
 /// <para>수신 스레드는 정하지 않는다 — 받는 쪽이 마샬링한다(<c>SubscribeOnUIThread</c> 등).

@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
@@ -109,6 +109,21 @@ public class DeviceApiModule : Module
                 .AsImplementedInterfaces()
                 .SingleInstance()
                 .WithMetadata("Order", _count + 2);
+
+            // 6. UnitLayoutApiService 등록 (부대 관계도 공유 배치 /api/units/layout — 서버 요청 S-1, FR-10 · FR-50)
+            //    IUnitApiService 를 넓히지 않는 새 인터페이스(NFR-10). IService 가 아니다 — 부팅 때 읽지 않고
+            //    관계도 창을 열 때 1회 읽는다(그 응답이 곧 지원 판정). 프로브가 없으면 6.3 으로 보고 네트워크에 나가지 않는다.
+            //    If-Match 는 이 이름의 IApiService(ApiService)가 IApiHeaderRequestService 로 싣는다.
+            builder.Register(ctx => new UnitLayoutApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name),
+                    ctx.ResolveOptionalNamed<IServerContractProbe>(_name)
+                        ?? ctx.ResolveOptional<IServerContractProbe>()
+                ))
+                .Named<IUnitLayoutApiService>(_name)
+                .As<IUnitLayoutApiService>()
+                .SingleInstance();
 
             _log?.Info($"[{nameof(DeviceApiModule)}] Module loaded successfully with name: {_name}");
         }
