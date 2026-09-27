@@ -33,8 +33,24 @@ public static class KoreanWordWrap
     {
         if (_installed) return;
         _installed = true;
-        EventManager.RegisterClassHandler(typeof(TextBlock), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnLoaded));
-        EventManager.RegisterClassHandler(typeof(TextBlock), FrameworkElement.UnloadedEvent, new RoutedEventHandler(OnUnloaded));
+        // ⚠ Loaded 클래스 처리기로는 안 된다 — WPF 는 Loaded/Unloaded 를 '제 처리기(인스턴스 · 스타일 EventSetter)가 있는 요소'에만
+        //   방송한다(FrameworkElement.ThisHasLoadedChangeEventHandler 에 클래스 처리기는 들지 않는다). 그래서 실창에서 한 번도 불리지 않았다
+        //   (2026-09-27 3회차 실창: "바 / 꿀 수 없습니다" 가 그대로). SizeChanged 는 모든 요소에서 올라오므로 그것으로 처음 한 번 붙잡고,
+        //   그 요소에 인스턴스 Loaded/Unloaded 와 Text 변경 구독을 단다.
+        EventManager.RegisterClassHandler(typeof(TextBlock), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler(OnFirstSized));
+    }
+
+    private static readonly DependencyProperty IsTrackedProperty = DependencyProperty.RegisterAttached(
+        "IsTracked", typeof(bool), typeof(KoreanWordWrap), new PropertyMetadata(false));
+
+    private static void OnFirstSized(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is not TextBlock tb || (bool)tb.GetValue(IsTrackedProperty)) return;
+        tb.SetValue(IsTrackedProperty, true);
+        tb.Loaded += OnLoaded;
+        tb.Unloaded += OnUnloaded;
+        TextDescriptor.AddValueChanged(tb, OnTextChanged);
+        Apply(tb);
     }
 
     /// <summary>글에서 결합자를 걷는다(자동화 · 복사용).</summary>
