@@ -190,9 +190,9 @@
 		</c:ConsoleShell.Rail>
 
 		<!--
-			툴바 — 기간 칩 · 검색 · [N건 조치보고](드래그의 키보드 폴백) · [갱신]
-			검색칸 안내 글은 짧게 둔다: 커널 검색칸은 남는 폭만 받는 자리(MinWidth 120)라
-			"장비 · 구역 검색" 은 제 테두리에 마지막 글자가 잘려 나갔다.
+			툴바 — 첫째 줄: [삭제] · [갱신] · 창 고유 동작([중단] · [이벤트 맵핑] · [N건 조치보고] = 드래그의 키보드 폴백) · 검색 · [열].
+			둘째 줄(커널 필터 줄): 기간 칩 · 직접 지정(억제 스케줄 레일에서는 상태 칩). 필터는 첫째 줄의 폭을 나눠 먹지 않는다(D-2026-09-27-71c353).
+			좁으면 WrapPanel 이 칩 · 날짜 범위를 다음 줄로 넘긴다 — 칩을 누르거나 자르지 않는다.
 		-->
 		<c:ConsoleShell.Toolbar>
 			<c:ConsoleToolbar
@@ -210,7 +210,7 @@
 				SearchText="{Binding SearchText, Mode=TwoWay}"
 				ShowSearch="{Binding ShowSearch}">
 				<c:ConsoleToolbar.Filters>
-					<StackPanel Orientation="Horizontal">
+					<WrapPanel Orientation="Horizontal">
 						<!--  억제 스케줄 상태 칩 (정본 SB L2313) — 기간 칩 대신 뜬다  -->
 						<ItemsControl
 							AutomationProperties.AutomationId="Console.Suppression.Toolbar.Filter"
@@ -218,13 +218,13 @@
 							Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}">
 							<ItemsControl.ItemsPanel>
 								<ItemsPanelTemplate>
-									<StackPanel Orientation="Horizontal" />
+									<WrapPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
 							</ItemsControl.ItemsPanel>
 							<ItemsControl.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
-										Margin="0,0,4,0"
+										Margin="0,2,6,2"
 										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Suppression.Filter.{0}}"
 										Click="OnSuppressionFilterClick"
 										Content="{Binding Label}"
@@ -242,12 +242,13 @@
 							Visibility="{Binding ShowPeriodChips, Converter={StaticResource BoolToVis}}">
 							<ItemsControl.ItemsPanel>
 								<ItemsPanelTemplate>
-									<StackPanel Orientation="Horizontal" />
+									<WrapPanel Orientation="Horizontal" />
 								</ItemsPanelTemplate>
 							</ItemsControl.ItemsPanel>
 							<ItemsControl.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
+										Margin="0,2,6,2"
 										AutomationProperties.AutomationId="{Binding Name, StringFormat=Console.Events.Period.{0}}"
 										Click="OnPeriodClick"
 										Content="{Binding Name}"
@@ -261,14 +262,14 @@
 						<!--  직접 지정 — 팝업 달력(연속 범위) + 시작/종료 시각. 드래그의 폴백이자 정확한 입력 수단이며,
 						     트리거는 계속 포커스 가능해 자동화가 좌표 클릭에 묶이지 않는다(요구사항 3).  -->
 						<c:DateTimeRangeField
-							Margin="6,0,0,0"
+							Margin="6,2,0,2"
 							VerticalAlignment="Center"
 							FromAutomationId="Console.Events.Period.From"
 							RangeEnd="{Binding EndDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 							RangeStart="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 							ToAutomationId="Console.Events.Period.To"
 							Visibility="{Binding ShowCustomPeriod, Converter={StaticResource BoolToVis}}" />
-					</StackPanel>
+					</WrapPanel>
 				</c:ConsoleToolbar.Filters>
 
 				<c:ConsoleToolbar.Extra>
@@ -318,9 +319,9 @@
 		<c:ConsoleShell.List>
 			<DockPanel ClipToBounds="True" LastChildFill="True">
 				<!--
-					필터 칩 — 정본은 이것을 툴바에 두지만(L1013), 커널 툴바는 줄바꿈이 없는 한 줄이고
-					캐넌이 ⋯ 안에 두는 [추가] · [삭제] 까지 고정으로 지고 있어 1360 폭에서 칩이 잘렸다.
-					목록 바로 위 한 줄로 내린다 — 자리만 다르고 구성과 동작은 정본 그대로다(선언된 편차).
+					유형 탭(전체 · 침입 · …) — 정본은 이것을 툴바에 두지만(L1013), 목록의 "보기" 를 가르는 탭이라 목록 바로 위에 둔다
+					(선언된 편차). 툴바 둘째 줄(기간 칩 = "언제")과 이 탭 줄("무엇")이 차례로 쌓인다 — 둘 다 좌우 여백 12 · 아래 선으로
+					같은 띠 문법을 쓰고, 탭은 밑줄형(Console.Tab) · 기간은 알약형(Console.Chip)이라 모양으로도 갈린다.
 				-->
 				<Border
 					Padding="12,6"

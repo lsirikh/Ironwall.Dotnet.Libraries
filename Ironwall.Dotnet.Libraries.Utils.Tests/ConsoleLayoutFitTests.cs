@@ -6,77 +6,197 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 
 /// <summary>
 /// U-17 — 실창(GIS) 캡처에서 나온 잘림 두 갈래를 커널 판정으로 막는다.
-/// ① 툴바 오른쪽 묶음(Extra)이 테두리 밖으로 잘림 → [⋯] 로 접기(<see cref="ConsoleLayoutMath.ShouldOverflowToolbarExtra"/>).
+/// ① 툴바 첫째 줄 — 검색이 최소폭(180) 아래로 눌리거나 오른쪽 끝 버튼이 잘림 → Extra · [열] 을 [⋯] 로 접기(<see cref="ConsoleLayoutMath.ResolveToolbarFit"/>).
 /// ② 좁은 목록에서 식별 열이 잘리고 끝 열이 가로 스크롤 밖으로 밀림 → 덜 중요한 열부터 접기(<see cref="ConsoleColumns.CollapseBelowProperty"/>).
 /// </summary>
 public class ConsoleLayoutFitTests
 {
-    #region ① 툴바 [⋯]
-    // 장비 콘솔 실측(미리보기 toolbar-probe): 왼쪽 묶음 204 · 열 버튼 81 · Extra(조립기 · 프리셋으로 등록 · 프리셋… · 셋업 · 결선) 368.
-    private const double Left = 204, Columns = 81, Extra = 368;
+    #region ① 툴바 첫째 줄 — 검색 폭 · [⋯] (ResolveToolbarFit, D-2026-09-27-71c353)
+    // 장비 콘솔 실측(미리보기 toolbar-probe): [추가][삭제][갱신] 170 · [열 6/11] 81 ·
+    // Extra = 제어기 레일(조립 · 프리셋 ▾ + 셋업 · 결선) 213 / 카메라 레일(조립 · 프리셋 ▾) 125.
+    private const double Left = 170, Columns = 81, Extra = 213, CameraExtra = 125;
 
     [Fact]
-    public void should_keep_extra_inline_when_docked_device_console_has_room_for_the_search_icon()
+    public void should_give_the_search_its_preferred_width_and_keep_extra_inline_when_docked_at_1280()
     {
-        // Arrange — 1280 표면 · 도킹(상세 340): 목록 = 1280 − 184 − 340 = 756. 예산 = 756 − 24 − 12 − 204 − 81 − 368 = 67 ≥ 32
+        // Arrange — 1280 표면 · 도킹(상세 340): 목록 = 1280 − 184 − 340 = 756
+        var list = ConsoleLayoutMath.Resolve(1280).ListWidth;
 
         // Act
-        var overflow = ConsoleLayoutMath.ShouldOverflowToolbarExtra(756, Left, Columns, Extra, showSearch: true);
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(list, Left, Extra, Columns, showSearch: true);
 
-        // Assert
-        Assert.False(overflow);
+        // Assert — 756 − 24 − 170 − 213 − 81 − 12 = 256 → 편한 폭 240
+        Assert.Equal(756, list);
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
+        Assert.Equal(ConsoleLayoutMath.ToolbarSearchPreferredWidth, fit.SearchWidth);
     }
 
     [Fact]
-    public void should_overflow_extra_when_the_drawer_leaves_less_than_the_search_icon()
+    public void should_move_extra_behind_more_before_squeezing_the_search_below_its_minimum()
     {
-        // Arrange — 옛 호스트 카드(1240 · 서랍 360): 목록 = 1240 − 184 − 360 = 696. 예산 7 — "셋업 · 결선" 이 잘리던 폭
+        // Arrange — 1150 서랍이 열림: 목록 966 − 서랍 360 = 606. 제어기 레일 Extra(213) 를 두면 검색에 106 뿐이다.
+        var layout = ConsoleLayoutMath.Resolve(1150);
+        var width = ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true);
 
         // Act
-        var overflow = ConsoleLayoutMath.ShouldOverflowToolbarExtra(696, Left, Columns, Extra, showSearch: true);
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, Left, Extra, Columns, showSearch: true);
 
-        // Assert
-        Assert.True(overflow);
+        // Assert — 옛 한 줄 구조는 검색을 106 으로 눌렀다. 이제 Extra 가 [⋯] 로 가고 검색은 전체 폭을 받는다.
+        Assert.Equal(606, width);
+        Assert.Equal(ConsoleToolbarOverflow.Extra, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
+        Assert.True(fit.SearchWidth >= ConsoleLayoutMath.ToolbarSearchFullMinWidth);
     }
 
     [Fact]
-    public void should_not_reserve_room_for_the_search_icon_when_search_is_hidden()
+    public void should_keep_a_narrow_extra_inline_when_the_search_still_gets_its_minimum()
     {
-        // Arrange — 예산 20: 검색을 보이면 아이콘(32)이 안 들어가 접지만, 검색이 꺼졌으면 20 도 남는 폭이다
-        var width = 24 + 12 + Left + Columns + Extra + 20;
+        // Arrange — 같은 606 이라도 카메라 레일(Extra 125)이면 검색에 194 가 남는다(≥ 180) — 아무것도 옮기지 않는다
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(606, Left, CameraExtra, Columns, showSearch: true);
 
-        // Act / Assert
-        Assert.True(ConsoleLayoutMath.ShouldOverflowToolbarExtra(width, Left, Columns, Extra, showSearch: true));
-        Assert.False(ConsoleLayoutMath.ShouldOverflowToolbarExtra(width, Left, Columns, Extra, showSearch: false));
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+        Assert.Equal(606 - 24 - Left - CameraExtra - Columns - 12, fit.SearchWidth, 3);
+    }
+
+    [Fact]
+    public void should_fold_extra_then_columns_and_still_show_a_full_search_at_900_with_the_drawer_open()
+    {
+        // Arrange — 900 접힘 + 서랍 열림: 목록 844 − 서랍 360 = 484
+        var layout = ConsoleLayoutMath.Resolve(900);
+        var width = ConsoleLayoutMath.EffectiveListWidth(layout, isDetailOpen: true);
+
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, Left, Extra, Columns, showSearch: true);
+
+        // Assert — Extra 만 옮기면 157(< 180), [열] 까지 옮기면 238 — 검색은 전체 폭이다
+        Assert.Equal(484, width);
+        Assert.Equal(ConsoleToolbarOverflow.Extra | ConsoleToolbarOverflow.Columns, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
+        Assert.True(fit.SearchWidth >= ConsoleLayoutMath.ToolbarSearchFullMinWidth);
     }
 
     [Theory]
-    [InlineData(0, 368)]            // 아직 재지 못한 툴바
-    [InlineData(double.NaN, 368)]
-    [InlineData(500, 0)]            // 접을 것이 없다(Extra 가 비었거나 전부 숨었다)
-    public void should_not_overflow_when_nothing_is_measured_or_there_is_nothing_to_fold(double toolbarWidth, double extraWidth)
+    [InlineData(1280, false)]   // 도킹 — 목록 756
+    [InlineData(1150, false)]   // 서랍 닫힘 — 목록 966
+    [InlineData(1150, true)]    // 서랍 열림 — 606
+    [InlineData(900, false)]    // 접힘 · 서랍 닫힘 — 844
+    [InlineData(900, true)]     // 접힘 · 서랍 열림 — 484
+    public void should_never_show_the_search_box_narrower_than_its_minimum_at_the_standard_widths(double surface, bool drawerOpen)
+    {
+        // Arrange — 장비 · 보고서([+ 새 보고서] 가 넓다) · 이벤트(Extra 세 단추) 실측에 가까운 왼쪽 · Extra 폭
+        var width = ConsoleLayoutMath.EffectiveListWidth(ConsoleLayoutMath.Resolve(surface), drawerOpen);
+        var consoles = new (double Left, double Extra, double Columns)[]
+        {
+            (Left, Extra, Columns),     // 장비 · 제어기
+            (201, 0, 81),               // 보고서 · 생성 이력(필터 칩은 둘째 줄 — 입력에 없다)
+            (96, 330, 0),               // 이벤트 · 탐지([중단] [이벤트 맵핑] [트레이에 담기])
+        };
+
+        foreach (var (left, extra, columns) in consoles)
+        {
+            // Act
+            var fit = ConsoleLayoutMath.ResolveToolbarFit(width, left, extra, columns, showSearch: true);
+
+            // Assert — 이 폭들에서는 검색이 아이콘으로 접히지 않고, 전체 폭이면 늘 180 이상이다
+            Assert.False(fit.IsSearchCompact, $"{surface}/{drawerOpen}: 목록 {width} · 왼쪽 {left} · Extra {extra}");
+            Assert.InRange(fit.SearchWidth, ConsoleLayoutMath.ToolbarSearchFullMinWidth, ConsoleLayoutMath.ToolbarSearchPreferredWidth);
+        }
+    }
+
+    [Theory]
+    [InlineData(1400)]
+    [InlineData(756)]
+    [InlineData(606)]
+    [InlineData(484)]
+    [InlineData(300)]
+    [InlineData(200)]
+    public void should_never_ask_the_action_row_for_more_than_the_toolbar_width(double width)
     {
         // Act
-        var overflow = ConsoleLayoutMath.ShouldOverflowToolbarExtra(toolbarWidth, Left, Columns, extraWidth, showSearch: true);
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, Left, Extra, Columns, showSearch: true);
+
+        // Assert — 제자리에 남은 것 + [⋯] + 검색(또는 아이콘) + 여백의 합이 툴바 폭을 넘지 않는다(= 오른쪽 끝이 잘리지 않는다).
+        // [추가][삭제][갱신] 만으로 넘치는 극단(200)은 옮길 것이 없어 예외다.
+        var moved = fit.Overflow != ConsoleToolbarOverflow.None;
+        var need = 24 + Left
+                   + (fit.Overflow.HasFlag(ConsoleToolbarOverflow.Extra) ? 0 : Extra)
+                   + (fit.Overflow.HasFlag(ConsoleToolbarOverflow.Columns) ? 0 : Columns)
+                   + (moved ? ConsoleLayoutMath.ToolbarOverflowButtonWidth : 0)
+                   + 12 + (fit.IsSearchCompact ? ConsoleLayoutMath.ToolbarSearchCompactMinWidth : fit.SearchWidth);
+        if (24 + Left + ConsoleLayoutMath.ToolbarOverflowButtonWidth + 12 + ConsoleLayoutMath.ToolbarSearchCompactMinWidth > width) return;
+        Assert.True(need <= width + 0.01, $"폭 {width} 에 {need} 를 요구했다({fit})");
+    }
+
+    [Fact]
+    public void should_fold_the_search_to_an_icon_only_when_even_folding_everything_leaves_less_than_its_minimum()
+    {
+        // Arrange — 300: 모두 옮겨도 300 − 24 − 170 − 40 − 12 = 54 < 180
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(300, Left, Extra, Columns, showSearch: true);
+
+        // Assert — 180 과 0 사이의 어중간한 폭으로 누르지 않는다: 아이콘이다
+        Assert.True(fit.IsSearchCompact);
+        Assert.Equal(0, fit.SearchWidth);
+    }
+
+    [Fact]
+    public void should_bring_extra_back_inline_when_the_search_is_folded_anyway_and_extra_fits_beside_the_icon()
+    {
+        // Arrange — Extra 가 작고(60) [열] 이 없는 좁은 툴바: 검색 180 은 어떤 단계에서도 안 들어가지만,
+        // 아이콘(32)이면 Extra 를 제자리에 둘 수 있다 — 접을 것만 접는다.
+        const double width = 24 + 170 + 60 + 12 + 32 + 10;
+
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, Left, 60, 0, showSearch: true);
 
         // Assert
-        Assert.False(overflow);
+        Assert.True(fit.IsSearchCompact);
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+    }
+
+    [Fact]
+    public void should_not_reserve_room_for_the_search_when_search_is_hidden()
+    {
+        // Arrange — 검색이 꺼진 레일(장비 부품으로 찾기 · 서버 시스템 이벤트): 동작만 들어가면 아무것도 옮기지 않는다
+        const double width = 24 + 170 + 213 + 81 + 5;
+
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, Left, Extra, Columns, showSearch: false);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
+        Assert.Equal(0, fit.SearchWidth);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(double.NaN)]
+    [InlineData(-5)]
+    public void should_not_fold_anything_before_the_toolbar_is_measured(double toolbarWidth)
+    {
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(toolbarWidth, Left, Extra, Columns, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
     }
 
     [Fact]
     public void should_decide_from_state_independent_widths_so_the_toolbar_does_not_oscillate()
     {
-        // Arrange — 접힌 뒤 오른쪽 묶음의 실제 폭은 [⋯](40) 로 줄지만, 판정은 Extra 의 제자리 폭으로 한다 —
-        // 같은 입력이면 같은 답이어야 한다(접힘 → 폭 늘어남 → 펼침 → 다시 접힘 진동 방지).
-        var first = ConsoleLayoutMath.ShouldOverflowToolbarExtra(696, Left, Columns, Extra, showSearch: true);
+        // Arrange — 접힌 뒤 실제 폭은 [⋯](40) 로 줄지만 판정은 제자리 폭으로 한다 — 같은 입력이면 같은 답
+        var first = ConsoleLayoutMath.ResolveToolbarFit(606, Left, Extra, Columns, showSearch: true);
 
         // Act
-        var second = ConsoleLayoutMath.ShouldOverflowToolbarExtra(696, Left, Columns, Extra, showSearch: true);
+        var second = ConsoleLayoutMath.ResolveToolbarFit(606, Left, Extra, Columns, showSearch: true);
 
         // Assert
         Assert.Equal(first, second);
-        Assert.True(696 - 24 - 12 - Left - Columns - ConsoleLayoutMath.ToolbarOverflowButtonWidth >= ConsoleLayoutMath.ToolbarSearchFullMinWidth,
-            "접은 뒤에는 검색이 다시 전체 폭을 받을 만큼 남아야 한다");
     }
     #endregion
 
@@ -171,85 +291,4 @@ public class ConsoleLayoutFitTests
     }
     #endregion
 
-    #region ③ 툴바 단계형 넘침 (U-18)
-    // 보고서 콘솔 1120 + 서랍(목록 576) 잘림 감사 실측에 가까운 폭: [추가][삭제][갱신] 216 · 상태 칩 다섯 270 · [열 n/m] 81 · Extra 없음.
-    private const double FixedLeft = 216, Chips = 270;
-
-    [Fact]
-    public void should_keep_everything_inline_when_the_toolbar_has_room()
-    {
-        // Act — 목록 936(서랍 닫힘): 216 + 270 + 81 + 검색 아이콘 32 + 여백 36 = 635 ≤ 936
-        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(936, FixedLeft, Chips, Columns, 0, showSearch: true);
-
-        // Assert
-        Assert.Equal(ConsoleToolbarOverflow.None, overflow);
-    }
-
-    [Fact]
-    public void should_fold_the_filter_chips_when_there_is_no_extra_and_the_columns_button_would_be_cut()
-    {
-        // Arrange — 서랍이 열린 576: 칩까지 두면 [열 4/11] 이 반쯤 잘렸다(잘림 감사). Extra 가 없으니 칩이 첫 번째로 접힌다.
-
-        // Act
-        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(576, FixedLeft, Chips, Columns, 0, showSearch: true);
-
-        // Assert
-        Assert.Equal(ConsoleToolbarOverflow.Filters, overflow);
-    }
-
-    [Fact]
-    public void should_fold_extra_first_and_filters_only_when_extra_alone_is_not_enough()
-    {
-        // Arrange — Extra 130(창 고유 동작 한 개)
-        const double extra = 130;
-        var extraOnlyWidth = 24 + 12 + 32 + FixedLeft + Chips + Columns + ConsoleLayoutMath.ToolbarOverflowButtonWidth;   // Extra 만 옮기면 딱 맞는 폭
-
-        // Act
-        var enough = ConsoleLayoutMath.ResolveToolbarOverflow(extraOnlyWidth, FixedLeft, Chips, Columns, extra, showSearch: true);
-        var tooNarrow = ConsoleLayoutMath.ResolveToolbarOverflow(extraOnlyWidth - 1, FixedLeft, Chips, Columns, extra, showSearch: true);
-
-        // Assert
-        Assert.Equal(ConsoleToolbarOverflow.Extra, enough);
-        Assert.Equal(ConsoleToolbarOverflow.Extra | ConsoleToolbarOverflow.Filters, tooNarrow);
-    }
-
-    [Fact]
-    public void should_fold_the_columns_button_last_so_the_more_button_itself_is_never_cut()
-    {
-        // Arrange — 극단적으로 좁은 툴바(300): 칩 · Extra 를 다 옮겨도 [열] + [⋯] 가 안 들어간다(이벤트 900 접힘에서 [⋯] 자신이 잘렸다)
-
-        // Act
-        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(300, FixedLeft, Chips, Columns, 130, showSearch: true);
-
-        // Assert
-        Assert.Equal(ConsoleToolbarOverflow.Extra | ConsoleToolbarOverflow.Filters | ConsoleToolbarOverflow.Columns, overflow);
-    }
-
-    [Fact]
-    public void should_agree_with_the_extra_only_rule_when_there_are_no_filters()
-    {
-        // Arrange — U-17 판정(ShouldOverflowToolbarExtra)과 같은 입력이면 같은 답이어야 한다(장비 콘솔 실측 폭).
-        foreach (var width in new double[] { 696, 756, 800, 1000 })
-        {
-            // Act
-            var staged = ConsoleLayoutMath.ResolveToolbarOverflow(width, Left, 0, Columns, Extra, showSearch: true);
-            var legacy = ConsoleLayoutMath.ShouldOverflowToolbarExtra(width, Left, Columns, Extra, showSearch: true);
-
-            // Assert
-            Assert.Equal(legacy, staged.HasFlag(ConsoleToolbarOverflow.Extra));
-        }
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(double.NaN)]
-    public void should_not_fold_anything_before_the_toolbar_is_measured(double toolbarWidth)
-    {
-        // Act
-        var overflow = ConsoleLayoutMath.ResolveToolbarOverflow(toolbarWidth, FixedLeft, Chips, Columns, 130, showSearch: true);
-
-        // Assert
-        Assert.Equal(ConsoleToolbarOverflow.None, overflow);
-    }
-    #endregion
 }

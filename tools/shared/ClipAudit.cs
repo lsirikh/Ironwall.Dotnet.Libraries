@@ -56,10 +56,36 @@ public static class ClipAudit
             root.UpdateLayout();
             var findings = Audit(root);
             Write(directory, frame, root, findings);
+            ToolbarMetrics(directory, frame, root);
         }
         catch (Exception ex)
         {
             File.AppendAllText(Path.Combine(directory, "clip-audit-error.txt"), $"{frame}: {ex}{Environment.NewLine}");
+        }
+    }
+
+    /// <summary>
+    /// 두 줄 툴바(D-2026-09-27-71c353)의 숫자 — 검색 실제 폭 · 접힘 · 필터 줄 높이. 잘림 감사가 못 보는
+    /// "잘리진 않았지만 눌렸다"(검색이 최소폭으로 눌려 글자가 테두리에 붙는 것)를 숫자로 남긴다.
+    /// </summary>
+    private static void ToolbarMetrics(string directory, string frame, FrameworkElement root)
+    {
+        var path = Path.Combine(directory, "toolbar-metrics.tsv");
+        if (!File.Exists(path))
+            File.WriteAllText(path, "frame	key	width	height	searchVisible	searchWidth	searchCompact	extraOverflow	columnsOverflow	filterRow	filterRowHeight" + Environment.NewLine, new UTF8Encoding(true));
+
+        foreach (var toolbar in Walk(root).OfType<Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleToolbar>())
+        {
+            if (!toolbar.IsVisible) continue;
+            var search = toolbar.Template?.FindName("Search", toolbar) as FrameworkElement;
+            var rows = (VisualTreeHelper.GetChildrenCount(toolbar) > 0 ? VisualTreeHelper.GetChild(toolbar, 0) as Panel : null)?.Children.OfType<Border>().ToList();
+            var filterRow = rows is { Count: > 1 } ? rows[1].ActualHeight : 0;
+            File.AppendAllText(path, string.Join("	",
+                frame, toolbar.ConsoleKey,
+                toolbar.ActualWidth.ToString("0.#", CultureInfo.InvariantCulture), toolbar.ActualHeight.ToString("0.#", CultureInfo.InvariantCulture),
+                search?.IsVisible == true, (search?.IsVisible == true ? search.ActualWidth : 0).ToString("0.#", CultureInfo.InvariantCulture),
+                toolbar.IsSearchCompact, toolbar.IsExtraOverflow, toolbar.IsColumnsOverflow, toolbar.HasFilterRow,
+                filterRow.ToString("0.#", CultureInfo.InvariantCulture)) + Environment.NewLine);
         }
     }
 

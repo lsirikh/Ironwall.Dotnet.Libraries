@@ -476,183 +476,214 @@
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type c:ConsoleToolbar}">
 					<!--
-						D-23 — 띠 높이는 고정한다(MinHeight 가 아니라 Height) + ClipToBounds. 폭 32 를 넘는
-						내용이 들어와도 행을 밀어 키우지 못하고 잘린다 — Padding 12,8 이 위아래 16 을 먹고
-						남는 32 가 버튼·검색 높이(Console.Button/.SearchBox = 32)와 정확히 맞는다(D-20 은
-						900~1900 어떤 폭에서도 재현 안 됨 — 이 고정은 재현 여부와 무관하게 구조로 막는다).
+						두 줄 툴바(D-2026-09-27-71c353 — D-2026-09-26-739b37 대체).
+						첫째 줄(동작 줄, 48 고정): [추가][삭제][갱신] · Extra(창 고유 동작) · 검색(편한 고정 폭 240, 최소 180) · [열 n/m] · [⋯].
+						둘째 줄(필터 줄, 필터가 있을 때만): 필터 칩을 왼쪽부터. 첫째 줄의 폭 예산에 들어가지 않는다.
+						옛 한 줄 구조에서는 필터 · Extra · 검색 · [열] 이 한 예산을 나눠 먹어 검색이 늘 최소폭(120)으로 눌리고
+						칩 여백까지 깎였다(D-16 · D-23 · U-13 · U-18 네 번의 부분 수정이 모두 그 안에서 움직였다).
+						이름 없는 요소는 코드비하인드가 구조(자식 순서 · Grid.Column)로 찾는다 — x:Name 을 늘리지 않는다.
 					-->
-					<Border
-						Height="{x:Static c:ConsoleLayoutMath.ToolbarHeight}"
-						Padding="12,8"
-						BorderBrush="{DynamicResource DividerBrush}"
-						BorderThickness="0,0,0,1"
-						ClipToBounds="True">
+					<StackPanel>
 						<!--
-							D-16 — 옛 구조는 DockPanel(LastChildFill) 이라 검색이 '남는 자리' 였다. Extra 가 길면
-							검색이 MinWidth 120 아래로 눌려 글자가 잘렸다. Grid 로 바꾸고 검색 칸에 MinWidth 를 걸어
-							이제는 왼쪽 · 오른쪽 묶음이 먼저 줄어든다 — 검색은 결코 잘리지 않는다.
-							D-44 — 버튼 사이 간격은 8px 로 통일한다(집 규칙). 커널이 8 이면 창도 8 이다.
-							D-23 — 그 "결코 잘리지 않는다"가 틀렸다: 가운데 칸의 고정 MinWidth(132) 는 폭이
-							모자라도 줄지 않아, 왼쪽(필터)이 넓어지면 오른쪽(Extra=기본 액션)이 화면 밖으로
-							밀렸다(서랍 1150px · "직접" 에서 실측). 가운데 칸의 MinWidth 는 이제 코드비하인드
-							(ConsoleToolbar.ApplySearchGeometry)가 검색 밀도에 맞춰 동적으로 줄인다 — 아래 132 는
-							"전체 폭 검색" 상태의 초기값일 뿐이다.
+							첫째 줄 — 높이 고정(Height) + ClipToBounds. Padding 12,8 이 위아래 16 을 먹고 남는 32 가 버튼·검색 높이와 같다.
+							아래 선은 필터 줄이 없을 때만 긋는다(있으면 필터 줄이 툴바 전체의 아래 선을 긋는다 — 두 줄이 한 띠로 읽힌다).
 						-->
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="*" MinWidth="132" />
-								<ColumnDefinition Width="Auto" />
-							</Grid.ColumnDefinitions>
-							<StackPanel Orientation="Horizontal">
-								<Button
-									x:Name="PART_Add"
-									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Add}"
-									IsEnabled="{TemplateBinding CanAdd}"
-									Style="{DynamicResource Console.Button.Primary}">
-									<StackPanel Orientation="Horizontal">
-										<!--  글리프는 버튼의 Foreground 를 따른다 — 꺼지면 판이 가라앉으므로 흰 십자가 사라지면 안 된다(K-01)  -->
+						<Border
+							Height="{x:Static c:ConsoleLayoutMath.ToolbarHeight}"
+							Padding="12,8"
+							BorderBrush="{DynamicResource DividerBrush}"
+							ClipToBounds="True">
+							<Border.Style>
+								<Style TargetType="Border">
+									<Setter Property="BorderThickness" Value="0,0,0,1" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding HasFilterRow, RelativeSource={RelativeSource AncestorType={x:Type c:ConsoleToolbar}}}" Value="True">
+											<Setter Property="BorderThickness" Value="0" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Border.Style>
+							<!--
+								가운데 칸(검색)만 줄 수 있다 — 왼쪽 · 오른쪽 묶음은 Auto 라 줄지 않는다. 그래서 판정(ConsoleLayoutMath.ResolveToolbarFit)이
+								검색 폭 · [⋯] 접힘을 먼저 정하고, 코드비하인드가 검색 폭과 가운데 칸 MinWidth 를 그 값으로 건다. D-44 — 버튼 사이 간격 8.
+							-->
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto" />
+									<ColumnDefinition Width="*" MinWidth="0" />
+									<ColumnDefinition Width="Auto" />
+								</Grid.ColumnDefinitions>
+								<StackPanel Orientation="Horizontal">
+									<Button
+										x:Name="PART_Add"
+										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Add}"
+										IsEnabled="{TemplateBinding CanAdd}"
+										Style="{DynamicResource Console.Button.Primary}">
+										<StackPanel Orientation="Horizontal">
+											<!--  글리프는 버튼의 Foreground 를 따른다 — 꺼지면 판이 가라앉으므로 흰 십자가 사라지면 안 된다(K-01)  -->
+											<Path
+												Width="10"
+												Height="10"
+												Margin="0,0,6,0"
+												VerticalAlignment="Center"
+												Data="M4,0 h2 v4 h4 v2 h-4 v4 h-2 v-4 h-4 v-2 h4z"
+												Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+												Stretch="Fill" />
+											<TextBlock VerticalAlignment="Center" Text="{Binding AddText, RelativeSource={RelativeSource TemplatedParent}}" />
+										</StackPanel>
+									</Button>
+									<Button
+										x:Name="PART_Delete"
+										Margin="8,0,0,0"
+										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Delete}"
+										Content="삭제"
+										IsEnabled="{TemplateBinding CanDelete}"
+										Style="{DynamicResource Console.Button}" />
+									<!--
+										X4 — 같은 줄의 [+ 추가](채움) · [삭제](테두리) 옆에서 '갱신' 만 글자뿐이라 버튼 모양이 셋이었다.
+										테두리 버튼(Console.Button, 높이 32)으로 맞추고 글자 대신 새로 고침 글리프 + 한국어 도움말을 준다.
+									-->
+									<Button
+										x:Name="PART_Refresh"
+										Width="32"
+										MinWidth="0"
+										Margin="8,0,0,0"
+										Padding="0"
+										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Refresh}"
+										AutomationProperties.Name="새로 고침"
+										IsEnabled="{TemplateBinding CanRefresh}"
+										Style="{DynamicResource Console.Button}"
+										ToolTip="새로 불러오기">
 										<Path
-											Width="10"
-											Height="10"
-											Margin="0,0,6,0"
+											Width="14"
+											Height="14"
+											HorizontalAlignment="Center"
 											VerticalAlignment="Center"
-											Data="M4,0 h2 v4 h4 v2 h-4 v4 h-2 v-4 h-4 v-2 h4z"
+											Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
 											Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
-											Stretch="Fill" />
-										<TextBlock VerticalAlignment="Center" Text="{Binding AddText, RelativeSource={RelativeSource TemplatedParent}}" />
-									</StackPanel>
-								</Button>
-								<Button
-									x:Name="PART_Delete"
-									Margin="8,0,0,0"
-									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Delete}"
-									Content="삭제"
-									IsEnabled="{TemplateBinding CanDelete}"
-									Style="{DynamicResource Console.Button}" />
+											Stretch="Uniform" />
+									</Button>
+									<!--  창 고유 동작(Extra) — 기본 동작 바로 뒤. 폭이 정말 모자라면 [⋯] 팝업으로 옮겨진다(IsExtraOverflow).  -->
+									<ContentPresenter
+										Margin="8,0,0,0"
+										VerticalAlignment="Center"
+										Content="{TemplateBinding Extra}" />
+								</StackPanel>
 								<!--
-									X4 — 같은 줄의 [+ 추가](채움) · [삭제](테두리) 옆에서 '갱신' 만 글자뿐이라 버튼 모양이 셋이었다.
-									테두리 버튼(Console.Button, 높이 32)으로 맞추고 글자 대신 새로 고침 글리프 + 한국어 도움말을 준다
-									(폭 32 — 서랍 모드 툴바 예산을 예전 글자 버튼보다 덜 먹는다).
+									검색 — 오른쪽 정렬 · 고정 폭(코드비하인드가 180~240 사이로 건다). 내용(안내 글 · 입력 글)에 맞춰 늘었다 줄었다 하지 않는다 —
+									옛 구조는 폭을 내용에 맞춰 입력 글 끝이 테두리에 붙었다(실창 "LRT-UI-SENSOR-091045|"). 긴 글은 칸 안에서 흐른다.
+								-->
+								<TextBox
+									x:Name="Search"
+									Grid.Column="1"
+									Width="{x:Static c:ConsoleLayoutMath.ToolbarSearchPreferredWidth}"
+									Margin="12,0,0,0"
+									HorizontalAlignment="Right"
+									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Search}"
+									Style="{DynamicResource Console.SearchBox}"
+									Tag="{TemplateBinding SearchPlaceholder}"
+									Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								<!--
+									U-13 — 정말 좁아 검색 전체 폭(180)이 안 들어가면 글자 상자 대신 아이콘 버튼 하나로 바꾼다.
+									클릭하면 PART_SearchPopup 이 열려 전체 폭(320) 검색창을 오버레이로 띄운다.
 								-->
 								<Button
-									x:Name="PART_Refresh"
-									Width="32"
-									MinWidth="0"
-									Margin="8,0,0,0"
-									Padding="0"
-									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Refresh}"
-									AutomationProperties.Name="새로 고침"
-									IsEnabled="{TemplateBinding CanRefresh}"
-									Style="{DynamicResource Console.Button}"
-									ToolTip="새로 불러오기">
-									<Path
-										Width="14"
-										Height="14"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
-										Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
-										Stretch="Uniform" />
+									x:Name="PART_SearchCompact"
+									Grid.Column="1"
+									Margin="12,0,0,0"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Center"
+									Cursor="Hand"
+									FocusVisualStyle="{x:Null}"
+									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.SearchTrigger}"
+									ToolTip="{TemplateBinding SearchPlaceholder}"
+									Style="{x:Null}"
+									Visibility="Collapsed">
+									<Button.Template>
+										<ControlTemplate TargetType="Button">
+											<Border
+												x:Name="Bd"
+												Padding="8"
+												Background="{DynamicResource SurfaceSunkenBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="4">
+												<Path
+													Data="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"
+													Fill="{DynamicResource TextMutedBrush}"
+													Stretch="Uniform" />
+											</Border>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsMouseOver" Value="True">
+													<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+													<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+												</Trigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Button.Template>
 								</Button>
-								<ContentPresenter
-									Margin="10,0,0,0"
-									VerticalAlignment="Center"
-									Content="{TemplateBinding Filters}" />
-							</StackPanel>
-							<TextBox
-								x:Name="Search"
-								Grid.Column="1"
-								MinWidth="120"
-								MaxWidth="320"
-								Margin="12,0,0,0"
-								HorizontalAlignment="Right"
-								AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Search}"
-								Style="{DynamicResource Console.SearchBox}"
-								Tag="{TemplateBinding SearchPlaceholder}"
-								Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-							<!--
-								U-13 — 예산이 전체 최소폭(120) 아래로 좁아지면, 예전엔 이 TextBox 를 그
-								남은 예산(0~120 사이 아무 값, 심지어 몇 px)으로 그대로 눌러 검색창 자신의
-								고정 30px 아이콘 칸조차 못 채워 아이콘이 잘렸다. 이제는 그 폭에서 TextBox
-								를 아예 숨기고, 글자 없는 아이콘 버튼(Stretch=Uniform — 잘리지 않고 작아질
-								뿐이다) 하나로 바꾼다. 예산 수학(ConsoleLayoutMath.ResolveToolbarSearchMode)
-								은 그대로다 — 바뀐 건 압축 상태의 "그리는 방법" 뿐, "얼마나 줄지" 가 아니다.
-								클릭하면 PART_SearchPopup 이 열려 전체 폭 검색창을 오버레이로 띄운다.
-							-->
-							<Button
-								x:Name="PART_SearchCompact"
-								Grid.Column="1"
-								Margin="12,0,0,0"
-								HorizontalAlignment="Right"
+								<!--  확장 오버레이 — 압축 아이콘을 눌렀을 때만 뜬다. 전체 폭(320) 그대로라 글자가 잘릴 일이 없다.  -->
+								<Popup
+									x:Name="PART_SearchPopup"
+									AllowsTransparency="True"
+									Placement="Bottom"
+									PlacementTarget="{Binding ElementName=PART_SearchCompact}"
+									StaysOpen="False">
+									<Border
+										Padding="1"
+										Background="{DynamicResource SurfaceBrush}"
+										BorderBrush="{DynamicResource PrimaryBrush}"
+										BorderThickness="1"
+										CornerRadius="4">
+										<TextBox
+											x:Name="PART_SearchExpanded"
+											Width="{x:Static c:ConsoleLayoutMath.ToolbarSearchFullMaxWidth}"
+											AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.SearchExpanded}"
+											Style="{DynamicResource Console.SearchBox}"
+											Tag="{TemplateBinding SearchPlaceholder}"
+											Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									</Border>
+								</Popup>
+								<!--  오른쪽 묶음 — [열 n/m] 뒤에 코드비하인드가 [⋯] 와 그 팝업을 붙인다.  -->
+								<StackPanel Grid.Column="2" Orientation="Horizontal">
+									<Button
+										x:Name="PART_Columns"
+										Margin="8,0,0,0"
+										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Columns}"
+										Content="{TemplateBinding ColumnsText}"
+										FontFamily="{DynamicResource MonoFont}"
+										Style="{DynamicResource Console.Button.Ghost}"
+										ToolTip="기본 열 / 전체 열" />
+								</StackPanel>
+							</Grid>
+						</Border>
+						<!--
+							둘째 줄(필터 줄) — 필터 칩을 왼쪽부터. 같은 좌우 여백(12) · 최소 높이 40 · 아래 선.
+							ContentPresenter 는 늘 트리에 둔다(필터 안의 바인딩이 창의 DataContext 를 물려받아야 보임 여부가 정해진다) —
+							내용이 없거나 전부 숨으면 HasFilterRow 가 거짓이 되어 여백 · 최소 높이 · 선이 모두 0 이다(빈 띠를 두지 않는다).
+							칩은 줄이지도, 글자 중간에서 자르지도 않는다 — 좁으면 창의 필터 패널(WrapPanel)이 다음 줄로 넘긴다.
+						-->
+						<Border BorderBrush="{DynamicResource DividerBrush}" ClipToBounds="True">
+							<Border.Style>
+								<Style TargetType="Border">
+									<Setter Property="Padding" Value="0" />
+									<Setter Property="MinHeight" Value="0" />
+									<Setter Property="BorderThickness" Value="0" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding HasFilterRow, RelativeSource={RelativeSource AncestorType={x:Type c:ConsoleToolbar}}}" Value="True">
+											<Setter Property="Padding" Value="12,4,12,5" />
+											<Setter Property="MinHeight" Value="{x:Static c:ConsoleLayoutMath.FilterRowMinHeight}" />
+											<Setter Property="BorderThickness" Value="0,0,0,1" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Border.Style>
+							<ContentPresenter
+								HorizontalAlignment="Left"
 								VerticalAlignment="Center"
-								Cursor="Hand"
-								FocusVisualStyle="{x:Null}"
-								AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.SearchTrigger}"
-								ToolTip="{TemplateBinding SearchPlaceholder}"
-								Style="{x:Null}"
-								Visibility="Collapsed">
-								<Button.Template>
-									<ControlTemplate TargetType="Button">
-										<Border
-											x:Name="Bd"
-											Padding="8"
-											Background="{DynamicResource SurfaceSunkenBrush}"
-											BorderBrush="{DynamicResource BorderBrush}"
-											BorderThickness="1"
-											CornerRadius="4">
-											<Path
-												Data="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"
-												Fill="{DynamicResource TextMutedBrush}"
-												Stretch="Uniform" />
-										</Border>
-										<ControlTemplate.Triggers>
-											<Trigger Property="IsMouseOver" Value="True">
-												<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-												<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-											</Trigger>
-										</ControlTemplate.Triggers>
-									</ControlTemplate>
-								</Button.Template>
-							</Button>
-							<!--  확장 오버레이 — 압축 아이콘을 눌렀을 때만 뜬다. 전체 폭(320) 그대로라 글자가 잘릴 일이 없다.  -->
-							<Popup
-								x:Name="PART_SearchPopup"
-								AllowsTransparency="True"
-								Placement="Bottom"
-								PlacementTarget="{Binding ElementName=PART_SearchCompact}"
-								StaysOpen="False">
-								<Border
-									Padding="1"
-									Background="{DynamicResource SurfaceBrush}"
-									BorderBrush="{DynamicResource PrimaryBrush}"
-									BorderThickness="1"
-									CornerRadius="4">
-									<TextBox
-										x:Name="PART_SearchExpanded"
-										Width="{x:Static c:ConsoleLayoutMath.ToolbarSearchFullMaxWidth}"
-										AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.SearchExpanded}"
-										Style="{DynamicResource Console.SearchBox}"
-										Tag="{TemplateBinding SearchPlaceholder}"
-										Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-								</Border>
-							</Popup>
-							<StackPanel Grid.Column="2" Orientation="Horizontal">
-								<Button
-									x:Name="PART_Columns"
-									Margin="8,0,0,0"
-									AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Toolbar.Columns}"
-									Content="{TemplateBinding ColumnsText}"
-									FontFamily="{DynamicResource MonoFont}"
-									Style="{DynamicResource Console.Button.Ghost}"
-									ToolTip="기본 열 / 전체 열" />
-								<ContentPresenter
-									Margin="8,0,0,0"
-									VerticalAlignment="Center"
-									Content="{TemplateBinding Extra}" />
-							</StackPanel>
-						</Grid>
-					</Border>
+								Content="{TemplateBinding Filters}" />
+						</Border>
+					</StackPanel>
 					<ControlTemplate.Triggers>
 						<!--  꺼진 버튼은 늘 사유를 갖는다  -->
 						<Trigger Property="CanAdd" Value="False">

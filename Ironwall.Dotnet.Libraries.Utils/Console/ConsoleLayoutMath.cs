@@ -21,19 +21,6 @@ public readonly record struct ConsoleLayout(
     bool IsSplitterVisible);
 
 /// <summary>
-/// 툴바 검색창의 밀도(D-23) — 폭이 모자라면 검색을 아이콘 트리거로 접는다.
-/// 필터 · 기본 액션(Extra)은 절대 줄이지 않는다 — Grid 의 Auto 칸이라 애초에 줄지 않기 때문에
-/// 줄일 수 있는 건 가운데 Star 칸(검색)뿐이다.
-/// </summary>
-public enum ConsoleToolbarSearchMode
-{
-    /// <summary>전체 폭 검색창(placeholder 포함).</summary>
-    Full,
-    /// <summary>아이콘 전용 — 포커스를 받으면 그 순간만 넓어진다(ConsoleToolbar 코드비하인드).</summary>
-    IconOnly,
-}
-
-/// <summary>
 /// 콘솔 배치 판정 — <b>이 한 곳에서만</b> 한다. 화면 없이 단위 테스트할 수 있게 WPF 에 기대지 않는다.
 /// (설계 정본 window-layout-system-storyboard.html L116-127 · L2175-2197)
 /// </summary>
@@ -127,140 +114,114 @@ public static class ConsoleLayoutMath
     public static double DetailWidthAfterSplitterMove(double currentDetailWidth, double splitterDelta)
         => ClampDetailWidth(currentDetailWidth - splitterDelta);
 
-    #region 툴바 오버플로 — 검색 밀도 (D-23)
-    /// <summary>검색창이 전체 폭일 때 필요한 최소 폭 — <c>Generic.xaml</c> Search 의 기본 MinWidth 와 같다.</summary>
-    public const double ToolbarSearchFullMinWidth = 120;
-    /// <summary>검색창이 전체 폭일 때 허용하는 최대 폭 — <c>Generic.xaml</c> Search 의 기본 MaxWidth 와 같다.</summary>
-    public const double ToolbarSearchFullMaxWidth = 320;
-    /// <summary>검색창과 왼쪽 클러스터 사이 여백 — <c>Generic.xaml</c> Search 의 Margin 왼쪽 값과 같다(예산 계산용).</summary>
-    public const double ToolbarSearchLeftMargin = 12;
-    /// <summary>툴바 띠 안쪽 여백의 좌우 합 — <c>Generic.xaml</c> Border 의 <c>Padding="12,8"</c> 중 좌 12 + 우 12.</summary>
-    public const double ToolbarHorizontalPadding = 24;
-
+    #region 툴바 두 줄 — 동작 줄 · 필터 줄 (D-2026-09-27-71c353)
     /// <summary>
-    /// 검색창에 실제로 내줄 수 있는 최소 폭(px, 0~<see cref="ToolbarSearchFullMinWidth"/>) — <b>항상 안전하다</b>:
-    /// 이 값 + 왼쪽 마진을 검색 칸의 <c>MinWidth</c> 로 그대로 써도 Grid 의 총 요구 폭이 툴바 자신의 폭을
-    /// 넘지 않는다. 왼쪽 클러스터(추가 · 삭제 · 갱신 · 필터)와 오른쪽 필수 클러스터(열 버튼 · Extra = 창
-    /// 고유 기본 액션)는 둘 다 Grid 의 <c>Auto</c> 칸이라 폭이 모자라도 줄지 않고 제 몫을 그대로 가져간다 —
-    /// 안쪽 여백 · 검색 왼쪽 마진 · 그 둘을 뺀 "예산"이 바로 검색이 가질 수 있는 전부다.
+    /// 검색창을 "전체 폭" 으로 보일 때의 최소 폭. 이보다 좁게는 절대 누르지 않는다 — 모자라면 아이콘 트리거로 접는다.
     /// <para>
-    /// D-23 — 옛 구조는 가운데 칸에 고정 <c>MinWidth 132</c> 를 걸어 두어, 예산이 132 보다 적어도 132 를
-    /// 강제로 채우려다 총 폭이 넘쳐 오른쪽(기본 액션 · 조치보고 버튼)이 화면 밖으로 밀렸다(서랍 1150px ·
-    /// "직접" 에서 실측). <b>고정폭이면 뭐든(120 이든 32 든) 같은 병이 재발한다</b> — 실측으로 확인:
-    /// 왼쪽 750.7px · 오른쪽 84px 인 채 900px 로 좁히면 예산이 13.3px 뿐인데, 검색을 32(아이콘 고정)로
-    /// 접어도 32 &gt; 13.3 이라 여전히 18.7px 이 넘쳤다. 그래서 고정 두 단계(전체/아이콘) 대신 예산을
-    /// 그대로 상한으로 쓴다 — 얼마가 남았든 그 이상은 절대 요구하지 않는다.
+    /// 옛 값 120 은 "남는 자리" 에서 늘 최솟값으로 눌려 안내 글 · 입력 글이 테두리에 붙었다(실창 022 · 024 · 007 · 032 —
+    /// D-16 · D-23 · U-13 · U-18 네 번의 부분 수정이 모두 한 줄 예산을 나눠 먹는 구조 안에서 움직였다).
     /// </para>
     /// </summary>
-    public static double ResolveToolbarSearchMinWidth(double toolbarWidth, double leftClusterWidth, double rightClusterWidth)
-    {
-        if (double.IsNaN(toolbarWidth) || toolbarWidth < 0) toolbarWidth = 0;
-        if (double.IsNaN(leftClusterWidth) || leftClusterWidth < 0) leftClusterWidth = 0;
-        if (double.IsNaN(rightClusterWidth) || rightClusterWidth < 0) rightClusterWidth = 0;
-
-        var budget = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin - leftClusterWidth - rightClusterWidth;
-        return Math.Max(0, Math.Min(budget, ToolbarSearchFullMinWidth));
-    }
-
-    /// <summary>검색창의 밀도 — <see cref="ResolveToolbarSearchMinWidth"/> 가 전체 폭을 다 주지 못하면 접힌 것이다.</summary>
-    public static ConsoleToolbarSearchMode ResolveToolbarSearchMode(double toolbarWidth, double leftClusterWidth, double rightClusterWidth)
-        => ResolveToolbarSearchMinWidth(toolbarWidth, leftClusterWidth, rightClusterWidth) >= ToolbarSearchFullMinWidth
-            ? ConsoleToolbarSearchMode.Full
-            : ConsoleToolbarSearchMode.IconOnly;
-
+    public const double ToolbarSearchFullMinWidth = 180;
+    /// <summary>검색창의 편한 기본 폭 — 자리가 넉넉하면 이 폭으로 선다(내용에 따라 늘었다 줄었다 하지 않는다).</summary>
+    public const double ToolbarSearchPreferredWidth = 240;
+    /// <summary>아이콘으로 접힌 검색을 눌렀을 때 뜨는 오버레이 입력칸의 폭 — <c>Generic.xaml</c> PART_SearchExpanded.</summary>
+    public const double ToolbarSearchFullMaxWidth = 320;
+    /// <summary>검색창과 왼쪽 묶음 사이 여백 — <c>Generic.xaml</c> Search 의 Margin 왼쪽 값과 같다(예산 계산용).</summary>
+    public const double ToolbarSearchLeftMargin = 12;
+    /// <summary>툴바 띠 안쪽 여백의 좌우 합 — <c>Generic.xaml</c> 두 줄 모두 <c>Padding="12,…"</c>(좌 12 + 우 12).</summary>
+    public const double ToolbarHorizontalPadding = 24;
     /// <summary>검색이 아이콘으로 접혀도 이 폭은 남아야 누를 수 있다(<c>Console.Button.Icon</c> 한 변과 같다).</summary>
     public const double ToolbarSearchCompactMinWidth = 32;
-
-    /// <summary>오른쪽 묶음을 접었을 때 그 자리에 서는 [⋯] 버튼 — 한 변 32 + 왼쪽 간격 8.</summary>
+    /// <summary>[⋯] 버튼 — 한 변 32 + 왼쪽 간격 8.</summary>
     public const double ToolbarOverflowButtonWidth = 40;
-
     /// <summary>
-    /// 오른쪽 묶음(Extra = 창 고유 동작)을 [⋯] 뒤로 접어야 하는가 — <b>마지막 수단</b>이다(U-17).
-    /// <para>
-    /// D-23 은 "기본 액션은 줄이지 않는다" 고 정했다 — 그래서 먼저 검색이 아이콘으로, 그다음 0 까지 접힌다.
-    /// 그래도 모자라면 Grid 의 Auto 칸은 줄지 않으므로 오른쪽 끝 버튼이 <b>테두리 밖으로 잘려 나가</b> 누를 수 없게 된다
-    /// (장비 콘솔 1240 서랍 실창: "셋업 · 결선" 이 반쯤 잘렸다). 누를 수 없는 버튼보다 한 번 더 누르는 버튼이 낫다 —
-    /// 이 판정이 참이면 Extra 전체를 [⋯] 팝업으로 옮긴다. 폭이 돌아오면 제자리로 돌아온다.
-    /// </para>
-    /// <para>
-    /// 입력은 <b>상태와 무관한 폭</b>이어야 한다(접힘 여부에 따라 달라지는 오른쪽 묶음의 실제 폭을 넣으면 접었다 폈다 진동한다):
-    /// <paramref name="rightFixedWidth"/> = 열 버튼(간격 포함), <paramref name="extraWidth"/> = Extra 가 제자리에 있을 때의 폭(간격 포함).
-    /// </para>
+    /// 둘째 줄(필터 칩 줄)의 최소 높이 — 칩(26) · 날짜 입력(32)이 위아래 여백을 갖고 선다.
+    /// 필터가 없으면 이 줄은 높이 0 이다(<see cref="ConsoleToolbar.HasFilterRow"/>).
     /// </summary>
-    public static bool ShouldOverflowToolbarExtra(double toolbarWidth, double leftClusterWidth, double rightFixedWidth, double extraWidth, bool showSearch)
-    {
-        static double Clean(double v) => double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
-        toolbarWidth = Clean(toolbarWidth);
-        extraWidth = Clean(extraWidth);
-        if (toolbarWidth <= 0 || extraWidth <= 0) return false;       // 아직 재지 못했거나 접을 것이 없다
-
-        var budget = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin
-                     - Clean(leftClusterWidth) - Clean(rightFixedWidth) - extraWidth;
-        return budget < (showSearch ? ToolbarSearchCompactMinWidth : 0);
-    }
+    public const double FilterRowMinHeight = 40;
 
     /// <summary>
-    /// 툴바에서 [⋯] 뒤로 접을 묶음들 — <see cref="ShouldOverflowToolbarExtra"/> 를 넓힌 단계형 판정(U-18).
+    /// 첫째 줄(동작 줄)의 배치 판정 — [추가][삭제][갱신] · Extra · 검색 · [열 n/m] 만 예산을 나눈다.
+    /// <b>필터 칩은 이 예산에 들어가지 않는다</b> — 둘째 줄에 따로 선다(D-2026-09-27-71c353).
     /// <para>
-    /// Extra 만 접어서는 모자랄 때가 있다(보고서 1120 서랍: 상태 칩 다섯 개가 왼쪽 묶음을 키워 [열 n/m] 이 반쯤 잘렸다 ·
-    /// 이벤트 900 접힘: 기간 칩 때문에 [⋯] 자신이 테두리 밖으로 밀렸다 — 잘림 감사 실측). Grid 의 Auto 칸은 줄지 않으므로
-    /// 줄일 수 없는 것을 옮기는 수밖에 없다. 순서는 창 고유 동작(Extra) → 필터 칩 → [열 n/m] 이다 — [추가] · [삭제] · [갱신] 은
-    /// 모든 콘솔의 기본 동작이라 옮기지 않는다.
+    /// 순서: ① 전부 제자리 + 검색 전체 폭(180~240) → ② Extra 를 [⋯] 로 → ③ [열 n/m] 도 [⋯] 로 →
+    /// 그래도 검색 180 이 안 들어가면 검색을 아이콘으로 접고 ①②③ 을 같은 순서로 다시 본다.
+    /// 검색이 전체 폭이면 그 폭은 늘 <see cref="ToolbarSearchFullMinWidth"/> 이상이다 — 180 과 0 사이의 어중간한 폭은 없다.
+    /// [추가] · [삭제] · [갱신] 은 모든 콘솔의 기본 동작이라 옮기지 않는다.
     /// </para>
     /// <para>입력은 모두 <b>제자리일 때의 폭</b>(간격 포함)이다 — 접힘 상태에 따라 달라지는 실제 폭을 넣으면 진동한다.</para>
     /// </summary>
+    /// <param name="toolbarWidth">툴바 자신의 폭(= 목록 칸의 실효 폭).</param>
     /// <param name="fixedLeftWidth">[추가] · [삭제] · [갱신] 의 폭(간격 포함) — 옮기지 않는 부분.</param>
-    public static ConsoleToolbarOverflow ResolveToolbarOverflow(
-        double toolbarWidth, double fixedLeftWidth, double filtersWidth, double columnsWidth, double extraWidth, bool showSearch)
+    /// <param name="extraWidth">창 고유 동작(Extra)의 폭(간격 포함), 없으면 0.</param>
+    /// <param name="columnsWidth">[열 n/m] 의 폭(간격 포함), 없으면 0.</param>
+    /// <param name="showSearch">검색을 보이는 화면인가.</param>
+    public static ConsoleToolbarFit ResolveToolbarFit(
+        double toolbarWidth, double fixedLeftWidth, double extraWidth, double columnsWidth, bool showSearch)
     {
         static double Clean(double v) => double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
         toolbarWidth = Clean(toolbarWidth);
         fixedLeftWidth = Clean(fixedLeftWidth);
-        filtersWidth = Clean(filtersWidth);
-        columnsWidth = Clean(columnsWidth);
         extraWidth = Clean(extraWidth);
-        if (toolbarWidth <= 0) return ConsoleToolbarOverflow.None;      // 아직 재지 못했다
+        columnsWidth = Clean(columnsWidth);
 
-        var available = toolbarWidth - ToolbarHorizontalPadding - ToolbarSearchLeftMargin - (showSearch ? ToolbarSearchCompactMinWidth : 0);
+        if (toolbarWidth <= 0)                                          // 아직 재지 못했다 — 아무것도 옮기지 않는다
+            return new ConsoleToolbarFit(ConsoleToolbarOverflow.None, showSearch ? ToolbarSearchPreferredWidth : 0, false);
 
-        double Need(ConsoleToolbarOverflow moved)
+        var available = toolbarWidth - ToolbarHorizontalPadding;
+
+        double Actions(ConsoleToolbarOverflow moved)
         {
             var need = fixedLeftWidth;
             var anyMoved = false;
-            if (moved.HasFlag(ConsoleToolbarOverflow.Filters)) anyMoved |= filtersWidth > 0; else need += filtersWidth;
-            if (moved.HasFlag(ConsoleToolbarOverflow.Columns)) anyMoved |= columnsWidth > 0; else need += columnsWidth;
             if (moved.HasFlag(ConsoleToolbarOverflow.Extra)) anyMoved |= extraWidth > 0; else need += extraWidth;
+            if (moved.HasFlag(ConsoleToolbarOverflow.Columns)) anyMoved |= columnsWidth > 0; else need += columnsWidth;
             return need + (anyMoved ? ToolbarOverflowButtonWidth : 0);
         }
 
-        var result = ConsoleToolbarOverflow.None;
-        if (Need(result) <= available) return result;
+        var stages = new List<ConsoleToolbarOverflow> { ConsoleToolbarOverflow.None };
+        if (extraWidth > 0) stages.Add(ConsoleToolbarOverflow.Extra);
+        if (columnsWidth > 0) stages.Add(stages[^1] | ConsoleToolbarOverflow.Columns);
 
-        if (extraWidth > 0)
+        if (!showSearch)
         {
-            result |= ConsoleToolbarOverflow.Extra;
-            if (Need(result) <= available) return result;
+            foreach (var stage in stages)
+                if (Actions(stage) <= available) return new ConsoleToolbarFit(stage, 0, false);
+            return new ConsoleToolbarFit(stages[^1], 0, false);
         }
-        if (filtersWidth > 0)
+
+        // ① 검색 전체 폭(180 이상)을 지키는 가장 얕은 단계
+        foreach (var stage in stages)
         {
-            result |= ConsoleToolbarOverflow.Filters;
-            if (Need(result) <= available) return result;
+            var budget = available - Actions(stage) - ToolbarSearchLeftMargin;
+            if (budget >= ToolbarSearchFullMinWidth)
+                return new ConsoleToolbarFit(stage, Math.Min(budget, ToolbarSearchPreferredWidth), false);
         }
-        if (columnsWidth > 0) result |= ConsoleToolbarOverflow.Columns;
-        return result;
+
+        // ② 정말 좁다 — 검색을 아이콘으로 접고 다시 본다
+        foreach (var stage in stages)
+            if (Actions(stage) + ToolbarSearchLeftMargin + ToolbarSearchCompactMinWidth <= available)
+                return new ConsoleToolbarFit(stage, 0, true);
+
+        return new ConsoleToolbarFit(stages[^1], 0, true);
     }
     #endregion
 }
 
-/// <summary>툴바에서 [⋯] 팝업으로 옮겨진 묶음(<see cref="ConsoleLayoutMath.ResolveToolbarOverflow"/>).</summary>
+/// <summary><see cref="ConsoleLayoutMath.ResolveToolbarFit"/> 의 결과 — 첫째 줄(동작 줄)의 모양.</summary>
+/// <param name="Overflow">[⋯] 팝업으로 옮긴 묶음.</param>
+/// <param name="SearchWidth">검색창 폭(전체 폭이면 180~240, 접혔거나 숨었으면 0).</param>
+/// <param name="IsSearchCompact">검색이 아이콘 트리거로 접혔는가.</param>
+public readonly record struct ConsoleToolbarFit(ConsoleToolbarOverflow Overflow, double SearchWidth, bool IsSearchCompact);
+
+/// <summary>툴바 첫째 줄에서 [⋯] 팝업으로 옮겨진 묶음(<see cref="ConsoleLayoutMath.ResolveToolbarFit"/>). 필터 칩은 둘째 줄에 서므로 옮길 대상이 아니다.</summary>
 [Flags]
 public enum ConsoleToolbarOverflow
 {
     None = 0,
     /// <summary>창 고유 동작(Extra).</summary>
     Extra = 1,
-    /// <summary>필터 칩(Filters).</summary>
-    Filters = 2,
     /// <summary>[열 n/m].</summary>
     Columns = 4,
 }

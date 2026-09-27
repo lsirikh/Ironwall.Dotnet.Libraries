@@ -509,12 +509,35 @@ public class ConsoleStyleContractTests
     [Fact]
     public void should_keep_the_search_box_from_being_squeezed_by_a_long_extra()
     {
-        // Arrange + Act — 옛 DockPanel(LastChildFill) 에서 검색은 '남는 자리' 라 MinWidth 아래로 눌렸다
-        var toolbar = Between(Kernel(), "c:ConsoleToolbar}\">", "</Style>");
+        // Arrange + Act — 옛 DockPanel(LastChildFill) 에서 검색은 '남는 자리' 라 MinWidth 아래로 눌렸다.
+        // 두 줄 구조(D-2026-09-27-71c353): 검색은 고정 폭(코드가 180~240 을 건다)이고 가운데 칸 MinWidth 도 코드가 그 폭에 맞춘다.
+        var toolbar = Between(Kernel(), "c:ConsoleToolbar}\">", "───────── 상세 호스트");
 
         // Assert
-        Assert.Contains("<ColumnDefinition Width=\"*\" MinWidth=\"132\" />", toolbar);
+        Assert.Contains("Width=\"{x:Static c:ConsoleLayoutMath.ToolbarSearchPreferredWidth}\"", toolbar);
         Assert.DoesNotContain("<DockPanel LastChildFill=\"True\">", toolbar);
+    }
+
+    [Fact]
+    public void should_put_the_filters_on_their_own_row_below_the_action_row()
+    {
+        // Arrange + Act — 필터 칩이 첫째 줄(검색 · 동작)과 폭을 나눠 먹던 한 줄 구조를 되살리지 않는다
+        var toolbar = Between(Kernel(), "c:ConsoleToolbar}\">", "───────── 상세 호스트");
+        var actionRowEnd = toolbar.IndexOf("x:Name=\"PART_Columns\"", StringComparison.Ordinal);
+        var filters = toolbar.IndexOf("Content=\"{TemplateBinding Filters}\"", StringComparison.Ordinal);
+
+        // Assert — 필터 자리는 첫째 줄의 마지막 부품([열 n/m])보다 뒤, 둘째 줄에만 있다
+        Assert.True(actionRowEnd > 0 && filters > actionRowEnd, "필터 자리가 첫째 줄 안에 있다");
+        Assert.Equal(1, CountOf(toolbar, "{TemplateBinding Filters}"));
+        Assert.Contains("MinHeight\" Value=\"{x:Static c:ConsoleLayoutMath.FilterRowMinHeight}\"", toolbar);
+        Assert.Contains("Binding HasFilterRow", toolbar);
+    }
+
+    private static int CountOf(string text, string token)
+    {
+        var count = 0;
+        for (var i = text.IndexOf(token, StringComparison.Ordinal); i >= 0; i = text.IndexOf(token, i + token.Length, StringComparison.Ordinal)) count++;
+        return count;
     }
     #endregion
 

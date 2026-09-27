@@ -827,11 +827,12 @@ public partial class App : Application
     {
         foreach (var toolbar in Descendants<ConsoleToolbar>(root))
         {
-            var grid = (VisualTreeHelper.GetChild(toolbar, 0) as Border)?.Child as Grid;
+            // 두 줄 툴바 — 뿌리 StackPanel 의 첫 Border(동작 줄) 안 Grid.
+            var grid = ((VisualTreeHelper.GetChild(toolbar, 0) as Panel)?.Children.OfType<Border>().FirstOrDefault())?.Child as Grid;
             var widths = grid?.Children.OfType<FrameworkElement>().Select(c => $"col{Grid.GetColumn(c)}={c.ActualWidth:0.#}") ?? Enumerable.Empty<string>();
             var extra = toolbar.Extra as FrameworkElement;
             File.AppendAllText(Path.Combine(directory, "toolbar-probe.txt"),
-                $"{name}: toolbar={toolbar.ActualWidth:0.#} overflow={toolbar.IsExtraOverflow} searchCompact={toolbar.IsSearchCompact} "
+                $"{name}: toolbar={toolbar.ActualWidth:0.#}x{toolbar.ActualHeight:0.#} overflow={toolbar.IsExtraOverflow} columnsOverflow={toolbar.IsColumnsOverflow} searchCompact={toolbar.IsSearchCompact} search={toolbar.SearchBoxWidth:0.#} filterRow={toolbar.HasFilterRow} "
                 + $"extraDesired={extra?.DesiredSize.Width:0.#} extraActual={extra?.ActualWidth:0.#} dc={extra?.DataContext?.GetType().Name ?? "null"} vparent={(extra is null ? "" : VisualTreeHelper.GetParent(extra)?.GetType().Name)} lparent={(extra is null ? "" : LogicalTreeHelper.GetParent(extra)?.GetType().Name)} {string.Join(" ", widths)}{Environment.NewLine}");
         }
     }
