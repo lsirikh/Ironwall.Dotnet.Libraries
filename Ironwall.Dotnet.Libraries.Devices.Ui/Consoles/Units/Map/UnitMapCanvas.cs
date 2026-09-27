@@ -78,15 +78,20 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     private UnitMapLevel _level = UnitMapLod.ForScale(INITIAL_SCALE);
     private int _gridBuilds;
     private bool _themeRedrawPending;
-    private bool _pendingFit;
 
-    private GraphGesture? _gesture;
-    private UnitMapNode? _pressedNode;
-    private IDisposable? _dragSession;
+    // 크기가 생기기 전(첫 레이아웃 전)에 온 뷰 요청 — 마지막 것만 크기가 생길 때 한 번 한다(must-cover 3).
+    private Action? _pendingView;
+
+    // 겹침 순서(z) — 선택 부대 · 마지막으로 끌어 옮긴 부대를 위로(가려진 노드도 선택하면 보인다, must-cover 2).
+    private int? _lastMovedUnitId;
+    private const int Z_LAST_MOVED = 1;
+    private const int Z_SELECTED = 2;
 
     public UnitMapCanvas()
     {
         Focusable = true;
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Once);     // 노드 200개를 Tab 으로 돌지 않는다(ISSUE-52)
+        FocusVisualStyle = null;                                                     // 포커스 표시는 캔버스 자체 링(오버레이)
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
@@ -113,8 +118,10 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
 
+        BuildOverlays();
         RebuildGrid();
         ApplyPan();
+        UpdateHud();
     }
 
     #region - 의존 속성 -
@@ -130,6 +137,7 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         canvas.SyncNodes();
         canvas.Relayout();
         canvas.RedrawLines();
+        canvas.OnSceneChangedDuringDrag();          // 끄는 중 레이어 토글 · 반영 — 끌기는 이어 간다
     }
 
     public static readonly DependencyProperty SelectedUnitIdProperty = DependencyProperty.Register(
@@ -143,6 +151,7 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         var canvas = (UnitMapCanvas)d;
         if (e.OldValue is int oldId && canvas._nodes.TryGetValue(oldId, out var oldNode)) oldNode.IsSelectedNode = false;
         if (e.NewValue is int newId && canvas._nodes.TryGetValue(newId, out var newNode)) newNode.IsSelectedNode = true;
+        canvas.ApplyZOrder();                       // 고른 노드는 위로 — 겹쳐 가려져도 보인다
         canvas.RedrawLines();                       // 선택 부대에 닿는 선 굵기 +1(FR-27)
     }
 
@@ -194,8 +203,6 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     internal Canvas DragLayer => _dragLayer;
     internal Grid OverlayLayer => _overlay;
 
-    /// <summary>진행 중인 제스처가 <see cref="DragSession"/> 토큰을 쥐고 있다.</summary>
-    internal bool HoldsDragSession => _dragSession is not null;
     #endregion
 
     #region - IUnitMapSurface -
@@ -216,19 +223,22 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
     public void CenterOn(int unitId, double? scale = null)
     {
+        if (DeferUntilSized(() => CenterOn(unitId, scale))) return;
         if (!Scene.Positions.TryGetValue(unitId, out var world)) return;
         var view = scale is double s ? new GraphViewport(GraphViewport.ClampScale(s), _view.Offset) : _view;
         ApplyView(view.CenterOn(world, ViewportSize));
     }
 
     public void SetView(double scale, Point centerWorld)
-        => ApplyView(new GraphViewport(GraphViewport.ClampScale(scale), _view.Offset).CenterOn(centerWorld, ViewportSize));
+    {
+        if (DeferUntilSized(() => SetView(scale, centerWorld))) return;
+        ApplyView(new GraphViewport(GraphViewport.ClampScale(scale), _view.Offset).CenterOn(centerWorld, ViewportSize));
+    }
 
     public void Fit()
     {
+        if (DeferUntilSized(Fit)) return;
         var size = ViewportSize;
-        if (size.Width <= 0 || size.Height <= 0) { _pendingFit = true; return; }
-        _pendingFit = false;
 
         var bounds = Scene.WorldBounds;
         if (!GraphViewport.TryFit(bounds, size, out var first)) return;
@@ -257,6 +267,9 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
     private void ApplyView(GraphViewport next)
     {
+        // 끄는 동안 배율은 바꾸지 않는다(시나리오 ISSUE-12 ⓐ) — 단계가 바뀌면 노드 템플릿이 갈려 끌기가 죽는다.
+        if (IsDragging && next.Scale != _view.Scale) return;
+        next = ClampPan(next);
         if (next == _view) return;
 
         var scaleChanged = next.Scale != _view.Scale;
@@ -271,7 +284,23 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         }
 
         ApplyPan();
+        UpdateHud();
+        OnViewMovedDuringDrag();
         ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 팬 범위 제한 자리 — 조직 경계가 화면에 최소 20% 남게(원장 D-2026-09-27-6615ba). 수식은 레인 A 의 <c>GraphViewport</c>
+    /// 가 가진다 — 그 함수가 들어오면 여기 한 줄로 부른다. 그 전에는 제한 없이 통과한다.
+    /// </summary>
+    private GraphViewport ClampPan(GraphViewport view) => view;
+
+    /// <summary>크기가 아직 없으면(첫 레이아웃 전) 요청을 미뤄 두고 <c>true</c>. 마지막 요청만 남는다.</summary>
+    private bool DeferUntilSized(Action request)
+    {
+        if (ActualWidth > 0 && ActualHeight > 0) return false;
+        _pendingView = request;
+        return true;
     }
 
     private void ApplyPan()
@@ -331,7 +360,25 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
         _ordered.Clear();
         _ordered.AddRange(ordered);
+        ApplyZOrder();
     }
+
+    /// <summary>
+    /// 겹침 순서 — 선택 부대가 맨 위, 그다음 마지막으로 끌어 옮긴 부대. 입력 히트(라우팅)와 끄는 동안의 판정
+    /// (<see cref="UnitMapHitTest"/> — 나중에 넣은 것이 위)이 같은 순서를 쓴다.
+    /// </summary>
+    private void ApplyZOrder()
+    {
+        foreach (var node in _ordered)
+        {
+            var z = node.UnitId == SelectedUnitId ? Z_SELECTED : node.UnitId == _lastMovedUnitId ? Z_LAST_MOVED : 0;
+            if (Panel.GetZIndex(node) != z) Panel.SetZIndex(node, z);
+        }
+    }
+
+    /// <summary>그림(히트) 순서 — z 가 같으면 편제 순서. 뒤에 있을수록 위다.</summary>
+    internal IReadOnlyList<UnitMapNode> NodesInDrawOrder()
+        => _ordered.Select((node, index) => (node, index)).OrderBy(x => Panel.GetZIndex(x.node)).ThenBy(x => x.index).Select(x => x.node).ToList();
 
     private void ApplyNode(UnitMapNode node, UnitTreeNode unit, UnitMapNodeFacts facts, UnitMapLayers layers)
     {
@@ -422,40 +469,7 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     }
     #endregion
 
-    #region - 입력 골격 -
-    protected override void OnPreviewMouseLeftButtonDown(MouseButtonEventArgs e)
-    {
-        base.OnPreviewMouseLeftButtonDown(e);
-        OnPointerPressed(e.GetPosition(this), NodeFrom(e.OriginalSource as DependencyObject), Keyboard.IsKeyDown(Key.Space));
-        Focus();
-        CaptureMouse();                         // 뗌 · 캡처 상실이 반드시 이 캔버스로 돌아오게 — 제스처 토큰이 새지 않는다
-    }
-
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
-    {
-        base.OnMouseLeftButtonUp(e);
-        if (_gesture is null) return;
-        OnPointerReleased(e.GetPosition(this));
-        e.Handled = true;
-    }
-
-    protected override void OnLostMouseCapture(MouseEventArgs e)
-    {
-        base.OnLostMouseCapture(e);
-        if (_gesture is not null) FinishGesture();
-    }
-
-    protected override void OnPreviewKeyDown(KeyEventArgs e)
-    {
-        base.OnPreviewKeyDown(e);
-        // Esc 는 제스처 중일 때만 소비한다 — 아니면 통과(기존 ClearSelectionOnEscBehavior 보존, DF).
-        if (e.Key == Key.Escape && _gesture is not null)
-        {
-            FinishGesture();
-            e.Handled = true;
-        }
-    }
-
+    #region - 수명 -
     private Window? _host;
 
     // 창 비활성화(Alt+Tab 등)도 제스처 끝이다(FR-33) — 캡처 상실이 먼저 오지 않는 경로를 막는다.
@@ -470,65 +484,30 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     {
         if (_host is not null) _host.Deactivated -= OnHostDeactivated;
         _host = null;
-        FinishGesture();
+        FinishGesture(commit: false);
     }
 
-    private void OnHostDeactivated(object? sender, EventArgs e) => FinishGesture();
-
-    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        if (_pendingFit) Fit();
-    }
-
-    /// <summary>눌렀다(<paramref name="at"/> 는 이 캔버스 기준). 뗌 없이 다시 눌리면 앞 제스처를 닫고 하나만 쥔다.</summary>
-    internal void OnPointerPressed(Point at, UnitMapNode? node, bool spaceHeld)
-    {
-        if (_gesture is not null) FinishGesture();
-
-        var target = node is null ? GraphPressTarget.Empty : GraphPressTarget.Node;
-        _gesture = GraphGesture.Begin(new GraphPress(target, GraphPointerButton.Left, spaceHeld, CanDragNode(node)), at);
-        _pressedNode = node;
-        _dragSession = DragSession.Begin();
-    }
-
-    /// <summary>뗐다. 데드존 안이면 선택 · 선택 해제를 올린다. 넘었으면 팬 · 끌기의 끝(Phase 3).</summary>
-    internal void OnPointerReleased(Point at)
-    {
-        if (_gesture is null) return;
-
-        var kind = _gesture.Release(at);
-        var node = _pressedNode;
-        FinishGesture();
-
-        switch (kind)
-        {
-            case GraphGestureKind.Select when node is not null:
-                Interaction?.RequestSelect(node.UnitId);
-                break;
-            case GraphGestureKind.ClearSelection:
-                Interaction?.RequestClearSelection();
-                break;
-        }
-    }
+    internal void OnHostDeactivated(object? sender, EventArgs e) => FinishGesture(commit: false);
 
     /// <summary>
-    /// 제스처 끝 — 뗌 · 캡처 상실 · <c>Esc</c> · 언로드가 모두 여기로. 순서(DF · <c>LabelAdorner</c> 계약):
-    /// ① 플래그 해제 ② 시각 복원 ③ 구독 해제 ④ 캡처 해제 ⑤ 통지(<see cref="DragSession"/> 토큰 반납 포함).
-    /// 캡처를 먼저 풀면 <c>LostMouseCapture</c> 로 재진입하므로 플래그를 가장 먼저 내린다.
+    /// 크기가 처음 생기면 미뤄 둔 뷰 요청을 한다. 그 뒤의 크기 변화는 <b>가운데를 지킨다</b>(배율 유지) — 창을 넓혀도
+    /// 보던 부대가 한쪽으로 밀려나지 않는다(must-cover 3).
     /// </summary>
-    private void FinishGesture()
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var session = _dragSession;
-        _gesture = null;                        // ①
-        _pressedNode = null;
-        _dragSession = null;
-        // ② ③ — Phase 3(끌리는 사본 · 잔상 · 자동 팬 타이머)이 여기에 더한다.
-        if (IsMouseCaptured) ReleaseMouseCapture();   // ④
-        session?.Dispose();                     // ⑤ 한 번만 — 토큰은 두 번째 반납을 무시한다
-    }
+        if (e.NewSize.Width <= 0 || e.NewSize.Height <= 0) return;
 
-    private bool CanDragNode(UnitMapNode? node)
-        => node is not null && _level != UnitMapLevel.L0 && node.Echelon is not null;   // L0 · 모르는 제대는 끌지 않는다(FR-13 · 부모 FR-19)
+        if (_pendingView is { } pending)
+        {
+            _pendingView = null;
+            pending();
+            return;
+        }
+
+        if (e.PreviousSize.Width <= 0 || e.PreviousSize.Height <= 0) return;
+        var center = _view.ScreenToWorld(new Point(e.PreviousSize.Width / 2, e.PreviousSize.Height / 2));
+        ApplyView(_view.CenterOn(center, e.NewSize));
+    }
 
     private void OnNodeSelectRequested(object sender, RoutedEventArgs e)
     {
@@ -545,21 +524,28 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         return null;
     }
 
+    /// <summary>입력 원천이 오버레이(HUD · 막대 · 확인) 안인가.</summary>
+    private bool IsInOverlay(DependencyObject? source)
+    {
+        for (var current = source; current is not null && !ReferenceEquals(current, this); current = ParentOf(current))
+            if (ReferenceEquals(current, _overlay)) return true;
+        return false;
+    }
+
     private static DependencyObject? ParentOf(DependencyObject child)
         => child is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(child) : LogicalTreeHelper.GetParent(child);
     #endregion
 
     protected override AutomationPeer OnCreateAutomationPeer()
-        => new UnitMapCanvasAutomationPeer(this, () => _ordered, () => _overlay.Children.OfType<UIElement>());
+        => new UnitMapCanvasAutomationPeer(this, () => _ordered,
+                                           () => _overlay.Children.OfType<UIElement>().Where(c => c.Visibility == Visibility.Visible));
 
     #region - 내부 -
     private Size ViewportSize
     {
         get
         {
-            var width = ActualWidth > 0 ? ActualWidth : double.IsNaN(Width) ? 0 : Width;
-            var height = ActualHeight > 0 ? ActualHeight : double.IsNaN(Height) ? 0 : Height;
-            return new Size(width, height);
+            return new Size(ActualWidth, ActualHeight);   // 레이아웃이 준 실제 크기만 — 없으면 요청을 미룬다
         }
     }
 

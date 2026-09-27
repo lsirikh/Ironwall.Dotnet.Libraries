@@ -485,11 +485,14 @@ public class UnitMapCanvasRenderTests
             var interaction = new RecordingInteraction();
             canvas.Interaction = interaction;
             var idle = PressEscape(canvas);
-            canvas.OnPointerPressed(new Point(10, 10), canvas.Nodes[3], spaceHeld: false);
+            canvas.SetView(0.5, canvas.Scene.Positions[canvas.Nodes[3].UnitId]);
+            var at = canvas.View.WorldToScreen(canvas.Scene.Positions[canvas.Nodes[3].UnitId]);
+            canvas.OnPointerPressed(at, canvas.Nodes[3], spaceHeld: false);
+            canvas.OnPointerMoved(at + new Vector(20, 0));                // 데드존을 넘겨 끄는 중으로(누르기만 한 Esc 는 통과 — SIM-C015)
             var busy = PressEscape(canvas);
             var session = canvas.HoldsDragSession;
-            canvas.OnPointerReleased(new Point(10, 10));                  // Esc 뒤의 뗌은 클릭이 아니다
-            return (idle, busy, session, interaction.Calls.ToList());
+            canvas.OnPointerReleased(at + new Vector(20, 0));             // Esc 뒤의 뗌은 놓기가 아니다
+            return (idle, busy, session, interaction.Calls.Where(c => !c.StartsWith("key:") && !c.StartsWith("begin:") && !c.StartsWith("cancel:")).ToList());
         });
 
         Assert.False(result.idle);                                        // 끌지 않을 때 Esc 는 통과(ClearSelectionOnEscBehavior 보존)
@@ -543,7 +546,7 @@ public class UnitMapCanvasRenderTests
         public void BeginDrag(int unitId) => Calls.Add($"begin:{unitId}");
         public void CompleteDrag(UnitMapDropRequest request) => Calls.Add($"complete:{request.UnitId}");
         public void CancelDrag(int unitId) => Calls.Add($"cancel:{unitId}");
-        public bool HandleKey(UnitMapKeyCommand command, bool shift) { Calls.Add($"key:{command}"); return true; }
+        public bool HandleKey(UnitMapKeyCommand command, bool shift) { Calls.Add($"key:{command}"); return command != UnitMapKeyCommand.Escape; }   // Esc 는 뷰모델이 할 일이 없으면 통과
     }
 
     private static bool PressEscape(UnitMapCanvas canvas)
