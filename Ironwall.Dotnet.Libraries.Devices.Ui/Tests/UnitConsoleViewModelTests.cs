@@ -412,6 +412,72 @@ public class UnitConsoleViewModelTests
     }
     #endregion
 
+    #region - 확인 창(2026-09-27 전수 조사: 삭제 · 운용 중지가 묻지 않고 나갔다) -
+    [Fact]
+    public async Task should_not_call_delete_when_the_person_declines_the_confirmation()
+    {
+        var (console, units, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        string? asked = null;
+        console.Confirm = (title, _) => { asked = title; return Task.FromResult(false); };
+
+        await console.DeleteAsync();
+
+        Assert.Equal("부대 삭제", asked);
+        Assert.Empty(units.Deletes);
+    }
+
+    [Fact]
+    public async Task should_delete_when_the_person_accepts_the_confirmation()
+    {
+        var (console, units, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        console.Confirm = (_, _) => Task.FromResult(true);
+
+        await console.DeleteAsync();
+
+        Assert.Equal(new[] { 6 }, units.Deletes);
+    }
+
+    [Fact]
+    public async Task should_not_disable_when_the_person_declines_the_confirmation()
+    {
+        var (console, units, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        units.Patches.Clear();
+        console.Confirm = (_, _) => Task.FromResult(false);
+
+        await console.DisableAsync();
+
+        Assert.Empty(units.Patches);
+    }
+
+    [Fact]
+    public async Task should_ask_before_closing_when_there_is_nothing_pending_and_close_freely()
+    {
+        var (console, _, _) = await OpenAsync();
+        var asked = false;
+        console.Confirm = (_, _) => { asked = true; return Task.FromResult(false); };
+
+        Assert.True(await console.CanCloseAsync());
+        Assert.False(asked);
+    }
+
+    [Fact]
+    public async Task should_keep_the_window_open_when_the_detail_has_unapplied_changes_and_the_person_declines()
+    {
+        var (console, _, _) = await OpenAsync();
+        await console.SelectRowAsync(Row(console, 6));
+        console.Detail.Tracker.Touch("name", "원래", "바꾼 이름");
+        string? message = null;
+        console.Confirm = (_, m) => { message = m; return Task.FromResult(false); };
+
+        Assert.True(console.Detail.IsDirty);
+        Assert.False(await console.CanCloseAsync());
+        Assert.Contains("적용하지 않은 부대 정보 변경", message);
+    }
+    #endregion
+
     #region - 삭제 · 운용 중지 -
     [Fact]
     public async Task should_surface_the_counts_when_delete_is_blocked_by_409()

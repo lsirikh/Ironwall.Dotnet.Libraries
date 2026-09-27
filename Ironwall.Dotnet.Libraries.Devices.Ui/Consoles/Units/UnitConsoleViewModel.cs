@@ -97,6 +97,25 @@ public sealed class UnitConsoleViewModel : Screen
     #endregion
 
     #region - Kernel pieces -
+    /// <summary>
+    /// 사람에게 묻는 확인 창(제목, 문장 → 예/아니오). 창을 여는 쪽(<see cref="UnitConsoleLauncher"/>)이 넣는다 — 뷰모델은 창 관리자를 모른다.
+    /// 비어 있으면(헤드리스 시험) 묻지 않고 진행한다.
+    /// <para>2026-09-27 전수 조사: 삭제 · 운용 중지가 확인 없이 곧바로 서버에 나갔고, 창을 닫으면 적용하지 않은 변경이 말없이 버려졌다.</para>
+    /// </summary>
+    public Func<string, string, Task<bool>>? Confirm { get; set; }
+
+    private Task<bool> AskAsync(string title, string message) => Confirm is null ? Task.FromResult(true) : Confirm(title, message);
+
+    /// <summary>창을 닫아도 되는가 — 적용하지 않은 상세 변경 · 배치 대기 장비가 있으면 먼저 묻는다.</summary>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = new List<string>();
+        if (Detail.IsDirty) pending.Add("적용하지 않은 부대 정보 변경");
+        if (Tray.HasEntries) pending.Add($"배치 대기 장비 {Tray.Count}대");
+        if (pending.Count == 0) return true;
+        return await AskAsync("부대 편제 닫기", $"{string.Join(" · ", pending)}이(가) 있습니다.\n닫으면 사라집니다. 버리고 닫을까요?").ConfigureAwait(true);
+    }
+
     public ConsoleDetailPresenter Detail { get; }
     public UnitDetailFormViewModel Form { get; }
     public DraftTrayViewModel Tray { get; }
@@ -795,6 +814,7 @@ public sealed class UnitConsoleViewModel : Screen
     public async Task DeleteAsync(CancellationToken token = default)
     {
         if (SelectedRow is not { } row || !CanDeleteUnit) return;
+        if (!await AskAsync("부대 삭제", $"'{row.Name}' 부대를 삭제할까요?\n되돌릴 수 없습니다. 이력을 남기려면 삭제 대신 [운용 중지]를 쓰세요.").ConfigureAwait(true)) return;
 
         IsBusy = true;
         try
@@ -830,6 +850,7 @@ public sealed class UnitConsoleViewModel : Screen
     public async Task DisableAsync(CancellationToken token = default)
     {
         if (SelectedRow is not { } row || !CanEditUnits || IsBusy) return;
+        if (!await AskAsync("부대 운용 중지", $"'{row.Name}' 부대를 운용 중지할까요?\n이력과 소속은 그대로 남습니다.").ConfigureAwait(true)) return;
 
         IsBusy = true;
         try

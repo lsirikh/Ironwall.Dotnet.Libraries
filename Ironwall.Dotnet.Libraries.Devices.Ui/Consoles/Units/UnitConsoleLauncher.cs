@@ -66,8 +66,27 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher
         }
 
         // GroupNats 가 '내 부대 코드' 의 유일한 출처다 — 트리에서 그 부대를 강조하는 데만 쓴다.
-        var viewModel = new UnitConsoleViewModel(_units, _devices, _log, () => _nats?.GroupNats);
+        var viewModel = new UnitConsoleViewModel(_units, _devices, _log, () => _nats?.GroupNats)
+        {
+            // 삭제 · 운용 중지 · 닫기 전에 묻는 창 — 조립기와 같은 확인 창(작은 모달, 부대 창을 소유자로).
+            Confirm = ConfirmAsync,
+        };
         await _windows.ShowDialogAsync(viewModel, null, Settings());
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string message)
+    {
+        var prompt = new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.ConfirmPromptViewModel(title, message);
+        await _windows.ShowDialogAsync(prompt, null, new Dictionary<string, object>
+        {
+            ["Width"] = 420.0,
+            ["Height"] = 260.0,
+            ["SizeToContent"] = SizeToContent.Manual,
+            ["WindowStartupLocation"] = WindowStartupLocation.CenterOwner,
+            ["ResizeMode"] = ResizeMode.NoResize,
+            ["ShowInTaskbar"] = false,
+        });
+        return prompt.Result;
     }
 
     private static IDictionary<string, object> Settings() => new Dictionary<string, object>
