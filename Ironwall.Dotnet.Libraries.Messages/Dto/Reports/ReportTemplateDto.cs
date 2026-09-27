@@ -75,6 +75,12 @@ public class ReportTemplateDto : BaseDto
     /// <summary>표시용 컴포넌트 수 — 목록이면 <c>component_count</c>, 상세면 <c>components.Count</c>.</summary>
     [JsonIgnore]
     public int EffectiveComponentCount => ComponentCount ?? Components.Count;
+
+    /// <summary>
+    /// 콤보 항목 · 화면 읽기 프로그램 이름 — <c>DisplayMemberPath</c> 는 그리는 글자만 바꾸고 UIA 이름은 이 값을 쓴다.
+    /// 2026-09-27 실창(WP-4 SC-RPT-016): 새 보고서 [템플릿] 콤보 항목이 전부 타입 이름으로 읽혔다.
+    /// </summary>
+    public override string ToString() => string.IsNullOrWhiteSpace(Name) ? $"템플릿 #{Id}" : Name;
 }
 
 /// <summary>
