@@ -131,6 +131,7 @@ public class ServerMonitorViewModel : Screen
         _detail = null;
         _intent = new ServerWriteIntent();
         _lastUndo = null;
+        _closeConfirmed = false;
         IsEditing = false;
         SearchText = string.Empty;
         StatusText = string.Empty;
@@ -142,7 +143,34 @@ public class ServerMonitorViewModel : Screen
     }
 
     /// <summary>머리 ✕(U-18) — 보고서 · 조치 문구 콘솔과 같은 닫기: 호스트 컨덕터가 받아 패널을 내린다.</summary>
+    /// <remarks>컨덕터가 닫기 전에 <see cref="CanCloseAsync"/> 를 묻는다 — 남은 것이 있으면 여기서 먼저 확인을 받는다.</remarks>
     public Task Close() => TryCloseAsync();
+
+    /// <summary>
+    /// 창을 닫아도 되는가 — 적용하지 않은 서버 설정 · 배정 대기 목록이 있으면 <b>먼저 묻는다</b>(2026-09-27 전수 조사:
+    /// ✕ 와 좌측 메뉴 전환이 묻지 않고 버렸다). 확인은 이 콘솔이 배정 확인에 쓰는 창과 같은 것이다.
+    /// 한 번 [확인] 을 받으면 이번 닫기에서는 다시 묻지 않는다(호스트가 닫기 전에 한 번 더 물어도 두 번 뜨지 않게).
+    /// </summary>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = PendingWorkSummary();
+        if (_closeConfirmed || pending is null) return true;
+
+        // 물을 창이 없으면(헤드리스) 막지 않는다 — 부대 콘솔과 같은 규칙.
+        if (DialogsOrNull() is not { } dialogs) return true;
+        var accepted = await dialogs.ConfirmAsync("서버 창 닫기", $"{pending}\n닫으면 이 내용은 사라집니다. 버리고 닫을까요?").ConfigureAwait(true);
+        _closeConfirmed = accepted;
+        return accepted;
+    }
+
+    /// <summary>닫으면 사라질 것 — 없으면 null. 확인 문장에 그대로 쓴다.</summary>
+    public string? PendingWorkSummary()
+    {
+        var parts = new List<string>();
+        if (Detail.IsDirty) parts.Add(Detail.IsCreating ? "등록하지 않은 서버 정보" : "적용하지 않은 서버 설정 변경");
+        if (Tray.HasEntries) parts.Add($"저장하지 않은 배정 대기 {Tray.Count}건");
+        return parts.Count == 0 ? null : string.Join(" · ", parts) + "이(가) 있습니다.";
+    }
     #endregion
 
     #region - Rail -
@@ -367,6 +395,10 @@ public class ServerMonitorViewModel : Screen
             RefreshRailCounts();
             RefreshStatus();
             NotifyOfPropertyChange(nameof(CanAdd));
+
+            // 후보 칩에 실제 서버 이름을 보인다 — 모델에는 스피커 말고는 서버 축이 없어 전부 "서버 없음" 이었다.
+            await Assign.RefreshServerMapAsync(token).ConfigureAwait(true);
+            RefreshCandidates();
 
             if (result.Message is not null) StatusText = result.Message;
         }
@@ -911,7 +943,7 @@ public class ServerMonitorViewModel : Screen
     {
         foreach (var row in Rows)
         {
-            var plan = ServerDropRules.Plan(row.Id, row.Type, dragged, _service.Contract);
+            var plan = ServerDropRules.Plan(row.Id, row.Type, dragged, _service.Contract, Assign.CurrentServerIdOf);
             row.DropBlockReason = plan.CanSend ? null : plan.BlockReason;
         }
     }
@@ -952,7 +984,7 @@ public class ServerMonitorViewModel : Screen
 
     private string ServerNameOf(IBaseDeviceModel device)
     {
-        var serverId = ServerDropRules.ServerIdOf(device);
+        var serverId = Assign.CurrentServerIdOf(device);
         if (serverId is null) return "서버 없음";
         var row = _all.FirstOrDefault(r => r.Id == serverId.Value);
         return row?.Name ?? $"서버 #{serverId}";
@@ -1020,6 +1052,7 @@ public class ServerMonitorViewModel : Screen
     private ServerAxisView? _detail;
     private ServerWriteIntent _intent = new();
     private ServerAssignUndo? _lastUndo;
+    private bool _closeConfirmed;
     private ServerUnitOption? _selectedUnit;
     private ServerCategoryOption? _selectedCategory;
     private CancellationTokenSource? _detailCts;

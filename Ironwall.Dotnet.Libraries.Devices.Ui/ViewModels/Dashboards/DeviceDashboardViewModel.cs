@@ -16,6 +16,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -42,6 +43,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 /// <para>싱글턴이다 — 창을 닫을 때 선택 · 미적용 변경 · 구독을 전부 내려놓는다.</para>
 /// </remarks>
 public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptions
+                                      , IHandle<CallCloseDeviceConsoleMessageModel>
 {
     public const string ConsoleKey = "Devices";
     public const string GroupsRailKey = "groups";
@@ -171,6 +173,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _pending = null;
         _draft = null;
         _lastGroupUndo = null;
+        _closeConfirmed = false;
         Form.Clear();
         Detail.Reset();
         SearchText = string.Empty;
@@ -183,6 +186,48 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         TabControlViewModel.Items.Clear();
         await TabControlViewModel.DeactivateAsync(true);
     }
+    #endregion
+
+    #region - Close guard -
+    /// <summary>
+    /// 창을 닫아도 되는가 — 적용하지 않은 상세 변경(만들던 장비 포함)이 있으면 <b>먼저 묻는다</b>
+    /// (2026-09-27 전수 조사: ✕ 와 좌측 메뉴 전환이 묻지 않고 버렸다). 확인 팝업은 이벤트 콘솔과 같은 길
+    /// (<see cref="OpenConfirmPopupMessageModel"/>)이고, [확인] 이 오면 <see cref="CallCloseDeviceConsoleMessageModel"/> 로
+    /// 돌아와 버리고 닫는다. 팝업은 기다리지 않는다 — 이번 닫기는 막고 false.
+    /// </summary>
+    /// <remarks>호스트의 창 틀(DevicePanelViewModel)이 ✕ · 좌측 메뉴 전환 앞에서 이 판정을 묻는다.</remarks>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = PendingWorkSummary();
+        if (_closeConfirmed || pending is null) return true;
+
+        if (_eventAggregator is null) return true;   // 물을 길이 없으면(헤드리스) 막지 않는다
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "장비 창 닫기",
+            Explain = $"{pending}\n닫으면 이 내용은 사라집니다. 버리고 닫을까요?",
+            MessageModel = new CallCloseDeviceConsoleMessageModel(),
+        }, cancellationToken);
+        return false;
+    }
+
+    /// <summary>닫으면 사라질 것 — 없으면 null. 확인 문장에 그대로 쓴다.</summary>
+    public string? PendingWorkSummary()
+    {
+        if (!Detail.IsDirty) return null;
+        return (Detail.IsCreating ? "저장하지 않은 새 장비 정보" : "적용하지 않은 장비 정보 변경") + "이(가) 있습니다.";
+    }
+
+    /// <summary>닫기 확인에서 [확인] — 이번 닫기만 묻지 않고 통과시킨다(창을 닫으면 다시 초기화).</summary>
+    public async Task HandleAsync(CallCloseDeviceConsoleMessageModel message, CancellationToken cancellationToken)
+    {
+        _closeConfirmed = true;
+        if (_eventAggregator is null) return;
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePanelMessageModel(), cancellationToken);
+    }
+
+    private bool _closeConfirmed;
     #endregion
 
     #region - Rail -
@@ -1364,3 +1409,6 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private string _statusText = string.Empty;
     #endregion
 }
+
+/// <summary>장비 창 닫기 확인에서 [확인] — 적용하지 않은 변경을 버리고 창을 닫는다(<see cref="DeviceDashboardViewModel.CanCloseAsync"/>).</summary>
+public sealed class CallCloseDeviceConsoleMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }

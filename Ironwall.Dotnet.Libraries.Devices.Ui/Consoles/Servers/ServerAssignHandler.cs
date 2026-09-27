@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
@@ -24,8 +25,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 /// <summary>되돌리기에 필요한 것 — 어느 장비가 <b>어디에</b> 붙어 있었는가.</summary>
 /// <param name="ServerId">방금 붙인 서버.</param>
 /// <param name="ServerName">그 서버 이름(문구용).</param>
-/// <param name="Moved">(장비, 이전 서버 Id) — 이전이 없으면 <c>null</c>.</param>
-public sealed record ServerAssignUndo(int ServerId, string ServerName, IReadOnlyList<(IBaseDeviceModel Device, int? PreviousServerId)> Moved)
+/// <param name="Moved">(장비, 이전 서버 Id) — 이전이 없으면 <c>null</c>. <b>서버에서 확인한 이전 값</b>만 담는다.</param>
+/// <param name="UnknownPrevious">배정 전 서버를 확인하지 못해 되돌리기에서 뺀 대수 — 모르는 값을 "없음" 으로 되돌리면 실제 배정을 지운다.</param>
+public sealed record ServerAssignUndo(int ServerId, string ServerName, IReadOnlyList<(IBaseDeviceModel Device, int? PreviousServerId)> Moved,
+    int UnknownPrevious = 0)
 {
     public int Count => Moved.Count;
 }
@@ -92,7 +95,7 @@ public sealed class ServerAssignHandler : IDragDropHandler
 
         var devices = ModelsOf(payload.Items);
         DragProbeRequested?.Invoke(devices);      // 행마다 사유를 채운다(고정 문구를 쓰지 않는다)
-        return ServerDropRules.Plan(server.Id, server.Type, devices, _service.Contract).CanSend;
+        return ServerDropRules.Plan(server.Id, server.Type, devices, _service.Contract, CurrentServerIdOf).CanSend;
     }
 
     public async void Drop(DragPayload payload, DropTarget target)
@@ -110,7 +113,7 @@ public sealed class ServerAssignHandler : IDragDropHandler
     {
         if (server is null) return Finish("배정할 서버가 없습니다.", null);
 
-        var plan = ServerDropRules.Plan(server.Id, server.Type, devices, _service.Contract);
+        var plan = ServerDropRules.Plan(server.Id, server.Type, devices, _service.Contract, CurrentServerIdOf);
         if (!plan.CanSend) return Finish(plan.BlockReason ?? "배정할 장비가 없습니다.", null);
         if (IsBusy) return Finish("앞선 배정이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요.", null);
 
@@ -121,7 +124,9 @@ public sealed class ServerAssignHandler : IDragDropHandler
         try
         {
             var device = plan.Devices[0];
-            var previous = ServerDropRules.ServerIdOf(device);
+            // 되돌리기의 기준은 서버가 말하는 지금 값이다 — 모델에는 스피커 말고는 서버 축이 없어,
+            // 예전에는 카메라 · 제어기의 이전 서버가 늘 "없음" 이었고 되돌리기가 실제 배정을 지웠다.
+            var previous = await PreviousAsync(device, token).ConfigureAwait(true);
             var result = await SendAsync(device, server.Id, token).ConfigureAwait(true);
 
             if (!result.IsSuccess)
@@ -132,8 +137,10 @@ public sealed class ServerAssignHandler : IDragDropHandler
             }
 
             Reflect(device, server);
-            var undo = new ServerAssignUndo(server.Id, server.Name, new[] { (device, previous) });
-            return Finish(ServerDropRules.ResultLine(server.Name, plan, 1, 0), undo, new[] { device.Id });
+            var undo = previous.Known ? new ServerAssignUndo(server.Id, server.Name, new[] { (device, previous.ServerId) }) : null;
+            var line = ServerDropRules.ResultLine(server.Name, plan, 1, 0);
+            if (!previous.Known) line += " " + UnknownPreviousNote;
+            return Finish(line, undo, new[] { device.Id });
         }
         catch (OperationCanceledException) { return Finish("배정을 취소했습니다.", null); }
         catch (Exception ex)
@@ -148,10 +155,10 @@ public sealed class ServerAssignHandler : IDragDropHandler
     private string Queue(IServerAssignTarget server, ServerAssignPlan plan)
     {
         var moved = new List<(IBaseDeviceModel Device, int? PreviousServerId)>();
+        var unknown = new List<int>();
 
         foreach (var device in plan.Devices)
         {
-            var previous = ServerDropRules.ServerIdOf(device);
             var name = string.IsNullOrWhiteSpace(device.DeviceName) ? $"장비 {device.Id}" : device.DeviceName!;
 
             _tray.Add(new DraftEntry(
@@ -160,16 +167,19 @@ public sealed class ServerAssignHandler : IDragDropHandler
                 description: $"{name} → '{server.Name}'",
                 apply: async ct =>
                 {
+                    // 보내기 직전에 읽는다 — 담아 둔 사이에 다른 창이 옮겼을 수 있다.
+                    var previous = await PreviousAsync(device, ct).ConfigureAwait(true);
                     var result = await SendAsync(device, server.Id, ct).ConfigureAwait(true);
                     if (!result.IsSuccess) return DraftOutcome.Failed;
 
                     Reflect(device, server);
-                    moved.Add((device, previous));
+                    if (previous.Known) moved.Add((device, previous.ServerId));
+                    else unknown.Add(device.Id);
                     return DraftOutcome.Applied;
                 }));
         }
 
-        _lastQueued = new ServerAssignUndo(server.Id, server.Name, moved);
+        _lastQueued = (server.Id, server.Name, moved, unknown);
         return $"'{server.Name}'에 배정할 {plan.WriteCount}대를 대기 목록에 담았습니다 — [적용]을 누르면 저장됩니다.";
     }
 
@@ -179,10 +189,18 @@ public sealed class ServerAssignHandler : IDragDropHandler
         if (!_tray.HasEntries) return Finish("대기 중인 배정이 없습니다.", null);
 
         var summary = await _tray.ApplyAsync(token).ConfigureAwait(true);
-        var undo = _lastQueued is { Count: > 0 } queued ? queued : null;
+        var queued = _lastQueued;
         _lastQueued = null;
 
-        return Finish(summary.ToMessage(), undo, undo?.Moved.Select(m => m.Device.Id).ToList() ?? (IReadOnlyList<int>)Array.Empty<int>());
+        var undo = queued is { } q && q.Moved.Count > 0
+            ? new ServerAssignUndo(q.ServerId, q.ServerName, q.Moved.ToList(), q.Unknown.Count)
+            : null;
+        var line = summary.ToMessage();
+        if (queued is { } u && u.Unknown.Count > 0) line += " " + UnknownPreviousNote;
+        var changed = (queued?.Moved.Select(m => m.Device.Id) ?? Enumerable.Empty<int>())
+            .Concat(queued?.Unknown ?? Enumerable.Empty<int>())
+            .ToList();
+        return Finish(line, undo, changed);
     }
 
     /// <summary>트레이를 버린다 — 서버 호출 0.</summary>
@@ -225,6 +243,7 @@ public sealed class ServerAssignHandler : IDragDropHandler
             var parts = new List<string> { $"{restored.Count}대를 되돌렸습니다" };
             if (stuck > 0) parts.Add($"배정 전에 서버가 없던 {stuck}대는 현재 서버에서 해제할 수 없습니다");
             if (restored.Count < restorable.Count) parts.Add($"{restorable.Count - restored.Count}대는 되돌리지 못했습니다");
+            if (undo.UnknownPrevious > 0) parts.Add($"배정 전 서버를 확인하지 못한 {undo.UnknownPrevious}대는 그대로 두었습니다");
             return Finish(string.Join(" · ", parts) + ".", null, restored);
         }
         catch (OperationCanceledException) { return Finish("되돌리기를 취소했습니다.", undo); }
@@ -234,6 +253,74 @@ public sealed class ServerAssignHandler : IDragDropHandler
             return Finish("되돌리지 못했습니다. 서버 연결을 확인하세요.", undo);
         }
         finally { IsBusy = false; }
+    }
+
+    /// <summary>배정 전 서버를 읽지 못했을 때 결과 줄에 덧붙이는 말.</summary>
+    public const string UnknownPreviousNote = "배정 전 서버를 확인하지 못해 이 배정은 되돌릴 수 없습니다.";
+
+    /// <summary>
+    /// 장비의 지금 서버 — 서버에서 읽어 둔 값이 먼저이고, 없으면 모델(스피커만 서버 축이 있다).
+    /// 끄는 동안 매 프레임 불려도 되게 서버를 부르지 않는다.
+    /// </summary>
+    public int? CurrentServerIdOf(IBaseDeviceModel device)
+    {
+        if (device is null) return null;
+        lock (_knownGate)
+        {
+            if (_known.TryGetValue(device.Id, out var serverId)) return serverId;
+        }
+        return ServerDropRules.ServerIdOf(device);
+    }
+
+    /// <summary>배정 후보 전부의 지금 서버를 서버에서 다시 읽는다 — 칩에 실제 서버 이름을 보이려고. 실패하면 모델 값을 쓴다.</summary>
+    public async Task RefreshServerMapAsync(CancellationToken token = default)
+    {
+        IReadOnlyDictionary<int, int?>? map;
+        try { map = await _service.GetDeviceServerMapAsync(token).ConfigureAwait(true); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[ServerAssign] 장비의 관리 서버를 읽지 못했습니다 — 모델 값을 씁니다: {ex.Message}");
+            return;
+        }
+
+        lock (_knownGate)
+        {
+            _known.Clear();
+            if (map is null) return;
+            foreach (var pair in map) _known[pair.Key] = pair.Value;
+        }
+    }
+
+    /// <summary>
+    /// 배정 직전 그 장비의 서버 — ① 서버에서 방금 읽은 값 ② 모델에 서버 축이 있는 스피커의 값 ③ 목록을 적재할 때 서버에서 읽어 둔 값.
+    /// 셋 다 없으면 <b>모른다</b>(되돌리기에서 뺀다).
+    /// </summary>
+    private async Task<DeviceServerLookup> PreviousAsync(IBaseDeviceModel device, CancellationToken token)
+    {
+        try
+        {
+            var read = await _service.GetDeviceServerAsync(DeviceAxesMapper.CategoryOf(device), device.Id, token).ConfigureAwait(true);
+            if (read.Known)
+            {
+                Remember(device.Id, read.ServerId);
+                return read;
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Warning($"[ServerAssign] 장비 {device.Id} 의 지금 서버를 읽지 못했습니다: {ex.Message}"); }
+
+        if (device is ISpeakerDeviceModel) return new DeviceServerLookup(true, ServerDropRules.ServerIdOf(device));
+        lock (_knownGate)
+        {
+            if (_known.TryGetValue(device.Id, out var cached)) return new DeviceServerLookup(true, cached);
+        }
+        return DeviceServerLookup.Unknown;
+    }
+
+    private void Remember(int deviceId, int? serverId)
+    {
+        lock (_knownGate) _known[deviceId] = serverId;
     }
 
     /// <summary>끌어 온 행(뷰모델 또는 모델)에서 장비 모델을 꺼낸다.</summary>
@@ -247,14 +334,18 @@ public sealed class ServerAssignHandler : IDragDropHandler
     private Task<ServerWriteResult> SendAsync(IBaseDeviceModel device, int? serverId, CancellationToken token)
         => _service.AssignDeviceAsync(DeviceAxesMapper.CategoryOf(device), device.Id, serverId, token);
 
-    /// <summary>서버가 받아 준 것만 로컬에 반영한다(스피커만 모델에 서버 축이 있다).</summary>
-    private static void Reflect(IBaseDeviceModel? model, IServerAssignTarget server)
+    /// <summary>서버가 받아 준 것만 로컬에 반영한다(스피커만 모델에 서버 축이 있다 — 나머지는 읽어 둔 사전에 적는다).</summary>
+    private void Reflect(IBaseDeviceModel? model, IServerAssignTarget server)
     {
+        if (model is null) return;
+        Remember(model.Id, server.Id);
         if (model is ISpeakerDeviceModel speaker) speaker.Server = server.AsModel();
     }
 
-    private static void Detach(IBaseDeviceModel? model, int? previousServerId)
+    private void Detach(IBaseDeviceModel? model, int? previousServerId)
     {
+        if (model is null) return;
+        Remember(model.Id, previousServerId is > 0 ? previousServerId : null);
         if (model is not ISpeakerDeviceModel speaker) return;
         speaker.Server = previousServerId is > 0 ? new ServerModel { Id = previousServerId.Value } : null;
     }
@@ -265,5 +356,9 @@ public sealed class ServerAssignHandler : IDragDropHandler
         return line;
     }
 
-    private ServerAssignUndo? _lastQueued;
+    private (int ServerId, string ServerName, List<(IBaseDeviceModel Device, int? PreviousServerId)> Moved, List<int> Unknown)? _lastQueued;
+
+    /// <summary>서버에서 읽은 "장비 → 지금 서버". 끄는 동안(UI) · 적재(await 뒤) 양쪽에서 닿아 잠근다.</summary>
+    private readonly Dictionary<int, int?> _known = new();
+    private readonly object _knownGate = new();
 }

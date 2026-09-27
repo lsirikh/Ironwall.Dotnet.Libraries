@@ -54,11 +54,39 @@ public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
     public async Task<bool> OpenAsync(int groupId, string? groupName, CancellationToken token = default)
     {
         var vm = new DeviceAssignDialogViewModel(_api, () => _devices.OfType<IBaseDeviceModel>(),
-            new DeviceGroupMembershipProbe(_api, _log), _log);
+            new DeviceGroupMembershipProbe(_api, _log), _log)
+        {
+            // 저장하지 않은 배정을 두고 닫으면 묻는 창 — 조립기 · 부대 창과 같은 확인 창(작은 모달, 이 창을 소유자로).
+            Confirm = ConfirmAsync,
+        };
         vm.Initialize(groupId, groupName);
 
         await _windows.ShowDialogAsync(vm, null, WindowSettings()).ConfigureAwait(true);
         return vm.Saved;
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string message)
+    {
+        try
+        {
+            var prompt = new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.ConfirmPromptViewModel(title, message);
+            await _windows.ShowDialogAsync(prompt, null, new Dictionary<string, object>
+            {
+                ["Width"] = 420.0,
+                ["Height"] = 260.0,
+                ["SizeToContent"] = SizeToContent.Manual,
+                ["WindowStartupLocation"] = WindowStartupLocation.CenterOwner,
+                ["ResizeMode"] = ResizeMode.NoResize,
+                ["ShowInTaskbar"] = false,
+            }).ConfigureAwait(true);
+            return prompt.Result;
+        }
+        catch (Exception ex)
+        {
+            // 물을 수 없으면 닫지 않는다 — 사람이 옮겨 둔 것을 말없이 버리는 쪽으로 기울지 않는다.
+            _log?.Error($"[DeviceAssign] 닫기 확인 창을 열지 못했습니다 — 창을 닫지 않습니다: {ex.Message}");
+            return false;
+        }
     }
 
     private static IDictionary<string, object> WindowSettings()

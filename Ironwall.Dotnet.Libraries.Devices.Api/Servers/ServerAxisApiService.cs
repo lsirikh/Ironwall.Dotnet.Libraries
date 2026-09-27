@@ -34,6 +34,15 @@ public sealed record ServerAxisListResult(
 public sealed record ServerCategoryView(int Id, string Name, string TypeServer);
 
 /// <summary>
+/// 장비 한 대가 <b>서버 기준으로</b> 지금 붙어 있는 관리 서버. <see cref="Known"/> 이 false 면 읽지 못했다는 뜻이다 —
+/// "서버 없음"(<see cref="Known"/> true · <see cref="ServerId"/> null)과 섞지 않는다. 섞으면 되돌리기가 실제 배정을 지운다.
+/// </summary>
+public readonly record struct DeviceServerLookup(bool Known, int? ServerId)
+{
+    public static DeviceServerLookup Unknown => new(false, null);
+}
+
+/// <summary>
 /// 서버 콘솔이 쓰는 <b>판본 인식</b> 통로. 기존 <see cref="Services.IServerApiService"/> 를 넓히지 않는
 /// <b>새 인터페이스</b>다 — 그 인터페이스의 페이크가 레포 곳곳에 있다.
 /// </summary>
@@ -57,6 +66,21 @@ public interface IServerAxisApiService
     /// <param name="serverId"><c>null</c> = 해제. 6.3 에서는 해제를 보낼 수 없어 거절한다.</param>
     Task<ServerAxisResult> AssignDeviceServerAsync(
         EnumDeviceCategory category, int deviceId, int? serverId, int? unitId, CancellationToken token = default);
+
+    /// <summary>
+    /// 장비 한 대의 지금 관리 서버를 서버에서 다시 읽는다(<c>GET /devices/{카테고리}/{id}</c> 의 <c>server_id</c>).
+    /// 배정 전에 읽어 되돌리기의 기준으로 쓴다 — 클라이언트 모델에는 스피커 말고는 서버 축이 없다.
+    /// </summary>
+    /// <remarks>기본 구현은 "읽지 못함" 이다 — 이 인터페이스의 페이크 · 목을 깨지 않으려고 기본 구현을 둔다.</remarks>
+    Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
+        => Task.FromResult(DeviceServerLookup.Unknown);
+
+    /// <summary>
+    /// 한 카테고리 장비 전부의 지금 관리 서버(장비 Id → 서버 Id, 없으면 null). 읽지 못하면 <c>null</c>.
+    /// 배정 후보 칩에 실제 서버 이름을 보이는 데 쓴다.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, int?>?> GetDeviceServerMapAsync(EnumDeviceCategory category, CancellationToken token = default)
+        => Task.FromResult<IReadOnlyDictionary<int, int?>?>(null);
 }
 
 /// <summary>
@@ -290,6 +314,85 @@ public sealed class ServerAxisApiService : IServerAxisApiService
             _log?.Error($"[{nameof(ServerAxisApiService)}] 장비 {deviceId} → 서버 {serverId} 실패 — {ex.Message}");
             return new ServerAxisResult(false, "서버에 닿지 못했습니다");
         }
+    }
+    #endregion
+
+    #region - Device → server (read) -
+    public async Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
+    {
+        var path = DevicePathOf(category);
+        if (path is null || deviceId <= 0) return DeviceServerLookup.Unknown;
+
+        try
+        {
+            var response = await _api.GetRequestAsync($"{_setup.Url}/devices/{path}/{deviceId}", new Dictionary<string, string>()).ConfigureAwait(false);
+            var envelope = await ReadAsync(response).ConfigureAwait(false);
+            if (envelope is null || envelope.Value<bool?>("success") != true) return DeviceServerLookup.Unknown;
+            return envelope["data"] is JObject row ? ServerOf(row) : DeviceServerLookup.Unknown;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(ServerAxisApiService)}] 장비 {deviceId} 의 관리 서버를 읽지 못했습니다 — {ex.Message}");
+            return DeviceServerLookup.Unknown;
+        }
+    }
+
+    public async Task<IReadOnlyDictionary<int, int?>?> GetDeviceServerMapAsync(EnumDeviceCategory category, CancellationToken token = default)
+    {
+        var path = DevicePathOf(category);
+        if (path is null) return null;
+
+        var map = new Dictionary<int, int?>();
+        try
+        {
+            for (var page = 1; page <= MaxPages; page++)
+            {
+                token.ThrowIfCancellationRequested();
+                var parameters = new Dictionary<string, string>
+                {
+                    ["page"] = page.ToString(),
+                    ["limit"] = PageLimit.ToString(),
+                };
+                var response = await _api.GetRequestAsync($"{_setup.Url}/devices/{path}", parameters).ConfigureAwait(false);
+                var envelope = await ReadAsync(response).ConfigureAwait(false);
+                if (envelope is null || envelope.Value<bool?>("success") != true) return null;
+
+                var rows = envelope["data"] as JArray;
+                foreach (var row in rows?.OfType<JObject>() ?? Enumerable.Empty<JObject>())
+                {
+                    var id = row.Value<int?>("id") ?? 0;
+                    var server = ServerOf(row);
+                    if (id > 0 && server.Known) map[id] = server.ServerId;
+                }
+
+                var pagination = envelope["pagination"] as JObject;
+                var total = pagination?.Value<int?>("total") ?? envelope.Value<int?>("total");
+                if (total is null || rows is null || rows.Count == 0 || page * PageLimit >= total.Value) break;
+            }
+            return map;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(ServerAxisApiService)}] {path} 목록의 관리 서버를 읽지 못했습니다 — {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 응답 한 줄에서 관리 서버를 꺼낸다 — 7.0+ 는 스칼라 <c>server_id</c>, 6.3 스피커는 중첩 <c>server</c>.
+    /// 둘 다 <b>키가 없으면</b> 모르는 것이다(없음이 아니다).
+    /// </summary>
+    public static DeviceServerLookup ServerOf(JObject row)
+    {
+        if (row.TryGetValue("server_id", out var scalar))
+            return new DeviceServerLookup(true, PositiveOrNull(scalar.Type == JTokenType.Integer ? scalar.Value<int?>() : null));
+        if (row.TryGetValue("server", out var nested))
+            return new DeviceServerLookup(true, PositiveOrNull((nested as JObject)?.Value<int?>("id")));
+        return DeviceServerLookup.Unknown;
+
+        static int? PositiveOrNull(int? value) => value is > 0 ? value : null;
     }
     #endregion
 

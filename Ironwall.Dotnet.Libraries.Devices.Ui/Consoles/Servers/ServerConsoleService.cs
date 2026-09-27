@@ -76,6 +76,18 @@ public interface IServerConsoleService
     /// <summary>장비 한 대의 관리 서버를 바꾼다 — 쓰기 <b>1회</b>. <paramref name="serverId"/> 가 <c>null</c> 이면 해제.</summary>
     Task<ServerWriteResult> AssignDeviceAsync(
         EnumDeviceCategory category, int deviceId, int? serverId, CancellationToken token = default);
+
+    /// <summary>
+    /// 장비 한 대가 서버 기준으로 지금 붙어 있는 관리 서버 — 배정 <b>직전에</b> 읽어 되돌리기의 기준으로 쓴다.
+    /// 읽지 못하면 <see cref="DeviceServerLookup.Known"/> 이 false 다("서버 없음" 과 다르다).
+    /// </summary>
+    /// <remarks>기본 구현은 "읽지 못함" — 이 인터페이스의 페이크를 깨지 않으려고 기본 구현을 둔다.</remarks>
+    Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
+        => Task.FromResult(DeviceServerLookup.Unknown);
+
+    /// <summary>배정할 수 있는 장비 전부의 지금 관리 서버(장비 Id → 서버 Id, 없으면 null). 읽지 못한 장비는 빠진다.</summary>
+    Task<IReadOnlyDictionary<int, int?>> GetDeviceServerMapAsync(CancellationToken token = default)
+        => Task.FromResult<IReadOnlyDictionary<int, int?>>(new Dictionary<int, int?>());
 }
 
 /// <summary>
@@ -208,6 +220,39 @@ public sealed class ServerConsoleService : IServerConsoleService
         return new ServerWriteResult(result.IsSuccess, result.IsSuccess
             ? result.Message
             : Plain(result.Message, result.StatusCode, "서버가 요청을 받아들이지 않았습니다."));
+    }
+
+    public async Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
+    {
+        // 6.3 은 스피커만 서버 축이 있고 그것은 모델에 이미 실려 있다 — 읽으러 가지 않는다.
+        if (!IsAxisEra) return DeviceServerLookup.Unknown;
+        try { return await _axis.GetDeviceServerAsync(category, deviceId, token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[ServerConsole] 장비 {deviceId} 의 관리 서버를 읽지 못했습니다: {ex.Message}");
+            return DeviceServerLookup.Unknown;
+        }
+    }
+
+    public async Task<IReadOnlyDictionary<int, int?>> GetDeviceServerMapAsync(CancellationToken token = default)
+    {
+        var map = new Dictionary<int, int?>();
+        if (!IsAxisEra) return map;
+
+        // 장비 Id 는 축 계약에서 전역 유일이다 — 카테고리를 가로질러 한 사전에 담아도 겹치지 않는다.
+        foreach (var category in ServerDropRules.AllowedServerTypes.Keys)
+        {
+            try
+            {
+                var part = await _axis.GetDeviceServerMapAsync(category, token).ConfigureAwait(false);
+                if (part is null) continue;
+                foreach (var pair in part) map[pair.Key] = pair.Value;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { _log?.Warning($"[ServerConsole] {category} 장비의 관리 서버를 읽지 못했습니다: {ex.Message}"); }
+        }
+        return map;
     }
 
     /// <summary>

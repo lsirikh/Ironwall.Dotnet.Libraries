@@ -504,6 +504,28 @@ public class DeviceAssignDialogViewModel : Screen, IDragDropHandler
     public Task CancelAsync() => TryCloseAsync(false);
 
     /// <summary>
+    /// 사람에게 묻는 확인 창(제목, 문장 → 예/아니오). 창을 여는 쪽(<c>DeviceAssignLauncher</c>)이 넣는다 — 뷰모델은 창 관리자를 모른다.
+    /// 비어 있으면(헤드리스 시험 · 옛 호스트 래퍼) 묻지 않고 닫는다.
+    /// </summary>
+    public Func<string, string, Task<bool>>? Confirm { get; set; }
+
+    /// <summary>
+    /// 창을 닫아도 되는가 — 저장하지 않은 배정 변경이 있으면 <b>먼저 묻는다</b>(2026-09-27 전수 조사: [취소] · 창 ✕ 가
+    /// 옮겨 둔 장비를 묻지 않고 버렸다). 저장이 끝나 닫는 길은 서버가 한 것을 기준선이 흡수해 차분이 비어 있으므로 묻지 않는다.
+    /// </summary>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var plan = CurrentPlan;
+        if (!plan.HasChanges || Confirm is null) return true;
+
+        var changes = new List<string>();
+        if (plan.Added.Count > 0) changes.Add($"넣을 장비 {plan.Added.Count}대");
+        if (plan.Removed.Count > 0) changes.Add($"뺄 장비 {plan.Removed.Count}대");
+        var summary = changes.Count == 0 ? "저장하지 않은 배정 변경" : string.Join(" · ", changes);
+        return await Confirm("장비 배정 닫기", $"저장하지 않은 변경({summary})이 있습니다.\n닫으면 이 변경은 사라집니다. 버리고 닫을까요?").ConfigureAwait(true);
+    }
+
+    /// <summary>
     /// 옛 이름 — 호스트 래퍼가 아직 이것을 부른다. 왼쪽에서 고른 것을 오른쪽으로 옮긴 다음 저장한다
     /// (옛 창은 고르기만 하면 확인이 곧 배정이었다). 새 창에서는 ▶ 와 [저장] 이 나뉜다.
     /// </summary>

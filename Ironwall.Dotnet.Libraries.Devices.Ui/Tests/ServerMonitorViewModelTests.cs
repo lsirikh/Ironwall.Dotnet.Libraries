@@ -92,8 +92,29 @@ internal sealed class FakeServerConsoleService : IServerConsoleService
     {
         if (deviceId == FailAssignForDeviceId) return Task.FromResult(new ServerWriteResult(false, "서버가 거절했습니다"));
         Assigns.Add((deviceId, serverId));
+        if (ServerSide.ContainsKey(deviceId)) ServerSide[deviceId] = serverId;
         return Task.FromResult(new ServerWriteResult(true, string.Empty));
     }
+
+    /// <summary>
+    /// 서버가 아는 "장비 → 지금 서버". 여기 없는 장비는 서버가 읽어 주지 못한다(Known=false) —
+    /// 예전 동작(모델만 보던 때)과 같은 조건이 된다.
+    /// </summary>
+    public Dictionary<int, int?> ServerSide { get; } = new();
+
+    /// <summary>true 면 목록 적재 때의 일괄 읽기만 실패한다(단건 읽기는 그대로).</summary>
+    public bool MapFails { get; set; }
+
+    public List<int> DeviceReads { get; } = new();
+
+    public Task<DeviceServerLookup> GetDeviceServerAsync(EnumDeviceCategory category, int deviceId, CancellationToken token = default)
+    {
+        DeviceReads.Add(deviceId);
+        return Task.FromResult(ServerSide.TryGetValue(deviceId, out var id) ? new DeviceServerLookup(true, id) : DeviceServerLookup.Unknown);
+    }
+
+    public Task<IReadOnlyDictionary<int, int?>> GetDeviceServerMapAsync(CancellationToken token = default)
+        => Task.FromResult<IReadOnlyDictionary<int, int?>>(MapFails ? new Dictionary<int, int?>() : new Dictionary<int, int?>(ServerSide));
 }
 
 internal sealed class FakeServerDialogs : IServerConsoleDialogs

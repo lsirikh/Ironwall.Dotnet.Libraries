@@ -40,6 +40,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 /// <para>호출 스레드: UI. 패널의 재조회 끝남은 작업 스레드에서 올 수 있어 한 번 UI 로 옮긴다.</para>
 /// </remarks>
 public class AccountConsolePanelViewModel : BasePanelViewModel
+                                         , IHandle<CallCloseAccountConsoleMessageModel>
 {
     public const string ConsoleKey = AccountConsoleKeys.ConsoleKey;
 
@@ -156,6 +157,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         AuditLogPanelViewModel.Items.CollectionChanged -= OnRailCountSourceChanged;
 
         // 싱글턴 — 다음에 열 때 옛 선택 · 미적용 변경 · Draft 가 남아 있으면 안 된다.
+        _closeConfirmed = false;
         DraftTray.Revert();
         Form.Clear();
         Detail.Reset();
@@ -1186,8 +1188,59 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     #endregion
 
     #region - Binding Methods -
+    /// <summary>
+    /// 머리 ✕ — 남은 것이 있으면 <see cref="CanCloseAsync"/> 가 먼저 묻는다(확인 팝업). [확인] 이 오면
+    /// <see cref="CallCloseAccountConsoleMessageModel"/> 로 돌아와 버리고 닫는다. 남은 것이 없으면 바로 닫는다.
+    /// </summary>
     public async Task ClickClose()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
+    {
+        if (!await CanCloseAsync()) return;
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
+    }
+
+    /// <summary>
+    /// 창을 닫아도 되는가 — 적용하지 않은 사용자 정보 · 저장하지 않은 권한 · 보내지 않은 그룹 배정 대기가 있으면
+    /// <b>먼저 묻는다</b>(2026-09-27 전수 조사: ✕ 와 좌측 메뉴 전환이 묻지 않고 버렸다). 확인 팝업은 이벤트 콘솔과 같은 길
+    /// (<see cref="OpenConfirmPopupMessageModel"/>)이고 기다리지 않는다 — 이번 닫기는 막고 false.
+    /// 호스트의 좌측 메뉴 전환도 이 판정을 묻는다.
+    /// </summary>
+    public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = PendingWorkSummary();
+        if (_closeConfirmed || pending is null) return true;
+        if (_eventAggregator is null) return true;   // 물을 길이 없으면(헤드리스) 막지 않는다
+
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "계정 · 권한 창 닫기",
+            Explain = $"{pending}\n닫으면 이 내용은 사라집니다. 버리고 닫을까요?",
+            MessageModel = new CallCloseAccountConsoleMessageModel(),
+        }, cancellationToken);
+        return false;
+    }
+
+    /// <summary>닫으면 사라질 것 — 없으면 null. 확인 문장에 그대로 쓴다.</summary>
+    public string? PendingWorkSummary()
+    {
+        var parts = new List<string>();
+        // 권한 칸의 변경은 문지기용으로 상세 장부에 한 칸(MatrixDirtKey)을 차지한다 — 그 칸은 사용자 정보가 아니다.
+        var userEdits = Detail.Tracker.Count - (Matrix.IsDirty ? 1 : 0);
+        if (userEdits > 0 || (Detail.IsCreating && Detail.IsDirty)) parts.Add("적용하지 않은 사용자 정보 변경");
+        if (Matrix.IsDirty) parts.Add("저장하지 않은 권한 변경");
+        if (DraftTray.HasEntries) parts.Add($"보내지 않은 그룹 배정 {DraftTray.Count}건");
+        return parts.Count == 0 ? null : string.Join(" · ", parts) + "이(가) 있습니다.";
+    }
+
+    /// <summary>닫기 확인에서 [확인] — 이번 닫기만 묻지 않고 통과시킨다(창을 닫으면 다시 초기화).</summary>
+    public async Task HandleAsync(CallCloseAccountConsoleMessageModel message, CancellationToken cancellationToken)
+    {
+        _closeConfirmed = true;
+        if (_eventAggregator is null) return;
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        await _eventAggregator.PublishOnUIThreadAsync(new ClosePanelMessageModel(), cancellationToken);
+    }
+
+    private bool _closeConfirmed;
     #endregion
 
     #region - Completion handling -
@@ -1330,3 +1383,6 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private GrantDto? _selectedGrant;
     #endregion
 }
+
+/// <summary>계정 · 권한 창 닫기 확인에서 [확인] — 남은 변경을 버리고 창을 닫는다(<see cref="AccountConsolePanelViewModel.CanCloseAsync"/>).</summary>
+public sealed class CallCloseAccountConsoleMessageModel : Ironwall.Dotnet.Libraries.Base.Models.IMessageModel { }

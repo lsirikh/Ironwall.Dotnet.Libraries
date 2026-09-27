@@ -99,10 +99,13 @@ public static class ServerDropRules
         => deviceCategory == EnumDeviceCategory.Speaker;
 
     /// <summary>끌어 온 장비들을 그 서버에 배정하는 계획. 서버를 부르지 않는다.</summary>
+    /// <param name="serverIdOf">장비의 지금 서버 — 서버에서 읽어 둔 값이 있으면 그것을 준다. 없으면 모델(<see cref="ServerIdOf"/>).</param>
     public static ServerAssignPlan Plan(
         int serverId, EnumServerType? serverType, IEnumerable<IBaseDeviceModel>? devices,
-        EnumServerContract contract = EnumServerContract.V8_0)
+        EnumServerContract contract = EnumServerContract.V8_0,
+        Func<IBaseDeviceModel, int?>? serverIdOf = null)
     {
+        serverIdOf ??= ServerIdOf;
         var list = devices?.Where(d => d is not null).ToList() ?? new List<IBaseDeviceModel>();
 
         if (serverId <= 0) return Blocked(serverId, "아직 등록되지 않은 서버입니다. 먼저 등록하세요.");
@@ -130,8 +133,8 @@ public static class ServerDropRules
 
         var drafts = eligible.Count(d => d.Id <= 0);
         var saved = eligible.Where(d => d.Id > 0).ToList();
-        var already = saved.Count(d => ServerIdOf(d) == serverId);
-        var sending = saved.Where(d => ServerIdOf(d) != serverId)
+        var already = saved.Count(d => serverIdOf(d) == serverId);
+        var sending = saved.Where(d => serverIdOf(d) != serverId)
                            .GroupBy(d => d.Id).Select(g => g.First()).ToList();
 
         string? block = null;

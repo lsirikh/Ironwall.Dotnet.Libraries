@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -31,10 +32,10 @@ public class DeviceDashboardConsoleTests : IDisposable
 
     private static readonly string LampRail = DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Lamp);
 
-    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync(Func<LampDevicePanelViewModel, IDeviceConsoleSource>? lampSource = null, Lazy<Consoles.Assembly.IAssemblyLauncher>? launcher = null)
+    private static async Task<(DeviceDashboardViewModel Console, LampDevicePanelViewModel Lamps)> OpenAsync(Func<LampDevicePanelViewModel, IDeviceConsoleSource>? lampSource = null, Lazy<Consoles.Assembly.IAssemblyLauncher>? launcher = null, EventAggregator? eventAggregator = null)
     {
         var log = new MockLogService();
-        var events = new EventAggregator();
+        var events = eventAggregator ?? new EventAggregator();
         var api = new MockDeviceApiService();
         var providerService = new MockDeviceProviderService();
 
@@ -68,6 +69,71 @@ public class DeviceDashboardConsoleTests : IDisposable
     }
 
     private static List<object> RowsOf(DeviceDashboardViewModel console) => console.Rows!.Cast<object>().ToList();
+
+    #region - 닫기 확인(2026-09-27 전수 조사: ✕ · 좌측 메뉴 전환이 적용하지 않은 변경을 묻지 않고 버렸다) -
+    private sealed class CloseSink : IHandle<Ironwall.Dotnet.Libraries.ViewModel.Models.OpenConfirmPopupMessageModel>,
+                                     IHandle<Ironwall.Dotnet.Libraries.ViewModel.Models.ClosePanelMessageModel>
+    {
+        public List<Ironwall.Dotnet.Libraries.ViewModel.Models.OpenConfirmPopupMessageModel> Confirms { get; } = new();
+        public int ClosePanels { get; private set; }
+
+        public Task HandleAsync(Ironwall.Dotnet.Libraries.ViewModel.Models.OpenConfirmPopupMessageModel message, CancellationToken cancellationToken)
+        { Confirms.Add(message); return Task.CompletedTask; }
+
+        public Task HandleAsync(Ironwall.Dotnet.Libraries.ViewModel.Models.ClosePanelMessageModel message, CancellationToken cancellationToken)
+        { ClosePanels++; return Task.CompletedTask; }
+    }
+
+    private static async Task<(DeviceDashboardViewModel Console, CloseSink Sink)> OpenWithSinkAsync()
+    {
+        var events = new EventAggregator();
+        var sink = new CloseSink();
+        events.SubscribeOnPublishedThread(sink);
+        var (console, _) = await OpenAsync(eventAggregator: events);
+        return (console, sink);
+    }
+
+    [Fact]
+    public async Task should_close_without_asking_when_the_device_console_has_nothing_pending()
+    {
+        var (console, sink) = await OpenWithSinkAsync();
+
+        Assert.True(await console.CanCloseAsync());
+        Assert.Empty(sink.Confirms);
+        Assert.Null(console.PendingWorkSummary());
+    }
+
+    [Fact]
+    public async Task should_ask_before_closing_when_the_device_detail_has_unapplied_changes()
+    {
+        var (console, sink) = await OpenWithSinkAsync();
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { RowsOf(console)[0] });
+        console.Detail.Tracker.Touch("name_device", "경광등 1", "고친 이름");
+
+        Assert.False(await console.CanCloseAsync());
+
+        var confirm = Assert.Single(sink.Confirms);
+        Assert.Contains("적용하지 않은 장비 정보 변경", confirm.Explain);
+        Assert.IsType<CallCloseDeviceConsoleMessageModel>(confirm.MessageModel);
+        Assert.Equal(0, sink.ClosePanels);            // 묻기만 하고 닫지 않는다
+    }
+
+    [Fact]
+    public async Task should_close_without_asking_again_when_the_device_console_close_was_confirmed()
+    {
+        var (console, sink) = await OpenWithSinkAsync();
+        await console.SelectRailAsync(LampRail);
+        console.OnRowsSelected(new List<object> { RowsOf(console)[0] });
+        console.Detail.Tracker.Touch("name_device", "경광등 1", "고친 이름");
+
+        await console.HandleAsync(new CallCloseDeviceConsoleMessageModel(), CancellationToken.None);
+
+        Assert.Equal(1, sink.ClosePanels);            // [확인] — 닫기를 다시 청한다
+        Assert.True(await console.CanCloseAsync());   // 이번에는 묻지 않는다
+        Assert.Empty(sink.Confirms);
+    }
+    #endregion
 
     [Fact]
     public async Task should_list_groups_and_seven_categories_with_live_counts_when_opened()
