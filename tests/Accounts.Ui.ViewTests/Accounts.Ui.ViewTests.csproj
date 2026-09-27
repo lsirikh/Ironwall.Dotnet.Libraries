@@ -22,6 +22,13 @@
     <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Gateway/Ironwall.Dotnet.Libraries.Gateway.csproj" />
   </ItemGroup>
 
+  <!-- 계정 콘솔 실제 뷰 시험 — 헤드리스 콘솔 하네스(가짜 서버 · 게이트웨이)를 그대로 가져다 쓴다(사본을 만들지 않는다) -->
+  <ItemGroup>
+    <Compile Include="../../Ironwall.Dotnet.Libraries.Accounts.Ui.Tests/Consoles/ConsoleHarness.cs" Link="Linked/ConsoleHarness.cs" />
+    <Compile Include="../../Ironwall.Dotnet.Libraries.Accounts.Ui.Tests/Grants/GrantSimHarness.cs" Link="Linked/GrantSimHarness.cs" />
+    <Compile Include="../../Ironwall.Dotnet.Libraries.Accounts.Ui.Tests/Grants/FakeGopServer.cs" Link="Linked/FakeGopServer.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
     <PackageReference Include="xunit" Version="2.9.3" />

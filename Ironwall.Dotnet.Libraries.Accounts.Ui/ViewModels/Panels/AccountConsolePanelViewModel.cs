@@ -90,7 +90,11 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         // 그룹 이름/설명 폼은 패널 뷰모델이 쥔다 — 폼이 열리면 상세 칸도 열려야 한다(A-9: 그룹을 고르기 전 [+ 새 그룹] 이 아무 일도 안 보였다).
         permissionMatrix.PropertyChanged += OnPermissionPanelChanged;
         permissionMatrix.Members.CollectionChanged += (_, _) => Execute.BeginOnUIThread(RaiseMatrixShape);
-        DraftTray.PropertyChanged += (_, _) => NotifyOfPropertyChange(nameof(DraftTrayText));
+        DraftTray.PropertyChanged += (_, _) =>
+        {
+            NotifyOfPropertyChange(nameof(DraftTrayText));
+            NotifyOfPropertyChange(nameof(ShowDraftTray));
+        };
         // 세션 설정 화면은 콘솔 툴바의 [갱신] 하나로 다시 읽는다 — 폼 바닥의 [새로고침] 은 접는다(A-46).
         accountSetup.IsHostedInConsole = true;
     }
@@ -182,12 +186,37 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
 
     public ConsoleRailEntry? SelectedRail
     {
-        get => RailEntries.FirstOrDefault(e => e.Key == _railKey);
+        get => _refusedRail ?? RailEntries.FirstOrDefault(e => e.Key == _railKey);
         set
         {
             if (value is null || value.Key == _railKey) return;
-            _ = SelectRailAsync(value.Key);
+            if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
+            {
+                RefuseRail(value);
+                return;
+            }
+            _ = SelectRailAsync(value.Key, force: true);
         }
+    }
+
+    /// <summary>화면 레일이 고르려다 막힌 항목 — 목록이 자기 선택 변경을 마칠 때까지만 <see cref="SelectedRail"/> 이 그대로 돌려준다.</summary>
+    private ConsoleRailEntry? _refusedRail;
+
+    /// <summary>
+    /// 막힌 레일 선택을 화면에서 되돌린다 — <b>목록이 선택 변경을 마친 뒤에</b>.
+    /// <para>ListBox 의 TwoWay 갱신 안에서는 WPF 가 원본을 다시 읽어(값이 다르면) SelectedItem 만 '사용자'로 되돌리고,
+    /// 목록 안의 실제 선택(SelectedItems · 항목 컨테이너)은 막힌 '권한 설정'에 남는다 — 화면은 막힌 레일을 고른 채였다
+    /// (2026-09-28 헤디드 SC-ACC-006, 실제 뷰 시험 AccountConsoleRailViewTests: SelectedItem=users · SelectedItems=[permissions]).
+    /// 그래서 그 갱신 동안은 고르려던 값을 그대로 돌려줘 목록을 한 가지 상태로 두고, 한 박자 뒤 평범한 선택 변경으로 되돌린다.</para>
+    /// </summary>
+    private void RefuseRail(ConsoleRailEntry requested)
+    {
+        _refusedRail = requested;
+        Execute.BeginOnUIThread(() =>
+        {
+            _refusedRail = null;
+            NotifyOfPropertyChange(nameof(SelectedRail));
+        });
     }
 
     /// <summary>레일에서 항목을 골랐다. 미적용 변경이 있으면 막고 false — 뷰는 선택을 되돌린다.</summary>
@@ -900,9 +929,17 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     {
         StatusText = line;
         NotifyOfPropertyChange(nameof(CanUndoDraft));
+        NotifyOfPropertyChange(nameof(ShowDraftTray));
+        NotifyOfPropertyChange(nameof(DraftTrayText));
     }
 
     public bool CanUndoDraft => GroupDrop.CanUndo;
+
+    /// <summary>
+    /// 배정 트레이를 보이는가 — 담긴 대기가 있거나, <b>방금 적용한 것을 되돌릴 수 있으면</b>(PRD FR-17 ⑤ 적용 뒤 [되돌리기]).
+    /// 예전에는 대기 유무(HasEntries)만 봐서, 적용이 끝나 대기가 비면 트레이가 [되돌리기]와 함께 접혔다(2026-09-28 헤디드 SC-ACC-032).
+    /// </summary>
+    public bool ShowDraftTray => DraftTray.HasEntries || CanUndoDraft;
     #endregion
 
     #region - Selection of the other rails -
@@ -1009,7 +1046,8 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         get
         {
             if (DraftTray.IsApplying) return $"옮기는 중 {DraftTray.ProgressDone}/{DraftTray.ProgressTotal}";
-            if (!DraftTray.HasEntries) return string.Empty;
+            if (!DraftTray.HasEntries)
+                return CanUndoDraft ? "옮겼습니다. 잘못 옮겼으면 [되돌리기]를 누르세요." : string.Empty;
             var failed = DraftTray.Entries.Count(e => !string.IsNullOrEmpty(e.FailureReason));
             return failed > 0
                 ? $"{failed}명을 옮기지 못했습니다. [적용]을 다시 누르거나 [버리기]를 누르세요."

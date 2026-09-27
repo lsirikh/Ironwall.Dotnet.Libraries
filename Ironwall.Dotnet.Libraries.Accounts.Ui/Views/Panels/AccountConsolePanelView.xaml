@@ -1347,7 +1347,7 @@
 						BorderBrush="{DynamicResource StatusWarningBrush}"
 						BorderThickness="4,1,1,1"
 						CornerRadius="4"
-						Visibility="{Binding DraftTray.HasEntries, Converter={StaticResource BoolToVisibility}}">
+						Visibility="{Binding ShowDraftTray, Converter={StaticResource BoolToVisibility}}">
 						<DockPanel LastChildFill="True">
 							<Button
 								Margin="6,0,0,0"
