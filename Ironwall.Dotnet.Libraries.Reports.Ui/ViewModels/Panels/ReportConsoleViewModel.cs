@@ -274,8 +274,28 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return false;
 
         if (IsTemplateRail) TemplateViewModel.SelectedItem = row as ReportTemplateDto;
+        else if (IsCreateRail)
+        {
+            // ★ '새 보고서' 레일의 상세 칸은 생성 폼이다 — 미리보기는 생성 이력 레일에만 산다.
+            //   여기서 그냥 고르면 HTML 을 받아 살아 있는 브라우저까지 만들고도 화면엔 폼만 남았다(2026-09-28 "미리보기가 안 된다").
+            //   고른 보고서는 미리보기가 보이는 생성 이력 레일에서 연다(적던 폼은 그대로 남는다).
+            if (row is ReportGenerationRow picked) _ = OpenGenerationAsync(picked.Id);
+        }
         else ListViewModel.SelectedItem = row as ReportGenerationRow;
         return true;
+    }
+
+    /// <summary>
+    /// 그 보고서를 <b>생성 이력 레일</b>에서 고른다 — 상세 칸(미리보기 · 메타 · 진행 · 동작)이 거기에만 있다.
+    /// </summary>
+    /// <remarks>레일을 옮기면 목록을 다시 받아 줄 인스턴스가 바뀌므로 번호로 다시 고른다.</remarks>
+    public async Task OpenGenerationAsync(int generationId)
+    {
+        if (!IsListRail) await SelectRailAsync(ReportConsoleRails.List);
+        if (!IsListRail) return;   // 다른 전환이 끼어들었다 — 그 전환을 따른다
+
+        var row = ListViewModel.Rows.FirstOrDefault(r => r.Id == generationId);
+        if (row != null) ListViewModel.SelectedItem = row;
     }
 
     /// <summary>지금 뷰모델이 쥐고 있는 줄 — 막혔을 때 뷰가 여기로 선택을 되돌린다.</summary>
@@ -716,18 +736,31 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
         PreviewViewModel.RefreshMeta();
     }
 
-    /// <summary>생성이 끝났다 — 목록을 갱신하고 그 보고서를 골라 상세 칸에 미리보기를 올린다.</summary>
+    /// <summary>
+    /// 생성이 끝났다 — 목록을 갱신하고 그 보고서를 골라 상세 칸에 미리보기를 올린다.
+    /// </summary>
+    /// <remarks>
+    /// ★ 미리보기는 생성 이력 레일에만 있다. '새 보고서' 레일에 머문 채 고르기만 하면 상세 칸은 생성 폼이라
+    /// 받아 온 미리보기가 끝내 보이지 않았다 — 그래서 생성 이력 레일로 옮겨 연다.
+    /// 그 사이 템플릿 레일로 갔다면 그 상세 칸(템플릿 편집)을 빼앗지 않는다 — 목록 · 건수 · 상태 띠만 맞춘다.
+    /// </remarks>
     private async void OnReportGenerated(int generationId)
     {
         try
         {
-            await ListViewModel.LoadAsync();
-            RefreshRailCounts();
-            var row = ListViewModel.Rows.FirstOrDefault(r => r.Id == generationId);
-            if (row != null)
+            if (IsTemplateRail)
             {
-                ListViewModel.SelectedItem = row;
-                StatusText = $"보고서(#{generationId})를 만들었습니다";
+                await ListViewModel.LoadAsync();
+                RefreshRailCounts();
+                if (ListViewModel.Rows.Any(r => r.Id == generationId)) StatusText = $"보고서(#{generationId})를 만들었습니다";
+            }
+            else
+            {
+                if (IsListRail) await ListViewModel.LoadAsync();
+                await OpenGenerationAsync(generationId);      // 새 보고서 레일이면 여기서 레일을 옮긴다(목록도 거기서 다시 받는다)
+                RefreshRailCounts();
+                if (IsListRail && ListViewModel.SelectedItem?.Id == generationId)
+                    StatusText = $"보고서(#{generationId})를 만들었습니다";   // 레일 전환이 상태 띠를 비우므로 그 뒤에 적는다
             }
         }
         catch (Exception ex) { _log?.Error($"[ReportConsole] 생성 완료 처리: {ex.Message}"); }

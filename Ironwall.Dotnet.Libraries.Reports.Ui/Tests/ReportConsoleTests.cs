@@ -166,6 +166,68 @@ public class ReportConsoleTests : IDisposable
         Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
     }
 
+    // ★ 미리보기는 '생성 이력' 레일의 상세 칸에만 산다. '새 보고서' 레일의 상세 칸은 생성 폼이라,
+    //   거기서 줄을 고르면(또는 생성이 끝나 그 줄이 골라지면) HTML 을 받아 살아 있는 브라우저까지 만들면서도
+    //   화면에는 폼만 남았다 — "보고서는 미리보기가 안 된다"(2026-09-28 실창 · gis-r7-ws4 001 · 로그 id=24 293160자 수신 후 미표시).
+    [Fact]
+    public async Task should_open_the_new_report_with_its_preview_in_the_history_rail_when_generation_completes_on_the_create_rail()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        rig.Console.CreateViewModel.Title = "새 보고서";
+
+        await rig.Console.ApplyAsync();
+        await WaitUntilAsync(() => rig.Console.IsListRail && rig.Console.ListViewModel.SelectedItem?.Id == 4);
+
+        Assert.True(rig.Console.IsListRail, "생성이 끝나면 미리보기가 사는 생성 이력 레일로 옮겨야 한다");
+        Assert.Equal(4, rig.Console.ListViewModel.SelectedItem?.Id);
+        Assert.Equal(4, rig.Console.PreviewViewModel.GenerationId);
+        Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
+        Assert.Equal("보고서(#4)를 만들었습니다", rig.Console.StatusText);
+    }
+
+    [Fact]
+    public async Task should_open_the_picked_report_with_its_preview_in_the_history_rail_when_a_recent_generation_is_picked_on_the_create_rail()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        rig.Console.CreateViewModel.Title = "적던 제목";
+
+        Assert.True(rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3)));
+        await WaitUntilAsync(() => rig.Console.IsListRail && rig.Console.ListViewModel.SelectedItem?.Id == 3);
+
+        Assert.True(rig.Console.IsListRail, "생성 폼 옆 이력에서 고른 보고서는 미리보기가 보이는 레일에서 열려야 한다");
+        Assert.Equal(3, rig.Console.ListViewModel.SelectedItem?.Id);
+        Assert.Equal(1, rig.Console.Detail.SelectedCount);
+        Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
+        Assert.Equal("적던 제목", rig.Console.CreateViewModel.Title);   // 돌아가면 적던 폼이 그대로다
+    }
+
+    [Fact]
+    public async Task should_leave_the_template_detail_alone_when_a_generation_completes_on_the_template_rail()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Create);
+        rig.Console.CreateViewModel.Title = "새 보고서";
+
+        var generating = rig.Console.ApplyAsync();                 // 1.5 s 폴링 동안 템플릿 레일로 옮긴다
+        await rig.Console.SelectRailAsync(ReportConsoleRails.Template);
+        rig.Console.OnRowSelected(rig.Console.TemplateViewModel.Rows.First(t => t.Id == 11));
+        await generating;
+        await Task.Delay(50);
+
+        Assert.True(rig.Console.IsTemplateRail);
+        Assert.Equal("주간 요약", rig.Console.Detail.SingleTitle);
+        Assert.Null(rig.Console.ListViewModel.SelectedItem);
+        Assert.Equal("보고서(#4)를 만들었습니다", rig.Console.StatusText);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(10);
+    }
+
     [Fact]
     public async Task should_not_fetch_html_when_the_selected_report_is_not_finished()
     {
