@@ -455,7 +455,10 @@ public class EventDashboardViewModel : BasePanelViewModel
 
         // 미조치는 목록을 실제로 불러와야 세진다 — 서버 요약에는 그 숫자가 없다.
         // 아직 한 번도 안 열었으면 0 이 아니라 "—" 을 보인다(0 은 거짓이다).
-        var counted = detection.Count > 0 || malfunction.Count > 0;
+        // ★ 불러왔는데 0건이면 0 이 참이다 — 행 수로만 판정하던 때는 기간 안 이벤트가 없으면(주말 억제) 띠가 끝내 안 떴다.
+        //   다른 콘솔은 '장애 0대' 를 보인다(2026-09-28 헤디드 SC-KRN-001). 판정은 '성공한 조회가 있었나' 다.
+        var counted = detection.Count > 0 || malfunction.Count > 0
+                      || DetectionPanelViewModel.HasLoadedList || MalfunctionPanelViewModel.HasLoadedList;
         OpenCountText = counted ? $"{EventRailCounter.OpenTotal(detection, malfunction)}건" : "—";
         FaultCountText = counted ? $"{EventRailCounter.FaultInProgress(malfunction)}건" : "—";
         // "—" 는 '빠진 값' 처럼 읽힌다(완성도 감사 E-2 #4) — 세기 전에는 줄 자체를 숨긴다.
@@ -503,7 +506,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// </summary>
     public bool HasFaultInProgress => EventRailCounter.IsFaultAlarm(_faultCount);
 
-    /// <summary>미조치 · 장애 진행 수를 셀 수 있게 되었는가(탐지나 장애 목록을 한 번이라도 불러왔는가).</summary>
+    /// <summary>미조치 · 장애 진행 수를 셀 수 있게 되었는가(탐지나 장애 목록을 한 번이라도 불러왔는가 — 0건으로 불러온 것도 센 것이다).</summary>
     public bool HasRailCounts
     {
         get => _hasRailCounts;

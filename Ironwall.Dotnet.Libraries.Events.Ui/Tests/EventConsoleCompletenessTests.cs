@@ -414,6 +414,49 @@ public class EventConsoleCompletenessTests : IDisposable
         Assert.False(_console.HasFaultInProgress);
     }
 
+    // 2026-09-28 헤디드 SC-KRN-001 — 기간 안에 이벤트가 0건이면(주말 억제) 바닥 띠가 끝내 뜨지 않았다.
+    // 다른 콘솔은 '장애 0대' 처럼 0 을 보인다. 목록을 불러왔으면 0건도 센 것이다.
+    [Fact]
+    public async Task should_show_the_rail_footer_with_zero_counts_when_the_event_lists_load_with_no_rows()
+    {
+        SetupDetections(() => Page(new List<DetectionEventDto>()));
+        await Activate();
+        Assert.False(_console.ShowRailFooter);                      // 첫 조회 전(개요)에는 숨긴다 — 그대로
+
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+
+        Assert.Equal(0, _console.DetectionPanelViewModel.ViewModelProvider.Count);
+        Assert.True(_console.HasRailCounts);
+        Assert.True(_console.ShowRailFooter);
+        Assert.Equal("0건", _console.OpenCountText);
+        Assert.Equal("0건", _console.FaultCountText);
+        Assert.False(_console.HasFaultInProgress);                  // 0건은 경보색이 아니다
+
+        await _console.SelectRailAsync(EventDashboardViewModel.SuppressionRailKey);
+        Assert.False(_console.ShowRailFooter);                      // 억제 스케줄 레일에서는 여전히 숨긴다
+    }
+
+    [Fact]
+    public async Task should_keep_the_rail_footer_hidden_when_the_first_list_load_fails()
+    {
+        SetupDetections(() => ApiListResponse<DetectionEventDto>.CreateError("SERVER_ERROR", "실패", "GET → 500"));
+        await Activate();
+
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+
+        Assert.False(_console.HasRailCounts);                       // 못 불러온 것을 '0건' 이라 하면 거짓이다
+        Assert.False(_console.ShowRailFooter);
+    }
+
+    private void SetupDetections(Func<ApiListResponse<DetectionEventDto>> answer)
+        => _api.Setup(a => a.GetDetectionEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                                                      It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                                                      It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(answer);
+
+    private static ApiListResponse<T> Page<T>(List<T> items)
+        => new() { Success = true, Data = items, Pagination = new PaginationDto { Page = 1, Limit = 100, Total = items.Count, TotalPages = 1 } };
+
     [Fact]
     public async Task should_show_the_schedule_count_on_the_suppression_rail_when_none_is_suppressing_now()
     {

@@ -494,6 +494,9 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
                 // 캐시 날짜범위 기록
                 SetCachedDate(_startDate, _endDate);
+                // 0건이어도 '불러왔다' 는 사실이다 — 콘솔 레일 바닥 띠가 "장애 진행 0건" 을 보일 근거(SC-KRN-001).
+                // UpdateAction(finally) 보다 먼저 켠다 — 끝남 신호를 받은 콘솔이 이 값을 읽는다.
+                _hasLoadedList = true;
             }
             catch (OperationCanceledException ex)
             {
@@ -662,6 +665,12 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     public string LoadedCountText => $"{ViewModelProvider.Count} / {_totalCount}건";
     public bool HasMorePages => _currentPage < _totalPages;
 
+    /// <summary>
+    /// 목록의 첫 페이지를 한 번이라도 <b>성공적으로</b> 불러왔는가(0건 포함). 실패는 켜지 않는다 — 기존 목록을 유지하는 실패를
+    /// '0건' 으로 말하면 거짓이다. 한 번 켜지면 끄지 않는다(이후 실패도 이전 목록을 보존한다).
+    /// </summary>
+    public bool HasLoadedList => _hasLoadedList;
+
     public ICommand LoadMoreCommand { get; }
 
     /// <summary>행 우클릭 '조치보고' 커맨드(CommandParameter=행 VM). 기존 조치보고 다이얼로그 재사용.</summary>
@@ -676,6 +685,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     private DateTime _cachedStartDate;
     private DateTime _cachedEndDate;
     private bool _isCacheValid;
+    private volatile bool _hasLoadedList;   // 작업 스레드(DataInitialize)가 쓰고 UI 스레드가 읽는다
 
     // ─── Pagination State ───
     private int _currentPage;

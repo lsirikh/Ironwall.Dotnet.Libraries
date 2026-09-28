@@ -95,6 +95,34 @@ public class EventConsoleRailViewTests
         finally { window.Close(); }
     });
 
+    [Fact]
+    public void should_expose_the_rail_footer_with_zero_counts_when_the_detection_list_loads_empty_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        // 2026-09-28 헤디드 SC-KRN-001 재실행: 루프백 서버의 기간 안 이벤트가 0건(주말 억제)이라 바닥 띠가 끝내 접혀 있었다.
+        // 다른 콘솔은 '장애 0대' 를 보인다 — 목록을 불러왔으면 0건도 보여야 한다.
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey)));
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            Assert.Equal(0, console.DetectionPanelViewModel.ViewModelProvider.Count);
+            Assert.True(console.ShowRailFooter, "탐지 목록을 0건으로 불러온 뒤에도 바닥 띠가 보여야 한다");
+
+            var rail = RailProbe.Rail(view, "Console.Events.Rail");
+            var children = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()
+                           ?? new List<System.Windows.Automation.Peers.AutomationPeer>();
+            var footer = children.FirstOrDefault(c => c.GetAutomationId() == "Console.Events.Rail.Footer");
+
+            Assert.True(footer is not null, "레일 자식: [" + string.Join(", ", children.Select(c => c.GetAutomationId())) + "]");
+            var lines = footer!.GetChildren() ?? new List<System.Windows.Automation.Peers.AutomationPeer>();
+            Assert.Contains(lines, l => l.GetName() == "미조치 0건");
+            var fault = lines.FirstOrDefault(l => l.GetAutomationId() == "Console.Events.Rail.Footer.Fault");
+            Assert.True(fault is not null, "바닥 띠 줄: [" + string.Join(", ", lines.Select(l => $"{l.GetAutomationId()}='{l.GetName()}'")) + "]");
+            Assert.Equal("장애 진행 0건", fault!.GetName());
+        }
+        finally { window.Close(); }
+    });
+
     private static (EventDashboardView View, System.Windows.Window Window, EventDashboardViewModel Console) HostConsole(params DetectionEventDto[] detections)
     {
         var events = new EventProvider();
