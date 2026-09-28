@@ -11,35 +11,93 @@
 
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-    <!--  PTZ 방향 패드 버튼  -->
+    <!--
+        PTZ 패드 · 세그먼트 · 탭 (B9 — window-design-inventory #55). 예전에는 다크 고정색(짙은 남색 바탕 · 옅은 하늘색 글자)이라
+        라이트 테마에서도 이 칸만 검었다. 이제 전부 DynamicResource 토큰이고 템플릿을 직접 둔다 —
+        스타일에 템플릿이 없으면 OS 기본 단추 모양(하늘색 호버 · 회색 눌림, 하드코딩)이 입혀져 다크에서 밝은 글자가 묻힌다.
+        상태는 색만이 아니라 형태로도 말한다: 눌림 = 주색 테두리 · 고른 탭 = 아래 2px 주색 선 + 굵게 · 고른 세그먼트 = 주색 채움.
+        (영상 위 배지의 검정 반투명 · 신호 점 색은 늘 검은 영상 위에 뜨는 것이라 의도대로 둔다.)
+    -->
     <Style x:Key="PtzPadButtonStyle" TargetType="Button">
         <Setter Property="Margin" Value="2" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Background" Value="#FF223043" />
-        <Setter Property="Foreground" Value="#FFCFE0F0" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Bd"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <!--  탭 버튼  -->
+    <!--  탭 버튼 — 고른 탭은 쓰는 쪽 DataTrigger 가 아래 선 · 굵기 · 바탕을 바꾼다  -->
     <Style x:Key="PtzTabButtonStyle" TargetType="Button">
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Padding" Value="0,4" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0,0,0,2" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Bd"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <!--  옵션 탭 세그먼트 버튼(주야간/포커스) — 활성은 인라인 DataTrigger로 Accent  -->
-    <Style x:Key="PtzSegButtonStyle" TargetType="Button">
+    <!--  옵션 탭 세그먼트 버튼(주야간/포커스 · 줌/포커스 ±) — 패드와 같은 모양, 활성은 쓰는 쪽 DataTrigger 가 주색으로 채운다  -->
+    <Style x:Key="PtzSegButtonStyle" BasedOn="{StaticResource PtzPadButtonStyle}" TargetType="Button">
         <Setter Property="Margin" Value="2,0" />
         <Setter Property="Padding" Value="0,4" />
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="Background" Value="#FF223043" />
-        <Setter Property="Foreground" Value="#FFCFE0F0" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Cursor" Value="Hand" />
     </Style>
 
     <!--  헤더 버튼(크게보기/닫기) — PanelCloseButtonStyle 답습: 26×26 원형 + 호버 #33FFFFFF  -->
@@ -290,8 +348,8 @@
                             <Border
                                 Grid.Row="2"
                                 Height="220"
-                                Background="#FF131922"
-                                BorderBrush="{StaticResource BorderGrayBrush}"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource DividerBrush}"
                                 BorderThickness="0,1,0,0"
                                 CornerRadius="0,0,9,9"
                                 Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
@@ -302,13 +360,13 @@
                                         <Button Command="{Binding SelectTabCommand}" CommandParameter="0" Content="PTZ">
                                             <Button.Style>
                                                 <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
-                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ActiveTab}" Value="0">
-                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                             <Setter Property="FontWeight" Value="Bold" />
-                                                            <Setter Property="Background" Value="#FF1B2735" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -317,13 +375,13 @@
                                         <Button Command="{Binding SelectTabCommand}" CommandParameter="1" Content="프리셋">
                                             <Button.Style>
                                                 <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
-                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ActiveTab}" Value="1">
-                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                             <Setter Property="FontWeight" Value="Bold" />
-                                                            <Setter Property="Background" Value="#FF1B2735" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -332,13 +390,13 @@
                                         <Button Command="{Binding SelectTabCommand}" CommandParameter="2" Content="옵션">
                                             <Button.Style>
                                                 <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
-                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ActiveTab}" Value="2">
-                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                             <Setter Property="FontWeight" Value="Bold" />
-                                                            <Setter Property="Background" Value="#FF1B2735" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -369,7 +427,7 @@
                                             <Button Content="▲" Style="{StaticResource PtzPadButtonStyle}" Tag="0,-1" />
                                             <Button Content="↗" Style="{StaticResource PtzPadButtonStyle}" Tag="1,-1" />
                                             <Button Content="◀" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,0" />
-                                            <Button Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" Tag="stop" ToolTip="정지" />
+                                            <Button Content="■" Foreground="{DynamicResource StatusCriticalBrush}" Style="{StaticResource PtzPadButtonStyle}" Tag="stop" ToolTip="정지" />
                                             <Button Content="▶" Style="{StaticResource PtzPadButtonStyle}" Tag="1,0" />
                                             <Button Content="↙" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,1" />
                                             <Button Content="▼" Style="{StaticResource PtzPadButtonStyle}" Tag="0,1" />
@@ -382,9 +440,9 @@
                                           <StackPanel IsEnabled="{Binding IsPtzCapable}">
                                             <!--  PanTilt 속도  -->
                                             <Grid Margin="0,0,0,1">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="PanTilt" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="PanTilt" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
-                                                         Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
+                                                         Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextAlignment="Center"
                                                          Text="{Binding PanTiltSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
                                             </Grid>
                                             <Slider Margin="0,0,0,8" Minimum="0.1" Maximum="1.0" SmallChange="0.1" LargeChange="0.1"
@@ -392,9 +450,9 @@
                                                     Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도 (0.1 단위)" />
                                             <!--  Zoom 속도  -->
                                             <Grid Margin="0,0,0,1">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="Zoom" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="Zoom" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
-                                                         Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
+                                                         Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextAlignment="Center"
                                                          Text="{Binding ZoomSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />
                                             </Grid>
                                             <Slider Minimum="0.1" Maximum="1.0" SmallChange="0.1" LargeChange="0.1"
@@ -403,7 +461,7 @@
 
                                             <!--  줌 +/- (press-hold: 누르면 연속 줌·뗌 정지 — 컨트롤이 Tag로 처리. 휠과 동일 ContinuousMove 줌)  -->
                                             <Grid Margin="0,8,0,1">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="줌" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="줌" />
                                                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                                                     <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Tag="zoom:-1" ToolTip="줌 아웃(누르고 있는 동안)" />
                                                     <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Tag="zoom:1" ToolTip="줌 인(누르고 있는 동안)" />
@@ -413,7 +471,7 @@
 
                                             <!--  포커스 +/- (press-hold: 누르면 연속 near/far·뗌 정지) — imaging 전용(IsImagingCapable), PTZ 게이트 밖 → 영상전용 고정카메라도 활성  -->
                                             <Grid Margin="0,4,0,0" IsEnabled="{Binding IsImagingCapable}">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="포커스" />
                                                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                                                     <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Tag="focus:-1" ToolTip="포커스 근경 near(누르고 있는 동안)" />
                                                     <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Tag="focus:1" ToolTip="포커스 원경 far(누르고 있는 동안)" />
@@ -501,7 +559,7 @@
                                         </StackPanel>
 
                                         <!--  빈 목록 상태(FR-C3): 조회 중/미지원/없음/조회 실패를 구분 표기(조회 중엔 스피너만)  -->
-                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="{Binding PresetStatusText}">
+                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding PresetStatusText}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -532,11 +590,11 @@
 
                                         <!--  인라인 이름 입력  -->
                                         <StackPanel Margin="0,6,0,0" Visibility="{Binding IsSavingPreset, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock FontSize="11" Foreground="#FF9FB0C0" Text="프리셋 이름" />
-                                            <TextBox Margin="0,2" Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="12" Foreground="White" MaxLength="100" Text="{Binding NewPresetName, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="프리셋 이름" />
+                                            <TextBox Margin="0,2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" MaxLength="100" Text="{Binding NewPresetName, UpdateSourceTrigger=PropertyChanged}" />
                                             <StackPanel Margin="0,4,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                                                <Button Margin="2,0" Padding="8,3" Content="취소" FontSize="11" Command="{Binding CancelSavePresetCommand}" />
-                                                <Button Margin="2,0" Padding="8,3" Content="확인" FontSize="11" Command="{Binding ConfirmSavePresetCommand}" />
+                                                <Button Margin="2,0" Padding="10,3" Content="취소" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding CancelSavePresetCommand}" />
+                                                <Button Margin="2,0" Padding="10,3" Content="확인" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding ConfirmSavePresetCommand}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
@@ -555,7 +613,7 @@
                                         </StackPanel.Style>
 
                                         <!--  미지원 안내  -->
-                                        <TextBlock Margin="0,10" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="이 카메라는 영상 옵션을 지원하지 않습니다">
+                                        <TextBlock Margin="0,10" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="{DynamicResource TextSecondaryBrush}" Text="이 카메라는 영상 옵션을 지원하지 않습니다">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -571,15 +629,16 @@
                                         <!--  옵션 콘텐츠(지원 시)  -->
                                         <StackPanel Visibility="{Binding IsImagingCapable, Converter={StaticResource BoolToVis}}">
                                             <!--  주야간(IR Cut Filter)  -->
-                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="주야간 (IR Cut)" />
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="주야간 (IR Cut)" />
                                             <UniformGrid Margin="0,2,0,8" Columns="3" Rows="1">
                                                 <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="ON" Content="주간">
                                                     <Button.Style>
                                                         <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IrCutFilterMode}" Value="ON">
-                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -590,8 +649,9 @@
                                                         <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IrCutFilterMode}" Value="OFF">
-                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -602,8 +662,9 @@
                                                         <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IrCutFilterMode}" Value="AUTO">
-                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -612,15 +673,16 @@
                                             </UniformGrid>
 
                                             <!--  포커스(AutoFocus)  -->
-                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="포커스" />
                                             <UniformGrid Margin="0,2" Columns="2" Rows="1">
                                                 <Button Command="{Binding SetAutoFocusCommand}" CommandParameter="true" Content="자동">
                                                     <Button.Style>
                                                         <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsAutoFocus}" Value="True">
-                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -631,8 +693,9 @@
                                                         <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsAutoFocus}" Value="False">
-                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -649,7 +712,7 @@
                     <ControlTemplate.Triggers>
                         <!--  단일 선택 강조 — 굵은 Accent 테두리 (FR-SEL-02)  -->
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                            <Setter TargetName="PART_Root" Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                            <Setter TargetName="PART_Root" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
                             <Setter TargetName="PART_Root" Property="BorderThickness" Value="3" />
                         </DataTrigger>
                     </ControlTemplate.Triggers>

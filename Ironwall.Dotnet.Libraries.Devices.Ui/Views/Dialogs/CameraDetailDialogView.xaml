@@ -3,40 +3,31 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:cal="http://www.caliburnproject.org"
-	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--
-		T4 · M 560 (스토리보드 #h-dlg L1433-1435).
-		※ 지금 이 창을 여는 곳이 <b>없다</b> — N-02 가 장비 콘솔을 상세 칸으로 다시 쓰면서 이 창을 열던 뷰모델이 끊겼다.
-		  형(型)은 호스트 래퍼가 아직 참조하므로 지우지 않고, 틀만 가족 규격으로 맞춰 둔다(따라오기 문서 참고).
+		카메라 상세 몸통 — 탭 셋(하드웨어 정보 · 카메라 설정 · 링크).
+		B4(window-design-inventory #26): 이 뷰는 틀을 그리지 않는다. 이 뷰를 여는 곳은 호스트 래퍼(CameraPropertyDialogView) 하나뿐이고,
+		  그 래퍼가 커널 틀(제목 · ✕ · [취소] · [저장])을 그린다 — 여기서도 틀을 그리면 머리와 버튼 줄이 두 겹이 됐다.
+		  옛 이 틀의 식별자(Dialog.Devices.CameraDetail.*)는 래퍼의 틀이 같은 DialogKey 로 이어받는다.
+		탭 스타일은 DynamicResource 로 찾는다 — 앱 없이 띄우는 뷰 시험에서도 뜨게(런타임 결과는 같다).
 	-->
-	<dlg:ConsoleDialogFrame
-		Backdrop="{DynamicResource BgBrush}"
-		BodyScroll="Disabled"
-		DialogKey="Devices.CameraDetail"
-		PrimaryText=""
-		SecondaryInvoked="OnClose"
-		SecondaryText="닫기"
-		Size="Medium"
-		Title="{Binding DisplayName}">
-		<TabControl
-			MinHeight="220"
-			ItemsSource="{Binding Items}"
-			SelectedItem="{Binding ActiveItem}"
-			Style="{StaticResource MaterialDesignTabControl}">
-			<TabControl.ItemTemplate>
-				<DataTemplate>
-					<TextBlock Text="{Binding DisplayName}" />
-				</DataTemplate>
-			</TabControl.ItemTemplate>
-			<TabControl.ContentTemplate>
-				<DataTemplate>
-					<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-						<ContentControl cal:View.Model="{Binding}" />
-					</ScrollViewer>
-				</DataTemplate>
-			</TabControl.ContentTemplate>
-		</TabControl>
-	</dlg:ConsoleDialogFrame>
+	<TabControl
+		MinHeight="220"
+		ItemsSource="{Binding Items}"
+		SelectedItem="{Binding ActiveItem}"
+		Style="{DynamicResource MaterialDesignTabControl}">
+		<TabControl.ItemTemplate>
+			<DataTemplate>
+				<TextBlock Text="{Binding DisplayName}" />
+			</DataTemplate>
+		</TabControl.ItemTemplate>
+		<TabControl.ContentTemplate>
+			<DataTemplate>
+				<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+					<ContentControl cal:View.Model="{Binding}" />
+				</ScrollViewer>
+			</DataTemplate>
+		</TabControl.ContentTemplate>
+	</TabControl>
 </UserControl>

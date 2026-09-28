@@ -1,4 +1,6 @@
-﻿using System.Windows.Controls;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Views.Dialogs;
 /****************************************************************************
@@ -17,6 +19,16 @@ public partial class DetectionHistoryDialogView : UserControl
     {
         InitializeComponent();
         HistoryGrid.SelectionChanged += OnHistorySelectionChanged;
+    }
+
+    /// <summary>
+    /// 틀(<c>ConsoleDialogFrame</c>)의 취소 — 머리 ✕ · ESC — 를 [닫기] 버튼(<c>x:Name="CloseDialog"</c>)의 Click 으로 넘긴다(B4).
+    /// 닫는 길이 그 버튼 하나라 두 번 닫히지 않고, Caliburn 액션(<c>CloseDialog()</c>)까지 예전과 같은 길을 탄다. 꺼진 버튼은 누르지 않는다.
+    /// </summary>
+    private void OnSecondaryInvoked(object sender, RoutedEventArgs e)
+    {
+        if (!CloseDialog.IsEnabled || CloseDialog.Visibility != Visibility.Visible) return;
+        CloseDialog.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, CloseDialog));
     }
 
     private void OnHistorySelectionChanged(object sender, SelectionChangedEventArgs e)

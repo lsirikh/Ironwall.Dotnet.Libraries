@@ -7,6 +7,7 @@
 	xmlns:controls="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Controls"
 	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:sys="clr-namespace:System;assembly=mscorlib"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -19,9 +20,14 @@
 	mc:Ignorable="d">
 
 	<!--
-		탐지 신호 이력 다이얼로그 콘텐츠 (Detection_Signal_History FR-09).
-		호스팅(md:DialogHost + md:Card 880×640)은 메인솔루션 래퍼(DetectionHistoryHostDialogView)가 담당 —
-		기존 DetectionEventDialogView 패턴 미러. 색상은 전부 DynamicResource 토큰(NFR-01 다크/라이트).
+		탐지 신호 이력 다이얼로그 (Detection_Signal_History FR-09) — B4(window-design-inventory #25): 커널 다이얼로그 틀 T4 · L 720.
+		틀은 이 뷰가 가진다 — 호스트 래퍼(DetectionHistoryHostDialogView)는 카드 없이 이 뷰만 담는다(틀이 두 겹이 되지 않게).
+		옛 모양: 호스트 카드 880×640 + 여기 시안 머리띠 + 손 템플릿 닫기(스타일 없음 · 반투명 흰 호버).
+		닫기: x:Name="CloseDialog"(Caliburn 지시자 · UI 시험 앵커 "CloseDialog")는 틀의 버튼 줄(FooterActions)에 그대로 두고
+		  cal:Message.Attach 로 잇는다. 틀의 ✕ · ESC 는 코드 숨김이 그 버튼의 Click 으로 넘긴다(닫는 길이 하나).
+		조회 범위 · 재시도 · 갱신 시각(옛 ⑦ 바닥 띠)은 틀의 버튼 줄 왼쪽(FooterExtra)으로 옮겼다 — 띠가 두 겹이 되지 않게.
+		바깥 스타일은 DynamicResource 로 찾는다 — 앱 없이 오프스크린으로 띄우는 뷰 시험에서도 뜨게(런타임 결과는 같다).
+		색상은 전부 DynamicResource 토큰(NFR-01 다크/라이트).
 	-->
 
 	<UserControl.Resources>
@@ -172,67 +178,66 @@
 		</Style>
 	</UserControl.Resources>
 
-	<Grid Background="{DynamicResource SurfaceBrush}">
+	<dlg:ConsoleDialogFrame
+		BodyPadding="0"
+		BodyScroll="Disabled"
+		DialogKey="Events.DetectionHistory"
+		Message="{Binding RangeText}"
+		PrimaryText=""
+		SecondaryInvoked="OnSecondaryInvoked"
+		SecondaryText=""
+		Size="Large"
+		Title="{Binding HeaderText, FallbackValue=탐지 신호 이력}">
+
+		<!--
+			옛 ⑦ 바닥 띠를 틀의 두 자리로 나눴다(띠가 두 겹이 되지 않게):
+			  조회 범위 · 절단 안내 → 버튼 줄 왼쪽 안내 글(Message, 길면 접힌다) · 마지막 갱신 → 머리 오른쪽(HeaderExtra).
+		-->
+		<dlg:ConsoleDialogFrame.HeaderExtra>
+			<TextBlock
+				VerticalAlignment="Center"
+				FontSize="11.5"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding LastUpdatedText}" />
+		</dlg:ConsoleDialogFrame.HeaderExtra>
+
+		<!--
+			버튼 줄 오른쪽 — [재시도](조회 실패일 때만) · [닫기].
+			닫기의 x:Name 은 Caliburn 지시자이자 UI 시험 앵커다(이름 · 요소 종류 그대로). 틀의 ✕ · ESC 도 이 버튼으로 온다.
+		-->
+		<dlg:ConsoleDialogFrame.FooterActions>
+			<StackPanel Orientation="Horizontal">
+				<Button
+					Height="34"
+					MinWidth="92"
+					Margin="0,0,8,0"
+					Command="{Binding RefreshCommand}"
+					Content="재시도"
+					Style="{DynamicResource Console.Button}"
+					Visibility="{Binding HasLoadError, Converter={StaticResource BoolToVis}}" />
+				<Button
+					x:Name="CloseDialog"
+					Height="34"
+					MinWidth="92"
+					cal:Message.Attach="CloseDialog"
+					Content="닫기"
+					Style="{DynamicResource Console.Button}" />
+			</StackPanel>
+		</dlg:ConsoleDialogFrame.FooterActions>
+
+	<!--  몸통 — 높이는 목록이 비어도 이만큼은 둔다(차트 + 목록이 한 화면). 넘치는 행은 목록이 스스로 굴린다.  -->
+	<Grid MinHeight="520">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
-
-		<!--  ① 시안 헤더 (ModernDialogHeader 표준) — 닫기=우상단 ✕ (디자인 패턴, 런타임 피드백)  -->
-		<Border Grid.Row="0" Style="{StaticResource ModernDialogHeader}">
-			<DockPanel LastChildFill="True">
-				<Button
-					x:Name="CloseDialog"
-					Width="26"
-					Height="26"
-					VerticalAlignment="Center"
-					Cursor="Hand"
-					DockPanel.Dock="Right"
-					Style="{x:Null}"
-					ToolTip="닫기">
-					<Button.Template>
-						<ControlTemplate TargetType="Button">
-							<Border
-								x:Name="Bd"
-								Background="Transparent"
-								CornerRadius="13">
-								<md:PackIcon
-									Width="15"
-									Height="15"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Center"
-									Foreground="{DynamicResource OnPrimaryFixedBrush}"
-									Kind="Close" />
-							</Border>
-							<ControlTemplate.Triggers>
-								<Trigger Property="IsMouseOver" Value="True">
-									<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
-								</Trigger>
-							</ControlTemplate.Triggers>
-						</ControlTemplate>
-					</Button.Template>
-				</Button>
-				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-					<md:PackIcon
-						Width="20"
-						Height="20"
-						Margin="0,0,8,0"
-						VerticalAlignment="Center"
-						Foreground="{DynamicResource OnPrimaryFixedBrush}"
-						Kind="ChartLine" />
-					<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="{Binding HeaderText, FallbackValue=탐지 신호 이력}" />
-				</StackPanel>
-			</DockPanel>
-		</Border>
 
 		<!--  ② 툴바 — 2행 구조(잘림 수정): 1행=기간 세그먼트+새로고침 / 2행=필터 칩 WrapPanel(줄바꿈)+미조치만  -->
 		<Border
-			Grid.Row="1"
+			Grid.Row="0"
 			Padding="10,7,10,3"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
@@ -290,7 +295,7 @@
 						VerticalAlignment="Center"
 						Command="{Binding RefreshCommand}"
 						DockPanel.Dock="Right"
-						Style="{StaticResource Console.Button.Icon}"
+						Style="{DynamicResource Console.Button.Icon}"
 						ToolTip="새로고침">
 						<md:PackIcon
 							Width="20"
@@ -423,7 +428,7 @@
 
 		<!--  ③ 기간지정 입력 행 (custom일 때만)  -->
 		<Border
-			Grid.Row="2"
+			Grid.Row="1"
 			Padding="10,6"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
@@ -448,13 +453,13 @@
 					VerticalAlignment="Center"
 					Command="{Binding ApplyCustomCommand}"
 					Content="적용"
-					Style="{StaticResource Console.Button.Primary}" />
+					Style="{DynamicResource Console.Button.Primary}" />
 			</StackPanel>
 		</Border>
 
 		<!--  ④ 통계 스트립  -->
 		<Border
-			Grid.Row="3"
+			Grid.Row="2"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,0,0,1">
 			<UniformGrid Columns="5">
@@ -532,7 +537,7 @@
 		</Border>
 
 		<!--  ⑤ 신호 차트 (FR-13) — 색상 전부 토큰 DP 주입  -->
-		<Grid Grid.Row="4">
+		<Grid Grid.Row="3">
 			<StackPanel Margin="10,8,10,0">
 				<controls:SignalChartControl
 					AxisBrush="{DynamicResource BorderBrush}"
@@ -607,7 +612,7 @@
 						Width="42"
 						Height="42"
 						IsIndeterminate="True"
-						Style="{StaticResource MaterialDesignCircularProgressBar}" />
+						Style="{DynamicResource MaterialDesignCircularProgressBar}" />
 					<TextBlock
 						Margin="0,8,0,0"
 						HorizontalAlignment="Center"
@@ -621,12 +626,12 @@
 		<!--  ⑥ 이력 그리드 — 미조치 행 우클릭 조치보고 (FR-15)  -->
 		<DataGrid
 			x:Name="HistoryGrid"
-			Grid.Row="5"
+			Grid.Row="4"
 			Margin="10,0,10,4"
 			AutoGenerateColumns="False"
 			CanUserAddRows="False"
-			CellStyle="{StaticResource ModernDataGridCell}"
-			ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+			CellStyle="{DynamicResource ModernDataGridCell}"
+			ColumnHeaderStyle="{DynamicResource ModernDataGridColumnHeader}"
 			HeadersVisibility="Column"
 			IsReadOnly="True"
 			ItemsSource="{Binding FilteredItems}"
@@ -634,9 +639,15 @@
 			RowHeight="{x:Static sys:Double.NaN}"
 			SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
 			SelectionMode="Single"
-			Style="{StaticResource ModernDataGrid}">
+			Style="{DynamicResource ModernDataGrid}">
 			<DataGrid.RowStyle>
-				<Style BasedOn="{StaticResource ModernDataGridRow}" TargetType="DataGridRow">
+				<!--
+					ModernDataGridRow(Theme/Styles.Containers.xaml)와 같은 토큰 · 같은 상태를 여기 적는다 — BasedOn 은 StaticResource 만 받아
+					앱 없이 띄우는 뷰 시험에서 이 뷰가 뜨지 않았다. 행 우클릭 [조치보고]는 그대로.
+				-->
+				<Style TargetType="DataGridRow">
+					<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+					<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 					<Setter Property="ContextMenu">
 						<Setter.Value>
 							<ContextMenu>
@@ -647,6 +658,14 @@
 							</ContextMenu>
 						</Setter.Value>
 					</Setter>
+					<Style.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+						</Trigger>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+						</Trigger>
+					</Style.Triggers>
 				</Style>
 			</DataGrid.RowStyle>
 			<DataGrid.Columns>
@@ -729,36 +748,6 @@
 				</DataGridTemplateColumn>
 			</DataGrid.Columns>
 		</DataGrid>
-
-		<!--  ⑦ 푸터 — 조회 범위/절단 경고/갱신 시각/재시도  -->
-		<Border
-			Grid.Row="6"
-			Padding="10,5"
-			Background="{DynamicResource SurfaceAltBrush}"
-			BorderBrush="{DynamicResource DividerBrush}"
-			BorderThickness="0,1,0,0">
-			<DockPanel LastChildFill="False">
-				<TextBlock
-					VerticalAlignment="Center"
-					DockPanel.Dock="Left"
-					FontSize="11"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="{Binding RangeText}" />
-				<Button
-					Margin="10,0,0,0"
-					VerticalAlignment="Center"
-					Command="{Binding RefreshCommand}"
-					Content="재시도"
-					DockPanel.Dock="Left"
-					Style="{StaticResource Console.Button}"
-					Visibility="{Binding HasLoadError, Converter={StaticResource BoolToVis}}" />
-				<TextBlock
-					VerticalAlignment="Center"
-					DockPanel.Dock="Right"
-					FontSize="11"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="{Binding LastUpdatedText}" />
-			</DockPanel>
-		</Border>
 	</Grid>
+	</dlg:ConsoleDialogFrame>
 </UserControl>
