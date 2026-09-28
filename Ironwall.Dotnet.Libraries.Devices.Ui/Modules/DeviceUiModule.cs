@@ -103,15 +103,26 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>()
                    .SingleInstance();
+            // 부대 관계도 배치 문서(S-1 GET/PATCH /api/units/layout) — 관계도 포트. 미지원 서버면 관계도가 세션 전용으로 동작한다(FR-50).
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.UnitLayoutApiAdapter(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Api.Services.IUnitLayoutApiService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.IUnitLayoutApi>()
+                   .SingleInstance();
+            // 부대 콘솔 입구 — 비모달 한 벌(FR-43). 지도의 [관계도에서 보기](OpenUnitConsoleRequest)를 들어야 하므로
+            // 호스트가 해석하지 않아도 만들어 둔다(AutoActivate — V-13: 해석되지 않은 싱글턴은 구독자 목록에 없다).
+            // 로그아웃 신호(ISessionLifecycle — GOP 모드만 등록)를 들어 콘솔을 닫는다.
             builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitConsoleLauncher(
                         c.Resolve<Caliburn.Micro.IWindowManager>(),
                         c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
                         c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>(),
                         c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
                         c.ResolveOptional<ILogService>(),
-                        c.ResolveOptional<Caliburn.Micro.IEventAggregator>()))   // 떠 있는 동안 SYNC_UNIT 를 듣는다
+                        c.ResolveOptional<Caliburn.Micro.IEventAggregator>(),   // 떠 있는 동안 SYNC_UNIT 를 듣는다 · 지도 요청을 듣는다
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.IUnitLayoutApi>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ISessionLifecycle>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
-                   .SingleInstance();
+                   .SingleInstance()
+                   .AutoActivate();
             // D-14: unit_id → 부대 이름 읽기 전용 사전. IUnitGraphApi 위에서 id→이름을 1회 적재해 캐시한다 —
             // 장비 목록 "소속 부대" 열 · 상세 "부대" 칸이 원값 id 대신 이름을 보이는 유일한 경로.
             builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory(
@@ -120,6 +131,14 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.IUnitTopologyCache>()   // SYNC_UNIT 수신 시 호스트가 무효화한다
+                   .SingleInstance();
+            // 부대 관계도 FR-44 — 지도 · 상세 창이 읽는 부대 사전(이름 · 경로 · 소속 줄). 등록은 IUnitDirectory 하나뿐이다
+            // (구체 타입으로 풀지 않는다 — 지도 쪽은 Devices 의 인터페이스만 안다). 편제 적재는 위 UnitNameDirectory 한 벌을 같이 쓴다.
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.UnitDirectory(
+                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Services.UnitNameDirectory>(),
+                        c.ResolveOptional<Caliburn.Micro.IEventAggregator>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Devices.Units.IUnitDirectory>()
                    .SingleInstance();
 
 

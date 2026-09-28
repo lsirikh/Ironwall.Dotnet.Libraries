@@ -163,6 +163,24 @@ public class UnitLayoutPortTests
         Assert.Equal(UnitLayoutFailureKind.Server,
             Assert.IsType<UnitLayoutWrite.Failed>(await Run(new UnitLayoutWriteResult.Failed(UnitLayoutFailureKind.Server, 500, "x"))).Kind);
     }
+
+    [Fact]
+    public async Task should_carry_the_new_write_outcomes_to_the_port_as_sub_cases()
+    {
+        // TEST-65 — 새 갈래가 포트까지 닿는다. 하위 갈래라 옛 소비자(case Unsupported / Failed)도 그대로 받는다.
+        async Task<UnitLayoutWrite> Run(UnitLayoutWriteResult r)
+            => await new UnitLayoutApiAdapter(new StubLayoutService { Write = r }).WriteAsync(1, UnitLayoutChange.ClearOne(1));
+
+        var gone = await Run(new UnitLayoutWriteResult.EndpointGone(404, "x"));
+        var precondition = await Run(new UnitLayoutWriteResult.PreconditionRequired(428, "x"));
+        var unknown = await Run(new UnitLayoutWriteResult.Unknown(504, "x"));
+
+        Assert.IsType<UnitLayoutWrite.EndpointGone>(gone);
+        Assert.IsAssignableFrom<UnitLayoutWrite.Unsupported>(gone);
+        Assert.Equal(UnitLayoutFailureKind.PreconditionRequired, Assert.IsType<UnitLayoutWrite.PreconditionRequired>(precondition).Kind);
+        Assert.Equal(UnitLayoutFailureKind.Timeout, Assert.IsType<UnitLayoutWrite.Unknown>(unknown).Kind);
+        Assert.IsAssignableFrom<UnitLayoutWrite.Failed>(unknown);
+    }
     #endregion
 
     #region - 세션 전용 저장소 (FR-51 · NFR-14) -

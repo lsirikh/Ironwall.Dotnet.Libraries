@@ -97,12 +97,13 @@ public class UnitMapTextTests
     }
     #endregion
 
-    #region - 배치 상태 문구 (FR-11 · ISSUE-7) -
+    #region - 배치 상태 문구 (FR-11 · PRD §2.1-A 7행 표 · ISSUE-7 · ISSUE-32) -
     private static readonly DateTime At1402 = new(2026, 9, 27, 14, 2, 11);
 
     [Fact]
     public void should_name_last_editor_and_time_when_shared_and_editable()
     {
+        // 2행 — 지원 · 문서 있음
         Assert.Equal("배치: 모든 운영자 공유 · 마지막 변경 김○○ 09-27 14:02",
                      UnitMapText.LayoutStatus(UnitMapLayoutState.Shared, canEdit: true, "김○○", At1402));
     }
@@ -117,27 +118,128 @@ public class UnitMapTextTests
     [Fact]
     public void should_say_nobody_moved_yet_when_shared_document_is_empty()
     {
-        // SIM-P003 — 빈 문서(version 0, updated_by null)
-        Assert.Equal("배치: 모든 운영자 공유 · 아직 옮긴 부대가 없습니다",
+        // 3행 — 빈 문서(version 0, updated_by null · SIM-P003)
+        Assert.Equal("배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다",
                      UnitMapText.LayoutStatus(UnitMapLayoutState.Shared, canEdit: true));
     }
 
     [Fact]
-    public void should_say_view_only_when_shared_without_edit_permission()
+    public void should_append_view_only_to_row_2_or_3_when_shared_without_edit_permission()
     {
-        Assert.Equal("배치: 모든 운영자 공유 · 보기 전용",
+        // 4행 — 2 · 3 행 문구 + " · 보기 전용"(SIM-P002 · P004)
+        Assert.Equal("배치: 모든 운영자 공유 · 마지막 변경 김○○ 09-27 14:02 · 보기 전용",
                      UnitMapText.LayoutStatus(UnitMapLayoutState.Shared, canEdit: false, "김○○", At1402));
+        Assert.Equal("배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다 · 보기 전용",
+                     UnitMapText.LayoutStatus(UnitMapLayoutState.Shared, canEdit: false));
     }
 
     [Theory]
+    [InlineData(UnitMapLayoutState.Loading, "배치를 불러오는 중 — 자동 배치로 보입니다")]
+    [InlineData(UnitMapLayoutState.VersionMismatch, "배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다")]
     [InlineData(UnitMapLayoutState.SessionOnly, "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다")]
     [InlineData(UnitMapLayoutState.ReadFailed, "배치를 불러오지 못했습니다 — 자동 배치로 보입니다")]
-    [InlineData(UnitMapLayoutState.VersionMismatch, "배치 판이 달라 자동 배치로 보입니다")]
-    [InlineData(UnitMapLayoutState.Loading, "배치를 불러오는 중입니다 — 자동 배치로 먼저 보입니다")]
     public void should_describe_layout_state_when_not_shared(UnitMapLayoutState state, string expected)
     {
+        // 1 · 5 · 6 · 7 행
         Assert.Equal(expected, UnitMapText.LayoutStatus(state, canEdit: true));
         Assert.Equal(expected, UnitMapText.LayoutStatus(state, canEdit: false));
+    }
+
+    [Fact]
+    public void should_say_login_expired_when_read_failed_with_401()
+    {
+        // 7행 변형(SIM-P019 · P020)
+        Assert.Equal("로그인이 만료되어 배치를 불러오지 못했습니다",
+                     UnitMapText.LayoutStatus(UnitMapLayoutState.ReadFailed, canEdit: true, sessionExpired: true));
+    }
+
+    [Theory]
+    [InlineData(UnitMapLayoutState.Shared)]
+    [InlineData(UnitMapLayoutState.SessionOnly)]
+    [InlineData(UnitMapLayoutState.ReadFailed)]
+    [InlineData(UnitMapLayoutState.Loading)]
+    public void should_append_live_off_suffix_to_every_row_when_global_subscription_is_off(UnitMapLayoutState state)
+    {
+        // ISSUE-32 · SIM-P045
+        Assert.EndsWith(" · 실시간 반영 꺼짐", UnitMapText.LayoutStatus(state, canEdit: true, liveOff: true));
+        Assert.DoesNotContain("실시간", UnitMapText.LayoutStatus(state, canEdit: true));
+    }
+    #endregion
+
+    #region - v1.3 문구 (TEST-09 개정) -
+    [Theory]
+    [InlineData("UNAUTHORIZED", "로그인이 만료되었습니다(401) — 다시 로그인하세요.")]
+    [InlineData("FORBIDDEN", "권한이 없습니다(403).")]
+    [InlineData("NOT_FOUND", "다른 곳에서 삭제된 부대입니다(404).")]
+    [InlineData("VALIDATION_ERROR", "서버 규칙에 맞지 않아 거절됐습니다.")]
+    [InlineData("PRECONDITION_REQUIRED", "버전 확인이 빠진 요청이었습니다(428).")]
+    [InlineData("INTERNAL_ERROR", "서버 오류입니다 — 잠시 후 다시 시도하세요.")]
+    [InlineData("GATEWAY_TIMEOUT", "결과를 확인하지 못했습니다 — 편제를 다시 읽어 실제 상태로 보입니다.")]
+    [InlineData("SERVICE_UNAVAILABLE", "서버 연결을 확인하세요.")]
+    [InlineData(null, "잠시 후 다시 시도하세요.")]
+    public void should_give_status_specific_reason_when_org_write_fails(string? code, string expected)
+    {
+        // FR-34 · ISSUE-25 · SIM-F002~011
+        Assert.Equal(expected, UnitMapText.OrgFailureReason(code));
+    }
+
+    [Fact]
+    public void should_mark_suspended_target_in_confirm_texts()
+    {
+        // ISSUE-16 — 운용 중지 부대도 받되 확인 문구가 알린다
+        var graph = UnitMapTestData.Graph(new[]
+        {
+            UnitMapTestData.Node(1, "b01", "1대대", UnitMapTestData.ECHELON_BATTALION),
+            UnitMapTestData.Node(2, "b02", "2대대", UnitMapTestData.ECHELON_BATTALION, isEnable: false),
+            UnitMapTestData.Node(3, "c01", "1중대", UnitMapTestData.ECHELON_COMPANY, 1),
+        });
+        var tree = UnitMapTestData.Tree(graph);
+
+        Assert.Equal("‘1중대’(중대)를 ‘2대대’(대대 (운용 중지 부대)) 밑으로 옮깁니다.", UnitMapText.ConfirmReparent(tree, 3, 2).Lines[0]);
+        Assert.Contains(UnitMapText.SuspendedMark, UnitMapText.ConfirmAdjoin(tree, 1, 2).Lines[0]);
+        Assert.DoesNotContain(UnitMapText.SuspendedMark, UnitMapText.ConfirmReparent(tree, 3, 1).Lines[0]);
+    }
+
+    [Fact]
+    public void should_add_new_parent_path_line_when_hierarchy_layer_is_hidden()
+    {
+        // ISSUE-55 — 계층선을 끈 채로는 옮긴 결과가 그림에 보이지 않는다
+        var f = UnitMapTestData.Standard200();
+
+        var confirm = UnitMapText.ConfirmReparent(f.Tree, f.IdOf("8중대"), f.IdOf("3대대"), showParentPath: true);
+
+        Assert.Contains("새 상위 경로: 3대대 › 1연대 › 제○○사단", confirm.Lines);
+        Assert.DoesNotContain(UnitMapText.ConfirmReparent(f.Tree, f.IdOf("8중대"), f.IdOf("3대대")).Lines, l => l.StartsWith("새 상위 경로"));
+    }
+
+    [Fact]
+    public void should_say_layout_returns_to_auto_when_parent_undone()
+    {
+        Assert.Equal("‘8중대’의 상위 변경을 되돌렸습니다 — 배치는 자동 배치로 돌아갑니다.", UnitMapText.ReparentUndoneWithLayoutBar("8중대"));
+    }
+
+    [Fact]
+    public void should_explain_reveal_blocked_by_unsaved_edit()
+    {
+        Assert.Equal("적용하지 않은 변경이 있어 ‘7중대’로 이동하지 않았습니다 — [적용] 또는 [되돌리기] 후 다시 하세요.", UnitMapText.RevealBlockedBand("7중대"));
+        Assert.Equal("적용하지 않은 변경이 있어 ‘1연대’로 이동하지 않았습니다 — [적용] 또는 [되돌리기] 후 다시 하세요.", UnitMapText.RevealBlockedBand("1연대"));
+    }
+
+    [Fact]
+    public void should_warn_in_reset_confirm_when_undo_would_exceed_batch_limit()
+    {
+        // ISSUE-50 — 1000곳 초과 초기화는 되돌릴 수 없음을 확인 문구가 미리 말한다
+        Assert.Contains(UnitMapText.ConfirmResetLayout(false, 1001).Lines, l => l.Contains(UnitMapText.ResetUndoUnavailableLine));
+        Assert.DoesNotContain(UnitMapText.ConfirmResetLayout(false, 1000).Lines, l => l.Contains(UnitMapText.ResetUndoUnavailableLine));
+    }
+
+    [Fact]
+    public void should_keep_fixed_texts_for_canvas_and_console()
+    {
+        Assert.Equal("관계도 밖에 놓아 취소했습니다", UnitMapText.DropOutsideCancelled);
+        Assert.Equal("앞선 저장이 끝나면 확정할 수 있습니다", UnitMapText.ConsoleBusyStatus);
+        Assert.Equal("인접선 켜기", UnitMapText.ShowAdjacencyAction);
+        Assert.Equal("배치를 불러오는 중입니다", UnitMapText.LayoutLoadingBlocked);
     }
     #endregion
 

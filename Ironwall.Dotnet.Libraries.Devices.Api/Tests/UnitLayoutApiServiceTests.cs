@@ -321,7 +321,9 @@ public class UnitLayoutApiServiceTests
 
         var result = await Create(http).PatchAsync(13, MovePatch());
 
-        Assert.Equal(UnitLayoutFailureKind.PreconditionRequired, Assert.IsType<UnitLayoutWriteResult.Failed>(result).Kind);
+        // TEST-65 — 428 은 전용 갈래(Failed 의 하위 — 옛 소비자도 Failed 로 받는다). VM 은 배치를 다시 읽는다.
+        var precondition = Assert.IsType<UnitLayoutWriteResult.PreconditionRequired>(result);
+        Assert.Equal(UnitLayoutFailureKind.PreconditionRequired, precondition.Kind);
     }
 
     [Fact]
@@ -351,13 +353,15 @@ public class UnitLayoutApiServiceTests
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.MethodNotAllowed)]
     [InlineData(HttpStatusCode.Gone)]
-    public async Task should_return_unsupported_when_patch_route_is_gone(HttpStatusCode status)
+    public async Task should_return_endpoint_gone_when_patch_route_is_gone(HttpStatusCode status)
     {
+        // TEST-65 — 지원 중이던 경로가 사라졌다 → EndpointGone(Unsupported 의 하위 — VM 은 세션 전용으로 전환, SIM-F059).
         var http = new ScriptedLayoutHttp().Reply(status, Error("NOT_FOUND", "없음"));
 
         var result = await Create(http).PatchAsync(13, MovePatch());
 
-        Assert.IsType<UnitLayoutWriteResult.Unsupported>(result);
+        Assert.Equal((int)status, Assert.IsType<UnitLayoutWriteResult.EndpointGone>(result).StatusCode);
+        Assert.IsAssignableFrom<UnitLayoutWriteResult.Unsupported>(result);
     }
 
     [Theory]
@@ -365,7 +369,7 @@ public class UnitLayoutApiServiceTests
     [InlineData(HttpStatusCode.Forbidden, UnitLayoutFailureKind.Forbidden)]
     [InlineData(HttpStatusCode.InternalServerError, UnitLayoutFailureKind.Server)]
     [InlineData(HttpStatusCode.ServiceUnavailable, UnitLayoutFailureKind.Unreachable)]
-    [InlineData(HttpStatusCode.GatewayTimeout, UnitLayoutFailureKind.Timeout)]
+    [InlineData(HttpStatusCode.Conflict, UnitLayoutFailureKind.Other)]
     public async Task should_return_failed_with_kind_when_patch_fails(HttpStatusCode status, UnitLayoutFailureKind kind)
     {
         var http = new ScriptedLayoutHttp().Reply(status, body: null);
@@ -373,6 +377,46 @@ public class UnitLayoutApiServiceTests
         var result = await Create(http).PatchAsync(13, MovePatch());
 
         Assert.Equal(kind, Assert.IsType<UnitLayoutWriteResult.Failed>(result).Kind);
+    }
+
+    [Fact]
+    public async Task should_return_unknown_when_patch_times_out_because_the_write_may_have_landed()
+    {
+        // TEST-65 — 504(ApiService 합성 · 본문 없음)는 "반영됐을 수 있음" → Unknown(Failed 의 하위, Kind=Timeout). VM 은 다시 읽어 확정한다(SIM-F065).
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.GatewayTimeout, body: null);
+
+        var result = await Create(http).PatchAsync(13, MovePatch());
+
+        Assert.Equal(UnitLayoutFailureKind.Timeout, Assert.IsType<UnitLayoutWriteResult.Unknown>(result).Kind);
+    }
+
+    [Fact]
+    public async Task should_read_fail_not_unsupported_when_probe_answers_400()
+    {
+        // 결정 D-2026-09-27-638a63 — 400 은 경로 부재의 증거가 아니다(SIM-P017~018 카탈로그 기대 '미지원' 대체).
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.BadRequest, Error("BAD_REQUEST", "잘못된 요청"));
+
+        var result = await Create(http).GetAsync();
+
+        Assert.Equal(UnitLayoutFailureKind.Other, Assert.IsType<UnitLayoutReadResult.ReadFailed>(result).Kind);
+    }
+
+    [Fact]
+    public void should_keep_the_iapiservice_member_list_unchanged_when_headers_travel_through_the_new_interface()
+    {
+        // NFR-10 · ISSUE-5 — If-Match 는 IApiHeaderRequestService 로만 나간다. IApiService 에 멤버를 더하면 여러 시험 프로젝트의 가짜가 깨진다.
+        var members = typeof(IApiService).GetMembers()
+            .Select(m => m is System.Reflection.MethodInfo mi ? $"{mi.Name}({mi.GetParameters().Length})" : m.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[]
+        {
+            "ApiKey", "DeleteRequestAsync(1)", "DeleteRequestAsync(2)", "get_ApiKey(0)", "get_Phone(0)", "get_Url(0)", "get_UserId(0)",
+            "GetRequestAsync(2)", "Initialize(0)", "PatchRequestAsync(2)", "Phone", "PostFormDataRequestAsync(2)", "PostRequestAsync(2)",
+            "PutRequestAsync(2)", "Url", "UserId",
+        }.OrderBy(n => n, StringComparer.Ordinal), members);
+        Assert.False(typeof(IApiHeaderRequestService).IsAssignableFrom(typeof(IApiService)));
     }
 
     [Fact]

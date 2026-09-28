@@ -525,7 +525,7 @@ public class UnitMapViewModelDropTests
         await kit.Vm.WhenIdleAsync();
         Assert.NotNull(kit.Vm.PendingConfirm);
         Assert.Equal(0, kit.Commands.WriteCalls);
-        Assert.Contains("앞선 작업", kit.Vm.StatusText);
+        Assert.Equal(UnitMapText.ConsoleBusyStatus, kit.Vm.StatusText);
 
         kit.Bridge.IsBusy = false;
         Assert.True(kit.Vm.CanConfirm);

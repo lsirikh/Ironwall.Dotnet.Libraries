@@ -85,4 +85,26 @@ public class UnitMapMessagesTests
         Assert.Null(UnitLayoutChangedMessage.FromBody(null, null));
         Assert.Null(UnitLayoutChangedMessage.FromBody(0, -1));
     }
+
+    [Theory]
+    [InlineData("14", null, 14L)]      // {action, version:14}
+    [InlineData(null, "14", 14L)]      // {action, resource_id:14} — 서버 PRD 초안
+    [InlineData("15", "14", 15L)]      // 둘 다 → version
+    [InlineData("abc", "14", 14L)]     // version 이 숫자가 아니면 resource_id
+    public void should_read_the_notice_version_from_raw_body_values(string? version, string? resourceId, long expected)
+    {
+        Assert.Equal(expected, UnitLayoutNotice.TryReadVersion(version, resourceId, out var reason));
+        Assert.Null(reason);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("abc", "x")]
+    [InlineData("0", "-3")]
+    public void should_reject_with_a_reason_when_the_notice_has_no_usable_version(string? version, string? resourceId)
+    {
+        // 버리고 경고 로그 1회 — 로그는 부르는 쪽(호스트)이 이 사유로 남긴다(ISSUE-2).
+        Assert.Null(UnitLayoutNotice.TryReadVersion(version, resourceId, out var reason));
+        Assert.False(string.IsNullOrWhiteSpace(reason));
+    }
 }

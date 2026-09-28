@@ -68,12 +68,12 @@ public class SymbolDetailUnitLineTests
     }
 
     [Fact]
-    public void should_show_the_raw_id_without_the_button_when_the_unit_is_not_in_the_graph_after_loading()
+    public void should_say_no_unit_information_without_the_button_when_the_unit_is_not_in_the_graph_after_loading()
     {
+        // v1.3 ISSUE-46 · SIM-M016 — 편제에 없는 id 는 "소속 부대 정보 없음"(이름을 지어내지 않는다).
         var line = SymbolDetailUnitLine.Evaluate(27, new FakeDirectory(), loadAttempted: true);
 
-        Assert.StartsWith(SymbolDetailUnitLine.Prefix, line.Text);          // SIM-M016 — 이름을 지어내지 않는다
-        Assert.Contains("#27", line.Text);
+        Assert.Equal(SymbolDetailUnitLine.NoUnitText, line.Text);
         Assert.False(line.CanOpen);
     }
     #endregion
@@ -100,6 +100,45 @@ public class SymbolDetailUnitLineTests
         Assert.Equal(new OpenUnitConsoleRequest(27, OpenMap: true), request);
         Assert.True(vm.IsUnitLineVisible);
         Assert.Equal($"소속 부대 {SevenPath}", vm.UnitLineText);
+    }
+
+    [Fact]
+    public async Task should_show_why_when_the_console_refused_to_move_because_of_an_unsaved_edit()
+    {
+        // v1.3 ISSUE-43 (지도 쪽) — 부대 창의 상세에 적용하지 않은 변경이 있으면 선택을 옮기지 않는다. 말없이 실패하지 않는다.
+        var events = new EventAggregator();
+        var vm = new SymbolDetailViewModel(new FakeDirectory { [27] = SevenPath }, events);
+        vm.Load(Marker(unitId: 27), new SymbolDetailContext(EnumDeviceType.IpCamera, HasDevice: true));
+        await vm.PendingUnitLoad;
+        vm.OpenUnitMapCommand.Execute(null);
+
+        await events.PublishOnCurrentThreadAsync(new OpenUnitConsoleResult(27, OpenUnitConsoleOutcome.BlockedByUnsavedEdit));
+
+        Assert.Equal(SymbolDetailUnitLine.BlockedByUnsavedEditText, vm.UnitNoticeText);
+        Assert.True(vm.HasUnitNotice);
+
+        await events.PublishOnCurrentThreadAsync(new OpenUnitConsoleResult(27, OpenUnitConsoleOutcome.Shown));
+        Assert.False(vm.HasUnitNotice);                                         // 다음 성공이 안내를 걷는다
+    }
+
+    [Fact]
+    public async Task should_ignore_console_results_for_units_it_did_not_ask_about_or_after_unload()
+    {
+        var events = new EventAggregator();
+        var vm = new SymbolDetailViewModel(new FakeDirectory { [27] = SevenPath }, events);
+        vm.Load(Marker(unitId: 27), new SymbolDetailContext(EnumDeviceType.IpCamera, HasDevice: true));
+        await vm.PendingUnitLoad;
+
+        await events.PublishOnCurrentThreadAsync(new OpenUnitConsoleResult(27, OpenUnitConsoleOutcome.BlockedByUnsavedEdit));   // 누르지 않았다
+        Assert.False(vm.HasUnitNotice);
+
+        vm.OpenUnitMapCommand.Execute(null);
+        await events.PublishOnCurrentThreadAsync(new OpenUnitConsoleResult(31, OpenUnitConsoleOutcome.BlockedByUnsavedEdit));   // 남의 부대
+        Assert.False(vm.HasUnitNotice);
+
+        vm.Unload();
+        await events.PublishOnCurrentThreadAsync(new OpenUnitConsoleResult(27, OpenUnitConsoleOutcome.BlockedByUnsavedEdit));   // 닫힌 창
+        Assert.False(vm.HasUnitNotice);
     }
 
     [Fact]

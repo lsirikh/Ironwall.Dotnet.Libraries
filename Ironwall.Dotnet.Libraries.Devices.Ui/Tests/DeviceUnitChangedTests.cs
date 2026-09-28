@@ -62,6 +62,23 @@ public class DeviceUnitChangedTests
     }
 
     [Fact]
+    public async Task should_change_the_model_once_when_the_same_move_arrives_on_old_and_new_subjects()
+    {
+        // v1.3 · ISSUE-47 — 8.0.3 은 부대 이동 알림을 옛 · 새 subject 로 같은 봉투 id 로 낸다. 호스트가 봉투 id 로 한 번만 옮기지만,
+        // 두 번 와도 모델은 한 번만 바뀐다(두 번째는 같은 값 — 알림 0).
+        var events = new EventAggregator();
+        var (provider, camera, _) = Seed(events);
+        var changes = 0;
+        provider.DeviceUnitChanged += (_, _) => changes++;
+
+        await events.PublishOnCurrentThreadAsync(new DeviceUnitChangedMessage(379, 27));
+        await events.PublishOnCurrentThreadAsync(new DeviceUnitChangedMessage(379, 27));
+
+        Assert.Equal(27, camera.UnitId);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
     public void should_not_count_a_change_when_the_unit_is_already_the_same()
     {
         var (provider, _, _) = Seed();

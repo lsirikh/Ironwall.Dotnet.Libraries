@@ -130,15 +130,17 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
 
             // 지원 중이던 경로가 사라졌다(404 · 405 · 410 · ENDPOINT_REMOVED) → 부르는 쪽이 세션 전용으로 넘긴다(SIM-F059 · 분석 ISSUE-6).
             if (IsRouteAbsent(status, envelope.Error))
-                return new UnitLayoutWriteResult.Unsupported(status, "이 서버는 배치 저장을 지원하지 않습니다.");
+                return new UnitLayoutWriteResult.EndpointGone(status, "배치 저장 경로가 사라졌습니다 — 이 창에서는 세션 전용으로 동작합니다.");
 
             if (status == 428)
             {
                 _log?.Error($"[{nameof(UnitLayoutApiService)}] 서버가 If-Match 누락(428)으로 거절했습니다 — 전송 계층을 확인하십시오.");
-                return new UnitLayoutWriteResult.Failed(UnitLayoutFailureKind.PreconditionRequired, status, envelope.Error?.Message ?? "HTTP 428");
+                return new UnitLayoutWriteResult.PreconditionRequired(status, envelope.Error?.Message ?? "HTTP 428");
             }
 
             _log?.Warning($"[{nameof(UnitLayoutApiService)}] 배치 쓰기 실패(HTTP {status}, {envelope.Error?.Code}): {envelope.Error?.Message}");
+            if (status == 504)   // 시간 초과 — 서버에는 반영됐을 수 있다(부르는 쪽이 다시 읽어 확정한다)
+                return new UnitLayoutWriteResult.Unknown(status, envelope.Error?.Message ?? "결과를 확인하지 못했습니다.");
             return new UnitLayoutWriteResult.Failed(KindOf(status), status, envelope.Error?.Message ?? $"HTTP {status}");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }

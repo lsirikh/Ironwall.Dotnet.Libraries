@@ -27,34 +27,76 @@ public class UnitMapUndoStackTests
         var stack = new UnitMapUndoStack();
         for (var i = 1; i <= 21; i++) stack.Push(Move(i));
 
-        Assert.Equal(UnitMapUndoStack.LayoutCapacity, stack.LayoutCount);
+        Assert.Equal(UnitMapUndoStack.Capacity, stack.Count);
         Assert.DoesNotContain(stack.Entries, e => e is UnitMapPositionUndo { UnitId: 1 });
         Assert.Equal(21, ((UnitMapPositionUndo)stack.Peek()!).UnitId);
         Assert.Equal(2, ((UnitMapPositionUndo)stack.Entries.Last()).UnitId);   // 가장 오래된 남은 것
     }
 
     [Fact]
-    public void should_keep_only_the_last_server_operation_when_reparent_and_adjacency_repeat()
+    public void should_keep_twenty_of_any_kind_in_one_time_ordered_line()
+    {
+        // v1.3 FR-35 ① · TEST-64 ① — 종류 무관 20. 상위 · 인접도 따로 "마지막 1회" 로 빼지 않는다(ISSUE-10 · 22).
+        var stack = new UnitMapUndoStack();
+        stack.Push(new UnitMapReparentUndo(7, 2, 3));                        // 가장 오래된 것
+        for (var i = 1; i <= 19; i++) stack.Push(Move(i));
+        stack.Push(new UnitMapAdjacencyUndo(7, 8, Added: true));             // 21번째
+
+        Assert.Equal(UnitMapUndoStack.Capacity, stack.Count);
+        Assert.DoesNotContain(stack.Entries, e => e is UnitMapReparentUndo);  // 가장 오래된 것이 밀려났다
+        Assert.IsType<UnitMapAdjacencyUndo>(stack.Peek());
+    }
+
+    [Fact]
+    public void should_keep_both_server_operations_when_reparent_and_adjacency_follow_each_other()
     {
         var stack = new UnitMapUndoStack();
         stack.Push(new UnitMapReparentUndo(7, 2, 3));
-        stack.Push(Move(9));
         stack.Push(new UnitMapAdjacencyUndo(7, 8, Added: true));
 
-        var server = stack.Entries.Where(e => !e.IsLayout).ToList();
-        Assert.IsType<UnitMapAdjacencyUndo>(Assert.Single(server));
         Assert.Equal(2, stack.Count);
     }
 
     [Fact]
-    public void should_not_count_server_operations_against_the_layout_capacity()
+    public void should_hand_out_increasing_undo_ids_and_find_entries_by_id()
     {
         var stack = new UnitMapUndoStack();
-        for (var i = 1; i <= 20; i++) stack.Push(Move(i));
-        stack.Push(new UnitMapReparentUndo(99, 1, 2));
+        var first = stack.Push(Move(1));
+        var second = stack.Push(new UnitMapReparentUndo(2, 5, 6));
 
-        Assert.Equal(20, stack.LayoutCount);
-        Assert.Equal(21, stack.Count);
+        Assert.True(second > first);
+        Assert.Equal(second, stack.Peek()!.UndoId);
+        Assert.Same(stack.Peek(), stack.Find(second));
+        Assert.Null(stack.Find(999));
+    }
+
+    [Fact]
+    public void should_drop_only_that_entry_and_retarget_the_bar_when_an_id_is_invalidated()
+    {
+        // #22 — 트리에서 다른 이동을 하면 콘솔의 _lastMove 가 바뀐다 → 그 항목만 무효, 막대는 남은 맨 위를 가리키지 않고 숨는다.
+        var stack = new UnitMapUndoStack();
+        var older = stack.Push(Move(1));
+        var reparent = stack.Push(new UnitMapReparentUndo(2, 5, 6));
+
+        Assert.True(stack.Invalidate(reparent));
+
+        Assert.Null(stack.Find(reparent));
+        Assert.Equal(older, stack.Peek()!.UndoId);
+        Assert.Null(stack.Bar);                                               // 막대가 말하던 항목이 사라졌다 — 다른 것을 되돌리지 않게
+        Assert.False(stack.Invalidate(reparent));                             // 두 번째는 할 일 없음
+    }
+
+    [Fact]
+    public void should_keep_the_bar_when_an_older_entry_is_invalidated()
+    {
+        var stack = new UnitMapUndoStack();
+        var older = stack.Push(Move(1));
+        var newer = stack.Push(Move(2));
+
+        stack.Invalidate(older);
+
+        Assert.Equal(newer, stack.Bar!.UndoId);
+        Assert.Equal(1, stack.Count);
     }
 
     [Fact]

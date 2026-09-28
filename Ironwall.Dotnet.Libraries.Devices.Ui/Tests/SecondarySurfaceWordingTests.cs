@@ -59,14 +59,18 @@ public class SecondarySurfaceWordingTests
     }
 
     [Fact]
-    public void should_not_offer_adjacency_graph_rail_entry_when_unit_console_is_created()
+    public void should_offer_unit_map_rail_between_tree_and_devices_when_unit_console_is_created()
     {
+        // unit-relationship-map TEST-31 — 자리표시("인접 관계도 · 다음 단계")가 걷히고 「부대 관계도」 칸이 들어섰다.
         var console = new UnitConsoleViewModel(new StubUnitApi(), new StubDeviceApi());
 
-        Assert.DoesNotContain(console.RailEntries, e => e.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY, UnitConsoleViewModel.RAIL_DEVICES },
+                     console.RailEntries.Select(e => e.Key));
+        var map = console.RailEntries.Single(e => e.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+        Assert.Equal("부대 관계도", map.Label);
+        Assert.False(map.ShowCount);                                   // 숫자 배지가 부대 수로 읽히지 않게
         Assert.DoesNotContain(console.RailEntries, e => e.Label.Contains("인접 관계도"));
-        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_DEVICES }, console.RailEntries.Select(e => e.Key));
-        Assert.False(console.IsAdjacencyView);
+        Assert.False(console.IsAdjacencyView);                         // 첫 칸은 여전히 편제 트리
     }
 
     [Fact]

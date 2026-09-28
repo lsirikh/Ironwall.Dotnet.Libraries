@@ -351,6 +351,7 @@
 										BorderBrush="{DynamicResource DividerBrush}"
 										BorderThickness="0,0,0,1"
 										Visibility="{Binding IsUnitLineVisible, Converter={StaticResource SdBoolToVisibility}}">
+										<StackPanel>
 										<Grid>
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*" />
@@ -373,6 +374,15 @@
 												Style="{StaticResource SdMiniButton}"
 												ToolTip="부대 콘솔을 열어 부대 관계도에서 이 부대를 고릅니다." />
 										</Grid>
+										<!--  [관계도에서 보기] 결과 안내(ISSUE-43) — 부대 창이 선택을 옮기지 않았으면 까닭을 말한다(말없는 실패 0).  -->
+										<TextBlock
+											Margin="0,5,0,0"
+											FontSize="10.5"
+											Foreground="{DynamicResource StatusWarningBrush}"
+											Text="{Binding UnitNoticeText, Mode=OneWay}"
+											TextWrapping="Wrap"
+											Visibility="{Binding HasUnitNotice, Converter={StaticResource SdBoolToVisibility}}" />
+										</StackPanel>
 									</Border>
 
 									<Grid Grid.Row="2">

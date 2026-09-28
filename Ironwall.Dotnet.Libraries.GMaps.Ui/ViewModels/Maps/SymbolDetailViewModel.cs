@@ -47,6 +47,8 @@ public static class SymbolDetailUnitLine
     public const string Prefix = "소속 부대";
     public const string NoUnitText = "소속 부대 정보 없음";
     public const string LoadingText = "소속 부대 불러오는 중…";
+    public const string BlockedByUnsavedEditText = "부대 창에 적용하지 않은 변경이 있어 이동하지 않았습니다";
+    public const string UnavailableText = "부대 창에서 이 부대를 찾지 못했습니다";
 
     /// <param name="unitId">장비 모델의 <c>UnitId</c>(심볼의 <b>연결 장비 객체</b>에서 읽는다 — 장비 미연결이면 <c>null</c>).</param>
     /// <param name="directory">부대 사전(<c>null</c> = DI 미등록).</param>
@@ -60,7 +62,7 @@ public static class SymbolDetailUnitLine
         if (!string.IsNullOrWhiteSpace(described)) return new(true, $"{Prefix} {described}", id, true);
 
         return loadAttempted
-            ? new(true, $"{Prefix} #{id} — 편제에서 찾지 못했습니다", id, false)   // 이름을 지어내지 않는다
+            ? new(true, NoUnitText, id, false)   // 편제에 없는 id — 이름을 지어내지 않는다(v1.3 ISSUE-46)
             : new(true, LoadingText, id, false);
     }
 }
@@ -117,7 +119,7 @@ public sealed class SymbolDetailActionModel : PropertyChangedBase
 /// 실제 동작은 <see cref="ActionRequested"/> 로 <c>MapViewModel</c> 에 위임한다 —
 /// 컨텍스트 메뉴와 <b>같은 메서드</b>를 부르게 해서 "메뉴는 되는데 버튼은 안 되는" 상태를 원천 차단한다(FR-21).</para>
 /// </summary>
-public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
+public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IHandle<OpenUnitConsoleResult>
 {
     /// <param name="unitDirectory">부대 이름 · 경로 사전(선택 — 없으면 "소속 부대" 줄을 숨긴다).</param>
     /// <param name="events">[관계도에서 보기]를 보낼 곳(선택 — 없으면 단추가 눌리지 않는다).</param>
@@ -266,6 +268,19 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
         }
     }
 
+    private string? _unitNoticeText;
+    /// <summary>[관계도에서 보기]의 결과 안내(ISSUE-43) — 부대 창이 선택을 옮기지 않았을 때 까닭을 띄운다. 없으면 <c>null</c>.</summary>
+    public string? UnitNoticeText
+    {
+        get => _unitNoticeText;
+        private set { _unitNoticeText = value; NotifyOfPropertyChange(nameof(UnitNoticeText)); NotifyOfPropertyChange(nameof(HasUnitNotice)); }
+    }
+
+    public bool HasUnitNotice => !string.IsNullOrEmpty(_unitNoticeText);
+
+    private int? _awaitingConsoleResultFor;
+    private bool _eventsHooked;
+
     public bool IsUnitLineVisible => _unitLine.IsVisible;
     public string UnitLineText => _unitLine.Text;
 
@@ -368,7 +383,42 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
     private void OpenUnitMap()
     {
         if (_events is null || !UnitLine.CanOpen || UnitLine.UnitId is not int unitId) return;
+        UnitNoticeText = null;
+        _awaitingConsoleResultFor = unitId;
+        HookEvents();
         _ = PublishOpenUnitConsoleAsync(new OpenUnitConsoleRequest(unitId, OpenMap: true));
+    }
+
+    /// <summary>
+    /// 런처의 회신(ISSUE-43). 이 창이 방금 부탁한 부대에 대한 회신만 본다 — 막혔으면 까닭을 띄우고, 성공이면 안내를 걷는다.
+    /// 발행 스레드는 UI(런처가 UI 에서 회신)라 곧바로 속성을 바꾼다.
+    /// </summary>
+    public Task HandleAsync(OpenUnitConsoleResult message, CancellationToken cancellationToken)
+    {
+        if (message is null || _marker is null || _awaitingConsoleResultFor != message.UnitId) return Task.CompletedTask;
+        // 막혔으면 계속 기다린다 — 운영자가 부대 창에서 편집을 정리하고 다시 보이면(Shown) 안내를 걷는다.
+        if (message.Outcome != OpenUnitConsoleOutcome.BlockedByUnsavedEdit) _awaitingConsoleResultFor = null;
+        UnitNoticeText = message.Outcome switch
+        {
+            OpenUnitConsoleOutcome.BlockedByUnsavedEdit => SymbolDetailUnitLine.BlockedByUnsavedEditText,
+            OpenUnitConsoleOutcome.Unavailable => SymbolDetailUnitLine.UnavailableText,
+            _ => null,
+        };
+        return Task.CompletedTask;
+    }
+
+    private void HookEvents()
+    {
+        if (_events is null || _eventsHooked) return;
+        _events.SubscribeOnPublishedThread(this);
+        _eventsHooked = true;
+    }
+
+    private void UnhookEvents()
+    {
+        if (_events is null || !_eventsHooked) return;
+        _events.Unsubscribe(this);
+        _eventsHooked = false;
     }
 
     private async Task PublishOpenUnitConsoleAsync(OpenUnitConsoleRequest request)
@@ -728,6 +778,9 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable
         EndMic();               // 마이크를 누른 채로 창이 닫히면 중지가 안 나간다
         Unsubscribe();
         UnhookUnitDirectory();  // 닫힌 창이 사전(싱글턴)에 붙잡히지 않게
+        UnhookEvents();
+        _awaitingConsoleResultFor = null;
+        UnitNoticeText = null;
         UnitLine = SymbolDetailUnitLineState.Hidden;
         _marker = null;
         IsBroadcasting = false;

@@ -111,7 +111,8 @@ public partial class UnitMapCanvas
     internal bool IsPreviewVisible => _preview?.Visibility == Visibility.Visible && _preview.Data is not null;
     internal bool IsPreviewDotted => _preview?.StrokeDashArray is { Count: > 0 };
     internal FrameworkElement? Ghost => _ghost;
-    internal int? LastMovedUnitId => _lastMovedUnitId;
+    /// <summary>마지막으로 끈 부대(확인 오버레이가 닫히면 포커스가 돌아간다 — SIM-K157 · K163).</summary>
+    internal int? LastDraggedUnitId { get; private set; }
 
     /// <summary>끝냄 순서 기록기 — ①flags ②visuals ③unsubscribe ④capture ⑤notify(시험).</summary>
     internal Action<string>? FinishTrace { get; set; }
@@ -550,8 +551,8 @@ public partial class UnitMapCanvas
     internal void AutoPanTick(TimeSpan elapsed)
     {
         if (!_dragging || _pointerOutside || elapsed <= TimeSpan.Zero) return;
-        var vx = DragMath.AutoScrollVelocity(_lastPoint.X, ActualWidth);
-        var vy = DragMath.AutoScrollVelocity(_lastPoint.Y, ActualHeight);
+        var vx = ActualWidth > 0 ? DragMath.AutoScrollVelocity(_lastPoint.X, ActualWidth, AutoPanBand(ActualWidth)) : 0;
+        var vy = ActualHeight > 0 ? DragMath.AutoScrollVelocity(_lastPoint.Y, ActualHeight, AutoPanBand(ActualHeight)) : 0;
         if (vx == 0 && vy == 0) return;
         var seconds = elapsed.TotalSeconds;
         PanBy(-vx * seconds, -vy * seconds);          // 아래 띠 = 아래를 보러 간다 → 그림은 위로
@@ -569,6 +570,7 @@ public partial class UnitMapCanvas
     {
         var wasDragging = _dragging;
         var unitId = _dragUnitId;
+        var droppedOutside = wasDragging && commit && (_pointerOutside || _overOverlay);
         var session = _dragSession;
         UnitMapDropRequest? request = wasDragging && commit && !_pointerOutside && !_overOverlay
             ? new UnitMapDropRequest(unitId, _dragDelta.X, _dragDelta.Y, _hoverId ?? (_ctrlHeld ? _hitIndex?.HitTest(_view.ScreenToWorld(_lastPoint), _exclusion) : null), _ctrlHeld)
@@ -616,15 +618,15 @@ public partial class UnitMapCanvas
         session?.Dispose();
         if (wasDragging)
         {
+            LastDraggedUnitId = unitId;
             if (request is not null)
             {
-                _lastMovedUnitId = unitId;          // 마지막으로 옮긴 부대는 위로(must-cover 2)
-                ApplyZOrder();
                 Interaction?.CompleteDrag(request);
             }
             else
             {
                 Interaction?.CancelDrag(unitId);
+                if (droppedOutside) ShowLocalNotice(DROP_OUTSIDE_CANCELLED);   // FR-29 v1.3 ② — 원위치 · 서버 0 · 알림
             }
         }
         FinishTrace?.Invoke("notify");

@@ -52,6 +52,15 @@ public partial class App : Application
                 return;
             }
 
+            // 부대 관계도(unit-relationship-map IMPL-35) — 진짜 캔버스 + 진짜 뷰모델 · 가짜 배치 서버 · 200 부대.
+            // --units-map [--layout supported|unsupported|fail|two-client] [--visible] [--view-only] [--call-log <파일>]
+            //             [--snapshot <폴더>] [--bench <폴더>] [--dark]
+            if (e.Args.Contains("--units-map"))
+            {
+                await RunUnitsMapAsync(e.Args);
+                return;
+            }
+
             // 부대 콘솔(N-11) — 콘솔과 따로 뜬다(--units [--dark] [--snapshot <폴더>]).
             if (e.Args.Contains("--units"))
             {
@@ -758,6 +767,46 @@ public partial class App : Application
         await Sweep("dark");
         _ = savedPreview;
     }
+
+    /// <summary>부대 관계도 미리보기 — 창 · 스냅숏 · 벤치(UnitsMapPreview.cs · UnitsMapPreviewRuns.cs).</summary>
+    private async Task RunUnitsMapAsync(string[] args)
+    {
+        IoC.GetInstance = (_, _) => null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();      // SubscribeOnUIThread · PublishOnUIThreadAsync 가 UI 스레드로 오게
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;            // 스냅숏은 라이트 창을 닫고 다크 창을 새로 띄운다
+
+        var options = UnitsMapPreviewOptions.Parse(args);
+        var output = options.SnapshotFolder ?? options.BenchFolder;
+        try
+        {
+            if (options.SnapshotFolder is { } snapshots)
+            {
+                await UnitsMapPreviewRuns.SnapshotAsync(this, options, snapshots);
+                Shutdown();
+                return;
+            }
+            if (options.BenchFolder is { } bench)
+            {
+                await UnitsMapPreviewRuns.BenchAsync(this, options, bench);
+                Shutdown();
+                return;
+            }
+
+            if (options.Dark) ApplyDark();
+            var preview = await UnitsMapPreview.CreateAsync(this, options);
+            preview.Window.Closed += (_, _) => Shutdown();
+        }
+        catch (Exception ex)
+        {
+            if (output is null) MessageBox.Show(ex.ToString());
+            else { Directory.CreateDirectory(output); File.WriteAllText(Path.Combine(output, "units-map-error.txt"), ex.ToString()); Shutdown(); }
+        }
+    }
+
+    /// <summary>관계도 미리보기가 한 실행 안에서 다크로 바꿀 때(스냅숏 · 테마 전환 벤치).</summary>
+    internal void ApplyDarkForPreview() => ApplyDark();
 
     private void ApplyDark()
     {

@@ -54,6 +54,18 @@ public sealed class UnitNameDirectory : IUnitTopologyCache
     #region - Properties -
     /// <summary>서버가 부대 편제 축을 갖는가(8.0+). ⚠ 비교는 <c>&gt;=</c> — 9.0 이 와도 유지된다.</summary>
     public bool IsUnitEra => (_probe?.Contract ?? EnumServerContract.V6_3) >= EnumServerContract.V8_0;
+
+    /// <summary>편제를 읽을 수 있는가 — 8.0+ 이고 편제 창구가 주입됐다.</summary>
+    public bool IsAvailable => IsUnitEra && _api is not null;
+
+    /// <summary>
+    /// 마지막으로 읽은 편제 트리(부모 · 자식 · 깊이) — 아직 못 읽었으면 <c>null</c>. 부대 관계도의 "소속 부대 · 상위 경로" 사전
+    /// (<c>Consoles/Units/Map/UnitDirectory</c>)이 <b>같은 캐시</b>로 쓴다(ISSUE-46 — 이름 사전 한 벌). 다시 읽는 동안에도 옛 트리가 보인다.
+    /// </summary>
+    public UnitTreeModel? Tree => _tree;
+
+    /// <summary>편제를 새로 읽었다(첫 적재 · 무효화 뒤 재적재). 발화 스레드는 정하지 않는다 — 받는 쪽이 옮긴다.</summary>
+    public event EventHandler? Changed;
     #endregion
 
     #region - Processes -
@@ -95,6 +107,7 @@ public sealed class UnitNameDirectory : IUnitTopologyCache
         if (!IsUnitEra || _api is null || _loaded) return;
         if (_lastAttemptTick != 0 && Environment.TickCount64 - _lastAttemptTick < RETRY_INTERVAL_MS) return;
 
+        var refreshed = false;
         await _gate.WaitAsync(token).ConfigureAwait(false);
         try
         {
@@ -123,7 +136,9 @@ public sealed class UnitNameDirectory : IUnitTopologyCache
             var live = new HashSet<int>(ordered.Select(o => o.Id));
             foreach (var gone in _names.Keys.Where(k => !live.Contains(k)).ToList()) _names.TryRemove(gone, out _);
             _ordered = ordered;
+            _tree = tree;
             _loaded = true;
+            refreshed = true;
         }
         catch (OperationCanceledException)
         {
@@ -137,6 +152,8 @@ public sealed class UnitNameDirectory : IUnitTopologyCache
         {
             _gate.Release();
         }
+
+        if (refreshed) Changed?.Invoke(this, EventArgs.Empty);   // 잠금 밖에서 발화
     }
 
     /// <summary>
@@ -172,6 +189,7 @@ public sealed class UnitNameDirectory : IUnitTopologyCache
     private readonly SemaphoreSlim _gate = new(1, 1);
     private volatile bool _loaded;
     private volatile IReadOnlyList<(int Id, string Name)> _ordered = Array.Empty<(int, string)>();
+    private volatile UnitTreeModel? _tree;
     private long _lastAttemptTick;
     private readonly CoalescingTrigger _reload;
     private Task _pendingReload = Task.CompletedTask;

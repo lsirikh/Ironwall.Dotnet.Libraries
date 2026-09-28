@@ -206,9 +206,16 @@ public class UnitMapNodePeerTests
     }
 
     [Fact]
-    public void should_not_take_keyboard_focus_when_created()
+    public void should_take_focus_but_stay_out_of_the_tab_order_when_created()
     {
-        Assert.False(OnSta(() => new UnitMapNode { UnitId = 1 }.Focusable));   // 포커스는 캔버스가 갖는다(FR-36)
+        var (focusable, tabStop) = OnSta(() =>
+        {
+            var node = new UnitMapNode { UnitId = 1 };
+            return (node.Focusable, KeyboardNavigation.GetIsTabStop(node));
+        });
+
+        Assert.True(focusable);                                        // UIA 가 고른 노드를 읽는다(ISSUE-52)
+        Assert.False(tabStop);                                         // 캔버스 = 한 Tab 정지점
     }
     #endregion
 

@@ -136,6 +136,22 @@ public partial class UnitConsoleView : UserControl
     }
     #endregion
 
+    #region - Map (unit-relationship-map IMPL-32) -
+    /// <summary>
+    /// 둘째 툴바 줄 · 상세 칸의 [지도에서 보기] — 둘 다 관계도의 같은 길(선택 부대 + 예하 포함 토글). 장비 0 이면 단추가 꺼져 있다.
+    /// </summary>
+    private async void OnLocateOnMap(object sender, RoutedEventArgs e) => await Guard(() => Vm?.Map.LocateOnMapAsync() ?? System.Threading.Tasks.Task.CompletedTask);
+
+    /// <summary>[배치 초기화] — 확인 오버레이를 연다(서버는 [확정]에서만).</summary>
+    private void OnResetLayout(object sender, RoutedEventArgs e) => Vm?.Map.RequestResetLayout();
+
+    /// <summary>상세 [이 부대 배치 초기화] — 확인 없이 1회, 되돌리기 막대가 뜬다.</summary>
+    private async void OnResetNodeLayout(object sender, RoutedEventArgs e) => await Guard(() => Vm?.Map.ResetSelectedNodeLayoutAsync() ?? System.Threading.Tasks.Task.CompletedTask);
+
+    /// <summary>상태 띠 [다시 읽기] — 편제만 다시 읽는다. 상세의 미적용 편집은 그대로(FR-48 ⑤).</summary>
+    private async void OnReadExternalChange(object sender, RoutedEventArgs e) => await Guard(() => Vm?.ReadExternalChangeAsync() ?? System.Threading.Tasks.Task.CompletedTask);
+    #endregion
+
     #region - Devices -
     private void OnDeviceSelectionChanged(object sender, SelectionChangedEventArgs e)
     {

@@ -102,6 +102,25 @@ public class MapLocateHandlerTests
     }
 
     [Fact]
+    public void should_split_every_requested_device_into_exactly_one_of_four_counts()
+    {
+        // v1.3 FR-45 · §3.5 · ISSUE-42 — 회신 4수: 보임(구역 안) · 구역 밖 · 숨김 · 지도에 없음. 네 수의 합 = 요청 장비 수.
+        var site = new MapLocateBounds(North: 37.65, South: 37.55, East: 127.05, West: 126.95);
+        var symbols = new[]
+        {
+            Sym(1, 37.60, 127.00),                   // 보임 · 구역 안
+            Sym(2, 37.90, 127.40),                   // 보임 · 구역 밖
+            Sym(3, 37.61, 127.01, visible: false),   // 숨김
+        };                                           // 4 · 5 — 지도에 없음
+
+        var result = MapLocateResolver.Plan(Request(1, 2, 3, 4, 5), symbols, site).ToResult();
+
+        Assert.Equal((1, 1, 1, 2), (result.ShownInView, result.OutOfAnchor, result.Hidden, result.NotOnMap));
+        Assert.Equal(5, result.ShownInView + result.OutOfAnchor + result.Hidden + result.NotOnMap);
+        Assert.Equal(5, result.Requested);
+    }
+
+    [Fact]
     public void should_keep_the_request_id_when_answering()
     {
         var request = Request(1);

@@ -27,6 +27,9 @@ public abstract record UnitMapUndoEntry
 
     /// <summary>이 조작이 걸린 부대들(편제에서 사라지면 표에서 뺀다).</summary>
     public abstract IReadOnlyList<int> UnitIds { get; }
+
+    /// <summary>되돌리기 id — <see cref="UnitMapUndoStack.Push"/> 가 매긴다(단조 증가, 시각 무관). 0 = 아직 표에 없음.</summary>
+    public long UndoId { get; internal set; }
 }
 
 /// <summary>위치 옮기기 한 번.</summary>
@@ -71,9 +74,10 @@ public sealed record UnitMapAdjacencyUndo(int UnitId, int OtherId, bool Added) :
 /// 되돌리기 표 — 배치(위치 · 초기화) <b>20단계</b> + 편제(상위 · 인접) <b>마지막 1회</b>(FR-35). UI 스레드 전용(NFR-12).
 /// </summary>
 /// <remarks>
-/// <para><b>순서</b>: 종류를 가리지 않고 한 줄(LIFO)이다 — 위치 A → 상위 B → 위치 C 를 <c>Ctrl+Z</c> 세 번이면 C · B · A(SIM-F123).
-/// 배치가 21번째로 오면 가장 오래된 <b>배치</b> 항목을 밀어낸다. 편제 항목이 새로 오면 앞선 편제 항목을 뺀다(툴바 [이동 되돌리기]와
-/// 같은 "마지막 1회" 표 — 부모 FR-18).</para>
+/// <para><b>순서</b>: 종류를 가리지 않고 한 줄(LIFO) · 최대 <see cref="Capacity"/>(20) — 위치 A → 상위 B → 위치 C 를 <c>Ctrl+Z</c> 세 번이면
+/// C · B · A(SIM-F123). 21번째가 오면 종류와 무관하게 가장 오래된 것을 밀어낸다(v1.3 FR-35 ① · ISSUE-10 · 22).</para>
+/// <para><b>되돌리기 id</b>: <see cref="Push"/> 가 단조 증가 id 를 매긴다(시각 무관). 콘솔이 트리에서 다른 이동을 해 그 항목이 가리키는
+/// 사실이 무효가 되면 <see cref="Invalidate"/> 로 그 항목만 뺀다 — 막대가 그것을 가리키고 있었으면 막대를 숨긴다(다른 것을 되돌리지 않게).</para>
 /// <para><b>막대</b>(<see cref="Bar"/>) = 가장 최근 조작. 다음 조작이 오면 교체된다(타이머로 사라지지 않는다 — SIM-F127).
 /// 닫기(<see cref="Dismiss"/>)는 막대만 숨기고 표는 남긴다.</para>
 /// <para><b>실패</b>하면 표를 그대로 둔다(<see cref="CompleteUndo"/> <c>succeeded:false</c>). 재조회를 넘어 산다 — 편제에서 사라진
@@ -81,8 +85,29 @@ public sealed record UnitMapAdjacencyUndo(int UnitId, int OtherId, bool Added) :
 /// </remarks>
 public sealed class UnitMapUndoStack
 {
-    /// <summary>배치 조작을 몇 단계까지 기억하는가.</summary>
-    public const int LayoutCapacity = 20;
+    /// <summary>한 줄에 기억하는 조작 수 — 종류 무관(v1.3 FR-35 ①).</summary>
+    public const int Capacity = 20;
+
+    /// <summary>옛 이름(v1.1 — 배치만 20). 이제 <see cref="Capacity"/> 와 같다.</summary>
+    public const int LayoutCapacity = Capacity;
+
+    private long _nextUndoId;
+
+    /// <summary>그 id 의 항목(없으면 <c>null</c>).</summary>
+    public UnitMapUndoEntry? Find(long undoId) => _entries.FirstOrDefault(e => e.UndoId == undoId);
+
+    /// <summary>
+    /// 그 id 의 항목만 뺀다(그 사이 가리키던 사실이 무효 — #22). 막대가 그 항목이면 막대를 숨긴다. 뺐으면 <c>true</c>.
+    /// </summary>
+    public bool Invalidate(long undoId)
+    {
+        var index = _entries.FindIndex(e => e.UndoId == undoId);
+        if (index < 0) return false;
+        var entry = _entries[index];
+        _entries.RemoveAt(index);
+        if (ReferenceEquals(Bar, entry)) Bar = null;
+        return true;
+    }
 
     // 앞 = 가장 최근.
     private readonly List<UnitMapUndoEntry> _entries = new();
@@ -102,25 +127,21 @@ public sealed class UnitMapUndoStack
     /// <summary>최근 것부터(사본).</summary>
     public IReadOnlyList<UnitMapUndoEntry> Entries => _entries.ToList();
 
-    /// <summary>조작 하나를 기록하고 막대를 그 조작으로 바꾼다.</summary>
-    public void Push(UnitMapUndoEntry entry)
+    /// <summary>조작 하나를 기록하고 막대를 그 조작으로 바꾼다. 매긴 되돌리기 id 를 돌려준다.</summary>
+    /// <remarks>같은 항목 인스턴스를 두 번 넣지 않는다(id 가 이미 있으면 예외 — 되돌리기 id 는 항목의 신원이다).</remarks>
+    public long Push(UnitMapUndoEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        if (entry.UndoId != 0) throw new InvalidOperationException("이미 되돌리기 표에 들어간 항목입니다.");
 
-        if (entry.IsLayout)
-        {
-            // 21번째 배치 → 가장 오래된 배치를 밀어낸다(편제 항목은 세지 않는다).
-            while (LayoutCount >= LayoutCapacity)
-                _entries.RemoveAt(_entries.FindLastIndex(e => e.IsLayout));
-        }
-        else
-        {
-            // 편제는 마지막 1회만 — 툴바 [이동 되돌리기]와 같은 표.
-            _entries.RemoveAll(e => !e.IsLayout);
-        }
+        // 21번째 → 종류와 무관하게 가장 오래된 것을 밀어낸다.
+        while (_entries.Count >= Capacity)
+            _entries.RemoveAt(_entries.Count - 1);
 
+        entry.UndoId = ++_nextUndoId;
         _entries.Insert(0, entry);
         Bar = entry;
+        return entry.UndoId;
     }
 
     /// <summary>

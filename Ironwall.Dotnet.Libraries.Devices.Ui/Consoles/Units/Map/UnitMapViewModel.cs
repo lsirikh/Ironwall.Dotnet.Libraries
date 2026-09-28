@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Graph;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using System;
 using System.Collections.Generic;
@@ -78,6 +79,9 @@ public interface IUnitMapConsoleBridge
 
     /// <summary><see cref="IsBusy"/> 가 바뀌었다.</summary>
     event EventHandler? BusyChanged;
+
+    /// <summary>마지막 편제 쓰기가 실패한 상태별 사유(<see cref="UnitMapText.OrgFailureReason"/>) — 없으면 <c>null</c>(일반 사유).</summary>
+    string? LastWriteFailureReason { get; }
 }
 
 /// <summary>관계도 뷰모델의 선택 사항 — 시험은 시간 · 설정 · 메시지를 여기로 바꿔 끼운다.</summary>
@@ -100,6 +104,12 @@ public sealed class UnitMapViewModelOptions
 
     /// <summary>이 앱이 붙은 부대(★ · <c>Home</c> · 첫 화면).</summary>
     public int? MyUnitId { get; init; }
+
+    /// <summary>내 부대를 편제가 바뀔 때마다 다시 찾는 함수(콘솔은 부대 <b>코드</b>만 알아 편제를 읽은 뒤에야 id 가 정해진다). 있으면 <see cref="MyUnitId"/> 보다 먼저.</summary>
+    public Func<int?>? MyUnitIdProvider { get; init; }
+
+    /// <summary>전역 구독이 꺼져 실시간 반영이 없는가(" · 실시간 반영 꺼짐" 꼬리표 — ISSUE-32). 없으면 켜져 있다고 본다.</summary>
+    public Func<bool>? IsLiveOff { get; init; }
 
     /// <summary>시계 — 캔버스의 휠 합침 · 알림 합침에 넘긴다(<c>IClock</c> — 시험은 가짜).</summary>
     public Ironwall.Dotnet.Libraries.Base.Services.IClock? Clock { get; init; }
@@ -127,13 +137,13 @@ public sealed class UnitMapViewModelOptions
 /// <para><b>스레드</b>: UI 스레드 전용. 메시지 구독은 UI 스레드로 받는다(<c>SubscribeOnUIThread</c>).</para>
 /// </remarks>
 public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInteraction, IUnitMapReloadGate,
-    IUnitMapOverlayCommands, IHandle<UnitLayoutChangedMessage>, IHandle<MapLocateResult>, IDisposable
+    IUnitMapOverlayCommands, IUnitMapBarAction, IHandle<UnitLayoutChangedMessage>, IHandle<MapLocateResult>, IDisposable
 {
     /// <summary>서버가 받는 Δ 한계(S-1 ⑤ · 시나리오 ISSUE-40).</summary>
-    public const double MaxDelta = 1_000_000;
+    public const double MaxDelta = GraphViewport.MaxDelta;
 
     /// <summary>콘솔이 바쁠 때 [확정]을 누르면 보이는 사유(#23).</summary>
-    public const string ConsoleBusyStatus = "앞선 작업을 마치는 중입니다 — 끝나면 다시 확정하세요.";
+    public const string ConsoleBusyStatus = UnitMapText.ConsoleBusyStatus;
 
     private readonly IUnitMapCommands _commands;
     private readonly IUnitLayoutApi _api;
@@ -163,13 +173,22 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
 
     private sealed record ReparentFacts(IReadOnlyList<int> ChainAfterMove, bool HadDelta);
 
+    private readonly Ironwall.Dotnet.Libraries.Base.Services.IClock _clock;
+    private int _queueDepth;
+    private string? _barAction;
+
+    /// <summary>내 부대 id — 콘솔이 준 함수가 있으면 그것(편제를 읽은 뒤 정해진다).</summary>
+    private int? MyUnitId => _options.MyUnitIdProvider?.Invoke() ?? _options.MyUnitId;
+
     public UnitMapViewModel(IUnitMapCommands commands, IUnitLayoutApi layoutApi, UnitMapViewModelOptions? options = null)
     {
         _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         _api = layoutApi ?? throw new ArgumentNullException(nameof(layoutApi));
         _options = options ?? new UnitMapViewModelOptions();
 
+        _clock = _options.Clock ?? new Ironwall.Dotnet.Libraries.Base.Services.SystemClock();
         _noticeTrigger = new CoalescingTrigger(OnNoticeSettledAsync, _options.NoticeCoalesce, _options.Delay);
+        _viewSaveTrigger = new CoalescingTrigger(OnViewIdleAsync, ViewSaveIdle, _options.Delay);
         _selectTrigger = new CoalescingTrigger(OnSelectionSettledAsync, _options.SelectionDebounce, _options.Delay);
         _layers = ReadLayersPref();
 
@@ -201,6 +220,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(CanLocateOnMap));
             NotifyOfPropertyChange(nameof(LocateDisabledReason));
+            NotifyResetState();
         }
     }
 
@@ -219,7 +239,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     /// <summary>서버 쓰기 · 배치 재조회가 대기열에 있다.</summary>
     public bool IsWriting => _queued > 0;
 
-    /// <summary>캔버스 아래 막대 문구(<c>Units.Map.UndoMessage</c>). 다음 조작까지 남는다(타이머 없음).</summary>
+    /// <summary>캔버스 아래 막대 문구(<c>Units.Map.UndoText</c>). 다음 조작까지 남는다(타이머 없음).</summary>
     public string? BarText => _barText;
 
     /// <summary>막대가 실패 · 충돌 모양(왼쪽 세로 막대).</summary>
@@ -236,7 +256,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         => _pending is { } p ? new UnitMapConfirmPrompt(p.Text.Title, p.Text.Lines, p.Text.OkText, CanConfirm, CanConfirm ? null : ConsoleBusyStatus) : null;
 
     /// <summary>캔버스 아래 되돌리기 막대 — 없으면 <c>null</c>.</summary>
-    public UnitMapBar? Bar => _barText is { } text ? new UnitMapBar(text, _barIsError, BarCanUndo) : null;
+    public UnitMapBar? Bar => _barText is { } text ? new UnitMapBar(text, _barIsError, BarCanUndo, _barAction) : null;
 
     /// <summary>캔버스 시계(휠 합침 — <c>UnitMapCanvas.Clock</c>).</summary>
     public Ironwall.Dotnet.Libraries.Base.Services.IClock? Clock => _options.Clock;
@@ -284,7 +304,11 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             ClosePending(focusCanvas: false);
             StatusText = "확인하던 부대가 편제에서 사라져 취소했습니다.";
         }
-        if (_moveMode && (_moveUnit is not int mu || _tree.Find(mu) is null)) ExitMoveMode(focusCanvas: false);
+        if (_moveMode && (_moveUnit is not int mu || _tree.Find(mu) is null))
+        {
+            ExitMoveMode(focusCanvas: false);
+            StatusText = UnitMapText.MoveModeUnitDeleted;         // FR-37 경계 표 — 서버 0
+        }
         if (_selected is int s && _tree.Find(s) is null) SelectedUnitId = _commands.SelectedUnitId;
 
         RebuildScene();
@@ -323,16 +347,15 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
                 node.Id,
                 count,
                 errors,
-                IsMine: _options.MyUnitId == node.Id,
+                IsMine: MyUnitId == node.Id,
                 IsMoved: deltas.ContainsKey(node.Id),
                 IsDimmed: _highlight is EnumUnitEchelon e && node.Echelon != e);
         }
         Scene = new UnitMapScene(_tree, layout.Positions, facts, _layers);
+        NotifyResetState();     // 옮긴 부대가 바뀌면 [이 부대 배치 초기화]도 바뀐다
     }
 
-    private static Vector ClampDelta(Vector delta)
-        => new(Math.Clamp(double.IsFinite(delta.X) ? delta.X : 0, -MaxDelta, MaxDelta),
-               Math.Clamp(double.IsFinite(delta.Y) ? delta.Y : 0, -MaxDelta, MaxDelta));
+    private static Vector ClampDelta(Vector delta) => GraphViewport.ClampDelta(delta);
     #endregion
 
     #region - 선택 다리 (FR-02) -
@@ -340,6 +363,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     public void RequestSelect(int unitId)
     {
         if (_pending is not null || _tree.Find(unitId) is null) return;
+        if (_moveMode && _moveUnit != unitId) ExitMoveMode(focusCanvas: false);   // FR-37 — 다른 노드 클릭 = M 취소(서버 0) 후 선택
         _pendingSelect = null;
         _selectTrigger.Cancel();
         SelectedUnitId = _commands.TrySelect(unitId) ? unitId : _commands.SelectedUnitId;
@@ -366,7 +390,9 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     public void AttachSurface(IUnitMapSurface? surface)
     {
         if (ReferenceEquals(_surface, surface)) return;
+        if (_surface is not null) _surface.ViewChanged -= OnSurfaceViewChanged;
         _surface = surface;
+        if (_surface is not null) _surface.ViewChanged += OnSurfaceViewChanged;
         _viewRestored = false;
         TryRestoreView();
     }
@@ -406,7 +432,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
                 break;
             case UnitMapDropKind.Reparent:
                 OpenPending(UnitMapConfirmKind.Reparent, request.UnitId, decision.TargetId!.Value,
-                            UnitMapText.ConfirmReparent(_tree, request.UnitId, decision.TargetId.Value));
+                            UnitMapText.ConfirmReparent(_tree, request.UnitId, decision.TargetId.Value, showParentPath: !_layers.Hierarchy));
                 break;
             case UnitMapDropKind.Adjoin:
                 OpenPending(UnitMapConfirmKind.Adjoin, request.UnitId, decision.TargetId!.Value,
@@ -534,7 +560,8 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         if (await _commands.ChangeAdjacencyAsync(unitId, otherId, null).ConfigureAwait(true))
         {
             _undo.Push(new UnitMapAdjacencyUndo(unitId, otherId, Added: true));
-            ShowBar(UnitMapText.AdjoinedBar(name, otherName), isError: false);
+            if (_layers.Adjacency) ShowBar(UnitMapText.AdjoinedBar(name, otherName), isError: false);
+            else ShowBar(UnitMapText.AdjoinedBar(name, otherName) + UnitMapText.AdjacencyHiddenNote, isError: false, action: UnitMapText.ShowAdjacencyAction);   // ISSUE-55
             await RefreshDetailIfAffectedAsync(unitId, otherId).ConfigureAwait(true);
             return;
         }
@@ -607,9 +634,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         if (ok)
         {
             _undo.CompleteUndo(entry, succeeded: true);
-            var bar = UnitMapText.ReparentUndoneBar(name);
-            if (facts?.HadDelta == true) bar += " 옮겨 두었던 위치는 되살리지 않습니다 — 자동 배치로 보입니다.";
-            ShowBar(bar, isError: false);
+            ShowBar(facts?.HadDelta == true ? UnitMapText.ReparentUndoneWithLayoutBar(name) : UnitMapText.ReparentUndoneBar(name), isError: false);
             await RefreshDetailIfAffectedAsync(entry.UnitId, entry.FromParentId, entry.ToParentId).ConfigureAwait(true);
             return;
         }
@@ -646,7 +671,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     private async Task ReportOrgWriteFailedAsync(string unitName)
     {
         await _commands.ReloadAsync(quiet: true).ConfigureAwait(true);
-        ShowBar(UnitMapText.WriteFailedBar(unitName, UnitMapText.OrgWriteFailedReason), isError: true);
+        ShowBar(UnitMapText.WriteFailedBar(unitName, _options.Console?.LastWriteFailureReason ?? UnitMapText.OrgWriteFailedReason), isError: true);
     }
 
     /// <summary>되돌릴 수 없는 항목을 표에서 빼고 까닭을 알린다(남의 변경을 되돌리기로 지우지 않는다).</summary>
@@ -662,15 +687,29 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         _undo.Dismiss();
         _barText = null;
         _barIsError = false;
+        _barAction = null;
         NotifyBar();
         RequestFocus(UnitMapFocusTarget.Canvas);
     }
 
-    private void ShowBar(string text, bool isError)
+    private void ShowBar(string text, bool isError, string? action = null)
     {
         _barText = text;
         _barIsError = isError;
+        _barAction = action;
         NotifyBar();
+    }
+
+    /// <summary>막대 오른쪽의 추가 단추 글(예 "인접선 켜기" — ISSUE-55). 없으면 <c>null</c>.</summary>
+    public string? BarActionText => _barAction;
+
+    /// <summary>막대 추가 단추 — 인접선을 켠다(자동으로 켜지 않는다: 결정).</summary>
+    public void RunBarAction()
+    {
+        if (_barAction == UnitMapText.ShowAdjacencyAction) SetLayers(_layers with { Adjacency = true });
+        _barAction = null;
+        NotifyBar();
+        RequestFocus(UnitMapFocusTarget.Canvas);
     }
 
     private void NotifyBar()
@@ -680,9 +719,50 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         NotifyOfPropertyChange(nameof(CanUndo));
         NotifyOfPropertyChange(nameof(BarCanUndo));
         NotifyOfPropertyChange(nameof(Bar));
+        NotifyOfPropertyChange(nameof(BarActionText));
     }
 
     private static string Quote(string name) => $"‘{name}’";
+    #endregion
+
+    #region - 콘솔이 알리는 편제 변경 (#22 · FR-08) -
+    /// <summary>
+    /// 트리 레일(관계도 밖)에서 상위 · 인접을 바꿨다 — 관계도 되돌리기 표의 편제 항목을 무효로 한다(#22 · TEST-63 ②):
+    /// 트리와 공유하는 되돌리기(<c>_lastMove</c>)가 다른 이동을 가리키게 되므로, 막대 [되돌리기]가 엉뚱한 이동을 되돌리지 않게.
+    /// </summary>
+    public void OnConsoleStructureChanged()
+    {
+        var removed = false;
+        foreach (var entry in _undo.Entries.Where(e => !e.IsLayout).ToList())
+        {
+            _undo.CompleteUndo(entry, succeeded: true);
+            removed = true;
+        }
+        if (removed) NotifyBar();
+    }
+
+    /// <summary>
+    /// 상위 바꾸기 뒤 그 부대의 배치(Δ) 정리(FR-08) — 트리에서 옮긴 경우 콘솔이 부른다(관계도에서 옮긴 경우는 이 VM 이 이미 한다).
+    /// 대기열 안에서 불리면 곧바로, 밖이면 대기열을 탄다(한 번에 하나 — NFR-12).
+    /// </summary>
+    public Task CleanupAfterParentChangeAsync(int unitId)
+        => _queueDepth > 0 ? CleanupAfterReparentAsync(unitId) : Serialize(() => CleanupAfterReparentAsync(unitId));
+    #endregion
+
+    #region - 보여 주기 (FR-46) -
+    private int? _pendingReveal;
+
+    /// <summary>
+    /// 지도 · 다른 창에서 온 "이 부대를 보여 달라" — 선택 표시 + 가운데(배율 유지). 캔버스가 아직 없으면 붙을 때 한다.
+    /// 콘솔 선택은 콘솔이 이미 바꿨다(<c>TryRevealAsync</c>).
+    /// </summary>
+    public void Reveal(int unitId)
+    {
+        if (_tree.Find(unitId) is null) return;
+        SelectedUnitId = unitId;
+        if (_surface is { } surface && _viewRestored) surface.CenterOn(unitId);
+        else _pendingReveal = unitId;
+    }
     #endregion
 
     #region - 캔버스 오버레이 명령 (IUnitMapOverlayCommands) -
@@ -722,6 +802,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         _noticeTrigger.Cancel();
         _selectTrigger.Cancel();
         _pendingSelect = null;
+        _firstNoticeAt = null;
     }
 
     public void Dispose()
@@ -731,6 +812,8 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         CancelAll();
         SaveView();
         _commands.SelectedUnitChanged -= OnConsoleSelectionChanged;
+        if (_surface is not null) _surface.ViewChanged -= OnSurfaceViewChanged;
+        _viewSaveTrigger.Cancel();
         if (_options.Console is { } bridge) bridge.BusyChanged -= OnConsoleBusyChanged;
         _options.Events?.Unsubscribe(this);
     }
@@ -752,6 +835,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         try { await previous.ConfigureAwait(true); }
         catch { /* 앞 작업의 실패는 그쪽 막대가 알렸다 */ }
 
+        _queueDepth++;
         try
         {
             await work().ConfigureAwait(true);
@@ -763,6 +847,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         }
         finally
         {
+            _queueDepth--;
             _queued--;
             NotifyOfPropertyChange(nameof(IsWriting));
             UpdateBusy();

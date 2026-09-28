@@ -194,6 +194,26 @@ internal static class UnitMapTestData
         return new UnitMapFixture(graph, Tree(graph));
     }
 
+    /// <summary>
+    /// 뿌리 여럿 + 기본 부대 + 고아(SIM-L050 모양) — 사단 <c>d01</c>(연대 · 대대 · 중대 · 소초 사슬) · 기본 중대 <c>unit001</c>(최상위) ·
+    /// 상위가 응답에 없는 중대 <c>c09</c>. 뿌리 순서는 편제 트리(제대 순위 → 코드)와 같아야 한다.
+    /// </summary>
+    public static UnitMapFixture MultiRootWithOrphan()
+    {
+        var graph = Graph(new[]
+        {
+            Node(1, "d01", "제1사단", ECHELON_DIVISION),
+            Node(2, "r01", "1연대", ECHELON_REGIMENT, 1),
+            Node(3, "b01", "1대대", ECHELON_BATTALION, 2),
+            Node(4, "c01", "1중대", ECHELON_COMPANY, 3),
+            Node(5, "p011", "11소초", ECHELON_OUTPOST, 4),
+            Node(6, "unit001", "기본중대", ECHELON_COMPANY),
+            Node(7, "c09", "9중대", ECHELON_COMPANY, 999),
+            Node(8, "p091", "91소초", ECHELON_OUTPOST, 7),
+        });
+        return new UnitMapFixture(graph, Tree(graph));
+    }
+
     /// <summary>모르는 제대 — 서버가 나중에 늘린 <c>Brigade</c>(해석 불가 → <c>Echelon == null</c>).</summary>
     public static UnitMapFixture UnknownEchelon()
     {

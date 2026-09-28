@@ -7,6 +7,7 @@
 	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles"
 	xmlns:dash="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards"
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:map="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:units="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units"
 	Background="{DynamicResource SurfaceBrush}"
@@ -160,7 +161,7 @@
 			</MultiBinding>
 		</c:ConsoleShell.IsDetailRequested>
 
-		<!--  레일 — 편제 트리 · 미배치 장비. 인접 관계도는 그림이 생길 때까지 감춘다(인접 편집은 상세 칸에 있다).  -->
+		<!--  레일 — 편제 트리 · 부대 관계도 · 미배치 장비(unit-relationship-map FR-01). 관계도 칸에는 숫자 배지를 달지 않는다.  -->
 		<c:ConsoleShell.Rail>
 			<c:ConsoleRail
 				AutomationProperties.AutomationId="Console.Units.Rail"
@@ -209,6 +210,7 @@
 				CanRefresh="{Binding CanReload}"
 				ConsoleKey="Units"
 				DeleteClick="OnDelete"
+				IsEnabled="{Binding IsConsoleInteractive}"
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
 				RefreshClick="OnReload"
 				SearchPlaceholder="이름 · 코드"
@@ -226,7 +228,7 @@
 			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>
 
-		<!--  가운데 — 편제 트리(항상) + 미배치 장비(나란히) + 인접 관계도 자리(트리 위 덮개)  -->
+		<!--  가운데 — 편제 트리(항상) + 미배치 장비(나란히) + 부대 관계도(트리 위 덮개)  -->
 		<c:ConsoleShell.List>
 			<Grid ClipToBounds="True">
 				<Grid.ColumnDefinitions>
@@ -235,7 +237,10 @@
 				</Grid.ColumnDefinitions>
 
 				<!--  ① 편제 트리 — 언제나 보인다(장비를 놓을 자리라서)  -->
-				<DockPanel Grid.Column="0" LastChildFill="True">
+				<DockPanel
+					Grid.Column="0"
+					IsEnabled="{Binding IsConsoleInteractive}"
+					LastChildFill="True">
 					<!--
 						제대 필터 줄 — 커널 Console.Tab(고를 때 폭이 변하지 않는다). WrapPanel 이라 목록이 더 좁아지면
 						잘리지 않고 다음 줄로 내려간다. 식별자는 옛 자리(Units.Toolbar.*) 그대로 둔다 — 자동화 계약.
@@ -483,28 +488,103 @@
 					</ListBox>
 				</DockPanel>
 
-				<!--  ③ 인접 관계도 — 이 노드의 범위 밖(봉투: "관계도는 뒤"). 레일 칸을 내지 않아 지금은 보이지 않는다(U-18 D-8 8.2).  -->
-				<Border
+				<!--
+					③ 부대 관계도(unit-relationship-map FR-01) — 트리와 같은 칸을 덮는다. 미배치 장비 칸(②)은 나란히 그대로 선다.
+					위 = 둘째 툴바 줄(레이어 3 · 예하 포함 · 지도에서 보기 · 배치 초기화), 가운데 = 캔버스(줌 · 맞춤 HUD · 배치 상태 줄 ·
+					확인 오버레이 · 되돌리기 막대 · M 모드 표시는 캔버스가 그린다), 아래 = 관계도 상태 문구(UIA 로 읽힌다).
+					캔버스는 확인 대기 중에도 살아 있어야 한다([확정] · [취소]) — 콘솔 잠금(IsConsoleInteractive)은 트리 · 상세 · 툴바에만 건다.
+					권한이 없거나 쓸 수 없으면 단추를 숨기지 않고 끄고 까닭을 툴팁으로 말한다.
+				-->
+				<DockPanel
 					Grid.Column="0"
-					Padding="18"
 					Background="{DynamicResource SurfaceBrush}"
+					LastChildFill="True"
 					Visibility="{Binding IsAdjacencyView, Converter={StaticResource BoolToVisibility}}">
-					<StackPanel VerticalAlignment="Top">
-						<Label
-							AutomationProperties.AutomationId="Units.Adjacency.Placeholder"
-							Content="인접 관계도를 아직 제공하지 않습니다"
-							FontSize="13"
-							FontWeight="Bold"
-							Foreground="{DynamicResource TextPrimaryBrush}"
-							Style="{StaticResource Unit.Readout}" />
-						<TextBlock
-							Margin="0,6,0,0"
+					<Border
+						Padding="12,6"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,0,0,1"
+						DockPanel.Dock="Top">
+						<ScrollViewer
+							Focusable="False"
+							HorizontalScrollBarVisibility="Auto"
+							VerticalScrollBarVisibility="Disabled">
+							<StackPanel Orientation="Horizontal">
+								<ToggleButton
+									AutomationProperties.AutomationId="Units.Map.Layer.Hierarchy"
+									Content="계층선"
+									IsChecked="{Binding Map.ShowHierarchyLayer, Mode=TwoWay}"
+									Style="{StaticResource Console.Chip}"
+									ToolTip="상위 · 하위를 잇는 선을 보이거나 감춥니다(내 화면에만 적용)." />
+								<ToggleButton
+									AutomationProperties.AutomationId="Units.Map.Layer.Adjacency"
+									Content="인접선"
+									IsChecked="{Binding Map.ShowAdjacencyLayer, Mode=TwoWay}"
+									Style="{StaticResource Console.Chip}"
+									ToolTip="인접 부대를 잇는 선을 보이거나 감춥니다(내 화면에만 적용)." />
+								<ToggleButton
+									AutomationProperties.AutomationId="Units.Map.Layer.Devices"
+									Content="장비 배지"
+									IsChecked="{Binding Map.ShowDeviceBadgesLayer, Mode=TwoWay}"
+									Style="{StaticResource Console.Chip}"
+									ToolTip="부대마다 소속 장비 수 · 장애 수 배지를 보이거나 감춥니다(내 화면에만 적용)." />
+								<Border
+									Width="1"
+									Margin="6,4,12,4"
+									Background="{DynamicResource DividerBrush}" />
+								<ToggleButton
+									AutomationProperties.AutomationId="Units.Map.IncludeSubordinates"
+									Content="예하 포함"
+									IsChecked="{Binding Map.LocateIncludeDescendants, Mode=TwoWay}"
+									Style="{StaticResource Console.Chip}"
+									ToolTip="[지도에서 보기]가 고른 부대의 예하 부대 장비까지 함께 보입니다." />
+								<Button
+									Margin="0,0,8,0"
+									AutomationProperties.AutomationId="Units.Map.LocateOnMap"
+									Click="OnLocateOnMap"
+									Content="지도에서 보기"
+									IsEnabled="{Binding Map.CanLocateOnMap}"
+									Style="{StaticResource Console.Button}"
+									ToolTip="{Binding Map.LocateDisabledReason}"
+									ToolTipService.ShowOnDisabled="True" />
+								<Button
+									AutomationProperties.AutomationId="Units.Map.ResetLayout"
+									Click="OnResetLayout"
+									Content="배치 초기화"
+									IsEnabled="{Binding Map.CanResetLayout}"
+									Style="{StaticResource Console.Button.Ghost}"
+									ToolTip="{Binding Map.ResetLayoutDisabledReason}"
+									ToolTipService.ShowOnDisabled="True" />
+							</StackPanel>
+						</ScrollViewer>
+					</Border>
+					<Border
+						MinHeight="26"
+						Padding="12,4"
+						Background="{DynamicResource SurfaceAltBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,1,0,0"
+						DockPanel.Dock="Bottom">
+						<c:ConsoleText
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Units.Map.Status"
 							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="인접 부대는 편제 트리에서 부대를 고른 뒤 상세 칸의 '인접 부대'에서 잇거나 끊을 수 있습니다."
-							TextWrapping="Wrap" />
-					</StackPanel>
-				</Border>
+							Text="{Binding Map.StatusText}"
+							TextTrimming="CharacterEllipsis"
+							ToolTip="{Binding Map.StatusText}" />
+					</Border>
+					<map:UnitMapCanvas
+						Bar="{Binding Map.Bar}"
+						CanRetryLayout="{Binding Map.CanRetryLayout}"
+						ConfirmPrompt="{Binding Map.ConfirmPrompt}"
+						Interaction="{Binding Map}"
+						LayoutStatusText="{Binding Map.LayoutStatusText}"
+						MoveModeText="{Binding Map.MoveModeText}"
+						Scene="{Binding Map.Scene}"
+						SelectedUnitId="{Binding Map.SelectedUnitId, Mode=OneWay}" />
+				</DockPanel>
 
 				<!--  ② 미배치 장비 — 트리와 나란히 선다. 여기서 끌어 왼쪽 부대 위에 놓는다.  -->
 				<Border
@@ -513,6 +593,7 @@
 					Background="{DynamicResource SurfaceSunkenBrush}"
 					BorderBrush="{DynamicResource DividerBrush}"
 					BorderThickness="1,0,0,0"
+					IsEnabled="{Binding IsConsoleInteractive}"
 					Visibility="{Binding IsDeviceView, Converter={StaticResource BoolToVisibility}}">
 					<DockPanel LastChildFill="True">
 						<Border
@@ -764,7 +845,7 @@
 					</Label>
 					<!--
 						다른 곳에서 편제가 바뀌었는데(서버 SYNC_UNIT) 적용하지 않은 편집 · 배치 대기 · 끌기 때문에 다시 읽지 않았다.
-						덮지 않고 알린다 — [다시 읽기]는 툴바 [갱신]과 같은 길(미적용 관문 포함)이다.
+						덮지 않고 알린다 — [다시 읽기]는 편제만 다시 읽고 상세의 미적용 편집은 그대로 둔다(결정 D-2026-09-27-215b6d · FR-48 ⑤).
 					-->
 					<StackPanel
 						Grid.Column="2"
@@ -780,11 +861,11 @@
 						<Button
 							Margin="6,0,0,0"
 							AutomationProperties.AutomationId="Units.Status.ExternalChangeReload"
-							Click="OnReload"
+							Click="OnReadExternalChange"
 							Content="{Binding ExternalChangeActionText}"
 							IsEnabled="{Binding CanReload}"
 							Style="{StaticResource Console.Button.Mini}"
-							ToolTip="서버의 지금 편제를 다시 읽습니다. 적용하지 않은 변경이 있으면 먼저 묻습니다." />
+							ToolTip="서버의 지금 편제를 다시 읽어 트리 · 관계도를 새로 그립니다. 상세 칸에 적용하지 않은 변경은 그대로 둡니다." />
 					</StackPanel>
 					<Label
 						Grid.Column="3"
@@ -809,6 +890,7 @@
 				DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"
 				FooterText="{Binding Detail.FooterText}"
 				IsDirty="{Binding Detail.IsDirty}"
+				IsEnabled="{Binding IsConsoleInteractive}"
 				IsReadOnly="{Binding Detail.IsReadOnly}"
 				Kind="{Binding Detail.Kind}"
 				RevertClick="OnRevert"
@@ -1121,6 +1203,31 @@
 									TextWrapping="Wrap" />
 							</StackPanel>
 						</c:ConsoleSection>
+
+						<!--  관계도 · 지도 — 고른 부대의 장비를 지도에 보이고(FR-44), 이 부대만 자동 배치로 되돌린다(FR-09). 확인 없이 1회 · 되돌리기 가능.  -->
+						<StackPanel
+							Margin="0,14,0,0"
+							HorizontalAlignment="Left"
+							Orientation="Horizontal"
+							Visibility="{Binding IsCreating, Converter={StaticResource NotBoolToVisibility}}">
+							<Button
+								Margin="0,0,8,0"
+								AutomationProperties.AutomationId="Units.Detail.LocateOnMap"
+								Click="OnLocateOnMap"
+								Content="지도에서 보기"
+								IsEnabled="{Binding DataContext.Map.CanLocateOnMap, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								Style="{StaticResource Console.Button}"
+								ToolTip="{Binding DataContext.Map.LocateDisabledReason, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								ToolTipService.ShowOnDisabled="True" />
+							<Button
+								AutomationProperties.AutomationId="Units.Detail.ResetNodeLayout"
+								Click="OnResetNodeLayout"
+								Content="이 부대 배치 초기화"
+								IsEnabled="{Binding DataContext.Map.CanResetSelectedNodeLayout, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								Style="{StaticResource Console.Button.Ghost}"
+								ToolTip="{Binding DataContext.Map.ResetSelectedNodeLayoutDisabledReason, RelativeSource={RelativeSource AncestorType=UserControl}}"
+								ToolTipService.ShowOnDisabled="True" />
+						</StackPanel>
 
 						<Label
 							Margin="0,14,0,0"

@@ -157,6 +157,38 @@ public readonly record struct GraphViewport(double Scale, Vector Offset)
         }
     }
 
+    /// <summary>
+    /// 전체 보기가 최소 배율(<see cref="MinScale"/>)에서도 뷰포트에 들지 않는가 — "전체가 한 화면에 들지 않습니다" 안내의 판정(FR-15 · ISSUE-39).
+    /// 뷰포트 크기가 0 이거나 경계가 비었으면 <c>false</c>(맞출 것이 없다).
+    /// </summary>
+    public static bool Overflows(Rect worldBounds, Size viewport, double padding = FitPadding, Rect nodeBox = default)
+    {
+        if (worldBounds.IsEmpty || !IsFinite(worldBounds) || viewport.IsEmpty || viewport.Width <= 0 || viewport.Height <= 0) return false;
+        var width = worldBounds.Width * MinScale + nodeBox.Width;
+        var height = worldBounds.Height * MinScale + nodeBox.Height;
+        return width > viewport.Width - 2 * padding + 1e-9 || height > viewport.Height - 2 * padding + 1e-9;
+    }
+
+    /// <summary>
+    /// 캔버스 크기가 <paramref name="oldViewport"/> 에서 <paramref name="newViewport"/> 로 바뀌었다 — 화면 가운데의 월드 점을 유지한다(FR-12 · ISSUE-54).
+    /// 어느 쪽이든 폭 · 높이가 0 이면 그대로(크기가 생긴 뒤 첫 화면 규칙을 다시 적용하는 것은 호출부 몫).
+    /// </summary>
+    public GraphViewport Resize(Size oldViewport, Size newViewport)
+    {
+        if (oldViewport.IsEmpty || newViewport.IsEmpty || oldViewport.Width <= 0 || oldViewport.Height <= 0
+            || newViewport.Width <= 0 || newViewport.Height <= 0) return this;
+        var center = ScreenToWorld(new Point(oldViewport.Width / 2, oldViewport.Height / 2));
+        return CenterOn(center, newViewport);
+    }
+
+    /// <summary>공유 배치 Δ 의 서버 한계(S-1 ⑤ · ISSUE-40).</summary>
+    public const double MaxDelta = 1_000_000;
+
+    /// <summary>Δ(월드 단위)를 서버 한계 ±<see cref="MaxDelta"/> 로 자른다. 수가 아니면 0.</summary>
+    public static Vector ClampDelta(Vector delta, double limit = MaxDelta)
+        => new(Math.Clamp(double.IsFinite(delta.X) ? delta.X : 0, -limit, limit),
+               Math.Clamp(double.IsFinite(delta.Y) ? delta.Y : 0, -limit, limit));
+
     private static bool IsFinite(Rect r)
         => double.IsFinite(r.X) && double.IsFinite(r.Y) && double.IsFinite(r.Width) && double.IsFinite(r.Height);
 }

@@ -315,6 +315,60 @@ public class GraphViewportTests
     }
     #endregion
 
+    #region - 넘침 · 크기 변경 · Δ 절단 (TEST-68 ③④⑤ · ②) -
+    [Fact]
+    public void should_report_overflow_only_when_min_scale_still_does_not_fit()
+    {
+        // 200 부대(7,000 월드) @756 은 0.10 에서 든다 · 폭 63 캔버스나 20,000 월드는 넘친다(SIM-V097~104)
+        Assert.False(GraphViewport.Overflows(new Rect(100, 0, 7000, 1160), new Size(756, 560), nodeBox: new Rect(-10, -6.5, 20, 13)));
+        Assert.True(GraphViewport.Overflows(new Rect(0, 0, 20000, 800), new Size(756, 560)));
+        Assert.True(GraphViewport.Overflows(new Rect(0, 0, 400, 300), new Size(63, 560)));
+        Assert.False(GraphViewport.Overflows(Rect.Empty, new Size(756, 560)));
+        Assert.False(GraphViewport.Overflows(new Rect(0, 0, 400, 300), new Size(0, 0)));
+    }
+
+    [Fact]
+    public void should_fit_at_min_scale_and_overflow_when_viewport_is_1_wide()
+    {
+        var bounds = new Rect(0, 0, 400, 300);
+
+        Assert.True(GraphViewport.TryFit(bounds, new Size(1, 560), out var fitted));
+        Assert.Equal(GraphViewport.MinScale, fitted.Scale, 9);
+        Assert.True(GraphViewport.Overflows(bounds, new Size(1, 560)));
+    }
+
+    [Fact]
+    public void should_keep_world_point_at_center_when_viewport_resized()
+    {
+        // ISSUE-54 — 756 → 1096(상세 칸 접힘 · 최대화)에도 화면 가운데의 월드 점이 그대로
+        var viewport = new GraphViewport(0.5, new Vector(-120, 40));
+        var before = viewport.ScreenToWorld(new Point(378, 280));
+
+        var resized = viewport.Resize(new Size(756, 560), new Size(1096, 700));
+
+        Assert.Equal(0.5, resized.Scale, 9);
+        AssertPoint(before, resized.ScreenToWorld(new Point(548, 350)));
+    }
+
+    [Fact]
+    public void should_do_nothing_when_resized_from_or_to_zero_size()
+    {
+        var viewport = new GraphViewport(0.5, new Vector(-120, 40));
+
+        Assert.Equal(viewport, viewport.Resize(new Size(0, 0), new Size(756, 560)));
+        Assert.Equal(viewport, viewport.Resize(new Size(756, 560), new Size(0, 560)));
+    }
+
+    [Theory]
+    [InlineData(5_000_000, -3_000_000, 1_000_000, -1_000_000)]
+    [InlineData(12.5, -7, 12.5, -7)]
+    [InlineData(double.NaN, double.PositiveInfinity, 0, 0)]
+    public void should_clamp_delta_to_server_limit(double x, double y, double ex, double ey)
+    {
+        Assert.Equal(new Vector(ex, ey), GraphViewport.ClampDelta(new Vector(x, y)));
+    }
+    #endregion
+
     #region - 좌표 변환 -
     [Theory]
     [InlineData(1.0, 0, 0, 0, 0)]

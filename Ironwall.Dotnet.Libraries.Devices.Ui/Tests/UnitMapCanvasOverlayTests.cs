@@ -57,7 +57,7 @@ public class UnitMapCanvasOverlayTests
 
         Assert.True(enter);
         Assert.True(escape);
-        Assert.False(other);
+        Assert.True(other);                                         // 소비 후 무동작(PRD v1.3 — TEST-72)
         Assert.Equal(new[] { "confirm:True", "confirm:False" }, calls);
     }
 
@@ -153,7 +153,7 @@ public class UnitMapCanvasOverlayTests
             canvas.Bar = new UnitMapBar("‘6중대’ 위치를 옮겼습니다 — 모든 운영자에게 보입니다", false, true);
             ((H.FakeClock)canvas.Clock).Advance(60_000);
             H.Pump();
-            var message = H.ById<ConsoleText>(canvas, UnitMapCanvas.ID_UNDO_MESSAGE)!;
+            var message = H.ById<ConsoleText>(canvas, UnitMapCanvas.ID_UNDO_TEXT)!;
             Invoke(H.ById<Button>(canvas, UnitMapCanvas.ID_UNDO)!);
             Invoke(H.ById<Button>(canvas, UnitMapCanvas.ID_UNDO_DISMISS)!);
             return (message.IsVisible && message.Text.StartsWith("‘6중대’"), fake.Calls.Contains("undo"), fake.Calls.Contains("dismiss"));
@@ -222,9 +222,9 @@ public class UnitMapCanvasOverlayTests
             var ids = new[]
             {
                 UnitMapCanvas.AUTOMATION_ID, UnitMapCanvas.ID_ZOOM_IN, UnitMapCanvas.ID_ZOOM_OUT, UnitMapCanvas.ID_FIT, UnitMapCanvas.ID_ZOOM_LEVEL,
-                UnitMapCanvas.ID_LAYOUT_STATUS, UnitMapCanvas.ID_LAYOUT_RETRY, UnitMapCanvas.ID_CONFIRM, UnitMapCanvas.ID_CONFIRM_MESSAGE,
+                UnitMapCanvas.ID_LAYOUT_STATUS, UnitMapCanvas.ID_LAYOUT_RETRY, UnitMapCanvas.ID_CONFIRM, UnitMapCanvas.ID_CONFIRM_TEXT,
                 UnitMapCanvas.ID_CONFIRM_OK, UnitMapCanvas.ID_CONFIRM_CANCEL, UnitMapCanvas.ID_UNDO, UnitMapCanvas.ID_UNDO_DISMISS,
-                UnitMapCanvas.ID_UNDO_MESSAGE, UnitMapCanvas.ID_MOVE_MODE,
+                UnitMapCanvas.ID_UNDO_TEXT, UnitMapCanvas.ID_MOVE_MODE,
             };
             var elements = H.Descendants(canvas).Prepend(canvas).OfType<UIElement>().ToList();
             var viaCanvasPeer = Flatten(UIElementAutomationPeer.CreatePeerForElement(canvas)!).Select(p => p.GetAutomationId()).ToHashSet();
@@ -275,7 +275,7 @@ public class UnitMapCanvasOverlayTests
 
     private static Border? ErrorMark(UnitMapCanvas canvas)
     {
-        var message = H.ById<ConsoleText>(canvas, UnitMapCanvas.ID_UNDO_MESSAGE)!;
+        var message = H.ById<ConsoleText>(canvas, UnitMapCanvas.ID_UNDO_TEXT)!;
         return (message.Parent as StackPanel)?.Children.OfType<Border>().FirstOrDefault();
     }
 

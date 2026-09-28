@@ -21,8 +21,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model;
 /// <remarks>
 /// <list type="bullet">
 /// <item>↑ = 상위(뿌리 · 편제 밖 상위를 가리키는 부대는 제자리) · ↓ = 첫 하위(코드 순 — 트리의 자식 순서) · 끝 부대는 제자리.</item>
-/// <item>←/→ = 같은 깊이의 이웃을 <b>화면 위치</b>(Δ 가 입혀진 월드 좌표) x 순, 같은 x 면 y 순으로 — 사용자가 옮긴 그림대로 움직인다(SIM-K153).
-/// 위치가 없는 부대는 트리 순서로 뒤에 선다. 가장자리는 제자리.</item>
+/// <item>←/→ = 같은 깊이의 이웃을 <b>트리 순</b>(<see cref="UnitTreeModel.Ordered"/>)으로 — 사용자가 Δ 로 옮긴 화면 위치와 무관하다
+/// (v1.3 FR-36 ② · ISSUE-35 · SIM-K153: 키보드 탐색은 편제 순서를 따라야 예측할 수 있다). 가장자리는 제자리.</item>
 /// <item><c>Home</c> = 내 부대(모르거나 편제에 없으면 제자리 — 띠 문구는 뷰모델 몫).</item>
 /// <item>선택이 없거나 편제에서 사라졌으면 화살표는 첫 뿌리를 고른다.</item>
 /// </list>
@@ -61,7 +61,7 @@ public static class UnitMapNavigation
                 return node.Id;
 
             default:
-                var row = SameDepthInScreenOrder(tree, positions, node.Depth);
+                var row = tree.Ordered.Where(n => n.Depth == node.Depth).Select(n => n.Id).ToList();
                 var index = row.IndexOf(node.Id);
                 var step = key == UnitMapKeyCommand.Right ? 1 : -1;
                 var target = index + step;
@@ -69,17 +69,4 @@ public static class UnitMapNavigation
         }
     }
 
-    /// <summary>같은 깊이의 부대들 — 위치 있는 것은 (x, y) 순, 없는 것은 그 뒤에 트리 순서로.</summary>
-    private static List<int> SameDepthInScreenOrder(UnitTreeModel tree, IReadOnlyDictionary<int, Point> positions, int depth)
-    {
-        var sameDepth = tree.Ordered.Where(n => n.Depth == depth).Select((n, order) => (n.Id, Order: order)).ToList();
-
-        var placed = sameDepth.Where(n => positions.ContainsKey(n.Id))
-                              .OrderBy(n => positions[n.Id].X)
-                              .ThenBy(n => positions[n.Id].Y)
-                              .ThenBy(n => n.Order)
-                              .Select(n => n.Id);
-        var unplaced = sameDepth.Where(n => !positions.ContainsKey(n.Id)).OrderBy(n => n.Order).Select(n => n.Id);
-        return placed.Concat(unplaced).ToList();
-    }
 }

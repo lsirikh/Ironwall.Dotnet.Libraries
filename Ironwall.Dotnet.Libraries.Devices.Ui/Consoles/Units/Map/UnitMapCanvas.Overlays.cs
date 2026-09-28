@@ -35,7 +35,14 @@ public sealed record UnitMapConfirmPrompt(string Title, IReadOnlyList<string> Li
 /// <param name="Message">사람 말로 한 줄.</param>
 /// <param name="IsError">실패 · 충돌 — 왼쪽 세로 막대 모양(색이 아니라 형태).</param>
 /// <param name="CanUndo">[되돌리기] 를 낼 것인가.</param>
-public sealed record UnitMapBar(string Message, bool IsError, bool CanUndo);
+public sealed record UnitMapBar(string Message, bool IsError, bool CanUndo, string? ActionText = null);
+
+/// <summary>막대의 보조 단추(예: [인접선 켜기] — FR-26 v1.3). 뷰모델이 구현하면 단추가 부른다.</summary>
+public interface IUnitMapBarAction
+{
+    /// <summary>막대의 <see cref="UnitMapBar.ActionText"/> 단추를 눌렀다.</summary>
+    void RunBarAction();
+}
 
 /// <summary>
 /// 오버레이 단추가 부르는 뷰모델 명령. 관계도 뷰모델이 <see cref="IUnitMapInteraction"/> 과 <b>함께</b> 구현한다
@@ -83,12 +90,16 @@ public partial class UnitMapCanvas
     public const string ID_LAYOUT_STATUS = "Units.Map.LayoutStatus";
     public const string ID_LAYOUT_RETRY = "Units.Map.LayoutRetry";
     public const string ID_CONFIRM = "Units.Map.Confirm";
-    public const string ID_CONFIRM_MESSAGE = "Units.Map.Confirm.Message";
+    public const string ID_CONFIRM_TEXT = "Units.Map.Confirm.Text";
     public const string ID_CONFIRM_OK = "Units.Map.Confirm.Ok";
     public const string ID_CONFIRM_CANCEL = "Units.Map.Confirm.Cancel";
     public const string ID_UNDO = "Units.Map.Undo";
     public const string ID_UNDO_DISMISS = "Units.Map.UndoDismiss";
-    public const string ID_UNDO_MESSAGE = "Units.Map.UndoMessage";
+    public const string ID_UNDO_TEXT = "Units.Map.UndoText";
+    public const string ID_BAR_ACTION = "Units.Map.BarAction";
+
+    /// <summary>캔버스 밖 · 오버레이 위에 놓아 취소했을 때 막대 문구(FR-29 v1.3 ②).</summary>
+    public const string DROP_OUTSIDE_CANCELLED = "관계도 밖에 놓아 취소했습니다";
     public const string ID_MOVE_MODE = "Units.Map.MoveMode";
     #endregion
 
@@ -103,7 +114,8 @@ public partial class UnitMapCanvas
     private Border _bar = null!;
     private Border _barErrorMark = null!;
     private ConsoleText _barText = null!;
-    private Button _undo = null!, _undoDismiss = null!;
+    private Button _undo = null!, _undoDismiss = null!, _barAction = null!;
+    private string? _localNotice;
     private UnitMapOverlayPanel _confirm = null!;
     private ConsoleText _confirmTitle = null!, _confirmMessage = null!, _confirmBusy = null!;
     private Button _confirmOk = null!, _confirmCancel = null!;
@@ -144,6 +156,7 @@ public partial class UnitMapCanvas
     {
         var canvas = (UnitMapCanvas)d;
         var focusInside = canvas.HasFocusInside();
+        if (e.Property == BarProperty) canvas._localNotice = null;          // 뷰모델의 새 막대가 캔버스 알림을 대신한다
         canvas.UpdateOverlays();
 
         if (e.Property == ConfirmPromptProperty && e.OldValue is null && e.NewValue is not null)
@@ -155,8 +168,10 @@ public partial class UnitMapCanvas
         }
 
         // 확인 오버레이 · M 모드 · 막대가 닫히면 포커스를 캔버스로 되돌린다(시나리오 ISSUE-52) — 포커스가 캔버스 안에 있었을 때만.
+        // 확인 오버레이가 닫히면 끈 노드(없으면 고른 노드)로(SIM-K157 · K163).
         var closed = e.NewValue is null || (e.NewValue is string text && string.IsNullOrWhiteSpace(text));
-        if (closed && e.OldValue is not null && focusInside) canvas.RestoreFocus();
+        if (closed && e.OldValue is not null && focusInside)
+            canvas.RestoreFocus(e.Property == ConfirmPromptProperty ? canvas.LastDraggedUnitId : null);
     }
 
     /// <summary>키보드 포커스(또는 창이 비활성일 때의 논리 포커스)가 이 캔버스 안인가.</summary>
@@ -169,8 +184,45 @@ public partial class UnitMapCanvas
         return false;
     }
 
-    /// <summary>캔버스로 포커스 — 창이 비활성이면 논리 포커스만 옮겨 두어 창이 돌아오면 캔버스가 받는다.</summary>
-    internal void RestoreFocus() => MoveFocus(this);
+    /// <summary>
+    /// 캔버스로 포커스 — <paramref name="preferUnitId"/> 노드가 있으면 그 노드, 아니면 고른 노드, 아니면 캔버스.
+    /// 창이 비활성이면 논리 포커스만 옮겨 두어 창이 돌아오면 그 요소가 받는다.
+    /// </summary>
+    internal void RestoreFocus(int? preferUnitId = null)
+    {
+        UIElement target = this;
+        if (preferUnitId is int p && _nodes.TryGetValue(p, out var preferred) && preferred.Visibility == Visibility.Visible) target = preferred;
+        else if (SelectedUnitId is int s && _nodes.TryGetValue(s, out var selected) && selected.Visibility == Visibility.Visible) target = selected;
+        MoveFocus(target);
+    }
+
+    /// <summary>누른 곳으로 포커스 — 노드면 그 노드, 빈 곳이면 고른 노드(없으면 캔버스).</summary>
+    private void FocusPressed(UnitMapNode? node)
+    {
+        if (node is not null) MoveFocus(node);
+        else RestoreFocus();
+    }
+
+    /// <summary>뷰모델의 포커스 요청 — 캔버스만 받는다(상세 칸은 콘솔 뷰).</summary>
+    private void OnFocusRequested(object? sender, UnitMapFocusTarget target)
+    {
+        if (target == UnitMapFocusTarget.Canvas) RestoreFocus();
+    }
+
+    /// <summary>Tab 으로 캔버스에 들어오면 고른 노드로 넘긴다(한 정지점 — 노드는 Tab 정지점이 아니다).</summary>
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnGotKeyboardFocus(e);
+        if (ReferenceEquals(e.NewFocus, this) && SelectedUnitId is int s && _nodes.TryGetValue(s, out var node) && node.Visibility == Visibility.Visible)
+            node.Focus();
+    }
+
+    /// <summary>캔버스가 스스로 띄우는 막대 한 줄(뷰모델 막대가 없을 때) — 예: 캔버스 밖에 놓아 취소. 다음 막대 · 닫기까지.</summary>
+    internal void ShowLocalNotice(string text)
+    {
+        _localNotice = text;
+        UpdateOverlays();
+    }
 
     private static void MoveFocus(UIElement target)
     {
@@ -214,21 +266,27 @@ public partial class UnitMapCanvas
         // 되돌리기 · 실패 막대 — 왼쪽 아래. 실패는 왼쪽 4px 세로 막대(형태로 가른다).
         _barErrorMark = new Border { Width = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(-6, -4, 6, -4), IsHitTestVisible = false };
         _barErrorMark.SetResourceReference(Border.BackgroundProperty, "StatusCriticalBrush");
-        _barText = Text(ID_UNDO_MESSAGE, 11.5, FontWeights.Normal);
+        _barText = Text(ID_UNDO_TEXT, 11.5, FontWeights.Normal);
         _barText.VerticalAlignment = VerticalAlignment.Center;
         _barText.TextTrimming = TextTrimming.CharacterEllipsis;
         _barText.MaxWidth = 380;
         _undo = MiniButton("되돌리기", ID_UNDO, (_, _) => OverlayCommands?.Undo());
         _undo.Margin = new Thickness(10, 0, 0, 0);
-        _undoDismiss = MiniButton("✕", ID_UNDO_DISMISS, (_, _) => OverlayCommands?.DismissBar());
+        _barAction = MiniButton(string.Empty, ID_BAR_ACTION, (_, _) => (Interaction as IUnitMapBarAction)?.RunBarAction());
+        _barAction.Margin = new Thickness(10, 0, 0, 0);
+        _undoDismiss = MiniButton("✕", ID_UNDO_DISMISS, (_, _) =>
+        {
+            if (_localNotice is not null && Bar is null) { _localNotice = null; UpdateOverlays(); return; }
+            OverlayCommands?.DismissBar();
+        });
         _undoDismiss.Margin = new Thickness(6, 0, 0, 0);
         _bar = OverlayBox(HorizontalAlignment.Left, VerticalAlignment.Bottom, new Thickness(12), translucent: false,
-                     Row(_barErrorMark, _barText, _undo, _undoDismiss));
+                     Row(_barErrorMark, _barText, _undo, _barAction, _undoDismiss));
         _bar.MaxWidth = 520;
 
         // 확인 오버레이 — 캔버스 가운데(결정 #2: 새 창 아님). 그림자 없음(그림자는 끌리는 사본 하나만 — NFR-05).
         _confirmTitle = Text(null, 13, FontWeights.Bold);
-        _confirmMessage = Text(ID_CONFIRM_MESSAGE, 11.5, FontWeights.Normal);
+        _confirmMessage = Text(ID_CONFIRM_TEXT, 11.5, FontWeights.Normal);
         _confirmMessage.Margin = new Thickness(0, 8, 0, 0);
         _confirmMessage.TextWrapping = TextWrapping.Wrap;
         _confirmBusy = Text(null, 11, FontWeights.Normal, "TextSecondaryBrush");
@@ -282,11 +340,14 @@ public partial class UnitMapCanvas
         _moveModeText.Text = MoveModeText ?? string.Empty;
         _moveMode.Visibility = string.IsNullOrWhiteSpace(MoveModeText) ? Visibility.Collapsed : Visibility.Visible;
 
-        var bar = Bar;
+        // 뷰모델 막대가 먼저, 없으면 캔버스 자신의 알림(취소 안내 등).
+        var bar = Bar ?? (_localNotice is { } notice ? new UnitMapBar(notice, false, false) : null);
         _bar.Visibility = bar is null ? Visibility.Collapsed : Visibility.Visible;
         _barText.Text = bar?.Message ?? string.Empty;
         _barErrorMark.Visibility = bar?.IsError == true ? Visibility.Visible : Visibility.Collapsed;
         _undo.Visibility = bar?.CanUndo == true ? Visibility.Visible : Visibility.Collapsed;
+        _barAction.Content = bar?.ActionText ?? string.Empty;
+        _barAction.Visibility = string.IsNullOrWhiteSpace(bar?.ActionText) ? Visibility.Collapsed : Visibility.Visible;
 
         var prompt = ConfirmPrompt;
         _confirm.Visibility = prompt is null ? Visibility.Collapsed : Visibility.Visible;
@@ -308,10 +369,11 @@ public partial class UnitMapCanvas
         yield return _moveMode;
     }
 
-    protected override void OnIsKeyboardFocusedChanged(DependencyPropertyChangedEventArgs e)
+    // 포커스 표시 — 캔버스 또는 그 안(고른 노드)에 키보드 포커스가 있을 때(오버레이 단추 포함).
+    protected override void OnIsKeyboardFocusWithinChanged(DependencyPropertyChangedEventArgs e)
     {
-        base.OnIsKeyboardFocusedChanged(e);
-        if (_focusRing is not null) _focusRing.Visibility = IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
+        base.OnIsKeyboardFocusWithinChanged(e);
+        if (_focusRing is not null) _focusRing.Visibility = IsKeyboardFocusWithin ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>포커스 표시가 보이는가(시험).</summary>

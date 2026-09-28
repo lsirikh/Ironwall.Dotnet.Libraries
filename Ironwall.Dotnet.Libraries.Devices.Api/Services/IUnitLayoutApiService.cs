@@ -105,9 +105,23 @@ public abstract record UnitLayoutWriteResult
     /// <summary>422 — 서버 규칙 위반(없는 부대 · 판 불일치 · 모르는 키 등). 전체 롤백 — 부분 적용 없음. 재시도 유도 금지.</summary>
     public sealed record Rejected(string Reason) : UnitLayoutWriteResult;
 
-    /// <summary>404 · 405 · 410 — 배치 경로가 없다(사라졌다) → 세션 전용 전환(SIM-F059).</summary>
-    public sealed record Unsupported(int StatusCode, string Reason) : UnitLayoutWriteResult;
+    /// <summary>배치를 쓸 수 없다 — 계약 8.0 미만(네트워크 전). 경로가 사라진 것은 하위 갈래 <see cref="EndpointGone"/>.</summary>
+    public record Unsupported(int StatusCode, string Reason) : UnitLayoutWriteResult;
 
-    /// <summary>그 밖의 실패(428 · 401 · 403 · 5xx · 타임아웃 · 전송 능력 없음). 쓰기가 반영됐을 수 있다면(<see cref="UnitLayoutFailureKind.Timeout"/>) 다시 읽어 확인한다.</summary>
-    public sealed record Failed(UnitLayoutFailureKind Kind, int StatusCode, string Reason) : UnitLayoutWriteResult;
+    /// <summary>
+    /// 404 · 405 · 410 · <c>ENDPOINT_REMOVED</c> — 지원 중이던 배치 경로가 사라졌다 → 세션 전용 전환(SIM-F059 · TEST-65).
+    /// <see cref="Unsupported"/> 의 하위라 옛 소비자(<c>case Unsupported</c>)도 그대로 받는다.
+    /// </summary>
+    public sealed record EndpointGone(int StatusCode, string Reason) : Unsupported(StatusCode, Reason);
+
+    /// <summary>그 밖의 실패(401 · 403 · 409 · 5xx · 503 · 전송 능력 없음). 전용 하위 갈래: <see cref="PreconditionRequired"/> · <see cref="Unknown"/>.</summary>
+    public record Failed(UnitLayoutFailureKind Kind, int StatusCode, string Reason) : UnitLayoutWriteResult;
+
+    /// <summary>428 — <c>If-Match</c> 가 없었다(클라 결함 신호). VM 은 배치를 다시 읽는다. <see cref="Failed"/> 의 하위.</summary>
+    public sealed record PreconditionRequired(int StatusCode, string Reason)
+        : Failed(UnitLayoutFailureKind.PreconditionRequired, StatusCode, Reason);
+
+    /// <summary>504 · 시간 초과 — 쓰기가 <b>반영됐을 수 있다</b>. VM 은 다시 읽어 결과를 확정한다(SIM-F065). <see cref="Failed"/> 의 하위(Kind = Timeout).</summary>
+    public sealed record Unknown(int StatusCode, string Reason)
+        : Failed(UnitLayoutFailureKind.Timeout, StatusCode, Reason);
 }

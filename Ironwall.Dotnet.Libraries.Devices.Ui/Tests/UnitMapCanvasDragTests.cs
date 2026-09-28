@@ -429,44 +429,8 @@ public class UnitMapCanvasDragTests
     }
     #endregion
 
-    #region - 겹침 · z 순서 (must-cover 2 · SIM-X001~003) -
-    [Fact]
-    public void should_lift_the_selected_node_and_prefer_it_under_the_pointer_when_two_nodes_overlap()
-    {
-        var result = H.Run(canvas =>
-        {
-            var fake = H.Attach(canvas);
-            var seventh = H.IdOf("7중대");
-            var ninth = H.IdOf("9중대");
-            canvas.SelectedUnitId = seventh;                         // 먼저 그려진(아래) 7중대를 고른다
-            var zSelected = Panel.GetZIndex(H.Node(canvas, "7중대"));
-
-            // 10중대를 끌어 7중대 · 9중대가 겹친 자리 위에 머문다 — 선택(위)인 7중대가 잡힌다.
-            var (_, at) = Start(canvas, "10중대", 0.5);
-            canvas.OnPointerMoved(at + new Vector(0, 20));
-            canvas.OnPointerMoved(H.ScreenOf(canvas, ninth));
-            var hover = canvas.HoverUnitId;
-            canvas.OnPointerReleased(H.ScreenOf(canvas, ninth) + new Vector(0, 200));
-            return (zSelected, hover, lastMoved: canvas.LastMovedUnitId, zMoved: Panel.GetZIndex(H.Node(canvas, "10중대")),
-                    top: canvas.NodesInDrawOrder().Last().UnitId);
-        }, Overlapped());
-
-        Assert.Equal(2, result.zSelected);
-        Assert.Equal(H.IdOf("7중대"), result.hover);                 // 가려진 노드도 고르면 위로 — 포인터 판정도 같은 순서
-        Assert.Equal(H.IdOf("10중대"), result.lastMoved);
-        Assert.Equal(1, result.zMoved);                               // 마지막으로 옮긴 부대가 그다음
-        Assert.Equal(H.IdOf("7중대"), result.top);
-    }
-
-    /// <summary>7중대를 9중대 자리에 겹쳐 둔 장면(사용자 Δ 로 겹침 — FR-21 은 허용).</summary>
-    private static UnitMapScene Overlapped()
-    {
-        var scene = H.Scene();
-        var positions = scene.Positions.ToDictionary(p => p.Key, p => p.Value);
-        positions[H.IdOf("7중대")] = positions[H.IdOf("9중대")];
-        return scene with { Positions = positions };
-    }
-    #endregion
+    // 겹침 · z 순서는 PRD v1.3 FR-29 ⑥(그리기 순서 = 트리 순, 선택해도 올리지 않는다)으로 바뀌었다 —
+    // UnitMapCanvasDragHardeningTests.should_keep_tree_order_as_draw_order_and_not_lift_the_selected_node 가 잠근다.
 
     /// <summary>그 부대를 가운데에 두고(배율 <paramref name="scale"/>) 누른다.</summary>
     private static (UnitMapNode Node, Point At) Start(UnitMapCanvas canvas, string name, double scale)

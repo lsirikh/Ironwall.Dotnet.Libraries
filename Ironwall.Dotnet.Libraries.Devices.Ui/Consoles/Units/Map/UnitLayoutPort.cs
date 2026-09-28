@@ -115,10 +115,19 @@ public abstract record UnitLayoutWrite
     public sealed record Rejected(string Reason) : UnitLayoutWrite;
 
     /// <summary>경로가 사라졌다 → 세션 전용 전환.</summary>
-    public sealed record Unsupported(string Reason) : UnitLayoutWrite;
+    public record Unsupported(string Reason) : UnitLayoutWrite;
+
+    /// <summary>지원 중이던 경로가 사라졌다(404 · 405 · 410) → 세션 전용 전환(TEST-65). <see cref="Unsupported"/> 의 하위.</summary>
+    public sealed record EndpointGone(string Reason) : Unsupported(Reason);
 
     /// <summary>그 밖의 실패(시간 초과면 반영됐을 수 있다 — 다시 읽어 확인).</summary>
-    public sealed record Failed(UnitLayoutFailureKind Kind, string Reason) : UnitLayoutWrite;
+    public record Failed(UnitLayoutFailureKind Kind, string Reason) : UnitLayoutWrite;
+
+    /// <summary>428 — If-Match 누락(클라 결함 신호) → 배치를 다시 읽는다. <see cref="Failed"/> 의 하위.</summary>
+    public sealed record PreconditionRequired(string Reason) : Failed(UnitLayoutFailureKind.PreconditionRequired, Reason);
+
+    /// <summary>504 — 반영됐을 수 있다 → 다시 읽어 결과를 확정한다. <see cref="Failed"/> 의 하위(Kind = Timeout).</summary>
+    public sealed record Unknown(string Reason) : Failed(UnitLayoutFailureKind.Timeout, Reason);
 }
 #endregion
 
@@ -175,7 +184,10 @@ public sealed class UnitLayoutApiAdapter : IUnitLayoutApi
             UnitLayoutWriteResult.Ok ok => new UnitLayoutWrite.Saved(ToSnapshot(ok.Document)),
             UnitLayoutWriteResult.Conflict c => new UnitLayoutWrite.Conflict(c.CurrentVersion),
             UnitLayoutWriteResult.Rejected r => new UnitLayoutWrite.Rejected(r.Reason),
+            UnitLayoutWriteResult.EndpointGone g => new UnitLayoutWrite.EndpointGone(g.Reason),          // 하위 갈래를 먼저
             UnitLayoutWriteResult.Unsupported u => new UnitLayoutWrite.Unsupported(u.Reason),
+            UnitLayoutWriteResult.PreconditionRequired p => new UnitLayoutWrite.PreconditionRequired(p.Reason),
+            UnitLayoutWriteResult.Unknown k => new UnitLayoutWrite.Unknown(k.Reason),
             UnitLayoutWriteResult.Failed f => new UnitLayoutWrite.Failed(f.Kind, f.Reason),
             _ => new UnitLayoutWrite.Failed(UnitLayoutFailureKind.Other, "알 수 없는 응답"),
         };

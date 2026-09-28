@@ -123,18 +123,23 @@ public partial class UnitMapCanvas
 
         var source = e.OriginalSource as DependencyObject;
         if (IsInOverlay(source)) return;                                  // HUD · 막대 · 확인 단추는 제 일을 한다
-        if (IsConfirmOpen) { e.Handled = true; return; }                  // 확인 중에는 캔버스 입력을 막는다
+        e.Handled = HandleMouseDown(e.GetPosition(this), e.ChangedButton, e.ClickCount, NodeFrom(source));
+    }
 
-        var at = e.GetPosition(this);
-        var node = NodeFrom(source);
-        Focus();
+    /// <summary>
+    /// 누름 하나 — 처리했으면 <c>true</c>. 확인 오버레이 중 · 끄는 중에는 어떤 버튼도 무시한다(ISSUE-18 · 49 · 가운데 버튼 끄는 중 무시).
+    /// </summary>
+    private bool HandleMouseDown(Point at, MouseButton button, int clickCount, UnitMapNode? node)
+    {
+        if (IsConfirmOpen || IsDragging) return true;
+        FocusPressed(node);                                                // 누르면 캔버스(누른 노드)가 포커스(ISSUE-19)
 
-        switch (e.ChangedButton)
+        switch (button)
         {
-            case MouseButton.Left when e.ClickCount >= 2 && node is null && !IsGestureActive:
-                ZoomToNextLevel(at);
-                e.Handled = true;
-                return;
+            case MouseButton.Left when clickCount >= 2:
+                // 빈 곳 = 다음 단계 경계 배율(L2 는 무동작) · 노드 위 = 무동작(첫 클릭이 이미 골랐다).
+                if (node is null && !IsGestureActive) ZoomToNextLevel(at);
+                return true;
             case MouseButton.Left:
                 OnPointerPressed(at, node, GraphPointerButton.Left, _spaceHeld);
                 break;
@@ -144,14 +149,13 @@ public partial class UnitMapCanvas
             case MouseButton.Right:
                 // 오른쪽 = 선택만(원장 D-2026-09-27-6615ba — 노드 메뉴는 v2).
                 _rightPress = (at, node);
-                e.Handled = true;
-                return;
+                return true;
             default:
-                return;
+                return false;
         }
 
-        CaptureMouse();                                                    // 뗌 · 캡처 상실이 반드시 이 캔버스로 — 토큰이 새지 않는다
-        e.Handled = true;
+        if (IsLoaded) CaptureMouse();                                     // 뗌 · 캡처 상실이 반드시 이 캔버스로 — 토큰이 새지 않는다
+        return true;
     }
 
     protected override void OnPreviewMouseMove(MouseEventArgs e)
@@ -195,11 +199,36 @@ public partial class UnitMapCanvas
         OnWheel(notches, e.GetPosition(this));
     }
 
+    /// <summary>더블클릭 — 빈 곳이면 다음 단계 경계 배율로(L2 는 무동작), 노드 위는 무동작(PRD v1.3 FR-14).</summary>
+    internal void OnDoubleClick(Point at, UnitMapNode? node) => HandleMouseDown(at, MouseButton.Left, 2, node);
+
+    /// <summary>버튼 누름(시험 · 다른 버튼) — 마우스 처리기와 같은 길.</summary>
+    internal void OnOtherButtonPressed(Point at, MouseButton button, UnitMapNode? node) => HandleMouseDown(at, button, 1, node);
+
+    /// <summary>화면 배율이 바뀌었다(다른 모니터로 옮김) — 선 층 · 격자를 한 번 다시 그린다(ISSUE-59 · NFR-08).</summary>
+    internal void OnDpiChangedForLayers()
+    {
+        RebuildGrid();
+        RedrawLines();
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        OnDpiChangedForLayers();
+    }
+
+    /// <summary>
+    /// 자동 팬 띠 두께 — 보통 32 DIU(<see cref="DragMath.AutoScrollEdge"/>), 64 DIU 보다 좁으면 길이의 1/4, 0 이면 없음(ISSUE-54).
+    /// </summary>
+    public static double AutoPanBand(double length)
+        => length <= 0 ? 0 : length < DragMath.AutoScrollEdge * 2 ? length / 4 : DragMath.AutoScrollEdge;
+
     /// <summary>오른쪽 클릭 — 데드존 안이면 그 노드 선택만. 빈 곳은 아무것도 하지 않는다.</summary>
     internal void OnRightClick(Point pressed, Point released, UnitMapNode? node)
     {
-        if (node is null || IsConfirmOpen) return;
-        if (DragMath.IsDrag(released.X - pressed.X, released.Y - pressed.Y)) return;
+        // 이동 거리와 무관하게 그 부대 선택만 — 메뉴 · 끌기 · 팬 없음(PRD v1.3 FR-13).
+        if (node is null || IsConfirmOpen || IsDragging) return;
         Interaction?.RequestSelect(node.UnitId);
     }
     #endregion
@@ -278,12 +307,16 @@ public partial class UnitMapCanvas
     /// </summary>
     internal bool HandleKeyDown(Key key, Key systemKey, Key imeProcessedKey, ModifierKeys modifiers, DependencyObject? source)
     {
-        // ① 확인 오버레이 — Enter = 확정 · Esc = 취소. [취소] 단추에 포커스가 있으면 Enter 는 그 단추가 받는다.
+        // ① 확인 오버레이(캔버스 쪽 모달 — ISSUE-49): Enter = 확정 · Esc = 취소 · L 만 통과 · Tab 은 오버레이 안에서 돈다.
+        //    그 밖의 키는 소비하고 아무것도 하지 않는다. [취소] 단추에 포커스가 있으면 Enter 는 그 단추가 받는다.
         if (IsConfirmOpen)
         {
+            var letter = key == Key.ImeProcessed ? imeProcessedKey : key;
             if (key == Key.Escape) { ConfirmChoice(false); return true; }
-            if (key == Key.Enter && !ReferenceEquals(source, _confirmCancel)) { ConfirmChoice(true); return true; }
-            return false;
+            if (key == Key.Enter) { if (!ReferenceEquals(source, _confirmCancel)) ConfirmChoice(true); return !ReferenceEquals(source, _confirmCancel); }
+            if (key == Key.Tab) return false;
+            if (letter == Key.L && modifiers == ModifierKeys.None) Interaction?.HandleKey(UnitMapKeyCommand.LocateOnMap, false);
+            return true;
         }
 
         // ② 끄는 중 — Esc 는 취소(서버 0)하고 소비한다. 다른 키는 끌기를 흔들지 않게 먹는다.

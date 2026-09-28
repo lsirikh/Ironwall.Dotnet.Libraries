@@ -29,21 +29,22 @@ public class UnitDeviceItemStatusTests
     [InlineData("DEACTIVATED", UnitDeviceStatus.Deactivated)]
     [InlineData("error", UnitDeviceStatus.Error)]
     [InlineData(" Deactivated ", UnitDeviceStatus.Deactivated)]
-    [InlineData(null, UnitDeviceStatus.Normal)]
-    [InlineData("", UnitDeviceStatus.Normal)]
-    [InlineData("MAINTENANCE", UnitDeviceStatus.Normal)]
+    [InlineData(null, UnitDeviceStatus.Unknown)]          // v1.3 FR-03 — 없거나 모르면 "알 수 없음"(배지 수에 넣지 않음, ISSUE-48)
+    [InlineData("", UnitDeviceStatus.Unknown)]
+    [InlineData("   ", UnitDeviceStatus.Unknown)]
+    [InlineData("MAINTENANCE", UnitDeviceStatus.Unknown)]
     public void should_map_server_status_word_when_parsing(string? raw, UnitDeviceStatus expected)
     {
         Assert.Equal(expected, UnitDeviceText.StatusOf(raw));
     }
 
     [Fact]
-    public void should_default_to_normal_when_existing_call_sites_omit_status()
+    public void should_default_to_unknown_when_existing_call_sites_omit_status()
     {
-        // 기존 생성 지점(어댑터 · 시험 픽스처)은 다섯 인자로 만든다 — 그대로 컴파일되고 정상으로 본다.
+        // 기존 생성 지점(어댑터 · 시험 픽스처)은 다섯 인자로 만든다 — 그대로 컴파일되고 "알 수 없음" 으로 본다(정상으로 부풀리지 않는다).
         var item = new UnitDeviceItem(1001, 1, "장비0001", EnumDeviceCategory.Camera, 7);
 
-        Assert.Equal(UnitDeviceStatus.Normal, item.Status);
+        Assert.Equal(UnitDeviceStatus.Unknown, item.Status);
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public class UnitDeviceItemStatusTests
         Assert.Equal(UnitDeviceStatus.Normal, byId[11]);
         Assert.Equal(UnitDeviceStatus.Error, byId[12]);
         Assert.Equal(UnitDeviceStatus.Deactivated, byId[13]);
-        Assert.Equal(UnitDeviceStatus.Normal, byId[21]);
+        Assert.Equal(UnitDeviceStatus.Unknown, byId[21]);
     }
 
     [Fact]

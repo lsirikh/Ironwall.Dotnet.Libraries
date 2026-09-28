@@ -64,6 +64,80 @@ public enum UnitMapRefetchDecision
     Defer,
 }
 
+/// <summary>배치 알림 한 묶음을 발화 순간에 판정한 결과(TEST-66).</summary>
+public enum UnitMapNoticeAction
+{
+    /// <summary>할 일 없음 — 기다리는 알림이 없거나, 가진 것보다 새롭지 않다(자기 메아리 · 늦게 온 옛 알림).</summary>
+    None,
+
+    /// <summary>지금 다시 읽는다(한 번).</summary>
+    Refetch,
+
+    /// <summary>손이 바쁘다 — 끝난 뒤 다시 판정한다.</summary>
+    Defer,
+
+    /// <summary>30초 넘게 미뤘다 — "다른 운영자가 배치를 바꿨습니다" 를 <b>한 번</b> 알린다(모드는 유지, 계속 미룸).</summary>
+    NotifyDeferred,
+}
+
+/// <summary>배치 알림 합침 · 발화 시점 재비교 · 연기 상한(FR-53 · ISSUE-9). UI 스레드 전용 상태, 시간은 <c>IClock</c>.</summary>
+public sealed class UnitMapLayoutNoticeGate
+{
+    public static readonly TimeSpan DefaultDeferCap = TimeSpan.FromSeconds(30);
+
+    private readonly Ironwall.Dotnet.Libraries.Base.Services.IClock _clock;
+    private readonly TimeSpan _deferCap;
+    private DateTime? _deferredSince;
+    private bool _notified;
+
+    /// <param name="clock">시각(시험은 가짜 시계 — sleep 없음).</param>
+    /// <param name="deferCap">이만큼 넘게 미루면 한 번 알린다. 생략하면 <see cref="DefaultDeferCap"/>(30초).</param>
+    public UnitMapLayoutNoticeGate(Ironwall.Dotnet.Libraries.Base.Services.IClock clock, TimeSpan? deferCap = null)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _deferCap = deferCap ?? DefaultDeferCap;
+    }
+
+    /// <summary>받았지만 아직 처리하지 않은 가장 큰 알림 버전(없으면 <c>null</c>).</summary>
+    public long? PendingVersion { get; private set; }
+
+    /// <summary>알림 한 건 — 가장 큰 버전만 남긴다(합침 · 버전 건너뜀 허용). 판정은 하지 않는다.</summary>
+    public void Notice(long version)
+    {
+        if (version <= 0) return;
+        if (PendingVersion is not long pending || version > pending) PendingVersion = version;
+    }
+
+    /// <summary>
+    /// <b>발화 순간</b>(합침 창이 끝났을 때 · 손을 놓았을 때 · 쓰기 응답을 반영한 뒤)의 판정 — 그 순간 가진 버전과 견준다.
+    /// </summary>
+    /// <remarks>
+    /// 알림이 도착한 순간이 아니라 이 순간에 견주므로, 내 PATCH 응답보다 먼저 온 자기 메아리도 응답 반영 뒤에는 "새롭지 않음" 이 된다(SIM-N082).
+    /// 미루는 동안은 <see cref="PendingVersion"/> 을 쥐고 있고, 처음 미룬 뒤 상한을 넘기면 <see cref="UnitMapNoticeAction.NotifyDeferred"/> 를 한 번만 낸다.
+    /// </remarks>
+    public UnitMapNoticeAction Evaluate(long? haveVersion, UnitMapBusy busy)
+    {
+        if (PendingVersion is not long pending) return UnitMapNoticeAction.None;
+
+        if (UnitMapLayoutSync.ShouldRefetch(pending, haveVersion, busy) is var decision && decision != UnitMapRefetchDecision.Defer)
+        {
+            PendingVersion = null;
+            _deferredSince = null;
+            _notified = false;
+            return decision == UnitMapRefetchDecision.Refetch ? UnitMapNoticeAction.Refetch : UnitMapNoticeAction.None;
+        }
+
+        var now = _clock.UtcNow;
+        _deferredSince ??= now;
+        if (!_notified && now - _deferredSince.Value >= _deferCap)
+        {
+            _notified = true;
+            return UnitMapNoticeAction.NotifyDeferred;
+        }
+        return UnitMapNoticeAction.Defer;
+    }
+}
+
 /// <summary>충돌 · 되돌리기 거절의 까닭(막대 문구 · 로그).</summary>
 public enum UnitMapConflictReason
 {
@@ -345,6 +419,15 @@ public static class UnitMapLayoutSync
             default:
                 return new UnitMapReparentCleanup.Skip(UnitMapReparentCleanupReason.WritesBlocked);
         }
+    }
+
+    /// <summary>
+    /// <see cref="PlanReparentCleanup"/> 의 공유 모드 전용 짧은 이름(plan v1.3 TEST-64 ④) — 상위 변경 <b>뒤에</b> 읽은 문서만 본다.
+    /// </summary>
+    public static UnitMapReparentCleanup PlanParentChangeClear(UnitLayoutSnapshot latestDoc, int unitId)
+    {
+        ArgumentNullException.ThrowIfNull(latestDoc);
+        return PlanReparentCleanup(UnitMapLayoutState.Shared, new UnitLayoutRead.Supported(latestDoc), null, unitId);
     }
     #endregion
 

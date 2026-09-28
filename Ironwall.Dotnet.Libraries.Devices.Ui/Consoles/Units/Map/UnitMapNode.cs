@@ -32,7 +32,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
 /// <c>DragStarted</c>)를 끄고, 누름 · 이동 · 뗌은 <b>캔버스가 루트 기준으로</b> 잰다. 노드는 입력을 삼키지 않고 올려 보낸다.</para>
 /// <para>단계(L0 · L1 · L2)마다 도형 크기가 <b>화면에서 고정</b>이라(FR-21) 노드 요소의 크기도 단계 · 제대로만 정해진다.
 /// 기하는 (단계, 제대) 한 쌍마다 한 번만 만들어 얼린 뒤 모든 노드가 나눠 쓴다(브러시가 아니라 기하라 얼려도 테마와 무관).</para>
-/// <para>포커스는 캔버스가 갖는다(FR-36 — 화살표 선택 이동). 노드는 포커스를 받지 않는다(Thumb 기본값).</para>
+/// <para>포커스: 캔버스 포커스는 <b>고른 노드</b>에 머문다(UIA 가 그 노드를 읽는다). 노드는 Tab 정지점이 아니다 — 캔버스 전체가 한 정지점(ISSUE-52).
+/// 단축키는 캔버스의 터널 <c>PreviewKeyDown</c> 이 받으므로 노드에 포커스가 있어도 그대로 동작한다.</para>
 /// </remarks>
 public class UnitMapNode : Thumb
 {
@@ -42,7 +43,10 @@ public class UnitMapNode : Thumb
     static UnitMapNode()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(UnitMapNode), new FrameworkPropertyMetadata(typeof(UnitMapNode)));
-        FocusableProperty.OverrideMetadata(typeof(UnitMapNode), new FrameworkPropertyMetadata(false));
+        // 포커스는 받는다(UIA 가 고른 노드를 읽는다 · 단축키는 캔버스 터널에서) — 그러나 Tab 정지점은 아니다(노드 200개를 돌지 않게).
+        FocusableProperty.OverrideMetadata(typeof(UnitMapNode), new FrameworkPropertyMetadata(true));
+        KeyboardNavigation.IsTabStopProperty.OverrideMetadata(typeof(UnitMapNode), new FrameworkPropertyMetadata(false));
+        FocusVisualStyleProperty.OverrideMetadata(typeof(UnitMapNode), new FrameworkPropertyMetadata(null));
     }
 
     public UnitMapNode()

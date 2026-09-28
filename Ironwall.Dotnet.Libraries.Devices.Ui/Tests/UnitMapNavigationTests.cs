@@ -87,20 +87,21 @@ public class UnitMapNavigationTests
     }
 
     [Fact]
-    public void should_follow_moved_positions_not_tree_order_when_delta_applied()
+    public void should_follow_tree_order_not_moved_screen_positions_when_delta_applied()
     {
-        // SIM-K153 — 사용자 Δ 로 3중대를 1중대 왼쪽에 옮기면 '이웃' 은 화면 x 순이다.
+        // v1.3 FR-36 ② · SIM-K153 · ISSUE-35 — 사용자 Δ 로 3중대를 1중대 왼쪽에 옮겨도 '이웃' 은 트리 순(Tree.Ordered)이다.
         var moved = Positions();
         moved[13] = new Point(-100, 160);
 
-        Assert.Equal(13, Next(11, UnitMapKeyCommand.Left, positions: moved));
-        Assert.Equal(11, Next(13, UnitMapKeyCommand.Right, positions: moved));
+        Assert.Equal(11, Next(11, UnitMapKeyCommand.Left, positions: moved));     // 트리 맨 앞 — 제자리
+        Assert.Equal(12, Next(11, UnitMapKeyCommand.Right, positions: moved));
+        Assert.Equal(13, Next(13, UnitMapKeyCommand.Right, positions: moved));   // 트리 맨 뒤 — 제자리
     }
 
     [Fact]
-    public void should_break_x_ties_by_y_when_neighbours_share_a_column()
+    public void should_walk_same_depth_units_across_parents_in_tree_order()
     {
-        Assert.Equal(15, Next(14, UnitMapKeyCommand.Right));                  // 같은 x(세로 한 줄) → 아래 칸
+        Assert.Equal(15, Next(14, UnitMapKeyCommand.Right));                  // 같은 부모의 다음 소초
         Assert.Equal(16, Next(15, UnitMapKeyCommand.Right));
         Assert.Equal(14, Next(15, UnitMapKeyCommand.Left));
     }

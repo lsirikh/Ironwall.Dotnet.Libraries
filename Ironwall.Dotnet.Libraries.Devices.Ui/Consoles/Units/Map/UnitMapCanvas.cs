@@ -82,10 +82,8 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     // 크기가 생기기 전(첫 레이아웃 전)에 온 뷰 요청 — 마지막 것만 크기가 생길 때 한 번 한다(must-cover 3).
     private Action? _pendingView;
 
-    // 겹침 순서(z) — 선택 부대 · 마지막으로 끌어 옮긴 부대를 위로(가려진 노드도 선택하면 보인다, must-cover 2).
-    private int? _lastMovedUnitId;
-    private const int Z_LAST_MOVED = 1;
-    private const int Z_SELECTED = 2;
+    // 겹침 순서 = 트리 순(Tree.Ordered) — 선택해도 앞으로 올리지 않는다(PRD v1.3 FR-29 ⑥ · ISSUE-56).
+    // 가려진 노드는 키보드 선택(화살표 · 검색)으로 닿는다.
 
     public UnitMapCanvas()
     {
@@ -151,8 +149,8 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         var canvas = (UnitMapCanvas)d;
         if (e.OldValue is int oldId && canvas._nodes.TryGetValue(oldId, out var oldNode)) oldNode.IsSelectedNode = false;
         if (e.NewValue is int newId && canvas._nodes.TryGetValue(newId, out var newNode)) newNode.IsSelectedNode = true;
-        canvas.ApplyZOrder();                       // 고른 노드는 위로 — 겹쳐 가려져도 보인다
         canvas.RedrawLines();                       // 선택 부대에 닿는 선 굵기 +1(FR-27)
+        if (canvas.HasFocusInside()) canvas.RestoreFocus();   // 포커스는 선택을 따른다(ISSUE-52 — UIA 가 고른 노드를 읽는다)
     }
 
     public static readonly DependencyProperty InteractionProperty = DependencyProperty.Register(
@@ -165,7 +163,10 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     {
         var canvas = (UnitMapCanvas)d;
         (e.OldValue as IUnitMapInteraction)?.AttachSurface(null);
+        if (e.OldValue is UnitMapViewModel oldVm) oldVm.FocusRequested -= canvas.OnFocusRequested;
         (e.NewValue as IUnitMapInteraction)?.AttachSurface(canvas);
+        // 뷰모델의 포커스 요청(오버레이 · M 모드 · 막대가 닫힘) → 캔버스(고른 노드). 상세 칸 요청은 콘솔 뷰의 몫.
+        if (e.NewValue is UnitMapViewModel newVm) newVm.FocusRequested += canvas.OnFocusRequested;
     }
 
     // 테마 전환 감지용 — 값은 쓰지 않는다(그릴 때 다시 찾는다). 여러 토큰이 한꺼번에 바뀌어도 한 번만 다시 그린다.
@@ -361,25 +362,10 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
         _ordered.Clear();
         _ordered.AddRange(ordered);
-        ApplyZOrder();
     }
 
-    /// <summary>
-    /// 겹침 순서 — 선택 부대가 맨 위, 그다음 마지막으로 끌어 옮긴 부대. 입력 히트(라우팅)와 끄는 동안의 판정
-    /// (<see cref="UnitMapHitTest"/> — 나중에 넣은 것이 위)이 같은 순서를 쓴다.
-    /// </summary>
-    private void ApplyZOrder()
-    {
-        foreach (var node in _ordered)
-        {
-            var z = node.UnitId == SelectedUnitId ? Z_SELECTED : node.UnitId == _lastMovedUnitId ? Z_LAST_MOVED : 0;
-            if (Panel.GetZIndex(node) != z) Panel.SetZIndex(node, z);
-        }
-    }
-
-    /// <summary>그림(히트) 순서 — z 가 같으면 편제 순서. 뒤에 있을수록 위다.</summary>
-    internal IReadOnlyList<UnitMapNode> NodesInDrawOrder()
-        => _ordered.Select((node, index) => (node, index)).OrderBy(x => Panel.GetZIndex(x.node)).ThenBy(x => x.index).Select(x => x.node).ToList();
+    /// <summary>그림(히트) 순서 = 트리 순. 뒤에 있을수록 위 — 입력 히트(라우팅)와 끄는 동안의 판정(<see cref="UnitMapHitTest"/>)이 같다.</summary>
+    internal IReadOnlyList<UnitMapNode> NodesInDrawOrder() => _ordered;
 
     private void ApplyNode(UnitMapNode node, UnitTreeNode unit, UnitMapNodeFacts facts, UnitMapLayers layers)
     {
@@ -506,6 +492,10 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         }
 
         if (e.PreviousSize.Width <= 0 || e.PreviousSize.Height <= 0) return;
+
+        // 끄는 중에는 뷰를 옮기지 않는다 — 포인터 아래 월드 점이 그대로라 월드 Δ 가 유지된다(ISSUE-54).
+        if (IsDragging) { OnViewMovedDuringDrag(); return; }
+
         var center = _view.ScreenToWorld(new Point(e.PreviousSize.Width / 2, e.PreviousSize.Height / 2));
         ApplyView(_view.CenterOn(center, e.NewSize));
     }

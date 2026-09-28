@@ -38,7 +38,7 @@ public static class UnitMapText
     public const string UnknownEchelonDrag = "제대를 알 수 없는 부대는 끌 수 없습니다";
 
     /// <summary>배치를 아직 읽는 중 — 위치 쓰기는 응답 뒤(SIM-P041).</summary>
-    public const string LayoutLoadingBlocked = "배치를 불러오는 중입니다 — 잠시 뒤 옮기세요";
+    public const string LayoutLoadingBlocked = "배치를 불러오는 중입니다";
 
     /// <summary>배치 읽기 실패 — 쓰기 금지(FR-50).</summary>
     public const string LayoutReadFailedBlocked = "배치를 불러오지 못해 위치를 옮길 수 없습니다";
@@ -104,32 +104,48 @@ public static class UnitMapText
 
     #region - 배치 상태 문구 (FR-11 · Units.Map.LayoutStatus) -
     /// <summary>
-    /// 캔버스 위 가운데 배치 상태 문구.
+    /// 캔버스 위 가운데 배치 상태 문구 — PRD §2.1-A 의 7행 표 그대로(ISSUE-7).
     /// </summary>
     /// <param name="state">배치 상태.</param>
-    /// <param name="canEdit"><c>units:edit</c> — 공유 배치에서 없으면 "보기 전용".</param>
-    /// <param name="updatedBy">마지막 변경자 이름(<c>updated_by.name</c>). 없으면 아직 아무도 옮기지 않은 문서.</param>
+    /// <param name="canEdit"><c>units:edit</c> — 공유 배치에서 없으면 끝에 " · 보기 전용".</param>
+    /// <param name="updatedBy">마지막 변경자 이름(<c>updated_by.name</c>). 없으면 아직 아무도 옮기지 않은 문서(빈 문서).</param>
     /// <param name="updatedAtLocal">마지막 변경 시각(<b>이미 로컬 시각</b>으로 바꾼 값).</param>
     /// <param name="updatedByMe">마지막 변경자가 이 운영자 — 이름 대신 "나".</param>
-    public static string LayoutStatus(UnitMapLayoutState state, bool canEdit, string? updatedBy = null, DateTime? updatedAtLocal = null, bool updatedByMe = false)
+    /// <param name="liveOff">전역 구독이 꺼져 실시간 반영이 없다 — 모든 행에 " · 실시간 반영 꺼짐" 꼬리표(ISSUE-32).</param>
+    /// <param name="sessionExpired">읽기 실패가 401 이다 — 7행의 변형 문구.</param>
+    public static string LayoutStatus(UnitMapLayoutState state, bool canEdit, string? updatedBy = null, DateTime? updatedAtLocal = null,
+                                      bool updatedByMe = false, bool liveOff = false, bool sessionExpired = false)
     {
-        switch (state)
+        var text = state switch
         {
-            case UnitMapLayoutState.Shared:
-                if (!canEdit) return "배치: 모든 운영자 공유 · 보기 전용";
-                if (string.IsNullOrWhiteSpace(updatedBy) && !updatedByMe) return "배치: 모든 운영자 공유 · 아직 옮긴 부대가 없습니다";
-                var who = updatedByMe ? "나" : updatedBy!.Trim();
-                var when = updatedAtLocal is DateTime at ? " " + at.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) : string.Empty;
-                return $"배치: 모든 운영자 공유 · 마지막 변경 {who}{when}";
-            case UnitMapLayoutState.SessionOnly:
-                return "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다";
-            case UnitMapLayoutState.ReadFailed:
-                return "배치를 불러오지 못했습니다 — 자동 배치로 보입니다";
-            case UnitMapLayoutState.VersionMismatch:
-                return "배치 판이 달라 자동 배치로 보입니다";
-            default:
-                return "배치를 불러오는 중입니다 — 자동 배치로 먼저 보입니다";
+            UnitMapLayoutState.Shared => SharedStatus(canEdit, updatedBy, updatedAtLocal, updatedByMe),
+            UnitMapLayoutState.SessionOnly => "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다",
+            UnitMapLayoutState.ReadFailed => sessionExpired
+                ? "로그인이 만료되어 배치를 불러오지 못했습니다"
+                : "배치를 불러오지 못했습니다 — 자동 배치로 보입니다",
+            UnitMapLayoutState.VersionMismatch => "배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다",
+            _ => "배치를 불러오는 중 — 자동 배치로 보입니다",
+        };
+        return liveOff ? text + LiveOffSuffix : text;
+    }
+
+    /// <summary>전역 구독이 꺼졌을 때 모든 배치 문구 끝에 붙는 꼬리표(ISSUE-32).</summary>
+    public const string LiveOffSuffix = " · 실시간 반영 꺼짐";
+
+    private static string SharedStatus(bool canEdit, string? updatedBy, DateTime? updatedAtLocal, bool updatedByMe)
+    {
+        string head;
+        if (string.IsNullOrWhiteSpace(updatedBy) && !updatedByMe)
+        {
+            head = "배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다";
         }
+        else
+        {
+            var who = updatedByMe ? "나" : updatedBy!.Trim();
+            var when = updatedAtLocal is DateTime at ? " " + at.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) : string.Empty;
+            head = $"배치: 모든 운영자 공유 · 마지막 변경 {who}{when}";
+        }
+        return canEdit ? head : head + " · 보기 전용";
     }
     #endregion
 
@@ -223,12 +239,16 @@ public static class UnitMapText
     public const string OrgWriteFailedReason = "서버가 거절했거나 응답하지 않았습니다.";
 
     /// <summary>[배치 초기화] 확인 오버레이.</summary>
-    public static UnitMapConfirmText ConfirmResetLayout(bool sessionOnly) => new(
-        "배치 초기화",
-        sessionOnly
-            ? new[] { "이 창에서 옮긴 위치를 모두 자동 배치로 돌립니다.", "되돌리기 가능" }
-            : new[] { "모든 운영자의 배치가 자동 배치로 돌아갑니다.", "서버에 바로 저장됩니다 · 되돌리기 가능" },
-        "초기화");
+    public static UnitMapConfirmText ConfirmResetLayout(bool sessionOnly, int movedCount = 0)
+    {
+        var undoLine = movedCount > 1000 ? ResetUndoUnavailableLine : "되돌리기 가능";
+        return new UnitMapConfirmText(
+            "배치 초기화",
+            sessionOnly
+                ? new[] { "이 창에서 옮긴 위치를 모두 자동 배치로 돌립니다.", undoLine }
+                : new[] { "모든 운영자의 배치가 자동 배치로 돌아갑니다.", movedCount > 1000 ? "서버에 바로 저장됩니다 · " + ResetUndoUnavailableLine : "서버에 바로 저장됩니다 · 되돌리기 가능" },
+            "초기화");
+    }
 
     /// <summary>[배치 초기화] 완료.</summary>
     public static string LayoutResetBar(bool sessionOnly)
@@ -312,7 +332,7 @@ public static class UnitMapText
 
     #region - 확인 오버레이 (FR-32 · SB S6 · S7) -
     /// <summary>상위 바꾸기 확인 — 옮길 부대 · 새 상위 · 함께 옮겨지는 예하 수.</summary>
-    public static UnitMapConfirmText ConfirmReparent(UnitTreeModel tree, int movingId, int targetId)
+    public static UnitMapConfirmText ConfirmReparent(UnitTreeModel tree, int movingId, int targetId, bool showParentPath = false)
     {
         ArgumentNullException.ThrowIfNull(tree);
         var moving = tree.Find(movingId);
@@ -320,8 +340,9 @@ public static class UnitMapText
         var lines = new List<string>
         {
             KoreanParticles.Resolve(
-                $"{Quote(moving?.Name)}({EchelonOf(moving)})을(를) {Quote(target?.Name)}({EchelonOf(target)}) 밑으로 옮깁니다."),
+                $"{Quote(moving?.Name)}({EchelonOf(moving)})을(를) {Quote(target?.Name)}({EchelonOf(target)}{SuspendedTag(target)}) 밑으로 옮깁니다."),
         };
+        if (showParentPath && target is not null) lines.Add($"새 상위 경로: {ParentPath(tree, targetId)}");
 
         var descendants = tree.DescendantIds(movingId).Select(tree.Find).Where(n => n != null).ToList();
         if (descendants.Count > 0)
@@ -341,12 +362,89 @@ public static class UnitMapText
         ArgumentNullException.ThrowIfNull(tree);
         var lines = new[]
         {
-            KoreanParticles.Resolve($"{Quote(tree.Find(unitId)?.Name)}과(와) {Quote(tree.Find(otherId)?.Name)}을(를) 인접 부대로 잇습니다."),
+            KoreanParticles.Resolve($"{Quote(tree.Find(unitId)?.Name)}과(와) {Quote(tree.Find(otherId)?.Name)}{SuspendedTag(tree.Find(otherId))}을(를) 인접 부대로 잇습니다."),
             "양쪽 상세에 함께 표시됩니다(무방향).",
             "보내기 직전 최신 인접 목록을 다시 읽습니다",
         };
         return new UnitMapConfirmText("인접 부대 연결", lines, "연결");
     }
+    #endregion
+
+    #region - v1.3 추가 문구 -
+    /// <summary>대상이 운용 중지면 확인 문구에 붙는 표지(ISSUE-16).</summary>
+    public const string SuspendedMark = "(운용 중지 부대)";
+
+    private static string SuspendedTag(UnitTreeNode? node) => node is { IsEnable: false } ? " " + SuspendedMark : string.Empty;
+
+    /// <summary>부대 → 조상 경로("3대대 › 1연대 › 제○○사단").</summary>
+    public static string ParentPath(UnitTreeModel tree, int unitId)
+    {
+        ArgumentNullException.ThrowIfNull(tree);
+        var names = new List<string>();
+        var cursor = tree.Find(unitId);
+        var guard = 0;
+        while (cursor is not null && guard++ <= tree.Count)
+        {
+            names.Add(cursor.Name);
+            cursor = cursor.ParentId is int p ? tree.Find(p) : null;
+        }
+        return string.Join(" › ", names);
+    }
+
+    /// <summary>캔버스 밖 · 오버레이 위에서 놓아 끌기를 취소했다(조정자 결정 · ISSUE-13 — 캔버스가 부른다).</summary>
+    public const string DropOutsideCancelled = "관계도 밖에 놓아 취소했습니다";
+
+    /// <summary>콘솔이 앞선 저장 중 — 확인 오버레이의 [확정]을 끄는 까닭(ISSUE-23).</summary>
+    public const string ConsoleBusyStatus = "앞선 저장이 끝나면 확정할 수 있습니다";
+
+    /// <summary>인접선을 끈 채 인접을 이었다 — 새 선이 보이지 않는다(ISSUE-55). 막대 단추는 <see cref="ShowAdjacencyAction"/>.</summary>
+    public const string AdjacencyHiddenNote = " 인접선이 꺼져 있어 보이지 않습니다.";
+
+    /// <summary>인접선 켜기 단추 글(막대 오른쪽).</summary>
+    public const string ShowAdjacencyAction = "인접선 켜기";
+
+    /// <summary>지도 · 다른 창에서 온 이동 요청을 상세 가드가 막았다(ISSUE-43).</summary>
+    public static string RevealBlockedBand(string unitName)
+        => KoreanParticles.Resolve($"적용하지 않은 변경이 있어 {Quote(unitName)}(으)로 이동하지 않았습니다 — [적용] 또는 [되돌리기] 후 다시 하세요.");
+
+    /// <summary>상위 되돌리기 성공 — 배치(Δ)는 되살리지 않는다(결정 D-2026-09-27-215b6d).</summary>
+    public static string ReparentUndoneWithLayoutBar(string unitName)
+        => KoreanParticles.Resolve($"{Quote(unitName)}의 상위 변경을 되돌렸습니다 — 배치는 자동 배치로 돌아갑니다.");
+
+    /// <summary>
+    /// 편제 쓰기 실패의 상태별 사유(FR-34 · ISSUE-25 · 6). 서버 원문은 붙이지 않는다(로그로만).
+    /// </summary>
+    /// <param name="errorCode">서버 오류 코드(<c>ApiErrorCodes</c>) — 없으면 일반 사유.</param>
+    public static string OrgFailureReason(string? errorCode) => errorCode switch
+    {
+        "UNAUTHORIZED" or "SESSION_REVOKED" => "로그인이 만료되었습니다(401) — 다시 로그인하세요.",
+        "FORBIDDEN" => "권한이 없습니다(403).",
+        "NOT_FOUND" => "다른 곳에서 삭제된 부대입니다(404).",
+        "VALIDATION_ERROR" or "CONFLICT" or "BAD_REQUEST" => "서버 규칙에 맞지 않아 거절됐습니다.",
+        "PRECONDITION_REQUIRED" => "버전 확인이 빠진 요청이었습니다(428).",
+        "GATEWAY_TIMEOUT" => "결과를 확인하지 못했습니다 — 편제를 다시 읽어 실제 상태로 보입니다.",
+        "SERVICE_UNAVAILABLE" or "BAD_GATEWAY" => "서버 연결을 확인하세요.",
+        "INTERNAL_ERROR" => "서버 오류입니다 — 잠시 후 다시 시도하세요.",
+        _ => "잠시 후 다시 시도하세요.",
+    };
+
+    /// <summary>M 모드 — 선택 없이 M 을 눌렀다(FR-37 경계 표).</summary>
+    public const string MoveModeNeedsSelection = "옮길 부대를 먼저 고르세요";
+
+    /// <summary>M 모드 중 그 부대가 다른 곳에서 지워졌다(FR-37 경계 표).</summary>
+    public const string MoveModeUnitDeleted = "다른 곳에서 삭제된 부대입니다";
+
+    /// <summary>배치 알림이 오래(30초) 미뤄지고 있다 — 한 번만 알린다(ISSUE-9).</summary>
+    public const string LayoutNoticeDeferredStatus = "다른 운영자가 배치를 바꿨습니다 — 지금 하던 일이 끝나면 반영합니다";
+
+    /// <summary>전체 보기가 최소 배율에서도 넘친다(FR-15 · ISSUE-39).</summary>
+    public const string FitOverflowStatus = "전체가 한 화면에 들지 않습니다 — 검색 · 미니맵으로 이동하세요";
+
+    /// <summary>부대 0 — 관계도 빈 상태(FR-15).</summary>
+    public const string EmptyMapStatus = "표시할 부대가 없습니다";
+
+    /// <summary>되돌리기 가능한 초기화의 상한(S-1 ③) — 넘으면 확인 문구가 미리 알린다(ISSUE-50).</summary>
+    public const string ResetUndoUnavailableLine = "배치가 1000곳을 넘어 이번 초기화는 되돌릴 수 없습니다.";
     #endregion
 
     #region - 도움 -

@@ -55,7 +55,7 @@ public interface IUnitDeviceApi
 /// <summary>장비 목록의 <c>status</c> 를 부대 콘솔이 쓰는 세 갈래로(FR-03 — 관계도 L2 "▲오류 N" 의 원천, 읽은 시점 스냅샷).</summary>
 public enum UnitDeviceStatus
 {
-    /// <summary><c>ACTIVATED</c> — 그리고 모르는 값 · 빈 값(서버가 새 상태를 더해도 오류로 부풀리지 않는다).</summary>
+    /// <summary><c>ACTIVATED</c>.</summary>
     Normal = 0,
 
     /// <summary><c>ERROR</c>.</summary>
@@ -63,12 +63,15 @@ public enum UnitDeviceStatus
 
     /// <summary><c>DEACTIVATED</c>.</summary>
     Deactivated = 2,
+
+    /// <summary>없거나 모르는 값 — v1.3 FR-03 "알 수 없음". 배지 수(오류 N)에 넣지 않는다(ISSUE-48).</summary>
+    Unknown = 3,
 }
 
 /// <summary>장비 한 대 — 부대 콘솔이 아는 만큼만.</summary>
 /// <param name="Status">목록의 <c>status</c>(<see cref="UnitDeviceText.StatusOf"/>). 위치 매개변수 <b>기본값</b>이라 기존 생성 지점은 그대로 컴파일된다(NFR-10).</param>
 public sealed record UnitDeviceItem(int Id, int NumberDevice, string Name, EnumDeviceCategory Category, int? UnitId,
-                                    UnitDeviceStatus Status = UnitDeviceStatus.Normal)
+                                    UnitDeviceStatus Status = UnitDeviceStatus.Unknown)
 {
     public string CategoryText => UnitDeviceText.CategoryText(Category);
     public override string ToString() => $"{Name} (#{NumberDevice})";
@@ -98,12 +101,13 @@ public static class UnitDeviceText
         _ => category.ToString(),
     };
 
-    /// <summary>목록 <c>status</c> 문자열 → <see cref="UnitDeviceStatus"/>. 대소문자 · 앞뒤 공백 무시, 모르면 정상.</summary>
+    /// <summary>목록 <c>status</c> 문자열 → <see cref="UnitDeviceStatus"/>. 대소문자 · 앞뒤 공백 무시, 없거나 모르면 <b>알 수 없음</b>(v1.3 FR-03).</summary>
     public static UnitDeviceStatus StatusOf(string? raw) => raw?.Trim().ToUpperInvariant() switch
     {
+        "ACTIVATED" => UnitDeviceStatus.Normal,
         "ERROR" => UnitDeviceStatus.Error,
         "DEACTIVATED" => UnitDeviceStatus.Deactivated,
-        _ => UnitDeviceStatus.Normal,
+        _ => UnitDeviceStatus.Unknown,
     };
 }
 

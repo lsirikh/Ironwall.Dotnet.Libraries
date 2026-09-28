@@ -384,6 +384,14 @@ public class UnitMapLayoutSyncTests
         Assert.IsType<UnitMapReparentCleanup.Skip>(plan);
         Assert.Empty(server.Writes);
     }
+
+    [Fact]
+    public void should_plan_parent_change_clear_from_the_latest_document_only()
+    {
+        // TEST-64 ④ — PlanParentChangeClear(latestDoc, unitId): 행 없음 = Skip(충돌 아님) · 있음 = Clear(최신 버전).
+        Assert.IsType<UnitMapReparentCleanup.Skip>(UnitMapLayoutSync.PlanParentChangeClear(Snap(15, (Unrelated, 1, 1)), X));
+        Assert.Equal(16, Assert.IsType<UnitMapReparentCleanup.Clear>(UnitMapLayoutSync.PlanParentChangeClear(Snap(16, (X, 5, 5)), X)).IfMatchVersion);
+    }
     #endregion
 
     #region - [배치 초기화] 되돌리기 (FR-35 · 분석 ISSUE-50) -
@@ -442,6 +450,26 @@ public class UnitMapLayoutSyncTests
         Assert.Empty(plan.Restored);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(50)]
+    [InlineData(1000)]
+    public void should_restore_all_or_all_but_the_moved_unit_at_every_batch_size(int size)
+    {
+        // TEST-64 ③ — 1 · 50 · 1000 항목 × (무변경 → 전부 · 1부대 옮김 → 그 부대만 빼고 + 뺀 수). SIM-U001~016.
+        var ids = Org.Tree.Ordered.Select(n => n.Id).Take(Math.Min(size, Org.Tree.Count)).ToList();
+        var before = ids.Select(id => (id, 1.0, 2.0)).ToArray();
+        var entry = ResetOf(Snap(21), before);
+
+        var untouched = UnitMapLayoutSync.PlanResetUndo(entry, Snap(21), Org.Tree);
+        var moved = UnitMapLayoutSync.PlanResetUndo(entry, Snap(22, (ids[0], 9, 9)), Org.Tree);
+
+        Assert.Equal(ids.Count, untouched.Change!.Set.Count);
+        Assert.Equal(0, untouched.SkippedCount);
+        Assert.Equal(new[] { ids[0] }, moved.SkippedChanged);
+        Assert.Equal(ids.Count - 1, moved.Change?.Set.Count ?? 0);
+    }
+
     [Fact]
     public void should_refuse_instead_of_splitting_when_the_reset_touched_more_than_the_batch_limit()
     {
@@ -473,6 +501,81 @@ public class UnitMapLayoutSyncTests
 
         Assert.Equal(new[] { X }, plan.Restored);
         Assert.Equal(new[] { Unrelated }, plan.SkippedChanged);
+    }
+    #endregion
+
+    #region - 배치 알림 발화 시점 · 연기 상한 (TEST-66 ② ③ ④) -
+    private sealed class FakeClock : Ironwall.Dotnet.Libraries.Base.Services.IClock
+    {
+        public DateTime Now { get; set; } = new(2026, 9, 28, 9, 0, 0);
+        public DateTime UtcNow => Now.ToUniversalTime();
+        public void Advance(TimeSpan by) => Now += by;
+    }
+
+    [Fact]
+    public void should_skip_my_own_echo_when_compared_at_fire_time()
+    {
+        // SIM-N082 — 보유 13, 내 PATCH(13→14) 응답 대기 중 알림 14 가 먼저 온다. 발화 순간(응답 뒤) 다시 비교해 건너뛴다.
+        var gate = new UnitMapLayoutNoticeGate(new FakeClock());
+        gate.Notice(14);
+
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(haveVersion: 13, UnitMapBusy.WriteInFlight));
+        Assert.Equal(UnitMapNoticeAction.None, gate.Evaluate(haveVersion: 14, UnitMapBusy.None));   // 응답을 반영한 뒤
+        Assert.Null(gate.PendingVersion);
+    }
+
+    [Fact]
+    public void should_refetch_once_after_the_drag_even_when_several_versions_arrived()
+    {
+        // SIM-C013 · C028 · C044 — 끄는 중 15 · 17 · 20 → 놓은 뒤 GET 1회(버전 건너뜀 허용).
+        var gate = new UnitMapLayoutNoticeGate(new FakeClock());
+        foreach (var v in new long[] { 15, 17, 20 }) gate.Notice(v);
+
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(13, UnitMapBusy.Dragging));
+        Assert.Equal(UnitMapNoticeAction.Refetch, gate.Evaluate(13, UnitMapBusy.None));
+        Assert.Equal(UnitMapNoticeAction.None, gate.Evaluate(20, UnitMapBusy.None));
+    }
+
+    [Theory]
+    [InlineData(13)]
+    [InlineData(12)]
+    public void should_ignore_late_or_equal_notices(long notice)
+    {
+        var gate = new UnitMapLayoutNoticeGate(new FakeClock());
+        gate.Notice(notice);
+
+        Assert.Equal(UnitMapNoticeAction.None, gate.Evaluate(13, UnitMapBusy.None));
+    }
+
+    [Fact]
+    public void should_notify_once_after_thirty_seconds_of_deferral_and_then_stay_quiet()
+    {
+        // SIM-N084 · ISSUE-9 — M 모드를 30초 넘게 붙잡으면 한 번 알린다(모드는 유지). 그 뒤 알림은 조용히 누적.
+        var clock = new FakeClock();
+        var gate = new UnitMapLayoutNoticeGate(clock);
+        gate.Notice(15);
+
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(13, UnitMapBusy.MoveMode));
+        clock.Advance(TimeSpan.FromSeconds(29.9));
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(13, UnitMapBusy.MoveMode));
+        clock.Advance(TimeSpan.FromSeconds(0.2));
+        Assert.Equal(UnitMapNoticeAction.NotifyDeferred, gate.Evaluate(13, UnitMapBusy.MoveMode));
+        gate.Notice(16);
+        clock.Advance(TimeSpan.FromSeconds(60));
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(13, UnitMapBusy.MoveMode));
+        Assert.Equal(16, gate.PendingVersion);
+
+        Assert.Equal(UnitMapNoticeAction.Refetch, gate.Evaluate(13, UnitMapBusy.None));      // 손을 놓으면 한 번
+        gate.Notice(17);
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(16, UnitMapBusy.Dragging));   // 새 연기 — 시계가 다시 시작
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Assert.Equal(UnitMapNoticeAction.Defer, gate.Evaluate(16, UnitMapBusy.Dragging));
+    }
+
+    [Fact]
+    public void should_do_nothing_when_no_notice_is_pending()
+    {
+        Assert.Equal(UnitMapNoticeAction.None, new UnitMapLayoutNoticeGate(new FakeClock()).Evaluate(13, UnitMapBusy.Dragging));
     }
     #endregion
 

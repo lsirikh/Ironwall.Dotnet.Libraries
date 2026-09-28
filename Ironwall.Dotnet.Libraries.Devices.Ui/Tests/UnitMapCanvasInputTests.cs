@@ -307,8 +307,8 @@ public class UnitMapCanvasInputTests
     [Theory]
     [InlineData(0, true)]
     [InlineData(7.9, true)]
-    [InlineData(8.1, false)]
-    public void should_select_only_when_a_node_is_right_clicked_inside_the_dead_zone(double dx, bool selects)
+    [InlineData(8.1, true)]           // PRD v1.3 FR-13 — 이동 거리와 무관하게 선택만
+    public void should_select_only_when_a_node_is_right_clicked_regardless_of_the_distance(double dx, bool selects)
     {
         var calls = UnitMapCanvasHarness.Run(canvas =>
         {
@@ -465,7 +465,7 @@ internal static class UnitMapCanvasHarness
     }
 
     /// <summary>기록하는 가짜 관계도 뷰모델 — 판정은 레인 A 의 진짜 순수 판정기(<see cref="UnitMapDropClassifier"/>).</summary>
-    public sealed class FakeInteraction : IUnitMapInteraction, IUnitMapOverlayCommands
+    public sealed class FakeInteraction : IUnitMapInteraction, IUnitMapOverlayCommands, IUnitMapBarAction
     {
         private readonly UnitMapCanvas _canvas;
         private readonly UnitMapDropPolicy _policy;
@@ -506,5 +506,6 @@ internal static class UnitMapCanvasHarness
         public void Undo() => Calls.Add("undo");
         public void DismissBar() => Calls.Add("dismiss");
         public void RetryLayout() => Calls.Add("retry");
+        public void RunBarAction() => Calls.Add("bar-action");
     }
 }

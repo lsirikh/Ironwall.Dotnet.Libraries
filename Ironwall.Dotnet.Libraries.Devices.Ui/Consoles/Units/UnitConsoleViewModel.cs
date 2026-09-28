@@ -1,8 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
@@ -36,7 +39,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 /// <para><b>형제 순서 드래그는 없다</b> — 서버 계약에 순서 필드가 아예 없어 끌어도 저장되지 않는다
 /// (스토리보드 L359-361 · 드래그 와이어프레임 L446).</para>
 /// </remarks>
-public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMessage>
+public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMessage>, IUnitMapCommands, IUnitMapConsoleBridge
 {
     public const string RAIL_TREE = "tree";
     public const string RAIL_ADJACENCY = "adjacency";
@@ -57,6 +60,21 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>그 옆 단추의 글 — 누르면 [갱신]과 같은 길(미적용 관문 포함)로 다시 읽는다.</summary>
     public const string EXTERNAL_CHANGE_ACTION = "다시 읽기";
 
+    /// <summary>개인 표시 설정(<see cref="ConsolePrefs"/>)의 이 콘솔 키 — 셸 <c>ConsoleKey</c> 와 같다.</summary>
+    public const string PREFS_KEY = "Units";
+
+    /// <summary>관계도 확인 오버레이가 떠 있는 동안 다른 조작을 막을 때의 말(#49 — 콘솔 전체 모달).</summary>
+    public const string CONFIRM_PENDING_NOTICE = "관계도에서 확인을 기다리는 중입니다 — [확인] 또는 [취소]를 먼저 누르세요.";
+
+    /// <summary>고른 부대가 재조회 뒤 편제에 없다(ISSUE-29 — 모든 재조회가 같은 말).</summary>
+    public const string SELECTED_UNIT_GONE = "고른 부대가 다른 곳에서 삭제되었습니다.";
+
+    /// <summary>관계도에서 고르려 했는데 상세에 적용하지 않은 변경이 있다(v1.3 FR-02 — 가드가 막고 띠로 알린다).</summary>
+    public const string SELECT_BLOCKED_BY_EDIT = "적용하지 않은 변경이 있어 다른 부대를 고르지 않았습니다 — [적용] 또는 [되돌리기] 후 다시 고르세요.";
+
+    /// <summary>합침 창이 계속 다시 열려도 첫 알림에서 이만큼 지나면 곧바로 한 번 읽는다(ISSUE-30).</summary>
+    public static readonly TimeSpan EXTERNAL_CHANGE_MAX_WAIT = TimeSpan.FromSeconds(2);
+
     #region - Ctors -
     public UnitConsoleViewModel(
         IUnitGraphApi units,
@@ -69,7 +87,11 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         Func<bool>? canPlaceDevices = null,
         IEventAggregator? events = null,
         Func<bool>? isDragging = null,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        IUnitLayoutApi? layoutApi = null,
+        ConsolePrefEntry? prefs = null,
+        System.Action? savePrefs = null,
+        IClock? clock = null)
     {
         _units = units ?? throw new ArgumentNullException(nameof(units));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
@@ -86,6 +108,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         // SYNC_UNIT 는 PUT 한 번에 여러 건이 몰려온다 — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
         _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync, delay: delay,
                                                 onError: ex => _log?.Error($"[UnitConsole] 외부 변경 재조회: {ex.Message}"));
+        _clock = clock ?? new SystemClock();
+        _prefs = prefs;
+        _savePrefs = savePrefs;
 
         // 창 제목 — Caliburn 창 관리자가 DisplayName 을 Title 로 묶는다. 비우면 타입 이름이 뜬다(U-18 D-0 0.2 · D-8 8.1).
         DisplayName = WINDOW_TITLE;
@@ -97,11 +122,27 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
                                    reason => StatusText = reason, () => _canPlaceDevices());
 
         // 아이콘은 이름만 쥔 토큰이다 — 싱글턴이 아닌 창이어도 뷰모델이 시각 요소를 쥐지 않는다(장비 콘솔 선례).
-        // "인접 관계도" 칸은 내지 않는다 — 그림 관계도가 아직 없어 칸을 누르면 "다음 단계" 자리표시만 떴다(U-18 D-8 8.2).
-        // 인접 편집은 상세 칸에서 그대로 한다. 관계도가 생기면 RAIL_ADJACENCY 칸을 여기 다시 넣는다.
+        // 「부대 관계도」 칸 — 편제 트리와 미배치 장비 사이(unit-relationship-map FR-01). 키는 옛 RAIL_ADJACENCY 그대로라
+        // 옛 설정의 LastRailKey="adjacency" 도 유효하다. 숫자 배지는 달지 않는다 — 옆 칸들의 배지가 부대 · 장비 수라
+        // 여기 숫자가 있으면 부대 수로 읽힌다(조정자). 인접 쌍 수는 목록 상태 줄이 "인접 N쌍"으로 말한다.
         RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리", new ConsoleIconToken("FileTree")) { ShowCount = true });
+        RailEntries.Add(new ConsoleRailEntry(RAIL_ADJACENCY, "부대 관계도", new ConsoleIconToken("SitemapOutline")) { ShowCount = false });
         RailEntries.Add(new ConsoleRailEntry(RAIL_DEVICES, "미배치 장비", new ConsoleIconToken("Devices")) { ShowCount = true });
-        _selectedRail = RailEntries[0];
+        _selectedRail = RailEntries.FirstOrDefault(e => e.Key == prefs?.LastRailKey) ?? RailEntries[0];
+
+        // 관계도 — 콘솔이 소유한다(자식). 선택 · 편제 쓰기는 이 콘솔의 기존 경로 한 벌(D-5)을 IUnitMapCommands 로 쓴다.
+        Map = new UnitMapViewModel(this, layoutApi ?? new UnitLayoutApiAdapter(null), new UnitMapViewModelOptions
+        {
+            Events = events,
+            Delay = delay,
+            Prefs = prefs,
+            SavePrefs = savePrefs,
+            Console = this,
+            MyUnitIdProvider = () => MyUnitId,
+            Clock = _clock,
+        });
+        Map.PropertyChanged += OnMapPropertyChanged;
+        Map.DefersReloadChanged += OnMapDefersReloadChanged;
 
         EchelonFilters.Add(new UnitEchelonFilterViewModel(null, "전체") { IsSelected = true });
         foreach (var echelon in Enum.GetValues<EnumUnitEchelon>())
@@ -125,6 +166,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>창을 닫아도 되는가 — 적용하지 않은 상세 변경 · 배치 대기 장비가 있으면 먼저 묻는다.</summary>
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
+        Map.CancelAll();   // 관계도 확인 오버레이 · M 모드 · 끌기는 서버 0 으로 먼저 거둔다(IMPL-31 — 아래 가드는 그대로)
         var pending = new List<string>();
         if (Detail.IsDirty) pending.Add("적용하지 않은 부대 정보 변경");
         if (Tray.HasEntries) pending.Add($"배치 대기 장비 {Tray.Count}대");
@@ -153,20 +195,35 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         set
         {
             if (ReferenceEquals(_selectedRail, value) || value is null) return;
+            if (BlockedByConfirm()) { NotifyOfPropertyChange(); return; }     // #49 — 확인 대기 중 레일 전환 막힘
             // 레일 전환은 미적용 변경을 버릴 수 있다 — 커널 관문을 먼저 지난다.
             if (!Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail)) { NotifyOfPropertyChange(); return; }
             _selectedRail = value;
             NotifyOfPropertyChange();
             RaiseViewFlags();
             Project();
+            if (_prefs is not null)
+            {
+                _prefs.LastRailKey = value.Key;
+                _savePrefs?.Invoke();
+            }
         }
     }
 
     public bool IsTreeView => _selectedRail.Key == RAIL_TREE;
     public bool IsDeviceView => _selectedRail.Key == RAIL_DEVICES;
 
-    /// <summary>인접 관계도는 <b>이 노드의 범위 밖</b>이다(봉투: "관계도는 뒤"). 레일 칸을 내지 않아 이 값은 늘 false 다.</summary>
+    /// <summary>「부대 관계도」 칸을 보고 있다(unit-relationship-map FR-01).</summary>
     public bool IsAdjacencyView => _selectedRail.Key == RAIL_ADJACENCY;
+
+    /// <summary>관계도 뷰모델(캔버스의 <c>Interaction</c>) — 이 콘솔이 소유한다.</summary>
+    public UnitMapViewModel Map { get; }
+
+    /// <summary>관계도 확인 오버레이가 떠 있다 — 콘솔 전체가 모달이다(#49).</summary>
+    public bool IsStructureConfirmPending => Map.IsConfirming;
+
+    /// <summary>트리 · 상세 · 툴바를 만질 수 있다(확인 대기 중이 아니다) — 뷰가 IsEnabled 로 묶는다.</summary>
+    public bool IsConsoleInteractive => !IsStructureConfirmPending;
 
     public string SearchText
     {
@@ -183,7 +240,14 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public UnitNodeRowViewModel? SelectedRow
     {
         get => _selectedRow;
-        private set { _selectedRow = value; NotifyOfPropertyChange(); RaiseCommands(); }
+        private set
+        {
+            var changed = _selectedRow?.Id != value?.Id;
+            _selectedRow = value;
+            NotifyOfPropertyChange();
+            RaiseCommands();
+            if (changed) SelectedUnitChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     /// <summary>미배치 목록에서 지금 고른 장비들 — 끌기의 버튼 폴백이 쓴다.</summary>
@@ -193,7 +257,18 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         private set { _selectedDevices = value; NotifyOfPropertyChange(); RaiseCommands(); }
     }
 
-    public bool IsBusy { get => _isBusy; private set { _isBusy = value; NotifyOfPropertyChange(); RaiseCommands(); } }
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            var changed = _isBusy != value;
+            _isBusy = value;
+            NotifyOfPropertyChange();
+            RaiseCommands();
+            if (changed) BusyChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public string StatusText { get => _statusText; private set { _statusText = value; NotifyOfPropertyChange(); } }
 
@@ -207,7 +282,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <remarks>V-39 — "인접 쌍 N" 을 뺐다. 인접 관계도 칸은 숨겼으므로(아래 RailEntries) 그 수는 운영자가 볼 곳이 없다.</remarks>
     public string ListStatusText => IsDeviceView
         ? $"미배치 장비 {DeviceRows.Count}"
-        : $"부대 {Tree.Count}";
+        : IsAdjacencyView
+            ? $"부대 {Tree.Count} · 인접 {AdjacencyPairCount}쌍"
+            : $"부대 {Tree.Count}";
 
     /// <summary>
     /// 레일 바닥 — 내 부대를 <b>이름</b>으로 말한다(V-39: 종전엔 "내 부대 · unit001" 처럼 코드를 그대로 냈다).
@@ -235,6 +312,17 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public string RailSubtitle => _selectedRail.Label;
 
     public string? MyUnitCode => _myUnitCode();
+
+    /// <summary>편제에서 찾은 내 부대 id — 관계도 ★ · <c>Home</c> · 첫 화면.</summary>
+    public int? MyUnitId
+    {
+        get
+        {
+            var code = MyUnitCode;
+            if (string.IsNullOrEmpty(code)) return null;
+            return Tree.Ordered.FirstOrDefault(n => string.Equals(n.Code, code, StringComparison.Ordinal))?.Id;
+        }
+    }
 
     public int AdjacencyPairCount { get; private set; }
 
@@ -294,6 +382,8 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         if (_loadedOnce) return;
         _loadedOnce = true;
         await ReloadAsync(cancellationToken);
+        // 배치 문서 1회(지원 판정 겸 — FR-50). 관계도 칸을 열지 않아도 읽어 둔다: 트리에서 옮긴 부대의 배치 정리(FR-08)가 판정을 쓴다.
+        await Map.OpenAsync(cancellationToken);
     }
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -303,6 +393,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             _closed = true;
             _events?.Unsubscribe(this);
             _externalChange.Cancel();
+            Map.Dispose();     // 개인 뷰 저장 · 합침 중단 · 구독 해제
         }
         await base.OnDeactivateAsync(close, cancellationToken);
     }
@@ -318,10 +409,33 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// 건너뛰지 않으면 상세가 더럽다는 이유로 이동 · 인접 · 배치 뒤의 재조회가 조용히 취소되어
     /// <b>서버는 바뀌었는데 화면만 옛 상태</b>로 남는다.
     /// </param>
-    public async Task ReloadAsync(CancellationToken token = default, bool quiet = false, bool bypassGuard = false)
+    public Task ReloadAsync(CancellationToken token = default, bool quiet = false, bool bypassGuard = false)
+    {
+        // [갱신] 은 확인 대기 중 막는다(#49). 서버가 바꾼 것을 다시 읽는 길(bypassGuard)은 막지 않는다.
+        if (!bypassGuard && BlockedByConfirm()) return Task.CompletedTask;
+        return ReloadCoreAsync(token, quiet, bypassGuard, includeDevices: true);
+    }
+
+    /// <summary>
+    /// 편제만 다시 읽는다(장비 전량은 그대로 — ISSUE-28). 다른 곳의 편제 변경 · 편제 쓰기 뒤 · 관계도의 확정 직전 재판정이 쓴다.
+    /// 장비는 [갱신] · 창 열기 · 장비 배치 적용에서만 읽는다(카테고리 7종 · 여러 쪽이라 무겁다).
+    /// </summary>
+    public Task ReloadGraphAsync(CancellationToken token = default, bool quiet = true)
+        => ReloadCoreAsync(token, quiet, bypassGuard: true, includeDevices: false);
+
+    /// <summary>
+    /// 띠의 [다시 읽기] — 편제만 다시 읽어 그림을 새로 하고 <b>상세의 미적용 편집은 그대로</b> 둔다(결정 D-2026-09-27-215b6d · ISSUE-29).
+    /// </summary>
+    public async Task ReadExternalChangeAsync(CancellationToken token = default)
+    {
+        if (BlockedByConfirm()) return;
+        await ReloadGraphAsync(token).ConfigureAwait(true);
+    }
+
+    private async Task ReloadCoreAsync(CancellationToken token, bool quiet, bool bypassGuard, bool includeDevices)
     {
         if (!bypassGuard && !Detail.Guard.TryNavigate(ConsoleNavigation.Refresh)) return;
-        if (IsBusy) return;                 // 스스로 막는다 — 호출부가 IsBusy 를 내려놓고 부르는 길이 여럿이다
+        if (IsBusy) { _reloadPending = true; return; }     // 버리지 않는다 — 앞선 작업이 끝나면 한 번(ISSUE-27)
         if (!IsAvailable)
         {
             StatusText = NOT_SUPPORTED;
@@ -335,6 +449,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         }
 
         IsBusy = true;
+        var lost = false;
         try
         {
             var response = await _units.GetGraphAsync(token).ConfigureAwait(true);
@@ -348,7 +463,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             IsExternallyChanged = false;          // 방금 서버의 지금 편제를 받았다 — "바뀌었다" 안내는 더 이상 참이 아니다
             AdjacencyPairCount = response.Data?.Edges?.AdjacencyPairs.Count() ?? 0;
 
-            if (_devices.IsAvailable)
+            if (includeDevices && _devices.IsAvailable)
             {
                 var loaded = await _devices.LoadAllAsync(token).ConfigureAwait(true);
                 _allDevices = loaded.Items;
@@ -357,11 +472,21 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
             // 되돌리기는 재조회를 넘어 살아남는다 — 반대 방향 PATCH 한 번이라 화면을 다시 읽어도 여전히 유효하다.
             DeleteBlock = null;
-            RestoreSelection();
+            lost = RestoreSelection();
             Project();
             // 고른 행의 통지는 Project 뒤다 — 목록에 아직 없는 인스턴스를 밀면 ListBox 가 그냥 버린다.
             NotifyOfPropertyChange(nameof(SelectedRow));
-            if (!quiet) StatusText = $"부대 {Tree.Count}개를 불러왔습니다.";
+            Map.SetData(Tree, _allDevices);
+            if (lost)
+            {
+                // 고른 부대가 사라졌다(ISSUE-29 — 어느 재조회든 이 한 곳) — 없는 부대의 상세를 붙들면 다음 적용이 404 로 간다.
+                Form.Clear();
+                Detail.Reset();
+                RaiseDetail();
+                SelectedUnitChanged?.Invoke(this, EventArgs.Empty);
+                StatusText = SELECTED_UNIT_GONE;
+            }
+            else if (!quiet) StatusText = $"부대 {Tree.Count}개를 불러왔습니다.";
         }
         catch (OperationCanceledException) { StatusText = "불러오기를 취소했습니다."; }
         catch (Exception ex)
@@ -373,6 +498,11 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         {
             IsBusy = false;
             RaiseCommands();
+            if (_reloadPending && !_closed)
+            {
+                _reloadPending = false;
+                _externalChangeTask = _externalChange.Pulse();
+            }
         }
     }
     #endregion
@@ -399,6 +529,15 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public Task HandleAsync(UnitTopologyChangedMessage message, CancellationToken cancellationToken)
     {
         if (_closed) return Task.CompletedTask;
+        var now = _clock.UtcNow;
+        _firstExternalChangeAt ??= now;
+        if (now - _firstExternalChangeAt.Value >= EXTERNAL_CHANGE_MAX_WAIT)
+        {
+            // 최대 대기(ISSUE-30) — 400ms 간격으로 계속 오면 뒤끝 창이 영영 닫히지 않는다. 창을 끊고 지금 한 번.
+            _externalChange.Cancel();
+            _externalChangeTask = OnExternalChangeSettledAsync(CancellationToken.None);
+            return Task.CompletedTask;
+        }
         _externalChangeTask = _externalChange.Pulse();
         return Task.CompletedTask;
     }
@@ -413,15 +552,24 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     {
         if (_closed || !_loadedOnce) return;
 
-        // 끌기 · 다른 작업 중이면 잠깐 뒤로 미룬다 — 곧 끝나는 일이고, 끝나면 다음 창에서 알아서 다시 읽는다.
+        // 끌기 · 다른 작업 · 관계도의 확인 오버레이 · M 모드 · 관계도 끌기 중이면 뒤로 미룬다(#49 · ISSUE-9)
+        // — 끝나면 다음 창에서(관계도는 DefersReloadChanged 로도) 다시 읽는다.
         if (_isDragging() || IsBusy)
         {
             IsExternallyChanged = true;
             _externalChangeTask = _externalChange.Pulse();
             return;
         }
+        if (Map.DefersReload)
+        {
+            // 관계도는 끝남을 알린다(DefersReloadChanged) — 창을 다시 열어 두지 않는다(열어 두면 확인 창 내내 합침이 돈다).
+            IsExternallyChanged = true;
+            return;
+        }
 
-        // 사람이 손댄 것은 덮지 않는다 — 알리고 사람이 [다시 읽기]로 고른다.
+        _firstExternalChangeAt = null;
+
+        // 사람이 손댄 것은 덮지 않는다 — 그림도 그대로 두고 알린다(결정 D-2026-09-27-215b6d). 사람이 [다시 읽기]로 고른다.
         if (HasUnappliedWork)
         {
             IsExternallyChanged = true;
@@ -430,19 +578,10 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
         var selectedId = SelectedRow?.Id;
         var before = Tree;
-        // 조용히 · 관문 없이 — 방금 한 일의 결과 문장을 지우지 않고, 미적용 관문은 위에서 이미 확인했다.
-        await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
+        // 조용히 · 관문 없이 · 편제만(ISSUE-28) — 방금 한 일의 결과 문장을 지우지 않고, 미적용 관문은 위에서 이미 확인했다.
+        await ReloadGraphAsync(token).ConfigureAwait(true);
         if (ReferenceEquals(Tree, before) || Detail.IsCreating || selectedId is not int id) return;   // 못 읽었거나 등록 중
-
-        if (SelectedRow is null)
-        {
-            // 고른 부대가 다른 곳에서 지워졌다 — 없는 부대의 상세를 붙들고 있으면 다음 적용이 404 로 간다.
-            Form.Clear();
-            Detail.Reset();
-            RaiseDetail();
-            StatusText = "고른 부대가 다른 곳에서 삭제되었습니다.";
-            return;
-        }
+        if (SelectedRow is null) return;      // 사라진 부대는 재조회가 한 곳(RestoreSelection)에서 알렸다
         // 같은 부대라도 다시 읽는다 — 옛 상세를 붙들면 다음 PATCH 가 이미 바뀐 칸을 옛 값으로 되돌린다.
         await SelectByIdAsync(id, token, force: true).ConfigureAwait(true);
     }
@@ -572,6 +711,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// </param>
     public async Task SelectRowAsync(UnitNodeRowViewModel? row, CancellationToken token = default, bool force = false)
     {
+        if (BlockedByConfirm()) { NotifyOfPropertyChange(nameof(SelectedRow)); return; }   // #49 — 목록 선택을 되돌린다
         if (!force && ReferenceEquals(row, SelectedRow)) return;
         if (!force && !Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) return;
 
@@ -596,7 +736,34 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         RaiseDetail();
     }
 
-    private async Task LoadDetailAsync(UnitNodeRowViewModel row, CancellationToken token)
+    /// <summary>
+    /// 상세 읽기 — 읽는 중에 또 고르면 새로 보내지 않고 <b>마지막 선택 하나</b>만 이어서 읽는다(화살표 자동 반복 · 빠른 클릭의 GET 폭주 방지 — ISSUE-51).
+    /// </summary>
+    private Task LoadDetailAsync(UnitNodeRowViewModel row, CancellationToken token)
+    {
+        _wantedDetail = row;
+        if (_detailLoop is { IsCompleted: false } running) return running;
+        _detailLoop = DetailLoopAsync(token);
+        return _detailLoop;
+    }
+
+    private async Task DetailLoopAsync(CancellationToken token)
+    {
+        while (_wantedDetail is { } row)
+        {
+            _wantedDetail = null;
+            await LoadDetailCoreAsync(row, token).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>진행 중인 상세 읽기(관계도 선택 포함)가 끝날 때까지.</summary>
+    public async Task WhenDetailSettledAsync()
+    {
+        await _detailSettle.ConfigureAwait(true);
+        if (_detailLoop is { } loop) await loop.ConfigureAwait(true);
+    }
+
+    private async Task LoadDetailCoreAsync(UnitNodeRowViewModel row, CancellationToken token)
     {
         // A 를 고르고 곧바로 B 를 고르면 A 의 답이 뒤에 도착해 B 의 상세를 덮을 수 있다 — 표를 끊어 둔다.
         var ticket = ++_detailTicket;
@@ -611,7 +778,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         try
         {
             var response = await _units.GetDetailAsync(row.Id, token).ConfigureAwait(true);
-            if (ticket != _detailTicket) return;                 // 그 사이 다른 부대를 골랐다
+            if (ticket != _detailTicket || _wantedDetail is not null) return;   // 그 사이 다른 부대를 골랐다(뒤에 이어 읽는다)
             if (response.Success && response.Data is { } detail)
             {
                 Form.Load(detail, Tree, deviceCount);
@@ -644,20 +811,22 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public void SetSelectedDevices(IEnumerable<UnitDeviceRowViewModel>? rows)
         => SelectedDevices = rows?.ToList() ?? (IReadOnlyList<UnitDeviceRowViewModel>)Array.Empty<UnitDeviceRowViewModel>();
 
-    private void RestoreSelection()
+    /// <summary>재조회 뒤 선택을 새 행 인스턴스로 옮긴다. 고른 부대가 편제에서 사라졌으면 <c>true</c>(ISSUE-29 — 모든 재조회가 이 한 곳).</summary>
+    private bool RestoreSelection()
     {
         var wanted = SelectedRow?.Id ?? 0;
         _rowCache.Clear();
         _deviceRowCache.Clear();
         // 통지 없이 바꾼다 — Project 가 끝나 목록이 채워진 뒤에 한 번만 알린다(ReloadAsync).
         _selectedRow = wanted > 0 && Tree.Find(wanted) is { } node ? RowOf(node) : null;
+        return wanted > 0 && _selectedRow is null;
     }
     #endregion
 
     #region - 등록 · 적용 · 되돌리기 -
     public void BeginCreate()
     {
-        if (!CanAdd) return;
+        if (!CanAdd || BlockedByConfirm()) return;
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
 
         SelectedRow = null;
@@ -673,7 +842,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>상세 칸의 [적용] · [등록].</summary>
     public async Task ApplyAsync(CancellationToken token = default)
     {
-        if (IsBusy || !Detail.CanApply) return;
+        if (IsBusy || !Detail.CanApply || BlockedByConfirm()) return;
 
         Form.ErrorText = null;
         if (Form.IsCreating) await CreateAsync(token).ConfigureAwait(true);
@@ -773,6 +942,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// </summary>
     public async Task<bool> MoveAsync(int movingId, int? targetParentId, CancellationToken token = default)
     {
+        if (BlockedByConfirm()) return false;
         var verdict = UnitDropRules.CanMove(Tree, movingId, targetParentId);
         if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return false; }
         if (!CanEditUnits) { StatusText = NO_EDIT_PERMISSION; return false; }
@@ -781,6 +951,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         var moving = Tree.Find(movingId)!;
         var previousParentId = moving.ParentId;
         var targetName = targetParentId is int id ? Tree.Find(id)?.Name ?? $"부대 {id}번" : "최상위";
+        var fromMap = _structureFromMap;
+        var affected = new[] { (int?)movingId, targetParentId, previousParentId };
+        var selectedId = SelectedRow?.Id;
 
         IsBusy = true;
         try
@@ -788,17 +961,26 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             var response = await _units.PatchAsync(movingId, UnitRequestBuilder.Move(targetParentId), token).ConfigureAwait(true);
             if (!response.Success)
             {
-                StatusText = $"'{moving.Name}'을(를) 옮기지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
+                LastWriteFailureReason = StructureReason(response.Error);
+                StatusText = $"'{moving.Name}'을(를) 옮기지 못했습니다. {LastWriteFailureReason}";
                 IsBusy = false;
-                await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);   // 실패 복구는 재조회다(화면과 서버를 다시 맞춘다)
+                await ReloadGraphAsync(token).ConfigureAwait(true);   // 실패 복구는 재조회다(화면과 서버를 다시 맞춘다 · 504 면 실제 결과를 본다)
                 return false;
             }
 
+            LastWriteFailureReason = null;
             _lastMove = new UnitMoveUndo(movingId, moving.Name, previousParentId);
             StatusText = $"'{moving.Name}'을(를) '{targetName}'(으)로 옮겼습니다.";
             IsBusy = false;
-            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
-            await SelectByIdAsync(movingId, token, force: true).ConfigureAwait(true);
+            await ReloadGraphAsync(token).ConfigureAwait(true);
+            // 선택을 강제로 바꾸지 않는다(#20) — 고른 부대가 영향 집합(끈 부대 · 새 상위 · 옛 상위)에 들 때만 상세를 다시 읽는다.
+            if (selectedId is int sel && affected.Contains(sel) && SelectedRow?.Id == sel) await RefreshSelectedDetailAsync(token).ConfigureAwait(true);
+            if (!fromMap)
+            {
+                // 트리 레일의 이동 — 관계도 되돌리기 표의 편제 항목은 이제 다른 이동을 가리킨다(#22), 배치 Δ 정리는 여기 한 곳(FR-08).
+                Map.OnConsoleStructureChanged();
+                await Map.CleanupAfterParentChangeAsync(movingId).ConfigureAwait(true);
+            }
             return true;
         }
         catch (OperationCanceledException) { StatusText = "이동을 취소했습니다."; return false; }
@@ -814,7 +996,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>마지막 이동 1회를 되돌린다 — 반대 방향 PATCH 한 번.</summary>
     public async Task UndoMoveAsync(CancellationToken token = default)
     {
-        if (_lastMove is not { } undo) return;
+        if (_lastMove is not { } undo || BlockedByConfirm()) return;
 
         // 표를 미리 버리지 않는다 — 되돌리기가 실패하면 되돌릴 방법이 영영 사라진다.
         var ok = await MoveAsync(undo.UnitId, undo.PreviousParentId, token).ConfigureAwait(true);
@@ -823,31 +1005,25 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         NotifyOfPropertyChange(nameof(CanUndoMove));
     }
 
-    /// <summary>키보드 폴백 — Alt+↑ 는 한 단계 위로(부모의 부모, 없으면 최상위).</summary>
+    /// <summary>키보드 폴백 — Alt+↑ 는 한 단계 위로(부모의 부모, 없으면 최상위). 판정은 <see cref="UnitMovePlanner"/>(관계도와 같은 함수).</summary>
     public Task MoveSelectedUpAsync(CancellationToken token = default)
     {
-        if (SelectedRow is not { } row) return Task.CompletedTask;
-        var node = Tree.Find(row.Id);
-        if (node?.ParentId is not int parentId) { StatusText = $"'{row.Name}'은(는) 이미 최상위 부대입니다."; return Task.CompletedTask; }
-
-        var grandParentId = Tree.Find(parentId)?.ParentId;
-        return MoveAsync(row.Id, grandParentId, token);
+        if (SelectedRow is not { } row || BlockedByConfirm()) return Task.CompletedTask;
+        var plan = UnitMovePlanner.PlanMoveUp(Tree, row.Id);
+        if (!plan.IsAllowed) { StatusText = plan.BlockedReason!; return Task.CompletedTask; }
+        return MoveAsync(row.Id, plan.NewParentId, token);
     }
 
-    /// <summary>키보드 폴백 — Alt+↓ 는 바로 위 형제 밑으로(상위 제대일 때만).</summary>
+    /// <summary>
+    /// 키보드 폴백 — Alt+↓ 는 바로 위 형제 밑으로(상위 제대일 때만). 후보는 <b>편제 전체의 트리 순서</b>에서 찾는다 —
+    /// 보이는 행(접힘 · 제대 칩 · 검색)에서 찾으면 관계도와 뜻이 갈린다(ISSUE-34).
+    /// </summary>
     public Task MoveSelectedDownAsync(CancellationToken token = default)
     {
-        if (SelectedRow is not { } row) return Task.CompletedTask;
-
-        var index = Rows.IndexOf(row);
-        for (var i = index - 1; i >= 0; i--)
-        {
-            var candidate = Rows[i];
-            if (UnitDropRules.CanMove(Tree, row.Id, candidate.Id).IsAllowed) return MoveAsync(row.Id, candidate.Id, token);
-        }
-
-        StatusText = $"'{row.Name}'을(를) 받을 수 있는 상위 부대가 바로 위에 없습니다.";
-        return Task.CompletedTask;
+        if (SelectedRow is not { } row || BlockedByConfirm()) return Task.CompletedTask;
+        var plan = UnitMovePlanner.PlanMoveDown(Tree, row.Id);
+        if (!plan.IsAllowed || plan.NewParentId is not int target) { StatusText = plan.BlockedReason!; return Task.CompletedTask; }
+        return MoveAsync(row.Id, target, token);
     }
     #endregion
 
@@ -859,63 +1035,112 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public async Task ChangeAdjacencyAsync(int? add, int? remove, CancellationToken token = default)
     {
         if (SelectedRow is not { } row) return;
-        if (!CanEditUnits) { StatusText = "인접 부대를 바꿀 권한이 없습니다."; return; }
-        if (IsBusy) return;
+        await ChangeAdjacencyAsync(row.Id, add, remove, token).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// <paramref name="sourceId"/> 기준 인접 추가 · 해제(#24) — 관계도에서 <b>선택하지 않은</b> 부대를 끌어 이어도 선택을 몰래 바꾸지 않는다.
+    /// 비교 기준은 편제에서 읽은 <b>그 부대</b>의 인접이다(상세 폼이 아니다 — 폼은 선택 부대 것이다).
+    /// </summary>
+    public async Task<bool> ChangeAdjacencyAsync(int sourceId, int? add, int? remove, CancellationToken token = default)
+    {
+        if (BlockedByConfirm()) return false;
+        if (Tree.Find(sourceId) is not { } source) return false;
+        if (!CanEditUnits) { StatusText = "인접 부대를 바꿀 권한이 없습니다."; return false; }
+        if (IsBusy) { StatusText = "앞선 작업이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요."; return false; }
 
         if (add is int addId)
         {
-            var verdict = UnitDropRules.CanAdjoin(Tree, addId, row.Id);
-            if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return; }
+            var verdict = UnitDropRules.CanAdjoin(Tree, addId, sourceId);
+            if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return false; }
         }
 
+        var fromMap = _structureFromMap;
+        var selectedId = SelectedRow?.Id;
         IsBusy = true;
         try
         {
             // 저장 직전 재조회 — 동시 편집에서 나중 저장이 앞선 변경을 지우는 것을 막는다(스토리보드 L368).
-            var fresh = await _units.GetDetailAsync(row.Id, token).ConfigureAwait(true);
+            var fresh = await _units.GetDetailAsync(sourceId, token).ConfigureAwait(true);
             if (!fresh.Success || fresh.Data is null)
             {
-                StatusText = $"'{row.Name}' 정보를 다시 불러오지 못해 인접 부대를 바꾸지 않았습니다. 잠시 후 다시 시도하세요.";
-                return;
+                LastWriteFailureReason = StructureReason(fresh.Error);
+                StatusText = $"'{source.Name}' 정보를 다시 불러오지 못해 인접 부대를 바꾸지 않았습니다. {LastWriteFailureReason}";
+                return false;
             }
 
             var current = fresh.Data.AdjacentUnitIds ?? new List<int>();
-            var known = Form.AdjacentIds;
+            var known = source.AdjacentIds;
             if (!current.OrderBy(x => x).SequenceEqual(known.OrderBy(x => x)))
-                StatusText = $"'{row.Name}'의 인접 부대가 그사이 바뀌어 최신 목록에 이어서 저장합니다.";
+                StatusText = $"'{source.Name}'의 인접 부대가 그사이 바뀌어 최신 목록에 이어서 저장합니다.";
 
-            var merged = UnitDropRules.MergeAdjacency(current, row.Id, add, remove);
-            var response = await _units.PatchAsync(row.Id, UnitRequestBuilder.Adjacency(merged, row.Id), token).ConfigureAwait(true);
+            var merged = UnitDropRules.MergeAdjacency(current, sourceId, add, remove);
+            var response = await _units.PatchAsync(sourceId, UnitRequestBuilder.Adjacency(merged, sourceId), token).ConfigureAwait(true);
             if (!response.Success)
             {
-                StatusText = $"인접 부대를 바꾸지 못했습니다. {Reason(response.Error?.Message, response.Message)}";
-                return;
+                LastWriteFailureReason = StructureReason(response.Error);
+                StatusText = $"인접 부대를 바꾸지 못했습니다. {LastWriteFailureReason}";
+                IsBusy = false;
+                await ReloadGraphAsync(token).ConfigureAwait(true);
+                return false;
             }
 
+            LastWriteFailureReason = null;
             var other = add ?? remove;
             var otherName = other is int id ? Tree.Find(id)?.Name ?? $"부대 {id}번" : string.Empty;
             StatusText = add is not null
-                ? $"'{row.Name}'과(와) '{otherName}'을(를) 인접 부대로 이었습니다. 양쪽에 함께 표시됩니다."
-                : $"'{row.Name}'과(와) '{otherName}'의 인접 관계를 끊었습니다.";
+                ? $"'{source.Name}'과(와) '{otherName}'을(를) 인접 부대로 이었습니다. 양쪽에 함께 표시됩니다."
+                : $"'{source.Name}'과(와) '{otherName}'의 인접 관계를 끊었습니다.";
+            if (other is int otherId) _lastAdjacency = (sourceId, otherId, add is not null);
+            NotifyOfPropertyChange(nameof(LastAdjacency));
+            NotifyOfPropertyChange(nameof(CanUndoAdjacency));
 
             IsBusy = false;
-            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);
-            await SelectByIdAsync(row.Id, token, force: true).ConfigureAwait(true);
+            await ReloadGraphAsync(token).ConfigureAwait(true);
+            // 선택을 강제로 바꾸지 않는다(#20) — 고른 부대가 두 부대 중 하나일 때만 상세를 다시 읽는다.
+            if (selectedId is int sel && (sel == sourceId || sel == other) && SelectedRow?.Id == sel) await RefreshSelectedDetailAsync(token).ConfigureAwait(true);
+            if (!fromMap) Map.OnConsoleStructureChanged();
+            return true;
         }
-        catch (OperationCanceledException) { StatusText = "인접 부대 변경을 취소했습니다."; }
+        catch (OperationCanceledException) { StatusText = "인접 부대 변경을 취소했습니다."; return false; }
         catch (Exception ex)
         {
-            _log?.Error($"[UnitConsole] adjacency {row.Id}: {ex.Message}");
+            _log?.Error($"[UnitConsole] adjacency {sourceId}: {ex.Message}");
             StatusText = $"인접 부대를 바꾸지 못했습니다. {UNREACHABLE}";
+            return false;
         }
         finally { IsBusy = false; RaiseCommands(); }
+    }
+
+    /// <summary>마지막 인접 조작(부대, 상대, 이었는가) — 되돌리기 1회(#24).</summary>
+    public (int UnitId, int OtherId, bool Added)? LastAdjacency => _lastAdjacency;
+
+    public bool CanUndoAdjacency => _lastAdjacency is not null && !IsBusy;
+
+    /// <summary>마지막 인접 조작을 반대로 1회 — 먼저 편제를 다시 읽어 이미 반영돼 있으면 보내지 않는다.</summary>
+    public async Task UndoAdjacencyAsync(CancellationToken token = default)
+    {
+        if (_lastAdjacency is not { } last || BlockedByConfirm()) return;
+        await ReloadGraphAsync(token).ConfigureAwait(true);
+        var present = Tree.Find(last.UnitId)?.AdjacentIds.Contains(last.OtherId) == true;
+        if (present != last.Added)
+        {
+            _lastAdjacency = null;
+            StatusText = "인접 관계가 이미 다른 곳에서 바뀌어 되돌릴 것이 없습니다.";
+            NotifyOfPropertyChange(nameof(LastAdjacency));
+            return;
+        }
+        var ok = await ChangeAdjacencyAsync(last.UnitId, last.Added ? null : last.OtherId, last.Added ? last.OtherId : null, token).ConfigureAwait(true);
+        if (ok) _lastAdjacency = null;
+        NotifyOfPropertyChange(nameof(LastAdjacency));
+        NotifyOfPropertyChange(nameof(CanUndoAdjacency));
     }
     #endregion
 
     #region - 삭제 · 운용 중지 -
     public async Task DeleteAsync(CancellationToken token = default)
     {
-        if (SelectedRow is not { } row || !CanDeleteUnit) return;
+        if (SelectedRow is not { } row || !CanDeleteUnit || BlockedByConfirm()) return;
         if (!await AskAsync("부대 삭제", $"'{row.Name}' 부대를 삭제할까요?\n되돌릴 수 없습니다. 이력을 남기려면 삭제 대신 [운용 중지]를 쓰세요.").ConfigureAwait(true)) return;
 
         IsBusy = true;
@@ -951,7 +1176,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>퇴역은 삭제가 아니라 <c>is_enable=false</c> 다 — 이력과 소속이 보존된다(스토리보드 L386).</summary>
     public async Task DisableAsync(CancellationToken token = default)
     {
-        if (SelectedRow is not { } row || !CanEditUnits || IsBusy) return;
+        if (SelectedRow is not { } row || !CanEditUnits || IsBusy || BlockedByConfirm()) return;
         if (!await AskAsync("부대 운용 중지", $"'{row.Name}' 부대를 운용 중지할까요?\n이력과 소속은 그대로 남습니다.").ConfigureAwait(true)) return;
 
         IsBusy = true;
@@ -1022,7 +1247,13 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         if (_assignStopped) { _assignSkipped.Add(item.Name); return DraftOutcome.Failed; }
 
         var result = await _devices.AssignAsync(item, unitId, token).ConfigureAwait(true);
-        if (result.IsSuccess) return DraftOutcome.Applied;
+        if (result.IsSuccess)
+        {
+            // FR-49 — 지도 쪽 장비 모델의 UnitId 를 고친다(다음 [지도에서 보기]가 옳은 집합을 쓴다). 실패 장비는 보내지 않는다.
+            if (_events is not null && DeviceUnitChangedMessage.For(item.Id, unitId) is { } changed)
+                await _events.PublishOnUIThreadAsync(changed).ConfigureAwait(true);
+            return DraftOutcome.Applied;
+        }
 
         _assignStopped = true;
         _assignFailure = result.Message;
@@ -1031,7 +1262,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
     public async Task ApplyAssignsAsync(CancellationToken token = default)
     {
-        if (!Tray.CanApply) return;
+        if (!Tray.CanApply || BlockedByConfirm()) return;
 
         _assignStopped = false;
         _assignFailure = null;
@@ -1206,6 +1437,122 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     }
     #endregion
 
+    #region - 관계도 결선 (IUnitMapCommands · IUnitMapConsoleBridge) -
+    /// <summary>관계도 확인 대기 중이면 막고 까닭을 말한다(#49).</summary>
+    private bool BlockedByConfirm()
+    {
+        if (!IsStructureConfirmPending) return false;
+        StatusText = CONFIRM_PENDING_NOTICE;
+        return true;
+    }
+
+    /// <summary>편제 쓰기 실패의 상태별 사유(FR-34 · ISSUE-25). 서버 원문은 로그로만.</summary>
+    private string StructureReason(ApiError? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error?.Message)) _log?.Warning($"[UnitConsole] 서버 거절 원문: {error!.Code} {error.Message}");
+        return UnitMapText.OrgFailureReason(error?.Code);
+    }
+
+    /// <summary>고른 부대의 상세를 서버 값으로 다시 읽는다(선택은 그대로 — 같은 부대).</summary>
+    private Task RefreshSelectedDetailAsync(CancellationToken token = default)
+        => SelectedRow is { } row ? SelectByIdAsync(row.Id, token, force: true) : Task.CompletedTask;
+
+    private void OnMapPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(UnitMapViewModel.IsConfirming) or nameof(UnitMapViewModel.PendingConfirm))
+        {
+            NotifyOfPropertyChange(nameof(IsStructureConfirmPending));
+            NotifyOfPropertyChange(nameof(IsConsoleInteractive));
+            if (!IsStructureConfirmPending && StatusText == CONFIRM_PENDING_NOTICE) StatusText = string.Empty;
+        }
+    }
+
+    /// <summary>관계도의 손이 비었다 — 미뤄 둔 편제 알림이 있으면 한 번 읽는다(깨끗할 때만 — dirty 면 띠가 이미 떠 있다).</summary>
+    private void OnMapDefersReloadChanged(object? sender, EventArgs e)
+    {
+        if (_closed || Map.DefersReload || !IsExternallyChanged || HasUnappliedWork) return;
+        _externalChangeTask = _externalChange.Pulse();
+    }
+
+    /// <summary>
+    /// 지도 · 다른 창에서 온 "이 부대를 보여 달라"(FR-46 · ISSUE-43) — 상세 가드에 막히면 선택을 두고 까닭을 말한다(말없는 실패 0).
+    /// 런처(레인 B)가 결과를 <c>OpenUnitConsoleResult</c> 로 회신한다.
+    /// </summary>
+    public async Task<OpenUnitConsoleOutcome> TryRevealAsync(int unitId, bool openMap, CancellationToken token = default)
+    {
+        if (!IsAvailable || Tree.Find(unitId) is not { } node) return OpenUnitConsoleOutcome.Unavailable;
+        if (IsStructureConfirmPending) { StatusText = CONFIRM_PENDING_NOTICE; return OpenUnitConsoleOutcome.BlockedByUnsavedEdit; }
+        if (SelectedRow?.Id != unitId && !Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow))
+        {
+            StatusText = UnitMapText.RevealBlockedBand(node.Name);
+            return OpenUnitConsoleOutcome.BlockedByUnsavedEdit;
+        }
+
+        if (openMap && !IsAdjacencyView) SelectedRail = RailEntries.First(e => e.Key == RAIL_ADJACENCY);
+        if (SelectedRow?.Id != unitId) await SelectRowAsync(RowOf(node), token, force: true).ConfigureAwait(true);
+        Map.Reveal(unitId);
+        return OpenUnitConsoleOutcome.Shown;
+    }
+
+    int? IUnitMapCommands.SelectedUnitId => SelectedRow?.Id;
+
+    /// <summary>선택이 바뀌었다(트리 · 관계도 · 재조회).</summary>
+    public event EventHandler? SelectedUnitChanged;
+
+    bool IUnitMapCommands.CanView => CanViewUnits;
+    bool IUnitMapCommands.CanEdit => CanEditUnits;
+
+    /// <summary>관계도에서 고름 — 상세 가드를 지난다(dirty 면 막고 띠로 알린다 — v1.3 FR-02).</summary>
+    bool IUnitMapCommands.TrySelect(int unitId)
+    {
+        if (IsStructureConfirmPending || Tree.Find(unitId) is not { } node) return false;
+        if (SelectedRow?.Id == unitId) return true;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow)) { StatusText = SELECT_BLOCKED_BY_EDIT; return false; }
+        _detailSettle = SelectRowAsync(RowOf(node), force: true);      // 선택은 곧바로, 상세 읽기는 이어서
+        return true;
+    }
+
+    async Task<bool> IUnitMapCommands.MoveAsync(int movingId, int targetId, CancellationToken token)
+    {
+        _structureFromMap = true;
+        try { return await MoveAsync(movingId, targetId, token).ConfigureAwait(true); }
+        finally { _structureFromMap = false; }
+    }
+
+    async Task<bool> IUnitMapCommands.UndoMoveAsync(CancellationToken token)
+    {
+        _structureFromMap = true;
+        try
+        {
+            await UndoMoveAsync(token).ConfigureAwait(true);
+            return _lastMove is null;
+        }
+        finally { _structureFromMap = false; }
+    }
+
+    async Task<bool> IUnitMapCommands.ChangeAdjacencyAsync(int unitId, int? add, int? remove, CancellationToken token)
+    {
+        _structureFromMap = true;
+        try { return await ChangeAdjacencyAsync(unitId, add, remove, token).ConfigureAwait(true); }
+        finally { _structureFromMap = false; }
+    }
+
+    /// <summary>관계도의 실패 복구 · 확정 직전 재판정 — 편제만 곧바로. 바쁘면 버리지 않고 끝난 뒤 한 번(ISSUE-27).</summary>
+    Task IUnitMapCommands.ReloadAsync(bool quiet, CancellationToken token) => ReloadGraphAsync(token, quiet);
+
+    bool IUnitMapConsoleBridge.IsDetailDirty => Detail.IsDirty;
+
+    Task IUnitMapConsoleBridge.RefreshDetailAsync(CancellationToken token) => RefreshSelectedDetailAsync(token);
+
+    bool IUnitMapConsoleBridge.HasDeferredReload => IsExternallyChanged;
+
+    /// <summary>콘솔이 바쁘다가 한가해졌다(관계도 [확정] 활성).</summary>
+    public event EventHandler? BusyChanged;
+
+    /// <summary>마지막 편제 쓰기 실패의 상태별 사유(성공하면 <c>null</c>).</summary>
+    public string? LastWriteFailureReason { get; private set; }
+    #endregion
+
     #region - Attributes -
     /// <summary>한 번의 [적용] 에서 보낼 수 있는 최대 장비 수 — N회 호출의 폭발반경을 눈에 보이게 묶는다.</summary>
     public const int MAX_ASSIGN_PER_APPLY = 50;
@@ -1223,6 +1570,16 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     private readonly IEventAggregator? _events;
     private readonly Func<bool> _isDragging;
     private readonly CoalescingTrigger _externalChange;
+    private readonly IClock _clock;
+    private readonly ConsolePrefEntry? _prefs;
+    private readonly System.Action? _savePrefs;
+    private DateTime? _firstExternalChangeAt;
+    private bool _reloadPending;
+    private bool _structureFromMap;
+    private (int UnitId, int OtherId, bool Added)? _lastAdjacency;
+    private UnitNodeRowViewModel? _wantedDetail;
+    private Task? _detailLoop;
+    private Task _detailSettle = Task.CompletedTask;
     private Task _externalChangeTask = Task.CompletedTask;
     private bool _isExternallyChanged;
     private bool _closed;

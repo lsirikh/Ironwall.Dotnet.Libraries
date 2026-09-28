@@ -46,7 +46,7 @@ public class UnitMapViewModelLayoutTests
 
         Assert.Equal(200, kit.Vm.Scene.Positions.Count);
         Assert.Equal(UnitMapLayoutState.Loading, kit.Vm.LayoutState);
-        Assert.Equal("배치를 불러오는 중입니다 — 자동 배치로 먼저 보입니다", kit.Vm.LayoutStatusText);
+        Assert.Equal("배치를 불러오는 중 — 자동 배치로 보입니다", kit.Vm.LayoutStatusText);
         var auto = kit.Vm.Scene.Positions[kit.Id("6중대")];
 
         kit.Gate.ReleaseRead();
@@ -111,7 +111,7 @@ public class UnitMapViewModelLayoutTests
 
         Assert.Equal(UnitMapLayoutState.VersionMismatch, kit.Vm.LayoutState);
         Assert.Equal(auto[kit.Id("6중대")], kit.Vm.Scene.Positions[kit.Id("6중대")]);
-        Assert.Equal("배치 판이 달라 자동 배치로 보입니다", kit.Vm.LayoutStatusText);
+        Assert.Equal("배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다", kit.Vm.LayoutStatusText);
         Assert.Equal(UnitMapText.LayoutVersionBlocked, kit.Vm.Classify(kit.Id("6중대"), null, false).Reason);
     }
 
@@ -120,7 +120,7 @@ public class UnitMapViewModelLayoutTests
     {
         var kit = await MapKit.OpenAsync(canEdit: false);
 
-        Assert.Equal("배치: 모든 운영자 공유 · 보기 전용", kit.Vm.LayoutStatusText);
+        Assert.Equal("배치: 모든 운영자 공유 · 아직 아무도 옮기지 않았습니다 · 보기 전용", kit.Vm.LayoutStatusText);
     }
     #endregion
 

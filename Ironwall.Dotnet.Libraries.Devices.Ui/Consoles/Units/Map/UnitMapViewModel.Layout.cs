@@ -44,7 +44,9 @@ public sealed partial class UnitMapViewModel
         get
         {
             var byMe = _options.CurrentOperatorName is { Length: > 0 } me && string.Equals(me, _snapshot.UpdatedByName, StringComparison.Ordinal);
-            return UnitMapText.LayoutStatus(LayoutState, _commands.CanEdit, _snapshot.UpdatedByName, _snapshot.UpdatedAt?.LocalDateTime, byMe);
+            return UnitMapText.LayoutStatus(LayoutState, _commands.CanEdit, _snapshot.UpdatedByName, _snapshot.UpdatedAt?.LocalDateTime, byMe,
+                                            liveOff: _options.IsLiveOff?.Invoke() == true,
+                                            sessionExpired: _assessment.Failure == UnitLayoutFailureKind.Unauthorized);
         }
     }
 
@@ -58,6 +60,7 @@ public sealed partial class UnitMapViewModel
         NotifyOfPropertyChange(nameof(LayoutState));
         NotifyOfPropertyChange(nameof(LayoutStatusText));
         NotifyOfPropertyChange(nameof(CanRetryLayout));
+        NotifyResetState();
     }
     #endregion
 
@@ -321,7 +324,8 @@ public sealed partial class UnitMapViewModel
         if (_pending is not null || _moveMode) return;
         var blocked = ResetBlockedReason();
         if (blocked is not null) { StatusText = blocked; return; }
-        OpenPending(UnitMapConfirmKind.ResetLayout, null, null, UnitMapText.ConfirmResetLayout(LayoutState == UnitMapLayoutState.SessionOnly));
+        OpenPending(UnitMapConfirmKind.ResetLayout, null, null,
+                    UnitMapText.ConfirmResetLayout(LayoutState == UnitMapLayoutState.SessionOnly, DisplayDeltas().Count));
     }
 
     /// <summary>상세 [이 부대 배치 초기화] — 확인 없이 <c>clear</c> 1회(되돌리기 가능).</summary>
@@ -424,6 +428,16 @@ public sealed partial class UnitMapViewModel
         return Task.CompletedTask;
     }
 
+    /// <summary>합침 창이 계속 다시 열려도 첫 알림에서 이만큼 지나면 곧바로 한 번 읽는다(ISSUE-30 — 뒤끝 디바운스의 굶주림 방지).</summary>
+    public static readonly TimeSpan NoticeMaxWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>알림이 이만큼 넘게 미뤄지면 한 번 알린다(ISSUE-9 — 강제 반영은 하지 않는다: 손 아래 노드가 튀지 않게).</summary>
+    public static readonly TimeSpan NoticeDeferCap = TimeSpan.FromSeconds(30);
+
+    private DateTime? _firstNoticeAt;
+    private DateTime? _deferredSince;
+    private bool _deferNotified;
+
     private void OnLayoutNotice(long version)
     {
         if (LayoutState == UnitMapLayoutState.SessionOnly) return;
@@ -433,18 +447,44 @@ public sealed partial class UnitMapViewModel
                 return;
             case UnitMapRefetchDecision.Defer:
                 _deferredNotice = Math.Max(_deferredNotice ?? version, version);
+                if (_deferredSince is null)
+                {
+                    _deferredSince = _clock.UtcNow;
+                    _ = WatchDeferCapAsync(_deferredSince.Value);
+                }
                 return;
             default:
                 _pendingNotice = Math.Max(_pendingNotice ?? version, version);
+                var now = _clock.UtcNow;
+                _firstNoticeAt ??= now;
+                if (now - _firstNoticeAt.Value >= NoticeMaxWait)
+                {
+                    // 최대 대기 — 창을 끊고 지금 한 번(ISSUE-30).
+                    _noticeTrigger.Cancel();
+                    _ = OnNoticeSettledAsync(CancellationToken.None);
+                    return;
+                }
                 _ = _noticeTrigger.Pulse();
                 return;
         }
+    }
+
+    /// <summary>연기가 <see cref="NoticeDeferCap"/> 을 넘기면 상태 띠로 한 번 알린다(ISSUE-9).</summary>
+    private async Task WatchDeferCapAsync(DateTime since)
+    {
+        try { await (_options.Delay ?? Task.Delay)(NoticeDeferCap, CancellationToken.None).ConfigureAwait(true); }
+        catch (OperationCanceledException) { return; }
+        if (_deferredSince != since || _deferredNotice is null || _deferNotified) return;
+        if (_clock.UtcNow - since < NoticeDeferCap) return;
+        _deferNotified = true;
+        StatusText = UnitMapText.LayoutNoticeDeferredStatus;
     }
 
     private async Task OnNoticeSettledAsync(CancellationToken token)
     {
         if (_pendingNotice is not long version) return;
         _pendingNotice = null;
+        _firstNoticeAt = null;
         switch (UnitMapLayoutSync.ShouldRefetch(version, HaveVersion, Busy))
         {
             case UnitMapRefetchDecision.Skip:
@@ -461,6 +501,9 @@ public sealed partial class UnitMapViewModel
     /// <summary>손이 비었다 — 미뤄 둔 알림을 다시 판정한다(그 사이 내 쓰기 응답으로 버전이 올랐으면 건너뛴다).</summary>
     private void ReplayDeferredNotice()
     {
+        if (_deferNotified && StatusText == UnitMapText.LayoutNoticeDeferredStatus) StatusText = null;
+        _deferredSince = null;
+        _deferNotified = false;
         if (_deferredNotice is not long version) return;
         _deferredNotice = null;
         OnLayoutNotice(version);

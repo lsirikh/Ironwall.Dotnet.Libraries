@@ -270,6 +270,7 @@ internal sealed class MapKit
     public List<object> Published { get; } = new();
     public FakeConsoleBridge Bridge { get; } = new();
     public ConsolePrefsProbe Prefs { get; } = new();
+    public MutableClock Clock { get; } = new();
     public UnitMapViewModel Vm { get; }
     public IReadOnlyList<UnitDeviceItem> Devices { get; }
 
@@ -290,6 +291,7 @@ internal sealed class MapKit
             CurrentOperatorName = "나운영",
             Prefs = Prefs.Entry,
             SavePrefs = Prefs.Save,
+            Clock = Clock,
         });
         Vm.SetData(F.Tree, Devices);
     }
@@ -500,6 +502,7 @@ internal sealed class FakeConsoleBridge : IUnitMapConsoleBridge
     public bool IsDetailDirty { get; set; }
     public int DetailRefreshes { get; private set; }
     public bool HasDeferredReload { get; set; }
+    public string? LastWriteFailureReason { get; set; }
     public event EventHandler? BusyChanged;
 
     public bool IsBusy
@@ -513,6 +516,14 @@ internal sealed class FakeConsoleBridge : IUnitMapConsoleBridge
         DetailRefreshes++;
         return Task.CompletedTask;
     }
+}
+
+/// <summary>손으로 흘리는 시계(<c>IClock</c> — 규칙 I-02).</summary>
+internal sealed class MutableClock : Ironwall.Dotnet.Libraries.Base.Services.IClock
+{
+    public DateTime UtcNow { get; set; } = new(2026, 9, 28, 0, 0, 0, DateTimeKind.Utc);
+    public DateTime Now => UtcNow.ToLocalTime();
+    public void Advance(TimeSpan by) => UtcNow += by;
 }
 
 /// <summary>개인 표시 설정(메모리) — 저장 횟수와 <c>Extra</c> 키를 본다. 디스크 0.</summary>

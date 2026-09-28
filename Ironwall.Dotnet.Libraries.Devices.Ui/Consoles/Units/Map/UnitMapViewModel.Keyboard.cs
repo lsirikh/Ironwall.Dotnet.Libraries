@@ -94,7 +94,7 @@ public sealed partial class UnitMapViewModel
     /// </summary>
     private void MoveSelection(UnitMapKeyCommand command)
     {
-        var next = UnitMapNavigation.Next(_tree, _scene.Positions, _selected, command, _options.MyUnitId);
+        var next = UnitMapNavigation.Next(_tree, _scene.Positions, _selected, command, MyUnitId);
         if (next is not int id || id == _selected) return;
 
         SelectedUnitId = id;
@@ -125,7 +125,7 @@ public sealed partial class UnitMapViewModel
 
     private void EnterMoveMode()
     {
-        if (_selected is not int unit) return;
+        if (_selected is not int unit) { StatusText = UnitMapText.MoveModeNeedsSelection; return; }   // FR-37 경계 표
         var decision = UnitMapDropClassifier.Classify(_tree, unit, null, ctrl: true, Policy);
         if (!decision.IsAllowed)
         {
@@ -166,6 +166,8 @@ public sealed partial class UnitMapViewModel
         _moveOffset += new Vector(dx, dy);
         NotifyOfPropertyChange(nameof(MoveModeOffset));
         RebuildScene();
+        // FR-37 경계 표 — 옮기는 노드가 뷰 밖으로 나가면 보이게 팬
+        if (_moveUnit is int unit && _surface is { } surface && !surface.IsInView(unit)) surface.CenterOn(unit);
     }
 
     private void ExitMoveMode(bool focusCanvas)
@@ -189,28 +191,26 @@ public sealed partial class UnitMapViewModel
     #endregion
 
     #region - Alt+↑/↓ 상위 바꾸기 (FR-38 · #34) -
-    /// <summary>Alt+↑ — 상위의 상위 밑으로. 트리와 같은 뜻이지만 관계도에서는 확인 오버레이를 거친다(결정 #2).</summary>
+    /// <summary>Alt+↑ — 상위의 상위 밑으로. 트리와 같은 판정(<see cref="UnitMovePlanner.PlanMoveUp"/>)이지만 관계도에서는 확인 오버레이를 거친다(결정 #2).</summary>
     private void ProposeParentUp()
     {
         if (_selected is not int unit || _tree.Find(unit) is not { } node) return;
-        if (node.ParentId is not int parent) { StatusText = UnitMapText.AlreadyTopStatus(node.Name); return; }
-        if (_tree.Find(parent)?.ParentId is not int grandParent) { StatusText = UnitMapText.NoGrandParentStatus(node.Name); return; }
-        ProposeReparent(unit, grandParent);
+        var plan = UnitMovePlanner.PlanMoveUp(_tree, unit);
+        if (!plan.IsAllowed) { StatusText = KoreanParticles.Resolve(plan.BlockedReason!); return; }
+        if (plan.ToRoot || plan.NewParentId is not int target) { StatusText = UnitMapText.NoGrandParentStatus(node.Name); return; }
+        ProposeReparent(unit, target);
     }
 
     /// <summary>
-    /// Alt+↓ — 편제 트리 순서(<see cref="UnitTreeModel.Ordered"/>)에서 바로 앞쪽의, 받을 수 있는 첫 상위 밑으로(#34 — 트리 레일의 접힘 · 필터와 무관).
+    /// Alt+↓ — 편제 트리 순서(<see cref="UnitTreeModel.Ordered"/>)에서 바로 앞쪽의, 받을 수 있는 첫 상위 밑으로
+    /// (<see cref="UnitMovePlanner.PlanMoveDown"/> — #34, 트리 레일의 접힘 · 필터와 무관).
     /// </summary>
     private void ProposeParentDown()
     {
-        if (_selected is not int unit || _tree.Find(unit) is not { } node) return;
-        var index = IndexInOrder(unit);
-        for (var i = index - 1; i >= 0; i--)
-        {
-            var candidate = _tree.Ordered[i].Id;
-            if (UnitDropRules.CanMove(_tree, unit, candidate).IsAllowed) { ProposeReparent(unit, candidate); return; }
-        }
-        StatusText = UnitMapText.NoParentCandidateBelowStatus(node.Name);
+        if (_selected is not int unit || _tree.Find(unit) is null) return;
+        var plan = UnitMovePlanner.PlanMoveDown(_tree, unit);
+        if (!plan.IsAllowed || plan.NewParentId is not int target) { StatusText = KoreanParticles.Resolve(plan.BlockedReason ?? string.Empty); return; }
+        ProposeReparent(unit, target);
     }
 
     private int IndexInOrder(int unitId)
@@ -228,12 +228,12 @@ public sealed partial class UnitMapViewModel
             StatusText = KoreanParticles.Resolve(decision.Reason ?? string.Empty);
             return;
         }
-        OpenPending(UnitMapConfirmKind.Reparent, unit, target, UnitMapText.ConfirmReparent(_tree, unit, target));
+        OpenPending(UnitMapConfirmKind.Reparent, unit, target, UnitMapText.ConfirmReparent(_tree, unit, target, showParentPath: !_layers.Hierarchy));
     }
     #endregion
 
     #region - 지도에서 보기 (FR-44) -
-    /// <summary>[예하 포함] 토글(<c>Units.Map.LocateIncludeDescendants</c>, 기본 켬).</summary>
+    /// <summary>[예하 포함] 토글(<c>Units.Map.IncludeSubordinates</c>, 기본 켬).</summary>
     public bool LocateIncludeDescendants
     {
         get => _locateIncludeDescendants;

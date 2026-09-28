@@ -15,10 +15,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// </summary>
 public class UnitMapViewModelViewTests
 {
-    private static void SeedView(MapKit kit, double scale, double x, double y)
+    private static void SeedView(MapKit kit, double scale, double x, double y, int v = UnitMapViewModel.PrefVersion)
     {
         kit.Prefs.Entry.Extra ??= new Dictionary<string, JsonElement>();
-        kit.Prefs.Entry.Extra[UnitMapViewModel.ViewPrefKey] = JsonSerializer.SerializeToElement(new { scale, x, y });
+        kit.Prefs.Entry.Extra[UnitMapViewModel.PrefKey] = JsonSerializer.SerializeToElement(new { v, scale, cx = x, cy = y });
     }
 
     #region - 첫 화면 (FR-15) -
@@ -37,7 +37,7 @@ public class UnitMapViewModelViewTests
     [Fact]
     public async Task should_clamp_saved_scale_when_damaged()
     {
-        // SIM-V083
+        // SIM-V083 — 배율은 범위로 자른다(중심은 캔버스 팬 한계가 조직 ≥20% 로 자른다)
         var kit = MapKit.Create();
         SeedView(kit, 7.0, 10, 20);
         await kit.Vm.OpenAsync();
@@ -47,12 +47,16 @@ public class UnitMapViewModelViewTests
         Assert.Equal(new[] { "SetView:1.60@10,20" }, kit.Surface.Calls);
     }
 
-    [Fact]
-    public async Task should_center_my_unit_at_half_scale_when_no_saved_view()
+    [Theory]
+    [InlineData("corrupt")]
+    [InlineData("version")]
+    public async Task should_fall_back_to_my_unit_at_half_scale_when_saved_view_is_unusable(string how)
     {
+        // SIM-V087 · ISSUE-53 — JSON 이 깨졌거나 판(v)이 다르면 무시하고 폴백(다음 저장이 덮는다)
         var f = UnitMapTestData.Standard200();
         var kit = MapKit.Create(myUnitId: f.IdOf("7중대"));
-        kit.Prefs.Entry.Extra = new Dictionary<string, JsonElement> { [UnitMapViewModel.ViewPrefKey] = JsonSerializer.SerializeToElement("깨진 값") };   // SIM-V087
+        if (how == "corrupt") kit.Prefs.Entry.Extra = new Dictionary<string, JsonElement> { [UnitMapViewModel.PrefKey] = JsonSerializer.SerializeToElement("깨진 값") };
+        else SeedView(kit, 0.5, 1200, 300, v: 9);
         await kit.Vm.OpenAsync();
 
         kit.Vm.AttachSurface(kit.Surface);
@@ -71,9 +75,23 @@ public class UnitMapViewModelViewTests
     }
 
     [Fact]
-    public async Task should_save_only_view_and_layer_keys_when_saving_view()
+    public async Task should_say_empty_and_keep_view_when_no_units()
     {
-        // NFR-14 — 공유 배치(Δ)는 개인 설정에 쓰지 않는다
+        // SIM-V019 — 부대 0: 빈 상태 · 배율 유지(맞춤 호출 0)
+        var kit = MapKit.Create();
+        kit.Vm.SetData(Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model.UnitTreeModel.Empty, System.Array.Empty<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitDeviceItem>());
+        await kit.Vm.OpenAsync();
+
+        kit.Vm.AttachSurface(kit.Surface);
+
+        Assert.Empty(kit.Surface.Calls);
+        Assert.Equal(Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model.UnitMapText.EmptyMapStatus, kit.Vm.StatusText);
+    }
+
+    [Fact]
+    public async Task should_save_one_namespaced_key_with_view_and_layers_only()
+    {
+        // ISSUE-53 · NFR-14 — Extra 에는 한 키 unitMap = {v, scale, cx, cy, layers}. 공유 배치(Δ)는 없다
         var api = new FakeUnitLayoutApi();
         var kit = await MapKit.OpenAsync(api);
         kit.Vm.AttachSurface(kit.Surface);
@@ -85,25 +103,57 @@ public class UnitMapViewModelViewTests
         kit.Vm.SetLayers(new UnitMapLayers(Hierarchy: true, Adjacency: false, DeviceBadges: true));
         kit.Vm.SaveView();
 
-        Assert.Equal(new[] { UnitMapViewModel.LayersPrefKey, UnitMapViewModel.ViewPrefKey }, kit.Prefs.Entry.Extra!.Keys.OrderBy(k => k));
-        var view = kit.Prefs.Entry.Extra[UnitMapViewModel.ViewPrefKey];
-        Assert.Equal(0.72, view.GetProperty("scale").GetDouble(), 9);
-        Assert.Equal(500, view.GetProperty("x").GetDouble(), 9);
+        Assert.Equal(new[] { UnitMapViewModel.PrefKey }, kit.Prefs.Entry.Extra!.Keys);
+        var pref = kit.Prefs.Entry.Extra[UnitMapViewModel.PrefKey];
+        Assert.Equal(1, pref.GetProperty("v").GetInt32());
+        Assert.Equal(0.72, pref.GetProperty("scale").GetDouble(), 9);
+        Assert.Equal(500, pref.GetProperty("cx").GetDouble(), 9);
+        Assert.Equal(400, pref.GetProperty("cy").GetDouble(), 9);
+        Assert.False(pref.GetProperty("layers").GetProperty("adjacency").GetBoolean());
+        Assert.DoesNotContain("dx", pref.ToString());
         Assert.True(kit.Prefs.Saves >= 1);
-        Assert.DoesNotContain(kit.Prefs.Entry.Extra.Values, v => v.ToString().Contains("dx"));
+    }
+
+    [Fact]
+    public async Task should_save_once_after_view_goes_idle_not_per_pan_frame()
+    {
+        // 조정자 — 팬 프레임마다가 아니라 멈춘 뒤 한 번
+        var kit = await MapKit.OpenAsync();
+        kit.Vm.AttachSurface(kit.Surface);
+        var saves = kit.Prefs.Saves;
+
+        for (var i = 0; i < 30; i++) kit.Surface.RaiseViewChanged();
+        Assert.Equal(saves, kit.Prefs.Saves);
+
+        kit.Delay.ElapseAll();
+        await kit.Vm.WhenIdleAsync();
+        Assert.Equal(saves + 1, kit.Prefs.Saves);
+    }
+
+    [Fact]
+    public async Task should_save_view_when_disposed()
+    {
+        var kit = await MapKit.OpenAsync();
+        kit.Vm.AttachSurface(kit.Surface);
+        var saves = kit.Prefs.Saves;
+
+        kit.Vm.Dispose();
+
+        Assert.Equal(saves + 1, kit.Prefs.Saves);
     }
     #endregion
 
     #region - 레이어 (FR-26) -
     [Fact]
-    public async Task should_restore_layers_and_put_them_in_scene()
+    public async Task should_restore_layers_from_same_key_and_put_them_in_scene()
     {
         var kit = MapKit.Create();
         kit.Vm.SetLayers(new UnitMapLayers(Hierarchy: false, Adjacency: true, DeviceBadges: false));
-        var saved = kit.Prefs.Entry.Extra![UnitMapViewModel.LayersPrefKey];
+        kit.Vm.SaveView();
+        var saved = kit.Prefs.Entry.Extra![UnitMapViewModel.PrefKey];
 
         var again = MapKit.Create();
-        again.Prefs.Entry.Extra = new Dictionary<string, JsonElement> { [UnitMapViewModel.LayersPrefKey] = saved };
+        again.Prefs.Entry.Extra = new Dictionary<string, JsonElement> { [UnitMapViewModel.PrefKey] = saved };
         var reopened = new UnitMapViewModel(again.Commands, again.Gate, new UnitMapViewModelOptions { Prefs = again.Prefs.Entry, Delay = again.Delay.Run });
         reopened.SetData(again.F.Tree, again.Devices);
         await reopened.OpenAsync();

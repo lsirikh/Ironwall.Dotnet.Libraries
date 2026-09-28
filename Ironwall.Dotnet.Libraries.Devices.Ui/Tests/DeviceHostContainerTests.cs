@@ -70,6 +70,20 @@ public class DeviceHostContainerTests
     /// 결함(이름 없는 등록을 찾음)이 다른 콘솔에 숨어 있으면 여기서 이름과 함께 드러난다.
     /// </summary>
     [Fact]
+    public void should_resolve_one_unit_directory_by_its_interface_when_modules_are_registered_like_the_host()
+    {
+        // unit-relationship-map — 지도 · 상세 창의 '소속 부대' 줄은 IUnitDirectory 가 없으면 조용히 빈다(레인 B 인계).
+        using var container = BuildHostLikeContainer();
+
+        var first = container.Resolve<Ironwall.Dotnet.Libraries.Devices.Units.IUnitDirectory>();
+        var second = container.Resolve<Ironwall.Dotnet.Libraries.Devices.Units.IUnitDirectory>();
+
+        Assert.IsType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.UnitDirectory>(first);
+        Assert.Same(first, second);                                                                        // 한 벌
+        Assert.False(container.IsRegistered<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.UnitDirectory>());   // 인터페이스로만
+    }
+
+    [Fact]
     public void should_construct_every_device_console_component_when_resolved_from_the_host_container()
     {
         using var container = BuildHostLikeContainer();
