@@ -17,6 +17,7 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Moq;
+using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
@@ -80,6 +81,114 @@ public class EventConsoleDetailGuardViewTests
         }
         finally { window.Close(); }
     });
+
+    /// <summary>
+    /// 불변식(경로 무관) — 적용하지 않은 판정이 있으면 다른 행을 <b>어떻게 골라도</b>(UIA Select · 마우스 · 키보드 ↓) 고친 칸이 사라지지 않는다:
+    /// 원래 행 선택 · 고친 사유 · [되돌리기] 가 그대로 남는다. 사유는 헤디드와 같은 길(콤보 펼침 → 항목 Select → 접음)로 고친다.
+    /// </summary>
+    [Theory]
+    [InlineData("uia")]
+    [InlineData("mouse")]
+    [InlineData("keyboard")]
+    public void should_keep_the_unapplied_reason_whatever_way_another_row_is_chosen_in_the_real_console_view(string how) => AppHost.Run(() =>
+    {
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(Wait(console.SelectRailAsync(EventDashboardViewModel.MalfunctionRailKey)));
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+            var first = new MalfunctionEventViewModel(Malfunction(701));
+            var second = new MalfunctionEventViewModel(Malfunction(702));
+            var third = new MalfunctionEventViewModel(Malfunction(703));
+            console.MalfunctionPanelViewModel.ViewModelProvider.Add(first);
+            console.MalfunctionPanelViewModel.ViewModelProvider.Add(second);
+            console.MalfunctionPanelViewModel.ViewModelProvider.Add(third);
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+            var grid = RailProbe.Find<DataGrid>(view, g => System.Windows.Automation.AutomationProperties.GetAutomationId(g) == "Console.Events.Grid.Malfunction")!;
+
+            ChooseRow(grid, first, how);
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+            Assert.Same(first, Assert.Single(console.SelectedRows));
+
+            var reason = RailProbe.Find<ComboBox>(view, c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "Console.Events.Detail.Field.reason")!;
+            var picked = PickOtherByAutomation(reason);
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+            Assert.True(console.Detail.CanRevert, "사유를 고쳤으면 [되돌리기] 가 켜져야 한다");
+
+            var rail = RailProbe.Rail(view, "Console.Events.Rail");
+            RailProbe.Select(rail, EventDashboardViewModel.ConnectionRailKey);
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+
+            ChooseRow(grid, how == "keyboard" ? first : second, how);   // 키보드는 원래 행에서 ↓ 한 칸
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+
+            Assert.True(console.Detail.CanRevert, $"[{how}] 다른 행을 골라도 고친 사유는 남아야 한다 · 상태={console.Detail.State} · 선택={console.SelectedRows.Count}");
+            Assert.Same(first, Assert.Single(console.SelectedRows));
+            Assert.Equal(picked, reason.SelectedItem);
+            Assert.True(grid.SelectedItems.Count == 1 && ReferenceEquals(grid.SelectedItems[0], first),
+                $"[{how}] 화면도 원래 행에 머물러야 한다 · 화면 선택=[{string.Join(",", grid.SelectedItems.Cast<MalfunctionEventViewModel>().Select(r => r.Model?.Id))}]");
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>헤디드와 같은 길로 콤보 값을 바꾼다 — 펼침 → 다른 항목 Select → 접음(자동화 peer).</summary>
+    private static object? PickOtherByAutomation(ComboBox combo)
+    {
+        var peer = (ComboBoxAutomationPeer)UIElementAutomationPeer.CreatePeerForElement(combo)!;
+        ((IExpandCollapseProvider)peer.GetPattern(PatternInterface.ExpandCollapse)!).Expand();
+        AppHost.Pump(DispatcherPriority.ApplicationIdle);
+        peer.ResetChildrenCache();
+        var current = combo.SelectedItem;
+        var item = peer.GetChildren()!.OfType<ItemAutomationPeer>().First(p => !Equals(p.Item, current));
+        ((ISelectionItemProvider)item.GetPattern(PatternInterface.SelectionItem)!).Select();
+        AppHost.Pump(DispatcherPriority.ApplicationIdle);
+        try { ((IExpandCollapseProvider)peer.GetPattern(PatternInterface.ExpandCollapse)!).Collapse(); } catch { }
+        AppHost.Pump(DispatcherPriority.ApplicationIdle);
+        return combo.SelectedItem;
+    }
+
+    /// <summary>행을 고른다 — uia: 항목 peer Select · mouse: 칸에 마우스 누름(미리보기 → 누름) · keyboard: 그 행 칸에 초점 → ↓.</summary>
+    private static void ChooseRow(DataGrid grid, object row, string how)
+    {
+        switch (how)
+        {
+            case "uia":
+                SelectRow(grid, row);
+                return;
+            case "mouse":
+            {
+                var cell = FirstCell(grid, row);
+                foreach (var ev in new[] { UIElement.PreviewMouseLeftButtonDownEvent, UIElement.MouseLeftButtonDownEvent })
+                    cell.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = ev, Source = cell });
+                foreach (var ev in new[] { UIElement.PreviewMouseLeftButtonUpEvent, UIElement.MouseLeftButtonUpEvent })
+                    cell.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = ev, Source = cell });
+                return;
+            }
+            default:
+            {
+                var cell = FirstCell(grid, row);
+                if (!cell.IsKeyboardFocusWithin) { cell.Focus(); AppHost.Pump(DispatcherPriority.Input); }
+                if (grid.SelectedItems.Count == 0 || !grid.SelectedItems.Contains(row)) { ChooseRow(grid, row, "mouse"); return; }
+                var source = PresentationSource.FromVisual(cell)!;
+                var down = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, source, Environment.TickCount, System.Windows.Input.Key.Down)
+                {
+                    RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent,
+                    Source = cell,
+                };
+                System.Windows.Input.InputManager.Current.ProcessInput(down);
+                return;
+            }
+        }
+    }
+
+    private static DataGridCell FirstCell(DataGrid grid, object row)
+    {
+        grid.ScrollIntoView(row);
+        AppHost.Pump(DispatcherPriority.Loaded);
+        var container = Container(grid, row)!;
+        var cell = RailProbe.Find<DataGridCell>(container, c => c.Column is DataGridTextColumn)!;
+        return cell;
+    }
 
     [Fact]
     public void should_keep_the_unapplied_reason_and_reselect_the_same_event_when_the_list_is_reloaded_in_the_real_console_view() => AppHost.Run(() =>

@@ -141,6 +141,18 @@ public class EventDashboardViewModel : BasePanelViewModel
         };
 
         Detail = new ConsoleDetailPresenter();
+        if (EventGuardTrace.IsOn)
+        {
+            // 손댄 칸 수가 바뀔 때마다 — 0 이 되는 순간에는 누가 비웠는지 호출 사슬까지(고친 칸 유실 추적, 헤디드 r9 SC-EVT-028)
+            var lastCount = 0;
+            Detail.Tracker.Changed += (_, _) =>
+            {
+                var now = Detail.Tracker.Count;
+                if (now == lastCount) return;
+                EventGuardTrace.Write($"[VM] 손댄 칸 {lastCount} → {now}" + (now == 0 && lastCount > 0 ? $" · 비운 곳: {EventGuardTrace.Caller()}" : string.Empty));
+                lastCount = now;
+            };
+        }
         // 조치 내역은 이미 있는 원본별 조회 API 를 열 때 한 번 부른다(정본 E-D4) — API 는 늦게 해석한다.
         DetailView = new EventDetailViewModel(Detail, new EventActionHistoryViewModel(ResolveEventApi, log));
         DetailView.ActionRequested += OnDetailAction;
@@ -349,8 +361,10 @@ public class EventDashboardViewModel : BasePanelViewModel
         _isSwitching = true;
         try
         {
+            TraceGuard($"레일 전환 {_railKey} → {key}");
             DetachRows();
             Detail.Reset();
+            _pendingApply = null;           // 앞 레일의 [적용] 끝남이 새 레일의 상세를 '적용했다' 며 비우지 않게
 
             if (TabControlViewModel.ActiveItem is not null)
                 await TabControlViewModel.DeactivateItemAsync(TabControlViewModel.ActiveItem, true);
@@ -699,11 +713,31 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         var next = rows ?? Array.Empty<object>();
 
-        // 같은 선택을 다시 받는 것은 이동이 아니다(뷰가 되돌린 직후 올라오는 알림).
-        if (!_isRevertingSelection && !SameSelection(next, SelectedRows)
-            && !Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow))
-            return false;
+        // 같은 선택을 다시 받는 것은 이동이 아니다(뷰가 되돌린 직후 올라오는 알림) — 상세를 <b>다시 세우지 않는다</b>.
+        // 예전엔 여기서도 상세를 다시 불러 고친 칸을 비웠다: 거절 뒤 그리드가 같은 선택을 한 번 더 알리면 [되돌리기] 가 꺼졌다.
+        if (SameSelection(next, SelectedRows))
+        {
+            TraceGuard("SetSelection 같은 선택 — 상세 유지", next);
+            return true;
+        }
 
+        {
+            if (!_isRevertingSelection && !Detail.Guard.TryNavigate(ConsoleNavigation.SelectRow))
+            {
+                TraceGuard("SetSelection 거절(관문)", next);
+                return false;
+            }
+
+            // 불변식 — 관문을 건너뛰는 길(되돌림 · 다시 읽기 정리)이라도 고친 칸이 있으면 <b>다른 이벤트</b>로 상세를 다시 세우지 않는다.
+            // 그러면 고친 칸이 말없이 사라진다(2026-09-28 헤디드 r9 SC-EVT-028 — 다시 읽기 도중 다른 목록의 바쁨 끝이 선택을 비웠다).
+            if (_isRevertingSelection && Detail.Tracker.IsDirty && !SameEvents(next, SelectedRows))
+            {
+                TraceGuard("SetSelection 거절(되돌림 중 · 고친 칸 있음 · 다른 이벤트)", next);
+                return false;
+            }
+        }
+
+        TraceGuard("SetSelection 수락", next);
         SelectedRows = next;
         _current?.Select(SelectedRows);
 
@@ -716,6 +750,18 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(QueueButtonText));
         NotifyOfPropertyChange(nameof(CanDelete));
         return true;
+    }
+
+    /// <summary>두 선택이 같은 이벤트들인가(인스턴스가 달라도 — 다시 읽기의 새 행).</summary>
+    private static bool SameEvents(IReadOnlyList<object> a, IReadOnlyList<object> b)
+        => a.Count == b.Count && a.All(x => b.Any(y => EventSelectionTwin.IsSameEvent(x, y)));
+
+    /// <summary>관문 진단 한 줄(<see cref="EventGuardTrace"/> 가 켜졌을 때만).</summary>
+    private void TraceGuard(string what, IReadOnlyList<object>? next = null)
+    {
+        if (!EventGuardTrace.IsOn) return;
+        EventGuardTrace.Write($"[VM] {what} · 레일={_railKey} · 새={EventGuardTrace.Rows(next)} · 현재={EventGuardTrace.Rows(SelectedRows)}"
+                              + $" · 손댄칸={Detail.Tracker.Count} · 되돌림중={_isRevertingSelection} · 상태={Detail.State}");
     }
 
     /// <summary>뷰가 선택을 되돌리는 동안은 가드를 다시 물지 않는다(무한 재귀).</summary>
@@ -831,12 +877,20 @@ public class EventDashboardViewModel : BasePanelViewModel
 
         if (vanished > 0)
         {
-            if (!dropVanished) return;       // 다시 읽기 도중 — 끝나고 다시 본다
+            // 다시 읽기 도중이면 끝나고 다시 본다. 끝났어도 고친 칸이 있으면 빼지 않는다 — 말없이 버리지 않고,
+            // 운영자가 [적용](서버가 그 이벤트의 운명을 말한다) 이나 [되돌리기] 로 끝낸다(2026-09-28 헤디드 r9 SC-EVT-028).
+            if (!dropVanished || Detail.Tracker.IsDirty)
+            {
+                TraceGuard($"다시 읽기 짝 없음 {vanished}건 — {(dropVanished ? "고친 칸이 있어 유지" : "다시 읽기 도중 — 기다림")}");
+                return;
+            }
+            TraceGuard($"다시 읽기 끝 · 짝 없음 {vanished}건 — 뺀다", mapped);
             using (SuppressSelectionGuard()) SetSelection(mapped);   // 삭제된 행은 뺀다(남은 행으로 상세를 다시 세운다)
             SelectionRemapped?.Invoke(SelectedRows);
             return;
         }
 
+        TraceGuard("다시 읽기 — 같은 이벤트의 새 행으로 옮긴다", mapped);
         SelectedRows = mapped;
         _current.Select(SelectedRows);
         if (!DetailView.Retarget(SelectedRows))
@@ -1067,12 +1121,14 @@ public class EventDashboardViewModel : BasePanelViewModel
         }
 
         // 진짜 결과는 BusyEnded 가 알려 준다 — 시작만 보고 dirty 를 푸는 것은 낙관적 종결이다(R8).
-        _pendingApply = new PendingApply(SelectedRows.Count, write.Written, SelectedRows.Count == 1 ? SelectedRows[0] : null);
+        _pendingApply = new PendingApply(SelectedRows.Count, write.Written, SelectedRows.Count == 1 ? SelectedRows[0] : null, _current);
         Detail.LastMessage = $"저장 중 — {write.Written}건";
     }
 
     /// <summary>[적용] 이 걸어 둔 일. 끝남이 오면 그때 정말 되었는지 보고 끝낸다.</summary>
-    private sealed record PendingApply(int SelectedCount, int Written, object? Row);
+    /// <remarks><c>Source</c> — 저장을 건 목록. 다른 목록의 바쁨 끝으로 이 일을 끝내면(<see cref="Detail"/>.Settle) 그때 상세에 있던
+    /// <b>다른 이벤트의 고친 칸</b>을 '적용했다' 며 비운다(헤디드 r9: 탐지 [적용] 의 저장은 레일을 옮긴 뒤에 끝났다).</remarks>
+    private sealed record PendingApply(int SelectedCount, int Written, object? Row, IEventConsoleSource? Source = null);
 
     private PendingApply? _pendingApply;
 
@@ -1080,11 +1136,20 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// 저장이 끝난 뒤 — 행이 아직도 손대진 채라면 서버가 받지 않은 것이다
     /// (패널은 저장에 성공한 행만 IsEdited 를 끔다).
     /// </summary>
-    internal void SettlePendingApply()
+    internal void SettlePendingApply() => SettlePendingApply(null);
+
+    /// <param name="endedSource">바쁨이 끝난 목록 — 걸어 둔 일의 목록이 아니면 끝내지 않는다(null 이면 묻지 않는다).</param>
+    private void SettlePendingApply(object? endedSource)
     {
         var pending = _pendingApply;
         if (pending is null) return;
+        if (endedSource is not null && pending.Source is not null && !ReferenceEquals(endedSource, pending.Source))
+        {
+            TraceGuard("걸어 둔 [적용] — 다른 목록의 바쁨 끝이라 끝내지 않는다");
+            return;
+        }
         _pendingApply = null;
+        TraceGuard("걸어 둔 [적용]을 끝낸다");
 
         // 행 뷰모델 계보가 제네릭이라 공통 기반으로 단언한다 — 네 종류 전부 BaseEventViewModel<T> 파생이다.
         if (IsRowStillEdited(pending.Row))
@@ -1553,8 +1618,12 @@ public class EventDashboardViewModel : BasePanelViewModel
     #region - Processes -
     private void OnSourceBusyEnded(object? sender, EventArgs e)
     {
-        SettlePendingApply();                 // (R8) 진짜 결과는 여기서야 알 수 있다
-        RemapSelectionToCurrentRows(dropVanished: true);   // 다시 읽기가 끝났다 — 짝이 없는 선택은 정말 사라진 것
+        if (EventGuardTrace.IsOn)
+            EventGuardTrace.Write($"[VM] 바쁨 끝 · 목록={(sender as IEventConsoleSource)?.Panel.GetType().Name ?? sender?.GetType().Name} · 지금 목록인가={ReferenceEquals(sender, _current)}");
+        SettlePendingApply(sender);           // (R8) 진짜 결과는 여기서야 알 수 있다 — 걸어 둔 목록의 끝남으로만
+        // 다시 읽기가 끝났다 — 짝이 없는 선택은 정말 사라진 것. 단 <b>지금 목록</b>의 끝남만 그 증거다: 다른 목록(예: 레일을 옮기기 전
+        // 탐지 [적용] 의 저장)이 끝났을 때 이 목록은 다시 읽는 도중일 수 있다(r9 SC-EVT-028 — 그 틈에 선택을 비워 고친 칸을 잃었다).
+        RemapSelectionToCurrentRows(dropVanished: ReferenceEquals(sender, _current));
         RefreshRailCounts();
         RaiseListState();
         NotifyOfPropertyChange(nameof(CanReload));

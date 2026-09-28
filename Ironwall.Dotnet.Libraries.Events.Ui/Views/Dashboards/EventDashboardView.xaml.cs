@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
+﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles;
+using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Suppression;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using MaterialDesignThemes.Wpf;
 using System;
@@ -45,6 +46,8 @@ public partial class EventDashboardView : UserControl
     private void OnSelectionRemapped(IReadOnlyList<object> rows)
     {
         var grid = Descendants<DataGrid>(this).FirstOrDefault(g => g.Visibility == Visibility.Visible && rows.All(r => g.Items.Contains(r)));
+        if (EventGuardTrace.IsOn)
+            EventGuardTrace.Write($"[View] 다시 가리킴 {EventGuardTrace.Rows(rows)} · 그리드={(grid is null ? "없음" : System.Windows.Automation.AutomationProperties.GetAutomationId(grid))}");
         if (grid is null || Model is null) return;
         _restoringSelection = true;
         using (Model.SuppressSelectionGuard())
@@ -123,6 +126,10 @@ public partial class EventDashboardView : UserControl
         if (sender is not DataGrid grid || Model is null) return;
         // 보이지 않는 그리드가 목록을 비우며 내는 선택 변경은 무시한다 — 다른 레일의 선택을 지운다.
         if (grid.Visibility != Visibility.Visible) return;
+        if (EventGuardTrace.IsOn)
+            EventGuardTrace.Write($"[View] 그리드 선택 변경 {System.Windows.Automation.AutomationProperties.GetAutomationId(grid)} · +{EventGuardTrace.Rows(e.AddedItems)} -{EventGuardTrace.Rows(e.RemovedItems)}"
+                                  + $" · 지금={EventGuardTrace.Rows(grid.SelectedItems)} · 현재항목={EventGuardTrace.Rows(new[] { grid.CurrentItem })} · 되돌리는중={_restoringSelection}"
+                                  + $" · 다시읽기빠짐={IsReloadDrop(grid, e)} · 초점={System.Windows.Input.Keyboard.FocusedElement?.GetType().Name}");
         if (_restoringSelection) return;
         if (IsReloadDrop(grid, e)) return;
 
@@ -136,10 +143,13 @@ public partial class EventDashboardView : UserControl
             try
             {
                 grid.SelectedItems.Clear();
-                foreach (var row in Model.SelectedRows) grid.SelectedItems.Add(row);
+                // 목록에 없는 행(다시 읽기로 빠진 옛 행)은 되돌릴 수 없다 — 넣으려다 예외로 끊기지 않게 거른다(뷰모델이 새 행을 다시 가리킨다).
+                foreach (var row in Model.SelectedRows.Where(r => grid.Items.Contains(r))) grid.SelectedItems.Add(row);
             }
             finally { _restoringSelection = false; }
         }
+        if (EventGuardTrace.IsOn)
+            EventGuardTrace.Write($"[View] 거절 → 되돌림 결과 {EventGuardTrace.Rows(grid.SelectedItems)} · 뷰모델 {EventGuardTrace.Rows(Model.SelectedRows)}");
     }
 
     private void OnFilterChipClick(object sender, RoutedEventArgs e)
