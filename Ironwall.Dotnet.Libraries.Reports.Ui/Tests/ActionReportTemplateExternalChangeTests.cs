@@ -232,6 +232,113 @@ public class ActionReportTemplateExternalChangeTests : IDisposable
     }
 
     [Fact]
+    public async Task should_not_keep_the_applied_message_when_someone_else_edits_the_chosen_line_after_our_apply()
+    {
+        // 적대 검토 M1: 우리가 #2 를 적용한 뒤(한참 뒤) 다른 운영자가 #2 를 고쳤다 — 다시 읽기가 그 사람의 글을 폼에 싣는데
+        // 바닥 막대는 "적용했습니다." 로 되살아나 우리가 쓰지 않은 글을 우리가 적용한 것처럼 말했다.
+        var rig = await OpenAsync();
+        MimicListDroppingSelectionOnClear(rig.Console);
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍/폭우(수정)";
+        await rig.Console.ApplyAsync();
+        Assert.Equal("적용했습니다.", rig.Console.Detail.FooterText);
+
+        rig.Api.Templates.Single(t => t.Id == 2).Content = "강풍/폭우(다른 운영자)";
+        await SettleAsync(rig, action: "UPDATED", id: 2);
+
+        Assert.Equal(2, rig.Console.SelectedItem?.Id);
+        Assert.Equal("강풍/폭우(다른 운영자)", rig.Console.DraftContent);
+        Assert.DoesNotContain("적용했습니다", rig.Console.DetailFooterText);
+        Assert.Equal(ActionReportTemplateConsoleViewModel.SelectedChangedElsewhereText, rig.Console.DetailFooterText);
+    }
+
+    [Fact]
+    public async Task should_keep_the_applied_message_when_only_another_line_changed_elsewhere()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍/폭우(수정)";
+        await rig.Console.ApplyAsync();
+
+        rig.Api.Templates.Single(t => t.Id == 3).Content = "오경보(다른 운영자)";   // 고른 줄의 글은 그대로다
+        await SettleAsync(rig, action: "UPDATED", id: 3);
+
+        Assert.Equal("적용했습니다.", rig.Console.DetailFooterText);
+    }
+
+    [Theory]
+    [InlineData(409, "이미 등록된 문구입니다.")]
+    [InlineData(422, "문구는 1~500자여야 합니다.")]
+    [InlineData(500, "문구를 고치지 못했습니다. 잠시 후 다시 시도하세요.")]
+    public async Task should_keep_the_rejected_draft_and_show_the_notice_when_a_change_arrives_after_a_failed_apply(int status, string failure)
+    {
+        // 적대 검토 시나리오 B: 실패한 [적용] 이 Settle(오류)로 손댄 칸을 비웠다 — 거절된 글이 폼에 남은 채 "미적용 없음"이 되어
+        // 뒤이은 SYNC 다시 읽기가 그 글을 말없이 서버 글로 덮고, 실패 문구를 실패하지 않은 글 옆에 되살렸다.
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍(거절될 글)";
+        rig.Api.FailWrite = true;
+        rig.Api.StatusCodeOnFailure = status;
+        await rig.Console.ApplyAsync();
+
+        Assert.True(rig.Console.Detail.IsDirty);                        // 거절된 글은 여전히 적용되지 않은 글이다
+        Assert.True(rig.Console.DetailCanApply);                        // 다시 [적용]할 수 있다
+        Assert.Equal(failure, rig.Console.DetailFooterText);            // 실패 문구는 거절된 글 옆에 보인다
+
+        rig.Api.FailWrite = false;
+        rig.Api.Templates.Single(t => t.Id == 2).Content = "강풍/폭우(다른 운영자)";
+        var readsBefore = rig.Api.ListReads;
+        await SettleAsync(rig, action: "UPDATED", id: 2);
+
+        Assert.Equal(readsBefore, rig.Api.ListReads);                   // 덮지 않았다
+        Assert.Equal("강풍(거절될 글)", rig.Console.DraftContent);
+        Assert.True(rig.Console.IsExternallyChanged);                   // 알리고 사람이 고른다
+        Assert.Equal(failure, rig.Console.DetailFooterText);            // 실패 문구는 여전히 거절된 글 옆이다
+    }
+
+    [Fact]
+    public async Task should_not_show_the_failure_message_when_the_form_no_longer_holds_the_rejected_draft()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍(거절될 글)";
+        rig.Api.FailWrite = true;
+        await rig.Console.ApplyAsync();
+
+        rig.Console.DraftContent = "강풍/폭우";                          // 사람이 원래 글로 되돌려 적었다 — 미적용 없음
+        Assert.False(rig.Console.Detail.IsDirty);
+        Assert.DoesNotContain("못했습니다", rig.Console.DetailFooterText);
+
+        rig.Api.FailWrite = false;
+        rig.Api.Templates.Single(t => t.Id == 2).Content = "강풍/폭우(다른 운영자)";
+        await SettleAsync(rig, action: "UPDATED", id: 2);
+
+        Assert.Equal("강풍/폭우(다른 운영자)", rig.Console.DraftContent);
+        Assert.DoesNotContain("못했습니다", rig.Console.DetailFooterText);   // 서버 글 옆에 옛 실패 문구가 없다
+    }
+
+    [Fact]
+    public async Task should_keep_the_rejected_new_phrase_when_a_change_arrives_after_a_failed_create()
+    {
+        var rig = await OpenAsync();
+        await rig.Console.AddAsync();
+        rig.Console.DraftContent = "순찰 중 확인";
+        rig.Api.FailWrite = true;
+        await rig.Console.ApplyAsync();
+
+        Assert.True(rig.Console.Detail.IsCreating);
+        Assert.True(rig.Console.DetailCanApply);                        // 다시 [등록]할 수 있다(전에는 꺼져 다시 적어야 했다)
+        Assert.Equal("문구를 등록하지 못했습니다. 잠시 후 다시 시도하세요.", rig.Console.DetailFooterText);
+
+        rig.Api.FailWrite = false;
+        rig.Api.Templates.Add(ActionReportTemplateSeed.Template(9, "다른 운영자 문구", 9));
+        await SettleAsync(rig, action: "CREATED", id: 9);
+
+        Assert.Equal("순찰 중 확인", rig.Console.DraftContent);
+        Assert.True(rig.Console.IsExternallyChanged);
+    }
+
+    [Fact]
     public async Task should_ignore_changes_when_the_console_is_not_open()
     {
         var rig = await OpenAsync();

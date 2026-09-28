@@ -99,6 +99,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         _externalChange.Cancel();
         IsExternallyChanged = false;
         _lastCommittedOrder = null;
+        _rejectedDraft = null;
         Detail.Reset();
         _selectedItem = null;
         _undoOrder = null;
@@ -232,6 +233,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     {
         // 앞 줄에서 한 일("등록을 취소했습니다." 등)을 다른 줄의 바닥 막대에 남겨 두지 않는다.
         // (등록 · 수정 뒤에는 SelectById 다음에 Settle 이 오므로 그 알림은 지워지지 않는다.)
+        _rejectedDraft = null;
         Detail.LastMessage = null;
         Detail.IsCreating = false;
         Detail.SelectedCount = SelectedItem is null ? 0 : 1;
@@ -325,6 +327,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return;
         _selectedItem = null;
         NotifyOfPropertyChange(nameof(SelectedItem));
+        _rejectedDraft = null;
+        Detail.LastMessage = null;       // 앞 폼의 실패 문구를 새 등록 폼에 남기지 않는다
         Detail.SelectedCount = 0;
         Detail.IsCreating = true;
         SetDraftContentQuiet(string.Empty);
@@ -403,6 +407,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             var wasCreate = Detail.IsCreating;
             var original = wasCreate ? null : (object?)(SelectedItem?.Content ?? string.Empty);
             _draftContent = value ?? string.Empty;
+            if (_rejectedDraft != null)
+            {
+                // 폼이 더는 거절된 글이 아니다 — 그 실패 문구를 다른 글 옆에 남기지 않는다.
+                _rejectedDraft = null;
+                Detail.LastMessage = null;
+            }
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(DraftContentCountText));
             NotifyOfPropertyChange(nameof(DraftValidationError));
@@ -477,8 +487,8 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// <summary>[적용] · [등록].</summary>
     public async Task ApplyAsync()
     {
-        if (!CanEdit) { Detail.Settle(IsUnsupported ? UnsupportedText : "편집 권한이 없습니다."); RaiseAll(); return; }
-        if (DraftValidationError != null) { _showValidation = true; Detail.Settle(DraftValidationError); RaiseAll(); return; }
+        if (!CanEdit) { FailApply(IsUnsupported ? UnsupportedText : "편집 권한이 없습니다."); RaiseAll(); return; }
+        if (DraftValidationError != null) { _showValidation = true; FailApply(DraftValidationError); RaiseAll(); return; }
         if (IsBusy) return;
 
         var content = DraftContent.Trim();
@@ -492,13 +502,14 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 if (!res.Success || res.Data is null)
                 {
                     _log?.Warning($"[ActionReportTemplate] 등록 실패({res.StatusCode}): {res.ErrorText()}");
-                    Detail.Settle(MapError(res.StatusCode, "문구를 등록하지 못했습니다."));
+                    FailApply(MapError(res.StatusCode, "문구를 등록하지 못했습니다."));
                     return;
                 }
                 IsBusy = false;   // LoadAsync 가 자기 재진입 가드로 스스로 막지 않도록 먼저 내린다.
                 await LoadAsync();
                 SelectById(res.Data.Id);
                 Detail.IsCreating = false;
+                _rejectedDraft = null;
                 Detail.Settle("문구를 등록했습니다.");
             }
             else
@@ -509,21 +520,43 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 if (!res.Success || res.Data is null)
                 {
                     _log?.Warning($"[ActionReportTemplate] 수정 실패({res.StatusCode}): {res.ErrorText()}");
-                    Detail.Settle(MapError(res.StatusCode, "문구를 고치지 못했습니다."));
+                    FailApply(MapError(res.StatusCode, "문구를 고치지 못했습니다."));
                     return;
                 }
                 IsBusy = false;
                 await LoadAsync();
                 SelectById(item.Id);
+                _rejectedDraft = null;
                 Detail.Settle("적용했습니다.");
             }
         }
         finally { IsBusy = false; RaiseAll(); }
     }
 
+    /// <summary>
+    /// [적용] · [등록] 이 거절됐다 — 실패 문구만 남기고 손댄 칸은 <b>비우지 않는다</b>(거절된 글은 여전히 적용되지 않은 글이다).
+    /// </summary>
+    /// <remarks>
+    /// 전에는 <see cref="ConsoleDetailPresenter.Settle"/>(오류)를 불러 손댄 칸을 비웠다 — 거절된 글이 폼에 그대로인데
+    /// "미적용 없음"이 되어, 뒤이은 SYNC 다시 읽기가 그 글을 말없이 서버 글로 덮고 실패 문구를 실패하지 않은 글 옆에
+    /// 되살렸다(적대 검토 시나리오 B). Settle 의 뜻(끝났다 = 칸을 비운다)은 콘솔 공통이라 커널은 그대로 두고 여기서 가른다
+    /// — 이벤트 콘솔의 "고친 칸은 그대로 두었으니"(EventDashboardViewModel.SettlePendingApply)와 같은 길.
+    /// 미적용 · 등록 상태의 커널 막대는 LastMessage 를 보이지 않으므로 <see cref="DetailFooterText"/> 가 거절된 글이
+    /// 폼에 남아 있는 동안에만 이 문구를 보인다.
+    /// </remarks>
+    private void FailApply(string message)
+    {
+        _rejectedDraft = _draftContent;
+        Detail.LastMessage = message;
+    }
+
+    /// <summary>방금 거절된 글 — 폼이 아직 그 글일 때만 non-null(글이 바뀌면 <see cref="DraftContent"/> 가 지운다).</summary>
+    private string? _rejectedDraft;
+
     /// <summary>[되돌리기] · [취소].</summary>
     public void Revert()
     {
+        _rejectedDraft = null;
         if (Detail.IsCreating)
         {
             Detail.IsCreating = false;
@@ -550,10 +583,23 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// 바닥 막대 글. 등록 폼의 커널 기본 글("등록 전에는 목록에 나타나지 않습니다")은 360 서랍의 막대(단추 둘 옆)에서
     /// "않습 / 니다" 로 갈렸다 — 같은 뜻을 한 줄 길이로 말한다. 나머지 상태는 커널 글 그대로.
     /// </summary>
-    public string DetailFooterText => Detail.State == ConsoleDetailState.Create
-                                      && Detail.FooterText == ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Create, 0)
-        ? CreateFooterText
-        : Detail.FooterText;
+    public string DetailFooterText
+    {
+        get
+        {
+            // 거절된 글이 폼에 그대로 있다 — 실패 문구를 그 글 옆에 보인다(미적용 · 등록 상태의 커널 막대는 LastMessage 를 숨긴다).
+            // "적용하거나 되돌린 뒤 이동하세요"(막힌 이동) · 읽기 전용은 커널 글이 이긴다.
+            if (_rejectedDraft != null && Detail.LastMessage != null
+                && Detail.State != ConsoleDetailState.ReadOnly
+                && Detail.FooterText != ConsoleDetailStateMachine.BlockedNotice)
+                return Detail.LastMessage;
+
+            return Detail.State == ConsoleDetailState.Create
+                   && Detail.FooterText == ConsoleDetailStateMachine.FooterText(ConsoleDetailState.Create, 0)
+                ? CreateFooterText
+                : Detail.FooterText;
+        }
+    }
 
     public const string CreateFooterText = "등록해야 목록에 나타납니다";
     #endregion
@@ -562,6 +608,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// <summary>다른 곳에서 문구 목록이 바뀌었는데 지금 다시 읽지 못할 때 상태 띠에 보이는 말.</summary>
     public const string ExternalChangeNotice = "다른 곳에서 문구 목록이 바뀌었습니다.";
     public const string ExternalChangeAction = "다시 읽기";
+
+    /// <summary>
+    /// 다시 읽었더니 고르고 있던 문구의 글이 <b>다른 곳에서</b> 바뀌어 있었다 — 상세 바닥 막대에 보이는 말.
+    /// 그 전의 "방금 한 일"(예: "적용했습니다.")은 우리가 쓰지 않은 글 옆에 남기지 않는다.
+    /// </summary>
+    public const string SelectedChangedElsewhereText = "다른 곳에서 이 문구가 바뀌었습니다.";
 
     public string ExternalChangeText => ExternalChangeNotice;
     public string ExternalChangeActionText => ExternalChangeAction;
@@ -619,13 +671,27 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         var committed = _lastCommittedOrder;
         // 다시 읽기는 같은 줄을 다시 고른다(SelectById → OnSelectionChanged) — 그 길이 바닥 막대의 "방금 한 일"을 지운다.
         // 우리 쓰기의 메아리(등록 · 적용 직후 곧바로 온다)면 "문구를 등록했습니다." 가 "변경 없음" 으로 바뀌었다(헤디드 3회차 SC-ART-005c).
-        // 같은 줄로 돌아왔으면 그 알림은 여전히 참이다 — 되살린다. 줄이 사라졌으면 남기지 않는다.
+        // 같은 줄로 돌아왔고 그 줄의 글이 다시 읽기 전과 같을 때만 그 알림은 여전히 참이다 — 되살린다.
+        // 글이 바뀌었으면(다른 운영자가 고쳤다 — 적대 검토 M1) 폼에는 그 사람의 글이 실렸다: "적용했습니다." 를 그 옆에
+        // 되살리면 우리가 쓰지 않은 글을 우리가 적용한 것처럼 말한다 — 알림은 버리고 바뀌었다고만 말한다.
+        // (순서 되돌리기가 _lastCommittedOrder 로 "우리 것의 메아리"를 가르는 것과 같은 기준: 우리가 마지막으로 본 값.)
+        // 줄이 사라졌으면 남기지 않는다.
         var keptId = SelectedItem?.Id;
+        var keptContent = SelectedItem?.Content;
         var keptMessage = Detail.LastMessage;
         await LoadAsync();
-        if (keptMessage != null && keptId.HasValue && SelectedItem?.Id == keptId
+        if (keptId.HasValue && SelectedItem is { } again && again.Id == keptId
             && !Detail.IsDirty && !Detail.IsCreating && Detail.LastMessage is null)
-            Detail.LastMessage = keptMessage;
+        {
+            if (string.Equals(again.Content, keptContent, StringComparison.Ordinal))
+            {
+                if (keptMessage != null) Detail.LastMessage = keptMessage;
+            }
+            else
+            {
+                Detail.LastMessage = SelectedChangedElsewhereText;
+            }
+        }
 
         // 되돌리기는 "우리가 보낸 순서"가 아직 서버 순서일 때만 산다 — 다른 사람이 또 바꿨다면
         // 되돌리기가 그 사람의 순서를 말없이 덮어쓴다. (우리 reorder 의 메아리면 순서가 같아 그대로 둔다.)
