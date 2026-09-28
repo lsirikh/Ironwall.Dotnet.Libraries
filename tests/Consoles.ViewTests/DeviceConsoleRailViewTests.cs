@@ -68,6 +68,53 @@ public class DeviceConsoleRailViewTests
         finally { window.Close(); }
     });
 
+    [Fact]
+    public void should_move_selection_and_keyboard_focus_to_the_next_rail_without_passing_back_through_lamps_when_down_is_pressed_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        // 적대 검토 M2: 전환은 패널 비활성화(await) 뒤에야 _railKey 를 바꾼다 — 그 await 가 양보하면 받아들인 전환이 거절처럼 보여
+        // 레일이 앞 레일로 튀었다가(초점도 앞 레일로) 늦은 알림에 새 레일로 간다. 사람의 ↓ 와 같은 길로 확인한다.
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(LampRail)));
+            AppHost.Pump();
+            var rail = RailProbe.Rail(view, "Console.Devices.Rail");
+            var next = RailProbe.KeyAfter(rail, LampRail);
+            var changes = RailProbe.RecordSelectionChanges(rail);
+
+            RailProbe.PressDownFrom(rail, LampRail);
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            Assert.Equal(next, console.SelectedRail?.Key);
+            Assert.Equal(new[] { $"+{next} -{LampRail}" }, changes);   // 앞 레일로 되돌아가는 중간 선택이 없다
+            RailProbe.AssertShows(rail, next, refused: LampRail);
+            RailProbe.AssertKeyboardFocusOn(rail, next);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void should_keep_selection_and_keyboard_focus_on_lamps_when_down_is_refused_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(LampRail)));
+            AppHost.Pump();
+            console.Detail.Tracker.Touch("name_device", "경광등 1", "고친 이름");
+            var rail = RailProbe.Rail(view, "Console.Devices.Rail");
+            var next = RailProbe.KeyAfter(rail, LampRail);
+
+            RailProbe.PressDownFrom(rail, LampRail);
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            Assert.Equal(LampRail, console.SelectedRail?.Key);
+            RailProbe.AssertShows(rail, LampRail, refused: next);
+            RailProbe.AssertKeyboardFocusOn(rail, LampRail);   // 다음 ↓ 가 막힌 레일이 아니라 경광등에서 출발한다
+        }
+        finally { window.Close(); }
+    });
+
     private static (DeviceDashboardView View, System.Windows.Window Window, DeviceDashboardViewModel Console) HostConsole()
     {
         var events = new EventAggregator();

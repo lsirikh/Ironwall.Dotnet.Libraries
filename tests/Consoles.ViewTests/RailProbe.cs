@@ -51,6 +51,51 @@ internal static class RailProbe
         ((ISelectionItemProvider)item.GetPattern(PatternInterface.SelectionItem)!).Select();
     }
 
+    /// <summary>
+    /// 키보드로 한 칸 아래 — 항목에 키보드 초점을 두고 ↓ 를 입력 관리자(InputManager)에 넣는다. 실제 키 입력과 같이
+    /// PreviewKeyDown → KeyDown 으로 올라가 ListBox 가 초점을 먼저 옮기고 그다음 고른다.
+    /// </summary>
+    public static void PressDownFrom(ConsoleRail rail, string key)
+    {
+        var from = Container(rail, key);
+        Assert.True(from.Focus() && from.IsKeyboardFocused, $"'{key}' 항목에 키보드 초점을 둘 수 없다 · 초점={System.Windows.Input.Keyboard.FocusedElement}");
+        var source = PresentationSource.FromVisual(rail)!;
+        var args = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, source, Environment.TickCount, System.Windows.Input.Key.Down)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent,
+            Source = from,
+        };
+        System.Windows.Input.InputManager.Current.ProcessInput(args);
+    }
+
+    /// <summary>레일 순서에서 <paramref name="key"/> 바로 아래 항목의 키.</summary>
+    public static string KeyAfter(ConsoleRail rail, string key)
+    {
+        var keys = rail.Items.OfType<ConsoleRailEntry>().Select(e => e.Key).ToList();
+        return keys[keys.IndexOf(key) + 1];
+    }
+
+    public static ListBoxItem Container(ConsoleRail rail, string key)
+    {
+        var entry = rail.Items.OfType<ConsoleRailEntry>().Single(e => e.Key == key);
+        return (ListBoxItem)rail.ItemContainerGenerator.ContainerFromItem(entry);
+    }
+
+    /// <summary>선택 변경을 차례로 적는다 — "+추가 -제거".</summary>
+    public static List<string> RecordSelectionChanges(ConsoleRail rail)
+    {
+        var log = new List<string>();
+        rail.SelectionChanged += (_, e) => log.Add($"+{Keys(e.AddedItems)} -{Keys(e.RemovedItems)}");
+        return log;
+
+        static string Keys(System.Collections.IList items) => string.Join(",", items.OfType<ConsoleRailEntry>().Select(e => e.Key));
+    }
+
+    /// <summary>키보드 초점이 <paramref name="key"/> 항목 컨테이너에 있는가.</summary>
+    public static void AssertKeyboardFocusOn(ConsoleRail rail, string key)
+        => Assert.True(Container(rail, key).IsKeyboardFocused,
+            $"키보드 초점이 '{key}' 항목에 있어야 한다 · 초점={((System.Windows.Input.Keyboard.FocusedElement as FrameworkElement)?.DataContext is ConsoleRailEntry e ? e.Key : System.Windows.Input.Keyboard.FocusedElement?.ToString())}");
+
     public static string? SelectedKey(ConsoleRail rail) => (rail.SelectedItem as ConsoleRailEntry)?.Key;
 
     public static bool ItemSelected(ConsoleRail rail, string key)

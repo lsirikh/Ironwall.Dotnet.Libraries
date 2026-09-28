@@ -80,6 +80,104 @@ public class ConsoleAutomationExposureTests
         Assert.DoesNotContain("Console.Test.Rail.Footer", ids);   // 억제 레일처럼 띠를 접은 레일에서는 없는 것이 맞다
     }
 
+    [Theory]
+    [InlineData(Visibility.Collapsed)]
+    [InlineData(Visibility.Hidden)]
+    public void should_not_expose_controls_under_a_hidden_panel_without_an_automation_id(Visibility hidden)
+    {
+        // 적대 검토 L1 — 서버 콘솔 바닥 띠: 부대 필터를 감싼 id 없는 StackPanel 이 6.3 서버에서 접혀 있는데도
+        // 그 아래 Console.Servers.UnitFilter · IncludeDescendants 가 레일 자식으로 나왔다(id 있는 묶음만 접힘을 봤다).
+        var ids = OnSta(() =>
+        {
+            var summary = new TextBox { Text = "전체 3대" };
+            AutomationProperties.SetAutomationId(summary, "Console.Test.Rail.Footer");
+            var unitFilter = new ComboBox();
+            AutomationProperties.SetAutomationId(unitFilter, "Console.Test.UnitFilter");
+            var include = new CheckBox { Content = "예하 포함" };
+            AutomationProperties.SetAutomationId(include, "Console.Test.IncludeDescendants");
+            var unitBlock = new StackPanel { Visibility = hidden };   // id 없음 — ServerMonitorView.xaml 의 IsUnitEra 묶음과 같은 꼴
+            unitBlock.Children.Add(new TextBlock { Text = "부대" });
+            unitBlock.Children.Add(unitFilter);
+            unitBlock.Children.Add(include);
+            var footer = new StackPanel();
+            footer.Children.Add(summary);
+            footer.Children.Add(unitBlock);
+
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = footer };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            return UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()?.Select(c => c.GetAutomationId()).ToList() ?? new List<string>();
+        });
+
+        Assert.Contains("Console.Test.Rail.Footer", ids);
+        Assert.DoesNotContain("Console.Test.UnitFilter", ids);
+        Assert.DoesNotContain("Console.Test.IncludeDescendants", ids);
+    }
+
+    [Fact]
+    public void should_expose_controls_under_a_panel_without_an_automation_id_when_the_panel_is_visible()
+    {
+        var ids = OnSta(() =>
+        {
+            var include = new CheckBox { Content = "예하 포함" };
+            AutomationProperties.SetAutomationId(include, "Console.Test.IncludeDescendants");
+            var unitBlock = new StackPanel();
+            unitBlock.Children.Add(include);
+            var footer = new StackPanel();
+            footer.Children.Add(unitBlock);
+
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = footer };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            return UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()?.Select(c => c.GetAutomationId()).ToList() ?? new List<string>();
+        });
+
+        Assert.Contains("Console.Test.IncludeDescendants", ids);   // 창 밖(IsVisible 이 모두 false)에서도 보이는 것은 나온다
+    }
+
+    [Fact]
+    public void should_not_expose_a_control_with_its_own_peer_when_it_is_collapsed()
+    {
+        var ids = OnSta(() =>
+        {
+            var include = new CheckBox { Content = "예하 포함", Visibility = Visibility.Collapsed };
+            AutomationProperties.SetAutomationId(include, "Console.Test.IncludeDescendants");
+            var summary = new TextBox { Text = "전체 3대" };
+            AutomationProperties.SetAutomationId(summary, "Console.Test.Rail.Footer");
+            var footer = new StackPanel();
+            footer.Children.Add(summary);
+            footer.Children.Add(include);
+
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = footer };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            return UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()?.Select(c => c.GetAutomationId()).ToList() ?? new List<string>();
+        });
+
+        Assert.Contains("Console.Test.Rail.Footer", ids);
+        Assert.DoesNotContain("Console.Test.IncludeDescendants", ids);
+    }
+
+    [Fact]
+    public void should_not_expose_the_footer_when_the_rail_is_compact()
+    {
+        var ids = OnSta(() =>
+        {
+            var summary = new TextBox { Text = "전체 3대" };
+            AutomationProperties.SetAutomationId(summary, "Console.Test.Rail.Footer");
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = summary, IsCompact = true };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            return UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()?.Select(c => c.GetAutomationId()).ToList() ?? new List<string>();
+        });
+
+        Assert.DoesNotContain("Console.Test.Rail.Footer", ids);   // 접힌 레일은 띠를 감춘다(템플릿 트리거)
+    }
+
     [Fact]
     public void should_put_template_text_in_the_control_view_when_it_is_a_console_text()
     {

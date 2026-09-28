@@ -71,6 +71,52 @@ public class EventConsoleRailViewTests
     });
 
     [Fact]
+    public void should_move_selection_and_keyboard_focus_to_malfunctions_without_passing_back_through_detections_when_down_is_pressed_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        // 적대 검토 M2: 전환은 패널 비활성화(await) 뒤에야 _railKey 를 바꾼다 — 그 await 가 양보하면 받아들인 전환이 거절처럼 보인다.
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey)));
+            AppHost.Pump();
+            var rail = RailProbe.Rail(view, "Console.Events.Rail");
+            Assert.Equal(EventDashboardViewModel.MalfunctionRailKey, RailProbe.KeyAfter(rail, EventDashboardViewModel.DetectionRailKey));
+            var changes = RailProbe.RecordSelectionChanges(rail);
+
+            RailProbe.PressDownFrom(rail, EventDashboardViewModel.DetectionRailKey);
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            Assert.Equal(EventDashboardViewModel.MalfunctionRailKey, console.SelectedRail?.Key);
+            Assert.Same(console.MalfunctionPanelViewModel, console.TabControlViewModel.ActiveItem);
+            Assert.Equal(new[] { $"+{EventDashboardViewModel.MalfunctionRailKey} -{EventDashboardViewModel.DetectionRailKey}" }, changes);
+            RailProbe.AssertShows(rail, EventDashboardViewModel.MalfunctionRailKey, refused: EventDashboardViewModel.DetectionRailKey);
+            RailProbe.AssertKeyboardFocusOn(rail, EventDashboardViewModel.MalfunctionRailKey);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void should_keep_selection_and_keyboard_focus_on_detections_when_down_is_refused_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        var (view, window, console) = HostConsole();
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey)));
+            AppHost.Pump();
+            console.Detail.Tracker.Touch(EventDetailProjection.FieldResult, "없음", "케이블 절단");
+            var rail = RailProbe.Rail(view, "Console.Events.Rail");
+
+            RailProbe.PressDownFrom(rail, EventDashboardViewModel.DetectionRailKey);
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            Assert.Equal(EventDashboardViewModel.DetectionRailKey, console.SelectedRail?.Key);
+            RailProbe.AssertShows(rail, EventDashboardViewModel.DetectionRailKey, refused: EventDashboardViewModel.MalfunctionRailKey);
+            RailProbe.AssertKeyboardFocusOn(rail, EventDashboardViewModel.DetectionRailKey);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void should_expose_the_rail_footer_by_its_automation_id_when_detections_are_counted_in_the_real_console_view() => AppHost.Run(() =>
     {
         // 2026-09-28 헤디드 SC-KRN-001: 다른 콘솔 다섯은 Console.{K}.Rail.Footer 가 보였고 이벤트만 '없음' 이었다.
