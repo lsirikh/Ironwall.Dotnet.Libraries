@@ -58,8 +58,10 @@ public readonly record struct ReportPreviewSurface(ReportPreviewMode Mode, strin
 /// <remarks>
 /// <para>세 가지가 미리보기를 내린다.</para>
 /// <list type="number">
-///   <item>서랍 · 접힘(창 폭 1280 미만) — 상세가 목록 <b>위로</b> 밀려 나오며 스크림을 덮는다.
-///         네이티브 표면을 거기 두면 스크림과 목록을 뚫는다(WL L982-983).</item>
+///   <item>칸이 읽을 수 없이 좁다(<see cref="ReportPreviewFit.MinLiveWidth"/> 미만) — 쪽을 그 폭에 맞추면 글자가 4px 아래가 된다.
+///         ★ 2026-09-28 개정: 예전엔 <b>서랍 · 접힘(콘솔 1280 미만)이라는 배치만으로</b> 내렸다. 실제 커널 서랍은 스크림이 없고
+///         목록을 오른쪽 여백만큼 비켜 겹치며(ConsoleShell.ApplyLayout 인셋) 닫히면 접힌다 — 네이티브 표면 위로 와야 할 같은 창
+///         WPF 요소가 없다. 그 탓에 사용자 콘솔(약 1100)에서는 늘 자리표시자만 떠 "미리보기가 안 된다" 로 읽혔다.</item>
 ///   <item>같은 창의 WPF 오버레이(확인 · 안내 · 진행 팝업) — 미리보기가 <b>팝업을 가린다</b>.
 ///         이미 한 번 당한 결함이다(다운로드 실패 안내가 미리보기 뒤로 깔렸다).</item>
 ///   <item>크게 보기 창이 열려 있다 — 같은 HTML 을 두 번 그릴 까닭이 없고, 그 창은 별도 HWND 라
@@ -80,7 +82,7 @@ public static class ReportPreviewSurfaceRules
     public const string OverlayReason = "확인 창을 닫으면 미리보기가 다시 나타납니다";
     // 짧게 둔다 — WPF 는 한글을 음절 단위로 끊으므로, 좁은 칸에서 긴 문장은 마지막 줄에
     // 음절 하나만 남긴다(접힘 900 에서 "…없습니 / 다" 로 갈라졌다).
-    public const string NarrowReason = "창이 좁아 이 칸에는 미리보기를 싣지 않습니다";
+    public const string NarrowReason = "칸이 좁아 미리보기를 싣지 않습니다";
     public const string NarrowHint = "[크게 보기]를 누르면 별도 창으로 볼 수 있습니다";
     public const string InProgressReason = "아직 만들어지는 중입니다";
     public const string InProgressHint = "아래 진행 상황에서 단계와 진행률을 볼 수 있습니다";
@@ -93,12 +95,12 @@ public static class ReportPreviewSurfaceRules
     /// <summary>
     /// 미리보기 자리를 정한다.
     /// </summary>
-    /// <param name="layout">콘솔의 폭 판정(<see cref="ConsoleLayoutMath.Resolve"/> 결과).</param>
+    /// <param name="paneWidth">미리보기 칸의 실제 폭(DIU). 아직 재지 못했으면 0 — 막지 않는다(<see cref="ReportPreviewFit.CanShowLive"/>).</param>
     /// <param name="isLargeViewOpen">[크게 보기] 창이 열려 있는가.</param>
     /// <param name="isBlockingOverlayOpen">같은 창에 WPF 팝업(확인 · 안내 · 진행)이 떠 있는가.</param>
     /// <param name="isRuntimeReady">WebView2 런타임을 초기화할 수 있는가.</param>
     /// <param name="content">고른 보고서의 미리보기 상태.</param>
-    public static ReportPreviewSurface Resolve(ConsoleLayoutMode layout,
+    public static ReportPreviewSurface Resolve(double paneWidth,
                                                bool isLargeViewOpen,
                                                bool isBlockingOverlayOpen,
                                                bool isRuntimeReady,
@@ -127,7 +129,7 @@ public static class ReportPreviewSurfaceRules
             case ReportPreviewContent.Cancelled: return ReportPreviewSurface.Placeholder(CancelledReason, CancelledHint);
         }
 
-        if (layout != ConsoleLayoutMode.Docked)
+        if (!ReportPreviewFit.CanShowLive(paneWidth))
             return ReportPreviewSurface.Placeholder(NarrowReason, NarrowHint);
 
         return content == ReportPreviewContent.Loading
@@ -138,7 +140,7 @@ public static class ReportPreviewSurfaceRules
     /// <summary>
     /// 크게 보기 창을 열 수 있는가 — <b>HTML 을 다 받은</b> 보고서이고 런타임이 있을 때만.
     /// 받는 중에 열면 빈 창이 뜨고, 그러면서 상세 칸 미리보기까지 자리표시자로 내려간다.
-    /// 좁은 창에서도 <b>열 수 있다</b>(별도 HWND 라 공역 제약을 받지 않는다 — 그것이 이 창의 존재 이유다).
+    /// 좁은 칸에서도 <b>열 수 있다</b>(별도 HWND 라 공역 제약을 받지 않는다 — 그것이 이 창의 존재 이유다).
     /// </summary>
     public static bool CanOpenLargeView(bool isRuntimeReady, ReportPreviewContent content)
         => isRuntimeReady && content == ReportPreviewContent.Ready;

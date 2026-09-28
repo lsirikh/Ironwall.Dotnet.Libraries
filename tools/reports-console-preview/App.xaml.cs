@@ -322,10 +322,10 @@ public partial class App : Application
     {
         var shell = FindShell(_view);
         var mode = _viewModel.LayoutMode;
-        var ifRuntime = ReportPreviewSurfaceRules.Resolve(mode, _viewModel.PreviewViewModel.IsLargeViewOpen,
+        var ifRuntime = ReportPreviewSurfaceRules.Resolve(_viewModel.PreviewViewModel.PaneWidth, _viewModel.PreviewViewModel.IsLargeViewOpen,
             _viewModel.PreviewViewModel.IsOverlayOpen, isRuntimeReady: true, _viewModel.PreviewViewModel.Content);
         File.AppendAllText(Path.Combine(directory, "preview-surface.txt"),
-            $"{frame}\tshellWidth={shell?.ActualWidth:0}\tlayout={mode}\tcontent={_viewModel.PreviewViewModel.Content}" +
+            $"{frame}\tshellWidth={shell?.ActualWidth:0}\tlayout={mode}\tpane={_viewModel.PreviewViewModel.PaneWidth:0}\tzoom={_viewModel.PreviewViewModel.ZoomText}\tcontent={_viewModel.PreviewViewModel.Content}" +
             $"\tifRuntime={(ifRuntime.IsLive ? "Live" : "Placeholder: " + ifRuntime.Reason + " / " + ifRuntime.Hint)}" +
             $"\tcanOpenLarge={ReportPreviewSurfaceRules.CanOpenLargeView(true, _viewModel.PreviewViewModel.Content)}{System.Environment.NewLine}");
     }

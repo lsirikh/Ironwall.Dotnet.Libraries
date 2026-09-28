@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 /// 않아 생성 화면의 템플릿 목록이 "콘솔을 연 순간의 스냅샷"으로 굳었고, 그 탓에 <b>지운 템플릿으로 생성</b>이
 /// 가능했다. 레일로 바꾸면서 전환마다 그 화면을 실제로 재적재해 그 결함이 구조적으로 재발할 수 없게 한다.</para>
 /// <para>★ <b>공역</b>: WebView2 는 네이티브 창이라 같은 창의 WPF 팝업 위에 그려진다. 이 뷰모델이
-/// <see cref="IPreviewAirspaceGate"/> 를 구현해 팝업 · 크게 보기 창 · 좁은 폭에서 미리보기를 내린다.</para>
+/// <see cref="IPreviewAirspaceGate"/> 를 구현해 팝업 · 크게 보기 창 · 읽을 수 없이 좁은 칸에서 미리보기를 내린다.</para>
 /// <para>싱글턴이다 — 닫을 때 선택 · 미적용 변경 · 미리보기를 전부 내려놓는다.</para>
 /// </remarks>
 public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, IHandle<ClosePopupMessageModel>

@@ -322,17 +322,67 @@ public class ReportConsoleTests : IDisposable
     #endregion
 
     #region - ★ 공역(airspace) -
+    // ★ 2026-09-28 정책 변경 — 서랍(콘솔 1280 미만)이라는 것만으로 미리보기를 내리지 않는다. 서랍은 스크림 없이
+    //   목록 오른쪽을 비켜(인셋) 겹치고 닫히면 접힌다 — 그 위에 올라오는 같은 창 WPF 요소가 없다(팝업은 공역 게이트가 따로 내린다).
+    //   사용자 콘솔(약 1100)에서 늘 "창이 좁아…" 만 보여 "미리보기가 안 된다" 로 읽혔다. 이제는 칸 폭이 기준이다.
     [Fact]
-    public async Task should_drop_the_preview_to_a_placeholder_when_the_console_becomes_a_drawer()
+    public async Task should_keep_the_preview_live_when_the_console_becomes_a_drawer()
     {
         var rig = await OpenAsync();
         rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
-        Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
 
         rig.Console.LayoutMode = ConsoleLayoutMode.Drawer;
+        rig.Console.PreviewViewModel.PaneWidth = 326;          // 서랍 360 칸의 미리보기 폭(실측)
+
+        Assert.True(rig.Console.PreviewViewModel.IsSurfaceLive);
+        Assert.Equal(0.38, rig.Console.PreviewViewModel.ZoomFactor, 2);
+        Assert.Equal("38%", rig.Console.PreviewViewModel.ZoomText);
+    }
+
+    [Fact]
+    public async Task should_drop_the_preview_to_a_placeholder_when_the_pane_is_below_the_readable_minimum()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+
+        rig.Console.PreviewViewModel.PaneWidth = 200;
 
         Assert.False(rig.Console.PreviewViewModel.IsSurfaceLive);
         Assert.Equal(ReportPreviewSurfaceRules.NarrowReason, rig.Console.PreviewViewModel.SurfaceReason);
+        Assert.True(rig.Console.PreviewViewModel.CanOpenLargeView);
+    }
+
+    [Fact]
+    public async Task should_follow_the_pane_width_until_the_user_zooms_and_return_to_fit_when_asked()
+    {
+        var rig = await OpenAsync();
+        var preview = rig.Console.PreviewViewModel;
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        preview.PaneWidth = 347;
+        Assert.Equal(0.41, preview.ZoomFactor, 2);
+
+        preview.ZoomIn();
+        preview.PaneWidth = 326;                                // 손으로 고른 배율은 폭이 바뀌어도 지킨다
+        Assert.Equal(0.51, preview.ZoomFactor, 2);
+
+        preview.ZoomReset();                                    // [맞춤] — 다시 칸 폭을 따른다
+        Assert.Equal(0.38, preview.ZoomFactor, 2);
+        preview.PaneWidth = 347;
+        Assert.Equal(0.41, preview.ZoomFactor, 2);
+    }
+
+    [Fact]
+    public async Task should_fit_again_when_another_report_is_picked_after_a_manual_zoom()
+    {
+        var rig = await OpenAsync(api => api.Generations.Add(ReportSeed.Generation(4, "10월 정기 보고서")));
+        var preview = rig.Console.PreviewViewModel;
+        preview.PaneWidth = 347;
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 3));
+        preview.ZoomIn();
+
+        rig.Console.OnRowSelected(rig.Console.ListViewModel.Rows.First(r => r.Id == 4));
+
+        Assert.Equal(0.41, preview.ZoomFactor, 2);
     }
 
     [Fact]

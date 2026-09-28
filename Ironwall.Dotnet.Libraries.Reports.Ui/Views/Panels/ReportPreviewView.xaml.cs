@@ -39,6 +39,20 @@ public partial class ReportPreviewView : UserControl
         DataContextChanged += OnDataContextChanged;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        SizeChanged += OnSizeChanged;
+    }
+
+    /// <summary>
+    /// ★ 칸 폭을 뷰모델에 알린다 — 실을지와 얼마나 줄일지는 이 폭으로 정한다(<see cref="ReportPreviewFit"/>).
+    /// 브라우저 자리(Border)가 아니라 늘 배치되는 이 뷰 자신을 잰다 — 자리표시자일 때 Border 는 접혀 폭이 0 이라
+    /// "좁아서 못 싣는다 → 접혀서 폭 0" 의 닭과 달걀이 된다. 접혀서 0 이 된 폭(다른 레일 · 서랍 닫힘)은 알리지 않는다.
+    /// </summary>
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e) => PushPaneWidth(e.NewSize.Width);
+
+    private void PushPaneWidth(double width)
+    {
+        if (_viewModel is null || width <= 0) return;
+        _viewModel.PaneWidth = width;
     }
 
     private void OnBrowserHostLoaded(object sender, RoutedEventArgs e)
@@ -52,6 +66,7 @@ public partial class ReportPreviewView : UserControl
         Detach();
         _viewModel = e.NewValue as ReportPreviewViewModel;
         Attach();
+        PushPaneWidth(ActualWidth);
         _renderedHtml = null;
         Sync();
     }

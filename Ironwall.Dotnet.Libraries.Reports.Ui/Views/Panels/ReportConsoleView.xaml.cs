@@ -116,7 +116,7 @@ public partial class ReportConsoleView : UserControl
     /// </summary>
     private void OnGridSizeChanged(object sender, SizeChangedEventArgs e) => ApplyColumnPrefs();
 
-    /// <summary>★ 공역: 서랍 · 접힘에서는 살아 있는 WebView2 를 만들지 않는다(뷰모델이 판정한다).</summary>
+    /// <summary>폭 판정을 뷰모델에 알린다(기록용). 미리보기를 실을지는 배치가 아니라 미리보기 칸 폭이 정한다(ReportPreviewFit).</summary>
     private void PushLayoutMode()
     {
         if (_shell is null || _viewModel is null) return;

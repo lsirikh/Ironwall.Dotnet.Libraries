@@ -86,10 +86,10 @@
 						Margin="8,0,0,0"
 						AutomationProperties.AutomationId="Reports.Preview.ZoomResetButton"
 						Click="OnZoomReset"
-						Content="100%"
+						Content="맞춤"
 						DockPanel.Dock="Left"
 						Style="{StaticResource Console.Button.Mini}"
-						ToolTip="원본 크기" />
+						ToolTip="보고서 쪽 전체를 칸 폭에 맞춥니다" />
 				</DockPanel>
 			</StackPanel>
 		</c:ConsoleSection>

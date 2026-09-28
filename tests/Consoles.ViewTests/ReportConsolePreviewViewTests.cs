@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Reports.Ui.Consoles.Preview;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Tests;
 using Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Xunit;
@@ -46,7 +47,66 @@ public class ReportConsolePreviewViewTests
         finally { window.Close(); }
     });
 
-    private static (ReportConsoleView View, System.Windows.Window Window, ReportConsoleViewModel Console) HostConsole()
+    /// <summary>
+    /// ★ 사용자 콘솔 폭(약 1100 — 1280 미만이라 상세가 서랍)에서도 고른 보고서의 미리보기(WebView2)가 <b>실제로 보여야</b> 한다.
+    /// 예전엔 서랍이라는 이유만으로 "창이 좁아…" 자리표시자였다. 칸 폭(실측 326)에 맞춰 축소해 싣는다.
+    /// </summary>
+    /// <remarks>화면 밖 창이지만 WebView2 를 실제로 만든다 — 이 PC 의 런타임이 필요하다(없으면 첫 단언이 그 사실을 말한다).</remarks>
+    [Fact]
+    public void should_show_the_live_preview_fitted_to_the_drawer_when_the_console_is_1100_wide() => AppHost.Run(() =>
+    {
+        var (view, window, console) = HostConsole(width: 1100, runtime: WebViewRuntimeProbe.Instance);
+        try
+        {
+            Assert.True(console.PreviewViewModel.IsRuntimeReady, "이 시험은 WebView2 런타임이 설치된 PC 가 필요하다");
+            var shell = RailProbe.Find<ConsoleShell>(view, _ => true)!;
+            Assert.Equal(ConsoleLayoutMode.Drawer, shell.LayoutMode);
+
+            SelectRow(view, console, 3);
+
+            var browser = RailProbe.Find<Microsoft.Web.WebView2.Wpf.WebView2>(view, _ => true);
+            Assert.True(browser is not null, $"서랍에서도 미리보기 브라우저가 있어야 한다 · 판정='{console.PreviewViewModel.SurfaceReason}' 칸={console.PreviewViewModel.PaneWidth}");
+            Assert.True(browser!.IsVisible, "미리보기 브라우저가 보여야 한다");
+            var pane = console.PreviewViewModel.PaneWidth;
+            Assert.True(pane >= ReportPreviewFit.MinLiveWidth, $"서랍 칸 폭 {pane}");
+            Assert.Equal(ReportPreviewFit.FitZoom(pane), console.PreviewViewModel.ZoomFactor, 2);
+            Assert.True(browser.ActualWidth <= pane + 0.5, $"브라우저 {browser.ActualWidth} 가 칸 {pane} 안에 있어야 한다");
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>실측 — 콘솔 폭 · 상세 폭별 미리보기 칸 폭. 폭 맞춤 하한(<see cref="ReportPreviewFit.MinLiveWidth"/>)의 근거다.</summary>
+    [Theory]
+    [InlineData(1400, 380, 347)]   // 도킹 기본(보고서 콘솔 DetailWidth 380)
+    [InlineData(1400, 300, 267)]   // 도킹 S — 가장 좁은 도킹
+    [InlineData(1100, 380, 326)]   // 서랍(360, 왼쪽 굵은 선 2) — 사용자 콘솔 폭
+    [InlineData(900, 380, 326)]    // 접힘 + 서랍(360)
+    public void should_measure_a_preview_pane_wide_enough_for_the_fitted_page_at_every_real_console_width(double consoleWidth, double detailWidth, double expectedPane) => AppHost.Run(() =>
+    {
+        var (view, window, console) = HostConsole(width: consoleWidth, runtime: new FixedWebViewRuntimeProbe(false));
+        try
+        {
+            var shell = RailProbe.Find<ConsoleShell>(view, _ => true)!;
+            shell.DetailWidth = detailWidth;
+            AppHost.Pump(DispatcherPriority.ApplicationIdle);
+            SelectRow(view, console, 3);
+
+            var preview = RailProbe.Find<ReportPreviewView>(view, _ => true)!;
+            Assert.Equal(expectedPane, preview.ActualWidth, 0);
+            Assert.Equal(expectedPane, console.PreviewViewModel.PaneWidth, 0);
+            Assert.True(ReportPreviewFit.CanShowLive(preview.ActualWidth));
+        }
+        finally { window.Close(); }
+    });
+
+    private static void SelectRow(ReportConsoleView view, ReportConsoleViewModel console, int id)
+    {
+        var grid = RailProbe.Find<DataGrid>(view, g => System.Windows.Automation.AutomationProperties.GetAutomationId(g) == "Reports.List.ReportGrid")!;
+        grid.SelectedItem = console.ListViewModel.Rows.First(r => r.Id == id);
+        for (var i = 0; i < 10; i++) AppHost.Pump(DispatcherPriority.ApplicationIdle);
+    }
+
+    private static (ReportConsoleView View, System.Windows.Window Window, ReportConsoleViewModel Console) HostConsole(double width = 1400, IWebViewRuntimeProbe? runtime = null)
     {
         var events = new EventAggregator();
         RailProbe.UseIoC(type => type == typeof(IEventAggregator) ? events : null);
@@ -65,10 +125,10 @@ public class ReportConsolePreviewViewTests
             new ReportPreviewViewModel(events, log, api),
             new ReportTemplateEditViewModel(events, log, api));
         // 화면 밖 시험에서 WebView2 를 띄우지 않는다 — 미리보기는 '런타임 없음' 안내로 그린다.
-        console.PreviewViewModel.RuntimeProbe = new FixedWebViewRuntimeProbe(false);
+        console.PreviewViewModel.RuntimeProbe = runtime ?? new FixedWebViewRuntimeProbe(false);
         RailProbe.Wait(((IActivate)console).ActivateAsync());
 
-        var view = new ReportConsoleView { Width = 1400, Height = 900 };
+        var view = new ReportConsoleView { Width = width, Height = 900 };
         var window = RailProbe.Host(console, view);
         return (view, window, console);
     }

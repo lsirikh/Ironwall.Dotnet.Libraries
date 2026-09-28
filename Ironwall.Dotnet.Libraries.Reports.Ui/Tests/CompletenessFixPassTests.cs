@@ -236,14 +236,14 @@ public class CompletenessFixPassTests : IDisposable
         var mode = ConsoleLayoutMath.ModeFor(1280);
 
         Assert.Equal(ConsoleLayoutMode.Docked, mode);
-        Assert.True(ReportPreviewSurfaceRules.Resolve(mode, false, false, true, ReportPreviewContent.Ready).IsLive);
+        Assert.True(ReportPreviewSurfaceRules.Resolve(347, false, false, true, ReportPreviewContent.Ready).IsLive);
     }
 
     [Fact]
-    public void should_offer_the_large_window_as_the_way_to_see_the_preview_in_drawer_mode()
+    public void should_offer_the_large_window_as_the_way_to_see_the_preview_when_the_pane_is_too_narrow()
     {
-        // R1 — 서랍(1280 미만)에서는 미리보기를 싣지 않고 [크게 보기] 로 이끈다. 큰 창은 폭과 상관없이 열린다.
-        var surface = ReportPreviewSurfaceRules.Resolve(ConsoleLayoutMode.Drawer, false, false, true, ReportPreviewContent.Ready);
+        // R1(2026-09-28 개정) — 서랍이라는 것만으로는 내리지 않는다. 칸이 읽을 수 없이 좁을 때만 [크게 보기] 로 이끈다.
+        var surface = ReportPreviewSurfaceRules.Resolve(200, false, false, true, ReportPreviewContent.Ready);
 
         Assert.True(surface.IsPlaceholder);
         Assert.Contains("[크게 보기]", surface.Hint);
@@ -258,7 +258,7 @@ public class CompletenessFixPassTests : IDisposable
         ReportPreviewContent content, string reason)
     {
         // 좁은 창에서 "[크게 보기]를 누르세요" 라고 하면 꺼진 단추를 가리킨다(큰 창은 완료본만 연다).
-        var surface = ReportPreviewSurfaceRules.Resolve(ConsoleLayoutMode.Drawer, false, false, true, content);
+        var surface = ReportPreviewSurfaceRules.Resolve(200, false, false, true, content);
 
         Assert.Equal(reason, surface.Reason);
         Assert.False(ReportPreviewSurfaceRules.CanOpenLargeView(true, content));
@@ -268,7 +268,7 @@ public class CompletenessFixPassTests : IDisposable
     public void should_not_explain_airspace_mechanics_while_a_popup_is_open()
     {
         // R15 — "네이티브 창이라 확인 창을 가리기 때문" 같은 구현 사정을 운영자에게 설명하지 않는다.
-        var surface = ReportPreviewSurfaceRules.Resolve(ConsoleLayoutMode.Docked, false, true, true, ReportPreviewContent.Ready);
+        var surface = ReportPreviewSurfaceRules.Resolve(347, false, true, true, ReportPreviewContent.Ready);
 
         Assert.Equal(ReportPreviewSurfaceRules.OverlayReason, surface.Reason);
         Assert.False(surface.HasHint);

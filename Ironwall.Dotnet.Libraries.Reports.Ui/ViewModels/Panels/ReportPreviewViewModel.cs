@@ -56,6 +56,8 @@ public class ReportPreviewViewModel : BasePanelViewModel
     /// <summary>고른 줄을 받는다. 완료된 보고서면 HTML 을 받아 오고, 아니면 사유가 적힌 자리표시자가 된다.</summary>
     public async Task ShowAsync(ReportGenerationRow? row, CancellationToken token = default)
     {
+        // 다른 보고서를 고르면 다시 칸 폭에 맞춘다 — 앞 보고서에서 손으로 고른 배율을 끌고 가지 않는다.
+        if (row?.Id != GenerationId) FitToPane();
         Row = row;
         Html = null;
         GenerationId = row?.Id ?? 0;
@@ -140,10 +142,18 @@ public class ReportPreviewViewModel : BasePanelViewModel
         RaiseSurface();
     }
 
-    // 미리보기 확대/축소 — WebView2.ZoomFactor 에 바인딩(0.5~3.0, 10%씩)
-    public void ZoomIn() => ZoomFactor = Math.Min(3.0, Math.Round(ZoomFactor + 0.1, 2));
-    public void ZoomOut() => ZoomFactor = Math.Max(0.5, Math.Round(ZoomFactor - 0.1, 2));
-    public void ZoomReset() => ZoomFactor = 1.0;
+    // 미리보기 확대/축소 — WebView2.ZoomFactor 에 바인딩(0.30~3.0, 10%씩). 손으로 바꾸면 폭 맞춤을 멈춘다.
+    public void ZoomIn() => ZoomFactor = ReportPreviewFit.Step(ZoomFactor, +1);
+    public void ZoomOut() => ZoomFactor = ReportPreviewFit.Step(ZoomFactor, -1);
+
+    /// <summary>[맞춤] — 쪽 전체가 칸 폭에 들어가게 되돌리고, 이후 폭이 바뀌면 따라간다.</summary>
+    public void ZoomReset() => FitToPane();
+
+    private void FitToPane()
+    {
+        _isAutoFit = true;
+        SetZoom(ReportPreviewFit.FitZoom(_paneWidth));
+    }
     #endregion
 
     #region - Properties -
@@ -205,13 +215,59 @@ public class ReportPreviewViewModel : BasePanelViewModel
     public bool IsBusy { get => _isBusy; set { _isBusy = value; NotifyOfPropertyChange(); } }
 
     private double _zoomFactor = 1.0;
-    /// <summary>WebView2 확대율(0.5~3.0) — 뷰의 WebView2.ZoomFactor 에 TwoWay 바인딩.</summary>
-    public double ZoomFactor { get => _zoomFactor; set { _zoomFactor = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(ZoomText)); } }
+    /// <summary>
+    /// WebView2 확대율(0.30~3.0) — 뷰의 WebView2.ZoomFactor 에 TwoWay 바인딩. 기본은 <b>칸 폭 맞춤</b>(<see cref="ReportPreviewFit.FitZoom"/>).
+    /// 바깥(단추 · 브라우저 Ctrl+휠)에서 다른 값이 들어오면 손으로 고른 배율로 보고 폭 맞춤을 멈춘다 — 같은 값의 되울림은 무시한다.
+    /// </summary>
+    public double ZoomFactor
+    {
+        get => _zoomFactor;
+        set
+        {
+            if (Math.Abs(value - _zoomFactor) < 0.001) return;
+            _isAutoFit = false;
+            SetZoom(value);
+        }
+    }
+
+    private void SetZoom(double value)
+    {
+        if (Math.Abs(value - _zoomFactor) < 0.001) return;
+        _zoomFactor = value;
+        NotifyOfPropertyChange(nameof(ZoomFactor));
+        NotifyOfPropertyChange(nameof(ZoomText));
+    }
+
     public string ZoomText => $"{ZoomFactor * 100:0}%";
+
+    /// <summary>칸 폭을 따라 배율을 맞추는 중인가(손으로 확대 · 축소하기 전까지 참).</summary>
+    public bool IsAutoFit => _isAutoFit;
+    private bool _isAutoFit = true;
+
+    private double _paneWidth;
+    /// <summary>
+    /// 미리보기 칸의 실제 폭(DIU) — 뷰가 잰다. 도킹 · 서랍과 무관하게 이 폭이 <b>실을지</b>(<see cref="ReportPreviewFit.CanShowLive"/>)와
+    /// <b>얼마나 줄일지</b>(<see cref="ReportPreviewFit.FitZoom"/>)를 정한다. 0 은 아직 재지 못함(막지 않는다).
+    /// </summary>
+    public double PaneWidth
+    {
+        get => _paneWidth;
+        set
+        {
+            if (Math.Abs(value - _paneWidth) < 0.5) return;
+            _paneWidth = value;
+            NotifyOfPropertyChange();
+            if (_isAutoFit) SetZoom(ReportPreviewFit.FitZoom(value));
+            RaiseSurface();
+        }
+    }
 
     #region - 공역(airspace) 신호 -
     private ConsoleLayoutMode _layoutMode = ConsoleLayoutMode.Docked;
-    /// <summary>콘솔의 폭 판정. 도킹이 아니면 살아 있는 WebView2 를 만들지 않는다(FR-19).</summary>
+    /// <summary>
+    /// 콘솔의 폭 판정(기록용). ★ 2026-09-28 부터 미리보기 판정에 쓰지 않는다 — 서랍이라는 배치가 아니라
+    /// 칸 폭(<see cref="PaneWidth"/>)이 기준이다(<see cref="ReportPreviewSurfaceRules"/> 비고).
+    /// </summary>
     public ConsoleLayoutMode LayoutMode
     {
         get => _layoutMode;
@@ -247,7 +303,7 @@ public class ReportPreviewViewModel : BasePanelViewModel
 
     /// <summary>지금 이 자리에 무엇을 그릴 것인가 — 순수 함수의 판정.</summary>
     public ReportPreviewSurface Surface => ReportPreviewSurfaceRules.Resolve(
-        LayoutMode, IsLargeViewOpen, IsOverlayOpen, IsRuntimeReady, Content);
+        PaneWidth, IsLargeViewOpen, IsOverlayOpen, IsRuntimeReady, Content);
 
     /// <summary>고른 줄의 미리보기 상태.</summary>
     public ReportPreviewContent Content => _row is null
