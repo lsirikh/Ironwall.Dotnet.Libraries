@@ -254,6 +254,47 @@ public class GraphViewportTests
         Assert.Equal(centered, kept);                                        // 가운데 부대가 그대로 가운데
     }
 
+    [Theory]
+    [InlineData(0, 0)]          // 오른쪽 상세 칸이 열려 폭만 줄었다 — 왼쪽 위 그대로
+    [InlineData(-184, 0)]       // 왼쪽 칸이 접혀 캔버스가 왼쪽으로 넓어졌다
+    [InlineData(120, 36)]
+    public void should_keep_every_world_point_at_the_same_host_position_when_the_canvas_origin_shifts(double sx, double sy)
+    {
+        // 2026-09-28 결정 — 크기 변화는 가운데를 지키지 않고 그림을 제자리에 둔다(호스트 기준).
+        var view = new GraphViewport(0.5, new Vector(-37, 12.5));
+        var shift = new Vector(sx, sy);
+        var world = new Point(900, 480);
+
+        var next = view.ShiftOrigin(shift);
+
+        var hostBefore = view.WorldToScreen(world);                           // 옛 캔버스 왼쪽 위 = 호스트 원점이라 치고
+        var hostAfter = next.WorldToScreen(world) + shift;                    // 새 캔버스는 shift 만큼 옮겨 갔다
+        AssertPoint(hostBefore, hostAfter);
+        Assert.Equal(view.Scale, next.Scale);
+    }
+
+    [Fact]
+    public void should_pull_the_selected_node_back_inside_by_the_minimum_when_the_canvas_shrinks_under_it()
+    {
+        // 폭 756 → 396(상세 칸 360). 고른 부대(카드 132×56)가 x 600 에 있었다 — 새 폭 밖이라 오른쪽 여백 안으로만 당긴다.
+        var view = new GraphViewport(1.0, new Vector(0, 0));
+        var selected = new Point(600, 300);
+        var card = new Rect(-66, -28, 132, 56);
+
+        var kept = view.ShiftOrigin(new Vector()).KeepClearOf(new Rect(selected, new Size(0, 0)), new Size(396, 600), default, nodeBox: card);
+
+        Assert.Equal(396 - GraphViewport.FitPadding, kept.WorldToScreen(selected).X + card.Right, 6);
+        Assert.Equal(view.Offset.Y, kept.Offset.Y, 9);                      // 세로는 이미 안 — 그대로
+    }
+
+    [Fact]
+    public void should_ignore_a_non_finite_origin_shift()
+    {
+        var view = new GraphViewport(0.8, new Vector(10, 20));
+
+        Assert.Equal(view, view.ShiftOrigin(new Vector(double.NaN, 5)));
+    }
+
     [Fact]
     public void should_report_nothing_to_fit_when_no_units()
     {

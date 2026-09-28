@@ -499,12 +499,18 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     internal void OnHostDeactivated(object? sender, EventArgs e) => FinishGesture(commit: false);
 
     /// <summary>
-    /// 크기가 처음 생기면 미뤄 둔 뷰 요청을 한다. 그 뒤의 크기 변화는 <b>가운데를 지킨다</b>(배율 유지) — 창을 넓혀도
-    /// 보던 부대가 한쪽으로 밀려나지 않는다(must-cover 3).
+    /// 크기가 처음 생기면 미뤄 둔 뷰 요청을 한다. 그 뒤의 크기 변화는(배율 유지):
+    /// ① 손대지 않은 자동 뷰 · 고른 부대 없음 → 같은 자동 요청을 새 크기로 다시 ② 그 밖 → 그림을 <b>제자리</b>에 두고(호스트 기준),
+    /// 보이던 고른 부대가 가려지면 가장 적게만 옮긴다. 2026-09-28 결정으로 PRD FR-12 의 "화면 중심 월드 점 유지"(ISSUE-54)를 대신한다 —
+    /// 상세 칸이 열려 폭이 줄면 가운데 유지가 그림 전체를 커서 밑에서 ~180 px 옆으로 밀었다.
     /// </summary>
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (e.NewSize.Width <= 0 || e.NewSize.Height <= 0) return;
+
+        var origin = OriginInHost();
+        var shift = _lastOrigin is Point before && origin is Point now ? now - before : new Vector();
+        _lastOrigin = origin;
 
         if (_pendingView is { } pending)
         {
@@ -518,9 +524,32 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         // 끄는 중에는 뷰를 옮기지 않는다 — 포인터 아래 월드 점이 그대로라 월드 Δ 가 유지된다(ISSUE-54).
         if (IsDragging) { OnViewMovedDuringDrag(); return; }
 
-        var center = _view.ScreenToWorld(new Point(e.PreviousSize.Width / 2, e.PreviousSize.Height / 2));
-        ApplyView(_view.CenterOn(center, e.NewSize));
+        // 아무도 손대지 않은 자동 뷰(첫 화면 · 전체 보기 · 가운데 두기)이고 고른 부대가 없으면 — 새 크기로 같은 요청을 다시 한다.
+        if (SelectedUnitId is null && _autoView is { } auto && auto.View == _view && auto.Bounds == Scene.WorldBounds)
+        {
+            auto.Replay();
+            return;
+        }
+
+        // 그 밖에는 그림을 제자리에 둔다(2026-09-28 결정 — 가운데 유지 대신): 고른 부대를 눌러 상세 칸이 열리면 캔버스가 좁아지는데,
+        // 가운데를 지키면 그림 전체가 커서 밑에서 ~180 px 옆으로 뛰었다. 왼쪽 위가 옮겨 갔을 때만 그만큼 되돌린다.
+        var next = _view.ShiftOrigin(shift);
+
+        // 고른 부대가 옛 화면 안에 보였는데 새 화면에서는 가장자리 · 오버레이 밑이면 — 들어오도록 가장 적게만 옮긴다.
+        if (SelectedUnitId is int id && Scene.Positions.TryGetValue(id, out var world) && _nodes.TryGetValue(id, out var node))
+        {
+            var box = new Rect(-node.CenterOffset.X, -node.CenterOffset.Y, node.Width, node.Height);
+            var wasVisible = new Rect(e.PreviousSize).Contains(new Rect(_view.WorldToScreen(world) + (Vector)box.TopLeft, box.Size));
+            if (wasVisible) next = next.KeepClearOf(new Rect(world, new Size(0, 0)), e.NewSize, OverlayInsets(), GraphViewport.FitPadding, box);
+        }
+        ApplyView(next);
     }
+
+    /// <summary>호스트(창 루트) 기준 이 캔버스의 왼쪽 위 — 크기가 바뀔 때 캔버스 자체가 옮겨 갔는지 본다. 루트가 없으면 null.</summary>
+    private Point? OriginInHost()
+        => PresentationSource.FromVisual(this)?.RootVisual is Visual root && IsDescendantOf(root) ? TranslatePoint(new Point(0, 0), (UIElement)root) : null;
+
+    private Point? _lastOrigin;
 
     private void OnNodeSelectRequested(object sender, RoutedEventArgs e)
     {

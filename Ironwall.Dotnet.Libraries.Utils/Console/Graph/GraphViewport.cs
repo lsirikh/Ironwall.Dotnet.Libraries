@@ -218,6 +218,17 @@ public readonly record struct GraphViewport(double Scale, Vector Offset)
         return CenterOn(center, newViewport);
     }
 
+    /// <summary>
+    /// 캔버스 크기가 바뀌었다 — 그림을 <b>제자리</b>에 둔다: 창(호스트) 기준으로 모든 월드 점이 같은 자리에 머문다.
+    /// 캔버스 왼쪽 위가 호스트 안에서 <paramref name="originShift"/> 만큼 옮겨 갔으면 그만큼 되돌리고, 오른쪽 · 아래만 줄거나 늘면
+    /// 아무것도 옮기지 않는다(상세 칸이 열려 폭이 줄어도 커서 밑 부대가 그대로 — 2026-09-28 결정, <see cref="Resize"/> 의 가운데 유지 대신).
+    /// </summary>
+    /// <param name="originShift">호스트 기준 캔버스 왼쪽 위의 이동(새 − 옛, DIU). 모르면 0.</param>
+    public GraphViewport ShiftOrigin(Vector originShift)
+        => double.IsFinite(originShift.X) && double.IsFinite(originShift.Y) && (originShift.X != 0 || originShift.Y != 0)
+            ? this with { Offset = Offset - originShift }
+            : this;
+
     /// <summary>공유 배치 Δ 의 서버 한계(S-1 ⑤ · ISSUE-40).</summary>
     public const double MaxDelta = 1_000_000;
 
