@@ -395,6 +395,7 @@ internal sealed class PreviewUnitConsole : IUnitMapCommands, IUnitMapConsoleBrid
     public bool HasDeferredReload => false;
     public bool IsBusy => false;
     public event EventHandler? BusyChanged { add { } remove { } }
+    public string? LastWriteFailureReason => null;       // 가짜 콘솔은 편제 쓰기가 실패하지 않는다
     #endregion
 
     private void SetParent(UnitListDto node, int? parentId)

@@ -464,13 +464,10 @@ public partial class UnitMapCanvas
         {
             if (decision.Kind == UnitMapDropKind.Reparent)
             {
-                var bottom = target.Y + ta.Bottom;
-                var top = ghostScreen.Y - ga.Top;
-                var middle = (bottom + top) / 2;
-                ctx.BeginFigure(new Point(target.X, bottom), false, false);
-                ctx.LineTo(new Point(target.X, middle), true, false);
-                ctx.LineTo(new Point(ghostScreen.X, middle), true, false);
-                ctx.LineTo(new Point(ghostScreen.X, top), true, false);
+                // 계층선과 같은 경로(대상 아래 가운데 → 사본 위 가운데) — 사본이 대상보다 위 · 옆이면 두 노드 사이로 돈다.
+                var route = UnitMapEdges.Route(target, ta, ghostScreen, ga);
+                ctx.BeginFigure(route[0], false, false);
+                for (var i = 1; i < route.Count; i++) ctx.LineTo(route[i], true, false);
             }
             else
             {

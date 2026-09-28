@@ -311,6 +311,10 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         }
         if (_selected is int s && _tree.Find(s) is null) SelectedUnitId = _commands.SelectedUnitId;
 
+        // 빈 상태 문구는 "지금" 편제의 사실이다 — 캔버스가 편제보다 먼저 붙으면 빈 편제로 "표시할 부대가 없습니다" 를 적고,
+        // 부대가 도착해 그려진 뒤에도 그 문구가 남아 있었다(실앱 2 부대 화면 · 2026-09-28).
+        if (_tree.Count > 0 && StatusText == UnitMapText.EmptyMapStatus) StatusText = null;
+
         RebuildScene();
         NotifyOfPropertyChange(nameof(Tree));
         NotifyOfPropertyChange(nameof(CanLocateOnMap));

@@ -715,7 +715,10 @@ public partial class App : Application
             await Shot($"units-{theme}-08-devices-draft");
             console.RevertAssigns();
 
-            // 인접 관계도 레일은 그림이 생길 때까지 감췄다(2026-09-27) — 자리표시 화면을 찍지 않는다.
+            // 부대 관계도 레일 — 툴바 둘째 줄(레이어 켜기/끄기 · 예하 포함) · 캔버스 · 상태 줄을 한 장에(2026-09-28 실앱 결함 3종 확인용).
+            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+            await Shot($"units-{theme}-09-map");
+
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_TREE);
 
             // 막힌 드롭 — 같은 제대 위에 놓으려 하면 까닭이 상태 띠에 뜬다.

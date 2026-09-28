@@ -44,13 +44,29 @@ public readonly record struct UnitMapAnchor(double Top, double Bottom, double Le
 /// </summary>
 /// <remarks>
 /// <para>세로 한 줄 묶음(자식이 모두 끝 부대)의 판정은 자동 배치(<c>UnitMapLayout</c> — FR-06)와 같은 규칙이다:
-/// 자식이 있고 그 자식이 모두 자식이 없으면 묶음. 척추는 부모 칸의 왼쪽 + 4 에 선다.</para>
+/// 자식이 있고 그 자식이 모두 자식이 없으면 묶음. 척추는 부모 칸의 왼쪽 + 4 에 서되 가지가 <see cref="MAX_BRANCH"/> 를
+/// 넘지 않게 묶음 쪽으로 당긴다(<see cref="SpineX"/>). <b>자식이 하나뿐인 묶음은 척추를 쓰지 않는다</b> — 그 자식은 부모 바로
+/// 아래에 서므로 곧은 세로선이다(2026-09-28 1:1 갈고리 결함).</para>
+/// <para>그 밖의 계층선은 <see cref="Route"/> — 부모 아래 가운데 → 가족 공통 버스 → 자식 위 가운데. 끌어 옮겨 자식이 부모 아래에
+/// 있지 않으면 두 노드 사이 통로로 돈다(선이 노드를 가로지르지 않는다).</para>
 /// <para>위치는 이미 Δ 가 입혀진 월드 좌표를 받는다 — 이 함수는 배치를 모른다.</para>
 /// </remarks>
 public static class UnitMapEdges
 {
     /// <summary>척추가 칸 왼쪽에서 들어오는 거리(화면 DIU).</summary>
     public const double SPINE_INSET = 4.0;
+
+    /// <summary>척추 → 노드 가지의 최대 길이(화면 DIU) — 넘으면 척추를 묶음 쪽으로 당긴다.</summary>
+    public const double MAX_BRANCH = 24.0;
+
+    /// <summary>돌아가는 선이 두 노드 "사이" 통로를 쓰려면 필요한 틈의 절반 — 틈이 이 두 배보다 좁으면 바깥으로 돈다.</summary>
+    public const double LANE_HALF_GAP = 2.0;
+
+    /// <summary>돌아가는 선이 노드에서 띄우는 거리.</summary>
+    public const double DETOUR_CLEARANCE = 12.0;
+
+    /// <summary>가운데가 이만큼 가까우면 곧은 세로선으로 긋는다(부동소수 · 반올림 흔들림).</summary>
+    public const double STRAIGHT_EPSILON = 0.5;
 
     /// <summary>같은 줄 인접 호가 닻 위로 띄우는 틈.</summary>
     public const double ARC_LIFT = 2.0;
@@ -118,7 +134,24 @@ public static class UnitMapEdges
             var pp = Screen(parentWorld);
             var pa = AnchorOf(level, parent.Echelon);
             var bottom = pp.Y + pa.Bottom;
-            var column = IsColumnParent(tree, parent);
+
+            // 한 가족의 버스 높이 — 부모 아래와 "자동 배치의 자식 줄 위" 사이의 가운데. 형제마다 따로 재지 않는다:
+            // L0 은 제대마다 닻이 달라(제대 건너뜀 형제) 형제별 가운데가 어긋나 버스가 겹줄로 번졌다.
+            var childTop = 0.0;
+            var childHalf = 0.0;
+            foreach (var childId in parent.ChildIds)
+            {
+                if (tree.Find(childId) is not { } c) continue;
+                var a = AnchorOf(level, c.Echelon);
+                childTop = Math.Max(childTop, a.Top);
+                childHalf = Math.Max(childHalf, a.Left);
+            }
+            var bus = bottom + (pp.Y + tierHeight * scale - childTop - bottom) / 2;
+
+            // 세로 한 줄 묶음(끝 부대 자식이 둘 이상)만 척추를 쓴다. 자식이 하나면 부모 바로 아래라 곧은 세로선이다 —
+            // 척추로 돌리면 "아래 → 왼쪽 → 아래 → 오른쪽" 갈고리가 되어 옆에서 붙은 것처럼 보였다(1:1 결함).
+            var comb = parent.ChildIds.Count >= 2 && IsColumnParent(tree, parent);
+            var spine = comb ? SpineX(pp.X, childHalf, scale, cellWidth) : double.NaN;
 
             foreach (var childId in parent.ChildIds)
             {
@@ -127,35 +160,19 @@ public static class UnitMapEdges
 
                 var cp = Screen(childWorld);
                 var ca = AnchorOf(level, child.Echelon);
-                IReadOnlyList<Point> points;
 
-                if (column)
-                {
-                    // 척추 = 부모 칸 왼쪽 + 4. 가운데 높이는 부모 아래와 "자동 배치의 첫 자식 위" 사이.
-                    var spine = pp.X - cellWidth / 2 * scale + SPINE_INSET;
-                    var firstTop = pp.Y + tierHeight * scale - ca.Top;
-                    var middle = bottom + (firstTop - bottom) / 2;
-                    points = new[]
+                // 옮겨서(Δ) 척추 오른쪽 · 버스 아래를 벗어난 자식은 척추에 매달지 않는다 — 가지가 거꾸로 제 노드를 가로지른다.
+                // 자동 배치에서는 늘 매단다: 가장 좁은 칸(L2 @0.72 · L0 @0.10)에서 가지가 2 · 0 이 되어도 거꾸로는 아니다.
+                var points = comb && cp.X - ca.Left >= spine - STRAIGHT_EPSILON && cp.Y - ca.Top > bus && bus > bottom
+                    ? new[]
                     {
                         new Point(pp.X, bottom),
-                        new Point(pp.X, middle),
-                        new Point(spine, middle),
+                        new Point(pp.X, bus),
+                        new Point(spine, bus),
                         new Point(spine, cp.Y),
                         new Point(cp.X - ca.Left, cp.Y),
-                    };
-                }
-                else
-                {
-                    var top = cp.Y - ca.Top;
-                    var middle = (bottom + top) / 2;
-                    points = new[]
-                    {
-                        new Point(pp.X, bottom),
-                        new Point(pp.X, middle),
-                        new Point(cp.X, middle),
-                        new Point(cp.X, top),
-                    };
-                }
+                    }
+                    : Route(pp, pa, cp, ca, bus);
 
                 edges.Add(new UnitMapEdge(UnitMapEdgeKind.Hierarchy, parent.Id, childId, points, false, Touches(parent.Id, childId)));
             }
@@ -208,4 +225,76 @@ public static class UnitMapEdges
     /// <summary>자식이 있고 모두 끝 부대인가 — 세로 한 줄 묶음(FR-06).</summary>
     public static bool IsColumnParent(UnitTreeModel tree, UnitTreeNode node)
         => node.ChildIds.Count > 0 && node.ChildIds.All(id => tree.Find(id) is { HasChildren: false });
+
+    /// <summary>
+    /// 척추 x — 칸 왼쪽 + 4(FR-24). 단 가지가 <see cref="MAX_BRANCH"/> 보다 길어지면 묶음 쪽으로 당긴다:
+    /// 배율이 커질수록 칸이 넓어져 척추가 노드에서 멀리 떨어져 떠 보였다(배율 1.6 에서 가지 90).
+    /// 칸 밖으로는 나가지 않는다(이웃 칸의 노드와 겹치지 않게).
+    /// </summary>
+    /// <param name="parentX">부모 중심 x(캔버스 좌표) — 묶음 자식도 같은 x 에 선다.</param>
+    /// <param name="childHalf">묶음 자식 닻의 왼쪽 거리 중 큰 값.</param>
+    public static double SpineX(double parentX, double childHalf, double scale, double cellWidth = 200.0)
+        => Math.Max(parentX - cellWidth / 2 * scale + SPINE_INSET, parentX - childHalf - MAX_BRANCH);
+
+    /// <summary>
+    /// 계층 꺾은선 하나 — 부모 <b>아래 가운데</b>에서 나가 자식 <b>위 가운데</b>로 들어간다(직교 선분만).
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item>자식이 부모 아래에 있으면: 아래 → 버스 높이 → 옆 → 아래. 가운데가 같으면 <b>곧은 세로선 한 줄</b>(점 2개).
+    /// 버스는 <paramref name="bus"/>(가족 공통)가 두 노드 사이 틈 안이면 그 높이, 아니면 틈의 가운데.</item>
+    /// <item>자식이 부모 아래에 없으면(끌어 옮겨 위 · 옆으로 올라감): 부모 아래로 조금 나가 두 노드 <b>사이</b>(겹치면 바깥) 세로 통로로
+    /// 돌아 자식 위로 들어간다 — 선이 두 노드를 가로지르지 않는다.</item>
+    /// </list>
+    /// 드래그 미리보기(상위 후보 → 끌리는 사본)도 같은 경로를 쓴다.
+    /// </remarks>
+    /// <param name="parent">부모 중심(캔버스 좌표).</param>
+    /// <param name="parentAnchor">부모 닻.</param>
+    /// <param name="child">자식 중심(캔버스 좌표).</param>
+    /// <param name="childAnchor">자식 닻.</param>
+    /// <param name="bus">버스 높이 희망값. 없으면 두 닻 사이 가운데.</param>
+    public static IReadOnlyList<Point> Route(Point parent, UnitMapAnchor parentAnchor, Point child, UnitMapAnchor childAnchor, double? bus = null)
+    {
+        var bottom = parent.Y + parentAnchor.Bottom;
+        var top = child.Y - childAnchor.Top;
+        var gap = top - bottom;
+
+        if (gap > 0)
+        {
+            if (Math.Abs(parent.X - child.X) < STRAIGHT_EPSILON)
+                return new[] { new Point(parent.X, bottom), new Point(parent.X, top) };
+
+            // 가족 버스가 틈 안이면 그대로(형제가 한 줄을 나눠 쓴다 — 멀리 아래로 옮긴 자식도 같은 버스에서 내려간다).
+            // 틈 밖이면(자식을 버스보다 위로 올렸다) 틈의 가운데.
+            var y = bus is double b && b > bottom && b < top ? b : bottom + gap / 2;
+            return new[]
+            {
+                new Point(parent.X, bottom),
+                new Point(parent.X, y),
+                new Point(child.X, y),
+                new Point(child.X, top),
+            };
+        }
+
+        // 자식이 부모 아래에 없다 — 두 노드 사이(겹치면 자식 쪽 바깥)의 세로 통로로 돈다.
+        double parentLeft = parent.X - parentAnchor.Left, parentRight = parent.X + parentAnchor.Left;
+        double childLeft = child.X - childAnchor.Left, childRight = child.X + childAnchor.Left;
+        double lane;
+        if (childLeft - parentRight >= 2 * LANE_HALF_GAP) lane = (parentRight + childLeft) / 2;
+        else if (parentLeft - childRight >= 2 * LANE_HALF_GAP) lane = (childRight + parentLeft) / 2;
+        else lane = child.X >= parent.X ? Math.Max(parentRight, childRight) + DETOUR_CLEARANCE
+                                        : Math.Min(parentLeft, childLeft) - DETOUR_CLEARANCE;
+
+        var below = bottom + DETOUR_CLEARANCE;
+        var above = top - DETOUR_CLEARANCE;
+        return new[]
+        {
+            new Point(parent.X, bottom),
+            new Point(parent.X, below),
+            new Point(lane, below),
+            new Point(lane, above),
+            new Point(child.X, above),
+            new Point(child.X, top),
+        };
+    }
 }

@@ -89,6 +89,22 @@ public class UnitMapViewModelViewTests
     }
 
     [Fact]
+    public async Task should_clear_the_empty_status_when_units_arrive_after_the_canvas_attached_to_an_empty_tree()
+    {
+        // 실앱(2026-09-28): 캔버스가 편제보다 먼저 붙어 "표시할 부대가 없습니다" 를 적고, 2 부대가 그려진 뒤에도 문구가 남았다.
+        var kit = MapKit.Create();
+        kit.Vm.SetData(Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model.UnitTreeModel.Empty, System.Array.Empty<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitDeviceItem>());
+        await kit.Vm.OpenAsync();
+        kit.Vm.AttachSurface(kit.Surface);
+        Assert.Equal(Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model.UnitMapText.EmptyMapStatus, kit.Vm.StatusText);
+
+        kit.Vm.SetData(kit.F.Tree, kit.Devices);
+
+        Assert.Null(kit.Vm.StatusText);
+        Assert.Equal(new[] { "Fit" }, kit.Surface.Calls);          // 편제가 오면 첫 화면을 그때 잡는다
+    }
+
+    [Fact]
     public async Task should_save_one_namespaced_key_with_view_and_layers_only()
     {
         // ISSUE-53 · NFR-14 — Extra 에는 한 키 unitMap = {v, scale, cx, cy, layers}. 공유 배치(Δ)는 없다

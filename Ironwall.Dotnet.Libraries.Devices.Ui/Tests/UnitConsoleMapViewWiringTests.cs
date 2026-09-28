@@ -122,6 +122,21 @@ public class UnitConsoleMapViewWiringTests
         Assert.Contains($"AutomationProperties.AutomationId=\"{automationId}\"", xaml);
     }
 
+    [Theory]
+    [InlineData("Units.Map.Layer.Hierarchy")]
+    [InlineData("Units.Map.Layer.Adjacency")]
+    [InlineData("Units.Map.Layer.Devices")]
+    [InlineData("Units.Map.IncludeSubordinates")]
+    public void should_declare_on_off_map_settings_as_kernel_check_boxes_not_filter_chips_when_the_view_is_declared(string automationId)
+    {
+        // 실앱(2026-09-28 다크): 켜고 끄는 설정을 단일 선택 필터 칩(Console.Chip)으로 그려 켜진 셋이 두꺼운 이중 윤곽이 됐다.
+        var element = Regex.Match(ReadView(), $@"<(\w+)\b[^>]*AutomationProperties\.AutomationId=""{Regex.Escape(automationId)}""[^>]*/>", RegexOptions.Singleline);
+
+        Assert.True(element.Success, automationId);
+        Assert.Equal("CheckBox", element.Groups[1].Value);
+        Assert.Contains("Style=\"{StaticResource Console.CheckBox}\"", element.Value);
+    }
+
     [Fact]
     public void should_keep_only_the_existing_template_part_names_when_the_map_is_wired()
     {

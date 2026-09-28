@@ -104,12 +104,23 @@ public class UnitMapEdgesTests
     [Fact]
     public void should_run_the_spine_at_cell_left_plus_4_when_children_are_all_leaves()
     {
+        var edges = UnitMapEdges.Build(Tree(), World(), 0.8, UnitMapLevel.L2);
+
+        // 대대 4 (100,320)×0.8 = (80,256). 칸 왼쪽 = 80 − 200/2×0.8 = 0 → 척추 x = 4(가지 80 − 66 − 4 = 10 ≤ 24 라 그대로).
+        // 첫 자식 위 = 256 + 160×0.8 − 28 = 356, 부모 아래 = 256 + 28 = 284, 가운데 320.
+        AssertPoints(Hierarchy(edges, 4, 6).Points, (80, 284), (80, 320), (4, 320), (4, 384), (14, 384));
+        AssertPoints(Hierarchy(edges, 4, 7).Points, (80, 284), (80, 320), (4, 320), (4, 488), (14, 488));
+    }
+
+    [Fact]
+    public void should_pull_the_spine_toward_the_column_when_the_branch_would_exceed_24()
+    {
         var edges = UnitMapEdges.Build(Tree(), World(), 0.5, UnitMapLevel.L1);
 
-        // 대대 4 (100,320)×0.5 = (50,160). 칸 왼쪽 = 50 − 200/2×0.5 = 0 → 척추 x = 4.
+        // 대대 4 (100,320)×0.5 = (50,160). 칸 왼쪽 + 4 = 4 면 가지가 31 — 24 를 넘어 척추를 50 − 15 − 24 = 11 로 당긴다.
         // 첫 자식 위 = 160 + 160×0.5 − 21 = 219, 부모 아래 = 160 + 28 = 188, 가운데 203.5.
-        AssertPoints(Hierarchy(edges, 4, 6).Points, (50, 188), (50, 203.5), (4, 203.5), (4, 240), (35, 240));
-        AssertPoints(Hierarchy(edges, 4, 7).Points, (50, 188), (50, 203.5), (4, 203.5), (4, 305), (35, 305));
+        AssertPoints(Hierarchy(edges, 4, 6).Points, (50, 188), (50, 203.5), (11, 203.5), (11, 240), (35, 240));
+        AssertPoints(Hierarchy(edges, 4, 7).Points, (50, 188), (50, 203.5), (11, 203.5), (11, 305), (35, 305));
     }
 
     [Fact]
