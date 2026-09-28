@@ -440,7 +440,7 @@
                                           <StackPanel IsEnabled="{Binding IsPtzCapable}">
                                             <!--  PanTilt 속도  -->
                                             <Grid Margin="0,0,0,1">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="PanTilt" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="팬 · 틸트 속도" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
                                                          Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextAlignment="Center"
                                                          Text="{Binding PanTiltSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
@@ -450,7 +450,7 @@
                                                     Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도 (0.1 단위)" />
                                             <!--  Zoom 속도  -->
                                             <Grid Margin="0,0,0,1">
-                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="Zoom" />
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="줌 속도" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
                                                          Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextAlignment="Center"
                                                          Text="{Binding ZoomSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />

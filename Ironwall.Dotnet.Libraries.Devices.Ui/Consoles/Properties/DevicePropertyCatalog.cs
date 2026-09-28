@@ -157,9 +157,11 @@ public static class DevicePropertyCatalog
             },
             new()
             {
+                // 서버 스키마 상한(api schemas/device.py name_device max_length=200) — 넘겨 보내면 422 로 되돌아온다.
+                // MaxLength 를 명세에 실으면 DevicePropertyAccessor.Validate 가 보내기 전에 이미 막는다(FR-13, 새 검증 코드 없음).
                 Key = "name_device", Label = "이름", ApiPath = "name_device",
                 Section = DevicePropertySection.Common, Editor = DevicePropertyEditor.Text,
-                Categories = All7, ViewModelPath = "DeviceName", IsRequiredOnCreate = true,
+                Categories = All7, ViewModelPath = "DeviceName", IsRequiredOnCreate = true, MaxLength = 200,
             },
             // 종류축은 카테고리마다 필드 이름이 다르다(type_sensor · type_camera …) — 캡션이 "type_<category>" 로 새지 않게
             // 카테고리마다 한 줄씩 만든다(TypeAxisSpecs, 이 자리 = "device_type" 바로 앞). 생성 필수 여부도 카테고리마다 다르다.

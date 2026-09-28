@@ -234,10 +234,19 @@ public sealed class PropertyFieldViewModel : PropertyChangedBase
     private void OnEdited()
     {
         if (_isLoading) return;
-        if (HasError) Error = null;
+        // 글자 수 상한은 서버로 보내기 전(Commit)까지 기다리지 않고 타이핑 중에 바로 알린다 — [등록]/[적용]을 누른 뒤에야
+        // 알면 다른 칸까지 다 채운 뒤 되돌아가야 한다. 필수·형식 검증(정수·소수 등)은 지금처럼 Commit 때만 본다 —
+        // 등록 중 빈 칸은 마저 채우기 전까지 정상이라 타이핑 도중에 "필수입니다"를 띄우면 소음이 된다.
+        Error = ValidateMaxLength();
         _tracker.Touch(Key, _originalText, _text, hasOriginal: !IsMixed);
         NotifyOfPropertyChange(nameof(IsTouched));
     }
+
+    /// <summary>글자 수 상한만의 즉시 검증(<see cref="DevicePropertyAccessor.Validate"/> 의 MaxLength 분기와 같은 문구). 상한이 없으면 null.</summary>
+    private string? ValidateMaxLength()
+        => Spec.MaxLength.HasValue && _text.Length > Spec.MaxLength.Value
+            ? $"{Label} 값은 {Spec.MaxLength.Value}자를 넘을 수 없습니다."
+            : null;
 
     private (bool, string?) ResolveLock(int rowCount, bool isCreating, bool isReadOnly)
     {

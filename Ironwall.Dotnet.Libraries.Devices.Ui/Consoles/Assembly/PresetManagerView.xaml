@@ -48,6 +48,12 @@
 					Text="{Binding StoreMessage}"
 					TextWrapping="Wrap" />
 			</Border>
+			<!--
+				항목의 화면 글자는 ItemTemplate 의 CategoryTextConverter 로 이미 한글이다. 그런데 데이터 템플릿으로 만든
+				ComboBoxItem 의 UIA 이름은 뷰가 그린 글자가 아니라 바인딩 원본(EnumDeviceCategory)의 ToString() 으로
+				새는 WPF 관행이 있다 — 자동화 도구로는 "Enclosure" 처럼 영문 enum 이름이 그대로 잡힌다.
+				ItemContainerStyle 로 컨테이너 자신의 AutomationProperties.Name 을 같은 변환기로 명시한다.
+			-->
 			<ComboBox
 				Width="140"
 				HorizontalAlignment="Left"
@@ -59,6 +65,11 @@
 						<TextBlock Text="{Binding Converter={StaticResource CategoryText}}" />
 					</DataTemplate>
 				</ComboBox.ItemTemplate>
+				<ComboBox.ItemContainerStyle>
+					<Style TargetType="ComboBoxItem">
+						<Setter Property="AutomationProperties.Name" Value="{Binding Converter={StaticResource CategoryText}}" />
+					</Style>
+				</ComboBox.ItemContainerStyle>
 			</ComboBox>
 		</StackPanel>
 

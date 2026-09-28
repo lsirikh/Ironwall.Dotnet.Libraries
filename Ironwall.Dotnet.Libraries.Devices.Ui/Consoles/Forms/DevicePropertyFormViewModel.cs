@@ -81,6 +81,10 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
 
     public IEnumerable<PropertyFieldViewModel> Fields => _sections.SelectMany(s => s.Fields);
 
+    /// <summary>지금 화면에 오른 칸 가운데 즉시 검증(글자 수 상한 등)에 걸린 것이 있는가 — [등록]/[적용]을 잠그는 데 쓴다(FR-13).
+    /// Commit 이 도는 전체 검증(필수·형식)과는 별개다: 그것은 누른 순간에만 본다.</summary>
+    public bool HasInvalidField => Fields.Any(f => f.HasError);
+
     public IReadOnlyList<object> Rows => _rows;
     public EnumDeviceCategory Category { get; private set; }
     public bool IsCreating { get; private set; }

@@ -174,7 +174,7 @@
 		<Setter Property="BorderBrush" Value="#FF3A3A3A" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="Focusable" Value="True" />
-		<Setter Property="StatusMessage" Value="Ready" />
+		<Setter Property="StatusMessage" Value="준비됨" />
 		<!--  기본 메시지 개선  -->
 		<Setter Property="Template">
 			<Setter.Value>
@@ -219,14 +219,14 @@
 										Text="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}"
 										TextAlignment="Left" />
 
-									<!--  Status Text  -->
+									<!--  Status Text — 한글 상태 레이블(같은 칸 아래 배지가 쓰는 StateToLabelConverter 재사용, 원문 enum 이름을 그대로 내지 않는다)  -->
 									<TextBlock
 										Grid.Column="2"
 										Margin="0,0,10,0"
 										VerticalAlignment="Center"
 										FontSize="10"
 										Foreground="#FFB0B0B0"
-										Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}"
+										Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToLabelConverter}}"
 										TextAlignment="Right" />
 
 									<!--  Status Indicator  -->
@@ -619,7 +619,7 @@
 											FontSize="12"
 											FontWeight="Medium"
 											Foreground="White"
-											Text="{Binding ConnectionInfo.Description, RelativeSource={RelativeSource TemplatedParent}, FallbackValue='RTSP Stream'}" />
+											Text="{Binding ConnectionInfo.Description, RelativeSource={RelativeSource TemplatedParent}, FallbackValue='RTSP 스트림'}" />
 
 										<StackPanel
 											Grid.Row="1"

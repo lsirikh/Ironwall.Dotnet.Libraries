@@ -399,7 +399,7 @@
 					ApplyClick="OnApply"
 					ApplyText="{Binding Detail.ApplyText}"
 					Banner="{Binding Detail.Banner}"
-					CanApply="{Binding Detail.CanApply}"
+					CanApply="{Binding CanApplyNow}"
 					CanRevert="{Binding Detail.CanRevert}"
 					ConsoleKey="Devices"
 					DetailWidth="{Binding DetailWidth, RelativeSource={RelativeSource AncestorType=c:ConsoleShell}, Mode=TwoWay}"

@@ -558,6 +558,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(WiringBlockedReason));
         NotifyOfPropertyChange(nameof(CanOpenCameraDetail));
         NotifyOfPropertyChange(nameof(IsCameraDetailVisible));
+        NotifyOfPropertyChange(nameof(CanApplyNow));
     }
     #endregion
 
@@ -1310,6 +1311,12 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
     public ConsoleDetailPresenter Detail { get; }
     public DevicePropertyFormViewModel Form { get; }
+
+    /// <summary>[적용] · [등록] 실제 켜짐 — 상세 상태(Detail.CanApply)는 손댄 칸이 있는가만 본다.
+    /// 손댄 칸 가운데 즉시 검증(이름 200자 상한 등)에 걸린 것이 있으면 여기서 마저 잠근다(FR-13).
+    /// 뷰는 Detail.CanApply 대신 이것을 켜짐 막대에 묶는다.</summary>
+    public bool CanApplyNow => Detail.CanApply && !Form.HasInvalidField;
+
     public ByComponentViewModel? ByComponent { get; private set; }
     public DeviceGroupDropHandler GroupDrop { get; }
 
