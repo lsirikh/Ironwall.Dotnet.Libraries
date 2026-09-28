@@ -27,6 +27,47 @@ public class UnitMapTextTests
     }
 
     [Theory]
+    // 실앱 결함(2026-09-28): 시험 서버의 '기본 부대'(unit001)가 L1 에서 '부대' 로만 보였다.
+    [InlineData("기본 부대", "기본 부대")]
+    [InlineData("대대", "대대")]                                   // 한 낱말 — 일반어여도 그 이름 그대로
+    [InlineData("제○○사단 7중대", "7중대")]
+    [InlineData("1대대", "1대대")]
+    [InlineData("제1보병사단 2연대 3대대", "3대대")]
+    [InlineData("제1보병사단 2연대 본부 중대", "2연대 본부 중대")]    // 일반어 둘이 이어지면 가를 낱말까지 붙인다
+    [InlineData("제1보병사단 본부 중대", "제1보병사단 본부 중대")]
+    [InlineData("제1사단 A", "제1사단 A")]                         // 한 글자는 너무 짧다
+    [InlineData("직할중대", "직할중대")]
+    [InlineData("동부전선경계작전지원특수임무부대", "동부전선경계작전지원특수임무부대")]   // 띄어쓰기 없는 긴 이름 — 자르지 않는다(폭 말줄임은 라벨 몫)
+    [InlineData("제3야전군사령부 직할 제25보병사단 제72보병여단 제3대대 통신 소대", "통신 소대")]
+    [InlineData("부대 부대", "부대 부대")]
+    public void should_add_preceding_words_instead_of_leaving_only_an_echelon_word_when_short_name(string name, string expected)
+    {
+        // Act
+        var shortName = UnitMapText.ShortName(name);
+
+        // Assert — 기대값 · 낱말을 버려 뜻 없는 일반어만 남지 않는다 · 원래 이름의 꼬리 그대로(글자를 지어내거나 자르지 않는다)
+        Assert.Equal(expected, shortName);
+        Assert.False(UnitMapText.GenericUnitWords.Contains(shortName) && shortName != name.Trim(), $"'{shortName}' 는 일반어뿐");
+        Assert.EndsWith(shortName, string.Join(" ", name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)));
+    }
+
+    [Fact]
+    public void should_leave_width_trimming_to_the_label_when_the_short_name_is_long()
+    {
+        // 짧은 이름은 낱말을 버리지 않는다 — 폭이 모자라면 L1 라벨이 폭(칸 × 배율 − 8)에서 말줄임한다.
+        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(ThisFile())!, "..", "Consoles", "Units", "Map", "UnitMapStyles.xaml"));
+        var label = System.Text.RegularExpressions.Regex.Match(xaml, @"<c:ConsoleText\b[^>]*Text=""\{TemplateBinding ShortName\}""[^>]*>",
+                                                              System.Text.RegularExpressions.RegexOptions.Singleline).Value;
+
+        Assert.Contains("TextTrimming=\"CharacterEllipsis\"", label);
+        Assert.Contains("Width=\"{TemplateBinding LabelWidth}\"", label);
+        Assert.Contains("TextWrapping=\"NoWrap\"", label);
+    }
+
+    private static string ThisFile([System.Runtime.CompilerServices.CallerFilePath] string? path = null) => path!;
+
+    [Theory]
     [InlineData(EnumUnitEchelon.Division, "XX")]
     [InlineData(EnumUnitEchelon.Regiment, "|||")]
     [InlineData(EnumUnitEchelon.Battalion, "||")]

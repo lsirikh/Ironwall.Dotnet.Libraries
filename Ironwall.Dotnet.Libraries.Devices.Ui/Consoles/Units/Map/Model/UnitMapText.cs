@@ -48,12 +48,48 @@ public static class UnitMapText
     #endregion
 
     #region - 이름 · 표지 · 단계 -
-    /// <summary>짧은 이름 — 이름의 <b>마지막 낱말</b>(L1 틀 아래 — FR-20). 비었으면 빈 문자열.</summary>
+    /// <summary>
+    /// 짧은 이름(L1 틀 아래 — FR-20) — 이름의 <b>마지막 낱말</b>이되, 그 낱말만으로는 부대를 가를 수 없으면 앞 낱말을 붙여 간다.
+    /// "제○○사단 7중대" → "7중대" · "기본 부대" → "기본 부대"(마지막 낱말 "부대" 는 제대 · 편성 일반어라 뜻이 없다 — 2026-09-28 실앱 결함) ·
+    /// "본부 중대" → "본부 중대". 낱말을 버리지 않고 늘릴 뿐이며, 폭이 모자라면 라벨이 폭에서 말줄임한다(<c>TextTrimming</c>).
+    /// 비었으면 빈 문자열.
+    /// </summary>
+    /// <remarks>
+    /// 붙여 가는 조건: 지금 꼬리의 낱말이 <b>모두</b> 일반어(<see cref="GenericUnitWords"/>)이거나, 꼬리 글자 수가 <see cref="MinShortNameLength"/> 미만.
+    /// 숫자 · 고유 글자가 들어간 낱말("7중대" · "1대대" · "직할중대")은 그 자체로 뜻이 있다.
+    /// </remarks>
     public static string ShortName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return string.Empty;
         var words = name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        return words.Length == 0 ? string.Empty : words[^1];
+        if (words.Length == 0) return string.Empty;
+
+        var start = words.Length - 1;
+        while (start > 0 && !IsDistinctive(words, start)) start--;
+        return string.Join(" ", words, start, words.Length - start);
+    }
+
+    /// <summary>짧은 이름의 최소 글자 수(공백 뺀) — 이보다 짧으면 앞 낱말을 붙인다("제1사단 A" → "A" 대신 전체).</summary>
+    public const int MinShortNameLength = 2;
+
+    /// <summary>그 자체로는 부대를 가르지 못하는 제대 · 편성 일반어 — 이것만 남으면 앞 낱말을 붙인다.</summary>
+    public static readonly IReadOnlySet<string> GenericUnitWords = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "부대", "군", "군단", "사단", "여단", "연대", "대대", "중대", "소대", "분대", "소초", "초소", "분초",
+        "본부", "사령부", "지휘소", "직할대", "본부중대", "대", "부", "반", "팀", "과", "실", "단",
+    };
+
+    /// <summary><paramref name="words"/>[<paramref name="start"/>..] 꼬리가 부대를 가를 만한가.</summary>
+    private static bool IsDistinctive(string[] words, int start)
+    {
+        var letters = 0;
+        var anySpecific = false;
+        for (var i = start; i < words.Length; i++)
+        {
+            letters += words[i].Length;
+            if (!GenericUnitWords.Contains(words[i])) anySpecific = true;
+        }
+        return anySpecific && letters >= MinShortNameLength;
     }
 
     /// <summary>APP-6(D) 제대 표지(FR-22) — 사단 XX · 연대 ||| · 대대 || · 중대 | · 소초 ●●●. 모르는 제대는 "?".</summary>
