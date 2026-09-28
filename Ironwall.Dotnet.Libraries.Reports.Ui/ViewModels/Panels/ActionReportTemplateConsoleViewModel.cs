@@ -617,7 +617,15 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
         }
 
         var committed = _lastCommittedOrder;
+        // 다시 읽기는 같은 줄을 다시 고른다(SelectById → OnSelectionChanged) — 그 길이 바닥 막대의 "방금 한 일"을 지운다.
+        // 우리 쓰기의 메아리(등록 · 적용 직후 곧바로 온다)면 "문구를 등록했습니다." 가 "변경 없음" 으로 바뀌었다(헤디드 3회차 SC-ART-005c).
+        // 같은 줄로 돌아왔으면 그 알림은 여전히 참이다 — 되살린다. 줄이 사라졌으면 남기지 않는다.
+        var keptId = SelectedItem?.Id;
+        var keptMessage = Detail.LastMessage;
         await LoadAsync();
+        if (keptMessage != null && keptId.HasValue && SelectedItem?.Id == keptId
+            && !Detail.IsDirty && !Detail.IsCreating && Detail.LastMessage is null)
+            Detail.LastMessage = keptMessage;
 
         // 되돌리기는 "우리가 보낸 순서"가 아직 서버 순서일 때만 산다 — 다른 사람이 또 바꿨다면
         // 되돌리기가 그 사람의 순서를 말없이 덮어쓴다. (우리 reorder 의 메아리면 순서가 같아 그대로 둔다.)

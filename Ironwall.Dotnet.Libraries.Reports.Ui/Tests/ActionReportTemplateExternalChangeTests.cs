@@ -168,6 +168,69 @@ public class ActionReportTemplateExternalChangeTests : IDisposable
         Assert.False(rig.Console.CanUndoReorder);
     }
 
+    /// <summary>
+    /// 화면의 목록(ListBox)처럼 — <c>Board.Load</c> 의 <c>Items.Clear()</c> 에 선택이 비면 뷰가 <c>OnRowSelected(null)</c> 를 부른다
+    /// (ActionReportTemplateConsoleView.OnListSelectionChanged).
+    /// </summary>
+    private static void MimicListDroppingSelectionOnClear(ActionReportTemplateConsoleViewModel console)
+        => console.Items.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset && console.SelectedItem != null)
+                console.OnRowSelected(null);
+        };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task should_keep_the_registered_message_and_the_new_line_when_the_echo_of_our_own_create_arrives(bool listDropsSelection)
+    {
+        // 헤디드 3회차 SC-ART-005c: [등록] 뒤 우리 쓰기의 SYNC_ACTION_REPORT_TEMPLATE 메아리가 다시 읽기를 부르면
+        // 상세 막대가 "문구를 등록했습니다." 대신 "변경 없음" 이 되었다.
+        var rig = await OpenAsync();
+        if (listDropsSelection) MimicListDroppingSelectionOnClear(rig.Console);
+        await rig.Console.AddAsync();
+        rig.Console.DraftContent = "순찰 중 확인";
+        await rig.Console.ApplyAsync();
+        var created = rig.Api.Templates.Max(t => t.Id);
+        Assert.Contains("등록했습니다", rig.Console.Detail.FooterText);
+
+        await SettleAsync(rig, action: "CREATED", id: created);
+
+        Assert.Contains("등록했습니다", rig.Console.Detail.FooterText);
+        Assert.Equal(created, rig.Console.SelectedItem?.Id);
+    }
+
+    [Fact]
+    public async Task should_keep_the_applied_message_when_the_echo_of_our_own_edit_arrives()
+    {
+        var rig = await OpenAsync();
+        MimicListDroppingSelectionOnClear(rig.Console);
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍/폭우(수정)";
+        await rig.Console.ApplyAsync();
+        Assert.Equal("적용했습니다.", rig.Console.Detail.FooterText);
+
+        await SettleAsync(rig, action: "UPDATED", id: 2);
+
+        Assert.Equal("적용했습니다.", rig.Console.Detail.FooterText);
+        Assert.Equal(2, rig.Console.SelectedItem?.Id);
+    }
+
+    [Fact]
+    public async Task should_not_keep_the_message_when_the_chosen_line_was_deleted_elsewhere()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍/폭우(수정)";
+        await rig.Console.ApplyAsync();
+
+        rig.Api.Templates.RemoveAll(t => t.Id == 2);
+        await SettleAsync(rig, action: "DELETED", id: 2);
+
+        Assert.Null(rig.Console.SelectedItem);
+        Assert.DoesNotContain("적용했습니다", rig.Console.Detail.FooterText);   // 사라진 줄의 알림을 남기지 않는다
+    }
+
     [Fact]
     public async Task should_ignore_changes_when_the_console_is_not_open()
     {
