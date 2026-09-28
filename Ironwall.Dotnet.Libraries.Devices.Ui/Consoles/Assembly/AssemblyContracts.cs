@@ -125,6 +125,12 @@ public sealed record DevicePreset
 
     /// <summary>처음 실행 때 심어 주는 본보기 프리셋인가.</summary>
     public bool IsSeed { get; init; }
+
+    /// <summary>
+    /// 목록 항목의 읽히는 이름(UIA · 화면 낭독) — 프리셋 이름. 레코드 기본 ToString 은 <c>DevicePreset { Id = …, Components = … }</c>
+    /// 전체를 늘어놓아 프리셋 관리 · 프리셋으로 등록 목록이 그 글로 읽혔다(GIS 실창 WP-2 SC-ASM-024/025).
+    /// </summary>
+    public override string ToString() => Name;
 }
 
 /// <summary>프리셋으로 등록할 때 사람이 넣는 것 — 프리셋이 <b>담지 않는</b> 개체 정보(FR-12).</summary>

@@ -241,6 +241,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         // 전환 중이거나 저장 · 재조회가 도는 중이면 받지 않는다 — 전환은 패널을 닫는다(목록 비우기 + 진행 중 요청 취소).
         if (_isSwitching || IsOperationRunning || !Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
         {
+            // 바빠서 막은 것은 말한다 — 예전에는 말없이 막아, [등록] 직후 다음 레일을 고른 운영자가 앞 레일에서 [추가]해
+            // 다른 카테고리로 장비를 만들었다(GIS 실창 WP-2: '경광등'으로 친 것이 함체로 — api_logs POST devices/enclosures).
+            // 미적용 변경으로 막은 것은 상세 바닥 막대가 흔들리며 말한다(여기서 겹쳐 말하지 않는다).
+            if (_isSwitching || IsOperationRunning) StatusText = RailRefusedWhileBusyText;
             NotifyOfPropertyChange(nameof(SelectedRail));
             return false;
         }
@@ -273,6 +277,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             _pending = null;
             _lastGroupUndo = null;          // 되돌리기는 그 일이 있었던 목록에서만 뜻이 있다
             NotifyOfPropertyChange(nameof(CanUndoGroupDrop));
+            if (StatusText is RailRefusedWhileBusyText or SelectionRefusedWhileBusyText) StatusText = string.Empty;   // 거절 까닭은 이제 지난 일
             Form.Clear();
             Detail.Reset();
 
@@ -1337,6 +1342,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         get => _listStatusText;
         private set { _listStatusText = value; NotifyOfPropertyChange(); }
     }
+
+    /// <summary>저장 · 재조회 중에 레일을 골랐다 — 바꾸지 않은 까닭(상태 띠).</summary>
+    public const string RailRefusedWhileBusyText = "저장하거나 불러오는 중이라 레일을 바꾸지 않았습니다 — 끝난 뒤 다시 고르세요.";
 
     /// <summary>저장 · 재조회 중에 행을 골랐다 — 받지 않은 까닭(상태 띠).</summary>
     public const string SelectionRefusedWhileBusyText = "목록을 불러오거나 저장하는 중이라 고른 행을 받지 않았습니다 — 끝난 뒤 다시 고르세요.";

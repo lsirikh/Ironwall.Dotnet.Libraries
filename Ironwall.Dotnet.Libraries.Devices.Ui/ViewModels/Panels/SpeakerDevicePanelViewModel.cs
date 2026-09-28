@@ -101,16 +101,19 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             //   여럿이면 비워 두고 운영자가 고른다(serverless 등록은 API상 허용). 유형을 모르는 6.3 은 예전대로 첫 서버.
             var servers = IoC.Get<ServerProvider>()?.OfType<IServerModel>().ToList() ?? new List<IServerModel>();
             var chosen = DeviceServerChoice.DefaultFor(servers, EnumDeviceCategory.Speaker);
-            if (chosen is not null)
-                model.Server = chosen;
-            else if (DeviceServerChoice.Allowed(servers, EnumDeviceCategory.Speaker).Count == 0)
+            if (chosen is not null) model.Server = chosen;
+
+            // 초안을 <b>먼저</b> 단다 — 안내 팝업은 창이라 게시(await)가 곧바로 돌아오지 않는다. 예전에는 안내를 기다린 뒤에 달아,
+            // 장비 콘솔(초안을 [추가] 호출 안에서 찾는다)이 초안이 없다고 보고 등록 폼을 열지 않았다(GIS 실창 WP-2 SC-DEV-015:
+            // 제목 '선택한 항목 없음'). 방송서버 없이도 등록은 된다(serverless 등록은 API상 허용) — 안내는 그대로 한다.
+            ViewModelProvider.Add(new SpeakerDeviceViewModel(model));
+
+            if (chosen is null && DeviceServerChoice.Allowed(servers, EnumDeviceCategory.Speaker).Count == 0)
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "방송서버 없음",
                     Explain = "스피커를 맡을 방송서버가 없습니다. 방송서버를 먼저 등록한 뒤 스피커에 배정하세요."
                 });
-
-            ViewModelProvider.Add(new SpeakerDeviceViewModel(model));
         }
         finally { _processGate.Release(); }
     }

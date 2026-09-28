@@ -30,4 +30,7 @@ public class DeviceAssignItemViewModel : PropertyChangedBase
     }
 
     public bool IsAlreadyAssigned { get; set; }
+
+    /// <summary>배정 창 목록 항목의 읽히는 이름(UIA · 화면 낭독) — "#번호 이름". 없으면 형식 이름이 읽혔다(WP-2 SC-ASM-024 과 같은 결함).</summary>
+    public override string ToString() => $"#{DeviceNumber} {DeviceName}";
 }
