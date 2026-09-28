@@ -324,6 +324,9 @@ public partial class UnitMapCanvas
         _focusRing.SetResourceReference(Border.BorderBrushProperty, "FocusRingBrush");
 
         foreach (var element in new UIElement[] { _focusRing, _hud, _statusNote, _moveMode, _bar, _confirm }) _overlay.Children.Add(element);
+        _statusNote.SizeChanged += (_, _) => OnOverlayBandChanged();
+        _statusNote.IsVisibleChanged += (_, _) => OnOverlayBandChanged();
+        _hud.SizeChanged += (_, _) => OnOverlayBandChanged();          // 첫 전체 보기가 HUD 가 재어지기 전에 돌았을 때
         UpdateOverlays();
     }
     #endregion
@@ -358,6 +361,49 @@ public partial class UnitMapCanvas
         _confirmBusy.Text = prompt is { CanConfirm: false } ? prompt.BusyText ?? string.Empty : string.Empty;
         _confirmBusy.Visibility = string.IsNullOrEmpty(_confirmBusy.Text) ? Visibility.Collapsed : Visibility.Visible;
     }
+
+    /// <summary>전체 보기가 오버레이 띠와 노드 사이에 두는 틈(DIU).</summary>
+    public const double OVERLAY_GAP = 4.0;
+
+    /// <summary>
+    /// 전체 보기가 비울 띠 — 위(배치 문구 · M 표시)와 아래(HUD · 되돌리기 막대) 중 <b>지금 보이는</b> 것의 실제 높이 + 여백 + 틈.
+    /// 좌우는 비우지 않는다(띠가 이미 위 · 아래 가장자리를 차지한다).
+    /// </summary>
+    internal GraphInsets OverlayInsets()
+    {
+        if (_hud is null) return default;
+        double Band(FrameworkElement box, double margin)
+        {
+            if (box.Visibility != Visibility.Visible) return 0;
+            var height = box.ActualHeight > 0 ? box.ActualHeight : box.DesiredSize.Height;
+            return height > 0 ? margin + height + OVERLAY_GAP : 0;
+        }
+
+        var top = Math.Max(Band(_statusNote, _statusNote.Margin.Top), Band(_moveMode, _moveMode.Margin.Top));
+        var bottom = Math.Max(Band(_hud, _hud.Margin.Bottom), Band(_bar, _bar.Margin.Bottom));
+        return new GraphInsets(0, top, 0, bottom);
+    }
+
+    /// <summary>
+    /// 배치 문구가 나타나거나 크기가 바뀌었다(배치 GET 응답은 첫 그림 뒤에 온다) — 마지막 자동 뷰(전체 보기 · 가운데 두기) 그대로라면
+    /// (뷰 · 장면이 같다) 새 띠로 같은 요청을 한 번 다시 한다. 사용자가 팬 · 줌했거나 장면이 바뀌었으면 건드리지 않는다.
+    /// 되돌리기 막대 · M 표시는 사용자 조작의 결과라 여기서 뷰를 옮기지 않는다(다음 [전체 보기]가 비운다).
+    /// </summary>
+    private void OnOverlayBandChanged()
+    {
+        if (_refitPending) return;
+        _refitPending = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            _refitPending = false;
+            if (IsDragging || _autoView is not { } auto) return;
+            if (auto.View != _view || auto.Bounds != Scene.WorldBounds) return;
+            if (OverlayInsets() == auto.Insets) return;
+            auto.Replay();
+        }));
+    }
+
+    private bool _refitPending;
 
     /// <summary>끄는 동안 오버레이 판정에 쓰는 틀(보이는 것만 본다).</summary>
     private IEnumerable<FrameworkElement> OverlayBoxes()

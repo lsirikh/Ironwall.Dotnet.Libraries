@@ -111,22 +111,59 @@ public readonly record struct GraphViewport(double Scale, Vector Offset)
     /// (0 나눗셈 없음 — 시나리오 ISSUE-39).
     /// </summary>
     public static bool TryFit(Rect worldBounds, Size viewport, out GraphViewport fitted, double padding = FitPadding, Rect nodeBox = default)
+        => TryFit(worldBounds, viewport, default, out fitted, padding, nodeBox);
+
+    /// <summary>
+    /// <see cref="TryFit(Rect, Size, out GraphViewport, double, Rect)"/> 과 같되, 뷰포트 가장자리의 <paramref name="insets"/> 를
+    /// <b>비워 두고</b> 그 안쪽(안전 영역)에 맞추고 그 가운데에 둔다 — 캔버스 위에 떠 있는 오버레이(위 가운데 배치 문구 ·
+    /// 아래 HUD · 되돌리기 막대) 밑에 노드가 깔리지 않게(2026-09-28 실앱: 전체 보기 뒤 뿌리 노드가 배치 문구 밑).
+    /// </summary>
+    /// <param name="insets">가장자리마다 비울 폭(DIU). 음수 · 수가 아닌 값은 0 으로 본다. 안전 영역이 여백보다 작아지면 점 하나 폭까지 줄인다.</param>
+    public static bool TryFit(Rect worldBounds, Size viewport, GraphInsets insets, out GraphViewport fitted, double padding = FitPadding, Rect nodeBox = default)
     {
         fitted = Identity;
         if (worldBounds.IsEmpty || viewport.IsEmpty || viewport.Width <= 0 || viewport.Height <= 0) return false;
         if (!IsFinite(worldBounds) || !IsFinite(nodeBox)) return false;
 
-        var usableWidth = Math.Max(1, viewport.Width - 2 * padding - nodeBox.Width);
-        var usableHeight = Math.Max(1, viewport.Height - 2 * padding - nodeBox.Height);
+        var safe = insets.Normalized();
+        var areaWidth = Math.Max(1, viewport.Width - safe.Left - safe.Right);
+        var areaHeight = Math.Max(1, viewport.Height - safe.Top - safe.Bottom);
+        var usableWidth = Math.Max(1, areaWidth - 2 * padding - nodeBox.Width);
+        var usableHeight = Math.Max(1, areaHeight - 2 * padding - nodeBox.Height);
         var scaleX = worldBounds.Width > 0 ? usableWidth / worldBounds.Width : double.PositiveInfinity;
         var scaleY = worldBounds.Height > 0 ? usableHeight / worldBounds.Height : double.PositiveInfinity;
         var scale = ClampScale(Math.Min(scaleX, scaleY));
 
-        // 화면에 그려질 내용(점 경계 × 배율 + 도형)의 가운데를 뷰포트 가운데에 둔다.
+        // 화면에 그려질 내용(점 경계 × 배율 + 도형)의 가운데를 안전 영역의 가운데에 둔다.
         var contentCenterX = (worldBounds.Left + worldBounds.Right) / 2 * scale + (nodeBox.Left + nodeBox.Right) / 2;
         var contentCenterY = (worldBounds.Top + worldBounds.Bottom) / 2 * scale + (nodeBox.Top + nodeBox.Bottom) / 2;
-        fitted = new GraphViewport(scale, new Vector(viewport.Width / 2 - contentCenterX, viewport.Height / 2 - contentCenterY));
+        var areaCenterX = safe.Left + areaWidth / 2;
+        var areaCenterY = safe.Top + areaHeight / 2;
+        fitted = new GraphViewport(scale, new Vector(areaCenterX - contentCenterX, areaCenterY - contentCenterY));
         return true;
+    }
+
+    /// <summary>
+    /// 배율은 그대로, 그림 전체(점 경계 × 배율 + <paramref name="nodeBox"/>)가 안전 영역(뷰포트 − <paramref name="insets"/> − <paramref name="padding"/>)에
+    /// <b>들어갈 수 있는 축에서만</b> 가장 적게 옮겨 그 안에 넣는다 — 첫 화면(내 부대 가운데 · 저장된 뷰)에서 노드가 오버레이 밑에 깔리지 않게.
+    /// 그림이 안전 영역보다 큰 축은 건드리지 않는다(가운데에 둔 부대가 그대로 가운데 — 나머지는 팬으로 본다).
+    /// </summary>
+    public GraphViewport KeepClearOf(Rect worldBounds, Size viewport, GraphInsets insets, double padding = FitPadding, Rect nodeBox = default)
+    {
+        if (worldBounds.IsEmpty || !IsFinite(worldBounds) || !IsFinite(nodeBox) || viewport.IsEmpty || viewport.Width <= 0 || viewport.Height <= 0) return this;
+        var safe = insets.Normalized();
+        var dx = Shift(worldBounds.Left * Scale + Offset.X + nodeBox.Left, worldBounds.Right * Scale + Offset.X + nodeBox.Right,
+                       safe.Left + padding, viewport.Width - safe.Right - padding);
+        var dy = Shift(worldBounds.Top * Scale + Offset.Y + nodeBox.Top, worldBounds.Bottom * Scale + Offset.Y + nodeBox.Bottom,
+                       safe.Top + padding, viewport.Height - safe.Bottom - padding);
+        return dx == 0 && dy == 0 ? this : new GraphViewport(Scale, new Vector(Offset.X + dx, Offset.Y + dy));
+
+        // [lo, hi] 를 [min, max] 안으로 옮길 양 — 들어가지 않으면 0.
+        static double Shift(double lo, double hi, double min, double max)
+        {
+            if (hi - lo > max - min) return 0;
+            return lo < min ? min - lo : hi > max ? max - hi : 0;
+        }
     }
 
     /// <summary>팬 한계에서 늘 보이는 그림의 몫(조정자 결정 D-2026-09-27-6615ba · 시나리오 ISSUE-40).</summary>
@@ -191,4 +228,16 @@ public readonly record struct GraphViewport(double Scale, Vector Offset)
 
     private static bool IsFinite(Rect r)
         => double.IsFinite(r.X) && double.IsFinite(r.Y) && double.IsFinite(r.Width) && double.IsFinite(r.Height);
+}
+
+/// <summary>
+/// 뷰포트 가장자리에서 비워 둘 폭(DIU) — 전체 보기가 오버레이 밑을 피하게 한다(<see cref="GraphViewport.TryFit(Rect, Size, GraphInsets, out GraphViewport, double, Rect)"/>).
+/// </summary>
+/// <remarks><c>Thickness</c>(PresentationFramework)를 쓰지 않는 값 형식 — 그래프 수학은 UI 형식을 참조하지 않는다.</remarks>
+public readonly record struct GraphInsets(double Left, double Top, double Right, double Bottom)
+{
+    /// <summary>음수 · 수가 아닌 값을 0 으로.</summary>
+    public GraphInsets Normalized() => new(Clean(Left), Clean(Top), Clean(Right), Clean(Bottom));
+
+    private static double Clean(double value) => double.IsFinite(value) && value > 0 ? value : 0;
 }

@@ -179,6 +179,81 @@ public class GraphViewportTests
         Assert.True(top >= 16 - Eps);
     }
 
+    [Theory]
+    [InlineData(38, 48)]      // 위 배치 문구 · 아래 HUD
+    [InlineData(0, 48)]       // 문구 없음
+    [InlineData(38, 0)]
+    [InlineData(120, 90)]
+    public void should_keep_every_node_shape_inside_the_band_free_area_when_fit_with_overlay_insets(double top, double bottom)
+    {
+        // 2026-09-28 실앱 — 전체 보기 뒤 뿌리 노드가 위 가운데 배치 문구 밑에 깔렸다. 띠를 비우고 그 안쪽에 맞춘다.
+        var bounds = new Rect(100, 0, 1400, 640);
+        var nodeBox = new Rect(-22, -22, 44, 50);
+        var viewport = new Size(756, 560);
+
+        Assert.True(GraphViewport.TryFit(bounds, viewport, new GraphInsets(0, top, 0, bottom), out var fitted, nodeBox: nodeBox));
+
+        var shapeTop = fitted.WorldToScreen(bounds.TopLeft).Y + nodeBox.Top;
+        var shapeBottom = fitted.WorldToScreen(bounds.BottomRight).Y + nodeBox.Bottom;
+        var shapeLeft = fitted.WorldToScreen(bounds.TopLeft).X + nodeBox.Left;
+        var shapeRight = fitted.WorldToScreen(bounds.BottomRight).X + nodeBox.Right;
+        Assert.True(shapeTop >= top + GraphViewport.FitPadding - Eps, $"위 {shapeTop} < {top} + 16");
+        Assert.True(shapeBottom <= viewport.Height - bottom - GraphViewport.FitPadding + Eps, $"아래 {shapeBottom}");
+        Assert.True(shapeLeft >= GraphViewport.FitPadding - Eps && shapeRight <= viewport.Width - GraphViewport.FitPadding + Eps);
+        // 안전 영역의 가운데(위아래 여백이 같다 — 한쪽 축이 꽉 차지 않아도 가운데)
+        var areaCenter = top + (viewport.Height - top - bottom) / 2;
+        Assert.Equal(areaCenter, (shapeTop + shapeBottom) / 2, 6);
+    }
+
+    [Fact]
+    public void should_match_the_plain_fit_when_insets_are_zero_or_invalid()
+    {
+        var bounds = new Rect(0, 0, 400, 300);
+        var nodeBox = new Rect(-66, -28, 132, 56);
+
+        GraphViewport.TryFit(bounds, new Size(800, 600), out var plain, nodeBox: nodeBox);
+        GraphViewport.TryFit(bounds, new Size(800, 600), new GraphInsets(-5, double.NaN, 0, double.PositiveInfinity), out var guarded, nodeBox: nodeBox);
+
+        Assert.Equal(plain, guarded);
+    }
+
+    [Fact]
+    public void should_fit_single_point_in_the_middle_of_the_safe_area_when_one_unit_and_a_top_band()
+    {
+        var fitted = GraphViewport.TryFit(new Rect(new Point(300, 160), new Size(0, 0)), new Size(756, 560),
+                                          new GraphInsets(0, 40, 0, 50), out var viewport, nodeBox: new Rect(-66, -28, 132, 56));
+
+        Assert.True(fitted);
+        AssertPoint(new Point(378, 40 + (560 - 40 - 50) / 2.0), viewport.WorldToScreen(new Point(300, 160)));
+    }
+
+    [Fact]
+    public void should_nudge_the_picture_below_the_top_band_when_it_fits_between_the_bands()
+    {
+        // 내 부대 가운데 50% 첫 화면 — 그림(세로 480 × 0.5 = 240 + 도형)은 띠 사이에 들어가는데 뿌리가 위 띠 밑에 있었다.
+        var bounds = new Rect(0, 0, 800, 480);
+        var nodeBox = new Rect(-22, -22, 44, 50);
+        var centered = new GraphViewport(0.5, new Vector(0, 0)).CenterOn(new Point(400, 400), new Size(756, 545));
+
+        var kept = centered.KeepClearOf(bounds, new Size(756, 545), new GraphInsets(0, 38, 0, 48), nodeBox: nodeBox);
+
+        var top = kept.WorldToScreen(bounds.TopLeft).Y + nodeBox.Top;
+        Assert.Equal(38 + GraphViewport.FitPadding, top, 6);                 // 가장 적게 — 딱 띠 + 여백 아래
+        Assert.Equal(centered.Offset.X, kept.Offset.X, 9);                  // 가로는 이미 들어가 있어 그대로
+        Assert.Equal(centered.Scale, kept.Scale);
+    }
+
+    [Fact]
+    public void should_leave_an_axis_alone_when_the_picture_is_larger_than_the_space_between_the_bands()
+    {
+        var bounds = new Rect(100, 0, 7000, 1160);
+        var centered = new GraphViewport(1.0, new Vector(0, 0)).CenterOn(new Point(2000, 600), new Size(756, 600));
+
+        var kept = centered.KeepClearOf(bounds, new Size(756, 600), new GraphInsets(0, 38, 0, 48), nodeBox: new Rect(-66, -28, 132, 56));
+
+        Assert.Equal(centered, kept);                                        // 가운데 부대가 그대로 가운데
+    }
+
     [Fact]
     public void should_report_nothing_to_fit_when_no_units()
     {

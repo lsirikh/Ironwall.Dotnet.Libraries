@@ -227,14 +227,27 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         if (DeferUntilSized(() => CenterOn(unitId, scale))) return;
         if (!Scene.Positions.TryGetValue(unitId, out var world)) return;
         var view = scale is double s ? new GraphViewport(GraphViewport.ClampScale(s), _view.Offset) : _view;
-        ApplyView(view.CenterOn(world, ViewportSize));
+        ApplyView(ClearOfOverlays(view.CenterOn(world, ViewportSize)));
+        Remember(() => CenterOn(unitId, scale));
     }
 
     public void SetView(double scale, Point centerWorld)
     {
         if (DeferUntilSized(() => SetView(scale, centerWorld))) return;
-        ApplyView(new GraphViewport(GraphViewport.ClampScale(scale), _view.Offset).CenterOn(centerWorld, ViewportSize));
+        ApplyView(ClearOfOverlays(new GraphViewport(GraphViewport.ClampScale(scale), _view.Offset).CenterOn(centerWorld, ViewportSize)));
+        Remember(() => SetView(scale, centerWorld));
     }
+
+    /// <summary>
+    /// 가운데 두기(첫 화면 · 저장된 뷰 · 검색 이동) 뒤 — 그림 전체가 오버레이 띠 사이에 들어갈 수 있는 축이면 가장 적게 옮겨 넣는다
+    /// (2026-09-28: 내 부대 가운데 50% 첫 화면에서 뿌리 노드가 위 배치 문구 밑). 그림이 더 크면 그대로(가운데 부대가 가운데).
+    /// </summary>
+    private GraphViewport ClearOfOverlays(GraphViewport view)
+        => view.KeepClearOf(Scene.WorldBounds, ViewportSize, OverlayInsets(), GraphViewport.FitPadding,
+                            NodeBoxAround(UnitMapLod.Resolve(view.Scale, _level)));
+
+    /// <summary>방금 만든 뷰를 기억한다 — 오버레이 띠가 바뀌었을 때 그대로라면 같은 요청을 한 번 다시 한다(<c>OnOverlayBandChanged</c>).</summary>
+    private void Remember(Action replay) => _autoView = (_view, Scene.WorldBounds, OverlayInsets(), replay);
 
     public void Fit()
     {
@@ -242,13 +255,22 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         var size = ViewportSize;
 
         var bounds = Scene.WorldBounds;
-        if (!GraphViewport.TryFit(bounds, size, out var first)) return;
+        var insets = OverlayInsets();
+        if (!GraphViewport.TryFit(bounds, size, insets, out var first)) return;
 
         // 도형은 배율로 커지지 않는다(FR-21) — 맞춘 배율의 단계 도형 크기만큼 한 번 더 맞춘다.
+        // 떠 있는 오버레이(위: 배치 문구 · M 표시 / 아래: HUD · 되돌리기 막대)의 띠는 비워 둔다 — 노드가 그 밑에 깔리지 않게.
         var level = UnitMapLod.ForScale(first.Scale);
         var box = NodeBoxAround(level);
-        ApplyView(GraphViewport.TryFit(bounds, size, out var fitted, GraphViewport.FitPadding, box) ? fitted : first);
+        ApplyView(GraphViewport.TryFit(bounds, size, insets, out var fitted, GraphViewport.FitPadding, box) ? fitted : first);
+        Remember(Fit);
     }
+
+    /// <summary>
+    /// 마지막 자동 뷰(전체 보기 · 가운데 두기)가 만든 뷰 · 그때의 경계 · 비운 띠 · 다시 할 요청. 뷰도 장면도 그대로인데 오버레이 띠만
+    /// 바뀌면(배치 문구가 배치 GET 응답 뒤에 나타남) 같은 요청을 한 번 다시 한다 — 사용자가 옮긴 뷰는 건드리지 않는다.
+    /// </summary>
+    private (GraphViewport View, Rect Bounds, GraphInsets Insets, Action Replay)? _autoView;
 
     public bool IsInView(int unitId)
     {

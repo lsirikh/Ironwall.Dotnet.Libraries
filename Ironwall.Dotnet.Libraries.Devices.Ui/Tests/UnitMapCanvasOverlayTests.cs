@@ -208,6 +208,107 @@ public class UnitMapCanvasOverlayTests
         Assert.Equal(new[] { "retry" }, calls);
     }
 
+    /// <summary>보이는 노드 요소 사각형 중 가장 위 · 가장 아래(캔버스 좌표).</summary>
+    private static (double Top, double Bottom) NodeExtent(UnitMapCanvas canvas)
+    {
+        var rects = canvas.Nodes.Where(n => n.IsVisible)
+                          .Select(n => new Rect(n.TranslatePoint(new Point(0, 0), canvas), new Size(n.ActualWidth, n.ActualHeight)))
+                          .ToList();
+        return (rects.Min(r => r.Top), rects.Max(r => r.Bottom));
+    }
+
+    /// <summary>오버레이 틀(문구 · HUD 글이 든 Border)의 캔버스 사각형.</summary>
+    private static Rect BoxOf(UnitMapCanvas canvas, string id)
+    {
+        var text = H.ById<FrameworkElement>(canvas, id)!;
+        DependencyObject current = text;
+        while (current is not Border { Parent: Grid }) current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+        var box = (Border)current;
+        return new Rect(box.TranslatePoint(new Point(0, 0), canvas), new Size(box.ActualWidth, box.ActualHeight));
+    }
+
+    [Fact]
+    public void should_keep_every_node_out_from_under_the_status_note_and_the_hud_when_fit_runs_with_the_note_shown()
+    {
+        // 2026-09-28 실앱 — [전체 보기] 뒤 뿌리 노드(제○○사단)가 위 가운데 배치 문구 밑에 깔렸다.
+        var (extent, note, hud) = H.Run(canvas =>
+        {
+            canvas.LayoutStatusText = "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다";
+            H.Pump();
+            ((IUnitMapSurface)canvas).Fit();
+            H.Pump();
+            return (NodeExtent(canvas), BoxOf(canvas, UnitMapCanvas.ID_LAYOUT_STATUS), BoxOf(canvas, UnitMapCanvas.ID_ZOOM_LEVEL));
+        });
+
+        Assert.True(extent.Top >= note.Bottom, $"맨 위 노드 {extent.Top} 가 배치 문구 아래 끝 {note.Bottom} 보다 위");
+        Assert.True(extent.Bottom <= hud.Top, $"맨 아래 노드 {extent.Bottom} 가 HUD 위 끝 {hud.Top} 보다 아래");
+    }
+
+    [Fact]
+    public void should_refit_once_when_the_status_note_appears_after_the_first_fit_and_the_view_was_not_touched()
+    {
+        // 배치 GET 응답(→ 배치 문구)은 첫 그림 뒤에 온다 — 그대로 둔 전체 보기는 문구가 뜨면 한 번 다시 맞춘다.
+        var (extent, note, touchedKept) = H.Run(canvas =>
+        {
+            ((IUnitMapSurface)canvas).Fit();
+            H.Pump();
+            canvas.LayoutStatusText = "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다";
+            H.Pump();
+            H.Pump();
+            var fitted = (NodeExtent(canvas), BoxOf(canvas, UnitMapCanvas.ID_LAYOUT_STATUS));
+
+            // 사용자가 팬한 뒤에는 문구가 바뀌어도 뷰를 옮기지 않는다.
+            canvas.PanBy(0, -40);
+            var offset = canvas.PanOffset;
+            canvas.LayoutStatusText = "배치를 불러오지 못했습니다 — 자동 배치로 보입니다 · 실시간 반영 꺼짐";
+            H.Pump();
+            H.Pump();
+            return (fitted.Item1, fitted.Item2, canvas.PanOffset == offset);
+        });
+
+        Assert.True(extent.Top >= note.Bottom, $"맨 위 노드 {extent.Top} 가 배치 문구 아래 끝 {note.Bottom} 보다 위");
+        Assert.True(touchedKept);
+    }
+
+    [Fact]
+    public void should_keep_a_small_org_out_from_under_the_status_note_when_the_first_view_centers_my_unit_at_50_percent()
+    {
+        // 실앱 첫 화면 규칙(FR-15): 내 부대 가운데 50%. 작은 편제(사단 → 연대 → 대대 → 중대 · 소초)는 띠 사이에 들어가는데
+        // 가운데 두기만 하면 뿌리가 위 배치 문구 밑에 깔렸다(preview units-dark-09-map, 2026-09-28).
+        var (extent, note, hud) = H.Run(canvas =>
+        {
+            canvas.LayoutStatusText = "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다";
+            var mine = canvas.Scene.Tree.Ordered.First(n => n.Depth == 4).Id;         // 소초(맨 아래) — 가운데 두면 뿌리가 화면 위로 밀린다
+            ((IUnitMapSurface)canvas).CenterOn(mine, 0.5);
+            H.Pump();
+            H.Pump();
+            return (NodeExtent(canvas), BoxOf(canvas, UnitMapCanvas.ID_LAYOUT_STATUS), BoxOf(canvas, UnitMapCanvas.ID_ZOOM_LEVEL));
+        }, SmallOrgScene());
+
+        Assert.True(extent.Top >= note.Bottom, $"맨 위 노드 {extent.Top} 가 배치 문구 아래 끝 {note.Bottom} 보다 위");
+        Assert.True(extent.Bottom <= hud.Top, $"맨 아래 노드 {extent.Bottom} 가 HUD 위 끝 {hud.Top} 보다 아래");
+    }
+
+    /// <summary>미리보기 부대 콘솔과 같은 크기의 작은 편제 — 사단 1 · 연대 1 · 대대 2 · 중대 3 · 소초 2.</summary>
+    private static UnitMapScene SmallOrgScene()
+    {
+        var nodes = new System.Collections.Generic.List<Ironwall.Dotnet.Libraries.Messages.Dto.Units.UnitListDto>
+        {
+            UnitMapTestData.Node(1, "d01", "제○○사단", "Division"),
+            UnitMapTestData.Node(2, "r01", "1연대", "Regiment", 1),
+            UnitMapTestData.Node(3, "b01", "2대대", "Battalion", 2),
+            UnitMapTestData.Node(4, "b02", "3대대", "Battalion", 2),
+            UnitMapTestData.Node(5, "c01", "5중대", "Company", 3),
+            UnitMapTestData.Node(6, "c02", "6중대", "Company", 3),
+            UnitMapTestData.Node(7, "c03", "7중대", "Company", 3),
+            UnitMapTestData.Node(8, "p01", "4소초", "Outpost", 6),
+            UnitMapTestData.Node(9, "p02", "3소초", "Outpost", 7),
+        };
+        var tree = UnitMapTestData.Tree(UnitMapTestData.Graph(nodes));
+        var layout = Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model.UnitMapLayout.Compute(tree);
+        return new UnitMapScene(tree, layout.Positions, new System.Collections.Generic.Dictionary<int, UnitMapNodeFacts>(), UnitMapLayers.All);
+    }
+
     [Fact]
     public void should_put_every_canvas_automation_id_on_an_element_with_a_peer()          // FR-40 · ISSUE-36 · UA
     {
