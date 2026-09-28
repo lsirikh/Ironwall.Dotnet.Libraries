@@ -26,9 +26,46 @@ public partial class EventDashboardView : UserControl
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.OldValue is EventDashboardViewModel old) old.RowFocusRequested -= OnRowFocusRequested;
-        if (e.NewValue is EventDashboardViewModel next) next.RowFocusRequested += OnRowFocusRequested;
+        if (e.OldValue is EventDashboardViewModel old)
+        {
+            old.RowFocusRequested -= OnRowFocusRequested;
+            old.SelectionRemapped -= OnSelectionRemapped;
+        }
+        if (e.NewValue is EventDashboardViewModel next)
+        {
+            next.RowFocusRequested += OnRowFocusRequested;
+            next.SelectionRemapped += OnSelectionRemapped;
+        }
     }
+
+    /// <summary>
+    /// 뷰모델이 고른 행을 같은 이벤트의 새 인스턴스로 옮겼다(목록 다시 읽기) — 그리드 선택을 그 행들로 맞춘다.
+    /// 관문을 다시 묻지 않는다(선택이 바뀐 것이 아니라 같은 이벤트를 다시 가리키는 것이다).
+    /// </summary>
+    private void OnSelectionRemapped(IReadOnlyList<object> rows)
+    {
+        var grid = Descendants<DataGrid>(this).FirstOrDefault(g => g.Visibility == Visibility.Visible && rows.All(r => g.Items.Contains(r)));
+        if (grid is null || Model is null) return;
+        _restoringSelection = true;
+        using (Model.SuppressSelectionGuard())
+        {
+            try
+            {
+                grid.SelectedItems.Clear();
+                foreach (var row in rows) grid.SelectedItems.Add(row);
+            }
+            finally { _restoringSelection = false; }
+        }
+    }
+
+    /// <summary>
+    /// 이 선택 변경은 목록 다시 읽기가 고른 행을 <b>빼 버린</b> 것뿐인가 — 새로 고른 것은 없고, 빠진 행이 이제 목록에 없다.
+    /// 그것은 운영자의 선택이 아니다: 뷰모델에 '선택 없음' 을 넘기지 않는다(같은 이벤트의 새 행이 들어오면 뷰모델이 다시 가리킨다 —
+    /// 부대 콘솔 UnitTreeSelectionBridge 와 같은 판단). 정말 지워진 행은 뷰모델이 다시 읽기가 끝난 뒤 뺀다.
+    /// </summary>
+    private static bool IsReloadDrop(DataGrid grid, SelectionChangedEventArgs e)
+        => e.AddedItems.Count == 0 && e.RemovedItems.Count > 0
+           && e.RemovedItems.Cast<object>().All(removed => !grid.Items.Contains(removed));
 
     /// <summary>
     /// 뷰모델이 "이 행을 골라 보여 달라" 고 했다([원본 열기] · '조치 내역 보기'). 레일을 막 옮긴 직후일 수 있어
@@ -87,6 +124,7 @@ public partial class EventDashboardView : UserControl
         // 보이지 않는 그리드가 목록을 비우며 내는 선택 변경은 무시한다 — 다른 레일의 선택을 지운다.
         if (grid.Visibility != Visibility.Visible) return;
         if (_restoringSelection) return;
+        if (IsReloadDrop(grid, e)) return;
 
         if (Model.SetSelection(grid.SelectedItems.Cast<object>().ToList())) return;
 
@@ -111,7 +149,7 @@ public partial class EventDashboardView : UserControl
 
     private void OnPeriodClick(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: EventPeriodOption option } && Model is not null) Model.Period = option.Name;
+        if (sender is FrameworkElement { DataContext: EventPeriodOption option } && Model is not null) Model.SelectPeriod(option.Name);
     }
 
     private void OnReload(object sender, RoutedEventArgs e) => Model?.Reload();

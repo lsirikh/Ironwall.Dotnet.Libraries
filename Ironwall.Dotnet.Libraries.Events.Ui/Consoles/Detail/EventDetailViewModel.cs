@@ -304,6 +304,22 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Actions.Clear();
     }
 
+    /// <summary>
+    /// 같은 이벤트의 <b>새 행 뷰모델</b>로 바꿔 쥔다 — 칸 · 손댄 기록은 그대로 두고, [적용] 이 쓸 행만 바꾼다.
+    /// </summary>
+    /// <remarks>
+    /// 목록 다시 읽기(레일 활성화 · SYNC)는 같은 id 의 행을 새 인스턴스로 갈아 끼운다. 옛 인스턴스를 쥔 채로 두면 [적용] 이 목록에 없는
+    /// 행에 써서 저장이 아무 일도 하지 않고, 다시 불러오면(<see cref="Load"/>) 고친 칸이 사라진다(2026-09-28 헤디드 SC-EVT-028).
+    /// 행 수가 다르면 바꾸지 않고 false — 호출자가 <see cref="Load"/> 로 새로 채운다.
+    /// </remarks>
+    public bool Retarget(IReadOnlyList<object> rows)
+    {
+        if (rows is null || rows.Count != _rows.Count) return false;
+        _rows = rows;
+        RaiseAll();
+        return true;
+    }
+
     /// <summary>[적용] 이 손대진 칸을 행에 쓴 결과.</summary>
     /// <param name="Written">실제로 쓴 칸 수(0 이면 저장을 부르지 않는다).</param>
     /// <param name="Rejected">값을 읽지 못해 쓰지 못한 칸 이름들 — 조용히 삼키지 않는다(R8).</param>

@@ -795,6 +795,55 @@ public class EventDashboardViewModel : BasePanelViewModel
 
         RefreshRailCounts();
         RaiseListState();
+        RemapSelectionToCurrentRows(dropVanished: false);
+    }
+
+    /// <summary>
+    /// 뷰모델이 고른 행을 새 인스턴스로 바꿔 쥐었다 — 뷰는 그리드 선택을 이 행들로 맞춘다(되돌리는 동안처럼 관문을 다시 묻지 않는다).
+    /// </summary>
+    public event Action<IReadOnlyList<object>>? SelectionRemapped;
+
+    /// <summary>
+    /// 목록 다시 읽기(레일 활성화 · 캐시 적재 · SYNC)가 고른 행을 <b>같은 id 의 새 인스턴스</b>로 갈아 끼웠으면 선택 · 상세를 그 인스턴스로 옮긴다.
+    /// </summary>
+    /// <remarks>
+    /// 2026-09-28 헤디드 SC-EVT-028 — 캐시로 먼저 그린 행을 고르고 사유를 고친 사이에 다시 읽기가 끝나면, 옛 행이 목록에서 빠지며
+    /// 그리드가 '선택 없음' 이 됐다. 그 뒤 다른 행을 누르면 관문이 막고 옛 행으로 되돌리려 했지만 옛 행은 목록에 없어 화면은 아무것도
+    /// 고르지 않은 채로 남았다(원래 행도 새 행도 선택 아님). 같은 이벤트가 새 인스턴스로 있으면 그것을 고른 것으로 삼는다 — 고친 칸은 그대로.
+    /// <para><paramref name="dropVanished"/> — 다시 읽기가 끝난 뒤(바쁨 끝)에도 짝이 없는 행은 정말 사라진 것이다(삭제) — 그때만 뺀다.
+    /// 다시 읽기 도중(목록을 비운 직후)에 빼면 새 인스턴스가 들어오기 전에 선택을 잃는다.</para>
+    /// </remarks>
+    private void RemapSelectionToCurrentRows(bool dropVanished)
+    {
+        if (_current is null || SelectedRows.Count == 0) return;
+        var live = _current.Rows.Cast<object>().ToList();
+        if (SelectedRows.All(r => live.Contains(r))) return;
+
+        var mapped = new List<object>(SelectedRows.Count);
+        var vanished = 0;
+        foreach (var row in SelectedRows)
+        {
+            if (live.Contains(row)) { mapped.Add(row); continue; }
+            var twin = live.FirstOrDefault(candidate => EventSelectionTwin.IsSameEvent(candidate, row));
+            if (twin is null) vanished++;
+            else mapped.Add(twin);
+        }
+
+        if (vanished > 0)
+        {
+            if (!dropVanished) return;       // 다시 읽기 도중 — 끝나고 다시 본다
+            using (SuppressSelectionGuard()) SetSelection(mapped);   // 삭제된 행은 뺀다(남은 행으로 상세를 다시 세운다)
+            SelectionRemapped?.Invoke(SelectedRows);
+            return;
+        }
+
+        SelectedRows = mapped;
+        _current.Select(SelectedRows);
+        if (!DetailView.Retarget(SelectedRows))
+            DetailView.Load(CurrentKind, SelectedRows, CanEdit, CanReport, 0);
+        NotifyOfPropertyChange(nameof(SelectedRows));
+        RaiseListState();
+        SelectionRemapped?.Invoke(SelectedRows);
     }
     #endregion
 
@@ -868,18 +917,36 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     public bool CanReload => IsSuppressionRail ? Suppression!.CanReload : _current is null || !_current.IsBusy;
 
+    /// <summary>
+    /// 기간 칩을 눌렀다(뷰가 부른다). <b>이미 눌린 칩을 다시 눌러도</b> '오늘 · 24시간 · 7일' 이면 끝을 지금으로 옮겨 다시 부른다 —
+    /// 값이 같다고 아무 일도 안 하면 창을 연 뒤의 이벤트를 부를 길이 없었다(2026-09-28 헤디드 SC-EVT-027 · SC-EVT-042).
+    /// </summary>
+    public void SelectPeriod(string name)
+    {
+        if (!string.Equals(name, _period, StringComparison.Ordinal)) { Period = name; return; }
+        if (AnchorPresetDates()) Reload();
+    }
+
     /// <summary>기간 칩을 눌렀다 — 활성 탭 한 곳만 다시 부른다(나머지는 캐시만 버린다).</summary>
     private void ApplyPeriod()
+    {
+        if (!AnchorPresetDates()) return;   // 직접 — 두 칸을 사람이 정하고 [갱신] 을 누른다
+        Reload();
+    }
+
+    /// <summary>
+    /// '오늘 · 24시간 · 7일' 은 <b>지금까지</b>다 — 부를 때마다 끝을 지금으로 다시 잡는다. 직접 기간이면 손대지 않고 false.
+    /// </summary>
+    private bool AnchorPresetDates()
     {
         var now = DateTime.Now;
         switch (_period)
         {
-            case "오늘": StartDate = now.Date; EndDate = now; break;
-            case "24시간": EndDate = now; StartDate = now.AddDays(-1); break;
-            case "7일": EndDate = now; StartDate = now.AddDays(-7); break;
-            default: return;        // 직접 — 두 칸을 사람이 정하고 [갱신] 을 누른다
+            case "오늘": StartDate = now.Date; EndDate = now; return true;
+            case "24시간": EndDate = now; StartDate = now.AddDays(-1); return true;
+            case "7일": EndDate = now; StartDate = now.AddDays(-7); return true;
+            default: return false;
         }
-        Reload();
     }
 
     private void PushDates()
@@ -958,6 +1025,8 @@ public class EventDashboardViewModel : BasePanelViewModel
             return;
         }
 
+        // [갱신] — '오늘 · 24시간 · 7일' 이면 끝을 지금으로(창을 연 때에 굳어 그 뒤의 이벤트가 영영 안 나오던 것). 직접 기간은 그대로.
+        AnchorPresetDates();
         PushDates();
         if (_current is null) DataChartPanelViewModel.ClickSearch();
         else _current.Search();
@@ -1485,6 +1554,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     private void OnSourceBusyEnded(object? sender, EventArgs e)
     {
         SettlePendingApply();                 // (R8) 진짜 결과는 여기서야 알 수 있다
+        RemapSelectionToCurrentRows(dropVanished: true);   // 다시 읽기가 끝났다 — 짝이 없는 선택은 정말 사라진 것
         RefreshRailCounts();
         RaiseListState();
         NotifyOfPropertyChange(nameof(CanReload));

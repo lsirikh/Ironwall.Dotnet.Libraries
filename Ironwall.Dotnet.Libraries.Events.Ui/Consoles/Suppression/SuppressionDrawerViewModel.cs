@@ -356,9 +356,23 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     /// <summary>유효기간 끝. 무제한이면 의미가 없다.</summary>
     public string WindowEndText
     {
-        get => _windowEndText ?? SuppressionTimeText.Format(_draft.WindowEnd ?? _draft.WindowStart.AddHours(1));
+        get => _windowEndText
+               ?? (_draft.WindowEnd is null && !_draft.IsWeekly
+                   ? string.Empty
+                   : SuppressionTimeText.Format(_draft.WindowEnd ?? _draft.WindowStart.AddHours(1)));
         set
         {
+            // 단발에서 끝 칸을 비웠다 = "종료 없음" 이다. 예전엔 '읽을 수 없는 글자'로만 쳐서 초안에 옛 끝 시각이 남았고,
+            // 검증이 그 옛 값으로 "종료가 시작보다 뒤여야 합니다." 를 말했다 — 운영자는 끝을 지웠는데 엉뚱한 까닭을 들었다
+            // (2026-09-28 헤디드 SC-SUP-007). 비우면 끝을 없애고, 규칙이 "단발 억제에는 종료 시각이 있어야 합니다." 라고 말한다.
+            // 주간 반복의 '끝 없음' 은 [기간 제한 없음] 이 맡는다 — 거기서 빈 칸은 예전처럼 읽을 수 없는 글자로 둔다.
+            if (string.IsNullOrWhiteSpace(value) && !_draft.IsWeekly)
+            {
+                _windowEndText = null;
+                _draft.WindowEnd = null;
+                RaiseAll();
+                return;
+            }
             _windowEndText = value;
             if (SuppressionTimeText.TryParseDateTime(value, out var parsed))
             {
@@ -386,12 +400,16 @@ public sealed class SuppressionDrawerViewModel : PropertyChangedBase
     private string? _dailyEndText;
 
     /// <summary>"기간 제한 없음" — <b>주간 반복에서만</b> 켤 수 있다.</summary>
+    /// <remarks>
+    /// 단발에서 끝 칸을 비우면 초안의 끝이 없어지지만(검증이 "종료 시각이 있어야 합니다" 라고 말하게) 그것은 '기간 제한 없음' 이 아니다 —
+    /// 여기서 참으로 보이면 끝 칸이 접히고 자리표시가 떠 운영자가 끝을 다시 적을 수 없다. 그래서 주간 반복일 때만 참이다.
+    /// </remarks>
     public bool IsUnlimited
     {
-        get => _draft.IsUnlimited;
+        get => _draft.IsUnlimited && _draft.IsWeekly;
         set
         {
-            if (value == _draft.IsUnlimited) return;
+            if (value == IsUnlimited) return;
             if (value && !_draft.IsWeekly) return;       // 단발 + 무제한은 서버가 422 로 막는다
             _draft.WindowEnd = value ? null : _draft.WindowStart.AddDays(DefaultWeeklySpanDays);
             RaiseAll();
