@@ -70,13 +70,38 @@ public class EventConsoleRailViewTests
         finally { window.Close(); }
     });
 
-    private static (EventDashboardView View, System.Windows.Window Window, EventDashboardViewModel Console) HostConsole()
+    [Fact]
+    public void should_expose_the_rail_footer_by_its_automation_id_when_detections_are_counted_in_the_real_console_view() => AppHost.Run(() =>
+    {
+        // 2026-09-28 헤디드 SC-KRN-001: 다른 콘솔 다섯은 Console.{K}.Rail.Footer 가 보였고 이벤트만 '없음' 이었다.
+        // 이벤트 바닥 띠는 두 줄이라 뿌리가 StackPanel(제 peer 없음)이다 — 그 id 가 UIA 에 한 번도 나오지 않았다.
+        var (view, window, console) = HostConsole(new DetectionEventDto { Id = 7, TypeEvent = "Intrusion", Result = "PIR_SENSOR" });
+        try
+        {
+            Assert.True(RailProbe.Wait(console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey)));
+            AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            Assert.True(console.ShowRailFooter, "탐지 1건을 센 뒤에는 바닥 띠가 보여야 한다");
+
+            var rail = RailProbe.Rail(view, "Console.Events.Rail");
+            var children = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()
+                           ?? new List<System.Windows.Automation.Peers.AutomationPeer>();
+            var footer = children.FirstOrDefault(c => c.GetAutomationId() == "Console.Events.Rail.Footer");
+
+            Assert.True(footer is not null, "레일 자식: [" + string.Join(", ", children.Select(c => c.GetAutomationId())) + "]");
+            var lines = footer!.GetChildren()?.Select(c => c.GetName()).ToList() ?? new List<string>();
+            Assert.Contains(lines, l => l.StartsWith("미조치 ", StringComparison.Ordinal));
+            Assert.Contains(lines, l => l.StartsWith("장애 진행 ", StringComparison.Ordinal));
+        }
+        finally { window.Close(); }
+    });
+
+    private static (EventDashboardView View, System.Windows.Window Window, EventDashboardViewModel Console) HostConsole(params DetectionEventDto[] detections)
     {
         var events = new EventProvider();
         var devices = new DeviceProvider();
         var ea = new EventAggregator();
         var log = new Mock<ILogService>().Object;
-        var api = BuildApi();
+        var api = BuildApi(detections);
         var account = new Mock<IAccountModel>();
         account.SetupGet(a => a.Name).Returns("tester");
 
@@ -109,13 +134,13 @@ public class EventConsoleRailViewTests
     }
 
     /// <summary>빈 목록을 돌려주는 가짜 이벤트 API(EventConsoleNavigationTests 와 같은 모양).</summary>
-    private static IEventApiService BuildApi()
+    private static IEventApiService BuildApi(IReadOnlyList<DetectionEventDto> detections)
     {
         var mock = new Mock<IEventApiService>(MockBehavior.Loose) { DefaultValue = DefaultValue.Empty };
         mock.Setup(a => a.GetDetectionEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
                                                   It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
                                                   It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Empty<DetectionEventDto>());
+            .ReturnsAsync(() => Of(detections.ToList()));
         mock.Setup(a => a.GetMalfunctionEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
                                                     It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Empty<MalfunctionEventDto>());
@@ -129,7 +154,9 @@ public class EventConsoleRailViewTests
             .ReturnsAsync(new ApiResponse<EventDashboardDto> { Success = true, Data = new EventDashboardDto() });
         return mock.Object;
 
-        static ApiListResponse<T> Empty<T>()
-            => new() { Success = true, Data = new List<T>(), Pagination = new PaginationDto { Page = 1, Limit = 100, Total = 0, TotalPages = 1 } };
+        static ApiListResponse<T> Empty<T>() => Of(new List<T>());
+
+        static ApiListResponse<T> Of<T>(List<T> items)
+            => new() { Success = true, Data = items, Pagination = new PaginationDto { Page = 1, Limit = 100, Total = items.Count, TotalPages = 1 } };
     }
 }

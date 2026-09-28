@@ -38,6 +38,49 @@ public class ConsoleAutomationExposureTests
     }
 
     [Fact]
+    public void should_expose_the_footer_by_its_automation_id_when_the_footer_root_is_a_panel_without_a_peer()
+    {
+        // 2026-09-28 헤디드 SC-KRN-001 — 이벤트 콘솔 바닥 띠(미조치 · 장애 진행)는 StackPanel 에 Console.Events.Rail.Footer 를 달았다.
+        // StackPanel 은 제 peer 가 없어 그 id 가 UIA 에 한 번도 나오지 않았다(다른 콘솔은 TextBlock 한 개라 보였다).
+        var (ids, footerChildren) = OnSta(() =>
+        {
+            var footer = new StackPanel();
+            AutomationProperties.SetAutomationId(footer, "Console.Test.Rail.Footer");
+            footer.Children.Add(new TextBlock { Text = "미조치 3건" });
+            footer.Children.Add(new TextBlock { Text = "장애 진행 1건" });
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = footer };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            var children = UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren() ?? new List<AutomationPeer>();
+            var footerPeer = children.FirstOrDefault(c => c.GetAutomationId() == "Console.Test.Rail.Footer");
+            var texts = footerPeer?.GetChildren()?.Select(c => c.GetName()).ToList() ?? new List<string>();
+            return (children.Select(c => c.GetAutomationId()).ToList(), texts);
+        });
+
+        Assert.Contains("Console.Test.Rail.Footer", ids);
+        Assert.Equal(new[] { "미조치 3건", "장애 진행 1건" }, footerChildren);   // 띠 안의 글은 그 아래에서 읽힌다
+    }
+
+    [Fact]
+    public void should_not_expose_the_footer_group_when_the_footer_root_is_collapsed()
+    {
+        var ids = OnSta(() =>
+        {
+            var footer = new StackPanel { Visibility = Visibility.Collapsed };
+            AutomationProperties.SetAutomationId(footer, "Console.Test.Rail.Footer");
+            footer.Children.Add(new TextBlock { Text = "미조치 3건" });
+            var rail = new ConsoleRail { Style = KernelStyle(typeof(ConsoleRail)), ConsoleKey = "Test", Footer = footer };
+            rail.Items.Add(new ConsoleRailEntry("all", "전체", null));
+            Arrange(rail, 240, 600);
+
+            return UIElementAutomationPeer.CreatePeerForElement(rail)!.GetChildren()?.Select(c => c.GetAutomationId()).ToList() ?? new List<string>();
+        });
+
+        Assert.DoesNotContain("Console.Test.Rail.Footer", ids);   // 억제 레일처럼 띠를 접은 레일에서는 없는 것이 맞다
+    }
+
+    [Fact]
     public void should_put_template_text_in_the_control_view_when_it_is_a_console_text()
     {
         var (plain, console) = OnSta(() => (TemplatedTextIsControl(new FrameworkElementFactory(typeof(TextBlock))),

@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -171,8 +172,16 @@ internal sealed class ConsoleRailAutomationPeer : ListBoxAutomationPeer
         return children;
     }
 
-    /// <summary>peer 가 있는 요소는 그 peer 를, 없으면 그 아래를 — UIElementAutomationPeer 가 자식을 모으는 방식과 같다.</summary>
-    private static void AddPeers(DependencyObject parent, List<AutomationPeer> into)
+    /// <summary>
+    /// peer 가 있는 요소는 그 peer 를, 없으면 그 아래를 — UIElementAutomationPeer 가 자식을 모으는 방식과 같다.
+    /// 단, peer 가 없는 요소(<c>StackPanel</c> · <c>Grid</c> …)에 <b>AutomationId 를 달았으면</b> 그 요소를 묶음(Group)으로 내놓는다.
+    /// </summary>
+    /// <remarks>
+    /// 2026-09-28 헤디드 SC-KRN-001: 이벤트 콘솔 바닥 띠는 두 줄(미조치 · 장애 진행)이라 <c>StackPanel</c> 에
+    /// <c>Console.Events.Rail.Footer</c> 를 달았는데, 패널은 peer 가 없어 그 id 가 UIA 에 없었다 — 안의 두 글만 id 없이 흩어져 나왔다.
+    /// 뷰마다 "peer 있는 요소로 감싸기" 를 기억하게 하지 않고, 커널이 달린 id 를 존중한다. 접힌 묶음은 내놓지 않는다(억제 레일 등).
+    /// </remarks>
+    internal static void AddPeers(DependencyObject parent, List<AutomationPeer> into)
     {
         var count = VisualTreeHelper.GetChildrenCount(parent);
         for (var i = 0; i < count; i++)
@@ -180,9 +189,44 @@ internal sealed class ConsoleRailAutomationPeer : ListBoxAutomationPeer
             var child = VisualTreeHelper.GetChild(parent, i);
             if (child is UIElement ui && UIElementAutomationPeer.CreatePeerForElement(ui) is { } peer)
                 into.Add(peer);
+            else if (child is FrameworkElement group && ConsoleFooterGroupAutomationPeer.For(group) is { } groupPeer)
+            {
+                if (group.Visibility == Visibility.Visible) into.Add(groupPeer);
+            }
             else
                 AddPeers(child, into);
         }
+    }
+}
+
+/// <summary>
+/// 레일 바닥 띠 안에서 제 peer 가 없는 요소(패널)에 AutomationId 가 달렸을 때 그 요소를 대신하는 묶음 peer.
+/// 자식은 그 요소 아래의 peer 들이다(<see cref="ConsoleRailAutomationPeer.AddPeers"/> 와 같은 규칙).
+/// </summary>
+internal sealed class ConsoleFooterGroupAutomationPeer : FrameworkElementAutomationPeer
+{
+    // 같은 요소에는 같은 peer — UIA 는 peer 의 정체(RuntimeId)로 요소를 알아본다. 매번 새로 만들면 이벤트 · 캐시가 끊긴다.
+    private static readonly ConditionalWeakTable<FrameworkElement, ConsoleFooterGroupAutomationPeer> Cache = new();
+
+    private ConsoleFooterGroupAutomationPeer(FrameworkElement owner) : base(owner) { }
+
+    /// <summary>AutomationId 가 달린 요소면 그 묶음 peer, 아니면 null(그대로 아래를 훑는다).</summary>
+    internal static ConsoleFooterGroupAutomationPeer? For(FrameworkElement element)
+        => string.IsNullOrEmpty(AutomationProperties.GetAutomationId(element))
+            ? null
+            : Cache.GetValue(element, e => new ConsoleFooterGroupAutomationPeer(e));
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+
+    protected override string GetClassNameCore() => Owner.GetType().Name;
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override List<AutomationPeer>? GetChildrenCore()
+    {
+        var children = new List<AutomationPeer>();
+        ConsoleRailAutomationPeer.AddPeers(Owner, children);
+        return children.Count == 0 ? null : children;
     }
 }
 
