@@ -30,6 +30,7 @@ public class ConsoleChipGroup : ItemsControl
 
         protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
 
-        protected override string GetClassNameCore() => nameof(ConsoleChipGroup);
+        // 파생(ConsoleChipStrip)은 제 이름으로 읽힌다
+        protected override string GetClassNameCore() => Owner.GetType().Name;
     }
 }

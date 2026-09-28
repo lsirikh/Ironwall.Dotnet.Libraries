@@ -1236,6 +1236,111 @@
 		</Setter>
 	</Style>
 
+	<!--  ───────── 칩 줄의 [⌄ 더 보기 +N] / [⌃ 접기] (ConsoleChipStrip) ─────────  -->
+	<!--
+		칩과 같은 높이(글 12 · 위아래 4 · 테두리 1)의 알약이되, 고를 거리가 아니라 조작이라는 것을 <b>형태</b>로 가른다:
+		바탕을 채우지 않고(칩은 SurfaceAlt 채움) 꺽쇠 글리프를 앞에 둔다. 펼치면 꺽쇠가 위로 뒤집힌다.
+		선택 테두리(칩의 SelectedRing)는 두지 않는다 — 펼침은 '고름'이 아니다. 포커스는 칩과 같은 바깥 윤곽(-4).
+		점선은 쓰지 않는다({4,3}·{5,3} 은 그룹 선택 · 러버밴드 · 드로잉 미리보기에 이미 배정된 어휘).
+	-->
+	<!--
+		칩 줄 틀 — 칩 칸(ConsoleChipStripPanel, ItemsPanel 기본값)을 세로 전용 ScrollViewer 로 감싼다.
+		MaxExpandedHeight(기본 무한)를 넘을 때만 굴린다: 칩이 아주 많아도 [⌃ 접기]와 아래 표가 화면 밖으로 밀려나지 않게.
+		가로는 Disabled — 칩 칸이 늘 제 폭을 받아 한 줄 판정을 한다. 스크롤 막대는 앱의 Console.ScrollViewer(DynamicResource — 이 사전의
+		StaticResource 는 앱 사전에 닿지 않는다). 템플릿 안 ScrollViewer 는 UIA 기본 보기에서 빠져 칩은 여전히 Group 의 자식으로 읽힌다.
+	-->
+	<Style TargetType="{x:Type c:ConsoleChipStrip}">
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type c:ConsoleChipStrip}">
+					<!--  좌우 4 여유(음수 여백 + 안쪽 여백) — 칩 · [더 보기]의 포커스 윤곽(-4)이 가장자리에서 잘리지 않게. 칩 자리는 그대로다.  -->
+					<ScrollViewer
+						x:Name="PART_Scroll"
+						MaxHeight="{TemplateBinding MaxExpandedHeight}"
+						Margin="-4,0"
+						Padding="4,0"
+						CanContentScroll="False"
+						Focusable="False"
+						HorizontalScrollBarVisibility="Disabled"
+						Style="{DynamicResource Console.ScrollViewer}"
+						VerticalScrollBarVisibility="Auto">
+						<ItemsPresenter />
+					</ScrollViewer>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style TargetType="{x:Type c:ConsoleChipStripToggle}">
+		<Setter Property="Margin" Value="0,2,0,2" />
+		<Setter Property="Padding" Value="9,4,10,4" />
+		<Setter Property="FontSize" Value="12" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type c:ConsoleChipStripToggle}">
+					<Grid>
+						<Border
+							x:Name="PART_Chip"
+							Padding="{TemplateBinding Padding}"
+							Background="{TemplateBinding Background}"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="11">
+							<StackPanel Orientation="Horizontal">
+								<Path
+									x:Name="PART_Chevron"
+									Width="9"
+									Height="6"
+									Margin="0,1,6,0"
+									VerticalAlignment="Center"
+									Data="M0.8,0.8 L4.5,4.6 L8.2,0.8"
+									RenderTransformOrigin="0.5,0.5"
+									Stroke="{TemplateBinding Foreground}"
+									StrokeEndLineCap="Round"
+									StrokeLineJoin="Round"
+									StrokeStartLineCap="Round"
+									StrokeThickness="1.5" />
+								<TextBlock
+									VerticalAlignment="Center"
+									Foreground="{TemplateBinding Foreground}"
+									Text="{TemplateBinding Text}" />
+							</StackPanel>
+						</Border>
+						<Border
+							x:Name="PART_Focus"
+							Margin="-4"
+							BorderBrush="{DynamicResource FocusRingBrush}"
+							BorderThickness="2"
+							CornerRadius="14"
+							IsHitTestVisible="False"
+							Visibility="Collapsed" />
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsChecked" Value="True">
+							<Setter TargetName="PART_Chevron" Property="RenderTransform">
+								<Setter.Value>
+									<ScaleTransform ScaleY="-1" />
+								</Setter.Value>
+							</Setter>
+						</Trigger>
+						<Trigger Property="IsKeyboardFocused" Value="True">
+							<Setter TargetName="PART_Focus" Property="Visibility" Value="Visible" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
 	<!--  ═════════ 날짜·시각 범위 팝업(DateTimeRangeField) ═════════
 	     사용자 결정(2026-09-23) — 두 mah:DateTimePicker 나열을 대체한다. 달력은 WPF 표준 Calendar
 	     (SelectionMode=SingleRange, 드래그/Shift+클릭으로 시작·끝을 한 번에), 시각은 MDIX TimePicker —

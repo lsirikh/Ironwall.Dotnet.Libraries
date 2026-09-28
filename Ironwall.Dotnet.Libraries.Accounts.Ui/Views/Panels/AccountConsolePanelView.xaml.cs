@@ -411,13 +411,6 @@ public partial class AccountConsolePanelView : UserControl
             vm.Matrix.ToggleRow(row);
     }
 
-    /// <summary>그룹 칩 줄 — 세로 휠을 가로 이동으로 바꾼다(칩 줄은 한 줄이라 세로로 굴릴 것이 없다).</summary>
-    private void OnGroupStripWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-    {
-        if (sender is not ScrollViewer strip || strip.ScrollableWidth <= 0) return;
-        strip.ScrollToHorizontalOffset(strip.HorizontalOffset - e.Delta / 2.0);
-        e.Handled = true;
-    }
 
     private async void OnAddMember(object sender, RoutedEventArgs e)
     {

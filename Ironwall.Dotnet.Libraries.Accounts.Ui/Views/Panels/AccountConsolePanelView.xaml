@@ -454,7 +454,9 @@
 					<!--
 						.tool — 한 줄 두 칸(A-1): 왼쪽 "권한 그룹" + 칩 줄, 오른쪽 [그룹 권한 | 구성원].
 						종전에는 안내문(≈240px) · 탭을 먼저 도킹하고 남은 폭을 WrapPanel 칩이 받아, 서랍이 겹친 폭에서 칩이 세로 3줄로 접혔다.
-						이제 칩은 한 줄(가로 StackPanel)이고 넘치면 그 줄만 가로로 민다(휠도 가로로) — 높이는 늘 한 줄이다.
+						이제 칩은 접힌 한 줄이 기본이고, 넘치면 끝 자리가 [⌄ 더 보기 +N] — 누르면 칩 칸 안에서 여러 줄로 펼쳐 아래 표를 밀어 낸다
+						(커널 ConsoleChipStrip). 2026-09-28 사용자 보고 "상단 필터쪽이 짤린다 … 아래 꺽쇠로 더 보기" — 종전의 숨긴 가로 스크롤 +
+						가로 휠은 잘린 칩으로 갈 길이 화면에 없었다. 제목과 탭은 첫 줄 높이(34)에 위로 붙여, 펼쳐도 첫 줄에 그대로 선다.
 						전송 방식 안내문("모듈 N종 전부를 한 번에 보냅니다")은 운영자가 알 일이 아니라 뺐다(A-2).
 					-->
 					<Border
@@ -469,19 +471,25 @@
 								<ColumnDefinition Width="*" />
 								<ColumnDefinition Width="Auto" />
 							</Grid.ColumnDefinitions>
-							<TextBlock
+							<Grid
 								Grid.Column="0"
+								Height="34"
 								Margin="0,0,10,0"
-								VerticalAlignment="Center"
-								FontSize="12"
-								Foreground="{DynamicResource TextSecondaryBrush}"
-								Text="권한 그룹" />
+								VerticalAlignment="Top">
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="권한 그룹" />
+							</Grid>
 							<StackPanel
 								Grid.Column="2"
+								Height="34"
 								Margin="10,0,0,0"
-								VerticalAlignment="Center"
+								VerticalAlignment="Top"
 								Orientation="Horizontal">
 								<RadioButton
+									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Permissions"
 									Click="OnShowMatrix"
 									Content="그룹 권한"
@@ -492,6 +500,7 @@
 									ToolTip="이 그룹의 모듈별 권한" />
 								<RadioButton
 									Margin="0"
+									VerticalAlignment="Center"
 									AutomationProperties.AutomationId="Console.Accounts.Matrix.Chip.Members"
 									Click="OnShowMembers"
 									Content="구성원"
@@ -502,23 +511,19 @@
 									ToolTip="이 그룹에 속한 계정" />
 							</StackPanel>
 							<!--
-								그룹 고르기 — 목업의 가운데 칸은 매트릭스가 차지하므로 그룹은 칩으로 고른다(한 줄).
-								넘치면 끝 칩이 잘려 보이고, 휠 · Tab(초점이 간 칩을 끌어 보인다)으로 가로로 민다 — 두꺼운 스크롤 막대로 줄 높이를 늘리지 않는다.
+								그룹 고르기 — 목업의 가운데 칸은 매트릭스가 차지하므로 그룹은 칩으로 고른다.
+								접힌 한 줄 + [⌄ 더 보기 +N](Console.Accounts.GroupStrip.More). 고른 그룹 칩은 접혀도 늘 보인다(커널 규칙).
+								펼침은 첫 줄 34 + 다섯 줄(28)까지 — 그보다 많으면 칩 칸 안에서 세로로 굴린다(그룹이 수십 개여도 표와 [⌃ 접기]가 화면에 남는다).
 							-->
-							<ScrollViewer
+							<c:ConsoleChipStrip
 								Grid.Column="1"
-								VerticalAlignment="Center"
-								Focusable="False"
-								HorizontalScrollBarVisibility="Hidden"
-								PreviewMouseWheel="OnGroupStripWheel"
-								VerticalScrollBarVisibility="Disabled">
-							<ItemsControl Focusable="False" ItemsSource="{Binding Matrix.Groups}">
-								<ItemsControl.ItemsPanel>
-									<ItemsPanelTemplate>
-										<StackPanel Orientation="Horizontal" />
-									</ItemsPanelTemplate>
-								</ItemsControl.ItemsPanel>
-								<ItemsControl.ItemTemplate>
+								VerticalAlignment="Top"
+								AutomationProperties.AutomationId="Console.Accounts.GroupStrip"
+								AutomationProperties.Name="권한 그룹"
+								FirstLineHeight="34"
+								ItemsSource="{Binding Matrix.Groups}"
+								MaxExpandedHeight="174">
+								<c:ConsoleChipStrip.ItemTemplate>
 									<DataTemplate>
 										<RadioButton
 											Margin="0,2,6,2"
@@ -537,9 +542,8 @@
 											</RadioButton.IsChecked>
 										</RadioButton>
 									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
-							</ScrollViewer>
+								</c:ConsoleChipStrip.ItemTemplate>
+							</c:ConsoleChipStrip>
 						</Grid>
 					</Border>
 
