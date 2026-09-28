@@ -217,7 +217,7 @@ public partial class UnitMapCanvas
             node.Focus();
     }
 
-    /// <summary>캔버스가 스스로 띄우는 막대 한 줄(뷰모델 막대가 없을 때) — 예: 캔버스 밖에 놓아 취소. 다음 막대 · 닫기까지.</summary>
+    /// <summary>캔버스가 스스로 띄우는 막대 한 줄 — 예: 캔버스 밖에 놓아 취소. 앞 막대 위에 뜨고, 뷰모델의 다음 막대 · ✕ 까지 남는다.</summary>
     internal void ShowLocalNotice(string text)
     {
         _localNotice = text;
@@ -276,7 +276,7 @@ public partial class UnitMapCanvas
         _barAction.Margin = new Thickness(10, 0, 0, 0);
         _undoDismiss = MiniButton("✕", ID_UNDO_DISMISS, (_, _) =>
         {
-            if (_localNotice is not null && Bar is null) { _localNotice = null; UpdateOverlays(); return; }
+            if (_localNotice is not null) { _localNotice = null; UpdateOverlays(); return; }   // 알림만 걷는다 — 밑의 막대(되돌리기)는 그대로
             OverlayCommands?.DismissBar();
         });
         _undoDismiss.Margin = new Thickness(6, 0, 0, 0);
@@ -343,8 +343,9 @@ public partial class UnitMapCanvas
         _moveModeText.Text = MoveModeText ?? string.Empty;
         _moveMode.Visibility = string.IsNullOrWhiteSpace(MoveModeText) ? Visibility.Collapsed : Visibility.Visible;
 
-        // 뷰모델 막대가 먼저, 없으면 캔버스 자신의 알림(취소 안내 등).
-        var bar = Bar ?? (_localNotice is { } notice ? new UnitMapBar(notice, false, false) : null);
+        // 더 새것이 먼저 — 캔버스 알림(취소 안내 등)은 뷰모델의 새 막대가 오면 지워지므로(OnOverlayChanged), 남아 있다면 지금 막대보다 새것이다.
+        // (실창 8회차 SIM-D087 · D-09: 앞 조작의 막대가 남아 있으면 "관계도 밖에 놓아 취소했습니다" 가 그 밑에 깔려 안 보였다 — FR-29 v1.3 ②)
+        var bar = _localNotice is { } notice ? new UnitMapBar(notice, false, false) : Bar;
         _bar.Visibility = bar is null ? Visibility.Collapsed : Visibility.Visible;
         _barText.Text = bar?.Message ?? string.Empty;
         _barErrorMark.Visibility = bar?.IsError == true ? Visibility.Visible : Visibility.Collapsed;

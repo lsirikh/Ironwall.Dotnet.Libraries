@@ -30,8 +30,18 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 public partial class UnitConsoleView : UserControl
 {
     private readonly UnitTreeSelectionBridge _treeSelection = new();
+    private readonly UnitDetailFocusBridge _detailFocus;
 
-    public UnitConsoleView() => InitializeComponent();
+    public UnitConsoleView()
+    {
+        InitializeComponent();
+        // 관계도 Enter = 상세 첫 칸(FR-36) — 선택이 막 바뀐 직후면 상세 폼이 아직 그려지지 않았을 수 있어 입력 차례로 미룬다.
+        _detailFocus = new UnitDetailFocusBridge(() => Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input, new Action(() => UnitDetailFocusBridge.FocusFirstField(this))));
+        DataContextChanged += (_, _) => _detailFocus.Bind(IsLoaded ? Vm?.Map : null);
+        Loaded += (_, _) => _detailFocus.Bind(Vm?.Map);
+        Unloaded += (_, _) => _detailFocus.Bind(null);
+    }
 
     private UnitConsoleViewModel? Vm => DataContext as UnitConsoleViewModel;
 
