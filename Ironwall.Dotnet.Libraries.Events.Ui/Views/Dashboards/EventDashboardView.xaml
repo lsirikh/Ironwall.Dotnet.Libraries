@@ -330,18 +330,17 @@
 					BorderThickness="0,0,0,1"
 					DockPanel.Dock="Top"
 					Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
-						<!--  필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다  -->
-						<c:ConsoleChipGroup
+						<!--
+							필터 칩 — 정본 L2310-2313. 다른 콘솔처럼 형태(테두리 + 배경)로 누른 것을 보인다.
+							좁은 폭(≈1100)에서 한 줄 StackPanel 이 잘려 나머지 칩으로 갈 길이 없던 것 — 커널 ConsoleChipStrip 으로
+							바꿔 넘치면 끝 자리가 [⌄ 더 보기 +N](커밋 2c7030c2 계약 그대로: 고른 칩은 접혀도 보임 · 초점 닿으면 자동 펼침).
+						-->
+						<c:ConsoleChipStrip
 							Margin="0"
-							AutomationProperties.AutomationId="Console.Events.Toolbar.Filters"
+							AutomationProperties.AutomationId="Console.Events.FilterStrip"
 							ItemsSource="{Binding FilterChips}"
 							Visibility="{Binding HasFilterChips, Converter={StaticResource BoolToVis}}">
-							<c:ConsoleChipGroup.ItemsPanel>
-								<ItemsPanelTemplate>
-									<StackPanel Orientation="Horizontal" />
-								</ItemsPanelTemplate>
-							</c:ConsoleChipGroup.ItemsPanel>
-							<c:ConsoleChipGroup.ItemTemplate>
+							<c:ConsoleChipStrip.ItemTemplate>
 								<DataTemplate>
 									<RadioButton
 										AutomationProperties.AutomationId="{Binding Key, StringFormat=Console.Events.Filter.{0}}"
@@ -351,8 +350,8 @@
 										IsChecked="{Binding IsSelected, Mode=OneWay}"
 										Style="{StaticResource Console.Tab}" />
 								</DataTemplate>
-							</c:ConsoleChipGroup.ItemTemplate>
-						</c:ConsoleChipGroup>
+							</c:ConsoleChipStrip.ItemTemplate>
+						</c:ConsoleChipStrip>
 				</Border>
 
 			<Grid ClipToBounds="True">
