@@ -375,7 +375,13 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 await LoadAsync();
                 StatusText = "문구를 삭제했습니다.";
             }
-            else _log?.Warning($"[ActionReportTemplate] 삭제 실패({res.StatusCode}): {res.ErrorText()}");
+            else
+            {
+                _log?.Warning($"[ActionReportTemplate] 삭제 실패({res.StatusCode}): {res.ErrorText()}");
+                // 404 = 이미 다른 곳에서 지워졌다 — 알림 창이 "목록을 다시 불러옵니다." 라고 말하므로 정말 다시 읽는다.
+                // (삭제는 미적용 관문을 지나와 폼이 깨끗하다 — 지운 줄은 SelectById 가 고르지 못해 상세가 빈다.)
+                if (res.StatusCode == 404 && !IsUnsupported) await LoadAsync();
+            }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "문구를 삭제했습니다." }
                 : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = MapError(res.StatusCode, "문구를 삭제하지 못했습니다.") };
@@ -520,6 +526,12 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
                 if (!res.Success || res.Data is null)
                 {
                     _log?.Warning($"[ActionReportTemplate] 수정 실패({res.StatusCode}): {res.ErrorText()}");
+                    if (res.StatusCode == 404 && !IsUnsupported)
+                    {
+                        IsBusy = false;   // 다시 읽기가 LoadAsync 재진입 가드에 막히지 않도록 먼저 내린다.
+                        await OnApplyTargetGoneAsync();
+                        return;
+                    }
                     FailApply(MapError(res.StatusCode, "문구를 고치지 못했습니다."));
                     return;
                 }
@@ -552,6 +564,20 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
 
     /// <summary>방금 거절된 글 — 폼이 아직 그 글일 때만 non-null(글이 바뀌면 <see cref="DraftContent"/> 가 지운다).</summary>
     private string? _rejectedDraft;
+
+    /// <summary>
+    /// [적용] 이 404 — 고치던 문구가 다른 곳에서 지워졌다. 전에는 "목록을 다시 불러옵니다." 라고 말만 하고 다시 읽지 않아
+    /// 지운 줄이 목록 · 상세에 그대로 남았다. SYNC 와 같은 조용한 다시 읽기로 정말 다시 읽는다 — 지운 줄은 목록에 없으므로
+    /// <see cref="SelectById"/> 가 고르지 못해 선택 · 상세가 빈다. 단, 적용하지 않은 글이 있으면 덮지 않는다:
+    /// 다시 읽지 않고 상태 띠로 알리며, 막대는 하지 않은 다시 읽기를 약속하지 않는다.
+    /// </summary>
+    private async Task OnApplyTargetGoneAsync()
+    {
+        if (await ReloadQuietlyAsync())
+            Detail.LastMessage = SelectedItem is null ? DeletedElsewhereReloadedText : MapError(0, "문구를 고치지 못했습니다.");
+        else
+            FailApply(DeletedElsewhereDraftKeptText);
+    }
 
     /// <summary>[되돌리기] · [취소].</summary>
     public void Revert()
@@ -615,6 +641,15 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
     /// </summary>
     public const string SelectedChangedElsewhereText = "다른 곳에서 이 문구가 바뀌었습니다.";
 
+    /// <summary>[적용] 이 404 — 고치던 문구가 다른 곳에서 지워져 목록을 <b>정말로</b> 다시 읽었다(지운 줄은 고르지 않는다).</summary>
+    public const string DeletedElsewhereReloadedText = "다른 곳에서 삭제된 문구입니다. 목록을 다시 불러왔습니다.";
+
+    /// <summary>
+    /// [적용] 이 404 인데 폼에 적용하지 않은 글이 있다 — 그 글을 덮지 않으려고 다시 읽지 않았다.
+    /// 하지 않은 다시 읽기를 약속하지 않는다(상태 띠의 [다시 읽기]가 사람에게 고르게 한다).
+    /// </summary>
+    public const string DeletedElsewhereDraftKeptText = "다른 곳에서 삭제된 문구입니다. 적은 글은 그대로 두었습니다.";
+
     public string ExternalChangeText => ExternalChangeNotice;
     public string ExternalChangeActionText => ExternalChangeAction;
 
@@ -661,11 +696,20 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             return;
         }
 
+        await ReloadQuietlyAsync();
+    }
+
+    /// <summary>
+    /// 조용한 다시 읽기 — SYNC 알림과 [적용] 404(고치던 문구가 다른 곳에서 지워졌다)가 같이 쓴다.
+    /// 적용하지 않은 글이 있으면 덮지 않고 상태 띠로 알린다 — 그때는 <c>false</c>(다시 읽지 않았다).
+    /// </summary>
+    private async Task<bool> ReloadQuietlyAsync()
+    {
         // 사람이 적고 있는 문구는 덮지 않는다 — 알리고 사람이 [다시 읽기]로 고른다.
         if (Detail.IsDirty)
         {
             IsExternallyChanged = true;
-            return;
+            return false;
         }
 
         var committed = _lastCommittedOrder;
@@ -700,6 +744,7 @@ public class ActionReportTemplateConsoleViewModel : BasePanelViewModel, IHandle<
             _undoOrder = null;
             NotifyOfPropertyChange(nameof(CanUndoReorder));
         }
+        return true;
     }
 
     private readonly CoalescingTrigger _externalChange;

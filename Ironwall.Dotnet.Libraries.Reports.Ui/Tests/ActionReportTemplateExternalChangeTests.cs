@@ -339,6 +339,62 @@ public class ActionReportTemplateExternalChangeTests : IDisposable
     }
 
     [Fact]
+    public async Task should_reload_the_list_when_apply_hits_404_and_the_form_holds_no_unapplied_text()
+    {
+        // 404 문구는 "목록을 다시 불러옵니다." 라고 약속했지만 아무것도 다시 읽지 않았다 — 지운 줄이 목록 · 상세에 남았다.
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Api.Templates.RemoveAll(t => t.Id == 2);                    // 다른 운영자가 지웠다
+        var readsBefore = rig.Api.ListReads;
+
+        await rig.Console.ApplyAsync();                                  // 손댄 글 없이 [적용] → 서버 404
+
+        Assert.Equal(readsBefore + 1, rig.Api.ListReads);                // 정말 다시 읽었다
+        Assert.DoesNotContain(rig.Console.Items, i => i.Id == 2);
+        Assert.Null(rig.Console.SelectedItem);                           // 지운 줄을 고르고 있지 않다
+        Assert.True(rig.Console.IsDetailEmpty);                          // 상세도 비었다
+        Assert.False(rig.Console.Detail.IsDirty);
+        Assert.Equal(ActionReportTemplateConsoleViewModel.DeletedElsewhereReloadedText, rig.Console.DetailFooterText);
+    }
+
+    [Fact]
+    public async Task should_keep_the_draft_and_show_the_notice_when_apply_hits_404_with_unapplied_text()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Console.DraftContent = "강풍(고친 글)";
+        rig.Api.Templates.RemoveAll(t => t.Id == 2);
+        var readsBefore = rig.Api.ListReads;
+
+        await rig.Console.ApplyAsync();
+
+        Assert.Equal(readsBefore, rig.Api.ListReads);                    // 적은 글을 덮지 않는다 — 다시 읽지 않는다
+        Assert.Equal("강풍(고친 글)", rig.Console.DraftContent);
+        Assert.True(rig.Console.Detail.IsDirty);
+        Assert.True(rig.Console.IsExternallyChanged);                    // [다시 읽기] 띠로 알린다
+        Assert.Equal(ActionReportTemplateConsoleViewModel.DeletedElsewhereDraftKeptText, rig.Console.DetailFooterText);
+        Assert.DoesNotContain("불러옵니다", rig.Console.DetailFooterText);   // 하지 않은 다시 읽기를 약속하지 않는다
+    }
+
+    [Fact]
+    public async Task should_reload_the_list_when_delete_hits_404()
+    {
+        var rig = await OpenAsync();
+        rig.Console.OnRowSelected(rig.Console.Items.Single(i => i.Id == 2));
+        rig.Api.Templates.RemoveAll(t => t.Id == 2);
+        rig.Api.FailDelete = true;
+        rig.Api.StatusCodeOnFailure = 404;
+        var readsBefore = rig.Api.ListReads;
+
+        await rig.Console.DeleteAsync();
+        await rig.Console.HandleAsync(new CallDeleteActionReportTemplateProcessMessageModel(), CancellationToken.None);
+
+        Assert.Equal(readsBefore + 1, rig.Api.ListReads);
+        Assert.DoesNotContain(rig.Console.Items, i => i.Id == 2);
+        Assert.Null(rig.Console.SelectedItem);
+    }
+
+    [Fact]
     public async Task should_ignore_changes_when_the_console_is_not_open()
     {
         var rig = await OpenAsync();
