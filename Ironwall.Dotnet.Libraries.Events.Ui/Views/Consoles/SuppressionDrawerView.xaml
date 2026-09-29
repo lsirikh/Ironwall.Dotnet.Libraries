@@ -258,13 +258,19 @@
 								Margin="0,14,0,3"
 								Style="{StaticResource BoxLabel}"
 								Text="반복" />
+							<!--
+								GroupName 을 두지 않는다 — 두 라디오는 이 StackPanel(부모)로 묶인다.
+								GroupName 은 앱 전역 이름표라, 같은 창(또는 창에서 떨어져 살아 있는 옛 뷰끼리 — 루트 null)에 서랍 사본이 둘 이상
+								같은 뷰모델에 붙어 있으면 사본끼리 서로의 [주간 반복] 을 꺼 버렸다: 누르면 IsWeekly 가 참이 됐다가(끝 +30일)
+								곧바로 거짓으로 돌아와 요약이 '→ 단발 · … ~ +30일' 로 남았다(헤디드 r10~r17 SC-SUP-007c · 008 · 006).
+								이벤트 창을 닫을 때마다 새 EventDashboardView 가 생기고 옛 뷰는 뷰모델 이벤트 구독으로 살아 남는다.
+							-->
 							<StackPanel Orientation="Horizontal">
 								<RadioButton
 									Margin="0,0,12,0"
 									AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.OneShot"
 									Content="단발"
 									FontSize="13"
-									GroupName="SuppressionRecurrence"
 									IsChecked="{Binding IsOneShot, Mode=TwoWay}"
 									IsEnabled="{Binding CanEditRecurrence}"
 									Style="{StaticResource Console.RadioButton}" />
@@ -272,7 +278,6 @@
 									AutomationProperties.AutomationId="Console.Suppression.Form.Recurrence.Weekly"
 									Content="주간 반복"
 									FontSize="13"
-									GroupName="SuppressionRecurrence"
 									IsChecked="{Binding IsWeekly, Mode=TwoWay}"
 									IsEnabled="{Binding CanEditRecurrence}"
 									Style="{StaticResource Console.RadioButton}" />
