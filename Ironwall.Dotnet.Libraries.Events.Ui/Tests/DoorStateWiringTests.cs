@@ -255,6 +255,32 @@ public class DoorStateWiringTests
         manager.Verify(m => m.SetDoorState(It.IsAny<int>(), It.IsAny<EnumDeviceType>(), It.IsAny<EnumDoorState>()), Times.Never);
     }
 
+    // v7.0+ 서버 — 이벤트의 장비는 참조 {id, category_device}(서버 D5), type_device 없음. 예전엔 이 모양을 전부 버렸다(2026-09-30).
+    private const string EnclosureOpenJsonV7 = """
+        { "id": "op-2", "m_type": "REQ", "cmd": "OPERATION_EVENT", "from": "gop-server",
+          "body": { "id": 20432, "category_event": "operation", "reason": "ENCLOSURE_DOOR_OPEN", "severity": "WARNING",
+                    "device": { "id": 1351, "category_device": "enclosure" },
+                    "detail": { "door_status": "OPEN" } } }
+        """;
+
+    [Fact]
+    public async Task should_set_enclosure_door_open_when_the_v7_event_carries_only_category_device()
+    {
+        var (_, manager, handler) = CreateOperation();
+        await handler(Args(EnclosureOpenJsonV7));
+        manager.Verify(m => m.SetDoorState(1351, EnumDeviceType.Enclosure, EnumDoorState.Open), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("enclosure", null, EnumDeviceType.Enclosure)]
+    [InlineData("gate", null, EnumDeviceType.Gate)]
+    [InlineData("GATE", null, EnumDeviceType.Gate)]
+    [InlineData(null, "Enclosure", EnumDeviceType.Enclosure)]   // 옛 서버(6.3)
+    [InlineData("sensor", null, null)]                          // 개폐 없음
+    [InlineData(null, null, null)]
+    public void should_resolve_door_device_type_from_category_first_then_legacy_type(string? category, string? type, EnumDeviceType? expected)
+        => Assert.Equal(expected, OperationEventNatsSyncService.ResolveDoorDeviceType(category, type));
+
     [Theory]
     [InlineData("OPEN", "ENCLOSURE_TEMP_HIGH", EnumDoorState.Open)]     // detail 이 권위
     [InlineData("closed", "GATE_OPEN", EnumDoorState.Closed)]

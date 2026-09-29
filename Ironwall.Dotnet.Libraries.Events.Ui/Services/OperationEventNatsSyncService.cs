@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
@@ -73,8 +74,10 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
 
             var device = body["device"];
             int deviceId = device?.Value<int?>("id") ?? body.Value<int?>("device_id") ?? 0;
-            var typeStr = device?.Value<string>("type_device") ?? string.Empty;
-            if (deviceId <= 0 || !Enum.TryParse<EnumDeviceType>(typeStr, ignoreCase: true, out var deviceType)) return Task.CompletedTask;
+            // v7.0+ 이벤트의 장비는 참조 {id, category_device}(서버 D5) — type_device 는 없다. 예전엔 type_device 만 읽어
+            //   7.0+ 서버의 함체 · 통문 개폐가 지도에 한 번도 반영되지 않았다(2026-09-30 발견). 개폐가 있는 카테고리만 종류로 옮긴다.
+            if (deviceId <= 0 || ResolveDoorDeviceType(device?.Value<string>("category_device"), device?.Value<string>("type_device")) is not { } deviceType)
+                return Task.CompletedTask;
             if (!DoorStateMachine.HasDoor(deviceType)) return Task.CompletedTask;
 
             var state = Resolve(body["detail"]?.Value<string>("door_status") ?? body["detail"]?.Value<string>("gate_status"), body.Value<string>("reason"));
@@ -88,6 +91,25 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
             _log?.Error($"{nameof(OnNatsOperationAsync)} 오류: {ex.Message}");
         }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 이벤트 장비 참조 → 개폐 판정용 종류. <c>category_device</c>(7.0+) 가 먼저, 옛 서버의 <c>type_device</c> 가 다음.
+    /// 개폐가 없는 장비면 null.
+    /// </summary>
+    internal static EnumDeviceType? ResolveDoorDeviceType(string? categoryDevice, string? typeDevice)
+    {
+        EnumDeviceType type;
+        if (Enum.TryParse(typeDevice, ignoreCase: true, out EnumDeviceType legacy) && Enum.IsDefined(legacy))
+            type = legacy;
+        else
+            type = DeviceTypeResolver.ResolveCategory(categoryDevice, null) switch
+            {
+                EnumDeviceCategory.Enclosure => EnumDeviceType.Enclosure,
+                EnumDeviceCategory.Gate => EnumDeviceType.Gate,
+                _ => EnumDeviceType.NONE,
+            };
+        return DoorStateMachine.HasDoor(type) ? type : null;
     }
 
     /// <summary>detail 상태 문자열이 있으면 그것(권위), 없으면 reason 접미(_OPEN/_CLOSED)로 판정. 둘 다 없으면 null.</summary>
