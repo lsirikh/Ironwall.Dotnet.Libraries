@@ -120,7 +120,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             {
                 // 캐시 미스 + 카테고리만으로 종류를 못 정함(sensor = Fence · PIR · Multi …) — 종류를 <b>추측하지 않고</b> NONE 으로 큐에 넣는다(WP-1 ⑱).
                 //   호스트는 이 이벤트의 카드를 띄운다 — 큐 엔트리가 없으면 자동 조치보고 · 원격 해제 · 알람이 그 카드와 따로 논다(종전: 이벤트 무시).
-                //   심볼은 SymbolEventManager 의 Id 단독 보조 조회가 찾으면 따라가고, 캐시에 없는 장비라 대개 그릴 심볼이 없다.
+                //   심볼은 칠하지 않는다 — NONE 은 Id 폴백을 쓰지 않는다(WP-8 H2: 같은 Id 의 카메라 · 다른 종류 심볼을 칠하고,
+                //   그 조치가 그 심볼의 진짜 장애색을 지웠다). 캐시에 없는 장비라 원래 그릴 심볼도 없다.
                 deviceType = EnumDeviceType.NONE;
                 deviceGroups = body.Device?.GroupIds?.Where(g => g > 0).ToList();
                 _log?.Warning($"DETECTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 종류 NONE 으로 큐 적재(자동조치 · 원격 해제용)");

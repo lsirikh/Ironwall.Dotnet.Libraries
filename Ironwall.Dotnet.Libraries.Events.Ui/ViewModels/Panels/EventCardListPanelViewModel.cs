@@ -165,6 +165,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// <summary>묶음 버퍼를 지금 비운다(시험 · 타이머 없는 헤드리스용). 타이머 틱과 같은 경로다.</summary>
         internal Task FlushPendingCardsNowAsync() => FlushPendingCardsAsync();
 
+        /// <summary>
+        /// 묶음 카드를 UI 스레드로 넘기는 길(기본 <see cref="DispatcherService.BeginInvoke(Action, DispatcherPriority)"/>).
+        /// 시험이 "Background 로 넘긴 삽입보다 Normal 우선순위의 원격 조치보고가 먼저 처리되는" 디스패처 순서를 재현하려고 바꾼다(WP-8 M3).
+        /// </summary>
+        internal Func<Action, DispatcherPriority, Task> DispatchToUi { get; set; } = DispatcherService.BeginInvoke;
+
         private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             // Reset은 배치 서스펜드 패턴에서 수동 발행 — entryId 매칭은 배치에서 이미 처리
@@ -237,6 +243,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             lock (_closedGate) return _closedKeys.Contains(key);
         }
 
+        /// <summary>이미 조치됐거나(종류 + 번호 기억) 목록에서 빠진 카드 — 전체 조치보고가 다시 보고하지 않는다(WP-8 M6). UI 스레드에서 부를 것.</summary>
+        private bool IsClosedOrGone(EventCardBaseViewModel card) => WasClosed(card) || !ViewModelProvider.Contains(card);
+
         // Timer 콜백: 동기 래퍼 — async void 금지(Timer 콜백에서 예외 시 프로세스 크래시)
         /// <summary>
         /// (EB2) 표시 카드 수가 MAX_EVENT_CARDS 를 초과하면 가장 오래된 카드부터 제거한다.
@@ -295,21 +304,37 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 var newInterval = _batchBuffer.CalculateInterval(drained.Count);
                 _batchTimer?.Change(newInterval, newInterval);
 
-                await DispatcherService.BeginInvoke(() =>
+                await DispatchToUi(() =>
                 {
+                    // (WP-8 M3) UI 스레드에서 한 번 더 거른다 — 위 검사(타이머 스레드)와 이 Background 삽입 사이에 Normal 우선순위의
+                    //   원격 ACTION_REPORT 가 먼저 처리되면, 카드가 없어 엔트리만 빼고 보류 EntryId 를 지운다. 여기서 거르지 않으면
+                    //   카드가 뒤늦게 올라와 영영 남았다(EntryId 없음 → 자동 조치보고 · 원격 해제 모두 못 닿음). 원격 종결은 UI 스레드라 경합이 없다.
+                    var inserted = new List<EventCardBaseViewModel>(batch.Count);
+                    foreach (var card in batch)
+                    {
+                        if (WasClosed(card))
+                        {
+                            _log?.Info($"[EnqueueCard] 삽입 직전 이미 조치된 이벤트라 올리지 않음: {KeyOf(card)}");
+                            card.Dispose();
+                            continue;
+                        }
+                        inserted.Add(card);
+                    }
+                    if (inserted.Count == 0) return;
+
                     // CollectionChanged 서스펜드 → 배치 Add → 재등록 (핸들러 폭주 방지)
                     ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
                     try
                     {
                         // 최신이 맨 위 — 종전엔 맨 아래에 붙고 스크롤이 따라가지 않아 새 이벤트가 화면 밖에 떴다(WP-1 ⑲).
-                        foreach (var card in batch)
+                        foreach (var card in inserted)
                             ViewModelProvider.Insert(0, card);
                     }
                     finally
                     {
                         ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                         // 배치 entryId 매칭
-                        foreach (var card in batch)
+                        foreach (var card in inserted)
                             TryAssignEntryId(card);
                         // (EB2) 표시 카드 하드 캡 — 장시간 운용 시 무한 증가 방지 (핸들러 활성 상태에서 제거)
                         EnforceDisplayCap();
@@ -488,6 +513,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     try
                     {
+                        // (WP-8 M6) 목록은 시작할 때 한 번 베꼈다 — 앞 카드를 보고하는(await) 사이 자동 · 원격 · 개별 조치로 이미 닫힌 카드는
+                        //   다시 보고하지 않는다(종전: 서버 조치 중복 생성 + ACTION_REPORT 중복 + 이중 정리). 가드를 잡은 뒤에 보므로
+                        //   자동 경로가 끝내고 가드를 푼 카드도 여기서 걸린다.
+                        if (IsClosedOrGone(card))
+                        {
+                            _log?.Info($"배치 조치보고: {KeyOf(card)} 이미 닫힘 — 건너뜀");
+                            continue;
+                        }
                         // ① 서버 API로 조치보고 생성 (보고자: Username(EmployeeNumber) 한 모양, Content: "일괄처리" 고정)
                         var actor = ActionReportRules.FormatActor(_userModel);
                         var dto = new ActionEventCreateDto
@@ -501,12 +534,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         if (!response.Success)
                             throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
 
+                    // (WP-8 M6) 보고를 기다리는 사이 다른 길(원격 ACTION_REPORT 등)이 이미 닫았으면 정리(②③)는 그쪽이 끝냈다 —
+                    //   두 번 Dequeue · 두 번 치우지 않는다. 서버 조치는 이미 만들어졌으므로 ACTION_REPORT(④)는 사실대로 낸다.
+                    if (IsClosedOrGone(card))
+                    {
+                        _log?.Info($"배치 조치보고: {KeyOf(card)} 보고 중 다른 경로로 닫힘 — 정리 생략");
+                    }
+                    else
+                    {
                     // ② 심볼 복원: EntryId 폴백 체인(종류까지 본다) → 엔트리가 없으면 심볼 재계산 (FR-01 · FR-03)
                     ReleaseQueueAndSymbol(card);
 
                     // ③ 제거 + Dispose
                     if (KeyOf(card) is { } closedKey) RememberClosed(closedKey.Kind, closedKey.EventId);
                     RemoveCard(card);
+                    }
 
                     // ④ NATS로 조치보고 발행 (NatsDomainService 경유)
                     await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(

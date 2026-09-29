@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
@@ -28,8 +29,16 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
     // 그룹 마커: DeviceGroup → GMapPidsGroupMarker/PidsGroupSymbolModel
     private readonly ConcurrentDictionary<int, DeviceSymbolLookupModel> _groupSymbolLookup;
 
-    // 보조 인덱스: DeviceId → DeviceSymbolLookupModel (DeviceType 불일치 fallback용 O(1) 검색)
-    private readonly ConcurrentDictionary<int, DeviceSymbolLookupModel> _deviceLookupById;
+    // (WP-8 H2) Id 단독 보조 색인은 없앴다 — '마지막으로 등록된 같은 Id' 를 가리켜, NONE 엔트리 · 해제된 장비의 남은 엔트리가
+    //   다른 종류의 같은 Id 심볼(카메라 7 ↔ 센서 7)을 칠했다. 종류 폴백 규칙은 TryResolveDevice 한 곳에 있다.
+
+    // 해제된 장비(Id, 종류) — 그 장비의 남은 큐 엔트리가 Id 폴백으로 형제 장비를 칠하지 않게 기억한다. 다시 등록되면 지운다.
+    private readonly ConcurrentDictionary<(int Id, EnumDeviceType Type), byte> _unregisteredKeys = new();
+
+    // (WP-8 L7) 큐 상태를 읽고 심볼을 칠하는 일은 전부 이 문 안에서 — 읽기와 칠하기 사이에 다른 스레드의 전이가 끼어들어
+    //   옛 값이 마지막에 덮던 경합을 막는다. 문 안에서는 늘 큐(EQM)를 다시 읽으므로 마지막 칠 = 큐의 실제 상태다.
+    //   문 안에서 부르는 것: EQM 읽기(자기 잠금만, 콜백은 그 잠금 밖) · 심볼 속성 세팅 · 비동기 마샬링(InvokeAsync) — 동기 UI 대기가 없어 교착이 없다.
+    private readonly object _paintGate = new();
 
     // 미등록 장비 경고를 이미 한 (Id, 종류) — 장비당 한 번만 알린다(WarnUnresolvedOnce). 다시 등록되면 지운다.
     private readonly ConcurrentDictionary<(int Id, EnumDeviceType Type), byte> _unresolvedWarned = new();
@@ -52,7 +61,6 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
 
         _deviceSymbolLookup = new ConcurrentDictionary<(int, EnumDeviceType), DeviceSymbolLookupModel>();
         _groupSymbolLookup = new ConcurrentDictionary<int, DeviceSymbolLookupModel>();
-        _deviceLookupById = new ConcurrentDictionary<int, DeviceSymbolLookupModel>();
     }
 
     // 센서 장비-심볼 매핑 등록 (개별 마커용)
@@ -68,7 +76,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
 
         var key = (deviceModel.Id, deviceModel.DeviceType);
         _deviceSymbolLookup[key] = lookup;
-        _deviceLookupById[deviceModel.Id] = lookup;
+        _unregisteredKeys.TryRemove(key, out _);   // 다시 등록됐다 — 해제 기억을 지운다
         _unresolvedWarned.TryRemove(key, out _);   // 다시 등록됐다 — 다음 미등록은 다시 알린다
         //_log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
 
@@ -127,15 +135,11 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
     {
         if (!_deviceSymbolLookup.TryRemove((deviceId, deviceType), out var removed)) return false;
 
-        // Id 보조 색인이 이 조회를 가리키면 — 같은 Id 의 다른 종류가 남았으면 그것으로 잇고, 없으면 뺀다.
-        if (_deviceLookupById.TryGetValue(deviceId, out var byId) && ReferenceEquals(byId, removed))
-        {
-            var sibling = _deviceSymbolLookup.FirstOrDefault(kv => kv.Key.Id == deviceId).Value;
-            if (sibling is not null) _deviceLookupById[deviceId] = sibling;
-            else _deviceLookupById.TryRemove(deviceId, out _);
-        }
+        // (WP-8 H2) 이 (Id, 종류) 는 Id 폴백에서도 빠진다 — 종전엔 Id 보조 색인을 같은 Id 의 형제 장비로 옮겨,
+        //   지워진 장비의 남은 큐 엔트리(늦은 Dequeue · 새 이벤트)가 형제 장비의 색을 덮었다.
+        _unregisteredKeys[(deviceId, deviceType)] = 0;
 
-        removed.ApplyCompositeStatus(EnumCompositeEventStatus.Normal);   // 지워진 장비의 마지막 색이 굳지 않게
+        lock (_paintGate) removed.ApplyCompositeStatus(EnumCompositeEventStatus.Normal);   // 지워진 장비의 마지막 색이 굳지 않게
         _log?.Info($"장비 심볼 해제: Device({deviceId},{deviceType}) — 색 Normal 복원 · 조회표에서 분리");
         return true;
     }
@@ -354,8 +358,12 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
     public void RefreshGroupSymbol(int groupId)
     {
         if (_eventQueueManager == null) return;
-        var state = _eventQueueManager.GetGroupState(groupId);
-        SetGroupCompositeStatus(groupId, state);   // 직접 세팅 — 재계산값 그대로(미등록이면 SetGroupCompositeStatus가 경고)
+        EnumCompositeEventStatus state;
+        lock (_paintGate)   // 읽기 + 칠하기를 한 문 안에서(WP-8 L7)
+        {
+            state = _eventQueueManager.GetGroupState(groupId);
+            SetGroupCompositeStatus(groupId, state);   // 직접 세팅 — 재계산값 그대로(미등록이면 SetGroupCompositeStatus가 경고)
+        }
         _log?.Info($"그룹 심볼 재계산 복원: DeviceGroup({groupId}) → {state}");
     }
 
@@ -364,14 +372,22 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
     {
         if (_eventQueueManager == null) return;
         if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
-        var state = _eventQueueManager.GetDeviceState(deviceId, deviceType);
-        lookup.ApplyCompositeStatus(state);
+        EnumCompositeEventStatus state;
+        lock (_paintGate)   // 읽기 + 칠하기를 한 문 안에서(WP-8 L7) — 사이에 온 전이는 문 밖에서 기다렸다가 다시 읽어 칠한다
+        {
+            state = _eventQueueManager.GetDeviceState(deviceId, deviceType);
+            lookup.ApplyCompositeStatus(state);
+        }
         _log?.Info($"개별 심볼 재계산: Device({deviceId},{deviceType}) → {state}");
     }
 
     /// <summary>
     /// 개별 디바이스 복합 상태 전이 처리 — EventQueueManager의 OnDeviceStateChanged에서 호출
     /// </summary>
+    /// <remarks>
+    /// 큐가 주입돼 있으면 <paramref name="next"/> 를 믿지 않고 <b>문 안에서 큐를 다시 읽어</b> 칠한다(WP-8 L7) —
+    /// 전이 콜백은 큐 잠금 밖에서 발화하므로 NATS 스레드의 Enqueue 전이와 UI 스레드의 Dequeue 전이가 뒤바뀐 순서로 닿을 수 있다.
+    /// </remarks>
     public void HandleDeviceStateChanged(int deviceId, EnumDeviceType deviceType, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
     {
         if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
@@ -379,8 +395,13 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
             WarnUnresolvedOnce(deviceId, deviceType, $"상태 전이 {prev}→{next}");
             return;
         }
-        deviceLookup.ApplyCompositeStatus(next);
-        _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}");
+        var applied = next;
+        lock (_paintGate)
+        {
+            if (_eventQueueManager != null) applied = _eventQueueManager.GetDeviceState(deviceId, deviceType);
+            deviceLookup.ApplyCompositeStatus(applied);
+        }
+        _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}" + (applied != next ? $" (큐 재확인 → {applied})" : ""));
     }
 
     /// <summary>
@@ -419,6 +440,16 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
 
     public void HandleGroupStateChanged(int groupId, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
     {
+        // 개별 심볼과 같은 규칙(WP-8 L7) — 문 안에서 큐를 다시 읽어 칠한다(뒤바뀐 순서로 닿은 전이가 옛 값으로 덮지 않게).
+        lock (_paintGate)
+        {
+            if (_eventQueueManager != null) next = _eventQueueManager.GetGroupState(groupId);
+            ApplyGroupTransition(groupId, next);
+        }
+    }
+
+    private void ApplyGroupTransition(int groupId, EnumCompositeEventStatus next)
+    {
         switch (next)
         {
             case EnumCompositeEventStatus.Normal:
@@ -441,23 +472,61 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
         _ea.Unsubscribe(this);
         _deviceSymbolLookup.Clear();
         _groupSymbolLookup.Clear();
-        _deviceLookupById.Clear();
+        // _unregisteredKeys 는 비우지 않는다 — Dispose 는 전량 재등록의 시작(SymbolLifecycleCoordinator.BeginRebuild)으로도 쓰이고,
+        //   지워진 장비의 남은 엔트리는 재등록 뒤에도 형제를 칠하면 안 된다. 같은 키가 다시 등록되면 그때 지운다.
     }
 
     /// <summary>
-    /// 복합 키(Id,Type) → 실패 시 보조 인덱스(Id 단독) 순서로 O(1) 검색.
+    /// 큐 읽기 + 심볼 칠하기를 전이 처리기와 <b>같은 문</b> 안에서 돌린다(WP-8 L7) — 지도 쪽 재칠(SymbolLifecycleCoordinator)이
+    /// 큐를 읽은 뒤 칠하기 전에 NATS 전이가 먼저 칠하고, 재칠의 옛 값이 그것을 덮던 경합을 막는다. <paramref name="readAndPaint"/> 안에서 큐를 읽을 것.
     /// </summary>
+    /// <remarks>인터페이스에는 넣지 않는다 — 멤버를 늘리면 목 · 페이크가 전부 깨진다(<see cref="UnregisterDeviceSymbol"/> 와 같은 규칙).</remarks>
+    public T PaintSerialized<T>(Func<T> readAndPaint)
+    {
+        ArgumentNullException.ThrowIfNull(readAndPaint);
+        lock (_paintGate) return readAndPaint();
+    }
+
+    /// <summary>
+    /// 복합 키(Id,Type) 로 찾고, 없으면 <b>좁은 Id 폴백</b>(WP-8 H2).
+    /// </summary>
+    /// <remarks>
+    /// <para>Id 폴백이 설계상 필요한 경우는 하나다 — <b>같은 장비의 세부 종류가 어긋난 것</b>(FR-B2 재등록 · DB 심볼 SmartSensor ↔ 서버 SmartSensor2).
+    /// 그래서 다음을 모두 만족할 때만 따라간다.</para>
+    /// <list type="bullet">
+    /// <item>요청 종류가 <c>NONE</c> 이 아니다 — NONE 은 "종류를 모른다"(캐시 미스 센서, DetectionNatsSyncService · MalfunctionNatsSyncService)이지
+    ///   "같은 장비"라는 근거가 아니다. 종전엔 (7, NONE) 이 카메라 7 을 칠하고, 그 조치가 카메라의 진짜 장애색을 지웠다.</item>
+    /// <item>그 Id 로 등록된 심볼이 <b>정확히 하나</b>다 — 둘 이상이면 어느 쪽인지 정할 수 없다.</item>
+    /// <item>그 심볼과 요청이 <b>같은 계열</b>(DeviceTypeResolver.CategoryOf)이다 — 센서 7 이 카메라 7 을 칠하지 않는다.</item>
+    /// <item>요청 (Id, 종류) 가 <b>해제된 장비</b>가 아니다 — 지워진 장비의 남은 엔트리가 형제를 칠하지 않는다.</item>
+    /// </list>
+    /// <para>폴백은 조회표를 훑는다(미스일 때만, 심볼 수만큼) — 종전 O(1) 보조 색인은 '마지막 등록' 하나만 가리켜 위 규칙을 지킬 수 없었다.</para>
+    /// </remarks>
     private bool TryResolveDevice(int deviceId, EnumDeviceType deviceType,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out DeviceSymbolLookupModel? lookup)
     {
         if (_deviceSymbolLookup.TryGetValue((deviceId, deviceType), out lookup)) return true;
-        if (_deviceLookupById.TryGetValue(deviceId, out lookup))
-        {
-            _log?.Warning($"TryResolveDevice: DeviceType 불일치 Device({deviceId},{deviceType}) → ID 재검색으로 대체");
-            return true;
-        }
         lookup = null;
-        return false;
+        if (deviceType == EnumDeviceType.NONE) return false;
+        if (_unregisteredKeys.ContainsKey((deviceId, deviceType))) return false;
+
+        var category = DeviceTypeResolver.CategoryOf(deviceType);
+        if (category == EnumDeviceCategory.None) return false;
+
+        (int Id, EnumDeviceType Type) onlyKey = default;
+        DeviceSymbolLookupModel? only = null;
+        foreach (var kv in _deviceSymbolLookup)
+        {
+            if (kv.Key.Id != deviceId) continue;
+            if (only is not null) return false;   // 같은 Id 가 둘 이상 — 정할 수 없다
+            onlyKey = kv.Key;
+            only = kv.Value;
+        }
+        if (only is null || DeviceTypeResolver.CategoryOf(onlyKey.Type) != category) return false;
+
+        _log?.Warning($"TryResolveDevice: DeviceType 불일치 Device({deviceId},{deviceType}) → 같은 계열의 유일한 Id 심볼({onlyKey.Type})로 대체");
+        lookup = only;
+        return true;
     }
 
     /// <summary>

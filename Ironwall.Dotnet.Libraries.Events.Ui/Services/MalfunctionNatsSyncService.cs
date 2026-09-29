@@ -106,6 +106,7 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
             if (!NatsEventDeviceResolver.TryResolve(body.Device, deviceId, _deviceProvider, out var deviceType, out var deviceGroups))
             {
                 // 캐시 미스 + 카테고리만으로 종류를 못 정함(sensor) — 추측하지 않고 NONE 으로 큐에 넣는다(WP-1 ⑱, 탐지와 같은 규칙).
+                //   NONE 엔트리는 어떤 심볼도 칠하지 않는다(WP-8 H2 — Id 폴백 금지: 같은 Id 의 다른 종류 심볼 색을 덮던 것).
                 deviceType = EnumDeviceType.NONE;
                 deviceGroups = body.Device?.GroupIds?.Where(g => g > 0).ToList();
                 _log?.Warning($"MALFUNCTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 종류 NONE 으로 큐 적재(자동조치 · 원격 해제용)");

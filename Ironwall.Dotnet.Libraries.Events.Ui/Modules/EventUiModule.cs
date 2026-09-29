@@ -328,6 +328,8 @@ public class EventUiModule : Module
     /// 알람 소리의 <b>유일한 주인</b> — 큐(EQM)에 들어오면 울리고, 활성 건수가 0 이 되면(조치보고) 멈추거나 남은 종류로 바꾼다(WP-1 ⑨).
     /// 종전엔 호스트가 카드마다 토큰을 달아 한 번, 이 컨트롤러가 토큰 없이 또 한 번 울려 조치보고해도 토큰 없는 쪽이 계속 울렸다.
     /// 탐지 계열(침입 · 접점 …)은 전부 탐지 소리다 — 사운드 서비스는 Intrusion · Fault 두 소리만 안다.
+    /// <b>울리는 것 = 세는 것</b>(WP-8 H1): 큐의 활성 탐지 건수(<c>GetActiveCounts</c>)도 Fault 가 아닌 전부를 센다. 두 규칙이 어긋나면
+    /// 접점 · 사전경보가 울리자마자 (0,0) 통지로 꺼진다. 건수 통지는 최신값이 마지막에 닿는다(WP-8 M4, EQM 전달 직렬화).
     /// </summary>
     internal static void WireSoundAlarm(IEventQueueManager eqm, ISoundAlarmController sac, ISoundService soundService)
     {

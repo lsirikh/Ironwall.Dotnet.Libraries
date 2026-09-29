@@ -410,7 +410,13 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             return _entries.TryGetValue(entryId, out var entry) ? entry : null;
     }
 
-    /// <summary>활성 탐지/장애 건수 재집계 (D-01/03). _gate 보호 하 _entries를 EventType별 카운트.</summary>
+    /// <summary>
+    /// 활성 탐지/장애 건수 재집계 (D-01/03). _gate 보호 하 _entries를 EventType별 카운트.
+    /// <b>탐지 = 장애(Fault)가 아닌 모든 엔트리</b>(침입 · 접점 ON/OFF · 사전경보 Alert · 강풍 …) — 알람 배선(EventUiModule.WireSoundAlarm)이
+    /// Fault 외 전부를 탐지 소리로 울리므로 "울리는 것 = 세는 것" 이어야 한다(WP-8 H1). 종전엔 Intrusion 만 세어
+    /// 접점 · 사전경보가 들어오자마자 (0,0) 통지로 소리가 꺼졌고, 접점이 남았는데 침입만 조치해도 꺼졌다.
+    /// 통문 · 함체 접점은 큐에 들어오지 않으므로(DetectionNatsSyncService FR-13 ③ — 개폐 형태로만 유도) 여기 세이지 않는다.
+    /// </summary>
     public (int Detection, int Fault) GetActiveCounts()
     {
         lock (_gate)
@@ -418,20 +424,44 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             int det = 0, flt = 0;
             foreach (var e in _entries.Values)
             {
-                if (e.EventType == EnumEventType.Intrusion) det++;
-                else if (e.EventType == EnumEventType.Fault) flt++;
+                if (e.EventType == EnumEventType.Fault) flt++;
+                else det++;
             }
             return (det, flt);
         }
     }
 
-    /// <summary>활성 카운트 변경 통지 — 각 mutator 끝(lock 밖)에서 호출. 핸들러 없으면 재집계도 생략.</summary>
+    /// <summary>
+    /// 활성 카운트 변경 통지 — 각 mutator 끝(lock 밖)에서 호출. 핸들러 없으면 재집계도 생략.
+    /// <para><b>최신값이 마지막에 도착한다(WP-8 M4)</b> — 종전엔 계산과 전달 사이에 순서가 없어, UI 스레드 Dequeue 가 계산한 (0,0) 이
+    /// NATS 스레드 Enqueue 의 (0,1) 보다 늦게 도착해 활성 장애가 있는데 소리를 껐다.
+    /// 이제 한 번에 한 스레드만 전달하고(<c>_countPumping</c>), 전달 중에 바뀐 것은 표시(<c>_countDirty</c>)만 남긴 채 돌아간다 —
+    /// 전달하는 스레드가 표시를 보고 <b>큐를 다시 읽어</b> 한 번 더 전달한다. 전달은 어떤 잠금도 쥐지 않는다(핸들러 재진입 · 교착 없음).
+    /// 중간값은 합쳐질 수 있으나(건수는 상태이지 사건이 아니다) 마지막으로 전달된 값은 언제나 큐의 실제 값이다.</para>
+    /// </summary>
     private void RaiseActiveCountChanged()
     {
-        var handler = OnActiveCountChanged;
-        if (handler == null) return;
-        var (det, flt) = GetActiveCounts();
-        handler.Invoke(det, flt);
+        if (OnActiveCountChanged == null) return;
+        Interlocked.Exchange(ref _countDirty, 1);
+        while (Interlocked.CompareExchange(ref _countPumping, 1, 0) == 0)
+        {
+            try
+            {
+                while (Interlocked.Exchange(ref _countDirty, 0) == 1)
+                {
+                    var handler = OnActiveCountChanged;
+                    if (handler == null) break;
+                    var (det, flt) = GetActiveCounts();
+                    handler.Invoke(det, flt);
+                }
+            }
+            finally
+            {
+                Volatile.Write(ref _countPumping, 0);
+            }
+            // 전달을 내려놓는 순간 다른 스레드가 표시만 하고 떠났을 수 있다 — 표시가 남았으면 다시 맡는다(잃어버린 깨움 방지).
+            if (Volatile.Read(ref _countDirty) == 0) break;
+        }
     }
 
     public int GetTotalQueueCount()
@@ -744,6 +774,9 @@ public class EventQueueManager : IEventQueueManager, IDisposable
     private readonly Dictionary<int, HashSet<string>> _groupIndex;
     private readonly Dictionary<(int Id, EnumDeviceType Type), HashSet<string>> _deviceIndex;
     private readonly object _gate = new();
+    // 활성 건수 통지 직렬화(WP-8 M4) — 1 = 지금 한 스레드가 전달 중 / 1 = 전달 뒤 다시 읽어야 할 변경이 있다.
+    private int _countPumping;
+    private int _countDirty;
     private DispatcherTimer? _sharedTimer;
     // lock 전용 scratch 재사용 필드 — OnSharedTimerTick/Enqueue 내부에서만 사용
     private readonly List<EventEntry> _expiredScratch = new();

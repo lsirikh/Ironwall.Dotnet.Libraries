@@ -127,8 +127,8 @@ public class DoorStateWiringTests
         Assert.Equal(EnumDoorState.Open, symbol.DoorState); Assert.Equal(1, updates);
         manager.SetDoorState(9, EnumDeviceType.Enclosure, EnumDoorState.Open);   // 동일 상태 → 무통지
         Assert.Equal(1, updates);
-        manager.SetDoorState(9, EnumDeviceType.Gate, EnumDoorState.Closed);        // 타입 불일치 → Id 폴백으로 해석
-        Assert.Equal(EnumDoorState.Closed, symbol.DoorState);
+        manager.SetDoorState(9, EnumDeviceType.Gate, EnumDoorState.Closed);        // 다른 계열(통문 ≠ 함체) → Id 폴백 안 함(WP-8 H2)
+        Assert.Equal(EnumDoorState.Open, symbol.DoorState);
         manager.SetDoorState(4444, EnumDeviceType.Gate, EnumDoorState.Open);       // 미등록 → 무해
     }
 

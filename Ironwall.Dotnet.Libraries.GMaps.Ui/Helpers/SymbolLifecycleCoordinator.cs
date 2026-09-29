@@ -56,7 +56,10 @@ public sealed class SymbolLifecycleCoordinator
     /// <summary>등록된 장비 심볼 수(시험 · 로그용).</summary>
     public int DeviceCount => _devices.Count;
 
-    /// <summary>(Id, 종류) 또는 Id 만으로 등록돼 있는가 — 조회표의 Id 폴백 규칙과 같다.</summary>
+    /// <summary>
+    /// (Id, 종류) 또는 Id 만으로 등록돼 있는가 — 미등록 전이 관찰 로그(<see cref="ObserveDeviceTransition"/>)만 쓴다.
+    /// 조회표의 Id 폴백(WP-8 H2: NONE 금지 · 같은 Id 하나 · 같은 계열 · 해제된 키 제외)보다 <b>느슨하다</b> — 칠하기 판단에 쓰지 말 것.
+    /// </summary>
     public bool IsRegistered(int deviceId, EnumDeviceType deviceType)
         => _devices.ContainsKey((deviceId, deviceType)) || (_deviceIdRefCount.TryGetValue(deviceId, out var n) && n > 0);
 
@@ -97,16 +100,18 @@ public sealed class SymbolLifecycleCoordinator
     {
         int devices = 0, groups = 0, unlinked = 0, changed = 0;
 
+        // (WP-8 L7) 큐 읽기 + 칠하기는 조회표의 칠하기 문 안에서 한 심볼씩 — 읽은 뒤 칠하기 전에 NATS 전이가 먼저 칠하고
+        //   재칠의 옛 값이 덮던 경합을 막는다. 문 밖에서 기다린 전이는 문 안에서 큐를 다시 읽어 칠한다(SymbolEventManager).
         foreach (var ((id, type), symbol) in _devices)
         {
             devices++;
-            if (Apply(symbol, _eventQueue?.GetDeviceState(id, type) ?? EnumCompositeEventStatus.Normal)) changed++;
+            if (PaintFromQueue(symbol, () => _eventQueue?.GetDeviceState(id, type) ?? EnumCompositeEventStatus.Normal)) changed++;
         }
 
         foreach (var (groupId, symbol) in _groups)
         {
             groups++;
-            if (Apply(symbol, _eventQueue?.GetGroupState(groupId) ?? EnumCompositeEventStatus.Normal)) changed++;
+            if (PaintFromQueue(symbol, () => _eventQueue?.GetGroupState(groupId) ?? EnumCompositeEventStatus.Normal)) changed++;
         }
 
         if (unlinkedSymbols != null)
@@ -115,7 +120,7 @@ public sealed class SymbolLifecycleCoordinator
             {
                 if (symbol is null || _devices.Values.Any(s => ReferenceEquals(s, symbol))) continue;
                 unlinked++;
-                if (Apply(symbol, EnumCompositeEventStatus.Normal)) changed++;
+                if (PaintFromQueue(symbol, () => EnumCompositeEventStatus.Normal)) changed++;
             }
         }
 
@@ -128,7 +133,7 @@ public sealed class SymbolLifecycleCoordinator
     public bool ReconcileDevice(int deviceId, EnumDeviceType deviceType)
     {
         if (!_devices.TryGetValue((deviceId, deviceType), out var symbol)) return false;
-        Apply(symbol, _eventQueue?.GetDeviceState(deviceId, deviceType) ?? EnumCompositeEventStatus.Normal);
+        PaintFromQueue(symbol, () => _eventQueue?.GetDeviceState(deviceId, deviceType) ?? EnumCompositeEventStatus.Normal);
         return true;
     }
 
@@ -145,7 +150,7 @@ public sealed class SymbolLifecycleCoordinator
         //   이후 이 키로 오는 늦은 전이 · 문 상태는 어떤 심볼도 칠하지 않고 조회표가 장비당 한 번 경고한다.
         _symbolEventManager.UnregisterDeviceSymbol(deviceId, deviceType);
 
-        Apply(symbol, EnumCompositeEventStatus.Normal);
+        PaintFromQueue(symbol, () => EnumCompositeEventStatus.Normal);
         _log?.Info($"[심볼 해제] Device({deviceId},{deviceType}) 삭제 — 조회표에서 분리 · 색 Normal 복원: '{symbol.Title}'");
         return symbol;
     }
@@ -162,7 +167,14 @@ public sealed class SymbolLifecycleCoordinator
         return true;
     }
 
-    /// <summary>색 축을 세팅하고 갱신을 통지한다. 실제로 바뀌었으면 true.</summary>
+    /// <summary>
+    /// 조회표의 칠하기 문(<see cref="SymbolEventManager.PaintSerialized{T}"/>) 안에서 <paramref name="readState"/> 로 큐를 읽고 곧바로 칠한다(WP-8 L7).
+    /// 실제로 바뀌었으면 true.
+    /// </summary>
+    private bool PaintFromQueue(IPidsEventCapable symbol, Func<EnumCompositeEventStatus> readState)
+        => _symbolEventManager.PaintSerialized(() => Apply(symbol, readState()));
+
+    /// <summary>색 축을 세팅하고 갱신을 통지한다. 실제로 바뀌었으면 true. 칠하기 문 밖에서 부르지 말 것(<see cref="PaintFromQueue"/>).</summary>
     private static bool Apply(IPidsEventCapable symbol, EnumCompositeEventStatus state)
     {
         var before = symbol.EventStatus;
