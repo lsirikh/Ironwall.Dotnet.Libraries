@@ -230,8 +230,9 @@ public sealed class Pipeline
             throw new InvalidOperationException($"SAFETY ABORT: pipeline subject {Nats.Subject}");
 
         // sync services first (EventUiModule build callback), host broker after (IService Order) - same as the app
-        Det = new DetectionNatsSyncService(Log, Nats, Sem, Eqm, EventSetup, Ea, Tokens, Devices, new DefaultDoorContactPolicy());
-        Mal = new MalfunctionNatsSyncService(Log, Nats, Sem, Eqm, EventSetup, Ea, Tokens, Devices);
+        //   캐시 미스 단건 GET(브로커 N-5)은 앱과 같이 DeviceProviderService 로 — EventUiModule 이 IDeviceProviderService 를 넘긴다.
+        Det = new DetectionNatsSyncService(Log, Nats, Sem, Eqm, EventSetup, Ea, Tokens, Devices, new DefaultDoorContactPolicy(), DeviceSvc);
+        Mal = new MalfunctionNatsSyncService(Log, Nats, Sem, Eqm, EventSetup, Ea, Tokens, Devices, DeviceSvc);
         Op = new OperationEventNatsSyncService(Log, Nats, Sem, Tokens);
         DetSync = new DetectionSyncNatsService(Log, Nats, Eqm, EventApi, Ea, Tokens);
         await Det.StartService(); await Mal.StartService(); await Op.StartService(); await DetSync.StartService();

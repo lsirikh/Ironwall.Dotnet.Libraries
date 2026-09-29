@@ -563,17 +563,21 @@ public static partial class Scenarios
             $"캐시 추가={inCache} REST[{string.Join(",", c.RestSince(t0).Select(r => r.Path + ":" + r.Status))}] EQM[{c.EntriesText()}] 그룹13={c.Grp(13)}",
             ok ? Verdict.PASS : Verdict.FAIL, c.LogsText(mark, "SYNC_DEVICE", "DETECTION", "Fetch"), ok ? "" : W1);
 
-        // d) DELETED while that device has an active detection (EB3: RemoveByDevice exists but is dormant)
+        // d) DELETED while that device has an active detection — EQM entries go (EB3 RemoveByDevice), the card stays reportable
+        //    (EVT-E2E-022 · broker N-5 snapshot; decision 2026-09-30: removing the card would hide a still-open server event)
         mark = c.P.Log.Mark;
         c.P.Server.Remove(created.Id);
         await c.Sync(Env.SyncDevice, "SYNC_DEVICE", Env.SyncBody("DELETED", created.Id, "sensor"));
         var gone = await WaitUntil(() => !c.P.Devices.Any(x => x.Id == created.Id), 3000);
         await Settle(500);
         var orphan = c.EntryFor(e, EnumEventType.Intrusion) != null;
+        var cardKept = c.Cards().Any(x => x.Kind == "det" && x.EventId == e);
+        var groupFreed = c.Grp(13) == Normal;
+        var okd = gone && !orphan && cardKept && groupFreed;
         c.Rec.Add("S18.b", "활성 탐지가 있는 센서 2300 의 SYNC_DEVICE DELETED",
-            "캐시에서 제거 · 그 장비의 EQM 엔트리/카드 정리(EventQueueManager.RemoveByDevice 설계 의도 — 고아 이벤트 방지) · 그룹13 Normal",
-            $"캐시 제거={gone} · EQM 잔류={orphan}[{c.EntriesText()}] · 카드[{c.CardsText()}] · 그룹13={c.Grp(13)}",
-            gone && !orphan ? Verdict.PASS : Verdict.FAIL, c.LogsText(mark, "SYNC_DEVICE", "RemoveByDevice", "EB3"), gone && !orphan ? "" : W1);
+            "캐시에서 제거 · 그 장비의 EQM 엔트리 제거(EventQueueManager.RemoveByDevice — 고아 이벤트 방지) · 그룹13 Normal · 카드는 남아 조치 가능(EVT-E2E-022 · 브로커 N-5 스냅숏)",
+            $"캐시 제거={gone} · EQM 잔류={orphan}[{c.EntriesText()}] · 카드 유지={cardKept}[{c.CardsText()}] · 그룹13={c.Grp(13)}",
+            okd ? Verdict.PASS : Verdict.FAIL, c.LogsText(mark, "SYNC_DEVICE", "RemoveByDevice", "EB3"), okd ? "" : W1);
 
         // b) UPDATED with membership change
         await c.Reset();
