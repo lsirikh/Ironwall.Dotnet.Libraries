@@ -39,6 +39,9 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     /// <summary>다른 곳에서 맵핑이 바뀌었는데 적용하지 않은 편집이 있어 다시 읽지 않았을 때의 상태줄.</summary>
     public const string EXTERNAL_CHANGE_NOTICE = "다른 곳에서 맵핑이 바뀌었습니다 — 적용하거나 되돌린 뒤 [다시 읽기]를 누르세요.";
 
+    /// <summary>다른 곳에서 바뀐 맵핑을 (손댄 것이 없어) 다시 읽어 실었을 때의 상태줄.</summary>
+    public const string EXTERNAL_RELOADED_NOTICE = "다른 곳에서 바뀐 맵핑을 다시 읽었습니다.";
+
     /// <summary>권한 모듈 — v8.0 에서 <c>events</c> 가 아니라 <c>integrations</c> 다.</summary>
     public const string PermissionModule = "integrations";
 
@@ -366,13 +369,13 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         }
 
         // 사람이 손댄 것은 덮지 않는다 — 알리기만 하고 [다시 읽기]는 사람이 고른다(부대 편제 콘솔과 같은 규칙).
-        if (_board.IsDirty || Detail.IsDirty)
+        if (HasUnappliedWork)
         {
             StatusText = EXTERNAL_CHANGE_NOTICE;
             return;
         }
 
-        await ReloadAsync();
+        await RefreshFromServerAsync();
     }
 
     /// <inheritdoc/>
@@ -428,21 +431,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
 
             _listLoadFailed = false;
             _loadedOnce = true;
-            _allMappings.Clear();
-            _allMappings.AddRange(result.Value ?? Array.Empty<EventMappingReadDto>());
-            RebuildMappingList();
-
-            if (_selectedMapping is not null)
-            {
-                var again = Mappings.FirstOrDefault(m => m.Id == _selectedMapping.Id);
-                _selectedMapping = again;
-            }
-            _selectedMapping ??= Mappings.FirstOrDefault();
-            SeedForm(_selectedMapping?.Dto);
-            NotifyOfPropertyChange(nameof(SelectedMapping));
-            NotifyOfPropertyChange(nameof(HasMapping));
-            NotifyOfPropertyChange(nameof(IsBoardEnabled));
-            NotifyOfPropertyChange(nameof(MappingTitle));
+            ApplyMappingList(result.Value);
 
             await LoadBoardAsync();
             StatusText = $"맵핑 {Mappings.Count}건";
@@ -451,6 +440,72 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>받아 온 목록으로 왼쪽 목록 · 선택 · 폼을 다시 세운다(동기 — 중간에 사람이 끼어들 틈이 없다).</summary>
+    private void ApplyMappingList(IReadOnlyList<EventMappingReadDto>? mappings)
+    {
+        _allMappings.Clear();
+        _allMappings.AddRange(mappings ?? Array.Empty<EventMappingReadDto>());
+        RebuildMappingList();
+
+        if (_selectedMapping is not null)
+        {
+            var again = Mappings.FirstOrDefault(m => m.Id == _selectedMapping.Id);
+            _selectedMapping = again;
+        }
+        _selectedMapping ??= Mappings.FirstOrDefault();
+        SeedForm(_selectedMapping?.Dto);
+        NotifyOfPropertyChange(nameof(SelectedMapping));
+        NotifyOfPropertyChange(nameof(HasMapping));
+        NotifyOfPropertyChange(nameof(IsBoardEnabled));
+        NotifyOfPropertyChange(nameof(MappingTitle));
+    }
+
+    /// <summary>한 맵핑의 하위 3종을 읽어 온 결과 — 읽기만 하고 화면은 건드리지 않는다.</summary>
+    private sealed record BoardFetch(
+        MappingCallResult<IReadOnlyList<MappingCameraReadDto>> Cameras,
+        MappingCallResult<IReadOnlyList<MappingSpeakerReadDto>> Speakers,
+        MappingCallResult<IReadOnlyList<MappingLampReadDto>> Lamps)
+    {
+        public bool IsSuccess => Cameras.IsSuccess && Speakers.IsSuccess && Lamps.IsSuccess;
+    }
+
+    private async Task<BoardFetch> FetchBoardAsync(int mappingId, CancellationToken token = default)
+    {
+        var cameras = await _gateway.ListCamerasAsync(mappingId, token);
+        var speakers = await _gateway.ListSpeakersAsync(mappingId, token);
+        var lamps = await _gateway.ListLampsAsync(mappingId, token);
+        return new BoardFetch(cameras, speakers, lamps);
+    }
+
+    /// <summary>읽어 온 하위 3종을 보드에 싣는다(동기).</summary>
+    private void ApplyBoard(MappingListItemViewModel mapping, BoardFetch fetch)
+    {
+        var problems = new List<string>();
+        if (fetch.Cameras.IsSuccess) _board.Load(MappingActionKind.Camera, (fetch.Cameras.Value ?? Array.Empty<MappingCameraReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Cameras.Message);
+
+        if (fetch.Speakers.IsSuccess) _board.Load(MappingActionKind.Speaker, (fetch.Speakers.Value ?? Array.Empty<MappingSpeakerReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Speakers.Message);
+
+        if (fetch.Lamps.IsSuccess) _board.Load(MappingActionKind.Lamp, (fetch.Lamps.Value ?? Array.Empty<MappingLampReadDto>()).Select(MappingBoardRow.FromDto));
+        else problems.Add(fetch.Lamps.Message);
+
+        mapping.CameraCount = _board.LiveRows(MappingActionKind.Camera).Count;
+        mapping.SpeakerCount = _board.LiveRows(MappingActionKind.Speaker).Count;
+        mapping.LampCount = _board.LiveRows(MappingActionKind.Lamp).Count;
+
+        if (problems.Count > 0) StatusText = string.Join(" · ", problems.Distinct());
+    }
+
+    /// <summary>보드를 다시 그린다(행 · 팔레트 · 레일 개수 · 경고).</summary>
+    private void RedrawBoard()
+    {
+        RebuildBoardRows();
+        RebuildPalette();
+        RefreshRailCounts();
+        UpdateWarnings();
     }
 
     private async Task LoadBoardAsync()
@@ -475,42 +530,97 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         var stale = false;
         try
         {
-            var cameras = await _gateway.ListCamerasAsync(mapping.Id, token);
-            var speakers = await _gateway.ListSpeakersAsync(mapping.Id, token);
-            var lamps = await _gateway.ListLampsAsync(mapping.Id, token);
+            var fetch = await FetchBoardAsync(mapping.Id, token);
 
             // 늦게 도착한 응답이 새 선택을 덮어쓰지 않게 한다.
             // 🔴 여기서 그냥 return 하면 finally 가 돌아 IsBusy 를 끄고 목록을 다시 그린다 —
             //    더 새 조회가 진행 중인데 옛 결과로 화면을 세우는 것과 같다. 그래서 '헛걸음' 으로 표시하고 나간다.
             if (token.IsCancellationRequested || !ReferenceEquals(_loadToken, source)) { stale = true; return; }
 
-            var problems = new List<string>();
-            if (cameras.IsSuccess) _board.Load(MappingActionKind.Camera, (cameras.Value ?? Array.Empty<MappingCameraReadDto>()).Select(MappingBoardRow.FromDto));
-            else problems.Add(cameras.Message);
-
-            if (speakers.IsSuccess) _board.Load(MappingActionKind.Speaker, (speakers.Value ?? Array.Empty<MappingSpeakerReadDto>()).Select(MappingBoardRow.FromDto));
-            else problems.Add(speakers.Message);
-
-            if (lamps.IsSuccess) _board.Load(MappingActionKind.Lamp, (lamps.Value ?? Array.Empty<MappingLampReadDto>()).Select(MappingBoardRow.FromDto));
-            else problems.Add(lamps.Message);
-
-            mapping.CameraCount = _board.LiveRows(MappingActionKind.Camera).Count;
-            mapping.SpeakerCount = _board.LiveRows(MappingActionKind.Speaker).Count;
-            mapping.LampCount = _board.LiveRows(MappingActionKind.Lamp).Count;
-
-            if (problems.Count > 0) StatusText = string.Join(" · ", problems.Distinct());
+            ApplyBoard(mapping, fetch);
         }
         finally
         {
             if (!stale)
             {
                 IsBusy = false;
-                RebuildBoardRows();
-                RebuildPalette();
-                RefreshRailCounts();
-                UpdateWarnings();
+                RedrawBoard();
             }
         }
+    }
+
+    /// <summary>
+    /// 서버 알림 뒤 — <b>먼저 읽기만 하고</b>, 기다린 뒤 다시 확인하고, 화면과 <b>실제로 다를 때만</b> 한 번에(동기로) 싣는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>🔴 종전(헤디드 r16 SC-EMP-009 · 012): 알림마다 <see cref="ReloadAsync"/> 를 불렀다. 그 재조회는 서버를 기다리는 사이
+    /// 사람이 [◀ 해제] 한 것을 <c>LoadBoardAsync</c> 의 <c>_board.Clear()</c> 로 지웠다 — 알림은 대개 <b>우리 [적용] 의 메아리</b>였다.</para>
+    /// <para>이제 기다리는 동안 화면을 한 칸도 바꾸지 않는다. 다 읽은 뒤 손댄 것 · 적용 · 불러오기가 있으면 싣지 않는다.
+    /// 우리 적용의 메아리는 적용 끝의 재조회와 같은 상태라 "다르지 않음" 으로 끝난다 — 결과 문장도 그대로 남는다.</para>
+    /// </remarks>
+    private async Task RefreshFromServerAsync()
+    {
+        var mappingId = _selectedMapping?.Id;
+        var list = await _gateway.ListMappingsAsync();
+        var board = mappingId is int id ? await FetchBoardAsync(id) : null;
+        if (!list.IsSuccess || board is { IsSuccess: false }) return;   // 못 읽은 것을 바뀐 것으로 읽지 않는다
+
+        // ── 여기부터 동기 — 기다리는 사이 바뀐 것을 다시 본다 ──
+        if (_closed) return;
+        if (IsBusy || IsApplying || _selectedMapping?.Id != mappingId)
+        {
+            _externalChangeTask = _externalChange.Pulse();   // 다른 일이 끼어들었다 — 끝난 뒤 한 번 더
+            return;
+        }
+        if (HasUnappliedWork)
+        {
+            StatusText = EXTERNAL_CHANGE_NOTICE;
+            return;
+        }
+
+        var listChanged = !SameMappings(list.Value);
+        var boardChanged = board is not null && !SameBoard(board);
+        if (!listChanged && !boardChanged) return;   // 우리 적용의 메아리 · 이미 본 상태
+
+        ApplyMappingList(list.Value);
+        if (_selectedMapping is null) { _board.Clear(); RedrawBoard(); }
+        else if (_selectedMapping.Id == mappingId && board is not null)
+        {
+            _loadToken?.Cancel();                    // 혹시 남은 옛 조회가 이 결과를 덮지 않게
+            _board.Clear();
+            ApplyBoard(_selectedMapping, board);
+            RedrawBoard();
+        }
+        else
+        {
+            await LoadBoardAsync();                  // 고른 맵핑이 지워져 다른 맵핑으로 옮겨 갔다 — 그 보드를 읽는다
+        }
+        StatusText = EXTERNAL_RELOADED_NOTICE;
+    }
+
+    /// <summary>적용하지 않은 것이 있다 — 다시 읽으면 사라진다(보드 Draft · 맵핑 본체 편집 · 등록 폼).</summary>
+    private bool HasUnappliedWork => _board.IsDirty || Detail.Tracker.IsDirty || HasMappingEdit;
+
+    private bool SameMappings(IReadOnlyList<EventMappingReadDto>? fresh)
+    {
+        var now = fresh ?? Array.Empty<EventMappingReadDto>();
+        if (now.Count != _allMappings.Count) return false;
+        var shown = _allMappings.ToDictionary(m => m.Id, m => m.UpdatedAt);
+        return now.All(m => shown.TryGetValue(m.Id, out var at) && string.Equals(at, m.UpdatedAt, StringComparison.Ordinal));
+    }
+
+    private bool SameBoard(BoardFetch fetch)
+    {
+        var fresh = new HashSet<(MappingActionKind, int, string?)>();
+        foreach (var dto in fetch.Cameras.Value ?? Array.Empty<MappingCameraReadDto>()) fresh.Add((MappingActionKind.Camera, dto.ConfigId, dto.UpdatedAt));
+        foreach (var dto in fetch.Speakers.Value ?? Array.Empty<MappingSpeakerReadDto>()) fresh.Add((MappingActionKind.Speaker, dto.ConfigId, dto.UpdatedAt));
+        foreach (var dto in fetch.Lamps.Value ?? Array.Empty<MappingLampReadDto>()) fresh.Add((MappingActionKind.Lamp, dto.ConfigId, dto.UpdatedAt));
+
+        var shown = new HashSet<(MappingActionKind, int, string?)>();
+        foreach (var kind in MappingBoard.Kinds)
+            foreach (var row in _board.Rows(kind))
+                shown.Add((kind, row.ConfigId, row.UpdatedAt));
+        return shown.SetEquals(fresh);
     }
     #endregion
 

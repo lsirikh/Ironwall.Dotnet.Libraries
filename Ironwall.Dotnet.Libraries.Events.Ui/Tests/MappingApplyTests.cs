@@ -56,11 +56,17 @@ internal sealed class CountingGateway : IMappingWorkbenchGateway
         return MappingCallResult<T>.Ok(value());
     }
 
-    public Task<MappingCallResult<IReadOnlyList<EventMappingReadDto>>> ListMappingsAsync(CancellationToken token = default)
-        => Reply<IReadOnlyList<EventMappingReadDto>>("list-mappings", () => new[]
+    /// <summary>있으면 목록 조회가 이 문이 열릴 때까지 기다린다 — 조회가 도는 사이에 사람이 손대는 경합을 만든다.</summary>
+    public TaskCompletionSource? ListGate { get; set; }
+
+    public async Task<MappingCallResult<IReadOnlyList<EventMappingReadDto>>> ListMappingsAsync(CancellationToken token = default)
+    {
+        if (ListGate is { } gate) await gate.Task;
+        return await Reply<IReadOnlyList<EventMappingReadDto>>("list-mappings", () => new[]
         {
             new EventMappingReadDto { Id = 1, NameEvent = "울타리 침입", CategoryEventMapping = "FENCE_SENSOR_ONLY", DeviceGroupId = 3, Status = true, UpdatedAt = "T0" },
         });
+    }
 
     public Task<MappingCallResult<EventMappingReadDto>> GetMappingAsync(int mappingId, CancellationToken token = default)
         => Reply("get-mapping", () => new EventMappingReadDto
