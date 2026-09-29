@@ -301,9 +301,13 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     }
 
     /// <summary>
-    /// 종료 — 마우스 업 · 캡처 상실 · Esc · 분리 · 언로드가 전부 이리로 온다.
-    /// 순서: ① 플래그 ② 시각 복원 ③ 구독 해제 ④ 통지(드롭). 통지를 먼저 하면 그 안에서 재진입한다.
+    /// 종료 — 마우스 업 · 캡처 상실 · Esc · 분리 · 언로드 · 잡은 행 이탈이 전부 이리로 온다.
+    /// 순서: ① 플래그 ② 시각 복원 ③ 구독 해제 ④ 손잡이 캡처 · 끌기 해제 ⑤ 통지(드롭). 통지를 먼저 하면 그 안에서 재진입한다.
     /// </summary>
+    /// <remarks>
+    /// ④ 는 스스로 끝내는 길(분리 · Esc 직접 종료 · 틱에서 행 이탈)을 위한 것이다 — 손잡이가 아직 끌기 · 캡처를 쥐고 있으면
+    /// 다음 클릭을 먹는다. 끝남 구독은 ③ 에서 이미 풀었으므로 여기서 부르는 <see cref="Thumb.CancelDrag"/> 는 되돌아오지 않는다.
+    /// </remarks>
     private void FinishDrag(bool commit)
     {
         ExitSession();      // 드롭 통지(④) 전에 내린다 — 담당이 드롭 처리 중에 목록을 다시 읽을 수 있어야 한다
@@ -324,7 +328,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         _hoverIndex = -1;
         _refusedZone = null;
         _refusedIndex = -1;
-        ReleaseHandle();
+        var handle = _handle;
+        _handle = null;
         _pressedItem = null;
 
         // ② 시각 복원
@@ -343,8 +348,16 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
             _root.ClearValue(FrameworkElement.CursorProperty);
             _root = null;
         }
+        if (handle != null) handle.DragCompleted -= OnDragCompleted;
 
-        // ④ 통지
+        // ④ 손잡이 캡처 · 끌기 해제(보통 길에서는 Thumb 가 이미 풀었다 — 그때는 아무것도 하지 않는다)
+        if (handle != null)
+        {
+            if (handle.IsDragging) handle.CancelDrag();
+            else if (handle.IsMouseCaptured) handle.ReleaseMouseCapture();
+        }
+
+        // ⑤ 통지
         if (!wasDragging)
         {
             if (commit && pressedItem != null) SelectOnly(pressedItem);       // 데드존 미만 = 클릭
@@ -357,7 +370,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
             return;
         }
 
-        var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
+        var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? ClampToItems(zone, index) : -1);
         var handler = HandlerFor(zone);
         // 시각 · 구독은 위에서 이미 다 풀었다 — 담당(창)의 Drop 이 던져도 커널 상태는 깨끗하다. 예외는 삼키지 않는다.
         var canDrop = handler != null && SafeCanDrop(handler, payload, target);
@@ -376,7 +389,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         if (ReferenceEquals(zone, payload.Source) || payload.Source.IsDescendantOf(zone)) return;
         if (HandlerFor(zone) is not IDropRefusalHandler listener) return;
 
-        var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
+        var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? ClampToItems(zone, index) : -1);
         if (DragTrace.IsOn) DragTrace.Write($"[capture] refused zone={target.ZoneKey} index={target.InsertionIndex}");
         listener.Refused(payload, target);
     }
@@ -393,7 +406,14 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     #endregion
 
     #region - Helpers -
-    /// <summary>잡은 손잡이에서 손을 뗀다 — 끝남 구독을 풀고 잊는다(끝나는 모든 길이 여기로 온다).</summary>
+    /// <summary>
+    /// 삽입 인덱스를 <b>놓는 순간의</b> 항목 수로 자른다. 인덱스는 마지막 포인터 이동 때 잰 값이라, 그 뒤 목록이 줄었으면
+    /// (재조회 · 다른 사람의 변경) 범위를 넘는다 — 담당마다 자르게 두지 않고 커널이 보장한다.
+    /// </summary>
+    private static int ClampToItems(FrameworkElement zone, int index)
+        => zone is ItemsControl list && index > list.Items.Count ? list.Items.Count : index;
+
+    /// <summary>눌림 직후 끌기로 가지 못한 길(BeginDrag 실패) — 끝남 구독을 풀고 잊는다.</summary>
     private void ReleaseHandle()
     {
         if (_handle != null) _handle.DragCompleted -= OnDragCompleted;

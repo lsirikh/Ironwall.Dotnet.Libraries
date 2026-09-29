@@ -86,14 +86,19 @@ public sealed class DragGhostAdorner : Adorner
 
     /// <summary>
     /// 꾸미는 요소(<see cref="Adorner.AdornedElement"/>) 기준 좌표계에서, 실제로 잘리는 경계(레이어 가장자리)의 사각.
-    /// 원점이 음수일 수 있다 — 레이어는 꾸미는 요소의 왼쪽 · 위쪽으로도 펼쳐져 있다. 레이어를 못 찾으면 무한 — 클램프하지 않는다.
+    /// 원점이 음수일 수 있다 — 레이어는 꾸미는 요소의 왼쪽 · 위쪽으로도 펼쳐져 있다. 레이어를 못 찾거나 변환이 없으면 무한 — 클램프하지 않는다.
     /// </summary>
-    private Rect AvailableBounds()
+    /// <remarks>
+    /// 원점과 크기를 <b>같은 변환</b>으로 옮긴다(레이어 사각 전체를 꾸미는 요소 좌표로). 원점만 옮기고 크기는 레이어 단위로 두면
+    /// 사이에 배율 변환이 있을 때 경계가 배율만큼 어긋난다. 공개는 시험 · 진단용 읽기다.
+    /// </remarks>
+    public Rect AvailableBounds()
     {
         if (_layer == null) return new Rect(0, 0, double.PositiveInfinity, double.PositiveInfinity);
 
-        var origin = AdornedElement.TransformToVisual(_layer).Transform(new Point(0, 0));
-        return new Rect(-origin.X, -origin.Y, Math.Max(0, _layer.RenderSize.Width), Math.Max(0, _layer.RenderSize.Height));
+        var toAdorned = _layer.TransformToVisual(AdornedElement);
+        if (toAdorned == null) return new Rect(0, 0, double.PositiveInfinity, double.PositiveInfinity);
+        return toAdorned.TransformBounds(new Rect(new Point(0, 0), _layer.RenderSize));
     }
 }
 

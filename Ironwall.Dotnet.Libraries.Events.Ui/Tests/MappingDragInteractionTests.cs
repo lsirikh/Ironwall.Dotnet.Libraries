@@ -9,7 +9,11 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
+using Microsoft.Xaml.Behaviors;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
@@ -220,4 +224,113 @@ public class MappingDragInteractionTests
         if (error is not null) throw new InvalidOperationException("STA body failed", error);
         return result;
     }
+}
+
+/// <summary>
+/// 실제 목록(화면 밖 창 · 실제 키보드 초점)에서 — <c>Move</c> 로 맞추는 수정의 핵심 주장:
+/// 행을 옮겨도 <b>목록의 선택과 초점이 옮긴 행에 그대로</b> 남는다.
+/// </summary>
+/// <remarks>
+/// 뷰모델 선택(<c>SelectedBoardRows</c>)을 직접 채우지 않는다 — 사람과 같은 길(목록 선택 → 뷰의 동기화 처리기 → 뷰모델)로 간다.
+/// 초점은 프로세스 전역이라 다른 창 시험과 겹치지 않게 병렬을 끈 모음에 둔다.
+/// </remarks>
+[Collection(MappingRealListCollection.Name)]
+public class MappingBoardRealListTests
+{
+    [Fact]
+    public async Task should_keep_list_selection_and_focus_on_the_moved_row_when_alt_up_is_pressed_twice()
+    {
+        var gateway = new CountingGateway();
+        for (var i = 0; i < 3; i++)
+            gateway.Cameras.Add(new Ironwall.Dotnet.Libraries.Messages.Dto.Integrations.MappingCameraReadDto
+            {
+                ConfigId = 700 + i, EventMappingId = 1, IsEnable = true, UpdatedAt = "T0",
+                Camera = new Ironwall.Dotnet.Libraries.Messages.Dto.Integrations.MappingDeviceRefDto { Id = 370 + i, CategoryDevice = "Camera" },
+            });
+        var vm = new MappingWorkbenchViewModel(gateway, new StubDevices());
+        await vm.ReloadAsync();
+
+        var result = OnSta(() =>
+        {
+            var list = new ListBox { ItemsSource = vm.BoardRows, SelectionMode = SelectionMode.Extended, DisplayMemberPath = nameof(MappingRowViewModel.DeviceName) };
+            Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.SetKey(list, vm.BoardZoneKey);
+            Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.SetIsReorder(list, true);
+            Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.SetHandler(list, vm);
+            var keyboard = new Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.ReorderKeyboardBehavior { Handler = vm };
+            Interaction.GetBehaviors(list).Add(keyboard);
+            // 뷰(MappingWorkbenchView.OnBoardSelectionChanged)와 같은 동기화
+            list.SelectionChanged += (_, _) =>
+            {
+                vm.SelectedBoardRows.Clear();
+                foreach (var item in list.SelectedItems.OfType<MappingRowViewModel>()) vm.SelectedBoardRows.Add(item);
+                vm.OnSelectionChanged();
+            };
+
+            var window = new Window
+            {
+                Content = list, Width = 320, Height = 240, ShowInTaskbar = false, WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
+            };
+            window.Show();
+            try
+            {
+                window.Activate();
+                Pump();
+                var moving = vm.BoardRows[2];
+                list.SelectedItem = moving;                                   // 사람이 고른 것과 같은 길
+                var row = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(moving);
+                row.Focus();
+                Pump();
+
+                var first = keyboard.MoveSelection(-1);                        // Alt+↑ 와 같은 경로
+                Pump();
+                var second = keyboard.MoveSelection(-1);                       // 두 번째 — 예전 판은 여기서 쥘 행을 잃었다
+                Pump();
+
+                var container = list.ItemContainerGenerator.ContainerFromItem(moving) as ListBoxItem;
+                return (first, second, vm.BoardRows.IndexOf(moving),
+                        list.SelectedItems.Cast<object>().ToArray(), vm.SelectedBoardRows.ToArray(), moving,
+                        container?.IsKeyboardFocusWithin == true, container?.IsSelected == true);
+            }
+            finally { window.Close(); }
+        });
+
+        Assert.True(result.first);
+        Assert.True(result.second);
+        Assert.Equal(0, result.Item3);                                         // 맨 위까지 올라왔다
+        Assert.Equal(new object[] { result.moving }, result.Item4);           // 목록 선택 = 옮긴 행 하나
+        Assert.Equal(new[] { result.moving }, result.Item5);                  // 뷰모델 선택도 같다(상태줄 "선택 1건")
+        Assert.True(result.Item8, "옮긴 행이 화면에서 선택으로 보여야 한다");
+        Assert.True(result.Item7, "키보드 초점이 옮긴 행에 남아야 한다 — 그래야 Alt+↑ 를 연달아 누를 수 있다");
+    }
+
+    private static void Pump()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
+
+    private static T OnSta<T>(Func<T> body)
+    {
+        T result = default!;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try { result = body(); }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null) throw new InvalidOperationException("STA body failed", error);
+        return result;
+    }
+}
+
+/// <summary>실제 창 · 키보드 초점을 쓰는 맵핑 시험 — 초점은 프로세스 전역이라 다른 시험과 겹쳐 돌지 않게 한다.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class MappingRealListCollection
+{
+    public const string Name = "Mapping real list (window · keyboard focus)";
 }

@@ -32,9 +32,10 @@ public class CaptureDragLifecycleTests
     {
         public bool Accepts { get; set; }
         public List<string> Dropped { get; } = new();
+        public List<int> DroppedIndexes { get; } = new();
         public List<string> Refused { get; } = new();
         public bool CanDrop(DragPayload payload, DropTarget target) => Accepts && target.ZoneKey == "target";
-        public void Drop(DragPayload payload, DropTarget target) => Dropped.Add(target.ZoneKey);
+        public void Drop(DragPayload payload, DropTarget target) { Dropped.Add(target.ZoneKey); DroppedIndexes.Add(target.InsertionIndex); }
         void IDropRefusalHandler.Refused(DragPayload payload, DropTarget target) => Refused.Add(target.ZoneKey);
     }
 
@@ -69,6 +70,23 @@ public class CaptureDragLifecycleTests
             handle.RaiseEvent(new DragDeltaEventArgs(0, 0));
         }
 
+        /// <summary>Thumb 을 거치지 않은 시작(미리보기 · 갤러리 재현과 같은 길) — 손잡이는 끌기 · 캡처를 쥐지 않는다.</summary>
+        public void StartWithoutThumb(DragHandle handle)
+        {
+            Pointer = Center(handle);
+            handle.RaiseEvent(new DragStartedEventArgs(0, 0));
+        }
+
+        public void Escape()
+            => Window.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(Window), Environment.TickCount, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+
+        public void Reload()
+        {
+            var fresh = Items.ToList();
+            Items.Clear();
+            foreach (var item in fresh) Items.Add(item);
+        }
+
         public void Release(DragHandle handle)
         {
             handle.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) { RoutedEvent = UIElement.MouseUpEvent });
@@ -89,15 +107,14 @@ public class CaptureDragLifecycleTests
             stage.MoveTo(handle, stage.Center(stage.Target));
             var during = (stage.DragAdorners().Count, DragSession.IsActive);
 
-            var fresh = stage.Items.ToList();
-            stage.Items.Clear();
-            foreach (var item in fresh) stage.Items.Add(item);
+            stage.Reload();
             Pump();                                     // 캡처 재평가 · 레이아웃은 디스패처가 돈다(실앱과 같다)
 
-            return (during, stage.DragAdorners().Count, DragSession.IsActive, stage.Window.ReadLocalValue(FrameworkElement.CursorProperty) == DependencyProperty.UnsetValue);
+            return (during, stage.DragAdorners().Count, DragSession.IsActive, stage.Window.ReadLocalValue(FrameworkElement.CursorProperty) == DependencyProperty.UnsetValue, stage.Handler.Dropped.Count);
         });
 
         Assert.Equal((1, true), after.during);          // 전제 — 실제로 끌고 있었다(고스트 1)
+        Assert.Equal(0, after.Item5);                   // 받는 칸 위였어도 사라진 끌기는 드롭이 아니다(취소)
         Assert.Equal(0, after.Item2);                   // 고스트 · 삽입선이 남지 않는다
         Assert.False(after.Item3);                      // 다른 콘솔의 다시 읽기를 영영 막지 않는다
         Assert.True(after.Item4);                       // 창 커서가 SizeAll 로 남지 않는다
@@ -163,11 +180,13 @@ public class CaptureDragLifecycleTests
             DropZone.SetKey(stage.Viewer, "source");
             stage.Press(handle);
             stage.MoveTo(handle, new Point(stage.Pointer.X, stage.Pointer.Y + 20));
+            var under = DragHitTest.ZoneFrom(DragHitTest.Top(stage.Window, stage.Pointer));
             stage.Release(handle);
-            return string.Join(",", stage.Handler.Refused);
+            return (ReferenceEquals(under, stage.Viewer), string.Join(",", stage.Handler.Refused));
         }, accepts: false);
 
-        Assert.Equal("", refused);
+        Assert.True(refused.Item1, "전제 — 놓는 자리가 출발 목록을 품은 드롭존(source) 위여야 한다");
+        Assert.Equal("", refused.Item2);
     }
 
     [Fact]
@@ -184,6 +203,166 @@ public class CaptureDragLifecycleTests
 
         Assert.Equal(("target", 0, false), dropped);
     }
+
+    #region - 스스로 끝내는 길(적대 검토 79de32d3) -
+    [Fact]
+    public void should_finish_on_the_auto_scroll_tick_when_the_held_row_left_the_list_without_any_completion()
+    {
+        // 손잡이가 끌기를 쥐지 않은 시작(미리보기 재현과 같은 길)이라 행이 빠져도 DragCompleted 가 오지 않는다 —
+        // 목록 가장자리에서 도는 오토스크롤 틱이 "잡은 행이 목록을 떠났다" 를 보고 스스로 끝내야 한다.
+        var after = OnStage((stage, handle) =>
+        {
+            DropZone.SetKey(stage.Source, "source-list");
+            DropZone.SetIsReorder(stage.Source, true);
+            stage.StartWithoutThumb(handle);
+            stage.MoveTo(handle, new Point(stage.Pointer.X, stage.Pointer.Y + 20));
+            var bottom = stage.Source.TranslatePoint(new Point(stage.Source.ActualWidth / 2, stage.Source.ActualHeight - 4), stage.Window);
+            stage.MoveTo(handle, bottom);                // 아래 가장자리 띠 — 틱이 돈다
+            var during = stage.DragAdorners().Count;
+
+            stage.Reload();                              // 끄는 도중 다시 그려짐 — 델타는 더 오지 않는다
+            Wait(TimeSpan.FromMilliseconds(250));        // 오토스크롤 틱(30ms)이 몇 번 돌 시간
+
+            return (during, stage.DragAdorners().Count, DragSession.IsActive, stage.Handler.Dropped.Count);
+        });
+
+        Assert.True(after.during > 0, "전제 — 끌고 있었다");
+        Assert.Equal((0, false, 0), (after.Item2, after.Item3, after.Item4));
+    }
+
+    [Fact]
+    public void should_finish_on_escape_even_when_the_thumb_no_longer_holds_the_drag()
+    {
+        var after = OnStage((stage, handle) =>
+        {
+            stage.StartWithoutThumb(handle);            // Thumb 은 끌기 상태가 아니다 → CancelDrag 는 아무것도 내지 않는다
+            stage.MoveTo(handle, new Point(stage.Pointer.X - 20, stage.Pointer.Y));
+            stage.MoveTo(handle, stage.Center(stage.Target));
+            var during = stage.DragAdorners().Count;
+            stage.Escape();
+            return (during, stage.DragAdorners().Count, DragSession.IsActive, stage.Handler.Dropped.Count);
+        }, accepts: true);
+
+        Assert.True(after.during > 0, "전제 — 끌고 있었다");
+        Assert.Equal((0, false, 0), (after.Item2, after.Item3, after.Item4));
+    }
+
+    [Fact]
+    public void should_finish_once_and_commit_nothing_when_escape_cancels_a_real_thumb_drag()
+    {
+        // Esc → CancelDrag 가 안쪽에서 DragCompleted(취소)를 두 번 내고, 그 뒤 Esc 처리기가 직접 끝내기를 한 번 더 시도한다.
+        var after = OnStage((stage, handle) =>
+        {
+            var finishes = 0;
+            handle.DragCompleted += (_, _) => finishes++;
+            stage.Press(handle);
+            stage.MoveTo(handle, new Point(stage.Pointer.X - 20, stage.Pointer.Y));
+            stage.MoveTo(handle, stage.Center(stage.Target));
+            stage.Escape();
+            stage.Release(handle);                      // 뒤늦은 뗌 — 이미 끝났으니 아무 일도 없어야 한다
+            return (finishes, stage.DragAdorners().Count, DragSession.IsActive, stage.Handler.Dropped.Count + stage.Handler.Refused.Count, handle.IsDragging, Mouse.Captured == null);
+        }, accepts: true);
+
+        // 전제 — WPF Thumb.CancelDrag 는 캡처를 풀며 안쪽에서 CancelDrag 를 다시 불러 DragCompleted 를 두 번 낸다.
+        Assert.Equal(2, after.finishes);
+        // 그래도 끝내기는 한 번 — 드롭 · 거절 통지 0, 고스트 · 세션 · 끌기 · 캡처 전부 풀림.
+        Assert.Equal((0, false, 0, false, true), (after.Item2, after.Item3, after.Item4, after.Item5, after.Item6));
+    }
+
+    [Fact]
+    public void should_commit_once_when_the_completion_arrives_twice()
+    {
+        var dropped = OnStage((stage, handle) =>
+        {
+            stage.Press(handle);
+            stage.MoveTo(handle, new Point(stage.Pointer.X - 20, stage.Pointer.Y));
+            stage.MoveTo(handle, stage.Center(stage.Target));
+            stage.Release(handle);
+            handle.RaiseEvent(new DragCompletedEventArgs(0, 0, false));
+            return stage.Handler.Dropped.Count;
+        }, accepts: true);
+
+        Assert.Equal(1, dropped);
+    }
+
+    [Fact]
+    public void should_release_the_thumb_capture_when_the_drag_finishes_on_its_own()
+    {
+        // 분리(창이 행동을 떼어 냄)로 스스로 끝낸다 — 손잡이가 끌기 · 캡처를 계속 쥐면 다음 클릭을 먹는다(규칙 ④).
+        var after = OnStage((stage, handle) =>
+        {
+            stage.Press(handle);
+            stage.MoveTo(handle, new Point(stage.Pointer.X - 20, stage.Pointer.Y));
+            stage.MoveTo(handle, stage.Center(stage.Target));
+            var held = (handle.IsDragging, handle.IsMouseCaptured);
+            Interaction.GetBehaviors(stage.Source).Clear();
+            return (held, handle.IsDragging, Mouse.Captured == null, stage.DragAdorners().Count, DragSession.IsActive, stage.Handler.Dropped.Count);
+        }, accepts: true);
+
+        Assert.Equal((true, true), after.held);          // 전제 — Thumb 이 실제로 끌기 · 캡처를 쥐고 있었다
+        Assert.False(after.Item2);
+        Assert.True(after.Item3);
+        Assert.Equal((0, false, 0), (after.Item4, after.Item5, after.Item6));
+    }
+
+    [Fact]
+    public void should_clamp_the_insertion_index_to_the_current_item_count_when_the_list_shrank_before_the_drop()
+    {
+        // 맨 끝(3) 에 놓으려는 사이 목록이 줄었다(재조회) — 담당이 받는 인덱스는 지금 항목 수를 넘지 않는다.
+        var indexes = OnStage((stage, handle) =>
+        {
+            DropZone.SetKey(stage.Source, "target");
+            DropZone.SetIsReorder(stage.Source, true);
+            DropZone.SetHandler(stage.Source, stage.Handler);
+            stage.Press(handle);
+            stage.MoveTo(handle, new Point(stage.Pointer.X, stage.Pointer.Y + 20));
+            var last = (FrameworkElement)stage.Source.ItemContainerGenerator.ContainerFromIndex(2);
+            stage.MoveTo(handle, last.TranslatePoint(new Point(last.ActualWidth / 2, last.ActualHeight * 0.9), stage.Window));
+            stage.Items.RemoveAt(2);
+            stage.Items.RemoveAt(1);                    // 잡은 행(0)은 그대로 — 그 뒤 포인터는 움직이지 않았다
+            stage.Window.UpdateLayout();
+            stage.Release(handle);
+            return (stage.Items.Count, string.Join(",", stage.Handler.DroppedIndexes));
+        }, accepts: true);
+
+        Assert.Equal((1, "1"), indexes);
+    }
+
+    [Fact]
+    public void should_measure_the_ghost_bounds_through_a_scale_transform()
+    {
+        // 레이어(600×300) 안, (100,50) 에 두 배로 키운 요소 — 요소 좌표로는 레이어가 (-50,-25) 에서 300×150 이다.
+        var bounds = OnSta(() =>
+        {
+            var adorned = new Border { Width = 40, Height = 20, RenderTransform = new ScaleTransform(2, 2), Background = Brushes.Gray };
+            Canvas.SetLeft(adorned, 100);
+            Canvas.SetTop(adorned, 50);
+            var canvas = new Canvas { Width = 600, Height = 300 };
+            canvas.Children.Add(adorned);
+            var window = new Window
+            {
+                Content = new AdornerDecorator { Child = canvas }, SizeToContent = SizeToContent.WidthAndHeight,
+                ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
+            };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                var layer = AdornerLayer.GetAdornerLayer(adorned)!;
+                var ghost = new DragGhostAdorner(adorned, layer, "끄는 행", 1);
+                return (ghost.AvailableBounds(), layer.RenderSize);
+            }
+            finally { window.Close(); }
+        });
+
+        Assert.Equal(new Size(600, 300), bounds.RenderSize);   // 전제 — 레이어 크기
+        Assert.Equal(-50, bounds.Item1.X, 3);
+        Assert.Equal(-25, bounds.Item1.Y, 3);
+        Assert.Equal(300, bounds.Item1.Width, 3);
+        Assert.Equal(150, bounds.Item1.Height, 3);
+    }
+    #endregion
 
     /// <summary>
     /// 왼쪽 = 놓을 칸(Border 드롭존) · 오른쪽 = ScrollViewer 안의 출발 목록. 전체를 AdornerDecorator 가 감싼다(콘솔 셸과 같은 모양).
@@ -237,6 +416,16 @@ public class CaptureDragLifecycleTests
                 window.Close();
             }
         });
+
+    private static void Wait(TimeSpan span)
+    {
+        // 타이머로 도는 오토스크롤을 기다린다 — 디스패처를 돌리며(스레드를 재우지 않는다).
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = span };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+        timer.Start();
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+    }
 
     private static void Pump()
     {
