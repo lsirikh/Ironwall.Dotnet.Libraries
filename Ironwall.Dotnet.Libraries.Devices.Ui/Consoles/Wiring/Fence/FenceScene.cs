@@ -87,7 +87,8 @@ public static class FenceScene
             o.Add(Text(FenceInk.Axis, lp, "지면 단면 · 펜스 안쪽", 10, FenceTextAnchor.Start));
         }
 
-        var posts = Posts(world, x0, x1);
+        // 기둥 LOD — 화면 간격이 좁아 빗살이 되면 기둥 센서의 기둥 · 양 끝 · 간격을 지키는 기둥만(철망은 이어진다). 확대하면 다 돌아온다.
+        var posts = ThinPosts(Posts(world, x0, x1), PostSensorXs(world), zoom);
         if (p.K > 0.02)
             foreach (var x in posts)
                 o.Add(Seg(FenceInk.Grid, p.P(x, 0, 8), p.P(x, 0, Math.Min(gz1, 120)), 0.5 * p.K));
@@ -207,6 +208,47 @@ public static class FenceScene
             : FenceSlotLayout.MountPosts(sensors, half, world.PostM * u, x0 + 2 * u, x1 - 2 * u);
     }
 
+    /// <summary>
+    /// 기둥이 화면에서 이보다 촘촘하면 솎는다(px) — 2.5m 펜스센서 칸이 맞춤 배율에서 빗살이 되던 문제.
+    /// 14px 로는 64% 맞춤(칸 18px)이 그대로 빗살이었다(재촬영 실측) — 28px 이면 64% 에서 한 칸 걸러, 100% 에서는 전부 보인다.
+    /// </summary>
+    public const double MIN_POST_SPACING_PX = 28;
+
+    /// <summary>기둥에 다는 센서(스마트 · 복합 · 모름)의 x — 솎아도 남길 기둥.</summary>
+    public static IEnumerable<double> PostSensorXs(FenceWorld world)
+        => world.Seq.Where(k => world.Sensors.TryGetValue(k, out var s) ? WiringTopology.IsPostMounted(s.Type) : true).Select(k => world.X[k]);
+
+    /// <summary>
+    /// 기둥 LOD(순수) — 이웃 기둥의 화면 간격(세계 간격 × <paramref name="zoom"/>)이 모두 <paramref name="minPx"/> 이상이면 그대로.
+    /// 아니면 <b>기둥 센서의 기둥</b>(<paramref name="keep"/>) · 양 끝은 늘 남기고, 나머지는 왼쪽부터 앞 기둥과 다음 필수 기둥 둘 다에서
+    /// <paramref name="minPx"/> 이상 떨어진 것만 남긴다(몇 개 걸러 하나).
+    /// </summary>
+    public static IReadOnlyList<double> ThinPosts(IReadOnlyList<double> posts, IEnumerable<double> keep, double zoom, double minPx = MIN_POST_SPACING_PX)
+    {
+        var sorted = (posts ?? Array.Empty<double>()).OrderBy(x => x).ToList();
+        if (sorted.Count < 3) return sorted;
+        var min = minPx / SafeZoom(zoom);
+        var dense = false;
+        for (var i = 1; i < sorted.Count && !dense; i++) dense = sorted[i] - sorted[i - 1] < min - 1e-9;
+        if (!dense) return sorted;
+
+        var keepXs = (keep ?? Enumerable.Empty<double>()).ToList();
+        bool Must(double x) => keepXs.Any(k => Math.Abs(k - x) < 0.5);
+        var must = sorted.Select((x, i) => i == 0 || i == sorted.Count - 1 || Must(x)).ToList();
+
+        var result = new List<double>();
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var x = sorted[i];
+            if (must[i]) { result.Add(x); continue; }
+            if (result.Count > 0 && x - result[^1] < min) continue;
+            var next = sorted.Skip(i + 1).Where((_, j) => must[i + 1 + j]).DefaultIfEmpty(double.PositiveInfinity).First();
+            if (next - x < min) continue;
+            result.Add(x);
+        }
+        return result;
+    }
+
     /// <summary>땅 표기 "펜스 외부 · 펜스 내부"(FR-20)를 오른쪽 끝에서 얼마나 바깥에 두나(세계 단위).</summary>
     public const double SIDE_LABEL_LEAD = 36;
 
@@ -323,7 +365,7 @@ public static class FenceScene
 
         // 보는 쪽(FR-20) — 뒤를 보면 몸체를 기둥 반대쪽으로 민다. 탐지 부채꼴은 정적 층(땅)에 그린다 — 칩 층에 두면 A/B 알약을 가린다.
         var q = s.IsBackFacing ? p with { ZOffset = BackFacingOffset(p) } : p;
-        Point? tagAt = null;
+        Rect? plate = null;
 
         switch (s.Kind)
         {
@@ -335,8 +377,7 @@ public static class FenceScene
                 Box(o, q, 0, H + 24, H + 48, de / 2, zf, 38, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(-11, H + 36, zf) }, 4, 4));
                 var pl = q.P(5, H + 36, zf);
-                Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
-                tagAt = q.P(19, H + 48, zf);
+                plate = Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 bb = new[] { q.P(-19, H + 48, de / 2), q.P(19, H + 48, de / 2), q.P(-19, H + 24, zf), q.P(19, H + 24, zf), q.P(19, H + 48, 0) };
                 break;
             }
@@ -360,7 +401,7 @@ public static class FenceScene
                 o.Add(Seg(FenceInk.RodRib, p.P(0, 2, UZ), p.P(0, 13, UZ)));
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.UgCap, new[] { p.P(0, 0, UZ) }, 8, 3 + 2 * k));
                 var pl = p.P(0, 22, UZ);
-                Plate(o, pl, 22, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
+                plate = Plate(o, pl, 22, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
                 bb = new[] { p.P(-12, 32, UZ), p.P(12, 32, UZ), p.P(-9, -48, UZ), p.P(9, -48, UZ) };
                 break;
             }
@@ -373,22 +414,22 @@ public static class FenceScene
                 Box(o, q, 0, 92, 99, zb0, zh, 32, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(0, 58, zb1) }, 3.2, 3.2));
                 var pl = q.P(0, 78, zb1);
-                Plate(o, pl, 20, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
-                tagAt = q.P(13, 66, zb1);
+                plate = Plate(o, pl, 20, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };
                 break;
             }
         }
 
-        // "뒤" 표지(FR-20) — 번호판 오른쪽 아래 작은 판. 색이 아니라 글자로 말한다(주 글자라 줌에 맞서 읽히게 키운다).
-        if (s.IsBackFacing && tagAt is { } t)
+        // 번호판은 작은 배율에서 커진다(Plate) — 적중 사각형(= 칩 배치 사각형)이 그것을 담아야 잘리지 않는다.
+        if (plate is { } pr) bb = bb.Append(pr.TopLeft).Append(pr.BottomRight).ToArray();
+
+        // "뒤" 표지(FR-20) — 번호판 <b>왼쪽</b>에 붙인 작은 판(번호판과 겹치지 않는다). 색이 아니라 글자로 말한다(주 글자라 줌에 맞서 키운다).
+        if (s.IsBackFacing && plate is { } pl2)
         {
-            var size = Math.Max(10, MIN_TEXT / SafeZoom(zoom));
-            var w = size + 7;
-            var h = size + 5;
-            var tag = new Rect(t.X - w / 2, t.Y - h / 2, w, h);
+            var tag = BackTagRect(pl2, zoom);
+            var size = tag.Height - 5;
             o.Add(RectShape(FenceInk.FacingTag, tag, 3));
-            o.Add(Text(FenceInk.FacingTagText, new Point(t.X, t.Y + size * 0.36), "뒤", size));
+            o.Add(Text(FenceInk.FacingTagText, new Point(tag.X + tag.Width / 2, tag.Y + tag.Height / 2 + size * 0.36), "뒤", size));
             bb = bb.Append(tag.TopLeft).Append(tag.BottomRight).ToArray();
         }
 
@@ -405,9 +446,11 @@ public static class FenceScene
         var o = new List<FenceShape>(10);
         var n = members.Count;
         var title = $"펜스센서 ×{n}";
+        var range = $"{members[0].Big(shape)}–{members[^1].Big(shape)}";
         var titleSize = Math.Max(15, MIN_TEXT / SafeZoom(zoom));
-        var w = Math.Max(EstimateWidth(title, titleSize) + 26, 70);
-        var h = Math.Max(30, titleSize + 15);
+        var subSize = Math.Max(11, MIN_TEXT / SafeZoom(zoom));
+        var w = Math.Max(Math.Max(EstimateWidth(title, titleSize), EstimateWidth(range, subSize)) + 26, 70);
+        var h = Math.Max(40, titleSize + subSize + 16);
         var c = p.P(0, 66, p.De / 2 + 4);
         var x = c.X - w / 2;
         var y = c.Y - h / 2;
@@ -417,9 +460,10 @@ public static class FenceScene
         o.Add(RectShape(FenceInk.GroupBack, new Rect(x + 8, y - 8, w, h), 15));
         o.Add(RectShape(FenceInk.GroupBack, new Rect(x + 4, y - 4, w, h), 15));
         o.Add(RectShape(FenceInk.GroupBody, new Rect(x, y, w, h), 15));
-        o.Add(Text(FenceInk.GroupText, new Point(c.X, c.Y + titleSize * 0.36), title, titleSize));
-        // 첫–끝 번호는 카드 위(겹 카드 뒤쪽) — 아래는 체인 선 · 거리 축과 부딪친다.
-        o.Add(Text(FenceInk.GroupSub, new Point(c.X + 4, y - 12), $"{members[0].Big(shape)}–{members[^1].Big(shape)}", 11));
+        // 첫–끝 번호는 카드 <b>안</b> 둘째 줄 — 카드 밖에 두면 기둥 · 철망 무늬 위라 읽히지 않았다(실측 · 2026-09-29).
+        var top = y + (h - titleSize - subSize - 4) / 2;
+        o.Add(Text(FenceInk.GroupText, new Point(c.X, top + titleSize * 0.86), title, titleSize));
+        o.Add(Text(FenceInk.GroupSub, new Point(c.X, top + titleSize + 4 + subSize * 0.82), range, subSize));
         if (members.Any(m => m.IsChanged))
             o.Add(Poly(FenceInk.Draft, new Point(x + w - 14, y), new Point(x + w - 4, y), new Point(x + w, y + 4), new Point(x + w, y + 14)));
         if (selected) o.Add(RectShape(FenceInk.Select, new Rect(x - 5, y - 9, w + 18, h + 30), 16));
@@ -548,6 +592,7 @@ public static class FenceScene
     /// <summary>주 글자 — 읽을 수 있어야 하는 것. 그 밖은 보조.</summary>
     public static bool IsPrimaryText(FenceInk ink) => ink is FenceInk.Number or FenceInk.NumberSmall or FenceInk.FenceLabel
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert or FenceInk.FacingTagText
+        or FenceInk.GroupSub       // 묶음 카드 안 첫–끝 번호
         or FenceInk.SideLabel;     // "펜스 외부 · 내부" — 방향 부채꼴을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
 
     private static double SafeZoom(double zoom) => zoom > 0.05 ? zoom : 0.05;
@@ -580,8 +625,17 @@ public static class FenceScene
     public static double EstimateWidth(string text, double px)
         => (text ?? string.Empty).Sum(ch => ch >= 0x1100 ? px : ch == ' ' ? px * 0.3 : px * 0.58);
 
+    /// <summary>"뒤" 표지 사각형 — 번호판 왼쪽에 2 만큼 띄워 붙이고 세로 가운데를 맞춘다(겹침 없음 · 시험 대상).</summary>
+    public static Rect BackTagRect(Rect plate, double zoom)
+    {
+        var size = Math.Max(10, MIN_TEXT / SafeZoom(zoom));
+        var w = size + 7;
+        var h = size + 5;
+        return new Rect(plate.Left - 2 - w, plate.Top + plate.Height / 2 - h / 2, w, h);
+    }
+
     /// <summary>번호판 — 줌이 작아 번호를 키워야 하면(<see cref="MIN_TEXT"/>) 판도 같은 비율로 키운다.</summary>
-    private static void Plate(List<FenceShape> o, Point at, double w, double h, string big, FenceInk numberInk, double size, double baseline, FenceSensor s,
+    private static Rect Plate(List<FenceShape> o, Point at, double w, double h, string big, FenceInk numberInk, double size, double baseline, FenceSensor s,
                               double zoom)
     {
         var f = Math.Max(1, MIN_TEXT / (size * SafeZoom(zoom)));
@@ -589,6 +643,7 @@ public static class FenceScene
         o.Add(RectShape(FenceInk.Plate, new Rect(at.X - w / 2, at.Y - h / 2, w, h), 2.5 * f));
         o.Add(Text(numberInk, new Point(at.X, at.Y + baseline), big, size));
         Corners(o, at.X, at.Y, w, h, s);
+        return new Rect(at.X - w / 2, at.Y - h / 2, w, h);
     }
 
     /// <summary>모서리 표지 — 제안 = 왼쪽 위 삼각(정보) · 미저장 = 오른쪽 위 삼각(경고) · 색이 아니라 자리로 가른다.</summary>

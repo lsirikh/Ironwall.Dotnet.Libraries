@@ -160,13 +160,13 @@ public static class TsvPaste
 
             if (number < 1 || number > SensorTableEdit.MAX_NUMBER)
             {
-                rows.Add(new PasteRow(line, SensorFacts.Empty, $"번호 {number} 가 범위(1 ~ {SensorTableEdit.MAX_NUMBER}) 밖입니다"));
+                rows.Add(new PasteRow(line, SensorFacts.Empty, WiringValidation.Particles($"번호 {number}이(가) 범위(1 ~ {SensorTableEdit.MAX_NUMBER}) 밖입니다")));
                 continue;
             }
 
             if (!taken.Add(number))
             {
-                rows.Add(new PasteRow(line, SensorFacts.Empty, $"번호 {number} 는 이미 있습니다"));
+                rows.Add(new PasteRow(line, SensorFacts.Empty, WiringValidation.Particles($"번호 {number}은(는) 이미 있습니다")));
                 continue;
             }
 

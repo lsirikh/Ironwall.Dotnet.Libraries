@@ -186,8 +186,8 @@ public class WiringValidationTests
     {
         var hint = WiringValidation.FaultHint(Ring(6));
 
-        Assert.Contains("1차 4~5 → 북측 4구간 센서 와 북측 5구간 센서 사이", hint);
-        Assert.Contains("2차 4~5 → 북측 3구간 센서 와 북측 2구간 센서 사이", hint);   // B 쪽에서: 2차 4 = 위치 3 · 2차 5 = 위치 2
+        Assert.Contains("1차 4~5 → 북측 4구간 센서와 북측 5구간 센서 사이", hint);
+        Assert.Contains("2차 4~5 → 북측 3구간 센서와 북측 2구간 센서 사이", hint);   // B 쪽에서: 2차 4 = 위치 3 · 2차 5 = 위치 2
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class WiringValidationTests
     {
         var board = Ring(6);
 
-        Assert.Equal("1차 2~3 → 북측 2구간 센서 와 북측 3구간 센서 사이", WiringValidation.DescribeFaultSection(board, 1, 2, 3));
+        Assert.Equal("1차 2~3 → 북측 2구간 센서와 북측 3구간 센서 사이", WiringValidation.DescribeFaultSection(board, 1, 2, 3));
         Assert.Equal("1차 2번 = 북측 2구간 센서", WiringValidation.DescribeFaultSection(board, 1, 2, 2));
     }
 
@@ -212,7 +212,7 @@ public class WiringValidationTests
 
         // 2차 n = 체인 위치 N+1−n — 같은 체인을 반대쪽 포트에서 센다.
         Assert.Equal("2차 1번 = 북측 6구간 센서", WiringValidation.DescribeFaultSection(board, 2, 1, 1));
-        Assert.Equal("2차 2~3 → 북측 5구간 센서 와 북측 4구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 2, 3));
+        Assert.Equal("2차 2~3 → 북측 5구간 센서와 북측 4구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 2, 3));
         Assert.Equal("2차 6번 = 북측 1구간 센서", WiringValidation.DescribeFaultSection(board, 2, 6, 6));
     }
 
@@ -223,7 +223,7 @@ public class WiringValidationTests
         board.Place(board.Rows[0].Key, 2, 0);
         board.Place(board.Rows[1].Key, 2, 1);
 
-        Assert.Equal("2차 1~2 → 북측 1구간 센서 와 북측 2구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 1, 2));
+        Assert.Equal("2차 1~2 → 북측 1구간 센서와 북측 2구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 1, 2));
         Assert.Contains("없어", WiringValidation.DescribeFaultSection(board, 1, 1, 1));
     }
 

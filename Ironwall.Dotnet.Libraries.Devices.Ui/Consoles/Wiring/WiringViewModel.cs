@@ -409,6 +409,16 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     public bool IsRing => _board.Shape == WiringShape.Ring;
     public bool IsTwoBranch => _board.Shape == WiringShape.TwoBranch;
 
+    /// <summary>"고장 구간과의 관계" 설명 — 결선 모양마다 다르다(링 = 양 끝 · 가지 = L/R 확인 중 O-6 · 한 줄 = 제어기 쪽이 1).</summary>
+    public string FaultRelationText => _board.Shape switch
+    {
+        WiringShape.Ring => "링에서 1차 번호는 Sensor A 쪽 끝에서, 2차 번호는 Sensor B 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
+                            + "결선을 저장해 두면 장애 화면이 \"1차 4~5\" 같은 구간을 센서 이름으로 보여 줄 수 있습니다.",
+        WiringShape.TwoBranch => "양쪽 가지는 제어기에서 바깥으로 셉니다 — 왼쪽 가지 L n · 오른쪽 가지 R n. "
+                                 + "장애 고장 구간의 1차/2차 번호와 어느 가지가 대응하는지는 확인 중입니다(O-6).",
+        _ => "한 줄은 제어기 쪽이 1입니다 — 장애 고장 구간 번호는 제어기에서 센 자리입니다.",
+    };
+
     /// <summary>두 번째 목록(오른쪽 가지)을 보이는가 — 양쪽 가지만.</summary>
     public bool ShowSecondLine => _board.LineCount > 1;
 
@@ -903,7 +913,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             return;
         }
         SyncAll();
-        StatusText = $"{name} 을(를) 결선에서 뺐습니다 — 뒤 센서는 한 칸씩 당겨집니다.";
+        StatusText = WiringValidation.Particles($"{name}을(를) 결선에서 뺐습니다 — 뒤 센서는 한 칸씩 당겨집니다.");
     }
 
     /// <summary>키보드 폴백 — 고른 칸의 센서를 빼기(Delete).</summary>
@@ -1052,7 +1062,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             }
             SyncAll();
             StatusText = removed.Count == 1
-                ? $"{removed[0].Display} 을(를) 결선에서 뺐습니다 — 뒤 센서는 당겨집니다."
+                ? WiringValidation.Particles($"{removed[0].Display}을(를) 결선에서 뺐습니다 — 뒤 센서는 당겨집니다.")
                 : $"{removed.Count}대를 결선에서 뺐습니다 — 뒤 센서는 당겨집니다.";
             return;
         }

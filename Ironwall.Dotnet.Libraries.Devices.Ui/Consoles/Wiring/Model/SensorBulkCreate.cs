@@ -40,7 +40,7 @@ public static class SensorBulkCreate
         if (string.IsNullOrWhiteSpace(spec.NameRule)) return "이름 규칙이 비어 있습니다.";
 
         var last = (long)spec.StartNumber + (long)spec.Step * (spec.Count - 1);
-        if (last > SensorTableEdit.MAX_NUMBER) return $"마지막 번호가 {SensorTableEdit.MAX_NUMBER} 을 넘습니다 — 개수나 시작 번호를 줄여 주세요.";
+        if (last > SensorTableEdit.MAX_NUMBER) return WiringValidation.Particles($"마지막 번호가 {SensorTableEdit.MAX_NUMBER}을(를) 넘습니다 — 개수나 시작 번호를 줄여 주세요.");
         return null;
     }
 

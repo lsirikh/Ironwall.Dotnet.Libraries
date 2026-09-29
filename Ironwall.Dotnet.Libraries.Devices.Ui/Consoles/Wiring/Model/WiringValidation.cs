@@ -51,7 +51,7 @@ public static class WiringValidation
         // ③ 같은 센서가 체인에 두 번(구조상 생기지 않지만, 생겼다면 저장이 순번을 뒤집는다)
         foreach (var key in board.Chain.Keys.GroupBy(k => k).Where(g => g.Count() > 1).Select(g => g.Key))
             issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_DUPLICATE,
-                $"{board.Find(key)?.Display ?? $"센서 {key}"} 이(가) 체인에 두 번 있습니다 — 한 곳에서 빼 주세요."));
+                Particles($"{board.Find(key)?.Display ?? $"센서 {key}"}이(가) 체인에 두 번 있습니다 — 한 곳에서 빼 주세요.")));
 
         // ④ 제품 한도(스마트 34) · 섞임(O-8) — 저장은 막지 않는다
         if (board.Topology.LimitWarning(board.Chain.Count) is { } limit)
@@ -80,6 +80,9 @@ public static class WiringValidation
 
         return issues;
     }
+
+    /// <summary>조사 병기("과(와)" · "이(가)" · "은(는)")를 앞 낱말의 받침에 맞게 고른다(커널 · 숫자로 끝나는 이름도).</summary>
+    internal static string Particles(string text) => Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanParticles.Resolve(text);
 
     /// <summary>치명이 하나라도 있으면 저장을 막는다.</summary>
     public static bool BlocksSave(IEnumerable<WiringIssue> issues)
@@ -133,8 +136,10 @@ public static class WiringValidation
 
         var start = Name(startOrder);
         var end = Name(endOrder);
-        if (start is null || end is null) return $"{line}차 {startOrder}~{endOrder} 는 지금 결선 범위(1~{sequence.Max(p => p.Order)}) 밖입니다.";
-        return startOrder == endOrder ? $"{line}차 {startOrder}번 = {start}" : $"{line}차 {startOrder}~{endOrder} → {start} 와 {end} 사이";
+        // 조사는 앞 낱말(숫자로 끝나는 이름 포함)의 받침으로 고른다 — "펜스 3과" · "센서와"(커널 KoreanParticles).
+        if (start is null || end is null)
+            return Particles($"{line}차 {startOrder}~{endOrder}은(는) 지금 결선 범위(1~{sequence.Max(p => p.Order)}) 밖입니다.");
+        return startOrder == endOrder ? $"{line}차 {startOrder}번 = {start}" : Particles($"{line}차 {startOrder}~{endOrder} → {start}과(와) {end} 사이");
 
         string? Name(int order) => sequence.FirstOrDefault(p => p.Order == order).Row?.Display;
     }

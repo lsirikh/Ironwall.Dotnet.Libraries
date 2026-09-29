@@ -118,8 +118,8 @@ public static class WiringSpec
         var order = AsInt(wiring[ORDER_KEY]);
         if (line is null) return "결선에 선 번호가 없습니다 — 다시 배치해 주세요.";
         if (order is null) return "결선에 순번이 없습니다 — 다시 배치해 주세요.";
-        if (line is not (LINE_PRIMARY or LINE_SECONDARY)) return $"선 번호 {line} 은 1차·2차가 아닙니다 — 다시 배치해 주세요.";
-        if (order < 1 || order > MAX_ORDER) return $"순번 {order} 이 쓸 수 있는 범위(1~{MAX_ORDER}) 밖입니다 — 다시 배치해 주세요.";
+        if (line is not (LINE_PRIMARY or LINE_SECONDARY)) return WiringValidation.Particles($"선 번호 {line}은(는) 1차·2차가 아닙니다 — 다시 배치해 주세요.");
+        if (order < 1 || order > MAX_ORDER) return WiringValidation.Particles($"순번 {order}이(가) 쓸 수 있는 범위(1~{MAX_ORDER}) 밖입니다 — 다시 배치해 주세요.");
         return null;
     }
 
