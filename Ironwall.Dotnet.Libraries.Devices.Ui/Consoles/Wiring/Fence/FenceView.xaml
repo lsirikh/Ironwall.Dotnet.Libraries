@@ -169,11 +169,12 @@
 				CornerRadius="7"
 				IsHitTestVisible="False">
 				<TextBlock
+					MaxWidth="760"
+					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="센서를 끌면 순서가 바뀝니다 · 함체를 끌면 리턴케이블 · VBUS 표지만 따라갑니다 · 빈 곳 끌기 = 이동 · 휠 = 확대 · 끄는 중 Esc = 취소 · Alt+←/→ 한 칸 · Delete 빼기"
-					TextWrapping="Wrap"
-					MaxWidth="620" />
+					Text="센서 끌기 = 순서 · 함체 끌기 = 리턴케이블 · VBUS 표지 · 빈 곳 끌기 = 이동 · 휠 = 확대 · Esc = 취소 · Ctrl 클릭 = 여럿 · Alt+←/→ = 한 칸 · Delete = 빼기"
+					TextWrapping="Wrap" />
 			</Border>
 		</Grid>
 	</DockPanel>

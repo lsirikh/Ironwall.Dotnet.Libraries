@@ -191,6 +191,54 @@ public class FenceWorldTests
     }
 
     [Fact]
+    public void should_keep_primary_text_at_least_ten_pixels_and_drop_small_secondary_text_when_zoomed_out()
+    {
+        var w = World(WiringShape.TwoBranch, new[] { M, F, F, F, M }, gap: 2);
+        const double zoom = 0.5;
+
+        var staticShapes = FenceScene.Static(w, FenceProjector.Tilt, false, w.ControllerX, w.Chain.ControllerGap, zoom);
+        var controller = FenceScene.Controller(WiringShape.TwoBranch, FenceProjector.Tilt, false, zoom);
+        var sensor = FenceScene.Sensor(w.Sensors[1], WiringShape.TwoBranch, FenceProjector.Tilt, false, zoom);
+
+        Assert.DoesNotContain(staticShapes, s => s.Ink is FenceInk.PostNumber or FenceInk.Axis or FenceInk.LabelChain);   // 5px 보조 글자는 빼기
+        var name = Assert.Single(controller.Shapes, s => s.Ink == FenceInk.ControllerText);
+        Assert.True(name.FontSize * zoom >= FenceScene.MIN_CONTROLLER_TEXT - 1e-9);                                     // "제어기" ≥ 11px
+        Assert.DoesNotContain(controller.Shapes, s => s.Text == "24VDC · ETH");
+        var number = Assert.Single(sensor.Shapes, s => s.Ink == FenceInk.NumberSmall);
+        Assert.True(number.FontSize * zoom >= FenceScene.MIN_TEXT - 1e-9);
+        var plate = sensor.Shapes.First(s => s.Ink == FenceInk.Plate);
+        Assert.True(plate.Points[1].X - plate.Points[0].X >= number.FontSize);                                           // 번호판이 번호와 같이 커진다
+
+        Assert.Contains(FenceScene.Static(w, FenceProjector.Tilt, false, w.ControllerX, w.Chain.ControllerGap, 1.0), s => s.Ink == FenceInk.PostNumber);
+    }
+
+    [Fact]
+    public void should_place_each_vbus_unit_inside_its_gap_on_the_chain_line_without_touching_the_neighbouring_sensors()
+    {
+        var w = World(WiringShape.Ring, Enumerable.Repeat(Sm, 13).ToArray());
+        var p = FenceProjector.Tilt;
+        var shapes = FenceScene.Static(w, p, false, w.ControllerX, w.Chain.ControllerGap);
+
+        var vbus = shapes.Where(s => s.Ink == FenceInk.VbusFront).ToList();
+        Assert.Equal(2, vbus.Count);
+        foreach (var front in vbus)
+        {
+            var left = front.Points.Min(q => q.X);
+            var right = front.Points.Max(q => q.X);
+            var gap = w.VbusGaps(w.Chain.ControllerGap).Select(g => (g, x: w.GapMid(g))).OrderBy(t => System.Math.Abs(t.x - (left + right) / 2)).First().g;
+            var body = new[] { w.Seq[gap - 1], w.Seq[gap] }.Select(k => FenceScene.Sensor(w.Sensors[k], WiringShape.Ring, p, false))
+                                                           .Select((pic, i) => new Rect(pic.Hit.X + w.X[w.Seq[gap - 1 + i]], pic.Hit.Y, pic.Hit.Width, pic.Hit.Height)).ToList();
+            Assert.True(left > body[0].Right - 10 && right < body[1].Left + 10, $"VBUS [{left:0}, {right:0}] · 이웃 [{body[0].Right:0}, {body[1].Left:0}]");
+            Assert.True(right - left < 26);                                                                                 // 센서보다 작다
+        }
+
+        var axis = shapes.Single(s => s.Ink == FenceInk.Axis && s.Text == "위치 · 약 6m");
+        Assert.True(axis.Points[0].X < p.P(w.X[w.Seq[0]], 0, 20).X - 20);                                                    // 기둥 범위 왼쪽 바깥
+        var vbusLabels = shapes.Where(s => s.Ink == FenceInk.VbusLabel).ToList();
+        Assert.All(vbusLabels, l => Assert.True(l.Points[0].Y > p.P(0, 0, 20).Y + 8));                                     // 기둥 번호 줄보다 아래
+    }
+
+    [Fact]
     public void should_contain_every_post_and_the_enclosure_when_computing_fit_bounds()
     {
         var w = World(WiringShape.Ring, Enumerable.Repeat(Sm, 10).ToArray());

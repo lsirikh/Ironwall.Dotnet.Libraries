@@ -257,6 +257,53 @@ public class WiringFenceViewTests
     }
     #endregion
 
+    [Fact]
+    public void should_move_all_ctrl_selected_sensors_in_chain_order_when_one_of_them_is_dragged()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            foreach (var key in new[] { 103, 101 })
+            {
+                var chip = canvas.SensorChips[key];
+                var at = canvas.ScreenCenterOf(chip);
+                canvas.OnPointerPressed(at, chip, ctrl: true);
+                canvas.OnPointerReleased(at);
+            }
+            Pump();
+            var pane = (vm.SelectedTitle, vm.HasMultiSelection,
+                        Rings: canvas.SensorChips.Values.Count(c => c.Picture!.Shapes.Any(s => s.Ink == FenceInk.Select)));
+
+            var grab = canvas.SensorChips[103];
+            var start = canvas.ScreenCenterOf(grab);
+            var end = new Point(canvas.ScreenCenterOf(canvas.SensorChips[105]).X + 60, start.Y);
+            canvas.OnPointerPressed(start, grab);
+            canvas.OnPointerMoved(end);
+            var ghostCount = canvas.SensorChips.Values.Count(c => c.Opacity < 1);
+            canvas.OnPointerReleased(end);
+            Pump();
+            return (pane, ghostCount, Chain: vm.FenceChain.Keys.ToList());
+        });
+
+        Assert.Equal("센서 2대 선택", result.pane.SelectedTitle);
+        Assert.True(result.pane.HasMultiSelection);
+        Assert.Equal(2, result.pane.Rings);                                  // 고른 칩마다 선택 윤곽
+        Assert.Equal(2, result.ghostCount);                                  // 둘 다 끌린다
+        Assert.Equal(new[] { 102, 104, 105, 101, 103 }, result.Chain);       // 체인 순서(101 → 103)를 지킨 채 끝으로
+    }
+
+    [Fact]
+    public void should_join_korean_words_in_the_hint_so_it_breaks_only_at_spaces()
+    {
+        var hint = OnWindow(Ring(3), (vm, canvas) =>
+        {
+            var view = (FenceView)Window.GetWindow(canvas)!.Content;
+            return Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint").Text;
+        });
+
+        Assert.Contains("⁠", hint);
+        Assert.Equal("센서 끌기", Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Strip(hint).Split(" = ")[0]);
+    }
+
     #region - Zoom · fit (FR-06) -
     [Fact]
     public void should_fit_the_whole_picture_inside_the_canvas_and_keep_the_cursor_point_when_zooming()

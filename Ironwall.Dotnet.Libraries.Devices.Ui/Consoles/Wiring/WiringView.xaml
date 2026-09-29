@@ -1490,6 +1490,18 @@
 												Visibility="{Binding HasSelectedDistance, Converter={StaticResource BoolToVisibility}}" />
 										</Grid>
 
+										<!--  여러 센서(Ctrl 클릭 · FR-07) — 함께 끌거나 한꺼번에 빼기  -->
+										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMultiSelection, Converter={StaticResource BoolToVisibility}}">
+											<TextBlock Style="{StaticResource W.Hint}" Text="고른 센서를 끌면 체인 순서를 지킨 채 함께 옮겨집니다 · Ctrl 클릭으로 더하거나 뺍니다" />
+											<Button
+												Margin="0,6,0,0"
+												HorizontalAlignment="Stretch"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Pane.UnplaceMany"
+												Click="OnFenceUnplace"
+												Content="고른 센서 모두 빼기"
+												Style="{StaticResource Console.Button}" />
+										</StackPanel>
+
 										<!--  센서 — 결선 동작  -->
 										<UniformGrid Margin="0,8,0,0" Columns="3" Visibility="{Binding IsSelectedPlaced, Converter={StaticResource BoolToVisibility}}">
 											<Button

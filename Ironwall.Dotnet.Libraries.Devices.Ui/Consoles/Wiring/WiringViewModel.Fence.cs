@@ -26,6 +26,7 @@ public sealed partial class WiringViewModel
     private bool _isSoftwareRendering;
     private bool _showRange;
     private int? _fenceSelectedKey;
+    private readonly List<int> _fenceSelection = new();
     private bool _isControllerSelected;
     private int? _hoverKey;
 
@@ -173,22 +174,57 @@ public sealed partial class WiringViewModel
     /// <summary>제어기(함체)를 골랐는가.</summary>
     public bool IsControllerSelected => _isControllerSelected;
 
-    /// <summary>이름 알약을 띄울 센서 — 고른 것 우선, 없으면 가리킨 것.</summary>
-    public int? FenceNamedKey => _fenceSelectedKey ?? _hoverKey;
+    /// <summary>이름 알약을 띄울 센서 — 하나만 골랐으면 그것, 아니면 가리킨 것.</summary>
+    public int? FenceNamedKey => _fenceSelection.Count <= 1 ? _fenceSelectedKey ?? _hoverKey : _hoverKey;
+
+    /// <summary>고른 센서 전부(Ctrl 클릭 · FR-07) — 고른 차례.</summary>
+    public IReadOnlyList<int> FenceSelectedKeys => _fenceSelection;
+
+    public bool IsFenceSelected(int key) => _fenceSelection.Contains(key);
+
+    /// <summary>여러 대를 골랐는가.</summary>
+    public bool HasMultiSelection => _fenceSelection.Count > 1;
+
+    public string MultiSelectionText => HasMultiSelection ? $"센서 {_fenceSelection.Count}대 선택" : string.Empty;
+
+    /// <summary>
+    /// 이 센서를 끌면 함께 갈 센서 — 여럿을 골랐고 그 안이면 고른 것 전부(<b>체인 순서</b> · 팔레트 것은 뒤), 아니면 그 센서 하나.
+    /// 끼워 넣기는 <see cref="WiringChain.PlaceInBranch"/> 가 상대 순서를 지킨다.
+    /// </summary>
+    public IReadOnlyList<int> FenceDragKeys(int key)
+    {
+        if (_fenceSelection.Count <= 1 || !_fenceSelection.Contains(key)) return new[] { key };
+        var chain = _board.Chain;
+        return _fenceSelection.OrderBy(k => chain.IndexOf(k) is var i && i >= 0 ? i : int.MaxValue).ToList();
+    }
 
     public void FenceSelect(int? key)
     {
         if (key is { } k && _board.Find(k) is null) key = null;
         _fenceSelectedKey = key;
+        _fenceSelection.Clear();
+        if (key is { } selectedKey) _fenceSelection.Add(selectedKey);
         _isControllerSelected = false;
         RaiseSelection();
         if (key is { } selected && _board.Find(selected) is { } row)
             StatusText = _board.NumberOf(selected) is { } n ? $"{row.Display} — {NumberText(n)}" : $"{row.Display} — 미배치";
     }
 
+    /// <summary>Ctrl 클릭 — 고른 것에 넣거나 뺀다(FR-07).</summary>
+    public void FenceToggleSelect(int key)
+    {
+        if (_board.Find(key) is null) return;
+        _isControllerSelected = false;
+        if (!_fenceSelection.Remove(key)) _fenceSelection.Add(key);
+        _fenceSelectedKey = _fenceSelection.Count > 0 ? _fenceSelection[^1] : null;
+        RaiseSelection();
+        StatusText = _fenceSelection.Count > 1 ? $"센서 {_fenceSelection.Count}대 선택 — 함께 끌거나 [빼기]" : StatusText;
+    }
+
     public void FenceSelectController()
     {
         _fenceSelectedKey = null;
+        _fenceSelection.Clear();
         _isControllerSelected = true;
         RaiseSelection();
         StatusText = IsRing ? "함체 — 옆으로 끌거나 Alt+←/→ 로 옮깁니다(표시만)" : "제어기 — 위치 고정";
@@ -201,15 +237,16 @@ public sealed partial class WiringViewModel
         FenceChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private WiringSensorRow? SelectedFenceRow => _fenceSelectedKey is { } k ? _board.Find(k) : null;
+    /// <summary>하나만 골랐을 때의 그 센서 — 여럿이면 <c>null</c>(속성 칸은 "센서 N대 선택").</summary>
+    private WiringSensorRow? SelectedFenceRow => _fenceSelection.Count <= 1 && _fenceSelectedKey is { } k ? _board.Find(k) : null;
 
-    public bool HasFenceSelection => SelectedFenceRow is not null || _isControllerSelected;
+    public bool HasFenceSelection => SelectedFenceRow is not null || _isControllerSelected || HasMultiSelection;
     public bool HasSensorSelection => SelectedFenceRow is not null;
     public bool HasNoFenceSelection => !HasFenceSelection;
 
-    public string SelectedKindText => _isControllerSelected ? (IsRing ? "함체" : "제어기") : "선택한 센서";
+    public string SelectedKindText => _isControllerSelected ? (IsRing ? "함체" : "제어기") : HasMultiSelection ? "여러 센서" : "선택한 센서";
 
-    public string SelectedTitle => _isControllerSelected ? Controller.Name : SelectedFenceRow?.Display ?? "없음";
+    public string SelectedTitle => _isControllerSelected ? Controller.Name : HasMultiSelection ? MultiSelectionText : SelectedFenceRow?.Display ?? "없음";
 
     public string SelectedNumberText => SelectedFenceRow?.Facts.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 
@@ -331,6 +368,7 @@ public sealed partial class WiringViewModel
             nameof(HasSelectedPort), nameof(SelectedDistanceText), nameof(HasSelectedDistance), nameof(SelectedPhoto), nameof(HasSelectedPhoto),
             nameof(SelectedPhotoCaption), nameof(IsSelectedPlaced), nameof(IsSelectedUnplaced), nameof(CanStepSelectedBack),
             nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
+            nameof(FenceSelectedKeys), nameof(HasMultiSelection), nameof(MultiSelectionText),
         }) NotifyOfPropertyChange(name);
         FenceChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -338,7 +376,8 @@ public sealed partial class WiringViewModel
     /// <summary>체인이 바뀌면(보드 동기화 끝) — 선택이 사라졌으면 풀고 캔버스를 다시 그린다.</summary>
     private void RaiseFence()
     {
-        if (_fenceSelectedKey is { } k && _board.Find(k) is null) _fenceSelectedKey = null;
+        _fenceSelection.RemoveAll(k => _board.Find(k) is null);
+        if (_fenceSelectedKey is { } k && _board.Find(k) is null) _fenceSelectedKey = _fenceSelection.Count > 0 ? _fenceSelection[^1] : null;
         RaiseSelection();
     }
     #endregion
@@ -435,7 +474,11 @@ public sealed partial class WiringViewModel
 
     public void StepSelectedBack() { if (_fenceSelectedKey is { } k) FenceStep(k, -1); }
     public void StepSelectedForward() { if (_fenceSelectedKey is { } k) FenceStep(k, 1); }
-    public void UnplaceFenceSelected() { if (_fenceSelectedKey is { } k) FenceUnplace(new[] { k }); }
+    public void UnplaceFenceSelected()
+    {
+        if (HasMultiSelection) FenceUnplace(FenceDragKeys(_fenceSelection[0]).Where(_board.Chain.Contains).ToList());
+        else if (_fenceSelectedKey is { } k) FenceUnplace(new[] { k });
+    }
     public void AppendFenceSelected() { if (_fenceSelectedKey is { } k) FenceAppend(k); }
     public void MoveEnclosureBack() => FenceMoveEnclosure(_board.Chain.ControllerGap - 1);
     public void MoveEnclosureForward() => FenceMoveEnclosure(_board.Chain.ControllerGap + 1);
