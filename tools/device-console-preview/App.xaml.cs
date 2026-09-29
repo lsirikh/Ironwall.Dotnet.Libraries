@@ -77,6 +77,22 @@ public partial class App : Application
                 return;
             }
 
+            // 결선 펜스 뷰(wiring-fence-view F-4) — --wiring ring|pids|line [--theme light|dark] [--shot <폴더>]
+            //   --shot: 진짜 WiringView(앱 리소스 병합)를 라이트/다크 × 입체/평면 × 3 시나리오 × 1280×820 · 1440×900 으로 찍고 끝낸다.
+            var wiringAt = Array.IndexOf(e.Args, "--wiring");
+            var fenceScenario = wiringAt >= 0 && wiringAt + 1 < e.Args.Length && e.Args[wiringAt + 1] is "ring" or "pids" or "line"
+                ? e.Args[wiringAt + 1] : null;
+            var shotAt = Array.IndexOf(e.Args, "--shot");
+            if (wiringAt >= 0 && (fenceScenario is not null || shotAt >= 0))
+            {
+                var themeAt = Array.IndexOf(e.Args, "--theme");
+                var theme = themeAt >= 0 && themeAt + 1 < e.Args.Length ? e.Args[themeAt + 1] : e.Args.Contains("--dark") ? "dark" : "light";
+                var shotDir = shotAt >= 0 && shotAt + 1 < e.Args.Length ? e.Args[shotAt + 1] : null;
+                await RunFenceAsync(fenceScenario ?? "ring", theme, shotDir);
+                if (shotDir is not null) Shutdown();
+                return;
+            }
+
             // 셋업 · 결선 창 — 콘솔과 따로 뜬다(--wiring [--dark] [--snapshot <폴더>]).
             if (e.Args.Contains("--wiring"))
             {
@@ -817,6 +833,73 @@ public partial class App : Application
     }
 
     private static Task Settle() => Task.Delay(450);
+
+    /// <summary>
+    /// 결선 펜스 뷰(F-4) — 한 시나리오를 띄우거나(<paramref name="shotDir"/> 없음), 테마 2 × 입체/평면 × 시나리오 3 × 크기 2 를 찍는다.
+    /// 찍는 대상은 진짜 결선 창 뷰 전체(도구줄 · 보기 전환 · 오른쪽 칸 · 팔레트 · 아래 띠)다.
+    /// </summary>
+    private async Task RunFenceAsync(string scenario, string theme, string? shotDir)
+    {
+        IoC.GetInstance = (type, _) => type == typeof(IEventAggregator) ? new EventAggregator() : null!;
+        IoC.GetAllInstances = _ => Array.Empty<object>();
+        IoC.BuildUp = _ => { };
+        PlatformProvider.Current = new XamlPlatformProvider();
+        Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Install();      // 앱과 같게 — 한글은 띄어쓰기에서만 끊는다
+
+        var preview = new WiringPreview();
+        _window = new Window { Title = "결선 펜스 뷰 미리보기", Width = 1320, Height = 880, Background = (Brush)FindResource("SurfaceBrush") };
+
+        if (shotDir is null)
+        {
+            if (theme == "dark") ApplyDark();
+            var (view, vm) = preview.Scenario(scenario);
+            _window.Content = new Border { Child = view };
+            _window.Show();
+            await Settle();
+            vm.IsSoftwareRendering = false;
+            return;
+        }
+
+        Directory.CreateDirectory(shotDir);
+        PreviewTools.Shared.OffscreenStage.Hide(_window).Show();
+        try
+        {
+            foreach (var t in new[] { "light", "dark" })
+            {
+                if (t == "dark") ApplyDark(); else ApplyLight();
+                _window.Background = (Brush)FindResource("SurfaceBrush");
+                foreach (var name in new[] { "ring", "pids", "line" })
+                    foreach (var flat in new[] { false, true })
+                        foreach (var (w, h) in new[] { (1280, 820), (1440, 900) })
+                        {
+                            var (view, vm) = preview.Scenario(name);
+                            view.Width = w;
+                            view.Height = h;
+                            _window.Width = w + 40;
+                            _window.Height = h + 60;
+                            _window.Content = new Border { Child = view };
+                            await Settle();
+                            vm.IsSoftwareRendering = false;           // 화면 밖 창의 렌더 tier 와 무관하게 — 고른 보기를 찍는다
+                            vm.IsFlatChosen = flat;
+                            await Settle();
+                            Save(shotDir, $"fence-{t}-{name}-{(flat ? "flat" : "tilt")}-{w}x{h}");
+                        }
+            }
+        }
+        catch (Exception ex)
+        {
+            File.WriteAllText(Path.Combine(shotDir, "shot-error.txt"), ex.ToString());
+        }
+    }
+
+    /// <summary>다크를 걷고 라이트로(한 실행에서 두 테마를 찍을 때).</summary>
+    private void ApplyLight()
+    {
+        foreach (var dark in Resources.MergedDictionaries.Where(d => d.Source?.OriginalString == DarkTokens).ToList())
+            Resources.MergedDictionaries.Remove(dark);
+        foreach (var bundled in Resources.MergedDictionaries.OfType<BundledTheme>()) bundled.BaseTheme = BaseTheme.Light;
+        ControlzEx.Theming.ThemeManager.Current.ChangeTheme(this, "Light.Cyan");
+    }
 
     private DataGrid FindGrid()
     {

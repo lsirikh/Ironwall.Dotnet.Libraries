@@ -362,7 +362,12 @@ public sealed class FenceWorld
             p.P(MinX - pad, 0, GroundDepth).X, p.P(MaxX + pad, FenceProjector.H + 40, -36 * p.K).X,
             p.P(MinX - 5 * u, 0, 0).X, p.P(MaxX + 5 * u, 0, 0).X,
         };
-        if (Shape == WiringShape.Ring) { xs.Add(p.P(ControllerX - 110, 0, 130).X); xs.Add(p.P(ControllerX + 120, 0, 106).X); }
+        if (Shape == WiringShape.Ring)
+        {
+            xs.Add(p.P(ControllerX - 110, 0, 130).X);
+            xs.Add(p.P(ControllerX + 120, 0, 106).X);
+            xs.Add(p.P(MinX - 5 * u - 16 - 80, 0, 20).X);      // 축 글자 "위치 · 약 6m"(기둥 범위 왼쪽 바깥 · 평면에서도 잘리지 않게)
+        }
 
         var minY = Math.Min(p.P(0, LabelTop + 10, OverlayDepth).Y, p.P(0, FenceProjector.H + 12, 0).Y);
         var maxY = Shape == WiringShape.Line

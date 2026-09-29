@@ -88,7 +88,10 @@ public sealed class FenceChip : Thumb
     {
         RenderCount++;
         if (_picture is null) return;
+        // 칩의 배치 사각형 = 적중 사각형 — 그림(앵커 원점 기준)을 그만큼 옮겨 그린다.
+        drawingContext.PushTransform(new TranslateTransform(-_picture.Hit.X, -_picture.Hit.Y));
         FenceRenderer.Draw(drawingContext, this, _picture.Shapes);
+        drawingContext.Pop();
     }
 
     // 캔버스가 누름 · 이동 · 뗌을 루트 기준으로 잰다 — Thumb 의 캡처 · DragStarted 를 끈다.

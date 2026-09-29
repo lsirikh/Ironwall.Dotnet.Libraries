@@ -368,7 +368,8 @@ public static class FenceScene
         o.Add(RectShape(FenceInk.GroupBack, new Rect(x + 4, y - 4, w, h), 15));
         o.Add(RectShape(FenceInk.GroupBody, new Rect(x, y, w, h), 15));
         o.Add(Text(FenceInk.GroupText, new Point(c.X, c.Y + titleSize * 0.36), title, titleSize));
-        o.Add(Text(FenceInk.GroupSub, new Point(c.X, y + h + 14), $"{members[0].Big(shape)}–{members[^1].Big(shape)}", 11));
+        // 첫–끝 번호는 카드 위(겹 카드 뒤쪽) — 아래는 체인 선 · 거리 축과 부딪친다.
+        o.Add(Text(FenceInk.GroupSub, new Point(c.X + 4, y - 12), $"{members[0].Big(shape)}–{members[^1].Big(shape)}", 11));
         if (members.Any(m => m.IsChanged))
             o.Add(Poly(FenceInk.Draft, new Point(x + w - 14, y), new Point(x + w - 4, y), new Point(x + w, y + 4), new Point(x + w, y + 14)));
         if (selected) o.Add(RectShape(FenceInk.Select, new Rect(x - 5, y - 9, w + 18, h + 30), 16));
@@ -418,10 +419,17 @@ public static class FenceScene
             // "제어기" 는 늘 화면에서 11px 이상(Legible) — 전원 · 통신은 아래 설명 글에 있다(작은 7px 부제는 뺐다).
             var t1 = p.P(0, 44, z1);
             o.Add(Text(FenceInk.ControllerText, new Point(t1.X, t1.Y + 4), "제어기", 11));
-            var cap = p.P(0, 0, z1);
-            o.Add(Text(FenceInk.Caption, new Point(cap.X, cap.Y + 15),
-                shape == WiringShape.TwoBranch ? "PIDS 제어기 · 24VDC · Ethernet" : "지중 제어기 · 24VDC · Ethernet", 10.5,
-                shape == WiringShape.Line ? FenceTextAnchor.Start : FenceTextAnchor.Middle));
+            if (shape == WiringShape.TwoBranch)
+            {
+                var cap = p.P(0, 0, z1);
+                o.Add(Text(FenceInk.Caption, new Point(cap.X, cap.Y + 15), "PIDS 제어기 · 24VDC · Ethernet", 10.5));
+            }
+            else
+            {
+                // 한 줄은 제어기 아래로 체인 선이 지나간다 — 설명은 상자 위에.
+                var cap = p.P(-25, 76, z1);
+                o.Add(Text(FenceInk.Caption, cap, "지중 제어기 · 24VDC · Ethernet", 10.5, FenceTextAnchor.Start));
+            }
             fl = p.P(-25, 60, z1);
             fr = p.P(25, 0, z1);
             dx = (z1 - z0) * p.Sh;
@@ -484,6 +492,9 @@ public static class FenceScene
     /// <summary>보조 글자(축 · 기둥 번호 · A/B 알약 · 설명)는 화면에서 이보다 작아지면 그리지 않는다.</summary>
     public const double HIDE_SECONDARY_BELOW = 9;
 
+    /// <summary>이 줌까지는 보조 글자를 화면 <see cref="HIDE_SECONDARY_BELOW"/> 로 받쳐 보이고, 그보다 작으면 뺀다(겹침 방지).</summary>
+    public const double SECONDARY_MIN_ZOOM = 0.6;
+
     /// <summary>주 글자 — 읽을 수 있어야 하는 것. 그 밖은 보조.</summary>
     public static bool IsPrimaryText(FenceInk ink) => ink is FenceInk.Number or FenceInk.NumberSmall or FenceInk.FenceLabel
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert;
@@ -492,7 +503,7 @@ public static class FenceScene
 
     /// <summary>
     /// 줌 <paramref name="zoom"/> 에서 글자를 읽히게 — 주 글자는 화면 <see cref="MIN_TEXT"/>(제어기 <see cref="MIN_CONTROLLER_TEXT"/>) 이상으로 키우고,
-    /// 보조 글자는 화면 <see cref="HIDE_SECONDARY_BELOW"/> 보다 작으면 뺀다. 글자가 아닌 그림은 그대로.
+    /// 보조 글자는 줌이 <see cref="SECONDARY_MIN_ZOOM"/> 이상이면 화면 <see cref="HIDE_SECONDARY_BELOW"/> 로 받쳐 보이고, 그보다 작으면 뺀다. 글자가 아닌 그림은 그대로.
     /// </summary>
     public static IReadOnlyList<FenceShape> Legible(IReadOnlyList<FenceShape> shapes, double zoom)
     {
@@ -507,6 +518,7 @@ public static class FenceScene
                 result.Add(shape.FontSize * z >= min ? shape : shape with { FontSize = min / z });
             }
             else if (shape.FontSize * z >= HIDE_SECONDARY_BELOW) result.Add(shape);
+            else if (z >= SECONDARY_MIN_ZOOM) result.Add(shape with { FontSize = HIDE_SECONDARY_BELOW / z });   // 조금 줄였으면 9px 로 받쳐 준다
         }
         return result;
     }

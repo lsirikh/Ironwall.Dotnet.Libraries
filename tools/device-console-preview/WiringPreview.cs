@@ -31,14 +31,96 @@ internal sealed class WiringPreview
     /// <summary>센서 8대 — 표 화면.</summary>
     public (FrameworkElement View, WiringViewModel Vm) Table() => Build(8, 0);
 
-    /// <summary>센서 9대 · 1차 5 · 2차 4 — 결선이 끝난 화면(고장 구간 예시가 뜨는 최소 대수).</summary>
+    /// <summary>센서 9대 · 왼쪽 가지 5 · 오른쪽 가지 4 — 결선이 끝난 화면(펜스 · 제어기 종류 모름 → 양쪽 가지).</summary>
+    /// <remarks>체인 모델(F-2)에서는 목록 끝의 빈 칸이 "끝에 붙이기" 자리 하나뿐이다 — 옛 칸 모델처럼 Line2[0..3] 을 가정하지 않는다.</remarks>
     public (FrameworkElement View, WiringViewModel Vm) Wired()
     {
         var (view, vm) = Build(9, 5);
-        for (var i = 0; i < 4; i++) vm.Drop(Payload(vm.Palette[0]), Slot(vm.Line2[i]));
+        for (var i = 0; i < 4; i++) vm.Drop(Payload(vm.Palette[0]), Slot(vm.Line2[^1]));
         vm.GoWiring();
+        vm.ShowTableView();                  // 옛 상태 스냅숏(03 · 11)은 표 보기로 찍는다
         return (view, vm);
     }
+
+    #region - Fence scenarios (wiring-fence-view F-4 · 목업 buildSmart/buildPids/buildUg) -
+    /// <summary>펜스 뷰 시나리오 — <c>ring</c> · <c>pids</c> · <c>line</c>. 결선 단계 · 펜스 보기로 연다.</summary>
+    public (FrameworkElement View, WiringViewModel Vm) Scenario(string name)
+    {
+        var (view, vm) = name switch
+        {
+            "pids" => Pids(),
+            "line" => UndergroundLine(),
+            _ => SmartRing(),
+        };
+        vm.GoWiring();
+        vm.ShowFenceView();
+        return (view, vm);
+    }
+
+    /// <summary>
+    /// 스마트 링 13대 — 저장된 체인 10대(현장에서 103 · 104 가 바꿔 꽂힘) + 저장된 배치가 없는 3대(번호 105 가 둘 — 하나는 "번호 같음 · id순")
+    /// → 번호순 제안 배너. 목업의 선택(S-0433)을 그대로 골라 둔다.
+    /// </summary>
+    private (FrameworkElement View, WiringViewModel Vm) SmartRing()
+    {
+        var sensors = new (int Id, int No, string Name, int Bus)[]
+        {
+            (417, 101, "북측 1구간 펜스", 1), (418, 102, "북측 2구간 펜스", 2), (419, 103, "북측 3구간 펜스", 4), (420, 104, "북측 4구간 펜스", 3),
+            (421, 105, "북측 5구간 펜스", 5), (433, 105, "북측 5구간 보강", 13), (422, 106, "북측 6구간 펜스", 6), (423, 107, "북측 7구간 펜스", 7),
+            (424, 108, "북측 8구간 펜스", 8), (425, 109, "북측 9구간 펜스", 9), (426, 110, "북측 10구간 펜스", 11), (427, 111, "북측 11구간 펜스", 10),
+            (428, 112, "북측 12구간 펜스", 12),
+        };
+        var saved = new[] { 417, 418, 420, 419, 421, 423, 424, 425, 427, 428 };
+        var seeds = sensors.Select(s => new WiringSensorSeed(s.Id, s.Bus, new SensorFacts(s.No, s.Name, "SmartSensor2", "북측"),
+            Array.IndexOf(saved, s.Id) is var at && at >= 0 ? new WiringPlacement(1, at + 1) : null));
+        var vm = Controller(new WiringControllerInfo(1, 1, "CTRL-북측-01", "10.99.7.1", "SmartController"), seeds, new[] { "SmartSensor2" });
+        vm.FenceSelect(433);
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    /// <summary>PIDS 양쪽 가지 — 가지마다 [복합, 펜스 ×7, 복합, 펜스 ×7, 복합, 펜스 ×6](23대 · 왼쪽 2 · 3번이 바뀜) + 다른 제어기의 스마트 센서 1대(팔레트 · 섞임 경고).</summary>
+    private (FrameworkElement View, WiringViewModel Vm) Pids()
+    {
+        var seeds = new List<WiringSensorSeed>();
+        var number = 101;
+        var pattern = new[] { 'M' }.Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 6)).ToArray();
+        foreach (var (line, side) in new[] { (1, "서측"), (2, "동측") })
+        {
+            int multi = 0, fence = 0;
+            var ids = new List<(int Id, string Name, bool Multi)>();
+            foreach (var t in pattern)
+            {
+                var isMulti = t == 'M';
+                var name = isMulti ? $"{side} 복합 {++multi}" : $"{side} 펜스 {++fence}";
+                ids.Add((1000 + number, name, isMulti));
+                number++;
+            }
+            if (line == 1) (ids[1], ids[2]) = (ids[2], ids[1]);
+            for (var i = 0; i < ids.Count; i++)
+                seeds.Add(new WiringSensorSeed(ids[i].Id, ids[i].Id - 1100, new SensorFacts(ids[i].Id - 1000, ids[i].Name, ids[i].Multi ? "Multi" : "Fence", side),
+                    new WiringPlacement(line, i + 1)));
+        }
+        seeds.Add(new WiringSensorSeed(499, 1, new SensorFacts(150, "스마트 복합센서 II(다른 제어기)", "SmartSensor2", "서측")));
+        var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "Multi", "Fence", "SmartSensor2" });
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    /// <summary>지중 한 줄 — 지진동센서 10대(제어기 쪽이 1).</summary>
+    private (FrameworkElement View, WiringViewModel Vm) UndergroundLine()
+    {
+        var seeds = Enumerable.Range(0, 10).Select(i => new WiringSensorSeed(5001 + i, i + 1,
+            new SensorFacts(501 + i, $"내부 지중 {i + 1}", "Underground", "내부"), new WiringPlacement(1, i + 1)));
+        var vm = Controller(new WiringControllerInfo(2, 2, "UG-내부-02", "10.99.9.2", "Controller"), seeds, new[] { "Underground" });
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    private WiringViewModel Controller(WiringControllerInfo info, IEnumerable<WiringSensorSeed> seeds, IReadOnlyList<string> types)
+    {
+        var gateway = new DeviceApiSensorGateway(new MockDeviceApiService());
+        var apply = new WiringApplyService(gateway, null, null, new DeviceQueryPolicy(new AxisProbe()));
+        return WiringViewModel.ForController(info, seeds, types, apply, _dialogs, Groups);
+    }
+    #endregion
 
     /// <summary>그룹 3상태 — 전부 · 하나도 · 줄마다 다름이 한 화면에 있다(W2).</summary>
     public (FrameworkElement View, WiringViewModel Vm) GroupSelection()

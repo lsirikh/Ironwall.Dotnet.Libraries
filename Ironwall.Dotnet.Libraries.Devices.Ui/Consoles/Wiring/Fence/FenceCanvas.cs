@@ -177,8 +177,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     /// <summary>센서의 화면 중심(시험 · 자동화 좌표).</summary>
     internal Point ScreenCenterOf(FenceChip chip)
     {
-        var hit = chip.HitBounds;
-        return WorldToScreen(new Point(Canvas.GetLeft(chip) + hit.X + hit.Width / 2, hit.Y + hit.Height / 2));
+        return WorldToScreen(new Point(Canvas.GetLeft(chip) + chip.Width / 2, Canvas.GetTop(chip) + chip.Height / 2));
     }
     #endregion
 
@@ -253,7 +252,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             {
                 chip = _controllerChip ??= NewChip(FenceChipKind.Controller, FenceWorld.CONTROLLER_KEY, Array.Empty<int>());
                 chip.Picture = FenceScene.Controller(shape, _projector, vm.IsControllerSelected, _view.Scale);
-                Canvas.SetLeft(chip, scene.ControllerX);
+                Place(chip, scene.ControllerX);
                 AutomationProperties.SetName(chip, shape == WiringShape.TwoBranch ? "PIDS 제어기 — 위치 고정" : "지중 제어기 — 한 줄의 시작, 위치 고정");
             }
             else if (unit.IsGroup)
@@ -265,7 +264,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 var members = unit.Keys.Select(k => scene.Sensors[k]).ToList();
                 var selected = unit.Keys.Any(vm.IsFenceSelected);
                 chip.Picture = FenceScene.Group(members, shape, _projector, selected, _view.Scale);
-                Canvas.SetLeft(chip, scene.UnitX(unit));
+                Place(chip, scene.UnitX(unit));
                 AutomationProperties.SetName(chip, $"펜스센서 묶음 {members.Count}대, {members[0].Big(shape)}부터 {members[^1].Big(shape)}까지. 확대하면 풀립니다");
             }
             else
@@ -275,11 +274,10 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
                 chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale);
-                Canvas.SetLeft(chip, scene.X[unit.Key]);
+                Place(chip, scene.X[unit.Key]);
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}");
             }
-            Canvas.SetTop(chip, 0);
             order.Add(chip);
         }
 
@@ -288,8 +286,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         {
             var chip = _controllerChip ??= NewChip(FenceChipKind.Controller, FenceWorld.CONTROLLER_KEY, Array.Empty<int>());
             chip.Picture = FenceScene.Controller(shape, _projector, vm.IsControllerSelected, _view.Scale);
-            Canvas.SetLeft(chip, _enclosureX);
-            Canvas.SetTop(chip, 0);
+            Place(chip, _enclosureX);
             AutomationProperties.SetName(chip, $"함체 — {vm.EnclosureGapText}. Alt+왼쪽/오른쪽 화살표로 옮깁니다(표시만)");
             order.Insert(0, chip);
         }
@@ -314,6 +311,20 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             _chips.Children.Insert(Math.Min(i, _chips.Children.Count), order[i]);
         }
         while (_chips.Children.Count > order.Count) _chips.Children.RemoveAt(_chips.Children.Count - 1);
+    }
+
+    /// <summary>
+    /// 칩을 세계 x 에 둔다 — 요소의 배치 사각형 = 그림의 적중 사각형(UIA BoundingRectangle · 좌표 클릭이 실제 모양과 맞게).
+    /// 그림은 칩 원점(앵커) 기준이라 칩이 <see cref="FenceChip.HitBounds"/> 만큼 옮겨 그린다.
+    /// </summary>
+    private static void Place(FenceChip chip, double x)
+    {
+        var hit = chip.HitBounds;
+        if (hit.IsEmpty) { Canvas.SetLeft(chip, x); Canvas.SetTop(chip, 0); return; }
+        chip.Width = hit.Width;
+        chip.Height = hit.Height;
+        Canvas.SetLeft(chip, x + hit.X);
+        Canvas.SetTop(chip, hit.Y);
     }
 
     private FenceChip NewChip(FenceChipKind kind, int key, IReadOnlyList<int> keys)
@@ -593,7 +604,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 var wx = ScreenToWorld(now).X;
                 var n = _scene.Chain.Count;
                 _enclosureX = Math.Max(_scene.GapMid(0), Math.Min(_scene.GapMid(n), wx));
-                if (_controllerChip is not null) Canvas.SetLeft(_controllerChip, _enclosureX);
+                if (_controllerChip is not null) Place(_controllerChip, _enclosureX);
                 var gap = _scene.NearestGap(_enclosureX);
                 if (gap != _enclosureGap)
                 {
