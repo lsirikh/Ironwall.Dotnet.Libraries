@@ -129,6 +129,36 @@ public class DialogFrameWindowRootTests
         Assert.Equal(420, result.Height, 0);      // 남의 창 크기를 건드리지 않는다
     }
 
+    /// <summary>
+    /// 호스트 셸(MetroWindow = 파생 창) 안의 패널층 — 틀이 창 Content 사슬에 닿더라도 파생 창은 커널 겉을 입지 않으므로 카드 모양 그대로다
+    /// (r16 SC-ACC-083 조사: 내 정보 카드 머리 ✕ 가 그대로 보여야 한다).
+    /// </summary>
+    [Fact]
+    public void should_keep_the_header_when_the_frame_is_the_content_of_a_derived_shell_window()
+    {
+        var result = OnSta(() =>
+        {
+            var frame = NewFrame(out _);
+            var window = new ShellLikeWindow
+            {
+                Content = new ContentControl { Content = frame }, Width = 600, Height = 420, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false,
+            };
+            window.Show();
+            Pump(DispatcherPriority.ApplicationIdle);
+            var snapshot = (Root: frame.IsWindowRoot, Close: Part(frame, ConsoleDialogFrame.PartClose)?.IsVisible, Redirect: ConsoleWindowChrome.GetCloseRedirect(window), Height: window.ActualHeight);
+            window.Close();
+            return snapshot;
+        });
+
+        Assert.False(result.Root);
+        Assert.True(result.Close);
+        Assert.Null(result.Redirect);
+        Assert.Equal(420, result.Height, 0);
+    }
+
+    private sealed class ShellLikeWindow : Window { }
+
     [Fact]
     public void should_keep_the_header_when_the_window_has_no_caption_of_its_own()
     {
