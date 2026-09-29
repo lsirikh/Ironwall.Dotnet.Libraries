@@ -151,8 +151,11 @@ public sealed partial class UnitMapViewModel
             case UnitMapKeyCommand.Enter:
                 var (unit, offset) = (_moveUnit!.Value, _moveOffset);
                 var target = DisplayDeltaOf(unit) ?? default;  // 미리보기가 입힌 Δ(자기 Δ + 쌓인 이동량) 그대로 확정
+                // M 모드 동안 본 배치 — M 을 끝내면 미룬 배치 알림의 재조회가 곧바로 돌 수 있다(FR-53). If-Match 기준은 운영자가 본 그림이다
+                // (TEST-43 r11b H-10 — 종전엔 그 재조회의 최신 판으로 보내 다른 운영자의 Δ 를 말없이 덮었다).
+                var view = CaptureView();
                 ExitMoveMode(focusCanvas: true);
-                if (offset.X != 0 || offset.Y != 0) _ = WritePositionAsync(unit, target);
+                if (offset.X != 0 || offset.Y != 0) _ = WritePositionAsync(unit, target, view);
                 break;
             case UnitMapKeyCommand.Escape:
                 ExitMoveMode(focusCanvas: true);        // 원위치 · 서버 0

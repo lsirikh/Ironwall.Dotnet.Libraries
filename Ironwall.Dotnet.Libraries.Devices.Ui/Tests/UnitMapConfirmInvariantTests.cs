@@ -276,12 +276,15 @@ internal sealed class MapKit
 
     public CapturingLog Log { get; } = new();
 
-    private MapKit(FakeUnitLayoutApi api, int? myUnitId, bool canEdit, bool canView, UnitMapFixture? fixture)
+    private MapKit(FakeUnitLayoutApi api, int? myUnitId, bool canEdit, bool canView, UnitMapFixture? fixture, int? clientLayoutVersion = null,
+                   IUnitLayoutApi? port = null)
     {
         F = fixture ?? UnitMapTestData.Standard200();
         Commands = new FakeMapCommands(F) { CanEdit = canEdit, CanView = canView };
         Api = api;
-        Gate = new GatedLayoutApi(api);
+        ClientLayoutVersion = clientLayoutVersion ?? UnitMapLayout.LayoutVersion;
+        api.ClientLayoutVersion = ClientLayoutVersion;          // 어댑터가 싣는 판 = 뷰모델이 견주는 판(같아야 한다)
+        Gate = new GatedLayoutApi(port ?? api);                  // port = 같은 가짜 서버의 다른 운영자 창구(두 운영자 시험)
         Delay = new ManualDelay();
         Devices = UnitMapTestData.Devices(F.Tree).Items;
         Vm = new UnitMapViewModel(Commands, Gate, new UnitMapViewModelOptions
@@ -295,16 +298,23 @@ internal sealed class MapKit
             SavePrefs = Prefs.Save,
             Clock = Clock,
             Log = Log,
+            ClientLayoutVersion = ClientLayoutVersion,
         });
         Vm.SetData(F.Tree, Devices);
     }
 
-    public static MapKit Create(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null)
-        => new(api ?? new FakeUnitLayoutApi(), myUnitId, canEdit, canView, fixture);
+    /// <summary>이 시험의 클라 자동 배치 판(기본 = 알고리즘 판). 판 올림 시험은 새 판 클라를 흉내 낸다.</summary>
+    public int ClientLayoutVersion { get; }
 
-    public static async Task<MapKit> OpenAsync(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null)
+    /// <param name="port">같은 가짜 서버의 다른 클라이언트 창구(<see cref="FakeUnitLayoutApi.ForClient"/>) — 두 운영자 시험. 없으면 기본 창구 "main".</param>
+    public static MapKit Create(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null,
+                                int? clientLayoutVersion = null, IUnitLayoutApi? port = null)
+        => new(api ?? new FakeUnitLayoutApi(), myUnitId, canEdit, canView, fixture, clientLayoutVersion, port);
+
+    public static async Task<MapKit> OpenAsync(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null,
+                                               int? clientLayoutVersion = null, IUnitLayoutApi? port = null)
     {
-        var kit = Create(api, myUnitId, canEdit, canView, fixture);
+        var kit = Create(api, myUnitId, canEdit, canView, fixture, clientLayoutVersion, port);
         await kit.Vm.OpenAsync();
         await kit.Vm.WhenIdleAsync();
         return kit;

@@ -284,8 +284,10 @@ public static class ApiMessageHelper
             HttpStatusCode.MethodNotAllowed => ApiErrorCodes.MethodNotAllowed,         // 405
             HttpStatusCode.Conflict => ApiErrorCodes.Conflict,                         // 409
             HttpStatusCode.Gone => ApiErrorCodes.EndpointRemoved,                      // 410 (GONE 은 봉투로만 온다)
+            HttpStatusCode.PreconditionFailed => ApiErrorCodes.PreconditionFailed,     // 412 — 서버 매핑 폴백과 같게(VERSION_CONFLICT 는 봉투로만 온다, v8.0.4)
             HttpStatusCode.RequestEntityTooLarge => ApiErrorCodes.PayloadTooLarge,     // 413
             HttpStatusCode.UnprocessableEntity => ApiErrorCodes.ValidationError,       // 422
+            HttpStatusCode.PreconditionRequired => ApiErrorCodes.PreconditionRequired, // 428 — If-Match 없음(v8.0.4)
             HttpStatusCode.TooManyRequests => ApiErrorCodes.TooManyRequests,           // 429
             HttpStatusCode.InternalServerError => ApiErrorCodes.InternalError,         // 500
             HttpStatusCode.BadGateway => ApiErrorCodes.BadGateway,                     // 502

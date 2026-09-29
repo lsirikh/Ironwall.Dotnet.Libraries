@@ -20,7 +20,11 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.Model;
 /// <param name="State">배치 상태(레인 A 의 <see cref="UnitMapLayoutState"/> — 문구 FR-11 과 드롭 판정이 함께 쓴다).</param>
 /// <param name="Snapshot">서버 문서(<see cref="UnitMapLayoutState.Shared"/> · <see cref="UnitMapLayoutState.VersionMismatch"/> 일 때만).</param>
 /// <param name="Failure">읽기 실패의 종류(<see cref="UnitMapLayoutState.ReadFailed"/> 일 때만).</param>
-public sealed record UnitMapLayoutAssessment(UnitMapLayoutState State, UnitLayoutSnapshot? Snapshot, UnitLayoutFailureKind? Failure = null)
+/// <param name="ServerLayoutNewer">
+/// 판 불일치 가운데 <b>서버 판이 이 클라보다 높다</b> — 새 자동 배치 규칙으로 올라갔다 → "클라이언트 갱신 필요"(읽기 전용).
+/// <c>false</c> 인 판 불일치는 서버가 옛 판이다(편집 권한이 있으면 여는 순간 한 번 올린다 — <see cref="UnitMapLayoutSync.ShouldBumpLayoutVersion"/>).
+/// </param>
+public sealed record UnitMapLayoutAssessment(UnitMapLayoutState State, UnitLayoutSnapshot? Snapshot, UnitLayoutFailureKind? Failure = null, bool ServerLayoutNewer = false)
 {
     /// <summary>창을 막 열었다 — 자동 배치로 먼저 그리고(NFR-01) 응답을 기다린다.</summary>
     public static UnitMapLayoutAssessment Loading { get; } = new(UnitMapLayoutState.Loading, null);
@@ -259,13 +263,29 @@ public static class UnitMapLayoutSync
         return read switch
         {
             UnitLayoutRead.Supported s when s.Snapshot.LayoutVersion != clientLayoutVersion
-                => new UnitMapLayoutAssessment(UnitMapLayoutState.VersionMismatch, s.Snapshot),
+                => new UnitMapLayoutAssessment(UnitMapLayoutState.VersionMismatch, s.Snapshot,
+                                               ServerLayoutNewer: s.Snapshot.LayoutVersion > clientLayoutVersion),
             UnitLayoutRead.Supported s => new UnitMapLayoutAssessment(UnitMapLayoutState.Shared, s.Snapshot),
             UnitLayoutRead.Unsupported => new UnitMapLayoutAssessment(UnitMapLayoutState.SessionOnly, null),
             UnitLayoutRead.Failed f => new UnitMapLayoutAssessment(UnitMapLayoutState.ReadFailed, null, f.Kind),
             _ => new UnitMapLayoutAssessment(UnitMapLayoutState.ReadFailed, null, UnitLayoutFailureKind.Other),
         };
     }
+    #endregion
+
+    #region - 판 올림 (서버 v8.0.4 · 회신 2026-09-29 §2 · §4.5) -
+    /// <summary>
+    /// 읽은 문서를 이 클라의 판으로 <b>한 번</b> 올려야 하는가 — 서버 문서가 옛 판이고(<c>layout_version</c> &lt; 클라) 편집 권한이 있을 때만.
+    /// </summary>
+    /// <remarks>
+    /// 올림 = <c>clear_all:true</c> + 더 큰 <c>layout_version</c> + <c>If-Match</c>(<see cref="UnitLayoutChange.LayoutVersionBump"/>). 옛 판의 Δ 는
+    /// 새 자동 배치 규칙에서 의미가 없어 지운다. 서버 판이 더 높으면 올리지 않는다(내리기는 없다 — 클라이언트 갱신 필요).
+    /// 보기 권한만 있으면 올리지 않고 읽기 전용으로 둔다(권한 있는 운영자가 열면 올라간다).
+    /// </remarks>
+    public static bool ShouldBumpLayoutVersion(UnitLayoutRead read, bool canEdit, int clientLayoutVersion = UnitMapLayout.LayoutVersion)
+        => canEdit
+        && read is UnitLayoutRead.Supported { Snapshot: var doc }
+        && doc.LayoutVersion < clientLayoutVersion;
     #endregion
 
     #region - 쓰기 모양 -

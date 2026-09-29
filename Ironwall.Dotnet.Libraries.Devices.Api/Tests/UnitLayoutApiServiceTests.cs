@@ -348,6 +348,138 @@ public class UnitLayoutApiServiceTests
 
         Assert.IsType<UnitLayoutWriteResult.Rejected>(result);
     }
+    #endregion
+
+    #region - 서버 v8.0.4 계약 맞춤(회신 2026-09-29 · REST §11-A.6 실행 예시 원문) -
+    /// <summary>§11-A.6 「낡은 If-Match 412」 원문 — 응답 헤더 <c>ETag: "9"</c> 와 함께 온다.</summary>
+    private const string Conflict412V804 =
+        "{\"success\":false,\"error\":{\"code\":\"VERSION_CONFLICT\",\"message\":\"배치가 그사이 바뀌었습니다(요청 판 \\\"8\\\", 현재 판 9) — 다시 읽고 재시도하십시오\","
+        + "\"details\":{\"current_version\":9}},\"meta\":{\"timestamp\":\"2026-09-29T10:24:57.651507+09:00\",\"request_id\":\"f3fcf6a4-6967-4890-a1c0-b985df8ed953\"}}";
+
+    /// <summary>§11-A.6 「내리기 422」 원문 — 요청 판이 서버 판보다 낮다.</summary>
+    private const string Downgrade422V804 =
+        "{\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"배치 판 1 은 서버 판 2 보다 낮습니다 — 옛 자동 배치 규칙으로 계산한 위치라 받을 수 없습니다. 클라이언트를 갱신하십시오\","
+        + "\"details\":[{\"field\":\"layout_version\",\"code\":\"VALUE_NOT_ALLOWED\",\"message\":\"배치 판 1 은 서버 판 2 보다 낮습니다\"}]},"
+        + "\"meta\":{\"timestamp\":\"2026-09-29T10:24:57.683840+09:00\",\"request_id\":\"080ff76d-feb8-452a-8fd2-ba3730943693\"}}";
+
+    /// <summary>§11-A.6 「판 올림인데 clear_all 없음 422」 원문.</summary>
+    private const string BumpWithoutClearAll422V804 =
+        "{\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"배치 판을 1 → 2 로 올리려면 clear_all: true 를 함께 보내야 합니다\","
+        + "\"details\":[{\"field\":\"clear_all\",\"code\":\"CONSTRAINT\",\"message\":\"배치 판을 1 → 2 로 올리려면 clear_all: true 를 함께 보내야 합니다\"}]},"
+        + "\"meta\":{\"timestamp\":\"2026-09-29T10:24:57.662169+09:00\",\"request_id\":\"b18602ae-df17-4182-a55e-5074075beebe\"}}";
+
+    [Fact]
+    public async Task should_return_conflict_with_current_version_when_412_is_the_v8_0_4_body()
+    {
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.PreconditionFailed, Conflict412V804, etag: "\"9\"");
+
+        var result = await Create(http).PatchAsync(8, MovePatch());
+
+        Assert.Equal(9, Assert.IsType<UnitLayoutWriteResult.Conflict>(result).CurrentVersion);
+    }
+
+    [Fact]
+    public async Task should_read_current_version_from_etag_when_412_details_are_missing()
+    {
+        // 회신 §1 ④ — 412 응답 헤더 ETag 에도 현재 판을 싣는다(다시 읽기 전에 판을 알 수 있게). details 가 없어도 판을 잃지 않는다.
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.PreconditionFailed, Error("VERSION_CONFLICT", "판이 바뀌었습니다"), etag: "\"9\"");
+
+        var result = await Create(http).PatchAsync(8, MovePatch());
+
+        Assert.Equal(9, Assert.IsType<UnitLayoutWriteResult.Conflict>(result).CurrentVersion);
+    }
+
+    [Fact]
+    public async Task should_return_conflict_when_412_code_is_precondition_failed()
+    {
+        // §12.2 — 412 에는 VERSION_CONFLICT(지금) · PRECONDITION_FAILED(매핑 폴백) 둘이 올 수 있다. 상태로 가른다.
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.PreconditionFailed, Error("PRECONDITION_FAILED", "전제 조건 불일치"), etag: "\"12\"");
+
+        var result = await Create(http).PatchAsync(8, MovePatch());
+
+        Assert.Equal(12, Assert.IsType<UnitLayoutWriteResult.Conflict>(result).CurrentVersion);
+    }
+
+    [Fact]
+    public async Task should_mark_client_outdated_when_422_names_layout_version()
+    {
+        // 회신 §2 — details[0].field == layout_version → "클라이언트 갱신 필요"(서버 판이 더 높다).
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.UnprocessableEntity, Downgrade422V804);
+
+        var result = await Create(http).PatchAsync(10, MovePatch());
+
+        Assert.Equal(UnitLayoutRejectKind.ClientOutdated, Assert.IsType<UnitLayoutWriteResult.Rejected>(result).Kind);
+    }
+
+    [Fact]
+    public async Task should_mark_bump_needs_clear_all_when_422_names_clear_all()
+    {
+        // 회신 §2 — details[0].field == clear_all → 판 올림 요청 형식 오류.
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.UnprocessableEntity, BumpWithoutClearAll422V804);
+
+        var result = await Create(http).PatchAsync(9, new UnitLayoutPatchDto { LayoutVersion = 2 });
+
+        Assert.Equal(UnitLayoutRejectKind.BumpNeedsClearAll, Assert.IsType<UnitLayoutWriteResult.Rejected>(result).Kind);
+    }
+
+    [Fact]
+    public async Task should_mark_plain_validation_when_422_names_another_field()
+    {
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.UnprocessableEntity,
+            Error("VALIDATION_ERROR", "검증 실패", new[] { new { field = "unit_id", code = "CONSTRAINT", message = "없는 부대" } }));
+
+        var result = await Create(http).PatchAsync(13, MovePatch());
+
+        Assert.Equal(UnitLayoutRejectKind.Validation, Assert.IsType<UnitLayoutWriteResult.Rejected>(result).Kind);
+    }
+
+    [Fact]
+    public async Task should_reject_locally_without_network_when_set_and_clear_exceed_1000_items()
+    {
+        // §11-A.6 — set · clear 합산 최대 1,000 항목. 넘으면 서버가 422 로 전체를 거절하므로 보내지 않는다.
+        var http = new ScriptedLayoutHttp();
+        var patch = new UnitLayoutPatchDto { LayoutVersion = 1 };
+        for (var id = 1; id <= 600; id++) patch.Set.Add(new UnitLayoutItemDto { UnitId = id, Dx = 1, Dy = 1 });
+        for (var id = 601; id <= 1001; id++) patch.Clear.Add(id);
+
+        var result = await Create(http).PatchAsync(13, patch);
+
+        Assert.Equal(UnitLayoutRejectKind.Validation, Assert.IsType<UnitLayoutWriteResult.Rejected>(result).Kind);
+        Assert.Empty(http.Requests);
+    }
+
+    [Fact]
+    public async Task should_send_when_set_and_clear_are_exactly_1000_items()
+    {
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.OK, Envelope(Doc(14, 1)), etag: "\"14\"");
+        var patch = new UnitLayoutPatchDto { LayoutVersion = 1 };
+        for (var id = 1; id <= 500; id++) patch.Set.Add(new UnitLayoutItemDto { UnitId = id, Dx = 1, Dy = 1 });
+        for (var id = 501; id <= 1000; id++) patch.Clear.Add(id);
+
+        var result = await Create(http).PatchAsync(13, patch);
+
+        Assert.IsType<UnitLayoutWriteResult.Ok>(result);
+        Assert.Single(http.Requests);
+    }
+
+    [Fact]
+    public async Task should_send_bump_body_with_clear_all_and_higher_layout_version_when_bumping()
+    {
+        // 회신 §2 1번 안 — 판 올림 = clear_all:true + 더 큰 layout_version + If-Match(한쪽만 성공 · 다른 쪽 412).
+        var http = new ScriptedLayoutHttp().Reply(HttpStatusCode.OK, Envelope(Doc(10, 2)), etag: "\"10\"");
+
+        var result = await Create(http).PatchAsync(9, new UnitLayoutPatchDto { LayoutVersion = 2, ClearAll = true });
+
+        var ok = Assert.IsType<UnitLayoutWriteResult.Ok>(result);
+        Assert.Equal(2, ok.Document.LayoutVersion);
+        Assert.Equal(10, ok.ETagVersion);
+        var sent = Assert.Single(http.Requests);
+        Assert.Equal("\"9\"", sent.Headers["If-Match"]);
+        Assert.Equal(2, (int)sent.Body!["layout_version"]!);
+        Assert.True((bool)sent.Body!["clear_all"]!);
+        Assert.Empty((JArray)sent.Body!["set"]!);
+        Assert.Empty((JArray)sent.Body!["clear"]!);
+    }
 
     [Theory]
     [InlineData(HttpStatusCode.NotFound)]

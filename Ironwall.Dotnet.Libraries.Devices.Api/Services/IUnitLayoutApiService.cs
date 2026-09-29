@@ -17,8 +17,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Services;
 /// <para><b>새 인터페이스</b>다 — <see cref="IUnitApiService"/> 를 넓히지 않는다(NFR-10: 그 가짜 · 목이 전부 깨진다).</para>
 /// <para><b>결과는 판별 공용체</b>다 — 404 · 412 · 타임아웃을 예외로 흘리지 않는다. 부르는 쪽(관계도 뷰모델 · 포트)은
 /// <c>switch</c> 한 번으로 지원 판정(FR-50) · 충돌(FR-52) · 실패 복구(FR-34)를 가른다.</para>
-/// <para>계약은 <b>제안형</b>이다(PRD §3.4) — 2026-09-28 현재 어느 서버 판에도 이 경로가 없다(8.0.x 는 422, 운영 6.3.2 는 부대 표면 0건).
-/// S-1 이 들어오면 IMPL-50 이 키 이름 · 412 본문 · ETag 형식을 실측으로 맞춘다.</para>
+/// <para>계약은 <b>서버 v8.0.4 확정</b>이다(REST §11-A.6 · 회신 2026-09-29 — 요청 스펙 ①~⑧ 그대로 + 판 올림 1번 안). 8.0.3 이하는 이 경로가 없어
+/// <c>/{unit_id}</c> 로 읽혀 422(<c>path.unit_id</c>)를 내고(미지원 판정 — ⑧), 운영 6.3.2 는 부대 표면이 없다. 키 · 412 본문 · <c>ETag</c> 따옴표는
+/// 8.0.4 검증 컨테이너 openapi 와 명세 실행 예시(2026-09-29)로 대조했다(IMPL-50).</para>
 /// <para>스레드: 어느 스레드에서 불러도 된다. 구현은 <c>ConfigureAwait(false)</c> — 결과를 UI 에 쓰려면 호출부가 돌아온다.</para>
 /// </remarks>
 public interface IUnitLayoutApiService
@@ -67,6 +68,25 @@ public enum UnitLayoutFailureKind
     Other,
 }
 
+/// <summary>쓰기 422 의 종류(<see cref="UnitLayoutWriteResult.Rejected"/>) — 문구와 다음 동작을 가른다.</summary>
+public enum UnitLayoutRejectKind
+{
+    /// <summary>그 밖의 검증 실패(없는 부대 · 중복 · 범위 · 모르는 키 · 1,000 항목 초과 등). 재시도 유도 금지.</summary>
+    Validation,
+
+    /// <summary>
+    /// <c>details[0].field == "layout_version"</c>(<c>VALUE_NOT_ALLOWED</c>) — 요청 판이 서버 판보다 낮다.
+    /// 서버가 더 새 자동 배치 규칙으로 올라갔다 → <b>클라이언트 갱신 필요</b>(쓰기 금지 · 읽기 전용).
+    /// </summary>
+    ClientOutdated,
+
+    /// <summary>
+    /// <c>details[0].field == "clear_all"</c>(<c>CONSTRAINT</c>) — 더 큰 판을 보냈는데 <c>clear_all:true</c> 가 없다.
+    /// 판 올림 요청 형식 오류(클라 결함 신호) — 판 올림은 언제나 <c>clear_all:true</c> 와 함께다.
+    /// </summary>
+    BumpNeedsClearAll,
+}
+
 /// <summary><see cref="IUnitLayoutApiService.GetAsync"/> 의 결과.</summary>
 public abstract record UnitLayoutReadResult
 {
@@ -103,7 +123,12 @@ public abstract record UnitLayoutWriteResult
     public sealed record Conflict(long? CurrentVersion) : UnitLayoutWriteResult;
 
     /// <summary>422 — 서버 규칙 위반(없는 부대 · 판 불일치 · 모르는 키 등). 전체 롤백 — 부분 적용 없음. 재시도 유도 금지.</summary>
-    public sealed record Rejected(string Reason) : UnitLayoutWriteResult;
+    /// <param name="Reason">서버 원문(로그용).</param>
+    /// <param name="Kind">
+    /// 거절 종류 — 서버 v8.0.4 는 판 422 둘을 <c>error.details[0].field</c> 로 가른다(REST §11-A.6 · 회신 2026-09-29 §2):
+    /// <c>layout_version</c> = <see cref="UnitLayoutRejectKind.ClientOutdated"/>, <c>clear_all</c> = <see cref="UnitLayoutRejectKind.BumpNeedsClearAll"/>.
+    /// </param>
+    public sealed record Rejected(string Reason, UnitLayoutRejectKind Kind = UnitLayoutRejectKind.Validation) : UnitLayoutWriteResult;
 
     /// <summary>배치를 쓸 수 없다 — 계약 8.0 미만(네트워크 전). 경로가 사라진 것은 하위 갈래 <see cref="EndpointGone"/>.</summary>
     public record Unsupported(int StatusCode, string Reason) : UnitLayoutWriteResult;

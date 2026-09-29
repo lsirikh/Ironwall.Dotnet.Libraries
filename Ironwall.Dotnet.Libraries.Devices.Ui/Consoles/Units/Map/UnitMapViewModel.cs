@@ -124,6 +124,12 @@ public sealed class UnitMapViewModelOptions
     public TimeSpan NoticeCoalesce { get; init; } = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
+    /// 이 클라의 자동 배치 판(<c>layout_version</c>) — 기본은 알고리즘 판 <see cref="Model.UnitMapLayout.LayoutVersion"/>.
+    /// 판 올림 · 판 불일치 경로를 새 판 클라로 흉내 내는 시험 · 미리보기만 바꾼다. 포트(어댑터)가 싣는 판과 같아야 한다.
+    /// </summary>
+    public int ClientLayoutVersion { get; init; } = Model.UnitMapLayout.LayoutVersion;
+
+    /// <summary>
     /// 기록 — 대기열 작업의 예기치 못한 예외 원문은 막대가 아니라 여기로 간다(REVIEW-01 L-6). 없으면 남기지 않는다.
     /// </summary>
     public Ironwall.Dotnet.Libraries.Base.Services.ILogService? Log { get; init; }
@@ -341,9 +347,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     {
         if (!_assessment.AppliesDeltas) return new Dictionary<int, Vector>();
 
-        var snapshot = _snapshot;
-        foreach (var change in _optimistic) snapshot = change.ApplyTo(snapshot);
-        var deltas = new Dictionary<int, Vector>(snapshot.Deltas);
+        var deltas = new Dictionary<int, Vector>(CaptureView().Doc.Deltas);
         if (_moveMode && _moveUnit is int unit)
             deltas[unit] = ClampDelta((deltas.TryGetValue(unit, out var own) ? own : default) + _moveOffset);
         return deltas;
@@ -435,6 +439,9 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     public void CompleteDrag(UnitMapDropRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        // 끄는 동안 본 배치 — 손을 놓으면(EndDrag) 미룬 배치 알림의 재조회가 곧바로 돌 수 있다(FR-53). 놓은 자리 · If-Match 기준은
+        // 그 재조회가 아니라 운영자가 보고 끈 그림이다(TEST-43 r11b D-08 — 종전엔 최신 Δ + 끈 양을 최신 판으로 보내 남의 Δ 를 덮었다).
+        var view = CaptureView();
         EndDrag();
         if (_pending is not null || _moveMode) return;     // 오버레이 · M 모드 중 두 번째 드롭은 없는 것으로
 
@@ -444,7 +451,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             case UnitMapDropKind.Position:
                 var offset = new Vector(request.WorldDx, request.WorldDy);
                 if (offset.X == 0 && offset.Y == 0) return;
-                _ = WritePositionAsync(request.UnitId, (DisplayDeltaOf(request.UnitId) ?? default) + offset);
+                _ = WritePositionAsync(request.UnitId, (ShownDelta(view, request.UnitId) ?? default) + offset, view);
                 break;
             case UnitMapDropKind.Reparent:
                 OpenPending(UnitMapConfirmKind.Reparent, request.UnitId, decision.TargetId!.Value,

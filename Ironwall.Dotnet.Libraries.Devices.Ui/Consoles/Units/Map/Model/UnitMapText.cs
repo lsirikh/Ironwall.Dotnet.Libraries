@@ -150,8 +150,10 @@ public static class UnitMapText
     /// <param name="liveOff">전역 구독이 꺼져 실시간 반영이 없다 — 모든 행에 " · 실시간 반영 꺼짐" 꼬리표(ISSUE-32).</param>
     /// <param name="sessionExpired">읽기 실패가 401 이다 — 7행의 변형 문구.</param>
     /// <param name="stale">열린 뒤 다시 읽기가 실패해 <b>마지막으로 읽은 배치</b>를 그대로 보이는 중(REVIEW-01 MEDIUM-7) — 공유 행 대신 그 사실을 말한다.</param>
+    /// <param name="serverLayoutNewer">판 불일치 중 서버 판이 이 클라보다 높다 — "클라이언트 갱신 필요"(PRD v1.8).</param>
     public static string LayoutStatus(UnitMapLayoutState state, bool canEdit, string? updatedBy = null, DateTime? updatedAtLocal = null,
-                                      bool updatedByMe = false, bool liveOff = false, bool sessionExpired = false, bool stale = false)
+                                      bool updatedByMe = false, bool liveOff = false, bool sessionExpired = false, bool stale = false,
+                                      bool serverLayoutNewer = false)
     {
         var text = state switch
         {
@@ -163,6 +165,8 @@ public static class UnitMapText
             UnitMapLayoutState.ReadFailed => sessionExpired
                 ? "로그인이 만료되어 배치를 불러오지 못했습니다"
                 : "배치를 불러오지 못했습니다 — 자동 배치로 보입니다",
+            UnitMapLayoutState.VersionMismatch when serverLayoutNewer => LayoutStatusClientOutdated,
+            UnitMapLayoutState.VersionMismatch when !canEdit => LayoutStatusOldVersionViewOnly,
             UnitMapLayoutState.VersionMismatch => "배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다",
             _ => "배치를 불러오는 중 — 자동 배치로 보입니다",
         };
@@ -365,6 +369,24 @@ public static class UnitMapText
 
     /// <summary>배치 쓰기가 서버 규칙에 맞지 않았다(422 — 재시도 유도 금지).</summary>
     public const string LayoutRejectedReason = "서버 규칙에 맞지 않아 거절됐습니다.";
+
+    /// <summary>쓰기 422 · <c>details[0].field = layout_version</c> — 서버 판이 이 클라보다 높다(서버 v8.0.4 · 회신 2026-09-29 §2).</summary>
+    public const string LayoutClientOutdatedReason = "서버의 배치 판이 이 클라이언트보다 새것입니다 — 클라이언트 갱신이 필요합니다.";
+
+    /// <summary>판 불일치 · 서버 판이 더 높다 — 읽기 전용(FR-11 표 5행 변형, PRD v1.8).</summary>
+    public const string LayoutStatusClientOutdated = "서버 배치 판이 더 새것이라 자동 배치로 보입니다 — 클라이언트 갱신 필요 · 위치를 옮길 수 없습니다";
+
+    /// <summary>판 불일치 · 서버가 옛 판이고 보기 권한뿐이다 — 올리지 않는다(PRD v1.8).</summary>
+    public const string LayoutStatusOldVersionViewOnly = "배치가 옛 판이라 자동 배치로 보입니다 — 편집 권한이 있는 운영자가 열면 새 판으로 올라갑니다";
+
+    /// <summary>
+    /// 판 올림 성공(서버 v8.0.4 · <c>clear_all</c> + 더 큰 <c>layout_version</c>) — 조용히 올리고 막대로 한 번 알린다(PRD v1.8). 되돌리기 없음.
+    /// </summary>
+    /// <param name="clearedCount">옛 판에서 옮겨 두었던 부대 수(올림으로 자동 배치로 돌아간 곳).</param>
+    public static string LayoutVersionBumpedBar(int clearedCount)
+        => clearedCount > 0
+            ? $"자동 배치 규칙이 바뀌어 공유 배치를 새 판으로 올렸습니다 — 옮겨 두었던 {clearedCount}곳은 자동 배치로 돌아갔습니다."
+            : "자동 배치 규칙이 바뀌어 공유 배치를 새 판으로 올렸습니다.";
 
     /// <summary>검색 — 일치 없음(조정자 필수 항목 2).</summary>
     public static string SearchNoMatch(string query)

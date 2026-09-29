@@ -25,6 +25,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
                     약 5 ms 먼저 온다(probe log V-11).
                   - 다른 운영자 흉내(SimulateOther*) · 다음 쓰기 결과 주입(FailNextWrite*) · 모드 전환(Mode).
                   - ForClient("A") 로 같은 서버를 보는 클라이언트 창구를 여럿 만든다(2클라이언트 시뮬레이션).
+                  - 서버 v8.0.4 판 규칙(REST §11-A.6 · 회신 2026-09-29 §2)을 흉내 낸다 — 창구마다 싣는 layout_version(어댑터 몫)으로:
+                    같음 = 일반 쓰기 · 큼 + clear_all = 판 올림(항목 전부 삭제 → 판 갱신 → set 적용) · 큼 + clear_all 없음 = 422 clear_all ·
+                    작음 = 422 layout_version(내리기 없음). 412 가 먼저다.
 ****************************************************************************/
 
 /// <summary>가짜 서버가 흉내 내는 판본.</summary>
@@ -42,7 +45,9 @@ public enum FakeLayoutServerMode
 
 /// <summary>기록된 쓰기 한 건.</summary>
 /// <param name="SnapshotBefore">쓰기 직전 서버 문서.</param>
-internal sealed record FakeLayoutWrite(string Client, long IfMatch, UnitLayoutChange Change, UnitLayoutWrite Result, UnitLayoutSnapshot SnapshotBefore)
+/// <param name="RequestedLayoutVersion">창구가 실은 <c>layout_version</c>(어댑터가 싣는 이 클라의 판).</param>
+internal sealed record FakeLayoutWrite(string Client, long IfMatch, UnitLayoutChange Change, UnitLayoutWrite Result, UnitLayoutSnapshot SnapshotBefore,
+                                       int RequestedLayoutVersion = UnitMapLayout.LayoutVersion)
 {
     public bool Succeeded => Result is UnitLayoutWrite.Saved;
     public long VersionBefore => SnapshotBefore.Version;
@@ -69,6 +74,9 @@ internal sealed class FakeUnitLayoutApi : IUnitLayoutApi
 
     /// <summary><see cref="FakeLayoutServerMode.Failing"/> 일 때 돌려줄 실패 종류.</summary>
     public UnitLayoutFailureKind FailureKind { get; set; } = UnitLayoutFailureKind.Timeout;
+
+    /// <summary>기본 창구(<c>"main"</c>)가 싣는 <c>layout_version</c> — 어댑터의 이 클라 판 흉내. 기본은 알고리즘 판.</summary>
+    public int ClientLayoutVersion { get; set; } = UnitMapLayout.LayoutVersion;
 
     /// <summary>쓰기가 성공할 때 기록할 변경자 이름(클라이언트 표지 → 이름). 없으면 표지 그대로.</summary>
     public Func<string, string>? ActorName { get; set; }
@@ -127,14 +135,16 @@ internal sealed class FakeUnitLayoutApi : IUnitLayoutApi
     }
 
     /// <summary>같은 서버를 보는 다른 클라이언트 창구(쓰기 기록에 <paramref name="client"/> 표지가 남는다).</summary>
-    public IUnitLayoutApi ForClient(string client) => new ClientView(this, client);
+    /// <param name="clientLayoutVersion">그 창구가 싣는 <c>layout_version</c>(옛 판 · 새 판 클라 흉내). 없으면 알고리즘 판.</param>
+    public IUnitLayoutApi ForClient(string client, int? clientLayoutVersion = null)
+        => new ClientView(this, client, clientLayoutVersion ?? UnitMapLayout.LayoutVersion);
     #endregion
 
     #region - IUnitLayoutApi -
     public Task<UnitLayoutRead> ReadAsync(CancellationToken token = default) => ReadCore();
 
     public Task<UnitLayoutWrite> WriteAsync(long ifMatchVersion, UnitLayoutChange change, CancellationToken token = default)
-        => WriteCore("main", ifMatchVersion, change);
+        => WriteCore("main", ClientLayoutVersion, ifMatchVersion, change);
     #endregion
 
     #region - 서버 흉내 -
@@ -154,7 +164,7 @@ internal sealed class FakeUnitLayoutApi : IUnitLayoutApi
         return Task.FromResult(result);
     }
 
-    private Task<UnitLayoutWrite> WriteCore(string client, long ifMatch, UnitLayoutChange change)
+    private Task<UnitLayoutWrite> WriteCore(string client, int requestedLayoutVersion, long ifMatch, UnitLayoutChange change)
     {
         ArgumentNullException.ThrowIfNull(change);
         UnitLayoutWrite result;
@@ -178,13 +188,24 @@ internal sealed class FakeUnitLayoutApi : IUnitLayoutApi
             {
                 result = new UnitLayoutWrite.Conflict(_current.Version);
             }
+            else if (requestedLayoutVersion < _current.LayoutVersion)
+            {
+                // 내리기 없음 — clear_all 여부 무관, 문서 불변(서버 test_should_reject_downgrade_when_layout_version_is_lower).
+                result = new UnitLayoutWrite.Rejected("배치 판이 서버 판보다 낮습니다 — 클라이언트를 갱신하십시오", UnitLayoutRejectKind.ClientOutdated);
+            }
+            else if (requestedLayoutVersion > _current.LayoutVersion && !change.ClearAll)
+            {
+                result = new UnitLayoutWrite.Rejected("배치 판을 올리려면 clear_all: true 를 함께 보내야 합니다", UnitLayoutRejectKind.BumpNeedsClearAll);
+            }
             else
             {
-                _current = Bump(change.ApplyTo(_current), ActorName?.Invoke(client) ?? client);
+                // 같은 판 = 일반 쓰기 · 더 큰 판 + clear_all = 판 올림(항목 전부 삭제 → 판 갱신 → 같은 요청의 set 적용).
+                var basis = requestedLayoutVersion > _current.LayoutVersion ? _current with { LayoutVersion = requestedLayoutVersion } : _current;
+                _current = Bump(change.ApplyTo(basis), ActorName?.Invoke(client) ?? client);
                 result = new UnitLayoutWrite.Saved(_current);
                 published = _current.Version;
             }
-            Writes.Add(new FakeLayoutWrite(client, ifMatch, change, result, before));
+            Writes.Add(new FakeLayoutWrite(client, ifMatch, change, result, before, requestedLayoutVersion));
         }
         if (published is long v) Published?.Invoke(v);   // 메아리가 응답보다 먼저(V-11)
         return Task.FromResult(result);
@@ -202,17 +223,19 @@ internal sealed class FakeUnitLayoutApi : IUnitLayoutApi
     {
         private readonly FakeUnitLayoutApi _server;
         private readonly string _client;
+        private readonly int _layoutVersion;
 
-        public ClientView(FakeUnitLayoutApi server, string client)
+        public ClientView(FakeUnitLayoutApi server, string client, int layoutVersion)
         {
             _server = server;
             _client = client;
+            _layoutVersion = layoutVersion;
         }
 
         public Task<UnitLayoutRead> ReadAsync(CancellationToken token = default) => _server.ReadCore();
 
         public Task<UnitLayoutWrite> WriteAsync(long ifMatchVersion, UnitLayoutChange change, CancellationToken token = default)
-            => _server.WriteCore(_client, ifMatchVersion, change);
+            => _server.WriteCore(_client, _layoutVersion, ifMatchVersion, change);
     }
     #endregion
 }

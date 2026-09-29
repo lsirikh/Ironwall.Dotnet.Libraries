@@ -46,7 +46,8 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 // ⚠ 전역 자원은 **부대 토큰이 아니라 `global`** 로 발행된다.
                 //    서버 `db_monitor/main.py:61,64,89` — GLOBAL_UNIT_TOKEN="global",
                 //    GLOBAL_CMDS = {SYNC_CATALOG, SYNC_CATEGORY, SYNC_ACTION_REPORT_TEMPLATE,
-                //                   SYNC_FILE_GROUP, SYNC_UNIT}.
+                //                   SYNC_FILE_GROUP, SYNC_UNIT} + v8.0.4 SYNC_UNIT_LAYOUT(all.sync.unit-layout).
+                //    서버 공지 2026-09-29 가 요구한 `sensorway.global.all.sync.>` 는 이 한 줄(`{domain}.global.>`)이 이미 덮는다.
                 //    우리 기본 구독은 `{도메인}.{부대}.{서브시스템}.>` 리터럴이라 두 번째 토큰이
                 //    `global` 인 메시지를 **와일드카드로도 받지 못한다.**
                 //    명세가 "단일 부대 배포는 무변화"라고 했지만 이 5종은 예외다 —
@@ -107,7 +108,8 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 // ⚠ 전역 자원은 **부대 토큰이 아니라 `global`** 로 발행된다.
                 //    서버 `db_monitor/main.py:61,64,89` — GLOBAL_UNIT_TOKEN="global",
                 //    GLOBAL_CMDS = {SYNC_CATALOG, SYNC_CATEGORY, SYNC_ACTION_REPORT_TEMPLATE,
-                //                   SYNC_FILE_GROUP, SYNC_UNIT}.
+                //                   SYNC_FILE_GROUP, SYNC_UNIT} + v8.0.4 SYNC_UNIT_LAYOUT(all.sync.unit-layout).
+                //    서버 공지 2026-09-29 가 요구한 `sensorway.global.all.sync.>` 는 이 한 줄(`{domain}.global.>`)이 이미 덮는다.
                 //    우리 기본 구독은 `{도메인}.{부대}.{서브시스템}.>` 리터럴이라 두 번째 토큰이
                 //    `global` 인 메시지를 **와일드카드로도 받지 못한다.**
                 //    명세가 "단일 부대 배포는 무변화"라고 했지만 이 5종은 예외다 —

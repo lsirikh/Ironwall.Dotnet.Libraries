@@ -97,6 +97,13 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
         patch.Set ??= new List<UnitLayoutItemDto>();
         patch.Clear ??= new List<int>();
 
+        // set · clear 합산 1,000 항목 상한(REST §11-A.6) — 넘으면 서버가 422 로 전체를 거절하므로 보내지 않는다.
+        if (patch.Set.Count + patch.Clear.Count > MAX_BATCH_ITEMS)
+        {
+            _log?.Warning($"[{nameof(UnitLayoutApiService)}] 배치 쓰기 항목이 {patch.Set.Count + patch.Clear.Count}개라 보내지 않았습니다(상한 {MAX_BATCH_ITEMS}).");
+            return new UnitLayoutWriteResult.Rejected($"한 번에 {MAX_BATCH_ITEMS}곳까지 저장할 수 있습니다.");
+        }
+
         try
         {
             var headers = new Dictionary<string, string>
@@ -117,15 +124,18 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
                 return new UnitLayoutWriteResult.Ok(envelope.Data, ParseETag(response));
             }
 
+            // 412 — 코드는 VERSION_CONFLICT(지금) · PRECONDITION_FAILED(매핑 폴백) 둘 다 올 수 있어 상태로 가른다(§12.2).
+            //   현재 판은 details.current_version 이 정본, 없으면 응답 헤더 ETag(v8.0.4 는 412 에도 싣는다 — 회신 §1 ④).
             if (status == 412)
-                return new UnitLayoutWriteResult.Conflict(ReadCurrentVersion(envelope.Error));
+                return new UnitLayoutWriteResult.Conflict(ReadCurrentVersion(envelope.Error) ?? ParseETag(response));
 
             // 422 는 먼저 본다 — 쓰기의 422 는 언제나 검증 실패다(FR-50 v1.2: 422 → 미지원 해석은 프로브 GET 한정).
             //   path.unit_id 를 짚는 422 라도 미지원으로 읽으면 세션 전용으로 조용히 넘어가 서버 거절이 숨는다.
             if (status == 422)
             {
-                _log?.Warning($"[{nameof(UnitLayoutApiService)}] 배치 쓰기 거절(422): {envelope.Error?.Message} {envelope.Error?.Details}");
-                return new UnitLayoutWriteResult.Rejected(envelope.Error?.Message ?? "서버 규칙에 맞지 않아 거절됐습니다.");
+                var kind = RejectKindOf(envelope.Error);
+                _log?.Warning($"[{nameof(UnitLayoutApiService)}] 배치 쓰기 거절(422 · {kind}): {envelope.Error?.Message} {envelope.Error?.Details}");
+                return new UnitLayoutWriteResult.Rejected(envelope.Error?.Message ?? "서버 규칙에 맞지 않아 거절됐습니다.", kind);
             }
 
             // 지원 중이던 경로가 사라졌다(404 · 405 · 410 · ENDPOINT_REMOVED) → 부르는 쪽이 세션 전용으로 넘긴다(SIM-F059 · 분석 ISSUE-6).
@@ -167,6 +177,22 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
         if (status == 422 && error is not null)
             return error.FieldErrors.Any(f => string.Equals(f.Field, PATH_UNIT_ID_FIELD, StringComparison.Ordinal));
         return false;
+    }
+
+    /// <summary>
+    /// 쓰기 422 의 종류 — 서버 v8.0.4 는 판 422 둘을 <c>error.details[0].field</c> 로 가른다(REST §11-A.6 · 회신 §2).
+    /// <c>layout_version</c>(<c>VALUE_NOT_ALLOWED</c>) = 요청 판이 서버보다 낮다 → 클라이언트 갱신 필요 ·
+    /// <c>clear_all</c>(<c>CONSTRAINT</c>) = 더 큰 판을 <c>clear_all</c> 없이 보냈다 · 그 밖 = 일반 검증 실패.
+    /// </summary>
+    internal static UnitLayoutRejectKind RejectKindOf(ApiError? error)
+    {
+        var first = error?.FieldErrors.FirstOrDefault()?.Field;
+        return first switch
+        {
+            LAYOUT_VERSION_FIELD => UnitLayoutRejectKind.ClientOutdated,
+            CLEAR_ALL_FIELD => UnitLayoutRejectKind.BumpNeedsClearAll,
+            _ => UnitLayoutRejectKind.Validation,
+        };
     }
 
     /// <summary>상태 코드 → 실패 종류.</summary>
@@ -222,6 +248,15 @@ public sealed class UnitLayoutApiService : IUnitLayoutApiService
     #region - Attributes -
     /// <summary>라우트 가림 422 의 표지 — 8.0.3 실측(<c>error.details[].field</c>).</summary>
     internal const string PATH_UNIT_ID_FIELD = "path.unit_id";
+
+    /// <summary>판 내리기 422 의 표지(v8.0.4) — 요청 판이 서버 판보다 낮다.</summary>
+    internal const string LAYOUT_VERSION_FIELD = "layout_version";
+
+    /// <summary>판 올림 형식 오류 422 의 표지(v8.0.4) — 더 큰 판을 <c>clear_all</c> 없이 보냈다.</summary>
+    internal const string CLEAR_ALL_FIELD = "clear_all";
+
+    /// <summary>한 번의 일괄 쓰기에 실을 수 있는 <c>set</c> + <c>clear</c> 항목 수(REST §11-A.6).</summary>
+    internal const int MAX_BATCH_ITEMS = 1000;
 
     private readonly ILogService? _log;
     private readonly IApiService _apiService;

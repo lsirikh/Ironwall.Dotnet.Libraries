@@ -120,6 +120,8 @@ public interface IUnitApiService : IService
     /// 🔴 <c>dto.AdjacentUnitIds</c> 가 <c>null</c> 이면 <b>호출하지 않고 거절한다</b> —
     /// 생략하면 서버가 인접을 전삭제하기 때문이다. 현재 값을 실으려면
     /// <c>UnitReplaceDto.FromCurrent(단건 조회 결과)</c> 를 쓰고, 정말 비울 의도라면 빈 목록을 명시한다.
+    /// <para>🔴 <c>dto.ParentId</c> 가 <c>null</c> 이고 <c>dto.IsRootIntended</c> 가 아니면 <b>호출하지 않고 거절한다</b> —
+    /// 생략하면 서버가 그 부대를 루트로 옮기고 관계도 배치 행까지 지운다(서버 v8.0.4 회신 ⑦). 부분 수정은 <see cref="PatchUnitAsync"/> 다.</para>
     /// </remarks>
     Task<ApiResponse<UnitDto>> ReplaceUnitAsync(
         int unitId,

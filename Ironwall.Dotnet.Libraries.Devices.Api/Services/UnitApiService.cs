@@ -335,6 +335,14 @@ public class UnitApiService : IUnitApiService
                 + "현재 값을 유지하려면 UnitReplaceDto.FromCurrent(단건 조회 결과) 로 만들고, "
                 + "부분 수정이라면 PATCH(PatchUnitAsync)를 쓰고, 정말 비울 의도라면 빈 목록을 명시하십시오.");
 
+        // 🔴 루트 이동 방지 게이트 — PUT 에서 parent_id 를 빼면 서버는 그 부대를 루트로 옮기고, 편제가 바뀐 부대의
+        //    관계도 배치 행까지 지운다(서버 v8.0.4 회신 2026-09-29 ⑦ · REST §11-A.6). 최상위로 두는 것이 의도일 때만 보낸다.
+        if (dto.ParentId is null && !dto.IsRootIntended)
+            return LocalValidationError<UnitDto>("parent_id",
+                "PUT 은 전체 교체입니다 — parent_id 를 생략하면 서버가 이 부대를 최상위로 옮기고 관계도 배치도 지웁니다. "
+                + "일부 필드만 고치려면 PATCH(PatchUnitAsync)를, 현재 값을 유지하려면 UnitReplaceDto.FromCurrent(단건 조회 결과)를 쓰고, "
+                + "정말 최상위로 옮길 의도라면 IsRootIntended = true 로 밝히십시오.");
+
         if (string.IsNullOrWhiteSpace(dto.Name))
             return LocalValidationError<UnitDto>("name", "부대 이름은 1자 이상이어야 합니다.");
 

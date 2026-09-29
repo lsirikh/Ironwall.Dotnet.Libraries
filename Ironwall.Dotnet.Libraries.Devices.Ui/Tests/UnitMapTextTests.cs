@@ -176,14 +176,25 @@ public class UnitMapTextTests
 
     [Theory]
     [InlineData(UnitMapLayoutState.Loading, "배치를 불러오는 중 — 자동 배치로 보입니다")]
-    [InlineData(UnitMapLayoutState.VersionMismatch, "배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다")]
     [InlineData(UnitMapLayoutState.SessionOnly, "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다")]
     [InlineData(UnitMapLayoutState.ReadFailed, "배치를 불러오지 못했습니다 — 자동 배치로 보입니다")]
     public void should_describe_layout_state_when_not_shared(UnitMapLayoutState state, string expected)
     {
-        // 1 · 5 · 6 · 7 행
+        // 1 · 6 · 7 행 — 권한과 무관(5 행 판 불일치는 PRD v1.8 에서 셋으로 갈렸다 — 아래)
         Assert.Equal(expected, UnitMapText.LayoutStatus(state, canEdit: true));
         Assert.Equal(expected, UnitMapText.LayoutStatus(state, canEdit: false));
+    }
+
+    [Fact]
+    public void should_split_version_mismatch_text_by_direction_and_permission_when_layout_version_differs()
+    {
+        // FR-11 5 행(PRD v1.8 · 서버 v8.0.4 판 올림 경로): 서버가 새것 = 클라이언트 갱신 필요(권한 무관) ·
+        // 서버가 옛 판 + 보기 권한 = 권한 있는 운영자가 열면 올라간다 · 서버가 옛 판 + 편집 권한(올림이 끝나지 않음) = 종전 문구.
+        Assert.Equal(UnitMapText.LayoutStatusClientOutdated, UnitMapText.LayoutStatus(UnitMapLayoutState.VersionMismatch, canEdit: true, serverLayoutNewer: true));
+        Assert.Equal(UnitMapText.LayoutStatusClientOutdated, UnitMapText.LayoutStatus(UnitMapLayoutState.VersionMismatch, canEdit: false, serverLayoutNewer: true));
+        Assert.Equal(UnitMapText.LayoutStatusOldVersionViewOnly, UnitMapText.LayoutStatus(UnitMapLayoutState.VersionMismatch, canEdit: false));
+        Assert.Equal("배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다",
+                     UnitMapText.LayoutStatus(UnitMapLayoutState.VersionMismatch, canEdit: true));
     }
 
     [Fact]

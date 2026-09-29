@@ -69,18 +69,29 @@ public sealed record UnitLayoutChange(IReadOnlyDictionary<int, Vector> Set, IRea
     public static UnitLayoutChange ClearEverything()
         => new(new Dictionary<int, Vector>(), Array.Empty<int>(), ClearAll: true);
 
+    /// <summary>
+    /// 판 올림 한 번(서버 v8.0.4 · 회신 2026-09-29 §2 1번 안) — <c>clear_all:true</c> 만 싣는다. 어댑터가 본문 <c>layout_version</c> 에
+    /// <b>이 클라의 판</b>을 실으므로, 서버 판보다 크면 서버가 항목을 전부 지우고 판을 올린다(<c>If-Match</c> 필수 — 동시에 올려도 한쪽만 성공).
+    /// </summary>
+    public static UnitLayoutChange LayoutVersionBump() => ClearEverything();
+
     /// <summary>이 변경이 손대는 부대 id(<c>clear_all</c> 은 포함하지 않는다 — 문서 전체다).</summary>
     public IEnumerable<int> UnitIds => Clear.Concat(Set.Keys).Distinct().OrderBy(id => id);
 
     /// <summary>
     /// 문서에 적용한 결과(순수) — <c>clear_all</c> 먼저, 그다음 <c>clear</c>, 마지막 <c>set</c>. 버전 · 변경자는 그대로 둔다.
     /// </summary>
+    /// <remarks>서버 v8.0.4 와 같게 <c>set</c> 의 dx · dy 가 <b>둘 다 0</b> 이면 그 행을 지운다(REST §11-A.6) — 한 축만 0 이면 남는다.</remarks>
     public UnitLayoutSnapshot ApplyTo(UnitLayoutSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var deltas = ClearAll ? new Dictionary<int, Vector>() : new Dictionary<int, Vector>(snapshot.Deltas);
         foreach (var id in Clear) deltas.Remove(id);
-        foreach (var (id, delta) in Set) deltas[id] = delta;
+        foreach (var (id, delta) in Set)
+        {
+            if (delta.X == 0 && delta.Y == 0) deltas.Remove(id);   // 서버: 0,0 = 행 삭제(자동 배치 그대로)
+            else deltas[id] = delta;
+        }
         return snapshot with { Deltas = deltas };
     }
 }
@@ -111,8 +122,8 @@ public abstract record UnitLayoutWrite
     /// <summary>412 — 그 사이 누가 썼다(쓰지 않았다). GET 뒤 <see cref="Model.UnitMapLayoutSync.Resolve"/> 로 판정.</summary>
     public sealed record Conflict(long? CurrentVersion) : UnitLayoutWrite;
 
-    /// <summary>422 — 서버 규칙 위반. 재시도 유도 금지.</summary>
-    public sealed record Rejected(string Reason) : UnitLayoutWrite;
+    /// <summary>422 — 서버 규칙 위반. 재시도 유도 금지. <paramref name="Kind"/> 로 판 422 둘(클라이언트 갱신 필요 · 판 올림 형식 오류)을 가른다.</summary>
+    public sealed record Rejected(string Reason, UnitLayoutRejectKind Kind = UnitLayoutRejectKind.Validation) : UnitLayoutWrite;
 
     /// <summary>경로가 사라졌다 → 세션 전용 전환.</summary>
     public record Unsupported(string Reason) : UnitLayoutWrite;
@@ -183,7 +194,7 @@ public sealed class UnitLayoutApiAdapter : IUnitLayoutApi
         {
             UnitLayoutWriteResult.Ok ok => new UnitLayoutWrite.Saved(ToSnapshot(ok.Document)),
             UnitLayoutWriteResult.Conflict c => new UnitLayoutWrite.Conflict(c.CurrentVersion),
-            UnitLayoutWriteResult.Rejected r => new UnitLayoutWrite.Rejected(r.Reason),
+            UnitLayoutWriteResult.Rejected r => new UnitLayoutWrite.Rejected(r.Reason, r.Kind),
             UnitLayoutWriteResult.EndpointGone g => new UnitLayoutWrite.EndpointGone(g.Reason),          // 하위 갈래를 먼저
             UnitLayoutWriteResult.Unsupported u => new UnitLayoutWrite.Unsupported(u.Reason),
             UnitLayoutWriteResult.PreconditionRequired p => new UnitLayoutWrite.PreconditionRequired(p.Reason),
@@ -212,13 +223,17 @@ public sealed class UnitLayoutApiAdapter : IUnitLayoutApi
     }
 
     /// <summary>변경 → 본문. 항목은 부대 id 오름차순(결정적 — 로그 · 시험 대조가 쉽다).</summary>
+    /// <remarks>
+    /// 서버는 한 요청에 같은 부대가 <c>set</c> · <c>clear</c> 합산 두 번 나오면 422 로 전체를 거절한다(REST §11-A.6). 적용 순서가
+    /// <c>clear</c> → <c>set</c> 이라 둘 다 있는 부대의 결과는 <c>set</c> 과 같으므로 <c>clear</c> 쪽에서 뺀다(중복도 한 번만).
+    /// </remarks>
     private UnitLayoutPatchDto ToPatch(UnitLayoutChange change) => new()
     {
         LayoutVersion = _clientLayoutVersion,
         Set = change.Set.OrderBy(kv => kv.Key)
                         .Select(kv => new UnitLayoutItemDto { UnitId = kv.Key, Dx = kv.Value.X, Dy = kv.Value.Y })
                         .ToList(),
-        Clear = change.Clear.Distinct().OrderBy(id => id).ToList(),
+        Clear = change.Clear.Distinct().Where(id => !change.Set.ContainsKey(id)).OrderBy(id => id).ToList(),
         ClearAll = change.ClearAll,
     };
 

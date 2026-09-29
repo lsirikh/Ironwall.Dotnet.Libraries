@@ -22,6 +22,17 @@ public class EnumGopCommandValueTests
     }
 
     [Fact]
+    public void should_register_sync_unit_layout_with_value_34_when_server_is_v8_0_4()
+    {
+        // 서버 v8.0.4 · 브로커 §9.18 — SYNC_UNIT_LAYOUT(sensorway.global.all.sync.unit-layout) 신설. 라우팅은 이름 기반이라
+        //   값은 유일성만 갖지만, 정수 로그 · 직렬화에서 다른 명령으로 오인되지 않게 고정한다(다음 빈 값 34).
+        var parsed = Enum.TryParse<EnumGopCommand>("SYNC_UNIT_LAYOUT", out var layout);
+
+        Assert.True(parsed);
+        Assert.Equal(34, (int)layout);
+    }
+
+    [Fact]
     public void should_have_unique_values_when_enumerating_all_gop_commands()
     {
         // Arrange

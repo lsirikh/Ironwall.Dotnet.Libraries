@@ -70,9 +70,9 @@ public class UnitMapMessagesTests
     }
 
     [Theory]
-    [InlineData(14L, null, 14L)]     // 클라 요청서 모양 {action, version}          — SIM-N074
-    [InlineData(null, 14L, 14L)]     // 서버 PRD 초안 모양 {action, resource_id:<v>} — SIM-N073
-    [InlineData(15L, 14L, 15L)]      // 둘 다 오면 version 이 이긴다
+    [InlineData(14L, null, 14L)]     // 옛 클라 요청서 모양 {action, version}(과도기 폴백) — SIM-N074
+    [InlineData(null, 14L, 14L)]     // 서버 v8.0.4 확정 모양 {action, resource_id:<새 문서 판>} — 브로커 §9.18
+    [InlineData(15L, 14L, 14L)]      // 둘 다 오면 정본 resource_id 가 이긴다(v8.0.4 확정)
     [InlineData(0L, 14L, 14L)]       // version 이 비정상이면 resource_id 로
     public void should_read_the_layout_version_from_either_body_key(long? version, long? resourceId, long expected)
     {
@@ -89,7 +89,8 @@ public class UnitMapMessagesTests
     [Theory]
     [InlineData("14", null, 14L)]      // {action, version:14}
     [InlineData(null, "14", 14L)]      // {action, resource_id:14} — 서버 PRD 초안
-    [InlineData("15", "14", 15L)]      // 둘 다 → version
+    [InlineData("15", "14", 14L)]      // 둘 다 → resource_id(서버 v8.0.4 정본)
+    [InlineData("15", "abc", 15L)]     // resource_id 가 숫자가 아니면 version(과도기 폴백)
     [InlineData("abc", "14", 14L)]     // version 이 숫자가 아니면 resource_id
     public void should_read_the_notice_version_from_raw_body_values(string? version, string? resourceId, long expected)
     {

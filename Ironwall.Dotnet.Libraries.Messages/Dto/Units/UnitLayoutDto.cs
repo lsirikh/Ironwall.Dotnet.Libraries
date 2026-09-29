@@ -15,8 +15,8 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Units;
 /// 공유 배치 문서 하나(조직 공용) — <c>GET /api/units/layout</c> 과 <c>PATCH</c> 성공 응답의 <c>data</c>.
 /// </summary>
 /// <remarks>
-/// <para>⚠ <b>제안형 계약</b>이다(PRD §3.4 · 서버 요청서 R-1). 2026-09-28 현재 어느 서버 판에도 이 경로가 없다 —
-/// 8.0.x 는 <c>/{unit_id}</c> 가 가려 <b>422</b> 를 낸다(probe log V-06). S-1 이 들어오면 키 이름 · 모양을 실측으로 맞춘다(IMPL-50).</para>
+/// <para>서버 <b>v8.0.4</b> 확정 계약(REST §11-A.6 · 회신 2026-09-29) — 키 이름은 제안 그대로다(8.0.4 openapi <c>UnitLayoutResponse</c> 실측:
+/// 필수 <c>version</c> · <c>layout_version</c>, 나머지는 없을 수 있다). 8.0.3 이하는 이 경로가 없어 <b>422</b>(<c>path.unit_id</c>)다(probe log V-06).</para>
 /// <para>항목은 <b>Δ 가 0 이 아닌 부대만</b> 온다. 문서 <see cref="Version"/> 은 쓰기마다 +1, 헤더 <c>ETag: "&lt;version&gt;"</c> 와 같다.</para>
 /// <para>디스크에 쓰지 않는다(NFR-14) — 이 DTO 는 메모리에서만 산다.</para>
 /// </remarks>
@@ -67,8 +67,14 @@ public class UnitLayoutItemDto
 }
 
 /// <summary>
-/// 일괄 쓰기 본문 — <c>PATCH /api/units/layout</c>. 키는 <b>정확히 네 개</b>다(서버 <c>extra="forbid"</c> 가정 — 모르는 키는 422).
+/// 일괄 쓰기 본문 — <c>PATCH /api/units/layout</c>. 키는 <b>정확히 네 개</b>다(8.0.4 openapi <c>UnitLayoutPatch</c> · <c>additionalProperties:false</c> — 모르는 키는 422).
 /// </summary>
+/// <remarks>
+/// <para>적용 순서 <c>clear_all</c> → <c>clear</c> → <c>set</c>, 한 트랜잭션. <c>set</c> 의 dx · dy 가 둘 다 0 이면 그 행을 지운다.
+/// <c>set</c> · <c>clear</c> 합산 최대 1,000 항목 · 같은 부대 두 번이면 422.</para>
+/// <para><b>판 올림</b>: <see cref="LayoutVersion"/> 이 서버 판보다 크고 <see cref="ClearAll"/> 이 <c>true</c> 면 항목을 전부 지우고 판을 올린다.
+/// <c>clear_all</c> 없이 크면 422(<c>details[0].field = clear_all</c>), 작으면 422(<c>layout_version</c>) — 내리기는 없다.</para>
+/// </remarks>
 /// <remarks>
 /// <para>빈 목록도 <c>[]</c> 로 싣는다(생략 · <c>null</c> 금지) — 서버 검증이 목록을 기대한다.
 /// <see cref="ClearAll"/> 과 <see cref="Set"/>/<see cref="Clear"/> 를 함께 보내면 서버가 <c>clear_all</c> 을 먼저 적용한다(S-1 ③).</para>

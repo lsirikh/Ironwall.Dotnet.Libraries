@@ -21,7 +21,21 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
 
 public sealed partial class UnitMapViewModel
 {
-    private readonly List<UnitLayoutChange> _optimistic = new();
+    /// <summary>대기 중인 위치 쓰기(먼저 그린 낙관 변경) — 도착 순서. 번호는 "그 쓰기가 닿지 못했다" 를 뒤따른 쓰기가 알아보는 데 쓴다(MEDIUM-2).</summary>
+    private readonly List<PendingPosition> _optimistic = new();
+
+    /// <summary>412 · 실패로 서버에 닿지 못한 위치 쓰기의 번호 — 그것을 본 채 놓은 뒤따른 쓰기는 보내지 않는다(REVIEW-01 MEDIUM-2).</summary>
+    private readonly HashSet<long> _lostWrites = new();
+    private long _writeSeq;
+
+    private sealed record PendingPosition(long Seq, UnitLayoutChange Change);
+
+    /// <summary>
+    /// 운영자가 확정하는 순간 <b>눈으로 본</b> 배치 — 서버 문서 + 그때 대기 중이던 내 낙관 변경(M 미리보기 제외).
+    /// 끌기 · <c>M</c> 모드를 끝내면 미뤄 둔 알림의 재조회가 곧바로 돌 수 있으므로(FR-53), 반드시 손을 놓기 <b>전에</b> 잡는다(TEST-43 r11b).
+    /// </summary>
+    private sealed record LayoutView(UnitLayoutSnapshot Doc, IReadOnlyList<PendingPosition> Pending);
+
     private readonly CoalescingTrigger _noticeTrigger;
     private UnitMapLayoutAssessment _assessment = UnitMapLayoutAssessment.Loading;
     private UnitLayoutSnapshot _snapshot = UnitLayoutSnapshot.Empty();
@@ -52,7 +66,8 @@ public sealed partial class UnitMapViewModel
             return UnitMapText.LayoutStatus(LayoutState, _commands.CanEdit, _snapshot.UpdatedByName, _snapshot.UpdatedAt?.LocalDateTime, byMe,
                                             liveOff: _options.IsLiveOff?.Invoke() == true,
                                             sessionExpired: (_layoutStale ? _staleFailure : _assessment.Failure) == UnitLayoutFailureKind.Unauthorized,
-                                            stale: _layoutStale);
+                                            stale: _layoutStale,
+                                            serverLayoutNewer: _assessment.ServerLayoutNewer);
         }
     }
 
@@ -60,6 +75,9 @@ public sealed partial class UnitMapViewModel
     public bool CanRetryLayout => LayoutState == UnitMapLayoutState.ReadFailed || _layoutStale;
 
     private long? HaveVersion => LayoutState is UnitMapLayoutState.Shared or UnitMapLayoutState.VersionMismatch ? _snapshot.Version : null;
+
+    /// <summary>이 클라의 자동 배치 판 — 문서의 <c>layout_version</c> 과 견준다(기본 = 알고리즘 판, 시험 · 미리보기만 바꾼다).</summary>
+    private int ClientLayoutVersion => _options.ClientLayoutVersion;
 
     private void NotifyLayout()
     {
@@ -85,9 +103,39 @@ public sealed partial class UnitMapViewModel
     /// <summary>[다시 시도] — GET 1회.</summary>
     public Task RetryLayoutAsync() => Serialize(() => ReloadLayoutAsync(CancellationToken.None));
 
+    /// <summary>판 올림 시도 상한 — 412(다른 운영자가 먼저 올렸다)면 다시 읽어 한 번 더 판정한다. 무한 반복 금지.</summary>
+    private const int MaxLayoutBumpAttempts = 2;
+
+    /// <summary>
+    /// 배치 문서를 읽는다. 문서가 <b>옛 판</b>이고 편집 권한이 있으면 여기서 <b>한 번</b> 올린다(서버 v8.0.4 · 회신 2026-09-29 §4.5 · PRD v1.8 FR-07-A) —
+    /// <c>clear_all:true</c> + 이 클라의 <c>layout_version</c> + <c>If-Match</c>(읽은 판). 옛 판의 Δ 는 새 자동 배치 규칙에서 의미가 없어 서버가 지운다.
+    /// </summary>
+    /// <remarks>
+    /// 조용히 올리고 막대로 한 번 알린다(되돌리기 없음 — 옛 판 Δ 는 되살려도 엉뚱한 자리다). 두 클라가 동시에 올리면 한쪽만 성공하고 다른 쪽은
+    /// 412 → 다시 읽어 같은 판이면 공유로 들어온다(두 번째 올림 없음). 그 밖의 실패(422 · 5xx · 시간 초과)도 다시 읽은 결과로 판정한다 —
+    /// 여전히 옛 판이면 판 불일치(쓰기 금지)로 남는다. 서버 판이 더 높으면 올리지 않는다(내리기는 없다 — 클라이언트 갱신 필요).
+    /// </remarks>
     private async Task ReloadLayoutAsync(CancellationToken token)
     {
         var read = await _api.ReadAsync(token).ConfigureAwait(true);
+        for (var attempt = 0;
+             attempt < MaxLayoutBumpAttempts
+             && LayoutState != UnitMapLayoutState.SessionOnly
+             && UnitMapLayoutSync.ShouldBumpLayoutVersion(read, _commands.CanEdit, ClientLayoutVersion);
+             attempt++)
+        {
+            var old = ((UnitLayoutRead.Supported)read).Snapshot;
+            var result = await _api.WriteAsync(old.Version, UnitLayoutChange.LayoutVersionBump(), token).ConfigureAwait(true);
+            if (result is UnitLayoutWrite.Saved saved)
+            {
+                _options.Log?.Info($"[UnitMap] 배치 판 올림 {old.LayoutVersion} → {saved.Snapshot.LayoutVersion}(문서 판 {old.Version} → {saved.Snapshot.Version}, 지운 Δ {old.Deltas.Count}곳).");
+                ApplyRead(new UnitLayoutRead.Supported(saved.Snapshot));
+                ShowBar(UnitMapText.LayoutVersionBumpedBar(old.Deltas.Count), isError: false);
+                return;
+            }
+            _options.Log?.Warning($"[UnitMap] 배치 판 올림이 끝나지 않았습니다({result.GetType().Name}) — 다시 읽어 판정합니다.");
+            read = await _api.ReadAsync(token).ConfigureAwait(true);
+        }
         ApplyRead(read);
     }
 
@@ -100,7 +148,7 @@ public sealed partial class UnitMapViewModel
     {
         if (LayoutState == UnitMapLayoutState.SessionOnly) return;
 
-        var assessment = UnitMapLayoutSync.Classify(read);
+        var assessment = UnitMapLayoutSync.Classify(read, ClientLayoutVersion);
         switch (assessment.State)
         {
             case UnitMapLayoutState.Shared:
@@ -130,42 +178,62 @@ public sealed partial class UnitMapViewModel
 
     private void SwitchToSessionOnly()
     {
-        _session ??= new SessionOnlyUnitLayoutStore();
+        _session ??= new SessionOnlyUnitLayoutStore(ClientLayoutVersion);
         _snapshot = _session.Snapshot;
         _assessment = new UnitMapLayoutAssessment(UnitMapLayoutState.SessionOnly, null);
     }
     #endregion
 
     #region - 위치 쓰기 (FR-31 · FR-34 · FR-52) -
-    /// <summary>위치 한 번 — 먼저 그리고 대기열에서 PATCH 1회(끈 부대 한 항목). 세션 전용이면 메모리만.</summary>
-    /// <remarks>
-    /// <b>놓을 때 본 자리</b>(끈 부대 + 조상의 Δ — 앞선 대기 쓰기의 낙관 변경 포함)를 적어 둔다. 차례가 왔을 때 문서가 그 자리와 다르면
-    /// (같은 부대의 앞선 쓰기가 412 · 실패로 닿지 못했거나, 그 사이 다른 운영자가 바꿨다) 보내지 않는다 — 운영자가 보지 못한 문서 위에
-    /// 새 버전으로 덮어쓰는 길을 막는다(REVIEW-01 MEDIUM-2). 되돌리기 항목도 만들지 않고, 앞선 충돌 · 실패 막대를 그대로 둔다.
-    /// </remarks>
-    private Task WritePositionAsync(int unitId, Vector newDelta)
+    /// <summary>운영자가 지금 보는 배치(서버 문서 + 대기 중 낙관 변경, M 미리보기 제외) — 확정 직전 · 손을 놓기 전에 잡는다.</summary>
+    private LayoutView CaptureView()
     {
+        var doc = _snapshot;
+        foreach (var pending in _optimistic) doc = pending.Change.ApplyTo(doc);
+        return new LayoutView(doc, _optimistic.ToList());
+    }
+
+    /// <summary>그 배치에서 부대의 Δ(화면과 같은 규칙 — 판 불일치 · 읽기 실패면 Δ 를 입히지 않는다).</summary>
+    private Vector? ShownDelta(LayoutView view, int unitId) => _assessment.AppliesDeltas ? view.Doc.DeltaOf(unitId) : null;
+
+    /// <summary>위치 한 번 — 먼저 그리고 대기열에서 PATCH 1회(끈 부대 한 항목). 세션 전용이면 메모리만.</summary>
+    /// <param name="view">운영자가 확정한 순간 본 배치(<see cref="CaptureView"/>). 없으면 지금.</param>
+    /// <remarks>
+    /// <para><b>본 배치 기준</b>으로 보낸다(TEST-43 r11b · H-10 · SIM-C013 · FR-52): 차례가 왔을 때 건드린 부대(끈 부대 + 조상)의 서버 문서가
+    /// 본 배치와 같으면(그 사이 바뀐 것이 내 앞선 쓰기뿐) 지금 버전으로, <b>다르면</b>(그 사이 미룬 알림의 재조회가 다른 운영자의 변경을 읽었다)
+    /// <b>본 판</b>을 <c>If-Match</c> 로 실어 보낸다 — 서버가 412 로 막고 FR-52 가 최신을 읽어 충돌 막대 · 최신 그림 · 재전송 0.
+    /// 종전엔 손을 놓는 순간 재조회가 먼저 돌아 최신 판으로 보냈고, 다른 운영자의 Δ 를 말없이 덮었다(r11b 실패 3건).</para>
+    /// <para>본 배치에 들어 있던 <b>내 앞선 쓰기</b>(같은 부대 · 조상)가 412 · 실패로 닿지 못했으면 보내지 않는다 — 운영자는 닿지 않은 자리를 보고
+    /// 놓았다(REVIEW-01 MEDIUM-2). 되돌리기 항목도 만들지 않고 앞선 충돌 · 실패 막대를 그대로 둔다.</para>
+    /// </remarks>
+    private Task WritePositionAsync(int unitId, Vector newDelta, LayoutView? view = null)
+    {
+        view ??= CaptureView();
         newDelta = ClampDelta(newDelta);
-        var shown = DisplayDeltas();
-        var before = shown.TryGetValue(unitId, out var own) ? own : (Vector?)null;
+        var before = ShownDelta(view, unitId);
         var change = UnitMapLayoutSync.MoveChange(unitId, newDelta);
         var name = NameOf(unitId);
         var touched = UnitMapLayoutSync.TouchedUnits(_tree, unitId);
-        var seen = touched.ToDictionary(id => id, id => shown.TryGetValue(id, out var d) ? d : (Vector?)null);
+        var dependsOn = view.Pending.Where(p => touched.Any(id => p.Change.Set.ContainsKey(id) || p.Change.Clear.Contains(id) || p.Change.ClearAll))
+                                    .Select(p => p.Seq).ToList();
+        var mine = new PendingPosition(++_writeSeq, change);
 
-        _optimistic.Add(change);
+        _optimistic.Add(mine);
         RebuildScene();
 
         return Serialize(async () =>
         {
             try
             {
-                if (!StillAsSeen(seen))
+                if (dependsOn.Any(_lostWrites.Contains))
                 {
                     if (!_barIsError) ShowBar(UnitMapText.LayoutConflictBar(name), isError: true);   // 앞선 충돌 · 실패 막대가 있으면 그것을 남긴다
                     return;
                 }
-                var commit = await CommitAsync(change, touched).ConfigureAwait(true);
+                // 본 배치와 서버 문서가 건드린 부대에서 다르면 본 판으로 — 서버가 판정한다(412 → FR-52). 같으면 지금 판(내 앞선 쓰기만 끼었다).
+                var basis = StillAsSeen(view.Doc, touched) ? null : view.Doc;
+                var commit = await CommitAsync(change, touched, basis: basis).ConfigureAwait(true);
+                if (commit.Kind is CommitKind.Conflicted or CommitKind.Failed) _lostWrites.Add(mine.Seq);
                 switch (commit.Kind)
                 {
                     case CommitKind.Saved:
@@ -189,20 +257,22 @@ public sealed partial class UnitMapViewModel
             }
             finally
             {
-                _optimistic.Remove(change);
+                _optimistic.Remove(mine);
+                if (_optimistic.Count == 0) _lostWrites.Clear();       // 기다리는 쓰기가 없다 — 그것을 볼 뒤따른 쓰기도 없다
                 RebuildScene();
             }
         }, name);
     }
 
     /// <summary>
-    /// 지금 문서(세션 전용이면 세션 문서)가 놓을 때 본 자리와 같은가 — 끈 부대 + 조상의 Δ 값 비교(REVIEW-01 MEDIUM-2).
+    /// 지금 문서(세션 전용이면 세션 문서)가 본 배치와 같은가 — 건드린 부대(끈 부대 + 조상)의 Δ 값 비교.
     /// 앞선 내 쓰기가 성공했으면 그 결과가 곧 본 자리였으므로 같다.
     /// </summary>
-    private bool StillAsSeen(IReadOnlyDictionary<int, Vector?> seen)
+    private bool StillAsSeen(UnitLayoutSnapshot seen, IEnumerable<int> touched)
     {
-        foreach (var (id, expected) in seen)
+        foreach (var id in touched)
         {
+            var expected = seen.DeltaOf(id);
             var now = _snapshot.DeltaOf(id);
             var same = (expected, now) switch
             {
@@ -220,8 +290,10 @@ public sealed partial class UnitMapViewModel
     /// 말없이 덮어쓰는 경로가 없다(NFR-15). 실패하면 서버 배치를 다시 읽어 그대로 그린다(FR-34). 대기열 안에서만 부른다.
     /// </summary>
     /// <param name="touched">건드린 부대(끈 부대 + 조상). <c>null</c> = 문서 전체(전체 초기화).</param>
-    /// <param name="ifMatch">되돌리기처럼 판정 버전을 정해 두었으면 그 값, 아니면 지금 가진 버전.</param>
-    private async Task<LayoutCommit> CommitAsync(UnitLayoutChange change, IReadOnlyCollection<int>? touched, long? ifMatch = null)
+    /// <param name="ifMatch">되돌리기처럼 판정 버전을 정해 두었으면 그 값, 아니면 기준 문서의 버전.</param>
+    /// <param name="basis">412 판정의 기준 문서 — 운영자가 본 배치(그 판이 <c>If-Match</c>). 없으면 지금 가진 문서.</param>
+    private async Task<LayoutCommit> CommitAsync(UnitLayoutChange change, IReadOnlyCollection<int>? touched, long? ifMatch = null,
+                                                 UnitLayoutSnapshot? basis = null)
     {
         if (LayoutState == UnitMapLayoutState.SessionOnly)
         {
@@ -232,7 +304,7 @@ public sealed partial class UnitMapViewModel
         if (LayoutState != UnitMapLayoutState.Shared)
             return new LayoutCommit(CommitKind.Failed, Reason: UnitMapText.LayoutReadFailedBlocked);
 
-        var basis = _snapshot;
+        basis ??= _snapshot;
         var version = ifMatch ?? basis.Version;
         var generation = _treeGeneration;
         var isRetry = false;
@@ -247,7 +319,7 @@ public sealed partial class UnitMapViewModel
 
                 case UnitLayoutWrite.Conflict:
                     var latest = await _api.ReadAsync().ConfigureAwait(true);
-                    var resolution = UnitMapLayoutSync.Resolve(basis, latest, touched, isRetry, generation != _treeGeneration);
+                    var resolution = UnitMapLayoutSync.Resolve(basis, latest, touched, isRetry, generation != _treeGeneration, ClientLayoutVersion);
                     if (resolution is UnitMapConflictResolution.Retry retry)
                     {
                         ApplySnapshot(retry.Latest);
@@ -268,9 +340,12 @@ public sealed partial class UnitMapViewModel
                     NotifyLayout();
                     return new LayoutCommit(CommitKind.SessionSaved, _snapshot);
 
-                case UnitLayoutWrite.Rejected:
+                case UnitLayoutWrite.Rejected rejected:
+                    // 422 · details[0].field = layout_version — 서버 판이 이 클라보다 높다(회신 §2). 다시 읽으면 판 불일치(서버가 새것)로 읽기 전용이 된다.
                     await ReloadLayoutAsync(CancellationToken.None).ConfigureAwait(true);
-                    return new LayoutCommit(CommitKind.Failed, Reason: UnitMapText.LayoutRejectedReason);
+                    return new LayoutCommit(CommitKind.Failed, Reason: rejected.Kind == UnitLayoutRejectKind.ClientOutdated
+                        ? UnitMapText.LayoutClientOutdatedReason
+                        : UnitMapText.LayoutRejectedReason);
 
                 case UnitLayoutWrite.Failed failed:
                     // 시간 초과는 반영됐을 수 있다 — 다시 읽은 서버 상태가 진실이다(ISSUE-6 · SIM-F065).
@@ -303,7 +378,7 @@ public sealed partial class UnitMapViewModel
             return;
         }
 
-        if (entry.Saved is null || UnitMapLayoutSync.CanUndo(entry.Saved, _snapshot, entry.Touched) is not UnitMapUndoCheck.Allowed allowed)
+        if (entry.Saved is null || UnitMapLayoutSync.CanUndo(entry.Saved, _snapshot, entry.Touched, ClientLayoutVersion) is not UnitMapUndoCheck.Allowed allowed)
         {
             Drop(entry, UnitMapText.UndoRefusedBar(name));
             return;
@@ -448,7 +523,7 @@ public sealed partial class UnitMapViewModel
             }
         }
 
-        var plan = UnitMapLayoutSync.PlanResetUndo(entry, _snapshot, _tree);
+        var plan = UnitMapLayoutSync.PlanResetUndo(entry, _snapshot, _tree, ClientLayoutVersion);
         if (plan.LayoutVersionChanged) { Drop(entry, UnitMapText.LayoutVersionBlocked); return; }
         if (plan.IsTooLarge) { Drop(entry, UnitMapText.LayoutResetTooLargeBar); return; }
         if (plan.Change is null) { Drop(entry, UnitMapText.LayoutResetNothingToRestoreBar); return; }

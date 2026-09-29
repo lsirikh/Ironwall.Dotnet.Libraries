@@ -50,8 +50,22 @@ public class UnitReplaceDto
     public string? Code { get; set; }
 
     /// <summary>상위 부대 id. <b>생략하면 루트로 올라간다</b> — 현재 상위를 유지하려면 반드시 채운다.</summary>
+    /// <remarks>
+    /// 서버 v8.0.4(REST §11-A.6 · 회신 2026-09-29 ⑦): 루트로 옮기면 편제가 바뀐 것이라 <b>그 부대의 관계도 배치 행도 지워진다</b>.
+    /// 그래서 <c>null</c> 로 보내려면 <see cref="IsRootIntended"/> 로 의도를 밝혀야 한다 — 밝히지 않으면 <c>ReplaceUnitAsync</c> 가 네트워크 전에 거절한다.
+    /// </remarks>
     [JsonProperty("parent_id", Order = 4, NullValueHandling = NullValueHandling.Ignore)]
     public int? ParentId { get; set; }
+
+    /// <summary>
+    /// <see cref="ParentId"/> 를 싣지 않는 것이 <b>의도</b>다 — 최상위 부대를 그대로 교체하거나 최상위로 옮긴다. 전송하지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 기본값 <c>false</c> — "상위를 빠뜨린 부분 수정 의도의 PUT" 이 말없이 루트 이동 + 배치 행 삭제로 이어지는 것을 막는다.
+    /// <see cref="FromCurrent"/> 는 지금 최상위인 부대에 대해서만 <c>true</c> 로 채운다. 부분 수정은 PATCH(<see cref="UnitUpdateDto"/>)다.
+    /// </remarks>
+    [JsonIgnore]
+    public bool IsRootIntended { get; set; }
 
     /// <summary>설명 — 생략하면 지워진다.</summary>
     [JsonProperty("description", Order = 5, NullValueHandling = NullValueHandling.Ignore)]
@@ -96,6 +110,7 @@ public class UnitReplaceDto
             Name = current.Name,
             Echelon = echelon,
             ParentId = current.ParentId,
+            IsRootIntended = current.ParentId is null,      // 지금 최상위면 최상위 그대로(루트 이동 아님)
             Description = current.Description,
             IsEnable = current.IsEnable,
             // 🔴 반드시 실어야 한다 — 생략하면 서버가 인접을 전삭제한다.

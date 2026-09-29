@@ -47,6 +47,26 @@ public class UnitLayoutPortTests
     }
 
     [Fact]
+    public void should_remove_row_when_set_delta_is_zero()
+    {
+        // 서버 v8.0.4(REST §11-A.6) — set 의 dx · dy 가 둘 다 0 이면 그 행을 지운다. 메모리 사본(세션 전용 · 낙관 표시)도 같게.
+        var before = Snapshot(5, (1, 10, 10), (2, 20, 20));
+
+        var after = UnitLayoutChange.SetOne(1, new Vector(0, 0)).ApplyTo(before);
+
+        Assert.Equal(new[] { 2 }, after.Deltas.Keys);
+        Assert.Null(after.DeltaOf(1));
+    }
+
+    [Fact]
+    public void should_keep_row_when_only_one_axis_of_set_delta_is_zero()
+    {
+        var after = UnitLayoutChange.SetOne(1, new Vector(-35.5, 0)).ApplyTo(Snapshot(5));
+
+        Assert.Equal(new Vector(-35.5, 0), after.DeltaOf(1));   // 서버 실행 예시: {unit_id:59, dx:-35.5, dy:0.0} 는 남는다
+    }
+
+    [Fact]
     public void should_hold_exactly_one_set_item_when_change_is_a_single_move()
     {
         var change = UnitLayoutChange.SetOne(27, new Vector(-51.1, 64.4));
@@ -137,6 +157,44 @@ public class UnitLayoutPortTests
         Assert.Equal(new[] { 7, 31 }, patch.Clear);
         Assert.False(patch.ClearAll);
         Assert.Equal(14, Assert.IsType<UnitLayoutWrite.Saved>(write).Snapshot.Version);
+    }
+
+    [Fact]
+    public async Task should_drop_clear_entry_when_the_same_unit_is_also_set()
+    {
+        // 서버는 한 요청에 같은 부대가 set · clear 합산 두 번 있으면 422 로 전체를 거절한다. clear → set 순이라 결과는 set 과 같다.
+        var service = new StubLayoutService { Write = new UnitLayoutWriteResult.Ok(Doc(14, 1, null, null), null) };
+        var change = new UnitLayoutChange(new Dictionary<int, Vector> { [5] = new Vector(1, 2) }, new[] { 5, 6, 6 }, ClearAll: false);
+
+        await new UnitLayoutApiAdapter(service).WriteAsync(13, change);
+
+        Assert.Equal(new[] { 5 }, service.LastPatch!.Set.Select(i => i.UnitId));
+        Assert.Equal(new[] { 6 }, service.LastPatch.Clear);
+    }
+
+    [Theory]
+    [InlineData(UnitLayoutRejectKind.ClientOutdated)]
+    [InlineData(UnitLayoutRejectKind.BumpNeedsClearAll)]
+    [InlineData(UnitLayoutRejectKind.Validation)]
+    public async Task should_carry_reject_kind_when_service_rejects(UnitLayoutRejectKind kind)
+    {
+        var service = new StubLayoutService { Write = new UnitLayoutWriteResult.Rejected("거절", kind) };
+
+        var write = await new UnitLayoutApiAdapter(service).WriteAsync(13, UnitLayoutChange.SetOne(1, new Vector(1, 1)));
+
+        Assert.Equal(kind, Assert.IsType<UnitLayoutWrite.Rejected>(write).Kind);
+    }
+
+    [Fact]
+    public async Task should_send_the_client_layout_version_with_clear_all_when_bumping()
+    {
+        var service = new StubLayoutService { Write = new UnitLayoutWriteResult.Ok(Doc(10, 2, null, null), 10) };
+
+        await new UnitLayoutApiAdapter(service, clientLayoutVersion: 2).WriteAsync(9, UnitLayoutChange.LayoutVersionBump());
+
+        Assert.Equal(9, service.LastIfMatch);
+        Assert.Equal(2, service.LastPatch!.LayoutVersion);
+        Assert.True(service.LastPatch.ClearAll);
     }
 
     [Fact]
@@ -303,6 +361,64 @@ public class UnitLayoutPortTests
 
         Assert.Equal(new[] { "A", "B" }, server.Writes.Select(w => w.Client));
         Assert.IsType<UnitLayoutWrite.Conflict>(late);
+    }
+
+    // ── 서버 시험 3건(tests/test_unit_layout.py · 회신 2026-09-29 §2)을 가짜 서버 자체 계약으로 옮겼다 — 뷰모델 시험이 이 규칙 위에 선다.
+    [Fact]
+    public async Task should_upgrade_layout_version_when_clear_all_and_higher_version_are_sent()
+    {
+        var server = new FakeUnitLayoutApi(layoutVersion: 1);
+        var v1 = server.ForClient("v1", 1);
+        for (var id = 1; id <= 3; id++) await v1.WriteAsync(server.Current.Version, UnitLayoutChange.SetOne(id, new Vector(id, id)));
+        var notices = new List<long>();
+        server.Published = notices.Add;
+
+        var bumped = await server.ForClient("v2", 2).WriteAsync(3, UnitLayoutChange.LayoutVersionBump());
+
+        var saved = Assert.IsType<UnitLayoutWrite.Saved>(bumped);
+        Assert.Empty(saved.Snapshot.Deltas);
+        Assert.Equal(2, saved.Snapshot.LayoutVersion);
+        Assert.Equal(4, saved.Snapshot.Version);
+        Assert.Single(notices);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task should_reject_downgrade_when_layout_version_is_lower(bool clearAll)
+    {
+        var server = new FakeUnitLayoutApi(layoutVersion: 2);
+        await server.ForClient("v2", 2).WriteAsync(0, UnitLayoutChange.SetOne(1, new Vector(5, 5)));
+        var before = server.Current;
+        var change = clearAll ? UnitLayoutChange.ClearEverything() : UnitLayoutChange.SetOne(1, new Vector(9, 9));
+
+        var result = await server.ForClient("v1", 1).WriteAsync(before.Version, change);
+
+        Assert.Equal(UnitLayoutRejectKind.ClientOutdated, Assert.IsType<UnitLayoutWrite.Rejected>(result).Kind);
+        Assert.Equal(before, server.Current);                    // 문서 불변
+    }
+
+    [Fact]
+    public async Task should_reject_bump_without_clear_all()
+    {
+        var server = new FakeUnitLayoutApi(layoutVersion: 1);
+
+        var result = await server.ForClient("v2", 2).WriteAsync(0, UnitLayoutChange.SetOne(1, new Vector(5, 5)));
+
+        Assert.Equal(UnitLayoutRejectKind.BumpNeedsClearAll, Assert.IsType<UnitLayoutWrite.Rejected>(result).Kind);
+        Assert.Equal(1, server.Current.LayoutVersion);
+    }
+
+    [Fact]
+    public async Task should_accept_normal_write_when_layout_version_matches_upgraded_value()
+    {
+        var server = new FakeUnitLayoutApi(layoutVersion: 1);
+        var v2 = server.ForClient("v2", 2);
+        await v2.WriteAsync(0, UnitLayoutChange.LayoutVersionBump());
+
+        var result = await v2.WriteAsync(server.Current.Version, UnitLayoutChange.SetOne(1, new Vector(5, 5)));
+
+        Assert.Equal(new Vector(5, 5), Assert.IsType<UnitLayoutWrite.Saved>(result).Snapshot.DeltaOf(1));
     }
 
     [Theory]

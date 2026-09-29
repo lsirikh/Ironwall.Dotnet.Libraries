@@ -111,7 +111,8 @@ public class UnitMapViewModelLayoutTests
 
         Assert.Equal(UnitMapLayoutState.VersionMismatch, kit.Vm.LayoutState);
         Assert.Equal(auto[kit.Id("6중대")], kit.Vm.Scene.Positions[kit.Id("6중대")]);
-        Assert.Equal("배치 판이 달라 자동 배치로 보입니다 — 이 판에서는 위치를 옮길 수 없습니다", kit.Vm.LayoutStatusText);
+        // 서버 판(2)이 이 클라(1)보다 높다 — 클라이언트 갱신 필요(PRD v1.8 · 회신 2026-09-29 §2)
+        Assert.Equal(UnitMapText.LayoutStatusClientOutdated, kit.Vm.LayoutStatusText);
         Assert.Equal(UnitMapText.LayoutVersionBlocked, kit.Vm.Classify(kit.Id("6중대"), null, false).Reason);
     }
 

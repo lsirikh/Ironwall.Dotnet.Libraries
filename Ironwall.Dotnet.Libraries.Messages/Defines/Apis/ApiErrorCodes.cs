@@ -1,16 +1,21 @@
 ﻿namespace Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 
 /// <summary>
-/// 서버 오류 봉투 <c>error.code</c> 의 <b>닫힌 16종</b>(명세 §12.2) — 문자열 리터럴을 흩뿌리지 않기 위한 단일 정본.
+/// 서버 오류 봉투 <c>error.code</c> 의 <b>닫힌 19종</b>(명세 §12.2) — 문자열 리터럴을 흩뿌리지 않기 위한 단일 정본.
 /// <para>
-/// 배포 실측(2026-09-18, 로컬 개발 <c>8.0.1</c>): Swagger <c>ApiErrorResponse.error.code.enum</c> 이
-/// 정확히 아래 16개다. 서버는 이 밖의 코드를 내지 않는다.
+/// 배포 실측(2026-09-18, 로컬 개발 <c>8.0.1</c>): Swagger <c>ApiErrorResponse.error.code.enum</c> 이 16개였고,
+/// <b>서버 v8.0.4 에서 19종</b>이 됐다(412 <see cref="PreconditionFailed"/> · 412 <see cref="VersionConflict"/> · 428 <see cref="PreconditionRequired"/> —
+/// 회신 2026-09-29 §3, 8.0.4 검증 컨테이너 openapi 실측). 서버는 이 밖의 코드를 내지 않는다.
 /// </para>
 /// <para>
-/// ⚠ <b>같은 상태에 두 코드가 오는 자리가 둘</b> 있다(명세 §12.2) — 한쪽만 처리하면 안 된다.
+/// <see cref="ApiError.Code"/> 는 enum 이 아니라 <b>문자열</b>이다 — 서버가 어휘를 늘려도 역직렬화가 실패하지 않는다(모르는 값은 일반 사유로).
+/// </para>
+/// <para>
+/// ⚠ <b>같은 상태에 두 코드가 오는 자리가 셋</b> 있다(명세 §12.2) — 한쪽만 처리하면 안 된다.
 /// <list type="bullet">
 ///   <item>401 = <see cref="Unauthorized"/>(재인증) · <see cref="SessionRevoked"/>(토큰 폐기 → 재로그인)</item>
 ///   <item>410 = <see cref="EndpointRemoved"/>(제거된 경로 = 클라가 구버전) · <see cref="Gone"/>(보고서 PDF 소실)</item>
+///   <item>412 = <see cref="VersionConflict"/>(부대 배치 — 지금 나가는 코드) · <see cref="PreconditionFailed"/>(매핑 폴백). 분기는 상태(412)로 한다</item>
 /// </list>
 /// </para>
 /// <para>
@@ -22,7 +27,7 @@
 /// </summary>
 public static class ApiErrorCodes
 {
-    #region - 서버 닫힌 16종 (명세 §12.2) -
+    #region - 서버 닫힌 19종 (명세 §12.2 · v8.0.4) -
     /// <summary>400 — 라우터가 판정한 잘못된 요청 · 본문 바이트가 UTF-8 디코딩 실패(v8.0). <b>JSON 문법만 깨진 경우는 422</b>.</summary>
     public const string BadRequest = "BAD_REQUEST";
 
@@ -50,11 +55,20 @@ public static class ApiErrorCodes
     /// <summary>410 — 리소스는 있으나 실체가 사라짐(보고서 PDF 소실). 사유는 <c>error.details.error_code</c>.</summary>
     public const string Gone = "GONE";
 
+    /// <summary>412 — 전제 조건 불일치(매핑 폴백). v8.0.4 현재 나가는 자리는 없고 <see cref="VersionConflict"/> 가 대신 나간다.</summary>
+    public const string PreconditionFailed = "PRECONDITION_FAILED";
+
+    /// <summary>412 — 문서 판이 바뀌었다(<c>PATCH /api/units/layout</c> 의 <c>If-Match</c> ≠ 현재 판). <c>error.details.current_version</c> · 응답 헤더 <c>ETag</c>. 쓰지 않았다(v8.0.4).</summary>
+    public const string VersionConflict = "VERSION_CONFLICT";
+
     /// <summary>413 — 업로드가 <c>THUMBNAIL_MAX_BYTES</c>(기본 10MB) 초과.</summary>
     public const string PayloadTooLarge = "PAYLOAD_TOO_LARGE";
 
     /// <summary>422 — 요청 검증 실패 · 라우터 판정 규칙 위반. 세부는 <c>details[].code</c>(<see cref="ApiFieldErrorCodes"/>).</summary>
     public const string ValidationError = "VALIDATION_ERROR";
+
+    /// <summary>428 — 전제 조건 필요(<c>PATCH /api/units/layout</c> 에 <c>If-Match</c> 없음, v8.0.4).</summary>
+    public const string PreconditionRequired = "PRECONDITION_REQUIRED";
 
     /// <summary>429 — 로그인 실패 누적 IP 제한(<c>Retry-After</c> 헤더).</summary>
     public const string TooManyRequests = "TOO_MANY_REQUESTS";
@@ -82,7 +96,7 @@ public static class ApiErrorCodes
     /// <b>클라 로컬</b> — 우리 쪽 요청 타임아웃. <see cref="System.Net.HttpStatusCode.GatewayTimeout"/>(504)는
     /// 서버가 아니라 <c>ApiService.BuildExceptionResponse</c> 가 <see cref="System.Threading.Tasks.TaskCanceledException"/> 에
     /// 붙이는 합성 상태다.
-    /// <para>⚠ 서버 닫힌 16종에 <b>없는</b> 코드다. 그래도 유지하는 이유:
+    /// <para>⚠ 서버 닫힌 19종에 <b>없는</b> 코드다. 그래도 유지하는 이유:
     /// 로그인 패널이 이 코드로 "요청 시간이 초과되었습니다."를 띄운다
     /// (<c>Accounts.Ui\ViewModels\Panels\LoginPanelViewModel.cs</c>의 사유 매핑).
     /// 지우면 타임아웃이 "아이디 또는 비밀번호가 일치하지 않습니다."로 오표시된다.</para>

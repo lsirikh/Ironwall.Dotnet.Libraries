@@ -131,6 +131,149 @@ public class UnitMapReviewFixTests
     }
     #endregion
 
+    #region - TEST-43 r11b (H-10 · D-08 · SIM-C013) — 미룬 알림 뒤 확정은 운영자가 본 판으로 보내고 412 가 지킨다 -
+    // 헤디드 r11b(2026-09-29 12:01) 실패 3건의 헤드리스 재현. PRD H-10 "막대 충돌 문구 · 최신 배치로 그려짐 · 재전송 0" ·
+    // SIM-C013 "끄는 동안 그림 불변 · 놓은 뒤 반영, 내 PATCH 는 412 → FR-52". 결함: 손을 놓는 순간(M 모드 끝 · 놓기) 미룬 알림의
+    // 재조회가 먼저 돌아 최신 문서를 읽고, 뒤따른 쓰기가 그 최신 버전을 If-Match 로 실어 다른 운영자의 Δ 를 말없이 덮었다.
+
+    /// <summary>다른 운영자(가짜 서버)가 그 부대를 옮기고 알림이 온다 — 손이 바빠 미룬다.</summary>
+    private static async Task<long> OtherOperatorMovesAsync(MapKit kit, FakeUnitLayoutApi api, int unitId, double dx, double dy)
+    {
+        var reads = api.ReadCount;
+        var version = api.SimulateOtherWrite(unitId, dx, dy);
+        await kit.Vm.HandleAsync(new UnitLayoutChangedMessage(version), default);
+        kit.Delay.ElapseAll();
+        await kit.Vm.WhenIdleAsync();
+        Assert.Equal(reads, api.ReadCount);                          // D-08 — 손이 바쁜 동안 읽지 않는다
+        return version;
+    }
+
+    [Fact]
+    public async Task should_send_seen_version_and_show_other_operators_delta_when_same_unit_changed_during_move_mode()
+    {
+        var api = new FakeUnitLayoutApi();
+        var kit = await MapKit.OpenAsync(api);
+        var seven = kit.Id("7중대");
+        var p0 = kit.Vm.Scene.Positions[seven];
+        kit.Vm.RequestSelect(seven);
+        kit.Vm.HandleKey(UnitMapKeyCommand.MoveMode, false);
+        for (var i = 0; i < 3; i++) kit.Vm.HandleKey(UnitMapKeyCommand.Right, false);
+        var seen = api.Current.Version;
+        await OtherOperatorMovesAsync(kit, api, seven, 60, 20);
+        Assert.True(kit.Vm.IsMoveMode);
+
+        kit.Vm.HandleKey(UnitMapKeyCommand.Enter, false);
+        await kit.Vm.WhenIdleAsync();
+        kit.Delay.ElapseAll();
+        await kit.Vm.WhenIdleAsync();
+
+        var write = Assert.Single(api.Writes);                        // 재전송 0
+        Assert.Equal(seen, write.IfMatch);                            // 운영자가 본 판으로 — 최신 판으로 덮지 않는다
+        Assert.IsType<UnitLayoutWrite.Conflict>(write.Result);
+        Assert.Equal(new Vector(60, 20), api.Current.Deltas[seven]);  // 서버는 다른 운영자 값 그대로
+        Assert.Equal(p0 + new Vector(60, 20), kit.Vm.Scene.Positions[seven]);   // 최신 배치로 그려짐(SIM-C013)
+        Assert.Equal(UnitMapText.LayoutConflictBar("7중대"), kit.Vm.BarText);
+        Assert.False(kit.Vm.CanUndo);
+    }
+
+    [Fact]
+    public async Task should_send_seen_version_and_show_latest_when_same_unit_changed_during_drag()
+    {
+        var api = new FakeUnitLayoutApi();
+        var kit = await MapKit.OpenAsync(api);
+        var seven = kit.Id("7중대");
+        var p0 = kit.Vm.Scene.Positions[seven];
+        var seen = api.Current.Version;
+        kit.Vm.BeginDrag(seven);
+        await OtherOperatorMovesAsync(kit, api, seven, 60, 20);
+        Assert.Equal(p0, kit.Vm.Scene.Positions[seven]);             // 끄는 동안 그림 불변
+
+        kit.Vm.CompleteDrag(new UnitMapDropRequest(seven, 40, 40, null, false));
+        await kit.Vm.WhenIdleAsync();
+        kit.Delay.ElapseAll();
+        await kit.Vm.WhenIdleAsync();
+
+        var write = Assert.Single(api.Writes);
+        Assert.Equal(seen, write.IfMatch);
+        Assert.Equal(new Vector(40, 40), write.Change.Set[seven]);   // 놓은 자리 = 본 그림 기준(최신 Δ + 끈 양이 아니다)
+        Assert.IsType<UnitLayoutWrite.Conflict>(write.Result);
+        Assert.Equal(p0 + new Vector(60, 20), kit.Vm.Scene.Positions[seven]);
+        Assert.Equal(UnitMapText.LayoutConflictBar("7중대"), kit.Vm.BarText);
+    }
+
+    [Fact]
+    public async Task should_still_save_my_move_when_other_operator_changed_a_different_unit_during_move_mode()
+    {
+        // 건드린 부대(끈 부대 + 조상) 밖의 변경은 충돌이 아니다(FR-52) — 막지 않는다
+        var api = new FakeUnitLayoutApi();
+        var kit = await MapKit.OpenAsync(api);
+        var seven = kit.Id("7중대");
+        var thirty = kit.Id("30중대");
+        kit.Vm.RequestSelect(seven);
+        kit.Vm.HandleKey(UnitMapKeyCommand.MoveMode, false);
+        kit.Vm.HandleKey(UnitMapKeyCommand.Right, false);
+        await OtherOperatorMovesAsync(kit, api, thirty, 5, 5);
+
+        kit.Vm.HandleKey(UnitMapKeyCommand.Enter, false);
+        await kit.Vm.WhenIdleAsync();
+        kit.Delay.ElapseAll();
+        await kit.Vm.WhenIdleAsync();
+
+        Assert.True(api.Writes.Last().Succeeded);
+        Assert.Equal(new Vector(UnitMapViewModel.MoveStep, 0), api.Current.Deltas[seven]);
+        Assert.Equal(new Vector(5, 5), api.Current.Deltas[thirty]);
+        Assert.False(kit.Vm.BarIsError);
+        Assert.True(kit.Vm.CanUndo);
+    }
+
+    [Fact]
+    public async Task should_reject_stale_write_and_show_b_latest_when_two_operators_move_same_unit()
+    {
+        // H-10 두 운영자판 — 같은 가짜 서버 · A(main) · B 두 창구. ① B 가 옮기면 A 는 알림으로 다시 읽는다 ② A 가 M 모드인 동안 B 가 같은 부대 저장 → A Enter
+        var server = new FakeUnitLayoutApi();
+        var a = await MapKit.OpenAsync(server);
+        var b = await MapKit.OpenAsync(server, port: server.ForClient("B"));
+        server.Published = v =>
+        {
+            _ = a.Vm.HandleAsync(new UnitLayoutChangedMessage(v), default);
+            _ = b.Vm.HandleAsync(new UnitLayoutChangedMessage(v), default);
+        };
+        var seven = a.Id("7중대");
+        var p0 = a.Vm.Scene.Positions[seven];
+
+        b.Vm.CompleteDrag(new UnitMapDropRequest(seven, 0, 40, null, false));   // ①
+        await b.Vm.WhenIdleAsync();
+        a.Delay.ElapseAll(); b.Delay.ElapseAll();
+        await a.Vm.WhenIdleAsync();
+        Assert.Equal(p0 + new Vector(0, 40), a.Vm.Scene.Positions[seven]);     // FR-53 — A 가 B 의 변경을 그린다
+
+        a.Vm.RequestSelect(seven);                                               // ②
+        a.Vm.HandleKey(UnitMapKeyCommand.MoveMode, false);
+        for (var i = 0; i < 3; i++) a.Vm.HandleKey(UnitMapKeyCommand.Right, false);
+        var aReads = server.ReadCount;
+        b.Vm.CompleteDrag(new UnitMapDropRequest(seven, 60, 0, null, false));   // B 의 Δ (60, 40)
+        await b.Vm.WhenIdleAsync();
+        a.Delay.ElapseAll();
+        await a.Vm.WhenIdleAsync();
+        Assert.Equal(new Vector(60, 40), server.Current.Deltas[seven]);
+        Assert.Equal(aReads, server.ReadCount);                                 // A 는 M 모드라 미뤘고, B 는 자기 메아리를 건너뛰었다
+
+        var aWritesBefore = server.Writes.Count(w => w.Client == "main");
+        a.Vm.HandleKey(UnitMapKeyCommand.Enter, false);
+        await a.Vm.WhenIdleAsync();
+        a.Delay.ElapseAll(); b.Delay.ElapseAll();
+        await a.Vm.WhenIdleAsync();
+        await b.Vm.WhenIdleAsync();
+
+        var aw = server.Writes.Where(w => w.Client == "main").Skip(aWritesBefore).ToList();
+        var write = Assert.Single(aw);                                           // 재전송 0
+        Assert.IsType<UnitLayoutWrite.Conflict>(write.Result);
+        Assert.Equal(new Vector(60, 40), server.Current.Deltas[seven]);         // B 의 값 그대로
+        Assert.Equal(p0 + new Vector(60, 40), a.Vm.Scene.Positions[seven]);     // A 는 B 의 최신을 그린다
+        Assert.Equal(UnitMapText.LayoutConflictBar("7중대"), a.Vm.BarText);
+    }
+    #endregion
+
     #region - MEDIUM-3 — 트리 이동 뒤 정리도 한 줄 대기열을 탄다 -
     [Fact]
     public async Task should_queue_parent_change_cleanup_behind_in_flight_write()

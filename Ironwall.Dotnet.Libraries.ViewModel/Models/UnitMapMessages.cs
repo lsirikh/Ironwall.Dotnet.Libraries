@@ -64,27 +64,29 @@ public sealed record MapLocateResult(Guid RequestId, int Shown, int Missing, int
 public sealed record OpenUnitConsoleRequest(int UnitId, bool OpenMap);
 
 /// <summary>
-/// 공유 배치 문서가 바뀌었다 — 서버 <c>SYNC_UNIT_LAYOUT</c>(S-1 ⑥)을 호스트가 옮긴다. 가진 버전보다 클 때만 다시 읽는다(FR-53).
+/// 공유 배치 문서가 바뀌었다 — 서버 <c>SYNC_UNIT_LAYOUT</c>(v8.0.4 · 브로커 §9.18, <c>sensorway.global.all.sync.unit-layout</c>)을
+/// 호스트가 옮긴다. <see cref="Version"/> = 새 <b>문서 판</b>. 가진 판보다 클 때만 다시 읽는다(FR-53 — 자기 저장 메아리는 건너뛴다).
 /// </summary>
 public sealed record UnitLayoutChangedMessage(long Version)
 {
     /// <summary>
-    /// 알림 본문의 버전 — <c>version</c> 을 먼저, 없으면 <c>resource_id</c>(서버 PRD 초안 FR-05 가 버전을 이 키에 싣는다).
+    /// 알림 본문의 판 — <c>resource_id</c>(서버 v8.0.4 확정 키 — 부대 id 가 아니라 <b>새 문서 판</b>)를 먼저, 없으면 <c>version</c>(옛 요청서 키, 과도기 폴백).
     /// 둘 다 없거나 0 이하면 <c>null</c>(보낼 것이 없다).
     /// </summary>
-    /// <remarks>분석 ISSUE-2 — 클라 요청서는 <c>{action, version}</c>, 서버 초안은 <c>{action, resource_id:&lt;version&gt;}</c>.
-    /// S-1 에서 키를 합의할 때까지 두 모양을 모두 받는다. 호스트 라우터가 본문 두 값을 읽어 이 함수로 만든다(SIM-N073 · N074).</remarks>
+    /// <remarks>분석 ISSUE-2 는 회신 2026-09-29 로 닫혔다 — 본문은 <c>{action:"UPDATED", resource_id:&lt;새 문서 판&gt;}</c>.
+    /// <c>version</c> 폴백은 해가 없어 남긴다(SIM-N073 · N074).</remarks>
     public static UnitLayoutChangedMessage? FromBody(long? version, long? resourceId)
-        => version is > 0 ? new UnitLayoutChangedMessage(version.Value)
-         : resourceId is > 0 ? new UnitLayoutChangedMessage(resourceId.Value)
+        => resourceId is > 0 ? new UnitLayoutChangedMessage(resourceId.Value)
+         : version is > 0 ? new UnitLayoutChangedMessage(version.Value)
          : null;
 }
 
-/// <summary>배치 알림(<c>SYNC_UNIT_LAYOUT</c>) 본문 읽기 — 과도기 파서(ISSUE-2). 호스트(EXT-03)가 case 한 줄로 부른다.</summary>
+/// <summary>배치 알림(<c>SYNC_UNIT_LAYOUT</c>) 본문 읽기(ISSUE-2 — v8.0.4 확정). 호스트(EXT-03)가 case 한 줄로 부른다.</summary>
 public static class UnitLayoutNotice
 {
     /// <summary>
-    /// 본문의 <c>version</c> 을 먼저, 숫자가 아니거나 0 이하면 <c>resource_id</c>(서버 초안 FR-05)를 읽는다. 둘 다 못 쓰면 <c>null</c> + 사유.
+    /// 본문의 <c>resource_id</c>(서버 v8.0.4 정본 — 새 문서 판)를 먼저, 숫자가 아니거나 0 이하면 <c>version</c>(옛 요청서 키)을 읽는다.
+    /// 둘 다 못 쓰면 <c>null</c> + 사유.
     /// </summary>
     /// <param name="versionRaw">본문 <c>version</c> 의 원문(없으면 <c>null</c>).</param>
     /// <param name="resourceIdRaw">본문 <c>resource_id</c> 의 원문.</param>
@@ -92,8 +94,8 @@ public static class UnitLayoutNotice
     /// <remarks>ViewModel 어셈블리는 JSON 라이브러리를 모른다 — 호스트가 <c>item["body"]?["version"]?.ToString()</c> 을 넘긴다.</remarks>
     public static long? TryReadVersion(string? versionRaw, string? resourceIdRaw, out string? rejectReason)
     {
-        if (Parse(versionRaw) is long version) { rejectReason = null; return version; }
-        if (Parse(resourceIdRaw) is long fallback) { rejectReason = null; return fallback; }
+        if (Parse(resourceIdRaw) is long resourceId) { rejectReason = null; return resourceId; }
+        if (Parse(versionRaw) is long fallback) { rejectReason = null; return fallback; }
 
         rejectReason = $"배치 알림 본문에 쓸 수 있는 버전이 없습니다(version='{versionRaw ?? "null"}', resource_id='{resourceIdRaw ?? "null"}') — 버립니다.";
         return null;
