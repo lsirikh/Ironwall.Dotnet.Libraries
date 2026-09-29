@@ -423,19 +423,46 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_force_flat_and_refuse_tilt_when_rendering_in_software()
+    public void should_stay_tilted_by_default_when_rendering_in_software_over_remote_desktop()
     {
+        // 2026-09-30 결정 — 원격 데스크톱(Tier 0)에서도 입체가 기본(2D 비스듬 투영이라 비용이 같다). 평면은 사람이 고를 때만.
         var result = OnWindow(Ring(3), (vm, canvas) =>
         {
             vm.IsSoftwareRendering = true;
+            Pump();
+            var tiltK = canvas.Projector.K;
+            var note = vm.FlatNoteText;
+            vm.ChooseFlat();
+            Pump();
+            var flatK = canvas.Projector.K;
             vm.ChooseTilt();
             Pump();
-            return (canvas.Projector.K, vm.CanChooseTilt, vm.FlatNoteText);
+            return (tiltK, note, flatK, AgainK: canvas.Projector.K, vm.CanChooseTilt);
         });
 
-        Assert.Equal(0, result.K);
-        Assert.False(result.CanChooseTilt);
-        Assert.Contains("원격 데스크톱", result.FlatNoteText);
+        Assert.Equal(1, result.tiltK);
+        Assert.Equal(string.Empty, result.note);
+        Assert.Equal(0, result.flatK);
+        Assert.Equal(1, result.AgainK);
+        Assert.True(result.CanChooseTilt);
+    }
+
+    [Fact]
+    public void should_expose_the_fence_canvas_as_a_pane_with_its_sensor_chips_as_children_in_the_uia_tree()
+    {
+        var result = OnWindow(Ring(4), (vm, canvas) =>
+        {
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(canvas);
+            var children = peer.GetChildren() ?? new List<System.Windows.Automation.Peers.AutomationPeer>();
+            return (Id: peer.GetAutomationId(), Type: peer.GetAutomationControlType(), Control: peer.IsControlElement(),
+                    ChildIds: children.Select(c => c.GetAutomationId()).ToList());
+        });
+
+        Assert.Equal("Devices.Wiring.Fence.Canvas", result.Id);
+        Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Pane, result.Type);
+        Assert.True(result.Control);
+        foreach (var key in new[] { 101, 102, 103, 104 })
+            Assert.Contains($"Devices.Wiring.Fence.Sensor.{key}", result.ChildIds);
     }
 
     [Theory]

@@ -84,7 +84,7 @@
 						IsEnabled="{Binding CanChooseTilt}"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding IsTilt}"
-						ToolTip="35° 기울여 봅니다 — 원격 데스크톱 연결 중에는 켤 수 없습니다" />
+						ToolTip="35° 기울여 봅니다(기본 · 원격 데스크톱에서도)" />
 					<Border
 						Height="24"
 						Margin="2,0,8,0"

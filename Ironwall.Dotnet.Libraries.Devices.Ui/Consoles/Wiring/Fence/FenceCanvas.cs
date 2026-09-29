@@ -75,6 +75,12 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
     private enum DropKind { None, Chain, Remove }
 
+    /// <summary>
+    /// 캔버스 자신의 UIA peer — <c>Grid</c>(패널)는 peer 가 없어 <c>Devices.Wiring.Fence.Canvas</c> 가 트리에 나오지 않고 칩만 보였다
+    /// (헤디드 r16 SC-FEN-001). 창 아래 Pane 으로 서고, 자식(칩 peer)은 시각 트리에서 그대로 모은다.
+    /// </summary>
+    protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer() => new FenceCanvasAutomationPeer(this);
+
     public FenceCanvas()
     {
         Focusable = true;
@@ -875,4 +881,24 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         group?.Focus();
     }
     #endregion
+}
+
+/// <summary>
+/// 펜스 캔버스의 UIA peer — Pane · 이름 · AutomationId(<see cref="FenceCanvas.AUTOMATION_ID"/>)를 내고, 자식은 기본 규칙대로
+/// 시각 트리의 peer(센서 · 묶음 · 제어기 칩)를 모은다. 헤디드 시험이 캔버스를 찾고 그 아래에서 칩을 센다(SC-FEN-001).
+/// </summary>
+public sealed class FenceCanvasAutomationPeer : System.Windows.Automation.Peers.FrameworkElementAutomationPeer
+{
+    public FenceCanvasAutomationPeer(FenceCanvas owner) : base(owner) { }
+
+    protected override string GetClassNameCore() => nameof(FenceCanvas);
+
+    protected override System.Windows.Automation.Peers.AutomationControlType GetAutomationControlTypeCore()
+        => System.Windows.Automation.Peers.AutomationControlType.Pane;
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override bool IsContentElementCore() => true;
+
+    protected override bool IsKeyboardFocusableCore() => true;
 }

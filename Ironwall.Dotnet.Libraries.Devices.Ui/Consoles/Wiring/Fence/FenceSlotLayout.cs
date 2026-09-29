@@ -12,7 +12,7 @@ public enum FenceProjection
 {
     /// <summary>기본 입체 — 지도 3D 몸체와 같은 35° 기울기(PRD FR-10).</summary>
     Tilt35 = 0,
-    /// <summary>[평면 보기] · 원격 데스크톱(Tier 0) 자동 평면 — 깊이를 버린다.</summary>
+    /// <summary>[평면 보기](사람이 고를 때만) — 깊이를 버린다.</summary>
     Flat = 1,
 }
 

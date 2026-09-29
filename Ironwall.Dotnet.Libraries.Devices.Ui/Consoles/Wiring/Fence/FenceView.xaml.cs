@@ -12,8 +12,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
 /// 펜스 형상 뷰 — 도구줄(평면/입체 · 탐지 범위 · 전체 보기 · 줌) + 캔버스 + 종류별 수. 뷰모델은 결선 창의 것(<see cref="WiringViewModel"/>)을 그대로 쓴다.
 /// </summary>
 /// <remarks>
-/// <b>원격 데스크톱(Tier 0)이면 자동 평면</b>(FR-10) — <c>RenderCapability.Tier</c> 의 상위 워드가 0 이면 소프트웨어 렌더링이다
-/// (<c>GMaps.Ui/Utils/RenderTierProbe</c> 와 같은 <c>&gt;&gt; 16</c> 규칙을 옮겨 둔다 — Devices.Ui 는 GMaps.Ui 를 참조하지 않는다).
+/// <b>입체가 기본 — 원격 데스크톱(Tier 0)에서도</b>(FR-10 개정 · 2026-09-30). 렌더 tier 는 로그로만 남긴다 —
+/// <c>RenderCapability.Tier</c> 의 상위 워드가 0 이면 소프트웨어 렌더링(<c>GMaps.Ui/Utils/RenderTierProbe</c> 와 같은 <c>&gt;&gt; 16</c> 규칙).
+/// 옛 "Tier 0 이면 자동 평면" 은 Viewport3D 비용을 피하려던 것인데 입체는 2D 비스듬 투영이라 비용이 같다.
 /// </remarks>
 public partial class FenceView : UserControl
 {
@@ -47,9 +48,15 @@ public partial class FenceView : UserControl
         }
     }
 
+    /// <summary>
+    /// 렌더 tier 는 <b>기록만</b> 한다 — 원격 데스크톱(Tier 0)에서도 입체가 기본이다(2026-09-30 결정 · FR-10 개정).
+    /// 입체는 2D 비스듬 투영이라 Tier 0 에서도 비용이 같다.
+    /// </summary>
     private void OnTierChanged(object? sender, EventArgs e)
     {
-        if (ViewModel is { } vm) vm.IsSoftwareRendering = IsSoftwareTier(RenderCapability.Tier);
+        var software = IsSoftwareTier(RenderCapability.Tier);
+        System.Diagnostics.Trace.WriteLine($"[FenceView] render tier {RenderCapability.Tier >> 16} · software={software} — 입체 기본 유지(평면은 사람이 고를 때만)");
+        if (ViewModel is { } vm) vm.IsSoftwareRendering = software;
     }
 
     private void OnViewChanged(object? sender, EventArgs e)

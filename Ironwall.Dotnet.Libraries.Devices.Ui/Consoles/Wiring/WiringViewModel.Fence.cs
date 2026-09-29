@@ -65,35 +65,32 @@ public sealed partial class WiringViewModel
         set { if (_isFlatChosen == value) return; _isFlatChosen = value; NotifyFlat(); }
     }
 
-    /// <summary>소프트웨어 렌더링(Tier 0 · 원격 데스크톱)인가 — 뷰가 알려 준다. 그러면 입체를 끈다.</summary>
+    /// <summary>
+    /// 소프트웨어 렌더링(Tier 0 · 원격 데스크톱)인가 — 뷰가 알려 준다. <b>정보(로그)용일 뿐</b> 보기를 바꾸지 않는다(2026-09-30 결정):
+    /// 입체는 Viewport3D 가 아니라 2D 비스듬 투영이라 Tier 0 에서도 비용이 같고(첫 그리기 33~36ms), 원격으로 쓰는 운영자도 입체를 봐야 한다.
+    /// </summary>
     public bool IsSoftwareRendering
     {
         get => _isSoftwareRendering;
-        set { if (_isSoftwareRendering == value) return; _isSoftwareRendering = value; NotifyFlat(); }
+        set { if (_isSoftwareRendering == value) return; _isSoftwareRendering = value; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>지금 평면으로 그리는가(고름 또는 자동).</summary>
-    public bool IsFlat => _isFlatChosen || _isSoftwareRendering;
+    /// <summary>지금 평면으로 그리는가 — 사람이 [평면 보기]를 골랐을 때만(기본은 입체 · 모든 렌더 tier).</summary>
+    public bool IsFlat => _isFlatChosen;
 
     public bool IsTilt => !IsFlat;
 
-    /// <summary>[입체 보기]를 누를 수 있는가 — 원격 데스크톱에서는 못 켠다.</summary>
-    public bool CanChooseTilt => !_isSoftwareRendering;
+    /// <summary>[입체 보기]를 누를 수 있는가 — 늘 누를 수 있다(원격 데스크톱 자동 평면 폐지).</summary>
+    public bool CanChooseTilt => true;
 
-    /// <summary>"평면으로 표시 중" 표지 글자.</summary>
-    public string FlatNoteText => _isSoftwareRendering
-        ? "평면 표시 — 원격 데스크톱(입체 끔)"
-        : _isFlatChosen ? "평면 표시 중(원격 데스크톱은 자동)" : string.Empty;
+    /// <summary>"평면으로 표시 중" 표지 글자 — 사람이 고른 평면일 때만.</summary>
+    public string FlatNoteText => _isFlatChosen ? "평면 표시 중 — [입체 보기]로 되돌립니다" : string.Empty;
 
     public bool HasFlatNote => IsFlat;
 
     public void ChooseFlat() => IsFlatChosen = true;
 
-    public void ChooseTilt()
-    {
-        if (!CanChooseTilt) return;
-        IsFlatChosen = false;
-    }
+    public void ChooseTilt() => IsFlatChosen = false;
 
     private void NotifyFlat()
     {
