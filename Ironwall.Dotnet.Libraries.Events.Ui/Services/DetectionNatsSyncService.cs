@@ -73,17 +73,22 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
     #endregion
 
     #region - Processes -
-    private Task OnNatsDetectionAsync(MessageArgsModel e)
+    private async Task OnNatsDetectionAsync(MessageArgsModel e)
     {
         // 로그인 게이팅(Login_Gated_GIS_Init): 로그인 전 NATS 이벤트 수신 차단 — 맵/캐시 미구축 상태에서 알람 방지.
         // 미조치 이벤트는 서버 DB에 영속 → 로그인 후 이력 패널 조회로 후처리(EventProviderService).
         // _tokenStorage 미주입(null) 시 게이트 비활성(하위호환). 물리 NATS 구독은 유지하고 앱 레이어에서 드롭.
-        if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;
+        if (_tokenStorage is { IsAuthenticated: false }) return;
+
+        // 배열 봉투는 항목마다 — 호스트 라우터와 같은 의미(WP-1 ⑰). 한 항목의 실패가 나머지를 버리지 않는다.
+        foreach (var envelope in NatsEnvelopeItems.Parse(e.Data, _log, "DETECTION"))
+            await ProcessEnvelopeAsync(envelope);
+    }
+
+    private Task ProcessEnvelopeAsync(JObject jObj)
+    {
         try
         {
-            if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
-
-            var jObj = JObject.Parse(e.Data);
             var natsMessageId = jObj.Value<string>("id"); // NATS 메시지 고유 UUID
             var cmd = jObj.Value<string>("cmd");
             if (cmd != "DETECT") return Task.CompletedTask;
@@ -113,8 +118,12 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             // 종류 · 그룹 — v7.0+ 는 장비 참조 {id, category_device} 뿐이라 캐시에서 읽는다(옛 전문은 본문이 이긴다).
             if (!NatsEventDeviceResolver.TryResolve(body.Device, deviceId, _deviceProvider, out var deviceType, out var deviceGroups))
             {
-                _log?.Error($"DETECTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 이벤트 무시");
-                return Task.CompletedTask;
+                // 캐시 미스 + 카테고리만으로 종류를 못 정함(sensor = Fence · PIR · Multi …) — 종류를 <b>추측하지 않고</b> NONE 으로 큐에 넣는다(WP-1 ⑱).
+                //   호스트는 이 이벤트의 카드를 띄운다 — 큐 엔트리가 없으면 자동 조치보고 · 원격 해제 · 알람이 그 카드와 따로 논다(종전: 이벤트 무시).
+                //   심볼은 SymbolEventManager 의 Id 단독 보조 조회가 찾으면 따라가고, 캐시에 없는 장비라 대개 그릴 심볼이 없다.
+                deviceType = EnumDeviceType.NONE;
+                deviceGroups = body.Device?.GroupIds?.Where(g => g > 0).ToList();
+                _log?.Warning($"DETECTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 종류 NONE 으로 큐 적재(자동조치 · 원격 해제용)");
             }
 
             _log?.Info($"DETECTION 수신: deviceId={deviceId}, deviceType={deviceType}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
@@ -137,6 +146,13 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
                 .OfType<Ironwall.Dotnet.Monitoring.Models.Devices.SensorDeviceModel>()
                 .FirstOrDefault(s => s.Id == deviceId);
             if (sensor?.Controller?.Id is int ctrlId && ctrlId > 0) owningControllerId = ctrlId;
+
+            // 같은 봉투(id)를 두 번 받으면 큐에 한 번만 — 두 번째는 알람 · EntryId 를 두 번 만든다(WP-1 ⑦).
+            if (!_recentEnvelopes.TryAdd(natsMessageId))
+            {
+                _log?.Info($"DETECTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                return Task.CompletedTask;
+            }
 
             // EventQueue에 이벤트 등록
             // 심볼 Detecting은 EventQueueManager 전이 이벤트로 일원화:
@@ -195,5 +211,6 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
     private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 소속 제어기 해석용(Controller_Fault_AutoRecovery_Extension)
+    private readonly RecentEnvelopeFilter _recentEnvelopes = new();   // 같은 봉투 두 번 → 큐 한 번(WP-1 ⑦)
     #endregion
 }

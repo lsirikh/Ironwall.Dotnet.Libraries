@@ -47,7 +47,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public override async Task<ActionSendResult> SendActionDetailed(string? content, string? idUser, CancellationToken token = default)
         {
             var account = IoC.Get<IAccountModel>();
-            IdUser = account.Name;
+            // 보고자 표기는 한 모양(Username(EmployeeNumber)) — 창 · 콘솔이 넘긴 값을 그대로 쓰고, 없으면 같은 규칙으로 만든다(WP-1 ⑬).
+            //   종전엔 넘겨받은 값을 버리고 표시 이름(Name)을 보내 같은 사람이 이력에 두 모양으로 찍혔다.
+            IdUser = string.IsNullOrWhiteSpace(idUser) ? Ironwall.Dotnet.Libraries.Events.Ui.Helpers.ActionReportRules.FormatActor(account) : idUser.Trim();
             Contents = content ?? "자동 조치보고";
 
             // (Phase3) 조치보고 멱등 — 동일 이벤트가 자동/자동복구/배치 경로에서 진행 중이면 수동 보고 스킵.
@@ -84,16 +86,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 }
 
                 await _eventAggregator.PublishOnCurrentThreadAsync(new MalfunctionReportedMessageModel(this, Contents, IdUser));
-                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
-                {
-                    EventId = Model.Id,
-                    EventType = EnumEventType.Fault,
-                    ActionDetails = Contents,
-                    ActionUser = IdUser,
-                    ActionTime = DateTime.Now,
-                    OriginEvent = Model,                 // NATS from_event(device) 원천
-                    ActionId = response.Data?.Id ?? 0    // 생성된 Action DB ID
-                });
+                await _eventAggregator.PublishOnBackgroundThreadAsync(
+                    Ironwall.Dotnet.Libraries.Events.Ui.Helpers.ActionReportMessages.Create(response, Model.Id, EnumEventType.Fault, Contents, IdUser, Model));
 
                 // 서버는 조치가 생기면 원본의 action_reported 를 '조치가 있는가(EXISTS)' 로 다시 계산한다 — 201 이면 참이다.
                 //   이 모델은 목록 행이 들고 있는 바로 그 인스턴스라(트레이 · 우클릭 · 이력) 여기서 맞춰 두지 않으면

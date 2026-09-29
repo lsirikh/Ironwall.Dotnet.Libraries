@@ -21,6 +21,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
     public abstract class EventReportDialogViewModel : BasePanelViewModel, IHandle<ActionReportTemplatesChangedMessage>
+                                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage>
     {
         #region - Ctors -
         public EventReportDialogViewModel()
@@ -53,12 +54,49 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
                 _model = eventModel;
             }
 
-            if(user != null) 
+            if(user != null)
             {
                 _user = user;
             }
 
+            // 새 이벤트로 창을 연다 — 앞 이벤트의 '보내는 중' · '이미 조치됨' 표시를 넘겨받지 않는다.
+            _isSending = false;
+            _isHandledElsewhere = false;
+            NotifyReportState();
+
             Refresh();
+        }
+
+        /// <summary>
+        /// 원격 조치보고(다른 운영자 · 다른 GIS)가 이 창의 이벤트를 이미 조치했다 — [확인]을 끄고 까닭을 보인다(WP-1 ③).
+        /// 모른 채 [확인]을 누르면 서버에 같은 이벤트의 두 번째 조치가 생긴다. 보내는 중(자기 조치의 메아리일 수 있다)이면 무시한다.
+        /// </summary>
+        public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || !IsActive || _isSending || _model is null) return Task.CompletedTask;
+            if (_model.Model?.Id != message.EventId
+                || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(_model) != message.Kind) return Task.CompletedTask;
+
+            _isHandledElsewhere = true;
+            _log?.Info($"[{GetType().Name}] 다른 운영자가 이미 조치함 — [확인] 끔: {message.Kind} {message.EventId}");
+            NotifyReportState();
+            return Task.CompletedTask;
+        }
+
+        /// <summary>보내기 시작 · 끝 — [확인] 을 끄고 켠다(두 번 눌러 두 건 보내지 않게, WP-1 ⑬).</summary>
+        protected void SetSending(bool sending)
+        {
+            if (_isSending == sending) return;
+            _isSending = sending;
+            NotifyReportState();
+        }
+
+        private void NotifyReportState()
+        {
+            NotifyOfPropertyChange(nameof(IsSending));
+            NotifyOfPropertyChange(nameof(IsHandledElsewhere));
+            NotifyOfPropertyChange(nameof(CanClickOk));
+            NotifyOfPropertyChange(nameof(DialogNotice));
         }
 
         /// <summary>
@@ -190,6 +228,28 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         public ObservableCollection<SelectableItemViewModel>? CollectionActionItem { get; private set; }
         public EventCardBaseViewModel? Model => _model;
 
+        /// <summary>조치보고를 보내는 중 — [확인] 이 꺼지고 창 틀의 Enter 도 막힌다.</summary>
+        public bool IsSending => _isSending;
+
+        /// <summary>다른 운영자가 이 이벤트를 이미 조치했다(원격 ACTION_REPORT).</summary>
+        public bool IsHandledElsewhere => _isHandledElsewhere;
+
+        /// <summary>
+        /// [확인] 을 누를 수 있는가 — Caliburn 가드(<c>x:Name="ClickOk"</c> ↔ <c>CanClickOk</c>)라 단추의 켜짐이 여기서 정해진다.
+        /// 보내는 중이거나 이미 다른 곳에서 조치됐으면 끈다.
+        /// </summary>
+        public bool CanClickOk => !_isSending && !_isHandledElsewhere;
+
+        /// <summary>버튼 줄 왼쪽 안내 — 평소엔 사용법, 이미 조치됐으면 그 까닭, 보내는 중이면 기다리라는 말.</summary>
+        public string DialogNotice => _isHandledElsewhere ? HANDLED_ELSEWHERE_TEXT
+                                    : _isSending ? SENDING_TEXT
+                                    : DEFAULT_NOTICE_TEXT;
+
+        /// <summary>원격 조치보고를 받은 창의 안내.</summary>
+        public const string HANDLED_ELSEWHERE_TEXT = "다른 운영자가 이미 조치했습니다. [확인]은 꺼졌습니다 — [취소]로 닫으세요.";
+        public const string SENDING_TEXT = "조치보고를 보내는 중입니다…";
+        public const string DEFAULT_NOTICE_TEXT = "문구를 고르고 [확인]을 누르세요. '기타'는 내용을 적어야 합니다.";
+
         // 속성 시현을 위한 ViewModel
         public BasePanelViewModel? SelectedItemEditor
         {
@@ -200,6 +260,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         #region - Attributes -
         protected EventCardBaseViewModel? _model;
         protected IAccountModel? _user;
+        private bool _isSending;
+        private bool _isHandledElsewhere;
         public BasePanelViewModel? _selectedItemEditor;
         #endregion
     }

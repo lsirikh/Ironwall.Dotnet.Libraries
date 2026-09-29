@@ -1586,7 +1586,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         try
         {
             var account = IoC.Get<IAccountModel>();
-            return $"{account?.Username}({account?.EmployeeNumber})";
+            return Ironwall.Dotnet.Libraries.Events.Ui.Helpers.ActionReportRules.FormatActor(account);   // 조치보고 창 · 카드와 같은 한 모양(WP-1 ⑬)
         }
         catch (Exception ex)
         {

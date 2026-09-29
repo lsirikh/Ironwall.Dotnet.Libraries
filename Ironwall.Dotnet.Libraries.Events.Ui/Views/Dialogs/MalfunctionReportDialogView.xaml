@@ -1,5 +1,6 @@
 ﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Dialogs.MalfunctionReportDialogView"
+	AutomationProperties.AutomationId="Events.MalfunctionActionReport.Root"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -112,12 +113,17 @@
 
 	<dlg:ConsoleDialogFrame
 		DialogKey="Events.MalfunctionActionReport"
-		Message="문구를 고르고 [확인]을 누르세요. '기타'는 내용을 적어야 합니다."
+		IsBusy="{Binding IsSending, Mode=OneWay, FallbackValue=False}"
 		PrimaryText=""
 		SecondaryInvoked="OnSecondaryInvoked"
 		SecondaryText=""
 		Size="Large"
 		Title="장애 조치보고">
+
+		<!--  안내 줄 — 평소엔 사용법, 보내는 중 · 다른 운영자가 이미 조치함이면 그 말(WP-1 ③ · ⑬). 뷰모델이 없으면 사용법  -->
+		<dlg:ConsoleDialogFrame.Message>
+			<Binding FallbackValue="문구를 고르고 [확인]을 누르세요. '기타'는 내용을 적어야 합니다." Mode="OneWay" Path="DialogNotice" />
+		</dlg:ConsoleDialogFrame.Message>
 
 		<!--  버튼 줄 오른쪽 — 보조 → 주 동작(T4). 둘 다 옛 x:Name 버튼 그대로  -->
 		<dlg:ConsoleDialogFrame.FooterActions>
@@ -125,6 +131,7 @@
 				<Button
 					x:Name="ClickCancel"
 					Height="34"
+					AutomationProperties.AutomationId="Events.MalfunctionActionReport.Cancel"
 					MinWidth="92"
 					Margin="0,0,8,0"
 					cal:Message.Attach="ClickCancel"
@@ -133,6 +140,7 @@
 				<Button
 					x:Name="ClickOk"
 					Height="34"
+					AutomationProperties.AutomationId="Events.MalfunctionActionReport.Ok"
 					MinWidth="92"
 					cal:Message.Attach="ClickOk"
 					Content="확인"
@@ -266,6 +274,7 @@
 							<DataTemplate>
 								<RadioButton
 									Margin="0,5"
+									AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.MalfunctionActionReport.Phrase.{0}}"
 									Content="{Binding Name, FallbackValue=—}"
 									GroupName="CollectionActionItem"
 									IsChecked="{Binding Path=IsSelected, Mode=TwoWay}"
@@ -284,6 +293,7 @@
 						<RadioButton
 							x:Name="RadioButtonEtc"
 							Margin="0,5"
+							AutomationProperties.AutomationId="Events.MalfunctionActionReport.Etc"
 							Content="{Binding EtcViewModel.Name, FallbackValue=기타}"
 							GroupName="CollectionActionItem"
 							IsChecked="{Binding EtcViewModel.IsSelected, Mode=TwoWay}"

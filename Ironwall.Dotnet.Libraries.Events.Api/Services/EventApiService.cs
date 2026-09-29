@@ -680,12 +680,31 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/actions", dto);
-            return await response.ToApiResponseAsync<ActionEventDto>();
+            var result = await response.ToApiResponseAsync<ActionEventDto>();
+            // 201 의 data 원문을 따로 든다 — NATS ACTION_REPORT body 가 이것을 그대로 싣는다(브로커 명세 §6.4, WP-1 ⑳).
+            if (result.Success) result.RawData = await ReadRawDataAsync(response);
+            return result;
         }
         catch (Exception ex)
         {
             _log?.Error($"[{nameof(CreateActionEventAsync)}] Error: {ex.Message}");
             return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", "Failed to create action event", ex.Message);
+        }
+    }
+
+    /// <summary>응답 봉투의 <c>data</c> 원문. 못 읽으면 <c>null</c>(부르는 쪽이 조립으로 폴백한다).</summary>
+    private async Task<Newtonsoft.Json.Linq.JToken?> ReadRawDataAsync(System.Net.Http.HttpResponseMessage response)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            return Newtonsoft.Json.Linq.JToken.Parse(content) is Newtonsoft.Json.Linq.JObject envelope
+                   && envelope["data"] is Newtonsoft.Json.Linq.JObject data ? data : null;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(CreateActionEventAsync)}] 응답 data 원문을 읽지 못함 — ACTION_REPORT 는 조립으로 폴백: {ex.Message}");
+            return null;
         }
     }
 

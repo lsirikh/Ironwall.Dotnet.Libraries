@@ -198,9 +198,10 @@ public class DetectionNatsSyncServiceTests
     }
 
     [Fact]
-    public async Task OnNatsDetection_InvalidDeviceType_ShouldDropEvent()
+    public async Task should_enqueue_as_type_none_without_guessing_when_type_device_is_unknown()
     {
-        // Arrange — 파싱 불가능한 type_device가 오면 이벤트 드롭 (Fence 오분류 금지)
+        // Arrange — 파싱 불가능한 type_device 가 와도 종류를 추측하지 않는다(Fence 오분류 금지).
+        //   WP-1 ⑱(2026-09-30): 버리지 않고 종류 NONE 으로 큐에 넣는다 — 호스트가 띄운 카드와 자동조치 · 원격 해제 · 알람이 짝을 이룬다.
         var service = CreateService(out var mockEa, out var mockQueue);
         await service.StartService();
 
@@ -225,12 +226,9 @@ public class DetectionNatsSyncServiceTests
         // Act
         await _capturedHandler!(args);
 
-        // Assert — Enqueue 호출 없음 (이벤트 드롭)
-        mockQueue.Verify(q => q.Enqueue(It.IsAny<EventEntry>(), It.IsAny<string?>()), Times.Never);
-        mockEa.Verify(ea => ea.PublishAsync(
-            It.IsAny<EventEntryEnqueuedMessage>(),
-            It.IsAny<Func<Func<Task>, Task>>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+        // Assert — 한 번, 종류 NONE(추측 없음) · Fence 로는 절대 아님
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.DeviceId == 10 && e.DeviceType == EnumDeviceType.NONE), It.IsAny<string?>()), Times.Once);
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.DeviceType == EnumDeviceType.Fence), It.IsAny<string?>()), Times.Never);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -331,14 +329,16 @@ public class DetectionNatsSyncServiceTests
     public async Task should_not_guess_sensor_kind_when_v7_sensor_reference_is_not_cached()
     {
         // Arrange — sensor 카테고리 안에는 Fence · PIR · Multi … 가 다 있다. 캐시에 없으면 종류를 단정하지 않는다.
+        //   WP-1 ⑱: 단정하지 않고(NONE) 큐에는 넣는다 — 카드와 큐가 따로 놀지 않게.
         var service = CreateServiceWithDevices(new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider(), out _, out var mockQueue);
         await service.StartService();
 
         // Act
         await _capturedHandler!(V7Detect());
 
-        // Assert
-        mockQueue.Verify(q => q.Enqueue(It.IsAny<EventEntry>(), It.IsAny<string?>()), Times.Never);
+        // Assert — 종류는 NONE 뿐(센서 세부종류를 고르지 않는다)
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.DeviceType == EnumDeviceType.NONE), It.IsAny<string?>()), Times.Once);
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.DeviceType != EnumDeviceType.NONE), It.IsAny<string?>()), Times.Never);
     }
 
     [Fact]

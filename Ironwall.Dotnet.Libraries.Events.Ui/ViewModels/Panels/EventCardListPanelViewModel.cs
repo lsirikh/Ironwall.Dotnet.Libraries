@@ -15,11 +15,15 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Action = System.Action;
 
@@ -139,9 +143,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #endregion
         #region - Processes -
         /// <summary>
-        /// NATS 수신 스레드에서 직접 호출 — lock-free ConcurrentQueue에 적재.
-        /// 150ms 타이머(FlushPendingCardsAsync)가 Background BeginInvoke로 배치 처리.
-        /// DispatcherService.Invoke() 직접 호출 금지 — NATS 스레드를 블로킹하지 않는다.
+        /// 새 이벤트 카드를 목록에 올리는 <b>유일한 입구</b> — 호스트(NATS DETECT · MALFUNCTION)가 부른다(WP-1 ①).
+        /// lock-free ConcurrentQueue에 적재하고, 150ms 타이머(FlushPendingCardsAsync)가 Background BeginInvoke로 묶어 올린 뒤
+        /// 표시 상한(<see cref="MAX_EVENT_CARDS"/>)을 지킨다. 종전 호스트는 ViewModelProvider.Add 로 곧장 넣어 상한 · 묶음이 죽어 있었다.
+        /// 어느 스레드에서 불러도 된다 — UI 스레드를 기다리지 않는다.
         /// </summary>
         public void EnqueueCard(EventCardBaseViewModel card)
         {
@@ -153,10 +158,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 card.Dispose();
             }
         }
+
+        /// <summary>아직 목록에 오르지 않고 묶음 버퍼에서 기다리는 카드 수.</summary>
+        public int PendingCardCount => _batchBuffer.PendingCount;
+
+        /// <summary>묶음 버퍼를 지금 비운다(시험 · 타이머 없는 헤드리스용). 타이머 틱과 같은 경로다.</summary>
+        internal Task FlushPendingCardsNowAsync() => FlushPendingCardsAsync();
+
         private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
-
             // Reset은 배치 서스펜드 패턴에서 수동 발행 — entryId 매칭은 배치에서 이미 처리
             if (e.Action == NotifyCollectionChangedAction.Reset)
             {
@@ -184,15 +194,47 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private void TryAssignEntryId(EventCardBaseViewModel card)
         {
             if (card.EntryId != null) return;
-            if (card.Model == null) return;
+            if (KeyOf(card) is not { } key) return;
 
-            if (_pendingEntries.TryGetValue(card.Model.Id, out var entryId))
+            // 종류 + 번호로 맞춘다 — 탐지 7번의 엔트리를 장애 7번 카드가 가져가지 않게(WP-1 ②).
+            if (_pendingEntries.TryRemove(key, out var entryId))
             {
                 card.EntryId = entryId;
-                _pendingEntries.TryRemove(card.Model.Id, out _);
                 _cardByEntryId[entryId] = card;
-                _log?.Info($"EntryId 지연 매칭: Card({card.Model.Id}) → Entry({entryId})");
+                _log?.Info($"EntryId 지연 매칭: Card({key.Kind} {key.EventId}) → Entry({entryId})");
             }
+        }
+
+        /// <summary>카드의 열쇠(종류 + 서버 번호). 탐지 · 장애 카드가 아니거나 번호가 없으면 <c>null</c>.</summary>
+        private static (string Kind, int EventId)? KeyOf(EventCardBaseViewModel? card)
+        {
+            var kind = EventCardKind.Of(card);
+            var id = card?.Model?.Id ?? 0;
+            return kind is null || id <= 0 ? null : (kind, id);
+        }
+
+        /// <summary>목록에서 종류 + 번호가 같은 카드. UI 스레드에서 부를 것.</summary>
+        private EventCardBaseViewModel? FindCard(string kind, int eventId)
+            => ViewModelProvider.FirstOrDefault(c => c.Model?.Id == eventId && EventCardKind.Of(c) == kind);
+
+        /// <summary>
+        /// 이미 조치된 이벤트를 기억한다 — 카드가 아직 묶음 버퍼(150 ms)에 있을 때 조치보고가 먼저 닿으면
+        /// 버퍼를 비울 때 그 카드를 올리지 않는다(뒤늦게 나타난 유령 카드 · 멈추지 않는 알람 방지).
+        /// </summary>
+        private void RememberClosed(string kind, int eventId)
+        {
+            lock (_closedGate)
+            {
+                if (!_closedKeys.Add((kind, eventId))) return;
+                _closedOrder.Enqueue((kind, eventId));
+                while (_closedOrder.Count > CLOSED_MEMORY) _closedKeys.Remove(_closedOrder.Dequeue());
+            }
+        }
+
+        private bool WasClosed(EventCardBaseViewModel card)
+        {
+            if (KeyOf(card) is not { } key) return false;
+            lock (_closedGate) return _closedKeys.Contains(key);
         }
 
         // Timer 콜백: 동기 래퍼 — async void 금지(Timer 콜백에서 예외 시 프로세스 크래시)
@@ -210,7 +252,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             int orphanedEntries = 0;
             while (ViewModelProvider.Count > MAX_EVENT_CARDS)
             {
-                var oldest = ViewModelProvider[0];
+                // 새 카드는 맨 위(0)에 들어온다 — 가장 오래된 카드는 맨 아래(WP-1 ⑲).
+                var oldest = ViewModelProvider[^1];
                 if (oldest.EntryId != null)
                 {
                     _cardByEntryId.TryRemove(oldest.EntryId, out _);
@@ -231,11 +274,25 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         {
             try
             {
-                var batch = _batchBuffer.DrainQueue();
+                var drained = _batchBuffer.DrainQueue();
+                if (drained.Count == 0) return;
+
+                // 버퍼에 있는 동안 이미 조치된 카드는 올리지 않는다(원격 · 임시 카드 조치보고가 먼저 닿은 경우).
+                var batch = new List<EventCardBaseViewModel>(drained.Count);
+                foreach (var card in drained)
+                {
+                    if (WasClosed(card))
+                    {
+                        _log?.Info($"[EnqueueCard] 이미 조치된 이벤트라 올리지 않음: {KeyOf(card)}");
+                        card.Dispose();
+                        continue;
+                    }
+                    batch.Add(card);
+                }
                 if (batch.Count == 0) return;
 
                 // 적응형 간격 조정
-                var newInterval = _batchBuffer.CalculateInterval(batch.Count);
+                var newInterval = _batchBuffer.CalculateInterval(drained.Count);
                 _batchTimer?.Change(newInterval, newInterval);
 
                 await DispatcherService.BeginInvoke(() =>
@@ -244,8 +301,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
                     try
                     {
+                        // 최신이 맨 위 — 종전엔 맨 아래에 붙고 스크롤이 따라가지 않아 새 이벤트가 화면 밖에 떴다(WP-1 ⑲).
                         foreach (var card in batch)
-                            ViewModelProvider.Add(card);
+                            ViewModelProvider.Insert(0, card);
                     }
                     finally
                     {
@@ -255,7 +313,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             TryAssignEntryId(card);
                         // (EB2) 표시 카드 하드 캡 — 장시간 운용 시 무한 증가 방지 (핸들러 활성 상태에서 제거)
                         EnforceDisplayCap();
-                        IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                         UpdateAction?.Invoke();
                     }
                 }, DispatcherPriority.Background);
@@ -290,15 +347,56 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel() { Title = "전체 조치보고", Explain = "전체 조치보고를 수행하시겠습니까?", MessageModel = new CallAllEventReportMessageModel() });
         }
 
-        public void OnClickEventCard(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// 카드 더블클릭 — 그 카드를 고르고 장비를 지도에서 보인다(WP-1 ⑪). 카드 안의 단추(조치보고 · 뒤집기)를 두 번 누른 것은 무시한다.
+        /// </summary>
+        public async void OnClickEventCard(object sender, RoutedEventArgs e)
         {
-            //if (!((sender as ListBox).SelectedItem is EventCardViewModel preEventViewModel))
-            //    return;
+            try
+            {
+                if (IsInsideButton(e?.OriginalSource as DependencyObject)) return;
+                var card = (e?.OriginalSource as FrameworkElement)?.DataContext as EventCardBaseViewModel
+                           ?? (sender as ListBox)?.SelectedItem as EventCardBaseViewModel;
+                await LocateCardAsync(card);
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"[EventCardList] 카드 더블클릭 처리 실패: {ex.Message}");
+            }
+        }
 
-            //if (SetupModel.EventCardMapChange)
-            //{
-            //    await _eventAggregator.PublishOnCurrentThreadAsync(new OpenCanvasMessageModel() { MapNumber = preEventViewModel.Map });
-            //}
+        /// <summary>
+        /// 카드를 고르고(<see cref="SelectedEventCardViewModel"/>) 그 장비를 지도에서 보이라고 요청한다 — 부대 콘솔 · 심볼 상세의
+        /// [지도에서 보기] 와 같은 메시지(<see cref="MapLocateRequest"/>)라 지도가 강조 고리 · 맞춤을 한다.
+        /// 장비가 없는 카드(지워진 장비)는 고르기만 한다.
+        /// </summary>
+        /// <returns>지도 요청을 보냈으면 <c>true</c>.</returns>
+        public async Task<bool> LocateCardAsync(EventCardBaseViewModel? card)
+        {
+            if (card == null) return false;
+            SelectedEventCardViewModel = card;
+
+            var device = card.Model?.Device;
+            var title = string.IsNullOrWhiteSpace(device?.DeviceName) ? $"이벤트 {card.Model?.Id}" : device!.DeviceName!;
+            var request = MapLocateRequest.For(title, device is null ? null : new[] { device.Id });
+            if (request is null)
+            {
+                _log?.Info($"[EventCardList] 지도에서 보기 생략 — 장비 없음: {KeyOf(card)}");
+                return false;
+            }
+            if (_eventAggregator is null) return false;
+            await _eventAggregator.PublishOnCurrentThreadAsync(request);
+            return true;
+        }
+
+        private static bool IsInsideButton(DependencyObject? source)
+        {
+            for (var node = source; node is not null and not ListBoxItem; node = SafeParent(node))
+                if (node is ButtonBase) return true;
+            return false;
+
+            static DependencyObject? SafeParent(DependencyObject node)
+                => node is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
         }
 
 
@@ -390,10 +488,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     try
                     {
-                        // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
+                        // ① 서버 API로 조치보고 생성 (보고자: Username(EmployeeNumber) 한 모양, Content: "일괄처리" 고정)
+                        var actor = ActionReportRules.FormatActor(_userModel);
                         var dto = new ActionEventCreateDto
                         {
-                            User = _userModel.Name,
+                            User = actor,
                             Content = "일괄처리",
                             FromEventId = eventId
                         };
@@ -402,53 +501,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         if (!response.Success)
                             throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
 
-                        // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
-                    // 1차: _pendingEntries 폴백 — entryId가 아직 카드에 할당 안 된 경우
-                    if (card.EntryId == null && eventModel?.Id != null)
-                    {
-                        if (_pendingEntries.TryRemove(eventModel.Id, out var fallbackEntryId))
-                        {
-                            card.EntryId = fallbackEntryId;
-                            _cardByEntryId[fallbackEntryId] = card;
-                            _log?.Info($"EntryId 배치 폴백 매칭: Event({eventModel.Id}) → Entry({fallbackEntryId})");
-                        }
-                    }
-
-                    if (card.EntryId != null)
-                    {
-                        _eventQueueManager.Dequeue(card.EntryId);
-                    }
-                    else if (eventModel?.Device != null)
-                    {
-                        // 2차: FindEntryByDevice 안전망 — _pendingEntries에도 없는 경우
-                        var entry = _eventQueueManager.FindEntryByDevice(eventModel.Device.Id, eventModel.Device.DeviceType);
-                        if (entry != null)
-                        {
-                            _eventQueueManager.Dequeue(entry.EntryId);
-                            _log?.Warning($"EntryId null 안전망 — FindEntryByDevice 복원: Device({eventModel.Device.Id})");
-                        }
-                        else
-                        {
-                            _log?.Error($"EntryId null 복원 불가: Event({eventModel?.Id}) — EQM 잔류 가능성");
-                        }
-                    }
+                    // ② 심볼 복원: EntryId 폴백 체인(종류까지 본다) → 엔트리가 없으면 심볼 재계산 (FR-01 · FR-03)
+                    ReleaseQueueAndSymbol(card);
 
                     // ③ 제거 + Dispose
-                    ViewModelProvider.Remove(card);
-                    if (card.EntryId != null) _cardByEntryId.TryRemove(card.EntryId, out _);
-                    card.Dispose();
+                    if (KeyOf(card) is { } closedKey) RememberClosed(closedKey.Kind, closedKey.EventId);
+                    RemoveCard(card);
 
                     // ④ NATS로 조치보고 발행 (NatsDomainService 경유)
-                    await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
-                    {
-                        EventId = eventModel?.Id ?? 0,
-                        EventType = eventModel?.MessageType ?? EnumEventType.Intrusion,
-                        ActionDetails = "일괄처리",
-                        ActionUser = _userModel.Name,
-                        ActionTime = DateTime.Now,
-                        OriginEvent = eventModel as IExEventModel,   // NATS from_event(device) 원천
-                        ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
-                    });
+                    await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(
+                        response, eventModel?.Id ?? 0, eventModel?.MessageType ?? EnumEventType.Intrusion,
+                        "일괄처리", actor, eventModel as IExEventModel));
 
                         await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
                     }
@@ -473,7 +536,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             {
                 _batchReportGate.Release();
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                 UpdateAction?.Invoke();
                 IsVisible = true;
             }
@@ -566,21 +628,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 await DispatcherService.BeginInvoke(() =>
                 {
+                    if (KeyOf(card) is { } key) RememberClosed(key.Kind, key.EventId);
                     _cardByEntryId.TryRemove(entryId, out _);
                     ViewModelProvider.Remove(card);
                     card.Dispose();
                 });
 
-                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
-                {
-                    EventId = eventId,
-                    EventType = entry.EventType,
-                    ActionDetails = content,
-                    ActionUser = GetActorName(),
-                    ActionTime = DateTime.Now,
-                    OriginEvent = card.Model as IExEventModel,   // NATS from_event(device) 원천
-                    ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
-                });
+                await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(
+                    response, eventId, entry.EventType, content, GetActorName(), card.Model as IExEventModel));
 
                 _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
                 }
@@ -598,7 +653,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         /// <summary>
         /// Fault 자동복구 핸들러 — EventQueueManager.OnAutoRecovery 구독용.
-        /// 서버 API 조치보고 → UI 카드 제거 → NATS 발행
+        /// 서버 API 조치보고 → <b>성공했을 때만</b> UI 카드 제거 → NATS 발행.
+        /// 종전엔 API 가 실패해도 카드를 지우고 ActionId=0 인 ACTION_REPORT 를 내보냈다 — 서버엔 조치가 없는데 다른 GIS 의 카드까지 닫혔다(WP-1 ⑤).
+        /// 실패하면 카드는 남는다(큐 엔트리는 자동복구가 이미 뺐으므로 사람이 조치보고하면 심볼은 큐 실제 상태로 다시 계산된다).
         /// </summary>
         public async Task HandleAutoRecoveryAsync(string faultEntryId)
         {
@@ -622,34 +679,32 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 try
                 {
+                var actor = GetActorName();
                 var dto = new ActionEventCreateDto
                 {
-                    User = _userModel.Name,
+                    User = actor,
                     Content = "etc 자동복구",
                     FromEventId = eventModel.Id
                 };
 
                 var response = await _apiService.CreateActionEventAsync(dto);
                 if (!response.Success)
-                    _log?.Warning($"AutoRecovery API 실패: {response.Message}");
+                {
+                    // 서버에 조치가 없다 — 카드를 지우거나 ACTION_REPORT 를 내보내면 거짓이 된다.
+                    _log?.Warning($"AutoRecovery API 실패 — 카드 유지 · NATS 미발행: Event({eventModel.Id}), {response.Message}");
+                    return;
+                }
 
                 await DispatcherService.BeginInvoke(() =>
                 {
+                    if (KeyOf(card) is { } key) RememberClosed(key.Kind, key.EventId);
                     _cardByEntryId.TryRemove(faultEntryId, out _);
                     ViewModelProvider.Remove(card);
                     card.Dispose();
                 });
 
-                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
-                {
-                    EventId = eventModel.Id,
-                    EventType = eventModel.MessageType,
-                    ActionDetails = "etc 자동복구",
-                    ActionUser = _userModel.Name,
-                    ActionTime = DateTime.Now,
-                    OriginEvent = eventModel as IExEventModel,   // NATS from_event(device) 원천
-                    ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
-                });
+                await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(
+                    response, eventModel.Id, eventModel.MessageType, "etc 자동복구", actor, eventModel as IExEventModel));
 
                 _log?.Info($"AutoRecovery 완료: Event({eventModel.Id}), Entry({faultEntryId})");
                 }
@@ -665,72 +720,137 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         /// <summary>
-        /// (C-2) 원격 ACTION_REPORT 수신 시 from_event.id로 활성 카드를 종결한다.
-        /// 다중 GIS/서브시스템이 이벤트를 공유하는 환경에서 타 GIS가 조치보고하면 본 GIS의 카드도 닫는다.
-        /// 자기 발행분 echo는 로컬에서 이미 닫혀 카드가 부재 → 멱등 no-op(false 반환, 예외·이중종결 없음).
-        /// 심볼 상태 복원(EQM Dequeue)까지 개별 조치보고(HandleAsync)와 동일 폴백 경로를 재사용한다.
+        /// (C-2) 원격 ACTION_REPORT 수신 — 다른 GIS · 서브시스템이 조치한 이벤트를 이 GIS 에서도 푼다.
+        /// <list type="number">
+        ///   <item>목록에 <b>종류 + 번호</b>가 같은 카드가 있으면 닫는다(큐 엔트리 Dequeue → 심볼 복원). 종전엔 번호만 봐서
+        ///     탐지 7번 조치보고가 장애 7번 카드를 닫을 수 있었다(WP-1 ②).</item>
+        ///   <item>카드가 없어도(이미 다른 경로로 닫힘 · 표시 상한으로 밀려남) 큐에 엔트리가 남았으면 뺀다.</item>
+        ///   <item>엔트리도 없으면 장비 · 그룹 심볼을 큐 실제 상태로 다시 계산한다 — 개별 조치보고의 복원과 같은 길(WP-1 ③).</item>
+        ///   <item>열린 조치보고 창이 같은 이벤트면 [확인]을 끄라고 알린다(<see cref="RemoteActionReportedMessage"/>).</item>
+        /// </list>
+        /// 종류를 모르면(<paramref name="kind"/> = null) 번호가 하나의 카드로만 정해질 때 그 카드를 닫고, 둘 이상이면 아무것도 닫지 않는다.
+        /// 자기 발행분의 메아리는 이미 닫혀 있어 <see cref="RemoteActionReportOutcome.Nothing"/> 이다(멱등).
         /// ⚠ ViewModelProvider를 변경하므로 UI 스레드에서 호출할 것(호출부 NatsDomainService가 DispatcherService.Invoke로 감쌈).
         /// </summary>
-        /// <returns>카드를 찾아 종결하면 true, 없으면(이미 닫힘/무관 이벤트) false.</returns>
-        public bool CloseCardByEventId(int eventId)
+        /// <param name="kind"><see cref="ActionReportKind"/> 값 또는 <c>null</c>(모름).</param>
+        /// <param name="eventId">원본 이벤트 서버 id(<c>from_event.id</c>).</param>
+        /// <param name="eventType">원본 유형(<c>from_event.type_event</c>) — 큐 엔트리를 찾는 열쇠. 모르면 종류의 기본 유형.</param>
+        /// <param name="device">원본 장비(DeviceProvider 에서 찾은 것) — 엔트리가 없을 때 심볼을 다시 계산할 대상. 없으면 생략.</param>
+        public RemoteActionReportOutcome CloseByRemoteActionReport(string? kind, int eventId, EnumEventType? eventType = null, IBaseDeviceModel? device = null)
         {
-            if (eventId <= 0) return false;
-            var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == eventId);
-            if (card == null) return false;   // 멱등: 이미 종결됐거나 본 패널에 없는 이벤트
+            if (eventId <= 0) return RemoteActionReportOutcome.Invalid;
 
-            // EntryId 폴백 체인(개별 조치보고와 동일) — 1차 _pendingEntries, 2차 FindEntryByDevice.
-            if (card.EntryId == null && card.Model?.Id != null)
+            if (kind is null)
             {
-                if (_pendingEntries.TryRemove(card.Model.Id, out var fallbackEntryId))
+                var sameId = ViewModelProvider.Where(c => c.Model?.Id == eventId && EventCardKind.Of(c) is not null).ToList();
+                if (sameId.Count > 1)
                 {
-                    card.EntryId = fallbackEntryId;
-                    _cardByEntryId[fallbackEntryId] = card;
+                    _log?.Warning($"[ACTION_REPORT] 종류를 모르는데 번호 {eventId} 카드가 {sameId.Count}장 — 잘못 닫지 않으려고 건너뜀");
+                    return RemoteActionReportOutcome.Ambiguous;
                 }
-            }
-            if (card.EntryId != null)
-            {
-                _eventQueueManager.Dequeue(card.EntryId);
-            }
-            else if (card.Model?.Device != null)
-            {
-                var entry = _eventQueueManager.FindEntryByDevice(card.Model.Device.Id, card.Model.Device.DeviceType);
-                if (entry != null) _eventQueueManager.Dequeue(entry.EntryId);
-                else _log?.Warning($"[ACTION_REPORT] EntryId 복원 불가: Event({eventId}) — EQM 잔류 가능성");
+                kind = sameId.Count == 1 ? EventCardKind.Of(sameId[0]) : null;
             }
 
+            if (kind is not null)
+            {
+                RememberClosed(kind, eventId);
+                _ = NotifyRemoteReportAsync(new RemoteActionReportedMessage(kind, eventId));
+            }
+
+            var card = kind is null ? null : FindCard(kind, eventId);
+            if (card is not null)
+            {
+                ReleaseQueueAndSymbol(card, allowDeviceFallback: false);   // 번호로 못 찾으면 지우지 않고 재계산만(⑮)
+                RemoveCard(card);
+                _log?.Info($"[ACTION_REPORT] 원격 조치보고로 카드 종결: {kind} {eventId}");
+                return RemoteActionReportOutcome.CardClosed;
+            }
+
+            // 카드가 없다 — 큐에 남은 엔트리를 빼거나, 그것도 없으면 심볼을 큐 실제 상태로 다시 계산한다.
+            var type = eventType ?? EventCardKind.EventTypeOf(kind, null);
+            var entry = type is EnumEventType t ? _eventQueueManager.FindEntryByEventId(eventId, t) : null;
+            if (entry?.EntryId is { } entryId)
+            {
+                _eventQueueManager.Dequeue(entryId);
+                _pendingEntries.TryRemove((kind ?? EventCardKind.Of(entry.EventType), eventId), out _);
+                _log?.Info($"[ACTION_REPORT] 카드 없음 — 큐 엔트리 해제: {kind} {eventId} → Entry({entryId})");
+                return RemoteActionReportOutcome.QueueEntryCleared;
+            }
+
+            if (device is not null)
+            {
+                RefreshSymbols(device);
+                _log?.Info($"[ACTION_REPORT] 카드 · 엔트리 없음 — 심볼 재계산: {kind} {eventId}, Device({device.Id},{device.DeviceType})");
+                return RemoteActionReportOutcome.SymbolRefreshed;
+            }
+
+            return RemoteActionReportOutcome.Nothing;   // 멱등: 이미 종결됐거나 이 GIS 가 모르는 이벤트
+        }
+
+        private async Task NotifyRemoteReportAsync(RemoteActionReportedMessage message)
+        {
+            try
+            {
+                if (_eventAggregator is not null) await _eventAggregator.PublishOnCurrentThreadAsync(message);
+            }
+            catch (Exception ex)
+            {
+                _log?.Warning($"[ACTION_REPORT] 열린 조치보고 창 알림 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>카드를 목록에서 빼고 치운다. UI 스레드에서 부를 것.</summary>
+        private void RemoveCard(EventCardBaseViewModel card)
+        {
             if (card.EntryId != null) _cardByEntryId.TryRemove(card.EntryId, out _);
             ViewModelProvider.Remove(card);
             card.Dispose();
-            _log?.Info($"[ACTION_REPORT] 원격 조치보고로 카드 종결: Event({eventId})");
-            return true;
+        }
+
+        /// <summary>장비 · 소속 그룹 심볼을 큐(EQM) 실제 상태로 다시 계산한다(맹목 Normal 아님 — 남은 이벤트는 보존).</summary>
+        private void RefreshSymbols(IBaseDeviceModel device)
+        {
+            _symbolEventManager.RefreshDeviceSymbol(device.Id, device.DeviceType);
+            if (device.DeviceGroups != null)
+                foreach (var g in device.DeviceGroups)
+                    _symbolEventManager.RefreshGroupSymbol(g);
         }
 
         /// <summary>
-        /// 조치보고 시 심볼/EQM 상태 정리 (FR-03). EntryId 폴백 체인: _pendingEntries → EQM 실엔트리(EventId+Type / Device).
-        /// 엔트리를 찾으면 Dequeue(N→0 전이 → 그룹/개별 심볼 복원), 아예 없으면(그리드 일시 카드 / 부팅 전 장애)
-        /// 심볼을 EQM 실제 상태로 **재계산 복원**(검정/장애색 소거, 잔여 활성 이벤트 보존). vm.EntryId를 확정 세팅.
+        /// 조치보고 시 심볼/EQM 상태 정리 (FR-03). EntryId 폴백 체인: 카드 EntryId → 보류 표(종류 + 번호) → EQM 실엔트리(번호 + 유형)
+        /// → 장비의 가장 오래된 엔트리(<b>같은 종류일 때만</b>). 엔트리를 찾으면 Dequeue(N→0 전이 → 그룹/개별 심볼 복원),
+        /// 아예 없으면(그리드 일시 카드 / 부팅 전 장애) 심볼을 EQM 실제 상태로 **재계산 복원**. vm.EntryId를 확정 세팅.
+        /// 개별 · 전체 · 원격 조치보고가 모두 이 한 길을 쓴다.
         /// </summary>
-        private void ResolveReportedFaultState(EventCardBaseViewModel vm)
+        /// <param name="allowDeviceFallback">
+        /// 번호로 엔트리를 못 찾았을 때 '그 장비의 가장 오래된 같은 종류 엔트리'를 뺄지. 원격 조치보고는 <c>false</c> —
+        /// 남이 조치한 이벤트 대신 이 GIS 의 다른 활성 이벤트를 지울 수 있다(WP-1 ⑮). 그때는 심볼만 큐 실제 상태로 다시 계산한다.
+        /// </param>
+        private void ReleaseQueueAndSymbol(EventCardBaseViewModel vm, bool allowDeviceFallback = true)
         {
             var model = vm.Model;
-            if (vm.EntryId == null && model?.Id != null)
+            var kind = EventCardKind.Of(vm);
+            if (vm.EntryId == null && model != null)
             {
-                if (_pendingEntries.TryRemove(model.Id, out var pendingId))
+                if (kind is not null && _pendingEntries.TryRemove((kind, model.Id), out var pendingId))
                 {
                     vm.EntryId = pendingId;
-                    _log?.Info($"EntryId 개별 폴백 매칭: Event({model.Id}) → Entry({pendingId})");
+                    _log?.Info($"EntryId 개별 폴백 매칭: {kind} {model.Id} → Entry({pendingId})");
                 }
                 else
                 {
                     // 그리드 조치보고=일시 카드 인스턴스라 EntryId 미할당 — 실제 EQM 엔트리 직접 조회(장애/탐지 독립 id → Type 판별).
-                    var entry = _eventQueueManager.FindEntryByEventId(model.Id, model.MessageType)
-                                ?? (model.Device != null
-                                        ? _eventQueueManager.FindEntryByDevice(model.Device.Id, model.Device.DeviceType)
-                                        : null);
+                    var entry = _eventQueueManager.FindEntryByEventId(model.Id, model.MessageType);
+                    if (entry == null && allowDeviceFallback && model.Device != null)
+                    {
+                        var byDevice = _eventQueueManager.FindEntryByDevice(model.Device.Id, model.Device.DeviceType);
+                        // 장비 기준 폴백은 종류가 같을 때만 — 탐지 조치보고가 같은 장비의 장애 엔트리를 빼면 안 된다.
+                        if (byDevice != null && (kind is null || EventCardKind.Of(byDevice.EventType) == kind)) entry = byDevice;
+                    }
                     if (entry?.EntryId != null)
                     {
                         vm.EntryId = entry.EntryId;
-                        _log?.Info($"조치보고 EQM 엔트리 직접 매칭(EntryId null 폴백): Event({model.Id}) → Entry({entry.EntryId})");
+                        _log?.Info($"조치보고 EQM 엔트리 직접 매칭(EntryId null 폴백): {kind} {model.Id} → Entry({entry.EntryId})");
                     }
                 }
             }
@@ -742,65 +862,50 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             else if (model?.Device != null)
             {
                 // EQM 엔트리 자체가 없음(부팅 전 장애 등) — Dequeue 대상 부재. 심볼을 EQM 실제 상태로 재계산 복원.
-                _symbolEventManager.RefreshDeviceSymbol(model.Device.Id, model.Device.DeviceType);
-                if (model.Device.DeviceGroups != null)
-                    foreach (var g in model.Device.DeviceGroups)
-                        _symbolEventManager.RefreshGroupSymbol(g);
-                _log?.Warning($"EQM 엔트리 부재 — 심볼 재계산 복원(EntryId null): Event({model.Id}), Device({model.Device.Id})");
+                RefreshSymbols(model.Device);
+                _log?.Warning($"EQM 엔트리 부재 — 심볼 재계산 복원(EntryId null): {kind} {model.Id}, Device({model.Device.Id})");
             }
             else
             {
-                _log?.Warning($"EntryId·EQM 엔트리·Device 모두 부재 — 심볼 복원 스킵: Event({model?.Id})");
+                _log?.Warning($"EntryId·EQM 엔트리·Device 모두 부재 — 심볼 복원 스킵: {kind} {model?.Id}");
             }
         }
 
-        public async Task HandleAsync(DetectionReportedMessageModel message, CancellationToken cancellationToken)
+        public Task HandleAsync(DetectionReportedMessageModel message, CancellationToken cancellationToken)
+            => HandleReportedAsync(message?.ViewModel);
+
+        public Task HandleAsync(MalfunctionReportedMessageModel message, CancellationToken cancellationToken)
+            => HandleReportedAsync(message?.ViewModel);
+
+        /// <summary>
+        /// 사람의 조치보고가 서버에 들어갔다 — 카드를 닫는다.
+        /// 트레이 · 목록 우클릭 · 이력 창은 <b>임시 카드</b>로 보고한다(§8-3) — 그 임시 카드는 목록에 없으므로
+        /// 목록에서 종류 + 번호가 같은 <b>진짜 카드</b>를 찾아 닫는다. 종전엔 임시 카드만 치워 진짜 카드가
+        /// NATS 메아리가 올 때까지(안 오면 영영) 남고 그 알람도 계속 울렸다(WP-1 ④).
+        /// </summary>
+        private async Task HandleReportedAsync(EventCardBaseViewModel? vm)
         {
             try
             {
-                if (message != null && message.ViewModel != null)
+                if (vm == null) return;
+                if (vm.Model == null) throw new NullReferenceException($"{vm.GetType().Name} 의 이벤트 모델을 찾을 수 없습니다.");
+
+                await DispatcherService.BeginInvoke(() =>
                 {
-                    var vm = message.ViewModel;
-                    var model = vm.Model;
-                    if (model == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
+                    var key = KeyOf(vm);
+                    var target = ViewModelProvider.Contains(vm) || key is null ? vm : FindCard(key.Value.Kind, key.Value.EventId) ?? vm;
+                    if (key is { } k) RememberClosed(k.Kind, k.EventId);
 
-                    // 심볼/EQM 상태 정리 — EntryId 폴백 체인(직접 EQM 조회) + 엔트리 부재 시 재계산 복원 (FR-03)
-                    ResolveReportedFaultState(vm);
+                    // 심볼/EQM 상태 정리 — 진짜 카드의 EntryId 가 있으면 그것으로(가장 정확), 없으면 폴백 체인 (FR-03)
+                    ReleaseQueueAndSymbol(target);
 
-                    await DispatcherService.BeginInvoke(() =>
+                    RemoveCard(target);
+                    if (!ReferenceEquals(target, vm))
                     {
-                        if (vm.EntryId != null) _cardByEntryId.TryRemove(vm.EntryId, out _);
-                        ViewModelProvider.Remove(vm);
                         vm.Dispose();
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                _log?.Error(ex.Message);
-            }
-        }
-
-        public async Task HandleAsync(MalfunctionReportedMessageModel message, CancellationToken cancellationToken)
-        {
-            try
-            {
-                if (message != null && message.ViewModel != null)
-                {
-                    var vm = message.ViewModel;
-                    var model = vm.Model;
-                    if (model == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
-
-                    // 심볼/EQM 상태 정리 — EntryId 폴백 체인(직접 EQM 조회) + 엔트리 부재 시 재계산 복원 (FR-03)
-                    ResolveReportedFaultState(vm);
-
-                    await DispatcherService.BeginInvoke(() =>
-                    {
-                        if (vm.EntryId != null) _cardByEntryId.TryRemove(vm.EntryId, out _);
-                        ViewModelProvider.Remove(vm);
-                        vm.Dispose();
-                    });
-                }
+                        _log?.Info($"임시 카드 조치보고 → 목록의 진짜 카드 종결: {key}");
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -831,17 +936,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         public Task HandleAsync(EventEntryEnqueuedMessage message, CancellationToken cancellationToken)
         {
-            var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == message.EventId && c.EntryId == null);
+            // 종류 + 번호로 맞춘다 — 서버는 탐지 · 장애를 따로 번호 매긴다(WP-1 ②).
+            var kind = EventCardKind.Of(message.EventType);
+            var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == message.EventId && EventCardKind.Of(c) == kind && c.EntryId == null);
             if (card != null)
             {
                 card.EntryId = message.EntryId;
                 _cardByEntryId[message.EntryId] = card;
-                _log?.Info($"EntryId 직접 매칭: Card({message.EventId}) → Entry({message.EntryId})");
+                _log?.Info($"EntryId 직접 매칭: Card({kind} {message.EventId}) → Entry({message.EntryId})");
             }
             else
             {
-                // 카드가 아직 추가되지 않음 → 보류 큐에 저장
-                _pendingEntries[message.EventId] = message.EntryId;
+                // 카드가 아직 추가되지 않음(묶음 버퍼에 있음) → 보류 큐에 저장
+                _pendingEntries[(kind, message.EventId)] = message.EntryId;
             }
             return Task.CompletedTask;
         }
@@ -873,12 +980,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
         public event Action? UpdateAction;
 
-        public bool IsAnimationEnabled
-        {
-            get { return _isAnimationEnabled; }
-            set { _isAnimationEnabled = value; NotifyOfPropertyChange(() => IsAnimationEnabled); }
-        }
-
         public bool IsVisible
         {
             get { return _isVisible; }
@@ -886,23 +987,28 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
         #endregion
         #region - Attributes -
-        private const int ANIMATION_THRESHOLD = 20;
         private const int MAX_EVENT_CARDS = 500;   // (EB2) 표시 카드 하드 캡
+        private const int CLOSED_MEMORY = 256;     // 이미 조치된 (종류, 번호) 기억 개수 — 묶음 버퍼 150 ms 창을 넉넉히 덮는다
         private const int BATCH_INTERVAL_MS = 150;
         private const string AUTO_REPORT_DETECTION   = "탐지 자동 조치보고";
         private const string AUTO_REPORT_MALFUNCTION = "이상 자동 조치보고";
         private const string AUTO_REPORT_DEFAULT     = "자동 조치보고";
         private const int BACKOFF_SECONDS = 30;
 
-        private string GetActorName() =>
-            string.IsNullOrWhiteSpace(_userModel?.Name) ? "SYSTEM" : _userModel.Name;
+        /// <summary>자동 경로의 보고자 — 조치보고 창과 같은 <c>Username(EmployeeNumber)</c> 모양, 로그인한 사람이 없으면 SYSTEM(WP-1 ⑬).</summary>
+        private string GetActorName() => ActionReportRules.FormatActor(_userModel);
         private EventProviderService _providerService;
         private IAccountModel _userModel;
         private IEventApiService _apiService;
         private ISymbolEventManager _symbolEventManager;
         private IEventQueueManager _eventQueueManager;
         private EventCardBatchBuffer<EventCardBaseViewModel> _batchBuffer;
-        private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
+        // 카드가 아직 없을 때 먼저 온 큐 엔트리 — 열쇠는 (종류, 서버 번호). 탐지 · 장애 번호는 서로 겹친다(WP-1 ②).
+        private readonly ConcurrentDictionary<(string Kind, int EventId), string> _pendingEntries = new();
+        // 이미 조치된 (종류, 번호) — 묶음 버퍼에 있던 카드가 조치 뒤에 떠오르지 않게(RememberClosed/WasClosed).
+        private readonly object _closedGate = new();
+        private readonly HashSet<(string Kind, int EventId)> _closedKeys = new();
+        private readonly Queue<(string Kind, int EventId)> _closedOrder = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private readonly SemaphoreSlim _batchReportGate = new(1, 1);
         // (EC2/EC5 + Phase3) 조치보고 멱등 가드(싱글톤 IActionReportGuard). Auto/AutoRecovery/Batch 3경로 +
@@ -911,7 +1017,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private readonly IActionReportGuard _reportGuard;
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
-        private bool _isAnimationEnabled = true;
         private bool _isVisible = true;
         #endregion
     }

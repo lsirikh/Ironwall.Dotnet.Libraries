@@ -1,5 +1,6 @@
 ﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Events.DetectionEventCardView"
+	AutomationProperties.AutomationId="{Binding AutomationKey, Mode=OneWay}"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -187,6 +188,7 @@
 								VerticalAlignment="Center"
 								VerticalContentAlignment="Center"
 								md:RippleAssist.IsCentered="True"
+								AutomationProperties.AutomationId="{Binding ReportAutomationKey, Mode=OneWay}"
 								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="{DynamicResource EventRemove_Title}">
 								<cal:Message.Attach>

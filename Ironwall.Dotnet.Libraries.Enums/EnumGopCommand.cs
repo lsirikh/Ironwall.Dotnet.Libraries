@@ -88,6 +88,19 @@ public enum EnumGopCommand
     //   body {action:"UPDATED", resource_id:<새 문서 판>} — resource_id 는 부대 id 가 아니라 문서 판(version)이다. 요청 1건 = 알림 1건.
     //   처리=호스트 라우터 → UnitLayoutChangedMessage(판). 가진 판 이하면 관계도가 버린다(자기 저장 메아리 포함).
     SYNC_UNIT_LAYOUT = 34,
+    // ── GIS 가 호스트 라우터에서 쓰지 않는 수신 cmd (WP-1 ⑩, 2026-09-30) ──────────────────────────
+    //  미정의면 메시지마다 "Unknown type_command" + "Unknown command: NONE" 경고 2줄이 남았다. 인식만 하고 건너뛴다.
+    //  정수는 유일성만(라우팅은 이름 기반).
+    // 운영 이벤트(통문 · 함체 개폐 · 임계치) — 처리=라이브러리 OperationEventNatsSyncService(cmd 자가 필터).
+    OPERATION_EVENT = 35,
+    // 시스템 이벤트(서버 발행, 브로커 v1.5 신규) — GIS 소비처 없음.
+    SYSTEM_EVENT = 36,
+    // 운영 이벤트 동기화 알림 — GIS 캐시 없음.
+    SYNC_OPERATION_EVENT = 37,
+    // 시스템 이벤트 동기화 알림 — GIS 캐시 없음.
+    SYNC_SYSTEM_EVENT = 38,
+    // 함체 계측(온도 · 전압 …) 주기 발행 — GIS 소비처 없음.
+    ENCLOSURE_METRICS = 39,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

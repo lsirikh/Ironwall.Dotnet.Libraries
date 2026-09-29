@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -57,6 +57,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public int TimeDiscardSec { get; set; }
         /// <summary>EventQueueManager의 entryId — Dequeue 호출 시 사용</summary>
         public string? EntryId { get; set; }
+        /// <summary>
+        /// 카드 자동화 식별자 — <c>Events.Card.{Detection|Malfunction}.{eventId}</c>(WP-1 ⑫). 종류를 넣는 까닭: 탐지 · 장애 번호가 겹친다.
+        /// 카드 뷰 뿌리가 바인딩으로 단다(x:Name 은 Caliburn 지시자라 쓰지 않는다).
+        /// </summary>
+        public string AutomationKey
+            => $"Events.Card.{Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.AutomationSegment(Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(this))}.{Model?.Id ?? 0}";
+        /// <summary>카드의 조치보고 단추 자동화 식별자 — <c>{AutomationKey}.Report</c>.</summary>
+        public string ReportAutomationKey => AutomationKey + ".Report";
         /// <summary>레거시 호환용 — Path A 타이머 제거 후 더 이상 사용되지 않음</summary>
         public CancellationTokenSource? Cts { get; set; }
         public bool IsFlipped

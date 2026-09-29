@@ -70,16 +70,21 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     #endregion
 
     #region - Processes -
-    private Task OnNatsMalfunctionAsync(MessageArgsModel e)
+    private async Task OnNatsMalfunctionAsync(MessageArgsModel e)
     {
         // 로그인 게이팅(Login_Gated_GIS_Init): 로그인 전 NATS 이벤트 수신 차단 — 맵/캐시 미구축 상태에서 알람 방지.
         // 미조치 이벤트는 서버 DB에 영속 → 로그인 후 이력 패널 조회로 후처리. _tokenStorage 미주입 시 게이트 비활성(하위호환).
-        if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;
+        if (_tokenStorage is { IsAuthenticated: false }) return;
+
+        // 배열 봉투는 항목마다 — 호스트 라우터와 같은 의미(WP-1 ⑰). 한 항목의 실패가 나머지를 버리지 않는다.
+        foreach (var envelope in NatsEnvelopeItems.Parse(e.Data, _log, "MALFUNCTION"))
+            await ProcessEnvelopeAsync(envelope);
+    }
+
+    private Task ProcessEnvelopeAsync(JObject jObj)
+    {
         try
         {
-            if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
-
-            var jObj = JObject.Parse(e.Data);
             var natsMessageId = jObj.Value<string>("id");
             var cmd = jObj.Value<string>("cmd");
             if (cmd != "MALFUNCTION") return Task.CompletedTask;
@@ -100,8 +105,10 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
             // 종류 · 그룹 — v7.0+ 는 장비 참조 {id, category_device} 뿐이라 캐시에서 읽는다(옛 전문은 본문이 이긴다).
             if (!NatsEventDeviceResolver.TryResolve(body.Device, deviceId, _deviceProvider, out var deviceType, out var deviceGroups))
             {
-                _log?.Error($"MALFUNCTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 이벤트 무시");
-                return Task.CompletedTask;
+                // 캐시 미스 + 카테고리만으로 종류를 못 정함(sensor) — 추측하지 않고 NONE 으로 큐에 넣는다(WP-1 ⑱, 탐지와 같은 규칙).
+                deviceType = EnumDeviceType.NONE;
+                deviceGroups = body.Device?.GroupIds?.Where(g => g > 0).ToList();
+                _log?.Warning($"MALFUNCTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 종류 NONE 으로 큐 적재(자동조치 · 원격 해제용)");
             }
 
             // [GMap_Controller_Blackout] 제어기 무통신(FAULT_CONTROLLER) → 연결 센서 그룹으로 확장 + blackout 표식.
@@ -119,6 +126,13 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
             }
 
             _log?.Info($"MALFUNCTION 수신: deviceId={deviceId}, deviceType={deviceType}, reason={body.Reason}, blackout={isControllerBlackout}, groups=[{string.Join(",", deviceGroups ?? [])}]");
+
+            // 같은 봉투(id)를 두 번 받으면 큐에 한 번만 — 두 번째는 알람 · EntryId 를 두 번 만든다(WP-1 ⑦).
+            if (!_recentEnvelopes.TryAdd(natsMessageId))
+            {
+                _log?.Info($"MALFUNCTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                return Task.CompletedTask;
+            }
 
             var entryId = _eventQueueManager.Enqueue(new EventEntry
             {
@@ -172,5 +186,6 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
     private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 제어기→센서→그룹 토폴로지(GMap_Controller_Blackout)
+    private readonly RecentEnvelopeFilter _recentEnvelopes = new();   // 같은 봉투 두 번 → 큐 한 번(WP-1 ⑦)
     #endregion
 }

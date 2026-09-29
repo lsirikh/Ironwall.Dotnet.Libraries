@@ -1,5 +1,6 @@
 ﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.EventCardListPanelView"
+	AutomationProperties.AutomationId="Events.CardList.Root"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -62,13 +63,14 @@
 						<Grid>
 							<Button
 								x:Name="ButtonActionAll"
+								AutomationProperties.AutomationId="Events.CardList.ReportAll"
 								md:RippleAssist.IsCentered="True"
 								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
 								Style="{StaticResource Console.Button.Icon}"
 								ToolTip="전체 조치보고"
 								Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibleConverter}}">
 								<cal:Message.Attach>
-									[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs]
+									[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs)]
 								</cal:Message.Attach>
 								<md:PackIcon
 									Width="23"

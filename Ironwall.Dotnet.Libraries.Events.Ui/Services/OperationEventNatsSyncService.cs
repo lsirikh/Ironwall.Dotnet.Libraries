@@ -64,24 +64,30 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
     private Task OnNatsOperationAsync(MessageArgsModel e)
     {
         if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;   // 로그인 게이팅(DETECT 와 동일)
+        // 배열 봉투는 항목마다 — 호스트 라우터와 같은 의미(WP-1 ⑰).
+        foreach (var envelope in NatsEnvelopeItems.Parse(e.Data, _log, "OPERATION_EVENT"))
+            ProcessEnvelope(envelope);
+        return Task.CompletedTask;
+    }
+
+    private void ProcessEnvelope(JObject jObj)
+    {
         try
         {
-            if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
-            var jObj = JObject.Parse(e.Data);
-            if (jObj.Value<string>("cmd") != "OPERATION_EVENT") return Task.CompletedTask;
+            if (jObj.Value<string>("cmd") != "OPERATION_EVENT") return;
             var body = jObj["body"];
-            if (body is null) return Task.CompletedTask;
+            if (body is null) return;
 
             var device = body["device"];
             int deviceId = device?.Value<int?>("id") ?? body.Value<int?>("device_id") ?? 0;
             // v7.0+ 이벤트의 장비는 참조 {id, category_device}(서버 D5) — type_device 는 없다. 예전엔 type_device 만 읽어
             //   7.0+ 서버의 함체 · 통문 개폐가 지도에 한 번도 반영되지 않았다(2026-09-30 발견). 개폐가 있는 카테고리만 종류로 옮긴다.
             if (deviceId <= 0 || ResolveDoorDeviceType(device?.Value<string>("category_device"), device?.Value<string>("type_device")) is not { } deviceType)
-                return Task.CompletedTask;
-            if (!DoorStateMachine.HasDoor(deviceType)) return Task.CompletedTask;
+                return;
+            if (!DoorStateMachine.HasDoor(deviceType)) return;
 
             var state = Resolve(body["detail"]?.Value<string>("door_status") ?? body["detail"]?.Value<string>("gate_status"), body.Value<string>("reason"));
-            if (state is null) return Task.CompletedTask;   // 온도/전압 임계치 등 개폐 무관
+            if (state is null) return;   // 온도/전압 임계치 등 개폐 무관
 
             _symbolEventManager.SetDoorState(deviceId, deviceType, state.Value);
             _log?.Info($"OPERATION_EVENT 개폐: deviceId={deviceId}, {deviceType}, reason={body.Value<string>("reason")} → {state}");
@@ -90,7 +96,6 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
         {
             _log?.Error($"{nameof(OnNatsOperationAsync)} 오류: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
 
     /// <summary>

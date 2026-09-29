@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -15,9 +15,11 @@ public class SoundAlarmController : ISoundAlarmController
     public SoundAlarmController(
         Action<EnumEventType> stopAndPlay,
         int durationSeconds = 20,
-        int typeSwitchThrottleMs = 200)
+        int typeSwitchThrottleMs = 200,
+        Action? stopAll = null)
     {
         _stopAndPlay = stopAndPlay;
+        _stopAll = stopAll;
         _durationSeconds = durationSeconds;
         _typeSwitchThrottleMs = typeSwitchThrottleMs;
         State = SoundAlarmState.Idle;
@@ -109,11 +111,45 @@ public class SoundAlarmController : ISoundAlarmController
             _lastTypeSwitchTime = default;
         }
     }
+
+    public void OnActiveCountsChanged(int detection, int fault)
+    {
+        EnumEventType? toPlay = null;
+        var stop = false;
+        lock (_lock)
+        {
+            if (State != SoundAlarmState.Playing) return;
+            var current = _currentType == EnumEventType.Fault ? fault : detection;
+            if (current > 0) return;                     // 지금 울리는 종류가 아직 남았다 — 그대로
+
+            var other = _currentType == EnumEventType.Fault ? EnumEventType.Intrusion : EnumEventType.Fault;
+            var otherCount = other == EnumEventType.Fault ? fault : detection;
+            _pendingType = null;
+            if (otherCount > 0)
+            {
+                // 이 종류는 다 조치됐지만 다른 종류가 남았다 — 그 소리로 바꾼다.
+                _currentType = other;
+                _lastTypeSwitchTime = DateTime.Now;
+                _lastEventTime = DateTime.Now;
+                toPlay = other;
+            }
+            else
+            {
+                // 남은 이벤트가 없다 — 멈춘다(취소된 재생은 완료 콜백을 내지 않으므로 다시 울리지 않는다).
+                State = SoundAlarmState.Idle;
+                _lastEventTime = default;
+                stop = true;
+            }
+        }
+        if (toPlay.HasValue) _stopAndPlay(toPlay.Value);
+        else if (stop) _stopAll?.Invoke();
+    }
     #endregion
 
     #region - Attributes -
     private readonly object _lock = new();
     private readonly Action<EnumEventType> _stopAndPlay;
+    private readonly Action? _stopAll;
     private readonly int _durationSeconds;
     private DateTime _lastEventTime;
     private DateTime _lastTypeSwitchTime;

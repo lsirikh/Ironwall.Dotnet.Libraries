@@ -48,4 +48,11 @@ public class SendActionRequestMessage
     /// 생성된 Action 이벤트 DB ID (CreateActionEventAsync 응답) — body.id 용도.
     /// </summary>
     public int ActionId { get; set; }
+
+    /// <summary>
+    /// 조치 생성 <c>POST /events/actions</c> 201 응답의 <c>data</c> 원문(JSON 문자열). 있으면 발행부는 이것을
+    /// <b>그대로</b> ACTION_REPORT body 로 싣는다(브로커 명세 §6.4 — from_event.category_event · 장비 참조 · 서버 시각 ·
+    /// action_reported 가 서버 값 그대로). 없을 때만 <see cref="OriginEvent"/> 로 조립하는 옛 길로 폴백한다(경고 로그).
+    /// </summary>
+    public string? ServerActionJson { get; set; }
 }

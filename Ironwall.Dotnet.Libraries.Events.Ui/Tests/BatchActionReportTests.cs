@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using Moq;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -100,10 +100,10 @@ public class BatchActionReportTests
         sut.ViewModelProvider.Add(card);
 
         // Act — 원격 ACTION_REPORT(from_event.id=1) 수신 시뮬
-        var closed = sut.CloseCardByEventId(1);
+        var closed = sut.CloseByRemoteActionReport(Ironwall.Dotnet.Libraries.Events.Ui.Services.ActionReportKind.Detection, 1);
 
         // Assert — 카드 종결 + EQM Dequeue
-        Assert.True(closed);
+        Assert.Equal(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportOutcome.CardClosed, closed);
         Assert.Empty(sut.ViewModelProvider);
         _mockEventQueueManager.Verify(m => m.Dequeue("entry-1"), Times.Once);
     }
@@ -116,10 +116,10 @@ public class BatchActionReportTests
         var sut = CreateSut();
 
         // Act
-        var closed = sut.CloseCardByEventId(999);
+        var closed = sut.CloseByRemoteActionReport(Ironwall.Dotnet.Libraries.Events.Ui.Services.ActionReportKind.Detection, 999);
 
         // Assert — 멱등 no-op
-        Assert.False(closed);
+        Assert.Equal(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportOutcome.Nothing, closed);
         _mockEventQueueManager.Verify(m => m.Dequeue(It.IsAny<string>()), Times.Never);
     }
 
@@ -128,8 +128,8 @@ public class BatchActionReportTests
     public void should_return_false_when_action_report_eventid_invalid()
     {
         var sut = CreateSut();
-        Assert.False(sut.CloseCardByEventId(0));
-        Assert.False(sut.CloseCardByEventId(-5));
+        Assert.Equal(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportOutcome.Invalid, sut.CloseByRemoteActionReport(null, 0));
+        Assert.Equal(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportOutcome.Invalid, sut.CloseByRemoteActionReport(null, -5));
         _mockEventQueueManager.Verify(m => m.Dequeue(It.IsAny<string>()), Times.Never);
     }
 
@@ -141,7 +141,8 @@ public class BatchActionReportTests
     public async Task BatchReport_ActionUser_IsUsername()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Name).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.Username).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.EmployeeNumber).Returns("7");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard());
@@ -151,7 +152,7 @@ public class BatchActionReportTests
 
         // Assert
         _mockApiService.Verify(a => a.CreateActionEventAsync(
-            It.Is<ActionEventCreateDto>(dto => dto.User == "TestOperator"),
+            It.Is<ActionEventCreateDto>(dto => dto.User == "TestOperator(7)"),
             It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -160,7 +161,8 @@ public class BatchActionReportTests
     public async Task BatchReport_ActionDetails_IsBulkText()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Name).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.Username).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.EmployeeNumber).Returns("7");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard());

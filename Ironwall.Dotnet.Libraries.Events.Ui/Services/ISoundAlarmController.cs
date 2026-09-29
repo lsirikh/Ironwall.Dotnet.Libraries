@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -32,6 +32,12 @@ public interface ISoundAlarmController
 
     /// <summary>이벤트 큐 전체 클리어 시 호출 — pendingType 초기화 + throttle 리셋</summary>
     void OnQueueCleared();
+
+    /// <summary>
+    /// 활성(미조치) 탐지 · 장애 건수가 바뀌었다(EQM <c>OnActiveCountChanged</c>) — 지금 울리는 종류가 0 건이 되면
+    /// 다른 종류가 남았으면 그 소리로 바꾸고, 아무것도 없으면 멈춘다. 조치보고가 '그 알람'을 끄는 길이다(WP-1 ⑨).
+    /// </summary>
+    void OnActiveCountsChanged(int detection, int fault);
 }
 
 public enum SoundAlarmState

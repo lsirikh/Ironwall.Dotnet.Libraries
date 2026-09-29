@@ -72,6 +72,14 @@ public class ApiResponse<T>
     public int StatusCode { get; set; }
 
     /// <summary>
+    /// 서버가 준 <c>data</c> 원문(JSON) — 받은 모양 그대로. 채우는 곳은 그것을 <b>그대로 다시 실어야 하는</b> 경로뿐이다
+    /// (예: 조치 생성 <c>POST /events/actions</c> 201 → NATS <c>ACTION_REPORT</c> body, 브로커 명세 §6.4 "data 그대로 · 장비 블록 조립 금지").
+    /// DTO 를 다시 직렬화하면 모르는 키가 빠지고 <c>ShouldSerialize*</c> 가 키를 지운다 — 그래서 원문을 따로 든다. 비직렬화 대상.
+    /// </summary>
+    [JsonIgnore]
+    public Newtonsoft.Json.Linq.JToken? RawData { get; set; }
+
+    /// <summary>
     /// 성공 응답 생성
     /// </summary>
     public static ApiResponse<T> CreateSuccess(T data, string message = "Operation completed successfully")

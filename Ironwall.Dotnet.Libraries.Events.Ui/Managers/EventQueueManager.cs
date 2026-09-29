@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -572,8 +572,12 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
     public void OnSharedTimerTick()
     {
-        // 글로벌 kill-switch: IsAutoEventDiscard=false면 자동 조치보고 전체 비활성
-        if (_eventSetupModel != null && !_eventSetupModel.IsAutoEventDiscard)
+        // 종류별 kill-switch: 탐지 = IsAutoEventDiscard("탐지 이벤트 해제"), 장애 = IsMalfunctionAutoEventDiscard("장애 이벤트 해제").
+        //   종전엔 탐지 스위치 하나가 전체를 막아, 탐지 해제를 끄면 장애 자동 조치보고까지 멈췄다(WP-1 ⑥).
+        //   설정을 틱마다 다시 읽는다 — 운영 중 토글이 이미 큐에 있는 엔트리에도 바로 먹는다.
+        var detectionOn = _eventSetupModel?.IsAutoEventDiscard ?? true;
+        var faultOn = _eventSetupModel?.IsMalfunctionAutoEventDiscard ?? true;
+        if (!detectionOn && !faultOn)
             return;
 
         var now = DateTime.Now;
@@ -584,6 +588,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             foreach (var e in _entries.Values)
             {
                 if (!e.IsAutoReportEnabled) continue;
+                if (!(e.EventType == EnumEventType.Fault ? faultOn : detectionOn)) continue;
                 if (e.AutoReportInFlight) continue;
                 if (now < e.NextRetryAfter) continue;
                 if ((now - e.EnqueuedAt).TotalSeconds < e.TimeoutSeconds) continue;

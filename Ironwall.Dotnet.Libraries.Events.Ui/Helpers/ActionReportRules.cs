@@ -41,4 +41,26 @@ public static class ActionReportRules
         if (content.Length > MAX_CONTENT_LENGTH) return $"조치 내용은 {MAX_CONTENT_LENGTH}자까지 보낼 수 있습니다(지금 {content.Length}자).";
         return null;
     }
+
+    /// <summary>로그인한 사람이 없을 때(자동 조치보고 · 자동복구)의 보고자.</summary>
+    public const string SYSTEM_ACTOR = "SYSTEM";
+
+    /// <summary>
+    /// 조치보고 <c>user</c> 칸에 싣는 보고자 표기 — <b>한 모양</b>: <c>Username(EmployeeNumber)</c>.
+    /// <para>서버 <c>ActionEventCreate.user</c> 는 자유 문자열(사람이 읽는 보고자)이다 — 칸의 뜻은 그대로 두고 모양만 하나로 맞춘다.
+    /// 종전엔 조치보고 창 · 콘솔은 <c>Username(EmployeeNumber)</c> 를 만들어 넘겼지만 카드가 그 값을 버리고 <c>Name</c>(표시 이름)을 보냈고,
+    /// 전체 조치보고 · 자동 경로도 <c>Name</c> 을 보내 같은 사람이 이력에 두 모양으로 찍혔다(WP-1 ⑬).</para>
+    /// 사번이 없으면 <c>Username</c> 만, 계정 아이디도 없으면 표시 이름, 그것도 없으면 <see cref="SYSTEM_ACTOR"/>.
+    /// </summary>
+    public static string FormatActor(Ironwall.Dotnet.Monitoring.Models.Accounts.IAccountModel? account)
+    {
+        var username = account?.Username?.Trim();
+        if (!string.IsNullOrEmpty(username))
+        {
+            var employee = account!.EmployeeNumber?.Trim();
+            return string.IsNullOrEmpty(employee) ? username! : $"{username}({employee})";
+        }
+        var name = account?.Name?.Trim();
+        return string.IsNullOrEmpty(name) ? SYSTEM_ACTOR : name!;
+    }
 }

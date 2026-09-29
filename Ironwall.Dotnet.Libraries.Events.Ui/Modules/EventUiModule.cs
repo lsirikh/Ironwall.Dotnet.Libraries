@@ -176,7 +176,8 @@ public class EventUiModule : Module
                 var durationSeconds = setupModel?.DetectionSoundDuration ?? 20;
                 return new SoundAlarmController(
                     stopAndPlay: (eventType) => { _ = soundService?.StopAndPlayAsync(eventType); },
-                    durationSeconds
+                    durationSeconds,
+                    stopAll: () => { _ = soundService?.StopAllSoundsAsync(); }   // 활성 0건 → 알람 끄기(WP-1 ⑨)
                 );
             }).As<ISoundAlarmController>().SingleInstance();
 
@@ -193,38 +194,9 @@ public class EventUiModule : Module
                 // OnDeviceFirstEvent/OnDeviceEmpty 경로 제거 — OnDeviceStateChanged 발화 순서가 앞서므로 중복
                 eqm.OnDeviceStateChanged += sem.HandleDeviceStateChanged;
 
-                // 자동복구: Fault 자동 조치보고
+                // 자동복구 · 자동 조치보고 — 둘 다 로그인 게이트를 지난다(WireAutoActions)
                 var elp = scope.Resolve<EventCardListPanelViewModel>();
-                eqm.OnAutoRecovery += faultEntryId =>
-                {
-                    var task = elp.HandleAutoRecoveryAsync(faultEntryId);
-                    task.ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            _log?.Error($"[AutoRecovery] 미처리 예외: {t.Exception?.GetBaseException()}");
-                    }, TaskScheduler.Default);
-                };
-
-                // 자동 조치보고: 타임아웃 만료 시 API 보고 → Dequeue → 카드 제거
-                eqm.OnAutoReport += entry =>
-                {
-                    // 로그인 게이팅: 로그인 전/로그아웃 상태에서는 자동조치보고 발송 차단(무인 조치보고 금지, 사용자 요구).
-                    // 로그인 중 Enqueue된 항목이 로그아웃 후 타임아웃되는 경계 케이스 — NATS 수신 게이트로도 못 막는 잔여 경로.
-                    // 미발송·미Dequeue → 재로그인(=담당자 복귀) 시 다음 틱에 정상 보고. AutoReportInFlight만 해제.
-                    if (tokenStorage is { IsAuthenticated: false })
-                    {
-                        _log?.Warning($"[AutoReport] 미인증 상태 — 자동조치보고 발송 보류(entry={entry.EntryId})");
-                        entry.AutoReportInFlight = false;
-                        return;
-                    }
-                    var task = elp.HandleAutoReportAsync(entry);
-                    task.ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            _log?.Error($"[AutoReport] 미처리 예외: {t.Exception?.GetBaseException()}");
-                        entry.AutoReportInFlight = false;
-                    }, TaskScheduler.Default);
-                };
+                WireAutoActions(eqm, elp, tokenStorage, _log);
 
                 // 그룹 심볼: 복합 상태 전이 (OnGroupStateChanged)
                 eqm.OnGroupStateChanged += sem.HandleGroupStateChanged;
@@ -232,15 +204,13 @@ public class EventUiModule : Module
                 // 공유 타이머 시작 (1초 간격, 자동 조치보고 타임아웃 체크)
                 eqm.StartSharedTimer();
 
-                // SoundAlarmController 이벤트 와이어링
+                // SoundAlarmController 이벤트 와이어링 — 알람 소리의 유일한 주인(WP-1 ⑨, 호스트 카드별 재생은 걷었다)
                 // ISoundService가 미등록 시 SAC 비활성화 (State=Playing 고착 방지)
                 var sac = scope.Resolve<ISoundAlarmController>();
                 var soundService = scope.ResolveOptional<ISoundService>();
                 if (soundService != null)
                 {
-                    eqm.OnAnyEnqueue += sac.OnEventArrived;
-                    soundService.OnDetectionPlaybackCompleted += sac.OnPlaybackStopped;
-                    soundService.OnMalfunctionPlaybackCompleted += sac.OnPlaybackStopped;
+                    WireSoundAlarm(eqm, sac, soundService);
                 }
                 else
                 {
@@ -305,6 +275,67 @@ public class EventUiModule : Module
     #region - Binding Methods -
     #endregion
     #region - Processes -
+    /// <summary>
+    /// 큐(EQM)의 자동 조치 두 갈래를 카드 목록에 잇는다 — 둘 다 <b>로그인 게이트</b>를 지난다.
+    /// <list type="bullet">
+    ///   <item>자동 조치보고(<c>OnAutoReport</c>): 미인증이면 보내지 않고 다음 틱으로 미룬다(AutoReportInFlight 만 푼다).</item>
+    ///   <item>자동복구(<c>OnAutoRecovery</c>): 미인증이면 보내지 않는다 — 종전엔 게이트가 없어 로그아웃 상태에서도
+    ///     조치보고가 나갔다(WP-1 ⑤, 사용자 ADR "로그아웃 상태서 조치보고 발송 절대 금지"). 큐 엔트리는 이미 빠졌으므로
+    ///     카드는 남고, 재로그인한 담당자가 조치보고하면 심볼은 큐 실제 상태로 다시 계산된다.</item>
+    /// </list>
+    /// </summary>
+    internal static void WireAutoActions(IEventQueueManager eqm, EventCardListPanelViewModel elp,
+                                         Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService? tokenStorage, ILogService? log)
+    {
+        eqm.OnAutoRecovery += faultEntryId =>
+        {
+            if (tokenStorage is { IsAuthenticated: false })
+            {
+                log?.Warning($"[AutoRecovery] 미인증 상태 — 자동복구 조치보고 발송 안 함(entry={faultEntryId}, 카드는 남는다)");
+                return;
+            }
+            var task = elp.HandleAutoRecoveryAsync(faultEntryId);
+            task.ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    log?.Error($"[AutoRecovery] 미처리 예외: {t.Exception?.GetBaseException()}");
+            }, TaskScheduler.Default);
+        };
+
+        // 자동 조치보고: 타임아웃 만료 시 API 보고 → Dequeue → 카드 제거
+        eqm.OnAutoReport += entry =>
+        {
+            // 로그인 게이팅: 로그인 전/로그아웃 상태에서는 자동조치보고 발송 차단(무인 조치보고 금지, 사용자 요구).
+            // 로그인 중 Enqueue된 항목이 로그아웃 후 타임아웃되는 경계 케이스 — NATS 수신 게이트로도 못 막는 잔여 경로.
+            // 미발송·미Dequeue → 재로그인(=담당자 복귀) 시 다음 틱에 정상 보고. AutoReportInFlight만 해제.
+            if (tokenStorage is { IsAuthenticated: false })
+            {
+                log?.Warning($"[AutoReport] 미인증 상태 — 자동조치보고 발송 보류(entry={entry.EntryId})");
+                entry.AutoReportInFlight = false;
+                return;
+            }
+            var task = elp.HandleAutoReportAsync(entry);
+            task.ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    log?.Error($"[AutoReport] 미처리 예외: {t.Exception?.GetBaseException()}");
+                entry.AutoReportInFlight = false;
+            }, TaskScheduler.Default);
+        };
+    }
+
+    /// <summary>
+    /// 알람 소리의 <b>유일한 주인</b> — 큐(EQM)에 들어오면 울리고, 활성 건수가 0 이 되면(조치보고) 멈추거나 남은 종류로 바꾼다(WP-1 ⑨).
+    /// 종전엔 호스트가 카드마다 토큰을 달아 한 번, 이 컨트롤러가 토큰 없이 또 한 번 울려 조치보고해도 토큰 없는 쪽이 계속 울렸다.
+    /// 탐지 계열(침입 · 접점 …)은 전부 탐지 소리다 — 사운드 서비스는 Intrusion · Fault 두 소리만 안다.
+    /// </summary>
+    internal static void WireSoundAlarm(IEventQueueManager eqm, ISoundAlarmController sac, ISoundService soundService)
+    {
+        eqm.OnAnyEnqueue += type => sac.OnEventArrived(type == Enums.EnumEventType.Fault ? Enums.EnumEventType.Fault : Enums.EnumEventType.Intrusion);
+        eqm.OnActiveCountChanged += sac.OnActiveCountsChanged;
+        soundService.OnDetectionPlaybackCompleted += sac.OnPlaybackStopped;
+        soundService.OnMalfunctionPlaybackCompleted += sac.OnPlaybackStopped;
+    }
     #endregion
     #region - IHanldes -
     #endregion

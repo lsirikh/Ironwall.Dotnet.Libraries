@@ -47,6 +47,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         #region - Implementation of Interface -
         public override async void ClickOk()
         {
+            // 보내는 중 · 이미 다른 곳에서 조치됨 — 두 번째 조치를 만들지 않는다(WP-1 ③ · ⑬). 단추도 CanClickOk 로 꺼져 있다.
+            if (!CanClickOk) return;
+
             // 권한 게이트 — SendAction 호출 이전 검사. 서버가 403 을 줄 요청은 보내지 않는다.
             if (!CanReportAction())
             {
@@ -58,7 +61,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
                 return;
             }
 
-            var user = $"{_user?.Username}({_user?.EmployeeNumber})";
+            var user = ActionReportRules.FormatActor(_user);   // 보고자 표기 한 모양 — Username(EmployeeNumber)
             if (!(Model is MalfunctionEventCardViewModel vm)) return;
 
             // 내용 게이트 — '기타' + 빈 메모는 서버 422(content min_length=1). 보내기 전에 이유를 알린다.
@@ -76,7 +79,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
 
             // (EA3) SendAction 성공 여부 확인 — 실패 시 다이얼로그 유지 + 오류 알림(성공 오인식 방지)
             //   실패하면 서버가 준 까닭을 그대로 보인다 — "네트워크를 확인" 한 줄은 403·422 를 가렸다.
-            var result = await vm.SendActionDetailed(content, user);
+            ActionSendResult result;
+            SetSending(true);
+            try
+            {
+                result = await vm.SendActionDetailed(content, user);
+            }
+            finally
+            {
+                SetSending(false);
+            }
 
             if (!result.CanCloseDialog)
             {
