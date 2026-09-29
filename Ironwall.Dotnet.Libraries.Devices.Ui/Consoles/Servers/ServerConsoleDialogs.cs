@@ -125,10 +125,16 @@ public sealed class ServerConsoleDialogs : IServerConsoleDialogs
         }
     }
 
-    private static Dictionary<string, object> Settings(double width, double height) => new()
+    /// <remarks>
+    /// <c>SizeToContent.Manual</c> 필수 — Caliburn 은 뷰를 새 창에 담을 때 <c>SizeToContent=WidthAndHeight</c> 로 만들어
+    /// 너비 · 높이를 무시한다. 빠져 있던 동안 지표 이력 창이 별표 열 때문에 화면 폭만큼 늘고, 기록이 없으면 머리 줄 높이로
+    /// 납작해졌다(2026-09-30 사용자 보고). 다른 창 입구(WiringLauncher · AssemblyLauncher · UnitConsoleLauncher 등)와 같게.
+    /// </remarks>
+    internal static Dictionary<string, object> Settings(double width, double height) => new()
     {
         ["Width"] = width,
         ["Height"] = height,
+        ["SizeToContent"] = SizeToContent.Manual,
         ["ResizeMode"] = ResizeMode.CanResize,
         ["WindowStartupLocation"] = WindowStartupLocation.CenterOwner,
         ["ShowInTaskbar"] = false,

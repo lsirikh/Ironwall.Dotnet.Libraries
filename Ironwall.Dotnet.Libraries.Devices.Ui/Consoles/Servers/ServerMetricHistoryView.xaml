@@ -73,8 +73,9 @@
 				</DataGrid.Columns>
 			</DataGrid>
 
+			<!--  머리 줄(약 36) 아래에 둔다 — 예전 여백 14 는 "디스크" 머리 글자 위에 겹쳤다(2026-09-30 사용자 보고).  -->
 			<TextBlock
-				Margin="0,14,0,0"
+				Margin="0,52,0,0"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Top"
 				AutomationProperties.AutomationId="Servers.MetricHistory.Empty"
