@@ -1,0 +1,491 @@
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
+
+/// <summary>
+/// 펜스 형상 뷰(wiring-fence-view F-3 · FR-04 ~ FR-11 · FR-13 · FR-15 · FR-17 ~ FR-19)가 보는 뷰모델 면.
+/// </summary>
+/// <remarks>
+/// 캔버스(<see cref="FenceCanvas"/>)는 판단하지 않는다 — 누름 · 끌기 · 키를 뜻 없이 올리고, 체인 편집 · 선택 · 속성 칸은 여기서 한다.
+/// 편집은 전부 보드(<see cref="WiringBoard"/>)의 같은 길이라 표 보기와 펜스 보기가 늘 같은 체인을 본다.
+/// </remarks>
+public sealed partial class WiringViewModel
+{
+    /// <summary>펜스 캔버스 드롭존(팔레트 → 펜스).</summary>
+    public const string FenceZoneKey = "wiring-fence";
+
+    private bool _isFenceView = true;
+    private bool _isFlatChosen;
+    private bool _isSoftwareRendering;
+    private bool _showRange;
+    private int? _fenceSelectedKey;
+    private bool _isControllerSelected;
+    private int? _hoverKey;
+
+    /// <summary>체인 · 선택 · 보기 방식이 바뀌었다 — 캔버스가 다시 그린다.</summary>
+    public event EventHandler? FenceChanged;
+
+    #region - View switch -
+    /// <summary>[펜스 보기](기본) / [표 보기].</summary>
+    public bool IsFenceView
+    {
+        get => _isFenceView;
+        set
+        {
+            if (_isFenceView == value) return;
+            _isFenceView = value;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(IsTableView));
+        }
+    }
+
+    public bool IsTableView
+    {
+        get => !_isFenceView;
+        set => IsFenceView = !value;
+    }
+
+    public void ShowFenceView() => IsFenceView = true;
+    public void ShowTableView() => IsFenceView = false;
+    #endregion
+
+    #region - Tilt · flat (FR-10) -
+    /// <summary>사람이 [평면 보기]를 골랐는가.</summary>
+    public bool IsFlatChosen
+    {
+        get => _isFlatChosen;
+        set { if (_isFlatChosen == value) return; _isFlatChosen = value; NotifyFlat(); }
+    }
+
+    /// <summary>소프트웨어 렌더링(Tier 0 · 원격 데스크톱)인가 — 뷰가 알려 준다. 그러면 입체를 끈다.</summary>
+    public bool IsSoftwareRendering
+    {
+        get => _isSoftwareRendering;
+        set { if (_isSoftwareRendering == value) return; _isSoftwareRendering = value; NotifyFlat(); }
+    }
+
+    /// <summary>지금 평면으로 그리는가(고름 또는 자동).</summary>
+    public bool IsFlat => _isFlatChosen || _isSoftwareRendering;
+
+    public bool IsTilt => !IsFlat;
+
+    /// <summary>[입체 보기]를 누를 수 있는가 — 원격 데스크톱에서는 못 켠다.</summary>
+    public bool CanChooseTilt => !_isSoftwareRendering;
+
+    /// <summary>"평면으로 표시 중" 표지 글자.</summary>
+    public string FlatNoteText => _isSoftwareRendering
+        ? "평면으로 표시 중 — 원격 데스크톱 연결(입체 끔)"
+        : _isFlatChosen ? "평면으로 표시 중 — 원격 데스크톱에서는 자동으로 이 보기" : string.Empty;
+
+    public bool HasFlatNote => IsFlat;
+
+    public void ChooseFlat() => IsFlatChosen = true;
+
+    public void ChooseTilt()
+    {
+        if (!CanChooseTilt) return;
+        IsFlatChosen = false;
+    }
+
+    private void NotifyFlat()
+    {
+        NotifyOfPropertyChange(nameof(IsFlatChosen));
+        NotifyOfPropertyChange(nameof(IsSoftwareRendering));
+        NotifyOfPropertyChange(nameof(IsFlat));
+        NotifyOfPropertyChange(nameof(IsTilt));
+        NotifyOfPropertyChange(nameof(CanChooseTilt));
+        NotifyOfPropertyChange(nameof(FlatNoteText));
+        NotifyOfPropertyChange(nameof(HasFlatNote));
+        RaiseFence();
+    }
+    #endregion
+
+    #region - Range (FR-19) -
+    public bool ShowRange
+    {
+        get => _showRange;
+        set { if (_showRange == value) return; _showRange = value; NotifyOfPropertyChange(); RaiseFence(); }
+    }
+
+    /// <summary>탐지 반경이 있는 센서(복합 · 지진동)가 있는가 — 없으면 [탐지 범위]를 끈다.</summary>
+    public bool HasRangeSensors => _board.Rows.Any(r => FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) > 0);
+
+    public void ToggleRange() => ShowRange = !ShowRange && HasRangeSensors;
+    #endregion
+
+    #region - Scene facts -
+    /// <summary>펜스 장면의 센서 사실(체인 · 팔레트 모두).</summary>
+    public IReadOnlyDictionary<int, FenceSensor> FenceSensors()
+    {
+        var duplicates = _board.Rows
+            .GroupBy(r => r.Facts.Number)
+            .Where(g => g.Count() > 1)
+            .SelectMany(g => g.OrderBy(r => r.Id <= 0 ? 1 : 0).ThenBy(r => r.Id).ThenBy(r => Math.Abs(r.Key)).Skip(1))
+            .Select(r => r.Key)
+            .ToHashSet();
+
+        var result = new Dictionary<int, FenceSensor>(_board.Rows.Count);
+        foreach (var row in _board.Rows)
+        {
+            var n = _board.NumberOf(row.Key);
+            result[row.Key] = new FenceSensor(
+                row.Key, row.Id, row.Facts.Number, row.Display,
+                WiringTopology.ParseSensorType(row.Facts.TypeText), row.Channel,
+                n?.Line ?? 0, n?.Order ?? 0, n?.OppositeOrder,
+                _board.IsProposed(row.Key),
+                !WiringSpec.SamePlacement(_board.PlacementOf(row.Key), row.BaselinePlacement),
+                duplicates.Contains(row.Key));
+        }
+        return result;
+    }
+
+    /// <summary>지금 체인(캔버스가 세계를 세운다).</summary>
+    public WiringChain FenceChain => _board.Chain;
+
+    /// <summary>끌어 놓으면 그 센서의 새 자리 글자(삽입 막대 알약) — 보드를 바꾸지 않고 체인으로만 흉내 낸다.</summary>
+    public string FenceDropLabel(IReadOnlyList<int> keys, int line, int index)
+    {
+        if (keys.Count == 0) return string.Empty;
+        var basis = _board.HasPendingProposals ? _board.Chain.AcceptSuggestions() : _board.Chain;
+        var next = basis.PlaceInBranch(keys, line, index);
+        return next.NumberOf(keys[0]) is { } n ? NumberText(n) : string.Empty;
+    }
+
+    private string NumberText(WiringChainNumber n) => _board.Shape switch
+    {
+        WiringShape.Ring => $"위치 {n.Order} · A{n.Order} · B{n.OppositeOrder}",
+        WiringShape.TwoBranch => $"{(n.Line == WiringSpec.LINE_PRIMARY ? "왼쪽 가지 L" : "오른쪽 가지 R")}{n.Order}",
+        _ => $"위치 {n.Order}",
+    };
+    #endregion
+
+    #region - Selection (FR-07) -
+    /// <summary>펜스에서 고른 센서 키(없으면 <c>null</c>).</summary>
+    public int? FenceSelectedKey => _fenceSelectedKey;
+
+    /// <summary>제어기(함체)를 골랐는가.</summary>
+    public bool IsControllerSelected => _isControllerSelected;
+
+    /// <summary>이름 알약을 띄울 센서 — 고른 것 우선, 없으면 가리킨 것.</summary>
+    public int? FenceNamedKey => _fenceSelectedKey ?? _hoverKey;
+
+    public void FenceSelect(int? key)
+    {
+        if (key is { } k && _board.Find(k) is null) key = null;
+        _fenceSelectedKey = key;
+        _isControllerSelected = false;
+        RaiseSelection();
+        if (key is { } selected && _board.Find(selected) is { } row)
+            StatusText = _board.NumberOf(selected) is { } n ? $"{row.Display} — {NumberText(n)}" : $"{row.Display} — 미배치";
+    }
+
+    public void FenceSelectController()
+    {
+        _fenceSelectedKey = null;
+        _isControllerSelected = true;
+        RaiseSelection();
+        StatusText = IsRing ? "함체 — 옆으로 끌거나 Alt+←/→ 로 옮깁니다(표시만)" : "제어기 — 위치 고정";
+    }
+
+    public void FenceHover(int? key)
+    {
+        if (_hoverKey == key) return;
+        _hoverKey = key;
+        FenceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private WiringSensorRow? SelectedFenceRow => _fenceSelectedKey is { } k ? _board.Find(k) : null;
+
+    public bool HasFenceSelection => SelectedFenceRow is not null || _isControllerSelected;
+    public bool HasSensorSelection => SelectedFenceRow is not null;
+    public bool HasNoFenceSelection => !HasFenceSelection;
+
+    public string SelectedKindText => _isControllerSelected ? (IsRing ? "함체" : "제어기") : "선택한 센서";
+
+    public string SelectedTitle => _isControllerSelected ? Controller.Name : SelectedFenceRow?.Display ?? "없음";
+
+    public string SelectedNumberText => SelectedFenceRow?.Facts.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+    public bool IsSelectedDuplicateNumber => SelectedFenceRow is { } r && _board.Rows.Count(x => x.Facts.Number == r.Facts.Number) > 1;
+
+    public string SelectedIdText => SelectedFenceRow is { } r ? (r.Id > 0 ? $"{r.Id}" : "새 줄(저장 때 만듦)") : string.Empty;
+
+    public string SelectedTypeText => SelectedFenceRow is { } r ? DeviceEnumDisplay.SensorTypeBilingual(r.Facts.TypeText) : _isControllerSelected ? ControllerTypeText : string.Empty;
+
+    private string ControllerTypeText => _board.Shape switch
+    {
+        WiringShape.Ring => "스마트 제어기 + VBUS 제어기(1U 도킹)",
+        WiringShape.TwoBranch => "PIDS 제어기 · 24VDC · Ethernet",
+        _ => "제어기 · 24VDC · Ethernet",
+    };
+
+    /// <summary>버스 주소 + "체인 순서와 다를 수 있음" 주석.</summary>
+    public string SelectedChannelText => SelectedFenceRow is { } r ? (r.Channel is { } c ? $"{c}" : "—") : string.Empty;
+
+    public string SelectedChannelNote
+    {
+        get
+        {
+            if (SelectedFenceRow is not { } r) return string.Empty;
+            if (_board.NumberOf(r.Key) is not { } n || r.Channel is not { } c) return "체인 순서와 다를 수 있음";
+            return c == n.Position ? "체인 순서와 다를 수 있음 — 지금은 같음" : $"주소 {c} · 위치 {n.Position} — 체인 순서와 다를 수 있음(주소는 바꾸지 않음)";
+        }
+    }
+
+    /// <summary>체인 위치 — 링 "3 / 13 · Sensor A 쪽이 1" · 가지 "L2 / 5 · 제어기 쪽이 1(확인 중 O-6)" · 한 줄 "4 / 10 · 제어기 쪽이 1".</summary>
+    public string SelectedPositionText
+    {
+        get
+        {
+            if (SelectedFenceRow is not { } r || _board.NumberOf(r.Key) is not { } n) return "—";
+            var count = _board.CountOn(n.Line);
+            return _board.Shape switch
+            {
+                WiringShape.Ring => $"{n.Order} / {count} · Sensor A 쪽이 1",
+                WiringShape.TwoBranch => $"{(n.Line == WiringSpec.LINE_PRIMARY ? "L" : "R")}{n.Order} / {count} · 제어기 쪽이 1(확인 중 O-6)",
+                _ => $"{n.Order} / {count} · 제어기 쪽이 1",
+            } + (_board.IsProposed(r.Key) ? " · 제안" : string.Empty);
+        }
+    }
+
+    /// <summary>링의 A · B 번호(1차 · 2차 번호). 링이 아니면 빈 글자.</summary>
+    public string SelectedPortText => SelectedFenceRow is { } r && _board.NumberOf(r.Key) is { OppositeOrder: { } b } n
+        ? $"A{n.Order} · B{b} — Sensor A 에서 {n.Order}번째 · Sensor B 에서 {b}번째"
+        : string.Empty;
+
+    public bool HasSelectedPort => SelectedPortText.Length > 0;
+
+    /// <summary>앞 센서와의 거리 — 두 종류 기본 간격 중 작은 값(FR-17).</summary>
+    public string SelectedDistanceText
+    {
+        get
+        {
+            if (SelectedFenceRow is not { } r) return string.Empty;
+            var keys = _board.Chain.Keys;
+            var i = _board.Chain.IndexOf(r.Key);
+            if (i <= 0) return string.Empty;
+            var neighbour = _board.Shape == WiringShape.TwoBranch && i == _board.Chain.ControllerGap ? (int?)null : keys[i - 1];
+            if (neighbour is not { } prev || _board.Find(prev) is not { } p) return string.Empty;
+            var metres = FenceSlotLayout.GapMetres(WiringTopology.ParseSensorType(p.Facts.TypeText), WiringTopology.ParseSensorType(r.Facts.TypeText));
+            return $"{metres:0.#}m · 두 종류 기본 간격 중 작은 값";
+        }
+    }
+
+    public bool HasSelectedDistance => SelectedDistanceText.Length > 0;
+
+    /// <summary>제품 사진(종류별 · 라이브러리 리소스) — 없으면 <c>null</c>(그림 자리에 "사진 준비 중").</summary>
+    public Uri? SelectedPhoto
+    {
+        get
+        {
+            if (_isControllerSelected) return IsRing ? AssetUri("thumb-1u-dock.png") : null;
+            if (SelectedFenceRow is not { } r) return null;
+            return WiringTopology.IsSmartSensor(WiringTopology.ParseSensorType(r.Facts.TypeText)) ? AssetUri("thumb-smart-sensor2.png") : null;
+        }
+    }
+
+    public bool HasSelectedPhoto => SelectedPhoto is not null;
+
+    public string SelectedPhotoCaption => _isControllerSelected
+        ? (IsRing ? "1U 도킹 — 스마트 제어기 + VBUS 제어기" : "제품 사진 준비 중")
+        : SelectedFenceRow is { } r
+            ? $"{DeviceEnumDisplay.SensorTypeBilingual(r.Facts.TypeText)} · 기본 간격 {FenceSlotLayout.SpacingMetres(WiringTopology.ParseSensorType(r.Facts.TypeText)):0.#}m"
+              + (FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) is var range and > 0 ? $" · 탐지 반경 {range:0}m" : string.Empty)
+              + (HasSelectedPhoto ? string.Empty : " · 제품 사진 준비 중")
+            : string.Empty;
+
+    internal static Uri AssetUri(string file)
+        => new($"pack://application:,,,/Ironwall.Dotnet.Libraries.Devices.Ui;component/Consoles/Wiring/Fence/Assets/{file}", UriKind.Absolute);
+
+    public bool IsSelectedPlaced => SelectedFenceRow is { } r && _board.Chain.Contains(r.Key);
+    public bool IsSelectedUnplaced => SelectedFenceRow is { } r && !_board.Chain.Contains(r.Key);
+
+    public bool CanStepSelectedBack => SelectedFenceRow is { } r && _board.LocationOf(r.Key) is { Index: > 0 };
+    public bool CanStepSelectedForward => SelectedFenceRow is { } r && _board.LocationOf(r.Key) is { } at && at.Index < _board.CountOn(at.Line) - 1;
+
+    /// <summary>함체 위치 글자(링) — "#6 ~ #7 사이".</summary>
+    public string EnclosureGapText
+    {
+        get
+        {
+            var n = _board.Chain.Count;
+            var g = _board.Chain.ControllerGap;
+            return g <= 0 ? "#1 왼쪽" : g >= n ? $"#{n} 오른쪽" : $"#{g} ~ #{g + 1} 사이";
+        }
+    }
+
+    private void RaiseSelection()
+    {
+        foreach (var name in new[]
+        {
+            nameof(FenceSelectedKey), nameof(IsControllerSelected), nameof(HasFenceSelection), nameof(HasSensorSelection), nameof(HasNoFenceSelection),
+            nameof(SelectedKindText), nameof(SelectedTitle), nameof(SelectedNumberText), nameof(IsSelectedDuplicateNumber), nameof(SelectedIdText),
+            nameof(SelectedTypeText), nameof(SelectedChannelText), nameof(SelectedChannelNote), nameof(SelectedPositionText), nameof(SelectedPortText),
+            nameof(HasSelectedPort), nameof(SelectedDistanceText), nameof(HasSelectedDistance), nameof(SelectedPhoto), nameof(HasSelectedPhoto),
+            nameof(SelectedPhotoCaption), nameof(IsSelectedPlaced), nameof(IsSelectedUnplaced), nameof(CanStepSelectedBack),
+            nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
+        }) NotifyOfPropertyChange(name);
+        FenceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>체인이 바뀌면(보드 동기화 끝) — 선택이 사라졌으면 풀고 캔버스를 다시 그린다.</summary>
+    private void RaiseFence()
+    {
+        if (_fenceSelectedKey is { } k && _board.Find(k) is null) _fenceSelectedKey = null;
+        RaiseSelection();
+    }
+    #endregion
+
+    #region - Fence edits (FR-08 · FR-09 · FR-11) -
+    /// <summary>펜스에서 끌어 놓기 — 선 · 자리(옮기기 전 기준). 되돌리기 한 걸음.</summary>
+    public bool FencePlace(IReadOnlyList<int> keys, int line, int index)
+    {
+        if (keys is null || keys.Count == 0 || IsBusy) return false;
+        var before = keys[0];
+        var wasPlaced = _board.Chain.Contains(before);
+        _board.PushUndo();
+        if (_board.PlaceMany(keys, line, index) == 0)
+        {
+            _board.Undo();
+            StatusText = "제자리 — 바뀐 것이 없습니다.";
+            return false;
+        }
+        SyncAll();
+        var label = _board.NumberOf(before) is { } n ? NumberText(n) : "미배치";
+        StatusText = $"{(wasPlaced ? "옮김" : "붙임")} — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(before)?.Display)}: {label} · Ctrl+Z 로 되돌립니다";
+        return true;
+    }
+
+    /// <summary>펜스에서 빼기(빼는 곳 · 팔레트로 끌기 · Delete · [빼기]).</summary>
+    public bool FenceUnplace(IReadOnlyList<int> keys)
+    {
+        if (keys is null || keys.Count == 0 || IsBusy) return false;
+        _board.PushUndo();
+        if (_board.UnplaceMany(keys) == 0)
+        {
+            _board.Undo();
+            StatusText = "이미 미배치입니다.";
+            return false;
+        }
+        SyncAll();
+        StatusText = $"뺌 — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display)}: 미배치, 뒤 위치가 당겨졌습니다 · Ctrl+Z 로 되돌립니다";
+        return true;
+    }
+
+    /// <summary>체인 끝에 붙이기(팔레트 Enter · [체인 끝에 붙이기]).</summary>
+    public bool FenceAppend(int key)
+    {
+        if (IsBusy) return false;
+        _board.PushUndo();
+        if (_board.Append(new[] { key }) == 0)
+        {
+            _board.Undo();
+            return false;
+        }
+        SyncAll();
+        StatusText = $"붙임 — {_board.Find(key)?.Display}: {(_board.NumberOf(key) is { } n ? NumberText(n) : "미배치")}(끝)";
+        return true;
+    }
+
+    /// <summary>[앞으로] · [뒤로] · Alt+←/→ — 같은 목록 안에서 한 칸.</summary>
+    public bool FenceStep(int key, int direction)
+    {
+        if (IsBusy) return false;
+        _board.PushUndo();
+        if (!_board.MoveBy(key, direction))
+        {
+            _board.Undo();
+            StatusText = direction < 0 ? "이미 맨 앞입니다." : "이미 맨 뒤입니다.";
+            return false;
+        }
+        SyncAll();
+        StatusText = $"옮김 — {_board.Find(key)?.Display}: {(_board.NumberOf(key) is { } n ? NumberText(n) : string.Empty)}";
+        return true;
+    }
+
+    /// <summary>Alt+Home/End — 목록 맨 앞 · 맨 끝으로.</summary>
+    public bool FenceToEnd(int key, bool end)
+    {
+        if (_board.LocationOf(key) is not { } at) return false;
+        return FencePlace(new[] { key }, at.Line, end ? _board.CountOn(at.Line) : 0);
+    }
+
+    /// <summary>함체를 틈 <paramref name="gap"/> 으로(표시만 · FR-09). 되돌리기 한 걸음.</summary>
+    public bool FenceMoveEnclosure(int gap)
+    {
+        if (!IsRing || IsBusy) return false;
+        _board.PushUndo();
+        if (!_board.MoveControllerGap(gap))
+        {
+            _board.Undo();
+            StatusText = "함체 위치 그대로입니다.";
+            return false;
+        }
+        SyncAll();
+        StatusText = $"함체 이동 — {EnclosureGapText} · 리턴케이블 · VBUS 표지만 따라감(체인 순서 · A/B 번호 그대로)";
+        return true;
+    }
+
+    public void StepSelectedBack() { if (_fenceSelectedKey is { } k) FenceStep(k, -1); }
+    public void StepSelectedForward() { if (_fenceSelectedKey is { } k) FenceStep(k, 1); }
+    public void UnplaceFenceSelected() { if (_fenceSelectedKey is { } k) FenceUnplace(new[] { k }); }
+    public void AppendFenceSelected() { if (_fenceSelectedKey is { } k) FenceAppend(k); }
+    public void MoveEnclosureBack() => FenceMoveEnclosure(_board.Chain.ControllerGap - 1);
+    public void MoveEnclosureForward() => FenceMoveEnclosure(_board.Chain.ControllerGap + 1);
+    #endregion
+
+    /// <summary>캔버스가 상태줄에 한 줄 알린다(취소 · 함체 후보 · 묶음 접힘).</summary>
+    public void NotifyFenceStatus(string text) => StatusText = text;
+
+    #region - Palette → fence (kernel drop zone) -
+    private bool CanDropOnFence(DragPayload payload)
+        => payload.Items.Count > 0 && payload.Items.All(i => i is SensorRowViewModel || i is WiringSlotViewModel { IsFilled: true });
+
+    private void DropOnFence(DragPayload payload, DropTarget target)
+    {
+        if (target.ZoneData is not IFenceDropSurface surface || surface.PointerTarget() is not { } at) return;
+        var keys = payload.Items.Select(i => i switch
+        {
+            SensorRowViewModel row => row.Key,
+            WiringSlotViewModel slot => slot.Row?.Key ?? 0,
+            _ => 0,
+        }).Where(k => k != 0).ToList();
+        if (FencePlace(keys, at.Line, at.Index) && keys.Count == 1) FenceSelect(keys[0]);
+    }
+    #endregion
+
+    #region - Footer counts (FR-01 · FR-18) -
+    /// <summary>아래 띠 — 링: "센서 13 · 체인 12 · 미배치 1 · 제품 한도 34" · 그 밖: 종류별 수 · 미배치 · 한도 확인 중.</summary>
+    public string FenceCountsText
+    {
+        get
+        {
+            var all = _board.Rows.Count;
+            var placed = _board.Chain.Count;
+            var unplaced = _board.Unplaced.Count;
+            if (_board.Topology.MaxSensors is { } max)
+                return $"센서 {all} · 체인 {placed} · 미배치 {unplaced} · 제품 한도 {max}";
+
+            var kinds = _board.Rows.GroupBy(r => FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText)))
+                                   .ToDictionary(g => g.Key, g => g.Count());
+            var parts = new[] { (FenceKind.Multi, "복합"), (FenceKind.Fence, "펜스"), (FenceKind.Underground, "지진동"), (FenceKind.Smart, "스마트") }
+                .Where(k => kinds.ContainsKey(k.Item1)).Select(k => $"{k.Item2} {kinds[k.Item1]}");
+            return string.Join(" · ", parts.Append($"미배치 {unplaced}").Append("한도 확인 중(O-7)"));
+        }
+    }
+    #endregion
+}
+
+/// <summary>팔레트에서 끌어 온 것을 놓을 펜스 자리 — 캔버스가 포인터 아래 자리를 준다(커널 드롭존 → 뷰모델).</summary>
+public interface IFenceDropSurface
+{
+    /// <summary>지금 포인터 아래 (선, 옮기기 전 자리). 캔버스 밖이면 <c>null</c>.</summary>
+    (int Line, int Index)? PointerTarget();
+}

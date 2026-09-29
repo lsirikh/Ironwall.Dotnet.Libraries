@@ -40,6 +40,11 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
   </ItemGroup>
 
+  <!-- 결선 펜스 뷰 속성 칸의 제품 사진(wiring-fence-view F-3 · NFR-05: 긴 변 ≤ 256px · ≤ 120KB) -->
+  <ItemGroup>
+    <Resource Include="Consoles\Wiring\Fence\Assets\*.png" />
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Services\" />
     <Folder Include="Tests\" />

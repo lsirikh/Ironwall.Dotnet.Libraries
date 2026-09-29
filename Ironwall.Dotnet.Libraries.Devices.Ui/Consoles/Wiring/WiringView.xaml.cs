@@ -79,7 +79,23 @@ public partial class WiringView : UserControl
 
     #region - Wiring map -
     private void OnAcceptSuggestion(object sender, RoutedEventArgs e) => ViewModel?.AcceptSuggestion();
-    private void OnUnplaceSelected(object sender, RoutedEventArgs e) => ViewModel?.UnplaceSelected();
+    private void OnUnplaceSelected(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+        if (vm.IsFenceView) vm.UnplaceFenceSelected();      // 펜스 보기에서는 펜스에서 고른 센서
+        else vm.UnplaceSelected();
+    }
+
+    #region - Fence view (wiring-fence-view F-3) -
+    private void OnShowFence(object sender, RoutedEventArgs e) => ViewModel?.ShowFenceView();
+    private void OnShowTable(object sender, RoutedEventArgs e) => ViewModel?.ShowTableView();
+    private void OnFenceBack(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedBack();
+    private void OnFenceForward(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedForward();
+    private void OnFenceUnplace(object sender, RoutedEventArgs e) => ViewModel?.UnplaceFenceSelected();
+    private void OnFenceAppend(object sender, RoutedEventArgs e) => ViewModel?.AppendFenceSelected();
+    private void OnEnclosureBack(object sender, RoutedEventArgs e) => ViewModel?.MoveEnclosureBack();
+    private void OnEnclosureForward(object sender, RoutedEventArgs e) => ViewModel?.MoveEnclosureForward();
+    #endregion
 
     private void OnRemoveSlot(object sender, RoutedEventArgs e)
     {

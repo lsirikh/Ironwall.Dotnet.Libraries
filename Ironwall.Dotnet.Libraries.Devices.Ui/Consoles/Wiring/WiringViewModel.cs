@@ -46,7 +46,7 @@ public sealed record WiringGroupInfo(int Id, string Name);
 /// <para>판정은 전부 <c>Model/</c> 의 순수 함수에 있다. 드래그는 UIA 로 단언할 수 없으므로(그 패턴이 .NET 8 WPF 에 없다)
 /// 회귀망은 그 함수들의 헤드리스 테스트와 <b>키보드 폴백 경로</b>다.</para>
 /// </remarks>
-public sealed class WiringViewModel : Screen, IDragDropHandler
+public sealed partial class WiringViewModel : Screen, IDragDropHandler
 {
     /// <summary>칸 드롭존.</summary>
     public const string SlotZoneKey = "wiring-slot";
@@ -227,6 +227,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         SyncPalette();
         RefreshIssues();
         RefreshCommands();
+        RaiseFence();
     }
 
     private void SyncRows()
@@ -387,6 +388,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         SyncPalette();
         RefreshIssues();
         RefreshCommands();
+        RaiseFence();       // 이름 · 번호 · 종류가 펜스 칩 · 모양에도 보인다
     }
     #endregion
 
@@ -1006,6 +1008,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         if (IsBusy || payload is null || target is null) return false;
 
+        if (target.ZoneKey == FenceZoneKey) return CanDropOnFence(payload);
+
         return target.ZoneKey switch
         {
             // 어느 칸에 놓아도 된다 — 그 자리에 끼워 넣고 뒤를 민다(체인에는 "찬 칸" 이 없다).
@@ -1021,6 +1025,12 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     public void Drop(DragPayload payload, DropTarget target)
     {
         if (!CanDrop(payload, target)) return;
+
+        if (target.ZoneKey == FenceZoneKey)
+        {
+            DropOnFence(payload, target);
+            return;
+        }
 
         if (target.ZoneKey == BinZoneKey)
         {
