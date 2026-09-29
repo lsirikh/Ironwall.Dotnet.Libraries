@@ -59,12 +59,13 @@ public class SecondarySurfaceWordingTests
     }
 
     [Fact]
-    public void should_offer_unit_map_rail_between_tree_and_devices_when_unit_console_is_created()
+    public void should_offer_unit_map_rail_after_tree_when_unit_console_is_created()
     {
         // unit-relationship-map TEST-31 — 자리표시("인접 관계도 · 다음 단계")가 걷히고 「부대 관계도」 칸이 들어섰다.
+        // v1.7 — 「미배치 장비」 칸은 서버 회신 Q-1 ⓐ(개념 폐지)로 걷었다.
         var console = new UnitConsoleViewModel(new StubUnitApi(), new StubDeviceApi());
 
-        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY, UnitConsoleViewModel.RAIL_DEVICES },
+        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY },
                      console.RailEntries.Select(e => e.Key));
         var map = console.RailEntries.Single(e => e.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
         Assert.Equal("부대 관계도", map.Label);
@@ -93,10 +94,8 @@ public class SecondarySurfaceWordingTests
         AssertClean(console.RailFooterText, nameof(console.RailFooterText));
         AssertClean(console.AddBlockedReason, nameof(console.AddBlockedReason));
         AssertClean(console.DeleteBlockedReason, nameof(console.DeleteBlockedReason));
-        AssertClean(console.TrayMessageText, nameof(console.TrayMessageText));
         AssertClean(UnitConsoleViewModel.NOT_SUPPORTED, nameof(UnitConsoleViewModel.NOT_SUPPORTED));
         AssertClean(UnitConsoleViewModel.NO_EDIT_PERMISSION, nameof(UnitConsoleViewModel.NO_EDIT_PERMISSION));
-        AssertClean(UnitDropHandler.PlaceDeniedReason, nameof(UnitDropHandler.PlaceDeniedReason));
         Assert.Equal("같은 단계의 부대는 코드 순으로 표시됩니다.", new UnitConsoleViewModel(new StubUnitApi(), new StubDeviceApi(), myUnitCode: () => null).RailFooterText);
     }
 

@@ -142,6 +142,7 @@ public class UnitMapViewModelScnTests
     {
         var api = new FakeUnitLayoutApi();
         var kit = await MapKit.OpenAsync(api);
+        var reads = api.ReadCount;
         kit.Vm.RequestSelect(kit.Id("6중대"));
         kit.Vm.HandleKey(UnitMapKeyCommand.MoveMode, false);
 
@@ -152,11 +153,17 @@ public class UnitMapViewModelScnTests
 
         Assert.Equal(UnitMapText.LayoutNoticeDeferredStatus, kit.Vm.StatusText);
         Assert.True(kit.Vm.IsMoveMode);                     // 강제 반영 · 모드 해제 없음
+        Assert.Equal(reads, api.ReadCount);                 // 미루는 동안 읽지 않았다
 
         kit.Vm.HandleKey(UnitMapKeyCommand.Escape, false);
         kit.Delay.ElapseAll();
         await kit.Vm.WhenIdleAsync();
-        Assert.NotEqual(UnitMapText.LayoutNoticeDeferredStatus, kit.Vm.StatusText);
+
+        // REVIEW-01 LOW-T4 — 종전 단언(NotEqual 연기 문구)은 Esc 가 상태 문구를 비우는 것만으로 늘 참이었다.
+        // 연기가 풀리면 미뤄 둔 알림이 실제로 한 번 반영(GET 1회)됐는지 본다.
+        Assert.Equal(reads + 1, api.ReadCount);
+        Assert.True(kit.Vm.Scene.FactsOf(kit.Id("30중대")).IsMoved);
+        Assert.Null(kit.Vm.StatusText);
     }
     #endregion
 

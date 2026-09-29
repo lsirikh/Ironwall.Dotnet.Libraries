@@ -27,13 +27,14 @@ public class UnitConsoleRailViewTests
             var rail = RailProbe.Rail(view, "Console.Units.Rail");
             Assert.Equal(UnitConsoleViewModel.RAIL_TREE, RailProbe.SelectedKey(rail));
 
-            RailProbe.Select(rail, UnitConsoleViewModel.RAIL_DEVICES);
+            // v1.7 — 「미배치 장비」 칸은 없다(Q-1 ⓐ). 남은 다른 칸(부대 관계도)으로 같은 관문을 시험한다.
+            RailProbe.Select(rail, UnitConsoleViewModel.RAIL_ADJACENCY);
             AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
             Assert.Equal(UnitConsoleViewModel.RAIL_TREE, console.SelectedRail.Key);
             Assert.Equal("6중대 (개편)", console.Form.Name);
             Assert.True(console.Detail.IsDirty, "막힌 뒤에도 고친 칸은 남아야 한다");
-            RailProbe.AssertShows(rail, UnitConsoleViewModel.RAIL_TREE, refused: UnitConsoleViewModel.RAIL_DEVICES);
+            RailProbe.AssertShows(rail, UnitConsoleViewModel.RAIL_TREE, refused: UnitConsoleViewModel.RAIL_ADJACENCY);
         }
         finally { window.Close(); }
     });
@@ -46,12 +47,12 @@ public class UnitConsoleRailViewTests
         {
             var rail = RailProbe.Rail(view, "Console.Units.Rail");
 
-            RailProbe.Select(rail, UnitConsoleViewModel.RAIL_DEVICES);
-            Assert.True(RailProbe.ItemSelected(rail, UnitConsoleViewModel.RAIL_DEVICES), "누른 즉시 새 레일이 선택으로 보여야 한다 · " + RailProbe.State(rail));
+            RailProbe.Select(rail, UnitConsoleViewModel.RAIL_ADJACENCY);
+            Assert.True(RailProbe.ItemSelected(rail, UnitConsoleViewModel.RAIL_ADJACENCY), "누른 즉시 새 레일이 선택으로 보여야 한다 · " + RailProbe.State(rail));
             AppHost.Pump(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
-            Assert.Equal(UnitConsoleViewModel.RAIL_DEVICES, console.SelectedRail.Key);
-            RailProbe.AssertShows(rail, UnitConsoleViewModel.RAIL_DEVICES, refused: UnitConsoleViewModel.RAIL_TREE);
+            Assert.Equal(UnitConsoleViewModel.RAIL_ADJACENCY, console.SelectedRail.Key);
+            RailProbe.AssertShows(rail, UnitConsoleViewModel.RAIL_ADJACENCY, refused: UnitConsoleViewModel.RAIL_TREE);
         }
         finally { window.Close(); }
     });

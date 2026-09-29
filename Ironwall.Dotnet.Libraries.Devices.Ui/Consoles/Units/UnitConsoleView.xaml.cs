@@ -86,9 +86,6 @@ public partial class UnitConsoleView : UserControl
         await Guard(() => _treeSelection.OnSelectionChangedAsync(list, e, Vm));
     }
 
-    /// <summary>끌기의 버튼 경로 — 고른 장비를 배치 바가 가리키는 부대에 쌓는다.</summary>
-    private void OnAssignSelected(object sender, RoutedEventArgs e) => Vm?.QueueAssignSelected();
-
     private void OnToggleExpand(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is UnitNodeRowViewModel row) Vm?.ToggleExpand(row);
@@ -160,18 +157,6 @@ public partial class UnitConsoleView : UserControl
 
     /// <summary>상태 띠 [다시 읽기] — 편제만 다시 읽는다. 상세의 미적용 편집은 그대로(FR-48 ⑤).</summary>
     private async void OnReadExternalChange(object sender, RoutedEventArgs e) => await Guard(() => Vm?.ReadExternalChangeAsync() ?? System.Threading.Tasks.Task.CompletedTask);
-    #endregion
-
-    #region - Devices -
-    private void OnDeviceSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (sender is not ListBox list) return;
-        Vm?.SetSelectedDevices(list.SelectedItems.OfType<UnitDeviceRowViewModel>());
-    }
-
-    private async void OnApplyAssigns(object sender, RoutedEventArgs e) => await Guard(() => Vm?.ApplyAssignsAsync() ?? System.Threading.Tasks.Task.CompletedTask);
-
-    private void OnRevertAssigns(object sender, RoutedEventArgs e) => Vm?.RevertAssigns();
     #endregion
 
     #region - Helpers -

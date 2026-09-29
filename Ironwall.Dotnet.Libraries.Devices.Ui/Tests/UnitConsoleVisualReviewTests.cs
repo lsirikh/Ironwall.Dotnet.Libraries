@@ -45,8 +45,8 @@ public class UnitConsoleVisualReviewTests
         var console = await OpenAsync(myUnitCode: "unit001");
 
         Assert.Equal("편제 트리", console.RailSubtitle);
-        console.SelectedRail = console.RailEntries.Single(e => e.Key == UnitConsoleViewModel.RAIL_DEVICES);
-        Assert.Equal("미배치 장비", console.RailSubtitle);
+        console.SelectedRail = console.RailEntries.Single(e => e.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
+        Assert.Equal("부대 관계도", console.RailSubtitle);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class UnitConsoleVisualReviewTests
     private static async Task<UnitConsoleViewModel> OpenAsync(string? myUnitCode = null)
     {
         var console = new UnitConsoleViewModel(new GraphApi(), new NoDevices(), myUnitCode: () => myUnitCode,
-                                               canEdit: () => true, canDelete: () => true, canView: () => true, canPlaceDevices: () => true);
+                                               canEdit: () => true, canDelete: () => true, canView: () => true);
         await ((IActivate)console).ActivateAsync();
         return console;
     }

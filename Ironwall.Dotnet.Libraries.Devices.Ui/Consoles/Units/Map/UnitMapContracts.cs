@@ -199,8 +199,9 @@ public enum UnitMapKeyCommand
 /// 부대 콘솔 VM 이 구현하고 관계도 VM 이 부른다 — 편제 쓰기 · 선택은 <b>기존 경로 한 벌</b>(D-5).
 /// </summary>
 /// <remarks>
-/// <para>관계도는 편제를 직접 쓰지 않는다. 트리와 관계도가 같은 규칙 · 되돌리기 표(<c>_lastMove</c>) · 재조회 ·
-/// 권한 · 상태 문구를 쓰게 하려는 것이다. 모든 멤버는 UI 스레드에서 부른다.</para>
+/// <para>관계도는 편제를 직접 쓰지 않는다. 트리와 관계도가 같은 규칙 · 재조회 · 권한 · 상태 문구를 쓰게 하려는 것이다.
+/// 되돌리기 표는 나눠 쓰지 않는다 — 관계도는 자기 표(<c>UnitMapUndoStack</c>)로 반대 이동을 보내고, 트리의 <c>_lastMove</c> 는 트리 이동만 담는다.
+/// 모든 멤버는 UI 스레드에서 부른다.</para>
 /// <para>콘솔 VM 에는 이름이 같은 공개 메서드가 이미 있다(<c>MoveAsync(int, int?, …)</c> 등) —
 /// 이 인터페이스는 <b>명시적 구현</b>으로 붙이면 기존 시그니처와 부딪히지 않는다.</para>
 /// </remarks>
@@ -224,11 +225,15 @@ public interface IUnitMapCommands
     /// </summary>
     bool TrySelect(int unitId);
 
-    /// <summary>상위 바꾸기 — 확인이 끝난 뒤 1회. 성공이면 <c>true</c>(실패 복구 재조회는 콘솔이 한다).</summary>
-    Task<bool> MoveAsync(int movingId, int targetId, CancellationToken token = default);
-
-    /// <summary>마지막 상위 이동 되돌리기 — 툴바 [이동 되돌리기]와 같은 표.</summary>
-    Task<bool> UndoMoveAsync(CancellationToken token = default);
+    /// <summary>
+    /// 상위 바꾸기 — 확인이 끝난 뒤 1회. <paramref name="targetId"/> 가 <c>null</c> 이면 최상위로(되돌리기가 옛 상위 없음으로 돌려보낼 때).
+    /// 성공이면 <c>true</c>(실패 복구 재조회는 콘솔이 한다). 실패 사유는 <see cref="IUnitMapConsoleBridge.LastWriteFailureReason"/>.
+    /// </summary>
+    /// <remarks>
+    /// 관계도의 되돌리기는 이 메서드로 <b>정확한 반대 이동</b>을 직접 보낸다 — 트리 툴바 [이동 되돌리기]의 공유 표(<c>_lastMove</c>)는
+    /// 쓰지도 채우지도 않는다(REVIEW-01 HIGH-1: 그 표는 하나뿐이라 최상위 부대 되돌리기가 엉뚱한 부대를 옮기거나 거짓 성공을 냈다).
+    /// </remarks>
+    Task<bool> MoveAsync(int movingId, int? targetId, CancellationToken token = default);
 
     /// <summary>
     /// 인접 추가 · 해제 — <paramref name="unitId"/> 기준(선택을 몰래 바꾸지 않는다 — FR-32).

@@ -1259,8 +1259,13 @@ public class MockDeviceApiService : IDeviceApiService
     // ──────────────────────────── Lamps ────────────────────────────
     public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default, string? view = null, string? include = null, string? typeLamp = null, int? groupId = null, int? serverId = null, int? unitId = null, bool? includeDescendants = null)
         => Rec($"lamps view={view ?? "-"} include={include ?? "-"} type={typeLamp ?? "-"} group={groupId?.ToString() ?? "-"} server={serverId?.ToString() ?? "-"} unit={unitId?.ToString() ?? "-"} desc={includeDescendants?.ToString() ?? "-"}", Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>())));
+    /// <summary>단건 경광등 조회가 돌려줄 값(SYNC_DEVICE 재조회 시험) — 비우면 종전처럼 NOT_IMPLEMENTED.</summary>
+    public LampDeviceDto? LampById { get; set; }
+
     public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default, string? view = null, string? include = null)
-        => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+        => Task.FromResult(LampById is { } lamp && lamp.Id == id
+            ? ApiResponse<LampDeviceDto>.CreateSuccess(lamp)
+            : ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<LampDeviceDto>> CreateLampAsync(LampDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<LampDeviceDto>> PatchLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)

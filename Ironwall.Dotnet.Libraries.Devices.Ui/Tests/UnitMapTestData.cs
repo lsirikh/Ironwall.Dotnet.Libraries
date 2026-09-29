@@ -131,6 +131,20 @@ internal static class UnitMapTestData
         var graph = Graph(nodes, adjacency: adjacency);
         return new UnitMapFixture(graph, Tree(graph));
     }
+
+    /// <summary>
+    /// 200 부대 + <b>최상위 중대 둘</b>(<c>unit001</c> 기본중대 id 201 · <c>c99</c> 예비중대 id 202) — 최상위 부대의 상위 바꾸기 ·
+    /// 되돌리기(옛 상위 = 없음 → 최상위로 돌려보내기)를 겪게 한다(REVIEW-01 HIGH-1).
+    /// </summary>
+    public static UnitMapFixture Standard200WithRoots()
+    {
+        var baseline = Standard200();
+        var nodes = baseline.Graph.Nodes.ToList();
+        nodes.Add(Node(201, "unit001", "기본중대", ECHELON_COMPANY));
+        nodes.Add(Node(202, "c99", "예비중대", ECHELON_COMPANY));
+        var graph = Graph(nodes, adjacency: baseline.Graph.Edges.AdjacencyPairs.ToList());
+        return new UnitMapFixture(graph, Tree(graph));
+    }
     #endregion
 
     #region - ② 소형 픽스처 -

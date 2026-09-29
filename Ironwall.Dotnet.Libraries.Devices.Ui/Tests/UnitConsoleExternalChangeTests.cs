@@ -184,23 +184,6 @@ public class UnitConsoleExternalChangeTests
     }
 
     [Fact]
-    public async Task should_not_reload_while_devices_wait_in_the_tray()
-    {
-        var h = await OpenAsync();
-        h.Console.QueueAssign(6, h.Console.DeviceRows.ToList());
-        Assert.True(h.Console.Tray.HasEntries);
-        var readsBefore = h.Units.GraphReads;
-
-        var pending = await SendAsync(h.Console, Changed());
-        h.Delay.ReleaseAll();
-        await pending;
-
-        Assert.Equal(readsBefore, h.Units.GraphReads);
-        Assert.True(h.Console.IsExternallyChanged);
-        Assert.True(h.Console.Tray.HasEntries);
-    }
-
-    [Fact]
     public async Task should_hold_the_reload_during_a_drag_and_run_it_after_the_drag_ends()
     {
         var h = await OpenAsync();

@@ -26,8 +26,13 @@ public sealed partial class UnitMapViewModel
     private UnitMapLayoutAssessment _assessment = UnitMapLayoutAssessment.Loading;
     private UnitLayoutSnapshot _snapshot = UnitLayoutSnapshot.Empty();
     private SessionOnlyUnitLayoutStore? _session;
-    private long? _pendingNotice;
-    private long? _deferredNotice;
+
+    /// <summary>
+    /// 열린 뒤 다시 읽기가 실패했다 — 마지막으로 읽은 문서(<see cref="_snapshot"/>)를 그대로 그리고 [다시 시도] 를 띄운다(REVIEW-01 MEDIUM-7).
+    /// 상태는 <see cref="UnitMapLayoutState.Shared"/> 그대로라 쓰기는 <c>If-Match</c>(마지막 버전)로 나가고, 그 사이 바뀌었으면 412 가 지킨다.
+    /// </summary>
+    private bool _layoutStale;
+    private UnitLayoutFailureKind? _staleFailure;
 
     /// <summary>한 번의 배치 쓰기가 끝난 모양.</summary>
     private enum CommitKind { Saved, SessionSaved, Conflicted, Failed, Unknown }
@@ -46,12 +51,13 @@ public sealed partial class UnitMapViewModel
             var byMe = _options.CurrentOperatorName is { Length: > 0 } me && string.Equals(me, _snapshot.UpdatedByName, StringComparison.Ordinal);
             return UnitMapText.LayoutStatus(LayoutState, _commands.CanEdit, _snapshot.UpdatedByName, _snapshot.UpdatedAt?.LocalDateTime, byMe,
                                             liveOff: _options.IsLiveOff?.Invoke() == true,
-                                            sessionExpired: _assessment.Failure == UnitLayoutFailureKind.Unauthorized);
+                                            sessionExpired: (_layoutStale ? _staleFailure : _assessment.Failure) == UnitLayoutFailureKind.Unauthorized,
+                                            stale: _layoutStale);
         }
     }
 
-    /// <summary>[다시 시도](<c>Units.Map.LayoutRetry</c>) — 읽기 실패일 때만.</summary>
-    public bool CanRetryLayout => LayoutState == UnitMapLayoutState.ReadFailed;
+    /// <summary>[다시 시도](<c>Units.Map.LayoutRetry</c>) — 읽기 실패일 때만(처음부터 못 읽었거나, 열린 뒤 다시 읽기가 실패해 옛 배치를 보이는 중).</summary>
+    public bool CanRetryLayout => LayoutState == UnitMapLayoutState.ReadFailed || _layoutStale;
 
     private long? HaveVersion => LayoutState is UnitMapLayoutState.Shared or UnitMapLayoutState.VersionMismatch ? _snapshot.Version : null;
 
@@ -85,7 +91,11 @@ public sealed partial class UnitMapViewModel
         ApplyRead(read);
     }
 
-    /// <summary>읽은 결과를 상태로 옮긴다. 세션 전용은 한번 정해지면 이 창 동안 유지한다(FR-51 — 세션 위치를 서버로 올리지 않는다).</summary>
+    /// <summary>
+    /// 읽은 결과를 상태로 옮긴다. 세션 전용은 한번 정해지면 이 창 동안 유지한다(FR-51 — 세션 위치를 서버로 올리지 않는다).
+    /// 읽기 실패로 자동 배치에 떨어지는 것은 <b>아직 한 번도 읽지 못했을 때</b>(창을 열 때)뿐이다 — 이미 읽은 문서가 있으면 그것을 지키고
+    /// 낡았다고 표시한다(REVIEW-01 MEDIUM-7 — 종전엔 알림 뒤 GET 한 번 실패로 모든 운영자의 배치가 화면에서 사라졌다).
+    /// </summary>
     private void ApplyRead(UnitLayoutRead read)
     {
         if (LayoutState == UnitMapLayoutState.SessionOnly) return;
@@ -97,9 +107,16 @@ public sealed partial class UnitMapViewModel
             case UnitMapLayoutState.VersionMismatch:
                 _snapshot = assessment.Snapshot!;
                 _assessment = assessment;
+                _layoutStale = false;
+                _staleFailure = null;
                 break;
             case UnitMapLayoutState.SessionOnly:
                 SwitchToSessionOnly();
+                _layoutStale = false;
+                break;
+            case UnitMapLayoutState.ReadFailed when LayoutState == UnitMapLayoutState.Shared:
+                _layoutStale = true;                     // 마지막으로 읽은 문서를 그대로 — 상태 · Δ 유지
+                _staleFailure = assessment.Failure;
                 break;
             default:
                 _assessment = assessment;
@@ -121,13 +138,20 @@ public sealed partial class UnitMapViewModel
 
     #region - 위치 쓰기 (FR-31 · FR-34 · FR-52) -
     /// <summary>위치 한 번 — 먼저 그리고 대기열에서 PATCH 1회(끈 부대 한 항목). 세션 전용이면 메모리만.</summary>
+    /// <remarks>
+    /// <b>놓을 때 본 자리</b>(끈 부대 + 조상의 Δ — 앞선 대기 쓰기의 낙관 변경 포함)를 적어 둔다. 차례가 왔을 때 문서가 그 자리와 다르면
+    /// (같은 부대의 앞선 쓰기가 412 · 실패로 닿지 못했거나, 그 사이 다른 운영자가 바꿨다) 보내지 않는다 — 운영자가 보지 못한 문서 위에
+    /// 새 버전으로 덮어쓰는 길을 막는다(REVIEW-01 MEDIUM-2). 되돌리기 항목도 만들지 않고, 앞선 충돌 · 실패 막대를 그대로 둔다.
+    /// </remarks>
     private Task WritePositionAsync(int unitId, Vector newDelta)
     {
         newDelta = ClampDelta(newDelta);
-        var before = DisplayDeltaOf(unitId);
+        var shown = DisplayDeltas();
+        var before = shown.TryGetValue(unitId, out var own) ? own : (Vector?)null;
         var change = UnitMapLayoutSync.MoveChange(unitId, newDelta);
         var name = NameOf(unitId);
         var touched = UnitMapLayoutSync.TouchedUnits(_tree, unitId);
+        var seen = touched.ToDictionary(id => id, id => shown.TryGetValue(id, out var d) ? d : (Vector?)null);
 
         _optimistic.Add(change);
         RebuildScene();
@@ -136,6 +160,11 @@ public sealed partial class UnitMapViewModel
         {
             try
             {
+                if (!StillAsSeen(seen))
+                {
+                    if (!_barIsError) ShowBar(UnitMapText.LayoutConflictBar(name), isError: true);   // 앞선 충돌 · 실패 막대가 있으면 그것을 남긴다
+                    return;
+                }
                 var commit = await CommitAsync(change, touched).ConfigureAwait(true);
                 switch (commit.Kind)
                 {
@@ -163,7 +192,27 @@ public sealed partial class UnitMapViewModel
                 _optimistic.Remove(change);
                 RebuildScene();
             }
-        });
+        }, name);
+    }
+
+    /// <summary>
+    /// 지금 문서(세션 전용이면 세션 문서)가 놓을 때 본 자리와 같은가 — 끈 부대 + 조상의 Δ 값 비교(REVIEW-01 MEDIUM-2).
+    /// 앞선 내 쓰기가 성공했으면 그 결과가 곧 본 자리였으므로 같다.
+    /// </summary>
+    private bool StillAsSeen(IReadOnlyDictionary<int, Vector?> seen)
+    {
+        foreach (var (id, expected) in seen)
+        {
+            var now = _snapshot.DeltaOf(id);
+            var same = (expected, now) switch
+            {
+                (null, null) => true,
+                (Vector a, Vector b) => Math.Abs(a.X - b.X) <= UnitMapLayoutSync.DeltaTolerance && Math.Abs(a.Y - b.Y) <= UnitMapLayoutSync.DeltaTolerance,
+                _ => false,
+            };
+            if (!same) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -362,9 +411,15 @@ public sealed partial class UnitMapViewModel
             _undo.Push(new UnitMapLayoutResetUndo(before, All: true, commit.Snapshot, sessionOnly));
             ShowBar(UnitMapText.LayoutResetBar(sessionOnly), isError: false);
         }
-        else ShowBar(commit.Kind == CommitKind.Conflicted ? UnitMapText.LayoutResetUndoRefusedBar : UnitMapText.LayoutWriteFailedBar("배치", commit.Reason ?? string.Empty), isError: true);
+        else ShowBar(commit.Kind switch
+        {
+            // 초기화 자체가 412 — 그 사이 누가 배치를 바꿨다(종전엔 "초기화를 되돌리지 않았습니다" 라고 엉뚱하게 말했다 — REVIEW-01 L-3).
+            CommitKind.Conflicted => UnitMapText.LayoutResetConflictBar,
+            CommitKind.Unknown => UnitMapText.LayoutResetUnknownBar,
+            _ => UnitMapText.LayoutResetFailedBar(commit.Reason ?? string.Empty),
+        }, isError: true);
         RebuildScene();
-    });
+    }, "배치 초기화");
 
     private string? ResetBlockedReason() => LayoutState switch
     {
@@ -386,9 +441,9 @@ public sealed partial class UnitMapViewModel
         if (!sessionOnly)
         {
             await ReloadLayoutAsync(CancellationToken.None).ConfigureAwait(true);
-            if (LayoutState != UnitMapLayoutState.Shared)
+            if (LayoutState != UnitMapLayoutState.Shared || _layoutStale)      // 다시 읽기 실패면 모르는 채로 보내지 않는다(MEDIUM-7)
             {
-                ShowBar(UnitMapText.LayoutWriteFailedBar("배치", UnitMapText.LayoutReadFailedBlocked), isError: true);
+                ShowBar(UnitMapText.LayoutResetUndoUnreadableBar, isError: true);
                 return;
             }
         }
@@ -410,7 +465,7 @@ public sealed partial class UnitMapViewModel
                 Drop(entry, UnitMapText.LayoutResetUndoRefusedBar);
                 break;
             default:
-                ShowBar(UnitMapText.LayoutWriteFailedBar("배치", commit.Reason ?? string.Empty), isError: true);
+                ShowBar(UnitMapText.LayoutResetUndoFailedBar(commit.Reason ?? string.Empty), isError: true);
                 break;
         }
         RebuildScene();
@@ -435,78 +490,118 @@ public sealed partial class UnitMapViewModel
     public static readonly TimeSpan NoticeDeferCap = TimeSpan.FromSeconds(30);
 
     private DateTime? _firstNoticeAt;
-    private DateTime? _deferredSince;
-    private bool _deferNotified;
+
+    /// <summary>
+    /// 합침 · 발화 시점 재비교 · 연기 상한의 <b>시험된 판정</b>(<see cref="UnitMapLayoutNoticeGate"/> — TEST-66)을 그대로 쓴다
+    /// (REVIEW-01 L-1 · MEDIUM-T2: 종전엔 뷰모델이 같은 규칙을 따로 들고 있어 합침 창 끝에 미룬 알림은 연기 시각이 적히지 않았다).
+    /// </summary>
+    private UnitMapLayoutNoticeGate? _noticeGateInstance;
+    private UnitMapLayoutNoticeGate NoticeGate => _noticeGateInstance ??= new UnitMapLayoutNoticeGate(_clock, NoticeDeferCap);
+
+    /// <summary>알림을 미루는 중이다(손이 비면 다시 판정한다).</summary>
+    private bool _noticeDeferred;
+
+    /// <summary>30초 연기 감시 — 닫히면(<see cref="_closing"/>) 함께 멈춘다(REVIEW-01 L-7).</summary>
+    private CancellationTokenSource? _deferWatch;
 
     private void OnLayoutNotice(long version)
     {
-        if (LayoutState == UnitMapLayoutState.SessionOnly) return;
-        switch (UnitMapLayoutSync.ShouldRefetch(version, HaveVersion, Busy))
+        if (_disposed || LayoutState == UnitMapLayoutState.SessionOnly) return;
+        if (UnitMapLayoutSync.ShouldRefetch(version, HaveVersion, UnitMapBusy.None) == UnitMapRefetchDecision.Skip) return;   // 자기 메아리 · 옛 알림
+        NoticeGate.Notice(version);
+
+        if (Busy != UnitMapBusy.None)
         {
-            case UnitMapRefetchDecision.Skip:
-                return;
-            case UnitMapRefetchDecision.Defer:
-                _deferredNotice = Math.Max(_deferredNotice ?? version, version);
-                if (_deferredSince is null)
-                {
-                    _deferredSince = _clock.UtcNow;
-                    _ = WatchDeferCapAsync(_deferredSince.Value);
-                }
-                return;
+            _ = ActOnNoticeAsync(NoticeGate.Evaluate(HaveVersion, Busy), CancellationToken.None);   // 미룬다(처음이면 연기 시각이 적힌다)
+            return;
+        }
+
+        var now = _clock.UtcNow;
+        _firstNoticeAt ??= now;
+        if (now - _firstNoticeAt.Value >= NoticeMaxWait)
+        {
+            // 최대 대기 — 창을 끊고 지금 한 번(ISSUE-30).
+            _noticeTrigger.Cancel();
+            _ = OnNoticeSettledAsync(CancellationToken.None);
+            return;
+        }
+        _ = _noticeTrigger.Pulse();
+    }
+
+    /// <summary>합침 창이 끝났다 — 그 순간의 버전 · 손 상태로 판정한다(그 사이 바빠졌으면 여기서 미룬다 — 연기 상한도 여기서부터 센다).</summary>
+    private Task OnNoticeSettledAsync(CancellationToken token)
+    {
+        _firstNoticeAt = null;
+        return ActOnNoticeAsync(NoticeGate.Evaluate(HaveVersion, Busy), token);
+    }
+
+    private Task ActOnNoticeAsync(UnitMapNoticeAction action, CancellationToken token)
+    {
+        switch (action)
+        {
+            case UnitMapNoticeAction.Refetch:
+                _noticeDeferred = false;
+                CancelDeferWatch();
+                return Serialize(() => ReloadLayoutAsync(token));
+            case UnitMapNoticeAction.Defer:
+                _noticeDeferred = true;
+                ArmDeferWatch();
+                return Task.CompletedTask;
+            case UnitMapNoticeAction.NotifyDeferred:
+                _noticeDeferred = true;
+                StatusText = UnitMapText.LayoutNoticeDeferredStatus;      // 한 번만(판정기가 센다) — 강제 반영은 하지 않는다
+                return Task.CompletedTask;
             default:
-                _pendingNotice = Math.Max(_pendingNotice ?? version, version);
-                var now = _clock.UtcNow;
-                _firstNoticeAt ??= now;
-                if (now - _firstNoticeAt.Value >= NoticeMaxWait)
-                {
-                    // 최대 대기 — 창을 끊고 지금 한 번(ISSUE-30).
-                    _noticeTrigger.Cancel();
-                    _ = OnNoticeSettledAsync(CancellationToken.None);
-                    return;
-                }
-                _ = _noticeTrigger.Pulse();
-                return;
+                _noticeDeferred = false;
+                CancelDeferWatch();
+                return Task.CompletedTask;
         }
     }
 
-    /// <summary>연기가 <see cref="NoticeDeferCap"/> 을 넘기면 상태 띠로 한 번 알린다(ISSUE-9).</summary>
-    private async Task WatchDeferCapAsync(DateTime since)
+    private void ArmDeferWatch()
     {
-        try { await (_options.Delay ?? Task.Delay)(NoticeDeferCap, CancellationToken.None).ConfigureAwait(true); }
-        catch (OperationCanceledException) { return; }
-        if (_deferredSince != since || _deferredNotice is null || _deferNotified) return;
-        if (_clock.UtcNow - since < NoticeDeferCap) return;
-        _deferNotified = true;
-        StatusText = UnitMapText.LayoutNoticeDeferredStatus;
+        if (_deferWatch is not null || _disposed) return;
+        var watch = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
+        _deferWatch = watch;
+        _ = WatchDeferCapAsync(watch);
     }
 
-    private async Task OnNoticeSettledAsync(CancellationToken token)
+    private void CancelDeferWatch()
     {
-        if (_pendingNotice is not long version) return;
-        _pendingNotice = null;
-        _firstNoticeAt = null;
-        switch (UnitMapLayoutSync.ShouldRefetch(version, HaveVersion, Busy))
+        var watch = _deferWatch;
+        _deferWatch = null;
+        watch?.Cancel();
+    }
+
+    /// <summary>연기가 <see cref="NoticeDeferCap"/> 을 넘기면 판정기가 "한 번 알림" 을 낸다(ISSUE-9). 아직이면 다시 감시한다.</summary>
+    private async Task WatchDeferCapAsync(CancellationTokenSource watch)
+    {
+        try
         {
-            case UnitMapRefetchDecision.Skip:
-                return;
-            case UnitMapRefetchDecision.Defer:
-                _deferredNotice = Math.Max(_deferredNotice ?? version, version);
-                return;
-            default:
-                await Serialize(() => ReloadLayoutAsync(token)).ConfigureAwait(true);
-                return;
+            var stopped = false;
+            try { await (_options.Delay ?? Task.Delay)(NoticeDeferCap, watch.Token).ConfigureAwait(true); }
+            catch (OperationCanceledException) { stopped = true; }
+            if (!ReferenceEquals(_deferWatch, watch)) return;
+            _deferWatch = null;                                   // 이 감시가 끝났다 — 다시 멈추려 하지 않게(곧 버린다)
+            if (stopped) return;
+            if (_disposed || !_noticeDeferred || NoticeGate.PendingVersion is null) return;
+
+            var action = NoticeGate.Evaluate(HaveVersion, Busy);
+            if (action == UnitMapNoticeAction.Defer) { ArmDeferWatch(); return; }     // 상한 전(시계) — 다시 감시
+            await ActOnNoticeAsync(action, CancellationToken.None).ConfigureAwait(true);
+        }
+        finally
+        {
+            watch.Dispose();
         }
     }
 
     /// <summary>손이 비었다 — 미뤄 둔 알림을 다시 판정한다(그 사이 내 쓰기 응답으로 버전이 올랐으면 건너뛴다).</summary>
     private void ReplayDeferredNotice()
     {
-        if (_deferNotified && StatusText == UnitMapText.LayoutNoticeDeferredStatus) StatusText = null;
-        _deferredSince = null;
-        _deferNotified = false;
-        if (_deferredNotice is not long version) return;
-        _deferredNotice = null;
-        OnLayoutNotice(version);
+        if (!_noticeDeferred || _disposed) return;
+        if (StatusText == UnitMapText.LayoutNoticeDeferredStatus) StatusText = null;
+        _ = ActOnNoticeAsync(NoticeGate.Evaluate(HaveVersion, Busy), CancellationToken.None);
     }
     #endregion
 }

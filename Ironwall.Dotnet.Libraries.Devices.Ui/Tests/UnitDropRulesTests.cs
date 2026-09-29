@@ -160,29 +160,6 @@ public class UnitDropRulesTests
     }
     #endregion
 
-    #region - 장비 배치 -
-    [Fact]
-    public void should_allow_device_assign_when_at_least_one_device_is_elsewhere()
-        => Assert.True(UnitDropRules.CanAssignDevices(Tree(), 6, new int?[] { 6, null, 5 }).IsAllowed);
-
-    [Fact]
-    public void should_block_device_assign_when_every_device_is_already_there()
-    {
-        var verdict = UnitDropRules.CanAssignDevices(Tree(), 6, new int?[] { 6, 6 });
-
-        Assert.False(verdict.IsAllowed);
-        Assert.Contains("이미", verdict.Reason);
-    }
-
-    [Fact]
-    public void should_block_device_assign_when_nothing_was_dragged()
-        => Assert.False(UnitDropRules.CanAssignDevices(Tree(), 6, System.Array.Empty<int?>()).IsAllowed);
-
-    [Fact]
-    public void should_block_device_assign_when_target_unit_is_unknown()
-        => Assert.False(UnitDropRules.CanAssignDevices(Tree(), 404, new int?[] { null }).IsAllowed);
-    #endregion
-
     [Fact]
     public void should_spell_every_known_echelon_in_korean()
     {

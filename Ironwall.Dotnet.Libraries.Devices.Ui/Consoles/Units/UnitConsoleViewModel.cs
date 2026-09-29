@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 
 /****************************************************************************
-   Purpose      : 부대 콘솔 — 편제 트리 · 상세 · 미배치 장비 (N-11)
+   Purpose      : 부대 콘솔 — 편제 트리 · 부대 관계도 · 상세 (N-11)
    Created By   : GHLee
    Created On   : 9/20/2026
    Department   : SW Team
@@ -34,16 +34,17 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 /// </summary>
 /// <remarks>
 /// <para><b>서버 호출 횟수가 드래그 허용의 기준</b>이다(드래그 와이어프레임 L432) —
-/// 상위 바꾸기·인접은 호출 <b>1회</b>라 드롭 즉시 보내고 되돌리기를 준다,
-/// 장비 배치는 장비 수만큼 <b>N회</b>라 Draft 트레이에 쌓고 [적용] 때 한꺼번에 보낸다.</para>
+/// 상위 바꾸기·인접은 호출 <b>1회</b>라 드롭 즉시 보내고 되돌리기를 준다.</para>
 /// <para><b>형제 순서 드래그는 없다</b> — 서버 계약에 순서 필드가 아예 없어 끌어도 저장되지 않는다
 /// (스토리보드 L359-361 · 드래그 와이어프레임 L446).</para>
+/// <para><b>「미배치 장비」 칸은 없다</b>(서버 회신 2026-09-28 Q-1 ⓐ 개념 폐지) — 서버 설계상 무소속 장비가 존재할 수 없다
+/// (<c>unit_id</c> 없이 만들면 기본 부대 <c>unit001</c>, PATCH/PUT 의 명시적 <c>null</c> 은 422). 장비는 여전히 전량 읽는다 —
+/// 트리 행의 장비 수 · 관계도 배지 · [지도에서 보기]의 원천이다. 옛 설정의 <c>LastRailKey="devices"</c> 는 첫 칸(편제 트리)으로 떨어진다.</para>
 /// </remarks>
 public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMessage>, IUnitMapCommands, IUnitMapConsoleBridge
 {
     public const string RAIL_TREE = "tree";
     public const string RAIL_ADJACENCY = "adjacency";
-    public const string RAIL_DEVICES = "devices";
 
     /// <summary>창 제목(<see cref="Screen.DisplayName"/>).</summary>
     public const string WINDOW_TITLE = "부대 편제";
@@ -84,31 +85,31 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         Func<bool>? canEdit = null,
         Func<bool>? canDelete = null,
         Func<bool>? canView = null,
-        Func<bool>? canPlaceDevices = null,
         IEventAggregator? events = null,
         Func<bool>? isDragging = null,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         IUnitLayoutApi? layoutApi = null,
         ConsolePrefEntry? prefs = null,
         System.Action? savePrefs = null,
-        IClock? clock = null)
+        IClock? clock = null,
+        Func<bool>? isLiveOff = null,
+        Func<string?>? operatorName = null)
     {
         _units = units ?? throw new ArgumentNullException(nameof(units));
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         _log = log;
         _myUnitCode = myUnitCode ?? (() => null);
         // 서버가 부대 편제를 지키는 모듈 그대로 — units:edit · units:delete · units:view(permission_map.py).
-        // 장비를 부대에 두는 것만 장비 쓰기(PATCH /api/devices/…)라 devices:edit 다.
         _canEdit = canEdit ?? UnitPermissionGate.CanEdit;
         _canDelete = canDelete ?? UnitPermissionGate.CanDelete;
         _canView = canView ?? UnitPermissionGate.CanView;
-        _canPlaceDevices = canPlaceDevices ?? DevicePermissionGate.CanEdit;
         _events = events;
         _isDragging = isDragging ?? (() => DragSession.IsActive);
         // SYNC_UNIT 는 PUT 한 번에 여러 건이 몰려온다 — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
         _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync, delay: delay,
                                                 onError: ex => _log?.Error($"[UnitConsole] 외부 변경 재조회: {ex.Message}"));
         _clock = clock ?? new SystemClock();
+        _delay = delay ?? Task.Delay;
         _prefs = prefs;
         _savePrefs = savePrefs;
 
@@ -117,20 +118,21 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
         Detail = new ConsoleDetailPresenter { TypeName = "부대" };
         Form = new UnitDetailFormViewModel(Detail);
-        Tray = new DraftTrayViewModel();
         Drop = new UnitDropHandler(() => Tree, () => SelectedRow?.Id ?? 0, () => _canEdit(), () => IsBusy, OnDropped,
-                                   reason => StatusText = reason, () => _canPlaceDevices());
+                                   reason => StatusText = reason);
 
         // 아이콘은 이름만 쥔 토큰이다 — 싱글턴이 아닌 창이어도 뷰모델이 시각 요소를 쥐지 않는다(장비 콘솔 선례).
-        // 「부대 관계도」 칸 — 편제 트리와 미배치 장비 사이(unit-relationship-map FR-01). 키는 옛 RAIL_ADJACENCY 그대로라
-        // 옛 설정의 LastRailKey="adjacency" 도 유효하다. 숫자 배지는 달지 않는다 — 옆 칸들의 배지가 부대 · 장비 수라
-        // 여기 숫자가 있으면 부대 수로 읽힌다(조정자). 인접 쌍 수는 목록 상태 줄이 "인접 N쌍"으로 말한다.
+        // 「부대 관계도」 칸(unit-relationship-map FR-01). 키는 옛 RAIL_ADJACENCY 그대로라 옛 설정의 LastRailKey="adjacency" 도 유효하다.
+        // 숫자 배지는 달지 않는다 — 편제 트리 칸의 배지가 부대 수라 여기 숫자가 있으면 부대 수로 읽힌다(조정자).
+        // 인접 쌍 수는 목록 상태 줄이 "인접 N쌍"으로 말한다.
+        // 「미배치 장비」 칸은 없다(서버 회신 Q-1 ⓐ — PRD v1.7). 옛 설정의 LastRailKey="devices" 는 아래 폴백으로 첫 칸에 떨어진다.
         RailEntries.Add(new ConsoleRailEntry(RAIL_TREE, "편제 트리", new ConsoleIconToken("FileTree")) { ShowCount = true });
         RailEntries.Add(new ConsoleRailEntry(RAIL_ADJACENCY, "부대 관계도", new ConsoleIconToken("SitemapOutline")) { ShowCount = false });
-        RailEntries.Add(new ConsoleRailEntry(RAIL_DEVICES, "미배치 장비", new ConsoleIconToken("Devices")) { ShowCount = true });
         _selectedRail = RailEntries.FirstOrDefault(e => e.Key == prefs?.LastRailKey) ?? RailEntries[0];
 
         // 관계도 — 콘솔이 소유한다(자식). 선택 · 편제 쓰기는 이 콘솔의 기존 경로 한 벌(D-5)을 IUnitMapCommands 로 쓴다.
+        // 실시간 꼬리표 · "나" 는 호스트가 준 값(REVIEW-01 MEDIUM-6 — 종전엔 넘기지 않아 꼬리표가 뜨지 않고 내 변경도 이름으로 보였다).
+        // 알림 통로(events)가 없으면 배치 알림을 들을 길이 없다 — 그때는 꺼짐이다.
         Map = new UnitMapViewModel(this, layoutApi ?? new UnitLayoutApiAdapter(null), new UnitMapViewModelOptions
         {
             Events = events,
@@ -140,6 +142,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             Console = this,
             MyUnitIdProvider = () => MyUnitId,
             Clock = _clock,
+            IsLiveOff = isLiveOff ?? (() => events is null),
+            CurrentOperatorName = SafeOperatorName(operatorName),
+            Log = log,
         });
         Map.PropertyChanged += OnMapPropertyChanged;
         Map.DefersReloadChanged += OnMapDefersReloadChanged;
@@ -149,7 +154,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             EchelonFilters.Add(new UnitEchelonFilterViewModel(echelon, UnitDropRules.EchelonText(echelon)));
 
         Detail.Tracker.Changed += (_, _) => RaiseDetail();
-        Tray.PropertyChanged += (_, _) => RaiseTray();
     }
     #endregion
 
@@ -163,26 +167,32 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
     private Task<bool> AskAsync(string title, string message) => Confirm is null ? Task.FromResult(true) : Confirm(title, message);
 
-    /// <summary>창을 닫아도 되는가 — 적용하지 않은 상세 변경 · 배치 대기 장비가 있으면 먼저 묻는다.</summary>
+    /// <summary>
+    /// 닫기 전 관계도의 쓰기(배치 · 편제)가 끝나기를 기다리는 한도(REVIEW-01 L-7). 넘으면 묻는다 — 말없이 닫으면 결과를 아무도 보지 못한다.
+    /// </summary>
+    public static readonly TimeSpan CLOSE_WRITE_WAIT = TimeSpan.FromSeconds(3);
+
+    /// <summary>창을 닫아도 되는가 — 관계도가 아직 쓰는 중이면 잠깐 기다렸다 묻고, 적용하지 않은 상세 변경이 있으면 묻는다.</summary>
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
         Map.CancelAll();   // 관계도 확인 오버레이 · M 모드 · 끌기는 서버 0 으로 먼저 거둔다(IMPL-31 — 아래 가드는 그대로)
-        var pending = new List<string>();
-        if (Detail.IsDirty) pending.Add("적용하지 않은 부대 정보 변경");
-        if (Tray.HasEntries) pending.Add($"배치 대기 장비 {Tray.Count}대");
-        if (pending.Count == 0) return true;
-        return await AskAsync("부대 편제 닫기", $"{string.Join(" · ", pending)}이(가) 있습니다.\n닫으면 사라집니다. 버리고 닫을까요?").ConfigureAwait(true);
+        if (Map.IsWriting && !await Map.WaitForWritesAsync(CLOSE_WRITE_WAIT).ConfigureAwait(true))
+        {
+            // 닫으면 아직 시작하지 않은 쓰기는 보내지 않고(관계도 Dispose), 나간 요청의 결과는 이 창에서 볼 수 없다.
+            if (!await AskAsync("부대 편제 닫기", "관계도의 저장이 아직 끝나지 않았습니다.\n지금 닫으면 기다리는 변경은 보내지 않고, 보낸 변경의 결과는 확인할 수 없습니다. 닫을까요?").ConfigureAwait(true))
+                return false;
+        }
+        if (!Detail.IsDirty) return true;
+        return await AskAsync("부대 편제 닫기", "적용하지 않은 부대 정보 변경이 있습니다.\n닫으면 사라집니다. 버리고 닫을까요?").ConfigureAwait(true);
     }
 
     public ConsoleDetailPresenter Detail { get; }
     public UnitDetailFormViewModel Form { get; }
-    public DraftTrayViewModel Tray { get; }
     public UnitDropHandler Drop { get; }
 
     public BindableCollection<ConsoleRailEntry> RailEntries { get; } = new();
     public BindableCollection<UnitEchelonFilterViewModel> EchelonFilters { get; } = new();
     public BindableCollection<UnitNodeRowViewModel> Rows { get; } = new();
-    public BindableCollection<UnitDeviceRowViewModel> DeviceRows { get; } = new();
     #endregion
 
     #region - View state -
@@ -211,7 +221,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     }
 
     public bool IsTreeView => _selectedRail.Key == RAIL_TREE;
-    public bool IsDeviceView => _selectedRail.Key == RAIL_DEVICES;
 
     /// <summary>「부대 관계도」 칸을 보고 있다(unit-relationship-map FR-01).</summary>
     public bool IsAdjacencyView => _selectedRail.Key == RAIL_ADJACENCY;
@@ -250,13 +259,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         }
     }
 
-    /// <summary>미배치 목록에서 지금 고른 장비들 — 끌기의 버튼 폴백이 쓴다.</summary>
-    public IReadOnlyList<UnitDeviceRowViewModel> SelectedDevices
-    {
-        get => _selectedDevices;
-        private set { _selectedDevices = value; NotifyOfPropertyChange(); RaiseCommands(); }
-    }
-
     public bool IsBusy
     {
         get => _isBusy;
@@ -275,16 +277,10 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>트리에 그릴 행이 없다 — 필터 때문인지 편제가 빈 것인지 글로 가른다.</summary>
     public bool IsTreeEmpty => Rows.Count == 0;
 
-    public bool IsDeviceListEmpty => DeviceRows.Count == 0;
-
-    public string DeviceHeaderText => $"미배치 장비 {DeviceRows.Count}";
-
-    /// <remarks>V-39 — "인접 쌍 N" 을 뺐다. 인접 관계도 칸은 숨겼으므로(아래 RailEntries) 그 수는 운영자가 볼 곳이 없다.</remarks>
-    public string ListStatusText => IsDeviceView
-        ? $"미배치 장비 {DeviceRows.Count}"
-        : IsAdjacencyView
-            ? $"부대 {Tree.Count} · 인접 {AdjacencyPairCount}쌍"
-            : $"부대 {Tree.Count}";
+    /// <remarks>인접 쌍 수는 관계도 칸에서만 말한다 — 관계도 칸에는 숫자 배지를 달지 않는다(FR-01).</remarks>
+    public string ListStatusText => IsAdjacencyView
+        ? $"부대 {Tree.Count} · 인접 {AdjacencyPairCount}쌍"
+        : $"부대 {Tree.Count}";
 
     /// <summary>
     /// 레일 바닥 — 내 부대를 <b>이름</b>으로 말한다(V-39: 종전엔 "내 부대 · unit001" 처럼 코드를 그대로 냈다).
@@ -348,27 +344,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public bool CanReload => IsAvailable && CanViewUnits && !IsBusy;
     public bool CanMoveSelected => IsAvailable && CanEditUnits && SelectedRow is not null && !IsBusy;
 
-    /// <summary>장비를 부대에 두는 것은 장비 쓰기다(<c>devices:edit</c>) — <c>units:edit</c> 가 아니다.</summary>
-    public bool CanPlaceDevices => IsAvailable && _canPlaceDevices();
-    public bool CanAssignSelectedDevices => CanPlaceDevices && SelectedDevices.Count > 0 && AssignTargetId > 0 && !IsBusy;
-
-    /// <summary>장비를 놓을 부대 — 트리 선택을 따르되 콤보로도 고른다(드래그의 버튼 · 키보드 경로).</summary>
-    public int? AssignTargetUnitId
-    {
-        get => _assignTargetUnitId;
-        set { _assignTargetUnitId = value; NotifyOfPropertyChange(); RaiseCommands(); }
-    }
-
-    /// <summary>실제로 쓰이는 대상 — 콤보가 비어 있으면 트리에서 고른 부대.</summary>
-    public int AssignTargetId => _assignTargetUnitId is int id && id > 0 ? id : SelectedRow?.Id ?? 0;
-
-    public string AssignTargetText
-        => AssignTargetId <= 0
-         ? "놓을 부대를 고르세요"
-         : $"'{Tree.Find(AssignTargetId)?.Name ?? $"부대 {AssignTargetId}번"}'에 배치";
-
-    /// <summary>피커가 고를 수 있는 부대 전부.</summary>
-    public BindableCollection<UnitOptionViewModel> AssignTargets { get; } = new();
     public bool IsDetailRequested => Detail.IsDetailRequested;
     #endregion
 
@@ -383,7 +358,10 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         _loadedOnce = true;
         await ReloadAsync(cancellationToken);
         // 배치 문서 1회(지원 판정 겸 — FR-50). 관계도 칸을 열지 않아도 읽어 둔다: 트리에서 옮긴 부대의 배치 정리(FR-08)가 판정을 쓴다.
-        await Map.OpenAsync(cancellationToken);
+        // 기다리지 않는다(REVIEW-01 MEDIUM-8) — 창 관리자는 활성화가 끝나야 창을 보이므로, 기다리면 배치 GET 이 느린 동안 창이 뜨지 않는다.
+        // 관계도는 자동 배치로 먼저 그리고(NFR-01) 응답이 오면 입힌다. 읽기는 관계도의 단일 대기열을 타고, 실패는 막대 · [다시 시도]가 말한다.
+        // 활성화 토큰은 넘기지 않는다 — 활성화가 끝난 뒤에도 사는 읽기다(닫으면 관계도 Dispose 가 거둔다).
+        _ = Map.OpenAsync(CancellationToken.None);
     }
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -418,7 +396,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
     /// <summary>
     /// 편제만 다시 읽는다(장비 전량은 그대로 — ISSUE-28). 다른 곳의 편제 변경 · 편제 쓰기 뒤 · 관계도의 확정 직전 재판정이 쓴다.
-    /// 장비는 [갱신] · 창 열기 · 장비 배치 적용에서만 읽는다(카테고리 7종 · 여러 쪽이라 무겁다).
+    /// 장비는 [갱신] · 창 열기에서만 읽는다(카테고리 7종 · 여러 쪽이라 무겁다).
     /// </summary>
     public Task ReloadGraphAsync(CancellationToken token = default, bool quiet = true)
         => ReloadCoreAsync(token, quiet, bypassGuard: true, includeDevices: false);
@@ -509,7 +487,7 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
     #region - 다른 곳에서 바뀐 편제 (SYNC_UNIT) -
     /// <summary>
-    /// 다른 곳에서 편제가 바뀌었는데 <b>지금 다시 읽지 않았다</b> — 적용하지 않은 편집 · 배치 대기 · 끌기 중이라서.
+    /// 다른 곳에서 편제가 바뀌었는데 <b>지금 다시 읽지 않았다</b> — 적용하지 않은 편집 · 끌기 중이라서.
     /// 상태 띠에 <see cref="ExternalChangeText"/> 와 [<see cref="EXTERNAL_CHANGE_ACTION"/>] 단추가 뜬다.
     /// </summary>
     public bool IsExternallyChanged
@@ -525,7 +503,8 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// 서버 <c>SYNC_UNIT</c> — 호스트가 옮겨 온다. 여기서는 신호만 세고 곧바로 돌아간다
     /// (호스트의 NATS 처리 줄이 창의 재조회를 기다리지 않도록). 실제 판단은 창이 끝난 뒤 한 번 한다.
     /// </summary>
-    /// <remarks><c>ResourceId</c> 는 보지 않는다 — 인접 알림에서는 부대 id 가 아니라 인접 행 id 다. 늘 편제 전체를 다시 읽는다.</remarks>
+    /// <remarks><c>ResourceId</c> 는 보지 않는다 — 인접 알림에서는 판본마다 뜻이 다르다(8.0.3 부터 쌍의 낮은 쪽 부대 id, 그 전 판은 인접 행 id —
+    /// 서버 회신 2026-09-28 R-3). 늘 편제 전체를 다시 읽고, 알림의 순서 · 건수에 기대지 않는다(R-6 — subject 가 다르면 순서 미보장).</remarks>
     public Task HandleAsync(UnitTopologyChangedMessage message, CancellationToken cancellationToken)
     {
         if (_closed) return Task.CompletedTask;
@@ -545,8 +524,8 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
     internal Task ExternalChangeTask => _externalChangeTask;
 
-    /// <summary>적용하지 않은 것이 있다 — 다시 읽으면 사라지거나(상세 · 등록 폼) 행 표시가 풀린다(배치 대기).</summary>
-    private bool HasUnappliedWork => Detail.IsDirty || Tray.HasEntries || Tray.IsApplying;
+    /// <summary>적용하지 않은 것이 있다 — 다시 읽으면 사라진다(상세 · 등록 폼).</summary>
+    private bool HasUnappliedWork => Detail.IsDirty;
 
     private async Task OnExternalChangeSettledAsync(CancellationToken token)
     {
@@ -619,34 +598,15 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
         Sync(Rows, keep);
 
-        var unassigned = _allDevices.Where(IsUnassigned).ToList();
-        var deviceRows = unassigned.Select(item => DeviceRowOf(item)).ToList();
-        Sync(DeviceRows, deviceRows);
-
-        SyncAssignTargets();
-        // 칸을 순번이 아니라 키로 찾는다 — "인접 관계도" 칸을 숨긴 뒤로 칸 수가 바뀌었다(U-18 D-8 8.2).
+        // 칸을 순번이 아니라 키로 찾는다 — 칸 구성이 판마다 바뀌었다(U-18 D-8 8.2 · Q-1 「미배치 장비」 폐지).
         SetRailCount(RAIL_TREE, Tree.Count);
         SetRailCount(RAIL_ADJACENCY, AdjacencyPairCount);
-        SetRailCount(RAIL_DEVICES, DeviceRows.Count);
 
         NotifyOfPropertyChange(nameof(ListStatusText));
         NotifyOfPropertyChange(nameof(RailFooterText));
         NotifyOfPropertyChange(nameof(MyUnitName));
         NotifyOfPropertyChange(nameof(IsTreeEmpty));
-        NotifyOfPropertyChange(nameof(IsDeviceListEmpty));
-        NotifyOfPropertyChange(nameof(DeviceHeaderText));
     }
-
-    /// <summary>
-    /// 미배치의 정의 — <b>소속이 비었거나(<c>unit_id</c> 없음) 편제에 없는 부대를 가리키는</b> 장비.
-    /// </summary>
-    /// <remarks>
-    /// ⚠ 서버에 "부대 없는 장비" 질의가 없다(8.0.1 필터축은 <c>unit_id</c>·<c>include_descendants</c> 뿐).
-    /// 게다가 <c>unit_id</c> 를 생략하고 등록하면 서버가 <b>기본 부대로 자동 귀속</b>시키므로
-    /// 실제 운영에서 이 목록은 대개 비어 있다 — 그것이 정상이고, 그때는 빈 상태 안내를 낸다.
-    /// </remarks>
-    private bool IsUnassigned(UnitDeviceItem item)
-        => item.UnitId is not int unitId || unitId <= 0 || Tree.Find(unitId) is null;
 
     private UnitNodeRowViewModel RowOf(UnitTreeNode node)
     {
@@ -657,36 +617,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         var row = new UnitNodeRowViewModel(node, isMine) { IsExpanded = !_collapsed.Contains(node.Id) };
         _rowCache[node.Id] = row;
         return row;
-    }
-
-    private UnitDeviceRowViewModel DeviceRowOf(UnitDeviceItem item)
-    {
-        var unitText = item.UnitId is int unitId && Tree.Find(unitId) is { } node ? node.Name : "소속 없음";
-        if (_deviceRowCache.TryGetValue(item.Id, out var existing) && existing.Item == item) return existing;
-
-        var row = new UnitDeviceRowViewModel(item, unitText);
-        if (existing is not null) row.PendingUnitName = existing.PendingUnitName;
-        _deviceRowCache[item.Id] = row;
-        return row;
-    }
-
-    /// <summary>장비를 놓을 부대 후보 — 편제 전체(트리 순서).</summary>
-    private void SyncAssignTargets()
-    {
-        var wanted = Tree.Ordered
-                         .Select(n => new UnitOptionViewModel(n.Id, $"{UnitDropRules.EchelonTextOf(n)} · {n.Name}"))
-                         .ToList();
-
-        for (var i = 0; i < wanted.Count; i++)
-        {
-            if (i < AssignTargets.Count && AssignTargets[i].Id == wanted[i].Id) continue;
-            if (i < AssignTargets.Count) AssignTargets[i] = wanted[i];
-            else AssignTargets.Add(wanted[i]);
-        }
-        while (AssignTargets.Count > wanted.Count) AssignTargets.RemoveAt(AssignTargets.Count - 1);
-
-        if (_assignTargetUnitId is int id && Tree.Find(id) is null) AssignTargetUnitId = null;
-        NotifyOfPropertyChange(nameof(AssignTargetText));
     }
 
     /// <summary>선택을 죽이지 않고 목록을 맞춘다 — <c>Clear()+Add()</c> 는 쓰지 않는다.</summary>
@@ -808,15 +738,11 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         Form.Load(fallback, Tree, deviceCount);
     }
 
-    public void SetSelectedDevices(IEnumerable<UnitDeviceRowViewModel>? rows)
-        => SelectedDevices = rows?.ToList() ?? (IReadOnlyList<UnitDeviceRowViewModel>)Array.Empty<UnitDeviceRowViewModel>();
-
     /// <summary>재조회 뒤 선택을 새 행 인스턴스로 옮긴다. 고른 부대가 편제에서 사라졌으면 <c>true</c>(ISSUE-29 — 모든 재조회가 이 한 곳).</summary>
     private bool RestoreSelection()
     {
         var wanted = SelectedRow?.Id ?? 0;
         _rowCache.Clear();
-        _deviceRowCache.Clear();
         // 통지 없이 바꾼다 — Project 가 끝나 목록이 채워진 뒤에 한 번만 알린다(ReloadAsync).
         _selectedRow = wanted > 0 && Tree.Find(wanted) is { } node ? RowOf(node) : null;
         return wanted > 0 && _selectedRow is null;
@@ -942,11 +868,12 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// </summary>
     public async Task<bool> MoveAsync(int movingId, int? targetParentId, CancellationToken token = default)
     {
-        if (BlockedByConfirm()) return false;
+        // 실패 사유는 이번 시도의 것만 — 앞선 실패의 사유가 남아 관계도 막대가 엉뚱한 까닭을 말하지 않게(REVIEW-01 MEDIUM-4).
+        if (BlockedByConfirm()) return FailStructureWrite(CONFIRM_PENDING_NOTICE);
         var verdict = UnitDropRules.CanMove(Tree, movingId, targetParentId);
-        if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return false; }
-        if (!CanEditUnits) { StatusText = NO_EDIT_PERMISSION; return false; }
-        if (IsBusy) { StatusText = "앞선 작업이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요."; return false; }
+        if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return FailStructureWrite(verdict.Reason!); }
+        if (!CanEditUnits) { StatusText = NO_EDIT_PERMISSION; return FailStructureWrite(NO_EDIT_PERMISSION); }
+        if (IsBusy) { StatusText = BUSY_NOTICE; return FailStructureWrite(UnitMapText.ConsoleBusyReason); }
 
         var moving = Tree.Find(movingId)!;
         var previousParentId = moving.ParentId;
@@ -969,7 +896,10 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             }
 
             LastWriteFailureReason = null;
-            _lastMove = new UnitMoveUndo(movingId, moving.Name, previousParentId);
+            if (!fromMap) _lastMove = new UnitMoveUndo(movingId, moving.Name, previousParentId);
+            // 관계도의 이동 · 되돌리기는 트리 [이동 되돌리기]를 채우지 않는다 — 관계도는 자기 표로 반대 이동을 보낸다(REVIEW-01 HIGH-1).
+            // 같은 부대를 관계도가 다시 옮겼으면 트리의 되돌리기는 이제 그 이동을 말없이 지우게 되므로 거둔다.
+            else if (_lastMove?.UnitId == movingId) _lastMove = null;
             StatusText = $"'{moving.Name}'을(를) '{targetName}'(으)로 옮겼습니다.";
             IsBusy = false;
             await ReloadGraphAsync(token).ConfigureAwait(true);
@@ -983,14 +913,24 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             }
             return true;
         }
-        catch (OperationCanceledException) { StatusText = "이동을 취소했습니다."; return false; }
+        catch (OperationCanceledException) { StatusText = "이동을 취소했습니다."; return FailStructureWrite("이동을 취소했습니다."); }
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] move {movingId} → {targetParentId}: {ex.Message}");
             StatusText = $"'{moving.Name}'을(를) 옮기지 못했습니다. {UNREACHABLE}";
-            return false;
+            return FailStructureWrite(UNREACHABLE);
         }
         finally { IsBusy = false; RaiseCommands(); }
+    }
+
+    /// <summary>바쁠 때 상태 띠의 말.</summary>
+    private const string BUSY_NOTICE = UnitMapText.ConsoleBusyReason + " 잠시 후 다시 시도하세요.";
+
+    /// <summary>편제 쓰기를 보내지 않았다 — 이번 시도의 사유를 남기고 <c>false</c>.</summary>
+    private bool FailStructureWrite(string reason)
+    {
+        LastWriteFailureReason = reason;
+        return false;
     }
 
     /// <summary>마지막 이동 1회를 되돌린다 — 반대 방향 PATCH 한 번.</summary>
@@ -1044,15 +984,15 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     /// </summary>
     public async Task<bool> ChangeAdjacencyAsync(int sourceId, int? add, int? remove, CancellationToken token = default)
     {
-        if (BlockedByConfirm()) return false;
-        if (Tree.Find(sourceId) is not { } source) return false;
-        if (!CanEditUnits) { StatusText = "인접 부대를 바꿀 권한이 없습니다."; return false; }
-        if (IsBusy) { StatusText = "앞선 작업이 아직 끝나지 않았습니다. 잠시 후 다시 시도하세요."; return false; }
+        if (BlockedByConfirm()) return FailStructureWrite(CONFIRM_PENDING_NOTICE);
+        if (Tree.Find(sourceId) is not { } source) return FailStructureWrite("편제에 없는 부대입니다.");
+        if (!CanEditUnits) { StatusText = "인접 부대를 바꿀 권한이 없습니다."; return FailStructureWrite(StatusText); }
+        if (IsBusy) { StatusText = BUSY_NOTICE; return FailStructureWrite(UnitMapText.ConsoleBusyReason); }
 
         if (add is int addId)
         {
             var verdict = UnitDropRules.CanAdjoin(Tree, addId, sourceId);
-            if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return false; }
+            if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return FailStructureWrite(verdict.Reason!); }
         }
 
         var fromMap = _structureFromMap;
@@ -1091,7 +1031,14 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             StatusText = add is not null
                 ? $"'{source.Name}'과(와) '{otherName}'을(를) 인접 부대로 이었습니다. 양쪽에 함께 표시됩니다."
                 : $"'{source.Name}'과(와) '{otherName}'의 인접 관계를 끊었습니다.";
-            if (other is int otherId) _lastAdjacency = (sourceId, otherId, add is not null);
+            // 관계도의 인접 조작 · 되돌리기는 콘솔의 인접 되돌리기를 채우지 않는다(이동과 같은 규칙 — REVIEW-01 HIGH-1).
+            // 같은 쌍을 관계도가 바꿨으면 콘솔의 되돌리기는 그 조작을 말없이 지우게 되므로 거둔다.
+            if (other is int otherId)
+            {
+                if (!fromMap) _lastAdjacency = (sourceId, otherId, add is not null);
+                else if (_lastAdjacency is { } last && ((last.UnitId, last.OtherId) == (sourceId, otherId) || (last.UnitId, last.OtherId) == (otherId, sourceId)))
+                    _lastAdjacency = null;
+            }
             NotifyOfPropertyChange(nameof(LastAdjacency));
             NotifyOfPropertyChange(nameof(CanUndoAdjacency));
 
@@ -1102,12 +1049,12 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             if (!fromMap) Map.OnConsoleStructureChanged();
             return true;
         }
-        catch (OperationCanceledException) { StatusText = "인접 부대 변경을 취소했습니다."; return false; }
+        catch (OperationCanceledException) { StatusText = "인접 부대 변경을 취소했습니다."; return FailStructureWrite("인접 부대 변경을 취소했습니다."); }
         catch (Exception ex)
         {
             _log?.Error($"[UnitConsole] adjacency {sourceId}: {ex.Message}");
             StatusText = $"인접 부대를 바꾸지 못했습니다. {UNREACHABLE}";
-            return false;
+            return FailStructureWrite(UNREACHABLE);
         }
         finally { IsBusy = false; RaiseCommands(); }
     }
@@ -1205,107 +1152,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     public void DismissDeleteBlock() => DeleteBlock = null;
     #endregion
 
-    #region - 미배치 장비 → 부대 (호출 N회 · Draft) -
-    /// <summary>
-    /// 장비들을 부대에 붙이는 Draft 를 쌓는다. 장비 <b>한 대마다 다시 받기 1 + PATCH 1</b> 이라
-    /// 드롭 즉시 보내지 않는다(드래그 와이어프레임 L413).
-    /// </summary>
-    public void QueueAssign(int targetUnitId, IReadOnlyList<UnitDeviceRowViewModel> devices)
-    {
-        if (Tree.Find(targetUnitId) is not { } target) return;
-        if (Tray.IsApplying) { StatusText = "저장하는 중에는 대기 목록에 더 담을 수 없습니다."; return; }
-
-        if (!CanPlaceDevices) { StatusText = UnitDropHandler.PlaceDeniedReason; return; }
-
-        var verdict = UnitDropRules.CanAssignDevices(Tree, targetUnitId, devices.Select(d => d.Item.UnitId).ToList());
-        if (!verdict.IsAllowed) { StatusText = verdict.Reason!; return; }
-
-        var capped = devices.Take(MAX_ASSIGN_PER_APPLY).ToList();
-        foreach (var row in capped)
-        {
-            row.PendingUnitName = target.Name;
-            var item = row.Item;
-            Tray.Add(new DraftEntry(
-                targetKey: $"device:{item.Id}",
-                callKind: "unit-assign",
-                description: $"{item.Name} → {target.Name}",
-                apply: ct => AssignOneAsync(item, targetUnitId, ct)));
-        }
-
-        var dropped = devices.Count - capped.Count;
-        StatusText = dropped > 0
-            ? $"'{target.Name}'에 배치할 {capped.Count}대를 대기 목록에 담았습니다. 한 번에 {MAX_ASSIGN_PER_APPLY}대까지만 담을 수 있어 {dropped}대는 뺐습니다."
-            : $"'{target.Name}'에 배치할 {capped.Count}대를 대기 목록에 담았습니다 — [적용]을 누르면 저장됩니다.";
-        RaiseTray();
-    }
-
-    private async Task<DraftOutcome> AssignOneAsync(UnitDeviceItem item, int unitId, CancellationToken token)
-    {
-        // 앞이 실패했으면 그 뒤는 보내지 않는다 — 폭발반경을 실패 지점에서 끊는다.
-        // Skipped 가 아니라 Failed 다: 커널 트레이는 Skipped 를 목록에서 <b>지우고</b> Failed 만 남긴다.
-        // 지워지면 "남겨 뒀다" 는 안내가 거짓이 되고 실패분만 다시 보내는 길도 사라진다.
-        if (_assignStopped) { _assignSkipped.Add(item.Name); return DraftOutcome.Failed; }
-
-        var result = await _devices.AssignAsync(item, unitId, token).ConfigureAwait(true);
-        if (result.IsSuccess)
-        {
-            // FR-49 — 지도 쪽 장비 모델의 UnitId 를 고친다(다음 [지도에서 보기]가 옳은 집합을 쓴다). 실패 장비는 보내지 않는다.
-            if (_events is not null && DeviceUnitChangedMessage.For(item.Id, unitId) is { } changed)
-                await _events.PublishOnUIThreadAsync(changed).ConfigureAwait(true);
-            return DraftOutcome.Applied;
-        }
-
-        _assignStopped = true;
-        _assignFailure = result.Message;
-        return DraftOutcome.Failed;
-    }
-
-    public async Task ApplyAssignsAsync(CancellationToken token = default)
-    {
-        if (!Tray.CanApply || BlockedByConfirm()) return;
-
-        _assignStopped = false;
-        _assignFailure = null;
-        _assignSkipped.Clear();
-
-        IsBusy = true;
-        try
-        {
-            var summary = await Tray.ApplyAsync(token).ConfigureAwait(true);
-            var line = summary.ToMessage();
-            if (_assignFailure is not null) line += $" · 처음 실패한 곳에서 멈췄습니다 — {_assignFailure}";
-            if (_assignSkipped.Count > 0) line += $" · 저장하지 않은 {_assignSkipped.Count}대는 대기 목록에 남아 있습니다([적용]을 다시 누르면 그것만 저장합니다)";
-            StatusText = line;
-
-            IsBusy = false;
-            await ReloadAsync(token, quiet: true, bypassGuard: true).ConfigureAwait(true);   // 성공분 반영은 재조회로 확정한다
-        }
-        catch (OperationCanceledException) { StatusText = "배치를 취소했습니다."; }
-        catch (Exception ex)
-        {
-            _log?.Error($"[UnitConsole] apply assigns: {ex.Message}");
-            StatusText = $"배치하지 못했습니다. {UNREACHABLE}";
-        }
-        finally { IsBusy = false; RaiseTray(); RaiseCommands(); }
-    }
-
-    public void RevertAssigns()
-    {
-        Tray.Revert();
-        foreach (var row in DeviceRows) row.PendingUnitName = null;
-        StatusText = "대기 목록을 비웠습니다.";
-        RaiseTray();
-    }
-
-    /// <summary>끌기의 버튼 폴백 — 고른 장비를 지금 고른 부대에 쌓는다.</summary>
-    public void QueueAssignSelected()
-    {
-        var target = AssignTargetId;
-        if (target <= 0) { StatusText = "놓을 부대를 트리나 아래 목록에서 고르세요."; return; }
-        QueueAssign(target, SelectedDevices);
-    }
-    #endregion
-
     #region - Drop plumbing -
     private void OnDropped(UnitDropRequest request)
     {
@@ -1318,10 +1164,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
                 {
                     case UnitDropRules.ZONE_ROOT:
                         await MoveAsync(request.Units[0].Id, null).ConfigureAwait(true);
-                        break;
-
-                    case UnitDropRules.ZONE_PARENT when request.Devices.Count > 0:
-                        QueueAssign(request.TargetUnitId, request.Devices);
                         break;
 
                     case UnitDropRules.ZONE_PARENT:
@@ -1396,25 +1238,10 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         if (entry is not null) entry.Count = count;
     }
 
-    private void RaiseTray()
-    {
-        NotifyOfPropertyChange(nameof(Tray));
-        NotifyOfPropertyChange(nameof(TrayMessageText));
-        RaiseCommands();
-    }
-
-    /// <summary>
-    /// 배치 대기 목록의 안내 한 줄. 커널 트레이의 문구("Draft …")는 운영자 말이 아니라 여기서 따로 만든다(U-18 D-8 8.7).
-    /// </summary>
-    public string TrayMessageText => Tray.IsApplying
-        ? $"저장하는 중입니다… ({Tray.ProgressDone}/{Tray.ProgressTotal})"
-        : $"배치 대기 {Tray.Count}건 — [적용]을 누르면 저장됩니다.";
-
     private void RaiseViewFlags()
     {
         NotifyOfPropertyChange(nameof(RailSubtitle));
         NotifyOfPropertyChange(nameof(IsTreeView));
-        NotifyOfPropertyChange(nameof(IsDeviceView));
         NotifyOfPropertyChange(nameof(IsAdjacencyView));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
@@ -1425,13 +1252,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         NotifyOfPropertyChange(nameof(CanDeleteUnit));
         NotifyOfPropertyChange(nameof(CanReload));
         NotifyOfPropertyChange(nameof(CanMoveSelected));
-        NotifyOfPropertyChange(nameof(CanAssignSelectedDevices));
-        NotifyOfPropertyChange(nameof(AssignTargetId));
-        NotifyOfPropertyChange(nameof(AssignTargetText));
         NotifyOfPropertyChange(nameof(CanUndoMove));
         NotifyOfPropertyChange(nameof(CanEditUnits));
         NotifyOfPropertyChange(nameof(CanViewUnits));
-        NotifyOfPropertyChange(nameof(CanPlaceDevices));
         NotifyOfPropertyChange(nameof(IsAvailable));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
@@ -1488,7 +1311,16 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
             return OpenUnitConsoleOutcome.BlockedByUnsavedEdit;
         }
 
-        if (openMap && !IsAdjacencyView) SelectedRail = RailEntries.First(e => e.Key == RAIL_ADJACENCY);
+        if (openMap && !IsAdjacencyView)
+        {
+            SelectedRail = RailEntries.First(e => e.Key == RAIL_ADJACENCY);
+            // 레일 전환도 미적용 관문을 지난다 — 막혔으면 관계도를 보이지 못했으니 "보였다" 고 하지 않는다(REVIEW-01 MEDIUM-5).
+            if (!IsAdjacencyView)
+            {
+                StatusText = UnitMapText.RevealBlockedBand(node.Name);
+                return OpenUnitConsoleOutcome.BlockedByUnsavedEdit;
+            }
+        }
         if (SelectedRow?.Id != unitId) await SelectRowAsync(RowOf(node), token, force: true).ConfigureAwait(true);
         Map.Reveal(unitId);
         return OpenUnitConsoleOutcome.Shown;
@@ -1512,21 +1344,13 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         return true;
     }
 
-    async Task<bool> IUnitMapCommands.MoveAsync(int movingId, int targetId, CancellationToken token)
+    /// <summary>
+    /// 관계도의 상위 바꾸기 · 되돌리기(<paramref name="targetId"/> <c>null</c> = 최상위로) — 트리 [이동 되돌리기](<c>_lastMove</c>)를 채우지 않는다(REVIEW-01 HIGH-1).
+    /// </summary>
+    async Task<bool> IUnitMapCommands.MoveAsync(int movingId, int? targetId, CancellationToken token)
     {
         _structureFromMap = true;
         try { return await MoveAsync(movingId, targetId, token).ConfigureAwait(true); }
-        finally { _structureFromMap = false; }
-    }
-
-    async Task<bool> IUnitMapCommands.UndoMoveAsync(CancellationToken token)
-    {
-        _structureFromMap = true;
-        try
-        {
-            await UndoMoveAsync(token).ConfigureAwait(true);
-            return _lastMove is null;
-        }
         finally { _structureFromMap = false; }
     }
 
@@ -1537,8 +1361,54 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
         finally { _structureFromMap = false; }
     }
 
-    /// <summary>관계도의 실패 복구 · 확정 직전 재판정 — 편제만 곧바로. 바쁘면 버리지 않고 끝난 뒤 한 번(ISSUE-27).</summary>
-    Task IUnitMapCommands.ReloadAsync(bool quiet, CancellationToken token) => ReloadGraphAsync(token, quiet);
+    /// <summary>
+    /// 관계도의 실패 복구 · 확정 직전 재판정 · 되돌리기 전 읽기 — 편제만. 바쁘면 <b>한가해진 뒤 실제로 읽고</b> 돌아온다(REVIEW-01 MEDIUM-4):
+    /// 종전엔 바쁘면 "나중에 한 번" 만 적어 두고 곧바로 돌아와, 관계도가 옛 편제로 재판정했다.
+    /// </summary>
+    async Task IUnitMapCommands.ReloadAsync(bool quiet, CancellationToken token)
+    {
+        await WhenNotBusyAsync(token).ConfigureAwait(true);
+        await ReloadGraphAsync(token, quiet).ConfigureAwait(true);
+    }
+
+    /// <summary>관계도가 콘솔이 한가해지기를 기다리는 한도 — 넘으면 그대로 진행한다(재조회는 바쁘면 뒤로 미뤄진다 — ISSUE-27).</summary>
+    public static readonly TimeSpan MAP_IDLE_WAIT = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// 콘솔이 한가해질 때까지(상한 <see cref="MAP_IDLE_WAIT"/>). 한가해진 알림은 작업의 <c>finally</c> 한가운데서 오므로 연속을 비동기로 미룬다
+    /// (UI 스레드면 디스패처 뒤로 — 재진입 방지).
+    /// </summary>
+    private async Task WhenNotBusyAsync(CancellationToken token)
+    {
+        if (!IsBusy) return;
+        var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var timeout = SafeDelayAsync(MAP_IDLE_WAIT, stop.Token);
+        void OnBusyChanged(object? sender, EventArgs e) { if (!IsBusy) idle.TrySetResult(); }
+        BusyChanged += OnBusyChanged;
+        try
+        {
+            if (IsBusy) await Task.WhenAny(idle.Task, timeout).ConfigureAwait(true);
+        }
+        finally
+        {
+            BusyChanged -= OnBusyChanged;
+            stop.Cancel();
+        }
+    }
+
+    private async Task SafeDelayAsync(TimeSpan span, CancellationToken token)
+    {
+        try { await _delay(span, token).ConfigureAwait(true); }
+        catch (OperationCanceledException) { /* 거뒀다 */ }
+    }
+
+    /// <summary>로그인한 운영자 이름(배치 "마지막 변경 나") — 호스트가 주지 않으면 권한 서비스의 표시 이름(<c>user.name</c>). 모르면 <c>null</c>.</summary>
+    private static string? SafeOperatorName(Func<string?>? provider)
+    {
+        if (provider is not null) return provider();
+        return DevicePermissionGate.Resolve()?.Name;       // 미등록(오프라인 · 시험)이면 null
+    }
 
     bool IUnitMapConsoleBridge.IsDetailDirty => Detail.IsDirty;
 
@@ -1554,9 +1424,6 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     #endregion
 
     #region - Attributes -
-    /// <summary>한 번의 [적용] 에서 보낼 수 있는 최대 장비 수 — N회 호출의 폭발반경을 눈에 보이게 묶는다.</summary>
-    public const int MAX_ASSIGN_PER_APPLY = 50;
-
     private sealed record UnitMoveUndo(int UnitId, string UnitName, int? PreviousParentId);
 
     private readonly IUnitGraphApi _units;
@@ -1566,11 +1433,11 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     private readonly Func<bool> _canEdit;
     private readonly Func<bool> _canDelete;
     private readonly Func<bool> _canView;
-    private readonly Func<bool> _canPlaceDevices;
     private readonly IEventAggregator? _events;
     private readonly Func<bool> _isDragging;
     private readonly CoalescingTrigger _externalChange;
     private readonly IClock _clock;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly ConsolePrefEntry? _prefs;
     private readonly System.Action? _savePrefs;
     private DateTime? _firstExternalChangeAt;
@@ -1585,12 +1452,9 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     private bool _closed;
 
     private readonly Dictionary<int, UnitNodeRowViewModel> _rowCache = new();
-    private readonly Dictionary<int, UnitDeviceRowViewModel> _deviceRowCache = new();
-    private readonly List<string> _assignSkipped = new();
     private readonly HashSet<int> _collapsed = new();
 
     private IReadOnlyList<UnitDeviceItem> _allDevices = Array.Empty<UnitDeviceItem>();
-    private IReadOnlyList<UnitDeviceRowViewModel> _selectedDevices = Array.Empty<UnitDeviceRowViewModel>();
     private ConsoleRailEntry _selectedRail;
     private UnitNodeRowViewModel? _selectedRow;
     private UnitMoveUndo? _lastMove;
@@ -1599,11 +1463,8 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
     private string _statusText = string.Empty;
     private bool _isBusy;
     private bool _loadedOnce;
-    private bool _assignStopped;
-    private string? _assignFailure;
     private int _pendingSelectId;
     private int _detailTicket;
-    private int? _assignTargetUnitId;
     private bool _isFiltered;
     #endregion
 }

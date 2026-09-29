@@ -180,22 +180,26 @@ public static partial class Steps
     {
         // ownUnit=false: 서버 기본 부대에 둔다 — 억제 스케줄 대상처럼 "이 클라이언트 부대" 소속이어야 할 때.
         int? unit = ownUnit ? await fx.EnsureUnit(suffix).ConfigureAwait(false) : null;
-        var ctrl = await fx.Device("devices/controllers", "controller", new
+        // 부대가 없으면 unit_id 키째 뺀다 — 서버가 기본 부대(unit001)에 넣는다. 명시적 "unit_id": null 은 보내지 않는다
+        // (서버 회신 2026-09-28 Q-1: PATCH/PUT 의 명시적 null 은 422 · 무소속 장비는 존재할 수 없다).
+        var ctrlBody = JObject.FromObject(new
         {
-            unit_id = unit,
             type_controller = "Controller",
             number_device = number,
             name_device = $"LRT-EVT-{suffix}-CTRL",
             connection = new { ip_address = $"10.97.{number % 200}.1", ip_port = 9700 },
-        }).ConfigureAwait(false);
-        var sensor = await fx.Device("devices/sensors", "sensor", new
+        });
+        if (unit is int ctrlUnit) ctrlBody["unit_id"] = ctrlUnit;
+        var ctrl = await fx.Device("devices/controllers", "controller", ctrlBody).ConfigureAwait(false);
+        var sensorBody = JObject.FromObject(new
         {
             type_sensor = "PIR",
             number_device = number + 1,
             name_device = $"LRT-EVT-{suffix}-S1",
             controller_id = ctrl,
-            unit_id = unit,
-        }).ConfigureAwait(false);
+        });
+        if (unit is int sensorUnit) sensorBody["unit_id"] = sensorUnit;
+        var sensor = await fx.Device("devices/sensors", "sensor", sensorBody).ConfigureAwait(false);
         return (ctrl, sensor);
     }
 

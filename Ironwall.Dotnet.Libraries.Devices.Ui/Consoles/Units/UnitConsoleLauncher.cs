@@ -71,6 +71,8 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
     private readonly Func<Func<Task>, Task> _onUi;
     private readonly Func<(ConsolePrefEntry Entry, System.Action Save)?> _prefs;
     private readonly IGuardedWindowRegistry? _guardedWindows;
+    private readonly Func<bool> _isLiveOff;
+    private readonly Func<string?>? _operatorName;
 
     /// <summary>지금 떠 있는 콘솔(한 벌). 닫히면 <c>null</c>.</summary>
     private UnitConsoleViewModel? _open;
@@ -105,7 +107,9 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         IUnitConsoleWindowHost? host = null,
         Func<Func<Task>, Task>? onUi = null,
         Func<(ConsolePrefEntry Entry, System.Action Save)?>? prefs = null,
-        IGuardedWindowRegistry? guardedWindows = null)
+        IGuardedWindowRegistry? guardedWindows = null,
+        Func<bool>? isLiveOff = null,
+        Func<string?>? operatorName = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _units = units ?? throw new ArgumentNullException(nameof(units));
@@ -119,6 +123,10 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         _onUi = onUi ?? RunOnUi;
         _prefs = prefs ?? DiskPrefs;
         _guardedWindows = guardedWindows;
+        // 관계도 배치 문구의 " · 실시간 반영 꺼짐" 꼬리표(ISSUE-32 · REVIEW-01 MEDIUM-6). 라이브러리에는 NATS 연결 상태를 공개하는 서비스가 없다
+        // (MessageService.Connection 은 protected) — 호스트가 주지 않으면 알림 통로(NATS 설정 · 이벤트 버스)가 아예 없을 때만 꺼짐으로 본다.
+        _isLiveOff = isLiveOff ?? (() => _nats is null || _events is null);
+        _operatorName = operatorName;
 
         // 지도(UI 스레드)가 보낸 그 자리에서 처리한다 — 창 조작과 회신이 같은 스레드에 있다.
         _events?.SubscribeOnPublishedThread(this);
@@ -184,7 +192,8 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         var prefs = SafePrefs();
         // GroupNats 가 '내 부대 코드' 의 유일한 출처다 — 트리에서 그 부대를 강조하는 데만 쓴다.
         var viewModel = new UnitConsoleViewModel(_units, _devices, _log, () => _nats?.GroupNats, events: _events,
-                                                 layoutApi: _layout, prefs: prefs?.Entry, savePrefs: prefs?.Save);
+                                                 layoutApi: _layout, prefs: prefs?.Entry, savePrefs: prefs?.Save,
+                                                 isLiveOff: _isLiveOff, operatorName: _operatorName);
         // 삭제 · 운용 중지 · 닫기 전에 묻는 창 — 조립기와 같은 확인 창(작은 모달, 부대 창을 소유자로).
         viewModel.Confirm = (title, message) => ConfirmAsync(viewModel, title, message);
         return viewModel;

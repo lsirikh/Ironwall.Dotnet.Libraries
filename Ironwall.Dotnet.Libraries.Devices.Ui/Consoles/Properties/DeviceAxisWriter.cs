@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -75,9 +76,12 @@ public sealed class DeviceAxisWriter
             if (path is null) { failed++; continue; }
 
             var body = DeviceAxisPatchBuilder.Build(edits);
-            if (_policy.Contract >= Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract.V8_0 && body["unit_id"] is null)
+            // JSON null 도 "없음"으로 본다 — 명시적 "unit_id": null 은 8.0+ 에서 422 다(서버 회신 2026-09-28 Q-1, 무소속 장비는 없다).
+            if (_policy.Contract >= Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract.V8_0
+                && body["unit_id"] is null or { Type: JTokenType.Null })
             {
                 // 부대를 고치지 않은 편집 — 그 장비의 지금 부대를 그대로 실어 서버가 기본 부대로 옮기지 않게 한다.
+                body.Remove("unit_id");
                 var unit = device.UnitId
                     ?? await UnitScopeGate.ResolveForExistingAsync(null, nameof(DeviceAxisWriter), _log, token).ConfigureAwait(false);
                 if (unit is { } unitId) body["unit_id"] = unitId;

@@ -85,6 +85,40 @@ public class DeviceAxesPatchTests
         Assert.Null(http.Method);
     }
 
+    #region - 명시적 unit_id null 은 보내지 않는다 (서버 회신 2026-09-28 Q-1 — PATCH/PUT 의 명시적 null 은 422) -
+    [Fact]
+    public async Task should_strip_an_explicit_null_unit_id_when_patching_axes_on_8_0()
+    {
+        var (service, http) = Create(EnumServerContract.V8_0);
+
+        var result = await service.PatchDeviceAxesAsync("controllers", 5, JObject.Parse("{\"hardware_spec\":{\"model\":\"X\"},\"unit_id\":null}"));
+
+        Assert.True(result.Success);
+        Assert.Equal(new[] { "hardware_spec" }, http.Body!.Properties().Select(p => p.Name).ToArray());   // 키째 빠진다 — 서버는 지금 부대를 그대로 둔다
+    }
+
+    [Fact]
+    public async Task should_send_nothing_when_the_only_key_is_a_null_unit_id_on_8_0()
+    {
+        var (service, http) = Create(EnumServerContract.V8_0);
+
+        var result = await service.PatchDeviceAxesAsync("sensors", 9, JObject.Parse("{\"unit_id\":null}"));
+
+        Assert.False(result.Success);
+        Assert.Null(http.Method);                                // 빈 PATCH 를 만들지 않는다 — 422 왕복도 없다
+    }
+
+    [Fact]
+    public async Task should_keep_a_real_unit_id_when_patching_axes_on_8_0()
+    {
+        var (service, http) = Create(EnumServerContract.V8_0);
+
+        await service.PatchDeviceAxesAsync("sensors", 9, JObject.Parse("{\"unit_id\":4}"));
+
+        Assert.Equal(4, (int?)http.Body!["unit_id"]);
+    }
+    #endregion
+
     [Fact]
     public async Task should_not_mutate_the_callers_body_when_dropping_unit_id()
     {

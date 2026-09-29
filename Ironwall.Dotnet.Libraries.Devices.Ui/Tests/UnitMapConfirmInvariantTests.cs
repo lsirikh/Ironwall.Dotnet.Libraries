@@ -274,9 +274,11 @@ internal sealed class MapKit
     public UnitMapViewModel Vm { get; }
     public IReadOnlyList<UnitDeviceItem> Devices { get; }
 
-    private MapKit(FakeUnitLayoutApi api, int? myUnitId, bool canEdit, bool canView)
+    public CapturingLog Log { get; } = new();
+
+    private MapKit(FakeUnitLayoutApi api, int? myUnitId, bool canEdit, bool canView, UnitMapFixture? fixture)
     {
-        F = UnitMapTestData.Standard200();
+        F = fixture ?? UnitMapTestData.Standard200();
         Commands = new FakeMapCommands(F) { CanEdit = canEdit, CanView = canView };
         Api = api;
         Gate = new GatedLayoutApi(api);
@@ -292,16 +294,17 @@ internal sealed class MapKit
             Prefs = Prefs.Entry,
             SavePrefs = Prefs.Save,
             Clock = Clock,
+            Log = Log,
         });
         Vm.SetData(F.Tree, Devices);
     }
 
-    public static MapKit Create(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true)
-        => new(api ?? new FakeUnitLayoutApi(), myUnitId, canEdit, canView);
+    public static MapKit Create(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null)
+        => new(api ?? new FakeUnitLayoutApi(), myUnitId, canEdit, canView, fixture);
 
-    public static async Task<MapKit> OpenAsync(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true)
+    public static async Task<MapKit> OpenAsync(FakeUnitLayoutApi? api = null, int? myUnitId = null, bool canEdit = true, bool canView = true, UnitMapFixture? fixture = null)
     {
-        var kit = Create(api, myUnitId, canEdit, canView);
+        var kit = Create(api, myUnitId, canEdit, canView, fixture);
         await kit.Vm.OpenAsync();
         await kit.Vm.WhenIdleAsync();
         return kit;
@@ -310,12 +313,37 @@ internal sealed class MapKit
     public int Id(string name) => F.IdOf(name);
 }
 
-/// <summary>가짜 부대 콘솔 — 편제 쓰기 · 선택을 기록한다.</summary>
+/// <summary>
+/// 가짜 부대 콘솔 — 편제 쓰기 · 선택을 기록한다. 진짜 콘솔처럼 <b>상위(부모)를 기억</b>한다(<see cref="CurrentTree"/> · <see cref="ParentOf"/>) —
+/// 되돌리기 시험이 "어느 부대가 어디로 갔는가" 를 호출 문자열이 아니라 결과 편제로 본다(REVIEW-01 MEDIUM-T1).
+/// </summary>
+/// <remarks>
+/// REVIEW-01 전에는 이 가짜가 <c>UndoMoveAsync</c> 를 호출 기록만 하고 늘 성공을 돌려줘, 진짜 콘솔의 <b>하나뿐인 공유 <c>_lastMove</c></b>
+/// (다른 이동이 덮으면 엉뚱한 부대를 옮기고, 비었으면 옮기지 않고 "성공")를 가렸다. 빨간 시험 단계에서 그 공유 칸을 그대로 흉내 내
+/// 결함을 드러낸 뒤, 계약에서 <c>UndoMoveAsync</c> 를 빼고(관계도 되돌리기 = 정확한 반대 <see cref="MoveAsync"/>) 여기서도 뺐다.
+/// </remarks>
 internal sealed class FakeMapCommands : IUnitMapCommands
 {
     private readonly UnitMapFixture _fixture;
+    private readonly Dictionary<int, int?> _parents;
 
-    public FakeMapCommands(UnitMapFixture fixture) => _fixture = fixture;
+    public FakeMapCommands(UnitMapFixture fixture)
+    {
+        _fixture = fixture;
+        _parents = fixture.Graph.Nodes.ToDictionary(n => n.Id, n => n.ParentId);
+    }
+
+    /// <summary>지금 서버 편제(성공한 이동이 반영된) — 콘솔 재조회 흉내에 쓴다.</summary>
+    public UnitTreeModel CurrentTree()
+    {
+        var nodes = _fixture.Graph.Nodes
+            .Select(n => UnitMapTestData.Node(n.Id, n.Code, n.Name, n.EchelonRaw, _parents.TryGetValue(n.Id, out var p) ? p : n.ParentId, n.IsEnable))
+            .ToList();
+        return UnitMapTestData.Tree(UnitMapTestData.Graph(nodes, adjacency: _fixture.Graph.Edges.AdjacencyPairs.ToList()));
+    }
+
+    /// <summary>그 부대의 지금 상위.</summary>
+    public int? ParentOf(int unitId) => _parents.TryGetValue(unitId, out var p) ? p : null;
 
     public int? SelectedUnitId { get; set; }
     public event EventHandler? SelectedUnitChanged;
@@ -325,7 +353,6 @@ internal sealed class FakeMapCommands : IUnitMapCommands
     /// <summary>네비게이션 가드가 허락하는가.</summary>
     public bool AllowSelect { get; set; } = true;
     public bool MoveResult { get; set; } = true;
-    public bool UndoMoveResult { get; set; } = true;
     public bool AdjacencyResult { get; set; } = true;
 
     /// <summary>편제 쓰기 응답을 붙잡는다(한 번에 하나 시험).</summary>
@@ -337,7 +364,7 @@ internal sealed class FakeMapCommands : IUnitMapCommands
     public int SelectCalls => Calls.Count(c => c.StartsWith("Select:", StringComparison.Ordinal));
     public int ReloadCalls => Calls.Count(c => c.StartsWith("Reload", StringComparison.Ordinal));
 
-    private static bool IsWrite(string c) => c.StartsWith("Move", StringComparison.Ordinal) || c.StartsWith("UndoMove", StringComparison.Ordinal) || c.StartsWith("Adj", StringComparison.Ordinal);
+    private static bool IsWrite(string c) => c.StartsWith("Move", StringComparison.Ordinal) || c.StartsWith("Adj", StringComparison.Ordinal);
 
     public void RaiseSelected(int? id) { SelectedUnitId = id; SelectedUnitChanged?.Invoke(this, EventArgs.Empty); }
 
@@ -352,24 +379,42 @@ internal sealed class FakeMapCommands : IUnitMapCommands
     /// <summary>상위 변경이 성공했을 때 할 일(서버가 같은 트랜잭션에서 배치 행을 지우는 것 등을 흉내).</summary>
     public System.Action? OnMoveSucceeded { get; set; }
 
-    public async Task<bool> MoveAsync(int movingId, int targetId, CancellationToken token = default)
+    /// <summary>편제 쓰기에서 던질 예외(대기열의 예기치 못한 실패 흉내).</summary>
+    public Exception? ThrowOnWrite { get; set; }
+
+    /// <summary>콘솔이 바쁜가(시험이 다리의 값을 넘긴다) — 바쁜 콘솔에 온 쓰기를 센다(진짜 콘솔은 거절한다).</summary>
+    public Func<bool>? IsConsoleBusy { get; set; }
+    public int WritesWhileBusy { get; private set; }
+
+    /// <summary>첫 편제 쓰기가 왔다.</summary>
+    public TaskCompletionSource FirstWrite { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private void NoteWrite()
     {
-        Calls.Add($"Move:{movingId}->{targetId}");
+        if (IsConsoleBusy?.Invoke() == true) WritesWhileBusy++;
+        FirstWrite.TrySetResult();
+    }
+
+    public async Task<bool> MoveAsync(int movingId, int? targetId, CancellationToken token = default)
+    {
+        Calls.Add($"Move:{movingId}->{targetId?.ToString() ?? "root"}");
+        NoteWrite();
         if (WriteGate is { } gate) await gate.Task.ConfigureAwait(false);
-        if (MoveResult) OnMoveSucceeded?.Invoke();
+        if (ThrowOnWrite is { } ex) throw ex;
+        if (MoveResult) ApplyMove(movingId, targetId);
         return MoveResult;
     }
 
-    public async Task<bool> UndoMoveAsync(CancellationToken token = default)
+    private void ApplyMove(int movingId, int? targetId)
     {
-        Calls.Add("UndoMove");
-        if (WriteGate is { } gate) await gate.Task.ConfigureAwait(false);
-        return UndoMoveResult;
+        _parents[movingId] = targetId;
+        OnMoveSucceeded?.Invoke();
     }
 
     public async Task<bool> ChangeAdjacencyAsync(int unitId, int? add, int? remove, CancellationToken token = default)
     {
         Calls.Add($"Adj:{unitId}+{add?.ToString() ?? "-"}-{remove?.ToString() ?? "-"}");
+        NoteWrite();
         if (WriteGate is { } gate) await gate.Task.ConfigureAwait(false);
         return AdjacencyResult;
     }
@@ -498,17 +543,30 @@ internal sealed class GatedLayoutApi : IUnitLayoutApi
 internal sealed class FakeConsoleBridge : IUnitMapConsoleBridge
 {
     private bool _isBusy;
+    private EventHandler? _busyChanged;
+    private int _subscribers;
 
     public bool IsDetailDirty { get; set; }
     public int DetailRefreshes { get; private set; }
     public bool HasDeferredReload { get; set; }
     public string? LastWriteFailureReason { get; set; }
-    public event EventHandler? BusyChanged;
+
+    /// <summary>
+    /// 관계도 뷰모델은 만들 때 한 번 구독한다 — 그 밖의 구독(대기열이 콘솔이 한가해지기를 기다림)이 붙으면 끝난다.
+    /// 시험이 시간 대기 없이 "기다리기 시작했다" 를 안다.
+    /// </summary>
+    public TaskCompletionSource ExtraBusySubscriber { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public event EventHandler? BusyChanged
+    {
+        add { _busyChanged += value; if (++_subscribers >= 2) ExtraBusySubscriber.TrySetResult(); }
+        remove { _busyChanged -= value; _subscribers--; }
+    }
 
     public bool IsBusy
     {
         get => _isBusy;
-        set { _isBusy = value; BusyChanged?.Invoke(this, EventArgs.Empty); }
+        set { _isBusy = value; _busyChanged?.Invoke(this, EventArgs.Empty); }
     }
 
     public Task RefreshDetailAsync(CancellationToken token = default)
@@ -516,6 +574,21 @@ internal sealed class FakeConsoleBridge : IUnitMapConsoleBridge
         DetailRefreshes++;
         return Task.CompletedTask;
     }
+}
+
+/// <summary>로그를 모은다 — 예외 원문은 화면이 아니라 여기로 가야 한다(REVIEW-01 L-6).</summary>
+internal sealed class CapturingLog : Ironwall.Dotnet.Libraries.Base.Services.ILogService
+{
+    public List<string> Errors { get; } = new();
+    public List<string> Warnings { get; } = new();
+
+    public void Info(string msg, string memberName = "", string filePath = "", int lineNumber = 0) { }
+    public void Warning(string msg, string memberName = "", string filePath = "", int lineNumber = 0) => Warnings.Add(msg);
+    public void Error(string msg, string memberName = "", string filePath = "", int lineNumber = 0) => Errors.Add(msg);
+
+#pragma warning disable CS0067 // 시험 가짜 — 발화하지 않는다
+    public event EventHandler<Ironwall.Dotnet.Libraries.Base.Services.LogEventArgs>? LogEvent;
+#pragma warning restore CS0067
 }
 
 /// <summary>손으로 흘리는 시계(<c>IClock</c> — 규칙 I-02).</summary>

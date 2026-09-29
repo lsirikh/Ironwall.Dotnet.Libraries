@@ -882,6 +882,13 @@ public class DeviceApiService : IDeviceApiService
 
         // 8.0 미만에는 unit_id 가 쓰기 스키마에 없다 — 실리면 422 라 확실히 뺀다(ShapeWrite 와 같은 규칙).
         if (!IsUnitScopedContract) shaped.Remove("unit_id");
+        // 8.0+ 에서 명시적 "unit_id": null 은 422 다(서버 회신 2026-09-28 Q-1 — 무소속 장비는 존재할 수 없다). 병합 PATCH 에서
+        // 키가 없으면 지금 부대가 그대로이므로 키째 뺀다 — 호출부가 어떤 경로로 null 을 실어도 서버까지 가지 않는 마지막 관문.
+        else if (shaped.TryGetValue("unit_id", out var unitToken) && unitToken.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+        {
+            shaped.Remove("unit_id");
+            _log?.Warning($"[{nameof(PatchDeviceAxesAsync)}] 명시적 unit_id=null 을 뺐습니다 — {deviceTypePath}/{deviceId}");
+        }
 
         var unknown = shaped.Properties().Select(p => p.Name).Where(name => !AxisPatchTopKeys.Contains(name)).ToList();
         string? blocked = unknown.Count > 0 ? $"축 값 부분 수정에 실을 수 없는 키입니다: {string.Join(", ", unknown)}"

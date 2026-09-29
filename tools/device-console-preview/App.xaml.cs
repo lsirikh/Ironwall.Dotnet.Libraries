@@ -707,13 +707,7 @@ public partial class App : Application
             await Shot($"units-{theme}-06-delete-blocked");
             console.DismissDeleteBlock();
 
-            // 끄는 쪽(장비)과 놓는 쪽(트리)이 한 화면에 같이 있어야 이 창의 대표 기능이 성립한다.
-            console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
-            await Shot($"units-{theme}-07-devices");
-
-            console.QueueAssign(console.Tree.Ordered.First(n => n.Code == "c0206").Id, console.DeviceRows.Take(3).ToList());
-            await Shot($"units-{theme}-08-devices-draft");
-            console.RevertAssigns();
+            // 07 · 08(「미배치 장비」 칸 · 배치 대기)은 서버 회신 Q-1 ⓐ(개념 폐지)로 칸과 함께 없앴다 — 번호는 비워 둔다.
 
             // 부대 관계도 레일 — 툴바 둘째 줄(레이어 켜기/끄기 · 예하 포함) · 캔버스 · 상태 줄을 한 장에(2026-09-28 실앱 결함 3종 확인용).
             console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);

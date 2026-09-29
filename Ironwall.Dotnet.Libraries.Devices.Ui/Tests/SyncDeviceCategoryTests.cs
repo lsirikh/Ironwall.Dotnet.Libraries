@@ -47,12 +47,19 @@ public class SyncDeviceCategoryTests
 
     private static (DeviceProviderService service, DeviceProvider provider) CreateService()
     {
+        var (service, provider, _) = CreateServiceWithApi();
+        return (service, provider);
+    }
+
+    private static (DeviceProviderService service, DeviceProvider provider, MockDeviceApiService api) CreateServiceWithApi()
+    {
         var log = new MockLogService();
         var provider = new DeviceProvider();
+        var api = new MockDeviceApiService();
         var service = new DeviceProviderService(
             logService: log,
             eventAggregator: new MockEventAggregator(),
-            apiService: new MockDeviceApiService(),
+            apiService: api,
             deviceProvider: provider,
             controllerProvider: new ControllerDeviceProvider(log, provider),
             sensorProvider: new SensorDeviceProvider(log, provider),
@@ -60,7 +67,24 @@ public class SyncDeviceCategoryTests
             deviceGroupProvider: new DeviceGroupProvider(log),
             serverApiService: new MockServerApiService(),
             serverProvider: new ServerProvider(log));
-        return (service, provider);
+        return (service, provider, api);
+    }
+
+    [Fact]
+    public async Task should_keep_the_device_and_take_its_new_unit_when_the_old_unit_subject_reports_a_move()
+    {
+        // 서버 8.0.3(회신 2026-09-28 R-2): 장비가 부대를 옮기면 옛 부대 subject 에도 같은 봉투의 UPDATED 가 온다.
+        // 서버 규약은 "재조회가 200 이고 unit_id 가 남의 부대면 캐시에서 빼라" — 부대 범위 캐시를 가정한 말이다.
+        // 이 클라의 장비 캐시는 조직 전체(목록 적재에 unit_id 를 싣지 않는다)라 빼면 지도에서 사라진다 → 새 unit_id 로 갱신만 한다.
+        var (service, provider, api) = CreateServiceWithApi();
+        provider.Add(new LampDeviceModel { Id = 21, DeviceType = EnumDeviceType.Lamp, CategoryDevice = EnumDeviceCategory.Lamp, UnitId = 1 });
+        api.LampById = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.LampDeviceDto { Id = 21, NumberDevice = 21, NameDevice = "lamp-21", UnitId = 7 };
+
+        var fetched = await service.FetchDeviceByIdAsync("LAMP", 21);
+
+        Assert.NotNull(fetched);
+        var lamp = Assert.Single(provider.OfType<LampDeviceModel>());
+        Assert.Equal(7, lamp.UnitId);
     }
 
     [Theory]

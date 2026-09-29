@@ -195,7 +195,6 @@ public class UnitConsoleViewModelTests
         Assert.False(console.CanAdd);
         Assert.False(console.CanReload);
         Assert.False(console.CanMoveSelected);
-        Assert.False(console.CanAssignSelectedDevices);
     }
 
     [Fact]
@@ -520,121 +519,52 @@ public class UnitConsoleViewModelTests
     }
     #endregion
 
-    #region - 미배치 장비 → 부대 (호출 N회 · Draft) -
+    #region - 「미배치 장비」 폐지 (서버 회신 2026-09-28 Q-1 ⓐ · PRD v1.7) -
     private static UnitDeviceItem Device(int id, int? unitId) => new(id, id, $"장비{id}", EnumDeviceCategory.Camera, unitId);
 
     [Fact]
-    public async Task should_list_only_devices_without_a_unit_in_the_tree()
+    public async Task should_offer_only_the_tree_and_map_rails_when_the_unassigned_devices_concept_is_abolished()
     {
-        var (console, _, _) = await OpenAsync(devices: new[] { Device(1, null), Device(2, 6), Device(3, 777) });
+        var (console, _, _) = await OpenAsync(devices: new[] { Device(1, null), Device(2, 6) });
 
-        await console.ReloadAsync();
-        console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
-
-        Assert.Equal(new[] { 1, 3 }, console.DeviceRows.Select(r => r.Id));      // 777 은 편제에 없는 부대다
+        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY }, console.RailEntries.Select(e => e.Key));
+        Assert.DoesNotContain(console.RailEntries, e => e.Label.Contains("미배치", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task should_queue_a_draft_without_calling_the_server_when_devices_are_dropped()
+    public void should_fall_back_to_the_tree_rail_when_the_saved_rail_is_the_abolished_devices_rail()
     {
-        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null), Device(2, null) });
-        await console.ReloadAsync();
+        // 옛 판이 저장한 LastRailKey="devices" — 없는 칸을 가리키면 첫 칸(편제 트리)으로 떨어진다(창이 빈 칸으로 열리지 않는다).
+        var prefs = new Ironwall.Dotnet.Libraries.Utils.Consoles.ConsolePrefEntry { LastRailKey = "devices" };
 
-        console.QueueAssign(6, console.DeviceRows.ToList());
+        var console = new UnitConsoleViewModel(new FakeUnitApi(true) { Graph = Sample() }, new FakeDeviceApi(), prefs: prefs);
 
-        Assert.Equal(2, console.Tray.Count);
-        Assert.Empty(devices.Assigns);                                   // 드롭은 서버를 부르지 않는다
-        Assert.All(console.DeviceRows, r => Assert.True(r.IsPending));
+        Assert.Equal(UnitConsoleViewModel.RAIL_TREE, console.SelectedRail.Key);
+        Assert.True(console.IsTreeView);
     }
 
     [Fact]
-    public async Task should_send_one_call_per_device_when_the_draft_is_applied()
+    public async Task should_keep_counting_devices_per_unit_when_the_devices_rail_is_gone()
     {
-        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null), Device(2, null) });
-        await console.ReloadAsync();
-        console.QueueAssign(6, console.DeviceRows.ToList());
+        // 장비 전량은 여전히 읽는다 — 트리 행의 장비 수 · 관계도 배지 · [지도에서 보기]의 원천이다.
+        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, 6), Device(2, 6), Device(3, 5), Device(4, 777) });
 
-        await console.ApplyAssignsAsync();
-
-        Assert.Equal(new[] { (1, 6), (2, 6) }, devices.Assigns);
-        Assert.Equal(0, console.Tray.Count);
+        Assert.Equal(1, devices.Loads);
+        Assert.Equal(2, Row(console, 6).DeviceCount);
+        Assert.Equal(1, Row(console, 5).DeviceCount);
+        Assert.Equal("부대 6", console.ListStatusText);
+        Assert.Empty(devices.Assigns);                                  // 콘솔은 장비 소속을 바꾸지 않는다
     }
 
     [Fact]
-    public async Task should_stop_at_the_first_failure_when_applying_the_draft()
-    {
-        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null), Device(2, null), Device(3, null) });
-        await console.ReloadAsync();
-        devices.FailFor.Add(1);
-        console.QueueAssign(6, console.DeviceRows.ToList());
-
-        await console.ApplyAssignsAsync();
-
-        Assert.Single(devices.Assigns);                                  // 첫 실패에서 멈춘다 — 2·3 은 보내지 않았다
-        Assert.Contains("처음 실패한 곳에서 멈췄습니다", console.StatusText);
-
-        // ★ 보내지 않은 것은 트레이에 남는다. 커널은 Skipped 를 목록에서 지우므로,
-        //   "남겨 뒀다" 고 알리려면 멈춘 항목을 Failed 로 돌려주어야 한다.
-        Assert.Equal(3, console.Tray.Count);
-        Assert.Contains("남아 있습니다", console.StatusText);
-    }
-
-    [Fact]
-    public async Task should_retry_only_what_failed_when_applied_again()
-    {
-        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null), Device(2, null) });
-        await console.ReloadAsync();
-        devices.FailFor.Add(1);
-        console.QueueAssign(6, console.DeviceRows.ToList());
-        await console.ApplyAssignsAsync();
-        Assert.Equal(2, console.Tray.Count);
-
-        devices.FailFor.Clear();
-        devices.Assigns.Clear();
-        await console.ApplyAssignsAsync();
-
-        Assert.Equal(new[] { (1, 6), (2, 6) }, devices.Assigns);
-        Assert.Equal(0, console.Tray.Count);
-    }
-
-    [Fact]
-    public async Task should_cap_the_number_of_calls_one_apply_can_make()
-    {
-        var many = Enumerable.Range(1, UnitConsoleViewModel.MAX_ASSIGN_PER_APPLY + 5).Select(i => Device(i, null)).ToList();
-        var (console, _, _) = await OpenAsync(devices: many);
-        await console.ReloadAsync();
-
-        console.QueueAssign(6, console.DeviceRows.ToList());
-
-        Assert.Equal(UnitConsoleViewModel.MAX_ASSIGN_PER_APPLY, console.Tray.Count);
-        Assert.Contains("뺐습니다", console.StatusText);
-    }
-
-    [Fact]
-    public async Task should_throw_nothing_away_on_the_server_when_the_draft_is_reverted()
-    {
-        var (console, _, devices) = await OpenAsync(devices: new[] { Device(1, null) });
-        await console.ReloadAsync();
-        console.QueueAssign(6, console.DeviceRows.ToList());
-
-        console.RevertAssigns();
-
-        Assert.Equal(0, console.Tray.Count);
-        Assert.Empty(devices.Assigns);
-        Assert.All(console.DeviceRows, r => Assert.False(r.IsPending));
-    }
-
-    [Fact]
-    public async Task should_use_the_selected_unit_when_the_button_fallback_assigns_devices()
+    public async Task should_close_without_asking_when_nothing_is_unapplied()
     {
         var (console, _, _) = await OpenAsync(devices: new[] { Device(1, null) });
-        await console.ReloadAsync();
-        await console.SelectRowAsync(Row(console, 6));
-        console.SetSelectedDevices(console.DeviceRows.ToList());
+        var asked = 0;
+        console.Confirm = (_, _) => { asked++; return Task.FromResult(false); };
 
-        console.QueueAssignSelected();
-
-        Assert.Equal(1, console.Tray.Count);
+        Assert.True(await console.CanCloseAsync());
+        Assert.Equal(0, asked);
     }
     #endregion
 
@@ -724,34 +654,6 @@ public class UnitConsoleViewModelTests
 
         Assert.Contains("더 높은 제대", console.StatusText);         // 조용히 끝나지 않는다
     }
-
-    [Fact]
-    public async Task should_offer_a_button_path_for_assigning_devices_without_the_tree()
-    {
-        // 트리에서 아무것도 고르지 않아도 콤보로 대상 부대를 정할 수 있어야 한다(드래그의 폴백).
-        var (console, _, _) = await OpenAsync(devices: new[] { Device(1, null) });
-        await console.ReloadAsync();
-        console.SetSelectedDevices(console.DeviceRows.ToList());
-
-        Assert.Null(console.SelectedRow);
-        Assert.False(console.CanAssignSelectedDevices);
-
-        console.AssignTargetUnitId = 6;
-
-        Assert.True(console.CanAssignSelectedDevices);
-        Assert.Contains("6", console.AssignTargetText);
-
-        console.QueueAssignSelected();
-        Assert.Equal(1, console.Tray.Count);
-    }
-
-    [Fact]
-    public async Task should_list_every_unit_as_an_assign_target()
-    {
-        var (console, _, _) = await OpenAsync();
-
-        Assert.Equal(console.Tree.Ordered.Select(n => n.Id).ToList(), console.AssignTargets.Select(o => o.Id!.Value).ToList());
-    }
     #endregion
 
     #region - 상세 · 관문 -
@@ -763,7 +665,7 @@ public class UnitConsoleViewModelTests
         console.Form.Name = "6중대 (개편)";
         Assert.True(console.Detail.IsDirty);
 
-        console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_DEVICES);
+        console.SelectedRail = console.RailEntries.First(r => r.Key == UnitConsoleViewModel.RAIL_ADJACENCY);
 
         Assert.Equal(UnitConsoleViewModel.RAIL_TREE, console.SelectedRail.Key);
         Assert.Equal(ConsoleDetailStateMachine.BlockedNotice, console.Detail.FooterText);
@@ -1028,39 +930,6 @@ public class UnitConsoleViewModelTests
         Assert.Equal(0, devices.Loads);
         Assert.False(console.CanReload);
         Assert.Equal("부대 편제를 볼 권한이 없습니다.", console.StatusText);
-    }
-
-    [Fact]
-    public async Task should_keep_device_placement_on_devices_edit_when_the_account_lacks_units_edit()
-    {
-        using var scope = new PermissionScope(Modules(devices: VIEW_EDIT, units: VIEW));
-        var (console, _, _) = await OpenWithDefaultGatesAsync(devices: new[] { Device(1, null) });
-        await console.ReloadAsync();
-        console.SetSelectedDevices(console.DeviceRows.ToList());
-        console.AssignTargetUnitId = 6;
-
-        var verdict = console.Drop.Verdict(PayloadOf(console.DeviceRows[0]), new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 6), -1));
-
-        Assert.False(console.CanEditUnits);
-        Assert.True(console.CanAssignSelectedDevices);          // 배치는 장비 쓰기다 — units:edit 가 없어도 된다
-        Assert.True(verdict.IsAllowed, verdict.Reason);
-    }
-
-    [Fact]
-    public async Task should_block_device_placement_when_the_account_lacks_devices_edit()
-    {
-        using var scope = new PermissionScope(Modules(devices: VIEW, units: ALL));
-        var (console, _, _) = await OpenWithDefaultGatesAsync(devices: new[] { Device(1, null) });
-        await console.ReloadAsync();
-        console.SetSelectedDevices(console.DeviceRows.ToList());
-        console.AssignTargetUnitId = 6;
-
-        var verdict = console.Drop.Verdict(PayloadOf(console.DeviceRows[0]), new DropTarget(UnitDropRules.ZONE_PARENT, Row(console, 6), -1));
-
-        Assert.True(console.CanEditUnits);
-        Assert.False(console.CanAssignSelectedDevices);
-        Assert.False(verdict.IsAllowed);
-        Assert.Equal(UnitDropHandler.PlaceDeniedReason, verdict.Reason);
     }
     #endregion
 }

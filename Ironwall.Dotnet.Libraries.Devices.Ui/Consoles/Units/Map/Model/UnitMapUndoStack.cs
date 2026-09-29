@@ -56,7 +56,10 @@ public sealed record UnitMapLayoutResetUndo(IReadOnlyDictionary<int, Vector> Bef
     public override IReadOnlyList<int> UnitIds => Before.Keys.OrderBy(k => k).ToList();
 }
 
-/// <summary>상위 바꾸기(툴바 [이동 되돌리기]와 같은 표 — 되돌리기는 <c>IUnitMapCommands.UndoMoveAsync</c>).</summary>
+/// <summary>
+/// 상위 바꾸기 — 되돌리기는 이 항목이 기억한 옛 상위로의 <b>정확한 반대 이동</b>(<c>IUnitMapCommands.MoveAsync(UnitId, FromParentId)</c>,
+/// 옛 상위가 없으면 최상위로). 트리 툴바 [이동 되돌리기]의 표(<c>_lastMove</c>)와 나눠 쓰지 않는다(REVIEW-01 HIGH-1).
+/// </summary>
 public sealed record UnitMapReparentUndo(int UnitId, int? FromParentId, int ToParentId) : UnitMapUndoEntry
 {
     public override bool IsLayout => false;
@@ -80,8 +83,10 @@ public sealed record UnitMapAdjacencyUndo(int UnitId, int OtherId, bool Added) :
 /// 사실이 무효가 되면 <see cref="Invalidate"/> 로 그 항목만 뺀다 — 막대가 그것을 가리키고 있었으면 막대를 숨긴다(다른 것을 되돌리지 않게).</para>
 /// <para><b>막대</b>(<see cref="Bar"/>) = 가장 최근 조작. 다음 조작이 오면 교체된다(타이머로 사라지지 않는다 — SIM-F127).
 /// 닫기(<see cref="Dismiss"/>)는 막대만 숨기고 표는 남긴다.</para>
-/// <para><b>실패</b>하면 표를 그대로 둔다(<see cref="CompleteUndo"/> <c>succeeded:false</c>). 재조회를 넘어 산다 — 편제에서 사라진
-/// 부대의 항목만 <see cref="Prune"/> 이 뺀다(SIM-F119).</para>
+/// <para><b>실패</b>하면 표를 그대로 둔다(<see cref="CompleteUndo"/> <c>succeeded:false</c>). 재조회를 넘어 산다. 편제에서 사라진 부대의
+/// 항목은 재조회 때 말없이 빼지 않고(REVIEW-01 — 종전 문서의 <c>Prune</c> 은 어디서도 불리지 않아 지웠다) <b>되돌리려는 순간</b> 판정한다(SIM-F119):
+/// 상위 · 인접은 "편제에 없어 되돌리지 않았습니다" 막대와 함께 빼고, 초기화 되돌리기는 사라진 부대만 건너뛰며(조정자 필수 항목 4 —
+/// 통째로 빼면 남은 부대까지 못 되살린다), 위치는 서버 문서 비교(<c>UnitMapLayoutSync.CanUndo</c>)가 막는다.</para>
 /// </remarks>
 public sealed class UnitMapUndoStack
 {
@@ -159,20 +164,6 @@ public sealed class UnitMapUndoStack
 
     /// <summary>막대만 숨긴다 — 표는 남는다(<c>Ctrl+Z</c> 는 여전히 된다).</summary>
     public void Dismiss() => Bar = null;
-
-    /// <summary>
-    /// 편제에서 사라진 부대의 항목을 뺀다(재조회 뒤). 뺀 것을 돌려준다 — 막대가 그중 하나였으면 부르는 쪽이 알린다.
-    /// </summary>
-    public IReadOnlyList<UnitMapUndoEntry> Prune(Func<int, bool> unitExists)
-    {
-        ArgumentNullException.ThrowIfNull(unitExists);
-
-        // 기록은 값이 같을 수 있다(같은 부대를 같은 Δ 로 두 번) — 동일성으로 뺀다.
-        var removed = _entries.Where(e => !e.UnitIds.All(unitExists)).ToList();
-        _entries.RemoveAll(e => removed.Any(r => ReferenceEquals(r, e)));
-        if (Bar is not null && removed.Any(r => ReferenceEquals(r, Bar))) Bar = null;
-        return removed;
-    }
 
     /// <summary>모두 비운다(창을 닫을 때).</summary>
     public void Clear()

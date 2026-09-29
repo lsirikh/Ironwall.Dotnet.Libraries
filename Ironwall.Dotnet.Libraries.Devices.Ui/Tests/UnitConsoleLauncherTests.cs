@@ -100,11 +100,15 @@ public sealed class UnitConsoleLauncherTests : IDisposable
 
     private sealed class ResultRecorder : IHandle<OpenUnitConsoleResult>
     {
-        public List<OpenUnitConsoleResult> Results { get; } = new();
+        private readonly object _gate = new();
+        private readonly List<OpenUnitConsoleResult> _results = new();
+
+        /// <summary>사본. 회신은 서로 다른 스레드에서 동시에 올 수 있다(붙잡은 GET 이 풀리면 두 요청의 연속이 스레드 풀에서 함께 돈다) — 잠가서 모은다.</summary>
+        public List<OpenUnitConsoleResult> Results { get { lock (_gate) return _results.ToList(); } }
 
         public Task HandleAsync(OpenUnitConsoleResult message, CancellationToken cancellationToken)
         {
-            Results.Add(message);
+            lock (_gate) _results.Add(message);
             return Task.CompletedTask;
         }
     }

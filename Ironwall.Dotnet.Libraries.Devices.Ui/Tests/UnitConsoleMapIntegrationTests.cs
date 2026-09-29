@@ -26,11 +26,11 @@ public class UnitConsoleMapIntegrationTests
 {
     #region - 레일 (FR-01 · ISSUE-58) -
     [Fact]
-    public void should_offer_map_rail_between_tree_and_devices()
+    public void should_offer_map_rail_after_tree_when_devices_rail_is_abolished()
     {
         var kit = ConsoleKit.Create();
 
-        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY, UnitConsoleViewModel.RAIL_DEVICES },
+        Assert.Equal(new[] { UnitConsoleViewModel.RAIL_TREE, UnitConsoleViewModel.RAIL_ADJACENCY },
                      kit.Console.RailEntries.Select(e => e.Key));
         Assert.Equal("부대 관계도", kit.Console.RailEntries[1].Label);
     }
@@ -225,21 +225,6 @@ public class UnitConsoleMapIntegrationTests
     }
     #endregion
 
-    #region - 장비 소속 발행 (FR-49) -
-    [Fact]
-    public async Task should_publish_device_unit_changed_for_each_applied_device_only()
-    {
-        var kit = await ConsoleKit.OpenAsync();
-        kit.Devices.FailIds.Add(502);
-        kit.Console.QueueAssign(6, kit.Console.DeviceRows.ToList());
-
-        await kit.Console.ApplyAssignsAsync();
-
-        var published = kit.Published.OfType<DeviceUnitChangedMessage>().ToList();
-        Assert.Equal(new[] { new DeviceUnitChangedMessage(501, 6) }, published);
-    }
-    #endregion
-
     #region - 닫기 (IMPL-31 — CanCloseAsync 앞 취소만) -
     [Fact]
     public async Task should_cancel_map_overlay_without_server_call_when_closing()
@@ -283,7 +268,7 @@ internal sealed class ConsoleKit
         Devices.Items.Add(new UnitDeviceItem(503, 3, "카메라-1", EnumDeviceCategory.Camera, 6));
         if (lastRail is not null) Prefs.Entry.LastRailKey = lastRail;
         Console = new UnitConsoleViewModel(Units, Devices, log: null, myUnitCode: () => "c06",
-                                           canEdit: () => canEdit, canDelete: () => true, canView: () => true, canPlaceDevices: () => true,
+                                           canEdit: () => canEdit, canDelete: () => true, canView: () => true,
                                            events: new CapturingEventAggregator(Published),
                                            isDragging: () => Dragging, delay: Delay.Run,
                                            layoutApi: layout, prefs: Prefs.Entry, savePrefs: Prefs.Save, clock: Clock);
@@ -339,6 +324,11 @@ internal sealed class FakeConsoleUnitApi : IUnitGraphApi
     private TaskCompletionSource _detailHold = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public void ReleaseDetails() { HoldDetails = false; _detailHold.TrySetResult(); }
 
+    /// <summary>편제 GET 응답을 붙잡는다(콘솔이 재조회로 바쁜 동안 — 연속은 푼 자리에서 곧바로 이어진다).</summary>
+    public bool HoldGraph { get; set; }
+    private TaskCompletionSource? _graphHold;
+    public void ReleaseGraph() { HoldGraph = false; _graphHold?.TrySetResult(); }
+
     /// <summary>다른 곳에서 바뀐 인접(재조회에만 보인다).</summary>
     public void SetAdjacency(int a, int b, bool present)
     {
@@ -351,9 +341,19 @@ internal sealed class FakeConsoleUnitApi : IUnitGraphApi
 
     public void Remove(int id) => _nodes.Remove(id);
 
-    public Task<ApiResponse<UnitGraphDto>> GetGraphAsync(CancellationToken token = default)
+    public async Task<ApiResponse<UnitGraphDto>> GetGraphAsync(CancellationToken token = default)
     {
         GraphReads++;
+        if (HoldGraph)
+        {
+            _graphHold = new TaskCompletionSource();
+            await _graphHold.Task.ConfigureAwait(true);
+        }
+        return await GraphCore().ConfigureAwait(true);
+    }
+
+    private Task<ApiResponse<UnitGraphDto>> GraphCore()
+    {
         var nodes = _nodes.Values.OrderBy(n => n.Id).Select(n => new UnitListDto { Id = n.Id, Code = n.Code, Name = n.Name, EchelonRaw = n.EchelonRaw, ParentId = n.ParentId, IsEnable = n.IsEnable }).ToList();
         var graph = new UnitGraphDto
         {

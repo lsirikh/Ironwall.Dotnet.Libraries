@@ -114,23 +114,6 @@ public sealed class UnitConsoleNonModalTests
     }
 
     [Fact]
-    public void should_ask_when_only_devices_are_waiting_to_be_placed()
-    {
-        var asked = Sta.Run(env =>
-        {
-            env.Open();
-            env.Console!.QueueAssign(6, new[] { new UnitDeviceRowViewModel(new UnitDeviceItem(501, 1, "센서-1", Ironwall.Dotnet.Libraries.Enums.EnumDeviceCategory.Sensor, null), "미배치") });
-            Assert.True(env.Console.Tray.HasEntries);
-
-            env.ConsoleWindow!.Close();
-            Sta.Pump();
-            return env.Windows.Confirms;
-        });
-
-        Assert.Equal(1, asked);
-    }
-
-    [Fact]
     public void should_close_without_asking_when_nothing_is_pending()
     {
         var result = Sta.Run(env =>

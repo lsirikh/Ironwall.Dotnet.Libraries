@@ -319,8 +319,6 @@ internal sealed class PreviewUnitConsole : IUnitMapCommands, IUnitMapConsoleBrid
     private readonly string _client;
     private readonly PreviewCallLog _log;
     private int? _selected;
-    private (int Unit, int? PreviousParent)? _lastMove;
-
     public PreviewUnitConsole(string client, PreviewCallLog log, bool canEdit)
     {
         _client = client;
@@ -351,22 +349,12 @@ internal sealed class PreviewUnitConsole : IUnitMapCommands, IUnitMapConsoleBrid
         return true;
     }
 
-    public Task<bool> MoveAsync(int movingId, int targetId, CancellationToken token = default)
+    /// <remarks>관계도 되돌리기도 이 한 길로 온다(<paramref name="targetId"/> <c>null</c> = 최상위) — REVIEW-01 HIGH-1.</remarks>
+    public Task<bool> MoveAsync(int movingId, int? targetId, CancellationToken token = default)
     {
         var node = _graph.Nodes.First(n => n.Id == movingId);
-        _lastMove = (movingId, node.ParentId);
         SetParent(node, targetId);
         _log.Write(new { client = _client, op = "unit-patch", unit = movingId, parent_id = targetId });
-        Rebuild();
-        return Task.FromResult(true);
-    }
-
-    public Task<bool> UndoMoveAsync(CancellationToken token = default)
-    {
-        if (_lastMove is not { } last) return Task.FromResult(false);
-        SetParent(_graph.Nodes.First(n => n.Id == last.Unit), last.PreviousParent);
-        _log.Write(new { client = _client, op = "unit-patch", unit = last.Unit, parent_id = last.PreviousParent, undo = true });
-        _lastMove = null;
         Rebuild();
         return Task.FromResult(true);
     }

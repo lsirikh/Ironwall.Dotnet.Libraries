@@ -149,11 +149,15 @@ public static class UnitMapText
     /// <param name="updatedByMe">마지막 변경자가 이 운영자 — 이름 대신 "나".</param>
     /// <param name="liveOff">전역 구독이 꺼져 실시간 반영이 없다 — 모든 행에 " · 실시간 반영 꺼짐" 꼬리표(ISSUE-32).</param>
     /// <param name="sessionExpired">읽기 실패가 401 이다 — 7행의 변형 문구.</param>
+    /// <param name="stale">열린 뒤 다시 읽기가 실패해 <b>마지막으로 읽은 배치</b>를 그대로 보이는 중(REVIEW-01 MEDIUM-7) — 공유 행 대신 그 사실을 말한다.</param>
     public static string LayoutStatus(UnitMapLayoutState state, bool canEdit, string? updatedBy = null, DateTime? updatedAtLocal = null,
-                                      bool updatedByMe = false, bool liveOff = false, bool sessionExpired = false)
+                                      bool updatedByMe = false, bool liveOff = false, bool sessionExpired = false, bool stale = false)
     {
         var text = state switch
         {
+            UnitMapLayoutState.Shared when stale => sessionExpired
+                ? "로그인이 만료되어 배치를 다시 불러오지 못했습니다 — 마지막으로 불러온 배치를 보입니다"
+                : "배치를 다시 불러오지 못했습니다 — 마지막으로 불러온 배치를 보입니다",
             UnitMapLayoutState.Shared => SharedStatus(canEdit, updatedBy, updatedAtLocal, updatedByMe),
             UnitMapLayoutState.SessionOnly => "이 서버는 배치 저장을 지원하지 않습니다 — 옮긴 위치는 창을 닫으면 자동 배치로 돌아갑니다",
             UnitMapLayoutState.ReadFailed => sessionExpired
@@ -225,6 +229,42 @@ public static class UnitMapText
     /// <summary>편제 쓰기 실패 → 재조회(FR-34) — "‘8중대’를 옮기지 못했습니다. {사유} 편제를 다시 읽었습니다."</summary>
     public static string WriteFailedBar(string unitName, string reason)
         => KoreanParticles.Resolve($"{Quote(unitName)}을(를) 옮기지 못했습니다. {reason.Trim()} 편제를 다시 읽었습니다.");
+
+    /// <summary>인접 쓰기 실패 → 재조회(FR-34 · REVIEW-01 L-2) — "옮기지 못했습니다" 가 아니라 인접을 말한다.</summary>
+    public static string AdjacencyWriteFailedBar(string unitName, string otherName, string reason)
+        => KoreanParticles.Resolve($"{Quote(unitName)}과(와) {Quote(otherName)}의 인접을 바꾸지 못했습니다. {reason.Trim()} 편제를 다시 읽었습니다.");
+
+    /// <summary>[배치 초기화] 쓰기 실패(REVIEW-01 L-3 — "‘배치’ 위치" 처럼 배치를 부대 이름으로 적지 않는다).</summary>
+    public static string LayoutResetFailedBar(string reason)
+        => $"배치 초기화를 저장하지 못했습니다. {reason.Trim()} 서버 배치를 다시 불러왔습니다.";
+
+    /// <summary>[배치 초기화] 가 412 — 그 사이 누가 배치를 바꿨다(REVIEW-01 L-3 — 종전엔 "초기화를 되돌리지 않았습니다" 라고 했다).</summary>
+    public const string LayoutResetConflictBar = "그 사이 다른 운영자가 배치를 바꿔 초기화하지 않았습니다 — 최신 배치를 불러왔습니다.";
+
+    /// <summary>[배치 초기화] 결과 모름(시간 초과) — 다시 읽은 서버 배치가 진실이다.</summary>
+    public const string LayoutResetUnknownBar = "배치 초기화 결과를 확인하지 못했습니다 — 서버 배치를 다시 불러와 그대로 보입니다.";
+
+    /// <summary>[배치 초기화] 되돌리기 쓰기 실패(REVIEW-01 L-3).</summary>
+    public static string LayoutResetUndoFailedBar(string reason)
+        => $"배치 초기화를 되돌리지 못했습니다. {reason.Trim()} 서버 배치를 다시 불러왔습니다.";
+
+    /// <summary>[배치 초기화] 되돌리기 전 다시 읽기가 실패했다 — 모르는 채로 보내지 않는다(REVIEW-01 L-3 · 종전엔 "다시 불러왔습니다" 라고 거짓을 말했다).</summary>
+    public const string LayoutResetUndoUnreadableBar = "배치를 다시 불러오지 못해 초기화를 되돌리지 않았습니다 — [다시 시도] 뒤 다시 하세요.";
+
+    /// <summary>콘솔의 앞선 작업이 끝나지 않았다(편제 쓰기 실패 사유 — REVIEW-01 MEDIUM-4).</summary>
+    public const string ConsoleBusyReason = "앞선 작업이 아직 끝나지 않았습니다.";
+
+    /// <summary>대기열에서 차례를 받았는데 콘솔이 끝내 한가해지지 않아 보내지 않았다(REVIEW-01 MEDIUM-4).</summary>
+    public static string ConsoleStillBusyBar(string unitName)
+        => $"앞선 작업이 끝나지 않아 {Quote(unitName)} 변경을 보내지 않았습니다 — 잠시 후 다시 하세요.";
+
+    /// <summary>
+    /// 대기열 작업이 예기치 않게 끝났다(REVIEW-01 L-6) — 예외 원문은 화면에 싣지 않고 기록으로 보낸다.
+    /// </summary>
+    public static string UnexpectedFailureBar(string? subject)
+        => subject is { Length: > 0 } name
+            ? $"{Quote(name)} 작업을 마치지 못했습니다 — 편제를 다시 읽은 뒤 다시 하세요."
+            : "작업을 마치지 못했습니다 — 편제를 다시 읽은 뒤 다시 하세요.";
 
     /// <summary>배치 쓰기 실패(충돌 외) → 서버 배치를 다시 읽어 그대로 그림(FR-34).</summary>
     public static string LayoutWriteFailedBar(string unitName, string reason)

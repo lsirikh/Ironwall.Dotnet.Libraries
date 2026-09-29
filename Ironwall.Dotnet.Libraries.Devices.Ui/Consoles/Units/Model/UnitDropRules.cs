@@ -7,7 +7,7 @@ using System.Linq;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Model;
 
 /****************************************************************************
-   Purpose      : 부대 콘솔 드롭 판정 — 화면 없이 도는 순수 함수 (N-11 FR-06 · FR-09 · FR-12)
+   Purpose      : 부대 콘솔 드롭 판정 — 화면 없이 도는 순수 함수 (N-11 FR-06 · FR-09)
    Created By   : GHLee
    Created On   : 9/20/2026
    Department   : SW Team
@@ -42,9 +42,6 @@ public static class UnitDropRules
 
     /// <summary>상세 칸의 인접 드롭존.</summary>
     public const string ZONE_ADJACENCY = "unit-adjacency";
-
-    /// <summary>부대 노드 위 — 미배치 장비 놓기.</summary>
-    public const string ZONE_DEVICE = "unit-device";
 
     #region - 상위 부대 바꾸기 -
     /// <summary>
@@ -125,24 +122,6 @@ public static class UnitDropRules
         if (add is int a) set.Add(a);
         if (remove is int r) set.Remove(r);
         return UnitRules.NormalizeAdjacency(set, selfId) ?? new List<int>();
-    }
-    #endregion
-
-    #region - 미배치 장비 놓기 -
-    /// <summary>끌어 온 장비들을 <paramref name="targetUnitId"/> 에 붙일 수 있는가.</summary>
-    /// <param name="deviceUnitIds">장비마다 현재 소속 부대 id(없으면 <c>null</c>).</param>
-    public static UnitDropVerdict CanAssignDevices(UnitTreeModel? tree, int targetUnitId, IReadOnlyList<int?> deviceUnitIds)
-    {
-        if (tree == null) return UnitDropVerdict.Block("편제를 아직 읽지 못했습니다.");
-
-        var target = tree.Find(targetUnitId);
-        if (target == null) return UnitDropVerdict.Block("놓을 부대를 편제에서 찾지 못했습니다.");
-        if (deviceUnitIds is not { Count: > 0 }) return UnitDropVerdict.Block("끌어 온 장비가 없습니다.");
-
-        if (deviceUnitIds.All(unitId => unitId == targetUnitId))
-            return UnitDropVerdict.Block($"이미 '{target.Name}' 소속입니다.");
-
-        return UnitDropVerdict.Allow();
     }
     #endregion
 

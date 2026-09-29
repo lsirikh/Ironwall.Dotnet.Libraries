@@ -19,9 +19,8 @@
 		docs/design/event-mapping-unit-console-wireframe.html §2-2 · §3 · §4-3 · §7 ·
 		docs/design/all-windows-drag-wireframe.html L411-413(호출 횟수 판정).
 
-		★ 트리와 미배치 장비는 같은 칸을 번갈아 쓰지 않는다 — 나란히 둔다.
-		  드래그 커널은 화면에 <b>보이는</b> 드롭존만 후보로 삼으므로(DropZone.ZonesUnder 가 IsVisible 로 거른다),
-		  둘이 배타적이면 끄는 쪽과 놓는 쪽이 한 번도 함께 있지 못해 이 노드의 대표 기능이 성립하지 않는다.
+		「미배치 장비」 칸은 없다 — 서버 회신 2026-09-28 Q-1 ⓐ(개념 폐지): 무소속 장비는 서버 설계상 존재할 수 없다
+		  (unit_id 없이 만들면 기본 부대 unit001, PATCH/PUT 의 명시적 null 은 422). unit-relationship-map PRD v1.7.
 
 		치수: 헤더 40 · 레일 184 · 툴바 40 · 트리 노드 30 · 들여쓰기 16/단계 · 입력 32 · 상세 340 · 상태 띠 30.
 		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationProperties.AutomationId 만.
@@ -142,26 +141,12 @@
 	<c:ConsoleShell
 		AutomationProperties.AutomationId="Units.Console.Panel"
 		ConsoleKey="Units"
+		IsDetailRequested="{Binding IsDetailRequested}"
 		Loaded="OnShellLoaded"
 		Subtitle="{Binding RailSubtitle}"
 		Title="부대 편제">
 
-		<!--
-			상세 칸 — 좁은 폭(서랍)의 미배치 장비 보기에서는 접는다(트리가 짓눌려 부대 이름이 잘렸다, 감사 D-8 8.10).
-			ConsoleShell 자신의 IsDetailDocked 를 읽으므로 Self 바인딩이다.
-		-->
-		<c:ConsoleShell.IsDetailRequested>
-			<MultiBinding>
-				<MultiBinding.Converter>
-					<units:UnitDetailRequestConverter />
-				</MultiBinding.Converter>
-				<Binding Path="IsDetailRequested" />
-				<Binding Path="IsDeviceView" />
-				<Binding Path="IsDetailDocked" RelativeSource="{RelativeSource Self}" />
-			</MultiBinding>
-		</c:ConsoleShell.IsDetailRequested>
-
-		<!--  레일 — 편제 트리 · 부대 관계도 · 미배치 장비(unit-relationship-map FR-01). 관계도 칸에는 숫자 배지를 달지 않는다.  -->
+		<!--  레일 — 편제 트리 · 부대 관계도(unit-relationship-map FR-01). 관계도 칸에는 숫자 배지를 달지 않는다.  -->
 		<c:ConsoleShell.Rail>
 			<c:ConsoleRail
 				AutomationProperties.AutomationId="Console.Units.Rail"
@@ -228,17 +213,11 @@
 			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>
 
-		<!--  가운데 — 편제 트리(항상) + 미배치 장비(나란히) + 부대 관계도(트리 위 덮개)  -->
+		<!--  가운데 — 편제 트리(항상) + 부대 관계도(트리 위 덮개)  -->
 		<c:ConsoleShell.List>
 			<Grid ClipToBounds="True">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="Auto" />
-				</Grid.ColumnDefinitions>
-
-				<!--  ① 편제 트리 — 언제나 보인다(장비를 놓을 자리라서)  -->
+				<!--  ① 편제 트리 — 언제나 깔려 있다(관계도 칸은 그 위를 덮는다)  -->
 				<DockPanel
-					Grid.Column="0"
 					IsEnabled="{Binding IsConsoleInteractive}"
 					LastChildFill="True">
 					<!--
@@ -252,7 +231,7 @@
 						BorderThickness="0,0,0,1"
 						DockPanel.Dock="Top">
 						<!--
-							U-18 D-8 8.10 — 좁은 폭(미배치 장비 칸이 열려 트리가 ≈430)에서 칩이 두 줄로 접혀 트리를 밀어냈다.
+							U-18 D-8 8.10 — 좁은 폭(트리가 ≈430)에서 칩이 두 줄로 접혀 트리를 밀어냈다.
 							한 줄로 두고, 넘치면 가로로 밀어 본다(스크롤 막대는 넘칠 때만).
 						-->
 						<ScrollViewer
@@ -348,7 +327,7 @@
 						</b:Interaction.Behaviors>
 						<ListBox.ItemTemplate>
 							<DataTemplate>
-								<!--  행 하나가 곧 드롭존이다 — 상위 바꾸기(부대) · 배치(장비) 둘 다 여기로 온다.  -->
+								<!--  행 하나가 곧 드롭존이다 — 상위 바꾸기(부대)가 여기로 온다.  -->
 								<drag:DropZoneChrome
 									Margin="{Binding Indent}"
 									drag:DropZone.Data="{Binding}"
@@ -489,14 +468,13 @@
 				</DockPanel>
 
 				<!--
-					③ 부대 관계도(unit-relationship-map FR-01) — 트리와 같은 칸을 덮는다. 미배치 장비 칸(②)은 나란히 그대로 선다.
+					② 부대 관계도(unit-relationship-map FR-01) — 트리와 같은 칸을 덮는다.
 					위 = 둘째 툴바 줄(레이어 3 · 예하 포함 · 지도에서 보기 · 배치 초기화), 가운데 = 캔버스(줌 · 맞춤 HUD · 배치 상태 줄 ·
 					확인 오버레이 · 되돌리기 막대 · M 모드 표시는 캔버스가 그린다), 아래 = 관계도 상태 문구(UIA 로 읽힌다).
 					캔버스는 확인 대기 중에도 살아 있어야 한다([확정] · [취소]) — 콘솔 잠금(IsConsoleInteractive)은 트리 · 상세 · 툴바에만 건다.
 					권한이 없거나 쓸 수 없으면 단추를 숨기지 않고 끄고 까닭을 툴팁으로 말한다.
 				-->
 				<DockPanel
-					Grid.Column="0"
 					Background="{DynamicResource SurfaceBrush}"
 					LastChildFill="True"
 					Visibility="{Binding IsAdjacencyView, Converter={StaticResource BoolToVisibility}}">
@@ -599,212 +577,6 @@
 						SelectedUnitId="{Binding Map.SelectedUnitId, Mode=OneWay}" />
 				</DockPanel>
 
-				<!--  ② 미배치 장비 — 트리와 나란히 선다. 여기서 끌어 왼쪽 부대 위에 놓는다.  -->
-				<Border
-					Grid.Column="1"
-					Width="320"
-					Background="{DynamicResource SurfaceSunkenBrush}"
-					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="1,0,0,0"
-					IsEnabled="{Binding IsConsoleInteractive}"
-					Visibility="{Binding IsDeviceView, Converter={StaticResource BoolToVisibility}}">
-					<DockPanel LastChildFill="True">
-						<Border
-							Height="30"
-							Padding="10,0"
-							Background="{DynamicResource SurfaceAltBrush}"
-							BorderBrush="{DynamicResource DividerBrush}"
-							BorderThickness="0,0,0,1"
-							DockPanel.Dock="Top">
-							<Label
-								AutomationProperties.AutomationId="Units.Devices.Header"
-								Content="{Binding DeviceHeaderText}"
-								FontWeight="SemiBold"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								Style="{StaticResource Unit.Readout}" />
-						</Border>
-
-						<Border
-							Padding="10,7"
-							Background="{DynamicResource TintInfoBrush}"
-							BorderBrush="{DynamicResource StatusInfoBrush}"
-							BorderThickness="4,0,0,0"
-							DockPanel.Dock="Top">
-							<TextBlock
-								FontSize="11"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								Text="소속 부대가 없거나 편제에 없는 부대에 속한 장비입니다."
-								TextWrapping="Wrap" />
-						</Border>
-
-						<!--  배치 대기 목록 — 쌓인 배치와 [적용] · [되돌리기]  -->
-						<Border
-							Padding="10,6"
-							Background="{DynamicResource SurfaceAltBrush}"
-							BorderBrush="{DynamicResource AccentBrush}"
-							BorderThickness="0,2,0,0"
-							DockPanel.Dock="Bottom"
-							Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVisibility}}">
-							<StackPanel>
-								<Label
-									AutomationProperties.AutomationId="Units.Devices.TrayMessage"
-									Content="{Binding TrayMessageText}"
-									Foreground="{DynamicResource TextPrimaryBrush}"
-									Style="{StaticResource Unit.Readout}" />
-								<ProgressBar
-									Height="4"
-									Margin="0,4,0,0"
-									AutomationProperties.AutomationId="Units.Devices.Progress"
-									Maximum="{Binding Tray.ProgressTotal, Mode=OneWay}"
-									Value="{Binding Tray.ProgressDone, Mode=OneWay}"
-									Visibility="{Binding Tray.IsApplying, Converter={StaticResource BoolToVisibility}}" />
-								<StackPanel
-									Margin="0,6,0,0"
-									HorizontalAlignment="Right"
-									Orientation="Horizontal">
-									<Button
-										Margin="0,0,8,0"
-										AutomationProperties.AutomationId="Units.Devices.Revert"
-										Click="OnRevertAssigns"
-										Content="되돌리기"
-										IsEnabled="{Binding Tray.CanRevert}"
-										Style="{StaticResource Console.Button}" />
-									<Button
-										AutomationProperties.AutomationId="Units.Devices.Apply"
-										Click="OnApplyAssigns"
-										Content="적용"
-										IsEnabled="{Binding Tray.CanApply}"
-										Style="{StaticResource Console.Button.Primary}" />
-								</StackPanel>
-							</StackPanel>
-						</Border>
-
-						<!--  배치 바 — 드래그의 버튼 · 키보드 경로. 콤보를 비우면 트리에서 고른 부대로 간다.  -->
-						<Border
-							Padding="10,7"
-							BorderBrush="{DynamicResource DividerBrush}"
-							BorderThickness="0,1,0,0"
-							DockPanel.Dock="Bottom">
-							<StackPanel>
-								<Label
-									AutomationProperties.AutomationId="Units.Devices.TargetLabel"
-									Content="{Binding AssignTargetText}"
-									Style="{StaticResource Unit.Readout}" />
-								<ComboBox
-									Margin="0,4,0,0"
-									AutomationProperties.AutomationId="Units.Devices.TargetCombo"
-									DisplayMemberPath="Label"
-									IsEnabled="{Binding CanPlaceDevices}"
-									ItemsSource="{Binding AssignTargets}"
-									SelectedValue="{Binding AssignTargetUnitId, Mode=TwoWay}"
-									SelectedValuePath="Id"
-									Style="{StaticResource Unit.Combo}"
-									ToolTip="비워 두면 편제 트리에서 고른 부대에 배치합니다." />
-								<Button
-									Margin="0,6,0,0"
-									HorizontalAlignment="Stretch"
-									AutomationProperties.AutomationId="Units.Devices.AssignButton"
-									Click="OnAssignSelected"
-									Content="이 부대에 배치"
-									IsEnabled="{Binding CanAssignSelectedDevices}"
-									Style="{StaticResource Console.Button}"
-									ToolTip="고른 장비를 위 부대의 배치 대기 목록에 담습니다. 손잡이를 끌어 트리에 놓아도 됩니다." />
-							</StackPanel>
-						</Border>
-
-						<Grid>
-							<Label
-								Margin="12,12,12,0"
-								VerticalAlignment="Top"
-								AutomationProperties.AutomationId="Units.Devices.Empty"
-								Content="미배치 장비가 없습니다. 모든 장비가 부대에 배치되어 있습니다."
-								Foreground="{DynamicResource TextMutedBrush}"
-								Style="{StaticResource Unit.Readout}"
-								Visibility="{Binding IsDeviceListEmpty, Converter={StaticResource BoolToVisibility}}" />
-
-							<ListBox
-								AutomationProperties.AutomationId="Units.Devices.List"
-								ItemsSource="{Binding DeviceRows}"
-								SelectionChanged="OnDeviceSelectionChanged"
-								SelectionMode="Extended"
-								Style="{StaticResource Console.ReorderList}">
-								<b:Interaction.Behaviors>
-									<drag:CaptureDragBehavior
-										DisplayMemberPath="Name"
-										Handler="{Binding Drop}"
-										IsDragEnabled="{Binding CanPlaceDevices}"
-										KeyboardFallback="장비를 고르고 아래 [이 부대에 배치]를 누르세요." />
-								</b:Interaction.Behaviors>
-								<ListBox.ItemContainerStyle>
-									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
-										<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Units.Devices.Item.{0}}" />
-										<Setter Property="HorizontalContentAlignment" Value="Stretch" />
-									</Style>
-								</ListBox.ItemContainerStyle>
-								<ListBox.ItemTemplate>
-									<DataTemplate>
-										<Grid Height="38">
-											<!--  미저장 Draft — 앰버 파선 {6,4}. {4,3}(그룹 선택)·{5,3}(드로잉)과 겹치지 않는 새 패턴이다.  -->
-											<Rectangle
-												RadiusX="4"
-												RadiusY="4"
-												Stroke="{DynamicResource AccentBrush}"
-												StrokeDashArray="6,4"
-												StrokeThickness="1"
-												Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}" />
-											<Grid Margin="2,0,8,0">
-												<Grid.ColumnDefinitions>
-													<ColumnDefinition Width="Auto" />
-													<ColumnDefinition Width="Auto" />
-													<ColumnDefinition Width="*" />
-													<ColumnDefinition Width="Auto" />
-												</Grid.ColumnDefinitions>
-												<drag:DragHandle
-													Grid.Column="0"
-													Width="14"
-													Margin="2,0,6,0"
-													AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Devices.Handle.{0}}"
-													AutomationProperties.Name="장비 배치 손잡이"
-													ToolTip="끌어서 왼쪽 편제 트리의 부대 위에 놓으세요 · Esc 로 취소" />
-												<Border
-													Grid.Column="1"
-													Margin="0,0,7,0"
-													Style="{StaticResource Unit.EchelonBadge}">
-													<TextBlock
-														VerticalAlignment="Center"
-														FontSize="10.5"
-														Foreground="{DynamicResource TextSecondaryBrush}"
-														Text="{Binding CategoryText}" />
-												</Border>
-												<StackPanel
-													Grid.Column="2"
-													VerticalAlignment="Center"
-													Orientation="Horizontal">
-													<TextBlock
-														FontSize="12.5"
-														Foreground="{DynamicResource TextPrimaryBrush}"
-														Text="{Binding Name}"
-														TextTrimming="CharacterEllipsis" />
-													<TextBlock
-														Margin="6,0,0,0"
-														FontSize="10.5"
-														Foreground="{DynamicResource TextMutedBrush}"
-														Text="{Binding NumberText}" />
-												</StackPanel>
-												<TextBlock
-													Grid.Column="3"
-													VerticalAlignment="Center"
-													FontSize="11"
-													Foreground="{DynamicResource AccentBrush}"
-													Text="{Binding PendingText}" />
-											</Grid>
-										</Grid>
-									</DataTemplate>
-								</ListBox.ItemTemplate>
-							</ListBox>
-						</Grid>
-					</DockPanel>
-				</Border>
 			</Grid>
 		</c:ConsoleShell.List>
 
@@ -857,7 +629,7 @@
 						</Label.ContentTemplate>
 					</Label>
 					<!--
-						다른 곳에서 편제가 바뀌었는데(서버 SYNC_UNIT) 적용하지 않은 편집 · 배치 대기 · 끌기 때문에 다시 읽지 않았다.
+						다른 곳에서 편제가 바뀌었는데(서버 SYNC_UNIT) 적용하지 않은 편집 · 끌기 때문에 다시 읽지 않았다.
 						덮지 않고 알린다 — [다시 읽기]는 편제만 다시 읽고 상세의 미적용 편집은 그대로 둔다(결정 D-2026-09-27-215b6d · FR-48 ⑤).
 					-->
 					<StackPanel

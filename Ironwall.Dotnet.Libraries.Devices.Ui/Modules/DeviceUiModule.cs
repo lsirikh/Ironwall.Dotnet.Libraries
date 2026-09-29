@@ -111,17 +111,24 @@ public class DeviceUiModule : Module
             // 부대 콘솔 입구 — 비모달 한 벌(FR-43). 지도의 [관계도에서 보기](OpenUnitConsoleRequest)를 들어야 하므로
             // 호스트가 해석하지 않아도 만들어 둔다(AutoActivate — V-13: 해석되지 않은 싱글턴은 구독자 목록에 없다).
             // 로그아웃 신호(ISessionLifecycle — GOP 모드만 등록)를 들어 콘솔을 닫는다.
-            builder.Register(c => new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitConsoleLauncher(
-                        c.Resolve<Caliburn.Micro.IWindowManager>(),
-                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
-                        c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>(),
-                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
-                        c.ResolveOptional<ILogService>(),
-                        c.ResolveOptional<Caliburn.Micro.IEventAggregator>(),   // 떠 있는 동안 SYNC_UNIT 를 듣는다 · 지도 요청을 듣는다
-                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.IUnitLayoutApi>(),
-                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ISessionLifecycle>(),
-                        // 셸 종료 관문(U-27) — 호스트가 등록하면 떠 있는 콘솔을 올려 셸이 끝나기 전에 가드를 묻게 한다.
-                        guardedWindows: c.ResolveOptional<Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles.IGuardedWindowRegistry>()))
+            builder.Register(c =>
+                   {
+                       // 관계도 배치 "마지막 변경 나"(REVIEW-01 MEDIUM-6) — 로그인 계정 표시 이름(user.name = 서버 updated_by.name). 읽는 순간의 값.
+                       var permissions = c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.IPermissionService>();
+                       return new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.UnitConsoleLauncher(
+                           c.Resolve<Caliburn.Micro.IWindowManager>(),
+                           c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitGraphApi>(),
+                           c.Resolve<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitDeviceApi>(),
+                           c.ResolveOptional<Ironwall.Dotnet.Libraries.Nats.Models.INatsSetupModel>(),
+                           c.ResolveOptional<ILogService>(),
+                           c.ResolveOptional<Caliburn.Micro.IEventAggregator>(),   // 떠 있는 동안 SYNC_UNIT 를 듣는다 · 지도 요청을 듣는다
+                           c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.IUnitLayoutApi>(),
+                           c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ISessionLifecycle>(),
+                           // 셸 종료 관문(U-27) — 호스트가 등록하면 떠 있는 콘솔을 올려 셸이 끝나기 전에 가드를 묻게 한다.
+                           guardedWindows: c.ResolveOptional<Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles.IGuardedWindowRegistry>(),
+                           // 실시간 꼬리표: 라이브러리에 NATS 연결 상태 공개 서비스가 없어 런처 기본(알림 통로 부재 = 꺼짐)을 쓴다.
+                           operatorName: permissions is null ? null : () => permissions.Name);
+                   })
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
                    .SingleInstance()
                    .AutoActivate();

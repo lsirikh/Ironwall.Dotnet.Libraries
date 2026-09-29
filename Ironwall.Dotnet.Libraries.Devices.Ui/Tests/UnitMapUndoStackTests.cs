@@ -134,20 +134,8 @@ public class UnitMapUndoStackTests
         Assert.Same(entry, stack.Bar);
     }
 
-    [Fact]
-    public void should_survive_a_reload_and_drop_only_entries_whose_units_vanished()
-    {
-        var stack = new UnitMapUndoStack();
-        stack.Push(Move(1));
-        stack.Push(new UnitMapReparentUndo(2, 5, 6));
-        stack.Push(Move(3));
-
-        var removed = stack.Prune(id => id != 2);          // 부대 2 가 다른 곳에서 삭제됨(SIM-F119)
-
-        Assert.IsType<UnitMapReparentUndo>(Assert.Single(removed));
-        Assert.Equal(new[] { 3, 1 }, stack.Entries.Cast<UnitMapPositionUndo>().Select(e => e.UnitId));
-        Assert.Empty(stack.Prune(_ => true));              // 다시 읽어도 멀쩡하면 아무것도 빠지지 않는다
-    }
+    // REVIEW-01 — 종전 Prune 시험은 어디서도 불리지 않는 메서드를 시험했다(MEDIUM-T2 와 같은 꼴). Prune 을 지우고,
+    // 사라진 부대의 되돌리기(SIM-F119)는 뷰모델 시험 UnitMapReviewFixTests.should_drop_parent_undo_and_say_why_when_unit_vanished 가 본다.
 
     [Fact]
     public void should_mark_session_only_entries_when_pushed_in_session_only_mode()

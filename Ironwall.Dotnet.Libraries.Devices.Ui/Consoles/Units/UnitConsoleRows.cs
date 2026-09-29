@@ -7,7 +7,7 @@ using System.Windows;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 
 /****************************************************************************
-   Purpose      : 부대 콘솔의 행 — 트리 노드 · 미배치 장비 · 인접 칩 (N-11 FR-02 · FR-11)
+   Purpose      : 부대 콘솔의 행 — 트리 노드 · 인접 칩 (N-11 FR-02)
    Created By   : GHLee
    Created On   : 9/20/2026
    Department   : SW Team
@@ -86,40 +86,6 @@ public sealed class UnitNodeRowViewModel : PropertyChangedBase
     public bool IsExpanded { get => _isExpanded; set { _isExpanded = value; NotifyOfPropertyChange(); } }
 
     public string Tooltip => $"{EchelonText} · {Name} · {Code}" + (IsEnable ? string.Empty : " · 운용 중지");
-
-    public override string ToString() => Name;
-}
-
-/// <summary>미배치 장비 목록의 행.</summary>
-public sealed class UnitDeviceRowViewModel : PropertyChangedBase
-{
-    private string? _pendingUnitName;
-
-    public UnitDeviceRowViewModel(UnitDeviceItem item, string unitText)
-    {
-        Item = item ?? throw new ArgumentNullException(nameof(item));
-        UnitText = unitText;
-    }
-
-    public UnitDeviceItem Item { get; }
-
-    public int Id => Item.Id;
-    public string Name => Item.Name;
-    public string NumberText => $"#{Item.NumberDevice}";
-    public string CategoryText => Item.CategoryText;
-
-    /// <summary>지금 소속 — 없으면 "소속 없음".</summary>
-    public string UnitText { get; }
-
-    /// <summary>아직 보내지 않은 배치(Draft). 채워져 있으면 행이 앰버 파선으로 뜬다.</summary>
-    public string? PendingUnitName
-    {
-        get => _pendingUnitName;
-        set { _pendingUnitName = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsPending)); NotifyOfPropertyChange(nameof(PendingText)); }
-    }
-
-    public bool IsPending => !string.IsNullOrEmpty(_pendingUnitName);
-    public string PendingText => IsPending ? $"→ {_pendingUnitName}" : string.Empty;
 
     public override string ToString() => Name;
 }

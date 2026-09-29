@@ -93,6 +93,29 @@ public class GateDeviceApiTests
     }
 
     [Fact]
+    public async Task should_omit_unit_id_key_when_the_gate_has_no_unit_on_v8()
+    {
+        // 서버 회신 2026-09-28 Q-1 — PATCH/PUT 의 명시적 "unit_id": null 은 422. DTO 는 값이 없으면 키째 뺀다(NullValueHandling.Ignore).
+        var (service, http) = Create(EnumServerContract.V8_0);
+        var gate = SampleGate();
+        gate.UnitId = null;
+
+        await service.UpdateGateAsync(77, gate);
+
+        Assert.False(http.Body!.ContainsKey("unit_id"), http.Body.ToString());
+    }
+
+    [Fact]
+    public void should_mark_device_unit_id_ignore_on_null()
+    {
+        var property = typeof(BaseDeviceDto).GetProperty(nameof(BaseDeviceDto.UnitId));
+        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<JsonPropertyAttribute>(property!);
+
+        Assert.NotNull(attribute);
+        Assert.Equal(NullValueHandling.Ignore, attribute!.NullValueHandling);
+    }
+
+    [Fact]
     public async Task should_not_send_unit_id_when_writing_gate_to_legacy_server()
     {
         var (service, http) = Create(EnumServerContract.V6_3);

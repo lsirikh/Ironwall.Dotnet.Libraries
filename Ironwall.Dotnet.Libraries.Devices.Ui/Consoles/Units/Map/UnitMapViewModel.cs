@@ -122,6 +122,11 @@ public sealed class UnitMapViewModelOptions
 
     /// <summary>배치 알림 합침 창(FR-53).</summary>
     public TimeSpan NoticeCoalesce { get; init; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// 기록 — 대기열 작업의 예기치 못한 예외 원문은 막대가 아니라 여기로 간다(REVIEW-01 L-6). 없으면 남기지 않는다.
+    /// </summary>
+    public Ironwall.Dotnet.Libraries.Base.Services.ILogService? Log { get; init; }
 }
 
 /// <summary>
@@ -174,8 +179,15 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     private sealed record ReparentFacts(IReadOnlyList<int> ChainAfterMove, bool HadDelta);
 
     private readonly Ironwall.Dotnet.Libraries.Base.Services.IClock _clock;
-    private int _queueDepth;
     private string? _barAction;
+
+    /// <summary>창이 닫혔다 — 아직 시작하지 않은 대기열 작업 · 연기 감시 · 콘솔 한가 기다림을 거둔다(REVIEW-01 L-7).</summary>
+    private readonly CancellationTokenSource _closing = new();
+
+    /// <summary>
+    /// 대기열에서 차례를 받은 편제 쓰기가 콘솔이 한가해지기를 기다리는 한도(REVIEW-01 MEDIUM-4). 넘으면 보내지 않고 막대로 말한다.
+    /// </summary>
+    public static readonly TimeSpan ConsoleIdleWait = TimeSpan.FromSeconds(10);
 
     /// <summary>내 부대 id — 콘솔이 준 함수가 있으면 그것(편제를 읽은 뒤 정해진다).</summary>
     private int? MyUnitId => _options.MyUnitIdProvider?.Invoke() ?? _options.MyUnitId;
@@ -482,10 +494,11 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         }
         ClosePending(focusCanvas: true);
 
+        var subject = NameOf(pending.MovingId);
         return pending.Kind switch
         {
-            UnitMapConfirmKind.Reparent => Serialize(() => ExecuteReparentAsync(pending)),
-            UnitMapConfirmKind.Adjoin => Serialize(() => ExecuteAdjoinAsync(pending)),
+            UnitMapConfirmKind.Reparent => Serialize(() => ExecuteReparentAsync(pending), subject),
+            UnitMapConfirmKind.Adjoin => Serialize(() => ExecuteAdjoinAsync(pending), subject),
             _ => ResetLayoutConfirmedAsync(),
         };
     }
@@ -535,6 +548,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
 
     private async Task ExecuteReparentAsync(UnitMapPendingConfirm pending)
     {
+        if (!await WhenConsoleIdleAsync(NameOf(pending.MovingId)).ConfigureAwait(true)) return;
         if (!await RevalidateAsync(pending).ConfigureAwait(true)) return;
         var (movingId, targetId, oldParentId) = (pending.MovingId!.Value, pending.TargetId!.Value, pending.OldParentId);
         var name = NameOf(movingId);
@@ -552,11 +566,12 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             await RefreshDetailIfAffectedAsync(movingId, targetId, oldParentId).ConfigureAwait(true);
             return;
         }
-        await ReportOrgWriteFailedAsync(name).ConfigureAwait(true);
+        await ReportOrgWriteFailedAsync(reason => UnitMapText.WriteFailedBar(name, reason)).ConfigureAwait(true);
     }
 
     private async Task ExecuteAdjoinAsync(UnitMapPendingConfirm pending)
     {
+        if (!await WhenConsoleIdleAsync(NameOf(pending.MovingId)).ConfigureAwait(true)) return;
         if (!await RevalidateAsync(pending).ConfigureAwait(true)) return;
         var (unitId, otherId) = (pending.MovingId!.Value, pending.TargetId!.Value);
         var name = NameOf(unitId);
@@ -569,7 +584,48 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             await RefreshDetailIfAffectedAsync(unitId, otherId).ConfigureAwait(true);
             return;
         }
-        await ReportOrgWriteFailedAsync(name).ConfigureAwait(true);
+        await ReportOrgWriteFailedAsync(reason => UnitMapText.AdjacencyWriteFailedBar(name, otherName, reason)).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// 콘솔이 한가해질 때까지(REVIEW-01 MEDIUM-4) — 대기열에서 차례를 받은 편제 쓰기 · 되돌리기가 바쁜 콘솔에 가서 "앞선 작업" 으로
+    /// 튕기거나, 재조회가 미뤄진 옛 편제로 재판정하지 않게. <see cref="ConsoleIdleWait"/> 를 넘기면 보내지 않고 막대로 말한다.
+    /// </summary>
+    /// <remarks>
+    /// 한가해진 알림(<c>BusyChanged</c>)은 콘솔 작업의 <c>finally</c> 한가운데서 온다 — 거기서 곧바로 이어 쓰면 재진입이다.
+    /// 그래서 연속을 비동기로 미룬다(UI 스레드면 디스패처 뒤로). 창이 닫히면(<see cref="_closing"/>) 조용히 그만둔다.
+    /// </remarks>
+    /// <returns>보내도 되면 <c>true</c>.</returns>
+    private async Task<bool> WhenConsoleIdleAsync(string subject)
+    {
+        if (_options.Console is not { } bridge || !bridge.IsBusy) return !_closing.IsCancellationRequested;
+
+        var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
+        var timeout = SafeDelay(ConsoleIdleWait, stop.Token);        // 먼저 건다 — 구독이 붙은 뒤의 시간은 모두 센다
+        void OnBusyChanged(object? sender, EventArgs e) { if (!bridge.IsBusy) idle.TrySetResult(); }
+        bridge.BusyChanged += OnBusyChanged;
+        try
+        {
+            if (bridge.IsBusy) await Task.WhenAny(idle.Task, timeout).ConfigureAwait(true);
+        }
+        finally
+        {
+            bridge.BusyChanged -= OnBusyChanged;
+            stop.Cancel();
+        }
+
+        if (_closing.IsCancellationRequested) return false;
+        if (!bridge.IsBusy) return true;
+        ShowBar(UnitMapText.ConsoleStillBusyBar(subject), isError: true);
+        return false;
+    }
+
+    /// <summary>주입된 지연(시험은 손으로 흘린다) — 취소는 예외가 아니라 끝난 작업으로 돌려준다.</summary>
+    private async Task SafeDelay(TimeSpan span, CancellationToken token)
+    {
+        try { await (_options.Delay ?? Task.Delay)(span, token).ConfigureAwait(true); }
+        catch (OperationCanceledException) { /* 거뒀다 */ }
     }
     #endregion
 
@@ -617,13 +673,16 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
 
     /// <summary>
     /// 상위 되돌리기 — 먼저 편제를 다시 읽고(#21), 그 부대의 상위 사슬(부대 + 조상, 값)이 내가 옮긴 그대로일 때만 반대로 보낸다.
-    /// 트리와 공유하는 <c>_lastMove</c> 가 그 사이 다른 이동을 가리킬 수 있어(#22) 반대 방향을 직접 보낸다.
+    /// 반대 이동은 <b>언제나 이 표가 직접</b> 보낸다 — 옛 상위가 없었으면(최상위) 최상위로(<c>MoveAsync(id, null)</c>).
+    /// 트리 툴바의 공유 <c>_lastMove</c> 는 쓰지 않는다(REVIEW-01 HIGH-1 — 그 칸은 하나뿐이라 다른 이동이 덮으면 엉뚱한 부대를 옮기고,
+    /// 비었으면 옮기지 않은 채 "성공" 했다).
     /// </summary>
     private async Task UndoReparentAsync(UnitMapReparentUndo entry)
     {
+        var name = NameOf(entry.UnitId);                                           // 다시 읽기 전 이름 — 사라졌어도 막대가 이름으로 말한다
+        if (!await WhenConsoleIdleAsync(name).ConfigureAwait(true)) return;      // 표는 그대로 — 다시 시도할 수 있게
         await _commands.ReloadAsync(quiet: true).ConfigureAwait(true);
 
-        var name = NameOf(entry.UnitId);
         var node = _tree.Find(entry.UnitId);
         if (node is null) { Drop(entry, UnitMapText.UndoUnitGoneBar(name)); return; }
 
@@ -632,9 +691,7 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         var unchanged = node.ParentId == entry.ToParentId && (facts is null || chainNow.SequenceEqual(facts.ChainAfterMove));
         if (!unchanged) { Drop(entry, UnitMapText.ReparentUndoRefusedBar(name)); return; }
 
-        var ok = entry.FromParentId is int from
-            ? await _commands.MoveAsync(entry.UnitId, from).ConfigureAwait(true)
-            : await _commands.UndoMoveAsync().ConfigureAwait(true);
+        var ok = await _commands.MoveAsync(entry.UnitId, entry.FromParentId).ConfigureAwait(true);
         if (ok)
         {
             _undo.CompleteUndo(entry, succeeded: true);
@@ -642,16 +699,17 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             await RefreshDetailIfAffectedAsync(entry.UnitId, entry.FromParentId, entry.ToParentId).ConfigureAwait(true);
             return;
         }
-        await ReportOrgWriteFailedAsync(name).ConfigureAwait(true);
+        await ReportOrgWriteFailedAsync(reason => UnitMapText.WriteFailedBar(name, reason)).ConfigureAwait(true);
     }
 
     /// <summary>인접 되돌리기 — 먼저 편제를 다시 읽고, 이미 반영돼 있으면 보내지 않는다(SIM-F120).</summary>
     private async Task UndoAdjacencyAsync(UnitMapAdjacencyUndo entry)
     {
+        var name = NameOf(entry.UnitId);                                           // 다시 읽기 전 이름(사라진 부대도 이름으로)
+        var otherName = NameOf(entry.OtherId);
+        if (!await WhenConsoleIdleAsync(name).ConfigureAwait(true)) return;
         await _commands.ReloadAsync(quiet: true).ConfigureAwait(true);
 
-        var name = NameOf(entry.UnitId);
-        var otherName = NameOf(entry.OtherId);
         var node = _tree.Find(entry.UnitId);
         if (node is null || _tree.Find(entry.OtherId) is null) { Drop(entry, UnitMapText.UndoUnitGoneBar(node is null ? name : otherName)); return; }
 
@@ -668,14 +726,18 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
             await RefreshDetailIfAffectedAsync(entry.UnitId, entry.OtherId).ConfigureAwait(true);
             return;
         }
-        await ReportOrgWriteFailedAsync(name).ConfigureAwait(true);
+        await ReportOrgWriteFailedAsync(reason => UnitMapText.AdjacencyWriteFailedBar(name, otherName, reason)).ConfigureAwait(true);
     }
 
-    /// <summary>편제 쓰기 실패 복구(FR-34) — 콘솔이 조용히 다시 읽어 제자리로 돌리고, 막대는 오류 모양으로 사유 한 줄.</summary>
-    private async Task ReportOrgWriteFailedAsync(string unitName)
+    /// <summary>
+    /// 편제 쓰기 실패 복구(FR-34) — 콘솔이 조용히 다시 읽어 제자리로 돌리고, 막대는 오류 모양으로 사유 한 줄.
+    /// 문구는 한 일에 맞춘다(이동 · 인접 — REVIEW-01 L-2). 사유는 콘솔이 이번 쓰기에서 정한 것(바쁨 포함 — MEDIUM-4).
+    /// </summary>
+    private async Task ReportOrgWriteFailedAsync(Func<string, string> bar)
     {
+        var reason = _options.Console?.LastWriteFailureReason ?? UnitMapText.OrgWriteFailedReason;
         await _commands.ReloadAsync(quiet: true).ConfigureAwait(true);
-        ShowBar(UnitMapText.WriteFailedBar(unitName, _options.Console?.LastWriteFailureReason ?? UnitMapText.OrgWriteFailedReason), isError: true);
+        ShowBar(bar(reason), isError: true);
     }
 
     /// <summary>되돌릴 수 없는 항목을 표에서 빼고 까닭을 알린다(남의 변경을 되돌리기로 지우지 않는다).</summary>
@@ -732,7 +794,8 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
     #region - 콘솔이 알리는 편제 변경 (#22 · FR-08) -
     /// <summary>
     /// 트리 레일(관계도 밖)에서 상위 · 인접을 바꿨다 — 관계도 되돌리기 표의 편제 항목을 무효로 한다(#22 · TEST-63 ②):
-    /// 트리와 공유하는 되돌리기(<c>_lastMove</c>)가 다른 이동을 가리키게 되므로, 막대 [되돌리기]가 엉뚱한 이동을 되돌리지 않게.
+    /// 막대가 말하는 조작 뒤에 다른 편제 변경이 끼었으므로, 막대 [되돌리기]가 그 사이 바뀐 편제를 되돌리지 않게(보수적으로 뺀다).
+    /// 관계도 되돌리기는 트리의 <c>_lastMove</c> 를 쓰지 않는다(REVIEW-01 HIGH-1).
     /// </summary>
     public void OnConsoleStructureChanged()
     {
@@ -747,10 +810,15 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
 
     /// <summary>
     /// 상위 바꾸기 뒤 그 부대의 배치(Δ) 정리(FR-08) — 트리에서 옮긴 경우 콘솔이 부른다(관계도에서 옮긴 경우는 이 VM 이 이미 한다).
-    /// 대기열 안에서 불리면 곧바로, 밖이면 대기열을 탄다(한 번에 하나 — NFR-12).
+    /// <b>언제나 대기열을 탄다</b>(한 번에 하나 — NFR-12): 앞선 배치 쓰기가 응답을 기다리는 중이면 그 뒤에 읽고 쓴다(REVIEW-01 MEDIUM-3 —
+    /// 종전엔 "대기열 깊이 &gt; 0" 이면 곧바로 돌아 앞선 쓰기와 겹쳤다).
     /// </summary>
-    public Task CleanupAfterParentChangeAsync(int unitId)
-        => _queueDepth > 0 ? CleanupAfterReparentAsync(unitId) : Serialize(() => CleanupAfterReparentAsync(unitId));
+    /// <param name="insideQueue">
+    /// 부르는 쪽이 <b>이미 대기열 작업 안</b>이다 — 그때만 곧바로 한다(대기열 안에서 대기열 끝을 기다리면 자기 자신을 기다린다).
+    /// 깊이로 짐작하지 않고 부르는 쪽이 밝힌다. 지금은 대기열 안의 호출부가 없다(관계도 자신의 정리는 <c>ExecuteReparentAsync</c> 가 직접 한다).
+    /// </param>
+    public Task CleanupAfterParentChangeAsync(int unitId, bool insideQueue = false)
+        => insideQueue ? CleanupAfterReparentAsync(unitId) : Serialize(() => CleanupAfterReparentAsync(unitId), NameOf(unitId));
     #endregion
 
     #region - 보여 주기 (FR-46) -
@@ -809,10 +877,17 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
         _firstNoticeAt = null;
     }
 
+    /// <summary>
+    /// 닫힌다 — 오버레이 · M 모드 · 끌기를 거두고, <b>아직 시작하지 않은</b> 대기열 작업 · 연기 감시 · 콘솔 한가 기다림을 멈춘다(REVIEW-01 L-7).
+    /// 이미 나간 요청 하나는 돌아오기만 하고 이어지는 쓰기는 없다 — 닫기 전에 그 결과를 볼지는 콘솔의 닫기 가드가 묻는다
+    /// (<see cref="WaitForWritesAsync"/>).
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        CancelDeferWatch();
+        _closing.Cancel();
         CancelAll();
         SaveView();
         _commands.SelectedUnitChanged -= OnConsoleSelectionChanged;
@@ -825,37 +900,52 @@ public sealed partial class UnitMapViewModel : PropertyChangedBase, IUnitMapInte
 
     #region - 대기열 · 상태 알림 -
     /// <summary>서버 쓰기 · 배치 재조회를 UI 스레드의 단일 대기열에 싣는다(NFR-12 — 한 번에 하나, 도착 순서대로).</summary>
-    private Task Serialize(Func<Task> work)
+    /// <param name="subject">예기치 못한 실패 때 막대가 말할 대상(부대 이름) — 없으면 일반 문구.</param>
+    private Task Serialize(Func<Task> work, string? subject = null)
     {
         _queued++;
         NotifyOfPropertyChange(nameof(IsWriting));
-        var task = RunAfterAsync(_tail, work);
+        var task = RunAfterAsync(_tail, work, subject);
         _tail = task;
         return task;
     }
 
-    private async Task RunAfterAsync(Task previous, Func<Task> work)
+    private async Task RunAfterAsync(Task previous, Func<Task> work, string? subject)
     {
         try { await previous.ConfigureAwait(true); }
         catch { /* 앞 작업의 실패는 그쪽 막대가 알렸다 */ }
 
-        _queueDepth++;
         try
         {
-            await work().ConfigureAwait(true);
+            // 닫힌 뒤 차례가 온 작업은 보내지 않는다(REVIEW-01 L-7) — 아무도 결과를 보지 못한다.
+            if (!_closing.IsCancellationRequested) await work().ConfigureAwait(true);
         }
         catch (OperationCanceledException) { /* 닫는 중 */ }
         catch (Exception ex)
         {
-            ShowBar($"작업을 마치지 못했습니다. {ex.Message}", isError: true);
+            // 예외 원문(영문 · 내부 정보)은 화면에 싣지 않는다 — 기록으로(REVIEW-01 L-6 · U-18 공통 규칙).
+            _options.Log?.Error($"[UnitMap] 대기열 작업 실패({subject ?? "-"}): {ex}");
+            ShowBar(UnitMapText.UnexpectedFailureBar(subject), isError: true);
         }
         finally
         {
-            _queueDepth--;
             _queued--;
             NotifyOfPropertyChange(nameof(IsWriting));
             UpdateBusy();
         }
+    }
+
+    /// <summary>
+    /// 대기열이 비기를 <paramref name="wait"/> 만큼만 기다린다 — 창 닫기 가드가 "쓰는 중에 말없이 닫기" 를 막을 때 쓴다(REVIEW-01 L-7).
+    /// </summary>
+    /// <returns>비었으면 <c>true</c>(더 쓰는 것이 없다).</returns>
+    public async Task<bool> WaitForWritesAsync(TimeSpan wait)
+    {
+        if (!IsWriting) return true;
+        using var stop = new CancellationTokenSource();
+        await Task.WhenAny(WhenIdleAsync(), SafeDelay(wait, stop.Token)).ConfigureAwait(true);
+        stop.Cancel();
+        return !IsWriting;
     }
 
     /// <summary>대기열이 빌 때까지(시험 · 닫기 전 정리).</summary>

@@ -7,7 +7,7 @@ using System.Linq;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 
 /****************************************************************************
-   Purpose      : 부대 콘솔 드롭 처리기 — 판정은 순수 함수, 전송은 콘솔이 (N-11 FR-06 ~ FR-12)
+   Purpose      : 부대 콘솔 드롭 처리기 — 판정은 순수 함수, 전송은 콘솔이 (N-11 FR-06 ~ FR-09)
    Created By   : GHLee
    Created On   : 9/20/2026
    Department   : SW Team
@@ -19,18 +19,17 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units;
 public sealed record UnitDropRequest(
     string ZoneKey,
     int TargetUnitId,
-    IReadOnlyList<UnitNodeRowViewModel> Units,
-    IReadOnlyList<UnitDeviceRowViewModel> Devices);
+    IReadOnlyList<UnitNodeRowViewModel> Units);
 
 /// <summary>
-/// 부대 콘솔의 드롭존 네 곳을 한 처리기가 맡는다 — 상위 바꾸기 · 루트로 · 인접 · 장비 배치.
+/// 부대 콘솔의 드롭존 세 곳을 한 처리기가 맡는다 — 상위 바꾸기 · 루트로 · 인접.
 /// </summary>
 /// <remarks>
 /// <para><see cref="CanDrop"/> 는 끄는 동안 마우스가 움직일 때마다 불린다 — <b>서버를 부르지 않고</b>
 /// <see cref="UnitDropRules"/> 로만 판정한다(커널 계약).</para>
 /// <para><see cref="Drop"/> 은 보내지 않는다. 무엇을 어디에 놓았는지만 콘솔에 넘기고,
-/// 호출 1회짜리(상위 바꾸기 · 인접)는 콘솔이 곧바로 보내고 N회짜리(장비 배치)는 Draft 트레이에 쌓는다
-/// — 드래그 와이어프레임 L432 의 판정 규칙 그대로.</para>
+/// 호출 1회짜리(상위 바꾸기 · 인접)라 콘솔이 곧바로 보낸다 — 드래그 와이어프레임 L432 의 판정 규칙 그대로.</para>
+/// <para>장비 배치 드롭은 없다 — 끄는 쪽이던 「미배치 장비」 칸을 서버 회신 Q-1 ⓐ(개념 폐지)로 걷었다.</para>
 /// </remarks>
 public sealed class UnitDropHandler : IDragDropHandler
 {
@@ -40,21 +39,15 @@ public sealed class UnitDropHandler : IDragDropHandler
     private readonly Func<bool> _isBusy;
     private readonly Action<UnitDropRequest> _onDrop;
     private readonly Action<string>? _onBlocked;
-    private readonly Func<bool> _canPlaceDevices;
-
-    /// <summary>장비 배치가 막힌 까닭 — 배치는 장비 쓰기(<c>PATCH /api/devices/…</c>)라 <c>devices:edit</c> 다.</summary>
-    public const string PlaceDeniedReason = "장비를 부대에 배치할 권한이 없습니다.";
 
     /// <param name="canEdit">부대 쓰기(<c>units:edit</c>) — 상위 바꾸기 · 인접.</param>
-    /// <param name="canPlaceDevices">장비 배치(<c>devices:edit</c>). 생략하면 <paramref name="canEdit"/> 를 따른다.</param>
     public UnitDropHandler(
         Func<UnitTreeModel?> tree,
         Func<int> selectedUnitId,
         Func<bool> canEdit,
         Func<bool> isBusy,
         Action<UnitDropRequest> onDrop,
-        Action<string>? onBlocked = null,
-        Func<bool>? canPlaceDevices = null)
+        Action<string>? onBlocked = null)
     {
         _tree = tree ?? throw new ArgumentNullException(nameof(tree));
         _selectedUnitId = selectedUnitId ?? throw new ArgumentNullException(nameof(selectedUnitId));
@@ -62,7 +55,6 @@ public sealed class UnitDropHandler : IDragDropHandler
         _isBusy = isBusy ?? throw new ArgumentNullException(nameof(isBusy));
         _onDrop = onDrop ?? throw new ArgumentNullException(nameof(onDrop));
         _onBlocked = onBlocked;
-        _canPlaceDevices = canPlaceDevices ?? _canEdit;
     }
 
     public bool CanDrop(DragPayload payload, DropTarget target)
@@ -85,7 +77,7 @@ public sealed class UnitDropHandler : IDragDropHandler
             return;
         }
 
-        _onDrop(new UnitDropRequest(target!.ZoneKey, TargetIdOf(target), UnitsOf(items!), DevicesOf(items!)));
+        _onDrop(new UnitDropRequest(target!.ZoneKey, TargetIdOf(target), UnitsOf(items!)));
     }
 
     /// <summary>판정 + 막힌 까닭. 화면이 "왜 못 놓는지" 를 한 줄로 보여줄 때도 쓴다.</summary>
@@ -103,12 +95,9 @@ public sealed class UnitDropHandler : IDragDropHandler
 
         var tree = _tree();
         var units = UnitsOf(items);
-        var devices = DevicesOf(items);
 
-        // 서버가 지키는 모듈이 다르다 — 장비를 두는 것은 devices:edit, 부대를 옮기고 잇는 것은 units:edit.
-        var placingDevices = target.ZoneKey == UnitDropRules.ZONE_PARENT && devices.Count > 0;
-        if (placingDevices && !_canPlaceDevices()) return UnitDropVerdict.Block(PlaceDeniedReason);
-        if (!placingDevices && !_canEdit()) return UnitDropVerdict.Block(UnitConsoleViewModel.NO_EDIT_PERMISSION);
+        // 부대를 옮기고 잇는 것은 units:edit 다.
+        if (!_canEdit()) return UnitDropVerdict.Block(UnitConsoleViewModel.NO_EDIT_PERMISSION);
 
         switch (target.ZoneKey)
         {
@@ -120,9 +109,6 @@ public sealed class UnitDropHandler : IDragDropHandler
             {
                 var targetId = TargetIdOf(target);
                 if (targetId <= 0) return UnitDropVerdict.Block("놓을 부대를 찾지 못했습니다.");
-
-                if (devices.Count > 0)
-                    return UnitDropRules.CanAssignDevices(tree, targetId, devices.Select(d => d.Item.UnitId).ToList());
 
                 if (units.Count != 1) return UnitDropVerdict.Block("부대 한 개만 옮길 수 있습니다.");
                 return UnitDropRules.CanMove(tree, units[0].Id, targetId);
@@ -150,7 +136,4 @@ public sealed class UnitDropHandler : IDragDropHandler
 
     private static IReadOnlyList<UnitNodeRowViewModel> UnitsOf(IEnumerable<object> items)
         => items.OfType<UnitNodeRowViewModel>().ToList();
-
-    private static IReadOnlyList<UnitDeviceRowViewModel> DevicesOf(IEnumerable<object> items)
-        => items.OfType<UnitDeviceRowViewModel>().ToList();
 }

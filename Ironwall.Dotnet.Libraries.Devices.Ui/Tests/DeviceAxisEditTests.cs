@@ -325,6 +325,21 @@ public class DeviceAxisEditTests : IDisposable
     }
 
     [Fact]
+    public async Task should_carry_the_devices_current_unit_instead_of_null_when_an_edit_clears_the_unit_on_8_0()
+    {
+        // 서버 회신 2026-09-28 Q-1 — PATCH 의 명시적 "unit_id": null 은 422(무소속 장비는 없다). 칸 명세가 비우기를 허용하도록
+        // 바뀌는 회귀가 생겨도 null 을 보내지 않고, 부대를 고치지 않은 편집과 같게 그 장비의 지금 부대를 싣는다.
+        var api = new AxisCaptureApi();
+        var writer = new DeviceAxisWriter(api, new DeviceQueryPolicy(new Probe(EnumServerContract.V8_0)));
+        var clearable = Spec("unit_id") with { AxisAllowsClear = true };
+
+        var result = await writer.ApplyAsync(new IBaseDeviceModel[] { LampModel(11, unitId: 4) }, new[] { (clearable, "") });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(4, (int?)api.Calls.Single().Body["unit_id"]);
+    }
+
+    [Fact]
     public async Task should_send_nothing_when_server_is_legacy()
     {
         var api = new AxisCaptureApi();

@@ -45,10 +45,15 @@ public interface IUnitDeviceApi
 {
     bool IsAvailable { get; }
 
-    /// <summary>일곱 카테고리를 훑어 장비를 전부 읽는다(부대 필터 없이 — 서버에 '미배치' 질의가 없다).</summary>
+    /// <summary>일곱 카테고리를 훑어 장비를 전부 읽는다(부대 필터 없이 한 번 — 트리 장비 수 · 관계도 배지 · [지도에서 보기]의 원천).</summary>
     Task<UnitDeviceLoadResult> LoadAllAsync(CancellationToken token = default);
 
-    /// <summary>장비 한 대의 소속 부대를 바꾼다 — 다시 받기 1회 + PATCH 1회.</summary>
+    /// <summary>장비 한 대의 소속 부대를 바꾼다 — 다시 받기 1회 + PATCH 1회. 본문은 늘 <b>1 이상의 부대 id</b> 다(명시적 <c>null</c> 은 422).</summary>
+    /// <remarks>
+    /// 「미배치 장비」 칸(Q-1 ⓐ 폐지)이 걷힌 뒤 콘솔 화면에는 부르는 곳이 없다. 창구는 남긴다 — 장비 한 대의 소속을 바꾸는
+    /// <b>좁은 본문</b>(<see cref="UnitAssignRequestBuilder"/>)의 유일한 경로이고, 라이브 하네스(dl.3d)가 저장된
+    /// <c>connection.type</c> 보존을 이 경로로 지킨다.
+    /// </remarks>
     Task<UnitDeviceAssignResult> AssignAsync(UnitDeviceItem device, int unitId, CancellationToken token = default);
 }
 
@@ -149,8 +154,8 @@ public sealed class UnitGraphApiAdapter : IUnitGraphApi
 /// 장비 창구 — 일곱 카테고리 목록을 병렬로 읽고, 소속 바꾸기는 <b>다시 받아 좁은 본문</b>으로 보낸다.
 /// </summary>
 /// <remarks>
-/// <para>서버에 "부대 없는 장비" 질의가 없다(스웨거 8.0.1 실측 — 필터축은 <c>unit_id</c>·<c>include_descendants</c> 뿐).
-/// 그래서 전량을 읽고 클라가 가른다. 목록은 <b>한 장</b>이 아니라 큰 한도로 한 번에 받는다(limit 100 이 서버 상한).</para>
+/// <para>부대마다 따로 묻지 않고 전량을 한 번 읽어 클라가 부대별로 센다(필터축은 <c>unit_id</c>·<c>include_descendants</c> 뿐).
+/// 목록은 <b>한 장</b>이 아니라 큰 한도로 한 번에 받는다(limit 100 이 서버 상한).</para>
 /// </remarks>
 public sealed class UnitDeviceApiAdapter : IUnitDeviceApi
 {
