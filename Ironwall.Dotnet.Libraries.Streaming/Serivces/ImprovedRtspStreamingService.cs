@@ -2057,7 +2057,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host). security.md — 자격증명 로그 금지.
     /// Onvif조회 모드(CameraPopup_RtspSource_Priority)는 조합 URL에 자격증명이 항상 임베드되므로 필수(감사 security-M).</summary>
     private static string MaskUrlCredentials(string? url)
-        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
+        => Ironwall.Dotnet.Libraries.Streaming.Base.Models.RtspUrlCredentials.Mask(url);
 
     #endregion
 }

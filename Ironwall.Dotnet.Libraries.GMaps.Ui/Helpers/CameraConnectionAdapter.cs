@@ -40,9 +40,11 @@ public static class CameraConnectionAdapter
             StreamType = preferSub && !string.IsNullOrWhiteSpace(sub) ? 1 : 0,
         };
 
-        // URL이 있으면 그대로 사용. 없으면 GetFullUrl()이 IpAddress+Port+StreamPath로 조립.
+        // URL이 있으면 그 URL에 카메라 계정을 싣는다. 없으면 GetFullUrl()이 IpAddress+Port+StreamPath로 조립.
+        // 서버 계약상 connection.urls 에는 계정이 없다(userinfo 422) → 그대로 넘기면 LibVLC 가 계정 없이 DESCRIBE 해
+        // 계정 있는 카메라는 401 로 영상이 비었다(192.168.202.108 실측). URL 에 이미 userinfo 가 있으면 그 값을 존중한다.
         if (!string.IsNullOrWhiteSpace(url))
-            info.Url = url!;
+            info.Url = RtspUrlCredentials.WithCredentials(url, camera.UserName, camera.UserPassword);
 
         // 유효성: Url 또는 IpAddress가 있어야 의미. 둘 다 없으면 null.
         return info.IsValid() ? info : null;

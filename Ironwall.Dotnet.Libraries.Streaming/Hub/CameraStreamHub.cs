@@ -110,7 +110,7 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
 
     /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host).</summary>
     private static string MaskUrl(string? url)
-        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
+        => Ironwall.Dotnet.Libraries.Streaming.Base.Models.RtspUrlCredentials.Mask(url);
 
     // ── Entry 팩토리 ─────────────────────────────────────────────────────────
 

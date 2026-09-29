@@ -454,7 +454,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
 
     /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host). security.md — 자격증명 로그 금지.</summary>
     private static string MaskUrlCredentials(string? url)
-        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
+        => Ironwall.Dotnet.Libraries.Streaming.Base.Models.RtspUrlCredentials.Mask(url);
 
     private async Task ConnectViaHubAsync(CameraViewModel vm)
     {

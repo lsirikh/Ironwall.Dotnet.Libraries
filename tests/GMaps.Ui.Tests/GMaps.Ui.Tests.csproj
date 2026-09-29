@@ -34,6 +34,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Messages\Dto\Brokers\CameraAimLocationBodyDto.cs" />
     <!-- 카메라 스트림 공유 키(A/B 동일영상 병합 버그 회귀 방지) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Streaming.Base\Models\RtspCameraKey.cs" />
+    <!-- Url 모드 카메라 계정 → RTSP URL 결합 · 로그 마스킹(계정 있는 카메라 팝업 401) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.Streaming.Base\Models\RtspUrlCredentials.cs" />
     <!-- 카메라 팝업 RTSP 소스 Onvif조회(CameraPopup_RtspSource_Priority FR-03/04) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\OnvifProfileSelector.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\OnvifRtspUrlComposer.cs" />

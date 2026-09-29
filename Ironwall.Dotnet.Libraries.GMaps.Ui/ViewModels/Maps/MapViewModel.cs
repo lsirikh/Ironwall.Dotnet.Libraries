@@ -1667,11 +1667,8 @@ public partial class MapViewModel : BasePanelViewModel,
     private static string MaskRtspCredentials(string? url)
     {
         if (string.IsNullOrEmpty(url)) return "(빈 URL)";
-        var scheme = url.IndexOf("://", StringComparison.Ordinal);
-        var at = url.IndexOf('@');
-        if (scheme > 0 && at > scheme)
-            return string.Concat(url.AsSpan(0, scheme + 3), "***@", url.AsSpan(at + 1));
-        return url;
+        // 공용 마스킹(authority 의 마지막 '@' 까지) — 옛 구현은 첫 '@' 에서 잘라 인코딩 안 된 '@' 비밀번호 뒷부분이 로그에 남았다.
+        return RtspUrlCredentials.Mask(url);
     }
 
     #region - Camera RTSP Stream Popup (맵 위 이동식 영상 팝업) -
