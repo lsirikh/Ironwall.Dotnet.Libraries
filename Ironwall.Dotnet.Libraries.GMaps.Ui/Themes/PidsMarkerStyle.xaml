@@ -30,7 +30,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
@@ -162,7 +162,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 																<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
@@ -346,7 +346,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 									<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 									<Canvas
@@ -457,7 +457,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 									<Canvas
@@ -572,7 +572,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 							<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
@@ -740,7 +740,7 @@
 								Width="{TemplateBinding Width}"
 								Height="{TemplateBinding Height}"
 								Stretch="Fill"
-								ToolTip="{TemplateBinding MarkerTitle}">
+								ToolTip="{TemplateBinding SymbolToolTip}">
 
 								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas Name="PART_SmartSensorIconContainer" Width="200" Height="200">
@@ -862,6 +862,16 @@
 									Color="Black" />
 							</Border.Effect>
 						</Border>
+
+						<!--  부품 층(장비 부품 설정 → 아이콘): 우하단 건강 배지(둥근 사각+공구) · 좌하단 문 표시.  -->
+						<!--  이벤트 점(우상단 원)과 모양이 다르고 깜빡이지 않는다. 테마 토큰은 요소가 DynamicResource 로 문다.  -->
+						<control:ComponentStatusOverlay
+							BadgeCount="{TemplateBinding ComponentBadgeCount}"
+							Door="{TemplateBinding DoorIndicator}"
+							Health="{TemplateBinding ComponentHealth}"
+							IsPreview="{TemplateBinding IsPreviewMode}"
+							ScreenScale="{TemplateBinding MarkerScreenScale}"
+							ShowShape="{TemplateBinding ShowShape}" />
 
 						<!--  Pulse Ripple Rings — Zero-size Canvas anchor at icon center  -->
 						<!--  Width=0/Height=0 + HA/VA=Center: Canvas origin = outer Grid center = icon center  -->
@@ -1417,6 +1427,11 @@
 							</Trigger.ExitActions>
 						</Trigger>
 
+						<!--  A9: 소프트웨어 렌더(Tier 0 · 원격 데스크톱)에서는 탐지 링을 1개만 — 표시등 색 · 깜빡임은 그대로.  -->
+						<Trigger Property="ReducedPulse" Value="True">
+							<Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed" />
+						</Trigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>

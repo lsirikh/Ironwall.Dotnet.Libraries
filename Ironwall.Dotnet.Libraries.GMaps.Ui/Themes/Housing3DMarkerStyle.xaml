@@ -7,7 +7,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type control:GMapMarker3DHousingControl}">
                     <Grid x:Name="PART_MainContainer" Background="Transparent">
-                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding MarkerTitle}"/>
+                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding SymbolToolTip}"/>
                         <house:HousingVisual x:Name="PART_Housing3D" BodyBrush="{TemplateBinding MarkerFill}" RingBrush="{TemplateBinding MarkerStroke}" RingThickness="{TemplateBinding MarkerStrokeThickness}" Elevation="{Binding Marker.Altitude, RelativeSource={RelativeSource TemplatedParent}}" Locked="{Binding Marker.IsLocked, RelativeSource={RelativeSource TemplatedParent}}"/>
                         <!--  FOV 캔버스는 ShowFOV(Path 의 TemplateBinding)로만 게이트한다 — 레거시 PidsMarkerStyle 와 동일.  -->
                         <!--  장비 타입 조건(IpCamera)을 두면 비카메라 8종의 FOV 가 영구 불가(D-2).  -->
@@ -50,6 +50,8 @@
                             </Ellipse>
                         </Canvas>
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
+                        <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
+                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -205,6 +207,11 @@
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
+                        <!--  A9: 소프트웨어 렌더(Tier 0 · 원격 데스크톱)에서는 탐지 링을 1개만 — 표시등 색 · 깜빡임은 그대로.  -->
+                        <Trigger Property="ReducedPulse" Value="True">
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -273,7 +280,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type control:GMapMarkerPidsFallbackControl}">
                     <Grid x:Name="PART_MainContainer" Background="Transparent">
-                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding MarkerTitle}"/>
+                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding SymbolToolTip}"/>
                         <Border x:Name="PART_Housing3D" Background="{TemplateBinding MarkerFill}" CornerRadius="50" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="1.5">
                             <Viewbox Margin="5">
                                 <md:PackIcon Width="24" Height="24" Kind="{Binding DeviceType, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource HousingFallbackIcon}}" Foreground="White"/>
@@ -320,6 +327,8 @@
                             </Ellipse>
                         </Canvas>
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
+                        <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
+                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -441,6 +450,11 @@
                             <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <!--  A9: 소프트웨어 렌더(Tier 0 · 원격 데스크톱)에서는 탐지 링을 1개만 — 표시등 색 · 깜빡임은 그대로.  -->
+                        <Trigger Property="ReducedPulse" Value="True">
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
                         </Trigger>

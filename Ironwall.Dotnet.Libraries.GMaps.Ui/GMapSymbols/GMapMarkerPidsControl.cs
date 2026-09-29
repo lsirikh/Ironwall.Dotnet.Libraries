@@ -15,6 +15,7 @@ using System.Windows.Data;
 using System.Windows.Shapes;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -204,6 +205,121 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.Register("IsBroadcasting", typeof(bool), typeof(GMapMarkerPidsControl),
             new PropertyMetadata(false));
 
+    // ── 부품 건강 · 문 표시 · 툴팁(장비 부품 설정을 지도 아이콘에 표현 — 1차 조각) ──
+    //   값 DP 몇 개만 둔다(부품마다 요소를 만들지 않는다 — 수백 개 아이콘). 그리는 쪽은 ComponentStatusOverlay 하나.
+
+    /// <summary>마커의 부품 요약(런타임). 바뀌면 파생 DP(<see cref="ComponentHealth"/> · <see cref="ComponentBadgeCount"/> · <see cref="DoorIndicator"/> · <see cref="SymbolToolTip"/>)를 다시 계산한다.</summary>
+    public ComponentHealthSummary ComponentSummary
+    {
+        get => (ComponentHealthSummary)GetValue(ComponentSummaryProperty);
+        set => SetValue(ComponentSummaryProperty, value);
+    }
+
+    public static readonly DependencyProperty ComponentSummaryProperty =
+        DependencyProperty.Register(nameof(ComponentSummary), typeof(ComponentHealthSummary), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(ComponentHealthSummary.None));
+
+    public ComponentHealthLevel ComponentHealth
+    {
+        get => (ComponentHealthLevel)GetValue(ComponentHealthProperty);
+        private set => SetValue(ComponentHealthPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey ComponentHealthPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(ComponentHealth), typeof(ComponentHealthLevel), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(ComponentHealthLevel.None));
+    public static readonly DependencyProperty ComponentHealthProperty = ComponentHealthPropertyKey.DependencyProperty;
+
+    public int ComponentBadgeCount
+    {
+        get => (int)GetValue(ComponentBadgeCountProperty);
+        private set => SetValue(ComponentBadgeCountPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey ComponentBadgeCountPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(ComponentBadgeCount), typeof(int), typeof(GMapMarkerPidsControl), new PropertyMetadata(0));
+    public static readonly DependencyProperty ComponentBadgeCountProperty = ComponentBadgeCountPropertyKey.DependencyProperty;
+
+    /// <summary>좌하단 문 표시 모양 — 통문 · 함체만. 3D 는 문짝이 위치를 그리므로 구동 중만.</summary>
+    public DoorIndicatorKind DoorIndicator
+    {
+        get => (DoorIndicatorKind)GetValue(DoorIndicatorProperty);
+        private set => SetValue(DoorIndicatorPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey DoorIndicatorPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(DoorIndicator), typeof(DoorIndicatorKind), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(DoorIndicatorKind.None));
+    public static readonly DependencyProperty DoorIndicatorProperty = DoorIndicatorPropertyKey.DependencyProperty;
+
+    /// <summary>아이콘 툴팁 — 제목 + (문) + (부품 절). 부품 축도 문도 없으면 제목만(종전과 같다).</summary>
+    public string? SymbolToolTip
+    {
+        get => (string?)GetValue(SymbolToolTipProperty);
+        private set => SetValue(SymbolToolTipPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey SymbolToolTipPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(SymbolToolTip), typeof(string), typeof(GMapMarkerPidsControl), new PropertyMetadata(null));
+    public static readonly DependencyProperty SymbolToolTipProperty = SymbolToolTipPropertyKey.DependencyProperty;
+
+    /// <summary>화면 배율(디지털 줌) — 부품 층 LOD 가 "화면에서 몇 px 인가"를 재는 데 쓴다.</summary>
+    public double MarkerScreenScale
+    {
+        get => (double)GetValue(MarkerScreenScaleProperty);
+        set => SetValue(MarkerScreenScaleProperty, value);
+    }
+
+    public static readonly DependencyProperty MarkerScreenScaleProperty =
+        DependencyProperty.Register(nameof(MarkerScreenScale), typeof(double), typeof(GMapMarkerPidsControl), new PropertyMetadata(1.0));
+
+    /// <summary>
+    /// (A9) 소프트웨어 렌더(Tier 0 — 원격 데스크톱 등)에서 탐지 펄스 링을 3개 → 1개로 줄인다. 우상단 이벤트 점 · 색은 그대로다.
+    /// 탐지 마커 1개가 무한 애니메이션 9개(링 3 × 투명도 · 가로 · 세로)를 돌리므로, 수백 개면 원격 dirty-region 전송이 폭증한다.
+    /// </summary>
+    public bool ReducedPulse
+    {
+        get => (bool)GetValue(ReducedPulseProperty);
+        set => SetValue(ReducedPulseProperty, value);
+    }
+
+    public static readonly DependencyProperty ReducedPulseProperty =
+        DependencyProperty.Register(nameof(ReducedPulse), typeof(bool), typeof(GMapMarkerPidsControl), new PropertyMetadata(false));
+
+    private void OnRenderTierChanged(int tier)
+    {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => OnRenderTierChanged(tier))); return; }
+        ReducedPulse = RenderTierProbe.IsSoftwareTier(tier);
+    }
+
+    /// <summary>문짝이 열림/닫힘을 직접 그리는 템플릿인가(3D 하우징) — 그러면 문 표시는 구동 중만 낸다.</summary>
+    protected virtual bool DoorLeavesShowPosition => false;
+
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.Property == ComponentSummaryProperty || e.Property == DoorStateProperty || e.Property == DeviceTypeProperty
+            || e.Property == MarkerTitleProperty)
+            RefreshComponentPresentation();
+    }
+
+    /// <summary>부품 요약 · 문 형태 · 제목 → 배지 · 문 표시 · 툴팁 파생값.</summary>
+    private void RefreshComponentPresentation()
+    {
+        var summary = ComponentSummary ?? ComponentHealthSummary.None;
+        ComponentHealth = summary.Health;
+        ComponentBadgeCount = summary.BadgeCount;
+        DoorIndicator = DoorIndicatorRules.Resolve(
+            Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(DeviceType), DoorState, summary.DoorMotion, DoorLeavesShowPosition);
+        SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorIndicator, summary);
+    }
+
+    /// <summary>
+    /// UIA peer(A6) — 지도 심볼이 <c>GMaps.Symbol.{종류}.{장비Id}</c> 로 트리에 나오고, 이름에 이벤트 · 장비 · 문 · 부품 상태가 실린다.
+    /// peer 는 UIA 클라이언트가 물을 때만 만들어진다(수백 개 아이콘에 상시 비용 없음).
+    /// </summary>
+    protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer() => new PidsMarkerAutomationPeer(this);
+
     #endregion
 
     #region Constructors
@@ -227,6 +343,10 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
 
     private void GMapMarkerPidsControl_Loaded(object sender, RoutedEventArgs e)
     {
+        try { ReducedPulse = RenderTierProbe.IsSoftware; } catch (InvalidOperationException) { /* 렌더 능력 조회 불가 — 기본(링 3개) 유지 */ }
+        RenderTierProbe.TierChanged -= OnRenderTierChanged;
+        RenderTierProbe.TierChanged += OnRenderTierChanged;   // Unloaded 에서 해제
+
         _mapControl = FindParentMapControl();
         if (_mapControl != null)
         {
@@ -245,6 +365,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     private void GMapMarkerPidsControl_Unloaded(object sender, RoutedEventArgs e)
     {
         // 이벤트 구독 해제 (메모리 누수 방지)
+        RenderTierProbe.TierChanged -= OnRenderTierChanged;   // 정적 이벤트 — 안 풀면 마커가 영구히 붙잡힌다
         if (_mapControl != null)
         {
             _mapControl.OnMapZoomChanged -= OnMapZoomChanged;
@@ -263,6 +384,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         bool tiltOnly = snapshot.IsTiltCosOnlyChangeFrom(_lastViewportSnapshot);
         _lastViewportSnapshot = snapshot;
+        if (!MarkerScreenScale.Equals(snapshot.DigitalZoomScale)) MarkerScreenScale = snapshot.DigitalZoomScale;   // 부품 층 LOD
         if (tiltOnly) return;
         OnMapZoomChanged();
     }
@@ -343,6 +465,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(DetectionAngleProperty, nameof(Marker.DetectionAngle));
         SetupPropertyBinding(DetectionBearingProperty, nameof(Marker.DetectionBearing));
         SetupPropertyBinding(IsBroadcastingProperty, nameof(Marker.IsBroadcasting));
+        SetupPropertyBinding(ComponentSummaryProperty, nameof(Marker.ComponentSummary), BindingMode.OneWay);   // 런타임 부품 요약
 
         var colorConverter = new ColorTypeToBrushConverter();
         var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();

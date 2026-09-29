@@ -16,6 +16,8 @@ public sealed class GMapMarker3DHousingControl : GMapMarkerPidsControl
     public override bool IsBillboard => false;
     protected override bool WritesBackRenderSize => false;
     protected override bool AnimateFovChanges => false;
+    /// <summary>3D 문짝이 열림/닫힘을 직접 그린다 — 문 표시는 구동 중(RUNNING)만 낸다.</summary>
+    protected override bool DoorLeavesShowPosition => true;
     protected override Point RotationPivot => new(.5, .5);
     static GMapMarker3DHousingControl() => DefaultStyleKeyProperty.OverrideMetadata(typeof(GMapMarker3DHousingControl), new FrameworkPropertyMetadata(typeof(GMapMarker3DHousingControl)));
     public GMapMarker3DHousingControl() { }

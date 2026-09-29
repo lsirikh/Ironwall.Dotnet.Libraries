@@ -151,6 +151,7 @@ public partial class MapViewModel : BasePanelViewModel,
         _playbackVm = playbackVm;
         _trackingSetupVm = trackingSetupVm;
         DeviceProvider = deviceProvider;
+        AttachSymbolLifecycle();   // WP-2 A3/A5 — 장비 삭제 · 미등록 전이 관찰
         InitializeCommands();
         InitializeUndoRedo();
     }
@@ -353,8 +354,9 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             var devices = DeviceProvider.ToList();
             var symbols = MainMap?.Markers.ToList();
-            _symbolEventManager.Dispose();
+            SymbolLifecycle.BeginRebuild();   // 조회표 비움 — 이 사이 큐 전이는 버려진다 → 끝에서 큐 기준으로 다시 칠한다(A2)
             var registeredCount = 0;
+            var linkedMarkers = new HashSet<GMapPidsMarker>();
             foreach (var device in devices)
             {
                 // 1차: DeviceType 완전 일치
@@ -379,8 +381,9 @@ public partial class MapViewModel : BasePanelViewModel,
                     //   여기(디바이스 로드 후 매칭 성공 지점)에서 실제 device 객체를 다시 붙여야 속성창 콤보·PTZ·
                     //   홈페이지 메뉴·'현재위치 적용' 등 객체 의존 기능이 복구됨. LinkedDeviceId는 이미 DB에서 정상 로드.
                     //   (그룹은 LinkedDeviceGroup 정수 링크라 객체 해석이 불필요 → 이 문제 없음)
-                    symbol.LinkedDevice = device;
-                    _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
+                    symbol.LinkedDevice = device;   // 부품 요약도 이 장비의 축 묶음으로 다시 만든다(GMapPidsMarker)
+                    SymbolLifecycle.RegisterDevice(device, symbol.Model);
+                    linkedMarkers.Add(symbol);
                     registeredCount++;
                     RestoreDoorStateFromDevice(device);
                 }
@@ -394,7 +397,7 @@ public partial class MapViewModel : BasePanelViewModel,
                             .FirstOrDefault(s => s.LinkedDeviceGroup == groupId);
                         if (groupSymbol != null)
                         {
-                            _symbolEventManager.RegisterGroupSymbol(groupId, device, groupSymbol.Model);
+                            SymbolLifecycle.RegisterGroup(groupId, device, groupSymbol.Model);
                             _log?.Info($"그룹-심볼 매핑: DeviceGroup({groupId}) <-> {groupSymbol.Title}");
                         }
                         else
@@ -408,6 +411,13 @@ public partial class MapViewModel : BasePanelViewModel,
             }
 
             _log?.Info($"심볼 등록 완료: 개별 {registeredCount}건 / 전체 {devices.Count}건 (FenceGroup 전용: {devices.Count - registeredCount}건)");
+
+            // (A1 · A2) 영속된 EventStatus 는 실시간 경보의 근거가 아니다 — 모든 장비 · 구역선을 큐(EQM) 상태로 다시 칠하고,
+            //   장비와 짝지어지지 않은 심볼은 Normal 로 되돌린다. 종전엔 ACTIVATED 장비만 재계산해 ERROR · DEACTIVATED 장비의
+            //   저장된 Detecting 이 재시작 뒤에도 영원히 펄스했고, 재등록 중 버려진 전이는 복원되지 않았다.
+            var unlinked = symbols?.OfType<GMapPidsMarker>().Where(m => !linkedMarkers.Contains(m)).Select(m => (Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsEventCapable)m.Model)
+                           ?? Enumerable.Empty<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsEventCapable>();
+            SymbolLifecycle.CompleteRebuild(unlinked);
         }
         catch (Exception ex)
         {
@@ -8765,7 +8775,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 && e.Marker is GMapPidsMarker pidsMarker
                 && pidsMarker.LinkedDevice != null)
             {
-                _symbolEventManager.RegisterDeviceSymbol(pidsMarker.LinkedDevice, pidsMarker.Model);
+                SymbolLifecycle.RegisterDevice(pidsMarker.LinkedDevice, pidsMarker.Model);
+                SymbolLifecycle.ReconcileDevice(pidsMarker.LinkedDevice.Id, pidsMarker.LinkedDevice.DeviceType);   // A2: 늦게 붙은 심볼도 큐 상태로
             }
 
             // LinkedDeviceGroup 변경 → _groupSymbolLookup 즉시 재등록 (FR-01, 근본원인 A)

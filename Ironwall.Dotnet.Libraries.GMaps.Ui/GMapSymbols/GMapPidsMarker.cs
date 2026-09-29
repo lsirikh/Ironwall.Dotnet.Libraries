@@ -26,9 +26,38 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     #endregion
 
     #region - Animation System -
+    /// <summary>
+    /// 모델 갱신 신호(<c>SetUpdate</c>) — 통지는 <b>항상 UI 스레드에서</b> 낸다.
+    /// </summary>
+    /// <remarks>
+    /// <para>(A4) <c>DeviceSymbolLookupModel.SyncFromDevice</c> 는 SYNC_DEVICE 를 받은 NATS 스레드에서 곧장 <c>SetUpdate</c> 를 부른다
+    /// (다른 경로는 <c>MarshalUpdate</c> 로 UI 스레드에 넘긴다). 그 스레드에서 마커 <c>PropertyChanged(DoorState)</c> 가 나가면
+    /// 열려 있는 속성창(<c>GMapPropertyPidsControl.SyncGateFromMarker</c>)이 WPF 의존 속성을 쓰다 교차 스레드 예외로 죽고,
+    /// 호스트의 SYNC_DEVICE 처리 전체(문 상태 · 제어기 자동복구 · 소속 통지)가 그 예외에 끊긴다.
+    /// → 여기서 한 번에 막는다: UI 스레드가 아니면 합쳐서(<see cref="_updatePending"/>) 한 번만 넘긴다. 넘어간 콜백은 모델의 <b>최신값</b>을 읽는다.</para>
+    /// </remarks>
     private void PidsModel_Update(object? sender, EventArgs e)
     {
-        _log?.Info($"[SYNC→Symbol] PidsModel_Update 수신: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
+        var dispatcher = Shape?.Dispatcher ?? System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess() && !dispatcher.HasShutdownStarted)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _updatePending, 1) == 1) return;   // 이미 넘겨 둔 콜백이 최신값을 읽는다
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                System.Threading.Interlocked.Exchange(ref _updatePending, 0);
+                ApplyModelUpdate();
+            }), System.Windows.Threading.DispatcherPriority.Background);
+            return;
+        }
+        ApplyModelUpdate();
+    }
+
+    private void ApplyModelUpdate()
+    {
+        if (_model is null) return;   // Dispose 뒤 늦게 도착한 콜백
+        // (A7) 갱신마다 Info 를 남기면 이벤트 1건이 로그 여러 줄이 된다(버퍼링 appender · 수백 개 마커). ILogService 에 Debug 수준이 없어
+        //   디버그 빌드 출력으로만 내린다 — 상태 전이 자체는 SymbolEventManager 가 이미 Info 로 남긴다.
+        System.Diagnostics.Debug.WriteLine($"[SYNC→Symbol] PidsModel_Update: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
 
         OnPropertyChanged(nameof(EventStatus));
         OnPropertyChanged(nameof(CompositeStatus));
@@ -37,6 +66,54 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         OnPropertyChanged(nameof(DetectionAngle));
         OnPropertyChanged(nameof(DetectionBearing));
         OnPropertyChanged(nameof(DoorState));   // FR-15: 이벤트 경로(DeviceSymbolLookupModel.ApplyDoorState → SetUpdate)는 모델에만 쓴다 — 통지가 없으면 3D 문짝이 안 움직인다(2026-09-08 00:27 실기 결함)
+
+        // SYNC_DEVICE 재조회는 장비 모델의 축 묶음(Axes)을 참조째 갈고 SyncFromDevice → SetUpdate 로 여기 온다 — 부품 요약도 그때 다시 만든다.
+        RefreshComponentSummary(force: false);
+    }
+    #endregion
+
+    #region - Component health (runtime only) -
+    /// <summary>
+    /// 연결 장비의 부품 요약 — <b>런타임 전용</b>(직렬화 · 영속 · Undo 대상 아님, 진실은 서버).
+    /// 연결 장비의 축 묶음 참조가 바뀔 때만 다시 만든다.
+    /// </summary>
+    public Helpers.Components.ComponentHealthSummary ComponentSummary
+    {
+        get => _componentSummary;
+        private set
+        {
+            if (ReferenceEquals(_componentSummary, value)) return;
+            _componentSummary = value;
+            OnPropertyChanged(nameof(ComponentSummary));
+        }
+    }
+
+    /// <summary>
+    /// 연결 장비의 축 묶음(<c>LinkedDevice.Axes</c>)으로 부품 요약을 다시 만든다. <paramref name="force"/>=false 면 참조가 같을 때 건너뛴다.
+    /// </summary>
+    public void RefreshComponentSummary(bool force = false)
+    {
+        if (_model is null) return;
+        var axes = _liveDetached ? null : _model.LinkedDevice?.Axes;
+        if (!force && ReferenceEquals(axes, _summarySource) && _summaryBuilt) return;
+        _summarySource = axes;
+        _summaryBuilt = true;
+        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes);
+    }
+
+    /// <summary>
+    /// 연결 장비가 서버에서 삭제됐다 — 실시간 상태(이벤트 색 · 동작 · 문 · 부품)를 비운다. 저장된 연결(LinkedDeviceId)은 건드리지 않는다.
+    /// 호출 스레드: UI.
+    /// </summary>
+    public void ResetLiveState()
+    {
+        if (_model is null) return;
+        _liveDetached = true;
+        _model.CompositeStatus = EnumCompositeEventStatus.Normal;   // EventStatus 도 함께 Normal
+        _model.DoorState = EnumDoorState.Unknown;
+        OperationState = EnumOperationState.NONE;
+        RefreshComponentSummary(force: true);
+        ApplyModelUpdate();
     }
     #endregion
 
@@ -144,8 +221,10 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         set
         {
             _model.LinkedDevice = value;
+            _liveDetached = false;   // 새로 연결됐다 — 삭제로 비웠던 실시간 상태를 다시 받는다
             OnPropertyChanged(nameof(LinkedDevice));
             OnPropertyChanged(nameof(LinkedDeviceId));  // ID도 동기화되므로 알림
+            RefreshComponentSummary(force: true);       // 부팅 재바인딩 · 속성창 연결 변경 — 부품 요약을 새 장비로
         }
     }
 
@@ -299,5 +378,10 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
 
     #region - Attributes -
     private bool _isBroadcasting;
+    private int _updatePending;   // 0=없음, 1=UI 스레드로 넘긴 갱신 대기 중(Interlocked)
+    private Helpers.Components.ComponentHealthSummary _componentSummary = Helpers.Components.ComponentHealthSummary.None;
+    private Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceAxesModel? _summarySource;
+    private bool _summaryBuilt;
+    private bool _liveDetached;
     #endregion
 }
