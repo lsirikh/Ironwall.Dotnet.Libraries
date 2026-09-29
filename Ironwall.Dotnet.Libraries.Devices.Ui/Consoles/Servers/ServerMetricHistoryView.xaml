@@ -42,7 +42,9 @@
 				CanUserSortColumns="False"
 				HeadersVisibility="Column"
 				IsReadOnly="True"
-				ItemsSource="{Binding Rows}">
+				ItemsSource="{Binding Rows}"
+				Style="{StaticResource Console.DataGrid}">
+				<!--  콘솔 표 스타일 — 빠져 있던 동안 MDIX 기본 회색 바탕이 창 바탕(토큰)과 어긋났다(2026-09-30 r15 갤러리 021).  -->
 				<!--  U-18 — 최소폭 합(540)이 이력 창 안쪽(536)보다 4 넓어 가로 스크롤이 섰다. 지표 칸(값 "91.5%")은 80 이면 넉넉하다.  -->
 				<DataGrid.Columns>
 					<DataGridTextColumn

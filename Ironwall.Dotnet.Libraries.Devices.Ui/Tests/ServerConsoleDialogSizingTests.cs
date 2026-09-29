@@ -71,6 +71,15 @@ public class ServerConsoleDialogSizingTests
         Assert.True(top >= 44, $"빈 목록 안내 글 위 여백 {top} — 표 머리 줄(약 36) 아래여야 한다");
     }
 
+    [Fact]
+    public void should_use_the_console_grid_style_when_the_metric_history_grid_is_declared()
+    {
+        var grid = Regex.Match(File.ReadAllText(ViewPath()), @"<DataGrid\b[^>]*AutomationId=""Servers\.MetricHistory\.Grid""[^>]*>", RegexOptions.Singleline);
+
+        Assert.True(grid.Success);
+        Assert.Contains("Style=\"{StaticResource Console.DataGrid}\"", grid.Value);
+    }
+
     private static string ViewPath([CallerFilePath] string here = "")
         => Path.Combine(Path.GetDirectoryName(here)!, "..", "Consoles", "Servers", "ServerMetricHistoryView.xaml");
 }
