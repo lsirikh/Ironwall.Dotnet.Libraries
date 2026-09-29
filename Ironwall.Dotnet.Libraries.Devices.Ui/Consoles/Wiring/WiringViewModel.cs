@@ -404,67 +404,44 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         : "저장하기 전에 확인하세요";
 
     #region - Shape (FR-16) -
-    /// <summary>결선 모양 — 링 · 양쪽 가지 · 한 줄.</summary>
+    /// <summary>결선 모양 — v0.4 부터 모든 제어기가 링(옛 가지 · 한 줄 저장값은 불러올 때 링으로 읽는다).</summary>
     public WiringShape Shape => _board.Shape;
     public bool IsRing => _board.Shape == WiringShape.Ring;
-    public bool IsTwoBranch => _board.Shape == WiringShape.TwoBranch;
 
-    /// <summary>"고장 구간과의 관계" 설명 — 결선 모양마다 다르다(링 = 양 끝 · 가지 = L/R 확인 중 O-6 · 한 줄 = 제어기 쪽이 1).</summary>
-    public string FaultRelationText => _board.Shape switch
-    {
-        WiringShape.Ring => "링에서 1차 번호는 Sensor A 쪽 끝에서, 2차 번호는 Sensor B 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
-                            + "결선을 저장해 두면 장애 화면이 \"1차 4~5\" 같은 구간을 센서 이름으로 보여 줄 수 있습니다.",
-        WiringShape.TwoBranch => "양쪽 가지는 제어기에서 바깥으로 셉니다 — 왼쪽 가지 L n · 오른쪽 가지 R n. "
-                                 + "장애 고장 구간의 1차/2차 번호와 어느 가지가 대응하는지는 확인 중입니다(O-6).",
-        _ => "한 줄은 제어기 쪽이 1입니다 — 장애 고장 구간 번호는 제어기에서 센 자리입니다.",
-    };
+    /// <summary>"고장 구간과의 관계" 설명 — 모든 제어기가 링(v0.4 §1-C)이라 늘 A/B 양 끝 설명.</summary>
+    public string FaultRelationText
+        => "링에서 1차 번호는 Sensor A 쪽 끝에서, 2차 번호는 Sensor B 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
+           + "결선을 저장해 두면 장애 화면이 \"1차 4~5\" 같은 구간을 센서 이름으로 보여 줄 수 있습니다.";
 
-    /// <summary>두 번째 목록(오른쪽 가지)을 보이는가 — 양쪽 가지만.</summary>
-    public bool ShowSecondLine => _board.LineCount > 1;
+    /// <summary>두 번째 목록을 보이는가 — 링은 선이 하나라 늘 거짓(옛 양쪽 가지 목록은 v0.4 에서 뺐다).</summary>
+    public bool ShowSecondLine => false;
 
-    /// <summary>한 줄 설명(상태 문장 · 머리).</summary>
-    public string ShapeText => _board.Shape switch
-    {
-        WiringShape.Ring => "링 결선(Sensor A → … → Sensor B)",
-        WiringShape.TwoBranch => "양쪽 가지 결선(잠정)",
-        _ => "한 줄 결선",
-    };
+    /// <summary>결선 설명(상태 문장 · 머리).</summary>
+    public string ShapeText => "링 결선(Sensor A → … → Sensor B)";
 
-    /// <summary>첫 목록 제목.</summary>
-    public string Line1Title => _board.Shape switch
-    {
-        WiringShape.Ring => "링 — Sensor A → … → Sensor B",
-        WiringShape.TwoBranch => "왼쪽 가지 ◀ 제어기",
-        _ => "한 줄 — 제어기 ─▶",
-    };
+    /// <summary>목록 제목.</summary>
+    public string Line1Title => "링 — Sensor A → … → Sensor B";
 
-    /// <summary>첫 목록 설명.</summary>
-    public string Line1Hint => _board.Shape switch
-    {
-        WiringShape.Ring => "왼쪽이 Sensor A 쪽 끝(A1)입니다 · 칩의 A·B 는 두 포트에서 센 번호 · 양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다 · Alt+← → 한 칸 · Delete 로 뺍니다",
-        WiringShape.TwoBranch => "제어기 옆이 1번 · 바깥으로 갈수록 커집니다 · Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지로 · Delete 로 뺍니다(가지 규칙은 확인 중)",
-        _ => "제어기 쪽 끝이 1번입니다 · Alt+← → 한 칸 · Delete 로 뺍니다",
-    };
-
-    public string Line2Title => "제어기 ▶ 오른쪽 가지";
-    public string Line2Hint => "제어기 옆이 1번 · 바깥으로 갈수록 커집니다";
-
-    /// <summary>제어기 상자의 두 포트 글자.</summary>
-    public string PortAText => IsRing ? "Sensor A" : IsTwoBranch ? "왼쪽" : "선";
-    public string PortBText => IsRing ? "Sensor B" : IsTwoBranch ? "오른쪽" : string.Empty;
-    public bool HasPortB => PortBText.Length > 0;
+    /// <summary>목록 설명.</summary>
+    public string Line1Hint => "왼쪽이 Sensor A 쪽 끝(A1)입니다 · 칩의 A·B 는 두 포트에서 센 번호 · 양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
     #endregion
 
     #region - Load notices (FR-02 · FR-03 · F-2b) -
     /// <summary>옛 두 선 배치를 한 줄로 바꿨고 아직 저장하지 않았다.</summary>
-    public bool HasLegacyNotice => _board.ConvertedFromLegacy;
+    public bool HasLegacyNotice => _board.ConvertedFromLegacy || _board.JoinedFromBranches;
 
     public const string LEGACY_NOTICE = WiringChainLoad.LEGACY_NOTICE;
+
+    /// <summary>옛 가지 배치(<c>"shape": "branch"</c>)를 링으로 이어 붙였을 때(v0.4 · 가지 폐기).</summary>
+    public const string JOINED_NOTICE = WiringBoard.JOINED_NOTICE;
+
+    /// <summary>제품군이 섞인 제어기의 번호순 제안 안내(O-12) — 번호 대역이 종류별로 달라 번호순이 실제 순서와 다를 수 있다.</summary>
+    public const string MIXED_ORDER_NOTICE = "종류가 섞여 있어 번호순이 실제 순서와 다를 수 있습니다 — 확인하세요";
 
     /// <summary>체인을 고치다가 제안을 함께 적용했을 때의 알림(H2).</summary>
     public const string APPLIED_NOTICE = "제안 · 변환 배치를 함께 적용했습니다 — Ctrl+Z 로 취소";
 
-    public string LegacyNoticeText => HasLegacyNotice ? LEGACY_NOTICE : string.Empty;
+    public string LegacyNoticeText => _board.JoinedFromBranches ? JOINED_NOTICE : HasLegacyNotice ? LEGACY_NOTICE : string.Empty;
 
     /// <summary>
     /// 적용하지 않은 불러오기 제안이 걸려 있다(번호순 제안 · 옛 배치 변환 · 빈 자리 당김) — [이대로 적용] 전에는 저장 대상이 아니다.
@@ -481,11 +458,15 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             var suggested = _board.ProposalCount(WiringProposalKind.Suggested);
             var converted = _board.ProposalCount(WiringProposalKind.Converted);
             var compacted = _board.ProposalCount(WiringProposalKind.Compacted);
+            var joined = _board.ProposalCount(WiringProposalKind.JoinedBranches);
             if (suggested > 0) parts.Add($"저장된 배치가 없는 센서 {suggested}대를 번호순으로 제안했습니다");
+            if (joined > 0) parts.Add($"옛 가지 배치 {joined}대를 링 한 줄로 이어 보였습니다(왼쪽 가지 바깥 → 제어기 → 오른쪽 가지 바깥)");
             if (converted > 0) parts.Add($"옛 두 선 배치 {converted}대를 한 줄로 바꿔 보였습니다");
             if (compacted > 0) parts.Add($"빈 자리를 당겨 붙인 센서 {compacted}대");
-            if (parts.Count == 1 && suggested > 0) return parts[0];
-            return string.Join(" · ", parts) + " — 적용 전에는 저장 대상이 아닙니다";
+            // 제품군이 섞인 제어기(스마트 1번~ · 펜스 101번~)는 번호순이 공간 순서가 아닐 수 있다(O-12) — 체인을 고쳐도 저절로 적용하지 않는다.
+            var mixed = suggested > 0 && _board.IsMixedFamily ? " — " + MIXED_ORDER_NOTICE : string.Empty;
+            if (parts.Count == 1 && suggested > 0) return parts[0] + mixed;
+            return string.Join(" · ", parts) + mixed + " — 적용 전에는 저장 대상이 아닙니다";
         }
     }
 
@@ -555,6 +536,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                                   .ToDictionary(g => g.Key ?? (WiringProposalKind)(-1), g => g.ToList());
                 if (byKind.TryGetValue(WiringProposalKind.Converted, out var converted))
                     lines.Add($"자동 변환 {converted.Count}건(옛 두 선 → 한 줄) — 옛 2차 선 센서를 Sensor B 쪽 끝부터 이어 붙인 자리입니다: {Places(converted)}");
+                if (byKind.TryGetValue(WiringProposalKind.JoinedBranches, out var joinedRows))
+                    lines.Add($"옛 가지 → 링 이어 붙임 {joinedRows.Count}건 — 왼쪽 가지를 뒤집어(바깥 → 제어기 옆) 오른쪽 가지 앞에 붙인 자리입니다: {Places(joinedRows)}");
                 if (byKind.TryGetValue(WiringProposalKind.Compacted, out var compacted))
                     lines.Add($"빈 자리 당겨 붙임 {compacted.Count}건 — 저장된 순번의 빈 자리를 메워 뒤 센서의 순번이 앞당겨집니다: {Places(compacted)}");
                 if (byKind.TryGetValue(WiringProposalKind.Suggested, out var suggested))
@@ -896,8 +879,9 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         _board.PushUndo();
         _board.AutoLayoutByNumber();
         SyncAll();
-        StatusText = IsTwoBranch
-            ? "가지마다 번호 순으로 다시 줄 세웠습니다 — 어느 가지에 둘지는 끌어 놓아 정하세요."
+        // 종류가 섞였으면(스마트 1번~ · 펜스 101번~) 번호순이 공간 순서가 아닐 수 있다(O-12) — 사람이 고른 동작이라 적용하되 알린다.
+        StatusText = _board.IsMixedFamily
+            ? $"번호 순으로 한 줄에 배치했습니다(번호가 같으면 id 순) — {MIXED_ORDER_NOTICE}."
             : "번호 순으로 한 줄에 배치했습니다(번호가 같으면 id 순).";
     }
 
@@ -947,30 +931,6 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         StatusText = placed == 1
             ? $"{list[0].Display} → {PlacementTextOf(list[0].Key)} 에 붙였습니다"
             : $"{placed}대를 결선 끝에 차례로 붙였습니다";
-    }
-
-    /// <summary>키보드 폴백 — 다른 가지로 옮긴다(Alt+↑ · Alt+↓ · C6). <b>양쪽 가지에서만</b> 뜻이 있다.</summary>
-    public void MoveSelectedToOtherLine()
-    {
-        var slot = SelectedSlots().FirstOrDefault(s => s.IsFilled);
-        if (slot?.Row is null || IsBusy) return;
-
-        if (!IsTwoBranch)
-        {
-            StatusText = "이 결선에는 다른 가지가 없습니다 — Alt+← → 로 순서를 바꿉니다.";
-            return;
-        }
-
-        var key = slot.Row.Key;
-        _board.PushUndo();
-        if (!_board.MoveToOtherLine(key))
-        {
-            _board.Undo();
-            return;
-        }
-        SyncAll();
-        if (_board.LocationOf(key) is { } at) SelectSlot(at.Line, at.Index);
-        StatusText = $"{_board.Find(key)?.Display} → {PlacementTextOf(key)}";
     }
 
     /// <summary>키보드 폴백 — 고른 칸의 센서를 한 칸 옮긴다(Alt+← · Alt+→). 옆 센서와 자리를 바꾼다.</summary>

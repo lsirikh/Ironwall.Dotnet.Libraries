@@ -53,11 +53,12 @@ public static class WiringValidation
             issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_DUPLICATE,
                 Particles($"{board.Find(key)?.Display ?? $"센서 {key}"}이(가) 체인에 두 번 있습니다 — 한 곳에서 빼 주세요.")));
 
-        // ④ 제품 한도(스마트 34) · 섞임(O-8) — 저장은 막지 않는다
-        if (board.Topology.LimitWarning(board.Chain.Count) is { } limit)
+        // ④ 기준 길이 · 대수(한도 표 · v0.4 §1-C) — 경고만, 저장은 막지 않는다. 섞어 쓰기는 정상(옛 섞임 경고 O-8 폐기) —
+        //    섞였을 때의 기준은 아직 모른다(O-11)는 알림만.
+        foreach (var limit in board.Limits.Warnings(board.ChainTypes, board.ChainLengthMetres))
             issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_LIMIT, limit));
-        if (board.MixWarning is { } mix)
-            issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_MIX, mix));
+        if (board.IsMixedFamily)
+            issues.Add(new WiringIssue(WiringIssueLevel.Info, CODE_MIX, WiringLimitTable.MIXED_INFO));
 
         // ② 불러온 배치의 빈 순번 — 당겨 붙였으니 저장하면 서버 순번이 바뀐다
         foreach (var notice in board.LoadNotices.Where(n => n.Code == WiringChain.CODE_GAP))
@@ -89,19 +90,14 @@ public static class WiringValidation
         => issues?.Any(i => i.Level == WiringIssueLevel.Critical) == true;
 
     /// <summary>
-    /// 글로 확인 — 링: "Sensor A ─▶ 1. 이름 → … ◀─ Sensor B" · 한 줄: "제어기 ─▶ 1. …" · 양쪽 가지: 가지마다 한 줄.
+    /// 글로 확인 — "Sensor A ─▶ 1. 이름 → … ◀─ Sensor B"(모든 제어기가 링 · v0.4).
     /// </summary>
     public static string LoopText(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        return board.Shape switch
-        {
-            WiringShape.Ring => $"Sensor A ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ Sensor B{Environment.NewLine}"
-                              + "    (양 끝은 리턴케이블로 함체에 돌아옵니다)",
-            WiringShape.TwoBranch => $"제어기 ─왼쪽▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))}{Environment.NewLine}"
-                                   + $"제어기 ─오른쪽▶ {Describe(board.Placed(WiringSpec.LINE_SECONDARY))}",
-            _ => $"제어기 ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))}",
-        };
+        // 모든 제어기가 링(v0.4) — 옛 가지 · 한 줄 글은 뺐다.
+        return $"Sensor A ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ Sensor B{Environment.NewLine}"
+               + "    (양 끝은 리턴케이블로 함체에 돌아옵니다)";
 
         static string Describe(IReadOnlyList<WiringSensorRow> placed)
             => placed.Count == 0 ? "(비어 있음)" : string.Join(" → ", placed.Select((r, i) => $"{i + 1}. {r.Display}"));

@@ -132,6 +132,9 @@ public sealed class FenceWorld
     /// <summary>제어기에서 첫 센서까지(m) — 가지 · 한 줄.</summary>
     public double CtrlGapM { get; }
 
+    /// <summary>이 세계를 세운 간격 표 — 펜스센서 칸 폭(기둥)이 현장 간격을 따른다.</summary>
+    public WiringSpacingTable Spacing { get; private set; } = WiringSpacingTable.Default;
+
     /// <summary>제어기(함체) x.</summary>
     public double ControllerX { get; private set; }
 
@@ -179,7 +182,7 @@ public sealed class FenceWorld
     /// <summary>체인과 센서 사실로 세계를 세운다.</summary>
     /// <param name="measuredGapMetres">실측 거리(왼쪽 이웃 → 이 센서, m). 없으면 종류별 기본 간격.</param>
     public static FenceWorld Build(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors,
-                                   IReadOnlyDictionary<int, double>? measuredGapMetres = null)
+                                   IReadOnlyDictionary<int, double>? measuredGapMetres = null, WiringSpacingTable? spacing = null)
     {
         ArgumentNullException.ThrowIfNull(chain);
         ArgumentNullException.ThrowIfNull(sensors);
@@ -193,7 +196,8 @@ public sealed class FenceWorld
         var world = new FenceWorld(shape, chain, sensors, upm, postM, ctrlGapM);
 
         EnumDeviceType TypeOf(int key) => sensors.TryGetValue(key, out var s) ? s.Type : EnumDeviceType.NONE;
-        var layout = FenceSlotLayout.Build(chain, TypeOf, new FenceLayoutOptions { PixelsPerMetre = 1, MeasuredGapMetres = measuredGapMetres });
+        var layout = FenceSlotLayout.Build(chain, TypeOf, new FenceLayoutOptions { PixelsPerMetre = 1, MeasuredGapMetres = measuredGapMetres, Spacing = spacing });
+        world.Spacing = layout.Spacing;
         var m = layout.Slots.Select(s => s.Metres).ToList();
         var keys = chain.Keys;
 
@@ -370,7 +374,7 @@ public sealed class FenceWorld
         {
             p.P(MinX - pad, 0, GroundDepth).X, p.P(MaxX + pad, FenceProjector.H + 40, -36 * p.K).X,
             p.P(MinX - 5 * u, 0, 0).X, p.P(MaxX + 5 * u, 0, 0).X,
-            p.P(MaxX + 5 * u + FenceScene.SIDE_LABEL_LEAD, 0, FenceScene.OutsideLabelDepth(p)).X + 4,   // 땅 표기 "펜스 외부"(FR-20)
+            p.P(MaxX + 5 * u + FenceScene.SIDE_LABEL_LEAD, 0, FenceScene.OutsideLabelDepth(p)).X + FenceScene.SIDE_LABEL_WIDTH,   // 땅 표기 "펜스 외부"(FR-20)
         };
         if (Shape == WiringShape.Ring)
         {

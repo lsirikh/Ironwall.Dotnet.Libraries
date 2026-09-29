@@ -24,7 +24,7 @@ public class FenceSlotLayoutTests
     }
 
     [Theory]
-    [InlineData(EnumDeviceType.Fence, 2.5)]
+    [InlineData(EnumDeviceType.Fence, 3.0)]      // v0.4 §1-C 기준 3m(현장 2~4m)
     [InlineData(EnumDeviceType.SmartSensor, 6)]
     [InlineData(EnumDeviceType.SmartSensor2, 6)]
     [InlineData(EnumDeviceType.SmartCompound, 6)]
@@ -40,7 +40,7 @@ public class FenceSlotLayoutTests
     {
         var layout = Layout(WiringShape.TwoBranch, new[] { M, F, F, F, M, M, S, S });
 
-        Assert.Equal(new[] { 0, 2.5, 5, 7.5, 10, 30, 36, 42 }, layout.Slots.Select(s => s.Metres));
+        Assert.Equal(new[] { 0, 3.0, 6, 9, 12, 32, 38, 44 }, layout.Slots.Select(s => s.Metres));
     }
 
     [Fact]

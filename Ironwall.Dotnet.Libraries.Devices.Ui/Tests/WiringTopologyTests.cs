@@ -5,19 +5,28 @@ using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
-/// <summary>결선 모양 판정(wiring-fence-view FR-16 · FR-14 ④ · O-6 ~ O-8) — 제어기 종류 → 링 · 양쪽 가지 · 한 줄.</summary>
+/// <summary>결선 모양 판정(wiring-fence-view FR-16 · v0.4 §1-C) — 모든 제어기는 링.</summary>
 public class WiringTopologyTests
 {
     private static readonly EnumDeviceType[] Smart = { EnumDeviceType.SmartSensor2, EnumDeviceType.SmartCompound };
 
-    [Fact]
-    public void should_be_ring_with_limit_34_when_smart_controller()
+    [Theory]
+    [InlineData("SmartController", WiringControllerKind.Smart)]
+    [InlineData("Controller", WiringControllerKind.Pids)]
+    [InlineData("IoController", WiringControllerKind.Io)]
+    [InlineData(null, WiringControllerKind.Unknown)]
+    public void should_be_ring_for_every_controller_when_deciding_the_shape(string? controller, WiringControllerKind kind)
     {
-        var t = WiringTopology.For("SmartController", Smart);
+        // Arrange
+        var sensors = new[] { EnumDeviceType.Multi, EnumDeviceType.Fence, EnumDeviceType.Underground };
 
+        // Act
+        var t = WiringTopology.For(controller, sensors);
+
+        // Assert — v0.4 §1-C: 모든 제어기는 링 · 한도는 한도 표가 맡는다
         Assert.Equal(WiringShape.Ring, t.Shape);
-        Assert.Equal(WiringControllerKind.Smart, t.ControllerKind);
-        Assert.Equal(34, t.MaxSensors);
+        Assert.Equal(kind, t.ControllerKind);
+        Assert.Null(t.MaxSensors);
         Assert.Equal(2, t.ReturnCableCount);
         Assert.True(t.HasOppositeNumber);
         Assert.True(t.HasVbus);
@@ -26,70 +35,31 @@ public class WiringTopologyTests
         Assert.Null(t.MixWarning);
     }
 
-    [Fact]
-    public void should_be_provisional_two_branch_without_limit_when_pids_controller_has_fence_sensors()
-    {
-        var t = WiringTopology.For("Controller", new[] { EnumDeviceType.Multi, EnumDeviceType.Fence, EnumDeviceType.Fence });
-
-        Assert.Equal(WiringShape.TwoBranch, t.Shape);
-        Assert.True(t.IsProvisional);
-        Assert.Null(t.MaxSensors);                                  // O-7 — 모른다
-        Assert.Equal(0, t.ReturnCableCount);
-        Assert.Null(t.LimitWarning(400));
-    }
-
-    [Fact]
-    public void should_be_line_when_pids_controller_has_only_underground_sensors()
-    {
-        var t = WiringTopology.For("Controller", new[] { EnumDeviceType.Underground, EnumDeviceType.Underground });
-
-        Assert.Equal(WiringShape.Line, t.Shape);
-        Assert.False(t.IsProvisional);
-    }
-
-    [Fact]
-    public void should_be_two_branch_when_pids_controller_has_no_sensor_yet()
-        => Assert.Equal(WiringShape.TwoBranch, WiringTopology.For("Controller", System.Array.Empty<EnumDeviceType>()).Shape);
-
-    [Fact]
-    public void should_be_line_when_io_controller()
-        => Assert.Equal(WiringShape.Line, WiringTopology.For("IoController", new[] { EnumDeviceType.Contact }).Shape);
-
     [Theory]
-    [InlineData(new[] { EnumDeviceType.SmartSensor }, WiringShape.Ring)]
-    [InlineData(new[] { EnumDeviceType.Underground }, WiringShape.Line)]
-    [InlineData(new[] { EnumDeviceType.Fence, EnumDeviceType.Underground }, WiringShape.TwoBranch)]
-    [InlineData(new EnumDeviceType[0], WiringShape.Ring)]
-    public void should_infer_shape_from_sensors_when_controller_type_is_unknown(EnumDeviceType[] sensors, WiringShape expected)
+    [InlineData(new[] { EnumDeviceType.SmartSensor })]
+    [InlineData(new[] { EnumDeviceType.Underground })]
+    [InlineData(new[] { EnumDeviceType.Fence, EnumDeviceType.Underground })]
+    [InlineData(new EnumDeviceType[0])]
+    public void should_be_ring_without_inference_when_controller_type_is_unknown(EnumDeviceType[] sensors)
     {
+        // Act
         var t = WiringTopology.For(null, sensors);
 
-        Assert.Equal(expected, t.Shape);
-        Assert.True(t.IsInferred);
+        // Assert
+        Assert.Equal(WiringShape.Ring, t.Shape);
+        Assert.False(t.IsInferred);
     }
 
     [Fact]
-    public void should_warn_over_product_limit_only_above_34_when_ring()
+    public void should_not_warn_mix_when_smart_and_pids_sensors_share_a_controller()
     {
-        var t = WiringTopology.For("SmartController", Smart);
+        // Act
+        var smartOnPids = WiringTopology.For("Controller", new[] { EnumDeviceType.SmartSensor2 });
+        var mixed = WiringTopology.For("SmartController", new[] { EnumDeviceType.SmartSensor2, EnumDeviceType.Fence });
 
-        Assert.Null(t.LimitWarning(34));
-        Assert.Contains("34", t.LimitWarning(35));
-    }
-
-    [Fact]
-    public void should_warn_mix_when_smart_sensors_hang_on_pids_controller()
-    {
-        var t = WiringTopology.For("Controller", new[] { EnumDeviceType.SmartSensor2 });
-        Assert.NotNull(t.MixWarning);
-    }
-
-    [Fact]
-    public void should_warn_mix_when_smart_and_pids_sensors_share_a_controller()
-    {
-        var t = WiringTopology.For("SmartController", new[] { EnumDeviceType.SmartSensor2, EnumDeviceType.Fence });
-        Assert.NotNull(t.MixWarning);
-        Assert.NotNull(WiringTopology.For("SmartController", new[] { EnumDeviceType.Multi }).MixWarning);
+        // Assert — 섞어 쓰기는 정상(옛 O-8 경고 폐기) · 알림은 검증의 Info 가 맡는다
+        Assert.Null(smartOnPids.MixWarning);
+        Assert.Null(mixed.MixWarning);
     }
 
     [Theory]
@@ -113,8 +83,8 @@ public class WiringTopologyTests
         => Assert.Equal(expected, WiringTopology.ParseSensorType(text));
 
     [Fact]
-    public void should_decide_from_type_texts_when_string_overload_used()
-        => Assert.Equal(WiringShape.Line, WiringTopology.For("Controller", new[] { "Underground", "underground" }).Shape);
+    public void should_decide_ring_from_type_texts_when_string_overload_used()
+        => Assert.Equal(WiringShape.Ring, WiringTopology.For("Controller", new[] { "Underground", "underground" }).Shape);
 
     [Theory]
     [InlineData(17, 34, new[] { 12, 22 })]

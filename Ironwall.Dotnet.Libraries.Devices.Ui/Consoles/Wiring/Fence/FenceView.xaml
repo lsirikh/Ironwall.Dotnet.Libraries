@@ -106,6 +106,21 @@
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding ShowRange}"
 						ToolTip="탐지 반경(복합 20m · 지진동 15m)을 지면에 옅게 겹칩니다 — 빈틈은 마름모" />
+					<!--
+						펜스센서 현장 간격(v0.4 §1-C · 기준 3m · 2~4m · 0.5m 단위) — 제어기마다 다르다. 그림만 다시 놓이고 바뀐 줄이 아니다
+						(서버 저장 위치는 O-10 · 지금은 이 창 안에서만).
+					-->
+					<ComboBox
+						MinWidth="96"
+						Margin="2,0,8,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Devices.Wiring.Fence.Spacing"
+						AutomationProperties.Name="펜스센서 간격"
+						ItemStringFormat="펜스센서 간격 {0:0.#}m"
+						Visibility="{Binding HasFenceSensors, Converter={StaticResource F.BoolToVisibility}}"
+						ItemsSource="{Binding FenceSpacingChoices}"
+						SelectedItem="{Binding FenceSpacingMetres}"
+						ToolTip="현장 펜스센서 간격(기준 3m · 2~4m) — 바꾸면 그림만 다시 놓입니다(저장 대상 아님)" />
 					<Rectangle Width="1" Height="20" Margin="2,0,8,0" Fill="{DynamicResource RowLineBrush}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Fit"

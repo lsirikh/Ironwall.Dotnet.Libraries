@@ -27,8 +27,8 @@ public class WiringViewModelTests
     private const string SMART = "SmartController";
 
     /// <summary>
-    /// 창을 연다. 기본은 펜스 센서 · 제어기 종류 모름 → <b>양쪽 가지</b>(잠정). 링을 보려면 <paramref name="controller"/> 에
-    /// <c>SmartController</c> 와 <paramref name="type"/> 에 스마트 센서 종류를 준다.
+    /// 창을 연다. 기본은 펜스 센서 · 제어기 종류 모름 → <b>링</b>(v0.4 · 모든 제어기) — 저장된 결선이 없는 센서는 번호순 제안으로 체인에 붙는다.
+    /// 스마트 링을 보려면 <paramref name="controller"/> 에 <c>SmartController</c> 와 <paramref name="type"/> 에 스마트 센서 종류를 준다.
     /// </summary>
     private static WiringViewModel Open(int sensors = 4, int placedOnFirst = 0, WiringFakeDialogs? dialogs = null, WiringFakeGateway? gateway = null,
                                         string? controller = null, string type = "Fence", IReadOnlyList<WiringPlacement?>? placements = null)
@@ -73,29 +73,34 @@ public class WiringViewModelTests
 
     #region - Load -
     [Fact]
-    public void should_show_every_sensor_in_the_palette_when_nothing_is_wired_on_two_branches()
+    public void should_suggest_every_sensor_by_number_when_nothing_is_wired_on_a_fence_controller()
     {
+        // Arrange · Act — 옛 양쪽 가지는 팔레트에만 두었다. 이제 링이라 번호순 제안으로 붙는다.
         var vm = Open(sensors: 3);
 
+        // Assert
         Assert.Equal(3, vm.Rows.Count);
-        Assert.Equal(3, vm.Palette.Count);
-        var only = Assert.Single(vm.Line1);                     // 끝에 붙이기 빈 칸 하나 — 옛 기본 8칸은 없다
-        Assert.True(only.IsEmpty);
+        Assert.Empty(vm.Palette);
+        Assert.Equal(4, vm.Line1.Count);                         // 센서 3 + 끝에 붙이기 빈 칸 하나
+        Assert.All(vm.Line1.Take(3), slot => Assert.True(slot.IsSuggested));
+        Assert.True(vm.Line1[3].IsEmpty);
         Assert.False(vm.HasChanges);
-        Assert.False(vm.HasSuggestion);                          // 양쪽 가지는 번호순 제안을 하지 않는다
+        Assert.True(vm.HasSuggestion);
     }
-
     [Fact]
     public void should_fill_the_lines_when_sensors_carry_saved_wiring()
     {
+        // Arrange · Act
         var vm = Open(sensors: 3, placedOnFirst: 2);
 
-        Assert.Equal(2, vm.Line1.Count(s => s.IsFilled));
-        Assert.Single(vm.Palette);
+        // Assert — 저장된 두 대 + 번호순 제안 한 대
+        Assert.Equal(3, vm.Line1.Count(s => s.IsFilled));
+        Assert.Empty(vm.Palette);
         Assert.Equal("1", vm.Line1[0].OrderText);
         Assert.Equal("2", vm.Line1[1].OrderText);
+        Assert.False(vm.Line1[0].IsSuggested);
+        Assert.True(vm.Line1[2].IsSuggested);
     }
-
     [Fact]
     public void should_start_on_the_sensor_step_and_switch_when_asked()
     {
@@ -196,15 +201,62 @@ public class WiringViewModelTests
     }
 
     [Fact]
-    public void should_say_the_shape_was_inferred_from_sensors_when_the_controller_type_is_unknown()
+    public void should_show_no_topology_notice_when_the_controller_type_is_unknown()
     {
-        var vm = Open(sensors: 2);                               // 펜스 · 제어기 종류 모름 → 가지
+        // Arrange · Act — 옛 규칙은 센서로 모양을 추정해 알렸다. 이제 모든 제어기가 링이라 추정이 없다.
+        var vm = Open(sensors: 2);
 
-        Assert.True(vm.HasTopologyNotice);
-        Assert.Equal("제어기 종류를 몰라 센서로 추정했습니다: 가지", vm.TopologyNoticeText);
+        // Assert
+        Assert.True(vm.IsRing);
+        Assert.False(vm.HasTopologyNotice);
         Assert.False(OpenRing(sensors: 2).HasTopologyNotice);
     }
 
+    [Fact]
+    public void should_show_the_joined_notice_as_a_proposal_when_v2_branch_wiring_loads()
+    {
+        // Arrange — "shape": "branch" 로 저장된 왼쪽 L1 · L2 + 오른쪽 R1
+        var placements = new WiringPlacement?[] { new(1, 1), new(1, 2), new(2, 1) };
+        var seeds = Enumerable.Range(0, 3).Select(i => new WiringSensorSeed(
+            101 + i, i + 1, new SensorFacts(1101 + i, $"북측 {i + 1}구간 펜스", "Fence", "북측 7구간"), placements[i],
+            SavedShape: WiringShape.TwoBranch));
+
+        // Act
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "북측 제어기 B", "10.20.1.103", "Controller"),
+                                               seeds, new[] { "Fence" }, null, new WiringFakeDialogs());
+
+        // Assert — 왼쪽 가지를 뒤집어(L2 → L1) 앞에, 오른쪽 가지를 뒤에
+        Assert.True(vm.IsRing);
+        Assert.True(vm.HasLegacyNotice);
+        Assert.Equal(WiringViewModel.JOINED_NOTICE, vm.LegacyNoticeText);
+        Assert.Equal("옛 가지 배치를 링으로 이어 붙였습니다 — 확인 후 저장", vm.LegacyNoticeText);
+        Assert.True(vm.HasSuggestion);
+        Assert.Contains("옛 가지 배치", vm.SuggestionText);
+        Assert.False(vm.HasChanges);
+        Assert.Equal(new[] { 1102, 1101, 1103 }, vm.Line1.Where(s => s.IsFilled).Select(s => s.Row!.Facts.Number));
+    }
+
+    [Fact]
+    public void should_warn_that_number_order_may_differ_when_a_mixed_controller_gets_suggestions()
+    {
+        // Arrange — 스마트 1번~ · 펜스 101번~ 이 한 제어기에 섞인 현장(O-12)
+        var seeds = new[]
+        {
+            new WiringSensorSeed(101, 1, new SensorFacts(1, "스마트 1", "SmartSensor2", "북측"), new WiringPlacement(1, 1)),
+            new WiringSensorSeed(102, 2, new SensorFacts(2, "스마트 2", "SmartSensor2", "북측")),
+            new WiringSensorSeed(103, 3, new SensorFacts(101, "펜스 101", "Fence", "북측")),
+        };
+
+        // Act
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "북측 제어기 B", "10.20.1.103", SMART),
+                                               seeds, new[] { "Fence", "SmartSensor2" }, null, new WiringFakeDialogs());
+
+        // Assert
+        Assert.True(vm.HasSuggestion);
+        Assert.Contains("종류가 섞여 있어 번호순이 실제 순서와 다를 수 있습니다", vm.SuggestionText);
+        Assert.Contains(vm.Issues, i => i.Code == WiringValidation.CODE_MIX && i.Level == WiringIssueLevel.Info);
+        Assert.DoesNotContain("종류가 섞여", OpenRing(sensors: 3).SuggestionText);
+    }
     [Fact]
     public async Task should_suggest_by_number_without_asking_on_close_when_nothing_is_saved_on_a_ring()
     {
@@ -242,20 +294,21 @@ public class WiringViewModelTests
     }
 
     [Fact]
-    public async Task should_save_left_and_right_branch_orders_when_two_branch()
+    public async Task should_save_ring_orders_when_a_suggested_sensor_is_dropped_on_a_fence_controller()
     {
+        // Arrange — 옛 규칙은 PIDS 제어기를 양쪽 가지로 저장했다. 이제 링 한 줄이다.
         var gateway = Gateway(3, placements: new WiringPlacement?[] { null, null, null });
         var vm = Open(sensors: 3, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway, controller: "Controller");
 
-        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
-        vm.Drop(Payload(vm.Palette[0], vm.Palette[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        // Act — 제안된 세 번째를 맨 앞으로(제안이 함께 적용된다)
+        vm.Drop(Payload(vm.Line1[2]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
         await vm.SaveAsync();
 
-        Assert.Equal(new WiringPlacement(1, 1), SentPlacement(gateway, 101));
-        Assert.Equal(new WiringPlacement(2, 1), SentPlacement(gateway, 102));
-        Assert.Equal(new WiringPlacement(2, 2), SentPlacement(gateway, 103));
+        // Assert
+        Assert.Equal(new WiringPlacement(1, 1), SentPlacement(gateway, 103));
+        Assert.Equal(new WiringPlacement(1, 2), SentPlacement(gateway, 101));
+        Assert.Equal(new WiringPlacement(1, 3), SentPlacement(gateway, 102));
     }
-
     [Fact]
     public void should_ignore_the_cross_line_key_when_the_wiring_is_a_ring()
     {
@@ -271,78 +324,92 @@ public class WiringViewModelTests
     }
 
     [Fact]
-    public void should_move_to_the_other_branch_when_the_cross_line_key_reaches_the_view_on_two_branches()
+    public void should_ignore_the_cross_line_key_when_a_fence_controller_is_wired()
     {
-        var vm = Open(sensors: 2, placedOnFirst: 2);             // 가지 — 왼쪽 [1101, 1102]
+        // Arrange — 옛 양쪽 가지는 Alt+↓ 로 다른 가지로 옮겼다. 펜스 제어기도 이제 링이다.
+        var vm = Open(sensors: 2, placedOnFirst: 2);
         vm.Line1[1].IsSelected = true;
 
+        // Act
         var handled = WiringView.HandleLineKey(vm, System.Windows.Input.Key.System, System.Windows.Input.Key.Down);
 
-        Assert.True(handled);
-        Assert.Equal(1102, vm.Line2[0].Row!.Facts.Number);
+        // Assert
+        Assert.False(handled);
+        Assert.Empty(vm.Line2);
+        Assert.False(vm.HasChanges);
     }
-
     #endregion
 
     #region - Drag -
     [Fact]
     public void should_place_the_sensor_when_dropped_on_the_end_slot()
     {
-        var vm = Open(sensors: 2);
+        // Arrange — 체인 [1101, 1102, 1103] 에서 1101 을 빼 팔레트로
+        var vm = Open(sensors: 3, placedOnFirst: 3);
+        vm.Drop(Payload(vm.Line1[0]), new DropTarget(WiringViewModel.BinZoneKey, null, -1));
         var sensor = vm.Palette[0];
-        var target = new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1);
+        var target = new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[2], -1);   // 끝에 붙이기 칸
 
+        // Act
         Assert.True(vm.CanDrop(Payload(sensor), target));
         vm.Drop(Payload(sensor), target);
 
-        Assert.Equal(sensor.Row, vm.Line1[0].Row);
-        Assert.Equal("1", vm.Line1[0].OrderText);
-        Assert.True(vm.Line1[1].IsEmpty);                        // 끝에 붙이기 칸이 뒤로 따라간다
-        Assert.Single(vm.Palette);
+        // Assert
+        Assert.Equal(sensor.Row, vm.Line1[2].Row);
+        Assert.Equal("3", vm.Line1[2].OrderText);
+        Assert.True(vm.Line1[3].IsEmpty);                        // 끝에 붙이기 칸이 뒤로 따라간다
+        Assert.Empty(vm.Palette);
         Assert.True(vm.HasChanges);
     }
-
     [Fact]
     public void should_insert_before_and_push_when_dropped_on_an_occupied_slot()
     {
         // 옛 칸 모델은 찬 칸에 놓기를 거절했다 — 체인은 그 자리에 끼워 넣고 뒤를 민다(FR-08).
-        var vm = Open(sensors: 2, placedOnFirst: 1);
+        var vm = Open(sensors: 2, placedOnFirst: 1);             // 1101 저장 · 1102 제안
         var target = new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1);
-        var sensor = vm.Palette[0];
+        var from = vm.Line1[1];
+        var sensor = from.Row!;
 
-        Assert.True(vm.CanDrop(Payload(sensor), target));
-        vm.Drop(Payload(sensor), target);
+        Assert.True(vm.CanDrop(Payload(from), target));
+        vm.Drop(Payload(from), target);
 
-        Assert.Equal(sensor.Row, vm.Line1[0].Row);
+        Assert.Equal(sensor, vm.Line1[0].Row);
         Assert.Equal(1101, vm.Line1[1].Row!.Facts.Number);
     }
-
     [Fact]
-    public void should_move_between_lines_when_a_filled_slot_is_dropped_on_the_other_branch()
+    public void should_refuse_a_drop_on_a_second_line_when_the_wiring_is_a_ring()
     {
+        // Arrange — 옛 양쪽 가지는 오른쪽 가지 칸에 놓을 수 있었다. 링에는 두 번째 목록이 없다.
         var vm = Open(sensors: 1, placedOnFirst: 1);
         var from = vm.Line1[0];
-        var row = from.Row!;
+        var second = new DropTarget(WiringViewModel.SlotZoneKey, new WiringSlotViewModel(2, 0), -1);
 
-        vm.Drop(Payload(from), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        // Act
+        vm.Drop(Payload(from), second);
 
-        Assert.True(vm.Line1[0].IsEmpty);
-        Assert.Equal(row, vm.Line2[0].Row);
+        // Assert
+        Assert.False(vm.CanDrop(Payload(from), second));
+        Assert.Empty(vm.Line2);
+        Assert.Equal(1101, vm.Line1[0].Row!.Facts.Number);
+        Assert.False(vm.HasChanges);
     }
-
     [Fact]
     public void should_fill_consecutive_positions_when_several_sensors_are_dropped_at_once()
     {
-        var vm = Open(sensors: 3);
+        // Arrange — 세 대를 모두 빼 팔레트로
+        var vm = Open(sensors: 3, placedOnFirst: 3);
+        vm.Drop(Payload(vm.Line1[0], vm.Line1[1], vm.Line1[2]), new DropTarget(WiringViewModel.BinZoneKey, null, -1));
+        Assert.Equal(3, vm.Palette.Count);
         var target = new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1);
 
+        // Act
         vm.Drop(Payload(vm.Palette[0], vm.Palette[1], vm.Palette[2]), target);
 
+        // Assert
         Assert.Equal(3, vm.Line1.Count(s => s.IsFilled));
         Assert.Equal(new[] { "1", "2", "3" }, vm.Line1.Take(3).Select(s => s.OrderText));
         Assert.Empty(vm.Palette);
     }
-
     [Fact]
     public void should_unplace_and_close_up_when_a_filled_slot_is_dropped_on_the_bin()
     {
@@ -362,7 +429,8 @@ public class WiringViewModelTests
     [Fact]
     public void should_refuse_the_bin_when_the_payload_comes_from_the_palette()
     {
-        var vm = Open(sensors: 1);
+        var vm = Open(sensors: 1, placedOnFirst: 1);
+        vm.AddOneRow();                                          // 새 줄은 팔레트에 선다
 
         Assert.False(vm.CanDrop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.BinZoneKey, null, -1)));
         Assert.False(vm.CanDrop(Payload(vm.Palette[0]), new DropTarget("somewhere-else", null, -1)));
@@ -573,41 +641,40 @@ public class WiringViewModelTests
 
     #region - Validation · save -
     [Fact]
-    public void should_allow_saving_when_only_one_branch_has_sensors()
+    public void should_allow_saving_when_every_sensor_is_on_one_ring_chain()
     {
         // 옛 모델은 "2차 선이 비면 루프가 안 닫힌다"(치명)로 저장을 막았다 — FR-14 에서 없앴다.
         var vm = Open(sensors: 2, gateway: new WiringFakeGateway());
-        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
+        vm.AcceptSuggestion();
 
         Assert.DoesNotContain(vm.Issues, i => i.Level == WiringIssueLevel.Critical);
         Assert.True(vm.CanSave, vm.SaveBlockedReason);
     }
-
     [Fact]
     public async Task should_send_one_call_per_changed_row_when_saving()
     {
-        var gateway = Gateway(2);
+        var gateway = Gateway(3);
         var dialogs = new WiringFakeDialogs { Confirm = true };
-        var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: dialogs, gateway: gateway);
+        var vm = Open(sensors: 3, placedOnFirst: 3, dialogs: dialogs, gateway: gateway);
 
-        // 두 번째 센서를 2차 선으로 — 루프가 닫힌다.
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        // 세 번째 센서를 두 번째 자리로 — 1101 은 그대로, 1102 · 1103 두 줄만 바뀐다.
+        vm.Drop(Payload(vm.Line1[2]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[1], -1));
         Assert.True(vm.CanSave);
 
         await vm.SaveAsync();
 
-        Assert.Equal(1, gateway.PatchCount);
+        Assert.Equal(2, gateway.PatchCount);
+        Assert.DoesNotContain(gateway.Patched, p => p.Id == 101);
         Assert.False(vm.HasChanges);                 // 저장한 줄은 새 기준이 된다
         Assert.Contains("저장했습니다", vm.StatusText);
         Assert.False(vm.HasSaveResults);
     }
-
     [Fact]
     public async Task should_send_nothing_when_the_confirm_is_declined()
     {
         var gateway = Gateway(2);
         var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new WiringFakeDialogs { Confirm = false }, gateway: gateway);
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
 
         await vm.SaveAsync();
 
@@ -621,7 +688,7 @@ public class WiringViewModelTests
         var gateway = Gateway(2);
         gateway.PatchFails.Add(102);
         var vm = Open(sensors: 2, placedOnFirst: 2, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));   // 101 · 102 둘 다 바뀐다
 
         await vm.SaveAsync();
 
@@ -637,7 +704,7 @@ public class WiringViewModelTests
         var vm = Open(sensors: 1, placedOnFirst: 1, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
         vm.AddOneRow();
         vm.PlaceFromPalette(vm.Palette[0]);
-        vm.Drop(Payload(vm.Line1[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));   // 새 줄을 맨 앞으로 — 기존 줄도 바뀐다
 
         await vm.SaveAsync();
 
@@ -649,13 +716,12 @@ public class WiringViewModelTests
     [Fact]
     public void should_report_the_change_preview_before_saving()
     {
-        var vm = Open(sensors: 2, placedOnFirst: 2, gateway: Gateway(2));
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        var vm = Open(sensors: 3, placedOnFirst: 3, gateway: Gateway(3));
+        vm.Drop(Payload(vm.Line1[2]), new DropTarget(WiringViewModel.BinZoneKey, null, -1));   // 끝 센서만 뺀다 — 한 줄만 바뀐다
 
         Assert.Contains("결선이 바뀐 줄", vm.ChangePreview);
         Assert.Contains("저장할 센서 1대", vm.ChangePreview);
     }
-
     [Fact]
     public async Task should_ask_before_closing_when_there_are_unsaved_changes()
     {

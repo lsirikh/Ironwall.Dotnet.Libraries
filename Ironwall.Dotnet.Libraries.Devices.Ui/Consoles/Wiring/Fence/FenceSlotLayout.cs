@@ -29,6 +29,9 @@ public sealed record FenceLayoutOptions
     /// 0 이하 · NaN · 무한대는 무시한다. 체인 맨 왼쪽 센서의 값은 쓸 곳이 없어 무시된다.
     /// </summary>
     public IReadOnlyDictionary<int, double>? MeasuredGapMetres { get; init; }
+
+    /// <summary>종류별 간격 표 — 펜스센서 현장 간격(2~4m)을 바꾼 표를 줄 수 있다(v0.4 §1-C). 없으면 기준 표.</summary>
+    public WiringSpacingTable? Spacing { get; init; }
 }
 
 /// <summary>센서 한 대의 자리.</summary>
@@ -75,12 +78,12 @@ public sealed class FenceSlotLayout
     /// <summary>이 줌보다 작으면 펜스센서 연속 구간을 한 묶음으로 접는다(FR-18).</summary>
     public const double GROUP_ZOOM_THRESHOLD = 0.8;
 
-    /// <summary>종류별 기본 간격(m · FR-17 · 카탈로그 3쪽).</summary>
-    public const double SPACING_FENCE_M = 2.5;
-    public const double SPACING_SMART_M = 6;
-    public const double SPACING_MULTI_M = 20;
-    public const double SPACING_UNDERGROUND_M = 25;
-    public const double SPACING_DEFAULT_M = 6;
+    /// <summary>종류별 기준 간격(m) — 정본은 <see cref="WiringSpacingTable"/>(v0.4 §1-C: 펜스 3m · 현장 2~4m).</summary>
+    public const double SPACING_FENCE_M = WiringSpacingTable.FENCE_DEFAULT_M;
+    public const double SPACING_SMART_M = WiringSpacingTable.SMART_M;
+    public const double SPACING_MULTI_M = WiringSpacingTable.MULTI_M;
+    public const double SPACING_UNDERGROUND_M = WiringSpacingTable.UNDERGROUND_M;
+    public const double SPACING_DEFAULT_M = WiringSpacingTable.OTHER_M;
 
     /// <summary>체인 양 끝에서 제어기 · 여백까지(m).</summary>
     public const double END_LEAD_M = 6;
@@ -159,20 +162,11 @@ public sealed class FenceSlotLayout
     #endregion
 
     #region - Pure helpers -
-    /// <summary>종류별 기본 간격(m · FR-17).</summary>
-    public static double SpacingMetres(EnumDeviceType type) => type switch
-    {
-        EnumDeviceType.Fence => SPACING_FENCE_M,
-        EnumDeviceType.SmartSensor or EnumDeviceType.SmartSensor2 or
-        EnumDeviceType.SmartCompound or EnumDeviceType.SmartMultisensor2 => SPACING_SMART_M,
-        EnumDeviceType.Multi => SPACING_MULTI_M,
-        EnumDeviceType.Underground => SPACING_UNDERGROUND_M,
-        _ => SPACING_DEFAULT_M,
-    };
+    /// <summary>종류별 기준 간격(m · FR-17) — 기준 표(<see cref="WiringSpacingTable.Default"/>).</summary>
+    public static double SpacingMetres(EnumDeviceType type) => WiringSpacingTable.Default.SpacingOf(type);
 
-    /// <summary>이웃 두 센서 사이 기본 간격 = 두 종류 간격 중 작은 값.</summary>
-    public static double GapMetres(EnumDeviceType left, EnumDeviceType right)
-        => Math.Min(SpacingMetres(left), SpacingMetres(right));
+    /// <summary>이웃 두 센서 사이 기준 간격 = 두 종류 간격 중 작은 값.</summary>
+    public static double GapMetres(EnumDeviceType left, EnumDeviceType right) => WiringSpacingTable.Default.GapBetween(left, right);
 
     /// <summary>
     /// 세계 점(x DIU · 높이 m · 깊이 m) → 화면 y. 입체: 지면 − (높이·cos35° + 깊이·sin35°)·배율 · 평면: 지면 − 높이·배율.
@@ -233,8 +227,11 @@ public sealed class FenceSlotLayout
         return filled;
     }
 
-    /// <summary>펜스센서 한 칸의 절반(m) — 이웃 펜스센서 간격(<see cref="SPACING_FENCE_M"/>)의 절반이라 이어진 칸이 기둥을 나눠 쓴다.</summary>
+    /// <summary>펜스센서 한 칸의 절반(m, 기준 표) — 이웃 펜스센서 간격의 절반이라 이어진 칸이 기둥을 나눠 쓴다. 현장 간격은 표의 <c>FenceMetres / 2</c>.</summary>
     public const double FENCE_HALF_PANEL_M = SPACING_FENCE_M / 2;
+
+    /// <summary>이 배치에 쓴 간격 표(펜스센서 현장 간격 포함).</summary>
+    public WiringSpacingTable Spacing { get; private init; } = WiringSpacingTable.Default;
 
     /// <summary>종류별 모양 — (붙는 높이 m, 깊이 m, 칩 폭, 칩 높이, 아래로 매달리는가).</summary>
     private static (double Height, double Depth, double Width, double ChipHeight, bool HangsDown) ShapeOf(EnumDeviceType type) => type switch
@@ -259,6 +256,7 @@ public sealed class FenceSlotLayout
         // 지면 y — 가장 높은 것(기둥 · 볼 마운트 칩)이 위 여백 안에 들어오게.
         var groundY = TOP_PAD + 26 + POST_HEIGHT_M * ppm;
 
+        var spacing = options.Spacing ?? WiringSpacingTable.Default;
         var types = chain.Keys.Select(k => typeOf(k)).ToList();
         var metres = new List<double>(types.Count);
         for (var i = 0; i < types.Count; i++)
@@ -266,7 +264,7 @@ public sealed class FenceSlotLayout
             if (i == 0) { metres.Add(0); continue; }
             var gap = options.MeasuredGapMetres is { } measured && measured.TryGetValue(chain.Keys[i], out var m) && m > 0 && double.IsFinite(m)
                 ? m
-                : GapMetres(types[i - 1], types[i]);
+                : spacing.GapBetween(types[i - 1], types[i]);
             metres.Add(metres[i - 1] + gap);
         }
 
@@ -284,7 +282,7 @@ public sealed class FenceSlotLayout
             slots.Add(new FenceSensorSlot(chain.Keys[i], i, types[i], metres[i], xs[i], anchor, rect));
         }
 
-        var layout = new FenceSlotLayout(chain, slots, xs, ppm, projection, groundY);
+        var layout = new FenceSlotLayout(chain, slots, xs, ppm, projection, groundY) { Spacing = spacing };
         layout.Complete();
         return layout;
     }
@@ -310,7 +308,7 @@ public sealed class FenceSlotLayout
         var anchors = Slots.Select(s => s.Anchor).ToList();
 
         PostTopY = ProjectY(GroundY, POST_HEIGHT_M, 0, _ppm, Projection);
-        PostXs = MountPosts(Slots.Select(s => (s.X, s.Type)), FENCE_HALF_PANEL_M * _ppm);
+        PostXs = MountPosts(Slots.Select(s => (s.X, s.Type)), Spacing.FenceMetres / 2 * _ppm);
 
         // 함체(링) · 제어기 — 제어기 틈 아래, 펜스 안쪽 지면에.
         var gx = GapX(Chain.ControllerGap);

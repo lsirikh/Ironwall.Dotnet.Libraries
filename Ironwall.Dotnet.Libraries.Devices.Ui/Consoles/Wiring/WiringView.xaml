@@ -1241,15 +1241,14 @@
 												BorderBrush="{DynamicResource BorderBrush}"
 												BorderThickness="1"
 												CornerRadius="4">
-												<TextBlock FontSize="10.5" Text="{Binding PortAText}" />
+												<TextBlock FontSize="10.5" Text="Sensor A" />
 											</Border>
 											<Border
 												Padding="5,1"
 												BorderBrush="{DynamicResource BorderBrush}"
 												BorderThickness="1"
-												CornerRadius="4"
-												Visibility="{Binding HasPortB, Converter={StaticResource BoolToVisibility}}">
-												<TextBlock FontSize="10.5" Text="{Binding PortBText}" />
+												CornerRadius="4">
+												<TextBlock FontSize="10.5" Text="Sensor B" />
 											</Border>
 										</StackPanel>
 									</StackPanel>
@@ -1257,7 +1256,7 @@
 							</StackPanel>
 
 							<StackPanel Grid.Column="1">
-								<!--  첫 목록 — 링 · 한 줄은 체인 전체, 양쪽 가지는 왼쪽 가지  -->
+								<!--  목록 — 링 체인 전체(Sensor A 쪽 끝부터 · v0.4 모든 제어기가 링)  -->
 								<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
 								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding Line1Hint}" TextWrapping="Wrap" />
 								<Border
@@ -1291,54 +1290,7 @@
 												<drag:CaptureDragBehavior
 													DisplayMemberPath="Display"
 													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지(양쪽 가지만) · Delete 빼기" />
-											</b:Interaction.Behaviors>
-										</ListBox>
-									</DockPanel>
-									</Grid>
-								</Border>
-
-								<!--  두 번째 목록 — 양쪽 가지의 오른쪽 가지만(링 · 한 줄은 숨긴다)  -->
-								<TextBlock
-									Style="{StaticResource W.Title}"
-									Text="{Binding Line2Title}"
-									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}" />
-								<TextBlock
-									Style="{StaticResource W.Hint}"
-									Text="{Binding Line2Hint}"
-									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}" />
-								<Border
-									Margin="0,6,0,0"
-									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}"
-									Padding="8"
-									Background="{DynamicResource SurfaceAltBrush}"
-									BorderBrush="{DynamicResource DividerBrush}"
-									BorderThickness="1"
-									CornerRadius="8">
-									<Grid>
-									<!--  케이블(WS L285)  -->
-									<Rectangle
-										Height="2"
-										VerticalAlignment="Top"
-										Fill="{DynamicResource DividerBrush}"
-										IsHitTestVisible="False"
-										RadiusX="1"
-										RadiusY="1"
-										Style="{StaticResource W.Cable}" />
-									<DockPanel LastChildFill="True">
-										<ListBox
-											AutomationProperties.AutomationId="Devices.Wiring.Line.2"
-											ItemsSource="{Binding Line2}"
-											ItemTemplate="{StaticResource W.SlotTemplate}"
-											PreviewKeyDown="OnLinePreviewKeyDown"
-											SelectionChanged="OnSlotSelectionChanged"
-											SelectionMode="Extended"
-											Style="{StaticResource W.SlotList}">
-											<b:Interaction.Behaviors>
-												<drag:CaptureDragBehavior
-													DisplayMemberPath="Display"
-													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지(양쪽 가지만) · Delete 빼기" />
+													KeyboardFallback="Alt+← → 한 칸 · Delete 빼기" />
 											</b:Interaction.Behaviors>
 										</ListBox>
 									</DockPanel>

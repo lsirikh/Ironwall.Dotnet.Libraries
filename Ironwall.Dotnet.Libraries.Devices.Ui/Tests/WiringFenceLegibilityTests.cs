@@ -81,16 +81,20 @@ public class WiringFenceLegibilityTests
 
     #region - Texts -
     [Theory]
-    [InlineData("SmartController", "Sensor A 쪽 끝")]
-    [InlineData("Controller", "왼쪽 가지 L n · 오른쪽 가지 R n")]
-    public void should_explain_the_fault_section_relation_per_topology(string controllerType, string expected)
+    [InlineData("SmartController")]
+    [InlineData("Controller")]           // 옛 규칙은 "왼쪽 가지 L n · 오른쪽 가지 R n" — 이제 PIDS 제어기도 링(v0.4)
+    public void should_explain_the_fault_section_relation_from_sensor_a_when_any_controller_is_a_ring(string controllerType)
     {
+        // Arrange
         var types = controllerType == "SmartController" ? "SmartSensor2" : "Multi";
         var seeds = Enumerable.Range(0, 3).Select(i => new WiringSensorSeed(101 + i, i + 1, new SensorFacts(1101 + i, $"센서 {i + 1}", types, ""), new WiringPlacement(1, i + 1)));
+
+        // Act
         var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "CTRL", "10.0.0.1", controllerType), seeds, new[] { types }, null, new WiringFakeDialogs());
 
-        Assert.Contains(expected, vm.FaultRelationText);
-        if (controllerType == "Controller") Assert.DoesNotContain("Sensor A", vm.FaultRelationText);
+        // Assert
+        Assert.Contains("Sensor A 쪽 끝", vm.FaultRelationText);
+        Assert.DoesNotContain("가지", vm.FaultRelationText);
     }
 
     [Fact]

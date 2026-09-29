@@ -32,14 +32,11 @@ public class WiringReviewTests
     [Fact]
     public async Task should_send_a_body_with_no_nulls_when_only_the_wiring_changed()
     {
-        var body = await PatchBodyAsync(board =>
-        {
-            board.Unplace(board.Rows[1].Key);
-            board.Place(board.Rows[1].Key, 2, 0);
-        });
+        // 링 체인 [1101, 1102] 에서 1102 를 맨 앞으로 — 두 줄 다 PATCH 되고, 마지막(1102) 본문을 본다.
+        var body = await PatchBodyAsync(board => board.Place(board.Rows[1].Key, 1, 0));
 
         AssertNoNulls(body);
-        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
         Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
 
         // 표 칸은 받은 값 그대로(비우면 PATCH 가 지운다)
@@ -83,14 +80,13 @@ public class WiringReviewTests
         {
             var row = board.Rows[1];
             row.Facts = row.Facts with { Name = "고친 이름" };
-            board.Unplace(row.Key);
-            board.Place(row.Key, 2, 2);
+            board.Place(row.Key, 1, 0);
         });
 
         AssertNoNulls(body);
         Assert.Equal("고친 이름", (string?)body["name_device"]);
-        // 체인 모델: 오른쪽 가지(선 2)가 비어 있어 어느 자리를 가리켜도 그 가지의 1번이 된다(옛 칸 모델의 "3번 빈 칸"은 없다).
-        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        // 체인 모델: 맨 앞에 끼워 넣으면 1번이 되고 뒤는 밀린다(링 · 선 1 하나).
+        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
         Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
     }
 
@@ -101,7 +97,7 @@ public class WiringReviewTests
         var http = new CapturingHttp();
         var board = WiringDoubles.Board(1, placedOnFirst: 1);
         var row = board.AddRow(new SensorFacts(1301, "새 센서", "Fence", "북측 8구간"));
-        board.Place(row.Key, 2, 0);
+        board.Place(row.Key, 1, 1);                          // 링 체인 끝 — (1, 2)
 
         var service = new WiringApplyService(new DeviceApiSensorGateway(http.Real()), null, null, WiringDoubles.AxisPolicy());
         await service.ApplyAsync(10, board);
@@ -113,7 +109,8 @@ public class WiringReviewTests
         Assert.Equal(1301, (int?)body["number_device"]);
         Assert.Equal(10, (int?)body["controller_id"]);
         Assert.Equal("Fence", (string?)body["type_sensor"]);
-        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
         Assert.Equal("북측 8구간", (string?)body.SelectToken("geolocation.location"));
     }
 
@@ -152,7 +149,7 @@ public class WiringReviewTests
         var vm = Open(gateway, dialogs, sensors: 1, placedOnFirst: 1);
 
         vm.AddOneRow();                       // 새 줄(Id=0)
-        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));   // 2차 선 — 루프를 닫는다
+        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[1], -1));   // 링 체인 끝
         Assert.True(vm.CanSave, vm.SaveBlockedReason);
         await vm.SaveAsync();
 
@@ -209,31 +206,21 @@ public class WiringReviewTests
 
     #region - C6 · 선을 건너는 키보드 길 -
     [Fact]
-    public void should_move_to_the_other_line_when_the_cross_line_key_is_used()
+    public void should_stay_on_the_chain_when_the_cross_line_key_is_used_on_a_ring()
     {
+        // Arrange — 옛 양쪽 가지는 다른 가지로 건너갔다. 모든 제어기가 링이라 건너갈 선이 없다(v0.4).
         var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 1, placedOnFirst: 1);
         vm.Line1[0].IsSelected = true;
 
-        vm.MoveSelectedToOtherLine();
+        // Act — Alt+↓ 는 뷰가 흘려보낸다(처리 안 함)
+        var handled = WiringView.HandleLineKey(vm, System.Windows.Input.Key.System, System.Windows.Input.Key.Down);
 
-        Assert.True(vm.Line1[0].IsEmpty);
-        Assert.NotNull(vm.Line2[0].Row);              // 같은 자리로 건너간다
-        Assert.True(vm.Line2[0].IsSelected);          // 선택도 따라간다(C8 과 같은 요구)
-    }
-
-    [Fact]
-    public void should_insert_at_the_same_position_and_push_when_moving_to_the_other_branch()
-    {
-        var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 2, placedOnFirst: 2);
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
-        vm.Line1[0].IsSelected = true;
-
-        vm.MoveSelectedToOtherLine();
-
-        // 체인에는 "찬 칸" 이 없다 — 같은 자리(1번)에 끼워 넣고 있던 센서는 뒤로 밀린다.
-        Assert.Equal(101, vm.Line2[0].Row!.Id);
-        Assert.Equal(102, vm.Line2[1].Row!.Id);
-        Assert.True(vm.Line2[0].IsSelected);
+        // Assert
+        Assert.False(handled);
+        Assert.NotNull(vm.Line1[0].Row);
+        Assert.Empty(vm.Line2);
+        Assert.False(vm.HasChanges);
+        Assert.False(vm.CanUndo);
     }
     #endregion
 
@@ -246,7 +233,7 @@ public class WiringReviewTests
         var vm = Open(gateway, dialogs, sensors: 1, placedOnFirst: 1);
 
         vm.AddOneRow();
-        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        vm.Drop(Payload(vm.Palette[0]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[1], -1));
         await vm.SaveAsync();
 
         Assert.Equal(1, gateway.ListCount);            // 번호로 되찾아 본다
@@ -261,7 +248,7 @@ public class WiringReviewTests
         gateway.ListResult.Add(WiringDoubles.ServerSensor(777, 1102, 2, null));
         var board = WiringDoubles.Board(1, placedOnFirst: 1);
         var row = board.AddRow(new SensorFacts(1102, "새 센서", "Fence", ""));
-        board.Place(row.Key, 2, 0);
+        board.Place(row.Key, 1, 1);
 
         var result = await new WiringApplyService(gateway, null, null, WiringDoubles.AxisPolicy()).ApplyAsync(10, board);
 
@@ -321,17 +308,22 @@ public class WiringReviewTests
     [Fact]
     public void should_undo_a_multi_row_enter_in_one_step()
     {
-        var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 3);
+        // Arrange — 링은 저장된 결선이 없으면 번호순 제안으로 붙이므로, 붙어 있던 세 대를 한 번에 빼 팔레트로 보낸다
+        var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 3, placedOnFirst: 3);
+        vm.Drop(Payload(vm.Line1[0], vm.Line1[1], vm.Line1[2]), new DropTarget(WiringViewModel.BinZoneKey, null, -1));
+        Assert.Equal(3, vm.Palette.Count);
 
+        // Act
         vm.PlaceManyFromPalette(vm.Palette.ToList());
         Assert.Empty(vm.Palette);
-
         vm.Undo();
 
-        Assert.Equal(3, vm.Palette.Count);        // 한 걸음으로 전부 돌아온다
+        // Assert — 한 걸음으로 전부 돌아온다(그 앞 걸음은 빼기 한 번)
+        Assert.Equal(3, vm.Palette.Count);
+        vm.Undo();
+        Assert.Empty(vm.Palette);
         Assert.False(vm.CanUndo);
     }
-
     [Fact]
     public void should_place_every_sensor_beyond_the_old_slot_cap_when_auto_laying_out_a_ring()
     {
@@ -349,18 +341,18 @@ public class WiringReviewTests
     }
 
     [Fact]
-    public void should_not_block_when_only_one_branch_has_sensors()
+    public void should_not_block_when_every_sensor_is_on_one_ring_chain()
     {
         // 옛 "한쪽 선만 차면 루프가 안 닫힌다(치명)" 는 없앴다 — 링의 돌아오는 길은 센서 없는 리턴케이블이다(FR-14).
         var board = WiringDoubles.Board(1);
-        Assert.True(board.Place(board.Rows[0].Key, 2, 0));
+        Assert.True(board.AcceptSuggestions());
+        Assert.False(board.Place(board.Rows[0].Key, 2, 0));          // 두 번째 선은 없다
 
         var issues = WiringValidation.Evaluate(board);
 
         Assert.False(WiringValidation.BlocksSave(issues));
         Assert.DoesNotContain(issues, i => i.Level == WiringIssueLevel.Critical);
     }
-
     [Fact]
     public void should_keep_the_typed_text_and_say_why_when_the_number_is_not_a_number()
     {
@@ -597,10 +589,13 @@ public class WiringReviewTests
 
     private static async Task RunAsync(CapturingHttp http, Action<WiringBoard> change)
     {
-        // 센서 2대 — 두 번째(102)가 줄 끝이라, 그 한 대를 옮기거나 빼도 다른 센서의 순번이 밀리지 않는다(체인은 빼면 당겨진다).
+        // 센서 2대 — 두 번째(102)가 줄 끝이라, 그 한 대를 빼도 다른 센서의 순번이 밀리지 않는다(체인은 빼면 당겨진다).
         var board = WiringDoubles.Board(2, placedOnFirst: 2);
-        // 재조회가 돌려줄 서버 쪽 상태 — 모든 칸이 채워져 있다.
-        http.GetResponseJson = ServerEnvelope(WiringDoubles.ServerSensor(102, 1102, 2, new WiringPlacement(1, 2)));
+        // 재조회가 돌려줄 서버 쪽 상태(센서마다) — 모든 칸이 채워져 있다. 맨 앞으로 옮기면 101 도 PATCH 되므로 101 도 돌려준다.
+        var server101 = ServerEnvelope(WiringDoubles.ServerSensor(101, 1101, 1, new WiringPlacement(1, 1)));
+        var server102 = ServerEnvelope(WiringDoubles.ServerSensor(102, 1102, 2, new WiringPlacement(1, 2)));
+        http.GetResponseFor = endpoint => endpoint.EndsWith("/101", StringComparison.Ordinal) ? server101
+                                        : endpoint.EndsWith("/102", StringComparison.Ordinal) ? server102 : null;
 
         change(board);
 

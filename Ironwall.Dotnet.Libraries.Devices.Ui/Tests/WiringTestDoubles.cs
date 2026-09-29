@@ -218,12 +218,15 @@ internal sealed class CapturingHttp : IApiService
     /// <summary>단건 조회가 돌려줄 봉투(JSON) — 없으면 빈 성공 응답.</summary>
     public string? GetResponseJson { get; set; }
 
+    /// <summary>엔드포인트마다 다른 봉투(JSON)를 돌려줄 때 — <c>null</c> 을 돌려주면 <see cref="GetResponseJson"/> 로 간다.</summary>
+    public Func<string, string?>? GetResponseFor { get; set; }
+
     public JObject? LastBody => Calls.Count == 0 ? null : Calls[^1].Body;
 
     public Task<HttpResponseMessage> GetRequestAsync(string endpoint, Dictionary<string, string>? parameters = null)
     {
         Calls.Add(("GET", endpoint, null));
-        return Task.FromResult(Ok(GetResponseJson ?? """{"success":true,"data":null,"meta":{}}"""));
+        return Task.FromResult(Ok(GetResponseFor?.Invoke(endpoint) ?? GetResponseJson ?? """{"success":true,"data":null,"meta":{}}"""));
     }
 
     public Task<HttpResponseMessage> PostRequestAsync<T>(string endpoint, T body) => Record("POST", endpoint, body);

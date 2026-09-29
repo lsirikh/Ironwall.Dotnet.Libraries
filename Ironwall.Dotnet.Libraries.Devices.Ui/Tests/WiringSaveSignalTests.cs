@@ -24,7 +24,7 @@ public class WiringSaveSignalTests
         return gateway;
     }
 
-    /// <summary>센서 두 대가 1차 선에 꽂힌 제어기 — 두 번째 센서를 2차 선으로 옮기면 루프가 닫혀 저장할 수 있다.</summary>
+    /// <summary>센서 두 대가 링 체인에 꽂힌 제어기 — 두 번째 센서를 맨 앞으로 옮기면 두 줄의 순번이 바뀌어 저장할 것이 생긴다.</summary>
     private static WiringViewModel OpenWithOneMove(WiringFakeGateway gateway, bool confirm = true)
     {
         var seeds = Enumerable.Range(0, 2).Select(i => new WiringSensorSeed(
@@ -40,7 +40,7 @@ public class WiringSaveSignalTests
             new WiringApplyService(gateway, null, null, WiringDoubles.AxisPolicy()),
             new WiringFakeDialogs { Confirm = confirm });
 
-        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
+        vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line1[0], -1));
         return vm;
     }
 
@@ -86,6 +86,7 @@ public class WiringSaveSignalTests
     public async Task should_not_report_a_save_when_every_call_fails()
     {
         var gateway = Gateway(2);
+        gateway.PatchFails.Add(101);             // 맨 앞으로 옮기면 두 줄이 다 바뀐다 — 둘 다 실패시킨다
         gateway.PatchFails.Add(102);
         var vm = OpenWithOneMove(gateway);
 

@@ -70,24 +70,35 @@ public class WiringValidationTests
 
         var issues = WiringValidation.Evaluate(Ring(35));
 
-        var limit = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_LIMIT));
-        Assert.Equal(WiringIssueLevel.Warning, limit.Level);
-        Assert.Contains("34", limit.Message);
+        // 35대 = 34대 초과 + 체인 약 204m(6m × 34) 로 200m 초과 — 둘 다 경고(한도 표 · v0.4 §1-C)
+        var limits = issues.Where(i => i.Code == WiringValidation.CODE_LIMIT).ToList();
+        Assert.All(limits, l => Assert.Equal(WiringIssueLevel.Warning, l.Level));
+        Assert.Contains(limits, l => l.Message.Contains("34대"));
+        Assert.Contains(limits, l => l.Message.Contains("200m"));
         Assert.False(WiringValidation.BlocksSave(issues));
     }
 
     [Fact]
-    public void should_warn_when_smart_and_pids_sensors_share_a_controller()
+    public void should_only_inform_when_smart_and_pids_sensors_share_a_controller()
     {
+        // Arrange
         var board = Ring(2);
         board.Rows[1].Facts = board.Rows[1].Facts with { TypeText = "Fence" };      // 표에서 종류를 바꾸면 바로 따라온다
 
+        // Act
         var issues = WiringValidation.Evaluate(board);
 
+        // Assert — 섞어 쓰기는 정상(옛 O-8 경고 폐기): 알림 하나 · 한도 경고 없음
         var mix = Assert.Single(issues.Where(i => i.Code == WiringValidation.CODE_MIX));
-        Assert.Equal(WiringIssueLevel.Warning, mix.Level);
+        Assert.Equal(WiringIssueLevel.Info, mix.Level);
+        Assert.Equal(WiringLimitTable.MIXED_INFO, mix.Message);
+        Assert.DoesNotContain(issues, i => i.Code == WiringValidation.CODE_LIMIT);
         Assert.False(WiringValidation.BlocksSave(issues));
     }
+
+    [Fact]
+    public void should_not_inform_mix_when_only_smart_sensors_hang_on_a_controller()
+        => Assert.DoesNotContain(WiringValidation.Evaluate(Ring(3)), i => i.Code == WiringValidation.CODE_MIX);
 
     [Fact]
     public void should_warn_about_the_closed_up_gap_when_saved_orders_had_a_hole()
@@ -165,16 +176,18 @@ public class WiringValidationTests
     }
 
     [Fact]
-    public void should_write_each_branch_when_two_branch()
+    public void should_write_one_ring_when_a_fence_controller_is_wired()
     {
+        // Arrange — 옛 양쪽 가지 제어기(PIDS · 펜스센서)도 이제 링이다(v0.4 §1-C)
         var board = Board(3, controllerType: "Controller", type: "Fence");
-        board.Place(board.Rows[0].Key, 1, 0);
-        board.Place(board.Rows[1].Key, 2, 0);
+        board.AcceptSuggestions();
 
+        // Act
         var text = WiringValidation.LoopText(board);
 
-        Assert.Contains("제어기 ─왼쪽▶ 1. 북측 1구간 센서", text);
-        Assert.Contains("제어기 ─오른쪽▶ 1. 북측 2구간 센서", text);
+        // Assert
+        Assert.Contains("Sensor A ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Sensor B", text);
+        Assert.DoesNotContain("왼쪽", text);
     }
 
     [Fact]
@@ -217,14 +230,15 @@ public class WiringValidationTests
     }
 
     [Fact]
-    public void should_read_each_branch_from_the_controller_when_describing_a_two_branch_fault_section()
+    public void should_count_from_both_ports_when_describing_a_fence_controller_fault_section()
     {
+        // Arrange — 펜스 제어기도 링: 1차는 Sensor A 쪽, 2차는 Sensor B 쪽에서 센다
         var board = Board(3, controllerType: "Controller", type: "Fence");
-        board.Place(board.Rows[0].Key, 2, 0);
-        board.Place(board.Rows[1].Key, 2, 1);
+        board.AcceptSuggestions();
 
-        Assert.Equal("2차 1~2 → 북측 1구간 센서와 북측 2구간 센서 사이", WiringValidation.DescribeFaultSection(board, 2, 1, 2));
-        Assert.Contains("없어", WiringValidation.DescribeFaultSection(board, 1, 1, 1));
+        // Act · Assert
+        Assert.Equal("1차 1~2 → 북측 1구간 센서와 북측 2구간 센서 사이", WiringValidation.DescribeFaultSection(board, 1, 1, 2));
+        Assert.Equal("2차 1번 = 북측 3구간 센서", WiringValidation.DescribeFaultSection(board, 2, 1, 1));
     }
 
     [Fact]

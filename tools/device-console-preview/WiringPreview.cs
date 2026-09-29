@@ -80,29 +80,35 @@ internal sealed class WiringPreview
         return (new WiringView { DataContext = vm }, vm);
     }
 
-    /// <summary>PIDS 양쪽 가지 — 가지마다 [복합, 펜스 ×7, 복합, 펜스 ×7, 복합, 펜스 ×6](23대 · 왼쪽 2 · 3번이 바뀜) + 다른 제어기의 스마트 센서 1대(팔레트 · 섞임 경고).</summary>
+    /// <summary>
+    /// 울타리 감지("PIDS") 제어기 — v0.4 · <b>링</b>(함체는 가운데). 섞어 쓰는 현장: 철조망 구간 스마트 센서 1~3번 뒤에
+    /// 윤형철조망 구간 [복합, 펜스 ×7, 복합, 펜스 ×7, 복합, 펜스 ×6] ×2(복합 · 펜스 101번~). 저장된 링 위치 · 동측 복합 2 는 내부를 본다(FR-20) ·
+    /// 번호 없는 스마트 1대는 미배치(번호순 제안 — 섞였으니 "번호순이 실제 순서와 다를 수 있습니다" 안내).
+    /// </summary>
     private (FrameworkElement View, WiringViewModel Vm) Pids()
     {
         var seeds = new List<WiringSensorSeed>();
+        var order = 1;
+        for (var i = 1; i <= 3; i++, order++)
+            seeds.Add(new WiringSensorSeed(300 + i, order, new SensorFacts(i, $"철조망 스마트 {i}", "SmartSensor2", "서측"), new WiringPlacement(1, order)));
+
         var number = 101;
         var pattern = new[] { 'M' }.Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 6)).ToArray();
-        foreach (var (line, side) in new[] { (1, "서측"), (2, "동측") })
+        foreach (var side in new[] { "서측", "동측" })
         {
             int multi = 0, fence = 0;
-            var ids = new List<(int Id, string Name, bool Multi)>();
             foreach (var t in pattern)
             {
                 var isMulti = t == 'M';
                 var name = isMulti ? $"{side} 복합 {++multi}" : $"{side} 펜스 {++fence}";
-                ids.Add((1000 + number, name, isMulti));
+                var back = side == "동측" && isMulti && multi == 2;
+                seeds.Add(new WiringSensorSeed(1000 + number, order, new SensorFacts(number, name, isMulti ? "Multi" : "Fence", side),
+                    new WiringPlacement(1, order, back ? WiringFacing.Back : WiringFacing.Front)));
                 number++;
+                order++;
             }
-            if (line == 1) (ids[1], ids[2]) = (ids[2], ids[1]);
-            for (var i = 0; i < ids.Count; i++)
-                seeds.Add(new WiringSensorSeed(ids[i].Id, ids[i].Id - 1100, new SensorFacts(ids[i].Id - 1000, ids[i].Name, ids[i].Multi ? "Multi" : "Fence", side),
-                    new WiringPlacement(line, i + 1, line == 2 && i == 8 ? WiringFacing.Back : WiringFacing.Front)));   // 동측 복합 2 는 내부를 본다(FR-20)
         }
-        seeds.Add(new WiringSensorSeed(499, 1, new SensorFacts(150, "스마트 복합센서 II(다른 제어기)", "SmartSensor2", "서측")));
+        seeds.Add(new WiringSensorSeed(304, 60, new SensorFacts(4, "철조망 스마트 4(새로 단 것)", "SmartSensor2", "서측")));
         var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "Multi", "Fence", "SmartSensor2" });
         return (new WiringView { DataContext = vm }, vm);
     }

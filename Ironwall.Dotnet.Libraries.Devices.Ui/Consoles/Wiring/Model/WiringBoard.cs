@@ -126,6 +126,8 @@ public enum WiringProposalKind
     Converted = 1,
     /// <summary>불러온 순번의 빈 자리를 당겨 붙여 순번이 바뀐 센서(FR-14 ②).</summary>
     Compacted = 2,
+    /// <summary>옛 양쪽 가지 저장값을 링 한 줄로 이어 붙인 것(v0.4 · 가지 폐기).</summary>
+    JoinedBranches = 3,
 }
 
 /// <summary>
@@ -217,10 +219,46 @@ public sealed class WiringBoard
     public bool IsProposed(int key) => _pending && _proposals.ContainsKey(key);
 
     /// <summary>
-    /// 지금 표의 센서 종류로 본 섞임 경고(O-8) — 종류를 표에서 고치면 바로 따라온다. 모양은 바꾸지 않는다.
+    /// 이 제어기의 제품군(표의 센서 종류 전부) — 스마트만 · 펜스 계열만 · 섞임. 섞어 쓰기는 정상(v0.4 · 옛 섞임 경고 O-8 폐기) —
+    /// 한도 표의 행과 "번호순이 실제 순서와 다를 수 있다"(O-12) 안내를 고른다.
     /// </summary>
-    public string? MixWarning
-        => WiringTopology.For(_controllerType, _rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)).ToList()).MixWarning;
+    public WiringFamily Family => WiringLimitTable.FamilyOf(_rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)));
+
+    /// <summary>제품군이 섞였는가(스마트 1번~ · 펜스 101번~ 같은 현장).</summary>
+    public bool IsMixedFamily => Family == WiringFamily.Mixed;
+
+    /// <summary>
+    /// 간격 표(v0.4 §1-C) — 펜스센서 현장 간격(2~4m)을 제어기마다 바꿀 수 있다. 보드 상태로만 쥐고 서버에 싣지 않는다(O-10) ·
+    /// 바꾸면 그림만 다시 놓이고 바뀐 줄 · 되돌리기와 무관하다.
+    /// </summary>
+    public WiringSpacingTable Spacing { get; private set; } = WiringSpacingTable.Default;
+
+    /// <summary>펜스센서 현장 간격을 바꾼다(2~4m · 0.5m 단위로 맞춘다). 바뀌었으면 <c>true</c>.</summary>
+    public bool SetFenceSpacing(double metres)
+    {
+        var next = Spacing.WithFence(metres);
+        if (next == Spacing) return false;
+        Spacing = next;
+        return true;
+    }
+
+    /// <summary>한도 표(경고만).</summary>
+    public WiringLimitTable Limits { get; } = WiringLimitTable.Default;
+
+    /// <summary>체인 길이(m) — 첫 센서에서 끝 센서까지, 이웃 간격(간격 표 · 두 종류 중 작은 값)의 합.</summary>
+    public double ChainLengthMetres
+    {
+        get
+        {
+            var types = _chain.Keys.Select(k => WiringTopology.ParseSensorType(Find(k)?.Facts.TypeText)).ToList();
+            var sum = 0.0;
+            for (var i = 1; i < types.Count; i++) sum += Spacing.GapBetween(types[i - 1], types[i]);
+            return sum;
+        }
+    }
+
+    /// <summary>체인의 센서 종류(체인 순서).</summary>
+    public IReadOnlyList<EnumDeviceType> ChainTypes => _chain.Keys.Select(k => WiringTopology.ParseSensorType(Find(k)?.Facts.TypeText)).ToList();
 
     /// <summary>그 선의 센서 키 — 목록 순서(링 · 한 줄: 체인 순서 · 가지: 제어기 쪽부터). 없는 선은 빈 목록.</summary>
     public IReadOnlyList<int> Line(int line)
@@ -304,15 +342,18 @@ public sealed class WiringBoard
         foreach (var s in loaded)
             _rows.Add(new WiringSensorRow(s.Id > 0 ? s.Id : _nextNewKey--, s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups));
 
-        var inferred = WiringTopology.For(controllerType, _rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)).ToList());
+        // 모든 제어기는 링(v0.4 §1-C). 저장된 모양은 옛 값을 어떻게 읽을지만 정한다 — 가지로 저장된 값은 링으로 이어 붙이는 제안이 된다.
+        Topology = WiringTopology.For(controllerType, _rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)).ToList());
         StoredShape = StoredShapeOf(savedShapes);
         ShapeNotice = null;
-        if (StoredShape is { } stored && stored != inferred.Shape)
-            ShapeNotice = $"저장된 결선 모양({ShapeName(stored)})과 {(inferred.IsInferred ? "센서 종류로" : "제어기 종류로")} 추정한 모양({ShapeName(inferred.Shape)})이 다릅니다 — 저장된 모양으로 엽니다";
-        Topology = StoredShape is { } shape && shape != inferred.Shape ? WithShape(inferred, shape) : inferred;
 
-        var result = WiringChain.Load(Shape, _rows.Select(r => new WiringChainSensor(r.Key, r.Id, r.Facts.Number, r.BaselinePlacement)));
-        var chain = result.Chain;
+        var chainSensors = _rows.Select(r => new WiringChainSensor(r.Key, r.Id, r.Facts.Number, r.BaselinePlacement)).ToList();
+        var leftCount = 0;
+        JoinedFromBranches = StoredShape == WiringShape.TwoBranch && chainSensors.Any(s => s.Placement is not null);
+        if (JoinedFromBranches) chainSensors = JoinBranches(chainSensors, out leftCount).ToList();
+
+        var result = WiringChain.Load(Shape, chainSensors);
+        var chain = JoinedFromBranches ? result.Chain.WithControllerGap(leftCount) : result.Chain;
 
         foreach (var issue in result.Issues)
         {
@@ -336,12 +377,36 @@ public sealed class WiringBoard
         {
             if (_chain.Suggested.Contains(row.Key)) { _proposals[row.Key] = WiringProposalKind.Suggested; continue; }
             if (WiringSpec.SamePlacement(DisplayPlacementOf(row.Key), row.BaselinePlacement)) continue;
-            _proposals[row.Key] = ConvertedFromLegacy && row.BaselinePlacement?.Line == WiringSpec.LINE_SECONDARY
-                ? WiringProposalKind.Converted
+            _proposals[row.Key] = JoinedFromBranches ? WiringProposalKind.JoinedBranches
+                : ConvertedFromLegacy && row.BaselinePlacement?.Line == WiringSpec.LINE_SECONDARY ? WiringProposalKind.Converted
                 : WiringProposalKind.Compacted;
         }
         _pending = _proposals.Count > 0;
     }
+
+    /// <summary>
+    /// 옛 양쪽 가지 저장값 → 링 한 줄(v0.4 · 가지 폐기). <b>펜스를 따라 왼쪽 → 오른쪽 물리 순서를 지킨다</b>:
+    /// 왼쪽 가지는 제어기에서 바깥으로 L1, L2 … 였으므로 <b>뒤집어</b>(바깥 L n → 제어기 옆 L1) 앞에 두고,
+    /// 이어서 오른쪽 가지를 그대로(제어기 옆 R1 → 바깥 R n) 붙인다. 함체(제어기) 틈은 L1 과 R1 사이 = 왼쪽 가지 수.
+    /// 같은 가지 안 순번이 겹치면 id 순. 자리 없는 센서는 그대로(번호순 제안 대상).
+    /// </summary>
+    internal static IEnumerable<WiringChainSensor> JoinBranches(IReadOnlyList<WiringChainSensor> sensors, out int leftCount)
+    {
+        var left = sensors.Where(s => s.Placement?.Line == WiringSpec.LINE_PRIMARY)
+                          .OrderByDescending(s => s.Placement!.Order).ThenBy(s => s.Id).ToList();
+        var right = sensors.Where(s => s.Placement?.Line == WiringSpec.LINE_SECONDARY)
+                           .OrderBy(s => s.Placement!.Order).ThenBy(s => s.Id).ToList();
+        leftCount = left.Count;
+        var joined = left.Concat(right)
+                         .Select((s, i) => s with { Placement = new WiringPlacement(WiringSpec.LINE_PRIMARY, i + 1, s.Placement!.Facing) })
+                         .ToList();
+        return joined.Concat(sensors.Where(s => s.Placement is null));
+    }
+
+    /// <summary>옛 가지 배치를 링으로 이어 붙였고 아직 저장하지 않았다.</summary>
+    public bool JoinedFromBranches { get; private set; }
+
+    public const string JOINED_NOTICE = "옛 가지 배치를 링으로 이어 붙였습니다 — 확인 후 저장";
 
     /// <summary>새 줄을 더한다(센서 여러 개 만들기 · 엑셀 붙여넣기). 팔레트에 선다 — 서버에는 저장 때 만든다.</summary>
     public WiringSensorRow AddRow(SensorFacts facts, IEnumerable<int>? groups = null)
@@ -355,14 +420,6 @@ public sealed class WiringBoard
         => savedShapes is null || savedShapes.Count == 0
             ? null
             : savedShapes.Values.GroupBy(s => s).OrderByDescending(g => g.Count()).ThenBy(g => (int)g.Key).First().Key;
-
-    private static WiringTopology WithShape(WiringTopology inferred, WiringShape shape)
-        => inferred with
-        {
-            Shape = shape,
-            MaxSensors = shape == WiringShape.Ring ? WiringTopology.SMART_MAX_SENSORS : null,
-            IsProvisional = shape == WiringShape.TwoBranch,
-        };
 
     /// <summary>사람이 읽는 모양 이름.</summary>
     public static string ShapeName(WiringShape shape) => shape switch
@@ -424,16 +481,6 @@ public sealed class WiringBoard
         return at.Index < count - 1 && Place(key, at.Line, at.Index + 2);     // "옮기기 전" 기준이라 +2 가 한 칸 뒤다
     }
 
-    /// <summary>
-    /// 다른 가지로 옮긴다(Alt+↑ · Alt+↓) — <b>양쪽 가지에서만</b>. 같은 자리(없으면 그 가지 끝)로 간다.
-    /// </summary>
-    public bool MoveToOtherLine(int key)
-    {
-        if (Shape != WiringShape.TwoBranch || LocationOf(key) is not { } at) return false;
-        var other = at.Line == WiringSpec.LINE_PRIMARY ? WiringSpec.LINE_SECONDARY : WiringSpec.LINE_PRIMARY;
-        return Place(key, other, Math.Min(at.Index, CountOn(other)));
-    }
-
     /// <summary>센서의 목록 위치(선 · 자리). 체인에 없으면 <c>null</c>.</summary>
     public (int Line, int Index)? LocationOf(int key)
     {
@@ -472,7 +519,7 @@ public sealed class WiringBoard
         {
             foreach (var key in palette) chain = chain.Append(key);
             return chain.SortByDefaultOrder(sensors, includeUnplaced: false);
-        }, _rows.Where(r => _chain.Contains(r.Key) || palette.Contains(r.Key)).Select(r => r.Key).ToList(), force: true);
+        }, _rows.Where(r => _chain.Contains(r.Key) || palette.Contains(r.Key)).Select(r => r.Key).ToList(), force: true, keepSuggestions: true);
         return true;
     }
 
@@ -590,6 +637,7 @@ public sealed class WiringBoard
         if (!_pending && Diff().WiringChanged.Count == 0)
         {
             ConvertedFromLegacy = false;
+            JoinedFromBranches = false;
             ProposalsAppliedByEdit = false;
             _loadNotices.Clear();
             _proposals.Clear();
@@ -635,11 +683,19 @@ public sealed class WiringBoard
     /// 사람이 자리를 정한 센서의 불러오기 경고는 여기서 풀린다(C4).
     /// </summary>
     /// <param name="force">바뀐 것이 없어도 적용(번호순 배치 — 사람이 누른 것).</param>
-    private bool Edit(Func<WiringChain, WiringChain> edit, IEnumerable<int> touched, bool force = false)
+    /// <param name="keepSuggestions">
+    /// 번호순 제안도 받아들인 채 고치는가. 제품군이 섞인 제어기(O-12)에서는 번호 대역이 종류별로 갈려 번호순이 실제 순서가 아닐 수 있어
+    /// <b>제안을 저절로 적용하지 않는다</b> — 체인을 고치면 제안 센서는 미배치로 돌아간다. [번호 순으로 자동 배치]처럼 사람이 번호순을 고른 동작만 참.
+    /// </param>
+    private bool Edit(Func<WiringChain, WiringChain> edit, IEnumerable<int> touched, bool force = false, bool keepSuggestions = false)
     {
-        var basis = _pending ? _chain.AcceptSuggestions() : _chain;
+        var withdrawn = _pending && IsMixedFamily && !keepSuggestions ? _chain.Suggested.ToList() : new List<int>();
+        var basis = !_pending ? _chain
+            : withdrawn.Count > 0 ? _chain.RemoveMany(withdrawn).AcceptSuggestions()
+            : _chain.AcceptSuggestions();
         var next = edit(basis);
         if (!force && next.SameAs(basis)) return false;            // 제자리 — 제안도 그대로 둔다
+        foreach (var key in withdrawn) _proposals.Remove(key);     // 섞인 제어기: 번호순 제안은 미배치로 돌아갔다(O-12)
 
         if (_pending)
         {
@@ -659,11 +715,12 @@ public sealed class WiringBoard
         IReadOnlyList<WiringFacing> Facings,
         WiringChain Chain,
         bool Pending,
-        bool AppliedByEdit);
+        bool AppliedByEdit,
+        IReadOnlyDictionary<int, WiringProposalKind> Proposals);
 
     private Snapshot Capture()
         => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _rows.Select(r => r.LoadIssue).ToList(), _rows.Select(r => r.Facing).ToList(),
-               _chain, _pending, ProposalsAppliedByEdit);
+               _chain, _pending, ProposalsAppliedByEdit, new Dictionary<int, WiringProposalKind>(_proposals));
 
     private void Restore(Snapshot snapshot)
     {
@@ -679,6 +736,8 @@ public sealed class WiringBoard
         _chain = snapshot.Chain;
         _pending = snapshot.Pending;
         ProposalsAppliedByEdit = snapshot.AppliedByEdit;
+        _proposals.Clear();
+        foreach (var (key, kind) in snapshot.Proposals) _proposals[key] = kind;
     }
     #endregion
 }

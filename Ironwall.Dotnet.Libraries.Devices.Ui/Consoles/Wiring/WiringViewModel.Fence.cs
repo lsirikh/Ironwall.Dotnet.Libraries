@@ -82,8 +82,8 @@ public sealed partial class WiringViewModel
 
     /// <summary>"평면으로 표시 중" 표지 글자.</summary>
     public string FlatNoteText => _isSoftwareRendering
-        ? "평면으로 표시 중 — 원격 데스크톱 연결(입체 끔)"
-        : _isFlatChosen ? "평면으로 표시 중 — 원격 데스크톱에서는 자동으로 이 보기" : string.Empty;
+        ? "평면 표시 — 원격 데스크톱(입체 끔)"
+        : _isFlatChosen ? "평면 표시 중(원격 데스크톱은 자동)" : string.Empty;
 
     public bool HasFlatNote => IsFlat;
 
@@ -119,6 +119,34 @@ public sealed partial class WiringViewModel
     public bool HasRangeSensors => _board.Rows.Any(r => FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) > 0);
 
     public void ToggleRange() => ShowRange = !ShowRange && HasRangeSensors;
+    #endregion
+
+    #region - Spacing (v0.4 §1-C) -
+    /// <summary>지금 간격 표(펜스센서 현장 간격 포함) — 캔버스가 세계를 세울 때 쓴다.</summary>
+    public WiringSpacingTable FenceSpacing => _board.Spacing;
+
+    /// <summary>[펜스센서 간격 ▾] 고를 값 — 2 · 2.5 · 3 · 3.5 · 4 m.</summary>
+    public IReadOnlyList<double> FenceSpacingChoices => WiringSpacingTable.FenceChoices;
+
+    /// <summary>
+    /// 펜스센서 현장 간격(m) — 바꾸면 그림만 다시 놓인다. <b>바뀐 줄 · 되돌리기와 무관</b>하고 서버에 싣지 않는다(O-10).
+    /// </summary>
+    public double FenceSpacingMetres
+    {
+        get => _board.Spacing.FenceMetres;
+        set
+        {
+            if (!_board.SetFenceSpacing(value)) return;
+            NotifyOfPropertyChange();
+            NotifyOfPropertyChange(nameof(FenceSpacing));
+            StatusText = $"펜스센서 간격 {FenceSpacingMetres:0.#}m 로 다시 놓았습니다 — 그림만 바뀌고 저장 대상은 아닙니다.";
+            RefreshIssues();
+            RaiseFence();
+        }
+    }
+
+    /// <summary>펜스센서가 하나라도 있는가 — 없으면 간격 고르기를 끈다.</summary>
+    public bool HasFenceSensors => _board.Rows.Any(r => WiringTopology.ParseSensorType(r.Facts.TypeText) == EnumDeviceType.Fence);
     #endregion
 
     #region - Scene facts -
@@ -287,7 +315,7 @@ public sealed partial class WiringViewModel
             return _board.Shape switch
             {
                 WiringShape.Ring => $"{n.Order} / {count} · Sensor A 쪽이 1",
-                WiringShape.TwoBranch => $"{(n.Line == WiringSpec.LINE_PRIMARY ? "L" : "R")}{n.Order} / {count} · 제어기 쪽이 1(확인 중 O-6)",
+                WiringShape.TwoBranch => $"{(n.Line == WiringSpec.LINE_PRIMARY ? "L" : "R")}{n.Order} / {count} · 제어기 쪽이 1",
                 _ => $"{n.Order} / {count} · 제어기 쪽이 1",
             } + (_board.IsProposed(r.Key) ? " · 제안" : string.Empty);
         }
@@ -311,7 +339,7 @@ public sealed partial class WiringViewModel
             if (i <= 0) return string.Empty;
             var neighbour = _board.Shape == WiringShape.TwoBranch && i == _board.Chain.ControllerGap ? (int?)null : keys[i - 1];
             if (neighbour is not { } prev || _board.Find(prev) is not { } p) return string.Empty;
-            var metres = FenceSlotLayout.GapMetres(WiringTopology.ParseSensorType(p.Facts.TypeText), WiringTopology.ParseSensorType(r.Facts.TypeText));
+            var metres = _board.Spacing.GapBetween(WiringTopology.ParseSensorType(p.Facts.TypeText), WiringTopology.ParseSensorType(r.Facts.TypeText));
             return $"{metres:0.#}m · 두 종류 기본 간격 중 작은 값";
         }
     }
@@ -334,7 +362,7 @@ public sealed partial class WiringViewModel
     public string SelectedPhotoCaption => _isControllerSelected
         ? (IsRing ? "1U 도킹 — 스마트 제어기 + VBUS 제어기" : "제품 사진 준비 중")
         : SelectedFenceRow is { } r
-            ? $"{DeviceEnumDisplay.SensorTypeBilingual(r.Facts.TypeText)} · 기본 간격 {FenceSlotLayout.SpacingMetres(WiringTopology.ParseSensorType(r.Facts.TypeText)):0.#}m"
+            ? $"{DeviceEnumDisplay.SensorTypeBilingual(r.Facts.TypeText)} · 기본 간격 {_board.Spacing.SpacingOf(WiringTopology.ParseSensorType(r.Facts.TypeText)):0.#}m"
               + (FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) is var range and > 0 ? $" · 탐지 반경 {range:0}m" : string.Empty)
               + (HasSelectedPhoto ? string.Empty : " · 제품 사진 준비 중")
             : string.Empty;
@@ -582,7 +610,10 @@ public sealed partial class WiringViewModel
     #endregion
 
     #region - Footer counts (FR-01 · FR-18) -
-    /// <summary>아래 띠 — 링: "센서 13 · 체인 12 · 미배치 1 · 제품 한도 34" · 그 밖: 종류별 수 · 미배치 · 한도 확인 중.</summary>
+    /// <summary>
+    /// 아래 띠(v0.4 §1-C) — "센서 13 · 체인 12 · 미배치 1 · 체인 길이 약 66m / 기준 200m". 종류가 둘 이상이면 앞에 종류별 수.
+    /// 섞였으면 기준은 "확인 중(O-11)" — 숫자를 지어내지 않는다.
+    /// </summary>
     public string FenceCountsText
     {
         get
@@ -590,14 +621,17 @@ public sealed partial class WiringViewModel
             var all = _board.Rows.Count;
             var placed = _board.Chain.Count;
             var unplaced = _board.Unplaced.Count;
-            if (_board.Topology.MaxSensors is { } max)
-                return $"센서 {all} · 체인 {placed} · 미배치 {unplaced} · 제품 한도 {max}";
-
             var kinds = _board.Rows.GroupBy(r => FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText)))
                                    .ToDictionary(g => g.Key, g => g.Count());
-            var parts = new[] { (FenceKind.Multi, "복합"), (FenceKind.Fence, "펜스"), (FenceKind.Underground, "지진동"), (FenceKind.Smart, "스마트") }
-                .Where(k => kinds.ContainsKey(k.Item1)).Select(k => $"{k.Item2} {kinds[k.Item1]}");
-            return string.Join(" · ", parts.Append($"미배치 {unplaced}").Append("한도 확인 중(O-7)"));
+            var parts = new List<string>();
+            if (kinds.Count > 1)
+                parts.AddRange(new[] { (FenceKind.Smart, "스마트"), (FenceKind.Multi, "복합"), (FenceKind.Fence, "펜스"), (FenceKind.Underground, "지진동") }
+                    .Where(k => kinds.ContainsKey(k.Item1)).Select(k => $"{k.Item2} {kinds[k.Item1]}"));
+            parts.Add($"센서 {all} · 체인 {placed} · 미배치 {unplaced}");
+            var reference = _board.Limits.ReferenceLength(_board.Family) is { } m ? $"기준 {m:0}m"
+                : _board.IsMixedFamily ? $"기준 — {WiringLimitTable.MIXED_SHORT}" : "기준 —";
+            parts.Add($"체인 길이 약 {_board.ChainLengthMetres:0}m / {reference}");
+            return string.Join(" · ", parts);
         }
     }
     #endregion

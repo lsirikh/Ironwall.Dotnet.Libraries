@@ -268,7 +268,7 @@ public class WiringApplyTests
     {
         var (board, gateway) = Arrange();
         var row = board.AddRow(new SensorFacts(1301, "새 센서", "Fence", "북측 7구간"));
-        board.Place(row.Key, 2, 0);
+        board.Place(row.Key, 1, 3);                          // 링 체인 끝(4번) — 기존 세 줄은 그대로
 
         var result = await Service(gateway).ApplyAsync(10, board);
 
@@ -280,15 +280,15 @@ public class WiringApplyTests
         Assert.Equal(1301, (int?)body["number_device"]);
         Assert.Equal(10, (int?)body["controller_id"]);
         Assert.Equal("Fence", (string?)body["type_sensor"]);
-        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
-        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
+        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        Assert.Equal(4, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
     }
 
     [Fact]
     public async Task should_call_once_per_changed_sensor_when_saving()
     {
         var (board, gateway) = Arrange();
-        MoveAllToSecondLine(board);          // 세 줄 모두 자리가 바뀐다
+        ShiftEveryPosition(board);           // 세 줄 모두 자리가 바뀐다
 
         var result = await Service(gateway).ApplyAsync(10, board);
 
@@ -302,7 +302,7 @@ public class WiringApplyTests
     public async Task should_keep_the_failed_rows_when_some_calls_fail()
     {
         var (board, gateway) = Arrange();
-        MoveAllToSecondLine(board);
+        ShiftEveryPosition(board);
         gateway.PatchFails.Add(102);
 
         var result = await Service(gateway).ApplyAsync(10, board);
@@ -318,7 +318,7 @@ public class WiringApplyTests
     public async Task should_report_progress_for_every_row_when_saving()
     {
         var (board, gateway) = Arrange();
-        MoveAllToSecondLine(board);
+        ShiftEveryPosition(board);
         var seen = new List<WiringProgress>();
 
         await Service(gateway).ApplyAsync(10, board, new Progress<WiringProgress>(seen.Add));
@@ -372,7 +372,7 @@ public class WiringApplyTests
         Assert.Equal(1, (int?)wiring["line"]);
         Assert.Equal(2, (int?)wiring["order"]);
         Assert.Equal(2, (int?)wiring["v"]);                          // 형식 표지(H3)
-        Assert.Equal("branch", (string?)wiring["shape"]);
+        Assert.Equal("ring", (string?)wiring["shape"]);               // 제어기 종류를 몰라도 링(v0.4 · 옛 규칙은 "branch")
     }
 
     [Fact]
@@ -458,11 +458,12 @@ public class WiringApplyTests
     private static void MovePlacement(WiringBoard board)
         => Assert.True(board.Place(board.Rows[0].Key, 1, 2));
 
-    /// <summary>세 줄 모두 오른쪽 가지(선 2)로 — 한 번에 세 건이 나가는 경우를 만든다(펜스 센서 · 제어기 종류 모름 → 양쪽 가지).</summary>
-    private static void MoveAllToSecondLine(WiringBoard board)
-    {
-        for (var i = 0; i < board.Rows.Count; i++) board.Place(board.Rows[i].Key, 2, i);
-    }
+    /// <summary>
+    /// 첫 센서를 체인 끝으로 — [101, 102, 103] → [102, 103, 101] 이라 세 줄 모두 순번이 바뀐다(한 번에 세 건이 나가는 경우).
+    /// 옛 규칙은 세 줄을 오른쪽 가지로 옮겼다 — 이제 모든 제어기가 링이라 두 번째 선이 없다.
+    /// </summary>
+    private static void ShiftEveryPosition(WiringBoard board)
+        => Assert.True(board.Place(board.Rows[0].Key, 1, board.CountOn(1)));
 
     private sealed class CountingProvider : MockDeviceProviderService, IDeviceProviderService
     {

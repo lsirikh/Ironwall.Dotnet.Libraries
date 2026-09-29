@@ -25,7 +25,7 @@ public class WiringBoardTests
         Seed(int id, int number, WiringPlacement? placement = null, string type = "Fence")
         => (id, (int?)null, Facts(number, type: type), placement, (string?)null, (IReadOnlyList<int>?)null);
 
-    /// <summary>펜스 센서 · 제어기 종류 모름 → 양쪽 가지(잠정). 앞 <paramref name="placedOnFirst"/> 대는 왼쪽 가지 1번부터.</summary>
+    /// <summary>펜스 센서 · 제어기 종류 모름 → 링(v0.4 · 모든 제어기). 앞 <paramref name="placedOnFirst"/> 대는 저장된 체인 1번부터, 나머지는 번호순 제안.</summary>
     private static WiringBoard Loaded(int count, int placedOnFirst = 0)
     {
         var board = new WiringBoard();
@@ -56,12 +56,15 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_use_two_lists_when_fence_sensors_hang_on_an_unknown_controller()
+    public void should_use_one_ring_list_when_fence_sensors_hang_on_an_unknown_controller()
     {
-        var board = Loaded(2);
+        // Arrange · Act — 옛 규칙은 양쪽 가지(두 목록)였다
+        var board = Loaded(2, placedOnFirst: 2);
 
-        Assert.Equal(WiringShape.TwoBranch, board.Shape);
-        Assert.Equal(2, board.LineCount);
+        // Assert
+        Assert.Equal(WiringShape.Ring, board.Shape);
+        Assert.Equal(1, board.LineCount);
+        Assert.False(board.Place(board.Rows[0].Key, 2, 0));
     }
     #endregion
 
@@ -130,19 +133,6 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_move_to_the_same_position_of_the_other_branch_only_when_two_branch()
-    {
-        var board = Loaded(3, placedOnFirst: 2);
-        var second = board.Rows[1].Key;
-
-        Assert.True(board.MoveToOtherLine(second));
-        Assert.Equal(new WiringPlacement(2, 1), board.PlacementOf(second));   // 오른쪽 가지가 비어 있어 1번
-
-        var ring = Ring(2, placed: 2);
-        Assert.False(ring.MoveToOtherLine(ring.Rows[0].Key));
-    }
-
-    [Fact]
     public void should_append_to_the_end_when_placed_from_the_palette_by_keyboard()
     {
         var board = Ring(3, placed: 2);
@@ -176,8 +166,9 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_sort_within_each_branch_and_keep_the_palette_when_auto_laying_out_two_branches()
+    public void should_line_up_everything_on_one_chain_when_auto_laying_out_a_fence_controller()
     {
+        // Arrange — 옛 규칙은 가지 안에서만 줄 세우고 팔레트는 그대로였다. 이제 PIDS 제어기도 링이라 전체가 한 줄이다.
         var board = new WiringBoard();
         board.Load(new[]
         {
@@ -186,11 +177,13 @@ public class WiringBoardTests
             Seed(5, 1100),
         }, "Controller");
 
+        // Act
         board.AutoLayoutByNumber();
 
-        Assert.Equal(new[] { 1102, 1104 }, Numbers(board.Placed(1)));
-        Assert.Equal(new[] { 1101, 1103 }, Numbers(board.Placed(2)));
-        Assert.Equal(new[] { 1100 }, Numbers(board.Unplaced));
+        // Assert
+        Assert.Equal(new[] { 1100, 1101, 1102, 1103, 1104 }, Numbers(board.Placed(1)));
+        Assert.Empty(board.Line(2));
+        Assert.Empty(board.Unplaced);
     }
     #endregion
 
@@ -335,12 +328,15 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_leave_unplaced_in_the_palette_without_suggestion_when_two_branch()
+    public void should_suggest_by_number_when_fence_sensors_hang_on_an_unknown_controller()
     {
+        // Arrange · Act — 옛 양쪽 가지는 팔레트에만 두었다. 링은 번호순으로 제안한다.
         var board = Loaded(3);
 
-        Assert.Equal(3, board.Unplaced.Count);
-        Assert.False(board.HasSuggestion);
+        // Assert
+        Assert.Empty(board.Unplaced);
+        Assert.Equal(3, board.SuggestedCount);
+        Assert.False(board.IsDirty);
     }
 
     [Fact]
@@ -363,22 +359,79 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_open_as_the_stored_branch_without_conversion_when_v2_data_meets_a_controller_inferred_as_a_line()
+    public void should_join_v2_branch_data_into_one_ring_when_the_controller_has_only_underground_sensors()
     {
+        // Arrange — 옛 규칙은 저장된 "가지" 모양으로 열었다(H3). 이제 가지는 링으로 이어 붙이는 제안이다.
         var board = new WiringBoard();
+
+        // Act
         board.Load(new[]
         {
             Seed(1, 501, new WiringPlacement(1, 1), "Underground"),
             Seed(2, 502, new WiringPlacement(2, 1), "Underground"),
         }, controllerType: null, savedShapes: new Dictionary<int, WiringShape> { [1] = WiringShape.TwoBranch, [2] = WiringShape.TwoBranch });
 
-        Assert.Equal(WiringShape.TwoBranch, board.Shape);                // 저장된 모양이 추정(지중만 → 한 줄)을 이긴다(H3)
+        // Assert
+        Assert.Equal(WiringShape.Ring, board.Shape);
         Assert.Equal(WiringShape.TwoBranch, board.StoredShape);
-        Assert.False(board.ConvertedFromLegacy);                          // 표지가 있는 line 2 는 옛 배치가 아니다
-        Assert.False(board.HasPendingProposals);
-        Assert.Equal(new[] { 502 }, Numbers(board.Placed(2)));
-        Assert.Contains("저장된 결선 모양(가지)", board.ShapeNotice);
-        Assert.Contains("한 줄", board.ShapeNotice);
+        Assert.True(board.JoinedFromBranches);
+        Assert.False(board.ConvertedFromLegacy);
+        Assert.Null(board.ShapeNotice);
+        Assert.Equal(new[] { 501, 502 }, Numbers(board.Placed(1)));
+        Assert.Equal(1, board.Chain.ControllerGap);
+        Assert.Equal(1, board.ProposalCount(WiringProposalKind.JoinedBranches));   // 501 은 (1,1) 그대로 — 502 만 자리가 바뀐다
+    }
+
+    [Fact]
+    public void should_join_left_branch_reversed_then_right_branch_when_loading_v2_branch_data()
+    {
+        // Arrange — 왼쪽 가지 L1 · L2 · L3(제어기 → 바깥) + 오른쪽 가지 R1 · R2
+        var board = new WiringBoard();
+        var shapes = Enumerable.Range(1, 5).ToDictionary(id => id, _ => WiringShape.TwoBranch);
+
+        // Act
+        board.Load(new[]
+        {
+            Seed(1, 1101, new WiringPlacement(1, 1)), Seed(2, 1102, new WiringPlacement(1, 2)), Seed(3, 1103, new WiringPlacement(1, 3)),
+            Seed(4, 1201, new WiringPlacement(2, 1)), Seed(5, 1202, new WiringPlacement(2, 2)),
+        }, "Controller", shapes);
+
+        // Assert — 펜스를 따라 왼쪽 바깥 L3 → L2 → L1 → (제어기) → R1 → R2
+        Assert.Equal(WiringShape.Ring, board.Shape);
+        Assert.Equal(new[] { 3, 2, 1, 4, 5 }, board.Placed(1).Select(r => r.Id));
+        Assert.Equal(3, board.Chain.ControllerGap);                                 // 함체 틈 = 왼쪽 가지 수
+        Assert.True(board.JoinedFromBranches);
+        Assert.Equal("옛 가지 배치를 링으로 이어 붙였습니다 — 확인 후 저장", WiringBoard.JOINED_NOTICE);
+        Assert.True(board.HasPendingProposals);
+        Assert.Equal(4, board.ProposalCount(WiringProposalKind.JoinedBranches));    // L2 는 (1,2) 그대로라 제안이 아니다
+        Assert.All(board.Proposals.Values, k => Assert.Equal(WiringProposalKind.JoinedBranches, k));
+        Assert.False(board.IsDirty);
+        Assert.Equal(new WiringPlacement(2, 1), board.PlacementOf(4));              // 적용 전 저장될 자리 = 받아들인 기준
+        Assert.Equal(new WiringPlacement(1, 4), board.DisplayPlacementOf(4));
+    }
+
+    [Fact]
+    public void should_save_the_joined_ring_places_when_the_joined_proposal_is_accepted()
+    {
+        // Arrange
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            Seed(1, 1101, new WiringPlacement(1, 1)), Seed(2, 1102, new WiringPlacement(1, 2)), Seed(3, 1103, new WiringPlacement(1, 3)),
+            Seed(4, 1201, new WiringPlacement(2, 1)), Seed(5, 1202, new WiringPlacement(2, 2)),
+        }, "Controller", Enumerable.Range(1, 5).ToDictionary(id => id, _ => WiringShape.TwoBranch));
+
+        // Act
+        Assert.True(board.AcceptProposals());
+
+        // Assert
+        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(3));
+        Assert.Equal(new WiringPlacement(1, 3), board.PlacementOf(1));
+        Assert.Equal(new WiringPlacement(1, 5), board.PlacementOf(5));
+        Assert.Equal(new[] { 1, 3, 4, 5 }, board.Diff().WiringChanged.Select(r => r.Id).OrderBy(i => i));
+
+        board.MarkBaseline();
+        Assert.False(board.JoinedFromBranches);                                     // 저장하면 알림을 걷는다
     }
 
     [Fact]
@@ -394,25 +447,6 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_place_from_saved_orders_when_loading_two_branches()
-    {
-        var board = new WiringBoard();
-        board.Load(new[]
-        {
-            Seed(1, 1101, new WiringPlacement(1, 2)),
-            Seed(2, 1102, new WiringPlacement(1, 1)),
-            Seed(3, 1103, new WiringPlacement(2, 1)),
-        });
-
-        Assert.Equal(new[] { 1102, 1101 }, Numbers(board.Placed(1)));
-        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(board.Rows[1].Key));
-        Assert.Equal(new[] { 1103 }, Numbers(board.Placed(2)));
-        Assert.Empty(board.Unplaced);
-        Assert.False(board.IsDirty);          // 불러오기만으로 "바뀐 줄"이 생기지 않는다
-        Assert.False(board.ConvertedFromLegacy);
-    }
-
-    [Fact]
     public void should_leave_the_second_claim_unplaced_when_two_sensors_claim_one_order()
     {
         var board = new WiringBoard();
@@ -421,6 +455,87 @@ public class WiringBoardTests
         Assert.Single(board.Placed(1));
         Assert.Single(board.Unplaced);
         Assert.NotNull(board.Unplaced[0].LoadIssue);
+    }
+    #endregion
+
+    #region - Spacing · mixed family (v0.4 §1-C) -
+    [Fact]
+    public void should_not_make_the_board_dirty_when_the_fence_spacing_changes()
+    {
+        // Arrange
+        var board = Loaded(3, placedOnFirst: 3);
+        var before = board.ChainLengthMetres;
+
+        // Act
+        var changed = board.SetFenceSpacing(2.0);
+
+        // Assert — 그림만 다시 놓인다(O-10 · 서버에 싣지 않는다)
+        Assert.True(changed);
+        Assert.Equal(2.0, board.Spacing.FenceMetres);
+        Assert.Equal(6.0, before);                                                  // 기본 3m × 2
+        Assert.Equal(4.0, board.ChainLengthMetres);
+        Assert.False(board.IsDirty);
+        Assert.False(board.CanUndo);
+        Assert.False(board.SetFenceSpacing(2.2));                                   // 0.5m 로 맞추면 같은 2m
+    }
+
+    [Fact]
+    public void should_withdraw_number_suggestions_to_the_palette_when_a_mixed_controller_chain_is_edited()
+    {
+        // Arrange — 스마트 1 · 2 저장 + 스마트 3 · 펜스 101 저장 없음(번호순 제안)
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            Seed(1, 1, new WiringPlacement(1, 1), "SmartSensor2"), Seed(2, 2, new WiringPlacement(1, 2), "SmartSensor2"),
+            Seed(3, 3, type: "SmartSensor2"), Seed(4, 101, type: "Fence"),
+        }, SMART);
+        Assert.True(board.IsMixedFamily);
+        Assert.Equal(2, board.SuggestedCount);
+
+        // Act
+        Assert.True(board.MoveBy(board.Rows[0].Key, 1));
+
+        // Assert — 섞인 제어기는 번호순이 실제 순서가 아닐 수 있어 제안을 저절로 적용하지 않는다(O-12)
+        Assert.Equal(new[] { 2, 1 }, Numbers(board.Placed(1)));
+        Assert.Equal(new[] { 3, 101 }, Numbers(board.Unplaced));
+        Assert.False(board.HasPendingProposals);
+        Assert.Equal(0, board.ProposalCount(WiringProposalKind.Suggested));
+        Assert.DoesNotContain(board.Diff().WiringChanged, r => r.Id is 3 or 4);
+    }
+
+    [Fact]
+    public void should_order_every_sensor_by_number_when_auto_laying_out_a_mixed_controller()
+    {
+        // Arrange
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            Seed(4, 101, new WiringPlacement(1, 1), "Fence"), Seed(1, 1, new WiringPlacement(1, 2), "SmartSensor2"),
+            Seed(3, 3, type: "SmartSensor2"), Seed(2, 2, type: "SmartSensor2"),
+        }, SMART);
+
+        // Act
+        Assert.True(board.AutoLayoutByNumber());
+
+        // Assert — 사람이 번호순을 고른 동작은 전부 줄 세운다
+        Assert.Equal(new[] { 1, 2, 3, 101 }, Numbers(board.Placed(1)));
+        Assert.Empty(board.Unplaced);
+        Assert.False(board.HasPendingProposals);
+    }
+
+    [Fact]
+    public void should_apply_number_suggestions_with_the_edit_when_the_controller_is_not_mixed()
+    {
+        // Arrange
+        var board = Ring(4, placed: 2);
+
+        // Act
+        Assert.True(board.MoveBy(board.Rows[0].Key, 1));
+
+        // Assert — 섞이지 않았으면 옛 규칙(H2) 그대로 함께 적용된다
+        Assert.False(board.IsMixedFamily);
+        Assert.Equal(new[] { 1102, 1101, 1103, 1104 }, Numbers(board.Placed(1)));
+        Assert.Empty(board.Unplaced);
     }
     #endregion
 
@@ -433,7 +548,7 @@ public class WiringBoardTests
 
         board.PushUndo();
         board.Rows[0].Facts = board.Rows[0].Facts with { Name = "고친 이름" };
-        board.Place(keys[1], 2, 0);
+        Assert.True(board.Place(keys[1], 1, 0));                     // 제안 센서를 맨 앞으로 — 제안 적용 + 자리
 
         Assert.True(board.Undo());
 
@@ -452,9 +567,9 @@ public class WiringBoardTests
         var board = Loaded(2, placedOnFirst: 2);
         var keys = board.Rows.Select(r => r.Key).ToList();
 
-        // 왼쪽 가지 끝(2번) 센서를 오른쪽 가지로 — 앞 센서의 순번은 그대로라 이 한 줄만 바뀐다.
+        // 체인 끝(2번) 센서를 뺀다 — 앞 센서의 순번은 그대로라 이 한 줄만 바뀐다.
         board.Rows[1].Facts = board.Rows[1].Facts with { Name = "새 이름" };
-        board.Place(keys[1], 2, 0);
+        Assert.True(board.Unplace(keys[1]));
 
         var diff = board.Diff();
 

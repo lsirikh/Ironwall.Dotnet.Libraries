@@ -139,22 +139,6 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_cross_the_controller_to_the_left_branch_when_alt_left_is_pressed_on_R1()
-    {
-        var result = OnWindow(Pids(3), (vm, canvas) =>
-        {
-            var r1 = vm.FenceChain.Branch(2)[0];
-            var chip = canvas.SensorChips[r1];
-            chip.Focus();
-            canvas.HandleKeyDown(Key.System, Key.Left, ModifierKeys.Alt, chip);
-            Pump();
-            return (r1, Left: vm.FenceChain.Branch(1).ToList());
-        });
-
-        Assert.Equal(result.r1, result.Left[0]);                            // 제어기를 건너 왼쪽 가지 L1
-    }
-
-    [Fact]
     public void should_unplace_with_delete_and_move_to_the_end_with_alt_end_when_a_sensor_has_focus()
     {
         var result = OnWindow(Ring(4), (vm, canvas) =>
@@ -503,7 +487,7 @@ public class WiringFenceViewTests
         });
 
         Assert.True(result.low.IsGrouped);
-        Assert.Equal(6, result.low.Groups);                                 // 가지마다 펜스센서 묶음 3개
+        Assert.Equal(6, result.low.Groups);                                 // 복합센서 사이마다 펜스센서 묶음 하나(링 한 줄)
         Assert.Equal(6, result.low.Sensors);                                // 복합센서만 낱개로
         Assert.Equal("펜스센서 ×9", result.low.Label);
         Assert.False(result.High.IsGrouped);
@@ -579,7 +563,7 @@ public class WiringFenceViewTests
     [Theory]
     [InlineData("pids", false)]
     [InlineData("line", true)]
-    public void should_render_branch_and_line_scenes_with_groups_and_ranges_when_snapshotted(string scene, bool dark)
+    public void should_render_pids_and_underground_scenes_with_groups_and_ranges_when_snapshotted(string scene, bool dark)
     {
         var vm = scene == "pids" ? Pids(30) : Line(10);
         var result = OnWindow(vm, (model, canvas) =>
@@ -602,7 +586,8 @@ public class WiringFenceViewTests
         _out.WriteLine($"스냅숏: {result.path} · 색 {result.colors}가지 · 묶음 {result.IsGrouped} · 빈틈 {result.ranges} · {result.FenceCountsText}");
         Assert.True(result.colors > 20);
         Assert.Equal(scene == "pids", result.IsGrouped);
-        Assert.Contains(scene == "pids" ? "복합 6 · 펜스 54" : "지진동 10", result.FenceCountsText);
+        // 종류가 둘 이상일 때만 앞에 종류별 수를 붙인다(v0.4 §1-C 아래 띠)
+        Assert.Contains(scene == "pids" ? "복합 6 · 펜스 54 · 센서 60" : "센서 10 · 체인 10 · 미배치 0", result.FenceCountsText);
     }
     #endregion
 
@@ -616,24 +601,26 @@ public class WiringFenceViewTests
             seeds, new[] { "SmartSensor2" }, null, new WiringFakeDialogs());
     }
 
-    /// <summary>PIDS 제어기 양쪽 가지 — 가지마다 [복합, 펜스 ×9, 복합, 펜스 ×9, 복합, 펜스 ×9](<paramref name="perSide"/> 대까지).</summary>
+    /// <summary>
+    /// PIDS(펜스 경계) 제어기 링 — 한 줄에 [복합, 펜스 ×9] 반복 <paramref name="perSide"/> × 2 대(옛 양쪽 가지 픽스처와 같은 대수).
+    /// 모든 제어기는 링이다(v0.4 §1-C).
+    /// </summary>
     private static WiringViewModel Pids(int perSide)
     {
         var seeds = new List<WiringSensorSeed>();
-        var id = 101;
-        foreach (var line in new[] { 1, 2 })
-            for (var i = 0; i < perSide; i++, id++)
-            {
-                var multi = i % 10 == 0;
-                seeds.Add(new WiringSensorSeed(id, id - 100,
-                    new SensorFacts(id + 1000, multi ? $"복합 {id}" : $"펜스 {id}", multi ? "Multi" : "Fence", "서측"),
-                    new WiringPlacement(line, i + 1)));
-            }
+        for (var i = 0; i < perSide * 2; i++)
+        {
+            var id = 101 + i;
+            var multi = i % 10 == 0;
+            seeds.Add(new WiringSensorSeed(id, id - 100,
+                new SensorFacts(id + 1000, multi ? $"복합 {id}" : $"펜스 {id}", multi ? "Multi" : "Fence", "서측"),
+                new WiringPlacement(1, i + 1)));
+        }
         return WiringViewModel.ForController(new WiringControllerInfo(20, 3, "PIDS-서측-03", "10.99.8.3", "Controller"),
             seeds, new[] { "Multi", "Fence" }, null, new WiringFakeDialogs());
     }
 
-    /// <summary>지중 제어기 한 줄 — 지진동센서 <paramref name="count"/> 대(제어기 종류 "Controller" · 지중만 → 한 줄).</summary>
+    /// <summary>지중 제어기 — 지진동센서 <paramref name="count"/> 대(제어기 종류 "Controller" · 지진동만이어도 O-9 전까지 링).</summary>
     private static WiringViewModel Line(int count)
     {
         var seeds = Enumerable.Range(0, count).Select(i => new WiringSensorSeed(

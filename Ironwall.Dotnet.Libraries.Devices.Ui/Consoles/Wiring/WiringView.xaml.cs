@@ -127,20 +127,12 @@ public partial class WiringView : UserControl
 
     /// <summary>
     /// 선 목록의 키 판정 — 처리했으면 <c>true</c>(시험이 이 길로 뷰의 판정을 부른다 · F-2b L4).
-    /// Alt+↑/↓(다른 가지)는 <b>양쪽 가지에서만</b> 먹는다 — 링 · 한 줄은 흘려보낸다.
+    /// 모든 제어기가 링(v0.4)이라 선이 하나 — Alt+↑/↓(옛 "다른 가지로")는 흘려보낸다.
     /// </summary>
     internal static bool HandleLineKey(WiringViewModel vm, Key key, Key systemKey)
     {
         if (key == Key.System && systemKey is Key.Left) { vm.MoveSelectedBack(); return true; }
         if (key == Key.System && systemKey is Key.Right) { vm.MoveSelectedForward(); return true; }
-
-        // Alt+↑ · Alt+↓ = 다른 가지로 옮기기(C6) — 양쪽 가지에서만. 링 · 한 줄은 선이 하나라 키를 흘려보낸다.
-        if (key == Key.System && systemKey is Key.Up or Key.Down)
-        {
-            if (!vm.IsTwoBranch) return false;
-            vm.MoveSelectedToOtherLine();
-            return true;
-        }
 
         if (key == Key.Delete) { vm.UnplaceSelected(); return true; }
         return false;

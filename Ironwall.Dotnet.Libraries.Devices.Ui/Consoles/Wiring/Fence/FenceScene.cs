@@ -97,8 +97,8 @@ public static class FenceScene
         // 땅 표기(FR-20 · 카탈로그 설치 사례) — 펜스 너머 = 외부, 보는 쪽 = 내부. 센서의 탐지 부채꼴이 어느 쪽을 보는지 읽는 기준.
         var outside = p.P(x1 + SIDE_LABEL_LEAD, 0, OutsideLabelDepth(p));
         var inside = p.P(x1 + SIDE_LABEL_LEAD, 0, InsideLabelDepth(shape));
-        o.Add(Text(FenceInk.SideLabel, new Point(outside.X, outside.Y - 2), "펜스 외부", 11, FenceTextAnchor.End));
-        o.Add(Text(FenceInk.SideLabel, new Point(inside.X, inside.Y + 4), "펜스 내부", 11, FenceTextAnchor.End));
+        o.Add(Text(FenceInk.SideLabel, new Point(outside.X, outside.Y - 2), "펜스 외부", 11, FenceTextAnchor.Start));
+        o.Add(Text(FenceInk.SideLabel, new Point(inside.X, inside.Y + 4), "펜스 내부", 11, FenceTextAnchor.Start));
 
         // 축 — 링 = 체인 위치 · 그 밖 = 제어기에서 거리
         if (shape == WiringShape.Ring)
@@ -202,7 +202,7 @@ public static class FenceScene
     {
         var u = world.Upm;
         var sensors = world.Seq.Select(k => (world.X[k], world.Sensors.TryGetValue(k, out var s) ? s.Type : Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.NONE));
-        var half = FenceSlotLayout.FENCE_HALF_PANEL_M * u;
+        var half = world.Spacing.FenceMetres / 2 * u;
         return world.Shape == WiringShape.Ring
             ? FenceSlotLayout.MountPosts(sensors, half)
             : FenceSlotLayout.MountPosts(sensors, half, world.PostM * u, x0 + 2 * u, x1 - 2 * u);
@@ -250,7 +250,10 @@ public static class FenceScene
     }
 
     /// <summary>땅 표기 "펜스 외부 · 펜스 내부"(FR-20)를 오른쪽 끝에서 얼마나 바깥에 두나(세계 단위).</summary>
-    public const double SIDE_LABEL_LEAD = 36;
+    public const double SIDE_LABEL_LEAD = 10;
+
+    /// <summary>땅 표기 글자가 오른쪽으로 차지하는 폭(세계 단위 · [전체 보기]가 담는다) — 작은 배율에서 글자를 키워도 잘리지 않게 넉넉히.</summary>
+    public const double SIDE_LABEL_WIDTH = 100;
 
     /// <summary>"펜스 외부" 표기의 깊이 — 펜스 너머(보는 쪽 반대). 평면에서도 지면선 바로 위.</summary>
     public static double OutsideLabelDepth(FenceProjector p) => -26 * p.K - 6;

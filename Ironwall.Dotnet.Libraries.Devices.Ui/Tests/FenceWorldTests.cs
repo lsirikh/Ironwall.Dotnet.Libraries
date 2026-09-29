@@ -50,7 +50,7 @@ public class FenceWorldTests
         Assert.True(w.X[1] < w.X[2] && w.X[2] < 0);                       // 왼쪽 가지는 음수, 제어기 쪽이 오른쪽 끝
         Assert.True(0 < w.X[3] && w.X[3] < w.X[4]);
         Assert.Equal(-5 * w.Upm, w.X[2], 6);                               // 제어기 → 첫 센서 5m
-        Assert.Equal(-(5 + 2.5) * w.Upm, w.X[1], 6);                       // 복합 ↔ 펜스 = 작은 쪽 2.5m
+        Assert.Equal(-(5 + 3.0) * w.Upm, w.X[1], 6);                       // 복합 ↔ 펜스 = 작은 쪽 3m(v0.4 기준)
     }
 
     [Fact]
