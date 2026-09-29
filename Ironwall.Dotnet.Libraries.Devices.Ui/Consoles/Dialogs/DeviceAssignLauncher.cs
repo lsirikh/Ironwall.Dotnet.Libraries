@@ -74,7 +74,7 @@ public sealed class DeviceAssignLauncher : IDeviceAssignLauncher
             var prompt = new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.ConfirmPromptViewModel(title, message);
             await _windows.ShowDialogAsync(prompt, null, new Dictionary<string, object>
             {
-                ["Width"] = 420.0,
+                ["Width"] = DialogSizeRules.WindowWidth(DialogSize.Small),   // 높이는 틀이 내용에 맞춘다
                 ["Height"] = 260.0,
                 ["SizeToContent"] = SizeToContent.Manual,
                 ["WindowStartupLocation"] = WindowStartupLocation.CenterOwner,

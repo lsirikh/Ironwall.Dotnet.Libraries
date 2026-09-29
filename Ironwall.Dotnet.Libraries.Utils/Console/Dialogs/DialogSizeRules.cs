@@ -82,5 +82,20 @@ public static class DialogSizeRules
     /// <summary>창을 이 규격의 다이얼로그에 맞춰 띄울 때의 바깥 치수 — 카드 폭 + 양쪽 여백.</summary>
     public static double WindowWidth(DialogSize size) => NominalWidth(size) + (2 * Gutter);
 
+    /// <summary>
+    /// 틀이 제 OS 창의 뿌리일 때 창 높이 — 창 겉(제목 줄 · 테두리) + 틀이 원하는 높이. 틀 높이는 규격 상한을, 창은 작업 영역을 넘지 않는다.
+    /// 쓸 수 없는 값(0 · 음수 · NaN · 무한)이 하나라도 있으면 <c>null</c> — 창을 건드리지 않는다.
+    /// </summary>
+    /// <param name="frameDesiredHeight">틀을 창 폭 · 무한 높이로 잰 높이(몸통이 다 보이는 높이).</param>
+    /// <param name="chromeHeight">창 바깥 높이 − 틀 높이(제목 줄 · 테두리 · 뷰의 여백).</param>
+    /// <param name="workAreaHeight">작업 영역 높이.</param>
+    public static double? FitWindowHeight(DialogSize size, double frameDesiredHeight, double chromeHeight, double workAreaHeight)
+    {
+        if (!IsUsable(frameDesiredHeight) || double.IsNaN(chromeHeight) || double.IsInfinity(chromeHeight) || chromeHeight < 0 || !IsUsable(workAreaHeight))
+            return null;
+        var frame = Math.Min(frameDesiredHeight, NominalMaxHeight(size));
+        return Math.Min(Math.Ceiling(chromeHeight + frame), workAreaHeight);
+    }
+
     private static bool IsUsable(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value > 0d;
 }

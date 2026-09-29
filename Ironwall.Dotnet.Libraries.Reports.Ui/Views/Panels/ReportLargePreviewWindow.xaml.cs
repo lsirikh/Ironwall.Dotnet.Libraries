@@ -19,17 +19,13 @@ public partial class ReportLargePreviewWindow : Window
 
     public ReportLargePreviewWindow(string? html, string title)
     {
-        // 머리 글이 바인딩하므로 InitializeComponent 전에 채운다(평범한 CLR 속성 — 한 번 읽고 끝난다).
-        ReportTitle = string.IsNullOrWhiteSpace(title) ? "미리보기" : title;
         InitializeComponent();
         _html = html;
         Title = WindowTitleFor(title);
         // B2 — OS 기본 크림색 제목 줄 대신 콘솔 창 공용 겉(토큰 제목 줄 · 창 단추). 직접 만드는 창이라 여기서 부른다.
+        // 제목 · ✕ 는 이 제목 줄 하나뿐이다 — 창 안 머리에 다시 그리지 않는다(이중 머리).
         Ironwall.Dotnet.Libraries.Utils.Consoles.ConsoleWindowChrome.Apply(this);
     }
-
-    /// <summary>머리에 보일 보고서 제목.</summary>
-    public string ReportTitle { get; }
 
     /// <summary>
     /// R32 — OS 제목 줄(작업 전환 · Alt+Tab)에 무슨 창인지 함께 보인다. 옛 제목은 보고서 제목만이라
@@ -88,8 +84,6 @@ public partial class ReportLargePreviewWindow : Window
         if (_browser is null) return;
         _browser.ZoomFactor = Math.Max(0.5, Math.Min(3.0, Math.Round(_browser.ZoomFactor + delta, 2)));
     }
-
-    private void OnClose(object sender, RoutedEventArgs e) => Close();
 
     protected override void OnClosed(EventArgs e)
     {

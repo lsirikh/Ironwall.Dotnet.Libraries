@@ -155,7 +155,7 @@
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type dlg:ConsoleDialogFrame}">
 					<!--  바깥: 창으로 띄우면 바탕, 호스트 스크림 위면 비워 둔다  -->
-					<Grid Background="{TemplateBinding Backdrop}">
+					<Grid x:Name="Outer" Background="{TemplateBinding Backdrop}">
 						<Border
 							x:Name="Card"
 							Width="{TemplateBinding CardWidth}"
@@ -183,6 +183,7 @@
 
 								<!--  ① 머리  -->
 								<Border
+									x:Name="Header"
 									Grid.Row="0"
 									Padding="20,10"
 									Background="{DynamicResource SurfaceAltBrush}"
@@ -203,6 +204,7 @@
 												Text="{TemplateBinding Title}"
 												TrimType="CharacterEllipsis" />
 											<dlg:ConsoleDialogText
+												x:Name="KindText"
 												Margin="0,2,0,0"
 												FontSize="12"
 												Foreground="{DynamicResource TextMutedBrush}"
@@ -239,6 +241,7 @@
 
 								<!--  ③ 버튼 줄 — 왼쪽 안내 글, 오른쪽 보조 → 주 동작  -->
 								<Border
+									x:Name="Footer"
 									Grid.Row="2"
 									Padding="20,12"
 									Background="{DynamicResource SurfaceAltBrush}"
@@ -366,6 +369,48 @@
 							<Setter TargetName="PART_Message" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 							<Setter TargetName="PART_Message" Property="FontWeight" Value="SemiBold" />
 						</Trigger>
+
+						<!--
+							창의 뿌리 — 틀이 제 OS 창을 채운다(2026-09-30 "부대 편제 닫기" 이중 머리).
+							창 제목 줄(ConsoleWindowChrome)이 이미 제목 · ✕ 를 그리므로 머리의 제목 · ✕ 를 감추고,
+							카드 둘레의 바탕(스크림 대신 칠하던 BgBrush) · 테두리 · 모서리 · 그림자도 없앤다. 창 바탕 = SurfaceBrush = 카드 바탕.
+							갈래 줄(Kind) · 머리 오른쪽 끼움(HeaderExtra)은 몸통 첫 줄로 남는다 — 둘 다 비면 그 줄도 없다.
+							버튼 줄은 그대로다. 호스트 팝업층(IsWindowRoot=False)은 위 모양 그대로.
+						-->
+						<Trigger Property="IsWindowRoot" Value="True">
+							<Setter TargetName="Outer" Property="Background" Value="Transparent" />
+							<Setter TargetName="Card" Property="Width" Value="NaN" />
+							<Setter TargetName="Card" Property="MaxHeight" Value="Infinity" />
+							<Setter TargetName="Card" Property="HorizontalAlignment" Value="Stretch" />
+							<Setter TargetName="Card" Property="VerticalAlignment" Value="Stretch" />
+							<Setter TargetName="Card" Property="BorderThickness" Value="0" />
+							<Setter TargetName="Card" Property="CornerRadius" Value="0" />
+							<Setter TargetName="Card" Property="Effect" Value="{x:Null}" />
+							<Setter TargetName="Header" Property="Background" Value="Transparent" />
+							<Setter TargetName="Header" Property="BorderThickness" Value="0" />
+							<Setter TargetName="Header" Property="CornerRadius" Value="0" />
+							<Setter TargetName="Header" Property="Padding" Value="20,14,20,0" />
+							<Setter TargetName="PART_Title" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_Close" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="KindText" Property="Margin" Value="0" />
+							<Setter TargetName="Footer" Property="CornerRadius" Value="0" />
+						</Trigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="IsWindowRoot" Value="True" />
+								<Condition Property="Kind" Value="{x:Static sys:String.Empty}" />
+								<Condition Property="HeaderExtra" Value="{x:Null}" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="Header" Property="Visibility" Value="Collapsed" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="IsWindowRoot" Value="True" />
+								<Condition Property="Kind" Value="{x:Null}" />
+								<Condition Property="HeaderExtra" Value="{x:Null}" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="Header" Property="Visibility" Value="Collapsed" />
+						</MultiTrigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>

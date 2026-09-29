@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 
@@ -30,6 +31,12 @@ public enum DialogMessageSeverity
 /// <para>식별자: <see cref="DialogKey"/> 하나로 <c>Dialog.{Key}.Root/.Title/.Close/.Primary/.Secondary/.Message</c> 가 만들어진다.
 /// 전부 peer 가 실재하는 요소에만 붙는다(<see cref="ConsoleDialogFramePeer"/> · <see cref="ConsoleDialogText"/> · <see cref="ButtonBase"/>).</para>
 /// <para>색은 전부 <c>DynamicResource</c> 다 — 한 번 찾아 캐싱하면 테마를 바꿔도 옛 색으로 굳는다.</para>
+/// <para><b>창의 뿌리일 때</b>(<see cref="IsWindowRoot"/>): 확인 · 배정 · 프리셋 창처럼 틀이 제 OS 창의 뿌리면 창 제목 줄
+/// (<see cref="ConsoleWindowChrome"/>)이 이미 제목 · ✕ 를 그린다. 그 창에서 틀은 머리(제목 · ✕) · 바깥 바탕 · 카드 테두리 · 그림자를 감추고
+/// 창을 가득 채운다 — 한 창에 제목 둘 · ✕ 둘 · 카드 둘레의 어두운 띠가 생기던 것(2026-09-30 "부대 편제 닫기"). 갈래 줄(<see cref="Kind"/>)은
+/// 몸통 첫 줄로 남는다. 제목 줄 ✕ 는 틀의 취소 길(<see cref="SecondaryInvoked"/>)로 오고, 창 제목은 틀 제목을 따른다.
+/// 몸통이 스스로 스크롤하지 않는 창(<see cref="BodyScroll"/> ≠ Disabled)은 첫 배치 때 창 높이를 내용에 맞춘다(<see cref="DialogSizeRules.FitWindowHeight"/>).
+/// 호스트 팝업층(셸 안의 칸 위에 앉은 카드)은 그대로다.</para>
 /// <para>호출 스레드: UI.</para>
 /// </remarks>
 [TemplatePart(Name = PartPrimary, Type = typeof(ButtonBase))]
@@ -49,6 +56,9 @@ public class ConsoleDialogFrame : ContentControl
     private ButtonBase? _secondary;
     private ButtonBase? _close;
     private bool _focusApplied;
+    private Window? _window;          // 뿌리로 앉은 창 — 제목 줄 ✕ 를 이 틀로 보내 둔 창
+    private Window? _fittedWindow;    // 높이를 맞춘 창 — 창마다 한 번만(사람이 늘린 높이를 되돌리지 않는다)
+    private readonly Action _cancelFromCaption;
 
     static ConsoleDialogFrame()
     {
@@ -57,12 +67,15 @@ public class ConsoleDialogFrame : ContentControl
 
     public ConsoleDialogFrame()
     {
+        _cancelFromCaption = () => RaiseEvent(new RoutedEventArgs(SecondaryInvokedEvent, this));
         Loaded += OnLoaded;
         // B2 — 이 틀이 제 OS 창의 뿌리면(확인 · 배정 · 프리셋 창) 그 창의 제목 줄을 토큰으로 칠한다. 호스트 팝업층 안에서는 아무것도 하지 않는다.
         ConsoleWindowChrome.Enlist(this);
+        // 창의 뿌리인지는 창 겉을 입힌 뒤에 판정한다 — Enlist 가 먼저 등록돼 같은 우선순위(Send)에서 먼저 돈다.
+        PresentationSource.AddSourceChangedHandler(this, OnSourceChanged);
         // 호스트 팝업층은 SingleInstance 뷰모델의 뷰를 다시 쓴다(Caliburn 뷰 캐시) — 템플릿은 한 번만 붙으므로
         // 내려갈 때 풀어 두지 않으면 두 번째 표시부터 첫 포커스가 오지 않아 ESC · Enter 가 창에 닿지 않는다.
-        Unloaded += (_, _) => _focusApplied = false;
+        Unloaded += (_, _) => { _focusApplied = false; ReleaseCaptionClose(); };
     }
 
     #region - Events -
@@ -101,7 +114,7 @@ public class ConsoleDialogFrame : ContentControl
     public DialogSize Size { get => (DialogSize)GetValue(SizeProperty); set => SetValue(SizeProperty, value); }
 
     public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(
-        nameof(Title), typeof(string), typeof(ConsoleDialogFrame), new PropertyMetadata(string.Empty));
+        nameof(Title), typeof(string), typeof(ConsoleDialogFrame), new PropertyMetadata(string.Empty, OnTitleChanged));
     public string? Title { get => (string?)GetValue(TitleProperty); set => SetValue(TitleProperty, value); }
 
     public static readonly DependencyProperty KindProperty = DependencyProperty.Register(
@@ -236,6 +249,16 @@ public class ConsoleDialogFrame : ContentControl
         new PropertyMetadata(DialogSizeRules.NominalMaxHeight(DialogSize.Medium)));
     public static readonly DependencyProperty CardMaxHeightProperty = CardMaxHeightKey.DependencyProperty;
     public double CardMaxHeight => (double)GetValue(CardMaxHeightProperty);
+
+    private static readonly DependencyPropertyKey IsWindowRootKey = DependencyProperty.RegisterReadOnly(
+        nameof(IsWindowRoot), typeof(bool), typeof(ConsoleDialogFrame), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsWindowRootProperty = IsWindowRootKey.DependencyProperty;
+
+    /// <summary>
+    /// 이 틀이 <b>제목 줄이 있는 OS 창의 뿌리</b>인가(<see cref="ConsoleWindowChrome.IsWindowRoot"/> + <see cref="HasOwnCaption"/>).
+    /// 참이면 템플릿이 머리 · 바탕 · 카드 테두리를 감추고 창을 채운다. 창에 붙을 때(<see cref="PresentationSource"/>)와 <c>Loaded</c> 에 다시 잰다.
+    /// </summary>
+    public bool IsWindowRoot => (bool)GetValue(IsWindowRootProperty);
     #endregion
 
     #region - Template -
@@ -311,17 +334,117 @@ public class ConsoleDialogFrame : ContentControl
     }
     #endregion
 
+    #region - Window root -
+    /// <summary>
+    /// 창에 제 제목 줄이 있는가 — 커널 겉을 입었거나 입힐 수 있는 평범한 창(<see cref="ConsoleWindowChrome.CanDress"/>).
+    /// 테두리 없는 창 · 투명 창 · 파생 창(호스트 셸)에서는 틀의 머리가 유일한 제목 · ✕ 라 감추지 않는다.
+    /// </summary>
+    public static bool HasOwnCaption(Window window)
+        => ConsoleWindowChrome.GetIsApplied(window) || ConsoleWindowChrome.CanDress(window);
+
+    private void OnSourceChanged(object sender, SourceChangedEventArgs e)
+    {
+        if (e.NewSource is null) { ReleaseCaptionClose(); return; }
+        Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(UpdateWindowRoot));
+    }
+
+    private void UpdateWindowRoot()
+    {
+        var window = Window.GetWindow(this);
+        if (window is null || !ConsoleWindowChrome.IsWindowRoot(window, this) || !HasOwnCaption(window))
+        {
+            ReleaseCaptionClose();
+            SetValue(IsWindowRootKey, false);
+            return;
+        }
+
+        SetValue(IsWindowRootKey, true);
+        if (!ReferenceEquals(_window, window))
+        {
+            ReleaseCaptionClose();
+            _window = window;
+            // 제목 줄 ✕ = 틀의 [취소] · ESC 와 같은 길. 창을 바로 닫으면 뷰의 취소 처리를 건너뛴다.
+            ConsoleWindowChrome.SetCloseRedirect(window, _cancelFromCaption);
+        }
+        PushTitle();
+    }
+
+    private void ReleaseCaptionClose()
+    {
+        if (_window is { } window && ReferenceEquals(ConsoleWindowChrome.GetCloseRedirect(window), _cancelFromCaption))
+            window.ClearValue(ConsoleWindowChrome.CloseRedirectProperty);
+        _window = null;
+    }
+
+    private static void OnTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        => ((ConsoleDialogFrame)d).PushTitle();
+
+    /// <summary>머리를 감췄으니 제목은 창 제목 줄이 말한다 — 틀 제목이 있으면 창 제목을 그것으로(창의 바인딩은 남긴다).</summary>
+    private void PushTitle()
+    {
+        if (_window is not { } window || !IsWindowRoot || string.IsNullOrEmpty(Title)) return;
+        if (!string.Equals(window.Title, Title, StringComparison.Ordinal)) window.SetCurrentValue(Window.TitleProperty, Title);
+    }
+
+    /// <summary>
+    /// 창 높이를 내용에 맞춘다 — 런처가 고정 높이(420×260 등)를 주면 내용 아래가 빈 띠로 남았다. 창마다 한 번, 첫 배치 때만.
+    /// </summary>
+    /// <remarks>
+    /// 몸통이 스스로 스크롤하는 창(<see cref="BodyScroll"/> = Disabled — 목록 · 표)은 무한 높이로 재면 목록 전체 높이가 나와
+    /// 뜻이 없다 — 런처가 준 높이가 곧 설계다. 크기를 창이 스스로 정하는 창(<see cref="SizeToContent"/> ≠ Manual) · 최대화된 창도 건드리지 않는다.
+    /// </remarks>
+    private void FitWindowHeight(Window window)
+    {
+        if (BodyScroll == ScrollBarVisibility.Disabled) return;
+        if (window.SizeToContent != SizeToContent.Manual || window.WindowState != WindowState.Normal) return;
+
+        // 높이가 바뀌면 글이 접히는 곳도 바뀔 수 있다 — 배치 → 재기 → 맞추기를 치수가 멈출 때까지(많아야 세 번) 되풀이한다.
+        var start = window.ActualHeight;
+        for (var pass = 0; pass < 3; pass++)
+        {
+            window.UpdateLayout();
+            if (ActualWidth <= 0 || ActualHeight <= 0) return;
+            var chrome = window.ActualHeight - ActualHeight;
+
+            Measure(new Size(ActualWidth, double.PositiveInfinity));
+            var desired = DesiredSize.Height;
+            InvalidateMeasure();      // 다음 배치에서 부모가 내주는 자리로 다시 잰다
+
+            if (DialogSizeRules.FitWindowHeight(Size, desired, chrome, SystemParameters.WorkArea.Height) is not { } target) return;
+            if (Math.Abs(target - window.ActualHeight) < 1) break;
+
+            if (window.MinHeight > target) window.MinHeight = target;   // 런처의 최소 높이가 내용보다 크면 빈 띠가 남는다
+            window.Height = target;
+        }
+
+        // 가운데 띄운 창은 가운데에 남는다 — 줄어든 만큼 반을 내린다.
+        window.UpdateLayout();
+        if (window.WindowStartupLocation != WindowStartupLocation.Manual && !double.IsNaN(window.Top))
+            window.Top += Math.Round((start - window.ActualHeight) / 2);
+    }
+    #endregion
+
     #region - Keys and focus -
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        UpdateWindowRoot();
+        if (IsWindowRoot && _window is { } window && !ReferenceEquals(_fittedWindow, window))
+        {
+            _fittedWindow = window;
+            // Loaded 는 창 겉 입히기(ConsoleWindowChrome.Enlist 가 Send 로 미뤄 둔 것)보다 먼저 온다(실측: OS 제목 줄 치수로 재
+            // 한 줄 글을 두 줄로 보고 22.7 띠가 남았다) — 같은 우선순위로 그 뒤에 줄 세운다. Send 는 첫 그리기보다 앞이다.
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() => FitWindowHeight(window)));
+        }
+
         if (_focusApplied || !FocusOnLoad) return;
         _focusApplied = true;
 
         // T4: 첫 포커스는 취소. 파괴적 동작이 Enter 한 번에 나가지 않게 한다.
+        // 창의 뿌리면 머리 ✕ 는 감춰져 있다(제목 줄 ✕ 는 포커스를 받지 않는다).
         var target = DialogFocusRules.InitialTarget(
             hasSecondary: IsUsable(_secondary),
             hasPrimary: IsUsable(_primary),
-            hasClose: IsUsable(_close));
+            hasClose: IsUsable(_close) && !IsWindowRoot);
 
         IInputElement? element = target switch
         {
@@ -331,6 +454,7 @@ public class ConsoleDialogFrame : ContentControl
             _ => null,
         };
         if (element is not null) Keyboard.Focus(element);
+        else if (IsWindowRoot) MoveFocus(new TraversalRequest(FocusNavigationDirection.First));   // ESC 가 틀에 닿도록 초점을 창 안에 둔다
     }
 
     private static bool IsUsable(ButtonBase? button)

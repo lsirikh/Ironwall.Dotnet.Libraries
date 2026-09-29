@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
 using System;
@@ -101,7 +102,10 @@ public sealed class ServerConsoleDialogs : IServerConsoleDialogs
         try
         {
             var vm = new ConfirmPromptViewModel(title, message);
-            await _windows.ShowDialogAsync(vm, null, Settings(440, 240)).ConfigureAwait(true);
+            // 다른 확인 창 입구와 같은 S 규격 폭 · 크기 고정 — 높이는 틀이 내용에 맞춘다(ConsoleDialogFrame.IsWindowRoot).
+            var settings = Settings(DialogSizeRules.WindowWidth(DialogSize.Small), 240);
+            settings["ResizeMode"] = ResizeMode.NoResize;
+            await _windows.ShowDialogAsync(vm, null, settings).ConfigureAwait(true);
             return vm.Result;
         }
         catch (Exception ex)

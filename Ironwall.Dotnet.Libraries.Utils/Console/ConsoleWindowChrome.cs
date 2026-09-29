@@ -36,7 +36,8 @@ namespace Ironwall.Dotnet.Libraries.Utils.Consoles;
 /// (뷰)는 그대로다 — 뷰의 뿌리 판정 · Caliburn 결속 · 자동화 식별자가 바뀌지 않는다. OS 제목(<see cref="Window.Title"/>)도 그대로라
 /// 작업 전환 · UIA 창 이름 · <c>WindowPattern.Close</c> · Alt+F4 · 끌어 옮기기 · 스냅 · 가장자리 크기 조절이 전부 OS 것 그대로 동작한다.</para>
 /// <para><b>닫기</b>는 <see cref="Window.Close"/> 로 간다 — OS ✕ · Alt+F4 와 같은 <c>Closing</c> 을 지나므로
-/// 뷰모델의 <c>CanCloseAsync</c> 확인(부대 편제 닫기 관문 등)이 그대로 걸린다.</para>
+/// 뷰모델의 <c>CanCloseAsync</c> 확인(부대 편제 닫기 관문 등)이 그대로 걸린다. 뿌리가 다이얼로그 틀인 창은 틀이
+/// <see cref="CloseRedirectProperty"/> 로 제 취소 길을 걸어 둔다(그 창에서 틀은 제 머리 · ✕ 를 감춘다).</para>
 /// <para>색은 템플릿이 전부 <c>DynamicResource</c> 로 가져오고, DWM(창 테두리 · 다크 표지)은 토큰이 바뀔 때마다 <b>다시 찾아</b> 칠한다
 /// — 한 번 찾아 쥐면 테마를 바꿔도 옛 색으로 굳는다(저장소 규칙).</para>
 /// <para>호출 스레드: UI.</para>
@@ -58,8 +59,25 @@ public static class ConsoleWindowChrome
     public static readonly ComponentResourceKey WindowTemplateKey = new(typeof(ConsoleWindowChrome), "WindowTemplate");
 
     #region - Commands (template-bound) -
-    /// <summary>제목 줄 ✕ — <see cref="Window.Close"/>. OS ✕ 와 같은 <c>Closing</c> 을 지난다.</summary>
-    public static ICommand CloseCommand { get; } = new WindowCommand(w => w.Close());
+    /// <summary>
+    /// 제목 줄 ✕ — <see cref="Window.Close"/>. OS ✕ 와 같은 <c>Closing</c> 을 지난다.
+    /// 창이 <see cref="CloseRedirectProperty"/> 를 쥐고 있으면(뿌리가 다이얼로그 틀인 창) 그리로 보낸다 — 틀의 취소 길 하나로.
+    /// </summary>
+    public static ICommand CloseCommand { get; } = new WindowCommand(w =>
+    {
+        if (GetCloseRedirect(w) is { } redirect) redirect();
+        else w.Close();
+    });
+
+    public static readonly DependencyProperty CloseRedirectProperty = DependencyProperty.RegisterAttached(
+        "CloseRedirect", typeof(Action), typeof(ConsoleWindowChrome), new PropertyMetadata(null));
+
+    /// <summary>
+    /// 제목 줄 ✕ 를 창 닫기 대신 이것으로 보낸다. 다이얼로그 틀이 제 창의 뿌리일 때 켠다 — 틀의 [취소] · ESC 와 <b>같은 길</b>
+    /// (<c>SecondaryInvoked</c>)로 가야 뷰의 취소 처리가 한 번만 돌고 창이 두 번 닫히지 않는다. Alt+F4 · 작업 표시줄 닫기는 그대로 OS 길이다.
+    /// </summary>
+    public static Action? GetCloseRedirect(DependencyObject window) => (Action?)window.GetValue(CloseRedirectProperty);
+    public static void SetCloseRedirect(DependencyObject window, Action? value) => window.SetValue(CloseRedirectProperty, value);
 
     public static ICommand MinimizeCommand { get; } = new WindowCommand(SystemCommands.MinimizeWindow);
 

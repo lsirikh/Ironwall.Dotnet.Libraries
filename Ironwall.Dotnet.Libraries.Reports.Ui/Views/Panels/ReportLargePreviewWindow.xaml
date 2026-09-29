@@ -29,17 +29,13 @@
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,0,0,1">
+			<!--
+				배율 도구 줄. 제목 · ✕ 는 창 제목 줄(ConsoleWindowChrome, "보고서 미리보기 — {제목}")이 이미 그린다 —
+				여기에도 그리면 한 창에 제목 둘 · ✕ 둘이 된다(2026-09-30 이중 머리 정리). 닫기는 제목 줄 ✕ · Alt+F4.
+			-->
 			<DockPanel LastChildFill="True">
-				<!--  R32 — 다른 콘솔과 같은 ✕(커널 Console.Button.Close). 글자 "닫기" 고스트 단추는 이 창에만 있었다.  -->
 				<Button
-					Margin="6,0,0,0"
-					AutomationProperties.AutomationId="Reports.LargePreview.CloseButton"
-					AutomationProperties.Name="미리보기 닫기"
-					Click="OnClose"
-					DockPanel.Dock="Right"
-					Style="{StaticResource Console.Button.Close}" />
-				<Button
-					Margin="0,0,6,0"
+					Margin="0,0,0,0"
 					AutomationProperties.AutomationId="Reports.LargePreview.ZoomResetButton"
 					Click="OnZoomReset"
 					Content="100%"
@@ -60,13 +56,12 @@
 					DockPanel.Dock="Right"
 					Style="{StaticResource Console.Button.Mini}" />
 				<TextBlock
+					Margin="0,0,8,0"
+					HorizontalAlignment="Right"
 					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Reports.LargePreview.TitleText"
-					FontSize="13"
-					FontWeight="Medium"
-					Foreground="{DynamicResource TextPrimaryBrush}"
-					Text="{Binding ReportTitle, RelativeSource={RelativeSource AncestorType=Window}}"
-					TextTrimming="CharacterEllipsis" />
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="배율" />
 			</DockPanel>
 		</Border>
 

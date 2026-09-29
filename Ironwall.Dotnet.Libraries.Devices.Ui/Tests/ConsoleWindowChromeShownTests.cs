@@ -35,9 +35,14 @@ public class ConsoleWindowChromeShownTests
             var view = new ConfirmPromptView { DataContext = new ConfirmPromptViewModel("부대 삭제", "제1중대를 지웁니다.") };
             var window = NewWindow(view, "부대 삭제", ResizeMode.NoResize);
             var closed = false;
+            var cancels = 0;
             window.Closed += (_, _) => closed = true;
             window.Show();
             Pump();
+            // 창의 뿌리인 틀은 제목 줄 ✕ 를 제 취소 길(SecondaryInvoked)로 받는다 — 뷰의 [아니오] 와 같은 하나.
+            // 여기서는 Caliburn 창 관리자가 없어 뷰모델의 TryCloseAsync 가 창을 닫지 못한다 — 그 몫을 시험이 대신한다.
+            var frame = Descendants<Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs.ConsoleDialogFrame>(window).Single();
+            frame.SecondaryInvoked += (_, _) => { cancels++; window.Close(); };
 
             var applied = ConsoleWindowChrome.GetIsApplied(window);
             var close = ById(window, ConsoleWindowChrome.CloseAutomationId);
@@ -46,13 +51,14 @@ public class ConsoleWindowChromeShownTests
                 Applied: applied,
                 Title: window.Title,
                 CaptionText: Descendants<TextBlock>(window).Any(t => t.Text == "부대 삭제" && t.FontSize == 12),
+                FrameHeaderHidden: frame.IsWindowRoot && !Descendants<Button>(frame).Any(b => b.IsVisible && AutomationProperties.GetAutomationId(b) == "Dialog.Devices.Assembly.Confirm.Close"),
                 CloseIsControl: peer?.IsControlElement() ?? false,
                 OldIds: new[] { "Devices.Assembly.Confirm.Accept", "Devices.Assembly.Confirm.Cancel" }.All(id => ById(window, id) is not null),
                 Minimize: ById(window, ConsoleWindowChrome.MinimizeAutomationId)?.Visibility);
 
             ((IInvokeProvider)peer!.GetPattern(PatternInterface.Invoke)).Invoke();
             Pump();
-            return (snapshot, closed);
+            return (snapshot, closed, cancels);
         });
 
         Assert.True(result.snapshot.Applied);
@@ -61,7 +67,9 @@ public class ConsoleWindowChromeShownTests
         Assert.True(result.snapshot.CloseIsControl);                  // 뜬 창에서 ✕ 는 UIA 제어 요소다
         Assert.True(result.snapshot.OldIds);                          // 틀의 옛 식별자는 그대로
         Assert.Equal(Visibility.Collapsed, result.snapshot.Minimize); // NoResize 창 = ✕ 만(OS 와 같다)
-        Assert.True(result.closed);                                   // ✕ 는 OS 닫기 길로 창을 닫는다
+        Assert.True(result.snapshot.FrameHeaderHidden);               // 틀의 머리 ✕ 는 감췄다 — ✕ 는 제목 줄 하나뿐
+        Assert.Equal(1, result.cancels);                              // 제목 줄 ✕ = 틀의 취소 길, 한 번
+        Assert.True(result.closed);
     }
 
     [Fact]

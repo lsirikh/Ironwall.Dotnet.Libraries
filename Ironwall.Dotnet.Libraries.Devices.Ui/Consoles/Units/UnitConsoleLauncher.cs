@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
@@ -364,7 +365,8 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         var prompt = new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.ConfirmPromptViewModel(title, message);
         var settings = new Dictionary<string, object>
         {
-            ["Width"] = 420.0,
+            // 폭은 S 규격 창(DialogSizeRules) — 높이는 틀이 창의 뿌리로서 내용에 맞춘다(ConsoleDialogFrame.IsWindowRoot).
+            ["Width"] = DialogSizeRules.WindowWidth(DialogSize.Small),
             ["Height"] = 260.0,
             ["SizeToContent"] = SizeToContent.Manual,
             ["WindowStartupLocation"] = WindowStartupLocation.CenterOwner,
