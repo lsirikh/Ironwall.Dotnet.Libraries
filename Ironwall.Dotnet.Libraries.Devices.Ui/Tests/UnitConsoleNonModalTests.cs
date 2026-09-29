@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Units;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -312,8 +313,8 @@ public sealed class UnitConsoleNonModalTests
     #region - 셸 종료 (V-17 헤드리스 부분) -
     /// <summary>
     /// V-17 헤드리스 관찰(2026-09-28): 소유자(셸)가 닫히면 WPF 가 소유 창을 <b>Closing 없이</b> 함께 없앤다 — 콘솔의 <c>CanCloseAsync</c> 는
-    /// 불리지 않고 미적용 편집은 묻지 않고 버려진다. 호스트 셸에는 종료 판정(<c>CanCloseAsync</c>)이 없어 다른 콘솔 · 패널도 같다.
-    /// 이 시험은 그 사실을 고정한다 — 셸 종료에서 묻게 바꾸려면 호스트 셸의 종료 판정이 먼저다(보고서 참조). 인스턴스는 놓는다.
+    /// 불리지 않는다. 이 시험은 그 WPF 사실을 고정한다. 그래서 셸 종료에서 묻는 일은 창 수준이 아니라 호스트 셸의 종료 관문
+    /// (<c>ShellExitGate</c> — U-27)이 셸을 닫기 <b>전에</b> <see cref="IGuardedWindowRegistry"/> 로 한다(위 「셸 종료 관문」 시험). 인스턴스는 놓는다.
     /// </summary>
     [Fact]
     public void should_close_with_the_shell_without_running_the_console_guard_and_release_the_instance()
@@ -336,6 +337,131 @@ public sealed class UnitConsoleNonModalTests
     }
     #endregion
 
+    #region - 셸 종료 관문 (U-27) -
+    // 호스트 셸은 종료 전에 이 목록의 창에 차례로 묻는다(ShellExitGate). 여기서는 런처 쪽 약속만 잠근다 —
+    // 띄우면 올리고 · 닫히면 내리고 · 물으면 ✕ 와 같은 가드를 지나고 · 앞으로 가져오고 · 동의 뒤에는 다시 묻지 않고 닫는다.
+
+    [Fact]
+    public void should_register_the_open_console_for_the_shell_exit_and_release_it_when_closed()
+    {
+        var result = Sta.Run(env =>
+        {
+            env.Open();
+            var whileOpen = env.Registry.OpenWindows.Count;
+            var window = env.ConsoleWindow!;
+            window.Close();                                              // ✕ (남은 것 없음 → 묻지 않고 닫힌다)
+            Sta.PumpUntil(() => !window.IsVisible);
+            return (WhileOpen: whileOpen, AfterClose: env.Registry.OpenWindows.Count);
+        });
+
+        Assert.Equal(1, result.WhileOpen);
+        Assert.Equal(0, result.AfterClose);
+    }
+
+    [Fact]
+    public void should_register_the_console_only_once_when_opened_again()
+    {
+        var count = Sta.Run(env =>
+        {
+            env.Open();
+            env.Open();                                                  // 이미 떠 있다 → 앞으로 가져올 뿐
+            return env.Registry.OpenWindows.Count;
+        });
+
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void should_ask_the_console_guard_and_keep_the_window_when_the_shell_exit_asks_and_the_user_refuses()
+    {
+        var result = Sta.Run(env =>
+        {
+            env.Open();
+            var window = env.ConsoleWindow!;
+            env.MakeDirty();
+            env.Windows.ConfirmAnswer = false;
+
+            var entry = env.Registry.OpenWindows.Single();
+            var ask = entry.CanCloseAsync();
+            Sta.Wait(ask);
+            Sta.Pump();
+            return (Answer: ask.Result, Asked: env.Windows.Confirms, Visible: window.IsVisible, Registered: env.Registry.OpenWindows.Count);
+        });
+
+        Assert.False(result.Answer);                 // 종료를 막는다
+        Assert.Equal(1, result.Asked);               // ✕ 와 같은 확인을 한 번 묻는다
+        Assert.True(result.Visible);                 // 창과 편집은 그대로
+        Assert.Equal(1, result.Registered);
+    }
+
+    [Fact]
+    public void should_agree_without_asking_when_the_shell_exit_asks_and_nothing_is_pending()
+    {
+        var result = Sta.Run(env =>
+        {
+            env.Open();
+            var ask = env.Registry.OpenWindows.Single().CanCloseAsync();
+            Sta.Wait(ask);
+            return (Answer: ask.Result, Asked: env.Windows.Confirms);
+        });
+
+        Assert.True(result.Answer);
+        Assert.Equal(0, result.Asked);
+    }
+
+    [Fact]
+    public void should_restore_a_minimized_console_when_the_shell_exit_brings_it_to_front()
+    {
+        var state = Sta.Run(env =>
+        {
+            env.Open();
+            env.ConsoleWindow!.WindowState = WindowState.Minimized;
+            Sta.Pump();
+            env.Registry.OpenWindows.Single().BringToFront();
+            Sta.Pump();
+            return env.ConsoleWindow.WindowState;
+        });
+
+        Assert.Equal(WindowState.Normal, state);
+    }
+
+    [Fact]
+    public void should_close_a_dirty_console_without_asking_and_release_it_when_the_shell_exit_closes_it()
+    {
+        var result = Sta.Run(env =>
+        {
+            env.Open();
+            var window = env.ConsoleWindow!;
+            var console = env.Console!;
+            env.MakeDirty();
+
+            Sta.Wait(env.Registry.OpenWindows.Single().CloseWithoutAskingAsync());
+            Sta.PumpUntil(() => !window.IsVisible);
+            return (Asked: env.Windows.Confirms, Visible: window.IsVisible, Active: console.IsActive, Registered: env.Registry.OpenWindows.Count);
+        });
+
+        Assert.Equal(0, result.Asked);               // 사람은 이미 답했다(또는 OS 가 끝내는 중) — 다시 묻지 않는다
+        Assert.False(result.Visible);
+        Assert.False(result.Active);
+        Assert.Equal(0, result.Registered);
+    }
+
+    [Fact]
+    public void should_release_the_console_from_the_shell_exit_when_the_session_expires()
+    {
+        var count = Sta.Run(env =>
+        {
+            env.Open();
+            env.Session.Fire(EnumRevokeReason.TokenExpired);
+            Sta.Wait(env.Launcher.SessionWork);
+            Sta.Pump();
+            return env.Registry.OpenWindows.Count;
+        });
+
+        Assert.Equal(0, count);
+    }
+    #endregion
+
     #region - Fixture -
     private sealed class Env
     {
@@ -346,6 +472,9 @@ public sealed class UnitConsoleNonModalTests
         public UnitConsoleLauncher Launcher { get; }
         public EventAggregator Events { get; } = new();
 
+        /// <summary>셸 종료 관문이 읽는 목록(U-27) — 런처가 콘솔을 올리고 내린다.</summary>
+        public GuardedWindowRegistry Registry { get; } = new();
+
         public Env()
         {
             Shell = new Window
@@ -355,7 +484,8 @@ public sealed class UnitConsoleNonModalTests
             };
             Shell.Show();
             Launcher = new UnitConsoleLauncher(Windows, Units, new DeviceStub(), events: Events, session: Session,
-                                               host: new WpfUnitConsoleWindowHost(() => Shell), prefs: () => null);
+                                               host: new WpfUnitConsoleWindowHost(() => Shell), prefs: () => null,
+                                               guardedWindows: Registry);
         }
 
         public UnitConsoleViewModel? Console => Windows.ShownWindows.LastOrDefault();

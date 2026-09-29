@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -69,6 +70,7 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
     private readonly IUnitConsoleWindowHost _host;
     private readonly Func<Func<Task>, Task> _onUi;
     private readonly Func<(ConsolePrefEntry Entry, System.Action Save)?> _prefs;
+    private readonly IGuardedWindowRegistry? _guardedWindows;
 
     /// <summary>지금 떠 있는 콘솔(한 벌). 닫히면 <c>null</c>.</summary>
     private UnitConsoleViewModel? _open;
@@ -79,6 +81,9 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
     /// <summary>메뉴 로그아웃의 가드에서 "닫지 않음" 을 고른 콘솔 — 다음 로그인에서 묻지 않고 닫는다.</summary>
     private UnitConsoleViewModel? _keptAfterLogout;
 
+    /// <summary><see cref="_open"/> 을 셸 종료 관문에 올린 것(U-27). 창이 닫히면 내린다.</summary>
+    private IDisposable? _exitRegistration;
+
     private bool _disposed;
 
     /// <param name="events">있으면 콘솔이 떠 있는 동안 <c>UnitTopologyChangedMessage</c>(서버 <c>SYNC_UNIT</c>)를 듣고, 런처는 지도의 <see cref="OpenUnitConsoleRequest"/> 를 듣는다.</param>
@@ -87,6 +92,7 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
     /// <param name="host">창 다루기(셸 소유자 · 앞으로 가져오기). 기본은 WPF.</param>
     /// <param name="onUi">세션 신호를 UI 스레드로 옮기는 곳(시험용). 기본은 WPF 디스패처.</param>
     /// <param name="prefs">개인 표시 설정(마지막 레일 · 관계도 보기). 기본은 <c>%LocalAppData%\Ironwall\console-prefs.json</c> 의 <c>Units</c> 키. <c>null</c> 을 돌려주면 쓰지 않는다.</param>
+    /// <param name="guardedWindows">셸 종료 관문(U-27). 있으면 떠 있는 동안 콘솔을 올려 두어 셸이 끝나기 전에 닫기 가드를 묻게 한다. 없으면 올리지 않는다.</param>
     public UnitConsoleLauncher(
         IWindowManager windows,
         IUnitGraphApi units,
@@ -98,7 +104,8 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         ISessionLifecycle? session = null,
         IUnitConsoleWindowHost? host = null,
         Func<Func<Task>, Task>? onUi = null,
-        Func<(ConsolePrefEntry Entry, System.Action Save)?>? prefs = null)
+        Func<(ConsolePrefEntry Entry, System.Action Save)?>? prefs = null,
+        IGuardedWindowRegistry? guardedWindows = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _units = units ?? throw new ArgumentNullException(nameof(units));
@@ -111,6 +118,7 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         _host = host ?? new WpfUnitConsoleWindowHost();
         _onUi = onUi ?? RunOnUi;
         _prefs = prefs ?? DiskPrefs;
+        _guardedWindows = guardedWindows;
 
         // 지도(UI 스레드)가 보낸 그 자리에서 처리한다 — 창 조작과 회신이 같은 스레드에 있다.
         _events?.SubscribeOnPublishedThread(this);
@@ -148,6 +156,8 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
         var viewModel = CreateConsole();
         _open = viewModel;
         viewModel.Deactivated += OnConsoleDeactivated;
+        // 셸이 끝나기 전에 이 창에 묻게 올린다(U-27 · V-17: 셸이 닫히면 WPF 는 소유 창을 Closing 없이 없애 가드가 불리지 않는다).
+        _exitRegistration = _guardedWindows?.Register(new ShellExitEntry(this, viewModel));
 
         // 진짜 창 관리자는 뷰모델을 활성화(= 첫 편제 적재)한 뒤 창을 보인다 — 이 await 가 끝나면 첫 적재가 끝났다.
         var showing = _windows.ShowWindowAsync(viewModel, null, Settings(_host.ShellOwner()));
@@ -190,7 +200,12 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
     private void Forget(UnitConsoleViewModel viewModel)
     {
         viewModel.Deactivated -= OnConsoleDeactivated;
-        if (ReferenceEquals(_open, viewModel)) _open = null;
+        if (ReferenceEquals(_open, viewModel))
+        {
+            _open = null;
+            _exitRegistration?.Dispose();
+            _exitRegistration = null;
+        }
         if (ReferenceEquals(_keptAfterLogout, viewModel)) _keptAfterLogout = null;
     }
     #endregion
@@ -260,12 +275,12 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
 
     /// <summary>
     /// 가드를 다시 묻지 않고 닫는다 — 닫힘 비활성화를 받은 Caliburn 창 지휘자가 창을 닫고(<c>CanCloseAsync</c> 를 부르지 않는다),
-    /// <see cref="OnConsoleDeactivated"/> 가 인스턴스를 놓는다.
+    /// <see cref="OnConsoleDeactivated"/> 가 인스턴스를 놓는다. 로그아웃 닫기와 셸 종료(동의 뒤 · 강제)가 쓴다.
     /// </summary>
     private async Task CloseAsync(UnitConsoleViewModel console)
     {
         try { await ((IDeactivate)console).DeactivateAsync(true).ConfigureAwait(true); }
-        catch (Exception ex) { _log?.Error($"[UnitConsole] 로그아웃 닫기 실패: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[UnitConsole] 묻지 않고 닫기 실패: {ex.Message}"); }
         finally { Forget(console); }
     }
 
@@ -306,6 +321,33 @@ public sealed class UnitConsoleLauncher : IUnitConsoleLauncher, IHandle<OpenUnit
             _session.LoginSucceeded -= OnLoginSucceeded;
         }
     }
+
+    #region - Shell exit (U-27) -
+    /// <summary>
+    /// 셸 종료 관문에 올리는 콘솔 한 벌 — 셸이 끝나기 전에 ✕ 와 같은 가드(<see cref="UnitConsoleViewModel.CanCloseAsync"/>)를 묻고,
+    /// 막히면 이 창을 앞으로 가져오고, 동의 뒤(또는 강제 종료)에는 다시 묻지 않고 닫는다.
+    /// </summary>
+    private sealed class ShellExitEntry : IGuardedWindow
+    {
+        private readonly UnitConsoleLauncher _launcher;
+        private readonly UnitConsoleViewModel _console;
+
+        public ShellExitEntry(UnitConsoleLauncher launcher, UnitConsoleViewModel console)
+        {
+            _launcher = launcher;
+            _console = console;
+        }
+
+        public string Name => "부대 편제";
+
+        public Task<bool> CanCloseAsync(CancellationToken cancellationToken = default) => _console.CanCloseAsync(cancellationToken);
+
+        public void BringToFront() => _launcher._host.BringToFront(_console);
+
+        public Task CloseWithoutAskingAsync()
+            => ReferenceEquals(_launcher._open, _console) ? _launcher.CloseAsync(_console) : Task.CompletedTask;
+    }
+    #endregion
 
     #region - Helpers -
     private async Task<bool> ConfirmAsync(UnitConsoleViewModel owner, string title, string message)

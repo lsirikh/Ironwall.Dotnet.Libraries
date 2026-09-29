@@ -119,7 +119,9 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<ILogService>(),
                         c.ResolveOptional<Caliburn.Micro.IEventAggregator>(),   // 떠 있는 동안 SYNC_UNIT 를 듣는다 · 지도 요청을 듣는다
                         c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.Map.IUnitLayoutApi>(),
-                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ISessionLifecycle>()))
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ISessionLifecycle>(),
+                        // 셸 종료 관문(U-27) — 호스트가 등록하면 떠 있는 콘솔을 올려 셸이 끝나기 전에 가드를 묻게 한다.
+                        guardedWindows: c.ResolveOptional<Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles.IGuardedWindowRegistry>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Units.IUnitConsoleLauncher>()
                    .SingleInstance()
                    .AutoActivate();
