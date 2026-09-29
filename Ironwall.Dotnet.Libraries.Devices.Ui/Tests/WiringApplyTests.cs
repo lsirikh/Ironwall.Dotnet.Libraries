@@ -352,6 +352,61 @@ public class WiringApplyTests
     }
     #endregion
 
+    #region - F-2b H1 · 불러올 때 겹친 센서 -
+    /// <summary>겹쳐 팔레트로 뺀 센서를 사람이 다시 놓고 저장 — 드리프트 기준은 서버 원값이라 "남이 바꿨다" 로 막히지 않는다.</summary>
+    [Fact]
+    public async Task should_save_without_a_conflict_when_a_duplicate_claim_is_placed_by_hand()
+    {
+        var (board, gateway) = DuplicateOnLoad(controllerType: null, type: "Fence");
+        var loser = board.Unplaced.Single();
+        Assert.Equal(102, loser.Id);
+
+        Assert.True(board.Place(loser.Key, 1, 1));
+        var result = await Service(gateway).ApplyAsync(10, board);
+
+        Assert.False(result.IsConflict, result.Message);
+        Assert.True(result.IsSuccess, result.Message);
+        var sent = Assert.Single(gateway.Patched);
+        Assert.Equal(102, sent.Id);
+        var wiring = JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring")!;
+        Assert.Equal(1, (int?)wiring["line"]);
+        Assert.Equal(2, (int?)wiring["order"]);
+        Assert.Equal(2, (int?)wiring["v"]);                          // 형식 표지(H3)
+        Assert.Equal("branch", (string?)wiring["shape"]);
+    }
+
+    [Fact]
+    public async Task should_save_without_a_conflict_when_auto_arrange_places_a_duplicate_claim()
+    {
+        var (board, gateway) = DuplicateOnLoad(controllerType: "SmartController", type: "SmartSensor2");
+
+        Assert.True(board.AutoLayoutByNumber());
+        var result = await Service(gateway).ApplyAsync(10, board);
+
+        Assert.False(result.IsConflict, result.Message);
+        Assert.True(result.IsSuccess, result.Message);
+        var sent = Assert.Single(gateway.Patched);
+        Assert.Equal(102, sent.Id);
+        Assert.Equal("ring", (string?)JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring.shape"));
+    }
+
+    /// <summary>센서 2대가 서버에 같은 자리(1,1)로 저장된 제어기 — 번호가 큰 102 가 팔레트로 빠진다.</summary>
+    private static (WiringBoard Board, WiringFakeGateway Gateway) DuplicateOnLoad(string? controllerType, string type)
+    {
+        var gateway = new WiringFakeGateway();
+        var board = new WiringBoard();
+        var seeds = new List<(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement, string? Issue, IReadOnlyList<int>? Groups)>();
+        for (var i = 0; i < 2; i++)
+        {
+            gateway.Fetched[101 + i] = WiringDoubles.ServerSensor(101 + i, 1101 + i, i + 1, new WiringPlacement(1, 1));
+            gateway.Fetched[101 + i].TypeDevice = type;
+            seeds.Add((101 + i, i + 1, new SensorFacts(1101 + i, $"북측 {i + 1}구간 펜스", type, "북측 7구간"), new WiringPlacement(1, 1), null, null));
+        }
+        board.Load(seeds, controllerType);
+        return (board, gateway);
+    }
+    #endregion
+
     #region - Helpers -
     private static string Wire(object dto) => JsonConvert.SerializeObject(dto, PresetRequestBuilder.WireSettings);
 

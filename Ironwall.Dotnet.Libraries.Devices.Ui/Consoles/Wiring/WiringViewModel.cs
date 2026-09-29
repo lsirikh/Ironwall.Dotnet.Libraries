@@ -30,8 +30,9 @@ public sealed record WiringControllerInfo(int Id, int Number, string Name, strin
 }
 
 /// <summary>서버에서 받은 센서 한 대 — 창은 모델 타입을 모른다(헤드리스 테스트).</summary>
+/// <param name="SavedShape">저장된 결선 모양(<c>spec.wiring</c> 의 <c>"v": 2</c> 표지). 옛 값이면 <c>null</c>(F-2b H3).</param>
 public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement = null, string? Issue = null,
-                                     IReadOnlyList<int>? Groups = null);
+                                     IReadOnlyList<int>? Groups = null, WiringShape? SavedShape = null);
 
 /// <summary>고를 수 있는 그룹 한 개(W2) — 창은 그룹 모델 타입을 모른다.</summary>
 public sealed record WiringGroupInfo(int Id, string Name);
@@ -153,7 +154,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
     /// <summary>단계 띠의 "결선" 이 끝났다고 볼 수 있는가 — 치명 문제가 없고 미배치가 없다.</summary>
     public bool IsWiringDone => Issues.All(i => i.Level != WiringIssueLevel.Critical) && _board.Unplaced.Count == 0 && _board.Rows.Count > 0
-                                && !_board.HasSuggestion;
+                                && !_board.HasPendingProposals;
 
     public string DraftText => $"바뀐 줄 {_board.UnsavedChangeCount}";
 
@@ -208,9 +209,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     #region - Load · sync -
     private void Load(IEnumerable<WiringSensorSeed>? sensors)
     {
-        var seeds = (sensors ?? Enumerable.Empty<WiringSensorSeed>())
-            .Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups));
-        _board.Load(seeds, Controller.TypeController);
+        var list = (sensors ?? Enumerable.Empty<WiringSensorSeed>()).ToList();
+        var shapes = list.Where(s => s.Id > 0 && s.SavedShape is not null)
+                         .GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First().SavedShape!.Value);
+        _board.Load(list.Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups)), Controller.TypeController, shapes);
         SyncAll();
         StatusText = _board.Rows.Count == 0
             ? "이 제어기에 센서가 없습니다 — [센서 여러 개 만들기] 로 시작하세요."
@@ -285,7 +287,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
                 slots[i].Order = _board.OrderAt(line, i);
                 slots[i].LineName = LineNameOf(line);
                 slots[i].PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"A{n.Order} · B{b}" : string.Empty;
-                slots[i].IsSuggested = row is not null && _board.IsSuggested(row.Key);
+                slots[i].IsSuggested = row is not null && _board.IsProposed(row.Key);
             }
         }
     }
@@ -300,7 +302,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             WiringShape.TwoBranch => $"{LineNameOf(n.Line)} {n.Order}번",
             _ => $"{n.Order}번",
         };
-        return _board.IsSuggested(key) ? $"제안 · {text}" : text;
+        return _board.IsProposed(key) ? $"제안 · {text}" : text;
     }
 
     private string LineNameOf(int line) => _board.Shape switch
@@ -348,6 +350,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(LegacyNoticeText));
         NotifyOfPropertyChange(nameof(HasSuggestion));
         NotifyOfPropertyChange(nameof(SuggestionText));
+        NotifyOfPropertyChange(nameof(HasAppliedNotice));
+        NotifyOfPropertyChange(nameof(AppliedNoticeText));
+        NotifyOfPropertyChange(nameof(HasTopologyNotice));
+        NotifyOfPropertyChange(nameof(TopologyNoticeText));
     }
 
     /// <summary>단계 띠 — 어느 단계에 있고 어디까지 끝났는지(W1).</summary>
@@ -391,7 +397,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         ? WiringIssueLevel.Info
         : Issues.Max(i => i.Level);
 
-    public string BannerTitle => Issues.Count == 0 && !_board.HasSuggestion
+    public string BannerTitle => Issues.Count == 0 && !_board.HasPendingProposals
         ? $"이상 없습니다 — 센서 {SensorCount}대가 모두 결선에 붙었고 순번도 겹치지 않습니다."
         : "저장하기 전에 확인하세요";
 
@@ -437,30 +443,64 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     public bool HasPortB => PortBText.Length > 0;
     #endregion
 
-    #region - Load notices (FR-02 · FR-03) -
+    #region - Load notices (FR-02 · FR-03 · F-2b) -
     /// <summary>옛 두 선 배치를 한 줄로 바꿨고 아직 저장하지 않았다.</summary>
     public bool HasLegacyNotice => _board.ConvertedFromLegacy;
 
     public const string LEGACY_NOTICE = WiringChainLoad.LEGACY_NOTICE;
 
+    /// <summary>체인을 고치다가 제안을 함께 적용했을 때의 알림(H2).</summary>
+    public const string APPLIED_NOTICE = "제안 · 변환 배치를 함께 적용했습니다 — Ctrl+Z 로 취소";
+
     public string LegacyNoticeText => HasLegacyNotice ? LEGACY_NOTICE : string.Empty;
 
-    /// <summary>번호순 제안이 걸려 있다 — [이대로 적용] 전에는 저장 대기가 아니다.</summary>
-    public bool HasSuggestion => _board.HasSuggestion;
+    /// <summary>
+    /// 적용하지 않은 불러오기 제안이 걸려 있다(번호순 제안 · 옛 배치 변환 · 빈 자리 당김) — [이대로 적용] 전에는 저장 대상이 아니다.
+    /// </summary>
+    public bool HasSuggestion => _board.HasPendingProposals;
 
-    public string SuggestionText => HasSuggestion
-        ? $"저장된 배치가 없는 센서 {_board.SuggestedCount}대를 번호순으로 제안했습니다"
-        : string.Empty;
+    /// <summary>제안 배너 문장 — 갈래마다 한 조각.</summary>
+    public string SuggestionText
+    {
+        get
+        {
+            if (!_board.HasPendingProposals) return string.Empty;
+            var parts = new List<string>();
+            var suggested = _board.ProposalCount(WiringProposalKind.Suggested);
+            var converted = _board.ProposalCount(WiringProposalKind.Converted);
+            var compacted = _board.ProposalCount(WiringProposalKind.Compacted);
+            if (suggested > 0) parts.Add($"저장된 배치가 없는 센서 {suggested}대를 번호순으로 제안했습니다");
+            if (converted > 0) parts.Add($"옛 두 선 배치 {converted}대를 한 줄로 바꿔 보였습니다");
+            if (compacted > 0) parts.Add($"빈 자리를 당겨 붙인 센서 {compacted}대");
+            if (parts.Count == 1 && suggested > 0) return parts[0];
+            return string.Join(" · ", parts) + " — 적용 전에는 저장 대상이 아닙니다";
+        }
+    }
 
-    /// <summary>[이대로 적용] — 제안을 저장 대기로(되돌리기 한 걸음).</summary>
+    /// <summary>체인을 고치다가 제안을 함께 적용했다(저장 전까지).</summary>
+    public bool HasAppliedNotice => _board.ProposalsAppliedByEdit;
+
+    public string AppliedNoticeText => HasAppliedNotice ? APPLIED_NOTICE : string.Empty;
+
+    /// <summary>
+    /// 결선 모양을 어떻게 정했는가 — 저장된 모양과 추정이 다르면 그 알림, 제어기 종류를 몰라 센서로 추정했으면 그 알림(H3).
+    /// </summary>
+    public string TopologyNoticeText
+        => _board.ShapeNotice
+           ?? (_board.StoredShape is null && _board.Topology.IsInferred && _board.Rows.Count > 0
+               ? $"제어기 종류를 몰라 센서로 추정했습니다: {WiringBoard.ShapeName(_board.Shape)}"
+               : string.Empty);
+
+    public bool HasTopologyNotice => TopologyNoticeText.Length > 0;
+
+    /// <summary>[이대로 적용] — 걸린 제안을 전부 저장 대기로(되돌리기 한 걸음).</summary>
     public void AcceptSuggestion()
     {
-        if (!_board.HasSuggestion || IsBusy) return;
-        var count = _board.SuggestedCount;
+        if (!_board.HasPendingProposals || IsBusy) return;
         _board.PushUndo();
-        _board.AcceptSuggestions();
+        _board.AcceptProposals();
         SyncAll();
-        StatusText = $"번호순 제안 {count}대를 적용했습니다 — [저장하기]를 눌러야 저장됩니다.";
+        StatusText = "제안을 적용했습니다 — [저장하기]를 눌러야 저장됩니다.";
     }
     #endregion
 
@@ -494,7 +534,22 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             var lines = new List<string>();
             if (diff.Created.Count > 0) lines.Add($"만들 줄 {diff.Created.Count}: {Join(diff.Created)}");
             if (diff.FactChanged.Count > 0) lines.Add($"값이 바뀐 줄 {diff.FactChanged.Count}: {Join(diff.FactChanged)}");
-            if (diff.WiringChanged.Count > 0) lines.Add($"결선이 바뀐 줄 {diff.WiringChanged.Count}: {string.Join(", ", diff.WiringChanged.Select(r => $"{r.Display}({Describe(r.BaselinePlacement)}→{Describe(_board.PlacementOf(r.Key))})"))}");
+            if (diff.WiringChanged.Count > 0)
+            {
+                // 불러오기 제안에서 온 결선은 갈래마다 따로 — 사람이 옮긴 것과 자동으로 바뀐 것을 섞어 보이지 않는다(M1).
+                var byKind = diff.WiringChanged.GroupBy(r => _board.Proposals.TryGetValue(r.Key, out var kind) ? (WiringProposalKind?)kind : null)
+                                              .ToDictionary(g => g.Key ?? (WiringProposalKind)(-1), g => g.ToList());
+                if (byKind.TryGetValue(WiringProposalKind.Converted, out var converted))
+                    lines.Add($"자동 변환 {converted.Count}건(옛 두 선 → 한 줄) — 옛 2차 선 센서를 Sensor B 쪽 끝부터 이어 붙인 자리입니다: {Places(converted)}");
+                if (byKind.TryGetValue(WiringProposalKind.Compacted, out var compacted))
+                    lines.Add($"빈 자리 당겨 붙임 {compacted.Count}건 — 저장된 순번의 빈 자리를 메워 뒤 센서의 순번이 앞당겨집니다: {Places(compacted)}");
+                if (byKind.TryGetValue(WiringProposalKind.Suggested, out var suggested))
+                    lines.Add($"번호순 제안 {suggested.Count}건 — 저장된 자리가 없던 센서를 장비번호 순으로 붙인 자리입니다: {Places(suggested)}");
+                if (byKind.TryGetValue((WiringProposalKind)(-1), out var edited))
+                    lines.Add($"결선이 바뀐 줄 {edited.Count}: {Places(edited)}");
+                if (_board.Shape == WiringShape.Ring && diff.WiringChanged.Any(r => r.BaselinePlacement is not null))
+                    lines.Add("링 위치가 바뀌면 이미 기록된 장애 고장 구간 번호가 가리키는 센서가 달라집니다.");
+            }
             lines.Add($"저장할 센서 {diff.ToSend.Count}대");
             return string.Join(Environment.NewLine, lines);
 
@@ -502,6 +557,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
                 => string.Join(", ", rows.Take(8).Select(r => r.Display)) + (rows.Count > 8 ? $" 외 {rows.Count - 8}" : string.Empty);
 
             static string Describe(WiringPlacement? placement) => placement?.Text ?? "미배치";
+
+            string Places(IReadOnlyList<WiringSensorRow> rows)
+                => string.Join(", ", rows.Take(8).Select(r => $"{r.Display}({Describe(r.BaselinePlacement)}→{Describe(_board.PlacementOf(r.Key))})"))
+                   + (rows.Count > 8 ? $" 외 {rows.Count - 8}" : string.Empty);
         }
     }
 
@@ -1025,13 +1084,13 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         if (!CanSave || _apply is null) return;
 
         var unplaced = _board.Unplaced.Count;
-        var suggested = _board.SuggestedCount;
+        var suggested = _board.HasPendingProposals ? _board.Proposals.Count : 0;
         var message = ChangePreview + Environment.NewLine + Environment.NewLine +
             (unplaced > 0
                 ? $"센서 {unplaced}대는 아직 결선에 없습니다 — 그 센서의 결선은 저장하지 않습니다(표 값은 저장됩니다)." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
             (suggested > 0
-                ? $"번호순 제안 {suggested}대는 [이대로 적용] 전이라 저장하지 않습니다." + Environment.NewLine + Environment.NewLine
+                ? $"적용하지 않은 제안(번호순 · 옛 배치 변환 · 빈 자리 당김) {suggested}대의 자리는 저장하지 않습니다 — [이대로 적용] 을 먼저 누르세요." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
             "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?";
 

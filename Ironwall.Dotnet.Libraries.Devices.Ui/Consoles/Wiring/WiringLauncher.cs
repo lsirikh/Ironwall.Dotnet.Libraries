@@ -138,7 +138,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                 new SensorFacts(sensor.DeviceNumber, sensor.DeviceName ?? string.Empty, TypeTextOf(sensor), sensor.Location ?? string.Empty),
                 WiringSpec.Read(spec),
                 WiringSpec.Validate(spec),
-                sensor.DeviceGroups?.ToList()));
+                sensor.DeviceGroups?.ToList(),
+                WiringSpec.ReadShape(spec)));
         }
         return seeds;
     }

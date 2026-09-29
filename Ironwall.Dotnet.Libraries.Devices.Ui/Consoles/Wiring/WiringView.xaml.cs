@@ -104,34 +104,28 @@ public partial class WiringView : UserControl
     private void OnLinePreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (ViewModel is not { } vm) return;
+        if (HandleLineKey(vm, e.Key, e.SystemKey)) e.Handled = true;
+    }
 
-        if (e.Key == Key.System && e.SystemKey is Key.Left)
-        {
-            vm.MoveSelectedBack();
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.System && e.SystemKey is Key.Right)
-        {
-            vm.MoveSelectedForward();
-            e.Handled = true;
-            return;
-        }
+    /// <summary>
+    /// 선 목록의 키 판정 — 처리했으면 <c>true</c>(시험이 이 길로 뷰의 판정을 부른다 · F-2b L4).
+    /// Alt+↑/↓(다른 가지)는 <b>양쪽 가지에서만</b> 먹는다 — 링 · 한 줄은 흘려보낸다.
+    /// </summary>
+    internal static bool HandleLineKey(WiringViewModel vm, Key key, Key systemKey)
+    {
+        if (key == Key.System && systemKey is Key.Left) { vm.MoveSelectedBack(); return true; }
+        if (key == Key.System && systemKey is Key.Right) { vm.MoveSelectedForward(); return true; }
 
         // Alt+↑ · Alt+↓ = 다른 가지로 옮기기(C6) — 양쪽 가지에서만. 링 · 한 줄은 선이 하나라 키를 흘려보낸다.
-        if (vm.IsTwoBranch && e.Key == Key.System && e.SystemKey is Key.Up or Key.Down)
+        if (key == Key.System && systemKey is Key.Up or Key.Down)
         {
+            if (!vm.IsTwoBranch) return false;
             vm.MoveSelectedToOtherLine();
-            e.Handled = true;
-            return;
+            return true;
         }
 
-        if (e.Key == Key.Delete)
-        {
-            vm.UnplaceSelected();
-            e.Handled = true;
-        }
+        if (key == Key.Delete) { vm.UnplaceSelected(); return true; }
+        return false;
     }
 
     /// <summary>팔레트의 키보드 폴백 — Enter = 결선 끝에 붙이기.</summary>

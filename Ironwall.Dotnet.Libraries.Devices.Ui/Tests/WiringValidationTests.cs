@@ -228,6 +228,30 @@ public class WiringValidationTests
     }
 
     [Fact]
+    public void should_name_fault_sections_by_saved_orders_while_load_proposals_are_not_applied()
+    {
+        // 저장 1 · 3(빈 2) + 저장 없음 1대 → 화면은 [1, 2(당김), 3(제안)]. 장애 번호는 서버의 번호다(L2).
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            (Id: 1, Channel: (int?)null, Facts: new SensorFacts(1101, "센서 1", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 1),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 2, Channel: (int?)null, Facts: new SensorFacts(1102, "센서 2", "SmartSensor2", ""), Placement: (WiringPlacement?)new WiringPlacement(1, 3),
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+            (Id: 3, Channel: (int?)null, Facts: new SensorFacts(1103, "센서 3", "SmartSensor2", ""), Placement: (WiringPlacement?)null,
+             Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
+        }, SMART);
+
+        Assert.Equal("1차 3번 = 센서 2", WiringValidation.DescribeFaultSection(board, 1, 3, 3));
+        Assert.Contains("밖입니다", WiringValidation.DescribeFaultSection(board, 1, 2, 2));    // 저장된 2번은 비어 있다
+
+        board.AcceptProposals();
+
+        Assert.Equal("1차 2번 = 센서 2", WiringValidation.DescribeFaultSection(board, 1, 2, 2));
+        Assert.Equal("1차 3번 = 센서 3", WiringValidation.DescribeFaultSection(board, 1, 3, 3));
+    }
+
+    [Fact]
     public void should_say_out_of_range_when_the_fault_section_is_beyond_the_wiring()
     {
         var board = Ring(3);

@@ -263,7 +263,7 @@ public sealed class WiringApplyService
 
         var placement = board.PlacementOf(row.Key);
         if (placement is not null)
-            dto.HardwareSpec = new HardwareSpecDto { UseAxisWrite = true, Spec = WiringSpec.Apply(null, placement) };
+            dto.HardwareSpec = new HardwareSpecDto { UseAxisWrite = true, Spec = WiringSpec.Apply(null, placement, board.Shape) };
 
         await UnitScopeGate.StampAsync(dto, nameof(WiringApplyService), _log, token).ConfigureAwait(false);
         var response = await _gateway.CreateAsync(dto, token).ConfigureAwait(false);
@@ -312,9 +312,11 @@ public sealed class WiringApplyService
     /// <remarks><c>status</c>·<c>updated_at</c> 는 보지 않는다 — 우리가 쓰지 않고 장비가 스스로 바꾼다.</remarks>
     private static string? DriftOf(WiringSensorRow row, SensorDeviceDto server)
     {
+        // 기준은 "받아들인 자리"(BaselinePlacement)가 아니라 <b>서버에서 받은 원값</b>(ServerPlacement)이다(F-2b H1) —
+        // 불러올 때 겹쳐 팔레트로 뺀 센서는 받아들인 기준이 null 이라, 그것과 비교하면 사람이 다시 놓은 뒤에도 늘 "남이 바꿨다" 였다.
         var serverPlacement = WiringSpec.Read(server.HardwareSpec?.Spec);
-        if (!WiringSpec.SamePlacement(serverPlacement, row.BaselinePlacement))
-            return $"자리를 바꿨습니다({Describe(row.BaselinePlacement)} → {Describe(serverPlacement)})";
+        if (!WiringSpec.SamePlacement(serverPlacement, row.ServerPlacement))
+            return $"자리를 바꿨습니다({Describe(row.ServerPlacement)} → {Describe(serverPlacement)})";
 
         if (server.NumberDevice != row.Baseline.Number)
             return $"번호를 바꿨습니다({row.Baseline.Number} → {server.NumberDevice})";
@@ -382,7 +384,8 @@ public sealed class WiringApplyService
                 UseAxisWrite = true,
                 // components 는 싣지 않는다 — 서버가 배열을 통째로 바꾼다(AllowComponentsWrite 기본 false).
                 // spec 은 우리 키 하나만 — 병합이라 나머지는 그대로 남고, 자리를 비울 때는 명시적 null 이 지운다.
-                Spec = WiringSpec.MergePatch(placement),
+                // 형식 표지(v 2 · 모양)를 함께 싣는다 — 다음에 열 때 옛 두 선으로 오해하지 않게(F-2b H3).
+                Spec = WiringSpec.MergePatch(placement, board.Shape),
             };
         }
 

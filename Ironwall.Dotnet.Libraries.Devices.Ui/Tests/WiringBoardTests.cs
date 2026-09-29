@@ -196,7 +196,7 @@ public class WiringBoardTests
 
     #region - Load -
     [Fact]
-    public void should_convert_legacy_second_line_reversed_and_count_it_as_changed_when_loading_a_ring()
+    public void should_propose_the_legacy_conversion_without_making_the_board_dirty_until_applied()
     {
         var board = new WiringBoard();
         board.Load(new[]
@@ -208,22 +208,36 @@ public class WiringBoardTests
         }, SMART);
 
         Assert.True(board.ConvertedFromLegacy);
-        Assert.Equal(new[] { 1, 2, 4, 5 }, board.Placed(1).Select(r => r.Id));
-        Assert.Equal(1, board.NumberOf(5)!.OppositeOrder);                 // 옛 2차 1번 = 새 B1
-        // 자동 저장하지 않는다 — 옮겨진 두 대가 "바뀐 줄"이 되어 [저장하기]가 써 준다.
+        Assert.Equal(new[] { 1, 2, 4, 5 }, board.Placed(1).Select(r => r.Id));     // 보이는 것은 한 줄
+        Assert.Equal(1, board.NumberOf(5)!.OppositeOrder);                         // 옛 2차 1번 = 새 B1
+        // F-2b: 변환은 제안이다 — 적용 전에는 바뀐 줄이 아니고 저장에 실리지 않는다(저장될 자리 = 서버 원값).
+        Assert.True(board.HasPendingProposals);
+        Assert.Equal(2, board.ProposalCount(WiringProposalKind.Converted));
+        Assert.False(board.IsDirty);
+        Assert.Equal(new WiringPlacement(2, 1), board.PlacementOf(5));
+
+        Assert.True(board.AcceptProposals());
+
         Assert.Equal(new[] { 4, 5 }, board.Diff().WiringChanged.Select(r => r.Id).OrderBy(i => i));
+        Assert.Equal(new WiringPlacement(1, 4), board.PlacementOf(5));
     }
 
     [Fact]
-    public void should_forget_the_legacy_notice_when_the_converted_chain_is_saved()
+    public void should_forget_the_legacy_notice_when_the_converted_chain_is_applied_and_saved()
     {
         var board = new WiringBoard();
         board.Load(new[] { Seed(1, 1101, new WiringPlacement(1, 1), "SmartSensor2"), Seed(2, 1102, new WiringPlacement(2, 1), "SmartSensor2") }, SMART);
 
+        board.MarkBaseline();                                           // 적용 없이 저장(이름만 고친 저장) — 제안은 그대로
+        Assert.True(board.ConvertedFromLegacy);
+        Assert.True(board.HasPendingProposals);
+
+        board.AcceptProposals();
         board.MarkBaseline();
 
         Assert.False(board.ConvertedFromLegacy);
         Assert.False(board.IsDirty);
+        Assert.Equal(new WiringPlacement(1, 2), board.Rows[1].ServerPlacement);   // 다음 드리프트 기준도 보낸 값
     }
 
     [Fact]
@@ -236,24 +250,88 @@ public class WiringBoardTests
         Assert.Null(board.PlacementOf(board.Rows[0].Key));
         Assert.Equal(new WiringPlacement(1, 1), board.DisplayPlacementOf(board.Rows[0].Key));
 
-        Assert.True(board.AcceptSuggestions());
+        Assert.True(board.AcceptProposals());
 
         Assert.True(board.IsDirty);
         Assert.Equal(3, board.UnsavedChangeCount);
-        Assert.False(board.AcceptSuggestions());
+        Assert.False(board.AcceptProposals());
     }
 
     [Fact]
-    public void should_accept_only_the_moved_sensor_when_a_suggested_sensor_is_placed_by_hand()
+    public void should_apply_every_proposal_together_with_the_first_chain_edit()
     {
         var board = Ring(3, placed: 1);                                 // 1101 저장 · 1102 · 1103 제안
         var moved = board.Rows[2].Key;
 
+        board.PushUndo();
         board.Place(moved, 1, 0);
 
-        Assert.False(board.IsSuggested(moved));
-        Assert.True(board.IsSuggested(board.Rows[1].Key));
-        Assert.Equal(new[] { board.Rows[0].Key, moved }, board.Diff().WiringChanged.Select(r => r.Key).ToArray());   // 제안 1102 는 세지 않는다
+        // H2: 적용하지 않은 제안 위에서 번호를 매기지 않는다 — 첫 편집이 제안을 전부 적용한다(같은 되돌리기 한 걸음).
+        Assert.False(board.HasPendingProposals);
+        Assert.True(board.ProposalsAppliedByEdit);
+        Assert.Equal(new[] { 1103, 1101, 1102 }, Numbers(board.Placed(1)));
+        Assert.Equal(3, board.Diff().WiringChanged.Count);
+
+        Assert.True(board.Undo());
+        Assert.True(board.HasPendingProposals);
+        Assert.False(board.ProposalsAppliedByEdit);
+        Assert.False(board.IsDirty);
+    }
+
+    [Fact]
+    public void should_number_the_append_after_the_applied_suggestions_when_enter_appends_to_a_ring_with_proposals()
+    {
+        // 저장 a1 · b2 + 제안 c · d + 팔레트 새 줄 e — 편집 없이는 c · d 가 저장에 실리지 않는다.
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            Seed(1, 101, new WiringPlacement(1, 1), "SmartSensor2"), Seed(2, 102, new WiringPlacement(1, 2), "SmartSensor2"),
+            Seed(3, 103, type: "SmartSensor2"), Seed(4, 104, type: "SmartSensor2"),
+        }, SMART);
+        var e = board.AddRow(Facts(105, type: "SmartSensor2"));
+
+        Assert.DoesNotContain(board.Diff().ToSend, r => r.Id is 3 or 4);
+
+        Assert.Equal(1, board.Append(new[] { e.Key }));
+
+        Assert.Equal(new[] { 1, 2, 3, 4, 0 }, board.Placed(1).Select(r => r.Id));
+        Assert.Equal(new WiringPlacement(1, 3), board.PlacementOf(3));
+        Assert.Equal(new WiringPlacement(1, 4), board.PlacementOf(4));
+        Assert.Equal(new WiringPlacement(1, 5), board.PlacementOf(e.Key));
+        var send = board.Diff().ToSend;
+        Assert.Contains(send, r => r.Id == 3);
+        Assert.Contains(send, r => r.Id == 4);
+        Assert.Contains(send, r => r.Key == e.Key);
+    }
+
+    [Fact]
+    public void should_restore_the_load_issue_when_undoing_the_placement_that_cleared_it()
+    {
+        var board = new WiringBoard();
+        board.Load(new[] { Seed(1, 1101, new WiringPlacement(1, 1)), Seed(2, 1102, new WiringPlacement(1, 1)) });
+        var loser = board.Unplaced.Single();
+        Assert.NotNull(loser.LoadIssue);
+
+        board.PushUndo();
+        board.Place(loser.Key, 1, 1);
+        Assert.Null(loser.LoadIssue);
+
+        board.Undo();
+
+        Assert.NotNull(loser.LoadIssue);                                // L1 — 되돌리면 경고도 돌아온다
+        Assert.Contains(loser, board.Unplaced);
+    }
+
+    [Fact]
+    public void should_keep_the_raw_server_placement_for_drift_when_a_duplicate_claim_is_sent_to_the_palette()
+    {
+        var board = new WiringBoard();
+        board.Load(new[] { Seed(1, 1101, new WiringPlacement(1, 1)), Seed(2, 1102, new WiringPlacement(1, 1)) });
+        var loser = board.Unplaced.Single();
+
+        Assert.Null(loser.BaselinePlacement);                           // 받아들인 기준 = 미배치(불러오기만으로 더러워지지 않게)
+        Assert.Equal(new WiringPlacement(1, 1), loser.ServerPlacement); // 서버 원값은 그대로 — 드리프트 기준(H1)
+        Assert.False(board.IsDirty);
     }
 
     [Fact]
@@ -266,15 +344,53 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_close_up_and_count_as_changed_when_saved_orders_have_a_hole()
+    public void should_propose_the_closed_up_gap_without_making_the_board_dirty_when_saved_orders_have_a_hole()
     {
         var board = new WiringBoard();
         board.Load(new[] { Seed(1, 1101, new WiringPlacement(1, 2), "SmartSensor2"), Seed(2, 1102, new WiringPlacement(1, 3), "SmartSensor2") }, SMART);
 
-        // 체인에는 빈 자리가 없다 — 당겨 붙이고 경고한다. 옛 칸 모델은 빈 자리를 두고 깨끗이 열었다(C5).
-        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(board.Rows[0].Key));
-        Assert.True(board.IsDirty);
+        // 체인에는 빈 자리가 없다 — 당겨 붙여 보이되 제안이다(적용 전 저장 대상 아님 · F-2b).
+        Assert.Equal(new WiringPlacement(1, 1), board.DisplayPlacementOf(board.Rows[0].Key));
+        Assert.Equal(new WiringPlacement(1, 2), board.PlacementOf(board.Rows[0].Key));
+        Assert.False(board.IsDirty);
+        Assert.Equal(2, board.ProposalCount(WiringProposalKind.Compacted));
         Assert.Single(board.LoadNotices);
+
+        board.AcceptProposals();
+
+        Assert.True(board.IsDirty);
+        Assert.Equal(new WiringPlacement(1, 1), board.PlacementOf(board.Rows[0].Key));
+    }
+
+    [Fact]
+    public void should_open_as_the_stored_branch_without_conversion_when_v2_data_meets_a_controller_inferred_as_a_line()
+    {
+        var board = new WiringBoard();
+        board.Load(new[]
+        {
+            Seed(1, 501, new WiringPlacement(1, 1), "Underground"),
+            Seed(2, 502, new WiringPlacement(2, 1), "Underground"),
+        }, controllerType: null, savedShapes: new Dictionary<int, WiringShape> { [1] = WiringShape.TwoBranch, [2] = WiringShape.TwoBranch });
+
+        Assert.Equal(WiringShape.TwoBranch, board.Shape);                // 저장된 모양이 추정(지중만 → 한 줄)을 이긴다(H3)
+        Assert.Equal(WiringShape.TwoBranch, board.StoredShape);
+        Assert.False(board.ConvertedFromLegacy);                          // 표지가 있는 line 2 는 옛 배치가 아니다
+        Assert.False(board.HasPendingProposals);
+        Assert.Equal(new[] { 502 }, Numbers(board.Placed(2)));
+        Assert.Contains("저장된 결선 모양(가지)", board.ShapeNotice);
+        Assert.Contains("한 줄", board.ShapeNotice);
+    }
+
+    [Fact]
+    public void should_propose_a_conversion_only_for_v_less_second_line_on_a_ring()
+    {
+        var board = new WiringBoard();
+        board.Load(new[] { Seed(1, 1101, new WiringPlacement(1, 1), "SmartSensor2"), Seed(2, 1102, new WiringPlacement(2, 1), "SmartSensor2") }, SMART);
+
+        Assert.True(board.ConvertedFromLegacy);
+        Assert.Null(board.StoredShape);
+        Assert.Null(board.ShapeNotice);
+        Assert.Equal(1, board.ProposalCount(WiringProposalKind.Converted));
     }
 
     [Fact]
@@ -429,7 +545,8 @@ public class WiringBoardTests
     [Theory]
     [InlineData(65)]      // 옛 칸 상한(64)을 넘어도 읽는다 — 펜스센서는 제어기 한 대에 수백 대다
     [InlineData(400)]
-    [InlineData(WiringSpec.MAX_ORDER)]
+    [InlineData(999)]
+    [InlineData(1000)]
     public void should_read_orders_up_to_the_raised_limit_when_spec_carries_a_long_chain(int order)
     {
         var spec = new JObject { ["wiring"] = new JObject { ["line"] = 1, ["order"] = order } };
@@ -439,13 +556,27 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_refuse_an_order_beyond_the_limit_when_reading()
+    public void should_refuse_an_order_of_1001_when_reading()
     {
-        var spec = new JObject { ["wiring"] = new JObject { ["line"] = 1, ["order"] = WiringSpec.MAX_ORDER + 1 } };
+        var spec = new JObject { ["wiring"] = new JObject { ["line"] = 1, ["order"] = 1001 } };
 
-        Assert.Equal(1000, WiringSpec.MAX_ORDER);
         Assert.Null(WiringSpec.Read(spec));
         Assert.Contains("범위", WiringSpec.Validate(spec));
+    }
+
+    [Fact]
+    public void should_write_the_v2_marker_with_the_shape_and_read_it_back()
+    {
+        var spec = WiringSpec.Apply(JObject.Parse("""{"resolution":"4K"}"""), new WiringPlacement(1, 7), WiringShape.Ring);
+        var patch = WiringSpec.MergePatch(new WiringPlacement(2, 3), WiringShape.TwoBranch);
+
+        Assert.Equal(2, (int?)spec["wiring"]!["v"]);
+        Assert.Equal("ring", (string?)spec["wiring"]!["shape"]);
+        Assert.Equal(7, (int?)spec["wiring"]!["order"]);                  // 옛 클라이언트가 읽는 키는 그대로
+        Assert.Equal(WiringShape.Ring, WiringSpec.ReadShape(spec));
+        Assert.Equal(new WiringPlacement(1, 7), WiringSpec.Read(spec));
+        Assert.Equal(WiringShape.TwoBranch, WiringSpec.ReadShape(patch));
+        Assert.Null(WiringSpec.ReadShape(JObject.Parse("""{"wiring":{"line":2,"order":1}}""")));   // 표지 없는 옛 값
     }
 
     [Theory]

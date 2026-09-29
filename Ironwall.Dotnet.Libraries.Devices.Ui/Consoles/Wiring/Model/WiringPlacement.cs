@@ -40,6 +40,19 @@ public static class WiringSpec
     public const int LINE_SECONDARY = 2;
 
     /// <summary>
+    /// 형식 표지(wiring-fence-view F-2b · H3) — 체인 모델이 쓴 값에는 <c>"v": 2</c> 와 결선 모양 <c>"shape"</c> 를 함께 싣는다.
+    /// 표지가 없는 값(N04 시절)만 "옛 두 선" 후보로 본다 — "line 2 가 있다" 만으로는 링의 옛 배치인지 가지의 오른쪽인지 가를 수 없다.
+    /// <c>line</c> · <c>order</c> 는 그대로 두어 옛 클라이언트도 읽는다.
+    /// </summary>
+    public const string VERSION_KEY = "v";
+    public const string SHAPE_KEY = "shape";
+    public const int FORMAT_VERSION = 2;
+
+    public const string SHAPE_RING = "ring";
+    public const string SHAPE_BRANCH = "branch";
+    public const string SHAPE_LINE = "line";
+
+    /// <summary>
     /// 순번의 상한 — 읽기 · 검증이 이보다 큰 값을 "범위 밖"으로 본다. 링 체인은 칸 상한이 없고
     /// 펜스센서는 제어기 한 대에 수백 대가 붙는다(카탈로그: 1km = 펜스 400 · PRD FR-18) — 넉넉하되 유한한 값이다
     /// (옛 64 는 N04 의 칸 상한이었다).
@@ -85,7 +98,32 @@ public static class WiringSpec
     /// <paramref name="placement"/> 가 <c>null</c> 이면 키를 뺀다. 나머지 키는 그대로 옮긴다.
     /// </summary>
     /// <remarks>원본을 고치지 않는다 — 재조회한 DTO 는 비교의 기준이라 손대면 충돌 판정이 거짓이 된다.</remarks>
-    public static JObject Apply(JObject? spec, WiringPlacement? placement)
+    /// <summary>결선 모양 → 저장 글자(<c>ring</c> · <c>branch</c> · <c>line</c>).</summary>
+    public static string ShapeText(WiringShape shape) => shape switch
+    {
+        WiringShape.Ring => SHAPE_RING,
+        WiringShape.TwoBranch => SHAPE_BRANCH,
+        _ => SHAPE_LINE,
+    };
+
+    /// <summary>
+    /// 저장된 결선 모양 — <c>"v": 2</c> 표지가 있고 모양 글자를 알 때만. 표지가 없으면(옛 값) <c>null</c>.
+    /// </summary>
+    public static WiringShape? ReadShape(JObject? spec)
+    {
+        if (spec?[SPEC_KEY] is not JObject wiring) return null;
+        if (AsInt(wiring[VERSION_KEY]) is not { } version || version < FORMAT_VERSION) return null;
+        return ((string?)wiring[SHAPE_KEY])?.Trim().ToLowerInvariant() switch
+        {
+            SHAPE_RING => WiringShape.Ring,
+            SHAPE_BRANCH => WiringShape.TwoBranch,
+            SHAPE_LINE => WiringShape.Line,
+            _ => null,
+        };
+    }
+
+    /// <param name="shape">결선 모양 — 주면 형식 표지(<c>v</c> · <c>shape</c>)를 함께 싣는다. 저장 계층은 늘 준다.</param>
+    public static JObject Apply(JObject? spec, WiringPlacement? placement, WiringShape? shape = null)
     {
         var next = spec is null ? new JObject() : (JObject)spec.DeepClone();
 
@@ -95,7 +133,7 @@ public static class WiringSpec
             return next;
         }
 
-        next[SPEC_KEY] = Node(placement);
+        next[SPEC_KEY] = Node(placement, shape);
         return next;
     }
 
@@ -114,14 +152,21 @@ public static class WiringSpec
     /// <para>그러므로 ① <b>안 보낸 키는 그대로 남고</b>(그래서 우리 키 하나만 보내면 벤더 키를 건드리지 않는다)
     /// ② <b>키를 빼는 것으로는 지워지지 않는다</b> — 자리를 비우는 저장이 조용히 아무 일도 하지 않게 된다.</para>
     /// </remarks>
-    public static JObject MergePatch(WiringPlacement? placement)
-        => new() { [SPEC_KEY] = placement is null ? JValue.CreateNull() : Node(placement) };
+    public static JObject MergePatch(WiringPlacement? placement, WiringShape? shape = null)
+        => new() { [SPEC_KEY] = placement is null ? JValue.CreateNull() : Node(placement, shape) };
 
-    private static JObject Node(WiringPlacement placement) => new()
+    private static JObject Node(WiringPlacement placement, WiringShape? shape)
     {
-        [LINE_KEY] = placement.Line,
-        [ORDER_KEY] = placement.Order,
-    };
+        var node = new JObject();
+        if (shape is { } s)
+        {
+            node[VERSION_KEY] = FORMAT_VERSION;
+            node[SHAPE_KEY] = ShapeText(s);
+        }
+        node[LINE_KEY] = placement.Line;
+        node[ORDER_KEY] = placement.Order;
+        return node;
+    }
 
     /// <summary>두 결선 자리가 같은가(둘 다 없어도 같다) — 재조회 충돌 판정.</summary>
     public static bool SamePlacement(WiringPlacement? a, WiringPlacement? b)

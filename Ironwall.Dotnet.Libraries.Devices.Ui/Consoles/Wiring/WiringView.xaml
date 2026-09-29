@@ -1035,6 +1035,36 @@
 							</StackPanel>
 
 							<StackPanel Grid.Column="1">
+								<!--  결선 모양을 어떻게 정했나 — 저장된 모양 ≠ 추정 · 제어기 종류 모름(F-2b H3)  -->
+								<Border
+									Margin="0,0,0,8"
+									Padding="10,6"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource StatusInfoBrush}"
+									BorderThickness="3,0,0,0"
+									CornerRadius="0,6,6,0"
+									Visibility="{Binding HasTopologyNotice, Converter={StaticResource BoolToVisibility}}">
+									<TextBlock
+										AutomationProperties.AutomationId="Devices.Wiring.TopologyNotice"
+										FontSize="12"
+										Text="{Binding TopologyNoticeText}"
+										TextWrapping="Wrap" />
+								</Border>
+								<!--  체인을 고치다가 제안을 함께 적용함(F-2b H2)  -->
+								<Border
+									Margin="0,0,0,8"
+									Padding="10,6"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									CornerRadius="0,6,6,0"
+									Visibility="{Binding HasAppliedNotice, Converter={StaticResource BoolToVisibility}}">
+									<TextBlock
+										AutomationProperties.AutomationId="Devices.Wiring.AppliedNotice"
+										FontSize="12"
+										Text="{Binding AppliedNoticeText}"
+										TextWrapping="Wrap" />
+								</Border>
 								<!--  불러오기 알림 — 옛 배치 변환(FR-02) · 번호순 제안(FR-03)  -->
 								<Border
 									Margin="0,0,0,8"

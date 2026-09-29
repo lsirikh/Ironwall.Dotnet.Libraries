@@ -124,23 +124,30 @@ public class WiringViewModelTests
     }
 
     [Fact]
-    public void should_show_the_legacy_banner_and_count_converted_sensors_as_changes_when_old_two_line_wiring_loads()
+    public void should_show_the_legacy_banner_as_a_proposal_that_is_not_a_change_when_old_two_line_wiring_loads()
     {
         var placements = new WiringPlacement?[] { new(1, 1), new(1, 2), new(2, 1) };
         var vm = OpenRing(sensors: 3, placements: placements);
 
         Assert.True(vm.HasLegacyNotice);
         Assert.Equal("옛 배치를 한 줄로 바꿨습니다 — 확인 후 저장", vm.LegacyNoticeText);
-        Assert.True(vm.HasChanges);                              // 자동 저장하지 않는다 — [저장하기]가 써 준다
+        Assert.False(vm.HasChanges);                             // F-2b: 변환은 제안 — 적용 전에는 바뀐 줄이 아니다
+        Assert.True(vm.HasSuggestion);                           // [이대로 적용] 배너가 선다
+        Assert.Contains("옛 두 선", vm.SuggestionText);
+        Assert.True(vm.Line1[2].IsSuggested);                    // 모서리 표지
         Assert.Equal(new[] { 1101, 1102, 1103 }, vm.Line1.Where(s => s.IsFilled).Select(s => s.Row!.Facts.Number));
     }
 
     [Fact]
-    public async Task should_write_the_converted_chain_and_drop_the_banner_when_saved()
+    public async Task should_write_the_converted_chain_and_drop_the_banner_when_applied_and_saved()
     {
         var placements = new WiringPlacement?[] { new(1, 1), new(2, 2), new(2, 1) };     // 2차 역순으로 이어 체인 [101, 102, 103]
         var gateway = Gateway(3, "SmartSensor2", placements);
         var vm = OpenRing(sensors: 3, placements: placements, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
+
+        vm.AcceptSuggestion();
+        Assert.Contains("자동 변환 2건(옛 두 선 → 한 줄)", vm.ChangePreview);                    // M1 — 갈래별로 따로
+        Assert.Contains("링 위치가 바뀌면 이미 기록된 장애 고장 구간 번호가 가리키는 센서가 달라집니다", vm.ChangePreview);
 
         await vm.SaveAsync();
 
@@ -149,6 +156,53 @@ public class WiringViewModelTests
         Assert.Equal(new WiringPlacement(1, 3), SentPlacement(gateway, 103));      // 옛 2차 1번 = Sensor B 쪽 끝
         Assert.False(vm.HasLegacyNotice);
         Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
+    public async Task should_not_send_proposed_placements_when_only_a_name_is_edited_and_saved()
+    {
+        var placements = new WiringPlacement?[] { new(1, 1), new(2, 2), new(2, 1) };
+        var gateway = Gateway(3, "SmartSensor2", placements);
+        var vm = OpenRing(sensors: 3, placements: placements, dialogs: new WiringFakeDialogs { Confirm = true }, gateway: gateway);
+
+        vm.Rows[1].Name = "고친 이름";
+        await vm.SaveAsync();
+
+        var sent = Assert.Single(gateway.Patched);
+        Assert.Equal(102, sent.Id);
+        Assert.Null(sent.Dto.HardwareSpec);                      // 적용하지 않은 변환 자리는 실리지 않는다(M1)
+        Assert.True(vm.HasSuggestion);                           // 제안은 그대로 걸려 있다
+        Assert.True(vm.HasLegacyNotice);
+    }
+
+    [Fact]
+    public void should_announce_that_proposals_were_applied_together_when_the_first_chain_edit_happens()
+    {
+        var vm = OpenRing(sensors: 3, placed: 1);                // 1101 저장 · 1102 · 1103 제안
+        vm.Line1[0].IsSelected = true;
+
+        vm.MoveSelectedForward();
+
+        Assert.True(vm.HasAppliedNotice);
+        Assert.Equal("제안 · 변환 배치를 함께 적용했습니다 — Ctrl+Z 로 취소", vm.AppliedNoticeText);
+        Assert.False(vm.HasSuggestion);
+        Assert.True(vm.HasChanges);
+
+        vm.Undo();                                               // 편집과 적용은 한 걸음
+
+        Assert.False(vm.HasAppliedNotice);
+        Assert.True(vm.HasSuggestion);
+        Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
+    public void should_say_the_shape_was_inferred_from_sensors_when_the_controller_type_is_unknown()
+    {
+        var vm = Open(sensors: 2);                               // 펜스 · 제어기 종류 모름 → 가지
+
+        Assert.True(vm.HasTopologyNotice);
+        Assert.Equal("제어기 종류를 몰라 센서로 추정했습니다: 가지", vm.TopologyNoticeText);
+        Assert.False(OpenRing(sensors: 2).HasTopologyNotice);
     }
 
     [Fact]
@@ -208,12 +262,26 @@ public class WiringViewModelTests
         var vm = OpenRing(sensors: 2, placed: 2);
         vm.Line1[0].IsSelected = true;
 
-        vm.MoveSelectedToOtherLine();
+        // L4 — 뷰의 키 판정 길로(Alt+↑ 는 Key.System + SystemKey.Up 으로 온다).
+        var handled = WiringView.HandleLineKey(vm, System.Windows.Input.Key.System, System.Windows.Input.Key.Up);
 
+        Assert.False(handled);                                   // 링은 키를 흘려보낸다
         Assert.False(vm.HasChanges);
         Assert.False(vm.CanUndo);                                // 되돌리기 장면도 쌓지 않는다
-        Assert.Contains("다른 가지가 없습니다", vm.StatusText);
     }
+
+    [Fact]
+    public void should_move_to_the_other_branch_when_the_cross_line_key_reaches_the_view_on_two_branches()
+    {
+        var vm = Open(sensors: 2, placedOnFirst: 2);             // 가지 — 왼쪽 [1101, 1102]
+        vm.Line1[1].IsSelected = true;
+
+        var handled = WiringView.HandleLineKey(vm, System.Windows.Input.Key.System, System.Windows.Input.Key.Down);
+
+        Assert.True(handled);
+        Assert.Equal(1102, vm.Line2[0].Row!.Facts.Number);
+    }
+
     #endregion
 
     #region - Drag -

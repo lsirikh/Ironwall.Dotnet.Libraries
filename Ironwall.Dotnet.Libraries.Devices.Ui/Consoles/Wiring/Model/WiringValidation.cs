@@ -62,7 +62,7 @@ public static class WiringValidation
         // ② 불러온 배치의 빈 순번 — 당겨 붙였으니 저장하면 서버 순번이 바뀐다
         foreach (var notice in board.LoadNotices.Where(n => n.Code == WiringChain.CODE_GAP))
             issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_GAP,
-                $"{notice.Message} 저장하면 뒤 센서들의 순번이 당겨진 값으로 바뀝니다 — 장애의 고장 구간 번호와 맞는지 확인해 주세요."));
+                $"{notice.Message} 적용해 저장하면 뒤 센서들의 순번이 당겨진 값으로 바뀝니다 — 장애의 고장 구간 번호와 맞는지 확인해 주세요."));
 
         // ① 아직 체인에 없는 센서(알림)
         var unplaced = board.Unplaced.Count;
@@ -108,7 +108,7 @@ public static class WiringValidation
     public static string FaultHint(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        if (board.CountOn(WiringSpec.LINE_PRIMARY) < FAULT_HINT_MIN)
+        if (SequenceFor(board, WiringSpec.LINE_PRIMARY).Count < FAULT_HINT_MIN)
             return $"센서를 {FAULT_HINT_MIN}대 이상 붙이면 예시를 보여 줍니다.";
 
         var first = $"장애 {DescribeFaultSection(board, WiringSpec.LINE_PRIMARY, 4, 5)}";
@@ -133,25 +133,46 @@ public static class WiringValidation
 
         var start = Name(startOrder);
         var end = Name(endOrder);
-        if (start is null || end is null) return $"{line}차 {startOrder}~{endOrder} 는 지금 결선 범위(1~{sequence.Count}) 밖입니다.";
+        if (start is null || end is null) return $"{line}차 {startOrder}~{endOrder} 는 지금 결선 범위(1~{sequence.Max(p => p.Order)}) 밖입니다.";
         return startOrder == endOrder ? $"{line}차 {startOrder}번 = {start}" : $"{line}차 {startOrder}~{endOrder} → {start} 와 {end} 사이";
 
-        string? Name(int order) => order >= 1 && order <= sequence.Count ? sequence[order - 1].Display : null;
+        string? Name(int order) => sequence.FirstOrDefault(p => p.Order == order).Row?.Display;
     }
 
-    /// <summary>그 선의 번호가 1, 2, 3… 으로 매겨지는 센서 차례.</summary>
-    private static IReadOnlyList<WiringSensorRow> SequenceFor(WiringBoard board, int line)
+    /// <summary>
+    /// 그 선의 (번호, 센서) — 번호가 1, 2, 3… 으로 매겨지는 차례. 적용하지 않은 불러오기 제안이 있으면 <b>받아들인(서버와 같은) 자리</b>로 센다(L2) —
+    /// 장애의 고장 구간 번호는 서버에 저장된 번호를 가리키지, 화면의 제안 번호를 가리키지 않는다(빈 번호는 빈 채로).
+    /// </summary>
+    private static IReadOnlyList<(int Order, WiringSensorRow Row)> SequenceFor(WiringBoard board, int line)
     {
+        if (board.HasPendingProposals)
+        {
+            var saved = board.Rows.Where(r => r.BaselinePlacement is not null).ToList();
+            var hasSecond = saved.Any(r => r.BaselinePlacement!.Line == WiringSpec.LINE_SECONDARY);
+            if (board.Shape == WiringShape.Ring && line == WiringSpec.LINE_SECONDARY && !hasSecond)
+            {
+                // 링의 2차 n = 체인 위치 N+1−n — 저장된 한 줄을 반대쪽에서 센다.
+                var first = saved.Where(r => r.BaselinePlacement!.Line == WiringSpec.LINE_PRIMARY).ToList();
+                var n = first.Count == 0 ? 0 : first.Max(r => r.BaselinePlacement!.Order);
+                return first.Select(r => (n + 1 - r.BaselinePlacement!.Order, r)).OrderBy(p => p.Item1).ToList();
+            }
+            return saved.Where(r => r.BaselinePlacement!.Line == line)
+                        .Select(r => (r.BaselinePlacement!.Order, r)).OrderBy(p => p.Item1).ToList();
+        }
+
+        IReadOnlyList<WiringSensorRow> rows;
         if (board.Shape == WiringShape.Ring)
         {
             var chain = board.Placed(WiringSpec.LINE_PRIMARY);
-            return line switch
+            rows = line switch
             {
                 WiringSpec.LINE_PRIMARY => chain,
                 WiringSpec.LINE_SECONDARY => chain.Reverse().ToList(),     // Sensor B 쪽 끝이 2차 1번
                 _ => Array.Empty<WiringSensorRow>(),
             };
         }
-        return board.Placed(line);
+        else rows = board.Placed(line);
+        return rows.Select((r, i) => (i + 1, r)).ToList();
     }
+
 }
