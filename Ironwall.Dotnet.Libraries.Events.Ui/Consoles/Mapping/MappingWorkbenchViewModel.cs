@@ -30,7 +30,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 서버로 나가는 것은 [적용] 한 번뿐이다. 서버에 재정렬 API 가 없어서
 /// 드롭마다 보내면 20행 재배치가 20회 PATCH 가 되고 API 타임아웃이 곱해진다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
+public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler
 {
     /// <summary>콘솔 키 — 자동화 식별자와 설정 저장의 접두사.</summary>
     public const string ConsoleKeyName = "Mapping";
@@ -277,8 +277,15 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
     /// <summary>읽기 전용인가 — 드래그 시작 자체를 막는다.</summary>
     public bool IsReadOnly => !CanEdit;
 
-    /// <summary>편집 권한이 있는가(드래그 가능 여부와 같은 값 — 바인딩 이름을 나눠 둔다).</summary>
-    public bool IsDragEnabled => CanEdit && HasMapping;
+    /// <summary>
+    /// 손잡이로 끌기를 시작할 수 있는가 — <b>편집 권한만</b> 본다.
+    /// </summary>
+    /// <remarks>
+    /// 맵핑을 고르지 않았다고 끌기 자체를 끄면 손잡이가 죽은 것처럼 보이고 "왜 안 되지?" 를 말할 곳이 없다
+    /// (2026-09-29 실창 재현 — 맵핑 0건 화면에서 팔레트를 끌어도 아무 반응이 없었다). 끌기는 시작되고,
+    /// 보드가 거절(<see cref="Verdict"/>)하고, 놓으면 상태줄이 사유를 말한다(<see cref="Refused"/>).
+    /// </remarks>
+    public bool IsDragEnabled => CanEdit;
 
     /// <summary>권한 안내 한 줄 — 상태줄 오른쪽. 권한 키 원문(<c>integrations:edit</c>)은 내지 않는다(감사 E-10 #1).</summary>
     /// <remarks>적용 중에는 <see cref="CanEdit"/> 가 잠깐 꺼지므로 권한 자체(<see cref="IsReadOnly"/> 와 별개)를 본다.</remarks>
@@ -496,23 +503,52 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         RaiseEmptyStates();
     }
 
+    /// <summary>
+    /// 보드 행 목록을 모델에 <b>맞춘다</b> — 통째로 다시 만들지 않는다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 예전 판은 바뀔 때마다 비우고 새 행 뷰모델로 다시 채웠다. 그러면 목록 컨테이너가 전부 새로 나와 <b>화면의 선택이 날아가고</b>
+    /// (상태줄은 "선택 N건" 인데 화면은 0 — [▲][▼][◀ 해제] 가 안 보이는 행에 걸린다), <c>Alt+↑↓</c> 는 한 번 움직인 뒤 쥘 행을 잃었다.
+    /// 끄는 도중에 다시 읽히면 잡은 행의 컨테이너도 사라졌다. 같은 모델 행은 같은 뷰모델을 그대로 쓰고
+    /// 자리만 옮긴다(<c>Move</c>) — 목록이 선택과 컨테이너를 지킨다. 행 상태(해제 · 추가)는 제자리에서 다시 알린다.
+    /// </remarks>
     private void RebuildBoardRows()
     {
         var rows = _board.Rows(SelectedKind);
-        var selectedKeys = SelectedBoardRows.Select(r => r.Row).ToHashSet();
+        var live = new HashSet<MappingBoardRow>(rows, ReferenceEqualityComparer.Instance);
+        // 목록을 고치는 동안 뷰가 선택을 다시 써 넣는다 — 그 전에 붙들어 둔다.
+        var selected = SelectedBoardRows.Where(v => live.Contains(v.Row)).ToList();
 
-        BoardRows.Clear();
-        foreach (var row in rows)
+        for (var i = BoardRows.Count - 1; i >= 0; i--)
+            if (!live.Contains(BoardRows[i].Row)) BoardRows.RemoveAt(i);
+
+        for (var i = 0; i < rows.Count; i++)
         {
-            var vm = new MappingRowViewModel(row) { DeviceName = NameOf(row) };
-            BoardRows.Add(vm);
+            var row = rows[i];
+            var at = IndexOfRow(row, i);
+            if (at < 0)
+            {
+                BoardRows.Insert(i, new MappingRowViewModel(row) { DeviceName = NameOf(row) });
+                continue;
+            }
+            if (at != i) BoardRows.Move(at, i);
+            var vm = BoardRows[i];
+            vm.DeviceName = NameOf(row);
+            vm.Refresh();           // 해제 · 추가 · 키(config_id) — 같은 행 객체라 바뀐 것을 제자리에서 알린다
         }
 
         SelectedBoardRows.Clear();
-        foreach (var vm in BoardRows.Where(v => selectedKeys.Contains(v.Row))) SelectedBoardRows.Add(vm);
+        foreach (var vm in selected) SelectedBoardRows.Add(vm);
 
         NotifyOfPropertyChange(nameof(BoardRows));
         RaiseCommandStates();
+    }
+
+    private int IndexOfRow(MappingBoardRow row, int from)
+    {
+        for (var i = from; i < BoardRows.Count; i++)
+            if (ReferenceEquals(BoardRows[i].Row, row)) return i;
+        return -1;
     }
 
     private string NameOf(MappingBoardRow row)
@@ -534,9 +570,18 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
 
         foreach (var item in cached) item.IsRegistered = _board.Contains(SelectedKind, item.Id);
 
+        // 통째로 비우지 않고 맞춘다 — 보드가 바뀔 때마다(끄는 도중 끝난 재조회 포함) 카드 컨테이너가 새로 나오면
+        // 잡고 있던 카드가 사라져 끌기가 끊기고, 팔레트에서 골라 둔 선택도 날아간다. 등록됨 표시는 위에서 제자리로 바꿨다.
         var filtered = MappingPaletteFilter.Apply(cached, PaletteSearch);
-        PaletteItems.Clear();
-        foreach (var item in filtered) PaletteItems.Add(item);
+        var shown = new HashSet<MappingPaletteItemViewModel>(filtered, ReferenceEqualityComparer.Instance);
+        for (var i = PaletteItems.Count - 1; i >= 0; i--)
+            if (!shown.Contains(PaletteItems[i])) PaletteItems.RemoveAt(i);
+        for (var i = 0; i < filtered.Count; i++)
+        {
+            var at = PaletteItems.IndexOf(filtered[i]);
+            if (at < 0) PaletteItems.Insert(i, filtered[i]);
+            else if (at != i) PaletteItems.Move(at, i);
+        }
         NotifyOfPropertyChange(nameof(PaletteItems));
         RaiseEmptyStates();
     }
@@ -1105,6 +1150,8 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
 
         var zoneKind = MappingBoard.Kinds.FirstOrDefault(k => MappingKindText.BoardZone(k) == target.ZoneKey);
         if (MappingKindText.BoardZone(zoneKind) != target.ZoneKey) return MappingDropVerdict.Block("여기에는 놓을 수 없습니다.");
+        if (!HasMapping)
+            return MappingDropVerdict.Block(_allMappings.Count == 0 ? MappingEligibility.NoMappingYetReason : MappingEligibility.NoMappingReason);
 
         if (payload.Items.Count > 0 && payload.Items.All(i => i is MappingPaletteItemViewModel))
         {
@@ -1121,6 +1168,16 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler
         }
 
         return MappingDropVerdict.Block("여기에는 놓을 수 없습니다.");
+    }
+
+    /// <summary>
+    /// 거절된 자리에서 놓았다(커널이 알린다) — 사유를 상태줄에 말한다. 아무것도 바꾸지 않는다.
+    /// </summary>
+    /// <remarks>끄는 동안에는 보드가 형태(삽입선 없음)로만 답한다. 놓는 순간 말없이 사라지면 "왜 안 들어가지?" 가 남는다.</remarks>
+    public void Refused(DragPayload payload, DropTarget target)
+    {
+        var verdict = Verdict(payload, target);
+        if (!verdict.IsAllowed && !string.IsNullOrEmpty(verdict.Reason)) StatusText = verdict.Reason;
     }
 
     /// <inheritdoc/>

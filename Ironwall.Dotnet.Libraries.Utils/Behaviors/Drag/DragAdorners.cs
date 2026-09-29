@@ -85,15 +85,15 @@ public sealed class DragGhostAdorner : Adorner
     private Brush Brush(string key, Brush fallback) => TryFindResource(key) as Brush ?? fallback;
 
     /// <summary>
-    /// 손잡이(<see cref="Adorner.AdornedElement"/>) 기준 좌표계에서, 실제로 잘리는 경계(레이어 가장자리)까지
-    /// 남는 폭 · 높이. 레이어를 못 찾으면 <see cref="double.PositiveInfinity"/> — 클램프하지 않는다.
+    /// 꾸미는 요소(<see cref="Adorner.AdornedElement"/>) 기준 좌표계에서, 실제로 잘리는 경계(레이어 가장자리)의 사각.
+    /// 원점이 음수일 수 있다 — 레이어는 꾸미는 요소의 왼쪽 · 위쪽으로도 펼쳐져 있다. 레이어를 못 찾으면 무한 — 클램프하지 않는다.
     /// </summary>
-    private Size AvailableBounds()
+    private Rect AvailableBounds()
     {
-        if (_layer == null) return new Size(double.PositiveInfinity, double.PositiveInfinity);
+        if (_layer == null) return new Rect(0, 0, double.PositiveInfinity, double.PositiveInfinity);
 
         var origin = AdornedElement.TransformToVisual(_layer).Transform(new Point(0, 0));
-        return new Size(Math.Max(0, _layer.RenderSize.Width - origin.X), Math.Max(0, _layer.RenderSize.Height - origin.Y));
+        return new Rect(-origin.X, -origin.Y, Math.Max(0, _layer.RenderSize.Width), Math.Max(0, _layer.RenderSize.Height));
     }
 }
 

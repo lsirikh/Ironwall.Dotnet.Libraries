@@ -46,6 +46,9 @@ public static class MappingEligibility
     /// <summary>매핑을 아직 고르지 않았을 때.</summary>
     public const string NoMappingReason = "먼저 왼쪽에서 이벤트 맵핑을 고르세요.";
 
+    /// <summary>맵핑이 한 건도 없을 때 — 고를 것이 없으니 만들라고 말한다.</summary>
+    public const string NoMappingYetReason = "등록된 맵핑이 없습니다. [맵핑 등록]으로 먼저 만드세요.";
+
     /// <summary>
     /// 팔레트 → 액션 보드(투입).
     /// </summary>

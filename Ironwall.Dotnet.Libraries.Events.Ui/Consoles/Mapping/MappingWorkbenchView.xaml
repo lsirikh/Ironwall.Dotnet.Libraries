@@ -578,12 +578,17 @@
 									<drag:ReorderKeyboardBehavior Handler="{Binding}" />
 								</b:Interaction.Behaviors>
 							</ListBox>
+							<!--
+								빈 보드 안내 — 보드(드롭존) 위에 얹힌 글자라 히트를 막지 않는다. 막으면 가장 먼저 노리는 가운데(이 글자 위)에서
+								놓은 드롭이 드롭존을 못 찾아 말없이 사라진다(2026-09-29 실창 재현: hit=TextBlock · zone=없음).
+							-->
 							<TextBlock
 								Margin="18"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
 								FontSize="12"
 								Foreground="{DynamicResource TextSecondaryBrush}"
+								IsHitTestVisible="False"
 								Text="오른쪽 팔레트에서 장비를 끌어다 놓거나 [＋ 추가]를 누르세요."
 								TextWrapping="Wrap">
 								<TextBlock.Style>

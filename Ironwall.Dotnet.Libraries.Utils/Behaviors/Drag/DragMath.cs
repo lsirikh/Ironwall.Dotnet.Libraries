@@ -114,13 +114,26 @@ public static class DragMath
     /// <remarks><paramref name="bounds"/> 의 각 변이 <see cref="double.IsInfinity(double)"/> 이면 그 축은 뒤집지도 누르지도 않는다
     /// — 가용 폭을 모를 때(레이어를 못 찾았을 때)는 예전처럼 커서 오른쪽 아래에 그냥 띄운다.</remarks>
     public static Rect ClampGhostRect(Point cursor, Size size, Size bounds, double offsetX = 12, double offsetY = 10)
-        => new(ClampAxis(cursor.X, size.Width, offsetX, bounds.Width), ClampAxis(cursor.Y, size.Height, offsetY, bounds.Height), size.Width, size.Height);
+        => ClampGhostRect(cursor, size, new Rect(0, 0, bounds.Width, bounds.Height), offsetX, offsetY);
 
-    private static double ClampAxis(double cursor, double extent, double offset, double boundExtent)
+    /// <summary>
+    /// <see cref="ClampGhostRect(Point, Size, Size, double, double)"/> 와 같되, 가용 영역이 커서 좌표계의 원점에서
+    /// 시작하지 않아도 된다 — 꾸미는 요소(출발 목록) 왼쪽 · 위쪽으로도 표면이 펼쳐져 있을 때(팔레트에서 왼쪽 보드로 끌 때).
+    /// </summary>
+    /// <remarks>
+    /// 예전 판은 하한을 0(출발 목록의 왼쪽 · 위쪽 끝)으로 두어, 오른쪽 칸에서 왼쪽 칸으로 끌면 고스트가 출발 목록 가장자리에
+    /// 붙은 채 커서를 따라오지 않았다(2026-09-29 이벤트 맵핑 워크벤치 실창 재현).
+    /// </remarks>
+    public static Rect ClampGhostRect(Point cursor, Size size, Rect bounds, double offsetX = 12, double offsetY = 10)
+        => new(ClampAxis(cursor.X, size.Width, offsetX, bounds.Left, bounds.Right),
+               ClampAxis(cursor.Y, size.Height, offsetY, bounds.Top, bounds.Bottom),
+               size.Width, size.Height);
+
+    private static double ClampAxis(double cursor, double extent, double offset, double min, double max)
     {
-        if (double.IsInfinity(boundExtent)) return cursor + offset;
+        if (double.IsInfinity(min) || double.IsInfinity(max)) return cursor + offset;
 
-        var preferred = cursor + offset + extent <= boundExtent ? cursor + offset : cursor - offset - extent;
-        return Math.Max(0, Math.Min(boundExtent - extent, preferred));
+        var preferred = cursor + offset + extent <= max ? cursor + offset : cursor - offset - extent;
+        return Math.Max(min, Math.Min(max - extent, preferred));
     }
 }

@@ -49,6 +49,20 @@ public interface IDragDropHandler
     void Drop(DragPayload payload, DropTarget target);
 }
 
+/// <summary>
+/// 놓을 수 없는 자리에서 놓았음을 담당에게 알린다 — <b>선택</b> 구현(<see cref="IDragDropHandler"/> 와 같은 객체에 붙인다).
+/// </summary>
+/// <remarks>
+/// 거절은 끄는 동안 형태(사선 해치 · 삽입선 없음)로 보이지만, 놓는 순간에는 아무 일도 일어나지 않아
+/// "왜 안 들어가지?" 가 남는다. 이 통지로 창이 사유를 상태줄에 말한다. 출발 목록 자신(또는 그것을 품은 드롭존)에
+/// 도로 놓은 것은 그만두기라 알리지 않는다. 서버를 부르지 않는다 — 판정을 다시 해서 사유만 고른다.
+/// </remarks>
+public interface IDropRefusalHandler
+{
+    /// <summary><paramref name="target"/> 위에서 놓았는데 <see cref="IDragDropHandler.CanDrop"/> 가 거절했다.</summary>
+    void Refused(DragPayload payload, DropTarget target);
+}
+
 /// <summary>끄는 동안 드롭존이 보이는 모습. 색이 아니라 <b>형태</b>로 구분한다.</summary>
 public enum DropZoneState
 {

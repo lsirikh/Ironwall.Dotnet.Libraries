@@ -56,6 +56,9 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private Point _pressPoint;
     private FrameworkElement? _hoverZone;
     private int _hoverIndex = -1;
+    // 지금 커서 아래 있지만 거절한 드롭존 — 거기서 놓으면 담당에게 알린다(IDropRefusalHandler).
+    private FrameworkElement? _refusedZone;
+    private int _refusedIndex = -1;
     private readonly EdgeAutoScroller _autoScroller = new();
     private string? _traceLastHit;
     // DragSession 에 올렸는가 — 눌림에서 올리고 FinishDrag(또는 BeginDrag 실패)에서 한 번만 내린다.
@@ -99,7 +102,6 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         AssociatedObject.PreviewMouseDown += OnPreviewMouseDown;
         AssociatedObject.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnDragStarted));
         AssociatedObject.AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnDragDelta));
-        AssociatedObject.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnDragCompleted));
     }
 
     protected override void OnDetaching()
@@ -110,7 +112,6 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         AssociatedObject.PreviewMouseDown -= OnPreviewMouseDown;
         AssociatedObject.RemoveHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnDragStarted));
         AssociatedObject.RemoveHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnDragDelta));
-        AssociatedObject.RemoveHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnDragCompleted));
         base.OnDetaching();
     }
 
@@ -175,6 +176,10 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         _pressed = true;
         _handle = handle;
+        // 끝남은 목록이 아니라 잡은 손잡이에서 직접 받는다. 끄는 도중 목록이 다시 그려져(서버 재조회 · 되돌리기 · 탭 전환)
+        // 잡은 행의 컨테이너가 빠지면 손잡이는 캡처를 잃고 DragCompleted(취소)를 내지만, 그 이벤트는 떨어져 나간 가지에서
+        // 목록까지 올라오지 못한다 — 고스트 · 삽입선 · 커서 · DragSession 이 영영 남았다(2026-09-29 이벤트 맵핑 실창 재현).
+        handle.DragCompleted += OnDragCompleted;
         _pressedItem = item;
         _pressPoint = DragPointer.GetPosition(AssociatedObject);
         EnterSession();
@@ -212,10 +217,10 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private void BeginDrag()
     {
         var items = PayloadItems();
-        if (items.Count == 0) { _pressed = false; ExitSession(); return; }
+        if (items.Count == 0) { _pressed = false; ReleaseHandle(); ExitSession(); return; }
 
         _root = Window.GetWindow(AssociatedObject) as FrameworkElement ?? TopVisual(AssociatedObject);
-        if (_root == null) { _pressed = false; ExitSession(); return; }
+        if (_root == null) { _pressed = false; ReleaseHandle(); ExitSession(); return; }
 
         _payload = new DragPayload(AssociatedObject, items, LabelOf(items[0]));
         _dragging = true;
@@ -224,7 +229,7 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         foreach (var zone in DropZone.ZonesUnder(_root)) Probe(zone);
         if (DragTrace.IsOn) DragTrace.Write($"[capture] begin root={DragTrace.Chain(_root, 1)} zones=[{string.Join(", ", _zoneAccepts.Select(z => $"{DropZone.GetKey(z.Key)}:{z.Value}"))}]");
 
-        _ghostLayer = AdornerLayer.GetAdornerLayer(AssociatedObject);
+        _ghostLayer = GhostLayerFor(AssociatedObject);
         if (_ghostLayer != null)
         {
             _ghost = new DragGhostAdorner(AssociatedObject, _ghostLayer, _payload.Label, _payload.Count);
@@ -239,6 +244,13 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     private void UpdateDrag()
     {
         if (!_dragging || _root == null || _payload == null) return;
+        if (_handle != null && !_handle.IsDescendantOf(AssociatedObject))
+        {
+            // 잡은 행이 목록에서 빠졌다(다시 그려짐) — 끄던 것은 이제 없다. 오토스크롤 틱이 여기로 올 수 있다.
+            if (DragTrace.IsOn) DragTrace.Write("[capture] held handle left the list — cancel");
+            FinishDrag(commit: false);
+            return;
+        }
 
         _ghost?.MoveTo(DragPointer.GetPosition(AssociatedObject));
 
@@ -253,11 +265,13 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
             }
         }
         var index = -1;
+        var rawIndex = -1;
         var lineY = double.NaN;
 
         if (zone != null && DropZone.GetIsReorder(zone) && zone is ItemsControl list)
         {
             (index, lineY) = InsertionAt(list, hit);
+            rawIndex = index;
             Probe(zone);        // 끄는 도중에 나타난 목록도 상태 장부에 올린다
             var ok = index >= 0 && SafeCanDrop(zone, DropZone.TargetOf(zone, index));
             if (!ok) { index = -1; lineY = double.NaN; }
@@ -270,6 +284,8 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
 
         var accepted = zone != null && (DropZone.GetIsReorder(zone) ? index >= 0 : Probe(zone));
         var newHover = accepted ? zone : null;
+        _refusedZone = zone != null && !accepted ? zone : null;
+        _refusedIndex = rawIndex;
 
         // 후보가 바뀔 때만 시각을 고친다 — 마우스 이동마다 다시 그리지 않는다(RDP 에서 증폭된다).
         if (!ReferenceEquals(newHover, _hoverZone))
@@ -298,13 +314,17 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         var payload = _payload;
         var zone = _hoverZone;
         var index = _hoverIndex;
+        var refusedZone = _refusedZone;
+        var refusedIndex = _refusedIndex;
         var pressedItem = _pressedItem;
         _pressed = false;
         _dragging = false;
         _payload = null;
         _hoverZone = null;
         _hoverIndex = -1;
-        _handle = null;
+        _refusedZone = null;
+        _refusedIndex = -1;
+        ReleaseHandle();
         _pressedItem = null;
 
         // ② 시각 복원
@@ -330,7 +350,12 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
             if (commit && pressedItem != null) SelectOnly(pressedItem);       // 데드존 미만 = 클릭
             return;
         }
-        if (!commit || payload == null || zone == null) return;
+        if (!commit || payload == null) return;
+        if (zone == null)
+        {
+            NotifyRefused(payload, refusedZone, refusedIndex);
+            return;
+        }
 
         var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
         var handler = HandlerFor(zone);
@@ -338,6 +363,22 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         var canDrop = handler != null && SafeCanDrop(handler, payload, target);
         if (DragTrace.IsOn) DragTrace.Write($"[capture] drop zone={target.ZoneKey} index={index} handler={handler?.GetType().Name ?? "(none)"} canDrop={canDrop}");
         if (canDrop) handler!.Drop(payload, target);
+        else NotifyRefused(payload, zone, index);
+    }
+
+    /// <summary>
+    /// 거절한 드롭존 위에서 놓았다 — 담당이 <see cref="IDropRefusalHandler"/> 면 알려 사유를 말하게 한다.
+    /// 출발 목록 자신(또는 그것을 품은 드롭존)에 도로 놓은 것은 그만두기라 알리지 않는다.
+    /// </summary>
+    private void NotifyRefused(DragPayload payload, FrameworkElement? zone, int index)
+    {
+        if (zone == null) return;
+        if (ReferenceEquals(zone, payload.Source) || payload.Source.IsDescendantOf(zone)) return;
+        if (HandlerFor(zone) is not IDropRefusalHandler listener) return;
+
+        var target = DropZone.TargetOf(zone, DropZone.GetIsReorder(zone) ? index : -1);
+        if (DragTrace.IsOn) DragTrace.Write($"[capture] refused zone={target.ZoneKey} index={target.InsertionIndex}");
+        listener.Refused(payload, target);
     }
 
     private void OnRootPreviewKeyDown(object sender, KeyEventArgs e)
@@ -346,10 +387,19 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         if (!_dragging || e.Key != Key.Escape) return;
         e.Handled = true;
         _handle?.CancelDrag();          // → DragCompleted(Canceled) → FinishDrag(false)
+        // 손잡이가 이미 끌기를 놓친 상태(캡처 상실 뒤)면 CancelDrag 는 아무것도 내지 않는다 — 여기서 직접 끝낸다.
+        if (_pressed || _dragging) FinishDrag(commit: false);
     }
     #endregion
 
     #region - Helpers -
+    /// <summary>잡은 손잡이에서 손을 뗀다 — 끝남 구독을 풀고 잊는다(끝나는 모든 길이 여기로 온다).</summary>
+    private void ReleaseHandle()
+    {
+        if (_handle != null) _handle.DragCompleted -= OnDragCompleted;
+        _handle = null;
+    }
+
     private void EnterSession()
     {
         if (_inSession) return;
@@ -473,6 +523,21 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         var last = list.ItemContainerGenerator.ContainerFromItem(list.Items[count - 1]) as FrameworkElement;
         var y = last == null ? double.NaN : last.TranslatePoint(new Point(0, last.RenderSize.Height), list).Y;
         return (count, y);
+    }
+
+    /// <summary>
+    /// 고스트를 얹을 층 — 가장 가까운 <see cref="AdornerDecorator"/>(콘솔 셸 · 창)의 층.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="AdornerLayer.GetAdornerLayer"/> 는 <see cref="ScrollContentPresenter"/> 의 층도 돌려준다. 출발 목록이
+    /// 스크롤 뷰어(상세 칸 · 팔레트) 안에 있으면 고스트가 그 뷰어의 뷰포트로 잘려, 다른 칸 위로 끄는 순간 사라졌다
+    /// (2026-09-29 이벤트 맵핑 워크벤치 — 팔레트 → 보드). 그런 층은 건너뛴다.
+    /// </remarks>
+    private static AdornerLayer? GhostLayerFor(Visual element)
+    {
+        for (var d = VisualTreeHelper.GetParent(element); d != null; d = VisualTreeHelper.GetParent(d))
+            if (d is AdornerDecorator { AdornerLayer: { } layer }) return layer;
+        return AdornerLayer.GetAdornerLayer(element);
     }
 
     private void MoveLineTo(FrameworkElement? zone)
