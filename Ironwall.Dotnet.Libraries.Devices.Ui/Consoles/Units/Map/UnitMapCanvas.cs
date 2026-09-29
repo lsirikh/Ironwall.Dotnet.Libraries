@@ -65,7 +65,9 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
     private readonly Canvas _world = new();
     private readonly TranslateTransform _pan = new();
     private readonly UnitMapLineLayer _lineLayer = new();
-    private readonly Canvas _nodeLayer = new();
+    // 노드 층 — 첫 뷰가 미뤄진 동안(크기 전) 노드를 재지 않는다: 템플릿을 첫 단계로 한 번 입혔다가 첫 뷰의 단계로 또 갈아 끼우던
+    // 이중 적용(레일 전환마다 200 → 400회, NFR-01 초과의 주 원인 — 2026-09-29 벤치 분해)을 없앤다.
+    private readonly UnitMapNodeLayer _nodeLayer;
     private readonly Canvas _originLayer = new() { IsHitTestVisible = false };
     private readonly Canvas _dragLayer = new() { IsHitTestVisible = false };
     private readonly Grid _overlay = new();
@@ -87,6 +89,7 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
 
     public UnitMapCanvas()
     {
+        _nodeLayer = new UnitMapNodeLayer(() => _pendingView is not null);
         Focusable = true;
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Once);     // 노드 200개를 Tab 으로 돌지 않는다(ISSUE-52)
         FocusVisualStyle = null;                                                     // 포커스 표시는 캔버스 자체 링(오버레이)
@@ -516,6 +519,7 @@ public partial class UnitMapCanvas : Grid, IUnitMapSurface
         {
             _pendingView = null;
             pending();
+            _nodeLayer.Resume();                    // 첫 뷰의 단계가 정해졌다 — 이제 노드를 재고(템플릿 한 번) 놓는다. 같은 레이아웃 차례 안이라 그림 전에 끝난다
             return;
         }
 

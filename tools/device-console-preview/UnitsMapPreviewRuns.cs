@@ -259,13 +259,37 @@ internal static class UnitsMapPreviewRuns
 
         // ①′ 레일 전환(창은 이미 떠 있다) — 새 뷰모델 + 캔버스 + 장면 → 첫 렌더. 첫 회는 워밍업.
         var rail = new List<double>();
+        var phases = new Dictionary<string, List<double>>();
         for (var i = 0; i < 11; i++)
         {
             var ms = await preview.MeasureRailSwitchAsync();
-            if (i > 0) rail.Add(ms);
+            if (i == 0) continue;
+            rail.Add(ms);
+            foreach (var (key, value) in preview.LastRailSwitchPhases)
+                (phases.TryGetValue(key, out var list) ? list : phases[key] = new List<double>()).Add(value);
         }
         results["railSwitchFirstDrawMs.median"] = Median(rail);
         results["railSwitchFirstDrawMs.max"] = Math.Round(rail.Max(), 1);
+        foreach (var (key, values) in phases) results[$"railSwitch.{key}.median"] = Median(values);
+
+        // ①″ 저장된 개인 뷰가 L1(50%) · L2(100%)였을 때의 첫 그림 — 단계 템플릿이 무거울수록 비싸다(전체 보기 = L0 가 가장 가볍다).
+        foreach (var (label, scale) in new[] { ("L1", 0.5), ("L2", 1.0) })
+        {
+            var at = new List<double>();
+            var layoutAt = new List<double>();
+            for (var i = 0; i < 11; i++)
+            {
+                var ms = await preview.MeasureRailSwitchAsync(scale);
+                if (i == 0) continue;
+                at.Add(ms);
+                layoutAt.Add(preview.LastRailSwitchPhases["layout"]);
+            }
+            results[$"railSwitchFirstDrawMs{label}.median"] = Median(at);
+            results[$"railSwitchFirstDrawMs{label}.max"] = Math.Round(at.Max(), 1);
+            results[$"railSwitch{label}.layout.median"] = Median(layoutAt);
+            results[$"railSwitch{label}.templates"] = preview.LastRailSwitchPhases["templates"];
+            results[$"railSwitch{label}.visualsPerNode"] = preview.LastRailSwitchPhases["visualsPerNode"];
+        }
         var frame = ((DockPanel)preview.Main.Pane.Content).Children.OfType<Border>().Last();
         frame.Child = canvas;                                   // 원래 캔버스로 되돌린다
         await Settle(preview.Main.ViewModel);
@@ -304,6 +328,25 @@ internal static class UnitsMapPreviewRuns
         // ⑥ 끄는 중 120Hz 포인터 1초(가짜 시계) — 끌리는 층 갱신 ≤ 30Hz · 정적 층 재그림 0(NFR-04).
         canvas.SetView(0.5, canvas.Scene.Positions[Id("7중대")]);
         await Settle(preview.Main.ViewModel);
+        // ⑥′ 끌기 시작 — 데드존을 넘는 이동부터 첫 렌더까지(모든 노드에 대상 표시를 칠한다, FR-30). 첫 회는 워밍업.
+        var realized = typeof(UnitMapNode).GetProperty("IsDropDecorRealized", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (realized is not null) results["dragStart.decorsRealizedBefore"] = canvas.Nodes.Count(n => (bool)realized.GetValue(n)!);
+        var dragStarts = new List<double>();
+        for (var i = 0; i < 6; i++)
+        {
+            var from = canvas.View.WorldToScreen(canvas.Scene.Positions[Id("7중대")]);
+            CanvasDriver.Press(canvas, from, canvas.Nodes.First(n => n.UnitId == Id("7중대")));
+            var watch = Stopwatch.StartNew();
+            CanvasDriver.Move(canvas, from + new Vector(20, 0));
+            await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            watch.Stop();
+            CanvasDriver.Cancel(canvas);
+            await Settle(preview.Main.ViewModel);
+            if (i > 0) dragStarts.Add(watch.Elapsed.TotalMilliseconds);
+            else results["dragStartColdMs"] = Math.Round(watch.Elapsed.TotalMilliseconds, 2);   // 첫 끌기(워밍업 · 지연 요소 첫 실체화 포함)
+        }
+        results["dragStartMs.median"] = Median(dragStarts);
+
         var clock = new StepClock();
         canvas.Clock = clock;
         var start = canvas.View.WorldToScreen(canvas.Scene.Positions[Id("7중대")]);
@@ -323,6 +366,20 @@ internal static class UnitsMapPreviewRuns
         results["drag120Hz.dragLayerUpdatesPerSecond"] = updates;
         results["drag120Hz.staticRedraws"] = canvas.RenderCount - staticBefore;
         CanvasDriver.Cancel(canvas);
+
+        // ⑦ 운영 조건 — 앱은 부대 콘솔(ConsoleShell)이 뜰 때 KoreanWordWrap(TextBlock 클래스 처리기)을 건다. 미리보기는 걸지 않아
+        //    위 ①′ 는 글 비용을 덜 센다. 한 번 걸면 되돌릴 수 없으므로 맨 끝에서 같은 레일 전환을 다시 잰다(다크 테마 상태).
+        Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Install();
+        foreach (var (label, scale) in new (string, double?)[] { ("", null), ("L1", 0.5), ("L2", 1.0) })
+        {
+            var at = new List<double>();
+            for (var i = 0; i < 11; i++)
+            {
+                var ms = await preview.MeasureRailSwitchAsync(scale);
+                if (i > 0) at.Add(ms);
+            }
+            results[$"prodWordWrap.railSwitchFirstDrawMs{label}.median"] = Median(at);
+        }
         preview.Window.Close();
     }
 

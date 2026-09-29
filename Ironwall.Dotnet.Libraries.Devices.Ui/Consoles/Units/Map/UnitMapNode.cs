@@ -236,14 +236,97 @@ public class UnitMapNode : Thumb
     {
         base.OnApplyTemplate();
         TemplateApplyCount++;
+        _dropDecor = FindDropDecor();
+        ScheduleDropDecorWarmUp();
     }
 
+    #region - 대상 표시 미리 입히기(NFR-01) -
+    // 대상 표시(UnitMapNodeDropDecor)는 접혀 있어 첫 그림에서 템플릿을 입지 않는다 — 첫 그림이 가볍다. 그대로 두면 첫 끌기 시작 때
+    // 노드 200개가 한꺼번에 입어(측정 13 → 43 ms) 고스트가 늦게 뜬다. 그래서 첫 그림 뒤 한가할 때(ApplicationIdle) 노드마다 하나씩 입혀 둔다.
+    // 한가한 틈이 오기 전에 끌기가 시작되면 보일 때 입는다(정확성은 같다 — 늦을 뿐).
+    private UnitMapNodeDropDecor? _dropDecor;
+    private System.Windows.Threading.DispatcherOperation? _dropDecorWarmUp;
+
+    /// <summary>대상 표시가 템플릿을 입었는가(시험용).</summary>
+    internal bool IsDropDecorRealized => _dropDecor is { } decor && VisualTreeHelper.GetChildrenCount(decor) > 0;
+
+    private UnitMapNodeDropDecor? FindDropDecor()
+    {
+        if (VisualTreeHelper.GetChildrenCount(this) == 0 || VisualTreeHelper.GetChild(this, 0) is not System.Windows.Controls.Panel root) return null;
+        foreach (var child in root.Children)
+            if (child is UnitMapNodeDropDecor decor) return decor;
+        return null;
+    }
+
+    private void ScheduleDropDecorWarmUp()
+    {
+        if (_dropDecor is null || _dropDecorWarmUp is { Status: System.Windows.Threading.DispatcherOperationStatus.Pending }) return;
+        _dropDecorWarmUp = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, new Action(WarmUpDropDecor));
+    }
+
+    /// <summary>대상 표시에 템플릿을 입힌다(접힌 채 — 보이지 않고 재지도 않는다). 템플릿이 이미 바뀌어 떨어진 표시면 건너뛴다.</summary>
+    internal void WarmUpDropDecor()
+    {
+        _dropDecorWarmUp = null;
+        if (!IsLoaded) return;                                  // 그 사이 떨어진 노드(레일 전환으로 버려진 캔버스 등) — 헛일을 하지 않는다
+        if (_dropDecor is { } decor && ReferenceEquals(VisualTreeHelper.GetParent(decor) is { } parent ? VisualTreeHelper.GetParent(parent) : null, this))
+            decor.ApplyTemplate();
+    }
+    #endregion
+
     private static void OnShapeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((UnitMapNode)d).ApplyVisuals();
+
+    // 템플릿이 TemplateBinding 으로 읽는 Visuals 의 값들(NFR-01) — Visuals.X 두 단계 경로 바인딩은 알림 없는 CLR 속성이라
+    // WPF 가 반사로 풀고 값 변화 구독까지 달아 노드 200개 템플릿 입히기가 비쌌다. 값은 Visuals 가 바뀔 때만 다시 쓴다.
+    private static readonly DependencyPropertyKey IsUnknownEchelonPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(IsUnknownEchelon), typeof(bool), typeof(UnitMapNode), new PropertyMetadata(false));
+
+    public static readonly DependencyProperty IsUnknownEchelonProperty = IsUnknownEchelonPropertyKey.DependencyProperty;
+
+    /// <summary>제대를 모른다 — 표지 자리에 "?"(<see cref="UnitMapNodeVisuals.IsUnknownEchelon"/>).</summary>
+    public bool IsUnknownEchelon => (bool)GetValue(IsUnknownEchelonProperty);
+
+    private static readonly DependencyPropertyKey UnknownMarkLeftPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(UnknownMarkLeft), typeof(double), typeof(UnitMapNode), new PropertyMetadata(0.0));
+
+    public static readonly DependencyProperty UnknownMarkLeftProperty = UnknownMarkLeftPropertyKey.DependencyProperty;
+
+    /// <summary>"?" 의 왼쪽(<see cref="UnitMapNodeVisuals.UnknownMarkLeft"/>).</summary>
+    public double UnknownMarkLeft => (double)GetValue(UnknownMarkLeftProperty);
+
+    private static readonly DependencyPropertyKey UnknownMarkTopPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(UnknownMarkTop), typeof(double), typeof(UnitMapNode), new PropertyMetadata(0.0));
+
+    public static readonly DependencyProperty UnknownMarkTopProperty = UnknownMarkTopPropertyKey.DependencyProperty;
+
+    /// <summary>"?" 의 윗변(<see cref="UnitMapNodeVisuals.UnknownMarkTop"/>).</summary>
+    public double UnknownMarkTop => (double)GetValue(UnknownMarkTopProperty);
+
+    private static readonly DependencyPropertyKey LabelTopPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(LabelTop), typeof(double), typeof(UnitMapNode), new PropertyMetadata(0.0));
+
+    public static readonly DependencyProperty LabelTopProperty = LabelTopPropertyKey.DependencyProperty;
+
+    /// <summary>L1 짧은 이름의 윗변(<see cref="UnitMapNodeVisuals.LabelTop"/>).</summary>
+    public double LabelTop => (double)GetValue(LabelTopProperty);
+
+    private static readonly DependencyPropertyKey ErrorGeometryPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(ErrorGeometry), typeof(Geometry), typeof(UnitMapNode), new PropertyMetadata(null));
+
+    public static readonly DependencyProperty ErrorGeometryProperty = ErrorGeometryPropertyKey.DependencyProperty;
+
+    /// <summary>▲ 기하 — L2 카드 글 줄의 오류 표지(<see cref="UnitMapNodeVisuals.ErrorGeometry"/>).</summary>
+    public Geometry? ErrorGeometry => (Geometry?)GetValue(ErrorGeometryProperty);
 
     private void ApplyVisuals()
     {
         var visuals = UnitMapNodeVisuals.For(Level, Echelon);
         SetValue(VisualsPropertyKey, visuals);
+        SetValue(IsUnknownEchelonPropertyKey, visuals.IsUnknownEchelon);
+        SetValue(UnknownMarkLeftPropertyKey, visuals.UnknownMarkLeft);
+        SetValue(UnknownMarkTopPropertyKey, visuals.UnknownMarkTop);
+        SetValue(LabelTopPropertyKey, visuals.LabelTop);
+        SetValue(ErrorGeometryPropertyKey, visuals.ErrorGeometry);
         Width = visuals.Box.Width;
         Height = visuals.Box.Height;
         UpdateLabelLeft();
@@ -337,6 +420,30 @@ public sealed class UnitMapNodeVisuals
     /// <summary>L1 짧은 이름의 윗변(틀 아래 + 4) · 가운데 x.</summary>
     public double LabelTop => Frame.Bottom + 3;
     public double LabelCenterX => Center.X;
+
+    private readonly Dictionary<(Geometry, double, PenLineCap), Size> _naturalSizes = new();
+    private readonly object _naturalGate = new();
+
+    /// <summary>
+    /// 이 기하를 <c>Stretch=None</c> 인 <c>Path</c> 로 그렸을 때의 자연 크기 — <c>Shape.GetNaturalSize</c> 와 같은 식
+    /// (펜 포함 렌더 경계의 오른쪽 · 아래, 음수는 0). <see cref="UnitMapNodeSymbol"/> 이 옛 <c>Path</c> 의 픽셀 맞춤 기준선을 되살릴 때 쓴다.
+    /// 펜의 브러시는 경계와 무관하다. (기하, 굵기, 끝 모양)마다 한 번 재고 기억한다(노드 200개가 나눠 쓴다).
+    /// </summary>
+    /// <param name="strokeThickness">0 이면 펜 없음(채움만).</param>
+    internal Size NaturalSize(Geometry geometry, double strokeThickness, PenLineCap cap)
+    {
+        lock (_naturalGate)
+        {
+            if (_naturalSizes.TryGetValue((geometry, strokeThickness, cap), out var size)) return size;
+            var pen = strokeThickness > 0
+                ? new Pen(Brushes.Black, strokeThickness) { StartLineCap = cap, EndLineCap = cap, DashCap = PenLineCap.Flat, LineJoin = PenLineJoin.Miter, MiterLimit = 10.0 }
+                : null;
+            var bounds = geometry.GetRenderBounds(pen);
+            size = new Size(Math.Max(bounds.Right, 0.0), Math.Max(bounds.Bottom, 0.0));     // 빈 경계의 Right/Bottom 은 -∞ → 0(Shape 와 같다)
+            _naturalSizes[(geometry, strokeThickness, cap)] = size;
+            return size;
+        }
+    }
 
     public static UnitMapNodeVisuals For(UnitMapLevel level, EnumUnitEchelon? echelon)
     {

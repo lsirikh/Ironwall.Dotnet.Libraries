@@ -635,22 +635,60 @@ internal sealed class UnitsMapPreview
     /// 벤치(TEST-37 ①) — 레일 전환 흉내: 이미 떠 있는 창의 관계도 칸에 <b>새</b> 뷰모델 + 캔버스를 넣고 첫 그림까지.
     /// 창 · HWND 생성은 빼고 잰다(레일 전환은 창을 새로 만들지 않는다). 배치 GET 은 기다리지 않는다(NFR-01).
     /// </summary>
-    public async Task<double> MeasureRailSwitchAsync()
+    /// <param name="firstScale">주면 저장된 개인 뷰가 그 배율이었던 것처럼 첫 뷰를 그 배율로(미뤄진 요청 — 뷰모델의 전체 보기를 대신한다).
+    /// 없으면 뷰모델 그대로(저장 뷰 없음 → 전체 보기 → L0).</param>
+    public async Task<double> MeasureRailSwitchAsync(double? firstScale = null)
     {
         var frame = ((DockPanel)Main.Pane.Content).Children.OfType<Border>().Last();
         var watch = System.Diagnostics.Stopwatch.StartNew();
+        double Lap(ref double last) { var now = watch.Elapsed.TotalMilliseconds; var d = now - last; last = now; return d; }
+        var mark = 0.0;
         var console = Main.Console;
         var viewModel = new UnitMapViewModel(console, Server.ForClient("bench", "bench"), new UnitMapViewModelOptions { Console = console, Clock = new SystemClock() });
         var canvas = new UnitMapCanvas { Width = CanvasWidth, Height = CanvasHeight };
         Bind(canvas, UnitMapCanvas.SceneProperty, viewModel, nameof(UnitMapViewModel.Scene));
         canvas.Interaction = viewModel;
+        var tCreate = Lap(ref mark);
         viewModel.SetData(console.Tree, console.Devices);
+        var tData = Lap(ref mark);
         _ = viewModel.OpenAsync();
+        if (firstScale is double scale) ((IUnitMapSurface)canvas).SetView(scale, canvas.Scene.Positions[console.Tree.Ordered.First(n => n.Name == "7중대").Id]);
+        var tOpen = Lap(ref mark);
+        frame.Child = null;
+        var tDetach = Lap(ref mark);
         frame.Child = canvas;
+        var tAttach = Lap(ref mark);
+        frame.UpdateLayout();                  // 벤치 분해용 — 첫 렌더 전에 어차피 도는 레이아웃을 여기서 먼저 돌려 따로 잰다(합계 불변)
+        var tLayout = Lap(ref mark);
         await System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+        var tRender = Lap(ref mark);
         watch.Stop();
+        LastRailSwitchPhases = new Dictionary<string, double>
+        {
+            ["create"] = tCreate, ["setData"] = tData, ["open"] = tOpen, ["detachOld"] = tDetach, ["attach"] = tAttach, ["layout"] = tLayout, ["render"] = tRender,
+            ["templates"] = canvas.Nodes.Sum(n => n.TemplateApplyCount),
+            ["visualsPerNode"] = canvas.Nodes.Count == 0 ? 0 : canvas.Nodes.Average(CountVisuals),
+            ["level"] = (int)canvas.Level,
+        };
         canvas.Interaction = null;
         return watch.Elapsed.TotalMilliseconds;
+    }
+
+    /// <summary>마지막 레일 전환 벤치의 단계별 시간(ms) · 템플릿 적용 수 · 노드당 시각 요소 수 — 벤치가 중앙값으로 적는다.</summary>
+    public Dictionary<string, double> LastRailSwitchPhases { get; private set; } = new();
+
+    private static double CountVisuals(DependencyObject root)
+    {
+        var count = 0;
+        var stack = new Stack<DependencyObject>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            count++;
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(current); i++) stack.Push(VisualTreeHelper.GetChild(current, i));
+        }
+        return count;
     }
 
     private void OnWindowKey(object sender, KeyEventArgs e)

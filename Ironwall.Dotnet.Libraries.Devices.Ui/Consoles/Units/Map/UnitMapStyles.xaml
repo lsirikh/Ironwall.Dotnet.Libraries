@@ -87,67 +87,85 @@
 		</Style.Triggers>
 	</Style>
 
+	<!--
+		끄는 동안의 대상 표시를 담는 자리(NFR-01) — 옛 L0 · L1 · L2 템플릿 끝에 똑같이 있던 요소들을 그대로 옮겼다(값 · 순서 같음).
+		보일 값(막힘 · 상위 후보 · 인접 후보 · 머묾)일 때만 Visible — 접힌 동안에는 템플릿을 입지 않는다. 원래 자리(Origin)는 노드 불투명도만.
+	-->
+	<Style TargetType="{x:Type map:UnitMapNodeDropDecor}">
+		<Setter Property="Visibility" Value="Collapsed" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type map:UnitMapNodeDropDecor}">
+					<Grid>
+						<Rectangle Style="{StaticResource UnitMapDropBlockedHatch}">
+							<Rectangle.Fill>
+								<DrawingBrush
+									Stretch="None"
+									TileMode="Tile"
+									Viewbox="0,0,7,7"
+									ViewboxUnits="Absolute"
+									Viewport="0,0,7,7"
+									ViewportUnits="Absolute">
+									<DrawingBrush.Transform>
+										<RotateTransform Angle="45" />
+									</DrawingBrush.Transform>
+									<DrawingBrush.Drawing>
+										<GeometryDrawing Geometry="M3.5,0 L3.5,7">
+											<GeometryDrawing.Pen>
+												<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
+											</GeometryDrawing.Pen>
+										</GeometryDrawing>
+									</DrawingBrush.Drawing>
+								</DrawingBrush>
+							</Rectangle.Fill>
+						</Rectangle>
+						<Rectangle Style="{StaticResource UnitMapDropCandidateOutline}" />
+						<Rectangle Style="{StaticResource UnitMapDropHoverOutline}" />
+						<Canvas Style="{StaticResource UnitMapDropLinkBadge}">
+							<Ellipse Width="16" Height="16" StrokeThickness="1.5" Fill="{DynamicResource SurfaceAltBrush}" Stroke="{DynamicResource PrimaryBrush}" />
+							<Ellipse Canvas.Left="2.6" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
+							<Ellipse Canvas.Left="7" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
+						</Canvas>
+					</Grid>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+		<Style.Triggers>
+			<Trigger Property="DropState" Value="Blocked">
+				<Setter Property="Visibility" Value="Visible" />
+			</Trigger>
+			<Trigger Property="DropState" Value="ParentCandidate">
+				<Setter Property="Visibility" Value="Visible" />
+			</Trigger>
+			<Trigger Property="DropState" Value="AdjoinCandidate">
+				<Setter Property="Visibility" Value="Visible" />
+			</Trigger>
+			<Trigger Property="DropState" Value="Hover">
+				<Setter Property="Visibility" Value="Visible" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
 	<!--  ── L0 개요: 작은 틀(크기가 제대를 말한다) · 글자 없음 · ★ ▲ 사선만  ──  -->
 	<ControlTemplate x:Key="UnitMapNodeL0Template" TargetType="{x:Type map:UnitMapNode}">
 		<Grid Background="Transparent" SnapsToDevicePixels="True" UseLayoutRounding="True">
-			<Canvas IsHitTestVisible="False">
-				<Path Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}" Fill="{DynamicResource SurfaceAltBrush}" />
-				<Path
-					Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource TintInfoBrush}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeThickness="1.2" />
-				<Path
-					Data="{Binding Visuals.SlashGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeThickness="1.2"
-					Visibility="{TemplateBinding IsSuspended, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.StarGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource PrimaryBrush}"
-					Stroke="{DynamicResource SurfaceAltBrush}"
-					StrokeThickness="0.8"
-					Visibility="{TemplateBinding IsMine, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.ErrorGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource StatusCriticalBrush}"
-					Visibility="{TemplateBinding HasErrors, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.BracketsGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource SelectionBrush}"
-					StrokeThickness="2"
-					Visibility="{TemplateBinding IsSelectedNode, Converter={StaticResource UnitMapBoolToVisibility}}" />
-			</Canvas>
-			<!--  끄는 동안의 대상 표시(FR-30)  -->
-			<Rectangle Style="{StaticResource UnitMapDropBlockedHatch}">
-				<Rectangle.Fill>
-					<DrawingBrush
-						Stretch="None"
-						TileMode="Tile"
-						Viewbox="0,0,7,7"
-						ViewboxUnits="Absolute"
-						Viewport="0,0,7,7"
-						ViewportUnits="Absolute">
-						<DrawingBrush.Transform>
-							<RotateTransform Angle="45" />
-						</DrawingBrush.Transform>
-						<DrawingBrush.Drawing>
-							<GeometryDrawing Geometry="M3.5,0 L3.5,7">
-								<GeometryDrawing.Pen>
-									<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
-								</GeometryDrawing.Pen>
-							</GeometryDrawing>
-						</DrawingBrush.Drawing>
-					</DrawingBrush>
-				</Rectangle.Fill>
-			</Rectangle>
-			<Rectangle Style="{StaticResource UnitMapDropCandidateOutline}" />
-			<Rectangle Style="{StaticResource UnitMapDropHoverOutline}" />
-			<Canvas Style="{StaticResource UnitMapDropLinkBadge}">
-				<Ellipse Width="16" Height="16" StrokeThickness="1.5" Fill="{DynamicResource SurfaceAltBrush}" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="2.6" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="7" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-			</Canvas>
+			<!--  기호(틀 · 사선 · ★ · ▲ · 괄호)는 요소 하나가 그린다 — 옛 Path 6개와 같은 순서 · 같은 펜(NFR-01, UnitMapNodeSymbol)  -->
+			<map:UnitMapNodeSymbol
+				AccentBrush="{DynamicResource PrimaryBrush}"
+				CriticalBrush="{DynamicResource StatusCriticalBrush}"
+				HasErrors="{TemplateBinding HasErrors}"
+				InkBrush="{DynamicResource TextPrimaryBrush}"
+				IsHitTestVisible="False"
+				IsMine="{TemplateBinding IsMine}"
+				IsSelectedNode="{TemplateBinding IsSelectedNode}"
+				IsSuspended="{TemplateBinding IsSuspended}"
+				Part="All"
+				SelectionBrush="{DynamicResource SelectionBrush}"
+				SurfaceBrush="{DynamicResource SurfaceAltBrush}"
+				TintBrush="{DynamicResource TintInfoBrush}"
+				Visuals="{TemplateBinding Visuals}" />
+			<!--  끄는 동안의 대상 표시(FR-30) — 보일 때만 실체화한다(NFR-01 · UnitMapNodeDropDecor)  -->
+			<map:UnitMapNodeDropDecor DropState="{TemplateBinding DropState}" />
 		</Grid>
 	</ControlTemplate>
 
@@ -155,75 +173,40 @@
 	<ControlTemplate x:Key="UnitMapNodeL1Template" TargetType="{x:Type map:UnitMapNode}">
 		<Grid Background="Transparent" SnapsToDevicePixels="True" UseLayoutRounding="True">
 			<Canvas IsHitTestVisible="False">
-				<Path Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}" Fill="{DynamicResource SurfaceAltBrush}" />
-				<Path
-					Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource TintInfoBrush}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeThickness="1.5" />
-				<!--  운용 중지 = 틀 사선 해치(토큰 재해석을 위해 템플릿 안에 둔다)  -->
-				<Path Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}" Visibility="{TemplateBinding IsSuspended, Converter={StaticResource UnitMapBoolToVisibility}}">
-					<Path.Fill>
-						<!--  Viewbox 를 타일 크기로 못박는다 — 선 하나(폭 0)의 경계로 늘이면 틀 전체가 까맣게 칠해진다  -->
-						<DrawingBrush
-							Stretch="None"
-							TileMode="Tile"
-							Viewbox="0,0,7,7"
-							ViewboxUnits="Absolute"
-							Viewport="0,0,7,7"
-							ViewportUnits="Absolute">
-							<DrawingBrush.Transform>
-								<RotateTransform Angle="45" />
-							</DrawingBrush.Transform>
-							<DrawingBrush.Drawing>
-								<GeometryDrawing Geometry="M3.5,0 L3.5,7">
-									<GeometryDrawing.Pen>
-										<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
-									</GeometryDrawing.Pen>
-								</GeometryDrawing>
-							</DrawingBrush.Drawing>
-						</DrawingBrush>
-					</Path.Fill>
-				</Path>
-				<Path
-					Data="{Binding Visuals.MarkStrokeGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeEndLineCap="Square"
-					StrokeStartLineCap="Square"
-					StrokeThickness="1.5" />
-				<Path Data="{Binding Visuals.MarkDotGeometry, RelativeSource={RelativeSource TemplatedParent}}" Fill="{DynamicResource TextPrimaryBrush}" />
+				<!--  틀 바탕 · 틀 · 중지 해치 · 제대 표지 — 요소 하나(옛 Path 5개와 같은 순서 · 같은 펜, NFR-01 · UnitMapNodeSymbol)  -->
+				<map:UnitMapNodeSymbol
+					HatchBrush="{DynamicResource TextMutedBrush}"
+					InkBrush="{DynamicResource TextPrimaryBrush}"
+					IsSuspended="{TemplateBinding IsSuspended}"
+					Part="Base"
+					SurfaceBrush="{DynamicResource SurfaceAltBrush}"
+					TintBrush="{DynamicResource TintInfoBrush}"
+					Visuals="{TemplateBinding Visuals}" />
 				<c:ConsoleText
-					Canvas.Left="{Binding Visuals.UnknownMarkLeft, RelativeSource={RelativeSource TemplatedParent}}"
-					Canvas.Top="{Binding Visuals.UnknownMarkTop, RelativeSource={RelativeSource TemplatedParent}}"
+					Canvas.Left="{TemplateBinding UnknownMarkLeft}"
+					Canvas.Top="{TemplateBinding UnknownMarkTop}"
 					FontSize="10"
 					FontWeight="Bold"
 					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="?"
-					Visibility="{Binding Visuals.IsUnknownEchelon, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.StarGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource PrimaryBrush}"
-					Stroke="{DynamicResource SurfaceAltBrush}"
-					StrokeThickness="0.8"
-					Visibility="{TemplateBinding IsMine, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.ErrorGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource StatusCriticalBrush}"
-					Visibility="{TemplateBinding HasErrors, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.PinGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource TextSecondaryBrush}"
-					StrokeThickness="1.4"
-					Visibility="{TemplateBinding IsMoved, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.BracketsGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource SelectionBrush}"
-					StrokeThickness="2"
-					Visibility="{TemplateBinding IsSelectedNode, Converter={StaticResource UnitMapBoolToVisibility}}" />
+					Visibility="{TemplateBinding IsUnknownEchelon, Converter={StaticResource UnitMapBoolToVisibility}}" />
+				<!--  ★ · ▲ · 핀 · 괄호 — 요소 하나("?" 글 위에 그린다 — 옛 순서 그대로)  -->
+				<map:UnitMapNodeSymbol
+					AccentBrush="{DynamicResource PrimaryBrush}"
+					CriticalBrush="{DynamicResource StatusCriticalBrush}"
+					HasErrors="{TemplateBinding HasErrors}"
+					IsMine="{TemplateBinding IsMine}"
+					IsMoved="{TemplateBinding IsMoved}"
+					IsSelectedNode="{TemplateBinding IsSelectedNode}"
+					Part="Badges"
+					PinBrush="{DynamicResource TextSecondaryBrush}"
+					SelectionBrush="{DynamicResource SelectionBrush}"
+					SurfaceBrush="{DynamicResource SurfaceAltBrush}"
+					Visuals="{TemplateBinding Visuals}" />
 				<!--  짧은 이름 — 한 줄 말줄임(줄바꿈 없음). 폭은 캔버스가 L1 에서 배율이 바뀔 때만 준다  -->
 				<c:ConsoleText
 					Canvas.Left="{TemplateBinding LabelLeft}"
-					Canvas.Top="{Binding Visuals.LabelTop, RelativeSource={RelativeSource TemplatedParent}}"
+					Canvas.Top="{TemplateBinding LabelTop}"
 					Width="{TemplateBinding LabelWidth}"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextPrimaryBrush}"
@@ -243,36 +226,8 @@
 					</c:ConsoleText.Style>
 				</c:ConsoleText>
 			</Canvas>
-			<!--  끄는 동안의 대상 표시(FR-30)  -->
-			<Rectangle Style="{StaticResource UnitMapDropBlockedHatch}">
-				<Rectangle.Fill>
-					<DrawingBrush
-						Stretch="None"
-						TileMode="Tile"
-						Viewbox="0,0,7,7"
-						ViewboxUnits="Absolute"
-						Viewport="0,0,7,7"
-						ViewportUnits="Absolute">
-						<DrawingBrush.Transform>
-							<RotateTransform Angle="45" />
-						</DrawingBrush.Transform>
-						<DrawingBrush.Drawing>
-							<GeometryDrawing Geometry="M3.5,0 L3.5,7">
-								<GeometryDrawing.Pen>
-									<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
-								</GeometryDrawing.Pen>
-							</GeometryDrawing>
-						</DrawingBrush.Drawing>
-					</DrawingBrush>
-				</Rectangle.Fill>
-			</Rectangle>
-			<Rectangle Style="{StaticResource UnitMapDropCandidateOutline}" />
-			<Rectangle Style="{StaticResource UnitMapDropHoverOutline}" />
-			<Canvas Style="{StaticResource UnitMapDropLinkBadge}">
-				<Ellipse Width="16" Height="16" StrokeThickness="1.5" Fill="{DynamicResource SurfaceAltBrush}" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="2.6" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="7" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-			</Canvas>
+			<!--  끄는 동안의 대상 표시(FR-30) — 보일 때만 실체화한다(NFR-01 · UnitMapNodeDropDecor)  -->
+			<map:UnitMapNodeDropDecor DropState="{TemplateBinding DropState}" />
 		</Grid>
 	</ControlTemplate>
 
@@ -302,61 +257,32 @@
 				IsHitTestVisible="False"
 				Visibility="{TemplateBinding IsSelectedNode, Converter={StaticResource UnitMapBoolToVisibility}}" />
 			<Canvas IsHitTestVisible="False">
-				<Path Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}" Fill="{DynamicResource SurfaceAltBrush}" />
-				<Path
-					Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource TintInfoBrush}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeThickness="1.5" />
-				<Path Data="{Binding Visuals.FrameGeometry, RelativeSource={RelativeSource TemplatedParent}}" Visibility="{TemplateBinding IsSuspended, Converter={StaticResource UnitMapBoolToVisibility}}">
-					<Path.Fill>
-						<!--  Viewbox 를 타일 크기로 못박는다 — 선 하나(폭 0)의 경계로 늘이면 틀 전체가 까맣게 칠해진다  -->
-						<DrawingBrush
-							Stretch="None"
-							TileMode="Tile"
-							Viewbox="0,0,7,7"
-							ViewboxUnits="Absolute"
-							Viewport="0,0,7,7"
-							ViewportUnits="Absolute">
-							<DrawingBrush.Transform>
-								<RotateTransform Angle="45" />
-							</DrawingBrush.Transform>
-							<DrawingBrush.Drawing>
-								<GeometryDrawing Geometry="M3.5,0 L3.5,7">
-									<GeometryDrawing.Pen>
-										<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
-									</GeometryDrawing.Pen>
-								</GeometryDrawing>
-							</DrawingBrush.Drawing>
-						</DrawingBrush>
-					</Path.Fill>
-				</Path>
-				<Path
-					Data="{Binding Visuals.MarkStrokeGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource TextPrimaryBrush}"
-					StrokeEndLineCap="Square"
-					StrokeStartLineCap="Square"
-					StrokeThickness="1.5" />
-				<Path Data="{Binding Visuals.MarkDotGeometry, RelativeSource={RelativeSource TemplatedParent}}" Fill="{DynamicResource TextPrimaryBrush}" />
+				<!--  틀 바탕 · 틀 · 중지 해치 · 제대 표지 — 요소 하나(옛 Path 5개와 같은 순서 · 같은 펜, NFR-01 · UnitMapNodeSymbol)  -->
+				<map:UnitMapNodeSymbol
+					HatchBrush="{DynamicResource TextMutedBrush}"
+					InkBrush="{DynamicResource TextPrimaryBrush}"
+					IsSuspended="{TemplateBinding IsSuspended}"
+					Part="Base"
+					SurfaceBrush="{DynamicResource SurfaceAltBrush}"
+					TintBrush="{DynamicResource TintInfoBrush}"
+					Visuals="{TemplateBinding Visuals}" />
 				<c:ConsoleText
-					Canvas.Left="{Binding Visuals.UnknownMarkLeft, RelativeSource={RelativeSource TemplatedParent}}"
-					Canvas.Top="{Binding Visuals.UnknownMarkTop, RelativeSource={RelativeSource TemplatedParent}}"
+					Canvas.Left="{TemplateBinding UnknownMarkLeft}"
+					Canvas.Top="{TemplateBinding UnknownMarkTop}"
 					FontSize="10"
 					FontWeight="Bold"
 					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="?"
-					Visibility="{Binding Visuals.IsUnknownEchelon, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.StarGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Fill="{DynamicResource PrimaryBrush}"
-					Stroke="{DynamicResource SurfaceAltBrush}"
-					StrokeThickness="0.8"
-					Visibility="{TemplateBinding IsMine, Converter={StaticResource UnitMapBoolToVisibility}}" />
-				<Path
-					Data="{Binding Visuals.PinGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-					Stroke="{DynamicResource TextSecondaryBrush}"
-					StrokeThickness="1.4"
-					Visibility="{TemplateBinding IsMoved, Converter={StaticResource UnitMapBoolToVisibility}}" />
+					Visibility="{TemplateBinding IsUnknownEchelon, Converter={StaticResource UnitMapBoolToVisibility}}" />
+				<!--  ★ · 핀 — 요소 하나("?" 글 위에 그린다 — 옛 순서 그대로)  -->
+				<map:UnitMapNodeSymbol
+					AccentBrush="{DynamicResource PrimaryBrush}"
+					IsMine="{TemplateBinding IsMine}"
+					IsMoved="{TemplateBinding IsMoved}"
+					Part="Badges"
+					PinBrush="{DynamicResource TextSecondaryBrush}"
+					SurfaceBrush="{DynamicResource SurfaceAltBrush}"
+					Visuals="{TemplateBinding Visuals}" />
 			</Canvas>
 			<!--  글 칸 — 카드 왼쪽 54 에서(틀 오른쪽 + 8)  -->
 			<StackPanel Margin="54,6,8,0" IsHitTestVisible="False">
@@ -397,7 +323,7 @@
 						<Path
 							Margin="0,1,2,0"
 							VerticalAlignment="Center"
-							Data="{Binding Visuals.ErrorGeometry, RelativeSource={RelativeSource TemplatedParent}}"
+							Data="{TemplateBinding ErrorGeometry}"
 							Fill="{DynamicResource StatusCriticalBrush}" />
 						<c:ConsoleText
 							VerticalAlignment="Center"
@@ -422,36 +348,8 @@
 					</Border>
 				</StackPanel>
 			</StackPanel>
-			<!--  끄는 동안의 대상 표시(FR-30)  -->
-			<Rectangle Style="{StaticResource UnitMapDropBlockedHatch}">
-				<Rectangle.Fill>
-					<DrawingBrush
-						Stretch="None"
-						TileMode="Tile"
-						Viewbox="0,0,7,7"
-						ViewboxUnits="Absolute"
-						Viewport="0,0,7,7"
-						ViewportUnits="Absolute">
-						<DrawingBrush.Transform>
-							<RotateTransform Angle="45" />
-						</DrawingBrush.Transform>
-						<DrawingBrush.Drawing>
-							<GeometryDrawing Geometry="M3.5,0 L3.5,7">
-								<GeometryDrawing.Pen>
-									<Pen Brush="{DynamicResource TextMutedBrush}" Thickness="1" />
-								</GeometryDrawing.Pen>
-							</GeometryDrawing>
-						</DrawingBrush.Drawing>
-					</DrawingBrush>
-				</Rectangle.Fill>
-			</Rectangle>
-			<Rectangle Style="{StaticResource UnitMapDropCandidateOutline}" />
-			<Rectangle Style="{StaticResource UnitMapDropHoverOutline}" />
-			<Canvas Style="{StaticResource UnitMapDropLinkBadge}">
-				<Ellipse Width="16" Height="16" StrokeThickness="1.5" Fill="{DynamicResource SurfaceAltBrush}" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="2.6" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-				<Ellipse Canvas.Left="7" Canvas.Top="5.8" Width="6.4" Height="4.4" StrokeThickness="1.3" Stroke="{DynamicResource PrimaryBrush}" />
-			</Canvas>
+			<!--  끄는 동안의 대상 표시(FR-30) — 보일 때만 실체화한다(NFR-01 · UnitMapNodeDropDecor)  -->
+			<map:UnitMapNodeDropDecor DropState="{TemplateBinding DropState}" />
 		</Grid>
 	</ControlTemplate>
 
