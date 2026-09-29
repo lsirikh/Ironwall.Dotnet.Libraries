@@ -89,6 +89,8 @@ public partial class WiringView : UserControl
     #region - Fence view (wiring-fence-view F-3) -
     private void OnShowFence(object sender, RoutedEventArgs e) => ViewModel?.ShowFenceView();
     private void OnShowTable(object sender, RoutedEventArgs e) => ViewModel?.ShowTableView();
+    private void OnFacingFront(object sender, RoutedEventArgs e) => ViewModel?.FenceSetFacingFront();
+    private void OnFacingBack(object sender, RoutedEventArgs e) => ViewModel?.FenceSetFacingBack();
     private void OnFenceBack(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedBack();
     private void OnFenceForward(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedForward();
     private void OnFenceUnplace(object sender, RoutedEventArgs e) => ViewModel?.UnplaceFenceSelected();

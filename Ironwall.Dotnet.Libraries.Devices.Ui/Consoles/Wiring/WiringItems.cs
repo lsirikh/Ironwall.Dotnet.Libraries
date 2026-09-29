@@ -126,7 +126,7 @@ public sealed class SensorRowViewModel : PropertyChangedBase
     public string PlacementText => _placementText?.Invoke(Row) ?? _placement(Row)?.Text ?? "미배치";
 
     /// <summary>저장 전까지 Draft(WS L181) — 새 줄이거나 값·자리가 바뀐 줄.</summary>
-    public bool IsDraft => Row.IsNew || Row.FactsChanged || !WiringSpec.SamePlacement(_placement(Row), Row.BaselinePlacement);
+    public bool IsDraft => Row.IsNew || Row.FactsChanged || !WiringSpec.SameWiring(_placement(Row), Row.BaselinePlacement);
 
     /// <summary>색이 아니라 글자로 — 새 줄 ＋ · 고친 줄 ● · 그대로면 빈 칸.</summary>
     public string StateGlyph => Row.IsNew ? "＋" : IsDraft ? "●" : string.Empty;

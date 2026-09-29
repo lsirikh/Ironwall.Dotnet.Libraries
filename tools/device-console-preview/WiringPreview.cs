@@ -72,7 +72,9 @@ internal sealed class WiringPreview
         };
         var saved = new[] { 417, 418, 420, 419, 421, 423, 424, 425, 427, 428 };
         var seeds = sensors.Select(s => new WiringSensorSeed(s.Id, s.Bus, new SensorFacts(s.No, s.Name, "SmartSensor2", "북측"),
-            Array.IndexOf(saved, s.Id) is var at && at >= 0 ? new WiringPlacement(1, at + 1) : null));
+            Array.IndexOf(saved, s.Id) is var at && at >= 0
+                ? new WiringPlacement(1, at + 1, s.Id == 423 ? WiringFacing.Back : WiringFacing.Front)      // 7구간은 펜스 내부를 본다(FR-20)
+                : null));
         var vm = Controller(new WiringControllerInfo(1, 1, "CTRL-북측-01", "10.99.7.1", "SmartController"), seeds, new[] { "SmartSensor2" });
         vm.FenceSelect(433);
         return (new WiringView { DataContext = vm }, vm);
@@ -98,7 +100,7 @@ internal sealed class WiringPreview
             if (line == 1) (ids[1], ids[2]) = (ids[2], ids[1]);
             for (var i = 0; i < ids.Count; i++)
                 seeds.Add(new WiringSensorSeed(ids[i].Id, ids[i].Id - 1100, new SensorFacts(ids[i].Id - 1000, ids[i].Name, ids[i].Multi ? "Multi" : "Fence", side),
-                    new WiringPlacement(line, i + 1)));
+                    new WiringPlacement(line, i + 1, line == 2 && i == 8 ? WiringFacing.Back : WiringFacing.Front)));   // 동측 복합 2 는 내부를 본다(FR-20)
         }
         seeds.Add(new WiringSensorSeed(499, 1, new SensorFacts(150, "스마트 복합센서 II(다른 제어기)", "SmartSensor2", "서측")));
         var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "Multi", "Fence", "SmartSensor2" });

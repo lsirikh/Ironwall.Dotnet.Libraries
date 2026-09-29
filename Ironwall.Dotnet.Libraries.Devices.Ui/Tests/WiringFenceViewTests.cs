@@ -92,6 +92,53 @@ public class WiringFenceViewTests
     }
 
     [Fact]
+    public void should_flip_facing_and_name_the_chip_back_when_f_is_pressed_on_a_post_sensor()
+    {
+        var result = OnWindow(Ring(4), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[102];
+            chip.Focus();
+            var handled = canvas.HandleKeyDown(Key.F, Key.None, ModifierKeys.None, chip);
+            Pump();
+            var name = AutomationProperties.GetName(canvas.SensorChips[102]);
+            var status = AutomationProperties.GetItemStatus(canvas.SensorChips[102]);
+            var back = vm.FenceSensors()[102].Facing;
+            var draft = vm.DraftText;
+            canvas.HandleKeyDown(Key.F, Key.None, ModifierKeys.None, canvas.SensorChips[102]);
+            Pump();
+            return (handled, name, status, back, draft, After: vm.FenceSensors()[102].Facing, AfterDraft: vm.DraftText);
+        });
+
+        Assert.True(result.handled);
+        Assert.Equal(WiringFacing.Back, result.back);
+        Assert.EndsWith("뒤(펜스 내부)", result.name);
+        Assert.Equal("방향 뒤", result.status);
+        Assert.Equal("바뀐 줄 1", result.draft);
+        Assert.Equal(WiringFacing.Front, result.After);           // 다시 F = 제자리
+        Assert.Equal("바뀐 줄 0", result.AfterDraft);
+    }
+
+    [Fact]
+    public void should_leave_fence_sensors_without_facing_when_f_is_pressed()
+    {
+        var result = OnWindow(Pids(3), (vm, canvas) =>
+        {
+            var fenceKey = vm.FenceSensors().Values.First(s => s.Kind == FenceKind.Fence).Key;
+            if (canvas.SensorChips.TryGetValue(fenceKey, out var chip))
+            {
+                chip.Focus();
+                canvas.HandleKeyDown(Key.F, Key.None, ModifierKeys.None, chip);
+            }
+            else vm.FenceFlipFacing(fenceKey);                     // 줌이 작아 묶음으로 접혔다 — 같은 뷰모델 길
+            Pump();
+            return (vm.HasChanges, vm.StatusText);
+        });
+
+        Assert.False(result.HasChanges);
+        Assert.Contains("방향이 없습니다", result.StatusText);
+    }
+
+    [Fact]
     public void should_cross_the_controller_to_the_left_branch_when_alt_left_is_pressed_on_R1()
     {
         var result = OnWindow(Pids(3), (vm, canvas) =>

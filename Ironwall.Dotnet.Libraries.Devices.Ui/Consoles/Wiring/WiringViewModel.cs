@@ -539,8 +539,10 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             if (diff.WiringChanged.Count > 0)
             {
                 // 불러오기 제안에서 온 결선은 갈래마다 따로 — 사람이 옮긴 것과 자동으로 바뀐 것을 섞어 보이지 않는다(M1).
-                var byKind = diff.WiringChanged.GroupBy(r => _board.Proposals.TryGetValue(r.Key, out var kind) ? (WiringProposalKind?)kind : null)
-                                              .ToDictionary(g => g.Key ?? (WiringProposalKind)(-1), g => g.ToList());
+                // 방향만 바뀐 줄(FR-20)은 자리 갈래에 넣지 않고 "방향 바뀜" 으로 따로 센다.
+                var moved = diff.WiringChanged.Where(r => !WiringSpec.SamePlacement(_board.PlacementOf(r.Key), r.BaselinePlacement)).ToList();
+                var byKind = moved.GroupBy(r => _board.Proposals.TryGetValue(r.Key, out var kind) ? (WiringProposalKind?)kind : null)
+                                  .ToDictionary(g => g.Key ?? (WiringProposalKind)(-1), g => g.ToList());
                 if (byKind.TryGetValue(WiringProposalKind.Converted, out var converted))
                     lines.Add($"자동 변환 {converted.Count}건(옛 두 선 → 한 줄) — 옛 2차 선 센서를 Sensor B 쪽 끝부터 이어 붙인 자리입니다: {Places(converted)}");
                 if (byKind.TryGetValue(WiringProposalKind.Compacted, out var compacted))
@@ -549,7 +551,12 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                     lines.Add($"번호순 제안 {suggested.Count}건 — 저장된 자리가 없던 센서를 장비번호 순으로 붙인 자리입니다: {Places(suggested)}");
                 if (byKind.TryGetValue((WiringProposalKind)(-1), out var edited))
                     lines.Add($"결선이 바뀐 줄 {edited.Count}: {Places(edited)}");
-                if (_board.Shape == WiringShape.Ring && diff.WiringChanged.Any(r => r.BaselinePlacement is not null))
+                var turned = diff.WiringChanged.Where(r => _board.FacingChanged(r.Key)).ToList();
+                if (turned.Count > 0)
+                    lines.Add($"방향 바뀜 {turned.Count}건 — 자리는 그대로 두고 보는 쪽만 바꿉니다: "
+                              + string.Join(", ", turned.Take(8).Select(r => $"{r.Display}({FacingName(r.BaselinePlacement!.Facing)}→{FacingName(r.Facing)})"))
+                              + (turned.Count > 8 ? $" 외 {turned.Count - 8}" : string.Empty));
+                if (_board.Shape == WiringShape.Ring && moved.Any(r => r.BaselinePlacement is not null))
                     lines.Add("링 위치가 바뀌면 이미 기록된 장애 고장 구간 번호가 가리키는 센서가 달라집니다.");
             }
             lines.Add($"저장할 센서 {diff.ToSend.Count}대");

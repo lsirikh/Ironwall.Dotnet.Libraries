@@ -28,7 +28,9 @@ public enum FenceKind
 /// 2.5D 몸체는 <c>Viewport3D</c> 가 아니라 이 투영으로 <b>2D 에 그린다</b> — 원격 데스크톱(Tier 0)에서 3D 층의 비용을 피하고,
 /// 목업과 같은 좌표를 그대로 쓰기 위해서다(F-3 결정). 지도 3D 몸체(<c>HousingModels</c>) 재사용은 범위 밖으로 둔다.
 /// </remarks>
-public readonly record struct FenceProjector(double K)
+/// <param name="K">1 = 입체 · 0 = 평면.</param>
+/// <param name="ZOffset">모든 깊이에 더하는 값 — 뒤를 보는 기둥 센서(FR-20)를 기둥 반대쪽에 그릴 때만 쓴다(0 이면 목업 그대로).</param>
+public readonly record struct FenceProjector(double K, double ZOffset = 0)
 {
     /// <summary>펜스 높이(세계 단위).</summary>
     public const double H = 130;
@@ -46,7 +48,7 @@ public readonly record struct FenceProjector(double K)
     public double Cz => 0.62 - 0.12 * K;
 
     /// <summary>세계 (x 가로 · y 높이 · z 깊이) → 그림 좌표(y 아래로 +).</summary>
-    public Point P(double x, double y, double z) => new(x - z * Sh, -y * Cy + z * Cz);
+    public Point P(double x, double y, double z) => new(x - (z + ZOffset) * Sh, -y * Cy + (z + ZOffset) * Cz);
 
     public static FenceProjector Tilt => new(1);
     public static FenceProjector Flat => new(0);
@@ -65,9 +67,16 @@ public sealed record FenceSensor(
     int? OppositeOrder,
     bool IsSuggested,
     bool IsChanged,
-    bool IsDuplicateNumber)
+    bool IsDuplicateNumber,
+    WiringFacing Facing = WiringFacing.Front)
 {
     public FenceKind Kind => FenceWorld.KindOf(Type);
+
+    /// <summary>보는 쪽이 있는 센서인가(FR-20 — 기둥에 다는 스마트 복합 · 복합).</summary>
+    public bool HasFacing => WiringTopology.SupportsFacing(Type);
+
+    /// <summary>뒤(펜스 내부)를 보는 기둥 센서 — 기둥 반대쪽에 그리고 칩에 "뒤" 표지.</summary>
+    public bool IsBackFacing => HasFacing && Facing == WiringFacing.Back;
 
     /// <summary>칩의 큰 글자 — 링 "3" · 가지 "L2"/"R1" · 한 줄 "4".</summary>
     public string Big(WiringShape shape) => shape == WiringShape.TwoBranch
@@ -361,6 +370,7 @@ public sealed class FenceWorld
         {
             p.P(MinX - pad, 0, GroundDepth).X, p.P(MaxX + pad, FenceProjector.H + 40, -36 * p.K).X,
             p.P(MinX - 5 * u, 0, 0).X, p.P(MaxX + 5 * u, 0, 0).X,
+            p.P(MaxX + 5 * u + FenceScene.SIDE_LABEL_LEAD, 0, FenceScene.OutsideLabelDepth(p)).X + 4,   // 땅 표기 "펜스 외부"(FR-20)
         };
         if (Shape == WiringShape.Ring)
         {

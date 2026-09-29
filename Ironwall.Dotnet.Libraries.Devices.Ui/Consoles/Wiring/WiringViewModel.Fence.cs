@@ -141,8 +141,9 @@ public sealed partial class WiringViewModel
                 WiringTopology.ParseSensorType(row.Facts.TypeText), row.Channel,
                 n?.Line ?? 0, n?.Order ?? 0, n?.OppositeOrder,
                 _board.IsProposed(row.Key),
-                !WiringSpec.SamePlacement(_board.PlacementOf(row.Key), row.BaselinePlacement),
-                duplicates.Contains(row.Key));
+                !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement),
+                duplicates.Contains(row.Key),
+                row.Facing);
         }
         return result;
     }
@@ -341,6 +342,81 @@ public sealed partial class WiringViewModel
     internal static Uri AssetUri(string file)
         => new($"pack://application:,,,/Ironwall.Dotnet.Libraries.Devices.Ui;component/Consoles/Wiring/Fence/Assets/{file}", UriKind.Absolute);
 
+    #region - Facing (FR-20) -
+    /// <summary>방향 칸을 보일까 — 센서 하나 또는 여럿을 골랐을 때.</summary>
+    public bool HasFacingRow => SelectedFenceRow is not null || HasMultiSelection;
+
+    /// <summary>방향을 바꿀 센서 — 고른 것 중 방향이 있는 것(스마트 복합 · 복합)만, 고른 차례.</summary>
+    private IReadOnlyList<int> FacingTargets()
+    {
+        var keys = HasMultiSelection ? _fenceSelection.ToList() : SelectedFenceRow is { } r ? new List<int> { r.Key } : new List<int>();
+        return keys.Where(_board.SupportsFacing).ToList();
+    }
+
+    /// <summary>[앞(외부)] · [뒤(내부)]를 누를 수 있는가 — 펜스센서 · 지진동은 방향이 없다.</summary>
+    public bool CanChooseFacing => !IsBusy && FacingTargets().Count > 0;
+
+    /// <summary>고른 기둥 센서가 모두 앞을 보는가(분할 단추의 켜짐 표시).</summary>
+    public bool IsSelectedFront => FacingTargets() is { Count: > 0 } t && t.All(k => _board.FacingOf(k) == WiringFacing.Front);
+
+    public bool IsSelectedBack => FacingTargets() is { Count: > 0 } t && t.All(k => _board.FacingOf(k) == WiringFacing.Back);
+
+    /// <summary>방향 칸 아래 한 줄 — 방향이 없는 종류면 까닭, 섞였으면 그 말.</summary>
+    public string FacingNote
+    {
+        get
+        {
+            if (!HasFacingRow) return string.Empty;
+            if (FacingTargets().Count == 0) return "펜스센서는 철망 가운데 · 지진동센서는 땅속 — 방향이 없습니다";
+            if (IsSelectedBack) return "뒤(펜스 내부)를 봅니다 — F 로 뒤집기";
+            if (IsSelectedFront) return "앞(펜스 외부)을 봅니다 — F 로 뒤집기";
+            return "고른 센서의 방향이 섞여 있습니다 — 누른 쪽으로 맞춥니다";
+        }
+    }
+
+    /// <summary>[앞(외부)] — 고른 기둥 센서를 모두 앞으로. 되돌리기 한 걸음.</summary>
+    public bool FenceSetFacingFront() => FenceSetFacing(FacingTargets(), WiringFacing.Front);
+
+    /// <summary>[뒤(내부)] — 고른 기둥 센서를 모두 뒤로. 되돌리기 한 걸음.</summary>
+    public bool FenceSetFacingBack() => FenceSetFacing(FacingTargets(), WiringFacing.Back);
+
+    /// <summary>
+    /// 키 F — 그 센서(여럿을 골랐고 그 안이면 고른 것 전부)의 방향을 뒤집는다. 여럿이면 <b>첫 센서의 반대쪽으로 모두 맞춘다</b>
+    /// (따로 뒤집으면 섞인 채로 남는다). 방향이 없는 종류는 건너뛴다.
+    /// </summary>
+    public bool FenceFlipFacing(int key)
+    {
+        var keys = (_fenceSelection.Count > 1 && _fenceSelection.Contains(key) ? _fenceSelection.ToList() : new List<int> { key })
+                   .Where(_board.SupportsFacing).ToList();
+        if (keys.Count == 0)
+        {
+            StatusText = "펜스센서 · 지진동센서는 방향이 없습니다(철망 가운데 · 땅속).";
+            return false;
+        }
+        var first = keys.Contains(key) ? key : keys[0];
+        var next = _board.FacingOf(first) == WiringFacing.Front ? WiringFacing.Back : WiringFacing.Front;
+        return FenceSetFacing(keys, next);
+    }
+
+    private bool FenceSetFacing(IReadOnlyList<int> keys, WiringFacing facing)
+    {
+        if (IsBusy || keys.Count == 0) return false;
+        _board.PushUndo();
+        if (_board.SetFacing(keys, facing) == 0)
+        {
+            _board.Undo();
+            StatusText = $"바뀐 것이 없습니다 — 이미 {FacingName(facing)}";
+            return false;
+        }
+        SyncAll();
+        var who = keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display;
+        StatusText = $"방향 — {who}: {FacingName(facing)} · Ctrl+Z 로 되돌립니다";
+        return true;
+    }
+
+    internal static string FacingName(WiringFacing facing) => facing == WiringFacing.Back ? "뒤(펜스 내부)" : "앞(펜스 외부)";
+    #endregion
+
     public bool IsSelectedPlaced => SelectedFenceRow is { } r && _board.Chain.Contains(r.Key);
     public bool IsSelectedUnplaced => SelectedFenceRow is { } r && !_board.Chain.Contains(r.Key);
 
@@ -369,6 +445,7 @@ public sealed partial class WiringViewModel
             nameof(SelectedPhotoCaption), nameof(IsSelectedPlaced), nameof(IsSelectedUnplaced), nameof(CanStepSelectedBack),
             nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
             nameof(FenceSelectedKeys), nameof(HasMultiSelection), nameof(MultiSelectionText),
+            nameof(HasFacingRow), nameof(CanChooseFacing), nameof(IsSelectedFront), nameof(IsSelectedBack), nameof(FacingNote),
         }) NotifyOfPropertyChange(name);
         FenceChanged?.Invoke(this, EventArgs.Empty);
     }

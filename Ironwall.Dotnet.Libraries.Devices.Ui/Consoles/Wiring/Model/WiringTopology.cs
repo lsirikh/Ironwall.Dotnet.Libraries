@@ -127,6 +127,14 @@ public sealed record WiringTopology(
         EnumDeviceType.SmartSensor or EnumDeviceType.SmartSensor2 or
         EnumDeviceType.SmartCompound or EnumDeviceType.SmartMultisensor2;
 
+    /// <summary>
+    /// 보는 쪽(앞 · 뒤)이 있는가(FR-20) — <b>기둥에 다는</b> 스마트 복합센서 · 복합센서만. 펜스센서(철망 가운데) · 지진동(땅속) · 모르는 종류는 없다.
+    /// </summary>
+    public static bool SupportsFacing(EnumDeviceType type) => IsSmartSensor(type) || type == EnumDeviceType.Multi;
+
+    /// <summary>기둥에 다는가(FR-20) — 펜스센서는 기둥 사이 철망 가운데, 지진동은 땅속. 그 밖(스마트 · 복합 · 모름)은 기둥.</summary>
+    public static bool IsPostMounted(EnumDeviceType type) => type is not (EnumDeviceType.Fence or EnumDeviceType.Underground);
+
     /// <summary>PIDS 제품군 센서인가(복합 · 펜스 · 지진동).</summary>
     public static bool IsPidsSensor(EnumDeviceType type) => type is
         EnumDeviceType.Multi or EnumDeviceType.Fence or EnumDeviceType.Underground;

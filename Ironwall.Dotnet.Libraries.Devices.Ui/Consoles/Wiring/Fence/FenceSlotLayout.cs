@@ -182,10 +182,64 @@ public sealed class FenceSlotLayout
             ? groundY - heightM * ppm
             : groundY - (heightM * CosPitch + depthM * SinPitch) * ppm;
 
+    /// <summary>
+    /// 기둥 x(FR-20 설치 위치) — <b>기둥 센서</b>(스마트 · 복합 · 모름)는 자기 x 에 기둥 하나, <b>펜스센서</b>는 기둥 사이 철망 가운데라
+    /// 자기 칸의 양쪽(x ± <paramref name="halfPanel"/>)에 기둥을 세운다(이어진 펜스센서는 기둥을 나눠 쓴다), 지진동은 기둥이 없다.
+    /// 센서 x 는 건드리지 않는다(순서 · 간격 규칙 FR-17 그대로).
+    /// </summary>
+    /// <param name="fillSpacing">0 보다 크면 빈 구간을 이 간격 이하로 채운다(가지 · 한 줄의 배경 펜스). 펜스센서 칸 안에는 넣지 않는다.</param>
+    /// <param name="from">채움의 왼쪽 끝(없으면 채우지 않음).</param>
+    /// <param name="to">채움의 오른쪽 끝.</param>
+    public static IReadOnlyList<double> MountPosts(IEnumerable<(double X, EnumDeviceType Type)> sensors, double halfPanel,
+                                                   double fillSpacing = 0, double? from = null, double? to = null)
+    {
+        var list = (sensors ?? Enumerable.Empty<(double X, EnumDeviceType Type)>()).OrderBy(s => s.X).ToList();
+        var eps = Math.Max(0.5, halfPanel * 0.05);
+        var raw = new List<double>();
+        foreach (var (x, type) in list)
+        {
+            if (type == EnumDeviceType.Fence) { raw.Add(x - halfPanel); raw.Add(x + halfPanel); }
+            else if (WiringTopology.IsPostMounted(type)) raw.Add(x);
+        }
+        raw.Sort();
+        var posts = new List<double>();
+        foreach (var x in raw)
+            if (posts.Count == 0 || x - posts[^1] > eps) posts.Add(x);
+
+        if (!(fillSpacing > 0) || from is not { } lo || to is not { } hi || hi < lo) return posts;
+
+        // 센서 기둥이 없으면(지진동만 · 빈 체인) 옛 격자 그대로 — 간격의 배수에서 시작한다.
+        if (posts.Count == 0)
+        {
+            for (var x = Math.Floor(lo / fillSpacing) * fillSpacing; x <= hi + 0.1; x += fillSpacing) posts.Add(x);
+            return posts;
+        }
+
+        var fences = list.Where(s => s.Type == EnumDeviceType.Fence).Select(s => s.X).ToList();
+        var filled = new List<double>();
+        for (var x = posts[0] - fillSpacing; x >= lo - 0.1; x -= fillSpacing) filled.Add(x);
+        for (var i = 0; i < posts.Count; i++)
+        {
+            filled.Add(posts[i]);
+            if (i == posts.Count - 1) break;
+            var a = posts[i];
+            var b = posts[i + 1];
+            if (b - a <= fillSpacing * 1.2 || fences.Any(f => f > a + eps && f < b - eps)) continue;     // 펜스센서 칸은 나누지 않는다
+            var n = (int)Math.Ceiling((b - a) / fillSpacing);
+            for (var j = 1; j < n; j++) filled.Add(a + (b - a) * j / n);
+        }
+        for (var x = posts[^1] + fillSpacing; x <= hi + 0.1; x += fillSpacing) filled.Add(x);
+        filled.Sort();
+        return filled;
+    }
+
+    /// <summary>펜스센서 한 칸의 절반(m) — 이웃 펜스센서 간격(<see cref="SPACING_FENCE_M"/>)의 절반이라 이어진 칸이 기둥을 나눠 쓴다.</summary>
+    public const double FENCE_HALF_PANEL_M = SPACING_FENCE_M / 2;
+
     /// <summary>종류별 모양 — (붙는 높이 m, 깊이 m, 칩 폭, 칩 높이, 아래로 매달리는가).</summary>
     private static (double Height, double Depth, double Width, double ChipHeight, bool HangsDown) ShapeOf(EnumDeviceType type) => type switch
     {
-        EnumDeviceType.Fence => (1.2, 0, 14, 10, false),                // 철망 레일 위 작은 박스
+        EnumDeviceType.Fence => (POST_HEIGHT_M / 2, 0, 14, 10, false), // 기둥 사이 철망 가운데(높이 중간 · FR-20)
         EnumDeviceType.Multi => (3.0, 0, 22, 22, false),                // 기둥 위 볼 마운트
         EnumDeviceType.Underground => (-0.8, -2.0, 10, 26, true),       // 땅속 막대(펜스 안쪽)
         _ => (2.6, 0, 18, 24, false),                                   // 스마트 후드형 · 모름
@@ -256,7 +310,7 @@ public sealed class FenceSlotLayout
         var anchors = Slots.Select(s => s.Anchor).ToList();
 
         PostTopY = ProjectY(GroundY, POST_HEIGHT_M, 0, _ppm, Projection);
-        PostXs = Slots.Where(s => s.Type != EnumDeviceType.Underground).Select(s => s.X).Distinct().ToList();
+        PostXs = MountPosts(Slots.Select(s => (s.X, s.Type)), FENCE_HALF_PANEL_M * _ppm);
 
         // 함체(링) · 제어기 — 제어기 틈 아래, 펜스 안쪽 지면에.
         var gx = GapX(Chain.ControllerGap);

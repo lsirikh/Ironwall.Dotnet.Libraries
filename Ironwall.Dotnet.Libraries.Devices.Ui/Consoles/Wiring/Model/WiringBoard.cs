@@ -21,9 +21,10 @@ public sealed record SensorFacts(int Number, string Name, string TypeText, strin
 public sealed class WiringSensorRow
 {
     internal WiringSensorRow(int key, int id, int? channel, SensorFacts facts, WiringPlacement? placement, string? loadIssue,
-                             IEnumerable<int>? groups = null)
+                             IEnumerable<int>? groups = null, WiringFacing? facing = null)
     {
         Key = key;
+        Facing = facing ?? placement?.Facing ?? WiringFacing.Front;
         Id = id;
         Channel = channel;
         Facts = facts;
@@ -45,6 +46,14 @@ public sealed class WiringSensorRow
     public int? Channel { get; }
 
     public SensorFacts Facts { get; set; }
+
+    /// <summary>
+    /// 보는 쪽(FR-20 · Draft) — 기둥 센서(스마트 · 복합)만 바꿀 수 있다. 저장값에 없으면 앞. 기준은 <see cref="BaselinePlacement"/> 의 <c>Facing</c>.
+    /// </summary>
+    public WiringFacing Facing { get; internal set; }
+
+    /// <summary>이 줄이 보는 쪽을 가질 수 있는가(스마트 복합 · 복합).</summary>
+    public bool SupportsFacing => WiringTopology.SupportsFacing(WiringTopology.ParseSensorType(Facts.TypeText));
 
     /// <summary>마지막으로 서버와 맞춘 값.</summary>
     public SensorFacts Baseline { get; internal set; }
@@ -242,8 +251,25 @@ public sealed class WiringBoard
     /// <b>저장될</b> 결선 자리. 적용하지 않은 제안이 있으면 <b>받아들인 자리</b>(<see cref="WiringSensorRow.BaselinePlacement"/>) 그대로 —
     /// 이름만 고쳐 저장해도 제안 자리가 실려 나가지 않는다(M1). 그 밖에는 체인의 자리, 팔레트면 <c>null</c>.
     /// </summary>
+    /// <remarks>보는 쪽(FR-20)은 늘 지금 값이다 — 제안이 걸려 있어도 방향만 바꾼 줄은 받아들인 자리 그대로 방향만 실린다.</remarks>
     public WiringPlacement? PlacementOf(int key)
-        => _pending ? Find(key)?.BaselinePlacement : DisplayPlacementOf(key);
+    {
+        if (Find(key) is not { } row) return null;
+        var at = _pending ? row.BaselinePlacement : DisplayPlacementOf(key);
+        return at is null ? null : at with { Facing = row.Facing };
+    }
+
+    /// <summary>그 센서가 보는 쪽(모르는 키는 앞).</summary>
+    public WiringFacing FacingOf(int key) => Find(key)?.Facing ?? WiringFacing.Front;
+
+    /// <summary>그 센서가 보는 쪽을 가질 수 있는가(FR-20).</summary>
+    public bool SupportsFacing(int key) => Find(key)?.SupportsFacing == true;
+
+    /// <summary>
+    /// 보는 쪽이 저장 기준과 다른가(미리보기 "방향 바뀜") — 저장된 자리가 있고 지금도 자리가 있는 줄만. 새로 붙인 줄은 "자리"로 센다.
+    /// </summary>
+    public bool FacingChanged(int key)
+        => Find(key) is { BaselinePlacement: { } before } && PlacementOf(key) is { } now && now.Facing != before.Facing;
 
     /// <summary>화면에 보일 자리 — 제안도 자리를 보인다.</summary>
     public WiringPlacement? DisplayPlacementOf(int key)
@@ -461,6 +487,22 @@ public sealed class WiringBoard
         return true;
     }
 
+    /// <summary>
+    /// 보는 쪽을 정한다(FR-20) — 방향이 있는 줄(스마트 복합 · 복합)만. 바뀐 줄 수를 돌려준다(0 이면 아무것도 안 바뀜).
+    /// 체인 편집이 아니다 — 자리 · 제안은 그대로 두고, 되돌리기 한 걸음은 부르는 쪽이 <see cref="PushUndo"/> 로 찍는다.
+    /// </summary>
+    public int SetFacing(IEnumerable<int> keys, WiringFacing facing)
+    {
+        var changed = 0;
+        foreach (var key in (keys ?? Enumerable.Empty<int>()).Distinct())
+        {
+            if (Find(key) is not { SupportsFacing: true } row || row.Facing == facing) continue;
+            row.Facing = facing;
+            changed++;
+        }
+        return changed;
+    }
+
     /// <summary><see cref="AcceptProposals"/> 의 옛 이름 — 번호순 제안만이 아니라 모든 불러오기 제안을 적용한다.</summary>
     public bool AcceptSuggestions() => AcceptProposals();
 
@@ -500,7 +542,7 @@ public sealed class WiringBoard
             if (row.GroupsChanged) groupChanged.Add(row);
             if (row.IsNew) { created.Add(row); continue; }
             if (row.FactsChanged) factChanged.Add(row);
-            if (!WiringSpec.SamePlacement(PlacementOf(row.Key), row.BaselinePlacement)) wiringChanged.Add(row);
+            if (!WiringSpec.SameWiring(PlacementOf(row.Key), row.BaselinePlacement)) wiringChanged.Add(row);
         }
 
         return new WiringBoardDiff(created, factChanged, wiringChanged, groupChanged);
@@ -538,7 +580,7 @@ public sealed class WiringBoard
         {
             if (set is not null && !set.Contains(row.Key)) continue;
             var placement = PlacementOf(row.Key);
-            if (!WiringSpec.SamePlacement(placement, row.BaselinePlacement)) row.ServerPlacement = placement;
+            if (!WiringSpec.SameWiring(placement, row.BaselinePlacement)) row.ServerPlacement = placement;
             row.Baseline = row.Facts;
             row.BaselinePlacement = placement;
             if (includeGroups) row.MarkGroupBaseline();
@@ -580,7 +622,7 @@ public sealed class WiringBoard
         var old = Find(key);
         if (old is null || newId <= 0) return null;
 
-        var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups);
+        var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups, old.Facing);
         promoted.CopyGroupBaselineFrom(old);
         _rows[_rows.IndexOf(old)] = promoted;
         return promoted;
@@ -614,12 +656,14 @@ public sealed class WiringBoard
         IReadOnlyList<WiringSensorRow> Rows,
         IReadOnlyList<SensorFacts> Facts,
         IReadOnlyList<string?> LoadIssues,
+        IReadOnlyList<WiringFacing> Facings,
         WiringChain Chain,
         bool Pending,
         bool AppliedByEdit);
 
     private Snapshot Capture()
-        => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _rows.Select(r => r.LoadIssue).ToList(), _chain, _pending, ProposalsAppliedByEdit);
+        => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _rows.Select(r => r.LoadIssue).ToList(), _rows.Select(r => r.Facing).ToList(),
+               _chain, _pending, ProposalsAppliedByEdit);
 
     private void Restore(Snapshot snapshot)
     {
@@ -629,6 +673,7 @@ public sealed class WiringBoard
             var row = snapshot.Rows[i];
             row.Facts = snapshot.Facts[i];      // 같은 객체를 되살린다 — 화면이 쥔 항목이 끊기지 않는다
             row.LoadIssue = snapshot.LoadIssues[i];
+            row.Facing = snapshot.Facings[i];
             _rows.Add(row);
         }
         _chain = snapshot.Chain;

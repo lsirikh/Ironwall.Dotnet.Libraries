@@ -1490,6 +1490,50 @@
 												Visibility="{Binding HasSelectedDistance, Converter={StaticResource BoolToVisibility}}" />
 										</Grid>
 
+										<!--
+											방향(FR-20) — 기둥 센서(스마트 복합 · 복합)만. 분할 단추 [앞(외부)] [뒤(내부)] · 켜진 쪽은 아래 굵은 막대(보기 전환과 같은 어휘 — 색 하나로 가르지 않는다).
+											펜스센서 · 지진동은 방향이 없어 단추를 끄고 까닭을 적는다. 키 F = 뒤집기.
+										-->
+										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasFacingRow, Converter={StaticResource BoolToVisibility}}">
+											<TextBlock Style="{StaticResource W.Hint}" Text="방향" />
+											<UniformGrid Margin="0,4,0,0" Columns="2">
+												<StackPanel Margin="0,0,3,0">
+													<Button
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Front"
+														Click="OnFacingFront"
+														Content="앞(외부)"
+														IsEnabled="{Binding CanChooseFacing}"
+														Style="{StaticResource Console.Button}"
+														ToolTip="펜스 외부를 봅니다(기본) — F 로 뒤집기" />
+													<Rectangle
+														Height="3"
+														Margin="4,2,4,0"
+														Fill="{DynamicResource PrimaryBrush}"
+														Visibility="{Binding IsSelectedFront, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Margin="3,0,0,0">
+													<Button
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Back"
+														Click="OnFacingBack"
+														Content="뒤(내부)"
+														IsEnabled="{Binding CanChooseFacing}"
+														Style="{StaticResource Console.Button}"
+														ToolTip="펜스 내부를 봅니다 — 기둥 반대쪽에 달고 칩에 '뒤' 표지 · F 로 뒤집기" />
+													<Rectangle
+														Height="3"
+														Margin="4,2,4,0"
+														Fill="{DynamicResource PrimaryBrush}"
+														Visibility="{Binding IsSelectedBack, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+											</UniformGrid>
+											<TextBlock
+												Margin="0,3,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Note"
+												Style="{StaticResource W.Hint}"
+												Text="{Binding FacingNote}"
+												TextWrapping="Wrap" />
+										</StackPanel>
+
 										<!--  여러 센서(Ctrl 클릭 · FR-07) — 함께 끌거나 한꺼번에 빼기  -->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMultiSelection, Converter={StaticResource BoolToVisibility}}">
 											<TextBlock Style="{StaticResource W.Hint}" Text="고른 센서를 끌면 체인 순서를 지킨 채 함께 옮겨집니다 · Ctrl 클릭으로 더하거나 뺍니다" />

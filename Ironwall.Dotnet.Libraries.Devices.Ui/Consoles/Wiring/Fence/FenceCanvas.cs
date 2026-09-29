@@ -276,7 +276,10 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale);
                 Place(chip, scene.X[unit.Key]);
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
-                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}");
+                // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
+                var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
+                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}{facing}");
+                AutomationProperties.SetItemStatus(chip, s.HasFacing ? (s.IsBackFacing ? "방향 뒤" : "방향 앞") : string.Empty);
             }
             order.Add(chip);
         }
@@ -773,6 +776,16 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var alt = key == Key.System;
         var k = alt ? systemKey : key;
         var chip = focused as FenceChip;
+
+        // F = 보는 쪽 뒤집기(FR-20) — 글자를 치는 중이면 건드리지 않는다.
+        if (!alt && k == Key.F && modifiers == ModifierKeys.None && focused is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            var target = chip is { Kind: not FenceChipKind.Controller } ? chip.Keys[0] : ReferenceEquals(focused, this) ? vm.FenceSelectedKey : null;
+            if (target is not { } flip) return false;
+            vm.FenceFlipFacing(flip);
+            if (chip is not null) FocusUnitOf(flip);
+            return true;
+        }
 
         if (chip is null)
         {

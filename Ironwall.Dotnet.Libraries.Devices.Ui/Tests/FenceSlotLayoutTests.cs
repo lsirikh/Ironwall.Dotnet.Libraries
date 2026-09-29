@@ -135,11 +135,13 @@ public class FenceSlotLayoutTests
     }
 
     [Fact]
-    public void should_put_posts_under_non_underground_sensors_when_built()
+    public void should_put_posts_under_post_sensors_and_around_fence_panels_when_built()
     {
         var layout = Layout(WiringShape.TwoBranch, new[] { M, F, U });
+        var half = FenceSlotLayout.FENCE_HALF_PANEL_M * FenceSlotLayout.DEFAULT_PIXELS_PER_METRE;
 
-        Assert.Equal(new[] { layout.SensorXs[0], layout.SensorXs[1] }, layout.PostXs);
+        // FR-20 — 복합은 자기 기둥, 펜스센서는 철망 가운데(양쪽 기둥), 지진동은 기둥 없음.
+        Assert.Equal(new[] { layout.SensorXs[0], layout.SensorXs[1] - half, layout.SensorXs[1] + half }, layout.PostXs);
         Assert.True(layout.PostTopY < layout.GroundY);
     }
 

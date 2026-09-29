@@ -4,11 +4,24 @@ using System;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 
 /// <summary>
-/// 센서 한 대의 결선 자리 — <b>어느 선의 몇 번째</b>(WS L466 · wiring-fence-view FR-01).
+/// 기둥에 다는 센서가 보는 쪽(wiring-fence-view FR-20) — 스마트 복합센서 · 복합센서만 쓴다.
+/// 펜스센서(철망 가운데) · 지진동센서(땅속)는 방향이 없어 늘 <see cref="Front"/> 로 둔다(저장에도 싣지 않는다).
+/// </summary>
+public enum WiringFacing
+{
+    /// <summary>앞 = 펜스 외부(기본).</summary>
+    Front = 0,
+    /// <summary>뒤 = 펜스 내부.</summary>
+    Back = 1,
+}
+
+/// <summary>
+/// 센서 한 대의 결선 자리 — <b>어느 선의 몇 번째</b>(WS L466 · wiring-fence-view FR-01) · 그리고 기둥 센서가 <b>보는 쪽</b>(FR-20).
 /// </summary>
 /// <param name="Line">링 · 한 줄은 늘 1(체인 위치). 양쪽 가지는 1 = 왼쪽 · 2 = 오른쪽. 옛 N04 저장값의 2 는 "2차 선"이었다(불러올 때 한 줄로 바꾼다).</param>
 /// <param name="Order">링: Sensor A 쪽 끝에서 센 체인 위치 · 한 줄 · 가지: 제어기 쪽에서 센 자리(1부터).</param>
-public sealed record WiringPlacement(int Line, int Order)
+/// <param name="Facing">보는 쪽 — 저장값에 없으면 앞(FR-20). 위치 비교(<see cref="WiringSpec.SamePlacement"/>)는 이 값을 보지 않는다.</param>
+public sealed record WiringPlacement(int Line, int Order, WiringFacing Facing = WiringFacing.Front)
 {
     public bool IsPrimary => Line == WiringSpec.LINE_PRIMARY;
 
@@ -53,6 +66,14 @@ public static class WiringSpec
     public const string SHAPE_LINE = "line";
 
     /// <summary>
+    /// 보는 쪽(FR-20 · v2 확장) — <c>"front"</c> | <c>"back"</c>. 방향이 있는 센서(스마트 · 복합)는 <b>늘 명시해</b> 싣는다:
+    /// PATCH 는 RFC 7396 병합이라 키를 빼면 서버의 옛 <c>"back"</c> 이 그대로 남는다. 읽을 때 없거나 모르는 값이면 앞.
+    /// </summary>
+    public const string FACING_KEY = "facing";
+    public const string FACING_FRONT = "front";
+    public const string FACING_BACK = "back";
+
+    /// <summary>
     /// 순번의 상한 — 읽기 · 검증이 이보다 큰 값을 "범위 밖"으로 본다. 링 체인은 칸 상한이 없고
     /// 펜스센서는 제어기 한 대에 수백 대가 붙는다(카탈로그: 1km = 펜스 400 · PRD FR-18) — 넉넉하되 유한한 값이다
     /// (옛 64 는 N04 의 칸 상한이었다).
@@ -73,8 +94,17 @@ public static class WiringSpec
         if (line is not (LINE_PRIMARY or LINE_SECONDARY)) return null;
         if (order < 1 || order > MAX_ORDER) return null;
 
-        return new WiringPlacement(line.Value, order.Value);
+        return new WiringPlacement(line.Value, order.Value, ReadFacing(wiring));
     }
+
+    /// <summary>보는 쪽 — <c>"back"</c> 만 뒤, 없거나 그 밖이면 앞(FR-20).</summary>
+    public static WiringFacing ReadFacing(JObject? wiring)
+        => string.Equals(((string?)wiring?[FACING_KEY])?.Trim(), FACING_BACK, StringComparison.OrdinalIgnoreCase)
+            ? WiringFacing.Back
+            : WiringFacing.Front;
+
+    /// <summary>보는 쪽 → 저장 글자.</summary>
+    public static string FacingText(WiringFacing facing) => facing == WiringFacing.Back ? FACING_BACK : FACING_FRONT;
 
     /// <summary>
     /// 저장된 값이 <b>있는데 읽을 수 없는</b> 경우의 까닭(사람 말). 읽을 수 있거나 아예 없으면 <c>null</c>.
@@ -123,7 +153,8 @@ public static class WiringSpec
     }
 
     /// <param name="shape">결선 모양 — 주면 형식 표지(<c>v</c> · <c>shape</c>)를 함께 싣는다. 저장 계층은 늘 준다.</param>
-    public static JObject Apply(JObject? spec, WiringPlacement? placement, WiringShape? shape = null)
+    /// <param name="includeFacing">보는 쪽(<c>facing</c>)을 싣는가 — 방향이 있는 센서(스마트 · 복합)만 참(FR-20).</param>
+    public static JObject Apply(JObject? spec, WiringPlacement? placement, WiringShape? shape = null, bool includeFacing = false)
     {
         var next = spec is null ? new JObject() : (JObject)spec.DeepClone();
 
@@ -133,7 +164,7 @@ public static class WiringSpec
             return next;
         }
 
-        next[SPEC_KEY] = Node(placement, shape);
+        next[SPEC_KEY] = Node(placement, shape, includeFacing);
         return next;
     }
 
@@ -152,10 +183,11 @@ public static class WiringSpec
     /// <para>그러므로 ① <b>안 보낸 키는 그대로 남고</b>(그래서 우리 키 하나만 보내면 벤더 키를 건드리지 않는다)
     /// ② <b>키를 빼는 것으로는 지워지지 않는다</b> — 자리를 비우는 저장이 조용히 아무 일도 하지 않게 된다.</para>
     /// </remarks>
-    public static JObject MergePatch(WiringPlacement? placement, WiringShape? shape = null)
-        => new() { [SPEC_KEY] = placement is null ? JValue.CreateNull() : Node(placement, shape) };
+    /// <remarks>방향만 바뀐 저장도 <b>v2 결선 객체 전체</b>(<c>v · shape · line · order · facing</c>)를 싣는다 — 자리는 그대로 간다(FR-20).</remarks>
+    public static JObject MergePatch(WiringPlacement? placement, WiringShape? shape = null, bool includeFacing = false)
+        => new() { [SPEC_KEY] = placement is null ? JValue.CreateNull() : Node(placement, shape, includeFacing) };
 
-    private static JObject Node(WiringPlacement placement, WiringShape? shape)
+    private static JObject Node(WiringPlacement placement, WiringShape? shape, bool includeFacing)
     {
         var node = new JObject();
         if (shape is { } s)
@@ -165,12 +197,20 @@ public static class WiringSpec
         }
         node[LINE_KEY] = placement.Line;
         node[ORDER_KEY] = placement.Order;
+        if (includeFacing) node[FACING_KEY] = FacingText(placement.Facing);
         return node;
     }
 
-    /// <summary>두 결선 자리가 같은가(둘 다 없어도 같다) — 재조회 충돌 판정.</summary>
+    /// <summary>두 결선 자리(<b>위치만</b> — 선 · 순번)가 같은가(둘 다 없어도 같다). 보는 쪽은 <see cref="SameWiring"/>.</summary>
     public static bool SamePlacement(WiringPlacement? a, WiringPlacement? b)
         => a is null ? b is null : b is not null && a.Line == b.Line && a.Order == b.Order;
+
+    /// <summary>
+    /// 저장할 결선 값 전체(위치 + 보는 쪽 · FR-20)가 같은가 — "바뀐 줄" · 재조회 충돌 판정.
+    /// 자리가 없으면(미배치) 보는 쪽은 싣지 않으므로 비교하지 않는다.
+    /// </summary>
+    public static bool SameWiring(WiringPlacement? a, WiringPlacement? b)
+        => SamePlacement(a, b) && (a is null || a.Facing == b!.Facing);
 
     private static int? AsInt(JToken? token) => token?.Type switch
     {
