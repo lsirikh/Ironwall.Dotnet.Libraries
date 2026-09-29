@@ -929,7 +929,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
 
         SyncAll();
         StatusText = placed == 1
-            ? $"{list[0].Display} → {PlacementTextOf(list[0].Key)} 에 붙였습니다"
+            ? $"{list[0].Display} → {PlacementTextOf(list[0].Key)}에 붙였습니다"
             : $"{placed}대를 결선 끝에 차례로 붙였습니다";
     }
 
