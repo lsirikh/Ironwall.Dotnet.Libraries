@@ -24,6 +24,7 @@
 		<wiring:IssueLevelBrushConverter x:Key="IssueBrush" />
 		<wiring:IssueLevelGlyphConverter x:Key="IssueGlyph" />
 		<wiring:SensorTypeDisplayConverter x:Key="SensorTypeKorean" />
+		<wiring:PackIconKindNameConverter x:Key="IconKind" />
 
 		<!--  종류 콤보 드롭다운 항목 — 겉보기만 "한국어 (코드)". Text 바인딩은 그대로 원문 코드를 나른다.  -->
 		<DataTemplate x:Key="W.SensorTypeItem">
@@ -87,8 +88,11 @@
 			<Setter Property="Margin" Value="0,0,8,8" />
 		</Style>
 
-		<!--  선의 칸 목록 — 가상화를 끈다(화면 밖 칸은 드롭 자리가 될 수 없다). 제어기 한 대분이라 전량 로딩이 전제다.  -->
-		<Style x:Key="W.SlotList" TargetType="ListBox">
+		<!--
+			표 보기 체인 목록(표 보기 정리 · 2026-09-30) — 링 체인을 한 줄씩 위에서 아래로(Sensor A 쪽 끝이 1).
+			가상화를 끈다(화면 밖 줄은 드롭 자리가 될 수 없다 · 제어기 한 대분이라 전량 로딩이 전제).
+		-->
+		<Style x:Key="W.RowList" TargetType="ListBox">
 			<Setter Property="Background" Value="Transparent" />
 			<Setter Property="BorderThickness" Value="0" />
 			<Setter Property="Padding" Value="0" />
@@ -99,7 +103,7 @@
 			<Setter Property="ItemsPanel">
 				<Setter.Value>
 					<ItemsPanelTemplate>
-						<WrapPanel Orientation="Horizontal" />
+						<StackPanel Orientation="Vertical" />
 					</ItemsPanelTemplate>
 				</Setter.Value>
 			</Setter>
@@ -107,27 +111,26 @@
 				<Setter.Value>
 					<Style TargetType="ListBoxItem">
 						<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-						<!--
-							칸 컨테이너는 상속을 끊는다(ItemContainerStyle 에 BasedOn 이 없어 Control.Foreground 가
-							기본값 검정으로 떨어진다) — 다크에서 칸 안 글자가 #000000 로 찍혔다(1.40:1 실측).
-							컨테이너에서 한 번 못 박고, 글자마다도 명시한다.
-						-->
+						<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+						<!--  컨테이너는 상속을 끊는다(BasedOn 이 없어 다크에서 검정 글자) — 한 번 못 박는다  -->
 						<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 						<!--  키보드로 옮기면 선택 표시와 UIA SelectionItemPattern 이 같이 따라와야 한다(C8)  -->
 						<Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-						<!--  계측은 peer 가 있는 컨테이너에 붙인다 — DropZoneChrome(ContentControl)은 UIA 에 안 나온다(C9)  -->
+						<!--  계측은 peer 가 있는 컨테이너에 붙인다(C9) — 헤디드 시험이 쓰는 Devices.Wiring.Slot.{선}-{자리} 그대로  -->
 						<Setter Property="AutomationProperties.AutomationId" Value="{Binding AutomationKey, StringFormat=Devices.Wiring.Slot.{0}}" />
 						<Setter Property="Template">
 							<Setter.Value>
 								<ControlTemplate TargetType="ListBoxItem">
-									<Grid>
+									<Grid Background="Transparent">
 										<ContentPresenter />
-										<!--  고른 칸 = 왼쪽 3px 세로 바(선택의 기존 어휘). 드롭 표시(윤곽)와 축이 직교한다.  -->
+										<!--  고른 줄 = 왼쪽 3px 세로 바(선택의 기존 어휘) · 드롭 표시(윤곽)와 축이 직교한다  -->
 										<Rectangle
 											x:Name="Bar"
 											Width="3"
-											Margin="0,4,0,10"
+											Margin="0,0,0,1"
 											HorizontalAlignment="Left"
+											VerticalAlignment="Bottom"
+											Height="37"
 											Fill="{DynamicResource PrimaryBrush}"
 											IsHitTestVisible="False"
 											Visibility="Collapsed" />
@@ -145,138 +148,200 @@
 			</Setter>
 		</Style>
 
-		<!--  칸 하나 — 104×56(WS L137, L289). 드롭존은 칸마다(HitTest 로 판정한다).  -->
-		<DataTemplate x:Key="W.SlotTemplate">
-			<drag:DropZoneChrome
-				Margin="0,0,6,6"
-				drag:DropZone.Data="{Binding}"
-				drag:DropZone.Key="wiring-slot"
-				CornerRadius="7">
-				<Grid Width="104" MinHeight="56" ToolTip="{Binding Tooltip}">
-					<!--  빈 칸 — 쉬고 있을 때도 파선이다(WS L289). 드래그 중의 {6,4} 와 무늬가 다르다.  -->
-					<Rectangle
-						RadiusX="7"
-						RadiusY="7"
-						Fill="{DynamicResource SurfaceBrush}"
-						Stroke="{DynamicResource TextMutedBrush}"
-						StrokeDashArray="2 3"
-						StrokeThickness="1"
-						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
-					<TextBlock
-						HorizontalAlignment="Center"
-						VerticalAlignment="Center"
-						FontSize="11.5"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="{Binding SlotLabel}"
-						Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+		<!--  표 보기 열 머리 · 줄의 글자  -->
+		<Style x:Key="W.ColHead" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+		<Style x:Key="W.Cell" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+		<Style x:Key="W.CellMono" TargetType="TextBlock" BasedOn="{StaticResource W.Cell}">
+			<Setter Property="FontFamily" Value="Consolas" />
+		</Style>
+		<!--  상태 표지 — 색 하나로 말하지 않는다(테두리 + 글자)  -->
+		<Style x:Key="W.Tag" TargetType="Border">
+			<Setter Property="Margin" Value="0,0,4,0" />
+			<Setter Property="Padding" Value="4,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="3" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		</Style>
 
-					<!--  찬 칸  -->
-					<Border
-						Padding="2,6,4,6"
-						Background="{DynamicResource SurfaceAltBrush}"
-						BorderBrush="{DynamicResource TextMutedBrush}"
-						BorderThickness="1"
-						CornerRadius="7"
-						Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}">
-						<DockPanel LastChildFill="True">
-							<drag:DragHandle
-								VerticalAlignment="Center"
-								AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.SlotHandle.{0}}"
-								DockPanel.Dock="Left" />
-							<StackPanel VerticalAlignment="Center">
-								<TextBlock
-									FontFamily="Consolas"
-									FontSize="12"
-									FontWeight="Bold"
-									Foreground="{DynamicResource TextPrimaryBrush}"
-									Text="{Binding NumberText}" />
-								<TextBlock
-									Margin="0,1,0,0"
-									FontSize="10.5"
-									Foreground="{DynamicResource TextSecondaryBrush}"
-									Text="{Binding Title}"
-									TextTrimming="CharacterEllipsis" />
-								<TextBlock
-									FontSize="10"
-									Foreground="{DynamicResource TextMutedBrush}"
-									Text="{Binding AddressText}" />
-								<!--  링: 두 포트에서 센 번호(A · B) — FR-04  -->
-								<TextBlock
-									FontFamily="Consolas"
-									FontSize="10"
-									Foreground="{DynamicResource TextSecondaryBrush}"
-									Text="{Binding PortText}"
-									Visibility="{Binding HasPortText, Converter={StaticResource BoolToVisibility}}" />
-							</StackPanel>
-						</DockPanel>
-					</Border>
-
-					<!--  순번 배지 — 1차는 원, 2차는 모난 사각(색이 아니라 형태로 선을 가른다 · W4)  -->
-					<Border
-						Margin="2,-1,0,0"
-						Padding="6,0"
-						HorizontalAlignment="Left"
-						VerticalAlignment="Top"
-						Background="{DynamicResource PrimaryBrush}"
-						Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}">
-						<Border.Style>
-							<Style TargetType="Border">
-								<Setter Property="CornerRadius" Value="9" />
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsSecondLine}" Value="True">
-										<Setter Property="CornerRadius" Value="2" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</Border.Style>
+		<!--
+			체인 한 줄 — 높이 38 고정 · 열 폭 고정(머리 줄과 같은 값). 함체(제어기) 자리 앞 줄에는 구분 띠("A 쪽 ← 함체 → B 쪽").
+			열: 손잡이 24 · 위치 44 · A/B 88 · 이름 * · 장비번호 72 · 종류 112 · 방향 44 · 버스 주소 60 · 간격 52 · 상태 112 · 빼기 30
+		-->
+		<DataTemplate x:Key="W.RowTemplate">
+			<StackPanel>
+				<Border
+					Height="26"
+					Margin="0,4,0,4"
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					BorderBrush="{DynamicResource PrimaryBrush}"
+					BorderThickness="0,1,0,1"
+					Visibility="{Binding EnclosureBefore, Converter={StaticResource BoolToVisibility}}">
+					<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<md:PackIcon
+							Width="15"
+							Height="15"
+							Margin="0,0,6,0"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Kind="ServerNetwork" />
 						<TextBlock
-							FontSize="10.5"
-							FontWeight="Bold"
-							Foreground="{DynamicResource OnPrimaryBrush}"
-							Text="{Binding OrderText}" />
-					</Border>
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Devices.Wiring.Table.EnclosureSplit"
+							FontSize="11.5"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding EnclosureLabel}" />
+					</StackPanel>
+				</Border>
+				<drag:DropZoneChrome
+					drag:DropZone.Data="{Binding}"
+					drag:DropZone.Key="wiring-slot"
+					CornerRadius="4">
+					<Grid Height="38" ToolTip="{Binding Tooltip}">
+						<!--  끝 줄 — 여기 놓으면 끝에 붙는다(체인에는 가운데 빈 줄이 없다)  -->
+						<Rectangle
+							Margin="0,3"
+							RadiusX="4"
+							RadiusY="4"
+							Fill="{DynamicResource SurfaceBrush}"
+							Stroke="{DynamicResource TextMutedBrush}"
+							StrokeDashArray="2 3"
+							StrokeThickness="1"
+							Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="11.5"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="{Binding SlotLabel}"
+							Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
 
-					<!--  번호순 제안 표지 — 색이 아니라 글자(FR-15 "제안 배치 = 모서리 표지")  -->
-					<Border
-						Margin="0,-1,2,0"
-						Padding="4,0"
-						HorizontalAlignment="Right"
-						VerticalAlignment="Top"
-						BorderBrush="{DynamicResource BorderBrush}"
-						BorderThickness="1"
-						CornerRadius="3"
-						ToolTip="번호순 제안 — [이대로 적용] 전에는 저장 대기가 아닙니다"
-						Visibility="{Binding IsSuggested, Converter={StaticResource BoolToVisibility}}">
-						<TextBlock FontSize="9.5" Text="제안" />
-					</Border>
-
-					<!--  주소 ≠ 순번 표시 — 고치지 않고 알리기만 한다  -->
-					<TextBlock
-						Margin="0,2,4,0"
-						HorizontalAlignment="Right"
-						VerticalAlignment="Top"
-						FontSize="10.5"
-						Foreground="{DynamicResource StatusWarningBrush}"
-						Text="≠"
-						ToolTip="버스 주소와 순번이 다릅니다 — 주소는 그대로 둡니다"
-						Visibility="{Binding HasChannelMismatch, Converter={StaticResource BoolToVisibility}}" />
-
-					<Button
-						Width="18"
-						Height="18"
-						Margin="0,0,1,1"
-						Padding="0"
-						HorizontalAlignment="Right"
-						VerticalAlignment="Bottom"
-						AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.SlotRemove.{0}}"
-						Click="OnRemoveSlot"
-						Content="✕"
-						FontSize="9"
-						Style="{StaticResource Console.Button.Icon}"
-						ToolTip="결선에서 빼기 — 뒤는 당겨집니다"
-						Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}" />
-				</Grid>
-			</drag:DropZoneChrome>
+						<!--  찬 줄  -->
+						<Border
+							BorderBrush="{DynamicResource RowLineBrush}"
+							BorderThickness="0,0,0,1"
+							Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}">
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="24" />
+									<ColumnDefinition Width="44" />
+									<ColumnDefinition Width="88" />
+									<ColumnDefinition Width="*" MinWidth="120" />
+									<ColumnDefinition Width="72" />
+									<ColumnDefinition Width="112" />
+									<ColumnDefinition Width="44" />
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="52" />
+									<ColumnDefinition Width="112" />
+									<ColumnDefinition Width="30" />
+								</Grid.ColumnDefinitions>
+								<drag:DragHandle
+									Grid.Column="0"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.SlotHandle.{0}}" />
+								<!--  위치 — 원 배지(순번)  -->
+								<Border
+									Grid.Column="1"
+									MinWidth="26"
+									Height="20"
+									Padding="5,0"
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									Background="{DynamicResource PrimaryBrush}"
+									CornerRadius="10">
+									<TextBlock
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="11.5"
+										FontWeight="Bold"
+										Foreground="{DynamicResource OnPrimaryBrush}"
+										Text="{Binding OrderText}" />
+								</Border>
+								<TextBlock Grid.Column="2" Style="{StaticResource W.CellMono}" Text="{Binding PortText}" />
+								<TextBlock
+									Grid.Column="3"
+									Margin="0,0,8,0"
+									FontWeight="SemiBold"
+									Style="{StaticResource W.Cell}"
+									Text="{Binding Title}"
+									ToolTip="{Binding Title}" />
+								<TextBlock Grid.Column="4" Style="{StaticResource W.CellMono}" Text="{Binding NumberText}" />
+								<StackPanel Grid.Column="5" VerticalAlignment="Center" Orientation="Horizontal">
+									<md:PackIcon
+										Width="15"
+										Height="15"
+										Margin="0,0,5,0"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Kind="{Binding TypeIcon, Converter={StaticResource IconKind}}" />
+									<TextBlock Style="{StaticResource W.Cell}" Text="{Binding TypeText}" />
+								</StackPanel>
+								<TextBlock Grid.Column="6" Style="{StaticResource W.Cell}" Text="{Binding FacingText}" />
+								<StackPanel Grid.Column="7" VerticalAlignment="Center" Orientation="Horizontal">
+									<TextBlock Style="{StaticResource W.CellMono}" Text="{Binding ChannelNumberText}" />
+									<!--  주소 ≠ 순번 — 고치지 않고 알리기만 한다  -->
+									<TextBlock
+										Margin="4,0,0,0"
+										VerticalAlignment="Center"
+										FontSize="12"
+										Foreground="{DynamicResource StatusWarningBrush}"
+										Text="≠"
+										ToolTip="버스 주소와 순번이 다릅니다 — 주소는 그대로 둡니다"
+										Visibility="{Binding HasChannelMismatch, Converter={StaticResource BoolToVisibility}}" />
+								</StackPanel>
+								<TextBlock Grid.Column="8" Style="{StaticResource W.CellMono}" Text="{Binding GapText}" />
+								<WrapPanel Grid.Column="9" VerticalAlignment="Center" Orientation="Horizontal">
+									<Border
+										Style="{StaticResource W.Tag}"
+										ToolTip="번호순 제안 — [이대로 적용] 전에는 저장 대기가 아닙니다"
+										Visibility="{Binding IsSuggested, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock FontSize="10.5" Text="제안" />
+									</Border>
+									<Border
+										BorderBrush="{DynamicResource StatusWarningBrush}"
+										Style="{StaticResource W.Tag}"
+										ToolTip="저장하지 않은 줄 — [저장하기]를 눌러야 저장됩니다"
+										Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock FontSize="10.5" Text="● 미저장" />
+									</Border>
+									<Border
+										Style="{StaticResource W.Tag}"
+										ToolTip="같은 장비번호가 둘 이상입니다 — id 순으로 놓습니다"
+										Visibility="{Binding IsDuplicateNumber, Converter={StaticResource BoolToVisibility}}">
+										<TextBlock FontSize="10.5" Text="번호 같음" />
+									</Border>
+								</WrapPanel>
+								<Button
+									Grid.Column="10"
+									Width="22"
+									Height="22"
+									Padding="0"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.SlotRemove.{0}}"
+									Click="OnRemoveSlot"
+									Content="✕"
+									FontSize="10"
+									Style="{StaticResource Console.Button.Icon}"
+									ToolTip="결선에서 빼기(Delete) — 뒤는 당겨집니다" />
+							</Grid>
+						</Border>
+					</Grid>
+				</drag:DropZoneChrome>
+			</StackPanel>
 		</DataTemplate>
 	</UserControl.Resources>
 
@@ -1199,108 +1264,170 @@
 							Visibility="{Binding IsFenceView, Converter={StaticResource BoolToVisibility}}">
 							<fence:FenceView AutomationProperties.AutomationId="Devices.Wiring.FenceView" />
 						</Border>
-					<ScrollViewer
+						<ScrollViewer
 							AutomationProperties.AutomationId="Devices.Wiring.TableView"
-							Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}"
 							HorizontalScrollBarVisibility="Disabled"
 							Style="{StaticResource Console.ScrollViewer}"
-							VerticalScrollBarVisibility="Auto">
-					<StackPanel Margin="12">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="150" />
-								<ColumnDefinition Width="*" />
-							</Grid.ColumnDefinitions>
-
-							<!--  제어기 상자 (WS L394-396)  -->
-							<StackPanel Margin="0,0,10,0">
-								<TextBlock Style="{StaticResource W.Title}" Text="제어기" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding ShapeText}" TextWrapping="Wrap" />
+							VerticalScrollBarVisibility="Auto"
+							Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}">
+							<!--
+								표 보기(표 보기 정리 · 2026-09-30) — 링처럼 읽히게: 위에 제어기 머리(이름 · 주소 · 종류 · 포트 A/B · 리턴케이블 · 체인 길이/기준),
+								아래에 체인 표(열 고정 · 줄 높이 38 · 함체 자리에 "A 쪽 ← 함체 → B 쪽" 띠). 가로 스크롤 없음(1280 기준).
+							-->
+							<StackPanel Margin="12,0,12,12">
+								<!--  제어기 머리  -->
 								<Border
-									Margin="0,6,0,0"
-									Padding="9,8"
+									Padding="12,10"
 									Background="{DynamicResource SurfaceSunkenBrush}"
 									BorderBrush="{DynamicResource PrimaryBrush}"
 									BorderThickness="2"
-									CornerRadius="8"
-									MinHeight="120">
-									<StackPanel VerticalAlignment="Center">
-										<TextBlock
-											FontSize="13"
-											FontWeight="Bold"
-											Text="{Binding Controller.Name}"
-											TextWrapping="Wrap" />
-										<TextBlock
-											Margin="0,3,0,0"
-											Style="{StaticResource W.Hint}"
-											Text="{Binding Controller.Address}" />
-										<StackPanel Margin="0,6,0,0" Orientation="Horizontal">
-											<Border
-												Margin="0,0,5,0"
-												Padding="5,1"
-												BorderBrush="{DynamicResource BorderBrush}"
-												BorderThickness="1"
-												CornerRadius="4">
-												<TextBlock FontSize="10.5" Text="Sensor A" />
-											</Border>
-											<Border
-												Padding="5,1"
-												BorderBrush="{DynamicResource BorderBrush}"
-												BorderThickness="1"
-												CornerRadius="4">
-												<TextBlock FontSize="10.5" Text="Sensor B" />
-											</Border>
+									CornerRadius="8">
+									<DockPanel LastChildFill="True">
+										<!--  포트 A · B + 리턴케이블 — 링의 양 끝  -->
+										<StackPanel Margin="16,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Right">
+											<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+												<Border
+													Padding="7,2"
+													Background="{DynamicResource SurfaceAltBrush}"
+													BorderBrush="{DynamicResource BorderBrush}"
+													BorderThickness="1"
+													CornerRadius="4">
+													<TextBlock FontFamily="Consolas" FontSize="11.5" Text="Sensor A" />
+												</Border>
+												<TextBlock
+													Margin="6,0"
+													VerticalAlignment="Center"
+													FontSize="11.5"
+													Foreground="{DynamicResource TextSecondaryBrush}"
+													Text="◀ 리턴케이블 · 체인 · 리턴케이블 ▶" />
+												<Border
+													Padding="7,2"
+													Background="{DynamicResource SurfaceAltBrush}"
+													BorderBrush="{DynamicResource BorderBrush}"
+													BorderThickness="1"
+													CornerRadius="4">
+													<TextBlock FontFamily="Consolas" FontSize="11.5" Text="Sensor B" />
+												</Border>
+											</StackPanel>
+											<TextBlock
+												Margin="0,5,0,0"
+												HorizontalAlignment="Right"
+												FontSize="11.5"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다" />
 										</StackPanel>
-									</StackPanel>
+										<StackPanel VerticalAlignment="Center">
+											<StackPanel Orientation="Horizontal">
+												<md:PackIcon
+													Width="18"
+													Height="18"
+													Margin="0,0,8,0"
+													VerticalAlignment="Center"
+													Foreground="{DynamicResource PrimaryBrush}"
+													Kind="ServerNetwork" />
+												<TextBlock
+													VerticalAlignment="Center"
+													AutomationProperties.AutomationId="Devices.Wiring.Table.ControllerName"
+													FontSize="15"
+													FontWeight="Bold"
+													Text="{Binding Controller.Name}"
+													TextTrimming="CharacterEllipsis" />
+												<TextBlock
+													Margin="10,0,0,0"
+													VerticalAlignment="Center"
+													FontFamily="Consolas"
+													FontSize="12.5"
+													Foreground="{DynamicResource TextSecondaryBrush}"
+													Text="{Binding Controller.Address}" />
+											</StackPanel>
+											<TextBlock
+												Margin="26,4,0,0"
+												FontSize="12"
+												Foreground="{DynamicResource TextSecondaryBrush}"
+												Text="{Binding ControllerKindText}"
+												TextTrimming="CharacterEllipsis" />
+											<TextBlock
+												Margin="26,2,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Table.ChainSummary"
+												FontSize="12"
+												FontWeight="SemiBold"
+												Text="{Binding ChainSummaryText}"
+												TextTrimming="CharacterEllipsis" />
+										</StackPanel>
+									</DockPanel>
 								</Border>
-							</StackPanel>
 
-							<StackPanel Grid.Column="1">
-								<!--  목록 — 링 체인 전체(Sensor A 쪽 끝부터 · v0.4 모든 제어기가 링)  -->
-								<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding Line1Hint}" TextWrapping="Wrap" />
+								<!--  체인 표 — 머리 줄(열 폭은 줄 템플릿과 같다)  -->
+								<DockPanel Margin="0,12,0,4" LastChildFill="True">
+									<TextBlock
+										VerticalAlignment="Center"
+										DockPanel.Dock="Right"
+										Style="{StaticResource W.Hint}"
+										Text="Alt+← → 한 칸 · Delete 빼기 · F 방향 · 손잡이로 끌기" />
+									<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
+								</DockPanel>
 								<Border
-									Margin="0,6,0,12"
-									Padding="8"
 									Background="{DynamicResource SurfaceAltBrush}"
 									BorderBrush="{DynamicResource DividerBrush}"
 									BorderThickness="1"
 									CornerRadius="8">
-									<Grid>
-									<!--  케이블(WS L285) — 칸 뒤로 지나가는 2px 선  -->
-									<Rectangle
-										Height="2"
-										Margin="8,0"
-										VerticalAlignment="Top"
-										Fill="{DynamicResource DividerBrush}"
-										IsHitTestVisible="False"
-										RadiusX="1"
-										RadiusY="1"
-										Style="{StaticResource W.Cable}" />
-									<DockPanel LastChildFill="True">
+									<StackPanel>
+										<Border
+											Height="30"
+											Background="{DynamicResource SurfaceBrush}"
+											BorderBrush="{DynamicResource DividerBrush}"
+											BorderThickness="0,0,0,1"
+											CornerRadius="8,8,0,0">
+											<Grid Margin="8,0">
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="24" />
+													<ColumnDefinition Width="44" />
+													<ColumnDefinition Width="88" />
+													<ColumnDefinition Width="*" MinWidth="120" />
+													<ColumnDefinition Width="72" />
+													<ColumnDefinition Width="112" />
+													<ColumnDefinition Width="44" />
+													<ColumnDefinition Width="60" />
+													<ColumnDefinition Width="52" />
+													<ColumnDefinition Width="112" />
+													<ColumnDefinition Width="30" />
+												</Grid.ColumnDefinitions>
+												<TextBlock Grid.Column="1" Style="{StaticResource W.ColHead}" Text="위치" />
+												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="A · B 번호" />
+												<TextBlock Grid.Column="3" Style="{StaticResource W.ColHead}" Text="이름" />
+												<TextBlock Grid.Column="4" Style="{StaticResource W.ColHead}" Text="장비번호" />
+												<TextBlock Grid.Column="5" Style="{StaticResource W.ColHead}" Text="종류" />
+												<TextBlock Grid.Column="6" Style="{StaticResource W.ColHead}" Text="방향" ToolTip="앞 = 펜스 외부 · 뒤 = 펜스 내부 · 기둥 센서만" />
+												<TextBlock Grid.Column="7" Style="{StaticResource W.ColHead}" Text="버스 주소" />
+												<TextBlock Grid.Column="8" Style="{StaticResource W.ColHead}" Text="간격" ToolTip="앞 센서와의 간격(m) — 두 종류 기본 간격 중 작은 값" />
+												<TextBlock Grid.Column="9" Style="{StaticResource W.ColHead}" Text="상태" />
+											</Grid>
+										</Border>
 										<ListBox
+											Margin="8,2,8,6"
 											AutomationProperties.AutomationId="Devices.Wiring.Line.1"
+											ItemTemplate="{StaticResource W.RowTemplate}"
 											ItemsSource="{Binding Line1}"
-											ItemTemplate="{StaticResource W.SlotTemplate}"
 											PreviewKeyDown="OnLinePreviewKeyDown"
 											SelectionChanged="OnSlotSelectionChanged"
 											SelectionMode="Extended"
-											Style="{StaticResource W.SlotList}">
+											Style="{StaticResource W.RowList}">
 											<b:Interaction.Behaviors>
 												<drag:CaptureDragBehavior
 													DisplayMemberPath="Display"
 													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Delete 빼기" />
+													KeyboardFallback="Alt+← → 한 칸 · Delete 빼기 · F 방향" />
 											</b:Interaction.Behaviors>
 										</ListBox>
-									</DockPanel>
-									</Grid>
+									</StackPanel>
 								</Border>
+								<TextBlock
+									Margin="2,6,0,0"
+									Style="{StaticResource W.Hint}"
+									Text="{Binding Line1Hint}"
+									TextWrapping="Wrap" />
 							</StackPanel>
-						</Grid>
-
-					</StackPanel>
-				</ScrollViewer>
+						</ScrollViewer>
 					</Grid>
 				</DockPanel>
 

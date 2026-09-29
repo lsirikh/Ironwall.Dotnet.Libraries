@@ -141,6 +141,7 @@ public sealed partial class WiringViewModel
             NotifyOfPropertyChange(nameof(FenceSpacing));
             StatusText = $"펜스센서 간격 {FenceSpacingMetres:0.#}m 로 다시 놓았습니다 — 그림만 바뀌고 저장 대상은 아닙니다.";
             RefreshIssues();
+            SyncLines();
             RaiseFence();
         }
     }
@@ -424,6 +425,24 @@ public sealed partial class WiringViewModel
         var first = keys.Contains(key) ? key : keys[0];
         var next = _board.FacingOf(first) == WiringFacing.Front ? WiringFacing.Back : WiringFacing.Front;
         return FenceSetFacing(keys, next);
+    }
+
+    /// <summary>표 보기의 키 F — 고른 칸(여럿이면 고른 칸 전부)의 방향을 첫 칸의 반대쪽으로 맞춘다.</summary>
+    public bool FlipSelectedSlotFacing()
+    {
+        var keys = Line1.Concat(Line2).Where(s => s.IsSelected && s.Row is not null).Select(s => s.Row!.Key).ToList();
+        if (keys.Count == 0) return false;
+        var capable = keys.Where(_board.SupportsFacing).ToList();
+        if (capable.Count == 0)
+        {
+            StatusText = "펜스센서 · 지진동센서는 방향이 없습니다(철망 가운데 · 땅속).";
+            return false;
+        }
+        var next = _board.FacingOf(capable[0]) == WiringFacing.Front ? WiringFacing.Back : WiringFacing.Front;
+        var selected = keys.ToHashSet();
+        var ok = FenceSetFacing(capable, next);
+        foreach (var slot in Line1.Concat(Line2)) slot.IsSelected = slot.Row is not null && selected.Contains(slot.Row.Key);   // 다시 그려도 고른 칸 유지
+        return ok;
     }
 
     private bool FenceSetFacing(IReadOnlyList<int> keys, WiringFacing facing)

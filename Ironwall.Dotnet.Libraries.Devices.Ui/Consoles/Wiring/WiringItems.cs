@@ -287,6 +287,44 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     /// <summary>버스 주소와 순번이 다른가 — 화면에 둘 다 보이고, 고치지는 않는다.</summary>
     public bool HasChannelMismatch => _row?.Channel is { } channel && _order > 0 && channel != _order;
 
+    #region - 표 보기 열(표 보기 정리 · 2026-09-30) -
+    private string _typeText = string.Empty;
+    private string _typeIcon = "Radar";
+    private string _facingText = string.Empty;
+    private string _gapText = string.Empty;
+    private bool _isDraft;
+    private bool _isDuplicateNumber;
+    private bool _enclosureBefore;
+    private string _enclosureLabel = string.Empty;
+
+    /// <summary>종류 짧은 글 — "스마트 복합" · "복합" · "펜스" · "지진동".</summary>
+    public string TypeText { get => _typeText; internal set { _typeText = value ?? string.Empty; NotifyOfPropertyChange(); } }
+
+    /// <summary>종류 아이콘 이름(<c>PackIconKind</c> — 뷰의 변환기가 없는 이름이면 기본 아이콘으로 바꾼다).</summary>
+    public string TypeIcon { get => _typeIcon; internal set { _typeIcon = value ?? "Radar"; NotifyOfPropertyChange(); } }
+
+    /// <summary>방향 "앞" · "뒤" — 기둥 센서(스마트 복합 · 복합)만, 그 밖은 "—"(FR-20).</summary>
+    public string FacingText { get => _facingText; internal set { _facingText = value ?? string.Empty; NotifyOfPropertyChange(); } }
+
+    /// <summary>앞 센서와의 간격 "6m"(첫 센서는 "—") — 간격 표(두 종류 중 작은 값 · 현장 펜스 간격).</summary>
+    public string GapText { get => _gapText; internal set { _gapText = value ?? string.Empty; NotifyOfPropertyChange(); } }
+
+    /// <summary>저장 전 바뀐 줄(새 줄 · 값 · 자리 · 방향) — 상태 열 "미저장".</summary>
+    public bool IsDraft { get => _isDraft; internal set { _isDraft = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>같은 장비번호가 둘 이상 — 상태 열 "번호 같음"(id 순).</summary>
+    public bool IsDuplicateNumber { get => _isDuplicateNumber; internal set { _isDuplicateNumber = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>이 줄 <b>앞</b>이 함체(제어기) 자리 — 체인이 여기서 A 쪽 · B 쪽으로 갈린다(구분 띠).</summary>
+    public bool EnclosureBefore { get => _enclosureBefore; internal set { _enclosureBefore = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>구분 띠 글자 — "▲ A 쪽 1~6 · 함체(제어기) · B 쪽 7~13 ▼".</summary>
+    public string EnclosureLabel { get => _enclosureLabel; internal set { _enclosureLabel = value ?? string.Empty; NotifyOfPropertyChange(); } }
+
+    /// <summary>버스 주소 숫자만("—" 없음은 빈 글자).</summary>
+    public string ChannelNumberText => _row?.Channel is { } channel ? channel.ToString(CultureInfo.InvariantCulture) : "—";
+    #endregion
+
     /// <summary>드래그 고스트에 찍히는 글자.</summary>
     public string Display => _row?.Display ?? $"{LineName} 끝";
 
@@ -303,6 +341,7 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(SlotLabel));
         NotifyOfPropertyChange(nameof(HasChannelMismatch));
         NotifyOfPropertyChange(nameof(Display));
+        NotifyOfPropertyChange(nameof(ChannelNumberText));
     }
 
     public override string ToString() => Display;

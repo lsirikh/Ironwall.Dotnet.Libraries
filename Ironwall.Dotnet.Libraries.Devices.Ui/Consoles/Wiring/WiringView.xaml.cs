@@ -122,17 +122,20 @@ public partial class WiringView : UserControl
     private void OnLinePreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (ViewModel is not { } vm) return;
-        if (HandleLineKey(vm, e.Key, e.SystemKey)) e.Handled = true;
+        if (HandleLineKey(vm, e.Key, e.SystemKey, Keyboard.Modifiers)) e.Handled = true;
     }
 
     /// <summary>
     /// 선 목록의 키 판정 — 처리했으면 <c>true</c>(시험이 이 길로 뷰의 판정을 부른다 · F-2b L4).
     /// 모든 제어기가 링(v0.4)이라 선이 하나 — Alt+↑/↓(옛 "다른 가지로")는 흘려보낸다.
     /// </summary>
-    internal static bool HandleLineKey(WiringViewModel vm, Key key, Key systemKey)
+    internal static bool HandleLineKey(WiringViewModel vm, Key key, Key systemKey, ModifierKeys modifiers = ModifierKeys.None)
     {
         if (key == Key.System && systemKey is Key.Left) { vm.MoveSelectedBack(); return true; }
         if (key == Key.System && systemKey is Key.Right) { vm.MoveSelectedForward(); return true; }
+
+        // F = 보는 쪽 뒤집기(FR-20) — 펜스 보기와 같은 키. 수식 키가 없을 때만(Ctrl+F 등은 흘려보낸다).
+        if (key == Key.F && modifiers == ModifierKeys.None) { vm.FlipSelectedSlotFacing(); return true; }
 
         if (key == Key.Delete) { vm.UnplaceSelected(); return true; }
         return false;
@@ -219,4 +222,18 @@ public sealed class SensorTypeDisplayConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException("표시 전용 — Text 바인딩은 원문 코드를 그대로 쓴다.");
+}
+
+/// <summary>
+/// 아이콘 이름 → <see cref="MaterialDesignThemes.Wpf.PackIconKind"/>. XAML 문자열-enum 은 판본에 없는 이름이면 조용히 깨지므로
+/// 여기서 한 번 고르고 없으면 레포가 이미 쓰는 <c>Radar</c> 로 둔다(표 보기 종류 열).
+/// </summary>
+public sealed class PackIconKindNameConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => Enum.TryParse<MaterialDesignThemes.Wpf.PackIconKind>(value as string, ignoreCase: false, out var kind)
+            ? kind
+            : MaterialDesignThemes.Wpf.PackIconKind.Radar;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }

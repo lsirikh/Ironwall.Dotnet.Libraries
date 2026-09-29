@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using System;
 using System.Collections.Generic;
@@ -274,6 +275,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         Sync(Line1, WiringSpec.LINE_PRIMARY);
         Sync(Line2, WiringSpec.LINE_SECONDARY);
         NotifyOfPropertyChange(nameof(UnplacedCount));
+        NotifyOfPropertyChange(nameof(ChainSummaryText));
 
         void Sync(ObservableCollection<WiringSlotViewModel> slots, int line)
         {
@@ -281,16 +283,55 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             while (slots.Count > count) slots.RemoveAt(slots.Count - 1);
             while (slots.Count < count) slots.Add(new WiringSlotViewModel(line, slots.Count));
 
+            var duplicates = _board.Rows.GroupBy(r => r.Facts.Number).Where(g => g.Count() > 1).SelectMany(g => g).Select(r => r.Key).ToHashSet();
+            var gap = _board.Chain.ControllerGap;
+            var placed = count - 1;
+            WiringSensorRow? previous = null;
             for (var i = 0; i < count; i++)
             {
                 var row = _board.RowAt(line, i);
-                slots[i].Row = row;
-                slots[i].Order = _board.OrderAt(line, i);
-                slots[i].LineName = LineNameOf(line);
-                slots[i].PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"A{n.Order} · B{b}" : string.Empty;
-                slots[i].IsSuggested = row is not null && _board.IsProposed(row.Key);
+                var slot = slots[i];
+                slot.Row = row;
+                slot.Order = _board.OrderAt(line, i);
+                slot.LineName = LineNameOf(line);
+                slot.PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"A{n.Order} · B{b}" : string.Empty;
+                slot.IsSuggested = row is not null && _board.IsProposed(row.Key);
+
+                // 표 보기 열(표 보기 정리) — 종류 · 방향 · 간격 · 상태 · 함체 자리 구분 띠
+                var type = WiringTopology.ParseSensorType(row?.Facts.TypeText);
+                slot.TypeText = row is null ? string.Empty : TypeShortText(type, row.Facts.TypeText);
+                slot.TypeIcon = TypeIconName(type);
+                slot.FacingText = row is null ? string.Empty : row.SupportsFacing ? (row.Facing == WiringFacing.Back ? "뒤" : "앞") : "—";
+                slot.GapText = row is null ? string.Empty
+                    : previous is null ? "—"
+                    : $"{_board.Spacing.GapBetween(WiringTopology.ParseSensorType(previous.Facts.TypeText), type):0.#}m";
+                slot.IsDraft = row is not null && (row.IsNew || row.FactsChanged || !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement));
+                slot.IsDuplicateNumber = row is not null && duplicates.Contains(row.Key);
+                slot.EnclosureBefore = IsRing && placed > 0 && i == Math.Clamp(gap, 0, placed);
+                slot.EnclosureLabel = slot.EnclosureBefore
+                    ? $"▲ A 쪽 {(gap > 0 ? $"1~{gap}" : "없음")}   ·   함체(제어기) 자리   ·   B 쪽 {(gap < placed ? $"{gap + 1}~{placed}" : "없음")} ▼"
+                    : string.Empty;
+                if (row is not null) previous = row;
             }
         }
+
+        static string TypeShortText(EnumDeviceType type, string raw) => type switch
+        {
+            _ when WiringTopology.IsSmartSensor(type) => "스마트 복합",
+            EnumDeviceType.Multi => "복합",
+            EnumDeviceType.Fence => "펜스",
+            EnumDeviceType.Underground => "지진동",
+            _ => string.IsNullOrWhiteSpace(raw) ? "—" : raw,
+        };
+
+        static string TypeIconName(EnumDeviceType type) => type switch
+        {
+            _ when WiringTopology.IsSmartSensor(type) => "Radar",
+            EnumDeviceType.Multi => "MotionSensor",
+            EnumDeviceType.Fence => "Fence",
+            EnumDeviceType.Underground => "Waveform",
+            _ => "Radar",
+        };
     }
 
     /// <summary>표의 "결선" 칸 글자.</summary>
@@ -421,6 +462,26 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
 
     /// <summary>목록 제목.</summary>
     public string Line1Title => "링 — Sensor A → … → Sensor B";
+
+    /// <summary>표 보기 머리 — 제어기 종류(모든 제어기가 링 · v0.4).</summary>
+    public string ControllerKindText => _board.Topology.ControllerKind switch
+    {
+        WiringControllerKind.Smart => "스마트 제어기 · 링(1U 도킹 · 스마트 + VBUS 제어기)",
+        WiringControllerKind.Pids => "펜스 경계 제어기 · 링",
+        WiringControllerKind.Io => "IO 제어기 · 링",
+        _ => "제어기 · 링(종류 모름)",
+    };
+
+    /// <summary>표 보기 머리 — 체인 대수 · 길이 · 기준(한도 표 · 섞이면 O-11).</summary>
+    public string ChainSummaryText
+    {
+        get
+        {
+            var reference = _board.Limits.ReferenceLength(_board.Family) is { } m ? $"기준 {m:0}m"
+                : _board.IsMixedFamily ? WiringLimitTable.MIXED_SHORT : "기준 —";
+            return $"체인 {_board.Chain.Count}대 · 길이 약 {_board.ChainLengthMetres:0}m / {reference} · 함체 자리 {EnclosureGapText}";
+        }
+    }
 
     /// <summary>목록 설명.</summary>
     public string Line1Hint => "왼쪽이 Sensor A 쪽 끝(A1)입니다 · 칩의 A·B 는 두 포트에서 센 번호 · 양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다 · Alt+← → 한 칸 · Delete 로 뺍니다";

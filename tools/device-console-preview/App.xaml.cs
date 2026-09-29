@@ -884,6 +884,21 @@ public partial class App : Application
                             await Settle();
                             Save(shotDir, $"fence-{t}-{name}-{(flat ? "flat" : "tilt")}-{w}x{h}");
                         }
+
+                // 표 보기(결선 단계의 [표 보기]) — 같은 시나리오 · 같은 두 크기.
+                foreach (var name in new[] { "ring", "pids", "line" })
+                    foreach (var (w, h) in new[] { (1280, 820), (1440, 900) })
+                    {
+                        var (view, vm) = preview.Scenario(name);
+                        view.Width = w;
+                        view.Height = h;
+                        _window.Width = w + 40;
+                        _window.Height = h + 60;
+                        _window.Content = new Border { Child = view };
+                        vm.ShowTableView();
+                        await Settle();
+                        Save(shotDir, $"table-{t}-{name}-{w}x{h}");
+                    }
             }
         }
         catch (Exception ex)
