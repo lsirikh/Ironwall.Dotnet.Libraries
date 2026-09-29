@@ -282,18 +282,19 @@ public class DtoToModelHelperTests
     }
 
     /// <summary>
-    /// ACTION_REPORT NATS 발행 봉투 계약 검증 (Gop_Message_Broker §2.3·§2.4·§6.4).
-    /// NatsDomainService 발행 경로와 동일: OriginEvent 담은 ActionEventModel → ToActionEventDto() → ToBrokerPublish("GIS").
-    /// 회귀 방지: body가 {content,user}만이던 결함(from_event 누락) + from=SystemUuid 결함 재발 차단.
+    /// ACTION_REPORT 폴백 body 계약(브로커 명세 v2.0.7 §6.4) — 서버 201 data 원문이 없을 때 발행부(NatsDomainService)가 싣는 모양.
+    /// from="GIS" · cmd=ACTION_REPORT · <c>from_event.category_event</c> 판별자 · 장비 <b>참조 2키</b> · bool <c>action_reported</c>.
+    /// 종전 이 시험은 조립한 장비 블록(status · version · controller_id · geolocation)을 "§6.4 계약" 으로 단언했다 — 명세 v2.0 은 그 조립을 금지한다.
     /// </summary>
     [Fact]
-    public void ToBrokerPublish_ActionReport_ShouldCarryFullFromEventAndGisFrom()
+    public void should_carry_the_spec_shaped_from_event_and_gis_from_when_the_fallback_action_report_is_published()
     {
         // Arrange — 조치보고 원본(Detection + Device)
         var origin = new DetectionEventModel
         {
             Id = 1001,
             MessageType = EnumEventType.Intrusion,
+            Result = EnumDetectionType.PIR_SENSOR,
             DateTime = new DateTime(2026, 7, 8, 5, 21, 31, DateTimeKind.Utc),
             Device = new SensorDeviceModel
             {
@@ -308,51 +309,50 @@ public class DtoToModelHelperTests
                 Longitude = 127.0
             }
         };
-        var actionModel = new ActionEventModel
-        {
-            Id = 4001,
-            MessageType = EnumEventType.Action,
-            DateTime = new DateTime(2026, 7, 8, 5, 21, 31, DateTimeKind.Utc),
-            Content = "야생동물출현",
-            User = "시스템 관리자",
-            OriginEvent = origin
-        };
 
-        // Act — 발행부(NatsDomainService)와 동일 경로
-        var dto = actionModel.ToActionEventDto();
-        var envelope = dto.ToBrokerPublish(EnumGopCommand.ACTION_REPORT.ToString(), "GIS");
-        var json = Newtonsoft.Json.JsonConvert.SerializeObject(envelope);
+        // Act — 발행부 폴백과 같은 길
+        var body = ActionReportFallbackBody.Build(4001, "야생동물출현", "kim(1234)", new DateTime(2026, 7, 8, 5, 21, 31, DateTimeKind.Utc), origin);
+        var envelope = body.ToBrokerPublish(EnumGopCommand.ACTION_REPORT.ToString(), "GIS");
+        var sent = Newtonsoft.Json.Linq.JObject.Parse(envelope.ToJson()!);
 
-        // Assert — 계약: from="GIS", cmd=ACTION_REPORT, body.from_event(device.id=101)
-        Assert.Equal("GIS", envelope.From);
-        Assert.Equal("ACTION_REPORT", envelope.Command);
-        Assert.NotNull(dto.FromEvent);
-        var dev = ((DetectionEventDto)dto.FromEvent!).Device!;
-        Assert.Equal(101, dev.Id);
-        Assert.Equal("ACTIVATED", dev.Status);      // §6.4 device.status
-        Assert.Equal("v1.5.0", dev.Version);        // §6.4 device.version
-        Assert.Equal(1, dev.ControllerId);          // §6.4 device.controller_id
-        Assert.NotNull(dev.Geolocation);            // §6.4 device.geolocation
-        Assert.Equal(4001, dto.Id);
-        Assert.Contains("\"from\":\"GIS\"", json);
-        Assert.Contains("\"from_event\"", json);
-        Assert.Contains("\"id\":101", json);            // from_event.device.id
-        Assert.Contains("\"controller_id\":1", json);
-        Assert.Contains("\"status\":\"ACTIVATED\"", json);
+        // Assert — 봉투
+        Assert.Equal("GIS", sent.Value<string>("from"));
+        Assert.Equal("ACTION_REPORT", sent.Value<string>("cmd"));
+        Assert.Equal("PUB", sent.Value<string>("m_type"));
+        // Assert — body(§6.4 필드)
+        var b = (Newtonsoft.Json.Linq.JObject)sent["body"]!;
+        Assert.Equal(4001, b.Value<int>("id"));
+        Assert.Equal("Action", b.Value<string>("type_event"));
+        Assert.Equal("야생동물출현", b.Value<string>("content"));
+        Assert.Equal("kim(1234)", b.Value<string>("user"));
+        var from = (Newtonsoft.Json.Linq.JObject)b["from_event"]!;
+        Assert.Equal(1001, from.Value<int>("id"));
+        Assert.Equal("detection", from.Value<string>("category_event"));
+        Assert.Equal("Intrusion", from.Value<string>("type_event"));
+        Assert.Equal("PIR_SENSOR", from.Value<string>("result"));
+        Assert.Equal(Newtonsoft.Json.Linq.JTokenType.Boolean, from["action_reported"]!.Type);
+        Assert.True(from.Value<bool>("action_reported"));
+        // 장비는 참조 두 키뿐 — 상태 · 판 · 제어기 · 좌표를 조립하지 않는다
+        var device = (Newtonsoft.Json.Linq.JObject)from["device"]!;
+        Assert.Equal(new[] { "id", "category_device" }, device.Properties().Select(p => p.Name).ToArray());
+        Assert.Equal(101, device.Value<int>("id"));
+        Assert.Equal("sensor", device.Value<string>("category_device"));
     }
 
     /// <summary>
-    /// FR-02/FR-04(GIS.md v1.5 §2.1/§6.4): ACTION_REPORT from_event.device 가
-    /// device_groups(N:N EventMapping 라우팅 키 id) + geolocation 전필드(location/altitude/heading)를 담는다.
+    /// §6.4 v2.0: 본문에 그룹 · 좌표가 없다 — 받는 쪽은 장비 캐시의 group_ids 로 EventMapping 을 찾는다.
+    /// 종전 이 시험은 device_groups · geolocation 전필드를 싣는 것을 계약으로 단언했다(GIS.md v1.5) — 명세가 뒤집혔다.
+    /// 장비가 지워졌으면 device 는 null, 장애 원본이면 category_event=malfunction · reason 을 싣는다.
     /// </summary>
     [Fact]
-    public void should_carry_device_groups_and_full_geolocation_when_action_report_published()
+    public void should_not_assemble_device_groups_or_geolocation_when_the_fallback_action_report_is_published()
     {
-        // Arrange — 그룹 소속 + 고도/방위/설명 있는 장비
-        var origin = new DetectionEventModel
+        // Arrange — 그룹 소속 + 고도/방위/설명 있는 장비(장애 원본)
+        var origin = new MalfunctionEventModel
         {
             Id = 1002,
-            MessageType = EnumEventType.Intrusion,
+            MessageType = EnumEventType.Fault,
+            Reason = EnumFaultType.FAULT_FENCE,
             DateTime = new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
             Device = new SensorDeviceModel
             {
@@ -361,7 +361,6 @@ public class DtoToModelHelperTests
                 DeviceName = "Sensor-B-11",
                 DeviceNumber = 11,
                 Status = EnumDeviceStatus.ERROR,
-                Version = "v1.5.0",
                 Controller = new ControllerDeviceModel { Id = 2 },
                 DeviceGroups = new List<int> { 1, 10 },
                 Latitude = 37.5,
@@ -371,31 +370,23 @@ public class DtoToModelHelperTests
                 Location = "북측 울타리 A구간"
             }
         };
-        var actionModel = new ActionEventModel
-        {
-            Id = 4002,
-            MessageType = EnumEventType.Action,
-            DateTime = new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
-            Content = "동물",
-            User = "운영자",
-            OriginEvent = origin
-        };
 
-        // Act — 발행부와 동일 경로
-        var dto = actionModel.ToActionEventDto();
-        var json = Newtonsoft.Json.JsonConvert.SerializeObject(
-            dto.ToBrokerPublish(EnumGopCommand.ACTION_REPORT.ToString(), "GIS"));
+        // Act
+        var body = ActionReportFallbackBody.Build(4002, "동물", "운영자", new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc), origin);
+        var deleted = ActionReportFallbackBody.Build(4003, "동물", "운영자", DateTime.UtcNow,
+            new DetectionEventModel { Id = 1003, MessageType = EnumEventType.Intrusion, Device = null });
 
-        // Assert — device_groups(라우팅 키 id) + geolocation 전필드
-        var dev = ((DetectionEventDto)dto.FromEvent!).Device!;
-        Assert.NotNull(dev.DeviceGroups);
-        Assert.Equal(new[] { 1, 10 }, dev.DeviceGroups!.Select(g => g.Id).ToArray());
-        Assert.NotNull(dev.Geolocation);
-        Assert.Equal(42.5, dev.Geolocation!.Altitude);
-        Assert.Equal(135.0, dev.Geolocation!.Heading);
-        Assert.Equal("북측 울타리 A구간", dev.Geolocation!.Location);
-        Assert.Contains("\"device_groups\"", json);
-        Assert.Contains("\"altitude\":42.5", json);
+        // Assert
+        var from = (Newtonsoft.Json.Linq.JObject)body["from_event"]!;
+        Assert.Equal("malfunction", from.Value<string>("category_event"));
+        Assert.Equal("FAULT_FENCE", from.Value<string>("reason"));
+        Assert.Equal(2, ((Newtonsoft.Json.Linq.JObject)from["device"]!).Count);
+        var json = body.ToString(Newtonsoft.Json.Formatting.None);
+        Assert.DoesNotContain("\"device_groups\"", json);
+        Assert.DoesNotContain("\"geolocation\"", json);
+        Assert.DoesNotContain("\"controller_id\"", json);
+        Assert.DoesNotContain("\"status\"", json);
+        Assert.Equal(Newtonsoft.Json.Linq.JTokenType.Null, deleted["from_event"]!["device"]!.Type);
     }
 }
 

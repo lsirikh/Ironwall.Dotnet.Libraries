@@ -236,23 +236,54 @@ public class EventQueueDefectTests
 
     #region - ⑤ 자동복구 로그인 게이트 -
 
-    [Fact]
-    public void should_not_send_the_auto_recovery_report_when_logged_out()
+    /// <summary>
+    /// 자동복구 배선 — 제어기 블랙아웃 장애 카드를 <b>목록에 실제로 걸어 둔</b> 상태(엔트리 ↔ 카드 매칭까지)에서 자동복구를 일으킨다.
+    /// 카드가 없으면 HandleAutoRecoveryAsync 가 게이트와 상관없이 "카드 없음" 으로 먼저 돌아가 시험이 늘 통과한다(Loop A, WP-7).
+    /// </summary>
+    private static (EventQueueManager Queue, Mock<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService> Api) WireRecoveryWithRegisteredCard(bool isAuthenticated)
     {
         var api = new Mock<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService>();
+        api.Setup(a => a.CreateActionEventAsync(It.IsAny<Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiResponse<Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventDto> { Success = false, Message = "시험 — 보내지 않는다" });
         var panel = new Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels.EventCardListPanelViewModel(
             new Mock<Caliburn.Micro.IEventAggregator>().Object, new Mock<ILogService>().Object, null!,
             new Mock<Ironwall.Dotnet.Monitoring.Models.Accounts.IAccountModel>().Object, api.Object,
             new Mock<ISymbolEventManager>().Object, new Mock<IEventQueueManager>().Object, new ActionReportGuard());
         var token = new Mock<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>();
-        token.SetupGet(t => t.IsAuthenticated).Returns(false);
+        token.SetupGet(t => t.IsAuthenticated).Returns(isAuthenticated);
         var queue = new EventQueueManager();
         Ironwall.Dotnet.Libraries.Events.Ui.Modules.EventUiModule.WireAutoActions(queue, panel, token.Object, null);
-        queue.Enqueue(new EventEntry { DeviceId = 9, DeviceType = EnumDeviceType.Controller, EventType = EnumEventType.Fault, IsControllerBlackout = true, EventId = 90 });
+
+        var entryId = queue.Enqueue(new EventEntry { DeviceId = 9, DeviceType = EnumDeviceType.Controller, EventType = EnumEventType.Fault, IsControllerBlackout = true, EventId = 90 });
+        var model = new Mock<Ironwall.Dotnet.Monitoring.Models.Events.IMalfunctionEventModel>();
+        model.SetupGet(m => m.Id).Returns(90);
+        model.SetupGet(m => m.MessageType).Returns(EnumEventType.Fault);
+        var card = new Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events.MalfunctionEventCardViewModel(model.Object);
+        panel.ViewModelProvider.Add(card);
+        panel.HandleAsync(new EventEntryEnqueuedMessage(entryId, 90, 9, EnumDeviceType.Controller, EnumEventType.Fault), CancellationToken.None).GetAwaiter().GetResult();
+        Assert.Equal(entryId, card.EntryId);   // 카드가 엔트리에 걸렸다 — 이제 게이트만이 발송을 막는다
+        return (queue, api);
+    }
+
+    [Fact]
+    public void should_not_send_the_auto_recovery_report_when_logged_out()
+    {
+        var (queue, api) = WireRecoveryWithRegisteredCard(isAuthenticated: false);
 
         Assert.True(queue.TryAutoRecoverController(9));
 
         api.Verify(a => a.CreateActionEventAsync(It.IsAny<Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventCreateDto>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public void should_send_the_auto_recovery_report_when_logged_in_and_the_card_is_registered()
+    {
+        // 위 시험의 대조군 — 같은 배선에서 로그인 상태면 조치보고 API 가 실제로 불린다(시험이 게이트를 재고 있다는 증거).
+        var (queue, api) = WireRecoveryWithRegisteredCard(isAuthenticated: true);
+
+        Assert.True(queue.TryAutoRecoverController(9));
+
+        api.Verify(a => a.CreateActionEventAsync(It.Is<Ironwall.Dotnet.Libraries.Messages.Dto.Events.ActionEventCreateDto>(d => d.FromEventId == 90), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

@@ -29,10 +29,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 /// 참이 퍼지는 순간 서로의 [주간 반복] 을 끄고 그 TwoWay 바인딩이 IsWeekly=false 를 써 넣었다. 사람이 눌러도 똑같다.
 /// 한 사본만 있는 미리보기 · 헤드리스(실제 뷰 + 실제 UIA 클라이언트 Select)에서는 멀쩡했다 — 그래서 사본을 세워 재현한다.
 /// </remarks>
-public class SuppressionRecurrenceRadioTests
+public class SuppressionRecurrenceRadioTests : IDisposable
 {
     private const string OneShotId = "Console.Suppression.Form.Recurrence.OneShot";
     private const string WeeklyId = "Console.Suppression.Form.Recurrence.Weekly";
+
+    /// <summary>전역 <see cref="PlatformProvider.Current"/> — 시험마다 바꾸고 끝나면 되돌린다(다른 시험이 이 값을 물려받지 않게, Loop A WP-7).</summary>
+    private readonly IPlatformProvider _previousPlatform = PlatformProvider.Current;
+
+    public SuppressionRecurrenceRadioTests() => PlatformProvider.Current = new DefaultPlatformProvider();
+
+    public void Dispose() => PlatformProvider.Current = _previousPlatform;
 
     private static string DrawerXamlPath([CallerFilePath] string here = "")
         => Path.Combine(Path.GetDirectoryName(here)!, "..", "Views", "Consoles", "SuppressionDrawerView.xaml");
@@ -111,7 +118,6 @@ public class SuppressionRecurrenceRadioTests
     [Fact]
     public void should_switch_drawer_to_weekly_when_the_weekly_radio_is_selected_through_automation()
     {
-        PlatformProvider.Current = new DefaultPlatformProvider();
         var (isWeekly, isChecked, text) = RunSta(() =>
         {
             var drawer = NewDrawer();
@@ -131,7 +137,6 @@ public class SuppressionRecurrenceRadioTests
     public void should_keep_weekly_when_old_detached_drawer_copies_still_share_the_viewmodel()
     {
         // 이벤트 창을 두 번 닫았다 연 셈 — 창에서 떨어졌지만 살아 있는 옛 서랍 두 벌이 같은 뷰모델에 붙어 있다.
-        PlatformProvider.Current = new DefaultPlatformProvider();
         var (isWeekly, liveChecked, text) = RunSta(() =>
         {
             var drawer = NewDrawer();
@@ -154,7 +159,6 @@ public class SuppressionRecurrenceRadioTests
     [Fact]
     public void should_keep_weekly_when_two_drawer_copies_share_the_viewmodel_in_one_window()
     {
-        PlatformProvider.Current = new DefaultPlatformProvider();
         var (isWeekly, text) = RunSta(() =>
         {
             var drawer = NewDrawer();
@@ -177,7 +181,6 @@ public class SuppressionRecurrenceRadioTests
     public void should_return_to_one_shot_when_the_one_shot_radio_is_selected_after_weekly()
     {
         // 묶음을 부모로 바꾼 뒤에도 두 라디오는 서로를 끈다(같은 StackPanel).
-        PlatformProvider.Current = new DefaultPlatformProvider();
         var (isWeekly, weeklyChecked, text) = RunSta(() =>
         {
             var drawer = NewDrawer();

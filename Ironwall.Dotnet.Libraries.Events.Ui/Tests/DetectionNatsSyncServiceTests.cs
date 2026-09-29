@@ -44,7 +44,7 @@ public class DetectionNatsSyncServiceTests
     }
 
     [Fact]
-    public async Task OnNatsDetection_ShouldPublishEventEntryEnqueuedMessage()
+    public async Task should_publish_the_entry_enqueued_message_when_a_detect_envelope_arrives()
     {
         // Arrange
         var service = CreateService(out var mockEa, out var mockQueue);
@@ -93,7 +93,7 @@ public class DetectionNatsSyncServiceTests
     }
 
     [Fact]
-    public async Task OnNatsDetection_NonDetectionCmd_ShouldNotPublish()
+    public async Task should_not_publish_when_the_cmd_is_not_detect()
     {
         // Arrange
         var service = CreateService(out var mockEa, out var mockQueue);
@@ -123,7 +123,7 @@ public class DetectionNatsSyncServiceTests
     }
 
     [Fact]
-    public async Task OnNatsDetection_ShouldCallEnqueueWithCorrectEntry()
+    public async Task should_enqueue_the_matching_entry_when_a_detect_envelope_arrives()
     {
         // Arrange
         var service = CreateService(out var mockEa, out var mockQueue);
@@ -162,7 +162,7 @@ public class DetectionNatsSyncServiceTests
     }
 
     [Fact]
-    public async Task OnNatsDetection_DeviceIdFromNestedDevice_WhenTopLevelDeviceIdMissing()
+    public async Task should_read_the_nested_device_id_when_the_top_level_device_id_is_missing()
     {
         // Arrange — device_id 필드 없이 device.id만 있는 실제 NATS 페이로드 시나리오
         var service = CreateService(out var mockEa, out var mockQueue);

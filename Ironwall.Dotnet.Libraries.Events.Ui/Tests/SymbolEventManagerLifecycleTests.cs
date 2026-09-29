@@ -59,18 +59,21 @@ public class SymbolEventManagerLifecycleTests
     }
 
     [Fact]
-    public void should_keep_the_id_fallback_pointing_at_the_remaining_kind_when_one_of_two_kinds_is_unregistered()
+    public void should_not_paint_the_remaining_kind_when_a_none_type_transition_arrives_after_one_of_two_kinds_is_unregistered()
     {
+        // WP-8 H2(57abf5db) — Id 단독 폴백은 NONE 을 받지 않는다. 종류를 모르는 전이가 같은 번호의 다른 장비를 칠하면
+        //   그 조치가 남의 상태색을 지운다((7,NONE) 이 카메라 7 을 칠하던 결함). 종전 이 시험은 그 오칠을 기대했다.
         var sem = CreateManager();
         var (fence, fenceSymbol) = Pair(20, EnumDeviceType.Fence);
         var (camera, cameraSymbol) = Pair(20, EnumDeviceType.IpCamera);
         sem.RegisterDeviceSymbol(fence, fenceSymbol.Object);
-        sem.RegisterDeviceSymbol(camera, cameraSymbol.Object);   // Id 보조 색인은 나중 것(카메라)
+        sem.RegisterDeviceSymbol(camera, cameraSymbol.Object);
 
         sem.UnregisterDeviceSymbol(20, EnumDeviceType.IpCamera);
         sem.HandleDeviceStateChanged(20, EnumDeviceType.NONE, EnumCompositeEventStatus.Normal, EnumCompositeEventStatus.Detecting);
 
-        Assert.Equal(EnumCompositeEventStatus.Detecting, fenceSymbol.Object.CompositeStatus);   // Id 폴백이 남은 종류로 이어졌다
+        Assert.Equal(EnumCompositeEventStatus.Normal, fenceSymbol.Object.CompositeStatus);    // 남은 울타리를 칠하지 않는다
+        Assert.Equal(EnumCompositeEventStatus.Normal, cameraSymbol.Object.CompositeStatus);   // 해제된 카메라도(해제 때 정상화된 그대로)
     }
 
     [Fact]

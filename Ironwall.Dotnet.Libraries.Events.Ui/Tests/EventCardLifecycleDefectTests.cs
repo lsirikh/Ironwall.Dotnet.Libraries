@@ -33,7 +33,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
    Company      : Sensorway Co., Ltd.
 ****************************************************************************/
 [Collection("IoC-Dependent")]   // IoC.GetInstance 는 전역 정적 — 스텁을 쓰는 다른 시험과 병렬로 돌면 서로 덮는다
-public class EventCardLifecycleDefectTests
+public class EventCardLifecycleDefectTests : IDisposable
 {
     private readonly Mock<IEventAggregator> _ea = new();
     private readonly Mock<ILogService> _log = new();
@@ -43,7 +43,11 @@ public class EventCardLifecycleDefectTests
     private readonly Mock<IEventQueueManager> _queue = new();
     private readonly ActionReportGuard _guard = new();
     private readonly List<object> _published = new();
-    private static readonly EventSetupModel _setup = new(new Mock<IEventSetupModel>().Object);
+    // 시험마다 새로 — 정적 공유 설정은 한 시험이 바꾼 값을 다음 시험이 물려받는다(Loop A, WP-7).
+    private readonly EventSetupModel _setup = new(new Mock<IEventSetupModel>().Object);
+    /// <summary>진짜 EventApiService 를 끼울 때만(⑳ 실파싱 시험). 없으면 목.</summary>
+    private IEventApiService? _apiOverride;
+    private readonly Func<Type, string, object> _previousGetInstance = IoC.GetInstance;
 
     public EventCardLifecycleDefectTests()
     {
@@ -53,7 +57,7 @@ public class EventCardLifecycleDefectTests
             if (type == typeof(ILogService)) return _log.Object;
             if (type == typeof(EventSetupModel)) return _setup;
             if (type == typeof(IAccountModel)) return _account.Object;
-            if (type == typeof(IEventApiService)) return _api.Object;
+            if (type == typeof(IEventApiService)) return _apiOverride ?? _api.Object;
             if (type == typeof(IActionReportGuard)) return _guard;
             return null!;
         };
@@ -64,6 +68,9 @@ public class EventCardLifecycleDefectTests
         _account.SetupGet(a => a.Username).Returns("kim");
         _account.SetupGet(a => a.EmployeeNumber).Returns("1234");
     }
+
+    /// <summary>전역 IoC 를 시험 전 값으로 되돌린다 — 다음 시험(다른 클래스 포함)이 이 시험의 목을 물려받지 않게.</summary>
+    public void Dispose() => IoC.GetInstance = _previousGetInstance;
 
     private EventCardListPanelViewModel CreatePanel()
         => new(_ea.Object, _log.Object, null!, _account.Object, _api.Object, _symbols.Object, _queue.Object, _guard);
@@ -445,6 +452,53 @@ public class EventCardLifecycleDefectTests
         var sent = Assert.Single(_published.OfType<SendActionRequestMessage>());
         Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(raw, Newtonsoft.Json.Linq.JToken.Parse(sent.ServerActionJson!)));
         Assert.Equal(83, sent.ActionId);
+    }
+
+    /// <summary>201 응답을 그대로 돌려주는 가짜 HTTP 처리기 — 진짜 ApiService · EventApiService 파싱을 그대로 탄다.</summary>
+    private sealed class CannedHttpHandler : System.Net.Http.DelegatingHandler
+    {
+        private readonly System.Net.HttpStatusCode _status;
+        private readonly string _body;
+        public CannedHttpHandler(System.Net.HttpStatusCode status, string body) { _status = status; _body = body; }
+        public System.Net.Http.HttpRequestMessage? Request { get; private set; }
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(_status)
+            {
+                Content = new System.Net.Http.StringContent(_body, System.Text.Encoding.UTF8, "application/json"),
+                RequestMessage = request,
+            });
+        }
+    }
+
+    [Fact]
+    public async Task should_carry_the_parsed_201_data_verbatim_when_a_card_reports_through_the_real_event_api_service()
+    {
+        // 목에 RawData 를 꽂지 않는다 — 201 JSON 을 진짜 EventApiService(응답 파싱 · data 원문 읽기)에 흘린다.
+        const string data = """
+        {"id":84,"type_event":"Action","content":"순찰 조치","user":"kim(1234)",
+         "from_event":{"id":3,"category_event":"detection","type_event":"Intrusion","action_reported":true,"result":"PIR_SENSOR",
+                       "device":{"id":349,"category_device":"sensor"},"device_description":"[sensor:Fence] GOP-SNS-01-01 (number: 101, id: 349)",
+                       "detail":{"signal":2000},"created_at":"2026-09-12T12:15:34.312591+09:00","updated_at":"2026-09-12T12:15:34.343185+09:00"},
+         "created_at":"2026-09-12T12:15:34.341757+09:00","updated_at":"2026-09-12T12:15:34.341759+09:00"}
+        """;
+        var handler = new CannedHttpHandler(System.Net.HttpStatusCode.Created, "{\"success\":true,\"message\":\"created\",\"data\":" + data + "}");
+        var setup = new Ironwall.Dotnet.Libraries.Api.Models.ApiSetupModel { Url = "http://127.0.0.1:9/api" };
+        var http = new Ironwall.Dotnet.Libraries.Api.Services.ApiService(_log.Object, setup, handler);
+        http.Initialize();
+        _apiOverride = new EventApiService(_log.Object, http, setup);
+
+        var result = await Detection(3).SendActionDetailed("순찰 조치", "kim(1234)");
+
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Request!.Method);
+        Assert.EndsWith("/events/actions", handler.Request.RequestUri!.AbsolutePath);
+        Assert.Equal(84, result.ActionId);
+        var sent = Assert.Single(_published.OfType<SendActionRequestMessage>());
+        Assert.Equal(84, sent.ActionId);
+        Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(Newtonsoft.Json.Linq.JToken.Parse(data), Newtonsoft.Json.Linq.JToken.Parse(sent.ServerActionJson!)),
+            sent.ServerActionJson);
     }
 
     #endregion
