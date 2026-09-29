@@ -390,15 +390,15 @@
 								x:Name="Bd"
 								Background="Transparent"
 								CornerRadius="4" />
-							<!--  선택 = 좌측 3px 세로 바 (드롭 위치의 가로선과 축이 직교)  -->
-							<Rectangle
+							<!--  선택 = 좌측 3px 세로 바 (드롭 위치의 가로선과 축이 직교).
+							      선택 배경(Bd) 안쪽 왼쪽 가장자리에 붙인다 — 목업 `.rail .ri.on::before{left:0;border-radius:3px 0 0 3px}`.
+							      예전 Margin -8 은 막대를 배경 밖 레일 가장자리로 밀어 창 테두리 위에 떨어져 그렸다(2026-09-29 사용자 보고).  -->
+							<Border
 								x:Name="Bar"
 								Width="3"
-								Margin="-8,6,0,6"
 								HorizontalAlignment="Left"
-								Fill="{DynamicResource PrimaryBrush}"
-								RadiusX="1.5"
-								RadiusY="1.5"
+								Background="{DynamicResource PrimaryBrush}"
+								CornerRadius="4,0,0,4"
 								Visibility="Collapsed" />
 							<Border
 								x:Name="Focus"
