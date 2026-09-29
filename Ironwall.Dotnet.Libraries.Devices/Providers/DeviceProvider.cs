@@ -81,6 +81,20 @@ public class DeviceProvider : BaseProvider<IBaseDeviceModel>, IHandle<DeviceUnit
     #region - Events -
     /// <summary>한 장비의 <c>UnitId</c> 를 고쳤다(UI 스레드).</summary>
     public event EventHandler<IBaseDeviceModel>? DeviceUnitChanged;
+
+    /// <summary>
+    /// 캐시에 있던 장비 모델을 <b>제자리에서</b> 고쳤다(SYNC_DEVICE 재조회) — 컬렉션은 그대로라 <c>CollectionChanged</c> 가 울리지 않고,
+    /// 모델은 변경 알림이 없는 평범한 객체라 그 모델을 보여 주는 화면(장비 콘솔의 행 · 상세)은 이 신호가 없으면 옛 값을 쥔 채 남는다.
+    /// </summary>
+    /// <remarks>호출 스레드: 고친 쪽의 스레드(NATS 처리 스레드일 수 있다) — 받는 쪽이 UI 스레드로 옮긴다.</remarks>
+    public event EventHandler<IBaseDeviceModel>? DeviceUpdated;
+
+    /// <summary>제자리 갱신을 알린다(<see cref="DeviceUpdated"/>).</summary>
+    public void NotifyDeviceUpdated(IBaseDeviceModel device)
+    {
+        if (device is null) return;
+        DeviceUpdated?.Invoke(this, device);
+    }
     #endregion
 
     #region - Attributes -

@@ -1092,8 +1092,13 @@ public class MockDeviceApiService : IDeviceApiService
         return Task.FromResult(ApiListResponse<ControllerDeviceDto>.CreateSuccess(new List<ControllerDeviceDto>()));
     }
 
+    /// <summary>단건 제어기 조회가 돌려줄 값(SYNC_DEVICE 재조회 시험) — 비우면 종전처럼 NOT_IMPLEMENTED.</summary>
+    public ControllerDeviceDto? ControllerById { get; set; }
+
     public Task<ApiResponse<ControllerDeviceDto>> GetControllerByIdAsync(int id, bool includeSensors = false, CancellationToken token = default, string? view = null, string? include = null)
-        => Task.FromResult(ApiResponse<ControllerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+        => Task.FromResult(ControllerById is { } controller && controller.Id == id
+            ? ApiResponse<ControllerDeviceDto>.CreateSuccess(controller)
+            : ApiResponse<ControllerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     public Task<ApiResponse<ControllerDeviceDto>> CreateControllerAsync(ControllerDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<ControllerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));

@@ -145,6 +145,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         foreach (var source in _sources.Values) source.BusyEnded += OnSourceBusyEnded;
         DeviceProvider.CollectionEntity.CollectionChanged += OnDevicesChanged;
+        DeviceProvider.DeviceUpdated += OnDeviceUpdated;
         _groupProvider.CollectionEntity.CollectionChanged += OnGroupsChanged;
         GroupDrop.Completed += OnGroupDropCompleted;
         Detail.Guard.Blocked += OnNavigationBlocked;
@@ -166,6 +167,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         foreach (var source in _sources.Values) source.BusyEnded -= OnSourceBusyEnded;
         DeviceProvider.CollectionEntity.CollectionChanged -= OnDevicesChanged;
+        DeviceProvider.DeviceUpdated -= OnDeviceUpdated;
         _groupProvider.CollectionEntity.CollectionChanged -= OnGroupsChanged;
         GroupDrop.Completed -= OnGroupDropCompleted;
         Detail.Guard.Blocked -= OnNavigationBlocked;
@@ -176,6 +178,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _draft = null;
         _lastGroupUndo = null;
         _closeConfirmed = false;
+        _externalUpdateWhileEditing = false;
         Form.Clear();
         Detail.Reset();
         SearchText = string.Empty;
@@ -382,6 +385,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         var rows = selected?.Cast<object>().ToList() ?? new List<object>();
         if (SameRows(rows, Form.Rows) && !Detail.IsCreating) return true;
 
+        // 그리드가 고른 행을 놓친 까닭이 운영자가 아니라 목록 변경이다(삭제 알림 · 같은 Id 행 교체) — 폼을 비우지 않는다.
+        // 그리드는 원천에서 빠진 고른 행을 선택에서 떼며 이 경로를 먼저 부른다. 여기서 비우면 뒤이은 Id 맞추기가 고를 것이 없다.
+        if (IsSelectionLostToListChange(rows))
+        {
+            ScheduleExternalReconcile();
+            return true;
+        }
+
         if (IsOperationRunning)
         {
             // 저장 · 재조회가 도는 중 — 패널의 선택을 바꾸면 안 된다. 거절은 말없이 하지 않는다: 예전에는 [갱신] 뒤 2초 동안 고른 행이
@@ -433,6 +444,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         RefreshStatus();
+
+        // 콘솔이 시키지 않은 변경으로 행이 빠지거나 바뀌었다(SYNC_DEVICE 삭제 · 같은 Id 행 교체) — 고른 장비를 Id 로 다시 맞춘다.
+        // 다시 채우기(Reset)는 패널의 재조회 · 저장 · 삭제가 하고, 그 끝남(OnSourceBusyEnded)이 맞춘다.
+        if (e.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Replace)
+            ScheduleExternalReconcile();
 
         // [등록] 을 기다리는 중에 새 행이 목록에 들어왔다 — 패널의 끝남(저장 뒤 2초 지연 + 결과 안내)을 기다리지 않고
         // 그 행을 곧바로 고른다. 예전에는 새 그룹이 목록에 떴는데도 상세가 한참 "새 그룹 등록 · 아직 등록 전" 이었다(GIS 실창 #16).
@@ -621,6 +637,15 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             return;
         }
 
+        // 고치는 동안 다른 곳에서 이 장비가 바뀌었다 — 되돌리기는 옛 글이 아니라 지금 값을 불러온다.
+        if (_externalUpdateWhileEditing && Form.Rows.Count > 0)
+        {
+            LoadForm(Form.Rows.ToList(), isCreating: false);
+            Detail.LastMessage = "되돌렸습니다 — 다른 곳에서 바뀐 값을 불러왔습니다.";
+            RefreshToolbar();
+            return;
+        }
+
         Form.Revert();
         Detail.Settle("되돌렸습니다.");
     }
@@ -628,6 +653,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private void LoadForm(IReadOnlyList<object> rows, bool isCreating)
     {
         var readOnly = !DevicePermissionGate.CanEdit();
+        _externalUpdateWhileEditing = false;   // 새로 읽은 폼은 지금 값이다 — "다른 곳에서 바뀌었다"는 이제 지난 일
+        if (StatusText == ExternalUpdateWhileEditingText) StatusText = string.Empty;
 
         if (_railKey == GroupsRailKey)
             Form.Load(rows, DeviceGroupPropertySpecs.All, default, isCreating, readOnly);
@@ -814,8 +841,82 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
 
         var lost = Form.Rows.Count - again.Count;
-        Reselect(again, lost > 0 ? $"고른 장비 {lost}대가 목록에서 사라졌습니다." : null);
+        var message = lost > 0 ? $"고른 장비 {lost}대가 목록에서 사라졌습니다." : null;
+        Reselect(again, message);
+        // 상세 바닥 막대는 남은 행이 있으면 "변경 없음" 자리라 가려질 수 있다 — 상태 띠에도 남긴다(말없이 선택을 잃지 않는다).
+        if (message is not null) StatusText = message;
     }
+
+    /// <summary>목록 변경 뒤 Id 로 다시 맞추기를 한 번만 걸어 둔다(같은 차례의 삭제 · 추가를 다 본 뒤에 맞춘다).</summary>
+    private void ScheduleExternalReconcile()
+    {
+        if (_externalReconcileQueued) return;
+        _externalReconcileQueued = true;
+        Caliburn.Micro.Execute.BeginOnUIThread(() =>
+        {
+            _externalReconcileQueued = false;
+            ReconcileAfterListChange();
+        });
+    }
+
+    /// <summary>
+    /// 콘솔이 시키지 않은 목록 변경 뒤 — 폼이 쥔 행이 목록에 그대로면 할 일이 없고, 아니면 같은 Id 행으로 바꿔 끼우거나(손댄 칸 보존)
+    /// 사라졌다고 알린다(<see cref="Reconcile"/>). 걸어 둔 일이 도는 중이면 그 끝남이 맞춘다.
+    /// </summary>
+    private void ReconcileAfterListChange()
+    {
+        if (_current is null || IsOperationRunning || Detail.IsCreating || Form.Rows.Count == 0) return;
+
+        var rows = _current.Rows.Cast<object>().ToList();
+        if (Form.Rows.All(rows.Contains)) return;
+
+        Reconcile(rows);
+        RefreshToolbar();
+        RefreshStatus();
+    }
+
+    /// <summary>그리드가 보고한 선택이 폼의 행 일부뿐이고, 빠진 행이 원천에서 사라졌다 — 운영자의 조작이 아니다.</summary>
+    private bool IsSelectionLostToListChange(IReadOnlyList<object> rows)
+    {
+        if (_current is null || Detail.IsCreating || Form.Rows.Count == 0 || rows.Count >= Form.Rows.Count) return false;
+        if (!rows.All(Form.Rows.Contains)) return false;
+
+        var source = _current.Rows.Cast<object>().ToList();
+        return Form.Rows.Any(r => !source.Contains(r));
+    }
+
+    /// <summary>SYNC_DEVICE 가 캐시의 장비 모델을 제자리에서 고쳤다 — 어느 스레드에서든 온다.</summary>
+    private void OnDeviceUpdated(object? sender, IBaseDeviceModel device)
+        => Caliburn.Micro.Execute.BeginOnUIThread(() => ApplyExternalUpdate(device));
+
+    /// <summary>
+    /// 그 장비의 행을 다시 그리고, 상세가 그 장비를 보고 있으면 새 값을 읽는다. 손댄 칸이 있으면 <b>덮지 않고</b> 상태 띠로 알린다 —
+    /// [적용]은 고친 칸만 새 값 위에 쓰고, [되돌리기]는 새 값을 불러온다.
+    /// </summary>
+    private void ApplyExternalUpdate(IBaseDeviceModel device)
+    {
+        if (_current is null) return;
+
+        // 모델은 변경 알림이 없는 객체라 행이 스스로 모른다 — 그 행의 칸을 전부 다시 읽게 한다.
+        foreach (var row in _current.Rows.Cast<object>().Where(r => ReferenceEquals(ModelOf(r), device)).ToList())
+            (row as Caliburn.Micro.INotifyPropertyChangedEx)?.Refresh();
+
+        if (Detail.IsCreating || IsOperationRunning) return;     // 걸어 둔 일 뒤에는 그 끝남이 다시 고르고 읽는다
+        if (!Form.Rows.Any(r => ReferenceEquals(ModelOf(r), device))) return;
+
+        if (Detail.Tracker.IsDirty)
+        {
+            _externalUpdateWhileEditing = true;
+            StatusText = ExternalUpdateWhileEditingText;
+            RefreshToolbar();
+            return;
+        }
+
+        LoadForm(Form.Rows.ToList(), isCreating: false);
+        RefreshToolbar();
+    }
+
+    private static IBaseDeviceModel? ModelOf(object row) => row.GetType().GetProperty("Model")?.GetValue(row) as IBaseDeviceModel;
 
     /// <summary>재조회로 행 인스턴스가 바뀐다 — 같은 Id 의 새 행을 다시 고른다.</summary>
     private void Reselect(IReadOnlyList<object> rows, string? message)
@@ -1356,6 +1457,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     /// <summary>저장 · 재조회 중에 행을 골랐다 — 받지 않은 까닭(상태 띠).</summary>
     public const string SelectionRefusedWhileBusyText = "목록을 불러오거나 저장하는 중이라 고른 행을 받지 않았습니다 — 끝난 뒤 다시 고르세요.";
 
+    /// <summary>고치던 장비가 다른 곳에서 바뀌었다 — 고치던 칸은 덮지 않았다(상태 띠).</summary>
+    public const string ExternalUpdateWhileEditingText = "고른 장비가 다른 곳에서 바뀌었습니다 — 고치던 칸은 그대로 두었습니다. [되돌리기]를 누르면 바뀐 값을 불러옵니다.";
+
     /// <summary>상태 띠의 한 줄 소식(그룹 넣기 결과 등).</summary>
     public string StatusText
     {
@@ -1435,6 +1539,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     private IReadOnlyList<DeviceColumnSpec> _columns = Array.Empty<DeviceColumnSpec>();
     private string? _railKey;
     private bool _isSwitching;
+    private bool _externalReconcileQueued;
+    private bool _externalUpdateWhileEditing;
     private object? _draft;
     private PendingOperation? _pending;
     private GroupDropUndo? _lastGroupUndo;

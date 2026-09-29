@@ -323,6 +323,9 @@ public class DeviceProviderService : IDeviceProviderService
                         else
                             _log?.Warning($"[SYNC-DIAG] Sensor({resourceId}) Controller.Id=0 — API가 Controller를 미포함하여 반환");
                     }
+
+                    // 제자리 갱신은 컬렉션 알림이 없다 — 그 모델을 보여 주는 화면(장비 콘솔의 행 · 상세)에 따로 알린다.
+                    _deviceProvider.NotifyDeviceUpdated(e);
                 }
                 else
                     _deviceProvider.Add(updated);
