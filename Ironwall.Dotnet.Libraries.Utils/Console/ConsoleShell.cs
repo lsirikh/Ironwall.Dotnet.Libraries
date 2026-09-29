@@ -60,6 +60,10 @@ public class ConsoleShell : Control
     public ConsoleShell()
     {
         SizeChanged += (_, _) => ApplyLayout();
+        // 바닥 띠 맞춤 — 띠 내용이 <b>줄어든</b> 것은 띠의 MinHeight 에 가려 셸까지 측정 무효가 올라오지 않는다(띠 원하는 높이가
+        // 그대로라서). 레이아웃 패스가 끝날 때마다 한 번 더 본다. LayoutUpdated 는 레이아웃 관리자가 강하게 잡으므로 붙어 있을 때만 구독한다.
+        Loaded += (_, _) => { LayoutUpdated -= OnLayoutUpdatedAlignBands; LayoutUpdated += OnLayoutUpdatedAlignBands; };
+        Unloaded += (_, _) => LayoutUpdated -= OnLayoutUpdatedAlignBands;
         // B2 — 이 셸이 제 OS 창의 뿌리면(부대 편제 · 맵핑 워크벤치) 그 창의 제목 줄을 토큰으로 칠한다. 호스트 카드 안에서는 아무것도 하지 않는다.
         ConsoleWindowChrome.Enlist(this);
     }
@@ -355,6 +359,141 @@ public class ConsoleShell : Control
         _splitter.DragCompleted -= OnSplitCompleted;
         _splitter.MouseDoubleClick -= OnSplitDoubleClick;
         _splitter.KeyDown -= OnSplitKeyDown;
+    }
+    #endregion
+
+    #region - 바닥 띠 윗선 맞춤 (레일 바닥 · 목록 상태 줄 · 상세 적용 막대) -
+    /// <summary>
+    /// 세 칸 바닥 띠의 <b>공통</b> 높이(상속). 셸이 스스로 정한다 — 보이는 띠들의 내용이 원하는 높이 중 가장 큰 값,
+    /// 단 <see cref="ConsoleLayoutMath.FooterBandHeight"/>(53) 이상 · 두 줄(<see cref="ConsoleLayoutMath.FooterBandAlignLimit"/>)을
+    /// 넘는 작업 판(조치 트레이 등)은 셈에서 뺀다. 띠마다 이 값을 <c>MinHeight</c> 로 걸어 윗선이 한 줄에 선다.
+    /// </summary>
+    /// <remarks>
+    /// 예전 규칙은 "띠마다 최소 53" 뿐이었다 — 내용이 53 을 넘는 띠(서버 콘솔 부대 필터 · 배정 칩, 계정 콘솔 권한 그룹 칩 줄)는
+    /// 제 높이로 자라 윗선이 계단처럼 어긋났다(2026-09-30 GIS 실창 020: 레일 · 상태 띠 128 / 상세 53 → 75px).
+    /// 셸 밖(미리보기 · 단독 레일)에서는 기본값 53 이라 예전과 같다. 안에 든 다른 셸은 제 값을 따로 정한다(가까운 셸이 이긴다).
+    /// </remarks>
+    public static readonly DependencyProperty FooterBandHeightProperty = DependencyProperty.RegisterAttached(
+        "FooterBandHeight", typeof(double), typeof(ConsoleShell),
+        new FrameworkPropertyMetadata(ConsoleLayoutMath.FooterBandHeight, FrameworkPropertyMetadataOptions.Inherits));
+
+    public static double GetFooterBandHeight(DependencyObject element)
+        => (double)(element ?? throw new ArgumentNullException(nameof(element))).GetValue(FooterBandHeightProperty);
+
+    public static void SetFooterBandHeight(DependencyObject element, double value)
+        => (element ?? throw new ArgumentNullException(nameof(element))).SetValue(FooterBandHeightProperty, value);
+
+    /// <summary>
+    /// 이 요소가 바닥 띠다(커널 템플릿이 단다: 레일 FooterHost · 셸 상태 줄 자리 · 상세 PART_Footer). 붙으면 가장 가까운
+    /// 셸에 등록되고, 셸은 측정 때마다 띠 내용의 원하는 높이를 모아 <see cref="FooterBandHeightProperty"/> 를 고친다.
+    /// </summary>
+    public static readonly DependencyProperty IsFooterBandProperty = DependencyProperty.RegisterAttached(
+        "IsFooterBand", typeof(bool), typeof(ConsoleShell), new PropertyMetadata(false, OnIsFooterBandChanged));
+
+    public static bool GetIsFooterBand(DependencyObject element)
+        => (bool)(element ?? throw new ArgumentNullException(nameof(element))).GetValue(IsFooterBandProperty);
+
+    public static void SetIsFooterBand(DependencyObject element, bool value)
+        => (element ?? throw new ArgumentNullException(nameof(element))).SetValue(IsFooterBandProperty, value);
+
+    private readonly List<FrameworkElement> _footerBands = new();
+
+    /// <summary>지금 이 셸에 등록된 바닥 띠(시험 · 진단용).</summary>
+    public IReadOnlyList<FrameworkElement> FooterBands => _footerBands;
+
+    private static void OnIsFooterBandChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement band) return;
+        band.Loaded -= OnFooterBandLoaded;
+        band.Unloaded -= OnFooterBandUnloaded;
+        if (e.NewValue is not true) return;
+
+        band.Loaded += OnFooterBandLoaded;
+        band.Unloaded += OnFooterBandUnloaded;
+        if (band.IsLoaded) OnFooterBandLoaded(band, null!);
+    }
+
+    private static void OnFooterBandLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement band || OwnerShell(band) is not { } shell || shell._footerBands.Contains(band)) return;
+        shell._footerBands.Add(band);
+        shell.InvalidateMeasure();
+    }
+
+    private static void OnFooterBandUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement band) return;
+        // 떨어져 나간 뒤라 부모 사슬이 없을 수 있다 — 등록한 셸을 모두 뒤지지 않고, 셸이 측정 때 떨어진 띠를 걷는다.
+        if (OwnerShell(band) is { } shell && shell._footerBands.Remove(band)) shell.InvalidateMeasure();
+    }
+
+    private static ConsoleShell? OwnerShell(DependencyObject element)
+    {
+        for (var node = VisualTreeHelper.GetParent(element); node != null; node = VisualTreeHelper.GetParent(node))
+            if (node is ConsoleShell shell) return shell;
+        return null;
+    }
+
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var desired = base.MeasureOverride(constraint);
+        AlignFooterBands();     // 자라는 쪽은 여기서 바로 잡힌다(띠 원하는 높이가 커지면 셸까지 측정이 올라온다)
+        return desired;
+    }
+
+    private void OnLayoutUpdatedAlignBands(object? sender, EventArgs e) => AlignFooterBands();
+
+    /// <summary>
+    /// 띠 내용의 원하는 높이는 띠 자신의 MinHeight 와 무관하다(자식 측정값) — 그래서 한 번 자란 값에 갇히지 않고 내용이 줄면 같이 준다.
+    /// 값이 바뀌면 띠의 MinHeight 바인딩이 띠를 다시 재게 하고 다음 패스에서 같은 값이 나오면 멈춘다(진동 없음 — 입력이 띠 크기가 아니다).
+    /// </summary>
+    private void AlignFooterBands()
+    {
+        if (_footerBands.Count == 0) return;
+        var band = ResolveFooterBandHeight();
+        if (Math.Abs(band - GetFooterBandHeight(this)) >= 0.5) SetFooterBandHeight(this, band);
+    }
+
+    /// <summary>
+    /// 보이는 띠들의 내용 높이 중 최댓값(최소 53, 위로 올림). 두 줄(<see cref="ConsoleLayoutMath.FooterBandAlignLimit"/>)을
+    /// 넘는 띠는 작업 판이라 셈에서 뺀다 — 그 띠만 제 높이로 서고 나머지는 따라 자라지 않는다.
+    /// </summary>
+    internal double ResolveFooterBandHeight()
+    {
+        _footerBands.RemoveAll(b => !ReferenceEquals(OwnerShell(b), this));
+        var tallest = 0d;
+        foreach (var band in _footerBands)
+        {
+            if (!IsShown(band)) continue;
+            var natural = NaturalBandHeight(band);
+            if (ConsoleLayoutMath.IsAlignableFooterBand(natural)) tallest = Math.Max(tallest, natural);
+        }
+        return ConsoleLayoutMath.AlignedFooterBandHeight(tallest);
+    }
+
+    /// <summary>띠 자신과 셸까지의 조상이 모두 보이는가(창에 붙기 전 · 화면 밖 렌더에서도 쓸 수 있게 IsVisible 대신).</summary>
+    private bool IsShown(FrameworkElement band)
+    {
+        for (DependencyObject? node = band; node != null && !ReferenceEquals(node, this); node = VisualTreeHelper.GetParent(node))
+            if (node is UIElement { Visibility: not Visibility.Visible }) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 띠 내용이 원하는 높이 — 띠의 MinHeight 가 끼지 않게 <b>자식</b>의 측정값으로 잰다.
+    /// Border 띠면 그 Padding · 테두리를 더한다. 내용이 없거나 접혔으면 0(이 띠는 맞춤에서 빠진다).
+    /// </summary>
+    internal static double NaturalBandHeight(FrameworkElement band)
+    {
+        if (band is Border border)
+        {
+            if (border.Child is not { Visibility: Visibility.Visible } child) return 0;
+            return child.DesiredSize.Height
+                + border.Padding.Top + border.Padding.Bottom
+                + border.BorderThickness.Top + border.BorderThickness.Bottom;
+        }
+        if (VisualTreeHelper.GetChildrenCount(band) == 0) return 0;
+        return VisualTreeHelper.GetChild(band, 0) is UIElement { Visibility: Visibility.Visible } content ? content.DesiredSize.Height : 0;
     }
     #endregion
 

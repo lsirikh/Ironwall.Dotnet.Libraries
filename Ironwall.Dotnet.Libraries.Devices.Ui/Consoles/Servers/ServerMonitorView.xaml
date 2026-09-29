@@ -90,37 +90,17 @@
 							Kind="{Binding Kind, Converter={StaticResource IconKind}}" />
 					</DataTemplate>
 				</c:ConsoleRail.Resources>
+				<!--
+					레일 바닥 띠는 합계 두 줄만 — 부대 필터는 툴바 둘째 줄(필터 줄)로 옮겼다(보고서 · 이벤트 · 계정 콘솔과 같은 자리).
+					예전에는 합계 + "부대" + 콤보 + "예하 포함" 을 여기 쌓아 띠가 128 까지 자라 체크 상자가 콘솔 바닥에 붙었고,
+					세 칸 바닥 띠 윗선이 75px 어긋났다(2026-09-30 GIS 실창 020).
+				-->
 				<c:ConsoleRail.Footer>
-					<StackPanel>
-						<TextBox
-							AutomationProperties.AutomationId="Console.Servers.Rail.Footer"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Style="{StaticResource Servers.ReadOnlyValue}"
-							Text="{Binding RailFooterText, Mode=OneWay}" />
-
-						<!--  부대 필터 — 8.0 이상에서만 뜻이 있어 그 밖에서는 아예 감춘다(비활성이 아니라).  -->
-						<StackPanel Margin="0,10,0,0" Visibility="{Binding IsUnitEra, Converter={StaticResource BoolToVisibility}}">
-							<TextBlock
-								FontSize="12"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="부대" />
-							<ComboBox
-								Margin="0,3,0,0"
-								AutomationProperties.AutomationId="Console.Servers.UnitFilter"
-								DisplayMemberPath="Name"
-								FontSize="12.5"
-								ItemsSource="{Binding UnitOptions}"
-								md:HintAssist.Hint="전체"
-								SelectedItem="{Binding SelectedUnit, Mode=TwoWay}" />
-							<CheckBox
-								Margin="0,5,0,0"
-								AutomationProperties.AutomationId="Console.Servers.IncludeDescendants"
-								Content="예하 포함"
-								FontSize="12"
-								IsChecked="{Binding IncludeDescendants, Mode=TwoWay}"
-								Style="{StaticResource Console.CheckBox}" />
-						</StackPanel>
-					</StackPanel>
+					<TextBox
+						AutomationProperties.AutomationId="Console.Servers.Rail.Footer"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Style="{StaticResource Servers.ReadOnlyValue}"
+						Text="{Binding RailFooterText, Mode=OneWay}" />
 				</c:ConsoleRail.Footer>
 			</c:ConsoleRail>
 		</c:ConsoleShell.Rail>
@@ -140,7 +120,36 @@
 				RefreshClick="OnReload"
 				SearchPlaceholder="이름 · 주소 · 유형 검색"
 				SearchText="{Binding SearchText, Mode=TwoWay}"
-				ShowSearch="{Binding IsServerList}" />
+				ShowSearch="{Binding IsServerList}">
+				<!--  부대 필터 — 8.0 이상에서만 뜻이 있어 그 밖에서는 아예 감춘다(비활성이 아니라). 감추면 필터 줄 자체가 높이 0 이다.  -->
+				<c:ConsoleToolbar.Filters>
+					<StackPanel Orientation="Horizontal" Visibility="{Binding IsUnitEra, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock
+							VerticalAlignment="Center"
+							FontSize="12"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="부대" />
+						<ComboBox
+							Width="180"
+							Margin="8,0,0,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Servers.UnitFilter"
+							DisplayMemberPath="Name"
+							FontSize="12.5"
+							ItemsSource="{Binding UnitOptions}"
+							md:HintAssist.Hint="전체"
+							SelectedItem="{Binding SelectedUnit, Mode=TwoWay}" />
+						<CheckBox
+							Margin="14,0,0,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Console.Servers.IncludeDescendants"
+							Content="예하 포함"
+							FontSize="12"
+							IsChecked="{Binding IncludeDescendants, Mode=TwoWay}"
+							Style="{StaticResource Console.CheckBox}" />
+					</StackPanel>
+				</c:ConsoleToolbar.Filters>
+			</c:ConsoleToolbar>
 		</c:ConsoleShell.Toolbar>
 
 		<c:ConsoleShell.List>
@@ -164,7 +173,162 @@
 					<Grid.RowDefinitions>
 						<RowDefinition Height="*" MinHeight="{x:Static local:ServerMonitorLayout.MinListHeight}" />
 						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
 					</Grid.RowDefinitions>
+
+					<!--
+						배정 트레이 — 목록 칸 바닥(지표 띠 아래, 상태 띠 바로 위). 칩은 두 줄까지 온전히 보이고(줄 높이 × 2) 넘치면 안에서 굴린다 —
+						예전 96 은 세 줄째가 칸 바닥에 붙어 잘려 보였다. 아래 여백 8 은 마지막 칩이 선에 닿지 않게 한다.
+					-->
+					<Border
+						Grid.Row="2"
+						Padding="12,6,12,8"
+						Background="{DynamicResource SurfaceAltBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="0,1,0,0">
+						<Border.Style>
+							<Style TargetType="Border">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasAssignCandidates}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+									<DataTrigger Binding="{Binding Tray.HasEntries}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Border.Style>
+						<StackPanel>
+							<!--  배정 대기 목록 — 여러 대 배정은 여기 쌓였다가 [적용] 한 번에 저장된다(콘솔 공통 규칙).  -->
+							<DockPanel
+								Margin="0,0,0,5"
+								LastChildFill="True"
+								Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVisibility}}">
+								<Button
+									Margin="6,0,0,0"
+									Padding="10,2"
+									AutomationProperties.AutomationId="Console.Servers.Tray.Revert"
+									Click="OnRevertTray"
+									Content="버리기"
+									DockPanel.Dock="Right"
+									FontSize="12"
+									IsEnabled="{Binding Tray.CanRevert}"
+									Style="{StaticResource Console.Button.Ghost}" />
+								<Button
+									Margin="8,0,0,0"
+									Padding="10,2"
+									AutomationProperties.AutomationId="Console.Servers.Tray.Apply"
+									Click="OnApplyTray"
+									Content="적용"
+									DockPanel.Dock="Right"
+									FontSize="12"
+									IsEnabled="{Binding Tray.CanApply}"
+									Style="{StaticResource Console.Button.Primary}" />
+								<TextBox
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Console.Servers.Tray.Message"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Style="{StaticResource Servers.ReadOnlyValue}">
+									<TextBox.Text>
+										<Binding
+											Mode="OneWay"
+											Path="Tray.Count"
+											StringFormat="배정 대기 {0}건 — [적용]을 누르면 저장됩니다." />
+									</TextBox.Text>
+								</TextBox>
+							</DockPanel>
+
+							<!--  배정 트레이 — 여기서 끌어 위의 서버 행에 놓는다. 같은 일을 [배정] 단추로도 한다(키보드 폴백).  -->
+							<DockPanel
+								LastChildFill="True"
+								Visibility="{Binding HasAssignCandidates, Converter={StaticResource BoolToVisibility}}">
+								<TextBlock
+									Width="44"
+									Margin="0,4,0,0"
+									VerticalAlignment="Top"
+									DockPanel.Dock="Left"
+									FontSize="12"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="장비" />
+								<Button
+									Margin="8,0,0,0"
+									Padding="10,2"
+									VerticalAlignment="Top"
+									AutomationProperties.AutomationId="Console.Servers.Assign.Button"
+									Click="OnAssignSelection"
+									Content="배정"
+									DockPanel.Dock="Right"
+									FontSize="12"
+									IsEnabled="{Binding CanAssignSelection}"
+									Style="{StaticResource Console.Button.Primary}"
+									ToolTip="{Binding AssignHint}" />
+								<ListBox
+									AutomationProperties.AutomationId="Console.Servers.Assign.Tray"
+									Background="Transparent"
+									BorderThickness="0"
+									MaxHeight="{x:Static local:ServerMonitorLayout.TrayMaxHeight}"
+									ItemsSource="{Binding AssignCandidates}"
+									Loaded="OnTrayLoaded"
+									ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+									ScrollViewer.VerticalScrollBarVisibility="Auto"
+									SelectionMode="Extended">
+									<!--  칩이 많으면(현장 약 40개) 세로 스크롤이 선다 — 콘솔의 얇은 막대로(기본 막대는 화살표 · 회색 판이 튀었다).  -->
+									<ListBox.Resources>
+										<Style BasedOn="{StaticResource Console.ScrollBar}" TargetType="ScrollBar" />
+									</ListBox.Resources>
+									<ListBox.ItemContainerStyle>
+										<Style TargetType="ListBoxItem">
+											<!--  ListBoxItem 은 peer 가 실재한다 — 칩의 식별자는 여기 단다.  -->
+											<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Servers.Assign.Chip.{0}}" />
+											<!--  줄 높이를 못 박는다 — 트레이 높이(TrayMaxHeight)가 정확히 두 줄이 되게(글꼴 · 테마가 바뀌어도 반 줄이 걸리지 않는다).  -->
+											<Setter Property="Height" Value="{x:Static local:ServerMonitorLayout.TrayRowHeight}" />
+											<Setter Property="VerticalContentAlignment" Value="Center" />
+										</Style>
+									</ListBox.ItemContainerStyle>
+									<ListBox.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel />
+										</ItemsPanelTemplate>
+									</ListBox.ItemsPanel>
+									<ListBox.ItemTemplate>
+										<DataTemplate>
+											<Border Margin="0,2,6,2" Style="{StaticResource Servers.Chip}">
+												<StackPanel Orientation="Horizontal">
+													<!--  손잡이에서만 끌기가 시작된다 — 행 본체 좌드래그는 범위선택과 충돌한다.  -->
+													<drag:DragHandle
+														Width="14"
+														Margin="0,0,4,0"
+														AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Servers.Assign.Handle.{0}}"
+														ToolTip="끌어서 서버 행에 놓으세요" />
+													<TextBlock
+														FontSize="11"
+														Foreground="{DynamicResource TextMutedBrush}"
+														Text="{Binding CategoryLabel}" />
+													<TextBlock
+														Margin="4,0,0,0"
+														FontSize="12"
+														Foreground="{DynamicResource TextPrimaryBrush}"
+														Text="{Binding Name}" />
+													<TextBlock
+														Margin="6,0,0,0"
+														FontSize="11"
+														Foreground="{DynamicResource TextMutedBrush}"
+														Text="{Binding ServerText}" />
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ListBox.ItemTemplate>
+									<b:Interaction.Behaviors>
+										<drag:CaptureDragBehavior
+											DisplayMemberPath="Name"
+											Handler="{Binding Assign}"
+											KeyboardFallback="장비를 고르고 서버 행을 고른 뒤 [배정]을 누르세요." />
+									</b:Interaction.Behaviors>
+								</ListBox>
+							</DockPanel>
+						</StackPanel>
+					</Border>
 
 					<!--  지표 띠 — 한 대를 고르면 목록 아래에 붙는다(SB L1345-1346).  -->
 					<Border
@@ -335,14 +499,18 @@
 			</Grid>
 		</c:ConsoleShell.List>
 
-		<!--  상태 띠 — 건수 · 방금 한 일 · 되돌리기 · 배정 트레이(끄는 곳)  -->
+		<!--
+			상태 띠 — 건수 · 방금 한 일 · 되돌리기(한 줄, 길면 두 줄). 배정 트레이(끄는 곳)는 목록 칸 바닥으로 옮겼다 —
+			상태 띠에 칩 세 줄을 얹으면 띠가 자라 세 칸 바닥 띠 윗선이 어긋났다(2026-09-30 GIS 실창 020).
+		-->
 		<c:ConsoleShell.StatusBar>
 			<Border
 				Padding="12,5"
 				Background="{DynamicResource SurfaceAltBrush}"
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="0,1,0,0">
-				<StackPanel>
+				<!--  띠 높이는 셸이 세 칸 공통으로 정한다(최소 53) — 글은 레일 · 상세 바닥 글과 같은 높이에 서도록 가운데.  -->
+				<StackPanel VerticalAlignment="Center">
 					<DockPanel LastChildFill="True">
 						<Button
 							Margin="8,0,0,0"
@@ -387,131 +555,6 @@
 						</TextBox>
 					</DockPanel>
 
-					<!--  배정 대기 목록 — 여러 대 배정은 여기 쌓였다가 [적용] 한 번에 저장된다(콘솔 공통 규칙).  -->
-					<DockPanel
-						Margin="0,5,0,0"
-						LastChildFill="True"
-						Visibility="{Binding Tray.HasEntries, Converter={StaticResource BoolToVisibility}}">
-						<Button
-							Margin="6,0,0,0"
-							Padding="10,2"
-							AutomationProperties.AutomationId="Console.Servers.Tray.Revert"
-							Click="OnRevertTray"
-							Content="버리기"
-							DockPanel.Dock="Right"
-							FontSize="12"
-							IsEnabled="{Binding Tray.CanRevert}"
-							Style="{StaticResource Console.Button.Ghost}" />
-						<Button
-							Margin="8,0,0,0"
-							Padding="10,2"
-							AutomationProperties.AutomationId="Console.Servers.Tray.Apply"
-							Click="OnApplyTray"
-							Content="적용"
-							DockPanel.Dock="Right"
-							FontSize="12"
-							IsEnabled="{Binding Tray.CanApply}"
-							Style="{StaticResource Console.Button.Primary}" />
-						<TextBox
-							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="Console.Servers.Tray.Message"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Style="{StaticResource Servers.ReadOnlyValue}">
-							<TextBox.Text>
-								<Binding
-									Mode="OneWay"
-									Path="Tray.Count"
-									StringFormat="배정 대기 {0}건 — [적용]을 누르면 저장됩니다." />
-							</TextBox.Text>
-						</TextBox>
-					</DockPanel>
-
-					<!--  배정 트레이 — 여기서 끌어 위의 서버 행에 놓는다. 같은 일을 [배정] 단추로도 한다(키보드 폴백).  -->
-					<DockPanel
-						Margin="0,5,0,0"
-						LastChildFill="True"
-						Visibility="{Binding HasAssignCandidates, Converter={StaticResource BoolToVisibility}}">
-						<TextBlock
-							Width="44"
-							Margin="0,4,0,0"
-							VerticalAlignment="Top"
-							DockPanel.Dock="Left"
-							FontSize="12"
-							Foreground="{DynamicResource TextMutedBrush}"
-							Text="장비" />
-						<Button
-							Margin="8,0,0,0"
-							Padding="10,2"
-							VerticalAlignment="Top"
-							AutomationProperties.AutomationId="Console.Servers.Assign.Button"
-							Click="OnAssignSelection"
-							Content="배정"
-							DockPanel.Dock="Right"
-							FontSize="12"
-							IsEnabled="{Binding CanAssignSelection}"
-							Style="{StaticResource Console.Button.Primary}"
-							ToolTip="{Binding AssignHint}" />
-						<ListBox
-							AutomationProperties.AutomationId="Console.Servers.Assign.Tray"
-							Background="Transparent"
-							BorderThickness="0"
-							MaxHeight="96"
-							ItemsSource="{Binding AssignCandidates}"
-							Loaded="OnTrayLoaded"
-							ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-							ScrollViewer.VerticalScrollBarVisibility="Auto"
-							SelectionMode="Extended">
-							<!--  칩이 많으면(현장 약 40개) 세로 스크롤이 선다 — 콘솔의 얇은 막대로(기본 막대는 화살표 · 회색 판이 튀었다).  -->
-							<ListBox.Resources>
-								<Style BasedOn="{StaticResource Console.ScrollBar}" TargetType="ScrollBar" />
-							</ListBox.Resources>
-							<ListBox.ItemContainerStyle>
-								<Style TargetType="ListBoxItem">
-									<!--  ListBoxItem 은 peer 가 실재한다 — 칩의 식별자는 여기 단다.  -->
-									<Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Console.Servers.Assign.Chip.{0}}" />
-								</Style>
-							</ListBox.ItemContainerStyle>
-							<ListBox.ItemsPanel>
-								<ItemsPanelTemplate>
-									<WrapPanel />
-								</ItemsPanelTemplate>
-							</ListBox.ItemsPanel>
-							<ListBox.ItemTemplate>
-								<DataTemplate>
-									<Border Margin="0,2,6,2" Style="{StaticResource Servers.Chip}">
-										<StackPanel Orientation="Horizontal">
-											<!--  손잡이에서만 끌기가 시작된다 — 행 본체 좌드래그는 범위선택과 충돌한다.  -->
-											<drag:DragHandle
-												Width="14"
-												Margin="0,0,4,0"
-												AutomationProperties.AutomationId="{Binding Id, StringFormat=Console.Servers.Assign.Handle.{0}}"
-												ToolTip="끌어서 서버 행에 놓으세요" />
-											<TextBlock
-												FontSize="11"
-												Foreground="{DynamicResource TextMutedBrush}"
-												Text="{Binding CategoryLabel}" />
-											<TextBlock
-												Margin="4,0,0,0"
-												FontSize="12"
-												Foreground="{DynamicResource TextPrimaryBrush}"
-												Text="{Binding Name}" />
-											<TextBlock
-												Margin="6,0,0,0"
-												FontSize="11"
-												Foreground="{DynamicResource TextMutedBrush}"
-												Text="{Binding ServerText}" />
-										</StackPanel>
-									</Border>
-								</DataTemplate>
-							</ListBox.ItemTemplate>
-							<b:Interaction.Behaviors>
-								<drag:CaptureDragBehavior
-									DisplayMemberPath="Name"
-									Handler="{Binding Assign}"
-									KeyboardFallback="장비를 고르고 서버 행을 고른 뒤 [배정]을 누르세요." />
-							</b:Interaction.Behaviors>
-						</ListBox>
-					</DockPanel>
 				</StackPanel>
 			</Border>
 		</c:ConsoleShell.StatusBar>

@@ -44,6 +44,26 @@ public static class ConsoleLayoutMath
     /// </summary>
     public const double FooterBandHeight = 53;
 
+    /// <summary>
+    /// 이 높이를 넘는 띠 내용은 "띠" 가 아니라 <b>작업 판</b>(이벤트 콘솔 조치 트레이 · 계정 콘솔 배정 대기 막대까지 선 상태 줄)이다 —
+    /// 다른 두 띠가 그 높이를 따라가지 않는다(따라가면 레일 바닥 · 상세 막대가 빈 판으로 200px 넘게 자란다, 2026-09-30 이벤트 미리보기 실측).
+    /// 띠는 두 줄(= 바닥 높이 × 2)까지다.
+    /// </summary>
+    public const double FooterBandAlignLimit = FooterBandHeight * 2;
+
+    /// <summary>띠 내용 높이가 세 칸 맞춤에 들어가는가(<see cref="FooterBandAlignLimit"/> 이하).</summary>
+    public static bool IsAlignableFooterBand(double contentHeight)
+        => contentHeight > 0 && contentHeight <= FooterBandAlignLimit + 0.01;
+
+    /// <summary>
+    /// 세 칸 바닥 띠가 <b>함께</b> 쓸 높이 — 맞춤에 드는 띠 내용 중 가장 큰 원하는 높이(<paramref name="tallestContent"/>)를
+    /// 위로 올린 값, 단 <see cref="FooterBandHeight"/> 이상. 띠마다 제 높이로 서면 윗선이 어긋난다(2026-09-30 서버 콘솔: 75px).
+    /// </summary>
+    public static double AlignedFooterBandHeight(double tallestContent)
+        => double.IsNaN(tallestContent) || double.IsInfinity(tallestContent)
+            ? FooterBandHeight
+            : Math.Max(FooterBandHeight, Math.Ceiling(tallestContent - 0.01));
+
     public const double DrawerMax = 360;
     public const double DrawerRatio = 0.86;
 

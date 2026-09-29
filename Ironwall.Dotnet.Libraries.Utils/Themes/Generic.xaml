@@ -208,12 +208,18 @@
 										</Grid.RowDefinitions>
 										<ContentPresenter Content="{TemplateBinding Toolbar}" />
 										<ContentPresenter Grid.Row="1" Content="{TemplateBinding List}" />
-										<!--  상태 줄도 상세 적용 막대와 같은 높이 이상(FooterBandHeight) — 세 칸 바닥 띠 윗선이 한 줄로 선다.  -->
-										<ContentPresenter Grid.Row="2" Content="{TemplateBinding StatusBar}">
+										<!--
+											상태 줄도 바닥 띠다 — 셸이 세 띠(레일 바닥 · 상태 줄 · 상세 적용 막대) 내용의 가장 큰 높이를 모아(최소 53)
+											ConsoleShell.FooterBandHeight 로 내리고, 띠마다 그 값을 MinHeight 로 건다 → 윗선이 한 줄로 선다.
+										-->
+										<ContentPresenter
+											Grid.Row="2"
+											c:ConsoleShell.IsFooterBand="True"
+											Content="{TemplateBinding StatusBar}">
 											<!--  상태 줄이 없는 화면(계정 세션 설정 등)에서는 빈 띠를 만들지 않는다 — 최소 높이는 내용이 있을 때만.  -->
 											<ContentPresenter.Style>
 												<Style TargetType="ContentPresenter">
-													<Setter Property="MinHeight" Value="{x:Static c:ConsoleLayoutMath.FooterBandHeight}" />
+													<Setter Property="MinHeight" Value="{Binding Path=(c:ConsoleShell.FooterBandHeight), RelativeSource={RelativeSource Self}}" />
 													<Style.Triggers>
 														<Trigger Property="Content" Value="{x:Null}">
 															<Setter Property="MinHeight" Value="0" />
@@ -336,11 +342,12 @@
 						<Border
 							x:Name="FooterHost"
 							Grid.Row="1"
-							MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
+							MinHeight="{Binding Path=(c:ConsoleShell.FooterBandHeight), RelativeSource={RelativeSource Self}}"
 							Padding="16,8"
+							c:ConsoleShell.IsFooterBand="True"
 							BorderBrush="{DynamicResource DividerBrush}"
 							BorderThickness="0,1,0,0">
-							<!--  세 칸 바닥 띠 윗선을 맞춘다(FooterBandHeight) — 내용은 띠 가운데.  -->
+							<!--  세 칸 바닥 띠 윗선을 맞춘다(셸이 정한 공통 높이 ConsoleShell.FooterBandHeight, 최소 53) — 내용은 띠 가운데.  -->
 							<ContentPresenter
 								VerticalAlignment="Center"
 								Content="{TemplateBinding Footer}"
@@ -846,8 +853,9 @@
 						<Border
 							x:Name="PART_Footer"
 							Grid.Row="3"
-							MinHeight="{x:Static c:ConsoleLayoutMath.FooterBandHeight}"
+							MinHeight="{Binding Path=(c:ConsoleShell.FooterBandHeight), RelativeSource={RelativeSource Self}}"
 							Padding="16,10"
+							c:ConsoleShell.IsFooterBand="True"
 							AutomationProperties.AutomationId="{Binding ConsoleKey, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Console.{0}.Detail.ApplyBar}"
 							Background="{DynamicResource SurfaceAltBrush}"
 							BorderBrush="{DynamicResource DividerBrush}"

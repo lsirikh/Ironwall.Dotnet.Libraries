@@ -28,4 +28,15 @@ public static class ServerMonitorLayout
 
     /// <summary>목록 줄의 바닥 높이 — 머리 + 다섯 줄 + 테두리 2.</summary>
     public const double MinListHeight = ColumnHeaderHeight + (RowHeight * MinVisibleRows) + 2;
+
+    /// <summary>배정 트레이 칩 한 줄의 높이(ListBoxItem 에 못 박는다 — 칩 24 + 위아래 여백 4 + 항목 테두리 · 여백 4).</summary>
+    public const double TrayRowHeight = 32;
+
+    /// <summary>배정 트레이가 한 번에 보이는 칩 줄 수 — 넘치면 트레이 안에서 굴린다.</summary>
+    public const int TrayVisibleRows = 2;
+
+    /// <summary>
+    /// 배정 트레이의 최대 높이 = 줄 높이 × 보이는 줄 수. 예전 96 은 세 줄째가 콘솔 바닥 선에 붙어 잘려 보였다(2026-09-30 GIS 실창 020).
+    /// </summary>
+    public const double TrayMaxHeight = TrayRowHeight * TrayVisibleRows;
 }

@@ -20,6 +20,13 @@
     <!-- B7 · B10 — 콘솔 안의 날짜 칸 · 옛 입력 뷰(보고서 생성 · 외부 연동)도 같은 화면 밖 호스트로 띄운다 -->
     <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Reports.Ui/Ironwall.Dotnet.Libraries.Reports.Ui.csproj" />
     <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Gateway/Ironwall.Dotnet.Libraries.Gateway.csproj" />
+    <!-- 2026-09-30 서버 콘솔 바닥 띠 잘림 · 세 칸 윗선 — 서버 모니터 실제 뷰도 같은 화면 밖 호스트로 잰다(Devices.Ui 시험 어셈블리는 Application 이 없어야 한다) -->
+    <ProjectReference Include="../../Ironwall.Dotnet.Libraries.Devices.Ui/Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+  </ItemGroup>
+
+  <!-- 서버 모니터 미리보기의 가짜 통로 · 현장 밀도 데이터(칩 40개)를 그대로 쓴다(사본을 만들지 않는다) -->
+  <ItemGroup>
+    <Compile Include="../../tools/device-console-preview/ServersPreview.cs" Link="Linked/ServersPreview.cs" />
   </ItemGroup>
 
   <!-- 계정 콘솔 실제 뷰 시험 — 헤드리스 콘솔 하네스(가짜 서버 · 게이트웨이)를 그대로 가져다 쓴다(사본을 만들지 않는다) -->
