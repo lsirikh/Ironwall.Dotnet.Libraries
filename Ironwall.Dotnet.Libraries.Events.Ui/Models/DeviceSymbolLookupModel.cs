@@ -84,7 +84,8 @@ public class DeviceSymbolLookupModel : BaseModel
         };
 
         _log?.Info($"[SYNC→Symbol] SyncFromDevice: '{SymbolModel.Title}' DeviceStatus={status} → OperationState: {prevState}→{SymbolModel.OperationState}");
-        SymbolModel.SetUpdate(); // 저빈도 상태 전이 — 즉시 SetUpdate 유지
+        // SYNC_DEVICE(NATS 스레드)에서 불린다 — UI 스레드로 넘겨 합친다(WP-1 ㉔). 종전 즉시 SetUpdate 는 교차 스레드로 속성창 · 마커를 건드렸다.
+        MarshalUpdate();
     }
 
     /// <summary>복합 상태를 직접 세팅 — EventQueueManager 전이 콜백에서 호출되므로 MarshalUpdate 경유</summary>

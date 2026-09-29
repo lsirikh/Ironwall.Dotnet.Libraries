@@ -143,9 +143,6 @@ public record AllDevicesLoadedMessage();
 /// <summary>로그인 게이팅(Login_Gated_GIS_Init) — Device fetch 진행 단계 알림(커버 진행바). StepIndex 1..TotalSteps.</summary>
 public record DeviceFetchProgressMessage(string Step, int StepIndex, int TotalSteps);
 
-/// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
-public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
-
 /// <summary>
 /// 장비 그룹 소속이 바뀌었다 — <see cref="GroupIds"/> 는 소속이 달라진 그룹들(넣은 그룹 · 뺀 그룹 모두).
 /// </summary>

@@ -19,9 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class SymbolEventManager : ISymbolEventManager, IDisposable,
-    IHandle<AllDevicesLoadedMessage>,
-    IHandle<DeviceStatusChangedMessage>
+public class SymbolEventManager : ISymbolEventManager, IDisposable
 {
     // 개별 마커: (Device.Id, DeviceType) → GMapPidsMarker/PidsSymbolModel
     // 복합 키를 사용하여 같은 ID라도 DeviceType이 다르면 별도 등록
@@ -32,6 +30,9 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
     // 보조 인덱스: DeviceId → DeviceSymbolLookupModel (DeviceType 불일치 fallback용 O(1) 검색)
     private readonly ConcurrentDictionary<int, DeviceSymbolLookupModel> _deviceLookupById;
+
+    // 미등록 장비 경고를 이미 한 (Id, 종류) — 장비당 한 번만 알린다(WarnUnresolvedOnce). 다시 등록되면 지운다.
+    private readonly ConcurrentDictionary<(int Id, EnumDeviceType Type), byte> _unresolvedWarned = new();
 
     private readonly IEventAggregator _ea;
     private readonly ILogService _log;
@@ -68,6 +69,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         var key = (deviceModel.Id, deviceModel.DeviceType);
         _deviceSymbolLookup[key] = lookup;
         _deviceLookupById[deviceModel.Id] = lookup;
+        _unresolvedWarned.TryRemove(key, out _);   // 다시 등록됐다 — 다음 미등록은 다시 알린다
         //_log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
 
         // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
@@ -112,6 +114,30 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         _groupSymbolLookup[deviceGroup] = lookup;
 
         //_log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
+    }
+
+    /// <summary>
+    /// 장비 심볼 등록 해제 — 장비가 지워졌을 때(지도 <c>SymbolLifecycleCoordinator.UnregisterDevice</c> 가 부른다, WP-1 ㉒).
+    /// 심볼 색을 Normal 로 돌리고(시각 상태 정리) 조회표 · Id 보조 색인에서 뺀다 — 이후 이 키로 오는 늦은 큐 전이 · 문 상태는
+    /// 어떤 심볼도 칠하지 않는다(장비당 한 번 경고). 종전엔 해제가 없어 지도가 '흡수용 빈 모델'을 같은 키로 등록해 끊었다.
+    /// </summary>
+    /// <remarks>인터페이스(<see cref="ISymbolEventManager"/>)에는 넣지 않는다 — 멤버를 늘리면 목 · 페이크가 전부 깨진다(<see cref="UnregisterGroupSymbol"/> 와 같은 규칙).</remarks>
+    /// <returns>등록돼 있어 내렸으면 true.</returns>
+    public bool UnregisterDeviceSymbol(int deviceId, EnumDeviceType deviceType)
+    {
+        if (!_deviceSymbolLookup.TryRemove((deviceId, deviceType), out var removed)) return false;
+
+        // Id 보조 색인이 이 조회를 가리키면 — 같은 Id 의 다른 종류가 남았으면 그것으로 잇고, 없으면 뺀다.
+        if (_deviceLookupById.TryGetValue(deviceId, out var byId) && ReferenceEquals(byId, removed))
+        {
+            var sibling = _deviceSymbolLookup.FirstOrDefault(kv => kv.Key.Id == deviceId).Value;
+            if (sibling is not null) _deviceLookupById[deviceId] = sibling;
+            else _deviceLookupById.TryRemove(deviceId, out _);
+        }
+
+        removed.ApplyCompositeStatus(EnumCompositeEventStatus.Normal);   // 지워진 장비의 마지막 색이 굳지 않게
+        _log?.Info($"장비 심볼 해제: Device({deviceId},{deviceType}) — 색 Normal 복원 · 조회표에서 분리");
+        return true;
     }
 
     /// <summary>
@@ -262,29 +288,9 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         }
     }
 
-    /// <summary>
-    /// AllDevicesLoadedMessage 수신 시 등록된 전체 Symbol 일괄 동기화 (FR-08b)
-    /// </summary>
-    public Task HandleAsync(AllDevicesLoadedMessage message, CancellationToken cancellationToken)
-    {
-        foreach (var lookup in _deviceSymbolLookup.Values)
-        {
-            if (lookup.DeviceModel != null)
-                lookup.SyncFromDevice(lookup.DeviceModel.Status);
-        }
-        _log?.Info($"전체 Symbol OperationState 동기화 완료: {_deviceSymbolLookup.Count}개");
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// DeviceStatusChangedMessage 수신 시 해당 Symbol 갱신 (FR-09)
-    /// </summary>
-    public Task HandleAsync(DeviceStatusChangedMessage message, CancellationToken cancellationToken)
-    {
-        _log?.Info($"[SYNC→Symbol] DeviceStatusChangedMessage 수신: id={message.DeviceId}, type={message.DeviceType}, status={message.Status} (등록 심볼 수={_deviceSymbolLookup.Count})");
-        SyncDeviceStatus(message.DeviceId, message.DeviceType, message.Status);
-        return Task.CompletedTask;
-    }
+    // (WP-1 ㉕) AllDevicesLoadedMessage · DeviceStatusChangedMessage 처리기는 뺐다 — 이 관리자를 이벤트 버스에 구독하는 곳이
+    //   한 군데도 없어(발행도 DeviceStatusChangedMessage 는 0건) 시험에서만 불리던 죽은 길이었다. 상태 동기화의 정본은
+    //   SYNC_DEVICE → SyncDeviceStatus, 등록 시 RegisterDeviceSymbol 의 즉시 동기화다.
 
     /// <summary>
     /// 개별 심볼 Detecting 상태 설정 — EventQueueManager의 OnDeviceFirstEvent에서 호출
@@ -369,7 +375,10 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     public void HandleDeviceStateChanged(int deviceId, EnumDeviceType deviceType, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
     {
         if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
+        {
+            WarnUnresolvedOnce(deviceId, deviceType, $"상태 전이 {prev}→{next}");
             return;
+        }
         deviceLookup.ApplyCompositeStatus(next);
         _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}");
     }
@@ -379,15 +388,33 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// </summary>
     public void SetDoorState(int deviceId, EnumDeviceType deviceType, EnumDoorState state)
     {
-        if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
+        if (!TryResolveDevice(deviceId, deviceType, out var lookup))
+        {
+            WarnUnresolvedOnce(deviceId, deviceType, $"개폐 {state}");
+            return;
+        }
         lookup.ApplyDoorState(state);
     }
 
     public void ApplyDoorEvent(int deviceId, EnumDeviceType deviceType, EnumEventType eventType)
     {
         if (!DoorStateMachine.IsContactEvent(eventType)) return;
-        if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
+        if (!TryResolveDevice(deviceId, deviceType, out var lookup))
+        {
+            WarnUnresolvedOnce(deviceId, deviceType, $"접점 {eventType}");
+            return;
+        }
         lookup.ApplyDoorEvent(eventType);
+    }
+
+    /// <summary>
+    /// 미등록 장비로 온 전이 · 개폐를 <b>장비당 한 번</b> 경고한다(WP-1 ㉓) — 종전엔 조용히 버려 "지도에 안 뜬다" 를 진단할 길이 없었다.
+    /// 한 번만인 까닭: 큐 전이는 이벤트마다 오므로 매번 쓰면 로그가 넘친다. 다시 등록되면 기억을 지운다.
+    /// </summary>
+    private void WarnUnresolvedOnce(int deviceId, EnumDeviceType deviceType, string what)
+    {
+        if (!_unresolvedWarned.TryAdd((deviceId, deviceType), 0)) return;
+        _log?.Warning($"[심볼 미등록] Device({deviceId},{deviceType}) — {what} 반영 no-op(지도에 심볼 없음 · 삭제된 장비 · 미배치). 이 장비는 이후 다시 알리지 않습니다.");
     }
 
     public void HandleGroupStateChanged(int groupId, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)

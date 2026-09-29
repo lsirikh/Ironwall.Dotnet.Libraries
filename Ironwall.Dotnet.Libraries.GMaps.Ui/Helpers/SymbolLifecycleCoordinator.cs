@@ -28,8 +28,7 @@ public readonly record struct SymbolReconcileResult(int Devices, int Groups, int
 /// <item><b>재등록 유실(A2)</b> — 전량 재등록은 조회표를 먼저 비운다. 그 사이에 온 큐 전이는 "미등록"으로 버려진다.
 /// 재등록 뒤 큐 상태로 다시 칠하면 버려진 전이도 복원된다(큐가 진실).</item>
 /// <item><b>장비 삭제(A3)</b> — 조회표에는 장비 해제가 없다. 삭제된 장비의 심볼이 마지막 색으로 굳고, 같은 키로 오는 늦은 전이가
-/// 계속 그 심볼을 칠한다. → <see cref="UnregisterDevice"/> 가 조회표 항목을 흡수용 빈 모델로 바꿔 끊고 심볼 색을 Normal 로 돌린다.
-/// (조회표에 <c>UnregisterDeviceSymbol</c> 이 생기면 흡수용 모델 대신 그것을 부른다 — Events.Ui 소관.)</item>
+/// 계속 그 심볼을 칠한다. → <see cref="UnregisterDevice"/> 가 조회표에서 그 항목을 빼고(<c>SymbolEventManager.UnregisterDeviceSymbol</c>) 심볼 색을 Normal 로 돌린다.</item>
 /// <item><b>무음 누락(A5)</b> — 큐 전이가 미등록 장비로 오면 조회표는 로그 없이 버린다. <see cref="ObserveDeviceTransition"/> 이
 /// 같은 전이를 곁에서 보고 장비당 한 번 기록한다.</item>
 /// </list>
@@ -142,11 +141,9 @@ public sealed class SymbolLifecycleCoordinator
         if (!_devices.TryRemove((deviceId, deviceType), out var symbol)) return null;
         _deviceIdRefCount.AddOrUpdate(deviceId, 0, (_, n) => Math.Max(0, n - 1));
 
-        // 조회표에는 해제가 없다(Events.Ui) — 같은 키로 흡수용 빈 모델을 등록해 옛 심볼을 조회표에서 떼어 낸다.
-        //   이후 이 키로 오는 늦은 전이 · 문 상태는 빈 모델이 받고 지도 심볼은 더 칠해지지 않는다.
-        var tombstoneDevice = new BaseDeviceModel { Id = deviceId, DeviceType = deviceType, Status = EnumDeviceStatus.DEACTIVATED };
-        var sink = new PidsSymbolModel { Title = $"(삭제된 장비 {deviceType}#{deviceId})", DeviceType = deviceType, LinkedDeviceId = deviceId };
-        _symbolEventManager.RegisterDeviceSymbol(tombstoneDevice, sink);
+        // 조회표에서 이 장비를 뺀다(Events.Ui UnregisterDeviceSymbol, WP-1 ㉒) — 종전 임시 방식(같은 키로 흡수용 빈 모델 등록)을 대신한다.
+        //   이후 이 키로 오는 늦은 전이 · 문 상태는 어떤 심볼도 칠하지 않고 조회표가 장비당 한 번 경고한다.
+        _symbolEventManager.UnregisterDeviceSymbol(deviceId, deviceType);
 
         Apply(symbol, EnumCompositeEventStatus.Normal);
         _log?.Info($"[심볼 해제] Device({deviceId},{deviceType}) 삭제 — 조회표에서 분리 · 색 Normal 복원: '{symbol.Title}'");

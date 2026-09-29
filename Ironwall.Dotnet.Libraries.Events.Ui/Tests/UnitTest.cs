@@ -5645,37 +5645,6 @@ public class SymbolEventManagerPhase4Tests
         Assert.Equal(EnumOperationState.ERROR, symbol.Object.OperationState);
     }
 
-    // Test 4.3: AllDevicesLoadedMessage 수신 시 전체 Symbol 일괄 동기화
-    [Fact]
-    public async System.Threading.Tasks.Task HandleAllDevicesLoadedMessage_SyncsAllSymbols()
-    {
-        var manager = CreateManager(out _);
-        var (d1, s1) = CreatePair(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED);
-        var (d2, s2) = CreatePair(2, EnumDeviceType.IpCamera, EnumDeviceStatus.ERROR);
-        manager.RegisterDeviceSymbol(d1.Object, s1.Object);
-        manager.RegisterDeviceSymbol(d2.Object, s2.Object);
-
-        await manager.HandleAsync(new Ironwall.Dotnet.Libraries.ViewModel.Models.AllDevicesLoadedMessage(), System.Threading.CancellationToken.None);
-
-        Assert.Equal(EnumOperationState.DEACTIVATED, s1.Object.OperationState);
-        Assert.Equal(EnumOperationState.ERROR, s2.Object.OperationState);
-    }
-
-    // Test 4.4: DeviceStatusChangedMessage 수신 시 해당 Symbol 갱신
-    [Fact]
-    public async System.Threading.Tasks.Task HandleDeviceStatusChangedMessage_UpdatesCorrectSymbol()
-    {
-        var manager = CreateManager(out _);
-        var (d1, s1) = CreatePair(1, EnumDeviceType.Fence, EnumDeviceStatus.ACTIVATED);
-        manager.RegisterDeviceSymbol(d1.Object, s1.Object);
-
-        await manager.HandleAsync(
-            new Ironwall.Dotnet.Libraries.ViewModel.Models.DeviceStatusChangedMessage(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED),
-            System.Threading.CancellationToken.None);
-
-        Assert.Equal(EnumOperationState.DEACTIVATED, s1.Object.OperationState);
-    }
-
     // Test 4.5: lookup에 없는 ID → 예외 없이 무시 (SYNC_DEVICE CREATED 케이스 대비)
     [Fact]
     public void SyncDeviceStatus_MissingDevice_DoesNotThrow()
