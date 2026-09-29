@@ -1,0 +1,798 @@
+{
+ "full": {
+  "controllers": {
+   "success": true,
+   "message": "Controller retrieved successfully",
+   "data": {
+    "id": 346,
+    "category_device": "controller",
+    "type_controller": "Controller",
+    "number_device": 1,
+    "name_device": "GOP-CTRL-01",
+    "description": null,
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 180.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "IP_DIRECT",
+     "ip_address": "192.168.10.11",
+     "ip_port": 5000
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v2.1.0",
+     "components": [
+      {
+       "key": "nic",
+       "type": "NETWORK_INTERFACE",
+       "position": "본체"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "nic": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {},
+     "component_overrides": {}
+    },
+    "created_at": "2026-09-10T15:25:20.820707+09:00",
+    "updated_at": "2026-09-10T16:42:32.811490+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.592689+09:00",
+    "request_id": "951e5e2f-ccc8-4caf-9dcc-5418d4ce38f0",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "sensors": {
+   "success": true,
+   "message": "Sensor retrieved successfully",
+   "data": {
+    "id": 349,
+    "category_device": "sensor",
+    "type_sensor": "Fence",
+    "number_device": 101,
+    "name_device": "GOP-SNS-01-01",
+    "description": null,
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "controller_id": 346,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 176.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "RS485",
+     "channel": 1
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v1.4.2",
+     "components": [
+      {
+       "key": "vibration",
+       "type": "VIBRATION_SENSOR"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "vibration": {
+       "state": "IDLE",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {},
+     "component_overrides": {}
+    },
+    "created_at": "2026-09-10T15:25:21.145038+09:00",
+    "updated_at": "2026-09-10T16:04:45.359371+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.616645+09:00",
+    "request_id": "8af76cca-d4db-4d92-af9b-e865d908dc0a",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "cameras": {
+   "success": true,
+   "message": "Camera retrieved successfully",
+   "data": {
+    "id": 379,
+    "category_device": "camera",
+    "type_camera": "FIXED",
+    "number_device": 201,
+    "name_device": "GOP-CAM-01",
+    "description": null,
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 190.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "IP_DIRECT",
+     "ip_address": "192.168.10.21",
+     "ip_port": 80,
+     "protocol": "ONVIF",
+     "credentials": {
+      "user_name": "admin",
+      "user_password": "<redacted-for-repo>"
+     },
+     "urls": {
+      "onvif": {
+       "device_service": "http://192.168.10.21:8000/onvif/device_service"
+      },
+      "streams": {
+       "rtsp": {
+        "sub": "rtsp://192.168.10.21:554/Streaming/Channels/102",
+        "main": "rtsp://192.168.10.21:554/Streaming/Channels/101"
+       }
+      },
+      "homepage": {
+       "url": "https://192.168.10.21/"
+      },
+      "snapshot": {
+       "ch1": "http://192.168.10.21/snapshot.jpg"
+      }
+     }
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "manufacturer": "Hanwha Vision",
+     "model": "XNO-6080R",
+     "firmware": "2.11.03",
+     "mac_address": "00:16:6C:01:1A:07",
+     "max_detection_range": 120.0,
+     "onvif_version": "2.6",
+     "components": [
+      {
+       "key": "nic",
+       "type": "NETWORK_INTERFACE"
+      },
+      {
+       "key": "lens",
+       "type": "OPTICAL_LENS",
+       "spec": {
+        "zoom_x": 1
+       }
+      },
+      {
+       "key": "ir",
+       "type": "IR_LED"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "nic": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "lens": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "ir": {
+       "state": "OFF",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {
+      "camera_mode": "NORMAL",
+      "day_night_mode": "AUTO",
+      "focus_mode": "AUTO",
+      "iris_mode": "AUTO",
+      "is_record": true,
+      "weather_mode": "NORMAL"
+     },
+     "thresholds": {},
+     "component_overrides": {}
+    },
+    "created_at": "2026-09-10T15:25:21.674135+09:00",
+    "updated_at": "2026-09-10T20:26:26.668297+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.639755+09:00",
+    "request_id": "9668cce0-84f6-446f-b454-e32cbfe00416",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "speakers": {
+   "success": true,
+   "message": "Speaker retrieved successfully",
+   "data": {
+    "id": 384,
+    "category_device": "speaker",
+    "speaker_role": "NORMAL",
+    "type_speaker": "Unknown",
+    "number_device": 301,
+    "name_device": "GOP-SPK-01",
+    "description": "NORMAL 방송용",
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 185.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "SERVER_MANAGED"
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v1.2.0",
+     "components": [
+      {
+       "key": "amp",
+       "type": "AMPLIFIER"
+      },
+      {
+       "key": "mic",
+       "type": "MIC"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "amp": {
+       "state": "ON",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "mic": {
+       "state": "OFF",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {},
+     "component_overrides": {}
+    },
+    "created_at": "2026-09-10T15:25:21.762711+09:00",
+    "updated_at": "2026-09-10T15:25:21.762712+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.654358+09:00",
+    "request_id": "034f4b88-2f16-4d0d-a8a7-5738b5c8fd52",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "enclosures": {
+   "success": true,
+   "message": "Enclosure retrieved successfully",
+   "data": {
+    "id": 394,
+    "category_device": "enclosure",
+    "type_enclosure": "Unknown",
+    "number_device": 501,
+    "name_device": "GOP-ENC-01",
+    "description": null,
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 178.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "IP_DIRECT",
+     "ip_address": "192.168.10.51",
+     "ip_port": 80,
+     "urls": {
+      "homepage": {
+       "url": "http://192.168.10.51/"
+      }
+     }
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v1.1.0",
+     "components": [
+      {
+       "key": "door",
+       "type": "DOOR_SENSOR"
+      },
+      {
+       "key": "temperature",
+       "type": "TEMPERATURE_SENSOR"
+      },
+      {
+       "key": "humidity",
+       "type": "HUMIDITY_SENSOR"
+      },
+      {
+       "key": "voltage",
+       "type": "VOLTAGE_SENSOR"
+      },
+      {
+       "key": "current",
+       "type": "CURRENT_SENSOR"
+      },
+      {
+       "key": "vibration",
+       "type": "VIBRATION_METER"
+      },
+      {
+       "key": "ups",
+       "type": "UPS"
+      },
+      {
+       "key": "heater",
+       "type": "HEATER",
+       "spec": {
+        "power_w": 100
+       }
+      },
+      {
+       "key": "fan",
+       "type": "FAN"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "door": {
+       "state": "CLOSED",
+       "health": "UNKNOWN",
+       "observed_at": null
+      },
+      "temperature": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "humidity": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "voltage": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "current": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "vibration": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "ups": {
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "heater": {
+       "state": "ON",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "fan": {
+       "state": "ON",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {
+      "current": {
+       "high": 12.0
+      },
+      "humidity": {
+       "high": 85.0
+      },
+      "temperature": {
+       "high": 45.0,
+       "low": -15.0
+      },
+      "ups_battery_level": {
+       "low": 20.0
+      },
+      "vibration": {
+       "high": 70.0
+      },
+      "voltage": {
+       "low": 200.0
+      }
+     },
+     "component_overrides": {
+      "fan": {
+       "enabled": true
+      },
+      "heater": {
+       "enabled": true
+      }
+     }
+    },
+    "created_at": "2026-09-10T15:25:21.938690+09:00",
+    "updated_at": "2026-09-10T15:25:21.938692+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.676927+09:00",
+    "request_id": "7fef65c9-c58a-484e-8097-ce173e6d25e0",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "lamps": {
+   "success": true,
+   "message": "Lamp retrieved successfully",
+   "data": {
+    "id": 389,
+    "category_device": "lamp",
+    "type_lamp": "Unknown",
+    "number_device": 401,
+    "name_device": "GOP-LMP-01",
+    "description": "경광등",
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 182.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "IP_DIRECT",
+     "ip_address": "192.168.10.41",
+     "ip_port": 8080,
+     "credentials": {
+      "user_name": "admin",
+      "user_password": "<redacted-for-repo>"
+     }
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v1.0.3",
+     "components": [
+      {
+       "key": "light",
+       "type": "LAMP_LIGHT"
+      },
+      {
+       "key": "buzzer",
+       "type": "BUZZER"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "light": {
+       "state": "OFF",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      },
+      "buzzer": {
+       "state": "OFF",
+       "health": "OK",
+       "observed_at": "2026-09-10T09:00:00.000000+09:00"
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {},
+     "component_overrides": {
+      "light": {
+       "color": "Red"
+      }
+     }
+    },
+    "created_at": "2026-09-10T15:25:21.852940+09:00",
+    "updated_at": "2026-09-10T15:25:21.852942+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.694247+09:00",
+    "request_id": "eaa292b6-3b41-4850-bc1c-b7f804381eb8",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  },
+  "gates": {
+   "success": true,
+   "message": "Gate retrieved successfully",
+   "data": {
+    "id": 399,
+    "category_device": "gate",
+    "type_gate": "Unknown",
+    "number_device": 601,
+    "name_device": "GOP-GATE-01",
+    "description": null,
+    "status": "ACTIVATED",
+    "is_enable": true,
+    "unit_id": 1,
+    "server_id": null,
+    "geolocation": {
+     "location": "GOP 1소초 전방",
+     "latitude": 38.3021,
+     "longitude": 128.1044,
+     "altitude": 176.0,
+     "heading": 0.0
+    },
+    "group_ids": [],
+    "connection": {
+     "schema": 1,
+     "type": "CONTROLLER_CONTACT",
+     "parent_device_id": 346,
+     "channel": 11
+    },
+    "hardware_spec": {
+     "schema": 1,
+     "firmware": "v1.0.0",
+     "components": [
+      {
+       "key": "actuator",
+       "type": "DOOR_ACTUATOR"
+      },
+      {
+       "key": "limit_open",
+       "type": "LIMIT_SWITCH",
+       "label": "열림 리밋"
+      },
+      {
+       "key": "limit_close",
+       "type": "LIMIT_SWITCH",
+       "label": "닫힘 리밋"
+      }
+     ]
+    },
+    "device_status": {
+     "schema": 1,
+     "components": {
+      "actuator": {
+       "state": "CLOSED",
+       "health": "OK",
+       "observed_at": null
+      }
+     }
+    },
+    "device_config": {
+     "schema": 1,
+     "modes": {},
+     "thresholds": {},
+     "component_overrides": {}
+    },
+    "created_at": "2026-09-10T15:25:22.080409+09:00",
+    "updated_at": "2026-09-10T15:25:22.080411+09:00"
+   },
+   "meta": {
+    "timestamp": "2026-09-11T18:21:35.716288+09:00",
+    "request_id": "c2698113-8f92-4f1c-9a03-21468af7eca5",
+    "view": "full",
+    "sections": [
+     "components",
+     "connection",
+     "device_config",
+     "device_status",
+     "hardware_spec"
+    ]
+   }
+  }
+ },
+ "event_device_ref": {
+  "controllers": {
+   "id": 346,
+   "category_device": "controller"
+  },
+  "sensors": {
+   "id": 349,
+   "category_device": "sensor"
+  },
+  "cameras": {
+   "id": 379,
+   "category_device": "camera"
+  },
+  "speakers": {
+   "id": 384,
+   "category_device": "speaker"
+  },
+  "enclosures": {
+   "id": 394,
+   "category_device": "enclosure"
+  },
+  "lamps": {
+   "id": 389,
+   "category_device": "lamp"
+  },
+  "gates": {
+   "id": 399,
+   "category_device": "gate"
+  }
+ },
+ "sync_device": {
+  "controllers": {
+   "id": "14639d0b-25f4-5e81-aa7c-390c203f8bff",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 346,
+    "category_device": "controller"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "sensors": {
+   "id": "c8141a95-ea65-5346-adba-300462dfb01f",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 349,
+    "category_device": "sensor"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "cameras": {
+   "id": "b9f8ed82-1e3c-5a83-8a4c-eca7ee485d37",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 379,
+    "category_device": "camera"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "speakers": {
+   "id": "fabde886-b70c-53e2-bb59-75345714d9ac",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 384,
+    "category_device": "speaker"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "enclosures": {
+   "id": "1ae5e5f9-5757-53bb-945b-4194159aa898",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 394,
+    "category_device": "enclosure"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "lamps": {
+   "id": "d29023ef-67ca-5849-942e-c76826d09c74",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 389,
+    "category_device": "lamp"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  },
+  "gates": {
+   "id": "df3a60cb-fbbf-5317-ad03-f952bbcf47e6",
+   "m_type": "PUB",
+   "cmd": "SYNC_DEVICE",
+   "from": "DBApi",
+   "body": {
+    "action": "UPDATED",
+    "resource_id": 399,
+    "category_device": "gate"
+   },
+   "created": "2026-09-11T20:00:00.000000+09:00"
+  }
+ }
+}

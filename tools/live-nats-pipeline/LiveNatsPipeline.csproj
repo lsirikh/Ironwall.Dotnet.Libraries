@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WP-5 live NATS pipeline probe (HEADLESS).
+
+    Runs the REAL event pipeline in-process against the loopback NATS broker:
+      - library  : NatsService (via NatsModule), DetectionNatsSyncService, MalfunctionNatsSyncService,
+                   OperationEventNatsSyncService, DetectionSyncNatsService, EventQueueManager,
+                   SymbolEventManager, EventCardListPanelViewModel, DeviceProviderService (+ DeviceApiService)
+      - host     : NatsBrokerService / NatsDomainService are COMPILED FROM THE HOST SOURCE FILES (linked,
+                   not copied) - the command router, ACTION_REPORT, SYNC_* and card paths are the real code.
+                   Only SetupModel (a settings bag) is shimmed - see src/HostShims.cs.
+
+    Isolation (hard):
+      - NATS: publishes and the pipeline's own group are sensorway.unit999.* ONLY (GuardedNatsService /
+        SubjectGuard refuse anything else). The headed GIS round on unit001 never sees our traffic.
+      - REST: NO network. The library's ApiService is given FakeGopServer as its outermost handler, which
+        answers device GETs from v7 fixtures (fixtures/v7_examples_e.json, copied from the test server's
+        contract fixtures) and REFUSES every write. Base URL is https://127.0.0.1:9/api (discard port).
+        The test server is single-session (login evicts the headed GIS) - this probe never logs in.
+
+    Source selection (so a colleague's half-finished edit does not break or colour the run):
+      LibRoot  - library root   (default: this repo's working tree)
+      HostRoot - host repo root (default: ..\..\..\Dotnet.Monitoring.Solution working tree)
+      e.g. dotnet run -p:LibRoot=<snapshot>\ -p:HostRoot=<snapshot>\   (see README section in Program.cs)
+
+    NOT part of the .sln on purpose (tools/ harness, like tools/live-api-roundtrip).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LiveNatsPipeline</AssemblyName>
+    <RootNamespace>LiveNatsPipeline</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS0618;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8620;CS8625;CS8629;CS8632;CS8765;CS8767;CS1998;CS4014;NU1701;NU1608;MSB3277;CS0105;CS0162;CS0168;CS0219</NoWarn>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <LibRoot Condition="'$(LibRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</LibRoot>
+    <HostRoot Condition="'$(HostRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\Dotnet.Monitoring.Solution\</HostRoot>
+    <HostProj>$(HostRoot)Dotnet.Monitoring.Solution\</HostProj>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+    <!-- real host code, compiled from the host source (never copied) -->
+    <Compile Include="$(HostProj)Services\INatsBrokerService.cs" Link="Host\INatsBrokerService.cs" />
+    <Compile Include="$(HostProj)Services\NatsBrokerService.cs" Link="Host\NatsBrokerService.cs" />
+    <Compile Include="$(HostProj)Services\NatsDomainService.cs" Link="Host\NatsDomainService.cs" />
+    <Compile Include="$(HostProj)Services\RecentEnvelopeIds.cs" Link="Host\RecentEnvelopeIds.cs" />
+    <Compile Include="$(HostProj)Models\EventCallInfo.cs" Link="Host\EventCallInfo.cs" />
+    <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Api\Ironwall.Dotnet.Libraries.Api.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Devices.Ui\Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Gateway\Ironwall.Dotnet.Libraries.Gateway.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Redis\Ironwall.Dotnet.Libraries.Redis.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Sounds\Ironwall.Dotnet.Libraries.Sounds.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.RtspMessage\Ironwall.Dotnet.Libraries.RtspMessage.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
+    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Ironwall.Message.Base"><HintPath>$(HostProj)Exts\Ironwall.Message.Base.dll</HintPath></Reference>
+    <Reference Include="Ironwall.Middleware.Message.Framework"><HintPath>$(HostProj)Exts\Ironwall.Middleware.Message.Framework.dll</HintPath></Reference>
+    <Reference Include="Ironwall.Redis.Message.Framework"><HintPath>$(HostProj)Exts\Ironwall.Redis.Message.Framework.dll</HintPath></Reference>
+  </ItemGroup>
+
+</Project>
