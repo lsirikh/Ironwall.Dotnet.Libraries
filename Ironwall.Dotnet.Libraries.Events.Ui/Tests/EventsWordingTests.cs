@@ -302,8 +302,9 @@ public class EventsWordingTests
         // Arrange
         var values = XamlAttributeValues(ReadSource("Views", "Dialogs", file));
 
-        // Assert
-        Assert.Contains(values, v => v == $"Text=\"{title}\"");
+        // Assert — B5(2c40a6c2, 9-28)부터 제목은 커널 다이얼로그 틀의 Title 이 그린다. 옛 머리 TextBlock(Text=) 이 되살아나면 제목이 두 번 뜬다.
+        Assert.Contains(values, v => v == $"Title=\"{title}\"");
+        Assert.DoesNotContain(values, v => v == $"Text=\"{title}\"");
         Assert.DoesNotContain(values, v => v.Contains("FallbackValue=테스트", StringComparison.Ordinal));
         Assert.DoesNotContain(values, v => v.Contains("FallbackValue=Etcs", StringComparison.Ordinal));
     }
