@@ -69,7 +69,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     {
         if (!IsAvailable || controller is null || controller.Id <= 0) return false;
 
-        var info = new WiringControllerInfo(controller.Id, controller.DeviceNumber, Name(controller), Address(controller));
+        // 종류축 원값(type_controller) 이 결선 모양을 정한다 — SmartController = 링(wiring-fence-view FR-16).
+        var info = new WiringControllerInfo(controller.Id, controller.DeviceNumber, Name(controller), Address(controller), controller.TypeAxisCode);
         var seeds = SeedsFor(controller.Id);
         var types = SensorTypeCodes(seeds);
 

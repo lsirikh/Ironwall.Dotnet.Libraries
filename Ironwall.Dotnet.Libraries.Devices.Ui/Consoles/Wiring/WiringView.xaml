@@ -199,6 +199,13 @@
 									FontSize="10"
 									Foreground="{DynamicResource TextMutedBrush}"
 									Text="{Binding AddressText}" />
+								<!--  링: 두 포트에서 센 번호(A · B) — FR-04  -->
+								<TextBlock
+									FontFamily="Consolas"
+									FontSize="10"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding PortText}"
+									Visibility="{Binding HasPortText, Converter={StaticResource BoolToVisibility}}" />
 							</StackPanel>
 						</DockPanel>
 					</Border>
@@ -228,6 +235,20 @@
 							Text="{Binding OrderText}" />
 					</Border>
 
+					<!--  번호순 제안 표지 — 색이 아니라 글자(FR-15 "제안 배치 = 모서리 표지")  -->
+					<Border
+						Margin="0,-1,2,0"
+						Padding="4,0"
+						HorizontalAlignment="Right"
+						VerticalAlignment="Top"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="3"
+						ToolTip="번호순 제안 — [이대로 적용] 전에는 저장 대기가 아닙니다"
+						Visibility="{Binding IsSuggested, Converter={StaticResource BoolToVisibility}}">
+						<TextBlock FontSize="9.5" Text="제안" />
+					</Border>
+
 					<!--  주소 ≠ 순번 표시 — 고치지 않고 알리기만 한다  -->
 					<TextBlock
 						Margin="0,2,4,0"
@@ -251,7 +272,7 @@
 						Content="✕"
 						FontSize="9"
 						Style="{StaticResource Console.Button.Icon}"
-						ToolTip="선에서 빼기"
+						ToolTip="결선에서 빼기 — 뒤는 당겨집니다"
 						Visibility="{Binding IsFilled, Converter={StaticResource BoolToVisibility}}" />
 				</Grid>
 			</drag:DropZoneChrome>
@@ -282,7 +303,7 @@
 						Click="OnAutoLayout"
 						Content="번호 순으로 자동 배치"
 						Style="{StaticResource Console.Button}"
-						ToolTip="전체를 번호 순으로 정렬해 앞 절반은 1차, 뒤 절반은 2차에 꽂습니다"
+						ToolTip="장비번호 순(같으면 id 순)으로 한 줄에 다시 줄 세웁니다 — 양쪽 가지면 가지 안에서만"
 						Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}" />
 					<Button
 						Margin="0,0,8,0"
@@ -972,7 +993,7 @@
 							<!--  제어기 상자 (WS L394-396)  -->
 							<StackPanel Margin="0,0,10,0">
 								<TextBlock Style="{StaticResource W.Title}" Text="제어기" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="선 2가닥" />
+								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding ShapeText}" TextWrapping="Wrap" />
 								<Border
 									Margin="0,6,0,0"
 									Padding="9,8"
@@ -998,14 +1019,15 @@
 												BorderBrush="{DynamicResource BorderBrush}"
 												BorderThickness="1"
 												CornerRadius="4">
-												<TextBlock FontSize="10.5" Text="1차 포트" />
+												<TextBlock FontSize="10.5" Text="{Binding PortAText}" />
 											</Border>
 											<Border
 												Padding="5,1"
 												BorderBrush="{DynamicResource BorderBrush}"
 												BorderThickness="1"
-												CornerRadius="4">
-												<TextBlock FontSize="10.5" Text="2차 포트" />
+												CornerRadius="4"
+												Visibility="{Binding HasPortB, Converter={StaticResource BoolToVisibility}}">
+												<TextBlock FontSize="10.5" Text="{Binding PortBText}" />
 											</Border>
 										</StackPanel>
 									</StackPanel>
@@ -1013,9 +1035,50 @@
 							</StackPanel>
 
 							<StackPanel Grid.Column="1">
-								<!--  1차 선  -->
-								<TextBlock Style="{StaticResource W.Title}" Text="1차 선 ──▶ 나감" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="왼쪽부터 순서대로 · 핸들 ⣿ 을 잡아 끌어 놓습니다 · Alt+← → 한 칸 이동 · Alt+↑ ↓ 다른 선으로 · Delete 로 뺍니다" />
+								<!--  불러오기 알림 — 옛 배치 변환(FR-02) · 번호순 제안(FR-03)  -->
+								<Border
+									Margin="0,0,0,8"
+									Padding="10,7"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource StatusWarningBrush}"
+									BorderThickness="3,0,0,0"
+									CornerRadius="0,6,6,0"
+									Visibility="{Binding HasLegacyNotice, Converter={StaticResource BoolToVisibility}}">
+									<TextBlock
+										AutomationProperties.AutomationId="Devices.Wiring.LegacyNotice"
+										FontSize="12"
+										Text="{Binding LegacyNoticeText}"
+										TextWrapping="Wrap" />
+								</Border>
+								<Border
+									Margin="0,0,0,8"
+									Padding="10,6"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource StatusInfoBrush}"
+									BorderThickness="3,0,0,0"
+									CornerRadius="0,6,6,0"
+									Visibility="{Binding HasSuggestion, Converter={StaticResource BoolToVisibility}}">
+									<DockPanel LastChildFill="True">
+										<Button
+											Margin="8,0,0,0"
+											VerticalAlignment="Center"
+											AutomationProperties.AutomationId="Devices.Wiring.AcceptSuggestion"
+											Click="OnAcceptSuggestion"
+											Content="이대로 적용"
+											DockPanel.Dock="Right"
+											Style="{StaticResource Console.Button}" />
+										<TextBlock
+											VerticalAlignment="Center"
+											AutomationProperties.AutomationId="Devices.Wiring.SuggestionNotice"
+											FontSize="12"
+											Text="{Binding SuggestionText}"
+											TextWrapping="Wrap" />
+									</DockPanel>
+								</Border>
+
+								<!--  첫 목록 — 링 · 한 줄은 체인 전체, 양쪽 가지는 왼쪽 가지  -->
+								<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
+								<TextBlock Style="{StaticResource W.Hint}" Text="{Binding Line1Hint}" TextWrapping="Wrap" />
 								<Border
 									Margin="0,6,0,12"
 									Padding="8"
@@ -1035,16 +1098,6 @@
 										RadiusY="1"
 										Style="{StaticResource W.Cable}" />
 									<DockPanel LastChildFill="True">
-										<Button
-											Height="56"
-											MinWidth="52"
-											Margin="4"
-											VerticalAlignment="Top"
-											AutomationProperties.AutomationId="Devices.Wiring.AddSlot.1"
-											Click="OnAddSlotPrimary"
-											Content="＋ 칸"
-											DockPanel.Dock="Right"
-											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.1"
 											ItemsSource="{Binding Line1}"
@@ -1057,18 +1110,25 @@
 												<drag:CaptureDragBehavior
 													DisplayMemberPath="Display"
 													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 선 · Delete 빼기" />
+													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지(양쪽 가지만) · Delete 빼기" />
 											</b:Interaction.Behaviors>
 										</ListBox>
 									</DockPanel>
 									</Grid>
 								</Border>
 
-								<!--  2차 선  -->
-								<TextBlock Style="{StaticResource W.Title}" Text="◀── 2차 선 들어옴" />
-								<TextBlock Style="{StaticResource W.Hint}" Text="제어기 쪽으로 돌아오는 순서" />
+								<!--  두 번째 목록 — 양쪽 가지의 오른쪽 가지만(링 · 한 줄은 숨긴다)  -->
+								<TextBlock
+									Style="{StaticResource W.Title}"
+									Text="{Binding Line2Title}"
+									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									Style="{StaticResource W.Hint}"
+									Text="{Binding Line2Hint}"
+									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}" />
 								<Border
 									Margin="0,6,0,0"
+									Visibility="{Binding ShowSecondLine, Converter={StaticResource BoolToVisibility}}"
 									Padding="8"
 									Background="{DynamicResource SurfaceAltBrush}"
 									BorderBrush="{DynamicResource DividerBrush}"
@@ -1085,16 +1145,6 @@
 										RadiusY="1"
 										Style="{StaticResource W.Cable}" />
 									<DockPanel LastChildFill="True">
-										<Button
-											Height="56"
-											MinWidth="52"
-											Margin="4"
-											VerticalAlignment="Top"
-											AutomationProperties.AutomationId="Devices.Wiring.AddSlot.2"
-											Click="OnAddSlotSecondary"
-											Content="＋ 칸"
-											DockPanel.Dock="Right"
-											Style="{StaticResource Console.Button}" />
 										<ListBox
 											AutomationProperties.AutomationId="Devices.Wiring.Line.2"
 											ItemsSource="{Binding Line2}"
@@ -1107,7 +1157,7 @@
 												<drag:CaptureDragBehavior
 													DisplayMemberPath="Display"
 													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 선 · Delete 빼기" />
+													KeyboardFallback="Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지(양쪽 가지만) · Delete 빼기" />
 											</b:Interaction.Behaviors>
 										</ListBox>
 									</DockPanel>
@@ -1301,7 +1351,7 @@
 								<TextBlock Style="{StaticResource W.SectionHead}" Text="고장 구간과의 관계" />
 								<TextBlock
 									Style="{StaticResource W.Hint}"
-									Text="장애가 &quot;1차 4~5&quot; 로 오면 1차 선의 4번째와 5번째 센서 사이를 뜻합니다. 결선을 저장해 두면 장애 화면이 그 자리를 센서 이름으로 보여 줄 수 있습니다." />
+									Text="링에서 1차 번호는 Sensor A 쪽 끝에서, 2차 번호는 Sensor B 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). 결선을 저장해 두면 장애 화면이 &quot;1차 4~5&quot; 같은 구간을 센서 이름으로 보여 줄 수 있습니다." />
 								<Border
 									Margin="0,6,0,0"
 									Padding="9,7"

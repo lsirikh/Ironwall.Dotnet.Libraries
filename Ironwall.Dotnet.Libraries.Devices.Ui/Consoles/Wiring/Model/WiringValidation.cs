@@ -19,17 +19,22 @@ public enum WiringIssueLevel
 public sealed record WiringIssue(WiringIssueLevel Level, string Code, string Message);
 
 /// <summary>
-/// 루프 검증(WS L695-705) — 전부 순수 함수다. 드래그는 자동화로 단언할 수 없어(UIA 에 드래그 패턴이 없다)
+/// 결선 검증(wiring-fence-view FR-14 · 옛 WS L695-705) — 전부 순수 함수다. 드래그는 자동화로 단언할 수 없어(UIA 에 드래그 패턴이 없다)
 /// 회귀망은 이 함수들과 키보드 폴백이 전부다.
 /// </summary>
+/// <remarks>
+/// N04 의 "2차 선이 비면 루프가 닫히지 않는다(치명)"는 <b>없앴다</b> — 링의 돌아오는 길은 센서가 없는 리턴케이블이라
+/// 센서가 한 줄에만 있는 것이 정상이다(PRD §1-A).
+/// </remarks>
 public static class WiringValidation
 {
     public const string CODE_UNPLACED = "unplaced";
     public const string CODE_GAP = "gap";
-    public const string CODE_LOOP_OPEN = "loop-open";
     public const string CODE_DUPLICATE = "duplicate";
     public const string CODE_LOAD = "load";
     public const string CODE_CHANNEL = "channel";
+    public const string CODE_LIMIT = "limit";
+    public const string CODE_MIX = "mix";
 
     /// <summary>고장 구간 예시를 보이기 시작하는 대수(WS L710).</summary>
     public const int FAULT_HINT_MIN = 5;
@@ -39,52 +44,39 @@ public static class WiringValidation
         ArgumentNullException.ThrowIfNull(board);
         var issues = new List<WiringIssue>();
 
-        // ⑤ 서버에 저장된 값을 읽지 못한 줄 — 가장 먼저 알린다(자리를 잃은 채로 저장하면 조용히 사라진다).
+        // ⑤ 서버에 저장된 값을 읽지 못했거나 겹친 줄 — 가장 먼저 알린다(자리를 잃은 채로 저장하면 조용히 사라진다).
         foreach (var row in board.Rows.Where(r => !string.IsNullOrEmpty(r.LoadIssue)))
             issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_LOAD, $"{row.Display}: {row.LoadIssue}"));
 
-        // ④ 같은 센서가 두 칸에(구조상 생기지 않지만, 생겼다면 저장이 순번을 뒤집는다)
-        foreach (var line in new[] { WiringSpec.LINE_PRIMARY, WiringSpec.LINE_SECONDARY })
-        {
-            var duplicated = board.Line(line).Where(k => k is not null)
-                                  .GroupBy(k => k!.Value).Where(g => g.Count() > 1).Select(g => g.Key);
-            foreach (var key in duplicated)
-                issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_DUPLICATE,
-                    $"{board.Find(key)?.Display ?? $"센서 {key}"} 이(가) {line}차 선의 두 칸에 있습니다 — 한 칸에서 빼 주세요."));
-        }
+        // ③ 같은 센서가 체인에 두 번(구조상 생기지 않지만, 생겼다면 저장이 순번을 뒤집는다)
+        foreach (var key in board.Chain.Keys.GroupBy(k => k).Where(g => g.Count() > 1).Select(g => g.Key))
+            issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_DUPLICATE,
+                $"{board.Find(key)?.Display ?? $"센서 {key}"} 이(가) 체인에 두 번 있습니다 — 한 곳에서 빼 주세요."));
 
-        // ③ 한쪽 선에만 센서가 있다 — 루프가 닫히지 않는다(양쪽 대칭으로 본다 · C11)
-        var first = board.Placed(WiringSpec.LINE_PRIMARY).Count;
-        var second = board.Placed(WiringSpec.LINE_SECONDARY).Count;
-        if (first > 0 && second == 0)
-            issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_LOOP_OPEN,
-                "2차 선이 비어 있습니다 — 루프가 닫히지 않습니다. 제어기로 돌아오는 센서를 2차 선에 놓아 주세요."));
-        else if (second > 0 && first == 0)
-            issues.Add(new WiringIssue(WiringIssueLevel.Critical, CODE_LOOP_OPEN,
-                "1차 선이 비어 있습니다 — 루프가 닫히지 않습니다. 제어기에서 나가는 센서를 1차 선에 놓아 주세요."));
+        // ④ 제품 한도(스마트 34) · 섞임(O-8) — 저장은 막지 않는다
+        if (board.Topology.LimitWarning(board.Chain.Count) is { } limit)
+            issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_LIMIT, limit));
+        if (board.MixWarning is { } mix)
+            issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_MIX, mix));
 
-        // ② 선 가운데의 빈 칸
-        foreach (var line in new[] { WiringSpec.LINE_PRIMARY, WiringSpec.LINE_SECONDARY })
-        {
-            var gap = FirstGap(board, line);
-            if (gap is { } slot)
-                issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_GAP,
-                    $"{line}차 선 {slot}번 자리가 비어 있어요(순번 {slot} 번이 없습니다). 센서를 끌어다 놓거나 [번호 순으로 자동 배치] 로 빈 자리를 메워 주세요."));
-        }
+        // ② 불러온 배치의 빈 순번 — 당겨 붙였으니 저장하면 서버 순번이 바뀐다
+        foreach (var notice in board.LoadNotices.Where(n => n.Code == WiringChain.CODE_GAP))
+            issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_GAP,
+                $"{notice.Message} 저장하면 뒤 센서들의 순번이 당겨진 값으로 바뀝니다 — 장애의 고장 구간 번호와 맞는지 확인해 주세요."));
 
-        // ① 아직 선에 안 붙인 센서
+        // ① 아직 체인에 없는 센서(알림)
         var unplaced = board.Unplaced.Count;
         if (unplaced > 0)
-            issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_UNPLACED,
-                $"아직 선에 안 붙인 센서 {unplaced}대 — 끌어다 놓거나 [번호 순으로 자동 배치] 를 누르세요. 이 센서의 결선은 저장하지 않습니다."));
+            issues.Add(new WiringIssue(WiringIssueLevel.Info, CODE_UNPLACED,
+                $"아직 결선에 안 붙인 센서 {unplaced}대 — 끌어다 놓거나 [번호 순으로 자동 배치] 를 누르세요. 이 센서의 결선은 저장하지 않습니다."));
 
         // 버스 주소와 순번이 다른 줄 — 건드리지 않고 알리기만 한다(WS L478, L524)
         var mismatched = board.Rows
-            .Where(r => r.Channel is { } ch && board.PlacementOf(r.Key) is { } p && ch != p.Order)
+            .Where(r => r.Channel is { } ch && board.NumberOf(r.Key) is { } n && ch != n.Order)
             .ToList();
         if (mismatched.Count > 0)
             issues.Add(new WiringIssue(WiringIssueLevel.Info, CODE_CHANNEL,
-                $"버스 주소와 순번이 다른 센서 {mismatched.Count}대 — 주소는 그대로 두고 순번만 저장합니다(예: {mismatched[0].Display} 주소 {mismatched[0].Channel} · 순번 {board.PlacementOf(mismatched[0].Key)!.Order})."));
+                $"버스 주소와 순번이 다른 센서 {mismatched.Count}대 — 주소는 그대로 두고 순번만 저장합니다(예: {mismatched[0].Display} 주소 {mismatched[0].Channel} · 순번 {board.NumberOf(mismatched[0].Key)!.Order})."));
 
         return issues;
     }
@@ -93,58 +85,73 @@ public static class WiringValidation
     public static bool BlocksSave(IEnumerable<WiringIssue> issues)
         => issues?.Any(i => i.Level == WiringIssueLevel.Critical) == true;
 
-    /// <summary>그 선에서 <b>마지막 찬 칸보다 앞</b>에 있는 첫 빈 칸의 칸 번호(1부터). 없으면 <c>null</c>.</summary>
-    public static int? FirstGap(WiringBoard board, int line)
-    {
-        var slots = board.Line(line);
-        var last = -1;
-        for (var i = 0; i < slots.Count; i++) if (slots[i] is not null) last = i;
-        if (last < 0) return null;
-
-        for (var i = 0; i < last; i++) if (slots[i] is null) return i + 1;
-        return null;
-    }
-
-    /// <summary>글로 확인(WS L706-708) — "제어기 ─1차▶ 1. 이름 → … ⟲ 제어기 ◀2차─ …".</summary>
+    /// <summary>
+    /// 글로 확인 — 링: "Sensor A ─▶ 1. 이름 → … ◀─ Sensor B" · 한 줄: "제어기 ─▶ 1. …" · 양쪽 가지: 가지마다 한 줄.
+    /// </summary>
     public static string LoopText(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        var first = Describe(board, WiringSpec.LINE_PRIMARY);
-        var second = Describe(board, WiringSpec.LINE_SECONDARY);
-        return $"제어기 ─1차▶ {first}{Environment.NewLine}    ⟲{Environment.NewLine}제어기 ◀2차─ {second}";
-
-        static string Describe(WiringBoard b, int line)
+        return board.Shape switch
         {
-            var placed = b.Placed(line);
-            if (placed.Count == 0) return "(비어 있음)";
-            return string.Join(" → ", placed.Select((r, i) => $"{i + 1}. {r.Display}"));
-        }
+            WiringShape.Ring => $"Sensor A ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ Sensor B{Environment.NewLine}"
+                              + "    (양 끝은 리턴케이블로 함체에 돌아옵니다)",
+            WiringShape.TwoBranch => $"제어기 ─왼쪽▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))}{Environment.NewLine}"
+                                   + $"제어기 ─오른쪽▶ {Describe(board.Placed(WiringSpec.LINE_SECONDARY))}",
+            _ => $"제어기 ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))}",
+        };
+
+        static string Describe(IReadOnlyList<WiringSensorRow> placed)
+            => placed.Count == 0 ? "(비어 있음)" : string.Join(" → ", placed.Select((r, i) => $"{i + 1}. {r.Display}"));
     }
 
-    /// <summary>고장 구간 예시(WS L709-712) — 장애 화면의 "1차 4~5" 가 어느 센서 사이인지.</summary>
+    /// <summary>고장 구간 예시(WS L709-712) — 장애 화면의 "1차 4~5" 가 어느 센서 사이인지. 링이면 2차(Sensor B 쪽)도 함께.</summary>
     public static string FaultHint(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        var placed = board.Placed(WiringSpec.LINE_PRIMARY);
-        if (placed.Count < FAULT_HINT_MIN) return $"1차 선에 {FAULT_HINT_MIN}대 이상 붙이면 예시를 보여 줍니다.";
-        return $"장애 \"1차 4~5\" → {placed[3].Display} 와 {placed[4].Display} 사이";
+        if (board.CountOn(WiringSpec.LINE_PRIMARY) < FAULT_HINT_MIN)
+            return $"센서를 {FAULT_HINT_MIN}대 이상 붙이면 예시를 보여 줍니다.";
+
+        var first = $"장애 {DescribeFaultSection(board, WiringSpec.LINE_PRIMARY, 4, 5)}";
+        return board.Shape == WiringShape.Ring
+            ? $"{first}{Environment.NewLine}장애 {DescribeFaultSection(board, WiringSpec.LINE_SECONDARY, 4, 5)}"
+            : first;
     }
 
     /// <summary>
-    /// 장애의 고장 구간(선 + 두 정수)을 센서 이름으로 옮긴다 — 1차로 나가 2차로 들어오는 루프 위의 지점이다.
+    /// 장애의 고장 구간(선 + 두 정수)을 센서 이름으로 옮긴다.
     /// </summary>
-    /// <remarks>구간의 정수가 <b>순번</b>인지 <b>버스 주소</b>인지는 서버팀 확인 항목이다(PRD W-D4) — 여기서는 순번으로 읽는다.</remarks>
+    /// <remarks>
+    /// <para><b>링</b> — 1차 n = Sensor A 쪽에서 센 체인 위치 n · <b>2차 n = 체인 위치 N+1−n</b>(Sensor B 쪽에서 센 수). 같은 체인을 양 끝에서 센다(PRD FR-01 · O-1).</para>
+    /// <para><b>양쪽 가지</b> — 선 1 = 왼쪽 · 선 2 = 오른쪽 가지, 제어기 쪽에서 센 수(잠정 O-6). <b>한 줄</b> — 선 1 만 있다.</para>
+    /// <para>구간의 정수가 <b>순번</b>인지 <b>버스 주소</b>인지는 서버팀 확인 항목이다(PRD W-D4) — 여기서는 순번으로 읽는다.</para>
+    /// </remarks>
     public static string DescribeFaultSection(WiringBoard board, int line, int startOrder, int endOrder)
     {
         ArgumentNullException.ThrowIfNull(board);
-        var placed = board.Placed(line);
-        if (placed.Count == 0) return $"{line}차 선에 붙은 센서가 없어 자리를 알 수 없습니다.";
+        var sequence = SequenceFor(board, line);
+        if (sequence.Count == 0) return $"{line}차 선에 붙은 센서가 없어 자리를 알 수 없습니다.";
 
         var start = Name(startOrder);
         var end = Name(endOrder);
-        if (start is null || end is null) return $"{line}차 {startOrder}~{endOrder} 는 지금 결선 범위(1~{placed.Count}) 밖입니다.";
+        if (start is null || end is null) return $"{line}차 {startOrder}~{endOrder} 는 지금 결선 범위(1~{sequence.Count}) 밖입니다.";
         return startOrder == endOrder ? $"{line}차 {startOrder}번 = {start}" : $"{line}차 {startOrder}~{endOrder} → {start} 와 {end} 사이";
 
-        string? Name(int order) => order >= 1 && order <= placed.Count ? placed[order - 1].Display : null;
+        string? Name(int order) => order >= 1 && order <= sequence.Count ? sequence[order - 1].Display : null;
+    }
+
+    /// <summary>그 선의 번호가 1, 2, 3… 으로 매겨지는 센서 차례.</summary>
+    private static IReadOnlyList<WiringSensorRow> SequenceFor(WiringBoard board, int line)
+    {
+        if (board.Shape == WiringShape.Ring)
+        {
+            var chain = board.Placed(WiringSpec.LINE_PRIMARY);
+            return line switch
+            {
+                WiringSpec.LINE_PRIMARY => chain,
+                WiringSpec.LINE_SECONDARY => chain.Reverse().ToList(),     // Sensor B 쪽 끝이 2차 1번
+                _ => Array.Empty<WiringSensorRow>(),
+            };
+        }
+        return board.Placed(line);
     }
 }

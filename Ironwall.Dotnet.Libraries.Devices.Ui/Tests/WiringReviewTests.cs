@@ -89,7 +89,9 @@ public class WiringReviewTests
 
         AssertNoNulls(body);
         Assert.Equal("고친 이름", (string?)body["name_device"]);
-        Assert.Equal(3, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
+        // 체인 모델: 오른쪽 가지(선 2)가 비어 있어 어느 자리를 가리켜도 그 가지의 1번이 된다(옛 칸 모델의 "3번 빈 칸"은 없다).
+        Assert.Equal(2, (int?)body.SelectToken("hardware_spec.spec.wiring.line"));
+        Assert.Equal(1, (int?)body.SelectToken("hardware_spec.spec.wiring.order"));
     }
 
     /// <summary>만들기(POST) 본문 — null 이 하나도 없고 소속 제어기와 결선이 같이 실린다.</summary>
@@ -188,6 +190,7 @@ public class WiringReviewTests
     [Fact]
     public void should_clear_the_load_issue_when_auto_layout_reassigns_every_slot()
     {
+        // 링(스마트 제어기) — 번호순 배치가 팔레트까지 전부 한 줄에 놓는다. 양쪽 가지는 팔레트를 끌어오지 않아 이 경로가 아니다.
         var board = new WiringBoard();
         board.Load(new[]
         {
@@ -195,7 +198,8 @@ public class WiringReviewTests
              Issue: (string?)"겹칩니다", Groups: (IReadOnlyList<int>?)null),
             (Id: 2, Channel: (int?)2, Facts: WiringDoubles.Facts(1102, 2), Placement: (WiringPlacement?)null,
              Issue: (string?)null, Groups: (IReadOnlyList<int>?)null),
-        });
+        }, "SmartController");
+        Assert.Contains(board.Unplaced, r => r.Id == 1);     // 읽지 못한 결선은 제안하지 않고 팔레트에 둔다
 
         Assert.True(board.AutoLayoutByNumber());
 
@@ -218,7 +222,7 @@ public class WiringReviewTests
     }
 
     [Fact]
-    public void should_take_the_first_empty_slot_when_the_same_position_is_taken_on_the_other_line()
+    public void should_insert_at_the_same_position_and_push_when_moving_to_the_other_branch()
     {
         var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 2, placedOnFirst: 2);
         vm.Drop(Payload(vm.Line1[1]), new DropTarget(WiringViewModel.SlotZoneKey, vm.Line2[0], -1));
@@ -226,7 +230,10 @@ public class WiringReviewTests
 
         vm.MoveSelectedToOtherLine();
 
-        Assert.NotNull(vm.Line2[1].Row);              // 0번 자리는 찼으니 다음 빈 칸
+        // 체인에는 "찬 칸" 이 없다 — 같은 자리(1번)에 끼워 넣고 있던 센서는 뒤로 밀린다.
+        Assert.Equal(101, vm.Line2[0].Row!.Id);
+        Assert.Equal(102, vm.Line2[1].Row!.Id);
+        Assert.True(vm.Line2[0].IsSelected);
     }
     #endregion
 
@@ -312,20 +319,6 @@ public class WiringReviewTests
 
     #region - C11 · 작은 것들 -
     [Fact]
-    public void should_not_push_an_undo_step_when_the_slot_cap_is_reached()
-    {
-        var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 1);
-        while (vm.Line1.Count < WiringBoard.MAX_SLOTS) vm.AddSlotPrimary();
-
-        var before = vm.CanUndo;
-        vm.AddSlotPrimary();
-
-        Assert.Equal(before, vm.CanUndo);
-        Assert.Equal(WiringBoard.MAX_SLOTS, vm.Line1.Count);
-        Assert.Contains("64", vm.StatusText);
-    }
-
-    [Fact]
     public void should_undo_a_multi_row_enter_in_one_step()
     {
         var vm = Open(new WiringFakeGateway(), new WiringFakeDialogs(), sensors: 3);
@@ -340,24 +333,32 @@ public class WiringReviewTests
     }
 
     [Fact]
-    public void should_refuse_auto_layout_when_the_sensors_do_not_fit()
+    public void should_place_every_sensor_beyond_the_old_slot_cap_when_auto_laying_out_a_ring()
     {
+        // 옛 칸 모델은 한 선 64칸이 상한이라 자동 배치를 거절했다 — 체인은 칸 상한이 없고 제품 한도(34)는 경고다.
         var board = WiringDoubles.Board(0);
-        for (var i = 0; i < WiringBoard.MAX_SLOTS * 2 + 2; i++) board.AddRow(new SensorFacts(2000 + i, $"센서 {i}", "Fence", ""));
+        for (var i = 0; i < 130; i++) board.AddRow(new SensorFacts(2000 + i, $"센서 {i}", "SmartSensor2", ""));
 
-        Assert.False(board.AutoLayoutByNumber());
-        Assert.Empty(board.Placed(1));            // 아무것도 바꾸지 않는다
+        Assert.True(board.AutoLayoutByNumber());
+
+        Assert.Equal(130, board.Placed(1).Count);
+        Assert.Equal(new WiringPlacement(1, 130), board.PlacementOf(board.Rows[^1].Key));
+        var issues = WiringValidation.Evaluate(board);
+        Assert.Contains(issues, i => i.Code == WiringValidation.CODE_LIMIT && i.Level == WiringIssueLevel.Warning);
+        Assert.False(WiringValidation.BlocksSave(issues));
     }
 
     [Fact]
-    public void should_report_the_loop_as_open_when_only_the_second_line_has_sensors()
+    public void should_not_block_when_only_one_branch_has_sensors()
     {
+        // 옛 "한쪽 선만 차면 루프가 안 닫힌다(치명)" 는 없앴다 — 링의 돌아오는 길은 센서 없는 리턴케이블이다(FR-14).
         var board = WiringDoubles.Board(1);
-        board.Place(board.Rows[0].Key, 2, 0);
+        Assert.True(board.Place(board.Rows[0].Key, 2, 0));
 
         var issues = WiringValidation.Evaluate(board);
 
-        Assert.Contains(issues, i => i.Code == WiringValidation.CODE_LOOP_OPEN && i.Message.Contains("1차 선이 비어"));
+        Assert.False(WiringValidation.BlocksSave(issues));
+        Assert.DoesNotContain(issues, i => i.Level == WiringIssueLevel.Critical);
     }
 
     [Fact]
@@ -463,7 +464,7 @@ public class WiringReviewTests
         var board = WiringDoubles.Board(0);
         var row = board.AddRow(new SensorFacts(1301, "새 센서", "Fence", ""));
         board.Place(row.Key, 1, 0);
-        board.Place(board.AddRow(new SensorFacts(1302, "짝", "Fence", "")).Key, 2, 0);
+        board.Place(board.AddRow(new SensorFacts(1302, "짝", "Fence", "")).Key, 1, 1);
         SensorGroupEdit.Apply(new[] { row }, new Dictionary<int, bool> { [4] = true });
 
         var result = await new WiringApplyService(gateway, null, null, WiringDoubles.AxisPolicy()).ApplyAsync(10, board);
@@ -596,7 +597,8 @@ public class WiringReviewTests
 
     private static async Task RunAsync(CapturingHttp http, Action<WiringBoard> change)
     {
-        var board = WiringDoubles.Board(3, placedOnFirst: 3);
+        // 센서 2대 — 두 번째(102)가 줄 끝이라, 그 한 대를 옮기거나 빼도 다른 센서의 순번이 밀리지 않는다(체인은 빼면 당겨진다).
+        var board = WiringDoubles.Board(2, placedOnFirst: 2);
         // 재조회가 돌려줄 서버 쪽 상태 — 모든 칸이 채워져 있다.
         http.GetResponseJson = ServerEnvelope(WiringDoubles.ServerSensor(102, 1102, 2, new WiringPlacement(1, 2)));
 

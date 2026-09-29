@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -98,144 +99,155 @@ public sealed record WiringBoardDiff(
 }
 
 /// <summary>
-/// 결선 보드 — 선 2가닥의 칸과 미배치 센서. <b>판정은 전부 여기</b>(UI 없음 · 헤드리스 테스트 대상).
+/// 결선 보드 — 제어기 한 대의 센서 표와 <b>결선 체인</b>(<see cref="WiringChain"/>). <b>판정은 전부 여기</b>(UI 없음 · 헤드리스 테스트 대상).
 /// </summary>
 /// <remarks>
-/// <para>순번은 칸 번호가 아니다 — 그 선에서 <b>자기 앞(자기 포함)의 찬 칸 수</b>다(WS L681).
-/// 빈 자리는 <b>빈 자리로 남고</b> 경고가 알린다 — 당겨 붙이는 것은 [번호 순으로 자동 배치]의 일이다
-/// (목업 L433·L717 의 "자동으로 당겨집니다" 에서 벗어난 자리 · PRD 이탈 D-4).</para>
-/// <para>되돌리기는 <b>한 스택</b>이다 — 표 값과 결선을 같이 찍는다(WS L181 "되돌리기 한 번으로 전부 원위치").</para>
+/// <para><b>체인 모델(wiring-fence-view F-2)</b> — N04 의 "1차 · 2차 선에 칸을 두고 반씩 꽂는다"는 링 제품 구조와 맞지 않았다(PRD §1-A).
+/// 결선 모양은 제어기 종류가 정하고(<see cref="WiringTopology"/>), 순서는 체인 하나(양쪽 가지면 가지 둘)다.
+/// 빈 칸이 없다 — 끼워 넣으면 뒤가 밀리고, 빼면 뒤가 당겨진다.</para>
+/// <para><b>선 번호</b> — 목록 보기의 선은 링 · 한 줄이면 <b>하나</b>(선 1 = 체인 전체, Sensor A · 제어기 쪽부터), 양쪽 가지면 <b>둘</b>
+/// (선 1 = 왼쪽 가지 · 선 2 = 오른쪽 가지, 각각 제어기 쪽부터). 목록 자리 i 의 순번은 늘 i+1 이다.</para>
+/// <para><b>제안(FR-03)</b> — 저장된 자리가 없는 센서는 불러올 때 번호순으로 체인 끝에 <b>제안</b>으로 붙는다.
+/// 제안은 [이대로 적용](<see cref="AcceptSuggestions"/>) 전까지 저장 대기가 아니다(<see cref="PlacementOf"/> 가 <c>null</c>).</para>
+/// <para>되돌리기는 <b>한 스택</b>이다 — 표 값과 체인을 같이 찍는다(WS L181). 체인은 불변이라 장면에 그대로 담긴다.</para>
 /// </remarks>
 public sealed class WiringBoard
 {
-    /// <summary>한 선의 칸 상한. 순번 상한과 같다.</summary>
-    public const int MAX_SLOTS = 64;
-
-    /// <summary>처음 그릴 때의 칸 수(WS L676-677 과 같다).</summary>
-    public const int DEFAULT_SLOTS = 8;
-
-    /// <summary>자동 배치 뒤에 남겨 두는 최소 칸 수(WS L762).</summary>
-    public const int MIN_SLOTS_AFTER_AUTO = 4;
-
     /// <summary>되돌리기 깊이 — 한 세션에서 이보다 더 거슬러 가지 않는다.</summary>
     public const int MAX_UNDO = 100;
 
     private readonly List<WiringSensorRow> _rows = new();
-    private readonly List<int?>[] _lines = { new(), new() };
     private readonly Stack<Snapshot> _undo = new();
+    private readonly List<WiringChainLoadIssue> _loadNotices = new();
+    private WiringChain _chain;
+    private string? _controllerType;
     private int _nextNewKey = -1;
 
     public WiringBoard()
     {
-        for (var line = 1; line <= 2; line++)
-            for (var i = 0; i < DEFAULT_SLOTS; i++) Slots(line).Add(null);
+        Topology = WiringTopology.For(null, Array.Empty<EnumDeviceType>());
+        _chain = WiringChain.Empty(Topology.Shape);
     }
 
     #region - Read -
     public IReadOnlyList<WiringSensorRow> Rows => _rows;
 
-    /// <summary>그 선의 칸 — 값은 <see cref="WiringSensorRow.Key"/>(빈 칸은 <c>null</c>).</summary>
-    public IReadOnlyList<int?> Line(int line) => Slots(line);
+    /// <summary>불러올 때 정한 결선 모양 — 편집 중에는 바뀌지 않는다(바뀌면 번호의 뜻이 바뀐다).</summary>
+    public WiringTopology Topology { get; private set; }
 
-    public int SlotCount(int line) => Slots(line).Count;
+    public WiringShape Shape => Topology.Shape;
+
+    /// <summary>지금 체인(불변 값).</summary>
+    public WiringChain Chain => _chain;
+
+    /// <summary>목록 보기의 선 수 — 양쪽 가지만 2.</summary>
+    public int LineCount => Shape == WiringShape.TwoBranch ? 2 : 1;
+
+    /// <summary>불러올 때 N04 의 2차 선을 한 줄로 이어 붙였는가(FR-02) — 저장 전까지 알린다.</summary>
+    public bool ConvertedFromLegacy { get; private set; }
+
+    /// <summary>불러오기에서 당겨 붙인 빈 순번 같은 경고(FR-14 ②).</summary>
+    public IReadOnlyList<WiringChainLoadIssue> LoadNotices => _loadNotices;
+
+    /// <summary>번호순 제안으로 붙어 있는 센서 수(FR-03).</summary>
+    public int SuggestedCount => _chain.Suggested.Count;
+
+    public bool HasSuggestion => SuggestedCount > 0;
+
+    public bool IsSuggested(int key) => _chain.Suggested.Contains(key);
+
+    /// <summary>
+    /// 지금 표의 센서 종류로 본 섞임 경고(O-8) — 종류를 표에서 고치면 바로 따라온다. 모양은 바꾸지 않는다.
+    /// </summary>
+    public string? MixWarning
+        => WiringTopology.For(_controllerType, _rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)).ToList()).MixWarning;
+
+    /// <summary>그 선의 센서 키 — 목록 순서(링 · 한 줄: 체인 순서 · 가지: 제어기 쪽부터). 없는 선은 빈 목록.</summary>
+    public IReadOnlyList<int> Line(int line)
+        => line >= 1 && line <= LineCount ? _chain.Branch(line) : Array.Empty<int>();
+
+    /// <summary>그 선에 붙은 센서 수.</summary>
+    public int CountOn(int line) => Line(line).Count;
 
     public WiringSensorRow? RowAt(int line, int index)
     {
-        var slots = Slots(line);
-        if (index < 0 || index >= slots.Count) return null;
-        return slots[index] is { } key ? Find(key) : null;
+        var keys = Line(line);
+        return index >= 0 && index < keys.Count ? Find(keys[index]) : null;
     }
 
     public WiringSensorRow? Find(int key) => _rows.FirstOrDefault(r => r.Key == key);
 
-    /// <summary>선에 붙이지 않은 센서 — 팔레트(WS L409).</summary>
+    /// <summary>체인에 없는 센서 — 팔레트(WS L409). 번호순.</summary>
     public IReadOnlyList<WiringSensorRow> Unplaced
-        => _rows.Where(r => PlacementOf(r.Key) is null).OrderBy(r => r.Facts.Number).ToList();
+        => _rows.Where(r => !_chain.Contains(r.Key)).OrderBy(r => r.Facts.Number).ThenBy(r => r.Key).ToList();
+
+    /// <summary>목록 자리의 순번(1부터) = 자리 + 1. 범위 밖이면 0.</summary>
+    public int OrderAt(int line, int index) => index >= 0 && index < CountOn(line) ? index + 1 : 0;
+
+    /// <summary>체인 위 번호(자리 · 선 · 순번 · 링이면 B 번호). 제안 센서도 번호가 있다(보이기용).</summary>
+    public WiringChainNumber? NumberOf(int key) => _chain.NumberOf(key);
 
     /// <summary>
-    /// 그 칸의 순번(1부터) = <b>칸의 자리 그대로</b>. 빈 칸이면 <c>0</c>.
+    /// <b>저장될</b> 결선 자리 — 체인에 있으면 <c>{line, order}</c>, 팔레트면 <c>null</c>.
+    /// <b>제안 센서는 <c>null</c></b>(적용 전에는 저장 대기가 아니다 · O-3).
     /// </summary>
-    /// <remarks>
-    /// <para><b>번호 체계는 하나다</b> — 칸 번호 · 배지의 순번 · 저장되는 <c>order</c> · 빈 칸 경고가 가리키는 자리가
-    /// 전부 같은 수다. 목업(L681)은 배지를 "찬 칸만 센 수"로 그려 가운데가 빈 상태에서
-    /// <b>배지 2 옆의 경고가 "2번 자리가 비어 있다"</b>고 말하는 모순이 생겼다(적대 검토 C5).</para>
-    /// <para>그리고 이 수는 장애의 <b>고장 구간 정수</b>와 같은 축이다 — 서버에 2·3·4 로 저장된 루프를
-    /// 화면에서 1·2·3 으로 다시 매기면 "1차 4~5" 가 가리키는 자리가 말없이 바뀐다.
-    /// 그래서 빈 자리는 <b>빈 자리로 두고</b> 경고로 알린다(당겨 붙이는 것은 [번호 순으로 자동 배치]가 한다).</para>
-    /// </remarks>
-    public int OrderAt(int line, int index)
-    {
-        var slots = Slots(line);
-        if (index < 0 || index >= slots.Count || slots[index] is null) return 0;
-        return index + 1;
-    }
-
     public WiringPlacement? PlacementOf(int key)
-    {
-        for (var line = 1; line <= 2; line++)
-        {
-            var index = Slots(line).IndexOf(key);
-            if (index >= 0) return new WiringPlacement(line, OrderAt(line, index));
-        }
-        return null;
-    }
+        => IsSuggested(key) ? null : DisplayPlacementOf(key);
 
-    /// <summary>그 선에 붙은 센서를 순번 순으로.</summary>
+    /// <summary>화면에 보일 자리 — 제안 센서도 자리를 보인다.</summary>
+    public WiringPlacement? DisplayPlacementOf(int key)
+        => _chain.NumberOf(key) is { } n ? new WiringPlacement(n.Line, n.Order) : null;
+
+    /// <summary>그 선에 붙은 센서를 목록 순서로.</summary>
     public IReadOnlyList<WiringSensorRow> Placed(int line)
-        => Slots(line).Where(k => k is not null).Select(k => Find(k!.Value)).Where(r => r is not null).Select(r => r!).ToList();
+        => Line(line).Select(Find).Where(r => r is not null).Select(r => r!).ToList();
     #endregion
 
     #region - Load -
     /// <summary>
-    /// 서버에서 받은 센서로 보드를 채운다. 저장된 결선이 <b>겹치거나 범위 밖</b>이면 그 줄은 미배치로 두고 까닭을 남긴다.
+    /// 서버에서 받은 센서로 보드를 채운다(FR-01 ~ FR-03 · FR-16).
     /// </summary>
-    public void Load(IEnumerable<(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement, string? Issue, IReadOnlyList<int>? Groups)> sensors)
+    /// <param name="controllerType">제어기 <c>type_controller</c> 원값 — 결선 모양을 정한다. 모르면 센서 종류로 추정한다.</param>
+    /// <remarks>
+    /// 옛 두 선 배치는 한 줄로 바꾸고(<see cref="ConvertedFromLegacy"/> · 바뀐 센서는 "바뀐 줄"로 센다 — 자동 저장하지 않는다),
+    /// 같은 자리를 둘이 주장하면 뒤의 센서는 팔레트로 + 까닭(치명), 저장된 결선을 읽지 못한 센서도 팔레트로 둔다.
+    /// </remarks>
+    public void Load(IEnumerable<(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement, string? Issue, IReadOnlyList<int>? Groups)> sensors,
+                     string? controllerType = null)
     {
         _rows.Clear();
         _undo.Clear();
-        for (var line = 1; line <= 2; line++)
-        {
-            Slots(line).Clear();
-            for (var i = 0; i < DEFAULT_SLOTS; i++) Slots(line).Add(null);
-        }
+        _loadNotices.Clear();
+        _controllerType = controllerType;
 
         var loaded = sensors?.ToList() ?? new();
         foreach (var s in loaded)
             _rows.Add(new WiringSensorRow(s.Id > 0 ? s.Id : _nextNewKey--, s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups));
 
-        // 저장된 자리에 그대로 앉힌다 — 빈 자리는 빈 칸으로 남는다(당겨 붙이지 않는다 · C5).
-        // 같은 (선, 순번) 을 두 줄이 주장하면 번호가 작은 줄이 자리를 갖고, 나머지는 미배치 + 까닭.
-        foreach (var line in new[] { WiringSpec.LINE_PRIMARY, WiringSpec.LINE_SECONDARY })
-        {
-            var claims = _rows
-                .Where(r => r.BaselinePlacement?.Line == line)
-                .OrderBy(r => r.BaselinePlacement!.Order)
-                .ThenBy(r => r.Facts.Number)
-                .ToList();
+        Topology = WiringTopology.For(controllerType, _rows.Select(r => WiringTopology.ParseSensorType(r.Facts.TypeText)).ToList());
 
-            foreach (var row in claims)
+        var result = WiringChain.Load(Shape, _rows.Select(r => new WiringChainSensor(r.Key, r.Id, r.Facts.Number, r.BaselinePlacement)));
+        var chain = result.Chain;
+
+        foreach (var issue in result.Issues)
+        {
+            if (issue.Key is { } key && Find(key) is { } row && issue.Level == WiringIssueLevel.Critical)
             {
-                var order = row.BaselinePlacement!.Order;
-                var index = order - 1;
-                EnsureSlots(line, order);
-                if (index >= Slots(line).Count)
-                {
-                    row.LoadIssue = $"{line}차 {order}번 자리가 이 선의 칸 수({MAX_SLOTS})를 넘어 미배치로 두었습니다.";
-                    row.BaselinePlacement = null;
-                    continue;
-                }
-                if (Slots(line)[index] is not null)
-                {
-                    row.LoadIssue = $"{line}차 {order}번 자리를 다른 센서가 이미 쓰고 있어 미배치로 두었습니다.";
-                    row.BaselinePlacement = null;      // 기준도 "미배치" 다 — 저장 때 이 줄만 보낸다
-                    continue;
-                }
-                Slots(line)[index] = row.Key;
+                row.LoadIssue = issue.Message;
+                row.BaselinePlacement = null;      // 기준도 "미배치" 다 — 사람이 자리를 정해 주면 그 줄만 나간다
             }
+            else _loadNotices.Add(issue);
         }
+
+        // 저장된 결선을 읽지 못한 센서는 제안하지 않는다 — 사람이 다시 배치해야 한다(C4).
+        var unreadable = _rows.Where(r => !string.IsNullOrEmpty(r.LoadIssue) && chain.Suggested.Contains(r.Key)).Select(r => r.Key).ToList();
+        if (unreadable.Count > 0) chain = chain.RemoveMany(unreadable);
+
+        _chain = chain;
+        ConvertedFromLegacy = result.ConvertedFromLegacy;
     }
 
-    /// <summary>새 줄을 더한다(센서 여러 개 만들기 · 엑셀 붙여넣기). 서버에는 저장 때 만든다.</summary>
+    /// <summary>새 줄을 더한다(센서 여러 개 만들기 · 엑셀 붙여넣기). 팔레트에 선다 — 서버에는 저장 때 만든다.</summary>
     public WiringSensorRow AddRow(SensorFacts facts, IEnumerable<int>? groups = null)
     {
         var row = new WiringSensorRow(_nextNewKey--, 0, null, facts, null, null, groups);
@@ -245,61 +257,103 @@ public sealed class WiringBoard
     #endregion
 
     #region - Edit -
-    /// <summary>빈 칸에 놓는다. 찬 칸이거나 없는 칸이면 <c>false</c>(아무것도 바뀌지 않는다).</summary>
-    public bool Place(int key, int line, int index)
-    {
-        var slots = Slots(line);
-        if (index < 0 || index >= slots.Count) return false;
-        if (slots[index] is { } occupant && occupant != key) return false;
-        if (Find(key) is not { } row) return false;
-        if (slots[index] == key) return false;
+    /// <summary>
+    /// 선 <paramref name="line"/> 의 <paramref name="index"/> 자리(옮기기 <b>전</b> 목록 기준 0…개수)에 끼워 넣는다 — 뒤는 밀린다.
+    /// 없는 선 · 모르는 센서 · 제자리면 <c>false</c>(아무것도 바뀌지 않는다).
+    /// </summary>
+    public bool Place(int key, int line, int index) => PlaceMany(new[] { key }, line, index) > 0;
 
-        Detach(key);
-        slots[index] = key;
-        row.LoadIssue = null;       // 사람이 자리를 정해 줬다 — 불러오기 경고는 여기서 풀린다(C4)
-        return true;
+    /// <summary>여러 대를 한 덩어리로 끼워 넣는다(여럿 끌기). 놓은 수를 돌려준다 — 바뀐 것이 없으면 0.</summary>
+    public int PlaceMany(IEnumerable<int> keys, int line, int index)
+    {
+        if (line < 1 || line > LineCount) return 0;
+        var known = (keys ?? Enumerable.Empty<int>()).Where(k => Find(k) is not null).Distinct().ToList();
+        if (known.Count == 0) return 0;
+
+        var next = _chain.PlaceInBranch(known, line, index).AcceptSuggestions(known);
+        return Commit(next, known) ? known.Count : 0;
     }
 
-    /// <summary>선에서 뺀다 — 그 자리는 <b>빈 칸으로 남는다</b>(자리는 곧 순번이다).</summary>
-    public bool Unplace(int key)
+    /// <summary>체인 끝에 붙인다(팔레트 Enter · FR-11) — 양쪽 가지면 오른쪽 가지 바깥 끝. 붙인 수.</summary>
+    public int Append(IEnumerable<int> keys)
     {
-        var removed = Detach(key);
-        if (Find(key) is { } row) row.LoadIssue = null;      // 빼는 것도 사람의 판단이다(C4)
-        return removed;
+        var known = (keys ?? Enumerable.Empty<int>()).Where(k => Find(k) is not null && !_chain.Contains(k)).Distinct().ToList();
+        if (known.Count == 0) return 0;
+
+        var next = _chain;
+        foreach (var key in known) next = next.Append(key);
+        return Commit(next, known) ? known.Count : 0;
     }
 
-    /// <summary>칸을 하나 늘린다(WS L411, L688).</summary>
-    public bool AddSlot(int line)
+    /// <summary>체인에서 뺀다 — 뒤는 한 칸씩 당겨진다.</summary>
+    public bool Unplace(int key) => UnplaceMany(new[] { key }) > 0;
+
+    /// <summary>여럿을 한꺼번에 뺀다. 뺀 수.</summary>
+    public int UnplaceMany(IEnumerable<int> keys)
     {
-        var slots = Slots(line);
-        if (slots.Count >= MAX_SLOTS) return false;
-        slots.Add(null);
-        return true;
+        var inChain = (keys ?? Enumerable.Empty<int>()).Where(_chain.Contains).Distinct().ToList();
+        if (inChain.Count == 0) return 0;
+        return Commit(_chain.RemoveMany(inChain), inChain) ? inChain.Count : 0;
     }
 
     /// <summary>
-    /// 번호 순으로 자동 배치 — 앞 절반은 1차, 뒤 절반은 2차(WS L757-763).
+    /// 한 칸 옮긴다(Alt+← · Alt+→) — 같은 선 안에서만. 끝이면 <c>false</c>.
+    /// </summary>
+    public bool MoveBy(int key, int direction)
+    {
+        if (direction == 0 || LocationOf(key) is not { } at) return false;
+        var count = CountOn(at.Line);
+        if (direction < 0)
+            return at.Index > 0 && Place(key, at.Line, at.Index - 1);
+        return at.Index < count - 1 && Place(key, at.Line, at.Index + 2);     // "옮기기 전" 기준이라 +2 가 한 칸 뒤다
+    }
+
+    /// <summary>
+    /// 다른 가지로 옮긴다(Alt+↑ · Alt+↓) — <b>양쪽 가지에서만</b>. 같은 자리(없으면 그 가지 끝)로 간다.
+    /// </summary>
+    public bool MoveToOtherLine(int key)
+    {
+        if (Shape != WiringShape.TwoBranch || LocationOf(key) is not { } at) return false;
+        var other = at.Line == WiringSpec.LINE_PRIMARY ? WiringSpec.LINE_SECONDARY : WiringSpec.LINE_PRIMARY;
+        return Place(key, other, Math.Min(at.Index, CountOn(other)));
+    }
+
+    /// <summary>센서의 목록 위치(선 · 자리). 체인에 없으면 <c>null</c>.</summary>
+    public (int Line, int Index)? LocationOf(int key)
+    {
+        for (var line = 1; line <= LineCount; line++)
+        {
+            var keys = Line(line);
+            for (var i = 0; i < keys.Count; i++) if (keys[i] == key) return (line, i);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 번호 순으로 배치(FR-03) — 링 · 한 줄은 <b>전체</b>(팔레트 포함)를 장비번호 → id 순으로 한 줄에,
+    /// 양쪽 가지는 <b>가지 안에서만</b> 줄 세운다(팔레트는 그대로). 사람이 누른 것이라 제안 표지도 걷는다.
+    /// 센서가 없으면 <c>false</c>.
     /// </summary>
     public bool AutoLayoutByNumber()
     {
-        var all = _rows.OrderBy(r => r.Facts.Number).ThenBy(r => r.Key).ToList();
-        var half = (int)Math.Ceiling(all.Count / 2.0);
+        if (_rows.Count == 0) return false;
+        var sensors = _rows.Select(r => new WiringChainSensor(r.Key, r.Id, r.Facts.Number, null));
 
-        // 말없이 버리지 않는다 — 한 선에 담을 수 없으면 아무것도 바꾸지 않고 거절한다(C11).
-        if (half > MAX_SLOTS || all.Count - half > MAX_SLOTS) return false;
+        // 팔레트는 보드가 쥔다(불러온 뒤 더한 줄은 체인이 모른다) — 링 · 한 줄은 먼저 체인 끝에 붙이고 전체를 줄 세운다.
+        var next = _chain;
+        if (Shape != WiringShape.TwoBranch)
+            foreach (var row in Unplaced) next = next.Append(row.Key);
 
-        for (var line = 1; line <= 2; line++) Slots(line).Clear();
+        _chain = next.SortByDefaultOrder(sensors, includeUnplaced: false).AcceptSuggestions();
+        foreach (var row in _rows.Where(r => _chain.Contains(r.Key))) row.LoadIssue = null;   // 자리를 다시 정했다(C4)
+        return true;
+    }
 
-        for (var i = 0; i < all.Count; i++)
-            Slots(i < half ? WiringSpec.LINE_PRIMARY : WiringSpec.LINE_SECONDARY).Add(all[i].Key);
-
-        for (var line = 1; line <= 2; line++)
-        {
-            var slots = Slots(line);
-            while (slots.Count < MIN_SLOTS_AFTER_AUTO) slots.Add(null);
-        }
-
-        foreach (var row in _rows) row.LoadIssue = null;     // 자리를 전부 다시 정했다(C4)
+    /// <summary>[이대로 적용](FR-03) — 제안을 저장 대기로 만든다. 제안이 없으면 <c>false</c>.</summary>
+    public bool AcceptSuggestions()
+    {
+        if (!HasSuggestion) return false;
+        _chain = _chain.AcceptSuggestions();
         return true;
     }
 
@@ -332,7 +386,6 @@ public sealed class WiringBoard
         var created = new List<WiringSensorRow>();
         var factChanged = new List<WiringSensorRow>();
         var wiringChanged = new List<WiringSensorRow>();
-
         var groupChanged = new List<WiringSensorRow>();
 
         foreach (var row in _rows)
@@ -363,11 +416,12 @@ public sealed class WiringBoard
     /// <remarks>
     /// <b>되돌리기 스택을 버린다</b>(C3) — 저장 전의 장면에는 <b>서버 Id 를 받기 전의 줄 객체</b>(Id=0)가 들어 있어,
     /// 저장 뒤에 되돌리면 이미 만든 센서가 다시 "새 줄"로 되살아나 같은 번호로 한 번 더 POST 된다.
+    /// 결선이 모두 서버와 맞으면 옛 배치 변환 알림 · 빈 순번 경고도 걷는다.
     /// </remarks>
     /// <param name="keys">새 기준으로 삼을 줄(<c>null</c> 이면 전부).</param>
     /// <param name="includeGroups">
     /// 그룹도 함께 기준으로 삼을지. 저장 결과를 받을 때는 <c>false</c> 로 부르고 그룹은 <see cref="MarkGroupsSaved"/> 로 옮긴다 —
-    /// 그룹은 장비 PATCH 와 <b>따로</b> 나가서, 행 PATCH 가 됐어도 그룹 호출은 실패했을 수 있다(그때 그룹 변경이 조용히 사라졌다).
+    /// 그룹은 장비 PATCH 와 <b>따로</b> 나가서, 행 PATCH 가 됐어도 그룹 호출은 실패했을 수 있다.
     /// </param>
     public void MarkBaseline(IEnumerable<int>? keys = null, bool includeGroups = true)
     {
@@ -381,16 +435,17 @@ public sealed class WiringBoard
             if (includeGroups) row.MarkGroupBaseline();
             row.LoadIssue = null;
         }
+
+        if (Diff().WiringChanged.Count == 0)
+        {
+            ConvertedFromLegacy = false;
+            _loadNotices.Clear();
+        }
     }
 
     /// <summary>
     /// 서버가 맞춰 준 그룹 호출(<paramref name="saved"/>: 그룹 · 방향 · 장비 id)만 그룹 기준선으로 옮긴다.
     /// </summary>
-    /// <remarks>
-    /// 그룹만 바꾼 저장은 장비 호출이 없어 <see cref="MarkBaseline"/> 에 걸리는 줄이 없다 — 이것을 부르지 않으면
-    /// 저장이 끝나도 창이 계속 "바뀐 것 있음"이고 다음 저장이 같은 그룹 호출을 다시 보냈다.
-    /// 되돌리기 스택은 버린다(<see cref="MarkBaseline"/> 과 같은 까닭 — 저장 전 장면으로 돌아가면 이미 보낸 것을 다시 보낸다).
-    /// </remarks>
     public void MarkGroupsSaved(IEnumerable<(int GroupId, bool Add, IReadOnlyList<int> DeviceIds)>? saved)
     {
         if (saved is null) return;
@@ -415,7 +470,6 @@ public sealed class WiringBoard
         if (old is null || newId <= 0) return null;
 
         var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups);
-        // 그룹 기준선은 옛 줄 것을 그대로 — 새 줄의 그룹 넣기가 실패했으면 "바뀐 것"으로 남아야 한다(생성자는 Groups 로 채운다).
         promoted.CopyGroupBaselineFrom(old);
         _rows[_rows.IndexOf(old)] = promoted;
         return promoted;
@@ -423,34 +477,19 @@ public sealed class WiringBoard
     #endregion
 
     #region - Internals -
-    private List<int?> Slots(int line) => _lines[line == WiringSpec.LINE_SECONDARY ? 1 : 0];
-
-    private void EnsureSlots(int line, int count)
+    /// <summary>새 체인이 실제로 다르면 받고, 사람이 자리를 정한 센서의 불러오기 경고를 푼다(C4).</summary>
+    private bool Commit(WiringChain next, IEnumerable<int> touched)
     {
-        var slots = Slots(line);
-        while (slots.Count < Math.Min(count, MAX_SLOTS)) slots.Add(null);
+        if (next.SameAs(_chain)) return false;
+        _chain = next;
+        foreach (var key in touched)
+            if (Find(key) is { } row) row.LoadIssue = null;
+        return true;
     }
 
-    private bool Detach(int key)
-    {
-        var removed = false;
-        for (var line = 1; line <= 2; line++)
-        {
-            var slots = Slots(line);
-            for (var i = 0; i < slots.Count; i++)
-                if (slots[i] == key) { slots[i] = null; removed = true; }
-        }
-        return removed;
-    }
+    private sealed record Snapshot(IReadOnlyList<WiringSensorRow> Rows, IReadOnlyList<SensorFacts> Facts, WiringChain Chain);
 
-    private sealed record Snapshot(
-        IReadOnlyList<WiringSensorRow> Rows,
-        IReadOnlyList<SensorFacts> Facts,
-        IReadOnlyList<int?> Line1,
-        IReadOnlyList<int?> Line2);
-
-    private Snapshot Capture()
-        => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), Slots(1).ToList(), Slots(2).ToList());
+    private Snapshot Capture() => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _chain);
 
     private void Restore(Snapshot snapshot)
     {
@@ -461,11 +500,7 @@ public sealed class WiringBoard
             row.Facts = snapshot.Facts[i];      // 같은 객체를 되살린다 — 화면이 쥔 항목이 끊기지 않는다
             _rows.Add(row);
         }
-
-        Slots(1).Clear();
-        Slots(1).AddRange(snapshot.Line1);
-        Slots(2).Clear();
-        Slots(2).AddRange(snapshot.Line2);
+        _chain = snapshot.Chain;
     }
     #endregion
 }

@@ -14,12 +14,17 @@ public sealed class SensorRowViewModel : PropertyChangedBase
 {
     private readonly Func<WiringSensorRow, WiringPlacement?> _placement;
     private readonly Action<SensorRowViewModel>? _edited;
+    private readonly Func<WiringSensorRow, string?>? _placementText;
 
-    public SensorRowViewModel(WiringSensorRow row, Func<WiringSensorRow, WiringPlacement?> placement, Action<SensorRowViewModel>? edited = null)
+    /// <param name="placement"><b>저장될</b> 자리 — Draft 판정의 기준(제안 센서는 <c>null</c>).</param>
+    /// <param name="placementText">자리 글자(없으면 <paramref name="placement"/> 의 글자) — 링의 "A3 · B32" · 제안 표지처럼 저장값과 다르게 보일 때.</param>
+    public SensorRowViewModel(WiringSensorRow row, Func<WiringSensorRow, WiringPlacement?> placement, Action<SensorRowViewModel>? edited = null,
+                              Func<WiringSensorRow, string?>? placementText = null)
     {
         Row = row ?? throw new ArgumentNullException(nameof(row));
         _placement = placement ?? throw new ArgumentNullException(nameof(placement));
         _edited = edited;
+        _placementText = placementText;
     }
 
     public WiringSensorRow Row { get; }
@@ -117,8 +122,8 @@ public sealed class SensorRowViewModel : PropertyChangedBase
     /// <summary>버스 주소 — 결선 순번과 다를 수 있어 둘 다 보인다(WS L478).</summary>
     public string ChannelText => Row.Channel is { } channel ? $"주소 {channel}" : "—";
 
-    /// <summary>결선 자리 — "1차 4번" · "미배치".</summary>
-    public string PlacementText => _placement(Row)?.Text ?? "미배치";
+    /// <summary>결선 자리 — "A4 · B31" · "왼쪽 2번" · "제안 · A5" · "미배치".</summary>
+    public string PlacementText => _placementText?.Invoke(Row) ?? _placement(Row)?.Text ?? "미배치";
 
     /// <summary>저장 전까지 Draft(WS L181) — 새 줄이거나 값·자리가 바뀐 줄.</summary>
     public bool IsDraft => Row.IsNew || Row.FactsChanged || !WiringSpec.SamePlacement(_placement(Row), Row.BaselinePlacement);
@@ -173,6 +178,9 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     private WiringSensorRow? _row;
     private int _order;
     private bool _isSelected;
+    private string _portText = string.Empty;
+    private bool _isSuggested;
+    private string _lineName = string.Empty;
 
     public WiringSlotViewModel(int line, int index)
     {
@@ -180,11 +188,34 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
         Index = index;
     }
 
-    /// <summary>1 = 1차(나감) · 2 = 2차(들어옴).</summary>
+    /// <summary>목록 보기의 선 — 링 · 한 줄은 1(체인), 양쪽 가지는 1 = 왼쪽 · 2 = 오른쪽.</summary>
     public int Line { get; }
 
-    /// <summary>칸의 자리(0부터). 순번과 다르다 — 순번은 <b>찬 칸만</b> 센다.</summary>
+    /// <summary>목록 안의 자리(0부터) — 순번 = 자리 + 1. 선 끝의 빈 칸은 "끝에 붙이기" 자리다.</summary>
     public int Index { get; }
+
+    /// <summary>링 칩의 양 포트 번호 "A3 · B32"(링이 아니면 빈 글자).</summary>
+    public string PortText
+    {
+        get => _portText;
+        internal set { _portText = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasPortText)); NotifyOfPropertyChange(nameof(Tooltip)); }
+    }
+
+    public bool HasPortText => _portText.Length > 0;
+
+    /// <summary>번호순 <b>제안</b>으로 붙은 센서인가(FR-03) — 모서리 "제안" 글자로 보인다(색이 아니라 글자).</summary>
+    public bool IsSuggested
+    {
+        get => _isSuggested;
+        internal set { _isSuggested = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(Tooltip)); }
+    }
+
+    /// <summary>사람이 읽는 선 이름 — "체인" · "왼쪽 가지" · "오른쪽 가지".</summary>
+    public string LineName
+    {
+        get => _lineName.Length > 0 ? _lineName : $"{Line}차 선";
+        internal set { _lineName = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(Tooltip)); }
+    }
 
     /// <summary>계측용 — <c>Devices.Wiring.Slot.1-3</c>.</summary>
     public string AutomationKey => $"{Line}-{Index}";
@@ -224,8 +255,8 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     public string OrderText => _order > 0 ? _order.ToString(CultureInfo.InvariantCulture) : string.Empty;
     public string Title => _row?.Display ?? "빈 칸";
 
-    /// <summary>빈 칸에 적는 자리 번호 — 칸 번호가 곧 순번이다.</summary>
-    public string SlotLabel => $"{Index + 1}번 빈 칸";
+    /// <summary>선 끝의 빈 칸 — 여기 놓으면 끝에 붙는다(체인에는 가운데 빈 칸이 없다).</summary>
+    public string SlotLabel => "여기 놓으면 끝에 붙습니다";
 
     /// <summary>좁은 칸(104)에서는 번호가 먼저다 — 이름은 잘리고 전체는 툴팁에 있다(W8).</summary>
     public string NumberText => _row is null ? string.Empty : _row.Facts.Number.ToString(CultureInfo.InvariantCulture);
@@ -237,13 +268,15 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     {
         get
         {
-            if (_row is null) return $"{Line}차 선 {Index + 1}번 자리 — 비어 있습니다";
+            if (_row is null) return $"{LineName} 끝 — 여기 놓으면 끝에 붙습니다";
 
             var address = _row.Channel is { } channel ? $" · 버스 주소 {channel}" : string.Empty;
+            var port = HasPortText ? $" · {_portText}" : string.Empty;
+            var suggested = _isSuggested ? " · 번호순 제안(아직 저장 대기 아님)" : string.Empty;
             return string.Join(Environment.NewLine,
                 _row.Display,
                 $"번호 {_row.Facts.Number}{address}",
-                $"{Line}차 {Index + 1}번 자리");
+                $"{LineName} {Index + 1}번 자리{port}{suggested}");
         }
     }
 
@@ -255,7 +288,7 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
     public bool HasChannelMismatch => _row?.Channel is { } channel && _order > 0 && channel != _order;
 
     /// <summary>드래그 고스트에 찍히는 글자.</summary>
-    public string Display => _row?.Display ?? $"{Line}차 {Index + 1}번 칸";
+    public string Display => _row?.Display ?? $"{LineName} 끝";
 
     internal void RefreshAll()
     {

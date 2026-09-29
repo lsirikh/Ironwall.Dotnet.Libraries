@@ -166,7 +166,7 @@ public class WiringApplyTests
     public async Task should_send_an_explicit_null_when_a_sensor_is_taken_off_the_line()
     {
         var (board, gateway) = Arrange();
-        board.Unplace(board.Rows[0].Key);       // 선에서 뺀다
+        board.Unplace(board.Rows[2].Key);       // 결선에서 뺀다 — 맨 끝 센서라 다른 센서의 순번은 그대로다(체인은 빼면 당겨진다)
 
         var result = await Service(gateway).ApplyAsync(10, board);
         Assert.True(result.IsSuccess);
@@ -181,13 +181,13 @@ public class WiringApplyTests
     public async Task should_stay_clean_when_saving_twice_after_an_unplace()
     {
         var (board, gateway) = Arrange();
-        board.Unplace(board.Rows[0].Key);
+        board.Unplace(board.Rows[2].Key);       // 맨 끝 — 이 한 줄만 바뀐다
 
         Assert.True((await Service(gateway).ApplyAsync(10, board)).IsSuccess);
         board.MarkBaseline();
 
         // 서버도 우리 기준도 "미배치" 다 — 다음 저장이 드리프트로 막히거나 다시 보내지 않는다(C1).
-        gateway.Fetched[101].HardwareSpec!.Spec = JObject.Parse("""{"detection_range":120}""");
+        gateway.Fetched[103].HardwareSpec!.Spec = JObject.Parse("""{"detection_range":120}""");
         var second = await Service(gateway).ApplyAsync(10, board);
 
         Assert.False(second.IsConflict);
@@ -396,18 +396,14 @@ public class WiringApplyTests
         return (board, gateway);
     }
 
-    /// <summary>첫 센서를 2차 선으로 옮긴다 — 한 줄만 바뀌게.</summary>
+    /// <summary>
+    /// 첫 센서를 한 칸 뒤로 — 101 은 순번 1 → 2, 102 는 2 → 1 이 된다(옛 칸 모델에서도 같은 두 줄이 바뀌었다).
+    /// 체인 모델에서는 "옮기기 전" 목록 기준 틈 2 에 끼워 넣는 것이 한 칸 뒤다.
+    /// </summary>
     private static void MovePlacement(WiringBoard board)
-    {
-        var first = board.Rows[0];
-        board.Unplace(board.Rows[1].Key);
-        board.Unplace(board.Rows[2].Key);
-        board.Place(first.Key, 1, 1);        // 순번 1 → 2 (칸만 옮긴다)
-        board.Place(board.Rows[1].Key, 1, 0);
-        board.Place(board.Rows[2].Key, 1, 2);
-    }
+        => Assert.True(board.Place(board.Rows[0].Key, 1, 2));
 
-    /// <summary>세 줄 모두 2차 선으로 — 한 번에 세 건이 나가는 경우를 만든다.</summary>
+    /// <summary>세 줄 모두 오른쪽 가지(선 2)로 — 한 번에 세 건이 나가는 경우를 만든다(펜스 센서 · 제어기 종류 모름 → 양쪽 가지).</summary>
     private static void MoveAllToSecondLine(WiringBoard board)
     {
         for (var i = 0; i < board.Rows.Count; i++) board.Place(board.Rows[i].Key, 2, i);

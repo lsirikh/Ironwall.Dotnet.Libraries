@@ -78,8 +78,7 @@ public partial class WiringView : UserControl
     #endregion
 
     #region - Wiring map -
-    private void OnAddSlotPrimary(object sender, RoutedEventArgs e) => ViewModel?.AddSlotPrimary();
-    private void OnAddSlotSecondary(object sender, RoutedEventArgs e) => ViewModel?.AddSlotSecondary();
+    private void OnAcceptSuggestion(object sender, RoutedEventArgs e) => ViewModel?.AcceptSuggestion();
     private void OnUnplaceSelected(object sender, RoutedEventArgs e) => ViewModel?.UnplaceSelected();
 
     private void OnRemoveSlot(object sender, RoutedEventArgs e)
@@ -120,8 +119,8 @@ public partial class WiringView : UserControl
             return;
         }
 
-        // Alt+↑ · Alt+↓ = 다른 선으로 옮기기(C6) — 선 안에서만 움직이면 건너갈 길이 없다.
-        if (e.Key == Key.System && e.SystemKey is Key.Up or Key.Down)
+        // Alt+↑ · Alt+↓ = 다른 가지로 옮기기(C6) — 양쪽 가지에서만. 링 · 한 줄은 선이 하나라 키를 흘려보낸다.
+        if (vm.IsTwoBranch && e.Key == Key.System && e.SystemKey is Key.Up or Key.Down)
         {
             vm.MoveSelectedToOtherLine();
             e.Handled = true;
@@ -135,7 +134,7 @@ public partial class WiringView : UserControl
         }
     }
 
-    /// <summary>팔레트의 키보드 폴백 — Enter = 첫 빈 칸에 붙이기.</summary>
+    /// <summary>팔레트의 키보드 폴백 — Enter = 결선 끝에 붙이기.</summary>
     private void OnPalettePreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || ViewModel is not { } vm) return;

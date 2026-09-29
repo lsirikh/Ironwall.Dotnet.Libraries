@@ -4,10 +4,10 @@ using System;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 
 /// <summary>
-/// 센서 한 대의 결선 자리 — <b>어느 선(1차·2차)의 몇 번째</b>(WS L466).
+/// 센서 한 대의 결선 자리 — <b>어느 선의 몇 번째</b>(WS L466 · wiring-fence-view FR-01).
 /// </summary>
-/// <param name="Line">1 = 1차(나감) · 2 = 2차(들어옴).</param>
-/// <param name="Order">그 선에서의 순번(1부터). 칸 번호가 아니라 <b>찬 칸만 센 순번</b>이다(WS L681).</param>
+/// <param name="Line">링 · 한 줄은 늘 1(체인 위치). 양쪽 가지는 1 = 왼쪽 · 2 = 오른쪽. 옛 N04 저장값의 2 는 "2차 선"이었다(불러올 때 한 줄로 바꾼다).</param>
+/// <param name="Order">링: Sensor A 쪽 끝에서 센 체인 위치 · 한 줄 · 가지: 제어기 쪽에서 센 자리(1부터).</param>
 public sealed record WiringPlacement(int Line, int Order)
 {
     public bool IsPrimary => Line == WiringSpec.LINE_PRIMARY;
@@ -39,8 +39,12 @@ public static class WiringSpec
     public const int LINE_PRIMARY = 1;
     public const int LINE_SECONDARY = 2;
 
-    /// <summary>한 선이 가질 수 있는 순번의 상한 — 칸 상한과 같다.</summary>
-    public const int MAX_ORDER = WiringBoard.MAX_SLOTS;
+    /// <summary>
+    /// 순번의 상한 — 읽기 · 검증이 이보다 큰 값을 "범위 밖"으로 본다. 링 체인은 칸 상한이 없고
+    /// 펜스센서는 제어기 한 대에 수백 대가 붙는다(카탈로그: 1km = 펜스 400 · PRD FR-18) — 넉넉하되 유한한 값이다
+    /// (옛 64 는 N04 의 칸 상한이었다).
+    /// </summary>
+    public const int MAX_ORDER = 1000;
 
     /// <summary>
     /// <paramref name="spec"/> 에서 결선 자리를 읽는다. 없거나 <b>말이 안 되면</b> <c>null</c> 이고,

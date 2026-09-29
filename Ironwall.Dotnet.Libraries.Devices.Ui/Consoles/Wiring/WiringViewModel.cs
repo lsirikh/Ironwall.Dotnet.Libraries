@@ -23,7 +23,8 @@ public enum WiringStep
 }
 
 /// <summary>결선 창이 다루는 제어기(WS L382, L395).</summary>
-public sealed record WiringControllerInfo(int Id, int Number, string Name, string Address)
+/// <param name="TypeController">서버 <c>type_controller</c> 원값(<c>SmartController</c>|<c>Controller</c>|<c>IoController</c>) — 결선 모양을 정한다(FR-16). 모르면 <c>null</c>.</param>
+public sealed record WiringControllerInfo(int Id, int Number, string Name, string Address, string? TypeController = null)
 {
     public string Subject => string.IsNullOrWhiteSpace(Address) ? Name : $"{Name} · {Address}";
 }
@@ -36,7 +37,7 @@ public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, W
 public sealed record WiringGroupInfo(int Id, string Name);
 
 /// <summary>
-/// 장비 셋업 · 결선맵 — 제어기 <b>한 대</b>의 센서 표와 1차/2차 선(WS 전체 · PRD N-04).
+/// 장비 셋업 · 결선맵 — 제어기 <b>한 대</b>의 센서 표와 결선 체인(WS 전체 · PRD N-04 · wiring-fence-view F-2).
 /// </summary>
 /// <remarks>
 /// <para><b>저장 전까지 Draft 다.</b> 끌어 놓기 · 만들기 · 붙여넣기 · 되돌리기는 서버를 부르지 않는다.
@@ -151,7 +152,8 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     public void GoWiring() => Step = WiringStep.Wiring;
 
     /// <summary>단계 띠의 "결선" 이 끝났다고 볼 수 있는가 — 치명 문제가 없고 미배치가 없다.</summary>
-    public bool IsWiringDone => Issues.All(i => i.Level != WiringIssueLevel.Critical) && _board.Unplaced.Count == 0 && _board.Rows.Count > 0;
+    public bool IsWiringDone => Issues.All(i => i.Level != WiringIssueLevel.Critical) && _board.Unplaced.Count == 0 && _board.Rows.Count > 0
+                                && !_board.HasSuggestion;
 
     public string DraftText => $"바뀐 줄 {_board.UnsavedChangeCount}";
 
@@ -199,7 +201,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
     /// <summary>표가 비었는가 — 팔레트가 빈 것("전부 붙였다")과 뜻이 다르다.</summary>
     public bool IsNoSensors => _board.Rows.Count == 0;
-    public string PaletteEmptyText => _board.Rows.Count == 0 ? "센서가 없습니다 — [센서 여러 개 만들기] 로 먼저 만드세요." : "전부 선에 붙였습니다 ✓";
+    public string PaletteEmptyText => _board.Rows.Count == 0 ? "센서가 없습니다 — [센서 여러 개 만들기] 로 먼저 만드세요." : "전부 결선에 붙였습니다 ✓";
     public string ListStatusText => $"센서 {SensorCount} · 선택 {_selectedRows.Count} · 미배치 {UnplacedCount}";
     #endregion
 
@@ -208,11 +210,11 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         var seeds = (sensors ?? Enumerable.Empty<WiringSensorSeed>())
             .Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups));
-        _board.Load(seeds);
+        _board.Load(seeds, Controller.TypeController);
         SyncAll();
         StatusText = _board.Rows.Count == 0
             ? "이 제어기에 센서가 없습니다 — [센서 여러 개 만들기] 로 시작하세요."
-            : $"센서 {_board.Rows.Count}대를 불러왔습니다.";
+            : $"센서 {_board.Rows.Count}대를 불러왔습니다 — {ShapeText}.";
     }
 
     /// <summary>화면 전체를 보드에 맞춘다 — 묶어서 바꾼 뒤 한 번만 부른다.</summary>
@@ -233,7 +235,7 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             // 저장으로 서버 Id 를 받은 줄은 보드가 새 객체로 갈아 끼운다(키는 같다) — 그때는 화면 항목도 새로 만든다.
             if (_rowsByKey.TryGetValue(row.Key, out var existing) && ReferenceEquals(existing.Row, row)) continue;
 
-            var item = new SensorRowViewModel(row, r => _board.PlacementOf(r.Key), OnRowEdited);
+            var item = new SensorRowViewModel(row, r => _board.PlacementOf(r.Key), OnRowEdited, r => PlacementTextOf(r.Key));
             _rowsByKey[row.Key] = item;
 
             var at = existing is null ? -1 : Rows.IndexOf(existing);
@@ -261,6 +263,9 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
 
+    /// <summary>
+    /// 목록 보기 — 선마다 센서 칸 + <b>끝에 붙이기 빈 칸 하나</b>. 링 · 한 줄은 선 1 하나(2차 목록은 비운다), 양쪽 가지는 둘.
+    /// </summary>
     private void SyncLines()
     {
         Sync(Line1, WiringSpec.LINE_PRIMARY);
@@ -269,17 +274,41 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
         void Sync(ObservableCollection<WiringSlotViewModel> slots, int line)
         {
-            var count = _board.SlotCount(line);
+            var count = line <= _board.LineCount ? _board.CountOn(line) + 1 : 0;
             while (slots.Count > count) slots.RemoveAt(slots.Count - 1);
             while (slots.Count < count) slots.Add(new WiringSlotViewModel(line, slots.Count));
 
             for (var i = 0; i < count; i++)
             {
-                slots[i].Row = _board.RowAt(line, i);
+                var row = _board.RowAt(line, i);
+                slots[i].Row = row;
                 slots[i].Order = _board.OrderAt(line, i);
+                slots[i].LineName = LineNameOf(line);
+                slots[i].PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"A{n.Order} · B{b}" : string.Empty;
+                slots[i].IsSuggested = row is not null && _board.IsSuggested(row.Key);
             }
         }
     }
+
+    /// <summary>표의 "결선" 칸 글자.</summary>
+    private string? PlacementTextOf(int key)
+    {
+        if (_board.NumberOf(key) is not { } n) return null;
+        var text = _board.Shape switch
+        {
+            WiringShape.Ring => $"A{n.Order} · B{n.OppositeOrder}",
+            WiringShape.TwoBranch => $"{LineNameOf(n.Line)} {n.Order}번",
+            _ => $"{n.Order}번",
+        };
+        return _board.IsSuggested(key) ? $"제안 · {text}" : text;
+    }
+
+    private string LineNameOf(int line) => _board.Shape switch
+    {
+        WiringShape.TwoBranch => line == WiringSpec.LINE_PRIMARY ? "왼쪽 가지" : "오른쪽 가지",
+        WiringShape.Ring => "체인",
+        _ => "한 줄",
+    };
 
     private void SyncPalette()
     {
@@ -315,6 +344,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(IsWiringDone));
         NotifyOfPropertyChange(nameof(LoopText));
         NotifyOfPropertyChange(nameof(FaultText));
+        NotifyOfPropertyChange(nameof(HasLegacyNotice));
+        NotifyOfPropertyChange(nameof(LegacyNoticeText));
+        NotifyOfPropertyChange(nameof(HasSuggestion));
+        NotifyOfPropertyChange(nameof(SuggestionText));
     }
 
     /// <summary>단계 띠 — 어느 단계에 있고 어디까지 끝났는지(W1).</summary>
@@ -358,9 +391,78 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         ? WiringIssueLevel.Info
         : Issues.Max(i => i.Level);
 
-    public string BannerTitle => Issues.Count == 0
-        ? $"이상 없습니다 — 센서 {SensorCount}대가 모두 선에 붙었고 순번도 겹치지 않습니다."
+    public string BannerTitle => Issues.Count == 0 && !_board.HasSuggestion
+        ? $"이상 없습니다 — 센서 {SensorCount}대가 모두 결선에 붙었고 순번도 겹치지 않습니다."
         : "저장하기 전에 확인하세요";
+
+    #region - Shape (FR-16) -
+    /// <summary>결선 모양 — 링 · 양쪽 가지 · 한 줄.</summary>
+    public WiringShape Shape => _board.Shape;
+    public bool IsRing => _board.Shape == WiringShape.Ring;
+    public bool IsTwoBranch => _board.Shape == WiringShape.TwoBranch;
+
+    /// <summary>두 번째 목록(오른쪽 가지)을 보이는가 — 양쪽 가지만.</summary>
+    public bool ShowSecondLine => _board.LineCount > 1;
+
+    /// <summary>한 줄 설명(상태 문장 · 머리).</summary>
+    public string ShapeText => _board.Shape switch
+    {
+        WiringShape.Ring => "링 결선(Sensor A → … → Sensor B)",
+        WiringShape.TwoBranch => "양쪽 가지 결선(잠정)",
+        _ => "한 줄 결선",
+    };
+
+    /// <summary>첫 목록 제목.</summary>
+    public string Line1Title => _board.Shape switch
+    {
+        WiringShape.Ring => "링 — Sensor A → … → Sensor B",
+        WiringShape.TwoBranch => "왼쪽 가지 ◀ 제어기",
+        _ => "한 줄 — 제어기 ─▶",
+    };
+
+    /// <summary>첫 목록 설명.</summary>
+    public string Line1Hint => _board.Shape switch
+    {
+        WiringShape.Ring => "왼쪽이 Sensor A 쪽 끝(A1)입니다 · 칩의 A·B 는 두 포트에서 센 번호 · 양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다 · Alt+← → 한 칸 · Delete 로 뺍니다",
+        WiringShape.TwoBranch => "제어기 옆이 1번 · 바깥으로 갈수록 커집니다 · Alt+← → 한 칸 · Alt+↑ ↓ 다른 가지로 · Delete 로 뺍니다(가지 규칙은 확인 중)",
+        _ => "제어기 쪽 끝이 1번입니다 · Alt+← → 한 칸 · Delete 로 뺍니다",
+    };
+
+    public string Line2Title => "제어기 ▶ 오른쪽 가지";
+    public string Line2Hint => "제어기 옆이 1번 · 바깥으로 갈수록 커집니다";
+
+    /// <summary>제어기 상자의 두 포트 글자.</summary>
+    public string PortAText => IsRing ? "Sensor A" : IsTwoBranch ? "왼쪽" : "선";
+    public string PortBText => IsRing ? "Sensor B" : IsTwoBranch ? "오른쪽" : string.Empty;
+    public bool HasPortB => PortBText.Length > 0;
+    #endregion
+
+    #region - Load notices (FR-02 · FR-03) -
+    /// <summary>옛 두 선 배치를 한 줄로 바꿨고 아직 저장하지 않았다.</summary>
+    public bool HasLegacyNotice => _board.ConvertedFromLegacy;
+
+    public const string LEGACY_NOTICE = WiringChainLoad.LEGACY_NOTICE;
+
+    public string LegacyNoticeText => HasLegacyNotice ? LEGACY_NOTICE : string.Empty;
+
+    /// <summary>번호순 제안이 걸려 있다 — [이대로 적용] 전에는 저장 대기가 아니다.</summary>
+    public bool HasSuggestion => _board.HasSuggestion;
+
+    public string SuggestionText => HasSuggestion
+        ? $"저장된 배치가 없는 센서 {_board.SuggestedCount}대를 번호순으로 제안했습니다"
+        : string.Empty;
+
+    /// <summary>[이대로 적용] — 제안을 저장 대기로(되돌리기 한 걸음).</summary>
+    public void AcceptSuggestion()
+    {
+        if (!_board.HasSuggestion || IsBusy) return;
+        var count = _board.SuggestedCount;
+        _board.PushUndo();
+        _board.AcceptSuggestions();
+        SyncAll();
+        StatusText = $"번호순 제안 {count}대를 적용했습니다 — [저장하기]를 눌러야 저장됩니다.";
+    }
+    #endregion
 
     /// <summary>글로 확인(WS L706-708).</summary>
     public string LoopText => WiringValidation.LoopText(_board);
@@ -702,25 +804,9 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     #endregion
 
     #region - Wiring commands -
-    /// <summary>칸을 하나 늘린다(WS L411).</summary>
-    public void AddSlot(int line)
-    {
-        if (_board.SlotCount(line) >= WiringBoard.MAX_SLOTS)
-        {
-            StatusText = $"한 선에 칸은 {WiringBoard.MAX_SLOTS}개까지입니다.";
-            return;      // 되돌리기 장면을 쌓지 않는다(C11)
-        }
-
-        _board.PushUndo();
-        _board.AddSlot(line);
-        SyncAll();
-        StatusText = $"{line}차 선의 칸을 늘렸습니다.";
-    }
-
-    public void AddSlotPrimary() => AddSlot(WiringSpec.LINE_PRIMARY);
-    public void AddSlotSecondary() => AddSlot(WiringSpec.LINE_SECONDARY);
-
-    /// <summary>번호 순으로 자동 배치(WS L387, L757-763).</summary>
+    /// <summary>
+    /// 번호 순으로 배치(FR-03) — 링 · 한 줄은 전체를 장비번호 → id 순으로 한 줄에, 양쪽 가지는 가지 안에서만.
+    /// </summary>
     public void AutoLayout()
     {
         if (_board.Rows.Count == 0)
@@ -730,25 +816,26 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         }
 
         _board.PushUndo();
-        if (!_board.AutoLayoutByNumber())
-        {
-            _board.Undo();
-            StatusText = $"센서가 너무 많아 자동 배치할 수 없습니다 — 한 선에 {WiringBoard.MAX_SLOTS}개까지입니다.";
-            return;
-        }
+        _board.AutoLayoutByNumber();
         SyncAll();
-        StatusText = "번호 순으로 자동 배치했습니다 — 앞 절반은 1차, 뒤 절반은 2차이고 빈 자리는 메워집니다.";
+        StatusText = IsTwoBranch
+            ? "가지마다 번호 순으로 다시 줄 세웠습니다 — 어느 가지에 둘지는 끌어 놓아 정하세요."
+            : "번호 순으로 한 줄에 배치했습니다(번호가 같으면 id 순).";
     }
 
-    /// <summary>선에서 뺀다(칸의 ✕ · Delete · 빼는 곳 드롭).</summary>
+    /// <summary>결선에서 뺀다(칸의 ✕ · Delete · 빼는 곳 드롭).</summary>
     public void Unplace(WiringSlotViewModel? slot)
     {
         if (slot?.Row is null) return;
         _board.PushUndo();
-        _board.Unplace(slot.Row.Key);
         var name = slot.Row.Display;
+        if (!_board.Unplace(slot.Row.Key))
+        {
+            _board.Undo();
+            return;
+        }
         SyncAll();
-        StatusText = $"{name} 을(를) 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다.";
+        StatusText = $"{name} 을(를) 결선에서 뺐습니다 — 뒤 센서는 한 칸씩 당겨집니다.";
     }
 
     /// <summary>키보드 폴백 — 고른 칸의 센서를 빼기(Delete).</summary>
@@ -759,87 +846,73 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         Unplace(slot);
     }
 
-    /// <summary>키보드 폴백 — 팔레트에서 Enter: 첫 빈 칸에 붙인다.</summary>
+    /// <summary>키보드 폴백 — 팔레트에서 Enter: 결선 끝에 붙인다.</summary>
     public void PlaceFromPalette(SensorRowViewModel? row)
         => PlaceManyFromPalette(row is null ? Array.Empty<SensorRowViewModel>() : new[] { row });
 
-    /// <summary>여러 줄을 고르고 Enter — <b>되돌리기는 한 걸음</b>(C11).</summary>
+    /// <summary>여러 줄을 고르고 Enter — 고른 순서대로 끝에 붙는다. <b>되돌리기는 한 걸음</b>(C11).</summary>
     public void PlaceManyFromPalette(IEnumerable<SensorRowViewModel>? rows)
     {
         var list = rows?.Where(r => r is not null).ToList() ?? new List<SensorRowViewModel>();
         if (list.Count == 0 || IsBusy) return;
 
-        if (FirstEmptySlot() is null)
+        _board.PushUndo();
+        var placed = _board.Append(list.Select(r => r.Key));
+        if (placed == 0)
         {
-            StatusText = "빈 칸이 없습니다 — [＋ 칸] 으로 칸을 먼저 늘리세요.";
+            _board.Undo();
+            StatusText = "붙일 센서가 없습니다.";
             return;
         }
 
-        _board.PushUndo();
-        var placed = 0;
-        foreach (var row in list)
-        {
-            if (FirstEmptySlot() is not { } target) break;
-            if (_board.Place(row.Key, target.Line, target.Index)) placed++;
-        }
-
         SyncAll();
-        StatusText = placed == 0 ? "놓을 빈 칸이 없습니다."
-            : placed == 1 ? $"{list[0].Display} → {_board.PlacementOf(list[0].Key)?.Text} 에 놓았습니다"
-            : $"{placed}대를 빈 칸에 차례로 놓았습니다"
-              + (placed < list.Count ? $" ({list.Count - placed}대는 칸이 모자랍니다)" : string.Empty);
+        StatusText = placed == 1
+            ? $"{list[0].Display} → {PlacementTextOf(list[0].Key)} 에 붙였습니다"
+            : $"{placed}대를 결선 끝에 차례로 붙였습니다";
     }
 
-    /// <summary>키보드 폴백 — 다른 선의 같은 자리(없으면 첫 빈 칸)로 옮긴다(Alt+↑ · Alt+↓ · C6).</summary>
+    /// <summary>키보드 폴백 — 다른 가지로 옮긴다(Alt+↑ · Alt+↓ · C6). <b>양쪽 가지에서만</b> 뜻이 있다.</summary>
     public void MoveSelectedToOtherLine()
     {
         var slot = SelectedSlots().FirstOrDefault(s => s.IsFilled);
         if (slot?.Row is null || IsBusy) return;
 
-        var other = slot.Line == WiringSpec.LINE_PRIMARY ? WiringSpec.LINE_SECONDARY : WiringSpec.LINE_PRIMARY;
-        var target = TargetOnOtherLine(other, slot.Index);
-        if (target is null)
+        if (!IsTwoBranch)
         {
-            StatusText = $"{other}차 선에 빈 칸이 없습니다 — [＋ 칸] 으로 늘리세요.";
+            StatusText = "이 결선에는 다른 가지가 없습니다 — Alt+← → 로 순서를 바꿉니다.";
             return;
         }
 
-        _board.PushUndo();
         var key = slot.Row.Key;
-        _board.Place(key, other, target.Value);
+        _board.PushUndo();
+        if (!_board.MoveToOtherLine(key))
+        {
+            _board.Undo();
+            return;
+        }
         SyncAll();
-        SelectSlot(other, target.Value);
-        StatusText = $"{_board.Find(key)?.Display} → {_board.PlacementOf(key)?.Text}";
+        if (_board.LocationOf(key) is { } at) SelectSlot(at.Line, at.Index);
+        StatusText = $"{_board.Find(key)?.Display} → {PlacementTextOf(key)}";
     }
 
-    /// <summary>다른 선에서 받아 줄 자리 — 같은 자리가 비었으면 그 자리, 아니면 첫 빈 칸.</summary>
-    private int? TargetOnOtherLine(int line, int index)
-    {
-        if (index < _board.SlotCount(line) && _board.RowAt(line, index) is null) return index;
-        for (var i = 0; i < _board.SlotCount(line); i++)
-            if (_board.RowAt(line, i) is null) return i;
-        return null;
-    }
-
-    /// <summary>키보드 폴백 — 고른 칸의 센서를 한 칸 옮긴다(Alt+← · Alt+→).</summary>
+    /// <summary>키보드 폴백 — 고른 칸의 센서를 한 칸 옮긴다(Alt+← · Alt+→). 옆 센서와 자리를 바꾼다.</summary>
     public void MoveSelected(int direction)
     {
         var slot = SelectedSlots().FirstOrDefault(s => s.IsFilled);
         if (slot?.Row is null || direction == 0) return;
 
-        var target = NextSlot(slot.Line, slot.Index, Math.Sign(direction));
-        if (target is null)
+        var key = slot.Row.Key;
+        _board.PushUndo();
+        if (!_board.MoveBy(key, Math.Sign(direction)))
         {
-            StatusText = "옮길 빈 칸이 없습니다.";
+            _board.Undo();
+            StatusText = "더 옮길 자리가 없습니다 — 끝입니다.";
             return;
         }
 
-        _board.PushUndo();
-        var key = slot.Row.Key;
-        _board.Place(key, target.Value.Line, target.Value.Index);
         SyncAll();
-        SelectSlot(target.Value.Line, target.Value.Index);
-        StatusText = $"{_board.Find(key)?.Display} → {_board.PlacementOf(key)?.Text}";
+        if (_board.LocationOf(key) is { } at) SelectSlot(at.Line, at.Index);
+        StatusText = $"{_board.Find(key)?.Display} → {PlacementTextOf(key)}";
     }
 
     public void MoveSelectedBack() => MoveSelected(-1);
@@ -867,22 +940,6 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
     {
         foreach (var slot in Line1.Concat(Line2)) slot.IsSelected = slot.Line == line && slot.Index == index;
     }
-
-    private (int Line, int Index)? FirstEmptySlot()
-    {
-        foreach (var line in new[] { WiringSpec.LINE_PRIMARY, WiringSpec.LINE_SECONDARY })
-            for (var i = 0; i < _board.SlotCount(line); i++)
-                if (_board.RowAt(line, i) is null) return (line, i);
-        return null;
-    }
-
-    /// <summary>그 방향의 첫 빈 칸 — 선 끝에 닿으면 다른 선으로 넘어가지 않는다(순서가 뒤집히지 않게).</summary>
-    private (int Line, int Index)? NextSlot(int line, int index, int direction)
-    {
-        for (var i = index + direction; i >= 0 && i < _board.SlotCount(line); i += direction)
-            if (_board.RowAt(line, i) is null) return (line, i);
-        return null;
-    }
     #endregion
 
     #region - Drag (IDragDropHandler) -
@@ -892,8 +949,10 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
 
         return target.ZoneKey switch
         {
+            // 어느 칸에 놓아도 된다 — 그 자리에 끼워 넣고 뒤를 민다(체인에는 "찬 칸" 이 없다).
             SlotZoneKey => target.ZoneData is WiringSlotViewModel slot
-                           && (slot.IsEmpty || payload.Items.Contains(slot))
+                           && slot.Line <= _board.LineCount
+                           && payload.Items.Count > 0
                            && payload.Items.All(i => i is SensorRowViewModel || i is WiringSlotViewModel { IsFilled: true }),
             BinZoneKey => payload.Items.Count > 0 && payload.Items.All(i => i is WiringSlotViewModel { IsFilled: true }),
             _ => false,
@@ -910,11 +969,15 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
             if (removed.Count == 0) return;
 
             _board.PushUndo();
-            foreach (var row in removed) _board.Unplace(row.Key);
+            if (_board.UnplaceMany(removed.Select(r => r.Key)) == 0)
+            {
+                _board.Undo();
+                return;
+            }
             SyncAll();
             StatusText = removed.Count == 1
-                ? $"{removed[0].Display} 을(를) 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다."
-                : $"{removed.Count}대를 선에서 뺐습니다 — 그 자리는 빈 칸으로 남습니다.";
+                ? $"{removed[0].Display} 을(를) 결선에서 뺐습니다 — 뒤 센서는 당겨집니다."
+                : $"{removed.Count}대를 결선에서 뺐습니다 — 뒤 센서는 당겨집니다.";
             return;
         }
 
@@ -932,24 +995,18 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         if (keys.Count == 0) return;
 
         _board.PushUndo();
-
-        // 여러 대를 끌면 놓은 칸부터 차례로 빈 칸을 채운다 — 찬 칸은 건너뛴다.
-        var placed = 0;
-        var index = slot.Index;
-        foreach (var key in keys)
+        var placed = _board.PlaceMany(keys, slot.Line, slot.Index);
+        if (placed == 0)
         {
-            while (index < _board.SlotCount(slot.Line) && _board.RowAt(slot.Line, index) is not null && _board.RowAt(slot.Line, index)!.Key != key) index++;
-            if (index >= _board.SlotCount(slot.Line)) break;
-            if (_board.Place(key, slot.Line, index)) placed++;
-            index++;
+            _board.Undo();
+            StatusText = "제자리입니다 — 바뀐 것이 없습니다.";
+            return;
         }
 
         SyncAll();
-        StatusText = placed == 0 ? "빈 칸이 아니어서 놓지 못했습니다."
-            : placed == 1 ? $"{_board.Find(keys[0])?.Display} → {_board.PlacementOf(keys[0])?.Text} 에 놓았습니다 · 순번 자동"
-            : $"{placed}대를 {slot.Line}차 선에 놓았습니다 · 순번 자동";
-
-        if (placed < keys.Count) StatusText += $" ({keys.Count - placed}대는 빈 칸이 모자라 그대로 두었습니다)";
+        StatusText = placed == 1
+            ? $"{_board.Find(keys[0])?.Display} → {PlacementTextOf(keys[0])} 에 놓았습니다 · 뒤는 한 칸씩 밀립니다"
+            : $"{placed}대를 {LineNameOf(slot.Line)} {slot.Index + 1}번 자리부터 놓았습니다 · 뒤는 밀립니다";
     }
     #endregion
 
@@ -968,9 +1025,13 @@ public sealed class WiringViewModel : Screen, IDragDropHandler
         if (!CanSave || _apply is null) return;
 
         var unplaced = _board.Unplaced.Count;
+        var suggested = _board.SuggestedCount;
         var message = ChangePreview + Environment.NewLine + Environment.NewLine +
             (unplaced > 0
-                ? $"센서 {unplaced}대는 아직 선에 없습니다 — 그 센서의 결선은 저장하지 않습니다(표 값은 저장됩니다)." + Environment.NewLine + Environment.NewLine
+                ? $"센서 {unplaced}대는 아직 결선에 없습니다 — 그 센서의 결선은 저장하지 않습니다(표 값은 저장됩니다)." + Environment.NewLine + Environment.NewLine
+                : string.Empty) +
+            (suggested > 0
+                ? $"번호순 제안 {suggested}대는 [이대로 적용] 전이라 저장하지 않습니다." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
             "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?";
 

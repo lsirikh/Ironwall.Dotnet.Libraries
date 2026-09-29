@@ -311,6 +311,55 @@ public class WiringChainTests
     }
 
     [Fact]
+    public void should_insert_at_the_head_of_the_right_branch_when_placed_in_branch_two_at_zero()
+    {
+        // 체인 틈으로는 제어기 틈에 놓으면 늘 왼쪽 가지가 된다 — 목록 보기는 "오른쪽 가지 1번" 을 가리킬 수 있어야 한다.
+        var chain = WiringChain.Create(WiringShape.TwoBranch, new[] { 2, 1, 3 }, unplaced: new[] { 9 }, controllerGap: 2);
+
+        var next = chain.PlaceInBranch(new[] { 9 }, 2, 0);
+
+        Assert.Equal(new[] { 1, 2 }, next.Branch(1));
+        Assert.Equal(new[] { 9, 3 }, next.Branch(2));
+        Assert.Empty(next.Unplaced);
+        Assert.Equal(new WiringChainNumber(3, 2, 1, null), next.NumberOf(9));
+    }
+
+    [Fact]
+    public void should_move_a_block_across_branches_keeping_chain_order_when_placed_in_branch()
+    {
+        var chain = WiringChain.Create(WiringShape.TwoBranch, new[] { 2, 1, 3, 4 }, unplaced: new[] { 9 }, controllerGap: 2);
+        // 왼쪽 가지 [1, 2] · 오른쪽 [3, 4]
+
+        var next = chain.PlaceInBranch(new[] { 9, 4, 1 }, 1, 1);        // 왼쪽 가지 2번 자리(옮기기 전 기준)에
+
+        // 덩어리 = 체인에 있던 것(체인 순서 1 · 4) + 팔레트 것(9). 틈 1 은 1 을 빼면 틈 0 이 된다.
+        Assert.Equal(new[] { 1, 4, 9, 2 }, next.Branch(1));
+        Assert.Equal(new[] { 3 }, next.Branch(2));
+    }
+
+    [Fact]
+    public void should_treat_index_as_chain_gap_when_ring_placed_in_branch()
+    {
+        var chain = WiringChain.Create(WiringShape.Ring, new[] { 1, 2, 3 }, unplaced: new[] { 9 });
+
+        Assert.Equal(new[] { 1, 9, 2, 3 }, chain.PlaceInBranch(new[] { 9 }, 1, 1).Keys);
+        Assert.Equal(new[] { 2, 3, 1 }, chain.PlaceInBranch(new[] { 1 }, 1, 3).Keys);
+        Assert.True(chain.PlaceInBranch(new[] { 2 }, 1, 1).SameAs(chain));     // 제자리
+        Assert.Same(chain, chain.PlaceInBranch(System.Array.Empty<int>(), 1, 0));
+    }
+
+    [Fact]
+    public void should_clear_only_named_suggestions_when_accepting_some()
+    {
+        var chain = WiringChain.Load(WiringShape.Ring, new[] { S(1, 1), S(2, 2), S(3, 3) }).Chain;
+
+        var next = chain.AcceptSuggestions(new[] { 2 });
+
+        Assert.Equal(new HashSet<int> { 1, 3 }, next.Suggested.ToHashSet());
+        Assert.Same(next, next.AcceptSuggestions(new[] { 2 }));
+    }
+
+    [Fact]
     public void should_sort_whole_chain_and_pull_palette_when_ring_sorted_by_number()
     {
         var sensors = new[] { S(1, 40), S(2, 10), S(3, 30), S(9, 5) };

@@ -353,6 +353,67 @@ public sealed class WiringChain
     public WiringChain AcceptSuggestions()
         => _suggested.Count == 0 ? this
          : new WiringChain(Shape, Keys, Unplaced, new HashSet<int>(), ControllerGap, IsControllerGapExplicit);
+
+    /// <summary>
+    /// 몇 대만 제안에서 걷는다 — 사람이 그 센서를 직접 옮기거나 끼워 넣으면 그 자리는 사람의 결정이다.
+    /// </summary>
+    public WiringChain AcceptSuggestions(IEnumerable<int> keys)
+    {
+        var set = new HashSet<int>(keys ?? Enumerable.Empty<int>());
+        if (!_suggested.Overlaps(set)) return this;
+        var keep = new HashSet<int>(_suggested.Where(k => !set.Contains(k)));
+        return new WiringChain(Shape, Keys, Unplaced, keep, ControllerGap, IsControllerGapExplicit);
+    }
+
+    /// <summary>
+    /// 목록 보기(표 보기)의 한 줄에 놓는다 — 선 <paramref name="line"/> 의 <paramref name="index"/> 자리(옮기기 <b>전</b> 목록 기준 0…개수)에
+    /// <paramref name="keys"/> 를 한 덩어리로 끼워 넣고 뒤는 밀린다. 팔레트 센서 · 체인 센서가 섞여도 된다
+    /// (덩어리 안 순서: 체인에 있던 것은 체인 순서, 그다음 팔레트 것은 준 순서).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>양쪽 가지</b> — 선 1 = 왼쪽 가지, 선 2 = 오른쪽 가지이고 각 목록은 <b>제어기 쪽에서 바깥으로</b>(<see cref="Branch"/>)다.
+    /// 그래서 "오른쪽 가지 맨 앞(제어기 옆)" 도 가리킬 수 있다 — 체인 틈 번호로는 제어기 틈이 늘 왼쪽으로 가서 안 된다.</para>
+    /// <para><b>링 · 한 줄</b> — 선은 하나라 <paramref name="line"/> 을 보지 않고 <paramref name="index"/> 는 체인 틈이다.</para>
+    /// </remarks>
+    public WiringChain PlaceInBranch(IEnumerable<int> keys, int line, int index)
+    {
+        var given = (keys ?? Enumerable.Empty<int>()).Where(k => k != GAP_SENTINEL).Distinct().ToList();
+        if (given.Count == 0) return this;
+
+        var block = given.Where(Contains).OrderBy(IndexOf).Concat(given.Where(k => !Contains(k))).ToList();
+        var moving = new HashSet<int>(block);
+        var palette = Unplaced.Where(k => !moving.Contains(k));
+
+        if (Shape == WiringShape.TwoBranch)
+        {
+            var left = Branch(WiringSpec.LINE_PRIMARY).ToList();
+            var right = Branch(WiringSpec.LINE_SECONDARY).ToList();
+            var target = line == WiringSpec.LINE_SECONDARY ? right : left;
+            var at = Math.Clamp(index, 0, target.Count);
+            at -= target.Take(at).Count(moving.Contains);
+
+            left.RemoveAll(moving.Contains);
+            right.RemoveAll(moving.Contains);
+            target.InsertRange(at, block);
+
+            left.Reverse();                                   // 화면 순서: 왼쪽 가지는 바깥 끝부터
+            var list = left.Concat(right).ToList();
+            var keep = new HashSet<int>(_suggested.Where(list.Contains));
+            return new WiringChain(Shape, list, palette.ToList(), keep, left.Count, gapExplicit: true);
+        }
+
+        var withGap = WithSentinel();
+        var idx = SentinelIndex(index);
+        idx -= withGap.Take(idx).Count(moving.Contains);
+        withGap.RemoveAll(moving.Contains);
+        withGap.InsertRange(idx, block);
+        return FromSentinel(withGap, palette, _suggested);
+    }
+
+    /// <summary>같은 체인인가(순서 · 제어기 틈 · 팔레트 · 제안) — 편집이 실제로 무엇을 바꿨는지 가린다.</summary>
+    public bool SameAs(WiringChain? other)
+        => other is not null && Shape == other.Shape && ControllerGap == other.ControllerGap
+           && Keys.SequenceEqual(other.Keys) && Unplaced.SequenceEqual(other.Unplaced) && _suggested.SetEquals(other._suggested);
     #endregion
 
     #region - Save -
