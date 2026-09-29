@@ -9,6 +9,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// <summary>
 /// 한글을 띄어쓰기에서만 줄바꿈 — 실창에서 "바 / 꿀 수 없습니다" · "다른 카 / 테고리로" 처럼 낱말 가운데서 끊기던 결함(2026-09-27).
 /// </summary>
+[Collection(WpfFocusCollection.Name)]
 public class KoreanWordWrapTests
 {
     private const string Hint = "카테고리는 바꿀 수 없습니다. 다른 카테고리로 옮기려면 삭제한 뒤 다시 등록하세요.";

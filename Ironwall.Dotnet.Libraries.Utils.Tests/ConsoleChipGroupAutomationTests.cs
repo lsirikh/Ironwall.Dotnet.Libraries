@@ -21,6 +21,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// (<c>{DisconnectedItem}</c>)을 쥔 채 남는다 — 옛 칩은 보이지 않아 기본 보기에서 빠진다.
 /// 이 시험은 진짜 UIA 클라이언트(프로세스 안, 화면 밖 창)로 그 길을 그대로 밟는다.
 /// </remarks>
+[Collection(WpfFocusCollection.Name)]
 public class ConsoleChipGroupAutomationTests
 {
     private const string ChipTemplate =

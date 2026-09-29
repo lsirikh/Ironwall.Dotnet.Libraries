@@ -20,6 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// 2026-09-28 사용자 보고: 계정 · 권한 → 권한 설정의 '권한 그룹' 칩 줄이 오른쪽에서 잘리는데 나머지로 갈 길이 보이지 않았다
 /// (숨긴 가로 스크롤 + 가로 휠). 접힌 한 줄 + [⌄ 더 보기 +N] → 펼침 · 고른 칩 늘 보임 · 폭과 항목 변화에 다시 잼.
 /// </remarks>
+[Collection(WpfFocusCollection.Name)]
 public class ConsoleChipStripTests
 {
     private const string ChipTemplate =

@@ -19,6 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// — 계정 · 장비 · 이벤트 목록에서 여러 행을 골라 끌면 잡은 한 행만 실렸다. ListBox 는 그렇지 않다(ListBoxItem 은 가상 메서드라
 /// 처리된 눌림에서 불리지 않는다).
 /// </remarks>
+[Collection(WpfFocusCollection.Name)]
 public class CaptureDragDataGridSelectionTests
 {
     public sealed class Row

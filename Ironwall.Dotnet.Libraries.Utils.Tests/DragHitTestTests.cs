@@ -11,6 +11,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// 드롭존 판정의 "커서 아래" — 셸 창(MetroWindow)은 창 전체를 덮는 숨은 대화상자 덮개(PART_OverlayBox)를 둔다.
 /// 걸러 내지 않은 HitTest 는 그 덮개를 집어 셸 콘솔의 모든 드롭이 말없이 사라졌다(2026-09-27 실창 기록).
 /// </summary>
+[Collection(WpfFocusCollection.Name)]
 public class DragHitTestTests
 {
     [Fact]

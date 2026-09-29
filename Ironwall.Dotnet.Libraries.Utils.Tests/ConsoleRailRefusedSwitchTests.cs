@@ -22,6 +22,7 @@ namespace Ironwall.Dotnet.Libraries.Utils.Tests;
 /// 안 울리든 · 한 박자 뒤 다시 울리든 같다 — 한 박자 뒤에는 SelectedItem 이 이미 같은 값이라 변경이 일어나지 않는다).</para>
 /// <para>2026-09-28 계정 콘솔 SC-ACC-006 · 장비 콘솔 SC-DEV-008 — 화면은 막힌 레일을 고른 채 남고 콘솔은 앞 레일이었다.</para>
 /// </remarks>
+[Collection(WpfFocusCollection.Name)]
 public class ConsoleRailRefusedSwitchTests
 {
     public enum Owner
@@ -356,4 +357,16 @@ public class ConsoleRailRefusedSwitchTests
         return result;
     }
     #endregion
+}
+
+/// <summary>
+/// 키보드 초점 · 마우스 캡처 · Win32 전경(foreground)은 프로세스 전역이다 — 화면 밖이라도 <c>Window.Show()</c> 로
+/// 실제 OS 창을 띄우고 <c>Keyboard.Focus</c>/<c>Mouse.Capture</c>/실제 입력 라우팅에 기대는 시험 반들을 한 모음에 묶어
+/// 서로 겹쳐 돌지 않게 한다. 겹치면 다른 반의 창이 초점 · 캡처를 가로채 간헐적으로 실패한다
+/// (실측 2026-09-29: 전체 스위트에서만 616/617 — <see cref="ConsoleRailRefusedSwitchTests"/> 단독 5연속 11/11 은 항상 통과).
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class WpfFocusCollection
+{
+    public const string Name = "WpfFocus (real window · keyboard focus · mouse capture)";
 }
