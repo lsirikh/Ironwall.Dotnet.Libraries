@@ -125,7 +125,7 @@
 						FontFamily="{TemplateBinding FontFamily}"
 						FontSize="{TemplateBinding FontSize}"
 						FontWeight="{TemplateBinding FontWeight}"
-						Text="{TemplateBinding Text}"
+						Text="{TemplateBinding DisplayText}"
 						TextTrimming="{TemplateBinding TrimType}"
 						TextWrapping="{TemplateBinding TextWrapping}" />
 				</ControlTemplate>
