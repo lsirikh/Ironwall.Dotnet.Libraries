@@ -478,7 +478,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         get
         {
             var reference = _board.Limits.ReferenceLength(_board.Family) is { } m ? $"기준 {m:0}m"
-                : _board.IsMixedFamily ? WiringLimitTable.MIXED_SHORT : "기준 —";
+                : _board.IsMixedFamily ? $"기준 — {WiringLimitTable.MIXED_SHORT}" : "기준 —";
             return $"체인 {_board.Chain.Count}대 · 길이 약 {_board.ChainLengthMetres:0}m / {reference} · 함체 자리 {EnclosureGapText}";
         }
     }

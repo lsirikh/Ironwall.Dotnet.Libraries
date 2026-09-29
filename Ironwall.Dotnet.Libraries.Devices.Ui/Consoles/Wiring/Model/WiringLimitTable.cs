@@ -34,10 +34,11 @@ public sealed record WiringLimitTable(
     public static WiringLimitTable Default { get; } = new();
 
     /// <summary>섞였을 때의 알림(정보 · 숫자 없음).</summary>
-    public const string MIXED_INFO = "섞임 한도 확인 중(O-11) — 스마트 센서와 펜스 계열 센서(복합 · 펜스 · 지진동)를 한 제어기에 섞어 쓰고 있습니다(정상). 섞였을 때의 기준 길이 · 대수는 아직 정해지지 않아 경고하지 않습니다.";
+    /// <remarks>운영자 화면 문구 — 설계 질문 번호(O-11)는 싣지 않는다(주석에만).</remarks>
+    public const string MIXED_INFO = "스마트 센서와 펜스 계열 센서(복합 · 펜스 · 지진동)를 한 제어기에 섞어 쓰고 있습니다(정상). 섞어 쓸 때의 기준 길이 · 대수는 아직 정해지지 않아 경고하지 않습니다.";
 
-    /// <summary>아래 띠에 쓰는 짧은 말(섞였을 때 기준 자리).</summary>
-    public const string MIXED_SHORT = "섞임 한도 확인 중(O-11)";
+    /// <summary>머리 · 아래 띠에 쓰는 짧은 말(섞였을 때 기준 자리 — "기준 — 섞임(미정)").</summary>
+    public const string MIXED_SHORT = "섞임(미정)";
 
     /// <summary>센서 종류들의 제품군. 모르는 종류(<see cref="EnumDeviceType.NONE"/> 등)는 판정에서 뺀다.</summary>
     public static WiringFamily FamilyOf(IEnumerable<EnumDeviceType> types)

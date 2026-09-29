@@ -258,7 +258,7 @@
 									MinWidth="26"
 									Height="20"
 									Padding="5,0"
-									HorizontalAlignment="Left"
+									HorizontalAlignment="Center"
 									VerticalAlignment="Center"
 									Background="{DynamicResource PrimaryBrush}"
 									CornerRadius="10">
@@ -386,19 +386,17 @@
 						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding SaveBlockedReason}" />
 				</StackPanel>
+				<!--
+					창 제목("장비 셋업 · 결선맵")은 커널 창 머리가 그린다 — 뷰 안에서 또 쓰면 두 번 보인다(대화 커널 정리 2026-09-30).
+					여기는 대상 제어기(이름 · 주소)만 남긴다 — 헤디드 시험이 Devices.Wiring.Subject 로 창을 찾는다.
+				-->
 				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 					<TextBlock
 						VerticalAlignment="Center"
-						FontSize="15"
-						FontWeight="Bold"
-						Foreground="{DynamicResource TextPrimaryBrush}"
-						Text="장비 셋업 · 결선맵" />
-					<TextBlock
-						Margin="10,0,0,0"
-						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Wiring.Subject"
-						FontSize="13"
-						Foreground="{DynamicResource TextSecondaryBrush}"
+						FontSize="14"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
 						Text="{Binding Subject}" />
 				</StackPanel>
 			</DockPanel>
@@ -1392,7 +1390,7 @@
 													<ColumnDefinition Width="112" />
 													<ColumnDefinition Width="30" />
 												</Grid.ColumnDefinitions>
-												<TextBlock Grid.Column="1" Style="{StaticResource W.ColHead}" Text="위치" />
+												<TextBlock HorizontalAlignment="Center" Grid.Column="1" Style="{StaticResource W.ColHead}" Text="위치" />
 												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="A · B 번호" />
 												<TextBlock Grid.Column="3" Style="{StaticResource W.ColHead}" Text="이름" />
 												<TextBlock Grid.Column="4" Style="{StaticResource W.ColHead}" Text="장비번호" />
@@ -1665,7 +1663,7 @@
 											<TextBlock Style="{StaticResource W.Hint}" Text="{Binding SelectedTypeText}" />
 											<StackPanel Visibility="{Binding IsRing, Converter={StaticResource BoolToVisibility}}">
 												<TextBlock Margin="0,4,0,0" Text="{Binding EnclosureGapText, StringFormat=함체 위치: {0}}" />
-												<TextBlock Style="{StaticResource W.Hint}" Text="표시만 — 체인 순서 · A/B 번호는 그대로(O-5)" />
+												<TextBlock Style="{StaticResource W.Hint}" Text="표시만 — 체인 순서 · A/B 번호는 그대로" />
 												<UniformGrid Margin="0,6,0,0" Columns="2">
 													<Button
 														Margin="0,0,4,0"

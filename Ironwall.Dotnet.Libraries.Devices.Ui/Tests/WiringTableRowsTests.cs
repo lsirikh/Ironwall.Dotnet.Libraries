@@ -73,6 +73,28 @@ public class WiringTableRowsTests
         Assert.Contains("체인 3대 · 길이 약 12m / 기준 200m", vm.ChainSummaryText);
     }
 
+    [Fact]
+    public void should_never_show_design_memo_codes_to_operators_when_families_are_mixed()
+    {
+        // Arrange — 스마트 + 펜스 섞임 · 자리 없는 센서 1대(번호순 제안)
+        var seeds = new[]
+        {
+            new WiringSensorSeed(101, 1, new SensorFacts(1, "스마트 1", "SmartSensor2", ""), new WiringPlacement(1, 1)),
+            new WiringSensorSeed(102, 2, new SensorFacts(101, "펜스 1", "Fence", ""), new WiringPlacement(1, 2)),
+            new WiringSensorSeed(103, 3, new SensorFacts(102, "펜스 2", "Fence", "")),
+        };
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "C", "10.0.0.1", "Controller"), seeds, new[] { "SmartSensor2", "Fence" }, null, new WiringFakeDialogs());
+
+        // Act
+        var texts = new[] { vm.ChainSummaryText, vm.FenceCountsText, vm.SuggestionText, vm.FaultRelationText, vm.ControllerKindText }
+            .Concat(vm.Issues.Select(i => i.Message));
+
+        // Assert
+        Assert.All(texts, t => Assert.DoesNotMatch(@"\bO-\d+|\bFR-\d+|PRD", t));
+        Assert.Contains("기준 — 섞임(미정)", vm.ChainSummaryText);
+        Assert.Contains("기준 — 섞임(미정)", vm.FenceCountsText);
+    }
+
     private static WiringViewModel Open(params (string Type, WiringFacing Facing)[] sensors)
     {
         var seeds = sensors.Select((s, i) => new WiringSensorSeed(
