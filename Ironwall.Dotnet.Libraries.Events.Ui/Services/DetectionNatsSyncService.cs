@@ -35,8 +35,10 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
         IEventAggregator? eventAggregator = null,
         ITokenStorageService? tokenStorage = null,
         Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? deviceProvider = null,
-        IDoorContactPolicy? doorContactPolicy = null)
+        IDoorContactPolicy? doorContactPolicy = null,
+        Ironwall.Dotnet.Libraries.Devices.Ui.Services.IDeviceProviderService? deviceLookup = null)
     {
+        _deviceLookup = deviceLookup;   // 캐시 미스 단건 GET(브로커 §2.4 N-5 · §6.1) — 미주입이면 조회 없이 종전 규칙
         _doorContactPolicy = doorContactPolicy;   // FR-13 ③: 미주입 시 기본 true(DefaultDoorContactPolicy 와 동일)
         _log = log;
         _natsService = natsService;
@@ -85,16 +87,16 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             await ProcessEnvelopeAsync(envelope);
     }
 
-    private Task ProcessEnvelopeAsync(JObject jObj)
+    private async Task ProcessEnvelopeAsync(JObject jObj)
     {
         try
         {
             var natsMessageId = jObj.Value<string>("id"); // NATS 메시지 고유 UUID
-            var cmd = jObj.Value<string>("cmd");
-            if (cmd != "DETECT") return Task.CompletedTask;
+            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정(프로브 S21 · S27)
+            if (!NatsEnvelopeItems.IsNotice(jObj, "DETECT")) return;
 
             var body = jObj["body"]?.ToObject<DetectionEventDto>();
-            if (body == null) return Task.CompletedTask;
+            if (body == null) return;
 
             // NATS JSON: body.device.id에 실제 ID가 있음 (body.device_id는 0일 수 있음)
             var deviceId = body.Device?.Id ?? body.DeviceId;
@@ -105,18 +107,26 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             if (!Enum.TryParse<EnumEventType>(typeEvent, ignoreCase: true, out var eventType))
             {
                 _log?.Warning($"DETECTION: 알 수 없는 type_event '{typeEvent}'");
-                return Task.CompletedTask;
+                return;
             }
 
             // 장비가 지워졌으면 device: null(브로커 §6.1) — 깜빡일 심볼도 큐 키도 없다. 카드는 호스트가 스냅샷으로 띄운다.
             if (body.Device is null && deviceId <= 0)
             {
                 _log?.Info($"DETECTION: 장비 없음(삭제된 장비) — 심볼 · 큐 건너뜀 (eventId={eventId})");
-                return Task.CompletedTask;
+                return;
             }
 
-            // 종류 · 그룹 — v7.0+ 는 장비 참조 {id, category_device} 뿐이라 캐시에서 읽는다(옛 전문은 본문이 이긴다).
-            if (!NatsEventDeviceResolver.TryResolve(body.Device, deviceId, _deviceProvider, out var deviceType, out var deviceGroups))
+            // 종류 · 그룹 — v7.0+ 는 장비 참조 {id, category_device} 뿐이라 캐시에서 읽고, 캐시에 없으면 단건 GET 1회(N-5).
+            var (resolution, deviceType, deviceGroups) = await NatsEventDeviceResolver.ResolveAsync(
+                body.Device, deviceId, _deviceProvider, _deviceLookup, NatsEventDeviceResolver.LOOKUP_TIMEOUT).ConfigureAwait(false);
+            if (resolution == NatsDeviceResolution.NotFound)
+            {
+                // 서버에도 없는 장비(404 = 삭제됨) — 큐 · 심볼 없이 호스트의 스냅숏 카드만(브로커 N-5). 카테고리와 무관한 한 규칙(프로브 S11.b).
+                _log?.Info($"DETECTION: 캐시 · 서버 모두 없는 장비 — 심볼 · 큐 건너뜀(카드는 스냅숏) (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', eventId={eventId})");
+                return;
+            }
+            if (resolution == NatsDeviceResolution.Unresolved)
             {
                 // 캐시 미스 + 카테고리만으로 종류를 못 정함(sensor = Fence · PIR · Multi …) — 종류를 <b>추측하지 않고</b> NONE 으로 큐에 넣는다(WP-1 ⑱).
                 //   호스트는 이 이벤트의 카드를 띄운다 — 큐 엔트리가 없으면 자동 조치보고 · 원격 해제 · 알람이 그 카드와 따로 논다(종전: 이벤트 무시).
@@ -137,7 +147,7 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
                 bool fallback = _doorContactPolicy?.FallbackEnabled ?? true;
                 if (fallback) _symbolEventManager.ApplyDoorEvent(deviceId, deviceType, eventType);
                 _log?.Info($"DETECTION 접점→개폐 형태(큐 제외): deviceId={deviceId}, {deviceType}, {eventType}, fallback={fallback}");
-                return Task.CompletedTask;
+                return;
             }
 
             // 탐지 센서의 소속 제어기 Id 해석 — 제어기 고장 자동복구 매칭용(Controller_Fault_AutoRecovery_Extension FR-02).
@@ -152,14 +162,14 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             if (!_recentEnvelopes.TryAdd(natsMessageId))
             {
                 _log?.Info($"DETECTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
-                return Task.CompletedTask;
+                return;
             }
             // 같은 이벤트(서버 번호)를 봉투 id 만 바꿔 다시 보내도(매니저 재전송) 큐에 한 번 — 봉투 기억으로는 못 막는다(GAP-C4).
             //   탐지 · 장애는 서버가 번호를 따로 세므로 종류를 열쇠에 넣는다.
             if (eventId > 0 && !_recentEvents.TryAdd($"detection:{eventId}"))
             {
                 _log?.Info($"DETECTION 같은 이벤트를 새 봉투로 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
-                return Task.CompletedTask;
+                return;
             }
 
             // EventQueue에 이벤트 등록
@@ -181,13 +191,12 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             _log?.Info($"DETECTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
             // entryId + eventId를 EventAggregator로 발행 → 카드 1:1 매칭에 사용
-            return PublishEnqueued(new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType));
+            await PublishEnqueued(new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _log?.Error($"OnNatsDetectionAsync 오류: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -219,6 +228,7 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
     private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 소속 제어기 해석용(Controller_Fault_AutoRecovery_Extension)
+    private readonly Ironwall.Dotnet.Libraries.Devices.Ui.Services.IDeviceProviderService? _deviceLookup;   // 캐시 미스 단건 GET(N-5)
     private readonly RecentEnvelopeFilter _recentEnvelopes = new();   // 같은 봉투 두 번 → 큐 한 번(WP-1 ⑦)
     private readonly RecentEnvelopeFilter _recentEvents = new();      // 같은 이벤트 새 봉투 → 큐 한 번(GAP-C4)
     #endregion

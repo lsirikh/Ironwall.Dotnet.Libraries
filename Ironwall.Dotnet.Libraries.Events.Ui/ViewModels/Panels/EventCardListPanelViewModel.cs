@@ -703,6 +703,29 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         /// <summary>
+        /// 큐 엔트리의 카드 — 목록에 오른 카드(<see cref="_cardByEntryId"/>) 또는 아직 묶음 버퍼에서 기다리는 카드
+        /// (보류 표 <see cref="_pendingEntries"/> 의 (종류, 번호) 로 버퍼 사본에서 찾는다). 못 찾으면 UI 스레드에 줄 선 일
+        /// (Background 로 넘긴 EventEntryEnqueuedMessage · 묶음 삽입)을 한 번 보낸 뒤 다시 본다. 없으면 <c>null</c>.
+        /// </summary>
+        private async Task<EventCardBaseViewModel?> FindCardForEntryAsync(string entryId)
+        {
+            if (FindCardForEntry(entryId) is { } card) return card;
+            await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Background);
+            return FindCardForEntry(entryId);
+        }
+
+        private EventCardBaseViewModel? FindCardForEntry(string entryId)
+        {
+            if (_cardByEntryId.TryGetValue(entryId, out var shown)) return shown;
+            foreach (var pending in _pendingEntries)
+            {
+                if (pending.Value != entryId) continue;
+                return _batchBuffer.Snapshot().FirstOrDefault(c => KeyOf(c) == pending.Key);
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Fault 자동복구 핸들러 — EventQueueManager.OnAutoRecovery 구독용.
         /// 서버 API 조치보고 → <b>성공했을 때만</b> UI 카드 제거 → NATS 발행.
         /// 종전엔 API 가 실패해도 카드를 지우고 ActionId=0 인 ACTION_REPORT 를 내보냈다 — 서버엔 조치가 없는데 다른 GIS 의 카드까지 닫혔다(WP-1 ⑤).
@@ -712,7 +735,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         {
             try
             {
-                if (!_cardByEntryId.TryGetValue(faultEntryId, out var card))
+                // 표시된 카드뿐 아니라 아직 묶음 버퍼(150 ms)에 있는 카드도 찾는다 — 장애 → 곧바로(30 ms) 같은 장비 탐지면
+                //   카드가 아직 목록에 없어 "카드 없음 — API 스킵" 으로 조치보고가 영영 나가지 않았다(프로브 S28.30ms 회귀).
+                var card = await FindCardForEntryAsync(faultEntryId);
+                if (card is null)
                 {
                     _log?.Warning($"AutoRecovery: entryId({faultEntryId}) 카드 없음 — API 스킵");
                     return;
@@ -748,10 +774,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 await DispatcherService.BeginInvoke(() =>
                 {
-                    if (KeyOf(card) is { } key) RememberClosed(key.Kind, key.EventId);
+                    if (KeyOf(card) is { } key)
+                    {
+                        RememberClosed(key.Kind, key.EventId);   // 아직 버퍼면 비울 때 올리지 않고 치운다(WP-1 ④ 와 같은 규칙)
+                        _pendingEntries.TryRemove(new KeyValuePair<(string Kind, int EventId), string>(key, faultEntryId));
+                    }
                     _cardByEntryId.TryRemove(faultEntryId, out _);
-                    ViewModelProvider.Remove(card);
-                    card.Dispose();
+                    // 목록에 있었으면 여기서 치우고, 버퍼에 있으면 FlushPendingCardsAsync 가 WasClosed 로 걸러 치운다(두 번 Dispose 하지 않게).
+                    if (ViewModelProvider.Remove(card)) card.Dispose();
                 });
 
                 await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(

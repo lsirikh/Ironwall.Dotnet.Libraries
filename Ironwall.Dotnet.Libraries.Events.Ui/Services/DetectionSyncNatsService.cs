@@ -75,16 +75,21 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
         // 로그인 게이팅(Login_Gated_GIS_Init): 로그인 전 NATS 이벤트 수신 차단.
         // _tokenStorage 미주입(null) 시 게이트 비활성(하위호환).
         if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;
+        // 배열 봉투는 항목마다 — 호스트 라우터 · 다른 이벤트 수신 서비스와 같은 의미(WP-1 ⑰). 종전엔 JObject.Parse 라
+        //   배열이 오면 통째로 ERROR 한 줄과 함께 그 안의 SYNC_DETECTION 이 사라졌다(프로브 S13).
+        foreach (var envelope in NatsEnvelopeItems.Parse(e.Data, _log, "SYNC_DETECTION"))
+            ProcessEnvelope(envelope);
+        return Task.CompletedTask;
+    }
+
+    private void ProcessEnvelope(JObject jObj)
+    {
         try
         {
-            if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
+            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정
+            if (!NatsEnvelopeItems.IsNotice(jObj, "SYNC_DETECTION")) return;
 
-            var jObj = JObject.Parse(e.Data);
-            var cmd = jObj.Value<string>("cmd");
-            if (cmd != "SYNC_DETECTION") return Task.CompletedTask;
-
-            var body = jObj["body"];
-            if (body == null) return Task.CompletedTask;
+            if (jObj["body"] is not JObject body) return;
 
             var action = body.Value<string>("action");
             var resourceId = body.Value<int?>("resource_id") ?? 0;
@@ -93,13 +98,13 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             if (!string.Equals(action, "UPDATED", StringComparison.OrdinalIgnoreCase))
             {
                 _log?.Info($"SYNC_DETECTION 무시(action={action}, resource_id={resourceId}) — UPDATED만 처리");
-                return Task.CompletedTask;
+                return;
             }
 
             if (resourceId <= 0)
             {
                 _log?.Warning("SYNC_DETECTION: resource_id 없음/유효하지 않음 — 무시");
-                return Task.CompletedTask;
+                return;
             }
 
             // 게이트: 현재 EQM에 등록(활성)된 **탐지**만 재조회 — 비활성이면 REST 호출 없이 no-op.
@@ -108,7 +113,7 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             if (_eventQueueManager.FindEntryByEventId(resourceId, EnumEventType.Intrusion) == null)
             {
                 _log?.Info($"SYNC_DETECTION: resource_id={resourceId} EQM 미등록(비활성 탐지) — 갱신 스킵");
-                return Task.CompletedTask;
+                return;
             }
 
             // 순서 역전 방지: 같은 resource_id에 UPDATED가 연속 오면 GET 완료 순서가 뒤바뀌어 stale가 최신을 덮을 수 있음.
@@ -124,7 +129,6 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
         {
             _log?.Error($"OnNatsDetectionSyncAsync 오류: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
 
     /// <summary>UPDATED 재조회 → detail 추출 → UI 스레드로 썸네일 갱신 메시지 발행. 예외는 내부 흡수(fire-and-forget).</summary>

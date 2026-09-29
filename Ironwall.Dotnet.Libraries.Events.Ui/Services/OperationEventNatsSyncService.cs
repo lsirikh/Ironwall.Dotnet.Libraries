@@ -74,19 +74,27 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
     {
         try
         {
-            if (jObj.Value<string>("cmd") != "OPERATION_EVENT") return;
-            var body = jObj["body"];
-            if (body is null) return;
+            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정(프로브 S21 · S27)
+            if (!NatsEnvelopeItems.IsNotice(jObj, "OPERATION_EVENT")) return;
+            if (jObj["body"] is not JObject body) return;
 
-            var device = body["device"];
+            // 지워진 장비는 device: null(JSON null = JValue) — 거기서 "id" 를 파고들면 예외였다(프로브 S17.g ERROR).
+            //   객체일 때만 장비 참조로 읽고, 아니면 장비 없음으로 조용히 넘긴다(브로커 N-3: null 과 키 없음을 같게).
+            var device = body["device"] as JObject;
             int deviceId = device?.Value<int?>("id") ?? body.Value<int?>("device_id") ?? 0;
+            if (deviceId <= 0)
+            {
+                _log?.Info($"OPERATION_EVENT: 장비 없음(삭제된 장비) — 개폐 반영 건너뜀 (reason={body.Value<string>("reason")})");
+                return;
+            }
             // v7.0+ 이벤트의 장비는 참조 {id, category_device}(서버 D5) — type_device 는 없다. 예전엔 type_device 만 읽어
             //   7.0+ 서버의 함체 · 통문 개폐가 지도에 한 번도 반영되지 않았다(2026-09-30 발견). 개폐가 있는 카테고리만 종류로 옮긴다.
-            if (deviceId <= 0 || ResolveDoorDeviceType(device?.Value<string>("category_device"), device?.Value<string>("type_device")) is not { } deviceType)
+            if (ResolveDoorDeviceType(device?.Value<string>("category_device"), device?.Value<string>("type_device")) is not { } deviceType)
                 return;
             if (!DoorStateMachine.HasDoor(deviceType)) return;
 
-            var state = Resolve(body["detail"]?.Value<string>("door_status") ?? body["detail"]?.Value<string>("gate_status"), body.Value<string>("reason"));
+            var detail = body["detail"] as JObject;   // detail: null 도 같은 함정(JValue) — 객체일 때만
+            var state = Resolve(detail?.Value<string>("door_status") ?? detail?.Value<string>("gate_status"), body.Value<string>("reason"));
             if (state is null) return;   // 온도/전압 임계치 등 개폐 무관
 
             _symbolEventManager.SetDoorState(deviceId, deviceType, state.Value);

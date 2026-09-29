@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -67,6 +68,74 @@ internal static class NatsEventDeviceResolver
         return true;
     }
 
+    /// <summary>캐시 미스 단건 GET 을 기다리는 최대 시간 — 넘기면 조회 없이 종전 규칙(<see cref="TryResolve"/>)으로 넘어간다.</summary>
+    internal static readonly TimeSpan LOOKUP_TIMEOUT = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// 종류 · 그룹을 정하고, <b>캐시에 없는 참조</b>면 단건 GET 1회로 채운다(브로커 §2.4 N-5 · §6.1 · §6.2 — "참조를 못 풀어도
+    /// 이벤트를 버리지 않는다. 단건 GET 으로 채우고, 404 면 스냅샷을 표시한다").
+    /// </summary>
+    /// <remarks>
+    /// <para>조회하는 경우: 본문이 v7 참조(<c>type_device</c> 없음) · 카테고리를 앎 · 캐시에 그 id 가 없음 · <paramref name="lookup"/> 주입됨.
+    /// 조회는 <see cref="IDeviceProviderService.FetchDeviceByIdAsync"/> — 찾으면 캐시에도 들어간다(SYNC_DEVICE CREATED 와 같은 길).</para>
+    /// <para>결과: 찾음 → <see cref="NatsDeviceResolution.Resolved"/>(조회한 장비의 종류 · 그룹) ·
+    /// 서버에 없음(404 · 조회 실패) → <see cref="NatsDeviceResolution.NotFound"/>(큐에 넣지 않는다 — 카드는 호스트가 스냅숏으로) ·
+    /// 시간 초과 · 조회 안 함 → 종전 규칙(<see cref="TryResolve"/>: 1:1 카테고리면 그 종류, 아니면 <see cref="NatsDeviceResolution.Unresolved"/>).
+    /// 종전엔 조회가 없어 sensor 는 종류 NONE · 그룹 없음으로 큐에 들어갔고(프로브 S11.a), controller 는 카테고리만으로
+    /// 없는 제어기를 큐에 넣었다(S11.b) — 카테고리마다 규칙이 달랐다.</para>
+    /// <para>호출 스레드: NATS 콜백. 기다리는 동안 스레드를 막지 않는다(await). NATS 처리 줄은 그만큼 늦게 다음 봉투로 간다 —
+    /// 순서를 지키려는 것이다(뒤따르는 ACTION_REPORT 가 큐에 들어가기 전의 이벤트를 놓치지 않게).</para>
+    /// </remarks>
+    internal static async Task<(NatsDeviceResolution Outcome, EnumDeviceType Type, List<int>? Groups)> ResolveAsync(
+        BaseDeviceDto? device,
+        int deviceId,
+        IEnumerable<IBaseDeviceModel>? cache,
+        IDeviceProviderService? lookup,
+        TimeSpan timeout,
+        CancellationToken token = default)
+    {
+        if (device is null) return (NatsDeviceResolution.Unresolved, EnumDeviceType.NONE, null);   // 옛 평면 device_id 만 — 종전 규칙
+        var category = DeviceTypeResolver.ResolveCategory(device.CategoryDevice, device.TypeDevice);
+        var legacyBody = DeviceTypeResolver.Resolve(device.TypeDevice, null) is not null;   // 옛 전문은 본문이 이긴다 — 조회하지 않는다
+
+        if (!legacyBody && lookup is not null && deviceId > 0 && category != EnumDeviceCategory.None
+            && FindCached(cache, deviceId, category) is null)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(timeout);
+            IBaseDeviceModel? fetched;
+            try
+            {
+                fetched = await lookup.FetchDeviceByIdAsync(device.CategoryDevice ?? category.ToString().ToLowerInvariant(), deviceId, cts.Token)
+                                      .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                fetched = null;
+            }
+
+            if (fetched is not null)
+            {
+                var type = fetched.DeviceType != EnumDeviceType.NONE ? fetched.DeviceType : DeviceTypeResolver.FromCategory(category);
+                if (type is EnumDeviceType resolvedType)
+                {
+                    var groups = device.GroupIds?.Where(g => g > 0).ToList()
+                                 ?? fetched.DeviceGroups?.Where(g => g > 0).ToList();
+                    return (NatsDeviceResolution.Resolved, resolvedType, groups);
+                }
+            }
+            else if (!cts.IsCancellationRequested)
+            {
+                return (NatsDeviceResolution.NotFound, EnumDeviceType.NONE, null);
+            }
+            // 시간 초과 · 종류 없는 응답 — 아래 종전 규칙으로
+        }
+
+        return TryResolve(device, deviceId, cache, out var fallbackType, out var fallbackGroups)
+            ? (NatsDeviceResolution.Resolved, fallbackType, fallbackGroups)
+            : (NatsDeviceResolution.Unresolved, EnumDeviceType.NONE, null);
+    }
+
     /// <summary>
     /// 캐시에서 장비를 찾는다 — 7.0+ 는 장비 id 가 카테고리를 가로질러 유일하지만, 옛 서버는 아니었으므로
     /// 카테고리가 맞는 것을 먼저 고른다.
@@ -93,4 +162,15 @@ internal static class NatsEventDeviceResolver
 
     private static EnumDeviceCategory CategoryOf(IBaseDeviceModel device)
         => device.CategoryDevice != EnumDeviceCategory.None ? device.CategoryDevice : DeviceTypeResolver.CategoryOf(device.DeviceType);
+}
+
+/// <summary><see cref="NatsEventDeviceResolver.ResolveAsync"/> 의 결과.</summary>
+internal enum NatsDeviceResolution
+{
+    /// <summary>종류(와 그룹)를 정했다 — 큐에 넣는다.</summary>
+    Resolved,
+    /// <summary>종류를 정하지 못했다(조회 안 함 · 시간 초과) — 종류 NONE 으로 큐에 넣는다(WP-1 ⑱).</summary>
+    Unresolved,
+    /// <summary>서버에도 없다(404 · 조회 실패) — 큐에 넣지 않는다. 카드는 호스트가 스냅숏으로 띄운다(N-5).</summary>
+    NotFound,
 }

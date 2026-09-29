@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -40,6 +40,9 @@ public class EventCardBatchBuffer<T>
         _pendingItems.Enqueue(item);
         return true;
     }
+
+    /// <summary>비우지 않고 지금 기다리는 항목을 본다(순서 보존 사본). 버퍼 속 카드를 찾는 용도 — 목록에 오르기 전의 카드도 조치 대상이다.</summary>
+    public IReadOnlyList<T> Snapshot() => _pendingItems.ToArray();
 
     /// <summary>
     /// 큐의 모든 아이템을 일괄 Drain하여 리스트로 반환.
