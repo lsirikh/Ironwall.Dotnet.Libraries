@@ -272,7 +272,7 @@ public class EventConsoleDetailGuardViewTests
 
     private static T Wait<T>(Task<T> task) => RailProbe.Wait(task);
 
-    private static (EventDashboardView View, System.Windows.Window Window, EventDashboardViewModel Console) HostConsole(IReadOnlyList<MalfunctionEventDto>? malfunctions = null)
+    internal static (EventDashboardView View, System.Windows.Window Window, EventDashboardViewModel Console) HostConsole(IReadOnlyList<MalfunctionEventDto>? malfunctions = null)
     {
         var events = new EventProvider();
         var devices = new DeviceProvider();

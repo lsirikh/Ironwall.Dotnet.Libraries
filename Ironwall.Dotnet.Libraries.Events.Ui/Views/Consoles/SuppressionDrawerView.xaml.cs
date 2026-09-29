@@ -50,7 +50,8 @@ public partial class SuppressionDrawerView : UserControl
 
     private void OnUnloaded(object sender, RoutedEventArgs e) => Hook(null);
 
-    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e) => Hook(Model);
+    // 화면에서 떨어진 뒤 DataContext 가 바뀌어도 다시 걸지 않는다 — 다음 Loaded 가 건다(떨어진 사본이 뷰모델에 남지 않게).
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e) => Hook(IsLoaded ? Model : null);
 
     /// <summary>구독은 짝으로만 건다 — 서랍은 콘솔과 함께 오래 산다.</summary>
     private void Hook(SuppressionDrawerViewModel? next)

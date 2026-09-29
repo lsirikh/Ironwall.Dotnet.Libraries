@@ -125,6 +125,7 @@
 					cal:Message.Attach="[Event MouseDoubleClick] = [Action OnClickEventCard($source, $eventArgs)]"
 					ItemsSource="{Binding ViewModelProvider}"
 					ScrollViewer.CanContentScroll="True"
+					ScrollViewer.HorizontalScrollBarVisibility="Disabled"
 					SelectedItem="{Binding SelectedEventCardViewModel}"
 					VirtualizingPanel.IsVirtualizing="True"
 					VirtualizingPanel.VirtualizationMode="Recycling"
@@ -143,7 +144,8 @@
 					     ScrollUnit=Pixel: Flipper 카드 높이 전환 시 항목 단위 스냅 방지 -->
 					<ListBox.ItemTemplate>
 						<DataTemplate>
-							<ContentControl cal:View.Model="{Binding}" />
+							<!--  카드가 칸 폭을 따라가게(카드 별 열 150~224, 판 최대 220) — ContentControl 기본값(Left)이면 카드가 내용 폭으로 줄어든다.  -->
+							<ContentControl HorizontalContentAlignment="Stretch" cal:View.Model="{Binding}" />
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>

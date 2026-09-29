@@ -29,17 +29,23 @@
 		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 
+	<!--  카드 폭 — 칸을 따라 150~224(판 최대 220), 왼쪽 정렬(탐지 카드와 같다 — 이유는 그쪽 주석).  -->
+	<Grid>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" MinWidth="150" MaxWidth="224" />
+		</Grid.ColumnDefinitions>
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
 		Background="{DynamicResource SurfaceTranslucentBrush}"
+		HorizontalContentAlignment="Stretch"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<!--  220×200 고정. 탐지 카드와 동일 골격 — 사진 슬롯(56×56)은 장애엔 사진이 없어 기본 이미지 상시 표시.  -->
-				<Grid Width="220" Height="200">
+				<!--  높이 200 고정 · 폭은 맨 위 별 열을 따른다(판 최대 220). 탐지 카드와 동일 골격 — 사진 슬롯(56×56)은 장애엔 사진이 없어 기본 이미지 상시 표시.  -->
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<!--  본문: ①구역·장비(전체폭) + ②사진(고정 슬롯)+장애 정보  -->
@@ -184,8 +190,8 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<!--  뒷면(상세)도 앞면과 동일 크기(220×200) — 플립 시 폭 점프 제거  -->
-				<Grid Width="220" Height="200">
+				<!--  뒷면(상세)도 앞면과 동일 크기(폭은 맨 위 별 열 × 200) — 플립 시 폭 점프 제거  -->
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="3*" />
@@ -297,4 +303,5 @@
 			</Border>
 		</md:Flipper.BackContent>
 	</md:Flipper>
+	</Grid>
 </UserControl>

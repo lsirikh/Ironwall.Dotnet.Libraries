@@ -19,23 +19,47 @@ public partial class EventDashboardView : UserControl
     public EventDashboardView()
     {
         InitializeComponent();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         DataContextChanged += OnDataContextChanged;
-        Loaded += (_, _) => BindToolbarParts();
     }
 
     private EventDashboardViewModel? Model => DataContext as EventDashboardViewModel;
 
-    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    /// <summary>지금 뷰모델 이벤트를 구독 중인 뷰모델(없으면 null) — 화면에 붙어 있는 동안만 채워진다.</summary>
+    private EventDashboardViewModel? _bound;
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (e.OldValue is EventDashboardViewModel old)
+        Hook(Model);
+        BindToolbarParts();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => Hook(null);
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e) => Hook(IsLoaded ? Model : null);
+
+    /// <summary>
+    /// 뷰모델 이벤트 구독은 <b>화면에 붙어 있는 동안만</b>, 짝으로 건다(여러 번 불려도 한 번만 걸린다).
+    /// </summary>
+    /// <remarks>
+    /// 이벤트 창을 닫았다 열 때마다 Caliburn 은 새 뷰를 만들고 같은 뷰모델을 붙인다. 예전처럼 DataContext 만 보고 걸면
+    /// 창에서 떨어진 옛 뷰가 뷰모델 이벤트 구독으로 살아 남아 N 벌이 같은 뷰모델에 반응했다(억제 서랍 [주간 반복] 결함 a90404b1 의 배경).
+    /// Unloaded 에서 풀어 옛 뷰가 수거되게 한다 — 같은 뷰가 다시 붙으면 Loaded 가 다시 건다.
+    /// </remarks>
+    private void Hook(EventDashboardViewModel? next)
+    {
+        if (ReferenceEquals(_bound, next)) return;
+        if (_bound is not null)
         {
-            old.RowFocusRequested -= OnRowFocusRequested;
-            old.SelectionRemapped -= OnSelectionRemapped;
+            _bound.RowFocusRequested -= OnRowFocusRequested;
+            _bound.SelectionRemapped -= OnSelectionRemapped;
         }
-        if (e.NewValue is EventDashboardViewModel next)
+        _bound = next;
+        if (_bound is not null)
         {
-            next.RowFocusRequested += OnRowFocusRequested;
-            next.SelectionRemapped += OnSelectionRemapped;
+            _bound.RowFocusRequested += OnRowFocusRequested;
+            _bound.SelectionRemapped += OnSelectionRemapped;
         }
     }
 

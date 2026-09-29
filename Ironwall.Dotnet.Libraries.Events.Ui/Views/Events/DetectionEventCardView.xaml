@@ -28,9 +28,16 @@
 		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 
+	<!--  카드 폭 — 칸을 따라 150~224(테두리 2px 양쪽 포함 = 판 220), 왼쪽 정렬. 별 열 하나에 MaxWidth 를 걸면 넉넉한 칸(보통 폭 300)에선 예전 220 판 그대로,
+	      좁은 칸(셸 이벤트 칸 최소 폭 200)에선 잘리지 않고 줄어든다. 테두리 · 머리 띠 · 본문이 같은 폭으로 함께 움직인다.  -->
+	<Grid>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" MinWidth="150" MaxWidth="224" />
+		</Grid.ColumnDefinitions>
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
 		Background="Transparent"
+		HorizontalContentAlignment="Stretch"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border
@@ -38,9 +45,9 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<!--  220×200 고정. 썸네일은 본문 ②행의 "고정 슬롯(56×56)" — 지연 로드(SYNC_DETECTION) 시
+				<!--  높이 200 고정 · 폭은 맨 위 별 열을 따른다(판 최대 220). 썸네일은 본문 ②행의 "고정 슬롯(56×56)" — 지연 로드(SYNC_DETECTION) 시
 				      슬롯 크기 불변, 이미지 소스만 교체 → 레이아웃 붕괴 없음.  -->
-				<Grid Width="220" Height="200">
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<!--  본문: ①구역·장비(전체폭) + ②사진(고정 슬롯)+결과·신호  -->
@@ -215,8 +222,8 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<!--  뒷면(상세)도 앞면과 동일 크기(220×200) — 플립 시 폭 점프 제거  -->
-				<Grid Width="220" Height="200">
+				<!--  뒷면(상세)도 앞면과 동일 크기(폭은 맨 위 별 열 × 200) — 플립 시 폭 점프 제거  -->
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="3*" />
@@ -344,4 +351,5 @@
 			</Border>
 		</md:Flipper.BackContent>
 	</md:Flipper>
+	</Grid>
 </UserControl>

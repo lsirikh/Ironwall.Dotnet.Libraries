@@ -39,9 +39,61 @@ public partial class EventOverviewView : UserControl
         {
             FinishDrag(_drag.LostCapture());
             UnsubscribeTheme();
-            if (_chart is not null) _chart.UpdateFinished -= OnChartUpdateFinished;
+            if (_chart is not null)
+            {
+                _chart.UpdateFinished -= OnChartUpdateFinished;
+                DetachChartData(_chart);
+            }
         };
     }
+
+    /// <summary>차트가 뷰모델 컬렉션을 관찰하는 속성들 — 셋 다 뷰모델의 <c>ObservableCollection</c> 에 묶여 있다.</summary>
+    private static readonly (DependencyProperty Property, object Empty)[] ChartDataProperties =
+    {
+        (LvcCartesianChart.SeriesProperty, Array.Empty<LiveChartsCore.ISeries>()),
+        (LvcCartesianChart.XAxesProperty, Array.Empty<ICartesianAxis>()),
+        (LvcCartesianChart.YAxesProperty, Array.Empty<ICartesianAxis>()),
+    };
+
+    /// <summary>
+    /// 창에서 떨어질 때 차트를 뷰모델 컬렉션에서 떼어 낸다.
+    /// </summary>
+    /// <remarks>
+    /// LiveCharts2 차트는 Series · XAxes · YAxes 컬렉션의 CollectionChanged 에 <b>강한 참조</b>로 관찰자를 걸고 Unloaded 에도 풀지 않는다.
+    /// 개요 뷰모델은 콘솔과 함께 오래 살아서, 이벤트 창을 닫았다 열 때마다 옛 차트 → 옛 개요 뷰 → 옛 콘솔 뷰 전체가
+    /// 그 관찰자에 붙들려 수거되지 않았다(시험 EventConsoleViewLifetimeTests 로 경로 확인). 축 · 계열도 차트마다의 그림 상태
+    /// (축 구분선 사전 · 계열 점 캐시)를 차트 엔진을 열쇠로 쥐고 있어, 차트가 붙어 있지 않으면 스스로 지우지 않는다.
+    /// 그래서 ① 요소마다 이 차트의 그림 상태를 지우고(<c>RemoveFromUI</c> — 차트가 요소를 뺄 때 스스로 부르는 것과 같다)
+    /// ② 바인딩을 잠시 떼고 빈 값을 넣어 관찰자를 푼다 — 바인딩을 남겨 두면 뷰모델이 축을 다시 만들며 알릴 때(새 창의 테마 적용)
+    /// 떨어진 차트가 컬렉션을 다시 읽어 관찰자를 도로 건다(실측). 다시 붙을 때(<see cref="OnChartLoaded"/>) 떼어 둔 바인딩을 돌려놓는다.
+    /// </remarks>
+    private void DetachChartData(LvcCartesianChart chart)
+    {
+        LiveChartsCore.Chart? core = null;
+        try { core = chart.CoreChart; }
+        catch (Exception ex) when (IsCoreNotReady(ex)) { }
+
+        foreach (var (property, empty) in ChartDataProperties)
+        {
+            if (core is not null && chart.GetValue(property) is System.Collections.IEnumerable current)
+                foreach (var element in current.OfType<LiveChartsCore.Kernel.IChartElement>().ToList()) element.RemoveFromUI(core);
+            if (System.Windows.Data.BindingOperations.GetBindingBase(chart, property) is { } binding)
+            {
+                _detachedChartBindings[property] = binding;
+                System.Windows.Data.BindingOperations.ClearBinding(chart, property);
+            }
+            chart.SetValue(property, empty);
+        }
+    }
+
+    private void ReattachChartData(LvcCartesianChart chart)
+    {
+        foreach (var (property, binding) in _detachedChartBindings) chart.SetBinding(property, binding);
+        _detachedChartBindings.Clear();
+    }
+
+    /// <summary>떨어질 때 떼어 둔 차트 바인딩 — 다시 붙을 때 그대로 돌려놓는다.</summary>
+    private readonly Dictionary<DependencyProperty, System.Windows.Data.BindingBase> _detachedChartBindings = new();
 
     private EventOverviewViewModel? Model => DataContext as EventOverviewViewModel;
 
@@ -95,6 +147,7 @@ public partial class EventOverviewView : UserControl
     {
         if (sender is not LvcCartesianChart chart) return;
         _chart = chart;
+        ReattachChartData(chart);                         // 떨어질 때 비워 둔 컬렉션을 다시 읽는다(처음이면 같은 값이라 변화 없음)
         chart.UpdateFinished -= OnChartUpdateFinished;   // 해제-후-구독(재로드 중복 방지)
         chart.UpdateFinished += OnChartUpdateFinished;
         // 즉시 읽지 않고 한 박자 미룬다 — 이 Loaded 가 차트 자신의 Loaded(코어 생성)보다 먼저 올 수 있다.
