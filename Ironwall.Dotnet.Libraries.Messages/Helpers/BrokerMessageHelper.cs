@@ -68,6 +68,14 @@ public static class BrokerMessageHelper
 
     #region - Publish 생성 (PUB) -
     /// <summary>
+    /// PUB 봉투의 <c>created</c> 표기 — 브로커 명세 v2.0.7 §3 봉투 표 · §6.4 ACTION_REPORT 예시와 같은
+    /// ISO 8601 · 마이크로초 <b>6자리 고정</b> · 오프셋(예 <c>2026-09-12T12:15:34.362348+09:00</c>).
+    /// 종전 <c>yyyy-MM-ddTHH:mm:ss.fffZ</c>(밀리초 · Z)는 서버 발행분과 길이가 달라 고정폭 파서가 깨질 수 있었다(헤디드 r18-e1 EVT-E2E-049).
+    /// </summary>
+    public static string PublishTimestamp(DateTimeOffset at)
+        => at.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffffzzz", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// DTO → BrokerRequest&lt;TDto&gt; 변환 (PUB 전용)
     /// 설계 문서 기준 이벤트 알림 메시지에 사용 (응답 불필요)
     /// REQ와 달리 수신 시스템에서 응답(RSP)을 기대하지 않음
@@ -84,7 +92,7 @@ public static class BrokerMessageHelper
             Command = command,
             From = from,
             Data = dto,
-            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            Timestamp = PublishTimestamp(DateTimeOffset.Now)
         };
     }
     #endregion

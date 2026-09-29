@@ -649,6 +649,34 @@ public class EventConsoleCompletenessTests : IDisposable
         Assert.Equal("조치보고 추가", _console.DetailView.ReportButtonText);
     }
 
+    // ── GAP-C10 (헤디드 r18-e1 EVT-E2E-059): 다른 GIS 가 조치하면 열린 콘솔 행이 다시 조회 없이 '조치됨' 으로 ──
+    //   서버는 조치 뒤 SYNC_DETECTION 을 내지 않는다(EVT-E2E-140 관측) — 원격 ACTION_REPORT 만이 알 길인데
+    //   콘솔은 로컬 보고(Detection/MalfunctionReportedMessageModel)만 받아 행이 '미조치' 로 남았다.
+    [Fact]
+    public async Task should_mark_the_row_reported_when_another_gis_reports_its_event()
+    {
+        await Activate();
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        var row = (DetectionEventViewModel)_console.DetectionPanelViewModel.ViewModelProvider.First();
+        Assert.False(row.IsActionReported);
+
+        await _console.HandleAsync(new Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage(ActionReportKind.Detection, row.Model!.Id), CancellationToken.None);
+
+        Assert.True(row.IsActionReported);
+    }
+
+    [Fact]
+    public async Task should_leave_the_detection_row_when_a_malfunction_with_the_same_id_is_reported_elsewhere()
+    {
+        await Activate();
+        await _console.SelectRailAsync(EventDashboardViewModel.DetectionRailKey);
+        var row = (DetectionEventViewModel)_console.DetectionPanelViewModel.ViewModelProvider.First();
+
+        await _console.HandleAsync(new Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage(ActionReportKind.Malfunction, row.Model!.Id), CancellationToken.None);
+
+        Assert.False(row.IsActionReported);
+    }
+
     private string StatusFieldText()
         => _console.DetailView.Sections.SelectMany(s => s.Fields).First(f => f.Key == "status").Text;
 

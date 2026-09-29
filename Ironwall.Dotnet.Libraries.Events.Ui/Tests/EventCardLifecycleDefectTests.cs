@@ -221,6 +221,36 @@ public class EventCardLifecycleDefectTests : IDisposable
         Assert.Empty(panel.ViewModelProvider);
     }
 
+    // GAP-C4 (헤디드 r18-e1 EVT-E2E-070): 매니저가 같은 이벤트를 봉투 id 만 바꿔 다시 보내면 카드가 두 장 떴다 —
+    //   봉투 id 기억으로는 못 막는다. 목록은 종류 + 서버 번호로 한 장만 둔다.
+    [Fact]
+    public async Task should_keep_one_card_when_the_same_event_is_enqueued_again_after_it_is_listed()
+    {
+        var panel = CreatePanel();
+        var first = Detection(21);
+        panel.EnqueueCard(first);
+        await panel.FlushPendingCardsNowAsync();
+
+        panel.EnqueueCard(Detection(21));                      // 봉투 id 만 다른 재전송
+        await panel.FlushPendingCardsNowAsync();
+
+        Assert.Same(first, Assert.Single(panel.ViewModelProvider));
+    }
+
+    [Fact]
+    public async Task should_keep_one_card_when_the_same_event_arrives_twice_in_one_batch()
+    {
+        var panel = CreatePanel();
+        panel.EnqueueCard(Detection(22));
+        panel.EnqueueCard(Detection(22));
+        panel.EnqueueCard(Malfunction(22));                    // 같은 번호의 다른 종류는 다른 카드다
+
+        await panel.FlushPendingCardsNowAsync();
+
+        Assert.Single(panel.ViewModelProvider.OfType<DetectionEventCardViewModel>());
+        Assert.Single(panel.ViewModelProvider.OfType<MalfunctionEventCardViewModel>());
+    }
+
     [Fact]
     public async Task should_assign_a_pending_entry_only_to_the_card_of_the_same_kind_when_cards_arrive_later()
     {
@@ -499,6 +529,31 @@ public class EventCardLifecycleDefectTests : IDisposable
         Assert.Equal(84, sent.ActionId);
         Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(Newtonsoft.Json.Linq.JToken.Parse(data), Newtonsoft.Json.Linq.JToken.Parse(sent.ServerActionJson!)),
             sent.ServerActionJson);
+    }
+
+    // 헤디드 r18-e1 EVT-E2E-049: 앱이 낸 ACTION_REPORT body 가 GET data 와 글자 단위로 달랐다 — 201 원문을 기본 JToken.Parse
+    //   (DateParseHandling.DateTime)로 읽어 시각 문자열이 DateTime 이 됐다가 다시 쓰이며 마이크로초 끝 0 이 잘렸다(.341750 → .34175).
+    //   위 시험은 양쪽을 다시 JToken.Parse 로 정규화해 비교하므로 이 손실을 못 봤다 — 여기서는 문자열 그대로 본다.
+    [Fact]
+    public async Task should_keep_server_timestamps_character_for_character_when_the_201_data_is_carried()
+    {
+        const string data = """
+        {"id":85,"type_event":"Action","content":"순찰 조치","user":"kim(1234)",
+         "from_event":{"id":3,"category_event":"detection","type_event":"Intrusion","action_reported":true,
+                       "device":{"id":349,"category_device":"sensor"},"created_at":"2026-09-12T12:15:34.312500+09:00","updated_at":"2026-09-12T12:15:34.343100+09:00"},
+         "created_at":"2026-09-12T12:15:34.341750+09:00","updated_at":"2026-09-12T12:15:34.341700+09:00"}
+        """;
+        var handler = new CannedHttpHandler(System.Net.HttpStatusCode.Created, "{\"success\":true,\"message\":\"created\",\"data\":" + data + "}");
+        var setup = new Ironwall.Dotnet.Libraries.Api.Models.ApiSetupModel { Url = "http://127.0.0.1:9/api" };
+        var http = new Ironwall.Dotnet.Libraries.Api.Services.ApiService(_log.Object, setup, handler);
+        http.Initialize();
+        _apiOverride = new EventApiService(_log.Object, http, setup);
+
+        await Detection(3).SendActionDetailed("순찰 조치", "kim(1234)");
+
+        var sent = Assert.Single(_published.OfType<SendActionRequestMessage>()).ServerActionJson!;
+        Assert.Contains("\"created_at\":\"2026-09-12T12:15:34.341750+09:00\"", sent);
+        Assert.Contains("\"created_at\":\"2026-09-12T12:15:34.312500+09:00\"", sent);
     }
 
     #endregion

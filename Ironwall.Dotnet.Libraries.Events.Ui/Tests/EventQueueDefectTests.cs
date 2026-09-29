@@ -120,6 +120,43 @@ public class EventQueueDefectTests
         queue.Verify(q => q.Enqueue(It.IsAny<EventEntry>(), "env-dup-2"), Times.Once);
     }
 
+    // GAP-C4 (헤디드 r18-e1 EVT-E2E-070): 같은 이벤트(종류 + 서버 번호)를 봉투 id 만 바꿔 다시 보내면(매니저 재전송)
+    //   큐 엔트리가 둘이 되어 알람 · 심볼 참조가 두 번 잡히고, 카드와 짝이 안 맞는 엔트리가 남았다(로그: eventId=1971 Enqueue 두 번).
+    [Fact]
+    public async Task should_enqueue_a_detection_once_when_the_same_event_is_resent_with_a_new_envelope_id()
+    {
+        var (handler, queue) = Subscribe((n, s, q) => new DetectionNatsSyncService(null, n, s, q, new Mock<IEventSetupModel>().Object));
+
+        await handler(new MessageArgsModel("sensorway.unit001.all.event.detect", null, DetectEnvelope));
+        await handler(new MessageArgsModel("sensorway.unit001.all.event.detect", null, DetectEnvelope.Replace("env-dup-1", "env-resent-1")));
+
+        queue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.EventId == 41), It.IsAny<string?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_enqueue_a_malfunction_once_when_the_same_event_is_resent_with_a_new_envelope_id()
+    {
+        var (handler, queue) = Subscribe((n, s, q) => new MalfunctionNatsSyncService(null, n, s, q, new Mock<IEventSetupModel>().Object));
+
+        await handler(new MessageArgsModel("sensorway.unit001.all.event.malfunction", null, MalfunctionEnvelope));
+        await handler(new MessageArgsModel("sensorway.unit001.all.event.malfunction", null, MalfunctionEnvelope.Replace("env-dup-2", "env-resent-2")));
+
+        queue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.EventId == 42), It.IsAny<string?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_enqueue_both_when_a_detection_and_a_malfunction_share_the_server_id()
+    {
+        var (dHandler, dQueue) = Subscribe((n, s, q) => new DetectionNatsSyncService(null, n, s, q, new Mock<IEventSetupModel>().Object));
+        var (mHandler, mQueue) = Subscribe((n, s, q) => new MalfunctionNatsSyncService(null, n, s, q, new Mock<IEventSetupModel>().Object));
+
+        await dHandler(new MessageArgsModel("sensorway.unit001.all.event.detect", null, DetectEnvelope.Replace("\"id\":41", "\"id\":42")));
+        await mHandler(new MessageArgsModel("sensorway.unit001.all.event.malfunction", null, MalfunctionEnvelope));
+
+        dQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.EventId == 42), It.IsAny<string?>()), Times.Once);
+        mQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e => e.EventId == 42), It.IsAny<string?>()), Times.Once);
+    }
+
     #endregion
 
     #region - ⑰ 배열 봉투 · ⑱ 캐시 미스 센서 -

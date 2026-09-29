@@ -698,7 +698,13 @@ public class EventApiService : IEventApiService
         try
         {
             var content = await response.Content.ReadAsStringAsync();
-            return Newtonsoft.Json.Linq.JToken.Parse(content) is Newtonsoft.Json.Linq.JObject envelope
+            // 시각 문자열을 DateTime 으로 바꾸지 않는다 — 기본 파싱(DateParseHandling.DateTime)은 다시 쓸 때 마이크로초 끝 0 을 잘라
+            //   ACTION_REPORT body 가 서버 data 와 글자 단위로 달라졌다(.341750 → .34175, 헤디드 r18-e1 EVT-E2E-049). 원문은 원문대로.
+            using var reader = new Newtonsoft.Json.JsonTextReader(new System.IO.StringReader(content))
+            {
+                DateParseHandling = Newtonsoft.Json.DateParseHandling.None,
+            };
+            return Newtonsoft.Json.Linq.JToken.ReadFrom(reader) is Newtonsoft.Json.Linq.JObject envelope
                    && envelope["data"] is Newtonsoft.Json.Linq.JObject data ? data : null;
         }
         catch (Exception ex)

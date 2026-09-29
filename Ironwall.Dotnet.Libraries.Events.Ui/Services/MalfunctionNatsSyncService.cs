@@ -134,6 +134,12 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
                 _log?.Info($"MALFUNCTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
                 return Task.CompletedTask;
             }
+            // 같은 이벤트(서버 번호)를 봉투 id 만 바꿔 다시 보내도(매니저 재전송) 큐에 한 번 — 봉투 기억으로는 못 막는다(GAP-C4).
+            if (eventId > 0 && !_recentEvents.TryAdd($"malfunction:{eventId}"))
+            {
+                _log?.Info($"MALFUNCTION 같은 이벤트를 새 봉투로 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                return Task.CompletedTask;
+            }
 
             var entryId = _eventQueueManager.Enqueue(new EventEntry
             {
@@ -188,5 +194,6 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
     private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 제어기→센서→그룹 토폴로지(GMap_Controller_Blackout)
     private readonly RecentEnvelopeFilter _recentEnvelopes = new();   // 같은 봉투 두 번 → 큐 한 번(WP-1 ⑦)
+    private readonly RecentEnvelopeFilter _recentEvents = new();      // 같은 이벤트 새 봉투 → 큐 한 번(GAP-C4)
     #endregion
 }

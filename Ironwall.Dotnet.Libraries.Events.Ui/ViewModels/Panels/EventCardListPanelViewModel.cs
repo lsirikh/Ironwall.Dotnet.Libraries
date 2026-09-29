@@ -318,6 +318,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             card.Dispose();
                             continue;
                         }
+                        // (GAP-C4) 같은 이벤트(종류 + 서버 번호)는 한 장 — 매니저가 봉투 id 만 바꿔 다시 보내면 호스트의 봉투 기억을 지나
+                        //   두 번째 카드가 떴다(헤디드 r18-e1 EVT-E2E-070). 목록에 이미 있거나 이 묶음에 먼저 든 카드가 있으면 버린다.
+                        if (KeyOf(card) is { } key
+                            && (FindCard(key.Kind, key.EventId) is not null || inserted.Any(c => KeyOf(c) == key)))
+                        {
+                            _log?.Info($"[EnqueueCard] 같은 이벤트 카드가 이미 있어 올리지 않음(재전송): {key}");
+                            card.Dispose();
+                            continue;
+                        }
                         inserted.Add(card);
                     }
                     if (inserted.Count == 0) return;

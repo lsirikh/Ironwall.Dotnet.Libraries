@@ -50,6 +50,7 @@ public class EventDashboardViewModel : BasePanelViewModel
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel>
                                      , IHandle<CallCloseEventConsoleMessageModel>
                                      , IHandle<ActionReportTemplatesChangedMessage>
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage>
 {
     public const string ConsoleKey = "Events";
 
@@ -1444,6 +1445,26 @@ public class EventDashboardViewModel : BasePanelViewModel
     public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel message, CancellationToken cancellationToken)
     {
         OnReported(message.ViewModel?.Model?.Id, ActionTrayDrop.KindMalfunction);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 다른 GIS · 운영자가 조치했다(원격 ACTION_REPORT — 카드 목록이 알린다). 서버는 조치 뒤 SYNC_DETECTION 을 내지 않으므로
+    /// 이 알림이 콘솔이 아는 유일한 길이다 — 목록에 그 행이 있으면 '조치됨' 으로 두고 로컬 보고와 같은 길로 다시 그린다
+    /// (GAP-C10, 헤디드 r18-e1 EVT-E2E-059: 행이 다시 조회 전까지 '미조치' 로 남았다). 행 모델의 상태만 바꾼다 — 서버 값의 거울이다.
+    /// </summary>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage message, CancellationToken cancellationToken)
+    {
+        if (message is null || message.EventId <= 0) return Task.CompletedTask;
+        var kind = message.Kind == ActionTrayDrop.KindMalfunction ? ActionTrayDrop.KindMalfunction
+                 : message.Kind == ActionTrayDrop.KindDetection ? ActionTrayDrop.KindDetection
+                 : null;
+        if (kind is null) return Task.CompletedTask;
+
+        var candidate = new ActionTrayCandidate(message.EventId, kind, string.Empty, true);
+        if (FindOriginModel(candidate) is not { } model) return Task.CompletedTask;   // 이 목록에 없는 이벤트
+        model.Status = Ironwall.Dotnet.Libraries.Enums.EnumTrueFalse.True;
+        OnReported(message.EventId, kind);
         return Task.CompletedTask;
     }
 
