@@ -212,6 +212,18 @@ public sealed record UnitTopologyChangedMessage(string Action, int ResourceId);
 /// </remarks>
 public sealed record ActionReportTemplatesChangedMessage(string Action, int ResourceId);
 
+/// <summary>
+/// 이벤트 맵핑이 <b>다른 곳에서</b> 바뀌었다 — 서버 NATS <c>SYNC_EVENT_MAPPING</c>(<c>{action, resource_id}</c>, 브로커 §9.6)을 호스트가 옮긴다.
+/// </summary>
+/// <param name="Action">서버가 보낸 <c>body.action</c> 원문 — <c>CREATED</c> · <c>UPDATED</c> · <c>DELETED</c>.</param>
+/// <param name="ResourceId">서버가 보낸 <c>body.resource_id</c>(맵핑 id) 원문 — 로그 · 진단용.</param>
+/// <remarks>
+/// <para>GIS 안에서 서버 맵핑을 들고 있는 곳은 <b>이벤트 맵핑 워크벤치 창뿐</b>이다(열 때 읽는다). RTSP 이벤트 호출 판단은
+/// 서버 맵핑이 아니라 로컬 게이트웨이 표(<c>GatewayEventProvider</c>)를 쓴다 — 이 알림과 무관하다.</para>
+/// <para>받는 쪽은 목록을 통째로 다시 읽고, 몰려오는 알림은 짧은 창(약 500 ms)으로 합친다. 적용하지 않은 편집은 덮지 않는다.</para>
+/// </remarks>
+public sealed record EventMappingsChangedMessage(string Action, int ResourceId);
+
 /// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
 public record WebServerEnabledChangedMessage(bool IsEnabled);
 

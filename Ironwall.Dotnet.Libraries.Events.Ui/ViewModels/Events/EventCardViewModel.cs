@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
@@ -144,6 +145,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         {
             get
             {
+                // 장비가 지워진 이벤트(v7.0+ device: null) — 빈 줄 대신 서버 스냅샷 이름을 보인다.
+                if (Device is null)
+                    return EventDeviceSnapshot.ShortLabel(null, _model) ?? DELETED_DEVICE_TEXT;
+
                 var group = DeviceGroupsText;
                 var type = DeviceTypeName ?? string.Empty;
                 var num = Device?.DeviceNumber is int n and > 0 ? n.ToString() : string.Empty;
@@ -154,6 +159,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         }
         #endregion
         #region - Attributes -
+        /// <summary>장비가 지워졌고 서버 스냅샷도 없을 때의 카드 1행.</summary>
+        public const string DELETED_DEVICE_TEXT = "삭제된 장비";
         protected readonly T _model;
         #endregion
     }

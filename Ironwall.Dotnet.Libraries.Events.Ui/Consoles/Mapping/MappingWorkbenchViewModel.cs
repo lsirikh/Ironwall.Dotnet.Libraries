@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
 using System;
 using System.Collections.Generic;
@@ -30,10 +31,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 서버로 나가는 것은 [적용] 한 번뿐이다. 서버에 재정렬 API 가 없어서
 /// 드롭마다 보내면 20행 재배치가 20회 PATCH 가 되고 API 타임아웃이 곱해진다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler
+public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>
 {
     /// <summary>콘솔 키 — 자동화 식별자와 설정 저장의 접두사.</summary>
     public const string ConsoleKeyName = "Mapping";
+
+    /// <summary>다른 곳에서 맵핑이 바뀌었는데 적용하지 않은 편집이 있어 다시 읽지 않았을 때의 상태줄.</summary>
+    public const string EXTERNAL_CHANGE_NOTICE = "다른 곳에서 맵핑이 바뀌었습니다 — 적용하거나 되돌린 뒤 [다시 읽기]를 누르세요.";
 
     /// <summary>권한 모듈 — v8.0 에서 <c>events</c> 가 아니라 <c>integrations</c> 다.</summary>
     public const string PermissionModule = "integrations";
@@ -57,18 +61,31 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     private bool _isBusy;
     private bool _isApplying;
 
+    private readonly IEventAggregator? _events;
+    private readonly CoalescingTrigger _externalChange;
+    private Task _externalChangeTask = Task.CompletedTask;
+    private bool _loadedOnce;
+    private bool _closed;
+
     /// <summary>생성자.</summary>
     /// <param name="gateway">서버 왕복.</param>
     /// <param name="devices">장비 캐시(팔레트·이름 조인).</param>
     /// <param name="permissions">권한. <c>null</c> 이면 편집 가능으로 본다(미리보기·시험용).</param>
+    /// <param name="events">있으면 창이 떠 있는 동안 <see cref="EventMappingsChangedMessage"/>(서버 <c>SYNC_EVENT_MAPPING</c>)를 듣는다.</param>
+    /// <param name="delay">알림 합치기 창의 지연(시험용). 생략하면 <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     public MappingWorkbenchViewModel(
         IMappingWorkbenchGateway gateway,
         IMappingDeviceSource devices,
-        IPermissionService? permissions = null)
+        IPermissionService? permissions = null,
+        IEventAggregator? events = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _gateway = gateway;
         _devices = devices;
         _permissions = permissions;
+        _events = events;
+        // 맵핑 저장 한 번이 알림을 여러 건 낼 수 있다(부모 + 하위 카메라 · 스피커 · 경광등) — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
+        _externalChange = new CoalescingTrigger(OnExternalChangeSettledAsync, delay: delay);
 
         DisplayName = "이벤트 맵핑";
         Detail = new ConsoleDetailPresenter { TypeName = "이벤트 맵핑" };
@@ -299,6 +316,8 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         if (_permissions is not null) _permissions.PermissionsChanged += OnPermissionsChanged;
         OnPermissionsChanged();     // ★ 1회 직접 호출 — 빠뜨리면 첫 진입 버튼이 권한과 무관하게 살아 있다
         Detail.Guard.Blocked += OnNavigationBlocked;
+        _closed = false;
+        _events?.SubscribeOnUIThread(this);   // 합치기 창의 실행이 UI 스레드로 돌아오게(목록 · 보드 컬렉션을 고친다)
 
         await ReloadAsync();
         await base.OnActivateAsync(cancellationToken);
@@ -309,10 +328,51 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     {
         if (_permissions is not null) _permissions.PermissionsChanged -= OnPermissionsChanged;
         Detail.Guard.Blocked -= OnNavigationBlocked;
+        if (close)
+        {
+            _closed = true;
+            _events?.Unsubscribe(this);
+            _externalChange.Cancel();
+        }
         _loadToken?.Cancel();
         _loadToken = null;
         Detail.Reset();
         return base.OnDeactivateAsync(close, cancellationToken);
+    }
+
+    /// <summary>
+    /// 서버 <c>SYNC_EVENT_MAPPING</c> — 호스트가 옮겨 온다. 신호만 세고 곧바로 돌아간다(호스트의 NATS 처리 줄이 재조회를 기다리지 않도록).
+    /// </summary>
+    /// <remarks><c>ResourceId</c> 로 한 건만 읽지 않는다 — 늘 목록 전체를 다시 읽는다(알림 순서 · 건수에 기대지 않는다).</remarks>
+    public Task HandleAsync(EventMappingsChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (_closed) return Task.CompletedTask;
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
+    internal Task ExternalChangeTask => _externalChangeTask;
+
+    private async Task OnExternalChangeSettledAsync(CancellationToken token)
+    {
+        if (_closed || !_loadedOnce) return;
+
+        // 불러오는 중 · 적용 중이면 창을 한 번 더 미룬다.
+        if (IsBusy || IsApplying)
+        {
+            _externalChangeTask = _externalChange.Pulse();
+            return;
+        }
+
+        // 사람이 손댄 것은 덮지 않는다 — 알리기만 하고 [다시 읽기]는 사람이 고른다(부대 편제 콘솔과 같은 규칙).
+        if (_board.IsDirty || Detail.IsDirty)
+        {
+            StatusText = EXTERNAL_CHANGE_NOTICE;
+            return;
+        }
+
+        await ReloadAsync();
     }
 
     /// <inheritdoc/>
@@ -367,6 +427,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             }
 
             _listLoadFailed = false;
+            _loadedOnce = true;
             _allMappings.Clear();
             _allMappings.AddRange(result.Value ?? Array.Empty<EventMappingReadDto>());
             RebuildMappingList();

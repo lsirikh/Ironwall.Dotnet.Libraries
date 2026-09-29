@@ -199,4 +199,119 @@ public class MalfunctionNatsSyncServiceTests
             It.IsAny<string?>()),
             Times.Once);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // v7.0+ 본문 — 장비는 참조 {id, category_device}, 그룹 없음, action_reported 는 bool
+    // (브로커 명세 v2.0.7 §6.2). 종전엔 type_device 만 읽어 모든 장애가 "DeviceType 파싱 실패" 로 버려졌다.
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>명세 §6.2 Publish Body 그대로(device · reason 만 바꿔 끼울 수 있다).</summary>
+    private static MessageArgsModel V7Malfunction(string deviceJson = """{ "id": 346, "category_device": "controller" }""", string reason = "FAULT_CONTROLLER")
+        => new(subject: "sensorway.unit001.all.event.malfunction", subscriptionSubject: null, data: $$"""
+        {
+          "id": "c7b1e4d2-3a55-4f0b-9e77-8d1c2b6f4a30",
+          "m_type": "PUB",
+          "cmd": "MALFUNCTION",
+          "from": "PidsProxy",
+          "body": {
+            "id": 358,
+            "category_event": "malfunction",
+            "type_event": "Fault",
+            "action_reported": false,
+            "reason": "{{reason}}",
+            "device": {{deviceJson}},
+            "device_description": "[controller:Controller] GOP-CTRL-01 (number: 1, id: 346)",
+            "detail": {
+              "first_end": 15,
+              "second_end": 25,
+              "first_start": 10,
+              "second_start": 20
+            },
+            "created_at": "2026-09-12T12:14:30.494175+09:00",
+            "updated_at": "2026-09-12T12:14:30.494176+09:00"
+          },
+          "created": "2026-09-12T12:14:30.511308+09:00"
+        }
+        """);
+
+    private MalfunctionNatsSyncService CreateServiceWithDevices(
+        Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider devices,
+        out Mock<IEventQueueManager> mockQueue)
+    {
+        var mockNats = new Mock<INatsService>();
+        mockQueue = new Mock<IEventQueueManager>();
+        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<MessageArgsModel, Task>>())
+                .Callback<Func<MessageArgsModel, Task>>(h => _capturedHandler = h);
+        mockQueue.Setup(q => q.Enqueue(It.IsAny<EventEntry>(), It.IsAny<string?>())).Returns("test-entry-id");
+        return new MalfunctionNatsSyncService(
+            null, mockNats.Object, new Mock<ISymbolEventManager>().Object, mockQueue.Object,
+            BuildSetup(malfunctionOn: true, malfunctionSec: 30), _mockEa.Object, deviceProvider: devices);
+    }
+
+    [Fact]
+    public async Task should_enqueue_controller_blackout_with_cached_groups_when_v7_reference_device_arrives()
+    {
+        // Arrange — 제어기 346(자기 그룹 7) 아래 센서 349(그룹 2, 5). 무통신이면 센서 그룹까지 검게.
+        var devices = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
+        var controller = new Ironwall.Dotnet.Monitoring.Models.Devices.ControllerDeviceModel
+        {
+            Id = 346, DeviceType = EnumDeviceType.Controller, CategoryDevice = EnumDeviceCategory.Controller, DeviceGroups = new List<int> { 7 }
+        };
+        devices.Add(controller);
+        devices.Add(new Ironwall.Dotnet.Monitoring.Models.Devices.SensorDeviceModel
+        {
+            Id = 349, DeviceType = EnumDeviceType.Fence, Controller = controller, DeviceGroups = new List<int> { 2, 5 }
+        });
+        var service = CreateServiceWithDevices(devices, out var mockQueue);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(V7Malfunction());
+
+        // Assert
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e =>
+            e.DeviceId == 346 &&
+            e.DeviceType == EnumDeviceType.Controller &&
+            e.EventType == EnumEventType.Fault &&
+            e.EventId == 358 &&
+            e.IsControllerBlackout &&
+            e.GroupIds != null && e.GroupIds.OrderBy(g => g).SequenceEqual(new[] { 2, 5, 7 })),
+            "c7b1e4d2-3a55-4f0b-9e77-8d1c2b6f4a30"), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_enqueue_sensor_fault_with_cached_type_and_groups_when_v7_reference_device_arrives()
+    {
+        // Arrange
+        var devices = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
+        devices.Add(new Ironwall.Dotnet.Monitoring.Models.Devices.SensorDeviceModel
+        {
+            Id = 349, DeviceType = EnumDeviceType.Fence, CategoryDevice = EnumDeviceCategory.Sensor, DeviceGroups = new List<int> { 2 }
+        });
+        var service = CreateServiceWithDevices(devices, out var mockQueue);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(V7Malfunction("""{ "id": 349, "category_device": "sensor" }""", reason: "FAULT_FENCE"));
+
+        // Assert
+        mockQueue.Verify(q => q.Enqueue(It.Is<EventEntry>(e =>
+            e.DeviceId == 349 && e.DeviceType == EnumDeviceType.Fence && !e.IsControllerBlackout &&
+            e.GroupIds != null && e.GroupIds.SequenceEqual(new[] { 2 })),
+            It.IsAny<string?>()), Times.Once);
+        _mockEa.Verify(ea => ea.PublishAsync(
+            It.Is<EventEntryEnqueuedMessage>(m => m.EventId == 358 && m.DeviceType == EnumDeviceType.Fence),
+            It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_not_enqueue_when_v7_malfunction_device_is_null_because_it_was_deleted()
+    {
+        var service = CreateServiceWithDevices(new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider(), out var mockQueue);
+        await service.StartService();
+
+        await _capturedHandler!(V7Malfunction("null"));
+
+        mockQueue.Verify(q => q.Enqueue(It.IsAny<EventEntry>(), It.IsAny<string?>()), Times.Never);
+    }
 }

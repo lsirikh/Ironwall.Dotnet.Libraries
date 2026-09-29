@@ -103,17 +103,17 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
                 return Task.CompletedTask;
             }
 
-            // device.device_groups → List<int> 변환
-            List<int>? deviceGroups = body.Device?.DeviceGroups?
-                .Where(g => g.Id > 0)
-                .Select(g => g.Id)
-                .ToList();
-
-            // 실제 DeviceType을 NATS 메시지 body에서 파싱 (하드코딩 금지)
-            var deviceTypeStr = body.Device?.TypeDevice ?? string.Empty;
-            if (!Enum.TryParse<EnumDeviceType>(deviceTypeStr, ignoreCase: true, out var deviceType))
+            // 장비가 지워졌으면 device: null(브로커 §6.1) — 깜빡일 심볼도 큐 키도 없다. 카드는 호스트가 스냅샷으로 띄운다.
+            if (body.Device is null && deviceId <= 0)
             {
-                _log?.Error($"DETECTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}) — 이벤트 무시");
+                _log?.Info($"DETECTION: 장비 없음(삭제된 장비) — 심볼 · 큐 건너뜀 (eventId={eventId})");
+                return Task.CompletedTask;
+            }
+
+            // 종류 · 그룹 — v7.0+ 는 장비 참조 {id, category_device} 뿐이라 캐시에서 읽는다(옛 전문은 본문이 이긴다).
+            if (!NatsEventDeviceResolver.TryResolve(body.Device, deviceId, _deviceProvider, out var deviceType, out var deviceGroups))
+            {
+                _log?.Error($"DETECTION: 장비 종류를 정하지 못함 (deviceId={deviceId}, category_device='{body.Device?.CategoryDevice}', type_device='{body.Device?.TypeDevice}', 캐시 미스) — 이벤트 무시");
                 return Task.CompletedTask;
             }
 

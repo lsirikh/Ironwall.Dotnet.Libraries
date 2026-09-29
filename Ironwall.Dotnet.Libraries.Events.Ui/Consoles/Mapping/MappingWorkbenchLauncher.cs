@@ -44,15 +44,18 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
     private readonly IPermissionService? _permissions;
     private readonly IServerContractProbe? _probe;
     private readonly ILogService? _log;
+    private readonly IEventAggregator? _events;
 
     /// <summary>생성자.</summary>
+    /// <param name="events">있으면 열린 창이 서버 <c>SYNC_EVENT_MAPPING</c>(<see cref="Ironwall.Dotnet.Libraries.ViewModel.Models.EventMappingsChangedMessage"/>)으로 목록을 다시 읽는다.</param>
     public MappingWorkbenchLauncher(
         IWindowManager windows,
         IMappingWorkbenchGateway gateway,
         IMappingDeviceSource devices,
         IPermissionService? permissions = null,
         IServerContractProbe? probe = null,
-        ILogService? log = null)
+        ILogService? log = null,
+        IEventAggregator? events = null)
     {
         _windows = windows;
         _gateway = gateway;
@@ -60,6 +63,7 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         _permissions = permissions;
         _probe = probe;
         _log = log;
+        _events = events;
     }
 
     /// <inheritdoc/>
@@ -83,7 +87,7 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         if (!IsAvailable) return;
         try
         {
-            var model = new MappingWorkbenchViewModel(_gateway, _devices, _permissions);
+            var model = new MappingWorkbenchViewModel(_gateway, _devices, _permissions, _events);
             await _windows.ShowDialogAsync(model, null, WindowSettings());
         }
         catch (Exception ex)

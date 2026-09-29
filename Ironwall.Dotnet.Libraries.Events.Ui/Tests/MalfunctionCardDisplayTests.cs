@@ -164,4 +164,39 @@ public class MalfunctionCardDisplayTests : IDisposable
         Assert.Equal(0, model.SecondStart);
         Assert.Equal(0, model.SecondEnd);
     }
+
+    /// <summary>
+    /// v7.0+ 본문에서 장비가 지워진 이벤트는 <c>device: null</c> + <c>device_description</c> 스냅샷만 온다(브로커 §6.1 · §6.2).
+    /// 호스트가 이 카드를 버리지 않게 되면 카드 1행이 비지 않고 "삭제된 장비 (이름)" 을 보여야 한다.
+    /// </summary>
+    [Fact]
+    public void should_show_deleted_device_label_when_card_device_is_null()
+    {
+        var dto = new MalfunctionEventDto
+        {
+            Id = 358,
+            CreatedAt = "2026-09-12T12:14:30.494175+09:00",
+            TypeEvent = "Fault",
+            ActionReported = "false",
+            Reason = "FAULT_CONTROLLER",
+            Device = null,
+            DeviceDescription = "[controller:Controller] GOP-CTRL-01 (number: 1, id: 346)"
+        };
+
+        var card = new MalfunctionEventCardViewModel(dto.ToMalfunctionEventModel(_deviceProvider));
+
+        Assert.Null(card.Device);
+        Assert.Equal("삭제된 장비 (GOP-CTRL-01)", card.ZoneDeviceText);
+    }
+
+    [Fact]
+    public void should_show_deleted_device_when_card_device_is_null_and_no_snapshot()
+    {
+        var card = new DetectionEventCardViewModel(new DetectionEventModel
+        {
+            Id = 357, MessageType = EnumEventType.Intrusion, DateTime = DateTime.Now, Device = null
+        });
+
+        Assert.Equal("삭제된 장비", card.ZoneDeviceText);
+    }
 }
