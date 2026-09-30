@@ -14,6 +14,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -159,6 +160,40 @@ public class WiringFenceEditorViewTests
 
         _out.WriteLine($"스냅숏: {result}");
         Assert.True(File.Exists(result));
+    }
+
+    [Fact]
+    public void should_list_every_changed_number_before_and_after_with_the_warning_in_the_save_dialog()
+    {
+        var result = OnSta(() =>
+        {
+            _ = Application.Current;
+            var changes = new[] { new NumberChange(105, "북측 5구간", 105, 5), new NumberChange(106, "북측 6구간", 106, 6) };
+            var vm = new WiringNumberChangesViewModel("구성 저장", changes, WiringViewModel.NUMBER_WARNING, "저장할 센서 2대");
+            var view = new WiringNumberChangesView { DataContext = vm };
+            var window = new Window
+            {
+                Content = view, Width = 640, Height = 620, WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
+            };
+            window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
+            window.Show();
+            Pump();
+            try
+            {
+                var table = Find<ItemsControl>(view, "Devices.Wiring.NumberChanges.Table");
+                var warning = Find<TextBlock>(view, "Devices.Wiring.NumberChanges.Warning");
+                var rows = Descendants<TextBlock>(table).Select(t => new TextRange(t.ContentStart, t.ContentEnd).Text).Where(t => t.Contains('→')).ToList();
+                return (Count: table.Items.Count, Rows: rows, Warning: new TextRange(warning.ContentStart, warning.ContentEnd).Text,
+                        Heading: Find<TextBlock>(view, "Devices.Wiring.NumberChanges.Heading").Text);
+            }
+            finally { window.Close(); }
+        });
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(new[] { "105 → 5", "106 → 6" }, result.Rows);
+        Assert.Contains("현장 센서의 번호 설정과 같아야 합니다", result.Warning);
+        Assert.Equal("바뀌는 번호 2대", result.Heading);
     }
 
     #region - Whole wiring window XAML (loose parse) -

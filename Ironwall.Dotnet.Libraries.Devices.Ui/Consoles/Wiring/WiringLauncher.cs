@@ -8,10 +8,13 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -41,7 +44,15 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     private readonly ICatalogService? _catalog;
     private readonly ILogService? _log;
     private readonly IEventAggregator? _eventAggregator;
+    private readonly Lazy<IFenceLayoutStore>? _fenceStore;
 
+    /// <summary>펜스 구성을 불러올 때 기다리는 한도 — 로컬 DB 가 늦어도 창은 곧 열린다(없으면 제안 구성).</summary>
+    public static readonly TimeSpan FENCE_LOAD_TIMEOUT = TimeSpan.FromSeconds(3);
+
+    /// <param name="fenceStore">
+    /// 펜스 구성 로컬 저장소(fence-wiring-editor FR-11 · FR-16) — <c>GMaps.Db</c> 모듈이 등록하면 Autofac 이 채운다(선택 인자).
+    /// 없거나 만들다 실패하면 로컬 저장 칸만 숨고 창은 그대로 열린다(조립기 선례 · Lazy).
+    /// </param>
     public WiringLauncher(IWindowManager windows,
                           IDeviceApiService api,
                           IDeviceProviderService providerService,
@@ -50,7 +61,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                           DeviceGroupProvider? groups = null,
                           ICatalogService? catalog = null,
                           ILogService? log = null,
-                          IEventAggregator? eventAggregator = null)
+                          IEventAggregator? eventAggregator = null,
+                          Lazy<IFenceLayoutStore>? fenceStore = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _api = api ?? throw new ArgumentNullException(nameof(api));
@@ -61,6 +73,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         _catalog = catalog;
         _log = log;
         _eventAggregator = eventAggregator;
+        _fenceStore = fenceStore;
     }
 
     public bool IsAvailable => _policy.IsAxisContract;
@@ -75,7 +88,10 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var types = SensorTypeCodes(seeds);
 
         var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy, _eventAggregator);
-        var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor());
+        var store = ResolveFenceStore();
+        var document = store is null ? null : await LoadFenceLayoutAsync(store, controller.Id);
+        var fence = new WiringFenceContext(document, store, new IcmpPingProbe());
+        var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor(), fence);
 
         var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
         return SavedAnything(closedWith, vm);
@@ -86,6 +102,42 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     /// 대화 결과만 보던 종전에는 저장에 성공해도 콘솔이 다시 읽지 않고 "센서 · 결선을 저장했습니다." 도 뜨지 않았다.
     /// </summary>
     internal static bool SavedAnything(bool? closedWith, WiringViewModel vm) => closedWith == true || vm.HasSaved;
+
+    #region - Fence layout (fence-wiring-editor FR-11 · FR-16) -
+    /// <summary>로컬 저장소를 꺼낸다 — 등록이 없거나 만들다 실패하면 <c>null</c>(로그 한 줄 · 창은 연다).</summary>
+    private IFenceLayoutStore? ResolveFenceStore()
+    {
+        if (_fenceStore is null) return null;
+        try { return _fenceStore.Value; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 펜스 구성 저장소를 쓸 수 없습니다 — 로컬 저장 없이 엽니다: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>제어기의 펜스 구성 — <see cref="FENCE_LOAD_TIMEOUT"/> 안에 오지 않거나 실패하면 <c>null</c>(제안 구성으로 연다).</summary>
+    internal async Task<FenceLayoutDocument?> LoadFenceLayoutAsync(IFenceLayoutStore store, int controllerId)
+    {
+        using var cts = new CancellationTokenSource(FENCE_LOAD_TIMEOUT);
+        try
+        {
+            var load = store.LoadAsync(controllerId, cts.Token);
+            var done = await Task.WhenAny(load, Task.Delay(FENCE_LOAD_TIMEOUT)).ConfigureAwait(true);
+            if (done != load)
+            {
+                _log?.Warning($"[Wiring] 제어기 {controllerId} 펜스 구성을 {FENCE_LOAD_TIMEOUT.TotalSeconds:0}초 안에 읽지 못했습니다 — 제안 구성으로 엽니다.");
+                return null;
+            }
+            return await load.ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 제어기 {controllerId} 펜스 구성 불러오기 실패 — 제안 구성으로 엽니다: {ex.Message}");
+            return null;
+        }
+    }
+    #endregion
 
     #region - Seeds -
     /// <summary>제어기에 달린 센서를 프로바이더 캐시에서 모은다 — 결선맵은 캐시만으로 그린다(WS L476).</summary>
@@ -132,19 +184,31 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         foreach (var sensor in sensors)
         {
             var spec = sensor.Axes?.HardwareSpec?.Spec;
+            var connection = sensor.Axes?.Connection;
             seeds.Add(new WiringSensorSeed(
                 sensor.Id,
-                sensor.Axes?.Connection?.Channel,
+                connection?.Channel,
                 new SensorFacts(sensor.DeviceNumber, sensor.DeviceName ?? string.Empty, TypeTextOf(sensor), sensor.Location ?? string.Empty),
                 WiringSpec.Read(spec),
                 WiringSpec.Validate(spec),
                 sensor.DeviceGroups?.ToList(),
-                WiringSpec.ReadShape(spec)));
+                WiringSpec.ReadShape(spec),
+                // 접속 축(FR-15) · 센서 링크 상태(FR-14 — 매니저가 NETWORK_INTERFACE 부품 health 를 보고하면)
+                connection?.Type,
+                connection?.IpAddress,
+                LinkHealthOf(sensor)));
         }
         return seeds;
     }
 
     private static int ControllerIdOf(ISensorDeviceModel sensor) => sensor.Controller?.Id ?? 0;
+
+    /// <summary>센서 링크 상태 — 부품 <c>NETWORK_INTERFACE</c> 의 health(없으면 <c>null</c> = 모름).</summary>
+    private static string? LinkHealthOf(IBaseDeviceModel sensor)
+    {
+        try { return sensor.Axes?.FindStatusByType(SignalMath.NETWORK_COMPONENT)?.Health; }
+        catch (Exception) { return null; }
+    }
 
     private static string TypeTextOf(IBaseDeviceModel sensor)
         => !string.IsNullOrWhiteSpace(sensor.TypeAxisCode) ? sensor.TypeAxisCode!
@@ -183,6 +247,14 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     #endregion
 
     #region - IWiringDialogs -
+    /// <summary>저장 전 바뀌는 번호 표(FR-11) — 표 창으로 보인다.</summary>
+    public async Task<bool> ConfirmNumberChangesAsync(string title, IReadOnlyList<NumberChange> changes, string warning, string details)
+    {
+        var vm = new WiringNumberChangesViewModel(title, changes, warning, details);
+        await _windows.ShowDialogAsync(vm, null, WindowSettings(DialogSizeRules.WindowWidth(DialogSize.Medium), 620, resizable: true));
+        return vm.Result;
+    }
+
     public async Task<bool> ConfirmAsync(string title, string message)
     {
         var vm = new WiringPromptViewModel(title, message);
