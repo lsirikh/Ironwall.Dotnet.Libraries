@@ -25,6 +25,9 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzFocusMath.cs" />
     <!-- PTZ 속도 스케일(CameraPopup_PTZ_Responsiveness_Speed FR-PTR-02) -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzVelocityMath.cs" />
+    <!-- PTZ 정지 우선 게이트 · 이동 안전 제한(camera-popup-modes FR-22) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzCommandGate.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzMotionPolicy.cs" />
     <!-- Tracking 달력/세션 분할 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\DateRangeCalendar.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackSessionSplitter.cs" />

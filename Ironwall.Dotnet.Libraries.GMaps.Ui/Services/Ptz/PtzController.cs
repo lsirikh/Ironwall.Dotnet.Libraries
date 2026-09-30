@@ -26,8 +26,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 /// <see cref="IPtzController"/> 구현. cameraId별 ONVIF 자원(PtzClient·profileToken·GetNode space)을
 /// 캐시·직렬화한다. PRD FR-PTZCTL-01~03 / FR-WRAP-01 / NFR-THREAD-01.
 ///
-/// 스레드 안전(I-05): 카메라 맵=ConcurrentDictionary, 카메라별 SemaphoreSlim(1,1)로 PtzClient 직렬 호출
+/// 스레드 안전(I-05): 카메라 맵=ConcurrentDictionary, 카메라별 <see cref="PtzCommandGate"/>로 PtzClient 직렬 호출
 /// (동일 인스턴스 병렬 호출 금지). 다른 cameraId는 병렬. 모든 ONVIF 호출은 ConfigureAwait(false).
+/// 정지 우선(camera-popup-modes FR-22): 정지는 대기 중 이동을 취소하고 대기열 맨 앞에 선다. 연속 이동은 안전 제한
+/// <see cref="PtzMotionPolicy.MoveTimeout"/>(2초)로 보내고, 누르는 동안 <see cref="PtzMotionPolicy.KeepAliveInterval"/>마다 재전송한다.
 /// 변환/클램프는 카메라 GetNode space(XRange/YRange) 진실원 — 고정 ±1.0 금지(NFR-SAFE-01).
 /// </summary>
 public sealed class PtzController : IPtzController
@@ -51,8 +53,10 @@ public sealed class PtzController : IPtzController
         public SpaceInfo? Spaces;
         public string? VsToken;            // 영상 옵션(Imaging)용 VideoSourceToken
         public bool ImagingPossible;       // IsImagingPossible + ImagingClient + VsToken
-        public readonly SemaphoreSlim Gate = new(1, 1);
+        public readonly PtzCommandGate Gate = new();   // 정지 우선 직렬 게이트(FR-22) — WaitAsync/Release 모양은 SemaphoreSlim 과 같다
         public volatile bool Busy;
+        // 누르는 동안 연속 이동 유지 재전송(FR-22 PT2S). 새 이동 · 정지 · 위치 명령 · Release 가 취소한다.
+        public CancellationTokenSource? KeepAlive;
         // 연속 포커스(ContinuousFocus) 속도 범위 캐시 — GetMoveOptions 1회 조회(FR-PH-10 클램프 진실원). null=미조회/미지원→폴백.
         public bool FocusOptLoaded;
         public double? FocusSpeedMin;
@@ -141,6 +145,7 @@ public sealed class PtzController : IPtzController
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasRel: true } sp || ctx.Model?.PtzClient == null)
             return false;
 
+        CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
         var (pan, tilt) = PtzCoordinateMath.PixelDeltaToRelative(
             dx, dy, imageW, imageH, sp.RelXMin, sp.RelXMax, sp.RelYMin, sp.RelYMax, sensitivity);
 
@@ -162,10 +167,12 @@ public sealed class PtzController : IPtzController
     public async Task<bool> ContinuousMoveAsync(int cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        CancelKeepAlive(ctx);   // 직전 이동의 유지 재전송 중단 — 새 속도로 대체
         try
         {
             var __swGate = System.Diagnostics.Stopwatch.StartNew();   // [진단] 게이트(직렬화) 대기 시간
-            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            // FR-22: 이동 대기 중 정지가 오면 이 대기는 취소된다(정지가 먼저 나감). epoch = 이 이동의 세대(정지 시 취소).
+            var epoch = await ctx.Gate.WaitMoveAsync(ct).ConfigureAwait(false);
             __swGate.Stop();
             try
             {
@@ -185,9 +192,11 @@ public sealed class PtzController : IPtzController
                 };
                 _log?.Info($"[PTZ] ContinuousMove cam={cameraId} norm(pan={panVel:F2},tilt={tiltVel:F2},zoom={zoomVel:F2})→scaled(pan={sPan:F2},tilt={sTilt:F2},zoom={sZoom:F2}) ptRange=[{(sp?.ContPtXMin ?? -1):F2},{(sp?.ContPtXMax ?? 1):F2}] zRange=[{(sp?.ContZMin ?? -1):F2},{(sp?.ContZMax ?? 1):F2}] gateWait={__swGate.ElapsedMilliseconds}ms");
                 var __swMove = System.Diagnostics.Stopwatch.StartNew();   // [진단] WCF ContinuousMove 호출 왕복
-                await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, "PT10S").ConfigureAwait(false);
+                // FR-22: 안전 제한 PT10S → PT2S(GIS 가 죽어 정지가 안 가도 2초 뒤 카메라가 스스로 멈춤). 누르는 동안은 유지 재전송.
+                var ok = await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, PtzMotionPolicy.MoveTimeout).ConfigureAwait(false);
                 __swMove.Stop();
-                _log?.Info($"[PTZ] ContinuousMove WCF={__swMove.ElapsedMilliseconds}ms cam={cameraId}  (카메라 raw SOAP=~10~150ms 측정됨 — 이 값이 크면 WCF 바인딩 병목 확정)");
+                _log?.Info($"[PTZ] ContinuousMove WCF={__swMove.ElapsedMilliseconds}ms cam={cameraId} ok={ok}");
+                if (ok) StartKeepAlive(cameraId, ctx, speed, epoch);
                 return true;
             }
             finally { ctx.Gate.Release(); }
@@ -201,6 +210,7 @@ public sealed class PtzController : IPtzController
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasRelZoom: true } sp || ctx.Model?.PtzClient == null)
             return false;
 
+        CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
         var z = PtzCoordinateMath.ClampToRange(zoomDelta, sp.RelZMin, sp.RelZMax);
         try
         {
@@ -222,6 +232,7 @@ public sealed class PtzController : IPtzController
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasAbs: true } sp || ctx.Model?.PtzClient == null)
             return false;
 
+        CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
         var cpan = PtzCoordinateMath.ClampToRange(pan, sp.AbsXMin, sp.AbsXMax);
         var ctilt = PtzCoordinateMath.ClampToRange(tilt, sp.AbsYMin, sp.AbsYMax);
         double? czoom = sp.AbsZoomUri != null ? PtzCoordinateMath.ClampToRange(zoom, sp.AbsZMin, sp.AbsZMax) : null;
@@ -265,14 +276,17 @@ public sealed class PtzController : IPtzController
     public async Task StopAsync(int cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return;
+        if (ct.IsCancellationRequested) return;   // LWW: 새 제스처가 이미 인계 — 새 이동의 유지 재전송 · 대기를 건드리지 않는다
+        CancelKeepAlive(ctx);                      // 유지 재전송 즉시 중단(정지 뒤에 이동이 다시 나가지 않게)
         try
         {
             // C1: PtzClient(WCF 채널) 동일 인스턴스 병렬 호출 금지(I-05) — Move와 동일 Gate로 직렬화.
+            // FR-22: 정지 우선 — 대기 중인 이동을 취소하고 대기열 맨 앞에 선다. 이미 나가는 이동 뒤에는 선다(그래야 멈춘 채 남음).
             // FR-L1(Stop LWW): 뗌 Stop은 호출측이 제스처 토큰(ct)을 전달 — 뗌→즉시 재누름 시 BeginPtzGesture가
             // 이 토큰을 취소해 Gate 대기 중인 Stop을 드롭하고 새 ContinuousMove가 즉시 진행한다
             // (ONVIF §5.3.2: 새 ContinuousMove가 이전 모션을 자동 대체 — Stop 생략 안전). 재누름이 없으면 정상 수행.
             var __swGate = System.Diagnostics.Stopwatch.StartNew();   // [진단] FR-L3: Stop 게이트 대기(재누름 지연 정량화)
-            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            await ctx.Gate.WaitStopAsync(ct).ConfigureAwait(false);
             __swGate.Stop();
             try
             {
@@ -319,6 +333,7 @@ public sealed class PtzController : IPtzController
     {
         if (string.IsNullOrEmpty(presetToken)) return false;
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        CancelKeepAlive(ctx);   // FR-22
         try
         {
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
@@ -374,6 +389,7 @@ public sealed class PtzController : IPtzController
     public async Task<bool> GotoHomePresetAsync(int cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        CancelKeepAlive(ctx);   // FR-22
         try
         {
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
@@ -608,25 +624,61 @@ public sealed class PtzController : IPtzController
         // H2: 딕셔너리에서만 제거. SemaphoreSlim은 Dispose하지 않는다 — 진행 중 Move/GetStatus 태스크가
         // 동일 ctx.Gate를 await/Release 중일 수 있어, 여기서 Dispose하면 ObjectDisposedException 경합.
         // SemaphoreSlim은 WaitHandle 미사용 시 정리할 핸들이 없어 미Dispose 비용 무시 가능. 멱등.
-        _ctx.TryRemove(cameraId, out _);
+        if (_ctx.TryRemove(cameraId, out var ctx)) CancelKeepAlive(ctx);
     }
 
     /*──────────────── 내부 헬퍼 ────────────────*/
 
+    /// <summary>연속 이동 유지 재전송 시작(FR-22). 토큰은 이동 세대(<paramref name="epoch"/>)에 묶인다 —
+    /// 이 이동이 나가는 사이 정지가 왔다면 이미 취소돼 곧바로 끝난다(정지 뒤에 이동이 다시 나가는 일 없음).</summary>
+    private void StartKeepAlive(int cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken epoch)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(epoch);
+        Interlocked.Exchange(ref ctx.KeepAlive, cts)?.Cancel();
+        _ = KeepAliveLoopAsync(cameraId, ctx, speed, cts.Token);
+    }
+
+    private static void CancelKeepAlive(CamCtx ctx) => Interlocked.Exchange(ref ctx.KeepAlive, null)?.Cancel();
+
+    private async Task KeepAliveLoopAsync(int cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken token)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(PtzMotionPolicy.KeepAliveInterval, token).ConfigureAwait(false);
+                await ctx.Gate.WaitMoveAsync(token).ConfigureAwait(false);
+                try
+                {
+                    token.ThrowIfCancellationRequested();   // 게이트를 받는 사이 정지 · 새 이동이 왔으면 보내지 않는다
+                    if (ctx.Model?.PtzClient is not { } client) return;
+                    await _onvif.MovePTZ(client, speed, ctx.ProfileToken, PtzMotionPolicy.MoveTimeout).ConfigureAwait(false);
+                }
+                finally { ctx.Gate.Release(); }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _log?.Error($"[PTZ] 이동 유지 재전송 실패 cam={cameraId}: {Mask(ex.Message)}"); }
+    }
+
     private static bool IsCapable(CamCtx c)
         => (c.Model?.IsPtzPossible ?? false) && c.Spaces is { } s && (s.HasRel || s.HasAbs);
 
-    /// <summary>GetConfigurations → NodeToken → GetNode로 카메라 space(Rel/Abs/Zoom)를 읽어 캐시.</summary>
+    /// <summary>카메라 space(Rel/Abs/Zoom)를 읽어 캐시. 초기화가 프로필과 병렬로 미리 읽은 노드(<c>Model.PtzNode</c>, FR-23)를 쓰고,
+    /// 없으면 GetConfigurations → NodeToken → GetNode 로 직접 조회(폴백).</summary>
     private async Task<SpaceInfo?> LoadSpacesAsync(CamCtx ctx)
     {
         var ptz = ctx.Model!.PtzClient!;
         try
         {
-            var cfgs = await ptz.GetConfigurationsAsync().ConfigureAwait(false);
-            var nodeToken = cfgs?.PTZConfiguration?.FirstOrDefault()?.NodeToken;
-            if (string.IsNullOrEmpty(nodeToken)) return null;
-
-            var node = await ptz.GetNodeAsync(nodeToken).ConfigureAwait(false);
+            var node = ctx.Model.PtzNode;
+            if (node == null)
+            {
+                var cfgs = await ptz.GetConfigurationsAsync().ConfigureAwait(false);
+                var nodeToken = cfgs?.PTZConfiguration?.FirstOrDefault()?.NodeToken;
+                if (string.IsNullOrEmpty(nodeToken)) return null;
+                node = await ptz.GetNodeAsync(nodeToken).ConfigureAwait(false);
+            }
             var sp = node?.SupportedPTZSpaces;
             if (sp == null) return null;
 
