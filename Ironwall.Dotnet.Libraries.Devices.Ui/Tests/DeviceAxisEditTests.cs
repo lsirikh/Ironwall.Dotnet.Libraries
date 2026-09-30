@@ -214,7 +214,8 @@ public class DeviceAxisEditTests : IDisposable
     [InlineData("CLOSED", "닫힘")]
     [InlineData("RUNNING", "구동 중")]
     [InlineData("", "미상")]
-    [InlineData("WEIRD", "알 수 없음")]
+    [InlineData("WEIRD", "알 수 없음 (WEIRD)")]   // 공용 사전: 원문을 괄호로(FR-01)
+    [InlineData("LOCKED", "잠김")]
     public void should_translate_door_state_when_displayed(string code, string expected)
         => Assert.Equal(expected, DeviceEnumDisplay.DoorStateKorean(code));
 

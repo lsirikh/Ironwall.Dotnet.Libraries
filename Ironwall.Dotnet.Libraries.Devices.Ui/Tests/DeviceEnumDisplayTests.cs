@@ -60,9 +60,10 @@ public class DeviceEnumDisplayTests
     public void should_return_unknown_text_when_component_health_is_empty(string? health)
         => Assert.Equal("미상", DeviceEnumDisplay.ComponentHealthKorean(health));
 
+    /// <summary>공용 부품 사전 규칙(component-display-unify FR-01) — 어휘 밖 값은 숨기지 않고 원문을 괄호로 붙인다.</summary>
     [Fact]
-    public void should_show_unknown_instead_of_raw_code_when_component_health_is_not_in_vocabulary()
-        => Assert.Equal(DeviceEnumDisplay.UnknownValue, DeviceEnumDisplay.ComponentHealthKorean("WEIRD"));
+    public void should_append_raw_code_in_parentheses_when_component_health_is_not_in_vocabulary()
+        => Assert.Equal("미상 (WEIRD)", DeviceEnumDisplay.ComponentHealthKorean("WEIRD"));
 
     [Fact]
     public void should_build_bilingual_display_when_korean_differs_from_code()

@@ -1,6 +1,8 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Api.Models;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Monitoring.Models.Components;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
 
@@ -42,13 +44,18 @@ public enum EnumComponentHealthKind
 /// 이것은 서버 <c>number_device</c> 가 <b>아니다</b> — 실제 이름·장비번호가 필요하면 같은 id 로 해당 카테고리
 /// 탭에서 찾아야 한다(알려진 한계, 최종 보고에 명시).</para>
 ///
-/// <para><see cref="FaultReason"/> 도 같은 이유로 항상 비어 있다 — <see cref="ComponentStateRowDto"/> 에
-/// 고장 사유 필드 자체가 없다(카탈로그의 <c>component_fault</c> 어휘는 있지만 이 행 DTO 는 사유 코드를 싣지 않는다).</para>
+/// <para><see cref="FaultReason"/> — <see cref="ComponentStateRowDto"/> 에 고장 사유 필드가 없다(서버 행 스키마가 닫혀 있다).
+/// 그래서 장비 캐시(<c>deviceLookup</c>, 선택)에서 같은 장비 · 같은 부품 key 의 관측 사유를 읽는다(component-display-unify FR-03).
+/// 캐시가 없거나 그 장비를 모르면 빈 칸이다. 건강이 고장 · 저하일 때만 적는다(정상 줄에 옛 사유를 붙이지 않는다).</para>
+/// <para>모든 한글(상태 · 건강 · 사유 · 부품 이름)은 공용 부품 사전(<see cref="ComponentDisplay"/>)이 만든다 — 지도와 같은 말이다.</para>
 /// </remarks>
 public sealed class ByComponentRowViewModel
 {
     #region - Ctors -
-    public ByComponentRowViewModel(ComponentStateRowDto dto, ICatalogService catalog)
+    /// <param name="dto">서버 행.</param>
+    /// <param name="catalog">카탈로그(유형 한글).</param>
+    /// <param name="deviceLookup">장비 캐시 조회(선택) — 부품 label · 고장 사유를 읽는다. 없으면 두 칸은 사전 · 빈 칸.</param>
+    public ByComponentRowViewModel(ComponentStateRowDto dto, ICatalogService catalog, Func<int, IBaseDeviceModel?>? deviceLookup = null)
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
         if (catalog == null) throw new ArgumentNullException(nameof(catalog));
@@ -58,15 +65,22 @@ public sealed class ByComponentRowViewModel
         DeviceNumber = dto.Id;                                   // 최선의 대안(내부 id) — number_device 아님
         CategoryText = ToCategoryText(dto.CategoryDevice);
         ComponentKey = dto.Component;
+        var labels = catalog as IComponentTypeLabels;
         ComponentTypeLabel = string.IsNullOrWhiteSpace(dto.ComponentType)
             ? Dash
-            : catalog.LabelOf(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE, dto.ComponentType);
+            : ComponentDisplay.TypeName(dto.ComponentType, labels ?? new CatalogLabelAdapter(catalog));
         StateText = StateLabel(dto.State);
         StateTooltip = UnknownStateTooltip(dto.State);
         var (healthText, healthKind) = ToHealth(dto.Health);
         HealthText = healthText;
         HealthKind = healthKind;
-        FaultReason = string.Empty;                              // 알려진 한계 — remarks 참조
+
+        var (label, faultCode) = ReadFromCache(deviceLookup, dto.Id, dto.Component);
+        ComponentName = ComponentDisplay.ComponentName(label, dto.ComponentType, dto.Component, labels ?? new CatalogLabelAdapter(catalog));
+        var level = ComponentDisplay.ParseHealth(dto.Health);
+        FaultReason = level is ComponentHealthLevel.Fault or ComponentHealthLevel.Degraded
+            ? ComponentDisplay.FaultName(faultCode) ?? string.Empty
+            : string.Empty;
         LastChangeText = string.IsNullOrWhiteSpace(dto.ObservedAt) ? NoObservation : dto.ObservedAt!;
     }
     #endregion
@@ -87,10 +101,13 @@ public sealed class ByComponentRowViewModel
     /// <summary>부품 <c>key</c> — 장비 형상 선언의 자유 문자열(닫힌 어휘 아님).</summary>
     public string ComponentKey { get; }
 
+    /// <summary>부품 이름 — label → 카탈로그 한글 → 내장 사전 → key(공용 사전 규칙). key 원문은 <see cref="ComponentKey"/>.</summary>
+    public string ComponentName { get; }
+
     /// <summary>부품 유형의 카탈로그 표시명. 유형이 없으면(옛 데이터) "—".</summary>
     public string ComponentTypeLabel { get; }
 
-    /// <summary>상태 한글 표시. 어휘 밖 값은 "알 수 없음"(원문은 <see cref="StateTooltip"/>), 축 자체가 없으면 "—".</summary>
+    /// <summary>상태 한글 표시. 어휘 밖 값은 "알 수 없음 (원문)", 축 자체가 없으면 "—".</summary>
     public string StateText { get; }
 
     /// <summary>어휘 밖 상태일 때만 원문을 담은 툴팁 글 — 아는 값이면 <c>null</c>(툴팁을 띄우지 않는다).</summary>
@@ -102,7 +119,7 @@ public sealed class ByComponentRowViewModel
     /// <summary>건강 값의 색·모양 분류(Ok/Warn/Crit/Unknown).</summary>
     public EnumComponentHealthKind HealthKind { get; }
 
-    /// <summary>알려진 한계로 항상 빈 문자열 — remarks 참조.</summary>
+    /// <summary>고장 사유 한글 — 장비 캐시에서 읽는다(remarks). 모르거나 정상이면 빈 문자열.</summary>
     public string FaultReason { get; }
 
     /// <summary>
@@ -127,16 +144,6 @@ public sealed class ByComponentRowViewModel
         ["gate"] = "통문",
     };
 
-    private static readonly IReadOnlyDictionary<string, string> StateLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["OPEN"] = "열림",
-        ["CLOSED"] = "닫힘",
-        ["RUNNING"] = "구동 중",
-        ["ON"] = "켜짐",
-        ["OFF"] = "꺼짐",
-        ["IDLE"] = "대기",
-    };
-
     private static string ToCategoryText(string? categoryDevice)
     {
         if (string.IsNullOrWhiteSpace(categoryDevice)) return Dash;
@@ -144,38 +151,64 @@ public sealed class ByComponentRowViewModel
         return CategoryLabels.TryGetValue(trimmed, out var label) ? label : trimmed;
     }
 
-    /// <summary>모르는 상태 값의 화면 글 — 영문 원문을 그대로 보이지 않는다(U-18 D-4 4.1).</summary>
-    public const string UnknownState = "알 수 없음";
+    /// <summary>모르는 상태 값의 화면 글 머리 — 원문을 괄호로 붙인다(공용 사전 규칙).</summary>
+    public const string UnknownState = ComponentDisplay.UnknownText;
 
     /// <summary>
-    /// 부품 상태 코드 → 한국어. 결과 열과 상태 필터 칩이 <b>같은 표</b>를 쓴다(칩만 영문이던 결함 — U-18 D-4 4.1).
-    /// 비었으면 "—", 어휘 밖이면 "알 수 없음".
+    /// 부품 상태 코드 → 한국어. 결과 열과 상태 필터 칩이 <b>같은 표</b>(공용 부품 사전)를 쓴다.
+    /// 비었으면 "—", 어휘 밖이면 "알 수 없음 (원문)".
     /// </summary>
-    public static string StateLabel(string? state)
-    {
-        if (string.IsNullOrWhiteSpace(state)) return Dash;
-        return StateLabels.TryGetValue(state.Trim(), out var label) ? label : UnknownState;
-    }
+    public static string StateLabel(string? state) => ComponentDisplay.StateName(state) ?? Dash;
 
     /// <summary>어휘 밖 상태일 때 원문을 보여 줄 툴팁 글. 아는 값 · 빈 값이면 <c>null</c>.</summary>
     public static string? UnknownStateTooltip(string? state)
-        => string.IsNullOrWhiteSpace(state) || StateLabels.ContainsKey(state.Trim())
+        => string.IsNullOrWhiteSpace(state) || ComponentDisplay.IsKnownState(state)
             ? null
             : $"받은 값: {state.Trim()}";
 
-    // 한글 라벨의 정본은 DeviceEnumDisplay.ComponentHealthKorean 하나뿐이다 — 필터 칩(ByComponentViewModel)도
-    // 같은 표를 읽는다. 여기서는 색·점 모양(Kind)만 이 행 전용으로 분류한다(표시 문구가 아니다).
+    // 한글 라벨 · 점 분류의 정본은 공용 부품 사전(ComponentDisplay) — 필터 칩(ByComponentViewModel)도 같은 표를 읽는다.
     private static (string Text, EnumComponentHealthKind Kind) ToHealth(string? health)
     {
-        var trimmed = health?.Trim().ToUpperInvariant();
-        var kind = trimmed switch
+        var kind = ComponentDisplay.KindOf(ComponentDisplay.ParseHealth(health)) switch
         {
-            "OK" => EnumComponentHealthKind.Ok,
-            "DEGRADED" => EnumComponentHealthKind.Warn,
-            "FAULT" => EnumComponentHealthKind.Crit,
+            ComponentHealthKind.Ok => EnumComponentHealthKind.Ok,
+            ComponentHealthKind.Warn => EnumComponentHealthKind.Warn,
+            ComponentHealthKind.Crit => EnumComponentHealthKind.Crit,
             _ => EnumComponentHealthKind.Unknown,
         };
-        return (DeviceEnumDisplay.ComponentHealthKorean(trimmed), kind);
+        return (ComponentDisplay.HealthText(health), kind);
+    }
+
+    /// <summary>장비 캐시에서 그 부품의 label · 관측 고장 사유를 읽는다. 캐시가 없거나 실패하면 둘 다 null.</summary>
+    private static (string? Label, string? FaultCode) ReadFromCache(Func<int, IBaseDeviceModel?>? lookup, int deviceId, string? key)
+    {
+        if (lookup is null || string.IsNullOrWhiteSpace(key)) return (null, null);
+        try
+        {
+            var axes = lookup(deviceId)?.Axes;
+            if (axes is null) return (null, null);
+            var label = axes.HardwareSpec?.Components.FirstOrDefault(c => string.Equals(c.Key, key, StringComparison.Ordinal))?.Label;
+            string? fault = null;
+            if (axes.DeviceStatus?.Components is { } observed && observed.TryGetValue(key, out var status)) fault = status?.FaultReason;
+            return (label, fault);
+        }
+        catch (Exception)
+        {
+            return (null, null);   // 캐시 조회 실패 — 사전 · 빈 칸으로(행을 죽이지 않는다)
+        }
+    }
+
+    /// <summary>카탈로그 서비스를 공용 사전의 유형 이름 입구로 잇는다(<see cref="IComponentTypeLabels"/> 를 구현하지 않는 가짜 서비스용).</summary>
+    private sealed class CatalogLabelAdapter : IComponentTypeLabels
+    {
+        private readonly ICatalogService _catalog;
+        public CatalogLabelAdapter(ICatalogService catalog) => _catalog = catalog;
+        public string? TypeLabel(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type)) return null;
+            var label = _catalog.LabelOf(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE, type);
+            return string.IsNullOrWhiteSpace(label) || string.Equals(label, type, StringComparison.OrdinalIgnoreCase) ? null : label;
+        }
     }
     #endregion
 }

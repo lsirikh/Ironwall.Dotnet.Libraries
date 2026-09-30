@@ -66,6 +66,7 @@ public class DeviceUiModule : Module
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Services.ICatalogService>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IComponentCatalog>()   // 같은 캐시가 부품 팔레트도 댄다(조립기)
+                   .As<Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels>()           // 지도 부품 이름도 같은 카탈로그 한글(FR-07)
                    .SingleInstance();
 
             // 서버 8.0 부대 편제(unit_id) — GroupNats(부대 코드) → unit_id(정수) 해석 1회 + 캐시.

@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Consoles;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -13,13 +14,19 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Forms;
 /// <summary>폼의 절 하나 — 절의 순서와 제목은 <see cref="DevicePropertyCatalog"/> 가 정한다.</summary>
 public sealed class PropertySectionViewModel
 {
-    public PropertySectionViewModel(DevicePropertySection section, IReadOnlyList<PropertyFieldViewModel> fields, bool isNotReceived)
+    public PropertySectionViewModel(DevicePropertySection section, IReadOnlyList<PropertyFieldViewModel> fields, bool isNotReceived,
+        ComponentTableModel? componentTable = null)
     {
         Section = section;
         Title = DevicePropertyCatalog.SectionTitle(section);
         AxisName = DevicePropertyCatalog.SectionAxisName(section);
         Fields = fields;
         IsNotReceived = isNotReceived;
+        if (componentTable is not null)
+        {
+            if (section == DevicePropertySection.DeviceStatus) StatusTable = componentTable;
+            else DeclarationTable = componentTable;
+        }
     }
 
     public DevicePropertySection Section { get; }
@@ -29,6 +36,12 @@ public sealed class PropertySectionViewModel
 
     /// <summary>이 절의 모든 축 칸이 "미수신"이다 — 칸 대신 미수신 상자 하나를 보인다.</summary>
     public bool IsNotReceived { get; }
+
+    /// <summary>"부품 상태" 절의 표(component-display-unify FR-02) — 요약 줄 · 정렬 단추 · 건강 점 · 설정/관측. 한 대를 골랐을 때만.</summary>
+    public ComponentTableModel? StatusTable { get; }
+
+    /// <summary>"부품" 절의 표 — 이름 · 종류 · 채널 · 위치 · 사용 안 함(공용 부품 사전 한글). 한 대를 골랐을 때만.</summary>
+    public ComponentTableModel? DeclarationTable { get; }
 }
 
 /// <summary>[적용] · [등록] 을 눌렀을 때 폼이 한 일.</summary>
@@ -124,11 +137,15 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
                 fields.Add(field);
             }
 
-            if (fields.Count == 0) continue;
+            // 부품 · 부품 상태 절은 한 줄 글 대신 표로 그린다(FR-02) — 표가 서면 같은 내용의 글 칸은 뺀다(두 번 말하지 않는다).
+            var table = BuildComponentTable(section, specs, isCreating);
+            if (table is not null) fields.RemoveAll(f => f.Key is ComponentsFieldKey or DeviceStatusFieldKey);
+
+            if (fields.Count == 0 && table is null) continue;
 
             var axisFields = fields.Where(f => f.Spec.AxisSection is not null).ToList();
-            var allMissing = axisFields.Count == fields.Count && axisFields.All(f => f.IsNotReceived);
-            sections.Add(new PropertySectionViewModel(section, fields, allMissing));
+            var allMissing = table is null && axisFields.Count == fields.Count && axisFields.All(f => f.IsNotReceived);
+            sections.Add(new PropertySectionViewModel(section, fields, allMissing, table));
         }
 
         Sections = sections;
@@ -258,4 +275,33 @@ public sealed class DevicePropertyFormViewModel : PropertyChangedBase
 
     private static IBaseDeviceModel? ModelOf(object row)
         => row.GetType().GetProperty("Model")?.GetValue(row) as IBaseDeviceModel;
+
+    /// <summary>표로 바꿔 그리는 글 칸의 키(<see cref="DevicePropertyCatalog"/> 명세 키).</summary>
+    internal const string ComponentsFieldKey = "components";
+    internal const string DeviceStatusFieldKey = "device_status";
+
+    /// <summary>
+    /// 부품 · 부품 상태 절의 표 — 한 대를 골랐고, 그 절의 축을 받았을 때만. 등록 중 · 여러 대 · 미수신이면 null(종전 칸 그대로).
+    /// </summary>
+    private ComponentTableModel? BuildComponentTable(DevicePropertySection section, IReadOnlyList<DevicePropertySpec> specs, bool isCreating)
+    {
+        if (section is not (DevicePropertySection.Components or DevicePropertySection.DeviceStatus)) return null;
+        if (isCreating || _rows.Count != 1) return null;
+        var key = section == DevicePropertySection.DeviceStatus ? DeviceStatusFieldKey : ComponentsFieldKey;
+        if (!specs.Any(s => s.Key == key)) return null;                     // 이 계약 · 종류에 그 절이 없다
+        if (ModelOf(_rows[0])?.Axes is not { } axes) return null;          // 6.3 — 축이 없다
+
+        var snapshot = ComponentSnapshot.Build(axes, ResolveComponentLabels());
+        var received = section == DevicePropertySection.DeviceStatus ? snapshot.IsReceived : snapshot.IsDeclarationReceived;
+        if (!received) return null;                                         // 미수신 상자가 말한다
+
+        return new ComponentTableModel(snapshot, ComponentSortMode.Declared, DateTime.Today);
+    }
+
+    /// <summary>카탈로그 한글(FR-01 이름 규칙) — 컨테이너 미구성(시험 · 미리보기)이면 null(내장 사전).</summary>
+    private static IComponentTypeLabels? ResolveComponentLabels()
+    {
+        try { return IoC.GetAllInstances(typeof(IComponentTypeLabels))?.OfType<IComponentTypeLabels>().FirstOrDefault(); }
+        catch (Exception) { return null; }
+    }
 }

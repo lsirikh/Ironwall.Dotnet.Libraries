@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Converters;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using System;
 using System.Collections.Generic;
 
@@ -64,43 +65,19 @@ public static class DeviceEnumDisplay
     public static string CategoryKorean(EnumDeviceCategory category)
         => _category.TryGetValue(category, out var s) ? s : category.ToString();
 
-    // ── 부품 건강 — "부품으로 찾기" 결과 행 배지 · 상세의 부품 상태 줄의 정본(목업 HEALTH 표: 정상 · 저하 · 고장 · 미상) ──
-    private static readonly IReadOnlyDictionary<string, string> _componentHealth = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["OK"]       = "정상",
-        ["DEGRADED"] = "저하",
-        ["FAULT"]    = "고장",
-        ["UNKNOWN"]  = "미상",
-    };
+    // ── 부품 건강 — 정본은 공용 부품 사전(Monitoring.Models ComponentDisplay, component-display-unify FR-01) ──
+    //    지도와 장비 콘솔이 같은 말(정상 · 저하 · 고장 · 미상)을 쓴다. 여기는 콘솔 호출부를 위한 얇은 입구만 남긴다.
 
-    /// <summary>서버 건강 코드(대소문자 무관) → 한글. 빈 값은 "미상", 어휘 밖 값은 <see cref="UnknownValue"/>.</summary>
-    public static string ComponentHealthKorean(string? health)
-    {
-        var trimmed = health?.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return "미상";
-        return _componentHealth.TryGetValue(trimmed, out var s) ? s : UnknownValue;
-    }
+    /// <summary>서버 건강 코드(대소문자 무관) → 한글. 빈 값은 "미상", 어휘 밖 값은 "미상 (원문)"(숨기지 않는다 — FR-01).</summary>
+    public static string ComponentHealthKorean(string? health) => ComponentDisplay.HealthText(health);
 
     /// <summary>표시 사전에 없는 값의 화면 글 — 원문은 툴팁 · 로그로만 보인다(운영자 화면에 영문 코드를 내지 않는다).</summary>
     public const string UnknownValue = "알 수 없음";
 
-    // ── 문 · 통문 위치(부품 state) — DOOR_SENSOR(OPEN/CLOSED) · DOOR_ACTUATOR(OPEN/CLOSED/RUNNING) ──
-    private static readonly IReadOnlyDictionary<string, string> _doorState = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["OPEN"]    = "열림",
-        ["CLOSED"]  = "닫힘",
-        ["RUNNING"] = "구동 중",
-        ["ON"]      = "켜짐",
-        ["OFF"]     = "꺼짐",
-    };
+    // ── 문 · 통문 위치(부품 state) — 정본은 공용 부품 사전의 상태 표(10종) ──
 
-    /// <summary>문 · 부품 동작 상태 코드 → 한글. 빈 값은 "미상", 모르는 값은 <see cref="UnknownValue"/>.</summary>
-    public static string DoorStateKorean(string? state)
-    {
-        var trimmed = state?.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return "미상";
-        return _doorState.TryGetValue(trimmed, out var s) ? s : UnknownValue;
-    }
+    /// <summary>문 · 부품 동작 상태 코드 → 한글. 빈 값은 "미상", 모르는 값은 "알 수 없음 (원문)"(공용 사전 규칙).</summary>
+    public static string DoorStateKorean(string? state) => ComponentDisplay.StateName(state) ?? "미상";
 
     // ── 종류축(type_<category>) — 목업 AX 표. 서버 카탈로그 라벨이 코드와 같을 때(한국어 라벨이 없을 때) 쓴다 ──
     private static readonly IReadOnlyDictionary<string, string> _typeAxis = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

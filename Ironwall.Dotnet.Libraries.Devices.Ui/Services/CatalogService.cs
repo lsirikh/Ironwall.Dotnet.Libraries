@@ -20,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /// 적재된 카탈로그는 <b>불변 스냅샷</b>이고 참조 하나를 통째 바꾼다 — 읽는 쪽은 락 없이 일관된 판을 본다.
 /// 진행 중 요청은 <see cref="_gate"/> 안에서 한 개로 합류시키고, 이벤트는 <b>락 밖에서</b> 발화한다.
 /// </remarks>
-public sealed class CatalogService : ICatalogService, IComponentCatalog
+public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels
 {
     #region - Ctors -
     public CatalogService(IDeviceApiService apiService, DeviceQueryPolicy? policy = null, ILogService? log = null)
@@ -99,6 +99,27 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog
         if (snapshot == null || string.IsNullOrEmpty(text)) return null;
         return snapshot.ComponentIndex.TryGetValue(text, out var info) ? info : null;
     }
+    #endregion
+
+    #region - Implementation of IComponentTypeLabels (지도 · 공용 부품 사전) -
+    /// <summary>
+    /// 부품 유형 한글 이름(component-display-unify FR-07) — 지도는 이 좁은 입구로만 카탈로그를 본다. 아직 안 읽혔으면
+    /// 한 번 읽기를 걸어 두고 <c>null</c>(그 사이엔 공용 사전의 내장 사전이 같은 한글을 낸다). 라벨이 코드와 같으면 <c>null</c>.
+    /// </summary>
+    public string? TypeLabel(string? type)
+    {
+        var text = type?.Trim();
+        if (string.IsNullOrEmpty(text)) return null;
+        if (!IsLoaded)
+        {
+            if (Interlocked.Exchange(ref _labelLoadKicked, 1) == 0) _ = EnsureLoadedAsync();   // 6.3 이면 정책이 막는다(서버를 부르지 않음)
+            return null;
+        }
+        var label = LabelOf(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE, text);
+        return string.IsNullOrWhiteSpace(label) || string.Equals(label, text, StringComparison.OrdinalIgnoreCase) ? null : label;
+    }
+
+    private int _labelLoadKicked;
     #endregion
 
     #region - Processes -

@@ -203,7 +203,8 @@ public class SecondarySurfaceWordingTests
     [InlineData("OPEN", "열림")]
     [InlineData("CLOSED", "닫힘")]
     [InlineData("RUNNING", "구동 중")]
-    [InlineData("WEIRD_STATE", "알 수 없음")]
+    [InlineData("WEIRD_STATE", "알 수 없음 (WEIRD_STATE)")]   // 공용 사전: 원문을 괄호로(FR-01)
+    [InlineData("ACTIVE", "추적 중")]
     [InlineData("", "—")]
     public void should_show_korean_state_when_component_state_code_is_given(string code, string expected)
         => Assert.Equal(expected, ByComponentRowViewModel.StateLabel(code));

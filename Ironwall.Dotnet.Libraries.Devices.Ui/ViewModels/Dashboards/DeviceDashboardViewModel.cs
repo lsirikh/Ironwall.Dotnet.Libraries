@@ -302,7 +302,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
                 // 늦게 만든다 — 이 뷰모델은 계약 판정 전에 만들어질 수 있고, 조회 뷰모델은 만들 때의 계약으로 굳는다.
                 if (ByComponent is null || !ByComponent.IsAvailable)
                 {
-                    ByComponent = new ByComponentViewModel(_deviceApiService, _catalogService, _log, _queryPolicy);
+                    ByComponent = new ByComponentViewModel(_deviceApiService, _catalogService, _log, _queryPolicy, LookupCachedDevice);
                     NotifyOfPropertyChange(nameof(ByComponent));
                 }
             }
@@ -1419,6 +1419,15 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
     public bool CanApplyNow => Detail.CanApply && !Form.HasInvalidField;
 
     public ByComponentViewModel? ByComponent { get; private set; }
+
+    /// <summary>
+    /// "부품으로 찾기" 행이 부품 이름 · 고장 사유를 읽는 장비 캐시(component-display-unify FR-03). 컨테이너 미구성이면 null.
+    /// </summary>
+    private static Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel? LookupCachedDevice(int id)
+    {
+        try { return IoC.Get<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()?.FirstOrDefault(d => d.Id == id); }
+        catch (Exception) { return null; }
+    }
     public DeviceGroupDropHandler GroupDrop { get; }
 
     public EnumDeviceCategory? Category { get; private set; }

@@ -115,6 +115,199 @@
 				ToolTip="{Binding RawToolTip}" />
 		</DataTemplate>
 
+		<!--
+			부품 표(component-display-unify FR-02) — 지도 상세 보기 "부품" 탭 · 조립 카드와 같은 칸 · 같은 점 색 · 같은 한글(공용 부품 사전).
+			건강 점: 정상 StatusNormal · 저하 StatusWarning · 고장 StatusCritical · 미상 회색 · 사용 안 함 = 빈 원(모양으로 가른다).
+			x:Name 은 쓰지 않는다 — 점 · 글자색은 요소 자신의 Style 트리거로 바꾼다.
+		-->
+		<Style x:Key="Form.Component.Dot" TargetType="Ellipse">
+			<Setter Property="Width" Value="8" />
+			<Setter Property="Height" Value="8" />
+			<Setter Property="Margin" Value="0,0,5,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+					<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+					<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+					<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding HealthKind}" Value="OutOfService">
+					<Setter Property="Fill" Value="Transparent" />
+					<Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="StrokeThickness" Value="1" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  요약 줄 점 — 표 전체의 최악(SummaryKind).  -->
+		<Style
+			x:Key="Form.Component.SummaryDot"
+			BasedOn="{StaticResource Form.Component.Dot}"
+			TargetType="Ellipse">
+			<Setter Property="Margin" Value="0,0,6,0" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Ok">
+					<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Warn">
+					<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+				<DataTrigger Binding="{Binding SummaryKind}" Value="Crit">
+					<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style x:Key="Form.Component.Head" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<Style x:Key="Form.Component.Cell" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12.5" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<!--  설정과 관측이 어긋난 상태 칸 — 경고 글자색(칸 글 "설정 켬 / 관측 꺼짐" 이 뜻을 나른다)  -->
+		<Style
+			x:Key="Form.Component.StateCell"
+			BasedOn="{StaticResource Form.Component.Cell}"
+			TargetType="TextBlock">
+			<Setter Property="ToolTip" Value="{Binding StateText}" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding IsIntentMismatch}" Value="True">
+					<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
+		<!--  "부품 상태" 절 — 요약 줄 + [선언 순서 / 고장 먼저] + 부품 · 상태 · 건강 · 사유 · 마지막 변화  -->
+		<DataTemplate x:Key="Form.ComponentStatusTable">
+			<StackPanel Margin="0,2,0,8">
+				<DockPanel Margin="0,0,0,6" LastChildFill="True">
+					<ToggleButton
+						AutomationProperties.AutomationId="Devices.Detail.Components.Sort"
+						Content="{Binding SortText}"
+						DockPanel.Dock="Right"
+						IsChecked="{Binding IsFaultFirst, Mode=TwoWay}"
+						Style="{StaticResource Console.Chip}"
+						ToolTip="줄 순서를 바꿉니다 — 선언 순서 / 고장 먼저" />
+					<Ellipse Style="{StaticResource Form.Component.SummaryDot}" />
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="13"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding SummaryText}"
+						TextTrimming="CharacterEllipsis"
+						ToolTip="{Binding SummaryText}" />
+				</DockPanel>
+				<Grid Margin="0,0,0,3">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" MinWidth="70" />
+						<ColumnDefinition Width="104" />
+						<ColumnDefinition Width="62" />
+						<ColumnDefinition Width="78" />
+						<ColumnDefinition Width="64" />
+					</Grid.ColumnDefinitions>
+					<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Head}" Text="부품" />
+					<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Head}" Text="상태" />
+					<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Head}" Text="건강" />
+					<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Head}" Text="사유" />
+					<TextBlock Grid.Column="4" Style="{StaticResource Form.Component.Head}" Text="마지막 변화" />
+				</Grid>
+				<Border Height="1" Background="{DynamicResource DividerBrush}" />
+				<ItemsControl Focusable="False" ItemsSource="{Binding Rows}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid Margin="0,3" Background="Transparent" ToolTip="{Binding DetailToolTip}">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" MinWidth="70" />
+									<ColumnDefinition Width="104" />
+									<ColumnDefinition Width="62" />
+									<ColumnDefinition Width="78" />
+									<ColumnDefinition Width="64" />
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Cell}" Text="{Binding Name}" />
+								<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.StateCell}" Text="{Binding StateText}" />
+								<StackPanel Grid.Column="2" Orientation="Horizontal">
+									<Ellipse Style="{StaticResource Form.Component.Dot}" />
+									<TextBlock Style="{StaticResource Form.Component.Cell}" Text="{Binding HealthText}" ToolTip="{Binding HealthText}" />
+								</StackPanel>
+								<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Cell}" Text="{Binding FaultText}" ToolTip="{Binding FaultText}" />
+								<TextBlock
+									Grid.Column="4"
+									FontFamily="Consolas"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Style="{StaticResource Form.Component.Cell}"
+									Text="{Binding TimeText}"
+									ToolTip="{Binding ObservedAtRaw}" />
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</StackPanel>
+		</DataTemplate>
+
+		<!--  "부품" 절 — 선언: 이름 · 종류 · 채널 · 위치 · 사용 안 함  -->
+		<DataTemplate x:Key="Form.ComponentDeclarationTable">
+			<StackPanel Margin="0,2,0,8">
+				<TextBlock
+					Margin="0,0,0,6"
+					FontSize="13"
+					FontWeight="SemiBold"
+					Foreground="{DynamicResource TextPrimaryBrush}"
+					Text="{Binding DeclarationSummaryText}" />
+				<Grid Margin="0,0,0,3">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" MinWidth="70" />
+						<ColumnDefinition Width="110" />
+						<ColumnDefinition Width="44" />
+						<ColumnDefinition Width="64" />
+						<ColumnDefinition Width="64" />
+					</Grid.ColumnDefinitions>
+					<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Head}" Text="부품" />
+					<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Head}" Text="종류" />
+					<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Head}" Text="채널" />
+					<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Head}" Text="위치" />
+					<TextBlock Grid.Column="4" Style="{StaticResource Form.Component.Head}" Text="사용" />
+				</Grid>
+				<Border Height="1" Background="{DynamicResource DividerBrush}" />
+				<ItemsControl Focusable="False" ItemsSource="{Binding DeclaredRows}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid Margin="0,3" Background="Transparent" ToolTip="{Binding DetailToolTip}">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" MinWidth="70" />
+									<ColumnDefinition Width="110" />
+									<ColumnDefinition Width="44" />
+									<ColumnDefinition Width="64" />
+									<ColumnDefinition Width="64" />
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0" Style="{StaticResource Form.Component.Cell}" Text="{Binding Name}" />
+								<TextBlock Grid.Column="1" Style="{StaticResource Form.Component.Cell}" Text="{Binding TypeName}" ToolTip="{Binding TypeName}" />
+								<TextBlock Grid.Column="2" Style="{StaticResource Form.Component.Cell}" Text="{Binding ChannelText}" />
+								<TextBlock Grid.Column="3" Style="{StaticResource Form.Component.Cell}" Text="{Binding PositionText}" ToolTip="{Binding PositionText}" />
+								<TextBlock
+									Grid.Column="4"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Style="{StaticResource Form.Component.Cell}"
+									Text="{Binding ServiceText}" />
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</StackPanel>
+		</DataTemplate>
+
 		<forms:PropertyEditorTemplateSelector
 			x:Key="EditorSelector"
 			Boolean="{StaticResource Editor.Boolean}"
@@ -134,6 +327,16 @@
 					<Grid>
 						<!--  축을 서버가 보내지 않았다 — 값이 없는 것과 다르다  -->
 						<c:NotReceivedBox SectionName="{Binding AxisName}" Visibility="{Binding IsNotReceived, Converter={StaticResource BoolToVisibility}}" />
+						<StackPanel>
+						<!--  부품 · 부품 상태 표(FR-02) — 한 대를 골랐고 축을 받았을 때만 내용이 있다(없으면 아무것도 그리지 않는다)  -->
+						<ContentControl
+							Content="{Binding DeclarationTable}"
+							ContentTemplate="{StaticResource Form.ComponentDeclarationTable}"
+							Focusable="False" />
+						<ContentControl
+							Content="{Binding StatusTable}"
+							ContentTemplate="{StaticResource Form.ComponentStatusTable}"
+							Focusable="False" />
 						<ItemsControl Focusable="False" ItemsSource="{Binding Fields}">
 							<ItemsControl.Style>
 								<Style TargetType="ItemsControl">
@@ -176,6 +379,7 @@
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
+						</StackPanel>
 					</Grid>
 				</c:ConsoleSection>
 			</DataTemplate>

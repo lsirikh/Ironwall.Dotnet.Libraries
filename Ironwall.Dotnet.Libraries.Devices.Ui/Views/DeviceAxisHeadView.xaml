@@ -108,11 +108,12 @@
 								<ColumnDefinition Width="80" />
 								<ColumnDefinition Width="*" />
 							</Grid.ColumnDefinitions>
-							<TextBlock Grid.Column="0" FontFamily="Consolas" Style="{StaticResource AxisCell}" Text="{Binding Key}" />
-							<TextBlock Grid.Column="1" Style="{StaticResource AxisCell}" Text="{Binding Type}" />
+							<!--  공용 부품 사전 한글(component-display-unify FR-01) — key · 유형 코드는 툴팁  -->
+							<TextBlock Grid.Column="0" Style="{StaticResource AxisCell}" Text="{Binding Name}" ToolTip="{Binding Key}" />
+							<TextBlock Grid.Column="1" Style="{StaticResource AxisCell}" Text="{Binding TypeName}" ToolTip="{Binding Type}" />
 							<TextBlock Grid.Column="2" Style="{StaticResource AxisCellMuted}" Text="{Binding Channel, StringFormat=ch {0}}" />
 							<TextBlock Grid.Column="3" Style="{StaticResource AxisCellMuted}" Text="{Binding Position}" />
-							<TextBlock Grid.Column="4" Style="{StaticResource AxisCellMuted}" Text="{Binding Label}" />
+							<TextBlock Grid.Column="4" Style="{StaticResource AxisCellMuted}" Text="{Binding Model}" />
 						</Grid>
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
@@ -128,6 +129,12 @@
 				DataContext="{Binding DeviceStatus}"
 				Focusable="False"
 				Template="{StaticResource AxisSectionBody}" />
+			<!--  요약 줄(FR-02) — "고장 1 · 저하 1 · 정상 3" / "부품 이상 없음"  -->
+			<TextBlock
+				Margin="0,2,0,4"
+				FontWeight="SemiBold"
+				Style="{StaticResource AxisCell}"
+				Text="{Binding ComponentSummaryText}" />
 			<ItemsControl ItemsSource="{Binding StatusRows}">
 				<ItemsControl.ItemTemplate>
 					<DataTemplate>
@@ -139,10 +146,35 @@
 								<ColumnDefinition Width="130" />
 								<ColumnDefinition Width="*" />
 							</Grid.ColumnDefinitions>
-							<TextBlock Grid.Column="0" FontFamily="Consolas" Style="{StaticResource AxisCell}" Text="{Binding Key}" />
-							<TextBlock Grid.Column="1" Style="{StaticResource AxisCell}" Text="{Binding State}" />
-							<TextBlock Grid.Column="2" Style="{StaticResource AxisCell}" Text="{Binding Health}" />
-							<TextBlock Grid.Column="3" Style="{StaticResource AxisCellMuted}" Text="{Binding FaultReason}" />
+							<TextBlock Grid.Column="0" Style="{StaticResource AxisCell}" Text="{Binding Name}" ToolTip="{Binding Key}" />
+							<TextBlock Grid.Column="1" Style="{StaticResource AxisCell}" Text="{Binding StateText}" ToolTip="{Binding State}" />
+							<StackPanel Grid.Column="2" Orientation="Horizontal">
+								<!--  건강 점 — 정상 · 저하 · 고장 · 미상 회색(부품으로 찾기와 같은 토큰)  -->
+								<Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center">
+									<Ellipse.Style>
+										<Style TargetType="Ellipse">
+											<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+													<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+												</DataTrigger>
+												<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+													<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+												</DataTrigger>
+												<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+													<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+												</DataTrigger>
+												<DataTrigger Binding="{Binding HealthKind}" Value="OutOfService">
+													<Setter Property="Fill" Value="Transparent" />
+													<Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Ellipse.Style>
+								</Ellipse>
+								<TextBlock Style="{StaticResource AxisCell}" Text="{Binding HealthText}" />
+							</StackPanel>
+							<TextBlock Grid.Column="3" Style="{StaticResource AxisCellMuted}" Text="{Binding FaultText}" />
 							<TextBlock Grid.Column="4" FontFamily="Consolas" Style="{StaticResource AxisCellMuted}" Text="{Binding ObservedAt}" />
 						</Grid>
 					</DataTemplate>

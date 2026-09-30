@@ -55,8 +55,11 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
 public sealed class ByComponentViewModel : Screen
 {
     #region - Ctors -
-    public ByComponentViewModel(IDeviceApiService api, ICatalogService catalog, ILogService log, DeviceQueryPolicy? policy = null)
+    /// <param name="deviceLookup">장비 캐시 조회(선택) — 행의 부품 이름 · 고장 사유 칸(component-display-unify FR-03).</param>
+    public ByComponentViewModel(IDeviceApiService api, ICatalogService catalog, ILogService log, DeviceQueryPolicy? policy = null,
+        Func<int, Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel?>? deviceLookup = null)
     {
+        _deviceLookup = deviceLookup;
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _log = log ?? throw new ArgumentNullException(nameof(log));
@@ -249,7 +252,7 @@ public sealed class ByComponentViewModel : Screen
 
             Rows.Clear();
             foreach (var dto in response.Data)
-                Rows.Add(new ByComponentRowViewModel(dto, _catalog));
+                Rows.Add(new ByComponentRowViewModel(dto, _catalog, _deviceLookup));
 
             RebuildStateChips(response.Data);
 
@@ -332,6 +335,7 @@ public sealed class ByComponentViewModel : Screen
     private readonly ICatalogService _catalog;
     private readonly ILogService _log;
     private readonly DeviceQueryPolicy _policy;
+    private readonly Func<int, Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel?>? _deviceLookup;
 
     private CatalogOption? _selectedComponentType;
     private string _selectedState;

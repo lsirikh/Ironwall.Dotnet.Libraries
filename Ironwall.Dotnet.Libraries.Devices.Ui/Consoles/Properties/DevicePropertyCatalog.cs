@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json.Linq;
 using System;
@@ -583,38 +584,49 @@ public static class DevicePropertyCatalog
         return present.Count == 0 ? "등록된 링크가 없습니다" : string.Join(" · ", present);
     }
 
-    /// <summary>부품 목록 — 한 줄에 하나(이름 · 유형 · 채널 · 위치). 이름은 부품의 label, 없으면 key.</summary>
+    /// <summary>
+    /// 부품 목록 — 한 줄에 하나(이름 · 유형 · 채널 · 위치). 이름 · 유형 한글은 공용 부품 사전(label → 카탈로그 한글 → 내장 사전 → key).
+    /// 한 대를 고르면 폼이 이 글 대신 표를 그린다(<c>DevicePropertyFormViewModel.BuildComponentTable</c>) — 여러 대일 때의 글이다.
+    /// </summary>
     private static string? ReadComponentsSummary(IBaseDeviceModel model)
     {
         var list = model.Axes?.HardwareSpec?.Components;
         if (list == null) return null;
         if (list.Count == 0) return "등록된 부품이 없습니다 — [부품 구성 바꾸기]에서 추가하세요";
-        return string.Join(Environment.NewLine, list.Where(c => c != null).Select(c =>
+        var snapshot = ComponentSnapshot.Build(model.Axes, ComponentLabels());
+        return string.Join(Environment.NewLine, snapshot.Rows.Where(r => r.IsDeclared).Select(r =>
         {
-            var parts = new List<string> { string.IsNullOrWhiteSpace(c.Label) ? c.Key : c.Label!, ComponentTypeLabel(c.Type) };
-            if (c.Channel is { } channel) parts.Add($"채널 {channel.ToString(CultureInfo.InvariantCulture)}");
-            if (!string.IsNullOrWhiteSpace(c.Position)) parts.Add(c.Position!);
-            if (c.InService == false) parts.Add("사용 안 함");
+            var parts = new List<string> { r.Name, r.TypeName };
+            if (r.Channel is { } channel) parts.Add($"채널 {channel.ToString(CultureInfo.InvariantCulture)}");
+            if (!string.IsNullOrWhiteSpace(r.Position)) parts.Add(r.Position!);
+            if (!r.InService) parts.Add(ComponentDisplay.OutOfServiceText);
             return string.Join(" · ", parts);
         }));
     }
 
-    /// <summary>부품 상태 — 한 줄에 하나(부품 · 동작 상태 · 건강 · 고장 사유 · 관측 시각).</summary>
+    /// <summary>부품 상태 — 한 줄에 하나(부품 · 동작 상태 · 건강 · 고장 사유 · 관측 시각). 전부 공용 부품 사전의 한글.</summary>
     private static string? ReadDeviceStatusSummary(IBaseDeviceModel model)
     {
         var components = model.Axes?.DeviceStatus?.Components;
         if (components == null) return null;
         if (components.Count == 0) return "아직 보고된 부품 상태가 없습니다";
-        return string.Join(Environment.NewLine, components.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv =>
+        var snapshot = ComponentSnapshot.Build(model.Axes, ComponentLabels());
+        return string.Join(Environment.NewLine, snapshot.Rows.Where(r => r.IsObserved).Select(r =>
         {
-            var status = kv.Value;
-            var parts = new List<string> { kv.Key };
-            if (!string.IsNullOrWhiteSpace(status?.State)) parts.Add(DeviceEnumDisplay.DoorStateKorean(status!.State));
-            parts.Add(DeviceEnumDisplay.ComponentHealthKorean(status?.Health));
-            if (!string.IsNullOrWhiteSpace(status?.FaultReason)) parts.Add(status!.FaultReason!);
-            if (TryShortTime(status?.ObservedAt, out var when)) parts.Add(when);
+            var parts = new List<string> { r.Name };
+            if (r.StateCode is not null || r.IntentEnabled is not null) parts.Add(r.StateText);
+            parts.Add(r.HealthText);
+            if (r.FaultText.Length > 0) parts.Add(r.FaultText);
+            if (TryShortTime(r.ObservedAt, out var when)) parts.Add(when);
             return string.Join(" · ", parts);
         }));
+    }
+
+    /// <summary>카탈로그 한글(공용 사전 이름 규칙) — 컨테이너 미구성(시험 · 미리보기)이면 null(내장 사전).</summary>
+    private static IComponentTypeLabels? ComponentLabels()
+    {
+        try { return Caliburn.Micro.IoC.GetAllInstances(typeof(IComponentTypeLabels))?.OfType<IComponentTypeLabels>().FirstOrDefault(); }
+        catch { return null; }
     }
 
     /// <summary>부품별 설정(component_overrides) — "히터 켜기 · 경광등 색 Red" 처럼 한국어 한 줄씩.</summary>
@@ -624,13 +636,18 @@ public static class DevicePropertyCatalog
         if (config == null) return null;
         var overrides = config.ComponentOverrides;
         if (overrides == null || overrides.Count == 0) return "따로 정한 부품 설정이 없습니다";
+        // 부품 이름은 공용 사전 규칙(label → 카탈로그 한글 → 내장 사전 → key) — key 를 그대로 보이지 않는다(FR-02).
+        var names = ComponentSnapshot.Build(model.Axes, ComponentLabels()).Rows.ToDictionary(r => r.Key, r => r.Name, StringComparer.Ordinal);
         return string.Join(Environment.NewLine, overrides.Properties().Select(p =>
         {
             var entry = p.Value as JObject;
             var enabled = entry?["enabled"]?.Type == JTokenType.Boolean ? (bool?)entry["enabled"] : null;
+            var inService = entry?["in_service"]?.Type == JTokenType.Boolean ? (bool?)entry["in_service"] : null;
             var color = entry?["color"]?.ToString();
-            var what = enabled is { } on ? (on ? "켜기" : "끄기") : !string.IsNullOrWhiteSpace(color) ? $"색 {color}" : "설정 있음";
-            return $"{p.Name} · {what}";
+            var what = enabled is { } on ? (on ? "켜기" : "끄기")
+                : inService == false ? ComponentDisplay.OutOfServiceText
+                : !string.IsNullOrWhiteSpace(color) ? $"색 {color}" : "설정 있음";
+            return $"{(names.TryGetValue(p.Name, out var name) ? name : p.Name)} · {what}";
         }));
     }
 
@@ -654,20 +671,6 @@ public static class DevicePropertyCatalog
             { Type: JTokenType.Boolean } => (bool)token ? "true" : "false",
             _ => token.ToString(),
         };
-    }
-
-    /// <summary>부품 유형 코드 → 카탈로그의 한국어 이름. 카탈로그를 못 쓰면 코드 그대로(부품 유형은 서버 어휘가 앞서 간다).</summary>
-    private static string ComponentTypeLabel(string? code)
-    {
-        if (string.IsNullOrWhiteSpace(code)) return DeviceEnumDisplay.UnknownValue;
-        try
-        {
-            if (Caliburn.Micro.IoC.Get<ICatalogService>() is Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.IComponentCatalog catalog
-                && catalog.Find(code) is { } info && !string.IsNullOrWhiteSpace(info.Label))
-                return info.Label;
-        }
-        catch { /* 컨테이너 미구성(시험 · 미리보기) — 코드 그대로 */ }
-        return code!;
     }
 
     /// <summary>관측 시각(ISO 8601, 오프셋 포함) → "MM-dd HH:mm". 못 읽으면 false.</summary>

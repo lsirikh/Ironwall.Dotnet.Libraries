@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json.Linq;
 using System;
@@ -23,11 +24,16 @@ public enum AxisSectionState
 /// <summary>상세 절의 한 줄(이름 — 값).</summary>
 public sealed record AxisRow(string Label, string Value);
 
-/// <summary>부품 선언 한 줄(<c>hardware_spec.components[]</c>).</summary>
-public sealed record ComponentRow(string Key, string Type, string Channel, string Position, string Label, string Model);
+/// <summary>부품 선언 한 줄(<c>hardware_spec.components[]</c>). 원문 칸 + 화면 한글(<see cref="Name"/> · <see cref="TypeName"/>, 공용 부품 사전).</summary>
+public sealed record ComponentRow(string Key, string Type, string Channel, string Position, string Label, string Model,
+    string Name = "", string TypeName = "", bool InService = true);
 
-/// <summary>부품 관측 한 줄(<c>device_status.components.&lt;key&gt;</c>).</summary>
-public sealed record ComponentStatusRow(string Key, string State, string Health, string FaultReason, string ObservedAt);
+/// <summary>
+/// 부품 관측 한 줄(<c>device_status.components.&lt;key&gt;</c>). 원문 칸(서버 값 대조용) + 화면 한글(공용 부품 사전 — 영문 코드를 보이지 않는다).
+/// </summary>
+public sealed record ComponentStatusRow(string Key, string State, string Health, string FaultReason, string ObservedAt,
+    string Name = "", string StateText = "", string HealthText = "", string FaultText = "",
+    ComponentHealthKind HealthKind = ComponentHealthKind.Unknown);
 
 /// <summary>상세 절 하나 — 상태 + 줄들 + (값이 없을 때의) 안내 문구.</summary>
 public sealed class AxisSection
@@ -96,10 +102,17 @@ public sealed class DeviceAxisSectionsViewModel : PropertyChangedBase
         vm.Connection = BuildConnection(axes?.Connection);
         vm.HardwareSpec = BuildHardwareSpec(axes?.HardwareSpec);
 
+        // 화면 한글은 공용 부품 사전(component-display-unify FR-01) — 지도와 같은 말.
+        var snapshot = ComponentSnapshot.Build(axes);
+        vm.ComponentSummaryText = snapshot.SummaryText;
+        var byKey = snapshot.Rows.GroupBy(r => r.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
         if (axes?.HardwareSpec != null)
         {
             vm.ComponentRows = axes.HardwareSpec.Components
-                .Select(c => new ComponentRow(c.Key, c.Type, Text(c.Channel), Text(c.Position), Text(c.Label), Text(c.Model)))
+                .Select(c => byKey.TryGetValue(c.Key, out var info)
+                    ? new ComponentRow(c.Key, c.Type, Text(c.Channel), Text(c.Position), Text(c.Label), Text(c.Model), info.Name, info.TypeName, info.InService)
+                    : new ComponentRow(c.Key, c.Type, Text(c.Channel), Text(c.Position), Text(c.Label), Text(c.Model), c.Key, ComponentDisplay.TypeName(c.Type)))
                 .ToList();
             vm.Components = new AxisSection(vm.ComponentRows.Count == 0 ? AxisSectionState.Empty : AxisSectionState.Present,
                 Array.Empty<AxisRow>(), emptyNotice: "형상 미입력");
@@ -108,7 +121,16 @@ public sealed class DeviceAxisSectionsViewModel : PropertyChangedBase
         if (axes?.DeviceStatus != null)
         {
             vm.StatusRows = axes.DeviceStatus.Components
-                .Select(kv => new ComponentStatusRow(kv.Key, Text(kv.Value.State), Text(kv.Value.Health), Text(kv.Value.FaultReason), Text(kv.Value.ObservedAt)))
+                .Select(kv =>
+                {
+                    byKey.TryGetValue(kv.Key, out var info);
+                    return new ComponentStatusRow(kv.Key, Text(kv.Value.State), Text(kv.Value.Health), Text(kv.Value.FaultReason), Text(kv.Value.ObservedAt),
+                        Name: info?.Name ?? kv.Key,
+                        StateText: info?.StateText ?? (ComponentDisplay.StateName(kv.Value.State) ?? ComponentDisplay.Dash),
+                        HealthText: info?.HealthText ?? ComponentDisplay.HealthText(kv.Value.Health),
+                        FaultText: info?.FaultText ?? string.Empty,
+                        HealthKind: info?.HealthKind ?? ComponentDisplay.KindOf(ComponentDisplay.ParseHealth(kv.Value.Health)));
+                })
                 .ToList();
             vm.DeviceStatus = new AxisSection(vm.StatusRows.Count == 0 ? AxisSectionState.Empty : AxisSectionState.Present, Array.Empty<AxisRow>());
         }
@@ -147,6 +169,9 @@ public sealed class DeviceAxisSectionsViewModel : PropertyChangedBase
 
     public IReadOnlyList<ComponentRow> ComponentRows { get; private set; } = Array.Empty<ComponentRow>();
     public IReadOnlyList<ComponentStatusRow> StatusRows { get; private set; } = Array.Empty<ComponentStatusRow>();
+
+    /// <summary>"부품 상태" 절 머리 요약 줄 — "고장 1 · 저하 1 · 정상 3" / "부품 이상 없음" / "부품 정보 없음".</summary>
+    public string ComponentSummaryText { get; private set; } = ComponentDisplay.NoInfoText;
 
     public string MetaView { get; private set; } = "—";
     public IReadOnlyList<string> MetaSections { get; private set; } = Array.Empty<string>();
