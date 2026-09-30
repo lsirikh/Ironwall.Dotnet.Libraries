@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using Ironwall.Dotnet.Libraries.Enums;
-using Ironwall.Dotnet.Libraries.Redis.Services;
 using Ironwall.Dotnet.Libraries.Sounds.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Newtonsoft.Json.Linq;

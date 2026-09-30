@@ -51,7 +51,6 @@
     <Compile Include="$(HostProj)Services\NatsBrokerService.cs" Link="Host\NatsBrokerService.cs" />
     <Compile Include="$(HostProj)Services\NatsDomainService.cs" Link="Host\NatsDomainService.cs" />
     <Compile Include="$(HostProj)Services\RecentEnvelopeIds.cs" Link="Host\RecentEnvelopeIds.cs" />
-    <Compile Include="$(HostProj)Models\EventCallInfo.cs" Link="Host\EventCallInfo.cs" />
     <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
@@ -64,9 +63,7 @@
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Gateway\Ironwall.Dotnet.Libraries.Gateway.csproj" />
-    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Redis\Ironwall.Dotnet.Libraries.Redis.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Sounds\Ironwall.Dotnet.Libraries.Sounds.csproj" />
-    <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.RtspMessage\Ironwall.Dotnet.Libraries.RtspMessage.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
     <ProjectReference Include="$(LibRoot)Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />

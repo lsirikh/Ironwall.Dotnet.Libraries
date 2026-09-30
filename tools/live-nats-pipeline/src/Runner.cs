@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Reflection;
-using Ironwall.Dotnet.Libraries.Redis.Services;
 using Ironwall.Dotnet.Libraries.Sounds.Services;
 
 namespace LiveNatsPipeline;
@@ -18,7 +17,7 @@ public static class Runner
         {
             ["label"] = label, ["mode"] = real ? "real inventory (dedicated account, GET only)" : "fake server (no network)", ["started"] = started.ToString("o"), ["nats"] = natsUrl, ["group"] = Safety.SubjectPrefix + "*",
             ["events_ui"] = typeof(Ironwall.Dotnet.Libraries.Events.Ui.Managers.EventQueueManager).Assembly.Location,
-            ["host_linked"] = "NatsBrokerService.cs, NatsDomainService.cs, INatsBrokerService.cs, RecentEnvelopeIds.cs, EventCallInfo.cs",
+            ["host_linked"] = "NatsBrokerService.cs, NatsDomainService.cs, INatsBrokerService.cs, RecentEnvelopeIds.cs",
         };
 
         try
@@ -65,7 +64,7 @@ public static class Runner
                           string.Join(", ", blocked.Select(b => $"{b.Method} {b.Path}").Distinct()) + ")" + (real ? " — 행 생성·수정 0건" : " — 실제 네트워크 요청 0건"));
             rec.Notes.Add($"파이프라인 자신의 NATS 발행 {pipeline.Nats.Published.Count}건: " +
                           string.Join(", ", pipeline.Nats.Published.Select(p => p.Subject).Distinct()));
-            rec.Notes.Add($"Redis(가짜) 호출 {RecordingProxy<IRedisService>.Calls.Count}건 · 사운드(가짜) 호출 {RecordingProxy<ISoundService>.Calls.Count}건");
+            rec.Notes.Add($"사운드(가짜) 호출 {RecordingProxy<ISoundService>.Calls.Count}건 (Redis EVENT_CALL 은 FR-19 로 제거)");
             rec.Notes.Add($"자동복구 발화 {pipeline.AutoRecoveryFired.Count}건 · 자동조치보고 발화 {pipeline.AutoReportFired.Count}건");
         }
         catch (Exception ex)

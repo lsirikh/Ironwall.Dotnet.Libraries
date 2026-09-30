@@ -17,11 +17,9 @@ using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
-using Ironwall.Dotnet.Libraries.Gateway.Providers;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Modules;
 using Ironwall.Dotnet.Libraries.Nats.Services;
-using Ironwall.Dotnet.Libraries.Redis.Services;
 using Ironwall.Dotnet.Libraries.Sounds.Services;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -237,8 +235,8 @@ public sealed class Pipeline
         DetSync = new DetectionSyncNatsService(Log, Nats, Eqm, EventApi, Ea, Tokens);
         await Det.StartService(); await Mal.StartService(); await Op.StartService(); await DetSync.StartService();
 
-        Host = new NatsDomainService(Log, Ea, Nats, RecordingProxy<IRedisService>.Create(), EventApi,
-            RecordingProxy<ISoundService>.Create(), Devices, Cameras, new GatewayEventProvider(Log), Cards, Sem,
+        Host = new NatsDomainService(Log, Ea, Nats, EventApi,
+            RecordingProxy<ISoundService>.Create(), Devices, Cameras, Cards, Sem,
             new SetupModel(), DeviceSvc, ServerApi, serverProvider, Eqm, Tokens);
         await Host.ExecuteAsync();
 
