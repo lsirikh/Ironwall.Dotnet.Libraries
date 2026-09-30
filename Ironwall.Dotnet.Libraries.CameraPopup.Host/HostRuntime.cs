@@ -28,6 +28,7 @@ internal sealed class HostRuntime
     private HostConnection? _connection;
     private MemoryWatchdog? _memoryWatchdog;
     private readonly UiPumpProbe _uiProbe;
+    private readonly UiCommandQueue _uiCommands;
 
     public HostRuntime(HostLaunchArguments launch, HostLog log, Dispatcher dispatcher)
     {
@@ -36,6 +37,7 @@ internal sealed class HostRuntime
         _dispatcher = dispatcher;
         _cameras = CreateCameraServices(log);
         _uiProbe = new UiPumpProbe(dispatcher);
+        _uiCommands = new UiCommandQueue(dispatcher, OnUiCommandFailed);
         var factory = new FrameProducerFactory(log, _cameras, new StreamOpenGate(launch.MaxConcurrentOpens));
         _streams = new OverlayStreamManager(factory, Send, log);
         _windows = new EventWindowManager(dispatcher, factory, Send, log, launch.Headless);
@@ -192,21 +194,12 @@ internal sealed class HostRuntime
         }
     }
 
-    /// <summary>
-    /// 창 명령을 UI 스레드에 넣는다 — <b>Background 우선순위</b>로, 하나씩. 창 10개가 한꺼번에 와도 창 하나를 만든 뒤
-    /// 그리기 · 입력 · UI 점검 표식이 먼저 돌고 다음 창으로 넘어간다(UI 가 몇 초씩 묶이지 않는다).
-    /// 창 명령은 전부 같은 우선순위라 받은 순서가 지켜진다(열기 → 닫기).
-    /// </summary>
-    private void OnUi(string name, Action action)
-        => _dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => Guard(name, action)));
+    /// <summary>창 명령을 UI 스레드에 넣는다(<see cref="UiCommandQueue"/>) — 파이프 읽기 줄은 기다리지 않는다.</summary>
+    private void OnUi(string name, Action action) => _uiCommands.Post(name, action);
 
-    private void Guard(string name, Action action)
+    private void OnUiCommandFailed(string name, Exception ex)
     {
-        try { action(); }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            _log.Error($"{name} failed: {ex}");
-            Send(new HostError { Code = "handler-failed", Message = name });
-        }
+        _log.Error($"{name} failed: {ex}");
+        Send(new HostError { Code = "handler-failed", Message = name });
     }
 }

@@ -61,6 +61,11 @@ public enum DebugCommandKind
     UiBusy = 5,
     /// <summary>메모리 한도 종료를 흉내 — 알림을 보내고 파이프를 끊은 뒤 <c>Argument</c> ms 늦게 종료 코드 20 으로 내려간다.</summary>
     PlannedExitSlow = 6,
+    /// <summary>
+    /// UI 스레드를 <c>Argument</c> ms 동안 Normal · Render 우선순위 일로 쉬지 않고 채운다(멈추지는 않는다 — 심박 · UI 점검 표식은 돈다).
+    /// Background 우선순위 일이 굶는 조건의 재현(K7b: 바쁜 UI 가 영상 복구 · 창 명령을 미루지 않는가).
+    /// </summary>
+    UiFlood = 7,
 }
 
 /// <summary>이벤트 창 종류 — 키 · 배지 · 테두리(탐지 = 빨간 테두리 + 배지 글자)를 가른다.</summary>

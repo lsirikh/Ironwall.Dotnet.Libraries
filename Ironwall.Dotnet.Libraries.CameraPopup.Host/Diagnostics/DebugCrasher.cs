@@ -13,6 +13,30 @@ internal static class DebugCrasher
     public static void Execute(DebugCommandKind kind, Dispatcher dispatcher, HostLog log)
         => Execute(new DebugCommand { Kind = kind }, dispatcher, log, _ => { }, () => { });
 
+    /// <summary>
+    /// Normal 4줄 + Render 4줄 — 일 하나가 4 ms 를 태우고 곧바로 자기를 다시 넣는다. 디스패처에 늘 Normal · Render 일이 있어
+    /// Background 이하 일은 끝날 때까지 한 번도 돌지 못한다(Send 표식은 일 사이에 돈다 — 멈춤으로 보이지 않는다).
+    /// </summary>
+    private static void StartUiFlood(Dispatcher dispatcher, int durationMs)
+    {
+        long until = Environment.TickCount64 + durationMs;
+        foreach (var priority in new[] { DispatcherPriority.Normal, DispatcherPriority.Render })
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                Action? chain = null;
+                chain = () =>
+                {
+                    if (Environment.TickCount64 >= until) return;
+                    long spinUntil = Environment.TickCount64 + 4;
+                    while (Environment.TickCount64 < spinUntil) { }
+                    dispatcher.BeginInvoke(priority, chain!);
+                };
+                dispatcher.BeginInvoke(priority, chain);
+            }
+        }
+    }
+
     /// <param name="send">GIS 로 보내기.</param>
     /// <param name="closePipe">파이프를 끊는다(호스트는 아직 산 채로).</param>
     public static void Execute(DebugCommand command, Dispatcher dispatcher, HostLog log, Action<IIpcMessage> send, Action closePipe)
@@ -25,6 +49,9 @@ internal static class DebugCrasher
                 // UI 스레드를 잠깐만 막는다(창을 몰아 여는 바쁨) — 심박은 끊기면 안 된다.
                 int busyMs = Math.Clamp(command.Argument, 0, 60_000);
                 dispatcher.BeginInvoke(() => Thread.Sleep(busyMs));
+                break;
+            case DebugCommandKind.UiFlood:
+                StartUiFlood(dispatcher, Math.Clamp(command.Argument, 0, 900_000));
                 break;
             case DebugCommandKind.PlannedExitSlow:
                 // 메모리 한도 종료 흉내: 예고 → 파이프 끊김 → 프로세스는 늦게 끝난다(큰 프로세스의 정리 시간).

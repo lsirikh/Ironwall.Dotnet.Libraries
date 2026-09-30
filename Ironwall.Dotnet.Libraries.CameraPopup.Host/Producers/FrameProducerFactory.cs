@@ -8,7 +8,7 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
 /// 제공자 종류 → 생산자. 시험 무늬 · 파일은 바로, 카메라(ONVIF · RTSP 주소 · 외부 VMS)는 제공자로 주소를 얻은 뒤
 /// LibVLC 로(<see cref="ResolvingFrameProducer"/>, T-02). 제공자 창구가 없으면(시험) RTSP 주소를 그대로 연다.
 /// </summary>
-internal sealed class FrameProducerFactory
+internal sealed class FrameProducerFactory : IFrameProducerFactory
 {
     private readonly HostLog _log;
     private readonly HostCameraServices? _cameras;
