@@ -1392,6 +1392,48 @@
 				</StackPanel>
 			</Border>
 
+			<!--  팝업 호스트 안내(camera-popup-modes FR-25) — 호스트가 일시 중지인 동안 계속 떠 있다(오버레이가 없어도).
+			      토스트 한 줄 위에 놓아 겹치지 않는다. [다시 시작]은 눌러야 하므로 히트 테스트를 막지 않는다. 토큰만(라이트/다크).  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				MaxWidth="720"
+				Margin="0,0,0,72"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Bottom"
+				Panel.ZIndex="300"
+				AutomationProperties.AutomationId="Map.CameraPopup.HostNotice.Panel"
+				Style="{StaticResource MapFloatingPanelStyle}"
+				Visibility="{Binding IsCameraPopupHostNoticeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource StatusWarningBrush}"
+						Kind="VideoOffOutline" />
+					<TextBlock
+						Margin="8,0,0,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Map.CameraPopup.HostNotice"
+						FontSize="13"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding CameraPopupHostNoticeMessage}" />
+					<Button
+						Height="28"
+						Margin="12,0,0,0"
+						Padding="10,0"
+						VerticalAlignment="Center"
+						cal:Message.Attach="RestartCameraPopupHost"
+						AutomationProperties.AutomationId="Map.CameraPopup.HostNotice.Restart"
+						AutomationProperties.Name="다시 시작"
+						Content="다시 시작"
+						Style="{StaticResource MaterialDesignOutlinedButton}"
+						ToolTip="영상 팝업 호스트를 다시 시작합니다" />
+				</StackPanel>
+			</Border>
+
 			<!--  측정 리드아웃 HUD (MapFloatingPanelStyle + 토큰 — 라이트/다크 자동스왑)  -->
 			<Border
 				Grid.Row="2"

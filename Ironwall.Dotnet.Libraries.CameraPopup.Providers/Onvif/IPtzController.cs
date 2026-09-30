@@ -121,7 +121,10 @@ public interface IPtzController
     /// 결과는 카메라 워밍 수명 동안 캐시(FR-07, Release 시 무효화). 실패/미지원/취소 시 null(호출측 URL조회 폴백).
     /// 반환 URL엔 자격증명이 없다 — 호출측이 조합(FR-04).
     /// </summary>
-    Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default);
+    /// <param name="targetWidth">그릴 크기(물리 픽셀). 0 보다 크면 "이 크기를 덮는 가장 낮은 해상도" 프로파일을 고른다
+    /// (<see cref="Ptz.OnvifProfileSelector"/>) — 작은 타일은 서브, 큰 상자는 메인. 0 이면 <paramref name="preferSub"/> 만 본다.</param>
+    Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default,
+        int targetWidth = 0, int targetHeight = 0);
 
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(string cameraId);

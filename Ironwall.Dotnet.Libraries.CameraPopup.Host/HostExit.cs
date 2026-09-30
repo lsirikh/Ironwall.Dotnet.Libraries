@@ -12,6 +12,19 @@ internal static class HostExit
 
     public static void Initialize(HostLog log) => _log = log;
 
+    /// <summary>
+    /// 종료를 먼저 맡아 두고(다른 종료 요청은 무시된다) <paramref name="delayMs"/> 뒤에 내려간다 — 디버그 전용
+    /// (파이프가 끊긴 뒤 프로세스가 늦게 끝나는 상황 재현).
+    /// </summary>
+    public static void After(int delayMs, int exitCode, string reason)
+    {
+        if (Interlocked.Exchange(ref _exiting, 1) == 1) return;
+        _log?.Info($"exit code={exitCode} reason={reason} (in {delayMs} ms)");
+        Thread.Sleep(Math.Max(0, delayMs));
+        NativeMethods.TerminateProcess(NativeMethods.GetCurrentProcess(), unchecked((uint)exitCode));
+        Environment.Exit(exitCode);
+    }
+
     public static void Now(int exitCode, string reason)
     {
         if (Interlocked.Exchange(ref _exiting, 1) == 1) return;

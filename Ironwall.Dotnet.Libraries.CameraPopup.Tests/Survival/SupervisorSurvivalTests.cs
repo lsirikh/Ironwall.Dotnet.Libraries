@@ -146,7 +146,8 @@ public class SupervisorSurvivalTests
     [Fact]
     public async Task should_kill_and_restart_when_host_hangs()
     {
-        var (host, recorder, log) = NewSupervisor();
+        // UI 멈춤 기준을 시험용으로 3초로(운영 기본 10초) — 심박은 배경 스레드가 계속 답하므로 멈춤은 UiStallMs 로 잡힌다.
+        var (host, recorder, log) = NewSupervisor(o => o.UiHangTimeout = TimeSpan.FromSeconds(3));
         using var _ = host;
         int oldPid = await StartRunningAsync(host, recorder);
         using var source = host.OpenOverlay(TestPattern("k2"));
@@ -166,8 +167,8 @@ public class SupervisorSurvivalTests
             worstCallMs = Math.Max(worstCallMs, sw.ElapsedMilliseconds);
         }
 
-        var detected = await recorder.WaitForStateAsync(CameraPopupHostState.Restarting, t0, TimeSpan.FromSeconds(8));
-        var running = await recorder.WaitForStateAsync(CameraPopupHostState.Running, t0, TimeSpan.FromSeconds(12));
+        var detected = await recorder.WaitForStateAsync(CameraPopupHostState.Restarting, t0, TimeSpan.FromSeconds(10));
+        var running = await recorder.WaitForStateAsync(CameraPopupHostState.Running, t0, TimeSpan.FromSeconds(14));
         if (running is null) DumpLog(log);
         Assert.NotNull(detected);
         Assert.NotNull(running);
@@ -176,11 +177,71 @@ public class SupervisorSurvivalTests
 
         long detectMs = detected!.Value.AtMs - t0;
         Metric($"K2 hang detect={detectMs}ms running={running!.Value.AtMs - t0}ms restartAfterDetect={running.Value.AtMs - detected.Value.AtMs}ms worstCall={worstCallMs}ms reason='{detected.Value.Args.Reason}'");
-        Assert.InRange(detectMs, 2500, 5000);
-        Assert.Contains("heartbeat timeout", detected.Value.Args.Reason);
+        Assert.InRange(detectMs, 2500, 6500);
+        Assert.Contains("ui hang", detected.Value.Args.Reason);
         Assert.True(running.Value.AtMs - detected.Value.AtMs <= 3000);
         Assert.True(worstCallMs < NonBlockingBudgetMs, $"worst call {worstCallMs} ms");
         Assert.Throws<ArgumentException>(() => Process.GetProcessById(oldPid));
+        AssertGisAlive();
+    }
+
+    // ── 심박 오탐(T-09: UI 3.8초 바쁨 → 멀쩡한 호스트를 죽였다) ─────────────
+
+    [Fact]
+    public async Task should_not_restart_when_host_ui_is_busy_for_five_seconds()
+    {
+        // Arrange — 운영 기본값(심박 3초 · UI 멈춤 10초)
+        var (host, recorder, log) = NewSupervisor();
+        using var _ = host;
+        int pid = await StartRunningAsync(host, recorder);
+        using var source = host.OpenOverlay(TestPattern("busy"));
+        Assert.True(await StateRecorder.WaitUntilAsync(() => source!.PublishedSequence > 3, TimeSpan.FromSeconds(5)));
+
+        // Act — 창을 몰아 여는 것과 같은 UI 바쁨 5초(옛 심박 기준 3초를 넘는다) + 그동안 창 10개 · 타일 열기
+        long t0 = recorder.NowMs;
+        Assert.True(host.SendDebugCommand(DebugCommandKind.UiBusy, 5000));
+        for (int i = 0; i < 10; i++) host.OpenEventWindow(EventWindow("busy-" + i));
+        bool restarted = await StateRecorder.WaitUntilAsync(
+            () => recorder.States.Any(s => s.AtMs >= t0 && s.Args.NewState != CameraPopupHostState.Running), TimeSpan.FromSeconds(8));
+
+        // Assert — 재시작 없음 · 같은 프로세스 · 바쁨이 끝나면 창이 다 열린다 · 영상은 계속 흐른다
+        if (restarted) DumpLog(log);
+        Assert.False(restarted, "host was restarted while its UI was only busy");
+        Assert.Equal(CameraPopupHostState.Running, host.State);
+        Assert.Equal(pid, host.HostProcessId);
+        long seq = source!.PublishedSequence;
+        Assert.True(await StateRecorder.WaitUntilAsync(() => source.PublishedSequence > seq + 3, TimeSpan.FromSeconds(3)));
+        Metric($"BUSY ui busy 5000ms → no restart · pid {pid} · states after t0: {recorder.States.Count(s => s.AtMs >= t0)}");
+        AssertGisAlive();
+    }
+
+    // ── 계획된 재시작 셈(T-09: 메모리 한도 재시작 하나가 충돌로 세어졌다) ─────
+
+    [Fact]
+    public async Task should_count_planned_restart_when_host_announced_memory_limit_but_exit_code_arrives_late()
+    {
+        // Arrange — 충돌 예산은 기본(60초에 3번)
+        var (host, recorder, log) = NewSupervisor();
+        using var _ = host;
+        await StartRunningAsync(host, recorder);
+
+        // Act — 예고 → 파이프 끊김 → 프로세스는 1.5초 뒤에야 끝난다(종료 코드를 0.5초 안에 못 읽는다). 5번 되풀이.
+        for (int i = 0; i < 5; i++)
+        {
+            long t0 = recorder.NowMs;
+            Assert.True(await StateRecorder.WaitUntilAsync(() => host.SendDebugCommand(DebugCommandKind.PlannedExitSlow, 1500), TimeSpan.FromSeconds(5)));
+            var restarting = await recorder.WaitForStateAsync(CameraPopupHostState.Restarting, t0, TimeSpan.FromSeconds(8));
+            if (restarting is null) DumpLog(log);
+            Assert.NotNull(restarting);
+            Assert.NotNull(await recorder.WaitForStateAsync(CameraPopupHostState.Running, restarting!.Value.AtMs, TimeSpan.FromSeconds(10)));
+        }
+
+        // Assert — 다섯 번 다 계획된 재시작으로 세어 일시 중지되지 않는다(충돌로 세면 네 번째에 Suspended)
+        Assert.DoesNotContain(recorder.States, s => s.Args.NewState == CameraPopupHostState.Suspended);
+        Assert.Equal(CameraPopupHostState.Running, host.State);
+        Assert.Equal(5, log.Lines.Count(l => l.Contains("host failure (planned)")));
+        Assert.DoesNotContain(log.Lines, l => l.Contains("host failure (crash)"));
+        Metric($"PLANNED 5 announced restarts with late exit code → crash budget untouched");
         AssertGisAlive();
     }
 

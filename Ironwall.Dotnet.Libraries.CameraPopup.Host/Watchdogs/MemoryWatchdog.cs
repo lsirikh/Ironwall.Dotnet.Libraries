@@ -8,12 +8,13 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Watchdogs;
 /// </summary>
 internal sealed class MemoryWatchdog : IDisposable
 {
-    private readonly long _limitBytes;
+    private readonly Func<long> _limitBytes;
     private readonly Action<long> _onExceeded;
     private readonly Timer _timer;
     private int _fired;
 
-    public MemoryWatchdog(long limitBytes, TimeSpan period, Action<long> onExceeded)
+    /// <param name="limitBytes">그때그때의 한도(열린 스트림 수에 따라 달라진다).</param>
+    public MemoryWatchdog(Func<long> limitBytes, TimeSpan period, Action<long> onExceeded)
     {
         _limitBytes = limitBytes;
         _onExceeded = onExceeded;
@@ -30,7 +31,7 @@ internal sealed class MemoryWatchdog : IDisposable
     {
         if (Volatile.Read(ref _fired) == 1) return;
         long bytes = CurrentPrivateBytes();
-        if (bytes <= _limitBytes) return;
+        if (bytes <= _limitBytes()) return;
         if (Interlocked.Exchange(ref _fired, 1) == 1) return;
         _onExceeded(bytes);
     }

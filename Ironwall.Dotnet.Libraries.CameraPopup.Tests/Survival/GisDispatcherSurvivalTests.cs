@@ -165,10 +165,11 @@ public class GisDispatcherSurvivalTests
         };
         int oldPid = await StartRunningAsync(host, recorder);
 
-        // Act 1 — 멈춤 → 심박 끊김 → 종료 시도 실패
+        // Act 1 — 멈춤 → UI 멈춤 감지 → 종료 시도 실패
         long t0 = recorder.NowMs;
         Assert.True(host.SendDebugCommand(DebugCommandKind.Hang));
-        var running = await recorder.WaitForStateAsync(CameraPopupHostState.Running, t0 + 1, TimeSpan.FromSeconds(12));
+        // UI 멈춤은 10초 기준(UiHangTimeout)으로 잡힌다 — 심박은 호스트 배경 스레드가 계속 답한다(T-09).
+        var running = await recorder.WaitForStateAsync(CameraPopupHostState.Running, t0 + 1, TimeSpan.FromSeconds(22));
         if (running is null) DumpLog(log);
 
         // Assert 1 — 멈춰 서지 않고 새 호스트로 Running(연결 있음)

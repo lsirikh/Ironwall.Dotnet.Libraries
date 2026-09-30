@@ -18,8 +18,17 @@ public sealed class CameraPopupHostOptions
 
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(1);
 
-    /// <summary>이 시간 동안 호스트에게서 아무것도 못 받으면 멈춤으로 보고 강제 종료 · 재시작.</summary>
+    /// <summary>
+    /// 이 시간 동안 호스트에게서 아무것도 못 받으면 멈춤으로 보고 강제 종료 · 재시작.
+    /// 심박 응답은 호스트의 <b>배경 스레드</b>가 보낸다 — 이 기준은 "프로세스가 통째로 멈춤 · 파이프 막힘"만 잡는다.
+    /// </summary>
     public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// 호스트 UI 스레드가 이 시간 넘게 메시지를 돌리지 못하면(심박 응답의 <c>UiStallMs</c>) 멈춤으로 보고 강제 종료 · 재시작.
+    /// 창을 몰아 여는 몇 초짜리 바쁨은 멈춤이 아니다 — 기준을 길게 둔다(T-09: 3.8초 바쁨을 죽였다).
+    /// </summary>
+    public TimeSpan UiHangTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>호스트 시작 후 파이프 연결 · 핸드셰이크 제한 시간.</summary>
     public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(5);
@@ -35,8 +44,17 @@ public sealed class CameraPopupHostOptions
     /// <summary>메모리 한도 초과로 인한 계획된 재시작 허용 수(같은 창 안). 폭주 방지용 별도 예산.</summary>
     public int MaxPlannedRestartsInWindow { get; set; } = 10;
 
-    /// <summary>호스트 자기 메모리 한도(MB).</summary>
+    /// <summary>호스트 자기 메모리 한도(MB) — 스트림이 많으면 <see cref="HostMemoryPerStreamMb"/> 만큼 늘어난다.</summary>
     public int HostMemoryLimitMb { get; set; } = HostLaunchArguments.DefaultMemoryLimitMb;
+
+    /// <summary>
+    /// 스트림 하나당 더 허용하는 메모리(MB). 실제 한도 = max(<see cref="HostMemoryLimitMb"/>, 512 + 열린 스트림 수 × 이 값).
+    /// 실측(타일 60개): 약 18 MB/스트림 → 기본 24. 0 이면 고정 한도.
+    /// </summary>
+    public int HostMemoryPerStreamMb { get; set; } = HostLaunchArguments.DefaultMemoryPerStreamMb;
+
+    /// <summary>한꺼번에 "연결 중"일 수 있는 카메라 스트림 수 — 나머지는 줄을 선다(60개 동시 연결 방지).</summary>
+    public int MaxConcurrentStreamOpens { get; set; } = HostLaunchArguments.DefaultMaxConcurrentOpens;
 
     /// <summary>명령 대기열 상한(FR-28). 넘으면 오래된 것부터 버리고 로그.</summary>
     public int CommandQueueCapacity { get; set; } = 256;

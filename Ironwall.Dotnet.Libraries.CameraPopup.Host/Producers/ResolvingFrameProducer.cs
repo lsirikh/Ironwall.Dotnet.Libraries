@@ -24,11 +24,18 @@ internal sealed class ResolvingFrameProducer : IFrameProducer
     private readonly HostLog _log;
     private readonly CancellationTokenSource _cts = new();
     private readonly object _gate = new();
+    private readonly StreamOpenGate? _openGate;
+    private readonly bool _priority;
+    private readonly int _attempt;
     private IFrameProducer? _inner;
     private bool _disposed;
 
-    public ResolvingFrameProducer(HostCameraServices cameras, string cameraId, VideoProviderInfo provider, int width, int height, string name, HostLog log)
+    public ResolvingFrameProducer(HostCameraServices cameras, string cameraId, VideoProviderInfo provider, int width, int height, string name, HostLog log,
+        StreamOpenGate? openGate = null, bool priority = false, int attempt = 0)
     {
+        _openGate = openGate;
+        _priority = priority;
+        _attempt = attempt;
         _cameras = cameras;
         _cameraId = string.IsNullOrWhiteSpace(cameraId) ? name : cameraId;
         _provider = provider;
@@ -49,7 +56,8 @@ internal sealed class ResolvingFrameProducer : IFrameProducer
         {
             onState(StreamState.Opening, DetailResolving);
             var started = Environment.TickCount64;
-            var resolved = await _cameras.ResolveStreamAsync(_cameraId, _provider, _cts.Token).ConfigureAwait(false);
+            // 상자 크기를 실어 보낸다 — ONVIF 제공자가 "이 크기를 덮는 가장 낮은 해상도" 프로필을 고른다(작은 타일 = 서브).
+            var resolved = await _cameras.ResolveStreamAsync(_cameraId, _provider.WithTarget(_width, _height), _cts.Token).ConfigureAwait(false);
             if (_cts.IsCancellationRequested) return;
             if (!resolved.Success || string.IsNullOrWhiteSpace(resolved.Uri))
             {
@@ -69,7 +77,7 @@ internal sealed class ResolvingFrameProducer : IFrameProducer
             lock (_gate)
             {
                 if (_disposed) return;
-                inner = new LibVlcFrameProducer(playable, _width, _height, _name, _log, started);
+                inner = new LibVlcFrameProducer(playable, _width, _height, _name, _log, started, _openGate, _priority, _attempt);
                 _inner = inner;
             }
             onState(StreamState.Opening, DetailConnecting);

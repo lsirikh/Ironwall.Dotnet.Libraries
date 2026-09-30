@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.CameraPopup;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.CameraPopup;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -95,6 +96,104 @@ public partial class MapViewModel
             }).ConfigureAwait(false);
         }
         catch { /* 종료 중 Dispatcher 없음 — 무시 */ }
+    }
+    #endregion
+
+    #region - 지도 하단 호스트 안내(FR-25) -
+    private string _cameraPopupHostNoticeMessage = string.Empty;
+    private bool _isCameraPopupHostNoticeVisible;
+    private ICameraPopupHost? _cameraPopupNoticeHost;
+    private CameraPopupHostState? _cameraPopupNoticeState;
+
+    /// <summary>계속 떠 있는 안내 한 줄("영상 기능 일시 중지") — 옆에 [다시 시작].</summary>
+    public string CameraPopupHostNoticeMessage
+    {
+        get => _cameraPopupHostNoticeMessage;
+        private set { _cameraPopupHostNoticeMessage = value; NotifyOfPropertyChange(nameof(CameraPopupHostNoticeMessage)); }
+    }
+
+    /// <summary>호스트가 일시 중지(Suspended)인 동안 참 — 오버레이가 하나도 없어도 지도 하단에 보인다.</summary>
+    public bool IsCameraPopupHostNoticeVisible
+    {
+        get => _isCameraPopupHostNoticeVisible;
+        private set { _isCameraPopupHostNoticeVisible = value; NotifyOfPropertyChange(nameof(IsCameraPopupHostNoticeVisible)); }
+    }
+
+    /// <summary>
+    /// 활성화 때 한 번 — 호스트 상태 변화를 구독하고, 이미 멈춰 있으면 지금 안내한다. 호스트가 없으면(미등록) 아무것도 안 한다.
+    /// 던지지 않는다 — 안내가 실패해도 지도는 뜬다.
+    /// </summary>
+    private void StartCameraPopupHostNotice()
+    {
+        try
+        {
+            if (_cameraPopupNoticeHost != null) return;
+            var host = ResolveCameraPopupHost();
+            if (host == null) return;
+            _cameraPopupNoticeHost = host;
+            host.StateChanged += OnCameraPopupHostStateChanged;
+            ApplyCameraPopupHostState(host.State);
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] 호스트 안내 구독 실패(GIS 는 정상): {ex.Message}");
+        }
+    }
+
+    private void StopCameraPopupHostNotice()
+    {
+        var host = _cameraPopupNoticeHost;
+        _cameraPopupNoticeHost = null;
+        if (host == null) return;
+        try { host.StateChanged -= OnCameraPopupHostStateChanged; }
+        catch (Exception ex) { _log?.Warning($"[CameraPopup] 호스트 안내 구독 해제 실패(무시): {ex.Message}"); }
+    }
+
+    /// <summary>감시자의 배경 스레드에서 온다 — UI 로 옮기고, 무엇이 실패해도 던지지 않는다(FR-27).</summary>
+    private void OnCameraPopupHostStateChanged(object? sender, CameraPopupHostStateChangedEventArgs e)
+    {
+        try { _ = OnUiAsync(() => ApplyCameraPopupHostState(e.NewState)); }
+        catch (Exception ex) { _log?.Warning($"[CameraPopup] 호스트 안내 갱신 실패(무시): {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// 상태 → 안내: 일시 중지 = 계속 떠 있는 "영상 기능 일시 중지 · [다시 시작]", 사용할 수 없음 = 토스트 한 번,
+    /// 그 밖(정상 · 시작 중 · 재시작 중) = 안내를 지운다. UI 스레드에서 부른다.
+    /// </summary>
+    internal void ApplyCameraPopupHostState(CameraPopupHostState state)
+    {
+        var previous = _cameraPopupNoticeState;
+        _cameraPopupNoticeState = state;
+        switch (CameraPopupHostNotices.KindOf(state))
+        {
+            case CameraPopupHostNoticeKind.Persistent:
+                CameraPopupHostNoticeMessage = CameraPopupHostNotices.Suspended;
+                IsCameraPopupHostNoticeVisible = true;
+                break;
+            case CameraPopupHostNoticeKind.Toast:
+                IsCameraPopupHostNoticeVisible = false;
+                // 같은 상태가 다시 알려져도 한 번만 띄운다.
+                if (previous != state) ShowCameraPopupToast(CameraPopupHostNotices.Unavailable, pending: false);
+                break;
+            default:
+                IsCameraPopupHostNoticeVisible = false;
+                break;
+        }
+    }
+
+    /// <summary>[다시 시작] — 감시자의 재시작 예산을 비우고 호스트를 다시 띄운다. 기다리지 않고 던지지 않는다.</summary>
+    public void RestartCameraPopupHost()
+    {
+        try
+        {
+            var host = _cameraPopupNoticeHost ?? ResolveCameraPopupHost();
+            _log?.Info("[CameraPopup] 지도 하단 [다시 시작]");
+            host?.Restart();
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] 호스트 다시 시작 실패(GIS 는 정상): {ex.Message}");
+        }
     }
     #endregion
 }

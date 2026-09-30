@@ -27,6 +27,7 @@ internal sealed class HostRuntime
     private readonly HostCameraServices? _cameras;
     private HostConnection? _connection;
     private MemoryWatchdog? _memoryWatchdog;
+    private readonly UiPumpProbe _uiProbe;
 
     public HostRuntime(HostLaunchArguments launch, HostLog log, Dispatcher dispatcher)
     {
@@ -34,7 +35,8 @@ internal sealed class HostRuntime
         _log = log;
         _dispatcher = dispatcher;
         _cameras = CreateCameraServices(log);
-        var factory = new FrameProducerFactory(log, _cameras);
+        _uiProbe = new UiPumpProbe(dispatcher);
+        var factory = new FrameProducerFactory(log, _cameras, new StreamOpenGate(launch.MaxConcurrentOpens));
         _streams = new OverlayStreamManager(factory, Send, log);
         _windows = new EventWindowManager(dispatcher, factory, Send, log, launch.Headless);
     }
@@ -42,7 +44,7 @@ internal sealed class HostRuntime
     public void Start()
     {
         ParentProcessWatch.Start(_launch.ParentProcessId, _log);
-        _memoryWatchdog = new MemoryWatchdog((long)_launch.MemoryLimitMb * 1024 * 1024, TimeSpan.FromSeconds(2), OnMemoryExceeded);
+        _memoryWatchdog = new MemoryWatchdog(() => (long)EffectiveMemoryLimitMb() * 1024 * 1024, TimeSpan.FromSeconds(2), OnMemoryExceeded);
         _ = Task.Run(RunPipeAsync);
         if (!_launch.Headless) _ = Task.Run(PrewarmLibVlc);
     }
@@ -78,10 +80,16 @@ internal sealed class HostRuntime
         }
     }
 
+    /// <summary>지금 한도(MB) — 설정 한도와 "바닥 + 열린 스트림 수 × 스트림당" 중 큰 값(스트림이 많아 커진 것을 누수로 보지 않는다).</summary>
+    private int EffectiveMemoryLimitMb()
+        => HostLaunchArguments.EffectiveMemoryLimitMb(_launch.MemoryLimitMb, _launch.MemoryPerStreamMb, _streams.Count + _windows.StreamCount);
+
     private void OnMemoryExceeded(long bytes)
     {
-        _log.Warn($"memory limit exceeded: {bytes / (1024 * 1024)} MB > {_launch.MemoryLimitMb} MB — planned restart");
-        Send(new HostError { Code = "memory-limit", Message = $"{bytes / (1024 * 1024)} MB" });
+        int streams = _streams.Count + _windows.StreamCount;
+        _log.Warn($"memory limit exceeded: {bytes / (1024 * 1024)} MB > {EffectiveMemoryLimitMb()} MB (streams={streams}) — planned restart");
+        // 예고를 먼저 보낸다 — 감시자는 이 예고를 받은 호스트의 종료를 종료 코드를 못 읽어도 계획된 재시작으로 센다.
+        Send(new HostError { Code = HostError.MemoryLimitCode, Message = $"{bytes / (1024 * 1024)} MB" });
         Thread.Sleep(200); // 알림이 파이프로 나갈 시간
         HostExit.Now(HostExitCodes.MemoryLimit, "memory limit");
     }
@@ -126,14 +134,16 @@ internal sealed class HostRuntime
             switch (message)
             {
                 case Heartbeat hb:
-                    // UI 스레드를 한 바퀴 돌아 응답 — UI 멈춤도 무응답으로 드러난다.
-                    _dispatcher.BeginInvoke(() => Guard("heartbeat", () => Send(new HeartbeatAck
+                    // 파이프 읽기 줄에서 바로 답한다 — UI 스레드가 창을 만드느라 바빠도 심박은 끊기지 않는다(T-09: 3.8초 바쁨 오탐).
+                    // UI 멈춤은 UiStallMs 로 따로 알리고, 감시자가 긴 기준(기본 10초)으로 판단한다.
+                    Send(new HeartbeatAck
                     {
                         Sequence = hb.Sequence,
                         PrivateBytes = MemoryWatchdog.CurrentPrivateBytes(),
-                        OpenStreams = _streams.Count,
+                        OpenStreams = _streams.Count + _windows.StreamCount,
                         OpenWindows = _windows.Count,
-                    })));
+                        UiStallMs = _uiProbe.StallMs,
+                    });
                     break;
                 case OpenOverlayStream open:
                     _streams.Open(open);
@@ -142,16 +152,16 @@ internal sealed class HostRuntime
                     _streams.Close(close.StreamId);
                     break;
                 case OpenEventWindow window:
-                    _dispatcher.BeginInvoke(() => Guard("open-window", () => _windows.Open(window)));
+                    OnUi("open-window", () => _windows.Open(window));
                     break;
                 case CloseEventWindow closeWindow:
-                    _dispatcher.BeginInvoke(() => Guard("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason, closeWindow.ReturnHome)));
+                    OnUi("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason, closeWindow.ReturnHome));
                     break;
                 case BringToFront front:
-                    _dispatcher.BeginInvoke(() => Guard("bring-to-front", () => _windows.BringToFront(front.EventKey)));
+                    OnUi("bring-to-front", () => _windows.BringToFront(front.EventKey));
                     break;
                 case SetTheme theme:
-                    _dispatcher.BeginInvoke(() => Guard("set-theme", () => _windows.SetTheme(theme.Theme)));
+                    OnUi("set-theme", () => _windows.SetTheme(theme.Theme));
                     break;
                 case PtzCommand ptz:
                     // 받은 순서대로 제공자 게이트에 줄을 세운다(정지 우선 — FR-22). 기다리지 않는다.
@@ -167,7 +177,7 @@ internal sealed class HostRuntime
                     else _cameras.HandleRequest(request);
                     break;
                 case DebugCommand debug:
-                    if (_launch.DebugCommands) DebugCrasher.Execute(debug.Kind, _dispatcher, _log);
+                    if (_launch.DebugCommands) DebugCrasher.Execute(debug, _dispatcher, _log, Send, () => _connection?.Dispose());
                     else Send(new HostError { Code = "debug-disabled" });
                     break;
                 default:
@@ -181,6 +191,14 @@ internal sealed class HostRuntime
             Send(new HostError { Code = "handler-failed", Message = message.GetType().Name });
         }
     }
+
+    /// <summary>
+    /// 창 명령을 UI 스레드에 넣는다 — <b>Background 우선순위</b>로, 하나씩. 창 10개가 한꺼번에 와도 창 하나를 만든 뒤
+    /// 그리기 · 입력 · UI 점검 표식이 먼저 돌고 다음 창으로 넘어간다(UI 가 몇 초씩 묶이지 않는다).
+    /// 창 명령은 전부 같은 우선순위라 받은 순서가 지켜진다(열기 → 닫기).
+    /// </summary>
+    private void OnUi(string name, Action action)
+        => _dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => Guard(name, action)));
 
     private void Guard(string name, Action action)
     {

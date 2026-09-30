@@ -52,6 +52,10 @@ public enum DebugCommandKind
     UnhandledException = 3,
     /// <summary>UI 스레드(디스패처)의 처리되지 않은 예외.</summary>
     DispatcherException = 4,
+    /// <summary>UI 스레드를 <c>Argument</c> ms 동안만 막는다(창을 몰아 여는 바쁨 재현 — 심박 오탐 시험).</summary>
+    UiBusy = 5,
+    /// <summary>메모리 한도 종료를 흉내 — 알림을 보내고 파이프를 끊은 뒤 <c>Argument</c> ms 늦게 종료 코드 20 으로 내려간다.</summary>
+    PlannedExitSlow = 6,
 }
 
 /// <summary>이벤트 창 종류 — 키 · 배지 · 테두리(탐지 = 빨간 테두리 + 배지 글자)를 가른다.</summary>

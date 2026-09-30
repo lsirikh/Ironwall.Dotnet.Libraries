@@ -528,4 +528,46 @@ public class EventWindowViewModelTests
         Assert.Equal(StreamState.Opening, a.StreamState);
         Assert.Equal(StreamState.Playing, vm.Tiles[1].StreamState);
     }
+
+    // ───────── 크게 보기 → 스트림 다시 고르기 · 알림 글(T-09) ─────────
+
+    [Fact]
+    public void should_announce_size_change_for_both_tiles_when_enlarged_tile_is_switched()
+    {
+        // Arrange
+        var vm = Create(c => c.AddRange(new[] { Fixed("a"), Fixed("b"), Fixed("c") }), 3, 1);
+        var changed = new List<string>();
+        vm.TileSizeChanged += t => changed.Add(t.CameraId);
+
+        // Act / Assert — 켬: 그 타일만
+        vm.ToggleEnlarge(vm.Tiles[1]);
+        Assert.Equal(new[] { "b" }, changed);
+
+        // 다른 타일로 바꿈: 작아진 타일 · 커진 타일
+        changed.Clear();
+        vm.ToggleEnlarge(vm.Tiles[2]);
+        Assert.Equal(new[] { "b", "c" }, changed);
+
+        // 끔: 작아진 타일만
+        changed.Clear();
+        vm.ToggleEnlarge(vm.Tiles[2]);
+        Assert.Equal(new[] { "c" }, changed);
+    }
+
+    [Fact]
+    public async Task should_expose_full_notice_text_for_automation_when_ptz_call_fails()
+    {
+        // Arrange — 모든 PTZ 호출이 실패하는 카메라
+        _controls.FailingIds.Add("p");
+        var vm = Create(c => c.Add(Ptz("p")));
+        var tile = vm.Tiles[0];
+        Assert.Equal(string.Empty, tile.NoticeText);   // 알림이 없으면 빈 글
+
+        // Act
+        await tile.GotoPresetAsync("P2");
+
+        // Assert — 화면 · UIA 이름이 같은 글 전체를 읽는다("⚠ " 만이 아니라)
+        Assert.Equal("프리셋 이동 실패", tile.Notice);
+        Assert.Equal("⚠ 프리셋 이동 실패", tile.NoticeText);
+    }
 }

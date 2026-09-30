@@ -36,7 +36,8 @@ public sealed class OnvifVideoProvider : ICameraVideoProvider
         else
         {
             var uri = await OnvifPtzProvider.Bounded(
-                _controller.ResolveStreamUriAsync(cameraId, OnvifPtzProvider.ToConnection(info), info.PreferSubStream, ct), ct, null).ConfigureAwait(false);
+                _controller.ResolveStreamUriAsync(cameraId, OnvifPtzProvider.ToConnection(info), info.PreferSubStream, ct,
+                    info.TargetWidth, info.TargetHeight), ct, null).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(uri))
                 return StreamResolution.Ok(OnvifRtspUrlComposer.Compose(uri!, info.Username, info.Password), "onvif");
             reason = ct.IsCancellationRequested ? "timeout" : "GetStreamUri failed";

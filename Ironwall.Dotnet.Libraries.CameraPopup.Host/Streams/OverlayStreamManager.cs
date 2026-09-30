@@ -55,7 +55,7 @@ internal sealed class OverlayStreamManager
         }
 
         var sink = new SharedMemoryFrameSink(view);
-        var producer = _factory.Create(msg.Provider, msg.Width, msg.Height, msg.StreamId, msg.Camera.CameraId);
+        var producer = _factory.Create(msg.Provider, msg.Width, msg.Height, msg.StreamId, msg.Camera.CameraId, priority: true);
         var stream = new OverlayStream(sink, producer);
         _streams[msg.StreamId] = stream;
         _log.Info($"overlay open {msg.StreamId} camera={msg.Camera} provider={msg.Provider} {msg.Width}x{msg.Height}");

@@ -55,6 +55,10 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     private int _activeIncarnation;
     private long _heartbeatSequence;
 
+    // 받기 줄이 적고 제어 루프가 읽는다.
+    private volatile int _plannedExitIncarnation;   // "곧 스스로 내려간다"(메모리 한도) 예고를 보낸 호스트의 기동 번호
+    private long _uiStallMs;                        // 마지막 심박 응답이 알린 호스트 UI 멈춤 시간
+
     // ── 어느 스레드에서나 읽는 상태 ──
     private volatile CameraPopupClient? _liveClient;
     private volatile CameraPopupHostState _state = CameraPopupHostState.NotStarted;
@@ -205,8 +209,8 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     }
 
     /// <summary>시험 전용 고장 주입 — <see cref="CameraPopupHostOptions.EnableDebugCommands"/> 일 때만 보낸다.</summary>
-    internal bool SendDebugCommand(DebugCommandKind kind)
-        => _options.EnableDebugCommands && SendIfLive(new DebugCommand { Kind = kind });
+    internal bool SendDebugCommand(DebugCommandKind kind, int argument = 0)
+        => _options.EnableDebugCommands && SendIfLive(new DebugCommand { Kind = kind, Argument = argument });
 
     private bool SendIfLive(IIpcMessage message, string? coalesceKey = null)
     {
@@ -310,6 +314,13 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             HandleFailure($"heartbeat timeout ({silentMs} ms)", null);
             return;
         }
+        // UI 멈춤은 심박과 따로 본다 — 심박은 호스트 배경 스레드가 답하고, UI 가 돌지 못한 시간은 응답에 실려 온다.
+        long uiStallMs = Interlocked.Read(ref _uiStallMs);
+        if (uiStallMs >= (long)_options.UiHangTimeout.TotalMilliseconds)
+        {
+            HandleFailure($"ui hang ({uiStallMs} ms)", null);
+            return;
+        }
         client.TrySend(new Heartbeat { Sequence = ++_heartbeatSequence }, "heartbeat");
     }
 
@@ -333,6 +344,8 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             PipeName = PipeNaming.Build(Environment.ProcessId, token),
             Token = token,
             MemoryLimitMb = _options.HostMemoryLimitMb,
+            MemoryPerStreamMb = Math.Max(0, _options.HostMemoryPerStreamMb),
+            MaxConcurrentOpens = Math.Max(1, _options.MaxConcurrentStreamOpens),
             Headless = _options.Headless,
             DebugCommands = _options.EnableDebugCommands,
             LogDirectory = _options.HostLogDirectory,
@@ -355,6 +368,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         };
         process.Exited += exitHandler;
         _activeIncarnation = incarnation;
+        Interlocked.Exchange(ref _uiStallMs, 0);
 
         try
         {
@@ -422,6 +436,9 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
 
     private void HandleFailure(string reason, int? exitCode, bool awaitExit = false)
     {
+        // 이 호스트가 "메모리 한도 — 곧 내려간다"를 예고했는가. TeardownHost 가 기동 번호를 지우기 전에 읽는다.
+        int failing = _activeIncarnation;
+        bool announcedPlannedExit = failing != 0 && _plannedExitIncarnation == failing;
         // 파이프가 먼저 끊긴 경우(충돌 · 메모리 한도 종료) 프로세스가 곧 끝난다 — 종료 코드를 잠깐 기다려 읽는다.
         // 코드를 못 읽고 죽이면 메모리 한도(20) 같은 계획된 재시작이 충돌로 잘못 세어진다.
         if (exitCode is null && awaitExit && _process is { } running)
@@ -437,7 +454,10 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         }
         if (exitCode is not null) reason = $"{reason} (exit {exitCode})";
         TeardownHost(reason);
-        bool planned = exitCode.HasValue && HostExitCodes.IsPlannedRestart(exitCode.Value);
+        // 계획된 재시작: 종료 코드 20, 또는 예고를 받은 호스트의 종료. 큰 호스트는 파이프가 끊긴 뒤 프로세스가 끝나기까지
+        // 0.5초 넘게 걸려 종료 코드를 못 읽는 일이 있다(T-09: 1811 MB 호스트 — 계획된 재시작이 충돌로 세어졌다).
+        bool planned = (exitCode.HasValue && HostExitCodes.IsPlannedRestart(exitCode.Value)) || announcedPlannedExit;
+        if (announcedPlannedExit && exitCode is null) reason = $"{reason} (announced memory-limit restart)";
         var budget = planned ? _plannedBudget : _crashBudget;
         long now = _clockMs();
         if (!budget.TryRecordFailure(now))
@@ -505,6 +525,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         {
             case HeartbeatAck ack:
                 LastHostPrivateBytes = ack.PrivateBytes;
+                Interlocked.Exchange(ref _uiStallMs, ack.UiStallMs);
                 return; // 심박 응답은 알리지 않는다(소음)
             case StreamStateChanged s when s.EventKey is null:
                 if (_sources.TryGetValue(s.StreamId, out var source)) UpdateSourceState(source, s.State, s.Detail);
@@ -517,6 +538,8 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
                 break;
             case HostError error:
                 _log.Warning($"[CameraPopup] host error {error.Code} scope={error.Scope} {error.Message}");
+                // 예고 — 이 호스트의 다음 종료는 계획된 재시작이다(충돌 예산을 쓰지 않는다).
+                if (error.Code == HostError.MemoryLimitCode) _plannedExitIncarnation = _activeIncarnation;
                 break;
         }
         _status.Writer.TryWrite(new StatusItem(message, null));

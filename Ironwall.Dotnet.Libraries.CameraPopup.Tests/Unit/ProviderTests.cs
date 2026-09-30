@@ -159,4 +159,60 @@ public class ProviderTests
         Assert.False(ready.Connected);
         Assert.False(ready.PtzCapable);
     }
+
+    // ───────── 그릴 크기에 맞춘 ONVIF 프로필(T-09 T7) ─────────
+
+    private static readonly Providers.Ptz.OnvifProfileSelector.ProfileInfo[] MainAndSub =
+    {
+        new("main", 1920, 1080, false),
+        new("sub", 640, 360, false),
+        new("third", 320, 180, false),
+    };
+
+    [Theory]
+    [InlineData(266, 218, "third")]   // 3×2 타일 — 320×180 을 1.25배 안쪽으로 늘리면 덮는다(266/320 < 1.25)
+    [InlineData(480, 270, "sub")]     // 오버레이 상자 — 320×180 은 1.5배 → 서브
+    [InlineData(800, 436, "sub")]     // 작은 창의 크게 보기 — 640×360 이 1.21배로 덮는다
+    [InlineData(960, 536, "main")]    // 기본 창의 크게 보기 — 서브는 1.49배 → 메인
+    [InlineData(1920, 1080, "main")]
+    [InlineData(3840, 2160, "main")]  // 덮는 것이 없으면 가장 높은 해상도
+    public void should_pick_lowest_profile_that_covers_the_box_when_target_size_is_known(int width, int height, string expected)
+        => Assert.Equal(expected, Providers.Ptz.OnvifProfileSelector.Select(MainAndSub, preferSub: true, width, height));
+
+    [Fact]
+    public void should_keep_prefer_sub_rule_when_target_size_is_unknown()
+    {
+        Assert.Equal("third", Providers.Ptz.OnvifProfileSelector.Select(MainAndSub, preferSub: true, 0, 0));
+        Assert.Equal("main", Providers.Ptz.OnvifProfileSelector.Select(MainAndSub, preferSub: false, 0, 0));
+    }
+
+    [Fact]
+    public void should_prefer_profile_without_audio_when_two_profiles_cover_the_box_equally()
+    {
+        var profiles = new Providers.Ptz.OnvifProfileSelector.ProfileInfo[]
+        {
+            new("main", 1920, 1080, false),
+            new("sub-audio", 640, 360, true),
+            new("sub", 640, 360, false),
+        };
+
+        Assert.Equal("sub", Providers.Ptz.OnvifProfileSelector.Select(profiles, preferSub: true, 266, 218));
+    }
+
+    [Fact]
+    public void should_carry_target_size_and_keep_every_other_field_when_provider_info_is_sized()
+    {
+        var info = new VideoProviderInfo
+        {
+            Kind = VideoProviderKind.Onvif, Host = "10.0.0.5", Port = 8080, Username = "u", Password = "p",
+            PreferSubStream = true, FallbackUri = "rtsp://10.0.0.5/s", OpenTimeoutMs = 7000, ProfileToken = "t", Uri = "rtsp://x",
+        };
+
+        var sized = info.WithTarget(266, 218);
+
+        Assert.Equal((266, 218), (sized.TargetWidth, sized.TargetHeight));
+        Assert.Equal((info.Kind, info.Host, info.Port, info.Username, info.Password, info.PreferSubStream, info.FallbackUri, info.OpenTimeoutMs, info.ProfileToken, info.Uri),
+            (sized.Kind, sized.Host, sized.Port, sized.Username, sized.Password, sized.PreferSubStream, sized.FallbackUri, sized.OpenTimeoutMs, sized.ProfileToken, sized.Uri));
+        Assert.Equal((0, 0), (info.TargetWidth, info.TargetHeight));
+    }
 }

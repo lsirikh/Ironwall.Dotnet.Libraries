@@ -40,8 +40,33 @@ public sealed class VideoProviderInfo
     /// <summary>ONVIF 프로필을 고를 때 낮은 해상도(서브 스트림)를 먼저 — 작은 상자 · 타일에 유리.</summary>
     public bool PreferSubStream { get; init; } = true;
 
+    /// <summary>
+    /// 화면에 그릴 크기(물리 픽셀) — 호스트가 채운다(타일 · 오버레이 상자). 0 보다 크면 ONVIF 프로필을
+    /// "이 크기를 덮는 가장 낮은 해상도"로 고른다(작은 타일 = 서브, 크게 보기 · 큰 창 = 메인). 0 이면 <see cref="PreferSubStream"/> 만 본다.
+    /// </summary>
+    public int TargetWidth { get; init; }
+
+    public int TargetHeight { get; init; }
+
     /// <summary>ONVIF 로 주소를 못 얻었을 때 쓸 저장 주소(현행 "URL 조회 폴백").</summary>
     public string? FallbackUri { get; init; }
+
+    /// <summary>그릴 크기만 바꾼 사본(호스트가 타일 · 오버레이 상자 크기를 실어 제공자에 넘긴다).</summary>
+    public VideoProviderInfo WithTarget(int width, int height) => new()
+    {
+        Kind = Kind,
+        Uri = Uri,
+        Username = Username,
+        Password = Password,
+        ProfileToken = ProfileToken,
+        OpenTimeoutMs = OpenTimeoutMs,
+        Host = Host,
+        Port = Port,
+        PreferSubStream = PreferSubStream,
+        FallbackUri = FallbackUri,
+        TargetWidth = Math.Max(0, width),
+        TargetHeight = Math.Max(0, height),
+    };
 
     public override string ToString()
         => $"{Kind} uri={RedactUri(Uri)} host={(string.IsNullOrEmpty(Host) ? "-" : Host)}:{(Port > 0 ? Port : 80)} " +

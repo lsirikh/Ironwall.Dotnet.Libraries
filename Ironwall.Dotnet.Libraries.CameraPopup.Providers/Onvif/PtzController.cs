@@ -67,6 +67,8 @@ public sealed class PtzController : IPtzController
         public string? ResolvedStreamUri;
         public string? ResolvedProfileToken;
         public bool ResolvedPreferSub;
+        /// <summary>프로파일 토큰 → 재생 주소(타일 = 서브, 크게 보기 = 메인이 같은 카메라에서 함께 열린다). Gate 안에서만 만진다.</summary>
+        public readonly Dictionary<string, string> ResolvedUris = new(StringComparer.Ordinal);
     }
 
     /// <summary>GetNode로 읽은 카메라 좌표 space(변환/클램프 진실원). URI는 직렬화에 동봉.</summary>
@@ -532,9 +534,11 @@ public sealed class PtzController : IPtzController
 
     /*──────────────── RTSP 스트림 URL 조회(Onvif조회 모드 — CameraPopup_RtspSource_Priority FR-03/07/08) ────────────────*/
 
-    public async Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default)
+    public async Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default,
+        int targetWidth = 0, int targetHeight = 0)
     {
         if (conn == null) return null;
+        bool sized = targetWidth > 0 && targetHeight > 0;
         // 캐시 fast-path(감사 perf-L6): 워밍된 재오픈은 EnsureReady 전체 재수행(Gate 2회+비PTZ 경고 로그) 없이
         // Gate 1회로 즉시 반환. 캐시는 Resolve 성공 시에만 채워지고 Release 시 CamCtx째 사라지므로 안전.
         if (_ctx.TryGetValue(cameraId, out var cached))
@@ -542,7 +546,7 @@ public sealed class PtzController : IPtzController
             await cached.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (cached.ResolvedStreamUri != null && cached.ResolvedPreferSub == preferSub)
+                if (!sized && cached.ResolvedStreamUri != null && cached.ResolvedPreferSub == preferSub)
                     return cached.ResolvedStreamUri;
             }
             finally { cached.Gate.Release(); }
@@ -563,7 +567,7 @@ public sealed class PtzController : IPtzController
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (ctx.ResolvedStreamUri != null && ctx.ResolvedPreferSub == preferSub)
+                if (!sized && ctx.ResolvedStreamUri != null && ctx.ResolvedPreferSub == preferSub)
                     return ctx.ResolvedStreamUri;   // 캐시 적중(워밍 수명 — Release 시 CamCtx째 무효화, FR-07)
 
                 var media = ctx.Model?.MediaClient;
@@ -583,7 +587,12 @@ public sealed class PtzController : IPtzController
                         p.VideoEncoderConfiguration?.Resolution?.Height ?? 0,
                         p.AudioEncoderConfiguration != null))
                     .ToList();
-                var token = OnvifProfileSelector.Select(infos, preferSub);
+                // 그릴 크기를 알면 "그 크기를 덮는 가장 낮은 해상도"(작은 타일 = 서브, 큰 상자 = 메인), 모르면 preferSub 규칙.
+                var token = sized
+                    ? OnvifProfileSelector.Select(infos, preferSub, targetWidth, targetHeight)
+                    : OnvifProfileSelector.Select(infos, preferSub);
+                if (!string.IsNullOrEmpty(token) && ctx.ResolvedUris.TryGetValue(token, out var known))
+                    return known;   // 같은 프로파일은 다시 묻지 않는다(타일 60개가 카메라 8대를 나눠 쓴다)
                 if (string.IsNullOrEmpty(token))
                 {
                     _log?.Info($"[PTZ] StreamUri 조회 불가 cam={cameraId} — 선택 가능한 프로파일 토큰 없음(profiles={profiles.Count}).");
@@ -602,10 +611,14 @@ public sealed class PtzController : IPtzController
                     return null;
                 }
 
-                ctx.ResolvedStreamUri = uri;
-                ctx.ResolvedProfileToken = token;
-                ctx.ResolvedPreferSub = preferSub;
-                _log?.Info($"[PTZ] StreamUri 조회 cam={cameraId} profile={token} preferSub={preferSub} uri={Mask(uri)}");
+                ctx.ResolvedUris[token] = uri;
+                if (!sized)
+                {
+                    ctx.ResolvedStreamUri = uri;
+                    ctx.ResolvedProfileToken = token;
+                    ctx.ResolvedPreferSub = preferSub;
+                }
+                _log?.Info($"[PTZ] StreamUri 조회 cam={cameraId} profile={token} preferSub={preferSub} target={targetWidth}x{targetHeight} uri={Mask(uri)}");
                 return uri;
             }
             finally { ctx.Gate.Release(); }

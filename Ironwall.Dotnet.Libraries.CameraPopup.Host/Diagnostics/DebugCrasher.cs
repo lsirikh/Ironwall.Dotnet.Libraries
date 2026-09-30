@@ -1,4 +1,5 @@
 ﻿using System.Windows.Threading;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
@@ -10,12 +11,37 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
 internal static class DebugCrasher
 {
     public static void Execute(DebugCommandKind kind, Dispatcher dispatcher, HostLog log)
+        => Execute(new DebugCommand { Kind = kind }, dispatcher, log, _ => { }, () => { });
+
+    /// <param name="send">GIS 로 보내기.</param>
+    /// <param name="closePipe">파이프를 끊는다(호스트는 아직 산 채로).</param>
+    public static void Execute(DebugCommand command, Dispatcher dispatcher, HostLog log, Action<IIpcMessage> send, Action closePipe)
     {
-        log.Warn($"debug command {kind}");
+        var kind = command.Kind;
+        log.Warn($"debug command {kind} {command.Argument}");
         switch (kind)
         {
+            case DebugCommandKind.UiBusy:
+                // UI 스레드를 잠깐만 막는다(창을 몰아 여는 바쁨) — 심박은 끊기면 안 된다.
+                int busyMs = Math.Clamp(command.Argument, 0, 60_000);
+                dispatcher.BeginInvoke(() => Thread.Sleep(busyMs));
+                break;
+            case DebugCommandKind.PlannedExitSlow:
+                // 메모리 한도 종료 흉내: 예고 → 파이프 끊김 → 프로세스는 늦게 끝난다(큰 프로세스의 정리 시간).
+                int lingerMs = Math.Clamp(command.Argument, 0, 60_000);
+                new Thread(() =>
+                {
+                    send(new HostError { Code = HostError.MemoryLimitCode, Message = "debug" });
+                    Thread.Sleep(200);
+                    var exit = new Thread(() => HostExit.After(lingerMs, HostExitCodes.MemoryLimit, "debug planned exit")) { IsBackground = true, Name = "debug-planned-exit" };
+                    exit.Start();
+                    Thread.Sleep(50); // 종료를 먼저 맡은 뒤에 파이프를 끊는다(끊김 → "client disconnected" 종료가 앞지르지 않게)
+                    closePipe();
+                })
+                { IsBackground = true, Name = "debug-planned" }.Start();
+                break;
             case DebugCommandKind.Hang:
-                // UI 스레드를 영원히 막는다 → 심박 응답(UI 스레드 경유)이 끊긴다.
+                // UI 스레드를 영원히 막는다 → 심박은 계속 오지만 UiStallMs 가 자란다(감시자가 긴 기준으로 죽인다).
                 dispatcher.BeginInvoke(() => Thread.Sleep(Timeout.Infinite));
                 break;
             case DebugCommandKind.FailFast:

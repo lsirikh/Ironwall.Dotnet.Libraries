@@ -152,11 +152,15 @@ internal sealed class EventWindowViewModel : ObservableObject
 
     public TileViewModel? EnlargedTile => _enlargedTile;
 
+    /// <summary>타일이 그려지는 크기가 바뀌었다(크게 보기 켬 · 끔) — 창 세션이 그 크기에 맞는 스트림(메인 · 서브)으로 다시 연다.</summary>
+    public event Action<TileViewModel>? TileSizeChanged;
+
     /// <summary>"이 카메라만 크게" 토글 — 격자를 1×1 로 바꾸고 나머지 타일을 숨긴다(스트림은 계속).</summary>
     public void ToggleEnlarge(TileViewModel tile)
     {
         if (!tile.IsCamera) return;
         NoteInteraction();
+        var previous = _enlargedTile;
         _enlargedTile = ReferenceEquals(_enlargedTile, tile) ? null : tile;
         foreach (var t in Tiles)
         {
@@ -166,6 +170,8 @@ internal sealed class EventWindowViewModel : ObservableObject
         Raise(nameof(EnlargedTile));
         Raise(nameof(Columns));
         Raise(nameof(Rows));
+        if (previous is not null) TileSizeChanged?.Invoke(previous);
+        if (_enlargedTile is not null && !ReferenceEquals(_enlargedTile, previous)) TileSizeChanged?.Invoke(_enlargedTile);
     }
 
     /// <summary>사람이 타일을 옮겼다(끌기 확정). 삽입 위치는 카메라 타일 목록 기준(<see cref="TileReorder"/>).</summary>

@@ -58,7 +58,9 @@
                         Visibility="{Binding IsRetryVisible, Converter={StaticResource CameraPopup.BoolToVis}}" />
                 <Border Style="{StaticResource CameraPopup.VideoChip}" Margin="4,0,0,0" VerticalAlignment="Center"
                         Visibility="{Binding IsNoticeVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
-                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" Text="{Binding Notice, StringFormat=⚠ {0}}"
+                    <!-- UIA 이름에 알림 글 전체를 싣는다 — StringFormat 만 쓰면 이름이 "⚠ " 로만 읽혔다(T-09). -->
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" Text="{Binding NoticeText}"
+                               AutomationProperties.Name="{Binding NoticeText}"
                                AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Notice}" />
                 </Border>
             </StackPanel>

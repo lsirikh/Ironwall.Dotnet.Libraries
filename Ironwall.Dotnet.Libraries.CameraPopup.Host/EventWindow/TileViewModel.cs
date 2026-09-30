@@ -299,11 +299,16 @@ internal sealed class TileViewModel : ObservableObject
         get => _notice;
         private set
         {
-            if (Set(ref _notice, value)) Raise(nameof(IsNoticeVisible));
+            if (!Set(ref _notice, value)) return;
+            Raise(nameof(IsNoticeVisible));
+            Raise(nameof(NoticeText));
         }
     }
 
     public bool IsNoticeVisible => _notice is not null;
+
+    /// <summary>화면 · UIA 가 읽는 알림 글 전체("⚠ P2 이동 실패"). 알림이 없으면 빈 글.</summary>
+    public string NoticeText => _notice is null ? string.Empty : "⚠ " + _notice;
 
     private async Task RunPtzAsync(Func<CancellationToken, Task<bool>> call, string failure, bool cancelsAutoMove = true, bool countsAsInteraction = true)
     {

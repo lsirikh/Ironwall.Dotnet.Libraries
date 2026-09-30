@@ -224,6 +224,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // 제어 허브(CameraPopup_ControlHub) 저장 위치 로드(없으면 컨트롤 기본 우하단 도킹). 실패해도 무해.
             _ = LoadHubPositionAsync();
 
+            // 팝업 호스트 상태 안내(FR-25) — 일시 중지면 지도 하단에 "영상 기능 일시 중지 · [다시 시작]".
+            StartCameraPopupHostNotice();
+
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
 
@@ -301,6 +304,7 @@ public partial class MapViewModel : BasePanelViewModel,
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
             StopBroadcastStatusSync();      // BROADCAST_STATUS 구독 해제(FR-24)
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
+            StopCameraPopupHostNotice();    // 팝업 호스트 상태 구독 해제(다시 활성화되면 다시 구독 · 현재 상태 반영)
 
             _bootResyncTimer?.Stop();   // 부팅 재동기 재시도 타이머 정지(비활성 후 발화 방지)
 
