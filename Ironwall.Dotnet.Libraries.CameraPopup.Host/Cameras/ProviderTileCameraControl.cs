@@ -53,6 +53,17 @@ internal sealed class ProviderTileCameraControl : ITileCameraControl
         catch (Exception ex) when (ex is not OutOfMemoryException) { /* 정지 실패는 카메라 2초 안전 제한이 멈춘다(FR-22) */ }
     }
 
+    public async Task<bool> DragMoveAsync(double viewX, double viewY, double viewAspect, CancellationToken ct)
+    {
+        if (PtzUnavailableReason is not null) return false;
+        try
+        {
+            var outcome = await _cameras.DragMoveAsync(_cameraId, _provider, viewX, viewY, viewAspect, ct).ConfigureAwait(false);
+            return outcome.Sent || outcome.Reason is "superseded" or "zero";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return false; }
+    }
+
     public async Task<IReadOnlyList<TilePreset>> GetPresetsAsync(CancellationToken ct)
     {
         if (PtzUnavailableReason is not null) return NoPresets;

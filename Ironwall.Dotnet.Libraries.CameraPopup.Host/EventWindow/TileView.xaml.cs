@@ -5,19 +5,32 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
 
 /// <summary>
-/// 타일 한 칸 뷰. PTZ 패드는 누르는 동안 연속 이동 · 떼거나 캡처를 잃으면 정지(FR-14, NFR-01).
-/// 패드가 열린 타일에 포커스가 있으면 방향키(누르는 동안) · +/−(줌) · Esc(패드 닫기)도 된다.
+/// 타일 한 칸 뷰. PTZ 패드는 <b>누르는 동안만</b> 연속 이동 — 뗌 · 캡처 잃음 · 포커스 이탈 · 창 비활성 · 패드 닫힘 · 타일 닫힘이
+/// 모두 단일 <see cref="FinishPress"/> 로 모여 정지를 한 번 보낸다(FR-14, NFR-01).
+/// 패드가 열린 타일에 포커스가 있으면 방향키(누르는 동안) · +/−(줌) · Esc(패드 닫기)도 되고, 패드 단추에 포커스가 있으면
+/// Space/Enter 도 누르는 동안 이동이다(자동 반복은 무시).
+/// 영상 위 좌드래그 = 드래그 길이만큼 PTZ 상대 이동(떼는 순간 한 번) — 8 DIU 미만은 클릭(선택), Esc · 캡처 잃음은 취소.
+/// 타일 순서 바꾸기는 손잡이에서만 시작하므로(창 뷰) 서로 부딪치지 않는다.
 /// 우클릭 메뉴는 열 때마다 새로 만든다 — 권한 · 제공자 · 크게 보기 상태를 그때그때 반영.
 /// </summary>
 internal partial class TileView : UserControl
 {
+    private const double DragTargetSize = 28;
+
     private TileViewModel? _subscribed;
-    private bool _padMoving;
+    private readonly PtzHoldPress _hold = new();
+    private readonly PtzDragGesture _drag = new();
+    private Rect _dragView;          // 눌렀을 때의 영상 사각형(타일 좌표)
     private Key _padKey = Key.None;
+    private Window? _window;
+
+    /// <summary>마우스 위치 읽기(기본 = 이벤트의 위치). 헤드리스 시험이 좌표를 넣을 수 있게 분리했다 — 화면에 없는 요소는 위치를 못 읽는다.</summary>
+    internal Func<IInputElement, MouseEventArgs, Point> PointerPosition { get; set; } = (element, e) => e.GetPosition(element);
 
     public TileView()
     {
@@ -25,9 +38,18 @@ internal partial class TileView : UserControl
         foreach (var button in new[] { PadUp, PadDown, PadLeft, PadRight, PadZoomIn, PadZoomOut })
         {
             button.PreviewMouseLeftButtonDown += OnPadButtonDown;
-            button.PreviewMouseLeftButtonUp += OnPadButtonUp;
-            button.LostMouseCapture += OnPadButtonLostCapture;
+            button.PreviewMouseLeftButtonUp += (_, _) => FinishPress();
+            button.LostMouseCapture += (_, _) => FinishPress();
         }
+        MouseMove += OnTileMouseMove;
+        MouseLeftButtonUp += (_, _) => FinishDrag(commit: true);
+        LostMouseCapture += (_, _) => FinishDrag(commit: false);
+        IsKeyboardFocusWithinChanged += (_, e) =>
+        {
+            if (e.NewValue is false) FinishPress();   // 포커스가 타일을 떠나면 키 뗌을 못 받는다
+        };
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         ContextMenu = new ContextMenu();
         ContextMenuOpening += OnContextMenuOpening;
         MouseLeftButtonDown += OnTileMouseDown;
@@ -60,8 +82,36 @@ internal partial class TileView : UserControl
         }
     }
 
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var window = Window.GetWindow(this);
+        if (ReferenceEquals(window, _window)) return;
+        if (_window is not null) _window.Deactivated -= OnWindowDeactivated;
+        _window = window;
+        if (_window is not null) _window.Deactivated += OnWindowDeactivated;
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        // 타일 · 창이 닫혔다 — 누르고 있던 이동을 멈추고 드래그는 버린다.
+        FinishPress();
+        FinishDrag(commit: false);
+        if (_window is not null) _window.Deactivated -= OnWindowDeactivated;
+        _window = null;
+    }
+
+    internal void OnWindowDeactivated(object? sender, EventArgs e)
+    {
+        // 다른 창으로 넘어가면 뗌(마우스 · 키)이 이 창에 오지 않을 수 있다.
+        FinishPress();
+        FinishDrag(commit: false);
+    }
+
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        // 다른 타일로 바뀌기 전에 — 이전 타일에 걸린 누름 · 드래그를 이전 타일 기준으로 끝낸다.
+        FinishPress();
+        FinishDrag(commit: false);
         if (_subscribed is not null) _subscribed.PropertyChanged -= OnTilePropertyChanged;
         _subscribed = Tile;
         if (_subscribed is not null) _subscribed.PropertyChanged += OnTilePropertyChanged;
@@ -76,7 +126,7 @@ internal partial class TileView : UserControl
     private void OnTilePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TileViewModel.StreamState)) UpdateStateGlyph();
-        if (e.PropertyName == nameof(TileViewModel.IsPadVisible) && Tile?.IsPadVisible == false) StopPadMove();
+        if (e.PropertyName == nameof(TileViewModel.IsPadVisible) && Tile?.IsPadVisible == false) FinishPress();
     }
 
     private void UpdateStateGlyph()
@@ -96,6 +146,68 @@ internal partial class TileView : UserControl
         if (Tile is not { IsCamera: true } tile) return;
         Owner?.Select(tile);
         Focus();
+
+        // 영상 위에서만 PTZ 드래그를 시작한다(패드 · 손잡이 · 단추 · 검은 여백 제외). 8 DIU 미만은 위 선택만 남는다.
+        if (!ReferenceEquals(e.OriginalSource, VideoImage) || VideoImage.ActualWidth <= 0 || VideoImage.ActualHeight <= 0) return;
+        var origin = VideoImage.TranslatePoint(new Point(0, 0), this);
+        var view = new Rect(origin.X, origin.Y, VideoImage.ActualWidth, VideoImage.ActualHeight);
+        var p = PointerPosition(this, e);
+        if (!_drag.Press(p.X - view.X, p.Y - view.Y, view.Width, view.Height)) return;
+        _dragView = view;
+        CaptureMouse();   // 타일(UserControl)이 쥔다 — 단추 계열이 아니라 캡처를 빼앗기지 않는다
+        e.Handled = true;
+    }
+
+    // ───────── 영상 위 드래그 PTZ ─────────
+
+    private void OnTileMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_drag.IsPressed) return;
+        var p = PointerPosition(this, e);
+        if (!_drag.Move(p.X - _dragView.X, p.Y - _dragView.Y)) return;   // 데드존 안 — 아직 클릭
+        if (Tile is not { IsPtzEnabled: true }) return;                   // 못 하는 타일은 표시 없이, 떼면 이유를 알린다
+        DrawDragTarget();
+    }
+
+    /// <summary>끈 길이(선)와 떼면 화면 중심으로 올 점(과녁)을 그린다.</summary>
+    private void DrawDragTarget()
+    {
+        double sx = _dragView.X + _drag.StartX, sy = _dragView.Y + _drag.StartY;
+        double cx = _dragView.X + _drag.CurrentX, cy = _dragView.Y + _drag.CurrentY;
+        foreach (var line in new[] { DragShaftHalo, DragShaft })
+        {
+            line.X1 = sx;
+            line.Y1 = sy;
+            line.X2 = cx;
+            line.Y2 = cy;
+        }
+        var (tx, ty) = PtzDragGesture.TargetPoint(_dragView.Width, _dragView.Height, _drag.CurrentX - _drag.StartX, _drag.CurrentY - _drag.StartY);
+        Canvas.SetLeft(DragTarget, _dragView.X + tx - (DragTargetSize / 2));
+        Canvas.SetTop(DragTarget, _dragView.Y + ty - (DragTargetSize / 2));
+        if (PtzDragOverlay.Visibility != Visibility.Visible)
+        {
+            PtzDragOverlay.Visibility = Visibility.Visible;
+            Cursor = Cursors.Cross;   // 요소 로컬 커서(전역 OverrideCursor 금지) — FinishDrag 가 ClearValue 로 되돌린다
+        }
+    }
+
+    /// <summary>
+    /// 드래그 종료 단일 지점(뗌 · 캡처 잃음 · Esc · 창 비활성 · 타일 닫힘). 순서: ①상태 지움 ②시각 복원 ③(구독 없음) ④캡처 해제 ⑤확정 통지.
+    /// 데드존 미만 · 취소면 아무것도 보내지 않는다.
+    /// </summary>
+    private void FinishDrag(bool commit)
+    {
+        if (!_drag.IsPressed) return;
+        var vector = _drag.Finish(commit);
+
+        PtzDragOverlay.Visibility = Visibility.Collapsed;
+        ClearValue(CursorProperty);
+
+        if (IsMouseCaptured) ReleaseMouseCapture();
+
+        if (vector is not { } v || (_subscribed ?? Tile) is not { } tile) return;
+        if (tile.IsPtzEnabled) _ = tile.PtzDragAsync(v.ViewX, v.ViewY, v.ViewAspect);
+        else tile.NotePtzUnavailable();
     }
 
     private void OnRetryClick(object sender, RoutedEventArgs e) => Tile?.RequestRetry();
@@ -115,33 +227,40 @@ internal partial class TileView : UserControl
 
     private void OnPadButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (Tile is not { IsPtzEnabled: true } tile || sender is not FrameworkElement button) return;
-        var (pan, tilt, zoom) = Vector(button.Tag as string);
-        _padMoving = true;
+        if (sender is FrameworkElement { Tag: string tag }) BeginPress(tag);
+    }
+
+    /// <summary>누름 시작 — 이동을 한 번 보낸다(키 자동 반복 · 같은 단추 재누름은 무시).</summary>
+    private void BeginPress(string tag, bool isRepeat = false)
+    {
+        if (Tile is not { IsPtzEnabled: true } tile) return;
+        var (pan, tilt, zoom) = Vector(tag);
+        if (pan == 0 && tilt == 0 && zoom == 0) return;
+        if (!_hold.Press(tag, isRepeat)) return;
         _ = tile.PtzMoveAsync(pan, tilt, zoom);
     }
 
-    private void OnPadButtonUp(object sender, MouseButtonEventArgs e) => StopPadMove();
-
-    private void OnPadButtonLostCapture(object sender, MouseEventArgs e) => StopPadMove();
-
-    private void StopPadMove()
+    /// <summary>
+    /// 누름 종료 단일 지점 — 뗌(마우스 · 키) · 캡처 잃음 · 포커스 이탈 · 창 비활성 · 패드 닫힘 · 타일/창 닫힘이 모두 여기로 온다.
+    /// 눌려 있던 게 있을 때만 정지를 한 번 보낸다.
+    /// </summary>
+    private void FinishPress()
     {
-        if (!_padMoving) return;
-        _padMoving = false;
         _padKey = Key.None;
-        if (Tile is { } tile) _ = tile.PtzStopAsync();
+        if (_hold.Finish() is null) return;
+        if ((_subscribed ?? Tile) is { } tile) _ = tile.StopIfMovingAsync();
     }
 
     private void OnPadStopClick(object sender, RoutedEventArgs e)
     {
-        _padMoving = false;
-        if (Tile is { } tile) _ = tile.PtzStopAsync();
+        _hold.Finish();
+        _padKey = Key.None;
+        if (Tile is { } tile) _ = tile.PtzStopAsync();   // ■ 는 눌린 게 없어도 항상 정지를 보낸다
     }
 
     private void OnPadCloseClick(object sender, RoutedEventArgs e)
     {
-        StopPadMove();
+        FinishPress();
         Tile?.HidePad();
         Focus();
     }
@@ -157,30 +276,41 @@ internal partial class TileView : UserControl
         _ => null,
     };
 
+    /// <summary>포커스가 있는 방향 · 줌 단추의 표식(Space/Enter 누름 이동용). 정지 · 닫기 단추는 null(보통 클릭).</summary>
+    private static string? FocusedPadTag(object? source)
+        => source is Button { Tag: string tag } && tag is not ("stop" or "close") ? tag : null;
+
     private void OnTileKeyDown(object sender, KeyEventArgs e)
     {
+        if (_drag.IsPressed && e.Key == Key.Escape)
+        {
+            // 드래그 중일 때만 소비 — 취소(이동을 보내지 않는다).
+            FinishDrag(commit: false);
+            e.Handled = true;
+            return;
+        }
         if (Tile is not { IsPadVisible: true } tile) return;
         if (e.Key == Key.Escape)
         {
-            StopPadMove();
+            FinishPress();
             tile.HidePad();
             e.Handled = true;
             return;
         }
-        if (KeyTag(e.Key) is not { } tag) return;
-        e.Handled = true;
-        if (e.IsRepeat || _padKey == e.Key) return;
+        string? tag = KeyTag(e.Key);
+        if (tag is null && e.Key is Key.Space or Key.Enter) tag = FocusedPadTag(e.OriginalSource);
+        if (tag is null) return;
+        e.Handled = true;   // 단추의 기본 클릭(Space 누름 → 캡처)으로 넘기지 않는다
+        if (e.IsRepeat || _padKey == e.Key) return;   // 자동 반복은 이동을 다시 보내지 않는다
         _padKey = e.Key;
-        _padMoving = true;
-        var (pan, tilt, zoom) = Vector(tag);
-        _ = tile.PtzMoveAsync(pan, tilt, zoom);
+        BeginPress(tag);
     }
 
     private void OnTileKeyUp(object sender, KeyEventArgs e)
     {
-        if (e.Key != _padKey) return;
+        if (_padKey == Key.None || e.Key != _padKey) return;
         e.Handled = true;
-        StopPadMove();
+        FinishPress();
     }
 
     // ───────── 우클릭 메뉴(FR-14) ─────────

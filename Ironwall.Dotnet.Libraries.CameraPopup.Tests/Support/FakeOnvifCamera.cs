@@ -35,6 +35,46 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
     /// <summary>응답 지연(ONVIF 무응답 · 느린 카메라 흉내, FR-26).</summary>
     public TimeSpan Delay { get; set; }
 
+    // ── 드래그 PTZ 시험용 좌표 공간 · 위치(기본값 = 이전과 같은 모양: 일반 상대 + 연속, 위치 응답 없음) ──
+    public bool HasRelativeGeneric { get; set; } = true;
+    /// <summary>화각 상대 공간(TranslationSpaceFov)을 일반 공간보다 <b>앞에</b> 싣는다 — 첫 항목을 무조건 쓰는 실수를 잡는다.</summary>
+    public bool HasRelativeFov { get; set; }
+    public bool HasAbsolute { get; set; }
+    public bool HasContinuous { get; set; } = true;
+    /// <summary>GetStatus 가 돌려줄 위치(pan, tilt, zoom). null 이면 GetStatus 를 모르는 카메라(기대한 모양이 아닌 응답).</summary>
+    public (double Pan, double Tilt, double Zoom)? Status { get; set; }
+
+    public const string RelGenericUri = "http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationGenericSpace";
+    public const string RelFovUri = "http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationSpaceFov";
+    public const string AbsGenericUri = "http://www.onvif.org/ver10/tptz/PanTiltSpaces/PositionGenericSpace";
+
+    /// <summary>카메라에 도착한 PTZ 명령만, 도착 순서대로(작업 이름 · 본문). 위치 읽기(GetStatus)는 뺀다.</summary>
+    public IReadOnlyList<(string Op, string Body)> PtzCommands
+        => Requests.Select(r => (Op: PtzOpOf(r.Body), r.Body)).Where(x => x.Op is not null).Select(x => (x.Op!, x.Body)).ToList();
+
+    private static string? PtzOpOf(string body)
+    {
+        foreach (var op in new[] { "RelativeMove", "AbsoluteMove", "ContinuousMove" })
+            if (body.Contains(op, StringComparison.Ordinal)) return op;
+        return body.Contains("<Stop", StringComparison.Ordinal) || body.Contains(":Stop", StringComparison.Ordinal) ? "Stop" : null;
+    }
+
+    /// <summary>명령 본문의 PanTilt x · y · space(없으면 null).</summary>
+    public static (double X, double Y, string? Space)? PanTiltOf(string body)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(body, "<(?:\\w+:)?PanTilt\\b([^>]*)>");
+        if (!m.Success) return null;
+        string attrs = m.Groups[1].Value;
+        string? Attr(string name)
+        {
+            var a = System.Text.RegularExpressions.Regex.Match(attrs, "\\b" + name + "=\"([^\"]*)\"");
+            return a.Success ? a.Groups[1].Value : null;
+        }
+        if (Attr("x") is not { } x || Attr("y") is not { } y) return null;
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        return (double.Parse(x, System.Globalization.NumberStyles.Float, inv), double.Parse(y, System.Globalization.NumberStyles.Float, inv), Attr("space"));
+    }
+
     /// <summary>GetStreamUri 가 돌려주는 주소(계정 없음 — 실측 카메라와 같다).</summary>
     public string StreamUri => $"rtsp://127.0.0.1:{Port}/sub";
 
@@ -63,14 +103,29 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
                    "<tt:NodeToken>N0</tt:NodeToken></tptz:PTZConfiguration></tptz:GetConfigurationsResponse>";
         if (body.Contains("GetNode"))
             return "<tptz:GetNodeResponse><tptz:PTZNode token=\"N0\"><tt:Name>n</tt:Name><tt:SupportedPTZSpaces>" +
-                   Space("RelativePanTiltTranslationSpace", "http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationGenericSpace", true) +
-                   Space("ContinuousPanTiltVelocitySpace", "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace", true) +
-                   Space("ContinuousZoomVelocitySpace", "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace", false) +
+                   (HasAbsolute ? Space("AbsolutePanTiltPositionSpace", AbsGenericUri, true) : string.Empty) +
+                   (HasAbsolute ? "<tt:AbsoluteZoomPositionSpace><tt:URI>http://www.onvif.org/ver10/tptz/ZoomSpaces/PositionGenericSpace</tt:URI><tt:XRange><tt:Min>0</tt:Min><tt:Max>1</tt:Max></tt:XRange></tt:AbsoluteZoomPositionSpace>" : string.Empty) +
+                   (HasRelativeFov ? Space("RelativePanTiltTranslationSpace", RelFovUri, true) : string.Empty) +
+                   (HasRelativeGeneric ? Space("RelativePanTiltTranslationSpace", RelGenericUri, true) : string.Empty) +
+                   (HasContinuous ? Space("ContinuousPanTiltVelocitySpace", "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace", true) : string.Empty) +
+                   (HasContinuous ? Space("ContinuousZoomVelocitySpace", "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace", false) : string.Empty) +
                    "</tt:SupportedPTZSpaces><tt:MaximumNumberOfPresets>8</tt:MaximumNumberOfPresets><tt:HomeSupported>true</tt:HomeSupported>" +
                    "</tptz:PTZNode></tptz:GetNodeResponse>";
         if (body.Contains("GetPresets"))
             return "<tptz:GetPresetsResponse><tptz:Preset token=\"1\"><tt:Name>정문</tt:Name></tptz:Preset>" +
                    "<tptz:Preset token=\"2\"><tt:Name>후문</tt:Name></tptz:Preset></tptz:GetPresetsResponse>";
+        if (body.Contains("RelativeMove")) return "<tptz:RelativeMoveResponse/>";
+        if (body.Contains("AbsoluteMove")) return "<tptz:AbsoluteMoveResponse/>";
+        if (body.Contains("GetStatus"))
+        {
+            if (Status is not { } s) return null;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            return "<tptz:GetStatusResponse><tptz:PTZStatus><tt:Position>" +
+                   $"<tt:PanTilt x=\"{s.Pan.ToString(inv)}\" y=\"{s.Tilt.ToString(inv)}\" space=\"{AbsGenericUri}\"/>" +
+                   $"<tt:Zoom x=\"{s.Zoom.ToString(inv)}\" space=\"http://www.onvif.org/ver10/tptz/ZoomSpaces/PositionGenericSpace\"/>" +
+                   "</tt:Position><tt:MoveStatus><tt:PanTilt>IDLE</tt:PanTilt><tt:Zoom>IDLE</tt:Zoom></tt:MoveStatus>" +
+                   "<tt:UtcTime>2026-09-30T01:02:03Z</tt:UtcTime></tptz:PTZStatus></tptz:GetStatusResponse>";
+        }
         if (body.Contains("ContinuousMove")) return "<tptz:ContinuousMoveResponse/>";
         if (body.Contains("<Stop") || body.Contains(":Stop")) return "<tptz:StopResponse/>";
         return null;

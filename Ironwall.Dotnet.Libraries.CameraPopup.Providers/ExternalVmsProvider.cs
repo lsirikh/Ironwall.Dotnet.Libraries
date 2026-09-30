@@ -24,6 +24,7 @@ public sealed class ExternalVmsProvider : ICameraVideoProvider, ICameraPtzProvid
     public bool IsPrepared(string cameraId) => false;
     public Task<bool> ContinuousMoveAsync(string cameraId, double pan, double tilt, double zoom, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task StopAsync(string cameraId, CancellationToken ct) => throw new NotSupportedException(Message);
+    public Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task<IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(string cameraId, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task<bool> GotoPresetAsync(string cameraId, string presetToken, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task<bool> SetPresetAsync(string cameraId, string presetName, CancellationToken ct) => throw new NotSupportedException(Message);

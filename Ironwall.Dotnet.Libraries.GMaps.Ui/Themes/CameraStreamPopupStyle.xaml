@@ -312,7 +312,7 @@
                                         AutomationProperties.AutomationId="GMaps.CameraPopup.Video"
                                         FrameSource="{Binding FrameSource}"
                                         IsHitTestVisible="False" />
-                                    <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
+                                    <!--  드래그-PTZ 목표 표시(끈 길이 선 + 떼면 화면 중심으로 올 점의 과녁). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
                                     <!--  PTZ 상태 배지(상단 상태 띠 중앙 — RTSP 헤더 Row0 #FF3F3F46, "Playing"·"스트리밍 HUB"와 같은 높이) — 🟢가능 / 🟠준비중 / ⚪지원안함.
@@ -367,7 +367,10 @@
                                         </Border.Style>
                                         <StackPanel Orientation="Horizontal">
                                             <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF95A5A6" />
-                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="PTZ 지원안함" />
+                                            <!--  막힌 이유: 지원안함 · 권한 없음 · 연결 실패(영상 드래그 · 휠 · PTZ 단추가 안 되는 까닭)  -->
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center"
+                                                       AutomationProperties.AutomationId="GMaps.CameraPopup.PtzReason"
+                                                       Text="{Binding PtzUnavailableReason, TargetNullValue='PTZ 지원안함', FallbackValue='PTZ 지원안함'}" />
                                         </StackPanel>
                                     </Border>
 

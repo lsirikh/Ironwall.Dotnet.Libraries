@@ -67,17 +67,18 @@ public class ContractTests
         var json = System.Text.Encoding.UTF8.GetString(IpcSerializer.Serialize(new PtzCommand { CameraId = "c", Operation = PtzOperation.Stop }, 1));
         Assert.Contains("\"operation\":\"Stop\"", json);
         Assert.Contains("\"type\":\"Ptz\"", json);
-        Assert.Contains("\"v\":2", json);
+        Assert.Contains("\"v\":3", json);
     }
 
     [Theory]
-    [InlineData("{\"v\":2,\"type\":\"FutureThing\",\"id\":3,\"body\":{}}", DecodeStatus.UnknownType)]
+    [InlineData("{\"v\":3,\"type\":\"FutureThing\",\"id\":3,\"body\":{}}", DecodeStatus.UnknownType)]
     [InlineData("{\"v\":1,\"type\":\"OpenEventWindow\",\"id\":3,\"body\":{}}", DecodeStatus.IncompatibleVersion)]
+    [InlineData("{\"v\":2,\"type\":\"Ptz\",\"id\":3,\"body\":{}}", DecodeStatus.IncompatibleVersion)]   // 판 2(드래그 PTZ 이전) 상대는 받지 않는다
     [InlineData("{\"v\":99,\"type\":\"Hello\",\"id\":3,\"body\":{}}", DecodeStatus.IncompatibleVersion)]
     [InlineData("{\"type\":\"Hello\",\"body\":{}}", DecodeStatus.Malformed)]
     [InlineData("not json", DecodeStatus.Malformed)]
     [InlineData("[1,2]", DecodeStatus.Malformed)]
-    [InlineData("{\"v\":2,\"type\":\"Hello\",\"id\":3,\"body\":5}", DecodeStatus.Malformed)]
+    [InlineData("{\"v\":3,\"type\":\"Hello\",\"id\":3,\"body\":5}", DecodeStatus.Malformed)]
     public void should_report_status_without_throwing_when_envelope_is_unusual(string json, DecodeStatus expected)
     {
         var status = IpcSerializer.TryDeserialize(System.Text.Encoding.UTF8.GetBytes(json), out var message, out _, out _);

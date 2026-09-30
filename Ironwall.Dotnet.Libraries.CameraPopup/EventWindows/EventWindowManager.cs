@@ -294,8 +294,9 @@ public sealed class EventWindowManager : IEventWindowManager, IDisposable
     internal static OpenEventWindow BuildMessage(EventWindowRequest request, CameraPopupSettings settings, PlacementArea area, ScreenRect rect)
     {
         var cameras = request.Cameras.Take(TileGrid.MaxCameras).ToList();
-        // 설정 격자는 "창당 카메라 수" 기준 — 실제 카메라가 적으면 그 수에 맞는 격자로 스냅(FR-10).
-        var layout = CameraPopupGridLayouts.Snap(cameras.Count, settings.GridLayout);
+        // 격자는 여기 한 곳에서 정한다(호스트는 받은 열 · 행을 그대로 쓴다). 설정 격자는 "창당 카메라 수" 기준 —
+        // 실제 카메라 수가 같으면 그대로, 적으면 이 창 크기에서 16:9 타일이 가장 큰 격자(3대 · 960×600 → 2×2 한 칸 비움). (FR-10)
+        var layout = CameraPopupGridLayouts.ForWindow(cameras.Count, settings.CamerasPerWindow, settings.GridLayout, rect.Width, rect.Height);
         var monitor = area.Monitor;
         return new OpenEventWindow
         {

@@ -32,6 +32,14 @@ public interface ICameraPopupControl : IDisposable
 
     bool Stop(string cameraId, VideoProviderInfo provider);
 
+    /// <summary>
+    /// 영상 위 드래그 → 드래그 길이만큼 상대 이동 <b>한 건</b>(보내고 잊기). <paramref name="viewX"/>/<paramref name="viewY"/> =
+    /// 영상 상자 크기에 대한 드래그 비율(오른쪽 +, 아래 +), <paramref name="viewAspect"/> = 상자 가로/세로.
+    /// 환산(화각 · 줌 · 카메라가 지원하는 이동 방식)은 호스트가 한다 — GIS 는 기다리지도 시간을 재지도 않는다.
+    /// 같은 카메라의 밀린 PTZ 명령은 최신 하나로 합쳐진다(빠른 연속 드래그는 마지막 것만). 호스트가 없으면 false.
+    /// </summary>
+    bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect);
+
     /// <summary>수동 포커스(+1 원경 · -1 근경 · 0 정지).</summary>
     bool Focus(string cameraId, VideoProviderInfo provider, int direction);
 }
@@ -90,6 +98,20 @@ public sealed class CameraPopupControl : ICameraPopupControl
 
     public bool Stop(string cameraId, VideoProviderInfo provider)
         => SendPtz(new PtzCommand { CameraId = cameraId, Operation = PtzOperation.Stop, Provider = provider });
+
+    public bool DragMove(string cameraId, VideoProviderInfo provider, double viewX, double viewY, double viewAspect)
+    {
+        if (!double.IsFinite(viewX) || !double.IsFinite(viewY)) return false;
+        return SendPtz(new PtzCommand
+        {
+            CameraId = cameraId,
+            Operation = PtzOperation.DragMove,
+            ViewX = Math.Clamp(viewX, -1d, 1d),
+            ViewY = Math.Clamp(viewY, -1d, 1d),
+            ViewAspect = double.IsFinite(viewAspect) && viewAspect > 0 ? viewAspect : 0d,
+            Provider = provider,
+        });
+    }
 
     public bool Focus(string cameraId, VideoProviderInfo provider, int direction)
     {

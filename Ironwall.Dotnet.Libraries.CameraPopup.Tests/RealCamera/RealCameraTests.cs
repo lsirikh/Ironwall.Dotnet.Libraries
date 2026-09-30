@@ -144,4 +144,39 @@ public class RealCameraTests
         Assert.Equal(CameraPopupHostState.Running, host.State);
         Assert.True(again.Success);
     }
+
+    /// <summary>
+    /// 드래그 PTZ 실카메라 확인(.66 TRUEN) — 제공자 경로 그대로(호스트 · LibVLC 없이): 준비 → 아주 작은 드래그 3번(합 = 0).
+    /// 위치 판독 · 원위치 복구(AbsoluteMove)는 시험 밖에서 따로 한다. 프리셋 · Home 은 건드리지 않는다.
+    /// </summary>
+    [Fact]
+    public async Task should_send_relative_move_for_small_drags_when_real_ptz_camera_reachable()
+    {
+        var cred = LoadCredentials();
+        if (cred is null) { _output.WriteLine("SKIP — IRONWALL_REALCAM_CRED 없음"); return; }
+        var info = new VideoProviderInfo
+        {
+            Kind = VideoProviderKind.Onvif,
+            Host = Env("IRONWALL_REALCAM_PTZ", "192.168.202.66"),
+            Port = 80,
+            Username = cred.Value.User,
+            Password = cred.Value.Password,
+        };
+        var ptz = Ironwall.Dotnet.Libraries.CameraPopup.Providers.CameraProviderRegistry.CreateDefault(new TestLog()).GetPtz(VideoProviderKind.Onvif)!;
+        var sw = Stopwatch.StartNew();
+        var ready = await ptz.PrepareAsync("66", info, new CancellationTokenSource(20_000).Token);
+        Assert.True(ready.Connected && ready.PtzCapable, ready.ToString());
+        long prepareMs = sw.ElapsedMilliseconds;
+        await Task.Delay(1500);   // 준비 뒤 배경 위치 읽기(줌) 1회가 끝나게
+
+        foreach (var (x, y) in new[] { (0.02, 0.0), (0.0, 0.02), (-0.02, -0.02) })
+        {
+            sw.Restart();
+            var outcome = await ptz.DragMoveAsync("66", x, y, 16d / 9d, new CancellationTokenSource(5000).Token);
+            _output.WriteLine(FormattableString.Invariant($"drag ({x},{y}) → sent={outcome.Sent} kind={outcome.Kind} pan={outcome.Pan:F5} tilt={outcome.Tilt:F5} reason={outcome.Reason} in {sw.ElapsedMilliseconds} ms"));
+            Assert.True(outcome.Sent, outcome.ToString());
+            await Task.Delay(2000);
+        }
+        _output.WriteLine($"prepare {prepareMs} ms");
+    }
 }

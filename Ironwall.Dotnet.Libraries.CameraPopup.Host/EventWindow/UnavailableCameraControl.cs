@@ -11,6 +11,7 @@ internal sealed class UnavailableCameraControl : ITileCameraControl
 
     public Task<bool> ContinuousMoveAsync(double pan, double tilt, double zoom, CancellationToken ct) => Task.FromResult(false);
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+    public Task<bool> DragMoveAsync(double viewX, double viewY, double viewAspect, CancellationToken ct) => Task.FromResult(false);
     public Task<IReadOnlyList<TilePreset>> GetPresetsAsync(CancellationToken ct) => Task.FromResult(NoPresets);
     public Task<bool> GotoPresetAsync(string presetToken, CancellationToken ct) => Task.FromResult(false);
     public Task<bool> GotoHomeAsync(string? homePresetToken, CancellationToken ct) => Task.FromResult(false);

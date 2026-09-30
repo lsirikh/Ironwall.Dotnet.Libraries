@@ -212,6 +212,7 @@ internal sealed class EventWindowViewModel : ObservableObject
         _send(new TileClosed { EventKey = EventKey, CameraId = tile.CameraId });
         Raise(nameof(CameraCountText));
         TileRemoved?.Invoke(tile);
+        _ = tile.StopIfMovingAsync();   // 누르고 있는 채로 타일이 닫혀도 정지는 나간다
         if (tile.Control is { } control) DisposeControl(control);
     }
 
@@ -313,6 +314,12 @@ internal sealed class EventWindowViewModel : ObservableObject
     public async Task ShutdownAsync(bool returnHome)
     {
         var tiles = CameraTiles.ToArray();
+        foreach (var tile in tiles)
+        {
+            // 누르고 있는 채로 창이 닫혀도(타이머 · 조치보고 · 사람) 정지는 나간다. 기다리지 않는다 — 실패해도 카메라는 2초 뒤 스스로 멈춘다.
+            try { _ = tile.StopIfMovingAsync(); }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { _log?.Warn($"stop-on-close failed {tile.CameraId}: {ex.Message}"); }
+        }
         if (returnHome)
         {
             try

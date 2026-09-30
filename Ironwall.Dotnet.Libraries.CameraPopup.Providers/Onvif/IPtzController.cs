@@ -15,6 +15,15 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Onvif;
 /// <summary>카메라 현재 PTZ 위치(프리셋 저장/복원 단위). space URI를 동봉해 저장↔이동 round-trip 보장.</summary>
 public sealed record PtzPosition(double Pan, double Tilt, double Zoom, string? PanTiltSpace, string? ZoomSpace);
 
+/// <summary>
+/// 영상 위 드래그 한 번의 결과. <see cref="Sent"/> = 카메라에 이동 명령이 나갔다. 안 나갔으면 <see cref="Reason"/>
+/// ("superseded" = 더 새 드래그 · 정지가 앞질렀다 · "not-ready" · "no-space" · "zero" · "failed" · "timeout").
+/// </summary>
+public sealed record PtzDragOutcome(bool Sent, Ptz.PtzDragMoveKind Kind, double Pan, double Tilt, string? Reason)
+{
+    public static PtzDragOutcome NotSent(string reason) => new(false, Ptz.PtzDragMoveKind.None, 0, 0, reason);
+}
+
 /// <summary>카메라 영상 옵션 상태(옵션 탭). <c>IrCutFilter</c>="ON"(주간)/"OFF"(야간)/"AUTO". <c>AutoFocus</c>=오토포커스 여부.</summary>
 public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
 
@@ -57,6 +66,16 @@ public interface IPtzController
     /// </summary>
     Task<bool> RelativeMoveByPixelAsync(string cameraId, double dx, double dy,
         double imageW, double imageH, double sensitivity = 1.0, CancellationToken ct = default);
+
+    /// <summary>
+    /// 영상 위 드래그 → 상대 이동 한 번(드래그 PTZ). <paramref name="viewX"/>/<paramref name="viewY"/> = 영상 상자 크기에 대한
+    /// 드래그 비율(오른쪽 +, 아래 +). 카메라가 지원하는 방식으로 <b>ONVIF 호출 한 번</b>에 보낸다(화각 상대 → 일반 상대 →
+    /// 절대 → 시간 제한 연속) — 좌표 공간 · 줌은 준비 때 읽어 둔 캐시를 쓰고 드래그마다 다시 묻지 않는다.
+    /// 최신 우선: 아직 못 나간 이전 드래그는 버려지고(밀린 드래그가 쌓이지 않는다), 정지가 오면 대기 중 드래그는 취소된다.
+    /// 기본 구현은 "지원 안 함" — 시험용 가짜가 이 멤버 때문에 깨지지 않게.
+    /// </summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct = default)
+        => Task.FromResult(PtzDragOutcome.NotSent("not-supported"));
 
     /// <summary>상대 줌(휠) — RelativeZoomTranslationSpace로 클램프. zoomDelta +=줌인/-=줌아웃. (FR-PTZCTL-03)</summary>
     Task<bool> RelativeZoomAsync(string cameraId, double zoomDelta, CancellationToken ct = default);

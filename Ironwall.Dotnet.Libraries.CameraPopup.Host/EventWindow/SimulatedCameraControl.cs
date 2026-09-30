@@ -42,6 +42,12 @@ internal sealed class SimulatedCameraControl : ITileCameraControl
         return Task.CompletedTask;
     }
 
+    public Task<bool> DragMoveAsync(double viewX, double viewY, double viewAspect, CancellationToken ct)
+    {
+        Record(FormattableString.Invariant($"drag:{viewX:0.###},{viewY:0.###}"));
+        return Task.FromResult(true);
+    }
+
     public Task<IReadOnlyList<TilePreset>> GetPresetsAsync(CancellationToken ct) => Task.FromResult(Presets);
 
     public Task<bool> GotoPresetAsync(string presetToken, CancellationToken ct)

@@ -20,11 +20,17 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests;
 /// 실제 XAML 로 확인한다. PNG 폴더: 환경 변수 <c>IRONWALL_T05_RENDER_DIR</c>, 없으면 %TEMP%\ironwall-camhost-render.
 /// Application 은 AppDomain 당 하나라 두 테마를 한 시험 · 한 STA 스레드에서 차례로 그린다.
 /// </summary>
+[Collection(HostStaCollection.Name)]
 public class EventWindowRenderTests
 {
     private readonly ITestOutputHelper _output;
+    private readonly HostStaThread _sta;
 
-    public EventWindowRenderTests(ITestOutputHelper output) => _output = output;
+    public EventWindowRenderTests(ITestOutputHelper output, HostStaThread sta)
+    {
+        _output = output;
+        _sta = sta;
+    }
 
     private static string RenderDirectory()
     {
@@ -39,30 +45,18 @@ public class EventWindowRenderTests
     {
         var files = new List<string>();
         var summaries = new List<string>();
-        ExceptionDispatchInfo? failure = null;
-        var thread = new Thread(() =>
+        // Application 은 AppDomain 당 하나 — 호스트 시험이 함께 쓰는 STA 스레드(HostStaThread)에서 그린다.
+        _sta.Invoke(() =>
         {
-            try
+            var app = Application.Current!;
+            foreach (var theme in new[] { HostTheme.Light, HostTheme.Dark })
             {
-                var app = Application.Current ?? new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-                HostTheme.EnsureLoaded(app);
-                foreach (var theme in new[] { HostTheme.Light, HostTheme.Dark })
-                {
-                    HostTheme.Apply(app, theme);
-                    var (path, summary) = RenderOnce(theme);
-                    files.Add(path);
-                    summaries.Add(summary);
-                }
-            }
-            catch (Exception ex)
-            {
-                failure = ExceptionDispatchInfo.Capture(ex);
+                HostTheme.Apply(app, theme);
+                var (path, summary) = RenderOnce(theme);
+                files.Add(path);
+                summaries.Add(summary);
             }
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(60)), "render thread hung");
-        failure?.Throw();
 
         foreach (var s in summaries) _output.WriteLine(s);
         Assert.Equal(2, files.Count);

@@ -2107,6 +2107,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (control == null)
         {
             _log?.Warning($"[CameraPopup] PTZ 비활성 — 팝업 호스트 미등록 cam={vm.CameraId}.");
+            await OnUiAsync(() => vm.PtzUnavailableReason = CameraStreamPopupViewModel.PtzReasonNoHost).ConfigureAwait(false);
             return;
         }
         await OnUiAsync(() => vm.IsPtzLoading = true).ConfigureAwait(false);   // "PTZ 준비 중…" 표시(수 초 소요)
@@ -2114,7 +2115,14 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             _log?.Info($"[CameraPopup] PTZ 준비 요청 cam={vm.CameraId} → 호스트");
             var r = await control.RequestAsync(NewCameraRequest(vm, CameraRequestKind.PreparePtz)).ConfigureAwait(false);
-            await OnUiAsync(() => { vm.IsPtzCapable = r.Success && r.PtzCapable && CanControlCamera(); vm.IsImagingCapable = r.Success && r.ImagingCapable; vm.IsPtzLoading = false; }).ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                bool permitted = CanControlCamera();
+                vm.PtzUnavailableReason = CameraStreamPopupViewModel.PtzReason(r.Success, r.PtzCapable, permitted);   // 막혔으면 왜 막혔는지(배지)
+                vm.IsPtzCapable = r.Success && r.PtzCapable && permitted;
+                vm.IsImagingCapable = r.Success && r.ImagingCapable;
+                vm.IsPtzLoading = false;
+            }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} ok={r.Success} capable={r.PtzCapable} err={r.ErrorCode} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
             // P2-3(리뷰): 준비 중에 프리셋 탭에 진입해 "PTZ 준비 중…"에서 멈춘 사용자 구제 — 준비 완료 시 활성 탭이면 자동 재조회(FR-C3).
             if (vm.ActiveTab == 1) _ = LoadPresetsAsync(vm);
@@ -2146,10 +2154,9 @@ public partial class MapViewModel : BasePanelViewModel,
     private void SendPtzStop(CameraStreamPopupViewModel vm)
         => ResolveCameraControl()?.Stop(vm.CameraId.ToString(), vm.Provider);
 
-    // ── ContinuousMove 펄스 상수(RelativeMove 미지원 카메라 대응) ──
+    // ── ContinuousMove 펄스 상수 ──
     //    팬/틸트·줌 속도 크기는 팝업 VM(PanTiltSpeed/ZoomSpeed, [0.1,1.0])이 사용자 조절값으로 보유 — PTZ 탭 슬라이더/텍스트박스.
-    private const int PtzDragMaxDurationMs = 700;   // 드래그 1회 이동 최대 시간(드래그 길이 비례)
-    private const int PtzDragMinDurationMs = 120;   // 짧은 드래그 최소 펄스 — sub-perceptible 무동작(dead-zone) 방지
+    //    (영상 드래그는 더 이상 GIS 가 시간을 재지 않는다 — 호스트가 상대 이동 한 건으로 보낸다.)
     private const int PtzZoomPulseMs = 250;         // 휠 1노치 줌 펄스 시간
 
     // PTZ 제스처(드래그/줌) 취소용 — 새 제스처가 직전 것을 취소(Last-Write-Wins, 큐 적체 방지).
@@ -2182,34 +2189,24 @@ public partial class MapViewModel : BasePanelViewModel,
 
     // R-1(이동 SOAP 실패 → 정지 보상)은 호스트가 한다(HostCameraServices — 그 뒤로 새 동작이 없을 때만).
 
+    /// <summary>
+    /// 영상 위 드래그 릴리즈 → 호스트로 <b>DragMove 한 건</b>(드래그 길이만큼 상대 이동, 보내고 잊기). (FR-DRAG-03)
+    /// 환산(지금 화각 · 카메라가 지원하는 이동 방식 · 한계)과 최신 우선 합치기는 호스트가 한다 — GIS 는 기다리지 않고
+    /// 시간도 재지 않는다(이전: GIS 가 ContinuousMove → Task.Delay(120~700ms) → Stop 두 건을 보냈다).
+    /// FOV(부채꼴)는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함(스케일 불일치).
+    /// </summary>
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
     {
-        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzDragAsync(vm, e);   // cam:control 게이팅 (FR-EN-06)
-    }
-
-    /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop. FOV(부채꼴)는 NVR→NATS가 갱신. (FR-DRAG-03)
-    /// T-02: 이동 · 정지는 호스트로 보내고 잊는다 — 밀린 이동 뒤 정지는 합쳐져 정지만 나간다.</summary>
-    private async Task HandlePtzDragAsync(CameraStreamPopupViewModel vm, PtzDragEventArgs e)
-    {
-        var len = Math.Sqrt(e.Dx * e.Dx + e.Dy * e.Dy);
-        if (len < 1) return;
-        var ct = BeginPtzGesture(vm.CameraId);   // 직전 제스처 취소(Last-Write-Wins)
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06) — 이유는 영상 위 배지("PTZ 권한 없음")
+        if (!e.TryGetViewFraction(out var viewX, out var viewY, out var viewAspect)) return;
         try
         {
-            // 최대 드래그 길이(이 이상이면 mag=1.0 포화). 0.4→0.65로 늘려 더 길게 끌어야 최대 — 미세조절 폭↑.
-            var maxLen = Math.Max(60.0, Math.Min(e.ImageWidth, e.ImageHeight) * 0.65);
-            var mag = Math.Min(1.0, len / maxLen);
-            // 드래그 길이 비례 이동량: 속도·시간 둘 다 mag로 스케일 → 짧은 드래그=느리고 짧게, 긴 드래그=빠르고 길게(차이 뚜렷).
-            // 속도엔 하한(0.3)을 둬 아주 짧은 드래그도 죽지 않게(카메라 가감속에 묻히는 것 방지).
-            var velFactor = vm.PanTiltSpeed * (0.3 + 0.7 * mag);
-            var panVel = (e.Dx / len) * velFactor;
-            var tiltVel = -(e.Dy / len) * velFactor;   // 화면 아래로 드래그 → 틸트 다운
-            if (!SendPtzMove(vm, panVel, tiltVel, 0)) return;   // 호스트 없음 — 보낼 곳이 없다
-            await Task.Delay(Math.Max(PtzDragMinDurationMs, (int)(mag * PtzDragMaxDurationMs)), ct).ConfigureAwait(false);
-            if (!ct.IsCancellationRequested) SendPtzStop(vm);
-            // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함(스케일 불일치).
+            // 직전 제스처의 대기(휠 줌 펄스의 뒤늦은 정지)를 LWW 취소 — 그 정지가 이 이동을 끊지 않게.
+            BeginPtzGesture(vm.CameraId);
+            if (ResolveCameraControl()?.DragMove(vm.CameraId.ToString(), vm.Provider, viewX, viewY, viewAspect) != true)
+                _log?.Warning($"[CameraPopup] PTZ 드래그 이동 미전송 cam={vm.CameraId} — 팝업 호스트 없음.");
         }
-        catch (OperationCanceledException) { /* 새 제스처가 인계 — 이전 Stop 생략 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 

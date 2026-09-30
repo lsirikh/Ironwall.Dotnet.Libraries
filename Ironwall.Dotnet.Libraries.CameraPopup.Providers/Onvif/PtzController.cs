@@ -69,10 +69,29 @@ public sealed class PtzController : IPtzController
         public bool ResolvedPreferSub;
         /// <summary>프로파일 토큰 → 재생 주소(타일 = 서브, 크게 보기 = 메인이 같은 카메라에서 함께 열린다). Gate 안에서만 만진다.</summary>
         public readonly Dictionary<string, string> ResolvedUris = new(StringComparer.Ordinal);
+
+        // ── 영상 위 드래그(DragMove) ──
+        /// <summary>가장 새 드래그의 취소원 — 새 드래그 · 다른 PTZ 명령이 이전 드래그(게이트 대기 · 시간 제한 이동의 대기)를 버린다.</summary>
+        public CancellationTokenSource? Drag;
+        /// <summary>배경 위치 다시 읽기(GetStatus)의 취소원.</summary>
+        public CancellationTokenSource? StatusRefresh;
+        /// <summary>마지막으로 읽었거나 명령으로 추적한 위치. 드래그마다 GetStatus 를 부르지 않기 위한 캐시.</summary>
+        public volatile PtzPosition? LastPosition;
+        /// <summary>팬 · 틸트가 캐시와 다를 수 있다(연속 이동 · 프리셋 뒤 아직 다시 못 읽음).</summary>
+        public volatile bool PanTiltStale = true;
+        /// <summary>줌이 캐시와 다를 수 있다(연속 줌 · 프리셋 뒤 아직 다시 못 읽음).</summary>
+        public volatile bool ZoomStale = true;
+        /// <summary>위치를 마지막으로 카메라에서 읽은 때(Environment.TickCount64). 0 = 읽은 적 없음.</summary>
+        public long LastPositionTick;
+        /// <summary>위치를 알려주지 않는 카메라(GetStatus 실패 · 빈 응답) — 다시 묻지 않는다.</summary>
+        public volatile bool StatusUnsupported;
     }
 
     /// <summary>GetNode로 읽은 카메라 좌표 space(변환/클램프 진실원). URI는 직렬화에 동봉.</summary>
     private sealed record SpaceInfo(
+        // 화각 상대 공간(TranslationSpaceFov) — 있으면 드래그 PTZ 가 이것을 먼저 쓴다(±1 = 화면 가장자리).
+        bool HasRelFov, string? RelFovUri, double RelFovXMin, double RelFovXMax, double RelFovYMin, double RelFovYMax,
+        bool HasCont,
         bool HasRel, string? RelPtUri, double RelXMin, double RelXMax, double RelYMin, double RelYMax,
         bool HasAbs, string? AbsPtUri, double AbsXMin, double AbsXMax, double AbsYMin, double AbsYMax,
         string? AbsZoomUri, double AbsZMin, double AbsZMax,
@@ -126,8 +145,12 @@ public sealed class PtzController : IPtzController
                         _log?.Info($"[PTZ] cam={cameraId} 비PTZ(고정) — PtzClient 없음. 인스턴스 워밍 유지(Imaging={ctx.ImagingPossible}). 재오픈 시 즉시.");
                 }
                 // PTZ space(GetNode)는 PtzClient가 있을 때만 로드(비PTZ는 생략 — LoadSpaces의 PtzClient 역참조 NRE 방지).
-                if (ctx.Model.PtzClient != null)
-                    ctx.Spaces ??= await LoadSpacesAsync(ctx).ConfigureAwait(false);
+                if (ctx.Model.PtzClient != null && ctx.Spaces == null)
+                {
+                    ctx.Spaces = await LoadSpacesAsync(ctx).ConfigureAwait(false);
+                    // 드래그 PTZ 가 쓸 위치 · 줌을 배경에서 한 번 읽어 둔다(준비를 늦추지 않는다 — 게이트가 풀린 뒤 돈다).
+                    if (ctx.Spaces != null) ScheduleStatusRefresh(cameraId, ctx, TimeSpan.Zero);
+                }
                 var cap = IsCapable(ctx);
                 if (!cap)
                     _log?.Warning($"[PTZ] capable=false cam={cameraId} (IsPtzPossible={ctx.Model?.IsPtzPossible}, GetNode space={(ctx.Spaces == null ? "로드실패/없음" : "로드됨")}).");
@@ -152,6 +175,8 @@ public sealed class PtzController : IPtzController
             return false;
 
         CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
+        CancelDrag(ctx);
+        ctx.PanTiltStale = true;
         var (pan, tilt) = PtzCoordinateMath.PixelDeltaToRelative(
             dx, dy, imageW, imageH, sp.RelXMin, sp.RelXMax, sp.RelYMin, sp.RelYMax, sensitivity);
 
@@ -174,6 +199,10 @@ public sealed class PtzController : IPtzController
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         CancelKeepAlive(ctx);   // 직전 이동의 유지 재전송 중단 — 새 속도로 대체
+        CancelDrag(ctx);        // 대기 중 드래그 · 시간 제한 이동의 정지가 이 이동을 끊지 않게
+        CancelStatusRefresh(ctx);
+        if (panVel != 0 || tiltVel != 0) ctx.PanTiltStale = true;
+        if (zoomVel != 0) ctx.ZoomStale = true;
         try
         {
             var __swGate = System.Diagnostics.Stopwatch.StartNew();   // [진단] 게이트(직렬화) 대기 시간
@@ -217,6 +246,8 @@ public sealed class PtzController : IPtzController
             return false;
 
         CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
+        CancelDrag(ctx);
+        ctx.ZoomStale = true;
         var z = PtzCoordinateMath.ClampToRange(zoomDelta, sp.RelZMin, sp.RelZMax);
         try
         {
@@ -225,6 +256,7 @@ public sealed class PtzController : IPtzController
             {
                 var vec = PtzVectorMapper.ToPtzVector(PtzVectorMapper.BuildZoom(z, sp.RelZoomUri));
                 await ctx.Model.PtzClient.RelativeMoveAsync(ctx.ProfileToken, vec, null).ConfigureAwait(false);
+                ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshRetry);
                 return true;
             }
             finally { ctx.Gate.Release(); }
@@ -239,6 +271,9 @@ public sealed class PtzController : IPtzController
             return false;
 
         CancelKeepAlive(ctx);   // 위치 명령이 연속 이동 유지 재전송에 덮이지 않게(FR-22)
+        CancelDrag(ctx);
+        ctx.PanTiltStale = true;
+        ctx.ZoomStale = true;
         var cpan = PtzCoordinateMath.ClampToRange(pan, sp.AbsXMin, sp.AbsXMax);
         var ctilt = PtzCoordinateMath.ClampToRange(tilt, sp.AbsYMin, sp.AbsYMax);
         double? czoom = sp.AbsZoomUri != null ? PtzCoordinateMath.ClampToRange(zoom, sp.AbsZMin, sp.AbsZMax) : null;
@@ -252,6 +287,7 @@ public sealed class PtzController : IPtzController
                 var vec = PtzVectorMapper.ToPtzVector(
                     PtzVectorMapper.BuildAbsolute(cpan, ctilt, czoom, sp.AbsPtUri, sp.AbsZoomUri));
                 await ctx.Model.PtzClient.AbsoluteMoveAsync(ctx.ProfileToken, vec, null).ConfigureAwait(false);
+                ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshRetry);
                 return true;
             }
             finally { ctx.Busy = false; ctx.Gate.Release(); }
@@ -284,6 +320,15 @@ public sealed class PtzController : IPtzController
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return;
         if (ct.IsCancellationRequested) return;   // LWW: 새 제스처가 이미 인계 — 새 이동의 유지 재전송 · 대기를 건드리지 않는다
         CancelKeepAlive(ctx);                      // 유지 재전송 즉시 중단(정지 뒤에 이동이 다시 나가지 않게)
+        CancelDrag(ctx);                           // 대기 중 드래그 · 시간 제한 이동의 뒤늦은 정지도 버린다
+        await StopCoreAsync(cameraId, ctx, ct).ConfigureAwait(false);
+        ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshDelay);   // 멈춘 자리 · 줌을 배경에서 다시 읽는다
+    }
+
+    /// <summary>정지 한 번(게이트 맨 앞). 유지 재전송 · 드래그 취소는 부르는 쪽이 한다.</summary>
+    private async Task StopCoreAsync(string cameraId, CamCtx ctx, CancellationToken ct)
+    {
+        if (ctx.Model?.PtzClient == null) return;
         try
         {
             // C1: PtzClient(WCF 채널) 동일 인스턴스 병렬 호출 금지(I-05) — Move와 동일 Gate로 직렬화.
@@ -340,11 +385,19 @@ public sealed class PtzController : IPtzController
         if (string.IsNullOrEmpty(presetToken)) return false;
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         CancelKeepAlive(ctx);   // FR-22
+        CancelDrag(ctx);
+        ctx.PanTiltStale = true;
+        ctx.ZoomStale = true;
         try
         {
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             ctx.Busy = true;   // AbsoluteMove와 동일 — 프리셋 이동 중 표시
-            try { return await _onvif.GoPTZPreset(ctx.Model.PtzClient, null!, ctx.ProfileToken, presetToken).ConfigureAwait(false); }   // 속도 null=카메라 기본(ToWsdl null-안전)
+            try
+            {
+                var moved = await _onvif.GoPTZPreset(ctx.Model.PtzClient, null!, ctx.ProfileToken, presetToken).ConfigureAwait(false);   // 속도 null=카메라 기본(ToWsdl null-안전)
+                ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshRetry);
+                return moved;
+            }
             finally { ctx.Busy = false; ctx.Gate.Release(); }
         }
         catch (OperationCanceledException) { return false; }
@@ -396,11 +449,19 @@ public sealed class PtzController : IPtzController
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         CancelKeepAlive(ctx);   // FR-22
+        CancelDrag(ctx);
+        ctx.PanTiltStale = true;
+        ctx.ZoomStale = true;
         try
         {
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             ctx.Busy = true;
-            try { return await _onvif.GoHomePreset(ctx.Model.PtzClient, null!, ctx.ProfileToken).ConfigureAwait(false); }   // Home 미지정 카메라는 폴트 → false
+            try
+            {
+                var moved = await _onvif.GoHomePreset(ctx.Model.PtzClient, null!, ctx.ProfileToken).ConfigureAwait(false);   // Home 미지정 카메라는 폴트 → false
+                ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshRetry);
+                return moved;
+            }
             finally { ctx.Busy = false; ctx.Gate.Release(); }
         }
         catch (OperationCanceledException) { return false; }
@@ -641,7 +702,12 @@ public sealed class PtzController : IPtzController
         // H2: 딕셔너리에서만 제거. SemaphoreSlim은 Dispose하지 않는다 — 진행 중 Move/GetStatus 태스크가
         // 동일 ctx.Gate를 await/Release 중일 수 있어, 여기서 Dispose하면 ObjectDisposedException 경합.
         // SemaphoreSlim은 WaitHandle 미사용 시 정리할 핸들이 없어 미Dispose 비용 무시 가능. 멱등.
-        if (_ctx.TryRemove(cameraId, out var ctx)) CancelKeepAlive(ctx);
+        if (_ctx.TryRemove(cameraId, out var ctx))
+        {
+            CancelKeepAlive(ctx);
+            CancelDrag(ctx);
+            CancelStatusRefresh(ctx);
+        }
     }
 
     /*──────────────── 내부 헬퍼 ────────────────*/
@@ -657,13 +723,198 @@ public sealed class PtzController : IPtzController
 
     private static void CancelKeepAlive(CamCtx ctx) => Interlocked.Exchange(ref ctx.KeepAlive, null)?.Cancel();
 
+    private static void CancelDrag(CamCtx ctx) => Interlocked.Exchange(ref ctx.Drag, null)?.Cancel();
+
+    private static void CancelStatusRefresh(CamCtx ctx) => Interlocked.Exchange(ref ctx.StatusRefresh, null)?.Cancel();
+
+    /*──────────────── 영상 위 드래그(DragMove) ────────────────*/
+
+    public async Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient is not { } client || ctx.Spaces is not { } sp)
+            return PtzDragOutcome.NotSent("not-ready");
+
+        CancelKeepAlive(ctx);      // 누름 이동의 유지 재전송이 이 이동을 덮지 않게
+        CancelStatusRefresh(ctx);  // 배경 위치 읽기가 이 드래그 앞에 줄 서지 않게(이미 나간 것은 끝까지 간다)
+        // 최신 우선: 아직 게이트를 못 얻은 이전 드래그 · 시간 제한 이동의 대기를 버린다 → 밀린 드래그가 쌓이지 않는다.
+        var mine = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        Interlocked.Exchange(ref ctx.Drag, mine)?.Cancel();
+        var token = mine.Token;
+
+        PtzDragPlan plan;
+        CancellationToken epoch;
+        var gateWait = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            // 이동 세대로 줄을 선다 — 정지가 오면 대기 중인 드래그는 취소된다(정지 우선, FR-22).
+            epoch = await ctx.Gate.WaitMoveAsync(token).ConfigureAwait(false);
+            gateWait.Stop();
+            try
+            {
+                token.ThrowIfCancellationRequested();   // 게이트를 받는 사이 더 새 드래그가 왔으면 보내지 않는다
+                var known = KnownPosition(ctx);
+                plan = PtzDragMath.Plan(ToDragSpaces(sp), known, viewX, viewY, viewAspect);
+                var call = System.Diagnostics.Stopwatch.StartNew();
+                switch (plan.Kind)
+                {
+                    case PtzDragMoveKind.RelativeFov:
+                        await client.RelativeMoveAsync(ctx.ProfileToken,
+                            PtzVectorMapper.ToPtzVector(PtzVectorMapper.BuildPanTilt(plan.Pan, plan.Tilt, sp.RelFovUri)), null).ConfigureAwait(false);
+                        ctx.PanTiltStale = true;   // 화각 단위 이동 — 정규화 좌표로는 얼마나 갔는지 모른다
+                        break;
+                    case PtzDragMoveKind.RelativeGeneric:
+                        await client.RelativeMoveAsync(ctx.ProfileToken,
+                            PtzVectorMapper.ToPtzVector(PtzVectorMapper.BuildPanTilt(plan.Pan, plan.Tilt, sp.RelPtUri)), null).ConfigureAwait(false);
+                        if (known.PanTiltKnown && ctx.LastPosition is { } before)
+                        {
+                            // 보낸 만큼 추적(다시 묻지 않는다). 이동 중에 또 끌면 어긋날 수 있다 — 다음 배경 읽기가 바로잡는다.
+                            var (toPan, toTilt) = PtzDragMath.AbsoluteTarget(before.Pan, before.Tilt, plan.Pan, plan.Tilt,
+                                sp.AbsXMin, sp.AbsXMax, sp.AbsYMin, sp.AbsYMax, PtzLensModel.Default.PanSpanDeg >= 360d);
+                            ctx.LastPosition = before with { Pan = toPan, Tilt = toTilt };
+                        }
+                        break;
+                    case PtzDragMoveKind.Absolute:
+                        // 줌은 싣지 않는다(null = 줌 그대로).
+                        await client.AbsoluteMoveAsync(ctx.ProfileToken,
+                            PtzVectorMapper.ToPtzVector(PtzVectorMapper.BuildAbsolute(plan.Pan, plan.Tilt, null, sp.AbsPtUri, null)), null).ConfigureAwait(false);
+                        if (ctx.LastPosition is { } at) ctx.LastPosition = at with { Pan = plan.Pan, Tilt = plan.Tilt };
+                        break;
+                    case PtzDragMoveKind.ContinuousPulse:
+                        var speed = new PtzSpeedDto
+                        {
+                            PanTilt = new Vector2DDto
+                            {
+                                X = (float)PtzVelocityMath.ScaleToRange(plan.Pan, sp.ContPtXMin, sp.ContPtXMax),
+                                Y = (float)PtzVelocityMath.ScaleToRange(plan.Tilt, sp.ContPtYMin, sp.ContPtYMax),
+                                Space = sp.ContPtUri,
+                            },
+                            Zoom = new Vector1DDto { X = 0f, Space = sp.ContZoomUri },
+                        };
+                        ctx.PanTiltStale = true;
+                        if (!await _onvif.MovePTZ(client, speed, ctx.ProfileToken, PtzMotionPolicy.MoveTimeout).ConfigureAwait(false))
+                            return PtzDragOutcome.NotSent("failed");
+                        break;
+                    default:
+                        return PtzDragOutcome.NotSent(plan.Pan == 0 && plan.Tilt == 0 && (viewX != 0 || viewY != 0) ? "no-space" : "zero");
+                }
+                call.Stop();
+                _log?.Info($"[PTZ] Drag cam={cameraId} kind={plan.Kind} view=({viewX:F3},{viewY:F3}) → ({plan.Pan:F4},{plan.Tilt:F4}) zoomKnown={known.ZoomKnown} gateWait={gateWait.ElapsedMilliseconds}ms WCF={call.ElapsedMilliseconds}ms");
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return PtzDragOutcome.NotSent("superseded"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[PTZ] Drag 실패 cam={cameraId}: {Mask(ex.Message)}");
+            ctx.PanTiltStale = true;
+            ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshDelay);
+            return PtzDragOutcome.NotSent("failed");
+        }
+
+        if (plan.Kind == PtzDragMoveKind.ContinuousPulse)
+        {
+            // 옛 방식(위치 · 줌을 모를 때만): 드래그 길이만큼 움직인 뒤 정지. 더 새 드래그 · 정지 · 누름 이동이 오면 이 정지는 버린다
+            // (새 명령이 이전 움직임을 대체한다 — ONVIF §5.3.2). 정지가 끝내 못 나가도 카메라는 2초 뒤 스스로 멈춘다.
+            try
+            {
+                using var wait = CancellationTokenSource.CreateLinkedTokenSource(token, epoch);
+                await Task.Delay(plan.PulseMs, wait.Token).ConfigureAwait(false);
+                await StopCoreAsync(cameraId, ctx, token).ConfigureAwait(false);
+                ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshDelay);
+            }
+            catch (OperationCanceledException) { /* 새 제스처가 인계 */ }
+        }
+        else if (ctx.PanTiltStale || ctx.ZoomStale
+                 || Environment.TickCount64 - Volatile.Read(ref ctx.LastPositionTick) > PtzMotionPolicy.StatusMaxAge.TotalMilliseconds)
+        {
+            // 보낸 뒤에 배경에서 읽는다 — 이 드래그는 기다리지 않았고, 다음 드래그가 새 줌(화각)을 쓴다.
+            ScheduleStatusRefresh(cameraId, ctx, PtzMotionPolicy.StatusRefreshRetry);
+        }
+        return new PtzDragOutcome(true, plan.Kind, plan.Pan, plan.Tilt, null);
+    }
+
+    private static PtzKnownPosition KnownPosition(CamCtx ctx)
+        => ctx.LastPosition is { } p
+            ? new PtzKnownPosition(p.Pan, p.Tilt, p.Zoom, !ctx.PanTiltStale, !ctx.ZoomStale)
+            : PtzKnownPosition.Unknown;
+
+    private static PtzDragSpaces ToDragSpaces(SpaceInfo sp) => new(
+        sp.HasRelFov, sp.RelFovXMin, sp.RelFovXMax, sp.RelFovYMin, sp.RelFovYMax,
+        sp.HasRel, sp.RelXMin, sp.RelXMax, sp.RelYMin, sp.RelYMax,
+        sp.HasAbs, sp.AbsXMin, sp.AbsXMax, sp.AbsYMin, sp.AbsYMax,
+        sp.AbsZMin, sp.AbsZMax,
+        sp.HasCont);
+
+    /// <summary>
+    /// 위치 · 줌을 배경에서 다시 읽어 캐시에 담는다(드래그 환산이 쓴다). 드래그 경로에서는 절대 기다리지 않는다.
+    /// 카메라가 아직 움직이는 중이면 멈출 때까지 몇 번 더 읽는다. 새 이동이 오면 취소된다.
+    /// </summary>
+    private void ScheduleStatusRefresh(string cameraId, CamCtx ctx, TimeSpan delay)
+    {
+        if (ctx.StatusUnsupported) return;
+        var cts = new CancellationTokenSource();
+        Interlocked.Exchange(ref ctx.StatusRefresh, cts)?.Cancel();
+        _ = RefreshStatusAsync(cameraId, ctx, delay, cts.Token);
+    }
+
+    private async Task RefreshStatusAsync(string cameraId, CamCtx ctx, TimeSpan delay, CancellationToken token)
+    {
+        try
+        {
+            for (int attempt = 0; attempt < PtzMotionPolicy.StatusRefreshMaxAttempts; attempt++)
+            {
+                var wait = attempt == 0 ? delay : PtzMotionPolicy.StatusRefreshRetry;
+                if (wait > TimeSpan.Zero) await Task.Delay(wait, token).ConfigureAwait(false);
+                if (ctx.Model?.PtzClient is not { } client) return;
+                OnvifSolution.Ptz.PTZStatus? status;
+                await ctx.Gate.WaitAsync(token).ConfigureAwait(false);
+                try
+                {
+                    token.ThrowIfCancellationRequested();
+                    status = await client.GetStatusAsync(ctx.ProfileToken).ConfigureAwait(false);
+                }
+                finally { ctx.Gate.Release(); }
+                var p = status?.Position;
+                if (p?.PanTilt == null)
+                {
+                    ctx.StatusUnsupported = true;   // 위치를 안 알려주는 카메라 — 드래그는 시간 제한 이동으로 간다(다시 묻지 않는다)
+                    return;
+                }
+                var ms = status!.MoveStatus;
+                bool moving = ms != null
+                    && ((ms.PanTiltSpecified && ms.PanTilt == OnvifSolution.Ptz.MoveStatus.MOVING)
+                        || (ms.ZoomSpecified && ms.Zoom == OnvifSolution.Ptz.MoveStatus.MOVING));
+                if (token.IsCancellationRequested) return;   // 읽는 사이 새 이동이 시작됐다 — 옛 위치를 "안다"로 표시하지 않는다
+                ctx.LastPosition = new PtzPosition(p.PanTilt.x, p.PanTilt.y, p.Zoom?.x ?? 0d, p.PanTilt.space, p.Zoom?.space);
+                Volatile.Write(ref ctx.LastPositionTick, Environment.TickCount64);
+                if (moving) continue;
+                ctx.PanTiltStale = false;
+                ctx.ZoomStale = p.Zoom == null;
+                return;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (ctx.LastPosition == null) ctx.StatusUnsupported = true;   // 한 번도 못 읽었다 — 위치를 안 알려주는 카메라로 본다
+            _log?.Warning($"[PTZ] 위치 읽기 실패 cam={cameraId}(드래그는 시간 제한 이동으로 대체): {Mask(ex.Message)}");
+        }
+    }
+
     private async Task KeepAliveLoopAsync(string cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken token)
     {
         try
         {
+            var held = System.Diagnostics.Stopwatch.StartNew();
             while (true)
             {
                 await Task.Delay(PtzMotionPolicy.KeepAliveInterval, token).ConfigureAwait(false);
+                if (held.Elapsed >= PtzMotionPolicy.MaxHoldDuration)
+                {
+                    // 뗌(정지)이 끝내 오지 않았다 — 재전송을 끊어 카메라가 2초 안에 스스로 멈추게 한다.
+                    _log?.Warning($"[PTZ] 이동 유지 최대 시간({PtzMotionPolicy.MaxHoldDuration.TotalSeconds:0}초) 초과 cam={cameraId} — 재전송 중단.");
+                    return;
+                }
                 await ctx.Gate.WaitMoveAsync(token).ConfigureAwait(false);
                 try
                 {
@@ -679,7 +930,7 @@ public sealed class PtzController : IPtzController
     }
 
     private static bool IsCapable(CamCtx c)
-        => (c.Model?.IsPtzPossible ?? false) && c.Spaces is { } s && (s.HasRel || s.HasAbs);
+        => (c.Model?.IsPtzPossible ?? false) && c.Spaces is { } s && (s.HasRel || s.HasAbs || s.HasRelFov);
 
     /// <summary>카메라 space(Rel/Abs/Zoom)를 읽어 캐시. 초기화가 프로필과 병렬로 미리 읽은 노드(<c>Model.PtzNode</c>, FR-23)를 쓰고,
     /// 없으면 GetConfigurations → NodeToken → GetNode 로 직접 조회(폴백).</summary>
@@ -699,7 +950,9 @@ public sealed class PtzController : IPtzController
             var sp = node?.SupportedPTZSpaces;
             if (sp == null) return null;
 
-            var rel = sp.RelativePanTiltTranslationSpace?.FirstOrDefault();
+            // 상대 공간이 여럿일 수 있다 — 일반 공간과 화각(FOV) 공간을 URI 로 가른다(첫 항목을 무조건 쓰면 단위가 뒤바뀐다).
+            var relFov = sp.RelativePanTiltTranslationSpace?.FirstOrDefault(s => IsFovSpace(s?.URI));
+            var rel = sp.RelativePanTiltTranslationSpace?.FirstOrDefault(s => s != null && !IsFovSpace(s.URI));
             var abs = sp.AbsolutePanTiltPositionSpace?.FirstOrDefault();
             var absZ = sp.AbsoluteZoomPositionSpace?.FirstOrDefault();
             var relZ = sp.RelativeZoomTranslationSpace?.FirstOrDefault();
@@ -712,6 +965,10 @@ public sealed class PtzController : IPtzController
                 _log?.Warning($"[PTZ] 연속속도 범위 단방향/비대칭 — ptX.min={(contPt?.XRange?.Min ?? -1d):F2} ptY.min={(contPt?.YRange?.Min ?? -1d):F2} z.min={(contZ?.XRange?.Min ?? -1d):F2}. 역방향(음수) 이동이 0으로 제한될 수 있음(카메라 space 특성).");
 
             return new SpaceInfo(
+                HasRelFov: relFov != null, RelFovUri: relFov?.URI,
+                RelFovXMin: relFov?.XRange?.Min ?? -1d, RelFovXMax: relFov?.XRange?.Max ?? 1d,
+                RelFovYMin: relFov?.YRange?.Min ?? -1d, RelFovYMax: relFov?.YRange?.Max ?? 1d,
+                HasCont: contPt != null,
                 HasRel: rel != null,
                 RelPtUri: rel?.URI,
                 RelXMin: rel?.XRange?.Min ?? -1d, RelXMax: rel?.XRange?.Max ?? 1d,
@@ -736,6 +993,10 @@ public sealed class PtzController : IPtzController
             return null;
         }
     }
+
+    /// <summary>ONVIF 화각 상대 공간(<c>…/PanTiltSpaces/TranslationSpaceFov</c>)인가.</summary>
+    internal static bool IsFovSpace(string? uri)
+        => !string.IsNullOrEmpty(uri) && uri.EndsWith("TranslationSpaceFov", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>자격증명/엔드포인트 마스킹(NFR-SEC-01). rtsp://user:pass@host → rtsp://***@host.</summary>
     private static string Mask(string? msg)

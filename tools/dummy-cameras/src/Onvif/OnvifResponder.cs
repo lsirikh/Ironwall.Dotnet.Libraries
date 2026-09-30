@@ -359,6 +359,13 @@ public sealed class OnvifResponder : IAsyncDisposable
             ["pan"] = v.Pan,
             ["tilt"] = v.Tilt,
             ["zoom"] = v.Zoom,
+            ["space"] = op switch
+            {
+                "ContinuousMove" => PanTiltSpace(body, "Velocity"),
+                "AbsoluteMove" => PanTiltSpace(body, "Position"),
+                "RelativeMove" => PanTiltSpace(body, "Translation"),
+                _ => null,
+            },
             ["timeout"] = op == "ContinuousMove" ? Child(body, "Timeout") : null,
             ["preset"] = Child(body, "PresetToken"),
             ["stopPanTilt"] = op == "Stop" ? Child(body, "PanTilt") : null,
@@ -383,6 +390,14 @@ public sealed class OnvifResponder : IAsyncDisposable
         var pt = vec.Elements().FirstOrDefault(e => e.Name.LocalName == "PanTilt");
         var z = vec.Elements().FirstOrDefault(e => e.Name.LocalName == "Zoom");
         return (Num(pt?.Attribute("x")), Num(pt?.Attribute("y")), Num(z?.Attribute("x")));
+    }
+
+    /// <summary>The PanTilt space URI's last segment (e.g. "TranslationGenericSpace") of the named vector, if any.</summary>
+    private static string? PanTiltSpace(XElement body, string vectorName)
+    {
+        var space = body.Elements().FirstOrDefault(e => e.Name.LocalName == vectorName)
+            ?.Elements().FirstOrDefault(e => e.Name.LocalName == "PanTilt")?.Attribute("space")?.Value;
+        return string.IsNullOrEmpty(space) ? null : space[(space.LastIndexOf('/') + 1)..];
     }
 
     private static double? Num(XAttribute? a)

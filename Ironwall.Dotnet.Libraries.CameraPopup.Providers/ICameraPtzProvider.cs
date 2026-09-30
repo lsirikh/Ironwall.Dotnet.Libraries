@@ -27,6 +27,12 @@ public interface ICameraPtzProvider
 
     Task StopAsync(string cameraId, CancellationToken ct);
 
+    /// <summary>
+    /// 영상 위 드래그 → 상대 이동 한 번(<see cref="IPtzController.DragMoveAsync"/>). 기본 구현은 "지원 안 함".
+    /// </summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct)
+        => Task.FromResult(PtzDragOutcome.NotSent("not-supported"));
+
     Task<IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(string cameraId, CancellationToken ct);
 
     Task<bool> GotoPresetAsync(string cameraId, string presetToken, CancellationToken ct);

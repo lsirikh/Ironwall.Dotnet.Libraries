@@ -28,6 +28,7 @@ internal sealed class RecordingControlFactory : ITileCameraControlFactory
         public string? PtzUnavailableReason => null;
         public Task<bool> ContinuousMoveAsync(double pan, double tilt, double zoom, CancellationToken ct) => Task.FromResult(false);
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> DragMoveAsync(double viewX, double viewY, double viewAspect, CancellationToken ct) => Task.FromResult(false);
         public Task<IReadOnlyList<TilePreset>> GetPresetsAsync(CancellationToken ct) => throw new InvalidOperationException("boom");
         public Task<bool> GotoPresetAsync(string presetToken, CancellationToken ct) => Task.FromResult(false);
         public Task<bool> GotoHomeAsync(string? homePresetToken, CancellationToken ct) => Task.FromResult(false);

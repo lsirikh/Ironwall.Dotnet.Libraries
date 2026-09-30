@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 using Ironwall.Dotnet.Libraries.CameraPopup.Providers;
+using Ironwall.Dotnet.Libraries.CameraPopup.Providers.Onvif;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Cameras;
 
@@ -202,6 +203,9 @@ internal sealed class HostCameraServices
             case PtzOperation.Stop:
                 Observe(provider.StopAsync(cameraId, ct), cameraId, "stop");
                 break;
+            case PtzOperation.DragMove:
+                ObserveDrag(provider.DragMoveAsync(cameraId, ptz.ViewX, ptz.ViewY, ptz.ViewAspect, ct), cameraId, Environment.TickCount64);
+                break;
             case PtzOperation.GotoPreset when !string.IsNullOrWhiteSpace(ptz.PresetToken):
                 Observe(provider.GotoPresetAsync(cameraId, ptz.PresetToken!, ct), cameraId, "goto-preset");
                 break;
@@ -211,6 +215,39 @@ internal sealed class HostCameraServices
             default:
                 _log.Warn($"ptz cam={cameraId} ignored op={ptz.Operation}");
                 break;
+        }
+    }
+
+    /// <summary>드래그 이동 결과 기록 — 못 보낸 이유(밀려서 버려짐 · 좌표 공간 없음 · 실패)를 호스트 로그에 남긴다.</summary>
+    private void ObserveDrag(Task<PtzDragOutcome> task, string cameraId, long startedTick)
+    {
+        _ = task.ContinueWith(t =>
+        {
+            if (t.Exception?.GetBaseException() is NotSupportedException)
+            {
+                _send(new HostError { Code = CameraErrorCodes.NotSupported, Scope = cameraId, Message = "drag" });
+                return;
+            }
+            if (t.IsFaulted)
+            {
+                _log.Warn($"ptz drag cam={cameraId} failed: {HostLogService.Mask(t.Exception?.GetBaseException().Message)}");
+                return;
+            }
+            if (t.IsCanceled) return;
+            var r = t.Result;
+            long ms = Environment.TickCount64 - startedTick;
+            if (r.Sent) _log.Info(FormattableString.Invariant($"ptz drag cam={cameraId} kind={r.Kind} pan={r.Pan:F4} tilt={r.Tilt:F4} in {ms} ms"));
+            else _log.Info($"ptz drag cam={cameraId} not sent: {r.Reason}");
+        }, TaskScheduler.Default);
+    }
+
+    private long NextSequence(string cameraId)
+    {
+        lock (_gate)
+        {
+            long next = (_motionSequence.TryGetValue(cameraId, out var s) ? s : 0) + 1;
+            _motionSequence[cameraId] = next;
+            return next;
         }
     }
 
@@ -242,18 +279,34 @@ internal sealed class HostCameraServices
     /// <summary>타일 누름 이동(호스트 UI 에서 직접). 준비 전이면 먼저 준비한다. 던지지 않는다(지원 안 함만 예외).</summary>
     public async Task<bool> MoveAsync(string cameraId, VideoProviderInfo info, double pan, double tilt, double zoom, CancellationToken ct)
     {
+        // 순번을 준비 전에 받는다 — 준비(ONVIF 연결 수 초)하는 사이 뗌(정지)이 오면 이 이동은 나가지 않는다.
+        // (이전: 뗌이 "준비 안 됨"으로 버려진 뒤 이동이 나가 유지 재전송과 함께 계속 돌았다.)
+        long sequence = NextSequence(cameraId);
         var provider = await PreparedAsync(cameraId, info, ct).ConfigureAwait(false);
         if (provider is null) return false;
-        lock (_gate) { _motionSequence[cameraId] = (_motionSequence.TryGetValue(cameraId, out var s) ? s : 0) + 1; }
+        if (!IsLatestMotion(cameraId, sequence)) return true;   // 그 사이 정지 · 새 동작이 왔다
         return await provider.ContinuousMoveAsync(cameraId, Clamp(pan), Clamp(tilt), Clamp(zoom), ct).ConfigureAwait(false);
+    }
+
+    /// <summary>타일 영상 위 드래그 → 상대 이동 한 번. 준비 전이면 먼저 준비한다. 더 새 동작에 밀렸으면 "superseded".</summary>
+    public async Task<PtzDragOutcome> DragMoveAsync(string cameraId, VideoProviderInfo info, double viewX, double viewY, double viewAspect, CancellationToken ct)
+    {
+        long sequence = NextSequence(cameraId);
+        var provider = await PreparedAsync(cameraId, info, ct).ConfigureAwait(false);
+        if (provider is null) return PtzDragOutcome.NotSent("not-ready");
+        if (!IsLatestMotion(cameraId, sequence)) return PtzDragOutcome.NotSent("superseded");
+        var started = Environment.TickCount64;
+        var task = provider.DragMoveAsync(cameraId, viewX, viewY, viewAspect, ct);
+        ObserveDrag(task, cameraId, started);
+        return await task.ConfigureAwait(false);
     }
 
     /// <summary>타일 뗌 정지.</summary>
     public async Task StopAsync(string cameraId, VideoProviderInfo info, CancellationToken ct)
     {
+        NextSequence(cameraId);   // 준비 중인 이동이 있으면 무효로 만든다(준비가 끝나도 나가지 않는다)
         var provider = PtzProviderFor(Remember(cameraId, info)!);
         if (provider is null || !provider.IsPrepared(cameraId)) return;   // 준비 안 된 카메라는 움직인 적도 없다
-        lock (_gate) { _motionSequence[cameraId] = (_motionSequence.TryGetValue(cameraId, out var s) ? s : 0) + 1; }
         await provider.StopAsync(cameraId, ct).ConfigureAwait(false);
     }
 

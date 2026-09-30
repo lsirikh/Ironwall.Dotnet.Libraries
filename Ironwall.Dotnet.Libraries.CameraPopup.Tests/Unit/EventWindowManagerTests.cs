@@ -236,7 +236,7 @@ public class EventWindowManagerTests
         manager.Open(new EventWindowRequest { Kind = request.Kind, EventId = request.EventId, Cameras = request.Cameras, ExtraCameraCount = 3 });
 
         var o = Assert.Single(host.Opened);
-        Assert.Equal((2, 1), (o.GridColumns, o.GridRows));   // 2대면 2대 격자로 스냅
+        Assert.Equal((1, 2), (o.GridColumns, o.GridRows));   // 설정(6대)보다 적은 2대 → 960×600 창에서 16:9 타일이 가장 큰 격자(위아래 2칸)
         Assert.Equal(3, o.ExtraCameraCount);
         Assert.Equal(45, o.TimerCloseSeconds);
         Assert.False(o.AlwaysOnTop);

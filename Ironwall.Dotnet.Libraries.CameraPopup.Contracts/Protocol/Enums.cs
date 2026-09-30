@@ -34,6 +34,11 @@ public enum PtzOperation
     Stop = 1,
     GotoPreset = 2,
     GotoHome = 3,
+    /// <summary>
+    /// 영상 위 드래그 — 드래그 길이만큼 상대 이동(판 3). <c>ViewX</c>/<c>ViewY</c> = 영상 상자 크기에 대한 비율.
+    /// 호스트가 카메라가 지원하는 방식(화각 상대 → 일반 상대 → 절대 → 시간 제한 연속)으로 한 번에 보낸다.
+    /// </summary>
+    DragMove = 4,
 }
 
 /// <summary>

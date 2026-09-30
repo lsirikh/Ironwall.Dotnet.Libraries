@@ -17,6 +17,12 @@ internal interface ITileCameraControl : IDisposable
 
     Task StopAsync(CancellationToken ct);
 
+    /// <summary>
+    /// 영상 위 드래그 → 상대 이동 한 번. <paramref name="viewX"/>/<paramref name="viewY"/> = 타일 영상 크기에 대한 드래그 비율(오른쪽 +, 아래 +).
+    /// 더 새 조작에 밀려 안 나간 것도 true(실패가 아니다).
+    /// </summary>
+    Task<bool> DragMoveAsync(double viewX, double viewY, double viewAspect, CancellationToken ct);
+
     Task<IReadOnlyList<TilePreset>> GetPresetsAsync(CancellationToken ct);
 
     Task<bool> GotoPresetAsync(string presetToken, CancellationToken ct);

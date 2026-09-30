@@ -231,11 +231,36 @@ internal sealed class TileViewModel : ObservableObject
         DelayText = string.Create(CultureInfo.InvariantCulture, $"{TargetPresetLabel} 로 이동 중 · {seconds}초");
     }
 
+    /// <summary>누름 이동을 보냈고 아직 정지를 안 보냈다(타일 · 창이 닫힐 때 정지를 빠뜨리지 않기 위한 표식).</summary>
+    public bool IsPtzMoving { get; private set; }
+
     public Task PtzMoveAsync(double pan, double tilt, double zoom)
-        => RunPtzAsync(ct => _control!.ContinuousMoveAsync(pan, tilt, zoom, ct), "PTZ 이동 실패");
+    {
+        if (!IsPtzEnabled || _control is null) return Task.CompletedTask;
+        IsPtzMoving = true;
+        return RunPtzAsync(ct => _control!.ContinuousMoveAsync(pan, tilt, zoom, ct), "PTZ 이동 실패");
+    }
 
     public Task PtzStopAsync()
-        => RunPtzAsync(async ct => { await _control!.StopAsync(ct).ConfigureAwait(true); return true; }, "PTZ 정지 실패");
+    {
+        IsPtzMoving = false;
+        return RunPtzAsync(async ct => { await _control!.StopAsync(ct).ConfigureAwait(true); return true; }, "PTZ 정지 실패");
+    }
+
+    /// <summary>누름 이동 중이면 정지를 보낸다(타일 닫기 · 창 닫기 — 어느 길로 닫혀도 정지가 한 번은 나간다). 아니면 아무것도 안 한다.</summary>
+    public Task StopIfMovingAsync() => IsPtzMoving ? PtzStopAsync() : Task.CompletedTask;
+
+    /// <summary>
+    /// 영상 위 드래그 → 드래그 길이만큼 상대 이동 한 번(떼는 순간). 비율은 타일 영상 크기 기준(오른쪽 +, 아래 +).
+    /// </summary>
+    public Task PtzDragAsync(double viewX, double viewY, double viewAspect)
+        => RunPtzAsync(ct => _control!.DragMoveAsync(viewX, viewY, viewAspect, ct), "PTZ 이동 실패");
+
+    /// <summary>PTZ 를 못 하는 타일에서 영상을 끌었다 — 이유(고정 · 권한 · 제공자)를 알림 한 줄로 보인다.</summary>
+    public void NotePtzUnavailable()
+    {
+        if (IsCamera && PtzDisabledReason is { } reason) Notice = reason;
+    }
 
     public Task GotoPresetAsync(string token)
         => RunPtzAsync(ct => _control!.GotoPresetAsync(token, ct), "프리셋 이동 실패");

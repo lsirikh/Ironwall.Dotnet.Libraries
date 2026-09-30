@@ -84,7 +84,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤 좌클릭 시 호출 → 선택 요청.</summary>
     internal void RaiseSelectRequested() => Raise(SelectRequested, nameof(SelectRequested));
 
-    /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 호스트로 연속 이동 → 정지(ICameraPopupControl). (FR-DRAG-03)</summary>
+    /// <summary>영상 위 드래그-PTZ 완료 — MapViewModel이 호스트로 DragMove 한 건(드래그 길이만큼 상대 이동)을 보낸다. (FR-DRAG-03)</summary>
     public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
 
     /// <summary>컨트롤이 영상 위 좌버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
@@ -101,7 +101,11 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     // 줌 release는 PtzStopRequested 재사용(StopAsync가 PanTilt+Zoom 정지). 휠은 별도 PtzZoomRequested 펄스 경로 유지.
     /// <summary>줌 버튼 누름 → 연속 줌 시작(+1=줌인/-1=줌아웃). 컨트롤 PreviewMouseDown. 뗌은 PtzStopRequested.</summary>
     public event EventHandler<int>? ZoomHoldRequested;
-    internal void RaiseZoomHold(int direction) => Raise(ZoomHoldRequested, direction, nameof(ZoomHoldRequested));
+    internal void RaiseZoomHold(int direction)
+    {
+        Volatile.Write(ref _holdActive, 1);
+        Raise(ZoomHoldRequested, direction, nameof(ZoomHoldRequested));
+    }
 
     /// <summary>포커스 버튼 누름 → 연속 포커스 시작(+1=far/-1=near). 컨트롤 PreviewMouseDown. IsImagingCapable일 때만.</summary>
     public event EventHandler<int>? FocusHoldRequested;
@@ -357,7 +361,29 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
 
     private void OnFrameSourceStateChanged(object? sender, EventArgs e) => RefreshVideoStatus();
 
-    private void OnHostStateChanged(object? sender, CameraPopupHostStateChangedEventArgs e) => RefreshVideoStatus();
+    private void OnHostStateChanged(object? sender, CameraPopupHostStateChangedEventArgs e)
+    {
+        RefreshVideoStatus();
+        SettleHoldOnHostState(e.NewState);
+    }
+
+    // ── 누르는 동안 이동(hold) ↔ 호스트 재시작 ─────────────────────────────
+    // 누르고 있는 중에 호스트가 죽으면 그때 보낸 정지는 갈 곳이 없다(카메라는 이동 유지 재전송이 끊겨 2초 안에 스스로 멈춘다).
+    // 그래도 "어느 길로든 정지가 한 번은 나간다"를 지키려고, 호스트가 다시 뜨면 빚진 정지를 한 번 보낸다.
+    private int _holdActive;   // 1 = 누름 이동을 보냈고 아직 정지를 안 보냈다(UI 스레드가 쓰고 호스트 상태 스레드가 읽는다)
+    private int _stopOwed;     // 1 = 호스트가 없을 때 누름이 끊겼다 — 다시 뜨면 정지
+
+    /// <summary>호스트 상태가 바뀔 때(배경 스레드 가능). 시험이 직접 부를 수 있게 internal.</summary>
+    internal void SettleHoldOnHostState(CameraPopupHostState state)
+    {
+        if (_disposed) return;
+        if (state != CameraPopupHostState.Running)
+        {
+            if (Interlocked.Exchange(ref _holdActive, 0) == 1) Volatile.Write(ref _stopOwed, 1);
+            return;
+        }
+        if (Interlocked.Exchange(ref _stopOwed, 0) == 1) Raise(PtzStopRequested, nameof(PtzStopRequested));
+    }
 
     /// <summary>호스트 · 스트림 상태를 다시 읽어 화면 상태를 정한다(어느 스레드에서 불러도 된다 — 알림은 CM 이 UI 로).</summary>
     internal void RefreshVideoStatus()
@@ -448,6 +474,30 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>PTZ 제어 가능 여부(MapViewModel이 호스트 PreparePtz 응답으로 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
     public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
 
+    private string? _ptzUnavailableReason;
+    /// <summary>
+    /// PTZ 를 못 하는 이유(영상 위 배지 글) — "PTZ 지원안함" · "PTZ 권한 없음" · "PTZ 연결 실패" · "영상 기능 없음". 할 수 있으면 null.
+    /// 영상 드래그 · 휠 · PTZ 단추가 막혀 있을 때 왜 막혔는지를 보인다.
+    /// </summary>
+    public string? PtzUnavailableReason
+    {
+        get => _ptzUnavailableReason;
+        set { if (_ptzUnavailableReason == value) return; _ptzUnavailableReason = value; NotifyOfPropertyChange(nameof(PtzUnavailableReason)); }
+    }
+
+    public const string PtzReasonNotSupported = "PTZ 지원안함";
+    public const string PtzReasonNoPermission = "PTZ 권한 없음";
+    public const string PtzReasonConnectFailed = "PTZ 연결 실패";
+    public const string PtzReasonNoHost = "PTZ 사용 불가(영상 기능 없음)";
+
+    /// <summary>PTZ 준비 결과 → 못 하는 이유(순수). 우선순위: 연결 실패 → 카메라 미지원 → 권한 없음. 할 수 있으면 null.</summary>
+    public static string? PtzReason(bool connected, bool ptzCapable, bool permitted)
+    {
+        if (!connected) return PtzReasonConnectFailed;
+        if (!ptzCapable) return PtzReasonNotSupported;
+        return permitted ? null : PtzReasonNoPermission;
+    }
+
     /// <summary>ONVIF PTZ 준비(InitializeFull+GetNode, 수 초 소요) 진행 중 — "PTZ 준비 중…" 배지 표시용. 끝나면 IsPtzCapable로 결정.</summary>
     public bool IsPtzLoading { get => _isPtzLoading; set { if (_isPtzLoading == value) return; _isPtzLoading = value; NotifyOfPropertyChange(nameof(IsPtzLoading)); } }
 
@@ -505,9 +555,19 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => Raise(PtzStopRequested, nameof(PtzStopRequested)));
 
     /// <summary>방향 패드 버튼 누름 → 해당 방향 연속 이동 시작(컨트롤이 PreviewMouseDown에서 호출). dx/dy ∈ {-1,0,1}.</summary>
-    internal void RaisePadPress(int dx, int dy) => Raise(PtzNudgeRequested, new PtzNudgeEventArgs(dx, dy), nameof(PtzNudgeRequested));
-    /// <summary>방향 패드 버튼 뗌/정지 → 이동 중지(컨트롤이 PreviewMouseUp에서 호출).</summary>
-    internal void RaisePtzStop() => Raise(PtzStopRequested, nameof(PtzStopRequested));
+    internal void RaisePadPress(int dx, int dy)
+    {
+        Volatile.Write(ref _holdActive, 1);
+        Raise(PtzNudgeRequested, new PtzNudgeEventArgs(dx, dy), nameof(PtzNudgeRequested));
+    }
+
+    /// <summary>방향 패드 버튼 뗌/정지 → 이동 중지(컨트롤의 단일 종료 지점 FinishPress 가 호출).</summary>
+    internal void RaisePtzStop()
+    {
+        Volatile.Write(ref _holdActive, 0);
+        Volatile.Write(ref _stopOwed, 0);
+        Raise(PtzStopRequested, nameof(PtzStopRequested));
+    }
 
     private void RaiseNudge(string? dir)
     {
@@ -646,7 +706,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     }
 }
 
-/// <summary>우버튼 드래그-PTZ 완료 이벤트 인자 — 픽셀 델타 + 영상 영역 치수(정규화·변환 기준).</summary>
+/// <summary>영상 위 드래그-PTZ 완료 이벤트 인자 — 픽셀 델타 + 영상 영역 치수(정규화·변환 기준).</summary>
 public sealed class PtzDragEventArgs : EventArgs
 {
     public PtzDragEventArgs(double dx, double dy, double imageW, double imageH)
@@ -658,6 +718,20 @@ public sealed class PtzDragEventArgs : EventArgs
     public double Dy { get; }
     public double ImageWidth { get; }
     public double ImageHeight { get; }
+
+    /// <summary>
+    /// 호스트로 보낼 값(순수): 드래그 비율(영상 상자 크기 기준 · −1..1 로 자른다)과 상자 가로세로비.
+    /// 상자 크기가 0 이거나 값이 유한하지 않으면 false.
+    /// </summary>
+    public bool TryGetViewFraction(out double viewX, out double viewY, out double viewAspect)
+    {
+        viewX = viewY = viewAspect = 0;
+        if (!(ImageWidth > 0) || !(ImageHeight > 0) || !double.IsFinite(Dx) || !double.IsFinite(Dy)) return false;
+        viewX = Math.Clamp(Dx / ImageWidth, -1d, 1d);
+        viewY = Math.Clamp(Dy / ImageHeight, -1d, 1d);
+        viewAspect = ImageWidth / ImageHeight;
+        return viewX != 0 || viewY != 0;
+    }
 }
 
 /// <summary>PTZ 탭 방향 패드 nudge 인자 — 방향 단위벡터(-1/0/1).</summary>

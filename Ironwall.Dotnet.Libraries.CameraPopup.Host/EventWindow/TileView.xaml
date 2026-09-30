@@ -21,6 +21,21 @@
         <Grid Visibility="{Binding IsCamera, Converter={StaticResource CameraPopup.BoolToVis}}">
             <Image x:Name="VideoImage" Source="{Binding Video}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
 
+            <!-- 영상 위 드래그 PTZ 목표 표시 — 모양으로 알린다: 끈 길이(선) + 떼면 화면 중심으로 올 점(과녁 = 원 + 십자).
+                 밝은 선 아래에 어두운 선을 깔아 어떤 영상 위에서도 보인다. 입력은 타일이 처리하므로 히트테스트 제외. -->
+            <Canvas x:Name="PtzDragOverlay" IsHitTestVisible="False" Visibility="Collapsed">
+                <Line x:Name="DragShaftHalo" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                <Line x:Name="DragShaft" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                <Grid x:Name="DragTarget" Width="28" Height="28">
+                    <Ellipse Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5" />
+                    <Path Data="M14,5 V23 M5,14 H23" Stroke="{DynamicResource CameraPopup.VideoChipBrush}" StrokeThickness="5" />
+                    <Ellipse Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
+                    <Path Data="M14,5 V23 M5,14 H23" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
+                </Grid>
+            </Canvas>
+
             <!-- 위: 손잡이 · 이름 · 태그 -->
             <DockPanel VerticalAlignment="Top" Margin="4" LastChildFill="True">
                 <Thumb x:Name="DragHandle" DockPanel.Dock="Left" Style="{StaticResource CameraPopup.GripThumb}" Margin="0,0,4,0"

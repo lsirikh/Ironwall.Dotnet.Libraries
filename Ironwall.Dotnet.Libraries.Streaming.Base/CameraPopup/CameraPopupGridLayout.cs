@@ -84,4 +84,69 @@ public static class CameraPopupGridLayouts
     /// </summary>
     public static CameraPopupGridLayout Snap(int cameraCount, CameraPopupGridLayout? current)
         => current is { } layout && IsAllowed(cameraCount, layout) ? layout : Default(cameraCount);
+
+    /// <summary>타일 영상 가로세로비(16:9) — 격자 고르기의 기준.</summary>
+    public const double TileAspect = 16d / 9d;
+
+    /// <summary>
+    /// 이벤트 창에 실제로 띄울 격자(<b>정하는 곳은 여기 하나</b> — GIS 창 관리자가 부르고, 호스트는 받은 열 · 행을 그대로 쓴다).
+    /// <list type="bullet">
+    /// <item>실제 카메라 수 = 설정의 창당 카메라 수 → <b>설정 격자 그대로</b>.</item>
+    /// <item>그보다 적으면(매핑 카메라가 모자람 · 일부가 빠짐) → 그 수를 담는 격자 가운데 <b>이 창 크기에서 16:9 타일이 가장 큰 것</b>
+    /// (<see cref="BestFit"/>). 예: 960×600 창에 3대 → 3×1(320×180 타일 · 위아래 큰 검은 띠) 대신 2×2 한 칸 비움(480×270).</item>
+    /// </list>
+    /// 창 크기는 창 전체(머리 · 꼬리 포함) 기준이다 — 머리 · 꼬리는 얇아 순위를 바꾸지 않는다.
+    /// </summary>
+    public static CameraPopupGridLayout ForWindow(int actualCameras, int configuredCameras, CameraPopupGridLayout configured,
+                                                  double windowWidth, double windowHeight)
+    {
+        int count = ClampCount(actualCameras);
+        if (count == ClampCount(configuredCameras) && IsAllowed(count, configured)) return configured;
+        return BestFit(count, windowWidth, windowHeight);
+    }
+
+    /// <summary>
+    /// 그 수를 담는 격자(표의 모든 모양 중 칸 수 ≥ 카메라 수) 가운데 16:9 타일 면적이 가장 큰 것.
+    /// 같으면 빈 칸이 적은 쪽, 그래도 같으면 표 순서(가로 우선). 창 크기를 모르면(0 이하) 그 수의 기본 격자.
+    /// </summary>
+    public static CameraPopupGridLayout BestFit(int cameraCount, double windowWidth, double windowHeight)
+    {
+        int count = ClampCount(cameraCount);
+        if (!(windowWidth > 0) || !(windowHeight > 0) || !double.IsFinite(windowWidth) || !double.IsFinite(windowHeight))
+            return Default(count);
+
+        CameraPopupGridLayout best = Default(count);
+        double bestArea = -1;
+        int bestEmpty = int.MaxValue;
+        var seen = new HashSet<CameraPopupGridLayout>();
+        foreach (var row in Table)
+        {
+            foreach (var layout in row)
+            {
+                if (layout.Capacity < count || !seen.Add(layout)) continue;
+                double area = TileArea(layout, windowWidth, windowHeight);
+                int empty = layout.Capacity - count;
+                // 면적은 소수 오차를 흡수해 비교(같은 값이 계산 순서로 갈리지 않게).
+                bool larger = area > bestArea + 1e-6;
+                bool same = Math.Abs(area - bestArea) <= 1e-6;
+                if (larger || (same && empty < bestEmpty))
+                {
+                    best = layout;
+                    bestArea = area;
+                    bestEmpty = empty;
+                }
+            }
+        }
+        return best;
+    }
+
+    /// <summary>그 격자 한 칸 안에 들어가는 16:9 타일의 면적(창 크기 단위²). 순수.</summary>
+    public static double TileArea(CameraPopupGridLayout layout, double windowWidth, double windowHeight)
+    {
+        if (layout.Columns <= 0 || layout.Rows <= 0) return 0;
+        double cellWidth = windowWidth / layout.Columns;
+        double cellHeight = windowHeight / layout.Rows;
+        double tileWidth = Math.Min(cellWidth, cellHeight * TileAspect);
+        return tileWidth * (tileWidth / TileAspect);
+    }
 }
