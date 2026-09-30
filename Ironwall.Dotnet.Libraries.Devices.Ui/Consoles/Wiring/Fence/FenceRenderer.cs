@@ -37,6 +37,14 @@ public sealed class FenceRenderer
         foreach (var shape in shapes) r.DrawOne(dc, shape, rangeClip);
     }
 
+    /// <summary>사람이 고른 색 글자(#RRGGBB) → 색. 읽을 수 없으면 <c>null</c>(잉크 기본색).</summary>
+    internal static Color? ParseColor(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        try { return (Color)ColorConverter.ConvertFromString(text); }
+        catch (FormatException) { return null; }
+    }
+
     /// <summary>시험용 — 잉크의 채움색(없으면 <c>null</c>).</summary>
     internal static Color? FillColorOf(FrameworkElement source, FenceInk ink)
         => (new FenceRenderer(source).Style(ink).Fill as SolidColorBrush)?.Color;
@@ -70,6 +78,15 @@ public sealed class FenceRenderer
     private Color Selection => Token("SelectionBrush", "#0C6B89");
     private Color TintInfo => Token("TintInfoBrush", "#2215589F");
     private Color Series4 => Token("ChartSeries4Brush", "#257A2E");
+    private Color TintAccent => Token("TintAccentBrush", "#220C6B89");
+
+    // 펜스 재질(fence-wiring-editor NFR-05) — 라이트/다크 쌍 토큰. 토큰이 없는 창(미리보기 · 시험)에서는 라이트 값.
+    private Color Brick => Token("FenceBrickBrush", "#A0522D");
+    private Color Mortar => Token("FenceBrickMortarBrush", "#D9CFC4");
+    private Color Concrete => Token("FenceConcreteBrush", "#B4B3AC");
+    private Color ConcreteSeamColor => Token("FenceConcreteSeamBrush", "#8C8B84");
+    private Color Design => Token("FenceDesignBrush", "#2F7D4A");
+    private Color RazorColor => Token("FenceRazorBrush", "#5E6B79");
 
     private Color Post => Divider;
     private Color PostSide => Mix(Divider, Colors.Black, 0.18);
@@ -89,12 +106,49 @@ public sealed class FenceRenderer
 
     #region - Styles -
     private readonly record struct InkStyle(Brush? Fill, Brush? Stroke, double Thickness, Brush? TextBrush = null, bool Mono = false,
-                                            FontWeight? Weight = null, PenLineCap Cap = PenLineCap.Flat, PenLineJoin Join = PenLineJoin.Miter);
+                                            FontWeight? Weight = null, PenLineCap Cap = PenLineCap.Flat, PenLineJoin Join = PenLineJoin.Miter,
+                                            double[]? Dash = null);
 
     private static SolidColorBrush B(Color c) => new(c);
 
-    private InkStyle Style(FenceInk ink) => ink switch
+    private InkStyle Style(FenceInk ink, Color? custom = null) => ink switch
     {
+        // ── 펜스 편집기 — 사람이 고른 색(custom)이 있으면 그 색이 이긴다 ──
+        FenceInk.Mesh when custom is { } c => new(MeshBrush(c), B(c), 0.6),
+        FenceInk.Rail when custom is { } c => new(null, B(c), 2.2, Cap: PenLineCap.Round),
+        FenceInk.PanelSelectFill => new(B(TintAccent), null, 0),
+        FenceInk.PanelSelectEdge => new(null, B(Selection), 2.2, Join: PenLineJoin.Round),
+        FenceInk.RubberBand => new(B(Color.FromArgb(0x1A, Primary.R, Primary.G, Primary.B)), B(Primary), 1, Dash: new[] { 5.0, 3.0 }),
+        FenceInk.Razor => new(null, B(custom ?? RazorColor), 1.2),
+        FenceInk.RazorArm => new(null, B(Divider), 2.2, Cap: PenLineCap.Round),
+        FenceInk.BrickFront => new(BrickBrush(custom ?? Brick, Mortar), B(Mix(custom ?? Brick, Colors.Black, 0.3)), 0.8),
+        FenceInk.BrickSide => new(B(Mix(custom ?? Brick, Colors.Black, 0.3)), null, 0),
+        FenceInk.BrickTop => new(B(Mix(custom ?? Brick, Colors.White, 0.25)), null, 0),
+        FenceInk.ConcreteFront => new(B(custom ?? Concrete), B(ConcreteSeamColor), 0.8),
+        FenceInk.ConcreteSeam => new(null, B(ConcreteSeamColor), 1.4),
+        FenceInk.WallSide => new(B(Mix(custom ?? Concrete, Colors.Black, 0.25)), null, 0),
+        FenceInk.WallTopFace => new(B(Mix(custom ?? Concrete, Colors.White, 0.25)), null, 0),
+        FenceInk.WallCap => new(B(Mix(Concrete, Colors.White, 0.15)), B(ConcreteSeamColor), 0.8),
+        FenceInk.DesignFace => new(DesignBrush(custom ?? Design), null, 0),
+        FenceInk.DesignRail => new(null, B(custom ?? Design), 3, Cap: PenLineCap.Round),
+        FenceInk.DesignPost => new(B(custom ?? Design), null, 0),
+        FenceInk.PostFront when custom is { } c => new(B(c), null, 0),
+        // ── 개념도(FR-12) — 점선 {4,3} · {5,3} 은 다른 뜻에 배정돼 있어 선에 쓰지 않는다 ──
+        FenceInk.ConceptWire => new(null, B(Primary), 2.6, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
+        FenceInk.ConceptReturn => new(null, B(Tx3), 1.6, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
+        FenceInk.ConceptArrow => new(B(Primary), null, 0),
+        FenceInk.ConceptNode => new(B(Alt), B(Border), 1.6),
+        FenceInk.ConceptNodeIp => new(null, B(Info), 1.6),
+        FenceInk.ConceptNodeText => new(null, null, 0, B(Tx1), true, FontWeights.Bold),
+        FenceInk.ConceptNodeSub => new(null, null, 0, B(Tx3), false, FontWeights.SemiBold),
+        FenceInk.ConceptController => new(B(Pressed), B(Border), 1.2),
+        FenceInk.ConceptControllerText => new(null, null, 0, B(Tx1), false, FontWeights.Bold),
+        FenceInk.ConceptPort => new(B(Tx2), B(Alt), 1),
+        FenceInk.ConceptPortText => new(null, null, 0, B(Tx2), true, FontWeights.SemiBold),
+        FenceInk.ConceptTitle => new(null, null, 0, B(Tx3), false, FontWeights.SemiBold),
+        FenceInk.ConceptInfo => new(null, null, 0, B(Info), false, FontWeights.SemiBold),
+        FenceInk.ConceptInsert => new(B(Primary), B(Primary), 3, Cap: PenLineCap.Round),
+        FenceInk.ConceptInternalNet => new(null, B(Info), 1.2, Dash: new[] { 6.0, 4.0 }),
         FenceInk.Ground => new(B(Sunken), B(RowLine), 1),
         FenceInk.Section => new(B(Bg), B(Divider), 1),
         FenceInk.Strata => new(null, B(RowLine), 1),
@@ -181,10 +235,10 @@ public sealed class FenceRenderer
     };
 
     /// <summary>철망 무늬 — 12×12 마름모 격자(목업 <c>#meshpat</c>). 테마마다 다시 만든다.</summary>
-    private Brush MeshBrush()
+    private Brush MeshBrush(Color? line = null)
     {
         var geometry = Geometry.Parse("M0,6 L6,0 12,6 6,12Z");
-        var drawing = new GeometryDrawing(null, new Pen(B(RowLine), 0.8), geometry);
+        var drawing = new GeometryDrawing(null, new Pen(B(line ?? RowLine), 0.8), geometry);
         return new DrawingBrush(drawing)
         {
             TileMode = TileMode.Tile,
@@ -196,12 +250,44 @@ public sealed class FenceRenderer
     }
     #endregion
 
+    /// <summary>벽돌 무늬 — 24×12 타일(줄눈 가로 두 줄 · 세로는 줄마다 엇갈림). 매번 새로 만든다(Frozen · 캐시 없음).</summary>
+    private static Brush BrickBrush(Color brick, Color mortar)
+    {
+        var group = new DrawingGroup();
+        group.Children.Add(new GeometryDrawing(B(brick), null, new RectangleGeometry(new Rect(0, 0, 24, 12))));
+        var pen = new Pen(B(mortar), 1);
+        group.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse("M0,0.5 H24 M0,6.5 H24 M0.5,0.5 V6.5 M12.5,6.5 V12")));
+        return new DrawingBrush(group)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, 24, 12),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewbox = new Rect(0, 0, 24, 12),
+            ViewboxUnits = BrushMappingMode.Absolute,
+        };
+    }
+
+    /// <summary>디자인펜스 세로살 — 8×8 타일에 3.5 폭 살 하나(나머지는 비친다).</summary>
+    private static Brush DesignBrush(Color slat)
+    {
+        var drawing = new GeometryDrawing(B(slat), null, new RectangleGeometry(new Rect(0, 0, 3.5, 8)));
+        return new DrawingBrush(drawing)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, 8, 8),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewbox = new Rect(0, 0, 8, 8),
+            ViewboxUnits = BrushMappingMode.Absolute,
+        };
+    }
+
     #region - Draw -
     private void DrawOne(DrawingContext dc, FenceShape shape, Geometry? rangeClip)
     {
-        var style = Style(shape.Ink);
+        var style = Style(shape.Ink, ParseColor(shape.Color));
         var pen = style.Stroke is null || style.Thickness <= 0 ? null
             : new Pen(style.Stroke, style.Thickness) { StartLineCap = style.Cap, EndLineCap = style.Cap, LineJoin = style.Join };
+        if (pen is not null && style.Dash is { } dash) pen.DashStyle = new DashStyle(dash, 0);
 
         var faded = shape.Opacity < 1 || shape.Ink == FenceInk.Range;
         if (faded) dc.PushOpacity(shape.Ink == FenceInk.Range ? 0.6 * shape.Opacity : shape.Opacity);

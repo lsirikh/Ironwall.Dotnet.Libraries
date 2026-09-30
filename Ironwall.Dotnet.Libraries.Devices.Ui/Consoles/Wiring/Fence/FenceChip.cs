@@ -19,6 +19,12 @@ public enum FenceChipKind
     Group = 1,
     /// <summary>함체(링) · 제어기(가지 · 한 줄).</summary>
     Controller = 2,
+    /// <summary>망 한 칸(fence-wiring-editor FR-04) — 키 = 망 번호(0부터).</summary>
+    Panel = 3,
+    /// <summary>개념도의 센서 노드(FR-12).</summary>
+    ConceptNode = 4,
+    /// <summary>개념도의 제어기(Ch1 · Ch2 포트).</summary>
+    ConceptController = 5,
 }
 
 /// <summary>
@@ -34,6 +40,9 @@ public sealed class FenceChip : Thumb
     public const string SENSOR_ID_PREFIX = "Devices.Wiring.Fence.Sensor.";
     public const string GROUP_ID_PREFIX = "Devices.Wiring.Fence.Group.";
     public const string ENCLOSURE_ID = "Devices.Wiring.Fence.Enclosure";
+    public const string PANEL_ID_PREFIX = "Devices.Wiring.Fence.Panel.";
+    public const string CONCEPT_NODE_ID_PREFIX = "Devices.Wiring.Fence.Concept.Node.";
+    public const string CONCEPT_CONTROLLER_ID = "Devices.Wiring.Fence.Concept.Controller";
 
     private FenceChipPicture? _picture;
 
@@ -49,11 +58,19 @@ public sealed class FenceChip : Thumb
         Key = key;
         Keys = keys;
         Template = null;                 // 테마 Thumb 모양을 쓰지 않는다 — OnRender 가 그린다
-        Cursor = kind == FenceChipKind.Controller ? Cursors.SizeWE : Cursors.Hand;
+        Cursor = kind switch
+        {
+            FenceChipKind.Controller => Cursors.SizeWE,
+            FenceChipKind.Panel or FenceChipKind.ConceptController => Cursors.Arrow,
+            _ => Cursors.Hand,
+        };
         AutomationProperties.SetAutomationId(this, kind switch
         {
             FenceChipKind.Sensor => SENSOR_ID_PREFIX + key,
             FenceChipKind.Group => GROUP_ID_PREFIX + key,
+            FenceChipKind.Panel => PANEL_ID_PREFIX + key,
+            FenceChipKind.ConceptNode => CONCEPT_NODE_ID_PREFIX + key,
+            FenceChipKind.ConceptController => CONCEPT_CONTROLLER_ID,
             _ => ENCLOSURE_ID,
         });
     }
@@ -112,7 +129,12 @@ public sealed class FenceChipAutomationPeer : ThumbAutomationPeer
     protected override string GetClassNameCore() => nameof(FenceChip);
 
     protected override AutomationControlType GetAutomationControlTypeCore()
-        => ((FenceChip)Owner).Kind == FenceChipKind.Controller ? AutomationControlType.Slider : AutomationControlType.Button;
+        => ((FenceChip)Owner).Kind switch
+        {
+            FenceChipKind.Controller => AutomationControlType.Slider,
+            FenceChipKind.Panel or FenceChipKind.ConceptNode => AutomationControlType.ListItem,
+            _ => AutomationControlType.Button,
+        };
 
     protected override bool IsKeyboardFocusableCore() => true;
 }
@@ -124,6 +146,7 @@ public sealed class FenceChipAutomationPeer : ThumbAutomationPeer
 public sealed class FenceOverlayAdorner : Adorner
 {
     private IReadOnlyList<FenceShape> _shapes = Array.Empty<FenceShape>();
+    private IReadOnlyList<FenceShape> _screen = Array.Empty<FenceShape>();
     private Matrix _world = Matrix.Identity;
 
     public FenceOverlayAdorner(UIElement adorned) : base(adorned)
@@ -135,9 +158,13 @@ public sealed class FenceOverlayAdorner : Adorner
 
     internal IReadOnlyList<FenceShape> Shapes => _shapes;
 
-    public void Show(IReadOnlyList<FenceShape> shapes, Matrix world)
+    /// <summary>화면 좌표로 그리는 것(러버밴드 — 배율과 무관하게 1px 점선).</summary>
+    internal IReadOnlyList<FenceShape> ScreenShapes => _screen;
+
+    public void Show(IReadOnlyList<FenceShape> shapes, Matrix world, IReadOnlyList<FenceShape>? screen = null)
     {
         _shapes = shapes;
+        _screen = screen ?? Array.Empty<FenceShape>();
         _world = world;
         InvalidateVisual();
     }
@@ -145,11 +172,12 @@ public sealed class FenceOverlayAdorner : Adorner
     protected override void OnRender(DrawingContext drawingContext)
     {
         RenderCount++;
-        if (_shapes.Count == 0) return;
+        if (_shapes.Count == 0 && _screen.Count == 0) return;
         drawingContext.PushClip(new RectangleGeometry(new Rect(AdornedElement.RenderSize)));
         drawingContext.PushTransform(new MatrixTransform(_world));
         FenceRenderer.Draw(drawingContext, (FrameworkElement)AdornedElement, _shapes);
         drawingContext.Pop();
+        FenceRenderer.Draw(drawingContext, (FrameworkElement)AdornedElement, _screen);
         drawingContext.Pop();
     }
 }

@@ -326,6 +326,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                     : $"{_board.Spacing.GapBetween(WiringTopology.ParseSensorType(previous.Facts.TypeText), type):0.#}m";
                 slot.IsDraft = row is not null && (row.IsNew || row.FactsChanged || !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement));
                 slot.IsDuplicateNumber = row is not null && duplicates.Contains(row.Key);
+                slot.IsIpAddress = row is not null && IsIpSensor(row.Key);
+                slot.AddressCellText = row is null ? string.Empty : AddressTextOf(row.Key);
                 slot.EnclosureBefore = IsRing && placed > 0 && i == Math.Clamp(gap, 0, placed);
                 slot.EnclosureLabel = slot.EnclosureBefore
                     ? $"▲ A 쪽 {(gap > 0 ? $"1~{gap}" : "없음")}   ·   함체(제어기) 자리   ·   B 쪽 {(gap < placed ? $"{gap + 1}~{placed}" : "없음")} ▼"

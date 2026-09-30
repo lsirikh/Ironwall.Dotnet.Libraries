@@ -99,6 +99,51 @@ public partial class WiringView : UserControl
     private void OnEnclosureForward(object sender, RoutedEventArgs e) => ViewModel?.MoveEnclosureForward();
     #endregion
 
+    #region - Fence editor pane (fence-wiring-editor FR-03 · FR-07 · FR-10) -
+    private static string? TagOf(object sender) => (sender as FrameworkElement)?.Tag as string;
+
+    private void OnPanelStyle(object sender, RoutedEventArgs e)
+    {
+        if (Enum.TryParse<Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle>(TagOf(sender), out var style)) ViewModel?.ChoosePanelStyle(style);
+    }
+
+    private void OnPanelColor(object sender, RoutedEventArgs e) => ViewModel?.ChoosePanelColor(string.IsNullOrEmpty(TagOf(sender)) ? null : TagOf(sender));
+
+    private async void OnPanelColorCustom(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.AskPanelColorAsync();
+    }
+
+    private void OnPanelSpan(object sender, RoutedEventArgs e)
+    {
+        if (double.TryParse(TagOf(sender), NumberStyles.Float, CultureInfo.InvariantCulture, out var metres)) ViewModel?.ChoosePanelSpan(metres);
+    }
+
+    private void OnApplyPanelEdit(object sender, RoutedEventArgs e) => ViewModel?.ApplyPanelEdit();
+
+    private void OnMountSpot(object sender, RoutedEventArgs e)
+    {
+        if (Enum.TryParse<Ironwall.Dotnet.Monitoring.Models.Fences.FenceMountSpot>(TagOf(sender), out var spot)) ViewModel?.ChooseMountSpot(spot);
+    }
+
+    private void OnMountOffsetKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || ViewModel is not { } vm) return;
+        vm.ApplyMountOffset();
+        e.Handled = true;
+    }
+
+    private void OnMountOffsetLostFocus(object sender, KeyboardFocusChangedEventArgs e) => ViewModel?.ApplyMountOffset();
+
+    private void OnBandPreset(object sender, RoutedEventArgs e)
+    {
+        if (TagOf(sender) is { } preset) ViewModel?.ChooseBandPreset(preset);
+    }
+
+    private void OnBandClear(object sender, RoutedEventArgs e) => ViewModel?.ClearBands();
+    private void OnBandCustom(object sender, RoutedEventArgs e) => ViewModel?.ApplyCustomBands();
+    #endregion
+
     private void OnRemoveSlot(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is WiringSlotViewModel slot) ViewModel?.Unplace(slot);
@@ -111,6 +156,9 @@ public partial class WiringView : UserControl
 
         foreach (var slot in e.RemovedItems.OfType<WiringSlotViewModel>()) slot.IsSelected = false;
         foreach (var slot in e.AddedItems.OfType<WiringSlotViewModel>()) slot.IsSelected = true;
+
+        // 선택 하나로(fence-wiring-editor FR-13) — 표에서 고른 줄이 펜스 · 개념도의 선택이 된다.
+        vm.SelectFromTable(list.SelectedItems.OfType<WiringSlotViewModel>().Where(s => s.Row is not null).Select(s => s.Row!.Key).ToList());
 
         if (e.AddedItems.Count == 0) return;
 

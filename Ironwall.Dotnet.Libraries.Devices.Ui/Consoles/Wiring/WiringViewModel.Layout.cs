@@ -650,14 +650,25 @@ public sealed partial class WiringViewModel
         return ok;
     }
 
-    /// <summary>끄는 동안 목표 칸 글자(삽입 막대 알약) — 보드를 바꾸지 않는다. "기둥 5 · 기둥 위" · "망 3 · 망 가운데".</summary>
-    public string FenceMoveLabel(int grabbedKey, double targetMetres)
+    /// <summary>
+    /// 끄는 동안 목표 알약(삽입 막대) — 보드를 바꾸지 않고 흉내만 낸다. "위치 3 · 기둥 3 · 기둥 위"(대역이 있으면 "· 번호 3" 도).
+    /// </summary>
+    public string FenceMoveLabel(IReadOnlyList<int> keys, int grabbedKey, double targetMetres)
     {
         var layout = _board.FenceLayout;
         if (layout.MountOf(grabbedKey) is not { } grabbed) return string.Empty;
-        var index = FenceLayoutMath.IndexAt(grabbed, layout.Geometry, targetMetres);
-        var target = FenceLayoutMath.Normalize(grabbed with { Panel = index }, layout.Panels);
-        return $"{(target.IsPostSpot ? "기둥" : "망")} {target.Panel + 1} · {SensorMountSpec.SpotText(target.Spot)}";
+        var delta = FenceLayoutMath.IndexAt(grabbed, layout.Geometry, targetMetres) - grabbed.Panel;
+        var moving = (keys ?? Array.Empty<int>()).Where(k => layout.MountOf(k) is not null).ToList();
+        if (!moving.Contains(grabbedKey)) moving.Add(grabbedKey);
+        var mounts = layout.Mounts.ToDictionary(p => p.Key, p => moving.Contains(p.Key) ? FenceLayoutMath.MoveBy(p.Value, delta, layout.Panels) : p.Value);
+        var rest = _board.Chain.Keys.Where(k => !moving.Contains(k)).ToList();
+        var tie = delta > 0 ? rest.Concat(moving).ToList() : moving.Concat(rest).ToList();
+        var order = FenceLayoutMath.PositionOrder(mounts.Select(p => (p.Key, p.Value)), tie).ToList();
+        var target = mounts[grabbedKey];
+        var place = $"{(target.IsPostSpot ? "기둥" : "망")} {target.Panel + 1} · {SensorMountSpec.SpotText(target.Spot)}";
+        var number = layout.Bands is { } bands
+            && NumberingMath.Assign(order.Select(k => (k, _board.CategoryOf(k))), bands).TryGetValue(grabbedKey, out var n) ? $" · 번호 {n}" : string.Empty;
+        return $"위치 {order.IndexOf(grabbedKey) + 1} · {place}{number}";
     }
 
     /// <summary>끄는 동안 목표 칸의 가로 위치(m) — 기둥이면 기둥 x, 망이면 망 가운데.</summary>

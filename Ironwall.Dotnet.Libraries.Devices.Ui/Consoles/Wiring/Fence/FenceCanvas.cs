@@ -1,9 +1,11 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Graph;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
@@ -16,15 +18,17 @@ using System.Windows.Threading;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
 
 /// <summary>
-/// 펜스 형상 뷰 캔버스(wiring-fence-view F-3 · FR-04 ~ FR-11 · FR-15 · FR-17 ~ FR-19). 지도(GMap)와 무관한 별도 컨트롤이다.
+/// 펜스 형상 뷰 캔버스(wiring-fence-view F-3 · fence-wiring-editor FR-02 ~ FR-09 · FR-12). 지도(GMap)와 무관한 별도 컨트롤이다.
 /// </summary>
 /// <remarks>
-/// <para><b>겹</b>(아래 → 위): 바탕 · [세계: 정적 층(땅 · 망 · 기둥 · 선) · 칩 층(센서 · 묶음 · 함체 — <see cref="FenceChip"/>)] · 덧그림 어도너(삽입 막대 · 알약) · 고스트 어도너.
-/// 세계는 <see cref="GraphViewport"/> 변환 하나로 줌 · 팬한다(목업처럼 그림이 배율대로 커진다).</para>
-/// <para><b>입력</b>: 터널 <c>PreviewMouseDown</c> 에서 누름을 받아 <b>캔버스가</b> 캡처한다 — 데드존(<see cref="FenceDropMath.IsDrag"/>, 8 DIU) 안이면 클릭(선택),
-/// 넘으면 센서 끌기 · 함체 끌기 · 빈 곳 팬. 끝나는 길(뗌 · 캡처 상실 · Esc)은 <see cref="FinishDrag"/> 하나다.
-/// 끄는 동안 다시 그리는 것은 <b>삽입 후보가 바뀔 때만</b>이다(NFR-02).</para>
-/// <para>판단은 하지 않는다 — 체인 편집 · 선택은 <see cref="WiringViewModel"/> 의 펜스 면이 한다.</para>
+/// <para><b>겹</b>(아래 → 위): 바탕 · [세계: 정적 층(땅 · 망 모양 5종 · 기둥 · 케이블 보기) · 망 칩 층(망 한 칸 = <see cref="FenceChip"/> Panel) ·
+/// 칩 층(센서 · 묶음 · 함체)] · 덧그림 어도너(목표 막대 · 알약 · 러버밴드) · 고스트 어도너.
+/// 세계는 <see cref="GraphViewport"/> 변환 하나로 줌 · 팬한다.</para>
+/// <para><b>입력</b>(<see cref="FenceGesture"/> 표 그대로): 터널 <c>PreviewMouseDown</c> 에서 누름을 받아 <b>캔버스가</b> 캡처한다 — 데드존(8 DIU) 안이면 클릭,
+/// 넘으면 — 왼쪽: 센서를 잡았으면 옮기기 · 빈 곳 · 망이면 센서 사각형 · Shift 면 망 사각형 / 오른쪽 · 가운데: 화면 이동.
+/// 오른쪽을 데드존 안에서 떼면 메뉴. 끝나는 길(뗌 · 캡처 상실 · Esc)은 <see cref="FinishDrag"/> 하나다.
+/// 끄는 동안 다시 그리는 것은 <b>목표 칸이 바뀔 때만</b>이다(NFR-02 · 러버밴드는 포인터를 따라간다).</para>
+/// <para>판단은 하지 않는다 — 체인 · 자리 편집 · 선택은 <see cref="WiringViewModel"/> 이 한다.</para>
 /// </remarks>
 public sealed class FenceCanvas : Grid, IFenceDropSurface
 {
@@ -39,9 +43,11 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private readonly Canvas _world = new() { ClipToBounds = false };
     private readonly MatrixTransform _transform = new();
     private readonly FenceStaticLayer _static = new();
+    private readonly Canvas _panels = new() { ClipToBounds = false };
     private readonly Canvas _chips = new() { ClipToBounds = false };
     private readonly Dictionary<int, FenceChip> _sensorChips = new();
     private readonly Dictionary<int, FenceChip> _groupChips = new();
+    private readonly Dictionary<int, FenceChip> _panelChips = new();
     private FenceChip? _controllerChip;
     private FenceOverlayAdorner? _overlay;
 
@@ -54,6 +60,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     // 끌기 — 누름(_press)과 끌기(_dragging)를 가른다(데드존 미만은 클릭)
     private Press? _press;
     private bool _dragging;
+    private FenceGestureAction _action;
     private DragGhostAdorner? _ghost;
     private double? _insertionX;
     private string? _insertionLabel;
@@ -63,15 +70,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private bool _arming;
     private IReadOnlyList<int> _dragKeys = Array.Empty<int>();
     private double _renderZoom = 1;
+    private Rect? _band;
 
     /// <summary>글자 최소 크기를 다시 맞출 줌 변화(비율) — 이만큼 넘게 바뀔 때만 정적 층 · 칩을 다시 그린다(팬 · 작은 줌은 변환만).</summary>
     public const double REDRAW_ZOOM_STEP = 0.04;
     private int _enclosureGap;
     private readonly DispatcherTimer _paletteHover;
 
-    private sealed record Press(PressKind Kind, FenceChip? Chip, Point Start, GraphViewport View, bool Ctrl);
-
-    private enum PressKind { Unit, Enclosure, Pan }
+    private sealed record Press(FencePointerButton Button, FenceTargetKind Target, FenceChip? Chip, Point Start, GraphViewport View, bool Ctrl, bool Shift);
 
     private enum DropKind { None, Chain, Remove }
 
@@ -89,11 +95,16 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         SnapsToDevicePixels = true;
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
         AutomationProperties.SetAutomationId(this, AUTOMATION_ID);
-        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동");
+        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Shift+F10 메뉴");
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Local);
+        // Tab 은 센서 칩 먼저, 망은 한 번에 들어가 화살표로 옮긴다(망 수백 칸을 Tab 으로 지나지 않게).
+        KeyboardNavigation.SetTabIndex(_chips, 0);
+        KeyboardNavigation.SetTabIndex(_panels, 1);
+        KeyboardNavigation.SetTabNavigation(_panels, KeyboardNavigationMode.Once);
 
         _world.RenderTransform = _transform;
         _world.Children.Add(_static);
+        _world.Children.Add(_panels);
         _world.Children.Add(_chips);
         Children.Add(_world);
 
@@ -116,7 +127,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     public static readonly DependencyProperty ViewModelProperty = DependencyProperty.Register(
         nameof(ViewModel), typeof(WiringViewModel), typeof(FenceCanvas), new PropertyMetadata(null, OnViewModelChanged));
 
-    /// <summary>결선 창 뷰모델 — 체인 · 선택 · 편집의 주인.</summary>
+    /// <summary>결선 창 뷰모델 — 체인 · 자리 · 선택 · 편집의 주인.</summary>
     public WiringViewModel? ViewModel
     {
         get => (WiringViewModel?)GetValue(ViewModelProperty);
@@ -161,12 +172,20 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     internal FenceProjector Projector => _projector;
     internal IReadOnlyDictionary<int, FenceChip> SensorChips => _sensorChips;
     internal IReadOnlyDictionary<int, FenceChip> GroupChips => _groupChips;
+    internal IReadOnlyDictionary<int, FenceChip> PanelChips => _panelChips;
     internal FenceChip? ControllerChip => _controllerChip;
     internal int StaticRenderCount => _static.RenderCount;
     internal int OverlayRenderCount => _overlay?.RenderCount ?? 0;
     internal IReadOnlyList<FenceShape> OverlayShapes => _overlay?.Shapes ?? Array.Empty<FenceShape>();
+    internal IReadOnlyList<FenceShape> OverlayScreenShapes => _overlay?.ScreenShapes ?? Array.Empty<FenceShape>();
     internal double? InsertionX => _insertionX;
     internal IReadOnlyList<FenceShape> StaticShapes => _static.Shapes;
+
+    /// <summary>시험 — 메뉴를 띄우지 않고 항목만 남긴다(화면 밖 창에서 팝업이 포커스를 뺏지 않게).</summary>
+    internal bool SuppressMenuPopup { get; set; }
+
+    /// <summary>마지막으로 연 메뉴의 항목.</summary>
+    internal IReadOnlyList<FenceMenuEntry>? LastMenu { get; private set; }
 
     /// <summary>덧그림을 새로 얹은 횟수 — 끄는 동안은 후보 자리가 바뀔 때만 는다(NFR-02).</summary>
     internal int OverlayUpdates { get; private set; }
@@ -180,7 +199,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     /// <summary>세계 점 → 화면 점.</summary>
     internal Point WorldToScreen(Point world) => _view.WorldToScreen(world);
 
-    /// <summary>센서의 화면 중심(시험 · 자동화 좌표).</summary>
+    /// <summary>칩의 화면 중심(시험 · 자동화 좌표).</summary>
     internal Point ScreenCenterOf(FenceChip chip)
     {
         return WorldToScreen(new Point(Canvas.GetLeft(chip) + chip.Width / 2, Canvas.GetTop(chip) + chip.Height / 2));
@@ -194,7 +213,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         Rebuild();
     }
 
-    /// <summary>뷰모델에서 장면을 다시 세운다(체인 · 선택 · 보기 방식).</summary>
+    /// <summary>뷰모델에서 장면을 다시 세운다(체인 · 자리 · 선택 · 보기 방식).</summary>
     internal void Rebuild()
     {
         var vm = ViewModel;
@@ -202,34 +221,43 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var watch = Stopwatch.StartNew();
 
         var focusedChip = FocusedChip();
-        var focusedKey = focusedChip?.Keys.FirstOrDefault() is { } fk && fk != 0 ? fk : (int?)null;
+        var focusedKey = focusedChip is { Kind: FenceChipKind.Sensor or FenceChipKind.Group } && focusedChip.Keys.FirstOrDefault() is var fk && fk != 0 ? fk : (int?)null;
+        var focusedPanel = focusedChip is { Kind: FenceChipKind.Panel } ? focusedChip.Key : (int?)null;
         var controllerFocused = focusedChip is { Kind: FenceChipKind.Controller };
 
         var flatChanged = _projector.K != (vm.IsFlat ? 0 : 1);
         _projector = vm.IsFlat ? FenceProjector.Flat : FenceProjector.Tilt;
-        _scene = FenceWorld.Build(vm.FenceChain, vm.FenceSensors(), null, vm.FenceSpacing);
+        _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing);
         _enclosureX = _scene.ControllerX;
         _enclosureGap = _scene.Chain.ControllerGap;
         _grouped = _scene.ShouldGroup(_view.Scale);
 
         DrawStatic();
+        SyncPanels();
         SyncChips();
 
         if (_autoFit && (flatChanged || ActualWidth > 0)) Fit();
         else ApplyView();
 
         if (focusedKey is { } key) FocusUnitOf(key);
+        else if (focusedPanel is { } panel && _panelChips.TryGetValue(panel, out var panelChip)) FocusQuietly(panelChip);
         else if (controllerFocused) _controllerChip?.Focus();
 
         UpdateOverlay();
         LastRebuildMs = watch.Elapsed.TotalMilliseconds;
     }
 
+    /// <summary>케이블 층(리턴케이블 · 함체 · A/B 번호)을 그리는가 — 펜스 구성 모드에서는 [케이블 보기]를 켰을 때만(FR-12).</summary>
+    private bool CablesShown => _scene is not { IsLayout: true } || ViewModel?.ShowCables == true;
+
     private void DrawStatic()
     {
         if (_scene is null || ViewModel is null) return;
         _renderZoom = _view.Scale;
-        var shapes = FenceScene.Static(_scene, _projector, ViewModel.ShowRange && ViewModel.HasRangeSensors, _enclosureX, _enclosureGap, _view.Scale);
+        var showRange = ViewModel.ShowRange && ViewModel.HasRangeSensors;
+        var shapes = _scene.IsLayout
+            ? FenceScene.StaticLayout(_scene, _projector, showRange, ViewModel.ShowCables, _enclosureX, _enclosureGap, _view.Scale)
+            : FenceScene.Static(_scene, _projector, showRange, _enclosureX, _enclosureGap, _view.Scale);
         var clip = new StreamGeometry();
         var ground = FenceScene.GroundPolygon(_scene, _projector, _enclosureX);
         using (var ctx = clip.Open())
@@ -238,6 +266,45 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             ctx.PolyLineTo(ground.Skip(1).ToList(), true, true);
         }
         _static.Show(shapes, clip);
+    }
+
+    /// <summary>망 칩 — 망 한 칸마다 하나(peer 있는 <see cref="FenceChip"/> · FR-04). 그림은 선택 표시와 적중 사각형뿐이고 모양은 정적 층이 그린다.</summary>
+    private void SyncPanels()
+    {
+        if (_scene is null || ViewModel is not { } vm) return;
+        var geometry = _scene.Geometry;
+        var count = geometry?.Panels.Count ?? 0;
+        foreach (var key in _panelChips.Keys.Where(k => k >= count).ToList())
+        {
+            _panels.Children.Remove(_panelChips[key]);
+            _panelChips.Remove(key);
+        }
+        if (geometry is null) return;
+
+        foreach (var panel in geometry.Panels)
+        {
+            if (!_panelChips.TryGetValue(panel.Index, out var chip))
+            {
+                chip = new FenceChip(FenceChipKind.Panel, panel.Index, Array.Empty<int>());
+                chip.GotFocus += OnChipFocused;
+                _panelChips[panel.Index] = chip;
+                _panels.Children.Add(chip);
+            }
+            var selected = vm.IsPanelSelected(panel.Index);
+            chip.Picture = FenceScene.PanelChip(panel, _scene, _projector, selected);
+            Place(chip, panel.StartM * _scene.Upm);
+            AutomationProperties.SetName(chip, $"망 {panel.Index + 1}, {FencePanelSpec.StyleText(panel.Spec.Style)}, 거리 {panel.SpanM:0.##}m, 높이 {panel.Spec.HeightM:0.##}m");
+            AutomationProperties.SetItemStatus(chip, selected ? "선택됨" : string.Empty);
+        }
+        // 자식 순서 = 망 순서(화살표 · 러버밴드가 같은 차례를 본다)
+        for (var i = 0; i < geometry.Panels.Count; i++)
+        {
+            var chip = _panelChips[i];
+            var at = _panels.Children.IndexOf(chip);
+            if (at == i) continue;
+            _panels.Children.RemoveAt(at);
+            _panels.Children.Insert(Math.Min(i, _panels.Children.Count), chip);
+        }
     }
 
     private void SyncChips()
@@ -279,25 +346,31 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!_sensorChips.TryGetValue(unit.Key, out chip!))
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
-                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale);
+                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
                 var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
-                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}{facing}");
+                var mount = vm.FenceLayout.MountOf(unit.Key) is { } m ? $", {(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} {SensorMountSpec.SpotText(m.Spot)}" : string.Empty;
+                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}{facing}{mount}");
                 AutomationProperties.SetItemStatus(chip, s.HasFacing ? (s.IsBackFacing ? "방향 뒤" : "방향 앞") : string.Empty);
             }
             order.Add(chip);
         }
 
-        // 링의 함체는 단위 목록에 없다 — 따로 세운다(끌어서 옮긴다 · FR-09).
-        if (shape == WiringShape.Ring)
+        // 링의 함체는 단위 목록에 없다 — 케이블 보기일 때만 따로 세운다(끌어서 옮긴다 · 표시만).
+        if (shape == WiringShape.Ring && CablesShown)
         {
             var chip = _controllerChip ??= NewChip(FenceChipKind.Controller, FenceWorld.CONTROLLER_KEY, Array.Empty<int>());
             chip.Picture = FenceScene.Controller(shape, _projector, vm.IsControllerSelected, _view.Scale);
             Place(chip, _enclosureX);
             AutomationProperties.SetName(chip, $"함체 — {vm.EnclosureGapText}. Alt+왼쪽/오른쪽 화살표로 옮깁니다(표시만)");
             order.Insert(0, chip);
+        }
+        else if (shape == WiringShape.Ring && _controllerChip is not null)
+        {
+            _chips.Children.Remove(_controllerChip);
+            _controllerChip = null;
         }
 
         foreach (var key in _sensorChips.Keys.Where(k => !liveSensors.Contains(k)).ToList())
@@ -347,8 +420,18 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private void OnChipFocused(object sender, RoutedEventArgs e)
     {
         if (_press is not null || _arming || sender is not FenceChip chip || ViewModel is not { } vm) return;
-        if (chip.Kind == FenceChipKind.Controller) { if (!vm.IsControllerSelected) vm.FenceSelectController(); }
-        else if (vm.FenceSelectedKey is not { } k || !chip.Keys.Contains(k)) vm.FenceSelect(chip.Keys[0]);
+        switch (chip.Kind)
+        {
+            case FenceChipKind.Controller:
+                if (!vm.IsControllerSelected) vm.FenceSelectController();
+                break;
+            case FenceChipKind.Panel:
+                if (!vm.IsPanelSelected(chip.Key) || vm.FencePaneKind != FenceSelectionKind.Panels) vm.FenceSelectPanel(chip.Key);
+                break;
+            default:
+                if (vm.FenceSelectedKey is not { } k || !chip.Keys.Contains(k)) vm.FenceSelect(chip.Keys[0]);
+                break;
+        }
         EnsureVisible(chip);
     }
 
@@ -360,7 +443,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private void RedrawAll()
     {
         _static.InvalidateVisual();
-        foreach (var chip in _chips.Children.OfType<FenceChip>()) chip.InvalidateVisual();
+        foreach (var chip in _chips.Children.OfType<FenceChip>().Concat(_panels.Children.OfType<FenceChip>())) chip.InvalidateVisual();
         _overlay?.InvalidateVisual();
     }
     #endregion
@@ -453,8 +536,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var hidden = new HashSet<int>(_grouped ? _groupChips.Values.SelectMany(c => c.Keys) : Enumerable.Empty<int>());
         var named = _dragging ? null : ViewModel.FenceNamedKey;
         var shapes = FenceScene.Overlay(_scene, _projector, hidden, named, _insertionX, _insertionLabel, _view.Scale);
+        var screen = _band is { } band ? new[] { FenceScene.RubberBand(band) } : Array.Empty<FenceShape>();
         OverlayUpdates++;
-        _overlay.Show(shapes, _transform.Matrix);
+        _overlay.Show(shapes, _transform.Matrix, screen);
     }
     #endregion
 
@@ -466,6 +550,15 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var p = Mouse.GetPosition(this);
         if (p.X < 0 || p.Y < 0 || p.X > ActualWidth || p.Y > ActualHeight) return null;
         return _scene.DropAt(ScreenToWorld(p).X);
+    }
+
+    /// <inheritdoc/>
+    public double? PointerMetres()
+    {
+        if (_scene is not { IsLayout: true }) return null;
+        var p = Mouse.GetPosition(this);
+        if (p.X < 0 || p.Y < 0 || p.X > ActualWidth || p.Y > ActualHeight) return null;
+        return ScreenToWorld(p).X / _scene.Upm;
     }
 
     private void UpdatePaletteHover()
@@ -481,14 +574,16 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     }
     #endregion
 
-    #region - Mouse (FR-08 · FR-09) -
+    #region - Mouse (FR-04 ~ FR-06) -
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
         base.OnPreviewMouseDown(e);
-        if (e.ChangedButton != MouseButton.Left || _press is not null || ViewModel is null) return;
+        if (_press is not null || ViewModel is null || ButtonOf(e.ChangedButton) is not { } button) return;
         // 선점 — Thumb · 목록의 기본 처리보다 먼저 받아 캔버스가 캡처한다(drag-first-ux · Preview 선점).
         e.Handled = true;
-        OnPointerPressed(e.GetPosition(this), ChipFrom(e.OriginalSource as DependencyObject), (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+        var modifiers = Keyboard.Modifiers;
+        OnPointerPressed(e.GetPosition(this), ChipFrom(e.OriginalSource as DependencyObject),
+            (modifiers & ModifierKeys.Control) != 0, (modifiers & ModifierKeys.Shift) != 0, button);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -504,36 +599,49 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         OnPointerMoved(e.GetPosition(this));
     }
 
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    protected override void OnMouseUp(MouseButtonEventArgs e)
     {
-        base.OnMouseLeftButtonUp(e);
-        if (_press is null) return;
+        base.OnMouseUp(e);
+        if (_press is null || ButtonOf(e.ChangedButton) != _press.Button) return;
         e.Handled = true;
         _lastPointer = e.GetPosition(this);
         FinishDrag(true);
     }
 
-    /// <summary>누름(캔버스 좌표) — 칩이면 센서 · 묶음 · 함체, 아니면 빈 곳(팬). 시험이 이 길로 부른다.</summary>
-    internal void OnPointerPressed(Point at, FenceChip? chip, bool ctrl = false)
+    private static FencePointerButton? ButtonOf(MouseButton button) => button switch
+    {
+        MouseButton.Left => FencePointerButton.Left,
+        MouseButton.Right => FencePointerButton.Right,
+        MouseButton.Middle => FencePointerButton.Middle,
+        _ => null,
+    };
+
+    private static FenceTargetKind TargetOf(FenceChip? chip) => chip?.Kind switch
+    {
+        FenceChipKind.Sensor or FenceChipKind.Group => FenceTargetKind.Sensor,
+        FenceChipKind.Panel => FenceTargetKind.Panel,
+        FenceChipKind.Controller => FenceTargetKind.Enclosure,
+        _ => FenceTargetKind.Empty,
+    };
+
+    /// <summary>누름(캔버스 좌표) — 시험이 이 길로 부른다. 칩이 없으면 빈 곳.</summary>
+    internal void OnPointerPressed(Point at, FenceChip? chip, bool ctrl = false, bool shift = false, FencePointerButton button = FencePointerButton.Left)
     {
         if (_press is not null || ViewModel is null) return;
-        var kind = chip is null ? PressKind.Pan
-            : chip.Kind == FenceChipKind.Controller
-                ? (_scene?.Shape == WiringShape.Ring ? PressKind.Enclosure : PressKind.Pan)    // 가지 · 한 줄의 제어기는 고정 — 누르면 선택, 끌면 팬
-                : PressKind.Unit;
 
         // 포커스 · 캡처를 먼저 — CaptureMouse 는 그 자리에서 합성 MouseMove(실제 커서 위치)를 올린다.
         // 누름을 먼저 세우면 그 이동이 데드존을 넘은 것으로 읽혀 클릭이 끌기로 바뀐다.
         _arming = true;
         try
         {
-            if (chip is not null) chip.Focus(); else Focus();
+            if (button == FencePointerButton.Left && chip is not null) chip.Focus(); else Focus();
             CaptureMouse();
         }
         finally { _arming = false; }
 
-        _press = new Press(kind, chip, at, _view, ctrl);
+        _press = new Press(button, TargetOf(chip), chip, at, _view, ctrl, shift);
         _dragging = false;
+        _action = FenceGestureAction.None;
         _lastPointer = at;
     }
 
@@ -544,7 +652,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _lastPointer = now;
         if (!_dragging)
         {
-            if (!FenceDropMath.IsDrag(_press.Start, now)) return;
+            if (!FenceGesture.IsDrag(_press.Start, now)) return;
             BeginDrag();
         }
         MoveDrag(now);
@@ -575,9 +683,12 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     {
         if (_press is null || _scene is null) return;
         _dragging = true;
-        switch (_press.Kind)
+        _action = FenceGesture.Classify(_press.Button, _press.Ctrl, _press.Shift, _press.Target, isDrag: true);
+        if (_action == FenceGestureAction.MoveEnclosure && _scene.Shape != WiringShape.Ring) _action = FenceGestureAction.Pan;   // 가지 · 한 줄 제어기는 고정
+
+        switch (_action)
         {
-            case PressKind.Unit when _press.Chip is { } chip:
+            case FenceGestureAction.MoveSensors when _press.Chip is { } chip:
                 _dragKeys = chip.Kind == FenceChipKind.Group ? chip.Keys.ToList() : ViewModel?.FenceDragKeys(chip.Key) ?? chip.Keys;
                 foreach (var dim in _chips.Children.OfType<FenceChip>().Where(c => c.Keys.Any(_dragKeys.Contains))) dim.Opacity = 0.3;
                 var layer = AdornerLayer.GetAdornerLayer(this);
@@ -588,8 +699,12 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 _ghost = new DragGhostAdorner(this, layer, label, _dragKeys.Count);
                 layer?.Add(_ghost);
                 break;
-            case PressKind.Enclosure:
+            case FenceGestureAction.MoveEnclosure:
                 Cursor = Cursors.SizeWE;
+                break;
+            case FenceGestureAction.RubberSensors:
+            case FenceGestureAction.RubberPanels:
+                Cursor = Cursors.Cross;
                 break;
             default:
                 Cursor = Cursors.ScrollAll;
@@ -600,15 +715,21 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private void MoveDrag(Point now)
     {
         if (_press is null || _scene is null || ViewModel is not { } vm) return;
-        switch (_press.Kind)
+        switch (_action)
         {
-            case PressKind.Pan:
+            case FenceGestureAction.Pan:
                 _autoFit = false;
                 _view = _press.View.Pan(now.X - _press.Start.X, now.Y - _press.Start.Y);
                 ApplyView();
                 return;
 
-            case PressKind.Enclosure:
+            case FenceGestureAction.RubberSensors:
+            case FenceGestureAction.RubberPanels:
+                _band = FenceRubberBand.FromPoints(_press.Start, now);
+                UpdateOverlay();
+                return;
+
+            case FenceGestureAction.MoveEnclosure:
             {
                 var wx = ScreenToWorld(now).X;
                 var n = _scene.Chain.Count;
@@ -624,7 +745,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 return;
             }
 
-            case PressKind.Unit when _press.Chip is { } chip:
+            case FenceGestureAction.MoveSensors when _press.Chip is { } chip:
             {
                 _ghost?.MoveTo(now);
                 var inside = now.X >= 0 && now.Y >= 0 && now.X <= ActualWidth && now.Y <= ActualHeight;
@@ -632,14 +753,27 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 {
                     _dropKind = DropKind.Chain;
                     var wx = ScreenToWorld(now).X;
-                    var x = _scene.InsertionX(wx, _dragKeys.ToList());
-                    if (_insertionX != x)
+                    double x;
+                    string label;
+                    if (_scene.IsLayout)
                     {
-                        _insertionX = x;
-                        var (line, index) = _scene.DropAt(wx);
-                        _insertionLabel = vm.FenceDropLabel(_dragKeys, line, index);
-                        UpdateOverlay();
+                        // 펜스 구성: 목표 = 잡은 센서 자리 종류(기둥 · 망)의 가장 가까운 칸(FR-05)
+                        var grabbed = GrabbedKey(chip);
+                        var metres = wx / _scene.Upm;
+                        x = vm.FenceMoveTargetMetres(grabbed, metres) * _scene.Upm;
+                        if (_insertionX == x) return;
+                        label = vm.FenceMoveLabel(_dragKeys, grabbed, metres);
                     }
+                    else
+                    {
+                        x = _scene.InsertionX(wx, _dragKeys.ToList());
+                        if (_insertionX == x) return;
+                        var (line, index) = _scene.DropAt(wx);
+                        label = vm.FenceDropLabel(_dragKeys, line, index);
+                    }
+                    _insertionX = x;
+                    _insertionLabel = label;
+                    UpdateOverlay();
                 }
                 else
                 {
@@ -651,6 +785,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         }
     }
 
+    private static int GrabbedKey(FenceChip chip) => chip.Kind == FenceChipKind.Group ? chip.Keys[0] : chip.Key;
+
     /// <summary>
     /// 끝내기는 이것 하나 — 뗌(<paramref name="commit"/>) · 캡처 상실 · Esc(취소). 순서: ① 표지 해제 ② 모습 복원 ③ (구독 없음) ④ 캡처 해제 ⑤ 커밋 통지.
     /// </summary>
@@ -659,16 +795,21 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var press = _press;
         if (press is null) return;
         var wasDragging = _dragging;
+        var action = wasDragging ? _action : FenceGesture.Classify(press.Button, press.Ctrl, press.Shift, press.Target, isDrag: false);
         var drop = _dropKind;
-        var pointerWorldX = ScreenToWorld(_lastPointer).X;
+        var pointer = _lastPointer;
+        var pointerWorldX = ScreenToWorld(pointer).X;
         var enclosureGap = _enclosureGap;
+        var band = _band;
 
         // ① 표지
         _press = null;
         _dragging = false;
+        _action = FenceGestureAction.None;
         _dropKind = DropKind.None;
         var dragKeys = _dragKeys;
         _dragKeys = Array.Empty<int>();
+        _band = null;
         // ② 모습
         foreach (var dim in _chips.Children.OfType<FenceChip>()) dim.Opacity = 1;
         if (_ghost is not null) { AdornerLayer.GetAdornerLayer(this)?.Remove(_ghost); _ghost = null; }
@@ -682,51 +823,111 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var vm = ViewModel;
         if (vm is null || _scene is null) { UpdateOverlay(); return; }
 
-        if (!wasDragging)
+        if (!commit)
         {
-            if (!commit) { UpdateOverlay(); return; }
-            if (press.Chip is { Kind: FenceChipKind.Controller }) vm.FenceSelectController();
-            else if (press.Chip is { Kind: FenceChipKind.Sensor } ctrlChip && press.Ctrl) { vm.FenceToggleSelect(ctrlChip.Key); ctrlChip.Focus(); }   // FR-07 Ctrl 클릭
-            else if (press.Chip is { } chip) { vm.FenceSelect(chip.Keys[0]); chip.Focus(); }
-            else { vm.FenceSelect(null); Focus(); }
+            if (wasDragging && action is FenceGestureAction.MoveSensors) vm.NotifyFenceStatus("취소 — 제자리로 돌렸습니다(서버 호출 없음)");
+            else if (wasDragging && action is FenceGestureAction.MoveEnclosure) vm.NotifyFenceStatus("취소 — 함체를 잡기 전 자리로 돌렸습니다");
+            else if (wasDragging && action is FenceGestureAction.RubberSensors or FenceGestureAction.RubberPanels) vm.NotifyFenceStatus("취소 — 선택을 바꾸지 않았습니다");
+            Rebuild();
             return;
         }
 
-        switch (press.Kind)
+        var chip = press.Chip;
+        switch (action)
         {
-            case PressKind.Pan:
-                UpdateOverlay();
-                return;
-
-            case PressKind.Enclosure:
-                if (!commit || !vm.FenceMoveEnclosure(enclosureGap))
-                {
-                    if (!commit) vm.NotifyFenceStatus("취소 — 함체를 잡기 전 자리로 돌렸습니다");
-                    Rebuild();
-                }
-                return;
-
-            case PressKind.Unit when press.Chip is { } chip:
+            case FenceGestureAction.SelectOne when chip is { Kind: FenceChipKind.Controller }:
+                vm.FenceSelectController();
+                break;
+            case FenceGestureAction.SelectOne when chip is { Kind: FenceChipKind.Panel }:
+                vm.FenceSelectPanel(chip.Key);
+                FocusQuietly(chip);
+                break;
+            case FenceGestureAction.SelectOne when chip is not null:
+                vm.FenceSelect(chip.Keys[0]);
+                chip.Focus();
+                break;
+            case FenceGestureAction.ToggleOne when chip is { Kind: FenceChipKind.Panel }:
+                vm.FenceTogglePanel(chip.Key);
+                FocusQuietly(chip);
+                break;
+            case FenceGestureAction.ToggleOne when chip is { Kind: FenceChipKind.Sensor }:     // FR-05 Ctrl 클릭
+                vm.FenceToggleSelect(chip.Key);
+                chip.Focus();
+                break;
+            case FenceGestureAction.ToggleOne when chip is { Kind: FenceChipKind.Group }:
+                foreach (var key in chip.Keys) vm.FenceToggleSelect(key);
+                break;
+            case FenceGestureAction.ClearSelection:
+                vm.FenceClearSelection();
+                Focus();
+                break;
+            case FenceGestureAction.RubberSensors when band is { } sensorBand:
+                vm.FenceSelectSensors(SensorHits(sensorBand), additive: press.Ctrl);
+                Focus();
+                break;
+            case FenceGestureAction.RubberPanels when band is { } panelBand:
+                vm.FenceSelectPanels(PanelHits(panelBand), additive: press.Ctrl);
+                Focus();
+                break;
+            case FenceGestureAction.ContextMenu:
+                OpenMenu(press.Target, chip, pointer);
+                break;
+            case FenceGestureAction.MoveEnclosure:
+                if (!vm.FenceMoveEnclosure(enclosureGap)) Rebuild();
+                break;
+            case FenceGestureAction.MoveSensors when chip is not null:
+            {
                 var keys = dragKeys.Count > 0 ? dragKeys.ToList() : chip.Keys.ToList();
-                if (!commit) { vm.NotifyFenceStatus("취소 — 제자리로 돌렸습니다(서버 호출 없음)"); Rebuild(); return; }
                 if (drop == DropKind.Chain)
                 {
-                    var (line, index) = _scene.DropAt(pointerWorldX);
-                    if (vm.FencePlace(keys, line, index)) { if (keys.Count == 1) vm.FenceSelect(keys[0]); }
-                    else Rebuild();
+                    bool moved;
+                    if (_scene.IsLayout) moved = vm.FenceMoveSensors(keys, GrabbedKey(chip), pointerWorldX / _scene.Upm);
+                    else
+                    {
+                        var (line, index) = _scene.DropAt(pointerWorldX);
+                        moved = vm.FencePlace(keys, line, index);
+                    }
+                    if (moved && keys.Count == 1) vm.FenceSelect(keys[0]);
+                    if (!moved) Rebuild();
                     FocusUnitOf(keys[0]);
                 }
-                else if (drop == DropKind.Remove)
-                {
-                    vm.FenceUnplace(keys);
-                }
+                else if (drop == DropKind.Remove) vm.FenceUnplace(keys);
                 else
                 {
                     vm.NotifyFenceStatus("놓을 곳이 아니어서 제자리로 돌렸습니다");
                     Rebuild();
                 }
-                return;
+                break;
+            }
+            default:
+                UpdateOverlay();
+                break;
         }
+    }
+
+    /// <summary>러버밴드(화면 사각형)에 걸친 센서 — 묶음 칩이면 그 묶음의 센서 전부.</summary>
+    private IReadOnlyList<int> SensorHits(Rect screenBand)
+    {
+        var world = new Rect(ScreenToWorld(screenBand.TopLeft), ScreenToWorld(screenBand.BottomRight));
+        var items = _sensorChips.Values.Select(c => (c.Key, WorldRectOf(c)))
+            .Concat(_groupChips.Values.SelectMany(g => g.Keys.Select(k => (k, WorldRectOf(g)))));
+        var hits = FenceRubberBand.Hits(items, world).ToHashSet();
+        return _scene?.Seq.Where(hits.Contains).ToList() ?? (IReadOnlyList<int>)hits.ToList();     // 체인 순서로
+    }
+
+    /// <summary>러버밴드에 걸친 망(망 순서).</summary>
+    private IReadOnlyList<int> PanelHits(Rect screenBand)
+    {
+        var world = new Rect(ScreenToWorld(screenBand.TopLeft), ScreenToWorld(screenBand.BottomRight));
+        return FenceRubberBand.Hits(_panelChips.Values.OrderBy(c => c.Key).Select(c => (c.Key, WorldRectOf(c))), world);
+    }
+
+    private static Rect WorldRectOf(FenceChip chip)
+    {
+        var left = Canvas.GetLeft(chip);
+        var top = Canvas.GetTop(chip);
+        if (double.IsNaN(left) || double.IsNaN(top) || double.IsNaN(chip.Width) || double.IsNaN(chip.Height)) return Rect.Empty;
+        return new Rect(left, top, chip.Width, chip.Height);
     }
 
     /// <summary>포인터 아래가 빼는 곳(<c>wiring-bin</c>) 또는 팔레트인가.</summary>
@@ -754,7 +955,36 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private static string GapText(int g, int n) => g <= 0 ? "#1 왼쪽" : g >= n ? $"#{n} 오른쪽" : $"#{g} ~ #{g + 1} 사이";
     #endregion
 
-    #region - Keyboard (FR-11) -
+    #region - Context menu (FR-08) -
+    /// <summary>
+    /// 오른쪽 클릭(데드존 안) · Shift+F10 · 메뉴 키 — 누른 것이 선택 밖이면 그것만 고르고 메뉴를 연다.
+    /// </summary>
+    private void OpenMenu(FenceTargetKind target, FenceChip? chip, Point at)
+    {
+        if (ViewModel is not { } vm) return;
+        IReadOnlyList<FenceMenuEntry> entries;
+        switch (target)
+        {
+            case FenceTargetKind.Sensor when chip is not null:
+                var key = chip.Keys[0];
+                if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelect(key);
+                entries = vm.FenceMenu(FenceMenuTargetKind.Sensor, key);
+                break;
+            case FenceTargetKind.Panel when chip is not null:
+                if (!vm.IsPanelSelected(chip.Key)) vm.FenceSelectPanel(chip.Key);
+                entries = vm.FenceMenu(FenceMenuTargetKind.Panel, chip.Key);
+                break;
+            default:
+                entries = vm.FenceMenu(FenceMenuTargetKind.Empty, 0);
+                break;
+        }
+        LastMenu = entries;
+        if (SuppressMenuPopup) return;
+        FenceMenuPresenter.Show(this, entries, at);
+    }
+    #endregion
+
+    #region - Keyboard (FR-04 · FR-05 · NFR-03) -
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
@@ -762,8 +992,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     }
 
     /// <summary>
-    /// 키 판정 — 처리했으면 <c>true</c>(시험이 이 길로 부른다). <c>Alt</c>+화살표는 <see cref="Key.System"/> + <paramref name="systemKey"/> 로 온다.
-    /// Esc 는 <b>끄는 중일 때만</b> 먹는다(다른 Esc 동작을 깨지 않게).
+    /// 키 판정 — 처리했으면 <c>true</c>(시험이 이 길로 부른다). <c>Alt</c>+화살표 · <c>F10</c> 은 <see cref="Key.System"/> + <paramref name="systemKey"/> 로 온다.
+    /// Esc 는 끄는 중(누르는 중)이면 취소, 아니면 선택 해제 — 풀 것이 없으면 흘려보낸다(다른 Esc 동작을 깨지 않게).
     /// </summary>
     internal bool HandleKeyDown(Key key, Key systemKey, ModifierKeys modifiers, DependencyObject? focused)
     {
@@ -772,9 +1002,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
         if (key == Key.Escape)
         {
-            if (!_dragging) return false;
-            FinishDrag(false);
-            return true;
+            if (_press is not null) { FinishDrag(false); return true; }
+            return vm.FenceClearSelection();
         }
 
         if (key == Key.Z && modifiers == ModifierKeys.Control) { vm.Undo(); return true; }
@@ -782,6 +1011,30 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var alt = key == Key.System;
         var k = alt ? systemKey : key;
         var chip = focused as FenceChip;
+
+        // Shift+F10 · 메뉴 키 — 오른쪽 클릭 메뉴의 키보드 대신(FR-08)
+        if (k == Key.Apps || (k == Key.F10 && (modifiers & ModifierKeys.Shift) != 0))
+        {
+            var at = chip is not null ? ScreenCenterOf(chip) : new Point(ActualWidth / 2, ActualHeight / 2);
+            OpenMenu(TargetOf(chip), chip, at);
+            return true;
+        }
+
+        // Ctrl+A — 센서 모두(망에 포커스가 있으면 망 모두)
+        if (!alt && k == Key.A && modifiers == ModifierKeys.Control)
+        {
+            if (chip is { Kind: FenceChipKind.Panel }) vm.FenceSelectAllPanels(); else vm.FenceSelectAllSensors();
+            return true;
+        }
+
+        if (chip is { Kind: FenceChipKind.Panel }) return HandlePanelKey(vm, chip, k, alt, modifiers);
+
+        // Ctrl+Space — 포커스 센서를 더하거나 뺀다
+        if (!alt && k == Key.Space && modifiers == ModifierKeys.Control && chip is { Kind: FenceChipKind.Sensor or FenceChipKind.Group })
+        {
+            foreach (var each in chip.Keys) vm.FenceToggleSelect(each);
+            return true;
+        }
 
         // F = 보는 쪽 뒤집기(FR-20) — 글자를 치는 중이면 건드리지 않는다.
         if (!alt && k == Key.F && modifiers == ModifierKeys.None && focused is not System.Windows.Controls.Primitives.TextBoxBase)
@@ -830,10 +1083,24 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (vm.FenceUnplace(removing) && neighbour is not null) FocusUnitOf(neighbour.Keys[0]);
                 return true;
             }
-            if (!alt && k is Key.Enter or Key.Space) { vm.FenceSelect(first); return true; }
+            if (!alt && k is Key.Enter or Key.Space && modifiers == ModifierKeys.None) { vm.FenceSelect(first); return true; }
+
+            // Shift+←/→ — 기준 센서에서 이웃까지 범위 선택(FR-05 키보드 대신)
+            if (!alt && k is Key.Left or Key.Right && modifiers == ModifierKeys.Shift)
+            {
+                var units = _scene.Units(_grouped).Where(u => !u.IsController).ToList();
+                var at = units.FindIndex(u => u.Key == chip.Key);
+                var j = at + (k == Key.Left ? -1 : 1);
+                if (at >= 0 && j >= 0 && j < units.Count)
+                {
+                    vm.FenceExtendSensorSelection(units[j].Keys[0]);
+                    FocusUnitOf(units[j].Keys[0], quietly: true);
+                }
+                return true;
+            }
         }
 
-        if (!alt && k is Key.Left or Key.Right or Key.Home or Key.End)
+        if (!alt && k is Key.Left or Key.Right or Key.Home or Key.End && modifiers == ModifierKeys.None)
         {
             var units = _scene.Units(_grouped).Where(u => !u.IsController || _scene.Shape != WiringShape.Ring).ToList();
             var at = units.FindIndex(u => chip.Kind == FenceChipKind.Controller ? u.IsController : u.Key == chip.Key);
@@ -854,9 +1121,35 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         return false;
     }
 
+    /// <summary>망에 포커스가 있을 때의 키 — ←/→/Home/End 이동 · Shift+←/→ 범위 · Enter/Space 선택 · Ctrl+Space 더함/뺌.</summary>
+    private bool HandlePanelKey(WiringViewModel vm, FenceChip chip, Key k, bool alt, ModifierKeys modifiers)
+    {
+        if (alt) return false;
+        var count = _panelChips.Count;
+        if (k == Key.Space && modifiers == ModifierKeys.Control) { vm.FenceTogglePanel(chip.Key); return true; }
+        if (k is Key.Enter or Key.Space && modifiers == ModifierKeys.None) { vm.FenceSelectPanel(chip.Key); return true; }
+        if (k is Key.Left or Key.Right && modifiers == ModifierKeys.Shift)
+        {
+            var j = chip.Key + (k == Key.Left ? -1 : 1);
+            if (j >= 0 && j < count)
+            {
+                vm.FenceExtendPanelSelection(j);
+                if (_panelChips.TryGetValue(j, out var next)) FocusQuietly(next);
+            }
+            return true;
+        }
+        if (k is Key.Left or Key.Right or Key.Home or Key.End && modifiers == ModifierKeys.None)
+        {
+            var target = k switch { Key.Home => 0, Key.End => count - 1, Key.Left => chip.Key - 1, _ => chip.Key + 1 };
+            if (target >= 0 && target < count && _panelChips.TryGetValue(target, out var next)) next.Focus();
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>
     /// 화면에서 한 단위 옆으로(Alt+←/→) — 이웃 단위 너머 세계 x 에 놓는 것과 같다. 양쪽 가지는 제어기를 건너 다른 가지로 간다.
-    /// 한 줄은 제어기 앞으로 가지 못한다.
+    /// 한 줄은 제어기 앞으로 가지 못한다. 펜스 구성 모드에서는 이웃과 자리를 바꾼다(보드가 자리를 맞춘다).
     /// </summary>
     private void MoveUnitVisually(FenceChip chip, int direction)
     {
@@ -874,18 +1167,26 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         vm.FencePlace(chip.Keys, line, index);
     }
 
-    private void FocusUnitOf(int key)
+    private void FocusUnitOf(int key, bool quietly = false)
     {
-        if (_sensorChips.TryGetValue(key, out var chip) && chip.IsVisible) { chip.Focus(); return; }
-        var group = _groupChips.Values.FirstOrDefault(g => g.Keys.Contains(key));
-        group?.Focus();
+        FenceChip? target = _sensorChips.TryGetValue(key, out var chip) && chip.IsVisible ? chip : _groupChips.Values.FirstOrDefault(g => g.Keys.Contains(key));
+        if (target is null) return;
+        if (quietly) FocusQuietly(target); else target.Focus();
+    }
+
+    /// <summary>선택을 건드리지 않고 포커스만 옮긴다(키보드 범위 선택 · 클릭 선택 뒤).</summary>
+    private void FocusQuietly(FenceChip chip)
+    {
+        _arming = true;
+        try { chip.Focus(); }
+        finally { _arming = false; }
     }
     #endregion
 }
 
 /// <summary>
 /// 펜스 캔버스의 UIA peer — Pane · 이름 · AutomationId(<see cref="FenceCanvas.AUTOMATION_ID"/>)를 내고, 자식은 기본 규칙대로
-/// 시각 트리의 peer(센서 · 묶음 · 제어기 칩)를 모은다. 헤디드 시험이 캔버스를 찾고 그 아래에서 칩을 센다(SC-FEN-001).
+/// 시각 트리의 peer(망 · 센서 · 묶음 · 제어기 칩)를 모은다. 헤디드 시험이 캔버스를 찾고 그 아래에서 칩을 센다(SC-FEN-001).
 /// </summary>
 public sealed class FenceCanvasAutomationPeer : System.Windows.Automation.Peers.FrameworkElementAutomationPeer
 {

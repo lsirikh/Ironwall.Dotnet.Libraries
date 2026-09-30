@@ -281,7 +281,7 @@ public sealed partial class WiringViewModel
     public bool HasSensorSelection => _selectionKind == FenceSelectionKind.Sensors && SelectedFenceRow is not null;
     public bool HasNoFenceSelection => !HasFenceSelection && !HasPanelSelection;
 
-    public string SelectedKindText => _isControllerSelected ? (IsRing ? "함체" : "제어기") : HasMultiSelection ? "여러 센서" : "선택한 센서";
+    public string SelectedKindText => _isControllerSelected ? (IsRing && ShowCables ? "함체" : "제어기") : HasMultiSelection ? "여러 센서" : "선택한 센서";
 
     public string SelectedTitle => _isControllerSelected ? Controller.Name : HasMultiSelection ? MultiSelectionText : SelectedFenceRow?.Display ?? "없음";
 
