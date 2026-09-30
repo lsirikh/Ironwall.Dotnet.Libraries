@@ -296,6 +296,66 @@ public class EventWindowManagerTests
         Assert.Empty(host.Closed);
     }
 
+    // ───────────────────────── 📌 고정은 GIS 책임(호스트는 CloseEventWindow 를 늘 따른다) ─────────────────────────
+
+    [Fact]
+    public void should_never_send_close_for_pinned_window_when_reports_and_evictions_arrive()
+    {
+        var (manager, host, settings, _, _) = NewManager(new CameraPopupSettings { MaxOpenWindows = 3 });
+        for (var i = 1; i <= 3; i++) manager.Open(Request(i));
+        host.Raise(new PinChanged { EventKey = Key(1), Pinned = true });
+        host.Raise(new PinChanged { EventKey = Key(3), Pinned = true });
+
+        manager.CloseForActionReport(EventWindowKind.Detection, "1");   // 고정 — 보내지 않는다
+        manager.Open(Request(4));                                       // 한도 3 → 고정 안 된 2 만 정리
+        settings.Value = new CameraPopupSettings { MaxOpenWindows = 1 }; // 한도를 줄여도 고정 창은 건드리지 않는다
+        var result = manager.Open(Request(5));
+
+        Assert.Equal(new[] { Key(2), Key(4) }, host.Closed.Select(c => c.Key));
+        Assert.DoesNotContain(host.Closed, c => c.Key == Key(1) || c.Key == Key(3));
+        Assert.Equal(EventWindowOpenResult.AllPinned, result);          // 전부 고정 → 새 창 거부와 같은 규칙
+        Assert.True(manager.IsPinned(Key(1)) && manager.IsPinned(Key(3)));
+    }
+
+    [Fact]
+    public void should_close_on_report_and_evict_again_when_window_is_unpinned()
+    {
+        var (manager, host, _, _, _) = NewManager(new CameraPopupSettings { MaxOpenWindows = 2 });
+        manager.Open(Request(1));
+        manager.Open(Request(2));
+        host.Raise(new PinChanged { EventKey = Key(1), Pinned = true });
+        host.Raise(new PinChanged { EventKey = Key(2), Pinned = true });
+        Assert.Equal(EventWindowOpenResult.AllPinned, manager.Open(Request(3)));
+
+        host.Raise(new PinChanged { EventKey = Key(1), Pinned = false });
+        Assert.Equal(EventWindowOpenResult.Opened, manager.Open(Request(3)));   // 푼 창이 정리 대상이 된다
+        host.Raise(new PinChanged { EventKey = Key(2), Pinned = false });
+        Assert.True(manager.CloseForActionReport(EventWindowKind.Detection, "2"));
+
+        Assert.Equal(new[] { (Key(1), EventWindowCloseReason.Evicted), (Key(2), EventWindowCloseReason.ActionReported) },
+                     host.Closed.Select(c => (c.Key, c.Reason)));
+    }
+
+    [Fact]
+    public void should_match_restore_list_pin_state_when_host_reports_pin()
+    {
+        // 감시자는 같은 PinChanged 를 기록부에 덧씌워 크래시 뒤 복원 메시지에 Pinned 로 싣는다 — 관리자 판단과 같아야 한다.
+        var (manager, host, _, _, _) = NewManager();
+        var registry = new HostSessionRegistry();
+        manager.Open(Request(1));
+        manager.Open(Request(2));
+        foreach (var o in host.Opened) registry.SetWindow(o);
+
+        var pin = new PinChanged { EventKey = Key(2), Pinned = true };
+        registry.ApplyHostNotice(pin);
+        host.Raise(pin);
+
+        var restored = registry.Snapshot().Windows;
+        Assert.All(restored, w => Assert.Equal(w.Pinned, manager.IsPinned(w.EventKey)));
+        Assert.False(manager.CloseForActionReport(EventWindowKind.Detection, "2"));
+        Assert.True(restored.Single(w => w.EventKey == Key(2)).Pinned);
+    }
+
     // ───────────────────────── FR-27/28 ─────────────────────────
 
     [Fact]

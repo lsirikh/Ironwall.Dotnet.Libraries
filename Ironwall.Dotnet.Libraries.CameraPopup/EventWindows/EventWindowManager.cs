@@ -61,6 +61,12 @@ public sealed class EventWindowManager : IEventWindowManager, IDisposable
         lock (_gate) return _slots.Contains(eventKey);
     }
 
+    /// <summary>시험 · 진단 — 호스트 PinChanged 로 받은 📌 상태(자동 닫기 · 정리에서 빠지는가).</summary>
+    internal bool IsPinned(string eventKey)
+    {
+        lock (_gate) return _slots.IsPinned(eventKey);
+    }
+
     /// <summary>시험 · 진단 — 키의 계단 번호(옮겨졌거나 모르면 null).</summary>
     internal int? CascadeIndexOf(string eventKey)
     {
