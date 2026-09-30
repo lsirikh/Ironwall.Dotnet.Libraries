@@ -35,6 +35,11 @@ public static class WiringValidation
     public const string CODE_CHANNEL = "channel";
     public const string CODE_LIMIT = "limit";
     public const string CODE_MIX = "mix";
+    public const string CODE_NUMBERING = "numbering";
+
+    /// <summary>제어기 포트 이름(fence-wiring-editor §1-0) — 화면은 "Ch1 · Ch2" 를 주로, A · B 를 괄호 별칭으로 쓴다.</summary>
+    public const string PORT_1 = "Ch1(A)";
+    public const string PORT_2 = "Ch2(B)";
 
     /// <summary>고장 구간 예시를 보이기 시작하는 대수(WS L710).</summary>
     public const int FAULT_HINT_MIN = 5;
@@ -65,6 +70,14 @@ public static class WiringValidation
             issues.Add(new WiringIssue(WiringIssueLevel.Warning, CODE_GAP,
                 $"{notice.Message} 적용해 저장하면 뒤 센서들의 순번이 당겨진 값으로 바뀝니다 — 장애의 고장 구간 번호와 맞는지 확인해 주세요."));
 
+        // ⑥ 번호 대역(fence-wiring-editor FR-10) — 대역을 고른 제어기만. 대역 초과 · 255 초과 · 같은 제어기 안 중복 = 저장 막음, 대역 겹침 = 경고.
+        foreach (var numbering in board.NumberingIssues())
+            issues.Add(new WiringIssue(
+                numbering.BlocksSave ? WiringIssueLevel.Critical
+                    : numbering.Kind == Monitoring.Models.Fences.NumberingIssueKind.BandOverlap ? WiringIssueLevel.Warning
+                    : WiringIssueLevel.Info,
+                CODE_NUMBERING, numbering.Message));
+
         // ① 아직 체인에 없는 센서(알림)
         var unplaced = board.Unplaced.Count;
         if (unplaced > 0)
@@ -90,13 +103,13 @@ public static class WiringValidation
         => issues?.Any(i => i.Level == WiringIssueLevel.Critical) == true;
 
     /// <summary>
-    /// 글로 확인 — "Sensor A ─▶ 1. 이름 → … ◀─ Sensor B"(모든 제어기가 링 · v0.4).
+    /// 글로 확인 — "Ch1(A) ─▶ 1. 이름 → … ◀─ Ch2(B)"(모든 제어기가 링 · fence-wiring-editor §1-0 포트 이름).
     /// </summary>
     public static string LoopText(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        // 모든 제어기가 링(v0.4) — 옛 가지 · 한 줄 글은 뺐다.
-        return $"Sensor A ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ Sensor B{Environment.NewLine}"
+        // 모든 제어기가 링(§1-0) — 포트는 Ch1(A) · Ch2(B). 옛 가지 · 한 줄 글은 뺐다.
+        return $"{PORT_1} ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ {PORT_2}{Environment.NewLine}"
                + "    (양 끝은 리턴케이블로 함체에 돌아옵니다)";
 
         static string Describe(IReadOnlyList<WiringSensorRow> placed)

@@ -171,7 +171,7 @@ public class WiringValidationTests
     {
         var text = WiringValidation.LoopText(Ring(3));
 
-        Assert.Contains("Sensor A ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Sensor B", text);
+        Assert.Contains("Ch1(A) ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Ch2(B)", text);
         Assert.Contains("리턴케이블", text);
     }
 
@@ -186,7 +186,7 @@ public class WiringValidationTests
         var text = WiringValidation.LoopText(board);
 
         // Assert
-        Assert.Contains("Sensor A ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Sensor B", text);
+        Assert.Contains("Ch1(A) ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Ch2(B)", text);
         Assert.DoesNotContain("왼쪽", text);
     }
 
