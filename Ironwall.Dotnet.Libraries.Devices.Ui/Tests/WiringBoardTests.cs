@@ -680,17 +680,19 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_write_the_v2_marker_with_the_shape_and_read_it_back()
+    public void should_write_the_v3_marker_without_a_shape_and_still_read_v2_shapes()
     {
         var spec = WiringSpec.Apply(JObject.Parse("""{"resolution":"4K"}"""), new WiringPlacement(1, 7), WiringShape.Ring);
-        var patch = WiringSpec.MergePatch(new WiringPlacement(2, 3), WiringShape.TwoBranch);
+        var patch = WiringSpec.MergePatch(new WiringPlacement(1, 3), WiringShape.Ring);
 
-        Assert.Equal(2, (int?)spec["wiring"]!["v"]);
-        Assert.Equal("ring", (string?)spec["wiring"]!["shape"]);
-        Assert.Equal(7, (int?)spec["wiring"]!["order"]);                  // 옛 클라이언트가 읽는 키는 그대로
-        Assert.Equal(WiringShape.Ring, WiringSpec.ReadShape(spec));
+        Assert.Equal(3, (int?)spec["wiring"]!["v"]);                  // v3 — 모두 링이라 모양은 싣지 않는다(fence-wiring-editor FR-11)
+        Assert.Null(spec["wiring"]!["shape"]);
+        Assert.Equal(7, (int?)spec["wiring"]!["order"]);              // 옛 클라이언트가 읽는 키는 그대로
+        Assert.Equal(1, (int?)spec["wiring"]!["line"]);
+        Assert.Null(WiringSpec.ReadShape(spec));                        // v3 는 모양이 없다 = 링
         Assert.Equal(new WiringPlacement(1, 7), WiringSpec.Read(spec));
-        Assert.Equal(WiringShape.TwoBranch, WiringSpec.ReadShape(patch));
+        Assert.Equal(3, (int?)patch["wiring"]!["v"]);
+        Assert.Equal(WiringShape.TwoBranch, WiringSpec.ReadShape(JObject.Parse("""{"wiring":{"v":2,"shape":"branch","line":2,"order":1}}""")));   // v2 는 계속 읽는다
         Assert.Null(WiringSpec.ReadShape(JObject.Parse("""{"wiring":{"line":2,"order":1}}""")));   // 표지 없는 옛 값
     }
 

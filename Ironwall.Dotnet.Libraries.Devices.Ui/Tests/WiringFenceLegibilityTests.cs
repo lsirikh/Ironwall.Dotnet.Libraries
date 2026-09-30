@@ -93,7 +93,7 @@ public class WiringFenceLegibilityTests
         var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "CTRL", "10.0.0.1", controllerType), seeds, new[] { types }, null, new WiringFakeDialogs());
 
         // Assert
-        Assert.Contains("Sensor A 쪽 끝", vm.FaultRelationText);
+        Assert.Contains("Ch1(A) 쪽 끝", vm.FaultRelationText);
         Assert.DoesNotContain("가지", vm.FaultRelationText);
     }
 

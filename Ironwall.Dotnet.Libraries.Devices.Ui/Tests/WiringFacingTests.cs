@@ -248,8 +248,8 @@ public class WiringFacingTests
         var (patchedId, dto) = Assert.Single(gateway.Patched);
         Assert.Equal(102, patchedId);
         var wiring = (JObject)JObject.Parse(JsonConvert.SerializeObject(dto, PresetRequestBuilder.WireSettings)).SelectToken("hardware_spec.spec.wiring")!;
-        Assert.Equal(2, (int)wiring["v"]!);
-        Assert.Equal("ring", (string)wiring["shape"]!);
+        Assert.Equal(3, (int)wiring["v"]!);
+        Assert.Null(wiring["shape"]);
         Assert.Equal(1, (int)wiring["line"]!);
         Assert.Equal(2, (int)wiring["order"]!);
         Assert.Equal("back", (string)wiring["facing"]!);

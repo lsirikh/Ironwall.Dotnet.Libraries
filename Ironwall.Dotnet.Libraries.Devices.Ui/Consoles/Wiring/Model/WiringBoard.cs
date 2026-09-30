@@ -616,7 +616,8 @@ public sealed class WiringBoard
     /// 번호 대역이 있으면 번호를 다시 매긴다. 되돌리기 한 걸음은 부르는 쪽이 <see cref="PushUndo"/> 로 찍는다. 바뀐 것이 없으면 <c>false</c>.
     /// </summary>
     /// <remarks>자리가 있는데 체인에 없던 센서(팔레트)는 체인에 들어오고, 자리를 뺀 센서는 팔레트로 간다.</remarks>
-    public bool ApplyFenceEdit(Func<WiringFenceLayout, WiringFenceLayout> edit)
+    /// <param name="tieOrder">같은 자리 센서끼리의 차례 — 없으면 지금 체인 순서(끌어 옮긴 센서를 이미 있는 센서 앞 · 뒤에 둘 때 준다).</param>
+    public bool ApplyFenceEdit(Func<WiringFenceLayout, WiringFenceLayout> edit, IReadOnlyList<int>? tieOrder = null)
     {
         ArgumentNullException.ThrowIfNull(edit);
         if (!_fence.IsActive) return false;
@@ -625,7 +626,7 @@ public sealed class WiringBoard
         var next = edit(before);
         if (next is null || !next.IsActive) return false;
         var mounts = next.Mounts.Where(p => Find(p.Key) is not null).Select(p => (p.Key, p.Value)).ToList();
-        var order = FenceLayoutMath.PositionOrder(mounts, _chain.Keys);
+        var order = FenceLayoutMath.PositionOrder(mounts, tieOrder ?? _chain.Keys);
         var chainChanged = !order.SequenceEqual(_chain.Keys);
         var layoutChanged = !next.SameContent(before);
         if (!chainChanged && !layoutChanged) return false;

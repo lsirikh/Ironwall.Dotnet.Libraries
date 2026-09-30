@@ -379,7 +379,7 @@ public class WiringFenceViewTests
         Assert.Equal(102, result.FenceSelectedKey);
         Assert.Equal("북측 2구간 펜스", result.SelectedTitle);
         Assert.StartsWith("A2 · B4", result.SelectedPortText);
-        Assert.StartsWith("2 / 5 · Sensor A 쪽이 1", result.SelectedPositionText);
+        Assert.StartsWith("2 / 5 · Ch1(A) 쪽이 1", result.SelectedPositionText);
         Assert.True(result.HasSelectedPhoto);                               // 스마트 센서 제품 사진
         Assert.True(result.Ring);
         Assert.False(result.Others);

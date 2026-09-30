@@ -32,8 +32,21 @@ public sealed record WiringControllerInfo(int Id, int Number, string Name, strin
 
 /// <summary>서버에서 받은 센서 한 대 — 창은 모델 타입을 모른다(헤드리스 테스트).</summary>
 /// <param name="SavedShape">저장된 결선 모양(<c>spec.wiring</c> 의 <c>"v": 2</c> 표지). 옛 값이면 <c>null</c>(F-2b H3).</param>
+/// <param name="ConnectionType">접속 축 종류(<c>connection.type</c> — <c>RS485</c> · <c>IP_DIRECT</c> · <c>IP_CONVERTER</c> …) — IP 센서 · 노드 주소를 가른다(fence-wiring-editor FR-15).</param>
+/// <param name="IpAddress">IP 센서의 주소(제어기 뒤 내부망일 수 있다).</param>
+/// <param name="LinkHealth">매니저가 보고한 <c>NETWORK_INTERFACE</c> 부품 health(OK · DEGRADED · FAULT) — 센서 신호등(FR-14).</param>
 public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, WiringPlacement? Placement = null, string? Issue = null,
-                                     IReadOnlyList<int>? Groups = null, WiringShape? SavedShape = null);
+                                     IReadOnlyList<int>? Groups = null, WiringShape? SavedShape = null,
+                                     string? ConnectionType = null, string? IpAddress = null, string? LinkHealth = null);
+
+/// <summary>
+/// 결선 창의 펜스 편집 재료(fence-wiring-editor FR-01 · FR-11 · FR-14) — 로컬에 저장된 구성 · 로컬 저장소 · 제어기 ping.
+/// 모두 없어도 창은 열린다(없으면 제안 구성 · 로컬 저장 칸 숨김 · 신호등 모름).
+/// </summary>
+public sealed record WiringFenceContext(
+    Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutDocument? Document = null,
+    Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore? Store = null,
+    Signals.IPingProbe? Ping = null);
 
 /// <summary>고를 수 있는 그룹 한 개(W2) — 창은 그룹 모델 타입을 모른다.</summary>
 public sealed record WiringGroupInfo(int Id, string Name);
@@ -73,13 +86,16 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     private string? _editZone;
 
     private WiringViewModel(WiringControllerInfo controller, IReadOnlyList<string> sensorTypes, IReadOnlyList<WiringGroupInfo> groups,
-                            WiringApplyService? apply, IWiringDialogs dialogs)
+                            WiringApplyService? apply, IWiringDialogs dialogs, WiringFenceContext? fence)
     {
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         SensorTypes = sensorTypes ?? Array.Empty<string>();
         AvailableGroups = groups ?? Array.Empty<WiringGroupInfo>();
         _apply = apply;
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+        _fenceStore = fence?.Store;
+        _fenceDocument = fence?.Document;
+        _ping = fence?.Ping;
 
         Rows = new ObservableCollection<SensorRowViewModel>();
         Palette = new ObservableCollection<SensorRowViewModel>();
@@ -98,9 +114,10 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                                                 IReadOnlyList<string> sensorTypes,
                                                 WiringApplyService? apply,
                                                 IWiringDialogs dialogs,
-                                                IReadOnlyList<WiringGroupInfo>? groups = null)
+                                                IReadOnlyList<WiringGroupInfo>? groups = null,
+                                                WiringFenceContext? fence = null)
     {
-        var vm = new WiringViewModel(controller, sensorTypes, groups ?? Array.Empty<WiringGroupInfo>(), apply, dialogs);
+        var vm = new WiringViewModel(controller, sensorTypes, groups ?? Array.Empty<WiringGroupInfo>(), apply, dialogs, fence);
         vm.Load(sensors);
         return vm;
     }
@@ -157,7 +174,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     public bool IsWiringDone => Issues.All(i => i.Level != WiringIssueLevel.Critical) && _board.Unplaced.Count == 0 && _board.Rows.Count > 0
                                 && !_board.HasPendingProposals;
 
-    public string DraftText => $"바뀐 줄 {_board.UnsavedChangeCount}";
+    public string DraftText => HasLocalChanges ? $"바뀐 줄 {_board.UnsavedChangeCount} · 펜스 구성 바뀜" : $"바뀐 줄 {_board.UnsavedChangeCount}";
 
     public string StatusText
     {
@@ -214,6 +231,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         var shapes = list.Where(s => s.Id > 0 && s.SavedShape is not null)
                          .GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First().SavedShape!.Value);
         _board.Load(list.Select(s => (s.Id, s.Channel, s.Facts, s.Placement, s.Issue, s.Groups)), Controller.TypeController, shapes);
+        LoadLinks(list);
+        LoadFence(_fenceDocument);
         SyncAll();
         StatusText = _board.Rows.Count == 0
             ? "이 제어기에 센서가 없습니다 — [센서 여러 개 만들기] 로 시작하세요."
@@ -420,6 +439,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(ChangePreview));
         NotifyOfPropertyChange(nameof(SaveNoteText));
         NotifyOfPropertyChange(nameof(HasChanges));
+        NotifyOfPropertyChange(nameof(HasLocalChanges));
+        NotifyOfPropertyChange(nameof(CanApplyPanelEdit));
         NotifyOfPropertyChange(nameof(ListStatusText));
     }
 
@@ -451,17 +472,17 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
 
     /// <summary>"고장 구간과의 관계" 설명 — 모든 제어기가 링(v0.4 §1-C)이라 늘 A/B 양 끝 설명.</summary>
     public string FaultRelationText
-        => "링에서 1차 번호는 Sensor A 쪽 끝에서, 2차 번호는 Sensor B 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
+        => $"링에서 1차 번호는 {WiringValidation.PORT_1} 쪽 끝에서, 2차 번호는 {WiringValidation.PORT_2} 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
            + "결선을 저장해 두면 장애 화면이 \"1차 4~5\" 같은 구간을 센서 이름으로 보여 줄 수 있습니다.";
 
     /// <summary>두 번째 목록을 보이는가 — 링은 선이 하나라 늘 거짓(옛 양쪽 가지 목록은 v0.4 에서 뺐다).</summary>
     public bool ShowSecondLine => false;
 
     /// <summary>결선 설명(상태 문장 · 머리).</summary>
-    public string ShapeText => "링 결선(Sensor A → … → Sensor B)";
+    public string ShapeText => $"링 결선({WiringValidation.PORT_1} → … → {WiringValidation.PORT_2})";
 
     /// <summary>목록 제목.</summary>
-    public string Line1Title => "링 — Sensor A → … → Sensor B";
+    public string Line1Title => $"링 — {WiringValidation.PORT_1} → … → {WiringValidation.PORT_2}";
 
     /// <summary>표 보기 머리 — 제어기 종류(모든 제어기가 링 · v0.4).</summary>
     public string ControllerKindText => _board.Topology.ControllerKind switch
@@ -484,7 +505,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     }
 
     /// <summary>목록 설명.</summary>
-    public string Line1Hint => "왼쪽이 Sensor A 쪽 끝(A1)입니다 · 칩의 A·B 는 두 포트에서 센 번호 · 양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
+    public string Line1Hint => $"위가 {WiringValidation.PORT_1} 쪽 끝(A1)입니다 · A·B 번호는 두 포트(Ch1 · Ch2)에서 센 자리 · 양 끝은 센서 없는 리턴케이블로 제어기에 돌아옵니다 · 순서를 바꾸면 펜스 위 자리도 따라갑니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
     #endregion
 
     #region - Load notices (FR-02 · FR-03 · F-2b) -
@@ -596,7 +617,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                 var byKind = moved.GroupBy(r => _board.Proposals.TryGetValue(r.Key, out var kind) ? (WiringProposalKind?)kind : null)
                                   .ToDictionary(g => g.Key ?? (WiringProposalKind)(-1), g => g.ToList());
                 if (byKind.TryGetValue(WiringProposalKind.Converted, out var converted))
-                    lines.Add($"자동 변환 {converted.Count}건(옛 두 선 → 한 줄) — 옛 2차 선 센서를 Sensor B 쪽 끝부터 이어 붙인 자리입니다: {Places(converted)}");
+                    lines.Add($"자동 변환 {converted.Count}건(옛 두 선 → 한 줄) — 옛 2차 선 센서를 {WiringValidation.PORT_2} 쪽 끝부터 이어 붙인 자리입니다: {Places(converted)}");
                 if (byKind.TryGetValue(WiringProposalKind.JoinedBranches, out var joinedRows))
                     lines.Add($"옛 가지 → 링 이어 붙임 {joinedRows.Count}건 — 왼쪽 가지를 뒤집어(바깥 → 제어기 옆) 오른쪽 가지 앞에 붙인 자리입니다: {Places(joinedRows)}");
                 if (byKind.TryGetValue(WiringProposalKind.Compacted, out var compacted))
@@ -627,7 +648,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         }
     }
 
-    public bool HasChanges => _board.IsDirty;
+    /// <summary>저장할 것이 있는가 — 서버(바뀐 줄) 또는 로컬(펜스 구성 · 저장소가 있을 때만).</summary>
+    public bool HasChanges => _board.IsDirty || HasLocalChanges;
     #endregion
 
     #region - Table commands -
@@ -1118,31 +1140,47 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     #endregion
 
     #region - Save -
-    public bool CanSave => !IsBusy && _apply is not null && _board.IsDirty && !WiringValidation.BlocksSave(Issues);
+    /// <summary>서버에 보낼 것이 있고 보낼 수 있는가(번호 · 순서 · 방향 · 표 값 · 그룹).</summary>
+    private bool CanSaveServer => _apply is not null && _board.IsDirty;
+
+    public bool CanSave => !IsBusy && (CanSaveServer || HasLocalChanges) && !WiringValidation.BlocksSave(Issues);
 
     public string? SaveBlockedReason => IsBusy ? "저장 중입니다."
-        : _apply is null ? "현재 서버에서는 결선을 저장할 수 없습니다."
-        : !_board.IsDirty ? "바뀐 줄이 없습니다."
+        : _apply is null && !HasLocalChanges ? "현재 서버에서는 결선을 저장할 수 없습니다."
+        : !_board.IsDirty && !HasLocalChanges ? "바뀐 줄이 없습니다."
         : WiringValidation.BlocksSave(Issues) ? Issues.First(i => i.Level == WiringIssueLevel.Critical).Message
         : null;
 
-    /// <summary>[저장하기] — 확인 문장을 보이고, 예라면 바뀐 줄만 보낸다(WS L450, L772-776).</summary>
+    /// <summary>
+    /// [저장하기](fence-wiring-editor FR-11 · [구성 저장]) — 확인 문장(번호가 바뀌면 <b>바뀌는 번호 표 + 경고</b>)을 보이고, 예라면
+    /// ① 서버: 바뀐 줄만(<c>number_device</c> · <c>spec.wiring</c> · 표 값 · 그룹) ② 로컬: 펜스 구성(망 · 설치 위치 · 번호 대역 · 간격).
+    /// 기준은 <b>저장이 된 뒤에만</b> 옮긴다 — 부분 실패면 된 것만 옮기고 나머지는 Draft 로 남는다.
+    /// </summary>
     public async Task SaveAsync()
     {
-        if (!CanSave || _apply is null) return;
+        if (!CanSave) return;
+        var server = CanSaveServer;
+        var local = _fenceStore is not null && _board.FenceLayout.IsActive;
 
         var unplaced = _board.Unplaced.Count;
         var suggested = _board.HasPendingProposals ? _board.Proposals.Count : 0;
-        var message = ChangePreview + Environment.NewLine + Environment.NewLine +
-            (unplaced > 0
+        var message = (server ? ChangePreview + Environment.NewLine + Environment.NewLine : string.Empty) +
+            (server && unplaced > 0
                 ? $"센서 {unplaced}대는 아직 결선에 없습니다 — 그 센서의 결선은 저장하지 않습니다(표 값은 저장됩니다)." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
-            (suggested > 0
+            (server && suggested > 0
                 ? $"적용하지 않은 제안(번호순 · 옛 배치 변환 · 빈 자리 당김) {suggested}대의 자리는 저장하지 않습니다 — [이대로 적용] 을 먼저 누르세요." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
-            "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?";
+            (local && (HasLocalChanges || _board.FenceLayout.IsProposed)
+                ? "펜스 구성(망 · 설치 위치 · 번호 대역)을 이 PC 에 저장합니다 — 다른 GIS 에서는 보이지 않습니다." + Environment.NewLine + Environment.NewLine
+                : string.Empty) +
+            (server ? "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?" : "저장할까요?");
 
-        if (!await _dialogs.ConfirmAsync("결선 저장", message)) return;
+        var numberChanges = server ? _board.NumberChanges() : Array.Empty<Ironwall.Dotnet.Monitoring.Models.Fences.NumberChange>();
+        var confirmed = numberChanges.Count > 0
+            ? await _dialogs.ConfirmNumberChangesAsync("구성 저장", numberChanges, NUMBER_WARNING, message)
+            : await _dialogs.ConfirmAsync("결선 저장", message);
+        if (!confirmed) return;
 
         IsBusy = true;
         SaveResults.Clear();
@@ -1150,29 +1188,42 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
 
         try
         {
-            var progress = new Progress<WiringProgress>(p => ProgressText = p.Total == 0 ? string.Empty : $"{p.Done}/{p.Total} · {p.Current}");
-            var result = await _apply.ApplyAsync(Controller.Id, _board, progress, CancellationToken.None);
+            var serverOk = true;
+            if (server && _apply is not null)
+            {
+                var progress = new Progress<WiringProgress>(p => ProgressText = p.Total == 0 ? string.Empty : $"{p.Done}/{p.Total} · {p.Current}");
+                var result = await _apply.ApplyAsync(Controller.Id, _board, progress, CancellationToken.None);
+                serverOk = result.IsSuccess;
 
-            StatusText = result.Message;
+                StatusText = result.Message;
 
-            foreach (var row in result.Rows.Where(r => !r.Ok)) SaveResults.Add(row);
-            NotifyOfPropertyChange(nameof(HasSaveResults));
+                foreach (var row in result.Rows.Where(r => !r.Ok)) SaveResults.Add(row);
+                NotifyOfPropertyChange(nameof(HasSaveResults));
 
-            // 성공한 줄만 새 기준으로 — 실패한 줄은 Draft 로 남아 다시 보낼 수 있다.
-            foreach (var row in result.Rows.Where(r => r.Ok && r.IsCreate && r.NewId is { } id && id > 0))
-                _board.Promote(row.Key, row.NewId!.Value);
+                // 성공한 줄만 새 기준으로 — 실패한 줄은 Draft 로 남아 다시 보낼 수 있다.
+                foreach (var row in result.Rows.Where(r => r.Ok && r.IsCreate && r.NewId is { } id && id > 0))
+                    _board.Promote(row.Key, row.NewId!.Value);
 
-            // 표·결선은 PATCH/POST 가 된 줄만, 그룹은 서버가 맞춰 준 그룹 호출만 새 기준으로 — 따로 나가므로 따로 옮긴다.
-            //   (종전: 그룹만 바꾼 저장은 기준선이 안 옮겨져 창이 계속 더러웠고, 행 PATCH 성공 + 그룹 실패는 그룹 변경을 조용히 먹었다.)
-            if (result.OkKeys.Count > 0) _board.MarkBaseline(result.OkKeys, includeGroups: false);
-            _board.MarkGroupsSaved(result.Groups.Where(g => g.Ok && g.DeviceIds is { Count: > 0 })
-                                                .Select(g => (g.GroupId, g.Add, g.DeviceIds!)));
-            if (result.IsSuccess && !_board.IsDirty) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
+                // 표·결선은 PATCH/POST 가 된 줄만, 그룹은 서버가 맞춰 준 그룹 호출만 새 기준으로 — 따로 나가므로 따로 옮긴다.
+                //   (종전: 그룹만 바꾼 저장은 기준선이 안 옮겨져 창이 계속 더러웠고, 행 PATCH 성공 + 그룹 실패는 그룹 변경을 조용히 먹었다.)
+                if (result.OkKeys.Count > 0) _board.MarkBaseline(result.OkKeys, includeGroups: false);
+                _board.MarkGroupsSaved(result.Groups.Where(g => g.Ok && g.DeviceIds is { Count: > 0 })
+                                                    .Select(g => (g.GroupId, g.Add, g.DeviceIds!)));
 
-            // 서버에 한 줄이라도 쓰였으면 기억한다 — 창은 OS ✕ 로만 닫혀 대화 결과가 늘 비므로(false),
-            // 입구(WiringLauncher)는 이 값으로 "저장했다" 를 판정해 콘솔 목록을 다시 읽고 안내를 띄운다.
-            if (result.OkKeys.Count > 0 || result.Groups.Any(g => g.Ok)) HasSaved = true;
+                // 서버에 한 줄이라도 쓰였으면 기억한다 — 창은 OS ✕ 로만 닫혀 대화 결과가 늘 비므로(false),
+                // 입구(WiringLauncher)는 이 값으로 "저장했다" 를 판정해 콘솔 목록을 다시 읽고 안내를 띄운다.
+                if (result.OkKeys.Count > 0 || result.Groups.Any(g => g.Ok)) HasSaved = true;
+            }
 
+            // 로컬 — 서버 뒤에(새 센서가 서버 id 를 받은 뒤라야 자리를 id 로 실을 수 있다). 서버가 일부 실패해도 모양은 저장한다.
+            if (local && (HasLocalChanges || _board.FenceLayout.IsProposed))
+            {
+                var saved = await SaveFenceLayoutAsync();
+                if (saved is not null)
+                    StatusText = server ? $"{StatusText} · {saved.Message}" : saved.Message;
+            }
+
+            if (serverOk && !_board.IsDirty && !HasLocalChanges) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
             SyncAll();
         }
         finally
@@ -1188,16 +1239,17 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     /// </summary>
     public bool HasSaved { get; private set; }
 
-    /// <summary>미저장 변경이 있으면 닫기 전에 묻는다.</summary>
+    /// <summary>미저장 변경(서버 · 로컬 펜스 구성)이 있으면 닫기 전에 묻는다.</summary>
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
-        if (!_board.IsDirty || _closeWithoutAsking) return true;
-        return await _dialogs.ConfirmAsync("셋업 창 닫기", $"미저장 변경 {_board.UnsavedChangeCount}건이 있습니다. 버리고 닫을까요?");
+        if ((!_board.IsDirty && !HasLocalChanges) || _closeWithoutAsking) return true;
+        var count = _board.UnsavedChangeCount + (HasLocalChanges ? 1 : 0);
+        return await _dialogs.ConfirmAsync("셋업 창 닫기", $"미저장 변경 {count}건이 있습니다. 버리고 닫을까요?");
     }
 
     public async Task CloseAsync()
     {
-        await TryCloseAsync(!_board.IsDirty);
+        await TryCloseAsync(!_board.IsDirty && !HasLocalChanges);
     }
     #endregion
 

@@ -371,8 +371,8 @@ public class WiringApplyTests
         var wiring = JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring")!;
         Assert.Equal(1, (int?)wiring["line"]);
         Assert.Equal(2, (int?)wiring["order"]);
-        Assert.Equal(2, (int?)wiring["v"]);                          // 형식 표지(H3)
-        Assert.Equal("ring", (string?)wiring["shape"]);               // 제어기 종류를 몰라도 링(v0.4 · 옛 규칙은 "branch")
+        Assert.Equal(3, (int?)wiring["v"]);                          // 형식 표지 v3(fence-wiring-editor FR-11)
+        Assert.Null(wiring["shape"]);                                 // 모든 제어기가 링 — 모양 글자는 싣지 않는다(§1-0)
     }
 
     [Fact]
@@ -387,7 +387,8 @@ public class WiringApplyTests
         Assert.True(result.IsSuccess, result.Message);
         var sent = Assert.Single(gateway.Patched);
         Assert.Equal(102, sent.Id);
-        Assert.Equal("ring", (string?)JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring.shape"));
+        Assert.Equal(3, (int?)JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring.v"));    // v3 — 모양 글자 없음
+        Assert.Null(JObject.Parse(Wire(sent.Dto)).SelectToken("hardware_spec.spec.wiring.shape"));
     }
 
     /// <summary>센서 2대가 서버에 같은 자리(1,1)로 저장된 제어기 — 번호가 큰 102 가 팔레트로 빠진다.</summary>

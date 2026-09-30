@@ -232,6 +232,7 @@ public sealed partial class WiringViewModel
         _fenceSelection.Clear();
         if (key is { } selectedKey) _fenceSelection.Add(selectedKey);
         _isControllerSelected = false;
+        _selectionKind = key is null ? KindAfterClear() : FenceSelectionKind.Sensors;
         RaiseSelection();
         if (key is { } selected && _board.Find(selected) is { } row)
             StatusText = _board.NumberOf(selected) is { } n ? $"{row.Display} — {NumberText(n)}" : $"{row.Display} — 미배치";
@@ -244,6 +245,7 @@ public sealed partial class WiringViewModel
         _isControllerSelected = false;
         if (!_fenceSelection.Remove(key)) _fenceSelection.Add(key);
         _fenceSelectedKey = _fenceSelection.Count > 0 ? _fenceSelection[^1] : null;
+        _selectionKind = _fenceSelection.Count > 0 ? FenceSelectionKind.Sensors : KindAfterClear();
         RaiseSelection();
         StatusText = _fenceSelection.Count > 1 ? $"센서 {_fenceSelection.Count}대 선택 — 함께 끌거나 [빼기]" : StatusText;
     }
@@ -253,8 +255,10 @@ public sealed partial class WiringViewModel
         _fenceSelectedKey = null;
         _fenceSelection.Clear();
         _isControllerSelected = true;
+        _selectionKind = FenceSelectionKind.Controller;
+        RefreshBandRows();
         RaiseSelection();
-        StatusText = IsRing ? "함체 — 옆으로 끌거나 Alt+←/→ 로 옮깁니다(표시만)" : "제어기 — 위치 고정";
+        StatusText = ShowCables && IsRing ? "함체 — 옆으로 끌거나 Alt+←/→ 로 옮깁니다(표시만)" : "제어기 — 번호 대역 · 통신 상태는 오른쪽 칸에서 봅니다";
     }
 
     public void FenceHover(int? key)
@@ -267,9 +271,15 @@ public sealed partial class WiringViewModel
     /// <summary>하나만 골랐을 때의 그 센서 — 여럿이면 <c>null</c>(속성 칸은 "센서 N대 선택").</summary>
     private WiringSensorRow? SelectedFenceRow => _fenceSelection.Count <= 1 && _fenceSelectedKey is { } k ? _board.Find(k) : null;
 
-    public bool HasFenceSelection => SelectedFenceRow is not null || _isControllerSelected || HasMultiSelection;
-    public bool HasSensorSelection => SelectedFenceRow is not null;
-    public bool HasNoFenceSelection => !HasFenceSelection;
+    /// <summary>센서 · 제어기 칸을 보일까 — 마지막으로 고른 쪽이 센서 · 제어기일 때(망이면 망 속성 칸이 대신 선다).</summary>
+    public bool HasFenceSelection => _selectionKind switch
+    {
+        FenceSelectionKind.Controller => _isControllerSelected,
+        FenceSelectionKind.Sensors => SelectedFenceRow is not null || HasMultiSelection,
+        _ => false,
+    };
+    public bool HasSensorSelection => _selectionKind == FenceSelectionKind.Sensors && SelectedFenceRow is not null;
+    public bool HasNoFenceSelection => !HasFenceSelection && !HasPanelSelection;
 
     public string SelectedKindText => _isControllerSelected ? (IsRing ? "함체" : "제어기") : HasMultiSelection ? "여러 센서" : "선택한 센서";
 
@@ -293,11 +303,18 @@ public sealed partial class WiringViewModel
     /// <summary>버스 주소 + "체인 순서와 다를 수 있음" 주석.</summary>
     public string SelectedChannelText => SelectedFenceRow is { } r ? (r.Channel is { } c ? $"{c}" : "—") : string.Empty;
 
+    /// <summary>주소 칸 이름(FR-15) — IP 센서는 "IP 주소", 그 밖은 "노드 주소".</summary>
+    public string SelectedAddressLabel => SelectedFenceRow is { } r ? AddressLabelOf(r.Key) : "노드 주소";
+
+    /// <summary>주소 칸 값(FR-15) — IP(없으면 "내부망") · 노드 주소.</summary>
+    public string SelectedAddressText => SelectedFenceRow is { } r ? AddressTextOf(r.Key) : string.Empty;
+
     public string SelectedChannelNote
     {
         get
         {
             if (SelectedFenceRow is not { } r) return string.Empty;
+            if (IsIpSensor(r.Key)) return "센서마다 IP — 제어기 뒤 내부망이라 GIS 에서 직접 닿지 않습니다";
             if (_board.NumberOf(r.Key) is not { } n || r.Channel is not { } c) return "체인 순서와 다를 수 있음";
             return c == n.Position ? "체인 순서와 다를 수 있음 — 지금은 같음" : $"주소 {c} · 위치 {n.Position} — 체인 순서와 다를 수 있음(주소는 바꾸지 않음)";
         }
@@ -312,7 +329,7 @@ public sealed partial class WiringViewModel
             var count = _board.CountOn(n.Line);
             return _board.Shape switch
             {
-                WiringShape.Ring => $"{n.Order} / {count} · Sensor A 쪽이 1",
+                WiringShape.Ring => $"{n.Order} / {count} · {WiringValidation.PORT_1} 쪽이 1",
                 WiringShape.TwoBranch => $"{(n.Line == WiringSpec.LINE_PRIMARY ? "L" : "R")}{n.Order} / {count} · 제어기 쪽이 1",
                 _ => $"{n.Order} / {count} · 제어기 쪽이 1",
             } + (_board.IsProposed(r.Key) ? " · 제안" : string.Empty);
@@ -321,7 +338,7 @@ public sealed partial class WiringViewModel
 
     /// <summary>링의 A · B 번호(1차 · 2차 번호). 링이 아니면 빈 글자.</summary>
     public string SelectedPortText => SelectedFenceRow is { } r && _board.NumberOf(r.Key) is { OppositeOrder: { } b } n
-        ? $"A{n.Order} · B{b} — Sensor A 에서 {n.Order}번째 · Sensor B 에서 {b}번째"
+        ? $"A{n.Order} · B{b} — {WiringValidation.PORT_1} 에서 {n.Order}번째 · {WiringValidation.PORT_2} 에서 {b}번째"
         : string.Empty;
 
     public bool HasSelectedPort => SelectedPortText.Length > 0;
@@ -490,7 +507,12 @@ public sealed partial class WiringViewModel
             nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
             nameof(FenceSelectedKeys), nameof(HasMultiSelection), nameof(MultiSelectionText),
             nameof(HasFacingRow), nameof(CanChooseFacing), nameof(IsSelectedFront), nameof(IsSelectedBack), nameof(FacingNote),
+            nameof(SelectedAddressLabel), nameof(SelectedAddressText), nameof(FencePaneKind), nameof(HasAnySelection), nameof(HasPanelSelection),
+            nameof(ControllerSignal), nameof(ControllerSignalText), nameof(BandText), nameof(HasBands), nameof(ConceptTitle), nameof(HasIpSensors),
         }) NotifyOfPropertyChange(name);
+        _editOffset = null;
+        RaiseMountPane();
+        SyncTableSelection();
         FenceChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -499,6 +521,10 @@ public sealed partial class WiringViewModel
     {
         _fenceSelection.RemoveAll(k => _board.Find(k) is null);
         if (_fenceSelectedKey is { } k && _board.Find(k) is null) _fenceSelectedKey = _fenceSelection.Count > 0 ? _fenceSelection[^1] : null;
+        _panelSelection.RemoveAll(i => i < 0 || i >= _board.FenceLayout.Panels.Count);
+        if (_selectionKind == FenceSelectionKind.Panels && _panelSelection.Count == 0) _selectionKind = KindAfterClear();
+        if (_selectionKind == FenceSelectionKind.Sensors && _fenceSelection.Count == 0) _selectionKind = KindAfterClear();
+        RaiseLayoutPane();
         RaiseSelection();
     }
     #endregion
@@ -614,13 +640,21 @@ public sealed partial class WiringViewModel
 
     private void DropOnFence(DragPayload payload, DropTarget target)
     {
-        if (target.ZoneData is not IFenceDropSurface surface || surface.PointerTarget() is not { } at) return;
+        if (target.ZoneData is not IFenceDropSurface surface) return;
         var keys = payload.Items.Select(i => i switch
         {
             SensorRowViewModel row => row.Key,
             WiringSlotViewModel slot => slot.Row?.Key ?? 0,
             _ => 0,
         }).Where(k => k != 0).ToList();
+
+        // 펜스 구성이 켜져 있으면 포인터 아래 망 · 기둥에 단다(자리 순서가 곧 체인 순서 · FR-09).
+        if (_board.FenceLayout.IsActive && surface.PointerMetres() is { } metres)
+        {
+            if (FenceDropAt(keys, metres) && keys.Count == 1) FenceSelect(keys[0]);
+            return;
+        }
+        if (surface.PointerTarget() is not { } at) return;
         if (FencePlace(keys, at.Line, at.Index) && keys.Count == 1) FenceSelect(keys[0]);
     }
     #endregion
@@ -658,4 +692,7 @@ public interface IFenceDropSurface
 {
     /// <summary>지금 포인터 아래 (선, 옮기기 전 자리). 캔버스 밖이면 <c>null</c>.</summary>
     (int Line, int Index)? PointerTarget();
+
+    /// <summary>지금 포인터 아래 펜스 위 가로 위치(m, A 쪽 끝이 0) — 펜스 구성이 켜진 캔버스만. 모르면 <c>null</c>.</summary>
+    double? PointerMetres() => null;
 }
