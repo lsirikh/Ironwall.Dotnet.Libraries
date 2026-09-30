@@ -51,3 +51,23 @@ public enum DebugCommandKind
     /// <summary>UI 스레드(디스패처)의 처리되지 않은 예외.</summary>
     DispatcherException = 4,
 }
+
+/// <summary>이벤트 창 종류 — 키 · 배지 · 테두리(탐지 = 빨간 테두리 + 배지 글자)를 가른다.</summary>
+public enum EventWindowKind
+{
+    Detection = 0,
+    Malfunction = 1,
+}
+
+/// <summary>이벤트 창이 닫힌 사유(GIS → 호스트 닫기 명령 · 호스트 → GIS 닫힘 알림 공통).</summary>
+public enum EventWindowCloseReason
+{
+    /// <summary>그 이벤트의 조치보고(내 조치 · 다른 GIS 조치).</summary>
+    ActionReported = 0,
+    /// <summary>타이머 N초 경과(호스트가 판단).</summary>
+    Timer = 1,
+    /// <summary>사람이 ✕ · Alt+F4 로 닫음.</summary>
+    User = 2,
+    /// <summary>동시 창 한도 초과로 가장 오래된 창 정리(GIS 창 관리자, FR-11) · 모드 전환 등 GIS 사정.</summary>
+    Evicted = 3,
+}

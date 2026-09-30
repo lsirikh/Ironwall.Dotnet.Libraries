@@ -20,21 +20,21 @@ internal sealed class EventWindow : Window
     {
         Title = string.IsNullOrWhiteSpace(msg.Title) ? $"이벤트 {msg.EventKey}" : msg.Title;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Left = msg.Left;
-        Top = msg.Top;
-        Width = Math.Max(240, msg.Width);
-        Height = Math.Max(160, msg.Height);
-        Topmost = msg.Topmost;
+        Left = msg.Window.X;
+        Top = msg.Window.Y;
+        Width = Math.Max(240, msg.Window.Width);
+        Height = Math.Max(160, msg.Window.Height);
+        Topmost = msg.AlwaysOnTop;
         ShowActivated = false;
         Background = Brushes.Black;
         AutomationProperties.SetAutomationId(this, "CameraPopupHost.EventWindow");
 
         int count = Math.Clamp(msg.Cameras.Count, 1, TileGrid.MaxCameras);
-        var (columns, rows) = TileGrid.Resolve(msg.Layout, count);
+        var (columns, rows) = TileGrid.Resolve(msg.GridColumns, msg.GridRows, count);
         var grid = new UniformGrid { Columns = columns, Rows = rows };
         for (int i = 0; i < count; i++)
         {
-            var camera = i < msg.Cameras.Count ? msg.Cameras[i].Camera : new CameraRef();
+            var camera = i < msg.Cameras.Count ? msg.Cameras[i] : new EventWindowCamera();
             var image = new Image { Stretch = Stretch.Uniform };
             var label = new TextBlock
             {

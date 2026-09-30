@@ -34,7 +34,14 @@ public interface ICameraPopupHost : IDisposable
 
     void OpenEventWindow(OpenEventWindow request);
 
-    void CloseEventWindow(string eventKey, string? reason = null);
+    /// <summary>이벤트 창 닫기. 키는 <see cref="Contracts.Protocol.EventKeys.Build"/>. 복원 목록에서도 뺀다.</summary>
+    void CloseEventWindow(string eventKey, Contracts.Protocol.EventWindowCloseReason reason, bool returnHome);
+
+    /// <summary>열려 있는 이벤트 창을 앞으로(같은 이벤트 재수신 등). 모르는 키면 무시.</summary>
+    void BringEventWindowToFront(string eventKey);
+
+    /// <summary>호스트 창 테마("Light" · "Dark"). 기억했다가 재시작 복원 때도 먼저 보낸다.</summary>
+    void SetTheme(string theme);
 
     /// <summary>PTZ. 같은 카메라의 밀린 명령은 최신 것 하나로 합쳐진다. 호스트가 없으면 버린다(순간 조작이므로 복원 안 함).</summary>
     void SendPtz(PtzCommand command);

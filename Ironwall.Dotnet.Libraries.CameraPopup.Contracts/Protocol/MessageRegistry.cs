@@ -18,11 +18,16 @@ public static class MessageRegistry
         ["CloseStream"] = typeof(CloseStream),
         ["OpenEventWindow"] = typeof(OpenEventWindow),
         ["CloseEventWindow"] = typeof(CloseEventWindow),
+        ["BringToFront"] = typeof(BringToFront),
+        ["SetTheme"] = typeof(SetTheme),
         ["Ptz"] = typeof(PtzCommand),
         ["Debug"] = typeof(DebugCommand),
         ["StreamStateChanged"] = typeof(StreamStateChanged),
         ["WindowOpened"] = typeof(WindowOpened),
         ["WindowClosed"] = typeof(WindowClosed),
+        ["WindowMoved"] = typeof(WindowMoved),
+        ["TileClosed"] = typeof(TileClosed),
+        ["PinChanged"] = typeof(PinChanged),
         ["HostError"] = typeof(HostError),
     };
 

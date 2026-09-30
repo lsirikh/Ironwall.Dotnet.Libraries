@@ -51,6 +51,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     private volatile CameraPopupClient? _liveClient;
     private volatile CameraPopupHostState _state = CameraPopupHostState.NotStarted;
     private volatile string? _stateReason;
+    private volatile string? _theme;
     private int _tickPending;
     private int _disposed;
 
@@ -145,11 +146,24 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         SendIfLive(request);
     });
 
-    public void CloseEventWindow(string eventKey, string? reason = null) => Guard(nameof(CloseEventWindow), () =>
+    public void CloseEventWindow(string eventKey, EventWindowCloseReason reason, bool returnHome) => Guard(nameof(CloseEventWindow), () =>
     {
         if (string.IsNullOrEmpty(eventKey)) return;
         if (_registry.RemoveWindow(eventKey))
-            SendIfLive(new CloseEventWindow { EventKey = eventKey, Reason = reason ?? "command" });
+            SendIfLive(new CloseEventWindow { EventKey = eventKey, Reason = reason, ReturnHome = returnHome });
+    });
+
+    public void BringEventWindowToFront(string eventKey) => Guard(nameof(BringEventWindowToFront), () =>
+    {
+        if (string.IsNullOrEmpty(eventKey) || !_registry.HasWindow(eventKey)) return;
+        SendIfLive(new BringToFront { EventKey = eventKey }, "front:" + eventKey);
+    });
+
+    public void SetTheme(string theme) => Guard(nameof(SetTheme), () =>
+    {
+        if (string.IsNullOrWhiteSpace(theme)) return;
+        _theme = theme;
+        SendIfLive(new SetTheme { Theme = theme }, "theme");
     });
 
     public void SendPtz(PtzCommand command) => Guard(nameof(SendPtz), () =>
@@ -356,6 +370,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
 
         // 복원 — 기록부를 그대로 다시 보낸다(창 → 오버레이). 이미 보낸 것과 겹쳐도 호스트 쪽 열기는 멱등이다.
         var (windows, overlays) = _registry.Snapshot();
+        if (_theme is { } theme) client.TrySend(new SetTheme { Theme = theme }, "theme");
         foreach (var w in windows) client.TrySend(w);
         foreach (var o in overlays)
         {
@@ -442,6 +457,9 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
                 break;
             case WindowClosed closed:
                 _registry.RemoveWindow(closed.EventKey); // 사람 · 타이머로 닫힌 창은 복원하지 않는다
+                break;
+            case PinChanged or WindowMoved or TileClosed:
+                _registry.ApplyHostNotice(message); // 재시작 복원 때 사람 조작을 되살린다
                 break;
             case HostError error:
                 _log.Warning($"[CameraPopup] host error {error.Code} scope={error.Scope} {error.Message}");

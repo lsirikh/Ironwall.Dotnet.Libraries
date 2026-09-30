@@ -45,17 +45,21 @@ public class SupervisorSurvivalTests
         Height = 180,
     };
 
-    private static OpenEventWindow EventWindow(string key) => new()
+    private static OpenEventWindow EventWindow(string id) => new()
     {
-        EventKey = key,
-        Title = "탐지 " + key,
-        Layout = "2x1",
+        Kind = EventWindowKind.Detection,
+        EventId = id,
+        Title = "탐지 " + id,
+        GridColumns = 2,
+        GridRows = 1,
         Cameras =
         {
-            new EventWindowCamera { Camera = new CameraRef { CameraId = "c1" }, Provider = new VideoProviderInfo { Kind = VideoProviderKind.TestPattern } },
-            new EventWindowCamera { Camera = new CameraRef { CameraId = "c2" }, Provider = new VideoProviderInfo { Kind = VideoProviderKind.TestPattern } },
+            new EventWindowCamera { CameraId = "c1", Provider = new VideoProviderInfo { Kind = VideoProviderKind.TestPattern } },
+            new EventWindowCamera { CameraId = "c2", Provider = new VideoProviderInfo { Kind = VideoProviderKind.TestPattern } },
         },
     };
+
+    private static string Key(string id) => EventKeys.Build(EventWindowKind.Detection, id);
 
     private void Metric(string text)
     {
@@ -105,7 +109,7 @@ public class SupervisorSurvivalTests
         Assert.NotNull(source);
         host.OpenEventWindow(EventWindow("evt-k1"));
         Assert.True(await StateRecorder.WaitUntilAsync(() => source!.PublishedSequence > 5, TimeSpan.FromSeconds(5)), "no frames before crash");
-        Assert.NotNull(await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == "evt-k1", 0, TimeSpan.FromSeconds(5)));
+        Assert.NotNull(await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == Key("evt-k1"), 0, TimeSpan.FromSeconds(5)));
 
         long t0 = recorder.NowMs;
         switch (crash)
@@ -126,7 +130,7 @@ public class SupervisorSurvivalTests
         long seqAtRestart = source!.PublishedSequence;
         bool resumed = await StateRecorder.WaitUntilAsync(() => source.PublishedSequence > seqAtRestart + 3, TimeSpan.FromSeconds(3));
         long framesMs = recorder.NowMs - t0;
-        var replayedWindow = await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == "evt-k1", running!.Value.AtMs, TimeSpan.FromSeconds(3));
+        var replayedWindow = await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == Key("evt-k1"), running!.Value.AtMs, TimeSpan.FromSeconds(3));
 
         Metric($"K1[{crash}] detect={detected!.Value.AtMs - t0}ms running={running.Value.AtMs - t0}ms framesResumed={framesMs}ms exit={detected.Value.Args.ExitCode} oldPid={oldPid} newPid={running.Value.Args.HostProcessId}");
         Assert.True(running.Value.AtMs - t0 <= 3000, $"restart took {running.Value.AtMs - t0} ms");
@@ -222,7 +226,7 @@ public class SupervisorSurvivalTests
             sw.Restart();
             host.SendPtz(new PtzCommand { CameraId = "c" + i, Operation = PtzOperation.Stop });
             host.OpenEventWindow(EventWindow("dead-" + i));
-            host.CloseEventWindow("dead-" + i, "action-report");
+            host.CloseEventWindow(Key("dead-" + i), EventWindowCloseReason.ActionReported, returnHome: false);
             var tmp = host.OpenOverlay(TestPattern("dead-" + i));
             tmp?.Dispose();
             host.Start();
@@ -238,7 +242,7 @@ public class SupervisorSurvivalTests
         Assert.NotNull(resumed);
         long seq = source!.PublishedSequence;
         Assert.True(await StateRecorder.WaitUntilAsync(() => source.PublishedSequence > seq + 3, TimeSpan.FromSeconds(3)), "overlay not replayed after Restart()");
-        Assert.NotNull(await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == "evt-k3", resumed!.Value.AtMs, TimeSpan.FromSeconds(3)));
+        Assert.NotNull(await recorder.WaitForMessageAsync<WindowOpened>(m => m.EventKey == Key("evt-k3"), resumed!.Value.AtMs, TimeSpan.FromSeconds(3)));
 
         var exitCodes = recorder.States.Where(s => s.Args.NewState is CameraPopupHostState.Restarting or CameraPopupHostState.Suspended)
             .Select(s => s.Args.ExitCode?.ToString() ?? "-");
@@ -268,7 +272,7 @@ public class SupervisorSurvivalTests
             var src = host.OpenOverlay(TestPattern("k8-" + i));
             host.OpenEventWindow(EventWindow("k8-" + i));
             host.SendPtz(new PtzCommand { CameraId = "c", Operation = PtzOperation.GotoPreset, PresetToken = "1" });
-            host.CloseEventWindow("k8-" + i);
+            host.CloseEventWindow(Key("k8-" + i), EventWindowCloseReason.Evicted, returnHome: false);
             host.CloseOverlay("k8-" + i);
             src?.Dispose();
             host.OpenOverlay(new OverlayStreamRequest { Width = 0, Height = 0 }); // 잘못된 크기 → null, 예외 없음

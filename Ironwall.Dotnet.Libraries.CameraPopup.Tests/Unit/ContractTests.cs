@@ -19,13 +19,18 @@ public class ContractTests
             new HeartbeatAck { Sequence = 9, PrivateBytes = 123, OpenStreams = 1, OpenWindows = 2 },
             new OpenOverlayStream { StreamId = "s1", Camera = new CameraRef { CameraId = "c1", Name = "정문" }, Provider = new VideoProviderInfo { Kind = VideoProviderKind.Rtsp, Uri = "rtsp://h/1" }, Width = 320, Height = 180, SharedMemoryName = "n" },
             new CloseStream { StreamId = "s1" },
-            new OpenEventWindow { EventKey = "e1", Layout = "3x2", Cameras = { new EventWindowCamera { Camera = new CameraRef { CameraId = "c1" }, PresetToken = "P2", PresetDelaySeconds = 3 } }, ClosePolicy = new WindowClosePolicy { TimeoutSeconds = 30, Pinned = true } },
-            new CloseEventWindow { EventKey = "e1", Reason = "action-report" },
+            FullOpenEventWindow(),
+            new CloseEventWindow { EventKey = "detection-e1", Reason = EventWindowCloseReason.Evicted, ReturnHome = true },
+            new BringToFront { EventKey = "detection-e1" },
+            new SetTheme { Theme = "Light" },
             new PtzCommand { CameraId = "c1", Operation = PtzOperation.ContinuousMove, Pan = 0.5, Tilt = -0.25 },
             new DebugCommand { Kind = DebugCommandKind.NativeAccessViolation },
             new StreamStateChanged { StreamId = "s1", State = StreamState.Failed, Detail = "open-timeout" },
             new WindowOpened { EventKey = "e1", Reused = true },
-            new WindowClosed { EventKey = "e1", Reason = "user" },
+            new WindowClosed { EventKey = "e1", Reason = EventWindowCloseReason.User },
+            new WindowMoved { EventKey = "e1", X = -1200, Y = 40 },
+            new TileClosed { EventKey = "e1", CameraId = "c2" },
+            new PinChanged { EventKey = "e1", Pinned = true },
             new HostError { Code = "x", Scope = "c1" },
         };
         Assert.Equal(MessageRegistry.Names.Count, messages.Length);
@@ -50,16 +55,17 @@ public class ContractTests
         var json = System.Text.Encoding.UTF8.GetString(IpcSerializer.Serialize(new PtzCommand { CameraId = "c", Operation = PtzOperation.Stop }, 1));
         Assert.Contains("\"operation\":\"Stop\"", json);
         Assert.Contains("\"type\":\"Ptz\"", json);
-        Assert.Contains("\"v\":1", json);
+        Assert.Contains("\"v\":2", json);
     }
 
     [Theory]
-    [InlineData("{\"v\":1,\"type\":\"FutureThing\",\"id\":3,\"body\":{}}", DecodeStatus.UnknownType)]
+    [InlineData("{\"v\":2,\"type\":\"FutureThing\",\"id\":3,\"body\":{}}", DecodeStatus.UnknownType)]
+    [InlineData("{\"v\":1,\"type\":\"OpenEventWindow\",\"id\":3,\"body\":{}}", DecodeStatus.IncompatibleVersion)]
     [InlineData("{\"v\":99,\"type\":\"Hello\",\"id\":3,\"body\":{}}", DecodeStatus.IncompatibleVersion)]
     [InlineData("{\"type\":\"Hello\",\"body\":{}}", DecodeStatus.Malformed)]
     [InlineData("not json", DecodeStatus.Malformed)]
     [InlineData("[1,2]", DecodeStatus.Malformed)]
-    [InlineData("{\"v\":1,\"type\":\"Hello\",\"id\":3,\"body\":5}", DecodeStatus.Malformed)]
+    [InlineData("{\"v\":2,\"type\":\"Hello\",\"id\":3,\"body\":5}", DecodeStatus.Malformed)]
     public void should_report_status_without_throwing_when_envelope_is_unusual(string json, DecodeStatus expected)
     {
         var status = IpcSerializer.TryDeserialize(System.Text.Encoding.UTF8.GetBytes(json), out var message, out _, out _);
@@ -180,6 +186,97 @@ public class ContractTests
     {
         Assert.Equal((columns, rows), TileGrid.Resolve(layout, count));
     }
+
+    [Theory]
+    [InlineData(0, 0, 1, 1, 1)]
+    [InlineData(0, 0, 2, 2, 1)]
+    [InlineData(0, 0, 4, 2, 2)]
+    [InlineData(3, 2, 5, 3, 2)] // 5대 3×2 — 한 칸 빈다
+    [InlineData(2, 3, 5, 2, 3)]
+    [InlineData(1, 6, 6, 1, 6)]
+    [InlineData(2, 2, 6, 3, 2)] // 못 담으면 기본값
+    [InlineData(4, 4, 3, 3, 1)] // 6칸 초과 → 기본값
+    [InlineData(1, 1, 9, 3, 2)] // 6대로 자른다
+    public void should_resolve_grid_when_columns_rows_and_count_given(int columns, int rows, int count, int expectedColumns, int expectedRows)
+    {
+        Assert.Equal((expectedColumns, expectedRows), TileGrid.Resolve(columns, rows, count));
+    }
+
+    [Fact]
+    public void should_offer_fr10_grids_when_camera_count_given()
+    {
+        Assert.Equal(new[] { (1, 1) }, TileGrid.AllowedFor(1));
+        Assert.Equal(new[] { (2, 2), (4, 1), (1, 4) }, TileGrid.AllowedFor(4));
+        Assert.Equal(new[] { (3, 2), (2, 3) }, TileGrid.AllowedFor(5));
+        Assert.Equal(new[] { (3, 2), (2, 3), (6, 1), (1, 6) }, TileGrid.AllowedFor(6));
+        Assert.Equal(TileGrid.AllowedFor(6), TileGrid.AllowedFor(40));
+    }
+
+    [Theory]
+    [InlineData(EventWindowKind.Detection, "1234", "detection-1234")]
+    [InlineData(EventWindowKind.Malfunction, "a-b", "malfunction-a-b")]
+    public void should_round_trip_event_key_when_built(EventWindowKind kind, string id, string expected)
+    {
+        var key = EventKeys.Build(kind, id);
+
+        Assert.Equal(expected, key);
+        Assert.True(EventKeys.TryParse(key, out var k, out var parsedId));
+        Assert.Equal((kind, id), (k, parsedId));
+        Assert.False(EventKeys.TryParse("other-1", out _, out _));
+        Assert.False(EventKeys.TryParse("detection-", out _, out _));
+    }
+
+    [Fact]
+    public void should_carry_every_event_window_field_when_open_message_serialized()
+    {
+        var bytes = IpcSerializer.Serialize(FullOpenEventWindow(), 5);
+        var json = System.Text.Encoding.UTF8.GetString(bytes);
+
+        Assert.Equal(DecodeStatus.Ok, IpcSerializer.TryDeserialize(bytes, out var decoded, out _, out _));
+        var m = Assert.IsType<OpenEventWindow>(decoded);
+        Assert.Equal("detection-e1", m.EventKey);
+        Assert.DoesNotContain("\"eventKey\"", json); // 파생값은 보내지 않는다
+        Assert.Contains("\"kind\":\"Detection\"", json);
+        Assert.Equal("구역-07", m.Header.ZoneName);
+        Assert.Equal(new DateTimeOffset(2026, 9, 30, 9, 41, 7, TimeSpan.FromHours(9)), m.Header.OccurredAt);
+        var cam = m.Cameras[0];
+        Assert.Equal(("c1", true, false, "P2", "HOME", 3), (cam.CameraId, cam.IsPtz, cam.PtzAllowed, cam.TargetPresetToken, cam.HomePresetToken, cam.DelaySeconds));
+        Assert.Equal("secret", cam.Provider.Password); // 계정은 파이프로는 간다(로그에서만 가린다)
+        Assert.DoesNotContain("secret", cam.ToString());
+        Assert.Equal((3, 2, 1), (m.GridColumns, m.GridRows, m.ExtraCameraCount));
+        Assert.Equal((-1920, 0, 1920, 1080), (m.MonitorBounds.X, m.MonitorBounds.Y, m.MonitorBounds.Width, m.MonitorBounds.Height));
+        Assert.Equal(1.5, m.DpiScale);
+        Assert.Equal((-1800, 60, 1200, 700), (m.Window.X, m.Window.Y, m.Window.Width, m.Window.Height));
+        Assert.Equal((true, 45, true, false, true, "Light"), (m.AlwaysOnTop, m.TimerCloseSeconds, m.ReturnHomeOnClose, m.CloseOnActionReport, m.Pinned, m.Theme));
+    }
+
+    private static OpenEventWindow FullOpenEventWindow() => new()
+    {
+        Kind = EventWindowKind.Detection,
+        EventId = "e1",
+        Header = new EventWindowHeader { KindLabel = "탐지", ZoneName = "구역-07", DeviceName = "펜스 센서 #104", EventTypeText = "침입", OccurredAt = new DateTimeOffset(2026, 9, 30, 9, 41, 7, TimeSpan.FromHours(9)) },
+        Cameras =
+        {
+            new EventWindowCamera { CameraId = "c1", Name = "외곽 PTZ-3", IsPtz = true, PtzAllowed = false, TargetPresetToken = "P2", TargetPresetName = "P2", HomePresetToken = "HOME", DelaySeconds = 3,
+                Provider = new VideoProviderInfo { Kind = VideoProviderKind.Onvif, Uri = "http://10.0.0.5/onvif/device_service", Username = "admin", Password = "secret", ProfileToken = "Profile_1" } },
+            new EventWindowCamera { CameraId = "c2", Name = "정문 고정-1", Provider = new VideoProviderInfo { Kind = VideoProviderKind.Rtsp, Uri = "rtsp://10.0.0.6/s1" } },
+        },
+        GridColumns = 3,
+        GridRows = 2,
+        ExtraCameraCount = 1,
+        MonitorBounds = new PixelRect { X = -1920, Y = 0, Width = 1920, Height = 1080 },
+        MonitorWorkArea = new PixelRect { X = -1920, Y = 0, Width = 1920, Height = 1040 },
+        DpiScale = 1.5,
+        MonitorDeviceName = @"\\.\DISPLAY2",
+        Window = new PixelRect { X = -1800, Y = 60, Width = 1200, Height = 700 },
+        AlwaysOnTop = true,
+        TimerCloseSeconds = 45,
+        CloseOnActionReport = false,
+        ReturnHomeOnClose = true,
+        Pinned = true,
+        Theme = "Light",
+    };
+
 
     [Fact]
     public void should_compute_layout_offsets_when_size_is_valid()

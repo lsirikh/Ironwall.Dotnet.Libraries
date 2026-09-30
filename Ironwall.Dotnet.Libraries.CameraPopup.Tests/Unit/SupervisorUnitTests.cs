@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.SharedMemory;
 using Ironwall.Dotnet.Libraries.CameraPopup.Frames;
 using Ironwall.Dotnet.Libraries.CameraPopup.Modules;
@@ -41,17 +42,44 @@ public class SupervisorUnitTests
     public void should_replay_windows_in_open_order_when_snapshot_taken()
     {
         var registry = new HostSessionRegistry();
-        registry.SetWindow(new OpenEventWindow { EventKey = "b" });
-        registry.SetWindow(new OpenEventWindow { EventKey = "a" });
-        registry.SetWindow(new OpenEventWindow { EventKey = "b", Title = "updated" });
+        registry.SetWindow(new OpenEventWindow { EventId = "b" });
+        registry.SetWindow(new OpenEventWindow { EventId = "a" });
+        registry.SetWindow(new OpenEventWindow { EventId = "b", Title = "updated" });
         registry.SetOverlay(new OpenOverlayStream { StreamId = "s" });
-        registry.RemoveWindow("a");
+        registry.RemoveWindow("detection-a");
 
         var (windows, overlays) = registry.Snapshot();
 
-        Assert.Equal(new[] { "b" }, windows.Select(w => w.EventKey));
+        Assert.Equal(new[] { "detection-b" }, windows.Select(w => w.EventKey));
         Assert.Equal("updated", windows[0].Title);
         Assert.Single(overlays);
+    }
+
+    [Fact]
+    public void should_replay_pin_move_and_closed_tile_when_host_reported_them()
+    {
+        var registry = new HostSessionRegistry();
+        var open = new OpenEventWindow
+        {
+            Kind = EventWindowKind.Malfunction,
+            EventId = "77",
+            Window = new PixelRect { X = 10, Y = 20, Width = 800, Height = 500 },
+            TimerCloseSeconds = 30,
+            Cameras = { new EventWindowCamera { CameraId = "c1" }, new EventWindowCamera { CameraId = "c2" } },
+        };
+        registry.SetWindow(open);
+
+        Assert.True(registry.ApplyHostNotice(new PinChanged { EventKey = "malfunction-77", Pinned = true }));
+        Assert.True(registry.ApplyHostNotice(new WindowMoved { EventKey = "malfunction-77", X = 300, Y = 400 }));
+        Assert.True(registry.ApplyHostNotice(new TileClosed { EventKey = "malfunction-77", CameraId = "c1" }));
+        Assert.False(registry.ApplyHostNotice(new PinChanged { EventKey = "detection-77", Pinned = true }));
+        var replay = registry.Snapshot().Windows.Single();
+
+        Assert.True(replay.Pinned);
+        Assert.Equal((300, 400, 800, 500), (replay.Window.X, replay.Window.Y, replay.Window.Width, replay.Window.Height));
+        Assert.Equal(new[] { "c2" }, replay.Cameras.Select(c => c.CameraId));
+        Assert.Equal(30, replay.TimerCloseSeconds);
+        Assert.Equal("malfunction-77", replay.EventKey);
     }
 
     [Fact]

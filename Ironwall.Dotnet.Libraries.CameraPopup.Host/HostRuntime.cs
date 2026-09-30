@@ -109,7 +109,13 @@ internal sealed class HostRuntime
                     _dispatcher.BeginInvoke(() => Guard("open-window", () => _windows.Open(window)));
                     break;
                 case CloseEventWindow closeWindow:
-                    _dispatcher.BeginInvoke(() => Guard("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason ?? "command")));
+                    _dispatcher.BeginInvoke(() => Guard("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason)));
+                    break;
+                case BringToFront front:
+                    _dispatcher.BeginInvoke(() => Guard("bring-to-front", () => _windows.BringToFront(front.EventKey)));
+                    break;
+                case SetTheme theme:
+                    _dispatcher.BeginInvoke(() => Guard("set-theme", () => _windows.SetTheme(theme.Theme)));
                     break;
                 case PtzCommand ptz:
                     // PTZ 제공자는 T-02 에서 호스트 안으로 들어온다.

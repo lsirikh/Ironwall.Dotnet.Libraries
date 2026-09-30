@@ -54,12 +54,19 @@ internal sealed class EventWindowManager
         _send(new WindowOpened { EventKey = msg.EventKey });
     }
 
-    public void Close(string eventKey, string reason)
+    public void Close(string eventKey, EventWindowCloseReason reason)
     {
         if (_sessions.TryGetValue(eventKey, out var session)) session.Close(reason);
     }
 
-    private void OnSessionClosed(Session session, string reason)
+    public void BringToFront(string eventKey)
+    {
+        if (_sessions.TryGetValue(eventKey, out var session)) session.BringToFront();
+    }
+
+    public void SetTheme(string theme) => _log.Info($"theme {theme}");
+
+    private void OnSessionClosed(Session session, EventWindowCloseReason reason)
     {
         if (_sessions.TryGetValue(session.EventKey, out var current) && ReferenceEquals(current, session))
             _sessions.Remove(session.EventKey);
@@ -76,7 +83,7 @@ internal sealed class EventWindowManager
         private readonly List<BitmapFrameSink> _sinks = new();
         private EventWindow? _window;
         private DispatcherTimer? _timer;
-        private string? _closeReason;
+        private EventWindowCloseReason? _closeReason;
         private bool _closed;
 
         public Session(EventWindowManager owner, OpenEventWindow msg)
@@ -89,18 +96,17 @@ internal sealed class EventWindowManager
 
         public void Show()
         {
-            var policy = _msg.ClosePolicy;
-            if (!policy.Pinned && policy.TimeoutSeconds > 0)
+            if (!_msg.Pinned && _msg.TimerCloseSeconds > 0)
             {
-                _timer = new DispatcherTimer(TimeSpan.FromSeconds(policy.TimeoutSeconds), DispatcherPriority.Normal,
-                    (_, _) => Close("timeout"), _owner._dispatcher);
+                _timer = new DispatcherTimer(TimeSpan.FromSeconds(_msg.TimerCloseSeconds), DispatcherPriority.Normal,
+                    (_, _) => Close(EventWindowCloseReason.Timer), _owner._dispatcher);
                 _timer.Start();
             }
             if (_owner._headless) return;
 
             _window = new EventWindow(_msg);
-            _window.Closed += (_, _) => Finish(_closeReason ?? "user");
-            var (columns, rows) = TileGrid.Resolve(_msg.Layout, _window.TileCount);
+            _window.Closed += (_, _) => Finish(_closeReason ?? EventWindowCloseReason.User);
+            var (columns, rows) = TileGrid.Resolve(_msg.GridColumns, _msg.GridRows, _window.TileCount);
             int tileWidth = Math.Max(64, (int)(_window.Width / columns)) & ~1;
             int tileHeight = Math.Max(48, (int)(_window.Height / rows)) & ~1;
             for (int i = 0; i < _window.TileCount && i < _msg.Cameras.Count; i++)
@@ -118,7 +124,7 @@ internal sealed class EventWindowManager
                     _owner._send(new StreamStateChanged { StreamId = streamId, EventKey = _msg.EventKey, State = state, Detail = detail });
                     _owner._dispatcher.BeginInvoke(() =>
                     {
-                        if (!_closed) _window?.SetTileState(index, $"{camera.Camera.Name ?? camera.Camera.CameraId} · {state}");
+                        if (!_closed) _window?.SetTileState(index, $"{camera.Name ?? camera.CameraId} · {state}");
                     });
                 });
             }
@@ -132,7 +138,7 @@ internal sealed class EventWindowManager
             _window.Activate();
         }
 
-        public void Close(string reason)
+        public void Close(EventWindowCloseReason reason)
         {
             if (_closed) return;
             _closeReason = reason;
@@ -140,7 +146,7 @@ internal sealed class EventWindowManager
             else Finish(reason);
         }
 
-        private void Finish(string reason)
+        private void Finish(EventWindowCloseReason reason)
         {
             if (_closed) return;
             _closed = true;

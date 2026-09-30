@@ -6,5 +6,8 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 public sealed class CloseEventWindow : IIpcMessage
 {
     public string EventKey { get; init; } = string.Empty;
-    public string? Reason { get; init; }
+    public EventWindowCloseReason Reason { get; init; } = EventWindowCloseReason.ActionReported;
+
+    /// <summary>자동 이동했던 PTZ 를 복귀 프리셋으로 돌린다(FR-15).</summary>
+    public bool ReturnHome { get; init; }
 }
