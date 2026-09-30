@@ -5,6 +5,9 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -42,14 +45,18 @@ internal sealed class WiringPreview
         return (view, vm);
     }
 
-    #region - Fence scenarios (wiring-fence-view F-4 · 목업 buildSmart/buildPids/buildUg) -
-    /// <summary>펜스 뷰 시나리오 — <c>ring</c> · <c>pids</c> · <c>line</c>. 결선 단계 · 펜스 보기로 연다.</summary>
+    #region - Fence scenarios (wiring-fence-view F-4 · fence-wiring-editor 시나리오) -
+    /// <summary>
+    /// 펜스 뷰 시나리오 — <c>ring</c>(스마트 링 13 · 센서마다 IP · 신호등) · <c>pids</c>(섞인 PIDS 50 · 4차 번호 대역 · 판망/윤형 구간) ·
+    /// <c>line</c>(지중 10) · <c>wall</c>(담 구간이 낀 펜스). 결선 단계 · 펜스 보기로 연다.
+    /// </summary>
     public (FrameworkElement View, WiringViewModel Vm) Scenario(string name)
     {
         var (view, vm) = name switch
         {
             "pids" => Pids(),
             "line" => UndergroundLine(),
+            "wall" => WallSection(),
             _ => SmartRing(),
         };
         vm.GoWiring();
@@ -71,45 +78,90 @@ internal sealed class WiringPreview
             (428, 112, "북측 12구간 펜스", 12),
         };
         var saved = new[] { 417, 418, 420, 419, 421, 423, 424, 425, 427, 428 };
-        var seeds = sensors.Select(s => new WiringSensorSeed(s.Id, s.Bus, new SensorFacts(s.No, s.Name, "SmartSensor2", "북측"),
+        // 스마트복합센서2 — 센서마다 IP(제어기 뒤 내부망 · FR-15). 매니저 보고(NETWORK_INTERFACE) 는 몇 대만 — 나머지는 모름(FR-14).
+        var health = new Dictionary<int, string> { [417] = "OK", [418] = "OK", [419] = "DEGRADED", [420] = "FAULT", [421] = "OK" };
+        var seeds = sensors.Select((s, i) => new WiringSensorSeed(s.Id, null, new SensorFacts(s.No, s.Name, "SmartSensor2", "북측"),
             Array.IndexOf(saved, s.Id) is var at && at >= 0
                 ? new WiringPlacement(1, at + 1, s.Id == 423 ? WiringFacing.Back : WiringFacing.Front)      // 7구간은 펜스 내부를 본다(FR-20)
-                : null));
-        var vm = Controller(new WiringControllerInfo(1, 1, "CTRL-북측-01", "10.99.7.1", "SmartController"), seeds, new[] { "SmartSensor2" });
+                : null,
+            ConnectionType: "IP_DIRECT", IpAddress: $"192.168.10.{i + 11}", LinkHealth: health.TryGetValue(s.Id, out var h) ? h : null));
+        var vm = Controller(new WiringControllerInfo(1, 1, "CTRL-북측-01", "10.99.7.1", "SmartController"), seeds, new[] { "SmartSensor2" },
+                            new WiringFenceContext(null, new PreviewFenceStore(), new PreviewPing()));
         vm.FenceSelect(433);
+        vm.StartSignals();                   // 미리보기 ping 은 가짜(12ms 성공) — 신호등이 켜지는 모양만 본다
         return (new WiringView { DataContext = vm }, vm);
     }
 
     /// <summary>
-    /// 울타리 감지("PIDS") 제어기 — v0.4 · <b>링</b>(함체는 가운데). 섞어 쓰는 현장: 철조망 구간 스마트 센서 1~3번 뒤에
-    /// 윤형철조망 구간 [복합, 펜스 ×7, 복합, 펜스 ×7, 복합, 펜스 ×6] ×2(복합 · 펜스 101번~). 저장된 링 위치 · 동측 복합 2 는 내부를 본다(FR-20) ·
-    /// 번호 없는 스마트 1대는 미배치(번호순 제안 — 섞였으니 "번호순이 실제 순서와 다를 수 있습니다" 안내).
+    /// 중요시설 4차 현장(fence-wiring-editor §1-A) — 한 링에 판망 구간(스마트센서 · 6m 망 · 기둥 위)과 윤형 구간(펜스센서 · 3m 망 가운데)이 번갈아
+    /// 5대씩 × 5 = 센서 50대. 저장된 구성(로컬)에 4차 대역(스마트 1~99 · 펜스 101~199)이 있어, 센서를 옮기면 번호가 다시 매겨진다.
+    /// 번호는 대역과 맞게 심어 두고, 한 대(스마트 13)만 현장 번호가 어긋난 채로 둔다(저장 전 번호 표에 한 줄).
     /// </summary>
     private (FrameworkElement View, WiringViewModel Vm) Pids()
     {
         var seeds = new List<WiringSensorSeed>();
-        var order = 1;
-        for (var i = 1; i <= 3; i++, order++)
-            seeds.Add(new WiringSensorSeed(300 + i, order, new SensorFacts(i, $"철조망 스마트 {i}", "SmartSensor2", "서측"), new WiringPlacement(1, order)));
-
-        var number = 101;
-        var pattern = new[] { 'M' }.Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 7)).Append('M').Concat(Enumerable.Repeat('F', 6)).ToArray();
-        foreach (var side in new[] { "서측", "동측" })
+        var panels = new List<FencePanelSpec>();
+        var mounts = new Dictionary<int, SensorMountSpec>();
+        int order = 1, smart = 0, fence = 0;
+        for (var section = 0; section < 5; section++)
         {
-            int multi = 0, fence = 0;
-            foreach (var t in pattern)
+            // 판망 — 스마트 5대, 기둥마다(6m)
+            for (var i = 0; i < 5; i++, order++)
             {
-                var isMulti = t == 'M';
-                var name = isMulti ? $"{side} 복합 {++multi}" : $"{side} 펜스 {++fence}";
-                var back = side == "동측" && isMulti && multi == 2;
-                seeds.Add(new WiringSensorSeed(1000 + number, order, new SensorFacts(number, name, isMulti ? "Multi" : "Fence", side),
-                    new WiringPlacement(1, order, back ? WiringFacing.Back : WiringFacing.Front)));
-                number++;
-                order++;
+                var id = 2000 + order;
+                smart++;
+                var number = smart == 13 ? 31 : smart;                                  // 현장 번호가 어긋난 한 대
+                seeds.Add(new WiringSensorSeed(id, order, new SensorFacts(number, $"판망 스마트 {smart}", "SmartSensor2", section % 2 == 0 ? "서측" : "동측"),
+                    new WiringPlacement(1, order)));
+                mounts[id] = new SensorMountSpec(panels.Count, FenceMountSpot.PostTop);
+                panels.Add(FencePanelSpec.Default(EnumFenceStyle.ChainLink, 6));
+            }
+            // 윤형 — 펜스센서 5대, 3m 망 가운데
+            for (var i = 0; i < 5; i++, order++)
+            {
+                var id = 2000 + order;
+                fence++;
+                seeds.Add(new WiringSensorSeed(id, order, new SensorFacts(100 + fence, $"윤형 펜스 {fence}", "Fence", section % 2 == 0 ? "서측" : "동측"),
+                    new WiringPlacement(1, order)));
+                mounts[id] = new SensorMountSpec(panels.Count, FenceMountSpot.PanelCenter);
+                panels.Add(FencePanelSpec.Default(EnumFenceStyle.ChainLinkRazor, 3));
             }
         }
-        seeds.Add(new WiringSensorSeed(304, 60, new SensorFacts(4, "철조망 스마트 4(새로 단 것)", "SmartSensor2", "서측")));
-        var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "Multi", "Fence", "SmartSensor2" });
+        panels.Add(FencePanelSpec.Default(EnumFenceStyle.ChainLink, 6));                  // 끝 기둥 뒤 한 칸
+        var document = new FenceLayoutDocument { ControllerId = 3, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier4, Revision = 1 };
+        var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "SmartSensor2", "Fence" },
+                            new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
+        vm.FenceSelectPanels(new[] { 5, 6, 7 });
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    /// <summary>
+    /// 담이 낀 펜스 — 스마트 8대: 철조망 3칸 · 벽돌담 2칸 · 시멘트담 1칸 · 디자인펜스 2칸. 담 위 센서는 "담 위", 담 사이에는 기둥이 없다.
+    /// RS485 노드 주소(IP 아님)라 주소 칸은 노드 번호.
+    /// </summary>
+    private (FrameworkElement View, WiringViewModel Vm) WallSection()
+    {
+        var styles = new[]
+        {
+            EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink, EnumFenceStyle.Brick, EnumFenceStyle.Brick,
+            EnumFenceStyle.Concrete, EnumFenceStyle.DesignFence, EnumFenceStyle.DesignFence,
+        };
+        var panels = styles.Select(s => FencePanelSpec.Default(s, s is EnumFenceStyle.Brick or EnumFenceStyle.Concrete ? 4.5 : 6)).ToList();
+        var seeds = new List<WiringSensorSeed>();
+        var mounts = new Dictionary<int, SensorMountSpec>();
+        for (var i = 0; i < 8; i++)
+        {
+            var id = 3001 + i;
+            seeds.Add(new WiringSensorSeed(id, i + 1, new SensorFacts(i + 1, $"남측 {i + 1}구간", "SmartSensor2", "남측"), new WiringPlacement(1, i + 1),
+                ConnectionType: "RS485"));
+            mounts[id] = styles[i] is EnumFenceStyle.Brick or EnumFenceStyle.Concrete
+                ? new SensorMountSpec(i, FenceMountSpot.WallTop)
+                : new SensorMountSpec(i, FenceMountSpot.PostTop);
+        }
+        var document = new FenceLayoutDocument { ControllerId = 4, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier3, Revision = 1 };
+        var vm = Controller(new WiringControllerInfo(4, 4, "CTRL-남측-04", "10.99.7.4", "SmartController"), seeds, new[] { "SmartSensor2" },
+                            new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
+        vm.FenceSelect(3004);
         return (new WiringView { DataContext = vm }, vm);
     }
 
@@ -122,11 +174,32 @@ internal sealed class WiringPreview
         return (new WiringView { DataContext = vm }, vm);
     }
 
-    private WiringViewModel Controller(WiringControllerInfo info, IEnumerable<WiringSensorSeed> seeds, IReadOnlyList<string> types)
+    private WiringViewModel Controller(WiringControllerInfo info, IEnumerable<WiringSensorSeed> seeds, IReadOnlyList<string> types, WiringFenceContext? fence = null)
     {
         var gateway = new DeviceApiSensorGateway(new MockDeviceApiService());
         var apply = new WiringApplyService(gateway, null, null, new DeviceQueryPolicy(new AxisProbe()));
-        return WiringViewModel.ForController(info, seeds, types, apply, _dialogs, Groups);
+        return WiringViewModel.ForController(info, seeds, types, apply, _dialogs, Groups, fence);
+    }
+
+    /// <summary>미리보기 로컬 저장소 — 메모리에만 쥔다(로컬 DB 없음).</summary>
+    private sealed class PreviewFenceStore : IFenceLayoutStore
+    {
+        private readonly Dictionary<int, FenceLayoutDocument> _documents = new();
+
+        public Task<FenceLayoutDocument?> LoadAsync(int controllerId, CancellationToken token = default)
+            => Task.FromResult(_documents.TryGetValue(controllerId, out var d) ? d : null);
+
+        public Task<FenceLayoutSaveResult> SaveAsync(FenceLayoutDocument document, CancellationToken token = default)
+        {
+            _documents[document.ControllerId] = document;
+            return Task.FromResult(new FenceLayoutSaveResult(FenceLayoutSaveStatus.Saved, document.Revision + 1, "펜스 구성을 미리보기 메모리에 저장했습니다."));
+        }
+    }
+
+    /// <summary>미리보기 ping — 늘 12ms 성공(ICMP 를 보내지 않는다).</summary>
+    private sealed class PreviewPing : IPingProbe
+    {
+        public Task<PingSample> SendAsync(string host, TimeSpan timeout, CancellationToken token = default) => Task.FromResult(new PingSample(true, 12));
     }
     #endregion
 
