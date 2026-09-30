@@ -25,6 +25,8 @@ public enum SymbolDetailTab
     Broadcast,
     /// <summary>심볼 자체 정보 — 제목·위경도·회전·최소표시줌·레이어·잠금. <b>장비와 무관</b>.</summary>
     Symbol,
+    /// <summary>부품 표 — 장비 콘솔 "부품 상태" 절과 같은 칸 · 같은 요약 줄(component-display-unify FR-06). 부품 축이 있는 장비만.</summary>
+    Components,
 }
 
 /// <summary>상세 창 하단 액션 바 버튼(기존 컨텍스트 메뉴와 1:1).</summary>
@@ -130,6 +132,18 @@ public static class SymbolDetailRules
             SymbolDetailTab.Symbol,
         };
         _ = deviceType;   // 타입별 분기는 현재 없음(위 결정) — 시그니처는 유지한다
+        return tabs;
+    }
+
+    /// <summary>
+    /// 부품 축 여부까지 본 탭 목록 — 부품 축이 있는 장비(7.0+)면 기본 · <b>부품</b> · 심볼, 없으면(6.3 · 미연결) 종전과 같다(무회귀).
+    /// </summary>
+    /// <param name="deviceType">장비 종류.</param>
+    /// <param name="hasComponentAxes">연결 장비에 부품 축 묶음이 있는가(component-display-unify FR-06 · FR-08).</param>
+    public static IReadOnlyList<SymbolDetailTab> VisibleTabs(EnumDeviceType deviceType, bool hasComponentAxes)
+    {
+        var tabs = VisibleTabs(deviceType).ToList();
+        if (hasComponentAxes) tabs.Insert(tabs.IndexOf(SymbolDetailTab.Symbol), SymbolDetailTab.Components);
         return tabs;
     }
 

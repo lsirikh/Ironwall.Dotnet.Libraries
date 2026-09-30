@@ -2,11 +2,13 @@
 using Ironwall.Dotnet.Libraries.Devices.Units;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Detail;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Door;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Utils.Converters;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using MaterialDesignThemes.Wpf;
 using System;
@@ -81,6 +83,15 @@ public sealed class SymbolDetailTabModel : PropertyChangedBase
     /// <summary>비활성 사유 — 빈 탭을 눌러보게 두지 않는다(FR-28).</summary>
     public string? DisabledReason { get; }
     public ObservableCollection<SymbolDetailField> Fields { get; } = new();
+
+    private ComponentTableModel? _componentTable;
+    /// <summary>부품 탭의 표(요약 줄 · 정렬 단추 · 줄) — 다른 탭은 null.</summary>
+    public ComponentTableModel? ComponentTable
+    {
+        get => _componentTable;
+        set { _componentTable = value; NotifyOfPropertyChange(nameof(ComponentTable)); }
+    }
+
     /// <summary>계측 앵커 — `GMaps.SymbolDetail.Tab.Basic` 형태.</summary>
     public string AutomationId => $"GMaps.SymbolDetail.Tab.{Tab}";
 
@@ -299,8 +310,9 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
     /// <param name="context">탭·액션 판정 입력.</param>
     /// <param name="layerName">심볼이 속한 레이어 이름(없으면 null).</param>
     /// <param name="groupNames">장비그룹 표시 문자열.</param>
+    /// <param name="initialTab">처음 고를 탭(우클릭 "상세 보기 › 부품"). 보이지 않거나 비활성이면 기본 규칙대로.</param>
     public void Load(IPidsEditableMarker marker, in SymbolDetailContext context,
-        string? layerName = null, string? groupNames = null)
+        string? layerName = null, string? groupNames = null, SymbolDetailTab? initialTab = null)
     {
         Unsubscribe();
         _marker = marker ?? throw new ArgumentNullException(nameof(marker));
@@ -326,7 +338,7 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
                 : "이 심볼은 장비와 연결되지 않아 심볼 탭만 볼 수 있습니다.";
 
         RefreshUnitLine(device?.UnitId);
-        BuildTabs(marker, device, layerName, groupNames);
+        BuildTabs(marker, device, layerName, groupNames, initialTab);
         BuildActions(marker.DeviceType);
         RefreshActionStates();
         Subscribe(marker);
@@ -463,20 +475,41 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
             tab.Fields.Add(field);
     }
 
-    private void BuildTabs(IPidsEditableMarker marker, IBaseDeviceModel? device, string? layerName, string? groupNames)
+    private void BuildTabs(IPidsEditableMarker marker, IBaseDeviceModel? device, string? layerName, string? groupNames,
+        SymbolDetailTab? initialTab = null)
     {
         Tabs.Clear();
-        foreach (var tab in SymbolDetailRules.VisibleTabs(marker.DeviceType))
+        var summary = SummaryOf(marker);
+        foreach (var tab in SymbolDetailRules.VisibleTabs(marker.DeviceType, hasComponentAxes: summary.HasAxes))
         {
             bool enabled = SymbolDetailRules.IsTabEnabled(tab, _context.HasDevice);
             var model = new SymbolDetailTabModel(tab, HeaderOf(tab), enabled, enabled ? null : "장비 미연결");
             foreach (var field in FieldsOf(tab, marker, device, layerName, groupNames))
                 model.Fields.Add(field);
+            if (tab == SymbolDetailTab.Components)
+                model.ComponentTable = new ComponentTableModel(summary.Snapshot, ComponentSortMode.Declared, DateTime.Today);
             Tabs.Add(model);
         }
 
         var initial = SymbolDetailRules.DefaultTab(_context.HasDevice);
-        SelectTab(Tabs.FirstOrDefault(t => t.Tab == initial) ?? Tabs.FirstOrDefault(t => t.IsEnabled) ?? Tabs.FirstOrDefault()!);
+        var requested = initialTab is { } wanted ? Tabs.FirstOrDefault(t => t.Tab == wanted && t.IsEnabled) : null;
+        SelectTab(requested ?? Tabs.FirstOrDefault(t => t.Tab == initial) ?? Tabs.FirstOrDefault(t => t.IsEnabled) ?? Tabs.FirstOrDefault()!);
+    }
+
+    /// <summary>심볼의 부품 요약 — 지도 마커가 이미 만든 것을 쓰고(같은 표), 없으면 연결 장비 축에서 만든다.</summary>
+    private static ComponentHealthSummary SummaryOf(IPidsEditableMarker marker)
+        => marker is GMapPidsMarker pids
+            ? pids.ComponentSummary ?? ComponentHealthSummary.None
+            : ComponentHealthSummary.Build(marker.LinkedDevice?.Axes, MapComponentCatalog.Labels);
+
+    /// <summary>부품 탭 표를 다시 만든다(SYNC_DEVICE 로 요약이 바뀌었을 때) — 정렬 선택은 유지한다.</summary>
+    private void RefreshComponentTab()
+    {
+        if (_marker is null) return;
+        var tab = Tabs.FirstOrDefault(t => t.Tab == SymbolDetailTab.Components);
+        if (tab is null) return;
+        var sort = tab.ComponentTable?.SortMode ?? ComponentSortMode.Declared;
+        tab.ComponentTable = new ComponentTableModel(SummaryOf(_marker).Snapshot, sort, DateTime.Today);
     }
 
     private void SelectTab(SymbolDetailTabModel? tab)
@@ -493,6 +526,7 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
         SymbolDetailTab.Broadcast => "방송",
         SymbolDetailTab.Status => "상태",
         SymbolDetailTab.Symbol => "심볼",
+        SymbolDetailTab.Components => "부품",
         _ => tab.ToString(),
     };
 
@@ -765,6 +799,8 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
         if (_marker is null) return;
         if (e.PropertyName == nameof(IPidsEditableMarker.DoorState))
             DoorOpen = _marker.DoorState == EnumDoorState.Open ? 1 : 0;
+        else if (e.PropertyName == nameof(GMapPidsMarker.ComponentSummary))
+            RefreshComponentTab();   // 부품 관측이 바뀌면 열린 창의 부품 탭도 따라간다(지도만 바뀌면 창이 거짓말을 한다)
     }
 
     #endregion

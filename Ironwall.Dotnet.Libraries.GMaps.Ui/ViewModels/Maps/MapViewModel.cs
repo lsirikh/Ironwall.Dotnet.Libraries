@@ -579,6 +579,9 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.Markers.CollectionChanged += Markers_CollectionChangedForLabels;
             _labelService.Sync(MainMap.Markers);   // 이미 로드된 마커 부착
 
+            // 조립 카드(L3, component-display-unify FR-05) — 운영 모드 심볼 클릭 → 옆에 부품 표. 라벨 서비스와 같은 급의 맵 부속.
+            _componentCard = new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.ComponentCardService(MainMap, _log);
+
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
             MainMap.MarkerEditStarted += OnMarkerEditStarted;
@@ -664,6 +667,8 @@ public partial class MapViewModel : BasePanelViewModel,
             if (_labelService != null) _labelService.LabelWidthChanged -= OnLabelWidthChanged;
             _labelService?.Dispose();
             _labelService = null;
+            _componentCard?.Dispose();
+            _componentCard = null;
 
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
@@ -686,7 +691,17 @@ public partial class MapViewModel : BasePanelViewModel,
     private Ironwall.Dotnet.Libraries.GMaps.Ui.Services.LabelAdornerService? _labelService;
     /// <summary>마커 추가/제거 시 라벨 adorner 동기화 — Action 기반 증분(O(N²) 전체 재스캔 제거, FR-12/P1-06).</summary>
     private void Markers_CollectionChangedForLabels(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        => _labelService?.ApplyCollectionChange(e, MainMap?.Markers);
+    {
+        _labelService?.ApplyCollectionChange(e, MainMap?.Markers);
+        // 조립 카드 대상이 지도에서 빠졌다(삭제 · 맵 전환 Reset) — 카드를 걷는다.
+        if (_componentCard?.Current is { } cardTarget
+            && (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset
+                || (e.OldItems?.Contains(cardTarget) ?? false)))
+            _componentCard.Hide();
+    }
+
+    /// <summary>조립 카드(L3) 수명 — <see cref="Ironwall.Dotnet.Libraries.GMaps.Ui.Services.ComponentCardService"/>.</summary>
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Services.ComponentCardService? _componentCard;
 
     /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(심볼/라인=LabelOffsetX/Y px, 이미지=LabelOffsetU/V 비율). RBAC 게이트(FR-LB-05).
     /// before 쌍의 도메인은 마커 타입 따름(이미지=U/V — LabelAdorner가 타입별로 전달, Overlay_Title FR-11).</summary>
@@ -1572,8 +1587,14 @@ public partial class MapViewModel : BasePanelViewModel,
             if (IsEditModeEnabled)
             {
                 //_log?.Info($"편집 모드에서 마커 선택 시도");
+                _componentCard?.Hide();   // 편집 중에는 조립 카드를 띄우지 않는다(편집 명령이 주인공)
                 SelectMarkerForEditing(marker);
                 
+            }
+            else
+            {
+                // 조립 카드(L3) — 누름에는 후보만, 뗄 때 팬이 아니었으면 연다(지도 좌드래그 팬을 뺏지 않는다)
+                _componentCard?.OnMarkerPressed(marker);
             }
             //else
             //{
@@ -3020,6 +3041,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             ClickedCurrentPosition = geoPos;
+            _componentCard?.OnMapClicked();   // 빈 곳 클릭 — 조립 카드를 닫는다(FR-05)
             //_log?.Info($"지도 클릭: ({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
             // 편집 모드에서 빈 공간 클릭 시 모든 선택 해제
@@ -6153,7 +6175,12 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>우클릭 → `상세 보기`. 이미 열려 있으면 대상만 갈아끼운다(창을 겹쳐 띄우지 않는다).</summary>
-    public void ShowSymbolDetail(IPidsEditableMarker marker)
+    public void ShowSymbolDetail(IPidsEditableMarker marker) => ShowSymbolDetail(marker, initialTab: null);
+
+    /// <summary>우클릭 → `상세 보기 › 부품`(component-display-unify FR-06) — 창을 부품 탭으로 연다.</summary>
+    public void ShowSymbolDetailComponents(IPidsEditableMarker marker) => ShowSymbolDetail(marker, SymbolDetailTab.Components);
+
+    private void ShowSymbolDetail(IPidsEditableMarker marker, SymbolDetailTab? initialTab)
     {
         try
         {
@@ -6170,7 +6197,8 @@ public partial class MapViewModel : BasePanelViewModel,
             _symbolDetailMarker = marker;
             _symbolDetailVm.Load(marker, BuildSymbolDetailContext(marker),
                 layerName: ResolveSymbolLayerName(marker),
-                groupNames: ResolveDeviceGroupNames(marker.LinkedDevice));
+                groupNames: ResolveDeviceGroupNames(marker.LinkedDevice),
+                initialTab: initialTab);
 
             _symbolDetailVm.IsBroadcasting = marker.IsBroadcasting;
             SymbolDetailPanel ??= new SymbolDetailControl { DataContext = _symbolDetailVm };
@@ -6470,6 +6498,19 @@ public partial class MapViewModel : BasePanelViewModel,
                 };
                 detailViewItem.Click += (s, e) => ShowSymbolDetail(detailTarget);
                 menu.Items.Add(detailViewItem);
+
+                // 상세 보기 › 부품(FR-06) — 부품 축이 있는 장비만(6.3 · 미연결은 메뉴 무변화)
+                if (detailTarget is GMapPidsMarker { ComponentSummary.HasAxes: true } && detailTarget.LinkedDevice is not null)
+                {
+                    var componentsItem = new MenuItem
+                    {
+                        Header = "상세 보기 › 부품",
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Wrench, Width = 16, Height = 16 }
+                    };
+                    System.Windows.Automation.AutomationProperties.SetAutomationId(componentsItem, "GMaps.Symbol.ContextMenu.DetailComponents");
+                    componentsItem.Click += (s, e) => ShowSymbolDetailComponents(detailTarget);
+                    menu.Items.Add(componentsItem);
+                }
                 menu.Items.Add(new Separator());
             }
             AddUnitLineMenuItem(menu, marker);   // 소속 부대 · [관계도에서 보기](FR-46) — MapViewModel.Locate.cs
@@ -8297,6 +8338,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 _isEditModeEnabled = value;
                 MainMap.SetEditMode(value);
+                _componentCard?.Hide();   // 모드가 바뀌면 조립 카드는 닫는다
 
                 // 편집 모드 해제 시 모든 선택 해제 + 배치 모드 취소(#4)
                 if (!value)

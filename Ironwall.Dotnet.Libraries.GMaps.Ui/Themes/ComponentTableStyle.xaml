@@ -1,0 +1,122 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+	<!--
+		부품 표 조각(component-display-unify FR-05 · FR-06) — 지도 조립 카드와 상세 보기 "부품" 탭이 함께 쓴다.
+		장비 콘솔 "부품 상태" 절과 같은 칸 · 같은 점 색 · 같은 한글(공용 부품 사전 ComponentDisplay).
+		건강 점: 정상 StatusNormal · 저하 StatusWarning · 고장 StatusCritical · 미상 회색 · 사용 안 함 = 빈 원.
+		(지도 아이콘 위에는 원형 점을 쓰지 않는다 — 그건 이벤트 몫. 여기는 카드 · 창 안의 표다.)
+		색은 전부 DynamicResource — 테마 전환 때 다시 해석된다. x:Name 은 쓰지 않는다(요소 자신의 Style 트리거).
+	-->
+
+	<Style x:Key="Gm.Component.Dot" TargetType="Ellipse">
+		<Setter Property="Width" Value="7" />
+		<Setter Property="Height" Value="7" />
+		<Setter Property="Margin" Value="0,0,5,0" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding HealthKind}" Value="Ok">
+				<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding HealthKind}" Value="Warn">
+				<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding HealthKind}" Value="Crit">
+				<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding HealthKind}" Value="OutOfService">
+				<Setter Property="Fill" Value="Transparent" />
+				<Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}" />
+				<Setter Property="StrokeThickness" Value="1" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<Style
+		x:Key="Gm.Component.SummaryDot"
+		BasedOn="{StaticResource Gm.Component.Dot}"
+		TargetType="Ellipse">
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding SummaryKind}" Value="Ok">
+				<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding SummaryKind}" Value="Warn">
+				<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+			</DataTrigger>
+			<DataTrigger Binding="{Binding SummaryKind}" Value="Crit">
+				<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<Style x:Key="Gm.Component.Head" TargetType="TextBlock">
+		<Setter Property="FontSize" Value="10.5" />
+		<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+		<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+	</Style>
+
+	<Style x:Key="Gm.Component.Cell" TargetType="TextBlock">
+		<Setter Property="FontSize" Value="11.5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+	</Style>
+
+	<!--  설정과 관측이 어긋난 상태 칸 — 경고 글자색("설정 켬 / 관측 꺼짐" 글이 뜻을 나른다)  -->
+	<Style
+		x:Key="Gm.Component.StateCell"
+		BasedOn="{StaticResource Gm.Component.Cell}"
+		TargetType="TextBlock">
+		<Setter Property="ToolTip" Value="{Binding StateText}" />
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding IsIntentMismatch}" Value="True">
+				<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<!--
+		표 줄 컨테이너 — ListBoxItem(UIA peer 가 있다)에 AutomationId 를 건다: 상세 탭 = Symbol.Detail.Components.Row.{key}.
+		선택 · 호버 모양은 없다(읽기 전용 표). 포커스도 받지 않는다.
+	-->
+	<Style x:Key="Gm.Component.RowItem" TargetType="ListBoxItem">
+		<Setter Property="AutomationProperties.AutomationId" Value="{Binding Key, StringFormat=Symbol.Detail.Components.Row.{0}}" />
+		<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="ListBoxItem">
+					<ContentPresenter Margin="0,3" />
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Gm.Component.RowList" TargetType="ListBox">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="ItemContainerStyle" Value="{StaticResource Gm.Component.RowItem}" />
+		<Setter Property="ItemsPanel">
+			<Setter.Value>
+				<ItemsPanelTemplate>
+					<StackPanel />
+				</ItemsPanelTemplate>
+			</Setter.Value>
+		</Setter>
+		<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+		<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="ListBox">
+					<ItemsPresenter />
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>
