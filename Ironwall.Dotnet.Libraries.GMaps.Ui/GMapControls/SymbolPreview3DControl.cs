@@ -91,6 +91,7 @@ public sealed class SymbolPreview3DControl : Grid
     private readonly AxisAngleRotation3D _doorL = new(new Vector3D(0, 1, 0), 0);
     private readonly AxisAngleRotation3D _doorR = new(new Vector3D(0, 1, 0), 0);
     private readonly Dictionary<string, DiffuseMaterial> _materials = new();
+    private readonly List<(string Token, EmissiveMaterial Glow)> _emissive = new();
     private readonly DispatcherTimer _timer;
 
     private HousingModel? _model;
@@ -154,7 +155,7 @@ public sealed class SymbolPreview3DControl : Grid
 
     private void Rebuild()
     {
-        _materials.Clear();
+        _materials.Clear(); _emissive.Clear();
         if (string.IsNullOrWhiteSpace(ModelKey))
         {
             _visual.Content = null;
@@ -169,10 +170,8 @@ public sealed class SymbolPreview3DControl : Grid
         {
             if (!_materials.TryGetValue(part.Material, out var diffuse))
                 _materials[part.Material] = diffuse = new DiffuseMaterial(Brushes.Silver);
-            var material = new MaterialGroup();
-            material.Children.Add(diffuse);
-            if (part.Material is "mat_glass" or "mat_metal" or "mat_body")
-                material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromArgb(110, 235, 248, 255)), part.Material == "mat_glass" ? 80 : 28));
+            var material = HousingPalette.Compose(part.Material, diffuse, out var glow);   // 지도 심볼과 같은 광택·발광 규칙
+            if (glow != null) _emissive.Add((part.Material, glow));
             var geometry = new GeometryModel3D(part.Mesh, material) { BackMaterial = material };
             geometry.Transform = part.Joint switch
             {
@@ -190,9 +189,7 @@ public sealed class SymbolPreview3DControl : Grid
         _extent = Math.Max(0.2, Math.Max(bounds.SizeY, Math.Sqrt(bounds.SizeX * bounds.SizeX + bounds.SizeZ * bounds.SizeZ)));
 
         var scene = new Model3DGroup();
-        scene.Children.Add(new AmbientLight(Color.FromRgb(112, 125, 145)));
-        scene.Children.Add(new DirectionalLight(Color.FromRgb(255, 248, 233), new Vector3D(-2, -3, 1)));
-        scene.Children.Add(new DirectionalLight(Color.FromRgb(146, 203, 255), new Vector3D(2, -1, -2)));
+        HousingLighting.AddTo(scene);   // 지도 심볼과 같은 조명(단일 정본)
         scene.Children.Add(objects);
         _visual.Content = scene;
 
@@ -211,6 +208,8 @@ public sealed class SymbolPreview3DControl : Grid
         var mesh = new SolidColorBrush(Color.FromArgb(96, 200, 212, 224));
         foreach (var (token, material) in _materials)
             material.Brush = HousingPalette.Resolve(token, tint, strength, metal, status, mesh, metal);
+        foreach (var (token, glow) in _emissive)
+            glow.Brush = _materials.TryGetValue(token, out var lit) ? lit.Brush : Brushes.Transparent;
     }
 
     private void ApplyDoorAngles()

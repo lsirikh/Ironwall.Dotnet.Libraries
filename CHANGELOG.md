@@ -2,6 +2,28 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - 지도 3D 장비 아이콘 브로셔 재모델링 (2026-09-30)
+
+> 결정 D-2026-09-30-a6e348. 근거 자료: `docs/design/` 브로셔 3종(스마트복합센서2 · 스마트센서 · 제어기·펜스센서·복합센서).
+
+### Changed
+- **브로셔 제품 8종을 실측 비율로 다시 모델링** — 전에는 다중·스마트·복합 센서가 한 메시를 나눠 써서 지도 30 px 에서 같은 기둥으로, 제어기 2종은 건물로 보였다. 브로셔 실측(mm, 200 mm = 1 단위)으로:
+  스마트 다중 센서 = 스마트 복합센서 II(S-IW-P104SM2, 올리브 · 사선 차양 · 카메라 + IR LED 4 · PIR 창) ·
+  스마트 센서 = S-IW-P104MVP(둥근 검정 케이스 · 흰 사각 창 · 큰 렌즈 둘) ·
+  다중 센서 = PIDS 복합센서(캡 안 PIR 돔 · 볼 헤드) · 펜스 센서 = 철책 가로대에 물린 쐐기형 케이스 ·
+  지중 센서 = 지진동센서 원뿔대를 보여 주는 땅 단면(방위 0° 에서 보임) ·
+  제어기 = 스마트 제어기 SC-1U(M12 Sensor A/B) · I/O 제어기 = P104C(녹색 단자대 · 빨간 스위치) ·
+  함체 = 스테인리스 외함 + 경사 지붕(문 개폐 유지). 제어기 두께는 30 px 식별을 위해 ×1.6.
+- **제품 외장은 브로셔 실물색 고정**(`mat_olive` · `mat_black` · `mat_steel`) — 심볼 채우기 색은 명판 · 띠(`mat_body`)가 받는다.
+- **조명 단일 정본 `HousingLighting`** — 지도 심볼과 상세 창 프리뷰가 두 벌로 갖던 조명을 합쳤다. 평탄광 (112,125,145) → (72,80,94), 지면 반사광 추가. LED · 상태등은 발광 재질(이벤트 상태색으로 빛남). `mat_body` 바탕 (220,227,234) → (170,178,188) — 채우기 색이 파스텔로 물 빠지지 않도록.
+- **곡면 법선** — 원통 · 반구에 꼭짓점 법선(`Tube(smooth:)` · `Hemisphere`), 돔 카메라 유리도 매끈하게.
+
+### Removed
+- 임시 렌더 프로브 `tests/GMaps.Housing.Tests/TempDesignProbe.cs`(0e314a6e 에 다른 세션 커밋으로 딸려 들어온 것).
+
+### Tests
+- `BrochureHousingModelTests` 11 — 제품 외장색 · 채우기 색 자리 · 센서 3종 실루엣 구분 · 지중 단면 방향 · 상태등 발광 · 조명 평탄광 상한.
+
 ## [Unreleased] - 부대 관계도 (사이클 진행 중 · 2026-09-27 ~ 09-29)
 
 > 이 사이클은 아직 `complete` 되지 않았다 — 서버 차단(실서버 배치 왕복 TEST-51 · 52 · 자동 배치 개선 IMPL-73)과 실기 환경 차단(VER-04 · 09 · 10)이 남아 있다. 사이클을 닫으면 하네스가 판 번호 항목을 따로 붙인다. 근거: [PRD](docs/prds/unit-relationship-map-prd.md) v1.8 · [Plan](docs/plans/unit-relationship-map-prd-plan.md) · [시험 결과](docs/tests/unit-relationship-map-test-result.md) · [실측 기록](docs/tests/unit-relationship-map-probe-log.md).

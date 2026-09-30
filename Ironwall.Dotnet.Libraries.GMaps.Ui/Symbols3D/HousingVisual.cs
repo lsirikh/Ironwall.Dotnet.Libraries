@@ -72,6 +72,7 @@ public sealed class HousingVisual : Grid
     private readonly ScaleTransform3D _footprint = new(1, 1, 1);   // D-8: 건축면적 → XZ 스케일(회전 앞, 중심 기준)
     private double _footprintScale = 1;
     private readonly Dictionary<string, DiffuseMaterial> _materials = new();
+    private readonly List<(string Token, EmissiveMaterial Glow)> _emissive = new();
     private HousingModel? _model;
     private double _scale, _height, _elevation;
     private double _centerX, _centerZ;
@@ -114,15 +115,15 @@ public sealed class HousingVisual : Grid
         {
             recolor = true;
             _model = HousingModels.Get(ModelKey, FloorCount);
-            _materials.Clear();
+            _materials.Clear(); _emissive.Clear();
             var objects = new Model3DGroup();
             foreach (var part in _model.Parts)
             {
                 if (!_materials.TryGetValue(part.Material, out var diffuse))
                     _materials[part.Material] = diffuse = new DiffuseMaterial(Brushes.Silver);
-                var material = new MaterialGroup(); material.Children.Add(diffuse);
-                if (part.Material is "mat_glass" or "mat_metal" or "mat_body")
-                    material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromArgb(110, 235, 248, 255)), part.Material == "mat_glass" ? 80 : 28));
+                // 재질 조립은 HousingPalette 단일 정본 — 상세 창 프리뷰와 같은 광택·발광 규칙.
+                var material = HousingPalette.Compose(part.Material, diffuse, out var glow);
+                if (glow != null) _emissive.Add((part.Material, glow));
                 var model = new GeometryModel3D(part.Mesh, material) { BackMaterial = material };
                 switch (part.Joint)
                 {
@@ -144,9 +145,7 @@ public sealed class HousingVisual : Grid
             transform.Children.Add(new ScaleTransform3D(-1, 1, 1));
             objects.Transform = transform;
             var scene = new Model3DGroup();
-            scene.Children.Add(new AmbientLight(Color.FromRgb(112, 125, 145)));
-            scene.Children.Add(new DirectionalLight(Color.FromRgb(255, 248, 233), new Vector3D(-2, -3, 1)));
-            scene.Children.Add(new DirectionalLight(Color.FromRgb(146, 203, 255), new Vector3D(2, -1, -2)));
+            HousingLighting.AddTo(scene);
             scene.Children.Add(objects); _visual.Content = scene;
         }
         _yaw.Angle = HousingMath.Normalize(Yaw); _head.Angle = HousingMath.Normalize(HeadYaw);
@@ -174,6 +173,8 @@ public sealed class HousingVisual : Grid
             // 색 결정은 HousingPalette 단일 정본 — 상세 창 3D 프리뷰가 같은 표를 쓴다(같은 장비=같은 색).
             material.Brush = HousingPalette.Resolve(token, tint, strength, MetalBrush, StatusBrush, MeshBrush, RoofBrush);
         }
+        if (recolor) foreach (var (token, glow) in _emissive)
+            glow.Brush = _materials.TryGetValue(token, out var lit) ? lit.Brush : Brushes.Transparent;   // LED 는 제 색으로 빛난다(상태색 포함)
         InvalidateVisual(); ProjectionChanged?.Invoke(this, EventArgs.Empty);
     }
     internal void RefreshMaterials() => Refresh(false, true);
