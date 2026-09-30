@@ -7,12 +7,14 @@ public enum VideoProviderKind
 {
     /// <summary>LibVLC 없이 호스트가 움직이는 시험 무늬를 그린다(생존 시험 · 진단).</summary>
     TestPattern = 0,
-    /// <summary>RTSP 주소(LibVLC).</summary>
+    /// <summary>RTSP 주소(LibVLC) — 설정의 "RTSP 주소" 제공자(장비에 저장된 주소). 계정이 없으면 호스트가 싣는다.</summary>
     Rtsp = 1,
     /// <summary>로컬 파일(LibVLC) — 시험 · 진단.</summary>
     File = 2,
-    /// <summary>ONVIF(영상 주소는 호스트가 얻는다) — T-02 에서 구현.</summary>
+    /// <summary>ONVIF — 호스트가 GetProfiles/GetStreamUri 로 영상 주소를 얻는다(T-02). 실패하면 <c>FallbackUri</c>.</summary>
     Onvif = 3,
+    /// <summary>외부 VMS API — 자리만(FR-18). 호스트는 "지원 안 함"(<c>not-supported</c>)으로 답한다.</summary>
+    ExternalVms = 4,
 }
 
 /// <summary>스트림(오버레이 또는 타일) 상태.</summary>

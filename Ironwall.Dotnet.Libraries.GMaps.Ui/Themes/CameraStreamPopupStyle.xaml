@@ -3,13 +3,53 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
     xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-    xmlns:streaming="clr-namespace:Ironwall.Dotnet.Libraries.Streaming.Controls;assembly=Ironwall.Dotnet.Libraries.Streaming">
+    xmlns:camerapopup="clr-namespace:Ironwall.Dotnet.Libraries.CameraPopup.Wpf;assembly=Ironwall.Dotnet.Libraries.CameraPopup">
 
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+    <!--
+        영상 상자 안내판 단추([다시 시도] · [다시 시작], camera-popup-modes T-02 · FR-26/29). 늘 검은 영상 위에 뜨므로
+        배지와 같은 어둠 반투명 판 위에 둔다 — 단추 자체는 토큰(주색 테두리 · 표면 글자)이고 눌림은 형태(두꺼운 테두리)로 말한다.
+    -->
+    <Style x:Key="VideoOverlayButtonStyle" TargetType="Button">
+        <Setter Property="Margin" Value="0,8,0,0" />
+        <Setter Property="Padding" Value="12,3" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Bd"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!--
         PTZ 패드 · 세그먼트 · 탭 (B9 — window-design-inventory #55). 예전에는 다크 고정색(짙은 남색 바탕 · 옅은 하늘색 글자)이라
@@ -258,7 +298,8 @@
                                 </Grid>
                             </Border>
 
-                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피). 우버튼 드래그-PTZ 입력 표면 + 벡터 오버레이  -->
+                            <!--  영상 영역 — 팝업 호스트가 공유 메모리로 넘긴 프레임(WriteableBitmap, airspace 없음). GIS 는 LibVLC 를 부르지 않는다(T-02).
+                                  좌버튼 드래그-PTZ 입력 표면 + 벡터 오버레이  -->
                             <Border
                                 x:Name="PART_VideoRegion"
                                 Grid.Row="1"
@@ -266,11 +307,11 @@
                                 CornerRadius="0,0,9,9"
                                 ClipToBounds="True">
                                 <Grid>
-                                    <streaming:ImprovedRtspPlayer
+                                    <camerapopup:HostedVideoView
                                         x:Name="PART_Player"
-                                        AutoPlay="True"
-                                        DataContext="{Binding StreamVm}"
-                                        ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
+                                        AutomationProperties.AutomationId="GMaps.CameraPopup.Video"
+                                        FrameSource="{Binding FrameSource}"
+                                        IsHitTestVisible="False" />
                                     <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
@@ -338,6 +379,38 @@
                                         <StackPanel Orientation="Horizontal">
                                             <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF4FC3F7" />
                                             <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="영상 주소 조회 중… (ONVIF)" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!--  재생 상태 표시(오른쪽 위 — 예전 플레이어 상태 띠의 "스트리밍" 자리). 입력 비간섭.  -->
+                                    <Border Margin="0,5,6,0" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
+                                            Visibility="{Binding IsVideoPlaying, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF2ECC71" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center"
+                                                       AutomationProperties.AutomationId="GMaps.CameraPopup.VideoPlaying"
+                                                       Text="{Binding VideoStatusText}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!--  영상 안내판(FR-26 · FR-29): 연결 중 / 연결 안 됨 · [다시 시도] / 지원 안 함 / 영상 기능을 사용할 수 없습니다 · [다시 시작].
+                                          실패는 이 상자에만 — 다른 팝업 · GIS 는 그대로.  -->
+                                    <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="14,10"
+                                            Background="#CC000000" CornerRadius="6"
+                                            Visibility="{Binding IsVideoMessageVisible, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel>
+                                            <TextBlock HorizontalAlignment="Center" FontSize="12" Foreground="White" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="260"
+                                                       AutomationProperties.AutomationId="GMaps.CameraPopup.VideoStatus"
+                                                       Text="{Binding VideoStatusText}" />
+                                            <Button Style="{StaticResource VideoOverlayButtonStyle}"
+                                                    AutomationProperties.AutomationId="GMaps.CameraPopup.VideoRetry"
+                                                    Command="{Binding RetryVideoCommand}" Content="다시 시도"
+                                                    Visibility="{Binding CanRetryVideo, Converter={StaticResource BoolToVis}}" />
+                                            <Button Style="{StaticResource VideoOverlayButtonStyle}"
+                                                    AutomationProperties.AutomationId="GMaps.CameraPopup.HostRestart"
+                                                    Command="{Binding RestartHostCommand}" Content="다시 시작"
+                                                    Visibility="{Binding CanRestartHost, Converter={StaticResource BoolToVis}}" />
                                         </StackPanel>
                                     </Border>
 

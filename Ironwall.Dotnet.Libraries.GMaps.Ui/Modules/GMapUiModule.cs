@@ -77,8 +77,8 @@ public class GMapUiModule: Module
                .As<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IUndoService>().SingleInstance();
         builder.RegisterType<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.EditRecorder>()
                .As<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder>().SingleInstance();
-        // PTZ 제어(CameraPopup_PTZ_Control) — IOnvifService(OnvifServiceModule)·ILogService 의존, 메인 Bootstrapper에서 OnvifServiceModule 등록 필요
-        builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
+        // PTZ 제어(CameraPopup_PTZ_Control) — camera-popup-modes T-02: 팝업 호스트 프로세스로 이관(CameraPopup.Providers).
+        //   GIS 프로세스는 팝업용 ONVIF 를 부르지 않는다(§0) — 여기서 등록할 것이 없다.
         // Tracking GIS 오버레이(FR-15) — IClock + 설정모델 + 단일 진입점 매니저(라이브러리 자족, EXT-01 없이 동작)
         builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
         // 시스템 리소스 모니터(SystemResources) — 툴바 우측 CPU/GPU/RAM. 위 IClock 등록 뒤라 IfNotRegistered가 중복 없이 스킵.

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /****************************************************************************
    Purpose      : 카메라별 PTZ 명령 직렬 게이트 — 정지 우선(PRD camera-popup-modes FR-22)

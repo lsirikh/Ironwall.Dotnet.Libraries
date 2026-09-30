@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    카메라 팝업 영상 · 제어 제공자(PRD camera-popup-modes FR-17 · FR-18 · FR-22).
+    CameraPopupHost 프로세스만 이 어셈블리를 부른다 — GIS 프로세스는 팝업용 ONVIF 를 직접 부르지 않는다(§0).
+    WPF 를 쓰지 않는다(ONVIF WCF 클라이언트 · 순수 수식 · 제공자 등록부). OnvifSolution 이 net8.0-windows 라 같은 대상.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup.Providers</RootNamespace>
+    <Version>1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution.Base\Ironwall.Dotnet.Libraries.OnvifSolution.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution\Ironwall.Dotnet.Libraries.OnvifSolution.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.CameraPopup.Tests" />
+    <InternalsVisibleTo Include="Ironwall.CameraPopupHost" />
+  </ItemGroup>
+
+</Project>

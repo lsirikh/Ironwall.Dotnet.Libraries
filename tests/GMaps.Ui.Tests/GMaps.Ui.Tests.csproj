@@ -22,12 +22,12 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackingMath.cs" />
     <!-- Press-Hold(CameraPopup_PressHold_PtzZoomFocus) 순수 헬퍼 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzGestureTag.cs" />
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzFocusMath.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ptz\PtzFocusMath.cs" />
     <!-- PTZ 속도 스케일(CameraPopup_PTZ_Responsiveness_Speed FR-PTR-02) -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzVelocityMath.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ptz\PtzVelocityMath.cs" />
     <!-- PTZ 정지 우선 게이트 · 이동 안전 제한(camera-popup-modes FR-22) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzCommandGate.cs" />
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzMotionPolicy.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ptz\PtzCommandGate.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ptz\PtzMotionPolicy.cs" />
     <!-- Tracking 달력/세션 분할 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\DateRangeCalendar.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackSessionSplitter.cs" />
@@ -40,8 +40,8 @@
     <!-- Url 모드 카메라 계정 → RTSP URL 결합 · 로그 마스킹(계정 있는 카메라 팝업 401) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Streaming.Base\Models\RtspUrlCredentials.cs" />
     <!-- 카메라 팝업 RTSP 소스 Onvif조회(CameraPopup_RtspSource_Priority FR-03/04) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\OnvifProfileSelector.cs" />
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\OnvifRtspUrlComposer.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ptz\OnvifProfileSelector.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Onvif\OnvifRtspUrlComposer.cs" />
     <!-- 카메라 팝업 제어 허브 순수 계산(CameraPopup_ControlHub NFR-05) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\CameraPopupHubMath.cs" />
     <!-- 사이트 고정 뷰포트-가두기 순수 수학(GMap_Anchor_Viewport_Lock FR-1/2/5) — 실코드 링크 -->

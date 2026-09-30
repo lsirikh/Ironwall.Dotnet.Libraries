@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /****************************************************************************
    Purpose      : 연속 포커스 속도 클램프(FR-PH-10) — WPF/ONVIF 무의존 순수 수식 (CameraPopup_PressHold_PtzZoomFocus)

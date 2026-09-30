@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Onvif;
 
 /****************************************************************************
    Purpose      : ONVIF 조회 RTSP URL 자격증명 조합(순수 로직) — CameraPopup_RtspSource_Priority FR-04

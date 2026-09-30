@@ -28,7 +28,7 @@ internal sealed class EventWindowManager
     private readonly bool _headless;
 
     public EventWindowManager(Dispatcher dispatcher, FrameProducerFactory producers, Action<IIpcMessage> send, HostLog log, bool headless)
-        : this(dispatcher, producers, new TileCameraControlFactory(), SystemHostClock.Instance, send, log, headless)
+        : this(dispatcher, producers, new TileCameraControlFactory(producers.Cameras), SystemHostClock.Instance, send, log, headless)
     {
     }
 
@@ -185,7 +185,7 @@ internal sealed class EventWindowManager
                 var sink = new BitmapFrameSink(width, height, _owner._dispatcher);
                 stream.Sink = sink;
                 tile.Video = sink.Bitmap;
-                var producer = _owner._producers.Create(tile.Camera.Provider, width, height, streamId);
+                var producer = _owner._producers.Create(tile.Camera.Provider, width, height, streamId, tile.Camera.CameraId);
                 stream.Producer = producer;
                 int generation = stream.Generation;
                 producer.Start(sink, (state, detail) => OnStreamState(tile, stream, generation, state, detail));

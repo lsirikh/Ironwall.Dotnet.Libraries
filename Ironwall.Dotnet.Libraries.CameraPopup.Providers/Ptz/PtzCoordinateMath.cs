@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /****************************************************************************
    Purpose      : PTZ 좌표 변환 순수 수학 (CameraPopup_PTZ_Control)

@@ -1,7 +1,7 @@
-using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models.Commons;
+﻿using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models.Commons;
 using OnvifPtz = Ironwall.Dotnet.Libraries.OnvifSolution.Ptz;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /****************************************************************************
    Purpose      : PtzVectorDto ↔ ONVIF WSDL PTZVector 매핑 (CameraPopup_PTZ_Control)

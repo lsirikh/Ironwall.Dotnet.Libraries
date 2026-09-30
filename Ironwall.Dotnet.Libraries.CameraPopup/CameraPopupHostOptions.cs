@@ -7,8 +7,14 @@ public sealed class CameraPopupHostOptions
 {
     public const string DefaultExecutableName = "Ironwall.CameraPopupHost.exe";
 
+    /// <summary>
+    /// 설치 · 출력 폴더 안 호스트 자리(T-02) — 호스트는 자기 의존성 · libvlc 폴더와 함께 하위 폴더에 산다
+    /// (GIS 폴더의 같은 이름 DLL 과 판이 섞이지 않게).
+    /// </summary>
+    public const string DefaultRelativePath = @"CameraPopupHost\" + DefaultExecutableName;
+
     /// <summary>호스트 exe 경로. 상대 경로면 GIS 실행 폴더(<see cref="AppContext.BaseDirectory"/>) 기준.</summary>
-    public string HostExecutablePath { get; set; } = DefaultExecutableName;
+    public string HostExecutablePath { get; set; } = DefaultRelativePath;
 
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(1);
 
@@ -45,9 +51,15 @@ public sealed class CameraPopupHostOptions
     public bool EnableDebugCommands { get; set; }
 
     /// <summary>설정 경로를 절대 경로로(순수).</summary>
+    /// <remarks>상대 경로가 없으면 실행 폴더 바로 아래 <see cref="DefaultExecutableName"/> 로 폴백한다
+    /// (하나의 출력 폴더로 모아 빌드한 개발 · 시험 배치).</remarks>
     public string ResolveExecutablePath()
     {
-        var path = string.IsNullOrWhiteSpace(HostExecutablePath) ? DefaultExecutableName : HostExecutablePath;
-        return Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+        var path = string.IsNullOrWhiteSpace(HostExecutablePath) ? DefaultRelativePath : HostExecutablePath;
+        if (Path.IsPathRooted(path)) return path;
+        var full = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+        if (File.Exists(full)) return full;
+        var flat = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, DefaultExecutableName));
+        return File.Exists(flat) ? flat : full;
     }
 }

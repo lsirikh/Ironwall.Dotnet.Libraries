@@ -4,8 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
-using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
-using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
@@ -17,21 +15,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
    Company      : Sensorway Co., Ltd.
 ****************************************************************************/
 
-/// <summary>테스트용 최소 Hub 스텁 — 팝업 VM 생성에만 필요(스트리밍 미기동, 어떤 메서드도 호출되지 않음).</summary>
-file sealed class FakeHub : ISharedCameraStreamHub
-{
-    public Task<ICameraStreamLease> AcquireAsync(LeaseRequest request, RtspConnectionInfo info, CancellationToken ct = default)
-        => throw new NotSupportedException("테스트에서 스트림 획득 없음");
-    public Task ReleaseAsync(string cameraId, string leaseId) => Task.CompletedTask;
-    public int GetRefCount(string cameraId) => 0;
-    public IReadOnlyDictionary<string, int> GetAllRefCounts() => new Dictionary<string, int>();
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-}
-
 public class CameraPopupPanClampPresetTests
 {
     private static CameraStreamPopupViewModel CreateVm(int cameraId = 7)
-        => new(cameraId, "테스트카메라", null, new PointLatLng(37.0, 127.0), new FakeHub());
+        => new(cameraId, "테스트카메라", new PointLatLng(37.0, 127.0));   // T-02: 호스트 없음 = 영상만 "사용할 수 없음"
 
     /*──────────────── FR-A1: CanvasTop 세터 클램프 제거 ────────────────*/
 

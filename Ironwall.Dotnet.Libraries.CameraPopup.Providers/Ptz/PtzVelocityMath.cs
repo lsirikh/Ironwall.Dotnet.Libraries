@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /****************************************************************************
    Purpose      : 연속 이동(ContinuousMove) 속도 스케일 — WPF/ONVIF 무의존 순수 수식

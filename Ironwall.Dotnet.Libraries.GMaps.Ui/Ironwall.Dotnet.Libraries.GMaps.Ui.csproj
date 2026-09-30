@@ -50,9 +50,9 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Db\Ironwall.Dotnet.Libraries.GMaps.Db.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps\Ironwall.Dotnet.Libraries.GMaps.csproj" />
-	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution.Base\Ironwall.Dotnet.Libraries.OnvifSolution.Base.csproj" />
-	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution\Ironwall.Dotnet.Libraries.OnvifSolution.csproj" />
-	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming\Ironwall.Dotnet.Libraries.Streaming.csproj" />
+	<!-- camera-popup-modes T-02: 팝업 영상 · PTZ 는 호스트 프로세스(CameraPopup.Host)가 한다 — GMaps.Ui 는 LibVLC(Streaming) · ONVIF(OnvifSolution)를 참조하지 않는다.
+	     감시자 · 조작 창구 · 공유 메모리 프레임 표시기(HostedVideoView)만 쓴다. -->
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Tracking.Api\Ironwall.Dotnet.Libraries.Tracking.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />

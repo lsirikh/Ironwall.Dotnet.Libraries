@@ -24,6 +24,18 @@ public class ContractTests
             new BringToFront { EventKey = "detection-e1" },
             new SetTheme { Theme = "Light" },
             new PtzCommand { CameraId = "c1", Operation = PtzOperation.ContinuousMove, Pan = 0.5, Tilt = -0.25 },
+            new PtzFocusCommand { CameraId = "c1", Direction = -1, Provider = new VideoProviderInfo { Kind = VideoProviderKind.Onvif, Host = "10.0.0.5", Port = 8080 } },
+            new CameraRequest
+            {
+                RequestId = "r1", Kind = CameraRequestKind.SetPreset, CameraId = "c1", PresetName = "정문", PresetToken = "p1",
+                IrCutFilter = "OFF", AutoFocus = true, TimeoutMs = 3000,
+                Provider = new VideoProviderInfo { Kind = VideoProviderKind.Onvif, Host = "10.0.0.5", Port = 80, Username = "u", Password = "p", PreferSubStream = false, FallbackUri = "rtsp://10.0.0.5/s" },
+            },
+            new CameraResponse
+            {
+                RequestId = "r1", Kind = CameraRequestKind.GetPresets, CameraId = "c1", Success = true, PtzCapable = true, ImagingCapable = true,
+                Presets = new List<CameraPreset> { new() { Token = "p1", Name = "정문" }, new() { Token = "p2" } }, IrCutFilter = "AUTO", AutoFocus = true,
+            },
             new DebugCommand { Kind = DebugCommandKind.NativeAccessViolation },
             new StreamStateChanged { StreamId = "s1", State = StreamState.Failed, Detail = "open-timeout" },
             new WindowOpened { EventKey = "e1", Reused = true },
@@ -305,11 +317,14 @@ public class ContractTests
     [Theory]
     [InlineData("rtsp://admin:secret@10.0.0.5:554/s1", "rtsp://***@10.0.0.5:554/s1")]
     [InlineData("rtsp://10.0.0.5/s1", "rtsp://10.0.0.5/s1")]
+    [InlineData("rtsp://admin:se@cret@10.0.0.5/s1", "rtsp://***@10.0.0.5/s1")]
+    [InlineData("rtsp://10.0.0.5/path@x?q=a@b", "rtsp://10.0.0.5/path@x?q=a@b")]
     [InlineData(null, "-")]
     public void should_redact_credentials_when_provider_is_logged(string? uri, string expected)
     {
         Assert.Equal(expected, VideoProviderInfo.RedactUri(uri));
-        var text = new VideoProviderInfo { Uri = uri, Username = "admin", Password = "secret" }.ToString();
+        var text = new VideoProviderInfo { Uri = uri, FallbackUri = uri, Username = "admin", Password = "secret" }.ToString();
         Assert.DoesNotContain("secret", text);
+        Assert.DoesNotContain("cret", text);
     }
 }

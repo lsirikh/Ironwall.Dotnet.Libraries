@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 
 /// <summary>
 /// 연속 이동(ContinuousMove) 안전 제한 · 유지 재전송 주기(PRD camera-popup-modes FR-22).

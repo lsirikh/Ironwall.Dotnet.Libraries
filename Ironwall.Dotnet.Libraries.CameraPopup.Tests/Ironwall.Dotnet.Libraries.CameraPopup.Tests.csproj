@@ -30,6 +30,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+    <!-- T-02: 제공자(ONVIF · RTSP 주소 · 외부 VMS 자리) 단위 시험 — 가짜 SOAP 카메라 상대. LibVLC 없음. -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ironwall.Dotnet.Libraries.CameraPopup.Providers.csproj" />
     <!-- 호스트 exe 는 빌드 순서만 보장(어셈블리 참조 안 함 — 시험 프로세스에 LibVLC 가 들어오지 않게). -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Host\Ironwall.Dotnet.Libraries.CameraPopup.Host.csproj"
                       ReferenceOutputAssembly="false" Private="false" />

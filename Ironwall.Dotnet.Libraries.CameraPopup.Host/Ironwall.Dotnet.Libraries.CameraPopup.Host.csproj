@@ -40,6 +40,8 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
     <!-- 이벤트 창 토큰(Tokens.Light/Dark/Shared — 무의존 leaf 사전)만 쓴다. MDIX · MahApps 형식은 로드하지 않는다(T-05). -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+    <!-- T-02: 영상 · PTZ 제공자(ONVIF · RTSP 주소 · 외부 VMS 자리). 팝업용 ONVIF 호출은 이 프로세스에서만 일어난다. -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ironwall.Dotnet.Libraries.CameraPopup.Providers.csproj" />
   </ItemGroup>
 
 </Project>

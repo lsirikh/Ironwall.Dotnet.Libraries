@@ -1,22 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Caliburn.Micro;
 using GMap.NET;
+using Ironwall.Dotnet.Libraries.CameraPopup;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.SharedMemory;
+using Ironwall.Dotnet.Libraries.CameraPopup.Frames;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
-using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
-using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
-using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 
+/// <summary>화면에 보이는 영상 상태(FR-26 · FR-29) — 상자 안 안내 문구 · 단추를 가른다.</summary>
+public enum CameraPopupVideoStatus
+{
+    /// <summary>아직 열지 않음 · 닫힘.</summary>
+    Idle = 0,
+    /// <summary>연결 중(주소 조회 · RTSP 연결 · 호스트 재시작 중).</summary>
+    Connecting = 1,
+    /// <summary>재생.</summary>
+    Playing = 2,
+    /// <summary>연결 안 됨 — [다시 시도].</summary>
+    Failed = 3,
+    /// <summary>제공자가 지원하지 않음(외부 VMS 자리 등).</summary>
+    Unsupported = 4,
+    /// <summary>팝업 호스트 없음 · 일시 중지 — "영상 기능을 사용할 수 없습니다 · [다시 시작]". GIS 는 정상.</summary>
+    HostUnavailable = 5,
+}
+
 /// <summary>
-/// 맵 위 카메라 RTSP 팝업 1개의 런타임 상태(비영속). Hub(공유 디코더) 경로로 영상 표시.
+/// 맵 위 카메라 팝업 1개의 런타임 상태(비영속).
 /// <para>
-/// Hub 배선: <see cref="CameraRowViewModel"/>(ISharedCameraStreamHub) + <see cref="CameraViewModel"/>(=player DataContext).
-/// 플레이어가 OnLoaded에서 vm.IsHubManaged를 보고 ConnectViaHubAsync→Lease→공유 BitmapSource 표시.
+/// 영상(camera-popup-modes T-02 · FR-24): GIS 는 LibVLC 를 부르지 않는다. 팝업 호스트 프로세스가 제공자(ONVIF · RTSP 주소)로
+/// 주소를 얻어 디코딩하고, 상자 크기(물리 픽셀)의 프레임을 공유 메모리로 넘긴다 — 여기서는 그 <see cref="FrameSource"/> 를
+/// <c>HostedVideoView</c> 가 그리기만 한다. 상자 크기가 바뀌면 잠깐 기다렸다가(<see cref="ResizeDebounce"/>) 새 크기로 다시 연다.
+/// 호스트가 죽으면 감시자가 다시 띄우고 같은 스트림을 복원한다 — 그동안 "연결 중", 일시 중지면 [다시 시작].
 /// </para>
 /// </summary>
 public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
@@ -25,8 +47,17 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public const double DefaultHeight = 300;
     public const double LargeWidth = 640;
     public const double LargeHeight = 380;
+    /// <summary>헤더(창 이동) 높이 — 영상 상자 = 팝업 높이 − 이 값(템플릿 Row0 과 같다).</summary>
+    public const double HeaderHeight = 42;
+    /// <summary>상자 크기 변화 뒤 다시 열기까지 기다리는 시간 — 크게보기 토글 · 창 크기 변화가 한 번에 모이게.</summary>
+    public static readonly TimeSpan ResizeDebounce = TimeSpan.FromMilliseconds(250);
+    /// <summary>이만큼(px) 이하로 바뀌면 다시 열지 않는다(반올림 · DPI 떨림).</summary>
+    public const int ResizeTolerancePx = 8;
 
-    private readonly CameraRowViewModel _row;
+    private readonly ICameraPopupHost? _host;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly object _videoGate = new();
     private double _canvasLeft;
     private double _canvasTop;
     private double _popupWidth = DefaultWidth;
@@ -53,14 +84,14 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤 좌클릭 시 호출 → 선택 요청.</summary>
     internal void RaiseSelectRequested() => SelectRequested?.Invoke(this, EventArgs.Empty);
 
-    /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 IPtzController.RelativeMoveByPixel 호출 + FOV 갱신. (FR-DRAG-03)</summary>
+    /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 호스트로 연속 이동 → 정지(ICameraPopupControl). (FR-DRAG-03)</summary>
     public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
 
     /// <summary>컨트롤이 영상 위 좌버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
     internal void RaisePtzDrag(double dx, double dy, double imageW, double imageH)
         => PtzDragRequested?.Invoke(this, new PtzDragEventArgs(dx, dy, imageW, imageH));
 
-    /// <summary>영상 위 휠 → PTZ 줌(+1=줌인 / -1=줌아웃). MapViewModel이 IPtzController.RelativeZoom 호출. (FR-PTZCTL-03)</summary>
+    /// <summary>영상 위 휠 → PTZ 줌(+1=줌인 / -1=줌아웃). MapViewModel이 호스트로 줌 펄스(ICameraPopupControl). (FR-PTZCTL-03)</summary>
     public event EventHandler<int>? PtzZoomRequested;
 
     /// <summary>컨트롤이 영상 위 휠 회전 시 호출(방향 ±1).</summary>
@@ -79,57 +110,230 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public event EventHandler? FocusStopRequested;
     internal void RaiseFocusStop() => FocusStopRequested?.Invoke(this, EventArgs.Empty);
 
-    public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo? connInfo,
-        PointLatLng anchorGeo, ISharedCameraStreamHub hub)
+    /// <param name="host">팝업 호스트(없으면 영상은 "사용할 수 없음", 나머지 팝업 기능은 그대로).</param>
+    /// <param name="provider">영상 · PTZ 제공자 정보(<c>CameraPopupProviderFactory</c>). 계정 포함 — 로그에 찍을 땐 ToString(가림).</param>
+    /// <param name="delay">디바운스 대기(시험용 주입). 기본 <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    public CameraStreamPopupViewModel(int cameraId, string? title, PointLatLng anchorGeo,
+        ICameraPopupHost? host = null, VideoProviderInfo? provider = null, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         CameraId = cameraId;
         Title = string.IsNullOrWhiteSpace(title) ? $"카메라 {cameraId}" : title!;
-        _connectionInfo = connInfo;   // Onvif조회 모드(FR-05)는 null로 시작 — 조회 완료 후 세터 주입(late-bind)
         AnchorGeo = anchorGeo;
-
-        _row = new CameraRowViewModel(cameraId.ToString(), Title, hub);
-        var model = new CameraModel
-        {
-            Guid = cameraId.ToString(),
-            Title = Title,
-            StreamingOptions = StreamingOptions.CreateDefault(),
-            AutoPlay = true,
-            ShowControls = true,
-        };
-        if (connInfo != null) model.ConnectionInfo = connInfo;
-        // 플레이어 DataContext가 될 스트리밍 VM (OwnerRow를 통해 Hub Lease 획득)
-        StreamVm = new CameraViewModel(model, _row.RowId, _row);
+        _host = host;
+        Provider = provider ?? new VideoProviderInfo();
+        _delay = delay ?? ((t, ct) => Task.Delay(t, ct));
+        StreamId = $"map-cam-{cameraId}";
+        if (_host is not null) _host.StateChanged += OnHostStateChanged;
+        RefreshVideoStatus();
     }
 
     /// <summary>카메라 장비 Id(= PidsSymbol.LinkedDeviceId). 팝업 식별/위치 키.</summary>
     public int CameraId { get; }
     public string Title { get; }
 
-    private RtspConnectionInfo? _connectionInfo;
-    /// <summary>재생 연결정보. Onvif조회 모드에선 오픈 시 null → 조회 완료 후 주입 — 세터가 StreamVm 모델을
-    /// 동기하고 PropertyChanged를 발화해 팝업 템플릿 바인딩 → 플레이어 ConnectionInfo DP → late-bind 연결을
-    /// 트리거한다. (CameraPopup_RtspSource_Priority FR-05)</summary>
-    public RtspConnectionInfo? ConnectionInfo
-    {
-        get => _connectionInfo;
-        set
-        {
-            if (ReferenceEquals(_connectionInfo, value)) return;   // 멱등(M-5) — 중복 주입 시 PropertyChanged 재발화→플레이어 재연결 트리거 방지
-            _connectionInfo = value;
-            if (value != null && StreamVm != null) StreamVm.ConnectionInfo = value;   // Row lease/모델 경로 일관
-            NotifyOfPropertyChange(nameof(ConnectionInfo));
-        }
-    }
+    /// <summary>영상 · PTZ 제공자 정보(호스트로 가는 명령에 싣는다).</summary>
+    public VideoProviderInfo Provider { get; }
+
+    /// <summary>호스트 오버레이 스트림 id(카메라당 하나 — 다시 열면 같은 id 로 교체).</summary>
+    public string StreamId { get; }
 
     private bool _isResolvingSource;
-    /// <summary>Onvif조회 모드에서 스트림 URL 조회(ONVIF GetStreamUri) 진행 중 — "영상 주소 조회 중…" 배지. (FR-05)</summary>
+    /// <summary>ONVIF 로 영상 주소를 얻는 중(호스트 상태 Opening "resolving") — "영상 주소 조회 중…" 배지. (FR-05)</summary>
     public bool IsResolvingSource { get => _isResolvingSource; set { if (_isResolvingSource == value) return; _isResolvingSource = value; NotifyOfPropertyChange(nameof(IsResolvingSource)); } }
 
     /// <summary>팝업 좌상단 코너의 위경도 앵커(드래그 완료 시 갱신 → DB 저장).</summary>
     public PointLatLng AnchorGeo { get; set; }
 
-    /// <summary>ImprovedRtspPlayer의 DataContext(Hub 경로 분기에 사용).</summary>
-    public CameraViewModel StreamVm { get; }
+    // ── 영상(호스트 프레임) ────────────────────────────────────────────────
+    private IFrameSource? _frameSource;
+    private (int Width, int Height) _viewport = ((int)DefaultWidth, (int)(DefaultHeight - HeaderHeight));
+    private (int Width, int Height) _openedSize;
+    private bool _videoStarted;
+    private bool _openFailed;
+    private int _openVersion;
+    private CameraPopupVideoStatus _videoStatus;
+
+    /// <summary>호스트가 쓰는 공유 메모리 프레임(HostedVideoView.FrameSource 바인딩). 다시 열 때마다 바뀐다.</summary>
+    public IFrameSource? FrameSource
+    {
+        get => _frameSource;
+        private set { if (ReferenceEquals(_frameSource, value)) return; _frameSource = value; NotifyOfPropertyChange(nameof(FrameSource)); }
+    }
+
+    /// <summary>지금 열려 있는(또는 요청한) 상자 크기(물리 픽셀). 시험 · 진단용.</summary>
+    public (int Width, int Height) OpenedVideoSize => _openedSize;
+
+    public CameraPopupVideoStatus VideoStatus
+    {
+        get => _videoStatus;
+        private set
+        {
+            if (_videoStatus == value) return;
+            _videoStatus = value;
+            NotifyOfPropertyChange(nameof(VideoStatus));
+            NotifyOfPropertyChange(nameof(VideoStatusText));
+            NotifyOfPropertyChange(nameof(IsVideoMessageVisible));
+            NotifyOfPropertyChange(nameof(IsVideoPlaying));
+            NotifyOfPropertyChange(nameof(CanRetryVideo));
+            NotifyOfPropertyChange(nameof(CanRestartHost));
+        }
+    }
+
+    /// <summary>상자 안 안내 문구(연결 중… · 재생 · 연결 안 됨 · 지원 안 함 · 영상 기능을 사용할 수 없습니다).</summary>
+    public string VideoStatusText => StatusText(VideoStatus);
+
+    /// <summary>가운데 안내판을 보일까(재생 · 대기 아닐 때).</summary>
+    public bool IsVideoMessageVisible => VideoStatus is CameraPopupVideoStatus.Connecting or CameraPopupVideoStatus.Failed
+        or CameraPopupVideoStatus.Unsupported or CameraPopupVideoStatus.HostUnavailable;
+
+    public bool IsVideoPlaying => VideoStatus == CameraPopupVideoStatus.Playing;
+
+    /// <summary>[다시 시도] — 그 상자만 다시 연다(FR-26).</summary>
+    public bool CanRetryVideo => VideoStatus == CameraPopupVideoStatus.Failed;
+
+    /// <summary>[다시 시작] — 호스트 재시작(FR-29 · 재시작 예산을 비운다).</summary>
+    public bool CanRestartHost => VideoStatus == CameraPopupVideoStatus.HostUnavailable && _host is not null;
+
+    private ICommand? _retryVideoCommand, _restartHostCommand;
+    public ICommand RetryVideoCommand => _retryVideoCommand ??= new RelayCommand(() => OpenVideoNow());
+    public ICommand RestartHostCommand => _restartHostCommand ??= new RelayCommand(() =>
+    {
+        try { _host?.Restart(); }
+        catch { /* 감시자는 던지지 않는다 — 방어 */ }
+    });
+
+    /// <summary>상태 → 문구(순수).</summary>
+    public static string StatusText(CameraPopupVideoStatus status) => status switch
+    {
+        CameraPopupVideoStatus.Connecting => "연결 중…",
+        CameraPopupVideoStatus.Playing => "재생",
+        CameraPopupVideoStatus.Failed => "연결 안 됨",
+        CameraPopupVideoStatus.Unsupported => "지원 안 함",
+        CameraPopupVideoStatus.HostUnavailable => "영상 기능을 사용할 수 없습니다",
+        _ => string.Empty,
+    };
+
+    /// <summary>
+    /// 호스트 상태 · 스트림 상태 → 화면 상태(순수, FR-26/29). 호스트가 없거나 멈춰 있으면 스트림과 상관없이 HostUnavailable.
+    /// </summary>
+    public static CameraPopupVideoStatus ComputeStatus(CameraPopupHostState? host, bool opened, StreamState? stream, string? detail)
+    {
+        if (host is null or CameraPopupHostState.Unavailable or CameraPopupHostState.Suspended
+            or CameraPopupHostState.Disposed or CameraPopupHostState.NotStarted)
+            return CameraPopupVideoStatus.HostUnavailable;
+        if (host is CameraPopupHostState.Starting or CameraPopupHostState.Restarting) return CameraPopupVideoStatus.Connecting;
+        if (!opened) return CameraPopupVideoStatus.Connecting;
+        return stream switch
+        {
+            null or StreamState.Opening => CameraPopupVideoStatus.Connecting,
+            StreamState.Playing => CameraPopupVideoStatus.Playing,
+            StreamState.Closed => CameraPopupVideoStatus.Idle,
+            _ when detail == CameraErrorCodes.NotSupported => CameraPopupVideoStatus.Unsupported,
+            _ => CameraPopupVideoStatus.Failed,
+        };
+    }
+
+    /// <summary>영상 시작 — 잠깐 기다렸다가(컨트롤이 실제 픽셀 크기를 알려줄 시간) 연다. 여러 번 불러도 한 번.</summary>
+    public void StartVideo()
+    {
+        if (_videoStarted || _disposed) return;
+        _videoStarted = true;
+        RefreshVideoStatus();
+        ScheduleOpen();
+    }
+
+    /// <summary>컨트롤이 알려주는 영상 상자 크기(물리 픽셀). 열린 뒤 크게 바뀌면 디바운스 후 새 크기로 다시 연다.</summary>
+    public void UpdateVideoViewport(int pixelWidth, int pixelHeight)
+    {
+        if (pixelWidth <= 0 || pixelHeight <= 0) return;
+        var size = ClampSize(pixelWidth, pixelHeight);
+        lock (_videoGate) { _viewport = size; }
+        if (!_videoStarted || _disposed || _openedSize == default) return;
+        var opened = _openedSize;
+        if (Math.Abs(opened.Width - size.Width) <= ResizeTolerancePx && Math.Abs(opened.Height - size.Height) <= ResizeTolerancePx) return;
+        ScheduleOpen();
+    }
+
+    /// <summary>상자 크기 정리(순수) — 공유 메모리 한도 안 · 짝수 · 최소 16.</summary>
+    public static (int Width, int Height) ClampSize(int width, int height)
+    {
+        int w = Math.Clamp(width, 16, SharedFrameLayout.MaxWidth) & ~1;
+        int h = Math.Clamp(height, 16, SharedFrameLayout.MaxHeight) & ~1;
+        return (w, h);
+    }
+
+    private void ScheduleOpen()
+    {
+        int version = Interlocked.Increment(ref _openVersion);
+        _ = DelayThenOpenAsync(version);
+    }
+
+    private async Task DelayThenOpenAsync(int version)
+    {
+        try
+        {
+            await _delay(ResizeDebounce, _lifetime.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) { return; }
+        catch (ObjectDisposedException) { return; }
+        if (version != Volatile.Read(ref _openVersion) || _disposed) return;
+        OpenVideoNow();
+    }
+
+    /// <summary>지금 크기로 (다시) 연다. 같은 스트림 id 라 감시자 · 호스트가 이전 스트림을 닫고 교체한다.</summary>
+    internal void OpenVideoNow()
+    {
+        if (_disposed) return;
+        Interlocked.Increment(ref _openVersion);   // 대기 중인 디바운스는 무효
+        _videoStarted = true;
+        if (_host is null) { RefreshVideoStatus(); return; }
+        (int Width, int Height) size;
+        lock (_videoGate) { size = _viewport; }
+        try
+        {
+            var old = _frameSource;
+            if (old is not null) old.StateChanged -= OnFrameSourceStateChanged;
+            var source = _host.OpenOverlay(new OverlayStreamRequest
+            {
+                StreamId = StreamId,
+                Camera = new CameraRef { CameraId = CameraId.ToString(), Name = Title },
+                Provider = Provider,
+                Width = size.Width,
+                Height = size.Height,
+            });
+            _openedSize = size;
+            if (source is not null) source.StateChanged += OnFrameSourceStateChanged;
+            FrameSource = source;
+            _openFailed = source is null;
+        }
+        catch
+        {
+            _openFailed = true;   // 감시자는 던지지 않는다 — 방어(FR-27)
+        }
+        RefreshVideoStatus();
+    }
+
+    private void OnFrameSourceStateChanged(object? sender, EventArgs e) => RefreshVideoStatus();
+
+    private void OnHostStateChanged(object? sender, CameraPopupHostStateChangedEventArgs e) => RefreshVideoStatus();
+
+    /// <summary>호스트 · 스트림 상태를 다시 읽어 화면 상태를 정한다(어느 스레드에서 불러도 된다 — 알림은 CM 이 UI 로).</summary>
+    internal void RefreshVideoStatus()
+    {
+        try
+        {
+            var source = _frameSource;
+            var host = _host?.State;
+            CameraPopupVideoStatus status;
+            if (_openFailed && host == CameraPopupHostState.Running) status = CameraPopupVideoStatus.Failed;
+            else status = ComputeStatus(host, source is not null, source?.State, source?.StateDetail);
+            if (!_videoStarted && status != CameraPopupVideoStatus.HostUnavailable) status = CameraPopupVideoStatus.Idle;
+            VideoStatus = status;
+            IsResolvingSource = status == CameraPopupVideoStatus.Connecting && source?.State == StreamState.Opening
+                && source.StateDetail == "resolving";
+        }
+        catch { /* 상태 표시는 GIS 를 흔들지 않는다 */ }
+    }
 
     public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); RecomputeLine(); } }
     // FR-A1: 세터 클램프 금지 — 맵 팬/줌 추종(RefreshCameraPopupPositions)이 이 세터를 경유하므로 여기서
@@ -198,7 +402,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>단일 선택 상태(MapViewModel.SelectedCameraPopup이 상호배타 설정). (FR-SEL-01)</summary>
     public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; NotifyOfPropertyChange(nameof(IsSelected)); } }
 
-    /// <summary>PTZ 제어 가능 여부(MapViewModel이 IPtzController.EnsureReady 후 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
+    /// <summary>PTZ 제어 가능 여부(MapViewModel이 호스트 PreparePtz 응답으로 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
     public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
 
     /// <summary>ONVIF PTZ 준비(InitializeFull+GetNode, 수 초 소요) 진행 중 — "PTZ 준비 중…" 배지 표시용. 끝나면 IsPtzCapable로 결정.</summary>
@@ -246,7 +450,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         else if (i == 2) RaiseOptionsReload();   // 옵션 탭 진입 시 영상 옵션 조회
     });
 
-    /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 IPtzController로 상대 이동. (FR-UI-02)</summary>
+    /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 호스트로 연속 이동. (FR-UI-02)</summary>
     public event EventHandler<PtzNudgeEventArgs>? PtzNudgeRequested;
     /// <summary>PTZ 정지 버튼.</summary>
     public event EventHandler? PtzStopRequested;
@@ -384,10 +588,18 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         if (_disposed) return;   // 멱등(타이머 Tick + 수동 Close 동시 진입 방어)
         _disposed = true;
 
-        // Hub Lease 해제(C-03: Row가 Stop→Dispose 순서 담당)
-        try { await _row.DisposeAsync().ConfigureAwait(false); }
-        catch { /* 종료 경로 — 무해 */ }
+        // 영상 닫기 — 공유 메모리 해제 + 호스트에 CloseStream(감시자가 복원 목록에서도 뺀다). 던지지 않는다.
+        try { _lifetime.Cancel(); } catch (ObjectDisposedException) { }
+        if (_host is not null) _host.StateChanged -= OnHostStateChanged;
+        var source = _frameSource;
+        if (source is not null)
+        {
+            source.StateChanged -= OnFrameSourceStateChanged;
+            try { source.Dispose(); } catch { /* 종료 경로 — 무해 */ }
+        }
+        FrameSource = null;
         CloseRequested = null;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 }
 

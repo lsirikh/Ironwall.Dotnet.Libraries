@@ -88,6 +88,33 @@ public class CameraStreamPopupControl : Control
 
         _videoRegion = GetTemplateChild("PART_VideoRegion") as FrameworkElement;
         _ptzOverlay = GetTemplateChild("PART_PtzOverlay") as Canvas;
+        if (_videoRegion != null) _videoRegion.SizeChanged += (_, _) => ReportVideoViewport();
+        DataContextChanged -= OnDataContextChangedForVideo;
+        DataContextChanged += OnDataContextChangedForVideo;
+        ReportVideoViewport();
+    }
+
+    private void OnDataContextChangedForVideo(object sender, DependencyPropertyChangedEventArgs e) => ReportVideoViewport();
+
+    /// <summary>
+    /// 영상 상자의 실제 크기(물리 픽셀 = DIU × 모니터 배율)를 VM 에 알린다 — 호스트가 그 해상도로 프레임을 만든다(FR-24, T-02).
+    /// 크기가 바뀌면 VM 이 디바운스 뒤 다시 연다. 어떤 예외도 GIS 로 번지지 않는다.
+    /// </summary>
+    private void ReportVideoViewport()
+    {
+        try
+        {
+            if (_videoRegion == null || DataContext is not CameraStreamPopupViewModel vm) return;
+            if (_videoRegion.ActualWidth <= 0 || _videoRegion.ActualHeight <= 0) return;
+            var dpi = VisualTreeHelper.GetDpi(_videoRegion);
+            vm.UpdateVideoViewport(
+                (int)Math.Round(_videoRegion.ActualWidth * dpi.DpiScaleX),
+                (int)Math.Round(_videoRegion.ActualHeight * dpi.DpiScaleY));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceWarning($"[CameraPopup] viewport report failed: {ex.Message}");
+        }
     }
 
     /*──────────────── 좌버튼: 창 이동(헤더) ────────────────*/
@@ -174,7 +201,7 @@ public class CameraStreamPopupControl : Control
             if (_isPtzDragging && _videoRegion != null && vm != null)
             {
                 var cur = e.GetPosition(_videoRegion);
-                // 릴리즈 시 단 1회 RelativeMove 요청(MapViewModel이 IPtzController 호출). (FR-DRAG-03)
+                // 릴리즈 시 단 1회 RelativeMove 요청(MapViewModel이 호스트로 이동 · 정지). (FR-DRAG-03)
                 vm.RaisePtzDrag(cur.X - _ptzStart.X, cur.Y - _ptzStart.Y,
                     _videoRegion.ActualWidth, _videoRegion.ActualHeight);
             }

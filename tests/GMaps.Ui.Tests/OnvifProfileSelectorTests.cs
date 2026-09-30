@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+using Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 using Xunit;
-using static Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz.OnvifProfileSelector;
+using static Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz.OnvifProfileSelector;
 
 namespace GMaps.Ui.Tests;
 

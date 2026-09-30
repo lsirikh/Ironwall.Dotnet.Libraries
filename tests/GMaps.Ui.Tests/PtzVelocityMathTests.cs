@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+﻿using Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 using Xunit;
 
 namespace GMaps.Ui.Tests;

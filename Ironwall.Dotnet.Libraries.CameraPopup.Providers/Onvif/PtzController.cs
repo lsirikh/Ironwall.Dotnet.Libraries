@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
+using Ironwall.Dotnet.Libraries.CameraPopup.Providers.Ptz;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models.Commons;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Models;
@@ -13,10 +13,12 @@ using Ironwall.Dotnet.Libraries.OnvifSolution.Services;
 using OnvifImaging = Ironwall.Dotnet.Libraries.OnvifSolution.Imaging;
 using OnvifMedia = Ironwall.Dotnet.Libraries.OnvifSolution.Media;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Providers.Onvif;
 
 /****************************************************************************
    Purpose      : 팝업 PTZ 제어 단일 소유 앱서비스 구현 (CameraPopup_PTZ_Control)
+                  2026-09-30 camera-popup-modes T-02: GMaps.Ui → CameraPopup.Providers 로 이관(호스트 프로세스 전용,
+                  카메라 id 는 문자열). GIS 프로세스는 이 클래스를 부르지 않는다(§0).
    Created By   : Claude Code
    Created On   : 2026-06-24
    Company      : Sensorway Co., Ltd.
@@ -36,7 +38,7 @@ public sealed class PtzController : IPtzController
 {
     private readonly IOnvifService _onvif;
     private readonly ILogService? _log;
-    private readonly ConcurrentDictionary<int, CamCtx> _ctx = new();
+    private readonly ConcurrentDictionary<string, CamCtx> _ctx = new(StringComparer.Ordinal);
 
     public PtzController(IOnvifService onvif, ILogService? log = null)
     {
@@ -81,7 +83,7 @@ public sealed class PtzController : IPtzController
 
     /*──────────────── 공개 API ────────────────*/
 
-    public async Task<bool> EnsureReadyAsync(int cameraId, IConnectionModel conn, CancellationToken ct = default)
+    public async Task<bool> EnsureReadyAsync(string cameraId, IConnectionModel conn, CancellationToken ct = default)
     {
         if (conn == null) return false;
         var ctx = _ctx.GetOrAdd(cameraId, _ => new CamCtx());
@@ -135,11 +137,13 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] EnsureReady 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public bool IsPtzCapable(int cameraId) => _ctx.TryGetValue(cameraId, out var c) && IsCapable(c);
+    public bool IsPtzCapable(string cameraId) => _ctx.TryGetValue(cameraId, out var c) && IsCapable(c);
 
-    public bool IsBusy(int cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.Busy;
+    public bool IsReady(string cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.Model != null;
 
-    public async Task<bool> RelativeMoveByPixelAsync(int cameraId, double dx, double dy,
+    public bool IsBusy(string cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.Busy;
+
+    public async Task<bool> RelativeMoveByPixelAsync(string cameraId, double dx, double dy,
         double imageW, double imageH, double sensitivity = 1.0, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasRel: true } sp || ctx.Model?.PtzClient == null)
@@ -164,7 +168,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] RelativeMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> ContinuousMoveAsync(int cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default)
+    public async Task<bool> ContinuousMoveAsync(string cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         CancelKeepAlive(ctx);   // 직전 이동의 유지 재전송 중단 — 새 속도로 대체
@@ -205,7 +209,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] ContinuousMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> RelativeZoomAsync(int cameraId, double zoomDelta, CancellationToken ct = default)
+    public async Task<bool> RelativeZoomAsync(string cameraId, double zoomDelta, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasRelZoom: true } sp || ctx.Model?.PtzClient == null)
             return false;
@@ -227,7 +231,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] RelativeZoom 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> AbsoluteMoveAsync(int cameraId, double pan, double tilt, double zoom, CancellationToken ct = default)
+    public async Task<bool> AbsoluteMoveAsync(string cameraId, double pan, double tilt, double zoom, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasAbs: true } sp || ctx.Model?.PtzClient == null)
             return false;
@@ -254,7 +258,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] AbsoluteMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<PtzPosition?> GetStatusAsync(int cameraId, CancellationToken ct = default)
+    public async Task<PtzPosition?> GetStatusAsync(string cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return null;
         try
@@ -273,7 +277,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] GetStatus 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
-    public async Task StopAsync(int cameraId, CancellationToken ct = default)
+    public async Task StopAsync(string cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return;
         if (ct.IsCancellationRequested) return;   // LWW: 새 제스처가 이미 인계 — 새 이동의 유지 재전송 · 대기를 건드리지 않는다
@@ -305,7 +309,7 @@ public sealed class PtzController : IPtzController
     // 전부 워밍 캐시(ctx.Model.PtzClient + ctx.ProfileToken) 재사용 + ctx.Gate 직렬(I-05: 동일 WCF 채널 병렬 금지).
     // 구 로컬 DB 프리셋(PtzPresetStore)은 팝업에서 분리(OQ-4/5) — 코드/테이블은 롤백 대비 유지.
 
-    public async Task<System.Collections.Generic.IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(int cameraId, CancellationToken ct = default)
+    public async Task<System.Collections.Generic.IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(string cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return null;
         try
@@ -329,7 +333,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] GetPresets 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
-    public async Task<bool> GotoPresetAsync(int cameraId, string presetToken, CancellationToken ct = default)
+    public async Task<bool> GotoPresetAsync(string cameraId, string presetToken, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(presetToken)) return false;
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
@@ -345,7 +349,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] GotoPreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> SetPresetAsync(int cameraId, string presetName, CancellationToken ct = default)
+    public async Task<bool> SetPresetAsync(string cameraId, string presetName, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(presetName)) return false;
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
@@ -359,7 +363,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] SetPreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> RemovePresetAsync(int cameraId, string presetToken, CancellationToken ct = default)
+    public async Task<bool> RemovePresetAsync(string cameraId, string presetToken, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(presetToken)) return false;
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
@@ -373,7 +377,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] RemovePreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> SetHomePresetAsync(int cameraId, CancellationToken ct = default)
+    public async Task<bool> SetHomePresetAsync(string cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         try
@@ -386,7 +390,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] SetHome 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> GotoHomePresetAsync(int cameraId, CancellationToken ct = default)
+    public async Task<bool> GotoHomePresetAsync(string cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         CancelKeepAlive(ctx);   // FR-22
@@ -403,9 +407,9 @@ public sealed class PtzController : IPtzController
 
     /*──────────────── 영상 옵션(Imaging) ────────────────*/
 
-    public bool IsImagingCapable(int cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.ImagingPossible;
+    public bool IsImagingCapable(string cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.ImagingPossible;
 
-    public async Task<CameraImagingState?> GetImagingAsync(int cameraId, CancellationToken ct = default)
+    public async Task<CameraImagingState?> GetImagingAsync(string cameraId, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return null;
         try
@@ -425,7 +429,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] GetImaging 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
-    public async Task<bool> SetIrCutFilterAsync(int cameraId, string mode, CancellationToken ct = default)
+    public async Task<bool> SetIrCutFilterAsync(string cameraId, string mode, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return false;
         if (!Enum.TryParse<OnvifImaging.IrCutFilterMode>(mode, true, out var irc)) return false;
@@ -448,7 +452,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] SetIrCutFilter 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    public async Task<bool> SetAutoFocusAsync(int cameraId, bool auto, CancellationToken ct = default)
+    public async Task<bool> SetAutoFocusAsync(string cameraId, bool auto, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return false;
         try
@@ -473,7 +477,7 @@ public sealed class PtzController : IPtzController
     private const double FocusMoveSpeed = 0.7;   // ContinuousFocus 속도 크기 [0,1]
 
     /// <summary>포커스 연속 이동 시작(누름→Stop까지). 속도는 카메라 ContinuousFocus 범위로 클램프. delay/stop 없음(StopFocusAsync가 정지). (FR-PH-02/10)</summary>
-    public async Task<bool> StartFocusAsync(int cameraId, int direction, CancellationToken ct = default)
+    public async Task<bool> StartFocusAsync(string cameraId, int direction, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return false;
         try
@@ -498,7 +502,7 @@ public sealed class PtzController : IPtzController
     }
 
     /// <summary>포커스 연속 이동 정지(뗌/캡처분실/닫기) — ImagingClient.Stop. PTZ StopAsync와 별개 모터 경로. (FR-PH-02/03/05)</summary>
-    public async Task StopFocusAsync(int cameraId, CancellationToken ct = default)
+    public async Task StopFocusAsync(string cameraId, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return;
         try
@@ -528,7 +532,7 @@ public sealed class PtzController : IPtzController
 
     /*──────────────── RTSP 스트림 URL 조회(Onvif조회 모드 — CameraPopup_RtspSource_Priority FR-03/07/08) ────────────────*/
 
-    public async Task<string?> ResolveStreamUriAsync(int cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default)
+    public async Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default)
     {
         if (conn == null) return null;
         // 캐시 fast-path(감사 perf-L6): 워밍된 재오픈은 EnsureReady 전체 재수행(Gate 2회+비PTZ 경고 로그) 없이
@@ -610,7 +614,7 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] StreamUri 조회 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
-    private bool TryImaging(int cameraId, out CamCtx ctx)
+    private bool TryImaging(string cameraId, out CamCtx ctx)
     {
         ctx = null!;
         if (!_ctx.TryGetValue(cameraId, out var c) || !c.ImagingPossible
@@ -619,7 +623,7 @@ public sealed class PtzController : IPtzController
         return true;
     }
 
-    public void Release(int cameraId)
+    public void Release(string cameraId)
     {
         // H2: 딕셔너리에서만 제거. SemaphoreSlim은 Dispose하지 않는다 — 진행 중 Move/GetStatus 태스크가
         // 동일 ctx.Gate를 await/Release 중일 수 있어, 여기서 Dispose하면 ObjectDisposedException 경합.
@@ -631,7 +635,7 @@ public sealed class PtzController : IPtzController
 
     /// <summary>연속 이동 유지 재전송 시작(FR-22). 토큰은 이동 세대(<paramref name="epoch"/>)에 묶인다 —
     /// 이 이동이 나가는 사이 정지가 왔다면 이미 취소돼 곧바로 끝난다(정지 뒤에 이동이 다시 나가는 일 없음).</summary>
-    private void StartKeepAlive(int cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken epoch)
+    private void StartKeepAlive(string cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken epoch)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(epoch);
         Interlocked.Exchange(ref ctx.KeepAlive, cts)?.Cancel();
@@ -640,7 +644,7 @@ public sealed class PtzController : IPtzController
 
     private static void CancelKeepAlive(CamCtx ctx) => Interlocked.Exchange(ref ctx.KeepAlive, null)?.Cancel();
 
-    private async Task KeepAliveLoopAsync(int cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken token)
+    private async Task KeepAliveLoopAsync(string cameraId, CamCtx ctx, PtzSpeedDto speed, CancellationToken token)
     {
         try
         {

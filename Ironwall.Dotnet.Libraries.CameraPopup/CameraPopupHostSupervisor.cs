@@ -173,6 +173,20 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             _log.Info($"[CameraPopup] PTZ dropped (host {State}) camera={command.CameraId} op={command.Operation}");
     });
 
+    public bool Send(IIpcMessage message, string? coalesceKey = null)
+    {
+        try
+        {
+            if (IsDisposed || message is null) return false;
+            return SendIfLive(message, coalesceKey);
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"[CameraPopup] {nameof(Send)} failed: {ex.GetType().Name} {ex.Message}");
+            return false;
+        }
+    }
+
     /// <summary>시험 전용 고장 주입 — <see cref="CameraPopupHostOptions.EnableDebugCommands"/> 일 때만 보낸다.</summary>
     internal bool SendDebugCommand(DebugCommandKind kind)
         => _options.EnableDebugCommands && SendIfLive(new DebugCommand { Kind = kind });

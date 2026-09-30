@@ -45,4 +45,11 @@ public interface ICameraPopupHost : IDisposable
 
     /// <summary>PTZ. 같은 카메라의 밀린 명령은 최신 것 하나로 합쳐진다. 호스트가 없으면 버린다(순간 조작이므로 복원 안 함).</summary>
     void SendPtz(PtzCommand command);
+
+    /// <summary>
+    /// 순간 명령 · 요청을 그대로 보낸다(T-02 — 포커스 · 카메라 요청). 복원하지 않는다. 호스트가 없으면 false.
+    /// <paramref name="coalesceKey"/> 가 같은 밀린 메시지는 최신 것 하나만 나간다.
+    /// 기본 구현은 false(보내지 않음) — 시험용 가짜 호스트가 이 멤버 때문에 깨지지 않게(인터페이스 확장 함정).
+    /// </summary>
+    bool Send(Contracts.Protocol.IIpcMessage message, string? coalesceKey = null) => false;
 }

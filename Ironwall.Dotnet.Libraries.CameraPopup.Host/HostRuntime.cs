@@ -1,12 +1,14 @@
 ﻿using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Host.Cameras;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Ipc;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Streams;
-using Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Watchdogs;
+using Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
+using Ironwall.Dotnet.Libraries.CameraPopup.Providers;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host;
 
@@ -22,6 +24,7 @@ internal sealed class HostRuntime
     private readonly Dispatcher _dispatcher;
     private readonly OverlayStreamManager _streams;
     private readonly EventWindowManager _windows;
+    private readonly HostCameraServices? _cameras;
     private HostConnection? _connection;
     private MemoryWatchdog? _memoryWatchdog;
 
@@ -30,7 +33,8 @@ internal sealed class HostRuntime
         _launch = launch;
         _log = log;
         _dispatcher = dispatcher;
-        var factory = new FrameProducerFactory(log);
+        _cameras = CreateCameraServices(log);
+        var factory = new FrameProducerFactory(log, _cameras);
         _streams = new OverlayStreamManager(factory, Send, log);
         _windows = new EventWindowManager(dispatcher, factory, Send, log, launch.Headless);
     }
@@ -40,6 +44,38 @@ internal sealed class HostRuntime
         ParentProcessWatch.Start(_launch.ParentProcessId, _log);
         _memoryWatchdog = new MemoryWatchdog((long)_launch.MemoryLimitMb * 1024 * 1024, TimeSpan.FromSeconds(2), OnMemoryExceeded);
         _ = Task.Run(RunPipeAsync);
+        if (!_launch.Headless) _ = Task.Run(PrewarmLibVlc);
+    }
+
+    /// <summary>
+    /// 카메라 제공자 창구(T-02 — ONVIF 영상 주소 · PTZ). 만들다 실패해도 호스트는 뜬다 — 그때 카메라 스트림은
+    /// 저장 RTSP 주소를 그대로 열고, PTZ 는 "지원 안 함"으로 답한다.
+    /// </summary>
+    private HostCameraServices? CreateCameraServices(HostLog log)
+    {
+        try
+        {
+            var registry = CameraProviderRegistry.CreateDefault(new HostLogService(log));
+            return new HostCameraServices(registry, log, Send);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            log.Error($"camera providers unavailable: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// LibVLC 코어를 미리 올린다(T-02) — 첫 영상의 냉시작 비용(Core.Initialize + 플러그인 탐색, T-00 실측 9.4 s)을
+    /// 첫 더블클릭 전에 배경에서 낸다. 헤드리스(시험) 호스트는 건너뛴다. 실패해도 첫 스트림이 다시 시도한다.
+    /// </summary>
+    private void PrewarmLibVlc()
+    {
+        try { LibVlcRuntime.Get(_log); }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _log.Warn($"libvlc prewarm failed: {ex.GetType().Name} {ex.Message}");
+        }
     }
 
     private void OnMemoryExceeded(long bytes)
@@ -118,8 +154,17 @@ internal sealed class HostRuntime
                     _dispatcher.BeginInvoke(() => Guard("set-theme", () => _windows.SetTheme(theme.Theme)));
                     break;
                 case PtzCommand ptz:
-                    // PTZ 제공자는 T-02 에서 호스트 안으로 들어온다.
-                    Send(new HostError { Code = "ptz-not-implemented", Scope = ptz.CameraId });
+                    // 받은 순서대로 제공자 게이트에 줄을 세운다(정지 우선 — FR-22). 기다리지 않는다.
+                    if (_cameras is null) Send(new HostError { Code = CameraErrorCodes.NotSupported, Scope = ptz.CameraId, Message = "ptz" });
+                    else _cameras.HandlePtz(ptz);
+                    break;
+                case PtzFocusCommand focus:
+                    if (_cameras is null) Send(new HostError { Code = CameraErrorCodes.NotSupported, Scope = focus.CameraId, Message = "focus" });
+                    else _cameras.HandleFocus(focus);
+                    break;
+                case CameraRequest request:
+                    if (_cameras is null) Send(CameraResponse.Fail(request, CameraErrorCodes.NotSupported, "camera providers unavailable"));
+                    else _cameras.HandleRequest(request);
                     break;
                 case DebugCommand debug:
                     if (_launch.DebugCommands) DebugCrasher.Execute(debug.Kind, _dispatcher, _log);
