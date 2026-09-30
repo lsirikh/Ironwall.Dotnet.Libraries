@@ -170,6 +170,32 @@ public class EventUiModule : Module
                    .AsSelf()
                    .SingleInstance();
 
+            // camera-popup-modes T-06: 탐지 → 이벤트 창 트리거 · 매핑 카메라 캐시 · 조치보고 닫기.
+            //   창 관리자(IEventWindowManager)는 CameraPopupModule 이 등록한다 — 호스트가 그 모듈을 올리지 않으면 트리거는 꺼진 채(IsEnabled=false).
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.EventMappingCameraCache(
+                       c.ResolveOptional<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchGateway>(),
+                       c.ResolveOptional<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService>(),
+                       c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventMappingCameraSource>()
+                   .SingleInstance();
+            builder.Register(c => new Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.DeviceProviderEventWindowDirectory(
+                       c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>(),
+                       c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceGroupProvider>(),
+                       c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventWindowDeviceDirectory>()
+                   .SingleInstance();
+            builder.Register(c =>
+            {
+                var context = c.Resolve<IComponentContext>();
+                return new Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.EventWindowTrigger(
+                    c.ResolveOptional<Ironwall.Dotnet.Libraries.CameraPopup.EventWindows.IEventWindowManager>(),
+                    c.Resolve<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventMappingCameraSource>(),
+                    c.Resolve<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventWindowDeviceDirectory>(),
+                    // PTZ 권한 = cameras:control — 지도 PTZ 와 같은 열쇠(MapViewModel.CanControlCamera). 명령류라 모르면 끔(fail-closed).
+                    () => context.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.IPermissionService>()?.CanControl("cameras") ?? false,
+                    c.ResolveOptional<ILogService>());
+            }).AsSelf().SingleInstance();
+
             // SoundAlarmController: ISoundService가 컨테이너에 등록된 경우에만 생성
             builder.Register(ctx =>
             {
@@ -199,6 +225,19 @@ public class EventUiModule : Module
                 // 자동복구 · 자동 조치보고 — 둘 다 로그인 게이트를 지난다(WireAutoActions)
                 var elp = scope.Resolve<EventCardListPanelViewModel>();
                 WireAutoActions(eqm, elp, tokenStorage, _log);
+
+                // 카메라 팝업 이벤트 창(camera-popup-modes T-06) — 큐 적재 → 창, 조치보고 → 닫기, 매핑 변경 → 캐시 비움.
+                //   예외가 나도 나머지 배선(소리 · NATS 구독)은 계속 선다(FR-27).
+                try
+                {
+                    WireEventWindows(eqm, elp,
+                                     scope.Resolve<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.EventWindowTrigger>(),
+                                     scope.ResolveOptional<Caliburn.Micro.IEventAggregator>(), _log);
+                }
+                catch (Exception ex)
+                {
+                    _log?.Error($"[EventWindow] 이벤트 창 배선 실패 — 탐지 팝업 창 없이 계속: {ex.GetType().Name} {ex.Message}");
+                }
 
                 // 그룹 심볼: 복합 상태 전이 (OnGroupStateChanged)
                 eqm.OnGroupStateChanged += sem.HandleGroupStateChanged;
@@ -324,6 +363,29 @@ public class EventUiModule : Module
                 entry.AutoReportInFlight = false;
             }, TaskScheduler.Default);
         };
+    }
+
+    /// <summary>
+    /// 카메라 팝업 이벤트 창 배선(camera-popup-modes T-06). 창 관리자가 없으면(팝업 모듈 미등록) 아무것도 잇지 않는다.
+    /// <list type="bullet">
+    ///   <item>큐 적재(<c>OnEntryEnqueued</c> — 봉투 · 이벤트 중복이 걸러진 뒤의 한 건) → 트리거(자체 모드에서만 창).</item>
+    ///   <item>조치보고(<c>ActionReported</c> — 로컬 · 원격 · 자동 모든 길, 종류 구분) → 그 이벤트 창 닫기.</item>
+    ///   <item><c>EventMappingsChangedMessage</c>(서버 SYNC_EVENT_MAPPING) → 매핑 카메라 캐시 비움. 받은 스레드에서 곧바로 끝난다.</item>
+    /// </list>
+    /// </summary>
+    internal static void WireEventWindows(EventQueueManager eqm, EventCardListPanelViewModel elp,
+                                          Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.EventWindowTrigger trigger,
+                                          Caliburn.Micro.IEventAggregator? events, ILogService? log)
+    {
+        if (!trigger.IsEnabled)
+        {
+            log?.Info("[EventWindow] 카메라 팝업 모듈이 없어 탐지 이벤트 창을 잇지 않음");
+            return;
+        }
+        eqm.OnEntryEnqueued += trigger.OnEntryEnqueued;
+        elp.ActionReported += trigger.OnActionReported;
+        if (events is not null) Caliburn.Micro.EventAggregatorExtensions.SubscribeOnPublishedThread(events, trigger);   // 트리거는 컨테이너 싱글턴 — 약한 참조 구독이어도 살아 있다
+        log?.Info("[EventWindow] 탐지 이벤트 창 트리거 배선 완료");
     }
 
     /// <summary>

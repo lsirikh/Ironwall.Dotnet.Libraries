@@ -235,6 +235,25 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 _closedOrder.Enqueue((kind, eventId));
                 while (_closedOrder.Count > CLOSED_MEMORY) _closedKeys.Remove(_closedOrder.Dequeue());
             }
+            RaiseActionReported(kind, eventId);
+        }
+
+        /// <summary>
+        /// 이벤트가 조치보고로 닫혔다(종류 · 서버 번호) — 개별(카드 · 창 · 트레이 · 이력) · 전체 · 자동 · 자동복구 · 원격 ACTION_REPORT
+        /// 모든 길이 지나는 <see cref="RememberClosed"/> 에서 <b>처음 한 번만</b> 발화한다(종류를 아는 원격 조치 포함, 카드가 없어도).
+        /// 카메라 팝업 이벤트 창 닫기(camera-popup-modes FR-15, T-06)가 듣는다. 구독자 예외는 삼키고 로그만(FR-27).
+        /// </summary>
+        public event Action<string, int>? ActionReported;
+
+        private void RaiseActionReported(string kind, int eventId)
+        {
+            var handlers = ActionReported;
+            if (handlers is null) return;
+            foreach (Action<string, int> h in handlers.GetInvocationList())
+            {
+                try { h(kind, eventId); }
+                catch (Exception ex) { _log?.Error($"[EventCardList] ActionReported 구독자 실패: {ex.GetType().Name} {ex.Message}"); }
+            }
         }
 
         private bool WasClosed(EventCardBaseViewModel card)

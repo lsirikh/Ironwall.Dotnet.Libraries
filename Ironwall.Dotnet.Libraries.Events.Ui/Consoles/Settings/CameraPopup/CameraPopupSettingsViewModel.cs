@@ -265,6 +265,9 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
 
     /// <summary>외부 VMS 칸 — 자리만(고칠 수 없다).</summary>
     public bool IsVmsEditable => false;
+
+    /// <summary>외부 VMS 칸 묶음은 그 제공자를 골랐을 때만 보인다(지금은 고를 수 없으므로 늘 숨김 — 연동처가 생기면 칩을 켜면 된다).</summary>
+    public bool ShowVmsFields => _draft.Provider == VideoProviderKind.ExternalVms;
     public string VmsKind => _draft.VmsKind;
     public string VmsServerUrl => _draft.VmsServerUrl;
     public string VmsAccount => _draft.VmsAccount;

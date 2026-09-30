@@ -221,7 +221,7 @@
 							ItemsPanel="{StaticResource CameraPopup.Row}"
 							ItemsSource="{Binding ProviderChoices}"
 							Tag="CameraPopup.Provider" />
-						<!--  외부 VMS — 자리만(PRD FR-18). 칸은 꺼져 있고 점선이 아닌 오목한 판으로 "아직" 을 보인다.  -->
+						<!--  외부 VMS — 자리만(PRD FR-18). 그 제공자를 골랐을 때만 보인다(T-06). 칸은 꺼져 있고 점선이 아닌 오목한 판으로 "아직" 을 보인다.  -->
 						<Border
 							Margin="0,8,0,0"
 							Padding="10,8"
@@ -229,7 +229,8 @@
 							Background="{DynamicResource SurfaceSunkenBrush}"
 							BorderBrush="{DynamicResource BorderBrush}"
 							BorderThickness="1"
-							CornerRadius="4">
+							CornerRadius="4"
+							Visibility="{Binding ShowVmsFields, Converter={StaticResource CameraPopup.BoolToVisibility}}">
 							<StackPanel>
 								<TextBlock
 									FontSize="12"

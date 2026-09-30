@@ -20,8 +20,28 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
    Department   : SW Team
    Company      : Sensorway Co., Ltd.
 ****************************************************************************/
-public class EventQueueDefectTests
+[Collection("IoC-Dependent")]   // 카드(BasePanelViewModel)는 IoC 를 부른다 — 스텁을 쓰는 다른 시험과 병렬로 돌면 서로 덮는다(camera-popup-modes T-06 에서 드러남)
+public class EventQueueDefectTests : IDisposable
 {
+    private readonly Func<Type, string, object> _previousGetInstance = Caliburn.Micro.IoC.GetInstance;
+
+    public EventQueueDefectTests()
+    {
+        // 다른 시험이 남긴 전역 IoC 에 기대지 않는다 — 혼자 돌려도(또는 앞 시험이 되돌려 놓아도) 카드를 만들 수 있게.
+        var events = new Mock<Caliburn.Micro.IEventAggregator>().Object;
+        var log = new Mock<ILogService>().Object;
+        var setup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+        Caliburn.Micro.IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(Caliburn.Micro.IEventAggregator)) return events;
+            if (type == typeof(ILogService)) return log;
+            if (type == typeof(EventSetupModel)) return setup;
+            return null!;
+        };
+    }
+
+    public void Dispose() => Caliburn.Micro.IoC.GetInstance = _previousGetInstance;
+
     #region - ⑥ 종류별 자동 조치보고 스위치 -
 
     private static EventEntry Expired(EnumEventType type, int eventId) => new()

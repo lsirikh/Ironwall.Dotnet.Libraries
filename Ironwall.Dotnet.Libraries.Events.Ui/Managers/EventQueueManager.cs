@@ -249,6 +249,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
         onAnyEnqueue?.Invoke(entry.EventType);
         RaiseActiveCountChanged();   // 인디케이터 라이브 갱신(GMap_Map_Instruments)
+        RaiseEntryEnqueued(entry);   // 이벤트 창 트리거(camera-popup-modes T-06) — 중복 걸러진 뒤의 한 건
 
         return entry.EntryId;
     }
@@ -667,6 +668,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         OnDeviceEmpty = null;
         OnAutoReport = null;
         OnAnyEnqueue = null;
+        OnEntryEnqueued = null;
         OnActiveCountChanged = null;
         OnDeviceStateChanged = null;
         OnAutoRecovery = null;
@@ -752,6 +754,24 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
     /// <summary>Enqueue 호출 시마다 발생 (0→1 전이 여부와 무관). EventType 전달.</summary>
     public event Action<EnumEventType>? OnAnyEnqueue;
+
+    /// <summary>
+    /// Enqueue 된 엔트리 한 건(카메라 팝업 이벤트 창 트리거, camera-popup-modes T-06). 부른 스레드(보통 NATS 처리 줄)에서
+    /// lock 밖으로 발화한다 — 구독자는 곧바로 돌아가야 한다. 구독자 예외는 여기서 삼키고 로그만 남긴다(팝업 때문에 큐가 멈추지 않게, FR-27).
+    /// 인터페이스에 넣지 않는다(목 · 가짜 구현을 깨지 않게) — 구성 콜백이 구체 타입으로 잇는다.
+    /// </summary>
+    public event Action<EventEntry>? OnEntryEnqueued;
+
+    private void RaiseEntryEnqueued(EventEntry entry)
+    {
+        var handlers = OnEntryEnqueued;
+        if (handlers is null) return;
+        foreach (Action<EventEntry> h in handlers.GetInvocationList())
+        {
+            try { h(entry); }
+            catch (Exception ex) { _log?.Error($"[EventQueue] OnEntryEnqueued 구독자 실패: {ex.GetType().Name} {ex.Message}"); }
+        }
+    }
 
     /// <summary>개별 디바이스 복합 상태 전이 시 (deviceId, deviceType, prev, next)</summary>
     public event Action<int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnDeviceStateChanged;
