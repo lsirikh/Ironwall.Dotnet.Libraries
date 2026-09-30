@@ -17,6 +17,8 @@
     <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup.Host</RootNamespace>
     <StartupObject>Ironwall.Dotnet.Libraries.CameraPopup.Host.Program</StartupObject>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <!-- 모니터별 DPI 인지 v2 — 이벤트 창 배치(물리 픽셀 · 모니터 배율)가 GIS 계산과 어긋나지 않게(T-05). -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <Version>1.0</Version>
   </PropertyGroup>
 
@@ -26,12 +28,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LibVLCSharp" Version="3.9.4" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+    <!-- 이벤트 창 토큰(Tokens.Light/Dark/Shared — 무의존 leaf 사전)만 쓴다. MDIX · MahApps 형식은 로드하지 않는다(T-05). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,98 @@
+﻿<UserControl
+    x:Class="Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow.TileView"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Focusable="True"
+    FocusVisualStyle="{x:Null}"
+    AutomationProperties.AutomationId="{Binding AutomationId}"
+    AutomationProperties.Name="{Binding Name}"
+    Background="{DynamicResource CameraPopup.VideoBackgroundBrush}">
+
+    <!--
+        이벤트 창 타일 한 칸(T-05, 스토리보드 §3 .tile2). 영상 · 이름 · PTZ/고정 태그 · 스트림 상태(글자) ·
+        "P2 로 이동 중 · N초" · PTZ 패드 · 끌기 손잡이. 우클릭 메뉴는 코드(열 때마다 권한 · 상태 반영).
+    -->
+    <Grid x:Name="Root" ClipToBounds="True">
+        <!-- 빈 칸 -->
+        <Border Background="{DynamicResource SurfaceSunkenBrush}"
+                Visibility="{Binding IsEmpty, Converter={StaticResource CameraPopup.BoolToVis}}" />
+
+        <Grid Visibility="{Binding IsCamera, Converter={StaticResource CameraPopup.BoolToVis}}">
+            <Image x:Name="VideoImage" Source="{Binding Video}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+
+            <!-- 위: 손잡이 · 이름 · 태그 -->
+            <DockPanel VerticalAlignment="Top" Margin="4" LastChildFill="True">
+                <Thumb x:Name="DragHandle" DockPanel.Dock="Left" Style="{StaticResource CameraPopup.GripThumb}" Margin="0,0,4,0"
+                       ToolTip="끌어서 순서 바꾸기 (Alt+← / Alt+→)" />
+                <Border DockPanel.Dock="Right" Style="{StaticResource CameraPopup.VideoChip}" Margin="4,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="10" Text="{Binding TagText}"
+                               AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Tag}" />
+                </Border>
+                <Border Style="{StaticResource CameraPopup.VideoChip}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontWeight="SemiBold" Text="{Binding Name}"
+                               AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Name}" />
+                </Border>
+            </DockPanel>
+
+            <!-- 가운데: 자동 프리셋 이동 표시 -->
+            <Border Style="{StaticResource CameraPopup.VideoChip}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="8,3"
+                    Visibility="{Binding IsDelayVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
+                <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="12" Text="{Binding DelayText}"
+                           AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Delay}" />
+            </Border>
+
+            <!-- 아래 왼쪽: 스트림 상태 · 다시 시도 · 알림 -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="4">
+                <Border x:Name="StateChip" Style="{StaticResource CameraPopup.VideoChip}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- 상태를 모양으로도: ● 재생 · ○ 연결 중 · ✕ 연결 안 됨 -->
+                        <TextBlock x:Name="StateGlyph" Style="{StaticResource CameraPopup.VideoText}" Margin="0,0,4,0" Text="○" />
+                        <TextBlock Style="{StaticResource CameraPopup.VideoText}" Text="{Binding StateText}"
+                                   AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.State}" />
+                    </StackPanel>
+                </Border>
+                <Button x:Name="RetryButton" Style="{StaticResource CameraPopup.ChipButton}" Margin="4,0,0,0" Content="다시 시도"
+                        Click="OnRetryClick"
+                        AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Retry}"
+                        Visibility="{Binding IsRetryVisible, Converter={StaticResource CameraPopup.BoolToVis}}" />
+                <Border Style="{StaticResource CameraPopup.VideoChip}" Margin="4,0,0,0" VerticalAlignment="Center"
+                        Visibility="{Binding IsNoticeVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" Text="{Binding Notice, StringFormat=⚠ {0}}"
+                               AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.Notice}" />
+                </Border>
+            </StackPanel>
+
+            <!-- 아래 오른쪽: PTZ 패드(누르는 동안 이동 · 떼면 정지) -->
+            <Border x:Name="PtzPad" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
+                    Background="{DynamicResource CameraPopup.VideoChipBrush}" CornerRadius="{DynamicResource RadiusMedium}" Padding="3"
+                    AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad}"
+                    Visibility="{Binding IsPadVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
+                <UniformGrid Columns="3" Rows="3">
+                    <Button x:Name="PadZoomOut" Style="{StaticResource CameraPopup.PadButton}" Content="−" Tag="zoom-out" ToolTip="줌 아웃"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.ZoomOut}" />
+                    <Button x:Name="PadUp" Style="{StaticResource CameraPopup.PadButton}" Content="▲" Tag="up" ToolTip="위"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Up}" />
+                    <Button x:Name="PadZoomIn" Style="{StaticResource CameraPopup.PadButton}" Content="＋" Tag="zoom-in" ToolTip="줌 인"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.ZoomIn}" />
+                    <Button x:Name="PadLeft" Style="{StaticResource CameraPopup.PadButton}" Content="◀" Tag="left" ToolTip="왼쪽"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Left}" />
+                    <Button x:Name="PadStop" Style="{StaticResource CameraPopup.PadButton}" Content="■" Tag="stop" ToolTip="정지"
+                            Click="OnPadStopClick"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Stop}" />
+                    <Button x:Name="PadRight" Style="{StaticResource CameraPopup.PadButton}" Content="▶" Tag="right" ToolTip="오른쪽"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Right}" />
+                    <Button x:Name="PadClose" Style="{StaticResource CameraPopup.PadButton}" Content="✕" Tag="close" ToolTip="패드 닫기 (Esc)"
+                            Click="OnPadCloseClick"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Close}" />
+                    <Button x:Name="PadDown" Style="{StaticResource CameraPopup.PadButton}" Content="▼" Tag="down" ToolTip="아래"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Down}" />
+                </UniformGrid>
+            </Border>
+        </Grid>
+
+        <!-- 선택(누른 타일) = 2px 테두리 — 끌기 삽입 표시(세로 막대)와 모양이 다르다 -->
+        <Border x:Name="SelectionRing" BorderThickness="2" BorderBrush="{DynamicResource PrimaryBrush}" IsHitTestVisible="False"
+                Visibility="{Binding IsSelected, Converter={StaticResource CameraPopup.BoolToVis}}" />
+    </Grid>
+</UserControl>

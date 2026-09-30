@@ -5,8 +5,8 @@ using Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Ipc;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Streams;
+using Ironwall.Dotnet.Libraries.CameraPopup.Host.EventWindow;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Watchdogs;
-using Ironwall.Dotnet.Libraries.CameraPopup.Host.Windows;
 
 namespace Ironwall.Dotnet.Libraries.CameraPopup.Host;
 
@@ -109,7 +109,7 @@ internal sealed class HostRuntime
                     _dispatcher.BeginInvoke(() => Guard("open-window", () => _windows.Open(window)));
                     break;
                 case CloseEventWindow closeWindow:
-                    _dispatcher.BeginInvoke(() => Guard("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason)));
+                    _dispatcher.BeginInvoke(() => Guard("close-window", () => _windows.Close(closeWindow.EventKey, closeWindow.Reason, closeWindow.ReturnHome)));
                     break;
                 case BringToFront front:
                     _dispatcher.BeginInvoke(() => Guard("bring-to-front", () => _windows.BringToFront(front.EventKey)));
