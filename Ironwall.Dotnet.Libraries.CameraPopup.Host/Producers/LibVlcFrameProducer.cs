@@ -44,6 +44,9 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
     private readonly MediaPlayer.LibVLCVideoDisplayCb _displayCb;
     private readonly MediaPlayer.LibVLCVideoFormatCb _formatCb;
     private readonly MediaPlayer.LibVLCVideoCleanupCb _cleanupCb;
+    // 플레이어 이벤트 처리기 — 정리할 때 떼어 낸다(LibVLCSharp 이벤트 관리자가 처리기를 붙잡아 생산자가 거둬지지 않았다, K7).
+    private readonly EventHandler<EventArgs> _onError;
+    private readonly EventHandler<EventArgs> _onEnd;
 
     private MediaPlayer? _player;
     private Media? _media;
@@ -82,6 +85,8 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
         _displayCb = OnDisplay;
         _formatCb = OnFormat;
         _cleanupCb = OnCleanup;
+        _onError = (_, _) => Fail(StreamState.Failed, "libvlc-error");
+        _onEnd = (_, _) => Fail(StreamState.Stalled, "end-reached");
     }
 
     public void Start(IFrameSink sink, Action<StreamState, string?> onState)
@@ -185,8 +190,8 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             _player = new MediaPlayer(_media) { EnableHardwareDecoding = false };
             _player.SetVideoFormatCallbacks(_formatCb, _cleanupCb);
             _player.SetVideoCallbacks(_lockCb, null, _displayCb);
-            _player.EncounteredError += (_, _) => Fail(StreamState.Failed, "libvlc-error");
-            _player.EndReached += (_, _) => Fail(StreamState.Stalled, "end-reached");
+            _player.EncounteredError += _onError;
+            _player.EndReached += _onEnd;
 
             int timeout = _provider.OpenTimeoutMs > 0 ? _provider.OpenTimeoutMs : DefaultOpenTimeoutMs;
             _openTimer = new Timer(_ =>
@@ -330,6 +335,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
     /// 플레이어를 멈추고 버퍼를 푼다(한 번만). Stop 은 LibVLC 스레드와 합류하느라 막힐 수 있어 늘 배경에서 한다 —
     /// LibVLC 이벤트 스레드에서 직접 Stop 하면 교착이다. <paramref name="wait"/> 가 참이면 3초까지 기다린다(닫기).
     /// 제한 시간 안에 못 멈추면 버퍼는 멈춘 뒤에 풀린다(멈추지 않으면 풀지 않는다 — 누수 &lt; 충돌).
+    /// 멈춘 뒤에는 플레이어 이벤트 처리기를 떼고 싱크 · 상태 콜백을 놓는다(K7 누수).
     /// </summary>
     private void TearDown(bool wait)
     {
@@ -348,6 +354,11 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
         }
         var stop = Task.Run(() =>
         {
+            if (player is not null)
+            {
+                player.EncounteredError -= _onError;
+                player.EndReached -= _onEnd;
+            }
             player?.Stop();
             player?.Dispose();
             media?.Dispose();
@@ -357,6 +368,10 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             if (t.IsFaulted) _log.Warn($"libvlc stop failed {_name}: {t.Exception?.GetBaseException().Message}");
             FreeStaging();
             if (_compose != IntPtr.Zero) { Marshal.FreeHGlobal(_compose); _compose = IntPtr.Zero; }
+            // 멈춘 생산자는 싱크(타일 비트맵 · 버퍼)와 상태 콜백(창 세션 · 타일)을 놓는다 — 생산자가 어디엔가 붙잡혀 있어도
+            // 다시 열 때마다 0.7 MB 씩 쌓이지 않게(K7: 2시간에 +270 MB).
+            _sink = null;
+            _onState = null;
         }, TaskScheduler.Default);
         if (wait && !free.Wait(TimeSpan.FromSeconds(3)))
             _log.Warn($"libvlc stop timed out {_name} — buffers are freed when it finishes");
