@@ -56,6 +56,24 @@ public sealed class CameraPopupClient : IDisposable
     public long CoalescedCount => Interlocked.Read(ref _coalesced);
     public int QueuedCount => _outgoing.Reader.CanCount ? _outgoing.Reader.Count : -1;
 
+    /// <summary>
+    /// 직렬화한 크기가 파이프 한 메시지 상한(<see cref="FrameCodec.MaxPayloadBytes"/>) 안인지(순수).
+    /// 직렬화 자체가 실패해도 false.
+    /// </summary>
+    public static bool FitsInFrame(IIpcMessage message, out int payloadBytes)
+    {
+        payloadBytes = 0;
+        try
+        {
+            payloadBytes = IpcSerializer.Serialize(message, 0).Length;
+            return FrameCodec.IsValidLength(payloadBytes);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>연결 + Hello/HelloAck. 실패하면 예외(감시자가 잡아 재시작 처리).</summary>
     public async Task<HelloAck> ConnectAsync(TimeSpan timeout, CancellationToken ct)
     {
@@ -96,6 +114,12 @@ public sealed class CameraPopupClient : IDisposable
             _log.Warning($"[CameraPopup] serialize failed {message.GetType().Name}: {ex.Message}");
             return false;
         }
+        // 파이프 한 메시지 상한(1 MiB)을 넘으면 쓰기 줄에서 터진다(L5) — 대기열에 넣기 전에 그 하나만 거절한다.
+        if (!FrameCodec.IsValidLength(payload.Length))
+        {
+            _log.Error($"[CameraPopup] {message.GetType().Name} rejected: message too large ({payload.Length} bytes > {FrameCodec.MaxPayloadBytes})");
+            return false;
+        }
         long version = 0;
         if (coalesceKey is not null)
         {
@@ -133,9 +157,10 @@ public sealed class CameraPopupClient : IDisposable
                 if (dropped > 0) _log.Warning($"[CameraPopup] command queue full — dropped {dropped} oldest command(s)");
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested) { }
+        catch (Exception ex)
         {
+            // 무엇이 던져도 조용히 죽지 않는다 — 연결 고장으로 알려 감시자가 재시작한다(L5).
             Fault($"write failed: {ex.GetType().Name} {ex.Message}");
         }
     }
@@ -165,8 +190,8 @@ public sealed class CameraPopupClient : IDisposable
                 catch (Exception ex) { _log.Error($"[CameraPopup] message handler failed {type}: {ex.Message}"); }
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidDataException or EndOfStreamException or InvalidOperationException)
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested) { }
+        catch (Exception ex)
         {
             Fault($"read failed: {ex.GetType().Name} {ex.Message}");
         }

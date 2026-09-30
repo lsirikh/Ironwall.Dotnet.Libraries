@@ -34,10 +34,19 @@ internal sealed class SharedFrameSource : IFrameSource
 
     public event EventHandler? StateChanged;
 
-    internal void SetState(StreamState state, string? detail)
+    /// <summary>값만 바꾼다(어느 스레드든, 즉시). 알림은 <see cref="RaiseStateChanged"/> — 감시자가 받기 줄 밖(상태 루프)에서 부른다.</summary>
+    internal void UpdateState(StreamState state, string? detail)
     {
-        _state = state;
         _detail = detail;
+        _state = state;
+    }
+
+    /// <summary>
+    /// 구독자에게 알린다. 구독자는 UI 로 동기 전환할 수 있으므로(Caliburn) <b>파이프 받기 스레드에서 부르면 안 된다</b>(H1).
+    /// </summary>
+    internal void RaiseStateChanged()
+    {
+        if (IsDisposed) return;
         var handlers = StateChanged;
         if (handlers is null) return;
         foreach (EventHandler h in handlers.GetInvocationList())

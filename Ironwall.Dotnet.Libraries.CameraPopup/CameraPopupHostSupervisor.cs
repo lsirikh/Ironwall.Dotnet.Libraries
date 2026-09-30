@@ -25,12 +25,18 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup;
 public sealed class CameraPopupHostSupervisor : ICameraPopupHost
 {
     private const int ExitCodeWaitMs = 500;
+    private const int TeardownWaitMs = 2000;
+    private const int DisposeTeardownWaitMs = 250;
+
+    /// <summary>Dispose 가 제어 루프를 기다리는 상한 — 넘으면 호스트를 직접 죽이고 돌아간다(GIS 종료를 붙잡지 않는다, L4).</summary>
+    internal static readonly TimeSpan DisposeBound = TimeSpan.FromSeconds(1);
 
     private readonly CameraPopupHostOptions _options;
     private readonly ILogService _log;
     private readonly Func<long> _clockMs;
     private readonly Channel<ControlEvent> _control = Channel.CreateUnbounded<ControlEvent>(new UnboundedChannelOptions { SingleReader = true });
-    private readonly Channel<IIpcMessage> _status = Channel.CreateBounded<IIpcMessage>(new BoundedChannelOptions(1024) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
+    // 받기 줄(파이프)은 여기에 넣기만 한다 — 구독자(UI) 호출은 전부 상태 루프가 한다(H1: UI 가 멈춰도 심박 응답은 계속 읽힌다).
+    private readonly Channel<StatusItem> _status = Channel.CreateBounded<StatusItem>(new BoundedChannelOptions(1024) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly HostSessionRegistry _registry = new();
     private readonly ConcurrentDictionary<string, SharedFrameSource> _sources = new(StringComparer.Ordinal);
     private readonly RestartBudget _crashBudget;
@@ -41,6 +47,8 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
 
     // ── 제어 루프 전용 상태 ──
     private Process? _process;
+    private Process? _emergencyProcess;   // Dispose 비상 종료용 — 제어 루프가 종료 처리를 끝낼 때까지 남긴다
+    private volatile bool _disposing;
     private EventHandler? _processExitedHandler;
     private CameraPopupClient? _client;
     private int _incarnation;
@@ -82,6 +90,9 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     public int? HostProcessId { get; private set; }
 
     internal HostSessionRegistry Registry => _registry;
+
+    /// <summary>호스트 프로세스 트리 강제 종료(시험 주입점 — 종료 실패 · 지연 재현).</summary>
+    internal Action<Process> KillProcessTree { get; set; } = static p => p.Kill(entireProcessTree: true);
     internal CameraPopupClient? LiveClient => _liveClient;
 
     public event EventHandler<CameraPopupHostStateChangedEventArgs>? StateChanged;
@@ -142,6 +153,12 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     public void OpenEventWindow(OpenEventWindow request) => Guard(nameof(OpenEventWindow), () =>
     {
         if (IsDisposed || request is null || string.IsNullOrWhiteSpace(request.EventKey)) return;
+        // 1 MiB 넘는 요청은 파이프로 못 간다 — 복원 목록에 넣으면 재시작마다 다시 보내 폭주한다(L5). 그 하나만 버린다.
+        if (!CameraPopupClient.FitsInFrame(request, out var bytes))
+        {
+            _log.Error($"[CameraPopup] OpenEventWindow {request.EventKey} rejected: message too large ({bytes} bytes > {FrameCodec.MaxPayloadBytes})");
+            return;
+        }
         _registry.SetWindow(request);
         SendIfLive(request);
     });
@@ -279,6 +296,13 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     private void OnTick()
     {
         var client = _client;
+        if (_state == CameraPopupHostState.Running && client is null)
+        {
+            // 자가 치유(M2): 실패 처리가 도중에 끊겨 "Running + 연결 없음" 으로 남으면 여기서 다시 실패로 처리한다.
+            _log.Warning("[CameraPopup] watchdog: Running without a pipe client — recovering");
+            HandleFailure("watchdog: running without client", null);
+            return;
+        }
         if (_state != CameraPopupHostState.Running || client is null) return;
         long silentMs = client.MillisecondsSinceLastReceive;
         if (silentMs > (long)_options.HeartbeatTimeout.TotalMilliseconds)
@@ -345,6 +369,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             return;
         }
         _process = process;
+        Volatile.Write(ref _emergencyProcess, process);
         _processExitedHandler = exitHandler;
         HostProcessId = SafeProcessId(process);
 
@@ -388,7 +413,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         foreach (var w in windows) client.TrySend(w);
         foreach (var o in overlays)
         {
-            if (_sources.TryGetValue(o.StreamId, out var src)) src.SetState(StreamState.Opening, "host restarted");
+            if (_sources.TryGetValue(o.StreamId, out var src)) UpdateSourceState(src, StreamState.Opening, "host restarted");
             client.TrySend(o);
         }
         SetState(CameraPopupHostState.Running,
@@ -440,25 +465,40 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         if (process is null) return;
         if (_processExitedHandler is not null) process.Exited -= _processExitedHandler;
         _processExitedHandler = null;
+        // 무엇이 던져도(AggregateException · Win32 · 접근 거부 …) 로그만 남기고 상태 전이로 넘어간다(M2).
+        // 여기서 새면 "Running + 연결 없음" 으로 멈춰 서고, 자가 치유 틱만 남는다.
         try
         {
             if (!process.HasExited)
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(2000);
+                KillProcessTree(process);
                 _log.Info($"[CameraPopup] host killed ({reason})");
             }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException)
+        catch (Exception ex)
         {
-            _log.Warning($"[CameraPopup] host kill failed: {ex.Message}");
+            _log.Warning($"[CameraPopup] host kill failed ({reason}): {ex.GetType().Name} {ex.Message}");
+        }
+        try
+        {
+            process.WaitForExit(_disposing ? DisposeTeardownWaitMs : TeardownWaitMs);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning($"[CameraPopup] host exit wait failed: {ex.GetType().Name} {ex.Message}");
         }
         finally
         {
-            process.Dispose();
+            Interlocked.CompareExchange(ref _emergencyProcess, null, process);
+            try { process.Dispose(); }
+            catch (Exception ex) { _log.Warning($"[CameraPopup] process dispose failed: {ex.Message}"); }
         }
     }
 
+    /// <summary>
+    /// 받기 스레드(파이프)에서 불린다 — <b>구독자(UI)를 여기서 부르지 않는다</b>(H1). 기록부 갱신 같은 짧은 일만 하고
+    /// 알림은 상태 루프로 넘긴다. GIS UI 가 몇 초 멈춰도 다음 프레임(심박 응답)은 곧바로 읽힌다.
+    /// </summary>
     private void OnHostMessage(IIpcMessage message)
     {
         switch (message)
@@ -467,7 +507,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
                 LastHostPrivateBytes = ack.PrivateBytes;
                 return; // 심박 응답은 알리지 않는다(소음)
             case StreamStateChanged s when s.EventKey is null:
-                if (_sources.TryGetValue(s.StreamId, out var source)) source.SetState(s.State, s.Detail);
+                if (_sources.TryGetValue(s.StreamId, out var source)) UpdateSourceState(source, s.State, s.Detail);
                 break;
             case WindowClosed closed:
                 _registry.RemoveWindow(closed.EventKey); // 사람 · 타이머로 닫힌 창은 복원하지 않는다
@@ -479,20 +519,43 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
                 _log.Warning($"[CameraPopup] host error {error.Code} scope={error.Scope} {error.Message}");
                 break;
         }
-        _status.Writer.TryWrite(message);
+        _status.Writer.TryWrite(new StatusItem(message, null));
     }
 
+    /// <summary>스트림 상태 값은 바로 바꾸고(읽는 쪽은 최신 값을 본다), 구독자 알림은 상태 루프에 맡긴다.</summary>
+    private void UpdateSourceState(SharedFrameSource source, StreamState state, string? detail)
+    {
+        source.UpdateState(state, detail);
+        _status.Writer.TryWrite(new StatusItem(null, source));
+    }
+
+    /// <summary>
+    /// 구독자 알림 전용 배경 루프. 구독자가 UI 로 동기 전환(Caliburn <c>NotifyOfPropertyChange</c> → <c>Dispatcher.Invoke</c>)해
+    /// 여기가 몇 초 멈춰도 받기 줄 · 제어 루프 · 심박은 영향이 없다. 밀리면 오래된 알림부터 버린다(값은 이미 최신).
+    /// </summary>
     private async Task RunStatusLoopAsync()
     {
-        await foreach (var message in _status.Reader.ReadAllAsync().ConfigureAwait(false))
+        await foreach (var item in _status.Reader.ReadAllAsync().ConfigureAwait(false))
         {
-            var handlers = StatusReceived;
-            if (handlers is null) continue;
-            var args = new CameraPopupStatusEventArgs(message);
-            foreach (EventHandler<CameraPopupStatusEventArgs> h in handlers.GetInvocationList())
+            try
             {
-                try { h(this, args); }
-                catch (Exception ex) { _log.Error($"[CameraPopup] StatusReceived subscriber failed: {ex.Message}"); }
+                if (item.Source is { } source)
+                {
+                    source.RaiseStateChanged();
+                    continue;
+                }
+                var handlers = StatusReceived;
+                if (handlers is null || item.Message is null) continue;
+                var args = new CameraPopupStatusEventArgs(item.Message);
+                foreach (EventHandler<CameraPopupStatusEventArgs> h in handlers.GetInvocationList())
+                {
+                    try { h(this, args); }
+                    catch (Exception ex) { _log.Error($"[CameraPopup] StatusReceived subscriber failed: {ex.Message}"); }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"[CameraPopup] status loop item failed: {ex.GetType().Name} {ex.Message}");
             }
         }
     }
@@ -529,15 +592,26 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         catch (InvalidOperationException) { return null; }
     }
 
+    /// <summary>
+    /// 감시자를 내린다 — <see cref="DisposeBound"/>(1초) 안에 돌아온다(L4). 제어 루프가 그 안에 호스트를 못 내리면
+    /// 호스트 프로세스 트리를 여기서 직접 죽인다(남은 종료 처리는 배경에서 끝난다). 던지지 않는다.
+    /// </summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
         try
         {
+            _disposing = true;
             _heartbeatTimer.Dispose();
             Post(new ControlEvent(ControlKind.Dispose));
-            if (!_controlLoop.Wait(TimeSpan.FromSeconds(5)))
-                _log.Warning("[CameraPopup] supervisor dispose timed out");
+            bool finished;
+            try { finished = _controlLoop.Wait(DisposeBound); }
+            catch (AggregateException) { finished = true; }
+            if (!finished)
+            {
+                _log.Warning($"[CameraPopup] supervisor dispose exceeded {DisposeBound.TotalMilliseconds:0} ms — killing host directly");
+                EmergencyKill();
+            }
             _status.Writer.TryComplete();
             foreach (var source in _sources.Values) source.Release();
             _sources.Clear();
@@ -545,6 +619,24 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         catch (Exception ex)
         {
             _log.Error($"[CameraPopup] supervisor dispose failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>호출한 스레드를 붙잡지 않는 종료(UI 스레드용). 배경 작업은 최대 <see cref="DisposeBound"/> 남짓 걸린다.</summary>
+    public ValueTask DisposeAsync() => new(Task.Run(Dispose));
+
+    private void EmergencyKill()
+    {
+        var process = Volatile.Read(ref _emergencyProcess);
+        if (process is null) return;
+        try
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            _log.Info("[CameraPopup] host killed (dispose fallback)");
+        }
+        catch (Exception ex)
+        {
+            _log.Warning($"[CameraPopup] dispose fallback kill failed: {ex.GetType().Name} {ex.Message}");
         }
     }
 
@@ -558,6 +650,8 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
         ClientFaulted,
         Dispose,
     }
+
+    private readonly record struct StatusItem(IIpcMessage? Message, SharedFrameSource? Source);
 
     private readonly record struct ControlEvent(ControlKind Kind, int Incarnation = 0, string? Reason = null, int? ExitCode = null);
 }

@@ -76,39 +76,70 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public event EventHandler? DragCompleted;
 
     /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
-    internal void RaiseDragCompleted() => DragCompleted?.Invoke(this, EventArgs.Empty);
+    internal void RaiseDragCompleted() => Raise(DragCompleted, nameof(DragCompleted));
 
     /// <summary>좌클릭 선택 요청 — MapViewModel이 SelectedCameraPopup 설정 + 맨앞 이동. (FR-SEL-01)</summary>
     public event EventHandler? SelectRequested;
 
     /// <summary>컨트롤 좌클릭 시 호출 → 선택 요청.</summary>
-    internal void RaiseSelectRequested() => SelectRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaiseSelectRequested() => Raise(SelectRequested, nameof(SelectRequested));
 
     /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 호스트로 연속 이동 → 정지(ICameraPopupControl). (FR-DRAG-03)</summary>
     public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
 
     /// <summary>컨트롤이 영상 위 좌버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
     internal void RaisePtzDrag(double dx, double dy, double imageW, double imageH)
-        => PtzDragRequested?.Invoke(this, new PtzDragEventArgs(dx, dy, imageW, imageH));
+        => Raise(PtzDragRequested, new PtzDragEventArgs(dx, dy, imageW, imageH), nameof(PtzDragRequested));
 
     /// <summary>영상 위 휠 → PTZ 줌(+1=줌인 / -1=줌아웃). MapViewModel이 호스트로 줌 펄스(ICameraPopupControl). (FR-PTZCTL-03)</summary>
     public event EventHandler<int>? PtzZoomRequested;
 
     /// <summary>컨트롤이 영상 위 휠 회전 시 호출(방향 ±1).</summary>
-    internal void RaisePtzZoom(int direction) => PtzZoomRequested?.Invoke(this, direction);
+    internal void RaisePtzZoom(int direction) => Raise(PtzZoomRequested, direction, nameof(PtzZoomRequested));
 
     // 줌 +/- 버튼 — press-hold(누르면 연속 줌·뗌 정지). 컨트롤이 PreviewMouseDown/Up에서 Hold/Stop 발화.
     // 줌 release는 PtzStopRequested 재사용(StopAsync가 PanTilt+Zoom 정지). 휠은 별도 PtzZoomRequested 펄스 경로 유지.
     /// <summary>줌 버튼 누름 → 연속 줌 시작(+1=줌인/-1=줌아웃). 컨트롤 PreviewMouseDown. 뗌은 PtzStopRequested.</summary>
     public event EventHandler<int>? ZoomHoldRequested;
-    internal void RaiseZoomHold(int direction) => ZoomHoldRequested?.Invoke(this, direction);
+    internal void RaiseZoomHold(int direction) => Raise(ZoomHoldRequested, direction, nameof(ZoomHoldRequested));
 
     /// <summary>포커스 버튼 누름 → 연속 포커스 시작(+1=far/-1=near). 컨트롤 PreviewMouseDown. IsImagingCapable일 때만.</summary>
     public event EventHandler<int>? FocusHoldRequested;
-    internal void RaiseFocusHold(int direction) => FocusHoldRequested?.Invoke(this, direction);
+    internal void RaiseFocusHold(int direction) => Raise(FocusHoldRequested, direction, nameof(FocusHoldRequested));
     /// <summary>포커스 버튼 뗌/캡처분실/닫기 → 포커스 모터 정지(ImagingClient Stop — PTZ StopAsync와 별개 경로).</summary>
     public event EventHandler? FocusStopRequested;
-    internal void RaiseFocusStop() => FocusStopRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaiseFocusStop() => Raise(FocusStopRequested, nameof(FocusStopRequested));
+
+    // ── 지도 VM 으로 가는 요청 발화(M3) ─────────────────────────────────────
+    // 구독자(MapViewModel)가 던진 예외는 여기서 구독자별로 잡아 기록한다 — 팝업 조작 경로(컨트롤 입력 · 명령)로 새지 않고,
+    // 다른 구독자는 그대로 불린다. GIS 전역 처리기는 이것을 "팝업 출처" 로 뭉개지 않는다(던진 곳 기준 판정).
+    private void Raise(EventHandler? handler, string eventName)
+    {
+        if (handler is null) return;
+        foreach (EventHandler h in handler.GetInvocationList())
+        {
+            try { h(this, EventArgs.Empty); }
+            catch (Exception ex) { ReportHandlerFault(eventName, ex); }
+        }
+    }
+
+    private void Raise<T>(EventHandler<T>? handler, T args, string eventName)
+    {
+        if (handler is null) return;
+        foreach (EventHandler<T> h in handler.GetInvocationList())
+        {
+            try { h(this, args); }
+            catch (Exception ex) { ReportHandlerFault(eventName, ex); }
+        }
+    }
+
+    private void ReportHandlerFault(string eventName, Exception ex)
+    {
+        var message = $"[CameraPopup] camera {CameraId} {eventName} handler failed (GIS side): {ex}";
+        try { System.Diagnostics.Trace.TraceError(message); } catch { /* 기록 실패는 무해 */ }
+        try { IoC.Get<Ironwall.Dotnet.Libraries.Base.Services.ILogService>()?.Error(message); }
+        catch { /* 컨테이너 없음(시험 · 설계 시) — Trace 로 충분 */ }
+    }
 
     /// <param name="host">팝업 호스트(없으면 영상은 "사용할 수 없음", 나머지 팝업 기능은 그대로).</param>
     /// <param name="provider">영상 · PTZ 제공자 정보(<c>CameraPopupProviderFactory</c>). 계정 포함 — 로그에 찍을 땐 ToString(가림).</param>
@@ -175,7 +206,6 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
             NotifyOfPropertyChange(nameof(IsVideoMessageVisible));
             NotifyOfPropertyChange(nameof(IsVideoPlaying));
             NotifyOfPropertyChange(nameof(CanRetryVideo));
-            NotifyOfPropertyChange(nameof(CanRestartHost));
         }
     }
 
@@ -191,8 +221,20 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>[다시 시도] — 그 상자만 다시 연다(FR-26).</summary>
     public bool CanRetryVideo => VideoStatus == CameraPopupVideoStatus.Failed;
 
-    /// <summary>[다시 시작] — 호스트 재시작(FR-29 · 재시작 예산을 비운다).</summary>
-    public bool CanRestartHost => VideoStatus == CameraPopupVideoStatus.HostUnavailable && _host is not null;
+    private bool _canRestartHost;
+    /// <summary>
+    /// [다시 시작] — 호스트 재시작(FR-29 · 재시작 예산을 비운다). 호스트가 건강하지 않은 <b>어느</b> 상태에서도(재시작 중 ·
+    /// 시작 중 · 일시 중지 · 없음) 보인다(M2) — 감시자가 어떤 이유로 멈춰 서도 사람이 풀 수 있게.
+    /// </summary>
+    public bool CanRestartHost
+    {
+        get => _canRestartHost;
+        private set { if (_canRestartHost == value) return; _canRestartHost = value; NotifyOfPropertyChange(nameof(CanRestartHost)); }
+    }
+
+    /// <summary>[다시 시작]을 보일 호스트 상태인지(순수).</summary>
+    public static bool IsRestartOffered(CameraPopupHostState? host)
+        => host is not null and not CameraPopupHostState.Running and not CameraPopupHostState.Disposed;
 
     private ICommand? _retryVideoCommand, _restartHostCommand;
     public ICommand RetryVideoCommand => _retryVideoCommand ??= new RelayCommand(() => OpenVideoNow());
@@ -329,6 +371,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
             else status = ComputeStatus(host, source is not null, source?.State, source?.StateDetail);
             if (!_videoStarted && status != CameraPopupVideoStatus.HostUnavailable) status = CameraPopupVideoStatus.Idle;
             VideoStatus = status;
+            CanRestartHost = IsRestartOffered(host);
             IsResolvingSource = status == CameraPopupVideoStatus.Connecting && source?.State == StreamState.Opening
                 && source.StateDetail == "resolving";
         }
@@ -459,12 +502,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public ICommand NudgeCommand => _nudgeCommand ??= new RelayCommand(p => RaiseNudge(p?.ToString()));
 
     private ICommand? _stopCommand;
-    public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => PtzStopRequested?.Invoke(this, EventArgs.Empty));
+    public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => Raise(PtzStopRequested, nameof(PtzStopRequested)));
 
     /// <summary>방향 패드 버튼 누름 → 해당 방향 연속 이동 시작(컨트롤이 PreviewMouseDown에서 호출). dx/dy ∈ {-1,0,1}.</summary>
-    internal void RaisePadPress(int dx, int dy) => PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
+    internal void RaisePadPress(int dx, int dy) => Raise(PtzNudgeRequested, new PtzNudgeEventArgs(dx, dy), nameof(PtzNudgeRequested));
     /// <summary>방향 패드 버튼 뗌/정지 → 이동 중지(컨트롤이 PreviewMouseUp에서 호출).</summary>
-    internal void RaisePtzStop() => PtzStopRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaisePtzStop() => Raise(PtzStopRequested, nameof(PtzStopRequested));
 
     private void RaiseNudge(string? dir)
     {
@@ -475,7 +518,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
             "DL" => (-1d, 1d), "D" => (0d, 1d), "DR" => (1d, 1d),
             _ => (0d, 0d)
         };
-        if (dx != 0 || dy != 0) PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
+        if (dx != 0 || dy != 0) Raise(PtzNudgeRequested, new PtzNudgeEventArgs(dx, dy), nameof(PtzNudgeRequested));
     }
 
     // ── 프리셋 탭(ONVIF — 카메라 저장 프리셋, FR-C2) ─────────────────────────
@@ -504,7 +547,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>[Home 이동] — 카메라 Home 위치로(ONVIF GotoHomePosition). (FR-C2)</summary>
     public event EventHandler? PresetHomeGotoRequested;
 
-    internal void RaisePresetsReload() => PresetsReloadRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaisePresetsReload() => Raise(PresetsReloadRequested, nameof(PresetsReloadRequested));
 
     private bool _isSavingPreset;
     /// <summary>프리셋 저장 인라인 이름 입력 표시 여부. (FR-PRESET-03)</summary>
@@ -520,12 +563,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     private ICommand? _gotoPresetCommand, _deletePresetCommand, _setHomeCommand, _gotoHomeCommand;
     private ICommand? _savePresetCommand, _confirmSaveCommand, _cancelSaveCommand;
 
-    public ICommand GotoPresetCommand => _gotoPresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetGotoRequested?.Invoke(this, m); });
-    public ICommand DeletePresetCommand => _deletePresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetDeleteRequested?.Invoke(this, m); });
+    public ICommand GotoPresetCommand => _gotoPresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) Raise(PresetGotoRequested, m, nameof(PresetGotoRequested)); });
+    public ICommand DeletePresetCommand => _deletePresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) Raise(PresetDeleteRequested, m, nameof(PresetDeleteRequested)); });
     /// <summary>[Home 지정] — 현재 위치를 카메라 Home으로. 행 파라미터 불필요(ONVIF Home=전용 슬롯). (FR-C2/OQ-6)</summary>
-    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(() => PresetHomeSetRequested?.Invoke(this, EventArgs.Empty));
+    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(() => Raise(PresetHomeSetRequested, nameof(PresetHomeSetRequested)));
     /// <summary>[Home 이동] — 카메라 Home 위치로(미지정 카메라는 무동작 — MapViewModel이 로그). (FR-C2/OQ-6)</summary>
-    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => PresetHomeGotoRequested?.Invoke(this, EventArgs.Empty));
+    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => Raise(PresetHomeGotoRequested, nameof(PresetHomeGotoRequested)));
 
     /// <summary>[현재위치 저장] → 인라인 이름 입력 시작.</summary>
     public ICommand SavePresetCommand => _savePresetCommand ??= new RelayCommand(() => { NewPresetName = $"Preset_{_presets.Count + 1}"; IsSavingPreset = true; });
@@ -533,7 +576,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     {
         var name = NewPresetName?.Trim();
         if (string.IsNullOrEmpty(name)) return;
-        PresetSaveRequested?.Invoke(this, name);
+        Raise(PresetSaveRequested, name, nameof(PresetSaveRequested));
         IsSavingPreset = false;
     });
     public ICommand CancelSavePresetCommand => _cancelSaveCommand ??= new RelayCommand(() => IsSavingPreset = false);
@@ -562,14 +605,14 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public event EventHandler<string>? IrCutFilterRequested;
     public event EventHandler<bool>? AutoFocusRequested;
 
-    internal void RaiseOptionsReload() => OptionsReloadRequested?.Invoke(this, EventArgs.Empty);
+    internal void RaiseOptionsReload() => Raise(OptionsReloadRequested, nameof(OptionsReloadRequested));
 
     private ICommand? _setIrCutFilterCommand, _setAutoFocusCommand;
-    public ICommand SetIrCutFilterCommand => _setIrCutFilterCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m)) IrCutFilterRequested?.Invoke(this, m); });
-    public ICommand SetAutoFocusCommand => _setAutoFocusCommand ??= new RelayCommand(p => { if (bool.TryParse(p?.ToString(), out var b)) AutoFocusRequested?.Invoke(this, b); });
+    public ICommand SetIrCutFilterCommand => _setIrCutFilterCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m)) Raise(IrCutFilterRequested, m, nameof(IrCutFilterRequested)); });
+    public ICommand SetAutoFocusCommand => _setAutoFocusCommand ??= new RelayCommand(p => { if (bool.TryParse(p?.ToString(), out var b)) Raise(AutoFocusRequested, b, nameof(AutoFocusRequested)); });
 
     public ICommand CloseCommand =>
-        _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
+        _closeCommand ??= new RelayCommand(() => Raise(CloseRequested, nameof(CloseRequested)));
 
     public ICommand ToggleSizeCommand =>
         _toggleSizeCommand ??= new RelayCommand(ToggleSize);
