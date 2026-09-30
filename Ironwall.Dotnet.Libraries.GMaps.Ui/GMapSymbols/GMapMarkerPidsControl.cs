@@ -16,6 +16,7 @@ using System.Windows.Shapes;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -263,6 +264,39 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.RegisterReadOnly(nameof(SymbolToolTip), typeof(string), typeof(GMapMarkerPidsControl), new PropertyMetadata(null));
     public static readonly DependencyProperty SymbolToolTipProperty = SymbolToolTipPropertyKey.DependencyProperty;
 
+    /// <summary>아이콘 아래 부품 칸 줄(L2) — 부품 요약에서 파생. 6.3 · 미수신이면 빈 줄.</summary>
+    public ComponentStrip ComponentStrip
+    {
+        get => (ComponentStrip)GetValue(ComponentStripProperty);
+        private set => SetValue(ComponentStripPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey ComponentStripPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(ComponentStrip), typeof(ComponentStrip), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(ComponentStrip.Empty));
+    public static readonly DependencyProperty ComponentStripProperty = ComponentStripPropertyKey.DependencyProperty;
+
+    /// <summary>조립 카드가 이 아이콘에 열려 있다(런타임 — 마커 <c>IsComponentCardOpen</c> 을 따른다).</summary>
+    public bool IsComponentCardTarget
+    {
+        get => (bool)GetValue(IsComponentCardTargetProperty);
+        set => SetValue(IsComponentCardTargetProperty, value);
+    }
+
+    public static readonly DependencyProperty IsComponentCardTargetProperty =
+        DependencyProperty.Register(nameof(IsComponentCardTarget), typeof(bool), typeof(GMapMarkerPidsControl), new PropertyMetadata(false));
+
+    /// <summary>선택 · 호버 · 조립 카드 대상 — 밀집 중에도 칸 줄을 그린다(FR-04).</summary>
+    public bool IsComponentEmphasized
+    {
+        get => (bool)GetValue(IsComponentEmphasizedProperty);
+        private set => SetValue(IsComponentEmphasizedPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey IsComponentEmphasizedPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsComponentEmphasized), typeof(bool), typeof(GMapMarkerPidsControl), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsComponentEmphasizedProperty = IsComponentEmphasizedPropertyKey.DependencyProperty;
+
     /// <summary>화면 배율(디지털 줌) — 부품 층 LOD 가 "화면에서 몇 px 인가"를 재는 데 쓴다.</summary>
     public double MarkerScreenScale
     {
@@ -301,6 +335,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         if (e.Property == ComponentSummaryProperty || e.Property == DoorStateProperty || e.Property == DeviceTypeProperty
             || e.Property == MarkerTitleProperty)
             RefreshComponentPresentation();
+        else if (e.Property == IsMouseOverProperty || e.Property == IsSelectedProperty || e.Property == IsComponentCardTargetProperty)
+            IsComponentEmphasized = IsMouseOver || IsSelected || IsComponentCardTarget;
     }
 
     /// <summary>부품 요약 · 문 형태 · 제목 → 배지 · 문 표시 · 툴팁 파생값.</summary>
@@ -309,6 +345,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         var summary = ComponentSummary ?? ComponentHealthSummary.None;
         ComponentHealth = summary.Health;
         ComponentBadgeCount = summary.BadgeCount;
+        ComponentStrip = summary.Strip;
         DoorIndicator = DoorIndicatorRules.Resolve(
             Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(DeviceType), DoorState, summary.DoorMotion, DoorLeavesShowPosition);
         SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorIndicator, summary);
@@ -466,6 +503,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(DetectionBearingProperty, nameof(Marker.DetectionBearing));
         SetupPropertyBinding(IsBroadcastingProperty, nameof(Marker.IsBroadcasting));
         SetupPropertyBinding(ComponentSummaryProperty, nameof(Marker.ComponentSummary), BindingMode.OneWay);   // 런타임 부품 요약
+        SetupPropertyBinding(IsComponentCardTargetProperty, nameof(Marker.IsComponentCardOpen), BindingMode.OneWay);   // 조립 카드 대상(칸 줄 강조)
 
         var colorConverter = new ColorTypeToBrushConverter();
         var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();

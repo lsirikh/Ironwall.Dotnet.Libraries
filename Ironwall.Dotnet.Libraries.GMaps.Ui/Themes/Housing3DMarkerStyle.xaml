@@ -51,7 +51,7 @@
                         </Canvas>
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
                         <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
-                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}"/>
+                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}" Strip="{TemplateBinding ComponentStrip}" IsEmphasized="{TemplateBinding IsComponentEmphasized}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -328,7 +328,7 @@
                         </Canvas>
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
                         <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
-                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}"/>
+                        <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}" Strip="{TemplateBinding ComponentStrip}" IsEmphasized="{TemplateBinding IsComponentEmphasized}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">

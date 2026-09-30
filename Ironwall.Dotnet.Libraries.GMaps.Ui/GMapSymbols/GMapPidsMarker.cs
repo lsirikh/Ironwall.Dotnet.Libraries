@@ -85,6 +85,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
             if (ReferenceEquals(_componentSummary, value)) return;
             _componentSummary = value;
             OnPropertyChanged(nameof(ComponentSummary));
+            (Map as GMapCustoms.GMapCustomControl)?.RequestComponentStripDensity();   // 칸 줄 대상 수가 바뀌었을 수 있다(합쳐서 한 번 센다)
         }
     }
 
@@ -98,7 +99,19 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         if (!force && ReferenceEquals(axes, _summarySource) && _summaryBuilt) return;
         _summarySource = axes;
         _summaryBuilt = true;
-        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes);
+        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes, Helpers.Components.MapComponentCatalog.Labels);   // FR-07 카탈로그 한글
+    }
+
+    /// <summary>조립 카드(L3)가 이 심볼에 열려 있다 — <b>런타임 전용</b>. 칸 줄을 밀집 중에도 그리게 한다.</summary>
+    public bool IsComponentCardOpen
+    {
+        get => _isComponentCardOpen;
+        set
+        {
+            if (_isComponentCardOpen == value) return;
+            _isComponentCardOpen = value;
+            OnPropertyChanged(nameof(IsComponentCardOpen));
+        }
     }
 
     /// <summary>
@@ -383,5 +396,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     private Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceAxesModel? _summarySource;
     private bool _summaryBuilt;
     private bool _liveDetached;
+    private bool _isComponentCardOpen;
     #endregion
 }

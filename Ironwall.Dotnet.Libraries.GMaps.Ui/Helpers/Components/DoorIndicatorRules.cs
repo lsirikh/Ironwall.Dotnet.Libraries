@@ -37,7 +37,7 @@ public static class DoorIndicatorRules
     {
         DoorIndicatorKind.Open => "문 열림",
         DoorIndicatorKind.Closed => "문 닫힘",
-        DoorIndicatorKind.Running => "문 동작 중",
+        DoorIndicatorKind.Running => "문 구동 중",
         DoorIndicatorKind.Unknown => "문 상태 모름",
         _ => string.Empty,
     };

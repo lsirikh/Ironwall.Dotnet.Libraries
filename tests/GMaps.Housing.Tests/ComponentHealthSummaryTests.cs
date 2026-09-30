@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Xunit;
 
@@ -52,7 +53,7 @@ public class ComponentHealthSummaryTests
     [InlineData("OK,DEGRADED", ComponentHealthLevel.Degraded, 0, 1, true)]
     [InlineData("OK,UNKNOWN", ComponentHealthLevel.Unknown, 0, 0, false)]
     [InlineData("ok,fault", ComponentHealthLevel.Fault, 1, 0, true)]          // 대소문자 무시
-    [InlineData("OK,BROKEN", ComponentHealthLevel.Unknown, 0, 0, false)]     // 모르는 어휘 = 확인 안 됨(거짓 고장 없음)
+    [InlineData("OK,BROKEN", ComponentHealthLevel.Unknown, 0, 0, false)]     // 모르는 어휘 = 미상(거짓 고장 없음)
     public void should_pick_worst_health_when_components_report(string healths, ComponentHealthLevel expected, int faults, int degraded, bool badge)
     {
         var parts = healths.Split(',').Select((h, i) => ($"c{i}", "FAN", (string?)null, (bool?)null, (string?)"ON", (string?)h, (string?)null, true)).ToArray();
@@ -160,7 +161,7 @@ public class ComponentHealthSummaryTests
         Assert.Equal("GMaps.Symbol.Enclosure.77", SymbolStatusText.AutomationId(EnumDeviceType.Enclosure, 77, 5));
         Assert.Equal("GMaps.Symbol.Gate.Unlinked.5", SymbolStatusText.AutomationId(EnumDeviceType.Gate, 0, 5));
         var summary = ComponentHealthSummary.Build(Axes(true, ("heater_1", "HEATER", null, null, "ON", "FAULT", "OVER_TEMP", true)));
-        Assert.Equal("함체 A · 이벤트 탐지 중 · 장비 오류 · 문 동작 중 · 부품 고장 1 · 저하 0 / 1",
+        Assert.Equal("함체 A · 이벤트 탐지 중 · 장비 오류 · 문 구동 중 · 부품 고장 1 · 저하 0 / 1",
             SymbolStatusText.AutomationName("함체 A", EnumEventStatus.Detecting, EnumOperationState.ERROR, DoorIndicatorKind.Running, summary));
         Assert.Equal("카메라 · 이벤트 정상 · 장비 활성", SymbolStatusText.AutomationName("카메라", EnumEventStatus.Normal, EnumOperationState.ACTIVATED, DoorIndicatorKind.None, ComponentHealthSummary.None));
         Assert.Equal("카메라", SymbolStatusText.ToolTip("카메라", DoorIndicatorKind.None, ComponentHealthSummary.None));   // 6.3 무회귀: 제목만

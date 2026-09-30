@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Moq;
@@ -106,7 +107,7 @@ public class MarkerComponentBadgeTests
         var peer = UIElementAutomationPeer.CreatePeerForElement(control);
         Assert.IsType<PidsMarkerAutomationPeer>(peer);
         Assert.Equal("GMaps.Symbol.Enclosure.31", peer.GetAutomationId());
-        Assert.Equal("함체 동문 · 이벤트 탐지 중 · 장비 상태 없음 · 문 동작 중 · 부품 고장 2 · 저하 0 / 3", peer.GetName());
+        Assert.Equal("함체 동문 · 이벤트 탐지 중 · 장비 상태 없음 · 문 구동 중 · 부품 고장 2 · 저하 0 / 3", peer.GetName());
         Assert.Equal("탐지 중", peer.GetItemStatus());
         Assert.Null(peer.GetChildren());                                   // 템플릿을 걷지 않는다(수백 개 아이콘)
         Assert.Equal(AutomationControlType.Custom, peer.GetAutomationControlType());

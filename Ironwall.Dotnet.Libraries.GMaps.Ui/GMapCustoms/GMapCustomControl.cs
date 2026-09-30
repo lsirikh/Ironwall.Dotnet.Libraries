@@ -806,6 +806,9 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
             // 줌 레벨에 따른 마커 가시성 처리
             UpdateMarkersVisibilityByZoom();
 
+            // 부품 칸 줄 밀도(FR-04) — 뷰포트가 바뀔 때 한 번 센다(프레임마다 아님)
+            RequestComponentStripDensity();
+
             // 드래그 중 InvalidateVisual 차단:
             // Markers.Add 등이 드래그 중 호출되면 GMap.NET 내부 ForceUpdateOverlays(newItems)
             // → TriggerSelectionChange → 이 핸들러 경로로 InvalidateVisual이 발화됨.
@@ -1984,6 +1987,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
         c.UpdateMarkersVisibilityByZoom(force: true);
         // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 inset 라이브 재계산(FR-4/5).
         c.RecomputeAnchorViewportBounds();
+        c.RequestComponentStripDensity();             // 부품 칸 줄 밀도(FR-04) — 화면 크기가 바뀌었다
         c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
         // ★ zoom-float-halfstep FR-19: dzl 변경 = 실효 배율 변경 — 뷰포트 스냅샷 버스에도 발행(Z-24).
         //   종전에는 회전 경로에서만 발행되어 12개 소비처(어도너/FOV/라인/트레일/팝업/오버레이맵)가

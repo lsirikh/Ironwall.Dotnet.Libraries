@@ -1,4 +1,6 @@
-﻿namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
+﻿using Ironwall.Dotnet.Monitoring.Models.Components;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 
 /// <summary>
 /// 부품 배지 · 문 표시의 상세도(LOD) — <b>마커가 화면에 그려진 픽셀 크기</b>로 정한다(순수 함수).

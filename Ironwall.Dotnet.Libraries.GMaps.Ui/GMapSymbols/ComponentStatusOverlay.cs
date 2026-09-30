@@ -2,11 +2,13 @@
 using System.Windows;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
+using Ironwall.Dotnet.Monitoring.Models.Components;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
 /// <summary>
-/// 장비 아이콘 위에 얹는 <b>부품 층</b> — 우하단 건강 배지 + 좌하단 문 표시. 2D · 3D · 폴백 세 템플릿이 같은 요소 하나를 쓴다(R10).
+/// 장비 아이콘 위에 얹는 <b>부품 층</b> — 우하단 건강 배지 + 좌하단 문 표시 + 아이콘 아래 부품 칸 줄(L2).
+/// 2D · 3D · 폴백 세 템플릿이 같은 요소 하나를 쓴다(R10).
 /// </summary>
 /// <remarks>
 /// <para><b>이벤트가 항상 이긴다</b>(분석 §4-1): 이벤트는 우상단 <b>원</b> · 색 채움 · 깜빡임 · 펄스 링을 쓴다. 이 층은
@@ -14,7 +16,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// 고장 = 채운 공구 · 1.5px 테두리 / 저하 = 속 빈 공구 · 1px 테두리 — 색이 아니라 모양으로 가른다.</para>
 /// <para><b>테마</b>: 브러시는 전부 <c>SetResourceReference</c> 로 토큰을 물고 있어(Surface · StatusWarning · TextSecondary · TextPrimary)
 /// 라이트/다크 전환 때 다시 해석되고 다시 그려진다. 1회 해석 · 정적 캐시 브러시는 쓰지 않는다.</para>
-/// <para><b>비용</b>: 요소 하나 · <see cref="OnRender"/> 한 번. 값이 바뀔 때만 다시 그린다. 히트테스트 없음.</para>
+/// <para><b>칸 줄(L2, component-display-unify FR-04)</b>: 아이콘이 화면에 48px 이상일 때 아래에 대표 4칸 + "+n".
+/// 정상 = 윤곽 · 가동 = 채움 · 고장 = 공구 표지 · 사용 안 함 = 사선. 지도가 크게 보이는 아이콘을 30개 넘게 세면
+/// (<see cref="IsStripCrowdedProperty"/> — 지도에 한 번 걸면 상속으로 내려온다) 고장 · 선택 · 호버한 아이콘만 그린다.</para>
+/// <para><b>비용</b>: 요소 하나 · <see cref="OnRender"/> 한 번. 값이 바뀔 때만 다시 그린다. 히트테스트 없음. 애니메이션 0.</para>
 /// </remarks>
 public sealed class ComponentStatusOverlay : FrameworkElement
 {
@@ -35,6 +40,8 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         SetResourceReference(AlertBrushProperty, "StatusWarningBrush");
         SetResourceReference(NeutralBrushProperty, "TextSecondaryBrush");
         SetResourceReference(InkBrushProperty, "TextPrimaryBrush");
+        SetResourceReference(ActiveBrushProperty, "PrimaryBrush");
+        SetResourceReference(MutedBrushProperty, "TextMutedBrush");
     }
 
     #region Value DPs
@@ -63,6 +70,25 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     public static readonly DependencyProperty IsPreviewProperty = DependencyProperty.Register(nameof(IsPreview), typeof(bool),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
     public bool IsPreview { get => (bool)GetValue(IsPreviewProperty); set => SetValue(IsPreviewProperty, value); }
+
+    /// <summary>부품 칸 줄(L2). 비었으면(6.3 · 미수신) 그리지 않는다.</summary>
+    public static readonly DependencyProperty StripProperty = DependencyProperty.Register(nameof(Strip), typeof(ComponentStrip),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(ComponentStrip.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+    public ComponentStrip? Strip { get => (ComponentStrip?)GetValue(StripProperty); set => SetValue(StripProperty, value); }
+
+    /// <summary>선택 · 호버 · 조립 카드 대상 — 밀집 중에도 칸 줄을 그린다.</summary>
+    public static readonly DependencyProperty IsEmphasizedProperty = DependencyProperty.Register(nameof(IsEmphasized), typeof(bool),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+    public bool IsEmphasized { get => (bool)GetValue(IsEmphasizedProperty); set => SetValue(IsEmphasizedProperty, value); }
+
+    /// <summary>
+    /// 밀집 판정(상속) — 지도(<c>GMapCustomControl</c>)가 뷰포트가 바뀔 때 한 번 세어 자기에게 걸면 모든 아이콘의 부품 층으로 내려온다.
+    /// 값이 바뀔 때만 다시 그린다(수백 개 아이콘에 프레임마다 쓰지 않는다 — NFR-02).
+    /// </summary>
+    public static readonly DependencyProperty IsStripCrowdedProperty = DependencyProperty.RegisterAttached("IsStripCrowded", typeof(bool),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits | FrameworkPropertyMetadataOptions.AffectsRender));
+    public static bool GetIsStripCrowded(DependencyObject d) => (bool)d.GetValue(IsStripCrowdedProperty);
+    public static void SetIsStripCrowded(DependencyObject d, bool value) => d.SetValue(IsStripCrowdedProperty, value);
     #endregion
 
     #region Theme brush DPs (DynamicResource)
@@ -81,6 +107,16 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     public static readonly DependencyProperty InkBrushProperty = DependencyProperty.Register(nameof(InkBrush), typeof(Brush),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
     public Brush? InkBrush { get => (Brush?)GetValue(InkBrushProperty); set => SetValue(InkBrushProperty, value); }
+
+    /// <summary>가동 칸 채움 — <c>PrimaryBrush</c>(선택 표지와 같은 색이지만 모양(작은 채운 사각)으로 가른다).</summary>
+    public static readonly DependencyProperty ActiveBrushProperty = DependencyProperty.Register(nameof(ActiveBrush), typeof(Brush),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Brush? ActiveBrush { get => (Brush?)GetValue(ActiveBrushProperty); set => SetValue(ActiveBrushProperty, value); }
+
+    /// <summary>미상 칸 윤곽 — <c>TextMutedBrush</c>.</summary>
+    public static readonly DependencyProperty MutedBrushProperty = DependencyProperty.Register(nameof(MutedBrush), typeof(Brush),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Brush? MutedBrush { get => (Brush?)GetValue(MutedBrushProperty); set => SetValue(MutedBrushProperty, value); }
     #endregion
 
     /// <summary>시험용 — 지금 크기 · 배율에서 배지를 그리는가.</summary>
@@ -90,6 +126,11 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     /// <summary>시험용 — 지금 크기 · 배율에서 문 표시를 그리는가.</summary>
     internal bool IsDoorDrawn => ShowShape && !IsPreview
         && ComponentBadgeLod.ShowsDoor(Door, ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale));
+
+    /// <summary>시험용 — 지금 크기 · 배율 · 밀집에서 칸 줄을 그리는가.</summary>
+    internal bool IsStripDrawn => ShowShape && !IsPreview
+        && ComponentStripRules.ShowsStrip(Strip, ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale),
+            GetIsStripCrowded(this), IsEmphasized);
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -105,6 +146,72 @@ public sealed class ComponentStatusOverlay : FrameworkElement
 
         if (ComponentBadgeLod.ShowsBadge(Health, px)) DrawBadge(dc, w, h, surface, alert);
         if (ComponentBadgeLod.ShowsDoor(Door, px)) DrawDoor(dc, h, surface, neutral, ink);
+        if (ComponentStripRules.ShowsStrip(Strip, px, GetIsStripCrowded(this), IsEmphasized))
+            DrawStrip(dc, w, h, Strip!, surface, alert, neutral, ActiveBrush ?? Brushes.SteelBlue, MutedBrush ?? Brushes.Gray);
+    }
+
+    /// <summary>칸 한 변(px, 마커 좌표). 48px 이상일 때만 그리므로 화면에서는 10px 남짓.</summary>
+    internal const double ChipSize = 8.0;
+    /// <summary>칸 사이 간격.</summary>
+    internal const double ChipGap = 2.0;
+    /// <summary>아이콘 아래 모서리(배지 걸침 포함)에서 줄까지의 틈.</summary>
+    internal const double StripGap = 2.0;
+
+    /// <summary>
+    /// 아이콘 아래 가운데 칸 줄 — 정상 = 윤곽 · 가동 = 채움 · 고장 = 경고 테두리 + 채운 공구 · 저하 = 경고 테두리 + 빈 공구 ·
+    /// 미상 = 흐린 점선 윤곽 · 사용 안 함 = 사선. 남은 부품은 "+n". 원형 점 · 빨강 · 깜빡임은 쓰지 않는다(이벤트 몫).
+    /// </summary>
+    private void DrawStrip(DrawingContext dc, double w, double h, ComponentStrip strip, Brush surface, Brush alert, Brush neutral, Brush active, Brush muted)
+    {
+        FormattedText? more = strip.MoreCount > 0
+            ? new FormattedText("+" + strip.MoreCount.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), 7.5, neutral,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip)
+            : null;
+
+        int n = strip.Chips.Count;
+        double total = n * ChipSize + Math.Max(0, n - 1) * ChipGap + (more == null ? 0 : ChipGap + more.Width);
+        double x = (w - total) / 2;
+        double y = h + Overhang + StripGap;
+
+        var outline = new Pen(neutral, 1.0);
+        foreach (var chip in strip.Chips)
+        {
+            var rect = new Rect(x + 0.5, y + 0.5, ChipSize - 1, ChipSize - 1);
+            switch (chip.Kind)
+            {
+                case ComponentChipKind.Active:
+                    dc.DrawRoundedRectangle(active, new Pen(active, 1.0), rect, 1.5, 1.5);
+                    break;
+                case ComponentChipKind.Fault:
+                case ComponentChipKind.Degraded:
+                    bool fault = chip.Kind == ComponentChipKind.Fault;
+                    dc.DrawRoundedRectangle(surface, new Pen(alert, fault ? 1.4 : 1.0), rect, 1.5, 1.5);
+                    const double glyph = 6.0;
+                    var transform = new TransformGroup();
+                    transform.Children.Add(new ScaleTransform(glyph / 24.0, glyph / 24.0));
+                    transform.Children.Add(new TranslateTransform(x + (ChipSize - glyph) / 2, y + (ChipSize - glyph) / 2));
+                    dc.PushTransform(transform);
+                    if (fault) dc.DrawGeometry(alert, null, WrenchGeometry);
+                    else dc.DrawGeometry(null, new Pen(alert, 3.0), WrenchGeometry);
+                    dc.Pop();
+                    break;
+                case ComponentChipKind.OutOfService:
+                    dc.DrawRoundedRectangle(surface, outline, rect, 1.5, 1.5);
+                    dc.DrawLine(outline, new Point(rect.Left + 1, rect.Bottom - 1), new Point(rect.Right - 1, rect.Top + 1));   // 사선
+                    break;
+                case ComponentChipKind.Unknown:
+                    dc.DrawRoundedRectangle(surface, new Pen(muted, 1.0) { DashStyle = new DashStyle(new[] { 1.0, 1.0 }, 0) }, rect, 1.5, 1.5);
+                    break;
+                default:
+                    dc.DrawRoundedRectangle(surface, outline, rect, 1.5, 1.5);
+                    break;
+            }
+            x += ChipSize + ChipGap;
+        }
+
+        if (more != null)
+            dc.DrawText(more, new Point(x, y + (ChipSize - more.Height) / 2));
     }
 
     private void DrawBadge(DrawingContext dc, double w, double h, Brush surface, Brush alert)
