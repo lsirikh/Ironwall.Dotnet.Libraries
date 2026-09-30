@@ -873,7 +873,9 @@
 							ScreenScale="{TemplateBinding MarkerScreenScale}"
 							ShowShape="{TemplateBinding ShowShape}"
 							Strip="{TemplateBinding ComponentStrip}"
-							IsEmphasized="{TemplateBinding IsComponentEmphasized}" />
+							IsEmphasized="{TemplateBinding IsComponentEmphasized}"
+							LabelBox="{TemplateBinding ComponentLabelBox}"
+							MarkerPixels="{TemplateBinding ComponentScreenPixels}" />
 
 						<!--  Pulse Ripple Rings — Zero-size Canvas anchor at icon center  -->
 						<!--  Width=0/Height=0 + HA/VA=Center: Canvas origin = outer Grid center = icon center  -->

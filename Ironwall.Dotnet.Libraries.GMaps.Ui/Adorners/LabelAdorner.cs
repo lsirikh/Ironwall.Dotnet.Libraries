@@ -488,6 +488,25 @@ public sealed class LabelAdorner : Adorner, IDisposable
         _cachedBg = null;
     }
 
+    /// <summary>
+    /// 점 심볼 제목 라벨 상자 — <b>아이콘 중심 기준</b> 좌표(OnRender 와 같은 글꼴 · 크기 · 여백 · 오프셋 규칙). 라벨이 그려지지 않으면
+    /// <see cref="Rect.Empty"/>. 줌 게이트는 보지 않는다 — 심볼 자신이 같은 게이트로 숨으므로 아이콘이 보이면 라벨 게이트도 열려 있다.
+    /// 부품 칸 줄(component-display-unify FR-04)이 라벨과 겹치지 않게 자리를 잡는 데 쓴다.
+    /// </summary>
+    internal static Rect DefaultPointLabelBox(IEditableMarker marker, double pixelsPerDip)
+    {
+        if (marker is null || marker.IsDisposed || !marker.ShowTitle || string.IsNullOrWhiteSpace(marker.Title) || !marker.IsLayerEnabled)
+            return Rect.Empty;
+        var text = new FormattedText(marker.Title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            GetTypeface(marker.TitleFontFamily, marker.TitleBold, marker.TitleItalic), Math.Max(9d, marker.TitleSize), Brushes.Black,
+            pixelsPerDip > 0 ? pixelsPerDip : 1d)
+        { MaxTextWidth = EffectiveMaxWidth(marker.TitleMaxWidth), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+        double w = text.WidthIncludingTrailingWhitespace + PadX * 2d;
+        double h = text.Height + PadY * 2d;
+        var c = ComputeLabelCenterRel(marker.Width / 2.0, marker.Height / 2.0, marker.LabelOffsetX, marker.LabelOffsetY, isNormalized: false);
+        return new Rect(c.X - w / 2d, c.Y - h / 2d, w, h);
+    }
+
     /// <summary>Typeface 정적 공유 캐시 — 폰트/굵기/이탤릭 조합당 1회 생성(FR-08, 불변 값 객체라 공유 안전).</summary>
     internal static Typeface GetTypeface(string? family, bool bold, bool italic)
     {

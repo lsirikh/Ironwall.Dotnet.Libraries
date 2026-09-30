@@ -130,7 +130,8 @@ public class ComponentDisplayUnifyTests : IDisposable
     public void should_fill_name_and_fault_reason_from_device_cache_when_by_component_row_has_lookup()
     {
         var device = LampWithParts(11);
-        var dto = new ComponentStateRowDto { Id = 11, CategoryDevice = "lamp", Component = "buzzer1", ComponentType = "BUZZER", State = "ON", Health = "FAULT" };
+        var dto = new ComponentStateRowDto { Id = 11, CategoryDevice = "lamp", Component = "buzzer1", ComponentType = "BUZZER", State = "ON", Health = "FAULT",
+            ObservedAt = "2026-10-01T00:41:07.000000+00:00" };   // 캐시와 같은 순간(표기만 다름)
 
         var withCache = new ByComponentRowViewModel(dto, Catalog(), id => id == 11 ? device : null);
         Assert.Equal("경보 부저", withCache.ComponentName);
@@ -141,7 +142,31 @@ public class ComponentDisplayUnifyTests : IDisposable
 
         var withoutCache = new ByComponentRowViewModel(dto, Catalog());
         Assert.Equal("부저", withoutCache.ComponentName);            // label 을 모르면 유형 한글
-        Assert.Equal(string.Empty, withoutCache.FaultReason);
+        Assert.Equal("—", withoutCache.FaultReason);                 // 고장인데 사유를 확인할 수 없다
+    }
+
+    [Theory]
+    [InlineData("2026-10-01T09:41:08.000000+09:00", "FAULT")]     // 다른 관측 시각 — 캐시가 오래됐거나 더 새 관측
+    [InlineData("2026-10-01T09:41:07.000000+09:00", "DEGRADED")]  // 같은 시각이어도 건강이 다르면 다른 관측
+    [InlineData(null, "FAULT")]                                    // 서버 행에 시각이 없다 — 대조할 수 없다
+    public void should_show_dash_instead_of_cache_reason_when_observation_differs(string? observedAt, string health)
+    {
+        var device = LampWithParts(11);
+        var dto = new ComponentStateRowDto { Id = 11, CategoryDevice = "lamp", Component = "buzzer1", ComponentType = "BUZZER", State = "ON", Health = health, ObservedAt = observedAt };
+        Assert.Equal("—", new ByComponentRowViewModel(dto, Catalog(), _ => device).FaultReason);
+    }
+
+    [Fact]
+    public void should_load_form_when_component_keys_are_duplicated_or_empty()
+    {
+        var model = LampWithParts(11);
+        model.Axes!.HardwareSpec!.Components.Add(new ComponentDefinitionModel { Key = "lamp", Type = "HEATER" });   // 겹친 key
+        model.Axes.HardwareSpec.Components.Add(new ComponentDefinitionModel { Key = "", Type = "FAN" });          // 빈 key
+
+        var form = Load(model, LampWithParts(12));   // 여러 대 — 글 칸(부품별 설정 이름 사전)을 탄다
+
+        Assert.Contains("경광등 · 켜기", form.Fields.Single(f => f.Key == "device_config.component_overrides").Text);   // 먼저 나온 이름이 이긴다
+        Assert.NotNull(Load(model).Sections.Single(s => s.Section == DevicePropertySection.DeviceStatus).StatusTable);
     }
 
     [Fact]

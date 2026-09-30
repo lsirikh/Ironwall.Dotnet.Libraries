@@ -833,6 +833,7 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
     /// </summary>
     private void Markers_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        TrackComponentStripMarkers(e);   // 부품 칸 줄 밀도(FR-04) — 새 심볼에 현재 값, SYNC_DEVICE 통지 구독
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:

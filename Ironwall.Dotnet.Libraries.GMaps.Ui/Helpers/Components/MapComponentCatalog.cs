@@ -7,29 +7,49 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 /// <see cref="Lazy{T}"/> 로 받는다(component-display-unify FR-07).
 /// </summary>
 /// <remarks>
-/// <para>지도 심볼은 DI 로 만들어지지 않는다(마커 수백 개를 뷰모델이 직접 만든다) — 그래서 생성자 주입 대신 처음 쓸 때 한 번
-/// 컨테이너에서 찾는다. 등록이 없거나(장비 콘솔 모듈 미구성 · 시험) 찾다가 실패하면 <c>null</c> → 공용 사전의 내장 사전으로
-/// 떨어진다(<see cref="ComponentDisplay.TypeName"/>). 카탈로그가 아직 안 읽혔을 때도 같은 폴백이다(내장 사전 = 서버 카탈로그와 같은 한글).</para>
-/// <para>시험 · 호스트는 <see cref="Use"/> 로 출처를 바꿀 수 있다.</para>
+/// <para><b>배선</b>: <c>MapViewModel</c> 이 DI 로 <c>Lazy&lt;IComponentTypeLabels&gt;</c> 를 받으면 <see cref="Use"/> 로 건다
+/// (지도 심볼은 DI 로 만들어지지 않아 생성자 주입을 받을 수 없다). 걸린 것이 없으면 컨테이너에서 찾는다.</para>
+/// <para><b>실패 · 미준비</b>: 출처가 예외를 던지거나 null 이면 <c>null</c> → 공용 사전의 내장 사전(서버 카탈로그와 같은 한글).
+/// 컨테이너가 아직 준비되지 않아 null 이었던 것은 <b>굳히지 않는다</b> — 값을 얻을 때까지 다음에 다시 찾는다(찾기는 싸다).</para>
+/// <para>시험은 <see cref="Reset"/> 으로 정적 상태를 되돌린다.</para>
 /// </remarks>
 public static class MapComponentCatalog
 {
-    private static Lazy<IComponentTypeLabels?> _source = CreateDefault();
+    private static readonly object Gate = new();
+    private static Lazy<IComponentTypeLabels>? _injected;
+    private static IComponentTypeLabels? _resolved;
 
     /// <summary>지금 쓸 카탈로그. 없으면 <c>null</c>(내장 사전). 예외를 던지지 않는다.</summary>
     public static IComponentTypeLabels? Labels
     {
         get
         {
-            try { return _source.Value; }
-            catch (Exception) { return null; }
+            Lazy<IComponentTypeLabels>? injected;
+            lock (Gate)
+            {
+                if (_resolved != null) return _resolved;
+                injected = _injected;
+            }
+
+            IComponentTypeLabels? found;
+            try { found = injected != null ? injected.Value : FromContainer(); }
+            catch (Exception) { found = null; }   // 출처 실패 — 내장 사전(FR-07)
+
+            if (found != null) lock (Gate) { if (ReferenceEquals(_injected, injected)) _resolved = found; }
+            return found;
         }
     }
 
-    /// <summary>출처를 바꾼다(시험 · 호스트 배선). null 이면 기본(컨테이너에서 찾기)으로 되돌린다.</summary>
-    public static void Use(Lazy<IComponentTypeLabels?>? source) => _source = source ?? CreateDefault();
+    /// <summary>출처를 건다(DI 의 암시적 <c>Lazy&lt;IComponentTypeLabels&gt;</c>). null 이면 컨테이너 찾기로 되돌린다.</summary>
+    public static void Use(Lazy<IComponentTypeLabels>? source)
+    {
+        lock (Gate) { _injected = source; _resolved = null; }
+    }
 
-    private static Lazy<IComponentTypeLabels?> CreateDefault() => new(() =>
+    /// <summary>시험용 — 걸린 출처와 찾은 값을 모두 비운다.</summary>
+    internal static void Reset() => Use(null);
+
+    private static IComponentTypeLabels? FromContainer()
     {
         try
         {
@@ -37,7 +57,7 @@ public static class MapComponentCatalog
         }
         catch (Exception)
         {
-            return null;   // 컨테이너 미구성(시험 · 미리보기) — 내장 사전
+            return null;   // 컨테이너 미구성(시험 · 미리보기 · 부팅 이전) — 이번엔 내장 사전, 다음에 다시 찾는다
         }
-    });
+    }
 }

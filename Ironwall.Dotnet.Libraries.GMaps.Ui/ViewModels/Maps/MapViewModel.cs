@@ -127,9 +127,12 @@ public partial class MapViewModel : BasePanelViewModel,
                         , TrackingOverlayManager? trackingOverlay = null
                         , PlaybackViewModel? playbackVm = null
                         , TrackingSetupViewModel? trackingSetupVm = null
+                        , Lazy<Ironwall.Dotnet.Monitoring.Models.Components.IComponentTypeLabels>? componentLabels = null
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
+        // 지도 부품 이름의 카탈로그 한글(component-display-unify FR-07) — 장비 콘솔 모듈이 등록했을 때만 온다(없으면 내장 사전).
+        if (componentLabels != null) Helpers.Components.MapComponentCatalog.Use(componentLabels);
         _mapProvider = mapProvider;
         _gMapDbSymbolService = gMapDbSymbolService;
         _gMapDbService = gMapDbService;
@@ -1587,13 +1590,13 @@ public partial class MapViewModel : BasePanelViewModel,
             if (IsEditModeEnabled)
             {
                 //_log?.Info($"편집 모드에서 마커 선택 시도");
-                _componentCard?.Hide();   // 편집 중에는 조립 카드를 띄우지 않는다(편집 명령이 주인공)
+                _componentCard?.Reset();   // 편집 중에는 조립 카드를 띄우지 않는다(편집 명령이 주인공)
                 SelectMarkerForEditing(marker);
                 
             }
             else
             {
-                // 조립 카드(L3) — 누름에는 후보만, 뗄 때 팬이 아니었으면 연다(지도 좌드래그 팬을 뺏지 않는다)
+                // 조립 카드(L3) — 누름에는 후보만, 뗄 때 데드존(8 DIU) 안이고 팬이 아니었으면 연다(지도 좌드래그 팬을 뺏지 않는다)
                 _componentCard?.OnMarkerPressed(marker);
             }
             //else
@@ -3041,7 +3044,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             ClickedCurrentPosition = geoPos;
-            _componentCard?.OnMapClicked();   // 빈 곳 클릭 — 조립 카드를 닫는다(FR-05)
+            _componentCard?.OnEmptyPressed(screenPos);   // 빈 곳 누름 — 뗄 때 클릭(데드존 안)이면 조립 카드를 닫고, 팬이면 그대로 둔다(FR-05)
             //_log?.Info($"지도 클릭: ({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
             // 편집 모드에서 빈 공간 클릭 시 모든 선택 해제
@@ -8338,7 +8341,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 _isEditModeEnabled = value;
                 MainMap.SetEditMode(value);
-                _componentCard?.Hide();   // 모드가 바뀌면 조립 카드는 닫는다
+                _componentCard?.Reset();   // 모드가 바뀌면 조립 카드는 닫는다
 
                 // 편집 모드 해제 시 모든 선택 해제 + 배치 모드 취소(#4)
                 if (!value)

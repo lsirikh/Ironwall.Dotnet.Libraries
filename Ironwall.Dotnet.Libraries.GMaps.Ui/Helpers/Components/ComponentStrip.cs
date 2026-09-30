@@ -26,7 +26,7 @@ public enum ComponentChipKind
 public sealed record ComponentChip(string Key, string Name, ComponentChipKind Kind);
 
 /// <summary>
-/// 지도 아이콘 아래 부품 칸 줄(L2, component-display-unify FR-04) — 조립 카드 순서의 앞 4칸 + 남은 수.
+/// 지도 아이콘 아래 부품 칸 줄(L2, component-display-unify FR-04) — 대표 4칸(고장 먼저 + 카테고리 대표 표) + 남은 수.
 /// <see cref="ComponentStripRules.Build"/> 가 <c>Axes</c> 새 참조를 받을 때 한 번 만든다(NFR-02).
 /// </summary>
 public sealed class ComponentStrip
@@ -34,11 +34,11 @@ public sealed class ComponentStrip
     /// <summary>그릴 것이 없다(6.3 · 축 미수신 · 부품 없음) — FR-08.</summary>
     public static readonly ComponentStrip Empty = new(Array.Empty<ComponentChip>(), 0, false);
 
-    public ComponentStrip(IReadOnlyList<ComponentChip> chips, int moreCount, bool hasIssue)
+    public ComponentStrip(IReadOnlyList<ComponentChip> chips, int moreCount, bool hasFault)
     {
         Chips = chips;
         MoreCount = moreCount;
-        HasIssue = hasIssue;
+        HasFault = hasFault;
     }
 
     /// <summary>대표 칸(최대 <see cref="ComponentStripRules.MaxChips"/>).</summary>
@@ -47,8 +47,8 @@ public sealed class ComponentStrip
     /// <summary>칸에 못 실은 부품 수 — "+n".</summary>
     public int MoreCount { get; }
 
-    /// <summary>사용 중인 부품에 고장 · 저하가 있다 — 밀도 제한 중에도 이 아이콘의 줄은 보인다.</summary>
-    public bool HasIssue { get; }
+    /// <summary>사용 중인 부품에 <b>고장</b>이 있다 — 밀도 제한 중에도 이 아이콘의 줄은 보인다(저하는 아니다 — PRD FR-04).</summary>
+    public bool HasFault { get; }
 
     public bool IsEmpty => Chips.Count == 0;
 }

@@ -18,7 +18,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// 라이트/다크 전환 때 다시 해석되고 다시 그려진다. 1회 해석 · 정적 캐시 브러시는 쓰지 않는다.</para>
 /// <para><b>칸 줄(L2, component-display-unify FR-04)</b>: 아이콘이 화면에 48px 이상일 때 아래에 대표 4칸 + "+n".
 /// 정상 = 윤곽 · 가동 = 채움 · 고장 = 공구 표지 · 사용 안 함 = 사선. 지도가 크게 보이는 아이콘을 30개 넘게 세면
-/// (<see cref="IsStripCrowdedProperty"/> — 지도에 한 번 걸면 상속으로 내려온다) 고장 · 선택 · 호버한 아이콘만 그린다.</para>
+/// (<see cref="IsStripCrowdedProperty"/>) 고장 · 선택 · 호버한 아이콘만 그린다. 제목 라벨이 기본 자리를 덮으면 라벨 아래로 내린다.</para>
 /// <para><b>비용</b>: 요소 하나 · <see cref="OnRender"/> 한 번. 값이 바뀔 때만 다시 그린다. 히트테스트 없음. 애니메이션 0.</para>
 /// </remarks>
 public sealed class ComponentStatusOverlay : FrameworkElement
@@ -76,14 +76,24 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(ComponentStrip.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
     public ComponentStrip? Strip { get => (ComponentStrip?)GetValue(StripProperty); set => SetValue(StripProperty, value); }
 
+    /// <summary>심볼의 화면 크기(px) — 마커 컨트롤이 심볼 크기 × 디지털 배율로 준다. NaN 이면 요소 크기 × <see cref="ScreenScale"/>.</summary>
+    public static readonly DependencyProperty MarkerPixelsProperty = DependencyProperty.Register(nameof(MarkerPixels), typeof(double),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender));
+    public double MarkerPixels { get => (double)GetValue(MarkerPixelsProperty); set => SetValue(MarkerPixelsProperty, value); }
+
+    /// <summary>제목 라벨 상자(아이콘 중심 기준) — 칸 줄이 이 상자를 피해 아래로 내려간다. 라벨이 없으면 <see cref="Rect.Empty"/>.</summary>
+    public static readonly DependencyProperty LabelBoxProperty = DependencyProperty.Register(nameof(LabelBox), typeof(Rect),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(Rect.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Rect LabelBox { get => (Rect)GetValue(LabelBoxProperty); set => SetValue(LabelBoxProperty, value); }
+
     /// <summary>선택 · 호버 · 조립 카드 대상 — 밀집 중에도 칸 줄을 그린다.</summary>
     public static readonly DependencyProperty IsEmphasizedProperty = DependencyProperty.Register(nameof(IsEmphasized), typeof(bool),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
     public bool IsEmphasized { get => (bool)GetValue(IsEmphasizedProperty); set => SetValue(IsEmphasizedProperty, value); }
 
     /// <summary>
-    /// 밀집 판정(상속) — 지도(<c>GMapCustomControl</c>)가 뷰포트가 바뀔 때 한 번 세어 자기에게 걸면 모든 아이콘의 부품 층으로 내려온다.
-    /// 값이 바뀔 때만 다시 그린다(수백 개 아이콘에 프레임마다 쓰지 않는다 — NFR-02).
+    /// 밀집 판정(상속) — 지도가 뷰포트가 바뀔 때 한 번 세어 각 심볼(<c>GMapPidsMarker.ComponentStripCrowded</c>)에 내려 주고,
+    /// 마커 컨트롤이 자기에게 이 값을 걸면 템플릿 안의 부품 층으로 상속된다. 값이 바뀔 때만 다시 그린다(NFR-02).
     /// </summary>
     public static readonly DependencyProperty IsStripCrowdedProperty = DependencyProperty.RegisterAttached("IsStripCrowded", typeof(bool),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits | FrameworkPropertyMetadataOptions.AffectsRender));
@@ -121,22 +131,38 @@ public sealed class ComponentStatusOverlay : FrameworkElement
 
     /// <summary>시험용 — 지금 크기 · 배율에서 배지를 그리는가.</summary>
     internal bool IsBadgeDrawn => ShowShape && !IsPreview
-        && ComponentBadgeLod.ShowsBadge(Health, ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale));
+        && ComponentBadgeLod.ShowsBadge(Health, CurrentScreenPixels());
 
     /// <summary>시험용 — 지금 크기 · 배율에서 문 표시를 그리는가.</summary>
     internal bool IsDoorDrawn => ShowShape && !IsPreview
-        && ComponentBadgeLod.ShowsDoor(Door, ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale));
+        && ComponentBadgeLod.ShowsDoor(Door, CurrentScreenPixels());
+
+    /// <summary>
+    /// 심볼의 화면 크기 — 마커 컨트롤이 준 값(<see cref="MarkerPixels"/> = 심볼 크기 × 디지털 배율, 지도 밀도 판정과 같은 함수)을 쓰고,
+    /// 없으면(단독 사용) 요소 크기 × <see cref="ScreenScale"/>.
+    /// </summary>
+    internal double CurrentScreenPixels()
+        => double.IsNaN(MarkerPixels) ? ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale) : MarkerPixels;
+
+    /// <summary>시험용 — 칸 줄 윗변(요소 좌표). 라벨이 기본 자리를 덮으면 라벨 아래.</summary>
+    internal double StripTopFor(double w, double h, double stripWidth)
+    {
+        var defaultStrip = new Rect((w - stripWidth) / 2, h + Overhang + StripGap, Math.Max(stripWidth, 0), ChipSize);
+        var label = LabelBox;
+        if (!label.IsEmpty) label.Offset(w / 2, h / 2);   // 라벨 상자는 아이콘 중심 기준으로 온다
+        return ComponentStripRules.StripTop(defaultStrip, label, StripGap);
+    }
 
     /// <summary>시험용 — 지금 크기 · 배율 · 밀집에서 칸 줄을 그리는가.</summary>
     internal bool IsStripDrawn => ShowShape && !IsPreview
-        && ComponentStripRules.ShowsStrip(Strip, ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale),
+        && ComponentStripRules.ShowsStrip(Strip, CurrentScreenPixels(),
             GetIsStripCrowded(this), IsEmphasized);
 
     protected override void OnRender(DrawingContext dc)
     {
         if (!ShowShape || IsPreview) return;
         double w = ActualWidth, h = ActualHeight;
-        var px = ComponentBadgeLod.ScreenPixels(w, h, ScreenScale);
+        var px = CurrentScreenPixels();
 
         // 토큰이 병합되지 않은 곳(오프스크린 등)에서도 형태는 보이게 — 시스템 기본 브러시로 폴백한다(캐시하지 않음).
         var surface = SurfaceFill ?? Brushes.White;
@@ -172,7 +198,7 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         int n = strip.Chips.Count;
         double total = n * ChipSize + Math.Max(0, n - 1) * ChipGap + (more == null ? 0 : ChipGap + more.Width);
         double x = (w - total) / 2;
-        double y = h + Overhang + StripGap;
+        double y = StripTopFor(w, h, total);
 
         var outline = new Pen(neutral, 1.0);
         foreach (var chip in strip.Chips)

@@ -622,6 +622,24 @@ public static class DevicePropertyCatalog
         }));
     }
 
+    /// <summary>
+    /// 부품 key → 이름. 서버 데이터에 key 가 겹치거나 비어도 폼은 반드시 열려야 한다 — 먼저 나온 것이 이기고, 겹침은 한 번만 로그에 남긴다.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> NamesByKey(ComponentSnapshot snapshot)
+    {
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var row in snapshot.Rows)
+        {
+            if (names.TryAdd(row.Key ?? string.Empty, row.Name) || _duplicateKeyLogged) continue;
+            _duplicateKeyLogged = true;
+            try { Caliburn.Micro.IoC.Get<Ironwall.Dotnet.Libraries.Base.Services.ILogService>()?.Warning($"[DeviceProperties] 부품 key 가 겹칩니다('{row.Key}') — 먼저 나온 부품 이름을 씁니다(한 번만 알림)."); }
+            catch { /* 컨테이너 미구성(시험 · 미리보기) */ }
+        }
+        return names;
+    }
+
+    private static bool _duplicateKeyLogged;
+
     /// <summary>카탈로그 한글(공용 사전 이름 규칙) — 컨테이너 미구성(시험 · 미리보기)이면 null(내장 사전).</summary>
     private static IComponentTypeLabels? ComponentLabels()
     {
@@ -637,7 +655,7 @@ public static class DevicePropertyCatalog
         var overrides = config.ComponentOverrides;
         if (overrides == null || overrides.Count == 0) return "따로 정한 부품 설정이 없습니다";
         // 부품 이름은 공용 사전 규칙(label → 카탈로그 한글 → 내장 사전 → key) — key 를 그대로 보이지 않는다(FR-02).
-        var names = ComponentSnapshot.Build(model.Axes, ComponentLabels()).Rows.ToDictionary(r => r.Key, r => r.Name, StringComparer.Ordinal);
+        var names = NamesByKey(ComponentSnapshot.Build(model.Axes, ComponentLabels()));
         return string.Join(Environment.NewLine, overrides.Properties().Select(p =>
         {
             var entry = p.Value as JObject;

@@ -46,7 +46,8 @@ public enum EnumComponentHealthKind
 ///
 /// <para><see cref="FaultReason"/> — <see cref="ComponentStateRowDto"/> 에 고장 사유 필드가 없다(서버 행 스키마가 닫혀 있다).
 /// 그래서 장비 캐시(<c>deviceLookup</c>, 선택)에서 같은 장비 · 같은 부품 key 의 관측 사유를 읽는다(component-display-unify FR-03).
-/// 캐시가 없거나 그 장비를 모르면 빈 칸이다. 건강이 고장 · 저하일 때만 적는다(정상 줄에 옛 사유를 붙이지 않는다).</para>
+/// 단 <b>같은 관측일 때만</b> — 캐시의 <c>observed_at</c> 과 건강이 서버 행과 같아야 한다(다른 관측의 사유를 붙이지 않는다).
+/// 고장 · 저하인데 사유를 확인할 수 없으면 "—", 정상이면 빈 칸.</para>
 /// <para>모든 한글(상태 · 건강 · 사유 · 부품 이름)은 공용 부품 사전(<see cref="ComponentDisplay"/>)이 만든다 — 지도와 같은 말이다.</para>
 /// </remarks>
 public sealed class ByComponentRowViewModel
@@ -75,11 +76,11 @@ public sealed class ByComponentRowViewModel
         HealthText = healthText;
         HealthKind = healthKind;
 
-        var (label, faultCode) = ReadFromCache(deviceLookup, dto.Id, dto.Component);
+        var (label, cached) = ReadFromCache(deviceLookup, dto.Id, dto.Component);
         ComponentName = ComponentDisplay.ComponentName(label, dto.ComponentType, dto.Component, labels ?? new CatalogLabelAdapter(catalog));
         var level = ComponentDisplay.ParseHealth(dto.Health);
         FaultReason = level is ComponentHealthLevel.Fault or ComponentHealthLevel.Degraded
-            ? ComponentDisplay.FaultName(faultCode) ?? string.Empty
+            ? (IsSameObservation(cached, dto) ? ComponentDisplay.FaultName(cached!.FaultReason) : null) ?? Dash
             : string.Empty;
         LastChangeText = string.IsNullOrWhiteSpace(dto.ObservedAt) ? NoObservation : dto.ObservedAt!;
     }
@@ -119,7 +120,7 @@ public sealed class ByComponentRowViewModel
     /// <summary>건강 값의 색·모양 분류(Ok/Warn/Crit/Unknown).</summary>
     public EnumComponentHealthKind HealthKind { get; }
 
-    /// <summary>고장 사유 한글 — 장비 캐시에서 읽는다(remarks). 모르거나 정상이면 빈 문자열.</summary>
+    /// <summary>고장 사유 한글 — 같은 관측의 장비 캐시에서 읽는다(remarks). 확인할 수 없으면 "—", 정상이면 빈 문자열.</summary>
     public string FaultReason { get; }
 
     /// <summary>
@@ -179,8 +180,8 @@ public sealed class ByComponentRowViewModel
         return (ComponentDisplay.HealthText(health), kind);
     }
 
-    /// <summary>장비 캐시에서 그 부품의 label · 관측 고장 사유를 읽는다. 캐시가 없거나 실패하면 둘 다 null.</summary>
-    private static (string? Label, string? FaultCode) ReadFromCache(Func<int, IBaseDeviceModel?>? lookup, int deviceId, string? key)
+    /// <summary>장비 캐시에서 그 부품의 label · 관측을 읽는다. 캐시가 없거나 실패하면 둘 다 null.</summary>
+    private static (string? Label, ComponentStatusModel? Status) ReadFromCache(Func<int, IBaseDeviceModel?>? lookup, int deviceId, string? key)
     {
         if (lookup is null || string.IsNullOrWhiteSpace(key)) return (null, null);
         try
@@ -188,14 +189,26 @@ public sealed class ByComponentRowViewModel
             var axes = lookup(deviceId)?.Axes;
             if (axes is null) return (null, null);
             var label = axes.HardwareSpec?.Components.FirstOrDefault(c => string.Equals(c.Key, key, StringComparison.Ordinal))?.Label;
-            string? fault = null;
-            if (axes.DeviceStatus?.Components is { } observed && observed.TryGetValue(key, out var status)) fault = status?.FaultReason;
-            return (label, fault);
+            ComponentStatusModel? status = null;
+            if (axes.DeviceStatus?.Components is { } observed) observed.TryGetValue(key, out status);
+            return (label, status);
         }
         catch (Exception)
         {
             return (null, null);   // 캐시 조회 실패 — 사전 · 빈 칸으로(행을 죽이지 않는다)
         }
+    }
+
+    /// <summary>캐시의 관측이 서버 행과 같은 관측인가 — <c>observed_at</c>(시각 값 비교) · 건강이 모두 같아야 한다.</summary>
+    internal static bool IsSameObservation(ComponentStatusModel? cached, ComponentStateRowDto row)
+    {
+        if (cached is null || string.IsNullOrWhiteSpace(cached.ObservedAt) || string.IsNullOrWhiteSpace(row.ObservedAt)) return false;
+        if (!string.Equals(cached.Health?.Trim(), row.Health?.Trim(), StringComparison.OrdinalIgnoreCase)) return false;
+        var a = ComponentDisplay.ParseObservedAt(cached.ObservedAt);
+        var b = ComponentDisplay.ParseObservedAt(row.ObservedAt);
+        return a.HasValue && b.HasValue
+            ? a.Value == b.Value
+            : string.Equals(cached.ObservedAt.Trim(), row.ObservedAt.Trim(), StringComparison.Ordinal);
     }
 
     /// <summary>카탈로그 서비스를 공용 사전의 유형 이름 입구로 잇는다(<see cref="IComponentTypeLabels"/> 를 구현하지 않는 가짜 서비스용).</summary>

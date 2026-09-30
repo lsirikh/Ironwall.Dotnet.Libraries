@@ -21,17 +21,17 @@ public sealed class ComponentHealthSummary
     public const int MaxToolTipRows = 6;
 
     /// <summary>축이 아예 없다(6.3 서버 · 장비 미연결) — 아무것도 그리지도 적지도 않는다(무회귀).</summary>
-    public static readonly ComponentHealthSummary None = new(ComponentSnapshot.None, DoorMotionState.Unknown);
+    public static readonly ComponentHealthSummary None = new(ComponentSnapshot.None, DoorMotionState.Unknown, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.NONE);
 
-    private ComponentHealthSummary(ComponentSnapshot snapshot, DoorMotionState doorMotion)
+    private ComponentHealthSummary(ComponentSnapshot snapshot, DoorMotionState doorMotion, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType deviceType)
     {
         Snapshot = snapshot;
         DoorMotion = doorMotion;
         Rows = ComponentStripRules.CardOrder(snapshot);
-        Strip = ComponentStripRules.Build(snapshot);
+        Strip = ComponentStripRules.Build(snapshot, deviceType);
     }
 
-    /// <summary>아이콘 아래 부품 칸 줄(L2) — 조립 카드 순서의 앞 4칸. 6.3 · 미수신이면 빈 줄.</summary>
+    /// <summary>아이콘 아래 부품 칸 줄(L2) — 고장 먼저 + 카테고리 대표 표의 앞 4칸. 6.3 · 미수신이면 빈 줄.</summary>
     public ComponentStrip Strip { get; }
 
     /// <summary>공용 부품 표(선언 순서 줄 · 수 · 요약 줄) — 조립 카드 · 상세 보기 부품 탭이 그대로 쓴다.</summary>
@@ -75,10 +75,12 @@ public sealed class ComponentHealthSummary
     /// </summary>
     /// <param name="axes">장비 모델의 축 묶음.</param>
     /// <param name="catalog">서버 카탈로그 한글 이름(FR-07). null 이면 내장 사전.</param>
-    public static ComponentHealthSummary Build(IDeviceAxesModel? axes, IComponentTypeLabels? catalog = null)
+    /// <param name="deviceType">장비 종류 — 칸 줄의 카테고리 대표 순서를 고른다.</param>
+    public static ComponentHealthSummary Build(IDeviceAxesModel? axes, IComponentTypeLabels? catalog = null,
+        Ironwall.Dotnet.Libraries.Enums.EnumDeviceType deviceType = Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.NONE)
     {
         if (axes is null) return None;
-        return new ComponentHealthSummary(ComponentSnapshot.Build(axes, catalog), ResolveDoorMotion(axes));
+        return new ComponentHealthSummary(ComponentSnapshot.Build(axes, catalog), ResolveDoorMotion(axes), deviceType);
     }
 
     /// <summary>

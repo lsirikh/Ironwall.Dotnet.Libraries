@@ -84,8 +84,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         {
             if (ReferenceEquals(_componentSummary, value)) return;
             _componentSummary = value;
-            OnPropertyChanged(nameof(ComponentSummary));
-            (Map as GMapCustoms.GMapCustomControl)?.RequestComponentStripDensity();   // 칸 줄 대상 수가 바뀌었을 수 있다(합쳐서 한 번 센다)
+            OnPropertyChanged(nameof(ComponentSummary));   // 지도(GMapCustomControl)가 이 통지를 받아 칸 줄 밀도를 다시 센다
         }
     }
 
@@ -99,7 +98,22 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         if (!force && ReferenceEquals(axes, _summarySource) && _summaryBuilt) return;
         _summarySource = axes;
         _summaryBuilt = true;
-        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes, Helpers.Components.MapComponentCatalog.Labels);   // FR-07 카탈로그 한글
+        ComponentSummary = Helpers.Components.ComponentHealthSummary.Build(axes, Helpers.Components.MapComponentCatalog.Labels, _model.DeviceType);   // FR-07 카탈로그 한글 · 종류별 대표 칸
+    }
+
+    /// <summary>
+    /// 지도가 센 칸 줄 밀집 여부(FR-04) — <b>런타임 전용</b>. 지도(<c>GMapCustomControl.RefreshComponentStripDensity</c>)가 값이 바뀔 때만
+    /// 모든 PIDS 심볼에 내려 주고, 마커 컨트롤이 이 값을 부품 층으로 넘긴다.
+    /// </summary>
+    public bool ComponentStripCrowded
+    {
+        get => _componentStripCrowded;
+        set
+        {
+            if (_componentStripCrowded == value) return;
+            _componentStripCrowded = value;
+            OnPropertyChanged(nameof(ComponentStripCrowded));
+        }
     }
 
     /// <summary>조립 카드(L3)가 이 심볼에 열려 있다 — <b>런타임 전용</b>. 칸 줄을 밀집 중에도 그리게 한다.</summary>
@@ -251,6 +265,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         {
             _model.DeviceType = value;
             OnPropertyChanged(nameof(DeviceType));
+            RefreshComponentSummary(force: true);   // 칸 줄의 종류별 대표 순서가 바뀐다
         }
     }
 
@@ -397,5 +412,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     private bool _summaryBuilt;
     private bool _liveDetached;
     private bool _isComponentCardOpen;
+    private bool _componentStripCrowded;
     #endregion
 }

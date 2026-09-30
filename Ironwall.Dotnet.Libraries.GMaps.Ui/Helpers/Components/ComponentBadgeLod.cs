@@ -24,6 +24,13 @@ public static class ComponentBadgeLod
         return side * scale;
     }
 
+    /// <summary>
+    /// 심볼의 화면 크기 — <b>심볼(모델) 크기</b> × 디지털 배율. 지도 밀도 판정과 마커의 부품 층이 이 한 함수를 쓴다
+    /// (템플릿마다 실제 요소 크기가 다를 수 있어서 요소 크기 대신 심볼 크기로 잰다 — 3D 템플릿 불일치 방지).
+    /// </summary>
+    public static double MarkerScreenPixels(double markerWidth, double markerHeight, double digitalZoomScale)
+        => ScreenPixels(markerWidth, markerHeight, digitalZoomScale);
+
     /// <summary>건강 배지를 그리는가 — 고장 · 저하이고 마커가 충분히 클 때만.</summary>
     public static bool ShowsBadge(ComponentHealthLevel health, double screenPixels)
         => health is ComponentHealthLevel.Fault or ComponentHealthLevel.Degraded && screenPixels >= MinMarkerPixels;

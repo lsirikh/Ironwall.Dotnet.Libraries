@@ -297,6 +297,52 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.RegisterReadOnly(nameof(IsComponentEmphasized), typeof(bool), typeof(GMapMarkerPidsControl), new PropertyMetadata(false));
     public static readonly DependencyProperty IsComponentEmphasizedProperty = IsComponentEmphasizedPropertyKey.DependencyProperty;
 
+    /// <summary>심볼의 화면 크기(px) = 심볼 크기 × 디지털 배율 — 지도 밀도 판정과 같은 함수(<see cref="ComponentBadgeLod.MarkerScreenPixels"/>).</summary>
+    public double ComponentScreenPixels
+    {
+        get => (double)GetValue(ComponentScreenPixelsProperty);
+        private set => SetValue(ComponentScreenPixelsPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey ComponentScreenPixelsPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(ComponentScreenPixels), typeof(double), typeof(GMapMarkerPidsControl), new PropertyMetadata(double.NaN));
+    public static readonly DependencyProperty ComponentScreenPixelsProperty = ComponentScreenPixelsPropertyKey.DependencyProperty;
+
+    /// <summary>제목 라벨 상자(아이콘 중심 기준) — 부품 칸 줄이 라벨을 피해 아래로 간다. 라벨이 없으면 <see cref="Rect.Empty"/>.</summary>
+    public Rect ComponentLabelBox
+    {
+        get => (Rect)GetValue(ComponentLabelBoxProperty);
+        private set => SetValue(ComponentLabelBoxPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey ComponentLabelBoxPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(ComponentLabelBox), typeof(Rect), typeof(GMapMarkerPidsControl), new PropertyMetadata(Rect.Empty));
+    public static readonly DependencyProperty ComponentLabelBoxProperty = ComponentLabelBoxPropertyKey.DependencyProperty;
+
+    /// <summary>라벨 상자에 영향을 주는 심볼 속성(LabelAdorner 의 글자 · 오프셋 규칙과 같다).</summary>
+    private static readonly HashSet<string> LabelProps = new(StringComparer.Ordinal)
+    {
+        "Title", "TitleSize", "ShowTitle", "TitleFontFamily", "TitleBold", "TitleItalic", "TitleMaxWidth",
+        "LabelOffsetX", "LabelOffsetY", "Width", "Height", "IsLayerEnabled",
+    };
+
+    private void OnMarkerPropertyChangedForComponents(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName) || LabelProps.Contains(e.PropertyName)) RefreshComponentGeometry();
+    }
+
+    /// <summary>화면 크기 · 라벨 상자 파생값을 다시 계산한다. 호출 스레드: UI(아니면 넘긴다).</summary>
+    private void RefreshComponentGeometry()
+    {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(RefreshComponentGeometry)); return; }
+        var marker = Marker;
+        double w = marker?.Width is > 0 ? marker.Width : ActualWidth;
+        double h = marker?.Height is > 0 ? marker.Height : ActualHeight;
+        ComponentScreenPixels = ComponentBadgeLod.MarkerScreenPixels(w, h, MarkerScreenScale);
+        ComponentLabelBox = marker is null ? Rect.Empty
+            : Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners.LabelAdorner.DefaultPointLabelBox(marker, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+    }
+
     /// <summary>화면 배율(디지털 줌) — 부품 층 LOD 가 "화면에서 몇 px 인가"를 재는 데 쓴다.</summary>
     public double MarkerScreenScale
     {
@@ -337,6 +383,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
             RefreshComponentPresentation();
         else if (e.Property == IsMouseOverProperty || e.Property == IsSelectedProperty || e.Property == IsComponentCardTargetProperty)
             IsComponentEmphasized = IsMouseOver || IsSelected || IsComponentCardTarget;
+        else if (e.Property == MarkerScreenScaleProperty || e.Property == WidthProperty || e.Property == HeightProperty)
+            RefreshComponentGeometry();
     }
 
     /// <summary>부품 요약 · 문 형태 · 제목 → 배지 · 문 표시 · 툴팁 파생값.</summary>
@@ -504,6 +552,11 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(IsBroadcastingProperty, nameof(Marker.IsBroadcasting));
         SetupPropertyBinding(ComponentSummaryProperty, nameof(Marker.ComponentSummary), BindingMode.OneWay);   // 런타임 부품 요약
         SetupPropertyBinding(IsComponentCardTargetProperty, nameof(Marker.IsComponentCardOpen), BindingMode.OneWay);   // 조립 카드 대상(칸 줄 강조)
+        // 지도가 센 밀집 값(FR-04) — 심볼 → 이 컨트롤(상속 속성) → 템플릿 안 부품 층
+        SetupPropertyBinding(ComponentStatusOverlay.IsStripCrowdedProperty, nameof(Marker.ComponentStripCrowded), BindingMode.OneWay);
+        Marker.PropertyChanged -= OnMarkerPropertyChangedForComponents;
+        Marker.PropertyChanged += OnMarkerPropertyChangedForComponents;   // 라벨 상자 · 크기(심볼과 수명이 같다)
+        RefreshComponentGeometry();
 
         var colorConverter = new ColorTypeToBrushConverter();
         var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();

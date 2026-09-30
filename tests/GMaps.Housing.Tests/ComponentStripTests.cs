@@ -38,7 +38,7 @@ public class ComponentStripTests
         // 카드 순서: 고장(fan) → 저하(ir) → 나머지 선언 순서(ptz · tracker · wiper) → 사용 안 함(heater)
         Assert.Equal(new[] { "fan", "ir", "ptz", "tracker" }, strip.Chips.Select(c => c.Key));
         Assert.Equal(2, strip.MoreCount);
-        Assert.True(strip.HasIssue);
+        Assert.True(strip.HasFault);
         Assert.Equal(new[] { ComponentChipKind.Fault, ComponentChipKind.Degraded, ComponentChipKind.Normal, ComponentChipKind.Active },
             strip.Chips.Select(c => c.Kind));
     }
@@ -78,6 +78,15 @@ public class ComponentStripTests
     {
         var strip = ComponentStripRules.Build(Snapshot(("a", "HEATER", null, "ON", faulty ? "FAULT" : "OK")));
         Assert.Equal(expected, ComponentStripRules.ShowsStrip(strip, px, crowded, emphasized));
+    }
+
+    [Fact]
+    public void should_hide_degraded_only_strip_when_crowded_because_prd_exempts_only_faults()
+    {
+        var strip = ComponentStripRules.Build(Snapshot(("a", "HEATER", null, "ON", "DEGRADED")));
+        Assert.False(strip.HasFault);
+        Assert.False(ComponentStripRules.ShowsStrip(strip, 64, crowded: true, emphasized: false));
+        Assert.True(ComponentStripRules.ShowsStrip(strip, 64, crowded: false, emphasized: false));
     }
 
     [Theory]
@@ -124,7 +133,6 @@ public class ComponentStripTests
     {
         var host = new Canvas { Width = Canvas, Height = Canvas, Background = Brushes.Transparent };
         host.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.{(dark ? "Dark" : "Light")}.xaml", UriKind.Relative) });
-        if (crowded) ComponentStatusOverlay.SetIsStripCrowded(host, true);   // 지도가 거는 상속 속성
 
         var marker = new GMapPidsMarker(Mock.Of<ILogService>(), new PidsSymbolModel { Title = "cam", DeviceType = EnumDeviceType.IpCamera });
         marker.Width = Size; marker.Height = Size; marker.IsVisible = true;
@@ -138,6 +146,7 @@ public class ComponentStripTests
                 ("wiper", "WIPER", null, null, "OFF", null, null, false),
                 ("fan", "FAN", null, false, "OFF", "OK", null, true)),
         };
+        if (crowded) marker.ComponentStripCrowded = true;   // 지도가 심볼에 내려 주는 값 → 컨트롤 → 부품 층
         var control = new GMapMarkerPidsControl(marker);
         control.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PidsMarkerStyle.xaml", UriKind.Relative) });
         control.Style = (Style)control.Resources[control.GetType()];
