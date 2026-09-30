@@ -15,6 +15,12 @@ public sealed class HostSessionRegistry
     private readonly Dictionary<string, WindowEntry> _windows = new(StringComparer.Ordinal);
     private readonly List<string> _windowOrder = new();
 
+    // 닫기 명령을 보냈지만 호스트의 WindowClosed 를 아직 못 받은 창 — 호스트가 📌 로 닫기를 거절하면(PinChanged 고정)
+    // 여기서 되살린다. 상한을 두어 사람이 닫은 창 기록이 쌓이지 않게 한다.
+    private const int ClosingCapacity = 64;
+    private readonly Dictionary<string, WindowEntry> _closing = new(StringComparer.Ordinal);
+    private readonly Queue<string> _closingOrder = new();
+
     public void SetOverlay(OpenOverlayStream message)
     {
         lock (_gate) { _overlays[message.StreamId] = message; }
@@ -40,12 +46,24 @@ public sealed class HostSessionRegistry
         }
     }
 
+    /// <summary>
+    /// 창 기록에서 뺀다. 열린 창이었으면 true — 호스트가 📌 로 거절할 수 있으므로 "닫는 중"으로 잠시 들고 있는다.
+    /// 이미 닫는 중인 창(호스트의 WindowClosed 가 온 경우)이면 완전히 잊고 false.
+    /// </summary>
     public bool RemoveWindow(string eventKey)
     {
         lock (_gate)
         {
             _windowOrder.Remove(eventKey);
-            return _windows.Remove(eventKey);
+            if (_windows.Remove(eventKey, out var entry))
+            {
+                _closing[eventKey] = entry;
+                _closingOrder.Enqueue(eventKey);
+                while (_closingOrder.Count > ClosingCapacity) _closing.Remove(_closingOrder.Dequeue());
+                return true;
+            }
+            _closing.Remove(eventKey);
+            return false;
         }
     }
 
@@ -63,6 +81,12 @@ public sealed class HostSessionRegistry
             {
                 case PinChanged pin when _windows.TryGetValue(pin.EventKey, out var e1):
                     e1.Pinned = pin.Pinned;
+                    return true;
+                case PinChanged { Pinned: true } pin when _closing.Remove(pin.EventKey, out var revived):
+                    // 호스트가 고정 창의 자동 닫기(조치보고 · 정리)를 거절했다 — 복원 목록에 되살린다.
+                    revived.Pinned = true;
+                    _windows[pin.EventKey] = revived;
+                    _windowOrder.Add(pin.EventKey);
                     return true;
                 case WindowMoved moved when _windows.TryGetValue(moved.EventKey, out var e2):
                     e2.MovedTo = (moved.X, moved.Y);

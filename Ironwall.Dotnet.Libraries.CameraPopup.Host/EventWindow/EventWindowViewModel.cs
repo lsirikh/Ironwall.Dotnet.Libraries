@@ -100,6 +100,21 @@ internal sealed class EventWindowViewModel : ObservableObject
 
     public void TogglePin() => SetPinned(!_isPinned);
 
+    /// <summary>📌 고정 창이 막는 자동 닫기 사유(순수) — 조치보고 · 오래된 창 정리. 사람(User) · 타이머는 막지 않는다.</summary>
+    public static bool IsBlockedByPin(bool pinned, EventWindowCloseReason reason)
+        => pinned && reason is EventWindowCloseReason.ActionReported or EventWindowCloseReason.Evicted;
+
+    /// <summary>
+    /// GIS 닫기 명령을 받을지(FR-15, 호스트가 📌 권위자). 사람이 📌 를 누른 직후 GIS 가 <see cref="PinChanged"/> 를 받기 전에
+    /// 보낸 조치보고 · 정리 닫기는 무시하고 <see cref="PinChanged"/>(고정)를 다시 보내 GIS 상태를 맞춘다.
+    /// </summary>
+    public bool TryAcceptCloseCommand(EventWindowCloseReason reason)
+    {
+        if (!IsBlockedByPin(_isPinned, reason)) return true;
+        _send(new PinChanged { EventKey = EventKey, Pinned = true });
+        return false;
+    }
+
     // ───────── 타일 격자(FR-10) ─────────
 
     public ObservableCollection<TileViewModel> Tiles { get; } = new();

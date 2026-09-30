@@ -83,6 +83,36 @@ public class SupervisorUnitTests
     }
 
     [Fact]
+    public void should_revive_window_for_restore_when_host_rejects_auto_close_of_pinned_window()
+    {
+        var registry = new HostSessionRegistry();
+        registry.SetWindow(new OpenEventWindow { EventId = "p", Window = new PixelRect { X = 1, Y = 2, Width = 800, Height = 500 } });
+        registry.SetWindow(new OpenEventWindow { EventId = "q" });
+
+        Assert.True(registry.RemoveWindow("detection-p"));   // GIS 조치보고 닫기(📌 를 아직 모름)
+        Assert.False(registry.HasWindow("detection-p"));
+        Assert.True(registry.ApplyHostNotice(new PinChanged { EventKey = "detection-p", Pinned = true })); // 호스트가 거절 + 고정 재통지
+
+        Assert.True(registry.HasWindow("detection-p"));
+        var replay = registry.Snapshot().Windows.Single(w => w.EventKey == "detection-p");
+        Assert.True(replay.Pinned);
+        Assert.Equal(800, replay.Window.Width);
+    }
+
+    [Fact]
+    public void should_forget_window_when_host_confirms_close()
+    {
+        var registry = new HostSessionRegistry();
+        registry.SetWindow(new OpenEventWindow { EventId = "p" });
+
+        Assert.True(registry.RemoveWindow("detection-p"));   // 닫기 명령
+        Assert.False(registry.RemoveWindow("detection-p"));  // 호스트 WindowClosed
+        Assert.False(registry.ApplyHostNotice(new PinChanged { EventKey = "detection-p", Pinned = true }));
+        Assert.False(registry.HasWindow("detection-p"));
+        Assert.Empty(registry.Snapshot().Windows);
+    }
+
+    [Fact]
     public void should_recognize_popup_origin_when_exception_thrown_inside_popup_code()
     {
         Exception? inner = null;

@@ -311,6 +311,44 @@ public class EventWindowViewModelTests
     }
 
     [Theory]
+    [InlineData(EventWindowCloseReason.ActionReported, false)]
+    [InlineData(EventWindowCloseReason.Evicted, false)]
+    [InlineData(EventWindowCloseReason.User, true)]
+    [InlineData(EventWindowCloseReason.Timer, true)]
+    public void should_keep_pinned_window_open_and_resend_pin_when_gis_auto_close_races_pin(EventWindowCloseReason reason, bool accepted)
+    {
+        var vm = Create(c => c.Add(Fixed("a")), timer: 30);
+        vm.Start();
+        vm.TogglePin();      // 사람이 📌 — GIS 는 아직 PinChanged 를 못 받았다
+        _sent.Clear();
+
+        bool result = vm.TryAcceptCloseCommand(reason); // 수 ms 뒤 GIS 의 닫기 명령
+
+        Assert.Equal(accepted, result);
+        if (accepted)
+        {
+            Assert.Empty(_sent);
+        }
+        else
+        {
+            var pin = Assert.IsType<PinChanged>(Assert.Single(_sent)); // GIS 상태를 맞춘다
+            Assert.Equal(("detection-42", true), (pin.EventKey, pin.Pinned));
+        }
+    }
+
+    [Theory]
+    [InlineData(EventWindowCloseReason.ActionReported)]
+    [InlineData(EventWindowCloseReason.Evicted)]
+    [InlineData(EventWindowCloseReason.User)]
+    public void should_accept_every_close_reason_when_not_pinned(EventWindowCloseReason reason)
+    {
+        var vm = Create(c => c.Add(Fixed("a")));
+
+        Assert.True(vm.TryAcceptCloseCommand(reason));
+        Assert.Empty(_sent);
+    }
+
+    [Theory]
     [InlineData(true, 0, "조치보고 오면 닫힘")]
     [InlineData(false, 30, "시간이 되면 닫힘")]
     [InlineData(false, 0, "직접 닫을 때까지")]

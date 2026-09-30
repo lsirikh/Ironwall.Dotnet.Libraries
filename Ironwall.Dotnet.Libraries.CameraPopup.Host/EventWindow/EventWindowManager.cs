@@ -85,7 +85,13 @@ internal sealed class EventWindowManager
 
     public void Close(string eventKey, EventWindowCloseReason reason, bool returnHome)
     {
-        if (_sessions.TryGetValue(eventKey, out var session)) session.Close(reason, returnHome);
+        if (!_sessions.TryGetValue(eventKey, out var session)) return;
+        if (!session.ViewModel.TryAcceptCloseCommand(reason))
+        {
+            _log.Info($"close {eventKey} reason={reason} ignored — pinned (PinChanged re-sent)");
+            return;
+        }
+        session.Close(reason, returnHome);
     }
 
     public void BringToFront(string eventKey)
