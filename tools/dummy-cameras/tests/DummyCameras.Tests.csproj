@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    dummy-cameras tests. NOT part of the solution (the root "dotnet test" does not run them).
+      - Unit:  PTZ simulator · generators (mediamtx.yml / ffmpeg args) · seed dry-run plan · cleanup safety.
+      - Onvif: in-process farm (ONVIF only, free ports) driven by OUR client - CameraProviderRegistry.CreateDefault
+               (OnvifVideoProvider / OnvifPtzProvider → PtzController → OnvifSolution, T-01 Expect-off).
+      - Live:  full farm (MediaMTX + ffmpeg, non-default ports) + ffprobe of the RTSP URIs our client resolves.
+               Skipped when ffmpeg/ffprobe or the MediaMTX binary (fetch-mediamtx) is missing.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>DummyCameras.Tests</AssemblyName>
+    <RootNamespace>DummyCameras.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);NU1701;MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.23" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DummyCameras.csproj" />
+    <ProjectReference Include="..\..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ironwall.Dotnet.Libraries.CameraPopup.Providers.csproj" />
+  </ItemGroup>
+
+</Project>

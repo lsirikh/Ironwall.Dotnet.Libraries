@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Dummy IP cameras for headed tests of the camera popups
+    (docs/prds/camera-popup-modes-prd.md §5 · storyboard §6 T1~T10).
+
+    Each camera = RTSP H.264 stream (MediaMTX + one ffmpeg publisher) + a minimal ONVIF device
+    (SOAP 1.2 · WS-UsernameToken digest · optional HTTP Digest): Device / Media / PTZ with a simulated
+    pan-tilt-zoom state, presets 1..5, GotoPreset travel time, JSONL command log and fault injection.
+    LOOPBACK ONLY - every listener binds 127.0.0.1.
+
+    Run:     DummyCameras.exe run            (8 cams, 4 PTZ; or: dotnet run with this project, then the args)
+             DummyCameras.exe run -video D:\clips -auth-fail 6 -slow-onvif 5=3000 -kill-stream-after 7=60
+             DummyCameras.exe fetch-mediamtx (download + SHA-256 pin check into tools/dummy-cameras/bin/)
+             DummyCameras.exe seed           (DRY-RUN by default · -apply to write · injector account only)
+             DummyCameras.exe cleanup        (DRY-RUN by default · deletes only rows in the seed manifest)
+             DummyCameras.exe help
+    (options accept one or two leading dashes; one is shown because XML comments forbid a double dash)
+    Tests:   tools/dummy-cameras/tests (xUnit) - in-process ONVIF farm driven by OUR client
+             (CameraPopup.Providers → PtzController → OnvifSolution) + a live farm check (ffprobe).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>DummyCameras</AssemblyName>
+    <RootNamespace>DummyCameras</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DummyCameras.Tests" />
+  </ItemGroup>
+
+</Project>
