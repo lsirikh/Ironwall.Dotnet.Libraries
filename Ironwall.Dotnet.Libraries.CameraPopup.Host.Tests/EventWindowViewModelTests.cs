@@ -287,6 +287,29 @@ public class EventWindowViewModelTests
         Assert.Equal(5, vm.RemainingSeconds); // 풀면 다시 센다
     }
 
+    [Fact]
+    public void should_restart_full_countdown_when_unpinned_after_opening_pinned()
+    {
+        var vm = Create(c => c.Add(Fixed("a")), timer: 10, pinned: true); // 재시작 복원처럼 고정 상태로 열림
+        var reasons = new List<EventWindowCloseReason>();
+        vm.CloseRequested += reasons.Add;
+        vm.Start();
+
+        _clock.Advance(600);
+        vm.Tick();
+        Assert.Empty(reasons);
+        Assert.Null(vm.RemainingSeconds);
+
+        vm.SetPinned(false);
+        Assert.Equal(10, vm.RemainingSeconds); // 처음부터 다시 센다
+        _clock.Advance(9.5);
+        vm.Tick();
+        Assert.Empty(reasons);
+        _clock.Advance(0.6);
+        vm.Tick();
+        Assert.Equal(new[] { EventWindowCloseReason.Timer }, reasons);
+    }
+
     [Theory]
     [InlineData(true, 0, "조치보고 오면 닫힘")]
     [InlineData(false, 30, "시간이 되면 닫힘")]
