@@ -47,6 +47,8 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Sounds\Ironwall.Dotnet.Libraries.Sounds.csproj" />
+    <!-- camera-popup-modes T-03: 카메라 팝업 설정 모델 · 배치 순수 함수(Streaming.Base/CameraPopup, WPF 무관) — 설정 콘솔 블록이 쓴다 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
     <!-- Phase 2 (IMPL-08): Modern Dark/Light 테마 토큰/서비스 (leaf, 순환 없음 — AD-1) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
     <!-- FR-EN-10/11: IPermissionService 게이팅 (순환 없음 — Accounts.Api는 Events.Ui 미참조) -->

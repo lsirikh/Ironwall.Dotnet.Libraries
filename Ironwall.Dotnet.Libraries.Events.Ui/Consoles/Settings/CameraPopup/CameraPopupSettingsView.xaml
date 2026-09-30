@@ -1,0 +1,786 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Settings.CameraPopup.CameraPopupSettingsView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Settings.CameraPopup"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DataContext="{d:DesignInstance Type=local:CameraPopupSettingsViewModel}"
+	AutomationProperties.AutomationId="Settings.CameraPopup.Root"
+	TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
+	mc:Ignorable="d">
+	<!--
+		설정 콘솔 이벤트 절 "카메라 팝업 연동" 블록 — SB §2 와이어프레임 v0.8(docs/design/camera-popup-modes-storyboard.html L217-294).
+		커널 ConsoleSection · ConsoleField 와 Console.* 스타일 · 토큰만 쓴다(라이트/다크 DynamicResource).
+		x:Name 은 쓰지 않는다(Caliburn 바인딩 지시자) — 계측은 AutomationId(Settings.CameraPopup.*)만.
+		첫 창 끌기는 캡처 드래그(drag-first-ux): PreviewMouseDown 선점 → 8 DIU 데드존 → Up/LostMouseCapture 에서 한 번에 끝낸다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="CameraPopup.BoolToVisibility" />
+
+		<Style x:Key="CameraPopup.TextBox" TargetType="TextBox">
+			<Setter Property="Height" Value="30" />
+			<Setter Property="Padding" Value="6,0" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+			<Style.Triggers>
+				<Trigger Property="IsEnabled" Value="False">
+					<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+
+		<Style x:Key="CameraPopup.Note" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="TextWrapping" Value="WrapWithOverflow" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<!--  오류 한 줄 — Label 이라 UIA 트리에 잡힌다(TextBlock 은 안 잡힌다)  -->
+		<Style x:Key="CameraPopup.Error" TargetType="Label">
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="0,3,0,0" />
+			<Setter Property="FontSize" Value="11.5" />
+			<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+			<Setter Property="ContentStringFormat" Value="⚠ {0}" />
+		</Style>
+
+		<!--  세그먼트 한 벌 — 라디오 칩(Console.Chip 모양). 고른 칸은 테두리 링 + 굵은 글자(형태), 색만으로 가르지 않는다.  -->
+		<DataTemplate x:Key="CameraPopup.SegmentItem" DataType="{x:Type local:CameraPopupChoice}">
+			<RadioButton
+				AutomationProperties.AutomationId="{Binding AutomationId}"
+				AutomationProperties.Name="{Binding Label}"
+				Content="{Binding Label}"
+				IsChecked="{Binding IsSelected, Mode=TwoWay}"
+				IsEnabled="{Binding IsEnabled}"
+				Style="{DynamicResource Console.Chip}"
+				ToolTip="{Binding ToolTip}"
+				ToolTipService.ShowOnDisabled="True">
+				<!--
+					묶음 이름에 뷰마다 다른 머리(GroupScope)를 붙인다 — WPF 라디오 묶음은 GroupName 이 같고 "시각 루트"가 같으면
+					서로 끄는데, 창 없는 뷰(오프스크린 · 떨어진 옛 뷰)는 루트가 모두 null 이라 옛 뷰의 라디오가 새 뷰의 선택을 꺼 버렸다(실측).
+				-->
+				<RadioButton.GroupName>
+					<MultiBinding StringFormat="{}{0}.{1}">
+						<Binding Path="GroupScope" RelativeSource="{RelativeSource AncestorType=local:CameraPopupSettingsView}" />
+						<Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+					</MultiBinding>
+				</RadioButton.GroupName>
+			</RadioButton>
+		</DataTemplate>
+
+		<ItemsPanelTemplate x:Key="CameraPopup.Row">
+			<WrapPanel Orientation="Horizontal" />
+		</ItemsPanelTemplate>
+
+		<!--  격자 칩 — 미니 격자(가로×세로) + 글자. 빈 칸은 속이 빈 칸(모양)으로.  -->
+		<Style x:Key="CameraPopup.LayoutChip" TargetType="RadioButton">
+			<Setter Property="Margin" Value="0,0,8,6" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="RadioButton">
+						<Grid>
+							<Border
+								x:Name="Chip"
+								Padding="8,6"
+								Background="{DynamicResource SurfaceAltBrush}"
+								BorderBrush="{DynamicResource BorderBrush}"
+								BorderThickness="1"
+								CornerRadius="4">
+								<StackPanel>
+									<ItemsControl HorizontalAlignment="Center" Focusable="False" ItemsSource="{Binding Cells}">
+										<ItemsControl.ItemsPanel>
+											<ItemsPanelTemplate>
+												<UniformGrid Columns="{Binding Columns}" Rows="{Binding Rows}" />
+											</ItemsPanelTemplate>
+										</ItemsControl.ItemsPanel>
+										<ItemsControl.ItemTemplate>
+											<DataTemplate>
+												<Border
+													x:Name="Cell"
+													Width="12"
+													Height="8"
+													Margin="1"
+													Background="{DynamicResource TextMutedBrush}"
+													BorderBrush="{DynamicResource TextMutedBrush}"
+													BorderThickness="1"
+													CornerRadius="1" />
+												<DataTemplate.Triggers>
+													<DataTrigger Binding="{Binding}" Value="False">
+														<Setter TargetName="Cell" Property="Background" Value="Transparent" />
+													</DataTrigger>
+												</DataTemplate.Triggers>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+									<TextBlock
+										x:Name="Label"
+										Margin="0,4,0,0"
+										HorizontalAlignment="Center"
+										FontFamily="{DynamicResource MonoFont}"
+										FontSize="11.5"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding Label}" />
+								</StackPanel>
+							</Border>
+							<Border
+								x:Name="SelectedRing"
+								Margin="-2"
+								BorderBrush="{DynamicResource PrimaryBrush}"
+								BorderThickness="2"
+								CornerRadius="6"
+								IsHitTestVisible="False"
+								Visibility="Collapsed" />
+							<Border
+								x:Name="Focus"
+								Margin="-4"
+								BorderBrush="{DynamicResource FocusRingBrush}"
+								BorderThickness="2"
+								CornerRadius="7"
+								IsHitTestVisible="False"
+								Visibility="Collapsed" />
+						</Grid>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource TintInfoBrush}" />
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+								<Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+								<Setter TargetName="SelectedRing" Property="Visibility" Value="Visible" />
+							</Trigger>
+							<Trigger Property="IsKeyboardFocused" Value="True">
+								<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--  미리보기 속 창 — 첫 창(끌 수 있음): 2px 윤곽 + 머리 띠 / 고스트: 1px 윤곽 · 머리 없음 · 흐림(모양으로 구분)  -->
+		<DataTemplate x:Key="CameraPopup.PreviewTiles" DataType="{x:Type local:CameraPopupPreviewWindow}">
+			<ItemsControl Margin="3" Focusable="False" ItemsSource="{Binding Tiles}">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<UniformGrid Columns="{Binding Columns}" Rows="{Binding Rows}" />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border Margin="1" Background="{DynamicResource SurfaceSunkenBrush}" />
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</DataTemplate>
+	</UserControl.Resources>
+
+	<!--  라벨 칸 168 — 설정 창 칸 목록(SettingsConsoleView 의 ConsoleSection)과 값 칸 왼쪽 모서리를 맞춘다  -->
+	<StackPanel c:ConsoleField.LabelWidth="168">
+		<!--  ① 팝업 방식 · ⑦ 영상 · 제어 방식  -->
+		<c:ConsoleSection AxisName="CameraPopup" Header="카메라 팝업 연동">
+			<StackPanel>
+				<c:ConsoleField IsTouched="{Binding Touched[Mode]}" Note="{Binding ModeNote}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="팝업 방식" />
+					</c:ConsoleField.Header>
+					<ItemsControl
+						AutomationProperties.AutomationId="Settings.CameraPopup.Mode"
+						AutomationProperties.Name="팝업 방식"
+						Focusable="False"
+						ItemTemplate="{StaticResource CameraPopup.SegmentItem}"
+						ItemsPanel="{StaticResource CameraPopup.Row}"
+						ItemsSource="{Binding ModeChoices}"
+						Tag="CameraPopup.Mode" />
+				</c:ConsoleField>
+
+				<c:ConsoleField
+					IsTouched="{Binding Touched[Provider]}"
+					Note="{Binding ProviderNote}"
+					Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="영상 · 제어 방식" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<ItemsControl
+							AutomationProperties.AutomationId="Settings.CameraPopup.Provider"
+							AutomationProperties.Name="영상 · 제어 방식"
+							Focusable="False"
+							ItemTemplate="{StaticResource CameraPopup.SegmentItem}"
+							ItemsPanel="{StaticResource CameraPopup.Row}"
+							ItemsSource="{Binding ProviderChoices}"
+							Tag="CameraPopup.Provider" />
+						<!--  외부 VMS — 자리만(PRD FR-18). 칸은 꺼져 있고 점선이 아닌 오목한 판으로 "아직" 을 보인다.  -->
+						<Border
+							Margin="0,8,0,0"
+							Padding="10,8"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Vms"
+							Background="{DynamicResource SurfaceSunkenBrush}"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="4">
+							<StackPanel>
+								<TextBlock
+									FontSize="12"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="외부 VMS API (연동 시)" />
+								<WrapPanel Margin="0,6,0,0">
+									<ComboBox
+										Width="120"
+										Height="30"
+										Margin="0,0,6,4"
+										AutomationProperties.AutomationId="Settings.CameraPopup.Vms.Kind"
+										AutomationProperties.Name="VMS 종류"
+										IsEnabled="{Binding IsVmsEditable}"
+										Text="{Binding VmsKind, Mode=OneWay}"
+										ToolTip="{Binding VmsNote}"
+										ToolTipService.ShowOnDisabled="True" />
+									<TextBox
+										Width="200"
+										Margin="0,0,6,4"
+										AutomationProperties.AutomationId="Settings.CameraPopup.Vms.ServerUrl"
+										AutomationProperties.Name="VMS 서버 주소"
+										IsEnabled="{Binding IsVmsEditable}"
+										Style="{StaticResource CameraPopup.TextBox}"
+										Text="{Binding VmsServerUrl, Mode=OneWay}" />
+									<TextBox
+										Width="110"
+										Margin="0,0,6,4"
+										AutomationProperties.AutomationId="Settings.CameraPopup.Vms.Account"
+										AutomationProperties.Name="VMS 계정"
+										IsEnabled="{Binding IsVmsEditable}"
+										Style="{StaticResource CameraPopup.TextBox}"
+										Text="{Binding VmsAccount, Mode=OneWay}" />
+									<Button
+										Margin="0,0,0,4"
+										AutomationProperties.AutomationId="Settings.CameraPopup.Vms.TestConnection"
+										Content="연결 확인"
+										IsEnabled="{Binding IsVmsEditable}"
+										Style="{DynamicResource Console.Button}"
+										ToolTip="{Binding VmsNote}"
+										ToolTipService.ShowOnDisabled="True" />
+								</WrapPanel>
+								<TextBlock Style="{StaticResource CameraPopup.Note}" Text="{Binding VmsNote}" />
+							</StackPanel>
+						</Border>
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  사용 안 함 — 팝업 칸을 전부 숨기고 한 줄만 남긴다(PRD FR-02 · FR-03). 설명은 위 팝업 방식 주석이 한다.  -->
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  더블클릭 팝업 — 지도 위 (현행 그대로)  -->
+		<c:ConsoleSection
+			AxisName="IsAutoDiscard · TimeoutSeconds"
+			Header="더블클릭 팝업 — 지도 위 (현행 그대로)"
+			Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
+			<c:ConsoleField IsTouched="{Binding Touched[DoubleClick]}" Note="옮긴 자리는 지도 좌표로 기억합니다">
+				<c:ConsoleField.Header>
+					<TextBlock Text="자동 닫기" />
+				</c:ConsoleField.Header>
+				<StackPanel>
+					<StackPanel Orientation="Horizontal">
+						<CheckBox
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Settings.CameraPopup.DoubleClick.AutoClose"
+							Content="사용"
+							IsChecked="{Binding DoubleClickAutoClose}"
+							Style="{DynamicResource Console.CheckBox}" />
+						<TextBox
+							Width="80"
+							Margin="12,0,6,0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.DoubleClick.AutoCloseSeconds"
+							AutomationProperties.Name="자동 닫기 시간(초)"
+							FontFamily="{DynamicResource MonoFont}"
+							IsEnabled="{Binding DoubleClickAutoClose}"
+							Style="{StaticResource CameraPopup.TextBox}"
+							Text="{Binding DoubleClickAutoCloseSecondsText, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBlock Style="{StaticResource CameraPopup.Note}" Text="초" />
+					</StackPanel>
+					<Label
+						AutomationProperties.AutomationId="Settings.CameraPopup.DoubleClick.AutoCloseSeconds.Error"
+						Content="{Binding DoubleClickAutoCloseSecondsError}"
+						Style="{StaticResource CameraPopup.Error}" Visibility="{Binding HasDoubleClickAutoCloseSecondsError, Converter={StaticResource CameraPopup.BoolToVisibility}}" />
+				</StackPanel>
+			</c:ConsoleField>
+		</c:ConsoleSection>
+
+		<!--  탐지 팝업 — 이벤트마다 창 1개  -->
+		<c:ConsoleSection
+			AxisName="CameraPopup.Event*"
+			Header="탐지 팝업 — 이벤트마다 창 1개"
+			Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
+			<StackPanel>
+				<!--  ② 띄우기  -->
+				<c:ConsoleField IsTouched="{Binding Touched[Trigger]}" Note="창 안 카메라는 이벤트 매핑 순서(priority)대로">
+					<c:ConsoleField.Header>
+						<TextBlock Text="띄우기" />
+					</c:ConsoleField.Header>
+					<StackPanel Orientation="Horizontal">
+						<CheckBox
+							Margin="0,0,16,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.OnDetection"
+							Content="탐지 때"
+							IsChecked="{Binding EventWindowOnDetection}"
+							Style="{DynamicResource Console.CheckBox}" />
+						<CheckBox
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.OnMalfunction"
+							Content="장애 때"
+							IsChecked="{Binding EventWindowOnMalfunction}"
+							Style="{DynamicResource Console.CheckBox}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  ⑥ 창당 카메라 · 격자  -->
+				<c:ConsoleField IsTouched="{Binding Touched[Cameras]}" Note="{Binding LayoutNote}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="창당 카메라 · 격자" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<StackPanel Orientation="Horizontal">
+							<ItemsControl
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.Cameras"
+								AutomationProperties.Name="창당 카메라"
+								Focusable="False"
+								ItemTemplate="{StaticResource CameraPopup.SegmentItem}"
+								ItemsPanel="{StaticResource CameraPopup.Row}"
+								ItemsSource="{Binding CameraCountChoices}"
+								Tag="CameraPopup.Cameras" />
+							<TextBlock Margin="2,0,0,0" Style="{StaticResource CameraPopup.Note}" Text="대" />
+						</StackPanel>
+						<ItemsControl
+							Margin="0,10,0,0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.Layout"
+							AutomationProperties.Name="격자 모양"
+							Focusable="False"
+							ItemsPanel="{StaticResource CameraPopup.Row}"
+							ItemsSource="{Binding LayoutChoices}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate DataType="{x:Type local:CameraPopupLayoutChoice}">
+									<RadioButton
+										AutomationProperties.AutomationId="{Binding AutomationId}"
+										AutomationProperties.Name="{Binding ToolTip}"
+										GroupName="{Binding GroupScope, RelativeSource={RelativeSource AncestorType=local:CameraPopupSettingsView}, StringFormat={}{0}.Layout}"
+										IsChecked="{Binding IsSelected, Mode=TwoWay}"
+										Style="{StaticResource CameraPopup.LayoutChip}"
+										ToolTip="{Binding ToolTip}" />
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  ③ 모니터 · 첫 위치  -->
+				<c:ConsoleField IsTouched="{Binding Touched[Monitor]}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="모니터 · 첫 위치" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<StackPanel Orientation="Horizontal">
+							<ComboBox
+								Width="262"
+								Height="30"
+								Margin="-2,0,0,0"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.Monitor"
+								AutomationProperties.Name="이벤트 창 모니터"
+								DisplayMemberPath="Label"
+								FontSize="13"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								IsEnabled="{Binding HasMonitors}"
+								ItemsSource="{Binding Monitors}"
+								SelectedItem="{Binding SelectedMonitor}" />
+							<Button
+								Margin="6,0,0,0"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.RefreshMonitors"
+								Click="OnRefreshMonitors"
+								Content="다시 조회"
+								Style="{DynamicResource Console.Button}"
+								ToolTip="연결된 모니터를 다시 읽습니다" />
+						</StackPanel>
+						<Label
+							Margin="0,4,0,0"
+							Padding="0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.MonitorNote">
+							<TextBlock Text="{Binding MonitorNote}">
+								<TextBlock.Style>
+									<Style BasedOn="{StaticResource CameraPopup.Note}" TargetType="TextBlock">
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding MonitorNeedsAttention}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+												<Setter Property="FontWeight" Value="SemiBold" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Label>
+
+						<!--  미리보기 — 고른 모니터 하나만, 작업 영역 비율대로  -->
+						<Border
+							Margin="0,8,0,0"
+							HorizontalAlignment="Left"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.Preview"
+							AutomationProperties.Name="선택한 모니터 미리보기 — 이벤트 창 계단식 배치"
+							Background="{DynamicResource SurfaceSunkenBrush}"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="3">
+							<Grid>
+							<!--  계단 방향 · 간격 표지(SB §2 "↘ 다음 창 +24px") — 실제 축척에서는 간격이 몇 DIU 라 그림만으로는 안 읽힌다  -->
+							<TextBlock
+								Margin="0,0,6,4"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Bottom"
+								FontSize="10.5"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								IsHitTestVisible="False"
+								Text="{Binding CascadeCaption}" />
+							<Canvas
+								Width="{Binding PreviewWidth}"
+								Height="{Binding PreviewHeight}"
+								ClipToBounds="True">
+								<ItemsControl Focusable="False" ItemsSource="{Binding GhostWindows}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<Canvas />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemContainerStyle>
+										<Style TargetType="ContentPresenter">
+											<Setter Property="Canvas.Left" Value="{Binding Left}" />
+											<Setter Property="Canvas.Top" Value="{Binding Top}" />
+										</Style>
+									</ItemsControl.ItemContainerStyle>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate DataType="{x:Type local:CameraPopupPreviewWindow}">
+											<Border
+												Width="{Binding Width}"
+												Height="{Binding Height}"
+												Background="{DynamicResource SurfaceAltBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												IsHitTestVisible="False"
+												Opacity="0.7">
+												<TextBlock
+													Margin="3,1,0,0"
+													FontFamily="{DynamicResource MonoFont}"
+													FontSize="10"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="{Binding Number}" />
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+
+								<!--  1번 창 — 끄는 손잡이. Thumb 은 AutomationPeer 가 있어 UIA 에 보인다(drag-first-ux 핸들 규칙).  -->
+								<Thumb
+									Canvas.Left="{Binding FirstWindowPreview.Left}"
+									Canvas.Top="{Binding FirstWindowPreview.Top}"
+									Width="{Binding FirstWindowPreview.Width}"
+									Height="{Binding FirstWindowPreview.Height}"
+									AutomationProperties.AutomationId="Settings.CameraPopup.Event.FirstWindow"
+									AutomationProperties.HelpText="끌어 놓거나 방향키로 옮깁니다(Shift = 10칸, Esc = 취소)"
+									AutomationProperties.Name="첫 이벤트 창 위치"
+									Cursor="SizeAll"
+									Focusable="True"
+									IsTabStop="True"
+									LostMouseCapture="OnFirstWindowLostCapture"
+									MouseLeftButtonUp="OnFirstWindowUp"
+									MouseMove="OnFirstWindowMove"
+									PreviewKeyDown="OnFirstWindowKeyDown"
+									PreviewMouseDown="OnFirstWindowPress"
+									ToolTip="끌어 놓거나 방향키로 옮깁니다(Shift = 10칸, Esc = 취소)">
+									<Thumb.Template>
+										<ControlTemplate TargetType="Thumb">
+											<Grid>
+												<Border
+													x:Name="Frame"
+													Background="{DynamicResource SurfaceBrush}"
+													BorderBrush="{DynamicResource PrimaryBrush}"
+													BorderThickness="2"
+													CornerRadius="2">
+													<DockPanel>
+														<Border
+															Padding="3,1"
+															Background="{DynamicResource SurfaceAltBrush}"
+															DockPanel.Dock="Top">
+															<StackPanel Orientation="Horizontal">
+																<md:PackIcon
+																	Width="10"
+																	Height="10"
+																	VerticalAlignment="Center"
+																	Foreground="{DynamicResource TextSecondaryBrush}"
+																	Kind="DragVertical" />
+																<TextBlock
+																	Margin="2,0,0,0"
+																	FontSize="10"
+																	FontWeight="SemiBold"
+																	Foreground="{DynamicResource TextPrimaryBrush}"
+																	Text="1 · 이벤트 창"
+																	TextTrimming="CharacterEllipsis" />
+															</StackPanel>
+														</Border>
+														<ContentPresenter
+															Content="{Binding FirstWindowPreview}"
+															ContentTemplate="{StaticResource CameraPopup.PreviewTiles}" />
+													</DockPanel>
+												</Border>
+												<Border
+													x:Name="FocusRing"
+													Margin="-3"
+													BorderBrush="{DynamicResource FocusRingBrush}"
+													BorderThickness="2"
+													CornerRadius="4"
+													IsHitTestVisible="False"
+													Visibility="Collapsed" />
+											</Grid>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsKeyboardFocused" Value="True">
+													<Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+												</Trigger>
+												<!--  끄는 중 — 그림자(형태). 색을 바꾸지 않는다.  -->
+												<DataTrigger Binding="{Binding IsDraggingFirstWindow}" Value="True">
+													<Setter TargetName="Frame" Property="Effect">
+														<Setter.Value>
+															<DropShadowEffect BlurRadius="8" Opacity="0.45" ShadowDepth="2" />
+														</Setter.Value>
+													</Setter>
+												</DataTrigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Thumb.Template>
+								</Thumb>
+							</Canvas>
+							</Grid>
+						</Border>
+						<Label
+							Margin="0,6,0,0"
+							Padding="0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.PlacementNote">
+							<TextBlock MaxWidth="560" Style="{StaticResource CameraPopup.Note}" Text="{Binding PlacementNote}" />
+						</Label>
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  창 크기 · 간격 · 항상 위  -->
+				<c:ConsoleField IsTouched="{Binding Touched[Window]}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="창 크기 · 간격" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<WrapPanel>
+							<ComboBox
+								Width="140"
+								Height="30"
+								Margin="-2,0,12,4"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.WindowSize"
+								AutomationProperties.Name="이벤트 창 크기"
+								DisplayMemberPath="Label"
+								FontFamily="{DynamicResource MonoFont}"
+								FontSize="13"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								ItemsSource="{Binding SizeChoices}"
+								SelectedItem="{Binding SelectedSize}" />
+							<TextBlock Margin="0,0,6,4" Style="{StaticResource CameraPopup.Note}" Text="다음 창 간격" />
+							<TextBox
+								Width="64"
+								Margin="0,0,4,4"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.CascadeStep"
+								AutomationProperties.Name="다음 창 간격(px)"
+								FontFamily="{DynamicResource MonoFont}"
+								Style="{StaticResource CameraPopup.TextBox}"
+								Text="{Binding CascadeStepText, UpdateSourceTrigger=PropertyChanged}" />
+							<TextBlock Margin="0,0,16,4" Style="{StaticResource CameraPopup.Note}" Text="px" />
+							<CheckBox
+								Margin="0,0,0,4"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.AlwaysOnTop"
+								Content="항상 위에"
+								IsChecked="{Binding AlwaysOnTop}"
+								Style="{DynamicResource Console.CheckBox}" />
+						</WrapPanel>
+						<Label
+							AutomationProperties.AutomationId="Settings.CameraPopup.Event.CascadeStep.Error"
+							Content="{Binding CascadeStepError}"
+							Style="{StaticResource CameraPopup.Error}" Visibility="{Binding HasCascadeStepError, Converter={StaticResource CameraPopup.BoolToVisibility}}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  ④ 창 닫기  -->
+				<c:ConsoleField IsTouched="{Binding Touched[Close]}" Note="{Binding CloseNote}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="창 닫기" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<CheckBox
+							Margin="0,0,0,6"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Close.OnActionReport"
+							Content="그 이벤트의 조치보고가 오면 자동으로 닫기 (내가 했든 다른 GIS 가 했든)"
+							IsChecked="{Binding CloseOnActionReport}"
+							Style="{DynamicResource Console.CheckBox}" />
+						<StackPanel Margin="0,0,0,6" Orientation="Horizontal">
+							<CheckBox
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Close.ByTimer"
+								Content="타이머로 닫기"
+								IsChecked="{Binding CloseByTimer}"
+								Style="{DynamicResource Console.CheckBox}" />
+							<TextBox
+								Width="80"
+								Margin="12,0,6,0"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Close.TimerSeconds"
+								AutomationProperties.Name="타이머(초)"
+								FontFamily="{DynamicResource MonoFont}"
+								IsEnabled="{Binding CloseByTimer}"
+								Style="{StaticResource CameraPopup.TextBox}"
+								Text="{Binding CloseTimerSecondsText, UpdateSourceTrigger=PropertyChanged}" />
+							<TextBlock Style="{StaticResource CameraPopup.Note}" Text="초" />
+						</StackPanel>
+						<Label
+							AutomationProperties.AutomationId="Settings.CameraPopup.Close.TimerSeconds.Error"
+							Content="{Binding CloseTimerSecondsError}"
+							Style="{StaticResource CameraPopup.Error}" Visibility="{Binding HasCloseTimerSecondsError, Converter={StaticResource CameraPopup.BoolToVisibility}}" />
+						<CheckBox
+							AutomationProperties.AutomationId="Settings.CameraPopup.Close.ReturnHomePreset"
+							Content="닫을 때 PTZ 로 돌린 카메라는 복귀 프리셋으로"
+							IsChecked="{Binding ReturnHomePresetOnClose}"
+							Style="{DynamicResource Console.CheckBox}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<!--  ⑤ 동시에 열 창  -->
+				<c:ConsoleField IsTouched="{Binding Touched[MaxWindows]}" Note="1~10. 넘으면 가장 오래된 창(📌 제외)을 닫고 새 창 — 카드는 그대로">
+					<c:ConsoleField.Header>
+						<TextBlock Text="동시에 열 창" />
+					</c:ConsoleField.Header>
+					<ComboBox
+						Width="120"
+						Height="30"
+						Margin="-2,0,0,0"
+						HorizontalAlignment="Left"
+						AutomationProperties.AutomationId="Settings.CameraPopup.Event.MaxWindows"
+						AutomationProperties.Name="동시에 열 창"
+						DisplayMemberPath="Label"
+						FontSize="13"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						ItemsSource="{Binding MaxWindowChoices}"
+						SelectedItem="{Binding SelectedMaxWindows}" />
+				</c:ConsoleField>
+			</StackPanel>
+		</c:ConsoleSection>
+
+		<!--  브로커 요청 — 더블클릭 전용  -->
+		<c:ConsoleSection
+			AxisName="CameraPopup.Broker*"
+			Header="브로커 요청 — 더블클릭 전용"
+			Visibility="{Binding ShowBrokerGroup, Converter={StaticResource CameraPopup.BoolToVisibility}}">
+			<StackPanel>
+				<c:ConsoleField Note="설치 때 자동 부여 · 바꿀 수 없음">
+					<c:ConsoleField.Header>
+						<TextBlock Text="관제석 식별자" />
+					</c:ConsoleField.Header>
+					<Border
+						Height="30"
+						Padding="8,0"
+						HorizontalAlignment="Left"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1">
+						<Label
+							Padding="0"
+							VerticalContentAlignment="Center"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.ClientId"
+							AutomationProperties.Name="관제석 식별자"
+							Content="{Binding ClientId}"
+							FontFamily="{DynamicResource MonoFont}"
+							FontSize="13"
+							Foreground="{DynamicResource TextPrimaryBrush}" />
+					</Border>
+				</c:ConsoleField>
+
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerTarget]}" Note="NVR 쪽 모니터 · 칸(3×3). 목록 가져오기는 브로커 연결 후 추가됩니다">
+					<c:ConsoleField.Header>
+						<TextBlock Text="모니터 · 칸" />
+					</c:ConsoleField.Header>
+					<StackPanel Orientation="Horizontal">
+						<ComboBox
+							Width="120"
+							Height="30"
+							Margin="-2,0,6,0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Monitor"
+							AutomationProperties.Name="NVR 모니터"
+							DisplayMemberPath="Label"
+							FontSize="13"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							ItemsSource="{Binding BrokerMonitorChoices}"
+							SelectedItem="{Binding SelectedBrokerMonitor}" />
+						<ComboBox
+							Width="110"
+							Height="30"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Cell"
+							AutomationProperties.Name="NVR 칸"
+							DisplayMemberPath="Label"
+							FontSize="13"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							ItemsSource="{Binding BrokerCellChoices}"
+							SelectedItem="{Binding SelectedBrokerCell}" />
+					</StackPanel>
+				</c:ConsoleField>
+
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerOccupied]}" Note="결과(띄움 · 거부 · 무응답)는 지도 하단 토스트로 알립니다">
+					<c:ConsoleField.Header>
+						<TextBlock Text="칸이 차 있으면" />
+					</c:ConsoleField.Header>
+					<ItemsControl
+						AutomationProperties.AutomationId="Settings.CameraPopup.Broker.OnOccupied"
+						AutomationProperties.Name="칸이 차 있으면"
+						Focusable="False"
+						ItemTemplate="{StaticResource CameraPopup.SegmentItem}"
+						ItemsPanel="{StaticResource CameraPopup.Row}"
+						ItemsSource="{Binding OnOccupiedChoices}"
+						Tag="CameraPopup.OnOccupied" />
+				</c:ConsoleField>
+
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerTimeout]}">
+					<c:ConsoleField.Header>
+						<TextBlock Text="응답 기다림" />
+					</c:ConsoleField.Header>
+					<StackPanel>
+						<StackPanel Orientation="Horizontal">
+							<TextBox
+								Width="80"
+								Margin="0,0,6,0"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Timeout"
+								AutomationProperties.Name="응답 기다림(초)"
+								FontFamily="{DynamicResource MonoFont}"
+								Style="{StaticResource CameraPopup.TextBox}"
+								Text="{Binding BrokerTimeoutText, UpdateSourceTrigger=PropertyChanged}" />
+							<TextBlock Style="{StaticResource CameraPopup.Note}" Text="초 — 넘으면 ‘응답 없음’ 토스트" />
+						</StackPanel>
+						<Label
+							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Timeout.Error"
+							Content="{Binding BrokerTimeoutError}"
+							Style="{StaticResource CameraPopup.Error}" Visibility="{Binding HasBrokerTimeoutError, Converter={StaticResource CameraPopup.BoolToVisibility}}" />
+					</StackPanel>
+				</c:ConsoleField>
+			</StackPanel>
+		</c:ConsoleSection>
+	</StackPanel>
+</UserControl>

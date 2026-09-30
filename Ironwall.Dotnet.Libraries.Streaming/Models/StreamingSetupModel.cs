@@ -1,4 +1,5 @@
 ﻿using System;
+using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.Models;
@@ -40,6 +41,15 @@ public interface IStreamingSetupModel
     /// <see cref="EnumCameraPopupRtspSource.Url"/>=수동 URL(현행 기본) / <see cref="EnumCameraPopupRtspSource.Onvif"/>=ONVIF GetStreamUri 조회.
     /// default 구현 제공 — 미반영 소비자(메인 SetupModel)도 컴파일되고 Url 모드로 동작(라이브러리 자립, NFR-03).</summary>
     EnumCameraPopupRtspSource CameraPopupRtspSource { get => EnumCameraPopupRtspSource.Url; set { } }
+
+    /// <summary>
+    /// 카메라 팝업 설정 한 벌(camera-popup-modes PRD FR-01 · §3) — 모드 · 제공자 · 이벤트 창 · 브로커.
+    /// 읽기 전용 보기다. default 구현은 새 키 없이 옛 키에서 이관한 값(<c>IsCameraPopupUsed</c> → 모드,
+    /// <c>CameraPopupRtspSource</c> → 제공자) — 새 키를 모르는 소비자도 컴파일되고 지금과 같은 동작을 본다.
+    /// 쓰기는 설정 화면(호스트)이 한다.
+    /// </summary>
+    CameraPopupSettings CameraPopupSettings
+        => CameraPopupSettingsCodec.Resolve(null, IsCameraPopupUsed, CameraPopupRtspSource, IsAutoDiscard, TimeoutSeconds);
 }
 
 /// <summary>
@@ -78,6 +88,13 @@ public class StreamingSetupModel : IStreamingSetupModel
 
     // 맵 카메라 팝업 RTSP 소스 (기본 Url=수동 URL — 현행 동작 무변경)
     public EnumCameraPopupRtspSource CameraPopupRtspSource { get; set; } = EnumCameraPopupRtspSource.Url;
+
+    /// <summary>카메라 팝업 새 설정 덩어리(appsettings <c>CameraPopup</c>). 없으면(<c>null</c>) 옛 키에서 이관한다.</summary>
+    public CameraPopupSettingsRecord? CameraPopup { get; set; }
+
+    /// <summary>해석한 카메라 팝업 설정(새 키 + 옛 키 이관 + 정규화).</summary>
+    public CameraPopupSettings CameraPopupSettings
+        => CameraPopupSettingsCodec.Resolve(CameraPopup, IsCameraPopupUsed, CameraPopupRtspSource, IsAutoDiscard, TimeoutSeconds);
 
     // 팝업 기동 딜레이
     public int PopupStartupDelayMs { get; set; } = 0;
@@ -118,6 +135,8 @@ public class StreamingSetupModel : IStreamingSetupModel
             QueueMinDisplayMs = model.QueueMinDisplayMs;
             IsCameraPopupUsed = model.IsCameraPopupUsed;
             CameraPopupRtspSource = model.CameraPopupRtspSource;
+            // 새 설정은 해석한 값으로 옮긴다(원본이 옛 키만 가진 소비자여도 같은 값이 된다).
+            CameraPopup = CameraPopupSettingsCodec.ToRecord(model.CameraPopupSettings);
         }
     }
 
