@@ -128,7 +128,7 @@ _client_id = request.headers.get("X-Client-Id") or getattr(login_data, "client_i
 
 | # | 내용 | 문서 |
 |---|---|---|
-| 1 | **이미지 복제로 설치 고유값이 복제되는 구멍** — 설치기가 감지해야 한다 | [client-id-image-clone-risk-analysis.md](../analyses/client-id-image-clone-risk-analysis.md) |
+| 1 | ✅ **이미지 복제 방어 구현 완료** — ⚠ 주 방어선은 **런타임**이다(복제 배포에서는 설치기가 다시 돌지 않는다). 런타임 지문 대조 + 설치기 지문 기록 + `/clientid=` 무인 인자. ⚠ **이미 복제 배포된 현장은 일회성 이관 필요** | [client-id-image-clone-risk-analysis.md](../analyses/client-id-image-clone-risk-analysis.md) |
 | 2 | **웹/VMS 에 "고정 `client_id` 금지 · 브라우저 프로필별 GUID"** 통지 | [WEB_VMS_client_id_session_axis_NOTIFY_20260930.md](../coordinations/WEB_VMS_client_id_session_axis_NOTIFY_20260930.md) |
 | 3 | 서버팀이 `session_self_replace_enabled` 를 켜기 **전에** 위 1·2 가 닫혀야 한다 | 3자 계약 rev.4 R10 |
 

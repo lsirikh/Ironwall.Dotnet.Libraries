@@ -29,8 +29,16 @@ namespace Ironwall.Dotnet.Libraries.Api.Helpers;
 /// ③ 파일도 없으면 새로 만들어 적는다
 /// ④ 파일 접근이 막히면 프로세스 수명 동안만 쓰는 임시값을 만든다(로그 경고).</para>
 ///
-/// <para><b>알려진 한계</b> — 디스크 이미지 복제로 배포하면 <c>%ProgramData%</c> 의 파일까지 복제되어
-/// 여러 관제석이 같은 값을 갖는다. 그 감지는 설치기 몫이며 별도 과제다.</para>
+/// <para><b>이미지 복제 방어</b> — <c>%ProgramData%</c> 는 디스크 이미지에 포함되고 <c>sysprep</c> 도
+/// 지우지 않는다. 설치까지 끝낸 PC 를 복제해 뿌리면 <b>설치기는 각 PC 에서 다시 돌지 않으므로</b>
+/// 설치기 검사로는 잡을 수 없다 — 매 실행마다 도는 <b>이 클래스가 잡아야 한다</b>.
+/// 그래서 값 옆에 <b>기기 지문</b>(<c>MachineGuid</c> + 컴퓨터명)을 같이 적고, 실행 때 대조해
+/// 다르면 값을 새로 만든다.</para>
+///
+/// <para><b>지문 파일이 없을 때는 값을 유지한다</b>(기존 설치 승계) — 갱신 한 번에 모든 현장이
+/// 세션 축을 잃지 않게. 대신 그 사실을 로그에 남긴다. 이 판본 이후에 만든 이미지는 지문을 품으므로
+/// 복제본에서 불일치가 잡힌다. ⚠ <b>이미 복제 배포된 현장</b>은 이 승계 때문에 자동으로 고쳐지지 않는다 —
+/// 그 경우 지문 파일과 <c>client-id</c> 를 함께 지우고 재실행해야 한다(일회성 이관).</para>
 /// </summary>
 public static class ClientIdResolver
 {
@@ -110,6 +118,48 @@ public static class ClientIdResolver
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         "Ironwall", "Gis", "client-id");
 
+    /// <summary>
+    /// 기기 지문 파일 — 값과 <b>같은 폴더의 별도 파일</b>이다.
+    /// <c>client-id</c> 자체를 여러 줄로 만들지 않는 이유: 설치기(<c>SaveStringToFile</c>)와
+    /// 이미 배포된 단일값 파일과의 호환을 깨지 않기 위해서다.
+    /// </summary>
+    public static string FingerprintFilePath => InstallIdFilePath + ".fingerprint";
+
+    /// <summary>
+    /// 이 기기의 지문. <c>MachineGuid</c>(레지스트리)와 컴퓨터명을 합친다 —
+    /// 둘 다 <c>sysprep</c> 이 갱신하므로 이미지 복제본에서 값이 달라진다.
+    /// 레지스트리를 읽을 수 없으면 컴퓨터명만으로 떨어진다(약하지만 없는 것보다 낫다).
+    /// </summary>
+    private static string MachineFingerprint()
+    {
+        var machineGuid = ReadMachineGuid() ?? "no-machine-guid";
+        var name = SafeMachineName();
+        return $"{machineGuid}|{name}";
+    }
+
+    private static string? ReadMachineGuid()
+    {
+        // Windows 전용 경로다. 다른 OS·권한 없음·키 부재 모두 null 로 떨어뜨린다.
+        try
+        {
+            using var key = Microsoft.Win32.RegistryKey
+                .OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64)
+                .OpenSubKey(@"SOFTWARE\Microsoft\Cryptography", writable: false);
+            var value = key?.GetValue("MachineGuid") as string;
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string SafeMachineName()
+    {
+        try { return Environment.MachineName; }
+        catch { return string.Empty; }
+    }
+
     /// <summary>테스트가 단계를 하나씩 검증할 수 있게 분리한 순수 조립부.</summary>
     internal static string Build(string? configuredId, Action<string>? warn = null)
     {
@@ -147,10 +197,19 @@ public static class ClientIdResolver
                 var raw = File.ReadAllText(path, Encoding.UTF8);
                 var cleaned = Sanitize(raw);
                 if (IsWellFormed(cleaned) && !IsLegacyShared(cleaned))
-                    return cleaned;
+                {
+                    // ★ 이미지 복제 방어 — 이 값이 '이 기기에서' 만들어진 것인지 본다.
+                    if (FingerprintMatches(warn))
+                        return cleaned;
 
-                // 손으로 고쳐 깨진 파일 · 옛 공용값이 적힌 파일은 새 값으로 갈아 준다.
-                warn?.Invoke($"[ClientId] '{path}' 의 값이 쓸 수 없어 새로 만듭니다.");
+                    warn?.Invoke($"[ClientId] '{cleaned}' 은 다른 기기에서 만들어진 값입니다(디스크 이미지 복제로 보입니다) — " +
+                                 "관제석끼리 세션을 서로 끊지 않도록 새 값을 만듭니다.");
+                }
+                else
+                {
+                    // 손으로 고쳐 깨진 파일 · 옛 공용값이 적힌 파일은 새 값으로 갈아 준다.
+                    warn?.Invoke($"[ClientId] '{path}' 의 값이 쓸 수 없어 새로 만듭니다.");
+                }
             }
         }
         catch (Exception ex)
@@ -165,6 +224,7 @@ public static class ClientIdResolver
 
             var id = NewId();
             File.WriteAllText(path, id, new UTF8Encoding(false));
+            WriteFingerprint(warn);
             warn?.Invoke($"[ClientId] 설치 고유값을 새로 만들었습니다: '{id}' → '{path}'");
             return id;
         }
@@ -172,6 +232,72 @@ public static class ClientIdResolver
         {
             warn?.Invoke($"[ClientId] '{path}' 쓰기 실패({ex.GetType().Name}).");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// 이 값이 <b>이 기기에서</b> 만들어졌는가.
+    ///
+    /// <para><b>지문 파일이 없으면 <c>true</c></b> — 이 판본 이전에 설치된 현장을 승계한다.
+    /// 갱신 한 번에 모든 관제석이 세션 축을 잃으면 유령 세션을 회수할 수 없게 되므로,
+    /// 값을 유지하고 지문만 지금 적어 둔다. 그 뒤에 만든 이미지는 지문을 품으므로
+    /// 복제본에서 불일치가 잡힌다.</para>
+    ///
+    /// <para>지문을 만들 수도 없으면(레지스트리·컴퓨터명 모두 실패) 판정을 포기하고 <c>true</c> 를
+    /// 돌린다 — 판정 근거가 없을 때 값을 버리면 매 실행 새 값이 되어 더 나쁘다.</para>
+    /// </summary>
+    private static bool FingerprintMatches(Action<string>? warn)
+    {
+        var current = MachineFingerprint();
+
+        // 두 축 모두 얻지 못한 경우("no-machine-guid|")만 판정 불가로 본다 —
+        // 한쪽이라도 있으면 복제본과 달라질 여지가 있어 대조할 값이 된다.
+        if (string.Equals(current, "no-machine-guid|", StringComparison.Ordinal))
+        {
+            warn?.Invoke("[ClientId] 기기 지문을 만들 수 없어 복제 판정을 건너뜁니다.");
+            return true;
+        }
+
+        string? stored = null;
+        try
+        {
+            if (File.Exists(FingerprintFilePath))
+                stored = File.ReadAllText(FingerprintFilePath, Encoding.UTF8).Trim();
+        }
+        catch (Exception ex)
+        {
+            warn?.Invoke($"[ClientId] 지문 파일 읽기 실패({ex.GetType().Name}) — 복제 판정을 건너뜁니다.");
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(stored))
+        {
+            // 이 판본 이전 설치 — 값을 유지하고 지문을 지금 심는다.
+            warn?.Invoke("[ClientId] 기기 지문이 없어 기존 값을 그대로 승계하고 지문을 새로 적습니다. " +
+                         "⚠ 이 관제석이 이미지 복제본이라면 client-id 와 .fingerprint 를 함께 지우고 재실행하십시오.");
+            WriteFingerprint(warn);
+            return true;
+        }
+
+        if (string.Equals(stored, current, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        warn?.Invoke($"[ClientId] 기기 지문 불일치 — 적힌 값 '{stored}' vs 현재 '{current}'.");
+        return false;
+    }
+
+    private static void WriteFingerprint(Action<string>? warn)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(FingerprintFilePath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            File.WriteAllText(FingerprintFilePath, MachineFingerprint(), new UTF8Encoding(false));
+        }
+        catch (Exception ex)
+        {
+            // 지문을 못 써도 값 자체는 쓸 수 있다 — 다음 실행에서 다시 승계 경로를 탄다.
+            warn?.Invoke($"[ClientId] 지문 파일 쓰기 실패({ex.GetType().Name}) — 복제 감지가 동작하지 않습니다.");
         }
     }
 

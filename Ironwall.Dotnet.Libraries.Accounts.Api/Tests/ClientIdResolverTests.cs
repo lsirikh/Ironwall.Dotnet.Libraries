@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Api.Helpers;
 using Xunit;
@@ -203,6 +204,34 @@ public class ClientIdResolverTests
         {
             ClientIdResolver.ResetCache();
         }
+    }
+
+    // ── 이미지 복제 방어 ──────────────────────────────────────────
+
+    /// <summary>
+    /// 지문 파일은 값 파일과 <b>별도</b>여야 한다 — <c>client-id</c> 를 여러 줄로 만들면
+    /// 설치기(<c>SaveStringToFile</c> 단일값)와 이미 배포된 파일을 읽지 못한다.
+    /// </summary>
+    [Fact]
+    public void should_keep_fingerprint_in_a_separate_file_next_to_the_id()
+    {
+        Assert.NotEqual(ClientIdResolver.InstallIdFilePath, ClientIdResolver.FingerprintFilePath);
+        Assert.StartsWith(ClientIdResolver.InstallIdFilePath, ClientIdResolver.FingerprintFilePath);
+        Assert.EndsWith(".fingerprint", ClientIdResolver.FingerprintFilePath);
+    }
+
+    /// <summary>
+    /// 값 파일은 <c>%ProgramData%\Ironwall\Gis\client-id</c> — 설치기
+    /// <c>StationIdFilePath</c> 와 <b>같은 자리</b>여야 한다. 어긋나면 설치기가 심은 값을 못 읽는다.
+    /// </summary>
+    [Fact]
+    public void should_read_the_same_path_the_installer_writes()
+    {
+        var expected = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Ironwall", "Gis", "client-id");
+
+        Assert.Equal(expected, ClientIdResolver.InstallIdFilePath);
     }
 
     /// <summary>
