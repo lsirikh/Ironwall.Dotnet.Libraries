@@ -45,6 +45,9 @@ public partial class CameraPopupSettingsView : UserControl
 
     private void OnRefreshMonitors(object sender, RoutedEventArgs e) => Vm?.RefreshMonitors();
 
+    /// <summary>[모니터 목록 가져오기] — 기다리지 않는다(뷰모델이 예외 없이 결과를 칸 아래 한 줄로 낸다, FR-27/28).</summary>
+    private void OnFetchBrokerMonitors(object sender, RoutedEventArgs e) => _ = Vm?.FetchBrokerMonitorsAsync();
+
     private void OnFirstWindowPress(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left || sender is not Thumb thumb || Vm is null) return;

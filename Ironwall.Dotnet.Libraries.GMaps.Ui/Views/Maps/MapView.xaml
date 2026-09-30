@@ -1360,6 +1360,38 @@
 					Text="{Binding AimStatusMessage}" />
 			</Border>
 
+			<!--  카메라 팝업 브로커 요청 결과 토스트(camera-popup-modes T-07 · FR-06) — 지도 하단 중앙 한 줄.
+			      요청 · 띄움 · 거부 · 무응답만 알린다. 클릭을 막지 않는다(IsHitTestVisible=False). 토큰만(라이트/다크).  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				MaxWidth="720"
+				Margin="0,0,0,28"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Bottom"
+				IsHitTestVisible="False"
+				Panel.ZIndex="300"
+				Style="{StaticResource MapFloatingPanelStyle}"
+				Visibility="{Binding IsCameraPopupToastVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource PrimaryBrush}"
+						Kind="Cctv" />
+					<TextBlock
+						Margin="8,0,0,0"
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Map.CameraPopup.Toast"
+						FontSize="13"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource TextPrimaryBrush}"
+						Text="{Binding CameraPopupToastMessage}"
+						TextWrapping="Wrap" />
+				</StackPanel>
+			</Border>
+
 			<!--  측정 리드아웃 HUD (MapFloatingPanelStyle + 토큰 — 라이트/다크 자동스왑)  -->
 			<Border
 				Grid.Row="2"

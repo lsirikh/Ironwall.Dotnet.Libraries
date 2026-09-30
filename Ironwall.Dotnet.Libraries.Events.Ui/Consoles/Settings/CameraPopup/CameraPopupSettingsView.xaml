@@ -716,32 +716,60 @@
 					</Border>
 				</c:ConsoleField>
 
-				<c:ConsoleField IsTouched="{Binding Touched[BrokerTarget]}" Note="NVR 쪽 모니터 · 칸(3×3). 목록 가져오기는 브로커 연결 후 추가됩니다">
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerTarget]}" Note="NVR 관제석 모니터 · 칸(3×3). 모니터 목록은 NVR Manager 에게 묻습니다">
 					<c:ConsoleField.Header>
 						<TextBlock Text="모니터 · 칸" />
 					</c:ConsoleField.Header>
-					<StackPanel Orientation="Horizontal">
-						<ComboBox
-							Width="120"
-							Height="30"
-							Margin="-2,0,6,0"
-							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Monitor"
-							AutomationProperties.Name="NVR 모니터"
-							DisplayMemberPath="Label"
-							FontSize="13"
-							Foreground="{DynamicResource TextPrimaryBrush}"
-							ItemsSource="{Binding BrokerMonitorChoices}"
-							SelectedItem="{Binding SelectedBrokerMonitor}" />
-						<ComboBox
-							Width="110"
-							Height="30"
-							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Cell"
-							AutomationProperties.Name="NVR 칸"
-							DisplayMemberPath="Label"
-							FontSize="13"
-							Foreground="{DynamicResource TextPrimaryBrush}"
-							ItemsSource="{Binding BrokerCellChoices}"
-							SelectedItem="{Binding SelectedBrokerCell}" />
+					<StackPanel>
+						<StackPanel Orientation="Horizontal">
+							<ComboBox
+								MinWidth="120"
+								Height="30"
+								Margin="-2,0,6,0"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Monitor"
+								AutomationProperties.Name="NVR 모니터"
+								DisplayMemberPath="Label"
+								FontSize="13"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								ItemsSource="{Binding BrokerMonitorChoices}"
+								SelectedItem="{Binding SelectedBrokerMonitor}" />
+							<ComboBox
+								Width="110"
+								Height="30"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Cell"
+								AutomationProperties.Name="NVR 칸"
+								DisplayMemberPath="Label"
+								FontSize="13"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								ItemsSource="{Binding BrokerCellChoices}"
+								SelectedItem="{Binding SelectedBrokerCell}" />
+							<Button
+								Margin="6,0,0,0"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Broker.FetchMonitors"
+								Click="OnFetchBrokerMonitors"
+								Content="모니터 목록 가져오기"
+								IsEnabled="{Binding CanFetchBrokerMonitors}"
+								Style="{DynamicResource Console.Button}"
+								ToolTip="NVR Manager 에게 이 관제석의 모니터 목록을 묻습니다(POPUP_LAYOUT_GET)" />
+						</StackPanel>
+						<Label
+							Margin="0,4,0,0"
+							Padding="0"
+							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.MonitorNote"
+							Visibility="{Binding HasBrokerMonitorNote, Converter={StaticResource CameraPopup.BoolToVisibility}}">
+							<TextBlock Text="{Binding BrokerMonitorNote}" TextWrapping="Wrap">
+								<TextBlock.Style>
+									<Style BasedOn="{StaticResource CameraPopup.Note}" TargetType="TextBlock">
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding BrokerMonitorNeedsAttention}" Value="True">
+												<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</Label>
 					</StackPanel>
 				</c:ConsoleField>
 

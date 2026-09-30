@@ -96,11 +96,12 @@ public class BrokerRequestClient : IBrokerRequestClient
                     EnumBrokerFailure.Rejected,
                     MapServerMessage(rsp.Message),
                     serverMessage: rsp.Message ?? string.Empty,
-                    reqId: rsp.RequestId);
+                    reqId: rsp.RequestId,
+                    rawReply: reply);
             }
 
             _log?.Info($"[BrokerReq] {command} 성공 — subject={subject}, message='{rsp.Message}'");
-            return BrokerRequestResult.Ok(rsp.Message ?? string.Empty, rsp.RequestId);
+            return BrokerRequestResult.Ok(rsp.Message ?? string.Empty, rsp.RequestId, reply);
         }
         catch (OperationCanceledException)
         {

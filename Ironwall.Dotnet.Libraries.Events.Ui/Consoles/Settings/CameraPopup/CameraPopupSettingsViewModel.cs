@@ -74,6 +74,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     internal const string ExternalVmsNote = "연동처가 생기면 추가됩니다 — 지금은 고를 수 없습니다";
     internal const string SaveFailedReason = "설정 파일에 쓰지 못했습니다";
     internal const string NotTakenReason = "저장했지만 다시 읽은 값이 다릅니다";
+    internal const string FetchingMonitorsNote = "NVR 관제석에 모니터 목록을 묻는 중…";
     #endregion
 
     private static readonly CameraPopupSizeChoice[] SizePresets =
@@ -101,6 +102,10 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     private CameraPopupMonitorChoice? _selectedMonitor;
     private MonitorMatch _monitorMatch = MonitorMatch.NoMonitors;
     private string _placementNotice = string.Empty;
+
+    private bool _isFetchingBrokerMonitors;
+    private bool _brokerMonitorAttention;
+    private string _brokerMonitorNote = string.Empty;
 
     private bool _pressed;
     private bool _dragging;
@@ -593,7 +598,74 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
         }
     }
 
-    public IReadOnlyList<CameraPopupNumberChoice> BrokerMonitorChoices { get; }
+    /// <summary>모니터 칸 — 처음엔 1~8, [모니터 목록 가져오기]가 성공하면 NVR 관제석이 알려 준 목록(PRD FR-08).</summary>
+    public IReadOnlyList<CameraPopupNumberChoice> BrokerMonitorChoices { get; private set; }
+
+    /// <summary>[모니터 목록 가져오기]가 응답을 기다리는 중.</summary>
+    public bool IsFetchingBrokerMonitors => _isFetchingBrokerMonitors;
+
+    /// <summary>[모니터 목록 가져오기] 누를 수 있는가(기다리는 동안 꺼진다 — 연타 방지).</summary>
+    public bool CanFetchBrokerMonitors => !_isFetchingBrokerMonitors;
+
+    /// <summary>가져오기 결과 한 줄(성공 · 실패 사유 · 기다림). 비면 칸 설명만 보인다.</summary>
+    public string BrokerMonitorNote => _brokerMonitorNote;
+
+    public bool HasBrokerMonitorNote => !string.IsNullOrEmpty(_brokerMonitorNote);
+
+    /// <summary>가져오기가 실패했거나 저장된 모니터가 목록에 없다(칸 아래 경고색).</summary>
+    public bool BrokerMonitorNeedsAttention => _brokerMonitorAttention;
+
+    /// <summary>
+    /// [모니터 목록 가져오기] — NVR Manager 에 <c>POPUP_LAYOUT_GET</c>(창구 경유). 예외를 내지 않는다.
+    /// 실패는 칸 아래 한 줄로만 알린다(목록은 그대로 둔다). 초안의 모니터 값은 건드리지 않는다.
+    /// </summary>
+    public async Task FetchBrokerMonitorsAsync(CancellationToken ct = default)
+    {
+        if (_isFetchingBrokerMonitors) return;
+        _isFetchingBrokerMonitors = true;
+        _brokerMonitorAttention = false;
+        _brokerMonitorNote = FetchingMonitorsNote;
+        Raise(string.Empty);
+
+        NvrPopupLayoutResult result;
+        try
+        {
+            result = await _port.FetchBrokerLayoutAsync(_draft.Normalize().BrokerResponseTimeoutSeconds, ct)
+                     ?? NvrPopupLayoutResult.Unavailable;
+        }
+        catch (Exception ex)
+        {
+            result = NvrPopupLayoutResult.Fail($"모니터 목록을 가져오지 못했습니다 — {ex.Message}");
+        }
+
+        _isFetchingBrokerMonitors = false;
+        ApplyBrokerLayout(result);
+        SyncAll();
+    }
+
+    private void ApplyBrokerLayout(NvrPopupLayoutResult result)
+    {
+        if (!result.Success || result.Monitors.Count == 0)
+        {
+            _brokerMonitorAttention = true;
+            _brokerMonitorNote = string.IsNullOrWhiteSpace(result.Message) ? "모니터 목록을 가져오지 못했습니다" : result.Message;
+            return;
+        }
+
+        var choices = result.Monitors.Select(m => new CameraPopupNumberChoice(m.Index, m.Describe())).ToList();
+        var current = _draft.BrokerMonitor;
+        var missing = choices.All(c => c.Value != current);
+        if (missing) choices.Add(new CameraPopupNumberChoice(current, string.Create(CultureInfo.InvariantCulture, $"모니터 {current} · 목록에 없음")));
+        BrokerMonitorChoices = choices;
+
+        var slot = result.DefaultMonitor is { } dm
+            ? string.Create(CultureInfo.InvariantCulture, $" · NVR 기본 자리 모니터 {dm}{(result.DefaultCell is { } dc ? $" · 칸 {dc}" : string.Empty)}")
+            : string.Empty;
+        _brokerMonitorAttention = missing;
+        _brokerMonitorNote = missing
+            ? string.Create(CultureInfo.InvariantCulture, $"저장된 모니터 {current} 가 관제석 목록({result.Monitors.Count}대)에 없습니다 — 다른 모니터를 고르세요")
+            : string.Create(CultureInfo.InvariantCulture, $"관제석 모니터 {result.Monitors.Count}대를 가져왔습니다{slot}");
+    }
 
     public CameraPopupNumberChoice? SelectedBrokerMonitor
     {

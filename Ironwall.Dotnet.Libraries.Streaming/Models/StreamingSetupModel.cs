@@ -11,46 +11,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Models;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-/// <summary>
-/// 스트리밍 설정 모델 인터페이스 (전체 서비스 설정)
-/// </summary>
-public interface IStreamingSetupModel
-{
-    int MaxConnections { get; set; }
-    int MaxRetryAttempts { get; set; }
-    long MaxMemoryUsageBytes { get; set; }
-    bool EnableDebugLogging { get; set; }
-    string LogPath { get; set; }
-    string SnapshotPath { get; set; }
-    bool UseHardwareAcceleration { get; set; }
-    int DefaultNetworkCaching { get; set; }
-    int ContextPoolSize { get; set; }
-    bool EnableFrameSkipping { get; set; }
-    int MaxFrameSkip { get; set; }
-    bool IsAutoDiscard { get; set; }
-    int TimeoutSeconds { get; set; }
-    int ClockJitterMs { get; set; }
-    bool EnableClockSync { get; set; }
-    int PopupStartupDelayMs { get; set; }
-    int QueueMinDisplayMs { get; set; }
-
-    /// <summary>맵 카메라 팝업 연동 on/off — false면 카메라 심볼 더블클릭으로 팝업이 열리지 않음.</summary>
-    bool IsCameraPopupUsed { get; set; }
-
-    /// <summary>맵 카메라 팝업 RTSP 소스(CameraPopup_RtspSource_Priority FR-01):
-    /// <see cref="EnumCameraPopupRtspSource.Url"/>=수동 URL(현행 기본) / <see cref="EnumCameraPopupRtspSource.Onvif"/>=ONVIF GetStreamUri 조회.
-    /// default 구현 제공 — 미반영 소비자(메인 SetupModel)도 컴파일되고 Url 모드로 동작(라이브러리 자립, NFR-03).</summary>
-    EnumCameraPopupRtspSource CameraPopupRtspSource { get => EnumCameraPopupRtspSource.Url; set { } }
-
-    /// <summary>
-    /// 카메라 팝업 설정 한 벌(camera-popup-modes PRD FR-01 · §3) — 모드 · 제공자 · 이벤트 창 · 브로커.
-    /// 읽기 전용 보기다. default 구현은 새 키 없이 옛 키에서 이관한 값(<c>IsCameraPopupUsed</c> → 모드,
-    /// <c>CameraPopupRtspSource</c> → 제공자) — 새 키를 모르는 소비자도 컴파일되고 지금과 같은 동작을 본다.
-    /// 쓰기는 설정 화면(호스트)이 한다.
-    /// </summary>
-    CameraPopupSettings CameraPopupSettings
-        => CameraPopupSettingsCodec.Resolve(null, IsCameraPopupUsed, CameraPopupRtspSource, IsAutoDiscard, TimeoutSeconds);
-}
+// IStreamingSetupModel(계약)은 Streaming.Base\Models\IStreamingSetupModel.cs 로 옮겼다 — 이름공간은 그대로(T-07).
 
 /// <summary>
 /// 스트리밍 설정 모델 구현

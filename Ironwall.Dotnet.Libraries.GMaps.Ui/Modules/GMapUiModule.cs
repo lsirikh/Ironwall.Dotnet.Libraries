@@ -61,6 +61,8 @@ public class GMapUiModule: Module
                .As<Services.Broadcast.IBroadcastStatusNatsSyncService>().SingleInstance();
         // 카메라 "특정 위치 확인" 회전요청 NATS 발행(GIS→nvr_manager REQ) — Camera_PTZ_AimLocation
         builder.RegisterType<CameraAimControlService>().As<ICameraAimControlService>().SingleInstance();
+        // 카메라 팝업 브로커 모드(camera-popup-modes T-07) — 더블클릭 CAMERA_POPUP_OPEN · 설정 POPUP_LAYOUT_GET(GIS→nvr_manager.popup REQ)
+        builder.RegisterType<Services.CameraPopup.CameraPopupBrokerService>().As<Services.CameraPopup.ICameraPopupBrokerService>().SingleInstance();
         // 경광등 제어 4종 REQ 발행(LAMP_CLEAR/OFF/COLOR_SET/BUZZER_SET) — UI 미배선, 로직 계층 선행(PRD FR-07)
         builder.RegisterType<LampControlService>().As<ILampControlService>().SingleInstance();
         // 통문·함체 문 개폐 명령 PUB 발행(GATE_DOOR_SET/ENCLOSURE_DOOR_SET → all.gate-door/all.enclosure-door)

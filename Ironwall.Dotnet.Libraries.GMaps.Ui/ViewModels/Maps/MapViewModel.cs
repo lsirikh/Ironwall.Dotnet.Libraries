@@ -1604,37 +1604,34 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 지도 카메라 심볼 더블클릭 → RTSP 스트리밍 팝업 오픈(IpCamera 한정).
-    /// 카메라 모델의 RTSP URL(Urls.RtspSub→RtspMain→Ip)을 어댑터로 변환해 팝업에 전달.
-    /// (P5에서 ObservableCollection 팝업 오픈/위치복원에 연결)
+    /// 지도 카메라 심볼 더블클릭(IpCamera 한정) — 팝업 방식으로 가른다(camera-popup-modes T-07 · FR-01~03 · 05/06):
+    /// 자체 = 지도 위 상자 / 브로커 = NVR 관제석에 <c>CAMERA_POPUP_OPEN</c> + 지도 하단 토스트 / 사용 안 함 = 카메라 상세 보기.
+    /// 분기는 <see cref="CameraPopupDoubleClickDispatcher"/> 한 곳(옛 <c>IsCameraPopupUsed</c> 게이트 대체).
     /// </summary>
     private void OnMapMarkerDoubleClicked(IEditableMarker marker)
     {
         try
         {
-            // 카메라(IpCamera)만 대상
-            if (marker is not IPidsEditableMarker pidsMarker
-                || pidsMarker.DeviceType != EnumDeviceType.IpCamera)
-                return;
+            CameraPopupDoubleClick.Handle(marker);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 더블클릭 처리 실패: {ex.Message}");
+        }
+    }
 
-            // 카메라 팝업 연동 OFF면 더블클릭 무시 (EventSetupView "카메라 팝업 연동") — 모드 전환(브로커 · 사용 안 함)은 뒤 태스크(T-07)
-            var overlaySettings = ResolveOverlaySettings();
-            if (overlaySettings != null && !overlaySettings.IsCameraPopupUsed)
-            {
-                _log?.Info("[CameraPopup] 카메라 팝업 연동 OFF — 더블클릭 무시");
-                return;
-            }
-
-            var cameraModel = pidsMarker.LinkedDevice as ICameraDeviceModel;
-            if (cameraModel == null)
-            {
-                _log?.Warning($"[CameraPopup] 카메라 모델 없음(LinkedDevice null): {marker.Title}");
-                return;
-            }
-
+    /// <summary>
+    /// 자체 모드 — 카메라 모델의 제공자(ONVIF / RTSP 주소)로 지도 위 상자를 연다(T-02 경로 그대로).
+    /// </summary>
+    private void OpenSelfCameraPopup(IPidsEditableMarker marker, ICameraDeviceModel cameraModel,
+                                     Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.CameraPopupSettings settings)
+    {
+        try
+        {
             // 제공자(T-02 · FR-17/18): ONVIF(카메라 IP 필요, 실패 시 저장 주소 폴백) / RTSP 주소(저장 주소 필수).
             // 영상 주소 조회 · 디코딩 · PTZ 는 전부 팝업 호스트 프로세스가 한다 — GIS 는 명령만 보낸다(§0).
-            var providerKind = overlaySettings?.Settings.Provider ?? PopupProviderKind.RtspUrl;
+            // 설정 창구가 없으면(미등록) 옛 기본 = RTSP 주소.
+            var providerKind = ResolveOverlaySettings() != null ? settings.Provider : PopupProviderKind.RtspUrl;
             var provider = CameraPopupProviderFactory.Build(cameraModel, providerKind);
             if (provider == null)
             {

@@ -42,21 +42,30 @@ public class BrokerRequestResult
     /// <summary>사용자 안내용 한글 문구 — §6.9 서버 message 패턴 매핑 결과</summary>
     public string UserMessage { get; init; } = string.Empty;
 
-    public static BrokerRequestResult Ok(string message, string? reqId) => new()
+    /// <summary>
+    /// 받은 RSP 봉투 원문(성공 · 거부만 — 무응답이면 null). RSP <c>body</c> 에 결과를 싣는 낱말
+    /// (<c>CAMERA_POPUP_OPEN.popup_id</c> · <c>POPUP_LAYOUT_GET.monitors</c>)이 꺼내 읽는다(camera-popup-modes T-07).
+    /// </summary>
+    public string? RawReply { get; init; }
+
+    public static BrokerRequestResult Ok(string message, string? reqId, string? rawReply = null) => new()
     {
         Success = true,
         Reason = EnumBrokerFailure.None,
         Message = message,
         ReqId = reqId,
         UserMessage = string.Empty,
+        RawReply = rawReply,
     };
 
-    public static BrokerRequestResult Fail(EnumBrokerFailure reason, string userMessage, string serverMessage = "", string? reqId = null) => new()
+    public static BrokerRequestResult Fail(EnumBrokerFailure reason, string userMessage, string serverMessage = "", string? reqId = null,
+                                           string? rawReply = null) => new()
     {
         Success = false,
         Reason = reason,
         Message = serverMessage,
         ReqId = reqId,
         UserMessage = userMessage,
+        RawReply = rawReply,
     };
 }

@@ -14,9 +14,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.CameraPopup;
 /// </summary>
 public interface ICameraPopupOverlaySettings
 {
-    /// <summary>옛 "카메라 팝업 연동" 게이트 — false 면 더블클릭을 무시한다(모드 전환은 뒤 태스크).</summary>
+    /// <summary>옛 "카메라 팝업 연동" 키(읽기 전용 흔적). 더블클릭 분기는 이제 <see cref="Settings"/>.Mode 가 정한다(T-07 FR-01~03).</summary>
     bool IsCameraPopupUsed { get; }
 
-    /// <summary>제공자 · 더블클릭 자동 닫기 등 새 설정(옛 키에서 이관된 값 포함).</summary>
+    /// <summary>모드 · 제공자 · 더블클릭 자동 닫기 · 브로커 등 새 설정(옛 키에서 이관된 값 포함).</summary>
     CameraPopupSettings Settings { get; }
+
+    /// <summary>
+    /// 이 관제석의 식별자(<c>SetupModel.ClientId</c> — 설치 때 자동 부여 <c>gis-xxxx</c>, FR-20).
+    /// 브로커 모드 <c>CAMERA_POPUP_OPEN.target_client_id</c> 로 간다. 기본 구현은 빈 값(= 브로커 요청 불가 안내).
+    /// </summary>
+    string ClientId => string.Empty;
 }
