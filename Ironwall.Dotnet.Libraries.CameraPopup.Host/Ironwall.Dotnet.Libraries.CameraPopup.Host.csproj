@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    카메라 팝업 호스트 프로세스(PRD camera-popup-modes §0 · FR-24).
+    팝업용 LibVLC(LibVLCSharp · VideoLAN.LibVLC.Windows)를 참조하는 유일한 곳 — GIS 프로세스는 이 exe 를 띄워
+    명명 파이프로 명령만 보내고, 영상은 공유 메모리로 받는다. 여기서 무엇이 죽어도 GIS 는 산다.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <AssemblyName>Ironwall.CameraPopupHost</AssemblyName>
+    <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup.Host</RootNamespace>
+    <StartupObject>Ironwall.Dotnet.Libraries.CameraPopup.Host.Program</StartupObject>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <Version>1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF 암시적 using 은 System.IO 를 뺀다(Path 충돌 회피) — 이 exe 는 System.Windows.Shapes 를 쓰지 않는다. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp" Version="3.9.4" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

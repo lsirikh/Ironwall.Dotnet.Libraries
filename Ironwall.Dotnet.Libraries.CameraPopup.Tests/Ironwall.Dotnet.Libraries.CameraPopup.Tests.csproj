@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    카메라 팝업 격리 시험(PRD camera-popup-modes §5-A). 이 시험 프로세스가 "GIS" 역할을 한다 —
+    실제 호스트 exe 를 띄우고 죽이고 멈추게 하면서 이 프로세스가 절대 죽지 않는지 본다.
+    Category=Survival 은 실제 프로세스를 쓴다(헤드리스 호스트 · 창 없음). Category=LibVlc 는 실제 LibVLC 디코딩.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+    <!-- 호스트 exe 는 빌드 순서만 보장(어셈블리 참조 안 함 — 시험 프로세스에 LibVLC 가 들어오지 않게). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Host\Ironwall.Dotnet.Libraries.CameraPopup.Host.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+</Project>

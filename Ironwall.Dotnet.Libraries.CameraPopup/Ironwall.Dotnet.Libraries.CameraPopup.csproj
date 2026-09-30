@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    GIS 쪽 카메라 팝업 호스트 감시자 · 클라이언트(PRD camera-popup-modes FR-24~29).
+    LibVLC 참조 금지 — 영상 디코딩은 CameraPopupHost 프로세스만 한다.
+    WPF 는 Wpf\HostedVideoView(공유 메모리 프레임 표시) 한 곳에서만 쓴다. 감시자 · 클라이언트 · 프레임 읽기는 WPF 무관.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+    <RootNamespace>Ironwall.Dotnet.Libraries.CameraPopup</RootNamespace>
+    <Version>1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.CameraPopup.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
