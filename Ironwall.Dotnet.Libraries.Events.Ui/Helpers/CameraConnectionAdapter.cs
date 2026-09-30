@@ -1,8 +1,8 @@
-using System.Linq;
+﻿using System.Linq;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 
 /// <summary>
 /// 카메라 도메인 모델(<see cref="ICameraDeviceModel"/>)의 스트리밍 정보를

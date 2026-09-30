@@ -1632,7 +1632,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 영상 주소 조회 · 디코딩 · PTZ 는 전부 팝업 호스트 프로세스가 한다 — GIS 는 명령만 보낸다(§0).
             // 설정 창구가 없으면(미등록) 옛 기본 = RTSP 주소.
             var providerKind = ResolveOverlaySettings() != null ? settings.Provider : PopupProviderKind.RtspUrl;
-            var provider = CameraPopupProviderFactory.Build(cameraModel, providerKind);
+            var provider = Ironwall.Dotnet.Libraries.Events.Ui.Helpers.CameraPopupProviderFactory.Build(cameraModel, providerKind);
             if (provider == null)
             {
                 _log?.Warning($"[CameraPopup] RTSP URL 없음(영상 없음): {marker.Title} — 카메라 상세보기 > URLs 탭에 rtsp:// 입력 필요");

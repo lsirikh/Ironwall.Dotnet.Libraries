@@ -15,6 +15,7 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Moq;
 using Xunit;
 using SettingsKind = Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.VideoProviderKind;
+using CameraPopupProviderFactory = Ironwall.Dotnet.Libraries.Events.Ui.Helpers.CameraPopupProviderFactory;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
 

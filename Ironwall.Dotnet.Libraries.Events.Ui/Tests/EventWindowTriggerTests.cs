@@ -17,6 +17,7 @@ using Moq;
 using Xunit;
 using ContractProviderKind = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.VideoProviderKind;
 using SettingsProviderKind = Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.VideoProviderKind;
+using CameraPopupProviderFactory = Ironwall.Dotnet.Libraries.Events.Ui.Helpers.CameraPopupProviderFactory;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -303,8 +304,30 @@ public class EventWindowTriggerTests
         Assert.Equal(("3", "카메라 3", true, true), (tile.CameraId, tile.Name, tile.IsPtz, tile.PtzAllowed));
         Assert.Equal(("2", "정문", "1", 7), (tile.TargetPresetToken, tile.TargetPresetName, tile.HomePresetToken, tile.DelaySeconds));
         Assert.Equal(ContractProviderKind.Onvif, tile.Provider.Kind);
-        Assert.Equal("http://10.0.0.3:80/onvif/device_service", tile.Provider.Uri);
+        Assert.Equal(("10.0.0.3", 80), (tile.Provider.Host, tile.Provider.Port));
         Assert.Equal(("admin", "pw"), (tile.Provider.Username, tile.Provider.Password));
+    }
+
+    [Fact]
+    public void should_fill_host_port_account_and_fallback_like_double_click_overlay_when_provider_is_onvif()
+    {
+        // Arrange — dummy ONVIF camera on a non-default port (the host resolves the stream + PTZ from Host · Port)
+        var camera = Camera(3);
+        camera.IpAddress = "127.0.0.1";
+        camera.IpPort = 8183;
+
+        // Act
+        var provider = EventWindowPlanning.BuildProvider(camera, new CameraPopupSettings().Normalize());
+
+        // Assert — the same rule as the double-click overlay (CameraPopupProviderFactory): one builder, no drift
+        Assert.Equal(ContractProviderKind.Onvif, provider.Kind);
+        Assert.Equal(("127.0.0.1", 8183), (provider.Host, provider.Port));
+        Assert.Equal(("admin", "pw"), (provider.Username, provider.Password));
+        Assert.True(provider.PreferSubStream);
+        Assert.Equal("rtsp://admin:pw@10.0.0.3/main", provider.FallbackUri);
+        var overlay = CameraPopupProviderFactory.Build(camera, SettingsProviderKind.Onvif)!;
+        Assert.Equal(overlay.ToString(), provider.ToString());
+        Assert.Equal((overlay.Password, overlay.ProfileToken, overlay.Uri), (provider.Password, provider.ProfileToken, provider.Uri));
     }
 
     [Fact]
@@ -319,7 +342,8 @@ public class EventWindowTriggerTests
         Assert.Null(tile.TargetPresetToken);
         Assert.Equal(0, tile.DelaySeconds);
         Assert.Equal(ContractProviderKind.Rtsp, tile.Provider.Kind);
-        Assert.Equal("rtsp://10.0.0.3/main", tile.Provider.Uri);
+        Assert.Equal("rtsp://admin:pw@10.0.0.3/main", tile.Provider.Uri);
+        Assert.Equal(("10.0.0.3", 80), (tile.Provider.Host, tile.Provider.Port));   // PTZ via ONVIF, like the overlay
     }
 
     // ───────────────────────── 조치보고 → 닫기 ─────────────────────────

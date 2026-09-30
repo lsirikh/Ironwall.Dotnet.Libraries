@@ -2,11 +2,12 @@
 using Contract = Ironwall.Dotnet.Libraries.CameraPopup.Contracts;
 using SettingsKind = Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.VideoProviderKind;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 
 /****************************************************************************
-   Purpose      : 더블클릭 팝업 제공자 정보 만들기(순수) — 설정 제공자 종류 + 카메라 장비 → 호스트 계약
-                  (PRD camera-popup-modes FR-04 · FR-17/18, T-02)
+   Purpose      : 카메라 팝업 제공자 정보 만들기(순수) — 설정 제공자 종류 + 카메라 장비 → 호스트 계약
+                  (PRD camera-popup-modes FR-04 · FR-17/18, T-02). 더블클릭 팝업(GMaps.Ui MapViewModel)과
+                  이벤트 창(EventWindowPlanning.BuildProvider)이 같이 쓴다 — 두 경로가 어긋나지 않게 한 곳(2026-09-30, GMaps.Ui 에서 이관).
    Created On   : 2026-09-30
    Company      : Sensorway Co., Ltd.
 ****************************************************************************/

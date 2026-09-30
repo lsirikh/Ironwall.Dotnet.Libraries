@@ -198,8 +198,8 @@ public class OnvifClientTests : IClassFixture<OnvifFarmFixture>
     [Fact]
     public async Task should_answer_device_calls_via_http_digest_retry_when_camera_demands_transport_digest()
     {
-        // cam7 demands HTTP Digest on every call. The device client carries HttpDigest credentials → its calls pass
-        // after one 401 challenge. (Media/PTZ: see the skipped test below.)
+        // cam7 demands HTTP Digest on every call. Every client carries the camera's HttpDigest credentials → calls pass
+        // after one 401 challenge (media: see the test below; PTZ: OnvifAuthTests).
         var registry = CameraProviderRegistry.CreateDefault(new TestLog());
 
         await registry.GetPtz(VideoProviderKind.Onvif)!.PrepareAsync("c7", _fx.Info(7), Within(10_000));
@@ -211,13 +211,12 @@ public class OnvifClientTests : IClassFixture<OnvifFarmFixture>
         Assert.Contains(cam7, e => (string?)e["op"] == "GetCapabilities" && (string?)e["result"] == "ok" && (string?)e["httpAuth"] == "Digest");
     }
 
-    [Fact(Skip = "Client gap (2026-09-30 dummy finding): OnvifClientFactory gives only the DEVICE client HttpDigest credentials; " +
-                 "Media/PTZ clients answer the 401 challenge with a digest for another account, so a camera that demands HTTP Digest " +
-                 "on media/ptz yields no stream URI and no PTZ. Un-skip when the factory sets ClientCredentials.HttpDigest on every client.")]
+    [Fact]
     public async Task should_resolve_stream_when_camera_demands_transport_digest()
     {
         var registry = CameraProviderRegistry.CreateDefault(new TestLog());
         var stream = await registry.GetVideo(VideoProviderKind.Onvif)!.ResolveStreamAsync("c7s", _fx.Info(7), Within(10_000));
         Assert.True(stream.Success, stream.ToString());
+        Assert.DoesNotContain(_fx.Requests, e => (string?)e["cam"] == "cam7" && e["httpAuthUserOk"] is false);   // never another account's digest
     }
 }

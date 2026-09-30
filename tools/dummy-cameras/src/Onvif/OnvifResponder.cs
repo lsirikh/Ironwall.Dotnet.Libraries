@@ -70,7 +70,7 @@ public sealed class OnvifResponder : IAsyncDisposable
 
         if (faults.NoOnvifReply)
         {
-            LogRequest(req, op, "no-reply (fault injected)", sw);
+            LogRequest(req, op, "no-reply (fault injected)", sw, HasUsernameToken(doc));
             return HttpReply.Hold;
         }
         if (faults.SlowOnvifMs > 0)
@@ -96,11 +96,11 @@ public sealed class OnvifResponder : IAsyncDisposable
         }
         else
         {
-            bool httpDigestOk = !faults.AuthFail && HttpDigestAuth.Verify(req.Header("authorization"), req.Method, _user, _password);
+            bool httpDigestOk = !faults.AuthFail && !faults.WsSecurityOnly && HttpDigestAuth.Verify(req.Header("authorization"), req.Method, _user, _password);
             (reply, result) = Dispatch(doc, op, ns, httpDigestOk);
         }
 
-        LogRequest(req, op, result, sw);
+        LogRequest(req, op, result, sw, HasUsernameToken(doc));
         return reply;
     }
 
@@ -125,12 +125,13 @@ public sealed class OnvifResponder : IAsyncDisposable
 
         if (op == "GetSystemDateAndTime") return (Ok(OnvifXml.SystemDateAndTime(now)), "ok");
 
-        if (!PreAuthOps.Contains(op) && !httpDigestOk)
+        bool strict = _cam.Faults.WsSecurityOnly;
+        if ((strict || !PreAuthOps.Contains(op)) && !httpDigestOk)
         {
             var header = doc.Root.Elements().FirstOrDefault(e => e.Name.LocalName == "Header");
             var auth = WsUsernameToken.Verify(header, _user, _password, now);
             if (_cam.Faults.AuthFail && auth != AuthResult.Missing) auth = AuthResult.BadPassword;
-            if (auth == AuthResult.Missing)
+            if (auth == AuthResult.Missing && !strict)
             {
                 LogPtzIfNeeded(op, body, "http-401-challenge", now);
                 return (Challenge(), "http-401-challenge");
@@ -312,7 +313,12 @@ public sealed class OnvifResponder : IAsyncDisposable
 
     // ── logging ──────────────────────────────────────────────────────────
 
-    private void LogRequest(HttpRequestData req, string op, string result, Stopwatch sw)
+    /// <summary>Did the SOAP request carry a WS-Security UsernameToken header (validity is judged in Dispatch)?</summary>
+    private static bool HasUsernameToken(XDocument? doc)
+        => doc?.Root?.Elements().FirstOrDefault(e => e.Name.LocalName == "Header")
+               ?.Descendants().Any(e => e.Name.LocalName == "UsernameToken") == true;
+
+    private void LogRequest(HttpRequestData req, string op, string result, Stopwatch sw, bool wsSecurity)
     {
         _requests.Write(new Dictionary<string, object?>
         {
@@ -323,6 +329,7 @@ public sealed class OnvifResponder : IAsyncDisposable
             ["op"] = op,
             ["result"] = result,
             ["expect100"] = req.HasExpectContinue,
+            ["wsSecurity"] = wsSecurity,
             ["httpAuth"] = req.Header("authorization") is { } a ? a.Split(' ')[0] : null,
             // whether an HTTP Digest header named the camera account (the name itself is not logged)
             ["httpAuthUserOk"] = req.Header("authorization") is { } d && d.StartsWith("Digest ", StringComparison.OrdinalIgnoreCase)

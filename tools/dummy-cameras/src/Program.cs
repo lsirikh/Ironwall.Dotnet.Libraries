@@ -38,6 +38,7 @@ internal static class Cli
           --no-onvif-reply 5[,6]            never answer ONVIF
           --auth-fail 6                     WS-Security + RTSP always rejected
           --http-digest 7|all               demand HTTP Digest on ONVIF (401 challenge)
+          --ws-security-only 3|all          demand WS-UsernameToken on every ONVIF op but the clock (no Digest, no PRE_AUTH)
           --kill-stream-after 7=30          stop the RTSP publisher after 30 s (camera power off)
           --corrupt-stream 8                bit-flip the H.264 packets
         SEED / CLEANUP OPTIONS
@@ -120,6 +121,7 @@ internal static class Cli
         foreach (var (cam, _) in a.PerCamera("no-onvif-reply", o.Count)) Add(o, cam, f => f.NoOnvifReply = true);
         foreach (var (cam, _) in a.PerCamera("auth-fail", o.Count)) Add(o, cam, f => f.AuthFail = true);
         foreach (var (cam, _) in a.PerCamera("http-digest", o.Count)) Add(o, cam, f => f.HttpDigest = true);
+        foreach (var (cam, _) in a.PerCamera("ws-security-only", o.Count)) Add(o, cam, f => f.WsSecurityOnly = true);
         foreach (var (cam, v) in a.PerCamera("kill-stream-after", o.Count)) Add(o, cam, f => f.KillStreamAfterSec = v ?? 30);
         foreach (var (cam, _) in a.PerCamera("corrupt-stream", o.Count)) Add(o, cam, f => f.CorruptStream = true);
         return o;

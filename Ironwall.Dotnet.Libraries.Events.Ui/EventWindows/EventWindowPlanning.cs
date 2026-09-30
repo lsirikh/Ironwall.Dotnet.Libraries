@@ -2,11 +2,11 @@
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using ContractProviderKind = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.VideoProviderKind;
-using SettingsProviderKind = Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.VideoProviderKind;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
 
@@ -101,36 +101,20 @@ public static class EventWindowPlanning
         };
     }
 
-    /// <summary>설정의 제공자 → 호스트 제공자 정보. RTSP 주소 제공자는 장비의 주 스트림(없으면 보조).</summary>
+    /// <summary>
+    /// 설정의 제공자 → 호스트 제공자 정보. <b>더블클릭 팝업과 같은 빌더</b>(<see cref="CameraPopupProviderFactory.Build"/>)를 쓴다 —
+    /// 두 경로가 따로 채우면 어긋난다(예전 이 경로는 ONVIF 에 Uri 만 채우고 Host · Port 를 비워, 호스트가 "주소 없음" · PTZ 불가로 답했다).
+    /// ONVIF: Host · Port(IpPort, 0 이면 80) · 계정 · 서브 스트림 우선 · 저장 주소 폴백. RTSP 주소: 저장 주소(서브 → 메인, 계정 결합) + PTZ 용 Host · Port.
+    /// 재생할 것이 없는 카메라(빌더가 null)도 타일은 연다 — 빈 RTSP 제공자(호스트가 그 타일에만 "주소 없음").
+    /// </summary>
     public static VideoProviderInfo BuildProvider(ICameraDeviceModel camera, CameraPopupSettings settings)
-    {
-        if (settings.Provider == SettingsProviderKind.RtspUrl)
-        {
-            var rtsp = FirstNonEmpty(camera.Urls?.RtspMain, camera.Urls?.RtspSub);
-            return new VideoProviderInfo
-            {
-                Kind = ContractProviderKind.Rtsp,
-                Uri = rtsp,
-                Username = camera.UserName,
-                Password = camera.UserPassword,
-            };
-        }
-        return new VideoProviderInfo
-        {
-            Kind = ContractProviderKind.Onvif,
-            Uri = FirstNonEmpty(camera.Urls?.OnvifDeviceService) ?? DefaultOnvifService(camera.IpAddress, camera.IpPort),
-            Username = camera.UserName,
-            Password = camera.UserPassword,
-        };
-    }
-
-    /// <summary>장비에 ONVIF 서비스 주소가 없을 때의 표준 주소.</summary>
-    public static string? DefaultOnvifService(string? ip, int port)
-    {
-        if (string.IsNullOrWhiteSpace(ip)) return null;
-        var p = port > 0 ? port : 80;
-        return string.Create(CultureInfo.InvariantCulture, $"http://{ip.Trim()}:{p}/onvif/device_service");
-    }
+        => CameraPopupProviderFactory.Build(camera, settings.Provider)
+           ?? new VideoProviderInfo
+           {
+               Kind = ContractProviderKind.Rtsp,
+               Username = camera.UserName,
+               Password = camera.UserPassword,
+           };
 
     /// <summary>창 머리(FR-16) — 배지 · 구역 · 장비 · 종류 · 시각.</summary>
     public static EventWindowHeader BuildHeader(EnumEventType eventType, string? zoneName, string? deviceName, DateTime occurredLocal)
@@ -157,7 +141,4 @@ public static class EventWindowPlanning
         => string.IsNullOrWhiteSpace(header.DeviceName)
             ? $"{header.KindLabel} · 이벤트 {eventId}"
             : $"{header.KindLabel} · {header.DeviceName}";
-
-    private static string? FirstNonEmpty(params string?[] values)
-        => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim();
 }

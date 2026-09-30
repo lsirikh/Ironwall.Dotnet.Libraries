@@ -8,7 +8,7 @@ namespace DummyCameras.Control;
 /// Loopback control/status endpoint for headed tests (no auth - binds 127.0.0.1 only):
 /// <list type="bullet">
 /// <item><c>GET /status</c> - every camera: type · ports · URLs · PTZ position/motion · faults · stream state.</item>
-/// <item><c>POST /cam/{n}/fault?slow=ms&amp;noreply=0|1&amp;authfail=0|1&amp;digest=0|1</c> - change ONVIF faults at runtime
+/// <item><c>POST /cam/{n}/fault?slow=ms&amp;noreply=0|1&amp;authfail=0|1&amp;digest=0|1&amp;ws=0|1</c> - change ONVIF faults at runtime
 /// (RTSP auth-fail is fixed at start: MediaMTX grants are written once).</item>
 /// <item><c>POST /cam/{n}/stream/kill</c> · <c>/stream/start</c> - camera power off / on.</item>
 /// <item><c>POST /cam/{n}/ptz/reset</c> - back home, idle.</item>
@@ -44,6 +44,7 @@ public sealed class ControlServer : IAsyncDisposable
                     if (q.TryGetValue("noreply", out var nr)) f.NoOnvifReply = nr is "1" or "true";
                     if (q.TryGetValue("authfail", out var af)) f.AuthFail = af is "1" or "true";
                     if (q.TryGetValue("digest", out var dg)) f.HttpDigest = dg is "1" or "true";
+                    if (q.TryGetValue("ws", out var ws)) f.WsSecurityOnly = ws is "1" or "true";
                     return Task.FromResult(HttpReply.Json(JsonSerializer.Serialize(new { cam = cam.Spec.Id, faults = f.ToString() })));
                 case "stream" when parts.Length >= 4 && cam.Publisher is { } pub:
                     if (parts[3] == "kill") pub.Kill("control");

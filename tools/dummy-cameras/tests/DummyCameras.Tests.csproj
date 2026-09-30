@@ -6,6 +6,7 @@
       - Onvif: in-process farm (ONVIF only, free ports) driven by OUR client - CameraProviderRegistry.CreateDefault
                (OnvifVideoProvider / OnvifPtzProvider → PtzController → OnvifSolution, T-01 Expect-off).
       - Live:  full farm (MediaMTX + ffmpeg, non-default ports) + ffprobe of the RTSP URIs our client resolves.
+      - EventWindow: full farm + the real camera host exe (headless) opening an event window built by Events.Ui planning.
                Skipped when ffmpeg/ffprobe or the MediaMTX binary (fetch-mediamtx) is missing.
   -->
   <PropertyGroup>
@@ -35,6 +36,12 @@
   <ItemGroup>
     <ProjectReference Include="..\DummyCameras.csproj" />
     <ProjectReference Include="..\..\..\Ironwall.Dotnet.Libraries.CameraPopup.Providers\Ironwall.Dotnet.Libraries.CameraPopup.Providers.csproj" />
+    <!-- Event window end to end: GIS planning (Events.Ui) → supervisor (CameraPopup) → real host exe (headless) → farm.
+         The host is a build-order reference only (no assembly reference, so LibVLC stays out of the test process). -->
+    <ProjectReference Include="..\..\..\Ironwall.Dotnet.Libraries.CameraPopup\Ironwall.Dotnet.Libraries.CameraPopup.csproj" />
+    <ProjectReference Include="..\..\..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
+    <ProjectReference Include="..\..\..\Ironwall.Dotnet.Libraries.CameraPopup.Host\Ironwall.Dotnet.Libraries.CameraPopup.Host.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
 </Project>

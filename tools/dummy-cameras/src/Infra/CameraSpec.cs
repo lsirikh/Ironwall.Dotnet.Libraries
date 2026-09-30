@@ -9,6 +9,7 @@ public sealed class CameraFaults
     private volatile bool _noOnvifReply;
     private volatile bool _authFail;
     private volatile bool _httpDigest;
+    private volatile bool _wsSecurityOnly;
     private volatile bool _corruptStream;
 
     /// <summary>Delay every ONVIF reply by this many ms (FR-26 · K5).</summary>
@@ -23,6 +24,13 @@ public sealed class CameraFaults
     /// <summary>Require HTTP Digest (401 challenge) on the ONVIF endpoints in addition to WS-UsernameToken.</summary>
     public bool HttpDigest { get => _httpDigest; set => _httpDigest = value; }
 
+    /// <summary>
+    /// Strict WS-Security camera: every op except GetSystemDateAndTime (GetCapabilities · GetDeviceInformation · Media · PTZ)
+    /// needs a valid WS-UsernameToken; HTTP Digest is neither offered nor accepted, a missing token is ter:NotAuthorized.
+    /// Proves a client really sends the SOAP header instead of riding on PRE_AUTH ops or the HTTP Digest fallback.
+    /// </summary>
+    public bool WsSecurityOnly { get => _wsSecurityOnly; set => _wsSecurityOnly = value; }
+
     /// <summary>Kill the RTSP publisher this many seconds after start (camera "power off"). null = never.</summary>
     public int? KillStreamAfterSec { get; set; }
 
@@ -36,6 +44,7 @@ public sealed class CameraFaults
         if (NoOnvifReply) parts.Add("no-onvif-reply");
         if (AuthFail) parts.Add("auth-fail");
         if (HttpDigest) parts.Add("http-digest");
+        if (WsSecurityOnly) parts.Add("ws-security-only");
         if (KillStreamAfterSec is int k) parts.Add($"kill-stream-after={k}s");
         if (CorruptStream) parts.Add("corrupt-stream");
         return parts.Count == 0 ? "none" : string.Join(' ', parts);
