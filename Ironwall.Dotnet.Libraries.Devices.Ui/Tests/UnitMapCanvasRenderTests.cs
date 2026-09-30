@@ -625,6 +625,7 @@ public class UnitMapCanvasRenderTests
         {
             try { result = body(); }
             catch (Exception ex) { failure = ex; }
+            finally { StaCleanup.ShutdownDispatcher(); }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

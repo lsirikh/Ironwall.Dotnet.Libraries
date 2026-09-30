@@ -245,7 +245,7 @@ public class DeviceConsoleTargetAndServerChoiceTests : IDisposable
     private static void RunSta(System.Action action)
     {
         Exception? failure = null;
-        var thread = new Thread(() => { try { action(); } catch (Exception ex) { failure = ex; } });
+        var thread = new Thread(() => { try { action(); } catch (Exception ex) { failure = ex; } finally { StaCleanup.ShutdownDispatcher(); } });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
