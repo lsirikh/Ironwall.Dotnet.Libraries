@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Api.Models;
+﻿using Ironwall.Dotnet.Libraries.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using System;
 using System.Net.Http;
@@ -96,15 +97,20 @@ public class ApiService : IApiService, IApiHeaderRequestService
         };
 
         // FR-2: 세션 식별용 X-Client-Id(주체별 고유). 로그인 포함 전 요청에 일관 부착.
-        // 빈값이면 미부착(하위호환 안전), 패턴(^[A-Za-z0-9._:-]{1,64}$) 위반이면 미부착+경고(서버는 위반값을 무시).
-        var clientId = _setupModel.ClientId;
-        if (!string.IsNullOrWhiteSpace(clientId))
-        {
-            if (System.Text.RegularExpressions.Regex.IsMatch(clientId, "^[A-Za-z0-9._:-]{1,64}$"))
-                _client.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Id", clientId);
-            else
-                _log?.Warning($"[ApiService] X-Client-Id 패턴 위반으로 미부착: '{clientId}'");
-        }
+        //
+        // ★ 값은 ClientIdResolver 가 정한다 — 설정값이 비었거나 **전 PC 공통인 옛 값**
+        //   (central-ui · gis-monitoring)이면 설치 고유값(%ProgramData%\Ironwall\Gis\client-id)으로
+        //   대체한다. 공통값을 그대로 보내면 관리자가 session_self_replace_enabled 를 켜는 순간
+        //   관제석끼리 서로 축출한다(서버 auth.py 의 ★ 경고).
+        //
+        // 서버는 헤더를 먼저 보고 본문 client_id 는 헤더가 없을 때만 본다
+        // (auth.py: `request.headers.get("X-Client-Id") or login_data.client_id`).
+        // 그래서 **헤더가 정본**이고, 로그인 본문도 같은 값을 실어야 두 곳이 어긋나지 않는다.
+        var clientId = ClientIdResolver.Resolve(_setupModel.ClientId, m => _log?.Warning(m));
+        if (ClientIdResolver.IsWellFormed(clientId))
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Id", clientId);
+        else
+            _log?.Warning($"[ApiService] X-Client-Id 패턴 위반으로 미부착: '{clientId}'");
     }
 
     /// <summary>
