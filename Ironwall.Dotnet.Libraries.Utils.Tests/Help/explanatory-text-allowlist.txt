@@ -4,11 +4,6 @@
 # 다시 찍기: IRONWALL_HELP_ALLOWLIST_WRITE=1 dotnet test --filter should_not_add_new_explanatory_text
 Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	binding	Hint=ListEmptyHint
 Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	binding	Hint=NoGroupHint
-Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	literal	Hint=위 ‘구성원 추가’에서 계정을 고른 뒤 [추가]를 누르세요.
-Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	literal	Note=비우면 기한 없이 부여합니다.
-Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	목록에서 세션을 고르면 단말 · 만료 시각과 종료 단추가 여기에 나옵니다.
-Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	방패(서버 적용) 표시가 없는 모듈의 제어 권한은 화면의 단추만 막습니다.
-Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요. 잘못 바꿨으면 [되돌리기]를 누르세요. 바꾼 값은 다음 로그인부터 적용됩니다.
 Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 잠그지 않음 · 3~20회
 Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 제한 없음 · 0~100
 Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 지우지 않음 · 0~3650일
@@ -184,36 +179,19 @@ Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	binding	Hint=MappingEmptyHint
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	binding	Hint=PaletteEmptyHint
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	literal	md:HintAssist.Hint=장비 검색
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=CloseNote
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=LayoutNote
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=ModeNote
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=ProviderNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=BrokerMonitorNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=MonitorNote
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=PlacementNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=VmsNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	ToolTip=VmsNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	ToolTip=VmsNote
 Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Visibility=HasBrokerMonitorNote
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=1~10. 넘으면 가장 오래된 창(📌 제외)을 닫고 새 창 — 카드는 그대로
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=NVR 관제석 모니터 · 칸(3×3). 모니터 목록은 NVR Manager 에게 묻습니다
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=결과(띄움 · 거부 · 무응답)는 지도 하단 토스트로 알립니다
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=설치 때 자동 부여 · 바꿀 수 없음
-Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=창 안 카메라는 이벤트 매핑 순서(priority)대로
 Ironwall.Dotnet.Libraries.Events.Ui/Views/ActionSelectionView.xaml	literal	md:HintAssist.Hint=작성자
 Ironwall.Dotnet.Libraries.Events.Ui/Views/ActionSelectionView.xaml	literal	md:HintAssist.Hint=조치 내용
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	literal	md:HintAssist.Hint=기타 내용을 적으세요
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	literal	md:HintAssist.Hint=문구를 고르세요
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	text	탐지 · 장애 행의 손잡이를 끌어 여기에 놓으세요. 툴바의 [트레이에 담기] 버튼으로도 담을 수 있습니다.
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=EmptyHint
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=LockNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=Note
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Visibility=HasLockNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Visibility=HasNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventOverviewView.xaml	binding	Text=DeviceGroupNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventOverviewView.xaml	binding	Text=TotalNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDetailView.xaml	binding	Text=DetailNote
-Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDetailView.xaml	binding	Visibility=HasDetailNote
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=HH:MM
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=HH:MM
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=YYYY-MM-DD HH:MM
@@ -239,15 +217,11 @@ Ironwall.Dotnet.Libraries.Gateway/Views/GatewaySetupView.xaml	literal	Hint=[추�
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Hint=DetailEmptyHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Text=EmptyStateHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Visibility=EmptyStateHint
-Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	text	문구를 끌거나, 고른 뒤 Alt+↑/↓ 또는 오른쪽 ▲▼ 로 순서를 바꿉니다.
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Hint=TemplateDetailEmptyHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Value=ListViewModel.EmptyStateHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Value=TemplateViewModel.EmptyStateHint
-Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportCreateDetailView.xaml	literal	Note=표준 전체에서는 고르지 않습니다
-Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportCreateDetailView.xaml	text	아무것도 고르지 않으면 전 심각도입니다. 시스템 이벤트 계열에만 적용됩니다.
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportPreviewView.xaml	binding	Text=SurfaceHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportPreviewView.xaml	binding	Visibility=HasSurfaceHint
-Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportTemplateDetailView.xaml	binding	Text=ReorderHint
 Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=이벤트 탐지 자동 해제
 Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=이벤트 탐지 자동 해제
 Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=탐지경보 자동해제
