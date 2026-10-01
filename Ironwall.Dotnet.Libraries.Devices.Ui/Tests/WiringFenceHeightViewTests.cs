@@ -419,6 +419,68 @@ public class WiringFenceHeightViewTests
     }
     #endregion
 
+    #region - Red snap points on screen (헤디드 r23 SC-FEN-025) -
+    /// <summary>창 안의 어도너 층까지 그린 그림에서 StatusCritical(#C62121 · 라이트) 빛깔 픽셀 수.</summary>
+    private static int CriticalPixels(Window window)
+    {
+        var root = Descendants<System.Windows.Documents.AdornerDecorator>(window).First();
+        var w = (int)Math.Ceiling(root.ActualWidth);
+        var h = (int)Math.Ceiling(root.ActualHeight);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(root);
+        var pixels = new byte[w * h * 4];
+        bitmap.CopyPixels(pixels, w * 4, 0);
+        var count = 0;
+        for (var i = 0; i < pixels.Length; i += 4)
+            if (Math.Abs(pixels[i + 2] - 0xC6) <= 20 && Math.Abs(pixels[i + 1] - 0x21) <= 20 && Math.Abs(pixels[i] - 0x21) <= 20 && pixels[i + 3] > 200) count++;
+        return count;
+    }
+
+    private static (int Before, int During, int After) DragAndCountRed(FenceCanvas canvas)
+    {
+        var window = Window.GetWindow(canvas)!;
+        var before = CriticalPixels(window);
+        var chip = canvas.SensorChips[102];
+        var start = canvas.ScreenCenterOf(chip);
+        canvas.OnPointerPressed(start, chip);
+        canvas.OnPointerMoved(start + new Vector(12, 0));
+        canvas.OnPointerMoved(start + new Vector(30, 40));                                    // 점에서 먼 곳 — 고리 없이 점만
+        Pump();
+        var during = CriticalPixels(window);
+        canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, chip);
+        Pump();
+        return (before, during, CriticalPixels(window));
+    }
+
+    [Fact]
+    public void should_paint_the_red_snap_points_on_screen_while_a_sensor_is_dragged()
+    {
+        var (before, during, after) = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) => DragAndCountRed(canvas));
+
+        Assert.True(during > before + 300, $"빨강 픽셀 전 {before} · 끄는 중 {during}");          // 점 35개(반지름 4px)
+        Assert.True(during > after + 300, $"놓은 뒤 {after}");
+    }
+
+    [Fact]
+    public void should_still_paint_the_red_snap_points_after_the_fence_view_left_the_tree_and_came_back()
+    {
+        // 헤디드 r23: 보기 전환 · 칸 접기로 펜스 보기가 트리에서 잠깐 빠지면 어도너 층이 덧그림 어도너를 스스로 떼어 낸다 —
+        // 캔버스는 예전 어도너를 쥐고 있어 다시 붙이지 않았다(끄는 동안 고스트만 보이고 빨강 점 · 알약이 안 보였다).
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var window = Window.GetWindow(canvas)!;
+            var view = window.Content;
+            window.Content = null;
+            Pump();
+            window.Content = view;
+            Pump();
+            return DragAndCountRed(canvas);
+        });
+
+        Assert.True(result.During > result.Before + 300, $"빨강 픽셀 전 {result.Before} · 끄는 중 {result.During}");
+    }
+    #endregion
+
     #region - Fixtures -
     private static T OnWindow<T>(WiringViewModel vm, Func<WiringViewModel, FenceCanvas, T> body)
         => OnSta(() =>

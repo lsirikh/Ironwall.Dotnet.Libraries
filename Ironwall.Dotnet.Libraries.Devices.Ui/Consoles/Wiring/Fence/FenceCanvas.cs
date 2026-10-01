@@ -574,12 +574,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     #endregion
 
     #region - Overlay -
+    /// <summary>
+    /// 덧그림 어도너가 <b>지금</b> 어도너 층에 붙어 있게 한다. 펜스 보기가 트리에서 잠깐 빠지면(보기 전환 · 칸 접기 · 다시 띄우기) 어도너 층이
+    /// 그 어도너를 스스로 떼어 낸다 — 예전에는 떼인 어도너를 쥔 채 다시 붙이지 않아 끄는 동안 고스트만 보이고 빨강 점 · 알약이 안 그려졌다(헤디드 r23 SC-FEN-025).
+    /// </summary>
     private void EnsureOverlay()
     {
-        if (_overlay is not null) return;
         var layer = AdornerLayer.GetAdornerLayer(this);
         if (layer is null) return;
-        _overlay = new FenceOverlayAdorner(this);
+        if (_overlay is not null && ReferenceEquals(VisualTreeHelper.GetParent(_overlay), layer)) return;
+        if (_overlay is not null && VisualTreeHelper.GetParent(_overlay) is AdornerLayer old) old.Remove(_overlay);
+        _overlay ??= new FenceOverlayAdorner(this);
         layer.Add(_overlay);
     }
 
