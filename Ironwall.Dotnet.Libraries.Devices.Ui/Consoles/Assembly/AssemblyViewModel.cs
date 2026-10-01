@@ -384,9 +384,15 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     public string CatalogStates => AssemblyPalette.Join(_inspected?.Info?.States ?? Array.Empty<string>());
     public string CatalogCommands => AssemblyPalette.Join(_inspected?.Info?.Commands ?? Array.Empty<string>());
     public string CatalogProduces => AssemblyPalette.Join(_inspected?.Info?.Produces ?? Array.Empty<string>());
-    public string CatalogNote => _inspected?.Info is null
+    /// <summary>무엇을 보고하는가 — 사실 상자의 한 줄(설명이 아니라 값). 목록에 없는 유형이면 빈 글.</summary>
+    public string CatalogReports => _inspected?.Info is null
+        ? string.Empty
+        : _inspected.Info.ReportsState ? "동작 상태 + 정상 · 고장" : "정상 · 고장만(동작 상태 없음)";
+
+    /// <summary>목록에 없는 유형 — 등록 · 적용을 막는 경고라 화면에 남는다(help-callout §2). 아니면 빈 글.</summary>
+    public string CatalogWarning => _inspected is not null && _inspected.Info is null
         ? "목록에 없는 부품 유형입니다. 등록하거나 적용할 수 없습니다."
-        : _inspected.Info.ReportsState ? "이 유형은 동작 상태를 보고합니다." : "이 유형은 동작 상태를 보고하지 않고 정상 · 고장 여부만 보고합니다.";
+        : string.Empty;
 
     private void Inspect(BoardSlotViewModel? item)
     {
@@ -400,7 +406,8 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         NotifyOfPropertyChange(nameof(CatalogStates));
         NotifyOfPropertyChange(nameof(CatalogCommands));
         NotifyOfPropertyChange(nameof(CatalogProduces));
-        NotifyOfPropertyChange(nameof(CatalogNote));
+        NotifyOfPropertyChange(nameof(CatalogReports));
+        NotifyOfPropertyChange(nameof(CatalogWarning));
         NotifyOfPropertyChange(nameof(HasOverrideRows));
     }
 
@@ -519,13 +526,6 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         _ => "등록…",
     };
 
-    public string PrimaryHint => Mode switch
-    {
-        AssemblyMode.EditDevice => "저장 전에 최신 상태와 비교합니다",
-        AssemblyMode.EditPreset => "이 PC의 프리셋에 저장합니다",
-        _ => "번호 · 이름만 입력하면 한 번에 등록됩니다",
-    };
-
     public bool CanCommit => !IsBusy && !_board.HasErrors && Mode switch
     {
         AssemblyMode.EditDevice => _board.IsDirty,
@@ -634,7 +634,6 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
     };
 
     public string FooterText => $"부품 {_board.Slots.Count} · 미저장 변경 {_board.UnsavedChangeCount}";
-    public string FooterNote => "저장하기 전에는 아무것도 바뀌지 않습니다";
 
     /// <summary>바뀐 것이 없을 때의 한 줄.</summary>
     public const string NoChangeText = "바뀐 내용이 없습니다.";
