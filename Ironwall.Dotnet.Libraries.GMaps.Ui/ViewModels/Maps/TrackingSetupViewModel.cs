@@ -1,4 +1,4 @@
-using System.Windows.Input;
+﻿using System.Windows.Input;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
@@ -54,7 +54,7 @@ public sealed class TrackingSetupViewModel : PropertyChangedBase
     /// <summary>콤보 ItemsSource — enum 값 목록(Local/Api).</summary>
     public IReadOnlyList<EnumTrackDataSource> DataSourceOptions { get; } = Enum.GetValues<EnumTrackDataSource>().ToList();
 
-    private string _status = "조정 즉시 반영 · [저장]으로 영속";
+    private string _status = string.Empty;   // "조정 즉시 반영 · [저장]으로 영속" 안내는 창 "?"(Map.Tracking.Settings, help-callout H-4)
     public string Status { get => _status; set { _status = value; NotifyOfPropertyChange(); } }
     #endregion
 
@@ -69,7 +69,7 @@ public sealed class TrackingSetupViewModel : PropertyChangedBase
         try
         {
             await MapSettingsHelper.SaveTrackingSettingsAsync(_model, _log).ConfigureAwait(true);
-            Status = "저장됨 — 재시작 후에도 유지";
+            Status = "저장됨";
             _log?.Info("[TrackingSetup] 설정 저장(appsettings.Tracking)");
         }
         catch (Exception ex)

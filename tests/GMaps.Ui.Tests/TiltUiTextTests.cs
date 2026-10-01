@@ -76,11 +76,13 @@ public class TiltUiTextTests
     }
 
     [Fact]
-    public void should_explain_off_and_gate_zoom_when_feature_is_disabled()
+    public void should_state_off_without_the_how_it_works_clause_when_feature_is_disabled()
     {
+        // help-callout H-4 — "켜면 줌 N 이상에서 적용" 은 동작 원리라 회전 · 기울이기 "?"(Map.Toolbar.RotateTilt)로 옮겼다
         string tip = TiltUiText.ToggleToolTip(false, TiltMath.ReasonOff, false, 0, 16.5, MinZoom, anchorLocked: false);
         Assert.Contains("OFF", tip);
-        Assert.Contains("줌 18 이상에서 적용", tip);
+        Assert.Contains("탑뷰", tip);
+        Assert.DoesNotContain("이상에서 적용", tip);
     }
 
     [Fact]
@@ -108,12 +110,12 @@ public class TiltUiTextTests
     }
 
     [Fact]
-    public void should_show_applied_angle_and_keyboard_hint_when_active()
+    public void should_show_applied_angle_without_keyboard_list_when_active()
     {
         string tip = TiltUiText.ToggleToolTip(true, TiltMath.ReasonActive, true, 20, 18.5, MinZoom, anchorLocked: false);
         Assert.Contains("기울임 20° 적용 중", tip);
         Assert.Contains("줌 18 이상", tip);
-        Assert.Contains(TiltUiText.KeyboardHint, tip);
+        Assert.DoesNotContain("Ctrl+↑", tip);   // 각도 단축키는 "?"(Map.Toolbar.RotateTilt) — help-callout H-4 · FR-08
         Assert.DoesNotContain("유지 밴드", tip);
     }
 

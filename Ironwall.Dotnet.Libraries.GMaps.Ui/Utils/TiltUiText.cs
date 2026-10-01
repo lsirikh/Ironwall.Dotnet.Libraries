@@ -20,9 +20,6 @@ public static class TiltUiText
     /// <summary>토글 단축키 표기(보기 메뉴 InputGestureText 와 동일).</summary>
     public const string ShortcutText = "Ctrl+Shift+T";
 
-    /// <summary>키보드 각도 조작 안내(컨트롤 OnKeyDown Ctrl(+Shift)+↑/↓ — TILT_STEP_COARSE 5 · TILT_STEP_FINE 1).</summary>
-    public const string KeyboardHint = "Ctrl+↑/↓ 5° · Ctrl+Shift+↑/↓ 1°";
-
     private const string Title = "지도 기울이기 (" + ShortcutText + ")";
 
     /// <summary>배지 표시 여부 — 적용 φ 가 0.1° 초과일 때만(NaN/∞ 는 숨김).</summary>
@@ -52,7 +49,9 @@ public static class TiltUiText
     }
 
     /// <summary>
-    /// 툴바 토글 툴팁(ToolTipService.ShowOnDisabled — 비활성 사유 포함). 우선순위:
+    /// 툴바 토글 툴팁(ToolTipService.ShowOnDisabled — 비활성 사유 포함). 이름 + 단축키 + 지금 상태 한 구절만 —
+    /// 각도 단축키(Ctrl(+Shift)+↑/↓) · "켜면 줌 N 이상에서 적용" 같은 동작 원리는 회전 · 기울이기 "?"(MapsHelp
+    /// "Map.Toolbar.RotateTilt", help-callout H-4)로 옮겼다. 우선순위:
     /// 앵커 A모드 잠금 → OFF → Tier0 → 게이트 미달(Below/Hold-inactive: "줌 18 이상에서 적용 · 현재 16.5 → 탑뷰")
     /// → 적용 중(Active/Hold-active: "기울임 20° 적용 중").
     /// </summary>
@@ -71,7 +70,7 @@ public static class TiltUiText
             return Title + " — 앵커(정북 고정) 중 사용 불가 · 변경하려면 앵커를 먼저 해제하세요";
 
         if (!isEnabled || string.Equals(reason, TiltMath.ReasonOff, StringComparison.Ordinal))
-            return Title + $" — OFF: 탑뷰 · ON 시 줌 {min} 이상에서 적용";
+            return Title + " — OFF · 탑뷰";
 
         if (string.Equals(reason, TiltMath.ReasonTier0, StringComparison.Ordinal))
             return Title + " — 소프트웨어 렌더링(Tier 0) 감지 · 기울이기 강제 해제(탑뷰)";
@@ -82,11 +81,11 @@ public static class TiltUiText
                 ? $" · 현재 {FormatZoom(effectiveZoom)}(유지 밴드)"
                 : string.Empty;
             return Title + string.Format(CultureInfo.InvariantCulture,
-                " — 기울임 {0:0.#}° 적용 중 · 줌 {1} 이상{2} · {3}", phiAppliedDeg, min, hold, KeyboardHint);
+                " — 기울임 {0:0.#}° 적용 중 · 줌 {1} 이상{2}", phiAppliedDeg, min, hold);
         }
 
         if (active)
-            return Title + $" — ON · 각도 0°(탑뷰) · {KeyboardHint}";
+            return Title + " — ON · 각도 0°(탑뷰)";
 
         // Below · Hold(inactive)
         return Title + $" — 줌 {min} 이상에서 적용 · 현재 {FormatZoom(effectiveZoom)} → 탑뷰";

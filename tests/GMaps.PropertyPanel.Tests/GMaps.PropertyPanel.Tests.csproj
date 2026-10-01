@@ -3,6 +3,8 @@
   <TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable>
  </PropertyGroup>
  <ItemGroup><ProjectReference Include="../../Ironwall.Dotnet.Libraries.GMaps.Ui/Ironwall.Dotnet.Libraries.GMaps.Ui.csproj"/></ItemGroup>
+ <!-- help-callout H-4 — "?" 계약 글 훑기는 Utils.Tests 의 것을 연결해 쓴다(사본 금지) -->
+ <ItemGroup><Compile Include="../../Ironwall.Dotnet.Libraries.Utils.Tests/Help/HelpSourceScan.cs" Link="Linked/HelpSourceScan.cs"/></ItemGroup>
  <ItemGroup>
   <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0"/>
   <PackageReference Include="xunit" Version="2.9.3"/>

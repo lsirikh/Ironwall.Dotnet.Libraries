@@ -266,6 +266,10 @@
 										FontSize="13" FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="추적 재생 (Playback)" />
+									<!--  창 "?"(help-callout H-4) — 기간 고르기 · [불러오기] · 31일 제한 · 세션 따라보기  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.Playback.Window" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
 									<!-- 추적 설정 ⚙ — 상단 툴바에서 이동(map-topbar-trafficlight FR-C5). MapViewModel 커맨드 DP 주입.
 								     명시 스타일(PanelHeaderGearButtonStyle) — 암시적 MD Button 그림자 누수 차단(사용자 피드백). -->
 									<Button
@@ -385,7 +389,7 @@
 													Margin="2,8,0,0"
 													FontSize="10.5"
 													Foreground="{DynamicResource TextMutedBrush}"
-													Text="{Binding Calendar.Hint}" />
+													Text="{Binding Calendar.StepText}" />
 											</StackPanel>
 										</Border>
 									</Popup>

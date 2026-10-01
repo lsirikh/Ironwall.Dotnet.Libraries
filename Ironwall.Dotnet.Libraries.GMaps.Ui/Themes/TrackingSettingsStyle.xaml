@@ -95,6 +95,10 @@
 										FontSize="13" FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="추적 설정" />
+									<!--  창 "?"(help-callout H-4) — 칸마다 붙어 있던 회색 설명 줄(이하 숨김 · gap 분리 · TTL 폴백 …)과 "즉시 반영 · [저장]으로 영속" 을 옮겼다  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.Tracking.Settings" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
 									<Button
 										x:Name="PART_CloseButton"
 										Grid.Column="2"
@@ -120,7 +124,6 @@
 										</Grid.ColumnDefinitions>
 										<StackPanel Grid.Column="0">
 											<TextBlock Style="{StaticResource SetLabel}" Text="최소 줌" />
-											<TextBlock Style="{StaticResource SetHint}" Text="이하 숨김 (0=항상)" />
 										</StackPanel>
 										<!--  zoom-float-halfstep FR-11(Z-21): 0.5 스냅 + 소수 표시 — 종전엔 스냅 없는 임의 소수 입력에 {0:0} 정수 표시로 표시-실값 괴리  -->
 										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="0" Maximum="20.5" IsSnapToTickEnabled="True" TickFrequency="0.5" AutoToolTipPlacement="None" Value="{Binding MinVisibleZoom, Mode=TwoWay}" />
@@ -149,7 +152,6 @@
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="끊김 분절" />
-											<TextBlock Style="{StaticResource SetHint}" Text="gap 초 초과 시 트레일 분리" />
 										</StackPanel>
 										<TextBox Style="{StaticResource SetNum}" Text="{Binding GapThresholdSec, Mode=TwoWay}" />
 									</Grid>
@@ -163,14 +165,12 @@
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="기본 TTL" />
-											<TextBlock Style="{StaticResource SetHint}" Text="ttl_sec 없을 때 폴백(초)" />
 										</StackPanel>
 										<TextBox Style="{StaticResource SetNum}" Text="{Binding DefaultTtlSec, Mode=TwoWay}" />
 									</Grid>
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="Lost 유예" />
-											<TextBlock Style="{StaticResource SetHint}" Text="lost 후 제거 유예(초)" />
 										</StackPanel>
 										<TextBox Style="{StaticResource SetNum}" Text="{Binding LostTtlSec, Mode=TwoWay}" />
 									</Grid>
@@ -184,14 +184,12 @@
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="최대 속도" />
-											<TextBlock Style="{StaticResource SetHint}" Text="m/s 이상치 방어" />
 										</StackPanel>
 										<TextBox Style="{StaticResource SetNum}" Text="{Binding MaxSpeedMs, Mode=TwoWay}" />
 									</Grid>
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="최대 재생시간" />
-											<TextBlock Style="{StaticResource SetHint}" Text="Playback 1회 조회 상한(시간)" />
 										</StackPanel>
 										<TextBox Style="{StaticResource SetNum}" Text="{Binding MaxPlaybackHours, Mode=TwoWay}" />
 									</Grid>
@@ -204,7 +202,6 @@
 									<Grid Margin="0,3">
 										<StackPanel>
 											<TextBlock Style="{StaticResource SetLabel}" Text="조회 소스" />
-											<TextBlock Style="{StaticResource SetHint}" Text="로컬 DB / 서버 API" />
 										</StackPanel>
 										<ComboBox Width="110" HorizontalAlignment="Right" VerticalAlignment="Center"
 										          ItemsSource="{Binding DataSourceOptions}"

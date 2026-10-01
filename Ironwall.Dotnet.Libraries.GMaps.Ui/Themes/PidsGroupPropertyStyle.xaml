@@ -1,6 +1,7 @@
 ﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:help="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
@@ -235,7 +236,6 @@
 								ItemsSource="{Binding Source={x:Type enums:EnumFenceMode}, Converter={StaticResource EnumToCollectionConverter}}"
 								SelectedItem="{Binding FenceMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								Style="{StaticResource CompactComboBox}"
-								ToolTip="기둥 간격: 균등 분배 / 센서 장착: 정확 간격 + 감지 노드"
 								AutomationProperties.AutomationId="GMaps.Property.FenceMode">
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
@@ -243,15 +243,21 @@
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 							</ComboBox>
-							<CheckBox
+							<!--  3D 철망 "?"(help-callout H-4) — 형태(기둥 간격 · 센서 장착)의 뜻 · 슬라이더 저장 시점  -->
+							<StackPanel
 								Grid.Row="0"
 								Grid.Column="2"
 								VerticalAlignment="Center"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								Content="3D"
-								IsChecked="{Binding Render3D, Mode=TwoWay}"
-								ToolTip="이 그룹을 3D 철망으로 표시"
-								AutomationProperties.AutomationId="GMaps.Property.Render3D" />
+								Orientation="Horizontal">
+								<CheckBox
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Content="3D"
+									IsChecked="{Binding Render3D, Mode=TwoWay}"
+									ToolTip="3D 철망 표시"
+									AutomationProperties.AutomationId="GMaps.Property.Render3D" />
+								<help:HelpTip Margin="4,0,0,0" HelpKey="Map.Property.Fence" />
+							</StackPanel>
 
 							<!--  간격 (D1 슬라이더 · 0.5 m 스냅 · 150 ms 지연 커밋)  -->
 							<TextBlock
@@ -272,7 +278,7 @@
 								TickFrequency="0.5"
 								IsSnapToTickEnabled="True"
 								Value="{Binding PostSpacingM, Mode=TwoWay}"
-								ToolTip="기둥(또는 센서) 간격 1~10 m, 0.5 m 단위 — 멈추면 150 ms 뒤 저장"
+								ToolTip="기둥(또는 센서) 간격 1~10 m (0.5 m 단위)"
 								AutomationProperties.AutomationId="GMaps.Property.PostSpacing" />
 							<StackPanel
 								Grid.Row="1"

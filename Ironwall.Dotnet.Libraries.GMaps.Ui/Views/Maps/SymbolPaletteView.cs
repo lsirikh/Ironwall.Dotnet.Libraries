@@ -66,9 +66,8 @@ public sealed class SymbolPaletteView : Control
         _header.DragDelta += HeaderDragDelta;
         Enable3D.IsChecked = Utils.Symbol3DFeature.IsEnabled;
         Enable3D.Click += Enable3DClicked;
-        FeatureStatus.Text = Utils.Symbol3DFeature.IsEnabled
-            ? "현재 지도: 3D · 변경은 재시작 후 적용됩니다."
-            : "현재 지도: 2D · 3D 사용 설정은 재시작 후 적용됩니다.";
+        // 지금 상태 한 구절만 — "재시작 후 적용" 은 옆 "?"(Map.SymbolPalette.Symbol3D, help-callout H-4).
+        FeatureStatus.Text = Utils.Symbol3DFeature.IsEnabled ? "현재 지도: 3D" : "현재 지도: 2D";
         HookButton("PART_CloseButton", CloseClicked);
         HookButton("PART_MilitaryButton", MilitaryClicked);
         HookButton("PART_BoundaryButton", BoundaryClicked);
@@ -175,7 +174,7 @@ public sealed class SymbolPaletteView : Control
         try
         {
             await Helpers.MapSettingsHelper.SaveSymbol3DAsync(Enable3D.IsChecked == true);
-            FeatureStatus.Text = "설정을 저장했습니다. 프로그램을 다시 시작하면 지도에 적용됩니다.";
+            FeatureStatus.Text = "저장됨 — 다시 시작해야 지도에 반영됩니다";
         }
         catch (Exception ex) { Enable3D.IsChecked = Utils.Symbol3DFeature.IsEnabled; FeatureStatus.Text = $"설정 저장 실패: {ex.Message}"; }
         finally { Enable3D.IsEnabled = true; }
