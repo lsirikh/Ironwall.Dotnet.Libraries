@@ -146,6 +146,7 @@
 	<c:ConsoleShell
 		Title="계정 · 권한"
 		ConsoleKey="Accounts"
+		HelpKey="Accounts.Console"
 		IsDetailRequested="{Binding IsDetailRequested}"
 		Loaded="OnShellLoaded"
 		Subtitle="{Binding Detail.TypeName}">
@@ -912,7 +913,6 @@
 							<c:ConsoleEmptyState
 								Margin="0,36,0,0"
 								AutomationProperties.AutomationId="Console.Accounts.Members.EmptyState"
-								Hint="위 ‘구성원 추가’에서 계정을 고른 뒤 [추가]를 누르세요."
 								IsHitTestVisible="False"
 								Title="이 그룹에 구성원이 없습니다"
 								Visibility="{Binding ShowNoMembersState, Converter={StaticResource BoolToVisibility}}" />
@@ -1325,7 +1325,7 @@
 												Click="OnGroupChipClick"
 												Cursor="Hand"
 												Style="{x:Null}"
-												ToolTip="고른 계정을 이 그룹에 넣습니다. [적용]을 눌러야 저장됩니다. 목록의 손잡이를 끌어 놓아도 됩니다.">
+												ToolTip="고른 계정을 이 그룹에 넣기">
 												<Button.Template>
 													<ControlTemplate TargetType="Button">
 														<Border Style="{StaticResource GroupChip}">
@@ -1453,7 +1453,7 @@
 									Content="비밀번호 · 사진 변경"
 									IsEnabled="{Binding CanOpenUserDialog}"
 									Style="{StaticResource Console.Button}"
-									ToolTip="비밀번호 초기화와 사진 변경 창을 엽니다. 손댄 칸이 있으면 먼저 적용하거나 되돌리세요." />
+									ToolTip="비밀번호 초기화 · 사진 변경 창 열기" />
 							</StackPanel>
 						</DockPanel>
 
@@ -1588,7 +1588,7 @@
 							AutomationProperties.AutomationId="Console.Accounts.Detail.NoGroup"
 							FontSize="12.5"
 							Foreground="{DynamicResource TextMutedBrush}"
-							Text="가운데에서 권한 그룹을 고르면 요약이 여기에 나옵니다."
+							Text="가운데에서 권한 그룹을 고르세요."
 							TextWrapping="Wrap">
 							<TextBlock.Style>
 								<Style TargetType="TextBlock">
@@ -1607,7 +1607,7 @@
 						</TextBlock>
 
 						<StackPanel Visibility="{Binding HasSelectedGroup, Converter={StaticResource BoolToVisibility}}">
-							<c:ConsoleSection Header="요약">
+							<c:ConsoleSection Header="요약" HelpKey="Accounts.Permissions">
 								<StackPanel>
 									<DockPanel Margin="0,2">
 										<TextBlock DockPanel.Dock="Left" Style="{StaticResource Kv.Label}" Text="구성원" />
@@ -1640,15 +1640,7 @@
 								</StackPanel>
 							</c:ConsoleSection>
 
-							<!--  '주의' — 운영자 말로(A-5): 서버 적용 표시가 없는 모듈의 제어는 화면 단추만 막는다  -->
-							<c:ConsoleSection Header="주의">
-								<TextBlock
-									AutomationProperties.AutomationId="Console.Accounts.Matrix.ControlNotice"
-									FontSize="12"
-									Foreground="{DynamicResource TextSecondaryBrush}"
-									Text="방패(서버 적용) 표시가 없는 모듈의 제어 권한은 화면의 단추만 막습니다."
-									TextWrapping="Wrap" />
-							</c:ConsoleSection>
+							<!--  '주의'(방패 표시가 없는 모듈의 제어는 화면 단추만 막는다, A-5)는 '요약' 절 "?" 로 옮겼다(help-callout H-3)  -->
 
 							<!--  그룹 자체의 관리 — 툴바 [새 그룹] · [삭제] 와 짝  -->
 							<c:ConsoleSection Header="그룹">
@@ -1677,7 +1669,7 @@
 							AutomationProperties.AutomationId="Console.Accounts.Detail.NoSession"
 							FontSize="12.5"
 							Foreground="{DynamicResource TextMutedBrush}"
-							Text="목록에서 세션을 고르면 단말 · 만료 시각과 종료 단추가 여기에 나옵니다."
+							Text="목록에서 세션을 고르세요."
 							TextWrapping="Wrap">
 							<TextBlock.Style>
 								<Style TargetType="TextBlock">
@@ -1793,7 +1785,10 @@
 
 					<!--  ④ 권한 부여 — 새 부여 폼이 상세의 본문이다(이 레일은 상세가 늘 열린다, A-29)  -->
 					<StackPanel Visibility="{Binding IsGrantsRail, Converter={StaticResource BoolToVisibility}}">
-						<c:ConsoleSection AxisName="grants" Header="새 부여">
+						<c:ConsoleSection
+							AxisName="grants"
+							Header="새 부여"
+							HelpKey="Accounts.Grants">
 							<StackPanel>
 								<c:ConsoleField ApiName="user_id" Header="계정">
 									<ComboBox
@@ -1825,10 +1820,7 @@
 										IncludeTime="True"
 										Value="{Binding GrantManagementPanelViewModel.ValidFrom, Mode=TwoWay}" />
 								</c:ConsoleField>
-								<c:ConsoleField
-									ApiName="valid_until"
-									Header="종료"
-									Note="비우면 기한 없이 부여합니다.">
+								<c:ConsoleField ApiName="valid_until" Header="종료">
 									<c:DateTimeField
 										Height="30"
 										HorizontalAlignment="Left"
@@ -1895,7 +1887,7 @@
 						AutomationProperties.AutomationId="Console.Accounts.Detail.NoDetail"
 						FontSize="12.5"
 						Foreground="{DynamicResource TextMutedBrush}"
-						Text="왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요. 잘못 바꿨으면 [되돌리기]를 누르세요. 바꾼 값은 다음 로그인부터 적용됩니다."
+						Text="왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요."
 						TextWrapping="Wrap"
 						Visibility="{Binding IsSessionSetupRail, Converter={StaticResource BoolToVisibility}}" />
 
@@ -1905,7 +1897,7 @@
 							AutomationProperties.AutomationId="Console.Accounts.Detail.NoAudit"
 							FontSize="12.5"
 							Foreground="{DynamicResource TextMutedBrush}"
-							Text="목록에서 기록을 고르면 무엇이 어떻게 바뀌었는지 여기에 나옵니다."
+							Text="목록에서 기록을 고르세요."
 							TextWrapping="Wrap">
 							<TextBlock.Style>
 								<Style TargetType="TextBlock">
