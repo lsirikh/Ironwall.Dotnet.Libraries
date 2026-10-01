@@ -245,5 +245,8 @@ public sealed partial class WiringViewModel
 
     /// <summary>시험 — 신호 알림을 주인 스레드로 넘기는 디스패처.</summary>
     internal Dispatcher? SignalDispatcher => _uiDispatcher;
+
+    /// <summary>시험 — 지금 모니터(늦게 도착하는 표본을 흉내 낼 때).</summary>
+    internal ControllerPingMonitor? SignalMonitor => _pingMonitor;
     #endregion
 }
