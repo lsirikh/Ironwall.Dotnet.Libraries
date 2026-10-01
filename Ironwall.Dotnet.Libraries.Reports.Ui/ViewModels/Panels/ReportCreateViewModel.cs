@@ -239,9 +239,12 @@ public class ReportCreateViewModel : BasePanelViewModel
 
     private bool _isTemplateBased;
     /// <summary>false = 표준 전체(STANDARD, 전 섹션) · true = 템플릿 기반(CUSTOM, 저장 템플릿 선택).</summary>
-    public bool IsTemplateBased { get => _isTemplateBased; set { _isTemplateBased = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsStandard)); } }
+    public bool IsTemplateBased { get => _isTemplateBased; set { _isTemplateBased = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsStandard)); NotifyOfPropertyChange(nameof(TemplateLockReason)); } }
     /// <summary>표준 전체 라디오용(settable) — true 설정 시 템플릿모드 해제.</summary>
     public bool IsStandard { get => !_isTemplateBased; set { if (value) IsTemplateBased = false; } }
+
+    /// <summary>템플릿 칸이 왜 잠겼는가 — 표준 전체일 때만(잠금 사유라 화면에 남는다, help-callout PRD §2).</summary>
+    public string TemplateLockReason => IsStandard ? "표준 전체에서는 고르지 않습니다" : string.Empty;
 
     private ReportTemplateDto? _selectedTemplate;
     public ReportTemplateDto? SelectedTemplate

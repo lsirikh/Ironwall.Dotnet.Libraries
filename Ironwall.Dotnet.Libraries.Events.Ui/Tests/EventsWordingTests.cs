@@ -78,32 +78,33 @@ public class EventsWordingTests
         // Act
         vm.Load(Dashboard(operation: 3), new DateTime(2026, 9, 24), new DateTime(2026, 9, 25));
 
-        // Assert
-        Assert.DoesNotContain("총계 밖", vm.TotalNote);
-        Assert.DoesNotContain("서버 규칙", vm.TotalNote);
-        Assert.DoesNotContain("6종", vm.TotalNote);
-        Assert.Contains("운영 3건", vm.TotalNote);                     // 운영 건수는 숨기지 않는다
-        Assert.EndsWith("셉니다", vm.TotalNote);
+        // Assert — 화면엔 운영 건수만(건수는 숨기지 않는다), 총계의 뜻은 개요 "?"(help-callout H-3)
+        Assert.DoesNotContain("총계 밖", vm.OperationCountText);
+        Assert.DoesNotContain("서버 규칙", vm.OperationCountText);
+        Assert.DoesNotContain("6종", vm.OperationCountText);
+        Assert.Contains("운영 3건", vm.OperationCountText);
+        Assert.EndsWith("셉니다", vm.OperationCountText);
+
+        var help = OverviewHelp();
+        Assert.Contains("사전 경보", help);
+        Assert.DoesNotContain("서버 규칙", help);
     }
 
-    [Theory]
-    [InlineData(OverviewDeviceGroup.Controller)]
-    [InlineData(OverviewDeviceGroup.Camera)]
-    [InlineData(OverviewDeviceGroup.Facility)]
-    public void should_show_one_short_operator_line_when_device_group_changes(OverviewDeviceGroup group)
+    [Fact]
+    public void should_explain_device_bars_in_the_overview_help_when_device_group_lines_moved()
     {
-        // Arrange
-        var vm = new EventOverviewViewModel();
-
-        // Act
-        vm.DeviceGroup = group;
+        // Arrange — 장비별 막대 아래 줄은 개요 "?" 로 옮겼다(help-callout H-3)
+        var help = OverviewHelp();
 
         // Assert
-        Assert.StartsWith("막대를 누르면 그 장비의 내역으로 이동합니다.", vm.DeviceGroupNote);
-        Assert.DoesNotContain("총계 밖", vm.DeviceGroupNote);
-        Assert.DoesNotContain("—", vm.DeviceGroupNote);
-        Assert.DoesNotContain("제어기에 속하지", vm.DeviceGroupNote);
+        Assert.Contains("막대를 누르면 그 장비의 내역으로 이동합니다.", help);
+        Assert.Contains("운영 이벤트도 함께 셉니다", help);
+        Assert.DoesNotContain("총계 밖", help);
+        Assert.DoesNotContain("제어기에 속하지", help);
     }
+
+    private static string OverviewHelp()
+        => Ironwall.Dotnet.Libraries.Events.Ui.Help.EventsHelp.Entries.Single(e => e.Key == "Events.Overview").ToPlainText();
 
     [Fact]
     public void should_separate_alert_from_sensor_by_colour_and_shape_when_series_are_declared()
@@ -149,7 +150,9 @@ public class EventsWordingTests
         // Assert
         Assert.DoesNotContain(values, v => v.Contains("도넛", StringComparison.Ordinal));
         Assert.DoesNotContain(values, v => v.Contains("기간 칩", StringComparison.Ordinal));
-        Assert.Contains(values, v => v == "Text=\"끌어서 기간 선택 (Esc 취소)\"");
+        Assert.DoesNotContain(values, v => v.Contains("끌어서 기간 선택", StringComparison.Ordinal));   // 개요 "?" 로 옮겼다(H-3)
+        Assert.Contains(values, v => v == "HelpKey=\"Events.Overview\"");
+        Assert.Contains("Esc", OverviewHelp());
     }
     #endregion
 

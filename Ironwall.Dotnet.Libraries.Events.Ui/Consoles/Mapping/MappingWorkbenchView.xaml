@@ -249,6 +249,7 @@
 	<c:ConsoleShell
 		AutomationProperties.AutomationId="Integrations.Mapping.Panel"
 		ConsoleKey="Mapping"
+		HelpKey="Events.Mapping"
 		IsDetailRequested="True"
 		Subtitle="{Binding MappingTitle}"
 		Title="이벤트 맵핑">
@@ -503,7 +504,7 @@
 								Content="▲ 위로"
 								IsEnabled="{Binding CanMoveUp}"
 								Style="{StaticResource Console.Button}"
-								ToolTip="Alt+↑ 와 같은 동작" />
+								ToolTip="위로 (Alt+↑)" />
 							<Button
 								Margin="0,0,8,0"
 								AutomationProperties.AutomationId="Integrations.Board.MoveDown"
@@ -511,14 +512,14 @@
 								Content="▼ 아래로"
 								IsEnabled="{Binding CanMoveDown}"
 								Style="{StaticResource Console.Button}"
-								ToolTip="Alt+↓ 와 같은 동작" />
+								ToolTip="아래로 (Alt+↓)" />
 							<Button
 								AutomationProperties.AutomationId="Integrations.Board.ReleaseButton"
 								Click="OnRelease"
 								Content="◀ 해제"
 								IsEnabled="{Binding CanReleaseSelected}"
 								Style="{StaticResource Console.Button}"
-								ToolTip="Delete 키와 같은 동작 — 해제는 [적용] 전까지 되돌릴 수 있습니다" />
+								ToolTip="해제 (Delete)" />
 						</StackPanel>
 					</Grid>
 
@@ -589,7 +590,7 @@
 								FontSize="12"
 								Foreground="{DynamicResource TextSecondaryBrush}"
 								IsHitTestVisible="False"
-								Text="오른쪽 팔레트에서 장비를 끌어다 놓거나 [＋ 추가]를 누르세요."
+								Text="아직 넣은 장비가 없습니다"
 								TextWrapping="Wrap">
 								<TextBlock.Style>
 									<Style TargetType="TextBlock">
@@ -655,7 +656,7 @@
 						Content="＋ 추가 ▶"
 						IsEnabled="{Binding CanAddSelected}"
 						Style="{StaticResource Console.Button}"
-						ToolTip="Enter 키와 같은 동작 — 고른 장비를 액션 보드에 넣습니다" />
+						ToolTip="추가 (Enter)" />
 
 					<!--  팔레트 = 해제 드롭존(보드 행을 여기로 끌면 해제)  -->
 					<drag:DropZoneChrome

@@ -124,22 +124,20 @@ public enum EventDetailAction
 }
 
 /// <summary>상세 칸의 한 절 — 머리 + 잠금 꼬리표 + 줄들.</summary>
+/// <remarks>절 아래 설명 줄(옛 Note — "잰 값이 틀렸다면 …", 고장 구간 뜻)은 상세 "?"(<c>Events.Detail</c>)로 옮겼다(help-callout H-3).</remarks>
 public sealed class EventDetailSection
 {
-    public EventDetailSection(string title, string? lockNote, IReadOnlyList<EventDetailField> fields, string? note = null)
+    public EventDetailSection(string title, string? lockNote, IReadOnlyList<EventDetailField> fields)
     {
         Title = title;
         LockNote = lockNote;
         Fields = fields;
-        Note = note;
     }
 
     public string Title { get; }
-    /// <summary>"측정값 · 수정 불가" 같은 꼬리표.</summary>
+    /// <summary>"측정값 · 수정 불가" 같은 꼬리표 — 잠금 사유라 화면에 남는다.</summary>
     public string? LockNote { get; }
-    public string? Note { get; }
     public IReadOnlyList<EventDetailField> Fields { get; }
-    public bool HasNote => !string.IsNullOrEmpty(Note);
     public bool HasLockNote => !string.IsNullOrEmpty(LockNote);
 }
 
@@ -201,19 +199,13 @@ public sealed class EventDetailViewModel : PropertyChangedBase
                                  && _rows.Count > 0 && _canReport;
 
     /// <summary>
-    /// 상세 칸 위의 안내 한 줄. 커널의 기본 문구(“값이 다른 칸은 — 여러 값 —”)는
-    /// 이벤트에는 <b>틀린 말</b>이다 — 여기서는 일괄 편집을 하지 않고 조치를 추가한다.
+    /// 상세 칸 위의 한 줄 — 읽기 전용(상태)과 고른 건수만. 커널의 기본 문구(“값이 다른 칸은 — 여러 값 —”)는
+    /// 이벤트에는 <b>틀린 말</b>이다. 여러 건을 어떻게 다루는지(트레이에 담아 한꺼번에 조치 · 한꺼번에 고치지 않음)는
+    /// 상세 "?"(<c>Events.Detail</c>)에 있다(help-callout H-3).
     /// </summary>
     public string BannerText => !_canEdit && _rows.Count > 0
         ? ConsoleDetailPresenter.ReadOnlyBanner
-        : IsMultiple
-            ? (_kind is EventDetailKind.Detection or EventDetailKind.Malfunction && _canReport
-                ? $"{_rows.Count}건을 골랐습니다. 조치 트레이에 담아 한꺼번에 조치보고할 수 있습니다."
-                : $"{_rows.Count}건을 골랐습니다. 여러 건은 한꺼번에 고치지 않습니다.")
-            : string.Empty;
-
-    /// <summary>범례 — 고칠 수 있는 칸과 발생 기록을 형태로 가른다.</summary>
-    public bool ShowLegend => Sections.Any(s => s.Fields.Any(f => f.IsEditable));
+        : IsMultiple ? $"{_rows.Count}건을 골랐습니다." : string.Empty;
 
     #region - 동작 줄 (정본 SB L2703-2731) -
     // 동작이 있는 단추만 보인다 — 구현이 없는 [지도에서 보기] 는 두지 않는다(지도 쪽에 장비로 옮기는 메시지가 없다).
@@ -431,7 +423,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("ai_model", "AI 모델", string.IsNullOrWhiteSpace(row.AiModel) ? "—" : row.AiModel!),
             Locked("inference", "추론", row.InferenceMs is > 0 ? $"{row.InferenceMs} ms" : "—"),
             Locked("frame", "프레임", row.FrameWidth is > 0 ? $"{row.FrameWidth} × {row.FrameHeight}" : "—"),
-        }, "잰 값이 틀렸다면 조치보고 메모로 남기세요."));
+        }));
     }
 
     private void BuildMalfunction(MalfunctionEventViewModel row)
@@ -453,7 +445,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         {
             Locked("fault_section", "1차 선", row.FirstStart == 0 && row.FirstEnd == 0 ? "— 해당 없음" : $"{row.FirstStart} → {row.FirstEnd}"),
             Locked("fault_section", "2차 선", row.SecondStart == 0 && row.SecondEnd == 0 ? "— 해당 없음" : $"{row.SecondStart} → {row.SecondEnd}"),
-        }, "제어기 선은 1차로 나가 센서를 거쳐 2차로 들어오는 루프입니다. 숫자는 그 선 위의 지점이며 시각이 아닙니다."));
+        }));
     }
 
     private void BuildConnection(ConnectionEventViewModel row)
@@ -468,7 +460,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("kind", "종류", row.DeviceTypeName ?? "—"),
             Locked("number", "번호", row.Model?.Id.ToString() ?? "—"),
             Locked("status", "상태", EnumKoreanMap.To(row.MessageType)),
-        }, "연결 이벤트에는 조치보고가 없습니다."));
+        }));
     }
 
     private void BuildAction(ActionEventViewModel row)
@@ -497,7 +489,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Locked("user", "사용자", string.IsNullOrWhiteSpace(row.User) ? "—" : row.User!),
             Editable(EventDetailProjection.FieldContent, "내용", row.Content ?? string.Empty, null),
             Locked("datetime", "시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
-        }, "판단이 바뀌었으면 내용을 고치지 말고 원본에 조치보고를 한 건 더 추가하세요."));
+        }));
     }
 
     private EventDetailField Locked(string key, string label, string text)
@@ -564,7 +556,6 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(EmptyHint));
         NotifyOfPropertyChange(nameof(ReportButtonText));
         NotifyOfPropertyChange(nameof(CanShowReport));
-        NotifyOfPropertyChange(nameof(ShowLegend));
         NotifyOfPropertyChange(nameof(BannerText));
         NotifyOfPropertyChange(nameof(Snapshot));
         NotifyOfPropertyChange(nameof(HasSnapshot));

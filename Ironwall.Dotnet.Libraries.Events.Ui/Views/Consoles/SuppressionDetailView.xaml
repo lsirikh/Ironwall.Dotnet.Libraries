@@ -96,7 +96,8 @@
 				<c:ConsoleSection
 					Margin="0,14,0,0"
 					AxisName="event_suppression_schedules"
-					Header="억제">
+					Header="억제"
+					HelpKey="Events.Suppression.Detail">
 					<Grid Margin="0,6,0,0">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="72" />
@@ -203,20 +204,7 @@
 					</StackPanel>
 				</c:ConsoleSection>
 
-				<!--  '진행중' 은 '지금 억제 중' 이 아니다 (SB L2738)  -->
-				<Border
-					Margin="0,12,0,0"
-					Padding="10,7"
-					Background="{DynamicResource TintWarningBrush}"
-					CornerRadius="5"
-					Visibility="{Binding HasDetailNote, Converter={StaticResource BoolToVis}}">
-					<TextBlock
-						AutomationProperties.AutomationId="Console.Suppression.Detail.Note"
-						FontSize="12"
-						Foreground="{DynamicResource TextPrimaryBrush}"
-						Text="{Binding DetailNote}"
-						TextWrapping="Wrap" />
-				</Border>
+				<!--  '진행중' 은 '지금 억제 중' 이 아니다 (SB L2738) — 이 용어 설명은 '억제' 절 "?" 로 옮겼다(help-callout H-3)  -->
 
 				<!--
 					동작(SB L2739)은 커널 ConsoleDetailHost 의 <b>적용 막대</b>에 있다 —

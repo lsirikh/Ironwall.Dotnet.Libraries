@@ -53,7 +53,7 @@
 					ApiName="template_id"
 					Header="템플릿"
 					IsLocked="{Binding CreateViewModel.IsStandard}"
-					Note="표준 전체에서는 고르지 않습니다">
+					LockReason="{Binding CreateViewModel.TemplateLockReason}">
 					<StackPanel>
 						<ComboBox
 							Height="30"
@@ -192,7 +192,8 @@
 		<c:ConsoleSection
 			AxisName="severity_filter"
 			CountText="{Binding CreateViewModel.SeveritySummary}"
-			Header="심각도">
+			Header="심각도"
+			HelpKey="Reports.Create.Severity">
 			<StackPanel>
 				<ItemsControl
 					AutomationProperties.AutomationId="Reports.Create.SeverityList"
@@ -214,12 +215,7 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
-				<TextBlock
-					Margin="0,2,0,0"
-					FontSize="11"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Text="아무것도 고르지 않으면 전 심각도입니다. 시스템 이벤트 계열에만 적용됩니다."
-					TextWrapping="Wrap" />
+				<!--  "아무것도 고르지 않으면 전 심각도 · 시스템 이벤트 계열에만" 은 절 "?" 로 옮겼다(help-callout H-3)  -->
 			</StackPanel>
 		</c:ConsoleSection>
 

@@ -22,8 +22,20 @@
 	</UserControl.Resources>
 
 	<Grid Margin="14,10,12,10">
+		<!--
+			상세 "?" (help-callout H-3) — 판정 칸 · 발생 기록의 뜻, 여러 건 · 트레이 사용법, 측정값 · 고장 구간 읽는 법.
+			ConsoleDetailHost 에 "?" 칸이 없어 상세 본문 오른쪽 위에 둔다(본문은 오른쪽 26 을 비운다).
+		-->
+		<c:HelpTip
+			Panel.ZIndex="1"
+			HorizontalAlignment="Right"
+			VerticalAlignment="Top"
+			HelpKey="Events.Detail"
+			Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
 		<!--  선택 없음  -->
 		<TextBlock
+			Margin="0,0,26,0"
 			VerticalAlignment="Top"
 			AutomationProperties.AutomationId="Console.Events.Detail.Empty"
 			FontSize="12.5"
@@ -35,7 +47,7 @@
 		<!--  여러 개 — 판정 칸 대신 고른 목록을 보이고 트레이로 보낸다  -->
 		<StackPanel Visibility="{Binding IsMultiple, Converter={StaticResource BoolToVis}}">
 			<TextBlock
-				Margin="0,0,0,6"
+				Margin="0,0,26,6"
 				Style="{StaticResource SectionTitle}"
 				Text="고른 이벤트" />
 			<ItemsControl
@@ -88,7 +100,7 @@
 					[지도에서 보기] 는 지도 쪽에 장비로 옮기는 메시지가 없어 빠졌다). 상세 폭(300~480)에서 넘치면 줄을 바꾼다.
 				-->
 				<WrapPanel
-					Margin="0,0,0,10"
+					Margin="0,0,26,10"
 					Orientation="Horizontal"
 					Visibility="{Binding HasActionRow, Converter={StaticResource BoolToVis}}">
 					<Button
@@ -250,14 +262,6 @@
 										</DataTemplate>
 									</ItemsControl.ItemTemplate>
 								</ItemsControl>
-
-								<TextBlock
-									Margin="0,6,0,0"
-									FontSize="11.5"
-									Foreground="{DynamicResource TextMutedBrush}"
-									Text="{Binding Note}"
-									TextWrapping="Wrap"
-									Visibility="{Binding HasNote, Converter={StaticResource BoolToVis}}" />
 							</StackPanel>
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
@@ -346,47 +350,9 @@
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
-
-					<TextBlock
-						Margin="0,6,0,0"
-						FontSize="11.5"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="판단이 바뀌면 조치보고를 한 건 더 추가하세요."
-						TextWrapping="Wrap"
-						Visibility="{Binding HasLines, Converter={StaticResource BoolToVis}}" />
 				</StackPanel>
 
-				<!--  범례 — 색이 아니라 상자 유무로 가른다  -->
-				<Border
-					Padding="9,6"
-					Background="{DynamicResource SurfaceBrush}"
-					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="1"
-					CornerRadius="5"
-					Visibility="{Binding ShowLegend, Converter={StaticResource BoolToVis}}">
-					<!--  정본 LEGEND(SB L2686) — 두 견본을 형태(상자 유무)로 보인다  -->
-					<WrapPanel Orientation="Horizontal">
-						<Border
-							Width="14"
-							Height="10"
-							Margin="0,0,5,0"
-							VerticalAlignment="Center"
-							BorderBrush="{DynamicResource BorderBrush}"
-							BorderThickness="1"
-							CornerRadius="2" />
-						<TextBlock
-							Margin="0,0,12,0"
-							VerticalAlignment="Center"
-							FontSize="11.5"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="고칠 수 있는 판정" />
-						<TextBlock
-							VerticalAlignment="Center"
-							FontSize="11.5"
-							Foreground="{DynamicResource TextMutedBrush}"
-							Text="그 밖은 발생 기록(수정 불가)" />
-					</WrapPanel>
-				</Border>
+				<!--  범례(고칠 수 있는 판정 / 발생 기록)는 상세 "?" 로 옮겼다(help-callout H-3)  -->
 			</StackPanel>
 		</ScrollViewer>
 	</Grid>

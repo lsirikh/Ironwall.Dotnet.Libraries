@@ -364,8 +364,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
     public string ComponentSummary => $"구성 {Board.EnabledCount}개 / 전체 {Board.Count}개";
 
-    /// <summary>구성 순서를 끌어 바꿀 수 있다는 안내(키보드 폴백을 글로도 알린다).</summary>
-    public const string ReorderHint = "끌거나 Alt+↑/↓ 로 순서를 바꿉니다";
+    // 구성 순서를 끌어 바꿀 수 있다는 안내는 '구성 요소' 절 "?"(Reports.Template.Components)로 옮겼다(help-callout H-3).
 
     private bool _catalogLoadFailed;
     /// <summary>구성 요소 목록(서버 카탈로그)을 받지 못했다 — 상세 칸이 까닭을 말한다(R28).</summary>

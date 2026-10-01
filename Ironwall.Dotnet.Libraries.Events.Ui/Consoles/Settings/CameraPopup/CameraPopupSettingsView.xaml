@@ -189,9 +189,13 @@
 	<!--  라벨 칸 168 — 설정 창 칸 목록(SettingsConsoleView 의 ConsoleSection)과 값 칸 왼쪽 모서리를 맞춘다  -->
 	<StackPanel c:ConsoleField.LabelWidth="168">
 		<!--  ① 팝업 방식 · ⑦ 영상 · 제어 방식  -->
-		<c:ConsoleSection AxisName="CameraPopup" Header="카메라 팝업 연동">
+		<!--  방식별 동작 설명(옛 ModeNote · ProviderNote)은 섹션 "?" 로(help-callout H-3 · 문구는 EventsHelp)  -->
+		<c:ConsoleSection
+			AxisName="CameraPopup"
+			Header="카메라 팝업 연동"
+			HelpKey="Settings.CameraPopup.Mode">
 			<StackPanel>
-				<c:ConsoleField IsTouched="{Binding Touched[Mode]}" Note="{Binding ModeNote}">
+				<c:ConsoleField IsTouched="{Binding Touched[Mode]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="팝업 방식" />
 					</c:ConsoleField.Header>
@@ -207,7 +211,6 @@
 
 				<c:ConsoleField
 					IsTouched="{Binding Touched[Provider]}"
-					Note="{Binding ProviderNote}"
 					Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="영상 · 제어 방식" />
@@ -287,7 +290,7 @@
 		<!--  설명(옮긴 자리 기억 · 자동 닫기)은 칸 아래 회색 줄이 아니라 섹션 "?" 로(help-callout H-1 시범 · 문구는 EventsHelp)  -->
 		<c:ConsoleSection
 			AxisName="IsAutoDiscard · TimeoutSeconds"
-			Header="더블클릭 팝업 — 지도 위 (현행 그대로)"
+			Header="더블클릭 팝업"
 			HelpKey="Settings.CameraPopup.DoubleClick"
 			Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
 			<c:ConsoleField IsTouched="{Binding Touched[DoubleClick]}">
@@ -321,14 +324,15 @@
 			</c:ConsoleField>
 		</c:ConsoleSection>
 
-		<!--  탐지 팝업 — 이벤트마다 창 1개  -->
+		<!--  탐지 팝업 — 이벤트마다 창 1개. 칸 아래 설명(격자 · 첫 위치 끌기 · 닫기 규칙 · 동시 창)은 섹션 "?" 로(help-callout H-3)  -->
 		<c:ConsoleSection
 			AxisName="CameraPopup.Event*"
-			Header="탐지 팝업 — 이벤트마다 창 1개"
+			Header="탐지 팝업"
+			HelpKey="Settings.CameraPopup.Event"
 			Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
 			<StackPanel>
 				<!--  ② 띄우기  -->
-				<c:ConsoleField IsTouched="{Binding Touched[Trigger]}" Note="창 안 카메라는 이벤트 매핑 순서(priority)대로">
+				<c:ConsoleField IsTouched="{Binding Touched[Trigger]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="띄우기" />
 					</c:ConsoleField.Header>
@@ -350,7 +354,7 @@
 				</c:ConsoleField>
 
 				<!--  ⑥ 창당 카메라 · 격자  -->
-				<c:ConsoleField IsTouched="{Binding Touched[Cameras]}" Note="{Binding LayoutNote}">
+				<c:ConsoleField IsTouched="{Binding Touched[Cameras]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="창당 카메라 · 격자" />
 					</c:ConsoleField.Header>
@@ -509,7 +513,7 @@
 									MouseMove="OnFirstWindowMove"
 									PreviewKeyDown="OnFirstWindowKeyDown"
 									PreviewMouseDown="OnFirstWindowPress"
-									ToolTip="끌어 놓거나 방향키로 옮깁니다(Shift = 10칸, Esc = 취소)">
+									ToolTip="첫 창 위치 (끌기 · 방향키 · Shift = 10칸 · Esc = 취소)">
 									<Thumb.Template>
 										<ControlTemplate TargetType="Thumb">
 											<Grid>
@@ -577,7 +581,7 @@
 							Margin="0,6,0,0"
 							Padding="0"
 							AutomationProperties.AutomationId="Settings.CameraPopup.Event.PlacementNote">
-							<TextBlock MaxWidth="560" Style="{StaticResource CameraPopup.Note}" Text="{Binding PlacementNote}" />
+							<TextBlock MaxWidth="560" Style="{StaticResource CameraPopup.Note}" Text="{Binding PlacementStatusText}" />
 						</Label>
 					</StackPanel>
 				</c:ConsoleField>
@@ -627,7 +631,7 @@
 				</c:ConsoleField>
 
 				<!--  ④ 창 닫기  -->
-				<c:ConsoleField IsTouched="{Binding Touched[Close]}" Note="{Binding CloseNote}">
+				<c:ConsoleField IsTouched="{Binding Touched[Close]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="창 닫기" />
 					</c:ConsoleField.Header>
@@ -635,7 +639,7 @@
 						<CheckBox
 							Margin="0,0,0,6"
 							AutomationProperties.AutomationId="Settings.CameraPopup.Close.OnActionReport"
-							Content="그 이벤트의 조치보고가 오면 자동으로 닫기 (내가 했든 다른 GIS 가 했든)"
+							Content="조치보고가 오면 자동으로 닫기"
 							IsChecked="{Binding CloseOnActionReport}"
 							Style="{DynamicResource Console.CheckBox}" />
 						<StackPanel Margin="0,0,0,6" Orientation="Horizontal">
@@ -669,7 +673,7 @@
 				</c:ConsoleField>
 
 				<!--  ⑤ 동시에 열 창  -->
-				<c:ConsoleField IsTouched="{Binding Touched[MaxWindows]}" Note="1~10. 넘으면 가장 오래된 창(📌 제외)을 닫고 새 창 — 카드는 그대로">
+				<c:ConsoleField IsTouched="{Binding Touched[MaxWindows]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="동시에 열 창" />
 					</c:ConsoleField.Header>
@@ -689,13 +693,14 @@
 			</StackPanel>
 		</c:ConsoleSection>
 
-		<!--  브로커 요청 — 더블클릭 전용  -->
+		<!--  브로커 요청 — 더블클릭 전용. 설명(관제석 칸 · 결과 알림 · 응답 기다림)은 섹션 "?" 로(help-callout H-3)  -->
 		<c:ConsoleSection
 			AxisName="CameraPopup.Broker*"
-			Header="브로커 요청 — 더블클릭 전용"
+			Header="브로커 요청"
+			HelpKey="Settings.CameraPopup.Broker"
 			Visibility="{Binding ShowBrokerGroup, Converter={StaticResource CameraPopup.BoolToVisibility}}">
 			<StackPanel>
-				<c:ConsoleField Note="설치 때 자동 부여 · 바꿀 수 없음">
+				<c:ConsoleField LockReason="설치 때 자동 부여 · 바꿀 수 없음">
 					<c:ConsoleField.Header>
 						<TextBlock Text="관제석 식별자" />
 					</c:ConsoleField.Header>
@@ -718,7 +723,7 @@
 					</Border>
 				</c:ConsoleField>
 
-				<c:ConsoleField IsTouched="{Binding Touched[BrokerTarget]}" Note="NVR 관제석 모니터 · 칸(3×3). 모니터 목록은 NVR Manager 에게 묻습니다">
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerTarget]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="모니터 · 칸" />
 					</c:ConsoleField.Header>
@@ -752,8 +757,7 @@
 								Click="OnFetchBrokerMonitors"
 								Content="모니터 목록 가져오기"
 								IsEnabled="{Binding CanFetchBrokerMonitors}"
-								Style="{DynamicResource Console.Button}"
-								ToolTip="NVR Manager 에게 이 관제석의 모니터 목록을 묻습니다(POPUP_LAYOUT_GET)" />
+								Style="{DynamicResource Console.Button}" />
 						</StackPanel>
 						<Label
 							Margin="0,4,0,0"
@@ -775,7 +779,7 @@
 					</StackPanel>
 				</c:ConsoleField>
 
-				<c:ConsoleField IsTouched="{Binding Touched[BrokerOccupied]}" Note="결과(띄움 · 거부 · 무응답)는 지도 하단 토스트로 알립니다">
+				<c:ConsoleField IsTouched="{Binding Touched[BrokerOccupied]}">
 					<c:ConsoleField.Header>
 						<TextBlock Text="칸이 차 있으면" />
 					</c:ConsoleField.Header>
@@ -803,7 +807,7 @@
 								FontFamily="{DynamicResource MonoFont}"
 								Style="{StaticResource CameraPopup.TextBox}"
 								Text="{Binding BrokerTimeoutText, UpdateSourceTrigger=PropertyChanged}" />
-							<TextBlock Style="{StaticResource CameraPopup.Note}" Text="초 — 넘으면 ‘응답 없음’ 토스트" />
+							<TextBlock Style="{StaticResource CameraPopup.Note}" Text="초" />
 						</StackPanel>
 						<Label
 							AutomationProperties.AutomationId="Settings.CameraPopup.Broker.Timeout.Error"

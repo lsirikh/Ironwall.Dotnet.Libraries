@@ -110,13 +110,16 @@ public class PermissionMatrixConsoleTests
     }
 
     [Fact]
-    public async Task should_show_enabled_modules_and_the_hatch_legend_when_a_group_is_selected()
+    public async Task should_show_enabled_modules_and_keep_the_hatch_legend_in_the_help_when_a_group_is_selected()
     {
         var console = await OpenAsync();
         console.Matrix.SelectedGroup = console.Matrix.Groups.First();
 
+        // 상태 띠엔 건수만, ▨ 범례는 '요약' 절 "?" 에 있다(help-callout H-3)
         Assert.Contains($"켜진 모듈 {console.Matrix.EnabledModuleText}", console.MatrixStatusText);
-        Assert.Contains("▨ 이 모듈에 없는 동작", console.MatrixStatusText);
+        Assert.DoesNotContain("▨", console.MatrixStatusText);
+        Assert.Contains("▨ 이 모듈에 없는 동작",
+            Ironwall.Dotnet.Libraries.Accounts.Ui.Help.AccountsHelp.Entries.Single(e => e.Key == "Accounts.Permissions").ToPlainText());
     }
 
     [Fact]

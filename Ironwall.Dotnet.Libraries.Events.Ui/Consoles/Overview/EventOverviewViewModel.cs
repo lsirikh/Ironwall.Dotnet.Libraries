@@ -95,11 +95,10 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     public int OperationCount { get; private set; }
 
     /// <summary>
-    /// 총계가 무엇의 합인지 한 줄로 — 운영 이벤트는 총계에 들지 않지만 그 수를 숨기지 않는다.
-    /// 운영자용 문장이다(서버 규칙 · 집계 방식 같은 구현 설명은 넣지 않는다, 감사 E-3 #1).
+    /// 총계 밖 운영 이벤트의 건수 — 총계에 들지 않지만 그 수를 숨기지 않는다(건수라 화면에 남는다).
+    /// 총계가 무엇의 합인지는 개요 "?"(<c>Events.Overview</c>)에 있다(help-callout H-3). 운영자용 문장이다(감사 E-3 #1).
     /// </summary>
-    public string TotalNote => $"센서·카메라 탐지, 사전 경보, 장애, 연결, 조치 합계입니다 · "
-                             + $"운영 {OperationCount:N0}건(문 개폐·환경 경보)은 따로 셉니다";
+    public string OperationCountText => $"운영 {OperationCount:N0}건(문 개폐·환경 경보)은 총계에서 따로 셉니다";
     #endregion
 
     #region - ① 유형별 비중 -
@@ -124,7 +123,6 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
             NotifyOfPropertyChange(nameof(IsControllerGroup));
             NotifyOfPropertyChange(nameof(IsCameraGroup));
             NotifyOfPropertyChange(nameof(IsFacilityGroup));
-            NotifyOfPropertyChange(nameof(DeviceGroupNote));
             RebuildBars();
         }
     }
@@ -132,13 +130,6 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
     public bool IsControllerGroup => _deviceGroup == OverviewDeviceGroup.Controller;
     public bool IsCameraGroup => _deviceGroup == OverviewDeviceGroup.Camera;
     public bool IsFacilityGroup => _deviceGroup == OverviewDeviceGroup.Facility;
-
-    /// <summary>장비별 막대 아래 한 줄 — 무엇을 누르면 무엇이 되는지만 적는다(감사 E-3 #3).</summary>
-    public string DeviceGroupNote => _deviceGroup switch
-    {
-        OverviewDeviceGroup.Facility => "막대를 누르면 그 장비의 내역으로 이동합니다. 운영 이벤트도 함께 셉니다.",
-        _ => "막대를 누르면 그 장비의 내역으로 이동합니다.",
-    };
 
     public bool HasBars => Bars.Count > 0;
 
@@ -336,7 +327,7 @@ public sealed class EventOverviewViewModel : PropertyChangedBase
         NotifyOfPropertyChange(nameof(DetectionPercentText));
         NotifyOfPropertyChange(nameof(SensorShareText));
         NotifyOfPropertyChange(nameof(CameraShareText));
-        NotifyOfPropertyChange(nameof(TotalNote));
+        NotifyOfPropertyChange(nameof(OperationCountText));
         NotifyOfPropertyChange(nameof(OperationCount));
 
         RebuildBars();

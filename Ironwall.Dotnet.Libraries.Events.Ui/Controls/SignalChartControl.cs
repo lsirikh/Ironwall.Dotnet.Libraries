@@ -286,7 +286,7 @@ public class SignalChartControl : FrameworkElement
 
         if (items.Count == 0)
         {
-            DrawLabel(dc, "이 구간에 신호가 없습니다 (휠=줌 · 드래그=이동 · 더블클릭=전체)",
+            DrawLabel(dc, "이 구간에 신호가 없습니다",   // 조작법은 이력 창 "?"(Events.History) — help-callout H-3
                 new Point((plotL + plotR) / 2, (plotT + plotB) / 2), 11, TextAlignment.Center);
             return;
         }

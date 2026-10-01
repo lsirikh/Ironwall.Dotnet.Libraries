@@ -3,6 +3,7 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:drag="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Consoles"
@@ -141,13 +142,11 @@
 								Foreground="{DynamicResource TextPrimaryBrush}"
 								Text="{Binding HeaderText}"
 								TextTrimming="CharacterEllipsis" />
-							<TextBlock
+							<!--  서랍 "?" (help-callout H-3) — 저장해야 적용 · 무제한 · 대상 담는 법(끌기 면의 키보드 대체 경로는 저절로 붙는다)  -->
+							<c:HelpTip
 								Margin="10,0,0,0"
-								VerticalAlignment="Center"
-								FontSize="12"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="저장 전까지는 적용되지 않습니다"
-								TextTrimming="CharacterEllipsis" />
+								HelpKey="Events.Suppression.Drawer"
+								Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
 						</StackPanel>
 						<Button
 							Grid.Column="1"
@@ -673,7 +672,7 @@
 										FontSize="12"
 										Foreground="{DynamicResource TextMutedBrush}"
 										IsHitTestVisible="False"
-										Text="아래 목록에서 손잡이를 끌어 놓거나, 고른 뒤 [추가 ▶]를 누르세요"
+										Text="담긴 대상이 없습니다"
 										TextWrapping="Wrap"
 										Visibility="{Binding IsTrayEmpty, Converter={StaticResource BoolToVis}}" />
 								</Grid>

@@ -92,11 +92,11 @@ public static class EventDetailProjection
                                    Func<T, int> idOf, Func<T, EventDetailKind> kindOf) where T : class
         => candidates.FirstOrDefault(c => idOf(c) == originId && kindOf(c) == originKind);
 
-    /// <summary>선택 없음 상태의 안내 한 줄.</summary>
+    /// <summary>선택 없음 상태의 한 줄 — 무엇이 열리는가만. 여러 건 고르기 · 트레이 담기는 상세 "?"(<c>Events.Detail</c>).</summary>
     public static string EmptyHint(EventDetailKind kind) => kind switch
     {
-        EventDetailKind.Detection => "탐지 행을 고르면 스냅샷 · 판정 · 조치 내역이 열립니다. Ctrl 로 여러 건을 골라 조치 트레이에 끌어 담으면 한꺼번에 조치보고합니다.",
-        EventDetailKind.Malfunction => "장애 행을 고르면 사유 · 고장 구간 · 조치 내역이 열립니다. Ctrl 로 여러 건을 골라 조치 트레이에 끌어 담을 수 있습니다.",
+        EventDetailKind.Detection => "탐지 행을 고르면 스냅샷 · 판정 · 조치 내역이 열립니다.",
+        EventDetailKind.Malfunction => "장애 행을 고르면 사유 · 고장 구간 · 조치 내역이 열립니다.",
         EventDetailKind.Connection => "연결 행을 고르면 장비 정보가 열립니다. 연결 이벤트에는 조치보고가 없습니다.",
         EventDetailKind.Overview => "개요에서는 고를 행이 없습니다. 왼쪽에서 내역을 고르세요.",
         _ => "조치 행을 고르면 원본 이벤트가 함께 열립니다.",

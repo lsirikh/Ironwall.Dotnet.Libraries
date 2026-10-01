@@ -96,10 +96,12 @@
 		<c:ConsoleSection
 			AxisName="components"
 			CountText="{Binding EditViewModel.ComponentSummary}"
-			Header="구성 요소">
+			Header="구성 요소"
+			HelpKey="Reports.Template.Components">
 			<StackPanel>
 				<!--  폴백은 목록 <b>위</b>에 둔다 — 아래에 두면 긴 목록에 밀려 화면 밖으로 나간다(자동화가 못 짚는다).  -->
-				<DockPanel Margin="0,0,0,6" LastChildFill="True">
+				<!--  순서 바꾸는 법(끌기 · Alt+↑/↓)은 절 "?" 로 옮겼다(help-callout H-3) — 단추만 남는다  -->
+				<DockPanel Margin="0,0,0,6" LastChildFill="False">
 					<Button
 						Margin="4,0,0,0"
 						AutomationProperties.AutomationId="Reports.Detail.MoveDownButton"
@@ -118,13 +120,6 @@
 						IsEnabled="{Binding EditViewModel.CanMoveComponent}"
 						Style="{StaticResource Reorder.Button}"
 						ToolTip="{Binding EditViewModel.MoveComponentToolTip}" />
-					<TextBlock
-						VerticalAlignment="Center"
-						AutomationProperties.AutomationId="Reports.Detail.ReorderHint"
-						FontSize="11"
-						Foreground="{DynamicResource TextMutedBrush}"
-						Text="{Binding ReorderHint}"
-						TextWrapping="Wrap" />
 				</DockPanel>
 
 				<ListBox

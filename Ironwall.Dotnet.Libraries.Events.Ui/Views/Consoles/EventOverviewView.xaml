@@ -3,6 +3,7 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
@@ -35,13 +36,6 @@
 			<Setter Property="FontWeight" Value="SemiBold" />
 			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 			<Setter Property="Margin" Value="0,0,0,8" />
-		</Style>
-
-		<Style x:Key="CardNote" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="11.5" />
-			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-			<Setter Property="TextWrapping" Value="Wrap" />
-			<Setter Property="Margin" Value="0,8,0,0" />
 		</Style>
 
 		<!--
@@ -112,11 +106,19 @@
 						<ColumnDefinition Width="*" />
 					</Grid.ColumnDefinitions>
 					<StackPanel AutomationProperties.AutomationId="Console.Events.Overview.Total">
-						<TextBlock
-							FontSize="12"
-							Foreground="{DynamicResource TextSecondaryBrush}">
-							<Run Text="총 이벤트 · " /><Run Text="{Binding RangeText, Mode=OneWay}" />
-						</TextBlock>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock
+								VerticalAlignment="Center"
+								FontSize="12"
+								Foreground="{DynamicResource TextSecondaryBrush}">
+								<Run Text="총 이벤트 · " /><Run Text="{Binding RangeText, Mode=OneWay}" />
+							</TextBlock>
+							<!--  개요 "?" (help-callout H-3) — 총계의 뜻 · 추이 끌기 · 장비별 막대 · 카메라 탐지 셈  -->
+							<c:HelpTip
+								Margin="8,0,0,0"
+								HelpKey="Events.Overview"
+								Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
+						</StackPanel>
 						<StackPanel Orientation="Horizontal">
 							<TextBlock
 								FontSize="34"
@@ -176,7 +178,7 @@
 					Margin="0,-6,10,10"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextMutedBrush}"
-					Text="{Binding TotalNote, Mode=OneWay}"
+					Text="{Binding OperationCountText, Mode=OneWay}"
 					TextWrapping="Wrap" />
 
 				<!--  ③ 시간대별 추이 — 좌우로 끌면 기간이 바뀐다(정본 all-windows-drag-wireframe.html L427)  -->
@@ -194,12 +196,6 @@
 								FontSize="11.5"
 								Foreground="{DynamicResource TextMutedBrush}"
 								Text="{Binding IntervalText, Mode=OneWay}" />
-							<TextBlock
-								VerticalAlignment="Center"
-								DockPanel.Dock="Right"
-								FontSize="11.5"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="끌어서 기간 선택 (Esc 취소)" />
 						</DockPanel>
 
 						<!--
@@ -548,9 +544,6 @@
 									Text="{Binding CameraShareText, Mode=OneWay}" />
 							</StackPanel>
 
-							<TextBlock
-								Style="{StaticResource CardNote}"
-								Text="카메라 탐지도 탐지 합계에 포함됩니다." />
 						</StackPanel>
 					</Border>
 				</Grid>
@@ -660,7 +653,6 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
-						<TextBlock Style="{StaticResource CardNote}" Text="{Binding DeviceGroupNote, Mode=OneWay}" />
 					</StackPanel>
 				</Border>
 			</StackPanel>
