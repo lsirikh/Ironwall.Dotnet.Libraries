@@ -483,7 +483,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!vm.IsPanelSelected(chip.Key) || vm.FencePaneKind != FenceSelectionKind.Panels) vm.FenceSelectPanel(chip.Key);
                 break;
             default:
-                if (vm.FenceSelectedKey is not { } k || !chip.Keys.Contains(k)) vm.FenceSelect(chip.Keys[0]);
+                if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceFocusSelect(chip.Keys[0]);     // 고른 것 사이를 다니면 선택을 풀지 않는다
                 break;
         }
         EnsureVisible(chip);
@@ -1211,7 +1211,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         // Ctrl+Space — 포커스 센서를 더하거나 뺀다
         if (!alt && k == Key.Space && modifiers == ModifierKeys.Control && chip is { Kind: FenceChipKind.Sensor or FenceChipKind.Group })
         {
-            foreach (var each in chip.Keys) vm.FenceToggleSelect(each);
+            vm.FenceToggleFocused(chip.Keys);
             return true;
         }
 

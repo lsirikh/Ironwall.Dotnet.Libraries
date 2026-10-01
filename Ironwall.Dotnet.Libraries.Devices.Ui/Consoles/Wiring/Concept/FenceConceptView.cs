@@ -261,7 +261,7 @@ public sealed class FenceConceptView : Grid
     {
         if (_press is not null || _arming || sender is not FenceChip chip || ViewModel is not { } vm) return;
         if (chip.Kind == FenceChipKind.ConceptController) { if (!vm.IsControllerSelected) vm.FenceSelectController(); }
-        else if (chip.Kind == FenceChipKind.ConceptNode && !vm.IsFenceSelected(chip.Key)) vm.FenceSelect(chip.Key);
+        else if (chip.Kind == FenceChipKind.ConceptNode) vm.FenceFocusSelect(chip.Key);
     }
     #endregion
 
@@ -526,7 +526,7 @@ public sealed class FenceConceptView : Grid
         if (alt && k is Key.Left or Key.Right) { vm.ConceptLaneStep(node.Key, k == Key.Left ? -1 : 1); FocusNode(node.Key); return true; }
         if (alt && k is Key.Up or Key.Down) { vm.ConceptLaneChange(node.Key, k == Key.Up ? FenceLane.Upper : FenceLane.Lower); FocusNode(node.Key); return true; }
         if (!alt && k is Key.Delete or Key.Back) { vm.FenceUnplace(vm.FenceDragKeys(node.Key)); return true; }
-        if (!alt && k == Key.Space && modifiers == ModifierKeys.Control) { vm.FenceToggleSelect(node.Key); return true; }
+        if (!alt && k == Key.Space && modifiers == ModifierKeys.Control) { vm.FenceToggleFocused(new[] { node.Key }); return true; }
         if (!alt && k is Key.Enter or Key.Space && modifiers == ModifierKeys.None) { vm.FenceSelect(node.Key); return true; }
         if (!alt && k is Key.Left or Key.Right or Key.Home or Key.End && modifiers == ModifierKeys.None)
         {

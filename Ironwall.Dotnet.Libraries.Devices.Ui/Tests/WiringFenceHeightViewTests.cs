@@ -481,6 +481,96 @@ public class WiringFenceHeightViewTests
     }
     #endregion
 
+    #region - Multi-select drag (헤디드 r23 SC-FEN-026) -
+    [Fact]
+    public void should_drag_both_sensors_when_the_second_was_added_with_ctrl_click()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var a = canvas.ScreenCenterOf(canvas.SensorChips[102]);
+            canvas.OnPointerPressed(a, canvas.SensorChips[102]);
+            canvas.OnPointerReleased(a);
+            Pump();
+            var b = canvas.ScreenCenterOf(canvas.SensorChips[103]);
+            canvas.OnPointerPressed(b, canvas.SensorChips[103], ctrl: true);
+            canvas.OnPointerReleased(b);
+            Pump();
+            var selected = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            var moved = DragSelectionOf102(vm, canvas);
+            return (selected, moved);
+        });
+
+        Assert.Equal(new[] { 102, 103 }, result.selected);
+        AssertMovedTogether(result.moved);
+    }
+
+    [Fact]
+    public void should_drag_both_sensors_when_the_second_was_added_with_ctrl_space_after_moving_focus()
+    {
+        // 헤디드 r23 SC-FEN-026: A 를 고르고 B 로 포커스를 옮겨(포커스 = 선택 → B 하나) Ctrl+Space — 예전에는 B 를 빼 선택이 비었고 A 만 끌렸다.
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var a = canvas.ScreenCenterOf(canvas.SensorChips[102]);
+            canvas.OnPointerPressed(a, canvas.SensorChips[102]);
+            canvas.OnPointerReleased(a);
+            Pump();
+            canvas.SensorChips[103].Focus();
+            Pump();
+            var focused = vm.FenceSelectedKeys.ToList();
+            var handled = canvas.HandleKeyDown(Key.Space, Key.None, ModifierKeys.Control, canvas.SensorChips[103]);
+            Pump();
+            var selected = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            canvas.SensorChips[102].Focus();                                                   // 고른 것 사이를 다녀도 풀리지 않는다
+            Pump();
+            var afterTab = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            var moved = DragSelectionOf102(vm, canvas);
+            return (focused, handled, selected, afterTab, moved);
+        });
+
+        Assert.Equal(new[] { 103 }, result.focused);
+        Assert.True(result.handled);
+        Assert.Equal(new[] { 102, 103 }, result.selected);
+        Assert.Equal(new[] { 102, 103 }, result.afterTab);
+        AssertMovedTogether(result.moved);
+    }
+
+    [Fact]
+    public void should_toggle_the_focused_sensor_off_with_ctrl_space_when_focus_did_not_just_replace_the_selection()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            vm.FenceSelectSensors(new[] { 102, 103 });
+            Pump();
+            canvas.SensorChips[103].Focus();
+            Pump();
+            canvas.HandleKeyDown(Key.Space, Key.None, ModifierKeys.Control, canvas.SensorChips[103]);
+            Pump();
+            return vm.FenceSelectedKeys.ToList();
+        });
+
+        Assert.Equal(new[] { 102 }, result);
+    }
+
+    private static (SensorMountSpec A, SensorMountSpec B) DragSelectionOf102(WiringViewModel vm, FenceCanvas canvas)
+    {
+        var chip = canvas.SensorChips[102];
+        var start = canvas.ScreenCenterOf(chip);
+        canvas.OnPointerPressed(start, chip);
+        canvas.OnPointerMoved(start + new Vector(12, 0));
+        var at = ScreenOf(canvas, new FenceGridCell(5, 2));                                    // 기둥 1(gx 4) → 망 1 왼쪽 위(gx 5) · Δ(+1, 0)
+        canvas.OnPointerMoved(at);
+        canvas.OnPointerReleased(at);
+        Pump();
+        return (vm.FenceLayout.MountOf(102)!, vm.FenceLayout.MountOf(103)!);
+    }
+
+    private static void AssertMovedTogether((SensorMountSpec A, SensorMountSpec B) moved)
+    {
+        Assert.Equal((1, FenceMountSpot.PanelTop, FenceColumn.Left), (moved.A.Panel, moved.A.Spot, moved.A.Column));
+        Assert.Equal((2, FenceMountSpot.PanelTop, FenceColumn.Left), (moved.B.Panel, moved.B.Spot, moved.B.Column));
+    }
+    #endregion
+
     #region - Fixtures -
     private static T OnWindow<T>(WiringViewModel vm, Func<WiringViewModel, FenceCanvas, T> body)
         => OnSta(() =>

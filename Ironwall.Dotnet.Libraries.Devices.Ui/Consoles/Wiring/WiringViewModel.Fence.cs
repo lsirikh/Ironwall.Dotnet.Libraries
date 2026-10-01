@@ -27,6 +27,8 @@ public sealed partial class WiringViewModel
     private bool _showRange;
     private int? _fenceSelectedKey;
     private readonly List<int> _fenceSelection = new();
+    // 포커스가 바꾼 선택(포커스 = 선택) — 그 직전 선택을 기억해 Ctrl+Space 가 "더하기"로 읽게 한다(헤디드 r23 SC-FEN-026)
+    private (int Key, int[] Before)? _focusReplaced;
     private bool _isControllerSelected;
     private int? _hoverKey;
 
@@ -253,6 +255,33 @@ public sealed partial class WiringViewModel
         _selectionKind = _fenceSelection.Count > 0 ? FenceSelectionKind.Sensors : KindAfterClear();
         RaiseSelection();
         StatusText = _fenceSelection.Count > 1 ? $"센서 {_fenceSelection.Count}대 선택 — 함께 끌거나 [빼기]" : StatusText;
+    }
+
+    /// <summary>
+    /// 포커스가 센서 칩에 왔다(포커스 = 선택) — 이미 고른 센서면 선택을 그대로 둔다(여러 대 선택 사이를 Tab 으로 다녀도 풀리지 않는다).
+    /// 아니면 그 센서 하나로 바꾸되, 바뀌기 전 선택을 기억해 곧바로 누른 Ctrl+Space 가 그 선택에 <b>더하게</b> 한다.
+    /// </summary>
+    public void FenceFocusSelect(int key)
+    {
+        if (_fenceSelection.Contains(key) || _board.Find(key) is null) return;
+        var before = _fenceSelection.ToArray();
+        FenceSelect(key);
+        _focusReplaced = before.Length > 0 ? (key, before) : null;
+    }
+
+    /// <summary>
+    /// Ctrl+Space — 포커스 센서를 더하거나 뺀다. 포커스가 방금 선택을 이 센서 하나로 바꿨다면(<see cref="FenceFocusSelect"/>) 빼는 대신
+    /// 바뀌기 전 선택 + 이 센서로 — "A 고르고 B 로 포커스 옮겨 Ctrl+Space" 가 두 대 선택이 된다(헤디드 r23: 선택이 비어 한 대만 끌렸다).
+    /// </summary>
+    public void FenceToggleFocused(IReadOnlyList<int> keys)
+    {
+        if (keys is not { Count: > 0 }) return;
+        if (_focusReplaced is { } replaced && keys.Contains(replaced.Key) && _fenceSelection.Count == 1 && _fenceSelection[0] == replaced.Key)
+        {
+            FenceSelectSensors(replaced.Before.Concat(keys).Distinct().ToList());
+            return;
+        }
+        foreach (var key in keys) FenceToggleSelect(key);
     }
 
     public void FenceSelectController()
@@ -562,6 +591,7 @@ public sealed partial class WiringViewModel
 
     private void RaiseSelection()
     {
+        _focusReplaced = null;
         foreach (var name in new[]
         {
             nameof(FenceSelectedKey), nameof(IsControllerSelected), nameof(HasFenceSelection), nameof(HasSensorSelection), nameof(HasNoFenceSelection),
