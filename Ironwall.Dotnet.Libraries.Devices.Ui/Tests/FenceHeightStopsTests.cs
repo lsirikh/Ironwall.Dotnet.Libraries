@@ -15,14 +15,14 @@ public class FenceHeightStopsTests
 
     private static readonly IReadOnlyList<FencePanelSpec> Razor3 = Panels(EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.ChainLinkRazor);
 
-    #region - Stops per style -
+    #region - Stops per position kind -
     [Theory]
-    [InlineData(EnumFenceStyle.ChainLink, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop })]
-    [InlineData(EnumFenceStyle.DesignFence, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop })]
-    [InlineData(EnumFenceStyle.ChainLinkRazor, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop, FenceMountSpot.RazorCoil })]
+    [InlineData(EnumFenceStyle.ChainLink, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter })]
+    [InlineData(EnumFenceStyle.DesignFence, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter })]
+    [InlineData(EnumFenceStyle.ChainLinkRazor, new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.RazorCoil })]
     [InlineData(EnumFenceStyle.Brick, new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop })]
     [InlineData(EnumFenceStyle.Concrete, new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop })]
-    public void should_order_the_height_stops_bottom_to_top_for_each_panel_style(EnumFenceStyle style, FenceMountSpot[] expected)
+    public void should_give_a_mid_panel_sensor_only_mid_panel_stops_bottom_to_top_for_each_style(EnumFenceStyle style, FenceMountSpot[] expected)
     {
         var panels = Panels(style, style);
         var spot = FencePanelSpec.IsWallStyle(style) ? FenceMountSpot.WallFace : FenceMountSpot.PanelCenter;
@@ -30,77 +30,108 @@ public class FenceHeightStopsTests
         Assert.Equal(expected, FenceLayoutMath.HeightStops(new SensorMountSpec(1, spot), panels));
     }
 
-    [Fact]
-    public void should_offer_the_coil_stop_to_a_post_sensor_when_either_neighbouring_panel_is_razor()
+    [Theory]
+    [InlineData(EnumFenceStyle.ChainLink)]
+    [InlineData(EnumFenceStyle.ChainLinkRazor)]
+    [InlineData(EnumFenceStyle.DesignFence)]
+    public void should_give_a_post_sensor_only_post_stops_and_no_coil_even_beside_razor(EnumFenceStyle style)
     {
-        var panels = Panels(EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLinkRazor);
+        var panels = Panels(style, style);
 
-        Assert.Contains(FenceMountSpot.RazorCoil, FenceLayoutMath.HeightStops(new SensorMountSpec(1, FenceMountSpot.PostTop), panels));
-        Assert.Contains(FenceMountSpot.RazorCoil, FenceLayoutMath.HeightStops(new SensorMountSpec(2, FenceMountSpot.PostTop), panels));
-        Assert.DoesNotContain(FenceMountSpot.RazorCoil, FenceLayoutMath.HeightStops(new SensorMountSpec(0, FenceMountSpot.PostTop), panels));
+        Assert.Equal(new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop }, FenceLayoutMath.HeightStops(new SensorMountSpec(1, FenceMountSpot.PostTop), panels));
+        Assert.Equal(new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop }, FenceLayoutMath.HeightStops(new SensorMountSpec(1, FenceMountSpot.PostMiddle), panels));
     }
 
     [Fact]
-    public void should_read_post_middle_at_the_same_level_as_panel_center()
+    public void should_stop_a_post_sensor_beside_razor_at_the_post_top_below_the_coil()
     {
-        var panels = Panels(EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink);
+        var top = new SensorMountSpec(1, FenceMountSpot.PostTop);
 
-        Assert.Equal(1, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.PostMiddle), panels));
-        Assert.Equal(1, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.PanelCenter), panels));
+        Assert.Same(top, FenceLayoutMath.StepStop(top, 1, Razor3));                         // 기둥에는 코일 자리가 없다 — 기둥 위에서 멈춘다
+        Assert.Equal(new SensorMountSpec(1, FenceMountSpot.PostMiddle), FenceLayoutMath.StepStop(top, -1, Razor3));
     }
 
     [Fact]
     public void should_read_an_upper_lane_sensor_off_the_coil_as_above_every_stop()
     {
-        var mount = new SensorMountSpec(1, FenceMountSpot.PostTop, Lane: FenceLane.Upper);
-
-        Assert.Equal(4, FenceLayoutMath.StopLevel(mount, Razor3));
-        Assert.Equal(3, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper), Razor3));
+        Assert.Equal(2, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.PostTop, Lane: FenceLane.Upper), Razor3));
+        Assert.Equal(2, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.PanelCenter, Lane: FenceLane.Upper), Panels(EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink)));
+        Assert.Equal(2, FenceLayoutMath.StopLevel(new SensorMountSpec(1, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper), Razor3));
     }
     #endregion
 
-    #region - Stepping · snapping -
+    #region - Stepping · snapping (가로 자리는 그대로) -
     [Fact]
-    public void should_climb_panel_bottom_to_the_coil_one_stop_at_a_time_and_stop_at_the_top()
+    public void should_climb_a_mid_panel_sensor_into_the_coil_and_stop_at_the_top()
     {
         // Arrange — 윤형 망 1 아래
         var m = new SensorMountSpec(1, FenceMountSpot.PanelBottom);
 
         // Act
         var center = FenceLayoutMath.StepStop(m, 1, Razor3);
-        var post = FenceLayoutMath.StepStop(center, 1, Razor3);
-        var coil = FenceLayoutMath.StepStop(post, 1, Razor3);
+        var coil = FenceLayoutMath.StepStop(center, 1, Razor3);
         var over = FenceLayoutMath.StepStop(coil, 1, Razor3);
 
-        // Assert — 망 1 → 왼쪽 기둥 1 → 망 1 코일 · 맨 위에서는 그대로
+        // Assert — 망 1 아래 → 망 1 가운데 → 망 1 코일(위 줄) · 맨 위에서는 그대로 · 맨 아래에서 내리기도 그대로
         Assert.Equal(new SensorMountSpec(1, FenceMountSpot.PanelCenter), center);
-        Assert.Equal(new SensorMountSpec(1, FenceMountSpot.PostTop), post);
         Assert.Equal(new SensorMountSpec(1, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper), coil);
         Assert.Same(coil, over);
-        Assert.Same(m, FenceLayoutMath.StepStop(m, -1, Razor3));                       // 맨 아래에서 내리기
+        Assert.Same(m, FenceLayoutMath.StepStop(m, -1, Razor3));
     }
 
     [Fact]
-    public void should_switch_to_the_upper_lane_entering_the_coil_and_back_to_the_lower_lane_leaving_it()
+    public void should_switch_to_the_upper_lane_entering_the_coil_and_back_to_the_lower_lane_leaving_it_without_moving_sideways()
     {
-        var below = new SensorMountSpec(2, FenceMountSpot.PostTop);
+        var geometry = FenceLayoutMath.Geometry(Razor3);
+        var center = new SensorMountSpec(2, FenceMountSpot.PanelCenter);
 
-        var coil = FenceLayoutMath.StepStop(below, 1, Razor3);
+        var coil = FenceLayoutMath.StepStop(center, 1, Razor3);
         var back = FenceLayoutMath.StepStop(coil, -1, Razor3);
 
         Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper, 2), (coil.Spot, coil.Lane, coil.Panel));
-        Assert.Equal((FenceMountSpot.PostTop, FenceLane.Lower, 2), (back.Spot, back.Lane, back.Panel));
+        Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower, 2), (back.Spot, back.Lane, back.Panel));
+        Assert.Equal(FenceLayoutMath.PointOf(center, geometry).XM, FenceLayoutMath.PointOf(coil, geometry).XM, 9);     // 코일로 들어가도 x 그대로
     }
 
-    [Fact]
-    public void should_pick_the_razor_side_of_a_post_when_climbing_into_the_coil()
+    private static readonly EnumFenceStyle[] Mixed =
     {
-        // 기둥 2 의 오른쪽 망 2 는 담 · 왼쪽 망 1 이 윤형
-        var panels = Panels(EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.Brick);
+        EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.Brick, EnumFenceStyle.Concrete, EnumFenceStyle.DesignFence, EnumFenceStyle.ChainLinkRazor,
+    };
 
-        var coil = FenceLayoutMath.StepStop(new SensorMountSpec(2, FenceMountSpot.PostTop), 1, panels);
+    public static IEnumerable<object[]> EveryPositionKind()
+    {
+        for (var i = 0; i < Mixed.Length; i++)
+        {
+            var wall = FencePanelSpec.IsWallStyle(Mixed[i]);
+            foreach (var spot in wall ? new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop }
+                                      : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop, FenceMountSpot.PostMiddle })
+                yield return new object[] { i, spot, FenceLane.Lower };
+            if (!wall) yield return new object[] { i, FenceMountSpot.PostTop, FenceLane.Upper };
+            if (!wall) yield return new object[] { i, FenceMountSpot.PanelCenter, FenceLane.Upper };
+            if (Mixed[i] == EnumFenceStyle.ChainLinkRazor) yield return new object[] { i, FenceMountSpot.RazorCoil, FenceLane.Upper };
+        }
+    }
 
-        Assert.Equal((FenceMountSpot.RazorCoil, 1), (coil.Spot, coil.Panel));
+    [Theory]
+    [MemberData(nameof(EveryPositionKind))]
+    public void should_never_move_a_sensor_sideways_on_any_height_step(int panel, FenceMountSpot spot, FenceLane lane)
+    {
+        // Arrange — 모양이 섞인 펜스(철조망 · 윤형 · 벽돌 · 시멘트 · 디자인 · 윤형)
+        var panels = Panels(Mixed);
+        var geometry = FenceLayoutMath.Geometry(panels);
+        var start = FenceLayoutMath.Normalize(new SensorMountSpec(panel, spot, Lane: lane), panels);
+        var x = FenceLayoutMath.PointOf(start, geometry).XM;
+
+        // Act + Assert — 맨 위까지 한 칸씩, 다시 맨 아래까지 한 칸씩 · 한 번에 여러 칸도
+        var m = start;
+        for (var i = 0; i < 8; i++)
+        {
+            m = FenceLayoutMath.StepStop(m, i < 4 ? 1 : -1, panels);
+            Assert.Equal(x, FenceLayoutMath.PointOf(m, geometry).XM, 9);
+            Assert.Equal((start.IsPostSpot, start.Panel), (m.IsPostSpot, m.Panel));
+        }
+        foreach (var delta in new[] { 10, -10, 2, -2 })
+            Assert.Equal(x, FenceLayoutMath.PointOf(FenceLayoutMath.StepStop(start, delta, panels), geometry).XM, 9);
     }
 
     [Fact]
@@ -117,7 +148,7 @@ public class FenceHeightStopsTests
     }
 
     [Fact]
-    public void should_step_an_upper_lane_sensor_off_the_coil_down_to_the_top_stop_on_the_lower_lane()
+    public void should_step_an_upper_lane_sensor_off_the_coil_down_to_its_top_stop_on_the_lower_lane()
     {
         var chainLink = Panels(EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink);
         var upper = new SensorMountSpec(1, FenceMountSpot.PostTop, Lane: FenceLane.Upper);

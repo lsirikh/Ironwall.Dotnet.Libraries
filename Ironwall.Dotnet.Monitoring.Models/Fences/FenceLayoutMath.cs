@@ -749,34 +749,25 @@ public static class FenceLayoutMath
 
     #region - Height stops (위 · 아래로 올리고 내리기) -
     /// <summary>
-    /// 높이 단계(아래 → 위) — 펜스 3종: 망 아래 · 망 가운데 · 기둥 위(+ 윤형이면 윤형 코일) / 담 2종: 담 앞면 · 담 위.
-    /// 센서가 선 곳(기둥 자리면 그 기둥 · 망 자리면 그 망)의 모양으로 고른다. 윤형 코일만 위 줄이고 나머지는 아래 줄 단계다.
+    /// 높이 단계(아래 → 위) — <b>센서가 지금 선 가로 자리</b>에서만 고른다(높이 단계는 센서를 옆으로 옮기지 않는다 · 렌더 검토 결정):
+    /// 기둥 자리 = 기둥 중간 · 기둥 위 / 망 가운데 자리 = 망 아래 · 망 가운데(+ 윤형 망이면 윤형 코일) / 담 = 담 앞면 · 담 위.
+    /// 윤형 코일은 기둥 사이(망 가운데)에만 있어 기둥 센서는 기둥 위에서 멈춘다. 가로 자리는 가로 끌기 · Alt+Shift+←/→ · 망 이동 단추로만 바뀐다.
+    /// 윤형 코일만 위 줄이고 나머지는 아래 줄 단계다.
     /// </summary>
     public static IReadOnlyList<FenceMountSpot> HeightStops(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels)
     {
         ArgumentNullException.ThrowIfNull(mount);
         var n = panels?.Count ?? 0;
-        if (n == 0) return new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop };
-        var m = Normalize(mount, panels);
-        bool wall, razor;
-        if (m.IsPostSpot)
-        {
-            wall = false;                                                             // 맞춘 기둥 자리는 서 있는 기둥이다
-            razor = IsRazorPanel(panels, m.Panel) || IsRazorPanel(panels, m.Panel - 1);
-        }
-        else
-        {
-            wall = panels![m.Panel].IsWall;
-            razor = IsRazorPanel(panels, m.Panel);
-        }
-        if (wall) return new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop };
-        return razor
-            ? new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop, FenceMountSpot.RazorCoil }
-            : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PostTop };
+        var m = n == 0 ? mount : Normalize(mount, panels);
+        if (m.IsPostSpot) return new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop };          // 맞춘 기둥 자리는 서 있는 기둥이다
+        if (n > 0 && panels![m.Panel].IsWall) return new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop };
+        return IsRazorPanel(panels, m.Panel)
+            ? new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.RazorCoil }
+            : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter };
     }
 
     /// <summary>
-    /// 지금 몇 번째 단계인가(0 = 맨 아래). 기둥 중간은 망 가운데와 같은 높이 단계로 읽는다. 윤형 코일이 아닌 <b>위 줄</b> 센서는 모든 단계 위
+    /// 지금 몇 번째 단계인가(0 = 맨 아래). 윤형 코일이 아닌 <b>위 줄</b> 센서는 모든 단계 위
     /// (= 단계 수 · 펜스 꼭대기 위)로 읽는다 — 한 단계 내리면 맨 위 단계로 온다(예전 Alt+↓ "아래 줄로"를 품는다).
     /// </summary>
     public static int StopLevel(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels)
@@ -785,9 +776,8 @@ public static class FenceLayoutMath
         var stops = HeightStops(mount, panels);
         var m = panels is { Count: > 0 } ? Normalize(mount, panels) : mount;
         if (m.Lane == FenceLane.Upper && m.Spot != FenceMountSpot.RazorCoil) return stops.Count;
-        var spot = m.Spot == FenceMountSpot.PostMiddle ? FenceMountSpot.PanelCenter : m.Spot;
-        var at = IndexOf(stops, spot);
-        return at >= 0 ? at : IndexOf(stops, stops.Contains(FenceMountSpot.PanelCenter) ? FenceMountSpot.PanelCenter : FenceMountSpot.WallFace);
+        var at = IndexOf(stops, m.Spot);
+        return at >= 0 ? at : 0;
 
         static int IndexOf(IReadOnlyList<FenceMountSpot> list, FenceMountSpot s)
         {
@@ -798,7 +788,8 @@ public static class FenceLayoutMath
 
     /// <summary>
     /// 높이 단계를 <paramref name="delta"/> 만큼(+ = 위) — 끝을 넘으면 끝에서 멈추고, 한 칸도 못 가면 그대로 돌려준다(시험 · 끌기 · 키보드 · ▲▼ 단추가 같은 길).
-    /// 단계를 바꾸면 높이 조정은 0 으로(새 단계 안에서 다시 미세 조정). 윤형 코일로 들어가면 위 줄, 나오면 아래 줄이다.
+    /// 단계는 같은 가로 자리 안에서만 고르므로 <b>센서는 옆으로 움직이지 않는다</b>(기둥 · 망 번호 그대로). 단계를 바꾸면 높이 조정은 0 으로.
+    /// 윤형 코일로 들어가면 위 줄, 나오면 아래 줄이다.
     /// </summary>
     public static SensorMountSpec StepStop(SensorMountSpec mount, int delta, IReadOnlyList<FencePanelSpec>? panels)
     {

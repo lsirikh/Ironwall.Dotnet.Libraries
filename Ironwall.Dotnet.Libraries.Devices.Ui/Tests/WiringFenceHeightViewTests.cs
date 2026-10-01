@@ -32,6 +32,7 @@ public class WiringFenceHeightViewTests
         {
             var chip = canvas.SensorChips[102];
             var start = canvas.ScreenCenterOf(chip);
+            var x0 = FenceLayoutMath.PointOf(vm.FenceLayout.MountOf(102)!, vm.FenceLayout.Geometry).XM;
             canvas.OnPointerPressed(start, chip);
             canvas.OnPointerMoved(start + new Vector(1, -12));                // 데드존을 넘는 순간 세로가 우세
             var action = canvas.DragAction;
@@ -44,11 +45,14 @@ public class WiringFenceHeightViewTests
             var sameStopUpdates = canvas.OverlayUpdates - updates;
             canvas.OnPointerReleased(start + new Vector(1, -620));
             Pump();
-            return (action, level, label, pill, sameStopUpdates, Spot: SpotOf(vm, 102), Guide: canvas.HeightGuide, vm.CanUndo);
+            return (action, level, label, pill, sameStopUpdates, Spot: SpotOf(vm, 102), Guide: canvas.HeightGuide, vm.CanUndo, x0, X1: FenceLayoutMath.PointOf(vm.FenceLayout.MountOf(102)!, vm.FenceLayout.Geometry).XM,
+                    Drawn: canvas.Scene!.X[102] / canvas.Scene.Upm);
         });
 
         Assert.Equal(FenceGestureAction.ChangeHeight, result.action);
-        Assert.Equal(3, result.level);
+        Assert.Equal(2, result.level);
+        Assert.Equal(result.x0, result.X1, 9);                                 // 코일로 들어가도 설치 가로 자리는 그대로(망 가운데)
+        Assert.Equal(result.X1, result.Drawn, 6);                              // 그림도 그 망 가운데(아래 줄 이웃과 벌리던 몫이 없어진 것뿐)
         Assert.Equal("높이: 윤형 코일 · 위 줄로", result.label);
         Assert.True(result.pill);
         Assert.Equal(0, result.sameStopUpdates);                              // 후보 단계가 그대로면 다시 그리지 않는다
@@ -67,18 +71,19 @@ public class WiringFenceHeightViewTests
             canvas.OnPointerPressed(start, chip);
             canvas.OnPointerMoved(start + new Vector(0, -12));
             var heights = canvas.StopHeights.ToList();
-            // 기둥 위 단계 높이까지의 화면 거리 + 조금(가장 가까운 단계는 여전히 기둥 위)
-            var dy = (heights[2] - heights[1]) * canvas.Scale * canvas.Projector.Cy + 3;
-            canvas.OnPointerMoved(start - new Vector(0, dy));
+            // 망 아래 단계 쪽으로, 두 단계 사이를 조금 넘게(가장 가까운 단계는 망 아래)
+            var dy = (heights[1] - heights[0]) * canvas.Scale * canvas.Projector.Cy * 0.6;
+            canvas.OnPointerMoved(start + new Vector(0, dy));
             var level = canvas.HeightLevel;
-            canvas.OnPointerReleased(start - new Vector(0, dy));
+            canvas.OnPointerReleased(start + new Vector(0, dy));
             Pump();
             return (heights, level, Spot: SpotOf(vm, 102));
         });
 
         Assert.True(result.heights.SequenceEqual(result.heights.OrderBy(h => h)));     // 아래 → 위
-        Assert.Equal(2, result.level);
-        Assert.Equal((FenceMountSpot.PostTop, FenceLane.Lower), result.Spot);
+        Assert.Equal(3, result.heights.Count);                                // 망 아래 · 망 가운데 · 윤형 코일(기둥 위는 기둥 센서만)
+        Assert.Equal(0, result.level);
+        Assert.Equal((FenceMountSpot.PanelBottom, FenceLane.Lower), result.Spot);
     }
 
     [Fact]
@@ -97,7 +102,7 @@ public class WiringFenceHeightViewTests
                     Pill: canvas.OverlayShapes.Any(s => s.Ink == FenceInk.PillInsert), vm.StatusText, Opacity: chip.Opacity);
         });
 
-        Assert.Equal(3, result.during);
+        Assert.Equal(2, result.during);
         Assert.True(result.handled);
         Assert.False(result.IsDragging);
         Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.Spot);
@@ -172,19 +177,19 @@ public class WiringFenceHeightViewTests
             Pump();
             var offset = vm.FenceLayout.MountOf(102)!.HeightOffsetM;
             var afterNudge = SpotOf(vm, 102);
-            canvas.HandleKeyDown(Key.System, Key.Up, ModifierKeys.Alt, canvas.SensorChips[102]);
+            canvas.HandleKeyDown(Key.System, Key.Down, ModifierKeys.Alt, canvas.SensorChips[102]);
             Pump();
-            return (plainUp, afterPlain, up, afterUp, nudge, offset, afterNudge, Coil: SpotOf(vm, 102));
+            return (plainUp, afterPlain, up, afterUp, nudge, offset, afterNudge, Down: SpotOf(vm, 102));
         });
 
         Assert.False(result.plainUp);
         Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.afterPlain);
         Assert.True(result.up);
-        Assert.Equal((FenceMountSpot.PostTop, FenceLane.Lower), result.afterUp);
+        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.afterUp);
         Assert.True(result.nudge);
         Assert.Equal(-0.1, result.offset, 6);
-        Assert.Equal((FenceMountSpot.PostTop, FenceLane.Lower), result.afterNudge);        // 미세 높이는 단계를 바꾸지 않는다
-        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.Coil);
+        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.afterNudge);      // 미세 높이는 단계를 바꾸지 않는다
+        Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.Down);
     }
 
     [Theory]
