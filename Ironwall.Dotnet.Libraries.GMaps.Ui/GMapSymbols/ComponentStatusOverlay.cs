@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Components;
 using Ironwall.Dotnet.Monitoring.Models.Components;
@@ -16,9 +17,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// 고장 = 채운 공구 · 1.5px 테두리 / 저하 = 속 빈 공구 · 1px 테두리 — 색이 아니라 모양으로 가른다.</para>
 /// <para><b>테마</b>: 브러시는 전부 <c>SetResourceReference</c> 로 토큰을 물고 있어(Surface · StatusWarning · TextSecondary · TextPrimary)
 /// 라이트/다크 전환 때 다시 해석되고 다시 그려진다. 1회 해석 · 정적 캐시 브러시는 쓰지 않는다.</para>
-/// <para><b>칸 줄(L2, component-display-unify FR-04)</b>: 아이콘이 화면에 48px 이상일 때 아래에 대표 4칸 + "+n".
-/// 정상 = 윤곽 · 가동 = 채움 · 고장 = 공구 표지 · 사용 안 함 = 사선. 지도가 크게 보이는 아이콘을 30개 넘게 세면
-/// (<see cref="IsStripCrowdedProperty"/>) 고장 · 선택 · 호버한 아이콘만 그린다. 제목 라벨이 기본 자리를 덮으면 라벨 아래로 내린다.</para>
+/// <para><b>이름표(L2, component-display-unify FR-04 · 2026-10-01 "1안 이상 있을 때만 이름표")</b>: 아이콘이 화면에 48px 이상이고
+/// 사용 중인 부품에 고장 · 저하가 있을 때만 아래에 "공구 + 가장 급한 부품 이름 + 건강 단어 (+n)". 정상 · 미상뿐이면 아무것도 없고,
+/// 호버 · 선택 때만 "부품 N · 이상 없음". 지도가 크게 보이는 아이콘을 30개 넘게 세면(<see cref="IsStripCrowdedProperty"/>)
+/// 고장 · 선택 · 호버한 아이콘만 그린다. 제목 라벨이 기본 자리를 덮으면 라벨 아래로 내린다.</para>
 /// <para><b>비용</b>: 요소 하나 · <see cref="OnRender"/> 한 번. 값이 바뀔 때만 다시 그린다. 히트테스트 없음. 애니메이션 0.</para>
 /// </remarks>
 public sealed class ComponentStatusOverlay : FrameworkElement
@@ -40,8 +42,6 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         SetResourceReference(AlertBrushProperty, "StatusWarningBrush");
         SetResourceReference(NeutralBrushProperty, "TextSecondaryBrush");
         SetResourceReference(InkBrushProperty, "TextPrimaryBrush");
-        SetResourceReference(ActiveBrushProperty, "PrimaryBrush");
-        SetResourceReference(MutedBrushProperty, "TextMutedBrush");
     }
 
     #region Value DPs
@@ -117,16 +117,6 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     public static readonly DependencyProperty InkBrushProperty = DependencyProperty.Register(nameof(InkBrush), typeof(Brush),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
     public Brush? InkBrush { get => (Brush?)GetValue(InkBrushProperty); set => SetValue(InkBrushProperty, value); }
-
-    /// <summary>가동 칸 채움 — <c>PrimaryBrush</c>(선택 표지와 같은 색이지만 모양(작은 채운 사각)으로 가른다).</summary>
-    public static readonly DependencyProperty ActiveBrushProperty = DependencyProperty.Register(nameof(ActiveBrush), typeof(Brush),
-        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
-    public Brush? ActiveBrush { get => (Brush?)GetValue(ActiveBrushProperty); set => SetValue(ActiveBrushProperty, value); }
-
-    /// <summary>미상 칸 윤곽 — <c>TextMutedBrush</c>.</summary>
-    public static readonly DependencyProperty MutedBrushProperty = DependencyProperty.Register(nameof(MutedBrush), typeof(Brush),
-        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
-    public Brush? MutedBrush { get => (Brush?)GetValue(MutedBrushProperty); set => SetValue(MutedBrushProperty, value); }
     #endregion
 
     /// <summary>시험용 — 지금 크기 · 배율에서 배지를 그리는가.</summary>
@@ -144,10 +134,10 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     internal double CurrentScreenPixels()
         => double.IsNaN(MarkerPixels) ? ComponentBadgeLod.ScreenPixels(ActualWidth, ActualHeight, ScreenScale) : MarkerPixels;
 
-    /// <summary>시험용 — 칸 줄 윗변(요소 좌표). 라벨이 기본 자리를 덮으면 라벨 아래.</summary>
-    internal double StripTopFor(double w, double h, double stripWidth)
+    /// <summary>이름표 윗변(요소 좌표). 라벨이 기본 자리를 덮으면 라벨 아래.</summary>
+    internal double StripTopFor(double w, double h, double stripWidth, double stripHeight = PlateHeight)
     {
-        var defaultStrip = new Rect((w - stripWidth) / 2, h + Overhang + StripGap, Math.Max(stripWidth, 0), ChipSize);
+        var defaultStrip = new Rect((w - stripWidth) / 2, h + Overhang + StripGap, Math.Max(stripWidth, 0), stripHeight);
         var label = LabelBox;
         if (!label.IsEmpty) label.Offset(w / 2, h / 2);   // 라벨 상자는 아이콘 중심 기준으로 온다
         return ComponentStripRules.StripTop(defaultStrip, label, StripGap);
@@ -160,6 +150,7 @@ public sealed class ComponentStatusOverlay : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
+        LastPlateWidth = 0;
         if (!ShowShape || IsPreview) return;
         double w = ActualWidth, h = ActualHeight;
         var px = CurrentScreenPixels();
@@ -173,71 +164,98 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         if (ComponentBadgeLod.ShowsBadge(Health, px)) DrawBadge(dc, w, h, surface, alert);
         if (ComponentBadgeLod.ShowsDoor(Door, px)) DrawDoor(dc, h, surface, neutral, ink);
         if (ComponentStripRules.ShowsStrip(Strip, px, GetIsStripCrowded(this), IsEmphasized))
-            DrawStrip(dc, w, h, Strip!, surface, alert, neutral, ActiveBrush ?? Brushes.SteelBlue, MutedBrush ?? Brushes.Gray);
+            DrawStrip(dc, w, h, px, Strip!, surface, alert, neutral, ink);
     }
 
-    /// <summary>칸 한 변(px, 마커 좌표). 48px 이상일 때만 그리므로 화면에서는 10px 남짓.</summary>
-    internal const double ChipSize = 8.0;
-    /// <summary>칸 사이 간격.</summary>
-    internal const double ChipGap = 2.0;
-    /// <summary>아이콘 아래 모서리(배지 걸침 포함)에서 줄까지의 틈.</summary>
+    /// <summary>이름표 높이(px, 마커 좌표) — 아이콘이 64px 미만일 때. 시트 §1안의 17px.</summary>
+    internal const double PlateHeight = 17.0;
+    /// <summary>이름표 높이 — 아이콘이 64px 이상일 때(19px).</summary>
+    internal const double PlateHeightLarge = 19.0;
+    /// <summary>이름표 최대 폭 — 이름을 8 글자로 줄인 뒤에도 넘치면 <b>이름만</b> 더 줄인다(건강 단어 · "+n" 은 늘 보인다, 밀집 지역에서 이웃 라벨 덮기 방지).</summary>
+    internal const double MaxPlateWidth = 150.0;
+
+    /// <summary>시험용 — 지금 이름표 폭(마커 좌표). 그리지 않으면 0.</summary>
+    internal double LastPlateWidth { get; private set; }
+    /// <summary>아이콘 아래 모서리(배지 걸침 포함)에서 이름표까지의 틈.</summary>
     internal const double StripGap = 2.0;
+    private const double PlatePadding = 5.0;
+    private const double PlateGlyphGap = 3.0;
+
+    /// <summary>시험용 — 지금 이름표에 적는 글(그리지 않으면 null).</summary>
+    internal string? DrawnPlateText => IsStripDrawn ? ComponentStripRules.PlateText(Strip!) : null;
 
     /// <summary>
-    /// 아이콘 아래 가운데 칸 줄 — 정상 = 윤곽 · 가동 = 채움 · 고장 = 경고 테두리 + 채운 공구 · 저하 = 경고 테두리 + 빈 공구 ·
-    /// 미상 = 흐린 점선 윤곽 · 사용 안 함 = 사선. 남은 부품은 "+n". 원형 점 · 빨강 · 깜빡임은 쓰지 않는다(이벤트 몫).
+    /// 아이콘 아래(라벨이 있으면 라벨 아래) 가운데 이름표 — 고장 = 채운 공구 · 1.5px 경고 테두리 · 굵은 "고장",
+    /// 저하 = 빈 공구 · 1px 경고 테두리, 나머지 수 "+n". 이상이 없으면(호버 · 선택만) 공구 없이 1px 흐린 테두리 + 요약 문장.
+    /// 원형 점 · 빨강 · 깜빡임은 쓰지 않는다(이벤트 몫). 바탕은 Surface 90% — 라이트/다크 지도 타일 위에서 글이 읽힌다.
     /// </summary>
-    private void DrawStrip(DrawingContext dc, double w, double h, ComponentStrip strip, Brush surface, Brush alert, Brush neutral, Brush active, Brush muted)
+    private void DrawStrip(DrawingContext dc, double w, double h, double px, ComponentStrip strip, Brush surface, Brush alert, Brush neutral, Brush ink)
     {
-        FormattedText? more = strip.MoreCount > 0
-            ? new FormattedText("+" + strip.MoreCount.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), 7.5, neutral,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip)
-            : null;
+        bool large = px >= 64.0;
+        double height = large ? PlateHeightLarge : PlateHeight;
+        double fontSize = large ? 11.5 : 10.5;
+        double glyph = large ? 10.0 : 9.0;
+        var family = TextElement.GetFontFamily(this) ?? new FontFamily("Malgun Gothic");
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        bool issue = strip.HasIssue;
+        bool fault = strip.Severity == ComponentPlateSeverity.Fault;
 
-        int n = strip.Chips.Count;
-        double total = n * ChipSize + Math.Max(0, n - 1) * ChipGap + (more == null ? 0 : ChipGap + more.Width);
-        double x = (w - total) / 2;
-        double y = StripTopFor(w, h, total);
-
-        var outline = new Pen(neutral, 1.0);
-        foreach (var chip in strip.Chips)
+        FormattedText Text(string value, Brush brush) => new(value, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), fontSize, brush, pixelsPerDip)
         {
-            var rect = new Rect(x + 0.5, y + 0.5, ChipSize - 1, ChipSize - 1);
-            switch (chip.Kind)
+            MaxLineCount = 1,
+            Trimming = TextTrimming.CharacterEllipsis,
+        };
+
+        // 이름(잉크) + 꼬리(" 고장"/" 저하" 경고색 · 고장 굵게, " +n" 흐린 굵은 글). 폭이 모자라면 이름만 줄인다 — 건강 단어 · 수는 늘 보인다.
+        // 이상이 없으면(호버 · 선택) 요약 문장 하나.
+        var text = Text(issue ? strip.LeadName : strip.IdleText, issue ? ink : neutral);
+        FormattedText? tail = null;
+        if (issue)
+        {
+            var tailText = " " + strip.HealthWord + (strip.MoreCount > 0 ? " +" + strip.MoreCount.ToString(CultureInfo.InvariantCulture) : string.Empty);
+            tail = Text(tailText, alert);
+            tail.SetFontWeight(fault ? FontWeights.Bold : FontWeights.SemiBold, 1, strip.HealthWord.Length);
+            if (strip.MoreCount > 0)
             {
-                case ComponentChipKind.Active:
-                    dc.DrawRoundedRectangle(active, new Pen(active, 1.0), rect, 1.5, 1.5);
-                    break;
-                case ComponentChipKind.Fault:
-                case ComponentChipKind.Degraded:
-                    bool fault = chip.Kind == ComponentChipKind.Fault;
-                    dc.DrawRoundedRectangle(surface, new Pen(alert, fault ? 1.4 : 1.0), rect, 1.5, 1.5);
-                    const double glyph = 6.0;
-                    var transform = new TransformGroup();
-                    transform.Children.Add(new ScaleTransform(glyph / 24.0, glyph / 24.0));
-                    transform.Children.Add(new TranslateTransform(x + (ChipSize - glyph) / 2, y + (ChipSize - glyph) / 2));
-                    dc.PushTransform(transform);
-                    if (fault) dc.DrawGeometry(alert, null, WrenchGeometry);
-                    else dc.DrawGeometry(null, new Pen(alert, 3.0), WrenchGeometry);
-                    dc.Pop();
-                    break;
-                case ComponentChipKind.OutOfService:
-                    dc.DrawRoundedRectangle(surface, outline, rect, 1.5, 1.5);
-                    dc.DrawLine(outline, new Point(rect.Left + 1, rect.Bottom - 1), new Point(rect.Right - 1, rect.Top + 1));   // 사선
-                    break;
-                case ComponentChipKind.Unknown:
-                    dc.DrawRoundedRectangle(surface, new Pen(muted, 1.0) { DashStyle = new DashStyle(new[] { 1.0, 1.0 }, 0) }, rect, 1.5, 1.5);
-                    break;
-                default:
-                    dc.DrawRoundedRectangle(surface, outline, rect, 1.5, 1.5);
-                    break;
+                int moreStart = 1 + strip.HealthWord.Length;
+                tail.SetForegroundBrush(neutral, moreStart, tailText.Length - moreStart);
+                tail.SetFontWeight(FontWeights.Bold, moreStart, tailText.Length - moreStart);
             }
-            x += ChipSize + ChipGap;
         }
 
-        if (more != null)
-            dc.DrawText(more, new Point(x, y + (ChipSize - more.Height) / 2));
+        double lead = issue ? glyph + PlateGlyphGap : 0;
+        double tailW = tail?.WidthIncludingTrailingWhitespace ?? 0;
+        double maxText = Math.Max(fontSize, MaxPlateWidth - 2 * PlatePadding - lead - tailW);
+        if (text.WidthIncludingTrailingWhitespace > maxText) text.MaxTextWidth = maxText;
+        double textW = Math.Min(text.WidthIncludingTrailingWhitespace, maxText);
+        double plateW = 2 * PlatePadding + lead + textW + tailW;
+        LastPlateWidth = plateW;
+        double x = (w - plateW) / 2;
+        double y = StripTopFor(w, h, plateW, height);
+        var rect = new Rect(x, y, plateW, height);
+
+        dc.PushOpacity(0.9);
+        dc.DrawRoundedRectangle(surface, null, rect, 3, 3);
+        dc.Pop();
+        double border = issue ? (fault ? 1.5 : 1.0) : 1.0;
+        var inset = new Rect(rect.X + border / 2, rect.Y + border / 2, rect.Width - border, rect.Height - border);
+        dc.DrawRoundedRectangle(null, new Pen(issue ? alert : neutral, border), inset, 3, 3);
+
+        double cx = x + PlatePadding;
+        if (issue)
+        {
+            var transform = new TransformGroup();
+            transform.Children.Add(new ScaleTransform(glyph / 24.0, glyph / 24.0));
+            transform.Children.Add(new TranslateTransform(cx, y + (height - glyph) / 2));
+            dc.PushTransform(transform);
+            if (fault) dc.DrawGeometry(alert, null, WrenchGeometry);                 // 고장 = 채운 공구
+            else dc.DrawGeometry(null, new Pen(alert, 24.0 / glyph), WrenchGeometry); // 저하 = 빈 공구(화면 1px 선)
+            dc.Pop();
+            cx += lead;
+        }
+        dc.DrawText(text, new Point(cx, y + (height - text.Height) / 2));
+        if (tail != null) dc.DrawText(tail, new Point(cx + textW, y + (height - tail.Height) / 2));
     }
 
     private void DrawBadge(DrawingContext dc, double w, double h, Brush surface, Brush alert)

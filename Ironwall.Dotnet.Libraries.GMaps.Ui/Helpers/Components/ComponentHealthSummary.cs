@@ -31,7 +31,7 @@ public sealed class ComponentHealthSummary
         Strip = ComponentStripRules.Build(snapshot, deviceType);
     }
 
-    /// <summary>아이콘 아래 부품 칸 줄(L2) — 고장 먼저 + 카테고리 대표 표의 앞 4칸. 6.3 · 미수신이면 빈 줄.</summary>
+    /// <summary>아이콘 아래 부품 이름표(L2) — 고장 · 저하가 있을 때만 가장 급한 부품 이름 + 건강 단어(+n). 6.3 · 미수신이면 빈 이름표.</summary>
     public ComponentStrip Strip { get; }
 
     /// <summary>공용 부품 표(선언 순서 줄 · 수 · 요약 줄) — 조립 카드 · 상세 보기 부품 탭이 그대로 쓴다.</summary>

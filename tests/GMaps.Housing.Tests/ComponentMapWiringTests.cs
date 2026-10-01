@@ -173,51 +173,23 @@ public class ComponentMapWiringTests
         Assert.Equal(66, ComponentStripRules.StripTop(strip, Rect.Empty, 2));
     }
 
-    // ── 카테고리 대표 칸 ──
-
-    [Theory]
-    [InlineData(EnumDeviceType.Enclosure, "DOOR_SENSOR,DOOR_LOCK,HEATER,FAN")]
-    [InlineData(EnumDeviceType.Gate, "DOOR_ACTUATOR,DOOR_SENSOR,DOOR_LOCK,LIMIT_SWITCH")]
-    [InlineData(EnumDeviceType.IpCamera, "PTZ_UNIT,TRACKER,IR_LED,WIPER")]
-    [InlineData(EnumDeviceType.SmartSensor2, "VIBRATION_SENSOR,PIR_SENSOR,RADAR_UNIT,EO_CAMERA")]
-    [InlineData(EnumDeviceType.SmartMultisensor2, "VIBRATION_SENSOR,PIR_SENSOR,RADAR_UNIT,EO_CAMERA")]
-    [InlineData(EnumDeviceType.SmartSensor, "VIBRATION_SENSOR,ULTRASONIC_SENSOR,PIR_SENSOR,UPS")]
-    [InlineData(EnumDeviceType.Multi, "VIBRATION_SENSOR,PIR_SENSOR,THERMAL_CAMERA,UPS")]
-    [InlineData(EnumDeviceType.Fence, "VIBRATION_SENSOR,UPS,FAN,HEATER")]
-    [InlineData(EnumDeviceType.Lamp, "LAMP_LIGHT,BUZZER,UPS,FAN")]
-    [InlineData(EnumDeviceType.IpSpeaker, "AMPLIFIER,MIC,UPS,FAN")]
-    [InlineData(EnumDeviceType.Controller, "NETWORK_INTERFACE,CONTACT_INPUT,UPS,FAN")]
-    [InlineData(EnumDeviceType.PIR, "UPS,FAN,HEATER,WIPER")]                       // 표에 없는 종류 — 선언 순서
-    public void should_follow_category_representative_table_when_nothing_is_faulted(EnumDeviceType type, string expected)
-    {
-        // 표에 든 유형을 거꾸로 · 섞어 선언해 선언 순서가 아니라 표 순서임을 확인한다(표 밖 UPS · FAN · HEATER · WIPER 는 선언 순서로 뒤에).
-        var declared = new[] { "UPS", "FAN", "HEATER", "WIPER", "EO_CAMERA", "RADAR_UNIT", "LIMIT_SWITCH", "DOOR_LOCK", "IR_LED", "TRACKER",
-            "THERMAL_CAMERA", "ULTRASONIC_SENSOR", "PIR_SENSOR", "DOOR_SENSOR", "DOOR_ACTUATOR", "PTZ_UNIT", "VIBRATION_SENSOR",
-            "BUZZER", "LAMP_LIGHT", "MIC", "AMPLIFIER", "CONTACT_INPUT", "NETWORK_INTERFACE" };
-        var snapshot = ComponentSnapshot.Build(ComponentHealthSummaryTests.Axes(true,
-            declared.Select(t => (t.ToLowerInvariant(), t, (string?)null, (bool?)null, (string?)null, (string?)"OK", (string?)null, true)).ToArray()));
-
-        // 대표 표 밖 유형은 대표 칸 뒤에 선언 순서(UPS · FAN · HEATER · WIPER …)로 채운다.
-        var strip = ComponentStripRules.Build(snapshot, type);
-        var actual = strip.Chips.Select(c => snapshot.Rows.Single(r => r.Key == c.Key).Type).ToArray();
-        Assert.Equal(expected.Split(','), actual);
-        Assert.Equal(declared.Length - 4, strip.MoreCount);
-    }
+    // ── 이름표의 가장 급한 부품(카드 순서) ──
 
     [Fact]
-    public void should_put_faults_first_then_representatives_when_a_non_representative_part_faults()
+    public void should_lead_with_first_fault_in_card_order_and_count_other_issues_when_several_parts_are_wrong()
     {
         var snapshot = ComponentSnapshot.Build(ComponentHealthSummaryTests.Axes(true,
-            ("ups", "UPS", null, null, null, "FAULT", "POWER_LOSS", true),
             ("fan", "FAN", null, null, "ON", "OK", null, true),
             ("heater", "HEATER", null, null, "OFF", "DEGRADED", null, true),
-            ("lock", "DOOR_LOCK", null, null, "LOCKED", "OK", null, true),
-            ("door", "DOOR_SENSOR", null, null, "CLOSED", "OK", null, true),
-            ("spare", "DOOR_SENSOR", null, false, null, "OK", null, true)));   // 사용 안 함 · 두 번째 문 센서
+            ("ups", "UPS", null, null, null, "FAULT", "POWER_LOSS", true),
+            ("lock", "DOOR_LOCK", null, null, "LOCKED", "FAULT", null, true),
+            ("spare", "DOOR_SENSOR", null, false, null, "FAULT", null, true)));   // 사용 안 함 — 고장이어도 세지 않는다
 
-        var keys = ComponentStripRules.Build(snapshot, EnumDeviceType.Enclosure).Chips.Select(c => c.Key);
+        var strip = ComponentStripRules.Build(snapshot, EnumDeviceType.Enclosure);
 
-        Assert.Equal(new[] { "ups", "heater", "door", "lock" }, keys);           // 고장 → 저하 → 대표 순서(문 · 잠금 · [히터] · 팬)
+        Assert.Equal(ComponentPlateSeverity.Fault, strip.Severity);
+        Assert.Equal(snapshot.Rows.Single(r => r.Key == "ups").Name, strip.LeadFullName);   // 고장 먼저 · 같은 단계는 선언 순서
+        Assert.Equal(2, strip.MoreCount);                                                  // lock(고장) + heater(저하)
     }
 
     // ── 카탈로그 한글 출처 ──
