@@ -143,6 +143,10 @@
 										FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="{TemplateBinding PanelTitle}" />
+									<!--  창 "?"(help-callout H-4) — 두 단추 · 엄격 컨테인먼트 · 회전 허용의 뜻(단추 글 속 괄호 설명과 긴 툴팁을 옮겼다)  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.Anchor.Window" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
 									<Button
 										x:Name="PART_CloseButton"
 										Grid.Column="2"
@@ -169,14 +173,14 @@
 										Margin="0,0,0,10"
 										HorizontalAlignment="Stretch"
 										Command="{Binding SetAnchorFromViewCommand}"
-										Content="현재 화면 기준 (지금 보는 영역을 좌표로)"
+										Content="현재 화면 기준"
 										Style="{StaticResource MapAnchorButton}" />
 
 									<Button
 										Margin="0,0,0,14"
 										HorizontalAlignment="Stretch"
 										Command="{Binding DrawAnchorAreaCommand}"
-										Content="지도에서 영역 그리기 (드래그)"
+										Content="지도에서 영역 그리기"
 										Style="{StaticResource MapAnchorButton}" />
 
 									<TextBlock Style="{StaticResource MapAnchorSectionLabel}" Text="북서(NW) 위도 / 경도" />
@@ -227,19 +231,29 @@
 
 									<CheckBox
 										Margin="0,0,0,8"
-										Content="엄격 컨테인먼트 (화면밖 완전차단)"
+										Content="엄격 컨테인먼트"
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorStrict}" />
 
 									<!--  [Rotation V-06 옵션C] 회전 허용 앵커(B모드) — 나침반 ON 동안엔 강제 체크+잠금(수정 불가)  -->
 									<CheckBox
 										Margin="0,0,0,16"
-										Content="회전 허용 (고정 중에도 지도 회전 유지)"
+										Content="회전 허용"
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorAllowRotation}"
 										IsEnabled="{Binding IsAnchorAllowRotationEditable}"
-										ToolTipService.ShowOnDisabled="True"
-										ToolTip="ON: 회전한 방향 그대로 사이트 고정(가두기는 회전 화면 외접 기준 — 같은 줌에서 보이는 범위가 다소 좁아짐)&#10;OFF(기본): 고정 시 정북으로 정렬되고 회전 잠금&#10;※ 나침반(회전 모드) ON 동안엔 자동 체크·잠금 — 해제하려면 회전 모드를 먼저 끄세요" />
+										ToolTipService.ShowOnDisabled="True">
+										<!--  잠금 사유는 화면에 남는 글 — 꺼졌을 때만 단다(로컬 ToolTip 은 트리거를 이긴다). ON/OFF 의 뜻은 창 "?".  -->
+										<CheckBox.Style>
+											<Style BasedOn="{StaticResource {x:Type CheckBox}}" TargetType="CheckBox">
+												<Style.Triggers>
+													<Trigger Property="IsEnabled" Value="False">
+														<Setter Property="ToolTip" Value="나침반(회전 모드)이 켜져 있어 잠겼습니다 — 풀려면 회전 모드를 먼저 끄세요" />
+													</Trigger>
+												</Style.Triggers>
+											</Style>
+										</CheckBox.Style>
+									</CheckBox>
 
 									<Button
 										MinWidth="110"

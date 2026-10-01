@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -63,7 +63,7 @@ public partial class MapViewModel
                 return;
             }
             _copyAnchor = _copyBuffer[0].sourcePos;   // 앵커 = 첫 항목(D-04)
-            SetAimStatus($"{_copyBuffer.Count}개 복사됨 — Ctrl+V로 붙여넣기(마우스 위치)", autoHide: true);
+            SetAimStatus($"{_copyBuffer.Count}개 복사됨", autoHide: true);   // 붙여넣기 방법은 [선택] 의 "?"(help-callout H-4)
             _log?.Info($"[복사] {_copyBuffer.Count}개 심볼 버퍼 저장(앵커 {_copyAnchor.Lat:F6},{_copyAnchor.Lng:F6})");
         }
         catch (Exception ex) { _log?.Error($"[복사] 실패: {ex.Message}"); }

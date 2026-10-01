@@ -2,6 +2,7 @@
 	x:Class="Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps.MapView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:help="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
@@ -22,6 +23,7 @@
 	d:DesignWidth="1200"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d"
+	help:HelpTip.HandlesF1="True"
 	AutomationProperties.AutomationId="GMaps.Map.Root">
 	<!--  전역 단축키 — 상단 메뉴 명령을 맵 포커스 상태에서 동작(메뉴 스코프가 아닌 루트 스코프).
 	      기존 코드 단축키(Ctrl+Shift+R 회전토글·Ctrl+R 회전리셋·Ctrl+←/→ 미세회전·Ctrl+A 전체선택)와 비충돌.  -->
@@ -643,14 +645,14 @@
 							Command="{Binding MeasureLengthCommand}"
 							IsChecked="{Binding IsMeasureLengthActive, Mode=OneWay}"
 							Style="{StaticResource ToolbarToggleButtonStyle}"
-							ToolTip="길이 측정 — 클릭으로 점 추가, 더블클릭/Enter 완료, ESC 취소">
+							ToolTip="길이 측정">
 							<md:PackIcon Kind="Ruler" />
 						</ToggleButton>
 						<ToggleButton
 							Command="{Binding MeasureAreaCommand}"
 							IsChecked="{Binding IsMeasureAreaActive, Mode=OneWay}"
 							Style="{StaticResource ToolbarToggleButtonStyle}"
-							ToolTip="넓이 측정 — 최소 3점, 더블클릭/Enter 완료, ESC 취소">
+							ToolTip="넓이 측정">
 							<md:PackIcon Kind="VectorSquare" />
 						</ToggleButton>
 					</StackPanel>
@@ -668,9 +670,19 @@
 							Command="{Binding ToggleRotationFeatureCommand}"
 							IsChecked="{Binding IsRotationFeatureEnabled, Mode=OneWay}"
 							IsEnabled="{Binding IsRotationToggleEnabled}"
-							Style="{StaticResource ToolbarToggleButtonStyle}"
-							ToolTipService.ShowOnDisabled="True"
-							ToolTip="지도 회전 모드 (Ctrl+Shift+R) — ON: Shift+휠 / Ctrl+←→ 회전 · OFF: 회전 입력 차단(현재 각도 유지 — 정북 복귀는 나침반 N / Ctrl+R)&#10;※ 사이트 고정(앵커) 중에는 토글 잠금 — 변경하려면 앵커를 먼저 해제하세요">
+							ToolTipService.ShowOnDisabled="True">
+							<!--  help-callout H-4 — 툴팁은 이름 + 단축키만. 조작법은 이 묶음의 "?"(Map.Toolbar.RotateTilt).
+							      잠금 사유는 화면에 남는 글이라 꺼졌을 때만 바꿔 단다(로컬 ToolTip 은 트리거를 이기므로 스타일 안에서).  -->
+							<ToggleButton.Style>
+								<Style BasedOn="{StaticResource ToolbarToggleButtonStyle}" TargetType="ToggleButton">
+									<Setter Property="ToolTip" Value="지도 회전 모드 (Ctrl+Shift+R)" />
+									<Style.Triggers>
+										<Trigger Property="IsEnabled" Value="False">
+											<Setter Property="ToolTip" Value="지도 회전 모드 — 사이트 고정 중에는 바꿀 수 없습니다(고정을 먼저 해제하세요)" />
+										</Trigger>
+									</Style.Triggers>
+								</Style>
+							</ToggleButton.Style>
 							<md:PackIcon Kind="CompassOutline" />
 						</ToggleButton>
 						<!--  기울이기 토글 — IsChecked OneWay(컨트롤 SSOT) + Command. 앵커 A모드면 잠금(ShowOnDisabled 사유 툴팁).
@@ -775,6 +787,11 @@
 								Height="14"
 								Kind="ChevronDown" />
 						</ToggleButton>
+						<!--  회전 · 기울이기 "?"(help-callout H-4) — 단축키 · 동작 원리 · 기울임 배지 뜻  -->
+						<help:HelpTip
+							Margin="4,0,2,0"
+							HelpKey="Map.Toolbar.RotateTilt"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
 
@@ -791,7 +808,7 @@
 						IsChecked="{Binding IsEditModeEnabled, Mode=OneWay}"
 						IsEnabled="{Binding CanMapEdit}"
 						Style="{StaticResource MaterialDesignSwitchToggleButton}"
-						ToolTip="편집 모드 전환 — ON 시 아래 편집 스트립(등록·심볼·선택·기준) 확장">
+						ToolTip="편집 모드">
 						<md:PackIcon Kind="Draw" />
 					</ToggleButton>
 					<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11">
@@ -809,6 +826,11 @@
 							</Style>
 						</TextBlock.Style>
 					</TextBlock>
+					<!--  편집 모드 "?"(help-callout H-4) — 켜면 무엇이 열리는지  -->
+					<help:HelpTip
+						Margin="6,0,0,0"
+						HelpKey="Map.Toolbar.EditMode"
+						Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}}" />
 				</StackPanel>
 
 				<!--  라인 드로잉 전용 버튼 추가 (AREA_BOUNDARY 카테고리일 때만 표시)  -->
@@ -1154,6 +1176,11 @@
 							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y / Ctrl+Shift+Z): {0}', TargetNullValue='다시 실행 (Ctrl+Y / Ctrl+Shift+Z)'}">
 							<md:PackIcon Kind="Redo" />
 						</Button>
+						<!--  선택 "?"(help-callout H-4) — 지도 위 선택 안내 띠에서 빠진 단축키(추가 · 해제 · 이동 · 삭제 · 복사)  -->
+						<help:HelpTip
+							Margin="4,0,2,0"
+							HelpKey="Map.EditStrip.Selection"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 				</Border>
 
@@ -1259,7 +1286,6 @@
 					BorderThickness="1"
 					CornerRadius="9"
 					IsHitTestVisible="False"
-					ToolTip="지도가 기울어져 세로 축척이 cosφ 배로 줄어 있습니다(수평 축척·MGRS 는 유지)"
 					Visibility="{Binding IsTiltBadgeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<StackPanel Orientation="Horizontal">
 						<md:PackIcon
@@ -1475,6 +1501,12 @@
 							FontSize="11"
 							Foreground="{DynamicResource TextMutedBrush}"
 							Text="{Binding MeasurePrimaryUnit}" />
+						<!--  측정 "?"(help-callout H-4 · D-1) — 띠에는 지금 할 일 한 줄만, 끝내기 · 지우기 · 취소 단축키는 여기.
+						      띠는 원래 히트 테스트를 받는 판이라(지도 클릭은 띠 밖에서만) "?" 가 지도 입력을 더 가리지 않는다.  -->
+						<help:HelpTip
+							Margin="10,0,0,0"
+							HelpKey="Map.Measure.Tool"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 					</StackPanel>
 					<StackPanel
 						Margin="0,3,0,0"

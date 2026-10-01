@@ -67,9 +67,7 @@
                                 </Grid>
                                 <Button x:Name="PART_CloseButton" Margin="0,0,4,0" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource PanelCloseButtonStyle}" ToolTip="닫기" AutomationProperties.AutomationId="GMaps.SymbolPalette.Close"/>
                             </Grid>
-                            <Border Grid.Row="1" Padding="10,7" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1">
-                                <TextBlock Text="심볼을 끌어 놓거나 선택 후 지도에서 위치를 지정하세요." FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
-                            </Border>
+                            <!--  help-callout H-4 — 머리 아래 안내 띠("끌어 놓거나 선택 후 지도에서 위치 지정")는 "?"(Map.SymbolPalette.Placement)로 옮겼다.  -->
                             <Grid Margin="10" Grid.Row="2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -100,7 +98,11 @@
                                     <RadioButton Content="도형" Tag="GEOMETRICS" Style="{StaticResource PaletteTab}" AutomationProperties.AutomationId="GMaps.SymbolPalette.Category.GEOMETRICS"/>
                                     <RadioButton Content="기본" Tag="BASIC_SHAPES" Style="{StaticResource PaletteTab}" AutomationProperties.AutomationId="GMaps.SymbolPalette.Category.BASIC_SHAPES"/>
                                 </StackPanel>
-                                <TextBlock x:Name="PART_CountLabel" Grid.Row="2" Margin="0,0,0,8" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <!--  건수 줄 오른쪽 "?" — 놓는 법(끌기 · 클릭 · Enter · Esc)  -->
+                                <DockPanel Grid.Row="2" Margin="0,0,0,8" LastChildFill="True">
+                                    <fb:HelpTip DockPanel.Dock="Right" HelpKey="Map.SymbolPalette.Placement" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+                                    <TextBlock x:Name="PART_CountLabel" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                </DockPanel>
                                 <Grid Grid.Row="3">
                                     <ListBox x:Name="PART_Items" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionMode="Single" AutomationProperties.AutomationId="GMaps.SymbolPalette.Items">
                                         <ListBox.ItemsPanel>
@@ -155,8 +157,11 @@
                                     <TextBlock x:Name="PART_EmptyLabel" Text="검색 결과가 없습니다" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </Grid>
                                 <StackPanel Grid.Row="4" Margin="0,12,0,0">
-                                    <TextBlock Text="클릭 또는 Enter: 지도에서 위치 지정 · ESC: 취소" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <CheckBox x:Name="PART_Enable3D" Content="지도에 3D 하우징 사용" Margin="0,12,0,5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <!--  "클릭 또는 Enter · ESC" 줄은 위 "?" 로. 3D 사용의 "재시작 후 적용" 은 옆 "?"(Map.SymbolPalette.Symbol3D)로.  -->
+                                    <StackPanel Margin="0,0,0,5" Orientation="Horizontal">
+                                        <CheckBox x:Name="PART_Enable3D" VerticalAlignment="Center" Content="지도에 3D 하우징 사용" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <fb:HelpTip Margin="6,0,0,0" HelpKey="Map.SymbolPalette.Symbol3D"/>
+                                    </StackPanel>
                                     <TextBlock x:Name="PART_FeatureStatus" TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </StackPanel>
                                 <WrapPanel Grid.Row="5" Orientation="Horizontal" Margin="0,12,0,0">

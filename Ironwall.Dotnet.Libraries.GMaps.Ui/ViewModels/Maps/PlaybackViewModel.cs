@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -83,8 +83,8 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         ToTime = end.Date.AddDays(1).AddSeconds(-1);        // 23:59:59 (종료일 끝)
         IsCalendarOpen = false;
         Status = (ToTime - FromTime).TotalDays > 31
-            ? $"{start:yyyy-MM-dd}~{end:yyyy-MM-dd} 선택(범위 큼 — 시작부터 31일 제한될 수 있음) · [불러오기]"
-            : $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd} 선택됨 · [불러오기]를 누르세요";
+            ? $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd} 선택됨 — 범위 큼: 시작부터 31일까지만 불러올 수 있음"
+            : $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd} 선택됨";   // "[불러오기]를 누르세요" 는 창 "?"(Map.Playback.Window, help-callout H-4)
         _log?.Info($"[Playback] 캘린더 범위 설정: start={start:yyyy-MM-dd} end={end:yyyy-MM-dd} → From={FromTime:yyyy-MM-dd HH:mm:ss} To={ToTime:yyyy-MM-dd HH:mm:ss}");
     }
 
@@ -116,7 +116,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
 
     public ObservableCollection<PlaybackTrackItem> Events { get; } = new();
 
-    private string _status = "기간을 선택하고 [불러오기]";
+    private string _status = string.Empty;   // 처음 안내("기간을 선택하고 [불러오기]")는 창 "?"(Map.Playback.Window, help-callout H-4)
     public string Status { get => _status; set { _status = value; NotifyOfPropertyChange(); } }
 
     private bool _hasData;

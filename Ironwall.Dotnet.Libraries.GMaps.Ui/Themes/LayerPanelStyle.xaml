@@ -251,7 +251,7 @@
 				AutomationProperties.AutomationId="{Binding Model.Id, StringFormat=GMaps.LayerPanel.DragHandle.{0}}"
 				AutomationProperties.Name="레이어 순서 손잡이"
 				IsEnabled="{Binding IsMapEditable}"
-				ToolTip="끌어서 순서를 바꿉니다 · 행을 고른 뒤 Alt+↑ / Alt+↓ 로도 됩니다 · Esc 로 취소" />
+				ToolTip="순서 바꾸기 (Alt+↑ / Alt+↓)" />
 			<CheckBox
 				Grid.Column="1"
 				IsChecked="{Binding IsChecked, Mode=TwoWay}"
@@ -685,8 +685,7 @@
 						Margin="6,0,2,0"
 						AutomationProperties.Name="{Binding Name, StringFormat={}{0} 전체 보이기}"
 						IsChecked="{Binding IsChecked, Mode=TwoWay}"
-						IsThreeState="True"
-						ToolTip="이 묶음 전체를 켜거나 끕니다">
+						IsThreeState="True">
 						<CheckBox.Style>
 							<Style BasedOn="{StaticResource LayerCheckBox}" TargetType="CheckBox">
 								<Style.Triggers>
@@ -879,6 +878,10 @@
 										FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="{TemplateBinding PanelTitle}" />
+									<!--  패널 "?"(help-callout H-4) — 체크 · 잠금 · 묶음 체크 · 순서 바꾸기(키보드로 묶음은 순서 목록의 KeyboardFallback 이 저절로 더한다)  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.LayerPanel.Layers" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
 									<Button
 										x:Name="PART_CloseButton"
 										Grid.Column="2"

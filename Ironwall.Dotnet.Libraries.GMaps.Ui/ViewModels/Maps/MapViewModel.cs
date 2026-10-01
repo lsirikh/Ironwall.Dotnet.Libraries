@@ -1136,7 +1136,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 { var k = (h is GMapSymbols.GMapImageMarker, h.Id); if (!ids.Add(k)) ids.Remove(k); }   // 겹치면 해제(토글), 아니면 추가(타입인지)
         ApplyGroupSelectionByIds(ids);
         if (ids.Count > 0)
-            SetAimStatus($"{ids.Count}개 선택 — 드래그=이동·Del=삭제 · Ctrl+클릭/Shift+드래그=추가·해제", autoHide: true);
+            SetAimStatus($"{ids.Count}개 선택", autoHide: true);   // 조작 단축키는 편집 도구줄 [선택] 의 "?"(Map.EditStrip.Selection, help-callout H-4)
     }
 
     /// <summary>Ctrl+클릭 — 해당 심볼/이미지마커를 그룹 선택에 토글(추가/해제, 나머지 유지).</summary>
@@ -1148,7 +1148,7 @@ public partial class MapViewModel : BasePanelViewModel,
         var key = (marker is GMapSymbols.GMapImageMarker, marker.Id);
         if (!ids.Add(key)) ids.Remove(key);   // 이미 선택→해제, 아니면 추가(나머지 유지, 타입인지)
         ApplyGroupSelectionByIds(ids);
-        SetAimStatus(ids.Count > 0 ? $"{ids.Count}개 선택(Ctrl+클릭·Shift+드래그로 추가·해제)" : "선택 해제", autoHide: true);
+        SetAimStatus(ids.Count > 0 ? $"{ids.Count}개 선택" : "선택 해제", autoHide: true);
     }
 
     /// <summary>현재 선택 집합을 (타입,Id)로 수집(그룹 ∪ 단일). 이미지↔심볼 같은 Id 충돌 시 함께 잡히지 않게 타입 구분.

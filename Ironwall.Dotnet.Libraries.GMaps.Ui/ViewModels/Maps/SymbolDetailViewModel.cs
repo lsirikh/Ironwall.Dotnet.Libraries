@@ -329,7 +329,8 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
         // 3D/2D 판정은 지도와 같은 조건이어야 한다 — 지도는 3D 인데 상세 창은 2D 면 다른 장비처럼 보인다.
         ModelKey = Symbol3DFeature.IsEnabled ? Symbols3D.HousingModels.DeviceKey(marker.DeviceType) : null;
         Is3D = !string.IsNullOrEmpty(ModelKey);
-        KindText = Is3D ? "3D 심볼 · 45°씩 자동 회전\n드래그로 자유 회전 · 놓으면 재개" : "2D 심볼 · 회전 없음";
+        // 회전 조작법(45° 자동 회전 · 끌어서 돌리기)은 창 "?"(Map.SymbolDetail.Window, help-callout H-4) — 여기엔 종류만.
+        KindText = Is3D ? "3D 심볼" : "2D 심볼 · 회전 없음";
         DoorOpen = marker.DoorState == EnumDoorState.Open ? 1 : 0;
 
         NoDeviceReason = context.HasDevice ? string.Empty

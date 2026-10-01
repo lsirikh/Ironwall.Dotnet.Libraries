@@ -397,12 +397,18 @@
 										Background="{DynamicResource BorderBrush}" />
 
 									<!--  라벨(제목) 스타일 섹션 — COLOR 섹션과 동일 컨셉 (Overlay_Title FR-07 v2.4)  -->
-									<TextBlock
-										Margin="0,0,0,8"
-										FontSize="13"
-										FontWeight="Bold"
-										Foreground="{DynamicResource PrimaryBrush}"
-										Text="LABEL" />
+									<!--  섹션 이름 옆 "?"(help-callout H-4) — 제목폭의 뜻 · 지도에서 라벨 가장자리 끌기  -->
+									<StackPanel Margin="0,0,0,8" Orientation="Horizontal">
+										<TextBlock
+											VerticalAlignment="Center"
+											FontSize="13"
+											FontWeight="Bold"
+											Foreground="{DynamicResource PrimaryBrush}"
+											Text="LABEL" />
+										<fb:HelpTip
+											Margin="6,0,0,0"
+											HelpKey="Map.Property.Label" />
+									</StackPanel>
 
 									<!--  글자색 — 심볼 채우기/테두리 색상 콤보를 그대로 재사용(AvailableColors, v2.5)  -->
 									<Grid Margin="0,5">
@@ -552,7 +558,7 @@
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
 											Text="{Binding TitleMaxWidthPx, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}"
-											ToolTip="라벨 최대 폭(px, 40~800). 글자가 이 폭에서 말줄임 처리됩니다. 맵에서 라벨 가장자리를 드래그해도 조절됩니다." />
+											ToolTip="라벨 최대 폭 (40~800 px)" />
 									</Grid>
 
 									<!--  구분선  -->

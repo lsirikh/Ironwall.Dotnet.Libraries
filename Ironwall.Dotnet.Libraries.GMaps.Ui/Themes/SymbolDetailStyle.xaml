@@ -206,7 +206,7 @@
 					DockPanel.Dock="Right"
 					IsChecked="{Binding IsFaultFirst, Mode=TwoWay}"
 					Style="{StaticResource SdSortToggle}"
-					ToolTip="줄 순서를 바꿉니다 — 선언 순서 / 고장 먼저" />
+					ToolTip="줄 순서" />
 				<Ellipse Style="{StaticResource Gm.Component.SummaryDot}" />
 				<TextBlock
 					VerticalAlignment="Center"
@@ -314,11 +314,16 @@
 									      3D/2D 판별은 3D 전용인 ResetView/ToggleRotate 버튼 존재로 한다.  -->
 									<TextBlock
 										Grid.Column="1"
+										Margin="0,0,28,0"
 										VerticalAlignment="Center"
 										FontSize="13" FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="{Binding HeaderText, Mode=OneWay}"
 										TextTrimming="CharacterEllipsis" />
+									<!--  창 "?"(help-callout H-4) — 3D 회전 · [정면] · [관계도에서 보기] · 부품 줄 순서. 제목은 왼쪽 정렬이라 오른쪽 끝에 둔다.  -->
+									<Border Grid.Column="1" Style="{StaticResource PanelHeaderHelpDisc}">
+										<fb:HelpTip HelpKey="Map.SymbolDetail.Window" Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+									</Border>
 									<Button
 										x:Name="PART_CloseButton"
 										Grid.Column="2"
@@ -402,8 +407,7 @@
 												AutomationProperties.AutomationId="GMaps.SymbolDetail.ResetView"
 												Command="{Binding ResetViewCommand}"
 												Content="정면"
-												Style="{StaticResource SdMiniButton}"
-												ToolTip="심볼을 정면으로 되돌리고 자동 회전을 처음부터 시작합니다." />
+												Style="{StaticResource SdMiniButton}" />
 											<Button
 												AutomationProperties.AutomationId="GMaps.SymbolDetail.ToggleRotate"
 												Command="{Binding ToggleAutoRotateCommand}"
@@ -478,8 +482,7 @@
 												AutomationProperties.AutomationId="GMaps.SymbolDetail.OpenUnitMap"
 												Command="{Binding OpenUnitMapCommand}"
 												Content="관계도에서 보기"
-												Style="{StaticResource SdMiniButton}"
-												ToolTip="부대 콘솔을 열어 부대 관계도에서 이 부대를 고릅니다." />
+												Style="{StaticResource SdMiniButton}" />
 										</Grid>
 										<!--  [관계도에서 보기] 결과 안내(ISSUE-43) — 부대 창이 선택을 옮기지 않았으면 까닭을 말한다(말없는 실패 0).  -->
 										<TextBlock
