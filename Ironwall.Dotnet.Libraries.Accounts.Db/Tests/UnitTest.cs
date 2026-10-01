@@ -40,13 +40,14 @@ public sealed class DbTestFixture : IAsyncLifetime
     {
         IpDbServer = "127.0.0.1",
         PortDbServer = 3306,
-        DbDatabase = "monitor_db",
+        // r24: 라이브 지도 DB(monitor_db)를 쓰면 DisposeAsync 의 DROP DATABASE 가 운영 지도 · 결선 배치를 통째로 지운다(2026-10-02 실측) — 시험 전용 DB
+        DbDatabase = "ut_accounts_db",
         UidDbServer = "root",
         PasswordDbServer = "root"
     };
 
     // ── IAsyncLifetime 구현 ──────────────────
-    [Fact(DisplayName = "Initialize DB Service")]
+    // IAsyncLifetime 메서드에 [Fact] 금지(testing-patterns I-01) — 두 번 돌고, Dispose 가 시험으로 먼저 돌아 DB 를 지운다
     public async Task InitializeAsync()
     {
         // 필요한 최소 서비스만 수동 생성
@@ -66,7 +67,6 @@ public sealed class DbTestFixture : IAsyncLifetime
     }
 
 
-    [Fact(DisplayName = "Dispose DB Service")]
     public async Task DisposeAsync()
     {
         await Svc.StopService(Cts.Token);

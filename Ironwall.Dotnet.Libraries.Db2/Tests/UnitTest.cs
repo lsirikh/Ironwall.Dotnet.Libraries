@@ -50,7 +50,6 @@ public class UnitTest
     }
 
     // ── IAsyncLifetime 구현 ──────────────────
-    [Fact(DisplayName = "Initialize DB Service")]
     public async Task InitializeAsync()
     {
         // Connect + 스키마 + 캐시 초기화
@@ -61,7 +60,6 @@ public class UnitTest
     }
 
 
-    [Fact(DisplayName = "Dispose DB Service")]
     public async Task DisposeAsync()
     {
         await InitializeAsync();

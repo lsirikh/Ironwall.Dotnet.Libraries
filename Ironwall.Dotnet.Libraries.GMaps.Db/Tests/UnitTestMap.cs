@@ -59,7 +59,6 @@ public sealed class GMapDbFixture : IAsyncLifetime
     };
 
     // ────────── IAsyncLifetime ──────────
-    [Fact(DisplayName = "Initialize GMap DB Service")]
     public async Task InitializeAsync()
     {
         var log = new LogService();
@@ -105,7 +104,6 @@ public sealed class GMapDbFixture : IAsyncLifetime
         await conn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
-    [Fact(DisplayName = "Dispose GMap DB Service")]
     public async Task DisposeAsync()
     {
         await Svc.StopService(Cts.Token);

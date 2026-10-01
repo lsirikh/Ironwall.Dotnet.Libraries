@@ -54,13 +54,14 @@ public sealed class DeviceDbFixture : IAsyncLifetime
         IpDbServer = "127.0.0.1",
         PortDbServer = 3306,
         //DbDatabase = "monitor_db_test",
-        DbDatabase = "monitor_db",
+        // r24: 라이브 지도 DB(monitor_db)의 테이블을 DROP 하던 것 — 시험 전용 DB(2026-10-02 지도 DB 소실 사고)
+        DbDatabase = "ut_devices_db",
         UidDbServer = "root",
         PasswordDbServer = "root"
     };
 
     // ────────── IAsyncLifetime ──────────
-    [Fact(DisplayName = "Initialize DB Service")]
+    // IAsyncLifetime 메서드에 [Fact] 금지(testing-patterns I-01)
     public async Task InitializeAsync()
     {
 
@@ -89,7 +90,6 @@ public sealed class DeviceDbFixture : IAsyncLifetime
         Assert.True(Svc.IsConnected);
     }
 
-    [Fact(DisplayName = "Dispose DB Service")]
     public async Task DisposeAsync()
     {
         await Svc.StopService(Cts.Token);
