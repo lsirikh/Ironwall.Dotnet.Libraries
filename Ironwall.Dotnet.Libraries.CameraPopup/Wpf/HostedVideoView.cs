@@ -41,6 +41,46 @@ public class HostedVideoView : Image
         set => SetValue(FrameSourceProperty, value);
     }
 
+    public static readonly DependencyProperty AspectFillToleranceProperty = DependencyProperty.Register(
+        nameof(AspectFillTolerance), typeof(double), typeof(HostedVideoView),
+        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsArrange));
+
+    /// <summary>
+    /// 프레임과 상자의 가로세로 비율 차이가 이 비율 이하면(예: 0.035 = 3.5%) 여백 없이 상자를 채운다(<see cref="Stretch.Fill"/> 처럼). 0 이면 늘 <see cref="Image.Stretch"/> 그대로.
+    /// </summary>
+    /// <remarks>
+    /// 호스트는 카메라 비율을 프레임 <b>안에서</b> 이미 맞춰(검은 띠 포함) 상자의 물리 픽셀 크기로 보낸다 — 그런데 크기를 짝수로 자르고(<c>&amp; ~1</c>)
+    /// 다시 열기 허용 오차 안의 변화는 다시 열지 않아, 프레임이 상자보다 1~몇 px 어긋난다. 그대로 <see cref="Stretch.Uniform"/> 으로 그리면
+    /// 그 차이가 영상 한쪽(가운데 맞춤의 반 픽셀이 한쪽으로 반올림)에 1 px 검은 세로 줄로 남았다(150% 에서 실측 — "영상과 오른쪽 테두리 사이 검은 줄").
+    /// 비율 차이가 크면(패널을 펼쳐 상자가 크게 바뀐 직후 다시 열기 전) 그대로 레터박스한다 — 찌그러뜨리지 않는다.
+    /// </remarks>
+    public double AspectFillTolerance
+    {
+        get => (double)GetValue(AspectFillToleranceProperty);
+        set => SetValue(AspectFillToleranceProperty, value);
+    }
+
+    /// <summary>
+    /// 이 상자를 여백 없이 채울 만큼 비율이 가까운가(순수 — 창 없이 시험한다). 상자 · 원본 크기를 모르면 거짓.
+    /// </summary>
+    public static bool FillsBox(Size source, Size box, double tolerance)
+    {
+        if (!(tolerance > 0)) return false;
+        if (!double.IsFinite(box.Width) || !double.IsFinite(box.Height) || box.Width <= 0 || box.Height <= 0) return false;
+        if (!double.IsFinite(source.Width) || !double.IsFinite(source.Height) || source.Width <= 0 || source.Height <= 0) return false;
+        var ratio = (source.Width / source.Height) / (box.Width / box.Height);
+        return Math.Abs(ratio - 1) <= tolerance;
+    }
+
+    private bool FillsBox(Size box)
+        => Stretch == Stretch.Uniform && Source is { } source && FillsBox(new Size(source.Width, source.Height), box, AspectFillTolerance);
+
+    protected override Size MeasureOverride(Size constraint)
+        => FillsBox(constraint) ? constraint : base.MeasureOverride(constraint);
+
+    protected override Size ArrangeOverride(Size arrangeSize)
+        => FillsBox(arrangeSize) ? arrangeSize : base.ArrangeOverride(arrangeSize);
+
     /// <summary>화면 갱신 구독 중인지(진단 · 시험용).</summary>
     internal bool IsHooked => _hooked;
 

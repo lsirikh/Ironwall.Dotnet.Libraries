@@ -217,9 +217,15 @@
 
     <!--  맵 위 이동식 RTSP 스트리밍 팝업 — 관심지역/레이어 창 답습  -->
     <Style TargetType="{x:Type ctrl:CameraStreamPopupControl}">
+        <!--  지도에서는 소수 좌표에 놓인다 — 1px 테두리 · 머리 띠 · 영상 가장자리가 두 줄로 번지지 않게 픽셀에 맞춘다(MapView 항목 스타일도 켠다)  -->
+        <Setter Property="UseLayoutRounding" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
+                    <Grid>
+                    <!--  둥근 틀 하나가 모서리를 맡는다: 안의 머리 띠 · 영상 · 탭 패널은 네모(CornerRadius 0)로 두고 FrameBorder 가 테두리 선 밑까지 잘라
+                          그 위에 테두리를 그린다. 안쪽 띠마다 반지름(9)을 따로 주면 틀의 자르기(테두리 두께에 따라 바뀜)와 어긋나
+                          모서리마다 표면색 쐐기가 비친다(2026-10-01 "창 Edge 마감이 너무 별로" — 화면 밖 렌더 실측).  -->
                     <fb:FrameBorder
                         x:Name="PART_Root"
                         Background="{DynamicResource SurfaceBrush}"
@@ -245,7 +251,6 @@
                             <Border
                                 Grid.Row="0"
                                 Background="{DynamicResource PrimaryBrush}"
-                                CornerRadius="9,9,0,0"
                                 Cursor="SizeAll">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -305,11 +310,13 @@
                                 x:Name="PART_VideoRegion"
                                 Grid.Row="1"
                                 Background="Black"
-                                CornerRadius="0,0,9,9"
                                 ClipToBounds="True">
                                 <Grid>
+                                    <!--  AspectFillTolerance: 호스트 프레임은 상자 크기로 와서(카메라 비율 띠는 프레임 안에 이미 있다) 짝수 자르기 · 다시 열기 허용 오차만큼만
+                                          어긋난다 — 그 1~2 px 를 레터박스하면 영상 한쪽에 검은 세로 줄이 남는다. 3.5% 안이면 채운다.  -->
                                     <camerapopup:HostedVideoView
                                         x:Name="PART_Player"
+                                        AspectFillTolerance="0.035"
                                         AutomationProperties.AutomationId="GMaps.CameraPopup.Video"
                                         FrameSource="{Binding FrameSource}"
                                         IsHitTestVisible="False" />
@@ -428,7 +435,6 @@
                                 Background="{DynamicResource SurfaceAltBrush}"
                                 BorderBrush="{DynamicResource DividerBrush}"
                                 BorderThickness="0,1,0,0"
-                                CornerRadius="0,0,9,9"
                                 Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
                                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Margin="8">
@@ -786,11 +792,20 @@
                             </Border>
                         </Grid>
                     </fb:FrameBorder>
+                    <!--  단일 선택 강조 — 굵은 주색 테두리 (FR-SEL-02). 틀 두께를 바꾸지 않고 위에 덧그린다:
+                          두께를 1→3 으로 바꾸면 안의 영상 상자가 4 DIU 줄어 호스트 프레임(상자 크기로 연 것)과 비율이 어긋나
+                          영상 양옆에 1px 검은 줄이 생기고, 선택할 때마다 내용이 2px 씩 움직였다.
+                          반지름 9 = 두께 3 선의 바깥 가장자리가 틀(두께 1 · 반지름 10)의 바깥 가장자리와 같은 곡선.  -->
+                    <Border
+                        BorderBrush="{DynamicResource PrimaryBrush}"
+                        BorderThickness="3"
+                        CornerRadius="9"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <!--  단일 선택 강조 — 굵은 Accent 테두리 (FR-SEL-02)  -->
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                             <Setter TargetName="PART_Root" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-                            <Setter TargetName="PART_Root" Property="BorderThickness" Value="3" />
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
