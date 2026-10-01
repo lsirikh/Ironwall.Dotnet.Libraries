@@ -43,6 +43,13 @@ public class ConsoleSection : HeaderedContentControl
     /// <summary>제목 옆 개수 배지(부품 수 등). 비우면 숨는다.</summary>
     public string CountText { get => (string)GetValue(CountTextProperty); set => SetValue(CountTextProperty, value); }
 
+    public static readonly DependencyProperty HelpKeyProperty = Reg(nameof(HelpKey), string.Empty);
+    /// <summary>
+    /// 이 섹션의 "?" 키(help-callout FR-04) — 제목 바로 오른쪽에 "?" 가 생긴다. 비우면 없다.
+    /// 사용법 · 용어 · 단축키 설명은 칸 사이 회색 줄이 아니라 여기로 옮긴다. 섹션 아래 끌기 면의 키보드 대체 경로는 "키보드로" 묶음에 저절로 들어간다.
+    /// </summary>
+    public string HelpKey { get => (string)GetValue(HelpKeyProperty); set => SetValue(HelpKeyProperty, value); }
+
     private static DependencyProperty Reg<T>(string name, T defaultValue)
         => DependencyProperty.Register(name, typeof(T), typeof(ConsoleSection), new PropertyMetadata(defaultValue));
 }
@@ -85,8 +92,19 @@ public class ConsoleField : HeaderedContentControl
     public bool IsTouched { get => (bool)GetValue(IsTouchedProperty); set => SetValue(IsTouchedProperty, value); }
 
     public static readonly DependencyProperty NoteProperty = Reg(nameof(Note), string.Empty);
-    /// <summary>값 아래 작은 주석 — "생성 시 확정", "센서에는 server_id 가 없습니다".</summary>
+    /// <summary>
+    /// 값 아래 작은 주석 — <b>설명용으로 쓰지 않는다</b>(help-callout PRD FR-05). 사용법 · 용어 · 동작 원리는 섹션
+    /// <see cref="ConsoleSection.HelpKey"/> 의 "?" 로, 잠금 · 비활성 사유는 <see cref="LockReason"/> 로 옮긴다.
+    /// 옛 화면이 깨지지 않게 그대로 보이며, 새 사용은 설명형 문구 회귀 시험의 허용 목록 밖이면 실패한다.
+    /// </summary>
     public string Note { get => (string)GetValue(NoteProperty); set => SetValue(NoteProperty, value); }
+
+    public static readonly DependencyProperty LockReasonProperty = Reg(nameof(LockReason), string.Empty);
+    /// <summary>
+    /// 왜 바꿀 수 없는가 — "생성 시 확정", "권한이 없습니다". 화면에 <b>남는</b> 글이다(상태 · 잠금 사유, PRD §2). 값 아래 작은 글로 보이고
+    /// <see cref="Note"/> 보다 위에 선다. 비우면 숨는다.
+    /// </summary>
+    public string LockReason { get => (string)GetValue(LockReasonProperty); set => SetValue(LockReasonProperty, value); }
 
     public static readonly DependencyProperty IsLockedProperty = Reg(nameof(IsLocked), false);
     /// <summary>잠긴 칸 — 자물쇠 글리프를 붙인다.</summary>

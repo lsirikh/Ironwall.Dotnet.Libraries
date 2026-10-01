@@ -59,6 +59,13 @@ public class ConsoleToolbar : Control
     public static readonly DependencyProperty CanRefreshProperty = Reg(nameof(CanRefresh), true);
     public bool CanRefresh { get => (bool)GetValue(CanRefreshProperty); set => SetValue(CanRefreshProperty, value); }
 
+    public static readonly DependencyProperty HelpKeyProperty = Reg(nameof(HelpKey), string.Empty);
+    /// <summary>
+    /// 도구줄의 "?" 키(help-callout FR-04) — 동작 묶음 끝(창 고유 동작 뒤)에 "?" 가 생긴다. 비우면 없다.
+    /// 왼쪽 묶음의 옮기지 않는 부분이라 폭 판정(<see cref="ConsoleLayoutMath.ResolveToolbarFit"/>)의 고정 폭에 저절로 들어간다.
+    /// </summary>
+    public string HelpKey { get => (string)GetValue(HelpKeyProperty); set => SetValue(HelpKeyProperty, value); }
+
     public static readonly DependencyProperty AddDisabledReasonProperty = Reg(nameof(AddDisabledReason), "권한이 없습니다.");
     /// <summary>[추가] 가 꺼져 있을 때의 사유.</summary>
     public string AddDisabledReason { get => (string)GetValue(AddDisabledReasonProperty); set => SetValue(AddDisabledReasonProperty, value); }

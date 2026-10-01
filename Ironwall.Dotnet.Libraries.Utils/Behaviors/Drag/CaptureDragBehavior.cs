@@ -81,8 +81,26 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
     /// 자동화가 좌표 클릭에 묶이고, 좌표 드래그는 파괴 동작 가드를 구조적으로 우회한다.
     /// </summary>
     public static readonly DependencyProperty KeyboardFallbackProperty = DependencyProperty.Register(
-        nameof(KeyboardFallback), typeof(string), typeof(CaptureDragBehavior));
+        nameof(KeyboardFallback), typeof(string), typeof(CaptureDragBehavior),
+        new PropertyMetadata(null, (d, _) => ((CaptureDragBehavior)d).PublishFallback()));
     public string? KeyboardFallback { get => (string?)GetValue(KeyboardFallbackProperty); set => SetValue(KeyboardFallbackProperty, value); }
+
+    /// <summary>
+    /// 붙은 목록에 그 끌기 면의 키보드 대체 경로를 걸어 둔다 — 섹션 "?" 가 열릴 때 이것을 모아 "키보드로" 묶음에 넣는다
+    /// (help-callout PRD FR-06, <see cref="Consoles.HelpKeyboardFallbacks"/>). 행동(Behavior)은 시각 트리에서 보이지 않아 목록 쪽에 둔다.
+    /// </summary>
+    public static readonly DependencyProperty PublishedKeyboardFallbackProperty = DependencyProperty.RegisterAttached(
+        "PublishedKeyboardFallback", typeof(string), typeof(CaptureDragBehavior), new PropertyMetadata(null));
+
+    public static string? GetPublishedKeyboardFallback(DependencyObject element)
+        => (string?)(element ?? throw new ArgumentNullException(nameof(element))).GetValue(PublishedKeyboardFallbackProperty);
+
+    private void PublishFallback()
+    {
+        if (AssociatedObject is null) return;
+        if (string.IsNullOrWhiteSpace(KeyboardFallback)) AssociatedObject.ClearValue(PublishedKeyboardFallbackProperty);
+        else AssociatedObject.SetValue(PublishedKeyboardFallbackProperty, KeyboardFallback);
+    }
 
     /// <summary>끌기를 허용할지 — 읽기 전용 · 적용 중이면 끈다.</summary>
     public static readonly DependencyProperty IsDragEnabledProperty = DependencyProperty.Register(
@@ -102,11 +120,13 @@ public class CaptureDragBehavior : Behavior<ItemsControl>
         AssociatedObject.PreviewMouseDown += OnPreviewMouseDown;
         AssociatedObject.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnDragStarted));
         AssociatedObject.AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(OnDragDelta));
+        PublishFallback();
     }
 
     protected override void OnDetaching()
     {
         FinishDrag(commit: false);
+        AssociatedObject.ClearValue(PublishedKeyboardFallbackProperty);
         AssociatedObject.Loaded -= OnLoaded;
         AssociatedObject.Unloaded -= OnUnloaded;
         AssociatedObject.PreviewMouseDown -= OnPreviewMouseDown;

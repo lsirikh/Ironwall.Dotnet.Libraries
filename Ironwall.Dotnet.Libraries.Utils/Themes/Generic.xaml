@@ -133,8 +133,119 @@
 		</Setter>
 	</Style>
 
+	<!--  ───────── "?" 도움말 (help-callout PRD FR-01 · FR-02 · 스토리보드 §공용 부품) ─────────  -->
+	<!--
+		작은 원형 "?" — 테두리 원(닫힘) / 채운 원(열림): 색이 아니라 채움으로 가른다. 초점은 바깥 고리(FocusRing).
+		말풍선(PART_Callout)은 코드가 연다(내용을 채운 뒤) — 템플릿에서 IsOpen 을 묶지 않는다. StaysOpen=True: 바깥 클릭은 "?" 가 창에서 보고 닫는다.
+		AutomationId 기본값 Help.{키} 는 스타일 세터라 지역 값(옛 id 별칭)이 이긴다. 키가 비면 단추가 없다.
+	-->
+	<Style TargetType="{x:Type c:HelpTip}">
+		<Setter Property="Width" Value="20" />
+		<Setter Property="Height" Value="20" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="ToolTip" Value="도움말" />
+		<Setter Property="AutomationProperties.AutomationId" Value="{Binding HelpKey, RelativeSource={RelativeSource Self}, StringFormat=Help.{0}}" />
+		<Setter Property="AutomationProperties.Name" Value="{Binding Entry.Title, RelativeSource={RelativeSource Self}, StringFormat=도움말 · {0}, FallbackValue=도움말}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type c:HelpTip}">
+					<Grid Background="Transparent">
+						<Ellipse
+							x:Name="Focus"
+							Margin="-3"
+							Stroke="{DynamicResource FocusRingBrush}"
+							StrokeThickness="2"
+							Visibility="Collapsed" />
+						<Ellipse
+							x:Name="Ring"
+							Fill="Transparent"
+							Stroke="{DynamicResource PrimaryBrush}"
+							StrokeThickness="1.5" />
+						<TextBlock
+							x:Name="Mark"
+							Margin="0,0,0,1"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="12"
+							FontWeight="Bold"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Text="?" />
+						<Popup
+							x:Name="PART_Popup"
+							AllowsTransparency="True"
+							Focusable="False"
+							PopupAnimation="None"
+							StaysOpen="True">
+							<c:HelpCallout x:Name="PART_Callout" />
+						</Popup>
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Ring" Property="StrokeThickness" Value="2" />
+						</Trigger>
+						<Trigger Property="IsChecked" Value="True">
+							<Setter TargetName="Ring" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
+							<Setter TargetName="Mark" Property="Foreground" Value="{DynamicResource OnPrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsKeyboardFocused" Value="True">
+							<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+							<Setter Property="Cursor" Value="Arrow" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+		<Style.Triggers>
+			<Trigger Property="HelpKey" Value="{x:Static sys:String.Empty}">
+				<Setter Property="Visibility" Value="Collapsed" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
+	<!--
+		말풍선 몸 — 겉(둥근 카드 + 꼬리, 한 윤곽선)은 HelpCallout.OnRender 가 Background · BorderBrush 로 그린다.
+		바깥 여백 8 은 꼬리 자리(HelpCalloutPlacement.TailMargin) — 어느 쪽에 뜨든 크기가 같다. 카드 최대 폭 420.
+	-->
+	<Style TargetType="{x:Type c:HelpCallout}">
+		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+		<Setter Property="Padding" Value="14,12" />
+		<Setter Property="Effect">
+			<Setter.Value>
+				<DropShadowEffect
+					BlurRadius="14"
+					Direction="270"
+					Opacity="0.28"
+					ShadowDepth="3"
+					Color="Black" />
+			</Setter.Value>
+		</Setter>
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type c:HelpCallout}">
+					<Border
+						MaxWidth="{x:Static c:HelpCallout.MaxCardWidth}"
+						Margin="8"
+						Padding="{TemplateBinding Padding}"
+						Background="Transparent">
+						<StackPanel x:Name="PART_Body" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
 	<!--  ───────── 콘솔 셸: 레일 · 목록 · 상세  ─────────  -->
 	<Style TargetType="{x:Type c:ConsoleShell}">
+		<!--  F1 = 포커스가 있는 섹션의 "?"(없으면 이 셸 머리의 "?") — help-callout PRD FR-02 · D-2  -->
+		<Setter Property="c:HelpTip.HandlesF1" Value="True" />
 		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
 		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 		<Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
@@ -180,6 +291,11 @@
 												FontSize="12.5"
 												Foreground="{DynamicResource TextMutedBrush}"
 												Text="{TemplateBinding Subtitle}" />
+											<!--  창 전체 "?" (help-callout FR-04) — 키가 비면 없다  -->
+											<c:HelpTip
+												Margin="10,0,0,0"
+												HelpKey="{TemplateBinding HelpKey}"
+												Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
 										</StackPanel>
 									</DockPanel>
 								</Border>
@@ -578,6 +694,14 @@
 										Margin="8,0,0,0"
 										VerticalAlignment="Center"
 										Content="{TemplateBinding Extra}" />
+									<!--
+										도구줄 "?" (help-callout FR-04) — 동작 묶음 끝. 왼쪽 묶음의 옮기지 않는 부분이라 폭 판정의 고정 폭(FixedLeftWidth)에 저절로 든다.
+										ContentPresenter 가 아니므로 Extra 자리(마지막 ContentPresenter) 찾기에 걸리지 않는다. 키가 비면 숨어 폭 0.
+									-->
+									<c:HelpTip
+										Margin="10,0,0,0"
+										HelpKey="{TemplateBinding HelpKey}"
+										Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
 								</StackPanel>
 								<!--
 									검색 — 오른쪽 정렬 · 고정 폭(코드비하인드가 180~240 사이로 건다). 내용(안내 글 · 입력 글)에 맞춰 늘었다 줄었다 하지 않는다 —
@@ -957,6 +1081,11 @@
 								TextElement.FontSize="13"
 								TextElement.FontWeight="SemiBold"
 								TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+							<!--  섹션 "?" (help-callout FR-04 · 스토리보드 "값 편집 ?") — 제목 바로 오른쪽. 키가 비면 없다  -->
+							<c:HelpTip
+								Margin="8,0,0,0"
+								HelpKey="{TemplateBinding HelpKey}"
+								Scope="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
 							<!--  축 이름은 개발자용 — ConsoleField.ShowApiNames(상속, 기본 끔)가 켜진 곳에서만 보인다  -->
 							<TextBlock
 								x:Name="Axis"
@@ -1091,14 +1220,23 @@
 								Fill="{DynamicResource StatusWarningBrush}"
 								Visibility="Collapsed" />
 							<ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
-							<TextBlock
-								x:Name="NoteText"
-								Grid.Row="1"
-								Margin="0,3,0,0"
-								FontSize="11"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="{TemplateBinding Note}"
-								TextWrapping="WrapWithOverflow" />
+							<!--  잠금 사유는 화면에 남는다(help-callout FR-05) — 옛 Note 와 같은 모양. 설명은 Note 가 아니라 섹션 "?" 로.  -->
+							<StackPanel Grid.Row="1">
+								<TextBlock
+									x:Name="LockReasonText"
+									Margin="0,3,0,0"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{TemplateBinding LockReason}"
+									TextWrapping="WrapWithOverflow" />
+								<TextBlock
+									x:Name="NoteText"
+									Margin="0,3,0,0"
+									FontSize="11"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="{TemplateBinding Note}"
+									TextWrapping="WrapWithOverflow" />
+							</StackPanel>
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
@@ -1110,6 +1248,9 @@
 						</Trigger>
 						<Trigger Property="Note" Value="{x:Static sys:String.Empty}">
 							<Setter TargetName="NoteText" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+						<Trigger Property="LockReason" Value="{x:Static sys:String.Empty}">
+							<Setter TargetName="LockReasonText" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 						<Trigger Property="IsTouched" Value="True">
 							<Setter TargetName="Touched" Property="Visibility" Value="Visible" />
@@ -1230,6 +1371,10 @@
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Hint" Value="{x:Static sys:String.Empty}">
+							<Setter TargetName="HintText" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+						<!--  사용법은 화면에 두지 않는다 — 섹션 · 창 "?" 몫(help-callout FR-05). 할 일 · 실패 · 권한 · 검색은 남는다.  -->
+						<Trigger Property="HintKind" Value="Usage">
 							<Setter TargetName="HintText" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 						<Trigger Property="Title" Value="{x:Static sys:String.Empty}">

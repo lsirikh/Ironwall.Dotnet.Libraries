@@ -36,11 +36,34 @@ public class ConsoleEmptyState : Control
 
     public static readonly DependencyProperty HintProperty = DependencyProperty.Register(
         nameof(Hint), typeof(string), typeof(ConsoleEmptyState), new PropertyMetadata(string.Empty));
-    /// <summary>다음에 무엇을 하면 되는가 — 한 줄. 비우면 숨는다.</summary>
+    /// <summary>다음에 무엇을 하면 되는가 — 한 줄. 비우면 숨는다. 사용법(<see cref="ConsoleHintKind.Usage"/>)이면 화면에 두지 않는다.</summary>
     public string Hint { get => (string)GetValue(HintProperty); set => SetValue(HintProperty, value); }
+
+    public static readonly DependencyProperty HintKindProperty = DependencyProperty.Register(
+        nameof(HintKind), typeof(ConsoleHintKind), typeof(ConsoleEmptyState), new PropertyMetadata(ConsoleHintKind.Action));
+    /// <summary>
+    /// 힌트의 종류(help-callout PRD FR-05) — 할 일 · 실패 · 권한 · 검색 결과 없음은 화면에 남고,
+    /// 사용법(<see cref="ConsoleHintKind.Usage"/>)은 화면에서 빠진다(그 설명은 섹션 · 창의 "?" 몫). 기본은 할 일(예전처럼 보인다).
+    /// </summary>
+    public ConsoleHintKind HintKind { get => (ConsoleHintKind)GetValue(HintKindProperty); set => SetValue(HintKindProperty, value); }
 
     public static readonly DependencyProperty ActionProperty = DependencyProperty.Register(
         nameof(Action), typeof(object), typeof(ConsoleEmptyState), new PropertyMetadata(null));
     /// <summary>선택적 단추 한 자리(예: [등록] · [갱신]). 비우면 숨는다 — 권한이 없으면 아예 주지 않는다.</summary>
     public object? Action { get => GetValue(ActionProperty); set => SetValue(ActionProperty, value); }
+}
+
+/// <summary>빈 자리 힌트의 종류 — 무엇이 화면에 남고 무엇이 "?" 로 가는가(help-callout PRD §2 · FR-05).</summary>
+public enum ConsoleHintKind
+{
+    /// <summary>다음에 할 일 — "[등록] 으로 추가하세요". 화면에 남는다.</summary>
+    Action,
+    /// <summary>조회 실패 · 오류. 화면에 남는다.</summary>
+    Failure,
+    /// <summary>권한 거부. 화면에 남는다.</summary>
+    Permission,
+    /// <summary>검색 · 필터 결과 없음. 화면에 남는다.</summary>
+    Search,
+    /// <summary>사용법 · 원리 설명. 화면에서 빠진다 — 섹션 · 창 "?" 로 옮긴다.</summary>
+    Usage,
 }

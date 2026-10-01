@@ -79,6 +79,10 @@ public class ConsoleShell : Control
     public static readonly DependencyProperty SubtitleProperty = Reg<string>(nameof(Subtitle), string.Empty);
     public string Subtitle { get => (string)GetValue(SubtitleProperty); set => SetValue(SubtitleProperty, value); }
 
+    public static readonly DependencyProperty HelpKeyProperty = Reg<string>(nameof(HelpKey), string.Empty);
+    /// <summary>창 전체의 "?" 키(help-callout FR-04) — 머리 제목 줄 끝에 "?" 가 생긴다. 비우면 없다. F1 은 섹션 "?" 가 없을 때 이것을 연다.</summary>
+    public string HelpKey { get => (string)GetValue(HelpKeyProperty); set => SetValue(HelpKeyProperty, value); }
+
     public static readonly DependencyProperty HeaderContentProperty = Slot(nameof(HeaderContent));
     /// <summary>머리 오른쪽(닫기 버튼 등).</summary>
     public object? HeaderContent { get => GetValue(HeaderContentProperty); set => SetValue(HeaderContentProperty, value); }
