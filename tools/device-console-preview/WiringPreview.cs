@@ -131,9 +131,9 @@ internal sealed class WiringPreview
             }
         }
         panels.Add(FencePanelSpec.Default(EnumFenceStyle.ChainLink, 6));                  // 끝 기둥 뒤 한 칸
-        // 4차 두 줄(v0.3 §1-0b) — 펜스센서는 위 줄. 서버 사슬 순서도 두 줄 규칙(아래 줄 왼쪽 → 오른쪽, 위 줄 오른쪽 → 왼쪽)으로 심는다.
+        // 4차 두 줄(v0.3 §1-0b) — 펜스센서는 윤형과 같이: 위 줄 · 윤형 코일(망 가운데). 서버 사슬 순서도 두 줄 규칙(아래 줄 왼쪽 → 오른쪽, 위 줄 오른쪽 → 왼쪽)으로 심는다.
         foreach (var id in mounts.Keys.ToList())
-            if (seeds.First(s => s.Id == id).Facts.TypeText == "Fence") mounts[id] = mounts[id] with { Lane = FenceLane.Upper };
+            if (seeds.First(s => s.Id == id).Facts.TypeText == "Fence") mounts[id] = mounts[id] with { Spot = FenceMountSpot.RazorCoil, Lane = FenceLane.Upper };
         var lanesOrder = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Left);
         seeds = seeds.Select(s => s with { Placement = new WiringPlacement(1, lanesOrder.ToList().IndexOf(s.Id) + 1) }).ToList();
         var document = new FenceLayoutDocument { ControllerId = 3, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier4, Revision = 1 };
@@ -175,19 +175,19 @@ internal sealed class WiringPreview
     }
 
     /// <summary>
-    /// 참고 그림 ① — 중요시설 4차 두 줄: 아래 줄 판망 스마트 1~6 · 위 줄 윤형 펜스센서 101~106(같은 기둥 위), 제어기 왼쪽 끝.
+    /// 참고 그림 ① — 중요시설 4차 두 줄: 아래 줄 판망 스마트 1~6(기둥 위) · 위 줄 윤형 펜스센서 101~106(윤형 코일 · 기둥 사이 망 가운데), 제어기 왼쪽 끝.
     /// 사슬 = 아래 1 → 6 → 먼 끝에서 꺾여 → 위 106 → 101 → Ch2. 번호는 줄마다 제어기에서 멀어지며 커진다(§1-0b 가정).
     /// </summary>
     private (FrameworkElement View, WiringViewModel Vm) Lanes4()
     {
-        var panels = Enumerable.Range(0, 5).Select(_ => FencePanelSpec.Default(EnumFenceStyle.ChainLinkRazor, 6)).ToList();
+        var panels = Enumerable.Range(0, 6).Select(_ => FencePanelSpec.Default(EnumFenceStyle.ChainLinkRazor, 6)).ToList();
         var mounts = new Dictionary<int, SensorMountSpec>();
         var facts = new Dictionary<int, SensorFacts>();
         for (var i = 0; i < 6; i++)
         {
             mounts[4101 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop);
             facts[4101 + i] = new SensorFacts(1 + i, $"판망 스마트 {i + 1}", "SmartSensor2", "북측");
-            mounts[4201 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop, Lane: FenceLane.Upper);
+            mounts[4201 + i] = new SensorMountSpec(i, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper);         // 펜스센서는 윤형과 같이
             facts[4201 + i] = new SensorFacts(101 + i, $"윤형 펜스 {i + 1}", "Fence", "북측");
         }
         var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Left).ToList();
