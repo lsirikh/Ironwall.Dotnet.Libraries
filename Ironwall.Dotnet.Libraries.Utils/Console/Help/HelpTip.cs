@@ -38,12 +38,27 @@ public class HelpTip : ToggleButton
     static HelpTip()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(HelpTip), new FrameworkPropertyMetadata(typeof(HelpTip)));
+        // Esc 는 열린 말풍선이 먼저 — 창의 클래스 처리기는 같은 창의 인스턴스 처리기보다 먼저 돈다.
+        // r24 헤디드(2026-10-02): 지도 측정 중 측정 "?" 를 열고 Esc → 측정이 먼저 등록한 창 PreviewKeyDown 이 Esc 를 먹어
+        // 측정만 끝나고 말풍선은 주인 없이 떠 있었다(우리 인스턴스 처리기는 handledEventsToo:false 라 못 받았다).
+        EventManager.RegisterClassHandler(typeof(Window), Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnWindowPreviewKeyDown));
     }
 
     public HelpTip()
     {
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        // 숨겨지면 닫는다 — 말풍선을 연 띠(측정 띠 등)가 접혀도 Unloaded 는 오지 않아 팝업이 허공에 남았다(r24 헤디드).
+        IsVisibleChanged += (_, e) => { if (e.NewValue is false) Close(); };
+    }
+
+    /// <summary>창 클래스 처리기 — 이 창에 열린 "?" 가 있으면 Esc 로 그것만 닫고 먹는다(열려 있을 때만).</summary>
+    private static void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.Handled) return;
+        if (_current is not { IsChecked: true } tip || !ReferenceEquals(tip._hookedWindow, sender)) return;
+        tip.Close();
+        e.Handled = true;
     }
 
     #region - Properties -

@@ -457,6 +457,47 @@ public class HelpTipTests
     }
 
     [Fact]
+    public void should_close_the_callout_before_an_earlier_window_escape_handler_when_escape_is_pressed()
+    {
+        Sta(() =>
+        {
+        Register("Test.Tip.EscOrder");
+        var tip = new HelpTip { HelpKey = "Test.Tip.EscOrder" };
+        var r = OnWindow(tip, (window, _) =>
+        {
+            var taken = 0;
+            // 지도 측정처럼 창 PreviewKeyDown 에 먼저 붙어 Esc 를 먹는 처리기(말풍선을 열기 전에 등록)
+            window.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { taken++; e.Handled = true; } };
+            tip.Open();
+            EscapeAt(window, tip);
+            var first = (Open: tip.IsChecked == true, taken);
+            EscapeAt(window, tip);                                // 닫혀 있으면 그 처리기가 그대로 받는다
+            return (first, second: taken);
+        });
+        Assert.Equal((false, 0), r.first);                        // r24: 측정이 Esc 를 먼저 먹어 말풍선이 남았다
+        Assert.Equal(1, r.second);
+        });
+    }
+
+    [Fact]
+    public void should_close_the_callout_when_its_question_mark_is_hidden()
+    {
+        Sta(() =>
+        {
+        Register("Test.Tip.Hidden");
+        var tip = new HelpTip { HelpKey = "Test.Tip.Hidden" };
+        var closed = OnWindow(tip, (window, _) =>
+        {
+            tip.Open();
+            tip.Visibility = Visibility.Collapsed;                // 측정 띠가 접히는 것처럼
+            window.UpdateLayout();
+            return tip.IsChecked != true && HelpTip.Current is null;
+        });
+        Assert.True(closed);
+        });
+    }
+
+    [Fact]
     public void should_open_the_dialog_question_mark_when_f1_is_pressed_inside_a_dialog_frame()
     {
         Sta(() =>
