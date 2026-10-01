@@ -76,5 +76,13 @@
     <SolidColorBrush x:Key="ChartSeries7Brush" Color="#B15A42" /><!-- series terracotta(lt) -->
     <SolidColorBrush x:Key="ChartSeries8Brush" Color="#5E5AA8" /><!-- series violet(lt) -->
 
+    <!-- ══ 결선 펜스 재질 (fence-wiring-editor NFR-05 — 벽돌 · 시멘트 · 디자인 초록 · 윤형 코일, 라이트/다크 쌍) ══ -->
+    <SolidColorBrush x:Key="FenceBrickBrush"        Color="#A0522D" /><!-- 벽돌 -->
+    <SolidColorBrush x:Key="FenceBrickMortarBrush"  Color="#D9CFC4" /><!-- 벽돌 줄눈 -->
+    <SolidColorBrush x:Key="FenceConcreteBrush"     Color="#B4B3AC" /><!-- 시멘트 판 -->
+    <SolidColorBrush x:Key="FenceConcreteSeamBrush" Color="#8C8B84" /><!-- 시멘트 이음매 -->
+    <SolidColorBrush x:Key="FenceDesignBrush"       Color="#2F7D4A" /><!-- 디자인펜스 초록 -->
+    <SolidColorBrush x:Key="FenceRazorBrush"        Color="#5E6B79" /><!-- 윤형 코일 -->
+
 
 </ResourceDictionary>

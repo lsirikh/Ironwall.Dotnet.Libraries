@@ -40,6 +40,10 @@ public class GMapDbModule : Module
                 .SingleInstance().WithMetadata("Order", _count+5);
             builder.RegisterType<GMapDbSymbolService>().As<IGMapDbSymbolService>().As<IService>()
                 .SingleInstance().WithMetadata("Order", _count+6);
+            // 결선 펜스 구성(fence-wiring-editor FR-11 · FR-16) — IService 가 아니다(부팅 경로 밖 · 표는 결선 창이 처음 쓸 때 만든다).
+            //   장비 콘솔(Devices.Ui)의 결선 창이 Lazy<IFenceLayoutStore> 로 받는다 — 이 모듈이 없으면 로컬 저장 칸만 숨는다.
+            builder.RegisterType<FenceLayoutStore>().As<Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore>()
+                .SingleInstance();
         }
         catch
         {

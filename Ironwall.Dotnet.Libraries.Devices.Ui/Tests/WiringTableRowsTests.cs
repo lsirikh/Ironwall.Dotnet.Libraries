@@ -24,7 +24,7 @@ public class WiringTableRowsTests
         Assert.Equal(new[] { "스마트 복합", "복합", "펜스" }, rows.Select(r => r.TypeText));
         Assert.Equal(new[] { "앞", "뒤", "—" }, rows.Select(r => r.FacingText));            // 펜스센서는 방향 없음
         Assert.Equal(new[] { "—", "6m", "3m" }, rows.Select(r => r.GapText));               // 두 종류 중 작은 값(펜스 3m)
-        Assert.Equal("A1 · B3", rows[0].PortText);
+        Assert.Equal("1 · 3", rows[0].PortText);                               // "Ch1 · Ch2 번호" 칸 — A · B 는 머리 툴팁의 별칭
         Assert.Equal(new[] { "Radar", "MotionSensor", "Fence" }, rows.Select(r => r.TypeIcon));
         Assert.All(rows, r => Assert.False(r.IsDraft));
     }

@@ -284,8 +284,25 @@ public sealed class WiringSlotViewModel : PropertyChangedBase
         ? string.Empty
         : _row.Channel is { } channel ? $"{_row.Facts.Number} · 주소 {channel}" : $"{_row.Facts.Number}";
 
-    /// <summary>버스 주소와 순번이 다른가 — 화면에 둘 다 보이고, 고치지는 않는다.</summary>
-    public bool HasChannelMismatch => _row?.Channel is { } channel && _order > 0 && channel != _order;
+    /// <summary>버스 주소와 순번이 다른가 — 화면에 둘 다 보이고, 고치지는 않는다. IP 센서는 노드 주소가 없어 늘 거짓(FR-15).</summary>
+    public bool HasChannelMismatch => !_isIpAddress && _row?.Channel is { } channel && _order > 0 && channel != _order;
+
+    private string _addressCellText = string.Empty;
+    private bool _isIpAddress;
+
+    /// <summary>주소 칸(fence-wiring-editor FR-15) — IP 센서는 IP(없으면 "내부망"), 그 밖은 노드 주소(<c>connection.channel</c>).</summary>
+    public string AddressCellText
+    {
+        get => _addressCellText.Length > 0 || _row is null ? _addressCellText : ChannelNumberText;
+        internal set { _addressCellText = value ?? string.Empty; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>센서마다 IP 인 접속인가(FR-15).</summary>
+    public bool IsIpAddress
+    {
+        get => _isIpAddress;
+        internal set { _isIpAddress = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasChannelMismatch)); }
+    }
 
     #region - 표 보기 열(표 보기 정리 · 2026-09-30) -
     private string _typeText = string.Empty;

@@ -157,7 +157,7 @@ public class FenceWorldTests
 
         Assert.Equal(2, shapes.Count(s => s.Ink == FenceInk.ReturnOuter));
         Assert.Equal(2, shapes.Count(s => s.Ink == FenceInk.VbusFront));
-        Assert.Contains(shapes, s => s.Text?.StartsWith("◀ 리턴케이블 · Sensor A") == true);
+        Assert.Contains(shapes, s => s.Text?.StartsWith("◀ 리턴케이블 · Ch1(A)") == true);
         Assert.Equal(12, shapes.Count(s => s.Ink == FenceInk.PillPort));      // A/B 번호 알약마다
     }
 

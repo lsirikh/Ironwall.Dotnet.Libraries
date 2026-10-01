@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,7 +31,8 @@ public enum FenceKind
 /// </remarks>
 /// <param name="K">1 = 입체 · 0 = 평면.</param>
 /// <param name="ZOffset">모든 깊이에 더하는 값 — 뒤를 보는 기둥 센서(FR-20)를 기둥 반대쪽에 그릴 때만 쓴다(0 이면 목업 그대로).</param>
-public readonly record struct FenceProjector(double K, double ZOffset = 0)
+/// <param name="YLift">모든 높이에 더하는 값 — 설치 자리(기둥 위 · 망 가운데 · 담 위 …) 높이로 센서 칩을 올리고 내릴 때(fence-wiring-editor FR-07).</param>
+public readonly record struct FenceProjector(double K, double ZOffset = 0, double YLift = 0)
 {
     /// <summary>펜스 높이(세계 단위).</summary>
     public const double H = 130;
@@ -48,7 +50,7 @@ public readonly record struct FenceProjector(double K, double ZOffset = 0)
     public double Cz => 0.62 - 0.12 * K;
 
     /// <summary>세계 (x 가로 · y 높이 · z 깊이) → 그림 좌표(y 아래로 +).</summary>
-    public Point P(double x, double y, double z) => new(x - (z + ZOffset) * Sh, -y * Cy + (z + ZOffset) * Cz);
+    public Point P(double x, double y, double z) => new(x - (z + ZOffset) * Sh, -(y + YLift) * Cy + (z + ZOffset) * Cz);
 
     public static FenceProjector Tilt => new(1);
     public static FenceProjector Flat => new(0);
@@ -102,6 +104,17 @@ public sealed class FenceWorld
 {
     /// <summary>제어기(함체) 단위 키 — 센서 키와 겹치지 않는다.</summary>
     public const int CONTROLLER_KEY = int.MinValue + 1;
+
+    /// <summary>
+    /// 펜스 높이 <see cref="FenceProjector.H"/>(세계 단위)가 몇 m 인가 — 망 높이(m)를 세계 높이로 옮기는 기준(철조망 기본 2.4m).
+    /// 가로(<see cref="Upm"/>)와 세로 배율이 다르다 — 목업처럼 높이를 과장해 읽히게 한다(Viewport3D 가 아닌 2.5D · FR-02).
+    /// </summary>
+    public const double REFERENCE_HEIGHT_M = 2.4;
+
+    /// <summary>같은 자리에 센서가 여럿이면 옆으로 벌리는 간격(세계 단위).</summary>
+    public const double STACK_DX = 30;
+
+    private readonly Dictionary<int, double> _lift = new();
 
     /// <summary>이 줌보다 작으면 펜스센서 묶음으로 접는다(FR-18) — <see cref="FenceSlotLayout.GROUP_ZOOM_THRESHOLD"/> 와 같다.</summary>
     public const double GROUP_ZOOM = FenceSlotLayout.GROUP_ZOOM_THRESHOLD;
@@ -166,6 +179,23 @@ public sealed class FenceWorld
     public double MinX { get; private set; }
     public double MaxX { get; private set; }
 
+    /// <summary>펜스 구성(망 목록 · 자리)으로 세운 세계인가 — 아니면 옛 간격 표 배치.</summary>
+    public WiringFenceLayout? Layout { get; private set; }
+
+    /// <summary>망 · 기둥 자리(m) — 펜스 구성으로 세웠을 때만.</summary>
+    public FenceGeometry? Geometry { get; private set; }
+
+    public bool IsLayout => Geometry is { Panels.Count: > 0 };
+
+    /// <summary>1m 높이가 몇 세계 단위인가(<see cref="REFERENCE_HEIGHT_M"/> 가 <see cref="FenceProjector.H"/>).</summary>
+    public double Vpm { get; private set; } = FenceProjector.H / REFERENCE_HEIGHT_M;
+
+    /// <summary>센서 칩을 설치 자리 높이로 올리는 값(세계 단위 · 없으면 0).</summary>
+    public double LiftOf(int key) => _lift.TryGetValue(key, out var lift) ? lift : 0;
+
+    /// <summary>그림 맨 위 높이(세계 단위) — 가장 높은 망 · 기둥 · 코일 · 센서.</summary>
+    public double TopHeight { get; private set; } = FenceProjector.H + 40;
+
     /// <summary>탐지 반경(m) — 복합 20 · 지진동 15(FR-19).</summary>
     public static double RangeOf(FenceKind kind) => kind switch { FenceKind.Multi => 20, FenceKind.Underground => 15, _ => 0 };
 
@@ -227,6 +257,105 @@ public sealed class FenceWorld
         return world;
     }
     #endregion
+
+    /// <summary>
+    /// 펜스 구성(망 목록 · 센서 자리)으로 세운다(fence-wiring-editor FR-01 · FR-02 · FR-07) — 센서 x = 자리의 가로(m) × <see cref="Upm"/>
+    /// (같은 자리 여럿은 옆으로 벌린다), 센서 높이 = 자리 높이(m) × <see cref="Vpm"/>. 구성이 꺼졌거나 망이 없으면 옛 배치.
+    /// </summary>
+    public static FenceWorld FromLayout(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors, WiringFenceLayout? layout, WiringSpacingTable? spacing = null)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        ArgumentNullException.ThrowIfNull(sensors);
+        if (layout is null || !layout.IsActive || layout.Panels.Count == 0) return Build(chain, sensors, (IReadOnlyDictionary<int, double>?)null, spacing);
+
+        var upm = 68.0 / 6;
+        var geometry = layout.Geometry;
+        var world = new FenceWorld(WiringShape.Ring, chain, sensors, upm, FencePanelSpec.DEFAULT_SPAN_M, 0)
+        {
+            Layout = layout,
+            Geometry = geometry,
+            Spacing = spacing ?? WiringSpacingTable.Default,
+        };
+        var vpm = world.Vpm;
+
+        var seats = chain.Keys.Select(k => (Key: k, Mount: FenceLayoutMath.Normalize(layout.MountOf(k) ?? new SensorMountSpec(0, FenceMountSpot.PostTop), layout.Panels)))
+                              .ToList();
+        var stacks = seats.GroupBy(t => FenceLayoutMath.SeatOf(t.Mount)).ToDictionary(g => g.Key, g => g.Select(t => t.Key).ToList());
+        var top = FenceProjector.H + 40;
+        foreach (var (key, mount) in seats)
+        {
+            var point = FenceLayoutMath.PointOf(mount, geometry);
+            var stack = stacks[FenceLayoutMath.SeatOf(mount)];
+            var dx = (stack.IndexOf(key) - (stack.Count - 1) / 2.0) * STACK_DX;
+            world._x[key] = point.XM * upm + dx;
+            var kind = sensors.TryGetValue(key, out var s) ? s.Kind : FenceKind.Smart;
+            var lift = LiftFor(kind, mount.Spot, point.HeightM * vpm);
+            world._lift[key] = lift;
+            top = Math.Max(top, lift + (kind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
+        }
+        // 모양이 바뀌는 곳(담 ↔ 철망 · 기둥 자리 ↔ 망 가운데)에서 이웃 칩이 거의 같은 x 에 서면 번호판이 겹친다(검토 V3) —
+        // 체인 순서를 지킨 채 겹친 것만 최소 간격으로 벌린다(무리 가운데는 제자리 평균).
+        var ordered = chain.Keys.Where(world._x.ContainsKey).ToList();
+        var spread = Separate(ordered.Select(k => world._x[k]).ToList(), MIN_CHIP_DX);
+        for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = spread[i];
+        foreach (var post in geometry.Posts) top = Math.Max(top, post.HeightM * vpm + (post.HasRazor ? 44 : 12));
+        foreach (var panel in geometry.Panels) top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 44 : 14));
+        world.TopHeight = top;
+
+        world.ControllerX = world.GapMid(chain.ControllerGap);
+        var xs = world._x.Values.Append(0).Append(geometry.LengthM * upm).Append(world.ControllerX).ToList();
+        world.MinX = xs.Min();
+        world.MaxX = xs.Max();
+        return world;
+    }
+
+    /// <summary>이웃 칩의 최소 간격(세계 단위) — 같은 자리 벌림(<see cref="STACK_DX"/>)과 같다(번호판 폭 20 + 여유).</summary>
+    public const double MIN_CHIP_DX = STACK_DX;
+
+    /// <summary>
+    /// 순서를 지킨 채 이웃 간격을 <paramref name="minGap"/> 이상으로 — 겹친 무리만 움직이고 무리의 가운데는 원래 자리의 평균에 둔다(순수 · 시험 대상).
+    /// 이미 충분히 떨어진 값은 그대로다.
+    /// </summary>
+    public static IReadOnlyList<double> Separate(IReadOnlyList<double> xs, double minGap)
+    {
+        var n = xs?.Count ?? 0;
+        var result = new double[n];
+        if (n == 0) return result;
+        // 무리: (첫 칸, 개수, Σ(x − 무리 안 자리 × 간격)) — 시작 = 합 / 개수
+        var blocks = new List<(int First, int Count, double Sum)>();
+        for (var i = 0; i < n; i++)
+        {
+            blocks.Add((i, 1, xs![i]));
+            while (blocks.Count > 1)
+            {
+                var prev = blocks[^2];
+                var cur = blocks[^1];
+                if (prev.Sum / prev.Count + prev.Count * minGap <= cur.Sum / cur.Count + 1e-9) break;
+                blocks.RemoveAt(blocks.Count - 1);
+                blocks[^1] = (prev.First, prev.Count + cur.Count, prev.Sum + cur.Sum - cur.Count * prev.Count * minGap);
+            }
+        }
+        foreach (var (first, count, sum) in blocks)
+            for (var j = 0; j < count; j++) result[first + j] = sum / count + j * minGap;
+        return result;
+    }
+
+    /// <summary>
+    /// 자리 높이(세계 단위)로 칩을 올리는 값 — 위 자리(기둥 위 · 담 위)는 칩의 <b>윗선</b>을, 그 밖은 몸 <b>가운데</b>를 맞춘다.
+    /// 지진동은 늘 땅속이라 0.
+    /// </summary>
+    public static double LiftFor(FenceKind kind, FenceMountSpot spot, double targetHeight)
+    {
+        if (kind == FenceKind.Underground) return 0;
+        var top = spot is FenceMountSpot.PostTop or FenceMountSpot.WallTop;
+        var anchor = kind switch
+        {
+            FenceKind.Multi => top ? FenceProjector.H : FenceProjector.H + 36,
+            FenceKind.Fence => top ? 76 : 66,
+            _ => top ? 99 : 71,
+        };
+        return targetHeight - anchor;
+    }
 
     #region - Gaps · drop -
     /// <summary>체인 틈 g 의 가운데 x(목업 <c>gapMid</c>) — 양 끝은 끝 센서에서 3m 바깥.</summary>
@@ -383,7 +512,7 @@ public sealed class FenceWorld
             xs.Add(p.P(MinX - 5 * u - 16 - 80, 0, 20).X);      // 축 글자 "위치 · 약 6m"(기둥 범위 왼쪽 바깥 · 평면에서도 잘리지 않게)
         }
 
-        var minY = Math.Min(p.P(0, LabelTop + 10, OverlayDepth).Y, p.P(0, FenceProjector.H + 12, 0).Y);
+        var minY = Math.Min(Math.Min(p.P(0, LabelTop + 10, OverlayDepth).Y, p.P(0, FenceProjector.H + 12, 0).Y), p.P(0, TopHeight, 0).Y);
         var maxY = Shape == WiringShape.Line
             ? p.P(0, -FenceProjector.SEC, FenceProjector.UZ).Y + 6
             : Math.Max(p.P(0, 0, GroundDepth).Y, p.P(0, 0, Shape == WiringShape.Ring ? 130 : 85).Y + 22) + 4;

@@ -92,6 +92,24 @@ public class WiringFenceViewTests
     }
 
     [Fact]
+    public void should_move_the_sensor_to_the_next_post_instead_of_swapping_order_when_alt_shift_right_is_pressed()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[101];
+            chip.Focus();
+            var before = vm.FenceLayout.MountOf(101)!.Panel;
+            var handled = canvas.HandleKeyDown(Key.System, Key.Right, ModifierKeys.Alt | ModifierKeys.Shift, chip);
+            Pump();
+            return (handled, before, After: vm.FenceLayout.MountOf(101)!.Panel, Chain: vm.FenceChain.Keys.ToList());
+        });
+
+        Assert.True(result.handled);
+        Assert.Equal(result.before + 1, result.After);                      // 망(기둥) 한 칸 — 끌기의 키보드 대신
+        Assert.Equal(new[] { 102, 101, 103, 104, 105 }, result.Chain);       // 같은 기둥이면 옮긴 센서가 끈 방향 뒤
+    }
+
+    [Fact]
     public void should_flip_facing_and_name_the_chip_back_when_f_is_pressed_on_a_post_sensor()
     {
         var result = OnWindow(Ring(4), (vm, canvas) =>
@@ -111,7 +129,7 @@ public class WiringFenceViewTests
 
         Assert.True(result.handled);
         Assert.Equal(WiringFacing.Back, result.back);
-        Assert.EndsWith("뒤(펜스 내부)", result.name);
+        Assert.Contains(", 뒤(펜스 내부)", result.name);
         Assert.Equal("방향 뒤", result.status);
         Assert.Equal("바뀐 줄 1", result.draft);
         Assert.Equal(WiringFacing.Front, result.After);           // 다시 F = 제자리
@@ -166,6 +184,8 @@ public class WiringFenceViewTests
     {
         var result = OnWindow(Ring(6), (vm, canvas) =>
         {
+            vm.ShowCables = true;                                            // 함체는 [케이블 보기]에서만 보인다(fence-wiring-editor FR-12)
+            Pump();
             var before = vm.FenceChain.ControllerGap;
             canvas.ControllerChip!.Focus();
             canvas.HandleKeyDown(Key.System, Key.Left, ModifierKeys.Alt, canvas.ControllerChip);
@@ -212,7 +232,7 @@ public class WiringFenceViewTests
         Assert.True(result.dragging);
         Assert.Equal(0.3, result.dimmed, 3);
         Assert.Equal(0, result.sameCandidateUpdates);                      // 후보가 그대로면 다시 그리지 않는다(NFR-02)
-        Assert.Equal("위치 3 · A3 · B3", result.label);
+        Assert.Equal("위치 3 · 기둥 3 · 기둥 위", result.label);         // 펜스 구성: 목표 = 잡은 센서 자리 종류의 가장 가까운 칸(FR-05)
         Assert.Equal(new[] { 102, 103, 101, 104, 105 }, result.Chain);
         Assert.Equal(101, result.Selected);
         Assert.Equal(1, result.Restored);
@@ -246,6 +266,8 @@ public class WiringFenceViewTests
     {
         var result = OnWindow(Ring(8), (vm, canvas) =>
         {
+            vm.ShowCables = true;
+            Pump();
             var before = vm.FenceChain.ControllerGap;
             var enclosure = canvas.ControllerChip!;
             var start = canvas.ScreenCenterOf(enclosure);
@@ -264,25 +286,35 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_pan_when_the_empty_ground_is_dragged_and_select_when_a_chip_is_only_clicked()
+    public void should_pan_with_right_or_middle_drag_and_select_when_a_chip_is_only_clicked()
     {
+        // PRD R-3 — 빈 곳 왼쪽 끌기는 이제 센서 선택 사각형이고, 화면 이동은 오른쪽 · 가운데 끌기다(FR-06).
         var result = OnWindow(Ring(4), (vm, canvas) =>
         {
             var offset = canvas.Offset;
-            canvas.OnPointerPressed(new Point(20, 20), null);
+            canvas.OnPointerPressed(new Point(20, 20), null, button: FencePointerButton.Right);
             canvas.OnPointerMoved(new Point(60, 30));
             canvas.OnPointerReleased(new Point(60, 30));
-            var panned = canvas.Offset - offset;
+            var rightPanned = canvas.Offset - offset;
+            var menuAfterRightDrag = canvas.LastMenu;
+
+            offset = canvas.Offset;
+            canvas.OnPointerPressed(new Point(20, 20), null, button: FencePointerButton.Middle);
+            canvas.OnPointerMoved(new Point(50, 20));
+            canvas.OnPointerReleased(new Point(50, 20));
+            var middlePanned = canvas.Offset - offset;
 
             var chip = canvas.SensorChips[103];
             var at = canvas.ScreenCenterOf(chip);
             canvas.OnPointerPressed(at, chip);
             canvas.OnPointerReleased(at + new Vector(3, 2));               // 데드존 안 — 클릭
             Pump();
-            return (panned, vm.FenceSelectedKey, Chain: vm.FenceChain.Keys.ToList());
+            return (rightPanned, menuAfterRightDrag, middlePanned, vm.FenceSelectedKey, Chain: vm.FenceChain.Keys.ToList());
         });
 
-        Assert.Equal(new Vector(40, 10), result.panned);
+        Assert.Equal(new Vector(40, 10), result.rightPanned);
+        Assert.Null(result.menuAfterRightDrag);                           // 데드존을 넘으면 메뉴는 안 뜬다
+        Assert.Equal(new Vector(30, 0), result.middlePanned);
         Assert.Equal(103, result.FenceSelectedKey);
         Assert.Equal(new[] { 101, 102, 103, 104 }, result.Chain);
     }
@@ -319,7 +351,7 @@ public class WiringFenceViewTests
         Assert.True(result.pane.HasMultiSelection);
         Assert.Equal(2, result.pane.Rings);                                  // 고른 칩마다 선택 윤곽
         Assert.Equal(2, result.ghostCount);                                  // 둘 다 끌린다
-        Assert.Equal(new[] { 102, 104, 105, 101, 103 }, result.Chain);       // 체인 순서(101 → 103)를 지킨 채 끝으로
+        Assert.Equal(new[] { 102, 101, 104, 105, 103 }, result.Chain);       // 둘 다 같은 칸 수(+2 기둥)만큼 — 간격을 지킨 채 옮긴다(FR-05)
     }
 
     [Fact]
@@ -332,7 +364,7 @@ public class WiringFenceViewTests
         });
 
         Assert.Contains("⁠", hint);
-        Assert.Equal("센서 끌기", Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Strip(hint).Split(" = ")[0]);
+        Assert.Equal("왼쪽 끌기", Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Strip(hint).Split(" = ")[0]);
     }
 
     #region - Zoom · fit (FR-06) -
@@ -378,8 +410,8 @@ public class WiringFenceViewTests
 
         Assert.Equal(102, result.FenceSelectedKey);
         Assert.Equal("북측 2구간 펜스", result.SelectedTitle);
-        Assert.StartsWith("A2 · B4", result.SelectedPortText);
-        Assert.StartsWith("2 / 5 · Sensor A 쪽이 1", result.SelectedPositionText);
+        Assert.StartsWith("2 · 4", result.SelectedPortText);
+        Assert.StartsWith("2 / 5 · Ch1(A) 쪽이 1", result.SelectedPositionText);
         Assert.True(result.HasSelectedPhoto);                               // 스마트 센서 제품 사진
         Assert.True(result.Ring);
         Assert.False(result.Others);
@@ -556,6 +588,7 @@ public class WiringFenceViewTests
         var result = OnWindow(Ring(13), (vm, canvas) =>
         {
             vm.FenceSelect(105);
+            vm.ShowCables = true;                                            // 함체 · 리턴케이블 자리까지 본다
             Pump();
             var window = Window.GetWindow(canvas)!;
             var bitmap = Snapshot(window);
@@ -615,6 +648,197 @@ public class WiringFenceViewTests
         Assert.Equal(scene == "pids", result.IsGrouped);
         // 종류가 둘 이상일 때만 앞에 종류별 수를 붙인다(v0.4 §1-C 아래 띠)
         Assert.Contains(scene == "pids" ? "복합 6 · 펜스 54 · 센서 60" : "센서 10 · 체인 10 · 미배치 0", result.FenceCountsText);
+    }
+    #endregion
+
+    #region - Fence editor (fence-wiring-editor FR-02 ~ FR-08 · FR-12) -
+    [Fact]
+    public void should_select_touched_sensors_and_draw_a_dashed_band_when_left_drag_banding()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            var a = canvas.ScreenCenterOf(canvas.SensorChips[102]);
+            var b = canvas.ScreenCenterOf(canvas.SensorChips[103]);
+            var start = new Point(a.X - 12, a.Y - 40);
+            var end = new Point(b.X + 12, b.Y + 40);
+            canvas.OnPointerPressed(start, null);
+            canvas.OnPointerMoved(end);
+            var band = canvas.OverlayScreenShapes.SingleOrDefault(s => s.Ink == FenceInk.RubberBand);
+            canvas.OnPointerReleased(end);
+            Pump();
+            return (band, Selected: vm.FenceSelectedKeys.ToList(), vm.FencePaneKind, BandAfter: canvas.OverlayScreenShapes.Count, vm.FenceChain.Keys);
+        });
+
+        Assert.NotNull(result.band);
+        Assert.Equal(new[] { 102, 103 }, result.Selected);
+        Assert.Equal(FenceSelectionKind.Sensors, result.FencePaneKind);
+        Assert.Equal(0, result.BandAfter);                                   // 떼면 사각형은 사라진다
+        Assert.Equal(new[] { 101, 102, 103, 104, 105 }, result.Keys);        // 선택만 — 체인은 그대로
+    }
+
+    [Fact]
+    public void should_select_panels_when_shift_drag_banded_and_add_one_when_ctrl_clicked()
+    {
+        var result = OnWindow(Ring(6), (vm, canvas) =>
+        {
+            var p1 = canvas.ScreenCenterOf(canvas.PanelChips[1]);
+            var p2 = canvas.ScreenCenterOf(canvas.PanelChips[2]);
+            canvas.OnPointerPressed(p1, canvas.PanelChips[1], shift: true);
+            canvas.OnPointerMoved(p2);
+            canvas.OnPointerReleased(p2);
+            Pump();
+            var banded = vm.FenceSelectedPanels.ToList();
+            var at4 = canvas.ScreenCenterOf(canvas.PanelChips[4]);
+            canvas.OnPointerPressed(at4, canvas.PanelChips[4], ctrl: true);
+            canvas.OnPointerReleased(at4);
+            Pump();
+            return (banded, After: vm.FenceSelectedPanels.ToList(), vm.HasPanelSelection, vm.PanelSelectionTitle,
+                    Highlighted: canvas.PanelChips.Values.Where(c => c.Picture!.Shapes.Any(s => s.Ink == FenceInk.PanelSelectEdge)).Select(c => c.Key).OrderBy(k => k).ToList(),
+                    Peer: UIElementAutomationPeer.CreatePeerForElement(canvas.PanelChips[4]).GetAutomationId());
+        });
+
+        Assert.Equal(new[] { 1, 2 }, result.banded);
+        Assert.Equal(new[] { 1, 2, 4 }, result.After);
+        Assert.True(result.HasPanelSelection);
+        Assert.Equal("선택한 망 3칸", result.PanelSelectionTitle);
+        Assert.Equal(new[] { 1, 2, 4 }, result.Highlighted);                  // 테두리 + 옅은 칠(형태)
+        Assert.Equal("Devices.Wiring.Fence.Panel.4", result.Peer);           // peer 있는 요소(NFR-04)
+    }
+
+    [Fact]
+    public void should_open_the_menu_and_select_that_sensor_when_right_clicked_inside_the_dead_zone()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            canvas.SuppressMenuPopup = true;
+            var chip = canvas.SensorChips[102];
+            var at = canvas.ScreenCenterOf(chip);
+            canvas.OnPointerPressed(at, chip, button: FencePointerButton.Right);
+            canvas.OnPointerMoved(at + new Vector(5, 0));                     // 5px — 데드존 안
+            canvas.OnPointerReleased(at + new Vector(5, 0));
+            Pump();
+            return (Menu: canvas.LastMenu!.Where(e => !e.IsSeparator).Select(e => e.Text).ToList(), vm.FenceSelectedKey, canvas.Offset);
+        });
+
+        Assert.Equal("이 설치 방식을 이 제어기 모든 센서에 적용", result.Menu[0]);
+        Assert.Contains("결선에서 빼기", result.Menu);
+        Assert.Equal(102, result.FenceSelectedKey);
+    }
+
+    [Fact]
+    public void should_extend_open_menu_and_clear_when_shift_arrows_shift_f10_and_escape_are_pressed()
+    {
+        var result = OnWindow(Ring(6), (vm, canvas) =>
+        {
+            canvas.SuppressMenuPopup = true;
+            canvas.PanelChips[0].Focus();
+            Pump();
+            var focusedSelects = vm.FenceSelectedPanels.ToList();
+            canvas.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Shift, canvas.PanelChips[0]);
+            canvas.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Shift, canvas.FocusedChip());
+            Pump();
+            var extended = vm.FenceSelectedPanels.ToList();
+            var menuHandled = canvas.HandleKeyDown(Key.System, Key.F10, ModifierKeys.Shift, canvas.FocusedChip());
+            var menu = canvas.LastMenu!.Select(e => e.Text).ToList();
+            var escaped = canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, canvas.FocusedChip());
+            var escapedAgain = canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, canvas.FocusedChip());
+            return (focusedSelects, extended, menuHandled, menu, escaped, escapedAgain, vm.HasAnySelection);
+        });
+
+        Assert.Equal(new[] { 0 }, result.focusedSelects);                    // 포커스 = 선택
+        Assert.Equal(new[] { 0, 1, 2 }, result.extended);
+        Assert.True(result.menuHandled);
+        Assert.Contains("이 망 속성을 모든 망에", result.menu);
+        Assert.True(result.escaped);                                          // 끄는 중이 아니면 선택 해제
+        Assert.False(result.escapedAgain);                                    // 풀 것이 없으면 흘려보낸다
+        Assert.False(result.HasAnySelection);
+    }
+
+    [Fact]
+    public void should_select_all_or_toggle_one_when_ctrl_a_or_ctrl_space_is_pressed()
+    {
+        var result = OnWindow(Ring(4), (vm, canvas) =>
+        {
+            canvas.Focus();
+            canvas.HandleKeyDown(Key.A, Key.None, ModifierKeys.Control, canvas);
+            var all = vm.FenceSelectedKeys.ToList();
+            canvas.HandleKeyDown(Key.Space, Key.None, ModifierKeys.Control, canvas.SensorChips[103]);
+            return (all, After: vm.FenceSelectedKeys.OrderBy(k => k).ToList());
+        });
+
+        Assert.Equal(new[] { 101, 102, 103, 104 }, result.all);
+        Assert.Equal(new[] { 101, 102, 104 }, result.After);
+    }
+
+    [Fact]
+    public void should_keep_cables_and_the_enclosure_off_the_fence_when_the_cable_toggle_is_off()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            var before = (Cables: canvas.StaticShapes.Count(s => s.Ink is FenceInk.ReturnOuter or FenceInk.PillPort), canvas.ControllerChip);
+            vm.ToggleCables();
+            Pump();
+            return (before, After: canvas.StaticShapes.Count(s => s.Ink is FenceInk.ReturnOuter or FenceInk.PillPort), Enclosure: canvas.ControllerChip);
+        });
+
+        Assert.Equal(0, result.before.Cables);
+        Assert.Null(result.before.ControllerChip);
+        Assert.True(result.After > 0);
+        Assert.NotNull(result.Enclosure);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void should_draw_the_five_fence_styles_and_skip_posts_between_walls_when_snapshotted(bool dark)
+    {
+        var result = OnWindow(Ring(6), (vm, canvas) =>
+        {
+            var styles = new[] { Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.ChainLink, Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.ChainLinkRazor,
+                                 Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.Brick, Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.Concrete,
+                                 Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.DesignFence };
+            for (var i = 0; i < styles.Length; i++)
+            {
+                vm.FenceSelectPanel(i);
+                vm.ChoosePanelStyle(styles[i]);
+                vm.ApplyPanelEdit();
+            }
+            vm.FenceClearSelection();
+            Pump();
+            var window = Window.GetWindow(canvas)!;
+            var bitmap = Snapshot(window);
+            var path = Path.Combine(Path.GetTempPath(), $"wiring-fence-styles-{(dark ? "dark" : "light")}.png");
+            using (var file = File.Create(path))
+            {
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                encoder.Save(file);
+            }
+            var inks = canvas.StaticShapes.Select(s => s.Ink).ToHashSet();
+            return (path, colors: DistinctColors(bitmap), inks, Posts: vm.FenceLayout.Geometry.Posts.Select(p => p.Exists).ToList());
+        }, dark);
+
+        _out.WriteLine($"스냅숏: {result.path} · 색 {result.colors}가지");
+        Assert.True(result.colors > 20);
+        foreach (var ink in new[] { FenceInk.Mesh, FenceInk.Razor, FenceInk.BrickFront, FenceInk.ConcreteFront, FenceInk.ConcreteSeam, FenceInk.DesignFace, FenceInk.DesignRail })
+            Assert.Contains(ink, result.inks);
+        Assert.Equal(new[] { true, true, true, false, true, true }, result.Posts);   // 벽돌 | 시멘트 사이 기둥은 서지 않는다
+    }
+
+    [Fact]
+    public void should_lower_a_sensor_chip_when_its_spot_changes_from_post_top_to_post_middle()
+    {
+        var result = OnWindow(Ring(3), (vm, canvas) =>
+        {
+            var top = canvas.ScreenCenterOf(canvas.SensorChips[102]).Y;
+            vm.FenceSelect(102);
+            vm.ChooseMountSpot(Ironwall.Dotnet.Monitoring.Models.Fences.FenceMountSpot.PostMiddle);
+            Pump();
+            return (top, Middle: canvas.ScreenCenterOf(canvas.SensorChips[102]).Y, Name: AutomationProperties.GetName(canvas.SensorChips[102]));
+        });
+
+        Assert.True(result.Middle > result.top + 5, $"{result.top} → {result.Middle}");   // 화면 y 가 커졌다 = 내려갔다
+        Assert.EndsWith("기둥 2 기둥 중간", result.Name);
     }
     #endregion
 

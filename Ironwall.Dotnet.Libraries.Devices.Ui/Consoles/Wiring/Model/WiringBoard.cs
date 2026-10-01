@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -154,6 +155,7 @@ public sealed class WiringBoard
     private readonly List<WiringChainLoadIssue> _loadNotices = new();
     private readonly Dictionary<int, WiringProposalKind> _proposals = new();
     private WiringChain _chain;
+    private WiringFenceLayout _fence = WiringFenceLayout.None;
     private string? _controllerType;
     private bool _pending;
     private int _nextNewKey = -1;
@@ -337,6 +339,8 @@ public sealed class WiringBoard
         _proposals.Clear();
         _controllerType = controllerType;
         ProposalsAppliedByEdit = false;
+        _fence = WiringFenceLayout.None;
+        FenceBaseline = WiringFenceLayout.None;
 
         var loaded = sensors?.ToList() ?? new();
         foreach (var s in loaded)
@@ -563,6 +567,7 @@ public sealed class WiringBoard
             foreach (var s in keep) _undo.Push(s);
         }
         _undo.Push(Capture());
+        _renumbered = 0;            // 새 동작의 시작 — 그 동작이 다시 매긴 번호만 센다(상태 줄 "번호 n대 바뀜")
     }
 
     public bool CanUndo => _undo.Count > 0;
@@ -572,7 +577,145 @@ public sealed class WiringBoard
     {
         if (_undo.Count == 0) return false;
         Restore(_undo.Pop());
+        _renumbered = 0;
         return true;
+    }
+    #endregion
+
+    #region - Fence layout (fence-wiring-editor FR-01 · FR-07 · FR-09 · FR-10) -
+    /// <summary>
+    /// 펜스 구성(망 · 자리 · 번호 대역) — 켜져 있으면 체인과 <b>늘 맞물린다</b>: 자리 순서(A 쪽 끝부터, 같은 망이면 기둥 위 → 망 가운데)대로
+    /// 줄 세운 것이 체인이다. 체인을 고치는 모든 길(<see cref="Edit"/>)이 자리를 맞추고, 자리를 고치는 길(<see cref="ApplyFenceEdit"/>)이 체인을 맞춘다.
+    /// </summary>
+    public WiringFenceLayout FenceLayout => _fence;
+
+    /// <summary>마지막으로 로컬에 저장한(불러온) 구성 — "로컬 저장할 것이 있나"의 기준.</summary>
+    public WiringFenceLayout FenceBaseline { get; private set; } = WiringFenceLayout.None;
+
+    /// <summary>
+    /// 펜스 구성이 기준과 다른가(제안만 걸려 있고 손대지 않았으면 거짓). 펜스센서 현장 간격(<see cref="Spacing"/>)도 로컬 문서에 실리므로
+    /// 간격만 바꿔도 바뀐 것이다.
+    /// </summary>
+    public bool IsFenceDirty => _fence.IsActive && (!_fence.SameContent(FenceBaseline) || !SameMetres(Spacing.FenceMetres, _fenceSpacingBaseline));
+
+    /// <summary>마지막으로 로컬에 저장한(불러온) 펜스센서 간격(m).</summary>
+    private double _fenceSpacingBaseline = WiringSpacingTable.Default.FenceMetres;
+
+    private static bool SameMetres(double a, double b) => Math.Abs(a - b) < 1e-9;
+
+    /// <summary>마지막 동작(<see cref="PushUndo"/> 이후)이 다시 매긴 번호 수.</summary>
+    private int _renumbered;
+
+    /// <summary>
+    /// 마지막 동작이 위치 순서대로 다시 매긴 번호 수를 꺼내고 비운다 — 창이 상태 줄에 "번호 n대 바뀜" 을 붙인다(Draft 로 번호가 바뀌면 늘 알린다).
+    /// </summary>
+    public int TakeRenumbered()
+    {
+        var n = _renumbered;
+        _renumbered = 0;
+        return n;
+    }
+
+    /// <summary>
+    /// 펜스 구성을 싣는다(불러오기 · 제안). 되돌리기 장면을 쌓지 않고 번호도 매기지 않는다 — 불러오기만으로 바뀐 줄이 생기지 않게.
+    /// <paramref name="baseline"/> 이 없으면 실은 구성이 곧 기준이다.
+    /// </summary>
+    public void LoadFenceLayout(WiringFenceLayout layout, WiringFenceLayout? baseline = null)
+    {
+        _fence = layout ?? WiringFenceLayout.None;
+        FenceBaseline = baseline ?? _fence;
+        _fenceSpacingBaseline = Spacing.FenceMetres;
+    }
+
+    /// <summary>로컬 저장이 끝났다 — 지금 구성을 새 기준으로(제안 표지도 걷는다).</summary>
+    public void MarkFenceSaved()
+    {
+        if (!_fence.IsActive) return;
+        _fence = _fence.Accepted();
+        FenceBaseline = _fence;
+        _fenceSpacingBaseline = Spacing.FenceMetres;
+    }
+
+    /// <summary>
+    /// 펜스 구성을 고친다(망 속성 · 센서 자리) — 고친 자리대로 체인을 다시 세우고(순서가 바뀌면 체인 편집 한 번 · 그때만 번호 대역대로 다시 매긴다).
+    /// 망 색 · 높이 · 거리처럼 순서가 그대로인 편집은 번호를 건드리지 않는다(표에서 손으로 고친 번호가 되돌아가지 않게).
+    /// 되돌리기 한 걸음은 부르는 쪽이 <see cref="PushUndo"/> 로 찍는다. 바뀐 것이 없으면 <c>false</c>.
+    /// </summary>
+    /// <remarks>자리가 있는데 체인에 없던 센서(팔레트)는 체인에 들어오고, 자리를 뺀 센서는 팔레트로 간다.</remarks>
+    /// <param name="tieOrder">같은 자리 센서끼리의 차례 — 없으면 지금 체인 순서(끌어 옮긴 센서를 이미 있는 센서 앞 · 뒤에 둘 때 준다).</param>
+    public bool ApplyFenceEdit(Func<WiringFenceLayout, WiringFenceLayout> edit, IReadOnlyList<int>? tieOrder = null)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+        if (!_fence.IsActive) return false;
+
+        var before = _fence;
+        var next = edit(before);
+        if (next is null || !next.IsActive) return false;
+        var mounts = next.Mounts.Where(p => Find(p.Key) is not null).Select(p => (p.Key, p.Value)).ToList();
+        var order = FenceLayoutMath.PositionOrder(mounts, tieOrder ?? _chain.Keys);
+        var chainChanged = !order.SequenceEqual(_chain.Keys);
+        var layoutChanged = !next.SameContent(before);
+        if (!chainChanged && !layoutChanged) return false;
+
+        _fence = next;
+        if (chainChanged)
+        {
+            var placed = new HashSet<int>(order);
+            Edit(chain =>
+            {
+                var palette = chain.Unplaced.Concat(chain.Keys).Where(k => !placed.Contains(k)).ToList();
+                return WiringChain.Create(chain.Shape, order, palette, chain.IsControllerGapExplicit ? chain.ControllerGap : null);
+            }, order, force: true);
+        }
+        return true;
+    }
+
+    /// <summary>번호 대역을 정한다(<c>null</c> = 자동 번호 끔) — 정하면 바로 위치 순서대로 다시 매긴다(Draft). 바뀐 것이 있으면 <c>true</c>.</summary>
+    public bool SetNumberBands(NumberBandSet? bands)
+    {
+        if (!_fence.IsActive) return false;
+        var numbers = _rows.Select(r => r.Facts.Number).ToList();
+        var changed = !Equals(_fence.Bands, bands);
+        _fence = _fence.WithBands(bands);
+        if (changed) Renumber();        // 대역이 바뀌었을 때만 — 같은 대역을 다시 골라도 손으로 고친 번호를 덮지 않는다
+        return changed || !numbers.SequenceEqual(_rows.Select(r => r.Facts.Number));
+    }
+
+    /// <summary>그 센서의 번호 갈래(종류 → 대역 갈래).</summary>
+    public FenceSensorCategory CategoryOf(int key) => NumberingMath.CategoryOf(WiringTopology.ParseSensorType(Find(key)?.Facts.TypeText));
+
+    /// <summary>번호 검증의 입력 — 모든 줄(체인 여부 · 지금 번호).</summary>
+    public IReadOnlyList<NumberingSensor> NumberingSensors()
+        => _rows.Select(r => new NumberingSensor(r.Key, CategoryOf(r.Key), r.Facts.Number, _chain.Contains(r.Key), r.Display)).ToList();
+
+    /// <summary>번호 검증(대역이 없으면 빈 목록).</summary>
+    public IReadOnlyList<NumberingIssue> NumberingIssues()
+        => _fence.IsActive && _fence.Bands is { } bands ? NumberingMath.Validate(NumberingSensors(), bands) : Array.Empty<NumberingIssue>();
+
+    /// <summary>저장 전 "바뀌는 번호 표" — 서버에 있는 센서 중 번호가 기준과 다른 것, 체인 순서 → 팔레트 순서.</summary>
+    public IReadOnlyList<NumberChange> NumberChanges()
+    {
+        var order = _chain.Keys.Concat(Unplaced.Select(r => r.Key)).Distinct();
+        return NumberingMath.Changes(order.Select(Find).Where(r => r is { IsNew: false }).Select(r => (r!.Key, r.Display, r.Baseline.Number, r.Facts.Number)));
+    }
+
+    /// <summary>
+    /// 대역이 있으면 체인 순서대로 번호를 다시 매긴다 — 바뀐 줄의 <see cref="WiringSensorRow.Facts"/> 번호만 고친다(Draft · 되돌리기 장면에 든다).
+    /// 부르는 곳은 셋뿐이다: 체인 순서가 바뀔 때 · 체인 구성원이 바뀔 때(<see cref="Edit"/>) · 대역이 바뀔 때(<see cref="SetNumberBands"/>).
+    /// </summary>
+    private int Renumber()
+    {
+        if (!_fence.IsActive || _fence.Bands is not { } bands) return 0;
+        var numbers = NumberingMath.Assign(_chain.Keys.Select(k => (k, CategoryOf(k))), bands);
+        var changed = 0;
+        foreach (var (key, number) in numbers)
+        {
+            if (Find(key) is not { } row || row.Facts.Number == number) continue;
+            row.Facts = row.Facts with { Number = number };
+            changed++;
+        }
+        _renumbered += changed;
+        return changed;
     }
     #endregion
 
@@ -705,6 +848,16 @@ public sealed class WiringBoard
         _chain = next.AcceptSuggestions();
         foreach (var key in touched)
             if (Find(key) is { } row) row.LoadIssue = null;
+
+        // 펜스 구성이 켜져 있으면 자리를 새 체인에 맞추고(남은 센서는 자리 묶음을 나눠 갖고 · 새 센서는 이웃 사이 · 빠진 센서는 자리를 비운다)
+        // 번호 대역이 있으면 번호를 다시 매긴다 — 이 편집과 <b>같은 되돌리기 한 걸음</b>이다(FR-09 · FR-12).
+        if (_fence.IsActive)
+        {
+            var (mounts, panels) = FenceLayoutMath.Reconcile(basis.Keys, _chain.Keys, _fence.Mounts, _fence.Panels, CategoryOf);
+            _fence = _fence.With(panels, mounts);
+            // 번호는 체인 순서 · 구성원이 실제로 바뀌었을 때만 다시 매긴다(사람이 누른 같은 배치 — force — 로는 번호를 덮지 않는다).
+            if (!basis.Keys.SequenceEqual(_chain.Keys)) Renumber();
+        }
         return true;
     }
 
@@ -716,11 +869,12 @@ public sealed class WiringBoard
         WiringChain Chain,
         bool Pending,
         bool AppliedByEdit,
-        IReadOnlyDictionary<int, WiringProposalKind> Proposals);
+        IReadOnlyDictionary<int, WiringProposalKind> Proposals,
+        WiringFenceLayout Fence);
 
     private Snapshot Capture()
         => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _rows.Select(r => r.LoadIssue).ToList(), _rows.Select(r => r.Facing).ToList(),
-               _chain, _pending, ProposalsAppliedByEdit, new Dictionary<int, WiringProposalKind>(_proposals));
+               _chain, _pending, ProposalsAppliedByEdit, new Dictionary<int, WiringProposalKind>(_proposals), _fence);
 
     private void Restore(Snapshot snapshot)
     {
@@ -734,6 +888,7 @@ public sealed class WiringBoard
             _rows.Add(row);
         }
         _chain = snapshot.Chain;
+        _fence = snapshot.Fence;             // 불변 값 — 되돌리면 그 장면의 망 · 자리 · 대역 그대로
         _pending = snapshot.Pending;
         ProposalsAppliedByEdit = snapshot.AppliedByEdit;
         _proposals.Clear();

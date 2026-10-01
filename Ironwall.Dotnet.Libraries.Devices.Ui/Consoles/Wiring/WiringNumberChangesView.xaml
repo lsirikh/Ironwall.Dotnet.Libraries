@@ -1,0 +1,85 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringNumberChangesView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		구성 저장 전 "바뀌는 번호 표"(fence-wiring-editor FR-11 · R-1) — T4 · M.
+		위: 경고(왼쪽 굵은 바 + 글자 — 색 하나로 말하지 않는다) · 가운데: 이름 · 전 → 후 · 아래: 저장 미리보기.
+		파괴적이지 않은 쪽(취소)이 첫 포커스 — ESC · Enter 는 틀이 정한다. x:Name 은 쓰지 않는다(계측은 AutomationId).
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.Wiring.NumberChanges"
+		PrimaryAutomationId="Devices.Wiring.NumberChanges.Confirm"
+		PrimaryInvoked="OnConfirm"
+		PrimaryText="번호 바꿔 저장"
+		SecondaryAutomationId="Devices.Wiring.NumberChanges.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Medium"
+		Title="{Binding Title}">
+		<DockPanel LastChildFill="True">
+			<Border
+				Margin="0,0,0,10"
+				Padding="10,8"
+				Background="{DynamicResource TintWarningBrush}"
+				BorderBrush="{DynamicResource StatusWarningBrush}"
+				BorderThickness="3,0,0,0"
+				CornerRadius="0,6,6,0"
+				DockPanel.Dock="Top">
+				<TextBlock
+					AutomationProperties.AutomationId="Devices.Wiring.NumberChanges.Warning"
+					FontSize="13"
+					FontWeight="SemiBold"
+					TextWrapping="Wrap"><Run Text="⚠ " /><Run Text="{Binding Warning, Mode=OneWay}" /><Run Text=" — 매니저가 장비번호로 센서를 찾는다면, 다르게 저장하면 탐지 · 장애가 엉뚱한 센서로 붙습니다." /></TextBlock>
+			</Border>
+			<TextBlock
+				Margin="0,0,0,6"
+				AutomationProperties.AutomationId="Devices.Wiring.NumberChanges.Heading"
+				DockPanel.Dock="Top"
+				FontSize="13"
+				FontWeight="Bold"
+				Text="{Binding Heading}" />
+			<ScrollViewer
+				MaxHeight="120"
+				Margin="0,10,0,0"
+				DockPanel.Dock="Bottom"
+				HorizontalScrollBarVisibility="Disabled"
+				VerticalScrollBarVisibility="Auto">
+				<TextBlock
+					AutomationProperties.AutomationId="Devices.Wiring.NumberChanges.Details"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding Details}"
+					TextWrapping="Wrap" />
+			</ScrollViewer>
+			<Border
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="1"
+				CornerRadius="6">
+				<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+					<ItemsControl AutomationProperties.AutomationId="Devices.Wiring.NumberChanges.Table" Focusable="False" ItemsSource="{Binding Changes}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Border Padding="10,5" BorderBrush="{DynamicResource RowLineBrush}" BorderThickness="0,0,0,1">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*" />
+											<ColumnDefinition Width="Auto" />
+										</Grid.ColumnDefinitions>
+										<TextBlock FontSize="12.5" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+										<!--  Run 사이에 줄바꿈을 두지 않는다 — 공백이 하나 더 끼어 "105  →  5" 가 된다  -->
+										<TextBlock Grid.Column="1" FontFamily="Consolas" FontSize="12.5"><Run Foreground="{DynamicResource TextMutedBrush}" Text="{Binding Before, Mode=OneWay}" /><Run Text=" → " /><Run FontWeight="Bold" Text="{Binding After, Mode=OneWay}" /></TextBlock>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+			</Border>
+		</DockPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

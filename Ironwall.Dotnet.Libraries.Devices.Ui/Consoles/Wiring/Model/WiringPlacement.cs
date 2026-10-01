@@ -53,13 +53,17 @@ public static class WiringSpec
     public const int LINE_SECONDARY = 2;
 
     /// <summary>
-    /// 형식 표지(wiring-fence-view F-2b · H3) — 체인 모델이 쓴 값에는 <c>"v": 2</c> 와 결선 모양 <c>"shape"</c> 를 함께 싣는다.
+    /// 형식 표지(wiring-fence-view F-2b · H3 · fence-wiring-editor FR-11) — 지금 쓰는 값은 <c>"v": 3</c>: 모든 제어기가 링이라(§1-0)
+    /// 결선 모양 <c>"shape"</c> 를 더는 싣지 않는다. <c>v2</c>(<c>shape</c> 있음) · <c>v1</c>(표지 없음 · N04)도 계속 읽는다.
     /// 표지가 없는 값(N04 시절)만 "옛 두 선" 후보로 본다 — "line 2 가 있다" 만으로는 링의 옛 배치인지 가지의 오른쪽인지 가를 수 없다.
-    /// <c>line</c> · <c>order</c> 는 그대로 두어 옛 클라이언트도 읽는다.
+    /// <c>line</c>(늘 1) · <c>order</c> 는 그대로 두어 옛 클라이언트(v2.6)도 읽는다.
     /// </summary>
     public const string VERSION_KEY = "v";
     public const string SHAPE_KEY = "shape";
-    public const int FORMAT_VERSION = 2;
+    public const int FORMAT_VERSION = 3;
+
+    /// <summary>결선 모양을 싣던 마지막 판(읽기 전용).</summary>
+    public const int SHAPED_FORMAT_VERSION = 2;
 
     public const string SHAPE_RING = "ring";
     public const string SHAPE_BRANCH = "branch";
@@ -142,7 +146,7 @@ public static class WiringSpec
     public static WiringShape? ReadShape(JObject? spec)
     {
         if (spec?[SPEC_KEY] is not JObject wiring) return null;
-        if (AsInt(wiring[VERSION_KEY]) is not { } version || version < FORMAT_VERSION) return null;
+        if (AsInt(wiring[VERSION_KEY]) is not { } version || version < SHAPED_FORMAT_VERSION) return null;
         return ((string?)wiring[SHAPE_KEY])?.Trim().ToLowerInvariant() switch
         {
             SHAPE_RING => WiringShape.Ring,
@@ -152,7 +156,7 @@ public static class WiringSpec
         };
     }
 
-    /// <param name="shape">결선 모양 — 주면 형식 표지(<c>v</c> · <c>shape</c>)를 함께 싣는다. 저장 계층은 늘 준다.</param>
+    /// <param name="shape">결선 모양 — 주면 형식 표지(<c>v: 3</c>)를 함께 싣는다(모양 글자는 v3 부터 싣지 않는다 · 모두 링). 저장 계층은 늘 준다.</param>
     /// <param name="includeFacing">보는 쪽(<c>facing</c>)을 싣는가 — 방향이 있는 센서(스마트 · 복합)만 참(FR-20).</param>
     public static JObject Apply(JObject? spec, WiringPlacement? placement, WiringShape? shape = null, bool includeFacing = false)
     {
@@ -190,11 +194,7 @@ public static class WiringSpec
     private static JObject Node(WiringPlacement placement, WiringShape? shape, bool includeFacing)
     {
         var node = new JObject();
-        if (shape is { } s)
-        {
-            node[VERSION_KEY] = FORMAT_VERSION;
-            node[SHAPE_KEY] = ShapeText(s);
-        }
+        if (shape is not null) node[VERSION_KEY] = FORMAT_VERSION;     // v3 — 모양은 싣지 않는다(모든 제어기가 링 · §1-0)
         node[LINE_KEY] = placement.Line;
         node[ORDER_KEY] = placement.Order;
         if (includeFacing) node[FACING_KEY] = FacingText(placement.Facing);

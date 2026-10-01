@@ -344,6 +344,8 @@ public sealed class WiringApplyService
         var dto = new SensorDeviceDto
         {
             // 축 모드에서 조건 없이 나가는 키 — 비우면 PATCH 가 지운다.
+            // number_device 는 서버에서 유일 제약이 없다(명세: "식별자가 아닙니다") — 번호를 서로 바꾸는 저장(1 ↔ 2)을
+            // 센서마다 차례로 PATCH 해도 중간 상태에서 거절되지 않는다. 그래서 임시 번호를 거치는 2단 쓰기를 하지 않는다.
             NumberDevice = row.Facts.Number,
             NameDevice = row.Facts.Name,
             Status = server.Status,

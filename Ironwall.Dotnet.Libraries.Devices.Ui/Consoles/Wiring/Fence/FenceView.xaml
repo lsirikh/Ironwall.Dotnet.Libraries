@@ -3,6 +3,7 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:fence="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence"
+	xmlns:concept="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Concept"
 	xmlns:sys="clr-namespace:System;assembly=mscorlib"
 	Background="{DynamicResource SurfaceBrush}"
 	Foreground="{DynamicResource TextPrimaryBrush}">
@@ -70,21 +71,22 @@
 			MinHeight="44">
 			<DockPanel LastChildFill="False" VerticalAlignment="Center">
 				<StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-					<Button
-						AutomationProperties.AutomationId="Devices.Wiring.Fence.Flat"
-						Click="OnFlat"
-						Content="평면 보기"
-						Style="{StaticResource F.Tool}"
-						Tag="{Binding IsFlat}"
-						ToolTip="깊이 없이 옆에서 본 모습" />
+					<!--  SB B 도구줄 — [입체] [평면] · [전체 보기]. 모양 5종은 둘 다에서 보인다(2.5D 투영 · FR-02)  -->
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Tilt"
 						Click="OnTilt"
-						Content="입체 보기"
+						Content="입체"
 						IsEnabled="{Binding CanChooseTilt}"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding IsTilt}"
 						ToolTip="35° 기울여 봅니다(기본 · 원격 데스크톱에서도)" />
+					<Button
+						AutomationProperties.AutomationId="Devices.Wiring.Fence.Flat"
+						Click="OnFlat"
+						Content="평면"
+						Style="{StaticResource F.Tool}"
+						Tag="{Binding IsFlat}"
+						ToolTip="깊이 없이 옆에서 본 모습" />
 					<Border
 						Height="24"
 						Margin="2,0,8,0"
@@ -106,6 +108,14 @@
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding ShowRange}"
 						ToolTip="탐지 반경(복합 20m · 지진동 15m)을 지면에 옅게 겹칩니다 — 빈틈은 마름모" />
+					<!--  케이블 보기(FR-12) — 리턴케이블 · 함체 · A·B 번호는 기본으로 빼고 개념도가 맡는다. 켜면 펜스 위에 겹친다  -->
+					<Button
+						AutomationProperties.AutomationId="Devices.Wiring.Fence.Cables"
+						Click="OnCables"
+						Content="케이블 보기"
+						Style="{StaticResource F.Tool}"
+						Tag="{Binding ShowCables}"
+						ToolTip="리턴케이블 · 함체 · A·B 번호를 펜스 위에 겹쳐 봅니다(연결 구조는 아래 개념도)" />
 					<!--
 						펜스센서 현장 간격(v0.4 §1-C · 기준 3m · 2~4m · 0.5m 단위) — 제어기마다 다르다. 그림만 다시 놓이고 바뀐 줄이 아니다
 						(서버 저장 위치는 O-10 · 지금은 이 창 안에서만).
@@ -170,6 +180,74 @@
 				Text="{Binding FenceCountsText}" />
 		</Border>
 
+		<!--
+			── 개념도(FR-12 · SB B 아래 띠) ── 링을 Ch1(A) → … → Ch2(B) 로. 가로 띠(기본) · 원형. 신호등(FR-14) · IP 표지(FR-15).
+			펜스 · 표 보기와 같은 선택을 본다(FR-13).
+		-->
+		<Border
+			BorderBrush="{DynamicResource RowLineBrush}"
+			BorderThickness="0,1,0,0"
+			DockPanel.Dock="Bottom">
+			<Border.Style>
+				<Style TargetType="Border">
+					<!--  가로 띠: 키는 개념도가 정한다(노드가 많으면 뱀 모양 줄 수만큼) · 원형: 고정  -->
+					<Setter Property="MinHeight" Value="168" />
+					<Setter Property="MaxHeight" Value="360" />
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsConceptRing}" Value="True">
+							<Setter Property="Height" Value="290" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Style>
+			<DockPanel LastChildFill="True">
+				<DockPanel Margin="10,6,10,0" DockPanel.Dock="Top" LastChildFill="True">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Height="24"
+							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.Strip"
+							Click="OnConceptStrip"
+							Content="가로 띠"
+							Style="{StaticResource F.Tool}"
+							Tag="{Binding IsConceptStrip}" />
+						<Button
+							Height="24"
+							Margin="0"
+							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.Ring"
+							Click="OnConceptRing"
+							Content="원형"
+							Style="{StaticResource F.Tool}"
+							Tag="{Binding IsConceptRing}" />
+					</StackPanel>
+					<WrapPanel VerticalAlignment="Center" Orientation="Horizontal">
+						<TextBlock
+							Margin="0,0,12,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.Title"
+							FontSize="12"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding ConceptTitle}" />
+						<TextBlock
+							Margin="0,0,12,0"
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.IpNote"
+							FontSize="11.5"
+							Foreground="{DynamicResource StatusInfoBrush}"
+							Text="스마트복합센서2 = 센서마다 IP (제어기 뒤 내부망)"
+							Visibility="{Binding HasIpSensors, Converter={StaticResource F.BoolToVisibility}}" />
+						<TextBlock
+							VerticalAlignment="Center"
+							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.ControllerSignal"
+							FontSize="11.5"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="{Binding ControllerSignalText, StringFormat=제어기 통신: {0}}" />
+					</WrapPanel>
+				</DockPanel>
+				<concept:FenceConceptView ViewModel="{Binding}" />
+			</DockPanel>
+		</Border>
+
 		<!--  ── 캔버스 ──  -->
 		<Grid>
 			<fence:FenceCanvas ViewModel="{Binding}" />
@@ -188,7 +266,7 @@
 					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="센서 끌기 = 순서 · 함체 끌기 = 리턴케이블 · VBUS 표지 · 빈 곳 끌기 = 이동 · 휠 = 확대 · Esc = 취소 · Ctrl 클릭 = 여럿 · Alt+←/→ = 한 칸 · Delete = 빼기"
+					Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 · Alt+Shift+← → = 다른 망으로 · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
 					TextWrapping="Wrap" />
 			</Border>
 		</Grid>

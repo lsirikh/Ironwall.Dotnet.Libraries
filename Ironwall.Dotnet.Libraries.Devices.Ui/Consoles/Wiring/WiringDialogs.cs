@@ -32,6 +32,18 @@ public interface IWiringDialogs
 
     /// <summary>클립보드 글자(없거나 읽을 수 없으면 <c>null</c>). 화면 계층에서만 실제 클립보드를 만진다.</summary>
     string? ReadClipboardText();
+
+    /// <summary>
+    /// 저장 전 <b>바뀌는 번호 표</b>("북측 5구간 105 → 5") + 경고(fence-wiring-editor FR-11 · R-1)를 보이고 "저장할까?" 를 묻는다.
+    /// 기본 구현은 표를 글로 적어 <see cref="ConfirmAsync"/> 로 묻는다 — 화면 계층은 표 창으로 바꿔 보인다.
+    /// </summary>
+    Task<bool> ConfirmNumberChangesAsync(string title, IReadOnlyList<Ironwall.Dotnet.Monitoring.Models.Fences.NumberChange> changes, string warning, string details)
+    {
+        var nl = Environment.NewLine;
+        var table = string.Join(nl, (changes ?? Array.Empty<Ironwall.Dotnet.Monitoring.Models.Fences.NumberChange>()).Take(30).Select(c => "  " + c.Text));
+        var more = changes is { Count: > 30 } ? $"{nl}  … 외 {changes.Count - 30}대" : string.Empty;
+        return ConfirmAsync(title, $"바뀌는 번호 {changes?.Count ?? 0}대{nl}{table}{more}{nl}{nl}⚠ {warning}{nl}{nl}{details}");
+    }
 }
 
 /// <summary>확인 · 저장 미리보기용 한 장(WS L450, L772).</summary>

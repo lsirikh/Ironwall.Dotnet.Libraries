@@ -162,6 +162,54 @@ internal sealed class WiringFakeGateway : ISensorWriteGateway
     }
 }
 
+/// <summary>펜스 구성 로컬 저장소의 가짜(fence-wiring-editor FR-11) — 저장한 문서를 붙잡고, 다음 결과를 정할 수 있다.</summary>
+internal sealed class FakeFenceStore : Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore
+{
+    public Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutDocument? Stored { get; set; }
+
+    /// <summary>불러오기 결과를 직접 정할 때(손상 · 실패) — 없으면 <see cref="Stored"/> 로 읽음 · 없음.</summary>
+    public Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutLoadResult? LoadResult { get; set; }
+
+    public List<Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutDocument> Saved { get; } = new();
+    public List<Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveMode> Modes { get; } = new();
+    public List<Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutKey> Keys { get; } = new();
+    public Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveStatus Next { get; set; } = Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveStatus.Saved;
+
+    public Task<Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutLoadResult> LoadAsync(Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutKey key, CancellationToken token = default)
+    {
+        Keys.Add(key);
+        return Task.FromResult(LoadResult ?? (Stored is { } d
+            ? Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutLoadResult.Loaded(d)
+            : Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutLoadResult.NotFound));
+    }
+
+    public Task<Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveResult> SaveAsync(Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutKey key,
+        Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutDocument document,
+        Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveMode mode = Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveMode.Normal,
+        CancellationToken token = default)
+    {
+        Keys.Add(key);
+        Saved.Add(document);
+        Modes.Add(mode);
+        return Task.FromResult(Next == Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveStatus.Saved
+            ? new Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveResult(Next, document.Revision + 1, "펜스 구성을 이 PC 에 저장했습니다.")
+            : new Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutSaveResult(Next, document.Revision, "다른 GIS 가 먼저 저장했습니다."));
+    }
+}
+
+/// <summary>ping 가짜 — 정한 표본을 차례로 돌려준다(다 쓰면 10ms 성공).</summary>
+internal sealed class FakePing : Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals.IPingProbe
+{
+    public Queue<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals.PingSample> Next { get; } = new();
+    public List<string> Hosts { get; } = new();
+
+    public Task<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals.PingSample> SendAsync(string host, TimeSpan timeout, CancellationToken token = default)
+    {
+        Hosts.Add(host);
+        return Task.FromResult(Next.Count > 0 ? Next.Dequeue() : new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals.PingSample(true, 10));
+    }
+}
+
 /// <summary>사람에게 묻는 자리의 가짜.</summary>
 internal sealed class WiringFakeDialogs : IWiringDialogs
 {
@@ -177,8 +225,16 @@ internal sealed class WiringFakeDialogs : IWiringDialogs
     public Task<bool> ConfirmAsync(string title, string message)
     {
         ConfirmCount++;
-        return Task.FromResult(Confirm);
+        Confirms.Add((title, message));
+        if (ThrowOnConfirm is { } ex) throw ex;
+        return Task.FromResult(AnswerFor?.Invoke(title) ?? Confirm);
     }
+
+    /// <summary>확인 창이 예외를 던지게(메뉴 동작 실패 시험).</summary>
+    public Exception? ThrowOnConfirm { get; set; }
+
+    /// <summary>제목마다 다른 답(없으면 <see cref="Confirm"/>).</summary>
+    public Func<string, bool?>? AnswerFor { get; set; }
 
     public Task<string?> AskTextAsync(string title, string label, string initial) => Task.FromResult(TextAnswer);
 
@@ -195,6 +251,20 @@ internal sealed class WiringFakeDialogs : IWiringDialogs
     public void RememberPasteContext(IReadOnlyCollection<int> existingNumbers, string defaultType, string defaultZone) { }
 
     public string? ReadClipboardText() => Clipboard;
+
+    /// <summary>마지막으로 보인 "바뀌는 번호 표"(fence-wiring-editor FR-11) · 경고.</summary>
+    public IReadOnlyList<Ironwall.Dotnet.Monitoring.Models.Fences.NumberChange>? LastNumberChanges { get; private set; }
+    public string? LastNumberWarning { get; private set; }
+
+    /// <summary>마지막 확인 제목 · 문장.</summary>
+    public List<(string Title, string Message)> Confirms { get; } = new();
+
+    public Task<bool> ConfirmNumberChangesAsync(string title, IReadOnlyList<Ironwall.Dotnet.Monitoring.Models.Fences.NumberChange> changes, string warning, string details)
+    {
+        LastNumberChanges = changes;
+        LastNumberWarning = warning;
+        return ConfirmAsync(title, details);
+    }
 }
 
 /// <summary>

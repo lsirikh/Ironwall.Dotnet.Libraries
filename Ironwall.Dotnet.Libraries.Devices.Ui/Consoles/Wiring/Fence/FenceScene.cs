@@ -24,6 +24,15 @@ public enum FenceInk
     GroupBack, GroupBody, GroupText, GroupSub,
     Pill, PillDuplicate, PillInsert, PillPort, Insert,
     Facing, FacingArrow, FacingTag, FacingTagText, SideLabel,
+    // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
+    PanelSelectFill, PanelSelectEdge, RubberBand,
+    Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
+    // 개념도(FR-12)
+    ConceptWire, ConceptReturn, ConceptArrow, ConceptNode, ConceptNodeIp, ConceptNodeText, ConceptNodeSub, ConceptController, ConceptControllerText,
+    ConceptPort, ConceptPortText, ConceptTitle, ConceptInfo, ConceptInsert, ConceptInternalNet,
+    BrickSide, BrickTop,
+    // 작은 배율의 윤형 철조망 — 코일 대신 톱니 띠 하나(fence-wiring-editor 검토 V2)
+    RazorBand,
 }
 
 public enum FenceShapeKind { Polygon, Polyline, Line, Ellipse, Rect, Text, Pill }
@@ -43,7 +52,8 @@ public sealed record FenceShape(
     string? Text = null,
     double FontSize = 0,
     FenceTextAnchor Anchor = FenceTextAnchor.Middle,
-    double Opacity = 1);
+    double Opacity = 1,
+    string? Color = null);
 
 /// <summary>칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표).</summary>
 public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);
@@ -52,7 +62,7 @@ public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit
 /// 펜스 뷰의 장면 — 목업(<c>wiring-fence-view-mockup.html</c> · <c>draw()</c> · <c>sensorShape()</c> · <c>drawCtrl()</c>)을 옮긴 <b>순수</b> 그림 목록.
 /// 좌표는 투영 뒤 그림 좌표. 칩(센서 · 묶음 · 제어기)은 <b>자기 x 를 원점</b>으로 그린다 — 투영이 선형이라 <c>P(x+dx, y, z) = P(dx, y, z) + (x, 0)</c>.
 /// </summary>
-public static class FenceScene
+public static partial class FenceScene
 {
     private const double H = FenceProjector.H;
     private const double PW = FenceProjector.PW;
@@ -288,8 +298,8 @@ public static class FenceScene
 
         var la = p.P(xa - 22, 0, RZ + 16);
         var lb = p.P(xb + 22, 0, RZ + 16);
-        o.Add(Text(FenceInk.LabelReturn, new Point(la.X, la.Y + 4), "◀ 리턴케이블 · Sensor A → #1", 11, FenceTextAnchor.Start));
-        o.Add(Text(FenceInk.LabelReturn, new Point(lb.X, lb.Y + 4), $"#{keys.Count} ← Sensor B · 리턴케이블 ▶", 11, FenceTextAnchor.End));
+        o.Add(Text(FenceInk.LabelReturn, new Point(la.X, la.Y + 4), $"◀ 리턴케이블 · {WiringValidation.PORT_1} → #1", 11, FenceTextAnchor.Start));
+        o.Add(Text(FenceInk.LabelReturn, new Point(lb.X, lb.Y + 4), $"#{keys.Count} ← {WiringValidation.PORT_2} · 리턴케이블 ▶", 11, FenceTextAnchor.End));
 
         // A/B 번호 알약(체인 선 높이)
         foreach (var key in keys)
@@ -358,8 +368,10 @@ public static class FenceScene
 
     #region - Chips -
     /// <summary>센서 칩 — 제품 모양(FR-10 · FR-17) + 번호판 + 모서리 표지(제안 = 왼쪽 위 · 미저장 = 오른쪽 위) + 선택 윤곽.</summary>
-    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1)
+    /// <param name="lift">설치 자리 높이로 칩 전체를 올리는 값(세계 단위 · fence-wiring-editor FR-07). 0 이면 목업 높이 그대로.</param>
+    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0)
     {
+        if (lift != 0) p = p with { YLift = lift };
         var o = new List<FenceShape>(24);
         var k = p.K;
         var de = p.De;
@@ -444,7 +456,12 @@ public static class FenceScene
     }
 
     /// <summary>펜스센서 묶음 칩(FR-18) — "펜스센서 ×N" 겹 카드 + 첫–끝 번호.</summary>
-    public static FenceChipPicture Group(IReadOnlyList<FenceSensor> members, WiringShape shape, FenceProjector p, bool selected, double zoom = 1)
+    /// <param name="maxWidth">
+    /// 이웃 칩까지 남는 폭(세계 단위) — 작은 배율에서 글자가 줌에 맞서 커지면 카드가 이웃 번호를 덮는다(검토 V2 · 실측 34%).
+    /// 넘치면 짧은 카드("×5" · 번호 줄 없음)로 줄인다(기둥 솎기와 같은 생각 — 덮느니 줄인다). 없으면 제한 없음.
+    /// </param>
+    public static FenceChipPicture Group(IReadOnlyList<FenceSensor> members, WiringShape shape, FenceProjector p, bool selected, double zoom = 1,
+                                         double maxWidth = double.PositiveInfinity)
     {
         var o = new List<FenceShape>(10);
         var n = members.Count;
@@ -453,7 +470,15 @@ public static class FenceScene
         var titleSize = Math.Max(15, MIN_TEXT / SafeZoom(zoom));
         var subSize = Math.Max(11, MIN_TEXT / SafeZoom(zoom));
         var w = Math.Max(Math.Max(EstimateWidth(title, titleSize), EstimateWidth(range, subSize)) + 26, 70);
-        var h = Math.Max(40, titleSize + subSize + 16);
+        var compact = w > maxWidth;
+        if (compact)
+        {
+            title = $"×{n}";
+            range = string.Empty;
+            subSize = 0;
+            w = Math.Max(EstimateWidth(title, titleSize) + 16, 30);
+        }
+        var h = compact ? Math.Max(26, titleSize + 10) : Math.Max(40, titleSize + subSize + 16);
         var c = p.P(0, 66, p.De / 2 + 4);
         var x = c.X - w / 2;
         var y = c.Y - h / 2;
@@ -464,9 +489,9 @@ public static class FenceScene
         o.Add(RectShape(FenceInk.GroupBack, new Rect(x + 4, y - 4, w, h), 15));
         o.Add(RectShape(FenceInk.GroupBody, new Rect(x, y, w, h), 15));
         // 첫–끝 번호는 카드 <b>안</b> 둘째 줄 — 카드 밖에 두면 기둥 · 철망 무늬 위라 읽히지 않았다(실측 · 2026-09-29).
-        var top = y + (h - titleSize - subSize - 4) / 2;
+        var top = compact ? y + (h - titleSize) / 2 : y + (h - titleSize - subSize - 4) / 2;
         o.Add(Text(FenceInk.GroupText, new Point(c.X, top + titleSize * 0.86), title, titleSize));
-        o.Add(Text(FenceInk.GroupSub, new Point(c.X, top + titleSize + 4 + subSize * 0.82), range, subSize));
+        if (!compact) o.Add(Text(FenceInk.GroupSub, new Point(c.X, top + titleSize + 4 + subSize * 0.82), range, subSize));
         if (members.Any(m => m.IsChanged))
             o.Add(Poly(FenceInk.Draft, new Point(x + w - 14, y), new Point(x + w - 4, y), new Point(x + w, y + 4), new Point(x + w, y + 14)));
         if (selected) o.Add(RectShape(FenceInk.Select, new Rect(x - 5, y - 9, w + 18, h + 30), 16));
@@ -488,7 +513,7 @@ public static class FenceScene
             o.Add(RectShape(FenceInk.Dock, RectOf(p.P(-62, 30, z1), p.P(62, 12, z1)), 1.5));
             o.Add(RectShape(FenceInk.CardSmart, RectOf(p.P(-60, 28, z1), p.P(18, 14, z1)), 0));
             o.Add(RectShape(FenceInk.CardVbus, RectOf(p.P(20, 28, z1), p.P(60, 14, z1)), 0));
-            // 포트 A · B 는 동그라미만 — 글자(6px)는 읽히지 않는다. 이름은 함체 밖 "Sensor A · Sensor B" 가 말한다.
+            // 포트 A · B 는 동그라미만 — 글자(6px)는 읽히지 않는다. 이름은 함체 밖 "Ch1(A) · Ch2(B)" 가 말한다(§1-0).
             foreach (var px in new[] { -50.0, -38.0 })
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Port, new[] { p.P(px, 21, z1) }, 3.4, 3.4));
             var t1 = p.P(-10, 21, z1);
@@ -497,8 +522,8 @@ public static class FenceScene
             o.Add(Text(FenceInk.CardVbusText, new Point(t2.X, t2.Y + 3.6), "VBUS", 10));
             var sa = p.P(-ew / 2 - 6, 30, z1);
             var sb = p.P(ew / 2 + 6, 30, z1);
-            o.Add(Text(FenceInk.LabelReturn, sa, "Sensor A", 11, FenceTextAnchor.End));
-            o.Add(Text(FenceInk.LabelReturn, new Point(sb.X + (z1 - z0) * p.Sh, sb.Y), "Sensor B", 11, FenceTextAnchor.Start));
+            o.Add(Text(FenceInk.LabelReturn, sa, WiringValidation.PORT_1, 11, FenceTextAnchor.End));
+            o.Add(Text(FenceInk.LabelReturn, new Point(sb.X + (z1 - z0) * p.Sh, sb.Y), WiringValidation.PORT_2, 11, FenceTextAnchor.Start));
             var cap = p.P(0, 0, z1);
             o.Add(Text(FenceInk.Caption, new Point(cap.X, cap.Y + 15), "함체 · 1U 도킹(스마트 + VBUS 제어기) — ‹ 옆으로 끌기 ›", 10.5));
             fl = p.P(-ew / 2, eh, z1);
