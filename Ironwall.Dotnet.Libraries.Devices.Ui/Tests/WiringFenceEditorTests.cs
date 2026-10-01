@@ -94,7 +94,7 @@ public class WiringFenceEditorTests
 
     #region - Panels (FR-03 · FR-04 · PRD §5) -
     [Fact]
-    public void should_apply_only_touched_fields_to_a_keyboard_selected_panel_range_and_undo_it_in_one_step()
+    public void should_apply_only_touched_fields_and_undo_in_one_step_when_a_keyboard_selected_panel_range_is_edited()
     {
         // Arrange
         var (vm, _, _, _) = Build();
@@ -141,7 +141,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
-    public void should_keep_sensor_and_panel_selections_apart_and_show_the_last_chosen_in_the_pane()
+    public void should_keep_selections_apart_and_show_the_last_chosen_when_sensors_and_panels_are_both_selected()
     {
         var (vm, _, _, _) = Build("SSSS");
 
@@ -191,7 +191,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
-    public async Task should_say_how_many_sensors_change_before_spreading_a_mount_style_to_all()
+    public async Task should_say_how_many_sensors_change_when_a_mount_style_is_spread_to_all()
     {
         // Arrange — 13대 중 3대는 이미 기둥 위 −0.3
         var (vm, dialogs, _, _) = Build();
@@ -213,7 +213,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
-    public void should_offer_the_storyboard_menu_items_on_a_sensor_and_on_a_panel()
+    public void should_offer_the_storyboard_menu_items_when_a_sensor_or_a_panel_is_targeted()
     {
         var (vm, _, _, _) = Build(MIXED);
 
@@ -229,7 +229,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
-    public async Task should_paste_a_copied_panel_to_the_selected_panels_after_confirming()
+    public async Task should_paste_a_copied_panel_to_the_selected_panels_when_confirmed()
     {
         var (vm, dialogs, _, _) = Build("SSSS");
         vm.FenceSelectPanel(0);
@@ -369,7 +369,7 @@ public class WiringFenceEditorTests
 
     #region - Concept · selection (FR-12 · FR-13 · FR-15) -
     [Fact]
-    public void should_share_one_selection_between_the_fence_table_and_concept()
+    public void should_share_one_selection_when_fence_table_or_concept_selects()
     {
         var (vm, _, _, _) = Build("SSSS");
 
@@ -397,7 +397,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
-    public void should_show_ip_or_node_address_by_connection_type()
+    public void should_show_ip_or_node_address_when_connection_type_differs()
     {
         var (vm, _, _, _) = Build("SF");
 
@@ -414,7 +414,7 @@ public class WiringFenceEditorTests
 
     #region - Signals (FR-14) -
     [Fact]
-    public async Task should_light_the_controller_from_pings_and_sensors_from_network_interface_health()
+    public async Task should_light_controller_and_sensor_lamps_when_pings_and_network_interface_health_arrive()
     {
         var ping = new FakePing();
         var (vm, _, _, _) = Build("SSSSS", ping: ping);

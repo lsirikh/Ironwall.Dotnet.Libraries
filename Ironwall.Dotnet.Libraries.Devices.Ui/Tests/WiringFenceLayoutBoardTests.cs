@@ -100,7 +100,7 @@ public class WiringFenceLayoutBoardTests
     }
 
     [Fact]
-    public void should_list_before_and_after_numbers_only_for_changed_server_sensors()
+    public void should_list_before_and_after_numbers_when_only_some_server_sensors_change()
     {
         var board = Board("SSS");
         board.SetNumberBands(NumberBandSet.Tier3);
@@ -165,7 +165,7 @@ public class WiringFenceLayoutBoardTests
     }
 
     [Fact]
-    public void should_change_the_spot_of_sensors_on_a_panel_turned_into_a_wall()
+    public void should_change_the_spot_of_its_sensors_when_a_panel_is_turned_into_a_wall()
     {
         var board = Board("SSS");
 

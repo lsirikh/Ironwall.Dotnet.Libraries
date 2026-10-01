@@ -166,7 +166,7 @@ public class FenceLayoutMathTests
     }
 
     [Fact]
-    public void should_seat_an_inserted_fence_sensor_on_the_panel_between_its_neighbours()
+    public void should_seat_it_between_its_neighbours_when_a_fence_sensor_is_inserted()
     {
         var mounts = OnPosts(1, 2, 3);
 

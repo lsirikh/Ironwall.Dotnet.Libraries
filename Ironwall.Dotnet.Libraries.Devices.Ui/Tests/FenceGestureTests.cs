@@ -32,7 +32,7 @@ public class FenceGestureTests
     [InlineData(FencePointerButton.Left, true, false, FenceTargetKind.Panel, 0, FenceGestureAction.ToggleOne)]
     [InlineData(FencePointerButton.Left, false, false, FenceTargetKind.Empty, 0, FenceGestureAction.ClearSelection)]
     [InlineData(FencePointerButton.Left, true, false, FenceTargetKind.Empty, 0, FenceGestureAction.None)]
-    public void should_classify_button_modifiers_target_and_travel_into_one_action(FencePointerButton button, bool ctrl, bool shift,
+    public void should_classify_into_one_action_when_given_button_modifiers_target_and_travel(FencePointerButton button, bool ctrl, bool shift,
         FenceTargetKind target, double travel, FenceGestureAction expected)
     {
         var isDrag = FenceGesture.IsDrag(new Point(100, 100), new Point(100 + travel, 100));
@@ -68,7 +68,7 @@ public class FenceGestureTests
     }
 
     [Fact]
-    public void should_add_to_the_selection_with_ctrl_and_replace_it_without()
+    public void should_add_to_the_selection_when_ctrl_is_held_and_replace_it_otherwise()
     {
         Assert.Equal(new[] { 5, 1, 2 }, FenceRubberBand.Merge(new[] { 5, 1 }, new[] { 1, 2 }, additive: true));
         Assert.Equal(new[] { 1, 2 }, FenceRubberBand.Merge(new[] { 5 }, new[] { 1, 2 }, additive: false));
@@ -80,7 +80,7 @@ public class FenceGestureTests
     private static readonly PingSample Fail = new(false, 0);
 
     [Fact]
-    public void should_be_unknown_until_the_first_sample_arrives()
+    public void should_be_unknown_when_no_sample_has_arrived()
         => Assert.Equal(SignalLevel.Unknown, SignalMath.Classify(System.Array.Empty<PingSample>()));
 
     [Fact]
@@ -96,7 +96,7 @@ public class FenceGestureTests
         => Assert.Equal(SignalLevel.Slow, SignalMath.Classify(rtts.Select(r => r < 0 ? Fail : Ok(r)).ToList()));
 
     [Fact]
-    public void should_be_down_after_three_failures_in_a_row()
+    public void should_be_down_when_three_pings_fail_in_a_row()
         => Assert.Equal(SignalLevel.Down, SignalMath.Classify(new[] { Ok(10), Ok(10), Fail, Fail, Fail }));
 
     [Theory]
@@ -105,11 +105,11 @@ public class FenceGestureTests
     [InlineData("FAULT", SignalLevel.Down)]
     [InlineData(null, SignalLevel.Unknown)]
     [InlineData("UNKNOWN", SignalLevel.Unknown)]
-    public void should_read_the_network_interface_health_as_a_signal_level(string? health, SignalLevel expected)
+    public void should_map_to_a_signal_level_when_network_interface_health_is_read(string? health, SignalLevel expected)
         => Assert.Equal(expected, SignalMath.FromHealth(health));
 
     [Fact]
-    public void should_light_left_middle_right_or_nothing_by_level()
+    public void should_light_left_middle_right_or_nothing_when_the_level_changes()
     {
         Assert.Equal(new[] { -1, 0, 1, 2 }, new[] { SignalLevel.Unknown, SignalLevel.Down, SignalLevel.Slow, SignalLevel.Ok }.Select(SignalMath.LitIndex));
     }

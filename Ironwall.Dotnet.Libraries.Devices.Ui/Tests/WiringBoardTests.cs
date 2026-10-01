@@ -680,7 +680,7 @@ public class WiringBoardTests
     }
 
     [Fact]
-    public void should_write_the_v3_marker_without_a_shape_and_still_read_v2_shapes()
+    public void should_write_v3_without_a_shape_and_read_v2_shapes_when_placements_round_trip()
     {
         var spec = WiringSpec.Apply(JObject.Parse("""{"resolution":"4K"}"""), new WiringPlacement(1, 7), WiringShape.Ring);
         var patch = WiringSpec.MergePatch(new WiringPlacement(1, 3), WiringShape.Ring);

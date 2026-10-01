@@ -635,7 +635,7 @@ public class WiringFenceViewTests
 
     #region - Fence editor (fence-wiring-editor FR-02 ~ FR-08 · FR-12) -
     [Fact]
-    public void should_select_the_sensors_a_left_drag_band_touches_and_draw_a_dashed_band_while_dragging()
+    public void should_select_touched_sensors_and_draw_a_dashed_band_when_left_drag_banding()
     {
         var result = OnWindow(Ring(5), (vm, canvas) =>
         {
@@ -659,7 +659,7 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_select_panels_with_a_shift_drag_band_and_add_one_with_ctrl_click()
+    public void should_select_panels_when_shift_drag_banded_and_add_one_when_ctrl_clicked()
     {
         var result = OnWindow(Ring(6), (vm, canvas) =>
         {
@@ -688,7 +688,7 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_open_the_menu_on_a_right_click_inside_the_dead_zone_and_select_that_sensor()
+    public void should_open_the_menu_and_select_that_sensor_when_right_clicked_inside_the_dead_zone()
     {
         var result = OnWindow(Ring(5), (vm, canvas) =>
         {
@@ -708,7 +708,7 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_extend_panels_with_shift_arrows_open_the_menu_with_shift_f10_and_clear_with_escape()
+    public void should_extend_open_menu_and_clear_when_shift_arrows_shift_f10_and_escape_are_pressed()
     {
         var result = OnWindow(Ring(6), (vm, canvas) =>
         {
@@ -737,7 +737,7 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_select_every_sensor_with_ctrl_a_and_toggle_one_with_ctrl_space()
+    public void should_select_all_or_toggle_one_when_ctrl_a_or_ctrl_space_is_pressed()
     {
         var result = OnWindow(Ring(4), (vm, canvas) =>
         {
@@ -753,7 +753,7 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_keep_cables_and_the_enclosure_off_the_fence_until_the_cable_toggle_is_on()
+    public void should_keep_cables_and_the_enclosure_off_the_fence_when_the_cable_toggle_is_off()
     {
         var result = OnWindow(Ring(5), (vm, canvas) =>
         {

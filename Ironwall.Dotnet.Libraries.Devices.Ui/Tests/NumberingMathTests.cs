@@ -90,7 +90,7 @@ public class NumberingMathTests
     }
 
     [Fact]
-    public void should_leave_numbers_of_a_category_without_a_band_untouched_and_say_so()
+    public void should_leave_numbers_untouched_and_say_so_when_a_category_has_no_band()
     {
         var chain = new[] { (Key: 1, Category: FenceSensorCategory.Smart), (Key: 2, Category: FenceSensorCategory.Underground) };
 

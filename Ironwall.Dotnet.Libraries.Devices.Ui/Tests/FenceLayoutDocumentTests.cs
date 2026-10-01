@@ -50,7 +50,7 @@ public class FenceLayoutDocumentTests
     }
 
     [Fact]
-    public void should_write_enums_as_names_and_keep_the_revision_out_of_the_body()
+    public void should_write_enums_as_names_and_omit_the_revision_when_serialized()
     {
         var json = JObject.Parse(FenceLayoutJson.Serialize(Sample()));
 

@@ -37,7 +37,7 @@ public class WiringFenceEditorViewTests
     public WiringFenceEditorViewTests(ITestOutputHelper output) => _out = output;
 
     [Fact]
-    public void should_show_the_controller_lamp_and_sensor_lamps_from_health_in_the_concept_diagram()
+    public void should_show_controller_and_sensor_lamps_when_the_concept_diagram_has_health()
     {
         var result = OnView(Ring(4), (vm, view) =>
         {
@@ -59,7 +59,7 @@ public class WiringFenceEditorViewTests
     }
 
     [Fact]
-    public void should_open_the_sensor_menu_from_a_right_click_on_a_concept_node()
+    public void should_open_the_sensor_menu_when_a_concept_node_is_right_clicked()
     {
         var result = OnView(Ring(4), (vm, view) =>
         {
@@ -77,7 +77,7 @@ public class WiringFenceEditorViewTests
     }
 
     [Fact]
-    public void should_move_a_concept_node_with_alt_arrows_and_cancel_a_drag_with_escape()
+    public void should_move_a_concept_node_and_cancel_a_drag_when_alt_arrows_and_escape_are_pressed()
     {
         var result = OnView(Ring(4), (vm, view) =>
         {
@@ -103,7 +103,7 @@ public class WiringFenceEditorViewTests
     }
 
     [Fact]
-    public void should_draw_the_concept_strip_with_one_node_per_chained_sensor_and_follow_the_shared_selection()
+    public void should_draw_one_node_per_chained_sensor_and_follow_the_shared_selection_when_the_concept_strip_is_shown()
     {
         var result = OnView(Ring(5), (vm, view) =>
         {
@@ -163,7 +163,7 @@ public class WiringFenceEditorViewTests
     }
 
     [Fact]
-    public void should_list_every_changed_number_before_and_after_with_the_warning_in_the_save_dialog()
+    public void should_list_every_changed_number_with_the_warning_when_the_save_dialog_is_parsed()
     {
         var result = OnSta(() =>
         {
@@ -203,7 +203,7 @@ public class WiringFenceEditorViewTests
     /// 만들면 다른 시험의 디스패처 경로가 바뀐다). 망 속성 · 설치 위치 · 번호 대역 · 신호등 · 알림이 바인딩 그대로 뜨는지 본다.
     /// </summary>
     [Fact]
-    public void should_bind_the_panel_pane_mount_row_band_row_and_signal_lamp_of_the_wiring_window()
+    public void should_bind_the_panel_pane_mount_row_band_row_and_signal_lamp_when_the_wiring_window_is_parsed()
     {
         var result = OnSta(() =>
         {
