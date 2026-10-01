@@ -282,7 +282,8 @@ public static partial class FenceScene
         DrawPanel(list, flat, geometry, u, v, !spec.IsWall, !spec.IsWall, 1);
         // 투영 y 는 위가 − — 견본 칸 안으로 옮긴다(아래 끝 = h − 2).
         var dy = h - 2;
-        foreach (var shape in list.Where(s => s.Kind != FenceShapeKind.Ellipse))
+        // 큰 코일 · 가시 · 철선은 견본(수십 px)에 넘친다 — 견본은 아래 작은 고리로 말한다
+        foreach (var shape in list.Where(s => s.Kind != FenceShapeKind.Ellipse && s.Ink is not (FenceInk.RazorCoil or FenceInk.RazorBarb or FenceInk.RazorStrand)))
             o.Add(shape with { Points = shape.Points.Select(q => new Point(q.X, q.Y + dy)).ToArray() });
         if (style == EnumFenceStyle.ChainLinkRazor)
             for (var x = 4.0; x <= w - 3.5; x += 7)

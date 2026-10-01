@@ -144,14 +144,15 @@ internal sealed class WiringPreview
     }
 
     /// <summary>
-    /// 담이 낀 펜스 — 스마트 8대: 철조망 3칸 · 벽돌담 2칸 · 시멘트담 1칸 · 디자인펜스 2칸. 담 위 센서는 "담 위", 담 사이에는 기둥이 없다.
+    /// 모양 5종이 한 화면에 — 스마트 8대: 철조망 1칸 · 윤형철조망 2칸 · 벽돌담 2칸 · 시멘트담 1칸 · 디자인펜스 2칸. 담 위 센서는 "담 위", 담 사이에는 기둥이 없다.
     /// RS485 노드 주소(IP 아님)라 주소 칸은 노드 번호.
     /// </summary>
     private (FrameworkElement View, WiringViewModel Vm) WallSection()
     {
         var styles = new[]
         {
-            EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLink, EnumFenceStyle.Brick, EnumFenceStyle.Brick,
+            // 모양 5종을 한 화면에(fence-style-art) — 철조망 · 윤형철조망 · 벽돌담 · 시멘트담 · 디자인펜스
+            EnumFenceStyle.ChainLink, EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.ChainLinkRazor, EnumFenceStyle.Brick, EnumFenceStyle.Brick,
             EnumFenceStyle.Concrete, EnumFenceStyle.DesignFence, EnumFenceStyle.DesignFence,
         };
         var panels = styles.Select(s => FencePanelSpec.Default(s, s is EnumFenceStyle.Brick or EnumFenceStyle.Concrete ? 4.5 : 6)).ToList();
