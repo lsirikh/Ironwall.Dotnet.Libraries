@@ -1,194 +1,23 @@
-# Ironwall Dotnet Based Libraries
+# Ironwall .NET Libraries
 
-### Goal
-> 다양한 SW를 개발하기 위한 Sensorway SW의 라이브러리 모음 Sensorway Framework이다.
+.NET 8 기반 관제 애플리케이션에서 사용하는 공통 라이브러리 모음입니다. 장치·이벤트·계정 데이터와 데이터베이스 접근, 지도와 영상 UI, ONVIF 및 Redis 연동을 모듈로 나눕니다.
 
-### Site : Common
-<hr>
+## 주요 영역
 
-## 1. Ironwall.Dotnet.Libraries.Base 소개
+| 모듈 | 역할 |
+|---|---|
+| `Base`, `Utils`, `ViewModel`, `Framework` | 공통 서비스, 데이터 관리, WPF MVVM 기반 |
+| `Accounts`, `Devices`, `Events` 및 `.Db`, `.Ui` | 도메인 모델, 저장, 화면 |
+| `GMaps`, `Canvas`, `AdornerDecorator` | 지도와 도형 기반 UI |
+| `OnvifSolution`, `Streaming`, `Dotnet.Streaming.UI` | 카메라 제어와 영상 표시 |
+| `Redis`, `Api`, `Api.Aligo` | 메시지 및 외부 API 연동 |
 
-### 1.1 개요
-`Ironwall.Dotnet.Libraries.Base`는 **Sensorway Framework**의 핵심 라이브러리로, 공통적으로 사용되는 기능을 제공합니다.  
-해당 라이브러리는 **.NET 8.0 (Windows)** 환경에서 동작하며, **WPF** 기반의 애플리케이션을 지원합니다.
+실제 폴더명에는 `Ironwall.Dotnet.Libraries.` 접두사가 붙습니다. [솔루션](Ironwall.Dotnet.Libraries.sln)에서 프로젝트 간 참조를 확인할 수 있습니다.
 
-### 1.2 프로젝트 구성
+## 개발 환경과 사용 방식
 
-#### **📂 DataProviders**
-> 데이터 관리 및 공통 인터페이스 제공
+Windows / .NET 8 / WPF를 중심으로 Autofac, Caliburn.Micro 등을 사용합니다. 데이터베이스나 영상 기능의 런타임 의존성은 각 `.csproj`를 확인해야 합니다.
 
-- `BaseCommonProvider.cs`
-- `BaseProvider.cs`
-- `EntityCollectionProvider.cs`
-- `EntityListProvider.cs`
-- `ICollector.cs`
-- `InstanceFactory.cs`
+이 저장소는 하나의 완성 앱이 아니라 여러 앱에서 사용하는 라이브러리 모음입니다. 일부 프로젝트는 다른 저장소의 프로젝트를 참조합니다. 예를 들어 Aligo 모듈은 Gym 메시지 프로젝트를 참조하므로 전체 솔루션 빌드 전에 경로를 맞춰야 합니다. 사용할 모듈부터 의존성을 확인하는 것이 좋습니다.
 
-#### **📂 Models**
-> 데이터 모델 정의
-
-- `CommonMessageModel.cs`
-- `IBaseModel.cs`
-- `ICommonMessageModel.cs`
-- `IMessageModel.cs`
-
-#### **📂 Services**
-> 서비스 및 유틸리티 기능 제공
-
-- `DispatcherService.cs`
-- `IDataProviderService.cs`
-- `ILoadable.cs`
-- `ILogService.cs`
-- `IService.cs`
-- `LogService.cs`
-- `TaskService.cs`
-- `TimerService.cs`
-
-#### **📄 ParentBootstrapper.cs**
-> 애플리케이션의 **부트스트래퍼(Bootstrapper)** 역할 수행
-
-#### 개발 환경
-- **.NET Version**: `net8.0-windows`
-- **언어**: `C#`
-- **UI Framework**: `WPF`
-- **DI Container**: `Autofac`
-
----
-
-## 2. Ironwall.Dotnet.Libraries.ViewModel 소개
-
-### 2.1 개요
-`Ironwall.Dotnet.Libraries.ViewModel`은 **Caliburn.Micro MVVM 프레임워크**를 기반으로 **WPF 애플리케이션의 ViewModel 계층을 관리**하는 라이브러리입니다.  
-이 라이브러리는 **ViewModel 컴포넌트**와 **컨덕터(Conductor)** 패턴을 지원하여 **동적 UI 관리**를 쉽게 구현할 수 있도록 합니다.
-
-### 2.2 프로젝트 구성
-
-#### **📂 Models**
-> ViewModel에서 사용하는 데이터 모델 및 이벤트 아규먼트 정의
-
-- `CommonMessages.cs`
-  - 공통적으로 사용되는 메시지 모델 정의
-- `ValueNotifyEventArgs.cs`
-  - 이벤트 발생 시 데이터를 전달하는 **이벤트 아규먼트 클래스**
-
-#### **📂 Services**
-> ViewModel에서 사용할 수 있는 공통 서비스 (추후 추가 예정)
-
-#### **📂 ViewModels**
-> WPF ViewModel을 구성하는 주요 컴포넌트 및 컨덕터
-
-##### **📂 Components**
-- `BaseCustomViewModel.cs`
-- `BaseDataGridPanelViewModel.cs`
-- `BaseDataGridViewModel.cs`
-- `BasePanelViewModel.cs`
-- `BaseViewModel.cs`
-- `IBaseCustomViewModel.cs`
-- `IBasePanelViewModel.cs`
-- `IBaseViewModel.cs`
-- `ISelectableBaseViewModel.cs`
-- `SelectableBaseViewModel.cs`
-
-##### **📂 Conductors**
-- `ConductorAllViewModel.cs`
-- `ConductorOneViewModel.cs`
-- `IConductorViewModel.cs`
-
-#### 개발 환경
-- **.NET Version**: `net8.0-windows`
-- **언어**: `C#`
-- **UI Framework**: `WPF`
-- **MVVM Framework**: `Caliburn.Micro`
-
----
-
-## 3. Ironwall.Dotnet.Libraries.Utils 소개
-
-### 3.1 개요
-`Ironwall.Dotnet.Libraries.Utils`는 **WPF 애플리케이션 개발**을 위한 **바인딩 확장 기능**과 **값 변환 기능**을 제공합니다.
-
-### 3.2 프로젝트 구성
-
-#### **📂 Utils**
-> WPF 바인딩을 위한 확장 및 변환기 제공
-
-- `BindingProxys.cs`
-  - 바인딩 프록시 객체를 제공하여 **데이터 컨텍스트와의 바인딩 문제를 해결**합니다.
-- `BoolToInverseVisibleConverter.cs`
-  - `bool` 값을 **반전된 Visibility 값**으로 변환합니다.
-  - `true` → `Collapsed`, `false` → `Visible`
-- `EnumBindingSourceExtension.cs`
-  - Enum 값을 바인딩 가능하도록 변환하는 **WPF 확장 기능**을 제공합니다.
-
----
-
-
-
-## 4. Ironwall.Dotnet.Libraries.Api 소개
-
-### 4.1 개요
-`Ironwall.Dotnet.Libraries.Api`는 **API 모듈 및 서비스 로직을 관리하는 라이브러리**입니다.  
-이 라이브러리는 **Autofac 기반의 의존성 주입(DI)** 구조를 사용하며,  
-단위 테스트를 위해 `xUnit`을 사용하여 API 기능을 검증할 수 있도록 설계되었습니다.
-
-### 4.2 프로젝트 구성
-
-#### **📂 Models**
-> API의 기본 설정을 관리하는 모델
-
-- `ApiSetupModel.cs`
-  - API의 설정을 관리하는 모델 클래스
-
-#### **📂 Modules**
-> API 모듈 등록을 위한 클래스
-
-- `ApiModule.cs`
-  - `Autofac`을 활용한 **의존성 주입(DI) 컨테이너 등록**을 수행하는 모듈 클래스
-
-#### **📂 Services**
-> API의 주요 기능을 제공하는 서비스 계층
-
-- `ApiService.cs`
-  - API의 핵심 비즈니스 로직을 담당하는 서비스 클래스
-- `IApiService.cs`
-  - API 서비스 인터페이스 정의 (DI 적용을 위한 인터페이스)
-
-#### 개발 환경
-- **.NET Version**: `net8.0-windows`
-- **언어**: `C#`
-- **DI Framework**: `Autofac`
-- **테스트 프레임워크**: `xUnit`
-
----
-## v1.2.4 (2025-08-28)
-
-### 추가된 파일
-- `Ironwall.Dotnet.Libraries.Enums/EnumColorType.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Providers/PidsSymbolProvider.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/ColorHelper.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/SymbolTypeHelper.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Models/DeviceSymbolLookupModel.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/controller01.png`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/fence01.png`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PidsMarkerStyle.xaml`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/IPidsSymbolModel.cs`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`
-
-### 수정된 파일
-- `Ironwall.Dotnet.Libraries.Devices.Db/Services/DeviceDbService.cs`
-- `Ironwall.Dotnet.Libraries.Enums/EnumDeviceType.cs`
-- `Ironwall.Dotnet.Libraries.Enums/EnumEventStatus.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Db/Services/GMapDbSymbolService.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapBaseMarker.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerBaseControl.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerCustomControl.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerGeometricControl.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/SensorMarkerControl.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/CustomMarkerStyle.xaml`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/Generic.xaml`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/GeometricMarkerStyle.xaml`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/GMapViewModel.cs`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/GeometricSymbolModel.cs`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/ISymbolModel.cs`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/SymbolModel.cs`
+기존 Sensorway Framework의 코드와 포함된 외부 라이브러리의 출처를 유지합니다. 라이브러리별로 대상 프레임워크와 네이티브 실행 조건이 다를 수 있습니다.
