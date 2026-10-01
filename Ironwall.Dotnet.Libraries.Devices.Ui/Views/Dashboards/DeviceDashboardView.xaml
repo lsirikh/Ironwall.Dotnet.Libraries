@@ -82,6 +82,7 @@
 					ConsoleKey="Devices"
 					DeleteClick="OnDelete"
 					DeleteDisabledReason="{Binding DeleteBlockedReason}"
+					HelpKey="Devices.Console.Toolbar"
 					Loaded="OnToolbarLoaded"
 					RefreshClick="OnReload"
 					SearchPlaceholder="장비번호 · 이름 검색"
@@ -112,7 +113,7 @@
 								AutomationProperties.Name="조립 · 프리셋 메뉴"
 								Click="OnOpenAssemblyMenu"
 								Style="{StaticResource Console.Button}"
-								ToolTip="조립기를 열거나 프리셋으로 등록 · 관리합니다">
+								ToolTip="조립 · 프리셋">
 								<StackPanel Orientation="Horizontal">
 									<TextBlock VerticalAlignment="Center" Text="조립 · 프리셋" />
 									<md:PackIcon
@@ -127,18 +128,15 @@
 										<MenuItem
 											AutomationProperties.AutomationId="Console.Devices.Toolbar.Assembly"
 											Click="OnOpenAssembly"
-											Header="조립기"
-											ToolTip="부품을 조립해 장비를 만들거나 프리셋으로 저장합니다" />
+											Header="조립기" />
 										<MenuItem
 											AutomationProperties.AutomationId="Console.Devices.Toolbar.RegisterFromPreset"
 											Click="OnRegisterFromPreset"
-											Header="프리셋으로 등록"
-											ToolTip="프리셋을 고르고 번호 · 이름 · 접속만 넣으면 부품까지 한 번에 등록합니다" />
+											Header="프리셋으로 등록" />
 										<MenuItem
 											AutomationProperties.AutomationId="Console.Devices.Toolbar.Presets"
 											Click="OnManagePresets"
-											Header="프리셋 관리"
-											ToolTip="저장한 프리셋을 보고 이름을 바꾸거나 지웁니다" />
+											Header="프리셋 관리" />
 									</ContextMenu>
 								</Button.ContextMenu>
 							</Button>
@@ -315,20 +313,30 @@
 							Margin="0,5,0,0"
 							LastChildFill="True"
 							Visibility="{Binding CanDragToGroup, Converter={StaticResource BoolToVisibility}}">
-							<TextBlock
-								Width="44"
-								Margin="0,4,0,0"
+							<!--  그룹 칩 줄 "?"(help-callout H-2) — 끌어 넣기 · 칩 누르기 · 그룹 만들기(옛 툴팁 · 빈 줄 안내)  -->
+							<StackPanel
+								Width="62"
+								Margin="0,2,0,0"
 								VerticalAlignment="Top"
 								DockPanel.Dock="Left"
-								FontSize="12"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="그룹" />
+								Orientation="Horizontal">
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="12"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="그룹" />
+								<c:HelpTip
+									Margin="6,0,0,0"
+									VerticalAlignment="Center"
+									HelpKey="Devices.Console.Groups"
+									Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+							</StackPanel>
 							<Grid>
 								<TextBlock
 									VerticalAlignment="Center"
 									FontSize="12"
 									Foreground="{DynamicResource TextMutedBrush}"
-									Text="그룹이 없습니다 — 왼쪽 '그룹'에서 먼저 만드세요">
+									Text="그룹이 없습니다">
 									<TextBlock.Style>
 										<Style TargetType="TextBlock">
 											<Setter Property="Visibility" Value="Collapsed" />
@@ -371,7 +379,7 @@
 													Cursor="Hand"
 													Style="{x:Null}"
 													AutomationProperties.Name="{Binding Name}"
-													ToolTip="선택한 장비를 이 그룹에 넣습니다 (행 손잡이를 끌어 놓아도 됩니다)">
+													ToolTip="이 그룹에 넣기">
 													<Button.Template>
 														<ControlTemplate TargetType="Button">
 															<Border Style="{StaticResource GroupChip}">

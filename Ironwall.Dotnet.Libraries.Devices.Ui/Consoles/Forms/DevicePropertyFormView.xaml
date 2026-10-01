@@ -388,7 +388,7 @@
 											Header="{Binding HeaderText}"
 											IsLocked="{Binding IsLocked}"
 											IsTouched="{Binding IsTouched}"
-											Note="{Binding LockReason}">
+											LockReason="{Binding LockReason}">
 											<ContentControl
 												Content="{Binding}"
 												ContentTemplateSelector="{StaticResource EditorSelector}"

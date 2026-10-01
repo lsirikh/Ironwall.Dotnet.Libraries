@@ -69,7 +69,7 @@ public sealed class ConsolePrefs
 
     /// <summary>기본 위치 — <c>%LocalAppData%\Ironwall\console-prefs.json</c>.</summary>
     public static string DefaultPath
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ironwall", "console-prefs.json");
+        => Path.Combine(LocalAppDataFolder.Path, "Ironwall", "console-prefs.json");
 
     /// <summary>파일을 읽다 실패했는가(진단용). 실패해도 기본값으로 동작한다.</summary>
     public bool WasCorrupt { get; private set; }

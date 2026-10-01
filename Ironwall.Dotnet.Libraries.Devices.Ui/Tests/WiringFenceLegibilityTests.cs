@@ -81,21 +81,17 @@ public class WiringFenceLegibilityTests
     #endregion
 
     #region - Texts -
-    [Theory]
-    [InlineData("SmartController")]
-    [InlineData("Controller")]           // 옛 규칙은 "왼쪽 가지 L n · 오른쪽 가지 R n" — 이제 PIDS 제어기도 링(v0.4)
-    public void should_explain_the_fault_section_relation_from_sensor_a_when_any_controller_is_a_ring(string controllerType)
+    [Fact]
+    public void should_explain_the_fault_section_relation_from_ch1_in_the_check_help_when_every_controller_is_a_ring()
     {
-        // Arrange
-        var types = controllerType == "SmartController" ? "SmartSensor2" : "Multi";
-        var seeds = Enumerable.Range(0, 3).Select(i => new WiringSensorSeed(101 + i, i + 1, new SensorFacts(1101 + i, $"센서 {i + 1}", types, ""), new WiringPlacement(1, i + 1)));
-
+        // Arrange — 옛 규칙은 "왼쪽 가지 L n · 오른쪽 가지 R n" — 이제 모든 제어기가 링(v0.4). 설명은 확인 칸 "?"(help-callout H-2)로 옮겼다.
         // Act
-        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "CTRL", "10.0.0.1", controllerType), seeds, new[] { types }, null, new WiringFakeDialogs());
+        var help = Ironwall.Dotnet.Libraries.Utils.Consoles.HelpCatalog.Find("Devices.Wiring.Check.Fault")?.ToPlainText() ?? string.Empty;
 
         // Assert
-        Assert.Contains("Ch1(A) 쪽 끝", vm.FaultRelationText);
-        Assert.DoesNotContain("가지", vm.FaultRelationText);
+        Assert.Contains("Ch1(A) 쪽 끝", help);
+        Assert.Contains("Ch2(B) 쪽 끝", help);
+        Assert.DoesNotContain("가지", help);
     }
 
     [Fact]
