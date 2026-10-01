@@ -567,7 +567,7 @@ public sealed partial class WiringViewModel
 
     /// <summary>첫 센서가 윤형 망(기둥이면 양옆 중 하나) 위에 있는가 — [윤형 코일] 단추를 보인다.</summary>
     public bool IsMountOnRazor => MountTargets().FirstOrDefault() is var k && _board.FenceLayout.MountOf(k) is { } m
-                                  && FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels).Contains(FenceMountSpot.RazorCoil);
+                                  && FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels, _board.CategoryOf(k)).Contains(FenceMountSpot.RazorCoil);
 
     /// <summary>"망 3 · 기둥 위" · "기둥 4 · 기둥 위" · "센서 3대".</summary>
     public string MountPlaceText
@@ -576,7 +576,7 @@ public sealed partial class WiringViewModel
         {
             var targets = MountTargets();
             if (targets.Count != 1 || _board.FenceLayout.MountOf(targets[0]) is not { } m) return targets.Count > 1 ? $"센서 {targets.Count}대" : string.Empty;
-            return $"{(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} · {SensorMountSpec.SpotText(m.Spot)}";
+            return MountText(m);
         }
     }
 
@@ -690,6 +690,7 @@ public sealed partial class WiringViewModel
             nameof(MountPanelText), nameof(MountPanelLabel),
         }) NotifyOfPropertyChange(name);
         RaiseLanePane();
+        RaiseGridPicker();
     }
     #endregion
 
@@ -786,7 +787,8 @@ public sealed partial class WiringViewModel
         => _board.FenceLayout.MountOf(key) is { } m ? MountText(m) : "미배치";
 
     /// <summary>"망 3 · 윤형 코일" · "기둥 4 · 기둥 위".</summary>
-    private static string MountText(SensorMountSpec m) => $"{(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} · {SensorMountSpec.SpotText(m.Spot)}";
+    private static string MountText(SensorMountSpec m)
+        => $"{(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1}{(m.IsPanelSpot && m.Column != FenceColumn.Center ? $" · {SensorMountSpec.ColumnText(m.Column)}" : string.Empty)} · {SensorMountSpec.SpotText(m.Spot)}";
 
     /// <summary>펜스 구성 편집 한 걸음 — 되돌리기를 찍고 보드에 맡긴다. 바뀐 것이 없으면 되돌리기 장면도 걷는다.</summary>
     private bool EditFence(Func<WiringFenceLayout, WiringFenceLayout> edit, IReadOnlyList<int>? tieOrder = null)

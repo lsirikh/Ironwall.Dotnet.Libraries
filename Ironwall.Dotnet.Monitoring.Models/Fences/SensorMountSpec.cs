@@ -22,7 +22,8 @@ public sealed record SensorMountSpec(
     [property: JsonProperty("spot")] FenceMountSpot Spot,
     [property: JsonProperty("height_offset_m")] double HeightOffsetM = 0,
     [property: JsonProperty("faces_back")] bool FacesBack = false,
-    [property: JsonProperty("lane")] FenceLane Lane = FenceLane.Lower)
+    [property: JsonProperty("lane")] FenceLane Lane = FenceLane.Lower,
+    [property: JsonProperty("column")] FenceColumn Column = FenceColumn.Center)
 {
     public const double MIN_OFFSET_M = -3.0;
     public const double MAX_OFFSET_M = 3.0;
@@ -35,11 +36,18 @@ public sealed record SensorMountSpec(
     public static bool IsPost(FenceMountSpot spot) => spot is FenceMountSpot.PostTop or FenceMountSpot.PostMiddle;
 
     /// <summary>담에 다는 자리인가.</summary>
-    public static bool IsWall(FenceMountSpot spot) => spot is FenceMountSpot.WallTop or FenceMountSpot.WallFace;
+    public static bool IsWall(FenceMountSpot spot) => spot is FenceMountSpot.WallTop or FenceMountSpot.WallFace or FenceMountSpot.WallBottom;
 
     /// <summary>높이 조정을 범위 안으로(0.05m 단위).</summary>
     public static double ClampOffset(double metres)
         => double.IsFinite(metres) ? Math.Round(Math.Clamp(metres, MIN_OFFSET_M, MAX_OFFSET_M) * 20) / 20 : 0;
+
+    /// <summary>망(담) 칸 안의 자리인가 — 열(<see cref="Column"/>)이 뜻을 갖는다(기둥 자리는 늘 가운데).</summary>
+    [JsonIgnore]
+    public bool IsPanelSpot => !IsPostSpot;
+
+    /// <summary>열 이름 — 왼쪽 · 가운데 · 오른쪽.</summary>
+    public static string ColumnText(FenceColumn column) => column switch { FenceColumn.Left => "왼쪽", FenceColumn.Right => "오른쪽", _ => "가운데" };
 
     /// <summary>자리 이름(한글).</summary>
     public static string SpotText(FenceMountSpot spot) => spot switch
@@ -49,6 +57,8 @@ public sealed record SensorMountSpec(
         FenceMountSpot.WallTop => "담 위",
         FenceMountSpot.WallFace => "담 앞면",
         FenceMountSpot.PanelBottom => "망 아래",
+        FenceMountSpot.PanelTop => "망 위",
+        FenceMountSpot.WallBottom => "담 아래",
         FenceMountSpot.RazorCoil => "윤형 코일",
         _ => "기둥 위",
     };

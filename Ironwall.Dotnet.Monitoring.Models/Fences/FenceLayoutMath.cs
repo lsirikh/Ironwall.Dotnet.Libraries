@@ -6,11 +6,13 @@ using System.Linq;
 namespace Ironwall.Dotnet.Monitoring.Models.Fences;
 
 /// <summary>
-/// 펜스 위 자리의 순서 값 — 기둥 p = 칸 2p, 망 i 가운데 = 칸 2i+1(A 쪽 끝부터). 같은 칸이면 <see cref="Rank"/>(기둥 위 → 기둥 중간 · 담 위 → 담 앞면).
+/// 펜스 위 자리의 순서 값 — 기둥 p = 칸 2p, 망 i = 칸 2i+1(A 쪽 끝부터). 같은 칸이면 열(<see cref="Sub"/> · 왼쪽 −1 → 가운데 0 → 오른쪽 +1 · 9점 격자),
+/// 그다음 <see cref="Rank"/>(기둥 위 → 기둥 중간 · 담 위 → 담 앞면).
 /// </summary>
-public readonly record struct FenceSeat(int Slot, int Rank) : IComparable<FenceSeat>
+public readonly record struct FenceSeat(int Slot, int Rank, int Sub = 0) : IComparable<FenceSeat>
 {
-    public int CompareTo(FenceSeat other) => Slot != other.Slot ? Slot.CompareTo(other.Slot) : Rank.CompareTo(other.Rank);
+    public int CompareTo(FenceSeat other)
+        => Slot != other.Slot ? Slot.CompareTo(other.Slot) : Sub != other.Sub ? Sub.CompareTo(other.Sub) : Rank.CompareTo(other.Rank);
 
     /// <summary>기둥 칸인가(짝수).</summary>
     public bool IsPost => Slot % 2 == 0;
@@ -20,6 +22,12 @@ public readonly record struct FenceSeat(int Slot, int Rank) : IComparable<FenceS
     public static bool operator <=(FenceSeat a, FenceSeat b) => a.CompareTo(b) <= 0;
     public static bool operator >=(FenceSeat a, FenceSeat b) => a.CompareTo(b) >= 0;
 }
+
+/// <summary>9점 격자 칸 — 가로 Gx(기둥 4q · 망 열 4i+1…3) · 세로 Gy(하단 0 · 중단 1 · 상단 2 · 코일 3).</summary>
+public readonly record struct FenceGridCell(int Gx, int Gy);
+
+/// <summary>격자 점 하나 — 그 자리(망 · 기둥 · 코일)와 칸.</summary>
+public sealed record FenceGridPoint(SensorMountSpec Mount, FenceGridCell Cell);
 
 /// <summary>망 한 칸의 자리(m) — A 쪽 끝이 0.</summary>
 public sealed record FencePanelGeometry(int Index, double StartM, double EndM, FencePanelSpec Spec)
@@ -136,7 +144,19 @@ public static class FenceLayoutMath
     public static FenceSeat SeatOf(SensorMountSpec mount)
         => SensorMountSpec.IsPost(mount.Spot)
             ? new FenceSeat(2 * mount.Panel, mount.Spot == FenceMountSpot.PostMiddle ? 1 : 0)
-            : new FenceSeat(2 * mount.Panel + 1, mount.Spot == FenceMountSpot.WallFace ? 1 : 0);
+            : new FenceSeat(2 * mount.Panel + 1, mount.Spot == FenceMountSpot.WallFace ? 1 : 0, ColumnSign(mount.Column));
+
+    /// <summary>열의 차례 값 — 왼쪽 −1 · 가운데 0 · 오른쪽 +1.</summary>
+    public static int ColumnSign(FenceColumn column) => column switch { FenceColumn.Left => -1, FenceColumn.Right => 1, _ => 0 };
+
+    /// <summary>열이 망 칸의 어디인가(망 길이의 몫) — 기둥에서 안쪽으로 들인 왼쪽 0.2 · 가운데 0.5 · 오른쪽 0.8.</summary>
+    public static double ColumnRatio(FenceColumn column) => column switch { FenceColumn.Left => COLUMN_INSET, FenceColumn.Right => 1 - COLUMN_INSET, _ => 0.5 };
+
+    /// <summary>왼쪽 · 오른쪽 열을 기둥에서 들이는 몫(망 길이의).</summary>
+    public const double COLUMN_INSET = 0.2;
+
+    /// <summary>망 위(상단) 자리의 높이(망 높이의 몫).</summary>
+    public const double PANEL_TOP_RATIO = 0.8;
 
     /// <summary>
     /// 자리를 망 목록에 맞춘다 — 번호를 범위 안으로, 서지 않는 기둥의 자리는 옆 담(담 위 · 담 앞면)으로, 담 자리를 펜스 망에 두면 망 가운데로,
@@ -152,17 +172,19 @@ public static class FenceLayoutMath
         if (mount.IsPostSpot)
         {
             var q = Math.Clamp(mount.Panel, 0, n);
-            if (PostExists(panels!, q)) return mount with { Panel = q, HeightOffsetM = offset };
+            if (PostExists(panels!, q)) return mount with { Panel = q, HeightOffsetM = offset, Column = FenceColumn.Center };
             var panel = Math.Min(q, n - 1);
-            return mount with { Panel = panel, Spot = mount.Spot == FenceMountSpot.PostTop ? FenceMountSpot.WallTop : FenceMountSpot.WallFace, HeightOffsetM = offset };
+            return mount with { Panel = panel, Spot = mount.Spot == FenceMountSpot.PostTop ? FenceMountSpot.WallTop : FenceMountSpot.WallFace, HeightOffsetM = offset, Column = FenceColumn.Center };
         }
 
         var i = Math.Clamp(mount.Panel, 0, n - 1);
         var wall = panels![i].IsWall;
         var spot = mount.Spot switch
         {
-            FenceMountSpot.PanelCenter or FenceMountSpot.PanelBottom when wall => FenceMountSpot.WallFace,
-            FenceMountSpot.RazorCoil when wall => FenceMountSpot.WallTop,
+            FenceMountSpot.PanelCenter when wall => FenceMountSpot.WallFace,
+            FenceMountSpot.PanelBottom when wall => FenceMountSpot.WallBottom,
+            FenceMountSpot.PanelTop or FenceMountSpot.RazorCoil when wall => FenceMountSpot.WallTop,
+            FenceMountSpot.WallBottom when !wall => FenceMountSpot.PanelBottom,
             FenceMountSpot.RazorCoil when mount.Lane != FenceLane.Upper || panels![i].Style != EnumFenceStyle.ChainLinkRazor => FenceMountSpot.PanelCenter,
             FenceMountSpot.WallTop or FenceMountSpot.WallFace when !wall => FenceMountSpot.PanelCenter,
             _ => mount.Spot,
@@ -201,11 +223,12 @@ public static class FenceLayoutMath
         else
         {
             var panel = geometry.Panels[m.Panel];
-            x = panel.CenterM;
+            x = panel.StartM + panel.SpanM * ColumnRatio(m.Column);
             h = m.Spot switch
             {
                 FenceMountSpot.WallTop => panel.Spec.HeightM,
-                FenceMountSpot.PanelBottom => panel.Spec.HeightM * PANEL_BOTTOM_RATIO,
+                FenceMountSpot.PanelBottom or FenceMountSpot.WallBottom => panel.Spec.HeightM * PANEL_BOTTOM_RATIO,
+                FenceMountSpot.PanelTop => panel.Spec.HeightM * PANEL_TOP_RATIO,
                 FenceMountSpot.RazorCoil => RazorCoilCenterM(panel.Spec.HeightM),
                 _ => panel.Spec.HeightM / 2,
             };
@@ -240,8 +263,22 @@ public static class FenceLayoutMath
                 foreach (var t in members) result[t.Key] = PointOf(t.Mount, geometry).XM;
                 continue;
             }
-            if (LaneDirection(group.Key.Lane, end) < 0) members.Reverse();              // 왼쪽 → 오른쪽
             var panel = geometry.Panels[group.Key.Panel];
+            // 9점 격자 — 열을 고른 센서는 그 열 x(같은 열 여럿만 그 열의 3분의 1 안에서 나눈다). 모두 가운데면(옛 자리) 망 길이 전체를 나눈다.
+            if (members.Any(t => t.Mount.Column != FenceColumn.Center))
+            {
+                foreach (var column in members.GroupBy(t => t.Mount.Column))
+                {
+                    var same = column.ToList();
+                    if (LaneDirection(group.Key.Lane, end) < 0) same.Reverse();
+                    var centre = panel.StartM + panel.SpanM * ColumnRatio(column.Key);
+                    var width = panel.SpanM / 3;
+                    for (var k = 0; k < same.Count; k++)
+                        result[same[k].Key] = same.Count == 1 ? centre : centre - width / 2 + width * (k + 0.5) / same.Count;
+                }
+                continue;
+            }
+            if (LaneDirection(group.Key.Lane, end) < 0) members.Reverse();              // 왼쪽 → 오른쪽
             for (var k = 0; k < members.Count; k++) result[members[k].Key] = panel.StartM + panel.SpanM * (k + 0.5) / members.Count;
         }
         return result;
@@ -378,10 +415,11 @@ public static class FenceLayoutMath
     }
 
     /// <summary>사슬 위 위치 열쇠 — 아래 줄 먼저, 줄 안에서는 사슬이 가는 쪽으로(같은 칸이면 기둥 위 → 기둥 중간).</summary>
-    private static (int Lane, int Slot, int Rank) PathKey(SensorMountSpec mount, FenceControllerEnd end)
+    private static (int Lane, int Slot, int Sub, int Rank) PathKey(SensorMountSpec mount, FenceControllerEnd end)
     {
         var seat = SeatOf(mount);
-        return ((int)mount.Lane, LaneDirection(mount.Lane, end) * seat.Slot, seat.Rank);
+        var dir = LaneDirection(mount.Lane, end);
+        return ((int)mount.Lane, dir * seat.Slot, dir * seat.Sub, seat.Rank);
     }
 
     /// <summary>
@@ -502,7 +540,8 @@ public static class FenceLayoutMath
 
     /// <summary>줄 안에서 <paramref name="seat"/> 가 <paramref name="floor"/> 보다 앞서지 않는가(사슬이 가는 쪽 <paramref name="dir"/> 기준).</summary>
     internal static bool Ahead(FenceSeat seat, FenceSeat floor, int dir)
-        => dir > 0 ? seat >= floor : seat.Slot < floor.Slot || (seat.Slot == floor.Slot && seat.Rank >= floor.Rank);
+        => dir > 0 ? seat >= floor
+                   : seat.Slot < floor.Slot || (seat.Slot == floor.Slot && (seat.Sub < floor.Sub || (seat.Sub == floor.Sub && seat.Rank >= floor.Rank)));
 
     /// <summary>
     /// 사슬 이웃 사이 새 자리 — 사슬이 왼쪽 → 오른쪽(<paramref name="dir"/> = +1)이면 <see cref="SeatBetween"/> 그대로,
@@ -739,8 +778,10 @@ public static class FenceLayoutMath
     /// <summary>다른 모양 위에서 같은 뜻의 자리.</summary>
     public static FenceMountSpot Equivalent(FenceMountSpot spot, bool onWall) => (spot, onWall) switch
     {
-        (FenceMountSpot.PostTop or FenceMountSpot.RazorCoil, true) => FenceMountSpot.WallTop,
-        (FenceMountSpot.PostMiddle or FenceMountSpot.PanelCenter or FenceMountSpot.PanelBottom, true) => FenceMountSpot.WallFace,
+        (FenceMountSpot.PostTop or FenceMountSpot.RazorCoil or FenceMountSpot.PanelTop, true) => FenceMountSpot.WallTop,
+        (FenceMountSpot.PostMiddle or FenceMountSpot.PanelCenter, true) => FenceMountSpot.WallFace,
+        (FenceMountSpot.PanelBottom, true) => FenceMountSpot.WallBottom,
+        (FenceMountSpot.WallBottom, false) => FenceMountSpot.PanelBottom,
         (FenceMountSpot.WallTop, false) => FenceMountSpot.PostTop,
         (FenceMountSpot.WallFace, false) => FenceMountSpot.PanelCenter,
         _ => spot,
@@ -754,26 +795,27 @@ public static class FenceLayoutMath
     /// 윤형 코일은 기둥 사이(망 가운데)에만 있어 기둥 센서는 기둥 위에서 멈춘다. 가로 자리는 가로 끌기 · Alt+Shift+←/→ · 망 이동 단추로만 바뀐다.
     /// 윤형 코일만 위 줄이고 나머지는 아래 줄 단계다.
     /// </summary>
-    public static IReadOnlyList<FenceMountSpot> HeightStops(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels)
+    /// <param name="category">센서 갈래 — 윤형 코일 단계는 펜스센서만(<c>null</c> 이면 갈래를 묻지 않는다).</param>
+    public static IReadOnlyList<FenceMountSpot> HeightStops(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels, FenceSensorCategory? category = null)
     {
         ArgumentNullException.ThrowIfNull(mount);
         var n = panels?.Count ?? 0;
         var m = n == 0 ? mount : Normalize(mount, panels);
         if (m.IsPostSpot) return new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop };          // 맞춘 기둥 자리는 서 있는 기둥이다
-        if (n > 0 && panels![m.Panel].IsWall) return new[] { FenceMountSpot.WallFace, FenceMountSpot.WallTop };
-        return IsRazorPanel(panels, m.Panel)
-            ? new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.RazorCoil }
-            : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter };
+        if (n > 0 && panels![m.Panel].IsWall) return new[] { FenceMountSpot.WallBottom, FenceMountSpot.WallFace, FenceMountSpot.WallTop };
+        return IsRazorPanel(panels, m.Panel) && category is null or FenceSensorCategory.Fence
+            ? new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PanelTop, FenceMountSpot.RazorCoil }
+            : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PanelTop };
     }
 
     /// <summary>
     /// 지금 몇 번째 단계인가(0 = 맨 아래). 윤형 코일이 아닌 <b>위 줄</b> 센서는 모든 단계 위
     /// (= 단계 수 · 펜스 꼭대기 위)로 읽는다 — 한 단계 내리면 맨 위 단계로 온다(예전 Alt+↓ "아래 줄로"를 품는다).
     /// </summary>
-    public static int StopLevel(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels)
+    public static int StopLevel(SensorMountSpec mount, IReadOnlyList<FencePanelSpec>? panels, FenceSensorCategory? category = null)
     {
         ArgumentNullException.ThrowIfNull(mount);
-        var stops = HeightStops(mount, panels);
+        var stops = HeightStops(mount, panels, category);
         var m = panels is { Count: > 0 } ? Normalize(mount, panels) : mount;
         if (m.Lane == FenceLane.Upper && m.Spot != FenceMountSpot.RazorCoil) return stops.Count;
         var at = IndexOf(stops, m.Spot);
@@ -791,12 +833,12 @@ public static class FenceLayoutMath
     /// 단계는 같은 가로 자리 안에서만 고르므로 <b>센서는 옆으로 움직이지 않는다</b>(기둥 · 망 번호 그대로). 단계를 바꾸면 높이 조정은 0 으로.
     /// 윤형 코일로 들어가면 위 줄, 나오면 아래 줄이다.
     /// </summary>
-    public static SensorMountSpec StepStop(SensorMountSpec mount, int delta, IReadOnlyList<FencePanelSpec>? panels)
+    public static SensorMountSpec StepStop(SensorMountSpec mount, int delta, IReadOnlyList<FencePanelSpec>? panels, FenceSensorCategory? category = null)
     {
         ArgumentNullException.ThrowIfNull(mount);
         if (delta == 0 || panels is null || panels.Count == 0) return mount;
-        var stops = HeightStops(mount, panels);
-        var level = StopLevel(mount, panels);
+        var stops = HeightStops(mount, panels, category);
+        var level = StopLevel(mount, panels, category);
         var target = delta > 0 ? Math.Min(level + delta, stops.Count - 1) : Math.Max(level + delta, 0);
         if (delta > 0 ? target <= level : target >= level) return mount;
         return ToStop(mount, stops[target], panels, 0, laneFromStop: true);
@@ -841,6 +883,124 @@ public static class FenceLayoutMath
     {
         ArgumentNullException.ThrowIfNull(mount);
         return mount with { HeightOffsetM = SensorMountSpec.ClampOffset(mount.HeightOffsetM + deltaM) };
+    }
+    #endregion
+
+    #region - Grid (9점 격자 · 2026-10-01) -
+    /// <summary>망 한 칸이 차지하는 격자 칸 수(가로) — 기둥 1 + 열 3.</summary>
+    public const int GRID_PER_PANEL = 4;
+
+    /// <summary>격자의 줄 — 하단 0 · 중단 1 · 상단 2 · 윤형 코일 3. 기둥 중간 = 1 · 기둥 위 = 2.</summary>
+    public static int RowOf(FenceMountSpot spot) => spot switch
+    {
+        FenceMountSpot.PanelBottom or FenceMountSpot.WallBottom => 0,
+        FenceMountSpot.PanelTop or FenceMountSpot.WallTop or FenceMountSpot.PostTop => 2,
+        FenceMountSpot.RazorCoil => 3,
+        _ => 1,
+    };
+
+    private static int ColumnIndex(FenceColumn column) => column switch { FenceColumn.Left => 0, FenceColumn.Right => 2, _ => 1 };
+
+    /// <summary>
+    /// 자리 → 격자 칸 — 가로 Gx: 기둥 q = 4q, 망 i 의 왼쪽 · 가운데 · 오른쪽 = 4i+1 · 4i+2 · 4i+3(A 쪽 끝부터) · 세로 Gy: <see cref="RowOf"/>.
+    /// 여럿을 함께 옮길 때(Δ칸) · Ctrl+←/→(다음 점)의 공통 좌표다.
+    /// </summary>
+    public static FenceGridCell GridOf(SensorMountSpec mount)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        return mount.IsPostSpot
+            ? new FenceGridCell(GRID_PER_PANEL * mount.Panel, RowOf(mount.Spot))
+            : new FenceGridCell(GRID_PER_PANEL * mount.Panel + 1 + ColumnIndex(mount.Column), RowOf(mount.Spot));
+    }
+
+    /// <summary>
+    /// 그 갈래 센서가 놓일 수 있는 점 전부(가로 · 세로 차례) — 망(펜스 3종) 9점(열 3 × 망 아래 · 가운데 · 위), 담 9점(열 3 × 담 아래 · 앞면 · 위),
+    /// 서 있는 기둥의 기둥 중간 · 기둥 위(펜스센서는 기둥에 달지 않는다), 윤형 망의 코일 3점(펜스센서만 · 위 줄).
+    /// </summary>
+    public static IReadOnlyList<FenceGridPoint> GridPoints(IReadOnlyList<FencePanelSpec>? panels, FenceSensorCategory category)
+    {
+        var list = new List<FenceGridPoint>();
+        var n = panels?.Count ?? 0;
+        var columns = new[] { FenceColumn.Left, FenceColumn.Center, FenceColumn.Right };
+        for (var q = 0; q <= n && n > 0; q++)
+        {
+            if (category != FenceSensorCategory.Fence && PostExists(panels!, q))
+                foreach (var spot in new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop })
+                    Add(new SensorMountSpec(q, spot));
+            if (q == n) break;
+            var rows = panels![q].IsWall
+                ? new[] { FenceMountSpot.WallBottom, FenceMountSpot.WallFace, FenceMountSpot.WallTop }
+                : new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PanelTop };
+            foreach (var column in columns)
+                foreach (var spot in rows)
+                    Add(new SensorMountSpec(q, spot, Column: column));
+            if (category == FenceSensorCategory.Fence && IsRazorPanel(panels, q))
+                foreach (var column in columns)
+                    Add(new SensorMountSpec(q, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper, Column: column));
+        }
+        return list.OrderBy(p => p.Cell.Gx).ThenBy(p => p.Cell.Gy).ToList();
+
+        void Add(SensorMountSpec m) => list.Add(new FenceGridPoint(m, GridOf(m)));
+    }
+
+    /// <summary>
+    /// 센서 <paramref name="own"/> 를 칸 <paramref name="cell"/> 의 점으로 — 그 갈래가 쓸 수 없는 칸이면 <c>null</c>. 보는 쪽 · 높이 조정(같은 줄일 때만)은 센서의 것,
+    /// 줄은 코일 규칙(코일 = 위 줄 · 코일에서 나오면 아래 줄 · 그 밖은 그대로).
+    /// </summary>
+    public static SensorMountSpec? MountAt(FenceGridCell cell, SensorMountSpec own, FenceSensorCategory category, IReadOnlyList<FencePanelSpec>? panels)
+    {
+        ArgumentNullException.ThrowIfNull(own);
+        var point = GridPoints(panels, category).FirstOrDefault(p => p.Cell == cell);
+        if (point is null) return null;
+        var lane = point.Mount.Spot == FenceMountSpot.RazorCoil ? FenceLane.Upper
+                 : own.Spot == FenceMountSpot.RazorCoil ? FenceLane.Lower
+                 : own.Lane;
+        var offset = RowOf(own.Spot) == cell.Gy ? own.HeightOffsetM : 0;
+        return own with { Panel = point.Mount.Panel, Spot = point.Mount.Spot, Column = point.Mount.Column, Lane = lane, HeightOffsetM = offset };
+    }
+
+    /// <summary>
+    /// 여럿을 함께 옮기는 계획(끌기 · 2D 맞추기) — 잡은 센서가 <paramref name="target"/> 로 가고 다른 센서는 같은 Δ칸(가로 · 세로)만큼.
+    /// 그 갈래가 쓸 수 없는 칸이거나 남은 센서가 이미 있는 점(같은 줄)이면 그 센서는 <c>null</c> — 부르는 쪽은 <b>하나라도 null 이면 놓지 않는다</b>(모두 옳을 때만 옮긴다).
+    /// </summary>
+    public static IReadOnlyDictionary<int, SensorMountSpec?> PlanGridMove(
+        IReadOnlyDictionary<int, SensorMountSpec> moving, int grabbedKey, FenceGridCell target,
+        Func<int, FenceSensorCategory> categoryOf, IReadOnlyList<FencePanelSpec>? panels, IEnumerable<(FenceGridCell Cell, FenceLane Lane)>? occupied)
+    {
+        ArgumentNullException.ThrowIfNull(moving);
+        var result = new Dictionary<int, SensorMountSpec?>();
+        if (!moving.TryGetValue(grabbedKey, out var grabbed)) return result;
+        var from = GridOf(grabbed);
+        var (dx, dy) = (target.Gx - from.Gx, target.Gy - from.Gy);
+        var taken = (occupied ?? Enumerable.Empty<(FenceGridCell, FenceLane)>()).ToHashSet();
+        var claimed = new HashSet<(FenceGridCell, FenceLane)>();
+        foreach (var (key, mount) in moving)
+        {
+            var cell = GridOf(mount);
+            var next = MountAt(new FenceGridCell(cell.Gx + dx, cell.Gy + dy), mount, categoryOf?.Invoke(key) ?? FenceSensorCategory.Other, panels);
+            var spotKey = next is null ? default : (GridOf(next), next.Lane);
+            result[key] = next is null || taken.Contains(spotKey) || !claimed.Add(spotKey) ? null : next;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 다음 격자 점으로 한 칸(Ctrl+←/→) — 가로로 <paramref name="direction"/> 쪽의 가장 가까운 점, 같은 줄이 있으면 그 줄(망 오른쪽 열 다음은 다음 기둥 · 다음 망).
+    /// 같은 줄이 없으면 가장 가까운 줄. 더 갈 점이 없으면 그대로.
+    /// </summary>
+    public static SensorMountSpec StepGridX(SensorMountSpec mount, int direction, FenceSensorCategory category, IReadOnlyList<FencePanelSpec>? panels)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        if (direction == 0) return mount;
+        var from = GridOf(mount);
+        var ahead = GridPoints(panels, category).Where(p => direction > 0 ? p.Cell.Gx > from.Gx : p.Cell.Gx < from.Gx).ToList();
+        if (ahead.Count == 0) return mount;
+        var nextGx = direction > 0 ? ahead.Min(p => p.Cell.Gx) : ahead.Max(p => p.Cell.Gx);
+        var sameRow = ahead.Where(p => p.Cell.Gy == from.Gy).ToList();
+        var cell = sameRow.Count > 0
+            ? new FenceGridCell(direction > 0 ? sameRow.Min(p => p.Cell.Gx) : sameRow.Max(p => p.Cell.Gx), from.Gy)
+            : ahead.Where(p => p.Cell.Gx == nextGx).OrderBy(p => Math.Abs(p.Cell.Gy - from.Gy)).First().Cell;
+        return MountAt(cell, mount, category, panels) ?? mount;
     }
     #endregion
 }

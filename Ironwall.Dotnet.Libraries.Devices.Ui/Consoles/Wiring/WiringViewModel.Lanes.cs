@@ -211,18 +211,18 @@ public sealed partial class WiringViewModel
     #region - Height stops (위 · 아래로 올리고 내리기) -
     /// <summary>그 센서의 높이 단계(아래 → 위 · <see cref="FenceLayoutMath.HeightStops"/>). 자리가 없으면 빈 목록.</summary>
     public IReadOnlyList<FenceMountSpot> FenceHeightStops(int key)
-        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels) : Array.Empty<FenceMountSpot>();
+        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels, _board.CategoryOf(key)) : Array.Empty<FenceMountSpot>();
 
     /// <summary>그 센서가 지금 몇 번째 단계인가(위 줄 · 코일 밖이면 단계 수 = 모든 단계 위). 자리가 없으면 −1.</summary>
     public int FenceStopLevel(int key)
-        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels) : -1;
+        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels, _board.CategoryOf(key)) : -1;
 
     /// <summary>센서를 단계 <paramref name="level"/> 에 두면 생길 자리(끄는 동안 안내선 높이 — 보드는 그대로). 지금 단계면 지금 자리.</summary>
     public SensorMountSpec? FenceStopMount(int key, int level)
     {
         if (_board.FenceLayout.MountOf(key) is not { } m) return null;
-        var current = FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels);
-        return level == current ? m : FenceLayoutMath.StepStop(m, level - current, _board.FenceLayout.Panels);
+        var current = FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels, _board.CategoryOf(key));
+        return level == current ? m : FenceLayoutMath.StepStop(m, level - current, _board.FenceLayout.Panels, _board.CategoryOf(key));
     }
 
     /// <summary>끄는 동안 알약 — "높이: 윤형 코일 · 위 줄" · 여러 대면 "· 3대".</summary>
@@ -268,7 +268,7 @@ public sealed partial class WiringViewModel
         if (targets.Count == 0) return false;
         var before = targets.ToDictionary(k => k, k => layout.MountOf(k)!);
         var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
-            p => before.ContainsKey(p.Key) ? FenceLayoutMath.StepStop(p.Value, delta, l.Panels) : p.Value)));
+            p => before.ContainsKey(p.Key) ? FenceLayoutMath.StepStop(p.Value, delta, l.Panels, _board.CategoryOf(p.Key)) : p.Value)));
         if (!ok)
         {
             StatusText = delta > 0 ? "더 올릴 단계가 없습니다 — 맨 위입니다." : "더 내릴 단계가 없습니다 — 맨 아래입니다.";
