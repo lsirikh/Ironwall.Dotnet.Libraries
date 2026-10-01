@@ -203,6 +203,13 @@ public sealed class FenceWorld
     /// </summary>
     public double CoilOf(int key) => _coil.TryGetValue(key, out var r) ? r : 0;
 
+    private readonly HashSet<int> _plateAbove = new();
+
+    /// <summary>
+    /// 번호판을 몸 위에 둘 센서 — 윤형 망 위 줄의 코일 밖 센서(몸 아래에 두면 번호판이 코일 선에 걸린다). 그 밖은 몸 아래.
+    /// </summary>
+    public bool PlateAboveOf(int key) => _plateAbove.Contains(key);
+
     /// <summary>
     /// 자리 <paramref name="mount"/> 의 설치 높이(세계 단위 · 칩을 올리기 전 목표 높이) — 윤형 코일은 코일 가운데, 그 밖은 줄을 따른 높이(<see cref="FenceLayoutMath.LaneHeightM"/>).
     /// 높이 단계 끌기의 안내선이 쓴다. 펜스 구성이 아니면 0.
@@ -325,7 +332,12 @@ public sealed class FenceWorld
                 world._coil[key] = FenceStyleArt.CoilRadius(fenceH);
             }
             // 위 줄 칩은 꼭대기 위에 올라앉는다 — 몸 가운데를 목표 높이 + 반 칩(약 28)에 맞춘다
-            else lift = mount.Lane == FenceLane.Upper ? LiftFor(kind, FenceMountSpot.PanelCenter, heightM * vpm + UPPER_CHIP_HALF) : LiftFor(kind, mount.Spot, heightM * vpm);
+            else
+            {
+                lift = mount.Lane == FenceLane.Upper ? LiftFor(kind, FenceMountSpot.PanelCenter, heightM * vpm + UPPER_CHIP_HALF) : LiftFor(kind, mount.Spot, heightM * vpm);
+                var overRazor = mount.IsPostSpot ? geometry.Posts[mount.Panel].HasRazor : geometry.Panels[mount.Panel].Spec.Style == EnumFenceStyle.ChainLinkRazor;
+                if (mount.Lane == FenceLane.Upper && overRazor) world._plateAbove.Add(key);
+            }
             world._lift[key] = lift;
             top = Math.Max(top, lift + (kind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
         }

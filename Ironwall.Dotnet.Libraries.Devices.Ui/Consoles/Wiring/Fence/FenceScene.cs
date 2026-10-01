@@ -392,7 +392,11 @@ public static partial class FenceScene
     /// 윤형 코일 자리면 그 코일 반지름(세계 단위 · <see cref="FenceWorld.CoilOf"/>) — 몸은 코일 <b>안</b>(가운데 높이)에, 번호판은 코일 <b>위</b>에 둔다
     /// (번호 글자가 코일 선을 지나지 않게 · 펜스센서는 윤형과 같이 배치). 0 이면 보통 칩.
     /// </param>
-    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0)
+    /// <param name="plateAbove">
+    /// 번호판을 몸 <b>위</b>에 둔다(아래에 두면 윤형 코일 선에 걸리는 위 줄 센서 — <see cref="FenceWorld.PlateAboveOf"/>). 그 밖은 몸 <b>아래</b>(사용자: "계속 가리잖아").
+    /// </param>
+    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0,
+                                          bool plateAbove = false)
     {
         if (lift != 0) p = p with { YLift = lift };
         // 코일 위 번호판 자리 — 코일 꼭대기(그림의 코일과 같은 식: 가운데 − 세로 반지름 × 1.02)에서 틈 + 반 판만큼 위
@@ -425,9 +429,9 @@ public static partial class FenceScene
                 Box(o, q, 0, H + 24, H + 48, de / 2, zf, mw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, mw, H + 24, H + 48, zf, new Point(-11, H + 36), 4);
                 if (s.IsBackFacing) MeshOver(o, q, mw, H + 24, H + 48, zf);
-                var pl = coilPlate ?? q.P(5, H + 36, zf);
-                plate = Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 bb = new[] { q.P(-19, H + 48, de / 2), q.P(19, H + 48, de / 2), q.P(-19, H + 24, zf), q.P(19, H + 24, zf), q.P(19, H + 48, 0) };
+                var pl = coilPlate ?? PlateOff(bb, q.P(0, H + 24, zf).X, PLATE_H, 11, zoom, plateAbove, GroundY(p, zf));
+                plate = Plate(o, pl, 24, PLATE_H, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 break;
             }
             case FenceKind.Fence:
@@ -445,10 +449,10 @@ public static partial class FenceScene
                 }
                 else
                 {
-                    var l = b.P(0, 46, zf);
-                    o.Add(Text(FenceInk.FenceLabel, new Point(l.X, l.Y + 3), big, 10));
-                    Corners(o, c.X, b.P(0, 71, zf).Y, 13, 10, s);
-                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 40, zf), b.P(7, 40, zf), b.P(7, 76, 0) };
+                    // 번호판(바탕 있음)을 몸 아래로 — 철망 · 담 무늬 위에서도 읽힌다
+                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 56, zf), b.P(7, 56, zf), b.P(7, 76, 0) };
+                    var pl = PlateOff(bb, c.X, FENCE_PLATE_H, FENCE_PLATE_TEXT, zoom, plateAbove, GroundY(b, zf));
+                    plate = Plate(o, pl, 18, FENCE_PLATE_H, big, FenceInk.NumberSmall, FENCE_PLATE_TEXT, 3.5, s, zoom);
                 }
                 break;
             }
@@ -474,9 +478,10 @@ public static partial class FenceScene
                 Box(o, q, 0, 92, 99, zb0, zh, SensorBodyWidth(32, s.Yaw), FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, bw, 50, 92, zb1, new Point(0, 58), 3.2);
                 if (s.IsBackFacing) MeshOver(o, q, bw, 50, 99, zb1);
-                var pl = coilPlate ?? q.P(0, 78, zb1);
-                plate = Plate(o, pl, 20, coilPlate is null ? 18 : COIL_PLATE_H, big, FenceInk.Number, coilPlate is null ? 12.5 : COIL_PLATE_TEXT, 4.5, s, zoom);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };
+                // 번호판은 몸을 가리지 않게 몸 아래(케이블 글랜드 밑)로 — 사용자: "80100 이 글씨 아래로 내려라" · "계속 가리잖아"
+                var pl = coilPlate ?? PlateOff(bb, q.P(0, 50, zb1).X, PLATE_H, COIL_PLATE_TEXT, zoom, plateAbove, GroundY(p, zb1));
+                plate = Plate(o, pl, 20, PLATE_H, big, FenceInk.Number, COIL_PLATE_TEXT, 4, s, zoom);
                 break;
             }
         }
@@ -500,6 +505,34 @@ public static partial class FenceScene
         if (selected) o.Add(RectShape(FenceInk.Select, hit, 8));
         return new FenceChipPicture(Legible(o, zoom), hit);
     }
+
+    /// <summary>몸 아래 번호판 — 판 높이(스마트 · 복합) · 펜스센서 판 높이 · 글자 크기 · 몸과의 틈(세계 단위).</summary>
+    public const double PLATE_H = 16;
+    public const double FENCE_PLATE_H = 13;
+    public const double FENCE_PLATE_TEXT = 9.5;
+    public const double PLATE_GAP = 3;
+
+    /// <summary>땅 번호 줄의 머리("번호")와 첫 번호 사이 틈(세계 단위).</summary>
+    public const double NUMBER_CAPTION_GAP = 10;
+
+    /// <summary>
+    /// 번호판 가운데 — 몸(<paramref name="body"/> 점들) <b>아래</b>로 틈만큼 띄운다(몸과 겹치지 않는다). 아래가 땅(<paramref name="groundY"/>) 밑으로 빠지거나
+    /// <paramref name="above"/>(아래에 두면 윤형 코일에 걸린다)이면 몸 <b>위</b>로. 판 높이는 작은 배율에서 커지는 몫(<see cref="Plate"/>)까지 센다.
+    /// </summary>
+    public static Point PlateOff(IReadOnlyList<Point> body, double centreX, double plateH, double textSize, double zoom, bool above, double groundY)
+    {
+        var f = Math.Max(1, MIN_TEXT / (textSize * SafeZoom(zoom)));
+        var h = plateH * f;
+        var bottom = body.Max(pt => pt.Y);
+        var top = body.Min(pt => pt.Y);
+        var below = bottom + PLATE_GAP + h / 2;
+        return above || below + h / 2 > groundY
+            ? new Point(centreX, top - PLATE_GAP - h / 2)
+            : new Point(centreX, below);
+    }
+
+    /// <summary>칩 좌표의 땅 선(그 깊이) — 올린 칩(YLift)도 세계 높이 0 이 땅이다.</summary>
+    private static double GroundY(FenceProjector p, double z) => p.P(0, -p.YLift, z).Y;
 
     /// <summary>코일 위 번호판 — 판 높이 · 글자 크기 · 코일 꼭대기와의 틈(세계 단위 · 가시 끝보다 멀리).</summary>
     public const double COIL_PLATE_H = 16;

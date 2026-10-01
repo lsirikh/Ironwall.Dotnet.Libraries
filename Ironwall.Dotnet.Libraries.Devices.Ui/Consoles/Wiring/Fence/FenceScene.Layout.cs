@@ -57,8 +57,12 @@ public static partial class FenceScene
             var q = p.P(world.X[key], 0, 20);
             o.Add(Text(FenceInk.PostNumber, new Point(q.X, q.Y + 4), s.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), 10.5));
         }
+        // "번호" 머리 — 첫 번호 글자의 왼쪽 끝에서 틈(10)만큼 더 왼쪽에 끝나게(재검토: "번호80096" 이 붙어 보였다)
         var axis = p.P(x0 - 16 + 5 * u, 0, 20);
-        o.Add(Text(FenceInk.Axis, new Point(axis.X, axis.Y + 4), "번호", 10, FenceTextAnchor.End));
+        var first = world.Seq.Where(world.X.ContainsKey).Select(k => (X: p.P(world.X[k], 0, 20).X, Text: world.Sensors.TryGetValue(k, out var fs) ? fs.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty))
+                             .OrderBy(t => t.X).FirstOrDefault();
+        var axisRight = first.Text is { Length: > 0 } ? Math.Min(axis.X, first.X - EstimateWidth(first.Text, 10.5) / 2 - NUMBER_CAPTION_GAP) : axis.X;
+        o.Add(Text(FenceInk.Axis, new Point(axisRight, axis.Y + 4), "번호", 10, FenceTextAnchor.End));
 
         if (showRange)
             foreach (var (key, x) in world.X)

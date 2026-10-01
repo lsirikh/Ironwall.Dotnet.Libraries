@@ -386,7 +386,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!_sensorChips.TryGetValue(unit.Key, out chip!))
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
-                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key));
+                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key),
+                                                 scene.PlateAboveOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
                 placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
