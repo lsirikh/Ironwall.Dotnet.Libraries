@@ -672,6 +672,7 @@ public static partial class FenceScene
     {
         var f = Math.Max(1, MIN_TEXT / (size * SafeZoom(zoom)));
         w *= f; h *= f; size *= f; baseline *= f;
+        w = Math.Max(w, EstimateWidth(big, size) + 6 * f);          // 세 자리 센서 번호(101 …)도 판 안에
         o.Add(RectShape(FenceInk.Plate, new Rect(at.X - w / 2, at.Y - h / 2, w, h), 2.5 * f));
         o.Add(Text(numberInk, new Point(at.X, at.Y + baseline), big, size));
         Corners(o, at.X, at.Y, w, h, s);

@@ -367,7 +367,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
                 var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
                 var mount = vm.FenceLayout.MountOf(unit.Key) is { } m ? $", {(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} {SensorMountSpec.SpotText(m.Spot)}" : string.Empty;
-                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, {s.Big(shape)}{port}{facing}{mount}");
+                AutomationProperties.SetName(chip, $"{s.Name}, 장비번호 {s.Number}, 위치 {s.Order}{port}{facing}{mount}");
+                ToolTipService.SetToolTip(chip, $"{s.Name} · 번호 {s.Number} · 사슬 위치 {s.Order}{(s.PortText.Length > 0 ? $" · {s.PortText}" : string.Empty)}");
                 AutomationProperties.SetItemStatus(chip, s.HasFacing ? (s.IsBackFacing ? "방향 뒤" : "방향 앞") : string.Empty);
             }
             order.Add(chip);

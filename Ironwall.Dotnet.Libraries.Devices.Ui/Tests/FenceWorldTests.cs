@@ -186,7 +186,7 @@ public class FenceWorldTests
         Assert.Contains(picture.Shapes, x => x.Ink == FenceInk.Proposal);
         Assert.Contains(picture.Shapes, x => x.Ink == FenceInk.Draft);
         Assert.Contains(picture.Shapes, x => x.Ink == FenceInk.Select);
-        Assert.Contains(picture.Shapes, x => x.Ink == FenceInk.Number && x.Text == "3");
+        Assert.Contains(picture.Shapes, x => x.Ink == FenceInk.Number && x.Text == "101");                 // 칩은 센서 번호(사슬 위치 3 이 아니라)
         Assert.True(picture.Hit.Width > 20 && picture.Hit.Height > 40);
     }
 

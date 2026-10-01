@@ -80,10 +80,13 @@ public sealed record FenceSensor(
     /// <summary>뒤(펜스 내부)를 보는 기둥 센서 — 기둥 반대쪽에 그리고 칩에 "뒤" 표지.</summary>
     public bool IsBackFacing => HasFacing && Facing == WiringFacing.Back;
 
-    /// <summary>칩의 큰 글자 — 링 "3" · 가지 "L2"/"R1" · 한 줄 "4".</summary>
+    /// <summary>
+    /// 칩의 큰 글자 — <b>센서 번호</b>(장비번호 · 개념도 · 표와 같은 수 · 재검토 렌더). 사슬 위치 · Ch1/Ch2 에서 센 수는 툴팁 · 속성 칸에 남는다.
+    /// 옛 가지 모양만 "L2"/"R1".
+    /// </summary>
     public string Big(WiringShape shape) => shape == WiringShape.TwoBranch
         ? $"{(Line == WiringSpec.LINE_PRIMARY ? "L" : "R")}{Order}"
-        : $"{Order}";
+        : $"{Number}";
 
     /// <summary>링의 양 포트 번호 "A3 · B32". 링이 아니면 빈 글자.</summary>
     public string PortText => OppositeOrder is { } b ? $"A{Order} · B{b}" : string.Empty;
