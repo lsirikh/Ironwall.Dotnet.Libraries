@@ -85,7 +85,10 @@ public sealed class ControllerPingMonitor : IDisposable
         if (string.IsNullOrWhiteSpace(_host) || IsRunning) return;
         var cts = new CancellationTokenSource();
         _cts = cts;
-        _ = Task.Run(() => LoopAsync(cts.Token));
+        // 토큰은 지금 꺼낸다 — 람다 안에서 cts.Token 을 읽으면, 작업이 시작되기 전에 Stop 이 cts 를 버렸을 때
+        // ObjectDisposedException 이 관찰되지 않은 Task 예외로 남는다(시험 크래시 기록이 잡았다).
+        var token = cts.Token;
+        _ = Task.Run(() => LoopAsync(token), token);
     }
 
     /// <summary>멈춤 — 비행 중인 ping 도 취소한다.</summary>

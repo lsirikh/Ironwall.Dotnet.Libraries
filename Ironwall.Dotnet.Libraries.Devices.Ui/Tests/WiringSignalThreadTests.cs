@@ -74,6 +74,36 @@ public class WiringSignalThreadTests
     }
 
     [Fact]
+    public async Task should_leave_no_unobserved_task_exception_when_the_monitor_is_stopped_right_after_it_starts()
+    {
+        // Arrange — 시험 크래시 기록이 잡은 것: Start 직후 Stop 이 cts 를 버리면 루프 람다의 cts.Token 이 ObjectDisposedException
+        var seen = 0;
+        void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            if (e.Exception.ToString().Contains(nameof(ControllerPingMonitor))) Interlocked.Increment(ref seen);
+        }
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            // Act
+            for (var i = 0; i < 300; i++)
+            {
+                var monitor = new ControllerPingMonitor(new FakePing(), "10.99.7.1");
+                monitor.Start();
+                monitor.Stop();
+            }
+            await Task.Delay(50);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+        finally { TaskScheduler.UnobservedTaskException -= OnUnobserved; }
+
+        // Assert
+        Assert.Equal(0, seen);
+    }
+
+    [Fact]
     public void should_raise_signal_notifications_only_on_the_dispatcher_thread_when_samples_arrive_on_workers()
     {
         // Arrange — 디스패처가 있는 STA 에서 창을 만든다(제품: 입구가 UI 스레드에서 만든다)
