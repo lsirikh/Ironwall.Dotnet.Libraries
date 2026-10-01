@@ -266,7 +266,7 @@
 					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 = 다른 망으로 · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
+					Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 · Alt+Shift+← → = 다른 망으로 · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
 					TextWrapping="Wrap" />
 			</Border>
 		</Grid>
