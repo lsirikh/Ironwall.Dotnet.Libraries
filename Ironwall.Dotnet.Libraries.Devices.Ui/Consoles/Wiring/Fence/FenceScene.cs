@@ -33,13 +33,20 @@ public enum FenceInk
     BrickSide, BrickTop,
     // 작은 배율의 윤형 철조망 — 코일 대신 톱니 띠 하나(fence-wiring-editor 검토 V2)
     RazorBand,
+    // 펜스 모양 5종(fence-style-art) — 윤형 코일 · 가시 · 철선, 디자인펜스 철선 · V 접힘 · 클램프, 벽돌 줄눈 · 벽돌 색 셋, 미장 반점
+    RazorCoil, RazorBarb, RazorStrand, DesignWire, DesignFold, DesignClamp,
+    BrickMortarFace, BrickTone0, BrickTone1, BrickTone2, ConcreteSpeckleDark, ConcreteSpeckleLight,
     // 두 줄 개념도(fence-wiring-editor v0.3 FR-20) — Ch1 실선 · Ch2 점선 · 펜스 격자 · 줄 칩 · 눈금 · VBus
     ConceptCh1, ConceptCh2, ConceptCh2Dash, ConceptFence, ConceptMesh, ConceptPost, ConceptGround, ConceptTick, ConceptTickText,
     ConceptLabelLower, ConceptLabelUpper, ConceptChipLower, ConceptChipUpper, ConceptChipTextLower, ConceptChipTextUpper,
     ConceptVbus, ConceptVbusText, ConceptTarget,
 }
 
-public enum FenceShapeKind { Polygon, Polyline, Line, Ellipse, Rect, Text, Pill }
+/// <summary>
+/// 그림 갈래. <see cref="Strokes"/> · <see cref="Patches"/> 는 도형 여럿을 그림 하나에 묶는다(<see cref="FenceShape.Figures"/> = 도형마다 점 수) —
+/// 철망 · 코일 · 벽돌처럼 조각이 많은 무늬를 한 기하로 그려 망 200칸에서도 가볍게(fence-style-art).
+/// </summary>
+public enum FenceShapeKind { Polygon, Polyline, Line, Ellipse, Rect, Text, Pill, Strokes, Patches }
 
 public enum FenceTextAnchor { Start, Middle, End }
 
@@ -57,7 +64,9 @@ public sealed record FenceShape(
     double FontSize = 0,
     FenceTextAnchor Anchor = FenceTextAnchor.Middle,
     double Opacity = 1,
-    string? Color = null);
+    string? Color = null,
+    int[]? Figures = null,
+    bool Closed = false);
 
 /// <summary>칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표).</summary>
 public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);

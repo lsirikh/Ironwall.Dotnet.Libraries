@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 
@@ -125,6 +126,19 @@ public sealed class FenceRenderer
         FenceInk.RubberBand => new(B(Color.FromArgb(0x1A, Primary.R, Primary.G, Primary.B)), B(Primary), 1, Dash: new[] { 5.0, 3.0 }),
         FenceInk.Razor => new(null, B(custom ?? RazorColor), 1.2),
         FenceInk.RazorBand => new(B(custom ?? RazorColor), null, 0),
+        // ── 펜스 모양 5종(fence-style-art) — 재질 토큰(FenceRazor · FenceDesign · FenceBrick · FenceBrickMortar · FenceConcrete)에서 매번 푼다 ──
+        FenceInk.RazorCoil => new(null, B(custom ?? RazorColor), 0.7),
+        FenceInk.RazorBarb => new(null, B(Mix(custom ?? RazorColor, Tx1, 0.35)), 0.9, Cap: PenLineCap.Round),
+        FenceInk.RazorStrand => new(null, B(Mix(RazorColor, Divider, 0.5)), 0.8),
+        FenceInk.DesignWire => new(null, B(custom ?? Design), 0.9),
+        FenceInk.DesignFold => new(null, B(Mix(custom ?? Design, Colors.White, 0.35)), 1.4, Cap: PenLineCap.Round),
+        FenceInk.DesignClamp => new(B(Mix(custom ?? Design, Colors.Black, 0.3)), null, 0),
+        FenceInk.BrickMortarFace => new(B(Mortar), null, 0),
+        FenceInk.BrickTone0 => new(B(custom ?? Brick), null, 0),
+        FenceInk.BrickTone1 => new(B(Mix(custom ?? Brick, Colors.Black, 0.12)), null, 0),
+        FenceInk.BrickTone2 => new(B(Mix(custom ?? Brick, Colors.White, 0.12)), null, 0),
+        FenceInk.ConcreteSpeckleDark => new(B(Mix(custom ?? Concrete, Colors.Black, 0.22)), null, 0),
+        FenceInk.ConcreteSpeckleLight => new(B(Mix(custom ?? Concrete, Colors.White, 0.28)), null, 0),
         // ── 두 줄 개념도(FR-20) — Ch1 = 정보 계열 실선 · Ch2 = 앰버 계열(실선 / 점선 {6,4}) · 펜스 격자는 디자인펜스 초록 토큰 ──
         FenceInk.ConceptCh1 => new(null, B(Info), 2.2, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
         FenceInk.ConceptCh2 => new(null, B(Accent), 2.2, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
@@ -339,11 +353,46 @@ public sealed class FenceRenderer
             case FenceShapeKind.Pill:
                 DrawPill(dc, shape, style, pen);
                 break;
+            case FenceShapeKind.Strokes:
+                if (pen is not null && shape.Points.Length > 1) dc.DrawGeometry(null, pen, FiguresGeometry(shape));
+                break;
+            case FenceShapeKind.Patches:
+                if (shape.Points.Length > 2) dc.DrawGeometry(style.Fill, pen, FiguresGeometry(shape));
+                break;
         }
 
         if (clipped) dc.Pop();
         if (faded) dc.Pop();
     }
+
+    /// <summary>
+    /// 묶음 그림(<see cref="FenceShapeKind.Strokes"/> · <see cref="FenceShapeKind.Patches"/>)의 기하 — 그림 값마다 한 번 만들어 얼려 둔다(약한 참조 표).
+    /// 장면이 다시 세워지면(망 · 줌이 바뀜) 새 그림 값이라 새로 만들고, 테마만 바뀌면 같은 기하에 새 토큰 색만 칠한다.
+    /// </summary>
+    private static readonly ConditionalWeakTable<FenceShape, StreamGeometry> FiguresCache = new();
+
+    internal static StreamGeometry FiguresGeometry(FenceShape shape)
+        => FiguresCache.GetValue(shape, static s =>
+        {
+            var g = new StreamGeometry();
+            var filled = s.Kind == FenceShapeKind.Patches;
+            using (var ctx = g.Open())
+            {
+                var counts = s.Figures ?? new[] { s.Points.Length };
+                var at = 0;
+                foreach (var count in counts)
+                {
+                    if (count >= 2 && at + count <= s.Points.Length)
+                    {
+                        ctx.BeginFigure(s.Points[at], filled, s.Closed);
+                        for (var i = 1; i < count; i++) ctx.LineTo(s.Points[at + i], true, false);
+                    }
+                    at += count;
+                }
+            }
+            g.Freeze();
+            return g;
+        });
 
     private static StreamGeometry PolyGeometry(IReadOnlyList<Point> points, bool closed, bool filled)
     {

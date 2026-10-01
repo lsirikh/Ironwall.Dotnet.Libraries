@@ -71,6 +71,6 @@ public class FenceLegibilityReviewTests
 
         // Assert
         Assert.Equal(band, shapes.Any(s => s.Ink == FenceInk.RazorBand));
-        Assert.Equal(!band, shapes.Any(s => s.Ink == FenceInk.Razor));
+        Assert.Equal(!band, shapes.Any(s => s.Ink == FenceInk.RazorCoil));
     }
 }

@@ -868,8 +868,10 @@ public class WiringFenceViewTests
 
         _out.WriteLine($"스냅숏: {result.path} · 색 {result.colors}가지");
         Assert.True(result.colors > 20);
-        foreach (var ink in new[] { FenceInk.Mesh, FenceInk.Razor, FenceInk.BrickFront, FenceInk.ConcreteFront, FenceInk.ConcreteSeam, FenceInk.DesignFace, FenceInk.DesignRail })
+        // 모양 5종(fence-style-art): 철망 · 윤형(Y 받침 + 코일 — 작은 배율이면 톱니 띠) · 벽돌담 · 시멘트담(이음매) · 디자인펜스(용접망 + V 접힘)
+        foreach (var ink in new[] { FenceInk.Mesh, FenceInk.RazorArm, FenceInk.BrickFront, FenceInk.ConcreteFront, FenceInk.ConcreteSeam, FenceInk.DesignWire, FenceInk.DesignFold })
             Assert.Contains(ink, result.inks);
+        Assert.True(result.inks.Contains(FenceInk.RazorCoil) || result.inks.Contains(FenceInk.RazorBand));
         Assert.Equal(new[] { true, true, true, false, true, true }, result.Posts);   // 벽돌 | 시멘트 사이 기둥은 서지 않는다
     }
 

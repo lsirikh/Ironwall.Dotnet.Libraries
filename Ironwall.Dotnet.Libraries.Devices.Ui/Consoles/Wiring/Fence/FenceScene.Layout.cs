@@ -16,6 +16,9 @@ public static partial class FenceScene
     /// <summary>담의 두께(세계 깊이).</summary>
     public const double WALL_DEPTH = 10;
 
+    /// <summary>철망 · 윤형 기둥 폭(세계 단위) — 가는 관.</summary>
+    public const double CHAIN_POST_W = 6;
+
     /// <summary>윤형 코일 반지름(세계 단위).</summary>
     public const double RAZOR_R = 9;
 
@@ -87,9 +90,12 @@ public static partial class FenceScene
                                                              .Any(i => geometry.Panels[i].Spec.Style == EnumFenceStyle.DesignFence);
             var color = new[] { post.Index - 1, post.Index }.Where(i => i >= 0 && i < geometry.Panels.Count)
                                                             .Select(i => geometry.Panels[i].Spec).FirstOrDefault(s => !s.IsWall && s.Style == EnumFenceStyle.DesignFence)?.Color;
-            BoxC(o, p, x, 0, h, -p.De / 2, p.De / 2, PW, design ? FenceInk.DesignPost : FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop, design ? color : null);
-            BoxC(o, p, x, h, h + 5, -p.De / 2 - 1.5 * p.K, p.De / 2 + 1.5 * p.K, PW + 4, FenceInk.CapFront, FenceInk.CapSide, FenceInk.CapTop, null);
-            if (post.HasRazor) o.Add(Seg(FenceInk.RazorArm, p.P(x, h + 5, 0), p.P(x, h + 2 * RAZOR_R + 10, 0)));
+            // 철망 기둥은 가는 관(사진), 디자인펜스 기둥은 각기둥 + 클램프
+            var width = design ? PW : CHAIN_POST_W;
+            BoxC(o, p, x, 0, h, -p.De / 2, p.De / 2, width, design ? FenceInk.DesignPost : FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop, design ? color : null);
+            BoxC(o, p, x, h, h + 5, -p.De / 2 - 1.5 * p.K, p.De / 2 + 1.5 * p.K, width + 3, FenceInk.CapFront, FenceInk.CapSide, FenceInk.CapTop, null);
+            if (design) o.AddRange(FenceStyleArt.DesignClamps(p, x, h, width, color));
+            if (post.HasRazor) o.AddRange(FenceStyleArt.YArms(p, x, h + 5).Shapes);              // Y 받침(두 팔이 바깥으로)
         }
 
         if (showCables) LaneCables(o, world, p);
@@ -132,17 +138,23 @@ public static partial class FenceScene
                 BoxC(o, p, (xa + xb) / 2, h, h + 7, -wd / 2 - 2, wd / 2 + 2, xb - xa + 4, FenceInk.WallCap, FenceInk.WallCap, FenceInk.WallCap, null);
                 if (spec.Style == EnumFenceStyle.Concrete)
                 {
+                    // 미장 결(결정적 반점 · 망 번호 씨) + 옅은 이음매
+                    o.AddRange(FenceStyleArt.ConcreteStucco(p, xa, xb, h, wd / 2, zoom, panel.Index, color));
                     var cx = (xa + xb) / 2;
-                    o.Add(Seg(FenceInk.ConcreteSeam, p.P(cx, 2, wd / 2), p.P(cx, h - 2, wd / 2)));
-                    o.Add(Seg(FenceInk.ConcreteSeam, p.P(xa + 1, 2, wd / 2), p.P(xa + 1, h - 2, wd / 2)));
+                    o.Add(Seg(FenceInk.ConcreteSeam, p.P(cx, 2, wd / 2), p.P(cx, h - 2, wd / 2), 0.55));
+                    o.Add(Seg(FenceInk.ConcreteSeam, p.P(xa + 1, 2, wd / 2), p.P(xa + 1, h - 2, wd / 2), 0.55));
+                }
+                else
+                {
+                    // 벽돌 쌓기(엇갈림 · 줄눈 · 색 흔들림) — 작은 배율에서는 바탕 무늬만
+                    o.AddRange(FenceStyleArt.BrickCourses(p, xa, xb, h, wd / 2, zoom, panel.Index, color));
                 }
                 break;
             }
             case EnumFenceStyle.DesignFence:
             {
-                o.Add(new FenceShape(FenceShapeKind.Polygon, FenceInk.DesignFace, new[] { p.P(a, 6, 0), p.P(b, 6, 0), p.P(b, h - 6, 0), p.P(a, h - 6, 0) }, Color: color));
-                foreach (var y in new[] { 16.0, h - 16 })
-                    o.Add(new FenceShape(FenceShapeKind.Line, FenceInk.DesignRail, new[] { p.P(a, y, 0), p.P(b, y, 0) }, Color: color));
+                // 3D 용접망 — 세로 철선 + 가로로 앞으로 꺾인 V 접힘(사진: 초록 용접망 · 각기둥 · 클램프)
+                o.AddRange(FenceStyleArt.DesignMesh(p, a, b, h, color));
                 break;
             }
             default:
@@ -157,10 +169,8 @@ public static partial class FenceScene
                 }
                 else if (spec.Style == EnumFenceStyle.ChainLinkRazor)
                 {
-                    // 원형 코일 — 망 위로 겹쳐 굴린다(작은 배율에서는 드문드문 · 망 500칸에서도 가볍게 · NFR-02).
-                    var step = RAZOR_R * 1.8 * Math.Max(1, 0.6 / Math.Max(0.05, zoom));
-                    for (var x = xa + RAZOR_R; x <= xb - RAZOR_R * 0.5 + 1e-6; x += step)
-                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Razor, new[] { p.P(x, h + RAZOR_R + 2, 0) }, RAZOR_R, RAZOR_R * (0.55 + 0.45 * (1 - p.K))));
+                    // 콘서티나 코일 — Y 받침 안에 얹힌 겹친 고리 + 가시 + 팔 끝 철선(사진: 윤형철조망). 고리는 칸마다 그림 하나로 묶는다(NFR-02).
+                    o.AddRange(FenceStyleArt.RazorCoil(p, xa, xb, h + 5));
                 }
                 break;
             }
