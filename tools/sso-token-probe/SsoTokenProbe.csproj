@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    P1 스파이크 — SSO 앱 토큰의 실제 클레임을 읽어 계약을 실측한다(버림 코드).
+    서버에 아무것도 쓰지 않는다: 에이전트 파이프로 토큰을 받아 열어보기만 한다.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>sso-token-probe</AssemblyName>
+    <RootNamespace>SsoTokenProbe</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Sso.Client.Sdk" Version="3.10.6" />
+  </ItemGroup>
+
+</Project>
