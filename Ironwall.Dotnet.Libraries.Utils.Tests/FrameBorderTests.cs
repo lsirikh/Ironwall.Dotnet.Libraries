@@ -28,13 +28,33 @@ public class FrameBorderTests
     }
 
     [Fact]
-    public void should_clip_the_child_to_the_inner_radius_when_a_radius_is_given()
+    public void should_clip_the_child_to_the_stroke_center_path_when_a_radius_is_given()
     {
         var clip = (RectangleGeometry)FrameBorderGeometry.ChildClip(new Size(398, 198), 10, 1, new Thickness(0))!;
 
-        Assert.Equal(new Rect(0, 0, 398, 198), clip.Rect);
-        Assert.Equal(9.5, clip.RadiusX);   // 테두리 안쪽선(10 − 0.5)
+        // 틀 400×200 의 선 중심 경로(0.5, 0.5, 399, 199 · 반지름 10)를 자식 좌표(틀에서 1, 1)로 옮긴 것 — 자식 가장자리가 테두리 밑에 든다.
+        Assert.Equal(new Rect(-0.5, -0.5, 399, 199), clip.Rect);
+        Assert.Equal(10, clip.RadiusX);
     }
+
+    [Fact]
+    public void should_reach_the_stroke_center_path_through_the_padding_when_the_frame_has_padding()
+    {
+        var clip = (RectangleGeometry)FrameBorderGeometry.ChildClip(new Size(390, 190), 10, 1, new Thickness(4, 2, 4, 2))!;
+
+        Assert.Equal(new Rect(-4.5, -2.5, 399, 195), clip.Rect);
+        Assert.Equal(10, clip.RadiusX);
+    }
+
+    [Theory]
+    [InlineData(1, 1.0, 1)]
+    [InlineData(1, 1.25, 0.8)]           // 125% — 1 DIU 선은 1 px(0.8 DIU)
+    [InlineData(1, 1.5, 4.0 / 3.0)]      // 150% — 1.5 px 는 2 px 로(Border 가 자식을 놓는 자리와 같다)
+    [InlineData(1, 1.75, 8.0 / 7.0)]
+    [InlineData(3, 1.25, 3.2)]           // 3.75 px → 4 px
+    [InlineData(3, 1.5, 8.0 / 3.0)]      // 4.5 px → 4 px(WPF 와 같은 짝수 반올림)
+    public void should_round_the_thickness_like_layout_rounding_when_the_monitor_is_scaled(double value, double scale, double expected)
+        => Assert.Equal(expected, FrameBorderGeometry.RoundToDevice(value, scale), 9);
 
     [Theory]
     [InlineData(6, 1, 6, 0)]       // 안쪽 여백이 반지름을 다 먹었다 — 자를 필요 없다
@@ -137,6 +157,49 @@ public class FrameBorderTests
 
         Assert.True(bottom.Item1.R > 200 && bottom.Item1.G < 60, $"아래 선 {bottom.Item1}");
         Assert.Equal(Colors.White, bottom.Item2);
+    }
+
+    [Theory]
+    [InlineData(96)]
+    [InlineData(120)]
+    [InlineData(144)]
+    [InlineData(168)]
+    public void should_not_let_the_background_show_between_the_stroke_and_a_filling_child_when_the_monitor_is_scaled(double dpi)
+    {
+        // 바탕(흰색)만 초록 성분이 있다 — 빨강 선 · 파랑 자식 · 검정 바깥은 0. 틀 안 어느 픽셀에도 초록이 비치면 바탕이 샌 것이다.
+        // (150% 에서 선은 1 DIU = 1.5 px 인데 자식은 반올림된 2 px 자리에 놓여 그 사이 반 픽셀 줄로 바탕이 비쳤다 · 모서리 호를 따라
+        //  자식 가장자리와 선 안쪽 가장자리가 반씩 칠해 바탕이 비쳤다 — 2026-10-01 카메라 영상 팝업 "창 가장자리 마감")
+        var worst = OnSta(() =>
+        {
+            var scale = dpi / 96;
+            var frame = new FrameBorder
+            {
+                Width = 200, Height = 120, BorderBrush = Brushes.Red, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10), Background = Brushes.White, UseLayoutRounding = true,
+                Child = new Border { Background = Brushes.Blue },
+            };
+            var root = new Grid { Width = 240, Height = 160, Background = Brushes.Black, Children = { frame } };
+            root.Measure(new Size(240, 160)); root.Arrange(new Rect(0, 0, 240, 160));
+            VisualTreeHelper.SetRootDpi(root, new DpiScale(scale, scale));
+            root.UpdateLayout();
+            Assert.Equal(scale, VisualTreeHelper.GetDpi(frame.Child).DpiScaleX);
+
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(240 * scale), (int)Math.Ceiling(160 * scale), dpi, dpi, PixelFormats.Pbgra32);
+            bitmap.Render(root);
+            var box = frame.TransformToAncestor(root).TransformBounds(new Rect(frame.RenderSize));
+            var (x0, y0) = ((int)Math.Floor(box.Left * scale), (int)Math.Floor(box.Top * scale));
+            var (x1, y1) = ((int)Math.Ceiling(box.Right * scale), (int)Math.Ceiling(box.Bottom * scale));
+            var stride = bitmap.PixelWidth * 4;
+            var pixels = new byte[stride * bitmap.PixelHeight];
+            bitmap.CopyPixels(pixels, stride, 0);
+            var (green, at) = (0, new Point());
+            for (var y = y0; y < y1; y++)
+                for (var x = x0; x < x1; x++)
+                    if (pixels[(y * stride) + (x * 4) + 1] is var g && g > green) (green, at) = (g, new Point(x, y));
+            return (green, at);
+        });
+
+        Assert.True(worst.green <= 16, $"{dpi} DPI: 틀 바탕(흰색)이 {worst.at} 에서 초록 {worst.green} 만큼 비친다");
     }
 
     #region - Fixtures -

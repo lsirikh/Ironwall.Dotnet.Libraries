@@ -48,7 +48,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <Grid Grid.Row="0">
-                                <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="9,9,0,0"/>
+                                <Border Background="{DynamicResource PrimaryBrush}"/>
                                 <Thumb x:Name="PART_HeaderDrag" Cursor="SizeAll" Focusable="False" AutomationProperties.AutomationId="GMaps.SymbolPalette.Header" AutomationProperties.Name="아이콘 등록 창 이동">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">

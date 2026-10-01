@@ -1761,6 +1761,9 @@
 							<Setter Property="Canvas.Left" Value="{Binding CanvasLeft}" />
 							<Setter Property="Canvas.Top" Value="{Binding CanvasTop}" />
 								<Setter Property="Panel.ZIndex" Value="{Binding ZIndex}" />
+							<!--  CanvasLeft/Top 은 위경도에서 온 소수다 — 항목 자리를 픽셀에 맞춰야 팝업의 1px 테두리가 한쪽만 두 줄로 번지지 않는다
+							      (오른쪽 테두리가 영상 쪽으로 번져 "검은 세로 줄 · 오른쪽이 더 두꺼운 테두리"로 보였다, 2026-10-01)  -->
+							<Setter Property="UseLayoutRounding" Value="True" />
 						</Style>
 					</ItemsControl.ItemContainerStyle>
 					<ItemsControl.ItemTemplate>
