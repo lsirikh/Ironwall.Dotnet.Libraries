@@ -19,6 +19,7 @@ public static class DialogIds
     public const string PrimaryPart = "Primary";
     public const string SecondaryPart = "Secondary";
     public const string MessagePart = "Message";
+    public const string MovePart = "Move";
 
     /// <summary><paramref name="key"/> 가 비어 있으면 <c>null</c> — 식별자를 붙이지 않는다(가짜 전역 이름을 만들지 않는다).</summary>
     public static string? For(string? key, string part)
@@ -34,4 +35,7 @@ public static class DialogIds
     public static string? Primary(string? key) => For(key, PrimaryPart);
     public static string? Secondary(string? key) => For(key, SecondaryPart);
     public static string? Message(string? key) => For(key, MessagePart);
+
+    /// <summary>머리의 옮기기 손잡이(<c>Thumb</c> — peer 가 실재한다). 셸 안 카드에서만 보인다.</summary>
+    public static string? Move(string? key) => For(key, MovePart);
 }

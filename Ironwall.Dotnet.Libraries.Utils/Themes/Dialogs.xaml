@@ -196,7 +196,44 @@
 											<ColumnDefinition Width="Auto" />
 											<ColumnDefinition Width="Auto" />
 										</Grid.ColumnDefinitions>
-										<StackPanel Grid.Column="0" VerticalAlignment="Center">
+										<!--
+											옮기기 손잡이 — 머리의 제목 칸(✕ · 머리 끼움 칸은 빼고)을 끌면 카드가 옮겨진다(셸 안 카드만, 창의 뿌리면 감춘다).
+											Thumb 인 까닭: peer 가 실재하고 캡처 · 캡처 상실 · CancelDrag 를 DragCompleted 하나로 알린다(Button 계열은 캡처를 빼앗는다).
+											머리 안쪽 여백(20,10)까지 덮도록 음수 여백을 준다. 제목 글은 누름을 받지 않는다(아래 StackPanel IsHitTestVisible=False).
+											초점이 오면 둘레를 그린다(형태) — 화살표로 옮긴다.
+										-->
+										<Thumb
+											x:Name="PART_Move"
+											Grid.Column="0"
+											Margin="-20,-10,0,-10"
+											AutomationProperties.HelpText="끌어서 창을 옮깁니다. 초점을 두고 화살표 키로도 옮길 수 있습니다(Ctrl = 크게)."
+											AutomationProperties.Name="창 옮기기 손잡이"
+											Cursor="SizeAll"
+											Focusable="True"
+											IsTabStop="True">
+											<Thumb.Template>
+												<ControlTemplate TargetType="Thumb">
+													<Grid>
+														<Border Background="Transparent" />
+														<Border
+															x:Name="Focus"
+															BorderBrush="{DynamicResource FocusRingBrush}"
+															BorderThickness="2"
+															CornerRadius="9,0,0,0"
+															Visibility="Collapsed" />
+													</Grid>
+													<ControlTemplate.Triggers>
+														<Trigger Property="IsKeyboardFocused" Value="True">
+															<Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+														</Trigger>
+													</ControlTemplate.Triggers>
+												</ControlTemplate>
+											</Thumb.Template>
+										</Thumb>
+										<StackPanel
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											IsHitTestVisible="False">
 											<dlg:ConsoleDialogText
 												x:Name="PART_Title"
 												FontSize="15"
@@ -392,6 +429,8 @@
 							<Setter TargetName="Header" Property="Padding" Value="20,14,20,0" />
 							<Setter TargetName="PART_Title" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_Close" Property="Visibility" Value="Collapsed" />
+							<!--  창은 OS 제목 줄이 옮긴다 — 머리의 옮기기 손잡이는 없다  -->
+							<Setter TargetName="PART_Move" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="KindText" Property="Margin" Value="0" />
 							<Setter TargetName="Footer" Property="CornerRadius" Value="0" />
 						</Trigger>

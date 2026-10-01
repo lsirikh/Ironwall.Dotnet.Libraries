@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 
 namespace Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 
@@ -37,6 +38,11 @@ public enum DialogMessageSeverity
 /// 몸통 첫 줄로 남는다. 제목 줄 ✕ 는 틀의 취소 길(<see cref="SecondaryInvoked"/>)로 오고, 창 제목은 틀 제목을 따른다.
 /// 몸통이 스스로 스크롤하지 않는 창(<see cref="BodyScroll"/> ≠ Disabled)은 첫 배치 때 창 높이를 내용에 맞춘다(<see cref="DialogSizeRules.FitWindowHeight"/>).
 /// 호스트 팝업층(셸 안의 칸 위에 앉은 카드)은 그대로다.</para>
+/// <para><b>셸 안 카드는 옮길 수 있다</b>(2026-10-01 "로그아웃창이 구석에 처박혀 있고 창 이동이 안 된다"): 머리의 제목 칸(<see cref="PartMove"/> — <see cref="Thumb"/>)을
+/// 끌면 카드가 가운데에서 비킨다. 캡처 드래그 · 8 DIU 데드존(<see cref="DragMath.IsDrag"/>) · 종료는 <see cref="Thumb.DragCompleted"/> 하나(<c>FinishMove</c>) ·
+/// 끄는 중 ESC = 원위치(창은 닫히지 않는다), 끄는 중이 아니면 ESC 는 예전처럼 취소다. 손잡이에 초점이 있으면 화살표로 옮긴다(Ctrl = 큰 걸음).
+/// 자리는 늘 카드 전체가 틀 안에 남게 잘리고(<see cref="DialogPlacementRules"/>), 다시 뜰 때마다(<c>Loaded</c>) 가운데로 돌아간다.
+/// 비킴은 카드의 <c>RenderTransform</c> 이라 배치(레이아웃)를 흔들지 않는다. 창의 뿌리일 때는 손잡이가 없다 — OS 제목 줄이 옮긴다.</para>
 /// <para>호출 스레드: UI.</para>
 /// </remarks>
 [TemplatePart(Name = PartPrimary, Type = typeof(ButtonBase))]
@@ -44,6 +50,8 @@ public enum DialogMessageSeverity
 [TemplatePart(Name = PartClose, Type = typeof(ButtonBase))]
 [TemplatePart(Name = PartTitle, Type = typeof(ConsoleDialogText))]
 [TemplatePart(Name = PartMessage, Type = typeof(ConsoleDialogText))]
+[TemplatePart(Name = PartMove, Type = typeof(Thumb))]
+[TemplatePart(Name = PartCard, Type = typeof(FrameworkElement))]
 public class ConsoleDialogFrame : ContentControl
 {
     public const string PartPrimary = "PART_Primary";
@@ -51,11 +59,20 @@ public class ConsoleDialogFrame : ContentControl
     public const string PartClose = "PART_Close";
     public const string PartTitle = "PART_Title";
     public const string PartMessage = "PART_Message";
+    public const string PartMove = "PART_Move";
+    public const string PartCard = "Card";
 
     private ButtonBase? _primary;
     private ButtonBase? _secondary;
     private ButtonBase? _close;
     private bool _focusApplied;
+    private Thumb? _move;
+    private FrameworkElement? _card;
+    private readonly TranslateTransform _shift = new();   // 카드가 가운데에서 비킨 만큼 — 인스턴스마다 하나(얼리지 않는다)
+    private bool _movePressed;
+    private bool _moveDragging;
+    private Point _pointerAtPress;
+    private Vector _offsetAtPress;
     private Window? _window;          // 뿌리로 앉은 창 — 제목 줄 ✕ 를 이 틀로 보내 둔 창
     private Window? _fittedWindow;    // 높이를 맞춘 창 — 창마다 한 번만(사람이 늘린 높이를 되돌리지 않는다)
     private readonly Action _cancelFromCaption;
@@ -76,6 +93,8 @@ public class ConsoleDialogFrame : ContentControl
         // 호스트 팝업층은 SingleInstance 뷰모델의 뷰를 다시 쓴다(Caliburn 뷰 캐시) — 템플릿은 한 번만 붙으므로
         // 내려갈 때 풀어 두지 않으면 두 번째 표시부터 첫 포커스가 오지 않아 ESC · Enter 가 창에 닿지 않는다.
         Unloaded += (_, _) => { _focusApplied = false; ReleaseCaptionClose(); };
+        // 셸이 줄면(창 크기 · 이벤트 드로어) 옮겨 둔 카드가 셸 밖으로 나가지 않게 다시 자른다.
+        SizeChanged += (_, _) => ReclampOffset();
     }
 
     #region - Events -
@@ -269,6 +288,7 @@ public class ConsoleDialogFrame : ContentControl
         Detach(_primary);
         Detach(_secondary);
         Detach(_close);
+        DetachMove();
 
         _primary = GetTemplateChild(PartPrimary) as ButtonBase;
         _secondary = GetTemplateChild(PartSecondary) as ButtonBase;
@@ -277,6 +297,7 @@ public class ConsoleDialogFrame : ContentControl
         if (_primary is not null) _primary.Click += OnPrimaryClick;
         if (_secondary is not null) _secondary.Click += OnSecondaryClick;
         if (_close is not null) _close.Click += OnSecondaryClick;      // 닫기도 취소다 — 길이 하나뿐이어야 두 번 닫히지 않는다
+        AttachMove();
 
         ApplyIdentity();
         _focusApplied = false;
@@ -299,6 +320,7 @@ public class ConsoleDialogFrame : ContentControl
         SetId(_primary, PrimaryAutomationId ?? DialogIds.Primary(key));
         SetId(_secondary, SecondaryAutomationId ?? DialogIds.Secondary(key));
         SetId(_close, CloseAutomationId ?? DialogIds.Close(key));
+        SetId(_move, DialogIds.Move(key));
 
         // 제목 · 안내 글은 peer 가 실재하는 ConsoleDialogText 에 붙는다 — TextBlock 은 UIA 제어 트리에 뜨지 않는다.
         SetId(GetTemplateChild(PartTitle) as ConsoleDialogText, DialogIds.Title(key));
@@ -428,6 +450,9 @@ public class ConsoleDialogFrame : ContentControl
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         UpdateWindowRoot();
+        // 다시 뜰 때마다 가운데에서 시작한다 — 호스트 층은 같은 뷰를 다시 쓰므로(Caliburn 뷰 캐시) 지난번 자리가 남아 있다.
+        CancelMove();
+        Offset = new Vector();
         if (IsWindowRoot && _window is { } window && !ReferenceEquals(_fittedWindow, window))
         {
             _fittedWindow = window;
@@ -466,6 +491,16 @@ public class ConsoleDialogFrame : ContentControl
         base.OnPreviewKeyDown(e);
         if (e.Handled) return;
 
+        // 카드를 끄는 중의 ESC 는 끌기만 되돌린다 — 창을 닫지 않는다(drag-first ③). 끄는 중이 아니면 아래의 취소로 간다.
+        if (e.Key == Key.Escape && _movePressed)
+        {
+            e.Handled = true;
+            CancelMove();
+            return;
+        }
+
+        if (TryKeyboardMove(e)) return;
+
         var primaryLive = IsPrimaryEnabled && _primary is { Visibility: Visibility.Visible };
         switch (DialogKeyRules.Decide(e.Key, primaryLive, IsMultiLineFocused(), IsBusy))
         {
@@ -497,6 +532,148 @@ public class ConsoleDialogFrame : ContentControl
     {
         e.Handled = true;
         RaiseEvent(new RoutedEventArgs(SecondaryInvokedEvent, this));
+    }
+    #endregion
+
+    #region - Move (셸 안 카드) -
+    /// <summary>카드가 가운데에서 비킨 만큼(DIU). 언제나 <see cref="DialogPlacementRules.Clamp"/> 를 거친 값이다.</summary>
+    public Vector Offset
+    {
+        get => new(_shift.X, _shift.Y);
+        private set
+        {
+            if (_shift.X != value.X) _shift.X = value.X;
+            if (_shift.Y != value.Y) _shift.Y = value.Y;
+        }
+    }
+
+    /// <summary>카드 치수 — 배치가 준 크기(RenderTransform 과 무관).</summary>
+    private System.Windows.Size CardSize => _card is null ? System.Windows.Size.Empty : new System.Windows.Size(_card.ActualWidth, _card.ActualHeight);
+
+    /// <summary>카드가 놓이는 칸 = 이 틀(호스트 층을 가득 채운다).</summary>
+    private System.Windows.Size HostSize => new(ActualWidth, ActualHeight);
+
+    private bool CanMove => _move is not null && _card is not null && !IsWindowRoot;
+
+    private void AttachMove()
+    {
+        _move = GetTemplateChild(PartMove) as Thumb;
+        _card = GetTemplateChild(PartCard) as FrameworkElement;
+
+        if (_card is not null)
+        {
+            _card.RenderTransform = _shift;
+            _card.SizeChanged += OnCardSizeChanged;
+        }
+        if (_move is not null)
+        {
+            _move.DragStarted += OnMoveStarted;
+            _move.DragDelta += OnMoveDelta;
+            _move.DragCompleted += OnMoveCompleted;
+        }
+    }
+
+    private void DetachMove()
+    {
+        CancelMove();
+        if (_card is not null)
+        {
+            _card.SizeChanged -= OnCardSizeChanged;
+            if (ReferenceEquals(_card.RenderTransform, _shift)) _card.ClearValue(UIElement.RenderTransformProperty);
+        }
+        if (_move is not null)
+        {
+            _move.DragStarted -= OnMoveStarted;
+            _move.DragDelta -= OnMoveDelta;
+            _move.DragCompleted -= OnMoveCompleted;
+        }
+        _move = null;
+        _card = null;
+    }
+
+    private void OnCardSizeChanged(object sender, SizeChangedEventArgs e) => ReclampOffset();
+
+    private void ReclampOffset()
+    {
+        if (_card is null) return;
+        Offset = IsWindowRoot ? new Vector() : DialogPlacementRules.Clamp(Offset, CardSize, HostSize);
+    }
+
+    /// <summary>
+    /// 포인터 자리 — <b>움직이지 않는 이 틀 기준</b>으로 잰다. <see cref="DragDeltaEventArgs"/> 는 손잡이 기준이라
+    /// 손잡이가 카드와 같이 움직이는 여기서는 누적이 아니라 증분이 되어 떨린다(<see cref="SurfaceFrame"/> 과 같은 까닭).
+    /// </summary>
+    private Point Pointer() => DragPointer.GetPosition(this);
+
+    private void OnMoveStarted(object sender, DragStartedEventArgs e)
+    {
+        if (!CanMove) return;
+        _movePressed = true;
+        _moveDragging = false;
+        _pointerAtPress = Pointer();
+        _offsetAtPress = Offset;
+    }
+
+    private void OnMoveDelta(object sender, DragDeltaEventArgs e)
+    {
+        if (!_movePressed) return;
+
+        var now = Pointer();
+        var dx = now.X - _pointerAtPress.X;
+        var dy = now.Y - _pointerAtPress.Y;
+
+        if (!_moveDragging)
+        {
+            if (!DragMath.IsDrag(dx, dy)) return;      // 8.0 DIU 데드존 — 그 전에는 클릭이다
+            _moveDragging = true;
+        }
+
+        Offset = DialogPlacementRules.Drag(_offsetAtPress, dx, dy, CardSize, HostSize);
+    }
+
+    private void OnMoveCompleted(object sender, DragCompletedEventArgs e) => FinishMove(commit: !e.Canceled);
+
+    /// <summary>
+    /// 끌기 종료 — 마우스 업 · 캡처 상실 · ESC(<see cref="Thumb.CancelDrag"/>)가 전부 여기로 온다.
+    /// 순서: ① 플래그 ② 자리(취소면 누른 자리로). 캡처는 <see cref="Thumb"/> 가 스스로 푼다. 자리는 저장하지 않는다 — 다음에 뜨면 가운데다.
+    /// </summary>
+    private void FinishMove(bool commit)
+    {
+        var wasDragging = _moveDragging;
+        _movePressed = false;
+        _moveDragging = false;
+
+        if (!wasDragging || commit) return;
+        Offset = _offsetAtPress;
+    }
+
+    /// <summary>ESC · 템플릿 교체 · 다시 뜰 때 — 잡고 있던 끌기를 누른 자리로 되돌린다.</summary>
+    private void CancelMove()
+    {
+        if (!_movePressed) return;
+        if (_move?.IsDragging == true) _move.CancelDrag();     // DragCompleted(Canceled) → FinishMove(false)
+        if (_movePressed) FinishMove(commit: false);           // 손잡이가 이미 놓았거나 사건이 오지 않았을 때
+    }
+
+    /// <summary>손잡이에 초점이 있을 때 화살표 = 옮기기(Ctrl = 큰 걸음). 드래그 전용 UI 를 내지 않는다.</summary>
+    private bool TryKeyboardMove(KeyEventArgs e)
+    {
+        if (!CanMove || _move?.IsKeyboardFocused != true) return false;
+
+        var (dirX, dirY) = e.Key switch
+        {
+            Key.Left => (-1, 0),
+            Key.Right => (1, 0),
+            Key.Up => (0, -1),
+            Key.Down => (0, 1),
+            _ => (0, 0),
+        };
+        if (dirX == 0 && dirY == 0) return false;
+
+        var coarse = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        Offset = DialogPlacementRules.KeyboardMove(Offset, dirX, dirY, coarse, CardSize, HostSize);
+        e.Handled = true;
+        return true;
     }
     #endregion
 
