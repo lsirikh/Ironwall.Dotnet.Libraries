@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
+﻿using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
@@ -262,27 +263,74 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_move_only_the_enclosure_when_it_is_dragged_along_the_ring()
+    public void should_flip_the_controller_end_only_when_the_enclosure_is_dropped_past_the_middle_with_cables_shown()
     {
         var result = OnWindow(Ring(8), (vm, canvas) =>
         {
             vm.ShowCables = true;
             Pump();
-            var before = vm.FenceChain.ControllerGap;
             var enclosure = canvas.ControllerChip!;
             var start = canvas.ScreenCenterOf(enclosure);
-            var target = new Point(canvas.ScreenCenterOf(canvas.SensorChips[102]).X, start.Y);
+
+            // 같은 쪽 안에서 놓으면 제자리
+            var near = new Point(canvas.ScreenCenterOf(canvas.SensorChips[102]).X, start.Y);
             canvas.OnPointerPressed(start, enclosure);
-            canvas.OnPointerMoved(target);
-            canvas.OnPointerReleased(target);
+            canvas.OnPointerMoved(near);
+            canvas.OnPointerReleased(near);
             Pump();
-            return (before, After: vm.FenceChain.ControllerGap, Chain: vm.FenceChain.Keys.ToList(), vm.HasChanges);
+            var stayed = vm.FenceControllerEnd;
+
+            // 반대쪽 끝 너머로 놓으면 뒤집힌다
+            start = canvas.ScreenCenterOf(canvas.ControllerChip!);
+            var far = new Point(canvas.ScreenCenterOf(canvas.SensorChips[108]).X + 30, start.Y);
+            canvas.OnPointerPressed(start, canvas.ControllerChip!);
+            canvas.OnPointerMoved(far);
+            canvas.OnPointerReleased(far);
+            Pump();
+            return (stayed, After: vm.FenceControllerEnd, Chain: vm.FenceChain.Keys.ToList(),
+                    Enclosure: canvas.ScreenCenterOf(canvas.ControllerChip!).X, Last: canvas.ScreenCenterOf(canvas.SensorChips[108]).X);
         });
 
-        Assert.Equal(4, result.before);
-        Assert.True(result.After is 1 or 2, $"{result.After}");
-        Assert.Equal(Enumerable.Range(101, 8), result.Chain);
-        Assert.False(result.HasChanges);
+        Assert.Equal(FenceControllerEnd.Left, result.stayed);
+        Assert.Equal(FenceControllerEnd.Right, result.After);
+        Assert.Equal(Enumerable.Range(101, 8).Reverse(), result.Chain);                     // 사슬은 오른쪽 끝부터
+        Assert.True(result.Enclosure > result.Last);
+    }
+
+    [Fact]
+    public void should_step_within_the_upper_lane_spatially_when_alt_right_is_pressed_on_an_upper_chip()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            vm.FenceSetLane(new[] { 104, 105 }, FenceLane.Upper);
+            Pump();
+            var chip = canvas.SensorChips[104];
+            chip.Focus();
+            var handled = canvas.HandleKeyDown(Key.System, Key.Right, ModifierKeys.Alt, chip);
+            Pump();
+            return (handled, Upper: vm.LaneKeysLeftToRight(FenceLane.Upper).ToList(), Lane: vm.FenceLayout.LaneOf(104));
+        });
+
+        Assert.True(result.handled);
+        Assert.Equal(new[] { 105, 104 }, result.Upper);                                    // 공간에서 오른쪽 이웃 너머로(사슬 차례가 아니라)
+        Assert.Equal(FenceLane.Upper, result.Lane);
+    }
+
+    [Fact]
+    public void should_draw_cables_along_the_lanes_with_a_far_end_turn_when_cables_are_shown()
+    {
+        var shapes = OnWindow(Ring(4), (vm, canvas) =>
+        {
+            vm.FenceSetLane(new[] { 103, 104 }, FenceLane.Upper);
+            vm.ShowCables = true;
+            Pump();
+            return canvas.StaticShapes.ToList();
+        });
+
+        var chains = shapes.Where(s => s.Ink == FenceInk.Chain).ToList();
+        Assert.Equal(2, chains.Count);                                                       // Ch1(아래 줄) · 꺾임 + 위 줄
+        Assert.Contains(shapes, s => s.Ink == FenceInk.ReturnOuter);                         // 위 줄 센서 뒤 제어기까지 리턴
+        Assert.Contains(shapes, s => s.Ink == FenceInk.LabelReturn && s.Text!.Contains("위 줄"));
     }
 
     [Fact]
@@ -614,7 +662,7 @@ public class WiringFenceViewTests
         Assert.True(result.colors > 20, $"색 {result.colors}가지 — 빈 그림");
         Assert.True(result.first.X < result.last.X);
         Assert.True(result.first.X > 0 && result.last.X < result.size.Width);
-        Assert.True(result.enclosure.X > result.first.X && result.enclosure.X < result.last.X);   // 함체는 체인 가운데 틈 아래
+        Assert.True(result.enclosure.X < result.first.X);                                           // 두 줄 형상 — 제어기는 펜스 왼쪽 끝 바깥(§1-0b)
         Assert.True(result.enclosure.Y > result.first.Y);                                           // 땅 쪽
         var luma = 0.2126 * result.background.R + 0.7152 * result.background.G + 0.0722 * result.background.B;
         Assert.True(dark ? luma < 90 : luma > 170, $"배경 밝기 {luma}");

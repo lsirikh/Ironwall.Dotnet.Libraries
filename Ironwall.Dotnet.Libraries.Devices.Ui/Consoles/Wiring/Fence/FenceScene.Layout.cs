@@ -97,7 +97,7 @@ public static partial class FenceScene
             if (world.Sensors.TryGetValue(key, out var fs) && fs.HasFacing)
                 Fan(o, p, world.X[key], fs.IsBackFacing);
 
-        if (showCables) RingCables(o, world, p, enclosureX, enclosureGap);
+        if (showCables) LaneCables(o, world, p);
 
         if (showRange)
             foreach (var gap in world.RangeGaps())
@@ -169,6 +169,57 @@ public static partial class FenceScene
                 }
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// 케이블 보기(두 줄 형상 · v0.3 §1-0b) — 제어기(펜스 끝 바깥)에서 Ch1 이 아래 줄을 따라 먼 끝까지, 먼 끝에서 위로 꺾여 위 줄(센서가 있으면 그 칩 높이)을
+    /// 제어기 쪽으로 돌아와 Ch2 로 들어간다. 위 줄에 센서가 없거나 센서가 끝난 뒤의 구간은 리턴케이블(2겹 선). 칩마다 Ch1 · Ch2 에서 센 번호 알약.
+    /// </summary>
+    private static void LaneCables(List<FenceShape> o, FenceWorld world, FenceProjector p)
+    {
+        var layout = world.Layout;
+        var geometry = world.Geometry;
+        if (layout is null || geometry is null) return;
+        var keys = world.Seq;
+        var u = world.Upm;
+        var left = layout.ControllerEnd == FenceControllerEnd.Left;
+        var cz = p.De / 2 + 6 * p.K;
+        const double LOWER_Y = 41;
+        var xs = keys.Select(k => world.X[k]).Append(0).Append(geometry.LengthM * u).ToList();
+        var nearX = world.ControllerX;
+        var farX = left ? xs.Max() + 18 : xs.Min() - 18;
+        var upper = keys.Where(k => layout.LaneOf(k) == FenceLane.Upper).ToList();
+        var lower = keys.Where(k => layout.LaneOf(k) == FenceLane.Lower).ToList();
+        var fenceTop = geometry.Panels.Count == 0 ? FenceProjector.H : geometry.Panels.Max(q => q.Spec.HeightM) * world.Vpm;
+        var upperY = upper.Count > 0 ? upper.Average(world.BodyCenterOf) : fenceTop + 14;
+        var lowerY = lower.Count > 0 ? Math.Min(LOWER_Y, lower.Min(world.BodyCenterOf)) : LOWER_Y;
+
+        // Ch1 — 제어기 → 아래 줄 → 먼 끝
+        o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.Chain, new[] { p.P(nearX, 12, cz), p.P(nearX, lowerY, cz), p.P(farX, lowerY, cz) }));
+        // 먼 끝 꺾임 + 위 줄 센서 구간(사슬) · 그 뒤 제어기까지 리턴(2겹)
+        var nearUpper = upper.Count > 0 ? (left ? upper.Min(k => world.X[k]) : upper.Max(k => world.X[k])) : farX;
+        if (upper.Count > 0)
+            o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.Chain, new[] { p.P(farX, lowerY, cz), p.P(farX, upperY, cz), p.P(nearUpper, upperY, cz) }));
+        var back = upper.Count > 0
+            ? new[] { p.P(nearUpper, upperY, cz), p.P(nearX, upperY, cz), p.P(nearX, 22, cz) }
+            : new[] { p.P(farX, lowerY, cz), p.P(farX, upperY, cz), p.P(nearX, upperY, cz), p.P(nearX, 22, cz) };
+        o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.ReturnOuter, back));
+        o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.ReturnInner, back));
+
+        var anchor = left ? FenceTextAnchor.Start : FenceTextAnchor.End;
+        var dx = left ? 10 : -10;
+        var a = p.P(nearX, lowerY, cz);
+        var b = p.P(nearX, upperY, cz);
+        o.Add(Text(FenceInk.LabelChain, new Point(a.X + dx, a.Y + 14), $"{Model.WiringValidation.PORT_1} ▶ 아래 줄", 11, anchor));
+        o.Add(Text(FenceInk.LabelReturn, new Point(b.X + dx, b.Y - 6), upper.Count > 0 ? $"{Model.WiringValidation.PORT_2} ◀ 위 줄" : $"{Model.WiringValidation.PORT_2} ◀ 리턴선", 11, anchor));
+
+        // Ch1 · Ch2 에서 센 번호 알약 — 칩 아래(그 줄 높이)
+        foreach (var key in keys)
+        {
+            if (!world.Sensors.TryGetValue(key, out var s) || s.PortText.Length == 0) continue;
+            var y = layout.LaneOf(key) == FenceLane.Upper ? upperY - 30 : lowerY - 24;
+            o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillPort, new[] { p.P(world.X[key], y, cz) }, Text: s.PortText, FontSize: 10));
         }
     }
 

@@ -309,12 +309,23 @@ public sealed class FenceWorld
         foreach (var panel in geometry.Panels) top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 44 : 14));
         world.TopHeight = top;
 
-        world.ControllerX = world.GapMid(chain.ControllerGap);
+        // 두 줄 형상(v0.3 §1-0b) — 제어기는 펜스 왼쪽 끝 또는 오른쪽 끝 바깥(케이블 보기의 함체 · 끌면 반대쪽으로)
+        var placedXs = world._x.Values.Append(0).Append(geometry.LengthM * upm).ToList();
+        world.ControllerX = layout.ControllerEnd == FenceControllerEnd.Left
+            ? placedXs.Min() - CONTROLLER_LEAD * upm
+            : placedXs.Max() + CONTROLLER_LEAD * upm;
         var xs = world._x.Values.Append(0).Append(geometry.LengthM * upm).Append(world.ControllerX).ToList();
         world.MinX = xs.Min();
         world.MaxX = xs.Max();
         return world;
     }
+
+    /// <summary>두 줄 형상에서 제어기(함체)를 펜스 끝 바깥에 두는 거리(m).</summary>
+    public const double CONTROLLER_LEAD = 5;
+
+    /// <summary>그 센서 칩 몸 가운데 높이(세계 단위) — 케이블 보기의 줄 선 높이.</summary>
+    public double BodyCenterOf(int key)
+        => LiftOf(key) + (_sensors.TryGetValue(key, out var s) ? s.Kind switch { FenceKind.Fence => 66, FenceKind.Multi => FenceProjector.H + 36, _ => 71 } : 71);
 
     /// <summary>위 줄 칩을 꼭대기 위로 올려 앉히는 반 칩 높이(세계 단위).</summary>
     public const double UPPER_CHIP_HALF = 28;

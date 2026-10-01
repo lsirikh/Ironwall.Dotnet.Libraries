@@ -744,6 +744,15 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 UpdateOverlay();
                 return;
 
+            case FenceGestureAction.MoveEnclosure when _scene.IsLayout:
+            {
+                // 두 줄 형상 — 제어기는 펜스 끝에만 선다. 끄는 동안은 따라 움직이고, 놓을 때 반대쪽 절반이면 끝을 바꾼다.
+                _enclosureX = Math.Clamp(ScreenToWorld(now).X, _scene.MinX - 6 * _scene.Upm, _scene.MaxX + 6 * _scene.Upm);
+                if (_controllerChip is not null) Place(_controllerChip, _enclosureX);
+                var flip = IsOtherEnd(_enclosureX);
+                vm.NotifyFenceStatus(flip ? "제어기 — 놓으면 반대쪽 끝으로(사슬 · 번호 방향이 바뀝니다) · Esc 취소" : "제어기 — 제자리(반대쪽 끝으로 끌면 위치가 바뀝니다)");
+                return;
+            }
             case FenceGestureAction.MoveEnclosure:
             {
                 var wx = ScreenToWorld(now).X;
@@ -886,6 +895,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 break;
             case FenceGestureAction.ContextMenu:
                 OpenMenu(press.Target, chip, pointer);
+                break;
+            case FenceGestureAction.MoveEnclosure when _scene.IsLayout:
+                if (!IsOtherEnd(_enclosureX) || !vm.FlipControllerEnd()) Rebuild();
                 break;
             case FenceGestureAction.MoveEnclosure:
                 if (!vm.FenceMoveEnclosure(enclosureGap)) Rebuild();
@@ -1174,9 +1186,30 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     /// 화면에서 한 단위 옆으로(Alt+←/→) — 이웃 단위 너머 세계 x 에 놓는 것과 같다. 양쪽 가지는 제어기를 건너 다른 가지로 간다.
     /// 한 줄은 제어기 앞으로 가지 못한다. 펜스 구성 모드에서는 이웃과 자리를 바꾼다(보드가 자리를 맞춘다).
     /// </summary>
+    /// <summary>두 줄 형상 — 세계 x 가 지금 제어기 끝의 반대쪽 절반인가.</summary>
+    private bool IsOtherEnd(double worldX)
+    {
+        if (_scene?.Layout is not { } layout) return false;
+        var mid = (_scene.MinX + _scene.MaxX) / 2;
+        return layout.ControllerEnd == FenceControllerEnd.Left ? worldX > mid : worldX < mid;
+    }
+
     private void MoveUnitVisually(FenceChip chip, int direction)
     {
         if (_scene is null || ViewModel is not { } vm) return;
+        if (_scene.IsLayout)
+        {
+            // 두 줄 형상 — 개념도와 같은 길: 그 줄 안에서 공간 이웃 너머로 한 칸(사슬 차례가 아니라)
+            if (chip.Keys.Count == 1) { vm.ConceptLaneStep(chip.Keys[0], direction); return; }
+            var lane = vm.FenceLayout.LaneOf(chip.Keys[0]);
+            var row = vm.LaneKeysLeftToRight(lane).ToList();
+            var others = row.Where(k => !chip.Keys.Contains(k)).ToList();
+            var first = row.FindIndex(k => chip.Keys.Contains(k));
+            var target = direction < 0 ? first - 1 : first + 1;
+            if (first < 0 || target < 0 || target > others.Count) { vm.NotifyFenceStatus("끝 — 더 갈 자리가 없습니다"); return; }
+            vm.ConceptLaneDrop(chip.Keys, lane, target);
+            return;
+        }
         var units = _scene.Units(_grouped).ToList();
         var at = units.FindIndex(u => u.Key == chip.Key);
         var j = at + direction;
