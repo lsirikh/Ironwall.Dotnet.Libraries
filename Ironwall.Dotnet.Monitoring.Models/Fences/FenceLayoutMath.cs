@@ -177,6 +177,52 @@ public static class FenceLayoutMath
         return new FenceMountPoint(x, h + m.HeightOffsetM);
     }
 
+    /// <summary>위 줄 센서가 펜스 꼭대기(윗 레일 · 윤형 코일) 위로 오르는 높이(m) — 윤형이면 코일 지름만큼 더.</summary>
+    public const double UPPER_LANE_RISE_M = 0.10;
+    public const double UPPER_LANE_RAZOR_RISE_M = 0.35;
+
+    /// <summary>두 줄일 때 아래 줄 기둥 위 센서를 망 위로 내리는 비율(펜스 높이의 몫 — 윗 레일 아래).</summary>
+    public const double LOWER_LANE_TOP_RATIO = 0.72;
+
+    /// <summary>
+    /// 줄을 따른 설치 높이(m · fence-wiring-editor v0.3 FR-18 · 2.5D 펜스 뷰) — 위 줄은 펜스 꼭대기(윗 레일 · 윤형 코일) 위, 아래 줄은 망 위.
+    /// 자리(기둥 위 · 기둥 중간 · 망 가운데)는 줄 <b>안에서</b> 높이를 조금 고른다. <paramref name="twoLanes"/>(위 줄에 센서가 있다)가 아니면
+    /// 아래 줄은 지금까지와 같다(<see cref="PointOf"/> 높이 — 한 줄 현장의 모습을 바꾸지 않는다).
+    /// </summary>
+    public static double LaneHeightM(SensorMountSpec mount, FenceGeometry geometry, bool twoLanes)
+    {
+        var point = PointOf(mount, geometry);
+        if (geometry.Panels.Count == 0) return point.HeightM;
+        var m = Normalize(mount, geometry.Specs);
+        double top;
+        bool razor;
+        if (m.IsPostSpot)
+        {
+            var post = geometry.Posts[m.Panel];
+            top = post.HeightM;
+            razor = post.HasRazor;
+        }
+        else
+        {
+            var panel = geometry.Panels[m.Panel];
+            top = panel.Spec.HeightM;
+            razor = panel.Spec.Style == EnumFenceStyle.ChainLinkRazor;
+        }
+        if (m.Lane == FenceLane.Upper)
+        {
+            var adjust = m.Spot switch
+            {
+                FenceMountSpot.PostTop => 0.15,
+                FenceMountSpot.PostMiddle => -0.05,
+                FenceMountSpot.WallFace => -0.20,
+                _ => 0,
+            };
+            return top + (razor ? UPPER_LANE_RAZOR_RISE_M : UPPER_LANE_RISE_M) + adjust + m.HeightOffsetM;
+        }
+        if (twoLanes && m.Spot == FenceMountSpot.PostTop) return top * LOWER_LANE_TOP_RATIO + m.HeightOffsetM;
+        return point.HeightM;
+    }
+
     /// <summary>x(m)에서 가장 가까운 기둥 번호(0…N).</summary>
     public static int PostIndexNear(FenceGeometry geometry, double xM)
     {

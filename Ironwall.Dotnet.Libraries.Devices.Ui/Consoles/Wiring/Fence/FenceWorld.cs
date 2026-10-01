@@ -280,24 +280,31 @@ public sealed class FenceWorld
 
         var seats = chain.Keys.Select(k => (Key: k, Mount: FenceLayoutMath.Normalize(layout.MountOf(k) ?? new SensorMountSpec(0, FenceMountSpot.PostTop), layout.Panels)))
                               .ToList();
-        var stacks = seats.GroupBy(t => FenceLayoutMath.SeatOf(t.Mount)).ToDictionary(g => g.Key, g => g.Select(t => t.Key).ToList());
+        var stacks = seats.GroupBy(t => (t.Mount.Lane, FenceLayoutMath.SeatOf(t.Mount))).ToDictionary(g => g.Key, g => g.Select(t => t.Key).ToList());   // 줄마다 따로(위 · 아래 줄은 높이가 다르다)
         var top = FenceProjector.H + 40;
+        var twoLanes = layout.HasUpperSensors;
         foreach (var (key, mount) in seats)
         {
             var point = FenceLayoutMath.PointOf(mount, geometry);
-            var stack = stacks[FenceLayoutMath.SeatOf(mount)];
+            var heightM = FenceLayoutMath.LaneHeightM(mount, geometry, twoLanes);                 // 위 줄 = 꼭대기 위 · 아래 줄 = 망 위(FR-18)
+            var stack = stacks[(mount.Lane, FenceLayoutMath.SeatOf(mount))];
             var dx = (stack.IndexOf(key) - (stack.Count - 1) / 2.0) * STACK_DX;
             world._x[key] = point.XM * upm + dx;
             var kind = sensors.TryGetValue(key, out var s) ? s.Kind : FenceKind.Smart;
-            var lift = LiftFor(kind, mount.Spot, point.HeightM * vpm);
+            // 위 줄 칩은 꼭대기 위에 올라앉는다 — 몸 가운데를 목표 높이 + 반 칩(약 28)에 맞춘다
+            var lift = mount.Lane == FenceLane.Upper ? LiftFor(kind, FenceMountSpot.PanelCenter, heightM * vpm + UPPER_CHIP_HALF) : LiftFor(kind, mount.Spot, heightM * vpm);
             world._lift[key] = lift;
             top = Math.Max(top, lift + (kind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
         }
-        // 모양이 바뀌는 곳(담 ↔ 철망 · 기둥 자리 ↔ 망 가운데)에서 이웃 칩이 거의 같은 x 에 서면 번호판이 겹친다(검토 V3) —
-        // 체인 순서를 지킨 채 겹친 것만 최소 간격으로 벌린다(무리 가운데는 제자리 평균).
-        var ordered = chain.Keys.Where(world._x.ContainsKey).ToList();
-        var spread = Separate(ordered.Select(k => world._x[k]).ToList(), MIN_CHIP_DX);
-        for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = spread[i];
+        // 모양이 바뀌는 곳(담 ↔ 철망 · 기둥 자리 ↔ 망 가운데)에서 이웃 칩이 거의 같은 x 에 서면 번호판이 겹친다(검토 V3 · 재검토) —
+        // 줄마다(위 · 아래 줄은 높이가 달라 서로 겹치지 않는다) 가로 순서를 지킨 채 겹친 것만 칩 폭 + 틈 이상으로 벌린다(무리 가운데는 제자리 평균).
+        var chainIndex = chain.Keys.Select((k, i) => (k, i)).ToDictionary(t => t.k, t => t.i);
+        foreach (var lane in seats.GroupBy(t => t.Mount.Lane))
+        {
+            var ordered = lane.Select(t => t.Key).Where(world._x.ContainsKey).OrderBy(k => world._x[k]).ThenBy(k => chainIndex[k]).ToList();
+            var spread = Separate(ordered.Select(k => world._x[k]).ToList(), MIN_CHIP_DX);
+            for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = spread[i];
+        }
         foreach (var post in geometry.Posts) top = Math.Max(top, post.HeightM * vpm + (post.HasRazor ? 44 : 12));
         foreach (var panel in geometry.Panels) top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 44 : 14));
         world.TopHeight = top;
@@ -309,8 +316,13 @@ public sealed class FenceWorld
         return world;
     }
 
-    /// <summary>이웃 칩의 최소 간격(세계 단위) — 같은 자리 벌림(<see cref="STACK_DX"/>)과 같다(번호판 폭 20 + 여유).</summary>
-    public const double MIN_CHIP_DX = STACK_DX;
+    /// <summary>위 줄 칩을 꼭대기 위로 올려 앉히는 반 칩 높이(세계 단위).</summary>
+    public const double UPPER_CHIP_HALF = 28;
+
+    /// <summary>
+    /// 이웃 칩의 최소 간격(세계 단위) — 칩 폭(스마트 몸 32 · 번호판 20) + 틈 8. 30(같은 자리 벌림)으로는 담/철망 경계의 두 칩 번호판이 여전히 겹쳤다(재검토 렌더).
+    /// </summary>
+    public const double MIN_CHIP_DX = 40;
 
     /// <summary>
     /// 순서를 지킨 채 이웃 간격을 <paramref name="minGap"/> 이상으로 — 겹친 무리만 움직이고 무리의 가운데는 원래 자리의 평균에 둔다(순수 · 시험 대상).
