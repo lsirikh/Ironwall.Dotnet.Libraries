@@ -59,42 +59,6 @@
 				</Trigger>
 			</Style.Triggers>
 		</Style>
-		<!--  F.Tool 과 같은 모양의 토글 — [?] 도움말. 켜지면 주 색 테두리(색만이 아니라 굵기로도)  -->
-		<Style x:Key="F.ToolToggle" TargetType="ToggleButton">
-			<Setter Property="Height" Value="28" />
-			<Setter Property="MinWidth" Value="28" />
-			<Setter Property="Padding" Value="0" />
-			<Setter Property="FontSize" Value="12.5" />
-			<Setter Property="FontWeight" Value="Bold" />
-			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-			<Setter Property="BorderThickness" Value="1" />
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="ToggleButton">
-						<Border
-							Padding="{TemplateBinding Padding}"
-							Background="{TemplateBinding Background}"
-							BorderBrush="{TemplateBinding BorderBrush}"
-							BorderThickness="{TemplateBinding BorderThickness}"
-							CornerRadius="6">
-							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-						</Border>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-			<Style.Triggers>
-				<Trigger Property="IsMouseOver" Value="True">
-					<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-				</Trigger>
-				<Trigger Property="IsChecked" Value="True">
-					<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-					<Setter Property="BorderThickness" Value="2" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
 	</UserControl.Resources>
 
 	<DockPanel LastChildFill="True">
