@@ -250,8 +250,6 @@ public sealed class FenceRenderer
         FenceInk.PillPort => new(B(Alt), B(RowLine), 0.8, B(Tx2), true, FontWeights.SemiBold),
         FenceInk.Insert => new(B(Primary), B(Primary), 3, Cap: PenLineCap.Round),
         // 보는 쪽(FR-20) — 옅은 채움 + 실선 윤곽(형태로 가른다) · "뒤" 표지는 진한 판에 밝은 글자.
-        FenceInk.Facing => new(B(Color.FromArgb(0x33, Tx2.R, Tx2.G, Tx2.B)), B(Tx2), 1.1, Join: PenLineJoin.Round),
-        FenceInk.FacingArrow => new(B(Tx2), null, 0),
         FenceInk.FacingTag => new(B(Tx2), B(Alt), 1),
         FenceInk.FacingTagText => new(null, null, 0, B(Alt), false, FontWeights.Bold),
         FenceInk.SideLabel => new(null, null, 0, B(Tx2), false, FontWeights.SemiBold),

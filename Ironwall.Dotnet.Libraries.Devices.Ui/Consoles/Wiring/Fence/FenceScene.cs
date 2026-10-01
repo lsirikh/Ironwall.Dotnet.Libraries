@@ -23,7 +23,7 @@ public enum FenceInk
     Hit, Select, Draft, Proposal,
     GroupBack, GroupBody, GroupText, GroupSub,
     Pill, PillDuplicate, PillInsert, PillPort, Insert,
-    Facing, FacingArrow, FacingTag, FacingTagText, SideLabel,
+    FacingTag, FacingTagText, SideLabel,
     // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
     PanelSelectFill, PanelSelectEdge, RubberBand,
     Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
@@ -108,7 +108,7 @@ public static partial class FenceScene
                 o.Add(Seg(FenceInk.Grid, p.P(x, 0, 8), p.P(x, 0, Math.Min(gz1, 120)), 0.5 * p.K));
         o.Add(Seg(FenceInk.Base, p.P(x0 - 40, 0, 0), p.P(x1 + 40, 0, 0)));
 
-        // 땅 표기(FR-20 · 카탈로그 설치 사례) — 펜스 너머 = 외부, 보는 쪽 = 내부. 센서의 탐지 부채꼴이 어느 쪽을 보는지 읽는 기준.
+        // 땅 표기(FR-20 · 카탈로그 설치 사례) — 펜스 너머 = 외부, 보는 쪽 = 내부. 센서가 앞(외부) · 뒤(내부) 어느 쪽을 보는지 읽는 기준.
         var outside = p.P(x1 + SIDE_LABEL_LEAD, 0, OutsideLabelDepth(p));
         var inside = p.P(x1 + SIDE_LABEL_LEAD, 0, InsideLabelDepth(shape));
         o.Add(Text(FenceInk.SideLabel, new Point(outside.X, outside.Y - 2), "펜스 외부", 11, FenceTextAnchor.Start));
@@ -174,11 +174,7 @@ public static partial class FenceScene
         if (shape == WiringShape.Line)
             for (var i = fenceStart; i < o.Count; i++) o[i] = o[i] with { Opacity = 0.5 };
 
-        // 탐지 부채꼴(FR-20) — 기둥 센서가 보는 쪽 땅에. 철망 위 · 선 · 알약 아래에 그린다(펜스 너머 부채꼴이 철망에 묻히지 않고,
-        // A/B 알약 글자는 가리지 않게).
-        foreach (var key in world.Seq)
-            if (world.Sensors.TryGetValue(key, out var fs) && fs.HasFacing)
-                Fan(o, p, world.X[key], fs.IsBackFacing);
+        // 보는 쪽(FR-20)은 칩의 "뒤" 표지 · 속성 칸 · 저장값으로 말한다 — 땅의 작은 부채꼴 · 화살은 없앴다(사용자 요청 · 화면만 어지럽혔다).
 
         switch (shape)
         {
@@ -382,7 +378,7 @@ public static partial class FenceScene
         var big = s.Big(shape);
         Point[] bb;
 
-        // 보는 쪽(FR-20) — 뒤를 보면 몸체를 기둥 반대쪽으로 민다. 탐지 부채꼴은 정적 층(땅)에 그린다 — 칩 층에 두면 A/B 알약을 가린다.
+        // 보는 쪽(FR-20) — 뒤를 보면 몸체를 기둥 반대쪽으로 민다(칩의 "뒤" 표지와 함께 — 땅 부채꼴은 없앴다).
         var q = s.IsBackFacing ? p with { ZOffset = BackFacingOffset(p) } : p;
         Rect? plate = null;
 
@@ -625,7 +621,7 @@ public static partial class FenceScene
     public static bool IsPrimaryText(FenceInk ink) => ink is FenceInk.Number or FenceInk.NumberSmall or FenceInk.FenceLabel
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert or FenceInk.FacingTagText
         or FenceInk.GroupSub       // 묶음 카드 안 첫–끝 번호
-        or FenceInk.SideLabel;     // "펜스 외부 · 내부" — 방향 부채꼴을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
+        or FenceInk.SideLabel;     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
 
     private static double SafeZoom(double zoom) => zoom > 0.05 ? zoom : 0.05;
 
@@ -688,30 +684,6 @@ public static partial class FenceScene
         var size = Math.Min(8, w / 2.4);
         if (s.IsSuggested) o.Add(Poly(FenceInk.Proposal, new Point(x0, y0), new Point(x0 + size, y0), new Point(x0, y0 + size)));
         if (s.IsChanged) o.Add(Poly(FenceInk.Draft, new Point(x1, y0), new Point(x1 - size, y0), new Point(x1, y0 + size)));
-    }
-
-    /// <summary>
-    /// 탐지 부채꼴 + 화살(FR-20) — 기둥 밑동에서 보는 쪽 땅으로 편다. 앞 = 펜스 너머(외부 · 깊이 −), 뒤 = 보는 쪽(내부 · 깊이 +).
-    /// 색이 아니라 <b>형태와 방향</b>으로 말한다(실선 윤곽 — 점선 {4,3}·{5,3} 은 다른 뜻에 배정돼 있어 쓰지 않는다).
-    /// </summary>
-    private static void Fan(List<FenceShape> o, FenceProjector p, double cx, bool back)
-    {
-        const double HALF = 18, Y = 1;
-        var sign = back ? 1 : -1;
-        // 평면에서 펜스 너머는 "위"로만 밀린다 — 밑동부터 펴면 A/B 알약 띠에 묻히므로 알약 위 빈 띠(알약 ~ 체인 선 사이)로 올려 작게 편다.
-        var flat = 1 - p.K;
-        var lift = back ? 0 : 40 * flat;
-        var r = back ? 40 : 40 * p.K + 18 * flat;
-        var head = back ? 9 : 9 * p.K + 5 * flat;
-        var z0 = sign * (p.De / 2 + 2 + lift);
-        var fan = new List<Point> { p.P(cx, Y, z0) };
-        for (var i = 0; i <= 4; i++)
-        {
-            var x = HALF * (i / 2.0 - 1);
-            fan.Add(p.P(cx + x, Y, z0 + sign * (r - Math.Abs(x) * 0.35)));
-        }
-        o.Add(new FenceShape(FenceShapeKind.Polygon, FenceInk.Facing, fan.ToArray()));
-        o.Add(Poly(FenceInk.FacingArrow, p.P(cx - 5, Y, z0 + sign * r), p.P(cx + 5, Y, z0 + sign * r), p.P(cx, Y, z0 + sign * (r + head))));
     }
 
     /// <summary>목업 <c>box()</c> — 앞면 · (깊이가 있으면) 옆면 · 윗면.</summary>

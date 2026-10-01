@@ -108,21 +108,18 @@ public class WiringFacingTests
     }
 
     [Fact]
-    public void should_point_the_detection_fan_to_the_facing_side_and_skip_it_for_fence_sensors()
+    public void should_draw_no_facing_fan_or_arrow_on_the_ground_in_tilt_or_flat_when_sensors_face_either_way()
     {
+        // 사용자 요청(fence-style-art · 참고 remove-facing-fan.png) — 센서 밑 회색 삼각 · 화살을 없앤다. 보는 쪽은 칩의 "뒤" 표지 · 속성 칸 · 저장값.
         var sensors = new Dictionary<int, FenceSensor> { [1] = Sensor(1, M), [2] = Sensor(2, F), [3] = Sensor(3, M, WiringFacing.Back) };
         var world = FenceWorld.Build(WiringChain.Create(WiringShape.Line, new[] { 1, 2, 3 }), sensors);
         foreach (var p in new[] { FenceProjector.Tilt, FenceProjector.Flat })
         {
-            var arrows = FenceScene.Static(world, p, showRange: false, world.ControllerX, world.Chain.ControllerGap)
-                                   .Where(s => s.Ink == FenceInk.FacingArrow).ToList();
-            var ground = p.P(0, 0, 0).Y;
+            var shapes = FenceScene.Static(world, p, showRange: false, world.ControllerX, world.Chain.ControllerGap);
 
-            Assert.Equal(2, arrows.Count);                                                        // 펜스센서는 부채꼴이 없다
-            var front = arrows.Single(a => a.Points.Max(q => q.Y) < ground);                   // 앞 = 펜스 너머(외부 · 위)
-            var back = arrows.Single(a => a.Points.Min(q => q.Y) > ground);                    // 뒤 = 보는 쪽(내부 · 아래)
-            Assert.NotSame(front, back);
+            Assert.DoesNotContain(shapes, s => s.Ink.ToString().StartsWith("Facing") && s.Ink != FenceInk.FacingTag && s.Ink != FenceInk.FacingTagText);
         }
+        Assert.Contains(FenceScene.Sensor(sensors[3], WiringShape.Line, FenceProjector.Tilt, false).Shapes, s => s.Ink == FenceInk.FacingTagText);   // "뒤" 표지는 남는다
     }
 
     [Fact]

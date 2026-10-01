@@ -20,7 +20,7 @@ public static partial class FenceScene
     public const double RAZOR_R = 9;
 
     /// <summary>
-    /// 망 목록으로 세운 세계의 정적 층 — 땅 · 번호 · 탐지 범위 · 망(모양 5종) · 기둥 · 탐지 부채꼴. 케이블(리턴케이블 · 함체 쪽 · A/B 번호)은
+    /// 망 목록으로 세운 세계의 정적 층 — 땅 · 번호 · 탐지 범위 · 망(모양 5종) · 기둥. 케이블(리턴케이블 · 함체 쪽 · A/B 번호)은
     /// <paramref name="showCables"/> 일 때만(기본 꺼짐 — 연결은 개념도가 맡는다 · FR-12).
     /// </summary>
     public static IReadOnlyList<FenceShape> StaticLayout(FenceWorld world, FenceProjector p, bool showRange, bool showCables,
@@ -91,11 +91,6 @@ public static partial class FenceScene
             BoxC(o, p, x, h, h + 5, -p.De / 2 - 1.5 * p.K, p.De / 2 + 1.5 * p.K, PW + 4, FenceInk.CapFront, FenceInk.CapSide, FenceInk.CapTop, null);
             if (post.HasRazor) o.Add(Seg(FenceInk.RazorArm, p.P(x, h + 5, 0), p.P(x, h + 2 * RAZOR_R + 10, 0)));
         }
-
-        // 탐지 부채꼴(FR-20) — 망 위 · 케이블 아래
-        foreach (var key in world.Seq)
-            if (world.Sensors.TryGetValue(key, out var fs) && fs.HasFacing)
-                Fan(o, p, world.X[key], fs.IsBackFacing);
 
         if (showCables) LaneCables(o, world, p);
 
