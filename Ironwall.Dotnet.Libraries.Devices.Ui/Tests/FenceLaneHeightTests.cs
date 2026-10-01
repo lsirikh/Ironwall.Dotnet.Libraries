@@ -23,7 +23,7 @@ public class FenceLaneHeightTests
         var lower = FenceLayoutMath.LaneHeightM(new SensorMountSpec(1, FenceMountSpot.PostTop), g, twoLanes: true);
         var single = FenceLayoutMath.LaneHeightM(new SensorMountSpec(1, FenceMountSpot.PostTop), g, twoLanes: false);
 
-        Assert.True(upper > top + FenceLayoutMath.UPPER_LANE_RAZOR_RISE_M - 1e-9);                 // 코일 위
+        Assert.True(upper > top * (1 + FenceLayoutMath.UPPER_LANE_RAZOR_RISE_RATIO));                // 코일(지름 = 높이 40%) 위
         Assert.True(lower < top);                                                                  // 망 위
         Assert.Equal(top, single, 6);                                                              // 한 줄 현장은 그대로(기둥 위)
     }

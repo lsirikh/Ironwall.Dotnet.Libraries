@@ -308,8 +308,10 @@ public sealed class FenceWorld
             var spread = Separate(ordered.Select(k => world._x[k]).ToList(), MIN_CHIP_DX);
             for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = spread[i];
         }
-        foreach (var post in geometry.Posts) top = Math.Max(top, post.HeightM * vpm + (post.HasRazor ? 44 : 12));
-        foreach (var panel in geometry.Panels) top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 44 : 14));
+        // 윤형 — 받침(5) + 코일 지름(펜스 높이의 40%) 위까지
+        foreach (var post in geometry.Posts) top = Math.Max(top, post.HeightM * vpm + (post.HasRazor ? 12 + 2 * FenceStyleArt.CoilRadius(post.HeightM * vpm) : 12));
+        foreach (var panel in geometry.Panels)
+            top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 12 + 2 * FenceStyleArt.CoilRadius(panel.Spec.HeightM * vpm) : 14));
         world.TopHeight = top;
 
         // 두 줄 형상(v0.3 §1-0b) — 제어기는 펜스 왼쪽 끝 또는 오른쪽 끝 바깥(케이블 보기의 함체 · 끌면 반대쪽으로)

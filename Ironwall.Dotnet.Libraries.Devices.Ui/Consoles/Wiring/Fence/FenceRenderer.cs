@@ -158,7 +158,7 @@ public sealed class FenceRenderer
         FenceInk.ConceptVbus => new(B(Sunken), B(Tx2), 1.2),
         FenceInk.ConceptVbusText => new(null, null, 0, B(Tx1), false, FontWeights.Bold),
         FenceInk.ConceptTarget => new(null, B(Primary), 2),
-        FenceInk.RazorArm => new(null, B(Divider), 2.2, Cap: PenLineCap.Round),
+        FenceInk.RazorArm => new(null, B(Mix(Divider, Tx1, 0.25)), 3.2, Cap: PenLineCap.Round),
         FenceInk.BrickFront => new(BrickBrush(custom ?? Brick, Mortar), B(Mix(custom ?? Brick, Colors.Black, 0.3)), 0.8),
         FenceInk.BrickSide => new(B(Mix(custom ?? Brick, Colors.Black, 0.3)), null, 0),
         FenceInk.BrickTop => new(B(Mix(custom ?? Brick, Colors.White, 0.25)), null, 0),

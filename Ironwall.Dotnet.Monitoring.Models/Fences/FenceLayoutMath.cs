@@ -179,7 +179,12 @@ public static class FenceLayoutMath
 
     /// <summary>위 줄 센서가 펜스 꼭대기(윗 레일 · 윤형 코일) 위로 오르는 높이(m) — 윤형이면 코일 지름만큼 더.</summary>
     public const double UPPER_LANE_RISE_M = 0.10;
-    public const double UPPER_LANE_RAZOR_RISE_M = 0.35;
+    /// <summary>
+    /// 윤형 위 줄 — 코일(지름 = 펜스 높이 × 이 비 · 2.5D 펜스 뷰와 같은 값) 위로 오르고 <see cref="UPPER_LANE_RAZOR_CLEAR_M"/> 만큼 더 띄운다.
+    /// 번호판이 코일 선에 겹치지 않게(재검토 렌더: 위 줄 101…106 번호가 코일 안에 묻혔다).
+    /// </summary>
+    public const double UPPER_LANE_RAZOR_RISE_RATIO = 0.4;
+    public const double UPPER_LANE_RAZOR_CLEAR_M = 0.25;
 
     /// <summary>두 줄일 때 아래 줄 기둥 위 센서를 망 위로 내리는 비율(펜스 높이의 몫 — 윗 레일 아래).</summary>
     public const double LOWER_LANE_TOP_RATIO = 0.72;
@@ -217,7 +222,7 @@ public static class FenceLayoutMath
                 FenceMountSpot.WallFace => -0.20,
                 _ => 0,
             };
-            return top + (razor ? UPPER_LANE_RAZOR_RISE_M : UPPER_LANE_RISE_M) + adjust + m.HeightOffsetM;
+            return top + (razor ? top * UPPER_LANE_RAZOR_RISE_RATIO + UPPER_LANE_RAZOR_CLEAR_M : UPPER_LANE_RISE_M) + adjust + m.HeightOffsetM;
         }
         if (twoLanes && m.Spot == FenceMountSpot.PostTop) return top * LOWER_LANE_TOP_RATIO + m.HeightOffsetM;
         return point.HeightM;

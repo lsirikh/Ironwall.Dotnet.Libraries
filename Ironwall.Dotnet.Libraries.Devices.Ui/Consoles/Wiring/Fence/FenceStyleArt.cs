@@ -19,14 +19,23 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
 public static class FenceStyleArt
 {
     #region - Constants · LOD -
-    /// <summary>윤형 코일 반지름(세계 단위) — Y 받침 안에 얹힌다.</summary>
-    public const double COIL_R = 13;
-    /// <summary>Y 받침 팔 길이(세계 단위).</summary>
-    public const double ARM_LEN = 26;
-    /// <summary>코일 고리 사이(코일 반지름의 몫).</summary>
-    public const double COIL_STEP_RATIO = 0.45;
+    /// <summary>코일 지름 = 펜스 높이 × 이 비(참고 사진 35~45%).</summary>
+    public const double COIL_DIAMETER_RATIO = 0.4;
+    public const double COIL_R_MIN = 12;
+    public const double COIL_R_MAX = 34;
+    /// <summary>고리 가로 = 세로 × 이 비(0.45~0.6).</summary>
+    public const double COIL_ASPECT = 0.52;
+    /// <summary>고리 가운데 사이 = 지름 × 이 비(0.35~0.45).</summary>
+    public const double COIL_SPACING_RATIO = 0.4;
+    /// <summary>고리가 번갈아 기우는 각(라디안 · 약 10°).</summary>
+    public const double COIL_TILT = 0.17;
+    /// <summary>코일 가운데 높이 = 받침 위 반지름 × 이 비(Y 안에 앉는다).</summary>
+    public const double COIL_SEAT_RATIO = 0.95;
+    /// <summary>Y 받침 팔 — 수직에서 30° · 길이 = 코일 반지름 × 1.2.</summary>
+    public const double ARM_ANGLE = Math.PI / 6;
+    public const double ARM_LENGTH_RATIO = 1.2;
     /// <summary>코일 고리 하나의 점 수.</summary>
-    public const int COIL_LOOP_POINTS = 18;
+    public const int COIL_LOOP_POINTS = 20;
     /// <summary>망 한 칸의 코일 고리 상한.</summary>
     public const int COIL_LOOP_CAP = 40;
 
@@ -53,15 +62,20 @@ public static class FenceStyleArt
 
     #region - Razor (윤형철조망) -
     /// <summary>
-    /// Y 받침(기둥 위) — 기둥 끝에서 두 팔이 바깥으로 벌어진다. 입체에서는 깊이(앞 · 뒤)로, 평면에서는 좌우로 벌려 "Y" 로 읽히게 한다.
-    /// 팔 끝(코일 밑 철선이 걸리는 자리)을 함께 돌려준다.
+    /// 코일 반지름(세계 높이 단위) — 지름이 펜스 높이의 약 40%(참고 사진 · 재검토 렌더: 코일 지름이 또렷이 보여야 한다). 아주 낮거나 높은 펜스는 범위 안으로.
     /// </summary>
-    public static (IReadOnlyList<FenceShape> Shapes, double TipY, double TipZ) YArms(FenceProjector p, double x, double postTop)
+    public static double CoilRadius(double fenceHeight) => Math.Clamp(fenceHeight * COIL_DIAMETER_RATIO / 2, COIL_R_MIN, COIL_R_MAX);
+
+    /// <summary>
+    /// Y 받침(기둥 위) — 두 팔이 수직에서 30° 바깥으로(앞 모습에서 "V" 로 또렷이 · 참고 사진 ③), 길이 = 코일 반지름 × 1.2. 입체에서는 깊이로도 조금 벌린다.
+    /// 팔 끝 높이를 함께 돌려준다(철선이 걸리는 자리).
+    /// </summary>
+    public static (IReadOnlyList<FenceShape> Shapes, double TipY, double TipZ) YArms(FenceProjector p, double x, double postTop, double fenceHeight)
     {
-        var k = p.K;
-        var dx = ARM_LEN * 0.55 * (1 - 0.7 * k);
-        var tipY = postTop + ARM_LEN * 0.82;
-        var tipZ = ARM_LEN * 0.6 * k;
+        var length = CoilRadius(fenceHeight) * ARM_LENGTH_RATIO;
+        var dx = length * Math.Sin(ARM_ANGLE);
+        var tipY = postTop + length * Math.Cos(ARM_ANGLE);
+        var tipZ = length * 0.35 * p.K;
         var arms = new List<Point[]>
         {
             new[] { p.P(x, postTop, 0), p.P(x - dx, tipY, -tipZ) },
@@ -71,53 +85,81 @@ public static class FenceStyleArt
     }
 
     /// <summary>
-    /// 콘서티나 코일(망 한 칸 · <paramref name="xa"/>~<paramref name="xb"/>) — 겹쳐진 고리(가로로 조금씩 기운 원)를 원통처럼 늘어놓고, 고리 몇 개에 가시(짧은 틱),
-    /// Y 받침 팔 끝 · 가운데를 잇는 철선 셋. 고리 · 가시 · 철선은 각각 그림 하나로 묶는다.
+    /// 콘서티나 코일(망 한 칸 · <paramref name="xa"/>~<paramref name="xb"/>) — <b>앞에서 보이는 고리</b>: 겹친 타원(가로 = 세로 × <see cref="COIL_ASPECT"/>)이
+    /// 지름의 <see cref="COIL_SPACING_RATIO"/> 간격으로 줄지어, 번갈아 조금씩 기울어(용수철처럼) 겹친다. 고리마다 작은 가시, 팔 끝 사이 철선 둘 + 꼭대기 철선 하나.
+    /// 고리는 화면에서 타원으로 그린다 — 펜스와 직각인 원을 투영하면 앞 모습에서 선으로 접혀 "막대 줄"로 보였다(재검토 렌더).
     /// </summary>
-    /// <param name="postTop">기둥(망) 꼭대기 높이(세계 단위).</param>
-    public static IReadOnlyList<FenceShape> RazorCoil(FenceProjector p, double xa, double xb, double postTop, string? color = null)
+    /// <param name="postTop">기둥 꼭대기(받침 시작) 높이(세계 단위).</param>
+    /// <param name="fenceHeight">펜스 높이(세계 단위) — 코일 지름을 정한다.</param>
+    public static IReadOnlyList<FenceShape> RazorCoil(FenceProjector p, double xa, double xb, double postTop, double fenceHeight, string? color = null)
     {
         var o = new List<FenceShape>(3);
         if (xb - xa < 1) return o;
-        var r = COIL_R;
-        var cy = postTop + ARM_LEN * 0.55 + r * 0.25;
-        var step = Math.Max(r * COIL_STEP_RATIO, (xb - xa) / COIL_LOOP_CAP);
-        var loops = new List<Point[]>();
+        var geometry = CoilLayout(p, xa, xb, postTop, fenceHeight);
+        var loops = new List<Point[]>(geometry.Centers.Count);
         var barbs = new List<Point[]>();
-        var n = 0;
-        for (var x0 = xa + r * 0.4; x0 <= xb - r * 0.4 + 1e-6; x0 += step, n++)
+        for (var n = 0; n < geometry.Centers.Count; n++)
         {
+            var c = geometry.Centers[n];
+            var tilt = (n % 2 == 0 ? 1 : -1) * COIL_TILT;
+            var (sin, cos) = Math.SinCos(tilt);
             var loop = new Point[COIL_LOOP_POINTS];
             for (var i = 0; i < COIL_LOOP_POINTS; i++)
             {
                 var t = 2 * Math.PI * i / COIL_LOOP_POINTS;
-                // 고리는 펜스와 직각인 원(높이 · 깊이) — 가로로 조금 기울여(콘서티나) 이웃 고리와 겹친다
-                loop[i] = p.P(x0 + 0.42 * r * Math.Cos(t), cy + r * Math.Sin(t), r * Math.Cos(t) * 0.9);
+                var ex = geometry.Rx * Math.Cos(t);
+                var ey = geometry.Ry * Math.Sin(t);
+                loop[i] = new Point(c.X + ex * cos - ey * sin, c.Y + ex * sin + ey * cos);
             }
             loops.Add(loop);
-            if (n % 2 == 0)
-                for (var j = 0; j < 4; j++)
-                {
-                    var t = 2 * Math.PI * (j + 0.5 * (n % 4 == 0 ? 1 : 0)) / 4;
-                    var c = new Point3(x0 + 0.42 * r * Math.Cos(t), cy + r * Math.Sin(t), r * Math.Cos(t) * 0.9);
-                    barbs.Add(new[] { p.P(c.X - 1.6, c.Y - 1.6, c.Z), p.P(c.X + 1.6, c.Y + 1.6, c.Z) });
-                }
+            // 가시 — 고리 둘레에 짧은 틱(바깥으로)
+            for (var i = n % 3; i < COIL_LOOP_POINTS; i += COIL_LOOP_POINTS / 6)
+            {
+                var q = loop[i];
+                var v = q - c;
+                if (v.Length < 1e-6) continue;
+                v.Normalize();
+                barbs.Add(new[] { q - v * 1.2 + new Vector(-v.Y, v.X) * 1.3, q + v * 1.8 - new Vector(-v.Y, v.X) * 1.3 });
+            }
         }
         if (loops.Count > 0)
         {
             o.Add(Figures(FenceShapeKind.Strokes, FenceInk.RazorCoil, loops, closed: true, color));
             o.Add(Figures(FenceShapeKind.Strokes, FenceInk.RazorBarb, barbs, closed: false, color));
         }
-        var tipY = postTop + ARM_LEN * 0.82;
-        var tipZ = ARM_LEN * 0.6 * p.K;
+        // 철선 — 받침 팔 끝 높이에 둘(앞 · 뒤), 기둥 꼭대기 바로 위에 하나
+        var length = geometry.Radius * ARM_LENGTH_RATIO;
+        var tipY = postTop + length * Math.Cos(ARM_ANGLE);
+        var tipZ = length * 0.35 * p.K;
         var strands = new List<Point[]>
         {
             new[] { p.P(xa, tipY, -tipZ), p.P(xb, tipY, -tipZ) },
-            new[] { p.P(xa, tipY, tipZ), p.P(xb, tipY, tipZ) },
+            new[] { p.P(xa, tipY - length * 0.12, tipZ), p.P(xb, tipY - length * 0.12, tipZ) },
             new[] { p.P(xa, postTop + 2, 0), p.P(xb, postTop + 2, 0) },
         };
         o.Add(Figures(FenceShapeKind.Strokes, FenceInk.RazorStrand, strands, closed: false, null));
         return o;
+    }
+
+    /// <summary>코일 배치(시험 대상) — 고리 가운데(화면 좌표) · 화면 반지름(가로 · 세로) · 세계 반지름 · 꼭대기/바닥(화면 y).</summary>
+    public sealed record CoilGeometry(IReadOnlyList<Point> Centers, double Rx, double Ry, double Radius, double TopY, double BottomY);
+
+    /// <summary>
+    /// 코일 배치 — 가운데 높이 = 받침 위 반지름 × <see cref="COIL_SEAT_RATIO"/>(Y 안에 앉는다), 고리 간격 = 지름(화면) × <see cref="COIL_SPACING_RATIO"/>,
+    /// 망 한 칸의 고리는 <see cref="COIL_LOOP_CAP"/> 이하.
+    /// </summary>
+    public static CoilGeometry CoilLayout(FenceProjector p, double xa, double xb, double postTop, double fenceHeight)
+    {
+        var r = CoilRadius(fenceHeight);
+        var cy = postTop + r * COIL_SEAT_RATIO;
+        var ry = r * p.Cy;
+        var rx = ry * COIL_ASPECT;
+        var step = Math.Max(2 * ry * COIL_SPACING_RATIO, (xb - xa) / COIL_LOOP_CAP);
+        var centers = new List<Point>();
+        for (var x0 = xa + rx * 0.6; x0 <= xb - rx * 0.6 + 1e-6; x0 += step) centers.Add(p.P(x0, cy, 0));
+        if (centers.Count == 0 && xb - xa >= 1) centers.Add(p.P((xa + xb) / 2, cy, 0));
+        var mid = p.P(xa, cy, 0).Y;
+        return new CoilGeometry(centers, rx, ry, r, mid - ry * 1.02, mid + ry * 1.02);
     }
     #endregion
 
@@ -258,6 +300,5 @@ public static class FenceStyleArt
     private static FenceShape Figures(FenceShapeKind kind, FenceInk ink, IReadOnlyList<Point[]> figures, bool closed, string? color)
         => new(kind, ink, figures.SelectMany(f => f).ToArray(), Color: color, Figures: figures.Select(f => f.Length).ToArray(), Closed: closed);
 
-    private readonly record struct Point3(double X, double Y, double Z);
     #endregion
 }
