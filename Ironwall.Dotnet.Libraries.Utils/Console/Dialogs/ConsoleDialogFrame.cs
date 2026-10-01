@@ -196,6 +196,12 @@ public class ConsoleDialogFrame : ContentControl
     /// <summary>머리 오른쪽(닫기 왼편)에 끼우는 것 — 개수 배지 같은 작은 것만.</summary>
     public object? HeaderExtra { get => GetValue(HeaderExtraProperty); set => SetValue(HeaderExtraProperty, value); }
 
+    public static readonly DependencyProperty HelpKeyProperty = DependencyProperty.Register(
+        nameof(HelpKey), typeof(string), typeof(ConsoleDialogFrame), new PropertyMetadata(string.Empty));
+
+    /// <summary>대화창 머리의 "?" 키(help-callout FR-04) — 제목 칸 오른쪽 끝에 "?" 가 생긴다. 비우면 없다.</summary>
+    public string HelpKey { get => (string)GetValue(HelpKeyProperty); set => SetValue(HelpKeyProperty, value); }
+
     public static readonly DependencyProperty FooterExtraProperty = DependencyProperty.Register(
         nameof(FooterExtra), typeof(object), typeof(ConsoleDialogFrame), new PropertyMetadata(null));
 

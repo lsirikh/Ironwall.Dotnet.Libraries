@@ -9,6 +9,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Microsoft.Xaml.Behaviors;
 using Xunit;
 
@@ -428,6 +429,32 @@ public class HelpTipTests
     [Fact]
     public void should_default_the_empty_state_hint_to_an_inline_action()
         => Assert.Equal(ConsoleHintKind.Action, (ConsoleHintKind)ConsoleEmptyState.HintKindProperty.DefaultMetadata.DefaultValue);
+
+    [Fact]
+    public void should_put_a_question_mark_in_the_dialog_header_and_let_escape_close_only_the_callout_while_it_is_open()
+    {
+        Sta(() =>
+        {
+        Register("Test.Tip.Slot.Dialog");
+        var frame = new ConsoleDialogFrame { Title = "대화창", HelpKey = "Test.Tip.Slot.Dialog", Content = new TextBox() };
+        var cancels = 0;
+        frame.SecondaryInvoked += (_, _) => cancels++;
+
+        var r = OnWindow(frame, (window, _) =>
+        {
+            var tip = TipOf(frame);
+            tip.Open();
+            EscapeAt(window, frame);                          // 열려 있으면 말풍선만 닫힌다 — 대화창 취소가 아니다
+            var afterOpenEsc = (tip.IsChecked, cancels);
+            EscapeAt(window, frame);                          // 닫혀 있으면 대화창의 Esc(취소) 그대로
+            return (Scope: tip.Scope, afterOpenEsc, cancels);
+        }, useDefaultTemplate: false);
+
+        Assert.IsType<ConsoleDialogFrame>(r.Scope);
+        Assert.Equal((false, 0), r.afterOpenEsc);
+        Assert.Equal(1, r.cancels);
+        });
+    }
     #endregion
 
     #region - Theme -
@@ -490,6 +517,9 @@ public class HelpTipTests
         window.RaiseEvent(args);
         return args.Handled;
     }
+
+    private static void EscapeAt(Window window, UIElement target)
+        => target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window)!, Environment.TickCount, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
 
     private static void PreviewDown(UIElement element)
         => element.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseDownEvent });
