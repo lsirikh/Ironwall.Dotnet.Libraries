@@ -219,6 +219,34 @@ public class WiringFenceLanesTests
     }
 
     [Fact]
+    public void should_say_how_many_fence_sensors_moved_up_when_the_tier4_preset_is_first_chosen()
+    {
+        var (vm, _) = Build("SFSFF");
+
+        vm.ChooseBandPreset(NumberBandSet.PRESET_TIER4);
+
+        Assert.Contains("펜스센서 3대를 위 줄로 옮겼습니다", vm.StatusText);
+        vm.Undo();
+        Assert.All(vm.FenceChain.Keys, k => Assert.Equal(FenceLane.Lower, vm.FenceLayout.LaneOf(k)));   // 한 번에 취소
+    }
+
+    [Fact]
+    public void should_say_that_lanes_followed_the_chain_seats_when_a_table_move_crosses_the_lane_boundary()
+    {
+        // Arrange — 104 만 위 줄: 사슬 101 · 102 · 103 | 104
+        var (vm, _) = Build("SSSS");
+        vm.FenceSetLane(new[] { 104 }, FenceLane.Upper);
+
+        // Act — 표에서 101 을 사슬 끝(위 줄 자리)으로
+        vm.FencePlace(new[] { 101 }, WiringSpec.LINE_PRIMARY, 4);
+
+        // Assert — 줄은 사슬 자리를 따라 넘겨졌고, 상태 줄이 그렇게 말한다
+        Assert.Equal(FenceLane.Upper, vm.FenceLayout.LaneOf(101));
+        Assert.Equal(FenceLane.Lower, vm.FenceLayout.LaneOf(104));
+        Assert.Contains("줄이 바뀐 센서 2대", vm.StatusText);
+    }
+
+    [Fact]
     public void should_offer_upper_and_lower_lane_items_in_the_sensor_menu()
     {
         var (vm, _) = Build();

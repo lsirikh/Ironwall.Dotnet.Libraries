@@ -199,6 +199,9 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             var text = value ?? string.Empty;
             var renumbered = _board.TakeRenumbered();
             if (renumbered > 0) text = $"{text.TrimEnd('.', ' ')} · 번호 {renumbered}대 바뀜";
+            // 사슬 순서를 줄 경계 너머로 바꾸면 줄은 위치를 따라 넘겨진다(v0.3 FR-19) — 조용히 바뀌지 않게 알린다.
+            var handovers = _board.TakeLaneHandovers();
+            if (handovers > 0) text = $"{text.TrimEnd('.', ' ')} · 줄이 바뀐 센서 {handovers}대(사슬 자리를 따라)";
             _statusText = text;
             NotifyOfPropertyChange();
         }

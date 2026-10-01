@@ -567,7 +567,8 @@ public sealed class WiringBoard
             foreach (var s in keep) _undo.Push(s);
         }
         _undo.Push(Capture());
-        _renumbered = 0;            // 새 동작의 시작 — 그 동작이 다시 매긴 번호만 센다(상태 줄 "번호 n대 바뀜")
+        _renumbered = 0;
+        _laneHandovers = 0;            // 새 동작의 시작 — 그 동작이 다시 매긴 번호만 센다(상태 줄 "번호 n대 바뀜")
     }
 
     public bool CanUndo => _undo.Count > 0;
@@ -578,6 +579,7 @@ public sealed class WiringBoard
         if (_undo.Count == 0) return false;
         Restore(_undo.Pop());
         _renumbered = 0;
+        _laneHandovers = 0;
         return true;
     }
     #endregion
@@ -602,6 +604,17 @@ public sealed class WiringBoard
     private double _fenceSpacingBaseline = WiringSpacingTable.Default.FenceMetres;
 
     private static bool SameMetres(double a, double b) => Math.Abs(a - b) < 1e-9;
+
+    /// <summary>마지막 동작이 사슬 순서를 바꾸며 줄을 넘겨준 센서 수(표 · 목록에서 줄 경계를 넘겨 옮겼을 때 · 위치를 따라).</summary>
+    private int _laneHandovers;
+
+    /// <summary>줄을 넘겨받은 센서 수를 꺼내고 비운다 — 창이 상태 줄에 "줄이 바뀐 센서 n대" 를 붙인다.</summary>
+    public int TakeLaneHandovers()
+    {
+        var n = _laneHandovers;
+        _laneHandovers = 0;
+        return n;
+    }
 
     /// <summary>마지막 동작(<see cref="PushUndo"/> 이후)이 다시 매긴 번호 수.</summary>
     private int _renumbered;
@@ -887,6 +900,7 @@ public sealed class WiringBoard
         if (_fence.IsActive)
         {
             var (mounts, panels) = FenceLayoutMath.Reconcile(basis.Keys, _chain.Keys, _fence.Mounts, _fence.Panels, CategoryOf, _fence.ControllerEnd);
+            _laneHandovers += mounts.Count(p => _fence.Mounts.TryGetValue(p.Key, out var before) && before.Lane != p.Value.Lane);
             _fence = _fence.With(panels, mounts);
             // 번호는 체인 순서 · 구성원이 실제로 바뀌었을 때만 다시 매긴다(사람이 누른 같은 배치 — force — 로는 번호를 덮지 않는다).
             if (!basis.Keys.SequenceEqual(_chain.Keys)) Renumber();
