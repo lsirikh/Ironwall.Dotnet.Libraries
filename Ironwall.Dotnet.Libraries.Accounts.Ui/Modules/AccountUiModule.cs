@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Framework.Services;                 // TokenGenerator
 using Ironwall.Dotnet.Libraries.Accounts.Db.Modules;      // AccountDbModule
 using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;     // AccountApiModule (GOP useDbAuth=false)
@@ -94,6 +94,11 @@ public class AccountUiModule : Module
                         "useDbAuth=false(GOP 모드)인데 apiSetup(IApiSetupModel — GOP 서버 URL)이 주입되지 않았습니다.");
                 builder.RegisterModule(new AccountApiModule(_log, _apiSetup, name: "Account", count: _count));
                 _count += 3;   // AccountApiModule 이 IService Order 3슬롯 사용(ApiService/PermissionRefresh/LogoutOnExit) — 후속 모듈과 Order 충돌 방지
+
+                // SSO(PRD FR-01 · FR-03) — 로그인 패널이 열릴 때 에이전트로 먼저 시도한다.
+                //   에이전트가 없거나 서버에 교환 경로가 없으면(404) 조용히 평소 로그인 화면 — 설정 불필요.
+                //   훅(401 재교환)은 SSO 로그인이 성공했을 때만 켜진다. 비밀번호 세션은 예전 그대로다.
+                builder.RegisterModule(new Ironwall.Dotnet.Libraries.Sso.SsoModule());
             }
 
             // 6) 상태 VM (Phase 2 이관 완료) — 패널/다이얼로그 VM은 Phase 3에서 활성화

@@ -33,6 +33,15 @@ public interface IAccountApiService
     Task<ApiResponse<PermissionsSnapshotDto>> GetMyPermissionsAsync(CancellationToken ct = default)
         => throw new NotImplementedException();
 
+    /// <summary>
+    /// POST /api/auth/sso-exchange — SSO 앱 토큰을 GOP 세션으로 바꾼다(SSO PRD FR-04).
+    /// <para>헤더 <c>X-Client-Id</c>(설치 고유값)는 <c>ApiService</c> 가 모든 요청에 이미 붙인다 — 교환에서는 <b>필수</b>다.
+    /// 실패의 분기는 <see cref="Helpers.SsoExchangeResult.Retryable"/> 로 한다.</para>
+    /// <para>기본구현=미지원(테스트 스텁 무수정) — <see cref="GetMyPermissionsAsync"/> 와 같은 넓히기 방식.</para>
+    /// </summary>
+    Task<Helpers.SsoExchangeResult> SsoExchangeAsync(string ssoAccessToken, CancellationToken ct = default)
+        => throw new NotImplementedException();
+
     // ── User CRUD (FR-19) ──
     /// <summary>GET /api/users — 계정 목록 <b>한 페이지</b>(limit 상한 100, 운영 6.3.2 봉투엔 pagination 없음).</summary>
     Task<ApiListResponse<AuthUserDto>> GetUsersAsync(int page = 1, int limit = 100, CancellationToken ct = default);

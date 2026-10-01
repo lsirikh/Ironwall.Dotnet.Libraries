@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -33,6 +33,7 @@
 
     <!-- GOP-00: 서버 인증 어댑터 (useDbAuth=false 시 AccountApiModule 등록) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Sso\Ironwall.Dotnet.Libraries.Sso.csproj" />
 
     <!-- TokenGenerator / PasswordHelper 출처 — Services/Helpers 만 사용, Bootstrapper류 import 금지 -->
     <ProjectReference Include="..\Ironwall.Dotnet.Framework\Ironwall.Dotnet.Framework.csproj" />

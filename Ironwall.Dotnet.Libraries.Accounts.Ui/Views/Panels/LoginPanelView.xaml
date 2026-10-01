@@ -50,6 +50,10 @@
 						<Setter Property="Background" Value="{DynamicResource TintCriticalBrush}" />
 						<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
 					</DataTrigger>
+					<!--  SSO 안내(에이전트 로그인 · 허용 창 · 관리자 등록) — 오류가 아니라 다음 행동 안내라 중립색(기본 Setter 그대로)  -->
+					<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
+						<Setter Property="Visibility" Value="Visible" />
+					</DataTrigger>
 				</Style.Triggers>
 			</Style>
 			<Style x:Key="Login.ResultGlyph" TargetType="TextBlock">
@@ -65,6 +69,10 @@
 					<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
 						<Setter Property="Text" Value="⚠" />
 						<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+					</DataTrigger>
+					<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
+						<Setter Property="Text" Value="ⓘ" />
+						<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 					</DataTrigger>
 				</Style.Triggers>
 			</Style>
@@ -217,6 +225,9 @@
 											<Setter Property="Visibility" Value="Visible" />
 										</DataTrigger>
 										<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+										<DataTrigger Binding="{Binding IsLoginInfo}" Value="True">
 											<Setter Property="Visibility" Value="Visible" />
 										</DataTrigger>
 									</Style.Triggers>

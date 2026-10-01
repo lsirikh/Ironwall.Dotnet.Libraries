@@ -17,6 +17,23 @@ public class BearerAuthHandler : DelegatingHandler
 {
     private static readonly SemaphoreSlim _refreshLock = new(1, 1);
 
+    /// <summary>
+    /// <b>SSO 모드 재인증 훅</b> — SSO PRD FR-06. <c>null</c> 이면 레거시(refresh) 모드다.
+    ///
+    /// <para><b>왜 필요한가</b>: SSO 교환(<c>POST /api/auth/sso-exchange</c>)은 <c>refresh_token</c> 을 주지 않는다.
+    /// 그대로 두면 401 한 번에 <c>refreshToken</c> 이 비어 즉시 <see cref="SessionExpired"/>(강제 로그아웃)가 된다.
+    /// SSO 모드에서는 refresh 대신 이 훅이 <b>새 SSO 앱 토큰을 받아 재교환</b>하고 토큰 저장소를 갱신한다.</para>
+    ///
+    /// <para><b>왜 정적인가</b>: 핸들러는 도메인마다(계정·장비·이벤트·보고서·추적) 따로 만들어지지만
+    /// 토큰 저장소는 하나이고 <see cref="_refreshLock"/> 도 이미 <b>프로세스 전역</b>이다. SSO 여부도 프로세스 전체의
+    /// 모드라, 다섯 모듈을 고치지 않고 한 자리에서 켠다. 재교환은 <see cref="_refreshLock"/> 안에서 부르므로
+    /// 다섯 도메인이 동시에 401 을 받아도 <b>한 번만</b> 일어난다.</para>
+    ///
+    /// <para>훅의 책임: 새 토큰을 <b>저장소에 넣고</b>(세대 검사 포함) 결과만 돌려준다. 핸들러는 저장소의 새 토큰으로 재시도한다.
+    /// 시험은 설정 후 반드시 <c>null</c> 로 되돌린다.</para>
+    /// </summary>
+    public static Func<CancellationToken, Task<SsoReauthOutcome>>? SsoReauthenticator { get; set; }
+
     /// <summary>refresh 결과 — Renewed(갱신 성공) / Terminal(종단 실패=세션 만료) / Transient(일시 실패=재시도 위임, 세션 유지).</summary>
     private enum RefreshOutcome { Renewed, Terminal, Transient }
     private readonly ITokenStorageService _store;
@@ -54,6 +71,18 @@ public class BearerAuthHandler : DelegatingHandler
         // 폐기 세션(SESSION_REVOKED: 중복로그인 축출/강제/비번변경 등)이면 refresh 왕복이 무의미 — 즉시 세션 만료 처리(session-revoked-08).
         if (await IsSessionRevokedAsync(response).ConfigureAwait(false))
         {
+            // ★ SSO 모드 경합(FR-06): 재교환은 같은 (계정, X-Client-Id) 의 **앞선 교환 세션을 끝낸다**
+            //   (서버 sso.py — 옛 access 는 401 SESSION_REVOKED). 그래서 재교환 직전에 나간 요청은
+            //   우리가 스스로 갈아 끼운 세션 때문에 SESSION_REVOKED 를 받는다. 이걸 진짜 폐기로 보면
+            //   **재교환할 때마다 진행 중이던 요청이 강제 로그아웃을 일으킨다.**
+            //   판별: 이 요청을 보낸 뒤 저장소 토큰이 바뀌었으면 우리 재교환이 대체한 것 → 새 토큰으로 1회 재시도.
+            //   토큰이 그대로면 진짜 폐기(관리자 강제 로그아웃 등) → 기존대로 만료.
+            if (SsoReauthenticator is not null && IsSupersededByOurRenewal(staleToken))
+            {
+                _log?.Info($"[BearerAuthHandler] SESSION_REVOKED 이나 토큰이 이미 재교환됨 — 대체된 옛 세션으로 보고 새 토큰으로 재시도 (trigger={request.RequestUri?.AbsolutePath})");
+                return await RetryWithCurrentTokenAsync(request, response, cancellationToken).ConfigureAwait(false);
+            }
+
             _log?.Warning($"[BearerAuthHandler] SESSION_REVOKED 감지 — refresh 생략·세션 만료 발화 (401 trigger={request.RequestUri?.AbsolutePath})");
             SessionExpired?.Invoke();
             return response;
@@ -74,18 +103,34 @@ public class BearerAuthHandler : DelegatingHandler
             return response;
         }
 
-        // Renewed → 새 토큰으로 1회 재시도 (HttpRequestMessage 는 1회성이라 clone 필요)
-        response.Dispose();
+        // Renewed → 새 토큰으로 1회 재시도
+        return await RetryWithCurrentTokenAsync(request, response, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 저장소의 <b>현재</b> 토큰으로 원요청을 1회 재시도한다(HttpRequestMessage 는 1회성이라 clone).
+    /// 재시도도 401 이면 종단 세션 만료로 escalate — 재-refresh 재귀 금지(token-refresh-15, 좀비 세션 방지).
+    /// </summary>
+    private async Task<HttpResponseMessage> RetryWithCurrentTokenAsync(
+        HttpRequestMessage request, HttpResponseMessage original, CancellationToken cancellationToken)
+    {
+        original.Dispose();
         var retry = await CloneAsync(request).ConfigureAwait(false);
         ApplyBearer(retry, _store.AccessToken);
         var retryResponse = await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
-        // 재시도도 401이면 종단 세션 만료로 escalate(token-refresh-15 — 재-refresh 재귀 금지, 좀비 세션 방지)
         if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
         {
             _log?.Warning("[BearerAuthHandler] refresh 후 재시도도 401 — 세션 만료 escalate");
             SessionExpired?.Invoke();
         }
         return retryResponse;
+    }
+
+    /// <summary>이 요청을 보낸 뒤 저장소 토큰이 다른 유효 값으로 바뀌었는가 — 우리 재교환이 옛 세션을 대체했다는 신호.</summary>
+    private bool IsSupersededByOurRenewal(string? staleToken)
+    {
+        var current = _store.AccessToken;
+        return !string.IsNullOrEmpty(current) && !string.Equals(current, staleToken, StringComparison.Ordinal);
     }
 
     /// <summary>auth 액션 엔드포인트(로그인/갱신/로그아웃) 여부 — 401 refresh·세션만료 로직 제외 대상.</summary>
@@ -131,6 +176,35 @@ public class BearerAuthHandler : DelegatingHandler
             var refreshToken = _store.RefreshToken;
             if (string.IsNullOrEmpty(refreshToken))
             {
+                // ★ SSO 모드(FR-06): 교환은 refresh 를 주지 않으므로 여기가 정상 경로다.
+                //   refresh 대신 재교환한다 — 훅이 새 SSO 앱 토큰(매번 새 jti)을 받아 교환하고 저장소를 갱신한다.
+                //   이미 _refreshLock 안이라 다섯 도메인의 동시 401 이 재교환 한 번으로 모인다.
+                var reauth = SsoReauthenticator;
+                if (reauth is not null)
+                {
+                    SsoReauthOutcome o;
+                    try { o = await reauth(ct).ConfigureAwait(false); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // 훅의 예외는 세션을 죽이지 않는다 — 일시 실패로 보고 다음 요청·사용자 재시도에 맡긴다.
+                        _log?.Warning($"[BearerAuthHandler] SSO 재교환 훅 예외 — 일시 실패로 처리: {ex.GetType().Name} {ex.Message}");
+                        return RefreshOutcome.Transient;
+                    }
+
+                    switch (o)
+                    {
+                        case SsoReauthOutcome.Renewed:
+                            return RefreshOutcome.Renewed;
+                        case SsoReauthOutcome.Transient:
+                            _log?.Warning("[BearerAuthHandler] SSO 재교환 일시 실패 — 세션 유지·재시도 위임");
+                            return RefreshOutcome.Transient;
+                        default:
+                            _log?.Warning("[BearerAuthHandler] SSO 재교환 종단 실패(retryable=false) — 세션 만료");
+                            _store.Clear();
+                            return RefreshOutcome.Terminal;
+                    }
+                }
+
                 _store.Clear();
                 return RefreshOutcome.Terminal;
             }

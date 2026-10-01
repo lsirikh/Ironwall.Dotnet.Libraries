@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
@@ -9,6 +9,7 @@ using Xunit;
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Tests;
 
 /// <summary>FR-5 BearerAuthHandler — Bearer 주입 / 401 single-flight refresh+재시도 / 403 미시도 / 만료 이벤트.</summary>
+[Collection(BearerAuthHandlerStaticCollection.Name)]   // 정적 SsoReauthenticator 를 SsoExchangeTests 와 공유 — 직렬화
 public class BearerAuthHandlerTests
 {
     private static HttpClient BuildClient(SequenceHandler inner, ITokenStorageService store, IAccountApiService api, out BearerAuthHandler handler)
