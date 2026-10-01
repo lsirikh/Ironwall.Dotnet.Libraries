@@ -48,7 +48,16 @@ public static class ConceptScene
         {
             var first = points[0].Center;
             var last = points[^1].Center;
-            if (g.Shape == ConceptShape.Strip)
+            if (g.Shape == ConceptShape.Strip && g.Rows > 1)
+            {
+                // 여러 줄 — Ch1 은 왼쪽 여백을 타고 첫 줄 #1 로(줄 사이를 가로지르지 않게), Ch2 는 마지막 줄 끝 노드 아래로.
+                var gutter = ConceptLayout.STRIP_MARGIN / 2;
+                var low = g.Controller.Top - 8;
+                var mid = (points.Max(p => p.Center.Y) + r + 16 + low) / 2;
+                o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.ConceptReturn, new[] { g.Port1, new Point(g.Port1.X, low), new Point(gutter, low), new Point(gutter, first.Y), new Point(first.X - r, first.Y) }));
+                o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.ConceptReturn, new[] { g.Port2, new Point(g.Port2.X, mid), new Point(last.X, mid), new Point(last.X, last.Y + r) }));
+            }
+            else if (g.Shape == ConceptShape.Strip)
             {
                 var y = (first.Y + r + 14 + g.Controller.Top) / 2;
                 o.Add(new FenceShape(FenceShapeKind.Polyline, FenceInk.ConceptReturn, new[] { g.Port1, new Point(g.Port1.X, y), new Point(first.X, y), new Point(first.X, first.Y + r) }));

@@ -17,6 +17,7 @@ public enum ConceptShape
 public sealed record ConceptPoint(int Key, Point Center, double Param);
 
 /// <summary>개념도 한 장의 배치 — 노드 · 제어기 · 두 포트(Ch1(A) · Ch2(B)) · 그림 전체 크기.</summary>
+/// <param name="Rows">가로 띠의 줄 수(뱀 모양으로 꺾어 접은 줄 · 원형은 1).</param>
 public sealed record ConceptGeometry(
     ConceptShape Shape,
     IReadOnlyList<ConceptPoint> Nodes,
@@ -25,14 +26,17 @@ public sealed record ConceptGeometry(
     Point Port2,
     Size Extent,
     Point Center,
-    double Radius);
+    double Radius,
+    int Rows = 1);
 
 /// <summary>
 /// 개념도 배치 — <b>순수 함수</b>(fence-wiring-editor FR-12 · NFR-01). 링을 <b>Ch1(A) → #1 … #N → Ch2(B)</b> 로 그린다(모든 제어기가 같은 그림 · §1-0).
 /// </summary>
 /// <remarks>
 /// <para><b>가로 띠</b> — 노드를 한 줄로(간격 ≥ <see cref="STRIP_MIN_STEP"/>, 넓으면 칸에 맞춰 벌린다), 제어기는 아래 가운데, 두 포트에서 리턴케이블이 양 끝 노드로 간다.
-/// 노드가 많으면 그림이 칸보다 넓어진다(가로로 이동).</para>
+/// 한 줄에 다 들어가지 않으면 <b>뱀 모양으로 꺾어</b> 여러 줄에 놓는다(짝수 줄 → · 홀수 줄 ← · 꺾이는 곳은 같은 x 라 흐름 화살표가 그대로 이어진다).
+/// 줄이 <see cref="STRIP_MAX_ROWS"/> 를 넘으면 간격을 <see cref="STRIP_TIGHT_STEP"/> 까지 줄이고, 그래도 넘칠 때만 가로로 넓어진다.
+/// 제어기(Ch1 · Ch2)는 늘 보이는 칸 안 가운데 아래다.</para>
 /// <para><b>원형</b> — 제어기는 아래 가운데, #1 은 Ch1 쪽(왼쪽 아래)에서 시작해 시계 방향으로 위를 돌아 #N 이 Ch2 쪽(오른쪽 아래)에 온다.</para>
 /// </remarks>
 public static class ConceptLayout
@@ -44,11 +48,53 @@ public static class ConceptLayout
     public const double CONTROLLER_W = 108;
     public const double CONTROLLER_H = 30;
 
+    /// <summary>가로 띠를 꺾을 때 줄 간격(노드 · IP 글자 · 신호등이 겹치지 않는 높이).</summary>
+    public const double STRIP_ROW_STEP = 56;
+
+    /// <summary>줄을 더 늘리지 않는 한도 — 넘으면 간격을 좁힌다.</summary>
+    public const int STRIP_MAX_ROWS = 4;
+
+    /// <summary>좁힌 간격(노드 지름 + 여유).</summary>
+    public const double STRIP_TIGHT_STEP = 30;
+
+    /// <summary>마지막 줄 아래 · 제어기 위 — 신호등 · 리턴케이블이 지나는 높이.</summary>
+    private const double STRIP_BELOW_NODES = NODE_R + 16 + 26;
+
     /// <summary>원형에서 제어기 쪽에 비워 두는 각(도, 한쪽) — #1 과 #N 이 제어기 양옆에 온다.</summary>
     public const double RING_GAP_DEGREES = 26;
 
     public static ConceptGeometry Build(ConceptShape shape, IReadOnlyList<int> keys, Size available)
         => shape == ConceptShape.Ring ? Ring(keys, available) : Strip(keys, available);
+
+    /// <summary>가로 띠에 노드 <paramref name="count"/> 개를 놓을 줄 수 · 한 줄 칸 수 · 간격(폭 <paramref name="width"/>).</summary>
+    public static (int Rows, int Columns, double Step) StripGrid(int count, double width)
+    {
+        var usable = Math.Max(0, Math.Max(width, 2 * STRIP_MARGIN + CONTROLLER_W) - 2 * STRIP_MARGIN);
+        if (count <= 1) return (1, Math.Max(1, count), 0);
+        var columns = Math.Max(2, (int)Math.Floor(usable / STRIP_MIN_STEP) + 1);
+        if (count <= columns) return (1, count, Math.Max(STRIP_MIN_STEP, usable / (count - 1)));
+        var rows = (int)Math.Ceiling(count / (double)columns);
+        if (rows > STRIP_MAX_ROWS)
+        {
+            columns = Math.Max(2, (int)Math.Floor(usable / STRIP_TIGHT_STEP) + 1);
+            rows = (int)Math.Ceiling(count / (double)columns);
+            if (rows > STRIP_MAX_ROWS)
+            {
+                rows = STRIP_MAX_ROWS;
+                columns = (int)Math.Ceiling(count / (double)rows);
+                return (rows, columns, STRIP_TIGHT_STEP);                 // 이때만 가로로 넓어진다
+            }
+        }
+        return (rows, columns, usable / (columns - 1));
+    }
+
+    /// <summary>가로 띠가 원하는 높이 — 줄 수에 맞춰(한 줄이면 <paramref name="minimum"/>).</summary>
+    public static double StripHeight(int count, double width, double minimum)
+    {
+        var (rows, _, _) = StripGrid(count, width);
+        var lastRowY = STRIP_NODE_Y + STRIP_ROW_STEP * (rows - 1);
+        return Math.Max(minimum, lastRowY + STRIP_BELOW_NODES + CONTROLLER_H + 12);
+    }
 
     /// <summary>가로 띠.</summary>
     public static ConceptGeometry Strip(IReadOnlyList<int> keys, Size available)
@@ -56,6 +102,8 @@ public static class ConceptLayout
         var list = keys ?? Array.Empty<int>();
         var n = list.Count;
         var width = Math.Max(available.Width, 2 * STRIP_MARGIN + CONTROLLER_W);
+        var grid = StripGrid(n, width);
+        if (grid.Rows > 1) return Snake(list, width, available.Height, grid);
         var step = n <= 1 ? 0 : Math.Max(STRIP_MIN_STEP, (width - 2 * STRIP_MARGIN) / (n - 1));
         var extentWidth = n <= 1 ? width : Math.Max(width, 2 * STRIP_MARGIN + step * (n - 1));
         var height = Math.Max(available.Height, 120);
@@ -68,6 +116,26 @@ public static class ConceptLayout
         var port1 = new Point(controller.Left + 14, controller.Top);
         var port2 = new Point(controller.Right - 14, controller.Top);
         return new ConceptGeometry(ConceptShape.Strip, nodes, controller, port1, port2, new Size(extentWidth, height), new Point(extentWidth / 2, height / 2), 0);
+    }
+
+    /// <summary>뱀 모양 가로 띠 — 짝수 줄은 왼쪽 → 오른쪽, 홀수 줄은 오른쪽 → 왼쪽. 제어기는 보이는 칸(<paramref name="width"/>) 가운데 아래.</summary>
+    private static ConceptGeometry Snake(IReadOnlyList<int> list, double width, double availableHeight, (int Rows, int Columns, double Step) grid)
+    {
+        var n = list.Count;
+        var extentWidth = Math.Max(width, 2 * STRIP_MARGIN + grid.Step * (grid.Columns - 1));
+        var height = Math.Max(Math.Max(availableHeight, 120), StripHeight(n, width, 120));
+        var nodes = new List<ConceptPoint>(n);
+        for (var i = 0; i < n; i++)
+        {
+            var row = i / grid.Columns;
+            var column = i % grid.Columns;
+            if (row % 2 == 1) column = grid.Columns - 1 - column;
+            nodes.Add(new ConceptPoint(list[i], new Point(STRIP_MARGIN + grid.Step * column, STRIP_NODE_Y + STRIP_ROW_STEP * row), i / (double)(n - 1)));
+        }
+        var controller = new Rect(width / 2 - CONTROLLER_W / 2, height - CONTROLLER_H - 12, CONTROLLER_W, CONTROLLER_H);
+        var port1 = new Point(controller.Left + 14, controller.Top);
+        var port2 = new Point(controller.Right - 14, controller.Top);
+        return new ConceptGeometry(ConceptShape.Strip, nodes, controller, port1, port2, new Size(extentWidth, height), new Point(width / 2, height / 2), 0, grid.Rows);
     }
 
     /// <summary>원형.</summary>
@@ -109,6 +177,19 @@ public static class ConceptLayout
     {
         var nodes = geometry.Nodes;
         if (nodes.Count <= 1) return nodes.Count == 1 && pointer.X > nodes[0].Center.X ? 1 : 0;
+        if (geometry.Shape == ConceptShape.Strip && geometry.Rows > 1)
+        {
+            // 가장 가까운 줄 → 그 줄 안에서 줄 방향으로 포인터보다 앞선 노드 수(앞 줄 노드는 모두 앞선다)
+            var rowYs = nodes.Select(p => p.Center.Y).Distinct().OrderBy(y => y).ToList();
+            var rowY = rowYs.OrderBy(y => Math.Abs(y - pointer.Y)).First();
+            var row = rowYs.IndexOf(rowY);
+            var before = nodes.TakeWhile(p => p.Center.Y < rowY - 0.5).Count();
+            var inRow = nodes.Where(p => Math.Abs(p.Center.Y - rowY) < 0.5).ToList();
+            before += row % 2 == 0 ? inRow.Count(p => p.Center.X < pointer.X) : inRow.Count(p => p.Center.X > pointer.X);
+            if (before <= 0) return -0.01;
+            if (before >= nodes.Count) return 1.01;
+            return (before - 0.5) / (nodes.Count - 1);
+        }
         if (geometry.Shape == ConceptShape.Strip)
         {
             var first = nodes[0].Center.X;

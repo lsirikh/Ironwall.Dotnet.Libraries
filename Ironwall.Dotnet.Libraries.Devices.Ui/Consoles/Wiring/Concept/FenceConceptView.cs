@@ -122,9 +122,26 @@ public sealed class FenceConceptView : Grid
         Rebuild();
     }
 
+    /// <summary>
+    /// 가로 띠가 원하는 높이 — 노드가 한 줄에 다 들어가지 않으면 뱀 모양 줄 수만큼 키를 키운다(<see cref="ConceptLayout.StripHeight"/>).
+    /// 바깥 칸(펜스 뷰의 개념도 띠)은 높이를 고정하지 않고 이 값을 받는다 — 제어기 · Ch1 · Ch2 가 늘 보이게.
+    /// </summary>
+    protected override Size MeasureOverride(Size constraint)
+    {
+        base.MeasureOverride(constraint);
+        if (ViewModel is not { } vm || vm.IsConceptRing) return new Size(0, MinHeight);
+        var width = double.IsInfinity(constraint.Width) ? Math.Max(ActualWidth, 200) : Math.Max(constraint.Width, 200);
+        _measuredCount = vm.FenceChain.Count;
+        var height = ConceptLayout.StripHeight(_measuredCount, width, MinHeight);
+        return new Size(0, double.IsInfinity(constraint.Height) ? height : Math.Min(height, constraint.Height));
+    }
+
+    private int _measuredCount = -1;
+
     internal void Rebuild()
     {
         if (ViewModel is not { } vm) return;
+        if (!vm.IsConceptRing && vm.FenceChain.Count != _measuredCount) InvalidateMeasure();   // 줄 수가 바뀔 수 있다
         var nodes = vm.ConceptNodes();
         var size = new Size(Math.Max(ActualWidth, 200), Math.Max(ActualHeight, MinHeight));
         _geometry = ConceptLayout.Build(vm.IsConceptRing ? ConceptShape.Ring : ConceptShape.Strip, nodes.Select(n => n.Key).ToList(), size);

@@ -190,7 +190,9 @@
 			DockPanel.Dock="Bottom">
 			<Border.Style>
 				<Style TargetType="Border">
-					<Setter Property="Height" Value="168" />
+					<!--  가로 띠: 키는 개념도가 정한다(노드가 많으면 뱀 모양 줄 수만큼) · 원형: 고정  -->
+					<Setter Property="MinHeight" Value="168" />
+					<Setter Property="MaxHeight" Value="360" />
 					<Style.Triggers>
 						<DataTrigger Binding="{Binding IsConceptRing}" Value="True">
 							<Setter Property="Height" Value="290" />
