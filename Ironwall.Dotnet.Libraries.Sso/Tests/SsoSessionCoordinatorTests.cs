@@ -379,7 +379,7 @@ public partial class SsoSessionCoordinatorTests : IDisposable
     private sealed class FakeAgent : ISsoAgentGateway
     {
         private int _n;
-        public SsoAgentResult? Next { get; init; }
+        public SsoAgentResult? Next { get; set; }
         public bool Present { get; init; } = true;
         public bool IsAgentPresent() => Present;
         public Task<SsoAgentResult> SignInAsync(CancellationToken ct = default)

@@ -53,6 +53,34 @@ public sealed class SsoSessionCoordinator
     /// <summary>사건으로 로그아웃됐을 때 다음 로그인 화면에 보여 줄 안내 — <see cref="TakeSignOutNotice"/> 가 한 번 꺼낸다.</summary>
     private string? _signOutNotice;
 
+    /// <summary>
+    /// 에이전트가 "다시 들어와도 된다" 고 알리면 저절로 돌아갈 상태인가(1).
+    /// <para><b>에이전트 쪽 사정으로 로그인 화면에 왔을 때만</b> 1 이다 — 에이전트 사건으로 로그아웃됨 · 시작 시 에이전트 세션 없음.
+    /// 사람이 GIS 에서 직접 로그아웃했거나 비밀번호로 들어가면 0 — 에이전트 쪽 동작으로 되살리지 않는다.</para>
+    /// </summary>
+    private int _awaitingAgentReturn;
+
+    /// <summary>"다시 들어와도 된다" 처리 중(1) — 사건이 겹쳐 와도 교환은 한 번.</summary>
+    private int _returnBusy;
+
+    /// <summary>교환 → 마무리 구간을 하나로 — 시작 시도 · 단추 · 사건 복귀가 겹쳐도 로그인은 한 번만 마무리된다.</summary>
+    private readonly SemaphoreSlim _completeGate = new(1, 1);
+
+    /// <summary>
+    /// 에이전트의 "다시 들어와도 된다" 사건으로 저절로 로그인했다 — 로그인 화면이 이걸 받아 화면 상태를 채우고 닫는다.
+    /// <b>UI 스레드가 아닌 곳에서</b> 불린다.
+    /// </summary>
+    public event Action<SsoSignInResult>? SignedInByAgent;
+
+    /// <summary>
+    /// 에이전트가 이 프로그램을 끄라고 했다(사람이 에이전트에서 종료를 고름 · 관리자). 받는 쪽이 앱 종료 경로를 탄다.
+    /// <b>UI 스레드가 아닌 곳에서</b> 불린다.
+    /// </summary>
+    public event Action<SsoAgentEvent>? ExitRequested;
+
+    /// <summary>에이전트 복귀를 기다리는 중인가(시험 · 진단).</summary>
+    public bool IsAwaitingAgentReturn => Volatile.Read(ref _awaitingAgentReturn) == 1;
+
     /// <param name="completer">
     /// 로그인 마무리(권한 적용 · 로그인 게이팅 알림). 앱에서는 <b>반드시</b> 준다 — 없으면 토큰만 넣고 끝나
     /// 권한·GIS 초기화가 돌지 않는다. <c>null</c> 은 시험·진단용이다.
@@ -80,13 +108,25 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public void Enable() => BearerAuthHandler.SsoReauthenticator = _hook;
 
-    /// <summary>훅을 떼어 레거시(refresh) 모드로 돌린다 — 로그아웃·아이디/비밀번호 재로그인 때. 에이전트 사건 구독도 멈춘다.</summary>
+    /// <summary>
+    /// 훅을 떼어 레거시(refresh) 모드로 돌린다 — 로그아웃·아이디/비밀번호 재로그인 때.
+    /// 에이전트 사건 구독도 멈춘다 — 단 <b>에이전트 복귀를 기다리는 중이면 구독은 남긴다</b>(그래야 "다시 들어와도 된다" 를 듣는다).
+    /// </summary>
     public void Disable()
     {
         // 다른 조정자가 꽂은 훅까지 지우지 않는다.
         if (ReferenceEquals(BearerAuthHandler.SsoReauthenticator, _hook))
             BearerAuthHandler.SsoReauthenticator = null;
-        StopWatch();
+        if (!IsAwaitingAgentReturn) StopWatch();
+    }
+
+    /// <summary>
+    /// 에이전트 복귀 기다림을 끝낸다 — 사람이 비밀번호로 들어갔을 때. 이후 에이전트 쪽 동작으로 로그인이 바뀌지 않는다.
+    /// </summary>
+    public void CancelAgentReturn()
+    {
+        Interlocked.Exchange(ref _awaitingAgentReturn, 0);
+        if (!IsEnabled) StopWatch();   // SSO 세션이면 구독은 계속(끝 사건을 들어야 한다)
     }
 
     /// <summary>훅이 지금 이 조정자를 가리키는가.</summary>
@@ -104,7 +144,16 @@ public sealed class SsoSessionCoordinator
             return new SsoSignInResult { Status = SsoSignInStatus.AgentUnavailable, Message = "SSO 에이전트가 실행 중이 아닙니다" };
 
         var agent = await _agent.SignInAsync(ct).ConfigureAwait(false);
-        return await CompleteSignInAsync(agent, ct).ConfigureAwait(false);
+        var result = await CompleteSignInAsync(agent, ct).ConfigureAwait(false);
+
+        // 에이전트는 있는데 세션이 없다(로그인 전 · 이 앱만 로그아웃으로 막힘) — 사람이 에이전트에서 로그인하면
+        // 저절로 들어가도록 구독해 두고 기다린다. 사람이 GIS 에서 로그아웃한 경우가 아니므로 되살려도 된다.
+        if (result.Status == SsoSignInStatus.NeedsAgentLogin)
+        {
+            Interlocked.Exchange(ref _awaitingAgentReturn, 1);
+            StartWatch();
+        }
+        return result;
     }
 
     /// <summary>
@@ -119,8 +168,23 @@ public sealed class SsoSessionCoordinator
         return await CompleteSignInAsync(agent, ct).ConfigureAwait(false);
     }
 
-    /// <summary>에이전트 결과 → 교환 → 로그인 마무리 → 재교환 훅 · 사건 구독. 시작 로그인과 단추가 함께 쓴다.</summary>
+    /// <summary>
+    /// 에이전트 결과 → 교환 → 로그인 마무리 → 재교환 훅 · 사건 구독. 시작 로그인 · 단추 · 에이전트 복귀가 함께 쓴다.
+    /// 세 길이 겹쳐도 마무리는 한 번 — 뒤에 온 쪽은 "이미 로그인됨" 으로 끝난다.
+    /// </summary>
     private async Task<SsoSignInResult> CompleteSignInAsync(SsoAgentResult agent, CancellationToken ct)
+    {
+        if (!agent.IsOk)
+        {
+            _log?.Info($"[SSO] 에이전트 로그인 불가 — {agent.Status}: {agent.Detail}");
+            return SsoSignInResult.FromAgent(agent);
+        }
+        await _completeGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await CompleteSignInCoreAsync(agent, ct).ConfigureAwait(false); }
+        finally { _completeGate.Release(); }
+    }
+
+    private async Task<SsoSignInResult> CompleteSignInCoreAsync(SsoAgentResult agent, CancellationToken ct)
     {
         if (!agent.IsOk)
         {
@@ -163,6 +227,7 @@ public sealed class SsoSessionCoordinator
 
         Enable();
         Interlocked.Exchange(ref _signingOut, 0);
+        Interlocked.Exchange(ref _awaitingAgentReturn, 0);   // 들어왔다 — 더 기다리지 않는다
         StartWatch();
         _log?.Info($"[SSO] 로그인 완료 — user={data.User?.LoginId} session={data.SessionId}");
         return SsoSignInResult.SignedIn(data, auth);
@@ -177,6 +242,13 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     internal static SsoEventAction Decide(SsoAgentEvent e)
     {
+        // SALP 1.4(에이전트 3.10.14) — "지금 SignInAsync 를 부르면 창 없이 될 것이다" 힌트. reason: reallowed · login.
+        if (string.Equals(e.Event, "session-available", StringComparison.OrdinalIgnoreCase))
+            return SsoEventAction.SessionAvailable;
+        // 에이전트가 이 프로그램을 끄라고 함 — GIS 가 SSO 에 요청한 이름(2026-10-02). SSO 가 다른 이름으로 정하면 여기만 바꾼다.
+        if (string.Equals(e.Event, "exit-requested", StringComparison.OrdinalIgnoreCase))
+            return SsoEventAction.ExitRequested;
+
         var blocked = string.Equals(e.Reason, "blocked", StringComparison.OrdinalIgnoreCase);
         if (string.Equals(e.Event, "signed-out", StringComparison.OrdinalIgnoreCase))
             return blocked ? SsoEventAction.AppBlocked : SsoEventAction.AppSignedOut;
@@ -249,8 +321,22 @@ public sealed class SsoSessionCoordinator
         {
             var action = Decide(e);
             _log?.Info($"[SSO] 에이전트 사건 — event={e.Event} reason={e.Reason} at={e.At:o} → {action}");
-            if (action == SsoEventAction.Ignore) return;
-            _ = SignOutFromAgentAsync(action);
+            switch (action)
+            {
+                case SsoEventAction.Ignore:
+                    return;
+                case SsoEventAction.SessionAvailable:
+                    _ = ReturnFromAgentAsync(e.Reason);
+                    return;
+                case SsoEventAction.ExitRequested:
+                    // 앱을 닫는 판단 · 경로(저장 안 한 창 확인 · 와치독 신호)는 받는 쪽(로그인 화면 → 셸 종료 경로)이 한다.
+                    try { ExitRequested?.Invoke(e); }
+                    catch (Exception ex) { _log?.Warning($"[SSO] 종료 요청 처리 예외: {ex.GetType().Name} {ex.Message}"); }
+                    return;
+                default:
+                    _ = SignOutFromAgentAsync(action);
+                    return;
+            }
         }
         catch (Exception ex)
         {
@@ -273,6 +359,11 @@ public sealed class SsoSessionCoordinator
             if (!_store.IsAuthenticated) return;   // 이미 로그아웃(사람 · 401 · 만료)
 
             Volatile.Write(ref _signOutNotice, NoticeFor(action));
+
+            // 에이전트 쪽 사정으로 나간다 — 에이전트가 "다시 들어와도 된다"(session-available)를 알리면 저절로 돌아온다.
+            // 차단은 사람이 풀어야 하므로 기다리지 않는다(풀리면 다음 실행 · 단추로 안다 — SSO 1.4 에 차단 해제 사건 없음).
+            if (action is not (SsoEventAction.AppBlocked or SsoEventAction.PcBlocked))
+                Interlocked.Exchange(ref _awaitingAgentReturn, 1);
 
             try
             {
@@ -299,7 +390,43 @@ public sealed class SsoSessionCoordinator
         }
         finally
         {
-            StopWatch();
+            // 복귀를 기다리면 구독을 남긴다(로그인 화면에서도 session-available 을 들어야 한다). 차단이면 멈춘다.
+            if (!IsAwaitingAgentReturn) StopWatch();
+        }
+    }
+
+    /// <summary>
+    /// 에이전트가 "다시 들어와도 된다"(<c>session-available</c>)고 알렸다 — 기다리던 중이면 창 없이 SSO 로그인한다.
+    /// <para>무시하는 때: 기다리지 않음(사람이 GIS 에서 직접 로그아웃 · 비밀번호로 들어감) · 이미 로그인돼 있음 · 처리 중.
+    /// 힌트일 뿐이라 실패해도 재시도하지 않는다(NoActiveSession 등은 로그인 화면 유지 — SSO 계약).</para>
+    /// </summary>
+    internal async Task ReturnFromAgentAsync(string reason)
+    {
+        if (!IsAwaitingAgentReturn) { _log?.Info($"[SSO] session-available({reason}) — 복귀를 기다리지 않아 무시(GIS 에서 직접 로그아웃 등)"); return; }
+        if (_store.IsAuthenticated) { _log?.Info($"[SSO] session-available({reason}) — 이미 로그인돼 있어 무시"); return; }
+        if (Interlocked.CompareExchange(ref _returnBusy, 1, 0) != 0) return;
+        try
+        {
+            var agent = await _agent.SignInAsync().ConfigureAwait(false);
+            var r = await CompleteSignInAsync(agent, CancellationToken.None).ConfigureAwait(false);
+            if (r.CanSkipLoginScreen)
+            {
+                _log?.Info($"[SSO] 에이전트 복귀로 저절로 로그인 — reason={reason}");
+                try { SignedInByAgent?.Invoke(r); }
+                catch (Exception ex) { _log?.Warning($"[SSO] 복귀 로그인 알림 처리 예외: {ex.GetType().Name} {ex.Message}"); }
+            }
+            else
+            {
+                _log?.Info($"[SSO] session-available({reason}) 뒤 로그인 안 됨 — {r.Status}: {r.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[SSO] 에이전트 복귀 처리 예외: {ex.GetType().Name} {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _returnBusy, 0);
         }
     }
 
@@ -481,6 +608,10 @@ public enum SsoEventAction
     SessionRevoked,
     /// <summary><c>session-ended</c> · <c>blocked</c> — 관리자가 이 PC 를 막음.</summary>
     PcBlocked,
+    /// <summary><c>session-available</c>(SALP 1.4) — 다시 들어와도 된다(<c>reallowed</c> · <c>login</c>). 기다리던 중이면 저절로 로그인.</summary>
+    SessionAvailable,
+    /// <summary><c>exit-requested</c> — 에이전트가 이 프로그램을 끄라고 함(GIS 요청 2026-10-02, SSO 확정 전).</summary>
+    ExitRequested,
 }
 
 /// <summary>시작 로그인 결과 분류 — 로그인 화면의 안내문과 1:1.</summary>

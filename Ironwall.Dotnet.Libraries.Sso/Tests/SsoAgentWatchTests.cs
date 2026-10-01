@@ -43,11 +43,10 @@ public partial class SsoSessionCoordinatorTests
     [Fact]
     public void should_have_notice_for_every_sign_out_action()
     {
-        foreach (SsoEventAction a in Enum.GetValues(typeof(SsoEventAction)))
-        {
-            if (a == SsoEventAction.Ignore) Assert.Empty(SsoSessionCoordinator.NoticeFor(a));
-            else Assert.False(string.IsNullOrWhiteSpace(SsoSessionCoordinator.NoticeFor(a)));
-        }
+        var signOuts = new[] { SsoEventAction.AppSignedOut, SsoEventAction.AppBlocked, SsoEventAction.SessionEnded, SsoEventAction.SessionRevoked, SsoEventAction.PcBlocked };
+        foreach (var a in signOuts)
+            Assert.False(string.IsNullOrWhiteSpace(SsoSessionCoordinator.NoticeFor(a)));
+        Assert.Empty(SsoSessionCoordinator.NoticeFor(SsoEventAction.Ignore));
     }
 
     // ══ 구독 수명 ═════════════════════════════════════════════════════
@@ -66,7 +65,8 @@ public partial class SsoSessionCoordinatorTests
     [Fact]
     public async Task should_not_watch_when_sso_sign_in_fails()
     {
-        var (sut, agent, _, _, _) = SignedInWithLifecycle(agent: new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.NoActiveSession, "x") });
+        // NoActiveSession 은 복귀를 기다리며 구독한다(SsoAgentReturnTests) — 여기서는 기다릴 이유가 없는 실패.
+        var (sut, agent, _, _, _) = SignedInWithLifecycle(agent: new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.NotRegistered, "x") });
 
         await sut.TrySignInAsync();
 
@@ -113,8 +113,9 @@ public partial class SsoSessionCoordinatorTests
         Assert.Equal(new[] { EnumRevokeReason.SessionRevoked }, logouts);
         Assert.False(store.IsAuthenticated);
         Assert.False(sut.IsEnabled);    // 훅이 떨어져 뒤늦은 401 이 재교환으로 되살리지 않는다
-        Assert.False(sut.IsWatching);
-        Assert.Equal(1, Volatile.Read(ref agent.WatchDisposed));
+        Assert.True(sut.IsAwaitingAgentReturn);   // 에이전트 쪽 사정으로 나갔다 — 복귀를 기다린다
+        Assert.True(sut.IsWatching);              // 로그인 화면에서도 session-available 을 들어야 한다
+        Assert.Equal(0, Volatile.Read(ref agent.WatchDisposed));
     }
 
     [Fact]
@@ -218,7 +219,7 @@ public partial class SsoSessionCoordinatorTests
 
         Assert.Equal(2, api.LogoutCalls);
         Assert.Equal(2, logouts.Count);
-        Assert.Equal(2, agent.WatchOpened);
+        Assert.Equal(1, agent.WatchOpened);   // 첫 로그아웃 뒤에도 구독을 남겨 두었다(복귀 대기) — 다시 열지 않는다
     }
 
     // ══ "SSO 로 로그인" 단추 ═════════════════════════════════════════

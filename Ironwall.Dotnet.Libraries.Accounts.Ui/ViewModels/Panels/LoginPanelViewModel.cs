@@ -34,6 +34,34 @@ public class LoginPanelViewModel : BasePanelViewModel
         AccountProvider = accountProvider;
         _gateway = gateway;
         _sso = sso;
+
+        if (_sso is not null)
+        {
+            // 에이전트 "다시 들어와도 된다"(session-available)로 조정자가 저절로 로그인했다 — 이 패널은 SingleInstance 라
+            // 앱 내내 받는다. 사건 스레드에서 오므로 UI 스레드로 옮겨 ClickOk 성공 경로와 같은 화면 상태를 채운다.
+            _sso.SignedInByAgent += r => _ = Execute.OnUIThreadAsync(() => OnSignedInByAgentAsync(r));
+            // 에이전트가 이 프로그램을 끄라고 했다 — 셸의 종료 경로(저장 안 한 창 확인 · 와치독 graceful)를 그대로 탄다.
+            // 사람이 에이전트에서 고른 종료라 "종료하시겠습니까?" 확인 창은 건너뛴다(ExitProgramMessageModel 직접).
+            _sso.ExitRequested += e => _ = Execute.OnUIThreadAsync(async () =>
+            {
+                _log?.Info($"[Login] SSO 에이전트 종료 요청 — reason={e.Reason}");
+                await _eventAggregator!.PublishOnUIThreadAsync(new ExitProgramMessageModel());
+            });
+        }
+    }
+
+    private async Task OnSignedInByAgentAsync(SsoSignInResult r)
+    {
+        try
+        {
+            _ssoButtonCts?.Cancel();   // 단추로 기다리던 중이면 그 기다림은 끝낸다 — 이미 들어왔다
+            if (!await ApplySsoSignInAsync(r).ConfigureAwait(true))
+                _log?.Warning("[Login] 에이전트 복귀 로그인 결과를 화면에 채우지 못했다(마무리 결과 없음)");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Login] 에이전트 복귀 로그인 화면 처리 예외: {ex.GetType().Name} {ex.Message}");
+        }
     }
     #endregion
     #region - Overrides -
@@ -122,6 +150,9 @@ public class LoginPanelViewModel : BasePanelViewModel
 
             await _gateway.RecordLoginAsync(ViewModel.Username, IsUsernameSaved, ct);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+
+            // 사람이 비밀번호로 들어왔다 — 에이전트 복귀(session-available)로 로그인이 바뀌지 않게 기다림을 끝낸다.
+            _sso?.CancelAgentReturn();
 
             SetLoginSuccess("로그인 성공");
             // 🔒 보안: 토큰/만료/세션을 로그에 남기지 않는다 (기존 L115 평문 토큰 로깅 제거)
