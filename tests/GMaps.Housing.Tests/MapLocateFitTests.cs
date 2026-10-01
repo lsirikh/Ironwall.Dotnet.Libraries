@@ -32,6 +32,20 @@ public class MapLocateFitTests
         // Arrange — 1200×800 지도 · 줌 18 · 심볼은 북동쪽 약 7 km(줌 18 에서 화면 밖 수천 px)
         var map = new GMapCustomControl { MinZoom = 1, MaxZoom = 21, Position = new PointLatLng(HomeLat, HomeLng) };
         map.Zoom = 18;
+        // 하네스 함정(MapViewTiltOverscanBindingTests 와 같음): 벤더 GMapControl 은 판 템플릿 · 항목 템플릿 · 항목 스타일을 정적 필드로 공유한다(GMapControl.cs:794-796).
+        // 다른 STA 스레드의 선행 시험이 먼저 만들면 Seal() · ApplyItemContainerStyle 이 "다른 스레드가 이 개체를 소유" 로 실행 순서에 따라 실패한다.
+        // 벤더와 같은 모양(GMapControl.cs:826-852)을 이 스레드에서 다시 만들어 결정적으로 만든다.
+        var itemsHost = new FrameworkElementFactory(typeof(Canvas));
+        itemsHost.SetValue(Panel.IsItemsHostProperty, true);
+        map.ItemsPanel = new ItemsPanelTemplate(itemsHost);
+        var itemPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        itemPresenter.SetBinding(ContentPresenter.ContentProperty, new System.Windows.Data.Binding("Shape"));
+        map.ItemTemplate = new DataTemplate(typeof(GMapMarker)) { VisualTree = itemPresenter };
+        var itemStyle = new Style();
+        itemStyle.Setters.Add(new Setter(Canvas.LeftProperty, new System.Windows.Data.Binding("LocalPositionX")));
+        itemStyle.Setters.Add(new Setter(Canvas.TopProperty, new System.Windows.Data.Binding("LocalPositionY")));
+        itemStyle.Setters.Add(new Setter(Panel.ZIndexProperty, new System.Windows.Data.Binding("ZIndex")));
+        map.ItemContainerStyle = itemStyle;
         var window = new Window
         {
             Width = 1200, Height = 800, Left = -20000, Top = -20000,
