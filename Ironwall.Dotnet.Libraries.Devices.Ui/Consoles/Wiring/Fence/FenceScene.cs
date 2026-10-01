@@ -31,6 +31,8 @@ public enum FenceInk
     ConceptWire, ConceptReturn, ConceptArrow, ConceptNode, ConceptNodeIp, ConceptNodeText, ConceptNodeSub, ConceptController, ConceptControllerText,
     ConceptPort, ConceptPortText, ConceptTitle, ConceptInfo, ConceptInsert, ConceptInternalNet,
     BrickSide, BrickTop,
+    // 작은 배율의 윤형 철조망 — 코일 대신 톱니 띠 하나(fence-wiring-editor 검토 V2)
+    RazorBand,
 }
 
 public enum FenceShapeKind { Polygon, Polyline, Line, Ellipse, Rect, Text, Pill }
@@ -454,7 +456,12 @@ public static partial class FenceScene
     }
 
     /// <summary>펜스센서 묶음 칩(FR-18) — "펜스센서 ×N" 겹 카드 + 첫–끝 번호.</summary>
-    public static FenceChipPicture Group(IReadOnlyList<FenceSensor> members, WiringShape shape, FenceProjector p, bool selected, double zoom = 1)
+    /// <param name="maxWidth">
+    /// 이웃 칩까지 남는 폭(세계 단위) — 작은 배율에서 글자가 줌에 맞서 커지면 카드가 이웃 번호를 덮는다(검토 V2 · 실측 34%).
+    /// 넘치면 짧은 카드("×5" · 번호 줄 없음)로 줄인다(기둥 솎기와 같은 생각 — 덮느니 줄인다). 없으면 제한 없음.
+    /// </param>
+    public static FenceChipPicture Group(IReadOnlyList<FenceSensor> members, WiringShape shape, FenceProjector p, bool selected, double zoom = 1,
+                                         double maxWidth = double.PositiveInfinity)
     {
         var o = new List<FenceShape>(10);
         var n = members.Count;
@@ -463,7 +470,15 @@ public static partial class FenceScene
         var titleSize = Math.Max(15, MIN_TEXT / SafeZoom(zoom));
         var subSize = Math.Max(11, MIN_TEXT / SafeZoom(zoom));
         var w = Math.Max(Math.Max(EstimateWidth(title, titleSize), EstimateWidth(range, subSize)) + 26, 70);
-        var h = Math.Max(40, titleSize + subSize + 16);
+        var compact = w > maxWidth;
+        if (compact)
+        {
+            title = $"×{n}";
+            range = string.Empty;
+            subSize = 0;
+            w = Math.Max(EstimateWidth(title, titleSize) + 16, 30);
+        }
+        var h = compact ? Math.Max(26, titleSize + 10) : Math.Max(40, titleSize + subSize + 16);
         var c = p.P(0, 66, p.De / 2 + 4);
         var x = c.X - w / 2;
         var y = c.Y - h / 2;
@@ -474,9 +489,9 @@ public static partial class FenceScene
         o.Add(RectShape(FenceInk.GroupBack, new Rect(x + 4, y - 4, w, h), 15));
         o.Add(RectShape(FenceInk.GroupBody, new Rect(x, y, w, h), 15));
         // 첫–끝 번호는 카드 <b>안</b> 둘째 줄 — 카드 밖에 두면 기둥 · 철망 무늬 위라 읽히지 않았다(실측 · 2026-09-29).
-        var top = y + (h - titleSize - subSize - 4) / 2;
+        var top = compact ? y + (h - titleSize) / 2 : y + (h - titleSize - subSize - 4) / 2;
         o.Add(Text(FenceInk.GroupText, new Point(c.X, top + titleSize * 0.86), title, titleSize));
-        o.Add(Text(FenceInk.GroupSub, new Point(c.X, top + titleSize + 4 + subSize * 0.82), range, subSize));
+        if (!compact) o.Add(Text(FenceInk.GroupSub, new Point(c.X, top + titleSize + 4 + subSize * 0.82), range, subSize));
         if (members.Any(m => m.IsChanged))
             o.Add(Poly(FenceInk.Draft, new Point(x + w - 14, y), new Point(x + w - 4, y), new Point(x + w, y + 4), new Point(x + w, y + 14)));
         if (selected) o.Add(RectShape(FenceInk.Select, new Rect(x - 5, y - 9, w + 18, h + 30), 16));

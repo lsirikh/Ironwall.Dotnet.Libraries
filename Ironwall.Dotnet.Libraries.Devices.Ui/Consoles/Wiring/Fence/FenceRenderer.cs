@@ -120,6 +120,7 @@ public sealed class FenceRenderer
         FenceInk.PanelSelectEdge => new(null, B(Selection), 2.2, Join: PenLineJoin.Round),
         FenceInk.RubberBand => new(B(Color.FromArgb(0x1A, Primary.R, Primary.G, Primary.B)), B(Primary), 1, Dash: new[] { 5.0, 3.0 }),
         FenceInk.Razor => new(null, B(custom ?? RazorColor), 1.2),
+        FenceInk.RazorBand => new(B(custom ?? RazorColor), null, 0),
         FenceInk.RazorArm => new(null, B(Divider), 2.2, Cap: PenLineCap.Round),
         FenceInk.BrickFront => new(BrickBrush(custom ?? Brick, Mortar), B(Mix(custom ?? Brick, Colors.Black, 0.3)), 0.8),
         FenceInk.BrickSide => new(B(Mix(custom ?? Brick, Colors.Black, 0.3)), null, 0),

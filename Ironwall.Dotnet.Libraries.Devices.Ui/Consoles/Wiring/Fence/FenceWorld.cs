@@ -293,6 +293,11 @@ public sealed class FenceWorld
             world._lift[key] = lift;
             top = Math.Max(top, lift + (kind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
         }
+        // 모양이 바뀌는 곳(담 ↔ 철망 · 기둥 자리 ↔ 망 가운데)에서 이웃 칩이 거의 같은 x 에 서면 번호판이 겹친다(검토 V3) —
+        // 체인 순서를 지킨 채 겹친 것만 최소 간격으로 벌린다(무리 가운데는 제자리 평균).
+        var ordered = chain.Keys.Where(world._x.ContainsKey).ToList();
+        var spread = Separate(ordered.Select(k => world._x[k]).ToList(), MIN_CHIP_DX);
+        for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = spread[i];
         foreach (var post in geometry.Posts) top = Math.Max(top, post.HeightM * vpm + (post.HasRazor ? 44 : 12));
         foreach (var panel in geometry.Panels) top = Math.Max(top, panel.Spec.HeightM * vpm + (panel.Spec.Style == EnumFenceStyle.ChainLinkRazor ? 44 : 14));
         world.TopHeight = top;
@@ -302,6 +307,37 @@ public sealed class FenceWorld
         world.MinX = xs.Min();
         world.MaxX = xs.Max();
         return world;
+    }
+
+    /// <summary>이웃 칩의 최소 간격(세계 단위) — 같은 자리 벌림(<see cref="STACK_DX"/>)과 같다(번호판 폭 20 + 여유).</summary>
+    public const double MIN_CHIP_DX = STACK_DX;
+
+    /// <summary>
+    /// 순서를 지킨 채 이웃 간격을 <paramref name="minGap"/> 이상으로 — 겹친 무리만 움직이고 무리의 가운데는 원래 자리의 평균에 둔다(순수 · 시험 대상).
+    /// 이미 충분히 떨어진 값은 그대로다.
+    /// </summary>
+    public static IReadOnlyList<double> Separate(IReadOnlyList<double> xs, double minGap)
+    {
+        var n = xs?.Count ?? 0;
+        var result = new double[n];
+        if (n == 0) return result;
+        // 무리: (첫 칸, 개수, Σ(x − 무리 안 자리 × 간격)) — 시작 = 합 / 개수
+        var blocks = new List<(int First, int Count, double Sum)>();
+        for (var i = 0; i < n; i++)
+        {
+            blocks.Add((i, 1, xs![i]));
+            while (blocks.Count > 1)
+            {
+                var prev = blocks[^2];
+                var cur = blocks[^1];
+                if (prev.Sum / prev.Count + prev.Count * minGap <= cur.Sum / cur.Count + 1e-9) break;
+                blocks.RemoveAt(blocks.Count - 1);
+                blocks[^1] = (prev.First, prev.Count + cur.Count, prev.Sum + cur.Sum - cur.Count * prev.Count * minGap);
+            }
+        }
+        foreach (var (first, count, sum) in blocks)
+            for (var j = 0; j < count; j++) result[first + j] = sum / count + j * minGap;
+        return result;
     }
 
     /// <summary>

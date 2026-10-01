@@ -155,7 +155,12 @@ public static partial class FenceScene
                 o.Add(new FenceShape(FenceShapeKind.Polygon, FenceInk.Mesh, new[] { p.P(a, 8, 0), p.P(b, 8, 0), p.P(b, h - 8, 0), p.P(a, h - 8, 0) }, Color: color));
                 o.Add(new FenceShape(FenceShapeKind.Line, FenceInk.Rail, new[] { p.P(xa, h - 8, 0), p.P(xb, h - 8, 0) }, Color: color));
                 o.Add(new FenceShape(FenceShapeKind.Line, FenceInk.Rail, new[] { p.P(xa, 10, 0), p.P(xb, 10, 0) }, Color: color));
-                if (spec.Style == EnumFenceStyle.ChainLinkRazor)
+                if (spec.Style == EnumFenceStyle.ChainLinkRazor && zoom < RAZOR_BAND_ZOOM)
+                {
+                    // 작은 배율 — 코일(가는 선 · 드문드문)은 거의 보이지 않는다(검토 V2). 톱니 띠 하나로 줄여 모양을 읽히게 한다.
+                    o.Add(new FenceShape(FenceShapeKind.Polygon, FenceInk.RazorBand, RazorBand(p, xa, xb, h, zoom), Opacity: 0.75));
+                }
+                else if (spec.Style == EnumFenceStyle.ChainLinkRazor)
                 {
                     // 원형 코일 — 망 위로 겹쳐 굴린다(작은 배율에서는 드문드문 · 망 500칸에서도 가볍게 · NFR-02).
                     var step = RAZOR_R * 1.8 * Math.Max(1, 0.6 / Math.Max(0.05, zoom));
@@ -165,6 +170,24 @@ public static partial class FenceScene
                 break;
             }
         }
+    }
+
+    /// <summary>이 줌보다 작으면 윤형 코일 대신 톱니 띠(<see cref="RazorBand"/>).</summary>
+    public const double RAZOR_BAND_ZOOM = 0.6;
+
+    /// <summary>
+    /// 작은 배율의 윤형 철조망 — 망 위 코일 자리를 덮는 톱니 띠(아래는 곧은 선 · 위는 톱니). 톱니 간격은 화면 약 12px(줌에 맞서 넓힌다) · 높이는 코일 지름.
+    /// </summary>
+    internal static Point[] RazorBand(FenceProjector p, double xa, double xb, double h, double zoom)
+    {
+        var low = h + 2;
+        var high = h + 2 * RAZOR_R + 2;
+        var step = Math.Max(RAZOR_R, 12 / Math.Max(0.05, zoom));
+        var top = new List<Point>();
+        var up = true;
+        for (var x = xa; x < xb; x += step / 2, up = !up) top.Add(p.P(x, up ? high : low + RAZOR_R * 0.6, 0));
+        top.Add(p.P(xb, high, 0));
+        return top.Append(p.P(xb, low, 0)).Append(p.P(xa, low, 0)).ToArray();
     }
 
     /// <summary>

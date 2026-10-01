@@ -307,6 +307,21 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         }
     }
 
+    /// <summary>
+    /// 묶음 칩이 쓸 수 있는 폭(세계 단위) — 가까운 이웃 단위까지의 거리 × 2 에서 이웃 번호판 몫을 뺀 값(검토 V2: 34% 에서 "펜스센서 ×5" 가 이웃 번호를 덮었다).
+    /// </summary>
+    private double GroupRoom(IReadOnlyList<FenceUnit> units, FenceUnit unit, FenceWorld scene)
+    {
+        var at = units.ToList().IndexOf(unit);
+        var x = scene.UnitX(unit);
+        var near = double.PositiveInfinity;
+        if (at > 0) near = Math.Min(near, x - scene.UnitX(units[at - 1]));
+        if (at >= 0 && at < units.Count - 1) near = Math.Min(near, scene.UnitX(units[at + 1]) - x);
+        if (double.IsPositiveInfinity(near)) return near;
+        var neighbourHalf = (FenceScene.EstimateWidth("888", FenceScene.MIN_TEXT / Math.Max(0.05, _view.Scale)) + 10) / 2;
+        return Math.Max(0, 2 * (Math.Abs(near) - neighbourHalf - 4));
+    }
+
     private void SyncChips()
     {
         if (_scene is null || ViewModel is null) return;
@@ -336,7 +351,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 chip.Keys = unit.Keys;
                 var members = unit.Keys.Select(k => scene.Sensors[k]).ToList();
                 var selected = unit.Keys.Any(vm.IsFenceSelected);
-                chip.Picture = FenceScene.Group(members, shape, _projector, selected, _view.Scale);
+                chip.Picture = FenceScene.Group(members, shape, _projector, selected, _view.Scale, GroupRoom(units, unit, scene));
                 Place(chip, scene.UnitX(unit));
                 AutomationProperties.SetName(chip, $"펜스센서 묶음 {members.Count}대, {members[0].Big(shape)}부터 {members[^1].Big(shape)}까지. 확대하면 풀립니다");
             }
