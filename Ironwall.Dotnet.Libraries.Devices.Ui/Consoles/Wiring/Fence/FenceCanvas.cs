@@ -361,7 +361,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!_sensorChips.TryGetValue(unit.Key, out chip!))
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
-                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key));
+                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.

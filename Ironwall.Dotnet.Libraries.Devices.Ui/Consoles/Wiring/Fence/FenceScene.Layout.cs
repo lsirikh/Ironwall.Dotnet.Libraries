@@ -95,7 +95,7 @@ public static partial class FenceScene
             BoxC(o, p, x, 0, h, -p.De / 2, p.De / 2, width, design ? FenceInk.DesignPost : FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop, design ? color : null);
             BoxC(o, p, x, h, h + 5, -p.De / 2 - 1.5 * p.K, p.De / 2 + 1.5 * p.K, width + 3, FenceInk.CapFront, FenceInk.CapSide, FenceInk.CapTop, null);
             if (design) o.AddRange(FenceStyleArt.DesignClamps(p, x, h, width, color));
-            if (post.HasRazor) o.AddRange(FenceStyleArt.YArms(p, x, h + 5, h).Shapes);           // Y 받침(두 팔이 30° 바깥으로)
+            if (post.HasRazor) o.AddRange(FenceStyleArt.YArms(p, x, h + FenceStyleArt.COIL_SEAT_GAP, h).Shapes);           // Y 받침(두 팔이 30° 바깥으로)
         }
 
         if (showCables) LaneCables(o, world, p);
@@ -170,7 +170,7 @@ public static partial class FenceScene
                 else if (spec.Style == EnumFenceStyle.ChainLinkRazor)
                 {
                     // 콘서티나 코일 — Y 받침 안에 얹힌 겹친 고리 + 가시 + 팔 끝 철선(사진: 윤형철조망). 고리는 칸마다 그림 하나로 묶는다(NFR-02).
-                    o.AddRange(FenceStyleArt.RazorCoil(p, xa, xb, h + 5, h));
+                    o.AddRange(FenceStyleArt.RazorCoil(p, xa, xb, h + FenceStyleArt.COIL_SEAT_GAP, h));
                 }
                 break;
             }

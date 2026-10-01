@@ -133,6 +133,56 @@ public class FenceStyleArtTests
         Assert.True(plateBottom < coil.TopY, $"번호판 아래 {plateBottom:0.#} · 코일 꼭대기 {coil.TopY:0.#}");
     }
 
+    [Theory]
+    [InlineData(0.0, 1.0)]
+    [InlineData(1.0, 1.0)]
+    [InlineData(1.0, 0.45)]
+    [InlineData(0.0, 2.5)]
+    public void should_seat_a_fence_sensor_chip_inside_the_coil_with_its_number_plate_clear_of_every_coil_stroke(double k, double zoom)
+    {
+        // Arrange — 윤형 두 칸 · 펜스센서가 망 1 윤형 코일(위 줄)
+        var p = new FenceProjector(k);
+        var layout = WiringFenceLayout.Create(Enumerable.Repeat(FencePanelSpec.Default(EnumFenceStyle.ChainLinkRazor), 2),
+            new Dictionary<int, SensorMountSpec> { [1] = new(1, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper) }, null);
+        var sensor = new FenceSensor(1, 1, 101, "펜스 101", EnumDeviceType.Fence, null, WiringSpec.LINE_PRIMARY, 1, null, false, false, false);
+        var world = FenceWorld.FromLayout(WiringChain.Create(WiringShape.Ring, new[] { 1 }), new Dictionary<int, FenceSensor> { [1] = sensor }, layout);
+        var panel = world.Geometry!.Panels[1];
+        var h = panel.Spec.HeightM * world.Vpm;
+        var x = world.X[1];
+
+        // Act
+        var chip = FenceScene.Sensor(sensor, WiringShape.Ring, p, false, zoom, world.LiftOf(1), world.CoilOf(1));
+        var art = FenceStyleArt.RazorCoil(p, panel.StartM * world.Upm, panel.EndM * world.Upm, h + FenceStyleArt.COIL_SEAT_GAP, h);
+        var coil = FenceStyleArt.CoilLayout(p, panel.StartM * world.Upm, panel.EndM * world.Upm, h + FenceStyleArt.COIL_SEAT_GAP, h);
+
+        // Assert — 몸(앞면)의 가운데가 코일 띠 안 · 가로는 망 가운데(기둥 사이)
+        Assert.True(world.CoilOf(1) > 0);
+        Assert.Equal(panel.CenterM * world.Upm, x, 6);
+        var body = chip.Shapes.First(s => s.Ink == FenceInk.OliveFront).Points;
+        var bodyY = body.Average(q => q.Y);
+        Assert.InRange(bodyY, coil.TopY + coil.Ry * 0.4, coil.BottomY - coil.Ry * 0.4);
+
+        // 번호판은 코일 위 — 아래 끝이 코일 꼭대기보다 위이고, 코일 · 가시 선의 어떤 점도 판 안에 없다(글자가 코일 선을 지나지 않는다)
+        var plate = chip.Shapes.Single(s => s.Ink == FenceInk.Plate);
+        var rect = new System.Windows.Rect(plate.Points[0], plate.Points[1]);
+        rect.Offset(x, 0);
+        Assert.True(rect.Bottom < coil.TopY, $"번호판 아래 {rect.Bottom:0.#} · 코일 꼭대기 {coil.TopY:0.#}");
+        var strokes = art.Where(s => s.Ink is FenceInk.RazorCoil or FenceInk.RazorBarb).SelectMany(s => s.Points);
+        Assert.DoesNotContain(strokes, q => rect.Contains(q));
+        Assert.Contains(chip.Shapes, s => s.Kind == FenceShapeKind.Text && s.Text == "101" && s.Points[0].Y < coil.TopY);
+    }
+
+    [Fact]
+    public void should_keep_an_ordinary_fence_sensor_chip_unchanged_when_it_is_not_in_a_coil()
+    {
+        var sensor = new FenceSensor(1, 1, 101, "펜스 101", EnumDeviceType.Fence, null, WiringSpec.LINE_PRIMARY, 1, null, false, false, false);
+
+        var plain = FenceScene.Sensor(sensor, WiringShape.Ring, FenceProjector.Tilt, false, 1, 20);
+
+        Assert.DoesNotContain(plain.Shapes, s => s.Ink == FenceInk.Plate);                  // 번호는 몸 아래 글자 그대로
+        Assert.Contains(plain.Shapes, s => s.Ink == FenceInk.FenceLabel);
+    }
+
     private static IEnumerable<System.Windows.Point[]> Chunks(FenceShape shape)
     {
         var at = 0;

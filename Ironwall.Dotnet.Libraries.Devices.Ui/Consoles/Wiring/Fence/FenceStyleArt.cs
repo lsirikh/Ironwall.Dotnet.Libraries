@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Monitoring.Models.Fences;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -19,8 +20,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
 public static class FenceStyleArt
 {
     #region - Constants · LOD -
-    /// <summary>코일 지름 = 펜스 높이 × 이 비(참고 사진 35~45%).</summary>
-    public const double COIL_DIAMETER_RATIO = 0.4;
+    /// <summary>코일 지름 = 펜스 높이 × 이 비(참고 사진 35~45% · 모델의 윤형 코일 자리 높이와 같은 값).</summary>
+    public const double COIL_DIAMETER_RATIO = FenceLayoutMath.RAZOR_COIL_DIAMETER_RATIO;
     public const double COIL_R_MIN = 12;
     public const double COIL_R_MAX = 34;
     /// <summary>고리 가로 = 세로 × 이 비(0.45~0.6).</summary>
@@ -30,7 +31,9 @@ public static class FenceStyleArt
     /// <summary>고리가 번갈아 기우는 각(라디안 · 약 10°).</summary>
     public const double COIL_TILT = 0.17;
     /// <summary>코일 가운데 높이 = 받침 위 반지름 × 이 비(Y 안에 앉는다).</summary>
-    public const double COIL_SEAT_RATIO = 0.95;
+    public const double COIL_SEAT_RATIO = FenceLayoutMath.RAZOR_COIL_SEAT_RATIO;
+    /// <summary>기둥 꼭대기 → 받침 시작(세계 단위 · 기둥 모자 높이).</summary>
+    public const double COIL_SEAT_GAP = 5;
     /// <summary>Y 받침 팔 — 수직에서 30° · 길이 = 코일 반지름 × 1.2.</summary>
     public const double ARM_ANGLE = Math.PI / 6;
     public const double ARM_LENGTH_RATIO = 1.2;
@@ -65,6 +68,9 @@ public static class FenceStyleArt
     /// 코일 반지름(세계 높이 단위) — 지름이 펜스 높이의 약 40%(참고 사진 · 재검토 렌더: 코일 지름이 또렷이 보여야 한다). 아주 낮거나 높은 펜스는 범위 안으로.
     /// </summary>
     public static double CoilRadius(double fenceHeight) => Math.Clamp(fenceHeight * COIL_DIAMETER_RATIO / 2, COIL_R_MIN, COIL_R_MAX);
+
+    /// <summary>높이 <paramref name="fenceHeight"/>(세계 단위) 펜스의 코일 가운데 높이(세계 단위) — 윤형 코일 자리의 센서가 여기에 앉는다.</summary>
+    public static double CoilCenterHeight(double fenceHeight) => fenceHeight + COIL_SEAT_GAP + CoilRadius(fenceHeight) * COIL_SEAT_RATIO;
 
     /// <summary>
     /// Y 받침(기둥 위) — 두 팔이 수직에서 30° 바깥으로(앞 모습에서 "V" 로 또렷이 · 참고 사진 ③), 길이 = 코일 반지름 × 1.2. 입체에서는 깊이로도 조금 벌린다.

@@ -378,9 +378,22 @@ public static partial class FenceScene
     #region - Chips -
     /// <summary>센서 칩 — 제품 모양(FR-10 · FR-17) + 번호판 + 모서리 표지(제안 = 왼쪽 위 · 미저장 = 오른쪽 위) + 선택 윤곽.</summary>
     /// <param name="lift">설치 자리 높이로 칩 전체를 올리는 값(세계 단위 · fence-wiring-editor FR-07). 0 이면 목업 높이 그대로.</param>
-    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0)
+    /// <param name="coil">
+    /// 윤형 코일 자리면 그 코일 반지름(세계 단위 · <see cref="FenceWorld.CoilOf"/>) — 몸은 코일 <b>안</b>(가운데 높이)에, 번호판은 코일 <b>위</b>에 둔다
+    /// (번호 글자가 코일 선을 지나지 않게 · 펜스센서는 윤형과 같이 배치). 0 이면 보통 칩.
+    /// </param>
+    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0)
     {
         if (lift != 0) p = p with { YLift = lift };
+        // 코일 위 번호판 자리 — 코일 꼭대기(그림의 코일과 같은 식: 가운데 − 세로 반지름 × 1.02)에서 틈 + 반 판만큼 위
+        Point? coilPlate = null;
+        if (coil > 0 && s.Kind != FenceKind.Underground)
+        {
+            var anchor = s.Kind switch { FenceKind.Fence => 66.0, FenceKind.Multi => H + 36, _ => 71.0 };
+            var centre = p.P(0, anchor, 0);
+            var f = Math.Max(1, MIN_TEXT / (COIL_PLATE_TEXT * SafeZoom(zoom)));
+            coilPlate = new Point(centre.X, centre.Y - coil * p.Cy * 1.02 - COIL_PLATE_GAP - COIL_PLATE_H * f / 2);
+        }
         var o = new List<FenceShape>(24);
         var k = p.K;
         var de = p.De;
@@ -400,7 +413,7 @@ public static partial class FenceScene
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Ball, new[] { p.P(0, H + 20, 0) }, 4.6, 4.6));     // 볼 마운트는 기둥 끝에 남는다
                 Box(o, q, 0, H + 24, H + 48, de / 2, zf, 38, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(-11, H + 36, zf) }, 4, 4));
-                var pl = q.P(5, H + 36, zf);
+                var pl = coilPlate ?? q.P(5, H + 36, zf);
                 plate = Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 bb = new[] { q.P(-19, H + 48, de / 2), q.P(19, H + 48, de / 2), q.P(-19, H + 24, zf), q.P(19, H + 24, zf), q.P(19, H + 48, 0) };
                 break;
@@ -408,13 +421,23 @@ public static partial class FenceScene
             case FenceKind.Fence:
             {
                 var zf = de / 2 + 6 * k;
-                Box(o, p, 0, 56, 76, de / 2, zf, 13, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
-                var c = p.P(0, 66, zf);
+                // 코일 안 — 몸의 깊이 가운데가 코일(깊이 0)과 같은 화면 높이에 오게 조금 올린다(입체에서 몸이 코일 아래로 처지지 않게)
+                var b = coilPlate is null ? p : p with { YLift = p.YLift + (de / 2 + 3 * k) * p.Cz / p.Cy };
+                Box(o, b, 0, 56, 76, de / 2, zf, 13, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
+                var c = b.P(0, 66, zf);
                 o.Add(RectShape(FenceInk.Pir, new Rect(c.X - 3, c.Y - 5, 6, 3), 1));
-                var l = p.P(0, 46, zf);
-                o.Add(Text(FenceInk.FenceLabel, new Point(l.X, l.Y + 3), big, 10));
-                Corners(o, c.X, p.P(0, 71, zf).Y, 13, 10, s);
-                bb = new[] { p.P(-7, 76, de / 2), p.P(7, 76, de / 2), p.P(-7, 40, zf), p.P(7, 40, zf), p.P(7, 76, 0) };
+                if (coilPlate is { } cp)
+                {
+                    plate = Plate(o, cp, 22, COIL_PLATE_H, big, FenceInk.NumberSmall, COIL_PLATE_TEXT, 4, s, zoom);
+                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 56, zf), b.P(7, 56, zf), b.P(7, 76, 0) };
+                }
+                else
+                {
+                    var l = b.P(0, 46, zf);
+                    o.Add(Text(FenceInk.FenceLabel, new Point(l.X, l.Y + 3), big, 10));
+                    Corners(o, c.X, b.P(0, 71, zf).Y, 13, 10, s);
+                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 40, zf), b.P(7, 40, zf), b.P(7, 76, 0) };
+                }
                 break;
             }
             case FenceKind.Underground:
@@ -437,8 +460,8 @@ public static partial class FenceScene
                 Box(o, q, 0, 50, 92, zb0, zb1, 26, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Box(o, q, 0, 92, 99, zb0, zh, 32, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(0, 58, zb1) }, 3.2, 3.2));
-                var pl = q.P(0, 78, zb1);
-                plate = Plate(o, pl, 20, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
+                var pl = coilPlate ?? q.P(0, 78, zb1);
+                plate = Plate(o, pl, 20, coilPlate is null ? 18 : COIL_PLATE_H, big, FenceInk.Number, coilPlate is null ? 12.5 : COIL_PLATE_TEXT, 4.5, s, zoom);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };
                 break;
             }
@@ -463,6 +486,11 @@ public static partial class FenceScene
         if (selected) o.Add(RectShape(FenceInk.Select, hit, 8));
         return new FenceChipPicture(Legible(o, zoom), hit);
     }
+
+    /// <summary>코일 위 번호판 — 판 높이 · 글자 크기 · 코일 꼭대기와의 틈(세계 단위 · 가시 끝보다 멀리).</summary>
+    public const double COIL_PLATE_H = 16;
+    public const double COIL_PLATE_TEXT = 11;
+    public const double COIL_PLATE_GAP = 4;
 
     /// <summary>펜스센서 묶음 칩(FR-18) — "펜스센서 ×N" 겹 카드 + 첫–끝 번호.</summary>
     /// <param name="maxWidth">

@@ -118,6 +118,7 @@ public sealed class FenceWorld
     public const double STACK_DX = 30;
 
     private readonly Dictionary<int, double> _lift = new();
+    private readonly Dictionary<int, double> _coil = new();
 
     /// <summary>이 줌보다 작으면 펜스센서 묶음으로 접는다(FR-18) — <see cref="FenceSlotLayout.GROUP_ZOOM_THRESHOLD"/> 와 같다.</summary>
     public const double GROUP_ZOOM = FenceSlotLayout.GROUP_ZOOM_THRESHOLD;
@@ -195,6 +196,24 @@ public sealed class FenceWorld
 
     /// <summary>센서 칩을 설치 자리 높이로 올리는 값(세계 단위 · 없으면 0).</summary>
     public double LiftOf(int key) => _lift.TryGetValue(key, out var lift) ? lift : 0;
+
+    /// <summary>
+    /// 윤형 코일 자리의 센서면 그 코일 반지름(세계 단위), 아니면 0 — 칩이 몸을 코일 가운데에 두고 번호판을 코일 위로 올린다(글자가 코일 선을 지나지 않게).
+    /// </summary>
+    public double CoilOf(int key) => _coil.TryGetValue(key, out var r) ? r : 0;
+
+    /// <summary>
+    /// 자리 <paramref name="mount"/> 의 설치 높이(세계 단위 · 칩을 올리기 전 목표 높이) — 윤형 코일은 코일 가운데, 그 밖은 줄을 따른 높이(<see cref="FenceLayoutMath.LaneHeightM"/>).
+    /// 높이 단계 끌기의 안내선이 쓴다. 펜스 구성이 아니면 0.
+    /// </summary>
+    public double MountHeight(SensorMountSpec mount)
+    {
+        if (Geometry is not { Panels.Count: > 0 } geometry || Layout is not { } layout || mount is null) return 0;
+        var m = FenceLayoutMath.Normalize(mount, layout.Panels);
+        if (m.Spot == FenceMountSpot.RazorCoil)
+            return FenceStyleArt.CoilCenterHeight(geometry.Panels[m.Panel].Spec.HeightM * Vpm) + m.HeightOffsetM * Vpm;
+        return FenceLayoutMath.LaneHeightM(m, geometry, layout.HasUpperSensors || m.Lane == FenceLane.Upper) * Vpm;
+    }
 
     /// <summary>그림 맨 위 높이(세계 단위) — 가장 높은 망 · 기둥 · 코일 · 센서.</summary>
     public double TopHeight { get; private set; } = FenceProjector.H + 40;
@@ -294,8 +313,16 @@ public sealed class FenceWorld
             var dx = (stack.IndexOf(key) - (stack.Count - 1) / 2.0) * STACK_DX;
             world._x[key] = point.XM * upm + dx;
             var kind = sensors.TryGetValue(key, out var s) ? s.Kind : FenceKind.Smart;
+            double lift;
+            if (mount.Spot == FenceMountSpot.RazorCoil)
+            {
+                // 윤형 코일(펜스센서는 윤형과 같이) — 몸 가운데를 2.5D 코일 가운데에(그림과 같은 식 · 망 높이 → 세계 높이)
+                var fenceH = geometry.Panels[mount.Panel].Spec.HeightM * vpm;
+                lift = LiftFor(kind, FenceMountSpot.PanelCenter, FenceStyleArt.CoilCenterHeight(fenceH) + mount.HeightOffsetM * vpm);
+                world._coil[key] = FenceStyleArt.CoilRadius(fenceH);
+            }
             // 위 줄 칩은 꼭대기 위에 올라앉는다 — 몸 가운데를 목표 높이 + 반 칩(약 28)에 맞춘다
-            var lift = mount.Lane == FenceLane.Upper ? LiftFor(kind, FenceMountSpot.PanelCenter, heightM * vpm + UPPER_CHIP_HALF) : LiftFor(kind, mount.Spot, heightM * vpm);
+            else lift = mount.Lane == FenceLane.Upper ? LiftFor(kind, FenceMountSpot.PanelCenter, heightM * vpm + UPPER_CHIP_HALF) : LiftFor(kind, mount.Spot, heightM * vpm);
             world._lift[key] = lift;
             top = Math.Max(top, lift + (kind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
         }
