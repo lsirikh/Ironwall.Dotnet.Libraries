@@ -66,6 +66,44 @@ public sealed partial class WiringViewModel
     }
 
     public void ToggleCables() => ShowCables = !ShowCables;
+
+    private bool _showDistances;
+    private Action<bool>? _saveDistancePrefs;
+
+    /// <summary>
+    /// [거리 표시] — 펜스 뷰(망 · 담 길이 · 같은 줄 센서 사이)와 개념도(줄마다 칩 사이)에 m 를 그린다. 기본 끔 · 사람마다 기억(ConsolePrefs).
+    /// </summary>
+    public bool ShowDistances
+    {
+        get => _showDistances;
+        set
+        {
+            if (_showDistances == value) return;
+            _showDistances = value;
+            NotifyOfPropertyChange();
+            FenceChanged?.Invoke(this, EventArgs.Empty);
+            try { _saveDistancePrefs?.Invoke(value); }
+            catch (Exception ex) { _log?.Warning($"[Wiring] 표시 설정 저장 실패(무시): {ex.Message}"); }
+        }
+    }
+
+    public void ToggleDistances() => ShowDistances = !ShowDistances;
+
+    /// <summary>저장된 [거리 표시] 로 시작하고, 바뀌면 <paramref name="save"/> 로 남긴다(런처).</summary>
+    public void UseDistancePrefs(bool? show, Action<bool>? save)
+    {
+        _saveDistancePrefs = null;
+        if (show is { } on) ShowDistances = on;
+        _saveDistancePrefs = save;
+    }
+
+    /// <summary>같은 줄 이웃 센서 사이 거리(실제 설치 자리 · 체인 센서만).</summary>
+    public IReadOnlyList<Monitoring.Models.Fences.FenceLaneGap> FenceLaneGaps()
+    {
+        var layout = _board.FenceLayout;
+        if (!layout.IsActive || layout.Panels.Count == 0) return Array.Empty<Monitoring.Models.Fences.FenceLaneGap>();
+        return Monitoring.Models.Fences.FenceLayoutMath.LaneGaps(_board.Chain.Keys.Where(k => layout.MountOf(k) is not null).Select(k => (k, layout.MountOf(k)!)), layout.Geometry);
+    }
     #endregion
 
     #region - Concept (FR-20 · 두 줄) -

@@ -124,7 +124,8 @@ public class FenceStyleArtTests
         var h = world.Geometry!.Panels[0].Spec.HeightM * world.Vpm;
 
         // Act
-        var chip = FenceScene.Sensor(sensor, WiringShape.Ring, p, false, 1, world.LiftOf(1));
+        Assert.True(world.PlateAboveOf(1));                                                   // 아래에 두면 코일에 걸린다 — 몸 위로
+        var chip = FenceScene.Sensor(sensor, WiringShape.Ring, p, false, 1, world.LiftOf(1), world.CoilOf(1), world.PlateAboveOf(1));
         var coil = FenceStyleArt.CoilLayout(p, 0, SPAN, h + 5, h);
 
         // Assert — 번호판(글자 바탕)의 아래 끝이 코일 꼭대기보다 위(화면 y 가 작다) · 코일 선이 번호를 지나지 않는다
@@ -179,8 +180,10 @@ public class FenceStyleArtTests
 
         var plain = FenceScene.Sensor(sensor, WiringShape.Ring, FenceProjector.Tilt, false, 1, 20);
 
-        Assert.DoesNotContain(plain.Shapes, s => s.Ink == FenceInk.Plate);                  // 번호는 몸 아래 글자 그대로
-        Assert.Contains(plain.Shapes, s => s.Ink == FenceInk.FenceLabel);
+        // 코일 밖 펜스센서 — 번호판(바탕 있음)이 몸 아래(철망 무늬 위에서도 읽힌다 · 2026-10-01 번호판 아래로)
+        var plate = plain.Shapes.Single(s => s.Ink == FenceInk.Plate);
+        var body = plain.Shapes.Where(s => s.Ink == FenceInk.OliveFront).SelectMany(s => s.Points).ToList();
+        Assert.True(System.Math.Min(plate.Points[0].Y, plate.Points[1].Y) > body.Max(q => q.Y), "번호판은 몸 아래");
     }
 
     private static IEnumerable<System.Windows.Point[]> Chunks(FenceShape shape)

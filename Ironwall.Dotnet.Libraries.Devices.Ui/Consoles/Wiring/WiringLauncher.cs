@@ -116,6 +116,11 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         {
             var store = new ConsolePrefs(ConsolePrefs.DefaultPath);
             var entry = store.Get(PREFS_KEY);
+            vm.UseDistancePrefs(entry.ShowDistances, show =>
+            {
+                entry.ShowDistances = show;
+                if (!store.Save()) _log?.Warning($"[Wiring] 표시 설정 저장 실패(무시): {store.LastSaveError}");
+            });
             vm.UseLayoutPrefs(entry.SplitRatio, !entry.DetailCollapsed, (ratio, open) =>
             {
                 entry.SplitRatio = ratio;

@@ -99,8 +99,11 @@ public sealed class FenceChip : Thumb
         }
     }
 
-    /// <summary>적중 사각형(칩 좌표).</summary>
+    /// <summary>적중 사각형(칩 좌표) — 센서는 몸(아이콘)만. 요소의 배치 사각형 · 선택 윤곽과 같다.</summary>
     public Rect HitBounds => _picture?.Hit ?? Rect.Empty;
+
+    /// <summary>그림 범위(칩 좌표) — 적중 밖에 그리는 번호판까지. 이웃 칩과의 화면 간격만 이것으로 잰다.</summary>
+    public Rect FootprintBounds => _picture?.Footprint ?? Rect.Empty;
 
     /// <summary>이 칩을 그린 횟수(시험 · 성능 확인).</summary>
     internal int RenderCount { get; private set; }
@@ -113,6 +116,23 @@ public sealed class FenceChip : Thumb
         drawingContext.PushTransform(new TranslateTransform(-_picture.Hit.X, -_picture.Hit.Y));
         FenceRenderer.Draw(drawingContext, this, _picture.Shapes);
         drawingContext.Pop();
+    }
+
+    /// <summary>
+    /// 누르는 자리는 배치 사각형(= 적중 사각형 · 몸)뿐 — 그 밖에 그린 번호판 · "뒤" 표지는 적중하지 않아 누름이 캔버스로 간다
+    /// (사용자: "그건 adorner에 안잡히게 해라" · 번호판을 눌러 센서를 고르거나 끌지 않는다).
+    /// </summary>
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters)
+    {
+        if (_picture is null) return null;
+        return new Rect(RenderSize).Contains(hitTestParameters.HitPoint) ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null;
+    }
+
+    protected override GeometryHitTestResult? HitTestCore(GeometryHitTestParameters hitTestParameters)
+    {
+        if (_picture is null) return null;
+        var detail = hitTestParameters.HitGeometry.FillContainsWithDetail(new RectangleGeometry(new Rect(RenderSize)));
+        return detail == IntersectionDetail.Empty ? null : new GeometryHitTestResult(this, detail);
     }
 
     // 캔버스가 누름 · 이동 · 뗌을 루트 기준으로 잰다 — Thumb 의 캡처 · DragStarted 를 끈다.

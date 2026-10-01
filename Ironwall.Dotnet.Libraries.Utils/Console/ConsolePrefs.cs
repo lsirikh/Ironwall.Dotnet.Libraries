@@ -27,6 +27,10 @@ public sealed class ConsolePrefEntry
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool DetailCollapsed { get; set; }
 
+    /// <summary>거리(m) 표시를 켜 두었는가(결선 창 [거리 표시]). 끄면 쓰지 않는다.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ShowDistances { get; set; }
+
     /// <summary>
     /// 이 빌드가 모르는 키(다른 빌드가 넣은 필드 · 아직 여기 선언되지 않은 미래 필드).
     /// <b>지워지지 않고 그대로 들고 있다가 그대로 되돌려 쓴다</b>(D-08 — 이게 없으면

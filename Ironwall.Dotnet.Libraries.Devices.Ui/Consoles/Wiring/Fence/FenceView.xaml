@@ -167,6 +167,14 @@
 						ItemsSource="{Binding FenceSpacingChoices}"
 						SelectedItem="{Binding FenceSpacingMetres}"
 						ToolTip="현장 펜스센서 간격(기준 3m · 2~4m) — 바꾸면 그림만 다시 놓입니다(저장 대상 아님)" />
+					<!--  거리 표시(2026-10-01) — 망 · 담 길이와 센서 사이 m 를 펜스 뷰 · 개념도에(기본 끔 · 사람마다 기억)  -->
+					<Button
+						AutomationProperties.AutomationId="Devices.Wiring.Fence.ShowDistances"
+						Click="OnDistances"
+						Content="거리 표시"
+						Style="{StaticResource F.Tool}"
+						Tag="{Binding ShowDistances}"
+						ToolTip="망 · 담 길이와 같은 줄 센서 사이 거리(m)를 펜스 뷰와 개념도에 표시합니다" />
 					<Rectangle Width="1" Height="20" Margin="2,0,8,0" Fill="{DynamicResource RowLineBrush}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Fit"

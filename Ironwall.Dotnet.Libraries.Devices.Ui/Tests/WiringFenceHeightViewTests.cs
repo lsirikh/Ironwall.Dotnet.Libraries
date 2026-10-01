@@ -387,6 +387,190 @@ public class WiringFenceHeightViewTests
     }
     #endregion
 
+    #region - Number plate is not a handle (2026-10-01) -
+    [Fact]
+    public void should_not_select_or_grab_a_sensor_when_its_number_plate_is_pressed()
+    {
+        // 사용자: "번호표 … 아이콘 하단으로 내려라 그리고 그건 adorner에 안잡히게 해라" — 번호판은 누르는 자리가 아니다
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[102];
+            var picture = chip.Picture!;
+            var plate = picture.Shapes.Single(s => s.Ink == FenceInk.Plate);
+            var anchor = new Point(Canvas.GetLeft(chip) - picture.Hit.X, Canvas.GetTop(chip) - picture.Hit.Y);
+            var plateCentre = new Point(anchor.X + (plate.Points[0].X + plate.Points[1].X) / 2, anchor.Y + (plate.Points[0].Y + plate.Points[1].Y) / 2);
+            var screen = canvas.WorldToScreen(plateCentre);
+            var hit = System.Windows.Media.VisualTreeHelper.HitTest(canvas, screen)?.VisualHit;
+            FenceChip? under = null;
+            for (DependencyObject? d = hit; d is not null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+                if (d is FenceChip c) { under = c; break; }
+            var bodyHit = System.Windows.Media.VisualTreeHelper.HitTest(canvas, canvas.ScreenCenterOf(chip))?.VisualHit;
+            canvas.OnPointerPressed(screen, under);
+            canvas.OnPointerReleased(screen);
+            Pump();
+            return (Under: under?.Kind, UnderKey: under?.Key, BodyIsChip: ReferenceEquals(bodyHit, chip), Selected: vm.IsFenceSelected(102),
+                    PlateInside: new Rect(Canvas.GetLeft(chip), Canvas.GetTop(chip), chip.Width, chip.Height).Contains(plateCentre));
+        });
+
+        Assert.False(result.Under == FenceChipKind.Sensor && result.UnderKey == 102, $"번호판 아래 {result.Under} {result.UnderKey}");
+        Assert.True(result.BodyIsChip);                                                       // 몸은 그대로 누르는 자리
+        Assert.False(result.Selected);
+        Assert.False(result.PlateInside);                                                     // 칩 요소(UIA 사각형)는 몸만
+    }
+    #endregion
+
+    #region - Red snap points on screen (헤디드 r23 SC-FEN-025) -
+    /// <summary>창 안의 어도너 층까지 그린 그림에서 StatusCritical(#C62121 · 라이트) 빛깔 픽셀 수.</summary>
+    private static int CriticalPixels(Window window)
+    {
+        var root = Descendants<System.Windows.Documents.AdornerDecorator>(window).First();
+        var w = (int)Math.Ceiling(root.ActualWidth);
+        var h = (int)Math.Ceiling(root.ActualHeight);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(root);
+        var pixels = new byte[w * h * 4];
+        bitmap.CopyPixels(pixels, w * 4, 0);
+        var count = 0;
+        for (var i = 0; i < pixels.Length; i += 4)
+            if (Math.Abs(pixels[i + 2] - 0xC6) <= 20 && Math.Abs(pixels[i + 1] - 0x21) <= 20 && Math.Abs(pixels[i] - 0x21) <= 20 && pixels[i + 3] > 200) count++;
+        return count;
+    }
+
+    private static (int Before, int During, int After) DragAndCountRed(FenceCanvas canvas)
+    {
+        var window = Window.GetWindow(canvas)!;
+        var before = CriticalPixels(window);
+        var chip = canvas.SensorChips[102];
+        var start = canvas.ScreenCenterOf(chip);
+        canvas.OnPointerPressed(start, chip);
+        canvas.OnPointerMoved(start + new Vector(12, 0));
+        canvas.OnPointerMoved(start + new Vector(30, 40));                                    // 점에서 먼 곳 — 고리 없이 점만
+        Pump();
+        var during = CriticalPixels(window);
+        canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, chip);
+        Pump();
+        return (before, during, CriticalPixels(window));
+    }
+
+    [Fact]
+    public void should_paint_the_red_snap_points_on_screen_while_a_sensor_is_dragged()
+    {
+        var (before, during, after) = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) => DragAndCountRed(canvas));
+
+        Assert.True(during > before + 300, $"빨강 픽셀 전 {before} · 끄는 중 {during}");          // 점 35개(반지름 4px)
+        Assert.True(during > after + 300, $"놓은 뒤 {after}");
+    }
+
+    [Fact]
+    public void should_still_paint_the_red_snap_points_after_the_fence_view_left_the_tree_and_came_back()
+    {
+        // 헤디드 r23: 보기 전환 · 칸 접기로 펜스 보기가 트리에서 잠깐 빠지면 어도너 층이 덧그림 어도너를 스스로 떼어 낸다 —
+        // 캔버스는 예전 어도너를 쥐고 있어 다시 붙이지 않았다(끄는 동안 고스트만 보이고 빨강 점 · 알약이 안 보였다).
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var window = Window.GetWindow(canvas)!;
+            var view = window.Content;
+            window.Content = null;
+            Pump();
+            window.Content = view;
+            Pump();
+            return DragAndCountRed(canvas);
+        });
+
+        Assert.True(result.During > result.Before + 300, $"빨강 픽셀 전 {result.Before} · 끄는 중 {result.During}");
+    }
+    #endregion
+
+    #region - Multi-select drag (헤디드 r23 SC-FEN-026) -
+    [Fact]
+    public void should_drag_both_sensors_when_the_second_was_added_with_ctrl_click()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var a = canvas.ScreenCenterOf(canvas.SensorChips[102]);
+            canvas.OnPointerPressed(a, canvas.SensorChips[102]);
+            canvas.OnPointerReleased(a);
+            Pump();
+            var b = canvas.ScreenCenterOf(canvas.SensorChips[103]);
+            canvas.OnPointerPressed(b, canvas.SensorChips[103], ctrl: true);
+            canvas.OnPointerReleased(b);
+            Pump();
+            var selected = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            var moved = DragSelectionOf102(vm, canvas);
+            return (selected, moved);
+        });
+
+        Assert.Equal(new[] { 102, 103 }, result.selected);
+        AssertMovedTogether(result.moved);
+    }
+
+    [Fact]
+    public void should_drag_both_sensors_when_the_second_was_added_with_ctrl_space_after_moving_focus()
+    {
+        // 헤디드 r23 SC-FEN-026: A 를 고르고 B 로 포커스를 옮겨(포커스 = 선택 → B 하나) Ctrl+Space — 예전에는 B 를 빼 선택이 비었고 A 만 끌렸다.
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var a = canvas.ScreenCenterOf(canvas.SensorChips[102]);
+            canvas.OnPointerPressed(a, canvas.SensorChips[102]);
+            canvas.OnPointerReleased(a);
+            Pump();
+            canvas.SensorChips[103].Focus();
+            Pump();
+            var focused = vm.FenceSelectedKeys.ToList();
+            var handled = canvas.HandleKeyDown(Key.Space, Key.None, ModifierKeys.Control, canvas.SensorChips[103]);
+            Pump();
+            var selected = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            canvas.SensorChips[102].Focus();                                                   // 고른 것 사이를 다녀도 풀리지 않는다
+            Pump();
+            var afterTab = vm.FenceSelectedKeys.OrderBy(k => k).ToList();
+            var moved = DragSelectionOf102(vm, canvas);
+            return (focused, handled, selected, afterTab, moved);
+        });
+
+        Assert.Equal(new[] { 103 }, result.focused);
+        Assert.True(result.handled);
+        Assert.Equal(new[] { 102, 103 }, result.selected);
+        Assert.Equal(new[] { 102, 103 }, result.afterTab);
+        AssertMovedTogether(result.moved);
+    }
+
+    [Fact]
+    public void should_toggle_the_focused_sensor_off_with_ctrl_space_when_focus_did_not_just_replace_the_selection()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            vm.FenceSelectSensors(new[] { 102, 103 });
+            Pump();
+            canvas.SensorChips[103].Focus();
+            Pump();
+            canvas.HandleKeyDown(Key.Space, Key.None, ModifierKeys.Control, canvas.SensorChips[103]);
+            Pump();
+            return vm.FenceSelectedKeys.ToList();
+        });
+
+        Assert.Equal(new[] { 102 }, result);
+    }
+
+    private static (SensorMountSpec A, SensorMountSpec B) DragSelectionOf102(WiringViewModel vm, FenceCanvas canvas)
+    {
+        var chip = canvas.SensorChips[102];
+        var start = canvas.ScreenCenterOf(chip);
+        canvas.OnPointerPressed(start, chip);
+        canvas.OnPointerMoved(start + new Vector(12, 0));
+        var at = ScreenOf(canvas, new FenceGridCell(5, 2));                                    // 기둥 1(gx 4) → 망 1 왼쪽 위(gx 5) · Δ(+1, 0)
+        canvas.OnPointerMoved(at);
+        canvas.OnPointerReleased(at);
+        Pump();
+        return (vm.FenceLayout.MountOf(102)!, vm.FenceLayout.MountOf(103)!);
+    }
+
+    private static void AssertMovedTogether((SensorMountSpec A, SensorMountSpec B) moved)
+    {
+        Assert.Equal((1, FenceMountSpot.PanelTop, FenceColumn.Left), (moved.A.Panel, moved.A.Spot, moved.A.Column));
+        Assert.Equal((2, FenceMountSpot.PanelTop, FenceColumn.Left), (moved.B.Panel, moved.B.Spot, moved.B.Column));
+    }
+    #endregion
+
     #region - Fixtures -
     private static T OnWindow<T>(WiringViewModel vm, Func<WiringViewModel, FenceCanvas, T> body)
         => OnSta(() =>

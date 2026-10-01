@@ -59,6 +59,7 @@ public sealed class ConsolePrefsTests : IDisposable
         var prefs = new ConsolePrefs(FilePath);
         prefs.Get("devices.wiring").SplitRatio = 0.7;
         prefs.Get("devices.wiring").DetailCollapsed = true;
+        prefs.Get("devices.wiring").ShowDistances = true;
         prefs.Get("Devices").DetailWidth = 400;
 
         // Act
@@ -69,6 +70,9 @@ public sealed class ConsolePrefsTests : IDisposable
         // Assert
         Assert.Equal(0.7, reloaded.Get("devices.wiring").SplitRatio);
         Assert.True(reloaded.Get("devices.wiring").DetailCollapsed);
+        Assert.True(reloaded.Get("devices.wiring").ShowDistances);
+        Assert.False(reloaded.Get("Devices").ShowDistances);
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "ShowDistances").Count);
         Assert.Null(reloaded.Get("Devices").SplitRatio);
         Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "SplitRatio").Count);       // 값이 없는 콘솔은 쓰지 않는다
         Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "DetailCollapsed").Count);

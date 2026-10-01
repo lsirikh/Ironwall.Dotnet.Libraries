@@ -29,6 +29,12 @@ public readonly record struct FenceGridCell(int Gx, int Gy);
 /// <summary>격자 점 하나 — 그 자리(망 · 기둥 · 코일)와 칸.</summary>
 public sealed record FenceGridPoint(SensorMountSpec Mount, FenceGridCell Cell);
 
+/// <summary>같은 줄 이웃 두 센서 사이(m) — 왼쪽 · 오른쪽 센서 키와 그 가로 자리.</summary>
+public sealed record FenceLaneGap(int LeftKey, int RightKey, FenceLane Lane, double LeftM, double RightM)
+{
+    public double Metres => RightM - LeftM;
+}
+
 /// <summary>망 한 칸의 자리(m) — A 쪽 끝이 0.</summary>
 public sealed record FencePanelGeometry(int Index, double StartM, double EndM, FencePanelSpec Spec)
 {
@@ -1001,6 +1007,36 @@ public static class FenceLayoutMath
             ? new FenceGridCell(direction > 0 ? sameRow.Min(p => p.Cell.Gx) : sameRow.Max(p => p.Cell.Gx), from.Gy)
             : ahead.Where(p => p.Cell.Gx == nextGx).OrderBy(p => Math.Abs(p.Cell.Gy - from.Gy)).First().Cell;
         return MountAt(cell, mount, category, panels) ?? mount;
+    }
+    #endregion
+
+    #region - Distances (거리 표시 · 2026-10-01) -
+    /// <summary>
+    /// 같은 줄 이웃 센서 사이 거리(m) — 줄마다 실제 설치 가로 자리(<see cref="PointOf"/> · 망 길이 + 열 위치)의 왼쪽 → 오른쪽 차례로 이웃끼리.
+    /// 같은 점(0.05m 미만)은 빼고, 다른 줄과는 잇지 않는다. 윤형 코일 센서는 위 줄 자리 그대로.
+    /// </summary>
+    public static IReadOnlyList<FenceLaneGap> LaneGaps(IEnumerable<(int Key, SensorMountSpec Mount)> mounts, FenceGeometry geometry)
+    {
+        var result = new List<FenceLaneGap>();
+        if (geometry is null) return result;
+        var seated = (mounts ?? Enumerable.Empty<(int, SensorMountSpec)>())
+            .Select(t => (t.Key, Mount: geometry.Panels.Count > 0 ? Normalize(t.Mount, geometry.Specs) : t.Mount))
+            .Select(t => (t.Key, t.Mount.Lane, X: PointOf(t.Mount, geometry).XM))
+            .ToList();
+        foreach (var lane in seated.GroupBy(t => t.Lane).OrderBy(g => g.Key))
+        {
+            var row = lane.OrderBy(t => t.X).ThenBy(t => t.Key).ToList();
+            for (var i = 1; i < row.Count; i++)
+                if (row[i].X - row[i - 1].X >= EPS_M) result.Add(new FenceLaneGap(row[i - 1].Key, row[i].Key, lane.Key, row[i - 1].X, row[i].X));
+        }
+        return result;
+    }
+
+    /// <summary>거리 글자 — 0.1m 로 반올림하고 끝의 ".0" 은 뺀다: 6 → "6m" · 2.45 → "2.5m" · 0.05 → "0.1m".</summary>
+    public static string MetresText(double metres)
+    {
+        var rounded = Math.Round(double.IsFinite(metres) ? metres : 0, 1, MidpointRounding.AwayFromZero);
+        return rounded.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "m";
     }
     #endregion
 }

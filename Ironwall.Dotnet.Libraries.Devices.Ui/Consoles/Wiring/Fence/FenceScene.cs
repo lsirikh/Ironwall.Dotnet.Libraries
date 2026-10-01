@@ -28,6 +28,8 @@ public enum FenceInk
     LensEdge, BackSeam, MeshOver,
     // 9점 격자 끌기 안내(2026-10-01) — 빨강(위급 토큰 · 잠깐 뜨는 끌기 안내) 채운 원 · 흐린 원 · 고리 · 빈 마름모
     SnapDot, SnapDotDim, SnapRing, SnapBlocked,
+    // 거리 표시(2026-10-01) — 치수선(끝 눈금) · 치수 글자(흐린 글자 토큰 · 새 색 없음)
+    DimLine, DimText,
     // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
     PanelSelectFill, PanelSelectEdge, RubberBand,
     Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
@@ -72,8 +74,18 @@ public sealed record FenceShape(
     int[]? Figures = null,
     bool Closed = false);
 
-/// <summary>칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표).</summary>
-public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);
+/// <summary>
+/// 칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표 · 누르는 자리 = 선택 윤곽 = 칩 요소의 배치 사각형).
+/// <see cref="Extent"/> 는 적중 밖에 그리는 것(센서 번호판 · "뒤" 표지)까지 담은 그림 범위 — 이웃 칩과의 화면 간격만 이것으로 잰다.
+/// </summary>
+public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit)
+{
+    /// <summary>적중 밖까지 그리는 그림 범위(없으면 적중과 같다).</summary>
+    public Rect? Extent { get; init; }
+
+    /// <summary>적중 ∪ 그림 범위 — 간격 · 겹침 계산용.</summary>
+    public Rect Footprint => Extent is { } e ? Rect.Union(Hit, e) : Hit;
+}
 
 /// <summary>격자 점 안내의 모습 — 빈 점 · 센서가 있는 점(흐림) · 포인터 아래(크게 + 고리) · 함께 끈 센서가 갈 점(고리) · 갈 수 없음(빈 마름모).</summary>
 public enum FenceSnapState { Free, Occupied, Hot, Member, Blocked }
@@ -392,7 +404,11 @@ public static partial class FenceScene
     /// 윤형 코일 자리면 그 코일 반지름(세계 단위 · <see cref="FenceWorld.CoilOf"/>) — 몸은 코일 <b>안</b>(가운데 높이)에, 번호판은 코일 <b>위</b>에 둔다
     /// (번호 글자가 코일 선을 지나지 않게 · 펜스센서는 윤형과 같이 배치). 0 이면 보통 칩.
     /// </param>
-    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0)
+    /// <param name="plateAbove">
+    /// 번호판을 몸 <b>위</b>에 둔다(아래에 두면 윤형 코일 선에 걸리는 위 줄 센서 — <see cref="FenceWorld.PlateAboveOf"/>). 그 밖은 몸 <b>아래</b>(사용자: "계속 가리잖아").
+    /// </param>
+    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0,
+                                          bool plateAbove = false)
     {
         if (lift != 0) p = p with { YLift = lift };
         // 코일 위 번호판 자리 — 코일 꼭대기(그림의 코일과 같은 식: 가운데 − 세로 반지름 × 1.02)에서 틈 + 반 판만큼 위
@@ -425,9 +441,9 @@ public static partial class FenceScene
                 Box(o, q, 0, H + 24, H + 48, de / 2, zf, mw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, mw, H + 24, H + 48, zf, new Point(-11, H + 36), 4);
                 if (s.IsBackFacing) MeshOver(o, q, mw, H + 24, H + 48, zf);
-                var pl = coilPlate ?? q.P(5, H + 36, zf);
-                plate = Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 bb = new[] { q.P(-19, H + 48, de / 2), q.P(19, H + 48, de / 2), q.P(-19, H + 24, zf), q.P(19, H + 24, zf), q.P(19, H + 48, 0) };
+                var pl = coilPlate ?? PlateOff(bb, q.P(0, H + 24, zf).X, PLATE_H, 11, zoom, plateAbove, GroundY(p, zf));
+                plate = Plate(o, pl, 24, PLATE_H, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 break;
             }
             case FenceKind.Fence:
@@ -445,10 +461,10 @@ public static partial class FenceScene
                 }
                 else
                 {
-                    var l = b.P(0, 46, zf);
-                    o.Add(Text(FenceInk.FenceLabel, new Point(l.X, l.Y + 3), big, 10));
-                    Corners(o, c.X, b.P(0, 71, zf).Y, 13, 10, s);
-                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 40, zf), b.P(7, 40, zf), b.P(7, 76, 0) };
+                    // 번호판(바탕 있음)을 몸 아래로 — 철망 · 담 무늬 위에서도 읽힌다
+                    bb = new[] { b.P(-7, 76, de / 2), b.P(7, 76, de / 2), b.P(-7, 56, zf), b.P(7, 56, zf), b.P(7, 76, 0) };
+                    var pl = PlateOff(bb, c.X, FENCE_PLATE_H, FENCE_PLATE_TEXT, zoom, plateAbove, GroundY(b, zf));
+                    plate = Plate(o, pl, 18, FENCE_PLATE_H, big, FenceInk.NumberSmall, FENCE_PLATE_TEXT, 3.5, s, zoom);
                 }
                 break;
             }
@@ -459,9 +475,9 @@ public static partial class FenceScene
                 foreach (var y in new[] { -12.0, -24.0, -34.0 }) o.Add(Seg(FenceInk.RodRib, p.P(-3.4, y, UZ), p.P(3.4, y, UZ)));
                 o.Add(Seg(FenceInk.RodRib, p.P(0, 2, UZ), p.P(0, 13, UZ)));
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.UgCap, new[] { p.P(0, 0, UZ) }, 8, 3 + 2 * k));
-                var pl = p.P(0, 22, UZ);
+                bb = new[] { p.P(-9, 6, UZ), p.P(9, 6, UZ), p.P(-9, -48, UZ), p.P(9, -48, UZ) };     // 몸 = 막대 + 뚜껑(번호판은 빼고)
+                var pl = PlateOff(bb, p.P(0, 0, UZ).X, 18, 12.5, zoom, above: true, double.PositiveInfinity);  // 땅 위 뚜껑 위로(선택 윤곽 밖)
                 plate = Plate(o, pl, 22, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
-                bb = new[] { p.P(-12, 32, UZ), p.P(12, 32, UZ), p.P(-9, -48, UZ), p.P(9, -48, UZ) };
                 break;
             }
             default:
@@ -474,15 +490,19 @@ public static partial class FenceScene
                 Box(o, q, 0, 92, 99, zb0, zh, SensorBodyWidth(32, s.Yaw), FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, bw, 50, 92, zb1, new Point(0, 58), 3.2);
                 if (s.IsBackFacing) MeshOver(o, q, bw, 50, 99, zb1);
-                var pl = coilPlate ?? q.P(0, 78, zb1);
-                plate = Plate(o, pl, 20, coilPlate is null ? 18 : COIL_PLATE_H, big, FenceInk.Number, coilPlate is null ? 12.5 : COIL_PLATE_TEXT, 4.5, s, zoom);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };
+                // 번호판은 몸을 가리지 않게 몸 아래(케이블 글랜드 밑)로 — 사용자: "80100 이 글씨 아래로 내려라" · "계속 가리잖아"
+                var pl = coilPlate ?? PlateOff(bb, q.P(0, 50, zb1).X, PLATE_H, COIL_PLATE_TEXT, zoom, plateAbove, GroundY(p, zb1));
+                plate = Plate(o, pl, 20, PLATE_H, big, FenceInk.Number, COIL_PLATE_TEXT, 4, s, zoom);
                 break;
             }
         }
 
-        // 번호판은 작은 배율에서 커진다(Plate) — 적중 사각형(= 칩 배치 사각형)이 그것을 담아야 잘리지 않는다.
-        if (plate is { } pr) bb = bb.Append(pr.TopLeft).Append(pr.BottomRight).ToArray();
+        // 적중 · 선택 윤곽 = 몸(아이콘)만 — 번호판은 누르는 자리도, 선택 윤곽(어도너)도 아니다(사용자: "그건 adorner에 안잡히게 해라").
+        // 번호판(작은 배율에서 커진다 · Plate)과 "뒤" 표지는 그림 범위(Extent)에만 들어가 이웃 칩과의 화면 간격을 잰다.
+        var box = Bounds(bb);
+        var extent = box;
+        if (plate is { } pr) extent.Union(pr);
 
         // "뒤" 표지(FR-20) — 번호판 <b>왼쪽</b>에 붙인 작은 판(번호판과 겹치지 않는다). 색이 아니라 글자로 말한다(주 글자라 줌에 맞서 키운다).
         if (s.IsBackFacing && plate is { } pl2)
@@ -491,15 +511,45 @@ public static partial class FenceScene
             var size = tag.Height - 5;
             o.Add(RectShape(FenceInk.FacingTag, tag, 3));
             o.Add(Text(FenceInk.FacingTagText, new Point(tag.X + tag.Width / 2, tag.Y + tag.Height / 2 + size * 0.36), "내", size));
-            bb = bb.Append(tag.TopLeft).Append(tag.BottomRight).ToArray();
+            extent.Union(tag);
         }
 
-        var box = Bounds(bb);
         var hit = new Rect(box.X - 5, box.Y - 5, box.Width + 10, box.Height + 10);
         o.Insert(0, RectShape(FenceInk.Hit, hit, 0));
         if (selected) o.Add(RectShape(FenceInk.Select, hit, 8));
-        return new FenceChipPicture(Legible(o, zoom), hit);
+        return new FenceChipPicture(Legible(o, zoom), hit) { Extent = new Rect(extent.X - 5, extent.Y - 5, extent.Width + 10, extent.Height + 10) };
     }
+
+    /// <summary>
+    /// 몸 아래 번호판 — 판 높이(스마트 · 복합) · 펜스센서 판 높이 · 글자 크기 · 몸과의 틈(세계 단위).
+    /// 틈은 선택 윤곽(몸 + 여백 5)보다 3 더 — 번호판이 선택 윤곽 · 누르는 자리 밖에 온다.
+    /// </summary>
+    public const double PLATE_H = 16;
+    public const double FENCE_PLATE_H = 13;
+    public const double FENCE_PLATE_TEXT = 9.5;
+    public const double PLATE_GAP = 8;
+
+    /// <summary>땅 번호 줄의 머리("번호")와 첫 번호 사이 틈(세계 단위).</summary>
+    public const double NUMBER_CAPTION_GAP = 10;
+
+    /// <summary>
+    /// 번호판 가운데 — 몸(<paramref name="body"/> 점들) <b>아래</b>로 틈만큼 띄운다(몸과 겹치지 않는다). 아래가 땅(<paramref name="groundY"/>) 밑으로 빠지거나
+    /// <paramref name="above"/>(아래에 두면 윤형 코일에 걸린다)이면 몸 <b>위</b>로. 판 높이는 작은 배율에서 커지는 몫(<see cref="Plate"/>)까지 센다.
+    /// </summary>
+    public static Point PlateOff(IReadOnlyList<Point> body, double centreX, double plateH, double textSize, double zoom, bool above, double groundY)
+    {
+        var f = Math.Max(1, MIN_TEXT / (textSize * SafeZoom(zoom)));
+        var h = plateH * f;
+        var bottom = body.Max(pt => pt.Y);
+        var top = body.Min(pt => pt.Y);
+        var below = bottom + PLATE_GAP + h / 2;
+        return above || below + h / 2 > groundY
+            ? new Point(centreX, top - PLATE_GAP - h / 2)
+            : new Point(centreX, below);
+    }
+
+    /// <summary>칩 좌표의 땅 선(그 깊이) — 올린 칩(YLift)도 세계 높이 0 이 땅이다.</summary>
+    private static double GroundY(FenceProjector p, double z) => p.P(0, -p.YLift, z).Y;
 
     /// <summary>코일 위 번호판 — 판 높이 · 글자 크기 · 코일 꼭대기와의 틈(세계 단위 · 가시 끝보다 멀리).</summary>
     public const double COIL_PLATE_H = 16;
@@ -707,7 +757,8 @@ public static partial class FenceScene
     public static bool IsPrimaryText(FenceInk ink) => ink is FenceInk.Number or FenceInk.NumberSmall or FenceInk.FenceLabel
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert or FenceInk.FacingTagText
         or FenceInk.GroupSub       // 묶음 카드 안 첫–끝 번호
-        or FenceInk.SideLabel;     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
+        or FenceInk.SideLabel
+        or FenceInk.DimText;       // 거리(m) — 켰으면 읽혀야 한다(겹치는 것은 FenceDimensions.Thin 이 뺀다)     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
 
     private static double SafeZoom(double zoom) => zoom > 0.05 ? zoom : 0.05;
 
