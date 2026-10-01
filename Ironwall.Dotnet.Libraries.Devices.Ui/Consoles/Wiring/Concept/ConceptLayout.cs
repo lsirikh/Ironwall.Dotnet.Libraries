@@ -218,6 +218,33 @@ public static class ConceptLayout
                                    posts.Select(X).ToList(), ticks, mode, chip, new Size(width, height));
     }
 
+    /// <summary>개념도 거리 글자 크기(px) · 줄에서 떨어진 거리(아래 줄은 선 아래 · 위 줄은 선 위).</summary>
+    public const double DISTANCE_SIZE = 10;
+    public const double DISTANCE_BELOW = 24;     // VBus 표지(선 위 가운데) 밑 · 눈금 숫자 위
+    public const double DISTANCE_ABOVE = 5;
+
+    /// <summary>
+    /// 개념도 거리(m · 2026-10-01 [거리 표시]) — 줄마다 이웃 칩 가운데 사이에 글자 하나(아래 줄은 선 아래, 위 줄은 선 위). 칩 위 번호 · 신호등은 칩 자리라
+    /// 사이(가운데)의 글자와 겹치지 않는다. 화면에서 이웃 글자와 겹치면 뺀다(처음 · 끝은 남긴다).
+    /// </summary>
+    public static IReadOnlyList<Fence.FenceShape> DistanceLabels(ConceptGeometry geometry, IReadOnlyList<FenceLaneGap> gaps)
+    {
+        var o = new List<Fence.FenceShape>();
+        if (geometry is null || gaps is null) return o;
+        var at = geometry.Nodes.ToDictionary(n => n.Key, n => n.Center);
+        foreach (var lane in new[] { FenceLane.Lower, FenceLane.Upper })
+        {
+            var row = gaps.Where(g => g.Lane == lane && at.ContainsKey(g.LeftKey) && at.ContainsKey(g.RightKey))
+                          .Select(g => (X: (at[g.LeftKey].X + at[g.RightKey].X) / 2, Text: FenceLayoutMath.MetresText(g.Metres))).ToList();
+            var keep = Fence.FenceDimensions.Thin(row.Select(r => (r.X, Fence.FenceScene.EstimateWidth(r.Text, DISTANCE_SIZE))).ToList(), Fence.FenceDimensions.GAP_PX);
+            var y = lane == FenceLane.Lower ? geometry.LowerY + DISTANCE_BELOW : geometry.UpperY - DISTANCE_ABOVE;
+            for (var i = 0; i < row.Count; i++)
+                if (keep[i])
+                    o.Add(new Fence.FenceShape(Fence.FenceShapeKind.Text, Fence.FenceInk.DimText, new[] { new Point(row[i].X, y) }, Text: row[i].Text, FontSize: DISTANCE_SIZE));
+        }
+        return o;
+    }
+
     /// <summary>포인터가 가리키는 줄 — 두 줄 가운데보다 위면 위 줄.</summary>
     public static FenceLane LaneAt(ConceptGeometry geometry, Point pointer)
         => pointer.Y < (geometry.UpperY + geometry.LowerY) / 2 ? FenceLane.Upper : FenceLane.Lower;

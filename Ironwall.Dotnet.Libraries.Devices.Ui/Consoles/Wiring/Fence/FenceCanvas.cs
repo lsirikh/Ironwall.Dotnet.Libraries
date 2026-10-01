@@ -279,7 +279,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _renderZoom = _view.Scale;
         var showRange = ViewModel.ShowRange && ViewModel.HasRangeSensors;
         var shapes = _scene.IsLayout
-            ? FenceScene.StaticLayout(_scene, _projector, showRange, ViewModel.ShowCables, _enclosureX, _enclosureGap, _view.Scale)
+            ? FenceScene.StaticLayout(_scene, _projector, showRange, ViewModel.ShowCables, _enclosureX, _enclosureGap, _view.Scale, ViewModel.ShowDistances)
             : FenceScene.Static(_scene, _projector, showRange, _enclosureX, _enclosureGap, _view.Scale);
         var clip = new StreamGeometry();
         var ground = FenceScene.GroundPolygon(_scene, _projector, _enclosureX);

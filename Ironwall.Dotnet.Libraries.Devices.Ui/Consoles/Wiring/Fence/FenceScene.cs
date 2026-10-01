@@ -28,6 +28,8 @@ public enum FenceInk
     LensEdge, BackSeam, MeshOver,
     // 9점 격자 끌기 안내(2026-10-01) — 빨강(위급 토큰 · 잠깐 뜨는 끌기 안내) 채운 원 · 흐린 원 · 고리 · 빈 마름모
     SnapDot, SnapDotDim, SnapRing, SnapBlocked,
+    // 거리 표시(2026-10-01) — 치수선(끝 눈금) · 치수 글자(흐린 글자 토큰 · 새 색 없음)
+    DimLine, DimText,
     // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
     PanelSelectFill, PanelSelectEdge, RubberBand,
     Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
@@ -740,7 +742,8 @@ public static partial class FenceScene
     public static bool IsPrimaryText(FenceInk ink) => ink is FenceInk.Number or FenceInk.NumberSmall or FenceInk.FenceLabel
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert or FenceInk.FacingTagText
         or FenceInk.GroupSub       // 묶음 카드 안 첫–끝 번호
-        or FenceInk.SideLabel;     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
+        or FenceInk.SideLabel
+        or FenceInk.DimText;       // 거리(m) — 켰으면 읽혀야 한다(겹치는 것은 FenceDimensions.Thin 이 뺀다)     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
 
     private static double SafeZoom(double zoom) => zoom > 0.05 ? zoom : 0.05;
 

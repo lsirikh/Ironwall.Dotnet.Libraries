@@ -136,7 +136,9 @@ public sealed class FenceConceptView : Grid
         var nodes = vm.ConceptNodes();
         var size = new Size(Math.Max(ActualWidth, 240), Math.Max(ActualHeight, MinHeight));
         _geometry = ConceptLayout.Build(vm.ConceptItems(), vm.ConceptPostsM(), vm.ConceptLengthM, vm.FenceControllerEnd, size);
-        _back.Show(ConceptScene.Background(_geometry, nodes), null);
+        var back = ConceptScene.Background(_geometry, nodes);
+        if (vm.ShowDistances) back = back.Concat(ConceptLayout.DistanceLabels(_geometry, vm.FenceLaneGaps())).ToList();
+        _back.Show(back, null);
         _overlay.Show(Array.Empty<FenceShape>(), null);
         SyncNodes(vm, nodes);
     }
