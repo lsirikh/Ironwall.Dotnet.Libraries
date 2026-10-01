@@ -413,23 +413,30 @@ public class WiringFenceViewTests
             var hint = Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint");
             var hintTop = hint.TranslatePoint(new Point(0, 0), canvas).Y;
             var hintBottom = hintTop + hint.ActualHeight;
-            var toggle = Descendants<System.Windows.Controls.Primitives.ToggleButton>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Help");
-            var popup = Descendants<System.Windows.Controls.Primitives.Popup>(view)
-                .Single(p => p.Child is Border { Child: TextBlock t } && AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.HelpText");
+            // help-callout H-1 — 옛 [?] 를 공용 "?"(HelpTip)로. 헤디드 SC-FEN-013 이 쓰는 두 id(단추 · 몸)는 그대로 잇는다.
+            var toggle = Descendants<Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Help");
+            var popup = toggle.CalloutPopup!;
             toggle.IsChecked = true;
             Pump();
             var opened = popup.IsOpen;
-            var helpId = AutomationProperties.GetAutomationId((TextBlock)((Border)popup.Child).Child);
+            var body = toggle.Callout!;
+            var helpId = AutomationProperties.GetAutomationId(body);
+            var helpText = UIElementAutomationPeer.CreatePeerForElement(body).GetName();
+            var titled = toggle.Entry?.Title;
             toggle.IsChecked = false;
             Pump();
-            return (hintTop, hintBottom, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
+            return (hintTop, hintBottom, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, helpText, titled, toggle.HelpKey,
+                ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
         });
 
         Assert.True(result.hintBottom <= 0 || result.hintTop >= result.CanvasHeight, $"안내 {result.hintTop}~{result.hintBottom} · 캔버스 높이 {result.CanvasHeight}");   // 그림 위에 겹치지 않는다(도구줄 오른쪽)
         Assert.True(result.hintBottom <= 0);                                   // 창 정리 2026-10-01 — 바닥 띠를 없애고 도구줄로
         Assert.True(result.opened);
         Assert.True(result.Closed);
-        Assert.Equal("Devices.Wiring.Fence.HelpText", result.helpId);
+        Assert.Equal("Devices.Wiring.Fence.HelpText", result.helpId);           // 옛 몸 id(별칭) 유지
+        Assert.Contains("Shift+끌기", result.helpText);                         // 헤디드가 읽는 글 — 말풍선 몸 이름(평문)
+        Assert.Equal("Devices.Wiring.Fence", result.HelpKey);                   // 문구는 설명 목록(DevicesHelp) 한 곳
+        Assert.Equal("펜스 보기 조작", result.titled);
         Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, result.ToggleType);
     }
 

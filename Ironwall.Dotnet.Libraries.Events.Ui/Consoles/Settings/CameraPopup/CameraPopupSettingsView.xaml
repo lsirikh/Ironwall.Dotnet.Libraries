@@ -284,11 +284,13 @@
 		</c:ConsoleSection>
 
 		<!--  더블클릭 팝업 — 지도 위 (현행 그대로)  -->
+		<!--  설명(옮긴 자리 기억 · 자동 닫기)은 칸 아래 회색 줄이 아니라 섹션 "?" 로(help-callout H-1 시범 · 문구는 EventsHelp)  -->
 		<c:ConsoleSection
 			AxisName="IsAutoDiscard · TimeoutSeconds"
 			Header="더블클릭 팝업 — 지도 위 (현행 그대로)"
+			HelpKey="Settings.CameraPopup.DoubleClick"
 			Visibility="{Binding ShowSelfGroups, Converter={StaticResource CameraPopup.BoolToVisibility}}">
-			<c:ConsoleField IsTouched="{Binding Touched[DoubleClick]}" Note="옮긴 자리는 지도 좌표로 기억합니다">
+			<c:ConsoleField IsTouched="{Binding Touched[DoubleClick]}">
 				<c:ConsoleField.Header>
 					<TextBlock Text="자동 닫기" />
 				</c:ConsoleField.Header>

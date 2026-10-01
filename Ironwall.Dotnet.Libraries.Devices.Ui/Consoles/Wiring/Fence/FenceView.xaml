@@ -2,6 +2,7 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence.FenceView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:fence="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence"
 	xmlns:concept="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Concept"
 	xmlns:sys="clr-namespace:System;assembly=mscorlib"
@@ -196,36 +197,16 @@
 						Content="+"
 						Padding="0"
 						Style="{StaticResource F.Tool}" />
-					<!--  도움말(검토: 캔버스 위 겹친 안내가 위 줄 · 윤형 코일을 가렸다) — [?] 를 누르면 전체 조작 안내가 뜬다  -->
-					<Grid Margin="6,0,0,0" VerticalAlignment="Center">
-					<ToggleButton
-						Width="28"
+					<!--
+						도움말 — 공용 "?"(help-callout H-1 시범). 문구는 DevicesHelp(키 Devices.Wiring.Fence)에 한 곳.
+						옛 [?] 의 id 를 그대로 잇는다(헤디드 SC-FEN-013): 단추 Devices.Wiring.Fence.Help · 몸 Devices.Wiring.Fence.HelpText — 별칭은 계약 시험의 허용 목록에 있다.
+					-->
+					<c:HelpTip
+						Margin="8,0,0,0"
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Help"
-						AutomationProperties.Name="조작 도움말"
-						Content="?"
-						Style="{StaticResource F.ToolToggle}"
-						ToolTip="조작 도움말" />
-					<Popup
-						AllowsTransparency="True"
-						IsOpen="{Binding Children[0].IsChecked, RelativeSource={RelativeSource AncestorType=Grid}, Mode=TwoWay}"
-						Placement="Bottom"
-						StaysOpen="False">
-						<Border
-							Padding="12,8"
-							Background="{DynamicResource SurfaceBrush}"
-							BorderBrush="{DynamicResource RowLineBrush}"
-							BorderThickness="1"
-							CornerRadius="7">
-							<TextBlock
-								MaxWidth="560"
-								AutomationProperties.AutomationId="Devices.Wiring.Fence.HelpText"
-								FontSize="12"
-								Foreground="{DynamicResource TextPrimaryBrush}"
-								Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 = 빨강 점(망마다 9점)에 맞춰 옮기기 · Ctrl+← → = 다음 격자 점 · Alt+Shift+← → = 다른 망으로 · Alt+↑ ↓ = 한 줄 위 · 아래(하단 · 중단 · 상단 · 윤형 망 펜스센서는 코일) · Shift+Alt+↑ ↓ = 미세 높이 0.1m · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
-								TextWrapping="Wrap" />
-						</Border>
-					</Popup>
-					</Grid>
+						BodyAutomationId="Devices.Wiring.Fence.HelpText"
+						HelpKey="Devices.Wiring.Fence"
+						Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
 				</StackPanel>
 				<!--  한 줄 조작 안내 — 도구줄 오른쪽(옛 바닥 띠는 결선 창 상태줄로 합쳤다 · 창 정리 2026-10-01). 전체는 [?]  -->
 				<TextBlock
