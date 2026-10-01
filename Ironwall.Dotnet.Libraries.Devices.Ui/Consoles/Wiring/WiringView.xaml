@@ -1356,7 +1356,7 @@
 												HorizontalAlignment="Right"
 												FontSize="11.5"
 												Foreground="{DynamicResource TextMutedBrush}"
-												Text="양 끝은 센서 없는 리턴케이블로 함체에 돌아옵니다" />
+												Text="Ch1 → 아래 줄 → 먼 끝에서 꺾여 위 줄(또는 리턴선) → Ch2" />
 										</StackPanel>
 										<StackPanel VerticalAlignment="Center">
 											<StackPanel Orientation="Horizontal">

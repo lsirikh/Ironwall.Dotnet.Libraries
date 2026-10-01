@@ -530,7 +530,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     }
 
     /// <summary>목록 설명.</summary>
-    public string Line1Hint => $"위가 {WiringValidation.PORT_1} 쪽 끝(A1)입니다 · A·B 번호는 두 포트(Ch1 · Ch2)에서 센 자리 · 양 끝은 센서 없는 리턴케이블로 제어기에 돌아옵니다 · 순서를 바꾸면 펜스 위 자리도 따라갑니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
+    public string Line1Hint => $"위가 {WiringValidation.PORT_1} 쪽 끝(A1)입니다 · A·B 번호는 두 포트(Ch1 · Ch2)에서 센 자리 · Ch1 → 아래 줄 → 먼 끝에서 꺾여 위 줄(또는 리턴선) → Ch2 · 순서를 바꾸면 펜스 위 자리도 따라갑니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
     #endregion
 
     #region - Load notices (FR-02 · FR-03 · F-2b) -

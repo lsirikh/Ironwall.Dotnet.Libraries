@@ -1,4 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -171,8 +173,9 @@ public class WiringValidationTests
     {
         var text = WiringValidation.LoopText(Ring(3));
 
-        Assert.Contains("Ch1(A) ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Ch2(B)", text);
-        Assert.Contains("리턴케이블", text);
+        Assert.Contains("Ch1(A) ─▶ 아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
+        Assert.Contains("먼 끝에서 꺾여 리턴선 ─▶ Ch2(B)", text);                         // 위 줄이 비면 리턴선(§1-0b ②)
+        Assert.DoesNotContain("리턴케이블로 함체", text);
     }
 
     [Fact]
@@ -186,8 +189,28 @@ public class WiringValidationTests
         var text = WiringValidation.LoopText(board);
 
         // Assert
-        Assert.Contains("Ch1(A) ─▶ 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서 ◀─ Ch2(B)", text);
+        Assert.Contains("Ch1(A) ─▶ 아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
         Assert.DoesNotContain("왼쪽", text);
+    }
+
+    [Fact]
+    public void should_write_the_upper_lane_back_to_ch2_and_name_fault_sections_in_the_lane_chain_order_when_two_lanes_are_used()
+    {
+        // Arrange — 펜스 구성(제안)이 켜진 링 6대, 뒤 셋을 위 줄로
+        var board = Ring(6);
+        var layout = WiringFenceLayout.Create(Enumerable.Repeat(FencePanelSpec.Default(), 5),
+            board.Chain.Keys.Select((k, i) => (k, i)).ToDictionary(t => t.k, t => new SensorMountSpec(t.i, FenceMountSpot.PostTop)), null);
+        board.LoadFenceLayout(layout);
+        board.SetLanes(board.Chain.Keys.Skip(3).ToList(), FenceLane.Upper);
+
+        // Act
+        var text = WiringValidation.LoopText(board);
+        var hint = WiringValidation.FaultHint(board);
+
+        // Assert — 사슬 = 아래 1 · 2 · 3 → 위 6 · 5 · 4(먼 끝에서 돌아온다)
+        Assert.Contains("아래 줄 1. 북측 1구간 센서 → 2. 북측 2구간 센서 → 3. 북측 3구간 센서", text);
+        Assert.Contains("위 줄 4. 북측 6구간 센서 → 5. 북측 5구간 센서 → 6. 북측 4구간 센서 ─▶ Ch2(B)", text);
+        Assert.Contains("북측 6구간 센서", hint.Split(Environment.NewLine)[0]);               // 1차 4~5 = 사슬 4 · 5번째
     }
 
     [Fact]

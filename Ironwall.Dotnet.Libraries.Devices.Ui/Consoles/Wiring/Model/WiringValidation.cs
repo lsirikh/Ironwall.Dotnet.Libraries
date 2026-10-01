@@ -109,12 +109,21 @@ public static class WiringValidation
     public static string LoopText(WiringBoard board)
     {
         ArgumentNullException.ThrowIfNull(board);
-        // 모든 제어기가 링(§1-0) — 포트는 Ch1(A) · Ch2(B). 옛 가지 · 한 줄 글은 뺐다.
-        return $"{PORT_1} ─▶ {Describe(board.Placed(WiringSpec.LINE_PRIMARY))} ◀─ {PORT_2}{Environment.NewLine}"
-               + "    (양 끝은 리턴케이블로 함체에 돌아옵니다)";
+        // 두 줄 형상(v0.3 §1-0b) — Ch1 → 아래 줄(제어기 쪽 → 먼 끝) → 먼 끝에서 꺾여 → 위 줄(먼 끝 → 제어기 쪽) 또는 리턴선 → Ch2.
+        // 번호(1. 2. …)는 사슬 위치 — 장애 고장 구간 예시와 같은 수다.
+        var placed = board.Placed(WiringSpec.LINE_PRIMARY);
+        if (placed.Count == 0) return $"{PORT_1} ─▶ (비어 있음) ◀─ {PORT_2}";
+        var position = placed.Select((r, i) => (r.Key, i + 1)).ToDictionary(t => t.Key, t => t.Item2);
+        var lower = placed.Where(r => board.FenceLayout.LaneOf(r.Key) == Monitoring.Models.Fences.FenceLane.Lower).ToList();
+        var upper = placed.Where(r => board.FenceLayout.LaneOf(r.Key) == Monitoring.Models.Fences.FenceLane.Upper).ToList();
+        var first = $"{PORT_1} ─▶ 아래 줄 {Describe(lower)}";
+        var second = upper.Count > 0
+            ? $"    ↳ 먼 끝에서 꺾여 위 줄 {Describe(upper)} ─▶ {PORT_2}"
+            : $"    ↳ 먼 끝에서 꺾여 리턴선 ─▶ {PORT_2}";
+        return first + Environment.NewLine + second;
 
-        static string Describe(IReadOnlyList<WiringSensorRow> placed)
-            => placed.Count == 0 ? "(비어 있음)" : string.Join(" → ", placed.Select((r, i) => $"{i + 1}. {r.Display}"));
+        string Describe(IReadOnlyList<WiringSensorRow> rows)
+            => rows.Count == 0 ? "(비어 있음)" : string.Join(" → ", rows.Select(r => $"{position[r.Key]}. {r.Display}"));
     }
 
     /// <summary>고장 구간 예시(WS L709-712) — 장애 화면의 "1차 4~5" 가 어느 센서 사이인지. 링이면 2차(Sensor B 쪽)도 함께.</summary>
