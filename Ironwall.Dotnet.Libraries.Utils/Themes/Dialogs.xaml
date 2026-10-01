@@ -145,6 +145,8 @@
 
 	<!--  ───────── 틀 T4  ─────────  -->
 	<Style TargetType="{x:Type dlg:ConsoleDialogFrame}">
+		<!--  F1 = 대화창 안 포커스에서 가장 가까운 "?"(머리 "?" 포함) — 셸 위 대화창(강풍모드 · 결선 만들기 …)도 F1 을 받는다(r24 헤디드). 못 찾으면 바깥 뿌리로 넘긴다  -->
+		<Setter Property="c:HelpTip.HandlesF1" Value="True" />
 		<Setter Property="HorizontalAlignment" Value="Stretch" />
 		<Setter Property="VerticalAlignment" Value="Stretch" />
 		<Setter Property="HorizontalContentAlignment" Value="Stretch" />

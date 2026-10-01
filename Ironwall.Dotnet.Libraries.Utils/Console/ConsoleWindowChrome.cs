@@ -251,6 +251,9 @@ public static class ConsoleWindowChrome
     /// </summary>
     public static bool Apply(Window window)
     {
+        // F1 = 포커스에서 가장 가까운 도움말 범위의 "?"(help-callout D-2). 콘솔 셸은 스타일이 켜지만, 결선 · 조립기 같은
+        // 창은 UserControl 뿌리라 범위(Scope)를 걸어 두고도 F1 을 받을 뿌리가 없었다(r24 헤디드 실측 2026-10-02) — 콘솔 창은 창 뿌리에서 받는다.
+        HelpTip.SetHandlesF1(window, true);
         if (GetIsApplied(window)) return false;
         if (FindTemplate(window) is not { } template) return false;
 

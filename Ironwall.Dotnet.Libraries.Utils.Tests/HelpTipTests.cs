@@ -455,6 +455,36 @@ public class HelpTipTests
         Assert.Equal(1, r.cancels);
         });
     }
+
+    [Fact]
+    public void should_open_the_dialog_question_mark_when_f1_is_pressed_inside_a_dialog_frame()
+    {
+        Sta(() =>
+        {
+        Register("Test.Tip.F1.Dialog");
+        var box = new TextBox();
+        var frame = new ConsoleDialogFrame { Title = "대화창", HelpKey = "Test.Tip.F1.Dialog", Content = box };
+        var r = OnWindow(frame, (window, _) =>
+        {
+            ApplicationCommands.Help.Execute(null, box);       // r24: 대화창 틀이 F1 을 받지 않아 아무 일도 없었다
+            return (Handles: HelpTip.GetHandlesF1(frame), Opened: TipOf(frame).IsChecked == true);
+        });
+        Assert.True(r.Handles);
+        Assert.True(r.Opened);
+        });
+    }
+
+    [Fact]
+    public void should_handle_f1_at_the_window_root_when_console_chrome_is_applied()
+    {
+        Sta(() =>
+        {
+            var window = new Window();
+            ConsoleWindowChrome.Apply(window);                  // r24: 결선 · 조립기 창(UserControl 뿌리)이 F1 을 받을 뿌리가 없었다
+            Assert.True(HelpTip.GetHandlesF1(window));
+            window.Close();
+        });
+    }
     #endregion
 
     #region - Theme -
