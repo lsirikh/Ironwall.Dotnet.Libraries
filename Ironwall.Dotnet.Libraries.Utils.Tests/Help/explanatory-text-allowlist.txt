@@ -233,9 +233,6 @@ Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelVi
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelView.xaml	literal	md:HintAssist.Hint=＋ 그룹 추가…
 Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelView.xaml	literal	md:HintAssist.Hint=＋ 장비 추가…
 Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/MapRegistrationStyle.xaml	literal	md:HintAssist.Hint=레이어 이름 입력
-Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PlaybackConsoleStyle.xaml	binding	Text=Calendar.Hint
-Ironwall.Dotnet.Libraries.GMaps.Ui/Views/Maps/MapView.xaml	binding	Text=MeasureHint
-Ironwall.Dotnet.Libraries.Gateway/Views/GatewaySetupView.xaml	literal	Hint=[추가]를 눌러 연동 이벤트를 만드세요
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Hint=DetailEmptyHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Text=EmptyStateHint
 Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Visibility=EmptyStateHint

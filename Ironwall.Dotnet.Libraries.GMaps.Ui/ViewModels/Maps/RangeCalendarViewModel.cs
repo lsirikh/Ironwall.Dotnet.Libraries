@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Caliburn.Micro;
@@ -49,9 +49,9 @@ public sealed class RangeCalendarViewModel : PropertyChangedBase
     /// <summary>"2026년 6월" 형식 헤더 라벨.</summary>
     public string MonthLabel => $"{_month:yyyy년 M월}";
 
-    private string _hint = "시작일을 선택하세요";
-    /// <summary>안내 문구(시작/종료 선택 단계 표시).</summary>
-    public string Hint { get => _hint; set { _hint = value; NotifyOfPropertyChange(); } }
+    private string _stepText = "시작일을 선택하세요";
+    /// <summary>지금 고를 차례(시작일 → 종료일) — 진행 상태 한 줄(help-callout H-4: 사용법은 창 "?"). 예전 이름 Hint.</summary>
+    public string StepText { get => _stepText; set { _stepText = value; NotifyOfPropertyChange(); } }
 
     public ICommand PrevMonthCommand { get; }
     public ICommand NextMonthCommand { get; }
@@ -67,7 +67,7 @@ public sealed class RangeCalendarViewModel : PropertyChangedBase
         if (_end < _start) (_start, _end) = (_end, _start);
         _pending = null;
         _month = DateRangeCalendar.MonthOf(_start);
-        Hint = "시작일을 선택하세요";
+        StepText = "시작일을 선택하세요";
         NotifyOfPropertyChange(nameof(MonthLabel));
         Rebuild();
     }
@@ -86,7 +86,7 @@ public sealed class RangeCalendarViewModel : PropertyChangedBase
         _start = s;
         _end = e;
         _pending = pending;
-        Hint = completed ? "시작일을 선택하세요" : $"시작 {s:M/d} · 종료일을 선택하세요";
+        StepText = completed ? "시작일을 선택하세요" : $"시작 {s:M/d} · 종료일을 선택하세요";
         Rebuild();
         if (completed) RangeCompleted?.Invoke(s, e);
     }

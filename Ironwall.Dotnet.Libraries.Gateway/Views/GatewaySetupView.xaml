@@ -293,10 +293,10 @@
 						</DataGrid.Columns>
 					</DataGrid>
 
-					<!--  S16 — 빈 목록은 아무 안내 없는 빈 판이었다. 무엇이 비었고 무엇을 하면 되는지 말한다(불러오는 중에는 숨긴다).  -->
+					<!--  S16 — 빈 목록은 아무 안내 없는 빈 판이었다. 무엇이 비었는지 말한다(불러오는 중에는 숨긴다).
+					      help-callout H-4 — 둘째 줄 사용법("[추가]를 눌러 …")은 설정 창 머리의 "?"(호스트 Host.Settings.Gateway)로 옮겼다.  -->
 					<console:ConsoleEmptyState
 						Margin="0,36,0,0"
-						Hint="[추가]를 눌러 연동 이벤트를 만드세요"
 						IsHitTestVisible="False"
 						Title="등록된 연동 이벤트가 없습니다">
 						<console:ConsoleEmptyState.Style>

@@ -389,7 +389,7 @@
 													Margin="2,8,0,0"
 													FontSize="10.5"
 													Foreground="{DynamicResource TextMutedBrush}"
-													Text="{Binding Calendar.Hint}" />
+													Text="{Binding Calendar.StepText}" />
 											</StackPanel>
 										</Border>
 									</Popup>

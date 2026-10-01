@@ -158,7 +158,7 @@ public sealed class MeasureController : IDisposable
 
     // help-callout H-4 · D-1 — 띠에는 지금 할 일 한 줄만 남긴다. 끝내기(더블클릭) · 지우기(Backspace · Ctrl+Z) · 취소(Esc)는
     // 측정 띠의 "?"(MapsHelp "Map.Measure.Tool") 로 옮겼다.
-    internal const string InProgressHint = "지도를 클릭해 점을 찍으세요 · Enter 완료";
+    public const string InProgressHint = "지도를 클릭해 점을 찍으세요 · Enter 완료";
 
     private string LengthHint(int count)
         => _finished ? "완료 — 클릭하여 새 측정"

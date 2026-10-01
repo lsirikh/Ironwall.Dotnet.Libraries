@@ -102,11 +102,15 @@ public partial class MapViewModel
         set { _measureSecondaryUnit = value; NotifyOfPropertyChange(nameof(MeasureSecondaryUnit)); }
     }
 
-    private string _measureHint = string.Empty;
-    public string MeasureHint
+    private string _measureStep = string.Empty;
+    /// <summary>
+    /// 측정 띠 아래 한 줄 — <b>지금 할 일</b>(진행 상태)만 담는다. 끝내기 · 지우기 · 취소 단축키 같은 사용법은 측정 띠의 "?"
+    /// (help-callout H-4 · D-1). 예전 이름 MeasureHint — 설명이 아니라 진행 단계라 이름을 바꿨다.
+    /// </summary>
+    public string MeasureStep
     {
-        get => _measureHint;
-        set { _measureHint = value; NotifyOfPropertyChange(nameof(MeasureHint)); }
+        get => _measureStep;
+        set { _measureStep = value; NotifyOfPropertyChange(nameof(MeasureStep)); }
     }
     #endregion
 
@@ -181,7 +185,7 @@ public partial class MapViewModel
         MeasureSecondaryLabel = r.SecondaryLabel;
         MeasureSecondaryValue = r.SecondaryValue;
         MeasureSecondaryUnit = r.SecondaryUnit;
-        MeasureHint = r.Hint;
+        MeasureStep = r.Hint;
     }
 
     private void OnMeasureStopped()
