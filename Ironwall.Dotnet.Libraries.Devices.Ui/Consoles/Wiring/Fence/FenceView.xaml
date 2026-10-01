@@ -160,6 +160,38 @@
 						Content="+"
 						Padding="0"
 						Style="{StaticResource F.Tool}" />
+					<!--  도움말(검토: 캔버스 위 겹친 안내가 위 줄 · 윤형 코일을 가렸다) — [?] 를 누르면 전체 조작 안내가 뜬다  -->
+					<Grid Margin="6,0,0,0" VerticalAlignment="Center">
+					<ToggleButton
+						Width="26"
+						Height="26"
+						Padding="0"
+						AutomationProperties.AutomationId="Devices.Wiring.Fence.Help"
+						AutomationProperties.Name="조작 도움말"
+						Content="?"
+						FontWeight="Bold"
+						ToolTip="조작 도움말" />
+					<Popup
+						AllowsTransparency="True"
+						IsOpen="{Binding Children[0].IsChecked, RelativeSource={RelativeSource AncestorType=Grid}, Mode=TwoWay}"
+						Placement="Bottom"
+						StaysOpen="False">
+						<Border
+							Padding="12,8"
+							Background="{DynamicResource SurfaceBrush}"
+							BorderBrush="{DynamicResource RowLineBrush}"
+							BorderThickness="1"
+							CornerRadius="7">
+							<TextBlock
+								MaxWidth="560"
+								AutomationProperties.AutomationId="Devices.Wiring.Fence.HelpText"
+								FontSize="12"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 · Alt+Shift+← → = 다른 망으로 · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
+								TextWrapping="Wrap" />
+						</Border>
+					</Popup>
+					</Grid>
 				</StackPanel>
 			</DockPanel>
 		</Border>
@@ -172,12 +204,25 @@
 			BorderBrush="{DynamicResource RowLineBrush}"
 			BorderThickness="0,1,0,0"
 			DockPanel.Dock="Bottom">
-			<TextBlock
-				VerticalAlignment="Center"
-				AutomationProperties.AutomationId="Devices.Wiring.Fence.Counts"
-				FontSize="12"
-				Foreground="{DynamicResource TextSecondaryBrush}"
-				Text="{Binding FenceCountsText}" />
+			<DockPanel LastChildFill="True">
+				<!--  한 줄 조작 안내(검토: 캔버스 위에서 바닥 띠로 옮겼다) — 전체는 도구줄 [?]  -->
+				<TextBlock
+					Margin="16,0,0,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
+					DockPanel.Dock="Right"
+					FontSize="11.5"
+					Foreground="{DynamicResource TextMutedBrush}"
+					Text="왼쪽 끌기 = 센서 선택 · 오른쪽 클릭 = 메뉴 · 휠 = 확대 · 전체 조작은 [?]"
+					TextTrimming="CharacterEllipsis" />
+				<TextBlock
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Wiring.Fence.Counts"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding FenceCountsText}"
+					TextTrimming="CharacterEllipsis" />
+			</DockPanel>
 		</Border>
 
 		<!--
@@ -223,24 +268,6 @@
 		<!--  ── 캔버스 ──  -->
 		<Grid>
 			<fence:FenceCanvas ViewModel="{Binding}" />
-			<Border
-				Margin="10"
-				Padding="10,6"
-				HorizontalAlignment="Left"
-				VerticalAlignment="Top"
-				Background="{DynamicResource SurfaceTranslucentBrush}"
-				BorderBrush="{DynamicResource RowLineBrush}"
-				BorderThickness="1"
-				CornerRadius="7"
-				IsHitTestVisible="False">
-				<TextBlock
-					MaxWidth="760"
-					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
-					FontSize="11.5"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 끌기 · Alt+Shift+← → = 다른 망으로 · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
-					TextWrapping="Wrap" />
-			</Border>
 		</Grid>
 	</DockPanel>
 </UserControl>

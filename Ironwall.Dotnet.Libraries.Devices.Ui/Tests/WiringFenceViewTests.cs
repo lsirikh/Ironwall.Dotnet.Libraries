@@ -403,6 +403,33 @@ public class WiringFenceViewTests
     }
 
     [Fact]
+    public void should_keep_the_hint_off_the_drawing_and_open_the_full_help_from_the_toolbar_question_button()
+    {
+        var result = OnWindow(Ring(3), (vm, canvas) =>
+        {
+            var view = (FenceView)Window.GetWindow(canvas)!.Content;
+            var hint = Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint");
+            var hintTop = hint.TranslatePoint(new Point(0, 0), canvas).Y;
+            var toggle = Descendants<System.Windows.Controls.Primitives.ToggleButton>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Help");
+            var popup = Descendants<System.Windows.Controls.Primitives.Popup>(view)
+                .Single(p => p.Child is Border { Child: TextBlock t } && AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.HelpText");
+            toggle.IsChecked = true;
+            Pump();
+            var opened = popup.IsOpen;
+            var helpId = AutomationProperties.GetAutomationId((TextBlock)((Border)popup.Child).Child);
+            toggle.IsChecked = false;
+            Pump();
+            return (hintTop, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
+        });
+
+        Assert.True(result.hintTop >= result.CanvasHeight, $"안내 {result.hintTop} · 캔버스 높이 {result.CanvasHeight}");   // 그림 위에 겹치지 않는다(바닥 띠)
+        Assert.True(result.opened);
+        Assert.True(result.Closed);
+        Assert.Equal("Devices.Wiring.Fence.HelpText", result.helpId);
+        Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, result.ToggleType);
+    }
+
+    [Fact]
     public void should_join_korean_words_in_the_hint_so_it_breaks_only_at_spaces()
     {
         var hint = OnWindow(Ring(3), (vm, canvas) =>

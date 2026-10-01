@@ -22,7 +22,7 @@ public partial class FenceView : UserControl
     {
         InitializeComponent();
         // 한글을 띄어쓰기에서만 끊는다(커널 KoreanWordWrap — 결합자 U+2060). 전역 Install 은 앱이 한다 — 여기서는 이 글 하나만.
-        foreach (var hint in LogicalDescendants<TextBlock>(this).Where(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint"))
+        foreach (var hint in LogicalDescendants<TextBlock>(this).Where(t => AutomationProperties.GetAutomationId(t) is "Devices.Wiring.Fence.Hint" or "Devices.Wiring.Fence.HelpText"))
             hint.Text = Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Join(hint.Text);
         Loaded += OnLoaded;
         Unloaded += (_, _) => RenderCapability.TierChanged -= OnTierChanged;
