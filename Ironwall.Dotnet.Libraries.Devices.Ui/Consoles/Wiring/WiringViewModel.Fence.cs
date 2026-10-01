@@ -254,7 +254,7 @@ public sealed partial class WiringViewModel
         _fenceSelectedKey = _fenceSelection.Count > 0 ? _fenceSelection[^1] : null;
         _selectionKind = _fenceSelection.Count > 0 ? FenceSelectionKind.Sensors : KindAfterClear();
         RaiseSelection();
-        StatusText = _fenceSelection.Count > 1 ? $"센서 {_fenceSelection.Count}대 선택 — 함께 끌거나 [빼기]" : StatusText;
+        StatusText = _fenceSelection.Count > 1 ? $"센서 {_fenceSelection.Count}대 선택" : StatusText;
     }
 
     /// <summary>
@@ -292,7 +292,7 @@ public sealed partial class WiringViewModel
         _selectionKind = FenceSelectionKind.Controller;
         RefreshBandRows();
         RaiseSelection();
-        StatusText = ShowCables && IsRing ? "함체 — 옆으로 끌거나 Alt+←/→ 로 옮깁니다(표시만)" : "제어기 — 번호 대역 · 통신 상태는 오른쪽 칸에서 봅니다";
+        StatusText = ShowCables && IsRing ? "함체 선택 — 위치는 표시만입니다" : "제어기 선택";
     }
 
     public void FenceHover(int? key)
@@ -343,16 +343,21 @@ public sealed partial class WiringViewModel
     /// <summary>주소 칸 값(FR-15) — IP(없으면 "내부망") · 노드 주소.</summary>
     public string SelectedAddressText => SelectedFenceRow is { } r ? AddressTextOf(r.Key) : string.Empty;
 
-    public string SelectedChannelNote
+    /// <summary>
+    /// 주소 ≠ 위치 — 이 센서의 노드 주소가 체인 위치와 다를 때만 그 사실(상태). 같거나 IP 센서 · 주소 없음이면 빈 글.
+    /// "주소는 체인 순서와 다를 수 있다 · IP 센서는 제어기 내부망" 같은 용어 설명은 속성 칸 "?"(help-callout H-2)로 옮겼다.
+    /// </summary>
+    public string SelectedChannelMismatchText
     {
         get
         {
-            if (SelectedFenceRow is not { } r) return string.Empty;
-            if (IsIpSensor(r.Key)) return "센서마다 IP — 제어기 뒤 내부망이라 GIS 에서 직접 닿지 않습니다";
-            if (_board.NumberOf(r.Key) is not { } n || r.Channel is not { } c) return "체인 순서와 다를 수 있음";
-            return c == n.Position ? "체인 순서와 다를 수 있음 — 지금은 같음" : $"주소 {c} · 위치 {n.Position} — 체인 순서와 다를 수 있음(주소는 바꾸지 않음)";
+            if (SelectedFenceRow is not { } r || IsIpSensor(r.Key)) return string.Empty;
+            if (_board.NumberOf(r.Key) is not { } n || r.Channel is not { } c || c == n.Position) return string.Empty;
+            return $"주소 {c} ≠ 위치 {n.Position} — 주소는 바꾸지 않습니다";
         }
     }
+
+    public bool HasSelectedChannelMismatch => SelectedChannelMismatchText.Length > 0;
 
     /// <summary>체인 위치 — 링 "3 / 13 · Sensor A 쪽이 1" · 가지 "L2 / 5 · 제어기 쪽이 1(확인 중 O-6)" · 한 줄 "4 / 10 · 제어기 쪽이 1".</summary>
     public string SelectedPositionText
@@ -438,7 +443,7 @@ public sealed partial class WiringViewModel
 
     public bool IsSelectedBack => FacingTargets() is { Count: > 0 } t && t.All(k => _board.FacingOf(k) == WiringFacing.Back);
 
-    /// <summary>방향 칸 아래 한 줄 — 방향이 없는 종류면 까닭, 섞였으면 그 말.</summary>
+    /// <summary>방향 칸 아래 한 줄(상태) — 방향이 없는 종류면 까닭, 섞였으면 그 말. 단축키(F · R) 안내는 속성 칸 "?"(help-callout H-2).</summary>
     public string FacingNote
     {
         get
@@ -447,7 +452,7 @@ public sealed partial class WiringViewModel
             if (FacingTargets().Count == 0) return "펜스센서는 철망 가운데 · 지진동센서는 땅속 — 방향이 없습니다";
             var side = IsSelectedBack ? "펜스 내부에 답니다" : IsSelectedFront ? "펜스 외부에 답니다" : "설치 면이 섞여 있습니다";
             var yaw = SelectedYaw is { } y ? $"{WiringYawMath.LongText(y)}을 봅니다" : "보는 방향이 섞여 있습니다";
-            return $"{side} · {yaw} — F 면 뒤집기 · R / Shift+R 돌리기";
+            return $"{side} · {yaw}";
         }
     }
 
@@ -505,7 +510,7 @@ public sealed partial class WiringViewModel
         }
         SyncAll();
         var who = keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display;
-        StatusText = $"방향 — {who}: {FacingName(facing)} · Ctrl+Z 로 되돌립니다";
+        StatusText = $"방향 — {who}: {FacingName(facing)}";
         return true;
     }
 
@@ -567,7 +572,7 @@ public sealed partial class WiringViewModel
         var what = to is { } target ? WiringYawMath.LongText(target)
                  : keys.Count == 1 ? $"{(steps > 0 ? "⟳" : "⟲")} {WiringYawMath.LongText(_board.YawOf(keys[0]))}"
                  : $"{(steps > 0 ? "⟳" : "⟲")} 90° 씩";
-        StatusText = $"보는 방향 — {who}: {what} · Ctrl+Z 로 되돌립니다";
+        StatusText = $"보는 방향 — {who}: {what}";
         return true;
     }
     #endregion
@@ -596,7 +601,7 @@ public sealed partial class WiringViewModel
         {
             nameof(FenceSelectedKey), nameof(IsControllerSelected), nameof(HasFenceSelection), nameof(HasSensorSelection), nameof(HasNoFenceSelection),
             nameof(SelectedKindText), nameof(SelectedTitle), nameof(SelectedNumberText), nameof(IsSelectedDuplicateNumber), nameof(SelectedIdText),
-            nameof(SelectedTypeText), nameof(SelectedChannelText), nameof(SelectedChannelNote), nameof(SelectedPositionText), nameof(SelectedPortText),
+            nameof(SelectedTypeText), nameof(SelectedChannelText), nameof(SelectedChannelMismatchText), nameof(HasSelectedChannelMismatch), nameof(SelectedPositionText), nameof(SelectedPortText),
             nameof(HasSelectedPort), nameof(SelectedDistanceText), nameof(HasSelectedDistance), nameof(SelectedPhoto), nameof(HasSelectedPhoto),
             nameof(SelectedPhotoCaption), nameof(IsSelectedPlaced), nameof(IsSelectedUnplaced), nameof(CanStepSelectedBack),
             nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
@@ -641,7 +646,7 @@ public sealed partial class WiringViewModel
         }
         SyncAll();
         var label = _board.NumberOf(before) is { } n ? NumberText(n) : "미배치";
-        StatusText = $"{(wasPlaced ? "옮김" : "붙임")} — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(before)?.Display)}: {label} · Ctrl+Z 로 되돌립니다";
+        StatusText = $"{(wasPlaced ? "옮김" : "붙임")} — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(before)?.Display)}: {label}";
         return true;
     }
 
@@ -657,7 +662,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         SyncAll();
-        StatusText = $"뺌 — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display)}: 미배치, 뒤 위치가 당겨졌습니다 · Ctrl+Z 로 되돌립니다";
+        StatusText = $"뺌 — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display)}: 미배치, 뒤 위치가 당겨졌습니다";
         return true;
     }
 

@@ -86,7 +86,7 @@ public class WiringTableRowsTests
         var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "C", "10.0.0.1", "Controller"), seeds, new[] { "SmartSensor2", "Fence" }, null, new WiringFakeDialogs());
 
         // Act
-        var texts = new[] { vm.ChainSummaryText, vm.FenceCountsText, vm.SuggestionText, vm.FaultRelationText, vm.ControllerKindText }
+        var texts = new[] { vm.ChainSummaryText, vm.FenceCountsText, vm.SuggestionText, vm.ControllerKindText }
             .Concat(vm.Issues.Select(i => i.Message));
 
         // Assert

@@ -47,7 +47,7 @@ public class WiringFenceEditorViewTests
                     Sensors: concept.Lamps.OrderBy(p => p.Key).Select(p => p.Value.Level).ToList(),
                     LampPeer: UIElementAutomationPeer.CreatePeerForElement(lamp).GetAutomationControlType(),
                     Title: Find<TextBlock>(view, "Devices.Wiring.Fence.Concept.Title").Text,
-                    IpNote: Find<TextBlock>(view, "Devices.Wiring.Fence.Concept.IpNote").IsVisible);
+                    ConceptHelp: Descendants<Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip>(view).Any(t => t.HelpKey == "Devices.Wiring.Fence.Concept" && t.IsAvailable));
         });
 
         Assert.Equal("제어기 통신 모름", result.LampName);
@@ -55,7 +55,8 @@ public class WiringFenceEditorViewTests
         Assert.Equal(new[] { SignalLevel.Ok, SignalLevel.Unknown, SignalLevel.Unknown, SignalLevel.Ok }, result.Sensors);
         Assert.Equal(AutomationControlType.Image, result.LampPeer);           // peer 있는 신호등(NFR-04)
         Assert.Equal("개념도 · Ch1(A) → 아래 줄 4 → 리턴선 → Ch2(B) · 제어기 왼쪽 끝", result.Title);
-        Assert.True(result.IpNote);                                          // IP 센서 표지(FR-15)
+        Assert.True(result.ConceptHelp);                                     // IP 센서 뜻(FR-15)은 개념도 "?" 로(help-callout H-2)
+        Assert.Contains("센서마다 IP", Ironwall.Dotnet.Libraries.Utils.Consoles.HelpCatalog.Find("Devices.Wiring.Fence.Concept")!.ToPlainText());
     }
 
     [Fact]

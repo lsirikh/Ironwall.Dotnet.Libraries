@@ -31,7 +31,7 @@
 				BorderBrush="{DynamicResource StatusInfoBrush}"
 				BorderThickness="1"
 				CornerRadius="10"
-				ToolTip="category_device — 장비가 속한 경로가 정하며 바꿀 수 없습니다">
+				ToolTip="카테고리 — 장비가 속한 경로가 정하며 바꿀 수 없습니다">
 				<StackPanel Orientation="Horizontal">
 					<md:PackIcon
 						Width="12"

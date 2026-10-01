@@ -57,7 +57,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         SyncAll();
-        StatusText = $"{(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)} → {LaneText(lane)} · Ctrl+Z 로 되돌립니다";
+        StatusText = $"{(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)} → {LaneText(lane)}";
         return true;
     }
     #endregion
@@ -96,7 +96,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         SyncAll();
-        StatusText = $"제어기 위치 — {ControllerEndText(end)} · 사슬은 {ControllerEndText(end)}에서 아래 줄로 나가 위 줄로 돌아옵니다 · Ctrl+Z 로 되돌립니다";
+        StatusText = $"제어기 위치 — {ControllerEndText(end)} · 사슬은 {ControllerEndText(end)}에서 아래 줄로 나가 위 줄로 돌아옵니다";
         return true;
     }
     #endregion
@@ -124,7 +124,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         SyncAll();
-        StatusText = $"VBus 표지를 {VbusGap}번째 센서 뒤로 옮겼습니다 — 표시 전용(서버에 싣지 않음) · Ctrl+Z 로 되돌립니다";
+        StatusText = $"VBus 표지를 {VbusGap}번째 센서 뒤로 옮겼습니다 — 표시 전용(서버에 싣지 않음)";
         return true;
     }
     #endregion
@@ -175,7 +175,7 @@ public sealed partial class WiringViewModel
         var tie = Directed(lower, FenceLane.Lower).Concat(Directed(upper, FenceLane.Upper)).ToList();
         var name = moving.Count > 1 ? $"{moving.Count}대" : _board.Find(moving[0])?.Display;
         var ok = EditFence(l => l.With(panels, mounts), tie);
-        StatusText = ok ? $"옮김 — {name}: {LaneText(lane)} {index + 1}번째 자리 · {MountTextOf(moving[0])} · Ctrl+Z 로 되돌립니다" : "제자리 — 바뀐 것이 없습니다.";
+        StatusText = ok ? $"옮김 — {name}: {LaneText(lane)} {index + 1}번째 자리 · {MountTextOf(moving[0])}" : "제자리 — 바뀐 것이 없습니다.";
         return ok;
 
         IEnumerable<int> Directed(List<int> leftToRight, FenceLane l)
@@ -280,7 +280,7 @@ public sealed partial class WiringViewModel
         var who = moved.Count > 1 ? $"{moved.Count}대" : _board.Find(moved.FirstOrDefault())?.Display;
         var where = moved.Count == 1 && after.MountOf(moved[0]) is { } m ? $": {MountText(m)} · {LaneText(m.Lane)}" : $" 한 단계 {(delta > 0 ? "위로" : "아래로")}";
         var lanes = laneChanged > 0 ? $" · 줄이 바뀐 센서 {laneChanged}대(사슬 · 번호가 따라갑니다)" : string.Empty;
-        StatusText = $"높이 — {who}{where}{lanes} · Ctrl+Z 로 되돌립니다";
+        StatusText = $"높이 — {who}{where}{lanes}";
         return true;
     }
 
@@ -297,7 +297,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         var first = _board.FenceLayout.MountOf(set.First())!;
-        StatusText = $"높이 조정 {(set.Count > 1 ? $"{set.Count}대" : $"{first.HeightOffsetM:+0.##;-0.##;0}m")} · {(deltaM > 0 ? "위로" : "아래로")} {Math.Abs(deltaM):0.##}m · Ctrl+Z 로 되돌립니다";
+        StatusText = $"높이 조정 {(set.Count > 1 ? $"{set.Count}대" : $"{first.HeightOffsetM:+0.##;-0.##;0}m")} · {(deltaM > 0 ? "위로" : "아래로")} {Math.Abs(deltaM):0.##}m";
         NotifyOfPropertyChange(nameof(MountOffsetText));
         return true;
     }

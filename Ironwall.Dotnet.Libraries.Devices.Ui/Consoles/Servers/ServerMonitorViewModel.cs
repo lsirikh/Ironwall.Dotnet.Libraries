@@ -105,7 +105,7 @@ public class ServerMonitorViewModel : Screen
         Detail.Guard.Blocked += OnNavigationBlocked;
 
         Columns = ServerColumnCatalog.For(_service.IsUnitEra);
-        foreach (var name in new[] { nameof(Columns), nameof(IsUnitEra), nameof(IsAxisEra), nameof(LastChangeNote) })
+        foreach (var name in new[] { nameof(Columns), nameof(IsUnitEra), nameof(IsAxisEra), nameof(LastChangeNote), nameof(AssignRestriction) })
             NotifyOfPropertyChange(name);
 
         RefreshCandidates();
@@ -432,7 +432,8 @@ public class ServerMonitorViewModel : Screen
     public bool HasDetail => _detail is not null || Detail.IsCreating;
 
     /// <summary>고른 것이 없을 때 상세 칸의 안내 — 다른 콘솔처럼 "무엇을 하면 무엇이 나오는지"(GIS 실창 #11).</summary>
-    public string DetailEmptyHint => "목록에서 서버를 고르면 접속 정보 · 설정 · 상태가 여기에 나옵니다. 새 서버는 [추가]를 누르세요.";
+    /// <summary>고른 서버가 없을 때 한 줄(할 일). 무엇이 나오는지 · 새 서버 [추가] 는 툴바 "?"(help-callout H-2).</summary>
+    public string DetailEmptyText => "목록에서 서버를 고르세요.";
 
     /// <summary>뷰가 알린 선택 변경. 막혔으면 false — 뷰가 선택을 되돌린다.</summary>
     public bool OnRowsSelected(IList? selected)
@@ -596,15 +597,13 @@ public class ServerMonitorViewModel : Screen
         {
             _intent.NewPassword = string.IsNullOrEmpty(value) ? null : value;
             Detail.Tracker.Touch("user_password", null, _intent.NewPassword is null ? null : "(변경)", hasOriginal: false);
-            NotifyOfPropertyChange(nameof(PasswordNote));
+            NotifyOfPropertyChange(nameof(PasswordStateText));
             NotifyTouchFlags();
         }
     }
 
-    public string PasswordNote => _intent.NewPassword is null ? "비워 두면 바꾸지 않습니다" : "저장할 때 바뀝니다";
-
-    /// <summary>6.3 에서 비우기가 막힌다는 사실을 칸 주석으로 먼저 말한다.</summary>
-    public string ClearableNote => IsAxisEra ? "비우면 서버에서 지워집니다" : ServerRequestBuilder.CannotClear("이 값");
+    /// <summary>비밀번호 칸 상태 — 새 값을 넣었으면 "저장할 때 바뀝니다", 아니면 빈 글. "비워 두면 바꾸지 않습니다" 는 접속 "?"(help-callout H-2).</summary>
+    public string PasswordStateText => _intent.NewPassword is null ? string.Empty : "저장할 때 바뀝니다";
 
     public string CpuWarningText { get => Threshold(_intent.CpuWarning, "cpu", "warning"); set => SetThreshold(v => _intent.CpuWarning = v, value, "cpu", "warning", nameof(CpuWarningText)); }
     public string CpuCriticalText { get => Threshold(_intent.CpuCritical, "cpu", "critical"); set => SetThreshold(v => _intent.CpuCritical = v, value, "cpu", "critical", nameof(CpuCriticalText)); }
@@ -649,8 +648,6 @@ public class ServerMonitorViewModel : Screen
     public string ObservedLastChangeText => SelectedRow?.LastChangeText ?? ServerStatusRules.NotReportedText;
     public string ObservedLastEditText => SelectedRow?.LastEditText ?? ServerStatusRules.NotReportedText;
     public bool IsStatusReceived => SelectedRow is { IsNotReported: false };
-    public string StatusIsObservedNote => ServerWriteGuard.STATUS_IS_OBSERVED_NOTE;
-
     public string UnitSectionText => IsUnitEra
         ? SelectedRow?.UnitText ?? "—"
         : ServerWriteGuard.UNIT_NOT_IN_CONTRACT_NOTE;
@@ -728,11 +725,11 @@ public class ServerMonitorViewModel : Screen
         foreach (var name in new[]
         {
             nameof(NameText), nameof(IpText), nameof(PortText), nameof(HostnameText), nameof(UserNameText),
-            nameof(PasswordNote), nameof(CpuWarningText), nameof(CpuCriticalText), nameof(RamWarningText), nameof(RamCriticalText),
+            nameof(PasswordStateText), nameof(CpuWarningText), nameof(CpuCriticalText), nameof(RamWarningText), nameof(RamCriticalText),
             nameof(DiskWarningText), nameof(DiskCriticalText), nameof(NetworkWarningText), nameof(NetworkCriticalText),
             nameof(OperationModeValue), nameof(WindyModeValue), nameof(HasModesSection),
             nameof(ObservedStatusText), nameof(ObservedLastChangeText), nameof(ObservedLastEditText),
-            nameof(IsStatusReceived), nameof(UnitSectionText), nameof(HasDetail), nameof(ClearableNote),
+            nameof(IsStatusReceived), nameof(UnitSectionText), nameof(HasDetail),
         }) NotifyOfPropertyChange(name);
         NotifyTouchFlags();
     }
@@ -895,9 +892,11 @@ public class ServerMonitorViewModel : Screen
 
     public bool HasAssignCandidates => AssignCandidates.Count > 0;
 
-    public string AssignHint => IsAxisEra
-        ? "장비를 서버 행에 끌어 놓거나, 행을 고르고 [배정]을 누르세요."
-        : "현재 서버에서는 스피커만 배정할 수 있습니다. 서버 행을 고르고 [배정]을 누르세요.";
+    /// <summary>
+    /// 이 서버 판본의 배정 제약 — 6.3 은 스피커만(상태 · [배정] 툴팁). 7.0 이상은 제약이 없어 <c>null</c>(툴팁 없음).
+    /// 끌어 놓기 · [배정] · [적용] 사용법은 배정 "?"(help-callout H-2)로 옮겼다.
+    /// </summary>
+    public string? AssignRestriction => IsAxisEra ? null : "현재 서버에서는 스피커만 배정할 수 있습니다.";
 
     public bool CanAssignSelection => SelectedRow is { AcceptsDevices: true } && AssignCandidates.Count > 0;
 

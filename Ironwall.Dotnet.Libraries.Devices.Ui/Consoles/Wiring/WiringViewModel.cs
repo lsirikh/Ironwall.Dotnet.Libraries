@@ -499,11 +499,6 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     public WiringShape Shape => _board.Shape;
     public bool IsRing => _board.Shape == WiringShape.Ring;
 
-    /// <summary>"고장 구간과의 관계" 설명 — 모든 제어기가 링(v0.4 §1-C)이라 늘 A/B 양 끝 설명.</summary>
-    public string FaultRelationText
-        => $"링에서 1차 번호는 {WiringValidation.PORT_1} 쪽 끝에서, 2차 번호는 {WiringValidation.PORT_2} 쪽 끝에서 센 자리입니다(같은 체인을 양 끝에서 셉니다). "
-           + "결선을 저장해 두면 장애 화면이 \"1차 4~5\" 같은 구간을 센서 이름으로 보여 줄 수 있습니다.";
-
     /// <summary>두 번째 목록을 보이는가 — 링은 선이 하나라 늘 거짓(옛 양쪽 가지 목록은 v0.4 에서 뺐다).</summary>
     public bool ShowSecondLine => false;
 
@@ -532,9 +527,6 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             return $"체인 {_board.Chain.Count}대 · 길이 약 {_board.ChainLengthMetres:0}m / {reference} · 함체 자리 {EnclosureGapText}";
         }
     }
-
-    /// <summary>목록 설명.</summary>
-    public string Line1Hint => $"위가 {WiringValidation.PORT_1} 쪽 끝(A1)입니다 · A·B 번호는 두 포트(Ch1 · Ch2)에서 센 자리 · Ch1 → 아래 줄 → 먼 끝에서 꺾여 위 줄(또는 리턴선) → Ch2 · 순서를 바꾸면 펜스 위 자리도 따라갑니다 · Alt+← → 한 칸 · Delete 로 뺍니다";
     #endregion
 
     #region - Load notices (FR-02 · FR-03 · F-2b) -
@@ -604,7 +596,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         _board.PushUndo();
         _board.AcceptProposals();
         SyncAll();
-        StatusText = "제안을 적용했습니다 — [저장하기]를 눌러야 저장됩니다.";
+        StatusText = "제안을 적용했습니다.";
     }
     #endregion
 
@@ -716,7 +708,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         var facts = new SensorFacts(next, $"센서 {next}", SensorTypes.FirstOrDefault() ?? string.Empty, LastZone());
         _board.AddRow(facts);
         SyncAll();
-        StatusText = "한 줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다.";
+        StatusText = "한 줄을 추가했습니다.";
     }
 
     /// <summary>센서 여러 개 만들기(WS L348, L649-654).</summary>
@@ -742,7 +734,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         _board.PushUndo();
         foreach (var f in facts) _board.AddRow(f);
         SyncAll();
-        StatusText = $"{facts.Count}줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다.";
+        StatusText = $"{facts.Count}줄을 추가했습니다.";
     }
 
     /// <summary>엑셀에서 붙여넣기(WS L350, L659-664).</summary>
@@ -767,7 +759,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
         _board.PushUndo();
         foreach (var row in report.Accepted) _board.AddRow(row.Facts);
         SyncAll();
-        StatusText = $"붙여넣은 {report.Accepted.Count}줄을 추가했습니다 — [저장하기]를 눌러야 저장됩니다" + (report.Rejected.Count > 0 ? $" · {report.Rejected.Count}줄은 건너뛰었습니다." : ".");
+        StatusText = $"붙여넣은 {report.Accepted.Count}줄을 추가했습니다" + (report.Rejected.Count > 0 ? $" · {report.Rejected.Count}줄은 건너뛰었습니다." : ".");
     }
     #endregion
 

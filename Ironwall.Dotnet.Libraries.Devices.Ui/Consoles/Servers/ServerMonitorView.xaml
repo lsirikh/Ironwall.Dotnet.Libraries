@@ -116,6 +116,7 @@
 				ConsoleKey="Servers"
 				DeleteClick="OnDelete"
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				HelpKey="Devices.Servers"
 				Loaded="OnToolbarLoaded"
 				RefreshClick="OnReload"
 				SearchPlaceholder="이름 · 주소 · 유형 검색"
@@ -234,7 +235,7 @@
 										<Binding
 											Mode="OneWay"
 											Path="Tray.Count"
-											StringFormat="배정 대기 {0}건 — [적용]을 누르면 저장됩니다." />
+											StringFormat="배정 대기 {0}건" />
 									</TextBox.Text>
 								</TextBox>
 							</DockPanel>
@@ -243,14 +244,24 @@
 							<DockPanel
 								LastChildFill="True"
 								Visibility="{Binding HasAssignCandidates, Converter={StaticResource BoolToVisibility}}">
-								<TextBlock
-									Width="44"
+								<!--  배정 "?"(help-callout H-2) — 끌어 놓기 · [배정] · [적용](옛 AssignHint 툴팁 · 대기 줄 꼬리)  -->
+								<StackPanel
+									Width="62"
 									Margin="0,4,0,0"
 									VerticalAlignment="Top"
 									DockPanel.Dock="Left"
-									FontSize="12"
-									Foreground="{DynamicResource TextMutedBrush}"
-									Text="장비" />
+									Orientation="Horizontal">
+									<TextBlock
+										VerticalAlignment="Center"
+										FontSize="12"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="장비" />
+									<c:HelpTip
+										Margin="6,0,0,0"
+										VerticalAlignment="Center"
+										HelpKey="Devices.Servers.Assign"
+										Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+								</StackPanel>
 								<Button
 									Margin="8,0,0,0"
 									Padding="10,2"
@@ -262,7 +273,7 @@
 									FontSize="12"
 									IsEnabled="{Binding CanAssignSelection}"
 									Style="{StaticResource Console.Button.Primary}"
-									ToolTip="{Binding AssignHint}" />
+									ToolTip="{Binding AssignRestriction}" />
 								<ListBox
 									AutomationProperties.AutomationId="Console.Servers.Assign.Tray"
 									Background="Transparent"
@@ -586,7 +597,7 @@
 					AutomationProperties.AutomationId="Console.Servers.Detail.Empty"
 					FontSize="12.5"
 					Foreground="{DynamicResource TextMutedBrush}"
-					Text="{Binding DetailEmptyHint}"
+					Text="{Binding DetailEmptyText}"
 					TextWrapping="Wrap"
 					Visibility="{Binding HasDetail, Converter={StaticResource NotBool}}" />
 				<!--  고른 것이 없으면 절을 그리지 않는다 — 빈 편집 폼은 "고칠 수 있다" 는 거짓말이다.  -->
@@ -606,7 +617,11 @@
 						</c:ConsoleField>
 					</c:ConsoleSection>
 
-					<c:ConsoleSection AxisName="connection" Header="접속" TagKind="Intent">
+					<c:ConsoleSection
+						AxisName="connection"
+						Header="접속"
+						HelpKey="Devices.Servers.Connection"
+						TagKind="Intent">
 						<StackPanel>
 							<c:ConsoleField
 								ApiName="name"
@@ -643,8 +658,7 @@
 							<c:ConsoleField
 								ApiName="hostname"
 								Header="호스트명"
-								IsTouched="{Binding IsHostnameTouched}"
-								Note="{Binding ClearableNote}">
+								IsTouched="{Binding IsHostnameTouched}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.Hostname"
 									IsEnabled="{Binding IsEditing}"
@@ -654,8 +668,7 @@
 							<c:ConsoleField
 								ApiName="credentials.user_name"
 								Header="계정"
-								IsTouched="{Binding IsUserNameTouched}"
-								Note="{Binding ClearableNote}">
+								IsTouched="{Binding IsUserNameTouched}">
 								<TextBox
 									AutomationProperties.AutomationId="Console.Servers.Detail.UserName"
 									IsEnabled="{Binding IsEditing}"
@@ -667,7 +680,7 @@
 								ApiName="credentials.user_password"
 								Header="비밀번호"
 								IsTouched="{Binding IsPasswordTouched}"
-								Note="{Binding PasswordNote}">
+								Note="{Binding PasswordStateText}">
 								<PasswordBox
 									Height="28"
 									Padding="6,0"
@@ -894,7 +907,11 @@
 					</c:ConsoleSection>
 
 					<!--  상태 — 관측. 보고가 없으면 칸이 아니라 미수신 상자를 그린다(SB L1358).  -->
-					<c:ConsoleSection AxisName="status" Header="상태" TagKind="Observed">
+					<c:ConsoleSection
+						AxisName="status"
+						Header="상태"
+						HelpKey="Devices.Servers.Status"
+						TagKind="Observed">
 						<StackPanel>
 							<StackPanel Visibility="{Binding IsStatusReceived, Converter={StaticResource BoolToVisibility}}">
 								<c:ConsoleField ApiName="status" Header="상태">
@@ -905,8 +922,7 @@
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="status_observed_at"
-									Header="마지막 변화"
-									Note="상태가 마지막으로 바뀐 시각입니다">
+									Header="마지막 변화">
 									<TextBox
 										AutomationProperties.AutomationId="Console.Servers.Detail.LastChange"
 										Style="{StaticResource Servers.ReadOnlyValue}"
@@ -914,8 +930,7 @@
 								</c:ConsoleField>
 								<c:ConsoleField
 									ApiName="updated_at"
-									Header="마지막 수정"
-									Note="이름이나 접속 정보를 마지막으로 고친 시각입니다">
+									Header="마지막 수정">
 									<TextBox
 										AutomationProperties.AutomationId="Console.Servers.Detail.LastEdit"
 										Style="{StaticResource Servers.ReadOnlyValue}"
@@ -934,12 +949,6 @@
 								TextWrapping="Wrap"
 								Visibility="{Binding IsStatusReceived, Converter={StaticResource NotBool}}" />
 
-							<TextBlock
-								Margin="2,6,0,0"
-								FontSize="11"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="{Binding StatusIsObservedNote}"
-								TextWrapping="Wrap" />
 							<TextBlock
 								Margin="2,4,0,0"
 								FontSize="11"

@@ -278,7 +278,7 @@ public sealed partial class WiringViewModel
         _isControllerSelected = false;
         _selectionKind = _panelSelection.Count > 0 ? FenceSelectionKind.Panels : KindAfterClear();
         OnPanelSelectionChanged();
-        if (_panelSelection.Count > 0) StatusText = $"망 {_panelSelection.Count}칸 선택 — 오른쪽 속성 칸에서 고칩니다";
+        if (_panelSelection.Count > 0) StatusText = $"망 {_panelSelection.Count}칸 선택";
     }
 
     /// <summary>센서 선택 사각형 · 표 · 개념도 · 모두 선택 — <paramref name="additive"/>(Ctrl)면 더한다.</summary>
@@ -292,7 +292,7 @@ public sealed partial class WiringViewModel
         _isControllerSelected = false;
         _selectionKind = _fenceSelection.Count > 0 ? FenceSelectionKind.Sensors : KindAfterClear();
         RaiseSelection();
-        if (_fenceSelection.Count > 1) StatusText = $"센서 {_fenceSelection.Count}대 선택 — 함께 끌거나 오른쪽 클릭으로 설치 방식을 적용합니다";
+        if (_fenceSelection.Count > 1) StatusText = $"센서 {_fenceSelection.Count}대 선택";
     }
 
     /// <summary>Ctrl+A — 체인 센서 모두.</summary>
@@ -512,7 +512,7 @@ public sealed partial class WiringViewModel
         })), out raised, out lowered));
         ResetPanelEdit();
         RaisePanelPane();
-        StatusText = ok ? $"망 {count}칸에 적용했습니다{RazorFollowText(raised, lowered)} — Ctrl+Z 로 되돌립니다" : "바뀐 것이 없습니다.";
+        StatusText = ok ? $"망 {count}칸에 적용했습니다{RazorFollowText(raised, lowered)}" : "바뀐 것이 없습니다.";
         return ok;
     }
 
@@ -604,7 +604,7 @@ public sealed partial class WiringViewModel
             }
             return layout.WithMounts(mounts);
         });
-        StatusText = ok ? $"설치 위치 — {(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)}: {SensorMountSpec.SpotText(spot)} · Ctrl+Z 로 되돌립니다"
+        StatusText = ok ? $"설치 위치 — {(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)}: {SensorMountSpec.SpotText(spot)}"
                         : "바뀐 것이 없습니다.";
         return ok;
     }
@@ -625,7 +625,7 @@ public sealed partial class WiringViewModel
         var targets = MountTargets();
         var ok = EditFence(layout => layout.WithMounts(layout.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) ? p.Value with { HeightOffsetM = SensorMountSpec.ClampOffset(offset) } : p.Value)));
-        StatusText = ok ? $"높이 조정 {offset:+0.##;-0.##;0}m — {targets.Count}대 · Ctrl+Z 로 되돌립니다" : "바뀐 것이 없습니다.";
+        StatusText = ok ? $"높이 조정 {offset:+0.##;-0.##;0}m — {targets.Count}대" : "바뀐 것이 없습니다.";
         return ok;
     }
 
@@ -725,7 +725,7 @@ public sealed partial class WiringViewModel
         var tie = delta > 0 ? rest.Concat(moving).ToList() : moving.Concat(rest).ToList();
         var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => moving.Contains(p.Key) ? FenceLayoutMath.MoveBy(p.Value, delta, l.Panels) : p.Value)), tie);
-        if (ok) StatusText = $"옮김 — {(moving.Count > 1 ? $"{moving.Count}대" : _board.Find(grabbedKey)?.Display)}: {MountTextOf(grabbedKey)} · Ctrl+Z 로 되돌립니다";
+        if (ok) StatusText = $"옮김 — {(moving.Count > 1 ? $"{moving.Count}대" : _board.Find(grabbedKey)?.Display)}: {MountTextOf(grabbedKey)}";
         else StatusText = "더 옮길 자리가 없습니다 — 끝입니다.";
         return ok;
     }
@@ -779,7 +779,7 @@ public sealed partial class WiringViewModel
             }
             return l.WithMounts(mounts);
         });
-        if (ok) StatusText = $"붙임 — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display)}: {MountTextOf(keys[0])} · Ctrl+Z 로 되돌립니다";
+        if (ok) StatusText = $"붙임 — {(keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display)}: {MountTextOf(keys[0])}";
         return ok;
     }
 
@@ -933,7 +933,7 @@ public sealed partial class WiringViewModel
         _board.SetYaw(facingTargets, refRow.Yaw);
         _board.ApplyFenceEdit(l => l.WithMounts(mounts));
         SyncAll();
-        StatusText = $"설치 방식을 {changed}대에 적용했습니다 — Ctrl+Z 로 한 번에 되돌립니다";
+        StatusText = $"설치 방식을 {changed}대에 적용했습니다";
         return true;
     }
 
@@ -1000,7 +1000,7 @@ public sealed partial class WiringViewModel
         var set = targets.ToHashSet();
         int raised = 0, lowered = 0;
         var ok = EditFence(l => FollowRazor(l, l.WithPanels(l.Panels.Select((p, i) => set.Contains(i) ? template : p)), out raised, out lowered));
-        StatusText = ok ? $"망 {changed}칸에 적용했습니다{RazorFollowText(raised, lowered)} — Ctrl+Z 로 한 번에 되돌립니다" : "바뀐 것이 없습니다.";
+        StatusText = ok ? $"망 {changed}칸에 적용했습니다{RazorFollowText(raised, lowered)}" : "바뀐 것이 없습니다.";
         return ok;
     }
 
@@ -1036,7 +1036,7 @@ public sealed partial class WiringViewModel
     public void ShowBandPicker()
     {
         FenceSelectController();
-        StatusText = "번호 대역 — 오른쪽 칸에서 2차 · 3차 · 4차 중 고르거나 직접 설정하세요(고르면 위치 순서대로 번호를 매깁니다).";
+        StatusText = "번호 대역 — 오른쪽 칸에서 고르세요.";
     }
 
     /// <summary>직접 설정 줄 — 이 제어기에 있는 갈래만.</summary>

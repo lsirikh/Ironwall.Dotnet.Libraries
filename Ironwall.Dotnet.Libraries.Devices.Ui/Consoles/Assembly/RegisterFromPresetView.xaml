@@ -25,11 +25,6 @@
 			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 			<Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
 		</Style>
-		<Style x:Key="Reg.Hint" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="11.5" />
-			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-			<Setter Property="TextWrapping" Value="Wrap" />
-		</Style>
 	</UserControl.Resources>
 
 	<!--  T4 · L 720. 머리 · 버튼 줄은 틀이 댄다 — 창이 제 머리를 또 그리지 않는다. 옛 AutomationId 유지.  -->
@@ -38,7 +33,7 @@
 		BodyScroll="Disabled"
 		DialogKey="Devices.Assembly.Register"
 		IsPrimaryEnabled="{Binding CanRegister}"
-		Kind="프리셋이 부품 구성을 채웁니다 — 여기서는 그 장비만의 값(번호 · 이름 · 접속)을 입력하세요"
+		HelpKey="Devices.Assembly.Register"
 		Message="{Binding Message}"
 		PrimaryAutomationId="Devices.Assembly.Register.Submit"
 		PrimaryInvoked="OnRegister"
@@ -201,13 +196,10 @@
 				<DockPanel Margin="14,10" LastChildFill="True">
 					<StackPanel DockPanel.Dock="Top">
 						<TextBlock
+							Margin="0,0,0,8"
 							FontSize="13"
 							FontWeight="SemiBold"
 							Text="등록할 내용" />
-						<TextBlock
-							Margin="0,2,0,8"
-							Style="{StaticResource Reg.Hint}"
-							Text="[등록]을 누르면 아래 내용으로 장비를 만듭니다." />
 						<!--  U-18 D-10 10.3 — 사람이 읽는 요약을 먼저, 요청 본문(JSON)은 펼쳐야 보인다. 비밀번호 가림은 그대로다.  -->
 						<TextBox
 							Margin="0,0,0,8"

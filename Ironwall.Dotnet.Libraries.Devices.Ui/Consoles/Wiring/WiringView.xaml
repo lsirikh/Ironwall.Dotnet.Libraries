@@ -375,27 +375,27 @@
 										FontSize="12"
 										Foreground="{DynamicResource StatusWarningBrush}"
 										Text="≠"
-										ToolTip="버스 주소와 순번이 다릅니다 — 주소는 그대로 둡니다"
+										ToolTip="주소 ≠ 순번"
 										Visibility="{Binding HasChannelMismatch, Converter={StaticResource BoolToVisibility}}" />
 								</StackPanel>
 								<TextBlock Grid.Column="8" Style="{StaticResource W.CellMono}" Text="{Binding GapText}" />
 								<WrapPanel Grid.Column="9" VerticalAlignment="Center" Orientation="Horizontal">
 									<Border
 										Style="{StaticResource W.Tag}"
-										ToolTip="번호순 제안 — [이대로 적용] 전에는 저장 대기가 아닙니다"
+										ToolTip="번호순 제안"
 										Visibility="{Binding IsSuggested, Converter={StaticResource BoolToVisibility}}">
 										<TextBlock FontSize="10.5" Text="제안" />
 									</Border>
 									<Border
 										BorderBrush="{DynamicResource StatusWarningBrush}"
 										Style="{StaticResource W.Tag}"
-										ToolTip="저장하지 않은 줄 — [저장하기]를 눌러야 저장됩니다"
+										ToolTip="저장하지 않은 줄"
 										Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}">
 										<TextBlock FontSize="10.5" Text="● 미저장" />
 									</Border>
 									<Border
 										Style="{StaticResource W.Tag}"
-										ToolTip="같은 장비번호가 둘 이상입니다 — id 순으로 놓습니다"
+										ToolTip="같은 장비번호"
 										Visibility="{Binding IsDuplicateNumber, Converter={StaticResource BoolToVisibility}}">
 										<TextBlock FontSize="10.5" Text="번호 같음" />
 									</Border>
@@ -412,7 +412,7 @@
 									Content="✕"
 									FontSize="10"
 									Style="{StaticResource Console.Button.Icon}"
-									ToolTip="결선에서 빼기(Delete) — 뒤는 당겨집니다" />
+									ToolTip="결선에서 빼기(Delete)" />
 							</Grid>
 						</Border>
 					</Grid>
@@ -445,7 +445,7 @@
 						Click="OnAutoLayout"
 						Content="번호 순으로 자동 배치"
 						Style="{StaticResource Console.Button}"
-						ToolTip="장비번호 순(같으면 id 순)으로 한 줄에 다시 줄 세웁니다 — 양쪽 가지면 가지 안에서만"
+						ToolTip="번호 순으로 다시 줄 세우기"
 						Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}" />
 					<Button
 						Margin="0,0,8,0"
@@ -461,6 +461,12 @@
 						IsEnabled="{Binding CanSave}"
 						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding SaveBlockedReason}" />
+					<!--  창 "?"(help-callout H-2) — 단계 · 보기 · 자동 배치 · 되돌리기 · 저장. 상태줄 결과 문장 뒤의 "Ctrl+Z 로 되돌립니다" 꼬리도 여기로 모았다  -->
+					<c:HelpTip
+						Margin="8,0,0,0"
+						VerticalAlignment="Center"
+						HelpKey="Devices.Wiring"
+						Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
 				</StackPanel>
 				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 					<!--  창 제목("장비 셋업 · 결선맵")은 커널 창 머리가 그린다 — 여기는 대상 제어기만(헤디드 시험이 Devices.Wiring.Subject 로 창을 찾는다)  -->
@@ -731,14 +737,13 @@
 									Content="엑셀에서 붙여넣기"
 									Style="{StaticResource Console.Button}" />
 							</StackPanel>
-							<TextBlock
+							<!--  센서 표 "?"(help-callout H-2) — 옛 회색 안내 줄 · 주소 열 툴팁을 여기로  -->
+							<c:HelpTip
 								Margin="12,0,0,0"
+								HorizontalAlignment="Left"
 								VerticalAlignment="Center"
-								Style="{StaticResource W.Hint}"
-								Text="줄을 Ctrl 로 여러 개 고르면 오른쪽에서 한꺼번에 채웁니다"
-								TextTrimming="CharacterEllipsis"
-								TextWrapping="WrapWithOverflow"
-								ToolTip="줄을 Ctrl 로 여러 개 고르면 오른쪽에서 한꺼번에 채웁니다" />
+								HelpKey="Devices.Wiring.Sensors"
+								Scope="{Binding RelativeSource={RelativeSource AncestorType=DockPanel, AncestorLevel=2}}" />
 						</DockPanel>
 					</Border>
 
@@ -827,7 +832,7 @@
 												FontSize="12"
 												Foreground="{DynamicResource TextMutedBrush}"
 												Text="{Binding ChannelText}"
-												ToolTip="버스 주소입니다 — 결선 순번과 다를 수 있고, 저장 때 건드리지 않습니다" />
+												ToolTip="버스 주소" />
 										</DataTemplate>
 									</DataGridTemplateColumn.CellTemplate>
 								</DataGridTemplateColumn>
@@ -889,10 +894,6 @@
 									Content="취소"
 									DockPanel.Dock="Right"
 									Style="{StaticResource Console.Button.Ghost}" />
-								<TextBlock
-									VerticalAlignment="Center"
-									Style="{StaticResource W.Hint}"
-									Text="손댄 칸만 적용됩니다" />
 							</DockPanel>
 						</Border>
 
@@ -906,10 +907,17 @@
 								VerticalAlignment="Top"
 								AutomationProperties.AutomationId="Devices.Wiring.NoSelectionHint"
 								Style="{StaticResource W.Hint}"
-								Text="한 줄을 고르면 그 줄을 고칩니다. Ctrl 로 여러 줄을 고르면 [한꺼번에 채우기] 가 됩니다 — 그때 값이 줄마다 다른 칸은 &quot;— 여러 값 —&quot; 으로 보이고, 건드리지 않은 칸은 줄마다 원래 값을 그대로 둡니다."
+								Text="고른 줄이 없습니다"
 								Visibility="{Binding HasNoSelection, Converter={StaticResource BoolToVisibility}}" />
 							<StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
-								<TextBlock Style="{StaticResource W.SectionHead}" Text="값" />
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Style="{StaticResource W.SectionHead}" Text="값" />
+									<c:HelpTip
+										Margin="6,6,0,0"
+										VerticalAlignment="Center"
+										HelpKey="Devices.Wiring.Sensors.Edit"
+										Scope="{Binding RelativeSource={RelativeSource AncestorType=ScrollViewer}}" />
+								</StackPanel>
 								<Grid Margin="0,0,0,4">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="76" />
@@ -1040,7 +1048,14 @@
 
 								<!--  그룹 3상태(WS L614-618) — 체크를 바꾼 그룹만 더하고 뺀다. 덮어쓰지 않는다.  -->
 								<StackPanel Visibility="{Binding HasGroups, Converter={StaticResource BoolToVisibility}}">
-									<TextBlock Style="{StaticResource W.SectionHead}" Text="그룹" />
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Style="{StaticResource W.SectionHead}" Text="그룹" />
+										<c:HelpTip
+											Margin="6,6,0,0"
+											VerticalAlignment="Center"
+											HelpKey="Devices.Wiring.Sensors.Groups"
+											Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+									</StackPanel>
 									<ItemsControl AutomationProperties.AutomationId="Devices.Wiring.Groups" ItemsSource="{Binding GroupChecks}">
 										<ItemsControl.ItemTemplate>
 											<DataTemplate>
@@ -1089,10 +1104,6 @@
 											</DataTemplate>
 										</ItemsControl.ItemTemplate>
 									</ItemsControl>
-									<TextBlock
-										Margin="0,5,0,0"
-										Style="{StaticResource W.Hint}"
-										Text="체크를 바꾼 그룹만 더하거나 뺍니다 — 나머지 그룹은 줄마다 그대로 둡니다." />
 								</StackPanel>
 
 								<Border
@@ -1126,10 +1137,6 @@
 									</StackPanel>
 								</Border>
 
-								<TextBlock
-									Margin="0,12,0,0"
-									Style="{StaticResource W.Hint}"
-									Text="값이 줄마다 다른 칸은 &quot;— 여러 값 —&quot; 으로 보입니다. 그 칸을 건드리지 않으면 줄마다 원래 값을 그대로 둡니다." />
 							</StackPanel>
 							</Grid>
 						</ScrollViewer>
@@ -1238,7 +1245,7 @@
 								Content="대역 고르기"
 								DockPanel.Dock="Right"
 								Style="{StaticResource Console.Button}"
-								ToolTip="오른쪽 칸에 번호 대역(2차 · 3차 · 4차 · 직접 설정)을 엽니다"
+								ToolTip="번호 대역 고르기"
 								Visibility="{Binding IsBandsPrimary, Converter={StaticResource BoolToVisibility}}" />
 							<Button
 								Margin="8,0,0,0"
@@ -1317,7 +1324,7 @@
 									BorderBrush="{DynamicResource BorderBrush}"
 									BorderThickness="1"
 									CornerRadius="6"
-									ToolTip="센서를 여기(또는 미배치 칸)에 끌어 놓으면 결선에서 빠지고 뒤 센서가 당겨집니다. [되돌리기] 로 도로 넣을 수 있습니다.">
+									ToolTip="빼는 곳">
 									<StackPanel Orientation="Horizontal">
 										<md:PackIcon
 											Width="16"
@@ -1342,6 +1349,13 @@
 							</drag:DropZoneChrome>
 							<!--  팔레트 — 미배치 센서 (WS L408-412) · 펜스 · 표 두 보기가 함께 쓴다  -->
 							<DockPanel LastChildFill="True">
+								<!--  미배치 · 빼는 곳 "?"(help-callout H-2) — 옛 빼는 곳 긴 툴팁 · 미배치 칩 키보드(저절로)  -->
+								<c:HelpTip
+									Margin="0,0,6,0"
+									VerticalAlignment="Center"
+									DockPanel.Dock="Left"
+									HelpKey="Devices.Wiring.Unplaced"
+									Scope="{Binding RelativeSource={RelativeSource AncestorType=Border}}" />
 								<TextBlock
 									Margin="2,0,10,0"
 									VerticalAlignment="Center"
@@ -1363,7 +1377,7 @@
 										<drag:CaptureDragBehavior
 											DisplayMemberPath="Display"
 											Handler="{Binding}"
-											KeyboardFallback="Enter = 결선 끝에 붙이기" />
+											KeyboardFallback="{}{Enter} = 결선 끝에 붙이기" />
 									</b:Interaction.Behaviors>
 									<ListBox.ItemsPanel>
 										<ItemsPanelTemplate>
@@ -1456,12 +1470,6 @@
 													<TextBlock FontFamily="Consolas" FontSize="11.5" Text="Ch2(B)" />
 												</Border>
 											</StackPanel>
-											<TextBlock
-												Margin="0,5,0,0"
-												HorizontalAlignment="Right"
-												FontSize="11.5"
-												Foreground="{DynamicResource TextMutedBrush}"
-												Text="Ch1 → 아래 줄 → 먼 끝에서 꺾여 위 줄(또는 리턴선) → Ch2" />
 										</StackPanel>
 										<StackPanel VerticalAlignment="Center">
 											<StackPanel Orientation="Horizontal">
@@ -1506,11 +1514,13 @@
 
 								<!--  체인 표 — 머리 줄(열 폭은 줄 템플릿과 같다)  -->
 								<DockPanel Margin="0,12,0,4" LastChildFill="True">
-									<TextBlock
+									<!--  표 보기 "?"(help-callout H-2) — 링 읽는 법 · 열 뜻 · 상태 표지 · 끌기(옛 회색 줄 · 열 머리 툴팁 · Line1Hint 를 여기로)  -->
+									<c:HelpTip
+										Margin="8,0,0,0"
 										VerticalAlignment="Center"
 										DockPanel.Dock="Right"
-										Style="{StaticResource W.Hint}"
-										Text="Alt+← → 한 칸 · Delete 빼기 · F 방향 · 손잡이로 끌기" />
+										HelpKey="Devices.Wiring.Table"
+										Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}}" />
 									<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
 								</DockPanel>
 								<fb:FrameBorder
@@ -1540,13 +1550,13 @@
 													<ColumnDefinition Width="30" />
 												</Grid.ColumnDefinitions>
 												<TextBlock HorizontalAlignment="Center" Grid.Column="1" Style="{StaticResource W.ColHead}" Text="위치" />
-												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="Ch1 · Ch2 번호" ToolTip="두 포트에서 센 자리 — Ch1 = A 쪽 · Ch2 = B 쪽 (예: 1 · 50 = Ch1 에서 1번째 · Ch2 에서 50번째)" />
+												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="Ch1 · Ch2 번호" />
 												<TextBlock Grid.Column="3" Style="{StaticResource W.ColHead}" Text="이름" />
 												<TextBlock Grid.Column="4" Style="{StaticResource W.ColHead}" Text="장비번호" />
 												<TextBlock Grid.Column="5" Style="{StaticResource W.ColHead}" Text="종류" />
-												<TextBlock Grid.Column="6" Style="{StaticResource W.ColHead}" Text="방향" ToolTip="앞 = 펜스 외부 · 뒤 = 펜스 내부 · 기둥 센서만" />
-												<TextBlock Grid.Column="7" Style="{StaticResource W.ColHead}" Text="주소" ToolTip="IP 센서 = IP(제어기 뒤 내부망) · RS485 = 노드 주소" />
-												<TextBlock Grid.Column="8" Style="{StaticResource W.ColHead}" Text="간격" ToolTip="앞 센서와의 간격(m) — 두 종류 기본 간격 중 작은 값" />
+												<TextBlock Grid.Column="6" Style="{StaticResource W.ColHead}" Text="방향" />
+												<TextBlock Grid.Column="7" Style="{StaticResource W.ColHead}" Text="주소" />
+												<TextBlock Grid.Column="8" Style="{StaticResource W.ColHead}" Text="간격" />
 												<TextBlock Grid.Column="9" Style="{StaticResource W.ColHead}" Text="상태" />
 											</Grid>
 										</Border>
@@ -1563,16 +1573,11 @@
 												<drag:CaptureDragBehavior
 													DisplayMemberPath="Display"
 													Handler="{Binding}"
-													KeyboardFallback="Alt+← → 한 칸 · Delete 빼기 · F 방향" />
+													KeyboardFallback="{}{Alt}+{←}/{→} = 한 칸 · {Delete} = 빼기 · {F} = 방향" />
 											</b:Interaction.Behaviors>
 										</ListBox>
 									</StackPanel>
 								</fb:FrameBorder>
-								<TextBlock
-									Margin="2,6,0,0"
-									Style="{StaticResource W.Hint}"
-									Text="{Binding Line1Hint}"
-									TextWrapping="Wrap" />
 							</StackPanel>
 						</ScrollViewer>
 					</Grid>
@@ -1638,7 +1643,15 @@
 											FontSize="12"
 											Foreground="{DynamicResource TextMutedBrush}"
 											Text="{Binding PanelSelectionTitle}" />
-										<TextBlock FontSize="16" FontWeight="Bold" Text="망 속성" />
+										<StackPanel Orientation="Horizontal">
+											<TextBlock FontSize="16" FontWeight="Bold" Text="망 속성" />
+											<!--  망 속성 "?"(help-callout H-2) — 옛 "변경은 [저장하기] 전까지 되돌릴 수 있습니다" 줄을 여기로  -->
+											<c:HelpTip
+												Margin="8,0,0,0"
+												VerticalAlignment="Center"
+												HelpKey="Devices.Wiring.PanelPane"
+												Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+										</StackPanel>
 
 										<TextBlock Margin="0,10,0,4" Style="{StaticResource W.Hint}" Text="판 종류" />
 										<UniformGrid Columns="5">
@@ -1811,7 +1824,6 @@
 										<Rectangle Height="1" Margin="0,10,0,6" Fill="{DynamicResource RowLineBrush}" />
 										<TextBlock Style="{StaticResource W.Hint}" Text="합계" />
 										<TextBlock AutomationProperties.AutomationId="Devices.Wiring.Fence.PanelPane.Total" FontSize="12.5" Text="{Binding PanelTotalText}" TextWrapping="Wrap" />
-										<TextBlock Margin="0,2,0,0" Style="{StaticResource W.Hint}" Text="변경은 [저장하기] 전까지 되돌릴 수 있습니다" />
 										<Button
 											Margin="0,8,0,0"
 											HorizontalAlignment="Stretch"
@@ -1833,7 +1845,19 @@
 									CornerRadius="8"
 									Visibility="{Binding HasFenceSelection, Converter={StaticResource BoolToVisibility}}">
 									<StackPanel>
-										<TextBlock FontSize="12" Foreground="{DynamicResource TextMutedBrush}" Text="{Binding SelectedKindText}" />
+										<StackPanel Orientation="Horizontal">
+											<TextBlock
+												VerticalAlignment="Center"
+												FontSize="12"
+												Foreground="{DynamicResource TextMutedBrush}"
+												Text="{Binding SelectedKindText}" />
+											<!--  고른 것 "?"(help-callout H-2) — 주소 · 줄 · 높이 · 설치 위치 · 면 · 방향 · 여러 센서 · 함체(옛 회색 줄 · 문장형 툴팁)  -->
+											<c:HelpTip
+												Margin="8,0,0,0"
+												VerticalAlignment="Center"
+												HelpKey="Devices.Wiring.SelectionPane"
+												Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+										</StackPanel>
 										<TextBlock
 											AutomationProperties.AutomationId="Devices.Wiring.Fence.Pane.Title"
 											FontSize="16"
@@ -1916,11 +1940,15 @@
 											<TextBlock Grid.Row="3" Style="{StaticResource W.Hint}" Text="{Binding SelectedAddressLabel}" />
 											<StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,4">
 												<TextBlock AutomationProperties.AutomationId="Devices.Wiring.Fence.Pane.Address" FontFamily="Consolas" Text="{Binding SelectedAddressText}" />
-												<TextBlock Style="{StaticResource W.Hint}" Text="{Binding SelectedChannelNote}" />
+												<TextBlock
+													Foreground="{DynamicResource StatusWarningBrush}"
+													Style="{StaticResource W.Hint}"
+													Text="{Binding SelectedChannelMismatchText}"
+													Visibility="{Binding HasSelectedChannelMismatch, Converter={StaticResource BoolToVisibility}}" />
 											</StackPanel>
 											<TextBlock Grid.Row="4" Style="{StaticResource W.Hint}" Text="체인 위치" />
 											<TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,4" Text="{Binding SelectedPositionText}" TextWrapping="Wrap" />
-											<TextBlock Grid.Row="5" Style="{StaticResource W.Hint}" Text="Ch1 · Ch2 번호" ToolTip="두 포트에서 센 자리 — Ch1 = A · Ch2 = B" Visibility="{Binding HasSelectedPort, Converter={StaticResource BoolToVisibility}}" />
+											<TextBlock Grid.Row="5" Style="{StaticResource W.Hint}" Text="Ch1 · Ch2 번호" Visibility="{Binding HasSelectedPort, Converter={StaticResource BoolToVisibility}}" />
 											<TextBlock
 												Grid.Row="5"
 												Grid.Column="1"
@@ -1943,11 +1971,11 @@
 											<TextBlock Style="{StaticResource W.Hint}" Text="줄" />
 											<UniformGrid Margin="0,4,0,0" Columns="2">
 												<StackPanel Margin="0,0,3,0">
-													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Lower" Click="OnLaneLower" Content="아래 줄" Style="{StaticResource Console.Button}" ToolTip="Ch1(실선)이 먼저 지나는 줄 (Alt+↓)" />
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Lower" Click="OnLaneLower" Content="아래 줄" Style="{StaticResource Console.Button}" ToolTip="아래 줄 (Alt+↓)" />
 													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsLaneLower, Converter={StaticResource BoolToVisibility}}" />
 												</StackPanel>
 												<StackPanel Margin="3,0,0,0">
-													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Upper" Click="OnLaneUpper" Content="위 줄" Style="{StaticResource Console.Button}" ToolTip="먼 끝에서 꺾여 Ch2(점선)로 돌아오는 줄 (Alt+↑)" />
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Upper" Click="OnLaneUpper" Content="위 줄" Style="{StaticResource Console.Button}" ToolTip="위 줄 (Alt+↑)" />
 													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsLaneUpper, Converter={StaticResource BoolToVisibility}}" />
 												</StackPanel>
 											</UniformGrid>
@@ -1970,7 +1998,7 @@
 														Click="OnMountRaise"
 														Content="▲"
 														Style="{StaticResource Console.Button}"
-														ToolTip="높이 한 단계 위로 — 윤형 망은 맨 위가 윤형 코일(위 줄) (Alt+↑ · 미세 Shift+Alt+↑)" />
+														ToolTip="한 단계 위로 (Alt+↑ · 미세 Shift+Alt+↑)" />
 													<Button
 														Width="26"
 														MinWidth="0"
@@ -1981,7 +2009,7 @@
 														Click="OnMountLower"
 														Content="▼"
 														Style="{StaticResource Console.Button}"
-														ToolTip="높이 한 단계 아래로 — 코일에서 내리면 아래 줄 (Alt+↓ · 미세 Shift+Alt+↓)" />
+														ToolTip="한 단계 아래로 (Alt+↓ · 미세 Shift+Alt+↓)" />
 												</StackPanel>
 												<TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.Place" Style="{StaticResource W.Hint}" Text="{Binding MountPlaceText}" />
 												<TextBlock VerticalAlignment="Center" Style="{StaticResource W.Hint}" Text="설치 위치" />
@@ -2063,8 +2091,7 @@
 												</StackPanel>
 												</Grid>
 											</DockPanel>
-											<TextBlock Margin="0,3,0,0" Style="{StaticResource W.Hint}" Text="오른쪽 클릭 → &quot;이 설치 방식을 이 제어기 모든 센서에 적용&quot;으로 퍼뜨립니다" />
-											<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Ctrl+← →(Alt+Shift+← → 도)  -->
+																						<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Ctrl+← →(Alt+Shift+← → 도)  -->
 											<TextBlock Margin="0,8,0,0" Style="{StaticResource W.Hint}" Text="{Binding MountPanelLabel}" />
 											<StackPanel Margin="0,4,0,0" Orientation="Horizontal">
 												<Button
@@ -2115,7 +2142,7 @@
 														Content="외부"
 														IsEnabled="{Binding CanChooseFacing}"
 														Style="{StaticResource Console.Button}"
-														ToolTip="펜스 외부 면에 답니다(기본) — F 로 뒤집기" />
+														ToolTip="외부 면 (F)" />
 													<Rectangle
 														Height="3"
 														Margin="4,2,4,0"
@@ -2129,7 +2156,7 @@
 														Content="내부"
 														IsEnabled="{Binding CanChooseFacing}"
 														Style="{StaticResource Console.Button}"
-														ToolTip="펜스 내부 면에 답니다 — 철망 뒤에 그리고 칩에 '내' 표지 · F 로 뒤집기" />
+														ToolTip="내부 면 (F)" />
 													<Rectangle
 														Height="3"
 														Margin="4,2,4,0"
@@ -2227,9 +2254,7 @@
 
 										<!--  여러 센서(Ctrl 클릭 · FR-07) — 함께 끌거나 한꺼번에 빼기  -->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMultiSelection, Converter={StaticResource BoolToVisibility}}">
-											<TextBlock Style="{StaticResource W.Hint}" Text="고른 센서를 끌면 체인 순서를 지킨 채 함께 옮겨집니다 · Ctrl 클릭으로 더하거나 뺍니다" />
 											<Button
-												Margin="0,6,0,0"
 												HorizontalAlignment="Stretch"
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Pane.UnplaceMany"
 												Click="OnFenceUnplace"
@@ -2305,7 +2330,15 @@
 												번호 대역(fence-wiring-editor FR-10 · §1-A) — 프리셋은 참고용(민간 시설은 다를 수 있다) · 직접 설정.
 												고르면 위치 순서대로 번호를 다시 매긴다(저장 전까지 대기 · 되돌리기 한 걸음). 대역 초과 · 255 초과 · 중복은 저장을 막는다.
 											-->
-											<TextBlock Style="{StaticResource W.SectionHead}" Text="번호 대역" />
+											<StackPanel Orientation="Horizontal">
+												<TextBlock Style="{StaticResource W.SectionHead}" Text="번호 대역" />
+												<!--  번호 대역 "?"(help-callout H-2) — 매기는 규칙 · 프리셋 뜻(옛 회색 줄)  -->
+												<c:HelpTip
+													Margin="6,6,0,0"
+													VerticalAlignment="Center"
+													HelpKey="Devices.Wiring.Bands"
+													Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel, AncestorLevel=2}}" />
+											</StackPanel>
 											<TextBlock AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Text" FontSize="12" Text="{Binding BandText}" TextWrapping="Wrap" />
 											<WrapPanel Margin="0,6,0,0" Orientation="Horizontal">
 												<Button Margin="0,0,4,4" MinWidth="0" Padding="8,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Tier2" Click="OnBandPreset" Content="2차" Style="{StaticResource Console.Button}" Tag="tier2" ToolTip="중요시설 2차 — 펜스센서 1~ · 복합센서 180~" />
@@ -2333,10 +2366,8 @@
 											</ItemsControl>
 											<TextBlock Foreground="{DynamicResource StatusCriticalBrush}" FontSize="12" Text="{Binding BandError}" TextWrapping="Wrap" Visibility="{Binding HasBandError, Converter={StaticResource BoolToVisibility}}" />
 											<Button Margin="0,4,0,0" HorizontalAlignment="Left" AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.ApplyCustom" Click="OnBandCustom" Content="직접 설정 적용" Style="{StaticResource Console.Button}" />
-											<TextBlock Margin="0,4,0,0" Style="{StaticResource W.Hint}" Text="번호 = 대역 시작 + (그 종류 안의 위치 순서 − 1) · 현장 센서의 번호 설정과 같아야 합니다" />
 											<StackPanel Visibility="{Binding ShowCables, Converter={StaticResource BoolToVisibility}}">
 												<TextBlock Margin="0,4,0,0" Text="{Binding EnclosureGapText, StringFormat=함체 위치: {0}}" />
-												<TextBlock Style="{StaticResource W.Hint}" Text="표시만 — 체인 순서 · A/B 번호는 그대로" />
 												<UniformGrid Margin="0,6,0,0" Columns="2">
 													<Button
 														Margin="0,0,4,0"
@@ -2408,13 +2439,15 @@
 										TextWrapping="Wrap" />
 								</Border>
 
-								<TextBlock Style="{StaticResource W.SectionHead}" Text="고장 구간과의 관계" />
-								<TextBlock
-									AutomationProperties.AutomationId="Devices.Wiring.FaultRelation"
-									Style="{StaticResource W.Hint}"
-									Text="{Binding FaultRelationText}" />
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Style="{StaticResource W.SectionHead}" Text="고장 구간과의 관계" />
+									<!--  "?"(help-callout H-2) — 옛 두 문장 설명(Devices.Wiring.FaultRelation)을 여기로. 아래 예시(FaultText)는 이 결선의 값이라 화면에 남는다  -->
+									<c:HelpTip
+										Margin="6,6,0,0"
+										VerticalAlignment="Center"
+										HelpKey="Devices.Wiring.Check.Fault" />
+								</StackPanel>
 								<Border
-									Margin="0,6,0,0"
 									Padding="9,7"
 									Background="{DynamicResource SurfaceSunkenBrush}"
 									BorderBrush="{DynamicResource StatusInfoBrush}"

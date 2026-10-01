@@ -284,11 +284,11 @@ public sealed class UnitConsoleViewModel : Screen, IHandle<UnitTopologyChangedMe
 
     /// <summary>
     /// 레일 바닥 — 내 부대를 <b>이름</b>으로 말한다(V-39: 종전엔 "내 부대 · unit001" 처럼 코드를 그대로 냈다).
-    /// 편제에서 그 코드를 못 찾으면(아직 안 읽었거나 다른 서버) 내 부대를 말하지 않고 정렬 안내를 낸다.
+    /// 편제에서 그 코드를 못 찾으면(아직 안 읽었거나 다른 서버) 비운다 — 옛 정렬 안내("같은 단계의 부대는 코드 순")는 트리 "?"(help-callout H-2)로 옮겼다.
     /// </summary>
     public string RailFooterText => MyUnitName is { Length: > 0 } name
         ? $"내 부대 · {name}"
-        : "같은 단계의 부대는 코드 순으로 표시됩니다.";
+        : string.Empty;
 
     /// <summary>편제에서 찾은 내 부대 이름 — 없으면 <c>null</c>.</summary>
     public string? MyUnitName
