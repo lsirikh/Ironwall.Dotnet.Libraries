@@ -33,6 +33,10 @@ public enum FenceInk
     BrickSide, BrickTop,
     // 작은 배율의 윤형 철조망 — 코일 대신 톱니 띠 하나(fence-wiring-editor 검토 V2)
     RazorBand,
+    // 두 줄 개념도(fence-wiring-editor v0.3 FR-20) — Ch1 실선 · Ch2 점선 · 펜스 격자 · 줄 칩 · 눈금 · VBus
+    ConceptCh1, ConceptCh2, ConceptCh2Dash, ConceptFence, ConceptMesh, ConceptPost, ConceptGround, ConceptTick, ConceptTickText,
+    ConceptLabelLower, ConceptLabelUpper, ConceptChipLower, ConceptChipUpper, ConceptChipTextLower, ConceptChipTextUpper,
+    ConceptVbus, ConceptVbusText, ConceptTarget,
 }
 
 public enum FenceShapeKind { Polygon, Polyline, Line, Ellipse, Rect, Text, Pill }

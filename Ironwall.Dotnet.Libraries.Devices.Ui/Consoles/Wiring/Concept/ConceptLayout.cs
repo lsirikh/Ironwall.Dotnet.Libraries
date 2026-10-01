@@ -1,221 +1,229 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Concept;
 
-/// <summary>개념도의 모양(FR-12) — 가로 띠(기본) · 원형.</summary>
-public enum ConceptShape
+/// <summary>칩을 얼마나 자세히 그리나 — 칸이 넓으면 번호까지, 좁으면 작은 칩, 아주 좁으면 점(센서 수백 대).</summary>
+public enum ConceptChipMode
 {
-    Strip = 0,
-    Ring = 1,
+    /// <summary>칩 안 번호 + 칩 위 번호(그림 ①).</summary>
+    Full = 0,
+    /// <summary>작은 칩 · 칩 위 번호는 솎는다(그림 ② · ③).</summary>
+    Compact = 1,
+    /// <summary>점 칩만(번호 · 신호등 없음 · 200대 이상).</summary>
+    Dot = 2,
 }
 
-/// <summary>개념도 노드 한 개의 자리.</summary>
-/// <param name="Param">경로 위 위치(0…1) — 끌어 놓을 틈을 셀 때 쓴다(Ch1(A) 쪽이 0).</param>
-public sealed record ConceptPoint(int Key, Point Center, double Param);
+/// <summary>개념도에 놓을 센서 한 대 — 줄 · 펜스 위 가로 위치(m).</summary>
+public sealed record ConceptLaneItem(int Key, FenceLane Lane, double XM);
 
-/// <summary>개념도 한 장의 배치 — 노드 · 제어기 · 두 포트(Ch1(A) · Ch2(B)) · 그림 전체 크기.</summary>
-/// <param name="Rows">가로 띠의 줄 수(뱀 모양으로 꺾어 접은 줄 · 원형은 1).</param>
+/// <summary>개념도 노드 한 개의 자리.</summary>
+/// <param name="ShowLabel">칩 위 번호를 그리는가(솎은 결과).</param>
+public sealed record ConceptPoint(int Key, FenceLane Lane, Point Center, bool ShowLabel);
+
+/// <summary>아래 눈금 하나 — 펜스 위 위치(왼쪽부터 1).</summary>
+public sealed record ConceptTick(double X, int Position);
+
+/// <summary>
+/// 두 줄 개념도 한 장의 배치(fence-wiring-editor v0.3 FR-20 · 참고 그림 4장) — 펜스 격자 · 두 줄 · 칩 · 제어기 <c>C</c> · 눈금.
+/// </summary>
 public sealed record ConceptGeometry(
-    ConceptShape Shape,
+    FenceControllerEnd End,
     IReadOnlyList<ConceptPoint> Nodes,
     Rect Controller,
     Point Port1,
     Point Port2,
-    Size Extent,
-    Point Center,
-    double Radius,
-    int Rows = 1);
+    double FenceLeft,
+    double FenceRight,
+    double UpperY,
+    double LowerY,
+    double FenceTop,
+    double FenceBottom,
+    double TickY,
+    IReadOnlyList<double> Posts,
+    IReadOnlyList<ConceptTick> Ticks,
+    ConceptChipMode Mode,
+    Size Chip,
+    Size Extent)
+{
+    /// <summary>먼 끝(꺾임선) x — 제어기 반대쪽 펜스 끝.</summary>
+    public double FarX => End == FenceControllerEnd.Left ? FenceRight : FenceLeft;
+
+    /// <summary>제어기 쪽 펜스 끝 x.</summary>
+    public double NearX => End == FenceControllerEnd.Left ? FenceLeft : FenceRight;
+
+    /// <summary>줄의 y.</summary>
+    public double LaneY(FenceLane lane) => lane == FenceLane.Upper ? UpperY : LowerY;
+}
 
 /// <summary>
-/// 개념도 배치 — <b>순수 함수</b>(fence-wiring-editor FR-12 · NFR-01). 링을 <b>Ch1(A) → #1 … #N → Ch2(B)</b> 로 그린다(모든 제어기가 같은 그림 · §1-0).
+/// 두 줄 개념도 배치 — <b>순수 함수</b>(fence-wiring-editor v0.3 FR-20 · NFR-01). 참고 그림처럼 펜스(격자 · 기둥)를 가로로 펴고 위 · 아래 두 줄에 칩을 놓는다.
+/// 제어기 <c>C</c> 는 왼쪽 끝 또는 오른쪽 끝 — Ch1(실선)은 아래 줄로, Ch2(점선)는 위 줄로(또는 리턴선) 들어간다.
 /// </summary>
 /// <remarks>
-/// <para><b>가로 띠</b> — 노드를 한 줄로(간격 ≥ <see cref="STRIP_MIN_STEP"/>, 넓으면 칸에 맞춰 벌린다), 제어기는 아래 가운데, 두 포트에서 리턴케이블이 양 끝 노드로 간다.
-/// 한 줄에 다 들어가지 않으면 <b>뱀 모양으로 꺾어</b> 여러 줄에 놓는다(짝수 줄 → · 홀수 줄 ← · 꺾이는 곳은 같은 x 라 흐름 화살표가 그대로 이어진다).
-/// 줄이 <see cref="STRIP_MAX_ROWS"/> 를 넘으면 간격을 <see cref="STRIP_TIGHT_STEP"/> 까지 줄이고, 그래도 넘칠 때만 가로로 넓어진다.
-/// 제어기(Ch1 · Ch2)는 늘 보이는 칸 안 가운데 아래다.</para>
-/// <para><b>원형</b> — 제어기는 아래 가운데, #1 은 Ch1 쪽(왼쪽 아래)에서 시작해 시계 방향으로 위를 돌아 #N 이 Ch2 쪽(오른쪽 아래)에 온다.</para>
+/// <para><b>칸에 맞춘다</b> — 펜스 전체 길이를 보이는 폭에 눌러 담는다(가로로 잘리지 않는다). 칸이 좁아지면 칩을 줄이고(<see cref="ConceptChipMode"/>)
+/// 칩 위 번호 · 아래 눈금을 솎는다(그림 ② 65대: 눈금 1 · 11 · 21 …).</para>
+/// <para>눈금은 펜스 위 위치를 <b>왼쪽부터</b> 센다(제어기가 오른쪽이어도 · 그림 ④).</para>
 /// </remarks>
 public static class ConceptLayout
 {
-    public const double NODE_R = 11;
-    public const double STRIP_MIN_STEP = 40;
-    public const double STRIP_MARGIN = 48;
-    public const double STRIP_NODE_Y = 44;
-    public const double CONTROLLER_W = 108;
-    public const double CONTROLLER_H = 30;
+    public const double CONTROLLER_W = 30;
+    public const double CONTROLLER_H = 20;
+    /// <summary>제어기와 펜스 사이.</summary>
+    public const double CONTROLLER_GAP = 26;
+    public const double SIDE_MARGIN = 10;
+    /// <summary>먼 끝 바깥 여백(칩 반 폭 · 꺾임선).</summary>
+    public const double FAR_MARGIN = 22;
 
-    /// <summary>가로 띠를 꺾을 때 줄 간격(노드 · IP 글자 · 신호등이 겹치지 않는 높이).</summary>
-    public const double STRIP_ROW_STEP = 56;
+    public const double UPPER_Y = 44;
+    public const double LOWER_Y = 96;
+    public const double MIN_HEIGHT = 140;
 
-    /// <summary>줄을 더 늘리지 않는 한도 — 넘으면 간격을 좁힌다.</summary>
-    public const int STRIP_MAX_ROWS = 4;
+    public const double FULL_STEP = 40;
+    public const double COMPACT_STEP = 18;
+    public static readonly Size FULL_CHIP = new(34, 16);
 
-    /// <summary>좁힌 간격(노드 지름 + 여유).</summary>
-    public const double STRIP_TIGHT_STEP = 30;
+    /// <summary>칩 위 번호를 솎을 때 번호 사이 최소 간격(px).</summary>
+    public const double LABEL_SPACING = 36;
 
-    /// <summary>마지막 줄 아래 · 제어기 위 — 신호등 · 리턴케이블이 지나는 높이.</summary>
-    private const double STRIP_BELOW_NODES = NODE_R + 16 + 26;
+    /// <summary>눈금 글자 사이 최소 간격(px) — 이보다 좁으면 5 · 10 · 20 … 칸마다.</summary>
+    public const double TICK_SPACING = 120;
 
-    /// <summary>원형에서 제어기 쪽에 비워 두는 각(도, 한쪽) — #1 과 #N 이 제어기 양옆에 온다.</summary>
-    public const double RING_GAP_DEGREES = 26;
+    /// <summary>눈금을 다 보이는 최대 칸 수(그림 ①: 6칸 모두).</summary>
+    public const int TICK_ALL_MAX = 12;
 
-    public static ConceptGeometry Build(ConceptShape shape, IReadOnlyList<int> keys, Size available)
-        => shape == ConceptShape.Ring ? Ring(keys, available) : Strip(keys, available);
-
-    /// <summary>가로 띠에 노드 <paramref name="count"/> 개를 놓을 줄 수 · 한 줄 칸 수 · 간격(폭 <paramref name="width"/>).</summary>
-    public static (int Rows, int Columns, double Step) StripGrid(int count, double width)
+    /// <param name="items">센서(줄 · 펜스 위 x m).</param>
+    /// <param name="postsM">기둥 x(m) — 없으면 격자만.</param>
+    /// <param name="lengthM">펜스 전체 길이(m) — 0 이면 센서 x 의 최댓값.</param>
+    public static ConceptGeometry Build(IReadOnlyList<ConceptLaneItem> items, IReadOnlyList<double> postsM, double lengthM, FenceControllerEnd end, Size available)
     {
-        var usable = Math.Max(0, Math.Max(width, 2 * STRIP_MARGIN + CONTROLLER_W) - 2 * STRIP_MARGIN);
-        if (count <= 1) return (1, Math.Max(1, count), 0);
-        var columns = Math.Max(2, (int)Math.Floor(usable / STRIP_MIN_STEP) + 1);
-        if (count <= columns) return (1, count, Math.Max(STRIP_MIN_STEP, usable / (count - 1)));
-        var rows = (int)Math.Ceiling(count / (double)columns);
-        if (rows > STRIP_MAX_ROWS)
+        var list = items ?? Array.Empty<ConceptLaneItem>();
+        var posts = postsM ?? Array.Empty<double>();
+        var width = Math.Max(available.Width, 240);
+        var height = Math.Max(available.Height, MIN_HEIGHT);
+        var length = lengthM > 0 ? lengthM : Math.Max(1, list.Count == 0 ? 1 : list.Max(i => i.XM));
+
+        double fenceLeft, fenceRight;
+        Rect controller;
+        var cTop = (UPPER_Y + LOWER_Y) / 2 - CONTROLLER_H / 2;
+        if (end == FenceControllerEnd.Left)
         {
-            columns = Math.Max(2, (int)Math.Floor(usable / STRIP_TIGHT_STEP) + 1);
-            rows = (int)Math.Ceiling(count / (double)columns);
-            if (rows > STRIP_MAX_ROWS)
-            {
-                rows = STRIP_MAX_ROWS;
-                columns = (int)Math.Ceiling(count / (double)rows);
-                return (rows, columns, STRIP_TIGHT_STEP);                 // 이때만 가로로 넓어진다
-            }
+            controller = new Rect(SIDE_MARGIN, cTop, CONTROLLER_W, CONTROLLER_H);
+            fenceLeft = controller.Right + CONTROLLER_GAP;
+            fenceRight = width - FAR_MARGIN;
         }
-        return (rows, columns, usable / (columns - 1));
-    }
-
-    /// <summary>가로 띠가 원하는 높이 — 줄 수에 맞춰(한 줄이면 <paramref name="minimum"/>).</summary>
-    public static double StripHeight(int count, double width, double minimum)
-    {
-        var (rows, _, _) = StripGrid(count, width);
-        var lastRowY = STRIP_NODE_Y + STRIP_ROW_STEP * (rows - 1);
-        return Math.Max(minimum, lastRowY + STRIP_BELOW_NODES + CONTROLLER_H + 12);
-    }
-
-    /// <summary>가로 띠.</summary>
-    public static ConceptGeometry Strip(IReadOnlyList<int> keys, Size available)
-    {
-        var list = keys ?? Array.Empty<int>();
-        var n = list.Count;
-        var width = Math.Max(available.Width, 2 * STRIP_MARGIN + CONTROLLER_W);
-        var grid = StripGrid(n, width);
-        if (grid.Rows > 1) return Snake(list, width, available.Height, grid);
-        var step = n <= 1 ? 0 : Math.Max(STRIP_MIN_STEP, (width - 2 * STRIP_MARGIN) / (n - 1));
-        var extentWidth = n <= 1 ? width : Math.Max(width, 2 * STRIP_MARGIN + step * (n - 1));
-        var height = Math.Max(available.Height, 120);
-        var nodes = new List<ConceptPoint>(n);
-        var start = n <= 1 ? extentWidth / 2 : STRIP_MARGIN;
-        for (var i = 0; i < n; i++)
-            nodes.Add(new ConceptPoint(list[i], new Point(start + step * i, STRIP_NODE_Y), n <= 1 ? 0.5 : i / (double)(n - 1)));
-
-        var controller = new Rect(extentWidth / 2 - CONTROLLER_W / 2, height - CONTROLLER_H - 12, CONTROLLER_W, CONTROLLER_H);
-        var port1 = new Point(controller.Left + 14, controller.Top);
-        var port2 = new Point(controller.Right - 14, controller.Top);
-        return new ConceptGeometry(ConceptShape.Strip, nodes, controller, port1, port2, new Size(extentWidth, height), new Point(extentWidth / 2, height / 2), 0);
-    }
-
-    /// <summary>뱀 모양 가로 띠 — 짝수 줄은 왼쪽 → 오른쪽, 홀수 줄은 오른쪽 → 왼쪽. 제어기는 보이는 칸(<paramref name="width"/>) 가운데 아래.</summary>
-    private static ConceptGeometry Snake(IReadOnlyList<int> list, double width, double availableHeight, (int Rows, int Columns, double Step) grid)
-    {
-        var n = list.Count;
-        var extentWidth = Math.Max(width, 2 * STRIP_MARGIN + grid.Step * (grid.Columns - 1));
-        var height = Math.Max(Math.Max(availableHeight, 120), StripHeight(n, width, 120));
-        var nodes = new List<ConceptPoint>(n);
-        for (var i = 0; i < n; i++)
+        else
         {
-            var row = i / grid.Columns;
-            var column = i % grid.Columns;
-            if (row % 2 == 1) column = grid.Columns - 1 - column;
-            nodes.Add(new ConceptPoint(list[i], new Point(STRIP_MARGIN + grid.Step * column, STRIP_NODE_Y + STRIP_ROW_STEP * row), i / (double)(n - 1)));
+            controller = new Rect(width - SIDE_MARGIN - CONTROLLER_W, cTop, CONTROLLER_W, CONTROLLER_H);
+            fenceLeft = FAR_MARGIN;
+            fenceRight = controller.Left - CONTROLLER_GAP;
         }
-        var controller = new Rect(width / 2 - CONTROLLER_W / 2, height - CONTROLLER_H - 12, CONTROLLER_W, CONTROLLER_H);
-        var port1 = new Point(controller.Left + 14, controller.Top);
-        var port2 = new Point(controller.Right - 14, controller.Top);
-        return new ConceptGeometry(ConceptShape.Strip, nodes, controller, port1, port2, new Size(extentWidth, height), new Point(width / 2, height / 2), 0, grid.Rows);
+        var scale = Math.Max(1e-6, fenceRight - fenceLeft) / length;
+        double X(double m) => fenceLeft + Math.Clamp(m, 0, length) * scale;
+
+        // 칸 폭 — 줄마다 이웃 칩 사이(같은 자리는 뺀다)의 가장 좁은 값
+        var step = double.PositiveInfinity;
+        foreach (var lane in new[] { FenceLane.Lower, FenceLane.Upper })
+        {
+            var xs = list.Where(i => i.Lane == lane).Select(i => X(i.XM)).OrderBy(x => x).ToList();
+            for (var i = 1; i < xs.Count; i++)
+                if (xs[i] - xs[i - 1] > 0.5) step = Math.Min(step, xs[i] - xs[i - 1]);
+        }
+        var mode = step >= FULL_STEP ? ConceptChipMode.Full : step >= COMPACT_STEP ? ConceptChipMode.Compact : ConceptChipMode.Dot;
+        var chip = mode switch
+        {
+            ConceptChipMode.Full => FULL_CHIP,
+            ConceptChipMode.Compact => new Size(Math.Min(24, step - 6), 10),
+            _ => new Size(Math.Max(2, Math.Min(8, step - 1)), 8),
+        };
+
+        // 같은 자리 칩은 옆으로 벌린다(줄마다 · 순서 유지)
+        var nodes = new List<ConceptPoint>(list.Count);
+        foreach (var lane in new[] { FenceLane.Lower, FenceLane.Upper })
+        {
+            var row = list.Where(i => i.Lane == lane).Select((item, index) => (item, index)).OrderBy(t => t.item.XM).ThenBy(t => t.index).Select(t => t.item).ToList();
+            // 같은 자리만 벌린다 — 칸보다 넓게 벌리면 펜스 밖으로 밀려난다(점 칩 · 수백 대)
+            var spread = FenceWorld.Separate(row.Select(i => X(i.XM)).ToList(), double.IsInfinity(step) ? chip.Width + 2 : Math.Min(chip.Width + 2, step));
+            var every = mode == ConceptChipMode.Full ? 1 : mode == ConceptChipMode.Compact ? Math.Max(1, (int)Math.Ceiling(LABEL_SPACING / Math.Max(1, step))) : int.MaxValue;
+            for (var i = 0; i < row.Count; i++)
+                nodes.Add(new ConceptPoint(row[i].Key, lane, new Point(spread[i], lane == FenceLane.Upper ? UPPER_Y : LOWER_Y), i % every == 0));
+        }
+
+        // 눈금 — 펜스 위 위치(센서가 선 가로 자리 · 왼쪽부터 1). 칸이 많으면 5 · 10 · 20 … 칸마다.
+        var columns = nodes.Select(n => Math.Round(n.Center.X * 2) / 2).Distinct().OrderBy(x => x).ToList();
+        var ticks = new List<ConceptTick>();
+        if (columns.Count > 0)
+        {
+            var spacing = columns.Count > 1 ? (columns[^1] - columns[0]) / (columns.Count - 1) : double.PositiveInfinity;
+            var every = 1;
+            if (columns.Count > TICK_ALL_MAX)
+                foreach (var k in new[] { 5, 10, 20, 50, 100, 200, 500 })
+                {
+                    every = k;
+                    if (k * spacing >= TICK_SPACING) break;
+                }
+            for (var i = 0; i < columns.Count; i += every) ticks.Add(new ConceptTick(columns[i], i + 1));
+        }
+
+        var port1 = new Point(controller.X + controller.Width / 2, controller.Bottom);
+        var port2 = new Point(controller.X + controller.Width / 2, controller.Top);
+        var fenceTop = UPPER_Y - 14;
+        var fenceBottom = LOWER_Y + 16;
+        return new ConceptGeometry(end, nodes, controller, port1, port2, fenceLeft, fenceRight, UPPER_Y, LOWER_Y, fenceTop, fenceBottom, fenceBottom + 16,
+                                   posts.Select(X).ToList(), ticks, mode, chip, new Size(width, height));
     }
 
-    /// <summary>원형.</summary>
-    public static ConceptGeometry Ring(IReadOnlyList<int> keys, Size available)
+    /// <summary>포인터가 가리키는 줄 — 두 줄 가운데보다 위면 위 줄.</summary>
+    public static FenceLane LaneAt(ConceptGeometry geometry, Point pointer)
+        => pointer.Y < (geometry.UpperY + geometry.LowerY) / 2 ? FenceLane.Upper : FenceLane.Lower;
+
+    /// <summary>놓을 틈 — 그 줄에서 끄는 것을 뺀 칩 중 포인터보다 왼쪽인 수(왼쪽부터 0…).</summary>
+    public static int IndexAt(ConceptGeometry geometry, FenceLane lane, Point pointer, IReadOnlyCollection<int>? excluding = null)
+        => geometry.Nodes.Count(n => n.Lane == lane && (excluding is null || !excluding.Contains(n.Key)) && n.Center.X < pointer.X);
+
+    /// <summary>틈 표지 자리 — 그 줄에서 이웃 둘의 가운데(양 끝은 칩 한 개 바깥).</summary>
+    public static Point InsertionPoint(ConceptGeometry geometry, FenceLane lane, int index, IReadOnlyCollection<int>? excluding = null)
     {
-        var list = keys ?? Array.Empty<int>();
-        var n = list.Count;
-        var width = Math.Max(available.Width, 200);
-        var height = Math.Max(available.Height, 200);
-        var radius = Math.Max(40, Math.Min(width, height - CONTROLLER_H - 20) / 2 - 30);
-        var center = new Point(width / 2, radius + 26);
-        var nodes = new List<ConceptPoint>(n);
-        var sweep = 360 - 2 * RING_GAP_DEGREES;
-        for (var i = 0; i < n; i++)
-        {
-            var t = n <= 1 ? 0.5 : i / (double)(n - 1);
-            var degrees = 90 + RING_GAP_DEGREES + sweep * t;             // 화면 좌표(y 아래)에서 90° = 아래 · 시계 방향으로 증가
-            var rad = degrees * Math.PI / 180;
-            nodes.Add(new ConceptPoint(list[i], new Point(center.X + radius * Math.Cos(rad), center.Y + radius * Math.Sin(rad)), t));
-        }
-        var controller = new Rect(center.X - CONTROLLER_W / 2, center.Y + radius + 8, CONTROLLER_W, CONTROLLER_H);
-        var port1 = new Point(controller.Left + 14, controller.Top);
-        var port2 = new Point(controller.Right - 14, controller.Top);
-        var extent = new Size(width, Math.Max(height, controller.Bottom + 10));
-        return new ConceptGeometry(ConceptShape.Ring, nodes, controller, port1, port2, extent, center, radius);
+        var row = geometry.Nodes.Where(n => n.Lane == lane && (excluding is null || !excluding.Contains(n.Key))).OrderBy(n => n.Center.X).ToList();
+        var y = geometry.LaneY(lane);
+        if (row.Count == 0) return new Point((geometry.FenceLeft + geometry.FenceRight) / 2, y);
+        var i = Math.Clamp(index, 0, row.Count);
+        var half = geometry.Chip.Width / 2 + 4;
+        if (i == 0) return new Point(Math.Max(geometry.FenceLeft - half, row[0].Center.X - half), y);
+        if (i == row.Count) return new Point(row[^1].Center.X + half, y);
+        return new Point((row[i - 1].Center.X + row[i].Center.X) / 2, y);
     }
 
     /// <summary>
-    /// 포인터를 놓으면 들어갈 체인 틈(옮기기 <b>전</b> 목록 기준 0…N · <c>WiringChain.PlaceInBranch</c> 규칙) — 포인터보다 앞(경로 위)에 있는 노드 수.
+    /// VBus 표지 자리(FR-21) — 사슬 틈 <paramref name="gap"/>(k = k번째 센서 뒤)의 두 칩 가운데. 꺾이는 곳(줄이 다르면)은 먼 끝 꺾임선 가운데.
     /// </summary>
-    public static int GapAt(ConceptGeometry geometry, Point pointer)
+    public static Point VbusPoint(ConceptGeometry geometry, IReadOnlyList<int> chain, int gap)
     {
-        var p = ParamAt(geometry, pointer);
-        return geometry.Nodes.Count(node => node.Param < p);
+        if (chain is null || chain.Count < 2) return new Point(geometry.FarX, (geometry.UpperY + geometry.LowerY) / 2);
+        var g = Math.Clamp(gap, 1, chain.Count - 1);
+        var a = geometry.Nodes.FirstOrDefault(n => n.Key == chain[g - 1]);
+        var b = geometry.Nodes.FirstOrDefault(n => n.Key == chain[g]);
+        if (a is null || b is null) return new Point(geometry.FarX, (geometry.UpperY + geometry.LowerY) / 2);
+        if (a.Lane != b.Lane) return new Point(geometry.FarX, (geometry.UpperY + geometry.LowerY) / 2);
+        return new Point((a.Center.X + b.Center.X) / 2, a.Center.Y);
     }
 
-    /// <summary>포인터의 경로 위 위치(0…1) — 띠는 x, 원형은 각.</summary>
-    public static double ParamAt(ConceptGeometry geometry, Point pointer)
+    /// <summary>VBus 를 놓을 사슬 틈 — 포인터에 가장 가까운 틈 표지(1…N−1).</summary>
+    public static int VbusGapAt(ConceptGeometry geometry, IReadOnlyList<int> chain, Point pointer)
     {
-        var nodes = geometry.Nodes;
-        if (nodes.Count <= 1) return nodes.Count == 1 && pointer.X > nodes[0].Center.X ? 1 : 0;
-        if (geometry.Shape == ConceptShape.Strip && geometry.Rows > 1)
+        if (chain is null || chain.Count < 2) return 0;
+        var best = 1;
+        var distance = double.PositiveInfinity;
+        for (var g = 1; g < chain.Count; g++)
         {
-            // 가장 가까운 줄 → 그 줄 안에서 줄 방향으로 포인터보다 앞선 노드 수(앞 줄 노드는 모두 앞선다)
-            var rowYs = nodes.Select(p => p.Center.Y).Distinct().OrderBy(y => y).ToList();
-            var rowY = rowYs.OrderBy(y => Math.Abs(y - pointer.Y)).First();
-            var row = rowYs.IndexOf(rowY);
-            var before = nodes.TakeWhile(p => p.Center.Y < rowY - 0.5).Count();
-            var inRow = nodes.Where(p => Math.Abs(p.Center.Y - rowY) < 0.5).ToList();
-            before += row % 2 == 0 ? inRow.Count(p => p.Center.X < pointer.X) : inRow.Count(p => p.Center.X > pointer.X);
-            if (before <= 0) return -0.01;
-            if (before >= nodes.Count) return 1.01;
-            return (before - 0.5) / (nodes.Count - 1);
+            var p = VbusPoint(geometry, chain, g);
+            var d = (p - pointer).LengthSquared;
+            if (d < distance) { distance = d; best = g; }
         }
-        if (geometry.Shape == ConceptShape.Strip)
-        {
-            var first = nodes[0].Center.X;
-            var last = nodes[^1].Center.X;
-            return (pointer.X - first) / Math.Max(1e-6, last - first);
-        }
-        var degrees = Math.Atan2(pointer.Y - geometry.Center.Y, pointer.X - geometry.Center.X) * 180 / Math.PI;   // −180…180, 90 = 아래
-        var sweep = 360 - 2 * RING_GAP_DEGREES;
-        var fromStart = ((degrees - (90 + RING_GAP_DEGREES)) % 360 + 360) % 360;
-        // 제어기 쪽 빈 부채꼴 — 가까운 끝으로(왼쪽 절반은 #1 앞, 오른쪽 절반은 #N 뒤)
-        if (fromStart > sweep) return fromStart > sweep + RING_GAP_DEGREES ? -0.01 : 1.01;
-        return fromStart / sweep;
+        return best;
     }
-
-    /// <summary>틈 <paramref name="gap"/> 의 삽입 표지 자리(두 이웃 노드의 가운데 · 양 끝은 한 칸 바깥).</summary>
-    public static Point InsertionPoint(ConceptGeometry geometry, int gap)
-    {
-        var nodes = geometry.Nodes;
-        if (nodes.Count == 0) return geometry.Center;
-        var g = Math.Clamp(gap, 0, nodes.Count);
-        if (g == 0) return nodes.Count > 1 ? Lerp(nodes[0].Center, nodes[1].Center, -0.5) : new Point(nodes[0].Center.X - 20, nodes[0].Center.Y);
-        if (g == nodes.Count) return nodes.Count > 1 ? Lerp(nodes[^1].Center, nodes[^2].Center, -0.5) : new Point(nodes[^1].Center.X + 20, nodes[^1].Center.Y);
-        var a = nodes[g - 1].Center;
-        var b = nodes[g].Center;
-        return new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
-    }
-
-    private static Point Lerp(Point a, Point b, double t) => new(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
 }

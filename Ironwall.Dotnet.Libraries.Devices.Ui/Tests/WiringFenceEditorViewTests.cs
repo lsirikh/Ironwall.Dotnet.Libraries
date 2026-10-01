@@ -54,7 +54,7 @@ public class WiringFenceEditorViewTests
         Assert.Equal("Devices.Wiring.Fence.Signal.Controller", result.LampId);
         Assert.Equal(new[] { SignalLevel.Ok, SignalLevel.Unknown, SignalLevel.Unknown, SignalLevel.Ok }, result.Sensors);
         Assert.Equal(AutomationControlType.Image, result.LampPeer);           // peer 있는 신호등(NFR-04)
-        Assert.Equal("개념도 · 링 (Ch1(A) → #1 … #4 → Ch2(B))", result.Title);
+        Assert.Equal("개념도 · Ch1(A) → 아래 줄 4 → 리턴선 → Ch2(B) · 제어기 왼쪽 끝", result.Title);
         Assert.True(result.IpNote);                                          // IP 센서 표지(FR-15)
     }
 
@@ -103,7 +103,42 @@ public class WiringFenceEditorViewTests
     }
 
     [Fact]
-    public void should_draw_one_node_per_chained_sensor_and_follow_the_shared_selection_when_the_concept_strip_is_shown()
+    public void should_move_a_chip_to_the_upper_lane_with_alt_up_flip_the_controller_by_dragging_c_and_show_the_vbus_chip()
+    {
+        var result = OnView(Ring(6), (vm, view) =>
+        {
+            var concept = Descendants<FenceConceptView>(view).Single();
+            var vbusShown = concept.VbusChip is { IsVisible: true };
+            var vbusId = concept.VbusChip is { } v ? AutomationProperties.GetAutomationId(v) : null;
+
+            // Alt+↑ — 위 줄로(Key.System + SystemKey)
+            concept.NodeChips[102].Focus();
+            var handled = concept.HandleKeyDown(Key.System, Key.Up, ModifierKeys.Alt, concept.NodeChips[102]);
+            Pump();
+            var lane = vm.FenceLayout.LaneOf(102);
+            var upperY = concept.ScreenCenterOf(102).Y;
+
+            // C 를 오른쪽 끝으로 끌기
+            var c = concept.Geometry!.Controller;
+            var from = new Point(c.X + c.Width / 2, c.Y + c.Height / 2);
+            concept.OnPointerPressed(from, concept.ControllerChip);
+            concept.OnPointerMoved(new Point(concept.ActualWidth - 20, from.Y));
+            concept.OnPointerReleased(new Point(concept.ActualWidth - 20, from.Y));
+            Pump();
+            return (vbusShown, vbusId, handled, lane, upperY, concept.Geometry!.UpperY, vm.FenceControllerEnd, ControllerRight: concept.Geometry!.Controller.Left > concept.Geometry.FenceRight);
+        });
+
+        Assert.True(result.vbusShown);                                        // 스마트 복합센서2 링 — VBus 칩(FR-21)
+        Assert.Equal("Devices.Wiring.Fence.Concept.Vbus", result.vbusId);
+        Assert.True(result.handled);
+        Assert.Equal(FenceLane.Upper, result.lane);
+        Assert.Equal(result.UpperY, result.upperY);
+        Assert.Equal(FenceControllerEnd.Right, result.FenceControllerEnd);
+        Assert.True(result.ControllerRight);
+    }
+
+    [Fact]
+    public void should_draw_one_node_per_chained_sensor_and_follow_the_shared_selection_when_the_two_lane_concept_is_shown()
     {
         var result = OnView(Ring(5), (vm, view) =>
         {
@@ -114,7 +149,7 @@ public class WiringFenceEditorViewTests
             var ids = concept.NodeChips.Values.Select(c => UIElementAutomationPeer.CreatePeerForElement(c).GetAutomationId()).OrderBy(s => s).ToList();
             var lamps = concept.Lamps.Values.Select(l => AutomationProperties.GetAutomationId(l)).OrderBy(s => s).ToList();
             var ports = concept.BackgroundShapes.Where(s => s.Ink == FenceInk.ConceptPortText).Select(s => s.Text).ToList();
-            var arrows = concept.BackgroundShapes.Count(s => s.Ink == FenceInk.ConceptArrow);
+            var arrows = concept.BackgroundShapes.Count(s => s.Ink == FenceInk.ConceptCh1) * 10 + concept.BackgroundShapes.Count(s => s.Ink == FenceInk.ConceptCh2Dash);
 
             // 개념도에서 끌어 순서 바꾸기 — 104 를 101 앞으로
             var from = concept.ScreenCenterOf(104);
@@ -130,8 +165,8 @@ public class WiringFenceEditorViewTests
         Assert.Equal(new[] { 102, 104 }, result.selectedRings);
         Assert.Equal(Enumerable.Range(101, 5).Select(k => $"Devices.Wiring.Fence.Concept.Node.{k}").ToList(), result.ids);
         Assert.Equal(Enumerable.Range(101, 5).Select(k => $"Devices.Wiring.Fence.Signal.{k}").ToList(), result.lamps);
-        Assert.Equal(new[] { "Ch1(A)", "Ch2(B)" }, result.ports);
-        Assert.Equal(4, result.arrows);                                       // 흐름 화살표 — 이웃마다 하나
+        Assert.Equal(new[] { "Ch1", "Ch2" }, result.ports);
+        Assert.Equal(12, result.arrows);                                      // Ch1 실선 하나 · 위 줄이 비어 Ch2 점선 = 꺾임선 + 리턴선(그림 ②)
         Assert.Equal(new[] { 104, 101, 102, 103, 105 }, result.Chain);
         Assert.Equal(0, result.Seat);                                         // 펜스 위 자리도 첫 기둥으로 따라갔다
     }

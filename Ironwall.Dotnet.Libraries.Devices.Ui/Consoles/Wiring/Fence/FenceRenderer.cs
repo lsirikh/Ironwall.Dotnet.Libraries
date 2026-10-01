@@ -87,6 +87,10 @@ public sealed class FenceRenderer
     private Color ConcreteSeamColor => Token("FenceConcreteSeamBrush", "#8C8B84");
     private Color Design => Token("FenceDesignBrush", "#2F7D4A");
     private Color RazorColor => Token("FenceRazorBrush", "#5E6B79");
+    private Color Accent => Token("AccentBrush", "#B25A06");
+
+    /// <summary>칠 위 글자색 — 글자 토큰(진한 쪽)과 바탕 토큰(밝은 쪽) 중 대비가 큰 것.</summary>
+    private Color On(Color fill) => Math.Abs(Luma(fill) - Luma(Tx1)) >= Math.Abs(Luma(fill) - Luma(Surface)) ? Tx1 : Surface;
 
     private Color Post => Divider;
     private Color PostSide => Mix(Divider, Colors.Black, 0.18);
@@ -121,6 +125,25 @@ public sealed class FenceRenderer
         FenceInk.RubberBand => new(B(Color.FromArgb(0x1A, Primary.R, Primary.G, Primary.B)), B(Primary), 1, Dash: new[] { 5.0, 3.0 }),
         FenceInk.Razor => new(null, B(custom ?? RazorColor), 1.2),
         FenceInk.RazorBand => new(B(custom ?? RazorColor), null, 0),
+        // ── 두 줄 개념도(FR-20) — Ch1 = 정보 계열 실선 · Ch2 = 앰버 계열(실선 / 점선 {6,4}) · 펜스 격자는 디자인펜스 초록 토큰 ──
+        FenceInk.ConceptCh1 => new(null, B(Info), 2.2, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
+        FenceInk.ConceptCh2 => new(null, B(Accent), 2.2, Cap: PenLineCap.Round, Join: PenLineJoin.Round),
+        FenceInk.ConceptCh2Dash => new(null, B(Accent), 1.6, Join: PenLineJoin.Round, Dash: new[] { 6.0, 4.0 }),
+        FenceInk.ConceptFence => new(null, B(Mix(Design, Surface, 0.15)), 1.2),
+        FenceInk.ConceptMesh => new(null, B(Mix(Design, Surface, 0.65)), 0.6),
+        FenceInk.ConceptPost => new(null, B(Design), 3.2),
+        FenceInk.ConceptGround => new(null, B(RowLine), 1),
+        FenceInk.ConceptTick => new(null, B(Tx3), 1),
+        FenceInk.ConceptTickText => new(null, null, 0, B(Tx2), false, FontWeights.SemiBold),
+        FenceInk.ConceptLabelLower => new(null, null, 0, B(Info), true, FontWeights.Bold),
+        FenceInk.ConceptLabelUpper => new(null, null, 0, B(Accent), true, FontWeights.Bold),
+        FenceInk.ConceptChipLower => new(B(Info), B(Mix(Info, Colors.Black, 0.25)), 1),
+        FenceInk.ConceptChipUpper => new(B(Accent), B(Mix(Accent, Colors.Black, 0.25)), 1),
+        FenceInk.ConceptChipTextLower => new(null, null, 0, B(On(Info)), true, FontWeights.Bold),
+        FenceInk.ConceptChipTextUpper => new(null, null, 0, B(On(Accent)), true, FontWeights.Bold),
+        FenceInk.ConceptVbus => new(B(Sunken), B(Tx2), 1.2),
+        FenceInk.ConceptVbusText => new(null, null, 0, B(Tx1), false, FontWeights.Bold),
+        FenceInk.ConceptTarget => new(null, B(Primary), 2),
         FenceInk.RazorArm => new(null, B(Divider), 2.2, Cap: PenLineCap.Round),
         FenceInk.BrickFront => new(BrickBrush(custom ?? Brick, Mortar), B(Mix(custom ?? Brick, Colors.Black, 0.3)), 0.8),
         FenceInk.BrickSide => new(B(Mix(custom ?? Brick, Colors.Black, 0.3)), null, 0),

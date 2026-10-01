@@ -389,13 +389,13 @@ public class WiringFenceEditorTests
     public void should_move_the_fence_seat_along_when_a_sensor_is_reordered_in_the_concept_diagram()
     {
         var (vm, _, _, _) = Build("SSSS");
-        var seat = vm.FenceLayout.MountOf(101)!;
+        var seat = vm.FenceLayout.MountOf(102)!;
 
-        vm.ConceptMove(new[] { 101 }, 3);                                             // 103 과 104 사이로
+        vm.ConceptLaneDrop(new[] { 101 }, FenceLane.Lower, 2);                         // 아래 줄 103 과 104 사이로
 
         Assert.Equal(new[] { 102, 103, 101, 104 }, vm.FenceChain.Keys);
         Assert.Equal(2, vm.FenceLayout.MountOf(101)!.Panel);                           // 펜스 위 자리도 따라갔다
-        Assert.Equal(seat, vm.FenceLayout.MountOf(102));                                // 자리 묶음은 그대로
+        Assert.Equal(seat, vm.FenceLayout.MountOf(102));                                // 이웃은 제자리(옮긴 센서만 이웃 사이 펜스 자리로)
     }
 
     [Fact]

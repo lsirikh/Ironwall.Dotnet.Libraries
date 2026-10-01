@@ -19,14 +19,13 @@ public sealed record ConceptNodeInfo(int Key, int Id, int Position, int Number, 
 /// 개념도(FR-12) · 통신 신호등(FR-14) · 케이블 보기 토글 — 결선 창 뷰모델의 면.
 /// </summary>
 /// <remarks>
-/// <para>개념도는 체인(= 위치 순서)을 <b>Ch1(A) → … → Ch2(B)</b> 한 줄(가로 띠 · 기본) 또는 원으로 그린다. 모든 제어기가 같은 링 그림이다(§1-0).
-/// 개념도에서 순서를 바꾸면 보드의 체인 편집 한 길(<see cref="FencePlace"/>)로 가고, 펜스 위 자리가 따라간다(보드가 맞춘다).</para>
+/// <para>개념도는 두 줄(아래 줄 · 위 줄) 펜스 도식이다(v0.3 §1-0b · FR-20 — 옛 가로 띠 · 원형은 없앴다). 제어기 <c>C</c> 에서 Ch1(실선)이 아래 줄로 나가
+/// 먼 끝에서 꺾여 위 줄로 돌아와 Ch2(점선)로 들어온다. 개념도에서 옮기면 펜스 위 자리 · 줄이 바뀌고 사슬 · 번호가 따라간다(보드가 맞춘다).</para>
 /// <para><b>제어기 신호등</b>은 창이 열린 동안(활성화 ~ 닫힘) 5초마다 ping(<see cref="ControllerPingMonitor"/>) · <b>센서 신호등</b>은
 /// 매니저가 보고한 <c>NETWORK_INTERFACE</c> 부품 health(스마트복합센서2 의 IP 는 제어기 뒤 내부망이라 GIS 가 ping 하지 않는다).</para>
 /// </remarks>
 public sealed partial class WiringViewModel
 {
-    private bool _isConceptRing;
     private bool _showCables;
     private ControllerPingMonitor? _pingMonitor;
     private SynchronizationContext? _uiContext;
@@ -48,30 +47,41 @@ public sealed partial class WiringViewModel
     public void ToggleCables() => ShowCables = !ShowCables;
     #endregion
 
-    #region - Concept (FR-12) -
-    /// <summary>원형으로 그리는가(기본은 가로 띠).</summary>
-    public bool IsConceptRing
+    #region - Concept (FR-20 · 두 줄) -
+    /// <summary>"개념도 · Ch1 → 아래 줄 4 → 위 줄 6 → Ch2 · 제어기 왼쪽 끝".</summary>
+    public string ConceptTitle
     {
-        get => _isConceptRing;
-        set
+        get
         {
-            if (_isConceptRing == value) return;
-            _isConceptRing = value;
-            NotifyOfPropertyChange();
-            NotifyOfPropertyChange(nameof(IsConceptStrip));
-            FenceChanged?.Invoke(this, EventArgs.Empty);
+            if (_board.Chain.Count == 0) return $"개념도 · {WiringValidation.PORT_1} → {WiringValidation.PORT_2} — 붙은 센서가 없습니다";
+            var lower = _board.Chain.Keys.Count(k => _board.FenceLayout.LaneOf(k) == Monitoring.Models.Fences.FenceLane.Lower);
+            var upper = _board.Chain.Count - lower;
+            var top = upper > 0 ? $"위 줄 {upper}" : "리턴선";
+            return $"개념도 · {WiringValidation.PORT_1} → 아래 줄 {lower} → {top} → {WiringValidation.PORT_2} · 제어기 {ControllerEndText(_board.FenceLayout.ControllerEnd)}";
         }
     }
 
-    public bool IsConceptStrip => !_isConceptRing;
+    /// <summary>개념도에 놓을 센서 — 줄 · 펜스 위 가로 위치(m). 펜스 구성이 꺼졌으면 사슬 차례를 1m 간격으로.</summary>
+    public IReadOnlyList<Concept.ConceptLaneItem> ConceptItems()
+    {
+        var layout = _board.FenceLayout;
+        if (!layout.IsActive || layout.Panels.Count == 0)
+            return _board.Chain.Keys.Select((k, i) => new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, i)).ToList();
+        var geometry = layout.Geometry;
+        return _board.Chain.Keys
+            .Select(k => layout.MountOf(k) is { } m
+                ? new Concept.ConceptLaneItem(k, m.Lane, Monitoring.Models.Fences.FenceLayoutMath.PointOf(m, geometry).XM)
+                : new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, 0))
+            .ToList();
+    }
 
-    public void ChooseConceptStrip() => IsConceptRing = false;
-    public void ChooseConceptRing() => IsConceptRing = true;
+    /// <summary>개념도 기둥 x(m) — 서 있는 기둥만.</summary>
+    public IReadOnlyList<double> ConceptPostsM()
+        => _board.FenceLayout.IsActive ? _board.FenceLayout.Geometry.Posts.Where(p => p.Exists).Select(p => p.XM).ToList() : Array.Empty<double>();
 
-    /// <summary>"개념도 · 링 (Ch1(A) → #1 … #13 → Ch2(B))".</summary>
-    public string ConceptTitle => _board.Chain.Count == 0
-        ? $"개념도 · 링 ({WiringValidation.PORT_1} → {WiringValidation.PORT_2}) — 붙은 센서가 없습니다"
-        : $"개념도 · 링 ({WiringValidation.PORT_1} → #1 … #{_board.Chain.Count} → {WiringValidation.PORT_2})";
+    /// <summary>개념도 펜스 길이(m) — 펜스 구성이 꺼졌으면 사슬 차례 수.</summary>
+    public double ConceptLengthM
+        => _board.FenceLayout.IsActive && _board.FenceLayout.Panels.Count > 0 ? _board.FenceLayout.Geometry.LengthM : Math.Max(1, _board.Chain.Count - 1);
 
     /// <summary>IP 센서가 있는가 — "센서마다 IP(제어기 뒤 내부망)" 표지.</summary>
     public bool HasIpSensors => _board.Chain.Keys.Any(IsIpSensor);
@@ -88,11 +98,6 @@ public sealed partial class WiringViewModel
                                        row.IsNew || row.FactsChanged || !WiringSpec.SameWiring(_board.PlacementOf(key), row.BaselinePlacement));
         }).ToList();
 
-    /// <summary>개념도에서 끌어 놓기 — 체인 틈 <paramref name="gap"/>(옮기기 전 기준)에. 펜스 위 자리 · 번호가 따라간다. 되돌리기 한 걸음.</summary>
-    public bool ConceptMove(IReadOnlyList<int> keys, int gap) => FencePlace(keys, WiringSpec.LINE_PRIMARY, gap);
-
-    /// <summary>끄는 동안 알약 글자 — "위치 5 · 번호 105 → 5".</summary>
-    public string ConceptDropLabel(IReadOnlyList<int> keys, int gap) => FenceDropLabel(keys, WiringSpec.LINE_PRIMARY, gap);
     #endregion
 
     #region - Signals (FR-14) -

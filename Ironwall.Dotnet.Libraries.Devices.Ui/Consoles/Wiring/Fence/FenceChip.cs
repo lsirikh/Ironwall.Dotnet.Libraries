@@ -25,6 +25,8 @@ public enum FenceChipKind
     ConceptNode = 4,
     /// <summary>개념도의 제어기(Ch1 · Ch2 포트).</summary>
     ConceptController = 5,
+    /// <summary>개념도의 VBus 표지(FR-21 · 표시 전용 · 끌어 옮김).</summary>
+    ConceptVbus = 6,
 }
 
 /// <summary>
@@ -43,6 +45,7 @@ public sealed class FenceChip : Thumb
     public const string PANEL_ID_PREFIX = "Devices.Wiring.Fence.Panel.";
     public const string CONCEPT_NODE_ID_PREFIX = "Devices.Wiring.Fence.Concept.Node.";
     public const string CONCEPT_CONTROLLER_ID = "Devices.Wiring.Fence.Concept.Controller";
+    public const string CONCEPT_VBUS_ID = "Devices.Wiring.Fence.Concept.Vbus";
 
     private FenceChipPicture? _picture;
 
@@ -60,8 +63,8 @@ public sealed class FenceChip : Thumb
         Template = null;                 // 테마 Thumb 모양을 쓰지 않는다 — OnRender 가 그린다
         Cursor = kind switch
         {
-            FenceChipKind.Controller => Cursors.SizeWE,
-            FenceChipKind.Panel or FenceChipKind.ConceptController => Cursors.Arrow,
+            FenceChipKind.Controller or FenceChipKind.ConceptController or FenceChipKind.ConceptVbus => Cursors.SizeWE,
+            FenceChipKind.Panel => Cursors.Arrow,
             _ => Cursors.Hand,
         };
         AutomationProperties.SetAutomationId(this, kind switch
@@ -71,6 +74,7 @@ public sealed class FenceChip : Thumb
             FenceChipKind.Panel => PANEL_ID_PREFIX + key,
             FenceChipKind.ConceptNode => CONCEPT_NODE_ID_PREFIX + key,
             FenceChipKind.ConceptController => CONCEPT_CONTROLLER_ID,
+            FenceChipKind.ConceptVbus => CONCEPT_VBUS_ID,
             _ => ENCLOSURE_ID,
         });
     }
