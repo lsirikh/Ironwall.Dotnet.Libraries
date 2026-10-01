@@ -1,3 +1,4 @@
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Base.Services;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Services;
@@ -13,6 +14,7 @@ public class SessionLifecycle : ISessionLifecycle
     private readonly ILogService? _log;
     private int _loggingOut;   // 0=idle, 1=in-progress (Interlocked once-guard)
     private Timer? _expiryTimer;   // T1: 세션 만료 능동 감지 타이머
+    private readonly object _timerGate = new();   // 타이머 교체는 로그인·갱신·발화 스레드가 겹친다
 
     public SessionLifecycle(ITokenStorageService tokenStore, IPermissionService permission, ILogService? log = null)
     {
@@ -87,18 +89,107 @@ public class SessionLifecycle : ISessionLifecycle
             _log?.Info($"[SessionLifecycle] 만료가 매우 김(exp={exp.Value:o}, {due.TotalDays:F0}일 후) — 능동 만료 타이머 생략(Timer 한계 초과, 401 반응 처리 위임)");
             return;
         }
+        // SSO 세션은 refresh 가 없어 만료 전에 재교환해야 한다(3자 계약 "만료 120초 전 재발급"). 모드는 무장 시점이 아니라
+        // **발화 시점**에 본다 — SSO 로그인은 ResetForLogin(여기) 뒤에 훅을 켜므로 무장 시점에는 아직 레거시처럼 보인다.
+        // 그래서 항상 만료 120초 전에 깨어나고, 레거시면 만료 시각으로 다시 잔다.
+        var wake = ComputeWakeDelay(due);
+        ArmTimer(wake, exp.Value);
+        _log?.Info($"[SessionLifecycle] 세션 만료 타이머 무장 — exp={exp.Value:o} ({due.TotalMinutes:F1}분 후, 깨어남 {wake.TotalMinutes:F1}분 후)");
+    }
+
+    /// <summary>만료 몇 초 전에 깨어나 재교환하는가(3자 계약 C-12 확약 "만료 120초 전 재발급").</summary>
+    internal static readonly TimeSpan SsoRenewLead = TimeSpan.FromSeconds(120);
+
+    /// <summary>재교환 사이 최소 간격 — 서버가 수명이 짧은 토큰을 주어도 재교환이 연달아 돌지 않게.</summary>
+    internal static readonly TimeSpan SsoRenewMinInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// 만료까지 <paramref name="untilExpiry"/> 남았을 때 언제 깨어날지. <c>만료 − 120초</c> 이되 최소 30초 뒤, 만료보다 늦지 않게.
+    /// 순수 함수 — 시험 대상.
+    /// </summary>
+    internal static TimeSpan ComputeWakeDelay(TimeSpan untilExpiry)
+    {
+        if (untilExpiry <= TimeSpan.Zero) return TimeSpan.Zero;
+        var wake = untilExpiry - SsoRenewLead;
+        if (wake < SsoRenewMinInterval) wake = SsoRenewMinInterval;
+        return wake > untilExpiry ? untilExpiry : wake;
+    }
+
+    private void ArmTimer(TimeSpan delay, DateTime expUtc)
+    {
         try
         {
-            _expiryTimer = new Timer(_ => OnExpiry(), null, due, Timeout.InfiniteTimeSpan);
-            _log?.Info($"[SessionLifecycle] 세션 만료 타이머 무장 — exp={exp.Value:o} ({due.TotalMinutes:F1}분 후)");
+            lock (_timerGate)
+            {
+                DisarmExpiryTimer();
+                _expiryTimer = new Timer(_ => _ = OnWakeAsync(expUtc), null, delay, Timeout.InfiniteTimeSpan);
+            }
         }
         catch (Exception ex) { _log?.Warning($"[SessionLifecycle] 만료 타이머 무장 실패: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// 타이머 발화. SSO 모드면 재교환을 먼저 시도하고, 레거시면 만료 시각에 강제 로그아웃(예전 그대로).
+    /// <list type="bullet">
+    /// <item>Renewed — 저장소의 <c>TokensRenewed</c> 가 새 exp 로 다시 무장한다(여기서 할 일 없음)</item>
+    /// <item>Transient — 만료 전이면 30초 뒤 다시, 시간이 없으면 강제 로그아웃</item>
+    /// <item>Terminal — 강제 로그아웃(에이전트 세션 끝 · 미등록 등)</item>
+    /// </list>
+    /// 예외를 밖으로 내지 않는다(타이머 스레드).
+    /// </summary>
+    internal async Task OnWakeAsync(DateTime expUtc)
+    {
+        try
+        {
+            if (_loggingOut != 0) return;
+            var stale = _tokenStore.AccessToken;
+            if (string.IsNullOrEmpty(stale)) return;   // 이미 로그아웃
+            if (_tokenStore.AccessExpiresAtUtc != expUtc) return;   // 그 사이 토큰이 바뀌었다 — 새 exp 의 타이머가 따로 있다
+
+            SsoReauthOutcome? outcome = null;
+            if (BearerAuthHandler.SsoReauthenticator is not null)
+            {
+                _log?.Info("[SessionLifecycle] SSO 세션 만료 임박 — 재교환 시도");
+                outcome = await BearerAuthHandler.RenewSsoAheadAsync(_tokenStore, stale).ConfigureAwait(false);
+            }
+
+            var remaining = expUtc - DateTime.UtcNow;
+            switch (outcome)
+            {
+                case null:   // 레거시 — 만료 시각까지 기다렸다 강제 로그아웃(예전 동작)
+                    if (remaining > TimeSpan.Zero) { ArmTimer(remaining, expUtc); return; }
+                    OnExpiry();
+                    return;
+                case SsoReauthOutcome.Renewed:
+                    _log?.Info("[SessionLifecycle] SSO 만료 전 재교환 성공");
+                    return;   // TokensRenewed → ArmExpiryTimer 가 새 exp 로 무장했다
+                case SsoReauthOutcome.Transient when remaining > SsoRenewMinInterval:
+                    _log?.Warning($"[SessionLifecycle] SSO 만료 전 재교환 일시 실패 — {SsoRenewMinInterval.TotalSeconds:F0}초 뒤 다시 (만료까지 {remaining.TotalSeconds:F0}초)");
+                    ArmTimer(SsoRenewMinInterval, expUtc);
+                    return;
+                case SsoReauthOutcome.Transient when remaining > TimeSpan.Zero:
+                    _log?.Warning("[SessionLifecycle] SSO 만료 전 재교환 일시 실패 — 만료 시각에 마지막으로 다시");
+                    ArmTimer(remaining, expUtc);
+                    return;
+                default:
+                    _log?.Warning($"[SessionLifecycle] SSO 재교환 실패({outcome}) — 강제 로그아웃");
+                    OnExpiry();
+                    return;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[SessionLifecycle] 만료 타이머 처리 예외: {ex.GetType().Name} {ex.Message}");
+        }
+    }
+
     private void DisarmExpiryTimer()
     {
-        _expiryTimer?.Dispose();
-        _expiryTimer = null;
+        lock (_timerGate)
+        {
+            _expiryTimer?.Dispose();
+            _expiryTimer = null;
+        }
     }
 
     private void OnExpiry()

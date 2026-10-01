@@ -34,6 +34,31 @@ public class BearerAuthHandler : DelegatingHandler
     /// </summary>
     public static Func<CancellationToken, Task<SsoReauthOutcome>>? SsoReauthenticator { get; set; }
 
+    /// <summary>
+    /// <b>만료 전 재교환</b> — SSO PRD FR-06 · 3자 계약 "만료 120초 전 재발급". <see cref="SessionLifecycle"/> 의 만료 타이머가 부른다.
+    /// <para>401 재교환과 <b>같은 전역 락</b> 안에서 훅을 부른다 — 타이머와 401 이 동시에 와도 교환은 한 번이다
+    /// (두 번 교환하면 뒤 교환이 앞 교환 세션을 끝내 진행 중 요청이 <c>SESSION_REVOKED</c> 를 받는다).</para>
+    /// <para>락을 얻는 사이 다른 경로가 이미 토큰을 바꿨으면 훅을 부르지 않고 <see cref="SsoReauthOutcome.Renewed"/>.
+    /// 훅이 없으면(SSO 모드 아님) <c>null</c>. 훅 예외는 <see cref="SsoReauthOutcome.Transient"/>.</para>
+    /// </summary>
+    public static async Task<SsoReauthOutcome?> RenewSsoAheadAsync(ITokenStorageService store, string? staleToken, CancellationToken ct = default)
+    {
+        await _refreshLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var reauth = SsoReauthenticator;
+            if (reauth is null) return null;
+            if (!string.IsNullOrEmpty(store.AccessToken) && !string.Equals(store.AccessToken, staleToken, StringComparison.Ordinal))
+                return SsoReauthOutcome.Renewed;
+            try { return await reauth(ct).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { return SsoReauthOutcome.Transient; }
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+    }
+
     /// <summary>refresh 결과 — Renewed(갱신 성공) / Terminal(종단 실패=세션 만료) / Transient(일시 실패=재시도 위임, 세션 유지).</summary>
     private enum RefreshOutcome { Renewed, Terminal, Transient }
     private readonly ITokenStorageService _store;
