@@ -39,7 +39,8 @@ public class WiringLauncherFenceTests
                                                      CancellationToken token = default) => throw new InvalidOperationException("DB 없음");
     }
 
-    private static (WiringLauncher Launcher, CapturingWindows Windows, ControllerDeviceModel Controller) Build(Lazy<IFenceLayoutStore>? store)
+    private static (WiringLauncher Launcher, CapturingWindows Windows, ControllerDeviceModel Controller) Build(Lazy<IFenceLayoutStore>? store,
+                                                                                                          WiringServerIdentity? server = null)
     {
         var log = new MockLogService();
         var devices = new DeviceProvider();
@@ -49,7 +50,7 @@ public class WiringLauncherFenceTests
             devices.Add(new SensorDeviceModel { Id = 101 + i, DeviceNumber = 1101 + i, DeviceName = $"북측 {i + 1}구간", Controller = controller });
         var windows = new CapturingWindows();
         var launcher = new WiringLauncher(windows, new MockDeviceApiService(), new MockDeviceProviderService(), devices, WiringDoubles.AxisPolicy(),
-                                          log: log, fenceStore: store);
+                                          log: log, fenceStore: store, server: server);
         return (launcher, windows, controller);
     }
 
@@ -75,6 +76,21 @@ public class WiringLauncherFenceTests
         Assert.NotNull(windows.Shown);
         Assert.True(windows.Shown!.HasFenceStore);                            // 저장소는 있다 — 읽기만 실패
         Assert.True(windows.Shown.FenceLayout.IsProposed);
+        Assert.Equal(WiringViewModel.FENCE_READ_FAILED_NOTICE, windows.Shown.FenceNoticeText);   // "없음" 이 아니라 "읽지 못함"
+    }
+
+    [Fact]
+    public async Task should_load_with_the_api_server_host_and_port_in_the_key_when_a_server_identity_is_registered()
+    {
+        // Arrange
+        var store = new FakeFenceStore();
+        var (launcher, _, controller) = Build(new Lazy<IFenceLayoutStore>(() => store), new WiringServerIdentity(() => "https://10.0.0.5:8000/api"));
+
+        // Act
+        await launcher.OpenAsync(controller);
+
+        // Assert
+        Assert.Equal(new FenceLayoutKey("10.0.0.5:8000", 10), Assert.Single(store.Keys));
     }
 
     [Fact]

@@ -92,6 +92,24 @@ public class WiringFenceViewTests
     }
 
     [Fact]
+    public void should_move_the_sensor_to_the_next_post_instead_of_swapping_order_when_alt_shift_right_is_pressed()
+    {
+        var result = OnWindow(Ring(5), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[101];
+            chip.Focus();
+            var before = vm.FenceLayout.MountOf(101)!.Panel;
+            var handled = canvas.HandleKeyDown(Key.System, Key.Right, ModifierKeys.Alt | ModifierKeys.Shift, chip);
+            Pump();
+            return (handled, before, After: vm.FenceLayout.MountOf(101)!.Panel, Chain: vm.FenceChain.Keys.ToList());
+        });
+
+        Assert.True(result.handled);
+        Assert.Equal(result.before + 1, result.After);                      // 망(기둥) 한 칸 — 끌기의 키보드 대신
+        Assert.Equal(new[] { 102, 101, 103, 104, 105 }, result.Chain);       // 같은 기둥이면 옮긴 센서가 끈 방향 뒤
+    }
+
+    [Fact]
     public void should_flip_facing_and_name_the_chip_back_when_f_is_pressed_on_a_post_sensor()
     {
         var result = OnWindow(Ring(4), (vm, canvas) =>
