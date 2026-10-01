@@ -197,6 +197,7 @@
 				DeleteClick="OnDelete"
 				IsEnabled="{Binding IsConsoleInteractive}"
 				DeleteDisabledReason="{Binding DeleteBlockedReason}"
+				HelpKey="Devices.Units"
 				RefreshClick="OnReload"
 				SearchPlaceholder="이름 · 코드"
 				SearchText="{Binding SearchText, Mode=TwoWay}">
@@ -207,7 +208,7 @@
 						Content="이동 되돌리기"
 						IsEnabled="{Binding CanUndoMove}"
 						Style="{StaticResource Console.Button}"
-						ToolTip="마지막 이동 1회를 반대로 되돌립니다."
+						ToolTip="마지막 이동 되돌리기"
 						Visibility="{Binding CanUndoMove, Converter={StaticResource BoolToVisibility}}" />
 				</c:ConsoleToolbar.Extra>
 			</c:ConsoleToolbar>
@@ -262,13 +263,21 @@
 						</ScrollViewer>
 					</Border>
 
-					<!--  "루트로" 드롭존 — 트리 최상단. 끌지 않을 때도 자리를 지켜 레이아웃이 튀지 않는다.  -->
+					<!--
+						"루트로" 드롭존 — 트리 최상단. 끌지 않을 때도 자리를 지켜 레이아웃이 튀지 않는다.
+						오른쪽 끝에 편제 트리 "?"(help-callout H-2) — 끌어 옮기기 · 최상위로 · 정렬 · 키보드(트리 끌기 면의 대체 경로가 저절로 붙는다).
+					-->
+					<DockPanel Margin="6,6,6,4" DockPanel.Dock="Top" LastChildFill="True">
+					<c:HelpTip
+						Margin="6,0,0,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Right"
+						HelpKey="Devices.Units.Tree"
+						Scope="{Binding RelativeSource={RelativeSource AncestorType=DockPanel, AncestorLevel=2}}" />
 					<drag:DropZoneChrome
-						Margin="6,6,6,4"
 						drag:DropZone.Handler="{Binding Drop}"
 						drag:DropZone.Key="unit-root"
-						CornerRadius="5"
-						DockPanel.Dock="Top">
+						CornerRadius="5">
 						<!--  계측점은 Button 이다 — DropZoneChrome 은 ContentControl 이라 UIA 트리에 나오지 않는다.  -->
 						<Button
 							Height="28"
@@ -280,7 +289,7 @@
 							Cursor="Hand"
 							IsEnabled="{Binding CanMoveSelected}"
 							Style="{x:Null}"
-							ToolTip="고른 부대를 최상위로 올립니다. 부대를 여기에 끌어다 놓아도 됩니다.">
+							ToolTip="최상위로 올리기">
 							<Button.Template>
 								<ControlTemplate TargetType="Button">
 									<Border Background="Transparent">
@@ -295,6 +304,7 @@
 							</Button.Template>
 						</Button>
 					</drag:DropZoneChrome>
+					</DockPanel>
 
 					<Label
 						Margin="16,10,16,0"
@@ -323,7 +333,7 @@
 								DisplayMemberPath="Name"
 								Handler="{Binding Drop}"
 								IsDragEnabled="{Binding CanEditUnits}"
-								KeyboardFallback="Alt+↑ 한 단계 위로 · Alt+↓ 바로 위 부대 아래로 · 상세 칸의 '상위 부대'에서 고르고 [옮기기]" />
+								KeyboardFallback="{}{Alt}+{↑} = 한 단계 위로 · {Alt}+{↓} = 바로 위 부대 아래로 · 상세 칸 '상위 부대'에서 고르고 [옮기기]" />
 						</b:Interaction.Behaviors>
 						<ListBox.ItemTemplate>
 							<DataTemplate>
@@ -387,7 +397,7 @@
 											Margin="2,0,4,0"
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Tree.Handle.{0}}"
 											AutomationProperties.Name="부대 옮기기 손잡이"
-											ToolTip="끌어서 다른 부대 아래로 옮기세요 · Esc 로 취소" />
+											ToolTip="옮기기 손잡이 (Esc 취소)" />
 
 										<Border
 											Grid.Column="2"
@@ -501,7 +511,7 @@
 									IsChecked="{Binding Map.ShowHierarchyLayer, Mode=TwoWay}"
 									FontSize="12"
 									Style="{StaticResource Console.CheckBox}"
-									ToolTip="상위 · 하위를 잇는 선을 보이거나 감춥니다(내 화면에만 적용)." />
+									/>
 								<CheckBox
 									Margin="0,0,14,0"
 									AutomationProperties.AutomationId="Units.Map.Layer.Adjacency"
@@ -509,7 +519,7 @@
 									IsChecked="{Binding Map.ShowAdjacencyLayer, Mode=TwoWay}"
 									FontSize="12"
 									Style="{StaticResource Console.CheckBox}"
-									ToolTip="인접 부대를 잇는 선을 보이거나 감춥니다(내 화면에만 적용)." />
+									/>
 								<CheckBox
 									Margin="0,0,14,0"
 									AutomationProperties.AutomationId="Units.Map.Layer.Devices"
@@ -517,7 +527,7 @@
 									IsChecked="{Binding Map.ShowDeviceBadgesLayer, Mode=TwoWay}"
 									FontSize="12"
 									Style="{StaticResource Console.CheckBox}"
-									ToolTip="부대마다 소속 장비 수 · 장애 수 배지를 보이거나 감춥니다(내 화면에만 적용)." />
+									/>
 								<Border
 									Width="1"
 									Margin="6,4,12,4"
@@ -529,7 +539,7 @@
 									IsChecked="{Binding Map.LocateIncludeDescendants, Mode=TwoWay}"
 									FontSize="12"
 									Style="{StaticResource Console.CheckBox}"
-									ToolTip="[지도에서 보기]가 고른 부대의 예하 부대 장비까지 함께 보입니다." />
+									/>
 								<Button
 									Margin="0,0,8,0"
 									AutomationProperties.AutomationId="Units.Map.LocateOnMap"
@@ -547,6 +557,12 @@
 									Style="{StaticResource Console.Button.Ghost}"
 									ToolTip="{Binding Map.ResetLayoutDisabledReason}"
 									ToolTipService.ShowOnDisabled="True" />
+								<!--  관계도 "?"(help-callout H-2) — 레이어 · 예하 포함 뜻(옛 문장형 툴팁)  -->
+								<c:HelpTip
+									Margin="8,0,0,0"
+									VerticalAlignment="Center"
+									HelpKey="Devices.Units.Map"
+									Scope="{Binding RelativeSource={RelativeSource AncestorType=DockPanel}}" />
 							</StackPanel>
 						</ScrollViewer>
 					</Border>
@@ -650,7 +666,7 @@
 							Content="{Binding ExternalChangeActionText}"
 							IsEnabled="{Binding CanReload}"
 							Style="{StaticResource Console.Button.Mini}"
-							ToolTip="서버의 지금 편제를 다시 읽어 트리 · 관계도를 새로 그립니다. 상세 칸에 적용하지 않은 변경은 그대로 둡니다." />
+							ToolTip="서버 편제 다시 읽기" />
 					</StackPanel>
 					<Label
 						Grid.Column="3"
@@ -690,7 +706,7 @@
 						VerticalAlignment="Top"
 						FontSize="12"
 						Foreground="{DynamicResource TextMutedBrush}"
-						Text="왼쪽 편제에서 부대를 고르면 여기에 상세가 표시됩니다. 새로 만들려면 툴바의 [부대 등록]을 누르세요."
+						Text="왼쪽 편제에서 부대를 고르세요."
 						TextWrapping="Wrap"
 						Visibility="{Binding IsDetailRequested, Converter={StaticResource NotBoolToVisibility}}" />
 
@@ -776,14 +792,17 @@
 							</Label>
 						</Border>
 
-						<c:ConsoleSection AxisName="units" Header="기본">
+						<c:ConsoleSection
+							AxisName="units"
+							Header="기본"
+							HelpKey="Devices.Units.Detail.Basic">
 							<StackPanel>
 								<!--  부대 코드 — 등록에서만 입력, 그 뒤로는 잠김(커널이 자물쇠 글리프를 그린다)  -->
 								<c:ConsoleField
 									ApiName="code"
 									Header="부대 코드"
 									IsLocked="{Binding IsCodeLocked}"
-									Note="{Binding CodeNote}">
+									LockReason="{Binding CodeLockReason}">
 									<Grid>
 										<TextBox
 											AutomationProperties.AutomationId="Units.Detail.CodeField"
@@ -866,13 +885,16 @@
 										IsChecked="{Binding IsEnable, Mode=TwoWay}"
 										IsEnabled="{Binding DataContext.CanEditUnits, RelativeSource={RelativeSource AncestorType=UserControl}}"
 										Style="{StaticResource Console.CheckBox}"
-										ToolTip="퇴역은 삭제가 아니라 운용 중지입니다." />
+										ToolTip="운용 중 · 운용 중지" />
 								</c:ConsoleField>
 							</StackPanel>
 						</c:ConsoleSection>
 
 						<!--  상위 부대 — 드래그의 버튼 폴백. 수정 화면에서는 [옮기기] 가 곧바로 보낸다.  -->
-						<c:ConsoleSection AxisName="parent_id" Header="상위 부대">
+						<c:ConsoleSection
+							AxisName="parent_id"
+							Header="상위 부대"
+							HelpKey="Devices.Units.Detail.Parent">
 							<StackPanel>
 								<c:ConsoleField ApiName="parent_id" Header="상위">
 									<ComboBox
@@ -902,7 +924,7 @@
 										Content="옮기기"
 										IsEnabled="{Binding DataContext.CanMoveSelected, RelativeSource={RelativeSource AncestorType=UserControl}}"
 										Style="{StaticResource Console.Button}"
-										ToolTip="고른 상위 부대 아래로 옮깁니다. 툴바의 [이동 되돌리기]로 되돌릴 수 있습니다." />
+										ToolTip="고른 상위 부대 아래로" />
 								</StackPanel>
 							</StackPanel>
 						</c:ConsoleSection>
@@ -911,7 +933,8 @@
 						<c:ConsoleSection
 							AxisName="adjacent_unit_ids"
 							CountText="{Binding AdjacencyCountText}"
-							Header="인접 부대">
+							Header="인접 부대"
+							HelpKey="Devices.Units.Detail.Adjacent">
 							<StackPanel>
 								<ItemsControl Focusable="False" ItemsSource="{Binding AdjacencyChips}">
 									<ItemsControl.ItemsPanel>
@@ -936,7 +959,7 @@
 														AutomationProperties.AutomationId="{Binding Id, StringFormat=Units.Detail.AdjacencyRemove.{0}}"
 														Click="OnRemoveAdjacency"
 														Style="{StaticResource Console.Button.Icon}"
-														ToolTip="인접을 끊습니다 — 양쪽에서 함께 사라집니다.">
+														ToolTip="인접 끊기">
 														<md:PackIcon
 															Width="11"
 															Height="11"
@@ -980,12 +1003,6 @@
 										ItemsSource="{Binding AdjacencyCandidates}"
 										Style="{StaticResource Unit.Combo}" />
 								</DockPanel>
-								<TextBlock
-									Margin="0,4,0,0"
-									FontSize="11"
-									Foreground="{DynamicResource TextMutedBrush}"
-									Text="인접은 양방향으로 연결됩니다. 상대 부대의 상세에도 함께 표시됩니다."
-									TextWrapping="Wrap" />
 							</StackPanel>
 						</c:ConsoleSection>
 

@@ -44,12 +44,6 @@ public sealed class ServerMetricHistoryViewModel : Screen
 
     public ObservableCollection<ServerMetricHistoryRow> Rows { get; }
 
-    /// <summary>
-    /// 이력 화면 머리 줄. 운영자에게 설계 메모("다시 판정하지 않는다")를 보이지 않는다(U-18 감사 D-7 7.11) —
-    /// 빈 글자면 뷰가 줄을 접는다.
-    /// </summary>
-    public string Note => string.Empty;
-
     /// <summary>불러오는 중 · 기록 없음 · 불러오기 실패를 <b>서로 다른 문장</b>으로 말한다.</summary>
     public string EmptyText { get; private set; } = LoadingText;
 

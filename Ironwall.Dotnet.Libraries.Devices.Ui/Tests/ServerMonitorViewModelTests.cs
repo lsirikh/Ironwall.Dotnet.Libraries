@@ -390,7 +390,7 @@ public class ServerMonitorViewModelTests
         vm.PasswordText = "hunter2";
 
         Assert.Equal(string.Empty, vm.PasswordText);
-        Assert.Equal("저장할 때 바뀝니다", vm.PasswordNote);
+        Assert.Equal("저장할 때 바뀝니다", vm.PasswordStateText);
         Assert.True(vm.Detail.IsDirty);
         Assert.True(vm.IsPasswordTouched);
     }
@@ -682,7 +682,7 @@ public class ServerMonitorViewModelTests
         await ActivateAsync(vm);
 
         Assert.Equal(new[] { 1 }, vm.AssignCandidates.Select(c => c.Id));
-        Assert.Contains("스피커만 배정할 수 있습니다", vm.AssignHint);
+        Assert.Contains("스피커만 배정할 수 있습니다", vm.AssignRestriction);
     }
 
     [Fact]
