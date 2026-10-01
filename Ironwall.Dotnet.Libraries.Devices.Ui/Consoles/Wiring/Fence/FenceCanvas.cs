@@ -34,6 +34,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 {
     public const string AUTOMATION_ID = "Devices.Wiring.Fence.Canvas";
 
+    /// <summary>이웃 칩 사이 화면 틈(px).</summary>
+    public const double CHIP_GAP_PX = 4;
+
     /// <summary>화살표 팬 한 번(DIU).</summary>
     public const double PAN_STEP = 50;
 
@@ -100,7 +103,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         SnapsToDevicePixels = true;
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
         AutomationProperties.SetAutomationId(this, AUTOMATION_ID);
-        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Alt+Shift+←/→ 다른 망으로 · Alt+↑/↓ 높이 한 단계 · Shift+Alt+↑/↓ 미세 높이 · Shift+F10 메뉴");
+        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Ctrl+←/→ 다른 망으로 · Alt+↑/↓ 높이 한 단계 · Shift+Alt+↑/↓ 미세 높이 · Shift+F10 메뉴");
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Local);
         // Tab 은 센서 칩 먼저, 망은 한 번에 들어가 화살표로 옮긴다(망 수백 칸을 Tab 으로 지나지 않게).
         KeyboardNavigation.SetTabIndex(_chips, 0);
@@ -349,6 +352,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var liveGroups = new HashSet<int>();
         var shape = scene.Shape;
         var order = new List<FenceChip>(units.Count);
+        var placed = new List<(FenceChip Chip, double X, FenceLane Lane)>(units.Count);
 
         foreach (var unit in units)
         {
@@ -370,6 +374,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 var selected = unit.Keys.Any(vm.IsFenceSelected);
                 chip.Picture = FenceScene.Group(members, shape, _projector, selected, _view.Scale, GroupRoom(units, unit, scene));
                 Place(chip, scene.UnitX(unit));
+                placed.Add((chip, scene.UnitX(unit), scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 AutomationProperties.SetName(chip, $"펜스센서 묶음 {members.Count}대, {members[0].Big(shape)}부터 {members[^1].Big(shape)}까지. 확대하면 풀립니다");
             }
             else
@@ -380,6 +385,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 var s = scene.Sensors[unit.Key];
                 chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
+                placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
                 var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
@@ -390,6 +396,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             }
             order.Add(chip);
         }
+
+        // 화면에서 칩끼리 겹치지 않게(헤디드 r22: 벽돌 한 칸 세 대가 낮은 배율에서 39px 칩이 27px 간격) — 칩 크기는 화면 기준(번호판이 배율에 맞서 커진다)이라
+        // 세계 간격만으로는 모자란다. 펜스 구성일 때 줄마다 칩 사각형의 왼쪽 끝을 "가장 넓은 칩 + 화면 4px" 이상으로 벌린다(무리 가운데는 제자리 평균).
+        if (scene.IsLayout)
+            foreach (var lane in placed.GroupBy(p => p.Lane))
+            {
+                var row = lane.Where(p => !p.Chip.HitBounds.IsEmpty).OrderBy(p => p.X + p.Chip.HitBounds.X).ToList();
+                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.HitBounds.X, p.Chip.HitBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
+                for (var i = 0; i < row.Count; i++)
+                    if (Math.Abs(xs[i] - row[i].X) > 1e-9) Place(row[i].Chip, xs[i]);
+            }
 
         // 링의 함체는 단위 목록에 없다 — 케이블 보기일 때만 따로 세운다(끌어서 옮긴다 · 표시만).
         if (shape == WiringShape.Ring && CablesShown)
@@ -723,6 +740,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         {
             case FenceGestureAction.MoveSensors when _press.Chip is { } chip:
                 _dragKeys = chip.Kind == FenceChipKind.Group ? chip.Keys.ToList() : ViewModel?.FenceDragKeys(chip.Key) ?? chip.Keys;
+                ViewModel?.NotifySensorDrag(true);                       // 빼는 곳 글자 "여기 놓으면 …"(창 아래 띠)
                 foreach (var dim in _chips.Children.OfType<FenceChip>().Where(c => c.Keys.Any(_dragKeys.Contains))) dim.Opacity = 0.3;
                 var layer = AdornerLayer.GetAdornerLayer(this);
                 var label = chip.Kind == FenceChipKind.Group
@@ -905,6 +923,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         ClearValue(CursorProperty);
         // ④ 캡처
         if (IsMouseCaptured) ReleaseMouseCapture();
+        ViewModel?.NotifySensorDrag(false);
 
         // ⑤ 통지
         var vm = ViewModel;
@@ -1191,8 +1210,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         else
         {
             var first = chip.Keys[0];
-            // Alt+Shift+←/→ — 고른 센서(포커스 센서가 선택 밖이면 그 센서)를 옆 망(기둥)으로 한 칸: 끌어 옮기기(FR-05)의 키보드 대신
-            if (alt && k is Key.Left or Key.Right && (modifiers & ModifierKeys.Shift) != 0)
+            // Ctrl+←/→(주) · Alt+Shift+←/→(보조) — 고른 센서(포커스 센서가 선택 밖이면 그 센서)를 옆 망(기둥)으로 한 칸: 끌어 옮기기(FR-05)의 키보드 대신.
+            // 한국어 Windows 는 Alt+Shift 가 입력 언어 전환 단축키라 Alt 를 먼저 누르면 Shift 가 앱에 닿지 않는다(헤디드 r21 · r22 세 번 재현) — Ctrl 이 주 단축키다.
+            if (IsPanelMoveKey(alt, k, modifiers))
             {
                 if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelectSensors(chip.Keys);
                 vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
@@ -1247,6 +1267,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         }
         return false;
     }
+
+    /// <summary>
+    /// 옆 망(기둥)으로 한 칸 옮기는 키인가 — <b>Ctrl+←/→</b>(주 · Alt 없이) 또는 Alt+Shift+←/→(보조 · Shift 는 <see cref="FenceKeyModifiers"/> 가 실제 상태로 본다).
+    /// 순수 판정(시험 대상) — 펜스 보기 · 개념도가 같은 규칙을 쓴다.
+    /// </summary>
+    internal static bool IsPanelMoveKey(bool alt, Key key, ModifierKeys modifiers)
+        => key is Key.Left or Key.Right
+           && (alt ? (modifiers & ModifierKeys.Shift) != 0 : (modifiers & ModifierKeys.Control) != 0 && (modifiers & ModifierKeys.Shift) == 0);
 
     /// <summary>망에 포커스가 있을 때의 키 — ←/→/Home/End 이동 · Shift+←/→ 범위 · Enter/Space 선택 · Ctrl+Space 더함/뺌.</summary>
     private bool HandlePanelKey(WiringViewModel vm, FenceChip chip, Key k, bool alt, ModifierKeys modifiers)

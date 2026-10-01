@@ -510,6 +510,14 @@ public sealed class FenceConceptView : Grid
         var lane = vm.FenceLayout.LaneOf(node.Key);
         var row = vm.LaneKeysLeftToRight(lane).ToList();
         var at = row.IndexOf(node.Key);
+        // Ctrl+←/→(주) · Alt+Shift+←/→ — 옆 망(기둥)으로 한 칸(펜스 보기와 같은 규칙 · 헤디드 r22: Shift 를 보지 않던 Alt+←/→ 가 줄 안 한 칸으로 갔다)
+        if (FenceCanvas.IsPanelMoveKey(alt, k, modifiers))
+        {
+            if (!vm.IsFenceSelected(node.Key)) vm.FenceSelect(node.Key);
+            vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
+            FocusNode(node.Key);
+            return true;
+        }
         if (alt && k is Key.Left or Key.Right) { vm.ConceptLaneStep(node.Key, k == Key.Left ? -1 : 1); FocusNode(node.Key); return true; }
         if (alt && k is Key.Up or Key.Down) { vm.ConceptLaneChange(node.Key, k == Key.Up ? FenceLane.Upper : FenceLane.Lower); FocusNode(node.Key); return true; }
         if (!alt && k is Key.Delete or Key.Back) { vm.FenceUnplace(vm.FenceDragKeys(node.Key)); return true; }

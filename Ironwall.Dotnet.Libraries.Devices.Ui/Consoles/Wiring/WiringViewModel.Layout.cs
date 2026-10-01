@@ -642,10 +642,10 @@ public sealed partial class WiringViewModel
     /// <summary>"망 이동" 칸 이름 — 기둥 센서도 같은 말(검토: 시나리오마다 "기둥 이동" · "망 이동" 으로 갈렸다).</summary>
     public string MountPanelLabel => "망 이동";
 
-    /// <summary>[◀] — 고른 센서를 앞(Ch1(A) 쪽) 망(기둥)으로 한 칸(Alt+Shift+←). 빈 망도 건너뛰지 않는다.</summary>
+    /// <summary>[◀] — 고른 센서를 앞(Ch1(A) 쪽) 망(기둥)으로 한 칸(Ctrl+← · Alt+Shift+←). 빈 망도 건너뛰지 않는다.</summary>
     public bool FenceMoveSelectedToPreviousPanel() => FenceMoveSelectedByPanels(-1);
 
-    /// <summary>[▶] — 고른 센서를 뒤(Ch2(B) 쪽) 망(기둥)으로 한 칸(Alt+Shift+→).</summary>
+    /// <summary>[▶] — 고른 센서를 뒤(Ch2(B) 쪽) 망(기둥)으로 한 칸(Ctrl+→ · Alt+Shift+→).</summary>
     public bool FenceMoveSelectedToNextPanel() => FenceMoveSelectedByPanels(1);
 
     /// <summary>

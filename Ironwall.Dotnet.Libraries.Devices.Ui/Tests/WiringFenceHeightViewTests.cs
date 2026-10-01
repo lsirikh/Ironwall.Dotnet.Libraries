@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System;
 using System.IO;
@@ -221,6 +222,119 @@ public class WiringFenceHeightViewTests
         Assert.Equal(ModifierKeys.Alt | ModifierKeys.Shift, FenceKeyModifiers.Combine(ModifierKeys.Alt, true));
         Assert.Equal(ModifierKeys.Alt, FenceKeyModifiers.Combine(ModifierKeys.Alt, false));
         Assert.Equal(ModifierKeys.Alt | ModifierKeys.Shift, FenceKeyModifiers.Combine(ModifierKeys.Alt | ModifierKeys.Shift, false));
+    }
+    #endregion
+
+    #region - Ctrl+←/→ (헤디드 r22) -
+    [Fact]
+    public void should_move_to_the_next_panel_with_ctrl_right_in_the_fence_view_and_the_concept()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[102];
+            chip.Focus();
+            var before = vm.FenceLayout.MountOf(102)!.Panel;
+            var handled = canvas.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Control, chip);
+            Pump();
+            var afterCanvas = vm.FenceLayout.MountOf(102)!.Panel;
+            var status = vm.StatusText;
+
+            var concept = Descendants<Consoles.Wiring.Concept.FenceConceptView>(Window.GetWindow(canvas)!).Single();
+            var node = concept.NodeChips[103];
+            node.Focus();
+            var before103 = vm.FenceLayout.MountOf(103)!.Panel;
+            var conceptHandled = concept.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Control, node);
+            Pump();
+            return (handled, before, afterCanvas, status, conceptHandled, before103, After103: vm.FenceLayout.MountOf(103)!.Panel);
+        });
+
+        Assert.True(result.handled);
+        Assert.Equal(result.before + 1, result.afterCanvas);
+        Assert.StartsWith("옮김 — ", result.status);
+        Assert.True(result.conceptHandled);
+        Assert.Equal(result.before103 + 1, result.After103);
+    }
+
+    [Fact]
+    public void should_keep_alt_right_without_shift_as_the_lane_step_in_the_concept()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var concept = Descendants<Consoles.Wiring.Concept.FenceConceptView>(Window.GetWindow(canvas)!).Single();
+            var node = concept.NodeChips[101];
+            node.Focus();
+            concept.HandleKeyDown(Key.System, Key.Right, ModifierKeys.Alt, node);
+            Pump();
+            var laneStep = vm.FenceChain.Keys.ToList();
+            vm.Undo();
+            Pump();
+            node = concept.NodeChips[101];
+            concept.HandleKeyDown(Key.System, Key.Right, ModifierKeys.Alt | ModifierKeys.Shift, node);
+            Pump();
+            return (laneStep, vm.StatusText, Panel: vm.FenceLayout.MountOf(101)!.Panel);
+        });
+
+        Assert.Equal(new[] { 102, 101, 103, 104 }, result.laneStep);                      // Alt+→ = 줄 안 한 칸
+        Assert.Equal(1, result.Panel);                                                     // Alt+Shift+→ = 다른 망(보조 길)
+        Assert.StartsWith("옮김 — ", result.StatusText);
+    }
+    #endregion
+
+    #region - Chips on one panel never overlap on screen (헤디드 r22) -
+    /// <summary>스마트 <paramref name="count"/> + 2 대 · 망 1 을 벽돌로 바꾸고 101 … 을 그 담 위에(다섯 자리 번호).</summary>
+    private static WiringViewModel OnBrick(int count)
+    {
+        var total = count + 2;
+        var seeds = Enumerable.Range(0, total).Select(i => new WiringSensorSeed(101 + i, i + 1, new SensorFacts(83024 + i, $"LRT-{83024 + i}", "SmartSensor2", "북측"),
+            new WiringPlacement(1, i + 1))).ToList();
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "CTRL", "10.99.7.1", "SmartController"), seeds, new[] { "SmartSensor2" },
+            null, new WiringFakeDialogs(), fence: new WiringFenceContext(null, new FakeFenceStore(), null));
+        vm.Board.ApplyFenceEdit(l =>
+        {
+            var panels = l.Panels.Select((p, i) => i == 1 ? FencePanelSpec.Default(Ironwall.Dotnet.Libraries.Enums.EnumFenceStyle.Brick, 4.5) : p).ToList();
+            var mounts = l.Mounts.ToDictionary(p => p.Key, p => p.Key < 101 + count ? new SensorMountSpec(1, FenceMountSpot.WallFace) : p.Value);
+            return l.With(panels, mounts);
+        });
+        return vm;
+    }
+
+    [Theory]
+    [InlineData(3, 0.6)]
+    [InlineData(3, 0.75)]
+    [InlineData(3, 0.9)]
+    [InlineData(5, 0.6)]
+    [InlineData(5, 0.9)]
+    [InlineData(5, 0.35)]
+    public void should_never_overlap_sensor_chips_on_one_brick_panel_at_the_headed_zoom(int count, double zoom)
+    {
+        var rects = OnWindow(OnBrick(count), (vm, canvas) =>
+        {
+            canvas.SetView(zoom, new Vector(40, 300));
+            Pump();
+            return canvas.SensorChips.Values.Where(c => c.IsVisible)
+                .Select(c => (c.Key, Rect: new Rect(canvas.WorldToScreen(new Point(Canvas.GetLeft(c), Canvas.GetTop(c))), new Size(c.Width * canvas.Scale, c.Height * canvas.Scale))))
+                .OrderBy(t => t.Rect.X).ToList();
+        });
+
+        Assert.True(rects.Count >= count, $"보이는 칩 {rects.Count}");
+        for (var i = 0; i < rects.Count; i++)
+            for (var j = i + 1; j < rects.Count; j++)
+            {
+                var overlap = Rect.Intersect(rects[i].Rect, rects[j].Rect);
+                Assert.True(overlap.IsEmpty || overlap.Width < 0.5 || overlap.Height < 0.5,
+                    $"칩 {rects[i].Key} · {rects[j].Key} 이 겹친다 — {rects[i].Rect} / {rects[j].Rect} (배율 {zoom})");
+            }
+    }
+
+    [Fact]
+    public void should_spread_chip_rects_by_the_widest_chip_plus_the_gap_and_leave_apart_chips_alone()
+    {
+        var xs = FenceChipSpacing.Spread(new[] { (10.0, -20.0, 40.0), (12.0, -20.0, 40.0), (14.0, -18.0, 36.0), (400.0, -20.0, 40.0) }, 4);
+
+        Assert.True(xs[1] - 20 >= xs[0] - 20 + 44 - 1e-9);
+        Assert.True(xs[2] - 18 >= xs[1] - 20 + 44 - 1e-9);
+        Assert.Equal(400.0, xs[3]);                                                        // 떨어진 칩은 그대로
+        Assert.Equal(12.0, (xs[0] + xs[1] + xs[2]) / 3, 6);                                // 무리 가운데는 제자리 평균
     }
     #endregion
 
