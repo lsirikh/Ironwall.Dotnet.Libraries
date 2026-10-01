@@ -102,9 +102,13 @@ public sealed partial class WiringViewModel
     #endregion
 
     #region - VBus (FR-21) -
-    /// <summary>VBus 표지를 그리는가 — 스마트 복합센서2 링(센서 2대 이상)만.</summary>
+    /// <summary>
+    /// VBus 표지를 그리는가 — <b>스마트 복합센서2 링</b>(센서 2대 이상 · 모든 센서가 스마트 복합센서2)만. PIDS · IO 제어기나 펜스센서 · 복합센서가 섞인 링에는 없다
+    /// (재검토 렌더: PIDS 4차 두 줄에 VBus 가 먼 끝에 떴다).
+    /// </summary>
     public bool HasVbus => _board.FenceLayout.IsActive && _board.Chain.Count >= 2
-                           && _board.Chain.Keys.Any(k => WiringTopology.ParseSensorType(_board.Find(k)?.Facts.TypeText) is EnumDeviceType.SmartSensor2 or EnumDeviceType.SmartMultisensor2);
+                           && _board.Topology.ControllerKind is not (WiringControllerKind.Pids or WiringControllerKind.Io)
+                           && _board.Chain.Keys.All(k => WiringTopology.ParseSensorType(_board.Find(k)?.Facts.TypeText) is EnumDeviceType.SmartSensor2 or EnumDeviceType.SmartMultisensor2);
 
     /// <summary>VBus 표지 틈(사슬 · k = k번째 센서 뒤).</summary>
     public int VbusGap => _board.VbusGap;

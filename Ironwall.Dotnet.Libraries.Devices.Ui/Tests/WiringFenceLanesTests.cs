@@ -132,6 +132,34 @@ public class WiringFenceLanesTests
         Assert.Equal(3, smart.VbusGap);                                                    // 기본 = 가운데 두 센서 사이
     }
 
+    [Theory]
+    [InlineData("Controller", "SmartSensor2", "Fence")]
+    [InlineData("Controller", "Multi", "Multi")]
+    [InlineData("SmartController", "SmartSensor2", "Multi")]
+    [InlineData("SmartController", "Fence", "Fence")]
+    public void should_not_show_a_vbus_marker_on_pids_or_mixed_rings(string controllerType, string typeA, string typeB)
+    {
+        var seeds = Enumerable.Range(0, 6).Select(i => new WiringSensorSeed(201 + i, i + 1,
+            new SensorFacts(1 + i, $"센서 {i + 1}", i % 2 == 0 ? typeA : typeB, "서측"), new WiringPlacement(1, i + 1))).ToList();
+
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(20, 2, "PIDS-서측-02", "10.99.8.2", controllerType), seeds,
+            new[] { typeA, typeB }, null, new WiringFakeDialogs(), fence: new WiringFenceContext(null, new FakeFenceStore(), null));
+
+        Assert.False(vm.HasVbus);
+    }
+
+    [Fact]
+    public void should_put_the_vbus_between_the_two_middle_sensors_of_a_smart_composite_ring_by_default()
+    {
+        var (vm, _) = Build("SSSSSS");
+
+        var gap = vm.VbusGap;
+
+        Assert.True(vm.HasVbus);
+        Assert.Equal(3, gap);                                                              // 3번째 센서(103) 뒤 = 103 과 104 사이
+        Assert.Equal(new[] { 103, 104 }, vm.FenceChain.Keys.Skip(gap - 1).Take(2));
+    }
+
     [Fact]
     public async Task should_save_lanes_controller_end_and_vbus_in_the_local_layout_document()
     {
