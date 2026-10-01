@@ -879,7 +879,7 @@ public class DevicePresetStoreTests : IDisposable
         var path = DevicePresetStore.DefaultPath;
 
         Assert.EndsWith(Path.Combine("Ironwall", "device-assembly-presets.json"), path);
-        Assert.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), path);
+        Assert.StartsWith(Ironwall.Dotnet.Libraries.Utils.Consoles.LocalAppDataFolder.Path, path);
     }
 
     #endregion

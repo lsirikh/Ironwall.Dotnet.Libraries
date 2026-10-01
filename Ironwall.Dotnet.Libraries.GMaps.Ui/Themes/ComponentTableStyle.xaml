@@ -10,6 +10,21 @@
 		색은 전부 DynamicResource — 테마 전환 때 다시 해석된다. x:Name 은 쓰지 않는다(요소 자신의 Style 트리거).
 	-->
 
+	<!--
+		표를 담는 ContentControl — 표(Content)가 null 이면 템플릿을 떼고 접는다.
+		ContentTemplate 은 Content 가 null 이어도 세워지고 DataContext 가 바깥으로 이어져, 빈 머리줄 · 회색 점 · 빈 정렬 단추가 그려진다.
+		쓰는 쪽은 BasedOn 으로 받아 ContentTemplate 을 Setter 로 건다(로컬 값으로 걸면 이 트리거가 이기지 못한다).
+	-->
+	<Style x:Key="Gm.Component.TableHost" TargetType="ContentControl">
+		<Setter Property="Focusable" Value="False" />
+		<Style.Triggers>
+			<Trigger Property="Content" Value="{x:Null}">
+				<Setter Property="ContentTemplate" Value="{x:Null}" />
+				<Setter Property="Visibility" Value="Collapsed" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
 	<Style x:Key="Gm.Component.Dot" TargetType="Ellipse">
 		<Setter Property="Width" Value="7" />
 		<Setter Property="Height" Value="7" />

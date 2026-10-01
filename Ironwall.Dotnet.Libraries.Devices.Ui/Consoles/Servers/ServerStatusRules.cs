@@ -50,8 +50,7 @@ public static class ServerStatusRules
 
     /// <summary>6.3 에서 "마지막 변화" 칸에 붙는 설명.</summary>
     public const string NoTransitionClockNote =
-        "이 서버는 상태가 바뀐 시각을 제공하지 않습니다. "
-        + "'마지막 수정'은 이름이나 접속 정보를 고친 시각입니다.";
+        "이 서버는 상태가 바뀐 시각을 제공하지 않습니다.";
 
     /// <summary>등록 직후 안내(L1360) — 목록 칸이 아니라 상태 줄에 쓴다.</summary>
     public const string JustRegisteredNotice = "등록했습니다. 서버가 상태를 보고하기 전까지는 '보고 없음'으로 표시됩니다.";

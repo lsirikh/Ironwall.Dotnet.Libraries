@@ -83,6 +83,9 @@ public sealed class ComponentTableModel : INotifyPropertyChanged
     /// <summary>선언된 줄만(선언 순서) — "부품" 절 표.</summary>
     public IReadOnlyList<ComponentTableRow> DeclaredRows => _rows.Where(r => r.Info.IsDeclared).OrderBy(r => r.Info.DeclaredIndex).ToList();
 
+    /// <summary>선언된 줄이 하나라도 있는가 — 없으면 "부품" 절은 머리줄 없이 요약 한 줄("부품 없음")만.</summary>
+    public bool HasDeclaredRows => _rows.Any(r => r.Info.IsDeclared);
+
     /// <summary>요약 줄의 분류 —고장이 있으면 Crit, 저하만 있으면 Warn, 전부 정상이면 Ok, 그 밖은 Unknown(점 색).</summary>
     public ComponentHealthKind SummaryKind => !Snapshot.IsAvailable ? ComponentHealthKind.Unknown
         : Snapshot.FaultCount > 0 ? ComponentHealthKind.Crit

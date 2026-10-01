@@ -155,7 +155,7 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
     public bool IsCreating
     {
         get => _isCreating;
-        private set { _isCreating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsCodeLocked)); NotifyOfPropertyChange(nameof(CodeNote)); }
+        private set { _isCreating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsCodeLocked)); NotifyOfPropertyChange(nameof(CodeLockReason)); }
     }
 
     /// <summary>등록 뒤에는 코드 칸이 잠긴다 — 🔒.</summary>
@@ -169,8 +169,8 @@ public sealed class UnitDetailFormViewModel : PropertyChangedBase
 
     public string CountsText => $"소속 장비 {_deviceCount} · 하위 부대 {_childCount}";
 
-    /// <summary>코드 칸 밑에 붙는 한 줄 — 등록에서는 경고, 그 뒤로는 불변 사실.</summary>
-    public string CodeNote => IsCreating
+    /// <summary>코드 칸 밑에 붙는 한 줄(잠금 사유 · ConsoleField.LockReason) — 등록에서는 되돌릴 수 없다는 경고, 그 뒤로는 잠긴 까닭.</summary>
+    public string CodeLockReason => IsCreating
         ? "등록 후에는 바꿀 수 없습니다. 신중히 입력하세요."
         : "등록 후에는 바꿀 수 없습니다.";
 

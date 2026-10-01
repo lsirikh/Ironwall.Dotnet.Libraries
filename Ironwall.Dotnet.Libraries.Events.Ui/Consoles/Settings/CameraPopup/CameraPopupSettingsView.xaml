@@ -419,7 +419,7 @@
 								Click="OnRefreshMonitors"
 								Content="다시 조회"
 								Style="{DynamicResource Console.Button}"
-								ToolTip="연결된 모니터를 다시 읽습니다" />
+								ToolTip="연결된 모니터를 다시 읽고 화면마다 번호를 띄웁니다" />
 						</StackPanel>
 						<Label
 							Margin="0,4,0,0"

@@ -149,8 +149,9 @@ public class ServerConsoleFixPassTests
 
         // Assert
         Assert.False(vm.HasDetail);
-        Assert.Contains("고르면", vm.DetailEmptyHint);
-        Assert.Contains("[추가]", vm.DetailEmptyHint);
+        Assert.Contains("고르세요", vm.DetailEmptyText);                                   // 화면엔 할 일 한 줄
+        var help = Ironwall.Dotnet.Libraries.Utils.Consoles.HelpCatalog.Find("Devices.Servers")!.ToPlainText();
+        Assert.Contains("[추가]", help);                                                   // 새 서버 안내 · 무엇이 나오는지는 툴바 "?"(help-callout H-2)
     }
 
     [Fact]

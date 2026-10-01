@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Monitors;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Settings.CameraPopup;
 
@@ -354,7 +355,28 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
                                                        _draft.WindowWidth, _draft.WindowHeight);
             _placementNotice = c.Clamped ? "고른 모니터 안으로 첫 창 위치를 당겼습니다" : string.Empty;
             Update(_draft with { TargetMonitorId = value.Id, FirstWindowX = c.X, FirstWindowY = c.Y });
+            // 바꾼 모니터에만 식별 카드를 띄운다 — 어느 화면인지 바로 보이게.
+            RequestIdentify(CameraPopupMonitorIdentify.ForSelected(Monitors, _selectedMonitor));
         }
+    }
+
+    /// <summary>
+    /// 모니터마다 식별 카드를 띄워 달라 — 뷰가 받아 화면에 띄운다(뷰모델은 창을 모른다).
+    /// [다시 조회]는 모든 모니터(고른 것은 강조), 목록에서 바꾸면 그 모니터만. 절 진입 · 생성 때의 다시 읽기는 띄우지 않는다.
+    /// </summary>
+    public event EventHandler<IReadOnlyList<MonitorIdentifyCard>>? MonitorIdentifyRequested;
+
+    /// <summary>[다시 조회] 버튼 — 모니터를 다시 읽고 모든 모니터에 번호 카드를 띄운다.</summary>
+    public void RescanMonitors()
+    {
+        RefreshMonitors();
+        RequestIdentify(CameraPopupMonitorIdentify.ForAll(Monitors, _selectedMonitor));
+    }
+
+    private void RequestIdentify(IReadOnlyList<MonitorIdentifyCard> cards)
+    {
+        if (cards.Count == 0) return;
+        MonitorIdentifyRequested?.Invoke(this, cards);
     }
 
     /// <summary>모니터 줄 설명 — 조회 대수 · 못 찾은 경우 안내.</summary>
@@ -368,7 +390,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
 
     public bool MonitorNeedsAttention => _monitorMatch is MonitorMatch.NoMonitors or MonitorMatch.FallbackPrimary or MonitorMatch.ResolutionChanged;
 
-    /// <summary>[다시 조회] — 모니터를 다시 읽고 저장된 대상을 다시 찾는다.</summary>
+    /// <summary>모니터를 다시 읽고 저장된 대상을 다시 찾는다(생성 · 절 진입 · [다시 조회]). 식별 카드는 띄우지 않는다.</summary>
     public void RefreshMonitors()
     {
         IReadOnlyList<DisplayMonitorInfo> list;

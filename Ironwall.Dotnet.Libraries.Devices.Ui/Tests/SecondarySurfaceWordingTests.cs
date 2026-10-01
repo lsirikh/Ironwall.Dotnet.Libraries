@@ -96,7 +96,7 @@ public class SecondarySurfaceWordingTests
         AssertClean(console.DeleteBlockedReason, nameof(console.DeleteBlockedReason));
         AssertClean(UnitConsoleViewModel.NOT_SUPPORTED, nameof(UnitConsoleViewModel.NOT_SUPPORTED));
         AssertClean(UnitConsoleViewModel.NO_EDIT_PERMISSION, nameof(UnitConsoleViewModel.NO_EDIT_PERMISSION));
-        Assert.Equal("같은 단계의 부대는 코드 순으로 표시됩니다.", new UnitConsoleViewModel(new StubUnitApi(), new StubDeviceApi(), myUnitCode: () => null).RailFooterText);
+        Assert.Equal(string.Empty, new UnitConsoleViewModel(new StubUnitApi(), new StubDeviceApi(), myUnitCode: () => null).RailFooterText);   // 정렬 안내는 트리 "?"(help-callout H-2)
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class SecondarySurfaceWordingTests
         console.BeginCreate();
 
         Assert.Equal("부대 코드는 등록 후 바꿀 수 없습니다. 신중히 입력하세요.", console.Detail.CreateBanner);
-        AssertClean(console.Form.CodeNote, nameof(console.Form.CodeNote));
+        AssertClean(console.Form.CodeLockReason, nameof(console.Form.CodeLockReason));
     }
     #endregion
 
@@ -170,8 +170,7 @@ public class SecondarySurfaceWordingTests
         var vm = new ServerMetricHistoryViewModel(new FakeServerConsoleService(), new FixedClock(DateTime.UtcNow), 1, "s");
         await ((IActivate)vm).ActivateAsync();
 
-        Assert.Equal(ServerMetricHistoryViewModel.NoRecordsText, vm.EmptyText);
-        Assert.Equal(string.Empty, vm.Note);
+        Assert.Equal(ServerMetricHistoryViewModel.NoRecordsText, vm.EmptyText);   // 옛 머리 줄(늘 빈 Note)은 help-callout H-2 에서 걷었다 — 설계 메모를 다시 내지 않는다
     }
 
     [Fact]

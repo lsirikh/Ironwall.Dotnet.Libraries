@@ -32,11 +32,13 @@ public class UnitConsoleVisualReviewTests
     }
 
     [Fact]
-    public async Task should_fall_back_to_the_ordering_note_when_my_unit_is_not_in_the_tree()
+    public async Task should_leave_the_rail_footer_empty_and_keep_the_ordering_note_in_the_tree_help_when_my_unit_is_not_in_the_tree()
     {
         var console = await OpenAsync(myUnitCode: "elsewhere");
 
-        Assert.Equal("같은 단계의 부대는 코드 순으로 표시됩니다.", console.RailFooterText);
+        // help-callout H-2 — 정렬 규칙 설명은 화면 바닥이 아니라 트리 "?" 에 있다
+        Assert.Equal(string.Empty, console.RailFooterText);
+        Assert.Contains("같은 단계의 부대는 코드 순으로 표시됩니다", Ironwall.Dotnet.Libraries.Utils.Consoles.HelpCatalog.Find("Devices.Units.Tree")!.ToPlainText());
     }
 
     [Fact]

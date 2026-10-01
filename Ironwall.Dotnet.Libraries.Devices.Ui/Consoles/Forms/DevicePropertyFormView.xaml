@@ -199,8 +199,9 @@
 						DockPanel.Dock="Right"
 						IsChecked="{Binding IsFaultFirst, Mode=TwoWay}"
 						Style="{StaticResource Console.Chip}"
-						ToolTip="줄 순서를 바꿉니다 — 선언 순서 / 고장 먼저" />
-					<Ellipse Style="{StaticResource Form.Component.SummaryDot}" />
+						ToolTip="줄 순서를 바꿉니다 — 선언 순서 / 고장 먼저"
+						Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+					<Ellipse Style="{StaticResource Form.Component.SummaryDot}" Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
 					<TextBlock
 						VerticalAlignment="Center"
 						FontSize="13"
@@ -210,6 +211,8 @@
 						TextTrimming="CharacterEllipsis"
 						ToolTip="{Binding SummaryText}" />
 				</DockPanel>
+				<!--  줄이 없으면(부품 없음) 요약 한 줄만 — 빈 머리줄 · 외톨이 점 · 빈 정렬 단추를 그리지 않는다  -->
+				<StackPanel Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
 				<Grid Margin="0,0,0,3">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*" MinWidth="70" />
@@ -254,6 +257,7 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
+				</StackPanel>
 			</StackPanel>
 		</DataTemplate>
 
@@ -266,6 +270,8 @@
 					FontWeight="SemiBold"
 					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="{Binding DeclarationSummaryText}" />
+				<!--  선언된 부품이 없으면 "부품 없음" 한 줄만  -->
+				<StackPanel Visibility="{Binding HasDeclaredRows, Converter={StaticResource BoolToVisibility}}">
 				<Grid Margin="0,0,0,3">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*" MinWidth="70" />
@@ -305,8 +311,36 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
+				</StackPanel>
 			</StackPanel>
 		</DataTemplate>
+
+		<!--
+			표를 담는 ContentControl — 표가 null 인 절(장비 공통 등 대부분)에서는 템플릿을 떼고 접는다.
+			ContentTemplate 은 Content 가 null 이어도 세워지고 DataContext 가 절 뷰모델로 이어져,
+			빈 머리줄 두 벌 · 외톨이 회색 점 · 글 없는 정렬 단추가 모든 절에 그려졌다(로컬 ContentTemplate 은 이 트리거가 이기지 못해 Setter 로 건다).
+		-->
+		<Style x:Key="Form.ComponentTableHost" TargetType="ContentControl">
+			<Setter Property="Focusable" Value="False" />
+			<Style.Triggers>
+				<Trigger Property="Content" Value="{x:Null}">
+					<Setter Property="ContentTemplate" Value="{x:Null}" />
+					<Setter Property="Visibility" Value="Collapsed" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+		<Style
+			x:Key="Form.ComponentDeclarationHost"
+			BasedOn="{StaticResource Form.ComponentTableHost}"
+			TargetType="ContentControl">
+			<Setter Property="ContentTemplate" Value="{StaticResource Form.ComponentDeclarationTable}" />
+		</Style>
+		<Style
+			x:Key="Form.ComponentStatusHost"
+			BasedOn="{StaticResource Form.ComponentTableHost}"
+			TargetType="ContentControl">
+			<Setter Property="ContentTemplate" Value="{StaticResource Form.ComponentStatusTable}" />
+		</Style>
 
 		<forms:PropertyEditorTemplateSelector
 			x:Key="EditorSelector"
@@ -329,14 +363,8 @@
 						<c:NotReceivedBox SectionName="{Binding AxisName}" Visibility="{Binding IsNotReceived, Converter={StaticResource BoolToVisibility}}" />
 						<StackPanel>
 						<!--  부품 · 부품 상태 표(FR-02) — 한 대를 골랐고 축을 받았을 때만 내용이 있다(없으면 아무것도 그리지 않는다)  -->
-						<ContentControl
-							Content="{Binding DeclarationTable}"
-							ContentTemplate="{StaticResource Form.ComponentDeclarationTable}"
-							Focusable="False" />
-						<ContentControl
-							Content="{Binding StatusTable}"
-							ContentTemplate="{StaticResource Form.ComponentStatusTable}"
-							Focusable="False" />
+						<ContentControl Content="{Binding DeclarationTable}" Style="{StaticResource Form.ComponentDeclarationHost}" />
+						<ContentControl Content="{Binding StatusTable}" Style="{StaticResource Form.ComponentStatusHost}" />
 						<ItemsControl Focusable="False" ItemsSource="{Binding Fields}">
 							<ItemsControl.Style>
 								<Style TargetType="ItemsControl">
@@ -360,7 +388,7 @@
 											Header="{Binding HeaderText}"
 											IsLocked="{Binding IsLocked}"
 											IsTouched="{Binding IsTouched}"
-											Note="{Binding LockReason}">
+											LockReason="{Binding LockReason}">
 											<ContentControl
 												Content="{Binding}"
 												ContentTemplateSelector="{StaticResource EditorSelector}"

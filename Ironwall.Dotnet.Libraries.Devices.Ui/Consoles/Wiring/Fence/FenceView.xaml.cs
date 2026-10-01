@@ -21,9 +21,6 @@ public partial class FenceView : UserControl
     public FenceView()
     {
         InitializeComponent();
-        // 한글을 띄어쓰기에서만 끊는다(커널 KoreanWordWrap — 결합자 U+2060). 전역 Install 은 앱이 한다 — 여기서는 이 글 하나만.
-        foreach (var hint in LogicalDescendants<TextBlock>(this).Where(t => AutomationProperties.GetAutomationId(t) is "Devices.Wiring.Fence.Hint"))
-            hint.Text = Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Join(hint.Text);
         Loaded += OnLoaded;
         Unloaded += (_, _) => RenderCapability.TierChanged -= OnTierChanged;
         DataContextChanged += OnDataContextChanged;
@@ -122,15 +119,6 @@ public partial class FenceView : UserControl
     private void OnFit(object sender, RoutedEventArgs e) => Canvas?.Fit();
     private void OnZoomIn(object sender, RoutedEventArgs e) => Canvas?.ZoomIn();
     private void OnZoomOut(object sender, RoutedEventArgs e) => Canvas?.ZoomOut();
-
-    private static System.Collections.Generic.IEnumerable<T> LogicalDescendants<T>(DependencyObject root) where T : DependencyObject
-    {
-        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-        {
-            if (child is T hit) yield return hit;
-            foreach (var deeper in LogicalDescendants<T>(child)) yield return deeper;
-        }
-    }
 
     private static System.Collections.Generic.IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
     {

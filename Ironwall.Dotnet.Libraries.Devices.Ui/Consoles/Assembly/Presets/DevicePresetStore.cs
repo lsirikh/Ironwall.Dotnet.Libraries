@@ -93,7 +93,7 @@ public sealed class DevicePresetStore
 
     /// <summary>기본 위치 — <c>%LocalAppData%\Ironwall\device-assembly-presets.json</c>.</summary>
     public static string DefaultPath
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        => Path.Combine(Ironwall.Dotnet.Libraries.Utils.Consoles.LocalAppDataFolder.Path,
                         "Ironwall", "device-assembly-presets.json");
 
     /// <summary>이 저장소가 보는 파일(펴진 절대 경로).</summary>

@@ -65,7 +65,7 @@ public sealed partial class WiringViewModel
         var rest = _board.Chain.Keys.Where(k => !moving.Contains(k)).ToList();
         var tie = target.Gx >= from.Gx ? rest.Concat(moving).ToList() : moving.Concat(rest).ToList();
         var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => plan.TryGetValue(p.Key, out var next) && next is not null ? next : p.Value)), tie);
-        StatusText = ok ? $"옮김 — {(moving.Count > 1 ? $"{moving.Count}대" : _board.Find(grabbedKey)?.Display)}: {MountTextOf(grabbedKey)} · Ctrl+Z 로 되돌립니다"
+        StatusText = ok ? $"옮김 — {(moving.Count > 1 ? $"{moving.Count}대" : _board.Find(grabbedKey)?.Display)}: {MountTextOf(grabbedKey)}"
                         : "제자리 — 바뀐 것이 없습니다.";
         return ok;
     }
@@ -83,7 +83,7 @@ public sealed partial class WiringViewModel
         var tie = direction > 0 ? rest.Concat(targets).ToList() : targets.Concat(rest).ToList();
         var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) ? FenceLayoutMath.StepGridX(FenceLayoutMath.Normalize(p.Value, l.Panels), direction, _board.CategoryOf(p.Key), l.Panels) : p.Value)), tie);
-        StatusText = ok ? $"옮김 — {(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)}: {MountTextOf(targets[0])} · Ctrl+Z 로 되돌립니다"
+        StatusText = ok ? $"옮김 — {(targets.Count > 1 ? $"{targets.Count}대" : _board.Find(targets[0])?.Display)}: {MountTextOf(targets[0])}"
                         : "더 옮길 점이 없습니다 — 끝입니다.";
         return ok;
     }
@@ -114,7 +114,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => next.TryGetValue(p.Key, out var v) ? v : p.Value)));
-        StatusText = ok ? $"설치 위치 — {(next.Count > 1 ? $"{next.Count}대" : _board.Find(next.Keys.First())?.Display)}: {MountTextOf(next.Keys.First())} · Ctrl+Z 로 되돌립니다"
+        StatusText = ok ? $"설치 위치 — {(next.Count > 1 ? $"{next.Count}대" : _board.Find(next.Keys.First())?.Display)}: {MountTextOf(next.Keys.First())}"
                         : "바뀐 것이 없습니다.";
         return ok;
     }

@@ -66,7 +66,8 @@
 	</Style>
 
 	<Style TargetType="{x:Type ctrl:ComponentCardControl}">
-		<Setter Property="Width" Value="320" />
+		<!--  폭은 화면 DIU 고정(지도 줌 · 디지털 줌 · 틸트와 무관 — ComponentCardAdorner). 상태 칸이 "설정 끔 / 관측 켜짐" 을 자르지 않는 폭.  -->
+		<Setter Property="Width" Value="360" />
 		<Setter Property="Focusable" Value="True" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
 		<Setter Property="TextOptions.TextFormattingMode" Value="Display" />
@@ -130,8 +131,8 @@
 								<Grid Margin="0,0,0,3">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="84" />
-										<ColumnDefinition Width="58" />
+										<ColumnDefinition Width="116" />
+										<ColumnDefinition Width="66" />
 										<ColumnDefinition Width="70" />
 									</Grid.ColumnDefinitions>
 									<TextBlock Grid.Column="0" Style="{StaticResource Gm.Component.Head}" Text="부품" />
@@ -147,12 +148,12 @@
 												<Grid Margin="0,3" Background="Transparent" ToolTip="{Binding DetailToolTip}">
 													<Grid.ColumnDefinitions>
 														<ColumnDefinition Width="*" />
-														<ColumnDefinition Width="84" />
-														<ColumnDefinition Width="58" />
+														<ColumnDefinition Width="116" />
+														<ColumnDefinition Width="66" />
 														<ColumnDefinition Width="70" />
 													</Grid.ColumnDefinitions>
 													<TextBlock Grid.Column="0" Style="{StaticResource Gm.Component.Cell}" Text="{Binding Name}" />
-													<TextBlock Grid.Column="1" Style="{StaticResource Gm.Component.StateCell}" Text="{Binding StateText}" />
+													<TextBlock Grid.Column="1" Style="{StaticResource Gm.Component.StateCell}" Text="{Binding StateText}" TextWrapping="Wrap" />
 													<StackPanel Grid.Column="2" Orientation="Horizontal">
 														<Ellipse Style="{StaticResource Gm.Component.Dot}" />
 														<TextBlock Style="{StaticResource Gm.Component.Cell}" Text="{Binding HealthText}" />

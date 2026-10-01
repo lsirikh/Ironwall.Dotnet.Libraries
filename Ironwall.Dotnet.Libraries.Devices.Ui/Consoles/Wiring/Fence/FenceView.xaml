@@ -80,14 +80,14 @@
 						IsEnabled="{Binding CanChooseTilt}"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding IsTilt}"
-						ToolTip="35° 기울여 봅니다(기본 · 원격 데스크톱에서도)" />
+						ToolTip="입체 보기(35°)" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Flat"
 						Click="OnFlat"
 						Content="평면"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding IsFlat}"
-						ToolTip="깊이 없이 옆에서 본 모습" />
+						ToolTip="평면 보기" />
 					<Border
 						Height="24"
 						Margin="2,0,8,0"
@@ -108,7 +108,7 @@
 						IsEnabled="{Binding HasRangeSensors}"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding ShowRange}"
-						ToolTip="탐지 반경(복합 20m · 지진동 15m)을 지면에 옅게 겹칩니다 — 빈틈은 마름모" />
+						ToolTip="탐지 범위 겹쳐 보기" />
 					<!--  케이블 보기(FR-12) — 리턴케이블 · 함체 · A·B 번호는 기본으로 빼고 개념도가 맡는다. 켜면 펜스 위에 겹친다  -->
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Cables"
@@ -116,7 +116,7 @@
 						Content="케이블 보기"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding ShowCables}"
-						ToolTip="리턴케이블 · 함체 · A·B 번호를 펜스 위에 겹쳐 봅니다(연결 구조는 아래 개념도)" />
+						ToolTip="케이블 겹쳐 보기" />
 					<!--
 						펜스센서 현장 간격(v0.4 §1-C · 기준 3m · 2~4m · 0.5m 단위) — 제어기마다 다르다. 그림만 다시 놓이고 바뀐 줄이 아니다
 						(서버 저장 위치는 O-10 · 지금은 이 창 안에서만).
@@ -131,7 +131,7 @@
 						Visibility="{Binding HasFenceSensors, Converter={StaticResource F.BoolToVisibility}}"
 						ItemsSource="{Binding FenceSpacingChoices}"
 						SelectedItem="{Binding FenceSpacingMetres}"
-						ToolTip="현장 펜스센서 간격(기준 3m · 2~4m) — 바꾸면 그림만 다시 놓입니다(저장 대상 아님)" />
+						ToolTip="펜스센서 간격(2~4m)" />
 					<!--  거리 표시(2026-10-01) — 망 · 담 길이와 센서 사이 m 를 펜스 뷰 · 개념도에(기본 끔 · 사람마다 기억)  -->
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.ShowDistances"
@@ -139,7 +139,7 @@
 						Content="거리 표시"
 						Style="{StaticResource F.Tool}"
 						Tag="{Binding ShowDistances}"
-						ToolTip="망 · 담 길이와 같은 줄 센서 사이 거리(m)를 펜스 뷰와 개념도에 표시합니다" />
+						ToolTip="거리 표시" />
 					<Rectangle Width="1" Height="20" Margin="2,0,8,0" Fill="{DynamicResource RowLineBrush}" />
 					<Button
 						AutomationProperties.AutomationId="Devices.Wiring.Fence.Fit"
@@ -170,8 +170,9 @@
 						Padding="0"
 						Style="{StaticResource F.Tool}" />
 					<!--
-						도움말 — 공용 "?"(help-callout H-1 시범). 문구는 DevicesHelp(키 Devices.Wiring.Fence)에 한 곳.
+						도움말 — 공용 "?". 문구는 DevicesHelp(키 Devices.Wiring.Fence)에 한 곳 — 도구줄 단추 뜻 · 조작 · 키보드.
 						옛 [?] 의 id 를 그대로 잇는다(헤디드 SC-FEN-013): 단추 Devices.Wiring.Fence.Help · 몸 Devices.Wiring.Fence.HelpText — 별칭은 계약 시험의 허용 목록에 있다.
+						옛 한 줄 조작 안내(Devices.Wiring.Fence.Hint)는 help-callout H-2 에서 이 "?" 로 합쳤다.
 					-->
 					<c:HelpTip
 						Margin="8,0,0,0"
@@ -180,15 +181,6 @@
 						HelpKey="Devices.Wiring.Fence"
 						Scope="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}" />
 				</StackPanel>
-				<!--  한 줄 조작 안내 — 도구줄 오른쪽(옛 바닥 띠는 결선 창 상태줄로 합쳤다 · 창 정리 2026-10-01). 전체는 [?]  -->
-				<TextBlock
-					Margin="12,0,0,0"
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
-					FontSize="11.5"
-					Foreground="{DynamicResource TextMutedBrush}"
-					Text="왼쪽 끌기 = 센서 선택 · 오른쪽 클릭 = 메뉴 · 휠 = 확대 · 전체 조작은 [?]"
-					TextTrimming="CharacterEllipsis" />
 			</DockPanel>
 		</Border>
 
@@ -225,7 +217,7 @@
 				ResizeBehavior="PreviousAndNext"
 				ResizeDirection="Rows"
 				ShowsPreview="False"
-				ToolTip="끌어서 3D 보기와 개념도의 높이를 나눕니다" />
+				ToolTip="높이 나누기(↑/↓)" />
 
 			<!--
 				── 개념도(v0.3 FR-20 · 참고 그림 4장) ── 두 줄 펜스 도식: 제어기 C 에서 Ch1(실선) → 아래 줄 → 먼 끝 꺾임 → 위 줄(또는 리턴선) → Ch2(점선).
@@ -242,14 +234,12 @@
 							FontWeight="SemiBold"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="{Binding ConceptTitle}" />
-						<TextBlock
+						<!--  개념도 "?"(help-callout H-2) — 도식 읽는 법 · 끌기 · 키보드 · 센서마다 IP(옛 IpNote 줄)  -->
+						<c:HelpTip
 							Margin="0,0,12,0"
 							VerticalAlignment="Center"
-							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.IpNote"
-							FontSize="11.5"
-							Foreground="{DynamicResource StatusInfoBrush}"
-							Text="스마트복합센서2 = 센서마다 IP (제어기 뒤 내부망)"
-							Visibility="{Binding HasIpSensors, Converter={StaticResource F.BoolToVisibility}}" />
+							HelpKey="Devices.Wiring.Fence.Concept"
+							Scope="{Binding RelativeSource={RelativeSource AncestorType=DockPanel}, Path=Parent}" />
 						<TextBlock
 							VerticalAlignment="Center"
 							AutomationProperties.AutomationId="Devices.Wiring.Fence.Concept.ControllerSignal"

@@ -206,8 +206,9 @@
 					DockPanel.Dock="Right"
 					IsChecked="{Binding IsFaultFirst, Mode=TwoWay}"
 					Style="{StaticResource SdSortToggle}"
-					ToolTip="줄 순서" />
-				<Ellipse Style="{StaticResource Gm.Component.SummaryDot}" />
+					ToolTip="줄 순서"
+					Visibility="{Binding HasRows, Converter={StaticResource SdBoolToVisibility}}" />
+				<Ellipse Style="{StaticResource Gm.Component.SummaryDot}" Visibility="{Binding HasRows, Converter={StaticResource SdBoolToVisibility}}" />
 				<TextBlock
 					VerticalAlignment="Center"
 					FontSize="12"
@@ -216,11 +217,13 @@
 					Text="{Binding SummaryText}"
 					TextTrimming="CharacterEllipsis" />
 			</DockPanel>
+			<!--  줄이 없으면(부품 없음) 요약 한 줄만 — 빈 머리줄 · 빈 정렬 단추를 그리지 않는다  -->
+			<StackPanel Visibility="{Binding HasRows, Converter={StaticResource SdBoolToVisibility}}">
 			<Grid Margin="0,0,0,3">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="96" />
-					<ColumnDefinition Width="58" />
+					<ColumnDefinition Width="112" />
+					<ColumnDefinition Width="66" />
 					<ColumnDefinition Width="70" />
 					<ColumnDefinition Width="58" />
 				</Grid.ColumnDefinitions>
@@ -240,8 +243,8 @@
 						<Grid Background="Transparent" ToolTip="{Binding DetailToolTip}">
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*" />
-								<ColumnDefinition Width="96" />
-								<ColumnDefinition Width="58" />
+								<ColumnDefinition Width="112" />
+								<ColumnDefinition Width="66" />
 								<ColumnDefinition Width="70" />
 								<ColumnDefinition Width="58" />
 							</Grid.ColumnDefinitions>
@@ -263,6 +266,7 @@
 					</DataTemplate>
 				</ListBox.ItemTemplate>
 			</ListBox>
+			</StackPanel>
 		</StackPanel>
 	</DataTemplate>
 
@@ -504,11 +508,20 @@
 													AutomationProperties.AutomationId="GMaps.SymbolDetail.Fields"
 													ItemTemplate="{StaticResource SdFieldTemplate}"
 													ItemsSource="{Binding SelectedTab.Fields}" />
-												<!--  부품 탭(FR-06) — 다른 탭은 ComponentTable 이 null 이라 아무것도 그리지 않는다  -->
+												<!--
+													부품 탭(FR-06) — 다른 탭은 ComponentTable 이 null 이라 아무것도 그리지 않는다.
+													ContentTemplate 을 직접 걸면 Content 가 null 이어도 템플릿이 서고(DataContext 는 탭으로 이어진다)
+													빈 머리줄 · 회색 점 · 빈 정렬 단추가 그려진다 — 그래서 null 이면 템플릿을 떼고 접는다(Gm.Component.TableHost).
+												-->
 												<ContentControl
 													Content="{Binding SelectedTab.ComponentTable}"
-													ContentTemplate="{StaticResource SdComponentTable}"
-													Focusable="False" />
+													Focusable="False">
+													<ContentControl.Style>
+														<Style BasedOn="{StaticResource Gm.Component.TableHost}" TargetType="ContentControl">
+															<Setter Property="ContentTemplate" Value="{StaticResource SdComponentTable}" />
+														</Style>
+													</ContentControl.Style>
+												</ContentControl>
 											</StackPanel>
 										</ScrollViewer>
 
