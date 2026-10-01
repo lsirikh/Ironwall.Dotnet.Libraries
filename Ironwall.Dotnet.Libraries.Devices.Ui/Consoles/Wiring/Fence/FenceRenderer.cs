@@ -194,6 +194,8 @@ public sealed class FenceRenderer
         FenceInk.Base => new(null, B(Divider), 1.6),
         FenceInk.PostNumber => new(null, null, 0, B(Tx3), true, FontWeights.Medium),
         FenceInk.Axis => new(null, null, 0, B(Tx3), false, FontWeights.Medium),
+        FenceInk.DimLine => new(null, B(Tx3), 0.8),
+        FenceInk.DimText => new(null, null, 0, B(Tx3), false, FontWeights.Medium),
         FenceInk.Caption => new(null, null, 0, B(Tx3), false, FontWeights.SemiBold),
         FenceInk.Mesh => new(MeshBrush(), B(RowLine), 0.6),
         FenceInk.Rail => new(null, B(Divider), 2.2, Cap: PenLineCap.Round),

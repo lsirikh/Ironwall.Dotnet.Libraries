@@ -118,6 +118,7 @@ public partial class FenceView : UserControl
     private void OnTilt(object sender, RoutedEventArgs e) => ViewModel?.ChooseTilt();
     private void OnRange(object sender, RoutedEventArgs e) => ViewModel?.ToggleRange();
     private void OnCables(object sender, RoutedEventArgs e) => ViewModel?.ToggleCables();
+    private void OnDistances(object sender, RoutedEventArgs e) => ViewModel?.ToggleDistances();
     private void OnFit(object sender, RoutedEventArgs e) => Canvas?.Fit();
     private void OnZoomIn(object sender, RoutedEventArgs e) => Canvas?.ZoomIn();
     private void OnZoomOut(object sender, RoutedEventArgs e) => Canvas?.ZoomOut();

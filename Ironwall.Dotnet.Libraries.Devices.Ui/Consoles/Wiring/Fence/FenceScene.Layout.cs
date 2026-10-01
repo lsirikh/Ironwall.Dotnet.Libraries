@@ -26,8 +26,9 @@ public static partial class FenceScene
     /// 망 목록으로 세운 세계의 정적 층 — 땅 · 번호 · 탐지 범위 · 망(모양 5종) · 기둥. 케이블(리턴케이블 · 함체 쪽 · A/B 번호)은
     /// <paramref name="showCables"/> 일 때만(기본 꺼짐 — 연결은 개념도가 맡는다 · FR-12).
     /// </summary>
+    /// <param name="showDistances">거리(m) 표시 — 망(담) 길이 줄 · 같은 줄 이웃 센서 사이 줄(<see cref="FenceDimensions"/>).</param>
     public static IReadOnlyList<FenceShape> StaticLayout(FenceWorld world, FenceProjector p, bool showRange, bool showCables,
-                                                         double enclosureX, int enclosureGap, double zoom = 1)
+                                                         double enclosureX, int enclosureGap, double zoom = 1, bool showDistances = false)
     {
         var geometry = world.Geometry ?? throw new InvalidOperationException("펜스 구성으로 세운 세계가 아닙니다.");
         var o = new List<FenceShape>(512);
@@ -57,8 +58,19 @@ public static partial class FenceScene
             var q = p.P(world.X[key], 0, 20);
             o.Add(Text(FenceInk.PostNumber, new Point(q.X, q.Y + 4), s.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), 10.5));
         }
+        // "번호" 머리 — 첫 번호 글자의 왼쪽 끝에서 틈(10)만큼 더 왼쪽에 끝나게(재검토: "번호80096" 이 붙어 보였다)
         var axis = p.P(x0 - 16 + 5 * u, 0, 20);
-        o.Add(Text(FenceInk.Axis, new Point(axis.X, axis.Y + 4), "번호", 10, FenceTextAnchor.End));
+        var first = world.Seq.Where(world.X.ContainsKey).Select(k => (X: p.P(world.X[k], 0, 20).X, Text: world.Sensors.TryGetValue(k, out var fs) ? fs.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty))
+                             .OrderBy(t => t.X).FirstOrDefault();
+        var axisRight = first.Text is { Length: > 0 } ? Math.Min(axis.X, first.X - EstimateWidth(first.Text, 10.5) / 2 - NUMBER_CAPTION_GAP) : axis.X;
+        o.Add(Text(FenceInk.Axis, new Point(axisRight, axis.Y + 4), "번호", 10, FenceTextAnchor.End));
+
+        // 거리 표시 — 땅 번호 줄 아래 두 줄(망 길이 · 센서 사이). 번호판(센서 몸 아래)과 땅 번호 줄에 걸리지 않는다.
+        if (showDistances && world.Layout is { } layout)
+        {
+            var gaps = FenceLayoutMath.LaneGaps(world.Seq.Where(k => layout.MountOf(k) is not null).Select(k => (k, layout.MountOf(k)!)), geometry);
+            o.AddRange(FenceDimensions.Build(geometry, gaps, world.X, u, p, zoom));
+        }
 
         if (showRange)
             foreach (var (key, x) in world.X)

@@ -279,7 +279,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _renderZoom = _view.Scale;
         var showRange = ViewModel.ShowRange && ViewModel.HasRangeSensors;
         var shapes = _scene.IsLayout
-            ? FenceScene.StaticLayout(_scene, _projector, showRange, ViewModel.ShowCables, _enclosureX, _enclosureGap, _view.Scale)
+            ? FenceScene.StaticLayout(_scene, _projector, showRange, ViewModel.ShowCables, _enclosureX, _enclosureGap, _view.Scale, ViewModel.ShowDistances)
             : FenceScene.Static(_scene, _projector, showRange, _enclosureX, _enclosureGap, _view.Scale);
         var clip = new StreamGeometry();
         var ground = FenceScene.GroundPolygon(_scene, _projector, _enclosureX);
@@ -386,7 +386,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!_sensorChips.TryGetValue(unit.Key, out chip!))
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
-                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key));
+                chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key),
+                                                 scene.PlateAboveOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
                 placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
@@ -405,8 +406,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (scene.IsLayout)
             foreach (var lane in placed.GroupBy(p => p.Lane))
             {
-                var row = lane.Where(p => !p.Chip.HitBounds.IsEmpty).OrderBy(p => p.X + p.Chip.HitBounds.X).ToList();
-                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.HitBounds.X, p.Chip.HitBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
+                var row = lane.Where(p => !p.Chip.FootprintBounds.IsEmpty).OrderBy(p => p.X + p.Chip.FootprintBounds.X).ToList();
+                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
                 for (var i = 0; i < row.Count; i++)
                     if (Math.Abs(xs[i] - row[i].X) > 1e-9) Place(row[i].Chip, xs[i]);
             }
@@ -482,7 +483,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!vm.IsPanelSelected(chip.Key) || vm.FencePaneKind != FenceSelectionKind.Panels) vm.FenceSelectPanel(chip.Key);
                 break;
             default:
-                if (vm.FenceSelectedKey is not { } k || !chip.Keys.Contains(k)) vm.FenceSelect(chip.Keys[0]);
+                if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceFocusSelect(chip.Keys[0]);     // 고른 것 사이를 다니면 선택을 풀지 않는다
                 break;
         }
         EnsureVisible(chip);
@@ -573,12 +574,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     #endregion
 
     #region - Overlay -
+    /// <summary>
+    /// 덧그림 어도너가 <b>지금</b> 어도너 층에 붙어 있게 한다. 펜스 보기가 트리에서 잠깐 빠지면(보기 전환 · 칸 접기 · 다시 띄우기) 어도너 층이
+    /// 그 어도너를 스스로 떼어 낸다 — 예전에는 떼인 어도너를 쥔 채 다시 붙이지 않아 끄는 동안 고스트만 보이고 빨강 점 · 알약이 안 그려졌다(헤디드 r23 SC-FEN-025).
+    /// </summary>
     private void EnsureOverlay()
     {
-        if (_overlay is not null) return;
         var layer = AdornerLayer.GetAdornerLayer(this);
         if (layer is null) return;
-        _overlay = new FenceOverlayAdorner(this);
+        if (_overlay is not null && ReferenceEquals(VisualTreeHelper.GetParent(_overlay), layer)) return;
+        if (_overlay is not null && VisualTreeHelper.GetParent(_overlay) is AdornerLayer old) old.Remove(_overlay);
+        _overlay ??= new FenceOverlayAdorner(this);
         layer.Add(_overlay);
     }
 
@@ -1205,7 +1211,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         // Ctrl+Space — 포커스 센서를 더하거나 뺀다
         if (!alt && k == Key.Space && modifiers == ModifierKeys.Control && chip is { Kind: FenceChipKind.Sensor or FenceChipKind.Group })
         {
-            foreach (var each in chip.Keys) vm.FenceToggleSelect(each);
+            vm.FenceToggleFocused(chip.Keys);
             return true;
         }
 

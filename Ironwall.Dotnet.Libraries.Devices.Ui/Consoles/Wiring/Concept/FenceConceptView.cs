@@ -136,7 +136,9 @@ public sealed class FenceConceptView : Grid
         var nodes = vm.ConceptNodes();
         var size = new Size(Math.Max(ActualWidth, 240), Math.Max(ActualHeight, MinHeight));
         _geometry = ConceptLayout.Build(vm.ConceptItems(), vm.ConceptPostsM(), vm.ConceptLengthM, vm.FenceControllerEnd, size);
-        _back.Show(ConceptScene.Background(_geometry, nodes), null);
+        var back = ConceptScene.Background(_geometry, nodes);
+        if (vm.ShowDistances) back = back.Concat(ConceptLayout.DistanceLabels(_geometry, vm.FenceLaneGaps())).ToList();
+        _back.Show(back, null);
         _overlay.Show(Array.Empty<FenceShape>(), null);
         SyncNodes(vm, nodes);
     }
@@ -259,7 +261,7 @@ public sealed class FenceConceptView : Grid
     {
         if (_press is not null || _arming || sender is not FenceChip chip || ViewModel is not { } vm) return;
         if (chip.Kind == FenceChipKind.ConceptController) { if (!vm.IsControllerSelected) vm.FenceSelectController(); }
-        else if (chip.Kind == FenceChipKind.ConceptNode && !vm.IsFenceSelected(chip.Key)) vm.FenceSelect(chip.Key);
+        else if (chip.Kind == FenceChipKind.ConceptNode) vm.FenceFocusSelect(chip.Key);
     }
     #endregion
 
@@ -524,7 +526,7 @@ public sealed class FenceConceptView : Grid
         if (alt && k is Key.Left or Key.Right) { vm.ConceptLaneStep(node.Key, k == Key.Left ? -1 : 1); FocusNode(node.Key); return true; }
         if (alt && k is Key.Up or Key.Down) { vm.ConceptLaneChange(node.Key, k == Key.Up ? FenceLane.Upper : FenceLane.Lower); FocusNode(node.Key); return true; }
         if (!alt && k is Key.Delete or Key.Back) { vm.FenceUnplace(vm.FenceDragKeys(node.Key)); return true; }
-        if (!alt && k == Key.Space && modifiers == ModifierKeys.Control) { vm.FenceToggleSelect(node.Key); return true; }
+        if (!alt && k == Key.Space && modifiers == ModifierKeys.Control) { vm.FenceToggleFocused(new[] { node.Key }); return true; }
         if (!alt && k is Key.Enter or Key.Space && modifiers == ModifierKeys.None) { vm.FenceSelect(node.Key); return true; }
         if (!alt && k is Key.Left or Key.Right or Key.Home or Key.End && modifiers == ModifierKeys.None)
         {
