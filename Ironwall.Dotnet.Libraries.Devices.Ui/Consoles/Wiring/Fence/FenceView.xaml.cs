@@ -26,12 +26,59 @@ public partial class FenceView : UserControl
             hint.Text = Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Join(hint.Text);
         Loaded += OnLoaded;
         Unloaded += (_, _) => RenderCapability.TierChanged -= OnTierChanged;
+        DataContextChanged += OnDataContextChanged;
     }
 
     /// <summary>소프트웨어 렌더링(Tier 0)인가 — 순수 판정.</summary>
     public static bool IsSoftwareTier(int renderCapabilityTier) => renderCapabilityTier >> 16 == 0;
 
     private WiringViewModel? ViewModel => DataContext as WiringViewModel;
+
+    #region - Split (3D 보기 · 개념도) -
+    /// <summary>나눔 막대(시험 · 자동화).</summary>
+    internal GridSplitter? Splitter => Descendants<GridSplitter>(this).FirstOrDefault();
+
+    private Grid? SplitGrid => Splitter?.Parent as Grid;
+
+    /// <summary>뷰모델의 나눔 비율을 행 높이(별 비율)로 — 로드 · 비율이 바뀔 때.</summary>
+    internal void ApplySplit()
+    {
+        if (SplitGrid is not { RowDefinitions.Count: 3 } grid || ViewModel is not { } vm) return;
+        var ratio = vm.FenceSplitRatio;
+        grid.RowDefinitions[0].Height = new GridLength(ratio, GridUnitType.Star);
+        grid.RowDefinitions[2].Height = new GridLength(1 - ratio, GridUnitType.Star);
+    }
+
+    /// <summary>나눔 막대를 놓았다(끌기 · ↑/↓) — 지금 높이에서 비율을 읽어 뷰모델에 맡긴다(범위 안으로 · 사람마다 기억).</summary>
+    internal void CommitSplit()
+    {
+        if (SplitGrid is not { RowDefinitions.Count: 3 } grid || ViewModel is not { } vm) return;
+        var top = grid.RowDefinitions[0].ActualHeight;
+        var bottom = grid.RowDefinitions[2].ActualHeight;
+        if (top + bottom <= 0) return;
+        vm.SetFenceSplitRatio(top / (top + bottom), top + bottom);
+        ApplySplit();
+    }
+
+    private void OnSplitDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) => CommitSplit();
+
+    private void OnSplitKeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is System.Windows.Input.Key.Up or System.Windows.Input.Key.Down) CommitSplit();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WiringViewModel.FenceSplitRatio)) ApplySplit();
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is WiringViewModel old) old.PropertyChanged -= OnViewModelPropertyChanged;
+        if (e.NewValue is WiringViewModel now) now.PropertyChanged += OnViewModelPropertyChanged;
+        ApplySplit();
+    }
+    #endregion
 
     internal FenceCanvas? Canvas => Descendants<FenceCanvas>(this).FirstOrDefault();
 
@@ -40,6 +87,7 @@ public partial class FenceView : UserControl
         RenderCapability.TierChanged -= OnTierChanged;
         RenderCapability.TierChanged += OnTierChanged;
         OnTierChanged(this, EventArgs.Empty);
+        ApplySplit();
         if (Canvas is { } canvas)
         {
             canvas.ViewChanged -= OnViewChanged;

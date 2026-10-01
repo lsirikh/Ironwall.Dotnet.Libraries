@@ -104,8 +104,8 @@
 			BorderBrush="{DynamicResource RowLineBrush}"
 			BorderThickness="0,0,0,1"
 			DockPanel.Dock="Top"
-			MinHeight="44">
-			<DockPanel LastChildFill="False" VerticalAlignment="Center">
+			MinHeight="38">
+			<DockPanel LastChildFill="True" VerticalAlignment="Center">
 				<StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
 					<!--  SB B 도구줄 — [입체] [평면] · [전체 보기]. 모양 5종은 둘 다에서 보인다(2.5D 투영 · FR-02)  -->
 					<Button
@@ -221,55 +221,65 @@
 								AutomationProperties.AutomationId="Devices.Wiring.Fence.HelpText"
 								FontSize="12"
 								Foreground="{DynamicResource TextPrimaryBrush}"
-								Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 옆으로 끌기 · Alt+Shift+← → = 다른 망으로 · 센서 잡고 위 · 아래로 끌기 · Alt+↑ ↓ = 높이 한 단계(윤형 망은 맨 위가 윤형 코일) · Shift+Alt+↑ ↓ = 미세 높이 0.1m · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
+								Text="왼쪽 끌기 = 센서 선택 · Shift+끌기 = 망 선택 · 센서 잡고 옆으로 끌기 · Ctrl+← → = 다른 망으로(Alt+Shift+← → 도) · 센서 잡고 위 · 아래로 끌기 · Alt+↑ ↓ = 높이 한 단계(윤형 망은 맨 위가 윤형 코일) · Shift+Alt+↑ ↓ = 미세 높이 0.1m · 오른쪽 끌기 · 휠 누르고 끌기 = 이동 · 휠 = 확대 · 오른쪽 클릭 = 메뉴 · Ctrl 클릭 = 더함/뺌 · Esc = 취소"
 								TextWrapping="Wrap" />
 						</Border>
 					</Popup>
 					</Grid>
 				</StackPanel>
-			</DockPanel>
-		</Border>
-
-		<!--  ── 아래 띠: 종류별 수(FR-01 · FR-18) ──  -->
-		<Border
-			Height="28"
-			Padding="12,0"
-			Background="{DynamicResource SurfaceAltBrush}"
-			BorderBrush="{DynamicResource RowLineBrush}"
-			BorderThickness="0,1,0,0"
-			DockPanel.Dock="Bottom">
-			<DockPanel LastChildFill="True">
-				<!--  한 줄 조작 안내(검토: 캔버스 위에서 바닥 띠로 옮겼다) — 전체는 도구줄 [?]  -->
+				<!--  한 줄 조작 안내 — 도구줄 오른쪽(옛 바닥 띠는 결선 창 상태줄로 합쳤다 · 창 정리 2026-10-01). 전체는 [?]  -->
 				<TextBlock
-					Margin="16,0,0,0"
+					Margin="12,0,0,0"
 					VerticalAlignment="Center"
 					AutomationProperties.AutomationId="Devices.Wiring.Fence.Hint"
-					DockPanel.Dock="Right"
 					FontSize="11.5"
 					Foreground="{DynamicResource TextMutedBrush}"
 					Text="왼쪽 끌기 = 센서 선택 · 오른쪽 클릭 = 메뉴 · 휠 = 확대 · 전체 조작은 [?]"
-					TextTrimming="CharacterEllipsis" />
-				<TextBlock
-					VerticalAlignment="Center"
-					AutomationProperties.AutomationId="Devices.Wiring.Fence.Counts"
-					FontSize="12"
-					Foreground="{DynamicResource TextSecondaryBrush}"
-					Text="{Binding FenceCountsText}"
 					TextTrimming="CharacterEllipsis" />
 			</DockPanel>
 		</Border>
 
 		<!--
-			── 개념도(v0.3 FR-20 · 참고 그림 4장) ── 두 줄 펜스 도식: 제어기 C 에서 Ch1(실선) → 아래 줄 → 먼 끝 꺾임 → 위 줄(또는 리턴선) → Ch2(점선).
-			칸 폭에 맞춰 그린다(가로 이동 없음). 신호등(FR-14) · IP 표지(FR-15) · VBus(FR-21). 펜스 · 표 보기와 같은 선택을 본다(FR-13).
+			── 3D 보기 · 나눔 막대 · 개념도(창 정리 2026-10-01) ── 남는 높이를 둘이 나눠 갖는다(기본 58 : 42 · 끌어 바꾸면 사람마다 기억).
+			나눔 막대는 키보드(↑/↓)로도 옮긴다. 개념도는 높아지면 줄 간격이 자란다(칩 · 글자 크기는 그대로).
 		-->
-		<Border
-			Height="178"
-			BorderBrush="{DynamicResource RowLineBrush}"
-			BorderThickness="0,1,0,0"
-			DockPanel.Dock="Bottom">
-			<DockPanel LastChildFill="True">
-				<DockPanel Margin="10,6,10,0" DockPanel.Dock="Top" LastChildFill="True">
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="58*" MinHeight="160" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="42*" MinHeight="150" />
+			</Grid.RowDefinitions>
+
+			<!--  ── 캔버스 ──  -->
+			<Grid>
+				<fence:FenceCanvas ViewModel="{Binding}" />
+			</Grid>
+
+			<GridSplitter
+				Grid.Row="1"
+				Height="6"
+				HorizontalAlignment="Stretch"
+				AutomationProperties.AutomationId="Devices.Wiring.Fence.Split"
+				AutomationProperties.Name="3D 보기 · 개념도 나눔(↑/↓ 로 옮김)"
+				Background="{DynamicResource SurfaceAltBrush}"
+				BorderBrush="{DynamicResource RowLineBrush}"
+				BorderThickness="0,1"
+				Cursor="SizeNS"
+				DragCompleted="OnSplitDragCompleted"
+				Focusable="True"
+				KeyboardIncrement="20"
+				KeyUp="OnSplitKeyUp"
+				ResizeBehavior="PreviousAndNext"
+				ResizeDirection="Rows"
+				ShowsPreview="False"
+				ToolTip="끌어서 3D 보기와 개념도의 높이를 나눕니다" />
+
+			<!--
+				── 개념도(v0.3 FR-20 · 참고 그림 4장) ── 두 줄 펜스 도식: 제어기 C 에서 Ch1(실선) → 아래 줄 → 먼 끝 꺾임 → 위 줄(또는 리턴선) → Ch2(점선).
+				칸 폭에 맞춰 그린다(가로 이동 없음). 신호등(FR-14) · IP 표지(FR-15) · VBus(FR-21). 펜스 · 표 보기와 같은 선택을 본다(FR-13).
+			-->
+			<DockPanel Grid.Row="2" LastChildFill="True">
+				<DockPanel Margin="10,4,10,0" DockPanel.Dock="Top" LastChildFill="True">
 					<WrapPanel VerticalAlignment="Center" Orientation="Horizontal">
 						<TextBlock
 							Margin="0,0,12,0"
@@ -297,11 +307,6 @@
 				</DockPanel>
 				<concept:FenceConceptView ViewModel="{Binding}" />
 			</DockPanel>
-		</Border>
-
-		<!--  ── 캔버스 ──  -->
-		<Grid>
-			<fence:FenceCanvas ViewModel="{Binding}" />
 		</Grid>
 	</DockPanel>
 </UserControl>

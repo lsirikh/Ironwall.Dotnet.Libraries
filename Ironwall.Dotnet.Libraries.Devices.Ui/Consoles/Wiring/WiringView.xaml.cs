@@ -22,6 +22,47 @@ public partial class WiringView : UserControl
     public WiringView()
     {
         InitializeComponent();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private DependencyObject? _bin;
+
+    /// <summary>
+    /// 빼는 곳(드롭존 <c>wiring-bin</c>)의 끌기 상태를 뷰모델에 알린다 — 표 · 팔레트 끌기(커널)가 시작되면 빼는 곳 글자가 "여기 놓으면 …"으로 바뀐다.
+    /// x:Name 은 쓰지 않는다(CM 바인딩 지시자) — 드롭존 열쇠로 찾는다.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        OnUnloaded(sender, e);
+        _bin = Descendants(this).FirstOrDefault(d => Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.GetKey(d) == WiringViewModel.BinZoneKey);
+        if (_bin is not null)
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.StateProperty, _bin.GetType())
+                ?.AddValueChanged(_bin, OnBinStateChanged);
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_bin is not null)
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.StateProperty, _bin.GetType())
+                ?.RemoveValueChanged(_bin, OnBinStateChanged);
+        _bin = null;
+    }
+
+    private void OnBinStateChanged(object? sender, EventArgs e)
+    {
+        if (_bin is not null)
+            ViewModel?.NotifySensorDrag(Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZone.GetState(_bin) != Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag.DropZoneState.None);
+    }
+
+    private static System.Collections.Generic.IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Descendants(child)) yield return deeper;
+        }
     }
 
     private WiringViewModel? ViewModel => DataContext as WiringViewModel;
@@ -79,6 +120,15 @@ public partial class WiringView : UserControl
 
     #region - Wiring map -
     private void OnAcceptSuggestion(object sender, RoutedEventArgs e) => ViewModel?.AcceptSuggestion();
+
+    /// <summary>알림 목록 항목의 할 일 단추 — Tag = 알림 갈래.</summary>
+    private void OnNoticeAction(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is WiringNoticeKind kind) ViewModel?.RunNoticeAction(kind);
+    }
+
+    /// <summary>속성 칸 접기 · 펴기.</summary>
+    private void OnToggleDetail(object sender, RoutedEventArgs e) => ViewModel?.ToggleDetailPane();
     private void OnUnplaceSelected(object sender, RoutedEventArgs e)
     {
         if (ViewModel is not { } vm) return;

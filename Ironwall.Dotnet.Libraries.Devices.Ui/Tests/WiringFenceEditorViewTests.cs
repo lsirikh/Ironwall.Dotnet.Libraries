@@ -395,6 +395,151 @@ public class WiringFenceEditorViewTests
     }
     #endregion
 
+    #region - Window layout (창 정리 2026-10-01) -
+    /// <summary>결선 창 전체를 1440×900 화면 밖 창에 느슨하게 띄워 <paramref name="body"/> 를 부른다(앱 스타일은 테마 파일 병합).</summary>
+    private static T OnWiringWindow<T>(WiringViewModel vm, Func<UserControl, T> body, bool dark = false)
+        => OnSta(() =>
+        {
+            _ = Application.Current;
+            var view = LooseWiringView();
+            view.DataContext = vm;
+            var window = new Window
+            {
+                Content = view, Width = 1440, Height = 900, WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
+            };
+            window.Resources.MergedDictionaries.Add(Theme(dark ? "Tokens.Dark.xaml" : "Tokens.Light.xaml"));
+            window.SetResourceReference(Control.BackgroundProperty, "SurfaceBrush");
+            vm.GoWiring();
+            window.Show();
+            Pump();
+            try { return body(view); }
+            finally { window.Close(); }
+        });
+
+    /// <summary>
+    /// 1440×900 에서 3D 보기 · 개념도가 받는 높이(사용자: "개념도와 3D 화면 배치를 크게") — 알림 세 개(제안 · 대역 · 펜스 구성)인 렌더 검토 그림과 같은 상태.
+    /// 높이는 %TEMP%\wiring-layout-heights.txt 에도 남긴다(보고용 · 단언은 아래).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void should_give_the_fence_view_and_the_concept_most_of_the_height_at_1440x900(bool dark)
+    {
+        var result = OnWiringWindow(WiringLayoutChromeTests.Build(placed: 4, unsaved: 3), view =>
+        {
+            var canvas = Descendants<FenceCanvas>(view).Single();
+            var concept = Descendants<FenceConceptView>(view).Single();
+            var conceptGeometry = concept.Geometry!;
+            SaveSnapshot(Window.GetWindow(view)!, view, dark ? "wiring-layout-1440x900-dark.png" : "wiring-layout-1440x900-light.png");
+            return (Canvas: canvas.ActualHeight, Concept: concept.ActualHeight, CanvasWidth: canvas.ActualWidth, LaneGap: conceptGeometry.LowerY - conceptGeometry.UpperY);
+        }, dark);
+        File.WriteAllText(Path.Combine(Path.GetTempPath(), "wiring-layout-heights.txt"),
+            $"canvas={result.Canvas:0} concept={result.Concept:0} sum={result.Canvas + result.Concept:0} canvasWidth={result.CanvasWidth:0} laneGap={result.LaneGap:0}");
+
+        Assert.True(result.Canvas >= 300, $"3D 보기 높이 {result.Canvas}");
+        Assert.True(result.Concept >= 200, $"개념도 높이 {result.Concept}");
+        Assert.InRange(result.Canvas / (result.Canvas + result.Concept), 0.5, 0.66);          // 기본 58 : 42 근처(제목 줄 몫만큼)
+        Assert.True(result.LaneGap > ConceptLayout.MIN_LANE_GAP);                             // 개념도가 커지면 줄 간격이 자란다
+    }
+
+    [Fact]
+    public void should_put_one_header_one_notice_row_and_a_slim_unplaced_strip_around_the_fence_view()
+    {
+        var result = OnWiringWindow(WiringLayoutChromeTests.Build(placed: 4, unsaved: 3), view =>
+        {
+            var subject = Find<TextBlock>(view, "Devices.Wiring.Subject");
+            var tabs = Find<Button>(view, "Devices.Wiring.View.Fence");
+            var save = Find<Button>(view, "Devices.Wiring.Save");
+            var top = (Subject: subject.TranslatePoint(new Point(0, 0), view).Y, Tabs: tabs.TranslatePoint(new Point(0, 0), view).Y, Save: save.TranslatePoint(new Point(0, 0), view).Y);
+            var noticeIds = new[]
+            {
+                "Devices.Wiring.SuggestionNotice", "Devices.Wiring.Fence.Band.Missing", "Devices.Wiring.AppliedNotice", "Devices.Wiring.LegacyNotice",
+                "Devices.Wiring.TopologyNotice", "Devices.Wiring.FenceNotice",
+            };
+            var shown = noticeIds.Where(id => Find<TextBlock>(view, id).IsVisible).ToList();
+            var chip = Find<System.Windows.Controls.Primitives.ToggleButton>(view, "Devices.Wiring.Notices.Toggle");
+            var accept = Find<Button>(view, "Devices.Wiring.AcceptSuggestion").IsVisible;
+            var bandChoose = Find<Button>(view, "Devices.Wiring.Fence.Band.Choose").IsVisible;
+            var palette = Find<ListBox>(view, "Devices.Wiring.Palette").IsVisible;
+            var bin = Find<Button>(view, "Devices.Wiring.Bin.UnplaceSelected").IsVisible;
+            var blocked = Find<TextBlock>(view, "Devices.Wiring.SaveBlockedReason");
+            var counts = Find<TextBlock>(view, "Devices.Wiring.Fence.Counts");
+            var stepsY = Find<Button>(view, "Devices.Wiring.Step.Wiring").TranslatePoint(new Point(0, 0), view).Y;
+            return (top, stepsY, shown, ChipText: chip.Content as string, ChipStyled: chip.Style is not null, accept, bandChoose, palette, bin,
+                    BlockedInStatus: blocked.TranslatePoint(new Point(0, 0), view).Y > view.ActualHeight - 40, CountsShown: counts.IsVisible);
+        });
+
+        Assert.True(result.top.Subject < 44 && result.top.Tabs < 44 && result.top.Save < 44 && result.stepsY < 44, $"머리 한 줄 {result.top} · 단계 {result.stepsY}");
+        Assert.Equal(new[] { "Devices.Wiring.SuggestionNotice" }, result.shown);              // 알림은 한 줄(가장 앞 하나)
+        Assert.Equal("알림 3", result.ChipText);
+        Assert.True(result.ChipStyled);
+        Assert.True(result.accept);
+        Assert.False(result.bandChoose);                                                    // 맨 앞이 아닌 알림의 단추는 목록에서
+        Assert.False(result.palette);                                                       // 미배치 0 — 칩 목록은 접힌다
+        Assert.True(result.bin);                                                            // 빼는 곳은 늘 있다(드롭존 등록 · Delete)
+        Assert.True(result.BlockedInStatus);                                                // 저장 막힘 까닭은 상태줄 오른쪽
+        Assert.True(result.CountsShown);                                                    // 펜스 종류별 수도 상태줄로
+    }
+
+    [Fact]
+    public void should_give_the_canvases_the_width_when_the_detail_pane_is_collapsed_and_keep_the_table_view_working()
+    {
+        var vm = WiringLayoutChromeTests.Build();
+        var result = OnWiringWindow(vm, view =>
+        {
+            var canvas = Descendants<FenceCanvas>(view).Single();
+            var open = canvas.ActualWidth;
+            var toggle = Find<Button>(view, "Devices.Wiring.DetailToggle");
+            vm.ToggleDetailPane();
+            Pump();
+            var collapsed = canvas.ActualWidth;
+            vm.FenceSelect(103);
+            vm.ToggleDetailPane();
+            Pump();
+            vm.ShowTableView();
+            Pump();
+            var table = Find<ScrollViewer>(view, "Devices.Wiring.TableView").IsVisible;
+            var fenceHidden = !Find<FenceView>(view, "Devices.Wiring.FenceView").IsVisible;
+            var countsHidden = !Find<TextBlock>(view, "Devices.Wiring.Fence.Counts").IsVisible;
+            return (open, collapsed, ToggleStyled: toggle.Style is not null, table, fenceHidden, countsHidden, vm.SelectedTitle);
+        });
+
+        Assert.True(result.collapsed >= result.open + 300, $"펼침 {result.open} → 접음 {result.collapsed}");
+        Assert.True(result.ToggleStyled);
+        Assert.True(result.table && result.fenceHidden && result.countsHidden);
+        Assert.Equal(vm.Board.Find(103)!.Display, result.SelectedTitle);
+    }
+
+    [Fact]
+    public void should_move_the_split_by_keyboard_and_remember_the_clamped_ratio()
+    {
+        var vm = WiringLayoutChromeTests.Build();
+        var saved = new List<double>();
+        vm.UseLayoutPrefs(null, null, (r, _) => saved.Add(r));
+        var result = OnWiringWindow(vm, view =>
+        {
+            var fence = Find<FenceView>(view, "Devices.Wiring.FenceView");
+            var splitter = fence.Splitter!;
+            var id = AutomationProperties.GetAutomationId(splitter);
+            var canvas = Descendants<FenceCanvas>(view).Single();
+            var before = canvas.ActualHeight;
+            var grid = (Grid)splitter.Parent;
+            grid.RowDefinitions[0].Height = new GridLength(before + 2000, GridUnitType.Pixel);     // 끌기 흉내 — 한껏 아래로
+            Pump();
+            fence.CommitSplit();
+            Pump();
+            return (id, before, After: canvas.ActualHeight, vm.FenceSplitRatio, Concept: Descendants<FenceConceptView>(view).Single().ActualHeight);
+        });
+
+        Assert.Equal("Devices.Wiring.Fence.Split", result.id);
+        Assert.True(result.FenceSplitRatio <= WiringLayoutMath.MAX_SPLIT);
+        Assert.True(result.Concept >= WiringLayoutMath.MIN_CONCEPT_HEIGHT - 30, $"개념도 {result.Concept}");    // 제목 줄 몫
+        Assert.Single(saved);
+        Assert.Equal(result.FenceSplitRatio, saved[0], 6);
+    }
+    #endregion
+
     #region - Fixtures -
     private static WiringViewModel Ring(int count)
     {

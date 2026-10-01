@@ -410,6 +410,7 @@ public class WiringFenceViewTests
             var view = (FenceView)Window.GetWindow(canvas)!.Content;
             var hint = Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint");
             var hintTop = hint.TranslatePoint(new Point(0, 0), canvas).Y;
+            var hintBottom = hintTop + hint.ActualHeight;
             var toggle = Descendants<System.Windows.Controls.Primitives.ToggleButton>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Help");
             var popup = Descendants<System.Windows.Controls.Primitives.Popup>(view)
                 .Single(p => p.Child is Border { Child: TextBlock t } && AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.HelpText");
@@ -419,10 +420,11 @@ public class WiringFenceViewTests
             var helpId = AutomationProperties.GetAutomationId((TextBlock)((Border)popup.Child).Child);
             toggle.IsChecked = false;
             Pump();
-            return (hintTop, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
+            return (hintTop, hintBottom, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
         });
 
-        Assert.True(result.hintTop >= result.CanvasHeight, $"안내 {result.hintTop} · 캔버스 높이 {result.CanvasHeight}");   // 그림 위에 겹치지 않는다(바닥 띠)
+        Assert.True(result.hintBottom <= 0 || result.hintTop >= result.CanvasHeight, $"안내 {result.hintTop}~{result.hintBottom} · 캔버스 높이 {result.CanvasHeight}");   // 그림 위에 겹치지 않는다(도구줄 오른쪽)
+        Assert.True(result.hintBottom <= 0);                                   // 창 정리 2026-10-01 — 바닥 띠를 없애고 도구줄로
         Assert.True(result.opened);
         Assert.True(result.Closed);
         Assert.Equal("Devices.Wiring.Fence.HelpText", result.helpId);

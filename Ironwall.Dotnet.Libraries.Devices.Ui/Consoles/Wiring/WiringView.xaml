@@ -42,6 +42,80 @@
 			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 			<Setter Property="TextWrapping" Value="Wrap" />
 		</Style>
+		<!--  알림 한 줄의 글자 — 한 줄(넘치면 … · 툴팁에 전부)  -->
+		<Style x:Key="W.NoticeText" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+			<Setter Property="TextWrapping" Value="NoWrap" />
+		</Style>
+		<!--  [알림 n] 칩 — 둥근 알약. 켜지면(목록이 열리면) 주 색 테두리 2(색만이 아니라 굵기로도)  -->
+		<Style x:Key="W.NoticeChip" TargetType="ToggleButton">
+			<Setter Property="Height" Value="24" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ToggleButton">
+						<Border
+							Padding="{TemplateBinding Padding}"
+							Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="12">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+						</Border>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+			<Style.Triggers>
+				<Trigger Property="IsMouseOver" Value="True">
+					<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+				</Trigger>
+				<Trigger Property="IsChecked" Value="True">
+					<Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+					<Setter Property="BorderThickness" Value="2" />
+				</Trigger>
+				<Trigger Property="IsEnabled" Value="False">
+					<Setter Property="Cursor" Value="Arrow" />
+					<Setter Property="Background" Value="Transparent" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+		<!--  속성 칸 가장자리 접기 막대 — 칸 높이 전체의 얇은 띠(글자 ‹ ›)  -->
+		<Style x:Key="W.EdgeToggle" TargetType="Button">
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+			<Setter Property="BorderThickness" Value="1,0,0,0" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+						</Border>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+			<Style.Triggers>
+				<Trigger Property="IsMouseOver" Value="True">
+					<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+					<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+				</Trigger>
+				<Trigger Property="IsKeyboardFocused" Value="True">
+					<Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+					<Setter Property="BorderThickness" Value="2" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
 		<Style x:Key="W.SectionHead" TargetType="TextBlock">
 			<Setter Property="FontSize" Value="12" />
 			<Setter Property="FontWeight" Value="Bold" />
@@ -348,12 +422,12 @@
 
 	<DockPanel LastChildFill="True">
 		<!--
-			── 머리 (WS L332, L382) ── 높이 40 — 콘솔 커널의 머리(ConsoleShell 40 · Utils/Themes/Generic.xaml L316)와 같다.
-			단추는 한 칸(6)씩 · 보조 → 주(主) 차례로, [저장하기]가 맨 오른쪽이다. 막힌 까닭은 같은 줄에 두지 않는다
-			(줄을 나눠 쓰면 단추가 밀려 문장이 잘린다 — D-14 실측).
+			── 머리 한 줄(창 정리 2026-10-01 · 사용자: "위쪽 쓸데없는 것 정리") ── 대상 제어기 · 단계 띠 · [펜스 보기|표 보기] · 바뀐 줄 수 · 단추.
+			옛 세 줄(머리 40 · "바뀐 줄이 없습니다" 줄 · 단계 띠 34)을 한 줄(44)로 — 저장이 막힌 까닭은 아래 상태줄 오른쪽에 둔다.
+			단추는 한 칸(8)씩 · 보조 → 주(主) 차례로, [저장하기]가 맨 오른쪽이다.
 		-->
 		<Border
-			Height="40"
+			Height="44"
 			Padding="16,0,8,0"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
@@ -387,68 +461,25 @@
 						Style="{StaticResource Console.Button.Primary}"
 						ToolTip="{Binding SaveBlockedReason}" />
 				</StackPanel>
-				<!--
-					창 제목("장비 셋업 · 결선맵")은 커널 창 머리가 그린다 — 뷰 안에서 또 쓰면 두 번 보인다(대화 커널 정리 2026-09-30).
-					여기는 대상 제어기(이름 · 주소)만 남긴다 — 헤디드 시험이 Devices.Wiring.Subject 로 창을 찾는다.
-				-->
 				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+					<!--  창 제목("장비 셋업 · 결선맵")은 커널 창 머리가 그린다 — 여기는 대상 제어기만(헤디드 시험이 Devices.Wiring.Subject 로 창을 찾는다)  -->
 					<TextBlock
+						MaxWidth="260"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Wiring.Subject"
 						FontSize="14"
 						FontWeight="SemiBold"
 						Foreground="{DynamicResource TextPrimaryBrush}"
-						Text="{Binding Subject}" />
-				</StackPanel>
-			</DockPanel>
-		</Border>
-
-		<!--
-			── 저장이 막힌 까닭 — 제 줄을 통째로 쓴다(자르지 않는다). 비어 있으면 줄 자체가 없다.
-			바꾼 것이 있는데 막혔을 때만 경고색이다 — "바뀐 줄이 없습니다" 같은 평시 안내까지 앰버로 칠하면
-			진짜 막힘이 묻힌다.
-		-->
-		<Border
-			Padding="16,5"
-			BorderThickness="0,0,0,1"
-			DockPanel.Dock="Top">
-			<Border.Style>
-				<Style TargetType="Border">
-					<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-					<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
-					<Style.Triggers>
-						<DataTrigger Binding="{Binding HasChanges}" Value="True">
-							<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
-							<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
-						</DataTrigger>
-						<DataTrigger Binding="{Binding SaveBlockedReason}" Value="">
-							<Setter Property="Visibility" Value="Collapsed" />
-						</DataTrigger>
-						<DataTrigger Binding="{Binding SaveBlockedReason}" Value="{x:Null}">
-							<Setter Property="Visibility" Value="Collapsed" />
-						</DataTrigger>
-					</Style.Triggers>
-				</Style>
-			</Border.Style>
-			<TextBlock
-				AutomationProperties.AutomationId="Devices.Wiring.SaveBlockedReason"
-				FontSize="12"
-				Foreground="{DynamicResource TextPrimaryBrush}"
-				Text="{Binding SaveBlockedReason}"
-				TextWrapping="Wrap" />
-		</Border>
-
-		<!--  ── 단계 띠 (WS L334-337) ──  -->
-		<Border
-			Height="34"
-			Padding="16,0"
-			Background="{DynamicResource SurfaceBrush}"
-			BorderBrush="{DynamicResource DividerBrush}"
-			BorderThickness="0,0,0,1"
-			DockPanel.Dock="Top">
-			<DockPanel LastChildFill="False">
-				<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-					<!--  단계 띠(WS L334-337) — 지금 단계는 ▸ + 굵게, 끝난 단계는 ✓. 색 하나로 말하지 않는다.  -->
+						Text="{Binding Subject}"
+						TextTrimming="CharacterEllipsis"
+						ToolTip="{Binding Subject}" />
+					<Rectangle
+						Width="1"
+						Height="18"
+						Margin="14,0,12,0"
+						VerticalAlignment="Center"
+						Fill="{DynamicResource DividerBrush}" />
+					<!--  단계 띠(WS L334-337) — 지금 단계는 ▸ + 굵게, 끝난 단계는 ✓. 색 하나로 말하지 않는다. [센서] · [결선] 은 누르면 그 단계로 간다  -->
 					<TextBlock
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Wiring.Step.Controller"
@@ -456,7 +487,7 @@
 						Foreground="{DynamicResource StatusNormalBrush}"
 						Text="{Binding StepControllerGlyph, StringFormat={}{0} 제어기}" />
 					<TextBlock
-						Margin="8,0"
+						Margin="6,0"
 						VerticalAlignment="Center"
 						Foreground="{DynamicResource DividerBrush}"
 						Text="›" />
@@ -491,7 +522,7 @@
 						</Grid>
 					</Button>
 					<TextBlock
-						Margin="8,0"
+						Margin="6,0"
 						VerticalAlignment="Center"
 						Foreground="{DynamicResource DividerBrush}"
 						Text="›" />
@@ -500,7 +531,6 @@
 						Click="OnGoWiring"
 						Style="{StaticResource Console.Button.Ghost}">
 						<Grid>
-							<!--  U-14 — 굵은 폭 예약(커널 Console.Tab 과 같은 고스트) — 지금 단계가 바뀌어 굵어져도 띠가 흔들리지 않는다.  -->
 							<TextBlock
 								FontSize="12.5"
 								FontWeight="Bold"
@@ -526,7 +556,7 @@
 						</Grid>
 					</Button>
 					<TextBlock
-						Margin="8,0"
+						Margin="6,0"
 						VerticalAlignment="Center"
 						Foreground="{DynamicResource DividerBrush}"
 						Text="›" />
@@ -547,10 +577,42 @@
 							</Style>
 						</TextBlock.Style>
 					</TextBlock>
-				</StackPanel>
-				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+					<!--
+						보기 전환 — [펜스 보기](기본) · [표 보기]. 결선 단계에서만. 둘 다 같은 보드를 본다(wiring-fence-view F-3).
+						고른 쪽은 아래 막대(형태)로 보인다.
+					-->
+					<StackPanel
+						Margin="18,0,0,0"
+						VerticalAlignment="Center"
+						Orientation="Horizontal"
+						Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}">
+						<StackPanel Margin="0,0,4,0">
+							<Button
+								AutomationProperties.AutomationId="Devices.Wiring.View.Fence"
+								Click="OnShowFence"
+								Content="펜스 보기"
+								Style="{StaticResource Console.Button}" />
+							<Rectangle
+								Height="2"
+								Margin="4,1,4,0"
+								Fill="{DynamicResource PrimaryBrush}"
+								Visibility="{Binding IsFenceView, Converter={StaticResource BoolToVisibility}}" />
+						</StackPanel>
+						<StackPanel>
+							<Button
+								AutomationProperties.AutomationId="Devices.Wiring.View.Table"
+								Click="OnShowTable"
+								Content="표 보기"
+								Style="{StaticResource Console.Button}" />
+							<Rectangle
+								Height="2"
+								Margin="4,1,4,0"
+								Fill="{DynamicResource PrimaryBrush}"
+								Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}" />
+						</StackPanel>
+					</StackPanel>
 					<TextBlock
-						Margin="0,0,10,0"
+						Margin="16,0,0,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Wiring.Progress"
 						FontSize="12"
@@ -558,6 +620,7 @@
 						Text="{Binding ProgressText}"
 						Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}" />
 					<TextBlock
+						Margin="16,0,0,0"
 						VerticalAlignment="Center"
 						AutomationProperties.AutomationId="Devices.Wiring.DraftCount"
 						FontSize="12"
@@ -567,7 +630,10 @@
 			</DockPanel>
 		</Border>
 
-		<!--  ── 상태줄 ──  -->
+		<!--
+			── 상태줄 ── 센서 수 · (펜스 보기) 종류별 수 · 마지막 동작 · 저장이 막힌 까닭(오른쪽 · 바꾼 것이 있으면 경고색).
+			옛 "바뀐 줄이 없습니다" 줄 · 펜스 보기 바닥 띠를 여기로 합쳤다(창 정리 2026-10-01).
+		-->
 		<Border
 			Height="30"
 			Padding="16,0"
@@ -577,11 +643,44 @@
 			DockPanel.Dock="Bottom">
 			<DockPanel LastChildFill="True">
 				<TextBlock
+					MaxWidth="420"
+					Margin="16,0,0,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Wiring.SaveBlockedReason"
+					DockPanel.Dock="Right"
+					FontSize="12"
+					Text="{Binding SaveBlockedReason}"
+					TextTrimming="CharacterEllipsis"
+					ToolTip="{Binding SaveBlockedReason}">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding HasChanges}" Value="True">
+									<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+									<Setter Property="FontWeight" Value="SemiBold" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+				<TextBlock
 					VerticalAlignment="Center"
 					AutomationProperties.AutomationId="Devices.Wiring.Counts"
 					FontSize="12"
 					Foreground="{DynamicResource TextMutedBrush}"
 					Text="{Binding ListStatusText}" />
+				<TextBlock
+					MaxWidth="460"
+					Margin="16,0,0,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.Wiring.Fence.Counts"
+					FontSize="12"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Text="{Binding FenceCountsText}"
+					TextTrimming="CharacterEllipsis"
+					ToolTip="{Binding FenceCountsText}"
+					Visibility="{Binding IsFenceCountsShown, Converter={StaticResource BoolToVisibility}}" />
 				<TextBlock
 					Margin="16,0,0,0"
 					VerticalAlignment="Center"
@@ -1039,188 +1138,226 @@
 
 			<!--  ══════════ 파트 2 — 결선맵 (WS L391-429) ══════════  -->
 			<Grid Visibility="{Binding IsWiringStep, Converter={StaticResource BoolToVisibility}}">
+				<!--  왼쪽 그림 · 접기 막대 · 오른쪽 속성 칸(기본 320 · 접으면 그림이 폭을 갖는다 — 창 정리 2026-10-01)  -->
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="360" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
 				</Grid.ColumnDefinitions>
 
 				<DockPanel LastChildFill="True">
-					<!--  보기 전환 — [펜스 보기](기본) · [표 보기]. 둘 다 같은 보드를 본다(wiring-fence-view F-3). 고른 쪽은 아래 막대(형태)로 보인다  -->
-					<StackPanel Margin="12,10,12,0" DockPanel.Dock="Top">
-						<StackPanel Margin="0,0,0,8" Orientation="Horizontal">
-							<StackPanel Margin="0,0,6,0">
-								<Button
-									AutomationProperties.AutomationId="Devices.Wiring.View.Fence"
-									Click="OnShowFence"
-									Content="펜스 보기"
-									Style="{StaticResource Console.Button}" />
-								<Rectangle
-									Height="3"
-									Margin="4,2,4,0"
-									Fill="{DynamicResource PrimaryBrush}"
-									Visibility="{Binding IsFenceView, Converter={StaticResource BoolToVisibility}}" />
-							</StackPanel>
-							<StackPanel>
-								<Button
-									AutomationProperties.AutomationId="Devices.Wiring.View.Table"
-									Click="OnShowTable"
-									Content="표 보기"
-									Style="{StaticResource Console.Button}" />
-								<Rectangle
-									Height="3"
-									Margin="4,2,4,0"
-									Fill="{DynamicResource PrimaryBrush}"
-									Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}" />
-							</StackPanel>
-						</StackPanel>
-								<!--  결선 모양을 어떻게 정했나 — 저장된 모양 ≠ 추정 · 제어기 종류 모름(F-2b H3)  -->
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,6"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusInfoBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasTopologyNotice, Converter={StaticResource BoolToVisibility}}">
-									<TextBlock
-										AutomationProperties.AutomationId="Devices.Wiring.TopologyNotice"
-										FontSize="12"
-										Text="{Binding TopologyNoticeText}"
-										TextWrapping="Wrap" />
-								</Border>
-								<!--  펜스 구성 불러오기 알림(fence-wiring-editor FR-01) — 제안 · 서버 순서에 맞춤  -->
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,6"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusInfoBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasFenceNotice, Converter={StaticResource BoolToVisibility}}">
-									<TextBlock
-										AutomationProperties.AutomationId="Devices.Wiring.FenceNotice"
-										FontSize="12"
-										Text="{Binding FenceNoticeText}"
-										TextWrapping="Wrap" />
-								</Border>
-								<!--  번호 대역 미설정(fence-wiring-editor FR-10) — 번호가 위치 순서와 어긋나 보여도 저절로 고치지 않는다. 고르는 곳으로 바로 간다  -->
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,6"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusInfoBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasNoBandsNotice, Converter={StaticResource BoolToVisibility}}">
-									<DockPanel LastChildFill="True">
-										<Button
-											Margin="8,0,0,0"
-											Padding="10,0"
-											MinWidth="0"
-											AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Choose"
-											Click="OnChooseBands"
-											Content="대역 고르기"
-											DockPanel.Dock="Right"
-											Style="{StaticResource Console.Button}"
-											ToolTip="오른쪽 칸에 번호 대역(2차 · 3차 · 4차 · 직접 설정)을 엽니다" />
-										<TextBlock
-											VerticalAlignment="Center"
-											AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Missing"
-											FontSize="12"
-											Text="{Binding NoBandsNoticeText}"
-											TextWrapping="Wrap" />
-									</DockPanel>
-								</Border>
-								<!--  체인을 고치다가 제안을 함께 적용함(F-2b H2)  -->
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,6"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusWarningBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasAppliedNotice, Converter={StaticResource BoolToVisibility}}">
-									<TextBlock
-										AutomationProperties.AutomationId="Devices.Wiring.AppliedNotice"
-										FontSize="12"
-										Text="{Binding AppliedNoticeText}"
-										TextWrapping="Wrap" />
-								</Border>
-								<!--  불러오기 알림 — 옛 배치 변환(FR-02) · 번호순 제안(FR-03)  -->
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,7"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusWarningBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasLegacyNotice, Converter={StaticResource BoolToVisibility}}">
-									<TextBlock
-										AutomationProperties.AutomationId="Devices.Wiring.LegacyNotice"
-										FontSize="12"
-										Text="{Binding LegacyNoticeText}"
-										TextWrapping="Wrap" />
-								</Border>
-								<Border
-									Margin="0,0,0,8"
-									Padding="10,6"
-									Background="{DynamicResource SurfaceSunkenBrush}"
-									BorderBrush="{DynamicResource StatusInfoBrush}"
-									BorderThickness="3,0,0,0"
-									CornerRadius="0,6,6,0"
-									Visibility="{Binding HasSuggestion, Converter={StaticResource BoolToVisibility}}">
-									<DockPanel LastChildFill="True">
-										<Button
-											Margin="8,0,0,0"
-											VerticalAlignment="Center"
-											AutomationProperties.AutomationId="Devices.Wiring.AcceptSuggestion"
-											Click="OnAcceptSuggestion"
-											Content="이대로 적용"
-											DockPanel.Dock="Right"
-											Style="{StaticResource Console.Button}" />
-										<TextBlock
-											VerticalAlignment="Center"
-											AutomationProperties.AutomationId="Devices.Wiring.SuggestionNotice"
-											FontSize="12"
-											Text="{Binding SuggestionText}"
-											TextWrapping="Wrap" />
-									</DockPanel>
-								</Border>
-
-					</StackPanel>
-
-					<StackPanel Margin="12,6,12,10" DockPanel.Dock="Bottom">
-						<!--  팔레트 — 미배치 센서 (WS L408-412) · 펜스 · 표 두 보기가 함께 쓴다  -->
-						<Border
-							Margin="0,14,0,0"
-							Padding="8"
-							Background="{DynamicResource SurfaceAltBrush}"
-							BorderBrush="{DynamicResource DividerBrush}"
-							BorderThickness="1"
-							CornerRadius="8">
-							<StackPanel>
-								<DockPanel LastChildFill="True">
-									<TextBlock
-										VerticalAlignment="Center"
-										DockPanel.Dock="Right"
-										FontSize="11.5"
-										Foreground="{DynamicResource TextMutedBrush}"
-										Text="{Binding UnplacedCount}" />
-									<TextBlock Style="{StaticResource W.Title}" Text="미배치 센서" />
-								</DockPanel>
+					<!--
+						알림 한 줄(창 정리 2026-10-01 · 옛 알림 칸 여러 줄을 쌓지 않는다) — [알림 n] 칩 + 가장 앞 알림 + 그 할 일 단추.
+						차례: 할 일(번호순 제안 · 번호 대역) → 경고(제안 함께 적용 · 옛 배치) → 안내(결선 모양 · 펜스 구성). 칩을 누르면 전부 펼친다.
+						알림마다 예전 자동화 id(Devices.Wiring.SuggestionNotice · Fence.Band.Missing …)를 그대로 쓴다 — 그 알림이 맨 앞일 때 이 줄에 보인다.
+					-->
+					<Border
+						Margin="12,8,12,0"
+						Padding="6,4,6,4"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						BorderBrush="{DynamicResource StatusInfoBrush}"
+						BorderThickness="3,0,0,0"
+						CornerRadius="0,6,6,0"
+						DockPanel.Dock="Top"
+						Visibility="{Binding HasNotices, Converter={StaticResource BoolToVisibility}}">
+						<DockPanel LastChildFill="True">
+							<!--  [알림 n] — 누르면 알림 전부(팝업). 하나뿐이면 글자만  -->
+							<Grid Margin="0,0,8,0" VerticalAlignment="Center" DockPanel.Dock="Left">
+								<ToggleButton
+									MinWidth="0"
+									Padding="8,0"
+									AutomationProperties.AutomationId="Devices.Wiring.Notices.Toggle"
+									AutomationProperties.Name="알림 모두 보기"
+									Content="{Binding NoticeChipText}"
+									IsChecked="{Binding IsNoticeListOpen, Mode=TwoWay}"
+									IsEnabled="{Binding HasMoreNotices}"
+									Style="{StaticResource W.NoticeChip}"
+									ToolTip="알림을 모두 펼칩니다" />
+								<Popup
+									AllowsTransparency="True"
+									IsOpen="{Binding IsNoticeListOpen, Mode=TwoWay}"
+									Placement="Bottom"
+									StaysOpen="False">
+									<Border
+										MaxWidth="720"
+										Padding="10,8"
+										Background="{DynamicResource SurfaceBrush}"
+										BorderBrush="{DynamicResource RowLineBrush}"
+										BorderThickness="1"
+										CornerRadius="7">
+										<ItemsControl AutomationProperties.AutomationId="Devices.Wiring.Notices.List" ItemsSource="{Binding Notices}">
+											<ItemsControl.ItemTemplate>
+												<DataTemplate>
+													<DockPanel Margin="0,3" LastChildFill="True">
+														<Button
+															Margin="10,0,0,0"
+															AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.Notices.Action.{0}}"
+															Click="OnNoticeAction"
+															Content="{Binding ActionText}"
+															DockPanel.Dock="Right"
+															Style="{StaticResource Console.Button}"
+															Tag="{Binding Kind}"
+															Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}" />
+														<Rectangle
+															Width="3"
+															Margin="0,0,8,0"
+															DockPanel.Dock="Left">
+															<Rectangle.Style>
+																<Style TargetType="Rectangle">
+																	<Setter Property="Fill" Value="{DynamicResource StatusInfoBrush}" />
+																	<Style.Triggers>
+																		<DataTrigger Binding="{Binding IsWarning}" Value="True">
+																			<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+																		</DataTrigger>
+																	</Style.Triggers>
+																</Style>
+															</Rectangle.Style>
+														</Rectangle>
+														<TextBlock
+															VerticalAlignment="Center"
+															AutomationProperties.AutomationId="{Binding AutomationKey, StringFormat=Devices.Wiring.Notices.Item.{0}}"
+															FontSize="12"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding Text}"
+															TextWrapping="Wrap" />
+													</DockPanel>
+												</DataTemplate>
+											</ItemsControl.ItemTemplate>
+										</ItemsControl>
+									</Border>
+								</Popup>
+							</Grid>
+							<!--  가장 앞 알림의 할 일 단추(이 줄 오른쪽)  -->
+							<Button
+								Margin="8,0,0,0"
+								Padding="10,0"
+								MinWidth="0"
+								AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Choose"
+								Click="OnChooseBands"
+								Content="대역 고르기"
+								DockPanel.Dock="Right"
+								Style="{StaticResource Console.Button}"
+								ToolTip="오른쪽 칸에 번호 대역(2차 · 3차 · 4차 · 직접 설정)을 엽니다"
+								Visibility="{Binding IsBandsPrimary, Converter={StaticResource BoolToVisibility}}" />
+							<Button
+								Margin="8,0,0,0"
+								VerticalAlignment="Center"
+								AutomationProperties.AutomationId="Devices.Wiring.AcceptSuggestion"
+								Click="OnAcceptSuggestion"
+								Content="이대로 적용"
+								DockPanel.Dock="Right"
+								Style="{StaticResource Console.Button}"
+								Visibility="{Binding IsSuggestionPrimary, Converter={StaticResource BoolToVisibility}}" />
+							<!--  가장 앞 알림 글자 — 한 줄(넘치면 … · 마우스를 올리면 전부)  -->
+							<Grid VerticalAlignment="Center">
 								<TextBlock
-									Margin="0,6,0,0"
-									Style="{StaticResource W.Hint}"
-									Text="{Binding PaletteEmptyText}"
-									Visibility="{Binding IsPaletteEmpty, Converter={StaticResource BoolToVisibility}}" />
+									AutomationProperties.AutomationId="Devices.Wiring.SuggestionNotice"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding SuggestionText}"
+									ToolTip="{Binding SuggestionText}"
+									Visibility="{Binding IsSuggestionPrimary, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Missing"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding NoBandsNoticeText}"
+									ToolTip="{Binding NoBandsNoticeText}"
+									Visibility="{Binding IsBandsPrimary, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									AutomationProperties.AutomationId="Devices.Wiring.AppliedNotice"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding AppliedNoticeText}"
+									ToolTip="{Binding AppliedNoticeText}"
+									Visibility="{Binding IsAppliedPrimary, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									AutomationProperties.AutomationId="Devices.Wiring.LegacyNotice"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding LegacyNoticeText}"
+									ToolTip="{Binding LegacyNoticeText}"
+									Visibility="{Binding IsLegacyPrimary, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									AutomationProperties.AutomationId="Devices.Wiring.TopologyNotice"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding TopologyNoticeText}"
+									ToolTip="{Binding TopologyNoticeText}"
+									Visibility="{Binding IsTopologyPrimary, Converter={StaticResource BoolToVisibility}}" />
+								<TextBlock
+									AutomationProperties.AutomationId="Devices.Wiring.FenceNotice"
+									Style="{StaticResource W.NoticeText}"
+									Text="{Binding FenceNoticeText}"
+									ToolTip="{Binding FenceNoticeText}"
+									Visibility="{Binding IsFencePrimary, Converter={StaticResource BoolToVisibility}}" />
+							</Grid>
+						</DockPanel>
+					</Border>
+
+					<!--
+						미배치 · 빼는 곳 한 띠(창 정리 2026-10-01) — 왼쪽 "미배치 n"(센서가 있으면 칩 목록이 펼쳐진다) · 오른쪽 빼는 곳(늘 있다 — 끄는 동안만 열면
+						드롭존 등록에서 빠진다 · 끄는 동안 글자가 "여기 놓으면 …"으로 바뀐다). Delete · [고른 칸 빼기]도 그대로.
+					-->
+					<Border
+						Margin="12,6,12,8"
+						Padding="8,4"
+						Background="{DynamicResource SurfaceAltBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="1"
+						CornerRadius="6"
+						DockPanel.Dock="Bottom">
+						<DockPanel LastChildFill="True">
+							<!--  빼는 곳 — 늘 보인다(끄는 동안만 열면 드롭존 등록에서 빠진다)  -->
+							<drag:DropZoneChrome
+								Margin="10,0,0,0"
+								VerticalAlignment="Top"
+								CornerRadius="6"
+								DockPanel.Dock="Right"
+								drag:DropZone.Key="wiring-bin">
+								<Border
+									Padding="8,2"
+									Background="{DynamicResource SurfaceBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
+									BorderThickness="1"
+									CornerRadius="6"
+									ToolTip="센서를 여기(또는 미배치 칸)에 끌어 놓으면 결선에서 빠지고 뒤 센서가 당겨집니다. [되돌리기] 로 도로 넣을 수 있습니다.">
+									<StackPanel Orientation="Horizontal">
+										<md:PackIcon
+											Width="16"
+											Height="16"
+											Margin="0,0,6,0"
+											VerticalAlignment="Center"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Kind="TrayArrowDown" />
+										<TextBlock
+											Margin="0,0,8,0"
+											VerticalAlignment="Center"
+											AutomationProperties.AutomationId="Devices.Wiring.Bin.Hint"
+											Style="{StaticResource W.Hint}"
+											Text="{Binding BinHintText}" />
+										<Button
+											AutomationProperties.AutomationId="Devices.Wiring.Bin.UnplaceSelected"
+											Click="OnUnplaceSelected"
+											Content="고른 칸 빼기"
+											Style="{StaticResource Console.Button.Ghost}" />
+									</StackPanel>
+								</Border>
+							</drag:DropZoneChrome>
+							<!--  팔레트 — 미배치 센서 (WS L408-412) · 펜스 · 표 두 보기가 함께 쓴다  -->
+							<DockPanel LastChildFill="True">
+								<TextBlock
+									Margin="2,0,10,0"
+									VerticalAlignment="Center"
+									AutomationProperties.AutomationId="Devices.Wiring.Palette.Title"
+									DockPanel.Dock="Left"
+									FontSize="12"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding UnplacedStripText}" />
 								<ListBox
-									Margin="0,6,0,0"
+									MaxHeight="64"
 									AutomationProperties.AutomationId="Devices.Wiring.Palette"
 									ItemsSource="{Binding Palette}"
 									PreviewKeyDown="OnPalettePreviewKeyDown"
-									MaxHeight="96"
 									SelectionMode="Extended"
-									Style="{StaticResource Console.ReorderList}">
+									Style="{StaticResource Console.ReorderList}"
+									Visibility="{Binding IsUnplacedStripExpanded, Converter={StaticResource BoolToVisibility}}">
 									<b:Interaction.Behaviors>
 										<drag:CaptureDragBehavior
 											DisplayMemberPath="Display"
@@ -1235,8 +1372,8 @@
 									<ListBox.ItemTemplate>
 										<DataTemplate>
 											<Border
-												Margin="0,0,6,6"
-												Padding="3,2,9,2"
+												Margin="0,0,6,4"
+												Padding="3,1,9,1"
 												Background="{DynamicResource SurfaceBrush}"
 												BorderBrush="{DynamicResource BorderBrush}"
 												BorderThickness="1"
@@ -1260,42 +1397,9 @@
 										</DataTemplate>
 									</ListBox.ItemTemplate>
 								</ListBox>
-							</StackPanel>
-						</Border>
-
-						<!--  빼는 곳 — 늘 보인다(끄는 동안만 열면 드롭존 등록에서 빠진다)  -->
-						<drag:DropZoneChrome
-							Margin="0,10,0,0"
-							CornerRadius="6"
-							drag:DropZone.Key="wiring-bin">
-							<Border
-								Padding="10,8"
-								Background="{DynamicResource SurfaceAltBrush}"
-								BorderBrush="{DynamicResource BorderBrush}"
-								BorderThickness="1"
-								CornerRadius="6">
-								<DockPanel LastChildFill="True">
-									<Button
-										AutomationProperties.AutomationId="Devices.Wiring.Bin.UnplaceSelected"
-										Click="OnUnplaceSelected"
-										Content="고른 칸 빼기"
-										DockPanel.Dock="Right"
-										Style="{StaticResource Console.Button.Ghost}" />
-									<md:PackIcon
-										Width="16"
-										Height="16"
-										Margin="0,0,8,0"
-										VerticalAlignment="Center"
-										Foreground="{DynamicResource TextMutedBrush}"
-										Kind="TrayArrowDown" />
-									<TextBlock
-										VerticalAlignment="Center"
-										Style="{StaticResource W.Hint}"
-										Text="빼는 곳 — 센서를 여기(또는 미배치 칸)에 끌어 놓으면 결선에서 빠지고 뒤 센서가 당겨집니다. [되돌리기] 로 도로 넣을 수 있습니다." />
-								</DockPanel>
-							</Border>
-						</drag:DropZoneChrome>
-					</StackPanel>
+							</DockPanel>
+						</DockPanel>
+					</Border>
 
 					<Grid>
 						<Border
@@ -1473,12 +1577,31 @@
 					</Grid>
 				</DockPanel>
 
+				<!--
+					속성 칸 접기 막대(창 정리 2026-10-01) — 칸 왼쪽 가장자리의 얇은 단추. 접으면 그림이 폭을 갖고, 선택은 계속 따라가 다시 펴면 지금 선택이 보인다.
+				-->
+				<Button
+					Grid.Column="1"
+					Width="16"
+					MinWidth="0"
+					Padding="0"
+					HorizontalContentAlignment="Center"
+					VerticalAlignment="Stretch"
+					AutomationProperties.AutomationId="Devices.Wiring.DetailToggle"
+					AutomationProperties.Name="속성 칸 접기 · 펴기"
+					Click="OnToggleDetail"
+					Content="{Binding DetailToggleText}"
+					Style="{StaticResource W.EdgeToggle}"
+					ToolTip="속성 칸 접기 · 펴기" />
+
 				<!--  ── 오른쪽 — 확인 (WS L414-428) ──  -->
 				<Border
-					Grid.Column="1"
+					Grid.Column="2"
+					Width="320"
 					Background="{DynamicResource SurfaceAltBrush}"
 					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="1,0,0,0">
+					BorderThickness="1,0,0,0"
+					Visibility="{Binding IsDetailPaneOpen, Converter={StaticResource BoolToVisibility}}">
 					<DockPanel LastChildFill="True">
 						<StackPanel Margin="13,11" DockPanel.Dock="Top">
 							<TextBlock
@@ -1896,7 +2019,7 @@
 												</StackPanel>
 											</UniformGrid>
 											<TextBlock Margin="0,3,0,0" Style="{StaticResource W.Hint}" Text="오른쪽 클릭 → &quot;이 설치 방식을 이 제어기 모든 센서에 적용&quot;으로 퍼뜨립니다" />
-											<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Alt+Shift+← →  -->
+											<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Ctrl+← →(Alt+Shift+← → 도)  -->
 											<TextBlock Margin="0,8,0,0" Style="{StaticResource W.Hint}" Text="{Binding MountPanelLabel}" />
 											<StackPanel Margin="0,4,0,0" Orientation="Horizontal">
 												<Button
@@ -1908,7 +2031,7 @@
 													Click="OnMountPanelPrev"
 													Content="◀"
 													Style="{StaticResource Console.Button}"
-													ToolTip="앞(Ch1 쪽) 망 · 기둥으로 한 칸 (Alt+Shift+←)" />
+													ToolTip="앞(Ch1 쪽) 망 · 기둥으로 한 칸 (Ctrl+←)" />
 												<TextBox
 													Width="56"
 													Margin="4,0"
@@ -1928,7 +2051,7 @@
 													Click="OnMountPanelNext"
 													Content="▶"
 													Style="{StaticResource Console.Button}"
-													ToolTip="뒤(Ch2 쪽) 망 · 기둥으로 한 칸 (Alt+Shift+→)" />
+													ToolTip="뒤(Ch2 쪽) 망 · 기둥으로 한 칸 (Ctrl+→)" />
 											</StackPanel>
 										</StackPanel>
 
