@@ -52,6 +52,52 @@ public class AccountApiService : IAccountApiService
         }
     }
 
+    /// <summary>
+    /// POST /api/auth/sso-exchange — SSO PRD FR-04.
+    /// <para>본문은 <c>sso_access_token</c> 하나뿐이다(서버 <c>extra="forbid"</c> — 다른 키는 422).
+    /// 헤더 <c>X-Client-Id</c> 는 <c>ApiService</c> 가 붙인다(교환에서는 필수).</para>
+    /// <para>공용 <c>ToApiResponseAsync</c> 를 쓰지 않는다 — 그 경로의 <c>ApiError</c> 는
+    /// <c>error.details.retryable</c> 을 잃는다. 원문을 직접 읽는다.</para>
+    /// </summary>
+    public async Task<SsoExchangeResult> SsoExchangeAsync(string ssoAccessToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(ssoAccessToken))
+            return new SsoExchangeResult { Success = false, ErrorCode = "INVALID_TOKEN", Message = "SSO 토큰이 비었습니다", Retryable = true };
+
+        try
+        {
+            using var res = await _api.PostRequestAsync("auth/sso-exchange",
+                                        new SsoExchangeRequestDto { SsoAccessToken = ssoAccessToken })
+                                    .ConfigureAwait(false);
+            var status = (int)res.StatusCode;
+            var body = res.Content is null ? null : await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (res.IsSuccessStatusCode)
+            {
+                var parsed = string.IsNullOrWhiteSpace(body)
+                    ? null
+                    : Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<SsoExchangeResponseDataDto>>(body);
+
+                // 성공인데 토큰이 비면 계약 불일치 — 재시도해도 같으므로 재시도 불가로 올린다.
+                if (parsed?.Data is null || string.IsNullOrEmpty(parsed.Data.AccessToken))
+                    return new SsoExchangeResult
+                    {
+                        Success = false, StatusCode = status, ErrorCode = "INVALID_TOKEN_RESPONSE",
+                        Message = "교환 응답에 토큰이 없습니다 — API 판 확인 필요", Retryable = false,
+                    };
+
+                return SsoExchangeResult.Ok(parsed.Data, status);
+            }
+
+            int? retryAfter = res.Headers.RetryAfter?.Delta is { } d ? (int)Math.Ceiling(d.TotalSeconds) : null;
+            return SsoExchangeErrorClassifier.FromErrorBody(body, status, retryAfter);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            return SsoExchangeResult.NetworkFailure(ex.Message);
+        }
+    }
+
     public async Task<ApiResponse<TokenDataDto>> RefreshAsync(string refreshToken, CancellationToken ct = default)
     {
         try
