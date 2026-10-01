@@ -43,7 +43,11 @@ public sealed class SsoSessionCoordinator
     /// <summary>훅에 꽂는 델리게이트 — 한 번 만들어 두고 같은 인스턴스로 꽂고 뗀다(누가 꽂았는지 가리기 위해).</summary>
     private readonly Func<CancellationToken, Task<SsoReauthOutcome>> _hook;
 
-    /// <summary>에이전트 사건 구독(<see cref="ISsoAgentGateway.Watch"/>). SSO 로그인 동안만 열려 있다.</summary>
+    /// <summary>
+    /// 에이전트 사건 구독(<see cref="ISsoAgentGateway.Watch"/>). <b>앱이 떠 있는 내내</b> 열어 둔다(첫 시작 시도 때 연다) —
+    /// 종료 요청(exit-requested)은 비밀번호 로그인 중 · 로그인 화면에서도 받아야 하고, 에이전트가 늦게 떠도 SDK 가 혼자 다시 붙는다.
+    /// 로그아웃 사건은 SSO 세션에만, 복귀 사건은 기다리는 중에만 적용한다(각 처리기에서 거른다).
+    /// </summary>
     private IAsyncDisposable? _watch;
     private readonly object _watchGate = new();
 
@@ -114,20 +118,15 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public void Disable()
     {
-        // 다른 조정자가 꽂은 훅까지 지우지 않는다.
+        // 다른 조정자가 꽂은 훅까지 지우지 않는다. 구독은 그대로 — 앱 수명 동안 열려 있다(종료 요청 · 복귀를 듣는다).
         if (ReferenceEquals(BearerAuthHandler.SsoReauthenticator, _hook))
             BearerAuthHandler.SsoReauthenticator = null;
-        if (!IsAwaitingAgentReturn) StopWatch();
     }
 
     /// <summary>
     /// 에이전트 복귀 기다림을 끝낸다 — 사람이 비밀번호로 들어갔을 때. 이후 에이전트 쪽 동작으로 로그인이 바뀌지 않는다.
     /// </summary>
-    public void CancelAgentReturn()
-    {
-        Interlocked.Exchange(ref _awaitingAgentReturn, 0);
-        if (!IsEnabled) StopWatch();   // SSO 세션이면 구독은 계속(끝 사건을 들어야 한다)
-    }
+    public void CancelAgentReturn() => Interlocked.Exchange(ref _awaitingAgentReturn, 0);
 
     /// <summary>훅이 지금 이 조정자를 가리키는가.</summary>
     public bool IsEnabled => ReferenceEquals(BearerAuthHandler.SsoReauthenticator, _hook);
@@ -139,20 +138,23 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public async Task<SsoSignInResult> TrySignInAsync(CancellationToken ct = default)
     {
+        // 구독은 결과와 상관없이 먼저 연다 — 에이전트가 아직 없어도 SDK 가 간격을 늘려 가며 다시 붙는다.
+        StartWatch();
+
         // 에이전트 없는 PC 는 상시 경로다 — 파이프 연결 대기(최대 1.5초) 없이 곧바로 평소 로그인 화면.
+        // 나중에 에이전트가 떠 사람이 로그인하면(session-available · login) 따라 들어간다 — 사람이 GIS 에서 로그아웃한 게 아니다.
         if (!_agent.IsAgentPresent())
+        {
+            Interlocked.Exchange(ref _awaitingAgentReturn, 1);
             return new SsoSignInResult { Status = SsoSignInStatus.AgentUnavailable, Message = "SSO 에이전트가 실행 중이 아닙니다" };
+        }
 
         var agent = await _agent.SignInAsync(ct).ConfigureAwait(false);
         var result = await CompleteSignInAsync(agent, ct).ConfigureAwait(false);
 
-        // 에이전트는 있는데 세션이 없다(로그인 전 · 이 앱만 로그아웃으로 막힘) — 사람이 에이전트에서 로그인하면
-        // 저절로 들어가도록 구독해 두고 기다린다. 사람이 GIS 에서 로그아웃한 경우가 아니므로 되살려도 된다.
-        if (result.Status == SsoSignInStatus.NeedsAgentLogin)
-        {
+        // 에이전트는 있는데 세션이 없다(로그인 전 · 이 앱만 로그아웃으로 막힘) — 사람이 에이전트에서 로그인하면 저절로 들어간다.
+        if (result.Status is SsoSignInStatus.NeedsAgentLogin or SsoSignInStatus.AgentUnavailable)
             Interlocked.Exchange(ref _awaitingAgentReturn, 1);
-            StartWatch();
-        }
         return result;
     }
 
@@ -265,9 +267,9 @@ public sealed class SsoSessionCoordinator
     /// <summary>사건으로 로그아웃된 뒤 로그인 화면에 보여 줄 안내(사람이 읽는 다음 행동).</summary>
     internal static string NoticeFor(SsoEventAction a) => a switch
     {
-        SsoEventAction.AppSignedOut => "SSO 에이전트에서 이 프로그램을 로그아웃했습니다. 다시 쓰려면 [SSO 로 로그인] 을 누르세요.",
+        SsoEventAction.AppSignedOut => "SSO 에이전트에서 이 프로그램을 로그아웃했습니다. 에이전트에서 [다시 로그인] 하면 자동으로 돌아오고, [SSO 로 로그인] 을 눌러도 됩니다.",
         SsoEventAction.AppBlocked => "관리자가 이 프로그램의 SSO 로그인을 막았습니다. 관리자에게 문의하세요.",
-        SsoEventAction.SessionEnded => "SSO 에이전트에서 로그아웃되었습니다.",
+        SsoEventAction.SessionEnded => "SSO 에이전트에서 로그아웃되었습니다. 에이전트에 다시 로그인하면 자동으로 돌아옵니다.",
         SsoEventAction.SessionRevoked => "SSO 세션이 서버에서 종료되었습니다. 다시 로그인하세요.",
         SsoEventAction.PcBlocked => "관리자가 이 PC 의 SSO 로그인을 막았습니다. 관리자에게 문의하세요.",
         _ => string.Empty,
@@ -286,7 +288,7 @@ public sealed class SsoSessionCoordinator
             if (_watch is not null) return;
             try
             {
-                _watch = _agent.Watch(OnAgentEvent, ex => _log?.Info($"[SSO] 에이전트 사건 구독 끊김(SDK 가 다시 붙는다): {ex.GetType().Name} {ex.Message}"));
+                _watch = _agent.Watch(OnAgentEvent, OnWatchError);
             }
             catch (Exception ex)
             {
@@ -297,22 +299,20 @@ public sealed class SsoSessionCoordinator
     }
 
     /// <summary>
-    /// 구독을 멈춘다. <b>기다리지 않는다</b> — SDK 의 DisposeAsync 는 사건 루프가 끝날 때까지 기다리는데,
-    /// 사건 콜백 → 강제 로그아웃 → 로그인 화면 → <see cref="Disable"/> 로 여기에 다시 오면 그 루프 안이라 기다리면 멈춘다.
+    /// 구독 오류(끊김 · 에이전트 없음) — SDK 가 혼자 다시 붙는다. 에이전트 없는 PC 에서는 계속 실패하므로
+    /// <b>10분에 한 번만</b> 남긴다(로그가 재시도로 덮이지 않게).
     /// </summary>
-    private void StopWatch()
+    private void OnWatchError(Exception ex)
     {
-        IAsyncDisposable? w;
-        lock (_watchGate) { w = _watch; _watch = null; }
-        if (w is null) return;
-        _ = DisposeQuietlyAsync(w);
+        var now = DateTime.UtcNow.Ticks;
+        var last = Interlocked.Read(ref _lastWatchErrorLogTicks);
+        if (now - last < WatchErrorLogInterval.Ticks) return;
+        if (Interlocked.CompareExchange(ref _lastWatchErrorLogTicks, now, last) != last) return;
+        _log?.Info($"[SSO] 에이전트 사건 구독 끊김(SDK 가 다시 붙는다 · 10분에 한 번 기록): {ex.GetType().Name} {ex.Message}");
     }
 
-    private async Task DisposeQuietlyAsync(IAsyncDisposable w)
-    {
-        try { await w.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception ex) { _log?.Info($"[SSO] 사건 구독 정리 중 예외(무시): {ex.GetType().Name} {ex.Message}"); }
-    }
+    private static readonly TimeSpan WatchErrorLogInterval = TimeSpan.FromMinutes(10);
+    private long _lastWatchErrorLogTicks;
 
     /// <summary>SDK 사건 콜백 — UI 스레드가 아니다. 예외를 밖으로 내지 않는다.</summary>
     private void OnAgentEvent(SsoAgentEvent e)
@@ -353,6 +353,9 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     internal async Task SignOutFromAgentAsync(SsoEventAction action)
     {
+        // 구독은 앱 수명 내내 열려 있으므로 비밀번호 로그인 중에도 사건이 온다 — SSO 세션(훅이 꽂혀 있음)일 때만 끝낸다.
+        // 에이전트에서 로그아웃했다고 비밀번호로 들어온 사람을 끊으면 안 된다.
+        if (!IsEnabled) { _log?.Info($"[SSO] {action} — SSO 로 로그인한 세션이 아니라 무시"); return; }
         if (Interlocked.CompareExchange(ref _signingOut, 1, 0) != 0) return;   // 겹친 사건 — 한 번만
         try
         {
@@ -387,11 +390,6 @@ public sealed class SsoSessionCoordinator
         catch (Exception ex)
         {
             _log?.Warning($"[SSO] 에이전트 사건 로그아웃 처리 예외: {ex.GetType().Name} {ex.Message}");
-        }
-        finally
-        {
-            // 복귀를 기다리면 구독을 남긴다(로그인 화면에서도 session-available 을 들어야 한다). 차단이면 멈춘다.
-            if (!IsAwaitingAgentReturn) StopWatch();
         }
     }
 
@@ -456,12 +454,15 @@ public sealed class SsoSessionCoordinator
             var outcome = agent.Status switch
             {
                 // 에이전트 세션이 끝났다(사용자 로그아웃·에이전트 재시작) — 재교환해도 소용없다. 로그인 화면으로.
+                // 사건을 놓치고 여기서 알게 됐어도 에이전트 쪽 사정이다 — 다시 로그인하면 따라 들어가도록 기다린다(아래).
                 SsoAgentStatus.NoActiveSession => SsoReauthOutcome.Terminal,
                 SsoAgentStatus.NotRegistered => SsoReauthOutcome.Terminal,
                 // 에이전트가 잠깐 내려갔거나(업데이트 중 등) 서버에 못 닿았다 — 세션을 죽이지 않는다.
                 _ => SsoReauthOutcome.Transient,
             };
             _log?.Warning($"[SSO] 재교환 — 에이전트 {agent.Status} → {outcome} ({agent.Detail})");
+            if (agent.Status == SsoAgentStatus.NoActiveSession)
+                Interlocked.Exchange(ref _awaitingAgentReturn, 1);
             return outcome;
         }
 

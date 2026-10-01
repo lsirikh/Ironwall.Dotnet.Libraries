@@ -62,28 +62,31 @@ public partial class SsoSessionCoordinatorTests
         Assert.Equal(1, agent.WatchOpened);
     }
 
+    /// <summary>구독은 앱 수명 내내 — 로그인이 실패해도 연다(종료 요청은 로그인 화면에서도 받아야 한다).</summary>
     [Fact]
-    public async Task should_not_watch_when_sso_sign_in_fails()
+    public async Task should_watch_even_when_sso_sign_in_fails()
     {
-        // NoActiveSession 은 복귀를 기다리며 구독한다(SsoAgentReturnTests) — 여기서는 기다릴 이유가 없는 실패.
         var (sut, agent, _, _, _) = SignedInWithLifecycle(agent: new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.NotRegistered, "x") });
 
         await sut.TrySignInAsync();
 
-        Assert.False(sut.IsWatching);
-        Assert.Equal(0, agent.WatchOpened);
+        Assert.True(sut.IsWatching);
+        Assert.Equal(1, agent.WatchOpened);
+        Assert.False(sut.IsAwaitingAgentReturn);   // 미등록은 사람이 에이전트에서 로그인한다고 풀리지 않는다
     }
 
+    /// <summary>로그인 화면이 열릴 때 부르는 Disable 은 재교환 훅만 뗀다 — 구독은 남아 종료 요청 · 복귀를 듣는다.</summary>
     [Fact]
-    public async Task should_stop_watching_when_disabled()
+    public async Task should_keep_watching_but_unhook_when_disabled()
     {
         var (sut, agent, _, _, _) = SignedInWithLifecycle();
         await sut.TrySignInAsync();
 
         sut.Disable();
 
-        Assert.False(sut.IsWatching);
-        Assert.Equal(1, Volatile.Read(ref agent.WatchDisposed));
+        Assert.False(sut.IsEnabled);
+        Assert.True(sut.IsWatching);
+        Assert.Equal(0, Volatile.Read(ref agent.WatchDisposed));
     }
 
     [Fact]

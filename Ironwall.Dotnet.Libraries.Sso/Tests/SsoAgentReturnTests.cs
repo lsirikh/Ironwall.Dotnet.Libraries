@@ -99,7 +99,7 @@ public partial class SsoSessionCoordinatorTests
         Assert.False(store.IsAuthenticated);
         Assert.Empty(returned);
         Assert.Single(api.Tokens);
-        Assert.False(sut.IsWatching);
+        Assert.True(sut.IsWatching);   // 구독은 남는다(종료 요청) — 복귀만 하지 않는다
     }
 
     [Fact]
@@ -115,7 +115,6 @@ public partial class SsoSessionCoordinatorTests
 
         Assert.Equal("pw-token", store.AccessToken);
         Assert.Empty(returned);
-        Assert.False(sut.IsWatching);
     }
 
     [Fact]
@@ -140,7 +139,6 @@ public partial class SsoSessionCoordinatorTests
         await sut.SignOutFromAgentAsync(SsoEventAction.AppBlocked);
 
         Assert.False(sut.IsAwaitingAgentReturn);   // 차단은 사람이 풀어야 한다 — SSO 1.4 에 차단 해제 사건 없음
-        Assert.False(sut.IsWatching);
     }
 
     /// <summary>앱 시작 때 에이전트에 세션이 없으면(로그인 전 · 막힘) — 사람이 에이전트에서 로그인하면 따라 들어온다.</summary>
@@ -221,5 +219,93 @@ public partial class SsoSessionCoordinatorTests
         Assert.Equal("user", exits[0].Reason);
         Assert.True(store.IsAuthenticated);   // 로그아웃은 종료 경로(종료 로그아웃)가 한다 — 여기서 하지 않는다
         Assert.Equal(0, api.LogoutCalls);
+    }
+
+    // ══ 검토(2026-10-02)로 고친 것 — 구독 수명 · 세션 종류 ═══════════
+
+    /// <summary>비밀번호로 로그인한 세션은 에이전트 로그아웃 사건으로 끊지 않는다(구독이 앱 수명 내내 열려 있으므로).</summary>
+    [Fact]
+    public async Task should_ignore_agent_sign_out_during_password_session()
+    {
+        var agent = new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.NoActiveSession, "x") };
+        var (sut, _, api, store, life, _) = WithLifecycle(agent);
+        await sut.TrySignInAsync();                 // SSO 안 됨 → 로그인 화면
+        sut.CancelAgentReturn();                    // 비밀번호로 들어옴
+        store.SetTokens("pw-token", "pw-refresh");
+        var logouts = new List<EnumRevokeReason>();
+        life.ForceLogoutRequested += r => logouts.Add(r);
+
+        await sut.SignOutFromAgentAsync(SsoEventAction.SessionEnded);
+        await sut.SignOutFromAgentAsync(SsoEventAction.AppSignedOut);
+
+        Assert.Equal("pw-token", store.AccessToken);
+        Assert.Equal(0, api.LogoutCalls);
+        Assert.Empty(logouts);
+    }
+
+    /// <summary>비밀번호 로그인 중에도 에이전트 [프로그램 종료] 는 받는다.</summary>
+    [Fact]
+    public async Task should_receive_exit_request_during_password_session()
+    {
+        var agent = new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.NoActiveSession, "x") };
+        var (sut, _, _, store, _, _) = WithLifecycle(agent);
+        var exits = 0;
+        sut.ExitRequested += _ => exits++;
+        await sut.TrySignInAsync();
+        sut.CancelAgentReturn();
+        store.SetTokens("pw-token", "pw-refresh");
+
+        agent.Raise("exit-requested", "user");
+
+        Assert.Equal(1, exits);
+    }
+
+    /// <summary>GIS 에서 직접 로그아웃한 로그인 화면에서도 [프로그램 종료] 를 받는다.</summary>
+    [Fact]
+    public async Task should_receive_exit_request_after_manual_gis_logout()
+    {
+        var (sut, agent, _, _, life, _) = WithLifecycle();
+        var exits = 0;
+        sut.ExitRequested += _ => exits++;
+        await sut.TrySignInAsync();
+        life.ForceLogoutOnce(EnumRevokeReason.Manual);
+        sut.Disable();
+
+        agent.Raise("exit-requested", "user");
+
+        Assert.Equal(1, exits);
+    }
+
+    /// <summary>에이전트 없이 켰다가 나중에 에이전트가 떠 사람이 로그인하면 따라 들어간다.</summary>
+    [Fact]
+    public async Task should_watch_and_await_return_when_agent_absent_at_startup()
+    {
+        var agent = new FakeAgent { Present = false };
+        var (sut, _, _, store, _, returned) = WithLifecycle(agent);
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.Equal(SsoSignInStatus.AgentUnavailable, r.Status);
+        Assert.True(sut.IsWatching);
+        Assert.True(sut.IsAwaitingAgentReturn);
+
+        await sut.ReturnFromAgentAsync("login");
+        Assert.True(store.IsAuthenticated);
+        Assert.Single(returned);
+    }
+
+    /// <summary>사건을 놓치고 401 재교환에서 에이전트 세션 종료를 알게 돼도 복귀를 기다린다.</summary>
+    [Fact]
+    public async Task should_await_return_when_reauth_finds_agent_session_gone()
+    {
+        var agent = new FakeAgent();
+        var (sut, _, _, _, _, _) = WithLifecycle(agent);
+        await sut.TrySignInAsync();
+        agent.Next = SsoAgentResult.Fail(SsoAgentStatus.NoActiveSession, "x");
+
+        var o = await sut.ReauthenticateAsync(CancellationToken.None);
+
+        Assert.Equal(Ironwall.Dotnet.Libraries.Accounts.Api.Handlers.SsoReauthOutcome.Terminal, o);
+        Assert.True(sut.IsAwaitingAgentReturn);
     }
 }
