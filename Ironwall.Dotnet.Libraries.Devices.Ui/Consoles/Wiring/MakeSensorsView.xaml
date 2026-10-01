@@ -38,7 +38,7 @@
 		BodyScroll="Disabled"
 		DialogKey="Devices.Wiring.Make"
 		IsPrimaryEnabled="{Binding CanMake}"
-		Kind="규칙은 모든 줄에 적용됩니다 — [저장하기]를 눌러야 저장됩니다"
+		HelpKey="Devices.Wiring.Make"
 		PrimaryAutomationId="Devices.Wiring.Make.Accept"
 		PrimaryInvoked="OnAccept"
 		PrimaryText="만들기"
@@ -109,7 +109,7 @@
 					AutomationProperties.AutomationId="Devices.Wiring.Make.NameRule"
 					Style="{StaticResource M.Box}"
 					Text="{Binding NameRule, UpdateSourceTrigger=PropertyChanged}"
-					ToolTip="{}{번호} 자리에 그 줄의 번호가 들어갑니다" />
+					ToolTip="{}{번호} = 그 줄의 번호" />
 
 				<TextBlock Grid.Row="4" Style="{StaticResource M.Label}" Text="종류" />
 				<ComboBox

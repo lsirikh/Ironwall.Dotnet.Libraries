@@ -175,7 +175,7 @@ public sealed class MakeSensorsViewModel : Screen
     public string Summary => HasError ? Error!
         : HasConflict && SkipConflicts ? $"{MakeCount}줄을 만듭니다 — 이미 있는 번호 {ConflictCount}줄은 건너뜁니다."
         : HasConflict ? $"이미 있는 번호 {ConflictCount}줄이 있습니다 — 건너뛰기를 켜거나 시작 번호를 바꾸세요."
-        : $"{MakeCount}줄을 추가합니다 — [저장하기]를 눌러야 저장됩니다.";
+        : $"{MakeCount}줄을 추가합니다.";
 
     public bool CanMake => !HasError && MakeCount > 0 && (SkipConflicts || !HasConflict);
 
@@ -306,7 +306,6 @@ public sealed class PasteReportViewModel : Screen
     public bool HasColumns => Columns.Count > 0;
 
     public string Summary => Report.Summary;
-    public string ColumnText => "열마다 무엇으로 읽을지 고르세요 — 머리글이 있으면 자동으로 맞춰 둡니다.";
     public bool HasRejected => Report.Rejected.Count > 0;
     public string MoreAcceptedText => Report.Accepted.Count > SHOW_LIMIT ? $"… 외 {Report.Accepted.Count - SHOW_LIMIT}줄" : string.Empty;
     public string MoreRejectedText => Report.Rejected.Count > SHOW_LIMIT ? $"… 외 {Report.Rejected.Count - SHOW_LIMIT}줄" : string.Empty;

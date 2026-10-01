@@ -20,6 +20,7 @@
 		Backdrop="{DynamicResource BgBrush}"
 		BodyScroll="Disabled"
 		DialogKey="Devices.Wiring.Paste"
+		HelpKey="Devices.Wiring.Paste"
 		IsPrimaryEnabled="{Binding CanApply}"
 		PrimaryAutomationId="Devices.Wiring.Paste.Accept"
 		PrimaryInvoked="OnAccept"
@@ -36,13 +37,6 @@
 			DockPanel.Dock="Top"
 			FontSize="13"
 			Text="{Binding Summary}"
-			TextWrapping="Wrap" />
-		<TextBlock
-			Margin="0,4,0,0"
-			DockPanel.Dock="Top"
-			FontSize="12"
-			Foreground="{DynamicResource TextMutedBrush}"
-			Text="{Binding ColumnText}"
 			TextWrapping="Wrap" />
 
 		<!--  열 매핑(W7) — 바꾸면 그 자리에서 다시 읽는다  -->

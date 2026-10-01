@@ -405,14 +405,13 @@ public class WiringFenceViewTests
     }
 
     [Fact]
-    public void should_keep_the_hint_off_the_drawing_and_open_the_full_help_from_the_toolbar_question_button()
+    public void should_drop_the_hint_line_and_open_the_full_help_from_the_toolbar_question_button()
     {
         var result = OnWindow(Ring(3), (vm, canvas) =>
         {
             var view = (FenceView)Window.GetWindow(canvas)!.Content;
-            var hint = Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint");
-            var hintTop = hint.TranslatePoint(new Point(0, 0), canvas).Y;
-            var hintBottom = hintTop + hint.ActualHeight;
+            // help-callout H-2 — 도구줄 오른쪽 한 줄 안내(Devices.Wiring.Fence.Hint)는 "?" 로 합쳤다.
+            var hints = Descendants<TextBlock>(view).Count(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint");
             // help-callout H-1 — 옛 [?] 를 공용 "?"(HelpTip)로. 헤디드 SC-FEN-013 이 쓰는 두 id(단추 · 몸)는 그대로 잇는다.
             var toggle = Descendants<Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Help");
             var popup = toggle.CalloutPopup!;
@@ -425,32 +424,33 @@ public class WiringFenceViewTests
             var titled = toggle.Entry?.Title;
             toggle.IsChecked = false;
             Pump();
-            return (hintTop, hintBottom, CanvasHeight: canvas.ActualHeight, opened, Closed: !popup.IsOpen, helpId, helpText, titled, toggle.HelpKey,
+            return (hints, opened, Closed: !popup.IsOpen, helpId, helpText, titled, toggle.HelpKey,
                 ToggleType: UIElementAutomationPeer.CreatePeerForElement(toggle).GetAutomationControlType());
         });
 
-        Assert.True(result.hintBottom <= 0 || result.hintTop >= result.CanvasHeight, $"안내 {result.hintTop}~{result.hintBottom} · 캔버스 높이 {result.CanvasHeight}");   // 그림 위에 겹치지 않는다(도구줄 오른쪽)
-        Assert.True(result.hintBottom <= 0);                                   // 창 정리 2026-10-01 — 바닥 띠를 없애고 도구줄로
+        Assert.Equal(0, result.hints);                                         // 한 줄 안내는 화면에서 빠졌다
         Assert.True(result.opened);
         Assert.True(result.Closed);
         Assert.Equal("Devices.Wiring.Fence.HelpText", result.helpId);           // 옛 몸 id(별칭) 유지
         Assert.Contains("Shift+끌기", result.helpText);                         // 헤디드가 읽는 글 — 말풍선 몸 이름(평문)
+        Assert.Contains("오른쪽 클릭 = 메뉴", result.helpText);                  // 옛 한 줄 안내의 말이 말풍선에 남는다
+        Assert.Contains("탐지 반경", result.helpText);                           // 도구줄 단추의 문장형 툴팁도 말풍선으로
         Assert.Equal("Devices.Wiring.Fence", result.HelpKey);                   // 문구는 설명 목록(DevicesHelp) 한 곳
         Assert.Equal("펜스 보기 조작", result.titled);
         Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, result.ToggleType);
     }
 
     [Fact]
-    public void should_join_korean_words_in_the_hint_so_it_breaks_only_at_spaces()
+    public void should_list_the_ctrl_path_before_the_alt_shift_path_when_the_fence_help_names_moving_to_another_panel()
     {
-        var hint = OnWindow(Ring(3), (vm, canvas) =>
-        {
-            var view = (FenceView)Window.GetWindow(canvas)!.Content;
-            return Descendants<TextBlock>(view).Single(t => AutomationProperties.GetAutomationId(t) == "Devices.Wiring.Fence.Hint").Text;
-        });
+        // 한국어 Windows 는 Alt 를 먼저 누른 Alt+Shift 를 입력 언어 전환이 먹는다 — 주 경로는 Ctrl(FenceCanvas.IsPanelMoveKey)
+        var help = Ironwall.Dotnet.Libraries.Utils.Consoles.HelpCatalog.Find("Devices.Wiring.Fence")!.ToPlainText();
 
-        Assert.Contains("⁠", hint);
-        Assert.Equal("왼쪽 끌기", Ironwall.Dotnet.Libraries.Utils.Consoles.KoreanWordWrap.Strip(hint).Split(" = ")[0]);
+        var ctrl = help.IndexOf("Ctrl+←/→", System.StringComparison.Ordinal);
+        var altShift = help.IndexOf("Alt+Shift+←/→", System.StringComparison.Ordinal);
+
+        Assert.True(ctrl >= 0 && altShift > ctrl, help);
+        Assert.True(FenceCanvas.IsPanelMoveKey(false, System.Windows.Input.Key.Right, System.Windows.Input.ModifierKeys.Control));
     }
 
     #region - Zoom · fit (FR-06) -
