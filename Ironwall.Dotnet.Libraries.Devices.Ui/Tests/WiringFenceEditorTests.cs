@@ -249,14 +249,16 @@ public class WiringFenceEditorTests
 
     #region - Numbering (FR-09 · FR-10 · FR-11) -
     [Fact]
-    public void should_number_the_mixed_ring_one_to_seven_and_101_to_105_when_the_tier4_preset_is_chosen()
+    public void should_put_fence_sensors_on_the_upper_lane_and_number_both_lanes_away_from_the_controller_when_the_tier4_preset_is_chosen()
     {
         var (vm, _, _, _) = Build(MIXED);
 
         vm.ChooseBandPreset(NumberBandSet.PRESET_TIER4);
         var numbers = vm.FenceChain.Keys.Select(k => vm.Board.Find(k)!.Facts.Number).ToList();
 
-        Assert.Equal(new[] { 1, 101, 2, 3, 102, 103, 4, 104, 5, 6, 105, 7 }, numbers);
+        // 사슬 = 아래 줄(스마트 · 제어기 쪽 → 먼 끝) → 위 줄(펜스센서 · 먼 끝 → 제어기 쪽). 번호는 줄마다 제어기에서 멀어질수록 커진다(§1-0b).
+        Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 105, 104, 103, 102, 101 }, numbers);
+        Assert.All(vm.FenceChain.Keys.Skip(7), k => Assert.Equal(FenceLane.Upper, vm.FenceLayout.LaneOf(k)));
         Assert.Contains("중요시설 4차", vm.BandText);
         Assert.False(WiringValidation.BlocksSave(vm.Issues));
     }

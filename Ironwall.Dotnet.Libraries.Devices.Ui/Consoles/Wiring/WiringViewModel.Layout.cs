@@ -164,10 +164,10 @@ public sealed partial class WiringViewModel
             var known = document.Mounts
                 .Where(p => chain.Contains(p.Key) && _board.Find(p.Key) is { Id: > 0 })
                 .ToDictionary(p => p.Key, p => p.Value);
-            var baseline = WiringFenceLayout.Create(document.Panels, known, document.Bands);
-            var storedOrder = FenceLayoutMath.PositionOrder(baseline.Mounts.Select(p => (p.Key, p.Value)), chain);
-            var (mounts, panels) = FenceLayoutMath.Reconcile(storedOrder, chain, baseline.Mounts, baseline.Panels, _board.CategoryOf);
-            var layout = WiringFenceLayout.Create(panels, mounts, document.Bands);
+            var baseline = WiringFenceLayout.Create(document.Panels, known, document.Bands, controllerEnd: document.ControllerEnd, vbusGap: document.VbusGap);
+            var storedOrder = FenceLayoutMath.ChainOrder(baseline.Mounts.Select(p => (p.Key, p.Value)), document.ControllerEnd, chain);
+            var (mounts, panels) = FenceLayoutMath.Reconcile(storedOrder, chain, baseline.Mounts, baseline.Panels, _board.CategoryOf, document.ControllerEnd);
+            var layout = WiringFenceLayout.Create(panels, mounts, document.Bands, controllerEnd: document.ControllerEnd, vbusGap: document.VbusGap);
             if (!storedOrder.SequenceEqual(chain.Where(baseline.Mounts.ContainsKey))) _fenceNotice = FENCE_REORDERED_NOTICE;
             else if (!layout.SameContent(baseline)) _fenceNotice = FENCE_RESEATED_NOTICE;
             _board.LoadFenceLayout(layout, baseline);
@@ -733,11 +733,12 @@ public sealed partial class WiringViewModel
         var mounts = layout.Mounts.ToDictionary(p => p.Key, p => moving.Contains(p.Key) ? FenceLayoutMath.MoveBy(p.Value, delta, layout.Panels) : p.Value);
         var rest = _board.Chain.Keys.Where(k => !moving.Contains(k)).ToList();
         var tie = delta > 0 ? rest.Concat(moving).ToList() : moving.Concat(rest).ToList();
-        var order = FenceLayoutMath.PositionOrder(mounts.Select(p => (p.Key, p.Value)), tie).ToList();
+        var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), layout.ControllerEnd, tie).ToList();
         var target = mounts[grabbedKey];
         var place = $"{(target.IsPostSpot ? "기둥" : "망")} {target.Panel + 1} · {SensorMountSpec.SpotText(target.Spot)}";
+        var numbering = FenceLayoutMath.NumberingOrder(order, k => mounts.TryGetValue(k, out var m) ? m.Lane : FenceLane.Lower, _board.NumberingDirection);
         var number = layout.Bands is { } bands
-            && NumberingMath.Assign(order.Select(k => (k, _board.CategoryOf(k))), bands).TryGetValue(grabbedKey, out var n) ? $" · 번호 {n}" : string.Empty;
+            && NumberingMath.Assign(numbering.Select(k => (k, _board.CategoryOf(k))), bands).TryGetValue(grabbedKey, out var n) ? $" · 번호 {n}" : string.Empty;
         return $"위치 {order.IndexOf(grabbedKey) + 1} · {place}{number}";
     }
 
@@ -908,9 +909,11 @@ public sealed partial class WiringViewModel
     private int NumberChangesIf(IReadOnlyDictionary<int, SensorMountSpec> mounts)
     {
         if (_board.FenceLayout.Bands is not { } bands) return 0;
-        var order = FenceLayoutMath.PositionOrder(mounts.Where(p => _board.Find(p.Key) is not null).Select(p => (p.Key, p.Value)), _board.Chain.Keys);
-        if (order.SequenceEqual(_board.Chain.Keys)) return 0;
-        return NumberingMath.Assign(order.Select(k => (k, _board.CategoryOf(k))), bands)
+        var order = FenceLayoutMath.ChainOrder(mounts.Where(p => _board.Find(p.Key) is not null).Select(p => (p.Key, p.Value)),
+                                               _board.FenceLayout.ControllerEnd, _board.Chain.Keys);
+        var numbering = FenceLayoutMath.NumberingOrder(order, k => mounts.TryGetValue(k, out var m) ? m.Lane : FenceLane.Lower, _board.NumberingDirection);
+        if (order.SequenceEqual(_board.Chain.Keys) && numbering.SequenceEqual(_board.NumberingOrder())) return 0;
+        return NumberingMath.Assign(numbering.Select(k => (k, _board.CategoryOf(k))), bands)
                             .Count(p => _board.Find(p.Key) is { } row && row.Facts.Number != p.Value);
     }
 
@@ -1037,7 +1040,9 @@ public sealed partial class WiringViewModel
     {
         if (IsBusy || !_board.FenceLayout.IsActive) return false;
         _board.PushUndo();
-        if (!_board.SetNumberBands(bands))
+        // 4차를 처음 고르면(아직 모두 아래 줄) 펜스센서를 위 줄로 — 같은 되돌리기 한 걸음(FR-18 기본값).
+        var lanesSet = bands?.Preset == NumberBandSet.PRESET_TIER4 && !_board.FenceLayout.HasUpperSensors && ApplyDefaultLanes(bands);
+        if (!_board.SetNumberBands(bands) && !lanesSet)
         {
             _board.Undo();
             StatusText = "바뀐 것이 없습니다.";
@@ -1049,8 +1054,23 @@ public sealed partial class WiringViewModel
         var pending = _board.Rows.Count(r => r.Facts.Number != r.Baseline.Number);
         StatusText = bands is null
             ? "번호 대역을 껐습니다 — 번호는 지금 값 그대로입니다."
-            : $"번호 대역 {bands.PresetText} — 위치 순서대로 번호를 매겼습니다 · 번호 {renumbered}대 바뀜(저장 대기 {pending}대). {NUMBER_WARNING}.";
+            : $"번호 대역 {bands.PresetText} — 위치 순서대로 번호를 매겼습니다 · 번호 {renumbered}대 바뀜(저장 대기 {pending}대)"
+              + (lanesSet ? " · 펜스센서를 위 줄로 옮겼습니다" : string.Empty) + $". {NUMBER_WARNING}.";
         return true;
+    }
+
+    /// <summary>대역 프리셋의 기본 줄을 매긴다(FR-18) — 바뀐 센서가 있으면 <c>true</c>. 되돌리기는 부르는 쪽.</summary>
+    private bool ApplyDefaultLanes(NumberBandSet? bands)
+    {
+        var mounts = _board.FenceLayout.Mounts;
+        var changed = mounts.Where(p => p.Value.Lane != FenceLayoutMath.DefaultLane(_board.CategoryOf(p.Key), bands)).Select(p => p.Key).ToList();
+        if (changed.Count == 0) return false;
+        var upper = changed.Where(k => FenceLayoutMath.DefaultLane(_board.CategoryOf(k), bands) == FenceLane.Upper).ToList();
+        var lower = changed.Except(upper).ToList();
+        var ok = false;
+        if (upper.Count > 0) ok |= _board.SetLanes(upper, FenceLane.Upper);
+        if (lower.Count > 0) ok |= _board.SetLanes(lower, FenceLane.Lower);
+        return ok;
     }
 
     private void RefreshBandRows()
@@ -1080,6 +1100,8 @@ public sealed partial class WiringViewModel
                 .ToDictionary(p => _board.Find(p.Key)!.Id, p => p.Value with { FacesBack = _board.FacingOf(p.Key) == WiringFacing.Back }),
             Bands = layout.Bands,
             FenceSpacingM = _board.Spacing.FenceMetres,
+            ControllerEnd = layout.ControllerEnd,
+            VbusGap = layout.VbusGap,
             Revision = _fenceRevision,
         };
         FenceLayoutSaveResult result;

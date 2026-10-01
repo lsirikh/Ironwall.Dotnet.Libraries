@@ -210,48 +210,104 @@ public static class FenceLayoutMath
         => Normalize(mount with { Panel = mount.Panel + delta }, panels);
     #endregion
 
-    #region - Chain ↔ seats (FR-09 · FR-12) -
+    #region - Lanes (FR-18 · FR-19 · §1-0b) -
     /// <summary>
-    /// 체인 순서가 바뀌었을 때 자리를 맞춘다. <b>위치 묶음은 그대로 두고 센서가 위치를 나눠 갖는다</b> — 남은 센서의 위치를 위치 순으로 줄 세워
-    /// 새 체인 순서대로 하나씩 준다(표 · 개념도에서 순서를 바꾸면 펜스 위 자리가 따라간다). 단 <b>센서가 가져가는 것은 망(기둥) 번호뿐</b>이다 —
-    /// 자리 종류(기둥 위 · 기둥 중간 · 망 가운데 · 담) · 높이 조정 · 보는 쪽은 센서를 따라간다(순서를 바꿨다고 남의 설치 방식을 넘겨받지 않는다).
-    /// 받은 위치가 제 자리 종류와 맞지 않으면(기둥 센서가 망 가운데 위치를 받으면) 가장 가까운 제 종류 칸으로 가되, 앞 센서보다 앞서지 않는다.
-    /// 새로 붙은 센서는 새 체인의 이웃 사이 자리(<see cref="SeatBetween"/> · 끝이면 다음 자리 — 망이 모자라면 끝 망을 본떠 늘린다), 빠진 센서의 자리는 비운다.
+    /// 그 줄에서 사슬이 가는 쪽 — +1 = 왼쪽 → 오른쪽(자리 값이 커지는 쪽), −1 = 오른쪽 → 왼쪽.
+    /// 아래 줄은 제어기 쪽 → 먼 끝, 위 줄은 먼 끝 → 제어기 쪽이다.
+    /// </summary>
+    public static int LaneDirection(FenceLane lane, FenceControllerEnd end)
+        => (lane == FenceLane.Lower) == (end == FenceControllerEnd.Left) ? 1 : -1;
+
+    /// <summary>갈래의 기본 줄(FR-18) — 4차 프리셋이면 펜스센서 = 위 줄, 그 밖은 아래 줄. 4차가 아니면 전부 아래 줄.</summary>
+    public static FenceLane DefaultLane(FenceSensorCategory category, NumberBandSet? bands)
+        => bands?.Preset == NumberBandSet.PRESET_TIER4 && category == FenceSensorCategory.Fence ? FenceLane.Upper : FenceLane.Lower;
+
+    /// <summary>사슬 위 위치 열쇠 — 아래 줄 먼저, 줄 안에서는 사슬이 가는 쪽으로(같은 칸이면 기둥 위 → 기둥 중간).</summary>
+    private static (int Lane, int Slot, int Rank) PathKey(SensorMountSpec mount, FenceControllerEnd end)
+    {
+        var seat = SeatOf(mount);
+        return ((int)mount.Lane, LaneDirection(mount.Lane, end) * seat.Slot, seat.Rank);
+    }
+
+    /// <summary>
+    /// 사슬 순서(FR-19 · 위치 순서 규칙을 대신한다) — 아래 줄(제어기 쪽 → 먼 끝) → 위 줄(먼 끝 → 제어기 쪽). 같은 자리끼리는
+    /// <paramref name="tieOrder"/>(지금 사슬 순서)를 지킨다.
+    /// </summary>
+    public static IReadOnlyList<int> ChainOrder(IEnumerable<(int Key, SensorMountSpec Mount)> mounts, FenceControllerEnd end, IReadOnlyList<int>? tieOrder = null)
+    {
+        var rank = new Dictionary<int, int>();
+        if (tieOrder is not null)
+            for (var i = 0; i < tieOrder.Count; i++) rank.TryAdd(tieOrder[i], i);
+        return (mounts ?? Enumerable.Empty<(int, SensorMountSpec)>())
+            .OrderBy(t => PathKey(t.Mount, end))
+            .ThenBy(t => rank.TryGetValue(t.Key, out var r) ? r : int.MaxValue)
+            .ThenBy(t => t.Key)
+            .Select(t => t.Key)
+            .ToList();
+    }
+
+    /// <summary>
+    /// 번호를 매기는 차례(§1-0b 번호 방향) — 기본(<see cref="FenceNumberingDirection.AwayFromController"/>)은 줄마다 제어기 쪽에서 먼 쪽으로:
+    /// 아래 줄은 사슬 그대로, 위 줄은 사슬을 뒤집어. <see cref="FenceNumberingDirection.AlongChain"/> 이면 사슬 그대로.
+    /// </summary>
+    public static IReadOnlyList<int> NumberingOrder(IReadOnlyList<int> chainOrder, Func<int, FenceLane> laneOf, FenceNumberingDirection direction = FenceNumberingDirection.AwayFromController)
+    {
+        var chain = chainOrder ?? Array.Empty<int>();
+        if (direction == FenceNumberingDirection.AlongChain || laneOf is null) return chain.ToList();
+        var lower = chain.Where(k => laneOf(k) == FenceLane.Lower).ToList();
+        var upper = chain.Where(k => laneOf(k) == FenceLane.Upper).Reverse().ToList();
+        return lower.Concat(upper).ToList();
+    }
+
+    /// <summary>VBus 표지 기본 틈(FR-21) — 가운데 두 센서 사이(N/2 번째 센서 뒤). 센서가 둘보다 적으면 0.</summary>
+    public static int DefaultVbusGap(int chainCount) => chainCount < 2 ? 0 : chainCount / 2;
+
+    /// <summary>VBus 틈을 사슬 범위(1…N−1) 안으로 — 없으면 기본.</summary>
+    public static int VbusGapOf(int? stored, int chainCount)
+        => chainCount < 2 ? 0 : stored is { } g ? Math.Clamp(g, 1, chainCount - 1) : DefaultVbusGap(chainCount);
+    #endregion
+
+    #region - Chain ↔ seats (FR-09 · FR-12 · FR-19) -
+    /// <summary>
+    /// 체인 순서가 바뀌었을 때 자리를 맞춘다. <b>위치 묶음은 그대로 두고 센서가 위치를 나눠 갖는다</b> — 남은 센서의 위치를 사슬 위 순서
+    /// (<see cref="ChainOrder"/> · 아래 줄 → 위 줄)로 줄 세워 새 체인 순서대로 하나씩 준다(표 · 개념도에서 순서를 바꾸면 펜스 위 자리가 따라간다).
+    /// 센서가 가져가는 것은 <b>줄과 망(기둥) 번호뿐</b>이다 — 자리 종류 · 높이 조정 · 보는 쪽은 센서를 따라간다.
+    /// 받은 위치가 제 자리 종류와 맞지 않으면 가장 가까운 제 종류 칸으로 가되, 줄 안에서 앞 센서보다 앞서지 않는다.
+    /// 새로 붙은 센서는 새 체인의 이웃 사이 자리(이웃의 줄 · 끝이면 다음 자리 — 망이 모자라면 끝 망을 본떠 늘린다), 빠진 센서의 자리는 비운다.
     /// </summary>
     /// <param name="oldOrder">바뀌기 전 체인 순서(같은 자리 센서끼리의 차례).</param>
     /// <param name="newChain">바뀐 체인.</param>
     /// <param name="mounts">지금 자리(키 → 자리).</param>
     /// <param name="panels">지금 망 목록.</param>
     /// <param name="categoryOf">새로 붙은 센서의 갈래(기본 자리 종류).</param>
+    /// <param name="end">제어기 위치(줄마다 사슬이 가는 쪽).</param>
     public static (IReadOnlyDictionary<int, SensorMountSpec> Mounts, IReadOnlyList<FencePanelSpec> Panels) Reconcile(
         IReadOnlyList<int> oldOrder, IReadOnlyList<int> newChain, IReadOnlyDictionary<int, SensorMountSpec> mounts,
-        IReadOnlyList<FencePanelSpec> panels, Func<int, FenceSensorCategory> categoryOf)
+        IReadOnlyList<FencePanelSpec> panels, Func<int, FenceSensorCategory> categoryOf, FenceControllerEnd end = FenceControllerEnd.Left)
     {
-        var rank = new Dictionary<int, int>();
-        for (var i = 0; i < (oldOrder?.Count ?? 0); i++) rank.TryAdd(oldOrder![i], i);
         var chain = (newChain ?? Array.Empty<int>()).Distinct().ToList();
         var current = mounts ?? new Dictionary<int, SensorMountSpec>();
         var panelList = (panels ?? Array.Empty<FencePanelSpec>()).ToList();
 
         var retained = chain.Where(current.ContainsKey).ToList();
-        var seats = retained.Select(k => (Key: k, Mount: current[k]))
-                            .OrderBy(t => SeatOf(t.Mount))
-                            .ThenBy(t => rank.TryGetValue(t.Key, out var r) ? r : int.MaxValue)
-                            .ThenBy(t => t.Key)
-                            .Select(t => t.Mount)
-                            .ToList();
+        var pathOrder = ChainOrder(retained.Select(k => (k, current[k])), end, oldOrder);
+        var seats = pathOrder.Select(k => current[k]).ToList();
 
         var result = new Dictionary<int, SensorMountSpec>();
         FenceSeat? floor = null;
+        FenceLane? floorLane = null;
         for (var i = 0; i < retained.Count; i++)
         {
             var own = current[retained[i]];
-            // 제자리면 그대로(자리 종류가 같은 위치를 받았다) — 아니면 위치만 받고 종류 · 높이 · 방향은 제 것.
-            var placed = own == seats[i] && (floor is null || SeatOf(own) >= floor.Value)
+            var lane = seats[i].Lane;
+            if (floorLane != lane) floor = null;                  // 줄이 바뀌면 앞 센서 기준도 새로
+            var dir = LaneDirection(lane, end);
+            var placed = own == seats[i] && (floor is null || Ahead(SeatOf(own), floor.Value, dir))
                 ? own
-                : PlaceKeeping(own, SeatOf(seats[i]).Slot, floor, panelList);
+                : PlaceKeeping(own with { Lane = lane }, SeatOf(seats[i]).Slot, floor, panelList, dir);
             result[retained[i]] = placed;
             floor = SeatOf(placed);
+            floorLane = lane;
         }
 
         for (var j = 0; j < chain.Count; j++)
@@ -261,29 +317,73 @@ public static class FenceLayoutMath
             SensorMountSpec? pred = null, succ = null;
             for (var a = j - 1; a >= 0 && pred is null; a--) if (result.TryGetValue(chain[a], out var m)) pred = m;
             for (var b = j + 1; b < chain.Count && succ is null; b++) if (result.TryGetValue(chain[b], out var m)) succ = m;
-            var (seat, grown) = SeatBetween(pred, succ, categoryOf?.Invoke(key) ?? FenceSensorCategory.Other, panelList);
+            var lane = pred?.Lane ?? succ?.Lane ?? FenceLane.Lower;
+            if (succ is not null && succ.Lane != lane) succ = null;              // 꺾이는 곳 — 앞 이웃 줄의 끝에 붙인다
+            var (seat, grown) = SeatNear(pred, succ, categoryOf?.Invoke(key) ?? FenceSensorCategory.Other, panelList, LaneDirection(lane, end));
             panelList = grown.ToList();
-            result[key] = seat;
+            result[key] = seat with { Lane = lane };
         }
         return (result, panelList);
     }
 
+    /// <summary>줄 안에서 <paramref name="seat"/> 가 <paramref name="floor"/> 보다 앞서지 않는가(사슬이 가는 쪽 <paramref name="dir"/> 기준).</summary>
+    internal static bool Ahead(FenceSeat seat, FenceSeat floor, int dir)
+        => dir > 0 ? seat >= floor : seat.Slot < floor.Slot || (seat.Slot == floor.Slot && seat.Rank >= floor.Rank);
+
+    /// <summary>
+    /// 사슬 이웃 사이 새 자리 — 사슬이 왼쪽 → 오른쪽(<paramref name="dir"/> = +1)이면 <see cref="SeatBetween"/> 그대로,
+    /// 오른쪽 → 왼쪽이면 공간에서 이웃을 뒤집어 본다(먼 끝 쪽 붙이기는 앞 이웃 바로 왼쪽 · 왼쪽 끝을 넘으면 앞 이웃과 같은 자리).
+    /// </summary>
+    internal static (SensorMountSpec Seat, IReadOnlyList<FencePanelSpec> Panels) SeatNear(
+        SensorMountSpec? pred, SensorMountSpec? succ, FenceSensorCategory category, IReadOnlyList<FencePanelSpec> panels, int dir)
+    {
+        if (dir > 0) return SeatBetween(pred, succ, category, panels);
+        if (pred is not null && succ is not null) return SeatBetween(succ, pred, category, panels);
+        if (pred is null) return SeatBetween(succ, null, category, panels);             // 사슬 첫 자리(오른쪽 끝 너머)
+        var list = (panels ?? Array.Empty<FencePanelSpec>()).ToList();
+        var preferCenter = DefaultSpotFor(category) == FenceMountSpot.PanelCenter;
+        var from = SeatOf(pred).Slot;
+        foreach (var slot in new[] { from - 1, from - 2 }.OrderBy(s => (s % 2 == 1) == preferCenter ? 0 : 1))
+        {
+            if (slot < 0) continue;
+            var seat = slot % 2 == 0 ? new SensorMountSpec(slot / 2, FenceMountSpot.PostTop) : new SensorMountSpec((slot - 1) / 2, FenceMountSpot.PanelCenter);
+            var placed = Normalize(seat, list);
+            if (Ahead(SeatOf(placed), SeatOf(pred), -1)) return (placed, list);
+        }
+        return (pred, list);
+    }
+
     /// <summary>
     /// 센서 <paramref name="own"/> 를 칸 <paramref name="targetSlot"/> 근처로 — 제 자리 종류(기둥 = 짝수 칸 · 망 = 홀수 칸)에서 가장 가까운 칸,
-    /// 같은 거리면 앞쪽. 앞 센서 자리(<paramref name="floor"/>)보다 앞서면 뒤로 민다(망이 모자라면 끝 망을 본떠 늘린다).
-    /// 높이 조정 · 보는 쪽 · 자리 종류는 <paramref name="own"/> 의 것(모양에 맞춘 같은 뜻 자리는 <see cref="Normalize"/>).
+    /// 같은 거리면 앞쪽. 줄 안에서 앞 센서 자리(<paramref name="floor"/>)보다 앞서면 사슬이 가는 쪽(<paramref name="dir"/>)으로 민다
+    /// (오른쪽으로 갈 때만 망이 모자라면 끝 망을 본떠 늘린다 — 왼쪽 앞에 붙이면 모든 번호가 밀리므로 늘리지 않는다).
+    /// 높이 조정 · 보는 쪽 · 자리 종류 · 줄은 <paramref name="own"/> 의 것(모양에 맞춘 같은 뜻 자리는 <see cref="Normalize"/>).
     /// </summary>
-    internal static SensorMountSpec PlaceKeeping(SensorMountSpec own, int targetSlot, FenceSeat? floor, List<FencePanelSpec> panels)
+    internal static SensorMountSpec PlaceKeeping(SensorMountSpec own, int targetSlot, FenceSeat? floor, List<FencePanelSpec> panels, int dir = 1)
     {
         var wantPost = own.IsPostSpot;
-        var near = (targetSlot % 2 == 0) == wantPost ? new[] { targetSlot } : new[] { targetSlot - 1, targetSlot + 1 };
+        var near = (targetSlot % 2 == 0) == wantPost ? new[] { targetSlot }
+                 : dir > 0 ? new[] { targetSlot - 1, targetSlot + 1 } : new[] { targetSlot + 1, targetSlot - 1 };
         foreach (var slot in near)
         {
             if (slot < 0) continue;
             var panel = wantPost ? slot / 2 : (slot - 1) / 2;
             if (wantPost ? panel > panels.Count : panel >= panels.Count) continue;     // 근처 칸 때문에 망을 늘리지 않는다
             var m = Normalize(own with { Panel = panel }, panels);
-            if (floor is null || SeatOf(m) >= floor.Value) return m;
+            if (floor is null || Ahead(SeatOf(m), floor.Value, dir)) return m;
+        }
+
+        if (dir < 0)
+        {
+            var top = Math.Min(targetSlot, floor?.Slot ?? targetSlot);
+            if ((top % 2 == 0) != wantPost) top--;
+            for (var slot = top; slot >= 0; slot -= 2)
+            {
+                var m = Normalize(own with { Panel = wantPost ? slot / 2 : (slot - 1) / 2 }, panels);
+                if (floor is null || Ahead(SeatOf(m), floor.Value, dir)) return m;
+            }
+            // 왼쪽 끝을 넘었다 — 앞 센서와 같은 칸(같은 자리 센서는 사슬 순서로 가른다)
+            return floor is { } f ? Normalize(own with { Panel = own.IsPostSpot ? f.Slot / 2 : Math.Max(0, (f.Slot - 1) / 2) }, panels) : Normalize(own, panels);
         }
 
         var start = Math.Max(Math.Max(0, targetSlot), floor?.Slot ?? 0);
@@ -295,7 +395,7 @@ public static class FenceLayoutMath
             var need = wantPost ? Math.Max(1, panel) : panel + 1;
             while (panels.Count < need) panels.Add(template);
             var m = Normalize(own with { Panel = panel }, panels);
-            if (floor is null || SeatOf(m) >= floor.Value) return m;
+            if (floor is null || Ahead(SeatOf(m), floor.Value, dir)) return m;
         }
         return Normalize(own, panels);
     }
@@ -452,7 +552,7 @@ public static class FenceLayoutMath
             var panel = current.Panel;
             if (SensorMountSpec.IsPost(wanted) && !current.IsPostSpot) panel = current.Panel;                       // 망 i → 그 왼쪽 기둥 i
             else if (!SensorMountSpec.IsPost(wanted) && current.IsPostSpot) panel = Math.Min(current.Panel, Math.Max(0, n - 1));
-            var next = Normalize(new SensorMountSpec(panel, wanted, heightOffsetM, current.FacesBack), panels);
+            var next = Normalize(new SensorMountSpec(panel, wanted, heightOffsetM, current.FacesBack, current.Lane), panels);
             if (next == current) continue;
             result[key] = next;
             changed.Add(key);

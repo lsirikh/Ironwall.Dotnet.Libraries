@@ -10,7 +10,8 @@ namespace Ironwall.Dotnet.Monitoring.Models.Fences;
 /// 기둥 자리(<see cref="FenceMountSpot.PostTop"/> · <see cref="FenceMountSpot.PostMiddle"/>)면 <b>기둥 번호</b>(0…망 수 — 망 i 의 왼쪽 기둥이 i),
 /// 그 밖이면 <b>망 번호</b>(0…망 수−1).
 /// </param>
-/// <param name="Spot">자리.</param>
+/// <param name="Spot">자리(줄 안에서 높이 · 기둥/망을 고른다).</param>
+/// <param name="Lane">아래 줄 · 위 줄(FR-18) — 자리와 별개. 옛 문서(schema 1)에는 없어 아래 줄로 읽는다.</param>
 /// <param name="HeightOffsetM">자리 높이에서 더 올리거나(+) 내린(−) 거리(m).</param>
 /// <param name="FacesBack">
 /// 보는 쪽이 뒤(펜스 내부)인가 — 저장 문서에만 싣는다(지도가 읽을 몫). 결선 창에서는 서버의 <c>spec.wiring.facing</c> 이 정본이라
@@ -20,7 +21,8 @@ public sealed record SensorMountSpec(
     [property: JsonProperty("panel")] int Panel,
     [property: JsonProperty("spot")] FenceMountSpot Spot,
     [property: JsonProperty("height_offset_m")] double HeightOffsetM = 0,
-    [property: JsonProperty("faces_back")] bool FacesBack = false)
+    [property: JsonProperty("faces_back")] bool FacesBack = false,
+    [property: JsonProperty("lane")] FenceLane Lane = FenceLane.Lower)
 {
     public const double MIN_OFFSET_M = -3.0;
     public const double MAX_OFFSET_M = 3.0;

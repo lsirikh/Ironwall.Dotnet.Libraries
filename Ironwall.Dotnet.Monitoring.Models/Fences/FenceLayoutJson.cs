@@ -40,14 +40,18 @@ public static class FenceLayoutJson
             var mounts = (raw.Mounts ?? new Dictionary<int, SensorMountSpec>())
                 .Where(p => p.Value is not null)
                 .ToDictionary(p => p.Key, p => FenceLayoutMath.Normalize(p.Value, panels));
+            // schema 1 → 2: 줄이 없던 문서 — 자리마다 아래 줄(칸이 없어 기본값으로 읽힌다) · 제어기 왼쪽 · VBus 기본.
+            var migrated = raw.Schema < 2;
             return new FenceLayoutDocument
             {
-                Schema = raw.Schema,
+                Schema = FenceLayoutDocument.SCHEMA,
                 ControllerId = raw.ControllerId,
                 Panels = panels,
-                Mounts = mounts,
+                Mounts = migrated ? mounts.ToDictionary(p => p.Key, p => p.Value with { Lane = FenceLane.Lower }) : mounts,
                 Bands = raw.Bands is { Bands: not null } bands ? bands : null,
                 FenceSpacingM = raw.FenceSpacingM is { } s && double.IsFinite(s) && s > 0 ? s : null,
+                ControllerEnd = migrated || !Enum.IsDefined(raw.ControllerEnd) ? FenceControllerEnd.Left : raw.ControllerEnd,
+                VbusGap = migrated || raw.VbusGap is not { } g || g < 0 ? null : g,
                 Revision = revision,
                 UpdatedAt = updatedAt,
             };

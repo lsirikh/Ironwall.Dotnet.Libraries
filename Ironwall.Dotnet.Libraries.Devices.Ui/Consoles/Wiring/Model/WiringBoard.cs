@@ -652,11 +652,12 @@ public sealed class WiringBoard
         var next = edit(before);
         if (next is null || !next.IsActive) return false;
         var mounts = next.Mounts.Where(p => Find(p.Key) is not null).Select(p => (p.Key, p.Value)).ToList();
-        var order = FenceLayoutMath.PositionOrder(mounts, tieOrder ?? _chain.Keys);
+        var order = FenceLayoutMath.ChainOrder(mounts, next.ControllerEnd, tieOrder ?? _chain.Keys);
         var chainChanged = !order.SequenceEqual(_chain.Keys);
         var layoutChanged = !next.SameContent(before);
         if (!chainChanged && !layoutChanged) return false;
 
+        var numberingBefore = NumberingOrderOf(before);
         _fence = next;
         if (chainChanged)
         {
@@ -667,6 +668,8 @@ public sealed class WiringBoard
                 return WiringChain.Create(chain.Shape, order, palette, chain.IsControllerGapExplicit ? chain.ControllerGap : null);
             }, order, force: true);
         }
+        // 사슬은 그대로인데 번호 차례가 바뀌었다(줄 · 제어기 위치) — 그때도 번호를 다시 매긴다.
+        else if (!NumberingOrderOf(_fence).SequenceEqual(numberingBefore)) Renumber();
         return true;
     }
 
@@ -679,6 +682,36 @@ public sealed class WiringBoard
         _fence = _fence.WithBands(bands);
         if (changed) Renumber();        // 대역이 바뀌었을 때만 — 같은 대역을 다시 골라도 손으로 고친 번호를 덮지 않는다
         return changed || !numbers.SequenceEqual(_rows.Select(r => r.Facts.Number));
+    }
+
+    /// <summary>번호 방향(§1-0b · 가정 — 확인 대기). 기본 = 줄마다 제어기에서 멀어질수록 커진다.</summary>
+    public FenceNumberingDirection NumberingDirection { get; set; } = FenceNumberingDirection.AwayFromController;
+
+    /// <summary>번호를 매기는 차례 — 사슬을 줄 · 번호 방향 규칙으로(<see cref="FenceLayoutMath.NumberingOrder"/>).</summary>
+    public IReadOnlyList<int> NumberingOrder() => NumberingOrderOf(_fence);
+
+    private IReadOnlyList<int> NumberingOrderOf(WiringFenceLayout fence)
+        => fence.IsActive ? FenceLayoutMath.NumberingOrder(_chain.Keys, fence.LaneOf, NumberingDirection) : _chain.Keys.ToList();
+
+    /// <summary>제어기 위치를 바꾼다(FR-19) — 사슬 방향이 뒤집히고 번호가 다시 매겨진다(대역이 있으면). 되돌리기는 부르는 쪽이 찍는다.</summary>
+    public bool SetControllerEnd(FenceControllerEnd end) => _fence.IsActive && _fence.ControllerEnd != end && ApplyFenceEdit(l => l.WithControllerEnd(end));
+
+    /// <summary>센서들의 줄을 바꾼다(FR-18 · 자리는 그대로) — 사슬 · 번호가 따라간다.</summary>
+    public bool SetLanes(IEnumerable<int> keys, FenceLane lane)
+    {
+        var set = (keys ?? Enumerable.Empty<int>()).ToHashSet();
+        return _fence.IsActive && ApplyFenceEdit(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => set.Contains(p.Key) ? p.Value with { Lane = lane } : p.Value)));
+    }
+
+    /// <summary>VBus 표지 틈(FR-21) — 저장값을 사슬 범위로. 표시 전용이라 사슬 · 번호와 무관하다.</summary>
+    public int VbusGap => FenceLayoutMath.VbusGapOf(_fence.VbusGap, _chain.Count);
+
+    /// <summary>VBus 표지를 옮긴다(틈 1…N−1). 바뀌었으면 <c>true</c>.</summary>
+    public bool SetVbusGap(int gap)
+    {
+        if (!_fence.IsActive || _chain.Count < 2) return false;
+        var clamped = Math.Clamp(gap, 1, _chain.Count - 1);
+        return clamped != VbusGap && ApplyFenceEdit(l => l.WithVbusGap(clamped));
     }
 
     /// <summary>그 센서의 번호 갈래(종류 → 대역 갈래).</summary>
@@ -706,7 +739,7 @@ public sealed class WiringBoard
     private int Renumber()
     {
         if (!_fence.IsActive || _fence.Bands is not { } bands) return 0;
-        var numbers = NumberingMath.Assign(_chain.Keys.Select(k => (k, CategoryOf(k))), bands);
+        var numbers = NumberingMath.Assign(NumberingOrder().Select(k => (k, CategoryOf(k))), bands);
         var changed = 0;
         foreach (var (key, number) in numbers)
         {
@@ -853,7 +886,7 @@ public sealed class WiringBoard
         // 번호 대역이 있으면 번호를 다시 매긴다 — 이 편집과 <b>같은 되돌리기 한 걸음</b>이다(FR-09 · FR-12).
         if (_fence.IsActive)
         {
-            var (mounts, panels) = FenceLayoutMath.Reconcile(basis.Keys, _chain.Keys, _fence.Mounts, _fence.Panels, CategoryOf);
+            var (mounts, panels) = FenceLayoutMath.Reconcile(basis.Keys, _chain.Keys, _fence.Mounts, _fence.Panels, CategoryOf, _fence.ControllerEnd);
             _fence = _fence.With(panels, mounts);
             // 번호는 체인 순서 · 구성원이 실제로 바뀌었을 때만 다시 매긴다(사람이 누른 같은 배치 — force — 로는 번호를 덮지 않는다).
             if (!basis.Keys.SequenceEqual(_chain.Keys)) Renumber();
