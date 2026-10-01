@@ -306,7 +306,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
 
     // ── v6.3 동시성 5키 ──
     private string _concurrencyPolicy = "allow";   // 서버 기본값(v6.3+ session_default_allow)
-    public string ConcurrencyPolicy { get => _concurrencyPolicy; set { _concurrencyPolicy = value; NotifyOfPropertyChange(() => ConcurrencyPolicy); NotifyOfPropertyChange(() => IsAllowPolicy); RaiseChanges(); } }
+    public string ConcurrencyPolicy { get => _concurrencyPolicy; set { _concurrencyPolicy = value; NotifyOfPropertyChange(() => ConcurrencyPolicy); NotifyOfPropertyChange(() => IsAllowPolicy); NotifyOfPropertyChange(() => ConcurrencyLockReason); RaiseChanges(); } }
 
     private int _maxConcurrentSessions;
     public int MaxConcurrentSessions { get => _maxConcurrentSessions; set { _maxConcurrentSessions = value; NotifyOfPropertyChange(() => MaxConcurrentSessions); RaiseChanges(); } }
@@ -327,6 +327,14 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     /// <summary>정책=allow &amp; 서버가용일 때만 최대세션·자기교체 컨트롤 활성(GUIDE §3 의존 UX).</summary>
     public bool IsAllowPolicy => ServerSettingsAvailable && ConcurrencyPolicy == "allow";
 
+    /// <summary>
+    /// 최대 동시 로그인 수 · 이전 로그인 교체 칸이 왜 꺼졌는가 — 잠금 사유라 화면에 남는다(help-callout PRD §2).
+    /// 서버 설정을 못 읽은 때는 위 상태 판이 이미 말하므로 비운다. 칸의 뜻은 '동시 로그인' 절 "?"(Accounts.SessionSetup.Concurrency).
+    /// </summary>
+    public string ConcurrencyLockReason => ServerSettingsAvailable && ConcurrencyPolicy != "allow"
+        ? "여러 곳 동시 로그인을 허용할 때만 적용됩니다."
+        : string.Empty;
+
     private string _authMode = "-";
     public string AuthMode { get => _authMode; set { _authMode = value; NotifyOfPropertyChange(() => AuthMode); } }
 
@@ -337,7 +345,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     public bool ServerSettingsAvailable
     {
         get => _serverSettingsAvailable;
-        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); NotifyOfPropertyChange(() => IsAllowPolicy); }
+        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); NotifyOfPropertyChange(() => IsAllowPolicy); NotifyOfPropertyChange(() => ConcurrencyLockReason); }
     }
 
     private string _serverStatus = string.Empty;

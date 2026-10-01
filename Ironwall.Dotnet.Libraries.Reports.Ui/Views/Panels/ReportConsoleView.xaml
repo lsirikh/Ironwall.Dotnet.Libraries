@@ -98,6 +98,7 @@
 	<c:ConsoleShell
 		Title="보고서"
 		ConsoleKey="Reports"
+		HelpKey="Reports.Console"
 		DetailWidth="380"
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Loaded="OnShellLoaded"

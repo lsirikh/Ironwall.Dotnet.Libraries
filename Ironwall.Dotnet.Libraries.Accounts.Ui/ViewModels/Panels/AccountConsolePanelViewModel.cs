@@ -1017,7 +1017,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     /// 저장 방식(전체 교체 · 키를 싣는다)은 운영자가 알 일이 아니라 적지 않는다.
     /// </summary>
     public string MatrixStatusText => IsPermissionsRail && Matrix.SelectedGroup is not null && Matrix.Modules.Count > 0
-        ? $"켜진 모듈 {Matrix.EnabledModuleText} · ▨ 이 모듈에 없는 동작"
+        ? $"켜진 모듈 {Matrix.EnabledModuleText}"   // ▨(이 모듈에 없는 동작) 범례는 '요약' 절 "?"(Accounts.Permissions) — help-callout H-3
         : string.Empty;
 
     /// <summary>상태 띠의 그룹 배정 대기 줄 — 커널 트레이의 문구(구현어)를 운영자 말로 바꿔 보인다(A-24).</summary>

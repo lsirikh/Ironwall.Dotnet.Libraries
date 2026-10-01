@@ -59,10 +59,7 @@
 					<ColumnDefinition Width="*" MaxWidth="760" />
 				</Grid.ColumnDefinitions>
 				<StackPanel c:ConsoleField.LabelWidth="220">
-					<TextBlock
-						Margin="0,10,0,0"
-						Style="{StaticResource Acct.Hint}"
-						Text="바꾼 값은 다음 로그인부터 적용됩니다." />
+					<!--  "바꾼 값은 다음 로그인부터 적용" · 칸 뜻(긴 툴팁)은 절 "?" 로 옮겼다(help-callout H-3). 범위 규칙(Note)은 화면에 남는다  -->
 
 					<!--  상태 안내(미배포 · 권한 없음) — 위험 틴트 판 + 왼쪽 굵은 막대(형태). 글은 운영자 말 그대로.  -->
 					<Border
@@ -90,7 +87,7 @@
 					</Border>
 
 					<!--  ① 기본 세션 · 잠금  -->
-					<c:ConsoleSection Header="세션 정책">
+					<c:ConsoleSection Header="세션 정책" HelpKey="Accounts.SessionSetup.Policy">
 						<StackPanel IsEnabled="{Binding ServerSettingsAvailable}">
 							<c:ConsoleField Note="1~168시간">
 								<c:ConsoleField.Header>
@@ -136,9 +133,9 @@
 					</c:ConsoleSection>
 
 					<!--  ② 동시 로그인 (v6.3)  -->
-					<c:ConsoleSection Header="동시 로그인">
+					<c:ConsoleSection Header="동시 로그인" HelpKey="Accounts.SessionSetup.Concurrency">
 						<StackPanel IsEnabled="{Binding ServerSettingsAvailable}">
-							<c:ConsoleField ToolTip="여러 곳 동시 로그인을 허용하면 같은 계정이 여러 곳에서 로그인해 있어도 서로 끊기지 않습니다. 다음 로그인부터 적용됩니다.">
+							<c:ConsoleField>
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="같은 계정의 동시 로그인" />
 								</c:ConsoleField.Header>
@@ -159,8 +156,8 @@
 							<!--  최대 동시 세션 수 — allow 일 때만 켜진다  -->
 							<c:ConsoleField
 								IsEnabled="{Binding IsAllowPolicy}"
-								Note="0 = 제한 없음 · 0~100"
-								ToolTip="여러 곳 동시 로그인을 허용할 때만 적용됩니다. 이 수를 넘으면 가장 오래된 로그인부터 끊습니다.">
+								LockReason="{Binding ConcurrencyLockReason}"
+								Note="0 = 제한 없음 · 0~100">
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="최대 동시 로그인 수" />
 								</c:ConsoleField.Header>
@@ -168,7 +165,7 @@
 							</c:ConsoleField>
 
 							<!--  자기 세션 교체 — allow 일 때만 켜진다  -->
-							<c:ConsoleField IsEnabled="{Binding IsAllowPolicy}" ToolTip="같은 프로그램에서 다시 로그인하면 그 프로그램의 이전 로그인만 끊습니다. 여러 곳 동시 로그인을 허용할 때만 적용됩니다.">
+							<c:ConsoleField IsEnabled="{Binding IsAllowPolicy}" LockReason="{Binding ConcurrencyLockReason}">
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="같은 프로그램에서 다시 로그인하면 이전 로그인 교체" />
 								</c:ConsoleField.Header>
@@ -178,7 +175,7 @@
 									Style="{StaticResource Console.ToggleSwitch}" />
 							</c:ConsoleField>
 
-							<c:ConsoleField Note="0 = 지우지 않음 · 0~3650일" ToolTip="0이면 지우지 않습니다. 그보다 크면 로그아웃 · 만료된 오래된 기록을 정해진 날수가 지난 뒤 지웁니다.">
+							<c:ConsoleField Note="0 = 지우지 않음 · 0~3650일">
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 기록 보존 — 일" />
 								</c:ConsoleField.Header>

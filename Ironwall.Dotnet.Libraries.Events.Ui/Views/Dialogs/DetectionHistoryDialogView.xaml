@@ -182,6 +182,7 @@
 		BodyPadding="0"
 		BodyScroll="Disabled"
 		DialogKey="Events.DetectionHistory"
+		HelpKey="Events.History"
 		Message="{Binding RangeText}"
 		PrimaryText=""
 		SecondaryInvoked="OnSecondaryInvoked"
@@ -595,11 +596,7 @@
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Text="미조치" />
 					</StackPanel>
-					<TextBlock
-						DockPanel.Dock="Right"
-						FontSize="11"
-						Foreground="{DynamicResource TextSecondaryBrush}"
-						Text="휠=줌 · 드래그=이동 · 더블클릭=전체 · 포인트 클릭=행 이동" />
+					<!--  그래프 조작(휠 · 끌기 · 더블클릭 · 점 클릭)은 대화창 머리 "?" 로 옮겼다(help-callout H-3)  -->
 				</DockPanel>
 			</StackPanel>
 

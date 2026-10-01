@@ -86,7 +86,9 @@ public class CameraPopupSettingsViewModelTests
         Assert.False(vm.ShowSelfGroups);
         Assert.False(vm.ShowBrokerGroup);
         Assert.True(vm.ShowNoneNote);
-        Assert.Contains("카메라 상세", vm.ModeNote);
+        // 방식별 설명은 섹션 "?" 로 옮겼다(help-callout H-3) — 사용 안 함의 뜻이 말풍선에 있다
+        Assert.Contains("카메라 상세",
+            Ironwall.Dotnet.Libraries.Events.Ui.Help.EventsHelp.Entries.Single(e => e.Key == "Settings.CameraPopup.Mode").ToPlainText());
     }
 
     [Fact]
@@ -422,7 +424,7 @@ public class CameraPopupSettingsViewModelTests
         vm.SelectedSize = new CameraPopupSizeChoice(1920, 1080);
 
         Assert.Equal(1920, vm.Draft.WindowWidth);                     // 저장 값은 고른 그대로
-        Assert.Contains("모니터 크기로", vm.PlacementNote);
+        Assert.Contains("모니터 크기로", vm.PlacementStatusText);
         Assert.Equal(0, vm.FirstWindowX);
     }
 

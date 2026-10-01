@@ -256,17 +256,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     /// <summary>사용 안 함 안내를 보이는가.</summary>
     public bool ShowNoneNote => _draft.Mode == CameraPopupMode.None;
 
-    /// <summary>모드 한 줄 설명.</summary>
-    public string ModeNote => _draft.Mode switch
-    {
-        CameraPopupMode.Broker => "더블클릭하면 NVR 관제석에 팝업을 요청합니다(GIS 는 영상을 띄우지 않고 결과만 지도 하단에 알립니다). 탐지 팝업은 프록시 매니저가 처리합니다.",
-        CameraPopupMode.None => "더블클릭하면 영상 대신 카메라 상세(속성)를 엽니다. 탐지 창은 뜨지 않습니다.",
-        _ => "더블클릭은 지도 위 상자로, 탐지는 이벤트마다 창 하나로 띄웁니다.",
-    };
-
-    public string ProviderNote => _draft.Provider == VideoProviderKind.RtspUrl
-        ? "장비에 저장된 RTSP 주소로 영상만 봅니다 — PTZ · 프리셋 메뉴는 꺼집니다."
-        : "영상 주소 · PTZ 모두 카메라에 직접 묻습니다.";
+    // 방식별 한 줄 설명(옛 ModeNote · ProviderNote)은 섹션 "?"(Settings.CameraPopup.Mode, EventsHelp)로 옮겼다(help-callout H-3).
 
     /// <summary>외부 VMS 칸 — 자리만(고칠 수 없다).</summary>
     public bool IsVmsEditable => false;
@@ -336,9 +326,6 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
             Update(_draft with { GridLayout = value });
         }
     }
-
-    public string LayoutNote
-        => "카메라 수를 바꾸면 그 수에 맞는 격자만 나옵니다 — 표기는 가로×세로. 매핑 카메라가 더 많으면 창 꼬리에 +N.";
 
     public IReadOnlyList<CameraPopupNumberChoice> MaxWindowChoices { get; }
 
@@ -434,15 +421,18 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     public int FirstWindowX => _draft.FirstWindowX;
     public int FirstWindowY => _draft.FirstWindowY;
 
-    /// <summary>첫 위치 · 계단 설명.</summary>
-    public string PlacementNote
+    /// <summary>
+    /// 첫 위치 · 계단 상태 — 좌표 · 당김 알림 · 몇 개마다 돌아오는지(간격 0 경고). 화면에 남는 상태 줄이다.
+    /// 옮기는 법 · 좌표 기준은 섹션 "?"(Settings.CameraPopup.Event)에 있다(help-callout H-3).
+    /// </summary>
+    public string PlacementStatusText
     {
         get
         {
             var first = CameraPopupPlacement.FirstWindow(WorkArea, _draft.FirstWindowX, _draft.FirstWindowY, _draft.WindowWidth, _draft.WindowHeight);
             var period = CameraPopupPlacement.CascadePeriod(WorkArea, first, _draft.CascadeStepPx);
             var text = string.Create(CultureInfo.InvariantCulture,
-                $"첫 창 x {_draft.FirstWindowX} · y {_draft.FirstWindowY} px(작업 영역 왼쪽 위 기준). 1번 창을 끌어 놓거나 방향키(Shift = 10칸)로 옮깁니다. ");
+                $"첫 창 x {_draft.FirstWindowX} · y {_draft.FirstWindowY} px. ");
             text += period <= 1
                 ? "간격이 0 이거나 자리가 없어 모든 창이 같은 자리에 뜹니다."
                 : string.Create(CultureInfo.InvariantCulture, $"창 {period}개마다 화면 끝에 닿아 첫 위치로 돌아옵니다.");
@@ -582,9 +572,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
         set => Update(_draft with { ReturnHomePresetOnClose = value });
     }
 
-    public string CloseNote => _draft.CloseOnActionReport || _draft.CloseByTimer
-        ? "둘 다 켜면 먼저 오는 쪽 · 창을 만지면 타이머를 다시 셉니다. 창을 닫아도 카드 · 지도 깜빡임은 조치보고로만 풀립니다."
-        : "둘 다 끄면 사람이 닫을 때까지 남습니다.";
+    // 닫기 규칙 설명(옛 CloseNote)은 섹션 "?"(Settings.CameraPopup.Event)로 옮겼다(help-callout H-3).
     #endregion
 
     #region - 브로커 요청 -
