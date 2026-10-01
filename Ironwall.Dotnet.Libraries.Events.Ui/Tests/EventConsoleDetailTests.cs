@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Detail;
 using Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Lists;
+using Ironwall.Dotnet.Libraries.Events.Ui.Help;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -122,11 +123,17 @@ public class EventDetailProjectionTests
     }
 
     [Fact]
-    public void should_hint_about_the_tray_when_nothing_is_selected_on_reportable_kinds()
+    public void should_explain_the_tray_in_the_detail_help_when_nothing_is_selected_on_reportable_kinds()
     {
-        Assert.Contains("트레이", EventDetailProjection.EmptyHint(EventDetailKind.Detection));
-        Assert.Contains("트레이", EventDetailProjection.EmptyHint(EventDetailKind.Malfunction));
+        // Arrange — help-callout H-3: 빈 상세는 무엇이 열리는지만 말하고, 여러 건 · 트레이 사용법은 상세 "?" 에 있다
+        var help = EventsHelp.Entries.Single(e => e.Key == "Events.Detail").ToPlainText();
+
+        // Assert
+        Assert.DoesNotContain("트레이", EventDetailProjection.EmptyHint(EventDetailKind.Detection));
+        Assert.DoesNotContain("트레이", EventDetailProjection.EmptyHint(EventDetailKind.Malfunction));
         Assert.Contains("조치보고가 없습니다", EventDetailProjection.EmptyHint(EventDetailKind.Connection));
+        Assert.Contains("트레이", help);
+        Assert.Contains("Ctrl", help);
     }
 }
 

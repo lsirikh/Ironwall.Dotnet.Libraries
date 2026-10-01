@@ -186,7 +186,8 @@ public class MappingDragInteractionTests
     public void should_let_drops_through_the_empty_board_hint()
     {
         var markup = Markup();
-        var hint = Regex.Match(markup, @"<TextBlock(?<body>[^>]*?끌어다 놓거나[^>]*?)>", RegexOptions.Singleline);
+        // 담는 법(끌어다 놓기 · [＋ 추가])은 창 "?" 로 옮기고 빈 보드엔 상태 한 줄만 남았다(help-callout H-3)
+        var hint = Regex.Match(markup, @"<TextBlock(?<body>[^>]*?아직 넣은 장비가 없습니다[^>]*?)>", RegexOptions.Singleline);
 
         Assert.True(hint.Success, "빈 보드 안내 글을 찾지 못했다");
         Assert.Contains("IsHitTestVisible=\"False\"", hint.Groups["body"].Value, StringComparison.Ordinal);

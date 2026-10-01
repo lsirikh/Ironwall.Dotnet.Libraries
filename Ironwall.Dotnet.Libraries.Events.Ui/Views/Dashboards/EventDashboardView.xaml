@@ -143,6 +143,7 @@
 	<Grid>
 		<c:ConsoleShell
 			ConsoleKey="Events"
+		HelpKey="Events.Dashboard"
 		IsDetailAvailable="{Binding IsDetailAvailable}"
 		IsDetailRequested="{Binding Detail.IsDetailRequested}"
 		Subtitle="{Binding Subtitle}"
@@ -291,7 +292,7 @@
 						Click="OnOpenMappingWorkbench"
 						Content="이벤트 맵핑"
 						Style="{StaticResource Console.Button}"
-						ToolTip="이벤트가 났을 때 움직일 카메라 · 스피커 · 경광등을 정합니다"
+						ToolTip="이벤트 맵핑 창 열기"
 						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
 					<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
 					<Button
@@ -309,7 +310,7 @@
 						Content="{Binding QueueButtonText}"
 						IsEnabled="{Binding CanQueueSelection}"
 						Style="{StaticResource Console.Button.Primary}"
-						ToolTip="고른 이벤트를 조치 트레이에 담습니다. 행 손잡이를 끌어 놓아도 됩니다. 보내는 것은 트레이의 [조치 적용]입니다."
+						ToolTip="조치 트레이에 담기"
 						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
 					</StackPanel>
 				</c:ConsoleToolbar.Extra>

@@ -182,7 +182,7 @@ public class EventOverviewServerContractTests
 
         Assert.Equal(5, vm.Total);                                            // 서버 total 은 alert 를 포함한다
         Assert.Equal(1, vm.Slices.Single(s => s.Spec.Key == "alert").Count);
-        Assert.Contains("운영 3건", vm.TotalNote);                              // 총계 밖 운영을 숨기지 않는다
+        Assert.Contains("운영 3건", vm.OperationCountText);                              // 총계 밖 운영을 숨기지 않는다
     }
 
     [Fact]

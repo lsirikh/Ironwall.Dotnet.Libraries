@@ -209,8 +209,6 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
             NotifyOfPropertyChange(nameof(DetailTargets));
             NotifyOfPropertyChange(nameof(IsDetailTargetsEmpty));
             NotifyOfPropertyChange(nameof(DetailTargetsEmptyText));
-            NotifyOfPropertyChange(nameof(DetailNote));
-            NotifyOfPropertyChange(nameof(HasDetailNote));
             NotifyOfPropertyChange(nameof(StatusLineText));
         }
     }
@@ -595,12 +593,7 @@ public sealed class SuppressionConsoleViewModel : PropertyChangedBase,
         ? "모든 장비에 적용되는 스케줄입니다."
         : "담긴 대상이 없습니다.";
 
-    /// <summary>'진행중' 이 '지금 억제 중' 이 아니라는 안내(SB L2738).</summary>
-    public string DetailNote => _selected?.Shape == SuppressionStatusShape.InWindow
-        ? "진행중은 유효기간 안이라는 뜻이고, 지금 억제 중인 것은 아닙니다."
-        : string.Empty;
-
-    public bool HasDetailNote => !string.IsNullOrEmpty(DetailNote);
+    // '진행중' 이 '지금 억제 중' 이 아니라는 안내(SB L2738)는 상세 '억제' 절 "?"(Events.Suppression.Detail)로 옮겼다(help-callout H-3).
 
     #endregion
 
