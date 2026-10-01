@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
 using System.Collections.Generic;
 using System.Linq;
@@ -218,16 +219,35 @@ public class WiringFenceLanesTests
         Assert.Equal(end == FenceControllerEnd.Left ? 101 : 103, vm.Board.Find(leftmostUpper)!.Facts.Number);   // 제어기 쪽부터 101
     }
 
+    [Theory]
+    [InlineData(NumberBandSet.PRESET_TIER4)]
+    [InlineData(NumberBandSet.PRESET_TIER3)]
+    public void should_say_how_many_fence_sensors_moved_into_the_coil_when_a_band_is_first_chosen_on_razor_panels(string preset)
+    {
+        // Arrange — 윤형 망(보드에 바로 — 망 모양 단추의 따라 붙이기 없이) · 펜스센서 3대는 아직 아래 줄 망 가운데
+        var (vm, _) = Build("SFSFF");
+        vm.Board.ApplyFenceEdit(l => l.WithPanels(l.Panels.Select(p => p with { Style = EnumFenceStyle.ChainLinkRazor })));
+
+        // Act
+        vm.ChooseBandPreset(preset);
+
+        // Assert — 프리셋과 무관하게 윤형 망의 펜스센서만 위 줄 · 윤형 코일
+        Assert.Contains("펜스센서 3대를 위 줄 · 윤형 코일로 옮겼습니다", vm.StatusText);
+        var fences = vm.FenceChain.Keys.Where(k => vm.Board.CategoryOf(k) == FenceSensorCategory.Fence).ToList();
+        Assert.All(fences, k => Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), (vm.FenceLayout.MountOf(k)!.Spot, vm.FenceLayout.LaneOf(k))));
+        vm.Undo();
+        Assert.All(vm.FenceChain.Keys, k => Assert.Equal(FenceLane.Lower, vm.FenceLayout.LaneOf(k)));   // 한 번에 취소
+    }
+
     [Fact]
-    public void should_say_how_many_fence_sensors_moved_up_when_the_tier4_preset_is_first_chosen()
+    public void should_leave_fence_sensors_on_the_lower_lane_when_the_tier4_preset_is_chosen_without_razor_panels()
     {
         var (vm, _) = Build("SFSFF");
 
         vm.ChooseBandPreset(NumberBandSet.PRESET_TIER4);
 
-        Assert.Contains("펜스센서 3대를 위 줄로 옮겼습니다", vm.StatusText);
-        vm.Undo();
-        Assert.All(vm.FenceChain.Keys, k => Assert.Equal(FenceLane.Lower, vm.FenceLayout.LaneOf(k)));   // 한 번에 취소
+        Assert.All(vm.FenceChain.Keys, k => Assert.Equal(FenceLane.Lower, vm.FenceLayout.LaneOf(k)));
+        Assert.DoesNotContain("윤형 코일", vm.StatusText);
     }
 
     [Fact]

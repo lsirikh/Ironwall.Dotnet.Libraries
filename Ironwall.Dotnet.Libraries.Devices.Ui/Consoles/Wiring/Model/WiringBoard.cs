@@ -709,11 +709,15 @@ public sealed class WiringBoard
     /// <summary>제어기 위치를 바꾼다(FR-19) — 사슬 방향이 뒤집히고 번호가 다시 매겨진다(대역이 있으면). 되돌리기는 부르는 쪽이 찍는다.</summary>
     public bool SetControllerEnd(FenceControllerEnd end) => _fence.IsActive && _fence.ControllerEnd != end && ApplyFenceEdit(l => l.WithControllerEnd(end));
 
-    /// <summary>센서들의 줄을 바꾼다(FR-18 · 자리는 그대로) — 사슬 · 번호가 따라간다.</summary>
+    /// <summary>
+    /// 센서들의 줄을 바꾼다(FR-18 · 망 · 기둥은 그대로) — 사슬 · 번호가 따라간다. 윤형 망의 펜스센서는 위 줄이면 윤형 코일에, 코일에서 아래 줄로 오면
+    /// 망 가운데에 앉는다(<see cref="FenceLayoutMath.WithLane"/>).
+    /// </summary>
     public bool SetLanes(IEnumerable<int> keys, FenceLane lane)
     {
         var set = (keys ?? Enumerable.Empty<int>()).ToHashSet();
-        return _fence.IsActive && ApplyFenceEdit(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => set.Contains(p.Key) ? p.Value with { Lane = lane } : p.Value)));
+        return _fence.IsActive && ApplyFenceEdit(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+            p => set.Contains(p.Key) ? FenceLayoutMath.WithLane(p.Value, lane, CategoryOf(p.Key), l.Panels) : p.Value)));
     }
 
     /// <summary>VBus 표지 틈(FR-21) — 저장값을 사슬 범위로. 표시 전용이라 사슬 · 번호와 무관하다.</summary>

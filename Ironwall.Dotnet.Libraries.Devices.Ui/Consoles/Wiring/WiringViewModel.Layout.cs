@@ -499,7 +499,8 @@ public sealed partial class WiringViewModel
         var span = _editSpan is { } s ? double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture) : (double?)null;
         var targets = _panelSelection.ToHashSet();
         var count = targets.Count;
-        var ok = EditFence(layout => layout.WithPanels(layout.Panels.Select((p, i) =>
+        int raised = 0, lowered = 0;
+        var ok = EditFence(layout => FollowRazor(layout, layout.WithPanels(layout.Panels.Select((p, i) =>
         {
             if (!targets.Contains(i)) return p;
             var next = p;
@@ -508,10 +509,10 @@ public sealed partial class WiringViewModel
             if (height is { } hv) next = next with { HeightM = hv };
             if (span is { } sv) next = next with { SpanM = sv };
             return next;
-        })));
+        })), out raised, out lowered));
         ResetPanelEdit();
         RaisePanelPane();
-        StatusText = ok ? $"망 {count}칸에 적용했습니다 — Ctrl+Z 로 되돌립니다" : "바뀐 것이 없습니다.";
+        StatusText = ok ? $"망 {count}칸에 적용했습니다{RazorFollowText(raised, lowered)} — Ctrl+Z 로 되돌립니다" : "바뀐 것이 없습니다.";
         return ok;
     }
 
@@ -762,9 +763,11 @@ public sealed partial class WiringViewModel
             var mounts = new Dictionary<int, SensorMountSpec>(l.Mounts);
             foreach (var key in keys.Where(k => _board.Find(k) is not null))
             {
-                var spot = FenceLayoutMath.DefaultSpotFor(_board.CategoryOf(key));
-                var seat = new SensorMountSpec(0, spot);
-                mounts[key] = FenceLayoutMath.Normalize(seat with { Panel = FenceLayoutMath.IndexAt(seat, geometry, metres) }, l.Panels);
+                var category = _board.CategoryOf(key);
+                var seat = new SensorMountSpec(0, FenceLayoutMath.DefaultSpotFor(category));
+                // 펜스센서는 윤형과 같이 — 윤형 망에 놓으면 위 줄 · 윤형 코일(사용자 결정)
+                mounts[key] = FenceLayoutMath.DefaultMount(FenceLayoutMath.Normalize(seat with { Panel = FenceLayoutMath.IndexAt(seat, geometry, metres) }, l.Panels),
+                                                           category, l.Panels);
             }
             return l.WithMounts(mounts);
         });
@@ -773,7 +776,10 @@ public sealed partial class WiringViewModel
     }
 
     private string MountTextOf(int key)
-        => _board.FenceLayout.MountOf(key) is { } m ? $"{(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} · {SensorMountSpec.SpotText(m.Spot)}" : "미배치";
+        => _board.FenceLayout.MountOf(key) is { } m ? MountText(m) : "미배치";
+
+    /// <summary>"망 3 · 윤형 코일" · "기둥 4 · 기둥 위".</summary>
+    private static string MountText(SensorMountSpec m) => $"{(m.IsPostSpot ? "기둥" : "망")} {m.Panel + 1} · {SensorMountSpec.SpotText(m.Spot)}";
 
     /// <summary>펜스 구성 편집 한 걸음 — 되돌리기를 찍고 보드에 맡긴다. 바뀐 것이 없으면 되돌리기 장면도 걷는다.</summary>
     private bool EditFence(Func<WiringFenceLayout, WiringFenceLayout> edit, IReadOnlyList<int>? tieOrder = null)
@@ -970,8 +976,9 @@ public sealed partial class WiringViewModel
         if (!await _dialogs.ConfirmAsync(title, $"{targets.Count}칸 중 {changed}칸이 바뀝니다 — {Describe(template)}.{Environment.NewLine}되돌리기 한 번으로 통째 취소됩니다. 적용할까요?"))
             return false;
         var set = targets.ToHashSet();
-        var ok = EditFence(l => l.WithPanels(l.Panels.Select((p, i) => set.Contains(i) ? template : p)));
-        StatusText = ok ? $"망 {changed}칸에 적용했습니다 — Ctrl+Z 로 한 번에 되돌립니다" : "바뀐 것이 없습니다.";
+        int raised = 0, lowered = 0;
+        var ok = EditFence(l => FollowRazor(l, l.WithPanels(l.Panels.Select((p, i) => set.Contains(i) ? template : p)), out raised, out lowered));
+        StatusText = ok ? $"망 {changed}칸에 적용했습니다{RazorFollowText(raised, lowered)} — Ctrl+Z 로 한 번에 되돌립니다" : "바뀐 것이 없습니다.";
         return ok;
     }
 
@@ -1047,8 +1054,8 @@ public sealed partial class WiringViewModel
     {
         if (IsBusy || !_board.FenceLayout.IsActive) return false;
         _board.PushUndo();
-        // 4차를 처음 고르면(아직 모두 아래 줄) 펜스센서를 위 줄로 — 같은 되돌리기 한 걸음(FR-18 기본값).
-        var raised = bands?.Preset == NumberBandSet.PRESET_TIER4 && !_board.FenceLayout.HasUpperSensors ? ApplyDefaultLanes(bands) : 0;
+        // 대역을 처음 고를 때(아직 모두 아래 줄) 윤형 망의 펜스센서를 위 줄 · 윤형 코일로 — 같은 되돌리기 한 걸음(FR-18 기본값 · "4차일 때만" 을 대신한다).
+        var raised = bands is not null && !_board.FenceLayout.HasUpperSensors ? ApplyDefaultLanes() : 0;
         var lanesSet = raised > 0;
         if (!_board.SetNumberBands(bands) && !lanesSet)
         {
@@ -1063,18 +1070,56 @@ public sealed partial class WiringViewModel
         StatusText = bands is null
             ? "번호 대역을 껐습니다 — 번호는 지금 값 그대로입니다."
             : $"번호 대역 {bands.PresetText} — 위치 순서대로 번호를 매겼습니다 · 번호 {renumbered}대 바뀜(저장 대기 {pending}대)"
-              + (lanesSet ? $" · 펜스센서 {raised}대를 위 줄로 옮겼습니다(Ctrl+Z 로 함께 취소)" : string.Empty) + $". {NUMBER_WARNING}.";
+              + (lanesSet ? $" · 윤형 망의 펜스센서 {raised}대를 위 줄 · 윤형 코일로 옮겼습니다(Ctrl+Z 로 함께 취소)" : string.Empty) + $". {NUMBER_WARNING}.";
         return true;
     }
 
-    /// <summary>대역 프리셋의 기본 줄을 매긴다(FR-18) — 위 줄로 옮긴 센서 수. 되돌리기는 부르는 쪽.</summary>
-    private int ApplyDefaultLanes(NumberBandSet? bands)
+    /// <summary>
+    /// 기본 줄을 매긴다(FR-18 · 윤형 설치) — 윤형 망 가운데 · 아래에 있는 아래 줄 펜스센서를 위 줄 · 윤형 코일로. 옮긴 센서 수. 되돌리기는 부르는 쪽.
+    /// </summary>
+    private int ApplyDefaultLanes()
     {
-        var upper = _board.FenceLayout.Mounts
-            .Where(p => p.Value.Lane != FenceLane.Upper && FenceLayoutMath.DefaultLane(_board.CategoryOf(p.Key), bands) == FenceLane.Upper)
+        var layout = _board.FenceLayout;
+        var upper = layout.Mounts
+            .Where(p => p.Value.Lane != FenceLane.Upper && !p.Value.IsPostSpot
+                        && FenceLayoutMath.DefaultLane(_board.CategoryOf(p.Key), FenceLayoutMath.IsRazorPanel(layout.Panels, p.Value.Panel)) == FenceLane.Upper)
             .Select(p => p.Key).ToList();
         return upper.Count > 0 && _board.SetLanes(upper, FenceLane.Upper) ? upper.Count : 0;
     }
+
+    /// <summary>
+    /// 망 모양이 바뀐 편집에 윤형 자리를 따라 붙인다 — 윤형이 된 망의 펜스센서(아래 줄 · 망 가운데 · 높이 조정 0 = 손대지 않은 기본 자리)는 위 줄 · 윤형 코일로,
+    /// 윤형이 아니게 된 망의 코일 센서는 아래 줄 · 망 가운데로. 손으로 고친 자리(다른 자리 · 높이 조정)는 건드리지 않는다.
+    /// </summary>
+    private WiringFenceLayout FollowRazor(WiringFenceLayout before, WiringFenceLayout next, out int raised, out int lowered)
+    {
+        raised = 0;
+        lowered = 0;
+        var mounts = new Dictionary<int, SensorMountSpec>(next.Mounts);
+        foreach (var (key, mount) in before.Mounts)
+        {
+            if (!mounts.TryGetValue(key, out var now) || mount.IsPostSpot) continue;
+            var wasRazor = FenceLayoutMath.IsRazorPanel(before.Panels, mount.Panel);
+            var isRazor = FenceLayoutMath.IsRazorPanel(next.Panels, mount.Panel);
+            if (!wasRazor && isRazor && mount is { Spot: FenceMountSpot.PanelCenter, Lane: FenceLane.Lower, HeightOffsetM: 0 }
+                && _board.CategoryOf(key) == FenceSensorCategory.Fence)
+            {
+                mounts[key] = FenceLayoutMath.DefaultMount(now, FenceSensorCategory.Fence, next.Panels);
+                raised++;
+            }
+            else if (wasRazor && !isRazor && mount.Spot == FenceMountSpot.RazorCoil)
+            {
+                mounts[key] = now with { Spot = FenceMountSpot.PanelCenter, Lane = FenceLane.Lower };
+                lowered++;
+            }
+        }
+        return raised + lowered > 0 ? next.WithMounts(mounts) : next;
+    }
+
+    /// <summary>윤형 따라 붙이기 결과를 상태 줄 꼬리로.</summary>
+    private static string RazorFollowText(int raised, int lowered)
+        => (raised > 0 ? $" · 펜스센서 {raised}대를 윤형 코일(위 줄)로" : string.Empty)
+           + (lowered > 0 ? $" · 윤형이 빠진 망의 코일 센서 {lowered}대를 망 가운데(아래 줄)로" : string.Empty);
 
     private void RefreshBandRows()
     {

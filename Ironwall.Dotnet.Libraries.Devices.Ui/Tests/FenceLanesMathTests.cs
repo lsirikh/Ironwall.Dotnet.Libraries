@@ -125,16 +125,12 @@ public class FenceLanesMathTests
         => Assert.Equal(expected, FenceLayoutMath.VbusGapOf(stored, count));
 
     [Theory]
-    [InlineData(NumberBandSet.PRESET_TIER4, FenceSensorCategory.Fence, FenceLane.Upper)]
-    [InlineData(NumberBandSet.PRESET_TIER4, FenceSensorCategory.Smart, FenceLane.Lower)]
-    [InlineData(NumberBandSet.PRESET_TIER3, FenceSensorCategory.Fence, FenceLane.Lower)]
-    public void should_choose_the_default_lane_by_band_preset_and_category(string preset, FenceSensorCategory category, FenceLane expected)
-    {
-        var bands = NumberBandSet.Presets.Single(p => p.Preset == preset);
-
-        Assert.Equal(expected, FenceLayoutMath.DefaultLane(category, bands));
-        Assert.Equal(FenceLane.Lower, FenceLayoutMath.DefaultLane(category, null));
-    }
+    [InlineData(true, FenceSensorCategory.Fence, FenceLane.Upper)]
+    [InlineData(true, FenceSensorCategory.Smart, FenceLane.Lower)]
+    [InlineData(false, FenceSensorCategory.Fence, FenceLane.Lower)]
+    [InlineData(false, FenceSensorCategory.Underground, FenceLane.Lower)]
+    public void should_choose_the_upper_lane_only_for_fence_sensors_on_razor_panels_whatever_the_band_preset(bool razor, FenceSensorCategory category, FenceLane expected)
+        => Assert.Equal(expected, FenceLayoutMath.DefaultLane(category, razor));
 
     [Fact]
     public void should_hand_over_the_lane_with_the_position_but_keep_spot_and_height_when_two_sensors_swap_across_the_turn()

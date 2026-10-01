@@ -249,9 +249,13 @@ public class WiringFenceEditorTests
 
     #region - Numbering (FR-09 · FR-10 · FR-11) -
     [Fact]
-    public void should_put_fence_sensors_on_the_upper_lane_and_number_both_lanes_away_from_the_controller_when_the_tier4_preset_is_chosen()
+    public void should_seat_fence_sensors_in_the_coil_on_razor_panels_and_number_both_lanes_away_from_the_controller_when_the_tier4_preset_is_chosen()
     {
         var (vm, _, _, _) = Build(MIXED);
+        vm.FenceSelectAllPanels();
+        vm.ChoosePanelStyle(EnumFenceStyle.ChainLinkRazor);
+        vm.ApplyPanelEdit();                                                             // 윤형이 된 망의 펜스센서는 코일(위 줄)로 따라 붙는다
+        Assert.Contains("윤형 코일(위 줄)로", vm.StatusText);
 
         vm.ChooseBandPreset(NumberBandSet.PRESET_TIER4);
         var numbers = vm.FenceChain.Keys.Select(k => vm.Board.Find(k)!.Facts.Number).ToList();
@@ -259,6 +263,7 @@ public class WiringFenceEditorTests
         // 사슬 = 아래 줄(스마트 · 제어기 쪽 → 먼 끝) → 위 줄(펜스센서 · 먼 끝 → 제어기 쪽). 번호는 줄마다 제어기에서 멀어질수록 커진다(§1-0b).
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 105, 104, 103, 102, 101 }, numbers);
         Assert.All(vm.FenceChain.Keys.Skip(7), k => Assert.Equal(FenceLane.Upper, vm.FenceLayout.LaneOf(k)));
+        Assert.All(vm.FenceChain.Keys.Skip(7), k => Assert.Equal(FenceMountSpot.RazorCoil, vm.FenceLayout.MountOf(k)!.Spot));
         Assert.Contains("중요시설 4차", vm.BandText);
         Assert.False(WiringValidation.BlocksSave(vm.Issues));
     }

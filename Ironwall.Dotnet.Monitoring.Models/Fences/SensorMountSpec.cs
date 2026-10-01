@@ -48,6 +48,8 @@ public sealed record SensorMountSpec(
         FenceMountSpot.PanelCenter => "망 가운데",
         FenceMountSpot.WallTop => "담 위",
         FenceMountSpot.WallFace => "담 앞면",
+        FenceMountSpot.PanelBottom => "망 아래",
+        FenceMountSpot.RazorCoil => "윤형 코일",
         _ => "기둥 위",
     };
 }

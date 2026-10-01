@@ -2,7 +2,7 @@
 
 /// <summary>
 /// 센서를 펜스 어디에 다는가(fence-wiring-editor FR-07). 펜스 3종(철조망 · 철조망+윤형 · 디자인)은 기둥 위 · 기둥 중간 · 망 가운데,
-/// 담 2종(벽돌 · 시멘트)은 담 위 · 담 앞면. 로컬 저장값에는 이름 글자로 싣는다.
+/// 담 2종(벽돌 · 시멘트)은 담 위 · 담 앞면. 망 아래 · 윤형 코일은 높이 단계(위 · 아래로 올리고 내리기)에서 더해졌다. 로컬 저장값에는 이름 글자로 싣는다.
 /// </summary>
 public enum FenceMountSpot
 {
@@ -16,4 +16,11 @@ public enum FenceMountSpot
     WallTop = 3,
     /// <summary>담 앞면 — 망 번호.</summary>
     WallFace = 4,
+    /// <summary>망 아래 — 망 번호(펜스 3종 · 망 높이의 <see cref="FenceLayoutMath.PANEL_BOTTOM_RATIO"/>).</summary>
+    PanelBottom = 5,
+    /// <summary>
+    /// 윤형 코일 — 망 번호(철조망+윤형 망 가운데 · 코일 위에 단다). 늘 <b>위 줄</b>이다(<see cref="FenceLane.Upper"/>) — 아래 줄이거나 윤형이 아닌 망이면
+    /// <see cref="FenceLayoutMath.Normalize"/> 가 망 가운데로 맞춘다.
+    /// </summary>
+    RazorCoil = 6,
 }

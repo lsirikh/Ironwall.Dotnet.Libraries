@@ -161,6 +161,8 @@ public sealed partial class WiringViewModel
             var own = (mounts.TryGetValue(key, out var m) ? m : new SensorMountSpec(0, FenceLayoutMath.DefaultSpotFor(category))) with { Lane = lane };
             var (placed, grown) = FenceLayoutMath.PlaceBetween(own, left, right, category, panels);
             panels = grown;
+            // 같은 높이 단계 규칙 — 윤형 망의 펜스센서는 위 줄이면 윤형 코일, 코일에서 아래 줄로 오면 망 가운데
+            placed = FenceLayoutMath.WithLane(placed, lane, category, panels);
             mounts[key] = placed;
             left = placed;
         }
@@ -202,8 +204,103 @@ public sealed partial class WiringViewModel
         return ConceptLaneDrop(new[] { key }, lane, target);
     }
 
-    /// <summary>키보드 대신(Alt+↑/↓) — 위 줄 · 아래 줄로(자리는 그대로).</summary>
+    /// <summary>키보드 대신(Alt+↑/↓) — 위 줄 · 아래 줄로(망 · 기둥은 그대로 · 윤형 망의 펜스센서는 위 줄 = 윤형 코일).</summary>
     public bool ConceptLaneChange(int key, FenceLane lane) => FenceSetLane(FenceDragKeys(key), lane);
+    #endregion
+
+    #region - Height stops (위 · 아래로 올리고 내리기) -
+    /// <summary>그 센서의 높이 단계(아래 → 위 · <see cref="FenceLayoutMath.HeightStops"/>). 자리가 없으면 빈 목록.</summary>
+    public IReadOnlyList<FenceMountSpot> FenceHeightStops(int key)
+        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels) : Array.Empty<FenceMountSpot>();
+
+    /// <summary>그 센서가 지금 몇 번째 단계인가(위 줄 · 코일 밖이면 단계 수 = 모든 단계 위). 자리가 없으면 −1.</summary>
+    public int FenceStopLevel(int key)
+        => _board.FenceLayout.MountOf(key) is { } m ? FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels) : -1;
+
+    /// <summary>센서를 단계 <paramref name="level"/> 에 두면 생길 자리(끄는 동안 안내선 높이 — 보드는 그대로). 지금 단계면 지금 자리.</summary>
+    public SensorMountSpec? FenceStopMount(int key, int level)
+    {
+        if (_board.FenceLayout.MountOf(key) is not { } m) return null;
+        var current = FenceLayoutMath.StopLevel(m, _board.FenceLayout.Panels);
+        return level == current ? m : FenceLayoutMath.StepStop(m, level - current, _board.FenceLayout.Panels);
+    }
+
+    /// <summary>끄는 동안 알약 — "높이: 윤형 코일 · 위 줄" · 여러 대면 "· 3대".</summary>
+    public string FenceStopLabel(IReadOnlyList<int> keys, int grabbedKey, int level)
+    {
+        if (FenceStopMount(grabbedKey, level) is not { } target) return string.Empty;
+        var current = _board.FenceLayout.MountOf(grabbedKey);
+        var name = FenceStopLevel(grabbedKey) == level && current is { Lane: FenceLane.Upper, Spot: not FenceMountSpot.RazorCoil }
+            ? $"{SensorMountSpec.SpotText(target.Spot)} 위(위 줄 · 그대로)"
+            : SensorMountSpec.SpotText(target.Spot);
+        var lane = target.Lane != current?.Lane ? $" · {LaneText(target.Lane)}로" : string.Empty;
+        return $"높이: {name}{lane}" + (keys is { Count: > 1 } ? $" · {keys.Count}대" : string.Empty);
+    }
+
+    /// <summary>[▲] — 고른 센서를 한 단계 위로(Alt+↑).</summary>
+    public bool FenceRaiseSelected() => FenceStepStop(MountTargets(), 1);
+
+    /// <summary>[▼] — 고른 센서를 한 단계 아래로(Alt+↓).</summary>
+    public bool FenceLowerSelected() => FenceStepStop(MountTargets(), -1);
+
+    /// <summary>끌어 놓기(세로) — 잡은 센서가 단계 <paramref name="level"/> 로 가고 함께 끈 센서는 같은 단계 수만큼. 되돌리기 한 걸음.</summary>
+    public bool FenceSetStopLevel(IReadOnlyList<int> keys, int grabbedKey, int level)
+    {
+        var current = FenceStopLevel(grabbedKey);
+        if (current < 0) return false;
+        if (level == current)
+        {
+            StatusText = "제자리 — 높이를 바꾸지 않았습니다.";
+            return false;
+        }
+        return FenceStepStop(keys, level - current);
+    }
+
+    /// <summary>
+    /// 센서들을 높이 단계 <paramref name="delta"/> 만큼(+ = 위 · 끌기 · Alt+↑/↓ · ▲▼ 의 한 길) — 저마다 제 단계에서 옮기고 끝이면 멈춘다.
+    /// 윤형 코일로 들어가면 위 줄, 나오면 아래 줄 — 줄이 바뀌면 사슬 · 번호가 따라간다(상태 줄이 말한다). 되돌리기 한 걸음.
+    /// </summary>
+    public bool FenceStepStop(IReadOnlyList<int> keys, int delta)
+    {
+        if (IsBusy || !_board.FenceLayout.IsActive || delta == 0) return false;
+        var layout = _board.FenceLayout;
+        var targets = (keys ?? Array.Empty<int>()).Where(k => layout.MountOf(k) is not null).Distinct().ToList();
+        if (targets.Count == 0) return false;
+        var before = targets.ToDictionary(k => k, k => layout.MountOf(k)!);
+        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+            p => before.ContainsKey(p.Key) ? FenceLayoutMath.StepStop(p.Value, delta, l.Panels) : p.Value)));
+        if (!ok)
+        {
+            StatusText = delta > 0 ? "더 올릴 단계가 없습니다 — 맨 위입니다." : "더 내릴 단계가 없습니다 — 맨 아래입니다.";
+            return false;
+        }
+        var after = _board.FenceLayout;
+        var moved = targets.Where(k => after.MountOf(k) != before[k]).ToList();
+        var laneChanged = moved.Count(k => after.LaneOf(k) != before[k].Lane);
+        var who = moved.Count > 1 ? $"{moved.Count}대" : _board.Find(moved.FirstOrDefault())?.Display;
+        var where = moved.Count == 1 && after.MountOf(moved[0]) is { } m ? $": {MountText(m)} · {LaneText(m.Lane)}" : $" 한 단계 {(delta > 0 ? "위로" : "아래로")}";
+        var lanes = laneChanged > 0 ? $" · 줄이 바뀐 센서 {laneChanged}대(사슬 · 번호가 따라갑니다)" : string.Empty;
+        StatusText = $"높이 — {who}{where}{lanes} · Ctrl+Z 로 되돌립니다";
+        return true;
+    }
+
+    /// <summary>단계 안 미세 높이(Shift+Alt+↑/↓) — 높이 조정을 ±<see cref="FenceLayoutMath.NUDGE_M"/>m(−3…+3). 되돌리기 한 걸음.</summary>
+    public bool FenceNudgeHeight(IReadOnlyList<int> keys, double deltaM)
+    {
+        if (IsBusy || !_board.FenceLayout.IsActive || deltaM == 0) return false;
+        var set = (keys ?? Array.Empty<int>()).Where(k => _board.FenceLayout.MountOf(k) is not null).ToHashSet();
+        if (set.Count == 0) return false;
+        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => set.Contains(p.Key) ? FenceLayoutMath.Nudge(p.Value, deltaM) : p.Value)));
+        if (!ok)
+        {
+            StatusText = $"높이 조정은 {SensorMountSpec.MIN_OFFSET_M}~+{SensorMountSpec.MAX_OFFSET_M}m 까지입니다 — 끝입니다.";
+            return false;
+        }
+        var first = _board.FenceLayout.MountOf(set.First())!;
+        StatusText = $"높이 조정 {(set.Count > 1 ? $"{set.Count}대" : $"{first.HeightOffsetM:+0.##;-0.##;0}m")} · {(deltaM > 0 ? "위로" : "아래로")} {Math.Abs(deltaM):0.##}m · Ctrl+Z 로 되돌립니다";
+        NotifyOfPropertyChange(nameof(MountOffsetText));
+        return true;
+    }
     #endregion
 
     private void RaiseLanePane()
