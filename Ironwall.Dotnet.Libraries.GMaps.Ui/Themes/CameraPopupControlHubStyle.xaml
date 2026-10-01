@@ -175,7 +175,7 @@
                                PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                IsOpen="{Binding IsFlyoutOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <!--  DataContext=허브 컨트롤(PlacementTarget) → 내부 바인딩 단순화  -->
-                            <fb:FrameBorder Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1"
+                            <fb:FrameBorder Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1" UseLayoutRounding="True"
                                     BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceBrush}"
                                     DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=Popup}}">
                                 <Border.Effect>
@@ -189,7 +189,7 @@
                                     </Grid.RowDefinitions>
 
                                     <!--  헤더 (시안 표면=PrimaryBrush + 전경=OnPrimaryFixedBrush)  -->
-                                    <Border Grid.Row="0" CornerRadius="13,13,0,0" Padding="12,10" Background="{DynamicResource PrimaryBrush}">
+                                    <Border Grid.Row="0" Padding="12,10" Background="{DynamicResource PrimaryBrush}">
                                         <StackPanel Orientation="Horizontal">
                                             <md:PackIcon Width="17" Height="17" VerticalAlignment="Center"
                                                          Foreground="{DynamicResource OnPrimaryFixedBrush}" Kind="Cctv" />
@@ -282,7 +282,7 @@
 
                                     <!--  푸터: 모두 닫기  -->
                                     <Border Grid.Row="2" Padding="12,10" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerBrush}"
-                                            Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="0,0,13,13">
+                                            Background="{DynamicResource SurfaceSunkenBrush}">
                                         <Button Command="{Binding CloseAllCommand}" Style="{StaticResource HubDangerButton}" />
                                     </Border>
                                 </Grid>

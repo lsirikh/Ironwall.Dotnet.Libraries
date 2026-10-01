@@ -295,7 +295,6 @@
 							<Border
 								Grid.Row="0"
 								Background="{DynamicResource PrimaryBrush}"
-								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
 									<Grid.ColumnDefinitions>
@@ -545,8 +544,7 @@
 										Padding="12,10,12,4"
 										Background="{DynamicResource SurfaceAltBrush}"
 										BorderBrush="{DynamicResource DividerBrush}"
-										BorderThickness="0,1,0,0"
-										CornerRadius="0,0,9,0">
+										BorderThickness="0,1,0,0">
 										<ItemsControl
 											x:Name="PART_Actions"
 											AutomationProperties.AutomationId="GMaps.SymbolDetail.Actions"

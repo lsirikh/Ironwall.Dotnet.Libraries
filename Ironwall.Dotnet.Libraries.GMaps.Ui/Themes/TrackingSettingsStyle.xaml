@@ -75,7 +75,6 @@
 							<Border
 								Grid.Row="0"
 								Background="{DynamicResource PrimaryBrush}"
-								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
 									<Grid.ColumnDefinitions>
@@ -218,7 +217,7 @@
 							</StackPanel>
 
 							<!-- footer -->
-							<Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="0,0,9,9">
+							<Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}">
 								<Grid Margin="12,8">
 									<TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" Style="{StaticResource SetHint}" Text="{Binding Status}" />
 									<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
