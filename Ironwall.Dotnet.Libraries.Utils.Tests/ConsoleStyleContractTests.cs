@@ -150,6 +150,8 @@ public class ConsoleStyleContractTests
                     if (attrs.Contains("TargetType", StringComparison.Ordinal)) continue;
                     // Style= 또는(자기 완결 템플릿을 로컬로 바로 거는) Template= 둘 중 하나면 명시된 것으로 친다.
                     if (attrs.Contains("Style=", StringComparison.Ordinal) || attrs.Contains("Template=", StringComparison.Ordinal)) continue;
+                    // 속성-요소 구문(<Button.Style> · <Button.Template>)으로 준 것도 명시된 것이다(예: 트리거가 붙은 로컬 Style BasedOn=Console.Button).
+                    if (HasPropertyElementStyle(text, m)) continue;
 
                     var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
                     var nameMatch = Regex.Match(attrs, "x:Name=\"([^\"]+)\"");
@@ -163,6 +165,32 @@ public class ConsoleStyleContractTests
 
         // Assert — 하나라도 있으면 그 요소는 런타임에 MD3 암시 스타일(틸 채움)로 떨어진다(U-12 실측 계열)
         Assert.True(offenders.Count == 0, $"Style/Template 이 없는 버튼 계열: {string.Join("; ", offenders)}");
+    }
+
+    /// <summary>요소 몸 안(닫는 태그 전)에 바로 그 요소의 <c>.Style</c> / <c>.Template</c> 속성-요소가 있는가.</summary>
+    private static bool HasPropertyElementStyle(string text, Match element)
+    {
+        if (element.Groups[3].Value == "/") return false;   // 자기 닫힘 — 몸이 없다
+        var tag = element.Value[1..].Split(new[] { ' ', '\t', '\r', '\n', '>', '/' }, 2)[0];   // 접두사 포함(예: controls:Button)
+        var bodyStart = element.Index + element.Length;
+        var close = text.IndexOf($"</{tag}>", bodyStart, StringComparison.Ordinal);
+        if (close < 0) return false;
+        var body = text.AsSpan(bodyStart, close - bodyStart);
+        return body.Contains($"<{tag}.Style>", StringComparison.Ordinal) || body.Contains($"<{tag}.Template>", StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void should_accept_a_property_element_style_when_the_button_has_no_style_attribute()
+    {
+        // Arrange — 로그인 화면 "SSO 로 로그인" 단추와 같은 모양(트리거 붙은 로컬 Style BasedOn=Console.Button)
+        const string xaml = "<Grid><Button Height=\"34\" Content=\"x\"><Button.Style><Style BasedOn=\"{StaticResource Console.Button}\" TargetType=\"Button\" /></Button.Style></Button><Button Content=\"bare\" /></Grid>";
+        var matches = ButtonFamilyTag.Matches(xaml).Where(m => !m.Groups[2].Value.Contains("TargetType", StringComparison.Ordinal)).ToList();
+
+        // Act
+        var explicitFlags = matches.Select(m => HasPropertyElementStyle(xaml, m)).ToList();
+
+        // Assert — 첫 단추는 명시, 둘째(자기 닫힘 · 스타일 없음)는 아님
+        Assert.Equal(new[] { true, false }, explicitFlags);
     }
     #endregion
 
