@@ -10,6 +10,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>AnyCPU;x86;x64</Platforms>
+    <!--
+      SDK 고정본의 위치를 **프로젝트 속성**으로 박는다. 폴더의 nuget.config 는 이 프로젝트를 직접 복원할 때만
+      읽히고, 호스트 솔루션(Dotnet.Monitoring.Solution)처럼 다른 폴더에서 복원하면 무시될 수 있다.
+      이 속성은 어디서 복원하든 이 프로젝트에 붙는다.
+    -->
+    <RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)..\third_party\sso</RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 
@@ -29,7 +30,9 @@ public sealed class SsoModule : Module
                    ctx.Resolve<ISsoAgentGateway>(),
                    ctx.Resolve<IAccountApiService>(),
                    ctx.Resolve<ITokenStorageService>(),
-                   ctx.ResolveOptional<ILogService>()))
+                   ctx.ResolveOptional<ILogService>(),
+                   // 로그인 마무리(권한 · GIS init 트리거)는 비밀번호 로그인과 같은 게이트웨이 코드 — 없으면 토큰만 들어간다
+                   ctx.ResolveOptional<ISsoLoginCompleter>()))
                .AsSelf()
                .SingleInstance();
     }

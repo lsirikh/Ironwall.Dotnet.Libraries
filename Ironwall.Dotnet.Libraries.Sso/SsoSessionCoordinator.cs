@@ -1,6 +1,8 @@
-﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
 
@@ -35,16 +37,23 @@ public sealed class SsoSessionCoordinator
     private readonly IAccountApiService _api;
     private readonly ITokenStorageService _store;
     private readonly ILogService? _log;
+    private readonly ISsoLoginCompleter? _completer;
 
     /// <summary>훅에 꽂는 델리게이트 — 한 번 만들어 두고 같은 인스턴스로 꽂고 뗀다(누가 꽂았는지 가리기 위해).</summary>
     private readonly Func<CancellationToken, Task<SsoReauthOutcome>> _hook;
 
-    public SsoSessionCoordinator(ISsoAgentGateway agent, IAccountApiService api, ITokenStorageService store, ILogService? log = null)
+    /// <param name="completer">
+    /// 로그인 마무리(권한 적용 · 로그인 게이팅 알림). 앱에서는 <b>반드시</b> 준다 — 없으면 토큰만 넣고 끝나
+    /// 권한·GIS 초기화가 돌지 않는다. <c>null</c> 은 시험·진단용이다.
+    /// </param>
+    public SsoSessionCoordinator(ISsoAgentGateway agent, IAccountApiService api, ITokenStorageService store,
+                                 ILogService? log = null, ISsoLoginCompleter? completer = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _log = log;
+        _completer = completer;
         _hook = ReauthenticateAsync;
     }
 
@@ -72,6 +81,10 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public async Task<SsoSignInResult> TrySignInAsync(CancellationToken ct = default)
     {
+        // 에이전트 없는 PC 는 상시 경로다 — 파이프 연결 대기(최대 1.5초) 없이 곧바로 평소 로그인 화면.
+        if (!_agent.IsAgentPresent())
+            return new SsoSignInResult { Status = SsoSignInStatus.AgentUnavailable, Message = "SSO 에이전트가 실행 중이 아닙니다" };
+
         var agent = await _agent.SignInAsync(ct).ConfigureAwait(false);
         if (!agent.IsOk)
         {
@@ -87,11 +100,27 @@ public sealed class SsoSessionCoordinator
         }
 
         var data = exchange.Data!;
-        // 교환은 refresh 를 주지 않는다 — null 로 넣어 BearerAuthHandler 가 SSO 경로(재교환)를 타게 한다.
-        _store.SetTokens(data.AccessToken, refreshToken: null, sessionId: data.SessionId);
+
+        // 마무리는 비밀번호 로그인과 같은 코드(토큰 → 권한 → 가드 재무장 → 로그인 게이팅 알림)를 탄다.
+        // 교환은 refresh 를 주지 않는다 — null 로 들어가 BearerAuthHandler 가 SSO 경로(재교환)를 타게 된다.
+        AuthOutcome? auth = null;
+        if (_completer is not null)
+        {
+            auth = _completer.CompleteSsoLogin(data);
+            if (!auth.Success)
+            {
+                _log?.Warning($"[SSO] 교환은 됐으나 로그인 마무리 실패 — {auth.ErrorCode}: {auth.Message}");
+                return new SsoSignInResult { Status = SsoSignInStatus.Failed, Message = auth.Message ?? auth.ErrorCode ?? "로그인 마무리 실패" };
+            }
+        }
+        else
+        {
+            _store.SetTokens(data.AccessToken, refreshToken: null, sessionId: data.SessionId);
+        }
+
         Enable();
         _log?.Info($"[SSO] 로그인 완료 — user={data.User?.LoginId} session={data.SessionId}");
-        return SsoSignInResult.SignedIn(data);
+        return SsoSignInResult.SignedIn(data, auth);
     }
 
     // ══ 401 복구 ═════════════════════════════════════════════════════
@@ -103,6 +132,15 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public async Task<SsoReauthOutcome> ReauthenticateAsync(CancellationToken ct)
     {
+        // ★ 재교환은 '살아 있는 세션의 갱신' 이지 '새 로그인' 이 아니다.
+        //   로그아웃(Clear) 뒤에 남은 백그라운드 요청이 401 을 받으면 여기로 온다 — 그때 에이전트 세션이
+        //   살아 있다고 재교환하면 **사용자가 로그아웃했는데 몰래 다시 로그인**된다. 저장소가 비었으면 거절한다.
+        if (!_store.IsAuthenticated)
+        {
+            _log?.Info("[SSO] 재교환 거절 — 저장소에 세션이 없다(로그아웃 뒤). 새 로그인은 로그인 화면에서만 한다");
+            return SsoReauthOutcome.Terminal;
+        }
+
         var gen = _store.Generation;
 
         var agent = await _agent.SignInAsync(ct).ConfigureAwait(false);
@@ -172,6 +210,27 @@ public sealed class SsoSignInResult
     /// <summary>성공 시 교환 응답(사용자 스냅샷 포함).</summary>
     public SsoExchangeResponseDataDto? Data { get; init; }
 
+    /// <summary>
+    /// 성공 시 로그인 마무리 결과 — 비밀번호 로그인의 <c>AuthenticateAsync</c> 와 같은 모양이라
+    /// 로그인 화면이 같은 코드로 계정 표시·토큰을 채운다. 조정자에 마무리 경계가 없으면 <c>null</c>.
+    /// </summary>
+    public AuthOutcome? Auth { get; init; }
+
+    /// <summary>
+    /// 로그인 화면에 보여줄 안내 한 줄. 조용한 폴백·성공이면 빈 문자열(안내 불필요).
+    /// 사람이 다음에 무엇을 해야 하는지를 말한다 — 원인 코드가 아니라 행동.
+    /// </summary>
+    public string Guidance => Status switch
+    {
+        SsoSignInStatus.NeedsAgentLogin => "SSO 에이전트에서 로그인하면 다음부터 이 화면을 건너뜁니다.",
+        SsoSignInStatus.NeedsAdminRegistration => "이 프로그램이 SSO 에 등록되지 않았습니다. 관리자에게 문의하세요.",
+        SsoSignInStatus.ConsentPending => "SSO 에이전트 창에서 이 프로그램의 연결을 허용해 주세요.",
+        SsoSignInStatus.TemporarilyUnavailable => "SSO 서버에 잠시 연결할 수 없습니다. 아이디로 로그인하세요.",
+        SsoSignInStatus.ExchangeRejected => $"SSO 로그인이 거절되었습니다 — {Message}",
+        SsoSignInStatus.Failed => "SSO 로그인에 실패했습니다. 아이디로 로그인하세요.",
+        _ => string.Empty,
+    };
+
     /// <summary>로그인 화면을 건너뛰어도 되는가.</summary>
     public bool CanSkipLoginScreen => Status == SsoSignInStatus.SignedIn;
 
@@ -179,10 +238,10 @@ public sealed class SsoSignInResult
     /// 아이디/비밀번호 로그인 화면을 <b>평소처럼</b> 보여주면 되는가 — 에이전트가 없는 PC 등.
     /// <c>false</c> 인 실패는 안내가 필요하다(에이전트 로그인 · 관리자 등록 · 허용 창).
     /// </summary>
-    public bool IsSilentFallback => Status == SsoSignInStatus.AgentUnavailable;
+    public bool IsSilentFallback => Status is SsoSignInStatus.AgentUnavailable or SsoSignInStatus.ServerNotSupported;
 
-    public static SsoSignInResult SignedIn(SsoExchangeResponseDataDto data)
-        => new() { Status = SsoSignInStatus.SignedIn, Data = data };
+    public static SsoSignInResult SignedIn(SsoExchangeResponseDataDto data, AuthOutcome? auth = null)
+        => new() { Status = SsoSignInStatus.SignedIn, Data = data, Auth = auth };
 
     internal static SsoSignInResult FromAgent(SsoAgentResult a) => new()
     {
@@ -200,9 +259,15 @@ public sealed class SsoSignInResult
 
     internal static SsoSignInResult FromExchange(SsoExchangeResult e) => new()
     {
-        Status = e.StatusCode == 429 || (e.Retryable && e.StatusCode is 0 or >= 500)
-            ? SsoSignInStatus.TemporarilyUnavailable
-            : SsoSignInStatus.ExchangeRejected,
+        Status = e.StatusCode switch
+        {
+            // 서버에 교환 경로가 아직 없다(구판 · 교환 미배포) — 오류가 아니라 '이 서버는 SSO 를 모른다'.
+            // 평소 로그인 화면으로 조용히 간다. 서버가 배포하는 순간 설정 없이 SSO 가 켜진다.
+            404 => SsoSignInStatus.ServerNotSupported,
+            429 => SsoSignInStatus.TemporarilyUnavailable,
+            0 or >= 500 when e.Retryable => SsoSignInStatus.TemporarilyUnavailable,
+            _ => SsoSignInStatus.ExchangeRejected,
+        },
         Message = string.IsNullOrWhiteSpace(e.Message) ? $"{e.ErrorCode} ({e.Reason})" : e.Message!,
     };
 }
@@ -215,6 +280,12 @@ public enum SsoSignInStatus
 
     /// <summary>에이전트가 없다(미설치·미실행·판본 불일치) — 평소 아이디/비밀번호 화면. 안내 불필요.</summary>
     AgentUnavailable,
+
+    /// <summary>
+    /// GOP 서버에 교환 경로가 없다(<c>404</c> — 교환 미배포 판) — 평소 아이디/비밀번호 화면. 안내 불필요.
+    /// 서버가 교환을 배포하면 설정 없이 SSO 가 켜진다.
+    /// </summary>
+    ServerNotSupported,
 
     /// <summary>에이전트에 로그인 세션이 없다 — "에이전트에서 로그인하세요" + 아이디/비밀번호 폴백.</summary>
     NeedsAgentLogin,

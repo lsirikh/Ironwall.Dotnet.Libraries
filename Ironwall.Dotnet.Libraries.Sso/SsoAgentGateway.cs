@@ -18,6 +18,27 @@ public sealed class SsoAgentGateway : ISsoAgentGateway, IDisposable
 
     public SsoAgentGateway(string clientId = AppClientId) => _client = new SsoAgentClient(clientId);
 
+    /// <summary>
+    /// 명명 파이프 목록에 에이전트 주소가 있는가. <c>\\.\pipe\</c> 열거는 연결을 시도하지 않아 즉시 끝난다.
+    /// 열거 자체가 실패하면(권한 등) <c>true</c> 를 돌려 실제 연결 판정에 맡긴다 — 확인 못 했다고 SSO 를 끄지 않는다.
+    /// </summary>
+    public bool IsAgentPresent()
+    {
+        try
+        {
+            var name = _client.Address;                         // 예: \\.\pipe\sso-agent-<사용자>
+            var leaf = name[(name.LastIndexOf('\\') + 1)..];
+            foreach (var p in Directory.EnumerateFiles(@"\\.\pipe\"))
+                if (p.EndsWith(leaf, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return true;
+        }
+    }
+
     public async Task<SsoAgentResult> SignInAsync(CancellationToken ct = default)
     {
         // 티켓 인자 없이 = 갱신·401 복구가 쓰는 경로(C-16). SDK 3.10.6 은 실패를 예외가 아니라 값으로 준다.

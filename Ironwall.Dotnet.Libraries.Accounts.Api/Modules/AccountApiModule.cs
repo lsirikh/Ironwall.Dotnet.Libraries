@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
@@ -93,6 +93,7 @@ public class AccountApiModule : Module
             .As<IAuthGateway>()
             .As<IUserDirectoryGateway>()
             .As<IProfileGateway>()
+            .As<ISsoLoginCompleter>()   // SSO 로그인 완료도 같은 인스턴스·같은 마무리 코드(FR-03)
             .SingleInstance();
 
         _log?.Info($"[{nameof(AccountApiModule)}] loaded (name={_name})");

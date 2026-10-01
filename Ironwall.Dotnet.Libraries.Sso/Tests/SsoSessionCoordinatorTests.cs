@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Net.Http;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
+using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
@@ -138,6 +140,54 @@ public class SsoSessionCoordinatorTests : IDisposable
         Assert.Single(api.Tokens);
     }
 
+    /// <summary>
+    /// 서버에 교환 경로가 아직 없으면(404) <b>조용히</b> 평소 로그인 화면 — 시작마다 오류를 띄우지 않는다.
+    /// 지금 개발 서버(8.0.6 함체 판)가 바로 이 상태다.
+    /// </summary>
+    [Fact]
+    public async Task should_fall_back_silently_when_server_has_no_exchange_endpoint()
+    {
+        var api = new FakeAccountApi(_ => new SsoExchangeResult { Success = false, StatusCode = 404, ErrorCode = "NOT_FOUND", Retryable = false });
+        var sut = new SsoSessionCoordinator(new FakeAgent(), api, new TokenStorageService());
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.Equal(SsoSignInStatus.ServerNotSupported, r.Status);
+        Assert.True(r.IsSilentFallback);
+        Assert.Single(api.Tokens);   // 404 는 재시도하지 않는다
+    }
+
+    /// <summary>에이전트 파이프가 없으면 연결 대기(최대 1.5초) 없이 곧바로 폴백 — 에이전트 없는 PC 의 시작 지연 0.</summary>
+    [Fact]
+    public async Task should_skip_without_waiting_when_agent_pipe_is_absent()
+    {
+        var agent = new FakeAgent { Present = false, Next = SsoAgentResult.Ok("should-not-be-used") };
+        var api = new FakeAccountApi(_ => Ok("never"));
+        var sut = new SsoSessionCoordinator(agent, api, new TokenStorageService());
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.Equal(SsoSignInStatus.AgentUnavailable, r.Status);
+        Assert.True(r.IsSilentFallback);
+        Assert.Equal(string.Empty, r.Guidance);   // 조용한 폴백은 안내하지 않는다
+        Assert.Empty(api.Tokens);
+    }
+
+    [Theory]
+    [InlineData(SsoAgentStatus.NoActiveSession)]
+    [InlineData(SsoAgentStatus.NotRegistered)]
+    [InlineData(SsoAgentStatus.ConsentRequired)]
+    public async Task should_give_actionable_guidance_when_user_must_act(SsoAgentStatus status)
+    {
+        var sut = new SsoSessionCoordinator(new FakeAgent { Next = SsoAgentResult.Fail(status, "d") },
+                                            new FakeAccountApi(_ => Ok("x")), new TokenStorageService());
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.False(string.IsNullOrWhiteSpace(r.Guidance));
+        Assert.False(r.IsSilentFallback);
+    }
+
     // ══ 401 복구 ═════════════════════════════════════════════════════
 
     [Fact]
@@ -198,6 +248,58 @@ public class SsoSessionCoordinatorTests : IDisposable
 
         Assert.Equal(SsoReauthOutcome.Terminal, o);
         Assert.False(store.IsAuthenticated);
+    }
+
+    /// <summary>
+    /// ★ 로그아웃 뒤 몰래 재로그인 방지: 저장소가 비었는데(로그아웃) 백그라운드 요청이 401 을 받아도
+    /// 에이전트 세션으로 다시 들어가면 안 된다. 재교환은 살아 있는 세션의 갱신일 뿐이다.
+    /// </summary>
+    [Fact]
+    public async Task should_refuse_reauthentication_when_user_has_logged_out()
+    {
+        var store = new TokenStorageService();   // 로그아웃 상태(토큰 없음)
+        var api = new FakeAccountApi(_ => Ok("gop-sneaky"));
+        var sut = new SsoSessionCoordinator(new FakeAgent(), api, store);
+
+        var o = await sut.ReauthenticateAsync(CancellationToken.None);
+
+        Assert.Equal(SsoReauthOutcome.Terminal, o);
+        Assert.Empty(api.Tokens);              // 에이전트에 묻지도, 교환하지도 않았다
+        Assert.False(store.IsAuthenticated);
+    }
+
+    /// <summary>
+    /// 로그인 마무리는 비밀번호 로그인과 <b>같은 게이트웨이 코드</b>를 탄다 — 토큰만 넣고 끝내면
+    /// 권한 엔진이 비고 GIS 초기화가 트리거되지 않는다. 마무리 결과가 로그인 화면으로 그대로 간다.
+    /// </summary>
+    [Fact]
+    public async Task should_complete_login_through_gateway_when_completer_is_given()
+    {
+        var store = new TokenStorageService();
+        var completer = new FakeCompleter(store);
+        var sut = new SsoSessionCoordinator(new FakeAgent(), new FakeAccountApi(_ => Ok("gop-1", "9")), store, completer: completer);
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.True(r.CanSkipLoginScreen);
+        Assert.Equal(1, completer.Calls);           // 게이트웨이 마무리를 탔다
+        Assert.True(r.Auth?.Success);               // 로그인 화면이 쓸 결과가 실려 있다
+        Assert.Equal("gop-1", store.AccessToken);   // 토큰은 게이트웨이가 넣었다
+        Assert.True(sut.IsEnabled);
+    }
+
+    /// <summary>마무리가 실패하면 로그인 화면을 건너뛰지 않고 훅도 켜지 않는다.</summary>
+    [Fact]
+    public async Task should_not_skip_login_when_gateway_completion_fails()
+    {
+        var store = new TokenStorageService();
+        var completer = new FakeCompleter(store) { FailWith = "PERMISSION_LOAD_FAILED" };
+        var sut = new SsoSessionCoordinator(new FakeAgent(), new FakeAccountApi(_ => Ok("gop-1")), store, completer: completer);
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.False(r.CanSkipLoginScreen);
+        Assert.False(sut.IsEnabled);
     }
 
     // ══ 훅 ═══════════════════════════════════════════════════════════
@@ -278,6 +380,8 @@ public class SsoSessionCoordinatorTests : IDisposable
     {
         private int _n;
         public SsoAgentResult? Next { get; init; }
+        public bool Present { get; init; } = true;
+        public bool IsAgentPresent() => Present;
         public Task<SsoAgentResult> SignInAsync(CancellationToken ct = default)
             => Task.FromResult(Next ?? SsoAgentResult.Ok($"sso-{++_n}"));
         public Task<SsoAgentResult> SignInInteractiveAsync(CancellationToken ct = default) => SignInAsync(ct);
@@ -314,6 +418,23 @@ public class SsoSessionCoordinatorTests : IDisposable
         public Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(int page = 1, int limit = 100, bool? isActive = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    /// <summary>게이트웨이 마무리 흉내 — 실제처럼 토큰을 저장소에 넣는다.</summary>
+    private sealed class FakeCompleter : ISsoLoginCompleter
+    {
+        private readonly ITokenStorageService _store;
+        public int Calls { get; private set; }
+        public string? FailWith { get; init; }
+        public FakeCompleter(ITokenStorageService store) => _store = store;
+
+        public AuthOutcome CompleteSsoLogin(SsoExchangeResponseDataDto data)
+        {
+            Calls++;
+            if (FailWith is not null) return AuthOutcome.Fail(FailWith, "마무리 실패");
+            _store.SetTokens(data.AccessToken, null, data.SessionId);
+            return AuthOutcome.Ok(new AuthResult(null!, data.AccessToken, DateTime.UtcNow.AddHours(1), "ADMIN", Array.Empty<string>()));
+        }
     }
 
     /// <summary>정해진 토큰만 통과시키는 가짜 GOP — 받은 Bearer 를 기록한다.</summary>

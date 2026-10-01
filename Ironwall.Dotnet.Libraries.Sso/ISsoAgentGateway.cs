@@ -8,6 +8,14 @@
 public interface ISsoAgentGateway
 {
     /// <summary>
+    /// 에이전트 파이프가 지금 있는가 — <b>값싼 확인</b>(연결하지 않는다).
+    /// <para>SDK 의 파이프 연결은 파이프가 생길 때까지 최대 1.5초 기다린다. 에이전트가 없는 PC(상시 경로, T28)가
+    /// 시작마다 그만큼 멈추지 않도록, 시작 로그인은 이걸 먼저 보고 없으면 곧바로 평소 로그인 화면으로 간다.</para>
+    /// <para><c>true</c> 가 연결 성공을 보장하지는 않는다 — 실제 판정은 <see cref="SignInAsync"/> 가 한다.</para>
+    /// </summary>
+    bool IsAgentPresent();
+
+    /// <summary>
     /// 창 없이 새 SSO 앱 토큰을 받는다 — SDK <c>SignInAsync([])</c>.
     /// <para>에이전트 안에서 <c>/handoff/issue</c>(자기 앞) → <c>/handoff/redeem</c> → SSO 서버 live 교환으로 가고,
     /// <b>호출마다 새 <c>jti</c></b> 의 토큰이 나온다(실측) — 그래서 교환 규칙 #8(<c>jti</c> 1회)과 충돌하지 않는다.

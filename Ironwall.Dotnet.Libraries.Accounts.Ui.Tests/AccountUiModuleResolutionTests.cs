@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Models;
@@ -30,6 +30,58 @@ public class AccountUiModuleResolutionTests
         public string DbDatabase { get; set; } = "test";
         public string UidDbServer { get; set; } = "test";
         public string PasswordDbServer { get; set; } = "test";
+    }
+
+    private sealed class StubApiSetup : Ironwall.Dotnet.Libraries.Api.Models.IApiSetupModel
+    {
+        public string Url { get; set; } = "https://127.0.0.1:8000/api";
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ApiKey { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public int Timeout { get; set; } = 10;
+    }
+
+    /// <summary>GOP 모드(앱 실제 구성) — AccountUiModule(useDbAuth:false, apiSetup) 가 SSO 모듈까지 등록한다.</summary>
+    private static IContainer BuildGopModeContainer()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance<IEventAggregator>(new EventAggregator());
+        builder.RegisterInstance(new Mock<ILogService>().Object).As<ILogService>();
+        builder.RegisterType<AccountModel>().AsImplementedInterfaces().SingleInstance();
+        var setup = new StubSetup();
+        builder.RegisterModule(new AccountUiModule(setup, setup, null, 10, useDbAuth: false, apiSetup: new StubApiSetup()));
+        return builder.Build();
+    }
+
+    /// <summary>
+    /// SSO 배선 — SSO PRD FR-03. GOP 모드에서 로그인 패널이 조정자를 실제로 받고, 조정자의 로그인 마무리 경계가
+    /// <b>비밀번호 로그인과 같은 게이트웨이 인스턴스</b>인지 본다. 다르면 SSO 로그인 뒤 권한·GIS 초기화가 돌지 않는다.
+    /// (빌드·단위시험이 통과해도 DI 배선만 빠져 기능이 죽는 사례를 막는다.)
+    /// </summary>
+    [Fact]
+    public void should_wire_sso_coordinator_into_login_panel_when_gop_mode()
+    {
+        using var c = BuildGopModeContainer();
+
+        var coordinator = c.Resolve<Ironwall.Dotnet.Libraries.Sso.SsoSessionCoordinator>();
+        Assert.NotNull(coordinator);
+
+        var completer = c.Resolve<Ironwall.Dotnet.Libraries.Accounts.Api.Gateways.ISsoLoginCompleter>();
+        var authGateway = c.Resolve<IAuthGateway>();
+        Assert.Same(authGateway, completer);   // 같은 게이트웨이 · 같은 마무리 코드
+
+        Assert.NotNull(c.Resolve<LoginPanelViewModel>());
+        // 훅은 등록만으로 켜지지 않는다 — SSO 로그인이 성공했을 때만(비밀번호 세션은 레거시 refresh 경로).
+        Assert.Null(Ironwall.Dotnet.Libraries.Accounts.Api.Handlers.BearerAuthHandler.SsoReauthenticator);
+    }
+
+    /// <summary>DB 모드에는 SSO 가 끼지 않는다 — 예전 그대로.</summary>
+    [Fact]
+    public void should_not_register_sso_when_db_mode()
+    {
+        using var c = BuildAppLikeContainer();
+        Assert.False(c.IsRegistered<Ironwall.Dotnet.Libraries.Sso.SsoSessionCoordinator>());
     }
 
     private static IContainer BuildAppLikeContainer()

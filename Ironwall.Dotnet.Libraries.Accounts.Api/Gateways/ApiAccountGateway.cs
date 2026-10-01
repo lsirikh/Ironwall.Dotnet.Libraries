@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
+﻿using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -17,7 +18,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 /// FR-21 typed 실패결과/LogoutAsync 는 Accounts.Ui 동시세션 충돌로 보류 → 현재 계약(AuthResult? / null 실패) 유지.</para>
 /// — GOP-00 PRD FR-7/FR-14/FR-21
 /// </summary>
-public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGateway
+public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGateway, ISsoLoginCompleter
 {
     private readonly IAccountApiService _api;
     private readonly ITokenStorageService _tokenStore;
@@ -59,12 +60,34 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         }
 
         var data = res.Data;
-        var user = data.User!;
+        return CompleteLogin(data.User!, data.AccessToken, data.RefreshToken, data.SessionId);
+    }
 
+    /// <summary>
+    /// SSO 교환 성공 뒤의 로그인 완료 — SSO PRD FR-03.
+    /// <para><b>비밀번호 로그인과 같은 코드</b>(<see cref="CompleteLogin"/>)를 탄다. 토큰만 넣고 끝내면
+    /// 권한 엔진이 비어 모든 게이팅이 죽고, 로그인 게이팅이 GIS 초기화를 트리거하지 않는다 —
+    /// 화면은 로그인된 것처럼 보이는데 지도·장비가 안 뜨는 상태가 된다.</para>
+    /// <para>교환은 refresh 를 주지 않으므로 <c>null</c> 로 넣는다 — 그래야 401 때 <c>BearerAuthHandler</c> 가
+    /// SSO 재교환 경로를 탄다.</para>
+    /// </summary>
+    public AuthOutcome CompleteSsoLogin(SsoExchangeResponseDataDto data)
+    {
+        if (data?.User is null || string.IsNullOrEmpty(data.AccessToken))
+            return AuthOutcome.Fail("INVALID_TOKEN_RESPONSE", "교환 응답에 사용자 또는 토큰이 없습니다");
+        return CompleteLogin(data.User, data.AccessToken, refreshToken: null, data.SessionId);
+    }
+
+    /// <summary>
+    /// 로그인 성공의 공통 마무리 — 비밀번호 로그인 · SSO 로그인 둘 다 여기를 지난다.
+    /// 순서가 의미를 갖는다: 토큰 → 권한 → 강제 로그아웃 가드 재무장 → 로그인 게이팅 알림(GIS init 트리거).
+    /// </summary>
+    private AuthOutcome CompleteLogin(AuthUserDto user, string accessToken, string? refreshToken, string? sessionId)
+    {
         // R1: access+refresh 를 게이트웨이가 직접 TokenStorage 에 보관(VM 엔 access 만 노출)
         // session_id 는 응답 본문의 값을 '명시' 전달한다(§9.2.2 required). 종전엔 JWT sid 클레임 포착에만 의존해,
         // 서버가 클레임만 빼도 세션 목록의 '내 세션' 판정이 계정 근사 폴백으로 조용히 격하됐다(allow 정책에서 과다표시).
-        _tokenStore.SetTokens(data.AccessToken, data.RefreshToken, data.SessionId);
+        _tokenStore.SetTokens(accessToken, refreshToken, sessionId);
         // ★ V-PG-01 §7: 로그인 시 권한엔진 적용. 이전엔 Apply() 호출이 0건이라 role/permissions 영구 미적용 →
         //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
         _permission.Apply(user);
@@ -75,7 +98,7 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         var permissions = PermissionsFlattener.Flatten(user.Permissions);
         var expiresAt = _tokenStore.AccessExpiresAtUtc ?? DateTime.UtcNow.AddHours(24); // exp 미상 시 기본 24h(§2.3.1)
 
-        return AuthOutcome.Ok(new AuthResult(account, data.AccessToken, expiresAt, user.Role ?? "GUEST", permissions));
+        return AuthOutcome.Ok(new AuthResult(account, accessToken, expiresAt, user.Role ?? "GUEST", permissions));
     }
 
     /// <summary>'아이디 저장' 로컬 prefs(G3). 서버엔 로그인 이력 조회 없음(B-5)이라 클라 로컬 파일에 보존.</summary>
