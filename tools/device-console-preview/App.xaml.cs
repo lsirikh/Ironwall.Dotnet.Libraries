@@ -77,10 +77,10 @@ public partial class App : Application
                 return;
             }
 
-            // 결선 펜스 뷰(wiring-fence-view F-4 · fence-wiring-editor) — --wiring ring|pids|line|wall [--theme light|dark] [--shot <폴더>]
+            // 결선 펜스 뷰(wiring-fence-view F-4 · fence-wiring-editor) — --wiring ring|pids|lanes4|ctrlright|line|wall [--theme light|dark] [--shot <폴더>]
             //   --shot: 진짜 WiringView(앱 리소스 병합)를 라이트/다크 × 입체/평면 × 3 시나리오 × 1280×820 · 1440×900 으로 찍고 끝낸다.
             var wiringAt = Array.IndexOf(e.Args, "--wiring");
-            var fenceScenario = wiringAt >= 0 && wiringAt + 1 < e.Args.Length && e.Args[wiringAt + 1] is "ring" or "pids" or "line" or "wall"
+            var fenceScenario = wiringAt >= 0 && wiringAt + 1 < e.Args.Length && e.Args[wiringAt + 1] is "ring" or "pids" or "lanes4" or "ctrlright" or "line" or "wall"
                 ? e.Args[wiringAt + 1] : null;
             var shotAt = Array.IndexOf(e.Args, "--shot");
             if (wiringAt >= 0 && (fenceScenario is not null || shotAt >= 0))
@@ -868,7 +868,7 @@ public partial class App : Application
             {
                 if (t == "dark") ApplyDark(); else ApplyLight();
                 _window.Background = (Brush)FindResource("SurfaceBrush");
-                foreach (var name in new[] { "ring", "pids", "line", "wall" })
+                foreach (var name in new[] { "ring", "pids", "lanes4", "ctrlright", "line", "wall" })
                     foreach (var flat in new[] { false, true })
                         foreach (var (w, h) in new[] { (1280, 820), (1440, 900) })
                         {
@@ -886,7 +886,7 @@ public partial class App : Application
                         }
 
                 // 표 보기(결선 단계의 [표 보기]) — 같은 시나리오 · 같은 두 크기.
-                foreach (var name in new[] { "ring", "pids", "line", "wall" })
+                foreach (var name in new[] { "ring", "pids", "lanes4", "ctrlright", "line", "wall" })
                     foreach (var (w, h) in new[] { (1280, 820), (1440, 900) })
                     {
                         var (view, vm) = preview.Scenario(name);

@@ -153,6 +153,43 @@ public class WiringFenceLanesTests
         Assert.Equal(FenceLane.Upper, saved.Mounts[104].Lane);
     }
 
+    [Theory]
+    [InlineData(FenceControllerEnd.Left)]
+    [InlineData(FenceControllerEnd.Right)]
+    public void should_load_a_stored_two_lane_layout_without_reordering_or_renumbering_when_the_server_chain_follows_the_lanes(FenceControllerEnd end)
+    {
+        // Arrange — 참고 그림 ①: 아래 줄 스마트 1~3 · 위 줄 펜스센서 101~103(같은 기둥) · 4차 대역. 서버 사슬은 두 줄 규칙 그대로.
+        var mounts = new Dictionary<int, SensorMountSpec>();
+        for (var i = 0; i < 3; i++)
+        {
+            mounts[11 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop);
+            mounts[21 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop, Lane: FenceLane.Upper);
+        }
+        var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), end).ToList();
+        var numbering = FenceLayoutMath.NumberingOrder(order, k => mounts[k].Lane);
+        var numbers = NumberingMath.Assign(numbering.Select(k => (k, k > 20 ? FenceSensorCategory.Fence : FenceSensorCategory.Smart)), NumberBandSet.Tier4);
+        var seeds = order.Select((id, i) => new WiringSensorSeed(id, i + 1, new SensorFacts(numbers[id], $"센서 {id}", id > 20 ? "Fence" : "SmartSensor2", "북측"),
+            new WiringPlacement(1, i + 1))).ToList();
+        var document = new FenceLayoutDocument
+        {
+            ControllerId = 10, Panels = Enumerable.Repeat(FencePanelSpec.Default(), 2).ToList(), Mounts = mounts, Bands = NumberBandSet.Tier4,
+            ControllerEnd = end, Revision = 1,
+        };
+
+        // Act
+        var vm = WiringViewModel.ForController(new WiringControllerInfo(10, 1, "PIDS", "10.99.8.1", "Controller"), seeds, new[] { "SmartSensor2", "Fence" },
+            null, new WiringFakeDialogs(), fence: new WiringFenceContext(document, new FakeFenceStore(), null));
+
+        // Assert
+        Assert.Equal(order, vm.FenceChain.Keys);
+        Assert.Equal(string.Empty, vm.FenceNoticeText);
+        Assert.False(vm.HasChanges);
+        Assert.Equal(end, vm.FenceControllerEnd);
+        Assert.Equal(new[] { 11, 12, 13 }, vm.LaneKeysLeftToRight(FenceLane.Lower));                // 공간 순서는 늘 왼쪽 → 오른쪽
+        var leftmostUpper = vm.LaneKeysLeftToRight(FenceLane.Upper)[0];
+        Assert.Equal(end == FenceControllerEnd.Left ? 101 : 103, vm.Board.Find(leftmostUpper)!.Facts.Number);   // 제어기 쪽부터 101
+    }
+
     [Fact]
     public void should_offer_upper_and_lower_lane_items_in_the_sensor_menu()
     {

@@ -47,7 +47,8 @@ internal sealed class WiringPreview
 
     #region - Fence scenarios (wiring-fence-view F-4 · fence-wiring-editor 시나리오) -
     /// <summary>
-    /// 펜스 뷰 시나리오 — <c>ring</c>(스마트 링 13 · 센서마다 IP · 신호등) · <c>pids</c>(섞인 PIDS 50 · 4차 번호 대역 · 판망/윤형 구간) ·
+    /// 펜스 뷰 시나리오 — <c>ring</c>(스마트 링 13 · 센서마다 IP · 신호등 · VBus) · <c>pids</c>(섞인 PIDS 50 · 4차 두 줄) ·
+    /// <c>lanes4</c>(4차 두 줄 6 + 6 · 제어기 왼쪽 · 참고 그림 ①) · <c>ctrlright</c>(한 줄 22 + 리턴선 · 제어기 오른쪽 · 참고 그림 ④) ·
     /// <c>line</c>(지중 10) · <c>wall</c>(담 구간이 낀 펜스). 결선 단계 · 펜스 보기로 연다.
     /// </summary>
     public (FrameworkElement View, WiringViewModel Vm) Scenario(string name)
@@ -55,6 +56,8 @@ internal sealed class WiringPreview
         var (view, vm) = name switch
         {
             "pids" => Pids(),
+            "lanes4" => Lanes4(),
+            "ctrlright" => SingleLaneControllerRight(),
             "line" => UndergroundLine(),
             "wall" => WallSection(),
             _ => SmartRing(),
@@ -128,6 +131,11 @@ internal sealed class WiringPreview
             }
         }
         panels.Add(FencePanelSpec.Default(EnumFenceStyle.ChainLink, 6));                  // 끝 기둥 뒤 한 칸
+        // 4차 두 줄(v0.3 §1-0b) — 펜스센서는 위 줄. 서버 사슬 순서도 두 줄 규칙(아래 줄 왼쪽 → 오른쪽, 위 줄 오른쪽 → 왼쪽)으로 심는다.
+        foreach (var id in mounts.Keys.ToList())
+            if (seeds.First(s => s.Id == id).Facts.TypeText == "Fence") mounts[id] = mounts[id] with { Lane = FenceLane.Upper };
+        var lanesOrder = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Left);
+        seeds = seeds.Select(s => s with { Placement = new WiringPlacement(1, lanesOrder.ToList().IndexOf(s.Id) + 1) }).ToList();
         var document = new FenceLayoutDocument { ControllerId = 3, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier4, Revision = 1 };
         var vm = Controller(new WiringControllerInfo(3, 3, "PIDS-서측-03", "10.99.8.3", "Controller"), seeds, new[] { "SmartSensor2", "Fence" },
                             new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
@@ -162,6 +170,51 @@ internal sealed class WiringPreview
         var vm = Controller(new WiringControllerInfo(4, 4, "CTRL-남측-04", "10.99.7.4", "SmartController"), seeds, new[] { "SmartSensor2" },
                             new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
         vm.FenceSelect(3004);
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    /// <summary>
+    /// 참고 그림 ① — 중요시설 4차 두 줄: 아래 줄 판망 스마트 1~6 · 위 줄 윤형 펜스센서 101~106(같은 기둥 위), 제어기 왼쪽 끝.
+    /// 사슬 = 아래 1 → 6 → 먼 끝에서 꺾여 → 위 106 → 101 → Ch2. 번호는 줄마다 제어기에서 멀어지며 커진다(§1-0b 가정).
+    /// </summary>
+    private (FrameworkElement View, WiringViewModel Vm) Lanes4()
+    {
+        var panels = Enumerable.Range(0, 5).Select(_ => FencePanelSpec.Default(EnumFenceStyle.ChainLinkRazor, 6)).ToList();
+        var mounts = new Dictionary<int, SensorMountSpec>();
+        var facts = new Dictionary<int, SensorFacts>();
+        for (var i = 0; i < 6; i++)
+        {
+            mounts[4101 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop);
+            facts[4101 + i] = new SensorFacts(1 + i, $"판망 스마트 {i + 1}", "SmartSensor2", "북측");
+            mounts[4201 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop, Lane: FenceLane.Upper);
+            facts[4201 + i] = new SensorFacts(101 + i, $"윤형 펜스 {i + 1}", "Fence", "북측");
+        }
+        var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Left).ToList();
+        var seeds = order.Select((id, i) => new WiringSensorSeed(id, i + 1, facts[id], new WiringPlacement(1, i + 1), ConnectionType: "RS485")).ToList();
+        var document = new FenceLayoutDocument { ControllerId = 6, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier4, Revision = 1 };
+        var vm = Controller(new WiringControllerInfo(6, 6, "PIDS-북측-06", "10.99.8.6", "Controller"), seeds, new[] { "SmartSensor2", "Fence" },
+                            new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
+        vm.FenceSelect(4203);
+        return (new WiringView { DataContext = vm }, vm);
+    }
+
+    /// <summary>
+    /// 참고 그림 ④ — 한 줄 센서 22대 + 리턴선, 제어기 <b>오른쪽</b> 끝: Ch1 이 오른쪽 끝에서 아래 줄을 왼쪽으로 지나 왼쪽 끝에서 꺾여 위 줄 점선으로 돌아온다.
+    /// 눈금은 왼쪽부터 1 · 6 · 11 · 16 · 21.
+    /// </summary>
+    private (FrameworkElement View, WiringViewModel Vm) SingleLaneControllerRight()
+    {
+        var panels = Enumerable.Range(0, 21).Select(_ => FencePanelSpec.Default(EnumFenceStyle.ChainLink, 6)).ToList();
+        var mounts = Enumerable.Range(0, 22).ToDictionary(i => 5101 + i, i => new SensorMountSpec(i, FenceMountSpot.PostTop));
+        var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Right).ToList();
+        var seeds = order.Select((id, i) => new WiringSensorSeed(id, i + 1, new SensorFacts(i + 1, $"동측 {i + 1}구간", "SmartSensor", "동측"),
+            new WiringPlacement(1, i + 1), ConnectionType: "RS485")).ToList();
+        var document = new FenceLayoutDocument
+        {
+            ControllerId = 7, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier3, ControllerEnd = FenceControllerEnd.Right, Revision = 1,
+        };
+        var vm = Controller(new WiringControllerInfo(7, 7, "CTRL-동측-07", "10.99.7.7", "SmartController"), seeds, new[] { "SmartSensor" },
+                            new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
         return (new WiringView { DataContext = vm }, vm);
     }
 
