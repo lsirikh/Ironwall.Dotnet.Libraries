@@ -74,8 +74,18 @@ public sealed record FenceShape(
     int[]? Figures = null,
     bool Closed = false);
 
-/// <summary>칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표).</summary>
-public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);
+/// <summary>
+/// 칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표 · 누르는 자리 = 선택 윤곽 = 칩 요소의 배치 사각형).
+/// <see cref="Extent"/> 는 적중 밖에 그리는 것(센서 번호판 · "뒤" 표지)까지 담은 그림 범위 — 이웃 칩과의 화면 간격만 이것으로 잰다.
+/// </summary>
+public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit)
+{
+    /// <summary>적중 밖까지 그리는 그림 범위(없으면 적중과 같다).</summary>
+    public Rect? Extent { get; init; }
+
+    /// <summary>적중 ∪ 그림 범위 — 간격 · 겹침 계산용.</summary>
+    public Rect Footprint => Extent is { } e ? Rect.Union(Hit, e) : Hit;
+}
 
 /// <summary>격자 점 안내의 모습 — 빈 점 · 센서가 있는 점(흐림) · 포인터 아래(크게 + 고리) · 함께 끈 센서가 갈 점(고리) · 갈 수 없음(빈 마름모).</summary>
 public enum FenceSnapState { Free, Occupied, Hot, Member, Blocked }
@@ -465,9 +475,9 @@ public static partial class FenceScene
                 foreach (var y in new[] { -12.0, -24.0, -34.0 }) o.Add(Seg(FenceInk.RodRib, p.P(-3.4, y, UZ), p.P(3.4, y, UZ)));
                 o.Add(Seg(FenceInk.RodRib, p.P(0, 2, UZ), p.P(0, 13, UZ)));
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.UgCap, new[] { p.P(0, 0, UZ) }, 8, 3 + 2 * k));
-                var pl = p.P(0, 22, UZ);
+                bb = new[] { p.P(-9, 6, UZ), p.P(9, 6, UZ), p.P(-9, -48, UZ), p.P(9, -48, UZ) };     // 몸 = 막대 + 뚜껑(번호판은 빼고)
+                var pl = PlateOff(bb, p.P(0, 0, UZ).X, 18, 12.5, zoom, above: true, double.PositiveInfinity);  // 땅 위 뚜껑 위로(선택 윤곽 밖)
                 plate = Plate(o, pl, 22, 18, big, FenceInk.Number, 12.5, 4.5, s, zoom);
-                bb = new[] { p.P(-12, 32, UZ), p.P(12, 32, UZ), p.P(-9, -48, UZ), p.P(9, -48, UZ) };
                 break;
             }
             default:
@@ -488,8 +498,11 @@ public static partial class FenceScene
             }
         }
 
-        // 번호판은 작은 배율에서 커진다(Plate) — 적중 사각형(= 칩 배치 사각형)이 그것을 담아야 잘리지 않는다.
-        if (plate is { } pr) bb = bb.Append(pr.TopLeft).Append(pr.BottomRight).ToArray();
+        // 적중 · 선택 윤곽 = 몸(아이콘)만 — 번호판은 누르는 자리도, 선택 윤곽(어도너)도 아니다(사용자: "그건 adorner에 안잡히게 해라").
+        // 번호판(작은 배율에서 커진다 · Plate)과 "뒤" 표지는 그림 범위(Extent)에만 들어가 이웃 칩과의 화면 간격을 잰다.
+        var box = Bounds(bb);
+        var extent = box;
+        if (plate is { } pr) extent.Union(pr);
 
         // "뒤" 표지(FR-20) — 번호판 <b>왼쪽</b>에 붙인 작은 판(번호판과 겹치지 않는다). 색이 아니라 글자로 말한다(주 글자라 줌에 맞서 키운다).
         if (s.IsBackFacing && plate is { } pl2)
@@ -498,21 +511,23 @@ public static partial class FenceScene
             var size = tag.Height - 5;
             o.Add(RectShape(FenceInk.FacingTag, tag, 3));
             o.Add(Text(FenceInk.FacingTagText, new Point(tag.X + tag.Width / 2, tag.Y + tag.Height / 2 + size * 0.36), "내", size));
-            bb = bb.Append(tag.TopLeft).Append(tag.BottomRight).ToArray();
+            extent.Union(tag);
         }
 
-        var box = Bounds(bb);
         var hit = new Rect(box.X - 5, box.Y - 5, box.Width + 10, box.Height + 10);
         o.Insert(0, RectShape(FenceInk.Hit, hit, 0));
         if (selected) o.Add(RectShape(FenceInk.Select, hit, 8));
-        return new FenceChipPicture(Legible(o, zoom), hit);
+        return new FenceChipPicture(Legible(o, zoom), hit) { Extent = new Rect(extent.X - 5, extent.Y - 5, extent.Width + 10, extent.Height + 10) };
     }
 
-    /// <summary>몸 아래 번호판 — 판 높이(스마트 · 복합) · 펜스센서 판 높이 · 글자 크기 · 몸과의 틈(세계 단위).</summary>
+    /// <summary>
+    /// 몸 아래 번호판 — 판 높이(스마트 · 복합) · 펜스센서 판 높이 · 글자 크기 · 몸과의 틈(세계 단위).
+    /// 틈은 선택 윤곽(몸 + 여백 5)보다 3 더 — 번호판이 선택 윤곽 · 누르는 자리 밖에 온다.
+    /// </summary>
     public const double PLATE_H = 16;
     public const double FENCE_PLATE_H = 13;
     public const double FENCE_PLATE_TEXT = 9.5;
-    public const double PLATE_GAP = 3;
+    public const double PLATE_GAP = 8;
 
     /// <summary>땅 번호 줄의 머리("번호")와 첫 번호 사이 틈(세계 단위).</summary>
     public const double NUMBER_CAPTION_GAP = 10;

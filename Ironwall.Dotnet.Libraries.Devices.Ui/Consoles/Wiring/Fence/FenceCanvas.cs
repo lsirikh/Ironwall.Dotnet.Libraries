@@ -406,8 +406,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (scene.IsLayout)
             foreach (var lane in placed.GroupBy(p => p.Lane))
             {
-                var row = lane.Where(p => !p.Chip.HitBounds.IsEmpty).OrderBy(p => p.X + p.Chip.HitBounds.X).ToList();
-                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.HitBounds.X, p.Chip.HitBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
+                var row = lane.Where(p => !p.Chip.FootprintBounds.IsEmpty).OrderBy(p => p.X + p.Chip.FootprintBounds.X).ToList();
+                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
                 for (var i = 0; i < row.Count; i++)
                     if (Math.Abs(xs[i] - row[i].X) > 1e-9) Place(row[i].Chip, xs[i]);
             }

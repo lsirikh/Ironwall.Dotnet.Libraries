@@ -65,7 +65,7 @@ public class WiringFenceLegibilityTests
     [InlineData(EnumDeviceType.Multi, 1.0)]
     [InlineData(EnumDeviceType.Multi, 0.64)]
     [InlineData(EnumDeviceType.SmartSensor2, 0.5)]
-    public void should_place_the_back_tag_left_of_the_number_plate_without_overlap_and_inside_the_hit_rect(EnumDeviceType type, double zoom)
+    public void should_place_the_back_tag_left_of_the_number_plate_without_overlap_and_outside_the_hit_rect(EnumDeviceType type, double zoom)
     {
         var picture = FenceScene.Sensor(Sensor(1, type, facing: WiringFacing.Back), WiringShape.TwoBranch, FenceProjector.Tilt, selected: false, zoom);
         var plate = picture.Shapes.Single(s => s.Ink == FenceInk.Plate);
@@ -75,7 +75,8 @@ public class WiringFenceLegibilityTests
 
         Assert.False(tagRect.IntersectsWith(plateRect) && tagRect.Right > plateRect.Left, $"표지 {tagRect} · 번호판 {plateRect}");
         Assert.True(tagRect.Right <= plateRect.Left);
-        Assert.True(picture.Hit.Contains(tagRect) && picture.Hit.Contains(plateRect), $"적중 {picture.Hit}");
+        Assert.False(picture.Hit.IntersectsWith(tagRect) || picture.Hit.IntersectsWith(plateRect), $"적중 {picture.Hit}");     // 번호판 · 표지는 누르는 자리가 아니다
+        Assert.True(picture.Footprint.Contains(tagRect) && picture.Footprint.Contains(plateRect), $"그림 범위 {picture.Footprint}");
     }
     #endregion
 

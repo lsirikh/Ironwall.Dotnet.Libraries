@@ -9,7 +9,8 @@ using Xunit;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 
 /// <summary>
-/// 센서 번호판을 몸 아래로(2026-10-01 · 사용자: "80100 이 글씨 아래로 내려라" · "계속 가리잖아") — 몸과 겹치지 않음 · 선택 윤곽이 번호판까지 ·
+/// 센서 번호판을 몸 아래로(2026-10-01 · 사용자: "80100 이 글씨 아래로 내려라" · "계속 가리잖아") — 몸과 겹치지 않음 ·
+/// 선택 윤곽 · 적중은 몸만("그건 adorner에 안잡히게 해라") · 번호판은 그림 범위(간격)에만 ·
 /// 땅 밑으로 빠지면 몸 위 · 땅 번호 줄 머리 틈.
 /// </summary>
 public class FenceChipPlateTests
@@ -36,7 +37,7 @@ public class FenceChipPlateTests
     [InlineData(EnumDeviceType.Multi, 1.0, 0.5)]
     [InlineData(EnumDeviceType.Fence, 1.0, 1.0)]
     [InlineData(EnumDeviceType.Fence, 0.0, 0.5)]
-    public void should_put_the_number_plate_fully_below_the_sensor_body_and_wrap_both_in_the_selection(EnumDeviceType type, double k, double zoom)
+    public void should_put_the_number_plate_below_the_sensor_body_and_keep_it_out_of_the_selection_and_hit_rect(EnumDeviceType type, double k, double zoom)
     {
         // 기둥 위 높이로 올린 칩(땅에서 충분히 높다)
         var chip = FenceScene.Sensor(Sensor(type), WiringShape.Ring, new FenceProjector(k), selected: true, zoom, lift: 60);
@@ -46,9 +47,11 @@ public class FenceChipPlateTests
         var select = Span(chip.Shapes.Single(s => s.Ink == FenceInk.Select).Points);
 
         Assert.True(plate.Top > body.Bottom, $"번호판 {plate} · 몸 {body}");                      // 몸을 가리지 않는다
-        Assert.True(plate.Top - body.Bottom < 12 / zoom + 1, "번호판은 몸 바로 아래(틈만큼)");
-        Assert.True(select.Contains(plate) && select.Contains(body), "선택 윤곽이 몸 + 번호판을 감싼다");
-        Assert.True(chip.Hit.Contains(plate), "번호판도 칩을 누르는 자리");
+        Assert.True(plate.Top - body.Bottom < 12, "번호판은 몸 바로 아래(틈만큼)");
+        Assert.Equal(chip.Hit, select);                                                        // 선택 윤곽 = 적중 = 몸(+ 여백)
+        Assert.True(select.Contains(body), "선택 윤곽이 몸을 감싼다");
+        Assert.False(select.IntersectsWith(plate), $"선택 윤곽 {select} 이 번호판 {plate} 에 닿지 않는다");
+        Assert.True(chip.Footprint.Contains(plate), "번호판은 그림 범위(이웃 칩 간격)에는 든다");
         Assert.Contains(chip.Shapes, s => s.Kind == FenceShapeKind.Text && s.Text == "80100");
     }
 

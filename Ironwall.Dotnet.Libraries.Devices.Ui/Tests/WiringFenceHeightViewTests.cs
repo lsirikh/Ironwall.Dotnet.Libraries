@@ -387,6 +387,38 @@ public class WiringFenceHeightViewTests
     }
     #endregion
 
+    #region - Number plate is not a handle (2026-10-01) -
+    [Fact]
+    public void should_not_select_or_grab_a_sensor_when_its_number_plate_is_pressed()
+    {
+        // 사용자: "번호표 … 아이콘 하단으로 내려라 그리고 그건 adorner에 안잡히게 해라" — 번호판은 누르는 자리가 아니다
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[102];
+            var picture = chip.Picture!;
+            var plate = picture.Shapes.Single(s => s.Ink == FenceInk.Plate);
+            var anchor = new Point(Canvas.GetLeft(chip) - picture.Hit.X, Canvas.GetTop(chip) - picture.Hit.Y);
+            var plateCentre = new Point(anchor.X + (plate.Points[0].X + plate.Points[1].X) / 2, anchor.Y + (plate.Points[0].Y + plate.Points[1].Y) / 2);
+            var screen = canvas.WorldToScreen(plateCentre);
+            var hit = System.Windows.Media.VisualTreeHelper.HitTest(canvas, screen)?.VisualHit;
+            FenceChip? under = null;
+            for (DependencyObject? d = hit; d is not null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+                if (d is FenceChip c) { under = c; break; }
+            var bodyHit = System.Windows.Media.VisualTreeHelper.HitTest(canvas, canvas.ScreenCenterOf(chip))?.VisualHit;
+            canvas.OnPointerPressed(screen, under);
+            canvas.OnPointerReleased(screen);
+            Pump();
+            return (Under: under?.Kind, UnderKey: under?.Key, BodyIsChip: ReferenceEquals(bodyHit, chip), Selected: vm.IsFenceSelected(102),
+                    PlateInside: new Rect(Canvas.GetLeft(chip), Canvas.GetTop(chip), chip.Width, chip.Height).Contains(plateCentre));
+        });
+
+        Assert.False(result.Under == FenceChipKind.Sensor && result.UnderKey == 102, $"번호판 아래 {result.Under} {result.UnderKey}");
+        Assert.True(result.BodyIsChip);                                                       // 몸은 그대로 누르는 자리
+        Assert.False(result.Selected);
+        Assert.False(result.PlateInside);                                                     // 칩 요소(UIA 사각형)는 몸만
+    }
+    #endregion
+
     #region - Fixtures -
     private static T OnWindow<T>(WiringViewModel vm, Func<WiringViewModel, FenceCanvas, T> body)
         => OnSta(() =>
