@@ -53,6 +53,28 @@ public sealed class ConsolePrefsTests : IDisposable
     }
 
     [Fact]
+    public void should_round_trip_the_split_ratio_and_collapsed_detail_and_leave_them_out_when_unset()
+    {
+        // Arrange — 결선 창(3D 보기 : 개념도 나눔 · 속성 칸 접기)만 쓰고, 다른 콘솔은 손대지 않는다
+        var prefs = new ConsolePrefs(FilePath);
+        prefs.Get("devices.wiring").SplitRatio = 0.7;
+        prefs.Get("devices.wiring").DetailCollapsed = true;
+        prefs.Get("Devices").DetailWidth = 400;
+
+        // Act
+        Assert.True(prefs.Save());
+        var reloaded = new ConsolePrefs(FilePath);
+        var json = File.ReadAllText(FilePath);
+
+        // Assert
+        Assert.Equal(0.7, reloaded.Get("devices.wiring").SplitRatio);
+        Assert.True(reloaded.Get("devices.wiring").DetailCollapsed);
+        Assert.Null(reloaded.Get("Devices").SplitRatio);
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "SplitRatio").Count);       // 값이 없는 콘솔은 쓰지 않는다
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "DetailCollapsed").Count);
+    }
+
+    [Fact]
     public void should_clamp_stored_width_when_out_of_range()
     {
         Directory.CreateDirectory(_directory);

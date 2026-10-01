@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+using Ironwall.Dotnet.Libraries.Utils.Consoles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -97,9 +98,35 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var load = store is null ? FenceLayoutLoadResult.NotFound : await LoadFenceLayoutAsync(store, key);
         var fence = new WiringFenceContext(load.Document, store, new IcmpPingProbe(), key, load);
         var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor(), fence, _log);
+        AttachLayoutPrefs(vm);
 
         var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
         return SavedAnything(closedWith, vm);
+    }
+
+    /// <summary>개인 표시 설정 열쇠 — 결선 창(3D 보기 : 개념도 나눔 · 속성 칸 접기).</summary>
+    public const string PREFS_KEY = "devices.wiring";
+
+    /// <summary>
+    /// 나눔 비율 · 속성 칸 접힘을 사람마다 기억한다(<see cref="ConsolePrefs"/> · 이 PC 의 이 사용자). 읽거나 쓰다 실패해도 창은 기본값으로 연다.
+    /// </summary>
+    private void AttachLayoutPrefs(WiringViewModel vm)
+    {
+        try
+        {
+            var store = new ConsolePrefs(ConsolePrefs.DefaultPath);
+            var entry = store.Get(PREFS_KEY);
+            vm.UseLayoutPrefs(entry.SplitRatio, !entry.DetailCollapsed, (ratio, open) =>
+            {
+                entry.SplitRatio = ratio;
+                entry.DetailCollapsed = !open;
+                if (!store.Save()) _log?.Warning($"[Wiring] 표시 설정 저장 실패(무시): {store.LastSaveError}");
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 표시 설정을 읽지 못했습니다(기본값으로 엽니다): {ex.Message}");
+        }
     }
 
     /// <summary>

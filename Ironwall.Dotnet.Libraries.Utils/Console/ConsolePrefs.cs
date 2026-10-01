@@ -18,6 +18,15 @@ public sealed class ConsolePrefEntry
     /// <summary>마지막으로 본 레일 항목.</summary>
     public string? LastRailKey { get; set; }
 
+    /// <summary>위 · 아래로 나눈 화면의 위 몫(0…1 · 결선 창 3D 보기 : 개념도). 없으면 콘솔 기본값.</summary>
+    /// <remarks>값이 없으면 쓰지 않는다 — 옛 형식과 바이트가 같게(이 필드를 모르는 빌드와 섞여도 파일이 흔들리지 않는다).</remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? SplitRatio { get; set; }
+
+    /// <summary>오른쪽 상세(속성) 칸을 접어 두었는가.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DetailCollapsed { get; set; }
+
     /// <summary>
     /// 이 빌드가 모르는 키(다른 빌드가 넣은 필드 · 아직 여기 선언되지 않은 미래 필드).
     /// <b>지워지지 않고 그대로 들고 있다가 그대로 되돌려 쓴다</b>(D-08 — 이게 없으면

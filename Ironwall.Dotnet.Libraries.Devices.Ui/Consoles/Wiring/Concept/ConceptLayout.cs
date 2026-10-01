@@ -83,6 +83,26 @@ public static class ConceptLayout
     public const double LOWER_Y = 96;
     public const double MIN_HEIGHT = 140;
 
+    /// <summary>두 줄 사이의 가장 좁은 · 가장 넓은 간격(px) — 칸이 높아지면 줄 간격이 자란다(칩 · 글자 크기는 그대로).</summary>
+    public const double MIN_LANE_GAP = LOWER_Y - UPPER_Y;
+    public const double MAX_LANE_GAP = 220;
+
+    /// <summary>위 줄 위 · 아래 줄 아래에 남기는 높이(px) — 칩 위 번호 · 펜스 테두리 · 눈금 글자 자리.</summary>
+    public const double TOP_ROOM = UPPER_Y;
+    public const double BOTTOM_ROOM = MIN_HEIGHT - LOWER_Y;
+
+    /// <summary>
+    /// 높이 <paramref name="height"/> 에서 두 줄의 y — 기본(140)은 44 · 96 그대로, 높아지면 줄 간격이 <see cref="MAX_LANE_GAP"/> 까지 자라고
+    /// 남는 높이는 위아래로 나눠 가운데에 둔다(렌더 검토: 개념도가 커져도 칩만 작게 남지 않게).
+    /// </summary>
+    public static (double Upper, double Lower) LaneYs(double height)
+    {
+        var h = double.IsFinite(height) ? Math.Max(height, MIN_HEIGHT) : MIN_HEIGHT;
+        var gap = Math.Clamp(h - TOP_ROOM - BOTTOM_ROOM, MIN_LANE_GAP, MAX_LANE_GAP);
+        var upper = TOP_ROOM + Math.Max(0, h - TOP_ROOM - BOTTOM_ROOM - gap) / 2;
+        return (upper, upper + gap);
+    }
+
     public const double FULL_STEP = 40;
     public const double COMPACT_STEP = 18;
     public static readonly Size FULL_CHIP = new(34, 16);
@@ -114,10 +134,11 @@ public static class ConceptLayout
         var width = Math.Max(available.Width, 240);
         var height = Math.Max(available.Height, MIN_HEIGHT);
         var length = lengthM > 0 ? lengthM : Math.Max(1, list.Count == 0 ? 1 : list.Max(i => i.XM));
+        var (upperY, lowerY) = LaneYs(height);
 
         double fenceLeft, fenceRight;
         Rect controller;
-        var cTop = (UPPER_Y + LOWER_Y) / 2 - CONTROLLER_H / 2;
+        var cTop = (upperY + lowerY) / 2 - CONTROLLER_H / 2;
         if (end == FenceControllerEnd.Left)
         {
             controller = new Rect(SIDE_MARGIN, cTop, CONTROLLER_W, CONTROLLER_H);
@@ -169,7 +190,7 @@ public static class ConceptLayout
                 var w = LabelWidth(row[i].Label);
                 var show = i % every == 0 && (lastX is not { } lx || spread[i] - lx >= (lastW + w) / 2);
                 if (show) { lastX = spread[i]; lastW = w; }
-                nodes.Add(new ConceptPoint(row[i].Key, lane, new Point(spread[i], lane == FenceLane.Upper ? UPPER_Y : LOWER_Y), show));
+                nodes.Add(new ConceptPoint(row[i].Key, lane, new Point(spread[i], lane == FenceLane.Upper ? upperY : lowerY), show));
             }
         }
 
@@ -191,9 +212,9 @@ public static class ConceptLayout
 
         var port1 = new Point(controller.X + controller.Width / 2, controller.Bottom);
         var port2 = new Point(controller.X + controller.Width / 2, controller.Top);
-        var fenceTop = UPPER_Y - 14;
-        var fenceBottom = LOWER_Y + 16;
-        return new ConceptGeometry(end, nodes, controller, port1, port2, fenceLeft, fenceRight, UPPER_Y, LOWER_Y, fenceTop, fenceBottom, fenceBottom + 16,
+        var fenceTop = upperY - 14;
+        var fenceBottom = lowerY + 16;
+        return new ConceptGeometry(end, nodes, controller, port1, port2, fenceLeft, fenceRight, upperY, lowerY, fenceTop, fenceBottom, fenceBottom + 16,
                                    posts.Select(X).ToList(), ticks, mode, chip, new Size(width, height));
     }
 
