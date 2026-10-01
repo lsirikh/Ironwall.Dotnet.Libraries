@@ -62,12 +62,12 @@ public static class FenceStyleArt
         var dx = ARM_LEN * 0.55 * (1 - 0.7 * k);
         var tipY = postTop + ARM_LEN * 0.82;
         var tipZ = ARM_LEN * 0.6 * k;
-        var o = new List<FenceShape>(2)
+        var arms = new List<Point[]>
         {
-            new(FenceShapeKind.Line, FenceInk.RazorArm, new[] { p.P(x, postTop, 0), p.P(x - dx, tipY, -tipZ) }),
-            new(FenceShapeKind.Line, FenceInk.RazorArm, new[] { p.P(x, postTop, 0), p.P(x + dx, tipY, tipZ) }),
+            new[] { p.P(x, postTop, 0), p.P(x - dx, tipY, -tipZ) },
+            new[] { p.P(x, postTop, 0), p.P(x + dx, tipY, tipZ) },
         };
-        return (o, tipY, tipZ);
+        return (new[] { Figures(FenceShapeKind.Strokes, FenceInk.RazorArm, arms, closed: false, null) }, tipY, tipZ);
     }
 
     /// <summary>
