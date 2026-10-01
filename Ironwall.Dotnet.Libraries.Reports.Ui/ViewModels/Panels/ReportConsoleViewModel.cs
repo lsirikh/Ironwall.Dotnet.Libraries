@@ -265,7 +265,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     public IReadOnlyList<ReportColumnSpec> Columns => ReportColumnCatalog.For(SelectedRailKey);
 
     /// <summary>목록 칸 위에 붙는 설명(생성 화면의 왼쪽 칸이 무엇인지 알린다).</summary>
-    public string ListCaption => IsCreateRail ? "최근 생성 이력 — 요청한 보고서가 여기서 진행됩니다" : string.Empty;
+    public string ListCaption => IsCreateRail ? "최근 생성 이력" : string.Empty;   // "요청한 보고서가 여기서 진행됩니다" 는 창 "?"(Reports.Console) — help-callout H-3
     public bool HasListCaption => !string.IsNullOrEmpty(ListCaption);
 
     /// <summary>줄을 골랐다. 막혔으면 거짓 — 뷰가 선택을 되돌린다.</summary>
@@ -455,8 +455,6 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     public bool IsComponentsTouched => Detail.Tracker.IsTouched(ReportTemplateEditViewModel.FieldComponents);
 
     /// <summary>드래그 전용 UI 를 내지 않는다 — 같은 일을 하는 키보드 경로를 글로도 알린다.</summary>
-    public string ReorderHint => ReportTemplateEditViewModel.ReorderHint;
-
     /// <summary>[적용] · [생성] · [등록].</summary>
     public async Task ApplyAsync()
     {
@@ -883,7 +881,7 @@ public class ReportConsoleViewModel : BasePanelViewModel, IPreviewAirspaceGate, 
     internal const string CreateFormFooter = "왼쪽 목록에서 진행됩니다";
     // 안내 띠는 상세 칸(서랍 360 · 도킹 380)에서 두 줄이 된다 — 한글이 음절 중간("진 / 행", "있습 / 니다")에서
     // 갈리지 않게 문장 단위로 직접 끊는다(한 줄은 22자 안쪽).
-    internal const string CreateFormBanner = "제목과 기간을 정하고 [생성]을 누르세요.\n진행 상황은 왼쪽 목록에 나옵니다.";
+    internal const string CreateFormBanner = "제목과 기간을 정하고 [생성]을 누르세요.";   // 진행 상황이 어디 나오는지는 창 "?"(Reports.Console)
     internal const string TemplateCreateBanner = "이름을 적고 구성 요소를 고른 뒤\n[등록]을 누르세요.";
 
     /// <summary>등록 폼 바닥 막대 — 커널 글("등록 전에는 목록에 나타나지 않습니다")이 막대에서 "않습 / 니다" 로 갈렸다.</summary>
