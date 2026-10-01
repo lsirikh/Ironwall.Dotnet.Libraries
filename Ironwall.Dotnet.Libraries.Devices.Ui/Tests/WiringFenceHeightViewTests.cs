@@ -25,139 +25,158 @@ public class WiringFenceHeightViewTests
 {
     private static (FenceMountSpot Spot, FenceLane Lane) SpotOf(WiringViewModel vm, int key) => (vm.FenceLayout.MountOf(key)!.Spot, vm.FenceLayout.LaneOf(key));
 
-    #region - Vertical drag -
+    #region - 9-point grid drag (2026-10-01) -
+    /// <summary>격자 칸의 화면 점(끄는 중 · 캔버스 좌표).</summary>
+    private static Point ScreenOf(FenceCanvas canvas, FenceGridCell cell) => canvas.WorldToScreen(canvas.SnapPoints.Single(p => p.Cell == cell).At);
+
     [Fact]
-    public void should_lock_a_vertical_drag_to_height_snap_to_the_coil_and_redraw_the_guide_only_when_the_stop_changes()
+    public void should_show_red_snap_points_and_drop_a_post_sensor_on_the_panel_point_under_the_pointer()
     {
-        var result = OnWindow(WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF")), (vm, canvas) =>
+        // 스마트 넷 = 기둥 0 … 3 · 망 3 칸 — 망 1 의 가운데 위(gx 4·1+2 = 6 · gy 2)로
+        var target = new FenceGridCell(6, 2);
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
             var chip = canvas.SensorChips[102];
             var start = canvas.ScreenCenterOf(chip);
-            var x0 = FenceLayoutMath.PointOf(vm.FenceLayout.MountOf(102)!, vm.FenceLayout.Geometry).XM;
             canvas.OnPointerPressed(start, chip);
-            canvas.OnPointerMoved(start + new Vector(1, -12));                // 데드존을 넘는 순간 세로가 우세
+            canvas.OnPointerMoved(start + new Vector(12, 0));
             var action = canvas.DragAction;
-            canvas.OnPointerMoved(start + new Vector(1, -600));
-            var level = canvas.HeightLevel;
-            var label = canvas.HeightGuide?.Label;
-            var pill = canvas.OverlayShapes.Any(s => s.Ink == FenceInk.PillInsert && s.Text == label);
+            var points = canvas.SnapPoints.Count;
+            var occupied = canvas.SnapPoints.Count(p => p.Occupied);
+            var at = ScreenOf(canvas, target);
+            canvas.OnPointerMoved(at + new Vector(6, -5));                                   // 반경(24px) 안
+            var snapped = canvas.SnapTarget;
             var updates = canvas.OverlayUpdates;
-            canvas.OnPointerMoved(start + new Vector(1, -620));                // 같은 단계
-            var sameStopUpdates = canvas.OverlayUpdates - updates;
-            canvas.OnPointerReleased(start + new Vector(1, -620));
+            canvas.OnPointerMoved(at + new Vector(4, -3));                                   // 같은 점
+            var sameUpdates = canvas.OverlayUpdates - updates;
+            var hot = canvas.OverlayShapes.Count(s => s.Ink == FenceInk.SnapRing);
+            var dim = canvas.OverlayShapes.Count(s => s.Ink == FenceInk.SnapDotDim);
+            var label = canvas.SnapLabel;
+            canvas.OnPointerReleased(at + new Vector(4, -3));
             Pump();
-            return (action, level, label, pill, sameStopUpdates, Spot: SpotOf(vm, 102), Guide: canvas.HeightGuide, vm.CanUndo, x0, X1: FenceLayoutMath.PointOf(vm.FenceLayout.MountOf(102)!, vm.FenceLayout.Geometry).XM,
-                    Drawn: canvas.Scene!.X[102] / canvas.Scene.Upm);
+            return (action, points, occupied, snapped, sameUpdates, hot, dim, label, Mount: vm.FenceLayout.MountOf(102)!, vm.StatusText,
+                    After: canvas.OverlayShapes.Count(s => s.Ink == FenceInk.SnapDot));
         });
 
-        Assert.Equal(FenceGestureAction.ChangeHeight, result.action);
-        Assert.Equal(2, result.level);
-        Assert.Equal(result.x0, result.X1, 9);                                 // 코일로 들어가도 설치 가로 자리는 그대로(망 가운데)
-        Assert.Equal(result.X1, result.Drawn, 6);                              // 그림도 그 망 가운데(아래 줄 이웃과 벌리던 몫이 없어진 것뿐)
-        Assert.Equal("높이: 윤형 코일 · 위 줄로", result.label);
-        Assert.True(result.pill);
-        Assert.Equal(0, result.sameStopUpdates);                              // 후보 단계가 그대로면 다시 그리지 않는다
-        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.Spot);
-        Assert.Null(result.Guide);
-        Assert.True(result.CanUndo);
+        Assert.Equal(FenceGestureAction.SnapMove, result.action);
+        Assert.Equal(3 * 9 + 4 * 2, result.points);                                           // 망 9점 × 3 + 기둥 2점 × 4
+        Assert.Equal(3, result.occupied);                                                     // 다른 센서 셋(기둥 위)
+        Assert.Equal(target, result.snapped);
+        Assert.Equal(0, result.sameUpdates);                                                  // 후보 점이 그대로면 다시 그리지 않는다
+        Assert.True(result.hot >= 1);
+        Assert.True(result.dim >= 1);
+        Assert.Equal("망 2 · 망 위", result.label);
+        Assert.Equal((1, FenceMountSpot.PanelTop, FenceColumn.Center), (result.Mount.Panel, result.Mount.Spot, result.Mount.Column));
+        Assert.StartsWith("옮김 — ", result.StatusText);
+        Assert.Equal(0, result.After);                                                        // 놓으면 빨강 점은 사라진다
     }
 
     [Fact]
-    public void should_snap_to_the_nearest_stop_by_height_when_dropped_between_stops()
+    public void should_leave_the_sensor_where_it_was_when_released_away_from_every_point()
     {
-        var result = OnWindow(WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF")), (vm, canvas) =>
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
+            var before = vm.FenceLayout.MountOf(102)!;
             var chip = canvas.SensorChips[102];
             var start = canvas.ScreenCenterOf(chip);
             canvas.OnPointerPressed(start, chip);
-            canvas.OnPointerMoved(start + new Vector(0, -12));
-            var heights = canvas.StopHeights.ToList();
-            // 망 아래 단계 쪽으로, 두 단계 사이를 조금 넘게(가장 가까운 단계는 망 아래)
-            var dy = (heights[1] - heights[0]) * canvas.Scale * canvas.Projector.Cy * 0.6;
-            canvas.OnPointerMoved(start + new Vector(0, dy));
-            var level = canvas.HeightLevel;
-            canvas.OnPointerReleased(start + new Vector(0, dy));
+            canvas.OnPointerMoved(start + new Vector(12, 0));
+            var far = new Point(canvas.ActualWidth / 2, 6);                                    // 하늘 — 점에서 멀다
+            canvas.OnPointerMoved(far);
+            var snapped = canvas.SnapTarget;
+            canvas.OnPointerReleased(far);
             Pump();
-            return (heights, level, Spot: SpotOf(vm, 102));
+            return (before, snapped, After: vm.FenceLayout.MountOf(102)!, vm.CanUndo, vm.StatusText);
         });
 
-        Assert.True(result.heights.SequenceEqual(result.heights.OrderBy(h => h)));     // 아래 → 위
-        Assert.Equal(3, result.heights.Count);                                // 망 아래 · 망 가운데 · 윤형 코일(기둥 위는 기둥 센서만)
-        Assert.Equal(0, result.level);
-        Assert.Equal((FenceMountSpot.PanelBottom, FenceLane.Lower), result.Spot);
+        Assert.Null(result.snapped);
+        Assert.Equal(result.before, result.After);
+        Assert.False(result.CanUndo);
+        Assert.Contains("빨강 점", result.StatusText);
     }
 
     [Fact]
-    public void should_put_everything_back_when_escape_cancels_a_height_drag()
+    public void should_put_everything_back_when_escape_cancels_a_grid_drag()
     {
-        var result = OnWindow(WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF")), (vm, canvas) =>
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
+            var before = vm.FenceLayout.MountOf(102)!;
             var chip = canvas.SensorChips[102];
             var start = canvas.ScreenCenterOf(chip);
             canvas.OnPointerPressed(start, chip);
-            canvas.OnPointerMoved(start + new Vector(0, -400));
-            var during = canvas.HeightLevel;
+            canvas.OnPointerMoved(start + new Vector(12, 0));
+            canvas.OnPointerMoved(ScreenOf(canvas, new FenceGridCell(6, 0)));
+            var during = canvas.SnapTarget;
             var handled = canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, chip);
             Pump();
-            return (during, handled, canvas.IsDragging, Spot: SpotOf(vm, 102), vm.CanUndo, vm.HasChanges, Guide: canvas.HeightGuide,
-                    Pill: canvas.OverlayShapes.Any(s => s.Ink == FenceInk.PillInsert), vm.StatusText, Opacity: chip.Opacity);
+            return (before, during, handled, canvas.IsDragging, After: vm.FenceLayout.MountOf(102)!, vm.CanUndo,
+                    Dots: canvas.OverlayShapes.Count(s => s.Ink is FenceInk.SnapDot or FenceInk.SnapDotDim or FenceInk.SnapRing), vm.StatusText, Opacity: chip.Opacity);
         });
 
-        Assert.Equal(2, result.during);
+        Assert.Equal(new FenceGridCell(6, 0), result.during);
         Assert.True(result.handled);
         Assert.False(result.IsDragging);
-        Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.Spot);
-        Assert.False(result.CanUndo);                                         // 되돌리기 장면도 쌓지 않는다
-        Assert.Null(result.Guide);
-        Assert.False(result.Pill);
-        Assert.Contains("높이를 바꾸지 않았습니다", result.StatusText);
+        Assert.Equal(result.before, result.After);
+        Assert.False(result.CanUndo);                                                         // 되돌리기 장면도 쌓지 않는다
+        Assert.Equal(0, result.Dots);
+        Assert.Contains("취소", result.StatusText);
         Assert.Equal(1, result.Opacity);
     }
 
     [Fact]
-    public void should_keep_a_horizontal_drag_as_a_panel_move_when_the_horizontal_motion_dominates()
+    public void should_move_the_whole_selection_by_the_same_grid_offset_in_one_undo_step()
     {
-        var result = OnWindow(WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF")), (vm, canvas) =>
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
+            vm.FenceSelectSensors(new[] { 102, 103 });
+            Pump();
             var chip = canvas.SensorChips[102];
             var start = canvas.ScreenCenterOf(chip);
             canvas.OnPointerPressed(start, chip);
-            canvas.OnPointerMoved(start + new Vector(12, -5));
-            var action = canvas.DragAction;
-            canvas.OnPointerMoved(start + new Vector(30, -300));             // 잠근 뒤에는 세로로 가도 가로 끌기
-            var height = canvas.HeightLevel;
-            canvas.HandleKeyDown(Key.Escape, Key.None, ModifierKeys.None, chip);
+            canvas.OnPointerMoved(start + new Vector(12, 0));
+            var at = ScreenOf(canvas, new FenceGridCell(5, 2));                                // 기둥 1(gx 4) → 망 1 왼쪽 위(gx 5) · Δ(+1, 0)
+            canvas.OnPointerMoved(at);
+            var members = canvas.OverlayShapes.Count(s => s.Ink == FenceInk.SnapRing);
+            var label = canvas.SnapLabel;
+            canvas.OnPointerReleased(at);
             Pump();
-            return (action, height);
+            var moved = (vm.FenceLayout.MountOf(102)!, vm.FenceLayout.MountOf(103)!);
+            vm.Undo();
+            return (members, label, moved, Back: (vm.FenceLayout.MountOf(102)!.Spot, vm.FenceLayout.MountOf(103)!.Spot));
         });
 
-        Assert.Equal(FenceGestureAction.MoveSensors, result.action);
-        Assert.Null(result.height);
+        Assert.True(result.members >= 2);                                                     // 포인터 아래 + 함께 끈 센서의 점
+        Assert.EndsWith("· 2대", result.label);
+        Assert.Equal((1, FenceMountSpot.PanelTop, FenceColumn.Left), (result.moved.Item1.Panel, result.moved.Item1.Spot, result.moved.Item1.Column));
+        Assert.Equal((2, FenceMountSpot.PanelTop, FenceColumn.Left), (result.moved.Item2.Panel, result.moved.Item2.Spot, result.moved.Item2.Column));
+        Assert.Equal((FenceMountSpot.PostTop, FenceMountSpot.PostTop), result.Back);           // 되돌리기 한 번
     }
 
     [Fact]
-    public void should_raise_every_selected_sensor_together_when_one_of_them_is_dragged_up()
+    public void should_refuse_a_group_move_when_any_member_would_land_off_the_grid()
     {
-        var result = OnWindow(WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF")), (vm, canvas) =>
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
-            vm.FenceSelectSensors(new[] { 102, 104 });
+            vm.FenceSelectSensors(new[] { 103, 104 });
             Pump();
-            var chip = canvas.SensorChips[102];
+            var chip = canvas.SensorChips[103];
             var start = canvas.ScreenCenterOf(chip);
             canvas.OnPointerPressed(start, chip);
-            canvas.OnPointerMoved(start + new Vector(0, -12));
-            canvas.OnPointerMoved(start + new Vector(0, -600));
-            var label = canvas.HeightGuide?.Label;
-            canvas.OnPointerReleased(start + new Vector(0, -600));
+            canvas.OnPointerMoved(start + new Vector(12, 0));
+            var at = ScreenOf(canvas, new FenceGridCell(11, 2));                               // 103: 기둥 2(gx 8) → gx 11 · 104: 기둥 3(gx 12) → gx 15(없음)
+            canvas.OnPointerMoved(at);
+            var label = canvas.SnapLabel;
+            var blocked = canvas.OverlayShapes.Count(s => s.Ink == FenceInk.SnapBlocked);
+            canvas.OnPointerReleased(at);
             Pump();
-            var both = (SpotOf(vm, 102), SpotOf(vm, 104));
-            vm.Undo();
-            return (label, both, After: (SpotOf(vm, 102), SpotOf(vm, 104)));
+            return (label, blocked, M103: vm.FenceLayout.MountOf(103)!.Spot, M104: vm.FenceLayout.MountOf(104)!.Spot, vm.CanUndo, vm.StatusText);
         });
 
-        Assert.EndsWith("· 2대", result.label);
-        Assert.Equal(((FenceMountSpot.RazorCoil, FenceLane.Upper), (FenceMountSpot.RazorCoil, FenceLane.Upper)), result.both);
-        Assert.Equal(((FenceMountSpot.PanelCenter, FenceLane.Lower), (FenceMountSpot.PanelCenter, FenceLane.Lower)), result.After);   // 되돌리기 한 번
+        Assert.Equal("놓을 수 없음 — 1대 갈 점 없음", result.label);
+        Assert.Equal(1, result.blocked);                                                      // 경고 모양(빈 마름모)
+        Assert.Equal((FenceMountSpot.PostTop, FenceMountSpot.PostTop), (result.M103, result.M104));
+        Assert.False(result.CanUndo);
+        Assert.Contains("놓지 않았습니다", result.StatusText);
     }
     #endregion
 
@@ -186,10 +205,10 @@ public class WiringFenceHeightViewTests
         Assert.False(result.plainUp);
         Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.afterPlain);
         Assert.True(result.up);
-        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.afterUp);
+        Assert.Equal((FenceMountSpot.PanelTop, FenceLane.Lower), result.afterUp);             // 한 줄 위(가운데 → 위)
         Assert.True(result.nudge);
         Assert.Equal(-0.1, result.offset, 6);
-        Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), result.afterNudge);      // 미세 높이는 단계를 바꾸지 않는다
+        Assert.Equal((FenceMountSpot.PanelTop, FenceLane.Lower), result.afterNudge);       // 미세 높이는 단계를 바꾸지 않는다
         Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), result.Down);
     }
 
@@ -258,32 +277,31 @@ public class WiringFenceHeightViewTests
 
     #region - Ctrl+←/→ (헤디드 r22) -
     [Fact]
-    public void should_move_to_the_next_panel_with_ctrl_right_in_the_fence_view_and_the_concept()
+    public void should_move_to_the_next_grid_point_with_ctrl_right_in_the_fence_view_and_the_concept()
     {
         var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
         {
             var chip = canvas.SensorChips[102];
             chip.Focus();
-            var before = vm.FenceLayout.MountOf(102)!.Panel;
             var handled = canvas.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Control, chip);
             Pump();
-            var afterCanvas = vm.FenceLayout.MountOf(102)!.Panel;
+            var afterCanvas = vm.FenceLayout.MountOf(102)!;
             var status = vm.StatusText;
 
             var concept = Descendants<Consoles.Wiring.Concept.FenceConceptView>(Window.GetWindow(canvas)!).Single();
             var node = concept.NodeChips[103];
             node.Focus();
-            var before103 = vm.FenceLayout.MountOf(103)!.Panel;
             var conceptHandled = concept.HandleKeyDown(Key.Right, Key.None, ModifierKeys.Control, node);
             Pump();
-            return (handled, before, afterCanvas, status, conceptHandled, before103, After103: vm.FenceLayout.MountOf(103)!.Panel);
+            return (handled, afterCanvas, status, conceptHandled, After103: vm.FenceLayout.MountOf(103)!);
         });
 
+        // 기둥 1 위 → 같은 줄(위)의 다음 점 = 망 1(번호 2) 왼쪽 위 · 103 은 기둥 2 위 → 망 2 왼쪽 위
         Assert.True(result.handled);
-        Assert.Equal(result.before + 1, result.afterCanvas);
+        Assert.Equal((1, FenceMountSpot.PanelTop, FenceColumn.Left), (result.afterCanvas.Panel, result.afterCanvas.Spot, result.afterCanvas.Column));
         Assert.StartsWith("옮김 — ", result.status);
         Assert.True(result.conceptHandled);
-        Assert.Equal(result.before103 + 1, result.After103);
+        Assert.Equal((2, FenceMountSpot.PanelTop, FenceColumn.Left), (result.After103.Panel, result.After103.Spot, result.After103.Column));
     }
 
     [Fact]

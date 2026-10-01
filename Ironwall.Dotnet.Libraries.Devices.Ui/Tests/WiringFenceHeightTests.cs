@@ -47,10 +47,10 @@ public class WiringFenceHeightTests
         var before = vm.FenceLayout.MountOf(102)!;
         var x = FenceLayoutMath.PointOf(before, vm.FenceLayout.Geometry).XM;
 
-        // Act
-        var raised = vm.FenceRaiseSelected();
+        // Act — 망 가운데 → 망 위 → 윤형 코일
+        var raised = vm.FenceRaiseSelected() && vm.FenceRaiseSelected();
 
-        // Assert — 망 가운데 → (같은 망) 윤형 코일(위 줄) · 사슬 끝(위 줄)으로 · 가로 자리 그대로
+        // Assert — 같은 망의 윤형 코일(위 줄) · 사슬 끝(위 줄)으로 · 가로 자리 그대로
         Assert.True(raised);
         Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), SpotOf(vm, 102));
         Assert.Equal(before.Panel, vm.FenceLayout.MountOf(102)!.Panel);
@@ -80,9 +80,12 @@ public class WiringFenceHeightTests
         var vm = Razor(Build("SFSFF"));
         vm.FenceSelect(102);
         vm.FenceRaiseSelected();
+        vm.FenceRaiseSelected();
 
         Assert.False(vm.FenceRaiseSelected());                                           // 맨 위
         Assert.Contains("맨 위", vm.StatusText);
+        vm.Undo();
+        Assert.Equal((FenceMountSpot.PanelTop, FenceLane.Lower), SpotOf(vm, 102));
         vm.Undo();
         Assert.Equal((FenceMountSpot.PanelCenter, FenceLane.Lower), SpotOf(vm, 102));
         Assert.True(vm.FenceLowerSelected());
@@ -97,7 +100,7 @@ public class WiringFenceHeightTests
         var vm = Razor(Build("SFSFF"));
         vm.FenceSelectSensors(new[] { 102, 104 });
 
-        vm.FenceStepStop(vm.FenceSelectedKeys, 1);
+        vm.FenceStepStop(vm.FenceSelectedKeys, 2);
 
         Assert.All(new[] { 102, 104 }, k => Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), SpotOf(vm, k)));
         Assert.Contains("2대", vm.StatusText);
@@ -110,13 +113,13 @@ public class WiringFenceHeightTests
     {
         var vm = Razor(Build("SFSFF"));
 
-        Assert.Equal(new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.RazorCoil }, vm.FenceHeightStops(102));
+        Assert.Equal(new[] { FenceMountSpot.PanelBottom, FenceMountSpot.PanelCenter, FenceMountSpot.PanelTop, FenceMountSpot.RazorCoil }, vm.FenceHeightStops(102));
         Assert.Equal(new[] { FenceMountSpot.PostMiddle, FenceMountSpot.PostTop }, vm.FenceHeightStops(101));
         Assert.Equal(1, vm.FenceStopLevel(102));
-        Assert.Equal("높이: 윤형 코일 · 위 줄로", vm.FenceStopLabel(new[] { 102 }, 102, 2));
+        Assert.Equal("높이: 윤형 코일 · 위 줄로", vm.FenceStopLabel(new[] { 102 }, 102, 3));
         Assert.False(vm.FenceSetStopLevel(new[] { 102 }, 102, 1));
         Assert.Contains("제자리", vm.StatusText);
-        Assert.True(vm.FenceSetStopLevel(new[] { 102 }, 102, 2));
+        Assert.True(vm.FenceSetStopLevel(new[] { 102 }, 102, 3));
         Assert.Equal((FenceMountSpot.RazorCoil, FenceLane.Upper), SpotOf(vm, 102));
     }
 

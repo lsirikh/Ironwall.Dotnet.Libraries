@@ -2018,6 +2018,50 @@
 													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsSpotWallFace, Converter={StaticResource BoolToVisibility}}" />
 												</StackPanel>
 											</UniformGrid>
+											<!--  9점 격자(2026-10-01) — 지금 망(기둥 센서는 오른쪽 망)의 9점 중 하나로. 끌기 · Ctrl+←/→ · Alt+↑/↓ 의 단추 대신 · 켜진 점은 아래 막대  -->
+											<DockPanel Margin="0,6,0,0" LastChildFill="False">
+												<TextBlock Margin="0,0,10,0" VerticalAlignment="Center" DockPanel.Dock="Left" Style="{StaticResource W.Hint}" Text="망 안 9점" />
+												<Grid AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid" DockPanel.Dock="Left">
+												<Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+												<Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+												<StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Left.Top" AutomationProperties.Name="왼쪽 위" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Left.2" ToolTip="망 왼쪽 · 위" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridLeftTop, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Center.Top" AutomationProperties.Name="가운데 위" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Center.2" ToolTip="망 가운데 · 위" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridCenterTop, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Right.Top" AutomationProperties.Name="오른쪽 위" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Right.2" ToolTip="망 오른쪽 · 위" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridRightTop, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Left.Middle" AutomationProperties.Name="왼쪽 가운데" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Left.1" ToolTip="망 왼쪽 · 가운데" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridLeftMiddle, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Center.Middle" AutomationProperties.Name="가운데 가운데" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Center.1" ToolTip="망 가운데 · 가운데" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridCenterMiddle, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Right.Middle" AutomationProperties.Name="오른쪽 가운데" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Right.1" ToolTip="망 오른쪽 · 가운데" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridRightMiddle, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Left.Bottom" AutomationProperties.Name="왼쪽 아래" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Left.0" ToolTip="망 왼쪽 · 아래" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridLeftBottom, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Center.Bottom" AutomationProperties.Name="가운데 아래" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Center.0" ToolTip="망 가운데 · 아래" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridCenterBottom, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,3,3">
+													<Button MinWidth="0" Width="30" Height="24" Padding="0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Grid.Right.Bottom" AutomationProperties.Name="오른쪽 아래" Click="OnGridPoint" Content="●" FontSize="9" Style="{StaticResource Console.Button}" Tag="Right.0" ToolTip="망 오른쪽 · 아래" />
+													<Rectangle Height="3" Margin="4,1,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsGridRightBottom, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												</Grid>
+											</DockPanel>
 											<TextBlock Margin="0,3,0,0" Style="{StaticResource W.Hint}" Text="오른쪽 클릭 → &quot;이 설치 방식을 이 제어기 모든 센서에 적용&quot;으로 퍼뜨립니다" />
 											<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Ctrl+← →(Alt+Shift+← → 도)  -->
 											<TextBlock Margin="0,8,0,0" Style="{StaticResource W.Hint}" Text="{Binding MountPanelLabel}" />

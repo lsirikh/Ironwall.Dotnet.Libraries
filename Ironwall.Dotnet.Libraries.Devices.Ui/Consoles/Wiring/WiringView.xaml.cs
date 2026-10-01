@@ -144,6 +144,14 @@ public partial class WiringView : UserControl
 
     private void OnYawCw(object sender, RoutedEventArgs e) => ViewModel?.FenceRotateSelected(1);
 
+    /// <summary>9점 고르개 — Tag = "열.줄"(Left|Center|Right . 0|1|2).</summary>
+    private void OnGridPoint(object sender, RoutedEventArgs e)
+    {
+        var parts = (TagOf(sender) ?? string.Empty).Split('.');
+        if (parts.Length == 2 && Enum.TryParse<Ironwall.Dotnet.Monitoring.Models.Fences.FenceColumn>(parts[0], out var column) && int.TryParse(parts[1], out var row))
+            ViewModel?.FenceSetGridPoint(column, row);
+    }
+
     private void OnYawCcw(object sender, RoutedEventArgs e) => ViewModel?.FenceRotateSelected(-1);
 
     /// <summary>네 방향 고르개 — Tag = 각도(0 · 90 · 180 · 270).</summary>

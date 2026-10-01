@@ -26,6 +26,8 @@ public enum FenceInk
     FacingTag, FacingTagText, SideLabel,
     // 센서 방향(2026-10-01) — 렌즈 쪽 모서리(주 색 굵은 선 · 화살 아님) · 뒷판 이음매 · 철망 뒤(내부) 센서 위에 겹치는 철망 선
     LensEdge, BackSeam, MeshOver,
+    // 9점 격자 끌기 안내(2026-10-01) — 빨강(위급 토큰 · 잠깐 뜨는 끌기 안내) 채운 원 · 흐린 원 · 고리 · 빈 마름모
+    SnapDot, SnapDotDim, SnapRing, SnapBlocked,
     // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
     PanelSelectFill, PanelSelectEdge, RubberBand,
     Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
@@ -73,10 +75,11 @@ public sealed record FenceShape(
 /// <summary>칩 하나의 그림 — 모양 · 적중 사각형(칩 좌표).</summary>
 public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);
 
-/// <summary>
-/// 높이 단계 끌기의 안내 — 세계 x 가운데 · 높이(세계 단위) · 반 폭 · 단계 이름 알약. 가로 안내선(삽입 막대는 세로 — 축으로 가른다 · 색이 아니라 형태).
-/// </summary>
-public sealed record FenceHeightGuide(double X, double Height, double HalfWidth, string Label);
+/// <summary>격자 점 안내의 모습 — 빈 점 · 센서가 있는 점(흐림) · 포인터 아래(크게 + 고리) · 함께 끈 센서가 갈 점(고리) · 갈 수 없음(빈 마름모).</summary>
+public enum FenceSnapState { Free, Occupied, Hot, Member, Blocked }
+
+/// <summary>끄는 동안 그리는 격자 점 하나(세계 좌표 · 투영 뒤).</summary>
+public sealed record FenceSnapDot(Point At, FenceSnapState State);
 
 /// <summary>
 /// 펜스 뷰의 장면 — 목업(<c>wiring-fence-view-mockup.html</c> · <c>draw()</c> · <c>sensorShape()</c> · <c>drawCtrl()</c>)을 옮긴 <b>순수</b> 그림 목록.
@@ -503,6 +506,9 @@ public static partial class FenceScene
     public const double COIL_PLATE_TEXT = 11;
     public const double COIL_PLATE_GAP = 4;
 
+    /// <summary>격자 점 반지름(화면 px).</summary>
+    public const double SNAP_DOT_PX = 4;
+
     /// <summary>펜스센서 묶음 칩(FR-18) — "펜스센서 ×N" 겹 카드 + 첫–끝 번호.</summary>
     /// <param name="maxWidth">
     /// 이웃 칩까지 남는 폭(세계 단위) — 작은 배율에서 글자가 줌에 맞서 커지면 카드가 이웃 번호를 덮는다(검토 V2 · 실측 34%).
@@ -619,7 +625,7 @@ public static partial class FenceScene
     /// </summary>
     public static IReadOnlyList<FenceShape> Overlay(FenceWorld world, FenceProjector p, IReadOnlyCollection<int> hidden,
                                                     int? named, double? insertionX, string? insertionLabel, double zoom = 1,
-                                                    FenceHeightGuide? heightGuide = null)
+                                                    IReadOnlyList<FenceSnapDot>? snapDots = null, string? snapLabel = null)
     {
         var o = new List<FenceShape>();
         var lt = world.LabelTop;
@@ -650,17 +656,35 @@ public static partial class FenceScene
                 o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { p.P(ix, yb + 26, z) }, Text: insertionLabel, FontSize: 11.5));
         }
 
-        // 높이 단계 안내 — 단계 높이의 가로선 + 양 끝 세모(안쪽을 가리킨다) + 단계 이름 알약(선 오른쪽 끝 위)
-        if (heightGuide is { } g)
+        // 9점 격자 안내(끄는 동안) — 빨강 채운 원(선택 윤곽 · 삽입 막대와 형태가 다르다) · 센서가 있는 점은 흐리게 · 포인터 아래는 크게 + 고리 ·
+        // 함께 끈 센서가 갈 점은 고리 · 갈 수 없으면 빈 마름모(경고). 크기는 화면에서 같게(줌에 맞서).
+        if (snapDots is { Count: > 0 })
         {
-            var z = p.De / 2;
-            var a = p.P(g.X - g.HalfWidth, g.Height, z);
-            var b = p.P(g.X + g.HalfWidth, g.Height, z);
-            o.Add(Seg(FenceInk.Insert, a, b));
-            o.Add(Poly(FenceInk.Insert, new Point(a.X - 9, a.Y - 6), new Point(a.X - 9, a.Y + 6), new Point(a.X - 1, a.Y)));
-            o.Add(Poly(FenceInk.Insert, new Point(b.X + 9, b.Y - 6), new Point(b.X + 9, b.Y + 6), new Point(b.X + 1, b.Y)));
-            if (!string.IsNullOrEmpty(g.Label))
-                o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { p.P(g.X, g.Height + 30, z) }, Text: g.Label, FontSize: 11.5));
+            var r = SNAP_DOT_PX / SafeZoom(zoom);
+            foreach (var dot in snapDots)
+            {
+                switch (dot.State)
+                {
+                    case FenceSnapState.Blocked:
+                        o.Add(Poly(FenceInk.SnapBlocked, new Point(dot.At.X, dot.At.Y - r * 1.8), new Point(dot.At.X + r * 1.8, dot.At.Y), new Point(dot.At.X, dot.At.Y + r * 1.8), new Point(dot.At.X - r * 1.8, dot.At.Y)));
+                        break;
+                    case FenceSnapState.Hot:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapRing, new[] { dot.At }, r * 2.4, r * 2.4));
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapDot, new[] { dot.At }, r * 1.5, r * 1.5));
+                        break;
+                    case FenceSnapState.Member:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapRing, new[] { dot.At }, r * 1.8, r * 1.8));
+                        break;
+                    case FenceSnapState.Occupied:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapDotDim, new[] { dot.At }, r, r));
+                        break;
+                    default:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapDot, new[] { dot.At }, r, r));
+                        break;
+                }
+            }
+            if (!string.IsNullOrEmpty(snapLabel) && snapDots.FirstOrDefault(d => d.State is FenceSnapState.Hot or FenceSnapState.Blocked) is { } hot)
+                o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { new Point(hot.At.X, hot.At.Y - 26) }, Text: snapLabel, FontSize: 11.5));
         }
         return Legible(o, zoom);
     }

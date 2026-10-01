@@ -48,8 +48,10 @@ public enum FenceGestureAction
     Pan = 8,
     /// <summary>오른쪽 클릭 메뉴(데드존 안에서 뗌).</summary>
     ContextMenu = 9,
-    /// <summary>잡은 센서(고른 것 전부)의 높이 단계를 바꾼다(센서를 잡고 세로로 끌기 · 펜스 구성).</summary>
+    /// <summary>잡은 센서(고른 것 전부)의 높이 단계를 바꾼다(옛 세로 끌기 — 9점 격자 끌기로 바뀌어 쓰지 않는다).</summary>
     ChangeHeight = 10,
+    /// <summary>잡은 센서(고른 것 전부)를 9점 격자의 빨강 점에 맞춰 옮긴다(가로 · 세로 한 번에 · 펜스 구성).</summary>
+    SnapMove = 11,
 }
 
 /// <summary>센서 끌기의 축 — 데드존을 넘을 때 우세한 쪽으로 한 번 잠근다.</summary>
@@ -98,6 +100,23 @@ public static class FenceGesture
         {
             var d = Math.Abs(stopHeights![i] - pointerHeight);
             if (d < distance - 1e-9) { distance = d; best = i; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// 격자 점 맞추기 — 포인터(화면 좌표)에서 <paramref name="radius"/>(화면 px) 안의 가장 가까운 점 번호, 없으면 −1. 점 위치도 화면 좌표.
+    /// </summary>
+    public static int NearestSnap(IReadOnlyList<Point> screenPoints, Point pointer, double radius)
+    {
+        var best = -1;
+        var limit = radius * radius;
+        for (var i = 0; i < (screenPoints?.Count ?? 0); i++)
+        {
+            var dx = screenPoints![i].X - pointer.X;
+            var dy = screenPoints[i].Y - pointer.Y;
+            var d = dx * dx + dy * dy;
+            if (d <= limit) { limit = d; best = i; }
         }
         return best;
     }

@@ -516,7 +516,8 @@ public sealed class FenceConceptView : Grid
         if (FenceCanvas.IsPanelMoveKey(alt, k, modifiers))
         {
             if (!vm.IsFenceSelected(node.Key)) vm.FenceSelect(node.Key);
-            vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
+            if (alt) vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
+            else vm.FenceStepGrid(vm.FenceDragKeys(node.Key), k == Key.Left ? -1 : 1);       // Ctrl+←/→ = 다음 격자 점(펜스 보기와 같은 규칙)
             FocusNode(node.Key);
             return true;
         }

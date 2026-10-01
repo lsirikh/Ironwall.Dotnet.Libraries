@@ -167,6 +167,10 @@ internal sealed class WiringPreview
                 ? new SensorMountSpec(i, FenceMountSpot.WallTop)
                 : new SensorMountSpec(i, FenceMountSpot.PostTop);
         }
+        // 9점 격자(2026-10-01) — 철조망 왼쪽 위 · 벽돌 왼쪽 아래 · 벽돌 오른쪽 가운데(담 앞면)
+        mounts[3001] = new SensorMountSpec(0, FenceMountSpot.PanelTop, Column: FenceColumn.Left);
+        mounts[3004] = new SensorMountSpec(3, FenceMountSpot.WallBottom, Column: FenceColumn.Left);
+        mounts[3005] = new SensorMountSpec(4, FenceMountSpot.WallFace, Column: FenceColumn.Right);
         var document = new FenceLayoutDocument { ControllerId = 4, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier3, Revision = 1 };
         var vm = Controller(new WiringControllerInfo(4, 4, "CTRL-남측-04", "10.99.7.4", "SmartController"), seeds, new[] { "SmartSensor2" },
                             new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));
@@ -185,7 +189,13 @@ internal sealed class WiringPreview
         var facts = new Dictionary<int, SensorFacts>();
         for (var i = 0; i < 6; i++)
         {
-            mounts[4101 + i] = new SensorMountSpec(i, FenceMountSpot.PostTop);
+            // 9점 격자(2026-10-01) — 스마트 1 = 망 1 왼쪽 가운데 · 6 = 망 6 오른쪽 아래 · 나머지는 기둥 위
+            mounts[4101 + i] = i switch
+            {
+                0 => new SensorMountSpec(0, FenceMountSpot.PanelCenter, Column: FenceColumn.Left),
+                5 => new SensorMountSpec(5, FenceMountSpot.PanelBottom, Column: FenceColumn.Right),
+                _ => new SensorMountSpec(i, FenceMountSpot.PostTop),
+            };
             facts[4101 + i] = new SensorFacts(1 + i, $"판망 스마트 {i + 1}", "SmartSensor2", "북측");
             mounts[4201 + i] = new SensorMountSpec(i, FenceMountSpot.RazorCoil, Lane: FenceLane.Upper);         // 펜스센서는 윤형과 같이
             facts[4201 + i] = new SensorFacts(101 + i, $"윤형 펜스 {i + 1}", "Fence", "북측");

@@ -208,13 +208,13 @@ public class WiringFenceViewTests
         {
             var chip = canvas.SensorChips[101];
             var start = canvas.ScreenCenterOf(chip);
-            var x103 = canvas.ScreenCenterOf(canvas.SensorChips[103]).X;
-            var x104 = canvas.ScreenCenterOf(canvas.SensorChips[104]).X;
-            var at = new Point((x103 + x104) / 2 - 3, start.Y);
 
             canvas.OnPointerPressed(start, chip);
             canvas.OnPointerMoved(start + new Vector(5, 0));              // 데드존(8) 안 — 아직 끌기가 아니다
             var beforeDeadZone = canvas.IsDragging;
+            canvas.OnPointerMoved(start + new Vector(14, 0));
+            // 9점 격자(2026-10-01) — 망 3(기둥 2 · 3 사이)의 왼쪽 위 빨강 점으로
+            var at = canvas.WorldToScreen(canvas.SnapPoints.Single(p => p.Cell == new Ironwall.Dotnet.Monitoring.Models.Fences.FenceGridCell(9, 2)).At);
             canvas.OnPointerMoved(at);
             var dragging = canvas.IsDragging;
             var dimmed = chip.Opacity;
@@ -233,7 +233,7 @@ public class WiringFenceViewTests
         Assert.True(result.dragging);
         Assert.Equal(0.3, result.dimmed, 3);
         Assert.Equal(0, result.sameCandidateUpdates);                      // 후보가 그대로면 다시 그리지 않는다(NFR-02)
-        Assert.Equal("위치 3 · 기둥 3 · 기둥 위", result.label);         // 펜스 구성: 목표 = 잡은 센서 자리 종류의 가장 가까운 칸(FR-05)
+        Assert.Equal("망 3 · 왼쪽 · 망 위", result.label);               // 펜스 구성: 목표 = 포인터 아래 빨강 점(9점 격자)
         Assert.Equal(new[] { 102, 103, 101, 104, 105 }, result.Chain);
         Assert.Equal(101, result.Selected);
         Assert.Equal(1, result.Restored);
@@ -386,8 +386,10 @@ public class WiringFenceViewTests
 
             var grab = canvas.SensorChips[103];
             var start = canvas.ScreenCenterOf(grab);
-            var end = new Point(canvas.ScreenCenterOf(canvas.SensorChips[105]).X + 60, start.Y);
             canvas.OnPointerPressed(start, grab);
+            canvas.OnPointerMoved(start + new Vector(14, 0));
+            // 103: 기둥 2(gx 8) → 망 4 왼쪽 위(gx 13) · 101 도 같은 Δ(+5) — 기둥 0 → 망 2 왼쪽 위(gx 5)
+            var end = canvas.WorldToScreen(canvas.SnapPoints.Single(p => p.Cell == new Ironwall.Dotnet.Monitoring.Models.Fences.FenceGridCell(13, 2)).At);
             canvas.OnPointerMoved(end);
             var ghostCount = canvas.SensorChips.Values.Count(c => c.Opacity < 1);
             canvas.OnPointerReleased(end);
@@ -399,7 +401,7 @@ public class WiringFenceViewTests
         Assert.True(result.pane.HasMultiSelection);
         Assert.Equal(2, result.pane.Rings);                                  // 고른 칩마다 선택 윤곽
         Assert.Equal(2, result.ghostCount);                                  // 둘 다 끌린다
-        Assert.Equal(new[] { 102, 101, 104, 105, 103 }, result.Chain);       // 둘 다 같은 칸 수(+2 기둥)만큼 — 간격을 지킨 채 옮긴다(FR-05)
+        Assert.Equal(new[] { 102, 101, 104, 103, 105 }, result.Chain);       // 둘 다 같은 격자 칸 수만큼 — 간격을 지킨 채 옮긴다(FR-05)
     }
 
     [Fact]
