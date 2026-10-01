@@ -21,7 +21,7 @@ public sealed class SsoStaticHookCollection { public const string Name = "Sso-st
 /// 에이전트와 서버 없이 헤드리스로 돈다(가짜 에이전트 · 가짜 계정 API · 실제 토큰 저장소).
 /// </summary>
 [Collection(SsoStaticHookCollection.Name)]
-public class SsoSessionCoordinatorTests : IDisposable
+public partial class SsoSessionCoordinatorTests : IDisposable
 {
     public SsoSessionCoordinatorTests() => BearerAuthHandler.SsoReauthenticator = null;
     public void Dispose() => BearerAuthHandler.SsoReauthenticator = null;
@@ -384,7 +384,35 @@ public class SsoSessionCoordinatorTests : IDisposable
         public bool IsAgentPresent() => Present;
         public Task<SsoAgentResult> SignInAsync(CancellationToken ct = default)
             => Task.FromResult(Next ?? SsoAgentResult.Ok($"sso-{++_n}"));
-        public Task<SsoAgentResult> SignInInteractiveAsync(CancellationToken ct = default) => SignInAsync(ct);
+        /// <summary>단추 경로 — 지정하면 그 결과, 아니면 창 없는 경로와 같게.</summary>
+        public Func<CancellationToken, Task<SsoAgentResult>>? Interactive { get; init; }
+        public int InteractiveCalls { get; private set; }
+        public Task<SsoAgentResult> SignInInteractiveAsync(CancellationToken ct = default)
+        {
+            InteractiveCalls++;
+            return Interactive is not null ? Interactive(ct) : SignInAsync(ct);
+        }
+
+        /// <summary>사건 구독 — 마지막 구독의 콜백을 쥐고 시험이 사건을 일으킨다.</summary>
+        public Action<SsoAgentEvent>? OnEvent { get; private set; }
+        public int WatchOpened { get; private set; }
+        public int WatchDisposed;
+        public bool ThrowOnWatch { get; init; }
+        public IAsyncDisposable Watch(Action<SsoAgentEvent> onEvent, Action<Exception>? onError = null)
+        {
+            if (ThrowOnWatch) throw new InvalidOperationException("watch failed");
+            WatchOpened++;
+            OnEvent = onEvent;
+            return new FakeWatch(this);
+        }
+        public void Raise(string evt, string reason) => OnEvent?.Invoke(new SsoAgentEvent(evt, reason, DateTimeOffset.UtcNow));
+
+        private sealed class FakeWatch : IAsyncDisposable
+        {
+            private readonly FakeAgent _owner;
+            public FakeWatch(FakeAgent owner) => _owner = owner;
+            public ValueTask DisposeAsync() { Interlocked.Increment(ref _owner.WatchDisposed); return ValueTask.CompletedTask; }
+        }
     }
 
     /// <summary>받은 SSO 토큰을 기록하고 각본대로 교환 결과를 돌려준다.</summary>
@@ -404,7 +432,14 @@ public class SsoSessionCoordinatorTests : IDisposable
             => throw new InvalidOperationException("SSO 세션에서 refresh 를 부르면 안 된다");
 
         public Task<ApiResponse<LoginResponseDataDto>> LoginAsync(string loginId, string password, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<ApiResponse<object>> LogoutAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public int LogoutCalls;
+        public bool LogoutThrows { get; init; }
+        public Task<ApiResponse<object>> LogoutAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref LogoutCalls);
+            if (LogoutThrows) throw new HttpRequestException("gop down");
+            return Task.FromResult(new ApiResponse<object> { Success = true });
+        }
         public Task<AuthUserDto?> GetMeAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ApiListResponse<AuthUserDto>> GetUsersAsync(int page = 1, int limit = 100, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ApiResponse<AuthUserDto>> CreateUserAsync(UserCreateDto dto, CancellationToken ct = default) => throw new NotSupportedException();

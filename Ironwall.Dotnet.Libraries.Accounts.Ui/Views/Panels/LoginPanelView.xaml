@@ -237,6 +237,39 @@
 					</DockPanel>
 				</Border>
 
+				<!--
+					SSO 로 로그인 — SSO PRD FR-03 · 에이전트 대화형 로그인(SDK SignInInteractiveAsync).
+					에이전트에 세션이 없거나 "이 앱만 로그아웃" 으로 막혔을 때 사람이 다시 들어오는 길. GOP 모드(IsSsoAvailable)에서만 보인다.
+					x:Name 을 두지 않는다(Caliburn 이름 관례 = 바인딩 지시자) — Message.Attach 로 잇고, 가드는 CanClickSsoLogin.
+				-->
+				<Button
+					Height="34"
+					Margin="0,12,0,0"
+					HorizontalAlignment="Stretch"
+					AutomationProperties.AutomationId="Accounts.Login.SsoButton"
+					cal:Message.Attach="ClickSsoLogin"
+					ToolTip="SSO 에이전트로 로그인합니다">
+					<Button.Style>
+						<Style BasedOn="{StaticResource Console.Button}" TargetType="Button">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsSsoAvailable}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Margin="0,0,6,0"
+							VerticalAlignment="Center"
+							Kind="ShieldAccountOutline" />
+						<TextBlock VerticalAlignment="Center" Text="{Binding SsoButtonText}" />
+					</StackPanel>
+				</Button>
+
 				<Rectangle
 					Height="1"
 					Margin="0,16,0,10"

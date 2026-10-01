@@ -28,7 +28,23 @@ public interface ISsoAgentGateway
     /// 에이전트에 세션이 없을 때(<see cref="SsoAgentStatus.NoActiveSession"/>) 로그인 화면에서 부른다.
     /// </summary>
     Task<SsoAgentResult> SignInInteractiveAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// 에이전트가 미는 사건을 받기 시작한다 — SDK <c>Watch</c>. 세션이 끝나면 GIS 가 묻지 않아도 안다.
+    /// <para>"이 앱만 로그아웃" 은 SSO 세션을 끝내지 않아 back-channel 도 401 도 오지 않는다 — <b>이 구독이 GIS 가 그것을
+    /// 아는 유일한 길</b>이다(SSO 회신 2026-10-01 16:55).</para>
+    /// <para>끊기면 SDK 가 혼자 다시 붙고, 콜백 예외로 구독이 죽지 않는다. <paramref name="onEvent"/> 는 UI 스레드가 아닌 곳에서 불린다.
+    /// 돌려받은 것을 버리면(<c>DisposeAsync</c>) 멈춘다 — 루프가 끝날 때까지 기다리므로 콜백 안에서 기다리면 안 된다.</para>
+    /// </summary>
+    IAsyncDisposable Watch(Action<SsoAgentEvent> onEvent, Action<Exception>? onError = null);
 }
+
+/// <summary>
+/// 에이전트 사건 — SDK <c>SessionEvent</c> 를 그대로 옮긴 것(<c>event</c> · <c>reason</c> · <c>at</c> 세 값뿐, 토큰 · 사용자 없음).
+/// <para>값: <c>session-ended</c>(<c>logout</c> · <c>revoked</c> · <c>blocked</c>) — 모든 구독 앱에 /
+/// <c>signed-out</c>(<c>logout</c> · <c>blocked</c>) — 그 앱에만.</para>
+/// </summary>
+public sealed record SsoAgentEvent(string Event, string Reason, DateTimeOffset At);
 
 /// <summary>에이전트가 돌려준 결과. 실패도 <b>예외가 아니라 값</b>이다(SDK 3.10.6).</summary>
 public sealed record SsoAgentResult(SsoAgentStatus Status, string? AccessToken, string Detail)

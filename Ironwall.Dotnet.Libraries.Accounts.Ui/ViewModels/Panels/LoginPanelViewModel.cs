@@ -46,8 +46,14 @@ public class LoginPanelViewModel : BasePanelViewModel
         ViewModel.Logout();
         ClearLoginPanel();
 
-        // 로그인 패널이 열렸다 = 로그아웃 상태 → SSO 재교환 훅도 뗀다(로그아웃 뒤 몰래 재로그인 방지의 이중 잠금).
+        // 로그인 패널이 열렸다 = 로그아웃 상태 → SSO 재교환 훅 · 에이전트 사건 구독도 뗀다(로그아웃 뒤 몰래 재로그인 방지의 이중 잠금).
         _sso?.Disable();
+        NotifyOfPropertyChange(nameof(IsSsoAvailable));
+
+        // 에이전트 사건(이 앱만 로그아웃 · 세션 끝)으로 로그아웃돼 이 패널이 열렸다면 왜인지 알려 준다.
+        var notice = _sso?.TakeSignOutNotice();
+        if (!string.IsNullOrWhiteSpace(notice))
+            SetLoginInfo(notice);
 
         // SSO 시작 로그인(FR-03) — **앱이 처음 이 패널을 열 때 한 번만**.
         //   사용자가 명시적으로 로그아웃한 뒤 열린 패널에서도 시도하면, 에이전트 세션이 살아 있는 한
@@ -159,23 +165,7 @@ public class LoginPanelViewModel : BasePanelViewModel
         {
             var r = await sso.TrySignInAsync().ConfigureAwait(true);   // 결과를 UI 스레드에서 다룬다
 
-            var auth = r.Auth?.Result;
-            if (r.CanSkipLoginScreen && auth is not null)
-            {
-                if (ViewModel.IsLogin) return;   // 그 사이 다른 경로로 로그인됐다 — 덮지 않는다
-
-                ViewModel.Insert(auth.Account);
-                ViewModel.IsLogin = true;
-                ViewModel.LoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.ff");
-                ViewModel.Token = auth.Token;
-
-                SetLoginSuccess("SSO 로그인 성공");
-                // 🔒 보안: 토큰/세션을 로그에 남기지 않는다
-                _log?.Info($"SSO 로그인 성공: {ViewModel.Username}");
-                await Task.Delay(TimeSpan.FromMilliseconds(600));
-                await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
-                return;
-            }
+            if (await ApplySsoSignInAsync(r).ConfigureAwait(true)) return;
 
             if (r.CanSkipLoginScreen)
             {
@@ -197,6 +187,88 @@ public class LoginPanelViewModel : BasePanelViewModel
         {
             SetSsoInFlight(false);
         }
+    }
+
+    /// <summary>
+    /// <b>"SSO 로 로그인" 단추</b> — 에이전트의 대화형 로그인(SDK <c>SignInInteractiveAsync</c>).
+    /// <para>에이전트에 세션이 없거나 "이 앱만 로그아웃" 으로 이 앱이 막혀 있으면 에이전트가 사람에게 묻는다.
+    /// 사람이 마칠 때까지 기다리므로 <b>[로그인](비밀번호)은 잠그지 않는다</b> — 그 사이 비밀번호로 들어가면
+    /// 조정자가 에이전트 토큰을 버린다(이미 로그인됨). 패널이 닫히면 기다림을 취소한다.</para>
+    /// <para>한 번 더 누르면 기다림을 취소한다.</para>
+    /// </summary>
+    public async Task ClickSsoLogin()
+    {
+        if (_sso is null) return;
+        if (_ssoButtonCts is not null) { _ssoButtonCts.Cancel(); return; }   // 기다리는 중 다시 누름 = 취소
+        if (ViewModel.IsLogin) return;
+
+        using var cts = new CancellationTokenSource();
+        _ssoButtonCts = cts;
+        NotifyOfPropertyChange(nameof(SsoButtonText));
+        SetLoginInfo("SSO 에이전트에 로그인을 요청했습니다. 에이전트 창을 확인하세요.");
+        try
+        {
+            var r = await _sso.TrySignInInteractiveAsync(cts.Token).ConfigureAwait(true);
+            if (await ApplySsoSignInAsync(r).ConfigureAwait(true)) return;
+            if (ViewModel.IsLogin) return;   // 그 사이 비밀번호로 들어갔다
+
+            var msg = r.ButtonGuidance;
+            if (!string.IsNullOrWhiteSpace(msg)) SetLoginInfo(msg); else ClearLoginStatus();
+            _log?.Info($"[Login] SSO 단추 — {r.Status}: {r.Message}");
+        }
+        catch (OperationCanceledException)
+        {
+            if (!ViewModel.IsLogin) ClearLoginStatus();
+            _log?.Info("[Login] SSO 단추 — 취소");
+        }
+        catch (Exception ex)
+        {
+            SetLoginInfo("SSO 로그인 중 오류가 발생했습니다. 아이디로 로그인하세요.");
+            _log?.Warning($"[Login] SSO 단추 예외: {ex.GetType().Name} {ex.Message}");
+        }
+        finally
+        {
+            _ssoButtonCts = null;
+            NotifyOfPropertyChange(nameof(SsoButtonText));
+        }
+    }
+
+    /// <summary>Caliburn 가드 — 시작 자동 시도 중에는 단추를 잠근다(두 SSO 로그인이 겹치지 않게).</summary>
+    public bool CanClickSsoLogin => !_ssoInFlight;
+
+    /// <summary>SSO 를 쓸 수 있는 구성인가(GOP 모드) — 단추를 보일지.</summary>
+    public bool IsSsoAvailable => _sso is not null;
+
+    /// <summary>단추 글 — 기다리는 중이면 취소.</summary>
+    public string SsoButtonText => _ssoButtonCts is null ? "SSO 로 로그인" : "SSO 로그인 취소";
+
+    /// <summary>
+    /// SSO 성공 결과로 화면 상태를 채우고 패널을 닫는다 — <see cref="ClickOk"/> 성공 경로와 같은 상태.
+    /// 성공이 아니면 <c>false</c>.
+    /// </summary>
+    private async Task<bool> ApplySsoSignInAsync(SsoSignInResult r)
+    {
+        var auth = r.Auth?.Result;
+        if (!r.CanSkipLoginScreen || auth is null) return false;
+        if (ViewModel.IsLogin) return true;   // 그 사이 다른 경로로 로그인됐다 — 덮지 않는다
+
+        ViewModel.Insert(auth.Account);
+        ViewModel.IsLogin = true;
+        ViewModel.LoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.ff");
+        ViewModel.Token = auth.Token;
+
+        SetLoginSuccess("SSO 로그인 성공");
+        // 🔒 보안: 토큰/세션을 로그에 남기지 않는다
+        _log?.Info($"SSO 로그인 성공: {ViewModel.Username}");
+        await Task.Delay(TimeSpan.FromMilliseconds(600));
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
+        return true;
+    }
+
+    protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        _ssoButtonCts?.Cancel();   // 패널이 닫히면 에이전트 로그인 기다림도 끝낸다
+        await base.OnDeactivateAsync(close, cancellationToken);
     }
 
     /// <summary>의도된 로그인 실패(사유 문구 확정) — 일반 예외와 구분해 raw 예외 문구의 UI 노출을 차단한다.</summary>
@@ -226,6 +298,7 @@ public class LoginPanelViewModel : BasePanelViewModel
         if (_ssoInFlight == value) return;
         _ssoInFlight = value;
         NotifyOfPropertyChange(nameof(CanClickOk));
+        NotifyOfPropertyChange(nameof(CanClickSsoLogin));
     }
 
     /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.
@@ -312,5 +385,7 @@ public class LoginPanelViewModel : BasePanelViewModel
     /// <summary>SSO 시작 로그인은 앱 수명에 한 번 — 로그아웃 뒤 다시 열린 패널에서는 시도하지 않는다.</summary>
     private bool _ssoTried;
     private bool _ssoInFlight;
+    /// <summary>"SSO 로 로그인" 단추가 에이전트를 기다리는 중이면 그 취소 원천. 아니면 <c>null</c>.</summary>
+    private CancellationTokenSource? _ssoButtonCts;
     #endregion
 }

@@ -52,6 +52,9 @@ public sealed class SsoAgentGateway : ISsoAgentGateway, IDisposable
         return Map(r.Outcome, r.Value?.AccessToken, r.Detail);
     }
 
+    public IAsyncDisposable Watch(Action<SsoAgentEvent> onEvent, Action<Exception>? onError = null)
+        => _client.Watch(e => onEvent(new SsoAgentEvent(e.Event, e.Reason, e.At)), onError, CancellationToken.None);
+
     /// <summary>SDK 결과를 GIS 대응 기준으로 접는다 — 시험 대상.</summary>
     internal static SsoAgentResult Map(SsoOutcome outcome, string? token, string detail) => outcome switch
     {

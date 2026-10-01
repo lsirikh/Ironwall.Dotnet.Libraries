@@ -32,7 +32,9 @@ public sealed class SsoModule : Module
                    ctx.Resolve<ITokenStorageService>(),
                    ctx.ResolveOptional<ILogService>(),
                    // 로그인 마무리(권한 · GIS init 트리거)는 비밀번호 로그인과 같은 게이트웨이 코드 — 없으면 토큰만 들어간다
-                   ctx.ResolveOptional<ISsoLoginCompleter>()))
+                   ctx.ResolveOptional<ISsoLoginCompleter>(),
+                   // 에이전트 사건(이 앱만 로그아웃 · 세션 끝)을 받으면 강제 로그아웃 단일 진입점으로 로그인 화면에 보낸다
+                   ctx.ResolveOptional<ISessionLifecycle>()))
                .AsSelf()
                .SingleInstance();
     }
