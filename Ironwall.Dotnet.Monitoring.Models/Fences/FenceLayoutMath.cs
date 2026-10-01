@@ -326,6 +326,23 @@ public static class FenceLayoutMath
         return (result, panelList);
     }
 
+    /// <summary>
+    /// 펜스 위 두 이웃(왼쪽 <paramref name="left"/> · 오른쪽 <paramref name="right"/>) 사이에 센서 <paramref name="own"/> 를 놓는다(개념도 끌어 놓기 · 줄 안 한 칸) —
+    /// 이웃 사이 가운데 칸을 고르고 센서 자리 종류에 맞춘다(종류 · 높이 · 방향 · 줄은 <paramref name="own"/> 의 것). 오른쪽 끝 너머면 망을 본떠 늘린다.
+    /// 오른쪽 이웃을 넘으면 그 이웃과 같은 칸(같은 자리끼리는 사슬 순서로 가른다).
+    /// </summary>
+    public static (SensorMountSpec Mount, IReadOnlyList<FencePanelSpec> Panels) PlaceBetween(
+        SensorMountSpec own, SensorMountSpec? left, SensorMountSpec? right, FenceSensorCategory category, IReadOnlyList<FencePanelSpec> panels)
+    {
+        ArgumentNullException.ThrowIfNull(own);
+        var (seat, grown) = SeatBetween(left, right, category, panels);
+        var list = grown.ToList();
+        var placed = PlaceKeeping(own, SeatOf(seat).Slot, left is null ? null : SeatOf(left), list, 1);
+        if (right is not null && SeatOf(placed) > SeatOf(right))
+            placed = Normalize(own with { Panel = own.IsPostSpot ? SeatOf(right).Slot / 2 : Math.Max(0, (SeatOf(right).Slot - 1) / 2) }, list);
+        return (placed, list);
+    }
+
     /// <summary>줄 안에서 <paramref name="seat"/> 가 <paramref name="floor"/> 보다 앞서지 않는가(사슬이 가는 쪽 <paramref name="dir"/> 기준).</summary>
     internal static bool Ahead(FenceSeat seat, FenceSeat floor, int dir)
         => dir > 0 ? seat >= floor : seat.Slot < floor.Slot || (seat.Slot == floor.Slot && seat.Rank >= floor.Rank);

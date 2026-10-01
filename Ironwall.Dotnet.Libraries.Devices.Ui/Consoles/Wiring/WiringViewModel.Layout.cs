@@ -632,8 +632,8 @@ public sealed partial class WiringViewModel
         set { _editPanelNumber = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>"망 이동" 칸 이름 — 기둥 센서면 "기둥 이동".</summary>
-    public string MountPanelLabel => MountTargets().FirstOrDefault() is var k && _board.FenceLayout.MountOf(k) is { IsPostSpot: true } ? "기둥 이동" : "망 이동";
+    /// <summary>"망 이동" 칸 이름 — 기둥 센서도 같은 말(검토: 시나리오마다 "기둥 이동" · "망 이동" 으로 갈렸다).</summary>
+    public string MountPanelLabel => "망 이동";
 
     /// <summary>[◀] — 고른 센서를 앞(Ch1(A) 쪽) 망(기둥)으로 한 칸(Alt+Shift+←). 빈 망도 건너뛰지 않는다.</summary>
     public bool FenceMoveSelectedToPreviousPanel() => FenceMoveSelectedByPanels(-1);
@@ -681,6 +681,7 @@ public sealed partial class WiringViewModel
             nameof(IsSpotPanelCenter), nameof(IsSpotWallTop), nameof(IsSpotWallFace), nameof(MountPlaceText), nameof(MountOffsetText),
             nameof(MountPanelText), nameof(MountPanelLabel),
         }) NotifyOfPropertyChange(name);
+        RaiseLanePane();
     }
     #endregion
 
@@ -810,6 +811,12 @@ public sealed partial class WiringViewModel
                 entries.Add(FenceMenuEntry.Separator(P + "Sep1"));
                 entries.Add(new FenceMenuEntry("방향만 모두 앞으로", P + "FacingFront", () => SetFacingAllAsync(WiringFacing.Front)));
                 entries.Add(new FenceMenuEntry("방향만 모두 뒤로", P + "FacingBack", () => SetFacingAllAsync(WiringFacing.Back)));
+                // 줄(FR-18) — 고른 센서 모두(이 센서가 선택 밖이면 이 센서만)
+                var laneKeys = SelectionFor(target).Where(k => _board.FenceLayout.MountOf(k) is not null).ToList();
+                entries.Add(new FenceMenuEntry("위 줄로", P + "LaneUpper", () => { FenceSetLane(laneKeys, FenceLane.Upper); return Task.CompletedTask; },
+                                               laneKeys.Any(k => _board.FenceLayout.LaneOf(k) != FenceLane.Upper), "Alt+↑"));
+                entries.Add(new FenceMenuEntry("아래 줄로", P + "LaneLower", () => { FenceSetLane(laneKeys, FenceLane.Lower); return Task.CompletedTask; },
+                                               laneKeys.Any(k => _board.FenceLayout.LaneOf(k) != FenceLane.Lower), "Alt+↓"));
                 if (PanelIndexOf(target) is { } panel)
                 {
                     entries.Add(new FenceMenuEntry("망 속성 복사", P + "CopyPanel", () => { CopyPanel(panel); return Task.CompletedTask; }));
@@ -1127,6 +1134,7 @@ public sealed partial class WiringViewModel
     {
         RaisePanelPane();
         RaiseMountPane();
+        RaiseLanePane();
         foreach (var name in new[]
         {
             nameof(FenceLayout), nameof(HasLocalChanges), nameof(FenceNoticeText), nameof(HasFenceNotice), nameof(BandText), nameof(HasBands),

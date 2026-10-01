@@ -149,6 +149,11 @@ public partial class WiringView : UserControl
 
     private void OnChooseBands(object sender, RoutedEventArgs e) => ViewModel?.ShowBandPicker();
 
+    private void OnLaneLower(object sender, RoutedEventArgs e) => ViewModel?.FenceSetLaneLower();
+    private void OnLaneUpper(object sender, RoutedEventArgs e) => ViewModel?.FenceSetLaneUpper();
+    private void OnControllerLeft(object sender, RoutedEventArgs e) => ViewModel?.ChooseControllerLeft();
+    private void OnControllerRight(object sender, RoutedEventArgs e) => ViewModel?.ChooseControllerRight();
+
     private void OnBandPreset(object sender, RoutedEventArgs e)
     {
         if (TagOf(sender) is { } preset) ViewModel?.ChooseBandPreset(preset);

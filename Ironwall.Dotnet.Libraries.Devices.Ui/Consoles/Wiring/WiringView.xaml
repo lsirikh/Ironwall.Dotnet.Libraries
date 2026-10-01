@@ -1814,6 +1814,21 @@
 												Visibility="{Binding HasSelectedDistance, Converter={StaticResource BoolToVisibility}}" />
 										</Grid>
 
+										<!--  줄(fence-wiring-editor FR-18 · §1-0b) — 아래 줄 · 위 줄. 고른 센서 모두(되돌리기 한 걸음) · 개념도 Alt+↑/↓ · 켜진 쪽은 아래 굵은 막대(형태)  -->
+										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMountRow, Converter={StaticResource BoolToVisibility}}">
+											<TextBlock Style="{StaticResource W.Hint}" Text="줄" />
+											<UniformGrid Margin="0,4,0,0" Columns="2">
+												<StackPanel Margin="0,0,3,0">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Lower" Click="OnLaneLower" Content="아래 줄" Style="{StaticResource Console.Button}" ToolTip="Ch1(실선)이 먼저 지나는 줄 (Alt+↓)" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsLaneLower, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Margin="3,0,0,0">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Lane.Upper" Click="OnLaneUpper" Content="위 줄" Style="{StaticResource Console.Button}" ToolTip="먼 끝에서 꺾여 Ch2(점선)로 돌아오는 줄 (Alt+↑)" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsLaneUpper, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+											</UniformGrid>
+										</StackPanel>
+
 										<!--
 											설치 위치(fence-wiring-editor FR-07 · SB B) — 펜스 3종: 기둥 위 · 기둥 중간 · 망 가운데 / 담 2종: 담 위 · 담 앞면.
 											고른 센서 모두에 바로 적용(되돌리기 한 걸음). 켜진 쪽은 아래 굵은 막대(형태).
@@ -2005,6 +2020,19 @@
 													Subject="제어기 통신" />
 												<TextBlock VerticalAlignment="Center" FontSize="12" Text="{Binding ControllerSignalText}" TextWrapping="Wrap" />
 											</DockPanel>
+
+											<!--  제어기 위치(FR-19) — 펜스 왼쪽 끝 · 오른쪽 끝. 사슬 · 번호 방향이 따라 바뀐다(되돌리기 한 걸음) · 개념도에서 C 를 반대쪽으로 끌어도 된다  -->
+											<TextBlock Style="{StaticResource W.SectionHead}" Text="제어기 위치" />
+											<UniformGrid Margin="0,4,0,0" Columns="2">
+												<StackPanel Margin="0,0,3,0">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.ControllerEnd.Left" Click="OnControllerLeft" Content="왼쪽 끝" Style="{StaticResource Console.Button}" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsControllerLeft, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Margin="3,0,0,0">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.ControllerEnd.Right" Click="OnControllerRight" Content="오른쪽 끝" Style="{StaticResource Console.Button}" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsControllerRight, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+											</UniformGrid>
 
 											<!--
 												번호 대역(fence-wiring-editor FR-10 · §1-A) — 프리셋은 참고용(민간 시설은 다를 수 있다) · 직접 설정.

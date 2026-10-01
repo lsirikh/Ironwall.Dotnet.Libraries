@@ -192,7 +192,7 @@ public class WiringFenceReviewFixTests
         Assert.Equal(new[] { 102, 103, 104, 101 }, rig.Vm.FenceChain.Keys);              // 같은 기둥이면 옮긴 센서가 뒤(끈 방향)
         Assert.False(refused);
         Assert.Contains("번호는 1~", rig.Vm.StatusText);
-        Assert.Equal("기둥 이동", rig.Vm.MountPanelLabel);
+        Assert.Equal("망 이동", rig.Vm.MountPanelLabel);                             // 기둥 센서도 같은 말
     }
     #endregion
 
