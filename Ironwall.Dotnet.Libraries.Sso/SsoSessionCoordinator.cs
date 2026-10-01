@@ -402,7 +402,9 @@ public sealed class SsoSignInResult
     /// </summary>
     public string Guidance => Status switch
     {
-        SsoSignInStatus.NeedsAgentLogin => "SSO 에이전트에서 로그인하면 다음부터 이 화면을 건너뜁니다.",
+        // 에이전트 3.10.13 부터 "이 앱만 로그아웃" 으로 막힌 경우도 같은 NoActiveSession 으로 온다(문구로만 갈림 —
+        // SSO 3.10.13 통보). 글자 맞추기로 가르지 않고 두 경우 모두 맞는 행동을 말한다.
+        SsoSignInStatus.NeedsAgentLogin => "SSO 에이전트에 로그인돼 있지 않거나 이 프로그램이 로그아웃된 상태입니다. [SSO 로 로그인] 을 누르세요.",
         SsoSignInStatus.NeedsAdminRegistration => "이 프로그램이 SSO 에 등록되지 않았습니다. 관리자에게 문의하세요.",
         SsoSignInStatus.ConsentPending => "SSO 에이전트 창에서 이 프로그램의 연결을 허용해 주세요.",
         SsoSignInStatus.TemporarilyUnavailable => "SSO 서버에 잠시 연결할 수 없습니다. 아이디로 로그인하세요.",
