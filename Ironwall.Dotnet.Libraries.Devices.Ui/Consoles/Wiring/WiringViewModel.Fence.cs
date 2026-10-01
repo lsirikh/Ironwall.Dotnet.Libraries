@@ -443,7 +443,7 @@ public sealed partial class WiringViewModel
 
     public bool IsSelectedBack => FacingTargets() is { Count: > 0 } t && t.All(k => _board.FacingOf(k) == WiringFacing.Back);
 
-    /// <summary>방향 칸 아래 한 줄 — 방향이 없는 종류면 까닭, 섞였으면 그 말.</summary>
+    /// <summary>방향 칸 아래 한 줄(상태) — 방향이 없는 종류면 까닭, 섞였으면 그 말. 단축키(F · R) 안내는 속성 칸 "?"(help-callout H-2).</summary>
     public string FacingNote
     {
         get
@@ -452,7 +452,7 @@ public sealed partial class WiringViewModel
             if (FacingTargets().Count == 0) return "펜스센서는 철망 가운데 · 지진동센서는 땅속 — 방향이 없습니다";
             var side = IsSelectedBack ? "펜스 내부에 답니다" : IsSelectedFront ? "펜스 외부에 답니다" : "설치 면이 섞여 있습니다";
             var yaw = SelectedYaw is { } y ? $"{WiringYawMath.LongText(y)}을 봅니다" : "보는 방향이 섞여 있습니다";
-            return $"{side} · {yaw} — F 면 뒤집기 · R / Shift+R 돌리기";
+            return $"{side} · {yaw}";
         }
     }
 
