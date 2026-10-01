@@ -118,16 +118,26 @@ public sealed class ControllerPingMonitor : IDisposable
                 changed = next != _level;
                 _level = next;
             }
-            // 이벤트는 잠금 밖에서(재진입 교착 방지)
-            if (changed)
-            {
-                if (next == SignalLevel.Down) _log?.Invoke($"[Wiring] 제어기 {_host} ping 응답 없음(연속 {SignalMath.DOWN_STREAK}회)");
-                Changed?.Invoke(this, next);
-            }
-            Sampled?.Invoke(this, next);
+            // 이벤트는 잠금 밖에서(재진입 교착 방지) · 받는 쪽 예외가 작업 스레드를 타고 루프를 죽이지 않게 막는다(로그 한 줄)
+            if (changed && next == SignalLevel.Down) _log?.Invoke($"[Wiring] 제어기 {_host} ping 응답 없음(연속 {SignalMath.DOWN_STREAK}회)");
+            if (changed) Notify(Changed, next);
+            Notify(Sampled, next);
             return true;
         }
         finally { Interlocked.Exchange(ref _inFlight, 0); }
+    }
+
+    private int _notifyFailureLogged;
+
+    private void Notify(EventHandler<SignalLevel>? handler, SignalLevel level)
+    {
+        if (handler is null) return;
+        try { handler(this, level); }
+        catch (Exception ex)
+        {
+            if (Interlocked.Exchange(ref _notifyFailureLogged, 1) == 0)
+                _log?.Invoke($"[Wiring] 제어기 ping 알림 실패(이후 같은 실패는 남기지 않음): {ex.GetType().Name} {ex.Message}");
+        }
     }
 
     private async Task LoopAsync(CancellationToken token)

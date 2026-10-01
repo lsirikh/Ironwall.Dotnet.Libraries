@@ -95,6 +95,7 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                             WiringApplyService? apply, IWiringDialogs dialogs, WiringFenceContext? fence, ILogService? log)
     {
         _log = log;
+        CaptureSignalThread();
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         SensorTypes = sensorTypes ?? Array.Empty<string>();
         AvailableGroups = groups ?? Array.Empty<WiringGroupInfo>();

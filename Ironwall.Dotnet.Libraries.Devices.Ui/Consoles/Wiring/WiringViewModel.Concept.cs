@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 
@@ -28,7 +29,27 @@ public sealed partial class WiringViewModel
 {
     private bool _showCables;
     private ControllerPingMonitor? _pingMonitor;
-    private SynchronizationContext? _uiContext;
+
+    /// <summary>창을 만든 스레드의 WPF 디스패처 — 신호 알림(<see cref="FenceChanged"/> · 속성 알림)은 이 스레드에서만 올린다.</summary>
+    private Dispatcher? _uiDispatcher;
+
+    /// <summary>창을 만든 스레드(디스패처가 없는 헤드리스 시험에서도 "주인 스레드" 를 가린다).</summary>
+    private int _ownerThreadId;
+
+    /// <summary>창이 닫혔다 — 늦게 도착한 ping 표본은 아무것도 하지 않는다.</summary>
+    private volatile bool _signalsClosed;
+
+    private int _signalFailureLogged;
+
+    /// <summary>
+    /// 생성자에서 부른다 — 주인 스레드 · 그 스레드의 디스패처를 붙잡는다. 창은 입구(<see cref="WiringLauncher"/>)가 UI 스레드에서 만든다.
+    /// <c>Application.Current.Dispatcher</c> 로 넘겨짚지 않는다 — 다른 스레드의 디스패처(시험의 끝난 STA 등)로 알림이 새지 않게.
+    /// </summary>
+    private void CaptureSignalThread()
+    {
+        _ownerThreadId = Environment.CurrentManagedThreadId;
+        _uiDispatcher = Dispatcher.FromThread(Thread.CurrentThread);
+    }
 
     #region - Cables toggle (FR-12) -
     /// <summary>[케이블 보기] — 펜스 뷰에 리턴케이블 · 함체 · A·B 번호를 겹친다(기본 꺼짐 · 연결은 개념도가 맡는다).</summary>
@@ -120,7 +141,8 @@ public sealed partial class WiringViewModel
     public void StartSignals()
     {
         if (_ping is null || string.IsNullOrWhiteSpace(Controller.Address)) return;
-        _uiContext ??= SynchronizationContext.Current;
+        _signalsClosed = false;
+        _uiDispatcher ??= Dispatcher.FromThread(Thread.CurrentThread);
         if (_pingMonitor is null)
         {
             _pingMonitor = CreatePingMonitor(_ping);
@@ -128,8 +150,12 @@ public sealed partial class WiringViewModel
         _pingMonitor.Start();
     }
 
-    /// <summary>멈춘다(창이 닫힐 때 · 즉시).</summary>
-    public void StopSignals() => _pingMonitor?.Stop();
+    /// <summary>멈춘다(창이 닫힐 때 · 즉시) — 루프를 끊고, 그 뒤 도착하는 표본은 버린다.</summary>
+    public void StopSignals()
+    {
+        _signalsClosed = true;
+        _pingMonitor?.Stop();
+    }
 
     /// <summary>ping 이 돌고 있는가(시험).</summary>
     internal bool IsPinging => _pingMonitor?.IsRunning == true;
@@ -159,29 +185,65 @@ public sealed partial class WiringViewModel
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
-        if (close) StopSignals();
+        if (close)
+        {
+            StopSignals();
+            if (_pingMonitor is { } monitor)
+            {
+                monitor.Changed -= OnControllerSignal;
+                monitor.Sampled -= OnControllerSample;
+                _pingMonitor = null;
+                monitor.Dispose();
+            }
+        }
         return base.OnDeactivateAsync(close, cancellationToken);
     }
 
-    /// <summary>모니터가 작업 스레드에서 알린다 — UI 로 넘겨 신호등을 다시 그린다.</summary>
-    private void OnControllerSignal(object? sender, SignalLevel level)
+    /// <summary>모니터가 작업 스레드에서 알린다 — UI 스레드로 넘겨 신호등을 다시 그린다.</summary>
+    private void OnControllerSignal(object? sender, SignalLevel level) => OnSignalThread("신호등", () =>
     {
-        void Raise()
-        {
-            NotifyOfPropertyChange(nameof(ControllerSignal));
-            NotifyOfPropertyChange(nameof(ControllerSignalText));
-            FenceChanged?.Invoke(this, EventArgs.Empty);
-        }
-        if (_uiContext is { } ui && SynchronizationContext.Current != ui) ui.Post(_ => Raise(), null);
-        else Raise();
-    }
+        NotifyOfPropertyChange(nameof(ControllerSignal));
+        NotifyOfPropertyChange(nameof(ControllerSignalText));
+        FenceChanged?.Invoke(this, EventArgs.Empty);
+    });
 
     /// <summary>표본마다(5초에 한 번) — 상태가 같아도 평균 · 손실 글자는 바뀐다. 그림은 다시 그리지 않는다(상태가 바뀔 때만).</summary>
-    private void OnControllerSample(object? sender, SignalLevel level)
+    private void OnControllerSample(object? sender, SignalLevel level) => OnSignalThread("ping 요약", () => NotifyOfPropertyChange(nameof(ControllerSignalText)));
+
+    /// <summary>
+    /// 신호 알림을 주인(UI) 스레드에서만 올린다 — 작업 스레드에서 <see cref="FenceChanged"/> 를 올리면 캔버스 · 개념도가 보드 · 구성 컬렉션을
+    /// UI 스레드와 동시에 훑는다(간헐 "Collection was modified" 의 1순위 용의자).
+    /// </summary>
+    /// <remarks>
+    /// <para>디스패처가 있으면 그 스레드면 그 자리에서, 아니면 <see cref="Dispatcher.BeginInvoke(Delegate, object[])"/> 로 넘긴다(종료 중이면 버린다).
+    /// 디스패처가 없으면(헤드리스 시험) 주인 스레드일 때만 그 자리에서 — 다른 스레드에서는 <b>알리지 않는다</b>(신호 상태는 모니터가 잠금 안에서 쥐고 있어
+    /// 다음에 읽을 때 맞다).</para>
+    /// <para>창이 닫혔으면 아무것도 하지 않는다. 넘겨받은 일이 실패하면 로그 한 줄(한 번)만 남기고 던지지 않는다 — 작업 스레드의 예외는 프로세스를 죽인다.</para>
+    /// </remarks>
+    private void OnSignalThread(string what, Action action)
     {
-        void Raise() => NotifyOfPropertyChange(nameof(ControllerSignalText));
-        if (_uiContext is { } ui && SynchronizationContext.Current != ui) ui.Post(_ => Raise(), null);
-        else Raise();
+        if (_signalsClosed) return;
+        void Safe()
+        {
+            if (_signalsClosed) return;
+            try { action(); }
+            catch (Exception ex)
+            {
+                if (Interlocked.Exchange(ref _signalFailureLogged, 1) == 0)
+                    _log?.Warning($"[Wiring] {what} 알림 실패(이후 같은 실패는 남기지 않음): {ex.GetType().Name} {ex.Message}");
+            }
+        }
+        var dispatcher = _uiDispatcher;
+        if (dispatcher is not null)
+        {
+            if (dispatcher.CheckAccess()) Safe();
+            else if (!dispatcher.HasShutdownStarted) dispatcher.BeginInvoke(DispatcherPriority.Normal, (Action)Safe);
+            return;
+        }
+        if (Environment.CurrentManagedThreadId == _ownerThreadId) Safe();
     }
+
+    /// <summary>시험 — 신호 알림을 주인 스레드로 넘기는 디스패처.</summary>
+    internal Dispatcher? SignalDispatcher => _uiDispatcher;
     #endregion
 }
