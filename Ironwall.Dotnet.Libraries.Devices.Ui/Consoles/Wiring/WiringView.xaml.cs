@@ -136,6 +136,10 @@ public partial class WiringView : UserControl
     private void OnMountOffsetLostFocus(object sender, KeyboardFocusChangedEventArgs e) => ViewModel?.ApplyMountOffset();
 
     private void OnMountPanelPrev(object sender, RoutedEventArgs e) => ViewModel?.FenceMoveSelectedToPreviousPanel();
+
+    private void OnMountRaise(object sender, RoutedEventArgs e) => ViewModel?.FenceRaiseSelected();
+
+    private void OnMountLower(object sender, RoutedEventArgs e) => ViewModel?.FenceLowerSelected();
     private void OnMountPanelNext(object sender, RoutedEventArgs e) => ViewModel?.FenceMoveSelectedToNextPanel();
 
     private void OnMountPanelKey(object sender, KeyEventArgs e)

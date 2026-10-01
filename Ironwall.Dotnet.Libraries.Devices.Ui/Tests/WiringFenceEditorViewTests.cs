@@ -300,6 +300,64 @@ public class WiringFenceEditorViewTests
         Assert.Equal(WiringViewModel.FENCE_PROPOSED_NOTICE, result.notice);
     }
 
+    /// <summary>
+    /// 속성 칸 「설치 위치」 옆 ▲ ▼(높이 한 단계 · Alt+↑/↓ 의 단추 대신)와 [망 아래] · [윤형 코일] — 명시 스타일 · 자동화 id · 단추 → 뷰모델 배선.
+    /// 느슨한 읽기는 Click 을 빼므로 배선은 원본(XAML · 코드 숨김) 글로 확인하고, 단추가 부르는 뷰모델 길은 <see cref="WiringFenceHeightTests"/> 가 본다.
+    /// </summary>
+    [Fact]
+    public void should_show_raise_and_lower_buttons_next_to_the_mount_spot_and_the_coil_button_only_on_razor()
+    {
+        var result = OnSta(() =>
+        {
+            _ = Application.Current;
+            var vm = WiringFenceHeightTests.Razor(WiringFenceHeightTests.Build("SFSFF"));
+            var view = LooseWiringView();
+            view.DataContext = vm;
+            var window = new Window
+            {
+                Content = view, Width = 1280, Height = 900, WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000, Top = -20000, ShowActivated = false, ShowInTaskbar = false,
+            };
+            window.Resources.MergedDictionaries.Add(Theme("Tokens.Light.xaml"));
+            vm.GoWiring();
+            window.Show();
+            Pump();
+            try
+            {
+                vm.FenceSelect(102);
+                Pump();
+                var raise = Find<Button>(view, "Devices.Wiring.Fence.Mount.Raise");
+                var lower = Find<Button>(view, "Devices.Wiring.Fence.Mount.Lower");
+                var coil = Find<Button>(view, "Devices.Wiring.Fence.Mount.RazorCoil");
+                var bottom = Find<Button>(view, "Devices.Wiring.Fence.Mount.PanelBottom");
+                var onRazor = (RaiseVisible: raise.IsVisible, LowerVisible: lower.IsVisible, Raise: raise.Content as string, Lower: lower.Content as string,
+                               Styled: raise.Style is not null && lower.Style is not null && coil.Style is not null && bottom.Style is not null,
+                               Coil: coil.IsVisible, Bottom: bottom.IsVisible,
+                               Names: (AutomationProperties.GetName(raise), AutomationProperties.GetName(lower)));
+                vm.ChooseMountSpot(FenceMountSpot.RazorCoil);
+                Pump();
+                var place = Find<TextBlock>(view, "Devices.Wiring.Fence.Mount.Place").Text;
+                return (onRazor, place);
+            }
+            finally { window.Close(); }
+        });
+        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.Devices.Ui", "Consoles", "Wiring", "WiringView.xaml"));
+        var code = File.ReadAllText(Path.Combine(RepoRoot(), "Ironwall.Dotnet.Libraries.Devices.Ui", "Consoles", "Wiring", "WiringView.xaml.cs"));
+
+        Assert.True(result.onRazor.RaiseVisible);
+        Assert.True(result.onRazor.LowerVisible);
+        Assert.Equal(("▲", "▼"), (result.onRazor.Raise, result.onRazor.Lower));
+        Assert.True(result.onRazor.Styled);                                   // 콘솔 스타일 계약 — 버튼 계열은 명시 스타일
+        Assert.True(result.onRazor.Coil);
+        Assert.True(result.onRazor.Bottom);
+        Assert.Equal(("한 단계 위로", "한 단계 아래로"), result.onRazor.Names);
+        Assert.Equal("망 2 · 윤형 코일", result.place);
+        Assert.Contains("Click=\"OnMountRaise\"", xaml);
+        Assert.Contains("Click=\"OnMountLower\"", xaml);
+        Assert.Contains("OnMountRaise(object sender, RoutedEventArgs e) => ViewModel?.FenceRaiseSelected()", code);
+        Assert.Contains("OnMountLower(object sender, RoutedEventArgs e) => ViewModel?.FenceLowerSelected()", code);
+    }
+
     /// <summary>창 그림을 임시 폴더에 남긴다(사람이 볼 증거 · 단언은 하지 않는다).</summary>
     private static void SaveSnapshot(Window window, FrameworkElement view, string file)
     {

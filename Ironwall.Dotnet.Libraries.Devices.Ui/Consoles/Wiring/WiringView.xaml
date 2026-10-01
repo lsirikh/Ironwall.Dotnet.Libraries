@@ -1835,8 +1835,32 @@
 										-->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMountRow, Converter={StaticResource BoolToVisibility}}">
 											<DockPanel LastChildFill="True">
-												<TextBlock DockPanel.Dock="Right" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.Place" Style="{StaticResource W.Hint}" Text="{Binding MountPlaceText}" />
-												<TextBlock Style="{StaticResource W.Hint}" Text="설치 위치" />
+												<!--  높이 한 단계 ▲ ▼(끌기 · Alt+↑/↓ 의 단추 대신) — 망 아래 · 망 가운데 · 기둥 위 · 윤형 코일 / 담 앞면 · 담 위  -->
+												<StackPanel Margin="6,0,0,0" DockPanel.Dock="Right" Orientation="Horizontal">
+													<Button
+														Width="26"
+														MinWidth="0"
+														Padding="0"
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.Raise"
+														AutomationProperties.Name="한 단계 위로"
+														Click="OnMountRaise"
+														Content="▲"
+														Style="{StaticResource Console.Button}"
+														ToolTip="높이 한 단계 위로 — 윤형 망은 맨 위가 윤형 코일(위 줄) (Alt+↑ · 미세 Shift+Alt+↑)" />
+													<Button
+														Width="26"
+														MinWidth="0"
+														Margin="3,0,0,0"
+														Padding="0"
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.Lower"
+														AutomationProperties.Name="한 단계 아래로"
+														Click="OnMountLower"
+														Content="▼"
+														Style="{StaticResource Console.Button}"
+														ToolTip="높이 한 단계 아래로 — 코일에서 내리면 아래 줄 (Alt+↓ · 미세 Shift+Alt+↓)" />
+												</StackPanel>
+												<TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.Place" Style="{StaticResource W.Hint}" Text="{Binding MountPlaceText}" />
+												<TextBlock VerticalAlignment="Center" Style="{StaticResource W.Hint}" Text="설치 위치" />
 											</DockPanel>
 											<UniformGrid Margin="0,4,0,0" Columns="3" Visibility="{Binding IsMountOnFence, Converter={StaticResource BoolToVisibility}}">
 												<StackPanel Margin="0,0,3,0">
@@ -1850,6 +1874,15 @@
 												<StackPanel>
 													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.PanelCenter" Click="OnMountSpot" Content="망 가운데" Style="{StaticResource Console.Button}" Tag="PanelCenter" />
 													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsSpotPanelCenter, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<StackPanel Margin="0,4,3,0">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.PanelBottom" Click="OnMountSpot" Content="망 아래" Style="{StaticResource Console.Button}" Tag="PanelBottom" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsSpotPanelBottom, Converter={StaticResource BoolToVisibility}}" />
+												</StackPanel>
+												<!--  윤형 코일(위 줄) — 윤형 망에 선 센서만. 고르면 위 줄로 가고 사슬 · 번호가 따라간다  -->
+												<StackPanel Margin="0,4,3,0" Visibility="{Binding IsMountOnRazor, Converter={StaticResource BoolToVisibility}}">
+													<Button MinWidth="0" Padding="4,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.RazorCoil" Click="OnMountSpot" Content="윤형 코일" Style="{StaticResource Console.Button}" Tag="RazorCoil" ToolTip="코일 위에 단다 — 위 줄(펜스센서는 윤형과 같이)" />
+													<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsSpotRazorCoil, Converter={StaticResource BoolToVisibility}}" />
 												</StackPanel>
 											</UniformGrid>
 											<UniformGrid Margin="0,4,0,0" Columns="2" Visibility="{Binding IsMountOnWall, Converter={StaticResource BoolToVisibility}}">

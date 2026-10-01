@@ -562,6 +562,12 @@ public sealed partial class WiringViewModel
     public bool IsSpotPanelCenter => SelectedSpot == FenceMountSpot.PanelCenter;
     public bool IsSpotWallTop => SelectedSpot == FenceMountSpot.WallTop;
     public bool IsSpotWallFace => SelectedSpot == FenceMountSpot.WallFace;
+    public bool IsSpotPanelBottom => SelectedSpot == FenceMountSpot.PanelBottom;
+    public bool IsSpotRazorCoil => SelectedSpot == FenceMountSpot.RazorCoil;
+
+    /// <summary>첫 센서가 윤형 망(기둥이면 양옆 중 하나) 위에 있는가 — [윤형 코일] 단추를 보인다.</summary>
+    public bool IsMountOnRazor => MountTargets().FirstOrDefault() is var k && _board.FenceLayout.MountOf(k) is { } m
+                                  && FenceLayoutMath.HeightStops(m, _board.FenceLayout.Panels).Contains(FenceMountSpot.RazorCoil);
 
     /// <summary>"망 3 · 기둥 위" · "기둥 4 · 기둥 위" · "센서 3대".</summary>
     public string MountPlaceText
@@ -582,7 +588,7 @@ public sealed partial class WiringViewModel
         set { _editOffset = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
-    /// <summary>[기둥 위] · [기둥 중간] · [망 가운데] · [담 위] · [담 앞면] — 고른 센서 모두. 되돌리기 한 걸음.</summary>
+    /// <summary>[기둥 위] · [기둥 중간] · [망 가운데] · [망 아래] · [윤형 코일] · [담 위] · [담 앞면] — 고른 센서 모두. 되돌리기 한 걸음(윤형 코일은 위 줄).</summary>
     public bool ChooseMountSpot(FenceMountSpot spot)
     {
         var targets = MountTargets();
@@ -679,7 +685,8 @@ public sealed partial class WiringViewModel
         foreach (var name in new[]
         {
             nameof(HasMountRow), nameof(IsMountOnWall), nameof(IsMountOnFence), nameof(SelectedSpot), nameof(IsSpotPostTop), nameof(IsSpotPostMiddle),
-            nameof(IsSpotPanelCenter), nameof(IsSpotWallTop), nameof(IsSpotWallFace), nameof(MountPlaceText), nameof(MountOffsetText),
+            nameof(IsSpotPanelCenter), nameof(IsSpotWallTop), nameof(IsSpotWallFace), nameof(IsSpotPanelBottom), nameof(IsSpotRazorCoil), nameof(IsMountOnRazor),
+            nameof(MountPlaceText), nameof(MountOffsetText),
             nameof(MountPanelText), nameof(MountPanelLabel),
         }) NotifyOfPropertyChange(name);
         RaiseLanePane();

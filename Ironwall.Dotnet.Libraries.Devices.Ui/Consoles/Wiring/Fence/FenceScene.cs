@@ -72,6 +72,11 @@ public sealed record FenceShape(
 public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit);
 
 /// <summary>
+/// 높이 단계 끌기의 안내 — 세계 x 가운데 · 높이(세계 단위) · 반 폭 · 단계 이름 알약. 가로 안내선(삽입 막대는 세로 — 축으로 가른다 · 색이 아니라 형태).
+/// </summary>
+public sealed record FenceHeightGuide(double X, double Height, double HalfWidth, string Label);
+
+/// <summary>
 /// 펜스 뷰의 장면 — 목업(<c>wiring-fence-view-mockup.html</c> · <c>draw()</c> · <c>sensorShape()</c> · <c>drawCtrl()</c>)을 옮긴 <b>순수</b> 그림 목록.
 /// 좌표는 투영 뒤 그림 좌표. 칩(센서 · 묶음 · 제어기)은 <b>자기 x 를 원점</b>으로 그린다 — 투영이 선형이라 <c>P(x+dx, y, z) = P(dx, y, z) + (x, 0)</c>.
 /// </summary>
@@ -607,7 +612,8 @@ public static partial class FenceScene
     /// 덧그림(세계 좌표) — "번호 같음 · id순" 알약 · 고른/가리킨 센서 이름 알약 · 끄는 중 삽입 막대(세로 막대 + 위아래 화살 + 자리 알약).
     /// </summary>
     public static IReadOnlyList<FenceShape> Overlay(FenceWorld world, FenceProjector p, IReadOnlyCollection<int> hidden,
-                                                    int? named, double? insertionX, string? insertionLabel, double zoom = 1)
+                                                    int? named, double? insertionX, string? insertionLabel, double zoom = 1,
+                                                    FenceHeightGuide? heightGuide = null)
     {
         var o = new List<FenceShape>();
         var lt = world.LabelTop;
@@ -636,6 +642,19 @@ public static partial class FenceScene
             o.Add(Poly(FenceInk.Insert, new Point(bot.X - 6, bot.Y + 9), new Point(bot.X + 6, bot.Y + 9), new Point(bot.X, bot.Y + 1)));
             if (!string.IsNullOrEmpty(insertionLabel))
                 o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { p.P(ix, yb + 26, z) }, Text: insertionLabel, FontSize: 11.5));
+        }
+
+        // 높이 단계 안내 — 단계 높이의 가로선 + 양 끝 세모(안쪽을 가리킨다) + 단계 이름 알약(선 오른쪽 끝 위)
+        if (heightGuide is { } g)
+        {
+            var z = p.De / 2;
+            var a = p.P(g.X - g.HalfWidth, g.Height, z);
+            var b = p.P(g.X + g.HalfWidth, g.Height, z);
+            o.Add(Seg(FenceInk.Insert, a, b));
+            o.Add(Poly(FenceInk.Insert, new Point(a.X - 9, a.Y - 6), new Point(a.X - 9, a.Y + 6), new Point(a.X - 1, a.Y)));
+            o.Add(Poly(FenceInk.Insert, new Point(b.X + 9, b.Y - 6), new Point(b.X + 9, b.Y + 6), new Point(b.X + 1, b.Y)));
+            if (!string.IsNullOrEmpty(g.Label))
+                o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { p.P(g.X, g.Height + 30, z) }, Text: g.Label, FontSize: 11.5));
         }
         return Legible(o, zoom);
     }

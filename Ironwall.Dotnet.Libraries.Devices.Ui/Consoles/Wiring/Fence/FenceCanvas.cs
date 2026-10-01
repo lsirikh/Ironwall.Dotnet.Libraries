@@ -69,6 +69,11 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private Point _lastPointer;
     private bool _arming;
     private IReadOnlyList<int> _dragKeys = Array.Empty<int>();
+    // 높이 단계 끌기(세로 축) — 잡은 센서의 단계 높이(세계 단위) · 시작 높이 · 지금 후보 단계 · 안내
+    private IReadOnlyList<double> _stopHeights = Array.Empty<double>();
+    private double _heightStart;
+    private int? _heightLevel;
+    private FenceHeightGuide? _heightGuide;
     private double _renderZoom = 1;
     private Rect? _band;
 
@@ -95,7 +100,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         SnapsToDevicePixels = true;
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
         AutomationProperties.SetAutomationId(this, AUTOMATION_ID);
-        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Alt+Shift+←/→ 다른 망으로 · Shift+F10 메뉴");
+        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Alt+Shift+←/→ 다른 망으로 · Alt+↑/↓ 높이 한 단계 · Shift+Alt+↑/↓ 미세 높이 · Shift+F10 메뉴");
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Local);
         // Tab 은 센서 칩 먼저, 망은 한 번에 들어가 화살표로 옮긴다(망 수백 칸을 Tab 으로 지나지 않게).
         KeyboardNavigation.SetTabIndex(_chips, 0);
@@ -179,6 +184,18 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     internal IReadOnlyList<FenceShape> OverlayShapes => _overlay?.Shapes ?? Array.Empty<FenceShape>();
     internal IReadOnlyList<FenceShape> OverlayScreenShapes => _overlay?.ScreenShapes ?? Array.Empty<FenceShape>();
     internal double? InsertionX => _insertionX;
+
+    /// <summary>높이 단계 끌기의 지금 후보 단계(끄는 중이 아니면 없음).</summary>
+    internal int? HeightLevel => _heightLevel;
+
+    /// <summary>높이 단계 끌기의 안내(가로선 · 단계 이름).</summary>
+    internal FenceHeightGuide? HeightGuide => _heightGuide;
+
+    /// <summary>높이 단계 끌기의 단계 높이(세계 단위 · 아래 → 위).</summary>
+    internal IReadOnlyList<double> StopHeights => _stopHeights;
+
+    /// <summary>지금 끌기 동작(시험).</summary>
+    internal FenceGestureAction DragAction => _action;
     internal IReadOnlyList<FenceShape> StaticShapes => _static.Shapes;
 
     /// <summary>시험 — 메뉴를 띄우지 않고 항목만 남긴다(화면 밖 창에서 팝업이 포커스를 뺏지 않게).</summary>
@@ -551,7 +568,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (_overlay is null || _scene is null || ViewModel is null) return;
         var hidden = new HashSet<int>(_grouped ? _groupChips.Values.SelectMany(c => c.Keys) : Enumerable.Empty<int>());
         var named = _dragging ? null : ViewModel.FenceNamedKey;
-        var shapes = FenceScene.Overlay(_scene, _projector, hidden, named, _insertionX, _insertionLabel, _view.Scale);
+        var shapes = FenceScene.Overlay(_scene, _projector, hidden, named, _insertionX, _insertionLabel, _view.Scale, _heightGuide);
         var screen = _band is { } band ? new[] { FenceScene.RubberBand(band) } : Array.Empty<FenceShape>();
         OverlayUpdates++;
         _overlay.Show(shapes, _transform.Matrix, screen);
@@ -714,6 +731,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                     : _scene.Sensors.TryGetValue(chip.Key, out var s) ? $"{s.Number} {s.Name}" : "센서";
                 _ghost = new DragGhostAdorner(this, layer, label, _dragKeys.Count);
                 layer?.Add(_ghost);
+                // 축 잠금(데드존을 넘은 순간 우세한 쪽) — 세로면 높이 단계, 가로면 다른 망으로(펜스 구성일 때만 높이가 있다)
+                if (_scene.IsLayout && FenceGesture.LockAxis(_press.Start, _lastPointer) == FenceDragAxis.Vertical && BeginHeightDrag(GrabbedKey(chip)))
+                    _action = FenceGestureAction.ChangeHeight;
                 break;
             case FenceGestureAction.MoveEnclosure:
                 Cursor = Cursors.SizeWE;
@@ -770,6 +790,22 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 return;
             }
 
+            case FenceGestureAction.ChangeHeight when _press.Chip is { } heightChip:
+            {
+                _ghost?.MoveTo(now);
+                // 포인터 높이(세계 · 위가 +) = 시작 단계 높이 + 끈 화면 거리 ÷ (배율 × 세로 줄임)
+                var pointer = _heightStart + (_press.Start.Y - now.Y) / (_view.Scale * _projector.Cy);
+                var level = FenceGesture.NearestStop(_stopHeights, pointer);
+                if (level < 0 || level == _heightLevel) return;                    // 후보 단계가 바뀔 때만 다시 그린다(NFR-02)
+                _heightLevel = level;
+                var grabbed = GrabbedKey(heightChip);
+                _heightGuide = new FenceHeightGuide(_scene.X.TryGetValue(grabbed, out var gx) ? gx : 0, _stopHeights[level], HEIGHT_GUIDE_HALF,
+                                                    vm.FenceStopLabel(_dragKeys, grabbed, level));
+                vm.NotifyFenceStatus($"{_heightGuide.Label} — 놓으면 확정 · Esc 취소");
+                UpdateOverlay();
+                return;
+            }
+
             case FenceGestureAction.MoveSensors when _press.Chip is { } chip:
             {
                 _ghost?.MoveTo(now);
@@ -812,6 +848,28 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
     private static int GrabbedKey(FenceChip chip) => chip.Kind == FenceChipKind.Group ? chip.Keys[0] : chip.Key;
 
+    /// <summary>높이 안내선의 반 폭(세계 단위 · 망 한 칸의 절반쯤).</summary>
+    public const double HEIGHT_GUIDE_HALF = 30;
+
+    /// <summary>
+    /// 세로 끌기 준비 — 잡은 센서의 단계 높이를 미리 센다(위 줄 코일 밖 센서는 지금 높이를 "그대로" 후보로 하나 더). 단계가 없으면 <c>false</c>(가로 끌기로).
+    /// </summary>
+    private bool BeginHeightDrag(int grabbed)
+    {
+        if (_scene is null || ViewModel is not { } vm) return false;
+        var count = vm.FenceHeightStops(grabbed).Count;
+        var current = vm.FenceStopLevel(grabbed);
+        if (count == 0 || current < 0) return false;
+        var heights = new List<double>(count + 1);
+        for (var level = 0; level < Math.Max(count, current + 1); level++)
+            heights.Add(vm.FenceStopMount(grabbed, level) is { } m ? _scene.MountHeight(m) : 0);
+        _stopHeights = heights;
+        _heightStart = heights[current];
+        _heightLevel = null;
+        Cursor = Cursors.SizeNS;
+        return true;
+    }
+
     /// <summary>
     /// 끝내기는 이것 하나 — 뗌(<paramref name="commit"/>) · 캡처 상실 · Esc(취소). 순서: ① 표지 해제 ② 모습 복원 ③ (구독 없음) ④ 캡처 해제 ⑤ 커밋 통지.
     /// </summary>
@@ -826,6 +884,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var pointerWorldX = ScreenToWorld(pointer).X;
         var enclosureGap = _enclosureGap;
         var band = _band;
+        var heightLevel = _heightLevel;
 
         // ① 표지
         _press = null;
@@ -835,6 +894,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var dragKeys = _dragKeys;
         _dragKeys = Array.Empty<int>();
         _band = null;
+        _stopHeights = Array.Empty<double>();
+        _heightLevel = null;
+        _heightGuide = null;
         // ② 모습
         foreach (var dim in _chips.Children.OfType<FenceChip>()) dim.Opacity = 1;
         if (_ghost is not null) { AdornerLayer.GetAdornerLayer(this)?.Remove(_ghost); _ghost = null; }
@@ -851,6 +913,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (!commit)
         {
             if (wasDragging && action is FenceGestureAction.MoveSensors) vm.NotifyFenceStatus("취소 — 제자리로 돌렸습니다(서버 호출 없음)");
+            else if (wasDragging && action is FenceGestureAction.ChangeHeight) vm.NotifyFenceStatus("취소 — 높이를 바꾸지 않았습니다(서버 호출 없음)");
             else if (wasDragging && action is FenceGestureAction.MoveEnclosure) vm.NotifyFenceStatus("취소 — 함체를 잡기 전 자리로 돌렸습니다");
             else if (wasDragging && action is FenceGestureAction.RubberSensors or FenceGestureAction.RubberPanels) vm.NotifyFenceStatus("취소 — 선택을 바꾸지 않았습니다");
             Rebuild();
@@ -903,6 +966,15 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             case FenceGestureAction.MoveEnclosure:
                 if (!vm.FenceMoveEnclosure(enclosureGap)) Rebuild();
                 break;
+            case FenceGestureAction.ChangeHeight when chip is not null:
+            {
+                var keys = dragKeys.Count > 0 ? dragKeys.ToList() : chip.Keys.ToList();
+                var moved = heightLevel is { } level && vm.FenceSetStopLevel(keys, GrabbedKey(chip), level);
+                if (moved && keys.Count == 1) vm.FenceSelect(keys[0]);
+                if (!moved) Rebuild();
+                FocusUnitOf(keys[0]);
+                break;
+            }
             case FenceGestureAction.MoveSensors when chip is not null:
             {
                 var keys = dragKeys.Count > 0 ? dragKeys.ToList() : chip.Keys.ToList();
@@ -1016,7 +1088,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
-        if (HandleKeyDown(e.Key, e.SystemKey, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
+        // 수정키는 누른 순서와 무관하게(Alt 먼저 · Shift 먼저 모두 Alt+Shift) — 헤디드 r21
+        if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
     }
 
     /// <summary>
@@ -1071,6 +1144,24 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             if (target is not { } flip) return false;
             vm.FenceFlipFacing(flip);
             if (chip is not null) FocusUnitOf(flip);
+            return true;
+        }
+
+        // Alt+↑/↓ — 높이 한 단계 · Shift+Alt+↑/↓ — 단계 안 미세 높이 ±0.1m(끌기의 키보드 대신). Alt 는 Key.System + SystemKey 로 온다(DF).
+        if (alt && k is Key.Up or Key.Down && _scene.IsLayout && (chip is { Kind: FenceChipKind.Sensor or FenceChipKind.Group } || (chip is null && ReferenceEquals(focused, this))))
+        {
+            IReadOnlyList<int> keys;
+            if (chip is null) keys = vm.FenceSelectedKeys.Count > 0 ? vm.FenceSelectedKeys.ToList() : vm.FenceSelectedKey is { } one ? new[] { one } : Array.Empty<int>();
+            else
+            {
+                if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelectSensors(chip.Keys);
+                keys = chip.Kind == FenceChipKind.Group ? chip.Keys : vm.FenceDragKeys(chip.Keys[0]);
+            }
+            if (keys.Count == 0) return false;
+            var up = k == Key.Up;
+            if ((modifiers & ModifierKeys.Shift) != 0) vm.FenceNudgeHeight(keys, up ? FenceLayoutMath.NUDGE_M : -FenceLayoutMath.NUDGE_M);
+            else vm.FenceStepStop(keys, up ? 1 : -1);
+            if (chip is not null) FocusUnitOf(keys[0]);
             return true;
         }
 

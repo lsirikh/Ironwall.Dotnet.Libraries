@@ -477,7 +477,8 @@ public sealed class FenceConceptView : Grid
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
-        if (HandleKeyDown(e.Key, e.SystemKey, Keyboard.Modifiers, Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
+        // 수정키는 누른 순서와 무관하게(Alt 먼저 · Shift 먼저 모두 Alt+Shift) — 헤디드 r21
+        if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
     }
 
     /// <summary>

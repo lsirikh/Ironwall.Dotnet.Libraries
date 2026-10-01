@@ -1,4 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using System;
+using System.Collections.Generic;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
@@ -46,6 +48,17 @@ public enum FenceGestureAction
     Pan = 8,
     /// <summary>오른쪽 클릭 메뉴(데드존 안에서 뗌).</summary>
     ContextMenu = 9,
+    /// <summary>잡은 센서(고른 것 전부)의 높이 단계를 바꾼다(센서를 잡고 세로로 끌기 · 펜스 구성).</summary>
+    ChangeHeight = 10,
+}
+
+/// <summary>센서 끌기의 축 — 데드존을 넘을 때 우세한 쪽으로 한 번 잠근다.</summary>
+public enum FenceDragAxis
+{
+    /// <summary>가로 — 다른 망(기둥)으로 옮긴다.</summary>
+    Horizontal = 0,
+    /// <summary>세로 — 높이 단계를 바꾼다.</summary>
+    Vertical = 1,
 }
 
 /// <summary>
@@ -67,6 +80,27 @@ public static class FenceGesture
 
     /// <summary>눌린 자리에서 데드존을 넘게 움직였는가(제곱 비교).</summary>
     public static bool IsDrag(Point pressed, Point current) => DragMath.IsDrag(current.X - pressed.X, current.Y - pressed.Y);
+
+    /// <summary>
+    /// 축 잠금 — 데드존을 넘은 순간의 움직임이 세로가 더 크면 세로(높이), 아니면 가로(다른 망). 같으면 가로(지금까지의 끌기).
+    /// </summary>
+    public static FenceDragAxis LockAxis(Point pressed, Point current)
+        => Math.Abs(current.Y - pressed.Y) > Math.Abs(current.X - pressed.X) ? FenceDragAxis.Vertical : FenceDragAxis.Horizontal;
+
+    /// <summary>
+    /// 높이 단계 맞추기 — 포인터 높이(세계 단위 · 위가 +)에 가장 가까운 단계의 번호. 같은 거리면 아래 단계. 단계가 없으면 −1.
+    /// </summary>
+    public static int NearestStop(IReadOnlyList<double> stopHeights, double pointerHeight)
+    {
+        var best = -1;
+        var distance = double.PositiveInfinity;
+        for (var i = 0; i < (stopHeights?.Count ?? 0); i++)
+        {
+            var d = Math.Abs(stopHeights![i] - pointerHeight);
+            if (d < distance - 1e-9) { distance = d; best = i; }
+        }
+        return best;
+    }
 
     /// <summary>판정 — <paramref name="isDrag"/> 는 누른 뒤 한 번이라도 데드존을 넘었는가.</summary>
     public static FenceGestureAction Classify(FencePointerButton button, bool ctrl, bool shift, FenceTargetKind target, bool isDrag)
