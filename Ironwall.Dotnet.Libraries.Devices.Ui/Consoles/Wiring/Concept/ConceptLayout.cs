@@ -18,8 +18,8 @@ public enum ConceptChipMode
     Dot = 2,
 }
 
-/// <summary>개념도에 놓을 센서 한 대 — 줄 · 펜스 위 가로 위치(m).</summary>
-public sealed record ConceptLaneItem(int Key, FenceLane Lane, double XM);
+/// <summary>개념도에 놓을 센서 한 대 — 줄 · 펜스 위 가로 위치(m) · 칩 위 번호 글자(간격 · 솎기 판단 · 없으면 세 자리로 본다).</summary>
+public sealed record ConceptLaneItem(int Key, FenceLane Lane, double XM, string? Label = null);
 
 /// <summary>개념도 노드 한 개의 자리.</summary>
 /// <param name="ShowLabel">칩 위 번호를 그리는가(솎은 결과).</param>
@@ -90,6 +90,14 @@ public static class ConceptLayout
     /// <summary>칩 위 번호를 솎을 때 번호 사이 최소 간격(px).</summary>
     public const double LABEL_SPACING = 36;
 
+    /// <summary>칩 위 번호 글자 크기(px).</summary>
+    public const double LABEL_SIZE = 11;
+
+    /// <summary>
+    /// 칩 위 번호의 폭(px · 여백 4 포함) — 숫자는 어림(0.58em)보다 넓게 그려져 1.15 배로 본다(헤디드 r21: 다섯 자리 번호 "70066" 끼리 36px 간격에서 겹쳤다).
+    /// </summary>
+    public static double LabelWidth(string? label) => FenceScene.EstimateWidth(string.IsNullOrEmpty(label) ? "000" : label, LABEL_SIZE) * 1.15 + 4;
+
     /// <summary>눈금 글자 사이 최소 간격(px) — 이보다 좁으면 5 · 10 · 20 … 칸마다.</summary>
     public const double TICK_SPACING = 120;
 
@@ -141,16 +149,28 @@ public static class ConceptLayout
             _ => new Size(Math.Max(2, Math.Min(8, step - 1)), 8),
         };
 
-        // 같은 자리 칩은 옆으로 벌린다(줄마다 · 순서 유지)
+        // 같은 자리 칩은 옆으로 벌린다(줄마다 · 순서 유지) — 큰 칩은 번호가 서로 닿지 않을 만큼(가장 넓은 번호 폭)
+        var widestLabel = list.Count == 0 ? LabelWidth(null) : list.Max(i => LabelWidth(i.Label));
         var nodes = new List<ConceptPoint>(list.Count);
         foreach (var lane in new[] { FenceLane.Lower, FenceLane.Upper })
         {
             var row = list.Where(i => i.Lane == lane).Select((item, index) => (item, index)).OrderBy(t => t.item.XM).ThenBy(t => t.index).Select(t => t.item).ToList();
             // 같은 자리만 벌린다 — 칸보다 넓게 벌리면 펜스 밖으로 밀려난다(점 칩 · 수백 대)
-            var spread = FenceWorld.Separate(row.Select(i => X(i.XM)).ToList(), double.IsInfinity(step) ? chip.Width + 2 : Math.Min(chip.Width + 2, step));
+            var gap = mode == ConceptChipMode.Full
+                ? Math.Max(chip.Width + 2, widestLabel)
+                : double.IsInfinity(step) ? chip.Width + 2 : Math.Min(chip.Width + 2, step);
+            var spread = FenceWorld.Separate(row.Select(i => X(i.XM)).ToList(), gap);
             var every = mode == ConceptChipMode.Full ? 1 : mode == ConceptChipMode.Compact ? Math.Max(1, (int)Math.Ceiling(LABEL_SPACING / Math.Max(1, step))) : int.MaxValue;
+            // 번호는 실제 간격으로 한 번 더 솎는다 — 앞에 그린 번호와 반 폭씩 닿으면 뺀다(글자끼리 겹치지 않게)
+            double? lastX = null;
+            var lastW = 0.0;
             for (var i = 0; i < row.Count; i++)
-                nodes.Add(new ConceptPoint(row[i].Key, lane, new Point(spread[i], lane == FenceLane.Upper ? UPPER_Y : LOWER_Y), i % every == 0));
+            {
+                var w = LabelWidth(row[i].Label);
+                var show = i % every == 0 && (lastX is not { } lx || spread[i] - lx >= (lastW + w) / 2);
+                if (show) { lastX = spread[i]; lastW = w; }
+                nodes.Add(new ConceptPoint(row[i].Key, lane, new Point(spread[i], lane == FenceLane.Upper ? UPPER_Y : LOWER_Y), show));
+            }
         }
 
         // 눈금 — 펜스 위 위치(센서가 선 가로 자리 · 왼쪽부터 1). 칸이 많으면 5 · 10 · 20 … 칸마다.

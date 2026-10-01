@@ -87,14 +87,20 @@ public sealed partial class WiringViewModel
     {
         var layout = _board.FenceLayout;
         if (!layout.IsActive || layout.Panels.Count == 0)
-            return _board.Chain.Keys.Select((k, i) => new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, i)).ToList();
+            return _board.Chain.Keys.Select((k, i) => new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, i, NumberLabelOf(k))).ToList();
         var geometry = layout.Geometry;
+        // 같은 망의 여러 센서는 망 길이를 나눠 선다(펜스 보기와 같은 자리 · 헤디드 r21 담 위 세 대가 한 점에 겹쳤다)
+        var placed = _board.Chain.Keys.Where(k => layout.MountOf(k) is not null).Select(k => (k, layout.MountOf(k)!)).ToList();
+        var xs = Monitoring.Models.Fences.FenceLayoutMath.SpreadXs(placed, geometry, layout.ControllerEnd);
         return _board.Chain.Keys
             .Select(k => layout.MountOf(k) is { } m
-                ? new Concept.ConceptLaneItem(k, m.Lane, Monitoring.Models.Fences.FenceLayoutMath.PointOf(m, geometry).XM)
-                : new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, 0))
+                ? new Concept.ConceptLaneItem(k, m.Lane, xs.TryGetValue(k, out var x) ? x : Monitoring.Models.Fences.FenceLayoutMath.PointOf(m, geometry).XM, NumberLabelOf(k))
+                : new Concept.ConceptLaneItem(k, Monitoring.Models.Fences.FenceLane.Lower, 0, NumberLabelOf(k)))
             .ToList();
     }
+
+    /// <summary>개념도 칩 위 번호 글자(간격 · 솎기 판단).</summary>
+    private string NumberLabelOf(int key) => (_board.Find(key)?.Facts.Number ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>개념도 기둥 x(m) — 서 있는 기둥만.</summary>
     public IReadOnlyList<double> ConceptPostsM()

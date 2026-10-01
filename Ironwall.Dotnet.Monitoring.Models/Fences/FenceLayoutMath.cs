@@ -213,6 +213,40 @@ public static class FenceLayoutMath
         return new FenceMountPoint(x, h + m.HeightOffsetM);
     }
 
+    /// <summary>
+    /// 그릴 가로 자리(m) — 같은 줄 · 같은 망에 망 자리(망 가운데 · 망 아래 · 윤형 코일 · 담 위 · 담 앞면) 센서가 여럿이면 망 길이를 고르게 나눠 선다
+    /// (담에는 기둥이 없어 모두 가운데 한 점에 겹쳤다 — 헤디드 r21 "7006 7006 7006"). 줄 안 차례는 사슬이 가는 쪽(<see cref="LaneDirection"/>)을 따른다.
+    /// 기둥 자리 · 혼자인 센서는 <see cref="PointOf"/> 그대로.
+    /// </summary>
+    /// <param name="chain">사슬 순서의 (키 · 자리).</param>
+    public static IReadOnlyDictionary<int, double> SpreadXs(IReadOnlyList<(int Key, SensorMountSpec Mount)> chain, FenceGeometry geometry,
+                                                            FenceControllerEnd end = FenceControllerEnd.Left)
+    {
+        var result = new Dictionary<int, double>();
+        var list = chain ?? Array.Empty<(int, SensorMountSpec)>();
+        if (geometry is null) return result;
+        if (geometry.Panels.Count == 0)
+        {
+            foreach (var (key, mount) in list) result[key] = PointOf(mount, geometry).XM;
+            return result;
+        }
+        var specs = geometry.Specs;
+        var seated = list.Select((t, i) => (t.Key, Mount: Normalize(t.Mount, specs), Index: i)).ToList();
+        foreach (var group in seated.GroupBy(t => (t.Mount.Lane, t.Mount.IsPostSpot, t.Mount.Panel)))
+        {
+            var members = group.OrderBy(t => t.Index).ToList();
+            if (group.Key.IsPostSpot || members.Count == 1)
+            {
+                foreach (var t in members) result[t.Key] = PointOf(t.Mount, geometry).XM;
+                continue;
+            }
+            if (LaneDirection(group.Key.Lane, end) < 0) members.Reverse();              // 왼쪽 → 오른쪽
+            var panel = geometry.Panels[group.Key.Panel];
+            for (var k = 0; k < members.Count; k++) result[members[k].Key] = panel.StartM + panel.SpanM * (k + 0.5) / members.Count;
+        }
+        return result;
+    }
+
     /// <summary>위 줄 센서가 펜스 꼭대기(윗 레일 · 윤형 코일) 위로 오르는 높이(m) — 윤형이면 코일 지름만큼 더.</summary>
     public const double UPPER_LANE_RISE_M = 0.10;
     /// <summary>
