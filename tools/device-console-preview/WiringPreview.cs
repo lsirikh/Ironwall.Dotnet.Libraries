@@ -191,7 +191,16 @@ internal sealed class WiringPreview
             facts[4201 + i] = new SensorFacts(101 + i, $"윤형 펜스 {i + 1}", "Fence", "북측");
         }
         var order = FenceLayoutMath.ChainOrder(mounts.Select(p => (p.Key, p.Value)), FenceControllerEnd.Left).ToList();
-        var seeds = order.Select((id, i) => new WiringSensorSeed(id, i + 1, facts[id], new WiringPlacement(1, i + 1), ConnectionType: "RS485")).ToList();
+        // 센서 방향(2026-10-01) — 한 장에 모든 경우: 스마트 2 = 내부 · 3 = 정방향 90° · 4 = 내부 · 역방향 270° · 5 = 펜스 쪽 180°(1 · 6 은 외부 정면)
+        var orientation = new Dictionary<int, (WiringFacing Side, WiringYaw Yaw)>
+        {
+            [4102] = (WiringFacing.Back, WiringYaw.Away),
+            [4103] = (WiringFacing.Front, WiringYaw.Along),
+            [4104] = (WiringFacing.Back, WiringYaw.Against),
+            [4105] = (WiringFacing.Front, WiringYaw.Toward),
+        };
+        var seeds = order.Select((id, i) => new WiringSensorSeed(id, i + 1, facts[id],
+            orientation.TryGetValue(id, out var o) ? new WiringPlacement(1, i + 1, o.Side, o.Yaw) : new WiringPlacement(1, i + 1), ConnectionType: "RS485")).ToList();
         var document = new FenceLayoutDocument { ControllerId = 6, Panels = panels, Mounts = mounts, Bands = NumberBandSet.Tier4, Revision = 1 };
         var vm = Controller(new WiringControllerInfo(6, 6, "PIDS-북측-06", "10.99.8.6", "Controller"), seeds, new[] { "SmartSensor2", "Fence" },
                             new WiringFenceContext(document, new PreviewFenceStore(), new PreviewPing()));

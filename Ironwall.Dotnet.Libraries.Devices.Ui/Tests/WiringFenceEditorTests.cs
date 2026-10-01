@@ -223,7 +223,9 @@ public class WiringFenceEditorTests
         Assert.Equal("이 설치 방식을 이 제어기 모든 센서에 적용", sensor[0]);
         Assert.StartsWith("같은 종류 센서에만 적용 (", sensor[1]);
         Assert.Contains("7대", sensor[1]);
-        Assert.Contains("방향만 모두 앞으로", sensor);
+        Assert.Contains("설치 면만 모두 외부로", sensor);
+        Assert.Contains("90° 돌리기 ⟳", sensor);
+        Assert.Contains("내부로", sensor);
         Assert.Contains("결선에서 빼기", sensor);
         Assert.Equal(new[] { "망 속성 복사", "선택한 망에 붙여넣기 (0칸)", "이 망 속성을 모든 망에" }, panel);
     }

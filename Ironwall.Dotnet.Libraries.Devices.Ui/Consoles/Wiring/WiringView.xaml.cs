@@ -141,6 +141,16 @@ public partial class WiringView : UserControl
     private void OnShowTable(object sender, RoutedEventArgs e) => ViewModel?.ShowTableView();
     private void OnFacingFront(object sender, RoutedEventArgs e) => ViewModel?.FenceSetFacingFront();
     private void OnFacingBack(object sender, RoutedEventArgs e) => ViewModel?.FenceSetFacingBack();
+
+    private void OnYawCw(object sender, RoutedEventArgs e) => ViewModel?.FenceRotateSelected(1);
+
+    private void OnYawCcw(object sender, RoutedEventArgs e) => ViewModel?.FenceRotateSelected(-1);
+
+    /// <summary>네 방향 고르개 — Tag = 각도(0 · 90 · 180 · 270).</summary>
+    private void OnYawPick(object sender, RoutedEventArgs e)
+    {
+        if (int.TryParse(TagOf(sender), out var degrees)) ViewModel?.FenceSetYaw(Model.WiringYawMath.FromDegrees(degrees));
+    }
     private void OnFenceBack(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedBack();
     private void OnFenceForward(object sender, RoutedEventArgs e) => ViewModel?.StepSelectedForward();
     private void OnFenceUnplace(object sender, RoutedEventArgs e) => ViewModel?.UnplaceFenceSelected();

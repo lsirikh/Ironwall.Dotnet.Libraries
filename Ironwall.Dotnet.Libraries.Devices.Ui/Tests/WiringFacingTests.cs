@@ -103,7 +103,7 @@ public class WiringFacingTests
 
         Assert.True(back.Hit.Top < front.Hit.Top - 4, $"뒤 센서는 위로(너머로) 밀린다: {front.Hit} → {back.Hit}");
         if (k > 0) Assert.True(back.Hit.Right > front.Hit.Right + 4, "입체에서는 오른쪽으로도 밀린다");   // 왼쪽은 "뒤" 표지가 넓힌다 — 오른쪽 끝으로 잰다
-        Assert.Contains(back.Shapes, s => s.Ink == FenceInk.FacingTagText && s.Text == "뒤");
+        Assert.Contains(back.Shapes, s => s.Ink == FenceInk.FacingTagText && s.Text == "내");          // 설치 면 = 내부(센서 방향 2026-10-01 · 옛 "뒤")
         Assert.DoesNotContain(front.Shapes, s => s.Ink == FenceInk.FacingTagText);
     }
 

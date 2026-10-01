@@ -2056,20 +2056,21 @@
 										</StackPanel>
 
 										<!--
-											방향(FR-20) — 기둥 센서(스마트 복합 · 복합)만. 분할 단추 [앞(외부)] [뒤(내부)] · 켜진 쪽은 아래 굵은 막대(보기 전환과 같은 어휘 — 색 하나로 가르지 않는다).
-											펜스센서 · 지진동은 방향이 없어 단추를 끄고 까닭을 적는다. 키 F = 뒤집기.
+											설치 면 · 보는 방향(FR-20 · 센서 방향 2026-10-01) — 기둥 센서(스마트 복합 · 복합)만. 켜진 쪽은 아래 굵은 막대(색 하나로 가르지 않는다).
+											설치 면 [외부] [내부](키 F) · 보는 방향 [⟲ 90°] [⟳ 90°](키 Shift+R · R) + 네 방향 고르개(정면 · 정방향 · 펜스 쪽 · 역방향).
+											펜스센서 · 지진동은 방향이 없어 단추를 끄고 까닭을 적는다. 고른 센서 모두 · 되돌리기 한 걸음.
 										-->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasFacingRow, Converter={StaticResource BoolToVisibility}}">
-											<TextBlock Style="{StaticResource W.Hint}" Text="방향" />
+											<TextBlock Style="{StaticResource W.Hint}" Text="설치 면" />
 											<UniformGrid Margin="0,4,0,0" Columns="2">
 												<StackPanel Margin="0,0,3,0">
 													<Button
 														AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Front"
 														Click="OnFacingFront"
-														Content="앞(외부)"
+														Content="외부"
 														IsEnabled="{Binding CanChooseFacing}"
 														Style="{StaticResource Console.Button}"
-														ToolTip="펜스 외부를 봅니다(기본) — F 로 뒤집기" />
+														ToolTip="펜스 외부 면에 답니다(기본) — F 로 뒤집기" />
 													<Rectangle
 														Height="3"
 														Margin="4,2,4,0"
@@ -2080,10 +2081,10 @@
 													<Button
 														AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Back"
 														Click="OnFacingBack"
-														Content="뒤(내부)"
+														Content="내부"
 														IsEnabled="{Binding CanChooseFacing}"
 														Style="{StaticResource Console.Button}"
-														ToolTip="펜스 내부를 봅니다 — 기둥 반대쪽에 달고 칩에 '뒤' 표지 · F 로 뒤집기" />
+														ToolTip="펜스 내부 면에 답니다 — 철망 뒤에 그리고 칩에 '내' 표지 · F 로 뒤집기" />
 													<Rectangle
 														Height="3"
 														Margin="4,2,4,0"
@@ -2091,6 +2092,71 @@
 														Visibility="{Binding IsSelectedBack, Converter={StaticResource BoolToVisibility}}" />
 												</StackPanel>
 											</UniformGrid>
+
+											<!--  보는 방향 — 왼쪽 ⟲ · ⟳ 단추, 오른쪽 네 방향 고르개(위 = 정면 · 오른쪽 = 정방향 · 아래 = 펜스 쪽 · 왼쪽 = 역방향 · 위에서 본 모습)  -->
+											<TextBlock Margin="0,8,0,0" Style="{StaticResource W.Hint}" Text="보는 방향" />
+											<DockPanel Margin="0,4,0,0" LastChildFill="False">
+												<StackPanel VerticalAlignment="Center" DockPanel.Dock="Left">
+													<Button
+														MinWidth="0"
+														Padding="8,0"
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.Ccw"
+														AutomationProperties.Name="반시계로 90° 돌리기"
+														Click="OnYawCcw"
+														Content="⟲ 90°"
+														IsEnabled="{Binding CanChooseFacing}"
+														Style="{StaticResource Console.Button}"
+														ToolTip="반시계로 90° 돌리기 (Shift+R)" />
+													<Button
+														MinWidth="0"
+														Margin="0,4,0,0"
+														Padding="8,0"
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.Cw"
+														AutomationProperties.Name="시계로 90° 돌리기"
+														Click="OnYawCw"
+														Content="⟳ 90°"
+														IsEnabled="{Binding CanChooseFacing}"
+														Style="{StaticResource Console.Button}"
+														ToolTip="시계로 90° 돌리기 (R)" />
+												</StackPanel>
+												<Grid Margin="10,0,0,0" DockPanel.Dock="Left">
+													<Grid.ColumnDefinitions>
+														<ColumnDefinition Width="Auto" />
+														<ColumnDefinition Width="Auto" />
+														<ColumnDefinition Width="Auto" />
+													</Grid.ColumnDefinitions>
+													<Grid.RowDefinitions>
+														<RowDefinition Height="Auto" />
+														<RowDefinition Height="Auto" />
+														<RowDefinition Height="Auto" />
+													</Grid.RowDefinitions>
+													<StackPanel Grid.Row="0" Grid.Column="1">
+														<Button MinWidth="0" Padding="6,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.0" AutomationProperties.Name="정면 0°" Click="OnYawPick" Content="정면" IsEnabled="{Binding CanChooseFacing}" Style="{StaticResource Console.Button}" Tag="0" ToolTip="펜스 반대쪽 정면(0°)" />
+														<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsYawAway, Converter={StaticResource BoolToVisibility}}" />
+													</StackPanel>
+													<StackPanel Grid.Row="1" Grid.Column="2" Margin="4,0,0,0">
+														<Button MinWidth="0" Padding="6,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.90" AutomationProperties.Name="정방향 90°" Click="OnYawPick" Content="정방향" IsEnabled="{Binding CanChooseFacing}" Style="{StaticResource Console.Button}" Tag="90" ToolTip="펜스를 따라 망 번호가 커지는 쪽(그림 오른쪽 · 90°)" />
+														<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsYawAlong, Converter={StaticResource BoolToVisibility}}" />
+													</StackPanel>
+													<StackPanel Grid.Row="2" Grid.Column="1">
+														<Button MinWidth="0" Padding="6,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.180" AutomationProperties.Name="펜스 쪽 180°" Click="OnYawPick" Content="펜스 쪽" IsEnabled="{Binding CanChooseFacing}" Style="{StaticResource Console.Button}" Tag="180" ToolTip="펜스를 향해(180° · 드묾)" />
+														<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsYawToward, Converter={StaticResource BoolToVisibility}}" />
+													</StackPanel>
+													<StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,4,0">
+														<Button MinWidth="0" Padding="6,0" AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.270" AutomationProperties.Name="역방향 270°" Click="OnYawPick" Content="역방향" IsEnabled="{Binding CanChooseFacing}" Style="{StaticResource Console.Button}" Tag="270" ToolTip="펜스를 따라 망 1 쪽(그림 왼쪽 · 270°)" />
+														<Rectangle Height="3" Margin="4,2,4,0" Fill="{DynamicResource PrimaryBrush}" Visibility="{Binding IsYawAgainst, Converter={StaticResource BoolToVisibility}}" />
+													</StackPanel>
+													<TextBlock
+														Grid.Row="1"
+														Grid.Column="1"
+														HorizontalAlignment="Center"
+														VerticalAlignment="Center"
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Yaw.Text"
+														FontSize="11"
+														Foreground="{DynamicResource TextSecondaryBrush}"
+														Text="{Binding SelectedYawText}" />
+												</Grid>
+											</DockPanel>
 											<TextBlock
 												Margin="0,3,0,0"
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Facing.Note"

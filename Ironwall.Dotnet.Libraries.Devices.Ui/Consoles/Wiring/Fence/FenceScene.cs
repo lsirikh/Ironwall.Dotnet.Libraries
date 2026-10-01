@@ -24,6 +24,8 @@ public enum FenceInk
     GroupBack, GroupBody, GroupText, GroupSub,
     Pill, PillDuplicate, PillInsert, PillPort, Insert,
     FacingTag, FacingTagText, SideLabel,
+    // 센서 방향(2026-10-01) — 렌즈 쪽 모서리(주 색 굵은 선 · 화살 아님) · 뒷판 이음매 · 철망 뒤(내부) 센서 위에 겹치는 철망 선
+    LensEdge, BackSeam, MeshOver,
     // 펜스 편집기(fence-wiring-editor) — 망 선택 · 러버밴드 · 모양 5종
     PanelSelectFill, PanelSelectEdge, RubberBand,
     Razor, RazorArm, BrickFront, WallSide, WallTopFace, WallCap, ConcreteFront, ConcreteSeam, DesignFace, DesignRail, DesignPost,
@@ -416,8 +418,10 @@ public static partial class FenceScene
                 var zf = de / 2 + 14 * k;
                 Box(o, p, 0, 0, H + 16, -de / 2 - 1, de / 2 + 1, 7, FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Ball, new[] { p.P(0, H + 20, 0) }, 4.6, 4.6));     // 볼 마운트는 기둥 끝에 남는다
-                Box(o, q, 0, H + 24, H + 48, de / 2, zf, 38, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
-                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(-11, H + 36, zf) }, 4, 4));
+                var mw = SensorBodyWidth(38, s.Yaw);
+                Box(o, q, 0, H + 24, H + 48, de / 2, zf, mw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
+                Lens(o, q, s.Yaw, mw, H + 24, H + 48, zf, new Point(-11, H + 36), 4);
+                if (s.IsBackFacing) MeshOver(o, q, mw, H + 24, H + 48, zf);
                 var pl = coilPlate ?? q.P(5, H + 36, zf);
                 plate = Plate(o, pl, 24, 16, big, FenceInk.NumberSmall, 11, 4, s, zoom);
                 bb = new[] { q.P(-19, H + 48, de / 2), q.P(19, H + 48, de / 2), q.P(-19, H + 24, zf), q.P(19, H + 24, zf), q.P(19, H + 48, 0) };
@@ -462,9 +466,11 @@ public static partial class FenceScene
                 double zb0 = de / 2, zb1 = de / 2 + 12 * k, zh = de / 2 + 19 * k, zg0 = de / 2 + 3 * k, zg1 = de / 2 + 8 * k;
                 Box(o, q, -6, 43, 50, zg0, zg1, 5, FenceInk.GlandFront, FenceInk.GlandSide, FenceInk.GlandTop);
                 Box(o, q, 6, 43, 50, zg0, zg1, 5, FenceInk.GlandFront, FenceInk.GlandSide, FenceInk.GlandTop);
-                Box(o, q, 0, 50, 92, zb0, zb1, 26, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
-                Box(o, q, 0, 92, 99, zb0, zh, 32, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
-                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(0, 58, zb1) }, 3.2, 3.2));
+                var bw = SensorBodyWidth(26, s.Yaw);
+                Box(o, q, 0, 50, 92, zb0, zb1, bw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
+                Box(o, q, 0, 92, 99, zb0, zh, SensorBodyWidth(32, s.Yaw), FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
+                Lens(o, q, s.Yaw, bw, 50, 92, zb1, new Point(0, 58), 3.2);
+                if (s.IsBackFacing) MeshOver(o, q, bw, 50, 99, zb1);
                 var pl = coilPlate ?? q.P(0, 78, zb1);
                 plate = Plate(o, pl, 20, coilPlate is null ? 18 : COIL_PLATE_H, big, FenceInk.Number, coilPlate is null ? 12.5 : COIL_PLATE_TEXT, 4.5, s, zoom);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };
@@ -481,7 +487,7 @@ public static partial class FenceScene
             var tag = BackTagRect(pl2, zoom);
             var size = tag.Height - 5;
             o.Add(RectShape(FenceInk.FacingTag, tag, 3));
-            o.Add(Text(FenceInk.FacingTagText, new Point(tag.X + tag.Width / 2, tag.Y + tag.Height / 2 + size * 0.36), "뒤", size));
+            o.Add(Text(FenceInk.FacingTagText, new Point(tag.X + tag.Width / 2, tag.Y + tag.Height / 2 + size * 0.36), "내", size));
             bb = bb.Append(tag.TopLeft).Append(tag.BottomRight).ToArray();
         }
 
@@ -743,6 +749,52 @@ public static partial class FenceScene
     }
 
     /// <summary>목업 <c>box()</c> — 앞면 · (깊이가 있으면) 옆면 · 윗면.</summary>
+    #region - Sensor orientation (센서 방향 2026-10-01) -
+    /// <summary>옆모습(90° · 270°)에서 몸의 앞면 폭 = 정면 폭 × 이 비(좁은 옆판).</summary>
+    public const double SIDE_PROFILE_RATIO = 0.45;
+
+    /// <summary>보는 방향에 따른 몸 앞면 폭 — 정면 · 뒷면(0° · 180°)은 그대로, 옆모습(90° · 270°)은 좁게.</summary>
+    public static double SensorBodyWidth(double frontWidth, WiringYaw yaw)
+        => yaw is WiringYaw.Along or WiringYaw.Against ? frontWidth * SIDE_PROFILE_RATIO : frontWidth;
+
+    /// <summary>렌즈가 그림의 어느 쪽 끝인가 — 정방향(90°) = 오른쪽(+1) · 역방향(270°) = 왼쪽(−1) · 정면 · 뒷면 = 가운데(0).</summary>
+    public static int LensSide(WiringYaw yaw) => yaw switch { WiringYaw.Along => 1, WiringYaw.Against => -1, _ => 0 };
+
+    /// <summary>
+    /// 렌즈 — 정면(0°): 앞면에 렌즈(지금까지의 모습) · 뒷면(180°): 렌즈 없이 뒷판 이음매 · 옆모습(90° · 270°): 보는 쪽 끝에 렌즈 + 그 모서리를 주 색 굵은 선으로
+    /// (화살 · 부채꼴이 아닌 몸의 모양으로 말한다 — 사용자가 지운 화살을 되살리지 않는다).
+    /// </summary>
+    private static void Lens(List<FenceShape> o, FenceProjector q, WiringYaw yaw, double width, double y0, double y1, double z, Point front, double radius)
+    {
+        switch (yaw)
+        {
+            case WiringYaw.Toward:
+                o.Add(Seg(FenceInk.BackSeam, q.P(0, y0 + 3, z), q.P(0, y1 - 3, z)));
+                break;
+            case WiringYaw.Along:
+            case WiringYaw.Against:
+            {
+                var side = LensSide(yaw);
+                var x = side * width / 2;
+                o.Add(Seg(FenceInk.LensEdge, q.P(x, y0 + 2, z), q.P(x, y1 - 2, z)));
+                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(x - side * radius * 0.6, front.Y, z) }, radius * 0.8, radius));
+                break;
+            }
+            default:
+                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { q.P(front.X, front.Y, z) }, radius, radius));
+                break;
+        }
+    }
+
+    /// <summary>철망 뒤(내부) 센서 — 몸 위로 철망 선 몇 가닥을 겹친다(철망 면 뒤에 있음을 형태로 · 고를 수는 그대로).</summary>
+    private static void MeshOver(List<FenceShape> o, FenceProjector q, double width, double y0, double y1, double z)
+    {
+        var half = width / 2 + 3;
+        for (var t = -half; t < half; t += 7)
+            o.Add(Seg(FenceInk.MeshOver, q.P(t, y0, z + 0.5), q.P(t + (y1 - y0) * 0.35, y1, z + 0.5), 0.85));
+    }
+    #endregion
+
     private static void Box(List<FenceShape> o, FenceProjector p, double x, double y0, double y1, double z0, double z1, double w,
                             FenceInk front, FenceInk side, FenceInk top)
     {

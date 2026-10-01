@@ -225,6 +225,37 @@ public class WiringFenceHeightViewTests
     }
     #endregion
 
+    #region - R · Shift+R · F (센서 방향 2026-10-01) -
+    [Fact]
+    public void should_rotate_with_r_and_shift_r_and_flip_the_mount_side_with_f_on_the_focused_sensor()
+    {
+        var result = OnWindow(WiringFenceHeightTests.Build("SSSS"), (vm, canvas) =>
+        {
+            var chip = canvas.SensorChips[102];
+            chip.Focus();
+            var r = canvas.HandleKeyDown(Key.R, Key.None, ModifierKeys.None, chip);
+            Pump();
+            var afterR = vm.Board.YawOf(102);
+            canvas.HandleKeyDown(Key.R, Key.None, ModifierKeys.Shift, canvas.SensorChips[102]);
+            canvas.HandleKeyDown(Key.R, Key.None, ModifierKeys.Shift, canvas.SensorChips[102]);
+            Pump();
+            var afterShiftR = vm.Board.YawOf(102);
+            var ctrlR = canvas.HandleKeyDown(Key.R, Key.None, ModifierKeys.Control, canvas.SensorChips[102]);
+            var f = canvas.HandleKeyDown(Key.F, Key.None, ModifierKeys.None, canvas.SensorChips[102]);
+            Pump();
+            return (r, afterR, afterShiftR, ctrlR, f, Side: vm.Board.FacingOf(102), Others: vm.Board.YawOf(101));
+        });
+
+        Assert.True(result.r);
+        Assert.Equal(WiringYaw.Along, result.afterR);
+        Assert.Equal(WiringYaw.Against, result.afterShiftR);                                 // 90 → 0 → 270
+        Assert.False(result.ctrlR);                                                           // Ctrl+R 은 흘려보낸다
+        Assert.True(result.f);
+        Assert.Equal(WiringFacing.Back, result.Side);
+        Assert.Equal(WiringYaw.Away, result.Others);
+    }
+    #endregion
+
     #region - Ctrl+←/→ (헤디드 r22) -
     [Fact]
     public void should_move_to_the_next_panel_with_ctrl_right_in_the_fence_view_and_the_concept()
