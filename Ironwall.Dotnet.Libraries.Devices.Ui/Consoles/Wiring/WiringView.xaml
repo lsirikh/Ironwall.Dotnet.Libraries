@@ -1,4 +1,5 @@
 ﻿<UserControl
+	xmlns:fb="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -1512,7 +1513,7 @@
 										Text="Alt+← → 한 칸 · Delete 빼기 · F 방향 · 손잡이로 끌기" />
 									<TextBlock Style="{StaticResource W.Title}" Text="{Binding Line1Title}" />
 								</DockPanel>
-								<Border
+								<fb:FrameBorder
 									Background="{DynamicResource SurfaceAltBrush}"
 									BorderBrush="{DynamicResource DividerBrush}"
 									BorderThickness="1"
@@ -1566,7 +1567,7 @@
 											</b:Interaction.Behaviors>
 										</ListBox>
 									</StackPanel>
-								</Border>
+								</fb:FrameBorder>
 								<TextBlock
 									Margin="2,6,0,0"
 									Style="{StaticResource W.Hint}"

@@ -1,4 +1,5 @@
 ﻿<ResourceDictionary
+	xmlns:fb="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
@@ -174,7 +175,7 @@
                                PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                IsOpen="{Binding IsFlyoutOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <!--  DataContext=허브 컨트롤(PlacementTarget) → 내부 바인딩 단순화  -->
-                            <Border Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1"
+                            <fb:FrameBorder Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1"
                                     BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceBrush}"
                                     DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=Popup}}">
                                 <Border.Effect>
@@ -285,7 +286,7 @@
                                         <Button Command="{Binding CloseAllCommand}" Style="{StaticResource HubDangerButton}" />
                                     </Border>
                                 </Grid>
-                            </Border>
+                            </fb:FrameBorder>
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
