@@ -26,11 +26,17 @@ public sealed record DisplayMonitorInfo(string DeviceName, PixelRect Bounds, Pix
     public int ScalePercent => Dpi <= 0 ? 100 : (int)Math.Round(Dpi * 100d / 96d);
 
     /// <summary>
-    /// 목록 글자 — <c>모니터 2 · 2560×1440 · 주</c>. 번호는 장치 이름 끝 숫자(없으면 목록 순번).
+    /// 사람이 부르는 번호 — 장치 이름 끝 숫자(<c>\\.\DISPLAY2</c> → 2), 없으면 목록 순번.
+    /// <see cref="Describe"/> 와 모니터 식별 카드가 같은 번호를 쓰도록 한 곳에서 정한다.
+    /// </summary>
+    public int Number(int ordinal) => CameraPopupMonitorId.DisplayNumber(DeviceName) ?? ordinal;
+
+    /// <summary>
+    /// 목록 글자 —<c>모니터 2 · 2560×1440 · 주</c>. 번호는 장치 이름 끝 숫자(없으면 목록 순번).
     /// </summary>
     public string Describe(int ordinal)
     {
-        var number = CameraPopupMonitorId.DisplayNumber(DeviceName) ?? ordinal;
+        var number = Number(ordinal);
         var text = string.Create(CultureInfo.InvariantCulture, $"모니터 {number} · {Bounds.Width}×{Bounds.Height}");
         if (ScalePercent != 100) text += string.Create(CultureInfo.InvariantCulture, $" · {ScalePercent}%");
         if (IsPrimary) text += " · 주";

@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Monitors;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Settings.CameraPopup;
 
@@ -30,12 +31,36 @@ public partial class CameraPopupSettingsView : UserControl
     private Point _pressPoint;
     private IInputElement? _canvas;
 
+    private CameraPopupSettingsViewModel? _identifySource;
+    private MonitorIdentifyOverlay? _identify;
+
     public CameraPopupSettingsView()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) => WireIdentify();
+        // 설정 화면이 내려가면(절 이동 · 창 닫힘) 떠 있는 식별 카드를 바로 닫는다.
+        Unloaded += (_, _) => _identify?.CloseAll();
     }
 
     private CameraPopupSettingsViewModel? Vm => DataContext as CameraPopupSettingsViewModel;
+
+    #region - 모니터 식별 카드 -
+    private void WireIdentify()
+    {
+        if (_identifySource is not null) _identifySource.MonitorIdentifyRequested -= OnMonitorIdentifyRequested;
+        _identifySource = Vm;
+        if (_identifySource is not null) _identifySource.MonitorIdentifyRequested += OnMonitorIdentifyRequested;
+        _identify?.CloseAll();
+    }
+
+    /// <summary>뷰모델이 식별 카드를 청했다 — 화면에 붙어 있을 때만 띄운다(떨어진 옛 뷰 · 오프스크린 렌더는 띄우지 않는다).</summary>
+    private void OnMonitorIdentifyRequested(object? sender, IReadOnlyList<MonitorIdentifyCard> cards)
+    {
+        if (!IsLoaded || PresentationSource.FromVisual(this) is null) return;
+        _identify ??= new MonitorIdentifyOverlay(CameraPopupMonitorIdentify.AutomationPrefix);
+        _identify.Show(cards);
+    }
+    #endregion
 
     /// <summary>
     /// 이 뷰의 라디오 묶음 이름 머리. WPF 는 GroupName 과 시각 루트가 같으면 라디오를 서로 끄는데, 창에 붙지 않은 뷰는
@@ -43,7 +68,8 @@ public partial class CameraPopupSettingsView : UserControl
     /// </summary>
     public string GroupScope { get; } = "CameraPopup." + Guid.NewGuid().ToString("N");
 
-    private void OnRefreshMonitors(object sender, RoutedEventArgs e) => Vm?.RefreshMonitors();
+    /// <summary>[다시 조회] — 모니터를 다시 읽고 모니터마다 번호 카드를 띄운다(<see cref="OnMonitorIdentifyRequested"/>).</summary>
+    private void OnRefreshMonitors(object sender, RoutedEventArgs e) => Vm?.RescanMonitors();
 
     /// <summary>[모니터 목록 가져오기] — 기다리지 않는다(뷰모델이 예외 없이 결과를 칸 아래 한 줄로 낸다, FR-27/28).</summary>
     private void OnFetchBrokerMonitors(object sender, RoutedEventArgs e) => _ = Vm?.FetchBrokerMonitorsAsync();
