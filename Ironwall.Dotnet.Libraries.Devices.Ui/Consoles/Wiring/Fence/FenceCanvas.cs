@@ -103,7 +103,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         SnapsToDevicePixels = true;
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
         AutomationProperties.SetAutomationId(this, AUTOMATION_ID);
-        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Ctrl+←/→ 다른 망으로 · Alt+↑/↓ 높이 한 단계 · Shift+Alt+↑/↓ 미세 높이 · Shift+F10 메뉴");
+        AutomationProperties.SetName(this, "펜스 형상 뷰 — 화살표 키로 화면 이동 · Ctrl+←/→ 다른 망으로 · Alt+↑/↓ 높이 한 단계 · Shift+Alt+↑/↓ 미세 높이 · R 돌리기 · F 설치 면 · Shift+F10 메뉴");
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Local);
         // Tab 은 센서 칩 먼저, 망은 한 번에 들어가 화살표로 옮긴다(망 수백 칸을 Tab 으로 지나지 않게).
         KeyboardNavigation.SetTabIndex(_chips, 0);
@@ -1156,7 +1156,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             return true;
         }
 
-        // F = 보는 쪽 뒤집기(FR-20) — 글자를 치는 중이면 건드리지 않는다.
+        // R = 90° 돌리기(⟳) · Shift+R = 반대로(⟲) — 보는 방향(센서 방향 2026-10-01). 글자를 치는 중이면 건드리지 않는다.
+        if (!alt && k == Key.R && modifiers is ModifierKeys.None or ModifierKeys.Shift && focused is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            var target = chip is { Kind: not FenceChipKind.Controller } ? chip.Keys[0] : ReferenceEquals(focused, this) ? vm.FenceSelectedKey : null;
+            if (target is not { } turn) return false;
+            vm.FenceRotate(turn, modifiers == ModifierKeys.Shift ? -1 : 1);
+            if (chip is not null) FocusUnitOf(turn);
+            return true;
+        }
+
+        // F = 설치 면 뒤집기(외부 ↔ 내부 · FR-20) — 글자를 치는 중이면 건드리지 않는다.
         if (!alt && k == Key.F && modifiers == ModifierKeys.None && focused is not System.Windows.Controls.Primitives.TextBoxBase)
         {
             var target = chip is { Kind: not FenceChipKind.Controller } ? chip.Keys[0] : ReferenceEquals(focused, this) ? vm.FenceSelectedKey : null;

@@ -822,8 +822,17 @@ public sealed partial class WiringViewModel
                 entries.Add(new FenceMenuEntry($"같은 종류 센서에만 적용 ({typeName} {same}대)", P + "ApplySameType", () => ApplyMountStyleAsync(FenceApplyScope.SameType, target), placed));
                 entries.Add(new FenceMenuEntry($"선택한 센서에 적용 ({selected.Count}대)", P + "ApplySelected", () => ApplyMountStyleAsync(FenceApplyScope.Selected, target), placed && selected.Count > 0));
                 entries.Add(FenceMenuEntry.Separator(P + "Sep1"));
-                entries.Add(new FenceMenuEntry("방향만 모두 앞으로", P + "FacingFront", () => SetFacingAllAsync(WiringFacing.Front)));
-                entries.Add(new FenceMenuEntry("방향만 모두 뒤로", P + "FacingBack", () => SetFacingAllAsync(WiringFacing.Back)));
+                // 설치 면 · 보는 방향(센서 방향 2026-10-01) — 고른 센서(이 센서가 선택 밖이면 이 센서만). 방향이 없는 종류(펜스 · 지진동)면 끈다.
+                var turnKeys = SelectionFor(target).Where(_board.SupportsFacing).ToList();
+                var canTurn = turnKeys.Count > 0;
+                entries.Add(new FenceMenuEntry("90° 돌리기 ⟳", P + "RotateCw", () => { FenceApplyYaw(turnKeys, 1, null); return Task.CompletedTask; }, canTurn, "R"));
+                entries.Add(new FenceMenuEntry("90° 돌리기 ⟲", P + "RotateCcw", () => { FenceApplyYaw(turnKeys, -1, null); return Task.CompletedTask; }, canTurn, "Shift+R"));
+                entries.Add(new FenceMenuEntry("외부로", P + "SideOutside", () => { FenceSetSide(turnKeys, WiringFacing.Front); return Task.CompletedTask; },
+                                               turnKeys.Any(k => _board.FacingOf(k) != WiringFacing.Front), "F"));
+                entries.Add(new FenceMenuEntry("내부로", P + "SideInside", () => { FenceSetSide(turnKeys, WiringFacing.Back); return Task.CompletedTask; },
+                                               turnKeys.Any(k => _board.FacingOf(k) != WiringFacing.Back), "F"));
+                entries.Add(new FenceMenuEntry("설치 면만 모두 외부로", P + "FacingFront", () => SetFacingAllAsync(WiringFacing.Front)));
+                entries.Add(new FenceMenuEntry("설치 면만 모두 내부로", P + "FacingBack", () => SetFacingAllAsync(WiringFacing.Back)));
                 // 줄(FR-18) — 고른 센서 모두(이 센서가 선택 밖이면 이 센서만)
                 var laneKeys = SelectionFor(target).Where(k => _board.FenceLayout.MountOf(k) is not null).ToList();
                 entries.Add(new FenceMenuEntry("위 줄로", P + "LaneUpper", () => { FenceSetLane(laneKeys, FenceLane.Upper); return Task.CompletedTask; },
@@ -897,7 +906,10 @@ public sealed partial class WiringViewModel
             _ => _board.Chain.Keys.ToList(),
         };
         var (mounts, changedMounts) = FenceLayoutMath.ApplyMountStyle(layout.Mounts, targets, reference.Spot, reference.HeightOffsetM, layout.Panels);
-        var facingTargets = refRow.SupportsFacing ? targets.Where(k => _board.SupportsFacing(k) && _board.FacingOf(k) != refRow.Facing).ToList() : new List<int>();
+        // 설치 면 · 보는 방향도 함께 퍼뜨린다(센서 방향 2026-10-01) — 방향이 있는 센서끼리만.
+        var facingTargets = refRow.SupportsFacing
+            ? targets.Where(k => _board.SupportsFacing(k) && (_board.FacingOf(k) != refRow.Facing || _board.YawOf(k) != refRow.Yaw)).ToList()
+            : new List<int>();
         var changed = changedMounts.Union(facingTargets).Count();
         if (changed == 0)
         {
@@ -905,7 +917,7 @@ public sealed partial class WiringViewModel
             return false;
         }
         var what = $"{SensorMountSpec.SpotText(reference.Spot)}{(reference.HeightOffsetM != 0 ? $" · 높이 {reference.HeightOffsetM:+0.##;-0.##}m" : string.Empty)}"
-                   + (refRow.SupportsFacing ? $" · {FacingName(refRow.Facing)}" : string.Empty);
+                   + (refRow.SupportsFacing ? $" · {OrientationName(refRow.Facing, refRow.Yaw)}" : string.Empty);
         // 자리 종류가 바뀌면 같은 망 안의 앞뒤(기둥 위 → 망 가운데)가 바뀌어 순서 · 번호가 따라 바뀔 수 있다 — 적용 전에 함께 알린다.
         var renumber = NumberChangesIf(mounts);
         if (!await _dialogs.ConfirmAsync("설치 방식 적용",
@@ -916,6 +928,7 @@ public sealed partial class WiringViewModel
 
         _board.PushUndo();
         _board.SetFacing(facingTargets, refRow.Facing);
+        _board.SetYaw(facingTargets, refRow.Yaw);
         _board.ApplyFenceEdit(l => l.WithMounts(mounts));
         SyncAll();
         StatusText = $"설치 방식을 {changed}대에 적용했습니다 — Ctrl+Z 로 한 번에 되돌립니다";

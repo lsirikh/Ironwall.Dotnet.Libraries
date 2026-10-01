@@ -14,7 +14,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 /// <param name="Number">장비 번호(<c>number_device</c> · 저장 대기 값 포함).</param>
 /// <param name="IsNumberChanged">번호가 서버 값과 다른가(저장 대기).</param>
 public sealed record ConceptNodeInfo(int Key, int Id, int Position, int Number, string Name, bool IsIp, string Address,
-                                     SignalLevel Signal, bool IsSelected, bool IsNumberChanged, bool IsDraft);
+                                     SignalLevel Signal, bool IsSelected, bool IsNumberChanged, bool IsDraft, string OrientationText = "");
 
 /// <summary>
 /// 개념도(FR-12) · 통신 신호등(FR-14) · 케이블 보기 토글 — 결선 창 뷰모델의 면.
@@ -122,7 +122,9 @@ public sealed partial class WiringViewModel
             var row = _board.Find(key)!;
             return new ConceptNodeInfo(key, row.Id, i + 1, row.Facts.Number, row.Display, IsIpSensor(key), AddressTextOf(key), SensorSignal(key),
                                        IsFenceSelected(key), row.Facts.Number != row.Baseline.Number,
-                                       row.IsNew || row.FactsChanged || !WiringSpec.SameWiring(_board.PlacementOf(key), row.BaselinePlacement));
+                                       row.IsNew || row.FactsChanged || !WiringSpec.SameWiring(_board.PlacementOf(key), row.BaselinePlacement),
+                                       // 개념도는 깨끗하게 — 설치 면(외/내) · 보는 방향은 툴팁 · 이름에만(센서 방향 2026-10-01)
+                                       row.SupportsFacing ? $"{WiringYawMath.SideText(row.Facing)} · {WiringYawMath.LongText(row.Yaw)}" : string.Empty);
         }).ToList();
 
     #endregion

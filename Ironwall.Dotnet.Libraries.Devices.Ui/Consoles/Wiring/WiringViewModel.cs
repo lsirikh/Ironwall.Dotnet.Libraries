@@ -655,10 +655,10 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                     lines.Add($"번호순 제안 {suggested.Count}건 — 저장된 자리가 없던 센서를 장비번호 순으로 붙인 자리입니다: {Places(suggested)}");
                 if (byKind.TryGetValue((WiringProposalKind)(-1), out var edited))
                     lines.Add($"결선이 바뀐 줄 {edited.Count}: {Places(edited)}");
-                var turned = diff.WiringChanged.Where(r => _board.FacingChanged(r.Key)).ToList();
+                var turned = diff.WiringChanged.Where(r => _board.OrientationChanged(r.Key)).ToList();
                 if (turned.Count > 0)
-                    lines.Add($"방향 바뀜 {turned.Count}건 — 자리는 그대로 두고 보는 쪽만 바꿉니다: "
-                              + string.Join(", ", turned.Take(8).Select(r => $"{r.Display}({FacingName(r.BaselinePlacement!.Facing)}→{FacingName(r.Facing)})"))
+                    lines.Add($"방향 바뀜 {turned.Count}건 — 자리는 그대로 두고 설치 면 · 보는 방향만 바꿉니다: "
+                              + string.Join(", ", turned.Take(8).Select(r => $"{r.Display}({OrientationName(r.BaselinePlacement!.Facing, r.BaselinePlacement.Yaw)}→{OrientationName(r.Facing, r.Yaw)})"))
                               + (turned.Count > 8 ? $" 외 {turned.Count - 8}" : string.Empty));
                 if (_board.Shape == WiringShape.Ring && moved.Any(r => r.BaselinePlacement is not null))
                     lines.Add("링 위치가 바뀌면 이미 기록된 장애 고장 구간 번호가 가리키는 센서가 달라집니다.");

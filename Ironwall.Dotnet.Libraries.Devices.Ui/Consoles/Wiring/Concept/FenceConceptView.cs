@@ -180,7 +180,9 @@ public sealed class FenceConceptView : Grid
             chip.Picture = ConceptScene.Node(node, point.Lane, geometry.Mode, geometry.Chip, node.IsSelected);
             Place(chip, point.Center);
             var ip = node.IsIp ? $", IP {node.Address}" : $", 노드 주소 {node.Address}";
-            AutomationProperties.SetName(chip, $"#{node.Position} {node.Name}, {WiringViewModel.LaneText(point.Lane)}, 번호 {node.Number}{ip}, 통신 {SignalMath.Text(node.Signal)}");
+            var orientation = node.OrientationText.Length > 0 ? $", {node.OrientationText}" : string.Empty;
+            AutomationProperties.SetName(chip, $"#{node.Position} {node.Name}, {WiringViewModel.LaneText(point.Lane)}, 번호 {node.Number}{ip}, 통신 {SignalMath.Text(node.Signal)}{orientation}");
+            ToolTipService.SetToolTip(chip, $"{node.Name} · 번호 {node.Number}{(node.OrientationText.Length > 0 ? $" · {node.OrientationText}" : string.Empty)}");
             AutomationProperties.SetItemStatus(chip, node.IsSelected ? "선택됨" : string.Empty);
             order.Add(chip);
 

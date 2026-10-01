@@ -70,7 +70,8 @@ public sealed record FenceSensor(
     bool IsSuggested,
     bool IsChanged,
     bool IsDuplicateNumber,
-    WiringFacing Facing = WiringFacing.Front)
+    WiringFacing Facing = WiringFacing.Front,
+    WiringYaw Yaw = WiringYaw.Away)
 {
     public FenceKind Kind => FenceWorld.KindOf(Type);
 

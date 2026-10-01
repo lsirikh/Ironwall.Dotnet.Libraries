@@ -22,10 +22,11 @@ public sealed record SensorFacts(int Number, string Name, string TypeText, strin
 public sealed class WiringSensorRow
 {
     internal WiringSensorRow(int key, int id, int? channel, SensorFacts facts, WiringPlacement? placement, string? loadIssue,
-                             IEnumerable<int>? groups = null, WiringFacing? facing = null)
+                             IEnumerable<int>? groups = null, WiringFacing? facing = null, WiringYaw? yaw = null)
     {
         Key = key;
         Facing = facing ?? placement?.Facing ?? WiringFacing.Front;
+        Yaw = yaw ?? placement?.Yaw ?? WiringYaw.Away;
         Id = id;
         Channel = channel;
         Facts = facts;
@@ -52,6 +53,9 @@ public sealed class WiringSensorRow
     /// 보는 쪽(FR-20 · Draft) — 기둥 센서(스마트 · 복합)만 바꿀 수 있다. 저장값에 없으면 앞. 기준은 <see cref="BaselinePlacement"/> 의 <c>Facing</c>.
     /// </summary>
     public WiringFacing Facing { get; internal set; }
+
+    /// <summary>보는 방향(90° 단계 · Draft) — 설치 면과 따로. 방향이 있는 센서만 바꿀 수 있다. 저장값에 없으면 0°.</summary>
+    public WiringYaw Yaw { get; internal set; }
 
     /// <summary>이 줄이 보는 쪽을 가질 수 있는가(스마트 복합 · 복합).</summary>
     public bool SupportsFacing => WiringTopology.SupportsFacing(WiringTopology.ParseSensorType(Facts.TypeText));
@@ -296,11 +300,18 @@ public sealed class WiringBoard
     {
         if (Find(key) is not { } row) return null;
         var at = _pending ? row.BaselinePlacement : DisplayPlacementOf(key);
-        return at is null ? null : at with { Facing = row.Facing };
+        return at is null ? null : at with { Facing = row.Facing, Yaw = row.Yaw };
     }
 
     /// <summary>그 센서가 보는 쪽(모르는 키는 앞).</summary>
     public WiringFacing FacingOf(int key) => Find(key)?.Facing ?? WiringFacing.Front;
+
+    /// <summary>그 센서가 보는 방향(모르는 키는 0°).</summary>
+    public WiringYaw YawOf(int key) => Find(key)?.Yaw ?? WiringYaw.Away;
+
+    /// <summary>설치 면 또는 보는 방향이 저장 기준과 다른가(미리보기 "방향 바뀜").</summary>
+    public bool OrientationChanged(int key)
+        => Find(key) is { BaselinePlacement: { } before } && PlacementOf(key) is { } now && (now.Facing != before.Facing || now.Yaw != before.Yaw);
 
     /// <summary>그 센서가 보는 쪽을 가질 수 있는가(FR-20).</summary>
     public bool SupportsFacing(int key) => Find(key)?.SupportsFacing == true;
@@ -402,7 +413,7 @@ public sealed class WiringBoard
                            .OrderBy(s => s.Placement!.Order).ThenBy(s => s.Id).ToList();
         leftCount = left.Count;
         var joined = left.Concat(right)
-                         .Select((s, i) => s with { Placement = new WiringPlacement(WiringSpec.LINE_PRIMARY, i + 1, s.Placement!.Facing) })
+                         .Select((s, i) => s with { Placement = new WiringPlacement(WiringSpec.LINE_PRIMARY, i + 1, s.Placement!.Facing, s.Placement.Yaw) })
                          .ToList();
         return joined.Concat(sensors.Where(s => s.Placement is null));
     }
@@ -549,6 +560,34 @@ public sealed class WiringBoard
         {
             if (Find(key) is not { SupportsFacing: true } row || row.Facing == facing) continue;
             row.Facing = facing;
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>보는 방향을 정한다(90° 단계) — 방향이 있는 줄만. 바뀐 줄 수. 되돌리기 한 걸음은 부르는 쪽이 찍는다.</summary>
+    public int SetYaw(IEnumerable<int> keys, WiringYaw yaw)
+    {
+        var changed = 0;
+        foreach (var key in (keys ?? Enumerable.Empty<int>()).Distinct())
+        {
+            if (Find(key) is not { SupportsFacing: true } row || row.Yaw == yaw) continue;
+            row.Yaw = yaw;
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>보는 방향을 저마다 <paramref name="steps"/> × 90° 돌린다 — 방향이 있는 줄만. 바뀐 줄 수.</summary>
+    public int RotateYaw(IEnumerable<int> keys, int steps)
+    {
+        var changed = 0;
+        foreach (var key in (keys ?? Enumerable.Empty<int>()).Distinct())
+        {
+            if (Find(key) is not { SupportsFacing: true } row) continue;
+            var next = WiringYawMath.Rotate(row.Yaw, steps);
+            if (next == row.Yaw) continue;
+            row.Yaw = next;
             changed++;
         }
         return changed;
@@ -863,7 +902,7 @@ public sealed class WiringBoard
         var old = Find(key);
         if (old is null || newId <= 0) return null;
 
-        var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups, old.Facing);
+        var promoted = new WiringSensorRow(key, newId, old.Channel, old.Facts, PlacementOf(key), null, old.Groups, old.Facing, old.Yaw);
         promoted.CopyGroupBaselineFrom(old);
         _rows[_rows.IndexOf(old)] = promoted;
         return promoted;
@@ -917,6 +956,7 @@ public sealed class WiringBoard
         IReadOnlyList<SensorFacts> Facts,
         IReadOnlyList<string?> LoadIssues,
         IReadOnlyList<WiringFacing> Facings,
+        IReadOnlyList<WiringYaw> Yaws,
         WiringChain Chain,
         bool Pending,
         bool AppliedByEdit,
@@ -925,7 +965,7 @@ public sealed class WiringBoard
 
     private Snapshot Capture()
         => new(_rows.ToList(), _rows.Select(r => r.Facts).ToList(), _rows.Select(r => r.LoadIssue).ToList(), _rows.Select(r => r.Facing).ToList(),
-               _chain, _pending, ProposalsAppliedByEdit, new Dictionary<int, WiringProposalKind>(_proposals), _fence);
+               _rows.Select(r => r.Yaw).ToList(), _chain, _pending, ProposalsAppliedByEdit, new Dictionary<int, WiringProposalKind>(_proposals), _fence);
 
     private void Restore(Snapshot snapshot)
     {
@@ -936,6 +976,7 @@ public sealed class WiringBoard
             row.Facts = snapshot.Facts[i];      // 같은 객체를 되살린다 — 화면이 쥔 항목이 끊기지 않는다
             row.LoadIssue = snapshot.LoadIssues[i];
             row.Facing = snapshot.Facings[i];
+            row.Yaw = snapshot.Yaws[i];
             _rows.Add(row);
         }
         _chain = snapshot.Chain;

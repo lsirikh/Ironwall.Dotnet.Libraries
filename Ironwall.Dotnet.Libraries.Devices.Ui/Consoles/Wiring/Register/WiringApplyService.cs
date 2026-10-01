@@ -318,7 +318,7 @@ public sealed class WiringApplyService
         if (!WiringSpec.SamePlacement(serverPlacement, row.ServerPlacement))
             return $"자리를 바꿨습니다({Describe(row.ServerPlacement)} → {Describe(serverPlacement)})";
         if (!WiringSpec.SameWiring(serverPlacement, row.ServerPlacement))
-            return $"방향을 바꿨습니다({FacingName(row.ServerPlacement!.Facing)} → {FacingName(serverPlacement!.Facing)})";
+            return $"방향을 바꿨습니다({FacingName(row.ServerPlacement!.Facing)} · {WiringYawMath.LongText(row.ServerPlacement.Yaw)} → {FacingName(serverPlacement!.Facing)} · {WiringYawMath.LongText(serverPlacement.Yaw)})";
 
         if (server.NumberDevice != row.Baseline.Number)
             return $"번호를 바꿨습니다({row.Baseline.Number} → {server.NumberDevice})";
@@ -404,7 +404,7 @@ public sealed class WiringApplyService
 
     private static string Describe(WiringPlacement? placement) => placement?.Text ?? "미배치";
 
-    private static string FacingName(WiringFacing facing) => facing == WiringFacing.Back ? "뒤(펜스 내부)" : "앞(펜스 외부)";
+    private static string FacingName(WiringFacing facing) => facing == WiringFacing.Back ? "펜스 내부" : "펜스 외부";
 
     private static string Text<T>(ApiResponse<T> response, string fallback)
         => ApiErrorTextHelper.FromFieldErrorsMultiline(response.Error)

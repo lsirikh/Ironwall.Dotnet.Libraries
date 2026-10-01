@@ -1,11 +1,13 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 
 /// <summary>
-/// 기둥에 다는 센서가 보는 쪽(wiring-fence-view FR-20) — 스마트 복합센서 · 복합센서만 쓴다.
+/// 기둥에 다는 센서의 <b>설치 면</b>(wiring-fence-view FR-20 · 센서 방향 2026-10-01) — 펜스의 어느 쪽에 다는가. 스마트 복합센서 · 복합센서만 쓴다.
 /// 펜스센서(철망 가운데) · 지진동센서(땅속)는 방향이 없어 늘 <see cref="Front"/> 로 둔다(저장에도 싣지 않는다).
+/// 서버 값 <c>spec.wiring.facing</c> 의 뜻은 그대로다(front = 외부 · back = 내부) — 옛 값이 같은 모습으로 읽힌다.
 /// </summary>
 public enum WiringFacing
 {
@@ -16,12 +18,62 @@ public enum WiringFacing
 }
 
 /// <summary>
+/// 센서가 <b>보는 방향</b>(펜스 기준 90° 단계 · 센서 방향 2026-10-01) — 설치 면과 따로다. 값은 각도(°)다.
+/// 방향은 <b>펜스 모양</b>에 묶는다(제어기 위치를 바꿔도 센서가 돌지 않게) — 정방향 = 망 번호가 커지는 쪽(그림 오른쪽).
+/// </summary>
+public enum WiringYaw
+{
+    /// <summary>0° — 설치 면에서 펜스 반대쪽 정면(지금까지의 모습 · 기본).</summary>
+    Away = 0,
+    /// <summary>90° — 펜스를 따라 정방향(망 번호가 커지는 쪽 · 그림 오른쪽).</summary>
+    Along = 90,
+    /// <summary>180° — 펜스 쪽(드묾).</summary>
+    Toward = 180,
+    /// <summary>270° — 펜스를 따라 역방향(망 1 쪽 · 그림 왼쪽).</summary>
+    Against = 270,
+}
+
+/// <summary>보는 방향 계산 — 순수 함수.</summary>
+public static class WiringYawMath
+{
+    /// <summary>네 방향(0 · 90 · 180 · 270 차례).</summary>
+    public static readonly IReadOnlyList<WiringYaw> All = new[] { WiringYaw.Away, WiringYaw.Along, WiringYaw.Toward, WiringYaw.Against };
+
+    /// <summary><paramref name="steps"/> × 90° 돌린다(+ = 시계 방향 ⟳ · 위에서 볼 때).</summary>
+    public static WiringYaw Rotate(WiringYaw yaw, int steps) => FromDegrees((int)yaw + 90 * steps);
+
+    /// <summary>각도 → 가장 가까운 90° 단계(음수 · 360 넘는 값도 감는다). 숫자가 아니면 0°.</summary>
+    public static WiringYaw FromDegrees(double degrees)
+    {
+        if (!double.IsFinite(degrees)) return WiringYaw.Away;
+        var snapped = (int)Math.Round(degrees / 90.0, MidpointRounding.AwayFromZero) * 90;
+        return (WiringYaw)(((snapped % 360) + 360) % 360);
+    }
+
+    /// <summary>한국어 이름 — 정면 · 정방향 · 펜스 쪽 · 역방향.</summary>
+    public static string Text(WiringYaw yaw) => yaw switch
+    {
+        WiringYaw.Along => "정방향",
+        WiringYaw.Toward => "펜스 쪽",
+        WiringYaw.Against => "역방향",
+        _ => "정면",
+    };
+
+    /// <summary>"정방향(90°)".</summary>
+    public static string LongText(WiringYaw yaw) => $"{Text(yaw)}({(int)yaw}°)";
+
+    /// <summary>설치 면 이름 — "외부" · "내부".</summary>
+    public static string SideText(WiringFacing facing) => facing == WiringFacing.Back ? "내부" : "외부";
+}
+
+/// <summary>
 /// 센서 한 대의 결선 자리 — <b>어느 선의 몇 번째</b>(WS L466 · wiring-fence-view FR-01) · 그리고 기둥 센서가 <b>보는 쪽</b>(FR-20).
 /// </summary>
 /// <param name="Line">링 · 한 줄은 늘 1(체인 위치). 양쪽 가지는 1 = 왼쪽 · 2 = 오른쪽. 옛 N04 저장값의 2 는 "2차 선"이었다(불러올 때 한 줄로 바꾼다).</param>
 /// <param name="Order">링: Sensor A 쪽 끝에서 센 체인 위치 · 한 줄 · 가지: 제어기 쪽에서 센 자리(1부터).</param>
-/// <param name="Facing">보는 쪽 — 저장값에 없으면 앞(FR-20). 위치 비교(<see cref="WiringSpec.SamePlacement"/>)는 이 값을 보지 않는다.</param>
-public sealed record WiringPlacement(int Line, int Order, WiringFacing Facing = WiringFacing.Front)
+/// <param name="Facing">설치 면(외부 · 내부) — 저장값에 없으면 외부(FR-20). 위치 비교(<see cref="WiringSpec.SamePlacement"/>)는 이 값을 보지 않는다.</param>
+/// <param name="Yaw">보는 방향(90° 단계) — 저장값에 없으면 0°(옛 v1 ~ v3 값).</param>
+public sealed record WiringPlacement(int Line, int Order, WiringFacing Facing = WiringFacing.Front, WiringYaw Yaw = WiringYaw.Away)
 {
     public bool IsPrimary => Line == WiringSpec.LINE_PRIMARY;
 
@@ -78,6 +130,12 @@ public static class WiringSpec
     public const string FACING_BACK = "back";
 
     /// <summary>
+    /// 보는 방향(센서 방향 2026-10-01) — <c>"yaw": 0 | 90 | 180 | 270</c>(°). <c>facing</c> 과 함께 <b>늘 명시해</b> 싣는다(RFC 7396 병합 — 빼면 옛 값이 남는다).
+    /// 읽을 때 없으면 0°(v1 ~ v3), 다른 각도면 가장 가까운 90° 단계. 형식 판(<c>v</c>)은 올리지 않는다(키 하나 더 — 옛 클라이언트는 모르는 키를 둔다).
+    /// </summary>
+    public const string YAW_KEY = "yaw";
+
+    /// <summary>
     /// 순번의 상한 — 읽기 · 검증이 이보다 큰 값을 "범위 밖"으로 본다. 링 체인은 칸 상한이 없고
     /// 펜스센서는 제어기 한 대에 수백 대가 붙는다(카탈로그: 1km = 펜스 400 · PRD FR-18) — 넉넉하되 유한한 값이다
     /// (옛 64 는 N04 의 칸 상한이었다).
@@ -98,8 +156,15 @@ public static class WiringSpec
         if (line is not (LINE_PRIMARY or LINE_SECONDARY)) return null;
         if (order < 1 || order > MAX_ORDER) return null;
 
-        return new WiringPlacement(line.Value, order.Value, ReadFacing(wiring));
+        return new WiringPlacement(line.Value, order.Value, ReadFacing(wiring), ReadYaw(wiring));
     }
+
+    /// <summary>보는 방향 — 없거나 숫자가 아니면 0°(옛 값), 그 밖은 가장 가까운 90° 단계.</summary>
+    public static WiringYaw ReadYaw(JObject? wiring)
+        => wiring?[YAW_KEY] is { } token && token.Type is JTokenType.Integer or JTokenType.Float or JTokenType.String
+           && double.TryParse(token.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var degrees)
+            ? WiringYawMath.FromDegrees(degrees)
+            : WiringYaw.Away;
 
     /// <summary>보는 쪽 — <c>"back"</c> 만 뒤, 없거나 그 밖이면 앞(FR-20).</summary>
     public static WiringFacing ReadFacing(JObject? wiring)
@@ -197,7 +262,11 @@ public static class WiringSpec
         if (shape is not null) node[VERSION_KEY] = FORMAT_VERSION;     // v3 — 모양은 싣지 않는다(모든 제어기가 링 · §1-0)
         node[LINE_KEY] = placement.Line;
         node[ORDER_KEY] = placement.Order;
-        if (includeFacing) node[FACING_KEY] = FacingText(placement.Facing);
+        if (includeFacing)
+        {
+            node[FACING_KEY] = FacingText(placement.Facing);
+            node[YAW_KEY] = (int)placement.Yaw;
+        }
         return node;
     }
 
@@ -210,7 +279,7 @@ public static class WiringSpec
     /// 자리가 없으면(미배치) 보는 쪽은 싣지 않으므로 비교하지 않는다.
     /// </summary>
     public static bool SameWiring(WiringPlacement? a, WiringPlacement? b)
-        => SamePlacement(a, b) && (a is null || a.Facing == b!.Facing);
+        => SamePlacement(a, b) && (a is null || (a.Facing == b!.Facing && a.Yaw == b.Yaw));
 
     private static int? AsInt(JToken? token) => token?.Type switch
     {

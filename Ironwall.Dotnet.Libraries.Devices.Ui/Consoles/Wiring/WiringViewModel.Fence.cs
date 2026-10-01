@@ -173,7 +173,8 @@ public sealed partial class WiringViewModel
                 _board.IsProposed(row.Key),
                 !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement),
                 duplicates.Contains(row.Key),
-                row.Facing);
+                row.Facing,
+                row.Yaw);
         }
         return result;
     }
@@ -415,9 +416,9 @@ public sealed partial class WiringViewModel
         {
             if (!HasFacingRow) return string.Empty;
             if (FacingTargets().Count == 0) return "펜스센서는 철망 가운데 · 지진동센서는 땅속 — 방향이 없습니다";
-            if (IsSelectedBack) return "뒤(펜스 내부)를 봅니다 — F 로 뒤집기";
-            if (IsSelectedFront) return "앞(펜스 외부)을 봅니다 — F 로 뒤집기";
-            return "고른 센서의 방향이 섞여 있습니다 — 누른 쪽으로 맞춥니다";
+            var side = IsSelectedBack ? "펜스 내부에 답니다" : IsSelectedFront ? "펜스 외부에 답니다" : "설치 면이 섞여 있습니다";
+            var yaw = SelectedYaw is { } y ? $"{WiringYawMath.LongText(y)}을 봅니다" : "보는 방향이 섞여 있습니다";
+            return $"{side} · {yaw} — F 면 뒤집기 · R / Shift+R 돌리기";
         }
     }
 
@@ -479,7 +480,67 @@ public sealed partial class WiringViewModel
         return true;
     }
 
-    internal static string FacingName(WiringFacing facing) => facing == WiringFacing.Back ? "뒤(펜스 내부)" : "앞(펜스 외부)";
+    internal static string FacingName(WiringFacing facing) => facing == WiringFacing.Back ? "펜스 내부" : "펜스 외부";
+
+    /// <summary>"펜스 외부 · 정방향(90°)".</summary>
+    internal static string OrientationName(WiringFacing facing, WiringYaw yaw) => $"{FacingName(facing)} · {WiringYawMath.LongText(yaw)}";
+    #endregion
+
+    #region - Yaw (보는 방향 · 센서 방향 2026-10-01) -
+    /// <summary>고른 방향 센서의 보는 방향이 모두 같으면 그것.</summary>
+    public WiringYaw? SelectedYaw => FacingTargets().Select(_board.YawOf).Distinct().ToList() is { Count: 1 } one ? one[0] : null;
+
+    public bool IsYawAway => SelectedYaw == WiringYaw.Away;
+    public bool IsYawAlong => SelectedYaw == WiringYaw.Along;
+    public bool IsYawToward => SelectedYaw == WiringYaw.Toward;
+    public bool IsYawAgainst => SelectedYaw == WiringYaw.Against;
+
+    /// <summary>방향 고르개 가운데 글자 — "정방향 90°" · 섞였으면 "여러 값".</summary>
+    public string SelectedYawText => SelectedYaw is { } y ? $"{WiringYawMath.Text(y)} {(int)y}°" : FacingTargets().Count > 0 ? MULTI_VALUE : "—";
+
+    /// <summary>[⟳ 90°] · [⟲ 90°] — 고른 방향 센서를 저마다 90° 돌린다. 되돌리기 한 걸음.</summary>
+    public bool FenceRotateSelected(int steps) => FenceApplyYaw(FacingTargets(), steps, null);
+
+    /// <summary>방향 고르개(정면 · 정방향 · 펜스 쪽 · 역방향) — 고른 방향 센서를 모두 그 방향으로. 되돌리기 한 걸음.</summary>
+    public bool FenceSetYaw(WiringYaw yaw) => FenceApplyYaw(FacingTargets(), 0, yaw);
+
+    /// <summary>
+    /// 키 R(+90°) · Shift+R(−90°) — 그 센서(여럿을 골랐고 그 안이면 고른 것 전부)를 돌린다. 방향이 없는 종류는 건너뛴다.
+    /// </summary>
+    public bool FenceRotate(int key, int steps)
+    {
+        var keys = (_fenceSelection.Count > 1 && _fenceSelection.Contains(key) ? _fenceSelection.ToList() : new List<int> { key })
+                   .Where(_board.SupportsFacing).ToList();
+        if (keys.Count == 0)
+        {
+            StatusText = "펜스센서 · 지진동센서는 방향이 없습니다(철망 가운데 · 땅속).";
+            return false;
+        }
+        return FenceApplyYaw(keys, steps, null);
+    }
+
+    /// <summary>메뉴 "외부로" · "내부로" — 고른 센서(이 센서가 선택 밖이면 이 센서만).</summary>
+    public bool FenceSetSide(IReadOnlyList<int> keys, WiringFacing facing) => FenceSetFacing((keys ?? Array.Empty<int>()).Where(_board.SupportsFacing).ToList(), facing);
+
+    private bool FenceApplyYaw(IReadOnlyList<int> keys, int steps, WiringYaw? to)
+    {
+        if (IsBusy || keys.Count == 0) return false;
+        _board.PushUndo();
+        var changed = to is { } yaw ? _board.SetYaw(keys, yaw) : _board.RotateYaw(keys, steps);
+        if (changed == 0)
+        {
+            _board.Undo();
+            StatusText = to is { } y ? $"바뀐 것이 없습니다 — 이미 {WiringYawMath.LongText(y)}" : "바뀐 것이 없습니다.";
+            return false;
+        }
+        SyncAll();
+        var who = keys.Count > 1 ? $"{keys.Count}대" : _board.Find(keys[0])?.Display;
+        var what = to is { } target ? WiringYawMath.LongText(target)
+                 : keys.Count == 1 ? $"{(steps > 0 ? "⟳" : "⟲")} {WiringYawMath.LongText(_board.YawOf(keys[0]))}"
+                 : $"{(steps > 0 ? "⟳" : "⟲")} 90° 씩";
+        StatusText = $"보는 방향 — {who}: {what} · Ctrl+Z 로 되돌립니다";
+        return true;
+    }
     #endregion
 
     public bool IsSelectedPlaced => SelectedFenceRow is { } r && _board.Chain.Contains(r.Key);
@@ -511,6 +572,7 @@ public sealed partial class WiringViewModel
             nameof(CanStepSelectedForward), nameof(EnclosureGapText), nameof(FenceCountsText), nameof(HasRangeSensors),
             nameof(FenceSelectedKeys), nameof(HasMultiSelection), nameof(MultiSelectionText),
             nameof(HasFacingRow), nameof(CanChooseFacing), nameof(IsSelectedFront), nameof(IsSelectedBack), nameof(FacingNote),
+            nameof(SelectedYaw), nameof(IsYawAway), nameof(IsYawAlong), nameof(IsYawToward), nameof(IsYawAgainst), nameof(SelectedYawText),
             nameof(SelectedAddressLabel), nameof(SelectedAddressText), nameof(FencePaneKind), nameof(HasAnySelection), nameof(HasPanelSelection),
             nameof(ControllerSignal), nameof(ControllerSignalText), nameof(BandText), nameof(HasBands), nameof(ConceptTitle), nameof(HasIpSensors),
         }) NotifyOfPropertyChange(name);
