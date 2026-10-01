@@ -1103,6 +1103,34 @@
 										Text="{Binding FenceNoticeText}"
 										TextWrapping="Wrap" />
 								</Border>
+								<!--  번호 대역 미설정(fence-wiring-editor FR-10) — 번호가 위치 순서와 어긋나 보여도 저절로 고치지 않는다. 고르는 곳으로 바로 간다  -->
+								<Border
+									Margin="0,0,0,8"
+									Padding="10,6"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									BorderBrush="{DynamicResource StatusInfoBrush}"
+									BorderThickness="3,0,0,0"
+									CornerRadius="0,6,6,0"
+									Visibility="{Binding HasNoBandsNotice, Converter={StaticResource BoolToVisibility}}">
+									<DockPanel LastChildFill="True">
+										<Button
+											Margin="8,0,0,0"
+											Padding="10,0"
+											MinWidth="0"
+											AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Choose"
+											Click="OnChooseBands"
+											Content="대역 고르기"
+											DockPanel.Dock="Right"
+											Style="{StaticResource Console.Button}"
+											ToolTip="오른쪽 칸에 번호 대역(2차 · 3차 · 4차 · 직접 설정)을 엽니다" />
+										<TextBlock
+											VerticalAlignment="Center"
+											AutomationProperties.AutomationId="Devices.Wiring.Fence.Band.Missing"
+											FontSize="12"
+											Text="{Binding NoBandsNoticeText}"
+											TextWrapping="Wrap" />
+									</DockPanel>
+								</Border>
 								<!--  체인을 고치다가 제안을 함께 적용함(F-2b H2)  -->
 								<Border
 									Margin="0,0,0,8"
@@ -1407,7 +1435,7 @@
 													<ColumnDefinition Width="30" />
 												</Grid.ColumnDefinitions>
 												<TextBlock HorizontalAlignment="Center" Grid.Column="1" Style="{StaticResource W.ColHead}" Text="위치" />
-												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="A · B 번호" />
+												<TextBlock Grid.Column="2" Style="{StaticResource W.ColHead}" Text="Ch1 · Ch2 번호" ToolTip="두 포트에서 센 자리 — Ch1 = A 쪽 · Ch2 = B 쪽 (예: 1 · 50 = Ch1 에서 1번째 · Ch2 에서 50번째)" />
 												<TextBlock Grid.Column="3" Style="{StaticResource W.ColHead}" Text="이름" />
 												<TextBlock Grid.Column="4" Style="{StaticResource W.ColHead}" Text="장비번호" />
 												<TextBlock Grid.Column="5" Style="{StaticResource W.ColHead}" Text="종류" />
@@ -1768,7 +1796,7 @@
 											</StackPanel>
 											<TextBlock Grid.Row="4" Style="{StaticResource W.Hint}" Text="체인 위치" />
 											<TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,4" Text="{Binding SelectedPositionText}" TextWrapping="Wrap" />
-											<TextBlock Grid.Row="5" Style="{StaticResource W.Hint}" Text="A · B 번호" Visibility="{Binding HasSelectedPort, Converter={StaticResource BoolToVisibility}}" />
+											<TextBlock Grid.Row="5" Style="{StaticResource W.Hint}" Text="Ch1 · Ch2 번호" ToolTip="두 포트에서 센 자리 — Ch1 = A · Ch2 = B" Visibility="{Binding HasSelectedPort, Converter={StaticResource BoolToVisibility}}" />
 											<TextBlock
 												Grid.Row="5"
 												Grid.Column="1"
@@ -1820,6 +1848,40 @@
 												</StackPanel>
 											</UniformGrid>
 											<TextBlock Margin="0,3,0,0" Style="{StaticResource W.Hint}" Text="오른쪽 클릭 → &quot;이 설치 방식을 이 제어기 모든 센서에 적용&quot;으로 퍼뜨립니다" />
+											<!--  망 이동(FR-05 의 단추 · 키보드 대신) — ◀ ▶ 한 칸(빈 망도 한 칸) · 번호를 적고 Enter · Alt+Shift+← →  -->
+											<TextBlock Margin="0,8,0,0" Style="{StaticResource W.Hint}" Text="{Binding MountPanelLabel}" />
+											<StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+												<Button
+													Width="32"
+													MinWidth="0"
+													Padding="0"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.PanelPrev"
+													AutomationProperties.Name="앞 망으로"
+													Click="OnMountPanelPrev"
+													Content="◀"
+													Style="{StaticResource Console.Button}"
+													ToolTip="앞(Ch1 쪽) 망 · 기둥으로 한 칸 (Alt+Shift+←)" />
+												<TextBox
+													Width="56"
+													Margin="4,0"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.PanelNumber"
+													AutomationProperties.Name="망 번호"
+													KeyDown="OnMountPanelKey"
+													LostKeyboardFocus="OnMountPanelLostFocus"
+													Style="{StaticResource W.TextBox}"
+													Text="{Binding MountPanelText, UpdateSourceTrigger=PropertyChanged}"
+													TextAlignment="Center" />
+												<Button
+													Width="32"
+													MinWidth="0"
+													Padding="0"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Mount.PanelNext"
+													AutomationProperties.Name="뒤 망으로"
+													Click="OnMountPanelNext"
+													Content="▶"
+													Style="{StaticResource Console.Button}"
+													ToolTip="뒤(Ch2 쪽) 망 · 기둥으로 한 칸 (Alt+Shift+→)" />
+											</StackPanel>
 										</StackPanel>
 
 										<!--

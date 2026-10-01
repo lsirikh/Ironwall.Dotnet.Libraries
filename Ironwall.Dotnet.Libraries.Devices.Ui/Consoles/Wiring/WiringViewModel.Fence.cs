@@ -126,7 +126,8 @@ public sealed partial class WiringViewModel
     public IReadOnlyList<double> FenceSpacingChoices => WiringSpacingTable.FenceChoices;
 
     /// <summary>
-    /// 펜스센서 현장 간격(m) — 바꾸면 그림만 다시 놓인다. <b>바뀐 줄 · 되돌리기와 무관</b>하고 서버에 싣지 않는다(O-10).
+    /// 펜스센서 현장 간격(m) — 바꾸면 그림이 다시 놓인다. 서버 바뀐 줄 · 되돌리기와는 무관하고 서버에 싣지 않는다(O-10) —
+    /// 펜스 구성이 켜져 있으면 로컬 문서(<c>fence_spacing_m</c>)에 실리므로 <b>그것만으로 로컬 저장 대상</b>이다.
     /// </summary>
     public double FenceSpacingMetres
     {
@@ -136,9 +137,12 @@ public sealed partial class WiringViewModel
             if (!_board.SetFenceSpacing(value)) return;
             NotifyOfPropertyChange();
             NotifyOfPropertyChange(nameof(FenceSpacing));
-            StatusText = $"펜스센서 간격 {FenceSpacingMetres:0.#}m 로 다시 놓았습니다 — 그림만 바뀌고 저장 대상은 아닙니다.";
+            StatusText = HasLocalChanges
+                ? $"펜스센서 간격 {FenceSpacingMetres:0.#}m 로 다시 놓았습니다 — [저장하기] 를 누르면 이 PC 의 펜스 구성에 저장됩니다."
+                : $"펜스센서 간격 {FenceSpacingMetres:0.#}m 로 다시 놓았습니다 — 그림만 바뀌고 저장 대상은 아닙니다.";
             RefreshIssues();
             SyncLines();
+            RefreshCommands();
             RaiseFence();
         }
     }
@@ -336,9 +340,9 @@ public sealed partial class WiringViewModel
         }
     }
 
-    /// <summary>링의 A · B 번호(1차 · 2차 번호). 링이 아니면 빈 글자.</summary>
+    /// <summary>링의 Ch1 · Ch2 번호(1차 · 2차 번호) — "1 · 50"(A · B 는 별칭으로만). 링이 아니면 빈 글자.</summary>
     public string SelectedPortText => SelectedFenceRow is { } r && _board.NumberOf(r.Key) is { OppositeOrder: { } b } n
-        ? $"A{n.Order} · B{b} — {WiringValidation.PORT_1} 에서 {n.Order}번째 · {WiringValidation.PORT_2} 에서 {b}번째"
+        ? $"{n.Order} · {b} — {WiringValidation.PORT_1} 에서 {n.Order}번째 · {WiringValidation.PORT_2} 에서 {b}번째"
         : string.Empty;
 
     public bool HasSelectedPort => SelectedPortText.Length > 0;

@@ -184,14 +184,15 @@ internal sealed class WiringPreview
     /// <summary>미리보기 로컬 저장소 — 메모리에만 쥔다(로컬 DB 없음).</summary>
     private sealed class PreviewFenceStore : IFenceLayoutStore
     {
-        private readonly Dictionary<int, FenceLayoutDocument> _documents = new();
+        private readonly Dictionary<FenceLayoutKey, FenceLayoutDocument> _documents = new();
 
-        public Task<FenceLayoutDocument?> LoadAsync(int controllerId, CancellationToken token = default)
-            => Task.FromResult(_documents.TryGetValue(controllerId, out var d) ? d : null);
+        public Task<FenceLayoutLoadResult> LoadAsync(FenceLayoutKey key, CancellationToken token = default)
+            => Task.FromResult(_documents.TryGetValue(key, out var d) ? FenceLayoutLoadResult.Loaded(d) : FenceLayoutLoadResult.NotFound);
 
-        public Task<FenceLayoutSaveResult> SaveAsync(FenceLayoutDocument document, CancellationToken token = default)
+        public Task<FenceLayoutSaveResult> SaveAsync(FenceLayoutKey key, FenceLayoutDocument document, FenceLayoutSaveMode mode = FenceLayoutSaveMode.Normal,
+                                                     CancellationToken token = default)
         {
-            _documents[document.ControllerId] = document;
+            _documents[key] = document;
             return Task.FromResult(new FenceLayoutSaveResult(FenceLayoutSaveStatus.Saved, document.Revision + 1, "펜스 구성을 미리보기 메모리에 저장했습니다."));
         }
     }

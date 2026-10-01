@@ -74,7 +74,8 @@ public static class WiringValidation
         foreach (var numbering in board.NumberingIssues())
             issues.Add(new WiringIssue(
                 numbering.BlocksSave ? WiringIssueLevel.Critical
-                    : numbering.Kind == Monitoring.Models.Fences.NumberingIssueKind.BandOverlap ? WiringIssueLevel.Warning
+                    : numbering.Kind is Monitoring.Models.Fences.NumberingIssueKind.BandOverlap or Monitoring.Models.Fences.NumberingIssueKind.Duplicate
+                        ? WiringIssueLevel.Warning
                     : WiringIssueLevel.Info,
                 CODE_NUMBERING, numbering.Message));
 

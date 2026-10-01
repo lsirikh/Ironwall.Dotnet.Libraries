@@ -16,7 +16,8 @@ public static class FenceMenuPresenter
     public const string AUTOMATION_ID = "Devices.Wiring.Fence.Menu";
 
     /// <summary><paramref name="owner"/> 좌표 <paramref name="at"/> 에 메뉴를 연다.</summary>
-    public static ContextMenu Show(FrameworkElement owner, IReadOnlyList<FenceMenuEntry> entries, Point at)
+    /// <param name="onError">항목 동작이 실패했을 때 — 뷰모델이 상태 줄 · 앱 로그로 알린다(뷰모델이 준 항목은 이미 감싸져 있어 마지막 그물).</param>
+    public static ContextMenu Show(FrameworkElement owner, IReadOnlyList<FenceMenuEntry> entries, Point at, Action<FenceMenuEntry, Exception>? onError = null)
     {
         var menu = new ContextMenu
         {
@@ -44,7 +45,7 @@ public static class FenceMenuPresenter
             item.Click += async (_, _) =>
             {
                 try { await run(); }
-                catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"[Wiring] 메뉴 '{entry.Text}' 실패: {ex.Message}"); }
+                catch (Exception ex) { onError?.Invoke(entry, ex); }
             };
             menu.Items.Add(item);
         }

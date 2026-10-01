@@ -41,7 +41,7 @@ public class NumberingMathTests
     }
 
     [Fact]
-    public void should_block_saving_when_a_renumbered_sensor_collides_with_an_unplaced_sensor()
+    public void should_warn_without_blocking_when_a_renumbered_sensor_collides_only_with_an_unplaced_sensor()
     {
         var bands = NumberBandSet.Tier3;
         var sensors = new List<NumberingSensor>
@@ -54,8 +54,29 @@ public class NumberingMathTests
         var issues = NumberingMath.Validate(sensors, bands);
 
         var duplicate = Assert.Single(issues, i => i.Kind == NumberingIssueKind.Duplicate);
-        Assert.True(duplicate.BlocksSave);
+        Assert.False(duplicate.BlocksSave);                                    // 미배치 센서가 끼어서만 겹친다 — 경고
         Assert.Equal(new[] { 2, 3 }, duplicate.Keys);
+        Assert.Contains("결선에 없는 센서", duplicate.Message);
+    }
+
+    [Fact]
+    public void should_block_saving_when_two_chained_sensors_share_a_number_even_if_an_unplaced_one_also_does()
+    {
+        // Arrange — 대역이 없는 갈래(복합)는 번호를 그대로 둔다: 결선의 두 대가 같은 번호
+        var bands = NumberBandSet.Tier3;
+        var sensors = new List<NumberingSensor>
+        {
+            new(1, FenceSensorCategory.Smart, 7, true, "북측 1"),
+            new(2, FenceSensorCategory.Smart, 7, true, "북측 2"),
+            new(3, FenceSensorCategory.Smart, 7, false, "창고 예비"),
+        };
+
+        // Act
+        var issues = NumberingMath.Validate(sensors, bands);
+
+        // Assert
+        var duplicate = Assert.Single(issues, i => i.Kind == NumberingIssueKind.Duplicate);
+        Assert.True(duplicate.BlocksSave);
     }
 
     [Fact]

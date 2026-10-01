@@ -34,8 +34,9 @@ public class WiringLauncherFenceTests
 
     private sealed class ThrowingStore : IFenceLayoutStore
     {
-        public Task<FenceLayoutDocument?> LoadAsync(int controllerId, CancellationToken token = default) => throw new InvalidOperationException("DB 없음");
-        public Task<FenceLayoutSaveResult> SaveAsync(FenceLayoutDocument document, CancellationToken token = default) => throw new InvalidOperationException("DB 없음");
+        public Task<FenceLayoutLoadResult> LoadAsync(FenceLayoutKey key, CancellationToken token = default) => throw new InvalidOperationException("DB 없음");
+        public Task<FenceLayoutSaveResult> SaveAsync(FenceLayoutKey key, FenceLayoutDocument document, FenceLayoutSaveMode mode = FenceLayoutSaveMode.Normal,
+                                                     CancellationToken token = default) => throw new InvalidOperationException("DB 없음");
     }
 
     private static (WiringLauncher Launcher, CapturingWindows Windows, ControllerDeviceModel Controller) Build(Lazy<IFenceLayoutStore>? store)

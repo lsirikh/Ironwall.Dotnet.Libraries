@@ -38,7 +38,8 @@ public sealed class IcmpPingProbe : IPingProbe
 /// </summary>
 /// <remarks>
 /// <para><b>비행 하나</b> — 앞 ping 이 끝나기 전에는 다음을 보내지 않는다(느린 망에서 쌓이지 않게). <b>창이 닫히면 즉시 멈춘다</b>(<see cref="Stop"/>).</para>
-/// <para>상태가 바뀔 때만 <see cref="Changed"/> 를 올린다 — <b>작업 스레드에서</b> 올 수 있다(받는 쪽이 UI 로 넘긴다).
+/// <para>상태가 바뀔 때 <see cref="Changed"/>, 표본마다(<see cref="INTERVAL"/> 한 번) <see cref="Sampled"/> 를 올린다 — 평균 · 손실 글자는
+/// 상태가 그대로여도 바뀐다. 둘 다 <b>작업 스레드에서</b> 올 수 있다(받는 쪽이 UI 로 넘긴다).
 /// 실패 로그는 상태가 "응답 없음"으로 바뀔 때 한 줄뿐이다(폭주 금지).</para>
 /// <para>UI 스레드를 쓰지 않는다 — 루프는 <see cref="Task.Run(Func{Task})"/> 위에서 돈다.</para>
 /// </remarks>
@@ -74,6 +75,9 @@ public sealed class ControllerPingMonitor : IDisposable
 
     /// <summary>상태가 바뀌었다(작업 스레드에서 올 수 있다).</summary>
     public event EventHandler<SignalLevel>? Changed;
+
+    /// <summary>표본 하나가 들어왔다(상태가 같아도 · 작업 스레드에서 올 수 있다) — 평균 · 손실 글자를 고친다.</summary>
+    public event EventHandler<SignalLevel>? Sampled;
 
     /// <summary>시작 — 이미 돌면 그대로. 주소가 없으면 시작하지 않는다(모름).</summary>
     public void Start()
@@ -120,6 +124,7 @@ public sealed class ControllerPingMonitor : IDisposable
                 if (next == SignalLevel.Down) _log?.Invoke($"[Wiring] 제어기 {_host} ping 응답 없음(연속 {SignalMath.DOWN_STREAK}회)");
                 Changed?.Invoke(this, next);
             }
+            Sampled?.Invoke(this, next);
             return true;
         }
         finally { Interlocked.Exchange(ref _inFlight, 0); }

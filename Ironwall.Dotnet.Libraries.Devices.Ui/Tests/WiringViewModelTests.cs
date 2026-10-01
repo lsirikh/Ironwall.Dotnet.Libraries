@@ -122,8 +122,8 @@ public class WiringViewModelTests
         Assert.True(vm.IsRing);
         Assert.False(vm.ShowSecondLine);
         Assert.Empty(vm.Line2);
-        Assert.Equal("A1 · B3", vm.Line1[0].PortText);
-        Assert.Equal("A3 · B1", vm.Line1[2].PortText);
+        Assert.Equal("1 · 3", vm.Line1[0].PortText);                           // Ch1 · Ch2 번호
+        Assert.Equal("3 · 1", vm.Line1[2].PortText);
         Assert.Contains("Ch1(A)", vm.Line1Title);
         Assert.Equal("A2 · B2", vm.Rows[1].PlacementText);
     }

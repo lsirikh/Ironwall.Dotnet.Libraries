@@ -109,6 +109,11 @@ public sealed partial class WiringViewModel
     public const string FENCE_REORDERED_NOTICE = "펜스 위 자리를 서버 결선 순서에 맞췄습니다 — 확인 후 저장하세요";
     public const string FENCE_RESEATED_NOTICE = "펜스 위 자리가 없던 센서를 이웃 사이에 놓았습니다 — 확인 후 저장하세요";
     public const string NUMBER_WARNING = "현장 센서의 번호 설정과 같아야 합니다";
+    public const string FENCE_READ_FAILED_NOTICE = "이 PC 의 펜스 구성을 읽지 못했습니다 — 지금 보이는 것은 제안 구성입니다. [저장하기] 때 덮어쓸지 묻습니다(읽지 못한 본문은 보관)";
+    public const string FENCE_OVERWRITE_QUESTION = "이 PC 의 펜스 구성을 읽지 못했습니다(본문 손상 또는 로컬 DB 읽기 실패).\n"
+                                                 + "지금 화면의 펜스 구성으로 덮어쓸까요? 읽지 못한 이전 본문은 지우지 않고 보관합니다.\n"
+                                                 + "[취소] 를 누르면 서버 저장만 하고 펜스 구성은 저장하지 않습니다.";
+    public const string NO_BANDS_NOTICE = "번호 대역 미설정 — 위치대로 번호를 매기려면";
 
     /// <summary>고른 것마다 값이 다른 칸(망 속성 · 높이 · 거리).</summary>
     private const string MULTI_VALUE = "여러 값";
@@ -116,6 +121,9 @@ public sealed partial class WiringViewModel
     private readonly IFenceLayoutStore? _fenceStore;
     private readonly FenceLayoutDocument? _fenceDocument;
     private readonly IPingProbe? _ping;
+    private readonly FenceLayoutKey _fenceKey;
+    private bool _fenceReadFailed;
+    private string? _editPanelNumber;
     private readonly Dictionary<int, WiringSensorLink> _links = new();
     private readonly List<int> _panelSelection = new();
     private int _fenceRevision;
@@ -146,7 +154,7 @@ public sealed partial class WiringViewModel
     /// </summary>
     private void LoadFence(FenceLayoutDocument? document)
     {
-        _fenceRevision = document?.Revision ?? 0;
+        if (document is not null) _fenceRevision = document.Revision;      // 읽기 실패면 저장소가 본 행 판(모르면 0)을 그대로 둔다
         _fenceNotice = null;
         var chain = _board.Chain.Keys;
 
@@ -186,7 +194,8 @@ public sealed partial class WiringViewModel
 
     /// <summary>불러올 때 알릴 것(제안 · 서버 순서에 맞춤).</summary>
     public string FenceNoticeText
-        => _fenceNotice ?? (_board.FenceLayout.IsProposed
+        => _fenceReadFailed && HasFenceStore ? FENCE_READ_FAILED_NOTICE
+         : _fenceNotice ?? (_board.FenceLayout.IsProposed
             ? (HasFenceStore ? FENCE_PROPOSED_NOTICE : "펜스 구성은 이 창에서만 쓰입니다 — 이 PC 에 저장할 곳(로컬 DB)이 없습니다")
             : string.Empty);
 
@@ -613,12 +622,64 @@ public sealed partial class WiringViewModel
         return ok;
     }
 
+    /// <summary>
+    /// "망 이동" 번호 칸(1부터) — 고친 글자, 없으면 고른 센서의 망(기둥) 번호가 모두 같을 때 그 값. 기둥 센서는 기둥 번호, 망 · 담 센서는 망 번호다.
+    /// </summary>
+    public string MountPanelText
+    {
+        get => _editPanelNumber ?? (MountTargets().Select(k => _board.FenceLayout.MountOf(k)!.Panel).Distinct().ToList() is { Count: 1 } one
+                ? (one[0] + 1).ToString(CultureInfo.InvariantCulture) : string.Empty);
+        set { _editPanelNumber = value ?? string.Empty; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>"망 이동" 칸 이름 — 기둥 센서면 "기둥 이동".</summary>
+    public string MountPanelLabel => MountTargets().FirstOrDefault() is var k && _board.FenceLayout.MountOf(k) is { IsPostSpot: true } ? "기둥 이동" : "망 이동";
+
+    /// <summary>[◀] — 고른 센서를 앞(Ch1(A) 쪽) 망(기둥)으로 한 칸(Alt+Shift+←). 빈 망도 건너뛰지 않는다.</summary>
+    public bool FenceMoveSelectedToPreviousPanel() => FenceMoveSelectedByPanels(-1);
+
+    /// <summary>[▶] — 고른 센서를 뒤(Ch2(B) 쪽) 망(기둥)으로 한 칸(Alt+Shift+→).</summary>
+    public bool FenceMoveSelectedToNextPanel() => FenceMoveSelectedByPanels(1);
+
+    /// <summary>
+    /// 고른 센서를 망(기둥) <paramref name="delta"/> 칸 옮긴다 — 끌어 옮기기(FR-05)의 키보드 · 단추 대신. 함께 고른 센서는 같은 칸 수만큼(서로 간격 유지),
+    /// 빈 망도 한 칸으로 센다(건너뛰지 않는다). 옮긴 자리대로 체인 · 번호가 다시 선다. 되돌리기 한 걸음.
+    /// </summary>
+    public bool FenceMoveSelectedByPanels(int delta)
+    {
+        var targets = MountTargets();
+        if (targets.Count == 0 || delta == 0) return false;
+        var grabbed = _fenceSelectedKey is { } k && targets.Contains(k) ? k : targets[0];
+        return MoveSensorsByPanels(targets, grabbed, delta);
+    }
+
+    /// <summary>번호 칸 적용(Enter · 칸을 떠날 때) — 기준 센서를 그 망(기둥) 번호로, 함께 고른 센서는 같은 칸 수만큼.</summary>
+    public bool ApplyMountPanel()
+    {
+        var text = _editPanelNumber;
+        _editPanelNumber = null;
+        NotifyOfPropertyChange(nameof(MountPanelText));
+        if (text is null) return false;
+        var targets = MountTargets();
+        if (targets.Count == 0) return false;
+        var grabbed = _fenceSelectedKey is { } k && targets.Contains(k) ? k : targets[0];
+        var mount = _board.FenceLayout.MountOf(grabbed)!;
+        var max = mount.IsPostSpot ? _board.FenceLayout.Panels.Count + 1 : _board.FenceLayout.Panels.Count;
+        if (!int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) || number < 1 || number > max)
+        {
+            StatusText = $"{(mount.IsPostSpot ? "기둥" : "망")} 번호는 1~{max} 로 적어 주세요.";
+            return false;
+        }
+        return MoveSensorsByPanels(targets, grabbed, number - 1 - mount.Panel);
+    }
+
     private void RaiseMountPane()
     {
         foreach (var name in new[]
         {
             nameof(HasMountRow), nameof(IsMountOnWall), nameof(IsMountOnFence), nameof(SelectedSpot), nameof(IsSpotPostTop), nameof(IsSpotPostMiddle),
             nameof(IsSpotPanelCenter), nameof(IsSpotWallTop), nameof(IsSpotWallFace), nameof(MountPlaceText), nameof(MountOffsetText),
+            nameof(MountPanelText), nameof(MountPanelLabel),
         }) NotifyOfPropertyChange(name);
     }
     #endregion
@@ -634,6 +695,15 @@ public sealed partial class WiringViewModel
         var layout = _board.FenceLayout;
         if (!layout.IsActive || layout.MountOf(grabbedKey) is not { } grabbed) return false;
         var delta = FenceLayoutMath.IndexAt(grabbed, layout.Geometry, targetMetres) - grabbed.Panel;
+        return MoveSensorsByPanels(keys, grabbedKey, delta);
+    }
+
+    /// <summary>센서를 망(기둥) <paramref name="delta"/> 칸 옮기는 한 길 — 끌기 · 단추 · 키보드 · 번호 칸이 함께 쓴다.</summary>
+    private bool MoveSensorsByPanels(IReadOnlyList<int> keys, int grabbedKey, int delta)
+    {
+        if (IsBusy || keys is null || keys.Count == 0) return false;
+        var layout = _board.FenceLayout;
+        if (!layout.IsActive || layout.MountOf(grabbedKey) is null) return false;
         if (delta == 0)
         {
             StatusText = "제자리 — 바뀐 것이 없습니다.";
@@ -761,7 +831,23 @@ public sealed partial class WiringViewModel
                 entries.Add(new FenceMenuEntry("망 모두 선택", P + "SelectAllPanels", () => { FenceSelectAllPanels(); return Task.CompletedTask; }, _board.FenceLayout.Panels.Count > 0));
                 break;
         }
-        return entries;
+        return entries.Select(e => e.Run is { } run ? e with { Run = Guard(e.Text, run) } : e).ToList();
+    }
+
+    /// <summary>
+    /// 메뉴 동작을 감싼다 — 실패하면 상태 줄에 알리고(사람이 본다) 앱 로그에 한 줄. 메뉴를 그리는 쪽(캔버스 · 개념도)은 예외를 보지 않는다.
+    /// </summary>
+    private Func<Task> Guard(string text, Func<Task> run) => async () =>
+    {
+        try { await run(); }
+        catch (Exception ex) { ReportFenceMenuFailure(text, ex); }
+    };
+
+    /// <summary>메뉴 동작 실패를 알린다 — 상태 줄(사람) + 앱 로그 한 줄.</summary>
+    public void ReportFenceMenuFailure(string text, Exception ex)
+    {
+        _log?.Warning($"[Wiring] 펜스 메뉴 '{text}' 실패: {ex?.Message}");
+        StatusText = $"'{text}' 을(를) 하지 못했습니다 — {ex?.Message}";
     }
 
     /// <summary>그 센서가 선택 안이면 선택 전부, 아니면 그 센서만.</summary>
@@ -799,7 +885,12 @@ public sealed partial class WiringViewModel
         }
         var what = $"{SensorMountSpec.SpotText(reference.Spot)}{(reference.HeightOffsetM != 0 ? $" · 높이 {reference.HeightOffsetM:+0.##;-0.##}m" : string.Empty)}"
                    + (refRow.SupportsFacing ? $" · {FacingName(refRow.Facing)}" : string.Empty);
-        if (!await _dialogs.ConfirmAsync("설치 방식 적용", $"{targets.Count}대 중 {changed}대가 바뀝니다 — {what}.{Environment.NewLine}되돌리기 한 번으로 통째 취소됩니다. 적용할까요?"))
+        // 자리 종류가 바뀌면 같은 망 안의 앞뒤(기둥 위 → 망 가운데)가 바뀌어 순서 · 번호가 따라 바뀔 수 있다 — 적용 전에 함께 알린다.
+        var renumber = NumberChangesIf(mounts);
+        if (!await _dialogs.ConfirmAsync("설치 방식 적용",
+                $"{targets.Count}대 중 설치 방식 {changed}대 · 번호 {renumber}대 바뀜 — {what}.{Environment.NewLine}"
+                + (renumber > 0 ? $"번호가 바뀌면 {NUMBER_WARNING}.{Environment.NewLine}" : string.Empty)
+                + "되돌리기 한 번으로 통째 취소됩니다. 적용할까요?"))
             return false;
 
         _board.PushUndo();
@@ -808,6 +899,19 @@ public sealed partial class WiringViewModel
         SyncAll();
         StatusText = $"설치 방식을 {changed}대에 적용했습니다 — Ctrl+Z 로 한 번에 되돌립니다";
         return true;
+    }
+
+    /// <summary>
+    /// 자리를 <paramref name="mounts"/> 로 바꾸면 다시 매겨질 번호 수(대역이 없거나 순서가 그대로면 0) — 보드를 바꾸지 않는다.
+    /// 번호는 체인 순서가 바뀔 때만 다시 매기므로(<see cref="WiringBoard.ApplyFenceEdit"/>) 같은 규칙으로 센다.
+    /// </summary>
+    private int NumberChangesIf(IReadOnlyDictionary<int, SensorMountSpec> mounts)
+    {
+        if (_board.FenceLayout.Bands is not { } bands) return 0;
+        var order = FenceLayoutMath.PositionOrder(mounts.Where(p => _board.Find(p.Key) is not null).Select(p => (p.Key, p.Value)), _board.Chain.Keys);
+        if (order.SequenceEqual(_board.Chain.Keys)) return 0;
+        return NumberingMath.Assign(order.Select(k => (k, _board.CategoryOf(k))), bands)
+                            .Count(p => _board.Find(p.Key) is { } row && row.Facts.Number != p.Value);
     }
 
     /// <summary>방향만 모두 앞 · 뒤(FR-08) — 방향이 있는 센서만. 확인 뒤 되돌리기 한 걸음.</summary>
@@ -871,6 +975,31 @@ public sealed partial class WiringViewModel
 
     public bool HasBands => _board.FenceLayout.Bands is not null;
 
+    /// <summary>
+    /// 번호 대역을 고르지 않았다는 알림을 보일까 — 펜스 구성이 켜져 있고 결선에 센서가 있는데 대역이 없을 때. 대역이 없으면 번호를 저절로 매기지 않아
+    /// 위치 순서와 번호가 어긋나 보일 수 있다(101 · 102 · 104 · 103 …) — 고르는 곳으로 바로 간다.
+    /// </summary>
+    public bool HasNoBandsNotice => _board.FenceLayout.IsActive && _board.FenceLayout.Bands is null && _board.Chain.Count > 0;
+
+    /// <summary>"번호 대역 미설정 — 위치대로 번호를 매기려면" (+ 번호가 위치 순서와 다르면 그 말).</summary>
+    public string NoBandsNoticeText
+    {
+        get
+        {
+            if (!HasNoBandsNotice) return string.Empty;
+            var numbers = _board.Chain.Keys.Select(k => _board.Find(k)?.Facts.Number ?? 0).ToList();
+            var ordered = numbers.Zip(numbers.Skip(1), (a, b) => a < b).All(x => x);
+            return ordered ? NO_BANDS_NOTICE : $"{NO_BANDS_NOTICE} (지금 번호는 위치 순서와 다릅니다)";
+        }
+    }
+
+    /// <summary>[대역 고르기] — 제어기를 골라 오른쪽 칸에 번호 대역(프리셋 2차 · 3차 · 4차 · 직접 설정)을 연다.</summary>
+    public void ShowBandPicker()
+    {
+        FenceSelectController();
+        StatusText = "번호 대역 — 오른쪽 칸에서 2차 · 3차 · 4차 중 고르거나 직접 설정하세요(고르면 위치 순서대로 번호를 매깁니다).";
+    }
+
     /// <summary>직접 설정 줄 — 이 제어기에 있는 갈래만.</summary>
     public ObservableCollection<WiringBandRowViewModel> BandRows { get; } = new();
 
@@ -914,12 +1043,13 @@ public sealed partial class WiringViewModel
             StatusText = "바뀐 것이 없습니다.";
             return false;
         }
+        var renumbered = _board.TakeRenumbered();
         SyncAll();
         RefreshBandRows();
-        var changed = _board.Rows.Count(r => r.Facts.Number != r.Baseline.Number);
+        var pending = _board.Rows.Count(r => r.Facts.Number != r.Baseline.Number);
         StatusText = bands is null
             ? "번호 대역을 껐습니다 — 번호는 지금 값 그대로입니다."
-            : $"번호 대역 {bands.PresetText} — 위치 순서대로 번호를 매겼습니다(바뀐 번호 {changed}대 · 저장 전까지 대기). {NUMBER_WARNING}.";
+            : $"번호 대역 {bands.PresetText} — 위치 순서대로 번호를 매겼습니다 · 번호 {renumbered}대 바뀜(저장 대기 {pending}대). {NUMBER_WARNING}.";
         return true;
     }
 
@@ -937,7 +1067,7 @@ public sealed partial class WiringViewModel
     /// <summary>
     /// 로컬 저장 — 망 · 설치 자리(서버 id 가 있는 센서만) · 대역 · 간격. 저장소가 없으면 아무것도 하지 않는다. 저장이 <b>된 뒤에만</b> 기준을 옮긴다.
     /// </summary>
-    private async Task<FenceLayoutSaveResult?> SaveFenceLayoutAsync()
+    private async Task<FenceLayoutSaveResult?> SaveFenceLayoutAsync(FenceLayoutSaveMode mode = FenceLayoutSaveMode.Normal)
     {
         if (_fenceStore is null || !_board.FenceLayout.IsActive) return null;
         var layout = _board.FenceLayout;
@@ -953,15 +1083,16 @@ public sealed partial class WiringViewModel
             Revision = _fenceRevision,
         };
         FenceLayoutSaveResult result;
-        try { result = await _fenceStore.SaveAsync(document); }
+        try { result = await _fenceStore.SaveAsync(_fenceKey, document, mode); }
         catch (Exception ex)
         {
-            result = new FenceLayoutSaveResult(FenceLayoutSaveStatus.Failed, _fenceRevision, "펜스 구성을 로컬 DB 에 저장하지 못했습니다.");
-            System.Diagnostics.Trace.WriteLine($"[Wiring] 펜스 구성 저장 예외: {ex.Message}");
+            result = new FenceLayoutSaveResult(FenceLayoutSaveStatus.Failed, _fenceRevision, FenceLayoutRows.FAILED);
+            _log?.Warning($"[Wiring] {_fenceKey} 펜스 구성 저장 예외: {ex.Message}");
         }
         if (result.IsSaved)
         {
             _fenceRevision = result.Revision;
+            _fenceReadFailed = false;
             _board.MarkFenceSaved();
             _fenceNotice = null;
         }
@@ -977,6 +1108,7 @@ public sealed partial class WiringViewModel
         foreach (var name in new[]
         {
             nameof(FenceLayout), nameof(HasLocalChanges), nameof(FenceNoticeText), nameof(HasFenceNotice), nameof(BandText), nameof(HasBands),
+            nameof(HasNoBandsNotice), nameof(NoBandsNoticeText),
             nameof(FencePaneKind), nameof(HasAnySelection),
         }) NotifyOfPropertyChange(name);
     }

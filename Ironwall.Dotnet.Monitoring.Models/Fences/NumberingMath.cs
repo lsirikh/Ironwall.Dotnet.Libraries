@@ -20,7 +20,7 @@ public enum NumberingIssueKind
     BandOverflow = 0,
     /// <summary>번호가 <see cref="NumberingMath.MAX_NUMBER"/> 를 넘는다 — 저장 막음.</summary>
     OverMax = 1,
-    /// <summary>같은 제어기 안에서 번호가 겹친다 — 저장 막음.</summary>
+    /// <summary>같은 제어기 안에서 번호가 겹친다 — 결선에 붙은 센서끼리면 저장 막음, 미배치 센서가 끼어서만 겹치면 경고.</summary>
     Duplicate = 2,
     /// <summary>대역끼리 겹친다 — 경고만.</summary>
     BandOverlap = 3,
@@ -129,9 +129,17 @@ public static class NumberingMath
             issues.Add(new NumberingIssue(NumberingIssueKind.OverMax, true,
                 $"번호는 1~{MAX_NUMBER} 이어야 합니다 — {Names(over)}", over.Select(s => s.Key).ToList()));
 
+        // 결선에 붙은 센서끼리 겹치면 저장 막음. 미배치 센서(체인에서 뺀 센서)가 끼어서만 겹치면 경고 — 뺀 센서의 옛 번호가 남아 있는 것은
+        // 흔하고(번호는 체인 순서로만 다시 매긴다), 그 센서는 결선에 다시 붙일 때 번호를 새로 받는다.
         foreach (var duplicate in list.GroupBy(s => s.Number).Where(g => g.Count() > 1 && g.Any(Numbered)).OrderBy(g => g.Key))
-            issues.Add(new NumberingIssue(NumberingIssueKind.Duplicate, true,
-                $"번호 {duplicate.Key} 중복 — {Names(duplicate.ToList())} · 같은 제어기 안에서 번호가 겹치면 저장하지 않습니다.", duplicate.Select(s => s.Key).ToList()));
+        {
+            var blocking = duplicate.Count(s => s.InChain) > 1;
+            issues.Add(new NumberingIssue(NumberingIssueKind.Duplicate, blocking,
+                blocking
+                    ? $"번호 {duplicate.Key} 중복 — {Names(duplicate.ToList())} · 같은 제어기 안에서 번호가 겹치면 저장하지 않습니다."
+                    : $"번호 {duplicate.Key} 가 결선에 없는 센서와 겹칩니다 — {Names(duplicate.ToList())} · 그 센서를 다시 붙이거나 번호를 바꾸세요.",
+                duplicate.Select(s => s.Key).ToList()));
+        }
 
         return issues;
 

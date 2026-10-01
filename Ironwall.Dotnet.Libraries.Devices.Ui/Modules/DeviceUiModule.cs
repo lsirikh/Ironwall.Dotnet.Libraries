@@ -182,6 +182,9 @@ public class DeviceUiModule : Module
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers.ServerMonitorViewModel>().SingleInstance();
 
             // 셋업 · 결선 창(N-04) — 장비 콘솔이 Lazy 로만 잡는다(못 만들어도 콘솔은 열린다).
+            // 펜스 구성 로컬 저장소 열쇠의 서버 식별(fence-wiring-editor) — 호스트 API 설정의 Url 을 열 때마다 읽는다(시험 서버 교체와 섞이지 않게).
+            builder.RegisterInstance(new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringServerIdentity(() => _apiSetup?.Url))
+                   .AsSelf().SingleInstance();
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher>().SingleInstance();
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();

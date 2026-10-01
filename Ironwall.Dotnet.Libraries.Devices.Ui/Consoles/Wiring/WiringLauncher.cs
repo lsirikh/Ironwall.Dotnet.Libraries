@@ -45,6 +45,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     private readonly ILogService? _log;
     private readonly IEventAggregator? _eventAggregator;
     private readonly Lazy<IFenceLayoutStore>? _fenceStore;
+    private readonly WiringServerIdentity? _server;
 
     /// <summary>펜스 구성을 불러올 때 기다리는 한도 — 로컬 DB 가 늦어도 창은 곧 열린다(없으면 제안 구성).</summary>
     public static readonly TimeSpan FENCE_LOAD_TIMEOUT = TimeSpan.FromSeconds(3);
@@ -53,6 +54,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     /// 펜스 구성 로컬 저장소(fence-wiring-editor FR-11 · FR-16) — <c>GMaps.Db</c> 모듈이 등록하면 Autofac 이 채운다(선택 인자).
     /// 없거나 만들다 실패하면 로컬 저장 칸만 숨고 창은 그대로 열린다(조립기 선례 · Lazy).
     /// </param>
+    /// <param name="server">지금 접속한 서버(펜스 구성 열쇠의 앞쪽) — 없으면 <see cref="FenceLayoutRows.UNKNOWN_SERVER"/>.</param>
     public WiringLauncher(IWindowManager windows,
                           IDeviceApiService api,
                           IDeviceProviderService providerService,
@@ -62,7 +64,8 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
                           ICatalogService? catalog = null,
                           ILogService? log = null,
                           IEventAggregator? eventAggregator = null,
-                          Lazy<IFenceLayoutStore>? fenceStore = null)
+                          Lazy<IFenceLayoutStore>? fenceStore = null,
+                          WiringServerIdentity? server = null)
     {
         _windows = windows ?? throw new ArgumentNullException(nameof(windows));
         _api = api ?? throw new ArgumentNullException(nameof(api));
@@ -74,6 +77,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         _log = log;
         _eventAggregator = eventAggregator;
         _fenceStore = fenceStore;
+        _server = server;
     }
 
     public bool IsAvailable => _policy.IsAxisContract;
@@ -89,9 +93,10 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
 
         var apply = new WiringApplyService(new DeviceApiSensorGateway(_api), _providerService, _log, _policy, _eventAggregator);
         var store = ResolveFenceStore();
-        var document = store is null ? null : await LoadFenceLayoutAsync(store, controller.Id);
-        var fence = new WiringFenceContext(document, store, new IcmpPingProbe());
-        var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor(), fence);
+        var key = new FenceLayoutKey(_server?.Key ?? FenceLayoutRows.UNKNOWN_SERVER, controller.Id);
+        var load = store is null ? FenceLayoutLoadResult.NotFound : await LoadFenceLayoutAsync(store, key);
+        var fence = new WiringFenceContext(load.Document, store, new IcmpPingProbe(), key, load);
+        var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor(), fence, _log);
 
         var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
         return SavedAnything(closedWith, vm);
@@ -116,25 +121,28 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         }
     }
 
-    /// <summary>제어기의 펜스 구성 — <see cref="FENCE_LOAD_TIMEOUT"/> 안에 오지 않거나 실패하면 <c>null</c>(제안 구성으로 연다).</summary>
-    internal async Task<FenceLayoutDocument?> LoadFenceLayoutAsync(IFenceLayoutStore store, int controllerId)
+    /// <summary>
+    /// 그 서버 · 제어기의 펜스 구성 — <see cref="FENCE_LOAD_TIMEOUT"/> 안에 오지 않거나 예외면 <b>읽기 실패</b>(행이 없다는 뜻이 아니다).
+    /// 창은 제안 구성으로 열고, 저장은 사람이 확인한 덮어쓰기로만 한다(없는 것으로 여기면 판 0 저장이 기존 행에 부딪혀 충돌로 오보된다).
+    /// </summary>
+    internal async Task<FenceLayoutLoadResult> LoadFenceLayoutAsync(IFenceLayoutStore store, FenceLayoutKey key)
     {
         using var cts = new CancellationTokenSource(FENCE_LOAD_TIMEOUT);
         try
         {
-            var load = store.LoadAsync(controllerId, cts.Token);
+            var load = store.LoadAsync(key, cts.Token);
             var done = await Task.WhenAny(load, Task.Delay(FENCE_LOAD_TIMEOUT)).ConfigureAwait(true);
             if (done != load)
             {
-                _log?.Warning($"[Wiring] 제어기 {controllerId} 펜스 구성을 {FENCE_LOAD_TIMEOUT.TotalSeconds:0}초 안에 읽지 못했습니다 — 제안 구성으로 엽니다.");
-                return null;
+                _log?.Warning($"[Wiring] {key} 펜스 구성을 {FENCE_LOAD_TIMEOUT.TotalSeconds:0}초 안에 읽지 못했습니다 — 제안 구성으로 엽니다(저장은 덮어쓰기 확인 뒤).");
+                return FenceLayoutLoadResult.Failed("시간 초과");
             }
-            return await load.ConfigureAwait(true);
+            return await load.ConfigureAwait(true) ?? FenceLayoutLoadResult.Failed("결과 없음");
         }
         catch (Exception ex)
         {
-            _log?.Warning($"[Wiring] 제어기 {controllerId} 펜스 구성 불러오기 실패 — 제안 구성으로 엽니다: {ex.Message}");
-            return null;
+            _log?.Warning($"[Wiring] {key} 펜스 구성 불러오기 실패 — 제안 구성으로 엽니다(저장은 덮어쓰기 확인 뒤): {ex.Message}");
+            return FenceLayoutLoadResult.Failed(ex.Message);
         }
     }
     #endregion

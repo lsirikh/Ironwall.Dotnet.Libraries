@@ -4,6 +4,8 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Register;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
+using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Libraries.Base.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -43,10 +45,14 @@ public sealed record WiringSensorSeed(int Id, int? Channel, SensorFacts Facts, W
 /// 결선 창의 펜스 편집 재료(fence-wiring-editor FR-01 · FR-11 · FR-14) — 로컬에 저장된 구성 · 로컬 저장소 · 제어기 ping.
 /// 모두 없어도 창은 열린다(없으면 제안 구성 · 로컬 저장 칸 숨김 · 신호등 모름).
 /// </summary>
+/// <param name="Key">저장소 열쇠(서버 · 제어기). 없으면 (<c>unknown</c>, 제어기 id).</param>
+/// <param name="Load">불러오기 결과 — 읽기 실패(손상 · DB 예외 · 시간 초과)면 저장은 덮어쓰기 확인 뒤에만. 없으면 <paramref name="Document"/> 로 판단.</param>
 public sealed record WiringFenceContext(
     Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutDocument? Document = null,
     Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore? Store = null,
-    Signals.IPingProbe? Ping = null);
+    Signals.IPingProbe? Ping = null,
+    Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutKey? Key = null,
+    Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutLoadResult? Load = null);
 
 /// <summary>고를 수 있는 그룹 한 개(W2) — 창은 그룹 모델 타입을 모른다.</summary>
 public sealed record WiringGroupInfo(int Id, string Name);
@@ -70,13 +76,13 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     private readonly WiringBoard _board = new();
     private readonly WiringApplyService? _apply;
     private readonly IWiringDialogs _dialogs;
+    private readonly ILogService? _log;
     private readonly Dictionary<int, SensorRowViewModel> _rowsByKey = new();
 
     private WiringStep _step = WiringStep.Sensors;
     private string _statusText = string.Empty;
     private string _progressText = string.Empty;
     private bool _isBusy;
-    private bool _closeWithoutAsking;
     private IReadOnlyList<SensorRowViewModel> _selectedRows = Array.Empty<SensorRowViewModel>();
 
     private readonly Dictionary<int, bool> _touchedGroups = new();
@@ -86,16 +92,21 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     private string? _editZone;
 
     private WiringViewModel(WiringControllerInfo controller, IReadOnlyList<string> sensorTypes, IReadOnlyList<WiringGroupInfo> groups,
-                            WiringApplyService? apply, IWiringDialogs dialogs, WiringFenceContext? fence)
+                            WiringApplyService? apply, IWiringDialogs dialogs, WiringFenceContext? fence, ILogService? log)
     {
+        _log = log;
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         SensorTypes = sensorTypes ?? Array.Empty<string>();
         AvailableGroups = groups ?? Array.Empty<WiringGroupInfo>();
         _apply = apply;
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _fenceStore = fence?.Store;
-        _fenceDocument = fence?.Document;
+        _fenceDocument = fence?.Document ?? fence?.Load?.Document;
         _ping = fence?.Ping;
+        _fenceKey = fence?.Key ?? new Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutKey(
+            Ironwall.Dotnet.Monitoring.Models.Fences.FenceLayoutRows.UNKNOWN_SERVER, controller.Id);
+        _fenceReadFailed = fence?.Load?.IsReadFailure == true;
+        _fenceRevision = fence?.Load?.RowRevision ?? 0;
 
         Rows = new ObservableCollection<SensorRowViewModel>();
         Palette = new ObservableCollection<SensorRowViewModel>();
@@ -115,9 +126,10 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                                                 WiringApplyService? apply,
                                                 IWiringDialogs dialogs,
                                                 IReadOnlyList<WiringGroupInfo>? groups = null,
-                                                WiringFenceContext? fence = null)
+                                                WiringFenceContext? fence = null,
+                                                ILogService? log = null)
     {
-        var vm = new WiringViewModel(controller, sensorTypes, groups ?? Array.Empty<WiringGroupInfo>(), apply, dialogs, fence);
+        var vm = new WiringViewModel(controller, sensorTypes, groups ?? Array.Empty<WiringGroupInfo>(), apply, dialogs, fence, log);
         vm.Load(sensors);
         return vm;
     }
@@ -176,10 +188,20 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
 
     public string DraftText => HasLocalChanges ? $"바뀐 줄 {_board.UnsavedChangeCount} · 펜스 구성 바뀜" : $"바뀐 줄 {_board.UnsavedChangeCount}";
 
+    /// <summary>
+    /// 상태 줄. 마지막 동작이 번호를 위치 순서대로 다시 매겼으면(Draft) 끝에 "번호 n대 바뀜" 을 붙인다 — 번호가 조용히 바뀌지 않게.
+    /// </summary>
     public string StatusText
     {
         get => _statusText;
-        private set { _statusText = value ?? string.Empty; NotifyOfPropertyChange(); }
+        private set
+        {
+            var text = value ?? string.Empty;
+            var renumbered = _board.TakeRenumbered();
+            if (renumbered > 0) text = $"{text.TrimEnd('.', ' ')} · 번호 {renumbered}대 바뀜";
+            _statusText = text;
+            NotifyOfPropertyChange();
+        }
     }
 
     public string ProgressText
@@ -313,7 +335,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                 slot.Row = row;
                 slot.Order = _board.OrderAt(line, i);
                 slot.LineName = LineNameOf(line);
-                slot.PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"A{n.Order} · B{b}" : string.Empty;
+                // "Ch1 · Ch2 번호" 칸 — 두 포트에서 센 자리만("1 · 50"). A · B 는 머리 칸 툴팁의 별칭.
+                slot.PortText = row is not null && _board.NumberOf(row.Key) is { OppositeOrder: { } b } n ? $"{n.Order} · {b}" : string.Empty;
                 slot.IsSuggested = row is not null && _board.IsProposed(row.Key);
 
                 // 표 보기 열(표 보기 정리) — 종류 · 방향 · 간격 · 상태 · 함체 자리 구분 띠
@@ -1162,7 +1185,8 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     {
         if (!CanSave) return;
         var server = CanSaveServer;
-        var local = _fenceStore is not null && _board.FenceLayout.IsActive;
+        var local = _fenceStore is not null && _board.FenceLayout.IsActive
+                    && (HasLocalChanges || _board.FenceLayout.IsProposed || _fenceReadFailed);
 
         var unplaced = _board.Unplaced.Count;
         var suggested = _board.HasPendingProposals ? _board.Proposals.Count : 0;
@@ -1173,8 +1197,11 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             (server && suggested > 0
                 ? $"적용하지 않은 제안(번호순 · 옛 배치 변환 · 빈 자리 당김) {suggested}대의 자리는 저장하지 않습니다 — [이대로 적용] 을 먼저 누르세요." + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
-            (local && (HasLocalChanges || _board.FenceLayout.IsProposed)
-                ? "펜스 구성(망 · 설치 위치 · 번호 대역)을 이 PC 에 저장합니다 — 다른 GIS 에서는 보이지 않습니다." + Environment.NewLine + Environment.NewLine
+            (local
+                ? "펜스 구성(망 · 설치 위치 · 번호 대역 · 간격)을 이 PC 에 저장합니다 — 다른 GIS 에서는 보이지 않습니다."
+                  + (server ? " 서버 저장이 하나라도 실패하면 펜스 구성은 이번에 저장하지 않습니다(서버 순서와 어긋나지 않게)." : string.Empty)
+                  + (_fenceReadFailed ? " 이 PC 의 펜스 구성을 읽지 못해 덮어쓸지 따로 묻습니다." : string.Empty)
+                  + Environment.NewLine + Environment.NewLine
                 : string.Empty) +
             (server ? "저장하기 전에 각 센서가 그사이 바뀌지 않았는지 확인합니다. 저장할까요?" : "저장할까요?");
 
@@ -1183,6 +1210,25 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
             ? await _dialogs.ConfirmNumberChangesAsync("구성 저장", numberChanges, NUMBER_WARNING, message)
             : await _dialogs.ConfirmAsync("결선 저장", message);
         if (!confirmed) return;
+
+        // 읽지 못한 로컬 구성(본문 손상 · 읽기 실패) — 판을 모르는 채로 저장하면 기존 행과 부딪혀 "다른 GIS 충돌" 로 오보되거나 영영 저장하지 못한다.
+        // 사람이 확인하면 덮어쓴다(읽지 못한 본문은 저장소가 보관 칸에 남긴다).
+        var overwrite = false;
+        string? localSkipped = null;
+        if (local && _fenceReadFailed)
+        {
+            overwrite = await _dialogs.ConfirmAsync("펜스 구성 덮어쓰기", FENCE_OVERWRITE_QUESTION);
+            if (!overwrite)
+            {
+                local = false;
+                localSkipped = "펜스 구성은 저장하지 않았습니다(덮어쓰기 취소)";
+            }
+        }
+        if (!server && !local)
+        {
+            if (localSkipped is not null) StatusText = localSkipped + ".";
+            return;
+        }
 
         IsBusy = true;
         SaveResults.Clear();
@@ -1217,15 +1263,25 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
                 if (result.OkKeys.Count > 0 || result.Groups.Any(g => g.Ok)) HasSaved = true;
             }
 
-            // 로컬 — 서버 뒤에(새 센서가 서버 id 를 받은 뒤라야 자리를 id 로 실을 수 있다). 서버가 일부 실패해도 모양은 저장한다.
-            if (local && (HasLocalChanges || _board.FenceLayout.IsProposed))
+            // 로컬 — 서버 뒤에(새 센서가 서버 id 를 받은 뒤라야 자리를 id 로 실을 수 있다).
+            // 서버 저장이 하나라도 실패하면 로컬의 센서 자리도 이번에는 싣지 않는다 — 서버에 안 들어간 순서 · 번호로 펜스 위 자리를 굳히면
+            // 다음에 열 때 로컬 자리와 서버 순서가 어긋난다. 서버에 보낼 것이 없던 저장(망만 고침)은 그대로 로컬에 저장한다.
+            if (local && server && !serverOk)
             {
-                var saved = await SaveFenceLayoutAsync();
+                local = false;
+                localSkipped = "펜스 구성은 저장하지 않았습니다(서버 저장 일부 실패 — 서버 순서와 어긋나지 않게 남겨 둠 · 다시 저장하면 함께 저장)";
+            }
+            if (local)
+            {
+                var saved = await SaveFenceLayoutAsync(overwrite ? FenceLayoutSaveMode.Overwrite : FenceLayoutSaveMode.Normal);
                 if (saved is not null)
                     StatusText = server ? $"{StatusText} · {saved.Message}" : saved.Message;
             }
+            else if (localSkipped is not null)
+            {
+                StatusText = server ? $"{StatusText} · {localSkipped}." : localSkipped + ".";
+            }
 
-            if (serverOk && !_board.IsDirty && !HasLocalChanges) _closeWithoutAsking = true;   // 전부 저장됐다 — 닫을 때 묻지 않는다
             SyncAll();
         }
         finally
@@ -1242,9 +1298,10 @@ public sealed partial class WiringViewModel : Screen, IDragDropHandler
     public bool HasSaved { get; private set; }
 
     /// <summary>미저장 변경(서버 · 로컬 펜스 구성)이 있으면 닫기 전에 묻는다.</summary>
+    /// <remarks>저장한 뒤라도 그 뒤에 고친 것이 있으면 묻는다 — "저장했다" 는 끈적한 표지가 아니라 지금 남은 변경으로 판단한다.</remarks>
     public override async Task<bool> CanCloseAsync(CancellationToken cancellationToken = default)
     {
-        if ((!_board.IsDirty && !HasLocalChanges) || _closeWithoutAsking) return true;
+        if (!_board.IsDirty && !HasLocalChanges) return true;
         var count = _board.UnsavedChangeCount + (HasLocalChanges ? 1 : 0);
         return await _dialogs.ConfirmAsync("셋업 창 닫기", $"미저장 변경 {count}건이 있습니다. 버리고 닫을까요?");
     }

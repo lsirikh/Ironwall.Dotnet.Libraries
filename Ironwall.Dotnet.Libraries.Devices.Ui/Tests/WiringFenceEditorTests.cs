@@ -207,7 +207,7 @@ public class WiringFenceEditorTests
         vm.Undo();
 
         // Assert
-        Assert.Contains(dialogs.Confirms, c => c.Message.StartsWith("13대 중 10대가 바뀝니다"));
+        Assert.Contains(dialogs.Confirms, c => c.Message.StartsWith("13대 중 설치 방식 10대 · 번호 0대 바뀜"));
         Assert.Equal(new[] { -0.3 }, offsets);
         Assert.Equal(10, vm.FenceLayout.Mounts.Values.Count(m => m.HeightOffsetM == 0));   // 되돌리기 한 번으로 통째 취소
     }

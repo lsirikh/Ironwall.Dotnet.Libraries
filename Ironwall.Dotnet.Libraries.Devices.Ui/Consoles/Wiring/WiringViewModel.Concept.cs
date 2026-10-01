@@ -118,8 +118,7 @@ public sealed partial class WiringViewModel
         _uiContext ??= SynchronizationContext.Current;
         if (_pingMonitor is null)
         {
-            _pingMonitor = new ControllerPingMonitor(_ping, Controller.Address, message => System.Diagnostics.Trace.WriteLine(message));
-            _pingMonitor.Changed += OnControllerSignal;
+            _pingMonitor = CreatePingMonitor(_ping);
         }
         _pingMonitor.Start();
     }
@@ -134,12 +133,17 @@ public sealed partial class WiringViewModel
     internal async Task<bool> PingControllerOnceAsync()
     {
         if (_ping is null || string.IsNullOrWhiteSpace(Controller.Address)) return false;
-        if (_pingMonitor is null)
-        {
-            _pingMonitor = new ControllerPingMonitor(_ping, Controller.Address);
-            _pingMonitor.Changed += OnControllerSignal;
-        }
+        _pingMonitor ??= CreatePingMonitor(_ping);
         return await _pingMonitor.PingOnceAsync();
+    }
+
+    /// <summary>모니터 — 로그는 앱 로거로(상태가 "응답 없음"으로 바뀔 때 한 줄), 상태 변화 · 표본마다 UI 로 알린다.</summary>
+    private ControllerPingMonitor CreatePingMonitor(IPingProbe ping)
+    {
+        var monitor = new ControllerPingMonitor(ping, Controller.Address, message => _log?.Warning(message));
+        monitor.Changed += OnControllerSignal;
+        monitor.Sampled += OnControllerSample;
+        return monitor;
     }
 
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -163,6 +167,14 @@ public sealed partial class WiringViewModel
             NotifyOfPropertyChange(nameof(ControllerSignalText));
             FenceChanged?.Invoke(this, EventArgs.Empty);
         }
+        if (_uiContext is { } ui && SynchronizationContext.Current != ui) ui.Post(_ => Raise(), null);
+        else Raise();
+    }
+
+    /// <summary>표본마다(5초에 한 번) — 상태가 같아도 평균 · 손실 글자는 바뀐다. 그림은 다시 그리지 않는다(상태가 바뀔 때만).</summary>
+    private void OnControllerSample(object? sender, SignalLevel level)
+    {
+        void Raise() => NotifyOfPropertyChange(nameof(ControllerSignalText));
         if (_uiContext is { } ui && SynchronizationContext.Current != ui) ui.Post(_ => Raise(), null);
         else Raise();
     }

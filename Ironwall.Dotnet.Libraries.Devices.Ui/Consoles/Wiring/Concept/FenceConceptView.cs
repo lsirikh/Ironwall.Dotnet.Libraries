@@ -427,7 +427,7 @@ public sealed class FenceConceptView : Grid
         }
         else entries = vm.FenceMenu(FenceMenuTargetKind.Empty, 0);
         LastMenu = entries;
-        if (!SuppressMenuPopup) FenceMenuPresenter.Show(this, entries, at);
+        if (!SuppressMenuPopup) FenceMenuPresenter.Show(this, entries, at, (entry, ex) => vm.ReportFenceMenuFailure(entry.Text, ex));
     }
 
     private static FenceChip? ChipFrom(DependencyObject? d)

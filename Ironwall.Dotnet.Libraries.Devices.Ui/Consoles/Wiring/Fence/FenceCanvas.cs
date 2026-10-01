@@ -980,7 +980,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         }
         LastMenu = entries;
         if (SuppressMenuPopup) return;
-        FenceMenuPresenter.Show(this, entries, at);
+        FenceMenuPresenter.Show(this, entries, at, (entry, ex) => vm.ReportFenceMenuFailure(entry.Text, ex));
     }
     #endregion
 
@@ -1072,6 +1072,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         else
         {
             var first = chip.Keys[0];
+            // Alt+Shift+←/→ — 고른 센서(포커스 센서가 선택 밖이면 그 센서)를 옆 망(기둥)으로 한 칸: 끌어 옮기기(FR-05)의 키보드 대신
+            if (alt && k is Key.Left or Key.Right && (modifiers & ModifierKeys.Shift) != 0)
+            {
+                if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelectSensors(chip.Keys);
+                vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
+                FocusUnitOf(first);
+                return true;
+            }
             if (alt && k is Key.Left or Key.Right) { MoveUnitVisually(chip, k == Key.Left ? -1 : 1); FocusUnitOf(first); return true; }
             if (alt && k is Key.Home or Key.End) { vm.FenceToEnd(first, k == Key.End); FocusUnitOf(first); return true; }
             if (!alt && k is Key.Delete or Key.Back)

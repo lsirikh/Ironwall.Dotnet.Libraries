@@ -212,9 +212,11 @@ public static class FenceLayoutMath
 
     #region - Chain ↔ seats (FR-09 · FR-12) -
     /// <summary>
-    /// 체인 순서가 바뀌었을 때 자리를 맞춘다. <b>자리 묶음은 그대로 두고 센서가 자리를 나눠 갖는다</b> — 남은 센서의 자리를 위치 순으로 줄 세워
-    /// 새 체인 순서대로 하나씩 준다(표 · 개념도에서 순서를 바꾸면 펜스 위 자리가 따라간다). 새로 붙은 센서는 새 체인의 이웃 사이 자리
-    /// (<see cref="SeatBetween"/> · 끝이면 다음 자리 — 망이 모자라면 끝 망을 본떠 늘린다), 빠진 센서의 자리는 비운다.
+    /// 체인 순서가 바뀌었을 때 자리를 맞춘다. <b>위치 묶음은 그대로 두고 센서가 위치를 나눠 갖는다</b> — 남은 센서의 위치를 위치 순으로 줄 세워
+    /// 새 체인 순서대로 하나씩 준다(표 · 개념도에서 순서를 바꾸면 펜스 위 자리가 따라간다). 단 <b>센서가 가져가는 것은 망(기둥) 번호뿐</b>이다 —
+    /// 자리 종류(기둥 위 · 기둥 중간 · 망 가운데 · 담) · 높이 조정 · 보는 쪽은 센서를 따라간다(순서를 바꿨다고 남의 설치 방식을 넘겨받지 않는다).
+    /// 받은 위치가 제 자리 종류와 맞지 않으면(기둥 센서가 망 가운데 위치를 받으면) 가장 가까운 제 종류 칸으로 가되, 앞 센서보다 앞서지 않는다.
+    /// 새로 붙은 센서는 새 체인의 이웃 사이 자리(<see cref="SeatBetween"/> · 끝이면 다음 자리 — 망이 모자라면 끝 망을 본떠 늘린다), 빠진 센서의 자리는 비운다.
     /// </summary>
     /// <param name="oldOrder">바뀌기 전 체인 순서(같은 자리 센서끼리의 차례).</param>
     /// <param name="newChain">바뀐 체인.</param>
@@ -240,7 +242,17 @@ public static class FenceLayoutMath
                             .ToList();
 
         var result = new Dictionary<int, SensorMountSpec>();
-        for (var i = 0; i < retained.Count; i++) result[retained[i]] = seats[i];
+        FenceSeat? floor = null;
+        for (var i = 0; i < retained.Count; i++)
+        {
+            var own = current[retained[i]];
+            // 제자리면 그대로(자리 종류가 같은 위치를 받았다) — 아니면 위치만 받고 종류 · 높이 · 방향은 제 것.
+            var placed = own == seats[i] && (floor is null || SeatOf(own) >= floor.Value)
+                ? own
+                : PlaceKeeping(own, SeatOf(seats[i]).Slot, floor, panelList);
+            result[retained[i]] = placed;
+            floor = SeatOf(placed);
+        }
 
         for (var j = 0; j < chain.Count; j++)
         {
@@ -254,6 +266,38 @@ public static class FenceLayoutMath
             result[key] = seat;
         }
         return (result, panelList);
+    }
+
+    /// <summary>
+    /// 센서 <paramref name="own"/> 를 칸 <paramref name="targetSlot"/> 근처로 — 제 자리 종류(기둥 = 짝수 칸 · 망 = 홀수 칸)에서 가장 가까운 칸,
+    /// 같은 거리면 앞쪽. 앞 센서 자리(<paramref name="floor"/>)보다 앞서면 뒤로 민다(망이 모자라면 끝 망을 본떠 늘린다).
+    /// 높이 조정 · 보는 쪽 · 자리 종류는 <paramref name="own"/> 의 것(모양에 맞춘 같은 뜻 자리는 <see cref="Normalize"/>).
+    /// </summary>
+    internal static SensorMountSpec PlaceKeeping(SensorMountSpec own, int targetSlot, FenceSeat? floor, List<FencePanelSpec> panels)
+    {
+        var wantPost = own.IsPostSpot;
+        var near = (targetSlot % 2 == 0) == wantPost ? new[] { targetSlot } : new[] { targetSlot - 1, targetSlot + 1 };
+        foreach (var slot in near)
+        {
+            if (slot < 0) continue;
+            var panel = wantPost ? slot / 2 : (slot - 1) / 2;
+            if (wantPost ? panel > panels.Count : panel >= panels.Count) continue;     // 근처 칸 때문에 망을 늘리지 않는다
+            var m = Normalize(own with { Panel = panel }, panels);
+            if (floor is null || SeatOf(m) >= floor.Value) return m;
+        }
+
+        var start = Math.Max(Math.Max(0, targetSlot), floor?.Slot ?? 0);
+        if ((start % 2 == 0) != wantPost) start++;
+        var template = panels.Count > 0 ? panels[^1] : FencePanelSpec.Default();
+        for (var slot = start; slot < start + 4 * (panels.Count + 8); slot += 2)
+        {
+            var panel = wantPost ? slot / 2 : (slot - 1) / 2;
+            var need = wantPost ? Math.Max(1, panel) : panel + 1;
+            while (panels.Count < need) panels.Add(template);
+            var m = Normalize(own with { Panel = panel }, panels);
+            if (floor is null || SeatOf(m) >= floor.Value) return m;
+        }
+        return Normalize(own, panels);
     }
 
     /// <summary>

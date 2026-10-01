@@ -567,6 +567,7 @@ public sealed class WiringBoard
             foreach (var s in keep) _undo.Push(s);
         }
         _undo.Push(Capture());
+        _renumbered = 0;            // 새 동작의 시작 — 그 동작이 다시 매긴 번호만 센다(상태 줄 "번호 n대 바뀜")
     }
 
     public bool CanUndo => _undo.Count > 0;
@@ -576,6 +577,7 @@ public sealed class WiringBoard
     {
         if (_undo.Count == 0) return false;
         Restore(_undo.Pop());
+        _renumbered = 0;
         return true;
     }
     #endregion
@@ -590,8 +592,29 @@ public sealed class WiringBoard
     /// <summary>마지막으로 로컬에 저장한(불러온) 구성 — "로컬 저장할 것이 있나"의 기준.</summary>
     public WiringFenceLayout FenceBaseline { get; private set; } = WiringFenceLayout.None;
 
-    /// <summary>펜스 구성이 기준과 다른가(제안만 걸려 있고 손대지 않았으면 거짓).</summary>
-    public bool IsFenceDirty => _fence.IsActive && !_fence.SameContent(FenceBaseline);
+    /// <summary>
+    /// 펜스 구성이 기준과 다른가(제안만 걸려 있고 손대지 않았으면 거짓). 펜스센서 현장 간격(<see cref="Spacing"/>)도 로컬 문서에 실리므로
+    /// 간격만 바꿔도 바뀐 것이다.
+    /// </summary>
+    public bool IsFenceDirty => _fence.IsActive && (!_fence.SameContent(FenceBaseline) || !SameMetres(Spacing.FenceMetres, _fenceSpacingBaseline));
+
+    /// <summary>마지막으로 로컬에 저장한(불러온) 펜스센서 간격(m).</summary>
+    private double _fenceSpacingBaseline = WiringSpacingTable.Default.FenceMetres;
+
+    private static bool SameMetres(double a, double b) => Math.Abs(a - b) < 1e-9;
+
+    /// <summary>마지막 동작(<see cref="PushUndo"/> 이후)이 다시 매긴 번호 수.</summary>
+    private int _renumbered;
+
+    /// <summary>
+    /// 마지막 동작이 위치 순서대로 다시 매긴 번호 수를 꺼내고 비운다 — 창이 상태 줄에 "번호 n대 바뀜" 을 붙인다(Draft 로 번호가 바뀌면 늘 알린다).
+    /// </summary>
+    public int TakeRenumbered()
+    {
+        var n = _renumbered;
+        _renumbered = 0;
+        return n;
+    }
 
     /// <summary>
     /// 펜스 구성을 싣는다(불러오기 · 제안). 되돌리기 장면을 쌓지 않고 번호도 매기지 않는다 — 불러오기만으로 바뀐 줄이 생기지 않게.
@@ -601,6 +624,7 @@ public sealed class WiringBoard
     {
         _fence = layout ?? WiringFenceLayout.None;
         FenceBaseline = baseline ?? _fence;
+        _fenceSpacingBaseline = Spacing.FenceMetres;
     }
 
     /// <summary>로컬 저장이 끝났다 — 지금 구성을 새 기준으로(제안 표지도 걷는다).</summary>
@@ -609,11 +633,13 @@ public sealed class WiringBoard
         if (!_fence.IsActive) return;
         _fence = _fence.Accepted();
         FenceBaseline = _fence;
+        _fenceSpacingBaseline = Spacing.FenceMetres;
     }
 
     /// <summary>
-    /// 펜스 구성을 고친다(망 속성 · 센서 자리 · 번호 대역) — 고친 자리대로 체인을 다시 세우고(순서가 바뀌면 체인 편집 한 번),
-    /// 번호 대역이 있으면 번호를 다시 매긴다. 되돌리기 한 걸음은 부르는 쪽이 <see cref="PushUndo"/> 로 찍는다. 바뀐 것이 없으면 <c>false</c>.
+    /// 펜스 구성을 고친다(망 속성 · 센서 자리) — 고친 자리대로 체인을 다시 세우고(순서가 바뀌면 체인 편집 한 번 · 그때만 번호 대역대로 다시 매긴다).
+    /// 망 색 · 높이 · 거리처럼 순서가 그대로인 편집은 번호를 건드리지 않는다(표에서 손으로 고친 번호가 되돌아가지 않게).
+    /// 되돌리기 한 걸음은 부르는 쪽이 <see cref="PushUndo"/> 로 찍는다. 바뀐 것이 없으면 <c>false</c>.
     /// </summary>
     /// <remarks>자리가 있는데 체인에 없던 센서(팔레트)는 체인에 들어오고, 자리를 뺀 센서는 팔레트로 간다.</remarks>
     /// <param name="tieOrder">같은 자리 센서끼리의 차례 — 없으면 지금 체인 순서(끌어 옮긴 센서를 이미 있는 센서 앞 · 뒤에 둘 때 준다).</param>
@@ -641,7 +667,6 @@ public sealed class WiringBoard
                 return WiringChain.Create(chain.Shape, order, palette, chain.IsControllerGapExplicit ? chain.ControllerGap : null);
             }, order, force: true);
         }
-        else Renumber();
         return true;
     }
 
@@ -652,7 +677,7 @@ public sealed class WiringBoard
         var numbers = _rows.Select(r => r.Facts.Number).ToList();
         var changed = !Equals(_fence.Bands, bands);
         _fence = _fence.WithBands(bands);
-        Renumber();
+        if (changed) Renumber();        // 대역이 바뀌었을 때만 — 같은 대역을 다시 골라도 손으로 고친 번호를 덮지 않는다
         return changed || !numbers.SequenceEqual(_rows.Select(r => r.Facts.Number));
     }
 
@@ -676,6 +701,7 @@ public sealed class WiringBoard
 
     /// <summary>
     /// 대역이 있으면 체인 순서대로 번호를 다시 매긴다 — 바뀐 줄의 <see cref="WiringSensorRow.Facts"/> 번호만 고친다(Draft · 되돌리기 장면에 든다).
+    /// 부르는 곳은 셋뿐이다: 체인 순서가 바뀔 때 · 체인 구성원이 바뀔 때(<see cref="Edit"/>) · 대역이 바뀔 때(<see cref="SetNumberBands"/>).
     /// </summary>
     private int Renumber()
     {
@@ -688,6 +714,7 @@ public sealed class WiringBoard
             row.Facts = row.Facts with { Number = number };
             changed++;
         }
+        _renumbered += changed;
         return changed;
     }
     #endregion
@@ -828,7 +855,8 @@ public sealed class WiringBoard
         {
             var (mounts, panels) = FenceLayoutMath.Reconcile(basis.Keys, _chain.Keys, _fence.Mounts, _fence.Panels, CategoryOf);
             _fence = _fence.With(panels, mounts);
-            Renumber();
+            // 번호는 체인 순서 · 구성원이 실제로 바뀌었을 때만 다시 매긴다(사람이 누른 같은 배치 — force — 로는 번호를 덮지 않는다).
+            if (!basis.Keys.SequenceEqual(_chain.Keys)) Renumber();
         }
         return true;
     }
