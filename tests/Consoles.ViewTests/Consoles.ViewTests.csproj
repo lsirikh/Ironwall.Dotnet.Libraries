@@ -24,6 +24,8 @@
   <!-- 화면 밖 호스트(Application 상주 · 호스트 App.xaml 과 같은 병합 순서)는 계정 뷰 시험의 것을 그대로 쓴다(사본을 만들지 않는다) -->
   <ItemGroup>
     <Compile Include="../Accounts.Ui.ViewTests/AppHost.cs" Link="Linked/AppHost.cs" />
+    <!-- "?" 계약의 글 훑기(help-callout H-1) — Utils.Tests 의 정본을 연결한다: 거기는 글끼리, 여기는 런타임 등록과 견준다 -->
+    <Compile Include="../../Ironwall.Dotnet.Libraries.Utils.Tests/Help/HelpSourceScan.cs" Link="Linked/HelpSourceScan.cs" />
   </ItemGroup>
 
   <ItemGroup>

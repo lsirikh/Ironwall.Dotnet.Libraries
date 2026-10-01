@@ -1,0 +1,254 @@
+﻿# help-callout NFR-02 — 화면에 박힌 설명형 문구의 허용 목록(H-1 시점 재고). 형식: 경로<TAB>종류<TAB>값
+# 종류: binding = *Hint · *Note · *Explain* 바인딩 / literal = Note= · Hint= 글자 값 / text = 40자 이상 TextBlock 글자.
+# 줄이 빠지는 것은 좋다(H-2 ~ H-4 이전). 새 줄은 HelpContractTests 가 막는다 — 설명은 "?"(HelpCatalog)로.
+# 다시 찍기: IRONWALL_HELP_ALLOWLIST_WRITE=1 dotnet test --filter should_not_add_new_explanatory_text
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	binding	Hint=ListEmptyHint
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	binding	Hint=NoGroupHint
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	literal	Hint=위 ‘구성원 추가’에서 계정을 고른 뒤 [추가]를 누르세요.
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	literal	Note=비우면 기한 없이 부여합니다.
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	목록에서 세션을 고르면 단말 · 만료 시각과 종료 단추가 여기에 나옵니다.
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	방패(서버 적용) 표시가 없는 모듈의 제어 권한은 화면의 단추만 막습니다.
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountConsolePanelView.xaml	text	왼쪽 칸에서 값을 바꾼 뒤 아래 [저장]을 누르세요. 잘못 바꿨으면 [되돌리기]를 누르세요. 바꾼 값은 다음 로그인부터 적용됩니다.
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 잠그지 않음 · 3~20회
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 제한 없음 · 0~100
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 지우지 않음 · 0~3650일
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=0 = 직접 풀 때까지 · 1~1440분
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=1~168시간
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AccountSetupPanelView.xaml	literal	Note=1~90일
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AuditLogPanelView.xaml	literal	md:HintAssist.Hint=시작일
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/AuditLogPanelView.xaml	literal	md:HintAssist.Hint=종료일
+Ironwall.Dotnet.Libraries.Accounts.Ui/Views/Panels/PermissionMatrixPanelView.xaml	text	※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 이 그룹의 권한이 반영됩니다 (ADMIN).
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	binding	Text=CatalogNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	binding	Text=FooterNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	binding	Text=PrimaryHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	literal	Note=유형을 바꾸려면 빼고 다시 다세요
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	literal	Note=프리셋에는 담기지 않습니다 — 그 장비만의 값입니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	text	비워 두면 유형 기본값을 씁니다. 부품을 빼면 이 설정도 함께 지워집니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	text	빼는 곳 — 보드의 블록을 여기에 끌어 놓으면 빠집니다. [되돌리기]로 다시 넣을 수 있습니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	text	손잡이 ⣿ 를 끌어 순서를 바꾸세요 · 팔레트 블록을 끌어 놓으면 그 자리에 들어갑니다 · Alt+↑ Alt+↓ 로도 옮깁니다 · Delete 로 뺍니다 · 끄는 중 Esc 는 제자리로 돌아갑니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/AssemblyView.xaml	text	이 카테고리에 달 수 있는 부품만 보입니다 · 손잡이를 끌어 보드에 놓거나 Enter 로 끝에 다세요
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Assembly/PresetManagerView.xaml	text	프리셋은 이 PC에만 저장됩니다 — 다른 PC로 옮기려면 [내보내기]를 쓰세요.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/ByComponent/ByComponentView.xaml	literal	Hint=부품 유형이나 상태 · 건강 칩을 바꿔 보세요
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMetricHistoryView.xaml	binding	Text=Note
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMetricHistoryView.xaml	binding	Visibility=Note
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Note=ClearableNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Note=ClearableNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Note=PasswordNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	ReloadHint=SystemEventsNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	ReloadHint=SystemEventsNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Text=DetailEmptyHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Text=LastChangeNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Text=StatusIsObservedNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	ToolTip=AssignHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	Visibility=LastChangeNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	md:HintAssist.Hint=ModeHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	binding	md:HintAssist.Hint=ModeHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	literal	Note=상태가 마지막으로 바뀐 시각입니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	literal	Note=이름이나 접속 정보를 마지막으로 고친 시각입니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Servers/ServerMonitorView.xaml	literal	md:HintAssist.Hint=전체
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Units/UnitConsoleView.xaml	binding	Note=CodeNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Units/UnitConsoleView.xaml	text	왼쪽 편제에서 부대를 고르면 여기에 상세가 표시됩니다. 새로 만들려면 툴바의 [부대 등록]을 누르세요.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Units/UnitConsoleView.xaml	text	운용을 멈추려면 삭제 대신 [운용 중지]를 쓰세요. 이력과 소속은 그대로 남습니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/Fence/FenceView.xaml	binding	Visibility=HasFlatNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/Fence/FenceView.xaml	text	왼쪽 끌기 = 센서 선택 · 오른쪽 클릭 = 메뉴 · 휠 = 확대 · 전체 조작은 [?]
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=FacingNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=Line1Hint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=NameHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=NumberHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=PanelHeightHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=PanelSpanHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=SelectedChannelNote
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	Text=ZoneHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	binding	md:HintAssist.Hint=TypeHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	Alt+← → 한 칸 · Delete 빼기 · F 방향 · 손잡이로 끌기
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	값이 줄마다 다른 칸은 "— 여러 값 —" 으로 보입니다. 그 칸을 건드리지 않으면 줄마다 원래 값을 그대로 둡니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	고른 센서를 끌면 체인 순서를 지킨 채 함께 옮겨집니다 · Ctrl 클릭으로 더하거나 뺍니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	번호 = 대역 시작 + (그 종류 안의 위치 순서 − 1) · 현장 센서의 번호 설정과 같아야 합니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	오른쪽 클릭 → "이 설치 방식을 이 제어기 모든 센서에 적용"으로 퍼뜨립니다
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	이 제어기에 센서가 없습니다 — [＋ 센서 여러 개 만들기] 로 시작하세요.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	체크를 바꾼 그룹만 더하거나 뺍니다 — 나머지 그룹은 줄마다 그대로 둡니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Consoles/Wiring/WiringView.xaml	text	한 줄을 고르면 그 줄을 고칩니다. Ctrl 로 여러 줄을 고르면 [한꺼번에 채우기] 가 됩니다 — 그때 값이 줄마다 다른 칸은 "— 여러 값 —" 으로 보이고, 건드리지 않은 칸은 줄마다 원래 값을 그대로 둡니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=FW 버전
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=GIS 특정위치 확인 반경(m). 예: 120
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=HW 식별자
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=MAC Address
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=ONVIF 규격 버전
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=모델명
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=시리얼/식별자
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=장비 명칭
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=제조사
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraInfoView.xaml	literal	md:HintAssist.Hint=현재 설치 지역
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=*******
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=192.168.0.10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=9000
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=admin
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraSelectionView.xaml	literal	md:HintAssist.Hint=카메라001
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=http://...
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=http://...
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=http://...
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=http://.../onvif/device_service
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=rtsp://...
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/CameraUrlsView.xaml	literal	md:HintAssist.Hint=rtsp://...
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=100
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=192.168.0.10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=9000
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerDeviceView.xaml	literal	md:HintAssist.Hint=제어기_01 / 펜스센서_001
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=192.168.0.10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=9000
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/ControllerSelectionView.xaml	literal	md:HintAssist.Hint=제어기_01
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Dashboards/DeviceDashboardView.xaml	binding	Hint=EmptyHint
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Dashboards/DeviceDashboardView.xaml	text	서버 버전을 확인하지 못해 기본 화면으로 표시합니다. 목록이 비어 보이면 [다시 확인]을 누르세요.
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/DeviceAxisHeadView.xaml	text	여러 장비가 선택되었습니다 — 접속·형상·상태·설정 정보는 한 대를 선택하면 표시됩니다.
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/DeviceGroupSelectionView.xaml	literal	md:HintAssist.Hint=1구역
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/DeviceGroupSelectionView.xaml	literal	md:HintAssist.Hint=설명
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=CLOSED
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureSelectionView.xaml	literal	md:HintAssist.Hint=함체_01
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: -10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: 10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: 10.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: 200
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: 45
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/EnclosureThresholdSettingView.xaml	literal	md:HintAssist.Hint=예: 80
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/GateSelectionView.xaml	literal	md:HintAssist.Hint=통문_01
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=192.168.0.10
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=9000
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=admin
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=경광등_01
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=설명
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/LampSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/CameraDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/ControllerDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/EnclosureDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/GateDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/LampDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/SensorDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/Panels/SpeakerDevicePanelView.xaml	literal	md:HintAssist.Hint=종류 필터
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorDeviceView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorDeviceView.xaml	literal	md:HintAssist.Hint=100
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorDeviceView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorDeviceView.xaml	literal	md:HintAssist.Hint=펜스센서_01-001
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SensorSelectionView.xaml	literal	md:HintAssist.Hint=펜스센서_001
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=0~360°
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=1
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=IP
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=v1.0
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=경도
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=고도(m)
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=설명
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=설치 위치
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=스피커_01
+Ironwall.Dotnet.Libraries.Devices.Ui/Views/SpeakerSelectionView.xaml	literal	md:HintAssist.Hint=위도
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	binding	Hint=MappingEmptyHint
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	binding	Hint=PaletteEmptyHint
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Mapping/MappingWorkbenchView.xaml	literal	md:HintAssist.Hint=장비 검색
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=CloseNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=LayoutNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=ModeNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Note=ProviderNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=BrokerMonitorNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=MonitorNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=PlacementNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Text=VmsNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	ToolTip=VmsNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	ToolTip=VmsNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	binding	Visibility=HasBrokerMonitorNote
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=1~10. 넘으면 가장 오래된 창(📌 제외)을 닫고 새 창 — 카드는 그대로
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=NVR 관제석 모니터 · 칸(3×3). 모니터 목록은 NVR Manager 에게 묻습니다
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=결과(띄움 · 거부 · 무응답)는 지도 하단 토스트로 알립니다
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=설치 때 자동 부여 · 바꿀 수 없음
+Ironwall.Dotnet.Libraries.Events.Ui/Consoles/Settings/CameraPopup/CameraPopupSettingsView.xaml	literal	Note=창 안 카메라는 이벤트 매핑 순서(priority)대로
+Ironwall.Dotnet.Libraries.Events.Ui/Views/ActionSelectionView.xaml	literal	md:HintAssist.Hint=작성자
+Ironwall.Dotnet.Libraries.Events.Ui/Views/ActionSelectionView.xaml	literal	md:HintAssist.Hint=조치 내용
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	literal	md:HintAssist.Hint=기타 내용을 적으세요
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	literal	md:HintAssist.Hint=문구를 고르세요
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/ActionTrayView.xaml	text	탐지 · 장애 행의 손잡이를 끌어 여기에 놓으세요. 툴바의 [트레이에 담기] 버튼으로도 담을 수 있습니다.
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=EmptyHint
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=LockNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Text=Note
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Visibility=HasLockNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventDetailView.xaml	binding	Visibility=HasNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventOverviewView.xaml	binding	Text=DeviceGroupNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/EventOverviewView.xaml	binding	Text=TotalNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDetailView.xaml	binding	Text=DetailNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDetailView.xaml	binding	Visibility=HasDetailNote
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=HH:MM
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=HH:MM
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=YYYY-MM-DD HH:MM
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=YYYY-MM-DD HH:MM
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Consoles/SuppressionDrawerView.xaml	literal	md:HintAssist.Hint=이름 검색
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Dashboards/EventDashboardView.xaml	binding	Hint=EmptyStateHint
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/DetectionEventCardView.xaml	literal	md:HintAssist.Hint=센서 번호
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/DetectionEventCardView.xaml	literal	md:HintAssist.Hint=신호 크기
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/DetectionEventCardView.xaml	literal	md:HintAssist.Hint=이벤트 시간
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/DetectionEventCardView.xaml	literal	md:HintAssist.Hint=이벤트종류
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/DetectionEventCardView.xaml	literal	md:HintAssist.Hint=제어기 번호
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/MalfunctionEventCardView.xaml	literal	md:HintAssist.Hint=센서 번호
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/MalfunctionEventCardView.xaml	literal	md:HintAssist.Hint=이벤트 시간
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/MalfunctionEventCardView.xaml	literal	md:HintAssist.Hint=장애원인
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Events/MalfunctionEventCardView.xaml	literal	md:HintAssist.Hint=제어기 번호
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelView.xaml	literal	md:HintAssist.Hint=예: GOP 3구역 펜스 보수
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelView.xaml	literal	md:HintAssist.Hint=＋ 그룹 추가…
+Ironwall.Dotnet.Libraries.Events.Ui/Views/Panels/EventSuppressionSchedulePanelView.xaml	literal	md:HintAssist.Hint=＋ 장비 추가…
+Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/MapRegistrationStyle.xaml	literal	md:HintAssist.Hint=레이어 이름 입력
+Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PlaybackConsoleStyle.xaml	binding	Text=Calendar.Hint
+Ironwall.Dotnet.Libraries.GMaps.Ui/Views/Maps/MapView.xaml	binding	Text=MeasureHint
+Ironwall.Dotnet.Libraries.Gateway/Views/GatewaySetupView.xaml	literal	Hint=[추가]를 눌러 연동 이벤트를 만드세요
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Hint=DetailEmptyHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Text=EmptyStateHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	binding	Visibility=EmptyStateHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ActionReportTemplateConsoleView.xaml	text	문구를 끌거나, 고른 뒤 Alt+↑/↓ 또는 오른쪽 ▲▼ 로 순서를 바꿉니다.
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Hint=TemplateDetailEmptyHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Value=ListViewModel.EmptyStateHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportConsoleView.xaml	binding	Value=TemplateViewModel.EmptyStateHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportCreateDetailView.xaml	literal	Note=표준 전체에서는 고르지 않습니다
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportCreateDetailView.xaml	text	아무것도 고르지 않으면 전 심각도입니다. 시스템 이벤트 계열에만 적용됩니다.
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportPreviewView.xaml	binding	Text=SurfaceHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportPreviewView.xaml	binding	Visibility=HasSurfaceHint
+Ironwall.Dotnet.Libraries.Reports.Ui/Views/Panels/ReportTemplateDetailView.xaml	binding	Text=ReorderHint
+Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=이벤트 탐지 자동 해제
+Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=이벤트 탐지 자동 해제
+Ironwall.Dotnet.Libraries.Sounds.Ui/Views/SoundSettingView.xaml	literal	md:HintAssist.Hint=탐지경보 자동해제
+Ironwall.Dotnet.Libraries.Utils/Themes/Generic.xaml	binding	Value=InputHint
