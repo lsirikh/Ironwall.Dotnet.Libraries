@@ -133,7 +133,7 @@
 										Kind="ImageOffOutline" />
 									<Image
 										RenderOptions.BitmapScalingMode="HighQuality"
-										Source="{Binding ThumbnailUri, Mode=OneWay}"
+										Source="{Binding Thumbnail, Mode=OneWay}"
 										Stretch="UniformToFill"
 										Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}" />
 								</Grid>

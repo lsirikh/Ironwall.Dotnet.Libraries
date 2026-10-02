@@ -4,6 +4,7 @@ using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Monitoring.Models.Events;
+using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 /****************************************************************************
@@ -63,5 +64,59 @@ public class DetectionEventCardViewModelTests
 
         // Assert
         Assert.Equal("/api/thumbnails/rotated.jpg", model.Thumbnail);
+    }
+
+    [Fact]
+    public void should_return_null_thumbnail_when_model_has_no_thumbnail()
+    {
+        // Arrange
+        var card = CreateCard(new DetectionEventModel());
+
+        // Act
+        var image = card.Thumbnail;
+
+        // Assert — 뷰는 뒤의 기본 아이콘을 보인다
+        Assert.Null(image);
+        Assert.False(card.HasThumbnail);
+    }
+
+    [Fact]
+    public void should_notify_thumbnail_image_when_update_has_new_thumbnail()
+    {
+        // Arrange — 카드 뷰는 Image.Source 를 Thumbnail(ImageSource)에 묶는다 → 그 이름이 반드시 울려야 다시 그린다
+        var card = CreateCard(new DetectionEventModel { Thumbnail = "/api/thumbnails/old.jpg" });
+        var raised = new List<string?>();
+        card.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // Act
+        card.ApplyThumbnailUpdate("/api/thumbnails/rotated.jpg", null, null);
+
+        // Assert
+        Assert.Contains(nameof(DetectionEventCardViewModel.Thumbnail), raised);
+    }
+
+    [Fact]
+    public void should_expose_decoded_image_when_thumbnail_file_loads()
+    {
+        // Arrange — 1×1 PNG 를 임시 파일로 두고 절대 file URI 를 썸네일로 준다(로컬은 동기 로드)
+        var path = Path.Combine(Path.GetTempPath(), $"card-thumb-{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(path, Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
+        try
+        {
+            var card = CreateCard(new DetectionEventModel { Thumbnail = new Uri(path).AbsoluteUri });
+
+            // Act — 첫 읽기는 로드를 걸고, 다음 읽기는 캐시에서 받는다
+            _ = card.Thumbnail;
+            var image = card.Thumbnail;
+
+            // Assert — Uri 가 아니라 디코드된 이미지가 뷰로 간다
+            Assert.NotNull(image);
+            Assert.True(image!.IsFrozen);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

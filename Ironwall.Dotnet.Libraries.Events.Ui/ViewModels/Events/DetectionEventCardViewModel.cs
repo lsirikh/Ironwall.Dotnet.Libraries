@@ -13,6 +13,7 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
     /****************************************************************************
@@ -175,6 +176,25 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         /// 카드 크기는 장애 카드와 동일 고정(220×200 / 뒷면 250×200) — 썸네일은 그 안에 들어가는 상단 밴드.</summary>
         public bool HasThumbnail => ThumbnailUri != null;
 
+        // 마지막으로 그려진 이미지 — 새 판(?v=N)을 받는 동안 빈 칸 대신 이전 사진을 유지한다.
+        private ImageSource? _lastThumbnail;
+
+        /// <summary>썸네일 이미지 — 원격 URL을 1회 다운로드→OnLoad 디코드→Freeze 캐시(<see cref="ThumbnailImageLoader"/>).
+        /// 카드 목록은 컨테이너를 재활용(Recycling)하고 앞/뒷면을 뒤집어 시각트리가 내려갔다 올라오는데,
+        /// Uri 를 Image.Source 에 직접 묶으면 그 재실현 때 원격 이미지를 다시 그리지 못해 기본 아이콘만 남았다
+        /// (그리드 · 속성창은 이 로더로 이미 옮겨졌고 카드만 남아 있었다). 로드 전이면 직전 사진, 처음이면 null.</summary>
+        public ImageSource? Thumbnail
+        {
+            get
+            {
+                var uri = ThumbnailUri;
+                if (uri is null) return null;
+                var image = ThumbnailImageLoader.GetOrLoad(uri, () => NotifyOfPropertyChange(nameof(Thumbnail)));
+                if (image is not null) _lastThumbnail = image;
+                return image ?? _lastThumbnail;
+            }
+        }
+
         /// <summary>
         /// SYNC_DETECTION{UPDATED} 재조회 결과를 카드 모델에 in-place 반영하고 뷰를 재렌더한다.
         /// 반드시 UI 스레드에서 호출(EventCardListPanelViewModel 핸들러가 UI 스레드에서 호출).
@@ -194,6 +214,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             _thumbVersion++;   // 같은 URL이어도 캐시버스트로 재로딩
             NotifyOfPropertyChange(nameof(ThumbnailUri));
             NotifyOfPropertyChange(nameof(HasThumbnail));
+            NotifyOfPropertyChange(nameof(Thumbnail));
         }
         #endregion
         #region - Attributes -
