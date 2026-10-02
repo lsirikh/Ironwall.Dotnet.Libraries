@@ -34,7 +34,8 @@ public static class DevicePresetSeeds
         new(2026, 9, 19, 0, 0, 0, TimeSpan.FromHours(9));
 
     public const string EnclosureStandardId = "seed-enclosure-standard";
-    public const string ControllerIo16Id = "seed-controller-io16";
+    /// <summary>표준 제어기 — Id 글자는 옛 "IO 제어기 16채널" 그대로다(손대지 않은 옛 씨앗이 새 판으로 바뀌도록).</summary>
+    public const string ControllerStandardId = "seed-controller-io16";
     public const string GateSlidingId = "seed-gate-sliding";
     public const string CameraPtzColdId = "seed-camera-ptz-cold";
     public const string SensorFenceId = "seed-sensor-fence";
@@ -42,7 +43,7 @@ public static class DevicePresetSeeds
     /// <summary>본보기 다섯.</summary>
     public static IReadOnlyList<DevicePreset> All => new[]
     {
-        EnclosureStandard(), ControllerIo16(), GateSliding(), CameraPtzCold(), SensorFence(),
+        EnclosureStandard(), ControllerStandard(), GateSliding(), CameraPtzCold(), SensorFence(),
     };
 
     /// <summary>표준 옥외 함체 — 도어 · 온습도 · 히터 · 팬 · UPS.</summary>
@@ -73,29 +74,33 @@ public static class DevicePresetSeeds
             """),
     };
 
-    /// <summary>IO 제어기 16채널 — 접점 16 + NIC. key 는 <c>ci_01</c>‥<c>ci_16</c>, 채널도 같이 붙는다.</summary>
-    private static DevicePreset ControllerIo16()
+    /// <summary>
+    /// 표준 제어기 — 실제 단자 그대로: 접점 2 + 이더넷 1. (실물에는 RS485 2 도 있다 — 아래 remarks.)
+    /// </summary>
+    /// <remarks>
+    /// <para>예전 씨앗은 "IO 제어기 16채널"(접점 16 + NIC)이었는데 실제 제어기와 맞지 않았다 — 사용자 확인(2026-10-02):
+    /// "제어기에는 2개의 RS485 와 1개의 이더넷, 2개의 접점이 있다".</para>
+    /// <para><b>RS485 두 포트는 아직 담지 못한다</b> — 서버 부품 카탈로그에 RS485 포트 부품 유형이 없다
+    /// (서버에서 RS485 는 센서의 <c>connection.type</c> 일 뿐이고, 제어기에 달 수 있는 부품은 CONTACT_INPUT ·
+    /// NETWORK_INTERFACE 둘뿐). 유형이 생기면 여기에 더한다. Id 는 그대로 둔다 — 손대지 않은 옛 씨앗이
+    /// <see cref="RefreshIfUntouched"/> 로 이 판으로 바뀐다.</para>
+    /// </remarks>
+    private static DevicePreset ControllerStandard() => new()
     {
-        var components = new List<ComponentDefinitionModel>();
-        for (var i = 1; i <= 16; i++)
+        Id = ControllerStandardId,
+        Name = "표준 제어기 (접점 2 · 이더넷)",
+        Category = EnumDeviceCategory.Controller,
+        TypeAxisCode = "IoController",
+        Description = "접점 2 + 이더넷 1 (RS485 2 는 서버 부품 유형 대기)",
+        UpdatedAt = SeededAt,
+        IsSeed = true,
+        Components = new List<ComponentDefinitionModel>
         {
-            var index = i.ToString("00", CultureInfo.InvariantCulture);
-            components.Add(Component("CONTACT_INPUT", $"ci_{index}", $"단자 {i}", i));
-        }
-        components.Add(Component("NETWORK_INTERFACE", "nic", null));
-
-        return new DevicePreset
-        {
-            Id = ControllerIo16Id,
-            Name = "IO 제어기 16채널",
-            Category = EnumDeviceCategory.Controller,
-            TypeAxisCode = "IoController",
-            Description = "접점 16 + NIC",
-            UpdatedAt = SeededAt,
-            IsSeed = true,
-            Components = components,
-        };
-    }
+            Component("CONTACT_INPUT", "ci_1", "접점 단자 1", 1),
+            Component("CONTACT_INPUT", "ci_2", "접점 단자 2", 2),
+            Component("NETWORK_INTERFACE", "nic", "이더넷 포트"),
+        },
+    };
 
     /// <summary>슬라이딩 통문 — 구동부 · 도어센서 · 리미트 2. 문 부품의 key 가 함체와 다르다(<c>actuator</c>).</summary>
     private static DevicePreset GateSliding() => new()

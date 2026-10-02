@@ -60,6 +60,28 @@ public class AssemblyViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task should_not_bring_back_a_ghost_selection_when_a_removed_slot_is_undone()
+    {
+        // 고른 블록을 빼고 [되돌리기] 하면 그 블록이 '고른 것' 모양으로 돌아오는데 목록 선택도 속성 칸도 비어 있었다 —
+        // [고른 것 빼기]는 켜져 있고 속성 칸은 "고른 블록이 없습니다". 실창 시험 SC-ASM-009 가 속성 칸을 못 찾은 이유.
+        var vm = await OpenAsync(AssemblyViewModel.Compose(EnumDeviceCategory.Enclosure, new FakeCatalog(), NewStore(), new FakeDialogs()));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "DOOR_SENSOR"));
+        vm.AddFromPalette(vm.Palette.Single(p => p.Code == "HEATER"));
+        var heater = vm.BoardItems[1];
+        vm.OnBoardSelectionChanged(new[] { heater });
+
+        vm.RemoveSelected();
+        vm.OnBoardSelectionChanged(Array.Empty<BoardSlotViewModel>());   // 목록에서 빠진 선택 — ListBox 가 빈 선택을 알린다
+        vm.Undo();
+
+        Assert.Contains(heater, vm.BoardItems);
+        Assert.False(heater.IsSelected);                 // 고른 것 모양이면 속성 칸에도 올라 있어야 한다 — 둘 다 아니어야 같다
+        Assert.Equal(0, vm.SelectedCount);
+        Assert.False(vm.CanRemoveSelected);
+        Assert.Null(vm.Inspected);
+    }
+
+    [Fact]
     public async Task should_add_at_the_end_when_enter_is_pressed_on_a_palette_item()
     {
         var vm = await OpenAsync(AssemblyViewModel.Compose(EnumDeviceCategory.Enclosure, new FakeCatalog(), NewStore(), new FakeDialogs()));

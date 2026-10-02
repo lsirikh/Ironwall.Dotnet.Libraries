@@ -76,7 +76,10 @@ public class DevicePresetStoreTests : IDisposable
 
         // 목업의 다섯 — 이름 · 카테고리 · 부품 수
         Assert.Equal(7, store.Presets.Single(p => p.Name == "표준 옥외 함체").Components.Count);
-        Assert.Equal(17, store.Presets.Single(p => p.Name == "IO 제어기 16채널").Components.Count);
+        // 실제 제어기 단자 — 접점 2 + 이더넷 1 (RS485 2 는 서버 부품 유형이 생기면 더한다)
+        var controller = store.Presets.Single(p => p.Name == "표준 제어기 (접점 2 · 이더넷)");
+        Assert.Equal(new[] { "CONTACT_INPUT", "CONTACT_INPUT", "NETWORK_INTERFACE" }, controller.Components.Select(c => c.Type).ToArray());
+        Assert.Equal(new int?[] { 1, 2, null }, controller.Components.Select(c => c.Channel).ToArray());
         Assert.Equal(5, store.Presets.Single(p => p.Name == "슬라이딩 통문").Components.Count);
         Assert.Equal(5, store.Presets.Single(p => p.Name == "PTZ 카메라 (한랭지)").Components.Count);
         Assert.Equal(2, store.Presets.Single(p => p.Name == "펜스 진동 센서").Components.Count);
@@ -321,6 +324,28 @@ public class DevicePresetStoreTests : IDisposable
         var camera = reopened.Presets.Single(p => p.Id == DevicePresetSeeds.CameraPtzColdId);
         Assert.Equal("NORMAL", (string?)camera.Modes!["camera_mode"]);
         Assert.True(camera.IsSeed);
+    }
+
+    /// <summary>옛 "IO 제어기 16채널"(접점 16 + NIC)이 손대지 않은 채 남은 PC 는 실제 단자(접점 2 + 이더넷)로 바뀐다.</summary>
+    [Fact]
+    public void should_replace_the_old_sixteen_contact_controller_seed_when_it_is_untouched()
+    {
+        NewStore().Load();
+        var file = JObject.Parse(File.ReadAllText(_path));
+        var entry = ((JArray)file["presets"]!).Single(p => (string?)p["id"] == DevicePresetSeeds.ControllerStandardId);
+        entry["name"] = "IO 제어기 16채널";
+        var parts = new JArray();
+        for (var i = 1; i <= 16; i++) parts.Add(new JObject { ["key"] = $"ci_{i:00}", ["type"] = "CONTACT_INPUT", ["channel"] = i });
+        parts.Add(new JObject { ["key"] = "nic", ["type"] = "NETWORK_INTERFACE" });
+        entry["components"] = parts;
+        File.WriteAllText(_path, file.ToString());
+
+        var reopened = NewStore();
+        reopened.Load();
+
+        var controller = reopened.Presets.Single(p => p.Id == DevicePresetSeeds.ControllerStandardId);
+        Assert.Equal("표준 제어기 (접점 2 · 이더넷)", controller.Name);
+        Assert.Equal(3, controller.Components.Count);
     }
 
     /// <summary>사용자의 손이 닿은 씨앗(이름 바꾸기 → 시각이 바뀜)은 건드리지 않는다.</summary>

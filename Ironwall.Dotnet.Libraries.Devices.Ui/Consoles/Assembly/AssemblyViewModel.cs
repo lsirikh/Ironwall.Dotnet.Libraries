@@ -238,7 +238,13 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
         // 비우고 다시 채우면 목록의 선택이 풀리고 속성 칸이 닫힌다(순서를 바꿀 때마다 · 되돌릴 때마다).
         // 빠진 것만 빼고, 새 것만 끼우고, 자리가 바뀐 것은 옮긴다 — 목록은 Move 에서 선택을 지킨다.
-        foreach (var gone in BoardItems.Where(i => !wanted.Contains(i)).ToList()) BoardItems.Remove(gone);
+        // 빠진 항목의 '고른 것' 표지도 같이 내린다 — 항목은 슬롯별로 보관돼 [되돌리기] 때 그대로 돌아오는데, 표지가 남으면
+        // 목록 선택도 속성 칸도 비어 있는 채로 '고른 것' 모양 · [고른 것 빼기] 활성으로 돌아왔다(실창 SC-ASM-009).
+        foreach (var gone in BoardItems.Where(i => !wanted.Contains(i)).ToList())
+        {
+            gone.IsSelected = false;
+            BoardItems.Remove(gone);
+        }
         for (var index = 0; index < wanted.Count; index++)
         {
             if (index < BoardItems.Count && ReferenceEquals(BoardItems[index], wanted[index])) continue;
