@@ -3961,9 +3961,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-32316
+- **현재 세션 ID**: ppid-18764
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-32316
+- **활성 세션 목록**: ppid-18764
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
