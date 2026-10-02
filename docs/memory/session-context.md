@@ -1,5 +1,110 @@
 # 세션 컨텍스트
 
+## ▶▶ 재개 포인트 (2026-10-02 01:55 — **SSO: 다시 로그인 자동 복귀 · 에이전트 종료 실기 통과**)
+
+- 커밋: `e70a2010` 안내 문구 · `a5d18dc8` session-available 자동 복귀 + exit-requested 종료. 에이전트 3.10.15(SALP 1.5).
+- 실기 통과(01:51): 이 앱만 로그아웃 → [다시 로그인] → 0.4초 자동 로그인 · [프로그램 종료] 로그인 중/로그인 화면 모두 정상 종료.
+- 남은 실기: 전체 로그아웃 → 에이전트 로그인 → 자동 복귀(login) · 전체 로그아웃 뒤 단추 → 에이전트 로그인 창 · 종료 메뉴 꺼짐 · **1시간(만료 전 재교환) 한 번도 끝까지 못 감**.
+- 주의: 앱 INFO 로그는 조용할 때 메모리에 버퍼링 — 정상 종료해야 파일로 내려옴(진단 시 시각 판정 불가).
+
+## ▶▶ 재개 포인트 (2026-10-01 17:46 — **SSO: 만료 전 재교환 · Watch · SSO 로그인 단추 완료**)
+
+- `4cd134aa` 만료 120초 전 재교환(SSO 세션이 매시간 튕기던 결함) · `d4d11da8` Watch + "SSO 로 로그인" 단추.
+- 실기: 17:43:53 에이전트 "이 앱만 로그아웃" → 0.04초 만에 GIS 자기 GOP 세션 로그아웃 + 로그인 화면(세션 4108). 단추로 재로그인(4109).
+- 남은 것: 시험 3(4109 기준 ~18:42 만료 전 재교환) · 시험 4 전체 로그아웃(세 쪽 대조) · SSO 다음 판(이 앱만 로그아웃 뒤 막힘) · SSO W1~W3 답.
+- 이 PC 에 Codex 앱 화면 조작(cua) 프로세스가 돌고 있음 — 실기 시험 섞임 주의(사용자에게 알림).
+
+## ▶▶ 재개 포인트 (2026-10-01 13:35 — **SSO 실기 성공: 로그인 화면 건너뛰기 동작**)
+
+- 서버팀이 13:26 개발 서버에 SSO 묶음 + `SSO_ENABLED=true` 배포. **13:31 GIS 첫 실물 교환 성공** — 로그인 화면 없이
+  메인, 권한(ADMIN) · 장비 조회 · 지도 초기화 정상. 재기동도 성공(세션 4085→4086). 결과 문서
+  `docs/coordinations/GOP_Server_API_sso_exchange_live_RESULT_20261001.md`(서버 · SSO 레포에 전달).
+- 남은 시험: ③ 만료(15:31 이후) `401` → 재교환 ④ SSO 에이전트 로그아웃 → back-channel(SSO 와 시각 맞춤) ⑤ GIS 로그아웃 뒤 자동 재시도 없음(사람과 함께).
+- SSO 회신 개선 2건 미반영: 파이프 목록 없으면 수십 ms 뒤 재확인 · `ConsentRequired` 면 몇 초 간격 최대 60초 재시도.
+- 개발 빌드 exe 가 `gis-monitoring` 으로 허용돼 있음(사용자가 직접 허용, consents 2건).
+
+## ▶▶ 재개 포인트 (2026-10-01 — **SSO 연동: GIS 쪽 구현 끝 · 서버 배포만 기다림**)
+
+**지금 멈춘 자리**: ✅ **GIS 쪽 코드는 다 끝났다.** 커밋 `fbb9be39`(교환 · 401 재교환 · 세션 조정자) ·
+`5228ea68`(로그인 화면 건너뛰기 — 처음 패널이 열릴 때 1회 SSO 시도 · 비밀번호 로그인과 같은 마무리 코드).
+시험 Accounts.Api 230 · Sso 40 · Accounts.Ui.Tests 301 통과 · 호스트 빌드 오류 0 · 호스트 출력에 SSO DLL 3종.
+- **남은 것은 남의 손**: 개발 서버(현재 8.0.6=외곽함체 판)에 **`/api/auth/sso-exchange` 가 없다(404)** — 교환 코드는
+  서버 브랜치 `harness/t-20260930-182544-28d6` 에만 있다. 404 는 조용한 폴백이라 **서버가 배포하면 설정 없이 켜진다.**
+  배포되면 할 일: 실제 왕복 1회 + 실기 로그인 화면 건너뛰기 확인.
+- SSO 팀: `gis-probe` 등록 삭제 요청 · S-20 / 3.10.8.
+- ⚠ **하네스 phase 가 `prd` 로 남아 있다** — 내가 `advance-phase.js prd` 를 잘못 실행해 dev→prd 로 옮겼고(activePrd 는
+  그대로 타 세션 것), dev 복귀는 게이트가 막았다. 사용자 지시("남의 프로젝트 건드리지 말 것")로 **더 손대지 않았다.**
+  그 사이클 주인 세션이 dev 로 되돌려야 한다. `--force` 금지.
+
+## ▶▶ 재개 포인트 (2026-10-01 새벽 — **SSO 연동: ② 확정 · 세션 축 결함 수정 완료 · U17 측정 직전**)
+
+**지금 멈춘 자리**: ✅ **여기까지 끝났다.** 표본 ⓐ·ⓒ 실측 완료 · U17 종결 · 정리(허용 취소·표본 삭제) 완료 ·
+커밋 `bb3f587c`. **다음은 두 가지를 기다린다** — ① 개발 서버 **8.0.6 교체**(지금 8.0.5, 교환 경로 404)
+② **SSO PRD 승인**(활성 PRD 가 타 세션 것이라 게이트에 안 잡힌다). 둘 다 오면 교환 호출부를 구현한다.
+
+### 10-01 아침에 더 진행된 것
+- ✅ **서버 교환 구현 완료(8.0.6)** — SSO 참조 벡터 27건 동일 판정 + PostgreSQL 왕복. **단 개발 서버는 8.0.5.**
+- ✅ **`retryable` 정정** — `aud` 불량이 `true`→**`false`**(무한 재교환 방지). **누락 시 `false`** 확정.
+- ✅ **rate limit 해소** — 키 `(IP, login_id)` + **실패만 센다** → 관제석 동시 기동 문제없음. `429`+`Retry-After`.
+- ✅ **U17 종결 실측**(`gis-probe`): 토큰 `iss` = `http://localhost:8091/`(끝 슬래시) = **서버 디스커버리(ⓐ)와 같음**,
+  에이전트(ⓒ)와 다름 · `refresh_token` 없음(C-15) · **`jti` 호출마다 새 값**(C-16) · `exp−iat=3600` ·
+  ⚠ 통보에 없던 **`x5t`** 헤더 · `session_id`=토큰 `sid`. 원장 `D-2026-09-30-8b9bf5`.
+- 🔴 **실사고**: 허용 창이 **두 개** 떠 있어 `gis-probe` 와 함께 **`gis-monitoring` 도 허용**됐다(해시 대조로 프로브
+  exe 확인). `trust --revoke` 둘 다 실행해 기준선 복귀. **진단 시 창마다 `client_id` 를 확인하고, 끝나면
+  `consents.json` 을 반드시 대조할 것.** SSO 에 창 표시 개선 제안.
+- 프로브 `tools/sso-token-probe` — 실측 모드 + **오프라인 판정 모드**(`--verify-file`, 합성 벡터 7종). 버림 코드.
+
+### 결정 — Q-1 이 닫혔다
+- **서버팀 PM 이 ②(`sso-exchange`)로 확정**(9/30 18:22). GOP 가 `POST /api/auth/sso-exchange` ·
+  `POST /api/auth/backchannel-logout` 을 만든다. **PRD→PM승인→구현, 일정 미정.**
+- 검증 규칙 10개 그대로 · `OIDC_REQUIRE_AUD` 처음부터 `true` · refresh 없음 · `server_time` 은 `data` 안 ·
+  **교환에서 헤더 `X-Client-Id` 필수**(없거나 패턴 위반 → 422).
+- 교환 경로는 같은 `(user_id, X-Client-Id)` 앞선 교환 세션을 **교체**한다(재교환=갱신). 전역
+  `session_self_replace_enabled` 는 안 건드린다.
+
+### 커밋된 것 (3건)
+- 라이브러리 `v2.6` — **`3a64d3d9`** 세션 축 `client_id` 단일화 · **`5f1013d7`** 기기 지문(이미지 복제 방어)
+- 호스트 `v0.5` — **`d670dce`** 🔴 `{sys}\netsh.exe` 3곳 복원(**설치기가 컴파일조차 안 되던 상태**였다) ·
+  **`c4acc7d`** 설치기 지문 기록 + `/clientid=` 무인 인자
+- 검증: `Accounts.Api` **209 통과 / 실패 0** · 솔루션 빌드 오류 0 · ISCC 컴파일 성공
+
+### 세션 축(`client_id`) — 정본이 바뀌었다
+- 정본 = **설치 고유값** `gis-<GUID12>`(설치기 FR-20 이 `%ProgramData%\Ironwall\Gis\client-id` 에 심는다).
+  이 PC 실측 `gis-fd44d1f63952`. **본문 = 헤더** 로 통일.
+- ⚠ **머신명 축은 폐기**했다. 옛 공용값 `central-ui`·`gis-monitoring` 은 세션 축으로 쓰지 않는다.
+- 새 파일 `Api/Helpers/ClientIdResolver.cs` 가 단일 정본. 지문은 `client-id.fingerprint` **별도 파일**
+  (값 파일을 여러 줄로 만들면 설치기 단일값 쓰기와 기존 배포본을 못 읽는다).
+
+### 🔴 내가 낸 오류 4건 (되풀이 금지)
+1. **브리지 안 A** — SSO 가 앱별 GOP 세션을 만들어 넘기자는 제안. **틀렸다.** ① GIS 는 종료 때
+   `LogoutOnExitService` 가 그 세션을 끝낸다(**우리 코드인데 확인 안 함**) → SSO 로그인 1회에 실행 1회만
+   ② GOP refresh 는 회전하며 옛 토큰을 블랙리스트에 넣어 SSO 보관본이 죽는다 ③ 수명이 SSO 세션을 넘긴다.
+   원장 `D-2026-09-30-68b8c6`.
+2. **`TOKEN_REPLAYED` 를 "재시도 불가" 로 판정** — 반대다. **복구 가능**이고 `details.retryable` 로 가른다.
+3. **`invalid_client` 를 "서버 미등록" 으로 단정** — 에이전트의 **낡은 캐시**였다(로그인 전이면 목록이
+   안 온다). 3.10.7 S-19 가 `no_active_session` 으로 갈라 줘서 방어 코드도 불필요해졌다.
+4. **이미지 복제 방어를 "설치기 몫" 이라 적음** — 거꾸로다. 복제 배포에서는 **설치기가 각 PC 에서 다시
+   돌지 않는다.** 매 실행 도는 **런타임이 주 방어선**이다.
+
+### 미검증 (통과로 적지 않는다)
+- **U17** 토큰의 실제 `iss`·`aud`·`jti`·`sid`·`sub` — 측정 직전
+- 실기 배포 설치본 동작 — `C:\PidsMonitoringSystem\` 에 **exe 가 없다**(설정·로그만 남은 껍데기)
+- 이미지 복제본에서의 재생성 — PC 한 대로는 지문 불일치를 만들 수 없다
+- 교환 실제 왕복 — 서버 엔드포인트 미구현
+
+### 대기 중 (남의 손)
+- **서버팀**: 구현 일정 · 🔴 **rate limit 이 전 사용자 공용**(Docker 게이트웨이 IP, 세션 3,645행 전수) 수정을
+  필수 항목으로 · 교환 한도값과 `429` 형태 · `retryable` 누락 시 기본값(우리·SSO 모두 `false` 의견)
+- **SSO**: S-20(`sso-server:<12자>` — SSO 서버도 고정 `X-Client-Id` 라 같은 함정) · 3.10.8
+- **하네스**: 활성 PRD 가 타 세션 것(부대 관계도)이라 **SSO PRD 승인이 게이트에 안 잡힌다.** 그 사이클이
+  끝나면 "승인" 한 번으로 잡힌다. PRD 는 `- **상태**: Draft` 형식으로 맞춰 뒀다.
+
+### 문서 정본
+- PRD `docs/prds/sso-integration-prd.md` **v0.4** · 3자 계약 `docs/coordinations/SSO_3party_integration_contract_20260930.md` **rev.5**
+- 완료 리포트 `docs/reports/client-id-session-axis-report.md` · 분석 `docs/analyses/client-id-image-clone-risk-analysis.md`
+- 참조 구현(서버팀 몫, SSO 제공): `api-test-server/docs/coordinations/reference/sso_exchange_verify.py` — `nbf` 는 **있을 때만** 검사
+
+
 ## ▶▶ 재개 포인트 (2026-09-23 저녁 — **PC 재부팅으로 중단. UI 결함 전수 수정 중 · 에이전트 8기 강제 중단 · 작업트리에 미완성 파일 있음**)
 
 **재개 후 진행(같은 날 저녁)**: 트리는 `SensorDeviceModel` 미구현(CS0535)으로 막혀 있었고 스텁으로 뚫은 뒤 에이전트 8기를 각자 끊긴 지점에서 재개. 닫힌 것 — D-21 `cf8a816f`(하네스 3b2 PASS) · D-27 계정 `cb0af19d` · D-22 `595c7c36` · 하네스 서버 스텝+스윕 13종 `c3df8ea4`(PASS 36/FAIL 0) · Events 뷰 묶음 `f019c022`. ★ D-16 은 **전제 오류로 기각** — 호스트 App.xaml:15-17 이 MahApps 카탈로그를 병합함; 테알 블록은 미리보기 도구가 그 목록을 복제하지 않은 아티팩트(D-28, 원장 `D-2026-09-23-338b38`). 아직 도는 것 — D-26 단일 선택 판정 · D-05/07 서버 헤더·콤보 · D-23 툴바 가로 밀림 · D-28 도구 충실성. 사용자 답 대기 — U-02 · U-03 · D-20 · 실기 A/B · 테알 스크린샷 출처(실앱인지 내 캡처인지).
@@ -85,7 +190,7 @@
   - **정리 대상**: 정션 `C:\workspace_app\worktrees\Ironwall.Dotnet.Libraries`(→ `v2.10.0`) — 워크트리를 지우기 전에 `rmdir` 로 **정션만** 제거. 워크트리·브랜치는 실기 수정에 대비해 남겨 둠.
   - **범위 밖 기록**: 이벤트 파이프라인이 통문을 센서로 해석(`DeviceModelConverter.cs:55` · 호스트 `NatsBrokerService.cs:410,470`) · 서버 요청 R-17(`PUT` 축 소실에 `warnings[]`) 우선순위 표 반영.
 
-- **현재 Phase**: complete
+- **현재 Phase**: prd
 - **★ 진행 현황 (2026-09-19 dev)**: PRD v1.0 **사용자 승인**("승인") → v1.1(FR-15 추가, 재승인 없이 기록) · Plan 62태스크 로드 · 원장 3행(`0f5434` 승인 결정 · `b5fce8` 워크트리 검증 방식 · `fd8c9a` PUT→PATCH)
   - **워크트리**: Libraries `C:\workspace_app\worktrees\v2.10.0`(브랜치 `v2.10.0`, 커밋 8개 `17ba879e`→`677572f0`) · Solution `C:\workspace_app\worktrees\sol-v0.6.0`(브랜치 `v0.6.0`, CHANGELOG 만 수정·미커밋). 롤백 태그 `before-device-console-v8` 양 레포. 스테일 라벨 `v2.10.0`·`v2.10.1`(6월, HEAD 에 완전 포함)은 `-d` 로 제거 후 재생성. **워크트리에 고아 소스 복사함**(OnvifSolution 49파일 · `GMap.NET/Directory.Build.props`·`sn.snk`) — 없으면 Devices.Ui 빌드 실패
   - **완료**: VER-01~08(03 은 `[-]`) · SETUP-01~03 · RISK-02·03 · FR-06(DB TryParse) · FR-02(해석기 `Messages/Helpers/DeviceTypeResolver` 이관) · FR-03(축 묶음 `Axes` + DTO 수신 원본 `ReceivedConnection`/`ReceivedDeviceConfig` + `DeviceAxesMapper` + meta 주입 20곳) · FR-04(병합 키 `(Id, 판별자)` · 통문 분기 · 축 복사) · FR-01(통문 Api CRUD 3종 · `GateDeviceProvider` · 삭제 메시지 · 위치 게이트웨이 · SYNC 판별자 라우팅) · **FR-15(축 계약 저장 PUT→PATCH + `AllowComponentsWrite`)**
@@ -1441,7 +1546,7 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - **호스트 경로 판단**: 맵 오버레이는 `LayerPanelControl.cs:342` `MaxPanelWidth=375`라 3-Pane 불가 → **좌측 메뉴 Conductor 패널(경로 B)** 뿐. 이 때문에 메인솔루션 변경이 불가피하다.
 
 ## ▶▶ 재개 포인트 (2026-09-03 — 27일 만의 재검증: "playwright로 검증 가능한 부분" 식별·재실행)
-- **마지막 업데이트**: 2026-09-23 10:02
+- **마지막 업데이트**: 2026-10-01 22:22
 
 **⚠ 용어 확정** — 이 프로젝트에서 "playwright"라 불러온 것은 FlaUI(UIA3) 하네스다. **진짜 Playwright는 WPF 본체를 못 건드리고 웹 표면 3종**(매뉴얼 HTML · 보고서 미리보기 HTML · GOP REST)만 대상([[project_playwright_verification_surfaces]]).
 
@@ -3856,9 +3961,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-12976
+- **현재 세션 ID**: ppid-32316
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-12976
+- **활성 세션 목록**: ppid-32316
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)

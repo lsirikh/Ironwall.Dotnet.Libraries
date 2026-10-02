@@ -1,8 +1,8 @@
 ﻿<!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-09-23 (advance-phase 자동)
-- **총 문서 수**: 617개
+- **마지막 갱신**: 2026-10-01
+- **총 문서 수**: 650개
 
 ---
 
@@ -10,6 +10,14 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [client-id-image-clone-risk-analysis.md](analyses/client-id-image-clone-risk-analysis.md) | client-id-image-clone-risk | 2026-09-30 |
+| [event-e2e-gap-analysis.md](analyses/event-e2e-gap-analysis.md) | event-e2e-gap | 2026-09-29 |
+| [device-components-map-icon-analysis.md](analyses/device-components-map-icon-analysis.md) | device-components-map-icon | 2026-09-29 |
+| [wiring-fence-view-analysis.md](analyses/wiring-fence-view-analysis.md) | wiring-fence-view | 2026-09-29 |
+| [server-prd-drafts-0929-gis-impact-analysis.md](analyses/server-prd-drafts-0929-gis-impact-analysis.md) | server-prd-drafts-0929-gis-impact | 2026-09-29 |
+| [dead-views-b11-analysis.md](analyses/dead-views-b11-analysis.md) | dead-views-b11 | 2026-09-29 |
+| [unit-relationship-map-scenario-analysis.md](analyses/unit-relationship-map-scenario-analysis.md) | unit-relationship-map-scenario | 2026-09-27 |
+| [window-design-inventory-analysis.md](analyses/window-design-inventory-analysis.md) | window-design-inventory | 2026-09-27 |
 | [all-windows-inventory-n05-n14-analysis.md](analyses/all-windows-inventory-n05-n14-analysis.md) | all-windows-inventory-n05-n14 | 2026-09-19 |
 | [device-console-n02-n03-design-input-analysis.md](analyses/device-console-n02-n03-design-input-analysis.md) | device-console-n02-n03-design-input | 2026-09-19 |
 | [all-windows-console-redesign-analysis.md](analyses/all-windows-console-redesign-analysis.md) | all-windows-console-redesign | 2026-09-19 |
@@ -101,6 +109,14 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [help-callout-prd.md](prds/help-callout-prd.md) | help-callout | Draft | 2026-10-01 |
+| [sso-integration-prd.md](prds/sso-integration-prd.md) | sso-integration | Draft | 2026-09-30 |
+| [fence-wiring-editor-prd.md](prds/fence-wiring-editor-prd.md) | fence-wiring-editor | Draft | 2026-09-30 |
+| [component-display-unify-prd.md](prds/component-display-unify-prd.md) | component-display-unify | Draft | 2026-09-30 |
+| [camera-popup-modes-prd.md](prds/camera-popup-modes-prd.md) | camera-popup-modes | Draft | 2026-09-30 |
+| [wiring-fence-view-prd.md](prds/wiring-fence-view-prd.md) | wiring-fence-view | Draft | 2026-09-29 |
+| [unit-relationship-map-prd.md](prds/unit-relationship-map-prd.md) | unit-relationship-map | Approved | 2026-09-29 |
+| [dead-views-cleanup-prd.md](prds/dead-views-cleanup-prd.md) | dead-views-cleanup | Draft | 2026-09-29 |
 | [shell-surface-prd.md](prds/shell-surface-prd.md) | shell-surface | Completed | 2026-09-23 |
 | [event-mapping-workbench-console-prd.md](prds/event-mapping-workbench-console-prd.md) | event-mapping-workbench-console | Completed | 2026-09-23 |
 | [server-monitor-prd.md](prds/server-monitor-prd.md) | server-monitor | Completed | 2026-09-23 |
@@ -303,6 +319,10 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [component-display-unify-prd-plan.md](plans/component-display-unify-prd-plan.md) | [PRD](prds/component-display-unify-prd.md) | 10/11 | 2026-09-30 |
+| [fence-wiring-editor-prd-plan.md](plans/fence-wiring-editor-prd-plan.md) | [PRD](prds/fence-wiring-editor-prd.md) | 0/0 | 2026-09-30 |
+| [wiring-fence-view-prd-plan.md](plans/wiring-fence-view-prd-plan.md) | [PRD](prds/wiring-fence-view-prd.md) | 0/8 | 2026-09-29 |
+| [unit-relationship-map-prd-plan.md](plans/unit-relationship-map-prd-plan.md) | [PRD](prds/unit-relationship-map-prd.md) | 134/159 | 2026-09-29 |
 | [shell-surface-prd-plan.md](plans/shell-surface-prd-plan.md) | [PRD](prds/shell-surface-prd.md) | 2/2 | 2026-09-23 |
 | [event-mapping-workbench-console-prd-plan.md](plans/event-mapping-workbench-console-prd-plan.md) | [PRD](prds/event-mapping-workbench-console-prd.md) | 2/2 | 2026-09-23 |
 | [server-monitor-prd-plan.md](plans/server-monitor-prd-plan.md) | [PRD](prds/server-monitor-prd.md) | 2/2 | 2026-09-23 |
@@ -443,6 +463,17 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [event-live-pipeline-probe-log.md](tests/event-live-pipeline-probe-log.md) | -% | -% | 2026-09-29 |
+| [event-live-pipeline-probe-log.latest.md](tests/event-live-pipeline-probe-log.latest.md) | -% | -% | 2026-09-29 |
+| [event-live-pipeline-probe-log.real.md](tests/event-live-pipeline-probe-log.real.md) | -% | -% | 2026-09-29 |
+| [event-live-pipeline-probe-log.head.md](tests/event-live-pipeline-probe-log.head.md) | -% | -% | 2026-09-29 |
+| [event-e2e-scenarios.md](tests/event-e2e-scenarios.md) | -% | -% | 2026-09-29 |
+| [unit-relationship-map-probe-log.md](tests/unit-relationship-map-probe-log.md) | -% | -% | 2026-09-29 |
+| [unit-relationship-map-snapshots.md](tests/unit-relationship-map-snapshots.md) | -% | -% | 2026-09-29 |
+| [unit-relationship-map-test-result.md](tests/unit-relationship-map-test-result.md) | -% | -% | 2026-09-29 |
+| [unit-relationship-map-scenarios.md](tests/unit-relationship-map-scenarios.md) | -% | -% | 2026-09-29 |
+| [unit-relationship-map-simulation-log.md](tests/unit-relationship-map-simulation-log.md) | -% | -% | 2026-09-27 |
+| [gis-full-scenario-catalog.md](tests/gis-full-scenario-catalog.md) | -% | -% | 2026-09-27 |
 | [settings-window-test-result.md](tests/settings-window-test-result.md) | -% | -% | 2026-09-21 |
 | [device-assembly-preset-test-result.md](tests/device-assembly-preset-test-result.md) | -% | -% | 2026-09-19 |
 | [device-console-redesign-test-result.md](tests/device-console-redesign-test-result.md) | -% | -% | 2026-09-19 |
@@ -510,6 +541,8 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [client-id-session-axis-report.md](reports/client-id-session-axis-report.md) | [PRD](prds/client-id-session-axis-prd.md) → [Plan](plans/client-id-session-axis-prd-plan.md) | 2026-09-30 |
+| [unit-relationship-map-report.md](reports/unit-relationship-map-report.md) | [PRD](prds/unit-relationship-map-prd.md) → [Plan](plans/unit-relationship-map-prd-plan.md) | 2026-09-29 |
 | [settings-window-report.md](reports/settings-window-report.md) | [PRD](prds/settings-window-prd.md) → [Plan](plans/settings-window-prd-plan.md) | 2026-09-21 |
 | [device-assembly-preset-report.md](reports/device-assembly-preset-report.md) | [PRD](prds/device-assembly-preset-prd.md) → [Plan](plans/device-assembly-preset-prd-plan.md) | 2026-09-19 |
 | [device-console-redesign-report.md](reports/device-console-redesign-report.md) | [PRD](prds/device-console-redesign-prd.md) → [Plan](plans/device-console-redesign-prd-plan.md) | 2026-09-19 |
