@@ -1,13 +1,365 @@
 ﻿{
-  "generated_at": "2026-09-27T03:09:06.2099974+09:00",
-  "server": "https://127.0.0.1:8000 (contract V8_0, info.version 8.0.2)",
+  "generated_at": "2026-10-03T22:15:13.4799207+09:00",
+  "server": "https://127.0.0.1:8000 (contract V8_0, info.version 8.0.6)",
   "checks": [
     {
       "Id": "1",
       "Item": "contract",
       "Title": "IServerContractProbe resolves V8_0 against the local server",
       "verdict": "PASS",
-      "Detail": "resolved=True IsResolved=True Contract=V8_0 RawVersion=8.0.2",
+      "Detail": "resolved=True IsResolved=True Contract=V8_0 RawVersion=8.0.6",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E1.1",
+      "Item": "E1",
+      "Title": "운영자 로그인 후에도 하네스 주 세션(admin)이 살아 있다(축출은 같은 user_id 에만)",
+      "verdict": "PASS",
+      "Detail": "admin GET detection 4281 success=True msg='Detection event retrieved successfully'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E1.2",
+      "Item": "E1",
+      "Title": "서버 운영자 프리셋의 events 등급(로그인 응답 그대로)",
+      "verdict": "INFO",
+      "Detail": "server preset events={\"edit\":false,\"view\":true,\"delete\":false,\"control\":true}; client CanControl=True CanEdit=False",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E1a",
+      "Item": "E1",
+      "Title": "events:edit 없는 운영자가 [확인] → 창이 보내기 전에 막는다(서버는 403 을 줄 요청)",
+      "verdict": "PASS",
+      "Detail": "no POST; dialog said 'popup:권한 없음|조치보고 권한(이벤트 편집)이 없습니다.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E1.4",
+      "Item": "E1",
+      "Title": "관리자 권한 스냅샷(/auth/me)",
+      "verdict": "INFO",
+      "Detail": "HTTP 200; role=ADMIN CanEdit(events)=True",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E1b",
+      "Item": "E1",
+      "Title": "권한 있는 사용자 [확인] → POST 201, 와이어 키 {type_event,content,user,from_event_id}(+무시되는 created_at), 재조회 action_reported=true, 창 닫힘",
+      "verdict": "PASS",
+      "Detail": "HTTP 201; keys=[content,created_at,from_event_id,type_event,user]; body={\"type_event\":\"Action\",\"content\":\"야생동물출현\",\"user\":\"admin\",\"from_event_id\":4281,\"created_at\":\"2026-10-03T22:15:05.068+09:00\"}; re-GET 200 action_reported=True; dialog='close'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": [
+        6
+      ]
+    },
+    {
+      "Id": "E1c",
+      "Item": "E1",
+      "Title": "'기타' + 빈 메모 [확인] → 보내지 않고 '내용을 입력' 안내(서버는 content min_length=1 로 422)",
+      "verdict": "PASS",
+      "Detail": "no POST; dialog said 'popup:조치 내용 확인|조치 내용을 입력하세요.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2a",
+      "Item": "E2",
+      "Title": "서랍 새 스케줄(weekly · 무제한) 와이어: window_end=null 명시 · daily_start offset 없음 · days_of_week=64 · 8.0 이면 unit_id=자기 부대",
+      "verdict": "PASS",
+      "Detail": "HTTP 201; window_end null=True; daily_start='03:00:00'; days_of_week=64; unit_id sent=1 own=1 unitEra=True; body={\"name\":\"LRT-EVT-E2-SUP\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000+09:00\",\"window_end\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"unit_id\":1}",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2b",
+      "Item": "E2",
+      "Title": "재조회: 서버가 저장한 값이 서랍에서 고른 값과 같다",
+      "verdict": "PASS",
+      "Detail": "HTTP 200; {\"id\":367,\"name\":\"LRT-EVT-E2-SUP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occ…<truncated>",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2c",
+      "Item": "E2",
+      "Title": "이름만 고친 PATCH → 재조회에서 이름 외 모든 칸이 그대로(unit_id 보존 포함)",
+      "verdict": "PASS",
+      "Detail": "PATCH HTTP 200; renamed=True; diffs=[]; patch unit_id=(키 없음 = 보존); body={\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000+09:00\",\"window_end\":null}; drawer=''",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2d",
+      "Item": "E2",
+      "Title": "취소 → 재조회 status=cancelled · revoked_at 기록, 콘솔 안내가 성공을 말한다",
+      "verdict": "PASS",
+      "Detail": "HTTP 200; status=cancelled revoked_at=2026-10-03 오후 10:15:07; console=''LRT-EVT-E2-SUP-RENAMED' 을(를) 취소했습니다.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2e",
+      "Item": "E2",
+      "Title": "일괄삭제 → 재조회 404, 콘솔 판정문이 삭제를 확인",
+      "verdict": "PASS",
+      "Detail": "re-GET HTTP 404; console='1건을 삭제했습니다. 남은 스케줄은 55건입니다.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E2f",
+      "Item": "E2",
+      "Title": "옛 억제 패널 [생성] 와이어도 8.0 이면 unit_id=자기 부대",
+      "verdict": "PASS",
+      "Detail": "HTTP 201; unit_id sent=1 own=1; body={\"name\":\"LRT-EVT-E2-PANEL\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T03:00:00.000+09:00\",\"window_end\":\"2026-10-04T04:00:00.000+09:00\",\"recurrence_type\":\"none\",\"unit_id\":1}",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3.0",
+      "Item": "E3",
+      "Title": "arrange: 함체 문 OPEN 보고 → 서버가 만든 운영 이벤트",
+      "verdict": "INFO",
+      "Detail": "component-status HTTP 200 ; operations for enclosure 2803: 1 (list HTTP 200)",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3a",
+      "Item": "E3",
+      "Title": "개요 총계 = 서버 summary.total (서버 total 은 alert 를 포함한다)",
+      "verdict": "PASS",
+      "Detail": "window Total=4; server total=4 (sensor 2 camera 0 alert 1 mal 1 con 0 act 0; operation 1 별도); note='운영 1건(문 개폐·환경 경보)은 총계에서 따로 셉니다'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3b",
+      "Item": "E3",
+      "Title": "서버 summary.alert(사전 경보) 가 개요에 조각으로 보인다",
+      "verdict": "PASS",
+      "Detail": "server alert=1; window slices=[센서 탐지:2, 카메라 탐지:0, 사전 경보:1, 장애:1, 연결:0, 조치:0]",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3c",
+      "Item": "E3",
+      "Title": "서버 summary.operation(총계 밖 별도 집계)이 개요에서 조용히 사라지지 않는다",
+      "verdict": "PASS",
+      "Detail": "server operation=1; window note='운영 1건(문 개폐·환경 경보)은 총계에서 따로 셉니다'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3d",
+      "Item": "E3",
+      "Title": "서버 by_device.enclosures/gates(함체·통문 운영 이벤트)가 개요 막대로 보인다",
+      "verdict": "PASS",
+      "Detail": "server enclosures=1 gates=0; mine={\"device_id\":2803,\"device_name\":\"LRT-EVT-E3-ENC\",\"device_number\":97310,\"sensor_detection\":0,\"alert\":0,\"malfunction\":0,\"connection\":0,\"operation\":1}; window facility bars=[LRT-EVT-E3-ENC]",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3e",
+      "Item": "E3",
+      "Title": "추이 X 축이 기간 전체를 고르게 채운다(서버의 빈 버킷 생략을 메운다) — 끌기 시각 = 화면 위치",
+      "verdict": "PASS",
+      "Detail": "hours in range=25; server buckets=1; window labels=25 values=25; now idx=24 window[now]=2 server[now]=2",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3g",
+      "Item": "E3",
+      "Title": "time_bucket(\"yyyy-MM-dd HH\")이 'HH시' 라벨로 읽힌다",
+      "verdict": "PASS",
+      "Detail": "server buckets e.g. [2026-10-03 22]; window label at now='22시'; first labels=[22시, 23시, 10-03, 01시]",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3h",
+      "Item": "E3",
+      "Title": "이름 없는 장비(controller_name/camera_name=null) 막대가 빈 이름으로 그려지지 않는다",
+      "verdict": "INFO",
+      "Detail": "서버 응답에 이름 없는 장비가 없다 — 장비 생성은 name_device min_length=1 이라 API 로는 만들 수 없다(재현 불가, 고치지 않음)",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E3f",
+      "Item": "E3",
+      "Title": "3일 기간: 화면의 단위 표기 · 끌기 스냅(Bucket)과 서버가 실제로 집계한 interval 이 같다",
+      "verdict": "PASS",
+      "Detail": "request interval=day; server trend.interval=day; window IntervalText='1일 단위' Bucket=1.00:00:00; window labels=4",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E4b",
+      "Item": "E4",
+      "Title": "게이트웨이가 읽은 updated_at 이 서버 원문과 같다(마이크로초 · offset 보존)",
+      "verdict": "PASS",
+      "Detail": "server raw='2026-10-03T22:15:09.127942+09:00'; gateway dto='2026-10-03T22:15:09.127942+09:00'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E4c",
+      "Item": "E4",
+      "Title": "맵핑을 연 뒤 같은 초 안에 다른 사용자가 고쳤으면 [적용] 이 아무것도 보내지 않고 새로 고치기를 권한다",
+      "verdict": "PASS",
+      "Detail": "attempt 1: t0=22:15:09.195639 t1=22:15:09.370771 sameSecond=True; bulk POST sent=False; status='다른 사용자가 이 맵핑을 바꿨습니다. 새로 고친 뒤 다시 시도하세요. 변경한 내용은 그대로 있습니다.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E4a",
+      "Item": "E4",
+      "Title": "편집 중 지워진 장비(서버 not_found_config_ids) 행은 실패 배지로 화면에 남고, 상태줄 '실패 1건 남음' 과 일치한다",
+      "verdict": "PASS",
+      "Detail": "bulk HTTP 200 not_found=[2805]; status='부분 적용 — 등록 1건 · 실패 1건은 화면에 남았습니다'; board rows=[2804:saved, 2805:draft!fail]; s2 row present=True failure=True",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E5a",
+      "Item": "E5",
+      "Title": "탐지 '결과' 만 [적용] → detail 의 signal · thumbnail · 업체 키(vendor_x) 가 그대로 남는다",
+      "verdict": "PASS",
+      "Detail": "detail before={\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"}; PUT body={\"type_event\":\"Intrusion\",\"result\":\"VIBRATION_SENSOR\",\"detail\":{\"signal\":5,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\",\"vendor_x\":1}} -> HTTP 200; detail after={\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"}",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E5b",
+      "Item": "E5",
+      "Title": "탐지 detail 이 업체 키뿐일 때 '결과' 만 [적용] → detail 이 null 로 지워지지 않는다",
+      "verdict": "PASS",
+      "Detail": "detail before={\"vendor_only\":\"abc\"}; PUT body={\"type_event\":\"Intrusion\",\"result\":\"VIBRATION_SENSOR\",\"detail\":{\"vendor_only\":\"abc\"}} -> HTTP 200; detail after={\"vendor_only\":\"abc\"}",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E5c",
+      "Item": "E5",
+      "Title": "장애 detail=null 에서 '사유' 만 [적용] → detail 이 0 네 개로 채워지지 않는다(그대로 null)",
+      "verdict": "PASS",
+      "Detail": "detail before=null; PUT body={\"type_event\":\"Fault\",\"reason\":\"FAULT_FENCE\"} -> HTTP 200; detail after=null",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E5d",
+      "Item": "E5",
+      "Title": "장애 detail(구간 + 업체 키) 에서 '사유' 만 [적용] → 구간 값과 업체 키(vendor_y)가 그대로",
+      "verdict": "PASS",
+      "Detail": "detail before={\"vendor_y\":\"k\",\"first_end\":20,\"first_start\":10}; PUT body={\"type_event\":\"Fault\",\"reason\":\"FAULT_FENCE\",\"detail\":{\"first_start\":10,\"first_end\":20,\"vendor_y\":\"k\"}} -> HTTP 200; detail after={\"vendor_y\":\"k\",\"first_end\":20,\"first_start\":10}",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E9a",
+      "Item": "E5",
+      "Title": "모르는 장애 사유가 서버에 저장될 수 있는가(재현 전제)",
+      "verdict": "INFO",
+      "Detail": "서버가 거절 HTTP 422 ({\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"'reason' 값 'FAULT_LRT_UNKNOWN' 은 허용되지 않습니다 — 허용: FAULT_CONTROLLER | FAULT_FENCE | FAULT_MULTI | F…<truncated>) — 서버 사유 어휘 5종 = 클라 EnumFaultType 5종과 같다. 이 판본에서는 재현 불가(고치지 않음)",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E8",
+      "Item": "E5",
+      "Title": "장비가 지워진 탐지의 상세 제목이 서버 device_description 스냅샷(장비 이름)을 보인다",
+      "verdict": "PASS",
+      "Detail": "server device=null device_description='[sensor:PIR] LRT-EVT-E5-GONE (number: 97509, id: 2808)'; window title='삭제된 장비 (LRT-EVT-E5-GONE)'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E6a",
+      "Item": "E6",
+      "Title": "연결 레일은 서버에 없는 '끊김 / 연결' 상태로 가르는 칩을 내지 않는다",
+      "verdict": "PASS",
+      "Detail": "POST type_event=ContactOff -> HTTP 422 ({\"success\":false,\"message\":\"요청 검증에 실패했습니다\",\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"요청 검증에 실패했습니다\",\"details\":[{\"field\":\"type_event\",\"co…<truncated>); server connection keys=[id,category_event,unit_id,type_event,device,device_description,created_at,updated_at]; window chips=[]; my row StateKey='' type=Connection",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E6b",
+      "Item": "E6",
+      "Title": "탐지 '침입' 칩은 Intrusion 만 — 접점 ON/OFF · 강풍 모드는 침입으로 세지 않고 자기 칩으로 걸린다",
+      "verdict": "PASS",
+      "Detail": "loaded mine=5/5; '침입' chip matched=[Intrusion]; unreachable by any type chip=[]; chips=[전체, 침입, 사전 경보, 접점·강풍, 미조치, 조치 있음]",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E7a",
+      "Item": "E7",
+      "Title": "트레이 [조치 적용] 201 뒤 그 행이 곧바로 '조치 있음' 이 된다(서버 action_reported 와 같다)",
+      "verdict": "PASS",
+      "Detail": "POST HTTP 201; server action_reported=True; row IsActionReported=True (model.Status=True); tray='조치보고 1건을 보냈습니다.'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E7b",
+      "Item": "E7",
+      "Title": "트레이 '기타' 메모 501자 → 보내지 않고 500자 한도를 알린다(서버 content max_length=500 → 422)",
+      "verdict": "PASS",
+      "Detail": "no POST; CanApply=False; reason='조치 내용은 500자까지 보낼 수 있습니다(지금 501자).'",
+      "DefectAt": "",
+      "BlockedReason": "",
+      "WireSeqs": []
+    },
+    {
+      "Id": "E9b",
+      "Item": "E9",
+      "Title": "쪽 사이에 새 이벤트가 생기면 다음 쪽이 앞 쪽의 Id 를 다시 준다(붙이기에 중복 제거가 필요한 근거)",
+      "verdict": "INFO",
+      "Detail": "page1 ids=[4302,4301]; page2 ids=[4301,4300]; overlap=[4301] — 재현됨: 패널이 그대로 붙이면 같은 행이 두 번 보인다",
       "DefectAt": "",
       "BlockedReason": "",
       "WireSeqs": []
@@ -17,7 +369,7 @@
       "Item": "ET",
       "Title": "조치 트레이 문구 = 조치보고 문구 관리 목록(서버) · display_order 순서 그대로",
       "verdict": "PASS",
-      "Detail": "fromServer=True; count=7; index B=5 A=6; head=[야생동물출현 | 강풍/폭우 | 울타리 점검/작업 | 침입발생 특경출동조치 | 오경보 | LRT-EVT-TRAY-문구-B]",
+      "Detail": "fromServer=True; count=7; index B=5 A=6; head=[강풍/폭우 | 울타리 점검/작업 | 야생동물출현 | 침입발생 특경출동조치 | 오경보 | LRT-EVT-TRAY-문구-B]",
       "DefectAt": "",
       "BlockedReason": "",
       "WireSeqs": []
@@ -27,7 +379,7 @@
       "Item": "ET",
       "Title": "창을 열면 트레이 문구 칸이 관리 목록으로 바뀐다('기타' 는 맨 끝)",
       "verdict": "PASS",
-      "Detail": "fromServer=True; options(8)=[야생동물출현 | 강풍/폭우 | 울타리 점검/작업 | 침입발생 특경출동조치 … 기타]",
+      "Detail": "fromServer=True; options(8)=[강풍/폭우 | 울타리 점검/작업 | 야생동물출현 | 침입발생 특경출동조치 … 기타]",
       "DefectAt": "",
       "BlockedReason": "",
       "WireSeqs": []
@@ -37,12 +389,12 @@
       "Item": "ET",
       "Title": "관리 문구로 [조치 적용] → POST /events/actions 201, 본문 content = 고른 관리 문구",
       "verdict": "PASS",
-      "Detail": "POST HTTP 201; content='LRT-EVT-TRAY-문구-B'; applied=1 failed=0 skipped=0; tray='적용 완료 — 적용 1'",
+      "Detail": "POST HTTP 201; content='LRT-EVT-TRAY-문구-B'; applied=1 failed=0 skipped=0; tray='조치보고 1건을 보냈습니다.'",
       "DefectAt": "",
       "BlockedReason": "",
       "WireSeqs": [
-        9,
-        10
+        74,
+        75
       ]
     },
     {
@@ -50,12 +402,12 @@
       "Item": "ET",
       "Title": "적용 뒤 상세가 '미조치' 로 남지 않는다 — 상태 칸이 바뀌고 조치 내역을 서버에 다시 물어 방금 문구가 보인다",
       "verdict": "PASS",
-      "Detail": "server re-GET 200 action_reported=True; row IsActionReported=True; detail status '미조치' → '조치 1건'; re-query GET …/609/actions HTTP 200; history state=Loaded lines=[LRT-EVT-TRAY-문구-B]",
+      "Detail": "server re-GET 200 action_reported=True; row IsActionReported=True; detail status '미조치' → '조치 1건'; re-query GET …/4304/actions HTTP 200; history state=Loaded lines=[LRT-EVT-TRAY-문구-B]",
       "DefectAt": "",
       "BlockedReason": "",
       "WireSeqs": [
-        9,
-        10
+        74,
+        75
       ]
     },
     {
@@ -71,22 +423,132 @@
   ],
   "cleanup": {
     "created": [
-      "action-report-template:88",
-      "action-report-template:89",
-      "unit:149",
-      "controller:1451",
-      "sensor:1452",
-      "events/detections:609",
-      "action:122"
+      "unit:647",
+      "controller:2797",
+      "sensor:2798",
+      "events/detections:4281",
+      "user:644",
+      "action:1503",
+      "controller:2799",
+      "sensor:2800",
+      "suppression-schedule:367",
+      "suppression-schedule:368",
+      "unit:648",
+      "controller:2801",
+      "sensor:2802",
+      "events/detections:4282",
+      "events/detections:4283",
+      "events/detections:4284",
+      "events/malfunctions:4285",
+      "enclosure:2803",
+      "events/operations:4286",
+      "speaker:2804",
+      "speaker:2805",
+      "event-mapping:74",
+      "event-mapping:75",
+      "event-mapping:76",
+      "unit:649",
+      "controller:2806",
+      "sensor:2807",
+      "events/detections:4287",
+      "events/detections:4288",
+      "events/malfunctions:4289",
+      "events/malfunctions:4290",
+      "sensor:2808",
+      "events/detections:4291",
+      "unit:650",
+      "controller:2809",
+      "sensor:2810",
+      "events/connections:4292",
+      "events/detections:4293",
+      "events/detections:4294",
+      "events/detections:4295",
+      "events/detections:4296",
+      "events/detections:4297",
+      "unit:651",
+      "controller:2811",
+      "sensor:2812",
+      "events/detections:4298",
+      "events/detections:4299",
+      "action:1504",
+      "unit:652",
+      "controller:2813",
+      "sensor:2814",
+      "events/detections:4300",
+      "events/detections:4301",
+      "events/detections:4302",
+      "events/detections:4303",
+      "action-report-template:622",
+      "action-report-template:623",
+      "unit:653",
+      "controller:2815",
+      "sensor:2816",
+      "events/detections:4304",
+      "action:1505"
     ],
     "deleted": [
-      "action:122",
-      "events/detections:609",
-      "sensor:1452",
-      "controller:1451",
-      "unit:149",
-      "action-report-template:88",
-      "action-report-template:89"
+      "action:1503",
+      "events/detections:4281",
+      "sensor:2798",
+      "controller:2797",
+      "user:644",
+      "unit:647",
+      "suppression-schedule:367",
+      "suppression-schedule:368",
+      "sensor:2800",
+      "controller:2799",
+      "events/operations:4286",
+      "events/malfunctions:4285",
+      "events/detections:4284",
+      "events/detections:4283",
+      "events/detections:4282",
+      "enclosure:2803",
+      "sensor:2802",
+      "controller:2801",
+      "unit:648",
+      "speaker:2805",
+      "event-mapping:74",
+      "event-mapping:75",
+      "event-mapping:76",
+      "speaker:2804",
+      "sensor:2808",
+      "events/detections:4291",
+      "events/malfunctions:4290",
+      "events/malfunctions:4289",
+      "events/detections:4288",
+      "events/detections:4287",
+      "sensor:2807",
+      "controller:2806",
+      "unit:649",
+      "events/detections:4297",
+      "events/detections:4296",
+      "events/detections:4295",
+      "events/detections:4294",
+      "events/detections:4293",
+      "events/connections:4292",
+      "sensor:2810",
+      "controller:2809",
+      "unit:650",
+      "action:1504",
+      "events/detections:4299",
+      "events/detections:4298",
+      "sensor:2812",
+      "controller:2811",
+      "unit:651",
+      "events/detections:4303",
+      "events/detections:4302",
+      "events/detections:4301",
+      "events/detections:4300",
+      "sensor:2814",
+      "controller:2813",
+      "unit:652",
+      "action:1505",
+      "events/detections:4304",
+      "sensor:2816",
+      "controller:2815",
+      "unit:653",
+      "action-report-template:622",
+      "action-report-template:623"
     ],
     "leftovers": []
   },
@@ -97,89 +559,674 @@
       "Method": "POST",
       "Uri": "https://127.0.0.1:8000/api/auth/login",
       "Status": 200,
-      "request": "{\"login_id\":\"admin\",\"password\":\"***REDACTED***\",\"client_id\":\"gis-monitoring:GHLEE\"}",
-      "response": "{\"success\":true,\"message\":\"Login successful\",\"data\":{\"access_token\":\"***JWT_REDACTED***\",\"refresh_token\":\"***JWT_REDACTED***\",\"token_type\":\"bearer\",\"session_id\":\"3307\",\"user\":{\"id\":1,\"login_id\":\"admin\",\"name\":\"시스템 관리자\",\"email\":null,\"department\":null,\"role\":\"ADMIN\",\"group_id\":null,\"permissions\":{\"modules\":{},\"device_groups\":[],\"valid_until\":null}}},\"meta\":{\"timestamp\":\"2026-09-27T03:09:01.587371+09:00\",\"request_id\":\"3f588eb0-0efb-4c6c-a76d-3fe551833194\"}}"
+      "request": "{\"login_id\":\"admin\",\"password\":\"***REDACTED***\",\"client_id\":\"gis-fd44d1f63952\"}",
+      "response": "{\"success\":true,\"message\":\"Login successful\",\"data\":{\"access_token\":\"***JWT_REDACTED***\",\"refresh_token\":\"***JWT_REDACTED***\",\"token_type\":\"bearer\",\"session_id\":\"4328\",\"user\":{\"id\":1,\"login_id\":\"admin\",\"name\":\"시스템 관리자\",\"email\":null,\"department\":null,\"role\":\"ADMIN\",\"group_id\":null,\"permissions\":{\"modules\":{},\"device_groups\":[],\"valid_until\":null}}},\"meta\":{\"timestamp\":\"2026-10-03T22:14:53.529985+09:00\",\"request_id\":\"ba5de6e1-0fc6-424c-b145-489d53da7373\"}}"
     },
     {
       "Seq": 2,
       "Tag": "probe",
+      "Method": "PUT",
+      "Uri": "https://127.0.0.1:8000/api/users/644",
+      "Status": 200,
+      "request": "{\"group_id\":2}",
+      "response": "{\"success\":true,\"message\":\"User updated successfully\",\"data\":{\"id\":644,\"login_id\":\"lrt_evt_op1\",\"name\":\"LRT-EVT 운영자\",\"email\":null,\"department\":null,\"position\":null,\"employee_number\":null,\"photo_url\":\"/api/users/photo/default.png\",\"phone\":null,\"role\":\"USER\",\"group_id\":2,\"is_active\":true,\"is_locked\":false,\"lock_reason\":null,\"locked_at\":null,\"last_login_at\":null,\"last_login_ip\":null,\"created_at\":\"2026-10-03T22:15:04.494095+09:00\",\"updated_at\":\"2026-10-03T22:15:04.519908+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:04.529626+09:00\",\"request_id\":\"d64371b3-474f-4356-b95f-a8872658faeb\"}}"
+    },
+    {
+      "Seq": 3,
+      "Tag": "E1/op-login",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/auth/login",
+      "Status": 200,
+      "request": "{\"login_id\":\"lrt_evt_op1\",\"password\":\"***REDACTED***\",\"client_id\":\"gis-fd44d1f63952\"}",
+      "response": "{\"success\":true,\"message\":\"Login successful\",\"data\":{\"access_token\":\"***JWT_REDACTED***\",\"refresh_token\":\"***JWT_REDACTED***\",\"token_type\":\"bearer\",\"session_id\":\"4330\",\"user\":{\"id\":644,\"login_id\":\"lrt_evt_op1\",\"name\":\"LRT-EVT 운영자\",\"email\":null,\"department\":null,\"role\":\"USER\",\"group_id\":2,\"permissions\":{\"modules\":{\"map\":{\"view\":true},\"files\":{\"view\":true},\"units\":{\"view\":true},\"users\":{},\"events\":{\"view\":true,\"control\":true},\"cameras\":{\"view\":true,\"control\":true},\"devices\":{\"view\":true},\"reports\":{\"edit\":true,\"view\":true},\"servers\":{},\"broadcast\":{},\"audit_logs\":{},\"user_groups\":{},\"integrations\":{\"view\":true},\"setup_system\":{},\"setup_feature\":{},\"action_report_templates\":{\"view\":true}},\"device_groups\":[],\"valid_until\":null}}},\"meta\":{\"timestamp\":\"2026-10-03T22:15:04.713906+09:00\",\"request_id\":\"88ff55d5-2588-4d50-9f30-e06d79099600\"}}"
+    },
+    {
+      "Seq": 4,
+      "Tag": "E1/admin-alive",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections/4281",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection event retrieved successfully\",\"data\":{\"id\":4281,\"category_event\":\"detection\",\"unit_id\":647,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2798,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E1-S1 (number: 97101, id: 2798)\",\"detail\":{\"signal\":5,\"thumbnail\":\"http://127.0.0.1/lrt-evt.jpg\"},\"created_at\":\"2026-10-03T22:15:04.247111+09:00\",\"updated_at\":\"2026-10-03T22:15:04.247115+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:04.730978+09:00\",\"request_id\":\"bb0756bc-c343-4d16-850e-ccb4d11931ca\"}}"
+    },
+    {
+      "Seq": 5,
+      "Tag": "E1/admin-alive",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A04.749%2B09%3A00&end_date=2026-10-04T00%3A15%3A04.749%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4281,\"category_event\":\"detection\",\"unit_id\":647,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2798,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E1-S1 (number: 97101, id: 2798)\",\"detail\":{\"signal\":5,\"thumbnail\":\"http://127.0.0.1/lrt-evt.jpg\"},\"created_at\":\"2026-10-03T22:15:04.247111+09:00\",\"updated_at\":\"2026-10-03T22:15:04.247115+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":1,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:04.763811+09:00\",\"request_id\":\"5c1c4ed0-d5e3-41af-bb0e-161cd04406f5\"}}"
+    },
+    {
+      "Seq": 6,
+      "Tag": "E1/admin-ok",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/events/actions",
+      "Status": 201,
+      "request": "{\"type_event\":\"Action\",\"content\":\"야생동물출현\",\"user\":\"admin\",\"from_event_id\":4281,\"created_at\":\"2026-10-03T22:15:05.068+09:00\"}",
+      "response": "{\"success\":true,\"message\":\"Action event created successfully\",\"data\":{\"id\":1503,\"unit_id\":647,\"type_event\":\"Action\",\"content\":\"야생동물출현\",\"user\":\"admin\",\"from_event\":{\"id\":4281,\"category_event\":\"detection\",\"unit_id\":647,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2798,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E1-S1 (number: 97101, id: 2798)\",\"detail\":{\"signal\":5,\"thumbnail\":\"http://127.0.0.1/lrt-evt.jpg\"},\"created_at\":\"2026-10-03T22:15:04.247111+09:00\",\"updated_at\":\"2026-10-03T22:15:05.110170+09:00\"},\"created_at\":\"2026-10-03T22:15:05.100479+09:00\",\"updated_at\":\"2026-10-03T22:15:05.100483+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:05.131067+09:00\",\"request_id\":\"9828e3ad-85e7-4e9d-b079-d2b20a0e8164\"},\"warnings\":[{\"field\":\"created_at\",\"code\":\"READ_ONLY_IGNORED\",\"message\":\"'created_at' 는 응답 전용 키입니다 — 무시했습니다\"}]}"
+    },
+    {
+      "Seq": 7,
+      "Tag": "E1/etc-empty",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/units?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"부대 목록 조회 성공\",\"data\":[{\"id\":188,\"code\":\"unit002\",\"name\":\"대대\",\"echelon\":\"Battalion\",\"parent_id\":null,\"is_enable\":true},{\"id\":1,\"code\":\"unit001\",\"name\":\"기본 부대\",\"echelon\":\"Company\",\"parent_id\":188,\"is_enable\":true}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:05.999380+09:00\",\"request_id\":\"3a3a01bf-e588-4a49-a804-6e6c70c4e1b5\"}}"
+    },
+    {
+      "Seq": 8,
+      "Tag": "E2/load",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T13:02:51.704850+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T13:02:51.085590+09:00\",\"updated_at\":\"2026-09-11T13:02:51.705305+09:00\"},{\"id\":254,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"r…<truncated>"
+    },
+    {
+      "Seq": 9,
+      "Tag": "E2/load",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/active",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"활성 억제 창 조회 성공\",\"data\":[],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.268624+09:00\",\"request_id\":\"e0772539-8b64-4930-abc5-d5a6df3160e9\"}}"
+    },
+    {
+      "Seq": 10,
+      "Tag": "E2/create",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules",
+      "Status": 201,
+      "request": "{\"name\":\"LRT-EVT-E2-SUP\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000+09:00\",\"window_end\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"unit_id\":1}",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 생성 성공\",\"data\":{\"id\":367,\"name\":\"LRT-EVT-E2-SUP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.299969+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.375549+09:00\",\"request_id\":\"fee620e4-4aad-4cc8-b1cf-6acdbf19c1e9\"}}"
+    },
+    {
+      "Seq": 11,
+      "Tag": "E2/create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":367,\"name\":\"LRT-EVT-E2-SUP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.299969+09:00\"},{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"202…<truncated>"
+    },
+    {
+      "Seq": 12,
+      "Tag": "E2/create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/active",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"활성 억제 창 조회 성공\",\"data\":[],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.404786+09:00\",\"request_id\":\"7f5b97a9-789c-4a30-891e-e645abbfb07c\"}}"
+    },
+    {
+      "Seq": 13,
+      "Tag": "E2/create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":367,\"name\":\"LRT-EVT-E2-SUP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.299969+09:00\"},{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"202…<truncated>"
+    },
+    {
+      "Seq": 14,
+      "Tag": "E2/create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/active",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"활성 억제 창 조회 성공\",\"data\":[],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.721763+09:00\",\"request_id\":\"aff9a15a-4ed9-4415-9a38-817bfddb6f5e\"}}"
+    },
+    {
+      "Seq": 15,
+      "Tag": "E2/patch",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/367",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 조회 성공\",\"data\":{\"id\":367,\"name\":\"LRT-EVT-E2-SUP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.299969+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.731075+09:00\",\"request_id\":\"b6742c88-1224-435b-86d7-f10b5f40747d\"}}"
+    },
+    {
+      "Seq": 16,
+      "Tag": "E2/patch",
+      "Method": "PATCH",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/367",
+      "Status": 200,
+      "request": "{\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000+09:00\",\"window_end\":null}",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 수정 성공\",\"data\":{\"id\":367,\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.748818+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:06.762789+09:00\",\"request_id\":\"ffc249a8-fb2d-4566-8ba7-59d9451614ed\"}}"
+    },
+    {
+      "Seq": 17,
+      "Tag": "E2/patch",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":367,\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:06.748818+09:00\"},{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_…<truncated>"
+    },
+    {
+      "Seq": 18,
+      "Tag": "E2/cancel",
+      "Method": "DELETE",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/367",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 삭제(취소) 성공\",\"data\":{\"id\":367,\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-10-03T22:15:07.092609+09:00\",\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:07.093007+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:07.102094+09:00\",\"request_id\":\"f0bdc7e1-ea93-442e-bdf6-52e0d8f551f1\"}}"
+    },
+    {
+      "Seq": 19,
+      "Tag": "E2/cancel",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":367,\"name\":\"LRT-EVT-E2-SUP-RENAMED\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T00:00:00.000000+09:00\",\"window_end\":null,\"recurrence_rule\":null,\"recurrence_type\":\"weekly\",\"days_of_week\":64,\"daily_start\":\"03:00:00\",\"daily_end\":\"04:00:00\",\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-10-03T22:15:07.092609+09:00\",\"created_by\":1,\"created_at\":\"2026-10-03T22:15:06.299968+09:00\",\"updated_at\":\"2026-10-03T22:15:07.093007+09:00\"},{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revok…<truncated>"
+    },
+    {
+      "Seq": 20,
+      "Tag": "E2/bulk-delete",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/bulk-delete",
+      "Status": 200,
+      "request": "{\"ids\":[367]}",
+      "response": "{\"success\":true,\"message\":\"삭제 1건 · 스킵(활성/예정) 0건 · 없음 0건\",\"data\":{\"deleted_ids\":[367],\"skipped_ids\":[],\"not_found_ids\":[]},\"meta\":{\"timestamp\":\"2026-10-03T22:15:07.152150+09:00\",\"request_id\":\"4dea06b2-b4cf-45ac-b409-ffd469338a10\"}}"
+    },
+    {
+      "Seq": 21,
+      "Tag": "E2/bulk-delete",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T13:02:51.704850+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T13:02:51.085590+09:00\",\"updated_at\":\"2026-09-11T13:02:51.705305+09:00\"},{\"id\":254,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"r…<truncated>"
+    },
+    {
+      "Seq": 22,
+      "Tag": "E2/panel-create",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules",
+      "Status": 201,
+      "request": "{\"name\":\"LRT-EVT-E2-PANEL\",\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T03:00:00.000+09:00\",\"window_end\":\"2026-10-04T04:00:00.000+09:00\",\"recurrence_type\":\"none\",\"unit_id\":1}",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 생성 성공\",\"data\":{\"id\":368,\"name\":\"LRT-EVT-E2-PANEL\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T03:00:00.000000+09:00\",\"window_end\":\"2026-10-04T04:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:07.192576+09:00\",\"updated_at\":\"2026-10-03T22:15:07.192577+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:07.202232+09:00\",\"request_id\":\"6f00470b-ee9e-4f99-be92-a85d41309985\"}}"
+    },
+    {
+      "Seq": 23,
+      "Tag": "E2/panel-create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"억제 스케줄 목록 조회 성공\",\"data\":[{\"id\":368,\"name\":\"LRT-EVT-E2-PANEL\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[2800],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"all\",\"window_start\":\"2026-10-04T03:00:00.000000+09:00\",\"window_end\":\"2026-10-04T04:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":true,\"status\":\"pending\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":\"2026-10-04T03:00:00.000000+09:00\",\"revoked_at\":null,\"created_by\":1,\"created_at\":\"2026-10-03T22:15:07.192576+09:00\",\"updated_at\":\"2026-10-03T22:15:07.192577+09:00\"},{\"id\":256,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":null,\"revoked_at\":\"2026-09-11T14:41:17.549705+09:00\",\"created_by\":1,\"created_at\":\"2026-09-11T14:41:17.016312+09:00\",\"updated_at\":\"2026-09-11T14:41:17.550196+09:00\"},{\"id\":255,\"name\":\"E2E-OP\",\"description\":null,\"unit_id\":1,\"target_type\":\"device\",\"target_device_ids\":[],\"target_group_ids\":[],\"target_side\":\"both\",\"event_scope\":\"operation\",\"window_start\":\"2026-09-01T00:00:00.000000+09:00\",\"window_end\":\"2026-12-31T00:00:00.000000+09:00\",\"recurrence_rule\":null,\"recurrence_type\":\"none\",\"days_of_week\":null,\"daily_start\":null,\"daily_end\":null,\"schedule_tz\":\"Asia/Seoul\",\"is_active\":false,\"status\":\"cancelled\",\"is_suppressing_now\":false,\"occurrence_start\":null,\"occurrence_end\":null,\"next_occurrence_start\":nu…<truncated>"
+    },
+    {
+      "Seq": 24,
+      "Tag": "E2/panel-create",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/event-suppression-schedules/active",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"활성 억제 창 조회 성공\",\"data\":[],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:07.224471+09:00\",\"request_id\":\"d32f078a-d6a3-4361-aa11-022218571774\"}}"
+    },
+    {
+      "Seq": 25,
+      "Tag": "E3/24h",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/statistics/dashboard?start_date=2026-10-02T22%3A16%3A08.718%2B09%3A00&end_date=2026-10-03T22%3A16%3A08.718%2B09%3A00&interval=hour",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event dashboard statistics retrieved\",\"data\":{\"summary\":{\"start_date\":\"2026-10-02T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"days_in_range\":1,\"total\":4,\"sensor_detection\":2,\"camera_detection\":0,\"malfunction\":1,\"connection\":0,\"alert\":1,\"action\":0,\"operation\":1,\"daily_averages\":{\"sensor_detection\":2.0,\"camera_detection\":0.0,\"malfunction\":1.0,\"connection\":0.0,\"alert\":1.0,\"action\":0.0,\"operation\":1.0},\"active_devices\":{\"sensors\":1,\"cameras\":0,\"controllers\":1}},\"trend\":{\"interval\":\"hour\",\"start_date\":\"2026-10-02T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"series\":[{\"time_bucket\":\"2026-10-03 22\",\"sensor_detection\":2,\"camera_detection\":0,\"malfunction\":1,\"connection\":0,\"operation\":1,\"alert\":1,\"action\":0}]},\"by_device\":{\"start_date\":\"2026-10-02T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"controllers\":[{\"controller_id\":2801,\"controller_name\":\"LRT-EVT-E3-CTRL\",\"controller_number\":97300,\"sensor_detection\":2,\"malfunction\":1,\"connection\":0,\"operation\":0,\"alert\":1,\"action\":0}],\"cameras\":[],\"enclosures\":[{\"device_id\":2803,\"device_name\":\"LRT-EVT-E3-ENC\",\"device_number\":97310,\"sensor_detection\":0,\"alert\":0,\"malfunction\":0,\"connection\":0,\"operation\":1}],\"gates\":[]}},\"meta\":{\"timestamp\":\"2026-10-03T22:15:08.802577+09:00\",\"request_id\":\"b886540f-36e4-4855-a8e0-5b47b6c07426\"}}"
+    },
+    {
+      "Seq": 26,
+      "Tag": "E3/3d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/statistics/dashboard?start_date=2026-09-30T22%3A16%3A08.718%2B09%3A00&end_date=2026-10-03T22%3A16%3A08.718%2B09%3A00&interval=day",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event dashboard statistics retrieved\",\"data\":{\"summary\":{\"start_date\":\"2026-09-30T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"days_in_range\":3,\"total\":4,\"sensor_detection\":2,\"camera_detection\":0,\"malfunction\":1,\"connection\":0,\"alert\":1,\"action\":0,\"operation\":1,\"daily_averages\":{\"sensor_detection\":0.7,\"camera_detection\":0.0,\"malfunction\":0.3,\"connection\":0.0,\"alert\":0.3,\"action\":0.0,\"operation\":0.3},\"active_devices\":{\"sensors\":1,\"cameras\":0,\"controllers\":1}},\"trend\":{\"interval\":\"day\",\"start_date\":\"2026-09-30T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"series\":[{\"time_bucket\":\"2026-10-03\",\"sensor_detection\":2,\"camera_detection\":0,\"malfunction\":1,\"connection\":0,\"operation\":1,\"alert\":1,\"action\":0}]},\"by_device\":{\"start_date\":\"2026-09-30T22:16:08.718000+09:00\",\"end_date\":\"2026-10-03T22:16:08.718000+09:00\",\"controllers\":[{\"controller_id\":2801,\"controller_name\":\"LRT-EVT-E3-CTRL\",\"controller_number\":97300,\"sensor_detection\":2,\"malfunction\":1,\"connection\":0,\"operation\":0,\"alert\":1,\"action\":0}],\"cameras\":[],\"enclosures\":[{\"device_id\":2803,\"device_name\":\"LRT-EVT-E3-ENC\",\"device_number\":97310,\"sensor_detection\":0,\"alert\":0,\"malfunction\":0,\"connection\":0,\"operation\":1}],\"gates\":[]}},\"meta\":{\"timestamp\":\"2026-10-03T22:15:08.873709+09:00\",\"request_id\":\"4da0438d-01f1-446f-a9b6-9e432e93e2cb\"}}"
+    },
+    {
+      "Seq": 27,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/74",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping retrieved successfully\",\"data\":{\"id\":74,\"name_event\":\"LRT-EVT-E4-MAP1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.127938+09:00\",\"updated_at\":\"2026-10-03T22:15:09.127942+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.187083+09:00\",\"request_id\":\"3d172159-07ec-43fe-881a-c86f4fd58230\"}}"
+    },
+    {
+      "Seq": 28,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mappings retrieved successfully\",\"data\":[{\"id\":64,\"name_event\":\"REAL-CAM-DEMO-MAP\",\"device_group_id\":356,\"category_event_mapping\":\"SENSOR_WITH_CAMERA\",\"description\":\"REAL-CAM-DEMO 2026-09-30 - real camera event window demo (persistent). revert: scratchpad/realcam/demo_revert.py --apply\",\"status\":true,\"created_at\":\"2026-09-30T18:17:47.661531+09:00\",\"updated_at\":\"2026-09-30T18:17:47.661535+09:00\"},{\"id\":74,\"name_event\":\"LRT-EVT-E4-MAP1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.127938+09:00\",\"updated_at\":\"2026-10-03T22:15:09.127942+09:00\"},{\"id\":75,\"name_event\":\"LRT-EVT-E4-DRIFT1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.195637+09:00\",\"updated_at\":\"2026-10-03T22:15:09.195639+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":3,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.227206+09:00\",\"request_id\":\"a0ff6dcc-8172-4afa-9da4-fc892f30f708\"}}"
+    },
+    {
+      "Seq": 29,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[{\"id\":39,\"event_mapping_id\":64,\"camera\":{\"id\":2171,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":1,\"created_at\":\"2026-09-30T18:17:47.702294+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702298+09:00\"},{\"id\":40,\"event_mapping_id\":64,\"camera\":{\"id\":2169,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":2,\"created_at\":\"2026-09-30T18:17:47.702298+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702299+09:00\"},{\"id\":41,\"event_mapping_id\":64,\"camera\":{\"id\":2170,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":3,\"created_at\":\"2026-09-30T18:17:47.702299+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702299+09:00\"}],\"total\":3},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.267812+09:00\",\"request_id\":\"b12dbadf-f552-46c5-99ed-5c48ae55b56d\"}}"
+    },
+    {
+      "Seq": 30,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.284951+09:00\",\"request_id\":\"58f3876d-a8c6-4dda-a440-797dc48dde0f\"}}"
+    },
+    {
+      "Seq": 31,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.298380+09:00\",\"request_id\":\"08ea1286-ffc0-4ef4-b820-a94f2b68a29e\"}}"
+    },
+    {
+      "Seq": 32,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/75/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.308810+09:00\",\"request_id\":\"d9307de0-abc9-47d3-8a8c-70f2b541eac6\"}}"
+    },
+    {
+      "Seq": 33,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/75/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.316684+09:00\",\"request_id\":\"5b504d2f-e125-4d46-a3a8-f83b1316439d\"}}"
+    },
+    {
+      "Seq": 34,
+      "Tag": "E4/precision",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/75/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.323493+09:00\",\"request_id\":\"c22d2cb1-0f6c-49e4-9f65-a0d1471281a4\"}}"
+    },
+    {
+      "Seq": 35,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/75",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping retrieved successfully\",\"data\":{\"id\":75,\"name_event\":\"LRT-EVT-E4-DRIFT1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":\"LRT-EVT 다른 사용자\",\"status\":false,\"created_at\":\"2026-10-03T22:15:09.195637+09:00\",\"updated_at\":\"2026-10-03T22:15:09.370771+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.385983+09:00\",\"request_id\":\"ecf5c813-38b0-4305-a183-0f5fa564063c\"}}"
+    },
+    {
+      "Seq": 36,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings?page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mappings retrieved successfully\",\"data\":[{\"id\":64,\"name_event\":\"REAL-CAM-DEMO-MAP\",\"device_group_id\":356,\"category_event_mapping\":\"SENSOR_WITH_CAMERA\",\"description\":\"REAL-CAM-DEMO 2026-09-30 - real camera event window demo (persistent). revert: scratchpad/realcam/demo_revert.py --apply\",\"status\":true,\"created_at\":\"2026-09-30T18:17:47.661531+09:00\",\"updated_at\":\"2026-09-30T18:17:47.661535+09:00\"},{\"id\":74,\"name_event\":\"LRT-EVT-E4-MAP1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.127938+09:00\",\"updated_at\":\"2026-10-03T22:15:09.127942+09:00\"},{\"id\":75,\"name_event\":\"LRT-EVT-E4-DRIFT1\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":\"LRT-EVT 다른 사용자\",\"status\":false,\"created_at\":\"2026-10-03T22:15:09.195637+09:00\",\"updated_at\":\"2026-10-03T22:15:09.370771+09:00\"},{\"id\":76,\"name_event\":\"LRT-EVT-E4-MAP2\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.455560+09:00\",\"updated_at\":\"2026-10-03T22:15:09.455562+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":4,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.470675+09:00\",\"request_id\":\"65a079dc-c5ee-46c8-8f2c-66e393f92cdf\"}}"
+    },
+    {
+      "Seq": 37,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[{\"id\":39,\"event_mapping_id\":64,\"camera\":{\"id\":2171,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":1,\"created_at\":\"2026-09-30T18:17:47.702294+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702298+09:00\"},{\"id\":40,\"event_mapping_id\":64,\"camera\":{\"id\":2169,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":2,\"created_at\":\"2026-09-30T18:17:47.702298+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702299+09:00\"},{\"id\":41,\"event_mapping_id\":64,\"camera\":{\"id\":2170,\"category_device\":\"camera\"},\"target_preset\":null,\"home_preset\":null,\"delay_time\":0,\"is_enable\":true,\"priority\":3,\"created_at\":\"2026-09-30T18:17:47.702299+09:00\",\"updated_at\":\"2026-09-30T18:17:47.702299+09:00\"}],\"total\":3},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.481566+09:00\",\"request_id\":\"2312530c-da5c-4b7e-886a-429a0cdf59ea\"}}"
+    },
+    {
+      "Seq": 38,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.487925+09:00\",\"request_id\":\"37631d55-05a9-41e3-a261-bf2de53012ea\"}}"
+    },
+    {
+      "Seq": 39,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/64/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.496668+09:00\",\"request_id\":\"3dfe87ce-62af-49c1-b8be-819027e61ab6\"}}"
+    },
+    {
+      "Seq": 40,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.503546+09:00\",\"request_id\":\"2b049c8c-ddd6-46e4-ada3-d57ff8569f18\"}}"
+    },
+    {
+      "Seq": 41,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.510638+09:00\",\"request_id\":\"9cad0538-da34-450d-879a-a1ceb05641a9\"}}"
+    },
+    {
+      "Seq": 42,
+      "Tag": "E4/drift1",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.536232+09:00\",\"request_id\":\"16026184-88c1-48e5-bae2-edc90d8991c8\"}}"
+    },
+    {
+      "Seq": 43,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping retrieved successfully\",\"data\":{\"id\":76,\"name_event\":\"LRT-EVT-E4-MAP2\",\"device_group_id\":null,\"category_event_mapping\":\"NONE\",\"description\":null,\"status\":false,\"created_at\":\"2026-10-03T22:15:09.455560+09:00\",\"updated_at\":\"2026-10-03T22:15:09.455562+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.574994+09:00\",\"request_id\":\"3e561b42-05f5-4e46-8c13-0b4f2f1737df\"}}"
+    },
+    {
+      "Seq": 44,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.582385+09:00\",\"request_id\":\"db4dd4ec-3839-4a7e-b700-be2095160747\"}}"
+    },
+    {
+      "Seq": 45,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.589053+09:00\",\"request_id\":\"4a293b11-4a8a-4666-88fe-a17e47d2e265\"}}"
+    },
+    {
+      "Seq": 46,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.602658+09:00\",\"request_id\":\"efbffc5b-0e8c-472d-bf4f-a9e3473261dd\"}}"
+    },
+    {
+      "Seq": 47,
+      "Tag": "E4/apply",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/speakers/bulk",
+      "Status": 200,
+      "request": "{\"items\":[{\"speaker_id\":2804,\"file_group_id\":null,\"repeat_count\":1,\"is_enable\":true,\"priority\":1},{\"speaker_id\":2805,\"file_group_id\":null,\"repeat_count\":1,\"is_enable\":true,\"priority\":2}]}",
+      "response": "{\"success\":true,\"message\":\"1개 Speaker 연동 생성 완료, 1개 없음\",\"data\":{\"mapping_id\":76,\"created_ids\":[15],\"failed_items\":[],\"skipped_config_ids\":[],\"not_found_config_ids\":[2805],\"message\":\"1개 Speaker 연동 생성 완료, 1개 없음\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.646897+09:00\",\"request_id\":\"c38181dd-e01b-4813-92f6-e7ec3d02a777\"}}"
+    },
+    {
+      "Seq": 48,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/cameras",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping cameras retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.657560+09:00\",\"request_id\":\"b3832244-1834-48a7-b2e4-d8a7bfbe3d92\"}}"
+    },
+    {
+      "Seq": 49,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/speakers",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping speakers retrieved successfully\",\"data\":{\"items\":[{\"id\":15,\"event_mapping_id\":76,\"speaker\":{\"id\":2804,\"category_device\":\"speaker\"},\"file_group\":null,\"repeat_count\":1,\"is_enable\":true,\"priority\":1,\"created_at\":\"2026-10-03T22:15:09.635774+09:00\",\"updated_at\":\"2026-10-03T22:15:09.635781+09:00\"}],\"total\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.664379+09:00\",\"request_id\":\"94372ea2-05bc-4dd8-85ee-925f40c8c612\"}}"
+    },
+    {
+      "Seq": 50,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/integrations/event-mappings/76/lamps",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Event mapping lamps retrieved successfully\",\"data\":{\"items\":[],\"total\":0},\"meta\":{\"timestamp\":\"2026-10-03T22:15:09.670817+09:00\",\"request_id\":\"c989f899-8e5e-4f8a-ae16-33098302a1ed\"}}"
+    },
+    {
+      "Seq": 51,
+      "Tag": "E4/apply",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A10.075%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.075%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4288,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_only\":\"abc\"},\"created_at\":\"2026-10-03T22:15:09.998012+09:00\",\"updated_at\":\"2026-10-03T22:15:09.998014+09:00\"},{\"id\":4287,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"},\"created_at\":\"2026-10-03T22:15:09.964823+09:00\",\"updated_at\":\"2026-10-03T22:15:09.964828+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.086444+09:00\",\"request_id\":\"010f895f-3ed3-43f7-9305-0f5ab8aafe57\"}}"
+    },
+    {
+      "Seq": 52,
+      "Tag": "E5/E5a",
+      "Method": "PUT",
+      "Uri": "https://127.0.0.1:8000/api/events/detections/4287",
+      "Status": 200,
+      "request": "{\"type_event\":\"Intrusion\",\"result\":\"VIBRATION_SENSOR\",\"detail\":{\"signal\":5,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\",\"vendor_x\":1}}",
+      "response": "{\"success\":true,\"message\":\"Detection event replaced successfully\",\"data\":{\"id\":4287,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"VIBRATION_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"},\"created_at\":\"2026-10-03T22:15:09.964823+09:00\",\"updated_at\":\"2026-10-03T22:15:10.101761+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.110800+09:00\",\"request_id\":\"242e8b95-83fc-4cbc-ae25-c8a5e65b85bd\"},\"warnings\":[]}"
+    },
+    {
+      "Seq": 53,
+      "Tag": "E5/E5a",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A10.125%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.125%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4288,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_only\":\"abc\"},\"created_at\":\"2026-10-03T22:15:09.998012+09:00\",\"updated_at\":\"2026-10-03T22:15:09.998014+09:00\"},{\"id\":4287,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"VIBRATION_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"},\"created_at\":\"2026-10-03T22:15:09.964823+09:00\",\"updated_at\":\"2026-10-03T22:15:10.101761+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.131671+09:00\",\"request_id\":\"75721f88-4ac9-4cf6-bbca-02361e0f6ff5\"}}"
+    },
+    {
+      "Seq": 54,
+      "Tag": "E5/E5b",
+      "Method": "PUT",
+      "Uri": "https://127.0.0.1:8000/api/events/detections/4288",
+      "Status": 200,
+      "request": "{\"type_event\":\"Intrusion\",\"result\":\"VIBRATION_SENSOR\",\"detail\":{\"vendor_only\":\"abc\"}}",
+      "response": "{\"success\":true,\"message\":\"Detection event replaced successfully\",\"data\":{\"id\":4288,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"VIBRATION_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_only\":\"abc\"},\"created_at\":\"2026-10-03T22:15:09.998012+09:00\",\"updated_at\":\"2026-10-03T22:15:10.140815+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.151689+09:00\",\"request_id\":\"1df18f03-b845-4a89-babf-e0ef8fe7cee0\"},\"warnings\":[]}"
+    },
+    {
+      "Seq": 55,
+      "Tag": "E5/E5b",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/malfunctions?start_date=2026-10-03T20%3A15%3A10.197%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.197%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Malfunction events retrieved successfully\",\"data\":[{\"id\":4290,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_CONTROLLER\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_y\":\"k\",\"first_end\":20,\"first_start\":10},\"created_at\":\"2026-10-03T22:15:10.041837+09:00\",\"updated_at\":\"2026-10-03T22:15:10.041840+09:00\"},{\"id\":4289,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_CONTROLLER\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.016185+09:00\",\"updated_at\":\"2026-10-03T22:15:10.016186+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.208475+09:00\",\"request_id\":\"17fb3613-d574-4b37-9b81-05897dc3c83b\"}}"
+    },
+    {
+      "Seq": 56,
+      "Tag": "E5/E5c",
+      "Method": "PUT",
+      "Uri": "https://127.0.0.1:8000/api/events/malfunctions/4289",
+      "Status": 200,
+      "request": "{\"type_event\":\"Fault\",\"reason\":\"FAULT_FENCE\"}",
+      "response": "{\"success\":true,\"message\":\"Malfunction event replaced successfully\",\"data\":{\"id\":4289,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_FENCE\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.016185+09:00\",\"updated_at\":\"2026-10-03T22:15:10.225955+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.233946+09:00\",\"request_id\":\"784bc81f-69ea-4c8f-8863-da19e412ed35\"},\"warnings\":[]}"
+    },
+    {
+      "Seq": 57,
+      "Tag": "E5/E5c",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/malfunctions?start_date=2026-10-03T20%3A15%3A10.250%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.250%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Malfunction events retrieved successfully\",\"data\":[{\"id\":4290,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_CONTROLLER\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_y\":\"k\",\"first_end\":20,\"first_start\":10},\"created_at\":\"2026-10-03T22:15:10.041837+09:00\",\"updated_at\":\"2026-10-03T22:15:10.041840+09:00\"},{\"id\":4289,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_FENCE\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.016185+09:00\",\"updated_at\":\"2026-10-03T22:15:10.225955+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.266760+09:00\",\"request_id\":\"d4a2341e-ed2b-41a1-a581-40664b00f496\"}}"
+    },
+    {
+      "Seq": 58,
+      "Tag": "E5/E5d",
+      "Method": "PUT",
+      "Uri": "https://127.0.0.1:8000/api/events/malfunctions/4290",
+      "Status": 200,
+      "request": "{\"type_event\":\"Fault\",\"reason\":\"FAULT_FENCE\",\"detail\":{\"first_start\":10,\"first_end\":20,\"vendor_y\":\"k\"}}",
+      "response": "{\"success\":true,\"message\":\"Malfunction event replaced successfully\",\"data\":{\"id\":4290,\"category_event\":\"malfunction\",\"unit_id\":649,\"type_event\":\"Fault\",\"action_reported\":false,\"reason\":\"FAULT_FENCE\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_y\":\"k\",\"first_end\":20,\"first_start\":10},\"created_at\":\"2026-10-03T22:15:10.041837+09:00\",\"updated_at\":\"2026-10-03T22:15:10.275990+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.284199+09:00\",\"request_id\":\"bf8ade27-250f-4058-99d8-f0a2831f2738\"},\"warnings\":[]}"
+    },
+    {
+      "Seq": 59,
+      "Tag": "E5/E5d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A10.373%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.373%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4291,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":null,\"device_description\":\"[sensor:PIR] LRT-EVT-E5-GONE (number: 97509, id: 2808)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.336375+09:00\",\"updated_at\":\"2026-10-03T22:15:10.336380+09:00\"},{\"id\":4288,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"VIBRATION_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"vendor_only\":\"abc\"},\"created_at\":\"2026-10-03T22:15:09.998012+09:00\",\"updated_at\":\"2026-10-03T22:15:10.140815+09:00\"},{\"id\":4287,\"category_event\":\"detection\",\"unit_id\":649,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"VIBRATION_SENSOR\",\"device\":{\"id\":2807,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E5-S1 (number: 97501, id: 2807)\",\"detail\":{\"signal\":5,\"vendor_x\":1,\"thumbnail\":\"http://127.0.0.1/lrt-evt-e5.jpg\"},\"created_at\":\"2026-10-03T22:15:09.964823+09:00\",\"updated_at\":\"2026-10-03T22:15:10.101761+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":3,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.380476+09:00\",\"request_id\":\"eeb81c7a-207d-409d-adc8-7c14eb73177b\"}}"
+    },
+    {
+      "Seq": 60,
+      "Tag": "E5/E5d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/connections?start_date=2026-10-03T20%3A15%3A10.668%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.668%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Connection events retrieved successfully\",\"data\":[{\"id\":4292,\"category_event\":\"connection\",\"unit_id\":650,\"type_event\":\"Connection\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"created_at\":\"2026-10-03T22:15:10.619172+09:00\",\"updated_at\":\"2026-10-03T22:15:10.619174+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":1,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.678369+09:00\",\"request_id\":\"410900ee-3173-406a-a8a1-ed140d46d353\"}}"
+    },
+    {
+      "Seq": 61,
+      "Tag": "E5/E5d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A10.790%2B09%3A00&end_date=2026-10-04T00%3A15%3A10.790%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4297,\"category_event\":\"detection\",\"unit_id\":650,\"type_event\":\"WindyMode\",\"action_reported\":false,\"result\":\"CONTACT_SENSOR\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.781424+09:00\",\"updated_at\":\"2026-10-03T22:15:10.781426+09:00\"},{\"id\":4296,\"category_event\":\"detection\",\"unit_id\":650,\"type_event\":\"ContactOff\",\"action_reported\":false,\"result\":\"CONTACT_SENSOR\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.763016+09:00\",\"updated_at\":\"2026-10-03T22:15:10.763019+09:00\"},{\"id\":4295,\"category_event\":\"detection\",\"unit_id\":650,\"type_event\":\"ContactOn\",\"action_reported\":false,\"result\":\"CONTACT_SENSOR\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.730269+09:00\",\"updated_at\":\"2026-10-03T22:15:10.730272+09:00\"},{\"id\":4294,\"category_event\":\"detection\",\"unit_id\":650,\"type_event\":\"Alert\",\"action_reported\":false,\"result\":\"CONTACT_SENSOR\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.708747+09:00\",\"updated_at\":\"2026-10-03T22:15:10.708749+09:00\"},{\"id\":4293,\"category_event\":\"detection\",\"unit_id\":650,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"CONTACT_SENSOR\",\"device\":{\"id\":2810,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E6-S1 (number: 97601, id: 2810)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:10.692406+09:00\",\"updated_at\":\"2026-10-03T22:15:10.692408+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":5,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:10.795…<truncated>"
+    },
+    {
+      "Seq": 62,
+      "Tag": "E5/E5d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A11.064%2B09%3A00&end_date=2026-10-04T00%3A15%3A11.064%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4299,\"category_event\":\"detection\",\"unit_id\":651,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2812,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E7-S1 (number: 97701, id: 2812)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.055377+09:00\",\"updated_at\":\"2026-10-03T22:15:11.055379+09:00\"},{\"id\":4298,\"category_event\":\"detection\",\"unit_id\":651,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2812,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E7-S1 (number: 97701, id: 2812)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.039291+09:00\",\"updated_at\":\"2026-10-03T22:15:11.039293+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:11.071611+09:00\",\"request_id\":\"31fefeca-21b5-45aa-b3bd-5a5aac1995f7\"}}"
+    },
+    {
+      "Seq": 63,
+      "Tag": "E5/E5d",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A11.073%2B09%3A00&end_date=2026-10-04T00%3A15%3A11.073%2B09%3A00&page=1&limit=100",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4299,\"category_event\":\"detection\",\"unit_id\":651,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2812,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E7-S1 (number: 97701, id: 2812)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.055377+09:00\",\"updated_at\":\"2026-10-03T22:15:11.055379+09:00\"},{\"id\":4298,\"category_event\":\"detection\",\"unit_id\":651,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2812,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E7-S1 (number: 97701, id: 2812)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.039291+09:00\",\"updated_at\":\"2026-10-03T22:15:11.039293+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":2,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:11.083898+09:00\",\"request_id\":\"6c488512-7bf8-4567-b039-a66e597d449d\"}}"
+    },
+    {
+      "Seq": 64,
+      "Tag": "E7/apply",
+      "Method": "POST",
+      "Uri": "https://127.0.0.1:8000/api/events/actions",
+      "Status": 201,
+      "request": "{\"type_event\":\"Action\",\"content\":\"야생동물출현\",\"user\":\"admin\",\"from_event_id\":4298,\"created_at\":\"2026-10-03T22:15:11.099+09:00\"}",
+      "response": "{\"success\":true,\"message\":\"Action event created successfully\",\"data\":{\"id\":1504,\"unit_id\":651,\"type_event\":\"Action\",\"content\":\"야생동물출현\",\"user\":\"admin\",\"from_event\":{\"id\":4298,\"category_event\":\"detection\",\"unit_id\":651,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2812,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E7-S1 (number: 97701, id: 2812)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.039291+09:00\",\"updated_at\":\"2026-10-03T22:15:11.115415+09:00\"},\"created_at\":\"2026-10-03T22:15:11.113890+09:00\",\"updated_at\":\"2026-10-03T22:15:11.113893+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:11.124262+09:00\",\"request_id\":\"9be462e2-07f5-434a-9628-b4bf1cc8a1d6\"},\"warnings\":[{\"field\":\"created_at\",\"code\":\"READ_ONLY_IGNORED\",\"message\":\"'created_at' 는 응답 전용 키입니다 — 무시했습니다\"}]}"
+    },
+    {
+      "Seq": 65,
+      "Tag": "E7/long-memo",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A11.464%2B09%3A00&end_date=2026-10-04T00%3A15%3A11.464%2B09%3A00&page=1&limit=2",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4302,\"category_event\":\"detection\",\"unit_id\":652,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2814,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E9-S1 (number: 97901, id: 2814)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.441749+09:00\",\"updated_at\":\"2026-10-03T22:15:11.441755+09:00\"},{\"id\":4301,\"category_event\":\"detection\",\"unit_id\":652,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2814,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E9-S1 (number: 97901, id: 2814)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.403931+09:00\",\"updated_at\":\"2026-10-03T22:15:11.403933+09:00\"}],\"pagination\":{\"page\":1,\"limit\":2,\"total\":3,\"total_pages\":2},\"meta\":{\"timestamp\":\"2026-10-03T22:15:11.472454+09:00\",\"request_id\":\"a252237c-c5aa-47ff-80b5-e39c2ec8b28b\"}}"
+    },
+    {
+      "Seq": 66,
+      "Tag": "E7/long-memo",
+      "Method": "GET",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-03T20%3A15%3A11.464%2B09%3A00&end_date=2026-10-04T00%3A15%3A11.464%2B09%3A00&page=2&limit=2",
+      "Status": 200,
+      "request": "",
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4301,\"category_event\":\"detection\",\"unit_id\":652,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2814,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E9-S1 (number: 97901, id: 2814)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.403931+09:00\",\"updated_at\":\"2026-10-03T22:15:11.403933+09:00\"},{\"id\":4300,\"category_event\":\"detection\",\"unit_id\":652,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2814,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-E9-S1 (number: 97901, id: 2814)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:11.385366+09:00\",\"updated_at\":\"2026-10-03T22:15:11.385369+09:00\"}],\"pagination\":{\"page\":2,\"limit\":2,\"total\":4,\"total_pages\":2},\"meta\":{\"timestamp\":\"2026-10-03T22:15:11.502615+09:00\",\"request_id\":\"41044e9e-473a-49d2-a6e1-f861e5f6f5d0\"}}"
+    },
+    {
+      "Seq": 67,
+      "Tag": "E7/long-memo",
       "Method": "POST",
       "Uri": "https://127.0.0.1:8000/api/events/action-report-templates",
       "Status": 201,
       "request": "{\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901}",
-      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 생성 성공\",\"data\":{\"id\":88,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-09-27T03:09:05.247849+09:00\",\"updated_at\":\"2026-09-27T03:09:05.247851+09:00\"},\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.252396+09:00\",\"request_id\":\"104aa7ae-56f4-43d5-bc1b-719ed0445f36\"}}"
+      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 생성 성공\",\"data\":{\"id\":622,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-10-03T22:15:12.722397+09:00\",\"updated_at\":\"2026-10-03T22:15:12.722426+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.729742+09:00\",\"request_id\":\"0bb6606d-cef8-4c99-9699-ce71edf465d7\"}}"
     },
     {
-      "Seq": 3,
-      "Tag": "probe",
+      "Seq": 68,
+      "Tag": "E7/long-memo",
       "Method": "POST",
       "Uri": "https://127.0.0.1:8000/api/events/action-report-templates",
       "Status": 201,
       "request": "{\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900}",
-      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 생성 성공\",\"data\":{\"id\":89,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-09-27T03:09:05.260743+09:00\",\"updated_at\":\"2026-09-27T03:09:05.260745+09:00\"},\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.266276+09:00\",\"request_id\":\"d38e9f89-c40f-4524-8431-0fb0791a59c4\"}}"
+      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 생성 성공\",\"data\":{\"id\":623,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-10-03T22:15:12.740093+09:00\",\"updated_at\":\"2026-10-03T22:15:12.740096+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.744246+09:00\",\"request_id\":\"10c4e2aa-aa2e-4ab2-8d16-aa62d7ecd0ce\"}}"
     },
     {
-      "Seq": 4,
+      "Seq": 69,
       "Tag": "ET/phrases",
       "Method": "GET",
       "Uri": "https://127.0.0.1:8000/api/events/action-report-templates",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379246+09:00\"},{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":5,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":89,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-09-27T03:09:05.260743+09:00\",\"updated_at\":\"2026-09-27T03:09:05.260745+09:00\"},{\"id\":88,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-09-27T03:09:05.247849+09:00\",\"updated_at\":\"2026-09-27T03:09:05.247851+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.273615+09:00\",\"request_id\":\"3d360cae-15c5-41b7-aaba-e83a3ccf94ea\"}}"
+      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":0,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795830+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795832+09:00\"},{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-29T23:22:15.049873+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":623,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-10-03T22:15:12.740093+09:00\",\"updated_at\":\"2026-10-03T22:15:12.740096+09:00\"},{\"id\":622,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-10-03T22:15:12.722397+09:00\",\"updated_at\":\"2026-10-03T22:15:12.722426+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.751837+09:00\",\"request_id\":\"70a2348e-27a0-4828-9bbd-3401c5511489\"}}"
     },
     {
-      "Seq": 5,
+      "Seq": 70,
       "Tag": "ET/open",
       "Method": "GET",
       "Uri": "https://127.0.0.1:8000/api/events/action-report-templates",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379246+09:00\"},{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":5,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":89,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-09-27T03:09:05.260743+09:00\",\"updated_at\":\"2026-09-27T03:09:05.260745+09:00\"},{\"id\":88,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-09-27T03:09:05.247849+09:00\",\"updated_at\":\"2026-09-27T03:09:05.247851+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.609117+09:00\",\"request_id\":\"8dd59846-7838-4fbc-babb-869399a33ac9\"}}"
+      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":0,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795830+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795832+09:00\"},{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-29T23:22:15.049873+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":623,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-10-03T22:15:12.740093+09:00\",\"updated_at\":\"2026-10-03T22:15:12.740096+09:00\"},{\"id\":622,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-10-03T22:15:12.722397+09:00\",\"updated_at\":\"2026-10-03T22:15:12.722426+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.861402+09:00\",\"request_id\":\"48470138-bf54-4172-ac13-57547b063cc1\"}}"
     },
     {
-      "Seq": 6,
+      "Seq": 71,
       "Tag": "ET/open",
       "Method": "GET",
-      "Uri": "https://127.0.0.1:8000/api/events/statistics/dashboard?start_date=2026-09-26T03%3A09%3A05.598%2B09%3A00&end_date=2026-09-27T03%3A09%3A05.598%2B09%3A00&interval=hour",
+      "Uri": "https://127.0.0.1:8000/api/events/statistics/dashboard?start_date=2026-10-02T22%3A15%3A12.849%2B09%3A00&end_date=2026-10-03T22%3A15%3A12.849%2B09%3A00&interval=hour",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"Event dashboard statistics retrieved\",\"data\":{\"summary\":{\"start_date\":\"2026-09-26T03:09:05.598000+09:00\",\"end_date\":\"2026-09-27T03:09:05.598000+09:00\",\"days_in_range\":1,\"total\":3,\"sensor_detection\":1,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"alert\":0,\"action\":2,\"operation\":0,\"daily_averages\":{\"sensor_detection\":1.0,\"camera_detection\":0.0,\"malfunction\":0.0,\"connection\":0.0,\"alert\":0.0,\"action\":2.0,\"operation\":0.0},\"active_devices\":{\"sensors\":1,\"cameras\":0,\"controllers\":1}},\"trend\":{\"interval\":\"hour\",\"start_date\":\"2026-09-26T03:09:05.598000+09:00\",\"end_date\":\"2026-09-27T03:09:05.598000+09:00\",\"series\":[{\"time_bucket\":\"2026-09-26 22\",\"sensor_detection\":0,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":1},{\"time_bucket\":\"2026-09-27 00\",\"sensor_detection\":0,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":1},{\"time_bucket\":\"2026-09-27 03\",\"sensor_detection\":1,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":0}]},\"by_device\":{\"start_date\":\"2026-09-26T03:09:05.598000+09:00\",\"end_date\":\"2026-09-27T03:09:05.598000+09:00\",\"controllers\":[{\"controller_id\":1451,\"controller_name\":\"LRT-EVT-ET-CTRL\",\"controller_number\":97900,\"sensor_detection\":1,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":0}],\"cameras\":[],\"enclosures\":[],\"gates\":[]}},\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.635792+09:00\",\"request_id\":\"461601ba-f8ee-4201-9afe-75885754e7f4\"}}"
+      "response": "{\"success\":true,\"message\":\"Event dashboard statistics retrieved\",\"data\":{\"summary\":{\"start_date\":\"2026-10-02T22:15:12.849000+09:00\",\"end_date\":\"2026-10-03T22:15:12.849000+09:00\",\"days_in_range\":1,\"total\":1,\"sensor_detection\":1,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"alert\":0,\"action\":0,\"operation\":0,\"daily_averages\":{\"sensor_detection\":1.0,\"camera_detection\":0.0,\"malfunction\":0.0,\"connection\":0.0,\"alert\":0.0,\"action\":0.0,\"operation\":0.0},\"active_devices\":{\"sensors\":1,\"cameras\":0,\"controllers\":1}},\"trend\":{\"interval\":\"hour\",\"start_date\":\"2026-10-02T22:15:12.849000+09:00\",\"end_date\":\"2026-10-03T22:15:12.849000+09:00\",\"series\":[{\"time_bucket\":\"2026-10-03 22\",\"sensor_detection\":1,\"camera_detection\":0,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":0}]},\"by_device\":{\"start_date\":\"2026-10-02T22:15:12.849000+09:00\",\"end_date\":\"2026-10-03T22:15:12.849000+09:00\",\"controllers\":[{\"controller_id\":2815,\"controller_name\":\"LRT-EVT-ET-CTRL\",\"controller_number\":97900,\"sensor_detection\":1,\"malfunction\":0,\"connection\":0,\"operation\":0,\"alert\":0,\"action\":0}],\"cameras\":[],\"enclosures\":[],\"gates\":[]}},\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.888327+09:00\",\"request_id\":\"b4718165-ddd4-4a1b-a3ca-fcdd37e020a2\"}}"
     },
     {
-      "Seq": 7,
+      "Seq": 72,
       "Tag": "ET/open",
       "Method": "GET",
       "Uri": "https://127.0.0.1:8000/api/events/action-report-templates",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379246+09:00\"},{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379248+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":5,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-27T02:47:12.379249+09:00\"},{\"id\":89,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-09-27T03:09:05.260743+09:00\",\"updated_at\":\"2026-09-27T03:09:05.260745+09:00\"},{\"id\":88,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-09-27T03:09:05.247849+09:00\",\"updated_at\":\"2026-09-27T03:09:05.247851+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.673439+09:00\",\"request_id\":\"b3731b5c-ec6b-450e-9539-b121dc238fdc\"}}"
+      "response": "{\"success\":true,\"message\":\"조치보고 템플릿 목록 조회 성공\",\"data\":[{\"id\":2,\"content\":\"강풍/폭우\",\"display_order\":0,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795830+09:00\"},{\"id\":3,\"content\":\"울타리 점검/작업\",\"display_order\":1,\"created_at\":\"2026-09-04T09:56:29.894572+09:00\",\"updated_at\":\"2026-10-01T00:14:33.795832+09:00\"},{\"id\":1,\"content\":\"야생동물출현\",\"display_order\":2,\"created_at\":\"2026-09-04T09:56:29.894569+09:00\",\"updated_at\":\"2026-09-29T23:22:15.049873+09:00\"},{\"id\":4,\"content\":\"침입발생 특경출동조치\",\"display_order\":3,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":5,\"content\":\"오경보\",\"display_order\":4,\"created_at\":\"2026-09-04T09:56:29.894573+09:00\",\"updated_at\":\"2026-09-29T23:22:07.553245+09:00\"},{\"id\":623,\"content\":\"LRT-EVT-TRAY-문구-B\",\"display_order\":900,\"created_at\":\"2026-10-03T22:15:12.740093+09:00\",\"updated_at\":\"2026-10-03T22:15:12.740096+09:00\"},{\"id\":622,\"content\":\"LRT-EVT-TRAY-문구-A\",\"display_order\":901,\"created_at\":\"2026-10-03T22:15:12.722397+09:00\",\"updated_at\":\"2026-10-03T22:15:12.722426+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.906215+09:00\",\"request_id\":\"85d2a396-3e50-4f9f-bc33-b1ed917b750d\"}}"
     },
     {
-      "Seq": 8,
+      "Seq": 73,
       "Tag": "ET/list",
       "Method": "GET",
-      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-09-26T03%3A09%3A05.598%2B09%3A00&end_date=2026-09-27T03%3A09%3A05.598%2B09%3A00&page=1&limit=100",
+      "Uri": "https://127.0.0.1:8000/api/events/detections?start_date=2026-10-02T22%3A15%3A12.849%2B09%3A00&end_date=2026-10-03T22%3A15%3A12.849%2B09%3A00&page=1&limit=100",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":609,\"category_event\":\"detection\",\"unit_id\":149,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":1452,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 1452)\",\"detail\":null,\"created_at\":\"2026-09-27T03:09:05.347409+09:00\",\"updated_at\":\"2026-09-27T03:09:05.347411+09:00\"},{\"id\":607,\"category_event\":\"detection\",\"unit_id\":1,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":null,\"device_description\":\"[sensor:PIR] LRT-UI-SENSOR-005604-R (number: 98329, id: 1443)\",\"detail\":null,\"created_at\":\"2026-09-27T00:57:20.879461+09:00\",\"updated_at\":\"2026-09-27T00:57:34.105740+09:00\"},{\"id\":606,\"category_event\":\"detection\",\"unit_id\":1,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":null,\"device_description\":\"[sensor:PIR] LRT-UI-SENSOR-225246-R (number: 97935, id: 1441)\",\"detail\":null,\"created_at\":\"2026-09-26T22:53:22.141415+09:00\",\"updated_at\":\"2026-09-26T22:53:28.805978+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":3,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.694921+09:00\",\"request_id\":\"c24c74e7-6dd8-4022-b276-fd7675d084cd\"}}"
+      "response": "{\"success\":true,\"message\":\"Detection events retrieved successfully\",\"data\":[{\"id\":4304,\"category_event\":\"detection\",\"unit_id\":653,\"type_event\":\"Intrusion\",\"action_reported\":false,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2816,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 2816)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:12.824510+09:00\",\"updated_at\":\"2026-10-03T22:15:12.824512+09:00\"}],\"pagination\":{\"page\":1,\"limit\":100,\"total\":1,\"total_pages\":1},\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.937895+09:00\",\"request_id\":\"ddb31d4f-5107-4f0d-af3a-469ac9d56211\"}}"
     },
     {
-      "Seq": 9,
+      "Seq": 74,
       "Tag": "ET/apply",
       "Method": "POST",
       "Uri": "https://127.0.0.1:8000/api/events/actions",
       "Status": 201,
-      "request": "{\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"LRT-EVT 트레이\",\"from_event_id\":609,\"created_at\":\"2026-09-27T03:09:05.725+09:00\"}",
-      "response": "{\"success\":true,\"message\":\"Action event created successfully\",\"data\":{\"id\":122,\"unit_id\":149,\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"LRT-EVT 트레이\",\"from_event\":{\"id\":609,\"category_event\":\"detection\",\"unit_id\":149,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":1452,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 1452)\",\"detail\":null,\"created_at\":\"2026-09-27T03:09:05.347409+09:00\",\"updated_at\":\"2026-09-27T03:09:05.744612+09:00\"},\"created_at\":\"2026-09-27T03:09:05.742934+09:00\",\"updated_at\":\"2026-09-27T03:09:05.742938+09:00\"},\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.756046+09:00\",\"request_id\":\"f3d4cf74-aa4f-444f-9bf5-9ecedcdcddbe\"},\"warnings\":[{\"field\":\"created_at\",\"code\":\"READ_ONLY_IGNORED\",\"message\":\"'created_at' 는 응답 전용 키입니다 — 무시했습니다\"}]}"
+      "request": "{\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"admin\",\"from_event_id\":4304,\"created_at\":\"2026-10-03T22:15:12.949+09:00\"}",
+      "response": "{\"success\":true,\"message\":\"Action event created successfully\",\"data\":{\"id\":1505,\"unit_id\":653,\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"admin\",\"from_event\":{\"id\":4304,\"category_event\":\"detection\",\"unit_id\":653,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2816,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 2816)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:12.824510+09:00\",\"updated_at\":\"2026-10-03T22:15:12.972095+09:00\"},\"created_at\":\"2026-10-03T22:15:12.970133+09:00\",\"updated_at\":\"2026-10-03T22:15:12.970138+09:00\"},\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.983127+09:00\",\"request_id\":\"28c0969a-d768-4498-a690-25ce11fb09a0\"},\"warnings\":[{\"field\":\"created_at\",\"code\":\"READ_ONLY_IGNORED\",\"message\":\"'created_at' 는 응답 전용 키입니다 — 무시했습니다\"}]}"
     },
     {
-      "Seq": 10,
+      "Seq": 75,
       "Tag": "ET/apply",
       "Method": "GET",
-      "Uri": "https://127.0.0.1:8000/api/events/detections/609/actions",
+      "Uri": "https://127.0.0.1:8000/api/events/detections/4304/actions",
       "Status": 200,
       "request": "",
-      "response": "{\"success\":true,\"message\":\"Action events retrieved successfully\",\"data\":[{\"id\":122,\"unit_id\":149,\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"LRT-EVT 트레이\",\"from_event\":{\"id\":609,\"category_event\":\"detection\",\"unit_id\":149,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":1452,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 1452)\",\"detail\":null,\"created_at\":\"2026-09-27T03:09:05.347409+09:00\",\"updated_at\":\"2026-09-27T03:09:05.744612+09:00\"},\"created_at\":\"2026-09-27T03:09:05.742934+09:00\",\"updated_at\":\"2026-09-27T03:09:05.742938+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-09-27T03:09:05.773555+09:00\",\"request_id\":\"330de9a4-7c20-413e-ac67-a4b7216def1d\"}}"
+      "response": "{\"success\":true,\"message\":\"Action events retrieved successfully\",\"data\":[{\"id\":1505,\"unit_id\":653,\"type_event\":\"Action\",\"content\":\"LRT-EVT-TRAY-문구-B\",\"user\":\"admin\",\"from_event\":{\"id\":4304,\"category_event\":\"detection\",\"unit_id\":653,\"type_event\":\"Intrusion\",\"action_reported\":true,\"result\":\"PIR_SENSOR\",\"device\":{\"id\":2816,\"category_device\":\"sensor\"},\"device_description\":\"[sensor:PIR] LRT-EVT-ET-S1 (number: 97901, id: 2816)\",\"detail\":null,\"created_at\":\"2026-10-03T22:15:12.824510+09:00\",\"updated_at\":\"2026-10-03T22:15:12.972095+09:00\"},\"created_at\":\"2026-10-03T22:15:12.970133+09:00\",\"updated_at\":\"2026-10-03T22:15:12.970138+09:00\"}],\"pagination\":null,\"meta\":{\"timestamp\":\"2026-10-03T22:15:12.997396+09:00\",\"request_id\":\"f07e8aa1-67fa-40c5-9061-42e5021da3f9\"}}"
     }
   ]
 }

@@ -592,7 +592,7 @@ public static partial class Steps
             var serverTotal = (int)sSum["total"]!;
             rec.Add("E3a", TAG, "개요 총계 = 서버 summary.total (서버 total 은 alert 를 포함한다)",
                 overview.Total == serverTotal ? Verdict.PASS : Verdict.FAIL,
-                $"window Total={overview.Total}; server total={serverTotal} (sensor {sSum["sensor_detection"]} camera {sSum["camera_detection"]} alert {sSum["alert"]} mal {sSum["malfunction"]} con {sSum["connection"]} act {sSum["action"]}; operation {sSum["operation"]} 별도); note='{overview.TotalNote}'",
+                $"window Total={overview.Total}; server total={serverTotal} (sensor {sSum["sensor_detection"]} camera {sSum["camera_detection"]} alert {sSum["alert"]} mal {sSum["malfunction"]} con {sSum["connection"]} act {sSum["action"]}; operation {sSum["operation"]} 별도); note='{overview.OperationCountText}'",
                 defectAt: overview.Total == serverTotal ? "" : "Events.Ui/Consoles/Overview/EventOverviewViewModel.cs Load (5종 재합산 — alert 누락) · Messages/Dto/Events/EventSummaryDto.cs (alert 키 없음)");
 
             // E3b 경보가 보이는가
@@ -605,11 +605,11 @@ public static partial class Steps
 
             // E3c 운영 이벤트(총계 밖)가 사라지지 않는가
             var serverOp = (int?)sSum["operation"] ?? 0;
-            var opShown = overview.TotalNote.Contains($"운영 {serverOp:N0}건");
+            var opShown = overview.OperationCountText.Contains($"운영 {serverOp:N0}건");
             rec.Add("E3c", TAG, "서버 summary.operation(총계 밖 별도 집계)이 개요에서 조용히 사라지지 않는다",
                 serverOp == 0 ? Verdict.INFO : (opShown ? Verdict.PASS : Verdict.FAIL),
-                $"server operation={serverOp}; window note='{overview.TotalNote}'",
-                defectAt: opShown ? "" : "Messages/Dto/Events/EventSummaryDto.cs (operation 키 없음) · EventOverviewViewModel.TotalNote");
+                $"server operation={serverOp}; window note='{overview.OperationCountText}'",
+                defectAt: opShown ? "" : "Messages/Dto/Events/EventSummaryDto.cs (operation 키 없음) · EventOverviewViewModel.OperationCountText");
 
             // E3d 함체·통문 막대
             var sEnc = (server["by_device"]?["enclosures"] as JArray) ?? new JArray();

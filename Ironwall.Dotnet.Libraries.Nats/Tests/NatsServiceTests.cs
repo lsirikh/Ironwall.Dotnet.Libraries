@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using Xunit;
@@ -23,7 +23,7 @@ public class NatsServiceTests
     {
         _setupModel = new NatsSetupModel
         {
-            IpAddressNats = "192.168.202.195",
+            IpAddressNats = "localhost",   // 옛 사내 서버(192.168.202.195)는 더 없다 — 루프백 NATS
             PortNats = 4222,
             DefaultSubjectNats = "test.>",
             SubsystemNats = "NatsServiceTests",
@@ -75,7 +75,7 @@ public class NatsServiceTests
         var natsService = new NatsService(_log);
         var setupModel = new NatsSetupModel
         {
-            IpAddressNats = "192.168.202.195",
+            IpAddressNats = "localhost",   // 옛 사내 서버(192.168.202.195)는 더 없다 — 루프백 NATS
             PortNats = 4222,
             DefaultSubjectNats = "test.wildcard.>", // 다중 레벨 와일드카드
             SubsystemNats = "WildcardTest"

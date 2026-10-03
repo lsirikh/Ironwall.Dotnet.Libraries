@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Services;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using Xunit;
@@ -26,10 +26,12 @@ public class NatsE2ETests
         PortNats            = 4222,
         DomainNats          = "sensorway",
         GroupNats           = "unit001",
-        SubsystemNats       = "gis",
+        // 실서버 GIS 주제(sensorway.unit001.gis.>)는 루프백 서버 · 주입기가 실제로 쓰는 곳이라, 거기에 구독하면
+        // 남의 메시지(gis.event.detect 등)를 내 것으로 받아 시험이 우연히 깨졌다 — 회차마다 자기만의 하위 주제를 쓴다.
+        SubsystemNats       = $"gis-test-{Guid.NewGuid():N}"[..17],
         ConnectionTimeoutNats = 5000,
     };
-    // EffectiveSubject → "sensorway.unit001.gis.>"
+    // EffectiveSubject → "sensorway.unit001.gis-test-xxxxxxxx.>"
 
     private readonly ILogService _log = new LogService();
 
@@ -206,6 +208,7 @@ public class NatsE2ETests
         cts.Cancel();
         await svc.StopAsync();
         await Task.Delay(200);
+        received = false;   // 중단 전에 받은 것은 묻지 않는다 — 이 시험은 '중단 뒤'만 본다
 
         var txSubject = $"{SetupModel.DomainNats}.{SetupModel.GroupNats}.{SetupModel.SubsystemNats}.test.stop";
         await svc.PublishAsync(txSubject, "should-not-arrive");
