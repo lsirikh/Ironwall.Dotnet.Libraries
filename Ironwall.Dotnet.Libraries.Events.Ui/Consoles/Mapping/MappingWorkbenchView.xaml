@@ -370,6 +370,7 @@
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="*" />
+						<RowDefinition Height="Auto" />
 					</Grid.RowDefinitions>
 
 					<!--  맵핑 속성 — 본체는 호출 1회라 Draft 없이 바로 저장한다(봉투 규약)  -->
@@ -605,6 +606,65 @@
 							</TextBlock>
 						</Grid>
 					</Grid>
+
+					<!--
+						카메라 연동 설정 — 카메라 행을 하나 고르면 뜬다. 값 변경은 Draft(행 '수정')이고 [적용] 한 번에 나간다.
+						프리셋 후보는 그 카메라 것만(서버가 다른 카메라 프리셋을 422 로 거절한다).
+					-->
+					<c:ConsoleSection
+						Grid.Row="4"
+						Margin="12,0,12,12"
+						AutomationProperties.AutomationId="Integrations.Board.CameraEditor"
+						AxisName="event-mapping-cameras"
+						Header="{Binding CameraEditorTitle}"
+						IsEnabled="{Binding IsBoardEnabled}"
+						Visibility="{Binding HasCameraEditor, Converter={StaticResource BoolToVis}}">
+						<StackPanel IsEnabled="{Binding CanEditCameraRow}">
+							<c:ConsoleField ApiName="target_preset_id" Header="타깃 프리셋">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Board.TargetPresetCombo"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding PresetOptions}"
+									SelectedItem="{Binding SelectedTargetPreset, Mode=TwoWay}"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="home_preset_id" Header="홈 프리셋">
+								<ComboBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									AutomationProperties.AutomationId="Integrations.Board.HomePresetCombo"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding PresetOptions}"
+									SelectedItem="{Binding SelectedHomePreset, Mode=TwoWay}"
+									Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+							</c:ConsoleField>
+							<c:ConsoleField ApiName="delay_time" Header="지연(초)">
+								<TextBox
+									Height="32"
+									Padding="8,0"
+									VerticalContentAlignment="Center"
+									md:HintAssist.IsFloating="False"
+									md:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+									AutomationProperties.AutomationId="Integrations.Board.DelayBox"
+									MaxLength="5"
+									Style="{StaticResource MaterialDesignOutlinedTextBox}"
+									Text="{Binding EditDelayTime, UpdateSourceTrigger=PropertyChanged}" />
+							</c:ConsoleField>
+							<TextBlock
+								Margin="0,4,0,0"
+								FontSize="11"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{Binding PresetStatusText}"
+								TextWrapping="Wrap"
+								Visibility="{Binding HasPresetStatus, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+					</c:ConsoleSection>
 				</Grid>
 			</Grid>
 		</c:ConsoleShell.List>

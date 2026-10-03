@@ -133,6 +133,19 @@ public interface IMappingWorkbenchGateway
 }
 
 /// <summary>
+/// 카메라 배선에 넣을 프리셋 후보를 받아 온다 — <b><see cref="IMappingWorkbenchGateway"/> 와 따로 둔다</b>.
+/// </summary>
+/// <remarks>
+/// 게이트웨이 인터페이스에 멤버를 더하면 레포의 목·페이크가 전부 깨진다(<c>CountingGateway</c> 등).
+/// 실제 구현(<see cref="MappingWorkbenchGateway"/>)이 이것도 함께 구현하고, 뷰모델은 없으면 편집 칸만 "불러올 수 없음" 으로 둔다.
+/// </remarks>
+public interface IMappingPresetSource
+{
+    /// <summary>그 카메라의 프리셋 전량(<c>GET /devices/cameras/{id}/presets</c>).</summary>
+    Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default);
+}
+
+/// <summary>
 /// 한 번의 서버 왕복 결과. <b>실패 사유를 사용자 문구와 원문으로 갈라서</b> 들고 온다.
 /// </summary>
 /// <typeparam name="T">본문 타입.</typeparam>
