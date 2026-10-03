@@ -107,6 +107,25 @@ public class ConsoleLayoutFitTests
     }
 
     [Theory]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    [InlineData(1150, true)]    // 행을 골라 상세 서랍이 열림 — 606
+    [InlineData(900, true)]     // 접힘 · 서랍 열림 — 484
+    public void should_keep_the_event_icon_buttons_inline_even_when_the_detail_opens(double surface, bool detailOpen)
+    {
+        // Arrange — 이벤트 콘솔 Extra 를 아이콘 단추로 바꿨다: [중단](32+8) · [이벤트 맵핑](32+8) · [트레이에 담기 N](≈60) = 140.
+        // 글자 단추(330)였을 때는 상세 칸이 열리면 Extra 가 [⋯] 뒤로 접혀 [트레이에 담기]가 안 보였다.
+        var width = ConsoleLayoutMath.EffectiveListWidth(ConsoleLayoutMath.Resolve(surface), detailOpen);
+
+        // Act
+        var fit = ConsoleLayoutMath.ResolveToolbarFit(width, 96, 140, 0, showSearch: true);
+
+        // Assert
+        Assert.Equal(ConsoleToolbarOverflow.None, fit.Overflow);
+        Assert.False(fit.IsSearchCompact);
+    }
+
+    [Theory]
     [InlineData(1400)]
     [InlineData(756)]
     [InlineData(606)]
