@@ -51,6 +51,13 @@ public static class EventListFilter
     /// <inheritdoc cref="ChipConnected"/>
     public const string ChipDisconnected = "off";
 
+    /// <summary>운영 — 개폐(함체 문 · 통문) 사유.</summary>
+    public const string ChipDoor = "door";
+    /// <summary>운영 — 함체 환경 임계(온도 · 습도 · 전압 · 전류 · 진동 · UPS).</summary>
+    public const string ChipEnvironment = "env";
+    /// <summary>운영 — 심각도 경고 이상(WARNING · CRITICAL).</summary>
+    public const string ChipWarning = "warn";
+
     private static readonly EventFilterChip All = new(ChipAll, "전체");
 
     /// <summary>그 레일에 다는 칩들. 조치 내역에는 칩이 없다(정본 FILTERS 에 항목이 없다).</summary>
@@ -74,6 +81,13 @@ public static class EventListFilter
         },
         // 연결: 서버가 상태를 주지 않는다 — 가를 사실이 없으니 칩을 내지 않는다(E6a).
         EventDetailKind.Connection => Array.Empty<EventFilterChip>(),
+        EventDetailKind.Operation => new[]
+        {
+            All,
+            new EventFilterChip(ChipDoor, "개폐"),
+            new EventFilterChip(ChipEnvironment, "환경 경보"),
+            new EventFilterChip(ChipWarning, "경고 이상"),
+        },
         _ => Array.Empty<EventFilterChip>(),
     };
 
@@ -88,6 +102,8 @@ public static class EventListFilter
             ChipDone => row.IsActionReported,
             ChipIntrusion or ChipAlert or ChipContact => string.Equals(row.TypeEventKey ?? ChipIntrusion, chipKey, StringComparison.Ordinal),
             ChipConnected or ChipDisconnected => string.Equals(row.StateKey, chipKey, StringComparison.Ordinal),
+            ChipDoor or ChipEnvironment => string.Equals(row.TypeEventKey, chipKey, StringComparison.Ordinal),
+            ChipWarning => string.Equals(row.StateKey, ChipWarning, StringComparison.Ordinal),
             _ => true,
         };
     }

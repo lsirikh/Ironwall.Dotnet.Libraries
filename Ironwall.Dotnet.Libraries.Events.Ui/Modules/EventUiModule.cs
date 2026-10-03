@@ -74,6 +74,8 @@ public class EventUiModule : Module
             builder.RegisterType<DetectionEventPanelViewModel>().SingleInstance();
             builder.RegisterType<MalfunctionEventPanelViewModel>().SingleInstance();
             builder.RegisterType<ConnectionEventPanelViewModel>().SingleInstance();
+            // 운영 이벤트 목록(이벤트 콘솔 '운영' 레일, 조회 전용) — 대시보드가 선택 인자로 받는다.
+            builder.RegisterType<OperationEventPanelViewModel>().SingleInstance();
             builder.RegisterType<ActionEventPanelViewModel>().SingleInstance();
             builder.RegisterType<EventInfoViewModel>().SingleInstance();
             builder.RegisterType<CameraEventInfoViewModel>().SingleInstance();

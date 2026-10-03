@@ -18,4 +18,10 @@ public class PagedResult<T>
     public int Total { get; set; }
 
     public bool HasNextPage => Page < TotalPages;
+
+    /// <summary>
+    /// 서버 판본에 그 목록이 아예 없다(예: 운영 이벤트는 7.0 이상) — 실패가 아니라 "없는 기능"이다.
+    /// 호출부는 오류 팝업 대신 빈 목록 + 안내를 보인다.
+    /// </summary>
+    public bool NotSupported { get; set; }
 }
