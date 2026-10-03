@@ -235,6 +235,156 @@ public class DetectionSyncNatsServiceTests
             It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // ── B2: 큐에 든 탐지는 침입만이 아니다 — 접점 센서 ContactOn/Off · 사전 경보 Alert 도 같은 탐지 번호 체계(실 EventQueueManager) ──
+
+    /// <summary>실 EQM 을 쓰는 서비스 — 게이트가 실제로 어떤 종류를 찾는지 목 설정에 기대지 않고 본다.</summary>
+    private DetectionSyncNatsService CreateServiceWithRealQueue(
+        EventQueueManager eqm, out Mock<IEventApiService> mockApi, out Mock<IEventAggregator> mockEa)
+    {
+        var mockNats = new Mock<INatsService>();
+        mockApi = new Mock<IEventApiService>();
+        mockEa = new Mock<IEventAggregator>();
+        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<MessageArgsModel, Task>>())
+                .Callback<Func<MessageArgsModel, Task>>(h => _capturedHandler = h);
+        mockApi.Setup(a => a.GetDetectionEventByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(BuildSuccessResponse());
+        mockEa.Setup(e => e.PublishAsync(It.IsAny<object>(), It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()))
+              .Returns(Task.CompletedTask);
+        return new DetectionSyncNatsService(null, mockNats.Object, eqm, mockApi.Object, mockEa.Object);
+    }
+
+    [Theory]
+    [InlineData(EnumEventType.ContactOn, EnumDeviceType.Contact)]
+    [InlineData(EnumEventType.ContactOff, EnumDeviceType.Contact)]
+    [InlineData(EnumEventType.Alert, EnumDeviceType.Fence)]
+    public async Task should_fetch_and_publish_when_queued_detection_is_not_intrusion(EnumEventType eventType, EnumDeviceType deviceType)
+    {
+        // Arrange — DetectionNatsSyncService 는 type_event 그대로 큐에 넣는다(접점 센서의 ContactOn · Alert 등)
+        var eqm = new EventQueueManager();
+        eqm.Enqueue(new EventEntry { DeviceId = 3, DeviceType = deviceType, EventType = eventType, EventId = DetectionId });
+        var service = CreateServiceWithRealQueue(eqm, out var mockApi, out var mockEa);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(SyncMessage());
+        if (service.LastProcessingTask is { } pending) await pending;
+
+        // Assert — 침입이 아니어도 큐에 든 탐지면 재조회 · 카드 썸네일 갱신
+        mockApi.Verify(a => a.GetDetectionEventByIdAsync(DetectionId, It.IsAny<CancellationToken>()), Times.Once);
+        mockEa.Verify(e => e.PublishAsync(
+            It.Is<object>(o => o is DetectionThumbnailSyncedMessage && ((DetectionThumbnailSyncedMessage)o).EventId == DetectionId),
+            It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_skip_get_when_only_fault_with_same_id_is_queued()
+    {
+        // Arrange — 장애는 서버가 따로 세는 번호다 — 같은 숫자 42 의 장애만 있으면 탐지 재조회를 하면 안 된다
+        var eqm = new EventQueueManager();
+        eqm.Enqueue(new EventEntry { DeviceId = 1, DeviceType = EnumDeviceType.IpCamera, EventType = EnumEventType.Fault, EventId = DetectionId });
+        var service = CreateServiceWithRealQueue(eqm, out var mockApi, out _);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(SyncMessage());
+
+        // Assert
+        mockApi.Verify(a => a.GetDetectionEventByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── B13: 순서 역전 방지 표(_latestRequest)는 처리가 끝나면 비어야 한다 — 탐지 번호마다 한 줄씩 영원히 쌓이지 않게 ──
+
+    private static int LatestRequestCount(DetectionSyncNatsService service)
+    {
+        var field = typeof(DetectionSyncNatsService).GetField("_latestRequest",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        return ((System.Collections.ICollection)field.GetValue(service)!).Count;
+    }
+
+    [Fact]
+    public async Task should_forget_request_generation_when_update_finished()
+    {
+        // Arrange
+        var service = CreateService(out _, out _, out _, entryActive: true);
+        await service.StartService();
+
+        // Act — 같은 탐지의 UPDATED 3건을 하나씩 끝까지 처리
+        for (var i = 0; i < 3; i++)
+        {
+            await _capturedHandler!(SyncMessage());
+            await service.LastProcessingTask!;
+        }
+
+        // Assert
+        Assert.Equal(0, LatestRequestCount(service));
+    }
+
+    [Fact]
+    public async Task should_forget_request_generation_when_get_fails()
+    {
+        // Arrange — 404(삭제 경합)로 끝나도 표에 남지 않는다
+        var notFound = new ApiResponse<DetectionEventDto> { Success = false, StatusCode = 404 };
+        var service = CreateService(out _, out _, out _, entryActive: true, getResponse: notFound);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(SyncMessage());
+        await service.LastProcessingTask!;
+
+        // Assert
+        Assert.Equal(0, LatestRequestCount(service));
+    }
+
+    [Fact]
+    public async Task should_drop_stale_response_when_newer_request_finished_and_another_started()
+    {
+        // Arrange — 표를 비운 뒤에도 순서 역전 방지가 유지되는지: A(오래된 것) 진행 중 B(신규)가 끝나 표를 비우고,
+        //           곧이어 C 가 새로 시작한 다음 A 가 끝나면 A 는 버려져야 한다(세대 번호를 재사용하면 A 가 통과한다).
+        var mockNats = new Mock<INatsService>();
+        var mockQueue = new Mock<IEventQueueManager>();
+        var mockApi = new Mock<IEventApiService>();
+        var mockEa = new Mock<IEventAggregator>();
+        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<MessageArgsModel, Task>>())
+                .Callback<Func<MessageArgsModel, Task>>(h => _capturedHandler = h);
+        mockQueue.Setup(q => q.FindEntryByEventId(DetectionId, EnumEventType.Intrusion))
+                 .Returns(new EventEntry { EventId = DetectionId, EventType = EnumEventType.Intrusion });
+        mockEa.Setup(e => e.PublishAsync(It.IsAny<object>(), It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()))
+              .Returns(Task.CompletedTask);
+        var tcsA = new TaskCompletionSource<ApiResponse<DetectionEventDto>>();
+        var tcsB = new TaskCompletionSource<ApiResponse<DetectionEventDto>>();
+        var tcsC = new TaskCompletionSource<ApiResponse<DetectionEventDto>>();
+        var call = 0;
+        mockApi.Setup(a => a.GetDetectionEventByIdAsync(DetectionId, It.IsAny<CancellationToken>()))
+               .Returns(() => (call++) switch { 0 => tcsA.Task, 1 => tcsB.Task, _ => tcsC.Task });
+        var service = new DetectionSyncNatsService(null, mockNats.Object, mockQueue.Object, mockApi.Object, mockEa.Object);
+        await service.StartService();
+
+        // Act
+        await _capturedHandler!(SyncMessage());
+        var taskA = service.LastProcessingTask!;
+        await _capturedHandler!(SyncMessage());
+        var taskB = service.LastProcessingTask!;
+        tcsB.SetResult(BuildSuccessResponse("/api/thumbnails/b.jpg"));
+        await taskB;
+        await _capturedHandler!(SyncMessage());
+        var taskC = service.LastProcessingTask!;
+        tcsA.SetResult(BuildSuccessResponse("/api/thumbnails/a-stale.jpg"));
+        await taskA;
+        tcsC.SetResult(BuildSuccessResponse("/api/thumbnails/c.jpg"));
+        await taskC;
+
+        // Assert — B · C 만 발행, A(가장 오래된 것)는 버려짐
+        mockEa.Verify(e => e.PublishAsync(
+            It.Is<object>(o => o is DetectionThumbnailSyncedMessage
+                            && ((DetectionThumbnailSyncedMessage)o).Thumbnail == "/api/thumbnails/a-stale.jpg"),
+            It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
+        mockEa.Verify(e => e.PublishAsync(
+            It.Is<object>(o => o is DetectionThumbnailSyncedMessage
+                            && ((DetectionThumbnailSyncedMessage)o).Thumbnail == "/api/thumbnails/c.jpg"),
+            It.IsAny<Func<Func<Task>, Task>>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(0, LatestRequestCount(service));
+    }
+
     // ── EQM 활성 게이트 타입 판별(FindEntryByEventId) — 탐지/장애 독립 id 시퀀스 충돌 방어(실 EventQueueManager) ──
 
     [Fact]

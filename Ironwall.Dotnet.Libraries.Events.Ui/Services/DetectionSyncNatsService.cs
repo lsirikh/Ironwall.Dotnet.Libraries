@@ -108,17 +108,23 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             }
 
             // 게이트: 현재 EQM에 등록(활성)된 **탐지**만 재조회 — 비활성이면 REST 호출 없이 no-op.
-            // EventType=Intrusion 판별 필수(탐지/장애 독립 id 시퀀스 → 숫자 EventId 충돌 방어).
+            // 탐지/장애는 독립 id 시퀀스라 종류 판별 필수(숫자 EventId 충돌 방어) — 장애(Fault)는 보지 않는다.
+            // 탐지 큐 엔트리는 침입만이 아니다: DetectionNatsSyncService 가 type_event 그대로(접점 센서 ContactOn/Off ·
+            //   사전 경보 Alert 등) 넣으므로 Intrusion 만 찾으면 그 카드들은 PTZ 회전 뒤 썸네일을 영영 못 받았다.
             // ("우리 현재 탐지로 EventQueueManager에 등록되어있는 경우"에만 갱신)
-            if (_eventQueueManager.FindEntryByEventId(resourceId, EnumEventType.Intrusion) == null)
+            if (!IsQueuedDetection(resourceId))
             {
                 _log?.Info($"SYNC_DETECTION: resource_id={resourceId} EQM 미등록(비활성 탐지) — 갱신 스킵");
                 return;
             }
 
             // 순서 역전 방지: 같은 resource_id에 UPDATED가 연속 오면 GET 완료 순서가 뒤바뀌어 stale가 최신을 덮을 수 있음.
-            // resource_id별 요청 세대를 단조 증가시키고, 처리 완료 시 최신 세대만 반영(아래 HandleUpdatedAsync).
-            var seq = _latestRequest.AddOrUpdate(resourceId, 1L, (_, prev) => prev + 1);
+            // 요청 세대를 단조 증가시키고, 처리 완료 시 최신 세대만 반영(아래 HandleUpdatedAsync).
+            // 세대는 서비스 전체에서 하나로 센다 — 처리가 끝난 항목을 표에서 지우므로(누적 방지) id별로 1부터 다시 세면
+            //   진행 중이던 오래된 요청과 새 요청이 같은 세대 번호를 받아 오래된 응답이 통과할 수 있다.
+            //   동시 수신에서 쓰기 순서가 뒤바뀌어도 표가 뒤로 가지 않게 큰 값만 남긴다.
+            var seq = Interlocked.Increment(ref _requestGeneration);
+            _latestRequest.AddOrUpdate(resourceId, seq, (_, prev) => Math.Max(prev, seq));
 
             // GET+발행은 NATS 수신 펌프를 블로킹하지 않도록 분리(fire-and-forget + 내부 예외처리).
             // 네트워크 GET을 인라인 await하면 뒤따르는 DETECT(라이브 알람) 수신이 지연됨.
@@ -146,9 +152,10 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             }
 
             // 순서 역전 방지: GET 진행 중 더 최신 UPDATED 요청이 시작됐으면 이 응답(오래된 것)은 폐기.
-            if (_latestRequest.TryGetValue(detectionId, out var latest) && latest != seq)
+            //   항목이 아예 없으면 더 최신 요청이 이미 끝나 지운 것이다 — 이 응답은 그보다 오래됐으니 역시 폐기.
+            if (!_latestRequest.TryGetValue(detectionId, out var latest) || latest != seq)
             {
-                _log?.Info($"SYNC_DETECTION 최신 아님(id={detectionId}, seq={seq}<{latest}) — 발행 스킵(순서 역전 방지)");
+                _log?.Info($"SYNC_DETECTION 최신 아님(id={detectionId}, seq={seq}, 최신={(latest == 0 ? "완료됨" : latest.ToString())}) — 발행 스킵(순서 역전 방지)");
                 return;
             }
 
@@ -183,6 +190,21 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
         {
             _log?.Error($"SYNC_DETECTION HandleUpdatedAsync 오류(id={detectionId}): {ex.Message}");
         }
+        finally
+        {
+            // 누적 방지: 끝난 요청이 아직 최신이면 표에서 지운다 — 탐지 번호마다 한 줄씩 앱 수명 내내 쌓이지 않게.
+            //   (키, 값) 쌍이 같을 때만 지우므로 그사이 시작된 더 최신 요청의 항목은 남는다.
+            _latestRequest.TryRemove(new KeyValuePair<int, long>(detectionId, seq));
+        }
+    }
+
+    /// <summary>resource_id 가 탐지 큐 엔트리(장애 Fault 외 모든 종류)로 활성인가.</summary>
+    private bool IsQueuedDetection(int eventId)
+    {
+        foreach (var type in DetectionQueueTypes)
+            if (_eventQueueManager.FindEntryByEventId(eventId, type) != null)
+                return true;
+        return false;
     }
     #endregion
 
@@ -194,8 +216,16 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;      // 로그인 게이팅 — IsAuthenticated 단일 소스
 
-    // 순서 역전 방지: resource_id별 최신 요청 세대. 처리 완료 시 최신 세대만 카드에 반영.
+    // 순서 역전 방지: resource_id별 최신 요청 세대. 처리 완료 시 최신 세대만 카드에 반영하고, 끝난 최신 항목은 지운다.
     private readonly ConcurrentDictionary<int, long> _latestRequest = new();
+    // 세대 번호 — 서비스 전체에서 하나(항목을 지운 뒤에도 번호가 재사용되지 않게).
+    private long _requestGeneration;
+
+    // 탐지 큐 엔트리가 가질 수 있는 종류 = 장애(Fault) 를 뺀 전부. DetectionNatsSyncService(와 호스트의 레거시 AI_DETECTION
+    //   적재)는 type_event 를 그대로 EventType 으로 넣고, 장애만 MalfunctionNatsSyncService 가 Fault 로 넣는다.
+    //   새 종류가 enum 에 생겨도 따로 고칠 필요가 없도록 목록을 enum 에서 만든다.
+    private static readonly EnumEventType[] DetectionQueueTypes =
+        Enum.GetValues<EnumEventType>().Where(t => t != EnumEventType.Fault).ToArray();
 
     // 테스트 동기화 시드(동일 어셈블리 internal): 마지막 UPDATED 처리 태스크. 프로덕션 로직 미사용.
     private Task? _lastProcessingTask;

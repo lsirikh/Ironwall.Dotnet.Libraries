@@ -748,6 +748,23 @@ public class EventConsoleCompletenessTests : IDisposable
         Assert.Equal("순찰 출동", _console.Tray.Phrase);          // 보내기 직전의 선택을 비우지 않는다
     }
 
+    [Fact]
+    public async Task should_pick_up_the_deferred_template_change_when_the_tray_empties()
+    {
+        // B9 — 트레이에 담긴 동안 온 문구 변경은 미뤘는데, 트레이가 비어도 다시 읽지 않아 콘솔을 다시 열 때까지 옛 문구가 남았다.
+        var (source, _, serve) = PhraseSourceServing("현장 확인 완료", "순찰 출동");
+        Build(source.Object);
+        await Activate();
+        _console.Tray.Enqueue(ActionTrayDrop.Plan(new[] { new ActionTrayCandidate(42, ActionTrayDrop.KindDetection, "센서-42", false) }, canControl: true));
+        serve(new[] { "현장 확인 완료", "순찰 출동", "경계 강화" });
+        await _console.HandleAsync(new ActionReportTemplatesChangedMessage("CREATED", 11), CancellationToken.None);
+
+        _console.Tray.Revert();                                   // 트레이를 비운다([전부 버리기])
+        await _console.PhraseRefreshTask;
+
+        Assert.Contains("경계 강화", _console.Tray.PhraseOptions);
+    }
+
     // ── E-5 #2 상세 동작 줄 ──
     [Fact]
     public async Task should_offer_report_and_history_actions_when_one_sensor_detection_is_selected()

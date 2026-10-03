@@ -63,6 +63,7 @@
 						<StackPanel Orientation="Horizontal">
 							<Button
 								HorizontalAlignment="Left"
+								AutomationProperties.AutomationId="{Binding FlipAutomationKey, Mode=OneWay}"
 								Command="{x:Static md:Flipper.FlipCommand}"
 								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
@@ -236,6 +237,7 @@
 						<StackPanel Orientation="Horizontal">
 							<Button
 								HorizontalAlignment="Left"
+								AutomationProperties.AutomationId="{Binding FlipBackAutomationKey, Mode=OneWay}"
 								Command="{x:Static md:Flipper.FlipCommand}"
 								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"

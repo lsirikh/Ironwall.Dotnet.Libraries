@@ -65,6 +65,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             => $"Events.Card.{Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.AutomationSegment(Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(this))}.{Model?.Id ?? 0}";
         /// <summary>카드의 조치보고 단추 자동화 식별자 — <c>{AutomationKey}.Report</c>.</summary>
         public string ReportAutomationKey => AutomationKey + ".Report";
+
+        /// <summary>앞면 [뒤집기] 단추 자동화 식별자 — <c>{AutomationKey}.Flip</c>. 뒤집힌 채 스크롤 · 재활용될 때 다른 카드로 번지는지 시험이 본다.</summary>
+        public string FlipAutomationKey => AutomationKey + ".Flip";
+
+        /// <summary>뒷면 [앞으로] 단추 자동화 식별자 — <c>{AutomationKey}.FlipBack</c>.</summary>
+        public string FlipBackAutomationKey => AutomationKey + ".FlipBack";
         /// <summary>레거시 호환용 — Path A 타이머 제거 후 더 이상 사용되지 않음</summary>
         public CancellationTokenSource? Cts { get; set; }
         public bool IsFlipped

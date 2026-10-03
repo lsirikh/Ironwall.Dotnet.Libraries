@@ -62,6 +62,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             // 새 이벤트로 창을 연다 — 앞 이벤트의 '보내는 중' · '이미 조치됨' 표시를 넘겨받지 않는다.
             _isSending = false;
             _isHandledElsewhere = false;
+            _remoteWhileSending = false;
             NotifyReportState();
 
             Refresh();
@@ -73,9 +74,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         /// </summary>
         public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage message, CancellationToken cancellationToken)
         {
-            if (message is null || !IsActive || _isSending || _model is null) return Task.CompletedTask;
+            if (message is null || !IsActive || _model is null) return Task.CompletedTask;
             if (_model.Model?.Id != message.EventId
                 || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(_model) != message.Kind) return Task.CompletedTask;
+
+            // (B10) 보내는 중에 온 것은 자기 조치의 메아리일 수 있어 지금은 끄지 않는다 — 기억해 두었다가 송신이 실패하면 적용한다.
+            //   실패했으면 메아리일 수 없다(자기 조치가 없다). 종전엔 그냥 버려 [확인]이 다시 켜졌고, 남이 조치한 이벤트에 두 번째 조치를 만들 수 있었다.
+            if (_isSending)
+            {
+                _remoteWhileSending = true;
+                return Task.CompletedTask;
+            }
 
             _isHandledElsewhere = true;
             _log?.Info($"[{GetType().Name}] 다른 운영자가 이미 조치함 — [확인] 끔: {message.Kind} {message.EventId}");
@@ -88,6 +97,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
             if (_isSending == sending) return;
             _isSending = sending;
+            if (sending) _remoteWhileSending = false;
+            NotifyReportState();
+        }
+
+        /// <summary>
+        /// 송신이 실패로 끝났다 — 보내는 동안 같은 이벤트의 원격 조치가 왔다면 그것은 메아리가 아니라 남의 조치다(B10).
+        /// [확인]을 끄고 까닭을 보인다. 성공했으면 창이 닫히므로 부르지 않는다.
+        /// </summary>
+        protected void OnSendFailed()
+        {
+            if (!_remoteWhileSending) return;
+            _remoteWhileSending = false;
+            _isHandledElsewhere = true;
+            _log?.Info($"[{GetType().Name}] 보내는 동안 다른 운영자가 조치했고 이 창의 송신은 실패 — [확인] 끔");
             NotifyReportState();
         }
 
@@ -262,6 +285,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         protected IAccountModel? _user;
         private bool _isSending;
         private bool _isHandledElsewhere;
+        private bool _remoteWhileSending;
         public BasePanelViewModel? _selectedItemEditor;
         #endregion
     }

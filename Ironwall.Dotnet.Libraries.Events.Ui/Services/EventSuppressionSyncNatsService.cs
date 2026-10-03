@@ -86,11 +86,20 @@ public class EventSuppressionSyncNatsService : IEventSuppressionSyncNatsService,
         // 1차 선필터(파싱 없음) — 대다수 메시지를 여기서 버린다.
         if (data.IndexOf(CmdName, StringComparison.Ordinal) < 0) return Task.CompletedTask;
 
+        // 배열 봉투는 항목마다 — 호스트 라우터 · 다른 이벤트 수신 서비스와 같은 파서(WP-1 ⑰). 종전엔 JObject.Parse 라
+        //   배열이 오면 경고 한 줄로 통째 버려져 폴링 가속이 사라졌다. 깨진 JSON 은 파서가 로그만 남기고 빈 목록을 준다.
+        foreach (var envelope in NatsEnvelopeItems.Parse(data, _log, CmdName))
+            ProcessEnvelope(envelope);
+        return Task.CompletedTask;
+    }
+
+    private void ProcessEnvelope(JObject jObj)
+    {
         try
         {
-            var jObj = JObject.Parse(data);
-            if (!string.Equals(jObj.Value<string>("cmd"), CmdName, StringComparison.Ordinal))
-                return Task.CompletedTask;   // 본문에 문자열만 우연히 섞인 경우 차단
+            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정.
+            //   본문에 문자열만 우연히 섞인 경우도 여기서 막힌다.
+            if (!NatsEnvelopeItems.IsNotice(jObj, CmdName)) return;
 
             var body = jObj["body"];
             var action = body?.Value<string>("action");
@@ -106,10 +115,9 @@ public class EventSuppressionSyncNatsService : IEventSuppressionSyncNatsService,
         }
         catch (Exception ex)
         {
-            // 파싱 실패로 구독이 죽으면 안 된다 — 다음 폴링 주기가 복구한다.
+            // 항목 하나의 해석 실패로 구독이 죽으면 안 된다 — 다음 폴링 주기가 복구한다.
             _log?.Warning($"[{nameof(EventSuppressionSyncNatsService)}] 파싱 실패(무시): {ex.Message}");
         }
-        return Task.CompletedTask;
     }
     #endregion
 

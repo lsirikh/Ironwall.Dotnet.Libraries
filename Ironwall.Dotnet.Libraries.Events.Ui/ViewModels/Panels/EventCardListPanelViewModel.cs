@@ -257,9 +257,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         private bool WasClosed(EventCardBaseViewModel card)
+            => KeyOf(card) is { } key && IsRemembered(key.Kind, key.EventId);
+
+        private bool IsRemembered(string kind, int eventId)
         {
-            if (KeyOf(card) is not { } key) return false;
-            lock (_closedGate) return _closedKeys.Contains(key);
+            lock (_closedGate) return _closedKeys.Contains((kind, eventId));
+        }
+
+        /// <summary>
+        /// 조치보고 가드를 <b>종류 + 번호</b>로 잡는다(B7). 번호만 잡으면 탐지 7번 자동 조치보고가 장애 7번 자동복구를 막고,
+        /// 자동복구는 다시 시도하지 않아 장애 카드가 남았다. 종류를 모르면 번호로(종전 동작).
+        /// </summary>
+        private bool EnterGuard(string? kind, int eventId)
+            => kind is not null && _reportGuard is IKeyedActionReportGuard keyed ? keyed.TryEnter(kind, eventId) : _reportGuard.TryEnter(eventId);
+
+        private void ExitGuard(string? kind, int eventId)
+        {
+            if (kind is not null && _reportGuard is IKeyedActionReportGuard keyed) keyed.Exit(kind, eventId);
+            else _reportGuard.Exit(eventId);
         }
 
         /// <summary>이미 조치됐거나(종류 + 번호 기억) 목록에서 빠진 카드 — 전체 조치보고가 다시 보고하지 않는다(WP-8 M6). UI 스레드에서 부를 것.</summary>
@@ -532,8 +547,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var eventModel = card.Model;
                     var eventId = eventModel?.Id ?? 0;
 
-                    // (EC5) 동일 이벤트가 Auto/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                    if (!_reportGuard.TryEnter(eventId))
+                    // (EC5) 동일 이벤트가 Auto/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵 — 종류까지 본다(B7)
+                    var guardKind = KeyOf(card)?.Kind;
+                    if (!EnterGuard(guardKind, eventId))
                     {
                         _log?.Info($"배치 조치보고: Event({eventId}) 진행 중 — 중복 스킵");
                         continue;
@@ -587,7 +603,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     }
                     finally
                     {
-                        _reportGuard.Exit(eventId);
+                        ExitGuard(guardKind, eventId);
                     }
                 }
             }
@@ -647,14 +663,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             var entryId = entry.EntryId!;
             try
             {
-                if (!_cardByEntryId.TryGetValue(entryId, out var card))
-                {
-                    _log?.Warning($"AutoReport: entryId({entryId}) 카드 없음 → Dequeue 후 스킵");
-                    _eventQueueManager.Dequeue(entryId);
-                    return;
-                }
-
-                var eventId = card.Model?.Id ?? entry.EventId;
+                // (B6) 카드는 목록에 없을 수 있다 — 아직 묶음 버퍼(150 ms)에 있거나 표시 상한으로 밀려났다. 종전엔 "카드 없음" 으로
+                //   서버에 보고하지 않고 큐에서만 뺐다: 서버엔 미조치로 남고, 버퍼에 있던 카드는 뒤늦게 올라왔다. 엔트리가 이벤트 번호를
+                //   알므로 카드가 없어도 보고한다. 카드는 찾으면 같이 치운다(자동복구와 같은 길).
+                var card = await FindCardForEntryAsync(entryId);
+                var eventId = card?.Model?.Id ?? entry.EventId;
+                var kind = card is not null ? KeyOf(card)?.Kind : EventCardKind.Of(entry.EventType);
                 if (eventId <= 0)
                 {
                     _log?.Warning($"AutoReport: entryId({entryId}) eventId 확인 불가 — Dequeue 후 스킵");
@@ -662,8 +676,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     return;
                 }
 
-                // (EC5) 동일 이벤트가 Batch/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                if (!_reportGuard.TryEnter(eventId))
+                // 다른 길(원격 · 개별 · 전체)로 이미 닫힌 이벤트면 다시 보고하지 않는다 — 엔트리만 뺀다.
+                if (kind is not null && IsRemembered(kind, eventId))
+                {
+                    _log?.Info($"AutoReport: {kind} {eventId} 이미 조치됨 — Dequeue 만");
+                    _eventQueueManager.Dequeue(entryId);
+                    return;
+                }
+
+                // (EC5) 동일 이벤트가 Batch/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵 — 종류까지 본다(B7)
+                if (!EnterGuard(kind, eventId))
                 {
                     _log?.Info($"AutoReport: Event({eventId}) 조치보고 진행 중 — 중복 스킵");
                     entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS); // 타이트 재발화 루프 방지
@@ -698,20 +720,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 await DispatcherService.BeginInvoke(() =>
                 {
-                    if (KeyOf(card) is { } key) RememberClosed(key.Kind, key.EventId);
+                    if (kind is not null)
+                    {
+                        RememberClosed(kind, eventId);   // 아직 버퍼면 비울 때 올리지 않고 치운다
+                        _pendingEntries.TryRemove(new KeyValuePair<(string Kind, int EventId), string>((kind, eventId), entryId));
+                    }
                     _cardByEntryId.TryRemove(entryId, out _);
-                    ViewModelProvider.Remove(card);
-                    card.Dispose();
+                    // 목록에 있었으면 여기서 치우고, 버퍼에 있으면 FlushPendingCardsAsync 가 WasClosed 로 걸러 치운다(두 번 Dispose 하지 않게).
+                    if (card is not null && ViewModelProvider.Remove(card)) card.Dispose();
                 });
 
                 await _eventAggregator.PublishOnBackgroundThreadAsync(ActionReportMessages.Create(
-                    response, eventId, entry.EventType, content, GetActorName(), card.Model as IExEventModel));
+                    response, eventId, entry.EventType, content, GetActorName(), card?.Model as IExEventModel));
 
-                _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
+                _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId}){(card is null ? " — 카드 없이(밀려남)" : string.Empty)}");
                 }
                 finally
                 {
-                    _reportGuard.Exit(eventId);
+                    ExitGuard(kind, eventId);
                 }
             }
             catch (Exception ex)
@@ -766,8 +792,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 var eventModel = card.Model;
                 if (eventModel == null) return;
 
-                // (EC5) 동일 이벤트가 Batch/Auto 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                if (!_reportGuard.TryEnter(eventModel.Id))
+                // (EC5) 동일 이벤트가 Batch/Auto 등 다른 경로에서 조치 진행 중이면 중복 스킵 — 종류까지 본다(B7)
+                var recoveryKind = KeyOf(card)?.Kind;
+                if (!EnterGuard(recoveryKind, eventModel.Id))
                 {
                     _log?.Info($"AutoRecovery: Event({eventModel.Id}) 조치보고 진행 중 — 중복 스킵");
                     return;
@@ -810,7 +837,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 }
                 finally
                 {
-                    _reportGuard.Exit(eventModel.Id);
+                    ExitGuard(recoveryKind, eventModel.Id);
                 }
             }
             catch (Exception ex)
@@ -1038,6 +1065,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         {
             // 종류 + 번호로 맞춘다 — 서버는 탐지 · 장애를 따로 번호 매긴다(WP-1 ②).
             var kind = EventCardKind.Of(message.EventType);
+
+            // (B5) 조치보고(원격 ACTION_REPORT 등)가 이 이벤트보다 먼저 닿았다 — 카드는 '이미 조치됨' 기억으로 걸러지지만
+            //   라이브러리가 큐에 넣은 엔트리는 아무도 빼지 않아 심볼이 깜빡이고 알람이 울린 채 남았다. 엔트리를 곧바로 뺀다.
+            if (kind is not null && IsRemembered(kind, message.EventId))
+            {
+                _eventQueueManager.Dequeue(message.EntryId);
+                _log?.Info($"[EntryEnqueued] {kind} {message.EventId} 는 이미 조치됨 — 큐 엔트리 즉시 해제({message.EntryId})");
+                return Task.CompletedTask;
+            }
+
             var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == message.EventId && EventCardKind.Of(c) == kind && c.EntryId == null);
             if (card != null)
             {
@@ -1062,7 +1099,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             // 타입 우선 필터(OfType) 필수 — ViewModelProvider는 탐지·장애 카드 혼재 컬렉션이고
             // 탐지/장애는 독립 id 시퀀스라 숫자 Id 충돌 시 FirstOrDefault가 장애 카드를 먼저 잡아
             // as 캐스트 null → 실제 탐지 카드가 뒤에 있어도 조용히 유실됨(Undo id충돌 선례와 동일).
+            // (B4) 아직 묶음 버퍼(150 ms)에 있는 카드도 찾는다 — 목록만 보면 폭주 중 도착한 썸네일 갱신이 버려졌다.
             var card = ViewModelProvider.OfType<DetectionEventCardViewModel>()
+                                        .FirstOrDefault(c => c.Model?.Id == message.EventId)
+                       ?? _batchBuffer.Snapshot().OfType<DetectionEventCardViewModel>()
                                         .FirstOrDefault(c => c.Model?.Id == message.EventId);
             if (card == null)
                 return Task.CompletedTask;   // 멱등: 이미 종결됐거나 본 패널에 없는 탐지

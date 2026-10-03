@@ -418,6 +418,45 @@ public class EventCardLifecycleDefectTests : IDisposable
         Assert.False(dialog.IsSending);
     }
 
+    [Fact]
+    public async Task should_keep_ok_disabled_when_a_remote_report_arrived_during_a_send_that_then_failed()
+    {
+        // B10 — 보내는 중에 온 원격 조치는 '자기 메아리일 수 있어' 무시했다. 그런데 자기 송신이 실패하면 메아리일 수 없다 —
+        //       [확인]이 다시 켜져 이미 남이 조치한 이벤트에 두 번째 조치를 만들 수 있었다.
+        var gate = new TaskCompletionSource<ApiResponse<ActionEventDto>>();
+        _api.Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>())).Returns(gate.Task);
+        var dialog = new Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs.DetectionReportDialogViewModel(_ea.Object, _log.Object);
+        dialog.UpdateData(Detection(42), _account.Object);
+        await ((IActivate)dialog).ActivateAsync();
+
+        dialog.ClickOk();
+        Assert.True(dialog.IsSending);
+        await dialog.HandleAsync(new RemoteActionReportedMessage(Services.ActionReportKind.Detection, 42), CancellationToken.None);
+
+        gate.SetResult(new ApiResponse<ActionEventDto> { Success = false, Message = "network" });
+        await Task.Run(() => SpinWait.SpinUntil(() => !dialog.IsSending, TimeSpan.FromSeconds(5)));
+
+        Assert.False(dialog.CanClickOk);
+        Assert.True(dialog.IsHandledElsewhere);
+    }
+
+    [Fact]
+    public async Task should_not_mark_handled_elsewhere_when_no_remote_report_arrived_during_a_failed_send()
+    {
+        var gate = new TaskCompletionSource<ApiResponse<ActionEventDto>>();
+        _api.Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>())).Returns(gate.Task);
+        var dialog = new Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs.DetectionReportDialogViewModel(_ea.Object, _log.Object);
+        dialog.UpdateData(Detection(43), _account.Object);
+        await ((IActivate)dialog).ActivateAsync();
+
+        dialog.ClickOk();
+        gate.SetResult(new ApiResponse<ActionEventDto> { Success = false, Message = "network" });
+        await Task.Run(() => SpinWait.SpinUntil(() => !dialog.IsSending, TimeSpan.FromSeconds(5)));
+
+        Assert.True(dialog.CanClickOk);                          // 실패만 했으면 다시 보낼 수 있어야 한다
+        Assert.False(dialog.IsHandledElsewhere);
+    }
+
     #endregion
 
     #region - ⑪ 카드 더블클릭 = 지도에서 보기 -

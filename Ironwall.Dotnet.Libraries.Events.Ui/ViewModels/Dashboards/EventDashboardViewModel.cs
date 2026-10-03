@@ -165,6 +165,7 @@ public class EventDashboardViewModel : BasePanelViewModel
             NotifyOfPropertyChange(nameof(IsTrayVisible));
             NotifyOfPropertyChange(nameof(IsTrayCollapsed));
             NotifyOfPropertyChange(nameof(TraySummaryText));
+            RefreshDeferredPhrasesIfIdle();
         };
         TrayDrop = new ActionTrayDropHandler(Tray, () => CanReport);
 
@@ -1559,10 +1560,26 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <remarks>기다리지 않고 돌아간다 — 호스트의 NATS 처리 줄이 서버 왕복을 기다리지 않도록.</remarks>
     public Task HandleAsync(ActionReportTemplatesChangedMessage message, CancellationToken cancellationToken)
     {
-        if (!IsActive || Tray.HasEntries || Tray.IsApplying) return Task.CompletedTask;
+        if (!IsActive) return Task.CompletedTask;
+        if (Tray.HasEntries || Tray.IsApplying)
+        {
+            // 담아 둔 조치의 문구 선택은 그대로 둔다 — 대신 미뤄 두고 트레이가 비면 읽는다(B9: 종전엔 버려 콘솔을 다시 열 때까지 옛 문구였다).
+            _phrasesStale = true;
+            return Task.CompletedTask;
+        }
         _phraseRefresh = RefreshPhrasesAsync();
         return Task.CompletedTask;
     }
+
+    /// <summary>트레이가 비었고 보내는 중도 아니면, 미뤄 둔 문구 변경을 이제 읽는다(B9).</summary>
+    private void RefreshDeferredPhrasesIfIdle()
+    {
+        if (!_phrasesStale || !IsActive || Tray.HasEntries || Tray.IsApplying) return;
+        _phrasesStale = false;
+        _phraseRefresh = RefreshPhrasesAsync();
+    }
+
+    private bool _phrasesStale;
 
     /// <summary>가장 최근 알림이 시작한 문구 다시 읽기(시험용).</summary>
     internal Task PhraseRefreshTask => _phraseRefresh;

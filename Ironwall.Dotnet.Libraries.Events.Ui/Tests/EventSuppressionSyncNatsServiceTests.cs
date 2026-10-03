@@ -157,6 +157,35 @@ public class EventSuppressionSyncNatsServiceTests
         Assert.Single(spy.Requests);   // 권위는 폴링이므로 body 가 부실해도 앞당긴다
     }
 
+    // ══════ 배열 봉투 — 다른 수신 서비스 · 호스트 라우터와 같이 항목마다 처리한다(B8) ══════
+
+    [Fact]
+    public async Task should_request_poll_when_envelope_arrives_as_array()
+    {
+        var (_, spy, handler) = Build();
+
+        await handler(Msg("[" + ValidPayload.Trim() + "]"));
+
+        Assert.Single(spy.Requests);
+        Assert.Contains("UPDATED", spy.Requests[0]);
+    }
+
+    [Fact]
+    public async Task should_request_poll_for_own_items_only_when_array_mixes_commands()
+    {
+        var (_, spy, handler) = Build();
+
+        await handler(Msg("""
+            [ {"cmd":"DETECT","body":{"id":1}},
+              {"cmd":"SYNC_EVENT_SUPPRESSION","body":{"action":"CREATED","resource_id":3}},
+              {"cmd":"SYNC_EVENT_SUPPRESSION","body":{"action":"DELETED","resource_id":4}} ]
+            """));
+
+        Assert.Equal(2, spy.Requests.Count);
+        Assert.Contains("CREATED", spy.Requests[0]);
+        Assert.Contains("DELETED", spy.Requests[1]);
+    }
+
     // ══════ ③ 파싱 실패로 구독이 죽지 않는다 ══════
 
     [Fact]

@@ -93,6 +93,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
 
             if (!result.CanCloseDialog)
             {
+                OnSendFailed();   // 보내는 동안 남이 조치했으면 [확인]을 다시 켜지 않는다(B10)
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "조치보고 실패",
