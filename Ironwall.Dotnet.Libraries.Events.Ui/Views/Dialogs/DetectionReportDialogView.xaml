@@ -9,6 +9,7 @@
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	d:DesignHeight="700"
 	d:DesignWidth="800"
 	FontFamily="{DynamicResource MaterialDesignFont}"
@@ -269,8 +270,10 @@
 								</c:ConsoleField>
 
 								<!--  썸네일 — 주소가 있을 때만 칸을 둔다(주소가 없는 PIDS 탐지에 빈 '미리보기 없음' 칸을 세우지 않는다).
-								      받아 오기 전 · 실패(자체서명 인증서 등)면 그림이 비어 뒤의 안내가 보인다 — 옛 겹침 폴백과 같다  -->
-								<Border
+								      받아 오기 전 · 실패(자체서명 인증서 등)면 그림이 비어 뒤의 안내가 보인다 — 옛 겹침 폴백과 같다.
+								      사진은 단추다 — 누르면(마우스 · Space · Enter) 아래 확대 팝업이 창 가운데에 뜬다(코드 숨김 OnThumbnailClick).
+								      사진이 아직 없으면 누르지 않는다(IsEnabled = Thumbnail 있음)  -->
+								<Button
 									Grid.Row="0"
 									Grid.RowSpan="7"
 									Grid.Column="3"
@@ -278,25 +281,96 @@
 									Height="150"
 									Margin="20,4,0,0"
 									VerticalAlignment="Top"
-									Background="{DynamicResource SurfaceAltBrush}"
-									BorderBrush="{DynamicResource BorderBrush}"
-									BorderThickness="1"
-									CornerRadius="6"
+									AutomationProperties.AutomationId="Events.DetectionActionReport.ThumbnailZoom"
+									AutomationProperties.Name="사진 크게 보기"
+									Click="OnThumbnailClick"
+									Cursor="Hand"
+									ToolTip="누르면 사진을 크게 봅니다"
 									Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}">
-									<Grid>
-										<c:ConsoleText
-											HorizontalAlignment="Center"
-											VerticalAlignment="Center"
-											FontSize="11.5"
-											Foreground="{DynamicResource TextSecondaryBrush}"
-											Text="미리보기 없음" />
+									<Button.Template>
+										<ControlTemplate TargetType="Button">
+											<Border
+												x:Name="Frame"
+												Background="{DynamicResource SurfaceAltBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="6">
+												<Grid>
+													<c:ConsoleText
+														HorizontalAlignment="Center"
+														VerticalAlignment="Center"
+														FontSize="11.5"
+														Foreground="{DynamicResource TextSecondaryBrush}"
+														Text="미리보기 없음" />
+													<Image
+														AutomationProperties.AutomationId="Events.DetectionActionReport.Thumbnail"
+														RenderOptions.BitmapScalingMode="HighQuality"
+														Source="{Binding Thumbnail, Mode=OneWay}"
+														Stretch="Uniform" />
+													<!--  확대 표시 — 누를 수 있다는 것을 모양으로 말한다(사진이 있을 때만)  -->
+													<Border
+														Margin="0,0,6,6"
+														Padding="3"
+														HorizontalAlignment="Right"
+														VerticalAlignment="Bottom"
+														Background="{DynamicResource SurfaceBrush}"
+														CornerRadius="4"
+														Opacity="0.85">
+														<Border.Style>
+															<Style TargetType="Border">
+																<Style.Triggers>
+																	<DataTrigger Binding="{Binding Thumbnail, Mode=OneWay}" Value="{x:Null}">
+																		<Setter Property="Visibility" Value="Collapsed" />
+																	</DataTrigger>
+																</Style.Triggers>
+															</Style>
+														</Border.Style>
+														<md:PackIcon
+															Width="16"
+															Height="16"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Kind="MagnifyPlus" />
+													</Border>
+												</Grid>
+											</Border>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsMouseOver" Value="True">
+													<Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+												</Trigger>
+												<Trigger Property="IsKeyboardFocused" Value="True">
+													<Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+													<Setter TargetName="Frame" Property="BorderThickness" Value="2" />
+												</Trigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Button.Template>
+								</Button>
+
+								<!--  사진 크게 보기 — 창 가운데 팝업. 크기 · 위치는 열 때 코드 숨김이 정한다(창의 85% 안, 비율 유지 — ThumbnailZoomRules).
+								      사진을 누르거나 · 바깥을 누르거나(StaysOpen=False) · ESC 로 닫는다. ESC 는 확대만 닫고 조치보고 창은 그대로  -->
+								<Popup
+									AllowsTransparency="True"
+									Placement="Center"
+									PopupAnimation="Fade"
+									StaysOpen="False">
+									<Border
+										Padding="6"
+										AutomationProperties.AutomationId="Events.DetectionActionReport.ThumbnailLarge"
+										Background="{DynamicResource SurfaceBrush}"
+										BorderBrush="{DynamicResource BorderBrush}"
+										BorderThickness="1"
+										Cursor="Hand"
+										CornerRadius="8"
+										Focusable="True"
+										MouseLeftButtonUp="OnZoomedImageClick"
+										PreviewKeyDown="OnZoomedKeyDown"
+										ToolTip="누르거나 ESC 로 닫습니다">
 										<Image
-											AutomationProperties.AutomationId="Events.DetectionActionReport.Thumbnail"
 											RenderOptions.BitmapScalingMode="HighQuality"
 											Source="{Binding Thumbnail, Mode=OneWay}"
 											Stretch="Uniform" />
-									</Grid>
-								</Border>
+									</Border>
+								</Popup>
 							</Grid>
 						</DataTemplate>
 					</ContentControl.ContentTemplate>

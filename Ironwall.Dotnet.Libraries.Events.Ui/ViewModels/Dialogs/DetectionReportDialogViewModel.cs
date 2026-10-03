@@ -8,6 +8,9 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
+using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
@@ -117,12 +120,41 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
             base.UpdateData(eventModel, user);
 
-            var model = (eventModel as DetectionEventCardViewModel)!.Model as IDetectionEventModel;
+            var card = (eventModel as DetectionEventCardViewModel)!;
+            var model = card.Model as IDetectionEventModel;
             var viewModel = new DetectionEventViewModel(model!);
             var list = new List<DetectionEventViewModel>() { viewModel };
             SelectedItemEditor = new DetectionSelectionViewModel(list) { IsEditable = false }; // 조치보고=읽기 전용(스크롤은 유지)
             (SelectedItemEditor as DetectionSelectionViewModel)!.RefreshAll();
+            WatchThumbnail(card);
         }
+
+        protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+        {
+            WatchThumbnail(null);
+            return base.OnDeactivateAsync(close, cancellationToken);
+        }
+        #endregion
+        #region - 사진 늦게 도착 -
+        /// <summary>
+        /// 사진은 탐지 뒤 SYNC_DETECTION 재조회로 늦게 오는 일이 흔하다 — 카드는 그때 같은 모델의 Thumbnail 을 채우고 알린다.
+        /// 창이 열려 있는 동안 그 알림을 받아 사진 칸을 다시 읽힌다(연 순간 '사진 없음' 으로 굳지 않게).
+        /// 다른 이벤트로 다시 열거나 창을 닫으면 앞 카드 구독을 끊는다. 호출 스레드: UI.
+        /// </summary>
+        private void WatchThumbnail(DetectionEventCardViewModel? card)
+        {
+            if (_thumbnailCard != null) _thumbnailCard.PropertyChanged -= OnCardPropertyChanged;
+            _thumbnailCard = card;
+            if (_thumbnailCard != null) _thumbnailCard.PropertyChanged += OnCardPropertyChanged;
+        }
+
+        private void OnCardPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is not (nameof(DetectionEventCardViewModel.HasThumbnail) or nameof(DetectionEventCardViewModel.ThumbnailUri))) return;
+            (SelectedItemEditor as DetectionSelectionViewModel)?.RefreshThumbnail();
+        }
+
+        private DetectionEventCardViewModel? _thumbnailCard;
         #endregion
         #region - Binding Methods -
         #endregion
