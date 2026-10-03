@@ -48,6 +48,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     private readonly IMappingWorkbenchGateway _gateway;
     private readonly IMappingDeviceSource _devices;
     private readonly IPermissionService? _permissions;
+    private readonly IMappingPresetSource? _presets;
     private readonly MappingBoard _board = new();
 
     private readonly Dictionary<MappingActionKind, List<MappingPaletteItemViewModel>> _paletteCache = new();
@@ -76,15 +77,18 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     /// <param name="permissions">권한. <c>null</c> 이면 편집 가능으로 본다(미리보기·시험용).</param>
     /// <param name="events">있으면 창이 떠 있는 동안 <see cref="EventMappingsChangedMessage"/>(서버 <c>SYNC_EVENT_MAPPING</c>)를 듣는다.</param>
     /// <param name="delay">알림 합치기 창의 지연(시험용). 생략하면 <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+    /// <param name="presets">카메라 프리셋 후보. 생략하면 <paramref name="gateway"/> 가 함께 구현하는지 본다(실제 게이트웨이는 구현한다).</param>
     public MappingWorkbenchViewModel(
         IMappingWorkbenchGateway gateway,
         IMappingDeviceSource devices,
         IPermissionService? permissions = null,
         IEventAggregator? events = null,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        IMappingPresetSource? presets = null)
     {
         _gateway = gateway;
         _devices = devices;
+        _presets = presets ?? gateway as IMappingPresetSource;
         _permissions = permissions;
         _events = events;
         // 맵핑 저장 한 번이 알림을 여러 건 낼 수 있다(부모 + 하위 카메라 · 스피커 · 경광등) — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
@@ -419,6 +423,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             Groups.Clear();
             foreach (var group in _devices.Groups()) Groups.Add(group);
             _paletteCache.Clear();
+            _presetCache.Clear();       // 프리셋도 다시 받는다 — 그 사이 카메라에 프리셋이 생겼을 수 있다
 
             var result = await _gateway.ListMappingsAsync();
             if (!result.IsSuccess)
@@ -712,6 +717,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         foreach (var vm in selected) SelectedBoardRows.Add(vm);
 
         NotifyOfPropertyChange(nameof(BoardRows));
+        UpdateCameraEditor();
         RaiseCommandStates();
     }
 
@@ -914,10 +920,219 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         NotifyOfPropertyChange(nameof(IsDragEnabled));
         NotifyOfPropertyChange(nameof(HasMappingEdit));
         NotifyOfPropertyChange(nameof(CanSaveMapping));
+        NotifyOfPropertyChange(nameof(CanEditCameraRow));
     }
 
     /// <summary>보드 선택이 바뀌었다(뷰가 알려 준다).</summary>
-    public void OnSelectionChanged() => RaiseCommandStates();
+    public void OnSelectionChanged()
+    {
+        UpdateCameraEditor();
+        RaiseCommandStates();
+    }
+    #endregion
+
+    #region - 카메라 연동 설정(프리셋 · 지연) -
+    private readonly Dictionary<int, IReadOnlyList<MappingPresetInfo>> _presetCache = new();
+    private MappingRowViewModel? _cameraRow;
+    private int _presetLoadSerial;
+    private bool _rebuildingPresets;
+    private string _presetStatusText = string.Empty;
+    private Task _presetLoadTask = Task.CompletedTask;
+
+    /// <summary>프리셋 콤보 항목 — 맨 위는 늘 "없음", 이어서 <b>고른 카메라의</b> 프리셋.</summary>
+    public ObservableCollection<MappingPresetOption> PresetOptions { get; } = new();
+
+    /// <summary>설정 칸이 붙들고 있는 카메라 행(카메라 탭에서 행을 <b>하나</b> 골랐을 때만).</summary>
+    public MappingRowViewModel? EditingCameraRow => _cameraRow;
+
+    /// <summary>설정 칸을 보일까.</summary>
+    public bool HasCameraEditor => _cameraRow is not null;
+
+    /// <summary>설정 칸 머리.</summary>
+    public string CameraEditorTitle => _cameraRow is null ? string.Empty : $"{_cameraRow.DeviceName} 연동 설정";
+
+    /// <summary>설정 칸 값을 바꿀 수 있는가 — 해제 표시 · 끊긴 행은 바꾸지 않는다.</summary>
+    public bool CanEditCameraRow => CanEdit && IsBoardEnabled && _cameraRow is { IsRemoved: false, IsOrphan: false };
+
+    /// <summary>프리셋 목록 상태(불러오는 중 · 없음 · 실패). 정상이면 빈 문자열.</summary>
+    public string PresetStatusText
+    {
+        get => _presetStatusText;
+        private set { _presetStatusText = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasPresetStatus)); }
+    }
+
+    /// <summary>프리셋 상태 줄을 보일까.</summary>
+    public bool HasPresetStatus => PresetStatusText.Length > 0;
+
+    /// <summary>가장 최근 프리셋 조회 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task PresetLoadTask => _presetLoadTask;
+
+    /// <summary>타깃 프리셋 — 이벤트가 나면 카메라가 돌아갈 자리.</summary>
+    public MappingPresetOption? SelectedTargetPreset
+    {
+        get => _cameraRow is { } vm ? OptionFor(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted) : null;
+        set
+        {
+            if (_rebuildingPresets || value is null || !CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            if (row.TargetPresetId == value.Id) return;
+            row.TargetPresetId = value.Id;
+            row.TargetPresetName = value.Id is null ? null : value.Name;
+            row.TargetPresetRestricted = value.Id is not null && value.IsRestrictedZone;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>홈 프리셋 — 지연 뒤 돌아올 자리.</summary>
+    public MappingPresetOption? SelectedHomePreset
+    {
+        get => _cameraRow is { } vm ? OptionFor(vm.Row.HomePresetId, vm.Row.HomePresetName, false) : null;
+        set
+        {
+            if (_rebuildingPresets || value is null || !CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            if (row.HomePresetId == value.Id) return;
+            row.HomePresetId = value.Id;
+            row.HomePresetName = value.Id is null ? null : value.Name;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>지연(초) — 타깃에 머무는 시간.</summary>
+    public int EditDelayTime
+    {
+        get => _cameraRow?.Row.DelayTime ?? 0;
+        set
+        {
+            if (!CanEditCameraRow) return;
+            var row = _cameraRow!.Row;
+            var next = Math.Max(EventMappingRules.DELAY_TIME_MIN, value);
+            if (row.DelayTime == next) { NotifyOfPropertyChange(); return; }
+            row.DelayTime = next;
+            CommitCameraEdit();
+        }
+    }
+
+    /// <summary>값을 바꿨다 — 행 상태를 다시 판정하고 보드에 알린다(Draft · 칩 · [적용]).</summary>
+    private void CommitCameraEdit()
+    {
+        _cameraRow!.Row.Refresh();
+        _board.Raise();
+        NotifyCameraValues();
+    }
+
+    /// <summary>고른 행에 맞춰 설정 칸을 세운다. 카메라가 바뀌었을 때만 프리셋을 새로 받는다.</summary>
+    private void UpdateCameraEditor()
+    {
+        var next = SelectedKind == MappingActionKind.Camera && SelectedBoardRows.Count == 1 ? SelectedBoardRows[0] : null;
+        if (ReferenceEquals(next, _cameraRow))
+        {
+            NotifyCameraEditor();
+            return;
+        }
+
+        _cameraRow = next;
+        _presetLoadSerial++;                    // 옛 조회가 늦게 와도 새 행을 덮지 않게
+        if (next?.Row.DeviceId is not int cameraId)
+        {
+            ShowPresets(Array.Empty<MappingPresetInfo>(), string.Empty);
+        }
+        else if (_presetCache.TryGetValue(cameraId, out var cached))
+        {
+            ShowPresets(cached, cached.Count == 0 ? NoPresetNotice : string.Empty);
+        }
+        else
+        {
+            _presetLoadTask = LoadPresetsAsync(next, cameraId, _presetLoadSerial);
+        }
+        NotifyCameraEditor();
+    }
+
+    private const string NoPresetNotice = "이 카메라에 등록된 프리셋이 없습니다.";
+
+    private async Task LoadPresetsAsync(MappingRowViewModel row, int cameraId, int serial)
+    {
+        ShowPresets(Array.Empty<MappingPresetInfo>(), "프리셋을 불러오는 중…");
+        if (_presets is null)
+        {
+            PresetStatusText = "프리셋 목록을 불러올 수 없습니다.";
+            return;
+        }
+
+        var result = await _presets.ListPresetsAsync(cameraId);
+        if (serial != _presetLoadSerial || !ReferenceEquals(row, _cameraRow)) return;    // 그 사이 다른 행을 골랐다
+
+        if (!result.IsSuccess)
+        {
+            // 실패를 "없음" 으로 읽지 않는다 — 지금 값은 자리 항목으로 남아 있고 사유만 말한다.
+            PresetStatusText = result.Message;
+            return;
+        }
+
+        // 다른 카메라의 프리셋은 서버가 422 로 거절한다 — 후보에 애초에 넣지 않는다.
+        var owned = (result.Value ?? Array.Empty<MappingPresetInfo>())
+            .Where(p => EventMappingRules.IsPresetOwnedBy(p.CameraId, cameraId))
+            .ToList();
+        _presetCache[cameraId] = owned;
+        ShowPresets(owned, owned.Count == 0 ? NoPresetNotice : string.Empty);
+    }
+
+    /// <summary>
+    /// 콤보 항목을 다시 세운다. <b>지금 행이 가진 프리셋은 목록에 없어도 넣는다</b> —
+    /// 빠지면 콤보가 빈칸으로 보이고, 사람이 손대지 않았는데도 값이 지워진 것처럼 보인다.
+    /// </summary>
+    private void ShowPresets(IReadOnlyList<MappingPresetInfo> presets, string status)
+    {
+        _rebuildingPresets = true;
+        try
+        {
+            PresetOptions.Clear();
+            PresetOptions.Add(MappingPresetOption.None);
+            foreach (var preset in presets)
+                PresetOptions.Add(new MappingPresetOption(preset.Id, preset.Name, preset.IsRestrictedZone));
+
+            if (_cameraRow is { } vm)
+            {
+                EnsureOption(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted);
+                EnsureOption(vm.Row.HomePresetId, vm.Row.HomePresetName, false);
+            }
+        }
+        finally
+        {
+            _rebuildingPresets = false;
+        }
+        PresetStatusText = status;
+        NotifyCameraValues();
+    }
+
+    private void EnsureOption(int? id, string? name, bool restricted)
+    {
+        if (id is not int value || PresetOptions.Any(o => o.Id == value)) return;
+        PresetOptions.Add(new MappingPresetOption(value, string.IsNullOrWhiteSpace(name) ? $"#{value}" : name!, restricted));
+    }
+
+    private MappingPresetOption OptionFor(int? id, string? name, bool restricted)
+    {
+        if (id is not int value) return MappingPresetOption.None;
+        return PresetOptions.FirstOrDefault(o => o.Id == value)
+            ?? new MappingPresetOption(value, string.IsNullOrWhiteSpace(name) ? $"#{value}" : name!, restricted);
+    }
+
+    private void NotifyCameraEditor()
+    {
+        NotifyOfPropertyChange(nameof(EditingCameraRow));
+        NotifyOfPropertyChange(nameof(HasCameraEditor));
+        NotifyOfPropertyChange(nameof(CameraEditorTitle));
+        NotifyOfPropertyChange(nameof(CanEditCameraRow));
+        NotifyCameraValues();
+    }
+
+    private void NotifyCameraValues()
+    {
+        NotifyOfPropertyChange(nameof(SelectedTargetPreset));
+        NotifyOfPropertyChange(nameof(SelectedHomePreset));
+        NotifyOfPropertyChange(nameof(EditDelayTime));
+    }
     #endregion
 
     #region - 맵핑 속성 폼 (본체는 호출 1회라 즉시 전송한다) -

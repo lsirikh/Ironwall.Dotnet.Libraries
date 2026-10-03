@@ -631,6 +631,69 @@
 					</DataGrid.Columns>
 				</DataGrid>
 
+				<!--  운영 내역 — 함체 · 통문 개폐와 함체 환경 경보. 서버가 만든 기록이라 조회만 한다(조치보고 · 끌기 없음)  -->
+				<DataGrid
+					AutomationProperties.AutomationId="Console.Events.Grid.Operation"
+					CanUserReorderColumns="False"
+					CanUserSortColumns="False"
+					IsReadOnly="True"
+					ItemsSource="{Binding Rows}"
+					RowStyle="{StaticResource EventRow}"
+					SelectionChanged="OnGridSelectionChanged"
+					SelectionMode="Extended"
+					Style="{StaticResource Console.DataGrid}"
+					Visibility="{Binding IsOperationRail, Converter={StaticResource BoolToVis}}">
+					<b:Interaction.Behaviors>
+						<inner:DataGridScrollEndBehavior Command="{Binding OperationPanelViewModel.LoadMoreCommand}" Threshold="50" />
+					</b:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<DataGridTextColumn
+							Width="160"
+							MinWidth="160"
+							Binding="{Binding DateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="발생시각" />
+						<!--  별 열은 그리드마다 하나(상세) — 반올림이 쌓이면 가로 스크롤이 선다(U-18)  -->
+						<DataGridTextColumn
+							Width="150"
+							MinWidth="150"
+							Binding="{Binding DeviceLabel}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource DeviceCellText}"
+							Header="장비" />
+						<DataGridTextColumn
+							Width="90"
+							MinWidth="90"
+							c:ConsoleColumns.CollapseBelow="700"
+							Binding="{Binding DeviceTypeName}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="종류" />
+						<DataGridTextColumn
+							Width="130"
+							MinWidth="130"
+							Binding="{Binding ReasonText}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="사유" />
+						<DataGridTextColumn
+							Width="80"
+							MinWidth="80"
+							c:ConsoleColumns.CollapseBelow="640"
+							Binding="{Binding SeverityText}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="심각도" />
+						<DataGridTextColumn
+							Width="*"
+							MinWidth="140"
+							Binding="{Binding DetailText}"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							ElementStyle="{StaticResource Console.DataGrid.CellText}"
+							Header="상세" />
+					</DataGrid.Columns>
+				</DataGrid>
+
 				<!--  조치 내역  -->
 				<DataGrid
 					AutomationProperties.AutomationId="Console.Events.Grid.Action"

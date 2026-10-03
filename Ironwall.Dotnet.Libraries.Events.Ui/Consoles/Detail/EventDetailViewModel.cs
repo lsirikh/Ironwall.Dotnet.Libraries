@@ -391,6 +391,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             case DetectionEventViewModel detection: BuildDetection(detection); break;
             case MalfunctionEventViewModel malfunction: BuildMalfunction(malfunction); break;
             case ConnectionEventViewModel connection: BuildConnection(connection); break;
+            case OperationEventViewModel operation: BuildOperation(operation); break;
             case ActionEventViewModel action: BuildAction(action); break;
         }
     }
@@ -463,6 +464,29 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         }));
     }
 
+    /// <summary>운영 — 서버가 만든 발생 기록이라 전부 잠근다. 사유는 글자와 서버 원문을 함께 보인다(모르는 어휘도 지우지 않는다).</summary>
+    private void BuildOperation(OperationEventViewModel row)
+    {
+        _presenter.SingleTitle = row.DeviceLabel ?? "(장비 없음)";
+        _presenter.SingleNumber = row.Model?.Id.ToString() ?? string.Empty;
+
+        Add(new EventDetailSection("운영 속성", "서버가 만든 발생 기록 — 수정 불가", new[]
+        {
+            Locked("datetime", "발생시각", row.DateTime.ToString("yyyy-MM-dd HH:mm:ss")),
+            Locked("device", "장비", row.DeviceLabel ?? "—"),
+            Locked("kind", "종류", row.DeviceTypeName ?? "—"),
+            Locked("number", "번호", row.Model?.Id.ToString() ?? "—"),
+            Locked("reason", "사유", string.IsNullOrWhiteSpace(row.Reason) ? "—" : $"{row.ReasonText} ({row.Reason})"),
+            Locked("severity", "심각도", row.SeverityText),
+            Locked("status", "조치", row.IsActionReported ? "조치 있음" : "미조치"),
+        }));
+
+        Add(new EventDetailSection("상세 값", "장비가 보고한 값 그대로", new[]
+        {
+            Locked("detail", "상세", row.DetailText),
+        }));
+    }
+
     private void BuildAction(ActionEventViewModel row)
     {
         _presenter.SingleTitle = string.IsNullOrWhiteSpace(row.Content) ? "(내용 없음)" : row.Content!;
@@ -514,6 +538,7 @@ public sealed class EventDetailViewModel : PropertyChangedBase
         DetectionEventViewModel d => $"{d.DateTime:MM-dd HH:mm} · {d.DeviceLabel ?? "—"} · {EnumKoreanMap.To(d.Result)}",
         MalfunctionEventViewModel m => $"{m.DateTime:MM-dd HH:mm} · {m.DeviceLabel ?? "—"} · {EnumKoreanMap.To(m.Reason)}",
         ConnectionEventViewModel c => $"{c.DateTime:MM-dd HH:mm} · {c.DeviceLabel ?? "—"}",
+        OperationEventViewModel o => $"{o.DateTime:MM-dd HH:mm} · {o.DeviceLabel ?? "—"} · {o.ReasonText}",
         ActionEventViewModel a => $"{a.DateTime:MM-dd HH:mm} · {a.User} · {a.Content}",
         _ => row?.ToString() ?? string.Empty,
     };
