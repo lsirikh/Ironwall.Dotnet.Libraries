@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - 맵핑 결함 G8 · G9 (2026-10-04)
+
+### Fixed
+- **G8 실행 중 감시금지구역 무시** — 탐지 이벤트 창이 대상 프리셋이 감시금지구역(`is_restricted_zone`)인 매핑 카메라도 띄우고 그 프리셋으로 PTZ 를 돌렸다(캐시가 플래그를 버림). 이제 그 배선은 창에서 빠진다(같은 카메라의 다른 배선은 남음 · 뺀 건수 로그). 워크벤치 경고 "일반 팝업·녹화에서 제외됩니다" 와 맞춘다. 6.3 옛 API 는 플래그가 없어 영향 없음.
+- **G9 SYNC_PRESET 무시** — `EnumGopCommand` 에 이름만 있고 받는 곳이 없었다. 라이브러리 자가필터 `PresetSyncNatsService`(Events.Ui) 가 받아 `CameraPresetsChangedMessage` 를 낸다 → 이벤트 창 매핑 카메라 캐시를 비우고, 열린 맵핑 워크벤치는 프리셋 후보를 버리고 보드를 다시 싣는다(적용 안 한 편집은 덮지 않음). 메인 솔루션 변경 없음.
+- 시험: `MappingRuntimePresetDefectTests` 17건(테스트 가짜 `CountingGateway` 가 프리셋 참조도 옮기게 보강). Events.Ui 1749건 통과.
+
 ## [Unreleased] - 결선 두 줄(레인) 형상 (브랜치 `feat/fence-lanes` · 2026-10-01)
 
 > 근거: [PRD](docs/prds/fence-wiring-editor-prd.md) v0.3 §1-0b · FR-18 ~ FR-21 · 참고 그림 `docs/assets/wiring-reference/` 4장. v2.6 에는 아직 머지하지 않았다.

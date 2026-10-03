@@ -31,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 서버로 나가는 것은 [적용] 한 번뿐이다. 서버에 재정렬 API 가 없어서
 /// 드롭마다 보내면 20행 재배치가 20회 PATCH 가 되고 API 타임아웃이 곱해진다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>
+public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropRefusalHandler, IHandle<EventMappingsChangedMessage>, IHandle<CameraPresetsChangedMessage>
 {
     /// <summary>콘솔 키 — 자동화 식별자와 설정 저장의 접두사.</summary>
     public const string ConsoleKeyName = "Mapping";
@@ -362,6 +362,20 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 서버 <c>SYNC_PRESET</c>(G9) — 프리셋 후보 · 배선 행의 프리셋 이름 · 감시금지구역 표시가 낡았다. 표시만 해 두고 같은 합치기 창으로 다시 읽는다.
+    /// </summary>
+    public Task HandleAsync(CameraPresetsChangedMessage message, CancellationToken cancellationToken)
+    {
+        if (_closed) return Task.CompletedTask;
+        Interlocked.Exchange(ref _presetsChanged, 1);
+        _externalChangeTask = _externalChange.Pulse();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>1 = SYNC_PRESET 을 받고 아직 다시 싣지 않았다(알림 스레드에서 켜고 화면 쪽에서 끈다).</summary>
+    private int _presetsChanged;
+
     /// <summary>가장 최근 신호의 작업 — 시험이 창이 끝나기를 기다릴 때 쓴다.</summary>
     internal Task ExternalChangeTask => _externalChangeTask;
 
@@ -375,6 +389,9 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             _externalChangeTask = _externalChange.Pulse();
             return;
         }
+
+        // 프리셋이 바뀌었으면 후보 목록은 손댄 것과 무관하게 버린다 — 다음 행 선택이 서버에서 다시 받는다.
+        if (Volatile.Read(ref _presetsChanged) == 1) _presetCache.Clear();
 
         // 사람이 손댄 것은 덮지 않는다 — 알리기만 하고 [다시 읽기]는 사람이 고른다(부대 편제 콘솔과 같은 규칙).
         if (HasUnappliedWork)
@@ -428,6 +445,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             foreach (var group in _devices.Groups()) Groups.Add(group);
             _paletteCache.Clear();
             _presetCache.Clear();       // 프리셋도 다시 받는다 — 그 사이 카메라에 프리셋이 생겼을 수 있다
+            Interlocked.Exchange(ref _presetsChanged, 0);
 
             var result = await _gateway.ListMappingsAsync();
             if (!result.IsSuccess)
@@ -589,7 +607,10 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
 
         var listChanged = !SameMappings(list.Value);
         var boardChanged = board is not null && !SameBoard(board);
-        if (!listChanged && !boardChanged) return;   // 우리 적용의 메아리 · 이미 본 상태
+        // 프리셋 변경(SYNC_PRESET)은 배선 행의 updated_at 을 바꾸지 않는다 — 프리셋 이름 · 🔒 를 새로 보이려면 비교 없이 싣는다.
+        var presetsChanged = Volatile.Read(ref _presetsChanged) == 1;
+        if (!listChanged && !boardChanged && !presetsChanged) return;   // 우리 적용의 메아리 · 이미 본 상태
+        Interlocked.Exchange(ref _presetsChanged, 0);
 
         ApplyMappingList(list.Value);
         if (_selectedMapping is null) { _board.Clear(); RedrawBoard(); }

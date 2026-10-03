@@ -81,6 +81,7 @@ internal sealed class CountingGateway : IMappingWorkbenchGateway
             {
                 ConfigId = c.ConfigId, EventMappingId = c.EventMappingId, Camera = c.Camera,
                 DelayTime = c.DelayTime, IsEnable = c.IsEnable, Priority = c.Priority,
+                TargetPreset = c.TargetPreset, HomePreset = c.HomePreset,
                 UpdatedAt = ChildDrifted ? "T9" : c.UpdatedAt,
             })
             .ToList());
