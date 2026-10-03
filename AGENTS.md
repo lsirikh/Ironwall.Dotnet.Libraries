@@ -1,65 +1,61 @@
+# AGENTS.md — Ironwall.Dotnet.Libraries
 
-<!-- harness-v14:start -->
-<!-- gen:harness-entry -->
-<!-- 이 블록은 scripts/gen-manual-tables.js 가 CLAUDE.md 에서 생성합니다.
-     정본은 CLAUDE.md 입니다 — 여기를 손으로 고치면 문서 동기화 테스트(DS-18)가 깨집니다. -->
+Sensorway 의 .NET 8 재사용 라이브러리 모음(30+) — PIDS · 모니터링 앱의 공통 기반(WPF · Caliburn.Micro · Autofac · Dapper · Redis/NATS · GMap.NET · ONVIF).
+구성·사용법의 정본은 [`README.md`](README.md) 와 [`ProjectManual.md`](ProjectManual.md), 변경 이력은 `CHANGELOG.md` 다.
 
-# 하네스 공통 진입점 (생성물)
+## 프로젝트 정보
 
-규칙의 **정본은 `CLAUDE.md`** 이고, 아래 절은 그 파일에서 바이트 그대로 옮겨진다.
-이 파일을 고치지 말고 `CLAUDE.md` 를 고친 뒤 `node scripts/gen-manual-tables.js` 를 돌린다.
-
-런타임 고유 배선·관리형 CLI 계약·UI 테스트 요구는 `.claude/skills/process/SKILL.md` 와
-`.claude/skills/process/MANAGED.md` 에 있다 — 여기로 복사하지 않는다.
-
-## 현재 실행 방식 (v14)
-
-새 작업은 [process 스킬의 v14 진입점](.claude/skills/process/SKILL.md)을 한 번 읽고 따른다. 같은 내용을 매 단계 다시 로드하지 않는다.
-
-- A: 읽기 전용 응답. B: 1노드·현재 모델·필요한 테스트. C: 대표 PRD + Plan + 의존 그래프.
-- 큰 작업은 분석을 시작하기 전에 `work draft`로 등록하고, `models invoke --work-id`와 `work create --draft`로 같은 ID를 유지한다.
-- 모델 설정·현황: `node .claude/hooks/advance-phase.js models`
-- 다중 창은 작업 ID를 공유하고 `work run`으로 격리 실행한다. `work context WORK_ID`로 짧은 컨텍스트를 받는다.
-- 이미 받은 실행 요청을 되묻지 않는다. 필요하지 않은 분석·테스트 결과·보고서 MD는 생략한다.
-- 아래 봉투·phase 규칙은 진행 중인 레거시 작업을 이어갈 때 적용한다.
-
-## 매 응답 후 — 컨텍스트 보존
-
-**결정을 내렸으면 기록한다.** 이것이 하네스의 존재 이유다 —
-다음 세션의 내가 같은 논의를 반복하지 않도록.
-
-기록은 **CLI 로만** 한다. `docs/memory/decisions.jsonl` 이 진실이고,
-`session-context.md` 의 5열 표는 하네스가 렌더링하는 파생 투영이다 — 손으로 고치면 덮어쓴다.
-
-```bash
-node .claude/hooks/advance-phase.js decide --json-file <경로>
-# 또는  decide --json '{…}'   ·   decide --from-commit <sha> --json-file <경로>
+```yaml
+project_name: "Ironwall.Dotnet.Libraries"
+language: "C#"
+framework: ".NET 8, WPF, Caliburn.Micro, GMap.NET"
+test_framework: "xUnit"
+package_manager: "NuGet"
+test_command: "dotnet test Ironwall.Dotnet.Libraries.sln"
+check_timeout_min: 20
 ```
 
-- **기각안(`rejected[]`)**: 택하지 않은 대안. 이 칸이 재논쟁을 막는다 — 결정만 적으면 못 막는다.
-- **재발방지(`invalidation`)**: 이 결정이 틀렸다면 무엇을 보고 알 수 있는가.
-  `specs` 에 기계 검증 문법으로 쓰면 Loop C 가 매 세션 종료 때 실제로 평가한다.
-- 둘 중 하나라도 비면 `decide` 가 **거부한다**.
-- 결정을 뒤집을 때는 행을 고치지 않고 새 행에 `supersedes` 로 이전 id 를 가리킨다.
+- **이 저장소를 쓰는 앱이 있다**: `Dotnet.Monitoring.Solution` 이 형제 폴더 경로(`..\..\Ironwall.Dotnet.Libraries\…`)로 여러 프로젝트를 직접 참조한다. 공개 형식 · 생성자 · 이벤트 모양을 바꾸면 그쪽 빌드가 깨질 수 있다.
+- `Ironwall.Dotnet.Libraries.OnvifSolution` 은 서브모듈(github `Ironwall-Onvif-Solution`)이다 — 이 저장소에서 고치지 않는다.
+- `GMap.NET/` 은 대부분 git 밖(벤더 소스)이다. 빌드에 필요한 `GMap.NET/Directory.Build.props` · `sn.snk` 는 `.worktreeinclude` 로 하네스 worktree 에 복사된다.
+- 코딩 규칙: `.claude/rules/csharp/`.
 
-기록할 때: 명명된 대안 중 하나를 택했을 때 · 사용자가 교정했을 때.
-백워드 전이 · `--force` · Loop V 재시도 통과 · escalate 는 하네스가 `cycle.needsDecision[]` 에
-자동 적재하고, 그 사이클은 **원장 없이 `complete` 할 수 없다.**
+## 문서
 
-문법·스키마 상세는 [`.claude/skills/process/LOOPS.md`](.claude/skills/process/LOOPS.md) 의 Loop D.
+- 분석·요구사항 → `docs/prds/` · 다른 프로젝트와 주고받는 통지·요청·회신 → `docs/coordinations/` · 디자인·와이어프레임·스토리보드 → `docs/designs/`.
+- 사용자가 요청할 때만 만든다. 기존 문서는 그대로 둔다.
 
-> `docs/INDEX.md` 와 결정 표는 파생 산출물이라 직접 갱신하지 않는다.
-> post-write-sync 훅과 `advance-phase-heal.js`가 만든다.
+<!-- harness:begin -->
+## 하네스 — 에이전트 공통 규칙 (이 블록은 `node harness/cli.js install` 이 관리한다)
 
-## 참조 경로
+### 자율
+- 되돌릴 수 있는 일(파일 편집 · 로컬 테스트와 빌드 · 읽기 전용 명령)은 묻지 말고 한다.
+- 되돌릴 수 없거나 밖으로 나가는 일(push · 사용자 브랜치 병합 · 삭제 · 외부 시스템 쓰기 · 비밀 다루기)은 완성된 결과를 보여 주고 한 번만 승인받는다.
+- 무엇이 끝인지 처음에 정하고 끝날 때까지 간다 — 중간 요약이나 "계속할까요?" 로 멈추지 않는다.
 
-| 필요할 때 | 읽을 파일 |
-|----------|---------|
-| Track/Phase 상세 규칙 | `.claude/skills/process/SKILL.md` |
-| 루프 계약 (검증·원장·완료검증·탐색) | `.claude/skills/process/LOOPS.md` |
-| 해당 Phase의 작업 지침 | `.claude/skills/{phase별 스킬}/SKILL.md` |
-| Hook·명령어·설치·전체 설명 | [`docs/Manual.md`](docs/Manual.md) |
-| 현재 세션 상태 | `docs/memory/session-context.md` |
-| 기계적 파이프라인 상태 | `node .claude/hooks/advance-phase.js status` (브랜치별 경로 출력) |
-<!-- /gen:harness-entry -->
-<!-- harness-v14:end -->
+### git
+- git 쓰기는 하네스를 거친다. 사용자 브랜치로의 병합 · push · 브랜치 삭제는 사용자가 명시적으로 말한 뒤에만 한다 — 병합은 `node harness/cli.js accept <id>`, push 는 `node harness/cli.js push [<remote>] [<branch>]`(빨리감기만 · 강제 없음). `git push` 를 직접 쓰지 않는다(훅이 막는다).
+- `git reset --hard`(와 커밋을 옮기는 reset) · `git clean -f` · `git checkout -- .` · `git rebase` · 직접 `git merge`(`--ff-only` 포함) · `git pull` · `git stash` · `git commit --amend` 는 쓰지 않는다(훅이 막는다). 되돌리기는 `git revert`.
+- 모든 작업은 커밋으로 끝난다. 대화형 세션에서는 **자기가 고친 파일만** 경로로 지정해 커밋한다: `git add -- <파일>` → `git commit -m "<무엇을 왜>" -- <파일>`. `git add -A` · `git add .` 는 쓰지 않는다.
+- 다른 세션 · 사람의 미커밋 변경은 건드리지 않는다(stash · 되돌리기 · 커밋 모두).
+- 비밀 파일(`.env*` · `*.pem` · `*.key` · `id_rsa*` · `.npmrc` · `credentials*` · `*.tfstate` · `service-account*.json`)은 커밋하지 않는다.
+
+### 큰 작업 · 여러 세션
+- 여러 파일에 걸친 기능 추가 · 수정 요청은 `node harness/cli.js go "<요청 원문>"` 으로 보낸다. 자기 worktree · 브랜치(`harness/<id>`)에서 끝까지 돌고 보고서를 낸다.
+- 실행 중인 작업을 멈출 때는 `node harness/cli.js stop <id>`(셸을 죽이지 않는다) — 진행분을 커밋하고 interrupted 로 바꾼다. 그 뒤 `resume` 또는 `cancel`.
+- 현황 `node harness/cli.js status` · 받아들이기 `accept <id>`(사용자가 말한 뒤) · 취소 `cancel <id>` · 되살리기 `restore <id>` · 정리 `gc`(끝난 작업) · `cleanup-legacy`(이전 하네스 잔여물 — `--apply` 는 사용자가 말한 뒤).
+- 무인 작업자는 허용 목록 밖 명령(`docker build` 등)이 자동 거부된다 — 필요하면 사용자가 `go`/`resume` 에 `--allow "Bash(docker build:*)"` 를 주거나 프로젝트 yaml 블록에 `worker_allow: ["…"]` 를 둔다(git 쓰기 · 셸은 거부된다). BLOCKED 작업은 `resume <id> [--allow …]` 로 같은 세션이 이어 간다.
+- 한두 줄 수정 · 질문 · 조사는 그 자리에서 하고, 고친 파일만 커밋한다.
+
+### 문서 (요청할 때만)
+- 문서는 사용자가 요청할 때만 만든다 — 요청 없이 만들거나 고치지 않는다. 종류는 셋: 분석·요구사항 `prd`(docs/prds/) · 다른 프로젝트와의 통신 `coordination`(docs/coordinations/) · 디자인·와이어프레임·스토리보드 `design`(docs/designs/).
+- 만들기 `node harness/cli.js doc new <prd|coordination|design> "<제목>"` · 상태가 바뀌면 `doc status <경로> <draft|active|done|superseded>`(대체는 `--by <새 문서>`) · 점검 `doc check`.
+- 문서를 명세로 작업을 보낼 때 `go … --doc <경로>` — 받아들이면(accept) 그 문서에 작업 id 가 기록된다.
+
+### 할 수 없을 때
+- 사용자 없이는 더 나아갈 수 없거나 의도적으로 보호된 것에 막혔을 때만 멈춘다. 하네스 작업에서는 `.harness/<id>/BLOCKED.md` 에 이유 · 시도한 것 · 필요한 것을 쓰고, 대화형 세션에서는 그 세 가지를 그대로 보고한다.
+- 검사를 통과시키려고 테스트를 지우거나 고치지 않는다. 할 수 없으면 할 수 없다고 쓴다.
+
+### 검증
+- 완료 신호는 저장소에 원래 있는 테스트 · 빌드 명령의 종료 코드다(사용자가 준 검사가 있으면 그것). 따로 검증 단계를 만들지 않는다.
+<!-- harness:end -->
