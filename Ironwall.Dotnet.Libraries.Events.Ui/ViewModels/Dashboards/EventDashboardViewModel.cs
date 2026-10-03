@@ -60,6 +60,9 @@ public class EventDashboardViewModel : BasePanelViewModel
     public const string ConnectionRailKey = "con";
     public const string ActionRailKey = "act";
 
+    /// <summary>운영 이벤트 레일(함체 · 통문 개폐, 함체 환경 경보) — 조회 전용. 패널을 주입받았을 때만 선다.</summary>
+    public const string OperationRailKey = "op";
+
     /// <summary>억제 스케줄 레일(정본 SB L1122 결정 E-D7 — 억제창을 이벤트 콘솔 레일로 옮긴다).</summary>
     public const string SuppressionRailKey = "sup";
 
@@ -84,6 +87,8 @@ public class EventDashboardViewModel : BasePanelViewModel
                                 , IClock? clock = null
                                 // 조치 트레이 문구 — 조치보고 문구 관리 목록(서버). 없으면 기본 문구로 간다.
                                 , IActionReportPhraseSource? phraseSource = null
+                                // 운영 이벤트 레일 — 선택 주입(안 받으면 레일이 서지 않는다. 이 뷰모델을 세우는 기존 곳 · 가짜를 깨지 않는다).
+                                , OperationEventPanelViewModel? operationEventPanelViewModel = null
                                 ) : base(eventAggregator, log)
     {
         _mappingFactory = mappingLauncher;
@@ -140,6 +145,26 @@ public class EventDashboardViewModel : BasePanelViewModel
                 () => actionEventPanelViewModel.HasMorePages,
                 actionEventPanelViewModel.ClickCancel),
         };
+
+        OperationPanelViewModel = operationEventPanelViewModel;
+        if (operationEventPanelViewModel is not null)
+        {
+            _sources[OperationRailKey] = new EventConsoleSource<OperationEventViewModel>(
+                operationEventPanelViewModel,
+                h => operationEventPanelViewModel.UpdateAction += (_, _) => h(),
+                operationEventPanelViewModel.SetDate,
+                operationEventPanelViewModel.ClickSearch,
+                operationEventPanelViewModel.InvalidateCache,
+                () => operationEventPanelViewModel.LoadedCountText,
+                () => operationEventPanelViewModel.HasMorePages,
+                operationEventPanelViewModel.ClickCancel);
+            // 판본이 운영 이벤트를 주지 않으면 빈 칸 안내가 그 사실을 말해야 한다.
+            operationEventPanelViewModel.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(OperationEventPanelViewModel.IsSupported))
+                    NotifyOfPropertyChange(nameof(EmptyStateHint));
+            };
+        }
 
         Detail = new ConsoleDetailPresenter();
         if (EventGuardTrace.IsOn)
@@ -428,6 +453,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         RailEntries.Add(new ConsoleRailEntry(DetectionRailKey, "탐지", new EventConsoleIcon("MotionSensor")));
         RailEntries.Add(new ConsoleRailEntry(MalfunctionRailKey, "장애", new EventConsoleIcon("AlertOutline")));
         RailEntries.Add(new ConsoleRailEntry(ConnectionRailKey, "연결", new EventConsoleIcon("LanConnect")));
+        if (OperationPanelViewModel is not null)
+            RailEntries.Add(new ConsoleRailEntry(OperationRailKey, "운영", new EventConsoleIcon("DoorOpen")));
         RailEntries.Add(new ConsoleRailEntry(ActionRailKey, "조치", new EventConsoleIcon("ClipboardCheckOutline")));
         // 억제 스케줄 — 배지는 등록된 스케줄 수다. 한 번도 불러오기 전에는 숨긴다("0" 은 거짓이다 — 실창 검토 #23).
         if (Suppression is not null)
@@ -468,6 +495,18 @@ public class EventDashboardViewModel : BasePanelViewModel
         Apply(MalfunctionRailKey, malfunction, "mal");
         Apply(ConnectionRailKey, connection, "con");
         Apply(ActionRailKey, action, "act");
+        if (OperationPanelViewModel is not null)
+        {
+            // 목록을 열기 전에는 서버 요약의 운영 건수(summary.operation)를 보인다 — 개요가 따로 세는 그 숫자다.
+            var opEntry = RailEntries.FirstOrDefault(e => e.Key == OperationRailKey);
+            if (opEntry is not null)
+            {
+                var loaded = OperationPanelViewModel.ViewModelProvider.Count;
+                opEntry.Count = loaded > 0 || OperationPanelViewModel.HasLoadedList ? loaded : Overview.OperationCount;
+                // ▲ 는 경고 이상 건수 — 운영에는 조치 대기가 아니라 심각도가 주의를 끈다.
+                opEntry.BadCount = OperationPanelViewModel.ViewModelProvider.Count(r => r.IsWarning);
+            }
+        }
 
         // 미조치는 목록을 실제로 불러와야 세진다 — 서버 요약에는 그 숫자가 없다.
         // 아직 한 번도 안 열었으면 0 이 아니라 "—" 을 보인다(0 은 거짓이다).
@@ -639,12 +678,14 @@ public class EventDashboardViewModel : BasePanelViewModel
         MalfunctionRailKey => EventDetailKind.Malfunction,
         ConnectionRailKey => EventDetailKind.Connection,
         ActionRailKey => EventDetailKind.Action,
+        OperationRailKey when OperationPanelViewModel is not null => EventDetailKind.Operation,
         _ => EventDetailKind.Overview,
     };
 
     public bool IsDetectionRail => _railKey == DetectionRailKey;
     public bool IsMalfunctionRail => _railKey == MalfunctionRailKey;
     public bool IsConnectionRail => _railKey == ConnectionRailKey;
+    public bool IsOperationRail => _railKey == OperationRailKey && OperationPanelViewModel is not null;
     public bool IsActionRail => _railKey == ActionRailKey;
 
     /// <summary>탐지 · 장애에서만 핸들을 끌 수 있다 — 연결 · 조치는 조치보고 원본이 아니다.</summary>
@@ -694,7 +735,9 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// </summary>
     public string EmptyStateHint => IsFiltered
         ? "검색어를 지우거나 [전체]를 누르세요"
-        : "기간을 넓히거나 [새로 불러오기]를 누르세요";
+        : IsOperationRail && OperationPanelViewModel!.UnsupportedNotice is { } notice
+            ? notice
+            : "기간을 넓히거나 [새로 불러오기]를 누르세요";
 
     /// <summary>목록 상태 한 벌 — 건수 줄과 빈 칸 안내는 늘 같은 순간에 바뀐다.</summary>
     private void RaiseListState()
@@ -1640,6 +1683,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         MalfunctionRailKey => MalfunctionPanelViewModel.CanSaveEvent,
         ConnectionRailKey => false,             // 연결은 전부 발생 기록
+        OperationRailKey => false,              // 운영은 서버가 만든 발생 기록(조회 전용)
         ActionRailKey => ActionPanelViewModel.CanSaveEvent,
         _ => DetectionPanelViewModel.CanSaveEvent,
     };
@@ -1679,6 +1723,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(IsDetectionRail));
         NotifyOfPropertyChange(nameof(IsMalfunctionRail));
         NotifyOfPropertyChange(nameof(IsConnectionRail));
+        NotifyOfPropertyChange(nameof(IsOperationRail));
         NotifyOfPropertyChange(nameof(IsActionRail));
         NotifyOfPropertyChange(nameof(IsSuppressionRail));
         NotifyOfPropertyChange(nameof(AddButtonText));
@@ -1725,6 +1770,8 @@ public class EventDashboardViewModel : BasePanelViewModel
     public DetectionEventPanelViewModel DetectionPanelViewModel { get; }
     public MalfunctionEventPanelViewModel MalfunctionPanelViewModel { get; }
     public ConnectionEventPanelViewModel ConnectionPanelViewModel { get; }
+    /// <summary>운영 이벤트 목록(조회 전용). 주입이 없으면 null — '운영' 레일도 서지 않는다.</summary>
+    public OperationEventPanelViewModel? OperationPanelViewModel { get; }
     public ActionEventPanelViewModel ActionPanelViewModel { get; }
     public EventInfoViewModel EventInfoViewModel { get; }
     public CameraEventInfoViewModel CameraEventInfoViewModel { get; }

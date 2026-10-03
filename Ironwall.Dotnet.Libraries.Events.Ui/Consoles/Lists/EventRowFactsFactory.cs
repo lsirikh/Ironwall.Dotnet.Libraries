@@ -40,6 +40,16 @@ public static class EventRowFactsFactory
             false,
             Extra: EnumKoreanMap.To(c.MessageType)),
 
+        // 운영: 칩은 개폐/환경과 심각도(경고 이상)로 가른다 — 검색은 사유 글자 · 원문 · 상세 값까지 본다.
+        OperationEventViewModel o => new EventRowFacts(
+            o.DeviceLabel,
+            ZoneTextOf(o.Device),
+            o.Model?.Id.ToString(),
+            o.IsActionReported,
+            TypeEventKey: Helpers.OperationEventText.IsDoorReason(o.Reason) ? EventListFilter.ChipDoor : EventListFilter.ChipEnvironment,
+            StateKey: o.IsWarning ? EventListFilter.ChipWarning : null,
+            Extra: $"{o.ReasonText} {o.Reason} {o.SeverityText} {o.Operation.DetailText}"),
+
         ActionEventViewModel a => new EventRowFacts(
             a.OriginEvent?.Device?.DeviceName,
             ZoneTextOf(a.OriginEvent?.Device),

@@ -408,6 +408,29 @@ public static class DtoToModelHelper
         }, dto);
     }
 
+    /// <summary>
+    /// OperationEventDto → <see cref="Models.OperationEventModel"/> 변환 (DeviceProvider 활용).
+    /// 사유 · 심각도는 원문 그대로(미지 값 보존), 상세는 한 줄로 편다. 장비가 지워졌으면 서버 스냅샷을 곁들인다(E8 과 같은 규칙).
+    /// </summary>
+    public static Models.OperationEventModel ToOperationEventModel(
+        this OperationEventDto dto,
+        DeviceProvider? deviceProvider)
+    {
+        var model = new Models.OperationEventModel
+        {
+            Id = dto.Id,
+            DateTime = ParseDateTime(dto.CreatedAt),
+            MessageType = EnumEventType.Operation,
+            Status = ToActionReported(dto.ActionReported),
+            Reason = dto.Reason ?? string.Empty,
+            Severity = dto.Severity,
+            DetailText = OperationEventText.DetailText(dto.Detail),
+            Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
+        };
+        EventDeviceSnapshot.Remember(model, dto.DeviceDescription);
+        return model;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // EventProvider 통합 오버로드
     // ═══════════════════════════════════════════════════════════════════════════════

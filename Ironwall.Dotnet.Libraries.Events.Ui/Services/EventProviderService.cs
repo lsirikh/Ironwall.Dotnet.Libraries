@@ -497,6 +497,67 @@ public class EventProviderService
         }
     }
 
+    /// <summary>
+    /// 운영 이벤트 한 쪽(<c>GET /api/events/operations</c>) — 조회 전용.
+    /// 서버 7.0 미만은 경로가 없다(API 서비스가 호출 전에 <c>NOT_SUPPORTED</c> 로 막는다) → 실패가 아니라
+    /// <see cref="PagedResult{T}.NotSupported"/> 로 돌려 화면이 오류 팝업 대신 안내를 보이게 한다.
+    /// </summary>
+    public async Task<PagedResult<OperationEventModel>> FetchOperationEventsPageAsync(
+        DateTime startDate, DateTime endDate,
+        int page = 1, int limit = 100,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetOperationEventsAsync(
+                startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                endDate: KoreaTimeHelper.ToServerIso8601(endDate),
+                page: page, limit: limit, token: token);
+
+            if (response is null)
+                return new PagedResult<OperationEventModel> { Success = false, Page = page, TotalPages = 1 };
+
+            if (!response.Success && string.Equals(response.Error?.Code, "NOT_SUPPORTED", StringComparison.Ordinal))
+            {
+                _log?.Info($"FetchOperationEventsPageAsync: 이 서버 판본에는 운영 이벤트가 없습니다({response.Error?.Details}).");
+                return new PagedResult<OperationEventModel> { Success = true, NotSupported = true, Page = 1, TotalPages = 1, Total = 0 };
+            }
+
+            if (!response.Success || response.Data == null || response.Data.Count == 0)
+            {
+                if (!response.Success)
+                    _log?.Error($"FetchOperationEventsPageAsync failed at page {page}: " +
+                                $"[{response.Error?.Code}] {response.ErrorText("운영 이벤트 조회에 실패했습니다.")} " +
+                                $"| raw={response.Error?.Details}");
+
+                return new PagedResult<OperationEventModel>
+                {
+                    Success = response.Success,
+                    Page = page,
+                    TotalPages = response.Pagination?.TotalPages ?? 1,
+                    Total = response.Pagination?.Total ?? 0
+                };
+            }
+
+            var models = response.Data
+                .Select(dto => dto.ToOperationEventModel(_deviceProvider))
+                .ToList();
+
+            return new PagedResult<OperationEventModel>
+            {
+                Items = models,
+                Page = response.Pagination?.Page ?? page,
+                TotalPages = response.Pagination?.TotalPages ?? 1,
+                Total = response.Pagination?.Total ?? models.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchOperationEventsPageAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // CUD Operations (Create, Update, Delete)
     // ═══════════════════════════════════════════════════════════════════════════════
