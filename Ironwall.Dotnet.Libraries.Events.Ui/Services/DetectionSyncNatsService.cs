@@ -19,7 +19,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
                   서버(DBApi)가 탐지 UPDATE 시 발행. GIS는 현재 EQM에 등록(활성)된 탐지에 한해
                   GET /events/detections/{id}로 재조회 → detail.thumbnail/frame_* 를 실시간 탐지 카드에 반영.
                   · 최초 탐지(DETECT/INSERT)는 DetectionNatsSyncService가 처리 — 본 서비스와 독립.
-                  · action=DELETED는 로그만(범위 결정: UPDATED 썸네일 갱신 전용).
+                  · action=DELETED(서버에서 탐지 삭제) → DetectionDeletedOnServerMessage 발행 — 카드 목록이
+                    카드를 닫고 큐 엔트리를 빼(신호등 건수 감소) "서버에서 삭제됨" 토스트를 띄운다.
    Created By   : GHLee
    Created On   : 2026-07-31
    Department   : SW Team
@@ -94,16 +95,29 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
             var action = body.Value<string>("action");
             var resourceId = body.Value<int?>("resource_id") ?? 0;
 
-            // UPDATED만 처리 — DELETED는 로그만(범위 결정: 썸네일 갱신 전용).
-            if (!string.Equals(action, "UPDATED", StringComparison.OrdinalIgnoreCase))
+            var isDeleted = string.Equals(action, "DELETED", StringComparison.OrdinalIgnoreCase);
+            if (!isDeleted && !string.Equals(action, "UPDATED", StringComparison.OrdinalIgnoreCase))
             {
-                _log?.Info($"SYNC_DETECTION 무시(action={action}, resource_id={resourceId}) — UPDATED만 처리");
+                _log?.Info($"SYNC_DETECTION 무시(action={action}, resource_id={resourceId}) — UPDATED · DELETED만 처리");
                 return;
             }
 
             if (resourceId <= 0)
             {
                 _log?.Warning("SYNC_DETECTION: resource_id 없음/유효하지 않음 — 무시");
+                return;
+            }
+
+            // DELETED — 다른 운영자 · 관리 도구가 서버에서 지웠다. 카드가 남으면 신호등 건수가 줄지 않고,
+            //   그 카드에 조치보고하면 서버가 "없는 이벤트" 로 거절한다 → 카드 목록에 닫으라고 알린다.
+            //   큐에 없어도 보낸다 — 카드만 남은 경우(엔트리가 먼저 빠진 경우)도 닫아야 한다. 닫을 것이 없으면 목록이 멱등 no-op.
+            //   진행 중이던 UPDATED 재조회 응답은 버린다(지워진 탐지의 썸네일을 다시 그리지 않게).
+            if (isDeleted)
+            {
+                _latestRequest.TryRemove(resourceId, out _);
+                var type = FindQueuedDetectionType(resourceId);
+                _log?.Info($"SYNC_DETECTION DELETED: resource_id={resourceId}, 큐={(type?.ToString() ?? "없음")} — 카드 닫기 요청");
+                _lastProcessingTask = PublishOnUiAsync(new DetectionDeletedOnServerMessage(resourceId, type), resourceId);
                 return;
             }
 
@@ -166,12 +180,30 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
 
             _log?.Info($"SYNC_DETECTION 재조회 성공: id={detectionId}, thumbnail={(string.IsNullOrEmpty(thumbnail) ? "(없음)" : "갱신")}, frame={frameWidth}x{frameHeight}");
 
+            await PublishOnUiAsync(new DetectionThumbnailSyncedMessage(detectionId, thumbnail, frameWidth, frameHeight), detectionId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"SYNC_DETECTION HandleUpdatedAsync 오류(id={detectionId}): {ex.Message}");
+        }
+        finally
+        {
+            // 누적 방지: 끝난 요청이 아직 최신이면 표에서 지운다 — 탐지 번호마다 한 줄씩 앱 수명 내내 쌓이지 않게.
+            //   (키, 값) 쌍이 같을 때만 지우므로 그사이 시작된 더 최신 요청의 항목은 남는다.
+            _latestRequest.TryRemove(new KeyValuePair<int, long>(detectionId, seq));
+        }
+    }
+
+    /// <summary>
+    /// UI 스레드에서 발행 → EventCardListPanelViewModel 핸들러가 UI 스레드에서 카드를 고친다. 예외는 내부 흡수(fire-and-forget).
+    /// </summary>
+    private async Task PublishOnUiAsync(object message, int detectionId)
+    {
+        try
+        {
             var ea = _eventAggregator;
             if (ea == null) return;
 
-            var message = new DetectionThumbnailSyncedMessage(detectionId, thumbnail, frameWidth, frameHeight);
-
-            // UI 스레드에서 발행 → EventCardListPanelViewModel 핸들러가 UI 스레드에서 카드 갱신.
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher == null)
             {
@@ -188,23 +220,20 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
         }
         catch (Exception ex)
         {
-            _log?.Error($"SYNC_DETECTION HandleUpdatedAsync 오류(id={detectionId}): {ex.Message}");
-        }
-        finally
-        {
-            // 누적 방지: 끝난 요청이 아직 최신이면 표에서 지운다 — 탐지 번호마다 한 줄씩 앱 수명 내내 쌓이지 않게.
-            //   (키, 값) 쌍이 같을 때만 지우므로 그사이 시작된 더 최신 요청의 항목은 남는다.
-            _latestRequest.TryRemove(new KeyValuePair<int, long>(detectionId, seq));
+            _log?.Error($"SYNC_DETECTION 발행 오류({message.GetType().Name}, id={detectionId}): {ex.Message}");
         }
     }
 
     /// <summary>resource_id 가 탐지 큐 엔트리(장애 Fault 외 모든 종류)로 활성인가.</summary>
-    private bool IsQueuedDetection(int eventId)
+    private bool IsQueuedDetection(int eventId) => FindQueuedDetectionType(eventId) != null;
+
+    /// <summary>resource_id 의 탐지 큐 엔트리 유형(장애 Fault 외). 없으면 <c>null</c>.</summary>
+    private EnumEventType? FindQueuedDetectionType(int eventId)
     {
         foreach (var type in DetectionQueueTypes)
             if (_eventQueueManager.FindEntryByEventId(eventId, type) != null)
-                return true;
-        return false;
+                return type;
+        return null;
     }
     #endregion
 

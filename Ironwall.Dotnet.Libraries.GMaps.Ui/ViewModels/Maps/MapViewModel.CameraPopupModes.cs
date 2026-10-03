@@ -62,6 +62,14 @@ public partial class MapViewModel
         private set { _cameraPopupToastMessage = value; NotifyOfPropertyChange(nameof(CameraPopupToastMessage)); }
     }
 
+    /// <summary>토스트 앞 아이콘 — 카메라 팝업 결과는 Cctv, 서버 삭제 알림은 휴지통.</summary>
+    public MaterialDesignThemes.Wpf.PackIconKind CameraPopupToastIcon
+    {
+        get => _cameraPopupToastIcon;
+        private set { _cameraPopupToastIcon = value; NotifyOfPropertyChange(nameof(CameraPopupToastIcon)); }
+    }
+    private MaterialDesignThemes.Wpf.PackIconKind _cameraPopupToastIcon = MaterialDesignThemes.Wpf.PackIconKind.Cctv;
+
     public bool IsCameraPopupToastVisible
     {
         get => _isCameraPopupToastVisible;
@@ -72,13 +80,15 @@ public partial class MapViewModel
     /// 토스트를 띄운다(어느 스레드에서나 — UI 로 옮긴다). 새 토스트가 옛 것을 덮는다.
     /// 대기(<paramref name="pending"/>) 토스트는 결과가 올 때까지 둔다.
     /// </summary>
-    private void ShowCameraPopupToast(string message, bool pending)
+    private void ShowCameraPopupToast(string message, bool pending,
+                                      MaterialDesignThemes.Wpf.PackIconKind icon = MaterialDesignThemes.Wpf.PackIconKind.Cctv)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
         _log?.Info($"[CameraPopup] 토스트: {message}");
         _ = OnUiAsync(() =>
         {
             var gen = ++_cameraPopupToastGeneration;
+            CameraPopupToastIcon = icon;
             CameraPopupToastMessage = message;
             IsCameraPopupToastVisible = true;
             _ = HideCameraPopupToastLaterAsync(gen, pending ? CameraPopupPendingToastHold : CameraPopupToastHold);

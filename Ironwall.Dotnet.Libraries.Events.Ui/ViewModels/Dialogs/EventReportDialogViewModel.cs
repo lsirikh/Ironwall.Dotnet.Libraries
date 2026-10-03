@@ -62,6 +62,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             // 새 이벤트로 창을 연다 — 앞 이벤트의 '보내는 중' · '이미 조치됨' 표시를 넘겨받지 않는다.
             _isSending = false;
             _isHandledElsewhere = false;
+            _isDeletedOnServer = false;
             _remoteWhileSending = false;
             NotifyReportState();
 
@@ -77,6 +78,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             if (message is null || !IsActive || _model is null) return Task.CompletedTask;
             if (_model.Model?.Id != message.EventId
                 || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(_model) != message.Kind) return Task.CompletedTask;
+
+            // 서버에서 지워졌다(SYNC_DETECTION DELETED) — 메아리일 수 없으니 보내는 중이어도 곧바로 끈다. 보내면 서버가 "없는 이벤트" 로 거절한다.
+            if (message.DeletedOnServer)
+            {
+                _isHandledElsewhere = true;
+                _isDeletedOnServer = true;
+                _log?.Info($"[{GetType().Name}] 서버에서 삭제된 이벤트 — [확인] 끔: {message.Kind} {message.EventId}");
+                NotifyReportState();
+                return Task.CompletedTask;
+            }
 
             // (B10) 보내는 중에 온 것은 자기 조치의 메아리일 수 있어 지금은 끄지 않는다 — 기억해 두었다가 송신이 실패하면 적용한다.
             //   실패했으면 메아리일 수 없다(자기 조치가 없다). 종전엔 그냥 버려 [확인]이 다시 켜졌고, 남이 조치한 이벤트에 두 번째 조치를 만들 수 있었다.
@@ -264,13 +275,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         public bool CanClickOk => !_isSending && !_isHandledElsewhere;
 
         /// <summary>버튼 줄 왼쪽 안내 — 평소엔 사용법, 이미 조치됐으면 그 까닭, 보내는 중이면 기다리라는 말.</summary>
-        public string DialogNotice => _isHandledElsewhere ? HANDLED_ELSEWHERE_TEXT
+        public string DialogNotice => _isDeletedOnServer ? DELETED_ON_SERVER_TEXT
+                                    : _isHandledElsewhere ? HANDLED_ELSEWHERE_TEXT
                                     : _isSending ? SENDING_TEXT
                                     : DEFAULT_NOTICE_TEXT;
 
         /// <summary>원격 조치보고를 받은 창의 안내.</summary>
         public const string HANDLED_ELSEWHERE_TEXT = "다른 운영자가 이미 조치했습니다. [확인]은 꺼졌습니다 — [취소]로 닫으세요.";
-        public const string SENDING_TEXT = "조치보고를 보내는 중입니다…";
+        /// <summary>서버에서 지워진 이벤트(SYNC_DETECTION DELETED)를 든 창의 안내.</summary>
+        public const string DELETED_ON_SERVER_TEXT = "서버에서 삭제된 이벤트입니다. [확인]은 꺼졌습니다 — [취소]로 닫으세요.";
+        public const string SENDING_TEXT ="조치보고를 보내는 중입니다…";
         public const string DEFAULT_NOTICE_TEXT = "문구를 고르고 [확인]을 누르세요. '기타'는 내용을 적어야 합니다.";
 
         // 속성 시현을 위한 ViewModel
@@ -285,6 +299,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         protected IAccountModel? _user;
         private bool _isSending;
         private bool _isHandledElsewhere;
+        private bool _isDeletedOnServer;     // 서버에서 지워졌다(SYNC_DETECTION DELETED) — 안내 문구만 다르다
         private bool _remoteWhileSending;
         public BasePanelViewModel? _selectedItemEditor;
         #endregion

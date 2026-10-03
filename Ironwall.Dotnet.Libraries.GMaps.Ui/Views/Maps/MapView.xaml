@@ -1405,7 +1405,7 @@
 						Height="16"
 						VerticalAlignment="Center"
 						Foreground="{DynamicResource PrimaryBrush}"
-						Kind="Cctv" />
+						Kind="{Binding CameraPopupToastIcon}" />
 					<TextBlock
 						Margin="8,0,0,0"
 						VerticalAlignment="Center"
