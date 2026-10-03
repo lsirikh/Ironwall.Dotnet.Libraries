@@ -31,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 배포 v8 서버는 하위 목록을 <c>{items,total}</c> 로 주지만 문서 v4 판은 경광등을 <c>[]</c> 로 적고 있고,
 /// 운영 6.3.2 는 아직 확인되지 않았다 — 어느 쪽이 오든 화면이 침묵하지 않게 한다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
+public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMappingPresetSource
 {
     private const int PAGE_LIMIT = 100;
     private const int MAX_PAGES = 200;      // 2만 건. 이보다 많으면 경고하고 멈춘다(무한 루프 금지)
@@ -222,6 +222,33 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway
         return result.IsSuccess
             ? MappingCallResult<bool>.Ok(true, result.StatusCode)
             : MappingCallResult<bool>.Fail(result.Message, result.RawError, result.StatusCode);
+    }
+    #endregion
+
+    #region - 프리셋 후보 -
+    /// <inheritdoc/>
+    /// <remarks>
+    /// 응답 항목은 <c>CameraPresetDto</c> 와 같은 모양이고 배선 응답의 <c>target_preset</c> 과 키가 같아
+    /// <see cref="MappingPresetRefDto"/> 로 읽는다. <c>camera_id</c> 가 빠져 오면 요청한 카메라로 채운다.
+    /// </remarks>
+    public async Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<IReadOnlyList<MappingPresetInfo>>();
+        var url = $"{_setup.Url}/devices/cameras/{cameraId}/presets";
+        var result = await SendAsync(() => _api.GetRequestAsync(url), "카메라 프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
+        if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Fail(result.Message, result.RawError, result.StatusCode);
+        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Fail("취소되었습니다.", "cancelled", 0);
+
+        var presets = ReadList<MappingPresetRefDto>(result.Value)
+            .Where(p => p.Id > 0)
+            .OrderBy(p => p.PresetIndex)
+            .Select(p => new MappingPresetInfo(
+                p.Id,
+                p.CameraId > 0 ? p.CameraId : cameraId,
+                string.IsNullOrWhiteSpace(p.PresetName) ? $"#{p.PresetIndex}" : p.PresetName!,
+                p.IsRestrictedZone))
+            .ToList();
+        return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Ok(presets, result.StatusCode);
     }
     #endregion
 

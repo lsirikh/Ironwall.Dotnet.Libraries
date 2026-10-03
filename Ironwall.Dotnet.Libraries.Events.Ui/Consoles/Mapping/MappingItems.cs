@@ -239,6 +239,24 @@ public sealed class MappingRowViewModel : PropertyChangedBase
     };
 }
 
+/// <summary>
+/// 카메라 연동 설정 칸의 프리셋 콤보 항목. <see cref="Id"/> 가 <c>null</c> 이면 "없음"(프리셋 해제)이다.
+/// </summary>
+/// <param name="Id">프리셋 PK. <c>null</c> = 없음.</param>
+/// <param name="Name">표시 이름.</param>
+/// <param name="IsRestrictedZone">감시금지구역이면 🔒 를 붙인다.</param>
+public sealed record MappingPresetOption(int? Id, string Name, bool IsRestrictedZone)
+{
+    /// <summary>"없음" 항목 — 콤보 맨 위에 늘 있다.</summary>
+    public static readonly MappingPresetOption None = new(null, "없음", false);
+
+    /// <summary>콤보에 그리는 글자.</summary>
+    public string Display => IsRestrictedZone ? $"🔒 {Name}" : Name;
+
+    /// <inheritdoc/>
+    public override string ToString() => Display;
+}
+
 /// <summary>팔레트 검색 — 순수 판정(이름·부제·id 를 본다).</summary>
 public static class MappingPaletteFilter
 {
