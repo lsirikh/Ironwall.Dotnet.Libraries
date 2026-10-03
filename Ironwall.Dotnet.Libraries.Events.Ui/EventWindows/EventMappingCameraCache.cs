@@ -10,7 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
    Purpose      : 이벤트 매핑 카메라 조회 + 캐시 (PRD camera-popup-modes FR-09 · §3 트리거)
                   - 서버 7.0+: 워크벤치 게이트웨이(매핑 목록 1회 + 매핑별 카메라, 프리셋 참조 포함)
                   - 6.3: 옛 IEventApiService(그룹별 매핑, 프리셋은 DB id 뿐이라 자동 이동 없음)
-                  - SYNC_EVENT_MAPPING(EventMappingsChangedMessage) → Invalidate
+                  - SYNC_EVENT_MAPPING(EventMappingsChangedMessage) · SYNC_PRESET(CameraPresetsChangedMessage) → Invalidate
    Created By   : Claude (T-06)
    Created On   : 2026-09-30
    Company      : Sensorway Co., Ltd.
@@ -134,7 +134,8 @@ public sealed class EventMappingCameraCache : IEventMappingCameraSource
             .Where(c => c.Camera is { Id: > 0 })
             .Select(c => new MappingCameraEntry(
                 c.Camera!.Id, c.Priority, c.ConfigId, Math.Max(0, c.DelayTime), c.IsEnable,
-                c.TargetPreset?.PresetIndex, c.TargetPreset?.PresetName, c.HomePreset?.PresetIndex))
+                c.TargetPreset?.PresetIndex, c.TargetPreset?.PresetName, c.HomePreset?.PresetIndex,
+                c.TargetPreset?.IsRestrictedZone ?? false))
             .ToList();
     }
 

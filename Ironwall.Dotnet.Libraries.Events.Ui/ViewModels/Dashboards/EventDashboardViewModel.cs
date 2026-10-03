@@ -793,6 +793,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         RaiseListState();
         NotifyOfPropertyChange(nameof(CanQueueSelection));
         NotifyOfPropertyChange(nameof(QueueButtonText));
+        NotifyOfPropertyChange(nameof(QueueCountText));
+        NotifyOfPropertyChange(nameof(HasQueueCount));
         NotifyOfPropertyChange(nameof(CanDelete));
         return true;
     }
@@ -1426,6 +1428,14 @@ public class EventDashboardViewModel : BasePanelViewModel
         ? $"{SelectedRows.Count}건 트레이에 담기"
         : "트레이에 담기";
 
+    /// <summary>
+    /// 툴바 [트레이에 담기] 는 아이콘 단추라(상세 칸이 열려도 [⋯] 로 접히지 않게) 글자 대신 건수만 아이콘 옆에 붙인다.
+    /// 이름 · 건수 전체(<see cref="QueueButtonText"/>)는 툴팁 · 자동화 이름이 말한다.
+    /// </summary>
+    public bool HasQueueCount => SelectedRows.Count > 1;
+
+    public string QueueCountText => HasQueueCount ? SelectedRows.Count.ToString() : string.Empty;
+
     /// <remarks>담은 결과는 트레이 자기 상태 줄이 말한다 — 바닥 상태 띠에 같은 말을 한 번 더 찍지 않는다(E-6 #5).</remarks>
     public void QueueSelection()
     {
@@ -1739,6 +1749,8 @@ public class EventDashboardViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(CanReport));
         NotifyOfPropertyChange(nameof(CanQueueSelection));
         NotifyOfPropertyChange(nameof(QueueButtonText));
+        NotifyOfPropertyChange(nameof(QueueCountText));
+        NotifyOfPropertyChange(nameof(HasQueueCount));
         RaiseListState();
         NotifyOfPropertyChange(nameof(Subtitle));
         NotifyOfPropertyChange(nameof(IsQueryRunning));

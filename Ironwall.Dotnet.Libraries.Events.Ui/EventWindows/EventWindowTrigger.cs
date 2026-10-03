@@ -14,7 +14,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
    Purpose      : 탐지 → 이벤트 창 트리거 · 조치보고 → 창 닫기 (PRD camera-popup-modes FR-09 · 15 · 27 · 28 · NFR-02)
                   - EQM Enqueue(중복 걸러진 뒤) → 자체 모드 · 탐지/장애 켜짐일 때만 → 매핑 카메라(캐시) → 창 관리자
                   - 조치보고(로컬 · 원격, 종류 구분) → 조치보고로 닫기 켜짐이면 닫기(📌 제외)
-                  - SYNC_EVENT_MAPPING(EventMappingsChangedMessage) → 매핑 캐시 비움
+                  - SYNC_EVENT_MAPPING(EventMappingsChangedMessage) · SYNC_PRESET(CameraPresetsChangedMessage) → 매핑 캐시 비움
    Created By   : Claude (T-06)
    Created On   : 2026-09-30
    Company      : Sensorway Co., Ltd.
@@ -25,7 +25,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
 /// 매핑 조회 · 창 명령은 배경 작업에서 한다(기다리지 않음, FR-28). 모든 입구는 예외를 삼키고 로그만 남긴다(FR-27).
 /// 창 관리자가 없으면(호스트가 팝업 모듈을 등록하지 않음) 아무 일도 하지 않는다.
 /// </summary>
-public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>
+public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>, IHandle<CameraPresetsChangedMessage>
 {
     private const int ReportedMemory = 256;
 
@@ -103,6 +103,10 @@ public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>
                 _log?.Info($"[EventWindow] 매핑을 읽는 사이 조치보고됨 — 창 열지 않음: {key}");
                 return;
             }
+
+            var restricted = entries.Count(e => e is { IsEnable: true, TargetPresetRestricted: true });
+            if (restricted > 0)
+                _log?.Info($"[EventWindow] 감시금지구역 프리셋 배선 {restricted}건을 창에서 뺌: {key}");
 
             var ptz = SafePtzAllowed();
             var (cameras, extra) = EventWindowPlanning.Select(entries, settings.CamerasPerWindow,
@@ -193,6 +197,16 @@ public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>
     {
         try { _cameras.Invalidate(); }
         catch (Exception ex) { _log?.Error($"[EventWindow] 매핑 캐시 비우기 실패: {ex.Message}"); }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 서버 SYNC_PRESET(G9) — 매핑 카메라 캐시는 프리셋 번호 · 이름 · 감시금지구역 여부를 들고 있다. 캐시만 비우고 곧바로 돌아간다.
+    /// </summary>
+    public Task HandleAsync(CameraPresetsChangedMessage message, CancellationToken cancellationToken)
+    {
+        try { _cameras.Invalidate(); }
+        catch (Exception ex) { _log?.Error($"[EventWindow] 프리셋 변경 — 매핑 캐시 비우기 실패: {ex.Message}"); }
         return Task.CompletedTask;
     }
 

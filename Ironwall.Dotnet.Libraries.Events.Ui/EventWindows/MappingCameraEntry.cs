@@ -19,6 +19,7 @@
 /// <param name="TargetPresetIndex">대상 프리셋 번호(<c>preset_index</c>). 모르면 null(자동 이동 없음).</param>
 /// <param name="TargetPresetName">대상 프리셋 이름(<c>preset_name</c>).</param>
 /// <param name="HomePresetIndex">복귀 프리셋 번호. null 이면 제공자의 Home.</param>
+/// <param name="TargetPresetRestricted">대상 프리셋이 감시금지구역(<c>is_restricted_zone</c>) — 이벤트 창에서 뺀다(G8). 6.3 은 늘 false.</param>
 public sealed record MappingCameraEntry(
     int CameraId,
     int? Priority,
@@ -27,4 +28,5 @@ public sealed record MappingCameraEntry(
     bool IsEnable,
     int? TargetPresetIndex = null,
     string? TargetPresetName = null,
-    int? HomePresetIndex = null);
+    int? HomePresetIndex = null,
+    bool TargetPresetRestricted = false);

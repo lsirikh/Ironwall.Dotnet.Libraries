@@ -221,6 +221,16 @@ public sealed record ActionReportTemplatesChangedMessage(string Action, int Reso
 /// </remarks>
 public sealed record EventMappingsChangedMessage(string Action, int ResourceId);
 
+/// <summary>
+/// 카메라 프리셋이 <b>다른 곳에서</b> 바뀌었다 — 서버 NATS <c>SYNC_PRESET</c>(<c>{action, resource_id, camera_id}</c>, 감시금지구역 변경 포함)을
+/// 라이브러리 자가필터 서비스(<c>PresetSyncNatsService</c>)가 옮긴다.
+/// </summary>
+/// <param name="Action">서버가 보낸 <c>body.action</c> 원문 — <c>CREATED</c> · <c>UPDATED</c> · <c>DELETED</c>.</param>
+/// <param name="ResourceId">서버가 보낸 <c>body.resource_id</c>(프리셋 id) 원문.</param>
+/// <param name="CameraId">서버가 보낸 <c>body.camera_id</c>. 없으면 0.</param>
+/// <remarks>받는 쪽: 이벤트 창 트리거(매핑 카메라 캐시 비움) · 열린 이벤트 맵핑 워크벤치(프리셋 후보 다시 받음).</remarks>
+public sealed record CameraPresetsChangedMessage(string Action, int ResourceId, int CameraId);
+
 /// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
 public record WebServerEnabledChangedMessage(bool IsEnabled);
 

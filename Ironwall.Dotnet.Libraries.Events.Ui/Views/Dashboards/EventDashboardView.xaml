@@ -276,24 +276,39 @@
 				<c:ConsoleToolbar.Extra>
 					<StackPanel Orientation="Horizontal">
 
+					<!--
+						[중단] · [이벤트 맵핑] · [트레이에 담기] 는 아이콘 단추(이름은 툴팁 · 자동화 이름, 설명은 창 머리 "?").
+						글자 단추 셋(≈330)이던 때는 행을 골라 상세 칸이 열리면 Extra 가 [⋯] 뒤로 접혀 [트레이에 담기]가 사라졌다 —
+						아이콘이면 Extra 가 ≈120 이라 표준 폭(서랍 열림 484 포함)에서 늘 제자리에 남는다.
+					-->
 					<!--  조회 중단 — 옆 창의 [취소] 가 하던 일(R14). 바쁜 동안만 뜬다  -->
 					<Button
 						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Console.Events.Toolbar.CancelQuery"
+						AutomationProperties.Name="중단"
 						Click="OnCancelQuery"
-						Content="중단"
-						Style="{StaticResource Console.Button}"
-						ToolTip="진행 중인 조회를 멈춥니다"
-						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}" />
+						Style="{StaticResource Console.Button.Icon}"
+						ToolTip="중단 — 진행 중인 조회를 멈춥니다"
+						Visibility="{Binding IsQueryRunning, Converter={StaticResource BoolToVis}}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="Stop" />
+					</Button>
 					<!--  N-13 mapping workbench — 창으로 연다(3-Pane 은 1280 폭이 필요해 이 콘솔 안에 들어가지 않는다).  -->
 					<Button
 						Margin="0,0,8,0"
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Mapping"
+						AutomationProperties.Name="이벤트 맵핑"
 						Click="OnOpenMappingWorkbench"
-						Content="이벤트 맵핑"
-						Style="{StaticResource Console.Button}"
-						ToolTip="이벤트 맵핑 창 열기"
-						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}" />
+						Style="{StaticResource Console.Button.Icon}"
+						ToolTip="이벤트 맵핑 — 맵핑 창 열기"
+						Visibility="{Binding CanOpenMappingWorkbench, Converter={StaticResource BoolToVis}}">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							Kind="LinkVariant" />
+					</Button>
 					<!--  억제 목록 전용 — 취소 · 종료 행을 한꺼번에 지운다(확인 팝업이 먼저 뜬다)  -->
 					<Button
 						Margin="0,0,8,0"
@@ -304,14 +319,31 @@
 						Style="{StaticResource Console.Button}"
 						ToolTip="목록의 취소 · 종료 항목을 모두 지웁니다. 되돌릴 수 없습니다."
 						Visibility="{Binding IsSuppressionRail, Converter={StaticResource BoolToVis}}" />
+					<!--  주 동작이라 Primary 채움 그대로, 글자 대신 아이콘 + 여러 건이면 건수(이름 · 건수 전체는 툴팁)  -->
 					<Button
+						MinWidth="32"
+						Padding="7,0"
 						AutomationProperties.AutomationId="Console.Events.Toolbar.Report"
+						AutomationProperties.Name="{Binding QueueButtonText}"
 						Click="OnQueueSelection"
-						Content="{Binding QueueButtonText}"
 						IsEnabled="{Binding CanQueueSelection}"
 						Style="{StaticResource Console.Button.Primary}"
-						ToolTip="조치 트레이에 담기"
-						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}" />
+						ToolTip="{Binding QueueButtonText}"
+						ToolTipService.ShowOnDisabled="True"
+						Visibility="{Binding CanDragToTray, Converter={StaticResource BoolToVis}}">
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="18"
+								Height="18"
+								VerticalAlignment="Center"
+								Kind="TrayArrowDown" />
+							<TextBlock
+								Margin="4,0,0,0"
+								VerticalAlignment="Center"
+								Text="{Binding QueueCountText}"
+								Visibility="{Binding HasQueueCount, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+					</Button>
 					</StackPanel>
 				</c:ConsoleToolbar.Extra>
 			</c:ConsoleToolbar>

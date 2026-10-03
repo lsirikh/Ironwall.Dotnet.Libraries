@@ -155,6 +155,16 @@ public class EventUiModule : Module
             )).As<IEventSuppressionSyncNatsService>()
               .As<IService>().WithMetadata("Order", _count + 7)
               .SingleInstance();
+            // SYNC_PRESET 자가필터 수신(맵핑 결함 G9) — CameraPresetsChangedMessage 로 알려 매핑 카메라 캐시 · 워크벤치 프리셋 후보를 비운다.
+            // ⚠ .As<IService>() 필수 — 빠뜨리면 StopAsync 가 안 불려 NATS 구독이 누수된다.
+            builder.Register(c => new PresetSyncNatsService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+            )).As<IPresetSyncNatsService>()
+              .As<IService>().WithMetadata("Order", _count + 8)
+              .SingleInstance();
             builder.Register(c => new DetectionSyncNatsService(
                 c.ResolveOptional<ILogService>(),
                 c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
@@ -276,6 +286,10 @@ public class EventUiModule : Module
                 var dsns = scope.Resolve<IDetectionSyncNatsService>();
                 dsns.StartService();
 
+                // PresetSyncNatsService 시작 — NATS SYNC_PRESET 구독(G9, 프리셋 · 감시금지구역 변경 → 매핑 캐시 비움)
+                var psns = scope.Resolve<IPresetSyncNatsService>();
+                psns.StartService();
+
                 // TrackingStatusNatsSyncService 시작 — NATS TRACKING_STATUS 구독 등록(로그-only stub)
                 var tns = scope.Resolve<ITrackingStatusNatsSyncService>();
                 tns.StartService();
@@ -372,7 +386,7 @@ public class EventUiModule : Module
     /// <list type="bullet">
     ///   <item>큐 적재(<c>OnEntryEnqueued</c> — 봉투 · 이벤트 중복이 걸러진 뒤의 한 건) → 트리거(자체 모드에서만 창).</item>
     ///   <item>조치보고(<c>ActionReported</c> — 로컬 · 원격 · 자동 모든 길, 종류 구분) → 그 이벤트 창 닫기.</item>
-    ///   <item><c>EventMappingsChangedMessage</c>(서버 SYNC_EVENT_MAPPING) → 매핑 카메라 캐시 비움. 받은 스레드에서 곧바로 끝난다.</item>
+    ///   <item><c>EventMappingsChangedMessage</c>(서버 SYNC_EVENT_MAPPING) · <c>CameraPresetsChangedMessage</c>(SYNC_PRESET) → 매핑 카메라 캐시 비움. 받은 스레드에서 곧바로 끝난다.</item>
     /// </list>
     /// </summary>
     internal static void WireEventWindows(EventQueueManager eqm, EventCardListPanelViewModel elp,
