@@ -50,10 +50,11 @@ public static class EventWindowPlanning
 
     /// <summary>
     /// 매핑 배선 → 타일 순서: 켜진 배선만 · <c>priority</c> 오름차순(null 은 뒤) · 같으면 배선 id · 같은 카메라는 처음 것 하나.
+    /// 대상 프리셋이 감시금지구역인 배선은 뺀다(G8 — 서버 계약: 금지구역은 일반 팝업 · 녹화에서 제외). 같은 카메라의 다른 배선은 남는다.
     /// </summary>
     public static IReadOnlyList<MappingCameraEntry> Order(IEnumerable<MappingCameraEntry>? entries)
         => (entries ?? Enumerable.Empty<MappingCameraEntry>())
-            .Where(e => e is not null && e.IsEnable && e.CameraId > 0)
+            .Where(e => e is not null && e.IsEnable && e.CameraId > 0 && !e.TargetPresetRestricted)
             .OrderBy(e => e.Priority ?? int.MaxValue)
             .ThenBy(e => e.ConfigId)
             .DistinctBy(e => e.CameraId)
