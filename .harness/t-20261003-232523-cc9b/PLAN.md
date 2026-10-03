@@ -22,7 +22,10 @@
 - [x] 뷰 XAML 편집 칸
 - [x] 헤드리스 시험(MappingPresetEditTests)
 - [x] Events.Ui 매핑 시험(`--filter FullyQualifiedName~Mapping`) 197건 통과(새 8건 포함)
-- [ ] 솔루션 전체 `dotnet test` — 하네스 체크가 돌린다(세션에서 출력 필터 명령이 거절됨)
+- [ ] 솔루션 전체 `dotnet test` — 1차 하네스: CameraPopup.Tests 1건 실패(2485 통과). 2차(내가 trx 로 재실행): CameraPopup 259/259 통과,
+      대신 Utils.Tests `ConsoleChipGroupAutomationTests` 2건이 `TimeoutException: STA 스레드가 끝나지 않았다` 로 실패.
+      두 프로젝트 모두 단독 실행에선 전부 통과(CameraPopup 259/259, ChipGroup 3/3) — 전체 병렬 부하에서만 나는 타이밍 실패이고,
+      이 작업이 고친 Events.Ui · 매핑 코드와 의존 관계가 없다. 시험은 손대지 않는다(약화 금지).
 
 ## 남은 일 / 메모
 - 실창(WPF) 확인은 안 했다: 카메라 탭에서 행 하나 선택 → 보드 아래 "… 연동 설정" 칸 → 콤보 · 지연 → [적용].
