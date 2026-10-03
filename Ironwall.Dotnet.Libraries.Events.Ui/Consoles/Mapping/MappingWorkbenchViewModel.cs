@@ -49,6 +49,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     private readonly IMappingDeviceSource _devices;
     private readonly IPermissionService? _permissions;
     private readonly IMappingPresetSource? _presets;
+    private readonly IMappingPresetEditor? _presetEditor;
     private readonly MappingBoard _board = new();
 
     private readonly Dictionary<MappingActionKind, List<MappingPaletteItemViewModel>> _paletteCache = new();
@@ -78,17 +79,20 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     /// <param name="events">있으면 창이 떠 있는 동안 <see cref="EventMappingsChangedMessage"/>(서버 <c>SYNC_EVENT_MAPPING</c>)를 듣는다.</param>
     /// <param name="delay">알림 합치기 창의 지연(시험용). 생략하면 <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     /// <param name="presets">카메라 프리셋 후보. 생략하면 <paramref name="gateway"/> 가 함께 구현하는지 본다(실제 게이트웨이는 구현한다).</param>
+    /// <param name="presetEditor">프리셋 관리 창의 서버 왕복. 생략하면 <paramref name="gateway"/> 가 함께 구현하는지 본다.</param>
     public MappingWorkbenchViewModel(
         IMappingWorkbenchGateway gateway,
         IMappingDeviceSource devices,
         IPermissionService? permissions = null,
         IEventAggregator? events = null,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
-        IMappingPresetSource? presets = null)
+        IMappingPresetSource? presets = null,
+        IMappingPresetEditor? presetEditor = null)
     {
         _gateway = gateway;
         _devices = devices;
         _presets = presets ?? gateway as IMappingPresetSource;
+        _presetEditor = presetEditor ?? gateway as IMappingPresetEditor;
         _permissions = permissions;
         _events = events;
         // 맵핑 저장 한 번이 알림을 여러 건 낼 수 있다(부모 + 하위 카메라 · 스피커 · 경광등) — 창(500 ms) 안의 알림을 재조회 한 번으로 합친다.
@@ -942,6 +946,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         NotifyOfPropertyChange(nameof(HasMappingEdit));
         NotifyOfPropertyChange(nameof(CanSaveMapping));
         NotifyOfPropertyChange(nameof(CanEditCameraRow));
+        NotifyOfPropertyChange(nameof(CanManagePresets));
     }
 
     /// <summary>보드 선택이 바뀌었다(뷰가 알려 준다).</summary>
@@ -1019,7 +1024,10 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         }
     }
 
-    /// <summary>지연(초) — 타깃에 머무는 시간.</summary>
+    /// <summary>
+    /// 지연(초) — <b>PTZ 가 타깃 프리셋까지 돌아가는 데 기다리는 시간</b>(사용자 정의, 2026-10-04).
+    /// 머무는 시간이 아니다 — 카메라가 자리를 잡은 뒤 다음 동작으로 넘어가도록 이동 시간만큼 둔다.
+    /// </summary>
     public int EditDelayTime
     {
         get => _cameraRow?.Row.DelayTime ?? 0;
@@ -1060,7 +1068,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         }
         else if (_presetCache.TryGetValue(cameraId, out var cached))
         {
-            ShowPresets(cached, cached.Count == 0 ? NoPresetNotice : string.Empty);
+            ShowPresets(cached, PresetStatusFor(next, cached));
         }
         else
         {
@@ -1095,7 +1103,87 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
             .Where(p => EventMappingRules.IsPresetOwnedBy(p.CameraId, cameraId))
             .ToList();
         _presetCache[cameraId] = owned;
-        ShowPresets(owned, owned.Count == 0 ? NoPresetNotice : string.Empty);
+        ShowPresets(owned, PresetStatusFor(row, owned));
+    }
+
+    /// <summary>
+    /// 받은 목록에 대한 상태 줄. 행이 가리키는 프리셋이 목록에 없으면(관리 창에서 지웠다) 그것을 먼저 말한다 —
+    /// 콤보에는 자리 항목으로 남아 있어 그대로 [적용]하면 서버가 거절한다.
+    /// </summary>
+    private static string PresetStatusFor(MappingRowViewModel row, IReadOnlyList<MappingPresetInfo> presets)
+    {
+        bool Missing(int? id) => id is int value && presets.All(p => p.Id != value);
+        if (Missing(row.Row.TargetPresetId) || Missing(row.Row.HomePresetId))
+            return "고른 프리셋이 이 카메라에 없습니다. 다른 프리셋을 고르세요.";
+        return presets.Count == 0 ? NoPresetNotice : string.Empty;
+    }
+
+    /// <summary>
+    /// 프리셋 관리 창을 띄우는 길 — 런처가 <c>IWindowManager</c> 로 채운다. 비어 있으면 [프리셋 관리…] 를 감춘다.
+    /// </summary>
+    public Func<MappingPresetManagerViewModel, Task>? ShowPresetManager
+    {
+        get => _showPresetManager;
+        set { _showPresetManager = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanManagePresets)); }
+    }
+    private Func<MappingPresetManagerViewModel, Task>? _showPresetManager;
+
+    /// <summary>[프리셋 관리…] 를 누를 수 있나 — 카메라 행 하나를 골랐고 창을 띄울 길이 있을 때.</summary>
+    public bool CanManagePresets => _showPresetManager is not null && _presetEditor is not null && IsBoardEnabled && _cameraRow?.Row.DeviceId is int;
+
+    /// <summary>가장 최근 프리셋 관리 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task PresetManagerTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>[프리셋 관리…] — 고른 카메라의 프리셋 관리 창을 연다.</summary>
+    public Task ManagePresetsAsync() => PresetManagerTask = ManagePresetsCoreAsync();
+
+    private async Task ManagePresetsCoreAsync()
+    {
+        if (!CanManagePresets) return;
+        var row = _cameraRow!;
+        var cameraId = row.Row.DeviceId!.Value;
+        var manager = new MappingPresetManagerViewModel(_presetEditor!, cameraId, row.DeviceName, CanEdit);
+
+        try
+        {
+            await _showPresetManager!(manager);
+        }
+        catch (Exception)
+        {
+            // 창 하나가 못 떠도 워크벤치는 살아 있어야 한다.
+            PresetStatusText = "프리셋 관리 창을 열지 못했습니다.";
+            return;
+        }
+        if (!manager.HasChanges) return;
+
+        // 이름이 바뀐 프리셋은 보드 칩에도 — 이름은 Draft 판정에 들지 않는다(값이 바뀐 것이 아니다).
+        var fresh = manager.Presets.ToDictionary(p => p.Id);
+        var renamed = false;
+        foreach (var vm in BoardRows.Where(r => r.Row.DeviceId == cameraId))
+        {
+            if (vm.Row.TargetPresetId is int t && fresh.TryGetValue(t, out var target)
+                && (vm.Row.TargetPresetName != target.Name || vm.Row.TargetPresetRestricted != target.IsRestrictedZone))
+            {
+                vm.Row.TargetPresetName = target.Name;
+                vm.Row.TargetPresetRestricted = target.IsRestrictedZone;
+                renamed = true;
+            }
+            if (vm.Row.HomePresetId is int h && fresh.TryGetValue(h, out var home) && vm.Row.HomePresetName != home.Name)
+            {
+                vm.Row.HomePresetName = home.Name;
+                renamed = true;
+            }
+        }
+        if (renamed) _board.Raise();
+
+        // 프리셋 콤보를 다시 받는다 — 그 사이 다른 행을 골랐으면 캐시만 비워 둔다(다음 선택 때 받는다).
+        _presetCache.Remove(cameraId);
+        if (ReferenceEquals(row, _cameraRow))
+        {
+            _presetLoadSerial++;
+            _presetLoadTask = LoadPresetsAsync(row, cameraId, _presetLoadSerial);
+            await _presetLoadTask;
+        }
     }
 
     /// <summary>
@@ -1145,6 +1233,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         NotifyOfPropertyChange(nameof(HasCameraEditor));
         NotifyOfPropertyChange(nameof(CameraEditorTitle));
         NotifyOfPropertyChange(nameof(CanEditCameraRow));
+        NotifyOfPropertyChange(nameof(CanManagePresets));
         NotifyCameraValues();
     }
 

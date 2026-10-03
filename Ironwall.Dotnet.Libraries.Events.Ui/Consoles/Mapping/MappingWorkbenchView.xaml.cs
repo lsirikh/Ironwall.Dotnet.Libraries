@@ -68,6 +68,8 @@ public partial class MappingWorkbenchView : UserControl
     private void OnRelease(object sender, RoutedEventArgs e) => Model?.ReleaseSelected();
 
     private void OnAddSelected(object sender, RoutedEventArgs e) => Model?.AddSelected();
+
+    private void OnManagePresets(object sender, RoutedEventArgs e) => _ = Model?.ManagePresetsAsync();
     #endregion
 
     #region - 선택 동기화 -

@@ -617,8 +617,10 @@
 						AutomationProperties.AutomationId="Integrations.Board.CameraEditor"
 						AxisName="event-mapping-cameras"
 						Header="{Binding CameraEditorTitle}"
+						HelpKey="Events.Mapping.Camera"
 						IsEnabled="{Binding IsBoardEnabled}"
 						Visibility="{Binding HasCameraEditor, Converter={StaticResource BoolToVis}}">
+						<StackPanel>
 						<StackPanel IsEnabled="{Binding CanEditCameraRow}">
 							<c:ConsoleField ApiName="target_preset_id" Header="타깃 프리셋">
 								<ComboBox
@@ -656,13 +658,23 @@
 									Style="{StaticResource MaterialDesignOutlinedTextBox}"
 									Text="{Binding EditDelayTime, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
-							<TextBlock
-								Margin="0,4,0,0"
-								FontSize="11"
-								Foreground="{DynamicResource TextSecondaryBrush}"
-								Text="{Binding PresetStatusText}"
-								TextWrapping="Wrap"
-								Visibility="{Binding HasPresetStatus, Converter={StaticResource BoolToVis}}" />
+						</StackPanel>
+						<!--  프리셋 관리 — 해제 표시 행이어도 프리셋 자체는 볼 수 있게 위 칸의 IsEnabled 밖에 둔다  -->
+						<Button
+							Margin="0,6,0,0"
+							HorizontalAlignment="Right"
+							AutomationProperties.AutomationId="Integrations.Board.ManagePresets"
+							Click="OnManagePresets"
+							Content="프리셋 관리…"
+							IsEnabled="{Binding CanManagePresets}"
+							Style="{StaticResource Console.Button}" />
+						<TextBlock
+							Margin="0,4,0,0"
+							FontSize="11"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding PresetStatusText}"
+							TextWrapping="Wrap"
+							Visibility="{Binding HasPresetStatus, Converter={StaticResource BoolToVis}}" />
 						</StackPanel>
 					</c:ConsoleSection>
 				</Grid>
