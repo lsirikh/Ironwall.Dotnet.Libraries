@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -87,7 +88,10 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         if (!IsAvailable) return;
         try
         {
-            var model = new MappingWorkbenchViewModel(_gateway, _devices, _permissions, _events);
+            var model = new MappingWorkbenchViewModel(_gateway, _devices, _permissions, _events)
+            {
+                ShowPresetManager = manager => _windows.ShowDialogAsync(manager, null, PresetManagerSettings()),
+            };
             await _windows.ShowDialogAsync(model, null, WindowSettings());
         }
         catch (Exception ex)
@@ -107,6 +111,18 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         [nameof(Window.Height)] = HEIGHT,
         [nameof(Window.MinWidth)] = MIN_WIDTH,
         [nameof(Window.MinHeight)] = MIN_HEIGHT,
+        [nameof(Window.SizeToContent)] = SizeToContent.Manual,
+        [nameof(Window.WindowStartupLocation)] = WindowStartupLocation.CenterOwner,
+        [nameof(Window.ResizeMode)] = ResizeMode.CanResize,
+        [nameof(Window.ShowInTaskbar)] = false,
+    };
+
+    /// <summary>프리셋 관리 창 — T4 · L(장비 조립 프리셋 관리 창과 같은 치수). 목록이 스스로 스크롤하므로 높이는 여기서 정한다.</summary>
+    private static IDictionary<string, object> PresetManagerSettings() => new Dictionary<string, object>
+    {
+        [nameof(Window.Width)] = DialogSizeRules.WindowWidth(DialogSize.Large),
+        [nameof(Window.Height)] = 560.0,
+        [nameof(Window.MinHeight)] = 420.0,
         [nameof(Window.SizeToContent)] = SizeToContent.Manual,
         [nameof(Window.WindowStartupLocation)] = WindowStartupLocation.CenterOwner,
         [nameof(Window.ResizeMode)] = ResizeMode.CanResize,

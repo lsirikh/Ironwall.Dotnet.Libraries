@@ -31,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 배포 v8 서버는 하위 목록을 <c>{items,total}</c> 로 주지만 문서 v4 판은 경광등을 <c>[]</c> 로 적고 있고,
 /// 운영 6.3.2 는 아직 확인되지 않았다 — 어느 쪽이 오든 화면이 침묵하지 않게 한다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMappingPresetSource
+public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMappingPresetSource, IMappingPresetEditor
 {
     private const int PAGE_LIMIT = 100;
     private const int MAX_PAGES = 200;      // 2만 건. 이보다 많으면 경고하고 멈춘다(무한 루프 금지)
@@ -249,6 +249,82 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMapping
                 p.IsRestrictedZone))
             .ToList();
         return MappingCallResult<IReadOnlyList<MappingPresetInfo>>.Ok(presets, result.StatusCode);
+    }
+    #endregion
+
+    #region - 프리셋 관리 -
+    private string PresetRoot(int cameraId) => $"{_setup.Url}/devices/cameras/{cameraId}/presets";
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<IReadOnlyList<MappingPresetDetail>>> ListPresetDetailsAsync(int cameraId, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<IReadOnlyList<MappingPresetDetail>>();
+        var result = await SendAsync(() => _api.GetRequestAsync(PresetRoot(cameraId)), "카메라 프리셋을 불러오지 못했습니다.").ConfigureAwait(false);
+        if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Fail(result.Message, result.RawError, result.StatusCode);
+        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Fail("취소되었습니다.", "cancelled", 0);
+
+        var presets = ReadList<MappingPresetRefDto>(result.Value)
+            .Where(p => p.Id > 0)
+            .Select(p => ToDetail(p, cameraId))
+            .OrderBy(p => p.PresetIndex)
+            .ToList();
+        return MappingCallResult<IReadOnlyList<MappingPresetDetail>>.Ok(presets, result.StatusCode);
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<MappingPresetDetail>> CreatePresetAsync(int cameraId, MappingPresetDraft draft, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<MappingPresetDetail>();
+        var result = await SendAsync(() => _api.PostRequestAsync(PresetRoot(cameraId), PresetBody(draft)), "프리셋을 만들지 못했습니다.").ConfigureAwait(false);
+        return ReadPreset(result, cameraId, "프리셋을 만들었지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.");
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<MappingPresetDetail>> PatchPresetAsync(int cameraId, int presetId, MappingPresetDraft draft, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<MappingPresetDetail>();
+        var url = $"{PresetRoot(cameraId)}/{presetId}";
+        var result = await SendAsync(() => _api.PatchRequestAsync(url, PresetBody(draft)), "프리셋을 저장하지 못했습니다.").ConfigureAwait(false);
+        return ReadPreset(result, cameraId, "저장했지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.");
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<bool>();
+        var url = $"{PresetRoot(cameraId)}/{presetId}";
+        var result = await SendAsync(() => _api.DeleteRequestAsync(url), "프리셋을 지우지 못했습니다.").ConfigureAwait(false);
+        return result.IsSuccess
+            ? MappingCallResult<bool>.Ok(true, result.StatusCode)
+            : MappingCallResult<bool>.Fail(result.Message, result.RawError, result.StatusCode);
+    }
+
+    /// <summary>
+    /// 보낼 본문 — 화면이 고치는 네 칸만. <c>id</c> · <c>camera_id</c> · <c>rois</c> 는 싣지 않는다(경로가 정하고, ROI 는 이 창이 다루지 않는다).
+    /// </summary>
+    internal static JObject PresetBody(MappingPresetDraft draft) => new()
+    {
+        ["preset_index"] = draft.PresetIndex,
+        ["preset_name"] = draft.Name.Trim(),
+        ["touring_time"] = draft.TouringTime,
+        ["is_restricted_zone"] = draft.IsRestrictedZone,
+    };
+
+    private static MappingPresetDetail ToDetail(MappingPresetRefDto p, int cameraId) => new(
+        p.Id,
+        p.CameraId > 0 ? p.CameraId : cameraId,
+        p.PresetIndex,
+        string.IsNullOrWhiteSpace(p.PresetName) ? $"#{p.PresetIndex}" : p.PresetName!,
+        p.TouringTime,
+        p.IsRestrictedZone);
+
+    private static MappingCallResult<MappingPresetDetail> ReadPreset(MappingCallResult<JObject> result, int cameraId, string unreadable)
+    {
+        if (!result.IsSuccess) return MappingCallResult<MappingPresetDetail>.Fail(result.Message, result.RawError, result.StatusCode);
+        var dto = ReadOne<MappingPresetRefDto>(result.Value);
+        return dto is null || dto.Id <= 0
+            ? MappingCallResult<MappingPresetDetail>.Fail(unreadable, "data was empty", result.StatusCode)
+            : MappingCallResult<MappingPresetDetail>.Ok(ToDetail(dto, cameraId), result.StatusCode);
     }
     #endregion
 
