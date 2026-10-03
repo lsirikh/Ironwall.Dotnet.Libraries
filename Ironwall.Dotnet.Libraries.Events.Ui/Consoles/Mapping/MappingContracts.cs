@@ -183,6 +183,46 @@ public interface IMappingPresetEditor
     Task<MappingCallResult<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default);
 }
 
+/// <summary>카메라 자신이 기억하는 프리셋 1건(ONVIF <c>GetPresets</c>).</summary>
+/// <param name="Token">ONVIF 프리셋 토큰 — 이벤트 때 GotoPreset 에 그대로 간다.</param>
+/// <param name="Name">카메라에 적힌 이름. 없으면 빈 문자열.</param>
+public sealed record MappingCameraPreset(string Token, string Name)
+{
+    /// <summary>
+    /// 토큰을 서버 <c>preset_index</c> 로 쓸 수 있으면 그 번호, 아니면 <c>null</c>.
+    /// 이벤트 경로는 <c>preset_index</c> 를 문자열로 바꿔 토큰으로 보내므로 <b>토큰이 1 이상의 정수일 때만</b> 서버에 담을 수 있다.
+    /// </summary>
+    public int? Index
+        => int.TryParse(Token.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) && n >= 1
+           && string.Equals(n.ToString(System.Globalization.CultureInfo.InvariantCulture), Token.Trim(), StringComparison.Ordinal)
+            ? n : null;
+
+    /// <summary>목록에 그리는 글자.</summary>
+    public string Display => string.IsNullOrWhiteSpace(Name) ? $"토큰 {Token}" : $"{Token}. {Name}";
+}
+
+/// <summary>프리셋 관리 창의 "카메라 프리셋" 한 줄 — 서버에 이미 담겼는지를 함께 들고 있다.</summary>
+/// <param name="Preset">카메라 프리셋.</param>
+/// <param name="IsRegistered">같은 번호의 서버 프리셋이 있나.</param>
+public sealed record MappingCameraPresetRow(MappingCameraPreset Preset, bool IsRegistered)
+{
+    /// <summary>목록에 그리는 글자.</summary>
+    public string Display => Preset.Display;
+
+    /// <summary>목록 부제.</summary>
+    public string Subtitle => Preset.Index is null ? "번호가 아닌 토큰 — 등록 불가" : IsRegistered ? "서버에 등록됨" : "미등록";
+}
+
+/// <summary>
+/// 카메라에서 ONVIF 프리셋을 읽는 창구 — 프리셋 관리 창이 서버 프리셋을 <b>카메라 것과 맞춰</b> 만들 때 쓴다.
+/// </summary>
+/// <remarks>GIS 는 ONVIF 를 직접 부르지 않는다 — 실제 구현은 카메라 팝업 호스트에 <c>GetPresets</c> 를 보낸다.</remarks>
+public interface IMappingCameraPresetReader
+{
+    /// <summary>그 카메라가 기억하는 프리셋 전량. 실패면 사유(한국어)를 담은 실패 결과.</summary>
+    Task<MappingCallResult<IReadOnlyList<MappingCameraPreset>>> ReadCameraPresetsAsync(int cameraId, CancellationToken token = default);
+}
+
 /// <summary>
 /// 한 번의 서버 왕복 결과. <b>실패 사유를 사용자 문구와 원문으로 갈라서</b> 들고 온다.
 /// </summary>
