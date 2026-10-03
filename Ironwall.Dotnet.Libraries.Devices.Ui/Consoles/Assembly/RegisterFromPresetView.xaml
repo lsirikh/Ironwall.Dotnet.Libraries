@@ -97,6 +97,25 @@
 
 					<c:ConsoleSection Header="이 장비만의 것">
 						<StackPanel>
+							<!--  종류(type_<category>) — 프리셋에 담긴 값으로 채운다. 조립기에서 새로 만든 프리셋은 종류가 비어 있어
+							      센서 · 제어기 · 카메라 등록이 서버에서 거절됐다(실창 SC-CS-sensor-05, type_sensor 'NONE').  -->
+							<c:ConsoleField
+								ApiName="{Binding TypeAxisField}"
+								Header="{Binding TypeHeader}"
+								Visibility="{Binding ShowsType, Converter={StaticResource BoolToVisibility}}">
+								<ComboBox
+									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.type_axis"
+									DisplayMemberPath="Display"
+									ItemsSource="{Binding TypeOptions}"
+									SelectedValue="{Binding TypeCode}"
+									SelectedValuePath="Code">
+									<ComboBox.ItemContainerStyle>
+										<Style TargetType="ComboBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+										</Style>
+									</ComboBox.ItemContainerStyle>
+								</ComboBox>
+							</c:ConsoleField>
 							<c:ConsoleField ApiName="number_device" Header="장비번호 *">
 								<TextBox
 									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.number_device"
@@ -120,11 +139,18 @@
 								ApiName="controller_id"
 								Header="소속 제어기 *"
 								Visibility="{Binding ShowsController, Converter={StaticResource BoolToVisibility}}">
+								<!--  위 카테고리 콤보와 같은 이유 — DisplayMemberPath 항목의 UIA 이름은 모델 형식 이름이라 제어기 이름으로 명시한다  -->
 								<ComboBox
 									AutomationProperties.AutomationId="Devices.Assembly.Register.Field.controller_id"
 									DisplayMemberPath="DeviceName"
 									ItemsSource="{Binding Controllers}"
-									SelectedItem="{Binding Controller}" />
+									SelectedItem="{Binding Controller}">
+									<ComboBox.ItemContainerStyle>
+										<Style TargetType="ComboBoxItem">
+											<Setter Property="AutomationProperties.Name" Value="{Binding DeviceName}" />
+										</Style>
+									</ComboBox.ItemContainerStyle>
+								</ComboBox>
 							</c:ConsoleField>
 						</StackPanel>
 					</c:ConsoleSection>

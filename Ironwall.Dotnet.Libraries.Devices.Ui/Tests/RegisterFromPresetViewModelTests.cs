@@ -199,6 +199,105 @@ public class RegisterFromPresetViewModelTests : IDisposable
         Assert.False(vm.CanRegister);
     }
 
+    // ── 종류(type_<category>) — 조립기 [새로 조립] 프리셋은 종류가 비어 있다 ──
+
+    // 실서버 /spec 모양을 줄인 것 — 카메라는 종류 필수, 함체(형상 축)는 선택 + 기본값 Unknown.
+    private const string TypeCatalogJson = """
+        {
+          "vocabularies": { "component_type": [
+            { "code": "HEATER", "label": "히터", "deprecated_at": null, "applies_to": ["enclosure", "camera"] } ] },
+          "categories": [
+            { "category_device": "camera",
+              "type_axis": { "field": "type_camera", "required_on_create": true, "nullable": false,
+                             "values": [ { "code": "FIXED", "label": "고정형" }, { "code": "PTZ", "label": "PTZ" } ] },
+              "extra_axes": [] },
+            { "category_device": "enclosure",
+              "type_axis": { "field": "type_enclosure", "required_on_create": false, "unknown_code": "Unknown", "default": "Unknown",
+                             "values": [ { "code": "Outdoor", "label": "옥외" }, { "code": "Unknown", "label": "미확인" } ] },
+              "extra_axes": [] }
+          ]
+        }
+        """;
+
+    private static async Task<Services.CatalogService> LoadedTypeCatalogAsync()
+    {
+        var api = new MockDeviceApiService
+        {
+            CatalogResponseFactory = () => Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiResponse<Ironwall.Dotnet.Libraries.Devices.Api.Models.DeviceSpecCatalogDto>
+                .CreateSuccess(Newtonsoft.Json.JsonConvert.DeserializeObject<Ironwall.Dotnet.Libraries.Devices.Api.Models.DeviceSpecCatalogDto>(TypeCatalogJson)!),
+        };
+        var catalog = new Services.CatalogService(api, new Helpers.DeviceQueryPolicy(new V8Probe()), log: null);
+        Assert.True(await catalog.EnsureLoadedAsync());
+        return catalog;
+    }
+
+    private RegisterFromPresetViewModel NewTypedVm(Services.CatalogService catalog, DevicePreset preset)
+        => new(NewStore(preset), catalog, new PresetRegistrar(new MockDeviceApiService(), new MockDeviceProviderService(), new MockLogService()),
+            Array.Empty<IControllerDeviceModel>(), _ => new HashSet<int>(), preset.Category);
+
+    private static DevicePreset CameraPreset(string? type) => new()
+    {
+        Id = DevicePresetStore.NewId(),
+        Name = "조립기에서 만든 카메라",
+        Category = EnumDeviceCategory.Camera,
+        TypeAxisCode = type,
+        Components = new[] { new ComponentDefinitionModel { Key = "heater", Type = "HEATER" } },
+    };
+
+    [Fact]
+    public async Task should_ask_for_a_type_instead_of_sending_none_when_the_preset_has_no_type()
+    {
+        // 실창 SC-CS-sensor-05: 종류 없는 프리셋을 그대로 보내 서버가 type_sensor 'NONE' 으로 거절했다.
+        var vm = NewTypedVm(await LoadedTypeCatalogAsync(), CameraPreset(type: null));
+
+        Assert.True(vm.ShowsType);
+        Assert.Equal("종류 *", vm.TypeHeader);
+        Assert.Contains("종류를 고르세요.", vm.Problems);
+        Assert.False(vm.CanRegister);
+
+        vm.TypeCode = "PTZ";
+
+        Assert.DoesNotContain("종류를 고르세요.", vm.Problems);
+        Assert.True(vm.CanRegister);
+        Assert.Equal("PTZ", (string?)JObject.Parse(vm.PreviewJson)["type_camera"]);
+    }
+
+    [Fact]
+    public async Task should_fill_the_type_from_the_preset_with_the_catalog_spelling()
+    {
+        var vm = NewTypedVm(await LoadedTypeCatalogAsync(), CameraPreset(type: "ptz"));
+
+        Assert.Equal("PTZ", vm.TypeCode);
+        Assert.True(vm.CanRegister);
+    }
+
+    [Fact]
+    public async Task should_use_the_catalog_default_when_an_optional_type_is_missing()
+    {
+        var preset = new DevicePreset
+        {
+            Id = DevicePresetStore.NewId(),
+            Name = "조립기에서 만든 함체",
+            Category = EnumDeviceCategory.Enclosure,
+            Components = new[] { new ComponentDefinitionModel { Key = "heater", Type = "HEATER" } },
+        };
+
+        var vm = NewTypedVm(await LoadedTypeCatalogAsync(), preset);
+
+        Assert.Equal("종류", vm.TypeHeader);
+        Assert.Equal("Unknown", vm.TypeCode);
+        Assert.True(vm.CanRegister);
+    }
+
+    private sealed class V8Probe : Ironwall.Dotnet.Libraries.Api.Services.IServerContractProbe
+    {
+        public Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract Contract => Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract.V8_0;
+        public string? RawVersion => "8.0";
+        public bool IsResolved => true;
+        public Task<bool> ResolveAsync(CancellationToken token = default) => Task.FromResult(true);
+        public Task<bool> RefreshAsync(CancellationToken token = default) => Task.FromResult(true);
+    }
+
     private sealed class LazyCatalog : IComponentCatalog
     {
         public int LoadCalls { get; private set; }

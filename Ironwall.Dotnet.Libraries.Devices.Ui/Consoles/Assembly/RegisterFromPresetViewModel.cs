@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Presets;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly.Register;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
@@ -62,6 +63,7 @@ public sealed class RegisterFromPresetViewModel : Screen
         DisplayName = "프리셋으로 장비 만들기";
 
         RefreshPresets();
+        ResetType();
         SuggestNumber();
         Rebuild();
     }
@@ -74,6 +76,7 @@ public sealed class RegisterFromPresetViewModel : Screen
     {
         await base.OnActivateAsync(cancellationToken);
         await _catalog.EnsureLoadedAsync(cancellationToken);
+        ResetType();     // 카탈로그가 이제야 읽혔을 수 있다 — 종류 목록 · 기본값을 다시 잡는다
         Rebuild();
     }
 
@@ -93,6 +96,7 @@ public sealed class RegisterFromPresetViewModel : Screen
             _category = value;
             NotifyOfPropertyChange();
             RefreshPresets();
+            ResetType();
             SuggestNumber();
             NotifyFieldVisibility();
             Rebuild();
@@ -102,8 +106,50 @@ public sealed class RegisterFromPresetViewModel : Screen
     public DevicePreset? SelectedPreset
     {
         get => FixedPreset ?? _selectedPreset;
-        set { if (FixedPreset is not null || ReferenceEquals(_selectedPreset, value)) return; _selectedPreset = value; NotifyOfPropertyChange(); Rebuild(); }
+        set { if (FixedPreset is not null || ReferenceEquals(_selectedPreset, value)) return; _selectedPreset = value; NotifyOfPropertyChange(); ResetType(); Rebuild(); }
     }
+
+    #region - 종류(type_<category>) -
+    // 조립기에서 [새로 조립]으로 만든 프리셋은 종류가 비어 있다(본뜰 장비가 없다). 그대로 보내면 제어기 · 센서 · 카메라는
+    // 서버가 거절했다(type_sensor 'NONE' — 실창 SC-CS-sensor-05). 프리셋 값으로 채우고 여기서 고르게 한다.
+    private string? _typeCode;
+
+    private CatalogTypeAxis? TypeAxisRule => (_catalog as ICatalogService)?.TypeAxis(_category);
+
+    /// <summary>고를 수 있는 종류 — 폐기된 값은 지금 고른 것이 아니면 숨긴다.</summary>
+    public IReadOnlyList<CatalogOption> TypeOptions => (TypeAxisRule?.Values ?? Array.Empty<CatalogOption>())
+        .Where(o => !o.IsDeprecated || string.Equals(o.Code, _typeCode, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    public bool ShowsType => TypeOptions.Count > 0;
+    public bool IsTypeRequired => TypeAxisRule?.RequiredOnCreate == true;
+    public string TypeHeader => IsTypeRequired ? "종류 *" : "종류";
+    public string TypeAxisField => TypeAxisRule?.Field ?? "type";
+
+    public string? TypeCode
+    {
+        get => _typeCode;
+        set { if (string.Equals(_typeCode, value, StringComparison.Ordinal)) return; _typeCode = value; NotifyOfPropertyChange(); Rebuild(); }
+    }
+
+    /// <summary>프리셋의 종류로 채운다(대소문자는 카탈로그 값에 맞춘다). 프리셋에 없으면 카탈로그 기본값, 그것도 없으면 비운다.</summary>
+    private void ResetType()
+    {
+        var rule = TypeAxisRule;
+        var wanted = SelectedPreset?.TypeAxisCode;
+        var match = rule?.Values.FirstOrDefault(o => string.Equals(o.Code, wanted, StringComparison.OrdinalIgnoreCase));
+        _typeCode = match?.Code ?? (rule is null ? wanted : rule.DefaultCode);
+        NotifyOfPropertyChange(nameof(TypeOptions));
+        NotifyOfPropertyChange(nameof(TypeCode));
+        NotifyOfPropertyChange(nameof(ShowsType));
+        NotifyOfPropertyChange(nameof(TypeHeader));
+        NotifyOfPropertyChange(nameof(TypeAxisField));
+    }
+
+    /// <summary>보낼 프리셋 — 이 창에서 고른 종류를 싣는다. 카탈로그가 없으면(6.3) 프리셋 값 그대로.</summary>
+    private DevicePreset Effective(DevicePreset preset)
+        => TypeAxisRule is null ? preset : preset with { TypeAxisCode = string.IsNullOrWhiteSpace(_typeCode) ? null : _typeCode };
+    #endregion
 
     public string PresetSummary => SelectedPreset is { } preset
         ? $"{preset.Name} — 부품 {preset.Components.Count}개 · 설정 {preset.ComponentOverrides?.Count ?? 0}개"
@@ -259,7 +305,10 @@ public sealed class RegisterFromPresetViewModel : Screen
             return;
         }
 
+        preset = Effective(preset);
         var problems = new List<string>();
+        if (IsTypeRequired && string.IsNullOrWhiteSpace(_typeCode))
+            problems.Add("종류를 고르세요.");
         var info = ReadInfo(problems);
         if (info is not null) problems.AddRange(PresetRequestBuilder.Validate(preset, info, _catalog));
 
@@ -271,7 +320,9 @@ public sealed class RegisterFromPresetViewModel : Screen
             {
                 var request = PresetRequestBuilder.Build(preset, info);
                 PreviewJson = Indent(request.PreviewJson);     // 같은 내용을 읽기 좋게만 — 보내는 것은 request 그대로다
-                RequestSummary = Summarize(preset, info, _category);
+                RequestSummary = Summarize(preset, info, _category)
+                    + (string.IsNullOrWhiteSpace(preset.TypeAxisCode) ? string.Empty
+                        : Environment.NewLine + "종류 " + ((_catalog as ICatalogService)?.TypeAxisLabel(_category, preset.TypeAxisCode) ?? preset.TypeAxisCode));
                 if (Problems.Count == 0) _request = request;
             }
             catch (ArgumentException ex)
