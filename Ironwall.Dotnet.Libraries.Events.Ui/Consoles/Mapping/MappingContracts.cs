@@ -145,6 +145,44 @@ public interface IMappingPresetSource
     Task<MappingCallResult<IReadOnlyList<MappingPresetInfo>>> ListPresetsAsync(int cameraId, CancellationToken token = default);
 }
 
+/// <summary>프리셋 관리 창의 한 줄 — 서버 프리셋 레코드 그대로.</summary>
+/// <param name="Id">프리셋 PK.</param>
+/// <param name="CameraId">소유 카메라 id.</param>
+/// <param name="PresetIndex">카메라의 프리셋 번호(<c>preset_index</c>).</param>
+/// <param name="Name">이름(<c>preset_name</c>).</param>
+/// <param name="TouringTime">투어링 시간(초, <c>touring_time</c>).</param>
+/// <param name="IsRestrictedZone">감시금지구역.</param>
+public sealed record MappingPresetDetail(int Id, int CameraId, int PresetIndex, string Name, int TouringTime, bool IsRestrictedZone)
+{
+    /// <summary>목록에 그리는 글자.</summary>
+    public string Display => IsRestrictedZone ? $"{PresetIndex}. 🔒 {Name}" : $"{PresetIndex}. {Name}";
+
+    /// <summary>목록 부제.</summary>
+    public string Subtitle => $"투어링 {TouringTime}초";
+}
+
+/// <summary>프리셋 생성 · 수정에 보낼 값.</summary>
+public sealed record MappingPresetDraft(int PresetIndex, string Name, int TouringTime, bool IsRestrictedZone);
+
+/// <summary>
+/// 카메라 프리셋 관리(<c>/devices/cameras/{id}/presets</c> CRUD) — <b>다른 인터페이스를 넓히지 않고</b> 따로 둔다.
+/// </summary>
+/// <remarks>실제 구현은 <see cref="MappingWorkbenchGateway"/> 가 함께 진다.</remarks>
+public interface IMappingPresetEditor
+{
+    /// <summary>그 카메라의 프리셋 전량(번호 순).</summary>
+    Task<MappingCallResult<IReadOnlyList<MappingPresetDetail>>> ListPresetDetailsAsync(int cameraId, CancellationToken token = default);
+
+    /// <summary>프리셋 생성.</summary>
+    Task<MappingCallResult<MappingPresetDetail>> CreatePresetAsync(int cameraId, MappingPresetDraft draft, CancellationToken token = default);
+
+    /// <summary>프리셋 부분 수정(PATCH).</summary>
+    Task<MappingCallResult<MappingPresetDetail>> PatchPresetAsync(int cameraId, int presetId, MappingPresetDraft draft, CancellationToken token = default);
+
+    /// <summary>프리셋 삭제.</summary>
+    Task<MappingCallResult<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default);
+}
+
 /// <summary>
 /// 한 번의 서버 왕복 결과. <b>실패 사유를 사용자 문구와 원문으로 갈라서</b> 들고 온다.
 /// </summary>
