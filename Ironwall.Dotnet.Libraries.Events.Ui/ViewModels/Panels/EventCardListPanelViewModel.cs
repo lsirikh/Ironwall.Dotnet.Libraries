@@ -46,6 +46,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<CallAllEventReportMessageModel>
                                             , IHandle<EventEntryEnqueuedMessage>
                                             , IHandle<DetectionThumbnailSyncedMessage>
+                                            , IHandle<DetectionDeletedOnServerMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -864,6 +865,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// <param name="eventType">원본 유형(<c>from_event.type_event</c>) — 큐 엔트리를 찾는 열쇠. 모르면 종류의 기본 유형.</param>
         /// <param name="device">원본 장비(DeviceProvider 에서 찾은 것) — 엔트리가 없을 때 심볼을 다시 계산할 대상. 없으면 생략.</param>
         public RemoteActionReportOutcome CloseByRemoteActionReport(string? kind, int eventId, EnumEventType? eventType = null, IBaseDeviceModel? device = null)
+            => CloseRemotely(kind, eventId, eventType, device, deletedOnServer: false);
+
+        /// <summary>
+        /// SYNC_DETECTION{DELETED} — 서버에서 지워진 탐지를 원격 조치보고와 같은 길로 닫는다(카드 · 큐 엔트리 → 신호등 건수 감소,
+        /// 열린 조치보고 창은 [확인] 을 끈다). 실제로 닫은 것이 있으면 "서버에서 삭제됨" 토스트를 알린다.
+        /// UI 스레드에서 발행된다(DetectionSyncNatsService).
+        /// </summary>
+        public Task HandleAsync(DetectionDeletedOnServerMessage message, CancellationToken cancellationToken)
+        {
+            if (message is null || message.EventId <= 0) return Task.CompletedTask;
+            var outcome = CloseRemotely(ActionReportKind.Detection, message.EventId, message.EventType, device: null, deletedOnServer: true);
+            _log?.Info($"[SYNC_DETECTION] 서버 삭제 처리: {message.EventId} → {outcome}");
+            if (outcome is RemoteActionReportOutcome.CardClosed or RemoteActionReportOutcome.QueueEntryCleared)
+                _ = PublishSafeAsync(new EventDeletedOnServerNotice(ActionReportKind.Detection, message.EventId));
+            return Task.CompletedTask;
+        }
+
+        private RemoteActionReportOutcome CloseRemotely(string? kind, int eventId, EnumEventType? eventType, IBaseDeviceModel? device, bool deletedOnServer)
         {
             if (eventId <= 0) return RemoteActionReportOutcome.Invalid;
 
@@ -881,7 +900,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (kind is not null)
             {
                 RememberClosed(kind, eventId);
-                _ = NotifyRemoteReportAsync(new RemoteActionReportedMessage(kind, eventId));
+                _ = PublishSafeAsync(new RemoteActionReportedMessage(kind, eventId, deletedOnServer));
             }
 
             var card = kind is null ? null : FindCard(kind, eventId);
@@ -889,7 +908,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             {
                 ReleaseQueueAndSymbol(card, allowDeviceFallback: false);   // 번호로 못 찾으면 지우지 않고 재계산만(⑮)
                 RemoveCard(card);
-                _log?.Info($"[ACTION_REPORT] 원격 조치보고로 카드 종결: {kind} {eventId}");
+                _log?.Info($"[ACTION_REPORT] {(deletedOnServer ? "서버 삭제로" : "원격 조치보고로")} 카드 종결: {kind} {eventId}");
                 return RemoteActionReportOutcome.CardClosed;
             }
 
@@ -914,7 +933,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             return RemoteActionReportOutcome.Nothing;   // 멱등: 이미 종결됐거나 이 GIS 가 모르는 이벤트
         }
 
-        private async Task NotifyRemoteReportAsync(RemoteActionReportedMessage message)
+        private async Task PublishSafeAsync(object message)
         {
             try
             {
@@ -922,7 +941,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
             catch (Exception ex)
             {
-                _log?.Warning($"[ACTION_REPORT] 열린 조치보고 창 알림 실패: {ex.Message}");
+                _log?.Warning($"[ACTION_REPORT] {message.GetType().Name} 알림 실패: {ex.Message}");
             }
         }
 

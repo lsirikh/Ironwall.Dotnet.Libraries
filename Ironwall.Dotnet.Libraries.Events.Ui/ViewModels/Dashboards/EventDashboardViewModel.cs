@@ -1500,6 +1500,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage message, CancellationToken cancellationToken)
     {
         if (message is null || message.EventId <= 0) return Task.CompletedTask;
+        if (message.DeletedOnServer) return Task.CompletedTask;   // 조치가 아니라 서버 삭제 — '조치됨' 으로 두지 않는다
         var kind = message.Kind == ActionTrayDrop.KindMalfunction ? ActionTrayDrop.KindMalfunction
                  : message.Kind == ActionTrayDrop.KindDetection ? ActionTrayDrop.KindDetection
                  : null;

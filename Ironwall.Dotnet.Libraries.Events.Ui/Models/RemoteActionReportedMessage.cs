@@ -11,7 +11,8 @@
 ****************************************************************************/
 /// <param name="Kind"><see cref="Services.ActionReportKind"/> 값("detection" · "malfunction").</param>
 /// <param name="EventId">원본 이벤트 서버 id.</param>
-public sealed record RemoteActionReportedMessage(string Kind, int EventId);
+/// <param name="DeletedOnServer">조치가 아니라 서버에서 지워졌다(SYNC_DETECTION DELETED) — 창은 다른 안내를 보이고, 대시보드는 '조치됨' 으로 두지 않는다.</param>
+public sealed record RemoteActionReportedMessage(string Kind, int EventId, bool DeletedOnServer = false);
 
 /// <summary>원격 조치보고를 받아 카드 목록이 한 일.</summary>
 public enum RemoteActionReportOutcome
