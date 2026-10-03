@@ -113,6 +113,18 @@ public class DetectionSelectionViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(FrameHeightEdit));
     }
 
+    /// <summary>
+    /// 사진이 늦게 왔다(SYNC_DETECTION 재조회가 같은 모델의 Thumbnail 을 채움) — 사진 칸 바인딩을 다시 읽힌다.
+    /// 조치보고 창을 연 뒤에 사진이 와도 칸이 비어 굳지 않게. 호출 스레드: UI.
+    /// </summary>
+    public void RefreshThumbnail()
+    {
+        NotifyOfPropertyChange(nameof(ThumbnailText));
+        NotifyOfPropertyChange(nameof(ThumbnailUri));
+        NotifyOfPropertyChange(nameof(HasThumbnail));
+        NotifyOfPropertyChange(nameof(Thumbnail));
+    }
+
     /// <summary>편집 반영 후 읽기전용 표시 텍스트 재계산.</summary>
     private void NotifyDetailTexts()
     {
