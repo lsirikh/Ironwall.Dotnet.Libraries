@@ -12,6 +12,54 @@ public readonly record struct PtzVector(double Pan, double Tilt, double Zoom)
 
 public sealed record PtzPreset(string Token, string Name, PtzVector Position);
 
+/// <summary>
+/// Shape of the ONVIF preset tokens a camera hands out - real models differ, and the GIS can only store a token as
+/// the server <c>preset_index</c> when it is a plain positive integer.
+/// </summary>
+public enum PresetTokenStyle
+{
+    /// <summary>"1".."5" (default).</summary>
+    Numeric,
+
+    /// <summary>"Preset001".."Preset005" (name-shaped tokens).</summary>
+    Named,
+
+    /// <summary>"001".."005" (leading zeros - digits, but not the canonical number).</summary>
+    Padded,
+
+    /// <summary>"1", "2", "Preset003", "004", "5" - storable and non-storable tokens on one camera.</summary>
+    Mixed,
+}
+
+public static class PresetTokens
+{
+    /// <summary>Token of preset number <paramref name="n"/> (1-based) in <paramref name="style"/>.</summary>
+    public static string Format(PresetTokenStyle style, int n)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        return style switch
+        {
+            PresetTokenStyle.Named => "Preset" + n.ToString("000", inv),
+            PresetTokenStyle.Padded => n.ToString("000", inv),
+            PresetTokenStyle.Mixed => (n % 5) switch
+            {
+                3 => "Preset" + n.ToString("000", inv),
+                4 => n.ToString("000", inv),
+                _ => n.ToString(inv),
+            },
+            _ => n.ToString(inv),
+        };
+    }
+
+    /// <summary>"numeric" · "named" · "padded" · "mixed" (case-insensitive).</summary>
+    public static PresetTokenStyle Parse(string text)
+        => Enum.TryParse<PresetTokenStyle>(text?.Trim(), ignoreCase: true, out var s) && Enum.IsDefined(s)
+            ? s
+            : throw new FormatException($"preset token style must be numeric, named, padded or mixed: '{text}'");
+
+    public static string Name(PresetTokenStyle style) => style.ToString().ToLowerInvariant();
+}
+
 /// <summary>Point-in-time PTZ state (GetStatus · overlay · control endpoint · JSONL).</summary>
 public sealed record PtzSnapshot(
     PtzVector Position,
@@ -56,12 +104,15 @@ public sealed class PtzSimulator
     private PtzVector _target;          // goto target
     private string? _targetPreset;
     private int _presetSeq;
+    private PresetTokenStyle _tokenStyle;
 
-    public PtzSimulator(TimeSpan gotoTravel, TimeSpan defaultTimeout, IEnumerable<PtzPreset>? presets = null, PtzVector? home = null)
+    public PtzSimulator(TimeSpan gotoTravel, TimeSpan defaultTimeout, IEnumerable<PtzPreset>? presets = null, PtzVector? home = null,
+        PresetTokenStyle tokenStyle = PresetTokenStyle.Numeric)
     {
         GotoTravel = gotoTravel < TimeSpan.Zero ? TimeSpan.Zero : gotoTravel;
         DefaultTimeout = defaultTimeout <= TimeSpan.Zero ? TimeSpan.FromSeconds(5) : defaultTimeout;
-        _presets = (presets ?? DefaultPresets()).ToList();
+        _tokenStyle = tokenStyle;
+        _presets = (presets ?? DefaultPresets(tokenStyle)).ToList();
         _home = home ?? (_presets.FirstOrDefault()?.Position ?? PtzVector.Zero);
         _origin = _home;
         _presetSeq = _presets.Count;
@@ -70,17 +121,40 @@ public sealed class PtzSimulator
     public TimeSpan GotoTravel { get; }
     public TimeSpan DefaultTimeout { get; }
 
+    /// <summary>Shape of the tokens this head hands out (default presets and new SetPreset tokens).</summary>
+    public PresetTokenStyle TokenStyle { get { lock (_gate) return _tokenStyle; } }
+
     /// <summary>P1..P5 - tokens "1".."5" (the GIS sends server preset_index as the ONVIF token), P1 = home.</summary>
-    public static IReadOnlyList<PtzPreset> DefaultPresets() => new[]
+    public static IReadOnlyList<PtzPreset> DefaultPresets() => DefaultPresets(PresetTokenStyle.Numeric);
+
+    /// <summary>P1..P5 at the same positions, tokens shaped by <paramref name="style"/> (names stay "P1".."P5").</summary>
+    public static IReadOnlyList<PtzPreset> DefaultPresets(PresetTokenStyle style) => new[]
     {
-        new PtzPreset("1", "P1", new PtzVector(0.0, 0.0, 0.0)),
-        new PtzPreset("2", "P2", new PtzVector(-0.5, 0.2, 0.3)),
-        new PtzPreset("3", "P3", new PtzVector(0.5, -0.2, 0.5)),
-        new PtzPreset("4", "P4", new PtzVector(0.8, 0.4, 0.8)),
-        new PtzPreset("5", "P5", new PtzVector(-0.8, -0.4, 1.0)),
+        new PtzPreset(PresetTokens.Format(style, 1), "P1", new PtzVector(0.0, 0.0, 0.0)),
+        new PtzPreset(PresetTokens.Format(style, 2), "P2", new PtzVector(-0.5, 0.2, 0.3)),
+        new PtzPreset(PresetTokens.Format(style, 3), "P3", new PtzVector(0.5, -0.2, 0.5)),
+        new PtzPreset(PresetTokens.Format(style, 4), "P4", new PtzVector(0.8, 0.4, 0.8)),
+        new PtzPreset(PresetTokens.Format(style, 5), "P5", new PtzVector(-0.8, -0.4, 1.0)),
     };
 
     public IReadOnlyList<PtzPreset> Presets { get { lock (_gate) return _presets.ToList(); } }
+
+    /// <summary>
+    /// Replaces the preset list with the defaults in <paramref name="style"/> (control endpoint: switch a running camera
+    /// between token shapes). Home and the current position are kept; a goto to a preset is cancelled.
+    /// </summary>
+    public void ResetPresets(PresetTokenStyle style, DateTime nowUtc)
+    {
+        lock (_gate)
+        {
+            Settle(nowUtc);
+            if (_kind == MotionKind.Goto && _targetPreset is not null && _targetPreset != "home") { _kind = MotionKind.Idle; _targetPreset = null; }
+            _tokenStyle = style;
+            _presets.Clear();
+            _presets.AddRange(DefaultPresets(style));
+            _presetSeq = _presets.Count;
+        }
+    }
 
     public PtzVector Home { get { lock (_gate) return _home; } }
 
@@ -175,9 +249,11 @@ public sealed class PtzSimulator
                 return existing.Token;
             }
             string newToken;
-            do { newToken = (++_presetSeq).ToString(System.Globalization.CultureInfo.InvariantCulture); }
+            // New tokens follow the camera's shape; mixed cameras hand out plain numbers for new presets.
+            var newStyle = _tokenStyle == PresetTokenStyle.Mixed ? PresetTokenStyle.Numeric : _tokenStyle;
+            do { newToken = PresetTokens.Format(newStyle, ++_presetSeq); }
             while (_presets.Any(p => p.Token == newToken));
-            _presets.Add(new PtzPreset(newToken, string.IsNullOrWhiteSpace(name) ? $"P{newToken}" : name!, at));
+            _presets.Add(new PtzPreset(newToken, string.IsNullOrWhiteSpace(name) ? $"P{_presetSeq}" : name!, at));
             return newToken;
         }
     }

@@ -38,6 +38,9 @@ public sealed class FarmOptions
     public string? MediaMtxPath { get; set; }
     public string OutDir { get; set; } = Path.Combine(AppContext.BaseDirectory, "run");
     public Dictionary<int, Action<CameraFaults>> FaultSetters { get; } = new();
+
+    /// <summary>PTZ camera → preset token shape (absent = numeric "1".."5").</summary>
+    public Dictionary<int, PresetTokenStyle> PresetTokenStyles { get; } = new();
 }
 
 /// <summary>Runtime of one camera.</summary>
@@ -82,6 +85,9 @@ public sealed class Farm : IAsyncDisposable
     public static async Task<Farm> StartAsync(FarmOptions o, TextWriter log, CancellationToken ct)
     {
         if (o.Count < 1 || o.Count > 32) throw new ArgumentOutOfRangeException(nameof(o), "count must be 1..32");
+        foreach (var cam in o.PresetTokenStyles.Keys)
+            if (cam < 1 || cam > Math.Min(o.PtzCount, o.Count))
+                throw new ArgumentException($"preset tokens: cam{cam} is not a PTZ camera (PTZ = cam1..cam{Math.Min(o.PtzCount, o.Count)})", nameof(o));
         var farm = new Farm(o);
         try
         {
@@ -135,7 +141,8 @@ public sealed class Farm : IAsyncDisposable
             }
             if (o.FaultSetters.TryGetValue(i, out var set)) set(spec.Faults);
             var ptz = spec.IsPtz
-                ? new PtzSimulator(TimeSpan.FromSeconds(o.GotoSeconds), TimeSpan.FromSeconds(o.DefaultPtzTimeoutSeconds))
+                ? new PtzSimulator(TimeSpan.FromSeconds(o.GotoSeconds), TimeSpan.FromSeconds(o.DefaultPtzTimeoutSeconds),
+                    tokenStyle: o.PresetTokenStyles.TryGetValue(i, out var style) ? style : PresetTokenStyle.Numeric)
                 : null;
             var onvif = new OnvifResponder(spec, o.User, o.Password, ptz, OnvifLog, PtzLog);
             onvif.Start();
@@ -206,6 +213,8 @@ public sealed class Farm : IAsyncDisposable
             var s = c.Spec;
             var rtsp = Options.EnableRtsp ? s.MainRtspUrl + (s.HasSub ? " / .../" + s.SubPath : string.Empty) : "(rtsp off)";
             sb.AppendLine($"  {s.Id,-6}{(s.IsPtz ? "PTZ" : "FIXED"),-7}{s.DeviceServiceUrl,-48}{rtsp,-60}{s.Faults}");
+            if (c.Ptz is { TokenStyle: not PresetTokenStyle.Numeric } ptz)
+                sb.AppendLine($"        preset tokens={PresetTokens.Name(ptz.TokenStyle)} ({string.Join(", ", ptz.Presets.Select(p => p.Token))})");
             if (s.VideoFile is not null)
                 sb.AppendLine($"        video={Path.GetFileName(s.VideoFile)} offset={s.VideoOffsetSec.ToString(CultureInfo.InvariantCulture)}s {(s.CopyVideo ? "copy" : "transcode")}");
         }
