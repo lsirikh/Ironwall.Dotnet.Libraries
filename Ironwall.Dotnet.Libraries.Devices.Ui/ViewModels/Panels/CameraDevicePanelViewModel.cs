@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services.Onvif;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -39,6 +40,9 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         _apiService = apiService;
         _deviceProvider = deviceProvider;
         _deviceProviderService = deviceProviderService;
+        // [ONVIF 검색] — 검색 · 조회는 이 VM 밖(서비스), 결과는 Draft 로만 들어온다(Temp-state).
+        Discovery = new OnvifDiscoveryViewModel(new WsDiscoveryClient(), new OnvifCameraLookup(log: log),
+            IsCameraListed, TryAddDiscoveredDraft, log);
     }
     #endregion
     #region - Implementation of Interface -
@@ -68,6 +72,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         // (FR-EN-11) 역할강등 재평가 구독 해제
         { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged -= OnPermissionsChanged; }
         TypeAxis.FilterChanged -= OnTypeAxisFilterChanged;
+        Discovery.OnClickCloseButton();   // 진행 중인 검색 · 조회를 멈춘다
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
         {
@@ -469,6 +474,41 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #endregion
     #region - Properties -
     public event System.Action? UpdateAction;
+
+    /// <summary>[ONVIF 검색] 펼침 영역 — 찾은 카메라를 조회해 Draft 로 추가.</summary>
+    public OnvifDiscoveryViewModel Discovery { get; }
+    #endregion
+    #region - ONVIF discovery -
+    /// <summary>도구줄 [ONVIF 검색] — 펼침 영역 열기/닫기(처음 열 때 바로 검색).</summary>
+    public void OnClickOnvifDiscoveryButton()
+    {
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 추가 권한 없음(devices, ONVIF 검색)"); return; }
+        Discovery.OnClickToggleButton();
+    }
+
+    /// <summary>같은 IP · 포트 카메라가 목록(저장분 + Draft)에 있는가 — 검색 결과의 "이미 등록됨" · 중복 추가 차단.</summary>
+    internal bool IsCameraListed(string host, int port) =>
+        ViewModelProvider.Any(vm => vm.Model is ICameraDeviceModel c
+                                    && c.IpPort == port
+                                    && string.Equals(c.IpAddress?.Trim(), host, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// 검색 결과를 Draft 로 넣는다 — [추가] 버튼과 같은 규칙(권한 · 다음 빈 번호 · 서버 미반영).
+    /// 저장 · 갱신 중(_processGate 잡힘)이면 넣지 않는다: 그 끝의 목록 재구성이 Draft 를 지우거나 이중으로 만든다.
+    /// </summary>
+    internal bool TryAddDiscoveredDraft(Func<int, CameraDeviceModel> build)
+    {
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 추가 권한 없음(devices, ONVIF 검색)"); return false; }
+        if (!_processGate.Wait(0)) return false;
+        try
+        {
+            var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
+            int number = 1; while (existing.Contains(number)) number++;
+            ViewModelProvider.Add(new CameraDeviceViewModel(build(number)) { Index = ViewModelProvider.Count + 1 });
+            return true;
+        }
+        finally { _processGate.Release(); }
+    }
     #endregion
     #region - Type axis (device-console-v8 FR-09/FR-10) -
     /// <summary>종류축 콤보·필터·저장 선차단. 6.3 계약이면 비활성(옛 화면 그대로).</summary>

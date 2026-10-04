@@ -63,6 +63,22 @@
 					SelectedValuePath="Code"
 					Visibility="{Binding TypeAxis.IsAxisUi, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  ONVIF search (WS-Discovery → lookup → Draft)  -->
+				<Button
+					Grid.Column="5"
+					AutomationProperties.AutomationId="Devices.Camera.Onvif.Toggle"
+					IsEnabled="{Binding IsButtonEnable}"
+					Style="{StaticResource Console.Button.Icon}"
+					ToolTip="ONVIF 검색">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickOnvifDiscoveryButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="20"
+						Height="20"
+						Kind="Radar" />
+				</Button>
+
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="7"
@@ -151,6 +167,8 @@
 					</Button.Content>
 				</Button>
 			</Grid>
+			<!--  [ONVIF 검색] 펼침 영역  -->
+			<local:OnvifDiscoveryView DataContext="{Binding Discovery}" Visibility="{Binding IsOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 		</StackPanel>
 		<Grid
 			Grid.Row="1"
