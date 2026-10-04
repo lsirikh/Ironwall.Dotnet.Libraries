@@ -206,6 +206,7 @@ public class OnvifLookupMappingTests
         Assert.Equal(("dummy", "dummy1234"), (m.UserName, m.UserPassword));
         Assert.Equal(EnumCameraMode.ONVIF, m.Mode);
         Assert.Equal(EnumCameraType.PTZ, m.Category);
+        Assert.Equal("PTZ", m.TypeAxisCode);   // 상세 칸 '종류 *' — 조회로 안 값을 채운다
         Assert.Equal("Ironwall DummyCam", m.HardwareSpec!.Manufacturer);
         Assert.Equal("DUMMY-PTZ", m.HardwareSpec.Model);
         Assert.Equal("DUMMY-0001", m.HardwareSpec.DeviceId);
@@ -230,6 +231,7 @@ public class OnvifLookupMappingTests
         Assert.Null(m.UserName);
         Assert.Null(m.UserPassword);
         Assert.Equal(EnumCameraType.FIXED, m.Category);
+        Assert.Equal("FIXED", m.TypeAxisCode);
     }
 }
 

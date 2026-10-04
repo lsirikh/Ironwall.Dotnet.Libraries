@@ -715,6 +715,7 @@ public class DeviceDashboardConsoleTests : IDisposable
         Assert.Equal(ConsoleDetailState.Create, console.Detail.State);
         var draft = Assert.IsType<CameraDeviceViewModel>(Assert.Single(console.Form.Rows));
         Assert.Equal(("127.0.0.1", 8181, "CAM-8181"), (draft.IpAddress, draft.IpPort, draft.DeviceName));
+        Assert.Equal("FIXED", draft.TypeAxisCode);                        // 조회로 안 종류가 '종류 *' 에 채워져 있다
         Assert.Empty(cameras.ViewModelProvider);                          // [등록] 전에는 목록에 없다(FR-12)
         Assert.Equal(OnvifDiscoveredState.Added, row.State);
         Assert.Contains("[등록]", console.CameraDiscovery.StatusText);
