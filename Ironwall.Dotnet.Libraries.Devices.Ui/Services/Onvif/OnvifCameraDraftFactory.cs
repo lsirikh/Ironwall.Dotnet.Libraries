@@ -12,6 +12,7 @@ public static class OnvifCameraDraftFactory
         OnvifLookupResult lookup, string? discoveredName = null)
     {
         ArgumentNullException.ThrowIfNull(lookup);
+        var category = lookup.IsPtz ? EnumCameraType.PTZ : EnumCameraType.FIXED;
         return new CameraDeviceModel
         {
             DeviceNumber = deviceNumber,
@@ -21,7 +22,10 @@ public static class OnvifCameraDraftFactory
             UserName = string.IsNullOrEmpty(userName) ? null : userName,
             UserPassword = string.IsNullOrEmpty(password) ? null : password,
             Mode = EnumCameraMode.ONVIF,
-            Category = lookup.IsPtz ? EnumCameraType.PTZ : EnumCameraType.FIXED,
+            Category = category,
+            // 조회로 PTZ 여부를 알았으니 상세 칸의 필수 '종류 *'(type_camera)도 채운다 — [추가] 직후 바로 [등록] 할 수 있게.
+            // 서버 어휘(FIXED · PTZ)가 enum 이름과 같다. 조회 전(PTZ?)에는 [추가] 가 없으므로 여기 오는 값은 늘 확정이다.
+            TypeAxisCode = category.ToString(),
             HardwareSpec = new CameraInfoModel
             {
                 Name = lookup.Name ?? discoveredName,
