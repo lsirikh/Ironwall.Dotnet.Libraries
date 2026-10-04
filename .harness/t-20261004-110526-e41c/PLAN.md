@@ -8,7 +8,12 @@ ONVIF 검색 → 조회 → [추가] 로 연 '새 카메라 등록' 상세 칸�
 - [x] 원인: `OnvifCameraDraftFactory.Create` 가 `Category`(enum)만 채우고 `TypeAxisCode` 는 비워 둠(이전 작업 결정 D5).
 - [x] 수정: `TypeAxisCode = (IsPtz ? PTZ : FIXED).ToString()` — 서버 type_camera 어휘(FIXED · PTZ)가 enum 이름과 같다.
 - [x] 시험: OnvifDiscoveryTests(PTZ/FIXED 각각) · DeviceDashboardConsoleTests(상세 칸 draft.TypeAxisCode == "FIXED") 단언 추가.
-- [ ] `dotnet test Ironwall.Dotnet.Libraries.sln`
+- [x] Devices.Ui(솔루션 밖) Onvif · DeviceDashboardConsoleTests 51/51 통과.
+- [x] `dotnet test Ironwall.Dotnet.Libraries.sln` 전 프로젝트 통과(오류 0).
+
+## Discoveries
+- 1차 하네스 검사 실패(exit 1, 실패 시험 0)는 코드 문제가 아니라 파일 잠금(MSB3027) — 중단된 백그라운드 시험 실행이 남긴
+  CameraPopupHost/testhost 가 bin DLL 을 쥐고 있었다. 잠금이 풀린 뒤 재실행은 깨끗이 통과.
 
 ## Decisions
 - D1: 이전 D5("종류축 비움")를 뒤집는다. "모르면 비움" 조건은 이미 구조로 보장된다 — [추가] 는 조회 성공(LookedUp) 줄에만 열리고, 조회 성공이면 IsPtz 가 확정(false=고정)이다. 'PTZ?' 는 조회 전 힌트일 뿐 [추가] 불가.
