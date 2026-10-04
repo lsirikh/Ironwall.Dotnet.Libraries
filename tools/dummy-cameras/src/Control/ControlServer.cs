@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Text.Json;
 using DummyCameras.Infra;
+using DummyCameras.Ptz;
 
 namespace DummyCameras.Control;
 
@@ -12,6 +13,8 @@ namespace DummyCameras.Control;
 /// (RTSP auth-fail is fixed at start: MediaMTX grants are written once).</item>
 /// <item><c>POST /cam/{n}/stream/kill</c> · <c>/stream/start</c> - camera power off / on.</item>
 /// <item><c>POST /cam/{n}/ptz/reset</c> - back home, idle.</item>
+/// <item><c>POST /cam/{n}/ptz/presets?style=numeric|named|padded|mixed</c> - replace the presets with the defaults in that
+/// token shape (a different camera model without restarting the farm).</item>
 /// </list>
 /// </summary>
 public sealed class ControlServer : IAsyncDisposable
@@ -54,6 +57,17 @@ public sealed class ControlServer : IAsyncDisposable
                 case "ptz" when parts.Length >= 4 && parts[3] == "reset" && cam.Ptz is { } ptz:
                     ptz.Reset();
                     return Task.FromResult(HttpReply.Json(JsonSerializer.Serialize(new { cam = cam.Spec.Id, ptz = "reset" })));
+                case "ptz" when parts.Length >= 4 && parts[3] == "presets" && cam.Ptz is { } sim:
+                    PresetTokenStyle style;
+                    try { style = PresetTokens.Parse(q.TryGetValue("style", out var st) ? st : string.Empty); }
+                    catch (FormatException ex) { return Task.FromResult(HttpReply.Json(JsonSerializer.Serialize(new { error = ex.Message }), 400)); }
+                    sim.ResetPresets(style, DateTime.UtcNow);
+                    return Task.FromResult(HttpReply.Json(JsonSerializer.Serialize(new
+                    {
+                        cam = cam.Spec.Id,
+                        presetTokens = PresetTokens.Name(style),
+                        presets = sim.Presets.Select(p => new { token = p.Token, name = p.Name }),
+                    })));
             }
         }
         return Task.FromResult(HttpReply.Json("{\"error\":\"not found\"}", 404));
@@ -84,6 +98,7 @@ public sealed class ControlServer : IAsyncDisposable
                     motion = s.Motion,
                     target = s.TargetPreset,
                     arrivesAt = s.ArrivesAtUtc?.ToString("O", CultureInfo.InvariantCulture),
+                    presetTokens = PresetTokens.Name(c.Ptz!.TokenStyle),
                     presets = c.Ptz!.Presets.Select(p => new { token = p.Token, name = p.Name }),
                 },
             };

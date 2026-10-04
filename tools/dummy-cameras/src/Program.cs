@@ -2,6 +2,7 @@
 using DummyCameras;
 using DummyCameras.Infra;
 using DummyCameras.MediaMtx;
+using DummyCameras.Ptz;
 using DummyCameras.Seed;
 
 return await Cli.MainAsync(args).ConfigureAwait(false);
@@ -28,6 +29,9 @@ internal static class Cli
           --transcode                       force overlay transcode for user footage
           --size 1280x720  --sub-size 640x360  --fps 15  --no-sub
           --goto-seconds 3                  GotoPreset / Home / Absolute travel time
+          --preset-tokens 2=named,3=padded  PTZ preset token shape per camera (or one style for every PTZ camera):
+                                              numeric 1..5 (default) · named Preset001.. · padded 001.. ·
+                                              mixed 1,2,Preset003,004,5 - tokens are matched exactly (like real cameras)
           --onvif-only                      no MediaMTX / ffmpeg
           --anonymous-rtsp                  RTSP read without credentials
           --out <dir>                       logs (onvif-requests.jsonl · ptz-commands.jsonl · stream-events.jsonl)
@@ -124,7 +128,29 @@ internal static class Cli
         foreach (var (cam, _) in a.PerCamera("ws-security-only", o.Count)) Add(o, cam, f => f.WsSecurityOnly = true);
         foreach (var (cam, v) in a.PerCamera("kill-stream-after", o.Count)) Add(o, cam, f => f.KillStreamAfterSec = v ?? 30);
         foreach (var (cam, _) in a.PerCamera("corrupt-stream", o.Count)) Add(o, cam, f => f.CorruptStream = true);
+        if (a.Flag("preset-tokens")) ParsePresetTokens(o, a.Str("preset-tokens"));
         return o;
+    }
+
+    /// <summary>"named" (every PTZ camera) · "2=named,3=padded,4=mixed" · "all=padded".</summary>
+    private static void ParsePresetTokens(FarmOptions o, string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) throw new FormatException("--preset-tokens needs a style (numeric|named|padded|mixed) or N=style list");
+        int ptz = Math.Min(o.PtzCount, o.Count);
+        foreach (var part in v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            int eq = part.IndexOf('=');
+            var who = eq < 0 ? "all" : part[..eq].Trim();
+            var style = PresetTokens.Parse(eq < 0 ? part : part[(eq + 1)..]);
+            if (who.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                for (int i = 1; i <= ptz; i++) o.PresetTokenStyles[i] = style;
+                continue;
+            }
+            int cam = int.Parse(who, CultureInfo.InvariantCulture);
+            if (cam < 1 || cam > ptz) throw new FormatException($"--preset-tokens: camera {cam} is not PTZ (PTZ = 1..{ptz})");
+            o.PresetTokenStyles[cam] = style;
+        }
     }
 
     private static void Add(FarmOptions o, int cam, Action<CameraFaults> set)

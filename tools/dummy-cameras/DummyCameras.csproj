@@ -6,7 +6,7 @@
 
     Each camera = RTSP H.264 stream (MediaMTX + one ffmpeg publisher) + a minimal ONVIF device
     (SOAP 1.2 · WS-UsernameToken digest · optional HTTP Digest): Device / Media / PTZ with a simulated
-    pan-tilt-zoom state, presets 1..5, GotoPreset travel time, JSONL command log and fault injection.
+    pan-tilt-zoom state, presets 1..5 (token shape per camera: numeric · named · padded · mixed), GotoPreset travel time, JSONL command log and fault injection.
     LOOPBACK ONLY - every listener binds 127.0.0.1.
 
     Run:     DummyCameras.exe run            (8 cams, 4 PTZ; or: dotnet run with this project, then the args)
