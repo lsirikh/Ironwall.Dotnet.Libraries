@@ -34,7 +34,7 @@ public sealed class OverlayWriter : IDisposable
         {
             string motion = s.Motion switch
             {
-                "goto" => $"MOVING -> {(s.TargetPreset == "home" ? "HOME" : "P" + s.TargetPreset)} ({Math.Max(0, (s.ArrivesAtUtc!.Value - nowUtc).TotalSeconds).ToString("0.0", CultureInfo.InvariantCulture)}s)",
+                "goto" => $"MOVING -> {s.TargetPreset switch { "home" => "HOME", { } t when !t.All(char.IsAsciiDigit) => t, var t => "P" + t }} ({Math.Max(0, (s.ArrivesAtUtc!.Value - nowUtc).TotalSeconds).ToString("0.0", CultureInfo.InvariantCulture)}s)",
                 "continuous" => $"MOVING v=({s.Velocity.Pan:+0.0;-0.0},{s.Velocity.Tilt:+0.0;-0.0},{s.Velocity.Zoom:+0.0;-0.0})",
                 _ => "IDLE",
             };
