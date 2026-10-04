@@ -361,6 +361,46 @@ public interface IMappingCameraPresetReader
     Task<MappingCallResult<IReadOnlyList<MappingCameraPreset>>> ReadCameraPresetsAsync(int cameraId, CancellationToken token = default);
 }
 
+/// <summary>영상 창구가 보는 카메라 팝업 호스트 상태.</summary>
+public enum MappingVideoHostState
+{
+    /// <summary>명령을 받는다.</summary>
+    Running,
+    /// <summary>시작 · 재시작 중 — 곧 이어진다.</summary>
+    Starting,
+    /// <summary>없음 · 일시 중지 · 시작 전 — 영상 기능을 쓸 수 없다(GIS 는 정상).</summary>
+    Unavailable,
+}
+
+/// <summary>
+/// 프리셋 관리 · ROI 설정 창의 카메라 실시간 영상 창구.
+/// </summary>
+/// <remarks>
+/// GIS 는 영상을 직접 재생하지 않는다 — 실제 구현은 카메라 팝업 호스트(별도 프로세스)에 오버레이 스트림을 열고,
+/// 호스트가 공유 메모리에 쓴 프레임(<see cref="Ironwall.Dotnet.Libraries.CameraPopup.Frames.IFrameSource"/>)을 돌려준다.
+/// 모든 멤버는 던지지 않는다.
+/// </remarks>
+public interface IMappingCameraVideo
+{
+    /// <summary>호스트 상태.</summary>
+    MappingVideoHostState HostState { get; }
+
+    /// <summary>호스트 상태가 바뀌었다(배경 스레드에서).</summary>
+    event EventHandler? HostStateChanged;
+
+    /// <summary>
+    /// 영상을 (다시) 연다. 같은 <paramref name="streamId"/> 로 다시 열면 이전 것을 교체한다.
+    /// 돌려받은 프레임 원천을 <c>Dispose</c> 하면 스트림이 닫힌다.
+    /// </summary>
+    MappingCallResult<Ironwall.Dotnet.Libraries.CameraPopup.Frames.IFrameSource> OpenVideo(int cameraId, string streamId, int width, int height);
+
+    /// <summary>카메라를 프리셋 자리로 움직일 수 있는 카메라인가(PTZ).</summary>
+    bool CanGotoPreset(int cameraId);
+
+    /// <summary>카메라를 그 번호의 프리셋 자리로 움직인다(ONVIF GotoPreset — 이벤트 경로와 같은 토큰).</summary>
+    Task<MappingCallResult<bool>> GotoPresetAsync(int cameraId, int presetIndex, CancellationToken token = default);
+}
+
 /// <summary>
 /// 한 번의 서버 왕복 결과. <b>실패 사유를 사용자 문구와 원문으로 갈라서</b> 들고 온다.
 /// </summary>

@@ -47,10 +47,12 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
     private readonly ILogService? _log;
     private readonly IEventAggregator? _events;
     private readonly IMappingCameraPresetReader? _cameraPresets;
+    private readonly IMappingCameraVideo? _cameraVideo;
 
     /// <summary>생성자.</summary>
     /// <param name="events">있으면 열린 창이 서버 <c>SYNC_EVENT_MAPPING</c>(<see cref="Ironwall.Dotnet.Libraries.ViewModel.Models.EventMappingsChangedMessage"/>)으로 목록을 다시 읽는다.</param>
     /// <param name="cameraPresets">있으면 프리셋 관리 창이 카메라 ONVIF 프리셋을 함께 읽는다.</param>
+    /// <param name="cameraVideo">있으면 프리셋 관리 · ROI 설정 창에 카메라 실시간 영상을 보인다.</param>
     public MappingWorkbenchLauncher(
         IWindowManager windows,
         IMappingWorkbenchGateway gateway,
@@ -59,9 +61,11 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         IServerContractProbe? probe = null,
         ILogService? log = null,
         IEventAggregator? events = null,
-        IMappingCameraPresetReader? cameraPresets = null)
+        IMappingCameraPresetReader? cameraPresets = null,
+        IMappingCameraVideo? cameraVideo = null)
     {
         _cameraPresets = cameraPresets;
+        _cameraVideo = cameraVideo;
         _windows = windows;
         _gateway = gateway;
         _devices = devices;
@@ -97,6 +101,7 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
                 ShowPresetManager = manager => _windows.ShowDialogAsync(manager, null, PresetManagerSettings()),
                 ShowRoiEditor = editor => _windows.ShowDialogAsync(editor, null, RoiEditorSettings()),
                 CameraPresetReader = _cameraPresets,
+                CameraVideo = _cameraVideo,
             };
             await _windows.ShowDialogAsync(model, null, WindowSettings());
         }
@@ -127,8 +132,8 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
     private static IDictionary<string, object> PresetManagerSettings() => new Dictionary<string, object>
     {
         [nameof(Window.Width)] = DialogSizeRules.WindowWidth(DialogSize.Large),
-        [nameof(Window.Height)] = 760.0,     // 아래 "카메라 프리셋(ONVIF)" 칸 몫까지
-        [nameof(Window.MinHeight)] = 600.0,
+        [nameof(Window.Height)] = 900.0,     // 오른쪽 위 영상 상자 · 아래 "카메라 프리셋(ONVIF)" 칸 몫까지
+        [nameof(Window.MinHeight)] = 680.0,
         [nameof(Window.SizeToContent)] = SizeToContent.Manual,
         [nameof(Window.WindowStartupLocation)] = WindowStartupLocation.CenterOwner,
         [nameof(Window.ResizeMode)] = ResizeMode.CanResize,

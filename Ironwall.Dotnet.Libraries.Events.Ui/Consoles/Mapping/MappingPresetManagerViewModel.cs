@@ -55,8 +55,9 @@ public sealed class MappingPresetManagerViewModel : Screen
     /// <param name="cameraName">카메라 이름(창 제목).</param>
     /// <param name="canEdit">편집 권한. <c>false</c> 면 목록만 본다.</param>
     /// <param name="cameraPresets">카메라 ONVIF 프리셋 읽기. 생략하면 "카메라 프리셋" 칸을 감춘다.</param>
+    /// <param name="cameraVideo">카메라 실시간 영상 창구. 생략하면 영상 상자를 감춘다.</param>
     public MappingPresetManagerViewModel(IMappingPresetEditor editor, int cameraId, string cameraName, bool canEdit = true,
-                                         IMappingCameraPresetReader? cameraPresets = null)
+                                         IMappingCameraPresetReader? cameraPresets = null, IMappingCameraVideo? cameraVideo = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _cameraReader = cameraPresets;
@@ -64,6 +65,9 @@ public sealed class MappingPresetManagerViewModel : Screen
         CameraName = string.IsNullOrWhiteSpace(cameraName) ? $"#{cameraId}" : cameraName;
         CanEdit = canEdit;
         DisplayName = Title;
+        _cameraVideo = cameraVideo;
+        if (cameraVideo is not null)
+            Video = new MappingCameraVideoViewModel(cameraVideo, cameraId, $"mapping-presets-{cameraId}");
     }
 
     #region - 상태 -
@@ -231,7 +235,8 @@ public sealed class MappingPresetManagerViewModel : Screen
     {
         if (!CanEditRois) return;
         var preset = _selected!;
-        var editor = new MappingRoiEditorViewModel(RoiEditor!, preset.Id, $"{preset.PresetIndex}. {preset.Name}", CameraName, CanEdit);
+        var editor = new MappingRoiEditorViewModel(RoiEditor!, preset.Id, $"{preset.PresetIndex}. {preset.Name}", CameraName, CanEdit,
+                                                   _cameraVideo, CameraId, preset.PresetIndex);
         try
         {
             await _showRoiEditor!(editor);
@@ -243,6 +248,55 @@ public sealed class MappingPresetManagerViewModel : Screen
             return;
         }
         if (editor.HasChanges) Say($"'{preset.Name}' 프리셋의 ROI 를 바꿨습니다.", DialogMessageSeverity.Info);
+    }
+    #endregion
+
+    #region - 카메라 영상 -
+    /// <summary>영상 요청 크기(16:9 상자).</summary>
+    public const int VIDEO_WIDTH = 640, VIDEO_HEIGHT = 360;
+
+    private readonly IMappingCameraVideo? _cameraVideo;
+    private bool _isMovingCamera;
+
+    /// <summary>카메라 실시간 영상 상자. 영상 창구가 없으면 <c>null</c>(상자를 감춘다).</summary>
+    public MappingCameraVideoViewModel? Video { get; }
+
+    /// <summary>영상 상자가 있나.</summary>
+    public bool HasVideo => Video is not null;
+
+    /// <summary>[프리셋 자리로 이동] 을 보일까 — PTZ 카메라일 때.</summary>
+    public bool HasGotoPreset => _cameraVideo is not null && _cameraVideo.CanGotoPreset(CameraId);
+
+    /// <summary>[프리셋 자리로 이동] 을 누를 수 있나 — 서버에 있는 프리셋을 골랐고, 카메라를 움직이므로 편집 권한이 있을 때.</summary>
+    public bool CanGotoPreset => HasGotoPreset && CanEdit && !_isMovingCamera && !_isNew && _selected is not null;
+
+    /// <summary>가장 최근 프리셋 이동 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task GotoPresetTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>[프리셋 자리로 이동] — 고른 프리셋 번호로 카메라를 돌려 영상에서 그 자리를 본다.</summary>
+    public Task GotoPresetAsync() => GotoPresetTask = GotoPresetCoreAsync();
+
+    private async Task GotoPresetCoreAsync()
+    {
+        if (!CanGotoPreset) return;
+        var preset = _selected!;
+        _isMovingCamera = true;
+        NotifyOfPropertyChange(nameof(CanGotoPreset));
+        try
+        {
+            var result = await _cameraVideo!.GotoPresetAsync(CameraId, preset.PresetIndex);
+            if (result.IsSuccess) Say($"카메라를 '{preset.Name}' 자리로 옮겼습니다.", DialogMessageSeverity.Info);
+            else Say(result.Message, DialogMessageSeverity.Warning);
+        }
+        catch (Exception)
+        {
+            Say("프리셋 자리로 이동하지 못했습니다.", DialogMessageSeverity.Warning);
+        }
+        finally
+        {
+            _isMovingCamera = false;
+            NotifyOfPropertyChange(nameof(CanGotoPreset));
+        }
     }
     #endregion
 
@@ -379,7 +433,15 @@ public sealed class MappingPresetManagerViewModel : Screen
     {
         LoadTask = LoadAsync();
         _ = ReadCameraPresetsAsync();   // 카메라 응답은 수 초 걸릴 수 있다 — 서버 목록을 기다리게 하지 않는다
+        Video?.Start(VIDEO_WIDTH, VIDEO_HEIGHT);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        if (close) Video?.Dispose();   // 스트림 · 공유 메모리를 닫는다 — 창이 닫힌 뒤 호스트가 계속 디코딩하지 않게
+        return base.OnDeactivateAsync(close, cancellationToken);
     }
 
     /// <summary>목록을 다시 받는다. <paramref name="selectId"/> 가 있으면 그 프리셋을 고른다.</summary>
@@ -577,6 +639,7 @@ public sealed class MappingPresetManagerViewModel : Screen
         NotifyOfPropertyChange(nameof(CanSave));
         NotifyOfPropertyChange(nameof(CanDelete));
         NotifyOfPropertyChange(nameof(CanEditRois));
+        NotifyOfPropertyChange(nameof(CanGotoPreset));
     }
     #endregion
 }

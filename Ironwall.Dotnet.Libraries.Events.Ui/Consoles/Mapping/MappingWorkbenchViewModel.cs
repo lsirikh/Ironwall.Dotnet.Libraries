@@ -1134,6 +1134,11 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     public IMappingCameraPresetReader? CameraPresetReader { get; set; }
 
     /// <summary>
+    /// 프리셋 관리 · ROI 설정 창의 카메라 실시간 영상 창구 — 런처가 채운다. 비어 있으면 두 창의 영상 상자가 감춰진다.
+    /// </summary>
+    public IMappingCameraVideo? CameraVideo { get; set; }
+
+    /// <summary>
     /// 프리셋 관리 창이 ROI 설정 창을 띄우는 길 — 런처가 채운다. 비어 있으면 그 창의 [ROI 설정…] 이 감춰진다.
     /// </summary>
     public Func<MappingRoiEditorViewModel, Task>? ShowRoiEditor { get; set; }
@@ -1152,7 +1157,7 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         if (!CanManagePresets) return;
         var row = _cameraRow!;
         var cameraId = row.Row.DeviceId!.Value;
-        var manager = new MappingPresetManagerViewModel(_presetEditor!, cameraId, row.DeviceName, CanEdit, CameraPresetReader)
+        var manager = new MappingPresetManagerViewModel(_presetEditor!, cameraId, row.DeviceName, CanEdit, CameraPresetReader, CameraVideo)
         {
             ShowRoiEditor = ShowRoiEditor,
         };
