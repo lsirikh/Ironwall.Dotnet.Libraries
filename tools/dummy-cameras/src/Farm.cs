@@ -19,6 +19,8 @@ public sealed class FarmOptions
     public int RtpPort { get; set; } = 18000;           // UDP RTP/RTCP (MediaMTX default 8000 clashes with the API server's number)
     public int MediaMtxApiPort { get; set; } = 9997;
     public int ControlPort { get; set; } = 8180;        // base port itself (cam N = base + N) · -1 = off
+    public int DiscoveryPort { get; set; } = -1;        // WS-Discovery: 3702 (CLI default) · 0 = free port (tests) · -1 = off
+    public bool DiscoveryMulticast { get; set; }        // true = join 239.255.255.250 (CLI) · false = loopback unicast only
     public string User { get; set; } = "dummy";
     public string Password { get; set; } = "dummy1234";
     public double GotoSeconds { get; set; } = 3.0;
@@ -62,6 +64,7 @@ public sealed class Farm : IAsyncDisposable
     private ManagedProcess? _mediamtx;
     private OverlayWriter? _overlay;
     private ControlServer? _control;
+    private WsDiscoveryResponder? _discovery;
 
     private Farm(FarmOptions options)
     {
@@ -81,6 +84,7 @@ public sealed class Farm : IAsyncDisposable
     public JsonlLog StreamLog { get; }
     public IReadOnlyList<CameraRuntime> Cameras => _cameras;
     public int? ControlPort => _control?.Port;
+    public WsDiscoveryResponder? Discovery => _discovery;
 
     public static async Task<Farm> StartAsync(FarmOptions o, TextWriter log, CancellationToken ct)
     {
@@ -152,6 +156,18 @@ public sealed class Farm : IAsyncDisposable
         // 2) control endpoint (loopback)
         if (o.ControlPort >= 0) _control = new ControlServer(this, o.ControlPort);
 
+        // 2b) WS-Discovery (ONVIF search) - after the responders so every XAddr carries its real port
+        if (o.DiscoveryPort >= 0)
+        {
+            var specs = _cameras.Select(c => c.Spec).ToList();
+            try { _discovery = new WsDiscoveryResponder(() => specs, OnvifLog, o.DiscoveryPort, o.DiscoveryMulticast); }
+            catch (SocketException ex)
+            {
+                // ONVIF itself still works (register by address) - only the search is missing.
+                log.WriteLine($"  WARNING: WS-Discovery off - udp {o.DiscoveryPort} unavailable ({ex.SocketErrorCode}). ONVIF search will not find the cameras.");
+            }
+        }
+
         if (!o.EnableRtsp) return;
 
         // 3) MediaMTX
@@ -220,6 +236,8 @@ public sealed class Farm : IAsyncDisposable
         }
         sb.AppendLine($"  logs: {LogDir}");
         if (_control is not null) sb.AppendLine($"  control: http://127.0.0.1:{_control.Port}/status");
+        if (_discovery is not null)
+            sb.AppendLine($"  ws-discovery: udp {(_discovery.IsMulticast ? $"{WsDiscoveryResponder.MulticastGroup}:{_discovery.Port} (multicast)" : $"127.0.0.1:{_discovery.Port} (unicast)")} - ONVIF search finds every camera");
         return sb.ToString();
     }
 
@@ -268,6 +286,7 @@ public sealed class Farm : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_control is not null) await _control.DisposeAsync().ConfigureAwait(false);
+        if (_discovery is not null) await _discovery.DisposeAsync().ConfigureAwait(false);
         foreach (var c in _cameras)
         {
             if (c.Publisher is not null) await c.Publisher.DisposeAsync().ConfigureAwait(false);

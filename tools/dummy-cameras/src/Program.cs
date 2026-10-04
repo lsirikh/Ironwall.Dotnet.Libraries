@@ -2,6 +2,7 @@
 using DummyCameras;
 using DummyCameras.Infra;
 using DummyCameras.MediaMtx;
+using DummyCameras.Onvif;
 using DummyCameras.Ptz;
 using DummyCameras.Seed;
 
@@ -32,6 +33,9 @@ internal static class Cli
           --preset-tokens 2=named,3=padded  PTZ preset token shape per camera (or one style for every PTZ camera):
                                               numeric 1..5 (default) · named Preset001.. · padded 001.. ·
                                               mixed 1,2,Preset003,004,5 - tokens are matched exactly (like real cameras)
+          --discovery-port 3702             WS-Discovery: answer ONVIF search probes (multicast 239.255.255.250 on
+                                            loopback) with one ProbeMatch per camera - GIS camera panel [ONVIF 검색]
+          --no-discovery                    do not answer ONVIF search
           --onvif-only                      no MediaMTX / ffmpeg
           --anonymous-rtsp                  RTSP read without credentials
           --out <dir>                       logs (onvif-requests.jsonl · ptz-commands.jsonl · stream-events.jsonl)
@@ -117,6 +121,8 @@ internal static class Cli
             MediaMtxPath = a.Str("mediamtx"),
         };
         o.ControlPort = a.Int("control-port", o.OnvifBasePort);
+        o.DiscoveryPort = a.Flag("no-discovery") ? -1 : a.Int("discovery-port", WsDiscoveryResponder.DefaultPort);
+        o.DiscoveryMulticast = true;
         if (a.Str("out") is { } outDir) o.OutDir = Path.GetFullPath(outDir);
         if (a.Str("size") is { } size) (o.Width, o.Height) = Size(size);
         if (a.Str("sub-size") is { } sub) (o.SubWidth, o.SubHeight) = Size(sub);
