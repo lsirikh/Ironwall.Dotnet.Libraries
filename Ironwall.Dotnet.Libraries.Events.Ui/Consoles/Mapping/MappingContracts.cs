@@ -183,6 +183,144 @@ public interface IMappingPresetEditor
     Task<MappingCallResult<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default);
 }
 
+/// <summary>ROI 꼭짓점 1개 — 화면은 언제나 <b>0~1 정규화</b> 좌표로 다룬다(왼쪽 위가 0,0).</summary>
+/// <param name="X">가로(0~1).</param>
+/// <param name="Y">세로(0~1).</param>
+public readonly record struct MappingRoiPoint(double X, double Y);
+
+/// <summary>프리셋 ROI 설정 창의 한 줄 — 서버 ROI 레코드(점 포함).</summary>
+/// <param name="Id">ROI PK.</param>
+/// <param name="PresetId">소유 프리셋 id.</param>
+/// <param name="Name">이름.</param>
+/// <param name="ResolutionWidth">기준 해상도 가로.</param>
+/// <param name="ResolutionHeight">기준 해상도 세로.</param>
+/// <param name="IsEnable">사용 여부.</param>
+/// <param name="IsExclusion">제외구역 여부 — 서버가 이 키를 주지 않았으면 <c>null</c>(구판). 저장 때 값이 있을 때만 되돌려 싣는다.</param>
+/// <param name="Points">꼭짓점(정규화, 그리는 순서).</param>
+/// <param name="IsPixelUnit">서버 원본이 픽셀 좌표였나 — 저장 때 같은 단위로 되돌린다.</param>
+public sealed record MappingRoiDetail(
+    int Id,
+    int PresetId,
+    string Name,
+    double ResolutionWidth,
+    double ResolutionHeight,
+    bool IsEnable,
+    bool? IsExclusion,
+    IReadOnlyList<MappingRoiPoint> Points,
+    bool IsPixelUnit = false)
+{
+    /// <summary>목록에 그리는 글자.</summary>
+    public string Display => IsEnable ? Name : $"{Name} (꺼짐)";
+
+    /// <summary>목록 부제.</summary>
+    public string Subtitle => $"점 {Points.Count}개 · {ResolutionWidth:0}×{ResolutionHeight:0}";
+}
+
+/// <summary>ROI 생성 · 교체(PUT)에 보낼 값. <see cref="Points"/> 는 정규화 좌표.</summary>
+public sealed record MappingRoiDraft(
+    string Name,
+    double ResolutionWidth,
+    double ResolutionHeight,
+    bool IsEnable,
+    bool? IsExclusion,
+    IReadOnlyList<MappingRoiPoint> Points,
+    bool IsPixelUnit = false);
+
+/// <summary>
+/// 프리셋 ROI 관리(<c>/presets/{id}/rois</c>) — <b>다른 인터페이스를 넓히지 않고</b> 따로 둔다.
+/// </summary>
+/// <remarks>실제 구현은 <see cref="MappingWorkbenchGateway"/> 가 함께 진다. 점은 ROI 본문에 함께 실려 한 번에 바뀐다(PUT 전체 교체).</remarks>
+public interface IMappingRoiEditor
+{
+    /// <summary>그 프리셋의 ROI 전량(점 포함).</summary>
+    Task<MappingCallResult<IReadOnlyList<MappingRoiDetail>>> ListRoisAsync(int presetId, CancellationToken token = default);
+
+    /// <summary>ROI 생성(점 3개 이상).</summary>
+    Task<MappingCallResult<MappingRoiDetail>> CreateRoiAsync(int presetId, MappingRoiDraft draft, CancellationToken token = default);
+
+    /// <summary>ROI 전체 교체(PUT — 점까지).</summary>
+    Task<MappingCallResult<MappingRoiDetail>> ReplaceRoiAsync(int presetId, int roiId, MappingRoiDraft draft, CancellationToken token = default);
+
+    /// <summary>ROI 삭제.</summary>
+    Task<MappingCallResult<bool>> DeleteRoiAsync(int presetId, int roiId, CancellationToken token = default);
+}
+
+/// <summary>ROI 다각형 판정 — 화면 · 시험이 함께 쓴다.</summary>
+public static class MappingRoiGeometry
+{
+    /// <summary>다각형 최소 꼭짓점 수(서버 <c>min_length=3</c>).</summary>
+    public const int MIN_POINTS = 3;
+
+    /// <summary>한 ROI 의 최대 꼭짓점 수(화면 한도).</summary>
+    public const int MAX_POINTS = 64;
+
+    /// <summary>0~1 로 자른다.</summary>
+    public static MappingRoiPoint Clamp(MappingRoiPoint p) => new(Clamp01(p.X), Clamp01(p.Y));
+
+    private static double Clamp01(double v) => double.IsNaN(v) ? 0 : v < 0 ? 0 : v > 1 ? 1 : v;
+
+    /// <summary>
+    /// 닫힌 다각형의 변끼리 서로 가로지르는가(이웃 변의 공유 꼭짓점은 빼고 본다).
+    /// </summary>
+    public static bool IsSelfIntersecting(IReadOnlyList<MappingRoiPoint> points)
+    {
+        int n = points.Count;
+        if (n < 4) return false;
+        for (int i = 0; i < n; i++)
+        {
+            var a1 = points[i];
+            var a2 = points[(i + 1) % n];
+            for (int j = i + 1; j < n; j++)
+            {
+                // 이웃 변(꼭짓점 공유)은 건너뛴다 — 처음 변과 마지막 변도 이웃이다.
+                if (j == i || (j + 1) % n == i || (i + 1) % n == j) continue;
+                if (SegmentsIntersect(a1, a2, points[j], points[(j + 1) % n])) return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 열린 꺾은선에 <paramref name="next"/> 를 이으면 기존 변을 가로지르는가 — 그리는 중 점 추가 판정.
+    /// </summary>
+    public static bool WouldCross(IReadOnlyList<MappingRoiPoint> points, MappingRoiPoint next)
+    {
+        int n = points.Count;
+        if (n < 3) return false;
+        var last = points[n - 1];
+        for (int i = 0; i < n - 2; i++)
+            if (SegmentsIntersect(points[i], points[i + 1], last, next)) return true;
+        return false;
+    }
+
+    /// <summary>다각형 넓이(정규화 단위 — 0 이면 한 줄로 늘어선 것).</summary>
+    public static double Area(IReadOnlyList<MappingRoiPoint> points)
+    {
+        double sum = 0;
+        for (int i = 0; i < points.Count; i++)
+        {
+            var a = points[i];
+            var b = points[(i + 1) % points.Count];
+            sum += a.X * b.Y - b.X * a.Y;
+        }
+        return Math.Abs(sum) / 2;
+    }
+
+    private static bool SegmentsIntersect(MappingRoiPoint p1, MappingRoiPoint p2, MappingRoiPoint q1, MappingRoiPoint q2)
+    {
+        double d1 = Cross(q1, q2, p1), d2 = Cross(q1, q2, p2), d3 = Cross(p1, p2, q1), d4 = Cross(p1, p2, q2);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+        return (d1 == 0 && OnSegment(q1, q2, p1)) || (d2 == 0 && OnSegment(q1, q2, p2))
+            || (d3 == 0 && OnSegment(p1, p2, q1)) || (d4 == 0 && OnSegment(p1, p2, q2));
+    }
+
+    private static double Cross(MappingRoiPoint a, MappingRoiPoint b, MappingRoiPoint c)
+        => (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+
+    private static bool OnSegment(MappingRoiPoint a, MappingRoiPoint b, MappingRoiPoint p)
+        => Math.Min(a.X, b.X) <= p.X && p.X <= Math.Max(a.X, b.X) && Math.Min(a.Y, b.Y) <= p.Y && p.Y <= Math.Max(a.Y, b.Y);
+}
+
 /// <summary>카메라 자신이 기억하는 프리셋 1건(ONVIF <c>GetPresets</c>).</summary>
 /// <param name="Token">ONVIF 프리셋 토큰 — 이벤트 때 GotoPreset 에 그대로 간다.</param>
 /// <param name="Name">카메라에 적힌 이름. 없으면 빈 문자열.</param>
