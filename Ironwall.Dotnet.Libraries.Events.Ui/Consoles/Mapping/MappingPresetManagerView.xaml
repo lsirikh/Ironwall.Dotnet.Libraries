@@ -5,6 +5,7 @@
 	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:video="clr-namespace:Ironwall.Dotnet.Libraries.CameraPopup.Wpf;assembly=Ironwall.Dotnet.Libraries.CameraPopup"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	Foreground="{DynamicResource TextPrimaryBrush}">
 	<!--
@@ -171,10 +172,66 @@
 				</Grid>
 			</DockPanel>
 
+			<DockPanel Grid.Column="1" Margin="12,0,0,0" LastChildFill="True">
+			<!--  ⓪ 카메라 실시간 영상 — 호스트가 디코딩한 프레임(공유 메모리)을 그리기만 한다. GIS 는 LibVLC 를 부르지 않는다.  -->
+			<StackPanel
+				Margin="0,0,0,10"
+				DockPanel.Dock="Top"
+				Visibility="{Binding HasVideo, Converter={StaticResource BoolToVis}}">
+				<Grid
+					Height="200"
+					AutomationProperties.AutomationId="Integrations.Presets.Video">
+					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<video:HostedVideoView
+						Margin="1"
+						AspectFillTolerance="0.035"
+						FrameSource="{Binding Video.FrameSource}"
+						IsHitTestVisible="False" />
+					<TextBlock
+						Margin="12"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsHitTestVisible="False"
+						Text="{Binding Video.StatusText}"
+						TextAlignment="Center"
+						TextWrapping="Wrap"
+						Visibility="{Binding Video.HasStatusText, Converter={StaticResource BoolToVis}}" />
+				</Grid>
+				<DockPanel Margin="0,6,0,0" LastChildFill="True">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Presets.VideoRetry"
+							Click="OnRetryVideo"
+							Content="다시 시도"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding Video.CanRetry, Converter={StaticResource BoolToVis}}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Presets.GotoPreset"
+							Click="OnGotoPreset"
+							Content="프리셋 자리로 이동"
+							IsEnabled="{Binding CanGotoPreset}"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding HasGotoPreset, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
+					<!--  TextBlock 은 UIA 트리에 안 나온다 — 평평한 읽기 전용 TextBox 로 계측 가능하게 둔다.  -->
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Presets.VideoStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding Video.Headline, Mode=OneWay}" />
+				</DockPanel>
+			</StackPanel>
+
+			<Grid>
 			<!--  ② 폼 — 고른 프리셋 또는 새 프리셋  -->
 			<c:ConsoleSection
-				Grid.Column="1"
-				Margin="12,0,0,0"
 				VerticalAlignment="Top"
 				AutomationProperties.AutomationId="Integrations.Presets.Form"
 				AxisName="camera-presets"
@@ -312,7 +369,6 @@
 			</c:ConsoleSection>
 
 			<TextBlock
-				Grid.Column="1"
 				Margin="12"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Center"
@@ -331,6 +387,8 @@
 					</Style>
 				</TextBlock.Style>
 			</TextBlock>
+			</Grid>
+			</DockPanel>
 		</Grid>
 		</DockPanel>
 	</dlg:ConsoleDialogFrame>
