@@ -31,5 +31,10 @@ public partial class MappingPresetManagerView : UserControl
 
     private void OnConfirmDelete(object sender, RoutedEventArgs e) => _ = Model?.ConfirmDeleteAsync();
 
+    private void OnReadCamera(object sender, RoutedEventArgs e) => _ = Model?.ReadCameraPresetsAsync();
+
+    private void OnUseCameraPreset(object sender, RoutedEventArgs e)
+        => Model?.UseCameraPreset((sender as FrameworkElement)?.DataContext as MappingCameraPresetRow);
+
     private void OnClose(object sender, RoutedEventArgs e) => _ = Model?.CloseAsync();
 }

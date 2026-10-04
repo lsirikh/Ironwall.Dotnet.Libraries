@@ -322,6 +322,14 @@ public class EventUiModule : Module
             builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingDeviceSource>()
                    .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingDeviceSource>()
                    .SingleInstance();
+            // 프리셋 관리 창의 카메라 ONVIF 프리셋 읽기 — 카메라 팝업 호스트(CameraPopupModule)로 GetPresets. 호스트가 없으면 "쓸 수 없음" 으로 답한다.
+            builder.Register(c => Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.HostMappingCameraPresetReader.FromHost(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.CameraPopup.ICameraPopupHost>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventWindowDeviceDirectory>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.CameraPopup.EventWindows.ICameraPopupSettingsSource>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingCameraPresetReader>()
+                   .SingleInstance();
             builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher>()
                    .SingleInstance();

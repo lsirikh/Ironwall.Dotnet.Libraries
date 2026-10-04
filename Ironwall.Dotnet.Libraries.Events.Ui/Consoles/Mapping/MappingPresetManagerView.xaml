@@ -30,6 +30,88 @@
 		SecondaryText="닫기"
 		Size="Large"
 		Title="{Binding Title, Mode=OneWay}">
+		<DockPanel LastChildFill="True">
+		<!--  ③ 카메라 프리셋(ONVIF) — 이벤트 때 GotoPreset 토큰 = 서버 번호라, 서버 프리셋은 카메라 것에서 골라 담는다  -->
+		<c:ConsoleSection
+			Margin="0,12,0,0"
+			AutomationProperties.AutomationId="Integrations.Presets.Camera"
+			AxisName="camera-onvif-presets"
+			DockPanel.Dock="Bottom"
+			Header="카메라 프리셋 (ONVIF)"
+			Visibility="{Binding HasCameraPresetReader, Converter={StaticResource BoolToVis}}">
+			<StackPanel>
+				<DockPanel LastChildFill="True">
+					<Button
+						AutomationProperties.AutomationId="Integrations.Presets.CameraRead"
+						Click="OnReadCamera"
+						Content="카메라에서 읽기"
+						DockPanel.Dock="Right"
+						IsEnabled="{Binding CanReadCameraPresets}"
+						Style="{DynamicResource Console.Button}" />
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Presets.CameraStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding CameraPresetStatus, Mode=OneWay}"
+						TextWrapping="Wrap" />
+				</DockPanel>
+				<TextBox
+					Margin="0,4,0,0"
+					AutomationProperties.AutomationId="Integrations.Presets.CameraMismatch"
+					Background="Transparent"
+					BorderThickness="0"
+					FontSize="12"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					IsReadOnly="True"
+					Text="{Binding CameraMismatchText, Mode=OneWay}"
+					TextWrapping="Wrap"
+					Visibility="{Binding HasCameraMismatch, Converter={StaticResource BoolToVis}}" />
+				<ListBox
+					MaxHeight="132"
+					Margin="0,6,0,0"
+					Padding="4"
+					AutomationProperties.AutomationId="Integrations.Presets.CameraList"
+					Background="{DynamicResource SurfaceSunkenBrush}"
+					ItemsSource="{Binding CameraPresets}">
+					<ListBox.ItemContainerStyle>
+						<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+							<Setter Property="AutomationProperties.Name" Value="{Binding Display}" />
+							<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+						</Style>
+					</ListBox.ItemContainerStyle>
+					<ListBox.ItemTemplate>
+						<DataTemplate>
+							<DockPanel Margin="2,1" LastChildFill="True">
+								<Button
+									Padding="8,0"
+									AutomationProperties.AutomationId="Integrations.Presets.CameraUse"
+									Click="OnUseCameraPreset"
+									Content="서버에 담기"
+									DockPanel.Dock="Right"
+									IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=ListBox}}"
+									Style="{DynamicResource Console.Button}" />
+								<StackPanel VerticalAlignment="Center">
+									<TextBlock
+										FontSize="13"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{Binding Display}"
+										TextTrimming="CharacterEllipsis" />
+									<TextBlock
+										FontSize="11"
+										Foreground="{DynamicResource TextSecondaryBrush}"
+										Text="{Binding Subtitle}" />
+								</StackPanel>
+							</DockPanel>
+						</DataTemplate>
+					</ListBox.ItemTemplate>
+				</ListBox>
+			</StackPanel>
+		</c:ConsoleSection>
+
 		<Grid MinHeight="320">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="260" />
@@ -233,5 +315,6 @@
 				</TextBlock.Style>
 			</TextBlock>
 		</Grid>
+		</DockPanel>
 	</dlg:ConsoleDialogFrame>
 </UserControl>
