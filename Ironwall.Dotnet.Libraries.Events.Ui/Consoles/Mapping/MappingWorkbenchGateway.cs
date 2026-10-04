@@ -31,7 +31,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping;
 /// 배포 v8 서버는 하위 목록을 <c>{items,total}</c> 로 주지만 문서 v4 판은 경광등을 <c>[]</c> 로 적고 있고,
 /// 운영 6.3.2 는 아직 확인되지 않았다 — 어느 쪽이 오든 화면이 침묵하지 않게 한다.</para>
 /// </remarks>
-public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMappingPresetSource, IMappingPresetEditor
+public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMappingPresetSource, IMappingPresetEditor, IMappingRoiEditor
 {
     private const int PAGE_LIMIT = 100;
     private const int MAX_PAGES = 200;      // 2만 건. 이보다 많으면 경고하고 멈춘다(무한 루프 금지)
@@ -300,7 +300,7 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMapping
     }
 
     /// <summary>
-    /// 보낼 본문 — 화면이 고치는 네 칸만. <c>id</c> · <c>camera_id</c> · <c>rois</c> 는 싣지 않는다(경로가 정하고, ROI 는 이 창이 다루지 않는다).
+    /// 보낼 본문 — 화면이 고치는 네 칸만. <c>id</c> · <c>camera_id</c> · <c>rois</c> 는 싣지 않는다(경로가 정하고, ROI 는 <see cref="IMappingRoiEditor"/> 가 <c>/presets/{id}/rois</c> 로 따로 다룬다).
     /// </summary>
     internal static JObject PresetBody(MappingPresetDraft draft) => new()
     {
@@ -325,6 +325,138 @@ public sealed class MappingWorkbenchGateway : IMappingWorkbenchGateway, IMapping
         return dto is null || dto.Id <= 0
             ? MappingCallResult<MappingPresetDetail>.Fail(unreadable, "data was empty", result.StatusCode)
             : MappingCallResult<MappingPresetDetail>.Ok(ToDetail(dto, cameraId), result.StatusCode);
+    }
+    #endregion
+
+    #region - 프리셋 ROI -
+    private const int ROI_PAGE_LIMIT = 100;    // 서버 기본은 10 — 한 프리셋의 ROI 를 한 번에 받는다
+
+    private string RoiRoot(int presetId) => $"{_setup.Url}/presets/{presetId}/rois";
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<IReadOnlyList<MappingRoiDetail>>> ListRoisAsync(int presetId, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<IReadOnlyList<MappingRoiDetail>>();
+        var query = new Dictionary<string, string>
+        {
+            ["include_points"] = "true",
+            ["limit"] = ROI_PAGE_LIMIT.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
+        var result = await SendAsync(() => _api.GetRequestAsync(RoiRoot(presetId), query), "ROI 를 불러오지 못했습니다.").ConfigureAwait(false);
+        if (!result.IsSuccess) return MappingCallResult<IReadOnlyList<MappingRoiDetail>>.Fail(result.Message, result.RawError, result.StatusCode);
+        if (token.IsCancellationRequested) return MappingCallResult<IReadOnlyList<MappingRoiDetail>>.Fail("취소되었습니다.", "cancelled", 0);
+
+        var data = result.Value?["data"];
+        var array = data as JArray ?? data?["items"] as JArray;
+        var rois = (array ?? new JArray()).OfType<JObject>()
+            .Select(o => ReadRoi(o, presetId))
+            .Where(r => r is not null && r.Id > 0)
+            .Select(r => r!)
+            .OrderBy(r => r.Id)
+            .ToList();
+        return MappingCallResult<IReadOnlyList<MappingRoiDetail>>.Ok(rois, result.StatusCode);
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<MappingRoiDetail>> CreateRoiAsync(int presetId, MappingRoiDraft draft, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<MappingRoiDetail>();
+        var result = await SendAsync(() => _api.PostRequestAsync(RoiRoot(presetId), RoiBody(draft)), "ROI 를 만들지 못했습니다.").ConfigureAwait(false);
+        return ReadRoiResult(result, presetId, draft, "ROI 를 만들었지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.");
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<MappingRoiDetail>> ReplaceRoiAsync(int presetId, int roiId, MappingRoiDraft draft, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<MappingRoiDetail>();
+        var url = $"{RoiRoot(presetId)}/{roiId}";
+        var result = await SendAsync(() => _api.PutRequestAsync(url, RoiBody(draft)), "ROI 를 저장하지 못했습니다.").ConfigureAwait(false);
+        return ReadRoiResult(result, presetId, draft, "저장했지만 응답을 읽지 못했습니다. 목록을 새로 고치세요.");
+    }
+
+    /// <inheritdoc/>
+    public async Task<MappingCallResult<bool>> DeleteRoiAsync(int presetId, int roiId, CancellationToken token = default)
+    {
+        if (!IsSupported) return Refuse<bool>();
+        var url = $"{RoiRoot(presetId)}/{roiId}";
+        var result = await SendAsync(() => _api.DeleteRequestAsync(url), "ROI 를 지우지 못했습니다.").ConfigureAwait(false);
+        return result.IsSuccess
+            ? MappingCallResult<bool>.Ok(true, result.StatusCode)
+            : MappingCallResult<bool>.Fail(result.Message, result.RawError, result.StatusCode);
+    }
+
+    /// <summary>
+    /// 보낼 본문(POST · PUT 공용). 서버는 모르는 키를 422 로 막는다 — <c>is_exclusion</c> 은 <b>읽었을 때만</b> 싣는다(구판에는 없다).
+    /// 점 <c>order</c> 는 1부터 차례로 매겨 유일하게 하고, 원본이 픽셀이었으면 해상도를 곱해 픽셀로 되돌린다.
+    /// </summary>
+    internal static JObject RoiBody(MappingRoiDraft draft)
+    {
+        var points = new JArray();
+        for (int i = 0; i < draft.Points.Count; i++)
+        {
+            var p = MappingRoiGeometry.Clamp(draft.Points[i]);
+            var x = draft.IsPixelUnit ? Math.Round(p.X * draft.ResolutionWidth, 1) : Math.Round(p.X, 6);
+            var y = draft.IsPixelUnit ? Math.Round(p.Y * draft.ResolutionHeight, 1) : Math.Round(p.Y, 6);
+            points.Add(new JObject { ["x"] = x, ["y"] = y, ["order"] = i + 1 });
+        }
+
+        var body = new JObject
+        {
+            ["name"] = draft.Name.Trim(),
+            ["resolution_width"] = draft.ResolutionWidth,
+            ["resolution_height"] = draft.ResolutionHeight,
+            ["is_enable"] = draft.IsEnable,
+        };
+        if (draft.IsExclusion is bool exclusion) body["is_exclusion"] = exclusion;
+        body["points"] = points;
+        return body;
+    }
+
+    /// <summary>
+    /// 응답 ROI 한 건을 읽는다. 점이 하나라도 1 을 넘으면 <b>픽셀 좌표</b>로 보고 해상도로 나눠 정규화한다.
+    /// </summary>
+    internal static MappingRoiDetail? ReadRoi(JObject? o, int presetId)
+    {
+        if (o is null) return null;
+        var id = o.Value<int?>("id") ?? 0;
+        var width = o.Value<double?>("resolution_width") ?? 0;
+        var height = o.Value<double?>("resolution_height") ?? 0;
+        var raw = (o["points"] as JArray ?? new JArray()).OfType<JObject>()
+            .Select(p => (X: p.Value<double?>("x") ?? 0, Y: p.Value<double?>("y") ?? 0, Order: p.Value<int?>("order") ?? 0, Id: p.Value<int?>("id") ?? 0))
+            .OrderBy(p => p.Order).ThenBy(p => p.Id)
+            .ToList();
+
+        var isPixel = raw.Any(p => p.X > 1 || p.Y > 1);
+        var points = raw.Select(p => isPixel
+                ? MappingRoiGeometry.Clamp(new MappingRoiPoint(width > 0 ? p.X / width : 0, height > 0 ? p.Y / height : 0))
+                : MappingRoiGeometry.Clamp(new MappingRoiPoint(p.X, p.Y)))
+            .ToList();
+
+        var name = o.Value<string>("name");
+        return new MappingRoiDetail(
+            id,
+            o.Value<int?>("preset_id") is int pid && pid > 0 ? pid : presetId,
+            string.IsNullOrWhiteSpace(name) ? $"ROI {id}" : name!,
+            width,
+            height,
+            o.Value<bool?>("is_enable") ?? true,
+            o["is_exclusion"]?.Type == JTokenType.Boolean ? o.Value<bool>("is_exclusion") : null,
+            points,
+            isPixel);
+    }
+
+    /// <summary>
+    /// 생성 · 교체 응답은 점을 싣지 않는다(<c>point_count</c> 만) — 점은 <b>보낸 값</b>으로 채운다.
+    /// </summary>
+    private static MappingCallResult<MappingRoiDetail> ReadRoiResult(MappingCallResult<JObject> result, int presetId, MappingRoiDraft draft, string unreadable)
+    {
+        if (!result.IsSuccess) return MappingCallResult<MappingRoiDetail>.Fail(result.Message, result.RawError, result.StatusCode);
+        var read = ReadRoi(result.Value?["data"] as JObject, presetId);
+        if (read is null || read.Id <= 0)
+            return MappingCallResult<MappingRoiDetail>.Fail(unreadable, "data was empty", result.StatusCode);
+        return MappingCallResult<MappingRoiDetail>.Ok(
+            read with { Points = draft.Points.Select(MappingRoiGeometry.Clamp).ToList(), IsPixelUnit = draft.IsPixelUnit },
+            result.StatusCode);
     }
     #endregion
 

@@ -95,6 +95,7 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
             var model = new MappingWorkbenchViewModel(_gateway, _devices, _permissions, _events)
             {
                 ShowPresetManager = manager => _windows.ShowDialogAsync(manager, null, PresetManagerSettings()),
+                ShowRoiEditor = editor => _windows.ShowDialogAsync(editor, null, RoiEditorSettings()),
                 CameraPresetReader = _cameraPresets,
             };
             await _windows.ShowDialogAsync(model, null, WindowSettings());
@@ -128,6 +129,18 @@ public sealed class MappingWorkbenchLauncher : IMappingWorkbenchLauncher
         [nameof(Window.Width)] = DialogSizeRules.WindowWidth(DialogSize.Large),
         [nameof(Window.Height)] = 760.0,     // 아래 "카메라 프리셋(ONVIF)" 칸 몫까지
         [nameof(Window.MinHeight)] = 600.0,
+        [nameof(Window.SizeToContent)] = SizeToContent.Manual,
+        [nameof(Window.WindowStartupLocation)] = WindowStartupLocation.CenterOwner,
+        [nameof(Window.ResizeMode)] = ResizeMode.CanResize,
+        [nameof(Window.ShowInTaskbar)] = false,
+    };
+
+    /// <summary>ROI 설정 창 — 프리셋 관리 창과 같은 폭(T4 · L). 캔버스와 폼이 위아래로 서므로 조금 더 높다.</summary>
+    private static IDictionary<string, object> RoiEditorSettings() => new Dictionary<string, object>
+    {
+        [nameof(Window.Width)] = DialogSizeRules.WindowWidth(DialogSize.Large),
+        [nameof(Window.Height)] = 820.0,
+        [nameof(Window.MinHeight)] = 640.0,
         [nameof(Window.SizeToContent)] = SizeToContent.Manual,
         [nameof(Window.WindowStartupLocation)] = WindowStartupLocation.CenterOwner,
         [nameof(Window.ResizeMode)] = ResizeMode.CanResize,

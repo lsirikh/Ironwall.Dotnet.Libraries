@@ -180,6 +180,7 @@
 				AxisName="camera-presets"
 				Header="{Binding FormTitle}"
 				Visibility="{Binding HasForm, Converter={StaticResource BoolToVis}}">
+				<StackPanel>
 				<StackPanel IsEnabled="{Binding CanEdit}">
 					<c:ConsoleField ApiName="preset_index" Header="번호">
 						<TextBox
@@ -291,6 +292,22 @@
 								TextWrapping="Wrap" />
 						</DockPanel>
 					</Border>
+				</StackPanel>
+
+					<!--  ROI — 편집 권한이 없어도 볼 수 있게 위 폼(CanEdit 로 잠긴다) 밖에 둔다. 새 프리셋은 먼저 만들어야 연다.  -->
+					<c:ConsoleField
+						Margin="0,8,0,0"
+						ApiName="rois"
+						Header="ROI"
+						Visibility="{Binding HasRoiEditor, Converter={StaticResource BoolToVis}}">
+						<Button
+							HorizontalAlignment="Left"
+							AutomationProperties.AutomationId="Integrations.Presets.EditRois"
+							Click="OnEditRois"
+							Content="ROI 설정…"
+							IsEnabled="{Binding CanEditRois}"
+							Style="{DynamicResource Console.Button}" />
+					</c:ConsoleField>
 				</StackPanel>
 			</c:ConsoleSection>
 
