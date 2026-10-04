@@ -365,6 +365,7 @@ public partial class DeviceDashboardView : UserControl
     }
 
     private void OnOpenCameraDetail(object sender, RoutedEventArgs e) => ViewModel?.OpenCameraDetail();
+    private void OnToggleCameraDiscovery(object sender, RoutedEventArgs e) => ViewModel?.ToggleCameraDiscovery();
 
     private async void OnUndoGroupDrop(object sender, RoutedEventArgs e)
     {

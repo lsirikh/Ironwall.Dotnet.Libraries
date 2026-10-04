@@ -10,6 +10,7 @@
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:consoles="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles"
+	xmlns:panels="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Panels"
 	FontFamily="{DynamicResource MaterialDesignFont}">
 	<!--
 		장비 콘솔(device-console-redesign) — 레일 · 목록 · 상세 3단. 정본 목업:
@@ -91,6 +92,30 @@
 					<!--  조립기 · 프리셋 입구 — 부품 모델이 있는 서버(7.0+)에서만 보인다  -->
 					<c:ConsoleToolbar.Extra>
 						<StackPanel Orientation="Horizontal">
+						<!--
+							[ONVIF 검색] — 카메라 레일에서만. 목록 위에 검색 영역을 펼친다: 검색 → 조회 → [추가] 하면 상세 칸에 새 카메라로 열리고 [등록] 이 저장한다.
+							AutomationId 는 옛 카메라 패널의 단추와 같다(실창 시험이 같은 이름으로 찾는다).
+						-->
+						<Button
+							Margin="0,0,8,0"
+							AutomationProperties.AutomationId="Devices.Camera.Onvif.Toggle"
+							AutomationProperties.Name="ONVIF 검색"
+							Click="OnToggleCameraDiscovery"
+							IsEnabled="{Binding CanOpenCameraDiscovery}"
+							Style="{StaticResource Console.Button}"
+							ToolTip="{Binding CameraDiscoveryBlockedReason}"
+							ToolTipService.ShowOnDisabled="True"
+							Visibility="{Binding IsCameraRail, Converter={StaticResource BoolToVisibility}}">
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="16"
+									Height="16"
+									Margin="-2,0,4,0"
+									VerticalAlignment="Center"
+									Kind="Radar" />
+								<TextBlock VerticalAlignment="Center" Text="ONVIF 검색" />
+							</StackPanel>
+						</Button>
 						<!--  장비 배정 창(N-05) — 그룹 레일에서 그룹 하나를 골랐을 때만 눌린다. 6.3 서버에서도 쓴다.  -->
 						<Button
 							Margin="0,0,8,0"
@@ -163,6 +188,7 @@
 				<Grid ClipToBounds="True">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
 						<RowDefinition Height="*" />
 					</Grid.RowDefinitions>
 
@@ -206,8 +232,16 @@
 						</DockPanel>
 					</Border>
 
-					<DataGrid
+					<!--  [ONVIF 검색] 펼침 영역(카메라 레일) — 찾은 카메라를 조회해 [추가] 하면 상세 칸에 새 카메라로 열린다  -->
+					<Border
 						Grid.Row="1"
+						AutomationProperties.AutomationId="Console.Devices.Camera.Onvif"
+						Visibility="{Binding IsCameraDiscoveryOpen, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+						<panels:OnvifDiscoveryView DataContext="{Binding CameraDiscovery}" />
+					</Border>
+
+					<DataGrid
+						Grid.Row="2"
 						AutomationProperties.AutomationId="Console.Devices.Grid"
 						IsReadOnly="True"
 						IsSynchronizedWithCurrentItem="False"
@@ -248,7 +282,7 @@
 
 					<!--  빈 목록 — 무엇이 비었고 무엇을 하면 되는지(커널 ConsoleEmptyState). 첫 읽기 중에는 띄우지 않는다.  -->
 					<c:ConsoleEmptyState
-						Grid.Row="1"
+						Grid.Row="2"
 						AutomationProperties.AutomationId="Console.Devices.Empty"
 						Glyph="M4,6 H20 M4,12 H20 M4,18 H14"
 						Hint="{Binding EmptyHint}"
@@ -258,7 +292,7 @@
 
 					<!--  부품으로 찾기 — 축 계약에서만 레일에 나온다  -->
 					<ContentControl
-						Grid.Row="1"
+						Grid.Row="2"
 						Content="{Binding ByComponent}"
 						Focusable="False"
 						Visibility="{Binding IsByComponent, Converter={StaticResource BoolToVisibility}}">

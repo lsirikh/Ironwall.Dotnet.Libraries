@@ -14,6 +14,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Properties;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services.Onvif;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
@@ -135,6 +136,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         RailEntries = new ObservableCollection<ConsoleRailEntry>();
         GroupChips = new ObservableCollection<DeviceGroupViewModel>();
         BuildRail();
+
+        // [ONVIF 검색](카메라 레일) — 검색 · 조회는 서비스, [추가] 는 상세 칸의 새 카메라 Draft 로만 들어온다(등록은 [등록]).
+        CameraDiscovery = CreateCameraDiscovery(new WsDiscoveryClient(), new OnvifCameraLookup(log: log));
     }
     #endregion
 
@@ -178,6 +182,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _draft = null;
         _lastGroupUndo = null;
         _closeConfirmed = false;
+        CameraDiscovery.OnClickCloseButton();
         _externalUpdateWhileEditing = false;
         Form.Clear();
         Detail.Reset();
@@ -317,6 +322,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             _log?.Error($"[DeviceConsole] 레일 전환 실패({key}) — {ex.Message}");
         }
         finally { _isSwitching = false; }
+
+        // 검색 영역은 카메라 레일의 것이다 — 다른 레일로 가면 닫는다(돌던 검색 · 조회도 멈춘다).
+        if (!IsCameraRail && CameraDiscovery.IsOpen) CameraDiscovery.OnClickCloseButton();
 
         NotifyOfPropertyChange(nameof(SelectedRail));
         NotifyOfPropertyChange(nameof(IsByComponent));
@@ -575,6 +583,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CanOpenCameraDetail));
         NotifyOfPropertyChange(nameof(IsCameraDetailVisible));
         NotifyOfPropertyChange(nameof(CanApplyNow));
+        NotifyOfPropertyChange(nameof(IsCameraRail));
+        NotifyOfPropertyChange(nameof(CanOpenCameraDiscovery));
+        NotifyOfPropertyChange(nameof(CameraDiscoveryBlockedReason));
+        NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+        SyncCameraDiscovery();
     }
     #endregion
 
@@ -818,6 +831,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         }
 
         RefreshStatus();
+        SyncCameraDiscovery();   // 등록된 Draft 의 검색 줄은 "이미 등록됨" 으로
     }
 
     /// <summary>
@@ -1268,6 +1282,100 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             _log?.Error($"[DeviceConsole] 카메라 상세보기를 열지 못했습니다 — {ex.Message}");
             StatusText = "카메라 상세보기를 열지 못했습니다. 잠시 후 다시 누르세요.";
         }
+    }
+    #endregion
+
+    #region - ONVIF discovery (camera rail) -
+    /// <summary>
+    /// [ONVIF 검색] 펼침 영역 — 찾은 카메라를 조회해 [추가] 하면 상세 칸에 새 카메라(Draft)로 열린다.
+    /// 서버에는 쓰지 않는다: 등록은 상세 칸의 [등록] 이 기존 패널 저장(검증 · 종류축 · 권한)으로 한다.
+    /// </summary>
+    public OnvifDiscoveryViewModel CameraDiscovery { get; private set; }
+
+    /// <summary>카메라 레일에서만 [ONVIF 검색] 단추가 보인다.</summary>
+    public bool IsCameraRail => Category == EnumDeviceCategory.Camera && _current is not null;
+
+    public bool CanOpenCameraDiscovery => IsCameraRail && DevicePermissionGate.CanEdit();
+
+    public string? CameraDiscoveryBlockedReason => !IsCameraRail ? null : !DevicePermissionGate.CanEdit() ? "권한이 없습니다." : null;
+
+    /// <summary>검색 영역은 카메라 레일에서 열었을 때만 보인다(다른 레일로 가면 닫는다).</summary>
+    public bool IsCameraDiscoveryOpen => IsCameraRail && CameraDiscovery.IsOpen;
+
+    /// <summary>툴바 [ONVIF 검색] — 펼침 영역 열기/닫기(처음 열 때 바로 검색).</summary>
+    public void ToggleCameraDiscovery()
+    {
+        if (!CanOpenCameraDiscovery)
+        {
+            if (IsCameraRail) _log?.Warning("[FR-EN-09] 추가 권한 없음(devices, ONVIF 검색)");
+            return;
+        }
+        CameraDiscovery.OnClickToggleButton();
+        SyncCameraDiscovery();
+    }
+
+    /// <summary>검색 · 조회 서비스를 바꿔 끼운다(시험 · 도구 — 가짜 카메라 팜을 유니캐스트로 겨눌 때).</summary>
+    internal void UseCameraDiscoveryServices(IWsDiscoveryClient discovery, IOnvifCameraLookup lookup)
+    {
+        CameraDiscovery.OnClickCloseButton();
+        CameraDiscovery.PropertyChanged -= OnCameraDiscoveryChanged;
+        CameraDiscovery = CreateCameraDiscovery(discovery, lookup);
+        NotifyOfPropertyChange(nameof(CameraDiscovery));
+        NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+    }
+
+    private OnvifDiscoveryViewModel CreateCameraDiscovery(IWsDiscoveryClient discovery, IOnvifCameraLookup lookup)
+    {
+        var vm = new OnvifDiscoveryViewModel(discovery, lookup, IsCameraListedInConsole, TryOpenDiscoveredDraft, _log)
+        {
+            AddedHint = "상세 칸에 새 카메라로 열었습니다 — [등록] 하면 등록됩니다.",
+        };
+        vm.PropertyChanged += OnCameraDiscoveryChanged;
+        return vm;
+    }
+
+    private void OnCameraDiscoveryChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OnvifDiscoveryViewModel.IsOpen)) NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
+    }
+
+    /// <summary>같은 IP · 포트 카메라가 저장된 목록이나 상세 칸의 Draft 에 있는가 — "이미 등록됨" · 중복 추가 차단.</summary>
+    internal bool IsCameraListedInConsole(string host, int port) => IsSavedCamera(host, port) || IsDraftCamera(host, port);
+
+    private bool IsSavedCamera(string host, int port) =>
+        CameraPanelViewModel.ViewModelProvider.Any(vm => vm.Id > 0 && SameAddress(vm.Model as ICameraDeviceModel, host, port));
+
+    private bool IsDraftCamera(string host, int port) =>
+        _draft is CameraDeviceViewModel draft && SameAddress(draft.Model as ICameraDeviceModel, host, port);
+
+    private static bool SameAddress(ICameraDeviceModel? camera, string host, int port) =>
+        camera is not null && camera.IpPort == port && string.Equals(camera.IpAddress?.Trim(), host, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 검색 결과 [추가] — 툴바 [추가] 와 같은 길(이동 막기 · 패널의 번호 자동 배정 · 권한)로 Draft 를 만들고,
+    /// 조회한 값을 채운 카메라로 바꿔 상세 칸에 연다. 목록에는 [등록] 전까지 아무것도 남지 않는다(FR-12).
+    /// </summary>
+    internal bool TryOpenDiscoveredDraft(Func<int, CameraDeviceModel> build)
+    {
+        if (!IsCameraRail || _current is null || !CanAdd || IsOperationRunning) return false;
+        if (!Detail.Guard.TryNavigate(ConsoleNavigation.BeginCreate)) return false;
+
+        if (_current.CreateDraft() is not CameraDeviceViewModel seed) return false;
+        var draft = new CameraDeviceViewModel(build(seed.Model.DeviceNumber));
+
+        _draft = draft;
+        _current.Select(Array.Empty<object>());
+        ClearGridSelectionRequested?.Invoke(this, EventArgs.Empty);
+        LoadForm(new[] { draft }, isCreating: true);
+        RefreshToolbar();
+        return true;
+    }
+
+    /// <summary>Draft 취소 · 등록 · 레일 이동 뒤 검색 목록의 줄 상태를 맞춘다.</summary>
+    private void SyncCameraDiscovery()
+    {
+        if (CameraDiscovery is null || CameraDiscovery.Items.Count == 0) return;
+        CameraDiscovery.Resync(IsSavedCamera, IsDraftCamera);
     }
     #endregion
 

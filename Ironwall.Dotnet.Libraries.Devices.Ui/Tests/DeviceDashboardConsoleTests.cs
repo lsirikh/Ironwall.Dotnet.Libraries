@@ -635,6 +635,180 @@ public class DeviceDashboardConsoleTests : IDisposable
         Assert.False(console.CanDelete);                       // 눈에 안 보이는 장비를 지우지 않는다
     }
 
+    #region - [ONVIF 검색] 카메라 레일(실창 EVT-R26-10: 옛 카메라 패널에만 붙어 장비 창에서 닿을 수 없었다) -
+    private static readonly string CameraRail = DeviceDashboardViewModel.RailKeyOf(EnumDeviceCategory.Camera);
+
+    private sealed class FakeDiscovery : Services.Onvif.IWsDiscoveryClient
+    {
+        public List<Services.Onvif.DiscoveredOnvifDevice> Devices { get; } = new();
+        public Task<IReadOnlyList<Services.Onvif.DiscoveredOnvifDevice>> ProbeAsync(Services.Onvif.WsDiscoveryProbeOptions options, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Services.Onvif.DiscoveredOnvifDevice>>(Devices);
+    }
+
+    private sealed class FakeLookup : Services.Onvif.IOnvifCameraLookup
+    {
+        public Task<Services.Onvif.OnvifLookupResult> LookupAsync(string host, int port, string? userName, string? password, CancellationToken ct = default)
+            => Task.FromResult(new Services.Onvif.OnvifLookupResult { Success = true, Name = $"CAM-{port}", RtspMain = $"rtsp://{host}:8554/{port}" });
+    }
+
+    private static Services.Onvif.DiscoveredOnvifDevice OnvifDevice(int port) =>
+        new($"urn:uuid:{port}", new[] { $"http://127.0.0.1:{port}/onvif/device_service" }, new[] { "dn:NetworkVideoTransmitter" }, Array.Empty<string>());
+
+    private static async Task<(DeviceDashboardViewModel Console, CameraDevicePanelViewModel Cameras)> OpenCameraRailWithDiscoveryAsync(params int[] ports)
+    {
+        var (console, _) = await OpenAsync();
+        await console.SelectRailAsync(CameraRail);
+        var discovery = new FakeDiscovery();
+        foreach (var port in ports) discovery.Devices.Add(OnvifDevice(port));
+        console.UseCameraDiscoveryServices(discovery, new FakeLookup());
+        return (console, console.CameraPanelViewModel);
+    }
+
+    /// <summary>STA 스레드에 디스패처 동기화 문맥을 깔고 본문을 끝까지 돌린다 — 카메라 레일 목록 보기(ListCollectionView)는 만든 스레드에서만 원천 변경을 받는다.</summary>
+    private static void RunOnSta(Func<Task> body)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            dispatcher.BeginInvoke(new Func<Task>(async () =>
+            {
+                try { await body(); }
+                catch (Exception ex) { failure = ex; }
+                finally { frame.Continue = false; }
+            }));
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            dispatcher.InvokeShutdown();
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "STA 스레드가 제시간에 끝나지 않았다");
+        if (failure is not null) throw new Xunit.Sdk.XunitException(failure.ToString());
+    }
+
+    [Fact]
+    public void should_offer_onvif_search_only_on_the_camera_rail() => RunOnSta(async () =>
+    {
+        var (console, _) = await OpenAsync();
+        await console.SelectRailAsync(LampRail);
+        Assert.False(console.IsCameraRail);
+        Assert.False(console.CanOpenCameraDiscovery);
+
+        await console.SelectRailAsync(CameraRail);
+        Assert.True(console.IsCameraRail);
+        Assert.True(console.CanOpenCameraDiscovery);
+    });
+
+    [Fact]
+    public void should_open_discovered_camera_as_create_draft_without_touching_the_list() => RunOnSta(async () =>
+    {
+        var (console, cameras) = await OpenCameraRailWithDiscoveryAsync(8181);
+        await console.CameraDiscovery.SearchAsync();
+        var row = console.CameraDiscovery.Items.Single();
+        await console.CameraDiscovery.LookupAsync(row);
+
+        Assert.True(console.CameraDiscovery.Add(row));
+
+        Assert.Equal(ConsoleDetailState.Create, console.Detail.State);
+        var draft = Assert.IsType<CameraDeviceViewModel>(Assert.Single(console.Form.Rows));
+        Assert.Equal(("127.0.0.1", 8181, "CAM-8181"), (draft.IpAddress, draft.IpPort, draft.DeviceName));
+        Assert.Empty(cameras.ViewModelProvider);                          // [등록] 전에는 목록에 없다(FR-12)
+        Assert.Equal(OnvifDiscoveredState.Added, row.State);
+        Assert.Contains("[등록]", console.CameraDiscovery.StatusText);
+        Assert.True(console.IsCameraListedInConsole("127.0.0.1", 8181)); // 같은 카메라를 두 번 열지 않는다
+    });
+
+    [Fact]
+    public void should_let_the_row_be_added_again_when_the_draft_is_cancelled() => RunOnSta(async () =>
+    {
+        var (console, _) = await OpenCameraRailWithDiscoveryAsync(8181);
+        await console.CameraDiscovery.SearchAsync();
+        var row = console.CameraDiscovery.Items.Single();
+        await console.CameraDiscovery.LookupAsync(row);
+        console.CameraDiscovery.Add(row);
+
+        console.Revert();
+
+        Assert.Equal(ConsoleDetailState.None, console.Detail.State);
+        Assert.Equal(OnvifDiscoveredState.LookedUp, row.State);
+        Assert.True(row.CanAdd);
+    });
+
+    /// <summary>진짜 카메라 패널 경로를 그대로 부르되, [등록] 이 무엇을 넘겼는지 적어 둔다.</summary>
+    private sealed class RecordingSource : IDeviceConsoleSource
+    {
+        private readonly IDeviceConsoleSource _inner;
+        public RecordingSource(IDeviceConsoleSource inner) => _inner = inner;
+        public List<object> Adopted { get; } = new();
+        public int SaveCalls { get; private set; }
+        public BasePanelViewModel Panel => _inner.Panel;
+        public IEnumerable Rows => _inner.Rows;
+        public INotifyCollectionChanged RowsChanged => _inner.RowsChanged;
+        public int RowCount => _inner.RowCount;
+        public bool IsBusy => _inner.IsBusy;
+        public event EventHandler? BusyEnded { add => _inner.BusyEnded += value; remove => _inner.BusyEnded -= value; }
+        public void Select(IReadOnlyList<object> rows) => _inner.Select(rows);
+        public object? CreateDraft() => _inner.CreateDraft();
+        public void AdoptDraft(object draft) { Adopted.Add(draft); _inner.AdoptDraft(draft); }
+        public void ReleaseDraft(object draft) => _inner.ReleaseDraft(draft);
+        public bool Save() { SaveCalls++; return _inner.Save(); }
+        public void Delete() => _inner.Delete();
+        public bool Reload() => _inner.Reload();
+    }
+
+    [Fact]
+    public void should_hand_the_discovered_draft_to_the_panel_save_when_registered() => RunOnSta(async () =>
+    {
+        var (console, _) = await OpenAsync();
+        var cameras = console.CameraPanelViewModel;
+        var source = new RecordingSource(new DeviceConsoleSource<CameraDeviceViewModel>(cameras, h => cameras.UpdateAction += h));
+        console.UseSource(CameraRail, source);
+        await console.SelectRailAsync(CameraRail);
+        var discovery = new FakeDiscovery();
+        discovery.Devices.Add(OnvifDevice(8181));
+        console.UseCameraDiscoveryServices(discovery, new FakeLookup());
+        await console.CameraDiscovery.SearchAsync();
+        var row = console.CameraDiscovery.Items.Single();
+        await console.CameraDiscovery.LookupAsync(row);
+        console.CameraDiscovery.Add(row);
+        var draft = (CameraDeviceViewModel)console.Form.Rows[0];
+
+        console.Apply();                                                  // [등록] — 기존 패널 저장 경로
+
+        Assert.Same(draft, Assert.Single(source.Adopted));
+        Assert.Equal(1, source.SaveCalls);
+        Assert.Equal(("127.0.0.1", 8181), (draft.IpAddress, draft.IpPort));
+    });
+
+    [Fact]
+    public void should_mark_already_registered_camera_when_searching_from_the_console() => RunOnSta(async () =>
+    {
+        var (console, cameras) = await OpenCameraRailWithDiscoveryAsync(8181, 8182);
+        cameras.ViewModelProvider.Add(new CameraDeviceViewModel(new CameraDeviceModel { Id = 31, DeviceNumber = 1, DeviceName = "정문", IpAddress = "127.0.0.1", IpPort = 8182 }));
+
+        await console.CameraDiscovery.SearchAsync();
+
+        Assert.Equal(OnvifDiscoveredState.Found, console.CameraDiscovery.Items.Single(r => r.Port == 8181).State);
+        Assert.Equal(OnvifDiscoveredState.AlreadyRegistered, console.CameraDiscovery.Items.Single(r => r.Port == 8182).State);
+    });
+
+    [Fact]
+    public void should_close_onvif_search_when_leaving_the_camera_rail() => RunOnSta(async () =>
+    {
+        var (console, _) = await OpenCameraRailWithDiscoveryAsync(8181);
+        console.ToggleCameraDiscovery();
+        Assert.True(console.IsCameraDiscoveryOpen);
+
+        await console.SelectRailAsync(LampRail);
+
+        Assert.False(console.CameraDiscovery.IsOpen);
+        Assert.False(console.IsCameraDiscoveryOpen);
+    });
+    #endregion
+
     /// <summary>끝남을 시험이 정한다 — 진짜 패널은 활성화 수명주기용으로만 물려 둔다.</summary>
     private sealed class ScriptedSource : IDeviceConsoleSource
     {
