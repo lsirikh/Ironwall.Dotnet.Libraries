@@ -201,6 +201,51 @@ public sealed class MappingPresetManagerViewModel : Screen
     public string SaveText => _isNew ? "만들기" : "저장";
     #endregion
 
+    #region - ROI -
+    /// <summary>
+    /// ROI 설정 창을 띄우는 길 — 워크벤치(런처)가 채운다. 비어 있거나 서버 왕복(<see cref="IMappingRoiEditor"/>)이 없으면 [ROI 설정…] 을 감춘다.
+    /// </summary>
+    public Func<MappingRoiEditorViewModel, Task>? ShowRoiEditor
+    {
+        get => _showRoiEditor;
+        set { _showRoiEditor = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(HasRoiEditor)); NotifyOfPropertyChange(nameof(CanEditRois)); }
+    }
+    private Func<MappingRoiEditorViewModel, Task>? _showRoiEditor;
+
+    /// <summary>ROI 왕복 — 생성자에 준 <see cref="IMappingPresetEditor"/> 가 함께 구현하면 그것.</summary>
+    private IMappingRoiEditor? RoiEditor => _editor as IMappingRoiEditor;
+
+    /// <summary>[ROI 설정…] 을 보일까.</summary>
+    public bool HasRoiEditor => _showRoiEditor is not null && RoiEditor is not null;
+
+    /// <summary>[ROI 설정…] 을 누를 수 있나 — 서버에 있는 프리셋 하나를 골랐을 때(새 프리셋은 먼저 만들어야 한다).</summary>
+    public bool CanEditRois => HasRoiEditor && !IsBusy && !_isNew && _selected is not null;
+
+    /// <summary>가장 최근 ROI 설정 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task RoiEditorTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>[ROI 설정…] — 고른 프리셋의 ROI 설정 창을 연다. 편집 권한이 없으면 보기만 한다.</summary>
+    public Task EditRoisAsync() => RoiEditorTask = EditRoisCoreAsync();
+
+    private async Task EditRoisCoreAsync()
+    {
+        if (!CanEditRois) return;
+        var preset = _selected!;
+        var editor = new MappingRoiEditorViewModel(RoiEditor!, preset.Id, $"{preset.PresetIndex}. {preset.Name}", CameraName, CanEdit);
+        try
+        {
+            await _showRoiEditor!(editor);
+        }
+        catch (Exception)
+        {
+            // 창 하나가 못 떠도 프리셋 관리 창은 살아 있어야 한다.
+            Say("ROI 설정 창을 열지 못했습니다.", DialogMessageSeverity.Critical);
+            return;
+        }
+        if (editor.HasChanges) Say($"'{preset.Name}' 프리셋의 ROI 를 바꿨습니다.", DialogMessageSeverity.Info);
+    }
+    #endregion
+
     #region - 카메라 프리셋(ONVIF) -
     /// <summary>카메라 프리셋을 읽을 길이 있나 — 없으면 그 칸을 감춘다.</summary>
     public bool HasCameraPresetReader => _cameraReader is not null;
@@ -531,6 +576,7 @@ public sealed class MappingPresetManagerViewModel : Screen
         NotifyOfPropertyChange(nameof(CanBeginNew));
         NotifyOfPropertyChange(nameof(CanSave));
         NotifyOfPropertyChange(nameof(CanDelete));
+        NotifyOfPropertyChange(nameof(CanEditRois));
     }
     #endregion
 }

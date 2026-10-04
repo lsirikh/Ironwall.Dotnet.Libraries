@@ -36,5 +36,7 @@ public partial class MappingPresetManagerView : UserControl
     private void OnUseCameraPreset(object sender, RoutedEventArgs e)
         => Model?.UseCameraPreset((sender as FrameworkElement)?.DataContext as MappingCameraPresetRow);
 
+    private void OnEditRois(object sender, RoutedEventArgs e) => _ = Model?.EditRoisAsync();
+
     private void OnClose(object sender, RoutedEventArgs e) => _ = Model?.CloseAsync();
 }
