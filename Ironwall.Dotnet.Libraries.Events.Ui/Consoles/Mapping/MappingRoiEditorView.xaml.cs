@@ -49,4 +49,8 @@ public partial class MappingRoiEditorView : UserControl
     private void OnConfirmDelete(object sender, RoutedEventArgs e) => _ = Model?.ConfirmDeleteAsync();
 
     private void OnClose(object sender, RoutedEventArgs e) => _ = Model?.CloseAsync();
+
+    private void OnRetryVideo(object sender, RoutedEventArgs e) => Model?.Video?.Retry();
+
+    private void OnGotoPreset(object sender, RoutedEventArgs e) => _ = Model?.GotoPresetAsync();
 }

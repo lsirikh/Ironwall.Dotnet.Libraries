@@ -6,6 +6,7 @@
 	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:video="clr-namespace:Ironwall.Dotnet.Libraries.CameraPopup.Wpf;assembly=Ironwall.Dotnet.Libraries.CameraPopup"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	Foreground="{DynamicResource TextPrimaryBrush}"
 	PreviewKeyDown="OnPreviewKeyDown">
@@ -94,6 +95,40 @@
 
 			<!--  ② 캔버스 + 폼 — 고른 ROI 또는 새 ROI  -->
 			<DockPanel Grid.Column="1" Margin="12,0,0,0" LastChildFill="True">
+				<!--  영상 줄 — 캔버스 바탕의 카메라 실시간 영상 상태 · [다시 시도] · [프리셋 자리로 이동]  -->
+				<DockPanel
+					Margin="0,0,0,6"
+					DockPanel.Dock="Top"
+					LastChildFill="True"
+					Visibility="{Binding HasVideo, Converter={StaticResource BoolToVis}}">
+					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+						<Button
+							Margin="0,0,6,0"
+							AutomationProperties.AutomationId="Integrations.Rois.VideoRetry"
+							Click="OnRetryVideo"
+							Content="다시 시도"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding Video.CanRetry, Converter={StaticResource BoolToVis}}" />
+						<Button
+							AutomationProperties.AutomationId="Integrations.Rois.GotoPreset"
+							Click="OnGotoPreset"
+							Content="프리셋 자리로 이동"
+							IsEnabled="{Binding CanGotoPreset}"
+							Style="{DynamicResource Console.Button}"
+							Visibility="{Binding HasGotoPreset, Converter={StaticResource BoolToVis}}" />
+					</StackPanel>
+					<TextBox
+						VerticalAlignment="Center"
+						AutomationProperties.AutomationId="Integrations.Rois.VideoStatus"
+						Background="Transparent"
+						BorderThickness="0"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsReadOnly="True"
+						Text="{Binding Video.Headline, Mode=OneWay}"
+						TextWrapping="Wrap" />
+				</DockPanel>
+
 				<!--  그리기 도구 줄 — 왼쪽 상태 · 오른쪽 도구  -->
 				<DockPanel
 					Margin="0,0,0,6"
@@ -262,9 +297,17 @@
 					</StackPanel>
 				</c:ConsoleSection>
 
-				<!--  캔버스 — 기준 해상도 비율로 가운데 맞춘다. 고른 것이 없어도 다른 ROI 를 보여 준다.  -->
+				<!--  캔버스 — 기준 해상도 비율로 가운데 맞춘다. 고른 것이 없어도 다른 ROI 를 보여 준다.
+				      바탕 영상: 숨은 HostedVideoView 가 호스트 프레임을 비트맵으로 복사하고, 캔버스가 그 비트맵을 그림 칸에 깐다.  -->
 				<Grid>
 					<Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" />
+					<video:HostedVideoView
+						x:Name="RoiVideoFrame"
+						Width="0"
+						Height="0"
+						FrameSource="{Binding Video.FrameSource}"
+						IsHitTestVisible="False"
+						Visibility="Hidden" />
 					<local:MappingRoiCanvas
 						MinHeight="220"
 						Margin="6"
@@ -273,7 +316,8 @@
 						Editor="{Binding}"
 						GridBrush="{DynamicResource BorderBrush}"
 						OtherBrush="{DynamicResource TextSecondaryBrush}"
-						ShapeBrush="{DynamicResource PrimaryBrush}" />
+						ShapeBrush="{DynamicResource PrimaryBrush}"
+						VideoImage="{Binding Source, ElementName=RoiVideoFrame}" />
 					<TextBlock
 						Margin="12"
 						HorizontalAlignment="Center"

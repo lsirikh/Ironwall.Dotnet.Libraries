@@ -330,6 +330,14 @@ public class EventUiModule : Module
                         c.ResolveOptional<ILogService>()))
                    .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingCameraPresetReader>()
                    .SingleInstance();
+            // 프리셋 관리 · ROI 설정 창의 카메라 실시간 영상 — 지도 팝업과 같은 호스트 오버레이(공유 메모리 프레임). GIS 는 LibVLC 를 부르지 않는다.
+            builder.Register(c => Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.HostMappingCameraVideo.FromHost(
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.CameraPopup.ICameraPopupHost>(),
+                        c.Resolve<Ironwall.Dotnet.Libraries.Events.Ui.EventWindows.IEventWindowDeviceDirectory>(),
+                        c.ResolveOptional<Ironwall.Dotnet.Libraries.CameraPopup.EventWindows.ICameraPopupSettingsSource>(),
+                        c.ResolveOptional<ILogService>()))
+                   .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingCameraVideo>()
+                   .SingleInstance();
             builder.RegisterType<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.MappingWorkbenchLauncher>()
                    .As<Ironwall.Dotnet.Libraries.Events.Ui.Consoles.Mapping.IMappingWorkbenchLauncher>()
                    .SingleInstance();

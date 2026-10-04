@@ -39,4 +39,8 @@ public partial class MappingPresetManagerView : UserControl
     private void OnEditRois(object sender, RoutedEventArgs e) => _ = Model?.EditRoisAsync();
 
     private void OnClose(object sender, RoutedEventArgs e) => _ = Model?.CloseAsync();
+
+    private void OnRetryVideo(object sender, RoutedEventArgs e) => Model?.Video?.Retry();
+
+    private void OnGotoPreset(object sender, RoutedEventArgs e) => _ = Model?.GotoPresetAsync();
 }

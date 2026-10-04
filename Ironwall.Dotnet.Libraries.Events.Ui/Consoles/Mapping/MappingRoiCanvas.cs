@@ -61,6 +61,17 @@ public sealed class MappingRoiCanvas : FrameworkElement
     /// <summary>그림 칸 바탕.</summary>
     public Brush Backdrop { get => (Brush)GetValue(BackdropProperty); set => SetValue(BackdropProperty, value); }
 
+    /// <summary>
+    /// 그림 칸 바탕 영상(카메라 실시간 프레임). 뷰가 <c>HostedVideoView.Source</c>(WriteableBitmap)를 건다 —
+    /// 비트맵은 자리에서 갱신되므로 프레임마다 다시 그리지 않아도 화면이 따라온다. 없으면 <see cref="Backdrop"/> 만.
+    /// </summary>
+    public static readonly DependencyProperty VideoImageProperty = DependencyProperty.Register(
+        nameof(VideoImage), typeof(ImageSource), typeof(MappingRoiCanvas),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>그림 칸 바탕 영상.</summary>
+    public ImageSource? VideoImage { get => (ImageSource?)GetValue(VideoImageProperty); set => SetValue(VideoImageProperty, value); }
+
     /// <summary>격자 · 테두리 색.</summary>
     public static readonly DependencyProperty GridBrushProperty = Brush(nameof(GridBrush), Brushes.Gray);
 
@@ -300,6 +311,8 @@ public sealed class MappingRoiCanvas : FrameworkElement
         if (frame.IsEmpty) return;
 
         dc.DrawRectangle(Backdrop, null, frame);
+        // 영상 프레임은 이미 그림 칸 비율로 온다(호스트가 카메라 비율을 그 안에 맞춘다) — 칸에 그대로 채운다.
+        if (VideoImage is { } video) dc.DrawImage(video, frame);
         DrawGrid(dc, frame);
 
         var editor = Editor;

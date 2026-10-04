@@ -58,7 +58,11 @@ public sealed class MappingRoiEditorViewModel : Screen
     /// <param name="presetTitle">프리셋 표시(창 제목) — 예: <c>3. 정문</c>.</param>
     /// <param name="cameraName">카메라 이름(창 제목).</param>
     /// <param name="canEdit">편집 권한. <c>false</c> 면 보기만 한다.</param>
-    public MappingRoiEditorViewModel(IMappingRoiEditor editor, int presetId, string presetTitle, string cameraName, bool canEdit = true)
+    /// <param name="cameraVideo">카메라 실시간 영상 창구. 있으면 캔버스 바탕에 영상을 깐다. 생략하면 빈 격자.</param>
+    /// <param name="cameraId">영상 · 프리셋 이동에 쓸 카메라 id.</param>
+    /// <param name="presetIndex">이 프리셋의 번호(카메라 프리셋 토큰) — [프리셋 자리로 이동] 에 쓴다.</param>
+    public MappingRoiEditorViewModel(IMappingRoiEditor editor, int presetId, string presetTitle, string cameraName, bool canEdit = true,
+                                     IMappingCameraVideo? cameraVideo = null, int cameraId = 0, int presetIndex = 0)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         PresetId = presetId;
@@ -66,6 +70,11 @@ public sealed class MappingRoiEditorViewModel : Screen
         CameraName = cameraName ?? string.Empty;
         CanEdit = canEdit;
         DisplayName = Title;
+        _cameraVideo = cameraVideo;
+        CameraId = cameraId;
+        PresetIndex = presetIndex;
+        if (cameraVideo is not null && cameraId > 0)
+            Video = new MappingCameraVideoViewModel(cameraVideo, cameraId, $"mapping-roi-{presetId}");
     }
 
     /// <summary>그린 모양(점 · 닫힘)이 바뀌었다 — 캔버스가 다시 그린다.</summary>
@@ -149,14 +158,14 @@ public sealed class MappingRoiEditorViewModel : Screen
     public string EditWidth
     {
         get => _editWidth;
-        set { _editWidth = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanvasAspect)); NotifyValidation(); RaiseShape(); }
+        set { _editWidth = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanvasAspect)); NotifyValidation(); RaiseShape(); ResizeVideo(); }
     }
 
     /// <summary>기준 해상도 세로.</summary>
     public string EditHeight
     {
         get => _editHeight;
-        set { _editHeight = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanvasAspect)); NotifyValidation(); RaiseShape(); }
+        set { _editHeight = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanvasAspect)); NotifyValidation(); RaiseShape(); ResizeVideo(); }
     }
 
     /// <summary>캔버스 가로/세로 비율 — 해상도가 틀렸으면 16:9.</summary>
@@ -252,6 +261,90 @@ public sealed class MappingRoiEditorViewModel : Screen
     public string SaveText => _isNew ? "만들기" : "저장";
     #endregion
 
+    #region - 카메라 영상 -
+    /// <summary>영상 요청 가로(px) — 세로는 기준 해상도 비율로 정한다.</summary>
+    public const int VIDEO_WIDTH = 960;
+
+    private readonly IMappingCameraVideo? _cameraVideo;
+    private bool _isMovingCamera;
+
+    /// <summary>카메라 id(영상 · 프리셋 이동). 0 이면 모른다.</summary>
+    public int CameraId { get; }
+
+    /// <summary>이 프리셋의 번호(카메라 프리셋 토큰). 0 이면 모른다.</summary>
+    public int PresetIndex { get; }
+
+    /// <summary>
+    /// 캔버스 바탕 영상. 없으면(<c>null</c>) 빈 격자에 그린다.
+    /// 영상은 기준 해상도 비율로 받는다 — 호스트가 카메라 비율을 그 안에 맞추므로, 기준 해상도가 카메라와 같으면 ROI 좌표가 영상과 꼭 맞는다.
+    /// </summary>
+    public MappingCameraVideoViewModel? Video { get; }
+
+    /// <summary>영상 상자가 있나.</summary>
+    public bool HasVideo => Video is not null;
+
+    /// <summary>[프리셋 자리로 이동] 을 보일까 — PTZ 카메라이고 번호를 알 때.</summary>
+    public bool HasGotoPreset => _cameraVideo is not null && CameraId > 0 && PresetIndex > 0 && _cameraVideo.CanGotoPreset(CameraId);
+
+    /// <summary>[프리셋 자리로 이동] 을 누를 수 있나 — 카메라를 움직이므로 편집 권한이 있을 때만.</summary>
+    public bool CanGotoPreset => HasGotoPreset && CanEdit && !_isMovingCamera;
+
+    /// <summary>가장 최근 프리셋 이동 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task GotoPresetTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>[프리셋 자리로 이동] — 카메라를 이 프리셋 자리로 돌려 영상이 ROI 를 그릴 화면이 되게 한다.</summary>
+    public Task GotoPresetAsync() => GotoPresetTask = GotoPresetCoreAsync();
+
+    private async Task GotoPresetCoreAsync()
+    {
+        if (!CanGotoPreset) return;
+        _isMovingCamera = true;
+        NotifyOfPropertyChange(nameof(CanGotoPreset));
+        try
+        {
+            var result = await _cameraVideo!.GotoPresetAsync(CameraId, PresetIndex);
+            if (result.IsSuccess) Say($"카메라를 {PresetTitle} 자리로 옮겼습니다.", DialogMessageSeverity.Info);
+            else Say(result.Message, DialogMessageSeverity.Warning);
+        }
+        catch (Exception)
+        {
+            Say("프리셋 자리로 이동하지 못했습니다.", DialogMessageSeverity.Warning);
+        }
+        finally
+        {
+            _isMovingCamera = false;
+            NotifyOfPropertyChange(nameof(CanGotoPreset));
+        }
+    }
+
+    /// <summary>캔버스 비율 → 영상 요청 크기(순수). 가로 <see cref="VIDEO_WIDTH"/>, 세로는 비율대로(짝수 · 공유 메모리 한도 안).</summary>
+    public static (int Width, int Height) VideoSize(double aspect)
+    {
+        if (!(aspect > 0) || double.IsInfinity(aspect)) aspect = DEFAULT_WIDTH / DEFAULT_HEIGHT;
+        var height = (int)Math.Round(VIDEO_WIDTH / aspect);
+        height = Math.Clamp(height, 16, 2160) & ~1;
+        return (VIDEO_WIDTH, height);
+    }
+
+    /// <summary>영상을 연다(창이 처음 뜰 때).</summary>
+    internal void StartVideo()
+    {
+        if (Video is null) return;
+        _videoOn = true;
+        var (w, h) = VideoSize(CanvasAspect);
+        Video.Start(w, h);
+    }
+
+    private bool _videoOn;
+
+    private void ResizeVideo()
+    {
+        if (Video is null || !_videoOn) return;
+        var (w, h) = VideoSize(CanvasAspect);
+        _ = Video.Resize(w, h);
+    }
+    #endregion
+
     #region - 그리기 -
     /// <summary>
     /// 점을 하나 찍는다(0~1). 다각형이 닫혔거나 · 한도에 찼거나 · 앞 변을 가로지르면 찍지 않는다.
@@ -333,7 +426,19 @@ public sealed class MappingRoiEditorViewModel : Screen
     protected override Task OnInitializeAsync(CancellationToken cancellationToken)
     {
         LoadTask = LoadAsync();
+        StartVideo();
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        if (close)
+        {
+            _videoOn = false;
+            Video?.Dispose();   // 스트림 · 공유 메모리를 닫는다 — 창이 닫힌 뒤 호스트가 계속 디코딩하지 않게
+        }
+        return base.OnDeactivateAsync(close, cancellationToken);
     }
 
     /// <summary>목록을 다시 받는다. <paramref name="selectId"/> 가 있으면 그 ROI 를 고른다.</summary>
@@ -552,6 +657,7 @@ public sealed class MappingRoiEditorViewModel : Screen
         NotifyOfPropertyChange(nameof(EditHeight));
         NotifyOfPropertyChange(nameof(CanvasAspect));
         ShapeEdited();
+        ResizeVideo();
     }
 
     private void NotifyValidation()
