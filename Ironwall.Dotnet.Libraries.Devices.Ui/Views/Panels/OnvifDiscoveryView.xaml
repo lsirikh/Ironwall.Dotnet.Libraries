@@ -7,7 +7,11 @@
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	FontFamily="{DynamicResource MaterialDesignFont}">
-	<!--  [ONVIF 검색] 펼침 영역 — DataContext = OnvifDiscoveryViewModel  -->
+	<!--  [ONVIF 검색] 펼침 영역 — DataContext = OnvifDiscoveryViewModel. 옛 카메라 패널과 장비 창(콘솔) 카메라 레일이 같이 쓴다  -->
+	<UserControl.Resources>
+		<!--  어느 호스트에 붙어도 풀리게 여기서 둔다(장비 창은 앱 병합 사전에 기대지 않는다)  -->
+		<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+	</UserControl.Resources>
 	<Border
 		Margin="10,4,10,6"
 		Padding="8,6"

@@ -148,8 +148,32 @@ public sealed class OnvifDiscoveryViewModel : PropertyChangedBase
             return false;
         }
         row.State = OnvifDiscoveredState.Added;
-        StatusText = $"{row.Address} 를 목록에 추가했습니다 — [저장] 하면 등록됩니다.";
+        StatusText = $"{row.Address} 를 {AddedHint}";
         return true;
+    }
+
+    /// <summary>
+    /// 목록 바깥의 변화(Draft 취소 · 등록 · 다른 경로의 등록)를 줄 상태에 다시 맞춘다.
+    /// "추가됨" 인데 Draft 가 사라졌으면 저장됐는지에 따라 "이미 등록됨" 또는 다시 [추가] 할 수 있게 되돌린다.
+    /// </summary>
+    /// <param name="isSaved">같은 IP · 포트의 카메라가 서버에 등록돼 있는가.</param>
+    /// <param name="isPendingDraft">같은 IP · 포트의 Draft 가 아직 저장 전으로 남아 있는가.</param>
+    public void Resync(Func<string, int, bool> isSaved, Func<string, int, bool> isPendingDraft)
+    {
+        foreach (var row in Items)
+        {
+            switch (row.State)
+            {
+                case OnvifDiscoveredState.Added when !isPendingDraft(row.Host, row.Port):
+                    row.State = isSaved(row.Host, row.Port) ? OnvifDiscoveredState.AlreadyRegistered
+                        : row.Lookup is { Success: true } ? OnvifDiscoveredState.LookedUp
+                        : OnvifDiscoveredState.Found;
+                    break;
+                case OnvifDiscoveredState.Found or OnvifDiscoveredState.LookedUp or OnvifDiscoveredState.Failed when isSaved(row.Host, row.Port):
+                    row.State = OnvifDiscoveredState.AlreadyRegistered;
+                    break;
+            }
+        }
     }
 
     private CancellationToken NewWork()
@@ -207,6 +231,9 @@ public sealed class OnvifDiscoveryViewModel : PropertyChangedBase
 
     /// <summary>검색 범위(시험 · 도구가 유니캐스트 대상을 줄 때 바꾼다).</summary>
     public Func<WsDiscoveryProbeOptions> ProbeOptionsFactory { get; set; } = () => new WsDiscoveryProbeOptions();
+
+    /// <summary>[추가] 뒤 상태 글의 뒷부분 — 옛 패널은 목록 [저장], 장비 창(콘솔)은 상세 칸 [등록] 이 저장한다.</summary>
+    public string AddedHint { get; set; } = "목록에 추가했습니다 — [저장] 하면 등록됩니다.";
     #endregion
 
     #region - Attributes -
