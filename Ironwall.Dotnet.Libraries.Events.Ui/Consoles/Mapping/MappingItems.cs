@@ -242,13 +242,37 @@ public sealed class MappingRowViewModel : PropertyChangedBase
 /// <summary>
 /// 카메라 연동 설정 칸의 프리셋 콤보 항목. <see cref="Id"/> 가 <c>null</c> 이면 "없음"(프리셋 해제)이다.
 /// </summary>
-/// <param name="Id">프리셋 PK. <c>null</c> = 없음.</param>
-/// <param name="Name">표시 이름.</param>
-/// <param name="IsRestrictedZone">감시금지구역이면 🔒 를 붙인다.</param>
-public sealed record MappingPresetOption(int? Id, string Name, bool IsRestrictedZone)
+/// <remarks>
+/// 🔴 <b>record(값 동등)로 두지 않는다</b> — 참조로만 같다(EVT-DEMO-R26). 목록은 "불러오는 중" 의 자리 항목 P2 로 한 번,
+/// 서버 목록의 P2 로 다시 선다. 그 사이 콤보에 목록 밖의 P2 가 남으면, 값으로 같은 서버 P2 를 줘도 WPF 가
+/// "안 바뀌었다" 로 보고 선택을 다시 하지 않는다 — <c>SelectedItem</c> 은 P2 인데 <c>SelectedIndex</c> 는 -1, 칸은 빈칸이 된다.
+/// (직접 원인은 뷰모델이 목록을 다시 세우는 도중 임시 항목을 내준 것이다 — <c>MappingWorkbenchViewModel.SelectedTargetPreset</c> 참조.
+/// 참조 동등은 같은 결함이 다른 길로 다시 생기지 않게 하는 둘째 방어다.)
+/// </remarks>
+public sealed class MappingPresetOption
 {
+    /// <summary>생성자.</summary>
+    /// <param name="id">프리셋 PK. <c>null</c> = 없음.</param>
+    /// <param name="name">표시 이름.</param>
+    /// <param name="isRestrictedZone">감시금지구역이면 🔒 를 붙인다.</param>
+    public MappingPresetOption(int? id, string name, bool isRestrictedZone)
+    {
+        Id = id;
+        Name = name;
+        IsRestrictedZone = isRestrictedZone;
+    }
+
     /// <summary>"없음" 항목 — 콤보 맨 위에 늘 있다.</summary>
     public static readonly MappingPresetOption None = new(null, "없음", false);
+
+    /// <summary>프리셋 PK. <c>null</c> = 없음.</summary>
+    public int? Id { get; }
+
+    /// <summary>표시 이름.</summary>
+    public string Name { get; }
+
+    /// <summary>감시금지구역이면 🔒 를 붙인다.</summary>
+    public bool IsRestrictedZone { get; }
 
     /// <summary>콤보에 그리는 글자.</summary>
     public string Display => IsRestrictedZone ? $"🔒 {Name}" : Name;
