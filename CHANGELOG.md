@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - ROI 창 영상 띠 제거 (EVT-R26-12 · 2026-10-07)
+
+### Fixed
+- **ROI 설정 창 영상이 기준 해상도 틀 안에 좁게(양옆 검은 띠)** — 오버레이 상자(960 폭)가 "덮는 가장 낮은 해상도" 규칙으로 서브(cam66 720×480 · 3:2)를 고르고, 호스트가 비율 유지로 맞춰 넣어 16:9 틀 양옆에 띠가 남았다. 점은 틀(띠 포함) 기준 0~1 로 저장되므로 메인 영상 위치와 어긋났다. 이제 ROI 창은 **상자 꽉 채우기**로 연다 — 호스트가 비율과 관계없이 상자 크기로 디코딩한다(메인 · 서브는 같은 시야라 늘려 그리면 위치가 맞다). 프로파일 선택 규칙 · 프리셋 관리 창 · 지도 팝업 · 이벤트 창의 비율 유지는 그대로.
+- 계약: `VideoProviderInfo.FillBox`(기본 false) · `WithFillBox` · `IMappingCameraVideo.OpenVideo(..., fillBox)`(기본 구현 — 가짜 · 목 무영향) · `MappingCameraVideoViewModel.FillBox`. 프로토콜 판은 올리지 않았다(구판 호스트는 모르는 칸을 무시 — 예전처럼 띠).
+- 시험: Events.Ui `MappingRoiVideoFillTests` 5 · 호스트 `VideoFillBoxTests` 8 · 실제 호스트 · LibVLC `Survival/LibVlcFillBoxHostTests` 1(3:2 원본 → 16:9 상자, 기본은 띠 · 꽉 채우기는 끝까지) · 가짜 카메라 팜(`--size 1280x720 --sub-size 640x480` 모양) `RoiVideoFillFarmTests` 1(비율 유지 상자 양옆 100% 검정 → 서브 골라짐 재현, 꽉 채우기 0%).
+
 ## [Unreleased] - ROI 기준 해상도 자동 채우기 (2026-10-07)
 
 ### Changed

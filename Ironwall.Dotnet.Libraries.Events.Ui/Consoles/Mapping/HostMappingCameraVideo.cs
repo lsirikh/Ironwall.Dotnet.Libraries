@@ -101,6 +101,11 @@ public sealed class HostMappingCameraVideo : IMappingCameraVideo
 
     /// <inheritdoc/>
     public MappingCallResult<IFrameSource> OpenVideo(int cameraId, string streamId, int width, int height)
+        => OpenVideo(cameraId, streamId, width, height, fillBox: false);
+
+    /// <inheritdoc/>
+    /// <remarks>꽉 채우기는 제공자 정보(<see cref="VideoProviderInfo.FillBox"/>)에 실어 호스트로 보낸다 — 호스트가 상자 크기로 디코딩한다.</remarks>
+    public MappingCallResult<IFrameSource> OpenVideo(int cameraId, string streamId, int width, int height, bool fillBox)
     {
         try
         {
@@ -118,7 +123,7 @@ public sealed class HostMappingCameraVideo : IMappingCameraVideo
                     CameraId = camera.Id.ToString(CultureInfo.InvariantCulture),
                     Name = string.IsNullOrWhiteSpace(camera.DeviceName) ? $"카메라 {camera.Id}" : camera.DeviceName,
                 },
-                Provider = EventWindowPlanning.BuildProvider(camera, ReadSettings()),
+                Provider = EventWindowPlanning.BuildProvider(camera, ReadSettings()).WithFillBox(fillBox),
                 Width = w,
                 Height = h,
             });

@@ -48,11 +48,23 @@ public sealed class VideoProviderInfo
 
     public int TargetHeight { get; init; }
 
+    /// <summary>
+    /// 상자를 꽉 채워 그린다(비율 무시 · 검은 띠 없음). 기본 false = 비율 유지(띠). ROI 설정 창만 켠다 —
+    /// 점이 상자(기준 해상도 틀) 기준 0~1 로 저장되므로, 비율이 다른 서브 스트림(720×480 등)이 골라져도 메인 영상 위치와 맞게.
+    /// 메인 · 서브는 같은 시야라 늘려 그리면 위치가 맞는다. 구판 호스트는 이 칸을 모른 채 무시한다(예전처럼 띠).
+    /// </summary>
+    public bool FillBox { get; init; }
+
     /// <summary>ONVIF 로 주소를 못 얻었을 때 쓸 저장 주소(현행 "URL 조회 폴백").</summary>
     public string? FallbackUri { get; init; }
 
     /// <summary>그릴 크기만 바꾼 사본(호스트가 타일 · 오버레이 상자 크기를 실어 제공자에 넘긴다).</summary>
-    public VideoProviderInfo WithTarget(int width, int height) => new()
+    public VideoProviderInfo WithTarget(int width, int height) => Copy(width, height, FillBox);
+
+    /// <summary>상자 꽉 채우기만 바꾼 사본(ROI 설정 창).</summary>
+    public VideoProviderInfo WithFillBox(bool fillBox) => Copy(TargetWidth, TargetHeight, fillBox);
+
+    private VideoProviderInfo Copy(int width, int height, bool fillBox) => new()
     {
         Kind = Kind,
         Uri = Uri,
@@ -66,6 +78,7 @@ public sealed class VideoProviderInfo
         FallbackUri = FallbackUri,
         TargetWidth = Math.Max(0, width),
         TargetHeight = Math.Max(0, height),
+        FillBox = fillBox,
     };
 
     public override string ToString()

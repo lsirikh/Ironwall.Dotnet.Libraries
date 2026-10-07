@@ -72,6 +72,7 @@ internal sealed class ResolvingFrameProducer : IFrameProducer
                 Username = _provider.Username,
                 Password = _provider.Password,
                 OpenTimeoutMs = _provider.OpenTimeoutMs,
+                FillBox = _provider.FillBox,
             };
             IFrameProducer inner;
             lock (_gate)

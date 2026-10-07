@@ -394,6 +394,13 @@ public interface IMappingCameraVideo
     /// </summary>
     MappingCallResult<Ironwall.Dotnet.Libraries.CameraPopup.Frames.IFrameSource> OpenVideo(int cameraId, string streamId, int width, int height);
 
+    /// <summary>
+    /// <see cref="OpenVideo(int, string, int, int)"/> 에 상자 꽉 채우기를 더한 것 — <paramref name="fillBox"/> 가 참이면 영상을
+    /// 비율과 관계없이 상자(기준 해상도 틀)에 꽉 채워 그린다(ROI 설정 창). 기본 구현은 꽉 채우기를 무시하고 그냥 연다.
+    /// </summary>
+    MappingCallResult<Ironwall.Dotnet.Libraries.CameraPopup.Frames.IFrameSource> OpenVideo(int cameraId, string streamId, int width, int height, bool fillBox)
+        => OpenVideo(cameraId, streamId, width, height);
+
     /// <summary>카메라를 프리셋 자리로 움직일 수 있는 카메라인가(PTZ).</summary>
     bool CanGotoPreset(int cameraId);
 

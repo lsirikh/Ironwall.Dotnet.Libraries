@@ -76,7 +76,8 @@ public sealed class MappingRoiEditorViewModel : Screen
         CameraId = cameraId;
         PresetIndex = presetIndex;
         if (cameraVideo is not null && cameraId > 0)
-            Video = new MappingCameraVideoViewModel(cameraVideo, cameraId, $"mapping-roi-{presetId}");
+            // 영상은 기준 해상도 틀을 꽉 채운다 — 비율이 다른 서브(720×480 등)가 골라져도 점 위치가 메인 영상과 맞게.
+            Video = new MappingCameraVideoViewModel(cameraVideo, cameraId, $"mapping-roi-{presetId}") { FillBox = true };
     }
 
     /// <summary>그린 모양(점 · 닫힘)이 바뀌었다 — 캔버스가 다시 그린다.</summary>
