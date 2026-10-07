@@ -220,7 +220,10 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
     {
         try
         {
-            var (fw, fh) = VideoFit.Fit((int)width, (int)height, _width, _height);
+            // 상자 꽉 채우기(ROI 설정 창)면 비율을 무시하고 상자 크기로 디코딩한다 — 띠 없음.
+            var (fw, fh) = _provider.FillBox
+                ? VideoFit.Fill(_width, _height)
+                : VideoFit.Fit((int)width, (int)height, _width, _height);
             Marshal.WriteInt32(chroma, unchecked((int)Rv32));
             width = (uint)fw;
             height = (uint)fh;
@@ -393,4 +396,8 @@ internal static class VideoFit
         if (boxHeight - h <= 2 && (boxHeight & 1) == 0) h = boxHeight;
         return (Math.Max(2, w), Math.Max(2, h));
     }
+
+    /// <summary>상자 꽉 채우기 — 원본 비율과 관계없이 상자 크기(최소 2).</summary>
+    public static (int Width, int Height) Fill(int boxWidth, int boxHeight)
+        => (Math.Max(2, boxWidth), Math.Max(2, boxHeight));
 }

@@ -77,6 +77,12 @@ public sealed class MappingCameraVideoViewModel : PropertyChangedBase, IDisposab
     /// <summary>스트림 id.</summary>
     public string StreamId { get; }
 
+    /// <summary>
+    /// 영상을 상자에 꽉 채워 그린다(비율 무시 · 띠 없음) — ROI 설정 창. 상자가 기준 해상도 비율이라 점(0~1)이 메인 영상 위치와 맞는다.
+    /// 프리셋 관리 창은 끈 채로(비율 유지).
+    /// </summary>
+    public bool FillBox { get; init; }
+
     /// <summary>호스트가 쓰는 프레임(뷰가 그린다). 다시 열 때마다 바뀐다.</summary>
     public IFrameSource? FrameSource
     {
@@ -183,7 +189,9 @@ public sealed class MappingCameraVideoViewModel : PropertyChangedBase, IDisposab
             var old = _source;
             if (old is not null) old.StateChanged -= OnSourceStateChanged;
 
-            var result = _video.OpenVideo(CameraId, StreamId, _size.Width, _size.Height);
+            var result = FillBox
+                ? _video.OpenVideo(CameraId, StreamId, _size.Width, _size.Height, fillBox: true)
+                : _video.OpenVideo(CameraId, StreamId, _size.Width, _size.Height);
             if (result.IsSuccess && result.Value is { } source)
             {
                 _failMessage = string.Empty;
