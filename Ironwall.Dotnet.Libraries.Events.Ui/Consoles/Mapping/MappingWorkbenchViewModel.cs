@@ -994,9 +994,13 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
     internal Task PresetLoadTask => _presetLoadTask;
 
     /// <summary>타깃 프리셋 — 이벤트가 나면 카메라가 돌아갈 자리.</summary>
+    /// <remarks>
+    /// 목록을 다시 세우는 동안에는 <c>null</c> 이다 — 콤보는 항목이 비워지면 <c>null</c> 을 밀어 넣고 이 값을 곧바로 다시 읽는다.
+    /// 그때 목록 밖의 임시 항목을 주면 그것이 콤보에 남아, 다 세운 뒤 진짜 항목을 줘도 선택이 서지 않는다(EVT-DEMO-R26).
+    /// </remarks>
     public MappingPresetOption? SelectedTargetPreset
     {
-        get => _cameraRow is { } vm ? OptionFor(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted) : null;
+        get => !_rebuildingPresets && _cameraRow is { } vm ? OptionFor(vm.Row.TargetPresetId, vm.Row.TargetPresetName, vm.Row.TargetPresetRestricted) : null;
         set
         {
             if (_rebuildingPresets || value is null || !CanEditCameraRow) return;
@@ -1009,10 +1013,10 @@ public sealed class MappingWorkbenchViewModel : Screen, IDragDropHandler, IDropR
         }
     }
 
-    /// <summary>홈 프리셋 — 지연 뒤 돌아올 자리.</summary>
+    /// <summary>홈 프리셋 — 지연 뒤 돌아올 자리. 목록을 다시 세우는 동안에는 <c>null</c>(<see cref="SelectedTargetPreset"/> 참조).</summary>
     public MappingPresetOption? SelectedHomePreset
     {
-        get => _cameraRow is { } vm ? OptionFor(vm.Row.HomePresetId, vm.Row.HomePresetName, false) : null;
+        get => !_rebuildingPresets && _cameraRow is { } vm ? OptionFor(vm.Row.HomePresetId, vm.Row.HomePresetName, false) : null;
         set
         {
             if (_rebuildingPresets || value is null || !CanEditCameraRow) return;

@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - 맵핑 창 연동 칸 프리셋 빈칸 (EVT-DEMO-R26 · 2026-10-07)
+
+### Fixed
+- **카메라 연동 설정 칸의 [타깃 프리셋] · [홈 프리셋] 이 빈칸** — 줄 칩은 "타깃 P2 · 홈 P1" 인데 칸의 콤보가 비어 보였다. 콤보 `SelectedItem` 은 P2 였지만 `SelectedIndex` 는 -1 이었다(실제 뷰 진단). 프리셋 목록을 "불러오는 중" 자리 항목으로 한 번, 서버 목록으로 다시 세우는 사이 뷰모델이 목록 밖 임시 P2 를 내줬고, 항목이 record(값 동등)라 서버 P2 를 줘도 WPF 가 선택을 다시 하지 않았다. 이제 목록을 세우는 동안 선택 값은 `null`, 항목은 참조로만 같다.
+- 빈칸 상태에서 [적용] 해도 서버 프리셋 값은 지워지지 않았다(PATCH 는 행 값 vs 원본만 견준다 — 행은 12/11 그대로). 시험으로 고정.
+- 시험: `MappingCameraEditorComboBindingTests` 6건(실제 XAML 콤보 · 고른 번호와 칸 글자를 본다), 실제 뷰 `tests/Consoles.ViewTests/MappingCameraEditorViewTests` 2건(MaterialDesign · 창 없음).
+
 ## [Unreleased] - 맵핑 결함 G8 · G9 (2026-10-04)
 
 ### Fixed
