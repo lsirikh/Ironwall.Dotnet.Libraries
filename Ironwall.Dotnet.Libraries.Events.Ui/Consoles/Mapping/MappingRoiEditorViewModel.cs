@@ -51,6 +51,8 @@ public sealed class MappingRoiEditorViewModel : Screen
     private DialogMessageSeverity _messageSeverity = DialogMessageSeverity.Normal;
     private bool _isBusy;
     private bool _isConfirmingDelete;
+    private MappingVideoResolution? _cameraResolution;
+    private (string Width, string Height)? _autoSize;
 
     /// <summary>생성자.</summary>
     /// <param name="editor">서버 왕복.</param>
@@ -125,7 +127,7 @@ public sealed class MappingRoiEditorViewModel : Screen
             }
             else if (!_isNew)
             {
-                FillForm(string.Empty, true, DEFAULT_WIDTH, DEFAULT_HEIGHT, null, false, Array.Empty<MappingRoiPoint>(), closed: false);
+                FillForm(string.Empty, true, BasisWidth, BasisHeight, null, false, Array.Empty<MappingRoiPoint>(), closed: false);
             }
             NotifyForm();
         }
@@ -168,9 +170,18 @@ public sealed class MappingRoiEditorViewModel : Screen
         set { _editHeight = value ?? string.Empty; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanvasAspect)); NotifyValidation(); RaiseShape(); ResizeVideo(); }
     }
 
-    /// <summary>캔버스 가로/세로 비율 — 해상도가 틀렸으면 16:9.</summary>
+    /// <summary>캔버스 가로/세로 비율 — 해상도가 틀렸으면 카메라 해상도(모르면 16:9).</summary>
     public double CanvasAspect
-        => TryReadSize(out var w, out var h) ? w / h : DEFAULT_WIDTH / DEFAULT_HEIGHT;
+        => TryReadSize(out var w, out var h) ? w / h : BasisWidth / BasisHeight;
+
+    /// <summary>카메라 메인 스트림 해상도(호스트가 ONVIF 프로파일에서 읽어 준다). 못 읽었으면 <c>null</c>.</summary>
+    public MappingVideoResolution? CameraResolution => _cameraResolution;
+
+    /// <summary>새 ROI 기본 해상도 가로 — 카메라 해상도, 모르면 <see cref="DEFAULT_WIDTH"/>.</summary>
+    private double BasisWidth => _cameraResolution?.Width ?? DEFAULT_WIDTH;
+
+    /// <summary>새 ROI 기본 해상도 세로 — 카메라 해상도, 모르면 <see cref="DEFAULT_HEIGHT"/>.</summary>
+    private double BasisHeight => _cameraResolution?.Height ?? DEFAULT_HEIGHT;
 
     /// <summary>지금 그린 꼭짓점(정규화, 그린 순서).</summary>
     public IReadOnlyList<MappingRoiPoint> Points => _points;
@@ -343,6 +354,62 @@ public sealed class MappingRoiEditorViewModel : Screen
         var (w, h) = VideoSize(CanvasAspect);
         _ = Video.Resize(w, h);
     }
+
+    /// <summary>가장 최근 카메라 해상도 읽기 — 시험이 기다릴 때 쓴다.</summary>
+    internal Task ResolutionTask { get; private set; } = Task.CompletedTask;
+
+    /// <summary>
+    /// 카메라 메인 스트림 해상도를 읽어 새 ROI 의 기준 해상도로 쓴다(창이 처음 뜰 때). GIS 는 카메라를 직접 부르지 않는다 — 호스트 경유.
+    /// 못 읽으면 지금처럼(기존 ROI 해상도 → 1920×1080). 기존 ROI 의 읽은 값은 바꾸지 않는다.
+    /// </summary>
+    internal Task ReadCameraResolutionAsync() => ResolutionTask = ReadCameraResolutionCoreAsync();
+
+    private async Task ReadCameraResolutionCoreAsync()
+    {
+        if (_cameraVideo is null || CameraId <= 0) return;
+        try
+        {
+            var result = await _cameraVideo.ReadVideoResolutionAsync(CameraId);
+            if (result.IsSuccess && result.Value is { Width: > 0 and <= 100000, Height: > 0 and <= 100000 } size)
+                ApplyCameraResolution(size);
+        }
+        catch (Exception)
+        {
+            // 못 읽으면 기본 해상도 그대로 — 창은 흔들리지 않는다.
+        }
+    }
+
+    /// <summary>
+    /// 늦게 도착한 카메라 해상도를 반영한다 — 고른 것이 없으면 빈 캔버스 비율을, [새 ROI] 를 눌렀지만 아직 점이 없고
+    /// 해상도 칸을 손대지 않았으면 그 칸을 카메라 해상도로 바꾼다. 고른 기존 ROI · 그리기 시작한 새 ROI 는 건드리지 않는다.
+    /// </summary>
+    private void ApplyCameraResolution(MappingVideoResolution size)
+    {
+        _cameraResolution = size;
+        NotifyOfPropertyChange(nameof(CameraResolution));
+
+        if (!HasForm)
+        {
+            _editWidth = Num(size.Width);
+            _editHeight = Num(size.Height);
+        }
+        else if (_isNew && _points.Count == 0 && _autoSize is { } auto && auto.Width == _editWidth && auto.Height == _editHeight)
+        {
+            _editWidth = Num(size.Width);
+            _editHeight = Num(size.Height);
+            _autoSize = (_editWidth, _editHeight);
+        }
+        else
+        {
+            return;
+        }
+        NotifyOfPropertyChange(nameof(EditWidth));
+        NotifyOfPropertyChange(nameof(EditHeight));
+        NotifyOfPropertyChange(nameof(CanvasAspect));
+        NotifyValidation();
+        RaiseShape();
+        ResizeVideo();
+    }
     #endregion
 
     #region - 그리기 -
@@ -427,6 +494,7 @@ public sealed class MappingRoiEditorViewModel : Screen
     {
         LoadTask = LoadAsync();
         StartVideo();
+        _ = ReadCameraResolutionAsync();
         return Task.CompletedTask;
     }
 
@@ -472,17 +540,23 @@ public sealed class MappingRoiEditorViewModel : Screen
         }
     }
 
-    /// <summary>[새 ROI] — 빈 캔버스로 연다. 해상도는 기존 ROI 것을 따른다(없으면 1920×1080).</summary>
+    /// <summary>
+    /// [새 ROI] — 빈 캔버스로 연다. 해상도는 카메라 실제 해상도(메인 스트림)를 따르고,
+    /// 못 읽었으면 기존 ROI 것을(없으면 1920×1080).
+    /// </summary>
     public void BeginNew()
     {
         if (!CanBeginNew) return;
         var basis = Rois.FirstOrDefault(r => r.ResolutionWidth > 0 && r.ResolutionHeight > 0);
+        var (width, height) = _cameraResolution is { } camera
+            ? ((double)camera.Width, (double)camera.Height)
+            : (basis?.ResolutionWidth ?? DEFAULT_WIDTH, basis?.ResolutionHeight ?? DEFAULT_HEIGHT);
         _isNew = true;
         _selected = null;
         NotifyOfPropertyChange(nameof(SelectedRoi));
         IsConfirmingDelete = false;
-        FillForm(NextName(), true, basis?.ResolutionWidth ?? DEFAULT_WIDTH, basis?.ResolutionHeight ?? DEFAULT_HEIGHT,
-                 null, false, Array.Empty<MappingRoiPoint>(), closed: false);
+        FillForm(NextName(), true, width, height, null, false, Array.Empty<MappingRoiPoint>(), closed: false);
+        _autoSize = (_editWidth, _editHeight);
         Say(string.Empty);
         NotifyForm();
     }
@@ -619,14 +693,16 @@ public sealed class MappingRoiEditorViewModel : Screen
     {
         _editName = name;
         _editEnabled = enabled;
-        _editWidth = (width > 0 ? width : DEFAULT_WIDTH).ToString("0.##", CultureInfo.InvariantCulture);
-        _editHeight = (height > 0 ? height : DEFAULT_HEIGHT).ToString("0.##", CultureInfo.InvariantCulture);
+        _editWidth = Num(width > 0 ? width : DEFAULT_WIDTH);
+        _editHeight = Num(height > 0 ? height : DEFAULT_HEIGHT);
         _editExclusion = exclusion;
         _editPixelUnit = pixelUnit;
         _points.Clear();
         _points.AddRange(points);
         _isClosed = closed && _points.Count >= MappingRoiGeometry.MIN_POINTS;
     }
+
+    private static string Num(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     private void Say(string text, DialogMessageSeverity severity = DialogMessageSeverity.Normal)
     {

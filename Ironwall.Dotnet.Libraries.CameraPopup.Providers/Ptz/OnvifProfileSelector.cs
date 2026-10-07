@@ -55,6 +55,22 @@ public static class OnvifProfileSelector
         return ordered.ThenBy(p => p.HasAudio ? 1 : 0).First().Token;
     }
 
+    /// <summary>
+    /// 메인 스트림 해상도 — 해상도가 있는 프로파일 중 넓이가 가장 큰 것(동률이면 원 순서 첫 번째).
+    /// 해상도를 아는 프로파일이 없으면 null(ROI 기준 해상도 채우기 — 호출 쪽이 기본값으로 폴백).
+    /// </summary>
+    public static (int Width, int Height)? MainResolution(IReadOnlyList<ProfileInfo> profiles)
+    {
+        if (profiles == null) return null;
+        ProfileInfo? best = null;
+        foreach (var p in profiles)
+        {
+            if (p.Width <= 0 || p.Height <= 0) continue;
+            if (best is null || (long)p.Width * p.Height > (long)best.Value.Width * best.Value.Height) best = p;
+        }
+        return best is { } b ? (b.Width, b.Height) : null;
+    }
+
     /// <summary>재생 대상 프로파일 토큰 선택. 목록이 비면 null.</summary>
     public static string? Select(IReadOnlyList<ProfileInfo> profiles, bool preferSub = true)
     {

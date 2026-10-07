@@ -36,6 +36,12 @@ public sealed class CameraResponse : IIpcMessage
     /// <summary>GetImaging — 오토포커스 여부.</summary>
     public bool AutoFocus { get; init; }
 
+    /// <summary>GetVideoResolution — 메인 스트림 가로(px).</summary>
+    public int VideoWidth { get; init; }
+
+    /// <summary>GetVideoResolution — 메인 스트림 세로(px).</summary>
+    public int VideoHeight { get; init; }
+
     /// <summary>GIS 쪽에서 실패 응답을 만든다(호스트 없음 · 시간 초과 등).</summary>
     public static CameraResponse Fail(CameraRequest request, string errorCode, string? message = null) => new()
     {

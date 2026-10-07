@@ -2,6 +2,13 @@
 
 <!-- changelog-entries-start -->
 
+## [Unreleased] - ROI 기준 해상도 자동 채우기 (2026-10-07)
+
+### Changed
+- **새 ROI 기준 해상도 = 카메라 메인 스트림 해상도** — ROI 설정 창이 열릴 때 카메라 팝업 호스트에 새 요청 `GetVideoResolution` 을 보내, 호스트가 ONVIF 프로파일(준비 때 받은 캐시 — 추가 ONVIF 호출 없음) 중 해상도가 가장 큰 것을 돌려준다. [새 ROI] 는 이 값을 쓰고, 못 읽으면 지금처럼 기존 ROI 해상도 → 1920×1080. 늦게 도착하면 아직 점이 없고 해상도 칸을 손대지 않은 새 ROI · 고른 것 없는 빈 캔버스(영상 상자 비율)에만 반영한다. 기존 ROI 의 읽은 값은 바꾸지 않는다. GIS 는 카메라를 직접 부르지 않는다(호스트 경유).
+- 계약: `CameraRequestKind.GetVideoResolution` · `CameraResponse.VideoWidth/VideoHeight` · `ICameraPtzProvider.GetVideoResolutionAsync` · `IPtzController.GetMainVideoResolutionAsync` · `IMappingCameraVideo.ReadVideoResolutionAsync`(새 멤버는 모두 기본 구현 — 가짜 · 목 무영향). 프로토콜 판은 올리지 않았다(구판 호스트는 요청을 버리고 GIS 는 시간 초과 뒤 기본값).
+- 시험: Events.Ui `MappingRoiCameraResolutionTests` 13 · 호스트 `HostCameraServicesResolutionTests` 4 · 제공자 `VideoResolutionProviderTests` 5 · 호스트 exe 경유 `VideoResolutionHostTests` 1 · 가짜 카메라 팜(`--size 1280x1024` 모양) `VideoResolutionFarmTests` 1.
+
 ## [Unreleased] - 맵핑 결함 G8 · G9 (2026-10-04)
 
 ### Fixed

@@ -30,6 +30,9 @@ public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
 /// <summary>카메라(ONVIF)에 저장된 프리셋 1건 — 팝업 프리셋 탭 표시/이동/삭제 단위. Name은 빈 값 가능(표시측 폴백). (FR-C1)</summary>
 public sealed record PtzPresetInfo(string Token, string Name);
 
+/// <summary>카메라 메인 스트림 해상도(ONVIF 프로파일 VideoEncoder 해상도 중 최대) — ROI 기준 해상도 채우기.</summary>
+public sealed record CameraVideoResolution(int Width, int Height);
+
 /// <summary>
 /// 팝업 PTZ 제어의 단일 소유 앱서비스. (PRD FR-PTZCTL-01~03 / FR-WRAP-01)
 ///
@@ -144,6 +147,13 @@ public interface IPtzController
     /// (<see cref="Ptz.OnvifProfileSelector"/>) — 작은 타일은 서브, 큰 상자는 메인. 0 이면 <paramref name="preferSub"/> 만 본다.</param>
     Task<string?> ResolveStreamUriAsync(string cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default,
         int targetWidth = 0, int targetHeight = 0);
+
+    /// <summary>
+    /// 메인 스트림 해상도 — 준비(EnsureReady) 때 받아 둔 프로파일 캐시만 읽는다(ONVIF 호출을 더 하지 않는다).
+    /// 준비 안 됨 · 프로파일에 해상도 없음이면 null. 기본 구현은 null — 시험용 가짜가 이 멤버 때문에 깨지지 않게.
+    /// </summary>
+    Task<CameraVideoResolution?> GetMainVideoResolutionAsync(string cameraId, CancellationToken ct = default)
+        => Task.FromResult<CameraVideoResolution?>(null);
 
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(string cameraId);

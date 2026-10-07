@@ -419,6 +419,15 @@ internal sealed class HostCameraServices
                 return Result(r, await p.SetIrCutFilterAsync(cam, r.IrCutFilter!, ct).ConfigureAwait(false));
             case CameraRequestKind.SetAutoFocus:
                 return Result(r, await p.SetAutoFocusAsync(cam, r.AutoFocus, ct).ConfigureAwait(false));
+            case CameraRequestKind.GetVideoResolution:
+                var resolution = await p.GetVideoResolutionAsync(cam, ct).ConfigureAwait(false);
+                return resolution is not { Width: > 0, Height: > 0 }
+                    ? CameraResponse.Fail(r, CameraErrorCodes.Failed, "GetVideoResolution")
+                    : new CameraResponse
+                    {
+                        RequestId = r.RequestId, Kind = r.Kind, CameraId = cam, Success = true,
+                        VideoWidth = resolution.Width, VideoHeight = resolution.Height,
+                    };
             default:
                 return CameraResponse.Fail(r, CameraErrorCodes.BadRequest, $"unknown kind {r.Kind}");
         }

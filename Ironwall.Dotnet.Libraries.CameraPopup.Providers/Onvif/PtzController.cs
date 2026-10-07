@@ -688,6 +688,39 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] StreamUri 조회 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
+    /// <summary>메인 스트림 해상도 — 워밍 때 받아 둔 프로파일만 읽는다(추가 ONVIF 호출 없음). ROI 기준 해상도 채우기.</summary>
+    public async Task<CameraVideoResolution?> GetMainVideoResolutionAsync(string cameraId, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx)) return null;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var profiles = ctx.Model?.Profiles;
+                if (profiles == null || profiles.Count == 0) return null;
+                var infos = profiles
+                    .Where(p => p != null)
+                    .Select(p => new OnvifProfileSelector.ProfileInfo(
+                        p.token ?? string.Empty,
+                        p.VideoEncoderConfiguration?.Resolution?.Width ?? 0,
+                        p.VideoEncoderConfiguration?.Resolution?.Height ?? 0,
+                        p.AudioEncoderConfiguration != null))
+                    .ToList();
+                var main = OnvifProfileSelector.MainResolution(infos);
+                if (main is not { } m)
+                {
+                    _log?.Info($"[PTZ] 메인 해상도 없음 cam={cameraId} — 프로파일에 해상도 정보 없음(profiles={profiles.Count}).");
+                    return null;
+                }
+                return new CameraVideoResolution(m.Width, m.Height);
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception ex) { _log?.Error($"[PTZ] 메인 해상도 조회 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
+    }
+
     private bool TryImaging(string cameraId, out CamCtx ctx)
     {
         ctx = null!;
