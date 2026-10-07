@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -385,27 +384,15 @@ public class HelpTip : ToggleButton
 
     #region - Placement -
     /// <summary>
-    /// 팝업의 사용자 배치 — 판정은 <see cref="HelpCalloutPlacement.Resolve"/>(순수 함수), 여기서는 단위만 맞춘다.
-    /// 콜백이 주는 크기의 단위(DIU 또는 장치 픽셀)는 "?" 의 실제 폭과 견주어 알아낸다 — 어느 쪽이든 같은 단위로 작업 영역을 옮겨 판정한다.
+    /// 팝업의 사용자 배치 — 판정은 <see cref="HelpCalloutPlacement.Resolve(Rect, Size, Rect, Rect)"/>(순수 함수, 창 안 우선 → 작업 영역),
+    /// 여기서는 단위만 맞춘다(<see cref="PopupScreenBounds"/>). 화면에 붙기 전이면 판정 없이 아래에.
     /// </summary>
     private CustomPopupPlacement[] Place(Size popupSize, Size targetSize, Point offset)
     {
         var target = new Rect(new Point(0, 0), targetSize);
-        var bounds = Rect.Empty;
-        try
-        {
-            if (PresentationSource.FromVisual(this) is not null && ActualWidth > 0 && WorkAreaPixels(PointToScreen(new Point(0, 0))) is { } work)
-            {
-                var origin = PointToScreen(new Point(0, 0));
-                var dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
-                var unitsPerPixel = targetSize.Width / ActualWidth / (dpi <= 0 ? 1 : dpi);
-                bounds = new Rect((work.Left - origin.X) * unitsPerPixel, (work.Top - origin.Y) * unitsPerPixel,
-                                  work.Width * unitsPerPixel, work.Height * unitsPerPixel);
-            }
-        }
-        catch (InvalidOperationException) { bounds = Rect.Empty; }   // 화면에 붙기 전 — 판정 없이 아래에
+        var (window, work) = PopupScreenBounds.For(this, targetSize);
 
-        var result = HelpCalloutPlacement.Resolve(target, popupSize, bounds);
+        var result = HelpCalloutPlacement.Resolve(target, popupSize, window, work);
         if (_callout is not null)
         {
             var scale = ActualWidth > 0 && targetSize.Width > 0 ? ActualWidth / targetSize.Width : 1;
@@ -413,37 +400,6 @@ public class HelpTip : ToggleButton
             _callout.TailOffset = result.TailOffset * scale;
         }
         return new[] { new CustomPopupPlacement(result.Position, PopupPrimaryAxis.None) };
-    }
-
-    private static Rect? WorkAreaPixels(Point screenPoint)
-    {
-        var monitor = NativeMethods.MonitorFromPoint(new NativeMethods.POINT { X = (int)screenPoint.X, Y = (int)screenPoint.Y }, NativeMethods.MONITOR_DEFAULTTONEAREST);
-        if (monitor == IntPtr.Zero) return null;
-        var info = new NativeMethods.MONITORINFO { cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>() };
-        if (!NativeMethods.GetMonitorInfo(monitor, ref info)) return null;
-        var w = info.rcWork;
-        return new Rect(w.Left, w.Top, w.Right - w.Left, w.Bottom - w.Top);
-    }
-
-    private static class NativeMethods
-    {
-        public const int MONITOR_DEFAULTTONEAREST = 2;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct POINT { public int X; public int Y; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public int dwFlags; }
-
-        [DllImport("user32.dll")]
-        public static extern IntPtr MonitorFromPoint(POINT pt, int flags);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     }
     #endregion
 }

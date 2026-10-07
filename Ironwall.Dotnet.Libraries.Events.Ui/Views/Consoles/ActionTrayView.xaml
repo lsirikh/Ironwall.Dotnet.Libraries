@@ -137,7 +137,10 @@
 						md:HintAssist.Hint="기타 내용을 적으세요"
 						Text="{Binding Tray.Memo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 						Visibility="{Binding Tray.IsEtc, Converter={StaticResource BoolToVis}}" />
+					<!--  트레이는 창 맨 아래다 — 목록이 아래로만 펼쳐져 창 밖 · 작업 표시줄까지 내려갔다(실창 점검 2026-10-08).
+					     DropDownFit 이 창(작업 영역) 안에 들어오게 위로 펼치고, 문구가 늘면 높이를 잘라 스크롤한다.  -->
 					<ComboBox
+						c:DropDownFit.IsEnabled="True"
 						AutomationProperties.AutomationId="Console.Events.Tray.Phrase"
 						FontSize="12"
 						IsEditable="False"
