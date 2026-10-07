@@ -59,6 +59,13 @@ public interface ICameraPtzProvider
 
     Task StopFocusAsync(string cameraId, CancellationToken ct);
 
+    /// <summary>
+    /// 메인 스트림 해상도(<see cref="IPtzController.GetMainVideoResolutionAsync"/>) — ROI 기준 해상도 채우기.
+    /// 모르면 null. 기본 구현은 null(지원 안 하는 제공자 · 시험용 가짜).
+    /// </summary>
+    Task<CameraVideoResolution?> GetVideoResolutionAsync(string cameraId, CancellationToken ct)
+        => Task.FromResult<CameraVideoResolution?>(null);
+
     /// <summary>캐시 버리기(멱등).</summary>
     void Release(string cameraId);
 }

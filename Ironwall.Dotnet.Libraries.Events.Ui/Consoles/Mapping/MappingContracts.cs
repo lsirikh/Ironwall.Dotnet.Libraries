@@ -399,7 +399,19 @@ public interface IMappingCameraVideo
 
     /// <summary>카메라를 그 번호의 프리셋 자리로 움직인다(ONVIF GotoPreset — 이벤트 경로와 같은 토큰).</summary>
     Task<MappingCallResult<bool>> GotoPresetAsync(int cameraId, int presetIndex, CancellationToken token = default);
+
+    /// <summary>
+    /// 카메라 메인 스트림 해상도(ONVIF 프로파일 중 최대) — 새 ROI 의 기준 해상도를 채운다.
+    /// 못 읽으면 실패 결과(호출 쪽은 기본 해상도로 폴백). 기본 구현은 "읽을 수 없음".
+    /// </summary>
+    Task<MappingCallResult<MappingVideoResolution>> ReadVideoResolutionAsync(int cameraId, CancellationToken token = default)
+        => Task.FromResult(MappingCallResult<MappingVideoResolution>.Fail("카메라 해상도를 읽을 수 없습니다."));
 }
+
+/// <summary>카메라 영상 해상도(px).</summary>
+/// <param name="Width">가로.</param>
+/// <param name="Height">세로.</param>
+public sealed record MappingVideoResolution(int Width, int Height);
 
 /// <summary>
 /// 한 번의 서버 왕복 결과. <b>실패 사유를 사용자 문구와 원문으로 갈라서</b> 들고 온다.

@@ -179,6 +179,40 @@ public sealed class HostMappingCameraVideo : IMappingCameraVideo
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>호스트에 <see cref="CameraRequestKind.GetVideoResolution"/> 를 보낸다 — 호스트가 ONVIF 프로파일(준비 때 받은 캐시)에서 답한다.</remarks>
+    public async Task<MappingCallResult<MappingVideoResolution>> ReadVideoResolutionAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            var camera = _directory.FindCamera(cameraId);
+            if (camera is null)
+                return MappingCallResult<MappingVideoResolution>.Fail("장비 목록에서 이 카메라를 찾지 못해 해상도를 읽을 수 없습니다.");
+
+            var control = _control();
+            if (control is null || !control.IsAvailable)
+                return MappingCallResult<MappingVideoResolution>.Fail("영상 기능을 쓸 수 없어 카메라 해상도를 읽지 못했습니다.");
+
+            var response = await control.RequestAsync(new CameraRequest
+            {
+                Kind = CameraRequestKind.GetVideoResolution,
+                CameraId = camera.Id.ToString(CultureInfo.InvariantCulture),
+                Provider = EventWindowPlanning.BuildProvider(camera, ReadSettings()),
+            }, token).ConfigureAwait(false);
+
+            if (response.Success && response.VideoWidth > 0 && response.VideoHeight > 0)
+                return MappingCallResult<MappingVideoResolution>.Ok(new MappingVideoResolution(response.VideoWidth, response.VideoHeight));
+
+            _log?.Info($"[MappingVideo] 카메라 해상도 읽기 실패 cam={cameraId}: {response.ErrorCode} {response.Message}");
+            return MappingCallResult<MappingVideoResolution>.Fail("카메라 해상도를 읽지 못했습니다.", response.Message);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[MappingVideo] 카메라 해상도 읽기 예외 cam={cameraId}: {ex.GetType().Name} {ex.Message}");
+            return MappingCallResult<MappingVideoResolution>.Fail("카메라 해상도를 읽지 못했습니다.", ex.Message);
+        }
+    }
+
     private CameraPopupSettings ReadSettings()
     {
         try { return _settings(); }

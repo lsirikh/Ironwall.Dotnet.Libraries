@@ -37,5 +37,6 @@ public sealed class ExternalVmsProvider : ICameraVideoProvider, ICameraPtzProvid
     public Task<bool> SetAutoFocusAsync(string cameraId, bool auto, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task<bool> StartFocusAsync(string cameraId, int direction, CancellationToken ct) => throw new NotSupportedException(Message);
     public Task StopFocusAsync(string cameraId, CancellationToken ct) => throw new NotSupportedException(Message);
+    public Task<CameraVideoResolution?> GetVideoResolutionAsync(string cameraId, CancellationToken ct) => throw new NotSupportedException(Message);
     public void Release(string cameraId) { }
 }

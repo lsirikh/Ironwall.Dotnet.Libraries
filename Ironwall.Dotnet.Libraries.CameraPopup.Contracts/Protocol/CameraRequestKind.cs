@@ -22,6 +22,8 @@ public enum CameraRequestKind
     GetImaging = 7,
     SetIrCutFilter = 8,
     SetAutoFocus = 9,
+    /// <summary>메인 스트림(ONVIF 프로파일 중 해상도 최대) 해상도 — ROI 기준 해상도 채우기.</summary>
+    GetVideoResolution = 10,
 }
 
 /// <summary>호스트 응답의 실패 사유 코드(기계 판독용 — 화면 문구는 GIS 가 고른다).</summary>

@@ -96,6 +96,9 @@ public sealed class OnvifPtzProvider : ICameraPtzProvider
         return true;
     }
 
+    public Task<CameraVideoResolution?> GetVideoResolutionAsync(string cameraId, CancellationToken ct)
+        => Bounded(_controller.GetMainVideoResolutionAsync(cameraId, ct), ct, null);
+
     public void Release(string cameraId) => _controller.Release(cameraId);
 
     /// <summary>
