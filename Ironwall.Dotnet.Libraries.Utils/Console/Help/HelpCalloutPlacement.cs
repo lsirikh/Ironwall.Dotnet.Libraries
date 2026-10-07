@@ -41,20 +41,31 @@ public static class HelpCalloutPlacement
     /// <summary>"?" 를 왼쪽에 두고 펼칠 때 꼬리 중심의 기본 자리(카드 왼쪽에서) — 스토리보드처럼 말풍선이 "?" 에서 오른쪽으로 펼쳐진다.</summary>
     public const double PreferredTailInset = 20;
 
+    /// <summary>
+    /// 창 우선 배치 — 말풍선이 "?" 가 있는 창(<paramref name="window"/>, 작업 영역 <paramref name="screen"/> 과 겹친 부분) 안에
+    /// 통째로 들어가는 쪽이 있으면 그 안에 둔다. 창 안 어디에도 안 들어가면(작은 대화창) 작업 영역 기준(<see cref="Resolve(Rect, Size, Rect)"/>)으로 돌아간다.
+    /// </summary>
+    /// <remarks>
+    /// 2026-10-08 실창 점검: 부대 창 오른쪽 끝 "?" 의 말풍선이 작업 영역 기준으로만 밀려 창 오른쪽 밖으로 펼쳐졌고
+    /// 창 안에서는 잘려 보였다 — 경계를 창으로 좁혀 창 안쪽으로 펼친다.
+    /// </remarks>
+    public static HelpCalloutPlacementResult Resolve(Rect target, Size callout, Rect window, Rect screen)
+    {
+        var inner = window;
+        if (!inner.IsEmpty && !screen.IsEmpty) inner.Intersect(screen);
+        if (!inner.IsEmpty && inner.IntersectsWith(target) && TryFit(target, callout, inner, out var inWindow)) return inWindow;
+        return Resolve(target, callout, screen);
+    }
+
     public static HelpCalloutPlacementResult Resolve(Rect target, Size callout, Rect bounds)
     {
         var below = new Point(0, target.Bottom + Gap);
         var above = new Point(0, target.Top - Gap - callout.Height);
-        var left = new Point(target.Left - Gap - callout.Width, 0);
-        var right = new Point(target.Right + Gap, 0);
 
         if (bounds.IsEmpty || !bounds.IntersectsWith(target))
             return Horizontal(HelpCalloutSide.Below, below.Y, target, callout, bounds, clamp: false);
 
-        if (below.Y + callout.Height <= bounds.Bottom) return Horizontal(HelpCalloutSide.Below, below.Y, target, callout, bounds, clamp: true);
-        if (above.Y >= bounds.Top) return Horizontal(HelpCalloutSide.Above, above.Y, target, callout, bounds, clamp: true);
-        if (left.X >= bounds.Left) return Vertical(HelpCalloutSide.Left, left.X, target, callout, bounds);
-        if (right.X + callout.Width <= bounds.Right) return Vertical(HelpCalloutSide.Right, right.X, target, callout, bounds);
+        if (TryFit(target, callout, bounds, out var fitted)) return fitted;
 
         // 어디에도 통째로 안 들어간다 — 위 · 아래 중 넓은 쪽에 두고 세로로도 경계 안에 민다(겹침은 피할 수 없다).
         var roomBelow = bounds.Bottom - target.Bottom;
@@ -63,6 +74,28 @@ public static class HelpCalloutPlacement
         var y = side == HelpCalloutSide.Below ? below.Y : above.Y;
         y = Clamp(y, bounds.Top, bounds.Bottom - callout.Height);
         return Horizontal(side, y, target, callout, bounds, clamp: true);
+    }
+
+    /// <summary>아래 → 위 → 왼쪽 → 오른쪽 순으로 경계 안에 통째로(가로 · 세로 모두) 들어가는 쪽.</summary>
+    private static bool TryFit(Rect target, Size callout, Rect bounds, out HelpCalloutPlacementResult result)
+    {
+        var below = target.Bottom + Gap;
+        var above = target.Top - Gap - callout.Height;
+        var left = target.Left - Gap - callout.Width;
+        var right = target.Right + Gap;
+        var fitsAcross = callout.Width <= bounds.Width;
+        var fitsAlong = callout.Height <= bounds.Height;
+
+        if (fitsAcross && below + callout.Height <= bounds.Bottom) result = Horizontal(HelpCalloutSide.Below, below, target, callout, bounds, clamp: true);
+        else if (fitsAcross && above >= bounds.Top) result = Horizontal(HelpCalloutSide.Above, above, target, callout, bounds, clamp: true);
+        else if (fitsAlong && left >= bounds.Left) result = Vertical(HelpCalloutSide.Left, left, target, callout, bounds);
+        else if (fitsAlong && right + callout.Width <= bounds.Right) result = Vertical(HelpCalloutSide.Right, right, target, callout, bounds);
+        else
+        {
+            result = default;
+            return false;
+        }
+        return true;
     }
 
     private static HelpCalloutPlacementResult Horizontal(HelpCalloutSide side, double y, Rect target, Size callout, Rect bounds, bool clamp)
