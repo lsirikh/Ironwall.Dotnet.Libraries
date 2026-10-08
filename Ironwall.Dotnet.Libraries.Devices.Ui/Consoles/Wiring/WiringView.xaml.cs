@@ -277,13 +277,18 @@ public partial class WiringView : UserControl
         if (key == Key.F && modifiers == ModifierKeys.None) { vm.FlipSelectedSlotFacing(); return true; }
 
         if (key == Key.Delete) { vm.UnplaceSelected(); return true; }
+
+        // Ctrl+Z = 되돌리기 — 3D 캔버스 · 개념도와 같은 키(알림 「… Ctrl+Z 로 취소」가 표 보기에서도 맞게 · 정적 판독 D2).
+        if (key == Key.Z && modifiers == ModifierKeys.Control) { vm.Undo(); return true; }
         return false;
     }
 
-    /// <summary>팔레트의 키보드 폴백 — Enter = 결선 끝에 붙이기.</summary>
+    /// <summary>팔레트의 키보드 폴백 — Enter = 결선 끝에 붙이기 · Ctrl+Z = 되돌리기.</summary>
     private void OnPalettePreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || ViewModel is not { } vm) return;
+        if (ViewModel is not { } vm) return;
+        if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) { vm.Undo(); e.Handled = true; return; }
+        if (e.Key != Key.Enter) return;
         if (sender is not ListBox list) return;
 
         vm.PlaceManyFromPalette(list.SelectedItems.OfType<SensorRowViewModel>().ToList());
