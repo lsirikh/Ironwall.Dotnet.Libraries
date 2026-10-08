@@ -18,7 +18,8 @@
 - [x] 겹창 렌더(라이트/다크) 시험 `tests/GMaps.PropertyPanel.Tests/MapOverlayPanelThemeLayoutTests.cs`(14종 × 2 = 28건)
 - [~] 위치(홈 · 고정): MAP-003 은 벤더 GMapControl 지연 이벤트(_lazyEvents)가 창 Loaded 뒤에만 풀려 창 없이 재현 불가 → 헤디드 남김(순수 수학은 기존 AnchorViewportClampTests)
 - [x] 결과표(항목 id 별) 정리 — 아래
-- [ ] 두 시험 프로젝트 전체 회귀 실행 · `dotnet test Ironwall.Dotnet.Libraries.sln`
+- [x] 두 시험 프로젝트 전체 회귀: GMaps.Housing.Tests 277/277 · GMaps.PropertyPanel.Tests 255/255 통과
+- [x] `dotnet test Ironwall.Dotnet.Libraries.sln` 1회차: 2521 통과 / 1 실패 — `CameraPopup.Host.Tests.DispatcherStarvationTests`(시간 한도 2000ms 에 2339ms). 이 프로젝트는 GMaps.Ui 를 참조하지 않아 변경과 무관하고, 검사 시각에 내가 띄운 백그라운드 시험이 같이 돌던 CPU 부하 탓. 단독 재실행 8/8 통과. 교훈: 하네스 검사 전에는 백그라운드 작업을 남기지 않는다.
 
 ## 항목별 결과(이번 작업에서 새로 본 것)
 - 통과: MAP-052 · 053 · 055 · 056 · 057 · 058 · 059(재적재) · 067 · 068(보임 복원) · 080 · 106(스냅샷 · 되돌리기 왕복) · 109 · 111 · 112 · 113 · 114 · 116 · 117 · 118(값 왕복) · 119 · 134(그룹 빈칸 표기) · 137 · 139(다시 열기 · 스냅샷) · 190(14종)
