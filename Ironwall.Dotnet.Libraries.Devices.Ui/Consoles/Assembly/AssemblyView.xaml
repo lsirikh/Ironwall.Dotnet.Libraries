@@ -463,15 +463,15 @@
 											Style="{StaticResource Console.CheckBox}" />
 									</c:ConsoleField>
 									<c:ConsoleField ApiName="manufacturer" Header="제조사">
-										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Manufacturer, UpdateSourceTrigger=PropertyChanged}" />
+										<TextBox AutomationProperties.AutomationId="Devices.Assembly.Field.manufacturer" Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Manufacturer, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
 									<c:ConsoleField ApiName="model" Header="모델">
-										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Model, UpdateSourceTrigger=PropertyChanged}" />
+										<TextBox AutomationProperties.AutomationId="Devices.Assembly.Field.model" Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Model, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
 									<c:ConsoleField
 										ApiName="serial"
 										Header="일련번호">
-										<TextBox Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Serial, UpdateSourceTrigger=PropertyChanged}" />
+										<TextBox AutomationProperties.AutomationId="Devices.Assembly.Field.serial" Style="{StaticResource Asm.TextBox}" Text="{Binding Inspected.Slot.Serial, UpdateSourceTrigger=PropertyChanged}" />
 									</c:ConsoleField>
 								</StackPanel>
 							</c:ConsoleSection>

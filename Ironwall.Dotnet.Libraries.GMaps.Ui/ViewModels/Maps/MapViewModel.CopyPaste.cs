@@ -152,29 +152,39 @@ public partial class MapViewModel
 
             // 3. 타입별 Insert + Fetch (파생 우선순위: PidsGroup > Line > Geometric/Military/Infra/Pids > SymbolModel).
             //    반드시 Fetch 결과(새 Id 보유)를 반환 — PIDS의 `= pidsSymbol`(Id=0) 버그 계승 금지.
+            //    타입별 INSERT 는 라벨 스타일 6종을 쓰지 않는다(Overlay_Title FR-06 — 전용 부분 UPDATE 전략). Fetch 전에 원본 스타일을
+            //    새 행에 이어 써야 복사본이 같은 라벨로 보이고 다시 불러와도 같다(2026-10-08 헤드리스 점검 D2).
+            int id;
             switch (clone)
             {
                 case PidsGroupSymbolModel m:
-                    return await _gMapDbSymbolService.FetchPidsGroupSymbolAsync(
-                        await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchPidsGroupSymbolAsync(id, token);
                 case LineSymbolModel m:
-                    return await _gMapDbSymbolService.FetchLineSymbolAsync(
-                        await _gMapDbSymbolService.InsertLineSymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertLineSymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchLineSymbolAsync(id, token);
                 case GeometricSymbolModel m:
-                    return await _gMapDbSymbolService.FetchGeometrySymbolAsync(
-                        await _gMapDbSymbolService.InsertGeometrySymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertGeometrySymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchGeometrySymbolAsync(id, token);
                 case MilitarySymbolModel m:
-                    return await _gMapDbSymbolService.FetchMilitarySymbolAsync(
-                        await _gMapDbSymbolService.InsertMilitarySymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertMilitarySymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchMilitarySymbolAsync(id, token);
                 case InfraSymbolModel m:
-                    return await _gMapDbSymbolService.FetchInfraSymbolAsync(
-                        await _gMapDbSymbolService.InsertInfraSymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertInfraSymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchInfraSymbolAsync(id, token);
                 case PidsSymbolModel m:
-                    return await _gMapDbSymbolService.FetchPidsSymbolAsync(
-                        await _gMapDbSymbolService.InsertPidsSymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertPidsSymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchPidsSymbolAsync(id, token);
                 case SymbolModel m:
-                    return await _gMapDbSymbolService.FetchSymbolAsync(
-                        await _gMapDbSymbolService.InsertSymbolAsync(m, token), token);
+                    id = await _gMapDbSymbolService.InsertSymbolAsync(m, token);
+                    await PersistLabelStyleAsync(id, m, token);
+                    return await _gMapDbSymbolService.FetchSymbolAsync(id, token);
                 default:
                     _log?.Warning($"[복사] 지원되지 않는 심볼 타입: {clone.GetType().Name}");
                     return null;
@@ -185,6 +195,19 @@ public partial class MapViewModel
             _log?.Error($"[복사] 심볼 생성 실패({clone?.GetType().Name}): {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>라벨 스타일 6종을 새로 만든(또는 되살린) 행에 부분 UPDATE — INSERT 계열이 스타일 컬럼을 쓰지 않아서다.
+    /// 실패해도 심볼 생성 자체는 살린다(기존 DbUpdateProcess 의 라벨 스타일 영속과 같은 정책 — 로그로 표면화).</summary>
+    private async Task PersistLabelStyleAsync(int id, ISymbolModel m, CancellationToken token = default)
+    {
+        if (id <= 0 || m == null) return;
+        try
+        {
+            await _gMapDbSymbolService.UpdateSymbolLabelStyleAsync(id, m.TitleColor, m.TitleBackground,
+                m.TitleFontFamily, m.TitleBold, m.TitleItalic, m.TitleMaxWidth, token);
+        }
+        catch (Exception ex) { _log?.Error($"라벨 스타일 부분 영속 실패(새 행 Id={id}): {ex.Message}"); }
     }
 
     /// <summary>복사 변형(순수·DB무관, 단위테스트 대상) — 딥클론 모델을 targetPos로 재배치 + LinePoints(Line/PidsGroup)
