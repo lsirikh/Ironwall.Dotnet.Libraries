@@ -2,6 +2,7 @@
 using System;
 using System.Windows.Media;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
@@ -263,6 +264,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         protected virtual void UpdateInfraAppearance()
         {
             if (Marker == null || _isUpdatingFromMarker) return;
+            // 기반 컨트롤과 같은 이유(D1) — 채우기 · 테두리가 사용자 FillColor/StrokeColor 바인딩에 묶인 뒤엔 로컬 값으로 덮지 않는다.
+            if (BindingOperations.IsDataBound(this, MarkerFillProperty) || BindingOperations.IsDataBound(this, MarkerStrokeProperty)) return;
 
             // 건물 타입별 색상
             MarkerFill = BuildingType switch

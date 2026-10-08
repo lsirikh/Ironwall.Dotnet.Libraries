@@ -10037,14 +10037,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 var imgMarker = FindImageMarkerByFilePath(model.FilePath);
                 if (imgMarker != null)
-                {
-                    imgMarker.IsLayerEnabled = model.IsVisible;
-                    imgMarker.IsVisible = model.IsVisible;
-                    if (imgMarker is IEditableMarker editableImg)
-                        ((IEditableMarker)editableImg).ZOrder = model.ZOrder;
-                    else
-                        imgMarker.ZIndex = model.ZOrder;
-                }
+                    ApplyOverlayImageLayerState(imgMarker, model);
                 else
                     _log?.Warning($"[Restore] OverlayImage 마커 미발견: {model.FilePath}");
             }
@@ -10055,6 +10048,17 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         MainMap?.InvalidateVisual();
         AggregateLeafCheckedFromMarkers();
+    }
+
+    /// <summary>오버레이 이미지 레이어 행(MapLayers)의 보임 · 순서 · 투명도를 지도 이미지 마커에 되돌린다(재시작 · 레이어 리로드).
+    /// 투명도는 레이어 패널 슬라이더가 MapLayers 에만 저장하므로 여기서 빠지면 다시 켰을 때 슬라이더 값과 그림이 어긋났다
+    /// (2026-10-08 헤드리스 점검 D3). 보임과 같은 규칙 — 레이어 행이 정본.</summary>
+    internal static void ApplyOverlayImageLayerState(GMapSymbols.GMapImageMarker imgMarker, IMapLayerModel model)
+    {
+        imgMarker.IsLayerEnabled = model.IsVisible;
+        imgMarker.IsVisible = model.IsVisible;
+        ((IEditableMarker)imgMarker).ZOrder = model.ZOrder;
+        imgMarker.Opacity = model.Opacity;
     }
 
     /// <summary>라벨 어도너 강제 재렌더 준비 — 투영(ViewArea) 유효 시 즉시 RefreshAll, 아니면 첫 타일 로드 후 1회.
@@ -10139,6 +10143,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 {
                     marker.Opacity = e.Opacity;
                     MainMap.InvalidateVisual();
+                    // 이미지 행(Images.Opacity)도 같이 — 보임 토글 경로(OnLayerVisibilityChanged)와 같은 규칙. 빠지면 속성창 · 다시 불러오기가 옛 값을 읽었다(D3).
+                    if (CanEditMap()) await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
                 }
             }
             if (CanEditMap())   // FR-PG-11: 로컬 렌더는 허용, DB 영속만 권한 필요 (FR-EN-08)
