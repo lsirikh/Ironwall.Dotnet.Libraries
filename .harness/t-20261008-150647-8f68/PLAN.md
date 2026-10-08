@@ -15,6 +15,8 @@
 - [x] 새 시험 4파일(107건): `WiringFenceGapTests.cs` · `WiringCanvasGapTests.cs` · `WiringSaveGapTests.cs` · `AssemblyGapTests.cs`
 - [x] 회귀: 관련 기존 헤드리스 클래스 327건 통과 · Utils.Tests XAML/도움말 계약 78건 통과
 
+- [x] 하네스 검사 1회차 실패 1건 = `CameraPopup.Tests.SupervisorSurvivalTests.should_suspend_after_four_crashes...` — 부하로 첫 기동 연결이 시간 초과돼 충돌 1회로 세어진 시간 의존 실패(로그 `connect failed: OperationCanceledException`). 이번 변경과 무관(CameraPopup 미수정 · Devices.Ui 는 sln 밖). 단독 12/12 · `dotnet test sln` 재실행 전부 통과.
+
 ## 고친 결함
 - **D1** `WiringViewModel.ShowBandPicker` 가 접힌 속성 칸을 펴지 않음 → `IsDetailPaneOpen = true`.
 - **D2** 표 보기 줄 · 팔레트에 Ctrl+Z 없음(알림은 「Ctrl+Z 로 취소」) → `WiringView.HandleLineKey` · `OnPalettePreviewKeyDown` 에 `vm.Undo()`.
