@@ -33,6 +33,9 @@ check_timeout_min: 20
 - 되돌릴 수 없거나 밖으로 나가는 일(push · 사용자 브랜치 병합 · 삭제 · 외부 시스템 쓰기 · 비밀 다루기)은 완성된 결과를 보여 주고 한 번만 승인받는다.
 - 무엇이 끝인지 처음에 정하고 끝날 때까지 간다 — 중간 요약이나 "계속할까요?" 로 멈추지 않는다.
 
+### 언어
+- 사람이 읽는 것(대답 · 진행 보고 · 요약 · 문서 · PLAN.md · BLOCKED.md · 커밋 메시지)은 **사용자가 쓰는 언어**로 쓴다 — 이 사용자는 한국어. 작업 도중 영어로 바꾸지 않는다. 식별자 · 명령 · 경로 · 원문 인용은 그대로 둔다.
+
 ### git
 - git 쓰기는 하네스를 거친다. 사용자 브랜치로의 병합 · push · 브랜치 삭제는 사용자가 명시적으로 말한 뒤에만 한다 — 병합은 `node harness/cli.js accept <id>`, push 는 `node harness/cli.js push [<remote>] [<branch>]`(빨리감기만 · 강제 없음). `git push` 를 직접 쓰지 않는다(훅이 막는다).
 - `git reset --hard`(와 커밋을 옮기는 reset) · `git clean -f` · `git checkout -- .` · `git rebase` · 직접 `git merge`(`--ff-only` 포함) · `git pull` · `git stash` · `git commit --amend` 는 쓰지 않는다(훅이 막는다). 되돌리기는 `git revert`.
@@ -42,6 +45,7 @@ check_timeout_min: 20
 
 ### 큰 작업 · 여러 세션
 - 여러 파일에 걸친 기능 추가 · 수정 요청은 `node harness/cli.js go "<요청 원문>"` 으로 보낸다. 자기 worktree · 브랜치(`harness/<id>`)에서 끝까지 돌고 보고서를 낸다.
+- 사용자가 이미지 · 영상 · 음성 · 문서를 함께 줬으면(붙여 넣은 이미지는 `[Image: source: <경로>]` 로 보인다) 각 파일을 `--attach <경로>` 로 넘긴다 — 영상은 장면 이미지와 전사로, 음성은 전사로 바뀌어 작업자에게 간다.
 - 실행 중인 작업을 멈출 때는 `node harness/cli.js stop <id>`(셸을 죽이지 않는다) — 진행분을 커밋하고 interrupted 로 바꾼다. 그 뒤 `resume` 또는 `cancel`.
 - 현황 `node harness/cli.js status` · 받아들이기 `accept <id>`(사용자가 말한 뒤) · 취소 `cancel <id>` · 되살리기 `restore <id>` · 정리 `gc`(끝난 작업) · `cleanup-legacy`(이전 하네스 잔여물 — `--apply` 는 사용자가 말한 뒤).
 - 무인 작업자는 허용 목록 밖 명령(`docker build` 등)이 자동 거부된다 — 필요하면 사용자가 `go`/`resume` 에 `--allow "Bash(docker build:*)"` 를 주거나 프로젝트 yaml 블록에 `worker_allow: ["…"]` 를 둔다(git 쓰기 · 셸은 거부된다). BLOCKED 작업은 `resume <id> [--allow …]` 로 같은 세션이 이어 간다.
