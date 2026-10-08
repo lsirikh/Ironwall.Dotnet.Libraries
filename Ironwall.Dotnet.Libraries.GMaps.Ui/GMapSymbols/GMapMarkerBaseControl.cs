@@ -441,6 +441,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
     /// </summary>
     protected virtual void UpdateMarkerAppearance()
     {
+        // 채우기 색의 정본은 사용자 FillColor 와의 OneWay 바인딩(SetupDataBindings)이다. 바인딩이 걸린 뒤 여기서 로컬 값을 넣으면
+        // 바인딩이 지워져, 상태가 한 번 바뀐 뒤(PIDS 그룹 SYNC · 되돌리기 OperationState) 사용자 색이 초록/회색/빨강으로 바뀌고
+        // 이후 속성창 색 변경도 지도에 반영되지 않았다(2026-10-08 헤드리스 점검 D1). 상태 색은 바인딩 전 초기값으로만 쓴다.
+        if (BindingOperations.IsDataBound(this, MarkerFillProperty)) return;
         MarkerFill = MarkerState switch
         {
             EnumOperationState.ACTIVATED => Brushes.Green,
