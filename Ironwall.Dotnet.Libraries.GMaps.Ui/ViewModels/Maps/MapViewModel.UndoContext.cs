@@ -207,6 +207,8 @@ public partial class MapViewModel : IUndoApplyContext
                 default: await _gMapDbSymbolService.InsertSymbolAsync(sym, ct); break;
             }
         }
+        // 복원 INSERT(Id 보존 · 새 Id 폴백 모두)도 라벨 스타일 컬럼을 쓰지 않는다 — 되돌린 심볼이 다시 불러온 뒤 기본 라벨로 바뀌지 않게(D2).
+        await PersistLabelStyleAsync(sym.Id, sym, ct);
     }
 
     /// <summary>마커 제거(DB 삭제 + 맵/provider/트리 제거). Add 취소 / Delete 재실행 시.
