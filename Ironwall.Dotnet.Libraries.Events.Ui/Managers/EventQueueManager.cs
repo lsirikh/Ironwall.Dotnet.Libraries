@@ -695,8 +695,8 @@ public class EventQueueManager : IEventQueueManager, IDisposable
                 if (entry.IsControllerBlackout) hasBlackout = true;
                 if (entry.EventType == EnumEventType.Fault)
                     hasFault = true;
-                else if (entry.EventType == EnumEventType.Intrusion)
-                    hasDetection = true;
+                else
+                    hasDetection = true;   // 탐지 계열 전부(침입 · 접점 · 사전경보) — GetActiveCounts 와 같은 규칙(ComputeDeviceState 설명)
             }
         }
 
@@ -705,6 +705,12 @@ public class EventQueueManager : IEventQueueManager, IDisposable
     }
 
     /// <summary>_entries + _deviceIndex 기반으로 디바이스 복합 상태 계산 (SSOT: _entries)</summary>
+    /// <remarks>
+    /// <b>탐지 = 장애(Fault)가 아닌 모든 엔트리</b> — 활성 건수(<see cref="GetActiveCounts"/>) · 탐지 소리 · 이벤트 창(EventWindowPlanning)과 같은 규칙.
+    /// 종전엔 침입(Intrusion)만 탐지로 쳐서, 접점 센서 ContactOn · 사전경보(Alert) 가 오면 카드 · 소리 · 신호등 수는 올라가는데
+    /// 지도 심볼과 구역선은 초록(정상) 그대로였다(카탈로그 EVM-021 · EVM-051, 2026-10-08 헤드리스 시험으로 확인).
+    /// 통문 · 함체 접점은 큐에 들어오지 않으므로(DetectionNatsSyncService — 개폐 형태로만) 여기 오지 않는다.
+    /// </remarks>
     private EnumCompositeEventStatus ComputeDeviceState((int Id, EnumDeviceType Type) deviceKey)
     {
         Debug.Assert(Monitor.IsEntered(_gate));
@@ -723,8 +729,8 @@ public class EventQueueManager : IEventQueueManager, IDisposable
                 if (entry.IsControllerBlackout) hasBlackout = true;
                 if (entry.EventType == EnumEventType.Fault)
                     hasFault = true;
-                else if (entry.EventType == EnumEventType.Intrusion)
-                    hasDetection = true;
+                else
+                    hasDetection = true;   // 탐지 계열 전부(침입 · 접점 · 사전경보) — 위 설명
             }
         }
 
