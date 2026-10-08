@@ -72,13 +72,18 @@ public partial class AssemblyView : UserControl
     /// <summary>Delete = 빼기(끌어서 "빼는 곳"에 놓는 것의 키보드 폴백). 글자 칸 안에서는 가로채지 않는다.</summary>
     private void OnBoardPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Delete || e.OriginalSource is TextBox) return;
-        // 끄는 도중의 Delete 는 받지 않는다 — 끌던 블록이 사라지고 되돌리기 기록이 어긋난다.
-        if (Mouse.LeftButton == MouseButtonState.Pressed) return;
-        if (ViewModel is not { CanRemoveSelected: true } vm) return;
+        if (ViewModel is not { } vm) return;
+        if (!ShouldRemoveOnDelete(e.Key, e.OriginalSource, Mouse.LeftButton == MouseButtonState.Pressed, vm.CanRemoveSelected)) return;
         vm.RemoveSelected();
         e.Handled = true;
     }
+
+    /// <summary>
+    /// 보드의 Delete 판정(순수 · 시험 대상) — 글 칸 안의 Delete 는 글자만 지우고, 끄는 도중(왼쪽 단추 눌림)의 Delete 는 받지 않는다
+    /// (끌던 블록이 사라지고 되돌리기 기록이 어긋난다).
+    /// </summary>
+    internal static bool ShouldRemoveOnDelete(Key key, object? originalSource, bool leftButtonPressed, bool canRemove)
+        => key == Key.Delete && originalSource is not TextBox && !leftButtonPressed && canRemove;
 
     private void OnUndo(object sender, RoutedEventArgs e) => ViewModel?.Undo();
     private void OnRenumber(object sender, RoutedEventArgs e) => ViewModel?.RenumberChannels();

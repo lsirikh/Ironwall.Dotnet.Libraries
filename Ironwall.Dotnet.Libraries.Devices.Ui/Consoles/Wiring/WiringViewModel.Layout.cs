@@ -1035,6 +1035,8 @@ public sealed partial class WiringViewModel
     /// <summary>[대역 고르기] — 제어기를 골라 오른쪽 칸에 번호 대역(프리셋 2차 · 3차 · 4차 · 직접 설정)을 연다.</summary>
     public void ShowBandPicker()
     {
+        // 대역 고르개는 오른쪽 속성 칸 안에 있다 — 칸을 접어 둔 채 누르면 아무것도 안 보였다(정적 판독 D1). 칸부터 편다.
+        IsDetailPaneOpen = true;
         FenceSelectController();
         StatusText = "번호 대역 — 오른쪽 칸에서 고르세요.";
     }
