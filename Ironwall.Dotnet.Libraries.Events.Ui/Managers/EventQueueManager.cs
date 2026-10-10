@@ -1,8 +1,11 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using System.Diagnostics;
+using System.Globalization;
 using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
@@ -220,6 +223,9 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             }
         }
 
+        // 계측(PERF-002 · 014): 큐 적재 시각 + 이 아래 동기 전이(심볼 관리자)가 이 이벤트로 찍히게 스레드 문맥을 세운다.
+        using var perfContext = PerfTrace.IsEnabled ? BeginPerf(entry, PerfStages.Enqueued) : default;
+
         // 이벤트 발화는 lock 밖에서 (데드락 방지)
         var onAutoRecovery = OnAutoRecovery;
         var onGroupFirst = OnGroupFirstEvent;
@@ -263,10 +269,12 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         var devicePrev = EnumCompositeEventStatus.Normal;
         var deviceNext = EnumCompositeEventStatus.Normal;
         bool deviceStateChanged = false;
+        EventEntry? removedEntry = null;
 
         lock (_gate)
         {
             if (!_entries.TryGetValue(entryId, out var entry)) return;
+            removedEntry = entry;
 
             deviceKey = (entry.DeviceId, entry.DeviceType);
 
@@ -317,6 +325,9 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             deviceNext = ComputeDeviceState(deviceKey);
             deviceStateChanged = devicePrev != deviceNext;
         }
+
+        // 계측(PERF-006): 조치 · 자동정리로 빠진 이벤트의 문맥 — 아래 복원 전이가 이 이벤트로 찍힌다.
+        using var perfContext = PerfTrace.IsEnabled && removedEntry is not null ? BeginPerf(removedEntry, null) : default;
 
         // 이벤트 발화는 lock 밖에서
         var onGroupEmpty = OnGroupEmpty;
@@ -676,6 +687,20 @@ public class EventQueueManager : IEventQueueManager, IDisposable
     #endregion
 
     #region - Private -
+    /// <summary>
+    /// 계측 — <paramref name="stage"/> 가 있으면 한 줄 찍고, 이 엔트리(종류 + 서버 번호)를 현재 스레드 문맥으로 세운다.
+    /// 전이 콜백(심볼 관리자)은 이 스레드에서 동기로 불리므로 그 단계가 이 이벤트로 남는다. 계측이 켜졌을 때만 부른다.
+    /// </summary>
+    private static PerfTrace.ContextScope BeginPerf(EventEntry entry, string? stage)
+    {
+        var kind = EventCardKind.Of(entry.EventType);
+        var id = entry.EventId > 0 ? entry.EventId.ToString(CultureInfo.InvariantCulture) : null;
+        if (stage is not null)
+            PerfTrace.Mark(stage, kind, id, PerfTrace.Extra(("entry", entry.EntryId), ("device", entry.DeviceId),
+                                                            ("device_type", entry.DeviceType.ToString()), ("type", entry.EventType.ToString())));
+        return PerfTrace.BeginContext(kind, id);
+    }
+
     /// <summary>_entries + _groupIndex 기반으로 그룹 복합 상태 계산 (SSOT: _entries)</summary>
     private EnumCompositeEventStatus ComputeGroupState(int groupId)
     {

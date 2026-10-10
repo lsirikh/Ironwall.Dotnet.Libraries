@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
 using Newtonsoft.Json.Linq;
 using System;
@@ -77,6 +78,9 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
             // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정(프로브 S21 · S27)
             if (!NatsEnvelopeItems.IsNotice(jObj, "OPERATION_EVENT")) return;
             if (jObj["body"] is not JObject body) return;
+            if (PerfTrace.IsEnabled)   // 계측: 수신 직후
+                PerfTrace.Mark(PerfStages.NatsReceived, PerfKinds.Operation, body.Value<int?>("id") ?? 0,
+                               PerfTrace.Extra(("cmd", "OPERATION_EVENT"), ("envelope", jObj.Value<string>("id")), ("reason", body.Value<string>("reason"))));
 
             // 지워진 장비는 device: null(JSON null = JValue) — 거기서 "id" 를 파고들면 예외였다(프로브 S17.g ERROR).
             //   객체일 때만 장비 참조로 읽고, 아니면 장비 없음으로 조용히 넘긴다(브로커 N-3: null 과 키 없음을 같게).

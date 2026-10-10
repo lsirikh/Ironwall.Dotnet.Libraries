@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using System;
 using System.Windows;
 using System.Windows.Threading;
@@ -96,6 +97,10 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
 
             var deviceId = body.Device?.Id ?? body.DeviceId;
             var eventId = body.Id;
+            // 계측(PERF-005): 수신 직후 — 장비 해석 전
+            if (PerfTrace.IsEnabled)
+                PerfTrace.Mark(PerfStages.NatsReceived, PerfKinds.Malfunction, eventId,
+                               PerfTrace.Extra(("cmd", "MALFUNCTION"), ("device", deviceId), ("envelope", natsMessageId), ("reason", body.Reason)));
 
             // 장비가 지워졌으면 device: null(브로커 §6.2) — 심볼도 큐 키도 없다. 카드는 호스트가 스냅샷으로 띄운다.
             if (body.Device is null && deviceId <= 0)
@@ -142,12 +147,16 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
             if (!_recentEnvelopes.TryAdd(natsMessageId))
             {
                 _log?.Info($"MALFUNCTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                if (PerfTrace.IsEnabled)
+                    PerfTrace.Mark(PerfStages.DedupSkipped, PerfKinds.Malfunction, eventId, PerfTrace.Extra(("where", "queue_envelope"), ("envelope", natsMessageId)));
                 return;
             }
             // 같은 이벤트(서버 번호)를 봉투 id 만 바꿔 다시 보내도(매니저 재전송) 큐에 한 번 — 봉투 기억으로는 못 막는다(GAP-C4).
             if (eventId > 0 && !_recentEvents.TryAdd($"malfunction:{eventId}"))
             {
                 _log?.Info($"MALFUNCTION 같은 이벤트를 새 봉투로 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                if (PerfTrace.IsEnabled)
+                    PerfTrace.Mark(PerfStages.DedupSkipped, PerfKinds.Malfunction, eventId, PerfTrace.Extra(("where", "queue_event"), ("envelope", natsMessageId)));
                 return;
             }
 

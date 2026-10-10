@@ -191,6 +191,7 @@ internal sealed class EventWindowManager : IDisposable
         private readonly Dictionary<TileViewModel, TileRetrySchedule> _retries = new();
         private EventWindowView? _view;
         private volatile bool _closed;
+        private readonly long _openedTicks = Environment.TickCount64;   // 열기 요청을 받은 시각(첫 영상 시간 기준, PERF-004)
 
         public Session(EventWindowManager owner, OpenEventWindow msg)
         {
@@ -380,7 +381,14 @@ internal sealed class EventWindowManager : IDisposable
         /// </summary>
         private void OnStreamState(TileViewModel tile, TileStream stream, int generation, StreamState state, string? detail)
         {
-            _owner._send(new StreamStateChanged { StreamId = stream.StreamId, EventKey = EventKey, State = state, Detail = detail });
+            // 첫 영상(PERF-004) — 이 타일의 첫 Playing 에만 창 열기 요청 받은 뒤 걸린 시간을 싣는다(재시도 · 재생성 뒤 Playing 은 싣지 않는다).
+            long? firstFrameMs = null;
+            if (state == StreamState.Playing && Interlocked.Exchange(ref stream.FirstFrameReported, 1) == 0)
+            {
+                firstFrameMs = Math.Max(0, Environment.TickCount64 - _openedTicks);
+                _owner._log.Info($"event window first frame {EventKey} {stream.StreamId} after {firstFrameMs} ms");
+            }
+            _owner._send(new StreamStateChanged { StreamId = stream.StreamId, EventKey = EventKey, State = state, Detail = detail, FirstFrameMs = firstFrameMs });
             bool scheduled;
             int failures;
             DateTime? dueAt;
@@ -561,6 +569,8 @@ internal sealed class EventWindowManager : IDisposable
             public BitmapFrameSink? Sink { get; set; }
             public GatedFrameSink? Output { get; set; }
             public IFrameProducer? Producer { get; set; }
+            /// <summary>첫 Playing 을 GIS 에 알렸는가(0/1, Interlocked) — 첫 영상 시간은 한 번만 싣는다.</summary>
+            public int FirstFrameReported;
         }
     }
 }
