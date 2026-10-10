@@ -220,8 +220,11 @@ internal sealed class FakeAccountApi : IAccountApiService
     public Task<ApiListResponse<AuthUserDto>> GetUserGroupUsersAsync(int groupId, CancellationToken ct = default)
         => Task.FromResult(new ApiListResponse<AuthUserDto> { Success = true, Data = Users.Where(u => u.GroupId == groupId).ToList() });
 
+    /// <summary>세션 목록을 부를 때마다 새로 만든다(실서버처럼 매번 새 인스턴스) — 정하지 않으면 빈 목록.</summary>
+    public Func<List<UserSessionDto>>? SessionPage { get; set; }
+
     public Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(int page = 1, int limit = 100, bool? isActive = null, CancellationToken ct = default)
-        => Task.FromResult(new ApiListResponse<UserSessionDto> { Success = true, Data = new List<UserSessionDto>() });
+        => Task.FromResult(new ApiListResponse<UserSessionDto> { Success = true, Data = SessionPage?.Invoke() ?? new List<UserSessionDto>() });
 
     public Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, string? startDate = null, string? endDate = null, CancellationToken ct = default)
         => Task.FromResult(new ApiListResponse<AuditLogDto> { Success = true, Data = new List<AuditLogDto>() });

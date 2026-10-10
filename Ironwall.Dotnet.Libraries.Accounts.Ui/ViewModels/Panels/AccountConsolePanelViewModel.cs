@@ -133,6 +133,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         AccountManagerPanelViewModel.ViewModelProvider.CollectionChanged += OnUserRowsChanged;
         PermissionMatrixPanelViewModel.Groups.CollectionChanged += OnRailCountSourceChanged;
         UserSessionPanelViewModel.Items.CollectionChanged += OnRailCountSourceChanged;
+        UserSessionPanelViewModel.Items.CollectionChanged += OnSessionRowsChanged;
         GrantManagementPanelViewModel.Grants.CollectionChanged += OnRailCountSourceChanged;
         AuditLogPanelViewModel.Items.CollectionChanged += OnRailCountSourceChanged;
 
@@ -157,6 +158,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         AccountManagerPanelViewModel.ViewModelProvider.CollectionChanged -= OnUserRowsChanged;
         PermissionMatrixPanelViewModel.Groups.CollectionChanged -= OnRailCountSourceChanged;
         UserSessionPanelViewModel.Items.CollectionChanged -= OnRailCountSourceChanged;
+        UserSessionPanelViewModel.Items.CollectionChanged -= OnSessionRowsChanged;
         GrantManagementPanelViewModel.Grants.CollectionChanged -= OnRailCountSourceChanged;
         AuditLogPanelViewModel.Items.CollectionChanged -= OnRailCountSourceChanged;
 
@@ -217,6 +219,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         Detail.Reset();
         Detail.TypeName = AccountConsoleKeys.LabelOf(key);
         SelectedSession = null;
+        _selectedSessionId = null;      // 레일을 떠나며 버린 선택 — 목록이 비어 있어도 기억을 지운다(되살리지 않는다)
         SelectedAuditLog = null;
         SelectedGrant = null;
         if (key != AccountConsoleKeys.Permissions) Matrix.ForceSelect(null);
@@ -923,10 +926,22 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     #endregion
 
     #region - Selection of the other rails -
+    /// <summary>
+    /// 고른 세션. 세션 목록은 ~20초마다 새 인스턴스로 갈아 끼워진다(UserSessionPanelViewModel.ReloadAsync) — 사용자 목록처럼
+    /// Id 를 따로 기억해 새로 고침 뒤 같은 세션을 되찾는다(ACC-026, <see cref="ReconcileSessions"/>).
+    /// </summary>
     public UserSessionDto? SelectedSession
     {
         get => _selectedSession;
-        set { _selectedSession = value; NotifyOfPropertyChange(); RaiseDetail(); }
+        set
+        {
+            // 재조회는 Items.Clear() 로 시작한다 — 그 순간 그리드가 밀어 넣는 null 을 "선택 해제"로 읽으면 다시 채워져도 돌아오지 않는다.
+            if (value is not null) _selectedSessionId = value.Id;
+            else if (UserSessionPanelViewModel.Items.Count > 0) _selectedSessionId = null;
+            _selectedSession = value;
+            NotifyOfPropertyChange();
+            RaiseDetail();
+        }
     }
 
     public AuditLogDto? SelectedAuditLog
@@ -1273,6 +1288,27 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private void OnRailCountSourceChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => Execute.BeginOnUIThread(() => { RefreshRailCounts(); RefreshStatus(); RaiseMatrixShape(); });
 
+    /// <summary>세션 목록이 바뀌었다(자동 새로 고침 · 강제 로그아웃 뒤 재조회) — UI 스레드에서 같은 Id 의 새 행으로 선택을 맞춘다.</summary>
+    private void OnSessionRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => Execute.BeginOnUIThread(ReconcileSessions);
+
+    /// <summary>
+    /// 기억한 세션 Id 로 선택을 되찾는다(ACC-026). 목록이 비어 있는 동안(재조회 도중)에는 아무것도 하지 않고,
+    /// 지금 목록에 그 Id 가 없으면 옛 인스턴스를 붙들지 않게 선택만 비운다 — Id 는 남겨 다 채워지면 다시 맞춘다(사용자 목록과 같은 규칙).
+    /// </summary>
+    private void ReconcileSessions()
+    {
+        var rows = UserSessionPanelViewModel.Items;
+        if (_selectedSessionId is not { } id || rows.Count == 0) return;
+
+        var again = rows.FirstOrDefault(r => r.Id == id);
+        if (ReferenceEquals(again, _selectedSession)) return;
+
+        _selectedSession = again;   // 세터를 거치지 않는다 — 못 찾은 동안에도 기억한 Id 를 지우지 않는다
+        NotifyOfPropertyChange(nameof(SelectedSession));
+        RaiseDetail();
+    }
+
     private void ReconcileUsers()
     {
         RefreshRailCounts();
@@ -1397,6 +1433,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     private Dictionary<int, string> _groupNameById = new();
     private int _adminGroupId;
     private UserSessionDto? _selectedSession;
+    private int? _selectedSessionId;   // 고른 세션의 Id — 새로 고침이 인스턴스를 갈아 끼워도 같은 세션을 되찾는다(ACC-026)
     private AuditLogDto? _selectedAuditLog;
     private GrantDto? _selectedGrant;
     #endregion
