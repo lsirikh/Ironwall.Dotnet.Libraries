@@ -43,6 +43,13 @@ dotnet test Ironwall.Dotnet.Libraries.Utils.Tests/Ironwall.Dotnet.Libraries.Util
 Devices.Ui 의 창 시험 파일(`.Show()`)은 11개 — 위 필터에 걸리는 5개를 뺐고 나머지(UnitMap* · UnitConsole* · StaCleanupTests)는 필터에 들지 않는다.
 TRX: `Ironwall.Dotnet.Libraries.Devices.Ui/obj/scenario-trx/devices-ui-wiring-asm.trx` · `Ironwall.Dotnet.Libraries.Events.Ui/obj/scenario-trx/events-ui-detail.trx`(obj — git 밖. 증거 폴더 수집은 `tools/scenario-evidence/run.ps1` 로 다시 돌려야 한다).
 
+## 하네스 검사 1회차(dotnet test sln) — 2521 통과 · 1 실패
+- 실패: `CameraPopup.Host.Tests.DispatcherStarvationTests.should_run_window_commands_in_received_order_when_many_are_posted_at_once`
+  「Assert.InRange() Failure · Range (0 - 2000) · Actual 2024.09」 — 한도 2초를 24ms 넘긴 **시간 의존 실패**(sln 전체를 병렬로 돌리는 부하 중).
+- 이번 변경과 무관: CameraPopup.Host 는 손대지 않았다(변경은 Devices.Ui · Events.Ui 뿐이고 둘 다 sln 밖).
+- 단독 재실행 `dotnet test Ironwall.Dotnet.Libraries.CameraPopup.Host.Tests/… --filter FullyQualifiedName~DispatcherStarvationTests` → 8/8 통과(44ms).
+- 기존 시험은 고치지 않는다는 규칙대로 그대로 두고 다음 검사를 기다린다.
+
 ## 남은 일 · 알림
 - collect.py 의 `ROW_RE` 는 `| ASM-100~116 |` · `| WIR-315~322 |` 같은 **범위 id 행을 읽지 못한다**(id 뒤에 바로 `|` 가 와야 함) — 그 행은 상태표에 안 나온다. 표지는 `ASM-100` 으로 달아 두었다.
 - ASM-214(제어기 부품 상태 요약)는 이번에 새 시험을 만들지 못했다(부분: ComponentDisplayUnifyTests 의 요약 경로가 일반 장비로 덮음).
