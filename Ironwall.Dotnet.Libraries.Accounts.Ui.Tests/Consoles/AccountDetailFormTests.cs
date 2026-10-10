@@ -23,6 +23,7 @@ public class AccountDetailFormTests
         Assert.Equal(AccountFieldEditor.ReadOnly, username.EffectiveEditor);
     }
 
+    [Trait("Scenario", "ACC-011")]
     [Fact]
     public async Task should_show_the_mixed_marker_when_the_selected_accounts_differ()
     {
@@ -63,6 +64,7 @@ public class AccountDetailFormTests
         Assert.Equal(1, gateway.UpdateCallCount);      // 고른 계정 1명 = 1회
     }
 
+    [Trait("Scenario", "ACC-011")]
     [Fact]
     public async Task should_apply_one_field_to_every_selected_account_when_editing_together()
     {
@@ -77,6 +79,7 @@ public class AccountDetailFormTests
         Assert.Equal(3, gateway.UpdateCallCount);
     }
 
+    [Trait("Scenario", "ACC-011")]
     [Fact]
     public async Task should_refuse_to_apply_when_a_required_field_is_emptied()
     {
@@ -92,6 +95,7 @@ public class AccountDetailFormTests
         Assert.Equal("김운영", console.AccountManagerPanelViewModel.ViewModelProvider[0].Name);
     }
 
+    [Trait("Scenario", "ACC-011")]
     [Fact]
     public async Task should_restore_the_original_text_when_reverting()
     {

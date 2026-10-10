@@ -145,6 +145,7 @@ public class MappingRuntimePresetDefectTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-015")]
     public async Task should_not_show_or_aim_a_camera_at_a_restricted_preset_when_a_detection_arrives()
     {
         var cache = new EventMappingCameraCache(Gateway(() => new[] { CameraRow(1, 3, 1, 4, restricted: true), CameraRow(2, 5, 2, 6, restricted: false) }).Object);

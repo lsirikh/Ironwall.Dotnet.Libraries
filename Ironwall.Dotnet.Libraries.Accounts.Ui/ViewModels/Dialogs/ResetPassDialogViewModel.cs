@@ -41,7 +41,8 @@ public class ResetPassDialogViewModel : BasePanelViewModel
            && !string.IsNullOrEmpty(NewPassword)
            && !string.IsNullOrEmpty(NewPasswordConfirm)
            && NewPassword!.Equals(NewPasswordConfirm)
-           && NewPassword!.Length >= 8;          // 최소 8자 (비밀번호 정책)
+           && NewPassword!.Length >= 8           // 최소 8자 (비밀번호 정책)
+           && NewPassword!.Length <= 20;         // 최대 20자 — 뷰 안내 「8자 이상 20자 이하」 · 검증 규칙 Max=20 과 맞춘다(ACC-041)
 
     public async Task ClickOk()
     {
