@@ -71,6 +71,7 @@ public class MapOverlayPanelThemeLayoutTests
         return px;
     }
 
+    [Trait("Scenario", "MAP-080,MAP-190")]
     [Theory]
     [MemberData(nameof(PanelStyles))]
     public void should_draw_frame_whole_and_keep_header_texts_inside_frame_in_light_and_dark(string styleFile) => AppHost.Run(() =>

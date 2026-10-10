@@ -72,5 +72,10 @@
 		<InternalsVisibleTo Include="GMaps.Housing.Tests" />
 		<InternalsVisibleTo Include="GMaps.Ui.Tests" />
 		<InternalsVisibleTo Include="GMaps.PropertyPanel.Tests" />
+		<!-- 지도 헤드리스 시나리오 시험(카탈로그 §1 · §3.5) -->
+		<InternalsVisibleTo Include="GMaps.MapNav.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapLayer.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapEdit.Tests" />
+		<InternalsVisibleTo Include="GMaps.MapAux.Tests" />
 	</ItemGroup>
 </Project>
