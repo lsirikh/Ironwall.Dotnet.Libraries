@@ -492,6 +492,7 @@ public class DeviceDashboardConsoleTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-208")]
     public async Task should_keep_the_component_button_in_place_but_disabled_when_a_field_is_touched()
     {
         // Arrange — GIS 실창 #13: 단추가 사라지면 폼 전체가 38px 튄다

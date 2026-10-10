@@ -88,6 +88,7 @@ public class WiringFenceReviewFixTests
 
     #region - 2. read failure vs no row -
     [Fact]
+    [Trait("Scenario", "WIR-008")]
     public async Task should_offer_an_explicit_overwrite_with_the_row_revision_when_the_stored_layout_was_unreadable()
     {
         // Arrange — 행은 있는데(판 7) 본문이 손상
@@ -107,6 +108,7 @@ public class WiringFenceReviewFixTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-008")]
     public async Task should_not_write_the_local_layout_when_the_overwrite_is_declined()
     {
         // Arrange — DB 읽기 실패(판 모름)
@@ -139,6 +141,7 @@ public class WiringFenceReviewFixTests
 
     #region - save order -
     [Fact]
+    [Trait("Scenario", "WIR-422")]
     public async Task should_skip_the_local_layout_and_say_so_when_a_server_write_fails()
     {
         // Arrange — 서버(번호)와 로컬(대역)이 함께 바뀌었는데 101 PATCH 가 실패

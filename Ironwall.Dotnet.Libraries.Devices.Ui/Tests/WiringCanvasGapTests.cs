@@ -112,6 +112,7 @@ public class WiringCanvasGapTests
 
     #region - 3D 캔버스 키보드 (WIR-128 · 132 · 133 · 135 · 139 · 140 · 141 · 162 · 116 · 113/114) -
     [Fact]
+    [Trait("Scenario", "WIR-128")]
     public void should_step_to_the_next_grid_point_with_ctrl_arrow_and_back_and_move_a_panel_with_alt_shift_arrow_WIR128()
     {
         var result = OnSta(() =>
@@ -139,6 +140,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-132,WIR-133,WIR-135")]
     public void should_climb_to_the_razor_coil_with_alt_up_and_nudge_the_height_with_shift_alt_WIR132_WIR133_WIR135()
     {
         var result = OnSta(() =>
@@ -177,6 +179,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-139,WIR-140,WIR-141")]
     public void should_turn_with_r_and_shift_r_flip_with_f_and_leave_text_boxes_alone_WIR139_WIR140_WIR141()
     {
         var result = OnSta(() =>
@@ -209,6 +212,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-162,WIR-114")]
     public void should_unplace_with_delete_restore_with_ctrl_z_and_clear_with_esc_on_the_canvas_WIR162_WIR114()
     {
         var result = OnSta(() =>
@@ -236,6 +240,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-116")]
     public void should_build_a_selection_with_ctrl_space_shift_arrow_and_ctrl_a_from_the_keyboard_WIR116()
     {
         var result = OnSta(() =>
@@ -262,6 +267,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-164")]
     public void should_move_to_the_chain_ends_with_alt_home_and_alt_end_on_the_canvas_WIR164()
     {
         var result = OnSta(() =>
@@ -281,6 +287,7 @@ public class WiringCanvasGapTests
 
     #region - 3D 그림 층 (WIR-103 · 119 · 155 · 156) -
     [Fact]
+    [Trait("Scenario", "WIR-102,WIR-103")]
     public void should_draw_each_of_the_five_fence_styles_differently_WIR102_WIR103()
     {
         var images = OnSta(() =>
@@ -308,6 +315,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-119")]
     public void should_add_distance_labels_to_the_3d_view_only_while_the_distance_toggle_is_on_WIR119()
     {
         var result = OnSta(() =>
@@ -330,6 +338,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-155,WIR-156")]
     public void should_draw_range_and_cable_overlays_only_when_toggled_WIR155_WIR156()
     {
         var result = OnSta(() =>
@@ -352,6 +361,7 @@ public class WiringCanvasGapTests
 
     #region - 개념도 (WIR-200 · 201 · 204 · 208 · 210 · 217 · 225 · 119) -
     [Fact]
+    [Trait("Scenario", "WIR-200,WIR-201")]
     public void should_title_the_concept_with_both_lanes_or_the_return_line_WIR200_WIR201()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -366,6 +376,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-201,WIR-202")]
     public void should_draw_the_return_line_differently_from_a_second_lane_in_the_concept_WIR201_WIR202()
     {
         var result = OnSta(() =>
@@ -386,6 +397,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-203,WIR-204")]
     public void should_put_the_controller_chip_on_the_chosen_end_of_the_concept_WIR203_WIR204()
     {
         var result = OnSta(() =>
@@ -410,6 +422,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-208,WIR-209,WIR-210")]
     public void should_name_the_vbus_chip_by_its_gap_and_hide_it_on_mixed_rings_WIR208_WIR210()
     {
         var result = OnSta(() =>
@@ -431,6 +444,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-217")]
     public void should_unplace_with_delete_and_restore_with_ctrl_z_in_the_concept_WIR217()
     {
         var result = OnSta(() =>
@@ -454,6 +468,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-225")]
     public void should_mark_the_concept_node_selected_when_the_3d_view_selects_it_WIR225()
     {
         var result = OnSta(() =>
@@ -470,6 +485,7 @@ public class WiringCanvasGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-119")]
     public void should_draw_lane_distances_in_the_concept_only_while_the_toggle_is_on_WIR119()
     {
         var result = OnSta(() =>

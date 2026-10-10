@@ -314,6 +314,7 @@ public class AssemblyViewModelTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-025")]
     public async Task should_flag_a_type_missing_from_the_catalog_instead_of_dropping_it()
     {
         var device = new EnclosureDeviceModel { Id = 7, DeviceNumber = 1, DeviceName = "함체", Axes = AxesWith(Part("legacy", "RETIRED_TYPE")) };

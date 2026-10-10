@@ -427,6 +427,7 @@ public class DeviceAxisEditTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-001")]
     public async Task should_show_wiring_only_on_the_controller_rail_when_wiring_is_available()
     {
         var api = new AxisCaptureApi();

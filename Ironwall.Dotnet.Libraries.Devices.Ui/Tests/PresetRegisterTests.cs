@@ -562,6 +562,7 @@ public class PresetRegisterTests
     /// 조립기가 채우지 않은 평면 칸만 기본값으로 실린다.
     /// </summary>
     [Fact]
+    [Trait("Scenario", "ASM-306")]
     public async Task should_send_nothing_and_fail_when_registering_against_a_legacy_contract()
     {
         var api = new FakeApi();
@@ -579,6 +580,7 @@ public class PresetRegisterTests
 
     /// <summary>적용도 마찬가지 — <b>다시 받기조차 하지 않는다</b>(읽기가 안전해도 사용자에게 거짓 기대를 주지 않는다).</summary>
     [Fact]
+    [Trait("Scenario", "ASM-306")]
     public async Task should_send_nothing_and_fail_when_applying_against_a_legacy_contract()
     {
         var api = new FakeApi { Fetched = FilledDto(EnumDeviceCategory.Enclosure, Component("door", "DOOR_SENSOR")) };
@@ -978,6 +980,7 @@ public class PresetRegisterTests
 
     /// <summary>팔레트로 단 새 팬에 받은 장비의 기본값 false 를 옮겨 적지 않는다(asm.R4a 실측).</summary>
     [Fact]
+    [Trait("Scenario", "ASM-206")]
     public async Task should_not_write_enabled_false_when_a_new_fan_is_added_by_apply()
     {
         var door = Component("door", "DOOR_SENSOR");

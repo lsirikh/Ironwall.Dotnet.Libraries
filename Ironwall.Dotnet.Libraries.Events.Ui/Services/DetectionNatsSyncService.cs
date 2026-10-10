@@ -13,6 +13,7 @@ using System;
 using System.Windows;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -102,6 +103,10 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             var deviceId = body.Device?.Id ?? body.DeviceId;
             var eventId = body.Id; // 서버 이벤트 ID (1:1 카드 매칭 키)
             var typeEvent = body.TypeEvent;
+            // 계측(PERF-001 · 002): 수신 직후 — 장비 해석(캐시 미스 단건 GET) 전
+            if (PerfTrace.IsEnabled)
+                PerfTrace.Mark(PerfStages.NatsReceived, PerfKinds.Detection, eventId,
+                               PerfTrace.Extra(("cmd", "DETECT"), ("device", deviceId), ("envelope", natsMessageId), ("type_event", typeEvent)));
 
             // type_event → EnumEventType 매핑
             if (!Enum.TryParse<EnumEventType>(typeEvent, ignoreCase: true, out var eventType))
@@ -162,6 +167,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             if (!_recentEnvelopes.TryAdd(natsMessageId))
             {
                 _log?.Info($"DETECTION 같은 봉투를 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                if (PerfTrace.IsEnabled)
+                    PerfTrace.Mark(PerfStages.DedupSkipped, PerfKinds.Detection, eventId, PerfTrace.Extra(("where", "queue_envelope"), ("envelope", natsMessageId)));
                 return;
             }
             // 같은 이벤트(서버 번호)를 봉투 id 만 바꿔 다시 보내도(매니저 재전송) 큐에 한 번 — 봉투 기억으로는 못 막는다(GAP-C4).
@@ -169,6 +176,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
             if (eventId > 0 && !_recentEvents.TryAdd($"detection:{eventId}"))
             {
                 _log?.Info($"DETECTION 같은 이벤트를 새 봉투로 다시 받아 건너뜀: id={natsMessageId}, eventId={eventId}");
+                if (PerfTrace.IsEnabled)
+                    PerfTrace.Mark(PerfStages.DedupSkipped, PerfKinds.Detection, eventId, PerfTrace.Extra(("where", "queue_event"), ("envelope", natsMessageId)));
                 return;
             }
 

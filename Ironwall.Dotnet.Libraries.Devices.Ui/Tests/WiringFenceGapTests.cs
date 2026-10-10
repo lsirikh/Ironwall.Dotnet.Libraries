@@ -60,6 +60,7 @@ public class WiringFenceGapTests
 {
     #region - 망 속성 (WIR-105 · 107 · 109 · 111) -
     [Fact]
+    [Trait("Scenario", "WIR-105")]
     public async Task should_refuse_a_malformed_direct_colour_and_take_a_well_formed_one_when_the_colour_is_typed_WIR105()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build();
@@ -90,6 +91,7 @@ public class WiringFenceGapTests
     [InlineData(4)]
     [InlineData(5)]
     [InlineData(6)]
+    [Trait("Scenario", "WIR-107")]
     public void should_light_the_chosen_span_chip_and_change_the_total_length_when_a_span_preset_is_applied_WIR107(int metres)
     {
         var (vm, _, _, _) = WiringGapRig.Build();
@@ -113,6 +115,7 @@ public class WiringFenceGapTests
     [InlineData("0.5", true)]
     [InlineData("20", true)]
     [InlineData("7.5", true)]
+    [Trait("Scenario", "WIR-107")]
     public void should_accept_a_typed_span_only_inside_half_to_twenty_metres_WIR107(string text, bool ok)
     {
         var (vm, _, _, _) = WiringGapRig.Build();
@@ -127,6 +130,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-109")]
     public void should_title_the_pane_with_the_panel_count_when_panels_are_ctrl_clicked_WIR109()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSSS");
@@ -142,6 +146,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-111")]
     public void should_extend_toggle_and_select_all_panels_the_way_the_keyboard_does_WIR111()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSSSSS");                                 // 망 6칸
@@ -166,6 +171,7 @@ public class WiringFenceGapTests
 
     #region - 센서 선택 · 빼기 (WIR-116 · 127) -
     [Fact]
+    [Trait("Scenario", "WIR-116")]
     public void should_grow_and_shrink_the_sensor_selection_with_ctrl_toggle_and_shift_range_WIR116()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSSS");
@@ -184,6 +190,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-127")]
     public void should_say_the_bin_hint_while_dragging_and_send_sensors_to_the_palette_when_dropped_on_the_bin_WIR127()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -214,6 +221,7 @@ public class WiringFenceGapTests
 
     [Theory]
     [MemberData(nameof(NineCells))]
+    [Trait("Scenario", "WIR-131")]
     public void should_seat_a_panel_sensor_on_each_of_the_nine_grid_points_WIR131(FenceColumn column, int row)
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -234,6 +242,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-131")]
     public void should_put_nine_different_grid_points_inside_one_panel_WIR131()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -258,6 +267,7 @@ public class WiringFenceGapTests
     [InlineData("5", false, 0.0)]
     [InlineData("-3.5", false, 0.0)]
     [InlineData("높이", false, 0.0)]
+    [Trait("Scenario", "WIR-136")]
     public void should_apply_an_offset_only_between_minus_three_and_plus_three_metres_WIR136(string text, bool ok, double expected)
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -273,6 +283,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-137")]
     public void should_seat_every_mount_spot_button_and_name_it_in_the_place_text_WIR137()
     {
         // 망 0 철조망 · 망 1 윤형 · 망 2 벽돌 — 펜스센서로 철조망 자리 · 윤형 코일 · 담 자리를 모두 지난다
@@ -311,6 +322,7 @@ public class WiringFenceGapTests
 
     #region - 방향 (WIR-139 · 142) -
     [Fact]
+    [Trait("Scenario", "WIR-139")]
     public void should_turn_counter_clockwise_and_pick_each_of_the_four_yaws_WIR139()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSS");
@@ -332,6 +344,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-142")]
     public void should_leave_fence_sensors_unturned_and_disable_the_turn_menu_when_the_kind_has_no_facing_WIR142()
     {
         var (vm, _, _, _) = WiringGapRig.Build("FFS");
@@ -360,6 +373,7 @@ public class WiringFenceGapTests
         => vm.FenceMenu(kind, target).Where(e => !e.IsSeparator).ToDictionary(e => e.AutomationId[(e.AutomationId.LastIndexOf('.') + 1)..]);
 
     [Fact]
+    [Trait("Scenario", "WIR-145")]
     public async Task should_spread_the_mount_style_only_to_the_same_kind_when_apply_same_type_is_run_WIR145()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build("SFSFS");
@@ -376,6 +390,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-145")]
     public async Task should_spread_the_mount_style_only_to_the_selection_and_count_it_in_the_menu_text_WIR145()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build("SSSSS");
@@ -394,6 +409,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-146")]
     public async Task should_turn_and_flip_through_the_menu_and_confirm_the_all_facing_entry_WIR146()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build("SSS");
@@ -414,6 +430,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-147")]
     public async Task should_move_lanes_and_unplace_through_the_sensor_menu_WIR147()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -438,6 +455,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-148")]
     public async Task should_copy_a_panel_and_spread_it_to_all_panels_through_the_panel_menu_WIR148()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build("SSSSS");
@@ -458,6 +476,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-149")]
     public async Task should_select_all_sensors_or_all_panels_from_the_empty_ground_menu_WIR149()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -477,6 +496,7 @@ public class WiringFenceGapTests
 
     #region - 도구줄 · 함체 · 사슬 끝 · 대수 (WIR-155 · 157 · 164 · 165 · 166) -
     [Fact]
+    [Trait("Scenario", "WIR-155")]
     public void should_keep_the_range_toggle_off_without_range_sensors_and_on_with_a_multi_sensor_WIR155()
     {
         var (smart, _, _, _) = WiringGapRig.Build("SSS");
@@ -494,6 +514,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-157")]
     public void should_move_the_enclosure_only_as_a_marker_and_undo_it_WIR157()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSSS");
@@ -514,6 +535,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-164")]
     public void should_jump_to_either_end_of_the_chain_with_alt_home_and_alt_end_WIR164()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSSS");
@@ -529,6 +551,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-165")]
     public void should_offer_the_spacing_combo_only_with_fence_sensors_and_not_count_it_as_a_server_change_WIR165()
     {
         var (smart, _, _, _) = WiringGapRig.Build("SSS");
@@ -547,6 +570,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-166")]
     public void should_show_the_kind_counts_only_in_the_fence_view_of_the_wiring_step_WIR166()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SFF");
@@ -573,10 +597,12 @@ public class WiringFenceGapTests
     [InlineData(0.30, 400, 0.40)]                                                           // 160px / 400 — 3D 최소
     [InlineData(0.85, 400, 0.625)]                                                          // 1 − 150/400 — 개념도 최소
     [InlineData(0.70, 250, 0.5)]                                                            // 둘 다 못 지키면 가운데
+    [Trait("Scenario", "WIR-159")]
     public void should_clamp_the_split_ratio_to_the_range_and_the_minimum_heights_WIR159(double ratio, double total, double expected)
         => Assert.Equal(expected, WiringLayoutMath.ClampSplit(ratio, total), 3);
 
     [Fact]
+    [Trait("Scenario", "WIR-159")]
     public void should_start_from_the_remembered_split_and_save_each_move_WIR159()
     {
         var (vm, _, _, _) = WiringGapRig.Build();
@@ -592,6 +618,7 @@ public class WiringFenceGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-161")]
     public void should_order_notices_action_first_then_warnings_then_information_and_drop_blank_ones_WIR161()
     {
         var notices = new[]
@@ -616,6 +643,7 @@ public class WiringFenceGapTests
 
     #region - 신호등 (WIR-221 · 222) -
     [Fact]
+    [Trait("Scenario", "WIR-221")]
     public void should_say_unknown_without_an_address_and_without_a_ping_probe_WIR221()
     {
         var (noAddress, _, _, _) = WiringGapRig.Build("S", ping: new FakePing(), address: " ");

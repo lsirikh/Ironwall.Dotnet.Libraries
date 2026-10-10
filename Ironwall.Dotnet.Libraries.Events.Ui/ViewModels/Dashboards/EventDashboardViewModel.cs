@@ -180,7 +180,9 @@ public class EventDashboardViewModel : BasePanelViewModel
             };
         }
         // 조치 내역은 이미 있는 원본별 조회 API 를 열 때 한 번 부른다(정본 E-D4) — API 는 늦게 해석한다.
-        DetailView = new EventDetailViewModel(Detail, new EventActionHistoryViewModel(ResolveEventApi, log));
+        // 장애 고장 구간 → 링 센서 이름(D3) — 장비 캐시의 센서 결선 자리(spec.wiring)만 읽는다. 캐시가 없으면 숫자만 보인다.
+        DetailView = new EventDetailViewModel(Detail, new EventActionHistoryViewModel(ResolveEventApi, log),
+            deviceProvider is null ? null : controllerId => global::Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model.WiringFaultLocator.RingOf(System.Linq.Enumerable.ToList(deviceProvider), controllerId));
         DetailView.ActionRequested += OnDetailAction;
         Overview = new EventOverviewViewModel();
         Tray = new ActionTrayViewModel(SendActionAsync);

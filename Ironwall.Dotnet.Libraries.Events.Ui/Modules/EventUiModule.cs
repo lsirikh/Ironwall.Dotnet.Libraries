@@ -257,6 +257,13 @@ public class EventUiModule : Module
                 // 공유 타이머 시작 (1초 간격, 자동 조치보고 타임아웃 체크)
                 eqm.StartSharedTimer();
 
+                // 계측 표본기(카탈로그 PERF-011 · 013) — IRONWALL_PERF_TRACE=1 일 때만 UI 지연 · 프로세스 표본을 1초마다 남긴다.
+                if (Ironwall.Dotnet.Libraries.Utils.Perf.PerfTrace.IsEnvironmentEnabled)
+                {
+                    var started = Ironwall.Dotnet.Libraries.Utils.Perf.PerfTraceRuntime.StartGisSamplers(System.Windows.Application.Current?.Dispatcher);
+                    _log?.Info($"[PerfTrace] 계측 켜짐 — 표본기 {(started ? "시작" : "시작 실패")}, 파일={Environment.GetEnvironmentVariable(Ironwall.Dotnet.Libraries.Utils.Perf.PerfTrace.FileVariable) ?? "(기본 %LocalAppData%\\Ironwall\\perf)"}");
+                }
+
                 // SoundAlarmController 이벤트 와이어링 — 알람 소리의 유일한 주인(WP-1 ⑨, 호스트 카드별 재생은 걷었다)
                 // ISoundService가 미등록 시 SAC 비활성화 (State=Playing 고착 방지)
                 var sac = scope.Resolve<ISoundAlarmController>();
