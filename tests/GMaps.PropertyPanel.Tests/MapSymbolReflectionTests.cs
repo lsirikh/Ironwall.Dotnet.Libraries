@@ -38,6 +38,7 @@ public class MapSymbolReflectionTests
 
     // ── MAP-115 · MAP-111 · MAP-112 · MAP-113 · MAP-114 · MAP-119 — 속성창 → 마커 → 심볼 컨트롤 ──
 
+    [Trait("Scenario", "MAP-111,MAP-112,MAP-113,MAP-114,MAP-115,MAP-119")]
     [Fact]
     public void should_push_every_common_field_from_property_panel_to_map_symbol_control_immediately() => AppHost.Run(() =>
     {
@@ -86,6 +87,7 @@ public class MapSymbolReflectionTests
 
     // ── MAP-116 · MAP-117 — 라벨 글꼴 · 색 · 폭 ──
 
+    [Trait("Scenario", "MAP-116")]
     [Fact]
     public void should_push_label_style_fields_from_property_panel_to_marker_model() => AppHost.Run(() =>
     {
@@ -138,6 +140,7 @@ public class MapSymbolReflectionTests
 
     // ── MAP-139 — 다시 열기(재구성) ──
 
+    [Trait("Scenario", "MAP-139")]
     [Fact]
     public void should_show_same_values_when_property_panel_is_reopened_for_same_symbol() => AppHost.Run(() =>
     {
@@ -222,6 +225,7 @@ public class MapSymbolReflectionTests
 
     // ── 픽셀 — 지도 심볼 그림이 실제로 바뀐다 ──
 
+    [Trait("Scenario", "MAP-115,MAP-119")]
     [Fact]
     public void should_repaint_symbol_pixels_when_fill_color_changes_and_survive_state_change() => AppHost.Run(() =>
     {
@@ -270,6 +274,7 @@ public class MapSymbolReflectionTests
         Assert.Equal(EnumColorType.Black, panel.MarkerStrokeColor);    // 같음 → 값
     });
 
+    [Trait("Scenario", "MAP-137")]
     [Fact]
     public void should_not_write_representative_directly_but_raise_event_when_group_field_changes() => AppHost.Run(() =>
     {
