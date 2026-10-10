@@ -92,6 +92,7 @@ public class ReportConsoleTests : IDisposable
     }
 
     #region - 레일 -
+    [Trait("Scenario", "RPT-001")]
     [Fact]
     public async Task should_show_three_rails_in_the_mockup_order_when_opened()
     {
@@ -126,6 +127,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Contains(rig.Console.CreateViewModel.Templates, t => t.Id == 13);
     }
 
+    [Trait("Scenario", "RPT-002,RPT-015")]
     [Fact]
     public async Task should_swap_the_columns_when_the_rail_changes()
     {
@@ -151,6 +153,7 @@ public class ReportConsoleTests : IDisposable
     #endregion
 
     #region - 선택 → 미리보기 -
+    [Trait("Scenario", "RPT-006")]
     [Fact]
     public async Task should_load_the_preview_into_the_detail_pane_when_a_report_is_selected()
     {
@@ -169,6 +172,7 @@ public class ReportConsoleTests : IDisposable
     // ★ 미리보기는 '생성 이력' 레일의 상세 칸에만 산다. '새 보고서' 레일의 상세 칸은 생성 폼이라,
     //   거기서 줄을 고르면(또는 생성이 끝나 그 줄이 골라지면) HTML 을 받아 살아 있는 브라우저까지 만들면서도
     //   화면에는 폼만 남았다 — "보고서는 미리보기가 안 된다"(2026-09-28 실창 · gis-r7-ws4 001 · 로그 id=24 293160자 수신 후 미표시).
+    [Trait("Scenario", "RPT-012")]
     [Fact]
     public async Task should_open_the_new_report_with_its_preview_in_the_history_rail_when_generation_completes_on_the_create_rail()
     {
@@ -278,6 +282,7 @@ public class ReportConsoleTests : IDisposable
         Assert.True(rig.Console.ShowDetailButtons);
     }
 
+    [Trait("Scenario", "RPT-018")]
     [Fact]
     public async Task should_show_an_empty_state_instead_of_a_blank_form_when_no_template_is_chosen()
     {
@@ -352,6 +357,7 @@ public class ReportConsoleTests : IDisposable
         Assert.True(rig.Console.PreviewViewModel.CanOpenLargeView);
     }
 
+    [Trait("Scenario", "RPT-008")]
     [Fact]
     public async Task should_follow_the_pane_width_until_the_user_zooms_and_return_to_fit_when_asked()
     {
@@ -504,6 +510,7 @@ public class ReportConsoleTests : IDisposable
     #endregion
 
     #region - 삭제 · 취소(확인 팝업 경로) -
+    [Trait("Scenario", "RPT-014")]
     [Fact]
     public async Task should_not_delete_anything_until_the_confirmation_is_answered()
     {
@@ -516,6 +523,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Equal(3, rig.Console.ListViewModel.Items.Count);
     }
 
+    [Trait("Scenario", "RPT-014")]
     [Fact]
     public async Task should_delete_and_keep_the_airspace_blocked_until_the_result_popup_closes()
     {
@@ -626,6 +634,7 @@ public class ReportConsoleTests : IDisposable
     #endregion
 
     #region - 상태 칩 · 검색 -
+    [Trait("Scenario", "RPT-004")]
     [Fact]
     public async Task should_send_no_status_parameter_when_the_pressed_chip_is_pressed_again()
     {
@@ -639,6 +648,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Null(rig.Api.LastStatusFilter);
     }
 
+    [Trait("Scenario", "RPT-005")]
     [Fact]
     public async Task should_filter_rows_without_calling_the_server_when_searching()
     {
@@ -689,6 +699,7 @@ public class ReportConsoleTests : IDisposable
         Assert.False(rig.Console.Detail.IsDirty);
     }
 
+    [Trait("Scenario", "RPT-016")]
     [Fact]
     public async Task should_send_only_the_touched_fields_when_applied()
     {
@@ -795,6 +806,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Null(rig.Api.LastUpdate!.IsPublic);
     }
 
+    [Trait("Scenario", "RPT-016")]
     [Fact]
     public async Task should_send_the_reordered_components_in_a_single_patch_when_applied()
     {
@@ -844,6 +856,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Contains("저장하지 못했습니다", rig.Console.EditViewModel.StatusText);
     }
 
+    [Trait("Scenario", "RPT-016")]
     [Fact]
     public async Task should_restore_the_original_values_when_reverted()
     {
@@ -860,6 +873,7 @@ public class ReportConsoleTests : IDisposable
         Assert.False(rig.Console.Detail.IsDirty);
     }
 
+    [Trait("Scenario", "RPT-016")]
     [Fact]
     public async Task should_register_a_new_template_in_place_without_a_dialog()
     {
@@ -983,6 +997,7 @@ public class ReportConsoleTests : IDisposable
     #endregion
 
     #region - 생성 폼 -
+    [Trait("Scenario", "RPT-013")]
     [Fact]
     public async Task should_refuse_to_generate_when_the_title_is_empty()
     {
@@ -995,6 +1010,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Contains("제목", rig.Console.CreateViewModel.StatusText);
     }
 
+    [Trait("Scenario", "RPT-013")]
     [Fact]
     public async Task should_refuse_to_generate_when_a_template_is_required_but_not_chosen()
     {
@@ -1009,6 +1025,7 @@ public class ReportConsoleTests : IDisposable
         Assert.Contains("템플릿", rig.Console.CreateViewModel.StatusText);
     }
 
+    [Trait("Scenario", "RPT-013")]
     [Fact]
     public async Task should_refuse_to_generate_when_the_end_date_is_before_the_start_date()
     {
@@ -1053,6 +1070,7 @@ public class ReportConsoleTests : IDisposable
         Assert.True(rig.Console.DetailCanApply);
     }
 
+    [Trait("Scenario", "RPT-013")]
     [Fact]
     public async Task should_empty_the_form_when_the_revert_button_is_pressed()
     {
@@ -1233,6 +1251,7 @@ public class ReportConsoleTests : IDisposable
         Assert.True(rig.Console.PreviewViewModel.HasHtml);
     }
 
+    [Trait("Scenario", "RPT-005")]
     [Fact]
     public async Task should_say_the_search_only_covers_the_newest_page_when_nothing_matches()
     {

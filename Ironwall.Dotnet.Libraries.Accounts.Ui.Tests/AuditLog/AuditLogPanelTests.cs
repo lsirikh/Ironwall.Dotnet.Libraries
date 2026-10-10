@@ -47,6 +47,7 @@ public class AuditLogPanelTests
     private static TestAuditLogPanel NewVm(FakeGopServer s)
         => new(new RecordingEventAggregator(), new RecordingLog(), s);
 
+    [Trait("Scenario", "ACC-029")]
     [Fact]
     public async Task should_send_start_and_end_date_when_search_clicked()
     {
@@ -80,6 +81,7 @@ public class AuditLogPanelTests
         Assert.EndsWith("+09:00", s.LastAuditEndDate);   // aware ISO(+09:00)
     }
 
+    [Trait("Scenario", "ACC-029")]
     [Fact]
     public async Task should_append_next_page_when_load_more_invoked()
     {

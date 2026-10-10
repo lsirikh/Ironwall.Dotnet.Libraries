@@ -89,6 +89,7 @@ public class PermissionMatrixReviewTests
     }
 
     // ── A3: 칠해 둔 변경은 이동을 막는다 ───────────────────────────────
+    [Trait("Scenario", "ACC-004")]
     [Fact]
     public async Task should_block_the_rail_switch_when_the_matrix_has_unapplied_changes()
     {
@@ -167,6 +168,7 @@ public class PermissionMatrixReviewTests
         Assert.False(console.Matrix.IsDirty);
     }
 
+    [Trait("Scenario", "ACC-020")]
     [Fact]
     public async Task should_refuse_every_cell_when_the_account_may_not_edit()
     {
@@ -193,6 +195,7 @@ public class PermissionMatrixReviewTests
 
     // 저장 방식 안내("모듈 N종 전부를 한 번에 보냅니다" · "전체 교체 저장")는 운영자 화면에서 뺐다
     // (원장 D-2026-09-26-648420 · 감사 A-2 · A-3) — 상태 띠는 켜진 모듈 수와 사선 칸의 뜻만 말한다.
+    [Trait("Scenario", "ACC-021")]
     [Fact]
     public async Task should_show_enabled_module_count_without_transport_notes_when_a_group_is_open()
     {

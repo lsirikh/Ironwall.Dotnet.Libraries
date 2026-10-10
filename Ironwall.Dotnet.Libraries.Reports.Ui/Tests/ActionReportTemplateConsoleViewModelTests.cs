@@ -42,6 +42,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         return new Rig { Console = console, Api = api, Permission = permission, Events = events };
     }
 
+    [Trait("Scenario", "RPT-026")]
     [Fact]
     public async Task should_show_an_empty_state_instead_of_a_blank_content_box_when_nothing_is_chosen()
     {
@@ -79,6 +80,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.DoesNotContain("[새 문구]", rig.Console.DetailEmptyHint);
     }
 
+    [Trait("Scenario", "RPT-021,RPT-026")]
     [Fact]
     public async Task should_load_templates_ordered_by_display_order_when_opened()
     {
@@ -98,6 +100,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
     }
 
     #region - 드래그 재정렬 커밋(단일 호출) -
+    [Trait("Scenario", "RPT-023")]
     [Fact]
     public async Task should_commit_a_reorder_with_exactly_one_call_carrying_the_full_order()
     {
@@ -115,6 +118,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.Equal(new[] { 3, 1, 2 }, sent.Select(s => s.Id).ToArray());
     }
 
+    [Trait("Scenario", "RPT-023")]
     [Fact]
     public async Task should_offer_undo_after_a_successful_reorder_and_send_a_second_reorder_call_with_the_previous_order()
     {
@@ -149,6 +153,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.False(rig.Console.CanUndoReorder);
     }
 
+    [Trait("Scenario", "RPT-023")]
     [Fact]
     public async Task should_move_the_same_way_through_the_up_down_button_path_as_through_drop()
     {
@@ -165,6 +170,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
     #endregion
 
     #region - 등록 · 수정(클라 선제 검증) -
+    [Trait("Scenario", "RPT-022")]
     [Fact]
     public async Task should_block_apply_when_the_draft_is_blank()
     {
@@ -176,6 +182,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.Equal("문구를 입력하세요.", rig.Console.DraftValidationError);
     }
 
+    [Trait("Scenario", "RPT-022")]
     [Fact]
     public async Task should_block_apply_when_the_draft_duplicates_an_existing_template()
     {
@@ -186,6 +193,7 @@ public class ActionReportTemplateConsoleViewModelTests : System.IDisposable
         Assert.Equal("이미 등록된 문구입니다.", rig.Console.DraftValidationError);
     }
 
+    [Trait("Scenario", "RPT-022")]
     [Fact]
     public async Task should_create_a_template_and_select_it_when_apply_succeeds()
     {

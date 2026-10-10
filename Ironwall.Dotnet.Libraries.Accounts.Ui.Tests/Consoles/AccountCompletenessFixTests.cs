@@ -137,6 +137,7 @@ public class AccountCompletenessFixTests
     }
 
     // ── A-11: 행 [전체] ─────────────────────────────────────────────────────────
+    [Trait("Scenario", "ACC-020")]
     [Fact]
     public async Task should_turn_on_every_applicable_cell_of_the_row_when_the_row_button_is_pressed()
     {
@@ -153,6 +154,7 @@ public class AccountCompletenessFixTests
     }
 
     // ── A-18: 구성원 추가 — 기존 배정 경로 그대로 ───────────────────────────────────
+    [Trait("Scenario", "ACC-022")]
     [Fact]
     public async Task should_assign_the_chosen_account_to_the_group_when_add_member_is_pressed()
     {
@@ -281,6 +283,7 @@ public class AccountCompletenessFixTests
         Assert.Equal("켜짐", row.After);
     }
 
+    [Trait("Scenario", "ACC-029")]
     [Fact]
     public async Task should_describe_the_selected_audit_record_in_korean_when_the_detail_is_shown()
     {
@@ -303,6 +306,7 @@ public class AccountCompletenessFixTests
     }
 
     // ── A-45: 저장은 바뀐 것이 있을 때만 ────────────────────────────────────────────
+    [Trait("Scenario", "ACC-031")]
     [Fact]
     public async Task should_enable_save_only_when_a_policy_value_differs_from_the_loaded_one()
     {

@@ -340,6 +340,7 @@ public class EventMapScenarioTests
     // ───────────────────────── A. 센서 탐지 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-005,EVM-009,EVM-011")]
     public async Task should_paint_symbol_and_zone_detecting_and_count_one_when_detect_arrives_after_api_record_evm005_009()
     {
         using var rig = Rig();
@@ -355,6 +356,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-019")]
     public async Task should_paint_both_zone_lines_when_sensor_in_two_groups_detects_evm019()
     {
         using var rig = Rig();
@@ -372,6 +374,7 @@ public class EventMapScenarioTests
     [InlineData("Alert", EnumDeviceType.Fence)]        // EVM-021 사전 경보
     [InlineData("ContactOn", EnumDeviceType.Contact)]  // EVM-051 접점 센서
     [InlineData("ContactOff", EnumDeviceType.Contact)]
+    [Trait("Scenario", "EVM-021,EVM-051")]
     public async Task should_paint_symbol_and_zone_detecting_when_alert_or_contact_sensor_detects_evm021_051(string typeEvent, EnumDeviceType type)
     {
         // 결함(2026-10-08 수정): 큐가 Intrusion 만 탐지로 쳐서, 카드 · 소리 · 신호등은 올라가는데 심볼 · 구역선은 초록 그대로였다.
@@ -393,6 +396,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-005")]
     public async Task should_fetch_device_once_and_paint_when_v7_reference_misses_cache_evm005_n5()
     {
         // 장비가 캐시에 없고 서버에만 있다(부팅 뒤 추가) — 단건 GET 으로 종류 · 그룹을 채워 칠한다. 심볼은 시작 때 놓인 것.
@@ -411,6 +415,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-016")]
     public async Task should_skip_queue_and_symbols_when_detected_device_was_deleted_on_server_evm016()
     {
         using var rig = Rig();
@@ -425,6 +430,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-017")]
     public async Task should_queue_as_none_and_paint_nothing_when_sensor_type_cannot_be_resolved_evm017()
     {
         // 캐시 미스 + 단건 GET 없음(조회 불가) + 카테고리 sensor — 종류를 추측하지 않고 NONE 으로 큐에(자동조치 · 원격 해제용), 심볼은 칠하지 않는다.
@@ -445,6 +451,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-032")]
     public async Task should_queue_once_when_same_envelope_is_published_three_times_evm032()
     {
         using var rig = Rig();
@@ -460,6 +467,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-033")]
     public async Task should_queue_once_when_same_event_is_resent_with_new_envelope_id_evm033()
     {
         using var rig = Rig();
@@ -475,6 +483,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-034")]
     public async Task should_end_normal_without_alarm_when_action_report_arrives_before_detection_evm034()
     {
         // 순서 뒤집힘 — 서버는 탐지를 기록하고 곧 조치됐는데, 이 GIS 엔 ACTION_REPORT 가 DETECT 보다 먼저 닿았다.
@@ -494,6 +503,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-036")]
     public async Task should_not_repaint_when_same_detection_envelope_is_redelivered_after_report_evm036()
     {
         using var rig = Rig();
@@ -529,6 +539,7 @@ public class EventMapScenarioTests
     // ───────────────────────── B. AI · 접점 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-041,EVM-042")]
     public async Task should_paint_camera_detecting_and_release_on_report_when_ai_detection_arrives_evm041_042()
     {
         using var rig = Rig();
@@ -558,6 +569,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-045")]
     public async Task should_skip_queue_when_ai_camera_was_deleted_evm045()
     {
         using var rig = Rig();
@@ -572,6 +584,7 @@ public class EventMapScenarioTests
     [Theory]
     [InlineData("ContactOn", EnumDoorState.Open)]
     [InlineData("ContactOff", EnumDoorState.Closed)]
+    [Trait("Scenario", "EVM-047")]
     public async Task should_move_door_without_card_queue_or_color_when_enclosure_contact_arrives_evm047(string typeEvent, EnumDoorState expected)
     {
         using var rig = Rig();
@@ -588,6 +601,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-049")]
     public async Task should_invert_door_when_open_on_contact_on_is_off_evm049()
     {
         using var rig = Rig();
@@ -600,6 +614,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-050")]
     public async Task should_leave_door_untouched_when_door_contact_fallback_is_off_evm050()
     {
         using var rig = Rig(doorContactFallback: false);
@@ -614,6 +629,7 @@ public class EventMapScenarioTests
     // ───────────────────────── C. 장애 · 블랙아웃 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-054,EVM-055,EVM-057,EVM-058")]
     public async Task should_paint_fault_and_count_fault_and_play_fault_sound_when_malfunction_arrives_evm054_055_057_058()
     {
         using var rig = Rig();
@@ -633,6 +649,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-056")]
     public async Task should_show_fault_color_and_error_axis_together_when_server_marks_device_error_after_fault_evm056()
     {
         // 장애 → 서버가 장비를 ERROR 로 바꾸고 SYNC_DEVICE(호스트가 SyncDeviceStatus 로 옮김) — 색 축(장애)과 운영 축(오류)이 같이 선다.
@@ -652,6 +669,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-061")]
     public async Task should_skip_queue_when_faulted_device_was_deleted_evm061()
     {
         using var rig = Rig();
@@ -663,6 +681,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-062")]
     public async Task should_paint_again_when_new_malfunction_arrives_after_report_evm062()
     {
         using var rig = Rig();
@@ -678,6 +697,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-064,EVM-065,EVM-066")]
     public async Task should_black_out_controller_and_member_zones_but_keep_member_sensor_color_when_controller_faults_evm064_065_066()
     {
         using var rig = Rig();
@@ -700,6 +720,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-070")]
     public async Task should_auto_recover_blackout_when_controller_becomes_activated_evm070()
     {
         using var rig = Rig();
@@ -721,6 +742,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-071")]
     public async Task should_turn_zone_from_black_to_red_when_member_sensor_detects_during_blackout_evm071()
     {
         using var rig = Rig();
@@ -744,6 +766,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-072")]
     public async Task should_not_expand_groups_when_lonely_controller_faults_evm072()
     {
         using var rig = Rig();
@@ -762,6 +785,7 @@ public class EventMapScenarioTests
     // ───────────────────────── D. 복합 상태 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-074,EVM-075")]
     public async Task should_step_down_to_fault_when_detection_of_faulted_detecting_sensor_is_reported_evm074_075()
     {
         using var rig = Rig();
@@ -783,6 +807,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-076")]
     public async Task should_keep_detecting_when_fault_is_reported_first_evm076()
     {
         using var rig = Rig();
@@ -800,6 +825,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-077")]
     public async Task should_auto_recover_fault_and_show_detecting_when_same_sensor_detects_after_fault_evm077()
     {
         using var rig = Rig();
@@ -820,6 +846,7 @@ public class EventMapScenarioTests
     // ───────────────────────── E. 연결 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-079,EVM-082")]
     public async Task should_change_nothing_on_map_when_connection_envelope_arrives_evm079_081_082()
     {
         // CONNECTION 은 라이브러리 수신 서비스가 받지 않는다(카드 없음 · 청록 Connection 상태는 만들어지지 않음 — 카탈로그 정적 판독 4).
@@ -837,6 +864,7 @@ public class EventMapScenarioTests
     // ───────────────────────── F. 조치보고와 원상복귀 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-091,EVM-095")]
     public async Task should_restore_symbol_zone_counts_and_stop_sound_when_local_report_ok_evm091_095()
     {
         using var rig = Rig();
@@ -856,6 +884,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-093")]
     public async Task should_restore_symbol_when_local_malfunction_report_ok_evm093()
     {
         using var rig = Rig();
@@ -872,6 +901,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-094")]
     public async Task should_restore_symbol_and_close_card_when_auto_report_timer_fires_evm094()
     {
         using var rig = Rig();
@@ -890,6 +920,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-096")]
     public async Task should_leave_own_symbols_when_unknown_event_is_reported_elsewhere_evm096()
     {
         using var rig = Rig();
@@ -905,6 +936,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-083")]
     public async Task should_close_only_detection_when_detection_and_malfunction_share_number_evm083()
     {
         // 서버는 탐지 · 장애를 따로 번호 매긴다 — 같은 번호라도 종류로 가른다.
@@ -924,6 +956,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-101")]
     public async Task should_clear_every_symbol_when_burst_on_distinct_sensors_is_reported_one_by_one_evm101()
     {
         // 운영 전제(같은 대상 중복 없음)를 지키는 버스트 — 서로 다른 센서 20개.
@@ -943,6 +976,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-103")]
     public async Task should_do_nothing_when_action_report_has_no_from_event_evm103()
     {
         using var rig = Rig();
@@ -978,6 +1012,7 @@ public class EventMapScenarioTests
     [InlineData(EnumDeviceType.Enclosure, "DOOR_OPEN", "OPEN", EnumDoorState.Open)]
     [InlineData(EnumDeviceType.Enclosure, "DOOR_CLOSED", "CLOSED", EnumDoorState.Closed)]
     [InlineData(EnumDeviceType.Gate, "GATE_OPEN", null, EnumDoorState.Open)]
+    [Trait("Scenario", "EVM-106,EVM-107,EVM-109")]
     public async Task should_set_door_state_without_color_or_count_when_operation_event_arrives_evm106_107_109(
         EnumDeviceType type, string reason, string? doorStatus, EnumDoorState expected)
     {
@@ -992,6 +1027,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-110")]
     public async Task should_keep_door_when_operation_event_is_threshold_reason_evm110()
     {
         using var rig = Rig();
@@ -1004,6 +1040,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-111")]
     public async Task should_skip_operation_event_for_deleted_device_and_keep_processing_evm111()
     {
         using var rig = Rig();
@@ -1019,6 +1056,7 @@ public class EventMapScenarioTests
     [InlineData(EnumDeviceStatus.ERROR, EnumOperationState.ERROR)]
     [InlineData(EnumDeviceStatus.DEACTIVATED, EnumOperationState.DEACTIVATED)]
     [InlineData(EnumDeviceStatus.ACTIVATED, EnumOperationState.ACTIVATED)]
+    [Trait("Scenario", "EVM-104")]
     public void should_follow_sync_device_status_on_operation_axis_without_touching_event_axis_evm104_114_115(EnumDeviceStatus status, EnumOperationState expected)
     {
         using var rig = Rig();
@@ -1031,6 +1069,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-116")]
     public async Task should_recompute_from_queue_when_activated_arrives_with_stale_blackout_evm116()
     {
         using var rig = Rig();
@@ -1048,6 +1087,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-117")]
     public async Task should_keep_card_reportable_and_lower_counts_and_normalize_symbol_when_device_deleted_evm117()
     {
         // 호스트 SYNC_DEVICE{DELETED}: RemoveByDevice(큐) + 지도 SymbolLifecycleCoordinator.UnregisterDevice(심볼)
@@ -1071,6 +1111,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-120")]
     public async Task should_paint_new_zone_when_cached_device_moves_to_another_group_evm120()
     {
         // 호스트 SYNC_DEVICE_GROUP/SYNC_DEVICE 가 캐시 장비의 그룹을 바꾼 뒤 — 다음 탐지는 새 그룹 선을 칠한다.
@@ -1088,6 +1129,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-139")]
     public async Task should_rotate_fov_when_ptz_status_arrives_evm139()
     {
         using var rig = Rig();
@@ -1104,6 +1146,7 @@ public class EventMapScenarioTests
     // ───────────────────────── H. SYNC_DETECTION · 억제 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-125")]
     public async Task should_close_card_restore_symbol_and_signal_window_when_detection_deleted_on_server_evm125()
     {
         using var rig = Rig();
@@ -1122,6 +1165,7 @@ public class EventMapScenarioTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-130")]
     public async Task should_still_paint_when_suppressed_device_event_bypasses_rest_gate_evm130()
     {
         // 억제는 서버 REST 게이트 하나(클라이언트 게이트 없음) — 직접 NATS 로 온 이벤트는 그대로 칠한다(설계 확인).
@@ -1139,6 +1183,7 @@ public class EventMapScenarioTests
     [Theory]
     [InlineData(1, 3, "1 ~ 3")]
     [InlineData(10, 15, "10 ~ 15")]
+    [Trait("Scenario", "EVM-067")]
     public void should_show_first_and_second_section_as_start_tilde_end_in_malfunction_report_dialog_evm067(int start, int end, string expected)
     {
         // 블랙아웃 · 울타리 장애의 고장 구간은 지도에 그리지 않고(EVM-068/069 구현 없음) 조치 창 글로만 나온다 —
@@ -1167,6 +1212,7 @@ public class EventMapScenarioTests
     // ───────────────────────── I. 견딤 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-140")]
     public async Task should_keep_map_unchanged_and_keep_processing_when_junk_messages_arrive_evm140()
     {
         using var rig = Rig();

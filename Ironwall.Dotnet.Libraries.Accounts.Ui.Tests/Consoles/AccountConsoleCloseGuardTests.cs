@@ -20,6 +20,7 @@ public class AccountConsoleCloseGuardTests
         ConsoleFixtures.User(2, "op2", "이감시", department: "상황실"),
     };
 
+    [Trait("Scenario", "ACC-002")]
     [Fact]
     public async Task should_close_the_account_console_without_asking_when_nothing_is_pending()
     {
@@ -32,6 +33,7 @@ public class AccountConsoleCloseGuardTests
         Assert.Single(events.OfType<ClosePanelMessageModel>());
     }
 
+    [Trait("Scenario", "ACC-002")]
     [Fact]
     public async Task should_ask_instead_of_closing_when_the_user_form_has_unapplied_changes()
     {

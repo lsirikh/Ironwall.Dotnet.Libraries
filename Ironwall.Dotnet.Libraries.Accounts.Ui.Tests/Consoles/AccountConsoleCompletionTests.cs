@@ -91,6 +91,7 @@ public class AccountConsoleCompletionTests
         Assert.True(console.DetailIsDirty);
     }
 
+    [Trait("Scenario", "ACC-012")]
     [Fact]
     public async Task should_count_the_visible_rows_when_a_search_filter_is_on()
     {

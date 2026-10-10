@@ -300,6 +300,7 @@ public class ReportServerTruthTests
         Assert.Equal(2, parsed.Pagination!.Total);
     }
 
+    [Trait("Scenario", "RPT-015")]
     [Fact]
     public void should_show_an_unset_default_period_as_not_specified()
     {

@@ -30,6 +30,7 @@ public class LayerPanelMapStateTests
 
     // ── MAP-052 · MAP-053 · MAP-055 — 섹션 · 빈 섹션 · 수 배지 ──
 
+    [Trait("Scenario", "MAP-052,MAP-055")]
     [Fact]
     public void should_show_three_sections_in_order_and_count_badge_equal_to_symbols_per_kind()
     {
@@ -61,6 +62,7 @@ public class LayerPanelMapStateTests
 
     // ── MAP-056 · MAP-057 · MAP-058 — 종류 · 섹션 머리 · 잎 보이기 ──
 
+    [Trait("Scenario", "MAP-057")]
     [Fact]
     public void should_hide_every_symbol_and_raise_each_leaf_when_symbols_section_header_is_unchecked()
     {
@@ -79,6 +81,7 @@ public class LayerPanelMapStateTests
         Assert.All(symbols, s => Assert.True(s.Visible));
     }
 
+    [Trait("Scenario", "MAP-058")]
     [Fact]
     public void should_make_parent_indeterminate_and_persist_only_that_symbol_when_one_leaf_is_unchecked()
     {
@@ -109,6 +112,7 @@ public class LayerPanelMapStateTests
 
     // ── MAP-067 — 오버레이 행 투명도 ──
 
+    [Trait("Scenario", "MAP-067")]
     [Fact]
     public void should_write_opacity_to_layer_model_and_raise_once_when_overlay_row_slider_moves()
     {
@@ -128,6 +132,7 @@ public class LayerPanelMapStateTests
 
     // ── 결함 D3 — 재시작 뒤 오버레이 이미지 투명도 ──
 
+    [Trait("Scenario", "MAP-067")]
     [Fact]
     public void should_restore_overlay_image_opacity_visibility_and_order_from_layer_row_when_map_reloads() => HousingTests.Sta(() =>
     {

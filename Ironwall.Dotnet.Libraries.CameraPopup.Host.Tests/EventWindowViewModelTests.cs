@@ -56,6 +56,7 @@ public class EventWindowViewModelTests
     // ───────── 격자(FR-10) ─────────
 
     [Fact]
+    [Trait("Scenario", "EVM-132")]
     public void should_fill_one_empty_cell_when_five_cameras_on_3x2()
     {
         var vm = Create(c => c.AddRange(Enumerable.Range(1, 5).Select(i => Fixed("c" + i))), 3, 2);
@@ -78,6 +79,7 @@ public class EventWindowViewModelTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-132")]
     public void should_show_only_six_and_plus_n_when_more_cameras_mapped()
     {
         var vm = Create(c => c.AddRange(Enumerable.Range(1, 6).Select(i => Fixed("c" + i))), 3, 2, extra: 2);
@@ -103,6 +105,7 @@ public class EventWindowViewModelTests
     // ───────── 프리셋 자동 이동 + delay(FR-13) ─────────
 
     [Fact]
+    [Trait("Scenario", "EVM-014")]
     public void should_goto_target_and_count_down_delay_when_window_starts()
     {
         var vm = Create(c => c.Add(Ptz("p1", target: "P2", delay: 3)));
@@ -139,6 +142,7 @@ public class EventWindowViewModelTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-136")]
     public void should_auto_move_even_without_user_permission_when_mapping_has_target()
     {
         var vm = Create(c => c.Add(Ptz("p1", target: "P2", delay: 2, allowed: false)));
@@ -227,6 +231,7 @@ public class EventWindowViewModelTests
     // ───────── 타이머 닫기 · 📌 · 닫기 사유(FR-15) ─────────
 
     [Fact]
+    [Trait("Scenario", "EVM-105")]
     public void should_restart_countdown_when_user_interacts()
     {
         var vm = Create(c => c.Add(Fixed("a")), timer: 30);
@@ -378,6 +383,7 @@ public class EventWindowViewModelTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-088,EVM-105")]
     public async Task should_return_home_only_auto_moved_tiles_when_shutdown_with_return_home()
     {
         var vm = Create(c => { c.Add(Ptz("moved", target: "P2", home: "HOME")); c.Add(Ptz("manual")); });

@@ -252,6 +252,7 @@ public class EventMarkerPaintScenarioTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]   // EVM-024 · EVM-R27-05 다크
+    [Trait("Scenario", "EVM-006,EVM-024,EVM-084,EVM-085")]
     public void should_paint_red_dot_with_pulse_on_detect_and_return_green_without_pulse_on_report_evm006_084_085(bool dark) => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -278,6 +279,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-054")]
     public void should_paint_steady_orange_dot_without_blink_on_malfunction_evm054() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -295,6 +297,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-056,EVM-093,EVM-114")]
     public void should_blink_icon_orange_when_server_marks_device_error_and_stop_on_activated_evm056_114() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -316,6 +319,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-115")]
     public void should_gray_dot_and_dim_icon_when_sync_device_deactivated_evm115() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -329,6 +333,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-104")]
     public void should_keep_red_pulse_over_error_and_deactivated_axes_when_detecting_evm104() => HousingTests.Sta(() =>
     {
         // 탐지 트리거가 템플릿 맨 뒤 — 운영 축(ERROR 주황 · DEACTIVATED 회색)보다 이벤트가 이긴다.
@@ -345,6 +350,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-074,EVM-075")]
     public void should_show_orange_dot_without_pulse_when_sensor_both_detects_and_faults_evm074_075() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -363,6 +369,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-066")]
     public void should_paint_black_dot_on_controller_when_controller_faults_evm066() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -378,6 +385,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-007,EVM-008,EVM-086")]
     public void should_blink_red_line_on_detect_and_collapse_on_report_evm007_008_086() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -402,6 +410,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-055")]
     public void should_paint_steady_orange_line_on_malfunction_evm055() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -419,6 +428,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-078")]
     public void should_alternate_red_and_orange_line_when_zone_has_detection_and_fault_evm078() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -440,6 +450,7 @@ public class EventMarkerPaintScenarioTests
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-065")]
     public void should_paint_black_line_for_member_zone_when_controller_blacks_out_evm065() => HousingTests.Sta(() =>
     {
         using var p = new Pipeline();
@@ -461,6 +472,7 @@ public class EventMarkerPaintScenarioTests
     [InlineData(1, 0, true, false, false)]
     [InlineData(0, 1, false, true, false)]
     [InlineData(2, 1, true, true, false)]
+    [Trait("Scenario", "EVM-009,EVM-057,EVM-087")]
     public void should_light_traffic_lamps_from_queue_counts_evm009_057_087(int detections, int faults, bool yellow, bool red, bool green) => HousingTests.Sta(() =>
     {
         // 상단 신호등은 큐 건수(OnActiveCountChanged)만 본다 — 같은 큐에서 건수를 받아 램프 규칙(TrafficLampLogic)을 돌린다.

@@ -13,6 +13,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Consoles;
 public class AccountVisualReviewFixTests
 {
     // ── #35: 세션 설정 바닥 막대에 [되돌리기] ──────────────────────────────────────
+    [Trait("Scenario", "ACC-030")]
     [Fact]
     public async Task should_restore_the_loaded_values_when_revert_is_pressed_on_the_session_policy()
     {

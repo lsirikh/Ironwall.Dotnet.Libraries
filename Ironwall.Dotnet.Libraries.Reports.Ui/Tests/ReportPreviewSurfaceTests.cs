@@ -74,6 +74,7 @@ public class ReportPreviewSurfaceTests
         Assert.Equal(ReportPreviewSurfaceRules.NoSelectionReason, surface.Reason);
     }
 
+    [Trait("Scenario", "RPT-006")]
     [Theory]
     [InlineData(ReportPreviewContent.InProgress, ReportPreviewSurfaceRules.InProgressReason)]
     [InlineData(ReportPreviewContent.Failed, ReportPreviewSurfaceRules.FailedReason)]
