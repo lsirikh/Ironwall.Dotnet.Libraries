@@ -234,6 +234,7 @@ public class EventQueueDefectTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-095")]
     public void should_stop_the_alarm_when_the_last_active_event_is_reported()
     {
         var probe = new SoundProbe();

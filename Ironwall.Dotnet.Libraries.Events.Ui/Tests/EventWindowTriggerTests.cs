@@ -137,6 +137,7 @@ public class EventWindowTriggerTests
     // ───────────────────────── 모드 · 종류 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-012")]
     public async Task should_open_window_with_mapped_cameras_when_detection_enqueued_in_self_mode()
     {
         var (trigger, manager, source, _) = NewTrigger();
@@ -157,6 +158,7 @@ public class EventWindowTriggerTests
     [Theory]
     [InlineData(CameraPopupMode.Broker)]
     [InlineData(CameraPopupMode.None)]
+    [Trait("Scenario", "EVM-135")]
     public async Task should_not_open_or_fetch_when_mode_is_broker_or_none(CameraPopupMode mode)
     {
         var (trigger, manager, source, _) = NewTrigger();
@@ -170,6 +172,7 @@ public class EventWindowTriggerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-059,EVM-060")]
     public async Task should_open_malfunction_window_only_when_malfunction_option_is_on()
     {
         var (trigger, manager, source, _) = NewTrigger();
@@ -251,6 +254,7 @@ public class EventWindowTriggerTests
     // ───────────────────────── 카메라 고르기 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-132")]
     public async Task should_order_by_priority_take_per_window_and_count_extra_when_more_cameras_are_mapped()
     {
         var (trigger, manager, source, directory) = NewTrigger();
@@ -282,6 +286,7 @@ public class EventWindowTriggerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-136")]
     public async Task should_mark_ptz_not_allowed_when_user_lacks_camera_control()
     {
         var (trigger, manager, source, _) = NewTrigger(ptzAllowed: false);
@@ -361,6 +366,7 @@ public class EventWindowTriggerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-034")]
     public async Task should_not_open_window_when_action_report_arrives_while_mapping_is_loading()
     {
         var (trigger, manager, source, _) = NewTrigger();
@@ -469,6 +475,7 @@ public class EventWindowTriggerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-138")]
     public async Task should_refetch_when_sync_event_mapping_invalidates_cache()
     {
         var gateway = Gateway();

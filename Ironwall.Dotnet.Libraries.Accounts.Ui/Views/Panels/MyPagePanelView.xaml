@@ -234,25 +234,37 @@
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="전화" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Acct.TextBox}" Text="{Binding ViewModel.Phone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Accounts.MyPage.PhoneInput"
+									Style="{StaticResource Acct.TextBox}"
+									Text="{Binding ViewModel.Phone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 							<c:ConsoleField>
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="이메일" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Acct.TextBox}" Text="{Binding ViewModel.EMail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Accounts.MyPage.EmailInput"
+									Style="{StaticResource Acct.TextBox}"
+									Text="{Binding ViewModel.EMail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 							<c:ConsoleField>
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="직급" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Acct.TextBox}" Text="{Binding ViewModel.Position, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Accounts.MyPage.PositionInput"
+									Style="{StaticResource Acct.TextBox}"
+									Text="{Binding ViewModel.Position, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 							<c:ConsoleField>
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="부서" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Acct.TextBox}" Text="{Binding ViewModel.Department, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Accounts.MyPage.DepartmentInput"
+									Style="{StaticResource Acct.TextBox}"
+									Text="{Binding ViewModel.Department, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 						</StackPanel>
 					</c:ConsoleSection>

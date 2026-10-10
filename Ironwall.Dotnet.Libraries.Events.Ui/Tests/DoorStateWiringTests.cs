@@ -116,6 +116,7 @@ public class DoorStateWiringTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-119")]
     public void should_set_door_state_directly_and_notify_only_on_change()
     {
         var manager = CreateManager();

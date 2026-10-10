@@ -88,6 +88,7 @@ public class DetectionSyncNatsServiceTests
         """);
 
     [Fact]
+    [Trait("Scenario", "EVM-123")]
     public async Task should_fetch_and_publish_when_updated_and_entry_active()
     {
         // Arrange
@@ -111,6 +112,7 @@ public class DetectionSyncNatsServiceTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-124")]
     public async Task should_skip_get_when_event_not_in_queue()
     {
         // Arrange — EQM 미등록(비활성) → REST 호출 없이 no-op

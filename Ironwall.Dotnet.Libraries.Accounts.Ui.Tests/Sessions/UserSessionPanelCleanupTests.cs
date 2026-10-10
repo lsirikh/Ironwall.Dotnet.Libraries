@@ -47,6 +47,7 @@ public class UserSessionPanelCleanupTests
 
     // ─────────────────────────── FR-2: 사용자 전체 세션 종료 ───────────────────────────
 
+    [Trait("Scenario", "ACC-025")]
     [Fact]
     public async Task should_call_delete_user_sessions_when_force_logout_all()
     {
@@ -93,6 +94,7 @@ public class UserSessionPanelCleanupTests
 
     // ─────────────────────────── FR-3: 기본 활성만 표시(서버 회신 2026-08-03) ───────────────────────────
 
+    [Trait("Scenario", "ACC-023")]
     [Fact]
     public async Task should_default_to_active_only_when_activated()
     {

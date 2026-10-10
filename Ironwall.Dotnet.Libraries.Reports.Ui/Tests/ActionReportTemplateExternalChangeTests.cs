@@ -103,6 +103,7 @@ public class ActionReportTemplateExternalChangeTests : IDisposable
         Assert.Equal("강풍/폭우(수정)", rig.Console.DraftContent);   // 깨끗한 폼은 서버의 새 글로 바뀐다
     }
 
+    [Trait("Scenario", "RPT-027")]
     [Fact]
     public async Task should_not_read_again_and_show_the_notice_when_the_content_has_unapplied_edits()
     {

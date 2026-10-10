@@ -72,6 +72,7 @@ public class EventSuppressionSyncNatsServiceTests
     // ══════ ① 자기 cmd 만 처리한다 ══════
 
     [Fact]
+    [Trait("Scenario", "EVM-131")]
     public async Task should_request_poll_when_own_command_arrives()
     {
         var (_, spy, handler) = Build();
