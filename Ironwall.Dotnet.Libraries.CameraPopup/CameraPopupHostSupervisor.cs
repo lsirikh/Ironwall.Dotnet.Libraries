@@ -58,6 +58,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     // 받기 줄이 적고 제어 루프가 읽는다.
     private volatile int _plannedExitIncarnation;   // "곧 스스로 내려간다"(메모리 한도) 예고를 보낸 호스트의 기동 번호
     private long _uiStallMs;                        // 마지막 심박 응답이 알린 호스트 UI 멈춤 시간
+    private readonly HostPerfRecorder _perf = new(); // 계측 — 호스트 알림 → popup_opened · first_frame · host_heartbeat
 
     // ── 어느 스레드에서나 읽는 상태 ──
     private volatile CameraPopupClient? _liveClient;
@@ -521,6 +522,11 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
     /// </summary>
     private void OnHostMessage(IIpcMessage message)
     {
+        if (Ironwall.Dotnet.Libraries.Utils.Perf.PerfTrace.IsEnabled)   // 계측(PERF-003 · 004 · 012 · 013) — 꺼져 있으면 읽기 한 번
+        {
+            _perf.HostProcessId = HostProcessId;
+            _perf.OnHostMessage(message);
+        }
         switch (message)
         {
             case HeartbeatAck ack:

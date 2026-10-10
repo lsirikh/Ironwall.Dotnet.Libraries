@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 using Ironwall.Dotnet.Libraries.CameraPopup.EventWindows;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
@@ -77,6 +78,10 @@ public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>, I
             }
             if (!_inFlight.TryAdd(key, 0)) return null;   // 같은 이벤트를 이미 만드는 중
 
+            // 계측(PERF-003): 창 만들기를 시작한 시각 — 매핑 조회 · 창 명령은 이 뒤 배경 작업
+            if (PerfTrace.IsEnabled)
+                PerfTrace.Mark(PerfStages.PopupRequested, EventKindName(kind), eventId, PerfTrace.Extra(("key", key), ("groups", entry.GroupIds?.Count ?? 0)));
+
             var snapshot = new EntrySnapshot(kind, eventId, entry.EventType, entry.DeviceId, entry.DeviceType,
                                              entry.GroupIds?.Where(g => g > 0).ToList() ?? new List<int>(),
                                              entry.EnqueuedAt == default ? DateTime.Now : entry.EnqueuedAt);
@@ -142,6 +147,8 @@ public sealed class EventWindowTrigger : IHandle<EventMappingsChangedMessage>, I
             _inFlight.TryRemove(key, out _);
         }
     }
+
+    private static string EventKindName(EventWindowKind kind) => kind == EventWindowKind.Malfunction ? PerfKinds.Malfunction : PerfKinds.Detection;
 
     private bool SafePtzAllowed()
     {

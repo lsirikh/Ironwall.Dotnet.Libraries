@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
@@ -94,6 +95,9 @@ public class DetectionSyncNatsService : IDetectionSyncNatsService, IService
 
             var action = body.Value<string>("action");
             var resourceId = body.Value<int?>("resource_id") ?? 0;
+            if (PerfTrace.IsEnabled)   // 계측: 수신 직후(PERF-015 늦은 SYNC 순서 확인용)
+                PerfTrace.Mark(PerfStages.NatsReceived, PerfKinds.Detection, resourceId,
+                               PerfTrace.Extra(("cmd", "SYNC_DETECTION"), ("action", action), ("envelope", jObj.Value<string>("id"))));
 
             var isDeleted = string.Equals(action, "DELETED", StringComparison.OrdinalIgnoreCase);
             if (!isDeleted && !string.Equals(action, "UPDATED", StringComparison.OrdinalIgnoreCase))
