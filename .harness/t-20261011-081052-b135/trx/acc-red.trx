@@ -1,0 +1,450 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="bc3a3d53-6630-4953-a3a4-beaafa6c8550" name="gh@GHLEE 2026-10-11 08:24:03" runUser="ghlee\gh" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-11T08:24:03.7348939+09:00" queuing="2026-10-11T08:24:03.7348944+09:00" start="2026-10-11T08:23:59.8353577+09:00" finish="2026-10-11T08:24:05.3211146+09:00" />
+  <TestSettings name="default" id="737e98ec-3ca7-4cbf-a234-f6ebd2dadeb9">
+    <Deployment runDeploymentRoot="gh_GHLEE_2026-10-11_08_24_03" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="eea96935-6978-4b82-ac4c-ec3ac8903baf" testId="a6016ef3-2e64-77fd-edeb-8fc745803ffc" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_still_report_the_failure_when_the_server_refuses_an_id_the_dialog_accepted" computerName="GHLEE" duration="00:00:00.0072461" startTime="2026-10-11T08:24:03.6731723+09:00" endTime="2026-10-11T08:24:03.6733602+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="eea96935-6978-4b82-ac4c-ec3ac8903baf" />
+    <UnitTestResult executionId="db8a7f86-281b-4428-8e31-b560a7fa0bb7" testId="b167a1d0-5683-ecad-6de7-a44ea0d5dfff" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh" computerName="GHLEE" duration="00:00:00.8339984" startTime="2026-10-11T08:24:02.8138153+09:00" endTime="2026-10-11T08:24:03.6644409+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="db8a7f86-281b-4428-8e31-b560a7fa0bb7">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ&#xD;
+                      ↓ (pos 11)&#xD;
+Expected: "2026-10-11T10:00:00+09:00"&#xD;
+Actual:   "2026-10-11T09:00:00+09:00"&#xD;
+                      ↑ (pos 11)</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 99&#xD;
+   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 102&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="038e116f-2b0c-4453-8f6b-be9cc28453e1" testId="cf0a9268-731f-b138-57f4-2770f83341fe" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;김&quot;, expected: False)" computerName="GHLEE" duration="00:00:00.0002184" startTime="2026-10-11T08:24:03.6978256+09:00" endTime="2026-10-11T08:24:03.6978621+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="038e116f-2b0c-4453-8f6b-be9cc28453e1">
+      <Output>
+        <ErrorInfo>
+          <Message>아이디 7자 · 성명 1자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 178&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="99f16b11-c3ad-4083-8bf8-b0ebbd8b9cee" testId="0e93d87f-f097-f452-e490-2f474e7f7028" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_bring_back_an_old_session_selection_after_the_rail_was_switched_away" computerName="GHLEE" duration="00:00:00.5205229" startTime="2026-10-11T08:24:03.7030258+09:00" endTime="2026-10-11T08:24:04.2187484+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="99f16b11-c3ad-4083-8bf8-b0ebbd8b9cee" />
+    <UnitTestResult executionId="ed54f8f7-0eb1-47e8-8cc0-2ffd223a1854" testId="582d3e5c-c37d-c649-614b-11096a5e20dd" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_repeat_an_automation_id_on_the_session_policy_view" computerName="GHLEE" duration="00:00:00.0021054" startTime="2026-10-11T08:24:03.7025710+09:00" endTime="2026-10-11T08:24:03.7026052+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ed54f8f7-0eb1-47e8-8cc0-2ffd223a1854">
+      <Output>
+        <ErrorInfo>
+          <Message>자동화 id 4개</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_repeat_an_automation_id_on_the_session_policy_view() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 251&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="518cb1a8-f85b-4f9d-a8a7-7effbcffb25a" testId="636ca4de-d8cf-85aa-53b2-a0cb4b8c0eb0" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows" computerName="GHLEE" duration="00:00:00.5110954" startTime="2026-10-11T08:24:04.7335899+09:00" endTime="2026-10-11T08:24:05.2457165+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="518cb1a8-f85b-4f9d-a8a7-7effbcffb25a">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.NotNull() Failure: Value is null</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 78&#xD;
+   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 83&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="2367f557-da28-4027-a9c9-b7deeb78599b" testId="ebb864bf-c4d8-6151-83e3-c40539899597" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcd&quot;, name: &quot;신규&quot;, expected: False)" computerName="GHLEE" duration="00:00:00.0008465" startTime="2026-10-11T08:24:03.6974793+09:00" endTime="2026-10-11T08:24:03.6975165+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2367f557-da28-4027-a9c9-b7deeb78599b">
+      <Output>
+        <ErrorInfo>
+          <Message>아이디 4자 · 성명 2자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 178&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ecf84bcb-6df5-47f8-b2a5-2487f4713d01" testId="ad8f67be-e4bc-6372-e4dd-f389bd0f1626" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;LockoutThreshold&quot;)" computerName="GHLEE" duration="00:00:00.0021077" startTime="2026-10-11T08:24:03.6769572+09:00" endTime="2026-10-11T08:24:03.6784140+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ecf84bcb-6df5-47f8-b2a5-2487f4713d01" />
+    <UnitTestResult executionId="1ab6e747-287c-47cd-9fc8-59adaa942c4c" testId="39b12352-c71c-7ddf-61aa-1cc28da14f3c" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcdefghijklmnopqrst&quot;, name: &quot;신규&quot;, expected: True)" computerName="GHLEE" duration="00:00:00.0000277" startTime="2026-10-11T08:24:03.6994990+09:00" endTime="2026-10-11T08:24:03.6995941+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1ab6e747-287c-47cd-9fc8-59adaa942c4c" />
+    <UnitTestResult executionId="fe43fad2-297f-460b-97ec-d6f15be5035c" testId="cbdebc44-3d65-d7a6-dcb9-d3465f384fd8" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;TimeoutHours&quot;)" computerName="GHLEE" duration="00:00:00.0031748" startTime="2026-10-11T08:24:03.6741959+09:00" endTime="2026-10-11T08:24:03.6762346+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fe43fad2-297f-460b-97ec-d6f15be5035c">
+      <Output>
+        <ErrorInfo>
+          <Message>TimeoutHours 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.TimeoutHours 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0219540d-0602-45d2-aabe-d54156e2e282" testId="29daa741-b68e-d15c-7e7b-1ba5127b80f8" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ToggleButton&quot;, bindingPath: &quot;SessionPolicyEnabled&quot;)" computerName="GHLEE" duration="00:00:00.0016743" startTime="2026-10-11T08:24:03.6785499+09:00" endTime="2026-10-11T08:24:03.6804309+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0219540d-0602-45d2-aabe-d54156e2e282">
+      <Output>
+        <ErrorInfo>
+          <Message>SessionPolicyEnabled 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionPolicyEnabled 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="cebfe523-f4f0-40d5-99ee-1432af7418c6" testId="f62b9a89-7e40-6693-6287-55396ebcca55" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;가나다라마바사아자차카&quot;, expected: False)" computerName="GHLEE" duration="00:00:00.0000412" startTime="2026-10-11T08:24:03.6982499+09:00" endTime="2026-10-11T08:24:03.6982878+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cebfe523-f4f0-40d5-99ee-1432af7418c6">
+      <Output>
+        <ErrorInfo>
+          <Message>아이디 7자 · 성명 11자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 178&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f144c47d-c30a-4715-949b-77f031f08f13" testId="c0468dc5-95cb-ddc5-e93f-230fcf1cde81" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_clear_the_selection_when_the_selected_session_is_gone_after_the_auto_refresh" computerName="GHLEE" duration="00:00:00.5142672" startTime="2026-10-11T08:24:04.2190534+09:00" endTime="2026-10-11T08:24:04.7334614+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f144c47d-c30a-4715-949b-77f031f08f13" />
+    <UnitTestResult executionId="b5e58de4-ba8e-4cd8-b609-f97aaae3290d" testId="86116bdf-d6cf-5fc5-4ebf-cf2e5add9ccd" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcde&quot;, name: &quot;신규&quot;, expected: True)" computerName="GHLEE" duration="00:00:00.0000143" startTime="2026-10-11T08:24:03.6997552+09:00" endTime="2026-10-11T08:24:03.6998714+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b5e58de4-ba8e-4cd8-b609-f97aaae3290d" />
+    <UnitTestResult executionId="0d8b4d32-5389-4103-a827-d008d536ad5f" testId="1d4077e7-c4a3-f825-ee31-ddf271fbe156" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name" computerName="GHLEE" duration="00:00:00.0016407" startTime="2026-10-11T08:24:05.2464246+09:00" endTime="2026-10-11T08:24:05.2475804+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0d8b4d32-5389-4103-a827-d008d536ad5f">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ&#xD;
+Expected: "Console.Accounts.SessionSetup.Reload"&#xD;
+Actual:   null</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name() in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 237&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="028b3f27-f64a-4952-8283-1f15aea78628" testId="4a989af9-3024-e51b-c6cf-07d82afd1f52" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;MaxConcurrentSessions&quot;)" computerName="GHLEE" duration="00:00:00.0025759" startTime="2026-10-11T08:24:03.6871338+09:00" endTime="2026-10-11T08:24:03.6895179+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="028b3f27-f64a-4952-8283-1f15aea78628">
+      <Output>
+        <ErrorInfo>
+          <Message>MaxConcurrentSessions 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.MaxConcurrentSessions 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="eeb3dbfa-aae7-4d0a-879b-ce2e154939be" testId="02d2e2e8-8e2c-ee31-0f98-0bf5d359596f" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;SessionHistoryRetentionDays&quot;)" computerName="GHLEE" duration="00:00:00.0023311" startTime="2026-10-11T08:24:03.6850696+09:00" endTime="2026-10-11T08:24:03.6866753+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="eeb3dbfa-aae7-4d0a-879b-ce2e154939be">
+      <Output>
+        <ErrorInfo>
+          <Message>SessionHistoryRetentionDays 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionHistoryRetentionDays 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="2b34008e-7c08-4eb4-a555-60af663a47fe" testId="7e695c14-fe45-090e-d611-2721434d62a6" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;LockoutDurationMinutes&quot;)" computerName="GHLEE" duration="00:00:00.0015862" startTime="2026-10-11T08:24:03.6971159+09:00" endTime="2026-10-11T08:24:03.6971517+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2b34008e-7c08-4eb4-a555-60af663a47fe">
+      <Output>
+        <ErrorInfo>
+          <Message>LockoutDurationMinutes 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.LockoutDurationMinutes 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="360ff62d-2089-4baa-ba65-759efb3b358a" testId="7aece2b3-c2f1-4582-e5c7-558864aee044" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ToggleButton&quot;, bindingPath: &quot;SessionSelfReplaceEnabled&quot;)" computerName="GHLEE" duration="00:00:00.0016970" startTime="2026-10-11T08:24:03.6829163+09:00" endTime="2026-10-11T08:24:03.6841629+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="360ff62d-2089-4baa-ba65-759efb3b358a">
+      <Output>
+        <ErrorInfo>
+          <Message>SessionSelfReplaceEnabled 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionSelfReplaceEnabled 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="16df030b-f2aa-42ea-864c-792e0577c856" testId="422b9813-d777-65ff-e9f7-a5444fd312a3" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;김운&quot;, expected: True)" computerName="GHLEE" duration="00:00:00.0001395" startTime="2026-10-11T08:24:03.7024038+09:00" endTime="2026-10-11T08:24:03.7024570+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="16df030b-f2aa-42ea-864c-792e0577c856" />
+    <UnitTestResult executionId="485639df-7e6a-4be8-9876-8fc45c5fd31a" testId="9d301a4c-3829-0dfc-8f9a-ab9a8684523b" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;RefreshDays&quot;)" computerName="GHLEE" duration="00:00:00.0016286" startTime="2026-10-11T08:24:03.6809182+09:00" endTime="2026-10-11T08:24:03.6822314+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="485639df-7e6a-4be8-9876-8fc45c5fd31a">
+      <Output>
+        <ErrorInfo>
+          <Message>RefreshDays 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.RefreshDays 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="481b77f1-8cba-4227-bb7f-7e0dd5d2a02e" testId="e19a7197-5058-be33-3b87-e1100559f6c3" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcdefghijklmnopqrstu&quot;, name: &quot;신규&quot;, expected: False)" computerName="GHLEE" duration="00:00:00.0000399" startTime="2026-10-11T08:24:03.6987356+09:00" endTime="2026-10-11T08:24:03.6988073+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="481b77f1-8cba-4227-bb7f-7e0dd5d2a02e">
+      <Output>
+        <ErrorInfo>
+          <Message>아이디 21자 · 성명 2자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 178&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="201e7457-73b3-4c88-ba12-c6ea2d681ca1" testId="cb616c20-66aa-d0c5-db06-d7a8056302bb" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;가나다라마바사아자차&quot;, expected: True)" computerName="GHLEE" duration="00:00:00.0000321" startTime="2026-10-11T08:24:03.6981293+09:00" endTime="2026-10-11T08:24:03.6981721+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="201e7457-73b3-4c88-ba12-c6ea2d681ca1" />
+    <UnitTestResult executionId="f8da39d9-8733-4e1a-abbd-2b42ba38f63c" testId="2aab9ac7-2fe5-6077-62a7-03b8d97b2530" testName="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ComboBox&quot;, bindingPath: &quot;ConcurrencyPolicy&quot;)" computerName="GHLEE" duration="00:00:00.0015548" startTime="2026-10-11T08:24:03.6959065+09:00" endTime="2026-10-11T08:24:03.6966507+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f8da39d9-8733-4e1a-abbd-2b42ba38f63c">
+      <Output>
+        <ErrorInfo>
+          <Message>ConcurrencyPolicy 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.ConcurrencyPolicy 이어야 한다</Message>
+          <StackTrace>   at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath) in C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs:line 226&#xD;
+   at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;LockoutThreshold&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="ad8f67be-e4bc-6372-e4dd-f389bd0f1626">
+      <Execution id="ecf84bcb-6df5-47f8-b2a5-2487f4713d01" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;가나다라마바사아자차카&quot;, expected: False)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="f62b9a89-7e40-6693-6287-55396ebcca55">
+      <Execution id="cebfe523-f4f0-40d5-99ee-1432af7418c6" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;RefreshDays&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="9d301a4c-3829-0dfc-8f9a-ab9a8684523b">
+      <Execution id="485639df-7e6a-4be8-9876-8fc45c5fd31a" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_clear_the_selection_when_the_selected_session_is_gone_after_the_auto_refresh" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="c0468dc5-95cb-ddc5-e93f-230fcf1cde81">
+      <Execution id="f144c47d-c30a-4715-949b-77f031f08f13" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_clear_the_selection_when_the_selected_session_is_gone_after_the_auto_refresh" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;MaxConcurrentSessions&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="4a989af9-3024-e51b-c6cf-07d82afd1f52">
+      <Execution id="028b3f27-f64a-4952-8283-1f15aea78628" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;김운&quot;, expected: True)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="422b9813-d777-65ff-e9f7-a5444fd312a3">
+      <Execution id="16df030b-f2aa-42ea-864c-792e0577c856" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;가나다라마바사아자차&quot;, expected: True)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="cb616c20-66aa-d0c5-db06-d7a8056302bb">
+      <Execution id="201e7457-73b3-4c88-ba12-c6ea2d681ca1" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_still_report_the_failure_when_the_server_refuses_an_id_the_dialog_accepted" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="a6016ef3-2e64-77fd-edeb-8fc745803ffc">
+      <Execution id="eea96935-6978-4b82-ac4c-ec3ac8903baf" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_still_report_the_failure_when_the_server_refuses_an_id_the_dialog_accepted" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ComboBox&quot;, bindingPath: &quot;ConcurrencyPolicy&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="2aab9ac7-2fe5-6077-62a7-03b8d97b2530">
+      <Execution id="f8da39d9-8733-4e1a-abbd-2b42ba38f63c" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="636ca4de-d8cf-85aa-53b2-a0cb4b8c0eb0">
+      <Execution id="518cb1a8-f85b-4f9d-a8a7-7effbcffb25a" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="1d4077e7-c4a3-f825-ee31-ddf271fbe156">
+      <Execution id="0d8b4d32-5389-4103-a827-d008d536ad5f" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcdefghijklmnopqrst&quot;, name: &quot;신규&quot;, expected: True)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="39b12352-c71c-7ddf-61aa-1cc28da14f3c">
+      <Execution id="1ab6e747-287c-47cd-9fc8-59adaa942c4c" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ToggleButton&quot;, bindingPath: &quot;SessionPolicyEnabled&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="29daa741-b68e-d15c-7e7b-1ba5127b80f8">
+      <Execution id="0219540d-0602-45d2-aabe-d54156e2e282" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcde&quot;, name: &quot;신규&quot;, expected: True)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="86116bdf-d6cf-5fc5-4ebf-cf2e5add9ccd">
+      <Execution id="b5e58de4-ba8e-4cd8-b609-f97aaae3290d" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;TimeoutHours&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="cbdebc44-3d65-d7a6-dcb9-d3465f384fd8">
+      <Execution id="fe43fad2-297f-460b-97ec-d6f15be5035c" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_bring_back_an_old_session_selection_after_the_rail_was_switched_away" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="0e93d87f-f097-f452-e490-2f474e7f7028">
+      <Execution id="99f16b11-c3ad-4083-8bf8-b0ebbd8b9cee" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_not_bring_back_an_old_session_selection_after_the_rail_was_switched_away" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="b167a1d0-5683-ecad-6de7-a44ea0d5dfff">
+      <Execution id="db8a7f86-281b-4428-8e31-b560a7fa0bb7" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_repeat_an_automation_id_on_the_session_policy_view" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="582d3e5c-c37d-c649-614b-11096a5e20dd">
+      <Execution id="ed54f8f7-0eb1-47e8-8cc0-2ffd223a1854" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_not_repeat_an_automation_id_on_the_session_policy_view" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;fresh01&quot;, name: &quot;김&quot;, expected: False)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="cf0a9268-731f-b138-57f4-2770f83341fe">
+      <Execution id="038e116f-2b0c-4453-8f6b-be9cc28453e1" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcd&quot;, name: &quot;신규&quot;, expected: False)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="ebb864bf-c4d8-6151-83e3-c40539899597">
+      <Execution id="2367f557-da28-4027-a9c9-b7deeb78599b" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: &quot;abcdefghijklmnopqrstu&quot;, name: &quot;신규&quot;, expected: False)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="e19a7197-5058-be33-3b87-e1100559f6c3">
+      <Execution id="481b77f1-8cba-4227-bb7f-7e0dd5d2a02e" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;LockoutDurationMinutes&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="7e695c14-fe45-090e-d611-2721434d62a6">
+      <Execution id="2b34008e-7c08-4eb4-a555-60af663a47fe" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;TextBox&quot;, bindingPath: &quot;SessionHistoryRetentionDays&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="02d2e2e8-8e2c-ee31-0f98-0bf5d359596f">
+      <Execution id="eeb3dbfa-aae7-4d0a-879b-ce2e154939be" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+    <UnitTest name="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: &quot;ToggleButton&quot;, bindingPath: &quot;SessionSelfReplaceEnabled&quot;)" storage="c:\workspace_app\ironwall.dotnet.libraries\.harness-worktrees\t-20261011-081052-b135\ironwall.dotnet.libraries.accounts.ui.tests\bin\debug\net8.0-windows\ironwall.dotnet.libraries.accounts.ui.tests.dll" id="7aece2b3-c2f1-4582-e5c7-558864aee044">
+      <Execution id="360ff62d-2089-4baa-ba65-759efb3b358a" />
+      <TestMethod codeBase="C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\bin\Debug\net8.0-windows\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests" name="should_give_each_session_policy_input_an_automation_id" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a6016ef3-2e64-77fd-edeb-8fc745803ffc" executionId="eea96935-6978-4b82-ac4c-ec3ac8903baf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b167a1d0-5683-ecad-6de7-a44ea0d5dfff" executionId="db8a7f86-281b-4428-8e31-b560a7fa0bb7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cf0a9268-731f-b138-57f4-2770f83341fe" executionId="038e116f-2b0c-4453-8f6b-be9cc28453e1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0e93d87f-f097-f452-e490-2f474e7f7028" executionId="99f16b11-c3ad-4083-8bf8-b0ebbd8b9cee" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="582d3e5c-c37d-c649-614b-11096a5e20dd" executionId="ed54f8f7-0eb1-47e8-8cc0-2ffd223a1854" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="636ca4de-d8cf-85aa-53b2-a0cb4b8c0eb0" executionId="518cb1a8-f85b-4f9d-a8a7-7effbcffb25a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ebb864bf-c4d8-6151-83e3-c40539899597" executionId="2367f557-da28-4027-a9c9-b7deeb78599b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ad8f67be-e4bc-6372-e4dd-f389bd0f1626" executionId="ecf84bcb-6df5-47f8-b2a5-2487f4713d01" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="39b12352-c71c-7ddf-61aa-1cc28da14f3c" executionId="1ab6e747-287c-47cd-9fc8-59adaa942c4c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cbdebc44-3d65-d7a6-dcb9-d3465f384fd8" executionId="fe43fad2-297f-460b-97ec-d6f15be5035c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="29daa741-b68e-d15c-7e7b-1ba5127b80f8" executionId="0219540d-0602-45d2-aabe-d54156e2e282" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f62b9a89-7e40-6693-6287-55396ebcca55" executionId="cebfe523-f4f0-40d5-99ee-1432af7418c6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c0468dc5-95cb-ddc5-e93f-230fcf1cde81" executionId="f144c47d-c30a-4715-949b-77f031f08f13" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="86116bdf-d6cf-5fc5-4ebf-cf2e5add9ccd" executionId="b5e58de4-ba8e-4cd8-b609-f97aaae3290d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1d4077e7-c4a3-f825-ee31-ddf271fbe156" executionId="0d8b4d32-5389-4103-a827-d008d536ad5f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4a989af9-3024-e51b-c6cf-07d82afd1f52" executionId="028b3f27-f64a-4952-8283-1f15aea78628" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="02d2e2e8-8e2c-ee31-0f98-0bf5d359596f" executionId="eeb3dbfa-aae7-4d0a-879b-ce2e154939be" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7e695c14-fe45-090e-d611-2721434d62a6" executionId="2b34008e-7c08-4eb4-a555-60af663a47fe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7aece2b3-c2f1-4582-e5c7-558864aee044" executionId="360ff62d-2089-4baa-ba65-759efb3b358a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="422b9813-d777-65ff-e9f7-a5444fd312a3" executionId="16df030b-f2aa-42ea-864c-792e0577c856" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9d301a4c-3829-0dfc-8f9a-ab9a8684523b" executionId="485639df-7e6a-4be8-9876-8fc45c5fd31a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e19a7197-5058-be33-3b87-e1100559f6c3" executionId="481b77f1-8cba-4227-bb7f-7e0dd5d2a02e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cb616c20-66aa-d0c5-db06-d7a8056302bb" executionId="201e7457-73b3-4c88-ba12-c6ea2d681ca1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2aab9ac7-2fe5-6077-62a7-03b8d97b2530" executionId="f8da39d9-8733-4e1a-abbd-2b42ba38f63c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="목록에 없는 결과" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="로드된 모든 결과" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="24" executed="24" passed="8" failed="16" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.0+00ab0a9ec4 (64-bit .NET 8.0.22)&#xD;
+[xUnit.net 00:00:01.86]   Discovering: Ironwall.Dotnet.Libraries.Accounts.Ui.Tests&#xD;
+[xUnit.net 00:00:01.99]   Discovered:  Ironwall.Dotnet.Libraries.Accounts.Ui.Tests&#xD;
+[xUnit.net 00:00:02.01]   Starting:    Ironwall.Dotnet.Libraries.Accounts.Ui.Tests&#xD;
+[xUnit.net 00:00:02.89]       Assert.Equal() Failure: Strings differ&#xD;
+[xUnit.net 00:00:02.89]                             ↓ (pos 11)&#xD;
+[xUnit.net 00:00:02.89]       Expected: "2026-10-11T10:00:00+09:00"&#xD;
+[xUnit.net 00:00:02.89]       Actual:   "2026-10-11T09:00:00+09:00"&#xD;
+[xUnit.net 00:00:02.89]                             ↑ (pos 11)&#xD;
+[xUnit.net 00:00:02.89]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.89]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(99,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh()&#xD;
+[xUnit.net 00:00:02.89]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(102,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh()&#xD;
+[xUnit.net 00:00:02.89]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:02.90]       TimeoutHours 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.TimeoutHours 이어야 한다&#xD;
+[xUnit.net 00:00:02.90]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.90]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.90]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+[xUnit.net 00:00:02.90]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:02.90]       SessionPolicyEnabled 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionPolicyEnabled 이어야 한다&#xD;
+[xUnit.net 00:00:02.90]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.90]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.90]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.90]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.91]       RefreshDays 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.RefreshDays 이어야 한다&#xD;
+[xUnit.net 00:00:02.91]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.91]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.91]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.91]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.91]       SessionSelfReplaceEnabled 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionSelfReplaceEnabled 이어야 한다&#xD;
+[xUnit.net 00:00:02.91]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.91]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.91]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.91]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.91]       SessionHistoryRetentionDays 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.SessionHistoryRetentionDays 이어야 한다&#xD;
+[xUnit.net 00:00:02.91]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.91]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.91]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.91]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.91]       MaxConcurrentSessions 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.MaxConcurrentSessions 이어야 한다&#xD;
+[xUnit.net 00:00:02.91]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.91]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.91]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.91]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.92]       ConcurrencyPolicy 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.ConcurrencyPolicy 이어야 한다&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.92]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.92]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.92]       LockoutDurationMinutes 칸의 자동화 id 가 '(없음)' — Console.Accounts.SessionSetup.LockoutDurationMinutes 이어야 한다&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(226,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(String element, String bindingPath)&#xD;
+[xUnit.net 00:00:02.92]            at InvokeStub_AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(Object, Span`1)&#xD;
+[xUnit.net 00:00:02.92]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)&#xD;
+[xUnit.net 00:00:02.92]       아이디 4자 · 성명 2자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(178,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected)&#xD;
+[xUnit.net 00:00:02.92]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:02.92]       아이디 7자 · 성명 1자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(178,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected)&#xD;
+[xUnit.net 00:00:02.92]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:02.92]       아이디 7자 · 성명 11자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(178,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected)&#xD;
+[xUnit.net 00:00:02.92]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:02.92]       아이디 21자 · 성명 2자에 가입 [확인] 이 켜졌다 — 안내는 아이디 5~20자 · 성명 2~10자&#xD;
+[xUnit.net 00:00:02.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.92]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(178,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(String username, String name, Boolean expected)&#xD;
+[xUnit.net 00:00:02.92]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:02.93]       자동화 id 4개&#xD;
+[xUnit.net 00:00:02.93]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.93]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(251,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_repeat_an_automation_id_on_the_session_policy_view()&#xD;
+[xUnit.net 00:00:02.93]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+[xUnit.net 00:00:02.93]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:04.47]       Assert.NotNull() Failure: Value is null&#xD;
+[xUnit.net 00:00:04.47]       Stack Trace:&#xD;
+[xUnit.net 00:00:04.47]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(78,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows()&#xD;
+[xUnit.net 00:00:04.47]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(83,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows()&#xD;
+[xUnit.net 00:00:04.47]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:04.47]       Assert.Equal() Failure: Strings differ&#xD;
+[xUnit.net 00:00:04.47]       Expected: "Console.Accounts.SessionSetup.Reload"&#xD;
+[xUnit.net 00:00:04.47]       Actual:   null&#xD;
+[xUnit.net 00:00:04.47]       Stack Trace:&#xD;
+[xUnit.net 00:00:04.47]         C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261011-081052-b135\Ironwall.Dotnet.Libraries.Accounts.Ui.Tests\Scenarios\AccountLeftoverDefectScenarioTests.cs(237,0): at Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name()&#xD;
+[xUnit.net 00:00:04.47]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+[xUnit.net 00:00:04.47]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:04.48]   Finished:    Ironwall.Dotnet.Libraries.Accounts.Ui.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6666672+09:00">
+        <Text>[xUnit.net 00:00:02.89]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_show_the_refreshed_session_values_in_the_detail_after_the_auto_refresh [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6766428+09:00">
+        <Text>[xUnit.net 00:00:02.90]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "TextBox", bindingPath: "TimeoutHours") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6807936+09:00">
+        <Text>[xUnit.net 00:00:02.90]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "ToggleButton", bindingPath: "SessionPolicyEnabled") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6827156+09:00">
+        <Text>[xUnit.net 00:00:02.91]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "TextBox", bindingPath: "RefreshDays") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6845866+09:00">
+        <Text>[xUnit.net 00:00:02.91]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "ToggleButton", bindingPath: "SessionSelfReplaceEnabled") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6870171+09:00">
+        <Text>[xUnit.net 00:00:02.91]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "TextBox", bindingPath: "SessionHistoryRetentionDays") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.6898992+09:00">
+        <Text>[xUnit.net 00:00:02.91]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "TextBox", bindingPath: "MaxConcurrentSessions") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7545538+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "ComboBox", bindingPath: "ConcurrencyPolicy") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7546853+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_each_session_policy_input_an_automation_id(element: "TextBox", bindingPath: "LockoutDurationMinutes") [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7548330+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: "abcd", name: "신규", expected: False) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7550283+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: "fresh01", name: "김", expected: False) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7553235+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: "fresh01", name: "가나다라마바사아자차카", expected: False) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7555668+09:00">
+        <Text>[xUnit.net 00:00:02.92]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_follow_the_id_and_name_length_rules_shown_on_the_register_dialog_when_ok_is_evaluated(username: "abcdefghijklmnopqrstu", name: "신규", expected: False) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:03.7621831+09:00">
+        <Text>[xUnit.net 00:00:02.93]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_not_repeat_an_automation_id_on_the_session_policy_view [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:05.2461213+09:00">
+        <Text>[xUnit.net 00:00:04.47]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_keep_the_same_session_selected_after_the_auto_refresh_replaces_the_rows [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="GHLEE" outcome="Error" timestamp="2026-10-11T08:24:05.2478358+09:00">
+        <Text>[xUnit.net 00:00:04.47]     Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Scenarios.AccountLeftoverDefectScenarioTests.should_give_the_reload_button_an_automation_id_and_keep_its_caliburn_name [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

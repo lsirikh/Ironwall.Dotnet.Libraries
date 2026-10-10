@@ -155,6 +155,7 @@ public class DeviceConsoleSyncSelectionTests : IDisposable
     });
 
     [Fact]
+    [Trait("Scenario", "EVM-121")]
     public void should_keep_the_unapplied_edit_and_say_so_when_the_selected_controller_is_updated_by_sync() => RunOnSta(async () =>
     {
         var rig = await OpenOnControllersAsync();

@@ -236,10 +236,17 @@ public class RegisterDialogViewModel : BasePanelViewModel
         set { if (Set(ref _phone, value)) { ViewModel.Phone = _phone; } }
     }
 
+    /// <summary>
+    /// [확인] 판정 — 창이 안내하는 규칙(「아이디 5~20자 · 비밀번호 8~20자 · 성명 필수」, 성명 검증 2~10자)과 같게 본다.
+    /// 뷰의 StringLengthValidationRule 은 틀린 값을 뷰모델로 넘기지 않을 뿐이라(마지막 맞는 값이 남는다) 여기서도 길이를 본다.
+    /// 서버가 더 엄격하면 <see cref="ClickOk"/> 의 실패 안내가 그대로 나온다.
+    /// </summary>
     public bool CanClickOk =>
         !string.IsNullOrWhiteSpace(Username) &&
+        Username.Length >= 5 && Username.Length <= 20 &&    // 아이디 5~20자(ACC-033)
         !_duplicate &&
         !string.IsNullOrWhiteSpace(Name) &&
+        Name.Length >= 2 && Name.Length <= 10 &&            // 성명 2~10자(ACC-033)
         !string.IsNullOrWhiteSpace(RegisterPass) &&
         RegisterPass.Length >= 8 &&
         RegisterPass.Length <= 20 &&     // 최대 20자 — 창 안내 「비밀번호 8~20자」 · 검증 규칙 Max=20 과 맞춘다(ACC-033)

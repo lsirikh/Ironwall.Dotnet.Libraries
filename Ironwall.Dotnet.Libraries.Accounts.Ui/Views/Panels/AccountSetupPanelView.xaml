@@ -93,14 +93,20 @@
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 유지 시간 — 시간" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.TimeoutHours"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 
 							<c:ConsoleField Note="1~90일">
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="자동 재로그인 허용 기간 — 일" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.RefreshDays"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 
 							<c:ConsoleField Note="0 = 잠그지 않음 · 3~20회">
@@ -117,7 +123,10 @@
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="잠금 자동 해제 — 분" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.LockoutDurationMinutes"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 
 							<c:ConsoleField>
@@ -126,6 +135,7 @@
 								</c:ConsoleField.Header>
 								<ToggleButton
 									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.SessionPolicyEnabled"
 									IsChecked="{Binding SessionPolicyEnabled}"
 									Style="{StaticResource Console.ToggleSwitch}" />
 							</c:ConsoleField>
@@ -144,6 +154,7 @@
 									Width="260"
 									Height="30"
 									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.ConcurrencyPolicy"
 									FontSize="13"
 									Foreground="{DynamicResource TextPrimaryBrush}"
 									SelectedValue="{Binding ConcurrencyPolicy, Mode=TwoWay}"
@@ -161,7 +172,10 @@
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="최대 동시 로그인 수" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding MaxConcurrentSessions, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.MaxConcurrentSessions"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding MaxConcurrentSessions, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 
 							<!--  자기 세션 교체 — allow 일 때만 켜진다  -->
@@ -171,6 +185,7 @@
 								</c:ConsoleField.Header>
 								<ToggleButton
 									HorizontalAlignment="Left"
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.SessionSelfReplaceEnabled"
 									IsChecked="{Binding SessionSelfReplaceEnabled}"
 									Style="{StaticResource Console.ToggleSwitch}" />
 							</c:ConsoleField>
@@ -179,7 +194,10 @@
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="로그인 기록 보존 — 일" />
 								</c:ConsoleField.Header>
-								<TextBox Style="{StaticResource Setup.Number}" Text="{Binding SessionHistoryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBox
+									AutomationProperties.AutomationId="Console.Accounts.SessionSetup.SessionHistoryRetentionDays"
+									Style="{StaticResource Setup.Number}"
+									Text="{Binding SessionHistoryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
 							</c:ConsoleField>
 
 							<!--
@@ -208,6 +226,7 @@
 					<Button
 						x:Name="ClickReload"
 						Margin="0,0,8,0"
+						AutomationProperties.AutomationId="Console.Accounts.SessionSetup.Reload"
 						Content="새로고침"
 						Style="{StaticResource Console.Button.Ghost}"
 						Visibility="{Binding ShowReloadButton, Converter={StaticResource BoolToVisibility}}" />
