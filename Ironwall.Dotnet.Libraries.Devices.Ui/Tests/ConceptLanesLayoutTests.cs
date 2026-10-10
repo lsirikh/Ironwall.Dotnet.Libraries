@@ -62,6 +62,7 @@ public class ConceptLanesLayoutTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-227")]
     public void should_keep_chips_and_thin_labels_and_ticks_when_sixty_five_sensors_share_one_lane()
     {
         var (items, posts, length) = Fence(65, 0);
@@ -76,6 +77,7 @@ public class ConceptLanesLayoutTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-227")]
     public void should_draw_dot_chips_without_labels_when_two_hundred_fifty_sensors_are_squeezed()
     {
         var (items, posts, length) = Fence(250, 0, span: 3);

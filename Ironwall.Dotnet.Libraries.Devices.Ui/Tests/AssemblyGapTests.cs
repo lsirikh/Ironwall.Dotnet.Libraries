@@ -29,6 +29,7 @@ public class AssemblyGapTests
     [InlineData(Key.Delete, false, true, true, false)]                                      // 끄는 도중은 받지 않는다
     [InlineData(Key.Delete, false, false, false, false)]                                    // 고른 칸이 없다
     [InlineData(Key.Back, false, false, true, false)]
+    [Trait("Scenario", "ASM-013")]
     public void should_remove_on_delete_only_from_the_board_and_never_inside_a_text_box_or_mid_drag_ASM013(
         Key key, bool fromTextBox, bool leftPressed, bool canRemove, bool expected)
     {
@@ -57,6 +58,7 @@ public class AssemblyGapTests
 
     #region - 부품 칸 (ASM-023 · ASM-026 · 정적 판독 D4) -
     [Fact]
+    [Trait("Scenario", "ASM-023,ASM-026")]
     public void should_carry_position_in_service_and_identity_fields_into_the_definition_and_count_one_change_ASM023_ASM026()
     {
         var board = new AssemblyBoard(EnumDeviceCategory.Enclosure, _ => null);
@@ -93,6 +95,7 @@ public class AssemblyGapTests
 
     #region - 결선된 센서에 부품 적용 (ASM-205) -
     [Fact]
+    [Trait("Scenario", "ASM-205")]
     public async Task should_keep_the_sensor_wiring_and_bus_address_when_components_are_applied_to_a_wired_sensor_ASM205()
     {
         // Arrange — 결선이 저장된 RS485 센서(spec.wiring · 버스 주소 3) — 서버가 돌려줄 한 건

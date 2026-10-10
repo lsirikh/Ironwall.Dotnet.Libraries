@@ -155,7 +155,17 @@
 			</DockPanel>
 		</Border>
 
-		<Grid>
+		<!--
+			좁은 창(D5 · ASM-304) — 세 칸(팔레트 280 · 보드 * · 속성 340)과 보드 블록 340 이 고정이라 창 최소 폭(420) · 800 에서 보드 블록 · 속성 칸이 잘렸다.
+			본문 폭 = 보이는 폭(넓은 창의 배치는 그대로)이되 1060 아래로는 줄지 않고, 그때만 가로로 밀어 닿게 한다.
+		-->
+		<ScrollViewer
+			AutomationProperties.AutomationId="Devices.Assembly.Body"
+			Focusable="False"
+			HorizontalScrollBarVisibility="Auto"
+			Style="{StaticResource Console.ScrollViewer}"
+			VerticalScrollBarVisibility="Disabled">
+		<Grid MinWidth="1060" Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="280" />
 				<ColumnDefinition Width="*" />
@@ -572,5 +582,6 @@
 				</ScrollViewer>
 			</Border>
 		</Grid>
+		</ScrollViewer>
 	</DockPanel>
 </UserControl>

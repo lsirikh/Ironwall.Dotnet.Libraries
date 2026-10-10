@@ -49,6 +49,7 @@ public class WiringSaveGapTests
 
     #region - 표 보기 표지 (WIR-302 · 303 · 304 · 305 · 309 · 314 · 418) -
     [Fact]
+    [Trait("Scenario", "WIR-302,WIR-303")]
     public void should_tag_every_row_as_suggested_before_apply_and_as_unsaved_after_apply_WIR302_WIR303()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 4).Select(i => ("Fence", 1101 + i, false, (int?)(i + 1))).ToList());
@@ -65,6 +66,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-304")]
     public void should_mark_both_rows_when_two_sensors_share_a_number_WIR304()
     {
         var (vm, _, _) = Seeded(new[] { ("Fence", 1101, true, (int?)1), ("Fence", 1105, true, (int?)2), ("Fence", 1105, true, (int?)3), ("Fence", 1104, true, (int?)4) });
@@ -75,6 +77,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-305")]
     public void should_show_the_not_equal_mark_when_the_bus_address_differs_from_the_position_WIR305()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 4).Select(i => ("Fence", 1101 + i, true, (int?)(i + 1))).ToList());
@@ -89,6 +92,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-309")]
     public void should_unplace_a_row_when_its_remove_button_is_pressed_WIR309()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 4).Select(i => ("Fence", 1101 + i, true, (int?)(i + 1))).ToList());
@@ -101,6 +105,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-314")]
     public void should_undo_a_table_edit_with_ctrl_z_typed_on_the_table_WIR314_D2()
     {
         // 정적 판독 D2 — 표 보기 줄에서 Ctrl+Z 가 묶여 있지 않았다(알림은 「Ctrl+Z 로 취소」). 고친 뒤의 회귀 시험.
@@ -121,6 +126,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-418")]
     public void should_count_ch1_and_ch2_positions_from_opposite_ends_of_the_ring_WIR418()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 5).Select(i => ("Fence", 1101 + i, true, (int?)(i + 1))).ToList());
@@ -133,6 +139,7 @@ public class WiringSaveGapTests
 
     #region - 번호 대역 (WIR-407 · 408 · 409 · 411 · 412) -
     [Fact]
+    [Trait("Scenario", "WIR-407")]
     public void should_number_each_kind_inside_its_tier2_or_tier3_band_WIR407()
     {
         var (tier2, _, _, _) = WiringGapRig.Build("FFMF", controllerType: "PidsController");
@@ -151,6 +158,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-407")]
     public void should_keep_the_numbers_of_a_kind_without_a_band_and_say_so_when_the_preset_lacks_it_WIR407()
     {
         // 2차 프리셋에는 스마트 대역이 없다 — 스마트 센서는 번호를 그대로 두고 안내한다(저장은 막지 않는다)
@@ -170,6 +178,7 @@ public class WiringSaveGapTests
     [InlineData("0", "10", "1~255 안에서")]
     [InlineData("20", "10", "1~255 안에서")]
     [InlineData("250", "260", "1~255 안에서")]
+    [Trait("Scenario", "WIR-408")]
     public void should_refuse_a_malformed_custom_band_and_keep_the_numbers_WIR408(string start, string end, string reason)
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -188,6 +197,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-408")]
     public void should_renumber_from_a_valid_custom_band_and_clear_the_error_WIR408()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -208,6 +218,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-409")]
     public void should_block_saving_when_twelve_sensors_do_not_fit_under_255_WIR409()
     {
         var (vm, _, _, _) = WiringGapRig.Build(new string('S', 12));
@@ -225,6 +236,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-411")]
     public void should_keep_the_numbers_and_say_so_when_bands_are_cleared_WIR411()
     {
         var (vm, _, _, _) = WiringGapRig.Build("SSSS");
@@ -241,6 +253,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-412")]
     public void should_open_the_collapsed_detail_pane_when_the_band_picker_is_asked_for_WIR412_D1()
     {
         // 정적 판독 D1 — 속성 칸을 접은 채 [대역 고르기] 를 누르면 고르개가 칸 안이라 아무것도 보이지 않았다. 고친 뒤의 회귀 시험.
@@ -259,6 +272,7 @@ public class WiringSaveGapTests
 
     #region - 저장 · 다시 열기 (WIR-414 · 417 · 419 · 420 · 421) -
     [Fact]
+    [Trait("Scenario", "WIR-414")]
     public async Task should_write_nothing_anywhere_when_the_number_table_is_cancelled_WIR414()
     {
         var (vm, dialogs, store, gateway) = WiringGapRig.Build("SSS");
@@ -275,6 +289,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-417")]
     public async Task should_reopen_with_the_same_panels_mounts_spacing_and_bands_after_saving_WIR417()
     {
         // Arrange — 망 모양 · 색 · 높이 · 설치 높이 조정 · 펜스센서 간격 · 대역을 고치고 저장
@@ -308,6 +323,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-419")]
     public async Task should_save_only_on_this_pc_and_write_nothing_to_the_server_when_only_the_fence_shape_changed_WIR419()
     {
         var (vm, dialogs, store, gateway) = WiringGapRig.Build("SSS");
@@ -323,6 +339,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-420")]
     public async Task should_count_a_local_only_change_as_one_unsaved_change_when_closing_WIR420()
     {
         var (vm, dialogs, _, _) = WiringGapRig.Build("SSS");
@@ -336,6 +353,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-421")]
     public void should_say_nothing_changed_and_disable_saving_when_nothing_was_touched_WIR421()
     {
         var stored = new FenceLayoutDocument
@@ -354,6 +372,7 @@ public class WiringSaveGapTests
 
     #region - 고장 구간 (WIR-500 · 501 · 502) -
     [Fact]
+    [Trait("Scenario", "WIR-500")]
     public void should_name_the_sensors_of_a_primary_and_secondary_fault_section_on_a_ring_WIR500()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 6).Select(i => ("Fence", 1101 + i, true, (int?)(i + 1))).ToList());
@@ -366,6 +385,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-501")]
     public void should_ask_for_five_sensors_before_showing_a_fault_example_WIR501()
     {
         var (vm, _, _) = Seeded(Enumerable.Range(0, 4).Select(i => ("Fence", 1101 + i, true, (int?)(i + 1))).ToList());
@@ -374,6 +394,7 @@ public class WiringSaveGapTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-502")]
     public void should_count_the_fault_section_from_the_saved_ring_while_a_suggestion_is_pending_WIR502()
     {
         // 저장된 링 5대 + 결선 없는 1대(번호순 제안으로 끝에 붙어 보인다) — 장애 번호는 서버에 저장된 링을 가리킨다

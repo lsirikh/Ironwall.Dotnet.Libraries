@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
@@ -158,10 +159,14 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     private bool _canEdit = true;
     private bool _canReport = true;
     private int _actionCount;
+    private readonly Func<int, IReadOnlyList<WiringRingSensor>>? _ringOf;
 
-    public EventDetailViewModel(ConsoleDetailPresenter presenter, EventActionHistoryViewModel? actions = null)
+    /// <param name="ringOf">제어기 id → 저장된 링(체인 위치 · 센서 이름). 주면 장애 고장 구간을 센서 이름으로도 보인다(WIR-504 · D3). 없으면 숫자만.</param>
+    public EventDetailViewModel(ConsoleDetailPresenter presenter, EventActionHistoryViewModel? actions = null,
+                                Func<int, IReadOnlyList<WiringRingSensor>>? ringOf = null)
     {
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
+        _ringOf = ringOf;
         Sections = new ObservableCollection<EventDetailSection>();
         SelectedSummary = new ObservableCollection<string>();
         Actions = actions ?? new EventActionHistoryViewModel(() => null);
@@ -442,11 +447,31 @@ public sealed class EventDetailViewModel : PropertyChangedBase
             Editable(EventDetailProjection.FieldReason, "사유", EnumKoreanMap.To(row.Reason), KoreanOptions<EnumFaultType>()),
         }));
 
-        Add(new EventDetailSection("고장 구간", "루프 위 위치 · 수정 불가", new[]
+        var fields = new List<EventDetailField>
         {
             Locked("fault_section", "1차 선", row.FirstStart == 0 && row.FirstEnd == 0 ? "— 해당 없음" : $"{row.FirstStart} → {row.FirstEnd}"),
             Locked("fault_section", "2차 선", row.SecondStart == 0 && row.SecondEnd == 0 ? "— 해당 없음" : $"{row.SecondStart} → {row.SecondEnd}"),
-        }));
+        };
+        // 구간 숫자를 링의 센서 이름으로도(D3) — 저장된 결선이 있는 제어기만. 없으면 숫자 두 줄 그대로다.
+        var ring = RingOf(row.Device);
+        if (WiringFaultLocator.Describe(ring, 1, row.FirstStart, row.FirstEnd) is { } first)
+            fields.Add(Locked("fault_section", "1차 센서", first));
+        if (WiringFaultLocator.Describe(ring, 2, row.SecondStart, row.SecondEnd) is { } second)
+            fields.Add(Locked("fault_section", "2차 센서", second));
+        Add(new EventDetailSection("고장 구간", "루프 위 위치 · 수정 불가", fields));
+    }
+
+    /// <summary>장애 장비의 링 — 제어기면 그 제어기, 센서면 그 센서가 붙은 제어기. 링을 모르면 빈 목록.</summary>
+    private IReadOnlyList<WiringRingSensor> RingOf(Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel? device)
+    {
+        if (_ringOf is null) return Array.Empty<WiringRingSensor>();
+        var controllerId = device switch
+        {
+            Ironwall.Dotnet.Monitoring.Models.Devices.ISensorDeviceModel sensor => sensor.Controller?.Id ?? 0,
+            { CategoryDevice: EnumDeviceCategory.Controller } or Ironwall.Dotnet.Monitoring.Models.Devices.IControllerDeviceModel => device.Id,
+            _ => 0,
+        };
+        return controllerId > 0 ? _ringOf(controllerId) : Array.Empty<WiringRingSensor>();
     }
 
     private void BuildConnection(ConnectionEventViewModel row)

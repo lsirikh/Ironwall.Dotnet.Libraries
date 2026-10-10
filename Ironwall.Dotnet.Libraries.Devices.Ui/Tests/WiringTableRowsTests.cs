@@ -30,6 +30,7 @@ public class WiringTableRowsTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-306")]
     public void should_put_the_enclosure_split_band_before_the_row_after_the_controller_gap()
     {
         // Arrange — 6대 링 · 함체 틈 기본 = 가운데(3)
@@ -46,6 +47,7 @@ public class WiringTableRowsTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-310")]
     public void should_mark_the_row_unsaved_and_flip_facing_when_f_is_pressed_in_the_table()
     {
         // Arrange

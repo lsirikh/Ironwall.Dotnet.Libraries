@@ -104,6 +104,7 @@ public class AssemblyBoardTests
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-027")]
     public void should_flag_every_slot_sharing_a_key_when_a_key_is_duplicated()
     {
         var board = Board();
@@ -185,6 +186,7 @@ public class AssemblyBoardTests
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-025,ASM-027")]
     public void should_report_the_catalog_problem_when_a_loaded_type_is_gone_from_the_catalog()
     {
         var board = Board(EnumDeviceCategory.Enclosure);
