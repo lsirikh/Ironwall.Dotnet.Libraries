@@ -22,6 +22,7 @@ public class FenceDistanceTests
 
     #region - Math -
     [Fact]
+    [Trait("Scenario", "WIR-120")]
     public void should_measure_same_lane_neighbours_over_mixed_panel_spans_and_never_join_the_two_lanes()
     {
         var geometry = Geometry((EnumFenceStyle.ChainLink, 6), (EnumFenceStyle.ChainLink, 3), (EnumFenceStyle.ChainLink, 4.5));
@@ -59,6 +60,7 @@ public class FenceDistanceTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-120")]
     public void should_measure_razor_coil_fence_sensors_on_the_upper_lane()
     {
         var geometry = Geometry((EnumFenceStyle.ChainLinkRazor, 6), (EnumFenceStyle.ChainLinkRazor, 6));
@@ -81,6 +83,7 @@ public class FenceDistanceTests
     [InlineData(3.04, "3m")]
     [InlineData(0.15, "0.2m")]
     [InlineData(12.25, "12.3m")]
+    [Trait("Scenario", "WIR-120")]
     public void should_round_to_a_tenth_and_drop_a_trailing_zero(double metres, string expected)
         => Assert.Equal(expected, FenceLayoutMath.MetresText(metres));
     #endregion
@@ -149,6 +152,7 @@ public class FenceDistanceTests
 
     #region - Toggle -
     [Fact]
+    [Trait("Scenario", "WIR-121")]
     public void should_start_off_remember_the_toggle_and_not_save_while_applying_the_stored_value()
     {
         var vm = WiringFenceHeightTests.Build("SSSS");

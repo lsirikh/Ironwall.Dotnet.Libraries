@@ -604,6 +604,7 @@ public class DevicePresetStoreTests : IDisposable
     #region 내보내기 · 가져오기
 
     [Fact]
+    [Trait("Scenario", "ASM-100")]
     public void should_import_with_new_ids_and_clash_suffix_when_exported_file_is_read()
     {
         var source = NewStore();
@@ -645,6 +646,7 @@ public class DevicePresetStoreTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-100")]
     public void should_refuse_import_without_touching_store_when_file_is_corrupt_or_newer()
     {
         var store = NewStore();

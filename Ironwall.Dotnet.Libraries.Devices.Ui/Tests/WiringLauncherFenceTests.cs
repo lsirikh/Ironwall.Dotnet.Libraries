@@ -55,6 +55,7 @@ public class WiringLauncherFenceTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-008")]
     public async Task should_open_the_window_with_a_proposed_fence_and_no_local_saving_when_the_store_cannot_be_created()
     {
         var (launcher, windows, controller) = Build(new Lazy<IFenceLayoutStore>(() => throw new InvalidOperationException("GMaps.Db 모듈 없음")));
@@ -67,6 +68,7 @@ public class WiringLauncherFenceTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-008")]
     public async Task should_still_open_the_window_when_loading_the_stored_fence_fails()
     {
         var (launcher, windows, controller) = Build(new Lazy<IFenceLayoutStore>(() => new ThrowingStore()));

@@ -32,6 +32,7 @@ public class FenceGestureTests
     [InlineData(FencePointerButton.Left, true, false, FenceTargetKind.Panel, 0, FenceGestureAction.ToggleOne)]
     [InlineData(FencePointerButton.Left, false, false, FenceTargetKind.Empty, 0, FenceGestureAction.ClearSelection)]
     [InlineData(FencePointerButton.Left, true, false, FenceTargetKind.Empty, 0, FenceGestureAction.None)]
+    [Trait("Scenario", "WIR-110,WIR-112,WIR-114,WIR-151")]
     public void should_classify_into_one_action_when_given_button_modifiers_target_and_travel(FencePointerButton button, bool ctrl, bool shift,
         FenceTargetKind target, double travel, FenceGestureAction expected)
     {
@@ -51,6 +52,7 @@ public class FenceGestureTests
 
     #region - Rubber band -
     [Fact]
+    [Trait("Scenario", "WIR-110,WIR-112")]
     public void should_pick_everything_the_band_touches_in_input_order_when_dragged_in_any_direction()
     {
         var items = new[]
@@ -68,6 +70,7 @@ public class FenceGestureTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-112")]
     public void should_add_to_the_selection_when_ctrl_is_held_and_replace_it_otherwise()
     {
         Assert.Equal(new[] { 5, 1, 2 }, FenceRubberBand.Merge(new[] { 5, 1 }, new[] { 1, 2 }, additive: true));
@@ -105,6 +108,7 @@ public class FenceGestureTests
     [InlineData("FAULT", SignalLevel.Down)]
     [InlineData(null, SignalLevel.Unknown)]
     [InlineData("UNKNOWN", SignalLevel.Unknown)]
+    [Trait("Scenario", "WIR-223")]
     public void should_map_to_a_signal_level_when_network_interface_health_is_read(string? health, SignalLevel expected)
         => Assert.Equal(expected, SignalMath.FromHealth(health));
 
