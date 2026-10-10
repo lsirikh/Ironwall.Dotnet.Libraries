@@ -48,6 +48,7 @@ public class SymbolCopyLabelStylePersistenceTests
     private static void VerifyStyleWritten(Mock<IGMapDbSymbolService> db, int id) =>
         db.Verify(d => d.UpdateSymbolLabelStyleAsync(id, EnumColorType.Red, EnumColorType.Yellow, "Malgun Gothic", true, true, 120, It.IsAny<CancellationToken>()), Times.Once);
 
+    [Trait("Scenario", "MAP-104,MAP-105")]
     [Fact]
     public async Task should_write_label_style_to_new_row_before_fetch_when_geometric_symbol_is_duplicated()
     {
@@ -62,6 +63,7 @@ public class SymbolCopyLabelStylePersistenceTests
         Assert.Equal(new[] { "insert", "style", "fetch" }, calls);   // Fetch 결과가 새 스타일을 읽도록 순서 보장
     }
 
+    [Trait("Scenario", "MAP-104,MAP-105")]
     [Fact]
     public async Task should_write_label_style_when_line_pidsgroup_and_plain_symbols_are_copied()
     {
@@ -96,6 +98,7 @@ public class SymbolCopyLabelStylePersistenceTests
         Assert.Equal(21, result!.Id);   // 스타일 쓰기 실패가 복사 자체를 죽이지 않는다
     }
 
+    [Trait("Scenario", "MAP-106")]
     [Fact]
     public async Task should_write_label_style_when_deleted_symbol_is_restored_by_undo_with_same_or_new_id()
     {
