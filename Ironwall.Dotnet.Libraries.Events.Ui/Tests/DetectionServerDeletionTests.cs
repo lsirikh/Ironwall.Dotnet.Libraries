@@ -169,6 +169,7 @@ public class DetectionServerDeletionPanelTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-125")]
     public async Task should_close_card_release_queue_and_notify_when_detection_deleted_on_server()
     {
         var panel = CreatePanel();
@@ -216,6 +217,7 @@ public class DetectionServerDeletionPanelTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-126")]
     public async Task should_disable_ok_with_deletion_notice_even_while_sending()
     {
         var gate = new TaskCompletionSource<ApiResponse<ActionEventDto>>();

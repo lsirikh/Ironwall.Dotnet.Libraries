@@ -175,6 +175,7 @@ public class EventCardLifecycleDefectTests : IDisposable
     #region - ① 묶음 버퍼 · 표시 상한 · ⑲ 최신이 맨 위 -
 
     [Fact]
+    [Trait("Scenario", "EVM-002")]
     public async Task should_hold_cards_in_the_batch_buffer_until_flushed_and_put_the_newest_on_top()
     {
         var panel = CreatePanel();
@@ -195,6 +196,7 @@ public class EventCardLifecycleDefectTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-038")]
     public async Task should_drop_the_oldest_cards_when_the_display_cap_is_exceeded()
     {
         var panel = CreatePanel();
@@ -375,6 +377,7 @@ public class EventCardLifecycleDefectTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-100")]
     public async Task should_disable_ok_and_explain_when_another_operator_reported_the_open_dialogs_event()
     {
         var dialog = new Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs.DetectionReportDialogViewModel(_ea.Object, _log.Object);
@@ -462,6 +465,7 @@ public class EventCardLifecycleDefectTests : IDisposable
     #region - ⑪ 카드 더블클릭 = 지도에서 보기 -
 
     [Fact]
+    [Trait("Scenario", "EVM-025")]
     public async Task should_select_the_card_and_ask_the_map_to_locate_its_device_when_double_clicked()
     {
         var panel = CreatePanel();

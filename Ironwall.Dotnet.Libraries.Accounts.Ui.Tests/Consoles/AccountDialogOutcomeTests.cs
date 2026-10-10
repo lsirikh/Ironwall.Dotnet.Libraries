@@ -82,6 +82,7 @@ public class AccountDialogOutcomeTests
     }
 
     #region - 편집 창 비밀번호 초기화 (SC-ACC-071) -
+    [Trait("Scenario", "ACC-035")]
     [Fact]
     public async Task should_show_success_and_close_when_the_server_resets_the_password()
     {
@@ -94,6 +95,7 @@ public class AccountDialogOutcomeTests
         Assert.Single(events.OfType<CloseDialogMessageModel>());
     }
 
+    [Trait("Scenario", "ACC-036")]
     [Fact]
     public async Task should_not_claim_success_when_the_server_fails_to_reset_the_password()
     {
@@ -166,6 +168,7 @@ public class AccountDialogOutcomeTests
         return new MyPagePanelViewModel(events, log, login, new ModeProfileGateway(canSelfDelete: !serverMode), new FakeProfileImageService());
     }
 
+    [Trait("Scenario", "ACC-042")]
     [Fact]
     public async Task should_disable_delete_account_with_a_reason_when_in_server_mode()
     {

@@ -362,6 +362,7 @@ public class EventDetailCarryTests : IoCStubbedTestBase   // 행 뷰모델은 �
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-016")]
     public void should_show_server_snapshot_when_device_was_deleted()
     {
         var dto = JsonConvert.DeserializeObject<DetectionEventDto>(

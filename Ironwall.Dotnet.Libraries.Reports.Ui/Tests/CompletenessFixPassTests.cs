@@ -190,6 +190,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.Equal("문구를 고치지 못했습니다. 잠시 후 다시 시도하세요.", console.Detail.LastMessage);
     }
 
+    [Trait("Scenario", "RPT-021")]
     [Fact]
     public async Task should_refuse_to_close_while_the_form_has_unapplied_changes()
     {
@@ -517,6 +518,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.Equal(string.Empty, list.CountText);
     }
 
+    [Trait("Scenario", "RPT-003")]
     [Fact]
     public async Task should_say_in_the_status_bar_what_the_rail_badge_counts()
     {
@@ -539,6 +541,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.Equal("이름 검색", console.SearchPlaceholder);
     }
 
+    [Trait("Scenario", "RPT-003")]
     [Fact]
     public async Task should_write_the_rail_footer_as_a_polite_instruction()
     {
@@ -588,6 +591,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.Matches(@"^보고서\(#\d+\)를 만들었습니다$", console.StatusText);
     }
 
+    [Trait("Scenario", "RPT-001")]
     [Fact]
     public async Task should_refuse_to_close_while_a_template_has_unapplied_changes()
     {
@@ -619,6 +623,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.True(console.EditViewModel.CanMoveComponent);
     }
 
+    [Trait("Scenario", "RPT-018")]
     [Fact]
     public async Task should_say_why_the_component_list_is_empty_when_the_catalog_fails()
     {
@@ -642,6 +647,7 @@ public class CompletenessFixPassTests : IDisposable
         Assert.Contains("[새 보고서]", console.ListViewModel.EmptyStateHint);
     }
 
+    [Trait("Scenario", "RPT-003")]
     [Fact]
     public async Task should_say_which_status_is_empty_when_a_chip_filters_everything_out()
     {

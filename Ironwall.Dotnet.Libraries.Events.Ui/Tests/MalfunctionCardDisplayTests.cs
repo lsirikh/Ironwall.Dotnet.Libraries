@@ -170,6 +170,7 @@ public class MalfunctionCardDisplayTests : IDisposable
     /// 호스트가 이 카드를 버리지 않게 되면 카드 1행이 비지 않고 "삭제된 장비 (이름)" 을 보여야 한다.
     /// </summary>
     [Fact]
+    [Trait("Scenario", "EVM-061")]
     public void should_show_deleted_device_label_when_card_device_is_null()
     {
         var dto = new MalfunctionEventDto

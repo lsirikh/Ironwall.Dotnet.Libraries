@@ -242,6 +242,7 @@ public class RegisterDialogViewModel : BasePanelViewModel
         !string.IsNullOrWhiteSpace(Name) &&
         !string.IsNullOrWhiteSpace(RegisterPass) &&
         RegisterPass.Length >= 8 &&
+        RegisterPass.Length <= 20 &&     // 최대 20자 — 창 안내 「비밀번호 8~20자」 · 검증 규칙 Max=20 과 맞춘다(ACC-033)
         RegisterPass == PasswordConfirm;
 
     public RegisterViewModel ViewModel { get; }

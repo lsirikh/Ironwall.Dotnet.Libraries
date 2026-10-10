@@ -10,6 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Consoles;
 /// </summary>
 public class AccountConsoleRailTests
 {
+    [Trait("Scenario", "ACC-003")]
     [Fact]
     public async Task should_list_six_rails_in_the_design_order_when_an_admin_opens_the_console()
     {
@@ -39,6 +40,7 @@ public class AccountConsoleRailTests
                    entry => Assert.False(entry.HasSeparatorAbove));
     }
 
+    [Trait("Scenario", "ACC-005")]
     [Fact]
     public async Task should_hide_count_badges_on_audit_and_session_setup()
     {
@@ -91,6 +93,7 @@ public class AccountConsoleRailTests
         Assert.Equal(6, console.RailEntries.Count);
     }
 
+    [Trait("Scenario", "ACC-004")]
     [Fact]
     public async Task should_block_the_rail_switch_when_there_are_unapplied_changes()
     {

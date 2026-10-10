@@ -52,6 +52,7 @@ public class AccountColumnsTests
         Assert.Equal("열 11/11", text);
     }
 
+    [Trait("Scenario", "ACC-008")]
     [Fact]
     public void should_turn_a_single_extra_column_on_without_showing_the_rest()
     {
@@ -66,6 +67,7 @@ public class AccountColumnsTests
         Assert.Equal(System.Windows.Visibility.Visible, Column(columns, "name").Visibility);
     }
 
+    [Trait("Scenario", "ACC-008")]
     [Fact]
     public void should_hide_a_default_column_the_user_turned_off()
     {

@@ -36,6 +36,7 @@ public class AccountLeftoverWriteTests
         Used = EnumUsedType.USED, Department = "경비과", EMail = "op5@example.com", Phone = "010-0000-0005",
     };
 
+    [Trait("Scenario", "ACC-035")]
     [Fact]
     public async Task should_pass_only_department_when_the_editor_changes_only_the_department()
     {
@@ -62,6 +63,7 @@ public class AccountLeftoverWriteTests
         Assert.Equal(new[] { "email", "is_active", "phone" }, fields.OrderBy(x => x, StringComparer.Ordinal));
     }
 
+    [Trait("Scenario", "ACC-035")]
     [Fact]
     public async Task should_not_write_when_nothing_changed_in_the_editor()
     {
@@ -101,6 +103,7 @@ public class AccountLeftoverWriteTests
 
     // ── AL2: 세션 정책 범위 검사 = 서버 SessionSettingsUpdate 규칙 ──────────
 
+    [Trait("Scenario", "ACC-030")]
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -123,6 +126,7 @@ public class AccountLeftoverWriteTests
         Assert.Null(AccountSetupPanelViewModel.ValidatePolicy(24, 7, threshold, 30, "allow", 0, 0));
     }
 
+    [Trait("Scenario", "ACC-030")]
     [Theory]
     [InlineData(0, 7, 5, 30, "allow", 0, 0, "1~168")]
     [InlineData(169, 7, 5, 30, "allow", 0, 0, "1~168")]
@@ -161,6 +165,7 @@ public class AccountLeftoverWriteTests
         return (dialog, gateway);
     }
 
+    [Trait("Scenario", "ACC-033")]
     [Fact]
     public async Task should_register_as_user_when_the_server_mode_local_list_is_empty()
     {
@@ -250,6 +255,7 @@ public class AccountLeftoverWriteTests
         Assert.DoesNotContain("사원번호", events.OfType<OpenInfoPopupMessageModel>().Last().Explain);
     }
 
+    [Trait("Scenario", "ACC-039")]
     [Fact]
     public void should_make_the_employee_number_read_only_when_the_profile_gateway_cannot_self_edit_it()
     {

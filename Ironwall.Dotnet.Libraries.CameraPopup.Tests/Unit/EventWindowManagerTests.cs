@@ -60,6 +60,7 @@ public class EventWindowManagerTests
     // ───────────────────────── FR-11 동시 창 한도 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-039,EVM-133")]
     public void should_evict_oldest_unpinned_window_when_eleventh_event_opens_with_max_ten()
     {
         var (manager, host, _, _, _) = NewManager(new CameraPopupSettings { MaxOpenWindows = 10 });
@@ -125,6 +126,7 @@ public class EventWindowManagerTests
     // ───────────────────────── FR-12 계단 배치 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-133")]
     public void should_cascade_right_down_by_step_and_wrap_to_first_position_when_reaching_work_area_edge()
     {
         // 작업영역 1920×1040, 창 960×600 at (24,24), 간격 100 → 한 바퀴 = min((1920-984)/100, (1040-624)/100)+1 = 5
@@ -138,6 +140,7 @@ public class EventWindowManagerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-134")]
     public void should_place_on_target_monitor_work_area_with_its_dpi_when_monitor_exists()
     {
         var (manager, host, _, _, notices) = NewManager(new CameraPopupSettings { TargetMonitorId = Second.Id, FirstWindowX = 10, FirstWindowY = 20 });
@@ -187,6 +190,7 @@ public class EventWindowManagerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-134")]
     public void should_clamp_to_primary_and_notify_once_when_target_monitor_is_missing()
     {
         var (manager, host, _, _, notices) = NewManager(new CameraPopupSettings { TargetMonitorId = @"\\.\DISPLAY9@3840x2160", FirstWindowX = 24, FirstWindowY = 24 });
@@ -224,6 +228,7 @@ public class EventWindowManagerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-132")]
     public void should_fill_window_policy_from_settings_when_opening()
     {
         var (manager, host, _, _, _) = NewManager(new CameraPopupSettings
@@ -249,6 +254,7 @@ public class EventWindowManagerTests
     [Theory]
     [InlineData(CameraPopupMode.Broker)]
     [InlineData(CameraPopupMode.None)]
+    [Trait("Scenario", "EVM-135")]
     public void should_not_open_window_when_mode_is_not_self(CameraPopupMode mode)
     {
         var (manager, host, _, _, _) = NewManager(new CameraPopupSettings { Mode = mode });
@@ -268,6 +274,7 @@ public class EventWindowManagerTests
     // ───────────────────────── FR-15 조치보고 닫기 ─────────────────────────
 
     [Fact]
+    [Trait("Scenario", "EVM-088")]
     public void should_close_with_action_reported_and_return_home_when_report_arrives()
     {
         var (manager, host, _, _, _) = NewManager(new CameraPopupSettings { CloseOnActionReport = true, ReturnHomePresetOnClose = true });
@@ -281,6 +288,7 @@ public class EventWindowManagerTests
     }
 
     [Fact]
+    [Trait("Scenario", "EVM-089,EVM-090")]
     public void should_keep_window_when_report_is_for_other_kind_pinned_or_close_on_report_off()
     {
         var (manager, host, settings, _, _) = NewManager();

@@ -27,6 +27,7 @@ public class PermissionMatrixConsoleTests
         Assert.Equal("관제 운영", console.Matrix.GroupTitle);
     }
 
+    [Trait("Scenario", "ACC-020")]
     [Fact]
     public async Task should_save_once_with_every_module_when_applying_the_matrix()
     {
@@ -69,6 +70,7 @@ public class PermissionMatrixConsoleTests
         Assert.Contains("새로 추가된 모듈이 1개", console.DetailBanner);
     }
 
+    [Trait("Scenario", "ACC-021")]
     [Fact]
     public async Task should_count_every_changed_cell_as_one_unapplied_change()
     {
@@ -82,6 +84,7 @@ public class PermissionMatrixConsoleTests
         Assert.Contains($"변경 {afterRow}건 미적용", console.DetailFooter);
     }
 
+    [Trait("Scenario", "ACC-020")]
     [Fact]
     public async Task should_restore_the_loaded_values_when_reverting_the_matrix()
     {
@@ -98,6 +101,7 @@ public class PermissionMatrixConsoleTests
         Assert.Empty(api.PermissionSaves);        // 되돌리기는 서버를 부르지 않는다
     }
 
+    [Trait("Scenario", "ACC-020")]
     [Fact]
     public async Task should_toggle_the_whole_column_when_the_header_button_is_used()
     {

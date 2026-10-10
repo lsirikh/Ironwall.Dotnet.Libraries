@@ -87,6 +87,7 @@ public class UserGroupDropTests
         await Task.CompletedTask;
     }
 
+    [Trait("Scenario", "ACC-015")]
     [Fact]
     public async Task should_call_the_server_once_per_user_when_applying_the_draft()
     {
@@ -132,6 +133,7 @@ public class UserGroupDropTests
         Assert.Equal(2, api.AssignCalls.Count);
     }
 
+    [Trait("Scenario", "ACC-015")]
     [Fact]
     public async Task should_not_call_the_server_when_the_draft_is_discarded()
     {
@@ -145,6 +147,7 @@ public class UserGroupDropTests
         await Task.CompletedTask;
     }
 
+    [Trait("Scenario", "ACC-015")]
     [Fact]
     public async Task should_send_reverse_calls_when_undoing_an_applied_draft()
     {
