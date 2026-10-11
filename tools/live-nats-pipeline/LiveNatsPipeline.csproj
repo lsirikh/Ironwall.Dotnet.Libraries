@@ -51,6 +51,7 @@
     <Compile Include="$(HostProj)Services\NatsBrokerService.cs" Link="Host\NatsBrokerService.cs" />
     <Compile Include="$(HostProj)Services\NatsDomainService.cs" Link="Host\NatsDomainService.cs" />
     <Compile Include="$(HostProj)Services\RecentEnvelopeIds.cs" Link="Host\RecentEnvelopeIds.cs" />
+    <Compile Include="$(HostProj)Services\NatsPerfMarks.cs" Link="Host\NatsPerfMarks.cs" />
     <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
