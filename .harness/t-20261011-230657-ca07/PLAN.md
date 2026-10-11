@@ -85,5 +85,14 @@
 
 - DEP-307 의 세션 정책 화면은 6.3 원격에서 '동시 로그인' 절이 잠기고 사유 한 줄이 보인다 — 헤디드 확인은 호스트 쪽 몫(창 띄우는 시험 금지).
 
+## 하네스 검사 실패 대응(2회차)
+- 하네스 `dotnet test …sln` 이 **실패 0 · 종료 코드 1**. 같은 작업 트리에서 재현(첫 실행 종료 0, 두 번째 1): CameraPopup.Tests 286개가 전부 통과한 뒤
+  `[xUnit.net] Catastrophic failure: NullReferenceException at PortableSymbolReader.Dispose ← DiaSession.Dispose ← VisualStudioSourceInformationProvider.DisposeAsync`.
+  시험 어댑터(xunit.runner.visualstudio 3.1.0)의 소스 줄 정보(DiaSession) 정리 단계 이중 해제로 보이는 간헐 결함 — 이 작업의 코드와 무관(CameraPopup 은 손대지 않음).
+- 결정: CameraPopup.Tests 에 `CameraPopup.Tests.runsettings`(`RunConfiguration/CollectSourceInformation=false`)를 두고 csproj `RunSettingsFilePath` 로 연결.
+  시험은 하나도 빼지 않는다 — 소스 줄 정보(IDE "시험으로 이동")만 수집하지 않는다. 어댑터 dll 에 `CollectSourceInformation` 문자열이 있음을 확인.
+  저장소 공통 `Directory.Build.props` 는 추적 대상이 아니라(작업 트리마다 복사) 건드리지 않았다. 다른 시험 프로젝트에서 같은 증상이 나오면 같은 설정을 붙인다.
+- 확인: 설정 뒤 `dotnet test Ironwall.Dotnet.Libraries.sln` 3회 연속(빌드 1회 + `--no-build` 2회) 종료 0 · 실패 0 · CameraPopup.Tests 286 통과 · Catastrophic failure 없음.
+
 ## 남은 일
 - 없음(이 작업 범위). 위 (나) 항목은 원격 6.3.2 실측 또는 후속 작업 후보.
