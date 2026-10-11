@@ -64,8 +64,9 @@ internal static class MapPopupRig
         var thread = new Thread(() =>
         {
             var previous = Caliburn.Micro.IoC.GetInstance;
-            Caliburn.Micro.IoC.GetInstance = (type, _) => type == typeof(ILogService)
-                ? new TestLog()
+            var events = new Caliburn.Micro.EventAggregator();   // 지도 컨트롤 생성자가 꺼낸다(GMapCustomControl) — 메모리 안 발행만
+            Caliburn.Micro.IoC.GetInstance = (type, _) => type == typeof(ILogService) ? new TestLog()
+                : type == typeof(Caliburn.Micro.IEventAggregator) ? events
                 : throw new InvalidOperationException("시험 컨테이너에 없음: " + type.Name);
             try
             {
@@ -177,6 +178,7 @@ internal static class MapPopupRig
                                      IGMapDbService? db = null, bool canControlCamera = true, ICameraPopupBrokerService? broker = null)
     {
         var vm = (MapViewModel)RuntimeHelpers.GetUninitializedObject(typeof(MapViewModel));
+        vm.IsNotifying = true;   // PropertyChangedBase 생성자가 켜는 값 — 생성자를 건너뛰었으니 직접 켠다(안 켜면 화면 바인딩이 값 변화를 못 받는다)
         var log = new TestLog();
         SetField(vm, "<MainMap>k__BackingField", map);
         SetField(vm, "_log", log);

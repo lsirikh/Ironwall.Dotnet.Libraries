@@ -33,6 +33,7 @@ public class SymbolDetailControl : Control
     public SymbolDetailControl()
     {
         InitializeDragSupport();
+        KeyDown += OnEscapeKeyDown;
         DataContextChanged += (_, e) =>
         {
             Detach(e.OldValue as SymbolDetailViewModel);
@@ -110,6 +111,19 @@ public class SymbolDetailControl : Control
     private void OnResetView() => _preview?.ResetToFront();
 
     /// <summary>
+    /// 겹창 안에서 Esc = 닫기 단추와 같은 길(CloseCommand) — 결함 AUX-D5(MAP-160 「CloseButton/Esc → 닫힘」).
+    /// 버블 KeyDown 이고 아직 처리되지 않은 Esc 만 받는다: 열린 "?" 말풍선은 창 단 PreviewKeyDown 에서 Esc 를 먼저 먹으므로
+    /// 첫 Esc 는 말풍선만 닫고 겹창은 남는다(MAP-166).
+    /// </summary>
+    private void OnEscapeKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.Handled) return;
+        if (DataContext is not SymbolDetailViewModel vm || !vm.CloseCommand.CanExecute(null)) return;
+        vm.CloseCommand.Execute(null);
+        e.Handled = true;
+    }
+
+    /// <summary>
     /// 창을 닫을 때 호출 — 마이크를 놓고 3D 타이머를 멈춘다(NFR-01).
     /// <para><b>VM 구독은 여기서 끊지 않는다</b>: 이 창은 Visibility 토글로 닫히고 같은 VM 인스턴스를 재사용하므로,
     /// 여기서 끊으면 다시 열었을 때 <c>⟲ 정면</c> 이 영영 죽는다. 구독 해제는 진짜 소멸(Unloaded)·DataContext 교체 때만.</para>
@@ -150,8 +164,10 @@ public class SymbolDetailControl : Control
         var cur = e.GetPosition(canvas);
         var left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
         var top = Canvas.GetTop(cp); if (double.IsNaN(top)) top = 0;
-        Canvas.SetLeft(cp, left + cur.X - _lastMousePosition.X);
-        Canvas.SetTop(cp, top + cur.Y - _lastMousePosition.Y);
+        // 머리(38)가 지도 안에 남도록 자른다(AUX-D7 · MAP-191)
+        var (newLeft, newTop) = Helpers.OverlayHeaderClamp.Clamp(left + cur.X - _lastMousePosition.X, top + cur.Y - _lastMousePosition.Y, this, canvas, 38);
+        Canvas.SetLeft(cp, newLeft);
+        Canvas.SetTop(cp, newTop);
         _lastMousePosition = cur;
     }
 
