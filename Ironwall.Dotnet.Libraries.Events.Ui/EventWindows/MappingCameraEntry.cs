@@ -8,7 +8,7 @@
 ****************************************************************************/
 
 /// <summary>
-/// 서버 7.0+ 의 <c>MappingCameraReadDto</c>(프리셋 참조 포함)와 6.3 의 <c>EventMappingCameraDto</c>(프리셋 DB id 만)를
+/// 서버 7.0+ 의 <c>MappingCameraReadDto</c>(프리셋 참조 포함)와 6.3 의 <c>EventMappingCameraDto</c>(중첩 응답이면 프리셋 번호 포함)를
 /// 한 모양으로 편 것.
 /// </summary>
 /// <param name="CameraId">카메라 장비 id.</param>

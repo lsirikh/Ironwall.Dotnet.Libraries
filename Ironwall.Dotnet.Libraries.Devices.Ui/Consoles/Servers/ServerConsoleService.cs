@@ -181,6 +181,9 @@ public sealed class ServerConsoleService : IServerConsoleService
         // 수정은 소속을 옮기지 않는다 — 자기 부대를 찍지 않고 방금 다시 받은 서버의 부대를 싣는다(D-13 과 같은 규칙).
         PreserveUnitForEdit(intent, fetched);
 
+        // 6.3 PATCH 는 임계 묶음을 통째로 바꾼다 — 방금 받은 서버 임계를 기준선으로 실어 손대지 않은 임계가 지워지지 않게 한다.
+        intent.BaselineThresholds = fetched.Thresholds;
+
         var result = await _axis.PatchServerAsync(id, intent, token).ConfigureAwait(false);
         return new ServerWriteResult(result.IsSuccess, result.IsSuccess
             ? "설정을 저장했습니다."

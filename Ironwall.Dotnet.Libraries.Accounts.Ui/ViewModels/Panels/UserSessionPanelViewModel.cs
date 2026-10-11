@@ -136,7 +136,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel
             if (res.Success && res.Data is not null)
             {
                 _currentPage = res.Pagination?.Page ?? 1;
-                _totalPages = res.Pagination?.TotalPages ?? 1;
+                _totalUnknown = res.Pagination is null;
+                // 6.3.0~6.3.2 는 pagination 을 주지 않는다(6.3.0 user_sessions.py:81-116) — 쪽이 가득 찼으면 다음 쪽이 있을 수 있다.
+                _totalPages = res.Pagination?.TotalPages ?? (res.Data.Count >= PAGE_SIZE ? _currentPage + 1 : _currentPage);
                 _totalCount = res.Pagination?.Total ?? res.Data.Count;
 
                 DispatcherService.Invoke(() =>
@@ -176,8 +178,19 @@ public class UserSessionPanelViewModel : BasePanelViewModel
             if (!res.Success || res.Data is null) return;
 
             _currentPage = res.Pagination?.Page ?? (_currentPage + 1);
-            _totalPages = res.Pagination?.TotalPages ?? _totalPages;
-            _totalCount = res.Pagination?.Total ?? _totalCount;
+            if (res.Pagination is null)
+            {
+                // pagination 없는 판본 — 가득 찬 쪽이면 한 쪽 더, 덜 찼으면 여기가 끝(전체 = 지금까지 받은 수)
+                _totalUnknown = true;
+                _totalPages = res.Data.Count >= PAGE_SIZE ? _currentPage + 1 : _currentPage;
+                _totalCount += res.Data.Count;
+            }
+            else
+            {
+                _totalUnknown = false;
+                _totalPages = res.Pagination.TotalPages;
+                _totalCount = res.Pagination.Total;
+            }
 
             DispatcherService.Invoke(() =>
             {
@@ -270,7 +283,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     }
 
     /// <summary>로드된 건수 / 전체 건수 표시.</summary>
-    public string LoadedCountText => $"{Items.Count} / {_totalCount}건";
+    public string LoadedCountText => _totalUnknown && HasMorePages ? $"{Items.Count}건 이상" : $"{Items.Count} / {_totalCount}건";
 
     /// <summary>서버가 알려 준 전체 건수(한 페이지 100건이 아니라) — 콘솔의 배지 · 상태 띠가 쓴다(A-36).</summary>
     public int TotalCount => _totalCount;
@@ -301,6 +314,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     private int _currentPage;
     private int _totalPages = 1;
     private int _totalCount;
+    private bool _totalUnknown;   // 서버가 pagination 을 주지 않아(6.3.0~6.3.2) 전체 건수를 모른다 — 다 받을 때까지 "N건 이상"
     private bool _isLoadingMore;
     private bool _isActiveOnly = true;   // 기본 활성만(is_active=true 전송) — allow 정책에선 '이력 무한 누적' 회피가 주 근거(IsActiveOnly 주석 참조).
     private Timer? _autoRefreshTimer;   // 주기 자동 갱신(활성 중만). OnActivate 시작 / OnDeactivate 폐기.

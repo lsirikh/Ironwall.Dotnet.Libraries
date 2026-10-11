@@ -128,6 +128,13 @@ public sealed class ServerWriteIntent
     /// <summary>소속 부대 — 8.0 이상에서만 실린다.</summary>
     public int? UnitId { get; set; }
 
+    /// <summary>
+    /// <b>6.3 전용</b> — 저장 직전에 다시 받은 서버의 임계 전체(<see cref="ServerAxisView.Thresholds"/>).
+    /// 6.3 의 <c>PATCH /servers/{id}</c> 는 <c>threshold_config</c> 를 병합 없이 통째로 바꾼다(6.3.0 <c>servers.py:437-440</c>) —
+    /// 손댄 값만 보내면 나머지 임계가 200 과 함께 지워진다. 그래서 이 기준선 위에 고친 값만 덮어 보낸다. 7.0+ 축 본문은 쓰지 않는다(병합 패치).
+    /// </summary>
+    public JObject? BaselineThresholds { get; set; }
+
     public bool HasThresholdEdit =>
         CpuWarning is not null || CpuCritical is not null || RamWarning is not null || RamCritical is not null
         || DiskWarning is not null || DiskCritical is not null
@@ -290,8 +297,21 @@ public static class ServerAxisWriter
         if (intent.UserName is not null) body["user_name"] = intent.UserName;
         if (intent.NewPassword is not null) body["user_password"] = intent.NewPassword;
 
-        if (intent.HasThresholdEdit) body["threshold_config"] = Thresholds(intent);
+        // 6.3 은 threshold_config 를 통째로 바꾼다 — 기준선(저장 직전 서버 값) 위에 고친 값만 덮는다.
+        if (intent.HasThresholdEdit) body["threshold_config"] = Overlay(intent.BaselineThresholds, Thresholds(intent));
         return body;
+    }
+
+    /// <summary>기준선 사본에 고친 값을 묶음 · 키 단위로 덮는다. 기준선이 없으면 고친 값만.</summary>
+    private static JObject Overlay(JObject? baseline, JObject edited)
+    {
+        var merged = baseline is null ? new JObject() : (JObject)baseline.DeepClone();
+        foreach (var group in edited.Properties())
+        {
+            if (merged[group.Name] is not JObject section) merged[group.Name] = section = new JObject();
+            foreach (var value in ((JObject)group.Value).Properties()) section[value.Name] = value.Value.DeepClone();
+        }
+        return merged;
     }
     #endregion
 

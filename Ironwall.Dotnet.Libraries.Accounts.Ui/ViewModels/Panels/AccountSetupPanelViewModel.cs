@@ -63,14 +63,18 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 LockoutThreshold = LockoutThreshold,
                 LockoutDurationMinutes = LockoutDurationMinutes,
                 SessionEnabled = SessionPolicyEnabled,
-                // v6.3 동시성 5키. 읽기전용 auth_mode/jwt_algorithm 은 채우지 않는다 — DTO 가 null 키를 싣지 않아야
-                // 서버(8.0 extra="forbid")가 422 UNKNOWN_FIELD 로 저장 전체를 거부하지 않는다(SessionSettingsDto 주석, 라이브 실측).
-                SessionConcurrencyPolicy = ConcurrencyPolicy,
-                MaxConcurrentSessions = MaxConcurrentSessions,
-                SessionSelfReplaceEnabled = SessionSelfReplaceEnabled,
-                SessionHistoryRetentionDays = SessionHistoryRetentionDays,
-                LoginAnomalyEventEnabled = LoginAnomalyEventEnabled,
             };
+            // 동시성 5키. 읽기전용 auth_mode/jwt_algorithm 은 채우지 않는다 — DTO 가 null 키를 싣지 않아야
+            // 서버(8.0 extra="forbid")가 422 UNKNOWN_FIELD 로 저장 전체를 거부하지 않는다(SessionSettingsDto 주석, 라이브 실측).
+            // 서버가 이 키들을 모르면(6.3.0~6.3.2) 싣지 않는다 — 실어도 말없이 버려져 "저장했습니다" 가 거짓이 된다.
+            if (IsConcurrencySupported)
+            {
+                dto.SessionConcurrencyPolicy = ConcurrencyPolicy;
+                dto.MaxConcurrentSessions = MaxConcurrentSessions;
+                dto.SessionSelfReplaceEnabled = SessionSelfReplaceEnabled;
+                dto.SessionHistoryRetentionDays = SessionHistoryRetentionDays;
+                dto.LoginAnomalyEventEnabled = LoginAnomalyEventEnabled;
+            }
             var res = await api.UpdateSessionSettingsAsync(dto);
             if (res.Success)
             {
@@ -167,10 +171,14 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 SessionPolicyEnabled = d.SessionEnabled ?? true;
                 AuthMode = d.AuthMode ?? "-";
                 JwtAlgorithm = d.JwtAlgorithm ?? "-";
-                // v6.3 동시성 5키 — 구버전 서버(키 없음)는 기본값 폴백
-                // 서버 기본값은 v6.3 부터 allow(다중 공존)다 — 키 없는 구서버 폴백도 allow 로 둔다.
-                // evict_all 로 폴백하면 조회 실패/구버전에서 화면이 "단일"을 사실처럼 표시해 운영자가 정책을 오인한다.
-                ConcurrencyPolicy = d.SessionConcurrencyPolicy ?? "allow";
+                // 동시성 5키 — 응답에 하나도 없으면 이 서버 판본(원격 6.3.0~6.3.2)이 모르는 설정이다.
+                //   그 판본의 로그인은 같은 계정의 이전 세션을 모두 끝낸다(6.3.0 auth.py:572-591) → 사실대로 evict_all 을 보이고 절을 잠근다.
+                //   키가 있는 판본에서 일부만 빠지면 종전처럼 서버 기본값(allow 등)으로 채운다.
+                IsConcurrencySupported = d.SessionConcurrencyPolicy is not null || d.MaxConcurrentSessions is not null
+                    || d.SessionSelfReplaceEnabled is not null || d.SessionHistoryRetentionDays is not null || d.LoginAnomalyEventEnabled is not null;
+                if (!IsConcurrencySupported)
+                    _log?.Info("[SessionPolicy] 이 서버 판본은 동시 로그인 설정이 없음 — '동시 로그인' 절을 잠그고 저장에서 뺌");
+                ConcurrencyPolicy = d.SessionConcurrencyPolicy ?? (IsConcurrencySupported ? "allow" : "evict_all");
                 MaxConcurrentSessions = d.MaxConcurrentSessions ?? 0;
                 SessionSelfReplaceEnabled = d.SessionSelfReplaceEnabled ?? false;
                 SessionHistoryRetentionDays = d.SessionHistoryRetentionDays ?? 0;
@@ -206,6 +214,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
         AuthMode = "(서버 조회 필요)"; JwtAlgorithm = "-";
         ConcurrencyPolicy = "allow"; MaxConcurrentSessions = 0; SessionSelfReplaceEnabled = false;   // 서버 기본값(v6.3+)
         SessionHistoryRetentionDays = 0; LoginAnomalyEventEnabled = false;
+        IsConcurrencySupported = true;   // 판본을 모른다 — 절 전체가 이미 ServerSettingsAvailable=false 로 잠긴다
         ServerSettingsAvailable = false;
         ServerStatus = status;
         MarkBaseline();
@@ -325,13 +334,13 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     public bool LoginAnomalyEventEnabled { get => _loginAnomalyEventEnabled; set { _loginAnomalyEventEnabled = value; NotifyOfPropertyChange(() => LoginAnomalyEventEnabled); RaiseChanges(); } }
 
     /// <summary>정책=allow &amp; 서버가용일 때만 최대세션·자기교체 컨트롤 활성(GUIDE §3 의존 UX).</summary>
-    public bool IsAllowPolicy => ServerSettingsAvailable && ConcurrencyPolicy == "allow";
+    public bool IsAllowPolicy => CanEditConcurrency && ConcurrencyPolicy == "allow";
 
     /// <summary>
     /// 최대 동시 로그인 수 · 이전 로그인 교체 칸이 왜 꺼졌는가 — 잠금 사유라 화면에 남는다(help-callout PRD §2).
     /// 서버 설정을 못 읽은 때는 위 상태 판이 이미 말하므로 비운다. 칸의 뜻은 '동시 로그인' 절 "?"(Accounts.SessionSetup.Concurrency).
     /// </summary>
-    public string ConcurrencyLockReason => ServerSettingsAvailable && ConcurrencyPolicy != "allow"
+    public string ConcurrencyLockReason => CanEditConcurrency && ConcurrencyPolicy != "allow"
         ? "여러 곳 동시 로그인을 허용할 때만 적용됩니다."
         : string.Empty;
 
@@ -345,7 +354,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     public bool ServerSettingsAvailable
     {
         get => _serverSettingsAvailable;
-        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); NotifyOfPropertyChange(() => IsAllowPolicy); NotifyOfPropertyChange(() => ConcurrencyLockReason); }
+        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); NotifyOfPropertyChange(() => IsAllowPolicy); NotifyOfPropertyChange(() => ConcurrencyLockReason); NotifyOfPropertyChange(() => CanEditConcurrency); NotifyOfPropertyChange(() => ConcurrencySupportReason); }
     }
 
     private string _serverStatus = string.Empty;
@@ -366,6 +375,37 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     private int _sessionExpiration;
     public int SessionExpiration { get => _sessionExpiration; set { if (_sessionExpiration == value) return; _sessionExpiration = value; NotifyOfPropertyChange(() => SessionExpiration); } }
     #endregion
+    /// <summary>
+    /// 서버가 동시 로그인 5키(<c>session_concurrency_policy</c> 등)를 아는가 — GET 응답에 하나라도 있으면 true.
+    /// <para>원격 운영 6.3.0~6.3.2 는 이 키가 없다(6.3.0 <c>app/schemas/settings.py</c> 7키뿐, PUT 은 모르는 키를 422 없이 버린다).
+    /// 종전엔 없는 키를 "여러 곳 동시 로그인 허용"으로 채워 서버 값처럼 보였고 저장도 조용히 버려졌다 — 실제 6.3 로그인은 같은 계정의 이전 세션을 모두 끝낸다.</para>
+    /// </summary>
+    public bool IsConcurrencySupported
+    {
+        get => _isConcurrencySupported;
+        private set
+        {
+            _isConcurrencySupported = value;
+            NotifyOfPropertyChange(() => IsConcurrencySupported);
+            NotifyOfPropertyChange(() => CanEditConcurrency);
+            NotifyOfPropertyChange(() => IsAllowPolicy);
+            NotifyOfPropertyChange(() => ConcurrencyLockReason);
+            NotifyOfPropertyChange(() => ConcurrencySupportReason);
+        }
+    }
+    private bool _isConcurrencySupported = true;
+
+    /// <summary>'동시 로그인' 절을 편집할 수 있는가 — 서버에서 불러왔고 그 서버가 동시 로그인 키를 알 때만.</summary>
+    public bool CanEditConcurrency => ServerSettingsAvailable && IsConcurrencySupported;
+
+    /// <summary>'동시 로그인' 절이 왜 잠겼는가(서버 판본 미지원). 화면에 남는 상태 글이다 — 지원하면 비운다.</summary>
+    public string ConcurrencySupportReason => ServerSettingsAvailable && !IsConcurrencySupported ? ConcurrencyUnsupportedText : string.Empty;
+
+    public const string ConcurrencyUnsupportedText = "이 서버 판본은 동시 로그인 설정을 지원하지 않습니다. 새로 로그인하면 같은 계정의 이전 로그인이 끝납니다.";
+
+    /// <summary>시험용 — IoC 대신 이 API 를 쓴다.</summary>
+    internal IAccountApiService? ApiOverride { set { _api = value; _apiResolved = true; } }
+
     #region - Attributes -
     private IAccountApiService? _api;
     private bool _apiResolved;
