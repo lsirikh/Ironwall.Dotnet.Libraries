@@ -27,6 +27,17 @@ public partial class MapViewModel
     }
     public void CancelPalettePlacement() => ExitSymbolPlacementMode();
 
+    /// <summary>
+    /// 팔레트 목록에서 사용자가 Esc 로 배치를 취소 — 지도 Esc 경로(OnMapPreviewKeyDownForAim)와 같은 「배치를 취소했습니다.」 안내(EDT-S2).
+    /// 배치 중이 아니면 조용히 둔다. 끌어 놓기 뒤 정리 · 다른 도구로 넘어갈 때는 안내 없는 <see cref="CancelPalettePlacement"/> 를 쓴다.
+    /// </summary>
+    public void EscapePalettePlacement()
+    {
+        bool wasPlacing = MainMap?.IsSymbolPlacementMode ?? false;
+        ExitSymbolPlacementMode();
+        if (wasPlacing) SetAimStatus("배치를 취소했습니다.", autoHide: true);
+    }
+
     public async Task PlacePaletteSymbolAsync(SymbolPaletteItem item, PointLatLng geo)
     {
         if (MainMap == null || !IsEditModeEnabled || !CanEditMap() || !MainMap.IsSymbolPlacementMode) return;

@@ -166,7 +166,7 @@ public sealed class SymbolPaletteView : Control
     private void ItemKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && Items.SelectedItem is SymbolPaletteItem item) { ViewModel?.BeginPalettePlacement(item); e.Handled = true; }
-        if (e.Key == Key.Escape) { ViewModel?.CancelPalettePlacement(); e.Handled = true; }
+        if (e.Key == Key.Escape) { ViewModel?.EscapePalettePlacement(); e.Handled = true; }
     }
     private async void Enable3DClicked(object sender, RoutedEventArgs e)
     {

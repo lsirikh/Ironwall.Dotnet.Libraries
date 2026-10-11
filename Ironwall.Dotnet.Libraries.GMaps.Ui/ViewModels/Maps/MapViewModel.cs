@@ -1068,6 +1068,32 @@ public partial class MapViewModel : BasePanelViewModel,
             SetAimStatus("영역 그리기를 취소했습니다.", autoHide: true);
             e.Handled = true;
         }
+        else if (TryReleaseSelectionOnEscape(sender, e))   // 남은 모드가 없으면 편집 모드 선택 해제(EDT-S1 · MAP-107/138)
+        {
+            SetAimStatus("선택 해제", autoHide: true);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// 편집 모드 Esc = 선택 해제(「선택 해제」 단추와 같은 <see cref="ClearAllSelections"/> — 속성창도 닫힘).
+    /// 지도 안에서 난 Esc 만 받는다(창 후킹으로 온 대화상자 · 다른 패널 · 글 칸의 Esc 는 그쪽 몫).
+    /// 끌기 · 크기 편집 중이면 GMapCustomControl.OnKeyDown 의 편집 취소(제자리 복원)가 먼저다 — 그다음 Esc 에서 선택을 푼다.
+    /// </summary>
+    private bool TryReleaseSelectionOnEscape(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        var map = MainMap;
+        if (map == null || !IsEditModeEnabled) return false;
+        bool fromMap = ReferenceEquals(sender, map)
+            || (e.OriginalSource is System.Windows.DependencyObject d && (ReferenceEquals(d, map) || map.IsAncestorOf(d)));
+        if (!fromMap) return false;
+        if (System.Windows.Input.Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase
+            or System.Windows.Controls.ComboBox or System.Windows.Controls.PasswordBox) return false;
+        bool anySelected = HasSelectedItem || map.Markers.OfType<IEditableMarker>().Any(m => m.IsSelected);
+        if (!anySelected) return false;
+        if ((map.AdornerManager?.GetEditingMarkers(map).Count ?? 0) > 0) return false;
+        ClearAllSelections();
+        return true;
     }
 
     /// <summary>
@@ -1370,6 +1396,8 @@ public partial class MapViewModel : BasePanelViewModel,
 
     // 그룹 삭제 확인 대기 스냅샷 — 확인 팝업 발행 시 대상 마커를 담고, Handle에서 소비.
     private System.Collections.Generic.List<IEditableMarker>? _pendingGroupDelete;
+    // 확인 전에 미리 뺀 잠긴 멤버 수 — 완료 글 「잠금 N개 제외」에 더한다(EDT-S3).
+    private int _pendingGroupDeleteLockedSkipped;
 
     /// <summary>그룹 삭제 요청 — 파괴적 작업이라 표준 확인 팝업(EventAggregator) 발행. 확인 시
     /// <see cref="HandleAsync(CallDeleteGroupSymbolsProcessMessageModel, CancellationToken)"/> 가 실제 삭제 수행.
@@ -1380,14 +1408,18 @@ public partial class MapViewModel : BasePanelViewModel,
         if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
         var targets = _groupSelection.Selection.Where(m => m != null && !m.IsDisposed && !m.IsLocked).ToList();
         if (targets.Count == 0) { SetAimStatus("삭제할 항목이 없습니다(잠금 제외).", true); return; }
+        // 잠긴 멤버는 여기서 미리 빠진다 — 확인 글 · 완료 글에 그 수를 알린다(그룹 이동 「잠금 N개 제외」와 같은 말, EDT-S3).
+        int lockedSkipped = _groupSelection.Selection.Count(m => m != null && !m.IsDisposed && m.IsLocked);
+        string lockedNote = lockedSkipped > 0 ? $"\n(잠금 {lockedSkipped}개 제외)" : "";
+        _pendingGroupDeleteLockedSkipped = lockedSkipped;
 
         _pendingGroupDelete = targets;
         // ★ [P0-3] 이미지 포함 시 비가역 경고 — 이미지 삭제는 원본 파일 영구삭제 + Undo 미지원(확정 기조, 분석문서 §6.1).
         int imgCount = targets.Count(t => t is GMapSymbols.GMapImageMarker);
         int symCount = targets.Count - imgCount;
-        string explain = imgCount > 0
+        string explain = (imgCount > 0
             ? $"선택한 심볼 {symCount}개 + 이미지 {imgCount}개를 삭제하시겠습니까?\n※ 이미지는 원본 파일이 영구 삭제되며 실행취소(Undo)로 복구되지 않습니다."
-            : $"선택한 {targets.Count}개 심볼을 삭제하시겠습니까?";
+            : $"선택한 {targets.Count}개 심볼을 삭제하시겠습니까?") + lockedNote;
         // raw MessageBox 금지 — 프로젝트 표준 확인 팝업 패턴(ROI 삭제와 동일). 확인 콜백 = CallDeleteGroupSymbolsProcessMessageModel.
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
@@ -1404,6 +1436,8 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         var targets = _pendingGroupDelete;
         _pendingGroupDelete = null;
+        int lockedBeforeConfirm = _pendingGroupDeleteLockedSkipped;
+        _pendingGroupDeleteLockedSkipped = 0;
         try
         {
             // 확인 팝업 → 진행 팝업으로 전환(확인 창 닫힘). ROI 삭제와 동일 패턴.
@@ -1412,7 +1446,7 @@ public partial class MapViewModel : BasePanelViewModel,
             if (targets == null || targets.Count == 0) return;
             if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
 
-            int del = 0, skipped = 0;
+            int del = 0, skipped = lockedBeforeConfirm;   // 확인 전에 뺀 잠금 + 확인 사이에 잠긴 것
             using (_editRecorder?.BeginBatch("그룹 삭제"))
             {
                 foreach (var m in targets)
@@ -4278,6 +4312,8 @@ public partial class MapViewModel : BasePanelViewModel,
         // 멀티셀렉트(그룹) 상태면 그룹 삭제로 위임 — 상단 메뉴 삭제 버튼도 다중삭제·확인창 적용(A).
         if (_groupSelection?.HasSelection ?? false) { await ExecuteGroupDelete(); return; }
         if (SelectedImage == null && SelectedMarker == null) return;
+        // 잠긴 심볼은 지우지 않는다 — 확인 창도 띄우지 않는다(그룹 삭제의 잠금 제외 · FR-MS-08 과 같은 규칙, LAY-D2 백스톱).
+        if (SelectedMarker?.IsLocked == true) { SetAimStatus("잠긴 항목은 삭제할 수 없습니다.", true); return; }
 
         // ★ 확인 없이 즉시 삭제하던 경로 차단 — Delete 키 오입력 한 번에 오버레이 이미지(PNG 파일+DB)가
         //   영구 삭제(Undo 불가)되는 데이터 손실 방지. 그룹 삭제와 동일한 표준 확인 팝업 패턴.
@@ -6645,7 +6681,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
                     var stopItem = new MenuItem
                     {
-                        Header = "Stop",
+                        Header = "방송 정지",   // 상세 창 행동(SymbolDetailViewModel BroadcastStop)과 같은 이름(AUX-D4)
                         IsEnabled = isEnabled,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Stop, Width = 16, Height = 16 }
                     };
@@ -9637,6 +9673,9 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void OnTtsSendRequested(object? sender, TtsSendEventArgs e)
     {
         if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — TTS 실행 차단"); return; }
+        // 전송 대기 중 「전송」 재클릭 시 같은 TTS 이중 전송 방지 — 음원 실행과 같은 스피커 요청 플래그 공용(AUX-D3).
+        if (_isBroadcastRequestInFlight) { _log?.Info("TTS 실행 무시 — 이전 방송 요청 응답 대기 중"); return; }
+        _isBroadcastRequestInFlight = true;
         try
         {
             await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message);
@@ -9645,8 +9684,11 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         catch (Exception ex)
         {
+            // 실패는 운영자에게 알리고 패널은 남겨 다시 보낼 수 있게 한다 — 음원 실행 실패 안내와 같은 표준 팝업(AUX-D2).
             _log?.Error($"TTS 실행 실패: {ex.Message}");
+            ShowBrokerControlInfo("TTS 실행 실패", "TTS 를 보내지 못했습니다. 연결 상태를 확인한 뒤 다시 보내세요.");
         }
+        finally { _isBroadcastRequestInFlight = false; }
     }
 
     #endregion
@@ -9917,6 +9959,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
             var oldLocked = marker?.IsLocked ?? e.Symbol.IsLocked;   // Undo용 이전 잠금상태
             if (marker != null) marker.IsLocked = e.IsLocked;
+            // 고른 채로 잠그면 선택을 푼다 — 잠긴 심볼은 클릭 · 선택이 막히는 규칙(:1578)과 같게, 남은 선택이 Delete · 끌기 표적이 되지 않게(LAY-D2).
+            if (e.IsLocked && marker != null && ReferenceEquals(SelectedMarker, marker)) ClearAllSelections();
 
             e.Symbol.IsLocked = e.IsLocked;
             // ★ 부분 UPDATE(IsLocked만) — 전체 행 재기록이 PidsGroup Category를 'AREA_BOUNDARY'로 오염시켜
@@ -9941,6 +9985,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (marker != null)
                 {
                     marker.IsLocked = e.IsLocked;
+                    if (e.IsLocked && ReferenceEquals(SelectedMarker, marker)) ClearAllSelections();   // 심볼 잠금과 같은 규칙(LAY-D2)
                     await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
                     // 트리에서 잠금 시 그룹 선택 점선박스 즉시 재렌더(ExecuteGroupLock과 달리 이 경로엔 누락됐던 갱신).
                     if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
@@ -10108,7 +10153,8 @@ public partial class MapViewModel : BasePanelViewModel,
                     if (!e.IsVisible && marker.IsSelected)
                         ClearAllSelections();
                     MainMap?.InvalidateVisual();
-                    await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+                    // 이미지 행(Images.Visibility)도 MapLayers 행과 같은 규칙 — 로컬 렌더는 허용, DB 영속만 권한 필요(FR-EN-08 · LAY-D1).
+                    if (CanEditMap()) await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
                 }
                 else
                 {
