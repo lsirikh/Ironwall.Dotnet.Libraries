@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -26,6 +26,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Api.Tests;
 /// EventApiService 단위 테스트
 /// <para>라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api) + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
 /// 쓰기 시험은 loopback · 사설망 주소에서만 돈다. 모듈 등록 · 초기화 시험은 네트워크 없이 돈다.</para>
+/// <para>2026-10-12: 시험 서버엔 시드 자료가 없다(INIT_SAMPLE_DATA=false). 고정 id(이벤트 1 · 2 · 5, 장비 2)와
+/// <c>if (Success)</c> 무검증을 버리고, 시험마다 제어기 · 이벤트를 직접 만들어 단언한 뒤 finally 에서 지운다
+/// (<see cref="LiveEventTestData"/>). 조회(By ID) 시험도 자기 이벤트를 만들어야 하므로 쓰기 시험이다.</para>
 /// </summary>
 [Trait("Scenario", "DEP-207")]
 public class EventApiServiceTests
@@ -41,6 +44,90 @@ public class EventApiServiceTests
 
         // 모듈 등록 · 초기화 시험용 접속 설정 — 계정은 싣지 않는다(서버 호출 시험은 공용 로그인 세션을 쓴다).
         _setupModel = LiveApiTarget.CreateSetup();
+    }
+    #endregion
+
+    #region - Live 시험 자료 도우미 -
+    /// <summary>공용 세션의 이벤트 서비스와 이 시험 전용 제어기(이벤트의 device_id).</summary>
+    private static async Task<(IEventApiService Service, int DeviceId)> ArrangeAsync()
+    {
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
+        var deviceId = await LiveEventTestData.CreateControllerAsync();
+        return (service, deviceId);
+    }
+
+    private static Task CleanupDeviceAsync(int deviceId)
+        => LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Controllers, deviceId);
+
+    private static async Task<DetectionEventDto> CreateDetectionAsync(IEventApiService service, int deviceId)
+    {
+        var response = await service.CreateDetectionEventAsync(new DetectionEventDto
+        {
+            TypeEvent = "Intrusion",
+            DeviceId = deviceId,
+            Result = "VIBRATION_SENSOR"
+        });
+        Assert.True(response.Success,
+            $"Detection create failed: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.Id > 0);
+        return response.Data;
+    }
+
+    private static async Task<MalfunctionEventDto> CreateMalfunctionAsync(IEventApiService service, int deviceId)
+    {
+        var response = await service.CreateMalfunctionEventAsync(new MalfunctionEventDto
+        {
+            TypeEvent = "Fault",
+            DeviceId = deviceId,
+            Reason = "FAULT_FENCE",
+            Detail = new MalfunctionDetailDto { FirstStart = 10, FirstEnd = 10, SecondStart = 15, SecondEnd = 15 }
+        });
+        Assert.True(response.Success,
+            $"Malfunction create failed: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.Id > 0);
+        return response.Data;
+    }
+
+    private static async Task<ConnectionEventDto> CreateConnectionAsync(IEventApiService service, int deviceId)
+    {
+        var response = await service.CreateConnectionEventAsync(new ConnectionEventDto
+        {
+            TypeEvent = "Connection",
+            DeviceId = deviceId
+        });
+        Assert.True(response.Success,
+            $"Connection create failed: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.Id > 0);
+        return response.Data;
+    }
+
+    private static async Task<ActionEventDto> CreateActionAsync(IEventApiService service, int fromEventId, string content = "Test action content")
+    {
+        var response = await service.CreateActionEventAsync(new ActionEventCreateDto
+        {
+            TypeEvent = "Action",
+            Content = content,
+            User = "admin1",
+            FromEventId = fromEventId,
+        });
+        Assert.True(response.Success,
+            $"Action create failed: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.Id > 0);
+        return response.Data;
+    }
+
+    /// <summary>
+    /// 삭제 응답 단언 — 서버 DELETE 는 <c>data:null</c> 이라 <c>ApiResponse&lt;bool&gt;.Data</c> 는 늘 <c>false</c> 다.
+    /// 성공 여부와 상태 코드(200)로 판정한다.
+    /// </summary>
+    private static void AssertDeleted(Ironwall.Dotnet.Libraries.Messages.Defines.Apis.ApiResponse<bool> response, string what)
+    {
+        Assert.True(response.Success, $"{what} delete failed: {response.Error?.Code} - {response.Message}");
+        Assert.Equal(200, response.StatusCode);
     }
     #endregion
 
@@ -116,7 +203,6 @@ public class EventApiServiceTests
     #region - Detection Event API Tests -
     /// <summary>
     /// Detection Event 목록 조회 API 테스트
-    /// 참고: 실제 GOP 서버가 없으면 실패할 수 있음
     /// </summary>
     [LiveApiFact(DisplayName = "03. Get DetectionEvents")]
     public async Task GetDetectionEvents_Should_Return_List()
@@ -131,28 +217,40 @@ public class EventApiServiceTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.True(response.Success);
+        Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
         Assert.NotNull(response.Data);
     }
 
     /// <summary>
-    /// Detection Event 단일 조회 API 테스트
+    /// Detection Event 단일 조회 API 테스트 — 자기 탐지 이벤트를 만들어 id · 종류 · 결과를 확인한다.
     /// </summary>
-    [LiveApiFact(DisplayName = "04. Get DetectionEvent By ID")]
+    [LiveApiWriteFact(DisplayName = "04. Get DetectionEvent By ID")]
     public async Task GetDetectionEventById_Should_Return_Single()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.GetDetectionEventByIdAsync(1);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal(1, response.Data.Id);
+            var created = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.GetDetectionEventByIdAsync(created.Id);
+
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
+                Assert.NotNull(response.Data);
+                Assert.Equal(created.Id, response.Data.Id);
+                Assert.Equal("Intrusion", response.Data.TypeEvent);
+                Assert.Equal("VIBRATION_SENSOR", response.Data.Result);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(created.Id), "Detection");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -162,50 +260,67 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "05. Create DetectionEvent")]
     public async Task CreateDetectionEvent_Should_Return_Created()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new DetectionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Intrusion",
-            DeviceId = 2,
-            Result = "VIBRATION_SENSOR"
-        };
+            // Act
+            var response = await service.CreateDetectionEventAsync(new DetectionEventDto
+            {
+                TypeEvent = "Intrusion",
+                DeviceId = deviceId,
+                Result = "VIBRATION_SENSOR"
+            });
 
-        // Act
-        var response = await service.CreateDetectionEventAsync(dto);
+            // Assert — 201(생성). 202 는 억제 창에 흡수된 것이라 저장되지 않았다(data 없음).
+            Assert.True(response.Success,
+                $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+            Assert.Equal(201, response.StatusCode);
+            Assert.NotNull(response.Data);
+            Assert.True(response.Data.Id > 0);
+            Assert.Equal("VIBRATION_SENSOR", response.Data.Result);
 
-        // Assert
-        Assert.NotNull(response);
-        Assert.True(response.Success);
-        Assert.NotNull(response.Data);
+            AssertDeleted(await service.DeleteDetectionEventAsync(response.Data.Id), "Detection");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
+        }
     }
 
     /// <summary>
     /// Detection Event 수정 (부분) API 테스트
+    /// <para><c>action_reported</c> 는 요청 필드가 아니다 — 서버가 조치 생성 · 삭제로 재계산하고, 보내면 무시한다
+    /// (<c>app/schemas/event.py:181-182 · 474-477</c>). 그래서 바꿀 수 있는 <c>result</c> 로 부분 수정을 확인한다.</para>
     /// </summary>
     [LiveApiWriteFact(DisplayName = "05-1. Patch DetectionEvent")]
     public async Task PatchDetectionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new DetectionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            ActionReported = "True",
-            //Result = "DISTANCE_SENSOR"
-            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-        };
+            var created = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.PatchDetectionEventAsync(created.Id, new DetectionEventDto { Result = "PIR_SENSOR" });
 
-        // Act
-        var response = await service.PatchDetectionEventAsync(2, dto);
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal("PIR_SENSOR", response.Data.Result);
 
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                var reread = await service.GetDetectionEventByIdAsync(created.Id);
+                Assert.True(reread.Success);
+                Assert.Equal("PIR_SENSOR", reread.Data!.Result);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(created.Id), "Detection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal("True", response.Data.ActionReported);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -215,24 +330,33 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "05-2. Update DetectionEvent")]
     public async Task UpdateDetectionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new DetectionEventReplaceDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Intrusion",
-            Result = "VIBRATION_SENSOR"
-        };
+            var created = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.UpdateDetectionEventAsync(created.Id, new DetectionEventReplaceDto
+                {
+                    TypeEvent = "Intrusion",
+                    Result = "THERMAL_SENSOR"
+                });
 
-        // Act
-        var response = await service.UpdateDetectionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal("THERMAL_SENSOR", response.Data.Result);
+                Assert.NotNull(response.Data.Device);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(created.Id), "Detection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.NotNull(response.Data.Device);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -242,17 +366,22 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "05-3. Delete DetectionEvent")]
     public async Task DeleteDetectionEvent_Should_Return_Success()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.DeleteDetectionEventAsync(2);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.True(response.Data);
+            var created = await CreateDetectionAsync(service, deviceId);
+
+            // Act
+            var response = await service.DeleteDetectionEventAsync(created.Id);
+
+            // Assert — 지운 뒤 조회는 실패해야 한다
+            AssertDeleted(response, "Detection");
+            var after = await service.GetDetectionEventByIdAsync(created.Id);
+            Assert.False(after.Success, "삭제한 탐지 이벤트가 아직 조회된다");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
     #endregion
@@ -274,27 +403,40 @@ public class EventApiServiceTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.True(response.Success);
+        Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
         Assert.NotNull(response.Data);
     }
 
     /// <summary>
-    /// Malfunction Event 단일 조회 API 테스트
+    /// Malfunction Event 단일 조회 API 테스트 — 자기 장애 이벤트를 만들어 확인한다.
     /// </summary>
-    [LiveApiFact(DisplayName = "07. Get MalfunctionEvent By ID")]
+    [LiveApiWriteFact(DisplayName = "07. Get MalfunctionEvent By ID")]
     public async Task GetMalfunctionEventById_Should_Return_Single()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.GetMalfunctionEventByIdAsync(5);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.NotNull(response.Data);
+            var created = await CreateMalfunctionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.GetMalfunctionEventByIdAsync(created.Id);
+
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
+                Assert.NotNull(response.Data);
+                Assert.Equal(created.Id, response.Data.Id);
+                Assert.Equal("Fault", response.Data.TypeEvent);
+                Assert.Equal("FAULT_FENCE", response.Data.Reason);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteMalfunctionEventAsync(created.Id), "Malfunction");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -304,57 +446,69 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "08. Create MalfunctionEvent")]
     public async Task CreateMalfunctionEvent_Should_Return_Created()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new MalfunctionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Fault",
-            DeviceId = 2,
-            Reason = "FAULT_FENCE",
-            Detail = new MalfunctionDetailDto
+            // Act
+            var response = await service.CreateMalfunctionEventAsync(new MalfunctionEventDto
             {
-                FirstStart = 10,
-                FirstEnd = 10,
-                SecondStart = 15,
-                SecondEnd = 15
-            }
-        };
+                TypeEvent = "Fault",
+                DeviceId = deviceId,
+                Reason = "FAULT_FENCE",
+                Detail = new MalfunctionDetailDto
+                {
+                    FirstStart = 10,
+                    FirstEnd = 10,
+                    SecondStart = 15,
+                    SecondEnd = 15
+                }
+            });
 
-        // Act
-        var response = await service.CreateMalfunctionEventAsync(dto);
+            // Assert
+            Assert.True(response.Success,
+                $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+            Assert.Equal(201, response.StatusCode);
+            Assert.NotNull(response.Data);
+            Assert.True(response.Data.Id > 0);
+            Assert.Equal("FAULT_FENCE", response.Data.Reason);
 
-        // Assert
-        Assert.NotNull(response);
-        Assert.True(response.Success,
-            $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
-        Assert.NotNull(response.Data);
+            AssertDeleted(await service.DeleteMalfunctionEventAsync(response.Data.Id), "Malfunction");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
+        }
     }
 
     /// <summary>
     /// Malfunction Event 수정 (부분) API 테스트
+    /// <para><c>action_reported</c> 는 서버 관리 값이라 싣지 않는다(event.py:181-182) — <c>reason</c> 만 바꾼다.</para>
     /// </summary>
     [LiveApiWriteFact(DisplayName = "08-1. Patch MalfunctionEvent")]
     public async Task PatchMalfunctionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new MalfunctionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            ActionReported = "True",
-            Reason = "FAULT_MULTI"
-        };
+            var created = await CreateMalfunctionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.PatchMalfunctionEventAsync(created.Id, new MalfunctionEventDto { Reason = "FAULT_MULTI" });
 
-        // Act
-        var response = await service.PatchMalfunctionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal("FAULT_MULTI", response.Data.Reason);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteMalfunctionEventAsync(created.Id), "Malfunction");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal("FAULT_MULTI", response.Data.Reason);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -364,31 +518,40 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "08-2. Update MalfunctionEvent")]
     public async Task UpdateMalfunctionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new MalfunctionEventReplaceDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Fault",
-            Reason = "FAULT_ETC",
-            Detail = new MalfunctionDetailDto
+            var created = await CreateMalfunctionAsync(service, deviceId);
+            try
             {
-                FirstStart = 2,
-                FirstEnd = 2,
-                SecondStart = 5,
-                SecondEnd = 5
+                // Act
+                var response = await service.UpdateMalfunctionEventAsync(created.Id, new MalfunctionEventReplaceDto
+                {
+                    TypeEvent = "Fault",
+                    Reason = "FAULT_ETC",
+                    Detail = new MalfunctionDetailDto
+                    {
+                        FirstStart = 2,
+                        FirstEnd = 2,
+                        SecondStart = 5,
+                        SecondEnd = 5
+                    }
+                });
+
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal("FAULT_ETC", response.Data.Reason);
+                Assert.NotNull(response.Data.Device);
             }
-        };
-
-        // Act
-        var response = await service.UpdateMalfunctionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+            finally
+            {
+                AssertDeleted(await service.DeleteMalfunctionEventAsync(created.Id), "Malfunction");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.NotNull(response.Data.Device);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -398,17 +561,22 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "08-3. Delete MalfunctionEvent")]
     public async Task DeleteMalfunctionEvent_Should_Return_Success()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.DeleteMalfunctionEventAsync(1);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.True(response.Data);
+            var created = await CreateMalfunctionAsync(service, deviceId);
+
+            // Act
+            var response = await service.DeleteMalfunctionEventAsync(created.Id);
+
+            // Assert
+            AssertDeleted(response, "Malfunction");
+            var after = await service.GetMalfunctionEventByIdAsync(created.Id);
+            Assert.False(after.Success, "삭제한 장애 이벤트가 아직 조회된다");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
     #endregion
@@ -430,28 +598,39 @@ public class EventApiServiceTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.True(response.Success);
+        Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
         Assert.NotNull(response.Data);
     }
 
     /// <summary>
-    /// Connection Event 단일 조회 API 테스트
+    /// Connection Event 단일 조회 API 테스트 — 자기 연결 이벤트를 만들어 확인한다.
     /// </summary>
-    [LiveApiFact(DisplayName = "09-1. Get ConnectionEvent By ID")]
+    [LiveApiWriteFact(DisplayName = "09-1. Get ConnectionEvent By ID")]
     public async Task GetConnectionEventById_Should_Return_Single()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.GetConnectionEventByIdAsync(1);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal(1, response.Data.Id);
+            var created = await CreateConnectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.GetConnectionEventByIdAsync(created.Id);
+
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
+                Assert.NotNull(response.Data);
+                Assert.Equal(created.Id, response.Data.Id);
+                Assert.Equal("Connection", response.Data.TypeEvent);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteConnectionEventAsync(created.Id), "Connection");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -461,46 +640,63 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "10. Create ConnectionEvent")]
     public async Task CreateConnectionEvent_Should_Return_Created()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ConnectionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Connection",
-            DeviceId = 2,
-        };
+            // Act
+            var response = await service.CreateConnectionEventAsync(new ConnectionEventDto
+            {
+                TypeEvent = "Connection",
+                DeviceId = deviceId,
+            });
 
-        // Act
-        var response = await service.CreateConnectionEventAsync(dto);
+            // Assert
+            Assert.True(response.Success,
+                $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+            Assert.Equal(201, response.StatusCode);
+            Assert.NotNull(response.Data);
+            Assert.True(response.Data.Id > 0);
 
-        // Assert
-        Assert.NotNull(response);
-        Assert.True(response.Success);
-        Assert.NotNull(response.Data);
+            AssertDeleted(await service.DeleteConnectionEventAsync(response.Data.Id), "Connection");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
+        }
     }
 
     /// <summary>
-    /// Connection Event 수정 (부분) API 테스트
+    /// Connection Event 수정 (부분) API 테스트 — 연결 이벤트에서 바꿀 수 있는 키는 <c>type_event</c> 하나다(event.py:717-730).
     /// </summary>
     [LiveApiWriteFact(DisplayName = "10-1. Patch ConnectionEvent")]
     public async Task PatchConnectionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ConnectionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Connection",
-        };
+            var created = await CreateConnectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.PatchConnectionEventAsync(created.Id, new ConnectionEventDto
+                {
+                    TypeEvent = "Connection",
+                });
 
-        // Act
-        var response = await service.PatchConnectionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal(created.Id, response.Data.Id);
+                Assert.Equal("Connection", response.Data.TypeEvent);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteConnectionEventAsync(created.Id), "Connection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -510,23 +706,32 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "10-2. Update ConnectionEvent")]
     public async Task UpdateConnectionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ConnectionEventReplaceDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Connection"
-        };
+            var created = await CreateConnectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.UpdateConnectionEventAsync(created.Id, new ConnectionEventReplaceDto
+                {
+                    TypeEvent = "Connection"
+                });
 
-        // Act
-        var response = await service.UpdateConnectionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                // Assert
+                Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.NotNull(response.Data);
+                Assert.Equal("Connection", response.Data.TypeEvent);
+                Assert.NotNull(response.Data.Device);
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteConnectionEventAsync(created.Id), "Connection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.NotNull(response.Data.Device);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -536,17 +741,22 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "10-3. Delete ConnectionEvent")]
     public async Task DeleteConnectionEvent_Should_Return_Success()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.DeleteConnectionEventAsync(1);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.True(response.Data);
+            var created = await CreateConnectionAsync(service, deviceId);
+
+            // Act
+            var response = await service.DeleteConnectionEventAsync(created.Id);
+
+            // Assert
+            AssertDeleted(response, "Connection");
+            var after = await service.GetConnectionEventByIdAsync(created.Id);
+            Assert.False(after.Success, "삭제한 연결 이벤트가 아직 조회된다");
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
     #endregion
@@ -568,28 +778,49 @@ public class EventApiServiceTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.True(response.Success);
+        Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
         Assert.NotNull(response.Data);
     }
 
     /// <summary>
-    /// Action Event 단일 조회 API 테스트
+    /// Action Event 단일 조회 API 테스트 — 자기 탐지 이벤트에 조치를 달아 확인한다.
     /// </summary>
-    [LiveApiFact(DisplayName = "11-1. Get ActionEvent By ID")]
+    [LiveApiWriteFact(DisplayName = "11-1. Get ActionEvent By ID")]
     public async Task GetActionEventById_Should_Return_Single()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        // Act
-        var response = await service.GetActionEventByIdAsync(1);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal(1, response.Data.Id);
+            var detection = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                var action = await CreateActionAsync(service, detection.Id);
+                try
+                {
+                    // Act
+                    var response = await service.GetActionEventByIdAsync(action.Id);
+
+                    // Assert
+                    Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}");
+                    Assert.NotNull(response.Data);
+                    Assert.Equal(action.Id, response.Data.Id);
+                    Assert.Equal("Action", response.Data.TypeEvent);
+                    Assert.Equal("admin1", response.Data.User);
+                }
+                finally
+                {
+                    AssertDeleted(await service.DeleteActionEventAsync(action.Id), "Action");
+                }
+            }
+            finally
+            {
+                // 조치를 먼저 지워야 원본을 지울 수 있다(조치가 달린 원본은 409 — detections.py:634 · 648)
+                AssertDeleted(await service.DeleteDetectionEventAsync(detection.Id), "Detection");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -599,25 +830,46 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "12. Create ActionEvent")]
     public async Task CreateActionEvent_Should_Return_Created()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ActionEventCreateDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Action",
-            Content = "Test action content",  // Required by GOP API
-            User = "admin1",  // Required by GOP API
-            FromEventId = 2,  // Required by GOP API (events.id FK)
-        };
+            var detection = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                // Act
+                var response = await service.CreateActionEventAsync(new ActionEventCreateDto
+                {
+                    TypeEvent = "Action",
+                    Content = "Test action content",  // Required by GOP API
+                    User = "admin1",  // Required by GOP API
+                    FromEventId = detection.Id,  // Required by GOP API (events.id FK)
+                });
 
-        // Act
-        var response = await service.CreateActionEventAsync(dto);
+                // Assert
+                Assert.True(response.Success,
+                    $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                Assert.Equal(201, response.StatusCode);
+                Assert.NotNull(response.Data);
+                Assert.True(response.Data.Id > 0);
+                Assert.Equal("Test action content", response.Data.Content);
 
-        // Assert
-        Assert.NotNull(response);
-        Assert.True(response.Success,
-            $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
-        Assert.NotNull(response.Data);
+                // 원본의 조치보고 여부가 서버에서 켜졌는지(조치 생성 = action_reported 재계산)
+                var source = await service.GetDetectionEventByIdAsync(detection.Id);
+                Assert.True(source.Success);
+                Assert.True(string.Equals("true", source.Data!.ActionReported, StringComparison.OrdinalIgnoreCase),
+                    $"action_reported='{source.Data.ActionReported}'");
+
+                AssertDeleted(await service.DeleteActionEventAsync(response.Data.Id), "Action");
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(detection.Id), "Detection");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
+        }
     }
 
     /// <summary>
@@ -626,24 +878,41 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "12-1. Patch ActionEvent")]
     public async Task PatchActionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ActionEventDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            Content = "침입 탐지 확인 완료 - 오탐지로 판명",
-            User = "operator_kim"
-        };
+            var detection = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                var action = await CreateActionAsync(service, detection.Id);
+                try
+                {
+                    // Act
+                    var response = await service.PatchActionEventAsync(action.Id, new ActionEventDto
+                    {
+                        Content = "침입 탐지 확인 완료 - 오탐지로 판명",
+                        User = "operator_kim"
+                    });
 
-        // Act
-        var response = await service.PatchActionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                    // Assert
+                    Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                    Assert.NotNull(response.Data);
+                    Assert.Equal("operator_kim", response.Data.User);
+                    Assert.Equal("침입 탐지 확인 완료 - 오탐지로 판명", response.Data.Content);
+                }
+                finally
+                {
+                    AssertDeleted(await service.DeleteActionEventAsync(action.Id), "Action");
+                }
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(detection.Id), "Detection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal("operator_kim", response.Data.User);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -653,25 +922,42 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "12-2. Update ActionEvent")]
     public async Task UpdateActionEvent_Should_Return_Updated()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
-
-        var dto = new ActionEventReplaceDto
+        var (service, deviceId) = await ArrangeAsync();
+        try
         {
-            TypeEvent = "Action",
-            Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
-            User = "operator_park"
-        };
+            var detection = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                var action = await CreateActionAsync(service, detection.Id);
+                try
+                {
+                    // Act
+                    var response = await service.UpdateActionEventAsync(action.Id, new ActionEventReplaceDto
+                    {
+                        TypeEvent = "Action",
+                        Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
+                        User = "operator_park"
+                    });
 
-        // Act
-        var response = await service.UpdateActionEventAsync(1, dto);
-
-        // Assert
-        Assert.NotNull(response);
-        if (response.Success)
+                    // Assert
+                    Assert.True(response.Success, $"{response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
+                    Assert.NotNull(response.Data);
+                    Assert.Equal("operator_park", response.Data.User);
+                    Assert.Equal("침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청", response.Data.Content);
+                }
+                finally
+                {
+                    AssertDeleted(await service.DeleteActionEventAsync(action.Id), "Action");
+                }
+            }
+            finally
+            {
+                AssertDeleted(await service.DeleteDetectionEventAsync(detection.Id), "Detection");
+            }
+        }
+        finally
         {
-            Assert.NotNull(response.Data);
-            Assert.Equal("operator_park", response.Data.User);
+            await CleanupDeviceAsync(deviceId);
         }
     }
 
@@ -681,17 +967,32 @@ public class EventApiServiceTests
     [LiveApiWriteFact(DisplayName = "12-3. Delete ActionEvent")]
     public async Task DeleteActionEvent_Should_Return_Success()
     {
-        // Arrange
-        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
+        var (service, deviceId) = await ArrangeAsync();
+        try
+        {
+            var detection = await CreateDetectionAsync(service, deviceId);
+            try
+            {
+                var action = await CreateActionAsync(service, detection.Id);
 
-        // Act
-        var response = await service.DeleteActionEventAsync(1);
+                // Act
+                var response = await service.DeleteActionEventAsync(action.Id);
 
-        // Assert
-        Assert.NotNull(response);
-        // Delete 응답의 data는 null 반환 — Success 여부만 확인
-        Assert.True(response.Success || response.Error?.Code == "NOT_FOUND",
-            $"Unexpected error: {response.Error?.Code} - {response.Message}");
+                // Assert — 삭제 응답의 data 는 null 이라 Success · 상태 코드로 판정한다
+                AssertDeleted(response, "Action");
+                var after = await service.GetActionEventByIdAsync(action.Id);
+                Assert.False(after.Success, "삭제한 조치 이벤트가 아직 조회된다");
+            }
+            finally
+            {
+                // 조치가 지워졌으므로 원본도 지울 수 있어야 한다
+                AssertDeleted(await service.DeleteDetectionEventAsync(detection.Id), "Detection");
+            }
+        }
+        finally
+        {
+            await CleanupDeviceAsync(deviceId);
+        }
     }
     #endregion
 

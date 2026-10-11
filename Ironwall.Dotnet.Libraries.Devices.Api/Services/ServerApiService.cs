@@ -170,12 +170,34 @@ public class ServerApiService : IServerApiService
         }
     }
 
+    /// <summary>
+    /// 7.0+ 카테고리 쓰기 본문 — 판별자를 <c>category_server</c> 로 싣는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>7.0+ <c>_CategoryWriteBase</c> 는 <c>extra="forbid"</c> 이고 옛 키 <c>type_server</c> 를
+    /// 422 <c>REMOVED_FIELD</c>(moved_to=<c>category_server</c>)로 거부한다(서버 <c>app/schemas/server.py:69 · 518-570</c>).
+    /// 평면 <see cref="CategoryDto"/> 를 그대로 보내면 등록·수정·교체가 전부 "요청 검증에 실패" 였다.</para>
+    /// <para><paramref name="isPatch"/> 면 보낸 것만 바뀌는 PATCH 의미를 지킨다 — 빈 문자열·0(종전 PATCH 본문의
+    /// <c>DefaultValueHandling.Ignore</c> 와 같은 규칙)은 싣지 않는다. 서버는 <c>name</c>·<c>category_server</c>·
+    /// <c>sort_order</c> 의 null 을 422 로 받으므로 null 도 싣지 않는다.</para>
+    /// </remarks>
+    private static JObject CategoryAxisBody(CategoryDto dto, bool isPatch)
+    {
+        var body = new JObject();
+        if (!string.IsNullOrWhiteSpace(dto.Name)) body["name"] = dto.Name;
+        if (!string.IsNullOrWhiteSpace(dto.TypeServer)) body["category_server"] = dto.TypeServer;
+        if (isPatch ? !string.IsNullOrEmpty(dto.Description) : dto.Description != null) body["description"] = dto.Description;
+        if (!isPatch || dto.SortOrder != 0) body["sort_order"] = dto.SortOrder;
+        return body;
+    }
+
     public async Task<ApiResponse<CategoryDto>> CreateCategoryAsync(
         CategoryDto dto, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/servers/categories", dto);
+            object body = IsAxisEra ? CategoryAxisBody(dto, isPatch: false) : dto;
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/servers/categories", body);
             return await response.ToApiResponseAsync<CategoryDto>();
         }
         catch (Exception ex)
@@ -190,16 +212,24 @@ public class ServerApiService : IServerApiService
     {
         try
         {
-            var patchBody = JObject.FromObject(dto, JsonSerializer.Create(new JsonSerializerSettings
+            JObject patchBody;
+            if (IsAxisEra)
             {
-                NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore
-            }));
-            // Remove empty string properties for PATCH (server rejects empty type_server/name)
-            var propsToRemove = patchBody.Properties()
-                .Where(p => p.Value.Type == JTokenType.String && string.IsNullOrEmpty(p.Value.ToString()))
-                .Select(p => p.Name).ToList();
-            foreach (var prop in propsToRemove) patchBody.Remove(prop);
+                patchBody = CategoryAxisBody(dto, isPatch: true);
+            }
+            else
+            {
+                patchBody = JObject.FromObject(dto, JsonSerializer.Create(new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                    DefaultValueHandling = DefaultValueHandling.Ignore
+                }));
+                // Remove empty string properties for PATCH (server rejects empty type_server/name)
+                var propsToRemove = patchBody.Properties()
+                    .Where(p => p.Value.Type == JTokenType.String && string.IsNullOrEmpty(p.Value.ToString()))
+                    .Select(p => p.Name).ToList();
+                foreach (var prop in propsToRemove) patchBody.Remove(prop);
+            }
 
             var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/servers/categories/{id}", patchBody);
             return await response.ToApiResponseAsync<CategoryDto>();
@@ -216,7 +246,8 @@ public class ServerApiService : IServerApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/servers/categories/{id}", dto);
+            object body = IsAxisEra ? CategoryAxisBody(dto, isPatch: false) : dto;
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/servers/categories/{id}", body);
             return await response.ToApiResponseAsync<CategoryDto>();
         }
         catch (Exception ex)
@@ -438,12 +469,47 @@ public class ServerApiService : IServerApiService
     #endregion
 
     #region - Server Metrics API (§8.6) -
+    /// <summary>
+    /// 7.0+ 서버 계측 보고 본문 — 서버가 받는 키만, 값이 있는 것만 싣는다.
+    /// </summary>
+    /// <remarks>
+    /// <para>7.0+ <c>ServerMetricsCreate</c> 는 <c>extra="forbid"</c> 이고 받는 키가 계측 10종 ·
+    /// <c>detail</c> · <c>observed_at</c> 뿐이다(서버 <c>app/schemas/server.py:585-617</c>).
+    /// 평면 <see cref="ServerMetricDto"/> 를 그대로 보내면 <c>server_id</c>(0) · <c>created_at</c>(BaseDto 기본값 = 지금) ·
+    /// <c>threshold_exceeded</c>(null) 가 실려 기록이 전부 422 <c>UNKNOWN_FIELD</c> 였다.</para>
+    /// <para>옛 관측 키 <c>collected_at</c> 은 422 <c>REMOVED_FIELD</c>(moved_to=<c>observed_at</c>, <c>server.py:72</c>)라
+    /// 값이 있으면 <c>observed_at</c> 으로 옮겨 싣는다. null 은 싣지 않는다 — 서버 기본값(미보고)과 같다.</para>
+    /// </remarks>
+    private static JObject MetricAxisBody(ServerMetricDto dto)
+    {
+        var body = new JObject();
+        void Put(string key, double? value) { if (value.HasValue) body[key] = value.Value; }
+
+        Put("cpu_usage", dto.CpuUsage);
+        Put("ram_usage", dto.RamUsage);
+        Put("ram_total_gb", dto.RamTotalGb);
+        Put("ram_used_gb", dto.RamUsedGb);
+        Put("disk_usage", dto.DiskUsage);
+        Put("disk_total_gb", dto.DiskTotalGb);
+        Put("disk_used_gb", dto.DiskUsedGb);
+        Put("network_in_mbps", dto.NetworkInMbps);
+        Put("network_out_mbps", dto.NetworkOutMbps);
+        if (dto.ProcessCount.HasValue) body["process_count"] = dto.ProcessCount.Value;
+        if (dto.Detail != null) body["detail"] = dto.Detail.DeepClone();
+
+        var observedAt = dto.ObservedAtEffective;
+        if (!string.IsNullOrWhiteSpace(observedAt)) body["observed_at"] = observedAt;
+        return body;
+    }
+
     public async Task<ApiResponse<ServerMetricDto>> CreateServerMetricAsync(
         int serverId, ServerMetricDto dto, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/servers/{serverId}/metrics", dto);
+            // 6.3 본문은 바이트 그대로 둔다(운영 6.3.2 무회귀) — 7.0+ 만 서버가 받는 키로 다시 조립한다.
+            object body = IsAxisEra ? MetricAxisBody(dto) : dto;
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/servers/{serverId}/metrics", body);
             return await response.ToApiResponseAsync<ServerMetricDto>();
         }
         catch (Exception ex)

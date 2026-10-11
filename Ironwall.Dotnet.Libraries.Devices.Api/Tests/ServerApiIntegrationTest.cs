@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
+using Ironwall.Dotnet.Libraries.Devices.Api.Servers;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using Newtonsoft.Json.Linq;
@@ -26,6 +27,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Tests;
                   라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
                   + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
                   쓰기 시험은 loopback · 사설망 주소에서만 돈다
+                  서버 등록 · 수정은 7.0+ 축 통로(IServerAxisApiService)로 한다 — 평면 ServerDto 쓰기는
+                  AXIS_SHAPE_REQUIRED 로 막히는 것을 회귀로 확인한다(ServerTestKit).
+                  카테고리 유형은 UNIQUE 라 시험마다 시드에 없는 유형을 따로 쓴다
+                  (이 파일: ETC · MONITORING · LOG · BACKUP · PUSH — ServerApiServiceTests 와 겹치지 않는다).
 ****************************************************************************/
 
 #region - Fixture & Collection -
@@ -74,7 +79,9 @@ public class CategoryApiTests
     [LiveApiWriteFact]
     public async Task S01_Category_CRUD_Lifecycle()
     {
-        // [1] CREATE — type_server는 서버 enum: ETC 사용
+        // [1] CREATE — 유형은 서버 enum ETC(시드에 없는 유형, 이 시험 전용 — 유형은 UNIQUE 라 시험마다 다르게 쓴다).
+        //     7.0+ 은 판별자를 category_server 로 보낸다(ServerApiService.CategoryAxisBody).
+        await ServerTestKit.PurgeLeftoverCategoryAsync(_svc, "ETC", ServerTestKit.MigrationPrefix, _output);
         var createDto = new CategoryDto
         {
             TypeServer = "ETC",
@@ -179,81 +186,122 @@ public class ServerInstanceApiTests
     [LiveApiWriteFact]
     public async Task S04_Server_CRUD_Lifecycle()
     {
-        // 선행: Category 생성 — type_server enum: MONITORING
-        var catDto = new CategoryDto
-        {
-            TypeServer = "MONITORING",
-            Name = "MIG_서버테스트_카테고리",
-            Description = "서버 CRUD 테스트용"
-        };
-        var catResp = await _svc.CreateCategoryAsync(catDto);
-        Assert.True(catResp.Success, $"Category create failed: {catResp.Message}");
-        var categoryId = catResp.Data!.Id;
+        // 선행: Category 생성 — 서버는 그 유형(category_server)의 카테고리 행이 있어야 등록된다(servers.py:198-208).
+        //       유형 MONITORING 은 이 시험 전용(시드에 없음 · 유형 UNIQUE).
+        const string type = "MONITORING";
+        var categoryId = await ServerTestKit.CreateCategoryAsync(
+            _svc, type, "MIG_서버테스트_카테고리", ServerTestKit.MigrationPrefix, _output, "서버 CRUD 테스트용");
+
+        // 7.0+ 서버 쓰기는 축 통로(IServerAxisApiService)로 한다 — 평면 ServerDto 는 네트워크 전에 막힌다(D-22).
+        var axis = await ServerTestKit.AxisAsync();
+        var isAxisEra = ServerTestKit.IsAxisEra(axis);
+        var name = ServerTestKit.UniqueName("MIG_테스트서버");
+        var serverId = 0;
 
         try
         {
-            // [1] CREATE — status: NORMAL | WARNING | ERROR
-            var createDto = new ServerDto
+            // [0] 회귀 확인 — 축 계약에서 평면 ServerDto 등록은 나가지 않고 AXIS_SHAPE_REQUIRED 다.
+            if (isAxisEra)
             {
-                CategoryId = categoryId,
-                Name = "MIG_테스트서버",
-                Status = "NORMAL",
-                IpAddress = "10.99.99.50",
-                Port = 8080
-            };
-            var createResp = await _svc.CreateServerAsync(createDto);
-            _output.WriteLine($"Create: Success={createResp.Success}, Id={createResp.Data?.Id}, Msg={createResp.Message}");
-            Assert.True(createResp.Success, $"Server create failed: {createResp.Message}");
-            Assert.True(createResp.Data!.Id > 0);
-            var serverId = createResp.Data.Id;
-
-            try
-            {
-                // [2] READ
-                var getResp = await _svc.GetServerByIdAsync(serverId);
-                Assert.True(getResp.Success);
-                Assert.Equal("MIG_테스트서버", getResp.Data?.Name);
-                Assert.Equal("10.99.99.50", getResp.Data?.IpAddress);
-
-                // [3] PATCH — 기존 데이터 복사 후 수정
-                var patchBase = getResp.Data!;
-                patchBase.Name = "MIG_수정_서버";
-                var patchResp = await _svc.PatchServerAsync(serverId, patchBase);
-                _output.WriteLine($"Patch: Success={patchResp.Success}");
-                Assert.True(patchResp.Success);
-
-                var verifyPatch = await _svc.GetServerByIdAsync(serverId);
-                Assert.Equal("MIG_수정_서버", verifyPatch.Data?.Name);
-
-                // [4] PUT — 전체 교체
-                var putDto = new ServerDto
+                var flat = await _svc.CreateServerAsync(new ServerDto
                 {
                     CategoryId = categoryId,
-                    Name = "MIG_교체_서버",
-                    Status = "ERROR",
+                    Name = name,
+                    IpAddress = "10.99.99.50",
+                    Port = 8080
+                });
+                Assert.False(flat.Success);
+                Assert.Equal("AXIS_SHAPE_REQUIRED", flat.Error?.Code);
+            }
+
+            // [1] CREATE — 축 통로. status 는 관측 필드라 등록 본문에 싣지 않는다(7.0+ 은 늘 UNKNOWN 으로 시작, servers.py:523).
+            var created = await axis.CreateServerAsync(new ServerWriteIntent
+            {
+                TypeServer = type,
+                CategoryId = categoryId,
+                Name = name,
+                IpAddress = "10.99.99.50",
+                Port = 8080
+            });
+            _output.WriteLine($"Create: Success={created.IsSuccess}, Id={created.Id}, Msg={created.Message}");
+            Assert.True(created.IsSuccess, $"Server create failed: {created.Message}");
+            Assert.True(created.Id > 0);
+            serverId = created.Id;
+
+            // [2] READ — 레거시 단건 조회도 축 응답(connection)을 평면 필드로 역투영해 읽는다.
+            var getResp = await _svc.GetServerByIdAsync(serverId);
+            Assert.True(getResp.Success);
+            Assert.Equal(name, getResp.Data?.Name);
+            Assert.Equal("10.99.99.50", getResp.Data?.IpAddress);
+            Assert.Equal(8080, getResp.Data?.Port);
+            if (isAxisEra)
+            {
+                Assert.Equal(type, getResp.Data?.CategoryServer);
+                Assert.Equal("UNKNOWN", getResp.Data?.Status);
+            }
+
+            // [3] PATCH — 이름만 바꾼다(보낸 키만 바뀐다).
+            var patchedName = ServerTestKit.UniqueName("MIG_수정_서버");
+            if (isAxisEra)
+            {
+                var flatPatch = await _svc.PatchServerAsync(serverId, new ServerDto { Name = patchedName });
+                Assert.Equal("AXIS_SHAPE_REQUIRED", flatPatch.Error?.Code);
+            }
+            var patchResp = await axis.PatchServerAsync(serverId, new ServerWriteIntent { Name = patchedName });
+            _output.WriteLine($"Patch: Success={patchResp.IsSuccess}, Msg={patchResp.Message}");
+            Assert.True(patchResp.IsSuccess, patchResp.Message);
+
+            var verifyPatch = await _svc.GetServerByIdAsync(serverId);
+            Assert.Equal(patchedName, verifyPatch.Data?.Name);
+            Assert.Equal("10.99.99.50", verifyPatch.Data?.IpAddress);
+
+            // [4] 교체 — 7.0+ 평면 PUT 은 막혀 있다. 이름 · 접속을 한 번에 바꾸고, 상태는 관측 보고 입구로 바꾼다
+            //     (PATCH /servers/{id}/status 가 status 의 유일한 입구, servers.py:699-782).
+            var replacedName = ServerTestKit.UniqueName("MIG_교체_서버");
+            if (isAxisEra)
+            {
+                var flatPut = await _svc.UpdateServerAsync(serverId, new ServerDto
+                {
+                    CategoryId = categoryId,
+                    Name = replacedName,
                     IpAddress = "10.99.99.51",
                     Port = 9090
-                };
-                var putResp = await _svc.UpdateServerAsync(serverId, putDto);
-                _output.WriteLine($"Put: Success={putResp.Success}");
-                Assert.True(putResp.Success);
-
-                var verifyPut = await _svc.GetServerByIdAsync(serverId);
-                Assert.Equal("MIG_교체_서버", verifyPut.Data?.Name);
-                Assert.Equal("10.99.99.51", verifyPut.Data?.IpAddress);
+                });
+                Assert.Equal("AXIS_SHAPE_REQUIRED", flatPut.Error?.Code);
             }
-            finally
+            var putResp = await axis.PatchServerAsync(serverId, new ServerWriteIntent
             {
-                // [5] DELETE Server
-                await _svc.DeleteServerAsync(serverId);
-                var verifyDel = await _svc.GetServerByIdAsync(serverId);
-                Assert.True(!verifyDel.Success || verifyDel.Data == null);
+                Name = replacedName,
+                IpAddress = "10.99.99.51",
+                Port = 9090
+            });
+            _output.WriteLine($"Put: Success={putResp.IsSuccess}, Msg={putResp.Message}");
+            Assert.True(putResp.IsSuccess, putResp.Message);
+
+            if (isAxisEra)
+            {
+                var report = await _svc.ReportServerStatusAsync(serverId, "ERROR");
+                _output.WriteLine($"Status: Success={report.Success}, Status={report.Data?.Status}, Msg={report.Message}");
+                Assert.True(report.Success, $"Status report failed: {report.Message} {report.Error?.Message}");
+                Assert.Equal("ERROR", report.Data?.Status);
             }
+
+            var verifyPut = await _svc.GetServerByIdAsync(serverId);
+            Assert.Equal(replacedName, verifyPut.Data?.Name);
+            Assert.Equal("10.99.99.51", verifyPut.Data?.IpAddress);
+            Assert.Equal(9090, verifyPut.Data?.Port);
+            if (isAxisEra) Assert.Equal("ERROR", verifyPut.Data?.Status);
         }
         finally
         {
-            // 후행: Category 삭제
-            await _svc.DeleteCategoryAsync(categoryId);
+            // [5] DELETE Server → 후행: Category 삭제(서버가 남으면 409 라 서버가 먼저다)
+            var serverDeleted = serverId <= 0 || (await _svc.DeleteServerAsync(serverId)).Success;
+            var verifyDel = serverId > 0 ? await _svc.GetServerByIdAsync(serverId) : null;
+            var categoryDeleted = await _svc.DeleteCategoryAsync(categoryId);
+            _output.WriteLine($"Cleanup: server={serverDeleted}, category={categoryDeleted.Success} {categoryDeleted.Message}");
+
+            Assert.True(serverDeleted);
+            Assert.True(verifyDel is null || !verifyDel.Success || verifyDel.Data == null);
         }
     }
 
@@ -321,70 +369,72 @@ public class ServerMetricsApiTests
     [LiveApiWriteFact]
     public async Task S09_ServerMetrics_Lifecycle()
     {
-        // 선행: Category + Server 생성
-        var catResp = await _svc.CreateCategoryAsync(new CategoryDto
-        {
-            TypeServer = "LOG",
-            Name = "MIG_메트릭테스트_카테고리"
-        });
-        Assert.True(catResp.Success, $"Category create failed: {catResp.Message}");
-        var categoryId = catResp.Data!.Id;
+        // 선행: Category + Server 생성 — 서버 등록은 축 통로(7.0+ 평면 ServerDto 는 AXIS_SHAPE_REQUIRED)
+        const string type = "LOG";
+        var categoryId = await ServerTestKit.CreateCategoryAsync(
+            _svc, type, "MIG_메트릭테스트_카테고리", ServerTestKit.MigrationPrefix, _output);
+        var serverId = 0;
 
         try
         {
-            var srvResp = await _svc.CreateServerAsync(new ServerDto
+            var axis = await ServerTestKit.AxisAsync();
+            serverId = await ServerTestKit.CreateServerAsync(
+                axis, type, categoryId, ServerTestKit.UniqueName("MIG_메트릭테스트_서버"), "10.99.99.60", 8080);
+
+            // [1] CREATE Metric — 7.0+ 본문은 서버가 받는 키만(server_id · created_at · threshold_exceeded 없음)
+            var metricDto = new ServerMetricDto
             {
-                CategoryId = categoryId,
-                Name = "MIG_메트릭테스트_서버",
-                Status = "NORMAL",
-                IpAddress = "10.99.99.60",
-                Port = 8080
-            });
-            Assert.True(srvResp.Success, $"Server create failed: {srvResp.Message}");
-            var serverId = srvResp.Data!.Id;
+                CpuUsage = 45.5,
+                RamUsage = 60.2,
+                DiskUsage = 30.1,
+                NetworkInMbps = 10.5,
+                NetworkOutMbps = 20.3
+            };
+            var createResp = await _svc.CreateServerMetricAsync(serverId, metricDto);
+            _output.WriteLine($"CreateMetric: Success={createResp.Success}, Id={createResp.Data?.Id}, Msg={createResp.Message}");
+            Assert.True(createResp.Success, $"Metric create failed: {createResp.Message} {createResp.Error?.Message}");
+            Assert.Equal(serverId, createResp.Data!.ServerId);
+            Assert.Equal(45.5, createResp.Data.CpuUsage);
 
-            try
-            {
-                // [1] CREATE Metric
-                var metricDto = new ServerMetricDto
-                {
-                    CpuUsage = 45.5,
-                    RamUsage = 60.2,
-                    DiskUsage = 30.1,
-                    NetworkInMbps = 10.5,
-                    NetworkOutMbps = 20.3
-                };
-                var createResp = await _svc.CreateServerMetricAsync(serverId, metricDto);
-                _output.WriteLine($"CreateMetric: Success={createResp.Success}, Id={createResp.Data?.Id}");
-                Assert.True(createResp.Success, $"Metric create failed: {createResp.Message}");
+            // [2] GET History
+            var historyResp = await _svc.GetServerMetricsAsync(serverId);
+            _output.WriteLine($"History: Success={historyResp.Success}, Count={historyResp.Data?.Count}");
+            Assert.True(historyResp.Success);
+            Assert.NotNull(historyResp.Data);
+            Assert.True(historyResp.Data!.Count > 0);
+            Assert.All(historyResp.Data, m => Assert.Equal(serverId, m.ServerId));
 
-                // [2] GET History
-                var historyResp = await _svc.GetServerMetricsAsync(serverId);
-                _output.WriteLine($"History: Success={historyResp.Success}, Count={historyResp.Data?.Count}");
-                Assert.True(historyResp.Success);
-                Assert.NotNull(historyResp.Data);
-                Assert.True(historyResp.Data!.Count > 0);
+            // [3] GET Latest
+            var latestResp = await _svc.GetServerMetricLatestAsync(serverId);
+            _output.WriteLine($"Latest: Success={latestResp.Success}");
+            Assert.True(latestResp.Success);
+            Assert.NotNull(latestResp.Data?.LatestMetrics);
+            Assert.Equal(serverId, latestResp.Data!.ServerId);
+            Assert.Equal(45.5, latestResp.Data.LatestMetrics!.CpuUsage);
 
-                // [3] GET Latest
-                var latestResp = await _svc.GetServerMetricLatestAsync(serverId);
-                _output.WriteLine($"Latest: Success={latestResp.Success}");
-                Assert.True(latestResp.Success);
-                Assert.NotNull(latestResp.Data?.LatestMetrics);
+            // [4] DELETE — 서버 계약은 older_than_days(≥1) 하나뿐이다(server_metrics.py:293-336).
+            //     방금 기록한 계측은 1일보다 새것이라 0건 삭제. 건수는 message 에만 실려 와 라이브러리가 Data 를 합성한다.
+            var delResp = await _svc.DeleteServerMetricsAsync(serverId, olderThanDays: 1);
+            _output.WriteLine($"DeleteMetrics: Success={delResp.Success}, Deleted={delResp.Data?.DeletedCount}, Msg={delResp.Message}");
+            Assert.True(delResp.Success, $"Metric delete failed: {delResp.Message}");
+            Assert.NotNull(delResp.Data);
+            Assert.Equal(serverId, delResp.Data!.ServerId);
+            Assert.Equal(0, delResp.Data.DeletedCount);
 
-                // [4] DELETE — 서버는 before_date 기준으로 "old" 메트릭만 삭제하므로
-                //     최근 생성된 메트릭은 deleted_count=0일 수 있음 (서버 정책)
-                var delResp = await _svc.DeleteServerMetricsAsync(serverId);
-                _output.WriteLine($"DeleteMetrics: Success={delResp.Success}, Deleted={delResp.Data?.DeletedCount}");
-                Assert.True(delResp.Success);
-            }
-            finally
-            {
-                await _svc.DeleteServerAsync(serverId);
-            }
+            var afterDelete = await _svc.GetServerMetricsAsync(serverId);
+            Assert.True(afterDelete.Success);
+            Assert.True(afterDelete.Data!.Count > 0);
+
+            // 회귀 확인 — 서버에 없는 before_date 오버로드는 나가지 않고 거부한다(조용한 30일 삭제 방지).
+#pragma warning disable CS0618
+            var legacyDelete = await _svc.DeleteServerMetricsAsync(serverId, beforeDate: "2020-01-01");
+#pragma warning restore CS0618
+            Assert.False(legacyDelete.Success);
+            Assert.Equal("INVALID_ARGUMENT", legacyDelete.Error?.Code);
         }
         finally
         {
-            await _svc.DeleteCategoryAsync(categoryId);
+            await ServerTestKit.DeleteServerThenCategoryAsync(_svc, serverId, categoryId, _output);
         }
     }
 
@@ -392,54 +442,36 @@ public class ServerMetricsApiTests
     public async Task S10_GetServerMetrics_DateFilter()
     {
         // 선행: Category + Server + Metric 생성
-        var catResp = await _svc.CreateCategoryAsync(new CategoryDto
-        {
-            TypeServer = "BACKUP",
-            Name = "MIG_날짜필터_카테고리"
-        });
-        Assert.True(catResp.Success);
-        var categoryId = catResp.Data!.Id;
+        const string type = "BACKUP";
+        var categoryId = await ServerTestKit.CreateCategoryAsync(
+            _svc, type, "MIG_날짜필터_카테고리", ServerTestKit.MigrationPrefix, _output);
+        var serverId = 0;
 
         try
         {
-            var srvResp = await _svc.CreateServerAsync(new ServerDto
+            var axis = await ServerTestKit.AxisAsync();
+            serverId = await ServerTestKit.CreateServerAsync(
+                axis, type, categoryId, ServerTestKit.UniqueName("MIG_날짜필터_서버"), "10.99.99.61", 8080);
+
+            var metric = await _svc.CreateServerMetricAsync(serverId, new ServerMetricDto
             {
-                CategoryId = categoryId,
-                Name = "MIG_날짜필터_서버",
-                Status = "NORMAL",
-                IpAddress = "10.99.99.61",
-                Port = 8080
+                CpuUsage = 50.0,
+                RamUsage = 70.0
             });
-            Assert.True(srvResp.Success);
-            var serverId = srvResp.Data!.Id;
+            Assert.True(metric.Success, $"Metric create failed: {metric.Message} {metric.Error?.Message}");
 
-            try
-            {
-                await _svc.CreateServerMetricAsync(serverId, new ServerMetricDto
-                {
-                    CpuUsage = 50.0,
-                    RamUsage = 70.0
-                });
+            // 날짜 필터 테스트 — 오늘 범위
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var resp = await _svc.GetServerMetricsAsync(serverId,
+                startDate: today, endDate: today, limit: 10);
+            _output.WriteLine($"DateFilter: Success={resp.Success}, Count={resp.Data?.Count}");
+            Assert.True(resp.Success);
 
-                // 날짜 필터 테스트 — 오늘 범위
-                var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
-                var resp = await _svc.GetServerMetricsAsync(serverId,
-                    startDate: today, endDate: today, limit: 10);
-                _output.WriteLine($"DateFilter: Success={resp.Success}, Count={resp.Data?.Count}");
-                Assert.True(resp.Success);
-
-                // cleanup
-                var cleanupDate = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd");
-                await _svc.DeleteServerMetricsAsync(serverId, beforeDate: cleanupDate);
-            }
-            finally
-            {
-                await _svc.DeleteServerAsync(serverId);
-            }
+            // 정리: 서버 삭제가 계측을 CASCADE 로 함께 지운다(servers.py:670) — 따로 지우지 않는다.
         }
         finally
         {
-            await _svc.DeleteCategoryAsync(categoryId);
+            await ServerTestKit.DeleteServerThenCategoryAsync(_svc, serverId, categoryId, _output);
         }
     }
 
@@ -447,42 +479,31 @@ public class ServerMetricsApiTests
     public async Task S11_ServerMetrics_EmptyHistory()
     {
         // 선행: Category + Server 생성 (메트릭 없음)
-        var catResp = await _svc.CreateCategoryAsync(new CategoryDto
-        {
-            TypeServer = "PUSH",
-            Name = "MIG_빈히스토리_카테고리"
-        });
-        Assert.True(catResp.Success);
-        var categoryId = catResp.Data!.Id;
+        const string type = "PUSH";
+        var categoryId = await ServerTestKit.CreateCategoryAsync(
+            _svc, type, "MIG_빈히스토리_카테고리", ServerTestKit.MigrationPrefix, _output);
+        var serverId = 0;
 
         try
         {
-            var srvResp = await _svc.CreateServerAsync(new ServerDto
-            {
-                CategoryId = categoryId,
-                Name = "MIG_빈히스토리_서버",
-                Status = "NORMAL",
-                IpAddress = "10.99.99.62",
-                Port = 8080
-            });
-            Assert.True(srvResp.Success);
-            var serverId = srvResp.Data!.Id;
+            var axis = await ServerTestKit.AxisAsync();
+            serverId = await ServerTestKit.CreateServerAsync(
+                axis, type, categoryId, ServerTestKit.UniqueName("MIG_빈히스토리_서버"), "10.99.99.62", 8080);
 
-            try
-            {
-                var resp = await _svc.GetServerMetricsAsync(serverId);
-                _output.WriteLine($"EmptyHistory: Success={resp.Success}, Count={resp.Data?.Count}");
-                Assert.True(resp.Success);
-                Assert.True(resp.Data == null || resp.Data.Count == 0);
-            }
-            finally
-            {
-                await _svc.DeleteServerAsync(serverId);
-            }
+            var resp = await _svc.GetServerMetricsAsync(serverId);
+            _output.WriteLine($"EmptyHistory: Success={resp.Success}, Count={resp.Data?.Count}");
+            Assert.True(resp.Success);
+            Assert.True(resp.Data == null || resp.Data.Count == 0);
+
+            // 보고받은 적 없는 서버의 최신 계측은 latest_metrics=null 이다(server_metrics.py:275-290).
+            var latest = await _svc.GetServerMetricLatestAsync(serverId);
+            Assert.True(latest.Success);
+            Assert.Equal(serverId, latest.Data?.ServerId);
+            Assert.Null(latest.Data?.LatestMetrics);
         }
         finally
         {
-            await _svc.DeleteCategoryAsync(categoryId);
+            await ServerTestKit.DeleteServerThenCategoryAsync(_svc, serverId, categoryId, _output);
         }
     }
 }

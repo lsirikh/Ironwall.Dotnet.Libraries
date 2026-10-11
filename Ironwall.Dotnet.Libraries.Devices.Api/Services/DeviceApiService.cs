@@ -207,6 +207,51 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <summary>
+    /// 관계 동반 조회(<c>includeSensors</c>·<c>includeController</c>)를 판본에 맞춰 싣는다.
+    /// 6.3 은 옛 불리언(<c>include_sensors=true</c>)을, 축 계약(7.0+)은 <c>include=</c> 토큰을 쓴다.
+    /// </summary>
+    /// <remarks>
+    /// <para>7.0+ 서버는 옛 불리언을 <b>값과 무관하게</b> 422 <c>REMOVED_FIELD</c> 로 거부한다
+    /// (서버 <c>app/routers/controllers.py:122·183</c> · <c>sensors.py:152·213</c> →
+    /// <c>device_axes_io.reject_legacy_include_booleans</c>, 새 이름 <c>_legacy.py:82-83</c>).
+    /// 그래서 8.0 에서 "센서 포함 조회"가 늘 실패했다. 토큰 이름은 응답 키 이름이다(<c>schemas/device.py:96-100</c>).</para>
+    /// <para>호출부가 준 <paramref name="include"/> 는 보존하고 토큰만 덧붙인다(중복은 붙이지 않는다).</para>
+    /// </remarks>
+    /// <returns>최종 <c>include</c> 값 — <see cref="AddViewInclude"/> 에 넘긴다.</returns>
+    private string? AddRelationInclude(Dictionary<string, string> parameters, bool requested,
+        string legacyKey, string token, string? include)
+    {
+        if (!requested) return include;
+        if (!IsAxisContract)
+        {
+            parameters[legacyKey] = "true";
+            return include;
+        }
+        if (string.IsNullOrWhiteSpace(include)) return token;
+        return include!.Split(',').Any(t => t.Trim() == token) ? include : $"{include!.Trim()},{token}";
+    }
+
+    /// <summary>
+    /// 7.0 에서 <b>이름만 바뀐</b> 목록 필터를 판본에 맞춰 싣는다 — 6.3 은 옛 키, 축 계약은 새 키.
+    /// </summary>
+    /// <remarks>
+    /// <para>7.0+ 서버는 옛 키(<c>type_device</c>·<c>mode</c>·<c>category</c>·<c>speaker_type</c>)를 422
+    /// <c>REMOVED_FIELD</c> 로 거부한다(서버 <c>sensors.py:148·163</c> · <c>cameras.py:124-125·138-141</c> ·
+    /// <c>speakers.py:136·145</c>). 호출부가 새 키(<paramref name="axisValue"/>)를 따로 주었으면 그쪽이 이긴다.</para>
+    /// </remarks>
+    /// <returns>축 계약에서 실을 새 키의 값(호출부가 <see cref="AddAxisFilter(Dictionary{string,string},string,string?,string)"/> 로 싣는다).</returns>
+    private string? RenamedFilter(Dictionary<string, string> parameters, string legacyKey, string? legacyValue, string? axisValue)
+    {
+        if (string.IsNullOrEmpty(legacyValue)) return axisValue;
+        if (!IsAxisContract)
+        {
+            parameters[legacyKey] = legacyValue!;
+            return axisValue;
+        }
+        return string.IsNullOrWhiteSpace(axisValue) ? legacyValue : axisValue;
+    }
+
+    /// <summary>
     /// 7.0 에서 신설된 목록 필터(종류축·<c>protocol</c>·<c>group_id</c>·<c>server_id</c> 등)를 붙인다.
     /// </summary>
     /// <remarks>
@@ -358,7 +403,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
-            if (includeSensors) parameters.Add("include_sensors", "true");
+            include = AddRelationInclude(parameters, includeSensors, "include_sensors", "sensors", include);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", ClampLimit(limit, nameof(GetControllersAsync)).ToString());
 
@@ -396,7 +441,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();
-            if (includeSensors) parameters.Add("include_sensors", "true");
+            include = AddRelationInclude(parameters, includeSensors, "include_sensors", "sensors", include);
 
             AddViewInclude(parameters, view, include);
 
@@ -538,9 +583,10 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();
-            if (controllerId.HasValue) parameters.Add("controller_id", controllerId.Value.ToString());            if (!string.IsNullOrEmpty(typeDevice)) parameters.Add("type_device", typeDevice);
+            if (controllerId.HasValue) parameters.Add("controller_id", controllerId.Value.ToString());
+            typeSensor = RenamedFilter(parameters, "type_device", typeDevice, typeSensor);   // 7.0+: type_device → type_sensor
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
-            if (includeController) parameters.Add("include_controller", "true");
+            include = AddRelationInclude(parameters, includeController, "include_controller", "controller", include);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", ClampLimit(limit, nameof(GetSensorsAsync)).ToString());
 
@@ -579,7 +625,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();
-            if (includeController) parameters.Add("include_controller", "true");
+            include = AddRelationInclude(parameters, includeController, "include_controller", "controller", include);
 
             AddViewInclude(parameters, view, include);
 
@@ -710,8 +756,9 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(mode)) parameters.Add("mode", mode);
-            if (!string.IsNullOrEmpty(category)) parameters.Add("category", category);
+            var parameters = new Dictionary<string, string>();
+            protocol = RenamedFilter(parameters, "mode", mode, protocol);               // 7.0+: mode → protocol
+            typeCamera = RenamedFilter(parameters, "category", category, typeCamera);   // 7.0+: category → type_camera
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", ClampLimit(limit, nameof(GetCamerasAsync)).ToString());
@@ -961,6 +1008,8 @@ public class DeviceApiService : IDeviceApiService
 
     public async Task<ApiResponse<CameraSettingDto>> GetCameraSettingAsync(int cameraId, CancellationToken token = default)
     {
+        if (IsAxisContract) return CameraSettingsRemoved(nameof(GetCameraSettingAsync), "GET", cameraId);
+
         try
         {
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings");
@@ -975,6 +1024,8 @@ public class DeviceApiService : IDeviceApiService
 
     public async Task<ApiResponse<CameraSettingDto>> PatchCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
     {
+        if (IsAxisContract) return CameraSettingsRemoved(nameof(PatchCameraSettingAsync), "PATCH", cameraId);
+
         try
         {
             var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings", dto);
@@ -989,6 +1040,8 @@ public class DeviceApiService : IDeviceApiService
 
     public async Task<ApiResponse<CameraSettingDto>> UpdateCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
     {
+        if (IsAxisContract) return CameraSettingsRemoved(nameof(UpdateCameraSettingAsync), "PUT", cameraId);
+
         try
         {
             var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings", dto);
@@ -999,6 +1052,21 @@ public class DeviceApiService : IDeviceApiService
             _log?.Error($"[{nameof(UpdateCameraSettingAsync)}] Error: {ex.Message}");
             return ApiResponse<CameraSettingDto>.CreateError("INTERNAL_ERROR", $"Failed to update camera setting {cameraId}", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// 카메라 설정 경로(<c>/devices/cameras/{id}/settings</c>) 무력화 — 축 계약(7.0+)에서는 <b>호출 전에 차단</b>한다.
+    /// <para>서버 7.0 부터 GET·PATCH·PUT 세 개 모두 410 <c>ENDPOINT_REMOVED</c> 묘비다(서버 <c>app/routers/camera_settings.py</c>).
+    /// 왕복을 만들지 않고 새 자리를 알려 준다 — 모드는 <c>/config</c> 의 <c>device_config.modes</c>,
+    /// 히터·팬·전조등은 <c>component_overrides</c>, 추적은 <c>component-status</c>.</para>
+    /// <para>화면은 이미 <c>DeviceQueryPolicy</c> 로 이 경로를 막는다 — 여기는 API 계층의 같은 판정이다(6.3 은 종전대로 호출).</para>
+    /// </summary>
+    private ApiResponse<CameraSettingDto> CameraSettingsRemoved(string caller, string method, int cameraId)
+    {
+        var message = $"'{method} /api/devices/cameras/{{id}}/settings' 는 서버 7.0 에서 제거됐습니다(410) — /config 를 쓰십시오.";
+        _log?.Warning($"[{caller}] 차단 — cameras/{cameraId}: {message}");
+        return ApiResponse<CameraSettingDto>.CreateError("ENDPOINT_REMOVED", message,
+            "모드는 GET·PATCH·PUT /api/devices/cameras/{id}/config 의 device_config.modes, 히터·팬·전조등은 component_overrides, 추적은 component-status 입니다.");
     }
     #endregion
 
@@ -1259,7 +1327,8 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(speakerType)) parameters.Add("speaker_type", speakerType);
+            var parameters = new Dictionary<string, string>();
+            speakerRole = RenamedFilter(parameters, "speaker_type", speakerType, speakerRole);   // 7.0+: speaker_type → speaker_role
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", ClampLimit(limit, nameof(GetSpeakersAsync)).ToString());
@@ -1371,9 +1440,17 @@ public class DeviceApiService : IDeviceApiService
         int? unitId = null,
         bool? includeDescendants = null)
     {
+        // 7.0+ 서버는 목록의 door_status 를 422 로 거부하고(서버 enclosures.py:126·138) 같은 목록에 대체 필터가 없다 —
+        // 문 위치는 부품 관측(DOOR_SENSOR)이다. 조용히 빼면 "걸렀는데 전건이 온다"가 되므로 보내기 전에 막고 새 자리를 알린다.
+        if (!string.IsNullOrEmpty(doorStatus) && IsAxisContract)
+            return AxisEndpointUnavailableList<EnclosureDeviceDto>(
+                "GET /api/devices/enclosures?door_status=",
+                "GetDevicesByComponentAsync(componentType: \"DOOR_SENSOR\", state: …, deviceType: \"enclosures\")");
+
         try
         {
-            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
+            var parameters = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", ClampLimit(limit, nameof(GetEnclosuresAsync)).ToString());
@@ -2120,13 +2197,35 @@ public class DeviceApiService : IDeviceApiService
                 endpoint += $"?before_date={Uri.EscapeDataString(beforeDate)}";   // aware ISO(+09:00)의 '+' 손상 방지(%2B 인코딩)
 
             var response = await _apiService.DeleteRequestAsync(endpoint);
-            return await response.ToApiResponseAsync<MetricDeleteResultDto>();
+            var result = await response.ToApiResponseAsync<MetricDeleteResultDto>();
+
+            // 7.0+ 서버는 data:null 이고 삭제 수를 message("Deleted {n} metrics for enclosure {id}")에만 싣는다
+            //   (서버 app/routers/enclosure_metrics.py:362-366). 이 메서드는 DeletedCount 를 약속하므로 문구에서 합성한다 —
+            //   서버 계측 삭제(ServerApiService.DeleteServerMetricsAsync)와 같은 규칙. 6.3 처럼 data 가 오면 그대로 쓴다.
+            if (result.Success && result.Data is null)
+            {
+                _log?.Info($"[{nameof(DeleteEnclosureMetricsAsync)}] enclosure={enclosureId} before_date={beforeDate ?? "(all)"} server_message=\"{result.Message}\"");
+                result.Data = new MetricDeleteResultDto
+                {
+                    EnclosureId = enclosureId,
+                    DeletedCount = ParseDeletedCount(result.Message),
+                };
+            }
+            return result;
         }
         catch (Exception ex)
         {
             _log?.Error($"[{nameof(DeleteEnclosureMetricsAsync)}] Error: {ex.Message}");
             return ApiResponse<MetricDeleteResultDto>.CreateError("INTERNAL_ERROR", "Failed to delete enclosure metrics", ex.Message);
         }
+    }
+
+    /// <summary>삭제 응답 문구의 첫 정수를 삭제 수로 읽는다(없으면 0) — <c>ServerApiService</c> 의 같은 이름 도우미와 한 규칙.</summary>
+    private static int ParseDeletedCount(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return 0;
+        var match = System.Text.RegularExpressions.Regex.Match(message, @"\d+");
+        return match.Success && int.TryParse(match.Value, out var count) ? count : 0;
     }
     #endregion
 

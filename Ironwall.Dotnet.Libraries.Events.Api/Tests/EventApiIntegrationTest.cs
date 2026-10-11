@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Ironwall.Dotnet.Libraries.Api.Models;
@@ -26,6 +26,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Api.Tests;
                   라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
                   + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
                   쓰기 시험은 loopback · 사설망 주소에서만 돈다
+                  2026-10-12: 시험 서버엔 시드 자료가 없다(INIT_SAMPLE_DATA=false) — 고정 id(장비 2 · 카메라 3 ·
+                  스피커 6 · 경광등 7 · 그룹 1)를 버리고 시험이 장비 · 프리셋을 만들어 쓰고 finally 에서 지운다
 ****************************************************************************/
 
 #region - Fixture & Collection -
@@ -35,6 +37,11 @@ public sealed class EventApiFixture : IAsyncLifetime
     internal IEventApiService Service { get; private set; } = null!;
     internal ILogService Log { get; } = new LogService();
 
+    /// <summary>이벤트(탐지 · 장애 · 연결)를 붙일 시험용 제어기 id. 쓰기 환경이 아니거나 만들지 못했으면 0.</summary>
+    internal int DeviceId { get; private set; }
+
+    private string? _deviceFailure;
+
     public async Task InitializeAsync()
     {
         // 라이브 환경이 없으면 모든 시험이 건너뛴다 — 픽스처도 네트워크에 닿지 않는다.
@@ -42,10 +49,31 @@ public sealed class EventApiFixture : IAsyncLifetime
 
         // 어셈블리 공용 로그인 세션에서 꺼낸다(초기화 · 로그인은 세션이 이미 했다).
         Service = await LiveApiSession.ResolveAsync<IEventApiService>();
+
+        // 쓰기가 허용된 주소에서만 시험 장비를 만든다(원격 운영 주소는 네트워크에 닿기 전에 건너뛴다).
+        //   실패해도 픽스처를 깨지 않는다 — 읽기 시험까지 같이 죽지 않게 사유만 들고 있다가 쓰기 시험에서 낸다.
+        if (LiveApiTarget.WriteSkipReason is not null) return;
+        try
+        {
+            DeviceId = await LiveEventTestData.CreateControllerAsync();
+        }
+        catch (Exception ex)
+        {
+            _deviceFailure = ex.Message;
+        }
+    }
+
+    /// <summary>시험용 제어기 id — 만들지 못했으면 그 사유로 실패시킨다.</summary>
+    internal int RequireDeviceId()
+    {
+        Assert.True(DeviceId > 0, $"시험용 제어기를 만들지 못했습니다: {_deviceFailure ?? "(사유 없음)"}");
+        return DeviceId;
     }
 
     // 공용 세션은 어셈블리 내내 쓴다 — 여기서 서비스를 멈추거나 컨테이너를 버리지 않는다.
-    public Task DisposeAsync() => Task.CompletedTask;
+    // 시험 장비만 지운다(이벤트의 device_id 는 SET NULL 이라 남은 이벤트가 있어도 지워진다 — models/event.py:78).
+    public Task DisposeAsync()
+        => DeviceId > 0 ? LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Controllers, DeviceId) : Task.CompletedTask;
 }
 
 [CollectionDefinition(nameof(EventApiCollection))]
@@ -59,11 +87,13 @@ public sealed class EventApiCollection : ICollectionFixture<EventApiFixture> { }
 [Trait("Scenario", "DEP-206")]
 public class DetectionEventApiTests
 {
+    private readonly EventApiFixture _fixture;
     private readonly IEventApiService _svc;
     private readonly ITestOutputHelper _output;
 
     public DetectionEventApiTests(EventApiFixture fixture, ITestOutputHelper output)
     {
+        _fixture = fixture;
         _svc = fixture.Service;
         _output = output;
     }
@@ -76,7 +106,7 @@ public class DetectionEventApiTests
         var createDto = new DetectionEventDto
         {
             TypeEvent = "Intrusion",
-            DeviceId = 2,
+            DeviceId = _fixture.RequireDeviceId(),
             Result = "VIBRATION_SENSOR"
         };
 
@@ -156,11 +186,13 @@ public class DetectionEventApiTests
 [Trait("Scenario", "DEP-206")]
 public class MalfunctionEventApiTests
 {
+    private readonly EventApiFixture _fixture;
     private readonly IEventApiService _svc;
     private readonly ITestOutputHelper _output;
 
     public MalfunctionEventApiTests(EventApiFixture fixture, ITestOutputHelper output)
     {
+        _fixture = fixture;
         _svc = fixture.Service;
         _output = output;
     }
@@ -173,7 +205,7 @@ public class MalfunctionEventApiTests
         var createDto = new MalfunctionEventDto
         {
             TypeEvent = "Fault",
-            DeviceId = 2,
+            DeviceId = _fixture.RequireDeviceId(),
             Reason = "FAULT_FENCE",
             Detail = new MalfunctionDetailDto
             {
@@ -247,11 +279,13 @@ public class MalfunctionEventApiTests
 [Trait("Scenario", "DEP-206")]
 public class ConnectionEventApiTests
 {
+    private readonly EventApiFixture _fixture;
     private readonly IEventApiService _svc;
     private readonly ITestOutputHelper _output;
 
     public ConnectionEventApiTests(EventApiFixture fixture, ITestOutputHelper output)
     {
+        _fixture = fixture;
         _svc = fixture.Service;
         _output = output;
     }
@@ -264,7 +298,7 @@ public class ConnectionEventApiTests
         var createDto = new ConnectionEventDto
         {
             TypeEvent = "Connection",
-            DeviceId = 2
+            DeviceId = _fixture.RequireDeviceId()
         };
 
         var createResp = await _svc.CreateConnectionEventAsync(createDto);
@@ -283,6 +317,7 @@ public class ConnectionEventApiTests
             Assert.Equal("Connection", getResp.Data.TypeEvent);
 
             // ── Patch ──
+            // device_description 은 응답 전용 키라 서버가 무시하고 경고만 남긴다(app/schemas/event.py:177-184).
             var patchDto = new ConnectionEventDto { DeviceDescription = "E06 Patched" };
             var patchResp = await _svc.PatchConnectionEventAsync(id, patchDto);
             Assert.True(patchResp.Success,
@@ -324,11 +359,13 @@ public class ConnectionEventApiTests
 [Trait("Scenario", "DEP-206")]
 public class ActionEventApiTests
 {
+    private readonly EventApiFixture _fixture;
     private readonly IEventApiService _svc;
     private readonly ITestOutputHelper _output;
 
     public ActionEventApiTests(EventApiFixture fixture, ITestOutputHelper output)
     {
+        _fixture = fixture;
         _svc = fixture.Service;
         _output = output;
     }
@@ -341,11 +378,11 @@ public class ActionEventApiTests
         var detDto = new DetectionEventDto
         {
             TypeEvent = "Intrusion",
-            DeviceId = 2,
+            DeviceId = _fixture.RequireDeviceId(),
             Result = "VIBRATION_SENSOR"
         };
         var detResp = await _svc.CreateDetectionEventAsync(detDto);
-        Assert.True(detResp.Success, $"Detection create failed: {detResp.Error?.Code}");
+        Assert.True(detResp.Success, $"Detection create failed: {detResp.Error?.Code} - {detResp.Message}. Details: {detResp.Error?.Details}");
         var detId = detResp.Data!.Id;
         _output.WriteLine($"Created source Detection ID={detId}");
 
@@ -399,7 +436,7 @@ public class ActionEventApiTests
             }
             finally
             {
-                // ── Delete Action ──
+                // ── Delete Action ── (원본보다 먼저 — 조치가 달린 원본 삭제는 409, detections.py:634 · 648)
                 var delResp = await _svc.DeleteActionEventAsync(id);
                 Assert.True(delResp.Success, $"Delete Action failed: {delResp.Error?.Code}");
                 _output.WriteLine($"Deleted Action ID={id}");
@@ -408,7 +445,8 @@ public class ActionEventApiTests
         finally
         {
             // ── Delete source Detection ──
-            await _svc.DeleteDetectionEventAsync(detId);
+            var delDet = await _svc.DeleteDetectionEventAsync(detId);
+            Assert.True(delDet.Success, $"Delete source Detection failed: {delDet.Error?.Code} - {delDet.Message}");
             _output.WriteLine($"Deleted source Detection ID={detId}");
         }
     }
@@ -431,11 +469,13 @@ public class ActionEventApiTests
 [Trait("Scenario", "DEP-206")]
 public class EventRelationApiTests
 {
+    private readonly EventApiFixture _fixture;
     private readonly IEventApiService _svc;
     private readonly ITestOutputHelper _output;
 
     public EventRelationApiTests(EventApiFixture fixture, ITestOutputHelper output)
     {
+        _fixture = fixture;
         _svc = fixture.Service;
         _output = output;
     }
@@ -448,40 +488,49 @@ public class EventRelationApiTests
         var detDto = new DetectionEventDto
         {
             TypeEvent = "Intrusion",
-            DeviceId = 2,
+            DeviceId = _fixture.RequireDeviceId(),
             Result = "VIBRATION_SENSOR"
         };
         var detResp = await _svc.CreateDetectionEventAsync(detDto);
-        Assert.True(detResp.Success);
+        Assert.True(detResp.Success, $"Detection create failed: {detResp.Error?.Code} - {detResp.Message}. Details: {detResp.Error?.Details}");
         var detId = detResp.Data!.Id;
 
-        // ── Action 생성 (from_event = detId) ──
-        var actDto = new ActionEventCreateDto
-        {
-            TypeEvent = "Action",
-            Content = "E10 Action for Detection",
-            User = "test_operator",
-            FromEventId = detId
-        };
-        var actResp = await _svc.CreateActionEventAsync(actDto);
-        Assert.True(actResp.Success);
-        var actId = actResp.Data!.Id;
-        _output.WriteLine($"Detection={detId}, Action={actId}");
-
+        // 원본을 만든 순간부터 finally 가 지운다 — 중간 단계가 실패해도 남기지 않는다.
         try
         {
-            // ── DetectionActions 조회 (v4.6 1:N — 배열) ──
-            var actionResp = await _svc.GetDetectionActionsAsync(detId);
-            Assert.True(actionResp.Success,
-                $"GetDetectionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
-            Assert.NotNull(actionResp.Data);
-            Assert.Contains(actionResp.Data, a => a.Id == actId);
-            _output.WriteLine($"DetectionActions count={actionResp.Data.Count}");
+            // ── Action 생성 (from_event = detId) ──
+            var actDto = new ActionEventCreateDto
+            {
+                TypeEvent = "Action",
+                Content = "E10 Action for Detection",
+                User = "test_operator",
+                FromEventId = detId
+            };
+            var actResp = await _svc.CreateActionEventAsync(actDto);
+            Assert.True(actResp.Success, $"Action create failed: {actResp.Error?.Code} - {actResp.Message}. Details: {actResp.Error?.Details}");
+            var actId = actResp.Data!.Id;
+            _output.WriteLine($"Detection={detId}, Action={actId}");
+
+            try
+            {
+                // ── DetectionActions 조회 (v4.6 1:N — 배열) ──
+                var actionResp = await _svc.GetDetectionActionsAsync(detId);
+                Assert.True(actionResp.Success,
+                    $"GetDetectionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
+                Assert.NotNull(actionResp.Data);
+                Assert.Contains(actionResp.Data, a => a.Id == actId);
+                _output.WriteLine($"DetectionActions count={actionResp.Data.Count}");
+            }
+            finally
+            {
+                var delAct = await _svc.DeleteActionEventAsync(actId);
+                Assert.True(delAct.Success, $"Delete Action failed: {delAct.Error?.Code} - {delAct.Message}");
+            }
         }
         finally
         {
-            await _svc.DeleteActionEventAsync(actId);
-            await _svc.DeleteDetectionEventAsync(detId);
+            var delDet = await _svc.DeleteDetectionEventAsync(detId);
+            Assert.True(delDet.Success, $"Delete Detection failed: {delDet.Error?.Code} - {delDet.Message}");
         }
     }
 
@@ -493,7 +542,7 @@ public class EventRelationApiTests
         var malDto = new MalfunctionEventDto
         {
             TypeEvent = "Fault",
-            DeviceId = 2,
+            DeviceId = _fixture.RequireDeviceId(),
             Reason = "FAULT_FENCE",
             Detail = new MalfunctionDetailDto
             {
@@ -502,36 +551,44 @@ public class EventRelationApiTests
             }
         };
         var malResp = await _svc.CreateMalfunctionEventAsync(malDto);
-        Assert.True(malResp.Success);
+        Assert.True(malResp.Success, $"Malfunction create failed: {malResp.Error?.Code} - {malResp.Message}. Details: {malResp.Error?.Details}");
         var malId = malResp.Data!.Id;
-
-        // ── Action 생성 (from_event = malId) ──
-        var actDto = new ActionEventCreateDto
-        {
-            TypeEvent = "Action",
-            Content = "E11 Action for Malfunction",
-            User = "test_operator",
-            FromEventId = malId
-        };
-        var actResp = await _svc.CreateActionEventAsync(actDto);
-        Assert.True(actResp.Success);
-        var actId = actResp.Data!.Id;
-        _output.WriteLine($"Malfunction={malId}, Action={actId}");
 
         try
         {
-            // ── MalfunctionActions 조회 (v4.6 1:N — 배열) ──
-            var actionResp = await _svc.GetMalfunctionActionsAsync(malId);
-            Assert.True(actionResp.Success,
-                $"GetMalfunctionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
-            Assert.NotNull(actionResp.Data);
-            Assert.Contains(actionResp.Data, a => a.Id == actId);
-            _output.WriteLine($"MalfunctionActions count={actionResp.Data.Count}");
+            // ── Action 생성 (from_event = malId) ──
+            var actDto = new ActionEventCreateDto
+            {
+                TypeEvent = "Action",
+                Content = "E11 Action for Malfunction",
+                User = "test_operator",
+                FromEventId = malId
+            };
+            var actResp = await _svc.CreateActionEventAsync(actDto);
+            Assert.True(actResp.Success, $"Action create failed: {actResp.Error?.Code} - {actResp.Message}. Details: {actResp.Error?.Details}");
+            var actId = actResp.Data!.Id;
+            _output.WriteLine($"Malfunction={malId}, Action={actId}");
+
+            try
+            {
+                // ── MalfunctionActions 조회 (v4.6 1:N — 배열) ──
+                var actionResp = await _svc.GetMalfunctionActionsAsync(malId);
+                Assert.True(actionResp.Success,
+                    $"GetMalfunctionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
+                Assert.NotNull(actionResp.Data);
+                Assert.Contains(actionResp.Data, a => a.Id == actId);
+                _output.WriteLine($"MalfunctionActions count={actionResp.Data.Count}");
+            }
+            finally
+            {
+                var delAct = await _svc.DeleteActionEventAsync(actId);
+                Assert.True(delAct.Success, $"Delete Action failed: {delAct.Error?.Code} - {delAct.Message}");
+            }
         }
         finally
         {
-            await _svc.DeleteActionEventAsync(actId);
-            await _svc.DeleteMalfunctionEventAsync(malId);
+            var delMal = await _svc.DeleteMalfunctionEventAsync(malId);
+            Assert.True(delMal.Success, $"Delete Malfunction failed: {delMal.Error?.Code} - {delMal.Message}");
         }
     }
 
@@ -568,6 +625,36 @@ public class EventMappingApiTests
         _output = output;
     }
 
+    /// <summary>
+    /// 시험용 매핑을 만든다. 장비그룹은 싣지 않는다 — 선택 필드이고(integration.py:125),
+    /// 시드가 없는 서버에서 고정 그룹 id 는 404 다.
+    /// </summary>
+    private async Task<int> CreateMappingAsync(string label)
+    {
+        var resp = await _svc.CreateEventMappingAsync(new EventMappingDto
+        {
+            NameEvent = $"{label} {Guid.NewGuid().ToString("N")[..8]}",   // 재실행 구분용 꼬리(≤100자 — integration.py:124)
+            CategoryEventMapping = "FENCE_SENSOR_ONLY",
+            Description = $"{label} Test",
+            Status = true
+        });
+        Assert.True(resp.Success,
+            $"Mapping create failed: {resp.Error?.Code} - {resp.Message}. Details: {resp.Error?.Details}");
+        var id = resp.Data!.Id;
+        Assert.True(id > 0);
+        _output.WriteLine($"Created Mapping ID={id}");
+        return id;
+    }
+
+    /// <summary>매핑을 지운 결과를 돌려준다(단언은 장비 정리 뒤에 한다 — 단언이 장비 삭제를 건너뛰지 않게).</summary>
+    private async Task<string?> DeleteMappingAsync(int mappingId)
+    {
+        if (mappingId <= 0) return null;
+        var del = await _svc.DeleteEventMappingAsync(mappingId);
+        _output.WriteLine($"Deleted Mapping ID={mappingId}: {del.Success}");
+        return del.Success ? null : $"Delete mapping {mappingId} failed: {del.Error?.Code} - {del.Message}";
+    }
+
     [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E13_EventMapping_CRUD_Lifecycle()
@@ -576,7 +663,6 @@ public class EventMappingApiTests
         var createDto = new EventMappingDto
         {
             NameEvent = "E13 Test Mapping",
-            DeviceGroupId = 1,
             CategoryEventMapping = "FENCE_SENSOR_ONLY",
             Description = "E13 Integration Test",
             Status = true
@@ -597,24 +683,35 @@ public class EventMappingApiTests
             Assert.Equal(id, getResp.Data!.Id);
             Assert.Equal("E13 Test Mapping", getResp.Data.NameEvent);
 
-            // ── Patch ──
+            // ── Patch ── (보낸 키만 바뀐다 — event_mappings.py:299)
             var patchDto = new EventMappingDto { Description = "E13 Patched" };
             var patchResp = await _svc.PatchEventMappingAsync(id, patchDto);
             Assert.True(patchResp.Success,
-                $"Patch failed: {patchResp.Error?.Code} - {patchResp.Message}");
+                $"Patch failed: {patchResp.Error?.Code} - {patchResp.Message}. Details: {patchResp.Error?.Details}");
+            Assert.Equal("E13 Patched", patchResp.Data!.Description);
+            Assert.Equal("E13 Test Mapping", patchResp.Data.NameEvent);
+            Assert.True(patchResp.Data.Status);
 
             // ── Put ──
             var putDto = new EventMappingDto
             {
                 NameEvent = "E13 Updated Mapping",
-                DeviceGroupId = 1,
                 CategoryEventMapping = "FENCE_SENSOR_ONLY",
                 Description = "E13 Full Update",
                 Status = false
             };
             var putResp = await _svc.UpdateEventMappingAsync(id, putDto);
             Assert.True(putResp.Success,
-                $"Put failed: {putResp.Error?.Code} - {putResp.Message}");
+                $"Put failed: {putResp.Error?.Code} - {putResp.Message}. Details: {putResp.Error?.Details}");
+            Assert.Equal("E13 Updated Mapping", putResp.Data!.NameEvent);
+            Assert.Equal("E13 Full Update", putResp.Data.Description);
+            Assert.False(putResp.Data.Status);
+
+            // ── Get after Put ──
+            var afterPut = await _svc.GetEventMappingByIdAsync(id);
+            Assert.True(afterPut.Success);
+            Assert.Equal("E13 Updated Mapping", afterPut.Data!.NameEvent);
+            Assert.False(afterPut.Data.Status);
         }
         finally
         {
@@ -649,28 +746,24 @@ public class EventMappingApiTests
     [Trait("Category", "Integration")]
     public async Task E16_MappingCamera_CRUD_Lifecycle()
     {
-        // ── Mapping 먼저 생성 ──
-        var mappingDto = new EventMappingDto
-        {
-            NameEvent = "E16 Camera Mapping",
-            DeviceGroupId = 1,
-            CategoryEventMapping = "FENCE_SENSOR_ONLY",
-            Description = "E16 Camera Test",
-            Status = true
-        };
-        var mappingResp = await _svc.CreateEventMappingAsync(mappingDto);
-        Assert.True(mappingResp.Success);
-        var mappingId = mappingResp.Data!.Id;
-        _output.WriteLine($"Created Mapping ID={mappingId}");
-
+        int cameraId = 0, mappingId = 0;
+        string? mappingCleanup = null;
         try
         {
+            // ── 카메라 · 실제 프리셋 2개 (target/home 은 그 카메라 소유여야 한다 — event_mapping_cameras.py:63-84) ──
+            cameraId = await LiveEventTestData.CreateCameraAsync();
+            var targetPresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 1);
+            var homePresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 2);
+
+            // ── Mapping 생성 ──
+            mappingId = await CreateMappingAsync("E16 Camera Mapping");
+
             // ── Create Camera Config ──
             var camDto = new EventMappingCameraDto
             {
-                CameraId = 3,
-                TargetPresetId = 0,
-                HomePresetId = 0,
+                CameraId = cameraId,
+                TargetPresetId = targetPresetId,
+                HomePresetId = homePresetId,
                 DelayTime = 5,
                 Priority = 1
             };
@@ -681,45 +774,36 @@ public class EventMappingApiTests
 
             // ── Get List ──
             var listResp = await _svc.GetMappingCamerasAsync(mappingId);
-            Assert.True(listResp.Success);
+            Assert.True(listResp.Success, $"List failed: {listResp.Error?.Code} - {listResp.Message}");
             Assert.NotNull(listResp.Data);
-            Assert.True(listResp.Data.Count > 0);
-            var configId = listResp.Data[0].CameraId;
-            _output.WriteLine($"MappingCamera list count={listResp.Data.Count}, first cameraId={configId}");
+            Assert.Single(listResp.Data);
+            _output.WriteLine($"MappingCamera list count={listResp.Data.Count}");
         }
         finally
         {
-            // ── Cleanup: Delete Mapping (cascades to camera configs) ──
-            var delResp = await _svc.DeleteEventMappingAsync(mappingId);
-            Assert.True(delResp.Success);
-            _output.WriteLine($"Deleted Mapping ID={mappingId}");
+            // ── Cleanup: 매핑 먼저(카메라 config 연쇄 삭제), 그다음 카메라(프리셋 연쇄 삭제) ──
+            mappingCleanup = await DeleteMappingAsync(mappingId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Cameras, cameraId);
         }
+        Assert.Null(mappingCleanup);
     }
 
     [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E17_MappingSpeaker_CRUD_Lifecycle()
     {
-        // ── Mapping 먼저 생성 ──
-        var mappingDto = new EventMappingDto
-        {
-            NameEvent = "E17 Speaker Mapping",
-            DeviceGroupId = 1,
-            CategoryEventMapping = "FENCE_SENSOR_ONLY",
-            Description = "E17 Speaker Test",
-            Status = true
-        };
-        var mappingResp = await _svc.CreateEventMappingAsync(mappingDto);
-        Assert.True(mappingResp.Success);
-        var mappingId = mappingResp.Data!.Id;
-        _output.WriteLine($"Created Mapping ID={mappingId}");
-
+        int speakerId = 0, mappingId = 0;
+        string? mappingCleanup = null;
         try
         {
+            speakerId = await LiveEventTestData.CreateSpeakerAsync();
+            mappingId = await CreateMappingAsync("E17 Speaker Mapping");
+
             // ── Create Speaker Config ──
+            // FileGroupId 0 = 음원 미지정 — 서비스가 본문에서 뺀다(L7, 서버는 0 을 실제 id 로 찾아 404 였다).
             var spkDto = new EventMappingSpeakerDto
             {
-                SpeakerId = 6,
+                SpeakerId = speakerId,
                 FileGroupId = 0,
                 RepeatCount = 3,
                 Priority = 1
@@ -731,44 +815,36 @@ public class EventMappingApiTests
 
             // ── Get List ──
             var listResp = await _svc.GetMappingSpeakersAsync(mappingId);
-            Assert.True(listResp.Success);
+            Assert.True(listResp.Success, $"List failed: {listResp.Error?.Code} - {listResp.Message}");
             Assert.NotNull(listResp.Data);
-            Assert.True(listResp.Data.Count > 0);
+            var row = Assert.Single(listResp.Data);
+            Assert.Equal(3, row.RepeatCount);
             _output.WriteLine($"MappingSpeaker list count={listResp.Data.Count}");
         }
         finally
         {
-            var delResp = await _svc.DeleteEventMappingAsync(mappingId);
-            Assert.True(delResp.Success);
-            _output.WriteLine($"Deleted Mapping ID={mappingId}");
+            mappingCleanup = await DeleteMappingAsync(mappingId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Speakers, speakerId);
         }
+        Assert.Null(mappingCleanup);
     }
 
     [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E18_MappingLamp_CRUD_Lifecycle()
     {
-        // ── Mapping 먼저 생성 ──
-        var mappingDto = new EventMappingDto
-        {
-            NameEvent = "E18 Lamp Mapping",
-            DeviceGroupId = 1,
-            CategoryEventMapping = "FENCE_SENSOR_ONLY",
-            Description = "E18 Lamp Test",
-            Status = true
-        };
-        var mappingResp = await _svc.CreateEventMappingAsync(mappingDto);
-        Assert.True(mappingResp.Success);
-        var mappingId = mappingResp.Data!.Id;
-        _output.WriteLine($"Created Mapping ID={mappingId}");
-
+        int lampId = 0, mappingId = 0;
+        string? mappingCleanup = null;
         try
         {
+            lampId = await LiveEventTestData.CreateLampAsync();
+            mappingId = await CreateMappingAsync("E18 Lamp Mapping");
+
             // ── Create Lamp Config ──
             var lampDto = new EventMappingLampDto
             {
-                EventMappingId = mappingId,
-                LampId = 7,
+                EventMappingId = mappingId,   // 보내면 경로와 같아야 한다(integration.py:416-420)
+                LampId = lampId,
                 Color = "Red",
                 LightMode = "steady",
                 BuzzerSound = "PI-PI-PI",
@@ -783,55 +859,58 @@ public class EventMappingApiTests
 
             // ── Get List ──
             var listResp = await _svc.GetMappingLampsAsync(mappingId);
-            Assert.True(listResp.Success);
+            Assert.True(listResp.Success, $"List failed: {listResp.Error?.Code} - {listResp.Message}");
             Assert.NotNull(listResp.Data);
-            Assert.True(listResp.Data.Count > 0);
+            var row = Assert.Single(listResp.Data);
+            Assert.Equal("Red", row.Color);
             _output.WriteLine($"MappingLamp list count={listResp.Data.Count}");
         }
         finally
         {
-            var delResp = await _svc.DeleteEventMappingAsync(mappingId);
-            Assert.True(delResp.Success);
-            _output.WriteLine($"Deleted Mapping ID={mappingId}");
+            mappingCleanup = await DeleteMappingAsync(mappingId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Lamps, lampId);
         }
+        Assert.Null(mappingCleanup);
     }
 
     [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E19_EventMapping_WithAllDevices()
     {
-        // ── Mapping 생성 ──
-        var mappingDto = new EventMappingDto
-        {
-            NameEvent = "E19 All Devices Mapping",
-            DeviceGroupId = 1,
-            CategoryEventMapping = "FENCE_SENSOR_ONLY",
-            Description = "E19 All Devices Test",
-            Status = true
-        };
-        var mappingResp = await _svc.CreateEventMappingAsync(mappingDto);
-        Assert.True(mappingResp.Success);
-        var mappingId = mappingResp.Data!.Id;
-
+        int cameraId = 0, speakerId = 0, lampId = 0, mappingId = 0;
+        string? mappingCleanup = null;
         try
         {
+            // ── 장비 준비 ──
+            cameraId = await LiveEventTestData.CreateCameraAsync();
+            var targetPresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 1);
+            var homePresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 2);
+            speakerId = await LiveEventTestData.CreateSpeakerAsync();
+            lampId = await LiveEventTestData.CreateLampAsync();
+
+            // ── Mapping 생성 ──
+            mappingId = await CreateMappingAsync("E19 All Devices Mapping");
+
             // ── Camera 추가 ──
-            await _svc.CreateMappingCameraAsync(mappingId, new EventMappingCameraDto
+            var camResp = await _svc.CreateMappingCameraAsync(mappingId, new EventMappingCameraDto
             {
-                CameraId = 3, TargetPresetId = 0, HomePresetId = 0, DelayTime = 5, Priority = 1
+                CameraId = cameraId, TargetPresetId = targetPresetId, HomePresetId = homePresetId, DelayTime = 5, Priority = 1
             });
+            Assert.True(camResp.Success, $"Create Camera failed: {camResp.Error?.Code} - {camResp.Message}. Details: {camResp.Error?.Details}");
 
             // ── Speaker 추가 ──
-            await _svc.CreateMappingSpeakerAsync(mappingId, new EventMappingSpeakerDto
+            var spkResp = await _svc.CreateMappingSpeakerAsync(mappingId, new EventMappingSpeakerDto
             {
-                SpeakerId = 6, FileGroupId = 0, RepeatCount = 2, Priority = 1
+                SpeakerId = speakerId, FileGroupId = 0, RepeatCount = 2, Priority = 1
             });
+            Assert.True(spkResp.Success, $"Create Speaker failed: {spkResp.Error?.Code} - {spkResp.Message}. Details: {spkResp.Error?.Details}");
 
             // ── Lamp 추가 ──
-            await _svc.CreateMappingLampAsync(mappingId, new EventMappingLampDto
+            var lampResp = await _svc.CreateMappingLampAsync(mappingId, new EventMappingLampDto
             {
-                EventMappingId = mappingId, LampId = 7, Color = "Red", LightMode = "steady", BuzzerSound = "PI-PI-PI", BuzzerTime = 5, IsEnable = true, Priority = 1
+                EventMappingId = mappingId, LampId = lampId, Color = "Red", LightMode = "steady", BuzzerSound = "PI-PI-PI", BuzzerTime = 5, IsEnable = true, Priority = 1
             });
+            Assert.True(lampResp.Success, $"Create Lamp failed: {lampResp.Error?.Code} - {lampResp.Message}. Details: {lampResp.Error?.Details}");
 
             // ── 각 서브리소스 목록 조회 ──
             var camList = await _svc.GetMappingCamerasAsync(mappingId);
@@ -856,51 +935,62 @@ public class EventMappingApiTests
         }
         finally
         {
-            await _svc.DeleteEventMappingAsync(mappingId);
-            _output.WriteLine($"Deleted Mapping ID={mappingId}");
+            // 매핑 먼저(하위 config 연쇄 삭제), 그다음 장비
+            mappingCleanup = await DeleteMappingAsync(mappingId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Cameras, cameraId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Speakers, speakerId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Lamps, lampId);
         }
+        Assert.Null(mappingCleanup);
     }
 
     [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E20_EventMapping_DeleteCascade()
     {
-        // ── Mapping 생성 + Camera 추가 ──
-        var mappingDto = new EventMappingDto
+        int cameraId = 0, mappingId = 0;
+        var mappingDeleted = false;
+        string? mappingCleanup = null;
+        try
         {
-            NameEvent = "E20 Cascade Test",
-            DeviceGroupId = 1,
-            CategoryEventMapping = "FENCE_SENSOR_ONLY",
-            Description = "E20 Cascade Delete Test",
-            Status = true
-        };
-        var mappingResp = await _svc.CreateEventMappingAsync(mappingDto);
-        Assert.True(mappingResp.Success);
-        var mappingId = mappingResp.Data!.Id;
+            // ── Mapping 생성 + Camera 추가 ──
+            cameraId = await LiveEventTestData.CreateCameraAsync();
+            var targetPresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 1);
+            var homePresetId = await LiveEventTestData.CreatePresetAsync(cameraId, 2);
+            mappingId = await CreateMappingAsync("E20 Cascade Test");
 
-        await _svc.CreateMappingCameraAsync(mappingId, new EventMappingCameraDto
-        {
-            CameraId = 1, TargetPresetId = 1, HomePresetId = 0, DelayTime = 5, Priority = 1
-        });
+            var camResp = await _svc.CreateMappingCameraAsync(mappingId, new EventMappingCameraDto
+            {
+                CameraId = cameraId, TargetPresetId = targetPresetId, HomePresetId = homePresetId, DelayTime = 5, Priority = 1
+            });
+            Assert.True(camResp.Success, $"Create Camera failed: {camResp.Error?.Code} - {camResp.Message}. Details: {camResp.Error?.Details}");
 
-        // ── Mapping 삭제 ──
-        var delResp = await _svc.DeleteEventMappingAsync(mappingId);
-        Assert.True(delResp.Success, $"Delete failed: {delResp.Error?.Code}");
-        _output.WriteLine($"Deleted Mapping ID={mappingId}");
+            // ── Mapping 삭제 ──
+            var delResp = await _svc.DeleteEventMappingAsync(mappingId);
+            Assert.True(delResp.Success, $"Delete failed: {delResp.Error?.Code}");
+            mappingDeleted = true;
+            _output.WriteLine($"Deleted Mapping ID={mappingId}");
 
-        // ── Mapping 조회 → NotFound 확인 ──
-        var getResp = await _svc.GetEventMappingByIdAsync(mappingId);
-        Assert.False(getResp.Success, "Mapping should be deleted");
+            // ── Mapping 조회 → NotFound 확인 ──
+            var getResp = await _svc.GetEventMappingByIdAsync(mappingId);
+            Assert.False(getResp.Success, "Mapping should be deleted");
 
-        // ── Camera 목록 조회 → 빈 목록 또는 에러 ──
-        var camResp = await _svc.GetMappingCamerasAsync(mappingId);
-        // 서버가 404 또는 빈 목록 반환 가능
-        if (camResp.Success)
-        {
-            Assert.True(camResp.Data == null || camResp.Data.Count == 0,
-                "Camera configs should be cascade deleted");
+            // ── Camera 목록 조회 → 빈 목록 또는 에러 ──
+            var camList = await _svc.GetMappingCamerasAsync(mappingId);
+            // 서버가 404 또는 빈 목록 반환 가능
+            if (camList.Success)
+            {
+                Assert.True(camList.Data == null || camList.Data.Count == 0,
+                    "Camera configs should be cascade deleted");
+            }
+            _output.WriteLine("Cascade delete verified");
         }
-        _output.WriteLine("Cascade delete verified");
+        finally
+        {
+            if (!mappingDeleted) mappingCleanup = await DeleteMappingAsync(mappingId);
+            await LiveEventTestData.DeleteDeviceAsync(LiveEventTestData.Cameras, cameraId);
+        }
+        Assert.Null(mappingCleanup);
     }
 }
 
