@@ -105,8 +105,22 @@
 - TRX 13+1개 전부 `failed="0"`, `outcome="Failed|NotExecuted|Error|Timeout|Aborted"` 0건(Grep). 합계 5,283 + 64 통과.
 - sln `dotnet build Ironwall.Dotnet.Libraries.sln` 오류 0. `dotnet test` sln(하네스 검사)은 창 시험이 섞여 있어 본 세션은 돌리지 않음(사용자 PC 사용 중 · 창 금지).
 
+## 하네스 검사 1차(sln) — 2637 통과 / 1 실패(CameraPopup.Tests 286 중 1) 분석
+- [x] 실패 시험 특정: 출력 끝의 `host error not-supported scope=cam19~cam49 ptz ContinuousMove` 경고는 `SupervisorSurvivalTests.should_kill_and_restart_when_host_hangs`(K2)만 보내는
+  PTZ 명령(`"cam" + (i % 50)`, 2000건)이고, 그 로그는 K2 가 재시작 뒤 14초 안에 Running 이 안 될 때만 쏟는다(`if (running is null) DumpLog(log)`) → K2 의 재시작 시간 초과.
+- [x] K2 의 시험 대상은 이번 작업과 무관: 감시자(Ironwall.Dotnet.Libraries.CameraPopup — 참조 Base · Contracts · Streaming.Base · Utils) · 호스트(CameraPopup.Host — 참조 Contracts · Theme · Providers)
+  어느 것도 이번 작업에서 바뀌지 않았다(제품 변경은 GMaps.Ui 한 곳뿐, Utils 는 시험만 추가). 기준선 실행(같은 워크트리, 작업 전)은 2605 통과 · 실패 0.
+- [x] 새 지도 팝업 시험(MapCameraPopupSta 모음)과의 간섭 점검: 그 모음과 Survival 모음은 둘 다 `DisableParallelization = true` 라 겹쳐 돌지 않는다(병렬 모음 뒤 하나씩).
+  새 시험의 Caliburn IoC 교체는 STA 스레드 끝에서 되돌리고, 지도 컨트롤은 디스패처 종료 때 스스로 닫히며(Dispatcher_ShutdownStarted → Dispose → OnMapClose),
+  실제 감시자를 쓰는 EVM-137 시험은 `using` 으로 해제하고 실행 파일이 없어 프로세스를 띄우지 않는다 · 파이프 이름은 토큰별(PipeNaming.Build).
+- [x] 부하 재현(창 없는 범위): Events.Ui · Housing · PropertyPanel · GMaps.Ui.Tests 를 뒤에서 동시에 돌리며 CameraPopup Unit 251건 → 통과 251/251.
+- 판단: K2 는 실제 호스트 프로세스를 멈추게 한 뒤 죽이고 다시 띄우는 시간 민감 시험(탐지 2.5~6.5초 · 재시작 3초 · Running 14초)이고, sln 실행은 시험 프로젝트들을
+  동시에 돌려 CPU 가 바쁘다 → 이번 실패는 이번 변경이 아니라 실행 환경의 시간 초과로 본다(증거: 시험 대상 코드 불변 · 간섭 경로 없음 · 기준선 통과).
+  Survival 범주는 호스트 프로세스가 실제 이벤트 창 · 오버레이 창을 띄우므로 창 금지 규칙상 본 세션이 직접 다시 돌리지 않았다 — 하네스 재검사로 확인한다.
+  시험(K2) · 검사 명령은 바꾸지 않는다.
+
 ## 남은 일
-- 없음(이 작업 범위). 후속 후보: F2 끊김 보충 기능(PRD) · F3/F4 의도 확인 · 상태표 재생성(D9 명령).
+- 하네스 재검사 결과 확인(위 판단 검증). 후속 후보: F2 끊김 보충 기능(PRD) · F3/F4 의도 확인 · 상태표 재생성(D9 명령).
 
 ## id 별 결과표(71개 — (가) 61 · (나) 10 · (다) 0, 부분 한계는 비고)
 | id | 결론 | 시험(가) 또는 이유(나) | 비고 |
