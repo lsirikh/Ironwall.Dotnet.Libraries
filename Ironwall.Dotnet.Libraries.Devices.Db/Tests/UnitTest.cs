@@ -290,11 +290,13 @@ public class DeviceDb_BulkTests
 
         var ctrlCnt = (await _fx.Svc.FetchControllersAsync())!.Count;
         var snsCnt = (await _fx.Svc.FetchSensorsAsync())!.Count;
-        int expected = ctrlCnt + snsCnt;
+        var camCnt = (await _fx.Svc.FetchCamerasAsync())!.Count;   // FetchInstanceAsync 는 카메라도 DevProvider 에 싣는다 — 같은 묶음의 카메라 시험이 남긴 행(순서 의존)
+        int expected = ctrlCnt + snsCnt + camCnt;
 
         Assert.Equal(expected, _fx.DevProvider.Count);
         Assert.Equal(ctrlCnt, _fx.CtrlProvider.Count);   // 수정된 로직(Provider 비움)
         Assert.Equal(snsCnt, _fx.SnsProvider.Count);
+        Assert.Equal(camCnt, _fx.CamProvider.Count);
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -913,8 +913,8 @@ internal class DeviceDbService : TaskService, IDeviceDbService
                 Id = deviceId,
                 model.IpAddress,
                 IpPort = model.IpPort,
-                model.UserName,
-                model.UserPassword,
+                Username = model.UserName,
+                Password = model.UserPassword,   // SQL 은 @Username · @Password — 속성 이름 그대로 넘기면 @Password 가 비어 MySqlException
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
             }, transaction);
@@ -980,8 +980,8 @@ internal class DeviceDbService : TaskService, IDeviceDbService
                 model.Id,
                 model.IpAddress,
                 IpPort = model.IpPort,
-                model.UserName,
-                model.UserPassword,
+                Username = model.UserName,
+                Password = model.UserPassword,   // SQL 은 @Username · @Password — 속성 이름 그대로 넘기면 @Password 가 비어 MySqlException
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
             }, transaction);
