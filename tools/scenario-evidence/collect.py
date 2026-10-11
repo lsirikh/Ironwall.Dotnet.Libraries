@@ -159,6 +159,23 @@ def load_runs(evidence):
     return results, runs
 
 
+def load_manual(evidence):
+    """사람(또는 화면 조작)이 실제로 해 본 확인 — run 폴더의 manual.json. 자동 시험이 아니므로 상태를 따로 적는다."""
+    out = {}
+    for path in sorted(glob.glob(os.path.join(evidence, "*", "manual.json"))):
+        m = json.load(open(path, encoding="utf-8-sig"))
+        run_id = m.get("run_id") or os.path.basename(os.path.dirname(path))
+        for it in m.get("items", []):
+            shots = [os.path.join(os.path.dirname(path), s) for s in it.get("shots", [])]
+            rec = {"id": it["id"], "outcome": it["outcome"], "run": run_id, "start": m.get("started", ""),
+                   "shas": m.get("shas", {}), "operator": m.get("operator", ""), "steps": it.get("steps", ""),
+                   "shots": [{"path": s, "sha256": sha256(s)} for s in shots if os.path.exists(s)]}
+            prev = out.get(it["id"])
+            if prev is None or rec["start"] >= prev["start"]:
+                out[it["id"]] = rec
+    return out
+
+
 def legacy_refs(refs_cell):
     """카탈로그 마지막 칸의 Class::method 참조."""
     return [f"{a}.{b}" for a, b in re.findall(r"(\w+)::(\w+)", refs_cell)]
@@ -175,6 +192,7 @@ def main():
     rows = parse_catalog(a.catalog)
     links = scan_sources(a.repo)
     results, runs = load_runs(a.evidence)
+    manual = load_manual(a.evidence)
     heads = {os.path.basename(r.rstrip("/\\")): git_head(r) for r in a.repo}
 
     by_test = {}
@@ -231,6 +249,13 @@ def main():
                 status = "미실행"
             else:
                 status = "일부만 실행"
+        man = manual.get(r["id"])
+        if man and status not in ("검증됨", "실패"):
+            stale = any(git_changed_since(rp, man["shas"].get(os.path.basename(rp.rstrip("/\\")), ""))
+                        for rp in a.repo if man["shas"].get(os.path.basename(rp.rstrip("/\\"))))
+            status = "실패" if man["outcome"] != "Passed" else ("검증됨(수동·옛)" if stale else "검증됨(수동)")
+            evid.append({"test": "수동 확인 — " + man["steps"][:80], "mode": "수동", "outcome": man["outcome"], "run": man["run"],
+                         "start": man["start"], "trx": [], "computer": man["operator"], "shots": [s["path"] for s in man["shots"]]})
         table.append({**r, "tests": tests, "status": status, "evidence": evid})
 
     os.makedirs(a.out, exist_ok=True)
@@ -243,9 +268,9 @@ def main():
     with open(os.path.join(a.out, "scenario-status.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1, default=list)
 
-    order = ["검증됨", "검증됨(옛)", "실패", "일부만 실행", "미실행", "시험 없음"]
+    order = ["검증됨", "검증됨(옛)", "검증됨(수동)", "검증됨(수동·옛)", "실패", "일부만 실행", "미실행", "시험 없음"]
     lines = [f"# 시나리오 검증 상태표", "",
-             f"- 만든 시각: {now} · 이 표는 `tools/scenario-evidence/collect.py` 가 실행 기록(TRX)만으로 만든다 — 손으로 고치지 않는다.",
+             f"- 만든 시각: {now} · 이 표는 `tools/scenario-evidence/collect.py` 가 실행 기록(TRX)과 수동 확인 기록(manual.json — 단계 · 화면 · 해시 · 커밋)만으로 만든다 — 손으로 고치지 않는다.",
              f"- 지금 커밋: " + " · ".join(f"{k} `{v[:8]}`" for k, v in heads.items()),
              f"- 실행 기록 {len(runs)}회 · TRX {sum(len(r['trx']) for r in runs)}개", "",
              "## 요약", "", "| 영역 | " + " | ".join(order) + " | 합계 |", "|---|" + "---|" * (len(order) + 1)]
@@ -257,7 +282,7 @@ def main():
             tot[k] += c.get(k, 0)
     lines.append("| **합계** | " + " | ".join(f"**{tot[k]}**" for k in order) + f" | **{sum(tot.values())}** |")
     lines += ["", "## 시나리오", "", "| 상태 | id | 영역 | 기대 | 시험 · 증거 |", "|---|---|---|---|---|"]
-    mark = {"검증됨": "✅", "검증됨(옛)": "🟨", "실패": "❌", "일부만 실행": "🟧", "미실행": "⬜", "시험 없음": "·"}
+    mark = {"검증됨": "✅", "검증됨(옛)": "🟨", "검증됨(수동)": "🖐", "검증됨(수동·옛)": "🖐🟨", "실패": "❌", "일부만 실행": "🟧", "미실행": "⬜", "시험 없음": "·"}
     for t in table:
         ev = "<br>".join(
             f"{e['outcome']} [{e['mode']}] `{e['test']}` · {e['start'][:16]} · run `{e['run']}`" + (f" · 그림 {len(e['shots'])}" if e["shots"] else "")
