@@ -49,6 +49,7 @@ public class XamlSchemaWarmupTests
                 catch (KeyNotFoundException ex) { Interlocked.Increment(ref failures); sample ??= ex.Message; }
                 barrier.SignalAndWait();
             }
+            System.Windows.Threading.Dispatcher.FromThread(Thread.CurrentThread)?.InvokeShutdown();   // STA 정리 계약(StaCleanupTests) — 문맥 조회가 디스패처를 만들었으면 닫는다
         })).ToList();
         threads.ForEach(t => { t.SetApartmentState(ApartmentState.STA); t.Start(); });
         for (var r = 0; r < rounds; r++)

@@ -239,7 +239,7 @@ public class DeviceConsoleSyncSelectionTests : IDisposable
     public void should_not_drop_the_detail_when_the_grid_reports_the_lost_row_before_the_list_is_matched_again() => RunOnSta(async () =>
     {
         var saved = PlatformProvider.Current;
-        PlatformProvider.Current = new XamlPlatformProvider();   // 호스트처럼 맞추기를 UI 스레드 뒤로 미룬다
+        PlatformProvider.Current = new OwnerThreadPlatformProvider();   // 호스트처럼 맞추기를 UI 스레드 뒤로 미룬다
         try
         {
             var rig = await OpenOnControllersAsync();

@@ -17,6 +17,7 @@ internal static class HelpSourceScan
     private static readonly HashSet<string> SkippedRoots = new(StringComparer.OrdinalIgnoreCase)
     {
         "GMap.NET", "third_party", "tools", "tests", "docs", "scripts", ".git", ".claude", ".playwright-mcp",
+        ".harness", ".harness-worktrees",   // 하네스 작업 사본 — 본 저장소에서 돌리면 남은 worktree 의 옛 XAML 까지 훑는다
     };
 
     private static readonly Regex XamlHelpKey = new(@"\bHelpKey\s*=\s*""([^""{][^""]*)""", RegexOptions.Compiled);

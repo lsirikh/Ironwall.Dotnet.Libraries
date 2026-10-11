@@ -667,7 +667,7 @@ public sealed class UnitConsoleNonModalTests
                 var savedIoC = IoC.GetInstance;
                 IoC.GetInstance = (_, _) => null!;                           // 권한 게이트 = 허용 폴백
                 var savedPlatform = PlatformProvider.Current;
-                PlatformProvider.Current = new XamlPlatformProvider();       // 호스트와 같은 창 닫기 길(TryCloseAsync → 창 닫기)
+                PlatformProvider.Current = new OwnerThreadPlatformProvider();       // 호스트와 같은 창 닫기 길(TryCloseAsync → 창 닫기)
                 SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
                 Env? env = null;
                 try

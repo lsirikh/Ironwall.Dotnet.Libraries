@@ -26,6 +26,14 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
                      %TEMP% · 시험 폴더 · 관계도 폴더의 파일 목록이 그대로인지. 개인 표시 설정(console-prefs)은 이 시험 밖이다(뷰 키만 허용 — 레인 A).
                      ⚠ 관계도 뷰모델(레인 A)이 녹색이 되면 같은 한 바퀴를 뷰모델 경로로 한 번 더 돌린다(Phase 4 통합).
 ****************************************************************************/
+[CollectionDefinition(NAME, DisableParallelization = true)]
+public sealed class FileSystemSnapshotCollection
+{
+    /// <summary>%TEMP% 목록 전후 비교는 나란히 도는 다른 시험의 임시 파일(assembly-layout-styles-*.xaml 등)을 결함으로 잡는다 — 병렬 묶음이 끝난 뒤 홀로 돈다.</summary>
+    public const string NAME = "FileSystemSnapshot";
+}
+
+[Collection(FileSystemSnapshotCollection.NAME)]
 public class UnitMapNoDiskWriteTests
 {
     /// <summary>파일 시스템에 쓰는 API — 캐시 · 임시 · 대체 파일 모두 금지(NFR-14). 주석과 문자열 안은 보지 않는다.</summary>

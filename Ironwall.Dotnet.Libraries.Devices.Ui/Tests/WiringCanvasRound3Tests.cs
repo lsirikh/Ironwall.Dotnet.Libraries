@@ -27,6 +27,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Tests;
 /// <b>창을 띄우지 않는다</b> — 부모 없는 <see cref="FenceCanvas"/> · <see cref="FenceConceptView"/> · 컴파일된 <see cref="FenceView"/> 를 Measure/Arrange 하고,
 /// 마우스는 캔버스의 시험 진입점(누름 · 움직임 · 뗌 · Esc 취소)으로, 도구줄 단추는 Click 이벤트로(코드비하인드 처리기를 그대로 지난다) 민다.
 /// </summary>
+[Collection("CaliburnIoC")]      // 단추 Click → 뷰모델이 Caliburn 정적 PlatformProvider 로 UI 스레드에 넘긴다 — 그것을 잠시 바꾸는 클래스와 나란히 돌면 다른 스레드 디스패처를 잡는다(WIR-100 · WIR-158 순서 의존 실패)
 public class WiringCanvasRound3Tests
 {
     #region - Rig -
