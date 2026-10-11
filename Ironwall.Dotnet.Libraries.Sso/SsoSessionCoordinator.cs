@@ -158,6 +158,41 @@ public sealed class SsoSessionCoordinator
         return result;
     }
 
+    /// <summary>허용 대기 동안 다시 묻는 최대 시간 — 에이전트 허용 창 수명(1분) + 여유.</summary>
+    public static readonly TimeSpan ConsentWaitWindow = TimeSpan.FromSeconds(75);
+
+    /// <summary>허용 대기 동안 다시 묻는 간격.</summary>
+    public static readonly TimeSpan ConsentRetryInterval = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// <see cref="TrySignInAsync"/> 가 <see cref="SsoSignInStatus.ConsentPending"/> 이면, 사람이 에이전트 허용 창에 답할 때까지
+    /// 창 없는 로그인을 <paramref name="interval"/> 마다 다시 시도한다. 허용되면 그 결과(로그인 완료)를, 시간이 다 되거나
+    /// 다른 상태(거절 등)가 오면 그 결과를 돌려준다. 처음 결과가 허용 대기가 아니면 그대로 돌려준다(추가 호출 없음).
+    /// <para><b>왜</b>: 허용을 눌러도 에이전트는 앱에 알리지 않는다 — 에이전트 답이 "허용한 뒤 다시 시도하세요" 다.
+    /// 다시 묻지 않으면 사람이 허용한 뒤 [SSO 로 로그인] 을 한 번 더 눌러야 했다(2026-10-12 실창, 판 갱신 뒤 첫 실행).
+    /// 에이전트는 허용 창을 실행 파일(지문)마다 하나만 띄우므로 다시 물어도 창이 쌓이지 않는다.</para>
+    /// <para>호출 스레드: 아무 스레드. 취소는 <paramref name="ct"/> 로(로그인 화면이 닫히거나 비밀번호로 들어갈 때).</para>
+    /// </summary>
+    public async Task<SsoSignInResult> WaitForConsentAsync(SsoSignInResult first, TimeSpan? window = null,
+                                                          TimeSpan? interval = null, CancellationToken ct = default)
+    {
+        if (first.Status != SsoSignInStatus.ConsentPending) return first;
+
+        var limit = window ?? ConsentWaitWindow;
+        var step = interval ?? ConsentRetryInterval;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var r = first;
+        var attempts = 0;
+        while (r.Status == SsoSignInStatus.ConsentPending && clock.Elapsed < limit)
+        {
+            await Task.Delay(step, ct).ConfigureAwait(false);
+            r = await TrySignInAsync(ct).ConfigureAwait(false);
+            attempts++;
+        }
+        _log?.Info($"[SSO] 허용 대기 끝 — {r.Status} (다시 묻기 {attempts}회 · {clock.Elapsed.TotalSeconds:F0}초)");
+        return r;
+    }
+
     /// <summary>
     /// 로그인 화면의 <b>"SSO 로 로그인"</b> 단추 — SDK <c>SignInInteractiveAsync</c>.
     /// <para>에이전트에 세션이 없거나 이 앱이 "이 앱만 로그아웃" 으로 막혀 있으면 <b>에이전트가 사람에게 묻는다</b>(로그인 창 · 다시 허락).

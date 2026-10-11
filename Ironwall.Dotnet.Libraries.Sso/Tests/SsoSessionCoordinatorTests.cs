@@ -35,6 +35,79 @@ public partial class SsoSessionCoordinatorTests : IDisposable
     private static SsoExchangeResult Fail(int status, bool retryable, string code = "INVALID_TOKEN", string reason = "x")
         => new() { Success = false, StatusCode = status, ErrorCode = code, Reason = reason, Retryable = retryable };
 
+    // ══ 허용 대기(SSO-010) — 판 갱신 뒤 첫 실행: 허용을 누르면 단추를 다시 누르지 않아도 들어간다 ═══
+
+    [Fact]
+    [Trait("Scenario", "SSO-010")]
+    public async Task should_sign_in_without_another_click_when_consent_is_granted_while_waiting()
+    {
+        // Arrange — 첫 시도는 허용 대기, 두 번 더 물은 뒤 허용됨
+        var agent = new FakeAgent();
+        agent.Sequence.Enqueue(SsoAgentResult.Fail(SsoAgentStatus.ConsentRequired, "pending"));
+        agent.Sequence.Enqueue(SsoAgentResult.Fail(SsoAgentStatus.ConsentRequired, "pending"));
+        var api = new FakeAccountApi(_ => Ok("gop-c", "77"));
+        var store = new TokenStorageService();
+        var sut = new SsoSessionCoordinator(agent, api, store);
+        var first = await sut.TrySignInAsync();
+
+        // Act
+        var r = await sut.WaitForConsentAsync(first, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(10));
+
+        // Assert
+        Assert.Equal(SsoSignInStatus.ConsentPending, first.Status);
+        Assert.Equal(SsoSignInStatus.SignedIn, r.Status);
+        Assert.Equal("gop-c", store.AccessToken);
+        Assert.Equal(3, agent.SignInCalls);   // 첫 시도 1 + 다시 묻기 2(대기 1 · 허용 1)
+    }
+
+    [Fact]
+    [Trait("Scenario", "SSO-010")]
+    public async Task should_give_up_with_consent_pending_when_nobody_answers_within_the_window()
+    {
+        var agent = new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.ConsentRequired, "pending") };
+        var api = new FakeAccountApi(_ => Ok("never"));
+        var store = new TokenStorageService();
+        var sut = new SsoSessionCoordinator(agent, api, store);
+        var first = await sut.TrySignInAsync();
+
+        var r = await sut.WaitForConsentAsync(first, TimeSpan.FromMilliseconds(150), TimeSpan.FromMilliseconds(10));
+
+        Assert.Equal(SsoSignInStatus.ConsentPending, r.Status);
+        Assert.True(agent.SignInCalls > 2, $"창 수명 안에서 여러 번 다시 물어야 한다 — {agent.SignInCalls}회");
+        Assert.True(string.IsNullOrEmpty(store.AccessToken));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SSO-010")]
+    [InlineData(SsoAgentStatus.NoActiveSession)]
+    [InlineData(SsoAgentStatus.Unavailable)]
+    [InlineData(SsoAgentStatus.NotRegistered)]
+    public async Task should_not_ask_again_when_the_first_result_is_not_consent_pending(SsoAgentStatus status)
+    {
+        var agent = new FakeAgent { Next = SsoAgentResult.Fail(status, "x") };
+        var sut = new SsoSessionCoordinator(agent, new FakeAccountApi(_ => Ok("never")), new TokenStorageService());
+        var first = await sut.TrySignInAsync();
+        var calls = agent.SignInCalls;
+
+        var r = await sut.WaitForConsentAsync(first, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(10));
+
+        Assert.Same(first, r);
+        Assert.Equal(calls, agent.SignInCalls);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SSO-010")]
+    public async Task should_stop_asking_when_the_wait_is_cancelled()
+    {
+        var agent = new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.ConsentRequired, "pending") };
+        var sut = new SsoSessionCoordinator(agent, new FakeAccountApi(_ => Ok("never")), new TokenStorageService());
+        var first = await sut.TrySignInAsync();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(80));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.WaitForConsentAsync(first, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(10), cts.Token));
+    }
+
     // ══ 시작 로그인 ═══════════════════════════════════════════════════
 
     [Fact]
@@ -382,8 +455,14 @@ public partial class SsoSessionCoordinatorTests : IDisposable
         public SsoAgentResult? Next { get; set; }
         public bool Present { get; init; } = true;
         public bool IsAgentPresent() => Present;
+        /// <summary>차례로 돌려줄 결과 — 비면 <see cref="Next"/> 로 돌아간다.</summary>
+        public Queue<SsoAgentResult> Sequence { get; } = new();
+        public int SignInCalls { get; private set; }
         public Task<SsoAgentResult> SignInAsync(CancellationToken ct = default)
-            => Task.FromResult(Next ?? SsoAgentResult.Ok($"sso-{++_n}"));
+        {
+            SignInCalls++;
+            return Task.FromResult(Sequence.Count > 0 ? Sequence.Dequeue() : Next ?? SsoAgentResult.Ok($"sso-{++_n}"));
+        }
         /// <summary>단추 경로 — 지정하면 그 결과, 아니면 창 없는 경로와 같게.</summary>
         public Func<CancellationToken, Task<SsoAgentResult>>? Interactive { get; init; }
         public int InteractiveCalls { get; private set; }

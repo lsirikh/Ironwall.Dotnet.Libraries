@@ -135,6 +135,7 @@ public class LoginPanelViewModel : BasePanelViewModel
         try
         {
             if (ViewModel.IsLogin) return;
+            _consentWaitCts?.Cancel();   // 비밀번호로 들어간다 — SSO 허용 대기가 뒤늦게 다른 세션으로 들어오지 않게
             ClearLoginStatus();
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
 
@@ -196,6 +197,19 @@ public class LoginPanelViewModel : BasePanelViewModel
         try
         {
             var r = await sso.TrySignInAsync().ConfigureAwait(true);   // 결과를 UI 스레드에서 다룬다
+
+            // 처음 보는 실행 파일(설치 · 판 갱신 뒤 첫 실행)이면 에이전트가 허용 창을 띄운다 — 사람이 허용하면 단추를
+            // 다시 누르지 않아도 들어가도록, 답할 때까지 창 없는 로그인을 다시 묻는다(비밀번호 로그인 · 패널 닫힘이면 그만).
+            if (r.Status == SsoSignInStatus.ConsentPending)
+            {
+                if (!string.IsNullOrWhiteSpace(r.Guidance)) SetLoginInfo(r.Guidance);
+                using var wait = new CancellationTokenSource();
+                _consentWaitCts = wait;
+                try { r = await sso.WaitForConsentAsync(r, ct: wait.Token).ConfigureAwait(true); }
+                catch (OperationCanceledException) { _log?.Info("[Login] SSO 허용 대기 — 취소(다른 로그인 · 패널 닫힘)"); return; }
+                finally { _consentWaitCts = null; }
+                if (ViewModel.IsLogin) return;
+            }
 
             if (await ApplySsoSignInAsync(r).ConfigureAwait(true)) return;
 
@@ -300,6 +314,7 @@ public class LoginPanelViewModel : BasePanelViewModel
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
         _ssoButtonCts?.Cancel();   // 패널이 닫히면 에이전트 로그인 기다림도 끝낸다
+        _consentWaitCts?.Cancel();
         await base.OnDeactivateAsync(close, cancellationToken);
     }
 
@@ -421,5 +436,7 @@ public class LoginPanelViewModel : BasePanelViewModel
     private bool _ssoInFlight;
     /// <summary>"SSO 로 로그인" 단추가 에이전트를 기다리는 중이면 그 취소 원천. 아니면 <c>null</c>.</summary>
     private CancellationTokenSource? _ssoButtonCts;
+    /// <summary>시작 로그인이 에이전트 허용을 기다리며 다시 묻는 중이면 그 취소 원천. 아니면 <c>null</c>.</summary>
+    private CancellationTokenSource? _consentWaitCts;
     #endregion
 }
