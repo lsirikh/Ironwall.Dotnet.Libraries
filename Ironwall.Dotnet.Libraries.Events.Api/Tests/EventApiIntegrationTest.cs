@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using System;
 using System.Linq;
 using System.Threading;
@@ -22,7 +23,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Api.Tests;
 
    Description  : Event 4종 CRUD + Action 연동 + Detection Log + EventMapping CRUD 통합 테스트
                   xUnit IAsyncLifetime Fixture 패턴 사용
-                  GOP API 서버 (localhost:8000) 연동 필수
+                  라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
+                  + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+                  쓰기 시험은 loopback · 사설망 주소에서만 돈다
 ****************************************************************************/
 
 #region - Fixture & Collection -
@@ -31,30 +34,18 @@ public sealed class EventApiFixture : IAsyncLifetime
 {
     internal IEventApiService Service { get; private set; } = null!;
     internal ILogService Log { get; } = new LogService();
-    private IContainer? _container;
-
-    private readonly ApiSetupModel _setup = new()
-    {
-        Url = "http://localhost:8000/api",
-        Username = "admin",
-        Password = "admin123",
-        Timeout = 30
-    };
 
     public async Task InitializeAsync()
     {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(Log, _setup, "EventIntTest"));
-        _container = builder.Build();
-        Service = _container.ResolveNamed<IEventApiService>("EventIntTest");
-        await Service.ExecuteAsync(CancellationToken.None);
+        // 라이브 환경이 없으면 모든 시험이 건너뛴다 — 픽스처도 네트워크에 닿지 않는다.
+        if (LiveApiTarget.ReadSkipReason is not null) return;
+
+        // 어셈블리 공용 로그인 세션에서 꺼낸다(초기화 · 로그인은 세션이 이미 했다).
+        Service = await LiveApiSession.ResolveAsync<IEventApiService>();
     }
 
-    public async Task DisposeAsync()
-    {
-        await Service.StopAsync(CancellationToken.None);
-        _container?.Dispose();
-    }
+    // 공용 세션은 어셈블리 내내 쓴다 — 여기서 서비스를 멈추거나 컨테이너를 버리지 않는다.
+    public Task DisposeAsync() => Task.CompletedTask;
 }
 
 [CollectionDefinition(nameof(EventApiCollection))]
@@ -65,6 +56,7 @@ public sealed class EventApiCollection : ICollectionFixture<EventApiFixture> { }
 #region - Detection Event Tests (E01~E03) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class DetectionEventApiTests
 {
     private readonly IEventApiService _svc;
@@ -76,7 +68,7 @@ public class DetectionEventApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E01_Detection_CRUD_Lifecycle()
     {
@@ -132,7 +124,7 @@ public class DetectionEventApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E02_Detection_GetList_DateFilter()
     {
@@ -146,7 +138,7 @@ public class DetectionEventApiTests
         _output.WriteLine($"Detection list count={resp.Data.Count}, pagination={resp.Pagination?.Total}");
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E03_Detection_NotFound()
     {
@@ -161,6 +153,7 @@ public class DetectionEventApiTests
 #region - Malfunction Event Tests (E04~E05) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class MalfunctionEventApiTests
 {
     private readonly IEventApiService _svc;
@@ -172,7 +165,7 @@ public class MalfunctionEventApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E04_Malfunction_CRUD_Lifecycle()
     {
@@ -236,7 +229,7 @@ public class MalfunctionEventApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E05_Malfunction_NotFound()
     {
@@ -251,6 +244,7 @@ public class MalfunctionEventApiTests
 #region - Connection Event Tests (E06~E07) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class ConnectionEventApiTests
 {
     private readonly IEventApiService _svc;
@@ -262,7 +256,7 @@ public class ConnectionEventApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E06_Connection_CRUD_Lifecycle()
     {
@@ -312,7 +306,7 @@ public class ConnectionEventApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E07_Connection_NotFound()
     {
@@ -327,6 +321,7 @@ public class ConnectionEventApiTests
 #region - Action Event Tests (E08~E09) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class ActionEventApiTests
 {
     private readonly IEventApiService _svc;
@@ -338,7 +333,7 @@ public class ActionEventApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E08_Action_CRUD_Lifecycle()
     {
@@ -418,7 +413,7 @@ public class ActionEventApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E09_Action_NotFound()
     {
@@ -433,6 +428,7 @@ public class ActionEventApiTests
 #region - Detection/Malfunction Action & Detection Log Tests (E10~E12) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class EventRelationApiTests
 {
     private readonly IEventApiService _svc;
@@ -444,7 +440,7 @@ public class EventRelationApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E10_Detection_GetAction()
     {
@@ -489,7 +485,7 @@ public class EventRelationApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E11_Malfunction_GetAction()
     {
@@ -539,7 +535,7 @@ public class EventRelationApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E12_DetectionLog_GetList()
     {
@@ -560,6 +556,7 @@ public class EventRelationApiTests
 #region - Event Mapping Tests (E13~E20) -
 
 [Collection(nameof(EventApiCollection))]
+[Trait("Scenario", "DEP-206")]
 public class EventMappingApiTests
 {
     private readonly IEventApiService _svc;
@@ -571,7 +568,7 @@ public class EventMappingApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E13_EventMapping_CRUD_Lifecycle()
     {
@@ -628,7 +625,7 @@ public class EventMappingApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E14_EventMapping_GetList()
     {
@@ -639,7 +636,7 @@ public class EventMappingApiTests
         _output.WriteLine($"EventMapping list count={resp.Data.Count}, total={resp.Pagination?.Total}");
     }
 
-    [Fact]
+    [LiveApiFact]
     [Trait("Category", "Integration")]
     public async Task E15_EventMapping_NotFound()
     {
@@ -648,7 +645,7 @@ public class EventMappingApiTests
         _output.WriteLine($"NotFound: {resp.Error?.Code} - {resp.Message}");
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E16_MappingCamera_CRUD_Lifecycle()
     {
@@ -699,7 +696,7 @@ public class EventMappingApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E17_MappingSpeaker_CRUD_Lifecycle()
     {
@@ -747,7 +744,7 @@ public class EventMappingApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E18_MappingLamp_CRUD_Lifecycle()
     {
@@ -799,7 +796,7 @@ public class EventMappingApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E19_EventMapping_WithAllDevices()
     {
@@ -864,7 +861,7 @@ public class EventMappingApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     [Trait("Category", "Integration")]
     public async Task E20_EventMapping_DeleteCascade()
     {

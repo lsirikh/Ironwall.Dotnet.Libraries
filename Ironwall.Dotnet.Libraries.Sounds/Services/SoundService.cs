@@ -41,6 +41,22 @@ internal class SoundService : TaskService, ISoundService
         _audioOutputMode = EnumAudioOutputMode.WaveOutEvent;
         _selectedAudioDevice = null;
     }
+
+    /// <summary>
+    /// 시험용 — 출력 장치와 파일 읽기기를 갈아 끼운다(소리를 내지 않고 재생 판정을 헤드리스로 본다).
+    /// <para>internal 이라 Autofac 은 이 생성자를 고르지 않는다(공개 생성자만 본다). <c>null</c> 이면 실제 NAudio 를 쓴다.</para>
+    /// </summary>
+    internal SoundService(ILogService log,
+                          SoundSetupModel setupModel,
+                          SoundSourceProvider soundProvider,
+                          AudioDeviceInfoProvider audioDeviceInfoProvider,
+                          Func<IWavePlayer>? outputDeviceFactory,
+                          Func<string, WaveStream>? audioReaderFactory)
+        : this(log, setupModel, soundProvider, audioDeviceInfoProvider)
+    {
+        _outputDeviceFactory = outputDeviceFactory;
+        _audioReaderFactory = audioReaderFactory;
+    }
     #endregion
     #region - Implementation of Interface -
     #endregion
@@ -671,16 +687,16 @@ internal class SoundService : TaskService, ISoundService
     private async Task PlaySoundAsync(ISoundModel soundModel, int duration, bool autoStop, CancellationToken token)
     {
         IWavePlayer? outputDevice = null;
-        AudioFileReader? audioFile = null;
+        WaveStream? audioFile = null;
         bool completedNormally = false;
 
         try
         {
             soundModel.IsPlaying = true;
 
-            // 선택된 설정에 따라 오디오 출력 장치 생성
-            outputDevice = CreateAudioOutputDevice();
-            audioFile = new AudioFileReader(soundModel.File);
+            // 선택된 설정에 따라 오디오 출력 장치 생성(시험용 교체 자리가 있으면 그것)
+            outputDevice = _outputDeviceFactory?.Invoke() ?? CreateAudioOutputDevice();
+            audioFile = _audioReaderFactory?.Invoke(soundModel.File) ?? new AudioFileReader(soundModel.File);
 
             // 현재 재생 중인 디바이스 저장 (중지용)
             lock (_currentDeviceLock)
@@ -774,7 +790,7 @@ internal class SoundService : TaskService, ISoundService
     /// <summary>
     /// 지정된 시간 동안 반복 재생
     /// </summary>
-    private async Task PlayWithAutoStopAsync(IWavePlayer outputDevice, AudioFileReader audioFile, int durationSeconds, CancellationToken token)
+    private async Task PlayWithAutoStopAsync(IWavePlayer outputDevice, WaveStream audioFile, int durationSeconds, CancellationToken token)
     {
         var endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
 
@@ -823,7 +839,7 @@ internal class SoundService : TaskService, ISoundService
     /// <summary>
     /// 취소될 때까지 무한 반복 재생
     /// </summary>
-    private async Task PlayContinuouslyAsync(IWavePlayer outputDevice, AudioFileReader audioFile, CancellationToken token)
+    private async Task PlayContinuouslyAsync(IWavePlayer outputDevice, WaveStream audioFile, CancellationToken token)
     {
         _log?.Info("Starting continuous playback (will loop until cancelled)");
 
@@ -869,7 +885,7 @@ internal class SoundService : TaskService, ISoundService
     /// <summary>
     /// 한 번만 재생
     /// </summary>
-    private async Task PlayOnceAsync(IWavePlayer outputDevice, AudioFileReader audioFile, CancellationToken token)
+    private async Task PlayOnceAsync(IWavePlayer outputDevice, WaveStream audioFile, CancellationToken token)
     {
         audioFile.Position = 0;
 
@@ -1024,7 +1040,11 @@ internal class SoundService : TaskService, ISoundService
     // 현재 재생 중인 NAudio 객체들
     private object _currentDeviceLock = new object();
     private IWavePlayer? _currentOutputDevice;
-    private AudioFileReader? _currentAudioFile;
+    private WaveStream? _currentAudioFile;
+
+    // 시험용 교체 자리(null = 실제 NAudio) — internal 생성자로만 채운다
+    private readonly Func<IWavePlayer>? _outputDeviceFactory;
+    private readonly Func<string, WaveStream>? _audioReaderFactory;
 
     // 오디오 장치 설정
     private IAudioDeviceInfo? _selectedAudioDevice;

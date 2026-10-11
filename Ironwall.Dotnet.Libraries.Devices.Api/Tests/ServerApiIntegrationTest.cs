@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
@@ -22,7 +23,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Tests;
 
    Description  : ServerCategory + ServerInstance + ServerMetrics + EnclosureMetrics 통합 테스트
                   xUnit IAsyncLifetime Fixture 패턴 사용
-                  GOP API 서버 (localhost:8000) 연동 필수
+                  라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
+                  + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+                  쓰기 시험은 loopback · 사설망 주소에서만 돈다
 ****************************************************************************/
 
 #region - Fixture & Collection -
@@ -32,33 +35,19 @@ public sealed class ServerApiFixture : IAsyncLifetime
     internal IServerApiService ServerService { get; private set; } = null!;
     internal IDeviceApiService DeviceService { get; private set; } = null!;
     internal ILogService Log { get; } = new LogService();
-    private IContainer? _container;
-
-    private readonly ApiSetupModel _setup = new()
-    {
-        Url = "http://localhost:8000/api",
-        Username = "admin",
-        Password = "admin123",
-        Timeout = 30
-    };
 
     public async Task InitializeAsync()
     {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(Log, _setup, "ServerIntTest"));
-        _container = builder.Build();
-        ServerService = _container.ResolveNamed<IServerApiService>("ServerIntTest");
-        DeviceService = _container.ResolveNamed<IDeviceApiService>("ServerIntTest");
-        await ServerService.ExecuteAsync(CancellationToken.None);
-        await DeviceService.ExecuteAsync(CancellationToken.None);
+        // 라이브 환경이 없으면 모든 시험이 건너뛴다 — 픽스처도 네트워크에 닿지 않는다.
+        if (LiveApiTarget.ReadSkipReason is not null) return;
+
+        // 어셈블리 공용 로그인 세션에서 꺼낸다(초기화 · 로그인은 세션이 이미 했다).
+        ServerService = await LiveApiSession.ResolveAsync<IServerApiService>();
+        DeviceService = await LiveApiSession.ResolveAsync<IDeviceApiService>();
     }
 
-    public async Task DisposeAsync()
-    {
-        await ServerService.StopAsync(CancellationToken.None);
-        await DeviceService.StopAsync(CancellationToken.None);
-        _container?.Dispose();
-    }
+    // 공용 세션은 어셈블리 내내 쓴다 — 여기서 서비스를 멈추거나 컨테이너를 버리지 않는다.
+    public Task DisposeAsync() => Task.CompletedTask;
 }
 
 [CollectionDefinition(nameof(ServerApiCollection))]
@@ -70,6 +59,7 @@ public sealed class ServerApiCollection : ICollectionFixture<ServerApiFixture> {
 
 [Collection(nameof(ServerApiCollection))]
 [Trait("Category", "Integration")]
+[Trait("Scenario", "DEP-202")]
 public class CategoryApiTests
 {
     private readonly IServerApiService _svc;
@@ -81,7 +71,7 @@ public class CategoryApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S01_Category_CRUD_Lifecycle()
     {
         // [1] CREATE — type_server는 서버 enum: ETC 사용
@@ -149,7 +139,7 @@ public class CategoryApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S02_GetCategories_Pagination()
     {
         var resp = await _svc.GetCategoriesAsync(page: 1, limit: 5);
@@ -159,7 +149,7 @@ public class CategoryApiTests
         Assert.True(resp.Pagination!.Total >= 0);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S03_GetCategory_NotFound()
     {
         var resp = await _svc.GetCategoryByIdAsync(999999);
@@ -174,6 +164,7 @@ public class CategoryApiTests
 
 [Collection(nameof(ServerApiCollection))]
 [Trait("Category", "Integration")]
+[Trait("Scenario", "DEP-202")]
 public class ServerInstanceApiTests
 {
     private readonly IServerApiService _svc;
@@ -185,7 +176,7 @@ public class ServerInstanceApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S04_Server_CRUD_Lifecycle()
     {
         // 선행: Category 생성 — type_server enum: MONITORING
@@ -266,7 +257,7 @@ public class ServerInstanceApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S05_GetServers_Pagination()
     {
         var resp = await _svc.GetServersAsync(page: 1, limit: 5);
@@ -275,7 +266,7 @@ public class ServerInstanceApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S06_GetServers_CategoryFilter()
     {
         // 기존 데이터에서 첫 번째 카테고리 찾기
@@ -292,7 +283,7 @@ public class ServerInstanceApiTests
         Assert.True(resp.Success);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S07_GetServers_StatusFilter()
     {
         var resp = await _svc.GetServersAsync(status: "NORMAL", page: 1, limit: 100);
@@ -300,7 +291,7 @@ public class ServerInstanceApiTests
         Assert.True(resp.Success);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task S08_GetServer_NotFound()
     {
         var resp = await _svc.GetServerByIdAsync(999999);
@@ -315,6 +306,7 @@ public class ServerInstanceApiTests
 
 [Collection(nameof(ServerApiCollection))]
 [Trait("Category", "Integration")]
+[Trait("Scenario", "DEP-202")]
 public class ServerMetricsApiTests
 {
     private readonly IServerApiService _svc;
@@ -326,7 +318,7 @@ public class ServerMetricsApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S09_ServerMetrics_Lifecycle()
     {
         // 선행: Category + Server 생성
@@ -396,7 +388,7 @@ public class ServerMetricsApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S10_GetServerMetrics_DateFilter()
     {
         // 선행: Category + Server + Metric 생성
@@ -451,7 +443,7 @@ public class ServerMetricsApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S11_ServerMetrics_EmptyHistory()
     {
         // 선행: Category + Server 생성 (메트릭 없음)
@@ -501,6 +493,7 @@ public class ServerMetricsApiTests
 
 [Collection(nameof(ServerApiCollection))]
 [Trait("Category", "Integration")]
+[Trait("Scenario", "DEP-202")]
 public class EnclosureMetricsApiTests
 {
     private readonly IDeviceApiService _deviceSvc;
@@ -512,7 +505,7 @@ public class EnclosureMetricsApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S12_EnclosureMetrics_Lifecycle()
     {
         // 선행: Enclosure 생성
@@ -564,7 +557,7 @@ public class EnclosureMetricsApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S13_GetEnclosureMetrics_TimeFilter()
     {
         // 선행: Enclosure + Metric 생성
@@ -602,7 +595,7 @@ public class EnclosureMetricsApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task S14_EnclosureMetrics_EmptyHistory()
     {
         // 선행: Enclosure 생성 (메트릭 없음)

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -23,7 +24,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Tests;
 
    Description  : 6종 디바이스 + CameraSetting + DeviceGroup CRUD 통합 테스트
                   xUnit IAsyncLifetime Fixture 패턴 사용
-                  GOP API 서버 (localhost:8000) 연동 필수
+                  라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
+                  + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+                  쓰기 시험은 loopback · 사설망 주소에서만 돈다
 ****************************************************************************/
 
 #region - Fixture & Collection -
@@ -32,30 +35,18 @@ public sealed class DeviceApiFixture : IAsyncLifetime
 {
     internal IDeviceApiService Service { get; private set; } = null!;
     internal ILogService Log { get; } = new LogService();
-    private IContainer? _container;
-
-    private readonly ApiSetupModel _setup = new()
-    {
-        Url = "http://localhost:8000/api",
-        Username = "admin",
-        Password = "admin123",
-        Timeout = 30
-    };
 
     public async Task InitializeAsync()
     {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(Log, _setup, "DeviceIntTest"));
-        _container = builder.Build();
-        Service = _container.ResolveNamed<IDeviceApiService>("DeviceIntTest");
-        await Service.ExecuteAsync(CancellationToken.None);
+        // 라이브 환경이 없으면 모든 시험이 건너뛴다 — 픽스처도 네트워크에 닿지 않는다.
+        if (LiveApiTarget.ReadSkipReason is not null) return;
+
+        // 어셈블리 공용 로그인 세션에서 꺼낸다(초기화 · 로그인은 세션이 이미 했다).
+        Service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
     }
 
-    public async Task DisposeAsync()
-    {
-        await Service.StopAsync(CancellationToken.None);
-        _container?.Dispose();
-    }
+    // 공용 세션은 어셈블리 내내 쓴다 — 여기서 서비스를 멈추거나 컨테이너를 버리지 않는다.
+    public Task DisposeAsync() => Task.CompletedTask;
 }
 
 [CollectionDefinition(nameof(DeviceApiCollection))]
@@ -66,6 +57,7 @@ public sealed class DeviceApiCollection : ICollectionFixture<DeviceApiFixture> {
 #region - Controller API Tests (D01~D05) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class ControllerApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -77,7 +69,7 @@ public class ControllerApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D01_Controller_CRUD_Lifecycle()
     {
         // [1] CREATE
@@ -148,7 +140,7 @@ public class ControllerApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D02_GetControllers_Pagination()
     {
         var resp = await _svc.GetControllersAsync(page: 1, limit: 5);
@@ -159,7 +151,7 @@ public class ControllerApiTests
         Assert.True(resp.Pagination.TotalPages >= 0);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D03_GetControllers_StatusFilter()
     {
         var resp = await _svc.GetControllersAsync(status: "ACTIVATED", page: 1, limit: 100);
@@ -171,7 +163,7 @@ public class ControllerApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D04_GetController_IncludeSensors()
     {
         // 기존 데이터에서 첫 번째 Controller 사용
@@ -190,7 +182,7 @@ public class ControllerApiTests
         // Sensors 리스트가 null이 아닌 것만 확인 (빈 배열 가능)
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D05_GetController_NotFound()
     {
         var resp = await _svc.GetControllerByIdAsync(999999);
@@ -204,6 +196,7 @@ public class ControllerApiTests
 #region - Sensor API Tests (D06~D10) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class SensorApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -215,7 +208,7 @@ public class SensorApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D06_Sensor_CRUD_Lifecycle()
     {
         // 선행: Controller 생성
@@ -283,7 +276,7 @@ public class SensorApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D07_GetSensors_Pagination()
     {
         var resp = await _svc.GetSensorsAsync(page: 1, limit: 5);
@@ -292,7 +285,7 @@ public class SensorApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D08_GetSensors_IncludeController()
     {
         var resp = await _svc.GetSensorsAsync(includeController: true, page: 1, limit: 1);
@@ -300,7 +293,7 @@ public class SensorApiTests
         Assert.True(resp.Success);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D09_GetSensors_TypeFilter()
     {
         var resp = await _svc.GetSensorsAsync(typeDevice: "Fence", page: 1, limit: 100);
@@ -312,7 +305,7 @@ public class SensorApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D10_GetSensor_NotFound()
     {
         var resp = await _svc.GetSensorByIdAsync(999999);
@@ -325,6 +318,7 @@ public class SensorApiTests
 #region - Camera API Tests (D11~D16) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class CameraApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -336,7 +330,7 @@ public class CameraApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D11_Camera_CRUD_Lifecycle()
     {
         // [1] CREATE
@@ -404,7 +398,7 @@ public class CameraApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D12_GetCameras_Pagination()
     {
         var resp = await _svc.GetCamerasAsync(page: 1, limit: 5);
@@ -412,7 +406,7 @@ public class CameraApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D13_GetCameras_ModeFilter()
     {
         var resp = await _svc.GetCamerasAsync(mode: "ONVIF", page: 1, limit: 100);
@@ -423,7 +417,7 @@ public class CameraApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D14_GetCameras_CategoryFilter()
     {
         var resp = await _svc.GetCamerasAsync(category: "PTZ", page: 1, limit: 100);
@@ -434,14 +428,14 @@ public class CameraApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D15_GetCamera_NotFound()
     {
         var resp = await _svc.GetCameraByIdAsync(999999);
         Assert.True(!resp.Success || resp.Data == null);
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D16_CameraSetting_GetAndPatch()
     {
         // 선행: Camera 생성
@@ -492,6 +486,7 @@ public class CameraApiTests
 #region - Speaker API Tests (D17~D20) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class SpeakerApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -503,7 +498,7 @@ public class SpeakerApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D17_Speaker_CRUD_Lifecycle()
     {
         var createDto = new SpeakerDeviceDto
@@ -552,7 +547,7 @@ public class SpeakerApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D18_GetSpeakers_Pagination()
     {
         var resp = await _svc.GetSpeakersAsync(page: 1, limit: 5);
@@ -560,7 +555,7 @@ public class SpeakerApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D19_GetSpeakers_TypeFilter()
     {
         var resp = await _svc.GetSpeakersAsync(speakerType: "NORMAL", page: 1, limit: 100);
@@ -571,7 +566,7 @@ public class SpeakerApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D20_GetSpeaker_NotFound()
     {
         var resp = await _svc.GetSpeakerByIdAsync(999999);
@@ -584,6 +579,7 @@ public class SpeakerApiTests
 #region - Enclosure API Tests (D21~D24) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class EnclosureApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -595,7 +591,7 @@ public class EnclosureApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D21_Enclosure_CRUD_Lifecycle()
     {
         var createDto = new EnclosureDeviceDto
@@ -655,7 +651,7 @@ public class EnclosureApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D22_GetEnclosures_Pagination()
     {
         var resp = await _svc.GetEnclosuresAsync(page: 1, limit: 5);
@@ -663,7 +659,7 @@ public class EnclosureApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D23_GetEnclosures_DoorStatusFilter()
     {
         var resp = await _svc.GetEnclosuresAsync(doorStatus: "CLOSED", page: 1, limit: 100);
@@ -674,7 +670,7 @@ public class EnclosureApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D24_GetEnclosure_NotFound()
     {
         var resp = await _svc.GetEnclosureByIdAsync(999999);
@@ -687,6 +683,7 @@ public class EnclosureApiTests
 #region - Lamp API Tests (D25~D27) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class LampApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -698,7 +695,7 @@ public class LampApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D25_Lamp_CRUD_Lifecycle()
     {
         var createDto = new LampDeviceDto
@@ -759,7 +756,7 @@ public class LampApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D26_GetLamps_Pagination()
     {
         var resp = await _svc.GetLampsAsync(page: 1, limit: 5);
@@ -767,7 +764,7 @@ public class LampApiTests
         Assert.NotNull(resp.Pagination);
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D27_GetLamp_NotFound()
     {
         var resp = await _svc.GetLampByIdAsync(999999);
@@ -781,6 +778,7 @@ public class LampApiTests
 
 [Collection(nameof(DeviceApiCollection))]
 [Trait("Category", "Integration")]
+[Trait("Scenario", "DEP-201")]
 public class DeviceGroupApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -792,7 +790,7 @@ public class DeviceGroupApiTests
         _output = output;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D28_DeviceGroup_CRUD_Lifecycle()
     {
         // [1] CREATE
@@ -853,7 +851,7 @@ public class DeviceGroupApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D29_GetDeviceGroups_Pagination()
     {
         var resp = await _svc.GetDeviceGroupsAsync(page: 1, limit: 5);
@@ -863,7 +861,7 @@ public class DeviceGroupApiTests
         Assert.True(resp.Pagination!.Total >= 0);
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D30_GetDeviceGroups_NameFilter()
     {
         // 선행: 그룹 생성 후 이름 검색
@@ -889,7 +887,7 @@ public class DeviceGroupApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D31_DeviceGroup_AssignAndRemove()
     {
         // 선행: Controller + DeviceGroup 생성
@@ -944,7 +942,7 @@ public class DeviceGroupApiTests
         }
     }
 
-    [Fact]
+    [LiveApiFact]
     public async Task D32_GetDeviceGroup_NotFound()
     {
         var resp = await _svc.GetDeviceGroupByIdAsync(999999);
@@ -958,6 +956,7 @@ public class DeviceGroupApiTests
 #region - Camera Preset / ROI / Point API Tests (D33~D42) -
 
 [Collection(nameof(DeviceApiCollection))]
+[Trait("Scenario", "DEP-201")]
 public class PresetRoiPointApiTests
 {
     private readonly IDeviceApiService _svc;
@@ -993,7 +992,7 @@ public class PresetRoiPointApiTests
         return resp.Data!.Id;
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D33_Preset_CRUD_Lifecycle()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1054,7 +1053,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D34_GetPresets_IncludeRois()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1088,7 +1087,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D35_GetPreset_NotFound()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1104,7 +1103,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D36_ROI_CRUD_Lifecycle()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1186,7 +1185,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D37_GetRois_IncludePoints()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1232,7 +1231,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D38_GetRoi_NotFound()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1258,7 +1257,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D39_Point_CRUD_Lifecycle()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1325,7 +1324,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D40_Point_MinimumValidation()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1363,7 +1362,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D41_FullHierarchy_CreateAndDelete()
     {
         var cameraId = await CreateTestCameraAsync();
@@ -1423,7 +1422,7 @@ public class PresetRoiPointApiTests
         }
     }
 
-    [Fact]
+    [LiveApiWriteFact]
     public async Task D42_CameraSetting_PUT()
     {
         var cameraId = await CreateTestCameraAsync();

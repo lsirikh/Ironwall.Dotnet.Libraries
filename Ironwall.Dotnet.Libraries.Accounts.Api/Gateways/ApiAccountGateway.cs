@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Newtonsoft.Json;
@@ -49,6 +50,13 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
             //   연결실패 로컬 에러(Details 세터) → JValue(string). ?.는 C# null만 거르므로 JValue["key"]가
             //   "Cannot access child value on JValue"로 크래시해 FailMessage의 정상 문구를 가로챘다(2026-07-31 실측).
             var d = res.Error?.DetailsToken as JObject;
+
+            // 서버에 닿지 못한 실패(인증서 신뢰 · 연결 거부 · 시간 초과 · 이름 해석)는 세부 사유 코드를 그대로 넘긴다 —
+            // 로그인 화면이 "서버에 연결할 수 없습니다" 한 줄 대신 원인과 다음 행동(인증서를 신뢰 저장소에 넣기 등)을 보인다.
+            var transport = res.Error?.DetailsErrorCode;
+            if (ApiTransportFailure.IsTransportCode(transport))
+                return AuthOutcome.Fail(transport!, res.Error?.Message);
+
             return AuthOutcome.Fail(
                 res.Error?.Code ?? "UNAUTHORIZED",
                 res.Error?.Message,

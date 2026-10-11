@@ -22,4 +22,9 @@
   	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
   	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
   </ItemGroup>
+
+  <!-- 라이브 API 통합 시험 공용 도우미(주소 · 전용 계정 · 원격 쓰기 안전 문 · 동적 건너뜀) — Devices.Api 와 같은 원본을 링크한다. -->
+  <ItemGroup>
+    <Compile Include="..\tests\Shared\LiveApi\*.cs" Link="Tests\LiveApi\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
