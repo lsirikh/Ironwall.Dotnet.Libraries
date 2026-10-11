@@ -333,9 +333,14 @@ public static class MapSettingsHelper
             var json = await ReadSettingsFileAsync();
             var jObject = JsonConvert.DeserializeObject<JObject>(json) ?? new JObject();
 
-            // AppSettings 섹션 확인/생성
-            var appSettingsSection = jObject[APP_SETTINGS_SECTION] as JObject ?? new JObject();
-            jObject[APP_SETTINGS_SECTION] = appSettingsSection;
+            // AppSettings 섹션 확인/생성 — 없을 때만 새로 만들어 넣는다(SaveSettingAsync 와 같은 방식).
+            //   결함 NAV-D1(MAP-040): 예전엔 이미 있는 절을 그 키에 다시 대입했고, Json.NET 은 부모가 있는 토큰을 대입하면
+            //   복제본을 넣으므로 아래 쓰기가 떨어져 나간 원본에만 들어가 MapName 등이 파일에 남지 않았다(재시작하면 이전 지도).
+            if (jObject[APP_SETTINGS_SECTION] is not JObject appSettingsSection)
+            {
+                appSettingsSection = new JObject();
+                jObject[APP_SETTINGS_SECTION] = appSettingsSection;
+            }
 
             // 설정 객체의 모든 속성 저장
             var settingsObject = JObject.FromObject(settings);
