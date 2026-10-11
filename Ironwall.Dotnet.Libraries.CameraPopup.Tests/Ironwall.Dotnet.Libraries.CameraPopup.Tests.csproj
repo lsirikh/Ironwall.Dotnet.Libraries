@@ -35,6 +35,9 @@
     <!-- 호스트 exe 는 빌드 순서만 보장(어셈블리 참조 안 함 — 시험 프로세스에 LibVLC 가 들어오지 않게). -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Host\Ironwall.Dotnet.Libraries.CameraPopup.Host.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <!-- 지도 쪽 카메라 팝업(지도 더블클릭 · 오버레이 팝업 VM · 지시선 · 호스트 안내 · 브로커 토스트) 헤드리스 시나리오 시험(MAP-183~187).
+         GMaps.Ui 는 LibVLC · ONVIF 를 참조하지 않는다 — 시험 프로세스에 LibVLC 가 들어오지 않는다. 창 · 지도 DB · 서버 없음(가짜만). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Ui\Ironwall.Dotnet.Libraries.GMaps.Ui.csproj" />
   </ItemGroup>
 
 </Project>
