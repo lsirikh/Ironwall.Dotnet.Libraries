@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Dapper;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Gateway.Models;
@@ -136,6 +136,14 @@ public sealed class GatewayDbFixture : IAsyncLifetime
         await dbConn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
+    /// <summary>시드 상태로 되돌린다 — 같은 묶음의 삽입 · 수정 · 삭제 시험이 먼저 돌면 시드 개수를 세는 시험이 순서에 따라 깨졌다(01 · 08).</summary>
+    internal async Task ResetToSeedAsync()
+    {
+        await DropTablesAsync();
+        await Svc.BuildSchemeAsync(Cts.Token);
+        await SeedAsync();
+    }
+
     internal string BuildConnStr() => Svc.BuildConnStr();
 }
 
@@ -147,10 +155,14 @@ public sealed class GatewayEventCollection : ICollectionFixture<GatewayDbFixture
 /// GatewayDbService 통합 테스트
 /// </summary>
 [Collection(nameof(GatewayEventCollection))]
-public class GatewayDb_BasicTests
+public class GatewayDb_BasicTests : IAsyncLifetime   // ← 라이프사이클 메서드에 [Fact] 금지
 {
     private readonly GatewayDbFixture _fx;
     public GatewayDb_BasicTests(GatewayDbFixture fx) => _fx = fx;
+
+    /// <summary>시험마다 시드 상태에서 시작 — 삽입 · 수정 · 삭제 시험과 시드 개수를 세는 시험(01 · 02 · 08)이 순서에 따라 서로 깼다.</summary>
+    public Task InitializeAsync() => _fx.ResetToSeedAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     // ──────────────────────────────────────────────────────────────
     [Fact(DisplayName = "01. 시드 데이터 개수 확인")]
