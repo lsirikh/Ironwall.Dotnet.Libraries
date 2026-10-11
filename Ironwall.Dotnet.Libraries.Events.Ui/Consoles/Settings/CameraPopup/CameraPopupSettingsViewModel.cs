@@ -165,8 +165,19 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     public bool IsDirty => DirtyCount > 0;
 
     /// <summary>글자로 넣는 칸 중 어긴 것이 있는가(있으면 [저장]이 꺼진다).</summary>
-    public bool HasError => !string.IsNullOrEmpty(_autoCloseError) || !string.IsNullOrEmpty(_stepError)
-                          || !string.IsNullOrEmpty(_timerError) || !string.IsNullOrEmpty(_brokerTimeoutError);
+    /// <remarks>
+    /// 꺼진 상자 안 칸(자동 닫기 [사용] · 타이머로 닫기를 끈 때의 초 칸)은 뷰에서 꺼지고 저장될 값도 아니라 판정에서 뺀다 —
+    /// 친 글은 그대로 두었다가 상자를 다시 켜면 다시 검사한다(호스트 보고 R6 · SET-020 · SET-025).
+    /// 상자가 없는 칸(다음 창 간격 · 응답 기다림)은 늘 저장 대상이라 그대로 막는다.
+    /// </remarks>
+    public bool HasError => !string.IsNullOrEmpty(ActiveAutoCloseError) || !string.IsNullOrEmpty(_stepError)
+                          || !string.IsNullOrEmpty(ActiveTimerError) || !string.IsNullOrEmpty(_brokerTimeoutError);
+
+    /// <summary>자동 닫기 초 칸 오류 — 상자가 꺼졌으면 없음(친 글 · 오류는 남겨 둔다).</summary>
+    private string ActiveAutoCloseError => _draft.DoubleClickAutoClose ? _autoCloseError : string.Empty;
+
+    /// <summary>타이머 초 칸 오류 — 상자가 꺼졌으면 없음(친 글 · 오류는 남겨 둔다).</summary>
+    private string ActiveTimerError => _draft.CloseByTimer ? _timerError : string.Empty;
 
     /// <summary>지금 초안(정규화 전).</summary>
     public CameraPopupSettings Draft => _draft;
@@ -197,7 +208,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
 
         _saved = after;
         _draft = after;
-        ResetTexts();
+        ResetTexts(keepSwitchedOff: true);
         SyncAll();
         return new CameraPopupApplyResult(true, false);
     }
@@ -221,7 +232,7 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
         if (!wasDirty)
         {
             _draft = _saved;
-            ResetTexts();
+            ResetTexts(keepSwitchedOff: true);
         }
         RefreshMonitors();
         SyncAll();
@@ -285,8 +296,8 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
                           n => _draft with { DoubleClickAutoCloseSeconds = n });
     }
 
-    public string DoubleClickAutoCloseSecondsError => _autoCloseError;
-    public bool HasDoubleClickAutoCloseSecondsError => !string.IsNullOrEmpty(_autoCloseError);
+    public string DoubleClickAutoCloseSecondsError => ActiveAutoCloseError;
+    public bool HasDoubleClickAutoCloseSecondsError => !string.IsNullOrEmpty(ActiveAutoCloseError);
     #endregion
 
     #region - 탐지 팝업(이벤트 창) -
@@ -438,7 +449,21 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
     /// <summary>미리보기 모서리 표지 — 계단 방향 · 간격.</summary>
     public string CascadeCaption => _draft.CascadeStepPx <= 0
         ? "간격 0 — 모든 창이 한 자리"
-        : string.Create(CultureInfo.InvariantCulture, $"↘ 다음 창 +{_draft.CascadeStepPx} px");
+        : "↘ " + CascadeCaptionText;
+
+    /// <summary>
+    /// 미리보기 모서리 표지의 글 — 화살표를 뺀 것. 화살표는 뷰가 벡터 아이콘으로 그린다(<see cref="ShowCascadeArrow"/>).
+    /// </summary>
+    /// <remarks>
+    /// '↘' 글리프는 기본 라틴 글꼴에 없어 대체 글꼴을 언어(xml:lang)에 따라 고르므로 폭이 문화권마다 달랐다(10.5pt 실측 en-US 7.7 · ko-KR 10.0 DIU) —
+    /// 칸(78)이 글(80.6)보다 좁게 잡혀 잘렸다(호스트 보고 R2 · SET-058). 글자에서 빼면 폭이 문화권 · 배율과 무관하다.
+    /// </remarks>
+    public string CascadeCaptionText => _draft.CascadeStepPx <= 0
+        ? "간격 0 — 모든 창이 한 자리"
+        : string.Create(CultureInfo.InvariantCulture, $"다음 창 +{_draft.CascadeStepPx} px");
+
+    /// <summary>계단 방향 화살표를 그리는가 — 간격 0 이면 모든 창이 한 자리라 방향이 없다.</summary>
+    public bool ShowCascadeArrow => _draft.CascadeStepPx > 0;
 
     public int FirstWindowX => _draft.FirstWindowX;
     public int FirstWindowY => _draft.FirstWindowY;
@@ -585,8 +610,8 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
                           n => _draft with { CloseTimerSeconds = n });
     }
 
-    public string CloseTimerSecondsError => _timerError;
-    public bool HasCloseTimerSecondsError => !string.IsNullOrEmpty(_timerError);
+    public string CloseTimerSecondsError => ActiveTimerError;
+    public bool HasCloseTimerSecondsError => !string.IsNullOrEmpty(ActiveTimerError);
 
     public bool ReturnHomePresetOnClose
     {
@@ -719,9 +744,9 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
         => TrackedFields.Any(f => f.Group == group && !Equals(f.Get(_draft), f.Get(_saved)))
         || group switch
         {
-            GroupDoubleClick => !string.IsNullOrEmpty(_autoCloseError),
+            GroupDoubleClick => !string.IsNullOrEmpty(ActiveAutoCloseError),
             GroupWindow => !string.IsNullOrEmpty(_stepError),
-            GroupClose => !string.IsNullOrEmpty(_timerError),
+            GroupClose => !string.IsNullOrEmpty(ActiveTimerError),
             GroupBrokerTimeout => !string.IsNullOrEmpty(_brokerTimeoutError),
             _ => false,
         };
@@ -768,13 +793,28 @@ public sealed class CameraPopupSettingsViewModel : CameraPopupObservable
         SyncAll();
     }
 
-    private void ResetTexts()
+    /// <summary>
+    /// 글 칸을 초안 값으로 다시 쓴다. <paramref name="keepSwitchedOff"/> 면 꺼진 상자 안 칸에 친 틀린 글은 남긴다 —
+    /// 저장 · 다시 읽기를 거쳐도 상자를 다시 켜면 그 글을 다시 검사한다(R6). [되돌리기]는 모두 버린다.
+    /// </summary>
+    private void ResetTexts(bool keepSwitchedOff = false)
     {
-        _autoCloseText = _draft.DoubleClickAutoCloseSeconds.ToString(CultureInfo.InvariantCulture);
+        var keepAutoClose = keepSwitchedOff && !_draft.DoubleClickAutoClose && !string.IsNullOrEmpty(_autoCloseError);
+        var keepTimer = keepSwitchedOff && !_draft.CloseByTimer && !string.IsNullOrEmpty(_timerError);
+
+        if (!keepAutoClose)
+        {
+            _autoCloseText = _draft.DoubleClickAutoCloseSeconds.ToString(CultureInfo.InvariantCulture);
+            _autoCloseError = string.Empty;
+        }
+        if (!keepTimer)
+        {
+            _timerText = _draft.CloseTimerSeconds.ToString(CultureInfo.InvariantCulture);
+            _timerError = string.Empty;
+        }
         _stepText = _draft.CascadeStepPx.ToString(CultureInfo.InvariantCulture);
-        _timerText = _draft.CloseTimerSeconds.ToString(CultureInfo.InvariantCulture);
         _brokerTimeoutText = _draft.BrokerResponseTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
-        _autoCloseError = _stepError = _timerError = _brokerTimeoutError = string.Empty;
+        _stepError = _brokerTimeoutError = string.Empty;
         _placementNotice = string.Empty;
     }
 
