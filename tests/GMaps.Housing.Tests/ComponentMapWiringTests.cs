@@ -229,6 +229,7 @@ public class ComponentMapWiringTests
 
     // ── 조립 카드 수명(누름 · 뗌) ──
 
+    [Trait("Scenario", "MAP-150")]
     [Fact]
     public void should_run_card_lifecycle_on_release_without_stealing_pan() => HousingTests.Sta(() =>
     {
