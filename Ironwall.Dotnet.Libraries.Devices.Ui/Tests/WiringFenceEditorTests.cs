@@ -94,6 +94,7 @@ public class WiringFenceEditorTests
 
     #region - Panels (FR-03 · FR-04 · PRD §5) -
     [Fact]
+    [Trait("Scenario", "WIR-108")]
     public void should_apply_only_touched_fields_and_undo_in_one_step_when_a_keyboard_selected_panel_range_is_edited()
     {
         // Arrange
@@ -122,6 +123,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-108")]
     public void should_show_many_values_and_refuse_an_out_of_range_height_when_panels_differ()
     {
         var (vm, _, _, _) = Build("SSSS");
@@ -378,6 +380,7 @@ public class WiringFenceEditorTests
 
     #region - Concept · selection (FR-12 · FR-13 · FR-15) -
     [Fact]
+    [Trait("Scenario", "WIR-226")]
     public void should_share_one_selection_when_fence_table_or_concept_selects()
     {
         var (vm, _, _, _) = Build("SSSS");
@@ -393,6 +396,7 @@ public class WiringFenceEditorTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-211")]
     public void should_move_the_fence_seat_along_when_a_sensor_is_reordered_in_the_concept_diagram()
     {
         var (vm, _, _, _) = Build("SSSS");

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Helpers;
@@ -364,6 +365,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
             state = _eventQueueManager.GetGroupState(groupId);
             SetGroupCompositeStatus(groupId, state);   // 직접 세팅 — 재계산값 그대로(미등록이면 SetGroupCompositeStatus가 경고)
         }
+        if (PerfTrace.IsEnabled && _groupSymbolLookup.ContainsKey(groupId)) MarkSymbolState($"group:{groupId}", state, "refresh");
         _log?.Info($"그룹 심볼 재계산 복원: DeviceGroup({groupId}) → {state}");
     }
 
@@ -378,6 +380,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
             state = _eventQueueManager.GetDeviceState(deviceId, deviceType);
             lookup.ApplyCompositeStatus(state);
         }
+        if (PerfTrace.IsEnabled) MarkSymbolState($"device:{deviceType}:{deviceId}", state, "refresh");
         _log?.Info($"개별 심볼 재계산: Device({deviceId},{deviceType}) → {state}");
     }
 
@@ -401,6 +404,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
             if (_eventQueueManager != null) applied = _eventQueueManager.GetDeviceState(deviceId, deviceType);
             deviceLookup.ApplyCompositeStatus(applied);
         }
+        if (PerfTrace.IsEnabled) MarkSymbolState($"device:{deviceType}:{deviceId}", applied, "transition");
         _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}" + (applied != next ? $" (큐 재확인 → {applied})" : ""));
     }
 
@@ -446,7 +450,16 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable
             if (_eventQueueManager != null) next = _eventQueueManager.GetGroupState(groupId);
             ApplyGroupTransition(groupId, next);
         }
+        if (PerfTrace.IsEnabled && _groupSymbolLookup.ContainsKey(groupId)) MarkSymbolState($"group:{groupId}", next, "transition");
     }
+
+    /// <summary>
+    /// 계측(PERF-002 · 005 · 006) — 심볼에 상태를 칠한 시각. 큐(EQM)가 전이 발화 동안 세운 이벤트 문맥(종류 + 서버 번호)으로 찍고,
+    /// 문맥이 없으면(재칠 · SYNC_DEVICE) 대상 자체를 id 로 찍는다(kind=device — 분석기는 이벤트로 세지 않는다).
+    /// </summary>
+    private static void MarkSymbolState(string target, EnumCompositeEventStatus state, string via)
+        => PerfTrace.MarkInContext(PerfStages.SymbolState, PerfKinds.Device, target,
+                                   PerfTrace.Extra(("target", target), ("state", state.ToString()), ("via", via)));
 
     private void ApplyGroupTransition(int groupId, EnumCompositeEventStatus next)
     {

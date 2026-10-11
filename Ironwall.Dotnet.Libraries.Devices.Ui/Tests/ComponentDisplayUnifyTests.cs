@@ -64,6 +64,7 @@ public class ComponentDisplayUnifyTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-213")]
     public void should_draw_status_table_with_summary_and_korean_when_one_device_is_selected()
     {
         var form = Load(LampWithParts(11));
@@ -84,6 +85,7 @@ public class ComponentDisplayUnifyTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "ASM-212")]
     public void should_switch_between_declared_and_fault_first_when_sort_button_is_toggled()
     {
         var table = Load(LampWithParts(11)).Sections.Single(s => s.Section == DevicePropertySection.DeviceStatus).StatusTable!;

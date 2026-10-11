@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 using Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using ContractRect = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages.PixelRect;
 using ScreenRect = Ironwall.Dotnet.Libraries.Streaming.Base.CameraPopup.PixelRect;
 
@@ -144,6 +145,10 @@ public sealed class EventWindowManager : IEventWindowManager, IDisposable
 
             _host.OpenEventWindow(BuildMessage(request, settings, area, rect));
             reserved = null;
+            // 계측(PERF-003): 호스트로 열기 명령을 넘긴 시각(감시자 대기열 → 파이프)
+            if (PerfTrace.IsEnabled)
+                PerfTrace.Mark(PerfStages.PopupOpenSent, PerfKindOf(request.Kind), request.EventId,
+                               PerfTrace.Extra(("key", key), ("cameras", request.Cameras.Count)));
             ReportPlacement(area);
             return EventWindowOpenResult.Opened;
         }
@@ -320,6 +325,9 @@ public sealed class EventWindowManager : IEventWindowManager, IDisposable
             Title = request.Title,
         };
     }
+
+    /// <summary>계측 종류 이름 — 카드 · 조치보고와 같은 "detection" · "malfunction".</summary>
+    internal static string PerfKindOf(EventWindowKind kind) => kind == EventWindowKind.Malfunction ? PerfKinds.Malfunction : PerfKinds.Detection;
 
     private static ContractRect ToContract(ScreenRect r) => new() { X = r.X, Y = r.Y, Width = r.Width, Height = r.Height };
 

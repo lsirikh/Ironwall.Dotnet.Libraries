@@ -25,6 +25,8 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.CameraPopup.Contracts\Ironwall.Dotnet.Libraries.CameraPopup.Contracts.csproj" />
     <!-- T-04/T-06: 이벤트 창 관리자가 설정 모델 · 모니터 조회 · 계단 배치 순수 함수(Streaming.Base/CameraPopup, WPF 무관)를 쓴다 -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
+    <!-- 이벤트 경로 계측(PerfTrace, 카탈로그 PERF-003 · 004 · 012): 창 명령 보냄 · 호스트 열림 · 첫 영상 · 호스트 하트비트를 GIS jsonl 에 남긴다 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
   </ItemGroup>
 
 </Project>

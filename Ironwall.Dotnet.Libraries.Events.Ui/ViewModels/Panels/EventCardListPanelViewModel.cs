@@ -17,6 +17,7 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
+using Ironwall.Dotnet.Libraries.Utils.Perf;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
@@ -156,6 +157,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (!accepted)
             {
                 _log?.Warning($"[EnqueueCard] 배치 버퍼 포화 — 카드 폐기: {card.GetType().Name}");
+                MarkCard(PerfStages.CardDropped, card, "buffer_full");
                 card.Dispose();
             }
         }
@@ -210,6 +212,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 _cardByEntryId[entryId] = card;
                 _log?.Info($"EntryId 지연 매칭: Card({key.Kind} {key.EventId}) → Entry({entryId})");
             }
+        }
+
+        /// <summary>계측 — 카드 단계 한 줄(종류 + 서버 번호). 탐지 · 장애 카드가 아니면 찍지 않는다.</summary>
+        private static void MarkCard(string stage, EventCardBaseViewModel card, string? where)
+        {
+            if (!PerfTrace.IsEnabled || KeyOf(card) is not { } key) return;
+            PerfTrace.Mark(stage, key.Kind, key.EventId, where is null ? null : PerfTrace.Extra(("where", where)));
         }
 
         /// <summary>카드의 열쇠(종류 + 서버 번호). 탐지 · 장애 카드가 아니거나 번호가 없으면 <c>null</c>.</summary>
@@ -328,6 +337,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     if (WasClosed(card))
                     {
                         _log?.Info($"[EnqueueCard] 이미 조치된 이벤트라 올리지 않음: {KeyOf(card)}");
+                        MarkCard(PerfStages.DedupSkipped, card, "card_already_reported");
                         card.Dispose();
                         continue;
                     }
@@ -350,6 +360,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         if (WasClosed(card))
                         {
                             _log?.Info($"[EnqueueCard] 삽입 직전 이미 조치된 이벤트라 올리지 않음: {KeyOf(card)}");
+                            MarkCard(PerfStages.DedupSkipped, card, "card_already_reported");
                             card.Dispose();
                             continue;
                         }
@@ -359,6 +370,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             && (FindCard(key.Kind, key.EventId) is not null || inserted.Any(c => KeyOf(c) == key)))
                         {
                             _log?.Info($"[EnqueueCard] 같은 이벤트 카드가 이미 있어 올리지 않음(재전송): {key}");
+                            MarkCard(PerfStages.DedupSkipped, card, "card_duplicate");
                             card.Dispose();
                             continue;
                         }
@@ -373,6 +385,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         // 최신이 맨 위 — 종전엔 맨 아래에 붙고 스크롤이 따라가지 않아 새 이벤트가 화면 밖에 떴다(WP-1 ⑲).
                         foreach (var card in inserted)
                             ViewModelProvider.Insert(0, card);
+                        // 계측(PERF-001 · 014): UI 컬렉션에 들어간 시각(UI 스레드) — 넣은 순서대로
+                        if (PerfTrace.IsEnabled)
+                            foreach (var card in inserted) MarkCard(PerfStages.CardAdded, card, null);
                     }
                     finally
                     {
@@ -865,7 +880,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// <param name="eventType">원본 유형(<c>from_event.type_event</c>) — 큐 엔트리를 찾는 열쇠. 모르면 종류의 기본 유형.</param>
         /// <param name="device">원본 장비(DeviceProvider 에서 찾은 것) — 엔트리가 없을 때 심볼을 다시 계산할 대상. 없으면 생략.</param>
         public RemoteActionReportOutcome CloseByRemoteActionReport(string? kind, int eventId, EnumEventType? eventType = null, IBaseDeviceModel? device = null)
-            => CloseRemotely(kind, eventId, eventType, device, deletedOnServer: false);
+        {
+            // 계측(PERF-006): ACTION_REPORT NATS 는 호스트 라우터가 받아 여기로 넘긴다 — 라이브러리에서 가장 이른 지점.
+            if (PerfTrace.IsEnabled)
+                PerfTrace.Mark(PerfStages.NatsReceived, kind ?? (eventType is { } t ? EventCardKind.Of(t) : PerfKinds.Detection), eventId,
+                               PerfTrace.Extra(("cmd", "ACTION_REPORT"), ("device", device?.Id)));
+            return CloseRemotely(kind, eventId, eventType, device, deletedOnServer: false);
+        }
 
         /// <summary>
         /// SYNC_DETECTION{DELETED} — 서버에서 지워진 탐지를 원격 조치보고와 같은 길로 닫는다(카드 · 큐 엔트리 → 신호등 건수 감소,

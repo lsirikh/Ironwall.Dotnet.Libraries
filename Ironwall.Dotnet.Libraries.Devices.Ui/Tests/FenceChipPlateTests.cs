@@ -56,6 +56,7 @@ public class FenceChipPlateTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-118")]
     public void should_flip_the_plate_above_the_body_when_below_would_go_under_the_ground()
     {
         // 땅 바로 위(낮은 자리)의 스마트 — 아래에 두면 땅 밑으로 빠진다
@@ -68,6 +69,7 @@ public class FenceChipPlateTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-118")]
     public void should_put_the_plate_above_the_body_when_asked_so_it_cannot_reach_a_razor_coil_below()
     {
         var chip = FenceScene.Sensor(Sensor(EnumDeviceType.SmartSensor2), WiringShape.Ring, FenceProjector.Tilt, false, 1, lift: 120, plateAbove: true);

@@ -1427,13 +1427,14 @@
 						</Border>
 						<ScrollViewer
 							AutomationProperties.AutomationId="Devices.Wiring.TableView"
-							HorizontalScrollBarVisibility="Disabled"
+							HorizontalScrollBarVisibility="Auto"
 							Style="{StaticResource Console.ScrollViewer}"
 							VerticalScrollBarVisibility="Auto"
 							Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}">
 							<!--
 								표 보기(표 보기 정리 · 2026-09-30) — 링처럼 읽히게: 위에 제어기 머리(이름 · 주소 · 종류 · 포트 A/B · 리턴케이블 · 체인 길이/기준),
-								아래에 체인 표(열 고정 · 줄 높이 38 · 함체 자리에 "A 쪽 ← 함체 → B 쪽" 띠). 가로 스크롤 없음(1280 기준).
+								아래에 체인 표(열 고정 · 줄 높이 38 · 함체 자리에 "A 쪽 ← 함체 → B 쪽" 띠). 1280 이상이면 가로 스크롤이 생기지 않는다.
+								좁은 창(최소 460 · 속성 칸 펼침 1000 등)에서는 고정 열 합(~800px)이 보이는 폭을 넘는다 — 가로 스크롤(Auto)로 오른쪽 열(상태 · 빼기)에 닿게 한다(D5 · WIR-608).
 							-->
 							<StackPanel Margin="12,0,12,12">
 								<!--  제어기 머리  -->

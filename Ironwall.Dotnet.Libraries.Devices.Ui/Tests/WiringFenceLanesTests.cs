@@ -89,6 +89,7 @@ public class WiringFenceLanesTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-215")]
     public void should_reorder_within_the_lane_when_a_concept_chip_steps_right_with_alt_arrow()
     {
         var (vm, _) = Build();
@@ -101,6 +102,7 @@ public class WiringFenceLanesTests
     }
 
     [Fact]
+    [Trait("Scenario", "WIR-212")]
     public void should_put_a_dropped_sensor_between_the_upper_lane_neighbours_when_dragged_across_lanes()
     {
         // Arrange — 103 · 104 를 위 줄로 올려 두고
@@ -222,6 +224,7 @@ public class WiringFenceLanesTests
     [Theory]
     [InlineData(NumberBandSet.PRESET_TIER4)]
     [InlineData(NumberBandSet.PRESET_TIER3)]
+    [Trait("Scenario", "WIR-207")]
     public void should_say_how_many_fence_sensors_moved_into_the_coil_when_a_band_is_first_chosen_on_razor_panels(string preset)
     {
         // Arrange — 윤형 망(보드에 바로 — 망 모양 단추의 따라 붙이기 없이) · 펜스센서 3대는 아직 아래 줄 망 가운데
