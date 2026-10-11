@@ -112,7 +112,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         _catalog.CatalogChanged -= OnCatalogChanged;
         if (close)
         {
-            foreach (var item in _itemsBySlot.Values) item.Detach();
+            foreach (var item in _itemsBySlot.Values) DetachItem(item);
             _itemsBySlot.Clear();
         }
         return base.OnDeactivateAsync(close, cancellationToken);
@@ -156,7 +156,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             var overrides = _board.ToOverrides();
             _board.Changed -= OnBoardChanged;
             _board.Slots.CollectionChanged -= OnSlotsChanged;
-            foreach (var item in _itemsBySlot.Values) item.Detach();
+            foreach (var item in _itemsBySlot.Values) DetachItem(item);
             _itemsBySlot.Clear();
             _board = NewBoard(value);
             if (definitions.Count > 0) _board.ReplaceAll(definitions, overrides);
@@ -229,8 +229,9 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
             var info = _catalog.Find(slot.TypeCode);
             if (!_itemsBySlot.TryGetValue(slot, out var item) || !ReferenceEquals(item.Info, info))
             {
-                item?.Detach();      // 카탈로그가 다시 읽혀 유형 정보가 바뀌었다 — 항목을 새로 만든다
+                if (item is not null) DetachItem(item);      // 카탈로그가 다시 읽혀 유형 정보가 바뀌었다 — 항목을 새로 만든다
                 item = new BoardSlotViewModel(slot, info);
+                item.PropertyChanged += OnItemPropertyChanged;
                 _itemsBySlot[slot] = item;
             }
             wanted.Add(item);
@@ -256,6 +257,24 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         if (_inspected is not null && !BoardItems.Contains(_inspected)) Inspect(null);
         NotifyOfPropertyChange(nameof(IsBoardEmpty));
     }
+
+    private void DetachItem(BoardSlotViewModel item)
+    {
+        item.PropertyChanged -= OnItemPropertyChanged;
+        item.Detach();
+    }
+
+    // 채널 칸의 못 읽는 글(「1a」)은 슬롯을 바꾸지 않아 보드가 울리지 않는다 — 항목의 알림으로 주 단추 상태를 다시 알린다.
+    private void OnItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(BoardSlotViewModel.ChannelError)) RefreshAll();
+    }
+
+    /// <summary>
+    /// 칸에 남은 입력 오류(지금은 채널 「1a」 같은 못 읽는 글) — 값은 옛 것 그대로라 그대로 보내면 화면과 나가는 값이 다르다.
+    /// 있으면 주 단추 · 프리셋 저장을 막고 그 까닭을 툴팁에 보인다(카탈로그 ASM-021 · SC-ASM-009). 없으면 null.
+    /// </summary>
+    private string? InputError => BoardItems.Select(i => i.ChannelError).FirstOrDefault(error => error is not null);
 
     /// <summary>화면의 선택이 바뀌었다 — 하나면 속성 칸에 올린다.</summary>
     public void OnBoardSelectionChanged(IReadOnlyList<BoardSlotViewModel> selected)
@@ -444,7 +463,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         StatusText = $"'{preset.Name}'을(를) 보드에 올렸습니다.";
     }
 
-    public bool CanSaveAsPreset => !_board.HasErrors && _board.Slots.Count > 0 && CanWritePresets && !IsBusy;
+    public bool CanSaveAsPreset => !_board.HasErrors && InputError is null && _board.Slots.Count > 0 && CanWritePresets && !IsBusy;
 
     public async Task SaveAsPresetAsync()
     {
@@ -532,7 +551,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
         _ => "등록…",
     };
 
-    public bool CanCommit => !IsBusy && !_board.HasErrors && Mode switch
+    public bool CanCommit => !IsBusy && !_board.HasErrors && InputError is null && Mode switch
     {
         AssemblyMode.EditDevice => _board.IsDirty,
         AssemblyMode.EditPreset => _board.IsDirty && CanWritePresets,
@@ -541,6 +560,7 @@ public sealed class AssemblyViewModel : Screen, IDragDropHandler
 
     public string? CommitBlockedReason => IsBusy ? "처리 중입니다."
         : _board.HasErrors ? _board.Problems.FirstOrDefault()
+        : InputError is { } inputError ? inputError
         : Mode == AssemblyMode.Compose ? (_board.Slots.Count == 0 ? "보드에 부품을 먼저 다세요." : null)
         : !_board.IsDirty ? NoChangeText
         : Mode == AssemblyMode.EditPreset && !CanWritePresets ? _presets.StateMessage

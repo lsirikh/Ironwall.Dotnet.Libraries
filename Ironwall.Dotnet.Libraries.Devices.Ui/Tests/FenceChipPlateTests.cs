@@ -37,6 +37,7 @@ public class FenceChipPlateTests
     [InlineData(EnumDeviceType.Multi, 1.0, 0.5)]
     [InlineData(EnumDeviceType.Fence, 1.0, 1.0)]
     [InlineData(EnumDeviceType.Fence, 0.0, 0.5)]
+    [Trait("Scenario", "WIR-117")]
     public void should_put_the_number_plate_below_the_sensor_body_and_keep_it_out_of_the_selection_and_hit_rect(EnumDeviceType type, double k, double zoom)
     {
         // 기둥 위 높이로 올린 칩(땅에서 충분히 높다)
