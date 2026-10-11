@@ -251,7 +251,19 @@
 				AutomationProperties.AutomationId="{Binding Model.Id, StringFormat=GMaps.LayerPanel.DragHandle.{0}}"
 				AutomationProperties.Name="레이어 순서 손잡이"
 				IsEnabled="{Binding IsMapEditable}"
-				ToolTip="순서 바꾸기 (Alt+↑ / Alt+↓)" />
+				ToolTipService.ShowOnDisabled="True">
+				<!--  꺼졌으면 그 까닭 — 같은 행 자물쇠 단추와 같은 글(MAP-066). 툴팁은 스타일로만 둔다(로컬 값이면 트리거가 못 바꾼다).  -->
+				<drag:DragHandle.Style>
+					<Style TargetType="drag:DragHandle">
+						<Setter Property="ToolTip" Value="순서 바꾸기 (Alt+↑ / Alt+↓)" />
+						<Style.Triggers>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="ToolTip" Value="편집 권한이 없습니다" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</drag:DragHandle.Style>
+			</drag:DragHandle>
 			<CheckBox
 				Grid.Column="1"
 				IsChecked="{Binding IsChecked, Mode=TwoWay}"

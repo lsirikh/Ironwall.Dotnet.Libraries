@@ -879,13 +879,25 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnTitleMaxWidthPxChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings && !control._isClampingTitleWidth)
             {
                 if (e.NewValue is not double v || double.IsNaN(v)) return;   // NaN=그룹 Pending
-                if (!control.IsGroupMode) control.SelectedMarker.TitleMaxWidth = v;
-                control.OnMarkerPropertyChanged("TitleMaxWidth", e.OldValue, v);
+                // 칸에 범위 밖 값을 넣어도 40~800 으로 묶어 저장 — 라벨 가장자리 끌기(LabelAdorner :362)와 같은 규칙 · 칸 툴팁 "40~800 px"(EDT2-D1).
+                // 묶은 값을 칸에도 되돌려 보이는 값 = 저장 값 = 그린 폭이 되게 한다(되돌림은 재진입 막고 한 번만).
+                double clamped = Math.Clamp(v, TitleMaxWidthMin, TitleMaxWidthMax);
+                if (clamped != v)
+                {
+                    control._isClampingTitleWidth = true;
+                    try { control.SetCurrentValue(TitleMaxWidthPxProperty, clamped); }
+                    finally { control._isClampingTitleWidth = false; }
+                }
+                if (!control.IsGroupMode) control.SelectedMarker.TitleMaxWidth = clamped;
+                control.OnMarkerPropertyChanged("TitleMaxWidth", e.OldValue, clamped);
             }
         }
+
+        private const double TitleMaxWidthMin = 40, TitleMaxWidthMax = 800;
+        private bool _isClampingTitleWidth;
 
         private static void OnMarkerZoomChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {

@@ -166,6 +166,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             entry.LastLat = lat; entry.LastLng = lng;
             entry.LastSpeedMps = speed; entry.LastBearing = bearing;
             entry.LastSeen = now; entry.ExpireAt = expireAt;
+            ApplyZoomGate(entry, IsShownAtCurrentZoom());   // 패널에서 최소 줌을 바꾼 뒤 오는 신호에도 반영
         }
         else
         {
@@ -181,7 +182,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             trail.AddPoint(new PointLatLng(lat, lng), _setup?.TrailMaxPoints ?? DefaultTrailMaxPoints);
             _map!.Markers.Add(trail);
 
-            _entries[key] = new TrackEntry
+            var created = new TrackEntry
             {
                 Marker = marker,
                 Trail = trail,
@@ -190,12 +191,44 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
                 LastSpeedMps = 0d, LastBearing = 0d,
                 LastSeen = now, ExpireAt = expireAt,
             };
+            _entries[key] = created;
+            ApplyZoomGate(created, IsShownAtCurrentZoom());
         }
+    }
+
+    /// <summary>
+    /// 「최소 줌」(MinVisibleZoom) 게이트 — 지금 실효줌이 설정값 미만이면 추적 마커 · 꼬리를 숨긴다(AUX-D1).
+    /// 판정은 심볼 · 이미지와 같은 <see cref="Helpers.ZoomLadder.IsVisibleAtEffectiveZoom"/>(0 이하 = 항상 표시).
+    /// 숨겨도 항목은 남겨 TTL · 위치 갱신은 계속된다 — 다시 줌인하면 마지막 위치에 바로 보인다.
+    /// </summary>
+    private bool IsShownAtCurrentZoom()
+    {
+        if (_map is null) return true;
+        double zoom = (_map as GMapCustoms.GMapCustomControl)?.EffectiveZoom ?? _map.Zoom;
+        return Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(zoom, _setup?.MinVisibleZoom ?? 0d);
+    }
+
+    /// <summary>마지막으로 전부에 적용한 최소 줌 판정(스윕 틱이 바뀐 때만 전부 다시 적용하려고 기억).</summary>
+    private bool _zoomGateShown = true;
+
+    private static void ApplyZoomGate(TrackEntry entry, bool shown)
+    {
+        var v = shown ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        if (entry.Marker?.Shape is System.Windows.UIElement m) m.Visibility = v;
+        if (entry.Trail?.Shape is System.Windows.UIElement t) t.Visibility = v;
     }
 
     private void OnSweepTick(object? sender, EventArgs e)
     {
         if (_map is null || _entries.Count == 0) return;
+
+        // 패널에서 최소 줌만 바꾸고 줌 · 신호가 없어도 "바로 반영"(Map.Tracking.Settings 도움말) — 판정이 바뀐 틱에만 전부 다시 적용.
+        bool shown = IsShownAtCurrentZoom();
+        if (shown != _zoomGateShown)
+        {
+            _zoomGateShown = shown;
+            foreach (var entry in _entries.Values) ApplyZoomGate(entry, shown);
+        }
 
         var now = _clock.UtcNow;
         var expired = _entries.Where(kv => kv.Value.ExpireAt <= now)
@@ -210,8 +243,12 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
     private void OnZoomChanged()
     {
         if (_map is null) return;
+        bool shown = _zoomGateShown = IsShownAtCurrentZoom();
         foreach (var entry in _entries.Values)
+        {
             entry.Trail?.Rebuild(_map);
+            ApplyZoomGate(entry, shown);   // 최소 줌 게이트 재판정(AUX-D1)
+        }
     }
 
     /// <summary>뷰포트(회전) snapshot 수신 — 트레일 재투영(R-19) + 화살표 표시각 재적용(R-10).</summary>

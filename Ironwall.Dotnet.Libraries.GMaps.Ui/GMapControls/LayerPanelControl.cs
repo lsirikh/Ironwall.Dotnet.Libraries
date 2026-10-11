@@ -342,9 +342,24 @@ public class LayerPanelControl : Control
         var cur = e.GetPosition(canvas);
         var left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
         var top = Canvas.GetTop(cp); if (double.IsNaN(top)) top = 0;
-        Canvas.SetLeft(cp, left + cur.X - _lastMousePosition.X);
-        Canvas.SetTop(cp, top + cur.Y - _lastMousePosition.Y);
+        var (newLeft, newTop) = ClampHeaderInside(left + cur.X - _lastMousePosition.X, top + cur.Y - _lastMousePosition.Y, canvas);
+        Canvas.SetLeft(cp, newLeft);
+        Canvas.SetTop(cp, newTop);
         _lastMousePosition = cur;
+    }
+
+    /// <summary>
+    /// 머리 끌기 위치를 지도(Canvas) 안으로 자른다(LAY-D3) — 패널 폭 전체와 머리(36px)가 지도 안에 남아 다시 잡을 수 있게.
+    /// 크기 조절(OnResizeDelta)의 Canvas 경계 클램프 · 팔레트 머리 끌기(SymbolPaletteView.ConstrainToCanvas)와 같은 규칙.
+    /// 지도 크기를 아직 모르면(ActualWidth 0) 자르지 않는다.
+    /// </summary>
+    private (double Left, double Top) ClampHeaderInside(double left, double top, Canvas canvas)
+    {
+        const double HeaderHeight = 36;
+        if (canvas.ActualWidth <= 0 || canvas.ActualHeight <= 0) return (left, top);
+        double width = double.IsNaN(Width) ? ActualWidth : Width;
+        return (Math.Clamp(left, 0, Math.Max(0, canvas.ActualWidth - width)),
+                Math.Clamp(top, 0, Math.Max(0, canvas.ActualHeight - HeaderHeight)));
     }
 
     private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
