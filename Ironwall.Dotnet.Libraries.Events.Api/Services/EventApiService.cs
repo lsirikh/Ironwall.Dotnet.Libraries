@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Newtonsoft.Json.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Events.Api.Services;
 /****************************************************************************
@@ -1072,6 +1073,55 @@ public class EventApiService : IEventApiService
     }
     #endregion
 
+    #region - Event Mapping 쓰기 본문 정리 (L6 · L7) -
+    /// <summary>
+    /// 이벤트 매핑 본체 쓰기(POST · PATCH · PUT) 본문을 서버가 받는 <b>5키</b>
+    /// (<c>name_event</c> · <c>device_group_id</c> · <c>category_event_mapping</c> · <c>description</c> · <c>status</c>)로만 만든다. (L6)
+    /// <para><b>왜</b> — <see cref="EventMappingDto"/> 는 읽기 · 쓰기 겸용이라 통째로 직렬화하면
+    /// <c>id:0</c>(BaseDto 를 숨긴 값형) · <c>created_at</c>(BaseDto 기본값) · <c>cameras/speakers/lamps: null</c> 이 실린다.
+    /// 7.0+ 의 <c>EventMappingCreate</c>/<c>EventMappingUpdate</c> 는 <c>extra="forbid"</c> 라
+    /// 이 키 하나로 요청 전체가 422 <c>UNKNOWN_FIELD</c> 였다
+    /// (서버 <c>app/schemas/integration.py:103-110 · 117-128 · 147-157</c>, PUT 도 <c>EventMappingCreate</c> 로 받는다 —
+    /// <c>app/routers/event_mappings.py:342-345</c>).</para>
+    /// <para><b>null 은 키째 뺀다</b> — PATCH 는 보낸 키만 바뀌고(<c>event_mappings.py:299</c> <c>exclude_unset</c>),
+    /// PUT 은 생략한 선택 필드를 현재 값으로 유지한다(<c>event_mappings.py:385-392</c>).
+    /// 그래서 이 DTO 로는 "그룹 해제 · 설명 삭제"(명시 null)를 표현하지 않는다 — 종전에도 <c>NullValueHandling.Ignore</c> 라 못 했다.
+    /// 명시 null 이 필요하면 <c>EventMappingUpdateDto</c> 경로(이벤트 매핑 워크벤치)를 쓴다.</para>
+    /// <para><b>무회귀</b> — 6.3.2 는 모르는 키를 무시했으므로(<c>extra=ignore</c>) 빠진 키는 원래도 효과가 없었다.
+    /// 판본 분기가 필요 없다.</para>
+    /// </summary>
+    private static JObject BuildEventMappingWriteBody(EventMappingDto? dto)
+    {
+        var body = new JObject();
+        if (dto == null) return body;
+        if (dto.NameEvent != null) body["name_event"] = dto.NameEvent;
+        if (dto.DeviceGroupId.HasValue) body["device_group_id"] = dto.DeviceGroupId.Value;
+        if (dto.CategoryEventMapping != null) body["category_event_mapping"] = dto.CategoryEventMapping;
+        if (dto.Description != null) body["description"] = dto.Description;
+        if (dto.Status.HasValue) body["status"] = dto.Status.Value;
+        return body;
+    }
+
+    /// <summary>
+    /// 매핑 스피커 쓰기(POST · PATCH · PUT) 본문 — <c>file_group_id</c> 가 0 이하(= 음원 미지정)면 키째 뺀다. (L7)
+    /// <para><b>왜</b> — <see cref="EventMappingSpeakerDto.FileGroupId"/> 는 값형 <c>int</c> 라 "없음"을 0 으로 들고 다닌다.
+    /// 서버는 0 을 실제 id 로 보고 찾다가 404 <c>FileGroup with id 0 not found</c> 를 낸다
+    /// (POST <c>app/routers/event_mapping_speakers.py:277-286</c>, PATCH · PUT 은 <c>_ensure_speaker_targets</c> <c>:47-54</c>).
+    /// 필드는 선택이라(<c>app/schemas/integration.py:332 · 346 · 368</c>) 빼면 POST = 음원 없음, PATCH · PUT = 현재 값 유지다.</para>
+    /// <para>나머지 키(<c>speaker_id</c> · <c>repeat_count</c> · <c>is_enable</c> · <c>priority</c>)는 세 스키마 모두 받는 키라 그대로 둔다.
+    /// DTO 자체는 바꾸지 않는다 — 같은 타입이 응답 역직렬화에도 쓰인다.</para>
+    /// <para><b>무회귀</b> — 0 은 어느 판본에서도 유효한 음원 그룹 id 가 아니다(존재 검사 404 또는 FK 위반).
+    /// 빼서 나빠지는 경로가 없다.</para>
+    /// </summary>
+    private static JObject BuildMappingSpeakerWriteBody(EventMappingSpeakerDto? dto)
+    {
+        if (dto == null) return new JObject();
+        var body = JObject.FromObject(dto);
+        if (dto.FileGroupId <= 0) body.Remove("file_group_id");
+        return body;
+    }
+    #endregion
+
     #region - Event Mapping CRUD -
     public async Task<ApiListResponse<EventMappingDto>> GetEventMappingsAsync(
         int? deviceGroupId = null,
@@ -1116,7 +1166,8 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings", dto);
+            // L6: DTO 통째가 아니라 서버가 받는 5키만 보낸다(BuildEventMappingWriteBody 참조).
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings", BuildEventMappingWriteBody(dto));
             return await response.ToApiResponseAsync<EventMappingDto>();
         }
         catch (Exception ex)
@@ -1130,7 +1181,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", BuildEventMappingWriteBody(dto));
             return await response.ToApiResponseAsync<EventMappingDto>();
         }
         catch (Exception ex)
@@ -1144,7 +1195,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", BuildEventMappingWriteBody(dto));
             return await response.ToApiResponseAsync<EventMappingDto>();
         }
         catch (Exception ex)
@@ -1288,7 +1339,8 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers", dto);
+            // L7: file_group_id 0(= 음원 미지정)은 싣지 않는다(BuildMappingSpeakerWriteBody 참조).
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers", BuildMappingSpeakerWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)
@@ -1302,7 +1354,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", BuildMappingSpeakerWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)
@@ -1316,7 +1368,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", BuildMappingSpeakerWriteBody(dto));
             return MapMappingDuplicate(await response.ToApiResponseAsync<EventMappingSpeakerDto>(), "스피커");
         }
         catch (Exception ex)

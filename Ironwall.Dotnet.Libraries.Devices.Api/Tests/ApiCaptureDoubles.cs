@@ -32,23 +32,37 @@ internal sealed class CapturingApiService : IApiService
     public JObject? Body { get; private set; }
     public bool Throw { get; set; }
 
-    private Task<HttpResponseMessage> Capture(string method, string endpoint, object? body)
+    /// <summary>마지막 GET 의 질의 매개변수(없으면 <c>null</c>).</summary>
+    public Dictionary<string, string>? Query { get; private set; }
+
+    /// <summary>요청 횟수 — "네트워크에 나가기 전에 막았다"를 확인할 때 쓴다.</summary>
+    public int CallCount { get; private set; }
+
+    /// <summary>돌려줄 응답 본문(기본: 빈 성공 봉투). 서버 판본별 응답 모양을 흉내 낼 때 바꾼다.</summary>
+    public string ResponseJson { get; set; } = "{\"success\":true,\"data\":null,\"meta\":{}}";
+
+    /// <summary>돌려줄 HTTP 상태(기본 200).</summary>
+    public HttpStatusCode ResponseStatus { get; set; } = HttpStatusCode.OK;
+
+    private Task<HttpResponseMessage> Capture(string method, string endpoint, object? body, Dictionary<string, string>? query = null)
     {
         if (Throw) throw new HttpRequestException("simulated transport failure");
 
+        CallCount++;
         Method = method;
         Endpoint = endpoint;
+        Query = query == null ? null : new Dictionary<string, string>(query);
         Body = body == null ? null : JObject.Parse(JsonConvert.SerializeObject(body));
 
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        return Task.FromResult(new HttpResponseMessage(ResponseStatus)
         {
-            Content = new StringContent("{\"success\":true,\"data\":null,\"meta\":{}}", Encoding.UTF8, "application/json"),
+            Content = new StringContent(ResponseJson, Encoding.UTF8, "application/json"),
         });
     }
 
     public Task<HttpResponseMessage> DeleteRequestAsync(string endpoint) => Capture("DELETE", endpoint, null);
     public Task<HttpResponseMessage> DeleteRequestAsync<T>(string endpoint, T body) => Capture("DELETE", endpoint, body);
-    public Task<HttpResponseMessage> GetRequestAsync(string endpoint, Dictionary<string, string>? parameters = null) => Capture("GET", endpoint, null);
+    public Task<HttpResponseMessage> GetRequestAsync(string endpoint, Dictionary<string, string>? parameters = null) => Capture("GET", endpoint, null, parameters);
     public Task<HttpResponseMessage> PatchRequestAsync<T>(string endpoint, T body) => Capture("PATCH", endpoint, body);
     public Task<HttpResponseMessage> PostFormDataRequestAsync(string endpoint, MultipartFormDataContent content) => Capture("POST", endpoint, null);
     public Task<HttpResponseMessage> PostRequestAsync<T>(string endpoint, T body) => Capture("POST", endpoint, body);

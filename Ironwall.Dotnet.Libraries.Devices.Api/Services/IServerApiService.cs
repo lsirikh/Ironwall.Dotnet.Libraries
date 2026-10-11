@@ -146,6 +146,12 @@ public interface IServerApiService : IService
 
     // ────────────────────────── Server Metrics (§8.6) ──────────────────────────
 
+    /// <summary>
+    /// 서버 계측 보고(<c>POST /api/servers/{id}/metrics</c>, 권한 <c>servers:control</c>).
+    /// <para>6.3 계약은 <see cref="ServerMetricDto"/> 를 그대로 보낸다. 7.0+ 는 <c>extra="forbid"</c> 라
+    /// 서버가 받는 키(계측 10종 · <c>detail</c> · <c>observed_at</c>)만, 값이 있는 것만 다시 조립해 보낸다 —
+    /// <c>server_id</c> · <c>created_at</c> · <c>threshold_exceeded</c> 는 실리지 않는다.</para>
+    /// </summary>
     Task<ApiResponse<ServerMetricDto>> CreateServerMetricAsync(
         int serverId,
         ServerMetricDto dto,

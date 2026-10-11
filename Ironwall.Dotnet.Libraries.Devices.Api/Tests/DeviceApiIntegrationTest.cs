@@ -2,6 +2,7 @@ using Autofac;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Tests.LiveApi;
@@ -459,20 +460,36 @@ public class CameraApiTests
 
         try
         {
-            // GET Setting
-            var getResp = await _svc.GetCameraSettingAsync(cameraId);
-            _output.WriteLine($"GetSetting: Success={getResp.Success}");
-            Assert.True(getResp.Success);
+            // 옛 /settings 경로는 서버 7.0 에서 제거됐다(410, 서버 camera_settings.py) — 라이브러리가 네트워크 전에 막고 새 자리를 알린다.
+            var legacy = await _svc.GetCameraSettingAsync(cameraId);
+            _output.WriteLine($"LegacySetting: Success={legacy.Success}, Code={legacy.Error?.Code}");
+            Assert.False(legacy.Success);
+            Assert.Equal("ENDPOINT_REMOVED", legacy.Error?.Code);
 
-            // PATCH Setting
-            var patchDto = new CameraSettingDto { WeatherMode = "FOG" };
-            var patchResp = await _svc.PatchCameraSettingAsync(cameraId, patchDto);
-            _output.WriteLine($"PatchSetting: Success={patchResp.Success}");
-            Assert.True(patchResp.Success);
+            // GET Setting — 새 자리는 /config 의 device_config.modes
+            var getResp = await _svc.GetDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId);
+            _output.WriteLine($"GetConfig: Success={getResp.Success}, Msg={getResp.Message}");
+            Assert.True(getResp.Success, getResp.Message);
+            Assert.NotNull(getResp.Data?.DeviceConfig);
+
+            // PATCH Setting — 날씨 모드만
+            var patchResp = await _svc.PatchDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId,
+                new DeviceConfigAxisDto { Modes = new JObject { ["weather_mode"] = "FOG" } });
+            _output.WriteLine($"PatchConfig: Success={patchResp.Success}, Msg={patchResp.Message}");
+            Assert.True(patchResp.Success, patchResp.Message);
+
+            // 두 번째 PATCH 는 다른 키만 — RFC 7396 병합이라 앞의 FOG 가 남아야 한다(서버 device_axes.py:674-705)
+            var patch2 = await _svc.PatchDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId,
+                new DeviceConfigAxisDto { Modes = new JObject { ["day_night_mode"] = "NIGHT" } });
+            Assert.True(patch2.Success, patch2.Message);
 
             // Verify
-            var verifyResp = await _svc.GetCameraSettingAsync(cameraId);
-            Assert.Equal("FOG", verifyResp.Data?.WeatherMode);
+            var verifyResp = await _svc.GetDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId);
+            Assert.True(verifyResp.Success, verifyResp.Message);
+            var modes = verifyResp.Data?.DeviceConfig?.Modes;
+            Assert.NotNull(modes);
+            Assert.Equal("FOG", (string?)modes!["weather_mode"]);
+            Assert.Equal("NIGHT", (string?)modes["day_night_mode"]);
         }
         finally
         {
@@ -623,7 +640,13 @@ public class EnclosureApiTests
         {
             var getResp = await _svc.GetEnclosureByIdAsync(createdId);
             Assert.True(getResp.Success);
-            Assert.Equal("CLOSED", getResp.Data?.DoorStatus);
+            // 8.0: door_status 는 7.0 에서 제거됐다 — 문 위치는 DOOR_SENSOR 부품의 관측이고 생성 시 초기값이 없다
+            //   (서버 schemas/device.py:760-768 "문 위치 초기값은 없습니다"). 그래서 막 만든 함체의 문 상태는 "모름(null)".
+            Assert.Null(getResp.Data!.DoorStatus);
+            Assert.NotNull(getResp.Data.DeviceStatusAxis);   // 관측 섹션 자체는 받았다(view 기본 full)
+            // 임계치는 device_config.thresholds 로 저장되고 평면 threshold_config 로 되돌아온다
+            Assert.Equal(40.0, getResp.Data.ThresholdConfig?["temp_high"]?.Value<double>());
+            Assert.Equal(-10.0, getResp.Data.ThresholdConfig?["temp_low"]?.Value<double>());
 
             var patchBase = getResp.Data!;
             patchBase.NameDevice = "MIG_수정_함체";
@@ -662,12 +685,22 @@ public class EnclosureApiTests
     [LiveApiFact]
     public async Task D23_GetEnclosures_DoorStatusFilter()
     {
-        var resp = await _svc.GetEnclosuresAsync(doorStatus: "CLOSED", page: 1, limit: 100);
-        Assert.True(resp.Success);
-        if (resp.Data != null && resp.Data.Count > 0)
+        // 8.0: 목록의 door_status 필터는 422 이고 같은 목록에 대체 필터가 없다(서버 enclosures.py:126·138).
+        //   라이브러리는 "걸렀는데 전건" 침묵 실패를 막으려 보내기 전에 막는다.
+        var legacy = await _svc.GetEnclosuresAsync(doorStatus: "CLOSED", page: 1, limit: 100);
+        Assert.False(legacy.Success);
+        Assert.Equal("ENDPOINT_UNAVAILABLE", legacy.Error?.Code);
+
+        // 새 자리 — 부품 기준 조회(DOOR_SENSOR · state=CLOSED · 함체)
+        var resp = await _svc.GetDevicesByComponentAsync(componentType: "DOOR_SENSOR", state: "CLOSED", deviceType: DeviceTypePaths.Enclosures);
+        _output.WriteLine($"ByComponent: Success={resp.Success}, Count={resp.Data?.Count}, Msg={resp.Message}");
+        Assert.True(resp.Success, resp.Message);
+        Assert.NotNull(resp.Data);
+        Assert.All(resp.Data!, row =>
         {
-            Assert.All(resp.Data, d => Assert.Equal("CLOSED", d.DoorStatus));
-        }
+            Assert.Equal("enclosure", row.CategoryDevice);
+            Assert.Equal("CLOSED", row.State);
+        });
     }
 
     [LiveApiFact]
@@ -1428,33 +1461,44 @@ public class PresetRoiPointApiTests
         var cameraId = await CreateTestCameraAsync();
         try
         {
+            // 옛 PUT /settings 는 서버 7.0 에서 제거(410) — 라이브러리가 네트워크 전에 막는다.
+            //   모드는 /config 의 device_config.modes, 히터 · 팬 · 전조등은 선언 부품의 component_overrides,
+            //   추적은 component-status 로 옮겨졌다(서버 camera_settings.py:23-28). 이 시험은 선행 부품 선언 없이
+            //   검증되는 모드 5종을 PUT 으로 통째 교체한다.
+            var legacy = await _svc.UpdateCameraSettingAsync(cameraId, new CameraSettingDto { WeatherMode = "SNOW" });
+            Assert.False(legacy.Success);
+            Assert.Equal("ENDPOINT_REMOVED", legacy.Error?.Code);
+
             // GET current setting
-            var getResp = await _svc.GetCameraSettingAsync(cameraId);
-            _output.WriteLine($"GetSetting: Success={getResp.Success}");
-            Assert.True(getResp.Success);
+            var getResp = await _svc.GetDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId);
+            _output.WriteLine($"GetConfig: Success={getResp.Success}, Msg={getResp.Message}");
+            Assert.True(getResp.Success, getResp.Message);
 
             // PUT — 전체 교체
-            var putDto = new CameraSettingDto
+            var putResp = await _svc.UpdateDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId, new DeviceConfigAxisDto
             {
-                WeatherMode = "SNOW",
-                CameraMode = "NIGHT_ENHANCE",
-                Heater = "on",
-                Fan = "on",
-                Headlight = "on",
-                DayNightMode = "NIGHT",
-                FocusMode = "MANUAL",
-                IrisMode = "MANUAL",
-                Tracking = "ACTIVE"
-            };
-            var putResp = await _svc.UpdateCameraSettingAsync(cameraId, putDto);
-            _output.WriteLine($"PutSetting: Success={putResp.Success}");
-            Assert.True(putResp.Success);
+                Modes = new JObject
+                {
+                    ["weather_mode"] = "SNOW",
+                    ["camera_mode"] = "NIGHT_ENHANCE",
+                    ["day_night_mode"] = "NIGHT",
+                    ["focus_mode"] = "MANUAL",
+                    ["iris_mode"] = "MANUAL",
+                },
+            });
+            _output.WriteLine($"PutConfig: Success={putResp.Success}, Msg={putResp.Message}");
+            Assert.True(putResp.Success, putResp.Message);
 
             // Verify
-            var verifyResp = await _svc.GetCameraSettingAsync(cameraId);
-            Assert.True(verifyResp.Success);
-            Assert.Equal("SNOW", verifyResp.Data?.WeatherMode);
-            Assert.Equal("on", verifyResp.Data?.Heater);
+            var verifyResp = await _svc.GetDeviceConfigAsync(DeviceTypePaths.Cameras, cameraId);
+            Assert.True(verifyResp.Success, verifyResp.Message);
+            var modes = verifyResp.Data?.DeviceConfig?.Modes;
+            Assert.NotNull(modes);
+            Assert.Equal("SNOW", (string?)modes!["weather_mode"]);
+            Assert.Equal("NIGHT_ENHANCE", (string?)modes["camera_mode"]);
+            Assert.Equal("NIGHT", (string?)modes["day_night_mode"]);
+            Assert.Equal("MANUAL", (string?)modes["focus_mode"]);
+            Assert.Equal("MANUAL", (string?)modes["iris_mode"]);
         }
         finally
         {
