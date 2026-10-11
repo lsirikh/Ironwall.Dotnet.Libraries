@@ -1,0 +1,20 @@
+{
+  "run_id": "20261011-105822-rem-lib-a2",
+  "started": "2026-10-11T10:58:22+09:00",
+  "computer": "dev-pc",
+  "headed": false,
+  "filter": "창 시험 제외 — PropertyPanel: FullyQualifiedName!~ComponentCardScreenSizeTests · Housing: FullyQualifiedName!~MapLocateFitTests · Events.Ui: 창 6클래스(EventConsoleSingleSelectionDetailTests · EventToolbarChipAutomationTests · MappingDragInteractionTests · SuppressionDayChipAutomationTests · SuppressionRecurrenceRadioTests · SuppressionRowSelectBindingTests) · Accounts.Ui.Tests: FullyQualifiedName!~AccountConsoleCloseButtonTests · CameraPopup.Tests: Category!=Survival&Category!=LibVlc&Category!=RealCamera · Utils.Tests: 새 시험 2클래스(나머지는 sln 하네스 검사가 돌림)",
+  "projects": [
+    "tests/GMaps.MapNav.Tests", "tests/GMaps.MapLayer.Tests", "tests/GMaps.MapEdit.Tests", "tests/GMaps.MapAux.Tests",
+    "tests/GMaps.PropertyPanel.Tests", "tests/GMaps.Housing.Tests", "tests/GMaps.Ui.Tests",
+    "Ironwall.Dotnet.Libraries.GMaps.Ui", "Ironwall.Dotnet.Libraries.Events.Ui", "Ironwall.Dotnet.Libraries.Accounts.Ui.Tests",
+    "Ironwall.Dotnet.Libraries.Reports.Ui", "Ironwall.Dotnet.Libraries.CameraPopup.Tests", "Ironwall.Dotnet.Libraries.Utils.Tests"
+  ],
+  "shas": {
+    "t-20261011-094654-8195": "5853d653d2f54348bdb35ce5b3e5848e9500026b"
+  },
+  "dirty": {
+    "t-20261011-094654-8195": true
+  },
+  "note": "하네스 작업 t-20261011-094654-8195 워크트리에서 커밋 전 작업본으로 실행(하네스가 이 차례 끝에 커밋 — 그래서 상태표는 '검증됨(옛)' 으로 보일 수 있다)"
+}

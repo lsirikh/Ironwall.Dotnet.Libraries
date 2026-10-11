@@ -593,8 +593,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (double.IsNaN(currentLeft)) currentLeft = 0;
             if (double.IsNaN(currentTop)) currentTop = 0;
 
-            var newLeft = currentLeft + deltaX;
-            var newTop = currentTop + deltaY;
+            // 머리(45)가 지도 안에 남도록 자른다(AUX-D7 · MAP-191)
+            var (newLeft, newTop) = Helpers.OverlayHeaderClamp.Clamp(currentLeft + deltaX, currentTop + deltaY, this, canvas, 45);
 
             Canvas.SetLeft(contentPresenter, newLeft);
             Canvas.SetTop(contentPresenter, newTop);

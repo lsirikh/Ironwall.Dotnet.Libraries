@@ -72,8 +72,10 @@ public class MapAnchorPanelControl : Control
         var cur = e.GetPosition(canvas);
         double left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
         double top = Canvas.GetTop(cp); if (double.IsNaN(top)) top = 0;
-        Canvas.SetLeft(cp, left + cur.X - _lastMousePosition.X);
-        Canvas.SetTop(cp, top + cur.Y - _lastMousePosition.Y);
+        // 머리(36)가 지도 안에 남도록 자른다(AUX-D7 · MAP-191)
+        var (newLeft, newTop) = Helpers.OverlayHeaderClamp.Clamp(left + cur.X - _lastMousePosition.X, top + cur.Y - _lastMousePosition.Y, this, canvas, 36);
+        Canvas.SetLeft(cp, newLeft);
+        Canvas.SetTop(cp, newTop);
         _lastMousePosition = cur;
     }
 

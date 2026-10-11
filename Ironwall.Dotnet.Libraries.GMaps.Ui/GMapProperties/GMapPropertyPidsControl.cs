@@ -102,10 +102,25 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         /// 개폐 명령 전송기 — <c>PropertyPanelFactory</c> 가 주입한다(장비 Id · 장비 타입 · "OPEN"/"CLOSE" -&gt; 성공 여부).
         /// 미주입이면 버튼은 비활성이다(배선 없는 환경에서 조용히 아무 일도 안 일어나는 것 방지).
         /// </summary>
-        public Func<int, EnumDeviceType, string, Task<bool>>? DoorCommandSender { get; set; }
+        /// <remarks>
+        /// 결함 EDT-D1(MAP-132): 팩토리가 SelectedMarker 를 먼저 넣어 판정기 · 전송기 없이 「권한 없음」으로 계산한 뒤
+        /// VM 의 WireDoorControl 이 이 속성들을 넣어도 다시 계산하지 않아, 보고가 한 번 더 올 때까지 단추가 꺼져 있었다.
+        /// 배선 순서와 무관하도록 넣는 즉시 문 UI 를 다시 계산한다.
+        /// </remarks>
+        public Func<int, EnumDeviceType, string, Task<bool>>? DoorCommandSender
+        {
+            get => _doorCommandSender;
+            set { _doorCommandSender = value; RefreshDoorUi(); }
+        }
+        private Func<int, EnumDeviceType, string, Task<bool>>? _doorCommandSender;
 
-        /// <summary>장비 제어 권한(devices:control) 판정기 — 미주입이면 <b>false</b>(fail-closed, FR-27).</summary>
-        public Func<bool>? CanControlDevice { get; set; }
+        /// <summary>장비 제어 권한(devices:control) 판정기 — 미주입이면 <b>false</b>(fail-closed, FR-27). 넣는 즉시 문 UI 재계산(EDT-D1).</summary>
+        public Func<bool>? CanControlDevice
+        {
+            get => _canControlDevice;
+            set { _canControlDevice = value; RefreshDoorUi(); }
+        }
+        private Func<bool>? _canControlDevice;
 
         /// <summary>명령 실패·타임아웃 통지기 — 미주입이면 무동작(FR-28/NFR-03).</summary>
         public Action<string>? NotifyDoorIssue { get; set; }
@@ -625,12 +640,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionRange는 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영(무DB·무undo — 단일과 동일 의미).
+                // DetectionRange 는 지도 DB 가 영속한다(GMapDbSymbolService "D-3: 탐지 방향/거리/각도 영속") — 기준방향(BaseBearing)과 같은 길로 저장 · undo.
+                //   결함 P3D-D2(MAP-123): 예전엔 "런타임 전용"이라 저장 요청을 내지 않아 다른 속성을 저장하기 전에 재시작하면 이전 값으로 돌아갔다.
+                //   그룹=VM 이 전원 일괄 적용(ApplyGroupPropertyChangeAsync → UndoableCommandBase.ApplyProperty).
                 if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
-                if (control.IsGroupMode)
-                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionRange = (double)e.NewValue;
-                else pidsMarker.DetectionRange = (double)e.NewValue;
-                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
+                if (!control.IsGroupMode) pidsMarker.DetectionRange = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("DetectionRange", e.OldValue, e.NewValue);
             }
         }
 
@@ -642,12 +657,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionAngle은 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영.
+                // DetectionAngle 도 DB 영속 — 저장 · undo(P3D-D2). 그룹=VM 일괄 적용.
                 if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
-                if (control.IsGroupMode)
-                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionAngle = (double)e.NewValue;
-                else pidsMarker.DetectionAngle = (double)e.NewValue;
-                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
+                if (!control.IsGroupMode) pidsMarker.DetectionAngle = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("DetectionAngle", e.OldValue, e.NewValue);
             }
         }
 
@@ -659,12 +672,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionBearing은 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영.
+                // DetectionBearing 도 DB 영속 — 저장 · undo(P3D-D2). 그룹=VM 일괄 적용.
                 if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
-                if (control.IsGroupMode)
-                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionBearing = (double)e.NewValue;
-                else pidsMarker.DetectionBearing = (double)e.NewValue;
-                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
+                if (!control.IsGroupMode) pidsMarker.DetectionBearing = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("DetectionBearing", e.OldValue, e.NewValue);
             }
         }
 

@@ -56,6 +56,10 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "FOVColor": if (m is IPidsEditableMarker pFc) pFc.FOVColor = ToEnum<EnumColorType>(v); break;
             case "FOVOpacity": if (m is IPidsEditableMarker pFo) pFo.FOVOpacity = ToD(v); break;
             case "BaseBearing": if (m is IPidsEditableMarker pBb) pBb.BaseBearing = ToD(v); break;
+            // 탐지 범위 · 각도 · 방향(DB 영속 D-3) — 속성창 저장 · undo · 그룹 일괄편집(P3D-D2)
+            case "DetectionRange": if (m is IPidsEditableMarker pDr) pDr.DetectionRange = ToD(v); break;
+            case "DetectionAngle": if (m is IPidsEditableMarker pDa) pDa.DetectionAngle = ToD(v); break;
+            case "DetectionBearing": if (m is IPidsEditableMarker pDb) pDb.DetectionBearing = ToD(v); break;
             case "ModelVariant": if (m is GMapPidsMarker pVariant) pVariant.ModelVariant = v as string; break;
             // 통문·함체 개폐(FR-12) — DoorState 는 런타임 형태 축이라 undo 대상이 아니다
             case "GateWidthM": if (m is IPidsEditableMarker pGw) pGw.GateWidthM = v is null ? null : ToD(v); break;
@@ -113,6 +117,9 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "FOVColor" => m is IPidsEditableMarker pFc ? pFc.FOVColor : null,
         "FOVOpacity" => m is IPidsEditableMarker pFo ? pFo.FOVOpacity : null,
         "BaseBearing" => m is IPidsEditableMarker pBb ? pBb.BaseBearing : null,
+        "DetectionRange" => m is IPidsEditableMarker pDr ? pDr.DetectionRange : null,
+        "DetectionAngle" => m is IPidsEditableMarker pDa ? pDa.DetectionAngle : null,
+        "DetectionBearing" => m is IPidsEditableMarker pDb ? pDb.DetectionBearing : null,
         "ModelVariant" => (m as GMapPidsMarker)?.ModelVariant,
         "GateWidthM" => (m as IPidsEditableMarker)?.GateWidthM,
         "OpenOnContactOn" => (m as IPidsEditableMarker)?.OpenOnContactOn,
@@ -144,6 +151,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
         or "StrokeColor" or "OperationState"
         or "TitleColor" or "TitleBackground" or "TitleFontFamily" or "TitleBold" or "TitleItalic" or "TitleMaxWidth"
         or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" or "ModelVariant"
+        or "DetectionRange" or "DetectionAngle" or "DetectionBearing"
         or "GateWidthM" or "OpenOnContactOn"
         or "PostSpacingM" or "FenceHeightM" or "FenceMode" or "Render3D" or "ReverseSensorOrder"
         or "LinkedDeviceGroup" or "LinePattern" or "LineOpacity" or "IsClosedPath"
