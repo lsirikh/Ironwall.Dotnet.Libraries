@@ -9,7 +9,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.EventWindows;
 /****************************************************************************
    Purpose      : 이벤트 매핑 카메라 조회 + 캐시 (PRD camera-popup-modes FR-09 · §3 트리거)
                   - 서버 7.0+: 워크벤치 게이트웨이(매핑 목록 1회 + 매핑별 카메라, 프리셋 참조 포함)
-                  - 6.3: 옛 IEventApiService(그룹별 매핑, 프리셋은 DB id 뿐이라 자동 이동 없음)
+                  - 6.3: 옛 IEventApiService(그룹별 매핑, 카메라 · 프리셋은 6.3.0 중첩 모양 camera{} · target_preset{} 에서 읽는다 — F2)
                   - SYNC_EVENT_MAPPING(EventMappingsChangedMessage) · SYNC_PRESET(CameraPresetsChangedMessage) → Invalidate
    Created By   : Claude (T-06)
    Created On   : 2026-09-30
@@ -145,7 +145,7 @@ public sealed class EventMappingCameraCache : IEventMappingCameraSource
     {
         if (_legacyApi is null) return Array.Empty<MappingCameraEntry>();
         if (Interlocked.Exchange(ref _legacyNoticeLogged, 1) == 0)
-            _log?.Info("[EventWindow] 서버 계약 7.0 미만 — 옛 매핑 API 로 카메라만 읽는다(프리셋 자동 이동 없음: 옛 응답엔 프리셋 번호가 없다)");
+            _log?.Info("[EventWindow] 서버 계약 7.0 미만 — 옛 매핑 API 로 카메라를 읽는다(6.3 응답의 target_preset · home_preset 번호를 쓴다, 감시금지구역 표시는 없다)");
 
         var result = new List<MappingCameraEntry>();
         foreach (var group in groups)
@@ -179,8 +179,13 @@ public sealed class EventMappingCameraCache : IEventMappingCameraSource
                 if (r is null || !r.Success) return null;   // 한 매핑이라도 못 읽으면 캐시하지 않는다
                 cameras = r.Data ?? new List<EventMappingCameraDto>();
             }
+            // 카메라 id 를 못 읽은 행(장비가 지워져 camera:null · 모르는 응답 모양)은 걸러내되 말없이 버리지 않는다(F2).
+            var unreadable = cameras.Count(c => c.CameraId <= 0);
+            if (unreadable > 0)
+                _log?.Warning($"[EventWindow] 매핑 {mapping.Id} 카메라 {unreadable}건에 카메라 id 가 없어 탐지 창에서 뺌(camera_id · camera.id 둘 다 없음)");
             result.AddRange(cameras.Where(c => c.CameraId > 0)
-                .Select((c, i) => new MappingCameraEntry(c.CameraId, c.Priority, mapping.Id * 1000 + i, Math.Max(0, c.DelayTime), c.IsEnable)));
+                .Select((c, i) => new MappingCameraEntry(c.CameraId, c.Priority, mapping.Id * 1000 + i, Math.Max(0, c.DelayTime), c.IsEnable,
+                    c.TargetPresetIndex, c.TargetPresetName, c.HomePresetIndex)));
         }
         return result;
     }

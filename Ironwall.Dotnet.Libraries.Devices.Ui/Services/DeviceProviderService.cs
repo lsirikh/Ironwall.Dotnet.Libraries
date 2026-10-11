@@ -860,6 +860,9 @@ public class DeviceProviderService : IDeviceProviderService
     /// <summary>
     /// GOP API를 통해 Gate(통문) 목록을 조회합니다 (Pagination 지원).
     /// <para>서버 <c>GET /api/devices/gates</c> 는 <b>page 가 1부터</b>고 파라미터 이름이 <c>limit</c> 이다(VER-02 실측).</para>
+    /// <para>통문은 6.3.2 뒤에 생긴 자원이라 원격 운영 6.3.0~6.3.2 는 404 다(F1). 404/405 는 '이 판본 미지원' 정보 한 줄로 넘긴다.
+    /// 판본으로 아예 안 부르지 않는 이유: 계약 프로브는 6.x 를 <c>V6_3</c> 하나로 묶고, 통문이 생긴 정확한 패치 판본도 확정되지 않았다 —
+    /// 문자열 비교로 끊으면 통문이 있는 6.3.x 에서 통문 전체가 조용히 사라진다.</para>
     /// </summary>
     private async Task<List<GateDeviceModel>> FetchGatesAsync(
         CancellationToken token = default)
@@ -883,7 +886,10 @@ public class DeviceProviderService : IDeviceProviderService
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
                 {
-                    if (!response.Success)
+                    if (!response.Success && IsResourceMissing(response.StatusCode))
+                        _log?.Info($"이 서버 판본({_queryPolicy.RawVersion ?? "알 수 없음"})은 통문 자원을 지원하지 않습니다 " +
+                                   $"(GET /api/devices/gates → HTTP {response.StatusCode}) — 통문 적재를 건너뛰고 계속합니다");
+                    else if (!response.Success)
                         _log?.Error($"Failed to fetch gates at page {currentPage}: {response.Error?.Message}");
                     break;
                 }
@@ -913,6 +919,9 @@ public class DeviceProviderService : IDeviceProviderService
             return allGates;
         }
     }
+
+    /// <summary>목록 경로 자체가 이 서버 판본에 없다(404 · 405) — 서버 오류 · 검증 실패와 구분한다.</summary>
+    private static bool IsResourceMissing(int statusCode) => statusCode is 404 or 405;
 
     /// <summary>
     /// GOP API를 통해 Lamp 목록을 조회합니다 (Pagination 지원).

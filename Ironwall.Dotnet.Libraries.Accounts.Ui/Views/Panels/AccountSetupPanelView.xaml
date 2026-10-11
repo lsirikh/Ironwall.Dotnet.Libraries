@@ -144,8 +144,9 @@
 
 					<!--  ② 동시 로그인 (v6.3)  -->
 					<c:ConsoleSection Header="동시 로그인" HelpKey="Accounts.SessionSetup.Concurrency">
-						<StackPanel IsEnabled="{Binding ServerSettingsAvailable}">
-							<c:ConsoleField>
+						<!--  서버 판본이 동시 로그인 키를 모르면(원격 6.3.0~6.3.2) 절을 잠그고 사유를 남긴다  -->
+						<StackPanel IsEnabled="{Binding CanEditConcurrency}">
+							<c:ConsoleField LockReason="{Binding ConcurrencySupportReason}">
 								<c:ConsoleField.Header>
 									<TextBlock Style="{StaticResource Acct.FieldLabel}" Text="같은 계정의 동시 로그인" />
 								</c:ConsoleField.Header>

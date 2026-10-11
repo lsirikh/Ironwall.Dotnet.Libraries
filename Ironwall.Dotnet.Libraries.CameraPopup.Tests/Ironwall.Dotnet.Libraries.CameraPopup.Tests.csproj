@@ -12,6 +12,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 시험 어댑터 정리 단계의 DiaSession 이중 해제(Catastrophic failure)를 피한다 — 파일 안 주석 참고. 시험은 전부 그대로 돈다. -->
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\CameraPopup.Tests.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>
