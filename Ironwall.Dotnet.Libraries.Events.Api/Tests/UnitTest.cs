@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,7 +24,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Api.Tests;
 
 /// <summary>
 /// EventApiService 단위 테스트
+/// <para>라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api) + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+/// 쓰기 시험은 loopback · 사설망 주소에서만 돈다. 모듈 등록 · 초기화 시험은 네트워크 없이 돈다.</para>
 /// </summary>
+[Trait("Scenario", "DEP-207")]
 public class EventApiServiceTests
 {
     private readonly ILogService _logService;
@@ -35,16 +39,8 @@ public class EventApiServiceTests
     {
         _logService = new LogService();
 
-        // GOP API 서버 설정 (실제 테스트 시 GOP 서버 URL로 변경 필요)
-        _setupModel = new ApiSetupModel
-        {
-            Url = "http://localhost:8000/api",  // GOP API 서버 주소
-            Username = "admin",
-            Password = "admin123",
-            ApiKey = "",
-            Phone = "",
-            Timeout = 30
-        };
+        // 모듈 등록 · 초기화 시험용 접속 설정 — 계정은 싣지 않는다(서버 호출 시험은 공용 로그인 세션을 쓴다).
+        _setupModel = LiveApiTarget.CreateSetup();
     }
     #endregion
 
@@ -77,8 +73,8 @@ public class EventApiServiceTests
     {
         // Arrange
         var builder = new ContainerBuilder();
-        var setup1 = new ApiSetupModel { Url = "http://localhost:8000/api/" };
-        var setup2 = new ApiSetupModel { Url = "http://localhost:8000/api/" };
+        var setup1 = new ApiSetupModel { Url = LiveApiTarget.Url };
+        var setup2 = new ApiSetupModel { Url = LiveApiTarget.Url };
 
         // Act
         builder.RegisterModule(new EventApiModule(_logService, setup1, "EventApi1"));
@@ -122,16 +118,11 @@ public class EventApiServiceTests
     /// Detection Event 목록 조회 API 테스트
     /// 참고: 실제 GOP 서버가 없으면 실패할 수 있음
     /// </summary>
-    [Fact(DisplayName = "03. Get DetectionEvents")]
+    [LiveApiFact(DisplayName = "03. Get DetectionEvents")]
     public async Task GetDetectionEvents_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetDetectionEventsAsync(
@@ -147,16 +138,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Detection Event 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "04. Get DetectionEvent By ID")]
+    [LiveApiFact(DisplayName = "04. Get DetectionEvent By ID")]
     public async Task GetDetectionEventById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetDetectionEventByIdAsync(1);
@@ -173,16 +159,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Detection Event 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "05. Create DetectionEvent")]
+    [LiveApiWriteFact(DisplayName = "05. Create DetectionEvent")]
     public async Task CreateDetectionEvent_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new DetectionEventDto
         {
@@ -203,16 +184,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Detection Event 수정 (부분) API 테스트
     /// </summary>
-    [Fact(DisplayName = "05-1. Patch DetectionEvent")]
+    [LiveApiWriteFact(DisplayName = "05-1. Patch DetectionEvent")]
     public async Task PatchDetectionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new DetectionEventDto
         {
@@ -236,16 +212,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Detection Event 수정 (전체) API 테스트
     /// </summary>
-    [Fact(DisplayName = "05-2. Update DetectionEvent")]
+    [LiveApiWriteFact(DisplayName = "05-2. Update DetectionEvent")]
     public async Task UpdateDetectionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new DetectionEventReplaceDto
         {
@@ -268,16 +239,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Detection Event 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "05-3. Delete DetectionEvent")]
+    [LiveApiWriteFact(DisplayName = "05-3. Delete DetectionEvent")]
     public async Task DeleteDetectionEvent_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.DeleteDetectionEventAsync(2);
@@ -295,16 +261,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 목록 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "06. Get MalfunctionEvents")]
+    [LiveApiFact(DisplayName = "06. Get MalfunctionEvents")]
     public async Task GetMalfunctionEvents_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetMalfunctionEventsAsync(
@@ -320,16 +281,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "07. Get MalfunctionEvent By ID")]
+    [LiveApiFact(DisplayName = "07. Get MalfunctionEvent By ID")]
     public async Task GetMalfunctionEventById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetMalfunctionEventByIdAsync(5);
@@ -345,16 +301,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "08. Create MalfunctionEvent")]
+    [LiveApiWriteFact(DisplayName = "08. Create MalfunctionEvent")]
     public async Task CreateMalfunctionEvent_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new MalfunctionEventDto
         {
@@ -383,16 +334,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 수정 (부분) API 테스트
     /// </summary>
-    [Fact(DisplayName = "08-1. Patch MalfunctionEvent")]
+    [LiveApiWriteFact(DisplayName = "08-1. Patch MalfunctionEvent")]
     public async Task PatchMalfunctionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new MalfunctionEventDto
         {
@@ -415,16 +361,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 수정 (전체) API 테스트
     /// </summary>
-    [Fact(DisplayName = "08-2. Update MalfunctionEvent")]
+    [LiveApiWriteFact(DisplayName = "08-2. Update MalfunctionEvent")]
     public async Task UpdateMalfunctionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new MalfunctionEventReplaceDto
         {
@@ -454,16 +395,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Malfunction Event 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "08-3. Delete MalfunctionEvent")]
+    [LiveApiWriteFact(DisplayName = "08-3. Delete MalfunctionEvent")]
     public async Task DeleteMalfunctionEvent_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.DeleteMalfunctionEventAsync(1);
@@ -481,16 +417,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 목록 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "09. Get ConnectionEvents")]
+    [LiveApiFact(DisplayName = "09. Get ConnectionEvents")]
     public async Task GetConnectionEvents_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetConnectionEventsAsync(
@@ -506,16 +437,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "09-1. Get ConnectionEvent By ID")]
+    [LiveApiFact(DisplayName = "09-1. Get ConnectionEvent By ID")]
     public async Task GetConnectionEventById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetConnectionEventByIdAsync(1);
@@ -532,16 +458,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "10. Create ConnectionEvent")]
+    [LiveApiWriteFact(DisplayName = "10. Create ConnectionEvent")]
     public async Task CreateConnectionEvent_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ConnectionEventDto
         {
@@ -561,16 +482,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 수정 (부분) API 테스트
     /// </summary>
-    [Fact(DisplayName = "10-1. Patch ConnectionEvent")]
+    [LiveApiWriteFact(DisplayName = "10-1. Patch ConnectionEvent")]
     public async Task PatchConnectionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ConnectionEventDto
         {
@@ -591,16 +507,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 수정 (전체) API 테스트
     /// </summary>
-    [Fact(DisplayName = "10-2. Update ConnectionEvent")]
+    [LiveApiWriteFact(DisplayName = "10-2. Update ConnectionEvent")]
     public async Task UpdateConnectionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ConnectionEventReplaceDto
         {
@@ -622,16 +533,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Connection Event 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "10-3. Delete ConnectionEvent")]
+    [LiveApiWriteFact(DisplayName = "10-3. Delete ConnectionEvent")]
     public async Task DeleteConnectionEvent_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.DeleteConnectionEventAsync(1);
@@ -649,16 +555,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 목록 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "11. Get ActionEvents")]
+    [LiveApiFact(DisplayName = "11. Get ActionEvents")]
     public async Task GetActionEvents_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetActionEventsAsync(
@@ -674,16 +575,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "11-1. Get ActionEvent By ID")]
+    [LiveApiFact(DisplayName = "11-1. Get ActionEvent By ID")]
     public async Task GetActionEventById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.GetActionEventByIdAsync(1);
@@ -700,16 +596,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "12. Create ActionEvent")]
+    [LiveApiWriteFact(DisplayName = "12. Create ActionEvent")]
     public async Task CreateActionEvent_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ActionEventCreateDto
         {
@@ -732,16 +623,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 수정 (부분) API 테스트
     /// </summary>
-    [Fact(DisplayName = "12-1. Patch ActionEvent")]
+    [LiveApiWriteFact(DisplayName = "12-1. Patch ActionEvent")]
     public async Task PatchActionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ActionEventDto
         {
@@ -764,16 +650,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 수정 (전체) API 테스트
     /// </summary>
-    [Fact(DisplayName = "12-2. Update ActionEvent")]
+    [LiveApiWriteFact(DisplayName = "12-2. Update ActionEvent")]
     public async Task UpdateActionEvent_Should_Return_Updated()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         var dto = new ActionEventReplaceDto
         {
@@ -797,16 +678,11 @@ public class EventApiServiceTests
     /// <summary>
     /// Action Event 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "12-3. Delete ActionEvent")]
+    [LiveApiWriteFact(DisplayName = "12-3. Delete ActionEvent")]
     public async Task DeleteActionEvent_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IEventApiService>("EventApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IEventApiService>();
 
         // Act
         var response = await service.DeleteActionEventAsync(1);

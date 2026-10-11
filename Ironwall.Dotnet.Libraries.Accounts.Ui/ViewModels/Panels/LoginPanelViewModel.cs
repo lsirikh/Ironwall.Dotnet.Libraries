@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Providers;
+using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Sso;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -334,7 +335,7 @@ public class LoginPanelViewModel : BasePanelViewModel
 
     /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.
     /// v6.3: 서버 잠금정책 잔여(details)가 있으면 "N회 중 M회 실패, K회 남음" 안내(details 우선, 메시지 문자열 파싱 안 함).</summary>
-    private static string FailMessage(AuthOutcome o)
+    internal static string FailMessage(AuthOutcome o)
     {
         // 이번 실패로 잠김: 서버 message(자동해제 시간 M분 포함)를 우선 노출.
         if (o.Locked == true)
@@ -351,6 +352,8 @@ public class LoginPanelViewModel : BasePanelViewModel
             "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
             "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
             "TOO_MANY_REQUESTS"   => "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",   // 429(login-clientid-13)
+            // 서버에 닿지 못한 사유(인증서 신뢰 · 연결 거부 · 시간 초과 · 이름 해석) — 비밀번호 문제로 오진하지 않게 원인과 다음 행동을 보인다.
+            var code when ApiTransportFailure.IsTransportCode(code) => ApiTransportFailure.Describe(code)!,
             _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
         };
     }

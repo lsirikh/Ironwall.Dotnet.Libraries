@@ -177,7 +177,11 @@ public sealed class ServerContractProbe : IServerContractProbe, IDisposable
             catch (Exception ex)
             {
                 // 타임아웃(TaskCanceledException) · TLS · DNS · 연결거부 전부 여기로 — 다음 후보로 넘어간다.
-                lastFailure = $"{uri} → {ex.GetType().Name}: {ex.Message}";
+                // 사유를 분류해 사람이 읽는 문구를 앞에 둔다(인증서 신뢰 실패면 "신뢰 저장소에 넣어야" 가 로그에 남는다).
+                var reason = ApiTransportFailure.Describe(ApiTransportFailure.Classify(ex));
+                lastFailure = reason is null
+                    ? $"{uri} → {ex.GetType().Name}: {ex.Message}"
+                    : $"{uri} → {reason} ({ex.GetType().Name}: {ApiTransportFailure.InnermostMessage(ex)})";
             }
         }
 

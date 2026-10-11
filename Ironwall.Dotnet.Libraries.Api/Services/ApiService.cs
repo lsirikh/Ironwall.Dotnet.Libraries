@@ -132,7 +132,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] GET 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] GET 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -198,7 +198,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] POST 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] POST 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -220,7 +220,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] FormData POST 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] FormData POST 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -243,7 +243,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] DELETE 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] DELETE 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -275,7 +275,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] DELETE(body) 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] DELETE(body) 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -307,7 +307,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] PATCH 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] PATCH 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -335,7 +335,7 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] PUT 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] PUT 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
@@ -374,18 +374,60 @@ public class ApiService : IApiService, IApiHeaderRequestService
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ApiService] {method} 요청 실패: {ex.Message}");
+            _log?.Error($"[ApiService] {method} 요청 실패: {FailureText(ex)}");
             return BuildExceptionResponse(ex);
         }
     }
 
     /// <summary>예외 → 상태코드 매핑 (FR-6): 타임아웃 504 / 연결실패 503 / 그 외 500. 기존 BadRequest(400) 일괄변환 폐지(401/503/504 구분 가능).</summary>
-    internal static HttpResponseMessage BuildExceptionResponse(Exception ex) => ex switch
+    /// <remarks>
+    /// 연결 실패(503 · 504)는 <b>사유를 분류해 봉투 본문</b>으로 싣는다(<see cref="ApiTransportFailure"/>).
+    /// 종전엔 본문이 비어 <c>ApiMessageHelper</c> 폴백이 "HTTP 503: An error occurred while sending the request." 로
+    /// 인증서 신뢰 실패 · 연결 거부 · 이름 해석 실패를 한 줄로 뭉갰다.
+    /// 상위 <c>error.code</c> 는 종전과 같게(503 <c>SERVICE_UNAVAILABLE</c> · 504 <c>GATEWAY_TIMEOUT</c>) 두고,
+    /// 세부 사유는 <c>error.details.error_code</c>, 사람용 문구는 <c>error.message</c> 에 싣는다.
+    /// </remarks>
+    internal static HttpResponseMessage BuildExceptionResponse(Exception ex)
     {
-        TaskCanceledException   => new HttpResponseMessage(HttpStatusCode.GatewayTimeout)     { ReasonPhrase = "Request timed out" },
-        HttpRequestException h   => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { ReasonPhrase = h.Message },
-        _                        => new HttpResponseMessage(HttpStatusCode.InternalServerError){ ReasonPhrase = ex.Message },
-    };
+        var subCode = ex is TaskCanceledException or HttpRequestException ? ApiTransportFailure.Classify(ex) : null;
+        if (subCode is null)
+            return new HttpResponseMessage(HttpStatusCode.InternalServerError) { ReasonPhrase = SingleLine(ex.Message) };
+
+        // 시간 초과 계열은 504 — 로그인 패널 "시간 초과" 문구 · ApiStatusHelper.IsTimeout 과 맞춘다.
+        var timeout = ApiTransportFailure.IsTimeout(subCode);
+        var status = timeout ? HttpStatusCode.GatewayTimeout : HttpStatusCode.ServiceUnavailable;
+        var topCode = timeout ? "GATEWAY_TIMEOUT" : "SERVICE_UNAVAILABLE";   // ApiErrorCodes.ClientTimeout · ServiceUnavailable 과 같은 값
+        var text = ApiTransportFailure.Describe(subCode)!;
+
+        var body = new Newtonsoft.Json.Linq.JObject
+        {
+            ["success"] = false,
+            ["message"] = text,
+            ["error"] = new Newtonsoft.Json.Linq.JObject
+            {
+                ["code"] = topCode,
+                ["message"] = text,
+                // error_code = 저장소의 안정 sub-code 자리(ApiError.DetailsErrorCode) · reason = SSO 교환 결과(SsoExchangeResult.Reason)가 읽는 자리
+                ["details"] = new Newtonsoft.Json.Linq.JObject { ["error_code"] = subCode, ["reason"] = subCode },
+            },
+        };
+
+        return new HttpResponseMessage(status)
+        {
+            ReasonPhrase = text,
+            Content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"),
+        };
+    }
+
+    /// <summary>로그 한 줄 — 연결 실패면 분류 코드와 원인 사슬 안쪽 메시지(바깥 메시지는 "see inner exception" 뿐이다)를 붙인다.</summary>
+    private static string FailureText(Exception ex)
+    {
+        var code = ex is TaskCanceledException or HttpRequestException ? ApiTransportFailure.Classify(ex) : null;
+        return code is null ? ex.Message : $"[{code}] {ex.Message} ← {ApiTransportFailure.InnermostMessage(ex)}";
+    }
+
+    /// <summary>ReasonPhrase 는 줄바꿈을 받지 않는다(설정 시 예외).</summary>
+    private static string SingleLine(string text) => text.Replace('\r', ' ').Replace('\n', ' ');
     #endregion
     #region - IHanldes -
     #endregion

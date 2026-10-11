@@ -328,99 +328,57 @@ public class SoundService_PlaybackTests
 
     public SoundService_PlaybackTests(SoundServiceFixture fx) => _fx = fx;
 
+    // ── 아래 재생 시험 4건(탐지 자동 멈춤 · 장애 수동 멈춤 · 동시 재생 방지 · 조치 보고)은 시험마다 자기 서비스 · 자기 설정을 만든다
+    //    (IsolatedSoundService). 예전엔 픽스처 SetupModel 하나를 나눠 쓰며 서로 반대 설정을 전제해 순서에 따라 깨졌다.
+    //    판정은 SoundPlaybackScenarios 에 있고, 소리 없는 가짜 재생기 판본(SoundServiceFakePlayerTests)이 같은 판정을 헤드리스로 돈다.
+    //    ⚠ 실제 소리가 난다 — 사람이 쓰는 PC 에서 자동 실행하지 않는다.
+
+    /// <summary>실제 소리 파일은 길이를 모른다 — 자동 멈춤은 지속 시간 뒤 도는 한 바퀴가 끝날 때라 넉넉히 둔다.</summary>
+    private static readonly TimeSpan RealClipAllowance = TimeSpan.FromSeconds(60);
+
     [Fact(DisplayName = "SoundService – Detection Sound Playback (Auto Stop)")]
+    [Trait("Scenario", "DEP-221")]
     public async Task Detection_Sound_Playback_AutoStop_Works()
     {
-        // Arrange - 자동 중지 설정 확인
-        Assert.True(_fx.SetupModel.IsDetectionAutoSoundStop);
-        Assert.True(_fx.SetupModel.DetectionSoundDuration > 0);
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_fx.SetupModel.DetectionSoundDuration)); // 안전 타임아웃
-
-        // Act
-        var playTask = _fx.SoundSvc.DetectionSoundPlayAsync(cts.Token);
-
-        // 재생 시작 확인
-        await Task.Delay(300); // 재생 시작 대기
-        var detectionSound = _fx.SoundProvider.FirstOrDefault(s =>
-            s.Name.Equals(_fx.SetupModel.DetectionSound, StringComparison.OrdinalIgnoreCase));
-
-        if (detectionSound != null)
+        // Arrange — 이 시험만의 설정: 탐지 자동 멈춤 켬
+        await using var iso = await IsolatedSoundService.CreateRealAsync(_fx, s =>
         {
-            Assert.True(detectionSound.IsPlaying);
-        }
+            s.IsDetectionAutoSoundStop = true;
+            s.DetectionSoundDuration = 3;
+        });
 
-        // 자동 중지까지 대기
-        await playTask;
-
-        // Assert - 재생 완료 후 상태 확인
-        if (detectionSound != null)
-        {
-            Assert.False(detectionSound.IsPlaying);
-        }
+        // Act · Assert
+        await SoundPlaybackScenarios.AutoStopsAfterDurationAsync(iso, EnumEventType.Intrusion, RealClipAllowance);
     }
 
     [Fact(DisplayName = "SoundService – Malfunction Sound Playback (Manual Stop)")]
+    [Trait("Scenario", "DEP-222")]
     public async Task Malfunction_Sound_Playback_ManualStop_Works()
     {
-        // Arrange - 수동 중지 설정 확인 (무한 재생)
-        Assert.False(_fx.SetupModel.IsMalfunctionAutoSoundStop);
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // 2초 후 취소
-
-        // Act
-        var playTask = _fx.SoundSvc.MalfunctionSoundPlayAsync(cts.Token);
-
-        // 재생 시작 확인
-        await Task.Delay(300);
-        var malfunctionSound = _fx.SoundProvider.FirstOrDefault(s =>
-            s.Name.Equals(_fx.SetupModel.MalfunctionSound, StringComparison.OrdinalIgnoreCase));
-
-        if (malfunctionSound != null)
+        // Arrange — 이 시험만의 설정: 장애 자동 멈춤 끔(취소할 때까지 계속)
+        await using var iso = await IsolatedSoundService.CreateRealAsync(_fx, s =>
         {
-            Assert.True(malfunctionSound.IsPlaying);
-        }
+            s.IsMalfunctionAutoSoundStop = false;
+            s.MalfunctionSoundDuration = 2;
+        });
 
-        // Assert - 취소로 인한 중지
-        await Assert.ThrowsAsync<OperationCanceledException>(() => playTask);
-
-        // 재생 상태 확인
-        if (malfunctionSound != null)
-        {
-            Assert.False(malfunctionSound.IsPlaying);
-        }
+        // Act · Assert
+        await SoundPlaybackScenarios.KeepsPlayingUntilCancelledAsync(iso);
     }
 
     [Fact(DisplayName = "SoundService – Action Report Sound Playback")]
+    [Trait("Scenario", "DEP-224")]
     public async Task ActionReport_Sound_Playback_Works()
     {
-        // Arrange - 자동 중지 설정 확인
-        Assert.True(_fx.SetupModel.IsActionReportAutoSoundStop);
-        Assert.True(_fx.SetupModel.ActionReportSoundDuration > 0);
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_fx.SetupModel.ActionReportSoundDuration)); // 안전 타임아웃
-
-        // Act
-        var playTask = _fx.SoundSvc.ActionReportSoundPlayAsync(cts.Token);
-
-        // 재생 시작 확인
-        await Task.Delay(300);
-        var actionSound = _fx.SoundProvider.FirstOrDefault(s =>
-            s.Name.Equals(_fx.SetupModel.ActionReportSound, StringComparison.OrdinalIgnoreCase));
-
-        if (actionSound != null)
+        // Arrange — 이 시험만의 설정: 조치 보고 자동 멈춤 켬
+        await using var iso = await IsolatedSoundService.CreateRealAsync(_fx, s =>
         {
-            Assert.True(actionSound.IsPlaying);
-        }
+            s.IsActionReportAutoSoundStop = true;
+            s.ActionReportSoundDuration = 3;
+        });
 
-        // 완료까지 대기
-        await playTask;
-
-        // Assert
-        if (actionSound != null)
-        {
-            Assert.False(actionSound.IsPlaying);
-        }
+        // Act · Assert
+        await SoundPlaybackScenarios.AutoStopsAfterDurationAsync(iso, EnumEventType.Action, RealClipAllowance);
     }
 
     [Fact(DisplayName = "SoundService – Stop All Sounds with Actual Files")]
@@ -449,23 +407,17 @@ public class SoundService_PlaybackTests
     }
 
     [Fact(DisplayName = "SoundService – Concurrent Playback Prevention")]
+    [Trait("Scenario", "DEP-223")]
     public async Task Concurrent_Playback_Prevention_Works()
     {
-        // Arrange - 자동 중지 설정 확인
-        Assert.False(_fx.SetupModel.IsDetectionAutoSoundStop);
+        // Arrange — 이 시험만의 설정: 탐지 자동 멈춤 끔(계속 울림) — 그 사이 장애 요청이 같이 울리지 않아야 한다
+        await using var iso = await IsolatedSoundService.CreateRealAsync(_fx, s =>
+        {
+            s.IsDetectionAutoSoundStop = false;
+        });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // 안전 타임아웃
-
-        // Act - 동시에 두 개의 사운드 재생 시도
-        var task1 = _fx.SoundSvc.DetectionSoundPlayAsync(cts.Token);
-        await Task.Delay(100); // 첫 번째 재생이 시작되도록 대기
-
-        // 두 번째 재생은 실패해야 함 (Semaphore 보호)
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => _fx.SoundSvc.MalfunctionSoundPlayAsync(cts.Token));
-
-        // 첫 번째 재생 완료 대기
-        await task1;
+        // Act · Assert — 두 번째 요청은 예외가 아니라 큐에서 기다린다(현 큐 설계). 같이 울리는 순간이 없어야 한다.
+        await SoundPlaybackScenarios.NeverPlaysTwoAtOnceAsync(iso, TimeSpan.FromSeconds(2));
     }
 }
 

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,42 +19,31 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Tests;
    Company      : Sensorway Co., Ltd.
 
    Description  : Server Category, Server Instance, Server Metrics API 통합 테스트
-                  GOP API 서버 (localhost:8000) 가동 필요
+                  라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api)
+                  + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+                  쓰기 시험은 loopback · 사설망 주소에서만 돈다
                   ⚠ type_server는 EnumServerType 유효값만 허용 (UNIQUE 제약)
                   테스트 간 병렬 실행 방지를 위해 [Collection] 사용
 ****************************************************************************/
 
 [Collection("ServerApiTests")]
+[Trait("Scenario", "DEP-203")]
 public class ServerApiServiceTests
 {
     private readonly ILogService _logService;
-    private readonly ApiSetupModel _setupModel;
 
     public ServerApiServiceTests()
     {
         _logService = new LogService();
-        _setupModel = new ApiSetupModel
-        {
-            Url = "http://localhost:8000/api",
-            Username = "admin",
-            Password = "admin123",
-            Timeout = 30
-        };
     }
 
-    private async Task<IServerApiService> CreateServiceAsync()
-    {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "ServerApi"));
-        var container = builder.Build();
-        var service = container.ResolveNamed<IServerApiService>("ServerApi");
-        await service.ExecuteAsync(CancellationToken.None);
-        return service;
-    }
+    // 어셈블리 공용 로그인 세션의 서비스를 쓴다 — 시험마다 컨테이너를 만들거나 로그인하지 않는다.
+    private static Task<IServerApiService> CreateServiceAsync()
+        => LiveApiSession.ResolveAsync<IServerApiService>();
 
     #region - Server Category API Tests (§8.2) -
 
-    [Fact(DisplayName = "A59.1: GetCategoriesAsync — 카테고리 목록 조회")]
+    [LiveApiFact(DisplayName = "A59.1: GetCategoriesAsync — 카테고리 목록 조회")]
     public async Task GetCategoriesAsync_ShouldReturnCategoryList()
     {
         // Arrange
@@ -73,7 +63,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Categories count: {response.Data.Count}, Total: {response.Pagination.Total}");
     }
 
-    [Fact(DisplayName = "A59.2: CreateCategoryAsync — 카테고리 생성")]
+    [LiveApiWriteFact(DisplayName = "A59.2: CreateCategoryAsync — 카테고리 생성")]
     public async Task CreateCategoryAsync_ShouldReturnCreatedCategory()
     {
         // Arrange
@@ -102,7 +92,7 @@ public class ServerApiServiceTests
         await service.DeleteCategoryAsync(response.Data.Id);
     }
 
-    [Fact(DisplayName = "A59.3: GetCategoryByIdAsync — 카테고리 상세 조회 (서버 목록 포함)")]
+    [LiveApiWriteFact(DisplayName = "A59.3: GetCategoryByIdAsync — 카테고리 상세 조회 (서버 목록 포함)")]
     public async Task GetCategoryByIdAsync_ShouldReturnCategoryWithServers()
     {
         // Arrange
@@ -133,7 +123,7 @@ public class ServerApiServiceTests
         await service.DeleteCategoryAsync(createdId);
     }
 
-    [Fact(DisplayName = "A59.4: PatchCategoryAsync — 카테고리 부분 수정")]
+    [LiveApiWriteFact(DisplayName = "A59.4: PatchCategoryAsync — 카테고리 부분 수정")]
     public async Task PatchCategoryAsync_ShouldUpdatePartialFields()
     {
         // Arrange
@@ -167,7 +157,7 @@ public class ServerApiServiceTests
         await service.DeleteCategoryAsync(createdId);
     }
 
-    [Fact(DisplayName = "A59.5: UpdateCategoryAsync — 카테고리 전체 교체")]
+    [LiveApiWriteFact(DisplayName = "A59.5: UpdateCategoryAsync — 카테고리 전체 교체")]
     public async Task UpdateCategoryAsync_ShouldReplaceAllFields()
     {
         // Arrange
@@ -208,7 +198,7 @@ public class ServerApiServiceTests
         await service.DeleteCategoryAsync(createdId);
     }
 
-    [Fact(DisplayName = "A59.6: DeleteCategoryAsync — 카테고리 삭제")]
+    [LiveApiWriteFact(DisplayName = "A59.6: DeleteCategoryAsync — 카테고리 삭제")]
     public async Task DeleteCategoryAsync_ShouldReturnSuccess()
     {
         // Arrange
@@ -233,7 +223,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Category deleted: Id={createdId}");
     }
 
-    [Fact(DisplayName = "A59.7: Category CRUD Lifecycle — Create→Read→Patch→Update→Delete")]
+    [LiveApiWriteFact(DisplayName = "A59.7: Category CRUD Lifecycle — Create→Read→Patch→Update→Delete")]
     public async Task CategoryCrudLifecycle_CreateReadUpdateDelete()
     {
         var service = await CreateServiceAsync();
@@ -286,7 +276,7 @@ public class ServerApiServiceTests
 
     #region - Server Instance API Tests (§8.3) -
 
-    [Fact(DisplayName = "A60.1: GetServersAsync — 서버 목록 조회")]
+    [LiveApiFact(DisplayName = "A60.1: GetServersAsync — 서버 목록 조회")]
     public async Task GetServersAsync_ShouldReturnServerList()
     {
         // Arrange
@@ -306,7 +296,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Servers count: {response.Data.Count}, Total: {response.Pagination.Total}");
     }
 
-    [Fact(DisplayName = "A60.2: CreateServerAsync — 서버 생성")]
+    [LiveApiWriteFact(DisplayName = "A60.2: CreateServerAsync — 서버 생성")]
     public async Task CreateServerAsync_ShouldReturnCreatedServer()
     {
         // Arrange
@@ -336,7 +326,7 @@ public class ServerApiServiceTests
         await service.DeleteServerAsync(response.Data.Id);
     }
 
-    [Fact(DisplayName = "A60.3: GetServerByIdAsync — 서버 상세 조회")]
+    [LiveApiWriteFact(DisplayName = "A60.3: GetServerByIdAsync — 서버 상세 조회")]
     public async Task GetServerByIdAsync_ShouldReturnSingleServer()
     {
         // Arrange
@@ -368,7 +358,7 @@ public class ServerApiServiceTests
         await service.DeleteServerAsync(createdId);
     }
 
-    [Fact(DisplayName = "A60.4: PatchServerAsync — 서버 부분 수정")]
+    [LiveApiWriteFact(DisplayName = "A60.4: PatchServerAsync — 서버 부분 수정")]
     public async Task PatchServerAsync_ShouldUpdatePartialFields()
     {
         // Arrange
@@ -402,7 +392,7 @@ public class ServerApiServiceTests
         await service.DeleteServerAsync(createdId);
     }
 
-    [Fact(DisplayName = "A60.5: UpdateServerAsync — 서버 전체 교체")]
+    [LiveApiWriteFact(DisplayName = "A60.5: UpdateServerAsync — 서버 전체 교체")]
     public async Task UpdateServerAsync_ShouldReplaceAllFields()
     {
         // Arrange
@@ -444,7 +434,7 @@ public class ServerApiServiceTests
         await service.DeleteServerAsync(createdId);
     }
 
-    [Fact(DisplayName = "A60.6: DeleteServerAsync — 서버 삭제")]
+    [LiveApiWriteFact(DisplayName = "A60.6: DeleteServerAsync — 서버 삭제")]
     public async Task DeleteServerAsync_ShouldReturnSuccess()
     {
         // Arrange
@@ -469,7 +459,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Server deleted: Id={createdId}");
     }
 
-    [Fact(DisplayName = "A60.7: Server CRUD Lifecycle — Create→Read→Patch→Update→Delete")]
+    [LiveApiWriteFact(DisplayName = "A60.7: Server CRUD Lifecycle — Create→Read→Patch→Update→Delete")]
     public async Task ServerCrudLifecycle_CreateReadUpdateDelete()
     {
         var service = await CreateServiceAsync();
@@ -524,7 +514,7 @@ public class ServerApiServiceTests
 
     #region - Server Metrics API Tests (§8.6) -
 
-    [Fact(DisplayName = "A61.1: CreateServerMetricAsync — 메트릭 기록")]
+    [LiveApiWriteFact(DisplayName = "A61.1: CreateServerMetricAsync — 메트릭 기록")]
     public async Task CreateServerMetricAsync_ShouldRecordMetric()
     {
         // Arrange
@@ -556,7 +546,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Metric created: Id={response.Data.Id}, CPU={response.Data.CpuUsage}");
     }
 
-    [Fact(DisplayName = "A61.2: GetServerMetricsAsync — 메트릭 이력 조회")]
+    [LiveApiFact(DisplayName = "A61.2: GetServerMetricsAsync — 메트릭 이력 조회")]
     public async Task GetServerMetricsAsync_ShouldReturnMetricHistory()
     {
         // Arrange
@@ -573,7 +563,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Metrics history count: {response.Data.Count}");
     }
 
-    [Fact(DisplayName = "A61.3: GetServerMetricLatestAsync — 최신 메트릭 조회")]
+    [LiveApiFact(DisplayName = "A61.3: GetServerMetricLatestAsync — 최신 메트릭 조회")]
     public async Task GetServerMetricLatestAsync_ShouldReturnLatest()
     {
         // Arrange
@@ -592,7 +582,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Latest metric: CPU={response.Data.LatestMetrics?.CpuUsage}");
     }
 
-    [Fact(DisplayName = "A61.4: DeleteServerMetricsAsync — 메트릭 삭제")]
+    [LiveApiWriteFact(DisplayName = "A61.4: DeleteServerMetricsAsync — 메트릭 삭제")]
     public async Task DeleteServerMetricsAsync_ShouldReturnDeletedCount()
     {
         // Arrange
@@ -617,7 +607,7 @@ public class ServerApiServiceTests
         _logService.Info($"[Test] Metrics deleted: {response.Data.DeletedCount}");
     }
 
-    [Fact(DisplayName = "A61.5: Server Metrics Lifecycle — Record→Query→Latest→Delete")]
+    [LiveApiWriteFact(DisplayName = "A61.5: Server Metrics Lifecycle — Record→Query→Latest→Delete")]
     public async Task ServerMetricsLifecycle_RecordQueryDelete()
     {
         var service = await CreateServiceAsync();
@@ -654,7 +644,7 @@ public class ServerApiServiceTests
 
     #region - Proxy Settings API Tests (§8.8) -
 
-    [Fact(DisplayName = "5.1: GetProxySettingsAsync — 프록시 설정 조회 (server_id=1)")]
+    [LiveApiFact(DisplayName = "5.1: GetProxySettingsAsync — 프록시 설정 조회 (server_id=1)")]
     public async Task GetProxySettingsAsync_ShouldReturnProxySetting()
     {
         // Arrange

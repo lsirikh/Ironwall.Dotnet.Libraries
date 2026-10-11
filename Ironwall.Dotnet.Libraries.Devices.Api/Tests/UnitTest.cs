@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Ironwall.Dotnet.Libraries.Tests.LiveApi;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -23,7 +24,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Tests;
 
 /// <summary>
 /// DeviceApiService 단위 테스트
+/// <para>라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api) + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+/// 쓰기 시험은 loopback · 사설망 주소에서만 돈다. 모듈 등록 · 초기화 시험은 네트워크 없이 돈다.</para>
 /// </summary>
+[Trait("Scenario", "DEP-204")]
 public class DeviceApiServiceTests
 {
     private readonly ILogService _logService;
@@ -35,16 +39,8 @@ public class DeviceApiServiceTests
     {
         _logService = new LogService();
 
-        // GOP API 서버 설정 (실제 테스트 시 GOP 서버 URL로 변경 필요)
-        _setupModel = new ApiSetupModel
-        {
-            Url = "http://localhost:8000/api/",  // GOP API 서버 주소
-            Username = "admin",
-            Password = "admin123",
-            ApiKey = "",
-            Phone = "",
-            Timeout = 30
-        };
+        // 모듈 등록 · 초기화 시험용 접속 설정 — 계정은 싣지 않는다(서버 호출 시험은 공용 로그인 세션을 쓴다).
+        _setupModel = LiveApiTarget.CreateSetup();
     }
     #endregion
 
@@ -122,16 +118,11 @@ public class DeviceApiServiceTests
     /// Controller 목록 조회 API 테스트
     /// 참고: 실제 GOP 서버가 없으면 실패할 수 있음
     /// </summary>
-    [Fact(DisplayName = "04. Get Controllers")]
+    [LiveApiFact(DisplayName = "04. Get Controllers")]
     public async Task GetControllers_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetControllersAsync();
@@ -156,16 +147,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Controller 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "05. Get Controller By ID")]
+    [LiveApiFact(DisplayName = "05. Get Controller By ID")]
     public async Task GetControllerById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetControllerByIdAsync(1, includeSensors: true);
@@ -182,16 +168,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Controller 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "06. Create Controller")]
+    [LiveApiWriteFact(DisplayName = "06. Create Controller")]
     public async Task CreateController_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new ControllerDeviceDto
         {
@@ -216,16 +197,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Controller 수정 API 테스트 (PATCH)
     /// </summary>
-    [Fact(DisplayName = "07. Update Controller (PATCH)")]
+    [LiveApiWriteFact(DisplayName = "07. Update Controller (PATCH)")]
     public async Task PatchController_Should_Update()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new ControllerDeviceDto
         {
@@ -252,16 +228,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Controller 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "08. Delete Controller")]
+    [LiveApiWriteFact(DisplayName = "08. Delete Controller")]
     public async Task DeleteController_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.DeleteControllerAsync(1);
@@ -275,16 +246,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 목록 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "09. Get Sensors")]
+    [LiveApiFact(DisplayName = "09. Get Sensors")]
     public async Task GetSensors_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetSensorsAsync();
@@ -305,16 +271,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 목록 조회 (include_controller=true) API 테스트
     /// </summary>
-    [Fact(DisplayName = "09-1. Get Sensors with Controller Info")]
+    [LiveApiFact(DisplayName = "09-1. Get Sensors with Controller Info")]
     public async Task GetSensors_WithController_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetSensorsAsync(includeController: true, page:2, limit:20);
@@ -332,16 +293,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "10. Get Sensor By ID")]
+    [LiveApiFact(DisplayName = "10. Get Sensor By ID")]
     public async Task GetSensorById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetSensorByIdAsync(1);
@@ -358,16 +314,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 단일 조회 (include_controller=true) API 테스트
     /// </summary>
-    [Fact(DisplayName = "10-1. Get Sensor By ID with Controller Info")]
+    [LiveApiFact(DisplayName = "10-1. Get Sensor By ID with Controller Info")]
     public async Task GetSensorById_WithController_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetSensorByIdAsync(1, includeController: true);
@@ -385,16 +336,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "11. Create Sensor")]
+    [LiveApiWriteFact(DisplayName = "11. Create Sensor")]
     public async Task CreateSensor_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new SensorDeviceDto
         {
@@ -418,16 +364,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 수정 API 테스트 (PATCH)
     /// </summary>
-    [Fact(DisplayName = "12. Update Sensor (PATCH)")]
+    [LiveApiWriteFact(DisplayName = "12. Update Sensor (PATCH)")]
     public async Task PatchSensor_Should_Update()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new SensorDeviceDto
         {
@@ -454,16 +395,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 전체 수정 API 테스트 (PUT)
     /// </summary>
-    [Fact(DisplayName = "13. Update Sensor (PUT)")]
+    [LiveApiWriteFact(DisplayName = "13. Update Sensor (PUT)")]
     public async Task UpdateSensor_Should_Update()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new SensorDeviceDto
         {
@@ -486,16 +422,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Sensor 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "14. Delete Sensor")]
+    [LiveApiWriteFact(DisplayName = "14. Delete Sensor")]
     public async Task DeleteSensor_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.DeleteSensorAsync(999);
@@ -509,16 +440,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 목록 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "15. Get Cameras")]
+    [LiveApiFact(DisplayName = "15. Get Cameras")]
     public async Task GetCameras_Should_Return_List()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetCamerasAsync();
@@ -539,16 +465,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 단일 조회 API 테스트
     /// </summary>
-    [Fact(DisplayName = "16. Get Camera By ID")]
+    [LiveApiFact(DisplayName = "16. Get Camera By ID")]
     public async Task GetCameraById_Should_Return_Single()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.GetCameraByIdAsync(1);
@@ -565,16 +486,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 생성 API 테스트
     /// </summary>
-    [Fact(DisplayName = "17. Create Camera")]
+    [LiveApiWriteFact(DisplayName = "17. Create Camera")]
     public async Task CreateCamera_Should_Return_Created()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new CameraDeviceDto
         {
@@ -605,16 +521,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 수정 API 테스트 (PATCH)
     /// </summary>
-    [Fact(DisplayName = "18. Update Camera (PATCH)")]
+    [LiveApiWriteFact(DisplayName = "18. Update Camera (PATCH)")]
     public async Task PatchCamera_Should_Update()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new CameraDeviceDto
         {
@@ -641,16 +552,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 전체 수정 API 테스트 (PUT)
     /// </summary>
-    [Fact(DisplayName = "19. Update Camera (PUT)")]
+    [LiveApiWriteFact(DisplayName = "19. Update Camera (PUT)")]
     public async Task UpdateCamera_Should_Update()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         var dto = new CameraDeviceDto
         {
@@ -680,16 +586,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// Camera 삭제 API 테스트
     /// </summary>
-    [Fact(DisplayName = "20. Delete Camera")]
+    [LiveApiWriteFact(DisplayName = "20. Delete Camera")]
     public async Task DeleteCamera_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         // Act
         var response = await service.DeleteCameraAsync(999);
@@ -703,16 +604,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// 제어기 다수 등록 테스트
     /// </summary>
-    [Fact(DisplayName = "21. Bulk Create Controllers")]
+    [LiveApiWriteFact(DisplayName = "21. Bulk Create Controllers")]
     public async Task BulkCreateControllers_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         int controllerCount = 3;
         var createdControllers = new List<ControllerDeviceDto>();
@@ -749,16 +645,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// 센서 다수 등록 테스트
     /// </summary>
-    [Fact(DisplayName = "22. Bulk Create Sensors")]
+    [LiveApiWriteFact(DisplayName = "22. Bulk Create Sensors")]
     public async Task BulkCreateSensors_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         int controllerId = 1;
         int sensorCount = 80;
@@ -800,16 +691,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// 제어기 및 센서 다수 등록 통합 테스트 (Db의 SeedAsync 참고)
     /// </summary>
-    [Fact(DisplayName = "23. Bulk Create Controllers with Sensors")]
+    [LiveApiWriteFact(DisplayName = "23. Bulk Create Controllers with Sensors")]
     public async Task BulkCreateControllersWithSensors_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         int controllerCount = 3;
         int sensorsPerController = 80;
@@ -883,16 +769,11 @@ public class DeviceApiServiceTests
     /// <summary>
     /// 카메라 다수 등록 테스트
     /// </summary>
-    [Fact(DisplayName = "24. Bulk Create Cameras")]
+    [LiveApiWriteFact(DisplayName = "24. Bulk Create Cameras")]
     public async Task BulkCreateCameras_Should_Return_Success()
     {
         // Arrange
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
-        _container = builder.Build();
-
-        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
-        await service.ExecuteAsync(CancellationToken.None);
+        var service = await LiveApiSession.ResolveAsync<IDeviceApiService>();
 
         int cameraCount = 30;
         var createdCameras = new List<CameraDeviceDto>();
@@ -1008,38 +889,26 @@ public class DeviceApiServiceTests
 
 /// <summary>
 /// Enclosure Metrics API 테스트 (§5.5.9~12)
-/// GOP API 서버 (localhost:8000) 가동 필요, Enclosure id=3 필요
+/// 라이브 서버: IRONWALL_LIVE_API_URL(기본 https://localhost:8000/api) + IRONWALL_E2E_CRED_FILE 전용 계정 — 없으면 건너뜀,
+/// 쓰기 시험은 loopback · 사설망 주소에서만 돈다. Enclosure id=3 필요
 /// </summary>
 [Collection("EnclosureMetricsTests")]
+[Trait("Scenario", "DEP-205")]
 public class EnclosureMetricsTests
 {
     private readonly ILogService _logService;
-    private readonly ApiSetupModel _setupModel;
     private const int TestEnclosureId = 3;
 
     public EnclosureMetricsTests()
     {
         _logService = new LogService();
-        _setupModel = new ApiSetupModel
-        {
-            Url = "http://localhost:8000/api",
-            Username = "admin",
-            Password = "admin123",
-            Timeout = 30
-        };
     }
 
-    private async Task<IDeviceApiService> CreateServiceAsync()
-    {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "EnclosureTest"));
-        var container = builder.Build();
-        var service = container.ResolveNamed<IDeviceApiService>("EnclosureTest");
-        await service.ExecuteAsync(CancellationToken.None);
-        return service;
-    }
+    // 어셈블리 공용 로그인 세션의 서비스를 쓴다 — 시험마다 컨테이너를 만들거나 로그인하지 않는다.
+    private static Task<IDeviceApiService> CreateServiceAsync()
+        => LiveApiSession.ResolveAsync<IDeviceApiService>();
 
-    [Fact(DisplayName = "A62.1: CreateEnclosureMetricAsync — 환경 메트릭 기록")]
+    [LiveApiWriteFact(DisplayName = "A62.1: CreateEnclosureMetricAsync — 환경 메트릭 기록")]
     public async Task CreateEnclosureMetricAsync_ShouldSaveMetric()
     {
         // Arrange
@@ -1065,7 +934,7 @@ public class EnclosureMetricsTests
         _logService.Info($"[Test] Enclosure metric created: Id={response.Data.Id}");
     }
 
-    [Fact(DisplayName = "A62.2: GetEnclosureMetricsAsync — 메트릭 이력 조회")]
+    [LiveApiWriteFact(DisplayName = "A62.2: GetEnclosureMetricsAsync — 메트릭 이력 조회")]
     public async Task GetEnclosureMetricsAsync_ShouldReturnHistory()
     {
         // Arrange
@@ -1089,7 +958,7 @@ public class EnclosureMetricsTests
         _logService.Info($"[Test] Enclosure metrics count: {response.Data.Count}");
     }
 
-    [Fact(DisplayName = "A62.3: GetEnclosureMetricLatestAsync — 최신 메트릭 조회")]
+    [LiveApiFact(DisplayName = "A62.3: GetEnclosureMetricLatestAsync — 최신 메트릭 조회")]
     public async Task GetEnclosureMetricLatestAsync_ShouldReturnLatest()
     {
         // Arrange
@@ -1107,7 +976,7 @@ public class EnclosureMetricsTests
         _logService.Info($"[Test] Latest metric: Temp={response.Data.Temperature}");
     }
 
-    [Fact(DisplayName = "A62.4: DeleteEnclosureMetricsAsync — 메트릭 삭제")]
+    [LiveApiWriteFact(DisplayName = "A62.4: DeleteEnclosureMetricsAsync — 메트릭 삭제")]
     public async Task DeleteEnclosureMetricsAsync_ShouldReturnDeletedCount()
     {
         // Arrange
@@ -1125,7 +994,7 @@ public class EnclosureMetricsTests
         _logService.Info($"[Test] Enclosure metrics deleted: {response.Data.DeletedCount}");
     }
 
-    [Fact(DisplayName = "A62.5: Enclosure Metrics Lifecycle — Record→Query→Latest→Delete")]
+    [LiveApiWriteFact(DisplayName = "A62.5: Enclosure Metrics Lifecycle — Record→Query→Latest→Delete")]
     public async Task EnclosureMetricsLifecycle_RecordQueryDelete()
     {
         var service = await CreateServiceAsync();
