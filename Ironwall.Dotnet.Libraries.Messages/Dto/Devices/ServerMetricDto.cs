@@ -82,14 +82,17 @@ public class ServerMetricDto : BaseDto
     public JToken? ThresholdExceeded { get; set; }
 
     /// <summary>
-    /// <see cref="ThresholdExceeded"/> 를 7.0 모양(목록)으로 읽은 뷰. 배열이 아니면(6.3 dict · null) <b>빈 목록</b>이다.
-    /// 직렬화 대상이 아니다.
+    /// <see cref="ThresholdExceeded"/> 를 7.0 모양(목록)으로 읽은 뷰. 직렬화 대상이 아니다.
+    /// <para>6.3 dict(<c>{"cpu":{"level","value","threshold"}}</c>, 6.3.0 <c>server_metrics.py</c> <c>_check_thresholds</c>)도
+    /// <b>서버가 자기 임계로 판정한 값</b>이라 같은 항목으로 옮긴다(키 → <c>field</c>, <c>level</c> → <c>severity</c>, 방향은 초과만 판정하므로 <c>HIGH</c>).
+    /// 종전엔 배열만 읽어 6.3 에서 임계 초과 배지가 조용히 하나도 뜨지 않았다. <c>threshold</c> 가 없는 항목은 판정이 아니라 건너뛴다.</para>
     /// </summary>
     [JsonIgnore]
     public IReadOnlyList<ServerThresholdExceededDto> ThresholdExceededItems
     {
         get
         {
+            if (ThresholdExceeded is JObject legacy) return FromLegacyDictionary(legacy);
             if (ThresholdExceeded is not JArray array) return Array.Empty<ServerThresholdExceededDto>();
 
             var list = new List<ServerThresholdExceededDto>();
@@ -109,12 +112,32 @@ public class ServerMetricDto : BaseDto
             return list;
         }
     }
+
+    private static IReadOnlyList<ServerThresholdExceededDto> FromLegacyDictionary(JObject dictionary)
+    {
+        var list = new List<ServerThresholdExceededDto>();
+        foreach (var entry in dictionary.Properties())
+        {
+            if (entry.Value is not JObject judged || !IsNumber(judged["threshold"])) continue;
+            list.Add(new ServerThresholdExceededDto
+            {
+                Field = entry.Name,
+                Value = IsNumber(judged["value"]) ? judged.Value<double>("value") : 0,
+                Threshold = judged.Value<double>("threshold"),
+                Direction = "HIGH",
+                Severity = judged.Value<string>("level") ?? string.Empty,
+            });
+        }
+        return list;
+    }
+
+    private static bool IsNumber(JToken? token) => token?.Type is JTokenType.Integer or JTokenType.Float;
 }
 /// <summary>
 /// 서버 계측의 임계 초과 항목 (API 7.0 <c>ThresholdExceeded</c>).
 /// <para>함체용 <see cref="ThresholdExceededItemDto"/> 와 <b>키가 다르다</b> — 함체는 <c>type</c>,
 /// 서버는 <c>direction</c> + <c>severity</c> 2키다(7.0.1 Swagger 실측). 재사용하면 두 값이 조용히 유실된다.</para>
-/// <para>6.3 서버는 이 모양을 보내지 않는다(dict 1개) — 그 판본에서는 이 목록이 비어 있다.</para>
+/// <para>6.3 서버는 이 모양 대신 dict 를 보낸다 — <see cref="ServerMetricDto.ThresholdExceededItems"/> 가 같은 항목으로 옮긴다.</para>
 /// </summary>
 public class ServerThresholdExceededDto
 {

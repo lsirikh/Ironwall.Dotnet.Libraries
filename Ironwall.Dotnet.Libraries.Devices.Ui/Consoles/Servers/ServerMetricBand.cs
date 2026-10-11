@@ -35,9 +35,9 @@ public sealed record ServerMetricHistoryRow(string TimeText, string Cpu, string 
 /// 지표 매핑의 순수 함수(스토리보드 L1345-1346 · L1359).
 /// </summary>
 /// <remarks>
-/// <para><b>임계는 우리가 판정하지 않는다.</b> 배지는 서버가 보낸 <c>threshold_exceeded</c> 항목에서만 나온다.
-/// 6.3 은 이 값을 dict 로 보내 <see cref="ServerMetricDto.ThresholdExceededItems"/> 가 <b>빈 목록</b>이므로
-/// 그 판본에서는 배지가 아예 뜨지 않는다 — 그것이 옳다(우리 임계와 서버 임계가 갈리면 화면이 거짓말을 한다).</para>
+/// <para><b>임계는 우리가 판정하지 않는다.</b> 배지는 서버가 보낸 <c>threshold_exceeded</c> 항목에서만 나온다
+/// (우리 임계와 서버 임계가 갈리면 화면이 거짓말을 한다). 6.3 은 이 값을 dict 로 보내지만 그것도 서버의 판정이라
+/// <see cref="ServerMetricDto.ThresholdExceededItems"/> 가 같은 항목으로 옮긴다 — 종전엔 6.3 에서 배지가 조용히 하나도 뜨지 않았다.</para>
 /// <para><b>이력은 재판정하지 않는다</b>(L1359). <see cref="History"/> 는 배지 자리를 아예 만들지 않는다 —
 /// 과거 행의 임계 배열은 언제나 비어 있어, 그리는 순간 "그때는 정상이었다" 는 거짓이 된다.</para>
 /// </remarks>
@@ -83,7 +83,7 @@ public static class ServerMetricBand
             .ToArray();
     }
 
-    /// <summary>서버가 보낸 임계 초과 항목 — 지표 키(<c>cpu</c>…)로 찾는다. 배열이 아니면 비어 있다.</summary>
+    /// <summary>서버가 보낸 임계 초과 항목 — 지표 키(<c>cpu</c>…)로 찾는다. 7.0+ 배열 · 6.3 dict 를 모두 읽는다.</summary>
     public static IReadOnlyDictionary<string, ServerThresholdExceededDto> BadgesOf(ServerMetricDto? metric)
     {
         var map = new Dictionary<string, ServerThresholdExceededDto>(StringComparer.OrdinalIgnoreCase);

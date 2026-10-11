@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CameraPopup.Tests 실행 설정 — 소스 줄 정보(DiaSession) 수집만 끈다. 시험은 전부 그대로 실행 · 판정된다.
+  까닭: `dotnet test Ironwall.Dotnet.Libraries.sln` 에서 286개가 모두 통과한 뒤 xunit.runner.visualstudio 3.1.0 의 정리 단계가
+  "Catastrophic failure: NullReferenceException at PortableSymbolReader.Dispose ← DiaSession.Dispose ← VisualStudioSourceInformationProvider.DisposeAsync"
+  로 간헐적으로 터져 실행 전체가 종료 코드 1 이 됐다(2026-10-11, 같은 작업 트리에서 두 번 중 한 번 · 하네스 실행에서 재현).
+  소스 줄 정보는 IDE 의 "시험으로 이동" 용이라 명령줄 실행에는 쓰이지 않는다.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <CollectSourceInformation>false</CollectSourceInformation>
+  </RunConfiguration>
+</RunSettings>
