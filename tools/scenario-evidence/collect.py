@@ -95,19 +95,19 @@ def scan_sources(repos):
                     continue
                 if "Scenario" not in text:
                     continue
-                cls, pending = "", []
+                # 파일 안의 모든 형식 이름을 후보로 둔다 — 보조 record/class 가 섞여 있어도 실행 기록(TRX)에 있는 쪽으로 나중에 고른다.
+                classes = [c for c in CLASS_RE.findall(text)]
+                pending = []
                 for line in text.splitlines():
-                    cm = CLASS_RE.search(line)
-                    if cm and "(" not in line.split(cm.group(0))[0]:
-                        cls = cm.group(1)
                     for am in SCEN_ATTR_RE.finditer(line):
                         pending += [s.strip() for s in am.group(1).split(",") if s.strip()]
                     if pending:
                         mm = METHOD_RE.search(line)
                         if mm and not SCEN_ATTR_RE.search(line):
-                            key = f"{cls}.{mm.group(1)}"
-                            links.setdefault(key, {"ids": set(), "file": os.path.relpath(p, repo), "repo": repo})
-                            links[key]["ids"].update(pending)
+                            entry = f"{os.path.relpath(p, repo)}::{mm.group(1)}"
+                            links.setdefault(entry, {"ids": set(), "file": os.path.relpath(p, repo), "repo": repo,
+                                                     "method": mm.group(1), "classes": classes})
+                            links[entry]["ids"].update(pending)
                             pending = []
     return links
 
@@ -189,7 +189,13 @@ def main():
         return [x for x in rs if x["run"] == last_run]   # 이론(Theory) 행이 여러 개면 그 실행의 행 전부
 
     scen_tests = {r["id"]: set() for r in rows}
-    for key, info in links.items():
+    key_file = {}
+    for info in links.values():
+        cands = [f"{c}.{info['method']}" for c in info["classes"]] or [info["method"]]
+        hit = [k for k in cands if k in by_test]
+        tests_first = sorted(cands, key=lambda k: (0 if k.split(".")[0].endswith(("Tests", "Test")) else 1))
+        key = hit[0] if hit else tests_first[0]
+        key_file[key] = info["file"]
         for sid in info["ids"]:
             scen_tests.setdefault(sid, set()).add(key)
     for r in rows:
@@ -214,7 +220,7 @@ def main():
                     repo_path = next((rp for rp in a.repo if os.path.basename(rp.rstrip("/\\")) == repo_name), None)
                     if repo_path and git_changed_since(repo_path, sha):
                         stale = True
-                mode = "헤디드" if "UiTests" in (links.get(t, {}).get("file", "") + x0["trx"]) else "헤드리스"
+                mode = "헤디드" if "UiTests" in (key_file.get(t, "") + x0["trx"]) else "헤드리스"
                 evid.append({"test": t, "mode": mode, "outcome": outcomes[-1], "run": x0["run"], "start": x0["start"],
                              "trx": x0["trx"], "computer": x0["computer"], "shots": sorted({s for x in batch for s in x["shots"]})})
             if "Failed" in outcomes:
