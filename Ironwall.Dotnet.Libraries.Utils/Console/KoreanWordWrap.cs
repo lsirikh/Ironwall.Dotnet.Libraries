@@ -24,11 +24,27 @@ public static class KoreanWordWrap
     /// <summary>단어 결합자 — 폭 0, 줄바꿈 금지.</summary>
     public const char WordJoiner = '⁠';
 
-    private static bool _installed;
+    // ⚠ 이름을 바꾸지 않는다 — 호스트 시험(Dotnet.Monitoring.Solution.Tests KoreanWrapGuard)이 반사로 읽고 쓴다.
+    //   false 면 처리기가 걸려 있어도 아무것도 하지 않는다(Uninstall).
+    private static volatile bool _installed;
     private static readonly DependencyPropertyDescriptor TextDescriptor =
         DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
 
+    /// <summary>지금 켜져 있는가(시험용).</summary>
+    internal static bool IsInstalled => _installed;
+
+    /// <summary>
+    /// 시험용 해제 — 클래스 처리기는 WPF 가 떼는 길을 주지 않으므로 걸린 채 두고 <b>일을 멈춘다</b>: 이후 새 TextBlock 은 붙잡지 않고,
+    /// 이미 붙잡은 TextBlock 도 글이 바뀌거나 다시 Loaded 돼도 손대지 않는다. 이미 넣은 결합자는 걷지 않는다(<see cref="Strip"/>).
+    /// 다시 <see cref="Install"/> 하면 원래대로 돈다. 앱은 부르지 않는다(호스트 보고 R10 — 같은 프로세스 시험 글자 비교가 순서에 따라 깨졌다).
+    /// </summary>
+    internal static void Uninstall() => _installed = false;
+
     /// <summary>전역 설치 — 앱(또는 미리보기 도구)마다 한 번. 여러 번 불러도 한 번만 건다. UI 스레드에서 부른다.</summary>
+    /// <remarks>
+    /// <see cref="Uninstall"/> 뒤에 다시 부르면 처리기를 한 번 더 건다 — 호스트 시험이 반사로 처리기를 떼고 표지를 끄는 길과도 맞물린다.
+    /// 겹쳐 걸려도 <c>IsTracked</c> 가 한 TextBlock 을 한 번만 붙잡으므로 결과는 같다(시험에서만 생긴다).
+    /// </remarks>
     public static void Install()
     {
         if (_installed) return;
@@ -45,7 +61,7 @@ public static class KoreanWordWrap
 
     private static void OnFirstSized(object sender, SizeChangedEventArgs e)
     {
-        if (sender is not TextBlock tb || (bool)tb.GetValue(IsTrackedProperty)) return;
+        if (!_installed || sender is not TextBlock tb || (bool)tb.GetValue(IsTrackedProperty)) return;
         tb.SetValue(IsTrackedProperty, true);
         tb.Loaded += OnLoaded;
         tb.Unloaded += OnUnloaded;
@@ -92,7 +108,7 @@ public static class KoreanWordWrap
 
     private static void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (sender is not TextBlock tb) return;
+        if (!_installed || sender is not TextBlock tb) return;
         TextDescriptor.RemoveValueChanged(tb, OnTextChanged);   // 다시 붙어도 한 번만
         TextDescriptor.AddValueChanged(tb, OnTextChanged);
         Apply(tb);
@@ -105,7 +121,7 @@ public static class KoreanWordWrap
 
     private static void OnTextChanged(object? sender, EventArgs e)
     {
-        if (sender is TextBlock tb) Apply(tb);
+        if (_installed && sender is TextBlock tb) Apply(tb);
     }
 
     private static void Apply(TextBlock tb)

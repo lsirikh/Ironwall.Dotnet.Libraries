@@ -450,15 +450,32 @@
 							BorderThickness="1"
 							CornerRadius="3">
 							<Grid>
-							<!--  계단 방향 · 간격 표지(SB §2 "↘ 다음 창 +24px") — 실제 축척에서는 간격이 몇 DIU 라 그림만으로는 안 읽힌다  -->
-							<TextBlock
+							<!--
+								계단 방향 · 간격 표지(SB §2 "↘ 다음 창 +24px") — 실제 축척에서는 간격이 몇 DIU 라 그림만으로는 안 읽힌다.
+								화살표는 글자('↘')가 아닌 벡터 아이콘 — 글리프는 대체 글꼴을 언어마다 달리 골라 폭이 바뀌고 칸보다 길어 잘렸다(R2 · SET-058).
+							-->
+							<StackPanel
 								Margin="0,0,6,4"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Bottom"
-								FontSize="10.5"
-								Foreground="{DynamicResource TextSecondaryBrush}"
+								AutomationProperties.AutomationId="Settings.CameraPopup.Event.CascadeCaption"
+								AutomationProperties.Name="{Binding CascadeCaption}"
 								IsHitTestVisible="False"
-								Text="{Binding CascadeCaption}" />
+								Orientation="Horizontal">
+								<md:PackIcon
+									Width="11"
+									Height="11"
+									Margin="0,0,2,0"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Kind="ArrowBottomRight"
+									Visibility="{Binding ShowCascadeArrow, Converter={StaticResource CameraPopup.BoolToVisibility}}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="10.5"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="{Binding CascadeCaptionText}" />
+							</StackPanel>
 							<Canvas
 								Width="{Binding PreviewWidth}"
 								Height="{Binding PreviewHeight}"
