@@ -675,7 +675,7 @@ internal class AccountDbService : TaskService, IAccountDbService
                     Username,
                     IsIdSaved
             FROM    Logins
-            ORDER BY CreatedAt DESC           -- 가장 최근 순
+            ORDER BY CreatedAt DESC, Id DESC   -- 가장 최근 순(같은 초면 나중 번호 — CreatedAt 은 초 단위)
             LIMIT 1;                          -- 한 건만";
 
             var loginModel = await _conn.QueryFirstOrDefaultAsync<LoginModel>(sql);
