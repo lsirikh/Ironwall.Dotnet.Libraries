@@ -622,6 +622,89 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
+**2026-09-23 ~ 10-12 — GIS 설치 파일 `IronwallMonitoring_Setup_v2.10.0.0.exe` 에 들어간 라이브러리 변경** (브랜치 `v2.6` · 호스트 어셈블리 `2.10.0`, 설치 파일은 2026-10-12 빌드 · 호스트 README 「변경 이력」 참조)
+
+*아래는 이 기간 `v2.6` 에 들어온 것 전부다. 결함마다 수정 전 실패 → 수정 뒤 통과를 확인했다. 결함 하나하나의 원인과 근거는 [CHANGELOG](CHANGELOG.md), 하네스 작업의 진행 기록은 git 기록의 `.harness/<작업 id>/PLAN.md`(archive 커밋 바로 전 판)에 있다. "실창 확인"이라고 적지 않은 것은 실제 앱 창에서는 보지 않았다.*
+
+*카메라 프리셋 · ROI · ONVIF · 영상* (`Events.Ui/Consoles/Mapping/` · `Devices.Ui/Services/Onvif/`)
+
+| 무엇 | 어디 · 어떻게 | 확인 |
+|---|---|---|
+| **맵핑에 카메라 프리셋 넣기** | 이벤트 맵핑 워크벤치 카메라 탭에서 줄 하나를 고르면 보드 아래 「카메라 연동 설정」 칸이 열린다(타깃 · 홈 프리셋 콤보 · 지연 초) → 기존 [적용]. 지연 = **PTZ 가 타깃 프리셋까지 가는 동안 기다리는 시간**. 프리셋 후보는 `IMappingPresetSource`(`GET devices/cameras/{id}/presets`) | 헤드리스 · 실창(R26) |
+| **카메라 프리셋 관리 창** | 연동 칸 [프리셋 관리…] → `MappingPresetManagerView`(번호 · 이름 · 투어링 초 · 감시금지구역). 저장 · 삭제는 바로 서버로, 삭제는 같은 창 안 확인 줄. 창을 닫으면 콤보를 다시 받는다 | 헤드리스 · 실창 |
+| **카메라 ONVIF 프리셋에서 만들기** | 관리 창이 열릴 때 카메라 프리셋을 카메라 팝업 호스트로 읽는다(`HostMappingCameraPresetReader` — GIS 는 ONVIF 를 직접 부르지 않는다). [서버에 담기] 로 같은 번호의 서버 프리셋을 만들고, 번호와 토큰이 어긋나면 경고한다. 토큰이 **1 이상 정수(앞자리 0 없음)** 일 때만 번호로 쓴다 — 이벤트 PTZ 가 서버 `preset_index` 를 토큰으로 보내기 때문 | 헤드리스 · 실카메라 1대 · 가짜 카메라 |
+| **ROI 설정 창** | 관리 창 [ROI 설정…] → `MappingRoiEditorView`. 빈 곳 클릭 = 점, 첫 점 클릭 · 더블클릭 · Enter = 닫기(점 ≥3), 우클릭 · Backspace = 마지막 점 지우기, Esc = 취소, 닫은 뒤 꼭짓점을 끌어 옮긴다. 선이 서로 겹치면 저장 거부. 저장 = `PUT /presets/{pid}/rois/{rid}` 전체 교체. 좌표는 화면에서 0~1, **서버에서 픽셀로 읽은 ROI 는 픽셀로 되돌려** 저장한다. `is_exclusion` 은 읽었을 때만 되싣는다(구판 서버 422 방지) | 헤드리스 · 실창(R26-09) |
+| **ROI 기준 해상도 자동** | 새 ROI 해상도 = 카메라 **메인 스트림** 해상도. 호스트 새 요청 `CameraRequestKind.GetVideoResolution` · `CameraResponse.VideoWidth/VideoHeight`(준비 때 받은 프로파일 캐시만 읽음). 못 읽으면 기존 ROI 해상도 → 1920×1080 | 헤드리스 · 실호스트 시험 |
+| **프리셋 · ROI 창 실시간 영상** | 지도 카메라 팝업과 같은 오버레이 경로(`IMappingCameraVideo` → 호스트가 디코딩, GIS 는 공유 메모리 복사만). ROI 창은 `VideoProviderInfo.FillBox` 로 **기준 해상도 틀을 꽉 채운다**(양옆 띠 없음 — 점 위치가 메인 영상과 맞는다). [프리셋 자리로 이동] 은 눌렀을 때만(자동으로 카메라를 돌리지 않는다) | 헤드리스 · 실창(R26-11) |
+| **ONVIF 검색 → 조회 → 등록** | 장비 창 카메라 레일 툴바 [ONVIF 검색](`Devices.Camera.Onvif.Toggle`) → WS-Discovery(UDP 3702) 목록 → [조회](장비 정보 · RTSP · PTZ, 15초 제한) → [추가](Draft, 종류 FIXED/PTZ 자동) → [등록]. 같은 IP:포트는 「이미 등록됨」. 계정 칸 기본값은 비운다 | 헤드리스 · 실창(R26-10) |
+| **감시금지구역 · `SYNC_PRESET`(G8 · G9)** | 타깃 프리셋이 감시금지구역인 배선은 탐지 이벤트 창 후보에서 뺀다. `SYNC_PRESET` 은 `PresetSyncNatsService` 가 받아 매핑 카메라 캐시를 비운다 | 헤드리스 |
+| **맵핑 연동 칸 프리셋 빈칸** | 목록을 다시 세울 때 콤보 getter 가 목록 밖 record 항목을 돌려주어 `SelectedIndex -1` 로 남던 것 — 재구성 중엔 null, `MappingPresetOption` 은 참조 동등 | 헤드리스 · 실제 뷰 |
+
+*이벤트 창 · 이벤트 처리* (`Events.Ui`)
+
+- **이벤트 콘솔 '운영' 레일**(연결과 조치 사이) — `GET /events/operations` 를 목록 · 상세로(조회 전용, 칩: 전체 · 개폐 · 환경 경보 · 경고 이상). 운영 6.3.2 처럼 경로가 없는 서버는 빈 목록 + 안내.
+- **툴바 아이콘화** — [중단] · [이벤트 맵핑] · [트레이에 담기] 를 아이콘 + 툴팁으로(폭 ≈330 → ≈140). 상세 칸이 열려도 [트레이에 담기] 가 `⋯` 로 숨지 않는다. 설명은 "?" 도움말에.
+- **조치보고 창 사진** — 탐지 사진을 누르면 창의 85% 안에서 크게 보기(`ThumbnailZoomRules`), 사진 · 바깥 · Esc 로 닫는다. 창을 연 뒤 늦게 온 사진도 갱신.
+- **서버에서 지운 탐지(`SYNC_DETECTION` DELETED)** — 카드 닫기 · 큐 해제(신호등 수 감소) · 지도 하단 토스트 「서버에서 삭제됨」. 조치보고 창이 열려 있으면 [확인] 을 끈다.
+- **이벤트 결함 9건**(b7d7410e) — 조치보고가 탐지보다 먼저 와도 큐가 남던 것 · 버퍼 안 카드의 자동 조치보고 · 탐지/장애 같은 번호 가드(종류 + 번호) · 늦은 썸네일 등. **카드 썸네일이 기본 아이콘으로 남던 것**(e3f63881)도 공용 로더로.
+- **사전경보 · 접점 센서도 지도에 빨강** — 큐가 Intrusion 만 탐지로 세던 것을 "장애가 아니면 탐지" 로.
+- **카메라 팝업 설정 블록** — 꺼진 상자 안 칸의 오류가 [저장] 을 막던 것 · 배치 미리보기 「↘ 다음 창 +24 px」 가 한국어 글꼴에서 칸보다 길던 것(화살표를 아이콘으로).
+- **조치 트레이 문구 콤보가 작업 표시줄까지 내려가던 것** — 아래 「공용 커널」 의 `DropDownFit`.
+
+*지도* (`GMaps.Ui`) — 시나리오 점검에서 찾아 고친 결함
+
+- 심볼 상태가 한 번 바뀐 뒤 사용자 채우기 색이 사라지던 것 · 복제 · 붙여넣기 · 삭제 되돌리기에서 라벨 스타일 6종이 빠지던 것 · 오버레이 이미지 투명도가 재시작 때 어긋나던 것.
+- 레이어 패널: 권한 없이 이미지 보이기를 바꾸면 DB 에 쓰던 것 · 잠근 심볼이 Delete 로 지워지던 것 · 패널 머리를 지도 밖으로 끌어 다시 못 잡던 것(겹창 9종 공용 `OverlayHeaderClamp`) · 종류 행 체크박스를 한 번 눌러도 안 숨던 것(`IsThreeState=False`) · 끌기 손잡이 꺼짐 사유 툴팁.
+- 편집 모드 Esc 가 선택을 풀지 않던 것 · 팔레트 Esc 취소 안내 · 「잠금 N개 제외」 안내 · 「제목폭」 40~800 묶기 · 상세 · 추적 설정 겹창 Esc 닫기.
+- 추적 「최소 줌」 무효 · TTS 실패 안내 없음 · TTS 이중 전송 · 스피커 메뉴 "Stop" 영문 · 지도 전환이 `appsettings.json` 에 저장 안 되던 것 · 3D 「색상 강도」 슬라이더 무효 · 탐지범위 · 각도 · 방향 변경이 DB 에 안 저장되던 것 · 통문/함체 속성창을 막 열면 「권한 없음」 으로 보이던 것.
+
+*장비 · 결선 · 조립기* (`Devices.Ui` · `Devices.Db`)
+
+- 결선 창: 대역 고르기에서 속성 칸이 안 펴지던 것 · 표 · 팔레트 Ctrl+Z · 조립기 제조사 · 모델 · 일련번호 칸 자동화 id.
+- 조립기: 뺐다 되돌린 부품이 「고른 것」 으로만 돌아오던 것 · 기본 제어기 프리셋을 실물(RS485 2 · 이더넷 · 접점 2 — RS485 는 서버 카탈로그 대기)로 · **프리셋으로 등록 창에 '종류' 칸**(조립기 프리셋으로 센서 · 제어기 · 카메라 등록이 서버에 거절되던 것).
+- **`Devices.Db` 카메라 저장 · 수정이 늘 실패하던 것** — 비밀번호 칸 이름이 SQL 매개변수(`@Password`)와 달랐다.
+
+*계정 · SSO* (`Accounts.Ui` · `Accounts.Db` · `Sso`)
+
+- **SSO 허용 대기(SSO-010)** — 설치 · 판 갱신 뒤 첫 실행에서 에이전트 허용 창에 [허용] 하면 [SSO 로 로그인] 을 다시 누르지 않아도 들어간다(`SsoSessionCoordinator.WaitForConsentAsync`, 2초 간격 · 최대 75초). 실창 확인.
+- UI 자동화 시험에서 SSO 끄기 — `IRONWALL_UITEST_NO_SSO=1`(빌드마다 실행 파일 지문이 바뀌어 에이전트가 매번 허용을 묻기 때문).
+- 비밀번호 바꾸기 · 가입 [확인] 이 21자 비밀번호에도 켜지던 것 · 가입 아이디(5~20) · 성명(2~10) 길이 · 세션 자동 새로 고침 뒤 선택이 풀리던 것 · 내 정보 · 세션 정책 칸 자동화 id · 최근 로그인 동률(같은 초) 정렬.
+
+*원격지 설치(GOP API 6.3.x) 대비* — DEP-301 ~ 310
+
+- 6.3 매핑 카메라 · 스피커 · 경광등 응답의 **중첩 id**(`camera{id}` 등)를 못 읽어 **탐지 창 카메라가 0개**이던 것(F2) · 6.3 `target_preset.preset_index` 전달.
+- 통문 404/405 를 오류 로그로 남기던 것 → 정보 1줄 「이 판본 미지원」(F1).
+- 세션 정책 동시 로그인 5키 없음 · 세션 목록 pagination 없음 · 서버 임계 PATCH 통째 교체 · `threshold_exceeded` 버림.
+- 7.0+ 질의 · 본문 정리(L1~L7): 카메라 `/settings` 선차단 · `category_server` · 서버 계측 본문 12키 · 함체 계측 삭제 수 · 옛 필터 이름(`include=` · `type_sensor` · `protocol` · `type_camera` · `speaker_role`). 6.3 본문 · 질의는 바이트 그대로.
+- 연결 실패 사유 구분: `error.details.error_code` = `CERT_UNTRUSTED` · `CONNECTION_REFUSED` · `CONNECT_TIMEOUT` · `NAME_RESOLUTION_FAILED` · `CONNECTION_FAILED` · `REQUEST_TIMEOUT`(상위 코드는 종전 그대로).
+
+*공용 커널 · 계측* (`Utils`)
+
+- **팝업이 창 · 작업 영역 안에** — `PopupScreenBounds`(창 클라이언트 영역 · 작업 영역) · `HelpCalloutPlacement` 가 **창 안을 먼저** 본다("?" 말풍선이 창 밖으로 나가던 것) · 콤보 부착 동작 `c:DropDownFit.IsEnabled`(넘치면 위로 펼치고 `MaxDropDownHeight` 를 남은 자리에 맞춘다, 순수 함수 `DropDownPlacement`).
+- **`PerfTrace`** — `IRONWALL_PERF_TRACE=1` 일 때만 이벤트 단계 시각을 jsonl 로(`IRONWALL_PERF_TRACE_FILE`), `PerfTraceAnalyzer` 가 단계 간 지연 · 누락 · 중복을 표로. 꺼져 있으면 조건 검사 한 번.
+- `KoreanWordWrap.Uninstall()` · `IsInstalled`(시험용 internal — 앱 동작 불변).
+
+*시험 · 도구*
+
+| 도구 · 장치 | 쓰는 법 |
+|---|---|
+| `tools/dummy-cameras`(가짜 ONVIF · RTSP 카메라 팜) | `dotnet run --project tools/dummy-cameras -- run --count 8 --ptz 4` · 시드 `seed --apply` · 정리 `cleanup --apply`(둘 다 주입 계정 필요) · 상태 `http://127.0.0.1:8180/status` · MediaMTX 받기 `fetch-mediamtx`. 프리셋 토큰 모양 `--preset-tokens 2=named,3=padded,4=mixed`(numeric · named · padded · mixed). **WS-Discovery 응답 기본 켬**(이 PC 에서 온 Probe 에만 답함, `--no-discovery`). 고장 흉내: `--slow-onvif` · `--no-onvif-reply` · `--auth-fail` · `--kill-stream-after` · `--corrupt-stream` · `--size`/`--sub-size` |
+| `tools/scenario-evidence` | `run.ps1` 이 시험을 돌려 `docs/tests/evidence/<실행>/` 에 TRX · meta.json(두 저장소 HEAD), `collect.py` 가 시나리오 카탈로그 id ↔ `[Trait("Scenario", …)]` ↔ TRX 로 상태표를 만든다. 수동 확인은 `manual.json` 으로 '검증됨(수동)' 표시 |
+| 라이브 API 시험(`Devices.Api` · `Events.Api`) | `LiveApiFact` · `LiveApiWriteFact` — 환경이 없으면 **건너뜀**, 주소가 loopback · 사설 IP 리터럴이 아니면 **쓰기 시험 즉시 건너뜀**. `dotnet test <csproj> -e IRONWALL_E2E_CRED_FILE=<파일> [-e IRONWALL_LIVE_API_URL=https://localhost:8000/api]`. 시험이 만든 자료는 `LIVE-` · `MIG_` · `E2E-` 접두어 + finally 삭제 |
+| 시나리오 헤드리스 시험 | `tests/GMaps.MapNav · MapLayer · MapEdit · MapAux.Tests`(새로 생김) · `Events.Ui/Tests` · `Accounts.Ui.Tests/Scenarios` · `Reports.Ui/Tests` · `Devices.Ui/Tests` — 창을 띄우지 않는다. **전부 `Ironwall.Dotnet.Libraries.sln` 밖**이라 `dotnet test <csproj>` 로 직접 돌린다 |
+
+- 시험 격리: `Devices.Ui` 의 XAML 스키마 미리 만들기(`XamlSchemaWarmup`, 끄기 `IRONWALL_XAML_WARMUP=off`) · `OwnerThreadPlatformProvider` 판정을 실행 흐름(AsyncLocal)으로 · `HelpSourceScan` 이 `.harness*` 를 훑지 않음 · Gateway 시험 시드 초기화. 결과: Devices.Ui 8회 연속 4282/0.
+
+*아직 확인하지 못한 것*
+
+- 원격지 6.3.2 서버 실측 · 원격 SSO(서버 8.0.6+ 필요) · 라이브 API 시험 재실행(전용 계정 필요).
+- 레이아웃 수정 2건(트레이 문구 콤보 · 부대 "?" 말풍선)의 실창 재측정 — `IRONWALL_LAYOUT_ONLY=Events,Units` 로 호스트 `LayoutSweepTests`.
+- 서버 회신 대기 — 프리셋 `onvif_token` 칸 · ROI 좌표 단위(`GOP_Server_API_GIS_preset_onvif_token_roi_unit_REQUEST_20261007.md`).
+
+*같은 기간 CHANGELOG 에만 있던 항목(2026-09-23 ~ 10-01)* — **[3.13.0]**(날짜 · 시각 범위 팝업 `DateTimeRangeField` · 장비 콘솔 소속 부대 칸 · 개요 추이 LiveCharts2 · `tools/live-api-roundtrip` · 소속 부대가 덮어써지던 것 등) · **부대 관계도**(`UnitMapCanvas`, 서버 `units/layout` 공유) · **결선 펜스 편집기**와 **두 줄(레인) 형상** · **장비 부품 표시 통일**(`Monitoring.Models/Components`, 지도 부품 칸 · 조립 카드) · **3D 장비 아이콘 브로셔 재모델링**(`HousingLighting`). 자세한 것은 [CHANGELOG](CHANGELOG.md).
+
+---
+
 **전 창 콘솔 재구성 N-04 ~ N-14 — 어디에 무엇이 있나** (봉투 all-windows-console-redesign · 통합 브랜치 `v2.14.0`, 2026-09-21 · **실기 전부 미검증** — 앱을 띄우지 않았고 운영 서버에 요청 0)
 
 *내일 이 코드를 처음 여는 사람을 위한 지도다. 무엇이 왜 그렇게 돼 있는지는 [CHANGELOG](CHANGELOG.md) 의 노드별 항목에 있다.*
