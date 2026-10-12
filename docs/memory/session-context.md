@@ -1546,7 +1546,7 @@ Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적�
 - **호스트 경로 판단**: 맵 오버레이는 `LayerPanelControl.cs:342` `MaxPanelWidth=375`라 3-Pane 불가 → **좌측 메뉴 Conductor 패널(경로 B)** 뿐. 이 때문에 메인솔루션 변경이 불가피하다.
 
 ## ▶▶ 재개 포인트 (2026-09-03 — 27일 만의 재검증: "playwright로 검증 가능한 부분" 식별·재실행)
-- **마지막 업데이트**: 2026-10-01 22:22
+- **마지막 업데이트**: 2026-10-02 04:58
 
 **⚠ 용어 확정** — 이 프로젝트에서 "playwright"라 불러온 것은 FlaUI(UIA3) 하네스다. **진짜 Playwright는 WPF 본체를 못 건드리고 웹 표면 3종**(매뉴얼 HTML · 보고서 미리보기 HTML · GOP REST)만 대상([[project_playwright_verification_surfaces]]).
 
@@ -3961,9 +3961,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-18764
+- **현재 세션 ID**: ppid-79016
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-18764
+- **활성 세션 목록**: ppid-79016
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
