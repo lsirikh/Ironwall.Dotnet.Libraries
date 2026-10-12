@@ -106,7 +106,9 @@ public class DetectionSelectionViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(Status));
         NotifyOfPropertyChange(nameof(Result));
         NotifyOfPropertyChange(nameof(DateTime));
+        _signalEditText = null;   // 다시 시딩됐으니 입력 중 글자는 버리고 값으로 다시 보인다
         NotifyOfPropertyChange(nameof(SignalEdit));
+        NotifyOfPropertyChange(nameof(SignalEditText));
         NotifyOfPropertyChange(nameof(AiModelEdit));
         NotifyOfPropertyChange(nameof(InferenceMsEdit));
         NotifyOfPropertyChange(nameof(FrameWidthEdit));
@@ -220,8 +222,33 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     /// <summary>상세 편집 가능 여부 — 단일 선택에서만(멀티셀렉트는 대상 모호).</summary>
     public bool IsDetailEditable => IsSingle;
 
-    /// <summary>신호 크기(detail.signal) 편집값.</summary>
-    public int? SignalEdit { get => Edit.Signal; set { Edit.Signal = value; NotifyOfPropertyChange(); } }
+    /// <summary>신호 크기(detail.signal) 편집값 — 정수 · 실수 모두.</summary>
+    public double? SignalEdit
+    {
+        get => Edit.Signal;
+        set { Edit.Signal = value; _signalEditText = null; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(SignalEditText)); }
+    }
+
+    private string? _signalEditText;
+    /// <summary>
+    /// 신호 편집 칸의 글자 — 뷰는 이것에 묶인다. <c>double?</c> 에 바로 묶으면(입력마다 갱신) "21." 을 치는 순간
+    /// 21 로 되돌려 써져 소수점을 칠 수 없다. 입력 중 글자는 그대로 두고, 숫자로 읽히면 <see cref="SignalEdit"/> 에 반영한다.
+    /// 빈 칸은 "변경 없음"(null), 숫자가 아닌 글자는 값을 바꾸지 않는다.
+    /// </summary>
+    public string SignalEditText
+    {
+        get => _signalEditText ?? SignalFormat.EditText(Edit.Signal);
+        set
+        {
+            _signalEditText = value;
+            if (SignalFormat.TryParseEdit(value, out var parsed))
+            {
+                Edit.Signal = parsed;
+                NotifyOfPropertyChange(nameof(SignalEdit));
+            }
+            NotifyOfPropertyChange();
+        }
+    }
 
     /// <summary>AI 모델명(detail.model) 편집값 — 공백만 입력하면 "변경 없음"으로 정규화된다.</summary>
     public string? AiModelEdit { get => Edit.AiModel; set { Edit.AiModel = value; NotifyOfPropertyChange(); } }
@@ -236,7 +263,7 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     public int? FrameHeightEdit { get => Edit.FrameHeight; set { Edit.FrameHeight = value; NotifyOfPropertyChange(); } }
 
     /// <summary>신호 크기(detail.signal) — null/0(AI)은 "—", 멀티셀렉트는 "(다중 선택)".</summary>
-    public string SignalText => !IsSingle ? MULTI : (FirstModel?.Signal is int s and > 0 ? s.ToString("N0") : "—");
+    public string SignalText => !IsSingle ? MULTI : SignalFormat.Text(FirstModel?.Signal);
 
     /// <summary>AI 추론 요약 — "yolov8n · 45ms".</summary>
     public string AiSummaryText

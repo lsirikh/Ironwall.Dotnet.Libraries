@@ -97,6 +97,19 @@ public class EventApiService : IEventApiService
         _log?.Info($"[{nameof(EventApiService)}] Stopping service...");
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// 목록 응답에서 형식 오류로 빠진 항목을 경고 로그로 남긴다(어느 id · 어느 칸 · 사유).
+    /// <para>목록 변환(<c>ToApiListResponseAsync</c>)은 한 항목이 깨져도 쪽 전체를 버리지 않고 그 항목만 뺀다 —
+    /// 빠진 사실이 조용히 묻히지 않게 여기서 알린다.</para>
+    /// </summary>
+    private ApiListResponse<T> WarnSkipped<T>(ApiListResponse<T> result, [System.Runtime.CompilerServices.CallerMemberName] string operation = "")
+    {
+        if (result.SkippedItems is { Count: > 0 } skipped)
+            foreach (var skip in skipped)
+                _log?.Warning($"[{operation}] {skip.Describe()}");
+        return result;
+    }
     #endregion
 
     #region - Detection Event API -
@@ -174,7 +187,7 @@ public class EventApiService : IEventApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections", parameters);
-            return await response.ToApiListResponseAsync<DetectionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<DetectionEventDto>());
         }
         catch (Exception ex)
         {
@@ -343,7 +356,7 @@ public class EventApiService : IEventApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions", parameters);
-            return await response.ToApiListResponseAsync<MalfunctionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<MalfunctionEventDto>());
         }
         catch (Exception ex)
         {
@@ -504,7 +517,7 @@ public class EventApiService : IEventApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/connections", parameters);
-            return await response.ToApiListResponseAsync<ConnectionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<ConnectionEventDto>());
         }
         catch (Exception ex)
         {
@@ -659,7 +672,7 @@ public class EventApiService : IEventApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/actions", parameters);
-            return await response.ToApiListResponseAsync<ActionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<ActionEventDto>());
         }
         catch (Exception ex)
         {
@@ -809,7 +822,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections/{detectionId}/actions");
-            return await response.ToApiListResponseAsync<ActionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<ActionEventDto>());
         }
         catch (Exception ex)
         {
@@ -823,7 +836,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions/{malfunctionId}/actions");
-            return await response.ToApiListResponseAsync<ActionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<ActionEventDto>());
         }
         catch (Exception ex)
         {
@@ -872,7 +885,7 @@ public class EventApiService : IEventApiService
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/detection-logs", parameters);
             // F-19: 이 엔드포인트만 actions[] 를 함께 준다 — DetectionEventDto 로 받으면 조용히 버렸다.
-            return await response.ToApiListResponseAsync<DetectionLogDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<DetectionLogDto>());
         }
         catch (Exception ex)
         {
@@ -979,7 +992,7 @@ public class EventApiService : IEventApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/operations", parameters);
-            return await response.ToApiListResponseAsync<OperationEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<OperationEventDto>());
         }
         catch (Exception ex)
         {
@@ -1015,7 +1028,7 @@ public class EventApiService : IEventApiService
         try
         {
             var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/operations/{operationId}/actions");
-            return await response.ToApiListResponseAsync<ActionEventDto>();
+            return WarnSkipped(await response.ToApiListResponseAsync<ActionEventDto>());
         }
         catch (Exception ex)
         {

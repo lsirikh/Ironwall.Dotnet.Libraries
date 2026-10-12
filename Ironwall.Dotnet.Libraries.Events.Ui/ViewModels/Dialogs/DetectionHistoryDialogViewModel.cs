@@ -55,9 +55,9 @@ public class SignalHistoryItemViewModel : PropertyChangedBase
     public int EventId => Model.Id;
     public DateTime DateTime => Model.DateTime;
     public EnumDetectionType Result => Model.Result;
-    public int? Signal => Model.Signal;
+    public double? Signal => Model.Signal;
     public bool HasSignal => Signal is > 0;
-    public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
+    public string SignalText => SignalFormat.Text(Signal);
     public string TimeText => DateTime.ToString("MM-dd HH:mm:ss");
     public bool IsActioned => Model.Status == EnumTrueFalse.True;
     public string ActionText => IsActioned ? "조치" : "미조치";
@@ -549,8 +549,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
     // 통계 스트립 (조회 구간 클라 측 집계 — signal null/0은 신호 통계에서 제외: RISK-01)
     public int TotalCount { get => _totalCount; private set { _totalCount = value; NotifyOfPropertyChange(); } }
-    public int MaxSignal { get => _maxSignal; private set { _maxSignal = value; NotifyOfPropertyChange(); } }
-    public string MaxSignalText => MaxSignal > 0 ? MaxSignal.ToString("N0") : "—";
+    public double MaxSignal { get => _maxSignal; private set { _maxSignal = value; NotifyOfPropertyChange(); } }
+    public string MaxSignalText => SignalFormat.Text(MaxSignal);
     public string AvgSignalText { get => _avgSignalText; private set { _avgSignalText = value; NotifyOfPropertyChange(); } }
     public string TopResultText { get => _topResultText; private set { _topResultText = value; NotifyOfPropertyChange(); } }
     public int UnactionedCount { get => _unactionedCount; private set { _unactionedCount = value; NotifyOfPropertyChange(); } }
@@ -614,7 +614,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         TotalCount = filtered.Count;
         var signals = filtered.Where(i => i.HasSignal).Select(i => i.Signal!.Value).ToList();
         MaxSignal = signals.Count > 0 ? signals.Max() : 0;
-        AvgSignalText = signals.Count > 0 ? signals.Average().ToString("N0") : "—";
+        // 평균은 소수 한 자리까지(신호 실측값이 대부분 소수 한 자리) — 정수 평균은 정수로 보인다.
+        AvgSignalText = signals.Count > 0 ? SignalFormat.Number(Math.Round(signals.Average(), 1)) : "—";
         if (IsGroupMode)
         {
             // FR-13: 최다 발생 센서 — 동률 타이브레이크=최근 발생 우선
@@ -726,7 +727,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     private IReadOnlyList<SignalChartPoint> _chartPoints = Array.Empty<SignalChartPoint>();
     private SignalHistoryItemViewModel? _selectedItem;
     private int _totalCount;
-    private int _maxSignal;
+    private double _maxSignal;
     private string _avgSignalText = "—";
     private string _topResultText = "—";
     private int _unactionedCount;

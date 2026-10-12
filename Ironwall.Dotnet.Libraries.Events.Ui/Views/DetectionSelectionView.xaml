@@ -183,7 +183,7 @@
 							FontFamily="Consolas"
 							IsEnabled="{Binding IsDetailEditable}"
 							Style="{StaticResource TextBoxInput}"
-							Text="{Binding SignalEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+							Text="{Binding SignalEditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 							ToolTip="탐지 신호 크기" />
 
 						<TextBlock Grid.Row="8" Grid.Column="0" Text="AI" />

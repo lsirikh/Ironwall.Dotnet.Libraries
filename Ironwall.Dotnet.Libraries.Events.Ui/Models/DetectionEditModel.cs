@@ -72,9 +72,9 @@ public class DetectionEditModel : PropertyChangedBase
     #endregion
 
     #region - 상세(detail) 필드 (단일 선택에서만 적용) -
-    private int? _signal;
-    /// <summary>신호 크기(detail.signal).</summary>
-    public int? Signal
+    private double? _signal;
+    /// <summary>신호 크기(detail.signal) — 정수 · 실수 모두.</summary>
+    public double? Signal
     {
         get => _signal;
         set { _signal = value; NotifyOfPropertyChange(); }
@@ -160,7 +160,7 @@ public class DetectionEditModel : PropertyChangedBase
 
         // 상세 필드 — Thumbnail/Objects 는 편집 대상이 아니며 모델 값이 그대로 남아
         // 저장 시 DtoToModelHelper.BuildDetectionDetail 이 함께 재구성해 보존한다.
-        if (Signal      is int sig)     row.Signal      = sig;
+        if (Signal      is double sig)  row.Signal      = sig;
         if (AiModel     is string ai)   row.AiModel     = ai;
         if (InferenceMs is int inf)     row.InferenceMs = inf;
         if (FrameWidth  is int fw)      row.FrameWidth  = fw;

@@ -203,7 +203,7 @@ public class ActionSelectionViewModel : BasePanelViewModel
     /// <summary>탐지 origin 결과(Result). 장애/부재면 "—".</summary>
     public string OriginResultText => OriginEvent is IDetectionEventModel detection ? EnumKoreanMap.To(detection.Result) : "—";
     /// <summary>탐지 origin 신호(signal). 0/부재/장애면 "—".</summary>
-    public string OriginSignalText => (OriginEvent as IDetectionEventModel)?.Signal is int s and > 0 ? s.ToString("N0") : "—";
+    public string OriginSignalText => SignalFormat.Text((OriginEvent as IDetectionEventModel)?.Signal);
     /// <summary>장애 origin 사유(Reason). 탐지/부재면 "—".</summary>
     public string OriginReasonText => OriginEvent is IMalfunctionEventModel malfunction ? EnumKoreanMap.To(malfunction.Reason) : "—";
 

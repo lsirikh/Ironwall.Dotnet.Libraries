@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
@@ -15,8 +16,13 @@ public class DetectedObjectDto
     [JsonProperty("confidence")]
     public double Confidence { get; set; }
 
-    [JsonProperty("bbox", NullValueHandling = NullValueHandling.Ignore)]
-    public List<int>? Bbox { get; set; }
+    /// <summary>
+    /// 바운딩 박스 <c>[x, y, width, height]</c> — 서버 규격 <c>List[float]</c>: 픽셀(정수) 또는 정규화 비율(0~1 실수).
+    /// <para>⚠ <c>List&lt;int&gt;</c> 로 되돌리지 말 것 — 비율 bbox 한 건이 목록 쪽 전체를 실패시킨다.
+    /// 원소 쓰기는 <see cref="WholeNumberJsonConverter"/> 가 픽셀 정수를 정수 모양으로 지킨다.</para>
+    /// </summary>
+    [JsonProperty("bbox", NullValueHandling = NullValueHandling.Ignore, ItemConverterType = typeof(WholeNumberJsonConverter))]
+    public List<double>? Bbox { get; set; }
 
     [JsonProperty("thumbnail", NullValueHandling = NullValueHandling.Ignore)]
     public string? Thumbnail { get; set; }

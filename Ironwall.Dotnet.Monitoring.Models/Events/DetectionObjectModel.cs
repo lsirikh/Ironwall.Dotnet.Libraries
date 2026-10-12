@@ -18,8 +18,9 @@ public class DetectionObjectModel
     [JsonProperty("confidence")]
     public double Confidence { get; set; }
 
+    /// <summary>바운딩 박스 [x, y, width, height] — 픽셀(정수) 또는 정규화 비율(0~1 실수). 서버 규격 <c>List[float]</c>.</summary>
     [JsonProperty("bbox", NullValueHandling = NullValueHandling.Ignore)]
-    public List<int>? Bbox { get; set; }
+    public List<double>? Bbox { get; set; }
 
     [JsonProperty("thumbnail", NullValueHandling = NullValueHandling.Ignore)]
     public string? Thumbnail { get; set; }

@@ -58,9 +58,9 @@ public class DetectionEventModel : ExEventModel, IDetectionEventModel
     [JsonProperty("result", Order = 6)]
     public EnumDetectionType Result { get; set; }
 
-    /// <summary>탐지 신호 크기(detail.signal). null=미제공, 0=AI_DETECT.</summary>
+    /// <summary>탐지 신호 크기(detail.signal). null=미제공, 0=AI_DETECT. 정수 · 실수 모두(반올림하지 않는다).</summary>
     [JsonProperty("signal", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
-    public int? Signal { get; set; }
+    public double? Signal { get; set; }
 
     /// <summary>AI 추론 모델명(detail.model).</summary>
     [JsonProperty("ai_model", Order = 8, NullValueHandling = NullValueHandling.Ignore)]

@@ -163,7 +163,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
     #region - FR-04 신호 컬럼 상대 기준 -
     /// <summary>현재 로드된 목록 내 최대 signal — 미니바 상대 폭·최대행 강조 기준. 없으면 0(바 미표시).</summary>
-    public int MaxSignal => ViewModelProvider?.Select(v => v.Signal ?? 0).DefaultIfEmpty(0).Max() ?? 0;
+    public double MaxSignal => ViewModelProvider?.Select(v => v.Signal ?? 0d).DefaultIfEmpty(0d).Max() ?? 0d;
 
     private void OnRowsChangedForSignal(object? sender, NotifyCollectionChangedEventArgs e)
         => NotifyOfPropertyChange(nameof(MaxSignal));

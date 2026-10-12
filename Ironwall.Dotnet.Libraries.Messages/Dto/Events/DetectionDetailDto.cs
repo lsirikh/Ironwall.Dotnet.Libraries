@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
@@ -14,8 +15,14 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 /// </summary>
 public class DetectionDetailDto
 {
+    /// <summary>
+    /// 탐지 신호 크기 — 서버 규격 <c>Optional[float]</c>(정수 · 실수 모두, 실측 저장값 대부분이 실수 예 <c>32.2</c>).
+    /// <para>⚠ <c>int?</c> 로 되돌리지 말 것 — 실수 한 건이 목록 쪽 전체를 실패시키고 NATS 경로는 반올림한다.
+    /// 쓰기는 <see cref="WholeNumberJsonConverter"/> 가 정수 값을 정수 모양(<c>21</c>)으로 지킨다.</para>
+    /// </summary>
     [JsonProperty("signal", NullValueHandling = NullValueHandling.Ignore)]
-    public int? Signal { get; set; }
+    [JsonConverter(typeof(WholeNumberJsonConverter))]
+    public double? Signal { get; set; }
 
     [JsonProperty("thumbnail", NullValueHandling = NullValueHandling.Ignore)]
     public string? Thumbnail { get; set; }

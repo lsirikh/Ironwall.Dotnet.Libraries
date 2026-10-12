@@ -246,7 +246,7 @@ public class DetectionDetailDirtyTests : IoCStubbedTestBase
         const string thumb = "https://server/api/thumbnails/images/CAM-008.jpg";
         var objects = new List<DetectionObjectModel>
         {
-            new() { Label = "person", Confidence = 0.95, Bbox = new List<int> { 100, 200, 50, 100 } }
+            new() { Label = "person", Confidence = 0.95, Bbox = new List<double> { 100, 200, 50, 100 } }
         };
         var row = BuildRow(signal: 1200, thumbnail: thumb, objects: objects);
 

@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Net;
 using System.Net.Http;
 
@@ -98,7 +99,17 @@ public static class ApiMessageHelper
 
             if (response.IsSuccessStatusCode)
             {
-                var result = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
+                ApiListResponse<T>? result;
+                try
+                {
+                    result = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
+                }
+                catch (JsonException) when (TryDeserializeListSkippingBadItems<T>(content, out var salvaged))
+                {
+                    // 한 항목의 형식 오류가 쪽 전체를 날리지 않게 — 문제 항목만 빼고 다시 읽었다.
+                    // 봉투 자체가 깨졌으면(data 가 배열이 아님 · JSON 아님) 되살릴 수 없으니 필터가 거짓 → 원래 예외로 실패한다.
+                    result = salvaged;
+                }
                 if (result == null)
                 {
                     var parseFail = ApiListResponse<T>.CreateError(
@@ -142,6 +153,69 @@ public static class ApiMessageHelper
                 ex.Message);
             crash.StatusCode = (int)response.StatusCode;
             return crash;
+        }
+    }
+
+    /// <summary>
+    /// 목록 응답을 <b>항목 하나씩</b> 읽어, 형식 오류 항목은 빼고 나머지를 싣는다.
+    /// 빼낸 항목은 <see cref="ApiListResponse{T}.SkippedItems"/> 에 어느 id · 어느 칸 · 사유로 남긴다.
+    /// <para><b>왜</b> — 통째 역직렬화는 한 항목의 형식 오류(예 정수 칸에 <c>21.5</c>)로 쪽 전체가 0건이 된다
+    /// (2026-10-12 탐지 목록 실측: 정상 2건까지 사라졌다).</para>
+    /// <para>봉투가 깨졌거나 <c>data</c> 가 배열이 아니면 <c>false</c> — 호출부는 원래 오류로 실패한다.</para>
+    /// </summary>
+    internal static bool TryDeserializeListSkippingBadItems<T>(string content, out ApiListResponse<T>? result)
+    {
+        result = null;
+        try
+        {
+            JObject root;
+            using (var text = new System.IO.StringReader(content))
+            using (var reader = new JsonTextReader(text) { DateParseHandling = DateParseHandling.None })
+            {
+                // 날짜 문자열을 DateTime 으로 바꾸지 않는다 — 통째 경로(_jsonSettings)와 같은 값이 나와야 한다.
+                if (JToken.ReadFrom(reader) is not JObject parsed) return false;
+                root = parsed;
+            }
+            if (root["data"] is not JArray items) return false;
+
+            root.Remove("data");
+            var envelope = JsonConvert.DeserializeObject<ApiListResponse<T>>(root.ToString(Formatting.None), _jsonSettings);
+            if (envelope == null) return false;
+
+            var data = new List<T>(items.Count);
+            var skipped = new List<ApiListItemSkip>();
+            for (int i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                try
+                {
+                    // ⚠ item.ToObject 를 쓰지 않는다 — JToken 경로는 정수 칸의 실수(12.5)를 예외 없이 반올림해
+                    //   깨진 항목을 조용히 값만 바꿔 싣는다. 텍스트로 다시 읽어야 통째 경로와 같은 엄격함이 된다.
+                    data.Add(JsonConvert.DeserializeObject<T>(item.ToString(Formatting.None), _jsonSettings)!);   // null 항목도 통째 경로처럼 그대로 싣는다
+                }
+                catch (JsonException ex)
+                {
+                    var id = item is JObject obj && obj["id"] is JValue { Value: not null } idToken ? idToken.ToString() : null;
+                    var path = ex switch
+                    {
+                        JsonSerializationException s when !string.IsNullOrEmpty(s.Path) => s.Path,
+                        JsonReaderException r when !string.IsNullOrEmpty(r.Path) => r.Path,
+                        _ => null
+                    };
+                    var skip = new ApiListItemSkip(i, id, path is null ? $"data[{i}]" : $"data[{i}].{path}", ex.Message);
+                    skipped.Add(skip);
+                    System.Diagnostics.Trace.TraceWarning(skip.Describe());
+                }
+            }
+
+            envelope.Data = data;
+            envelope.SkippedItems = skipped.Count > 0 ? skipped : null;
+            result = envelope;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 

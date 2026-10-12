@@ -78,6 +78,15 @@ public class ApiListResponse<T>
     [JsonIgnore]
     public int StatusCode { get; set; }
 
+    /// <summary>
+    /// 형식 오류로 <b>빼낸 목록 항목</b>(클라이언트 진단용 — 서버 값이 아니다). 없으면 <c>null</c>.
+    /// <para>한 항목의 형식 오류(예 정수 칸에 실수)가 쪽 전체를 날리지 않도록, 그 항목만 빼고 나머지를 싣는다.
+    /// 호출부는 비어 있지 않으면 <see cref="ApiListItemSkip.Describe"/> 로 경고 로그를 남긴다.
+    /// <see cref="Pagination"/> 은 서버 값 그대로다(빠진 건수만큼 <see cref="Data"/> 가 적다).</para>
+    /// </summary>
+    [JsonIgnore]
+    public List<ApiListItemSkip>? SkippedItems { get; set; }
+
     #region - 총계·절단 감지 (§3.2) -
     /// <summary>
     /// 실효 총계 — <c>pagination.total</c> 우선, 없으면 레거시 최상위 <c>total</c>. 양쪽 다 없으면 <c>null</c>.
