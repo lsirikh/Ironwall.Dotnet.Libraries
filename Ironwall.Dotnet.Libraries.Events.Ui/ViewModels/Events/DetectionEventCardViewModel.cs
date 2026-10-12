@@ -133,23 +133,23 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         // 세션 관측 최대 — 카드 미니바 상대 기준. 카드 생성은 UI 스레드 경유(DispatcherService.Invoke)라 단순 필드로 충분.
         // (code-review P1-4) 주의: 프로세스 생애 단조 증가라 이력 다이얼로그(조회 목록 max 기준)와 바 기준이 다르다 —
         // 실시간 카드는 이력이 없는 시점의 보조 시각화라 의도된 트레이드오프(PRD B3). 숫자 값이 정보의 정본.
-        private static int _sessionMaxSignal;
+        private static double _sessionMaxSignal;
 
-        /// <summary>탐지 신호 크기(detail.signal). null=미제공, 0=AI_DETECT.</summary>
-        public int? Signal => (Model as IDetectionEventModel)?.Signal;
+        /// <summary>탐지 신호 크기(detail.signal). null=미제공, 0=AI_DETECT. 정수 · 실수 모두.</summary>
+        public double? Signal => (Model as IDetectionEventModel)?.Signal;
 
         /// <summary>신호 줄 표시 여부 — null/0이면 앞면 신호 줄 Collapsed.</summary>
         public bool HasSignal => Signal is > 0;
 
-        /// <summary>표시 문자열 — 천 단위 구분, null/0은 "—"(뒷면 상세용).</summary>
-        public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
+        /// <summary>표시 문자열 — 천 단위 구분 · 실수는 소수 그대로, null/0은 "—"(뒷면 상세용).</summary>
+        public string SignalText => SignalFormat.Text(Signal);
 
         /// <summary>바 폭(px) — 세션 관측 최대 기준 상대(첫 관측=100%), 카드 생성 시점 고정.</summary>
         public double SignalBarWidth { get; private set; }
 
         private void InitializeSignalBar()
         {
-            if (Signal is not int s || s <= 0) { SignalBarWidth = 0d; return; }
+            if (Signal is not double s || s <= 0) { SignalBarWidth = 0d; return; }
             if (s > _sessionMaxSignal) _sessionMaxSignal = s;
             SignalBarWidth = (double)s / _sessionMaxSignal * SIGNAL_BAR_TOTAL_WIDTH;
         }

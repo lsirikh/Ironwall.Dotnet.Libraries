@@ -137,7 +137,7 @@ public class DetectionSignalTests
         dto.Detail.Thumbnail = "http://192.168.1.50:8080/events/1001/thumb.jpg";
         dto.Detail.Objects = new List<DetectedObjectDto>
         {
-            new() { Label = "person", Confidence = 0.95, Bbox = new List<int> { 100, 200, 50, 100 } }
+            new() { Label = "person", Confidence = 0.95, Bbox = new List<double> { 100, 200, 50, 100 } }
         };
 
         var model = dto.ToDetectionEventModel();
@@ -149,7 +149,7 @@ public class DetectionSignalTests
         Assert.Single(model.Objects!);
         Assert.Equal("person", model.Objects![0].Label);
         Assert.Equal(0.95, model.Objects[0].Confidence);
-        Assert.Equal(new List<int> { 100, 200, 50, 100 }, model.Objects[0].Bbox);
+        Assert.Equal(new List<double> { 100, 200, 50, 100 }, model.Objects[0].Bbox);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class DetectionSignalTests
             Thumbnail = "http://t/1.jpg",
             Objects = new List<DetectionObjectModel>
             {
-                new() { Label = "person", Confidence = 0.95, Bbox = new List<int> { 1, 2, 3, 4 } }
+                new() { Label = "person", Confidence = 0.95, Bbox = new List<double> { 1, 2, 3, 4 } }
             }
         };
 
@@ -207,7 +207,7 @@ public class DetectionSignalTests
             Result = EnumDetectionType.AI_DETECT,
             Objects = new List<DetectionObjectModel>
             {
-                new() { Label = "person", Confidence = 0.9, Bbox = new List<int> { 1, 2, 3, 4 } }
+                new() { Label = "person", Confidence = 0.9, Bbox = new List<double> { 1, 2, 3, 4 } }
             }
         };
 

@@ -23,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Controls;
 /// <summary>차트 1포인트 — Payload에 원본 행 VM을 실어 클릭 시 그리드 행과 동기화한다.
 /// SeriesIndex/SeriesName(pidsgroup-rightclick FR-11): 그룹 모드 센서 시리즈 식별 — 기본값이 단일 시리즈라 기존 호출부 하위호환.
 /// 시리즈 색은 센서(엔티티) 고정 인덱스를 따른다 — 칩 필터로 시리즈 수가 줄어도 남은 시리즈 색 불변.</summary>
-public sealed record SignalChartPoint(DateTime Time, int Signal, bool IsActioned, string ResultText, object? Payload,
+public sealed record SignalChartPoint(DateTime Time, double Signal, bool IsActioned, string ResultText, object? Payload,
                                       int SeriesIndex = 0, string? SeriesName = null);
 
 public class SignalChartControl : FrameworkElement
@@ -261,7 +261,7 @@ public class SignalChartControl : FrameworkElement
 
         // Y 스케일 — 뷰 내 최대(줌 시 재스케일), 뷰가 비면 전체 최대
         int yMax = NiceCeiling((items.Count > 0 ? items : all).Max(p => p.Signal));
-        double Y(int s) => plotB - Math.Clamp((double)s / yMax, 0, 1) * (plotB - plotT);
+        double Y(double s) => plotB - Math.Clamp(s / yMax, 0, 1) * (plotB - plotT);
 
         // Y 격자 + 라벨 (4분할)
         for (int i = 1; i <= 4; i++)
@@ -412,7 +412,7 @@ public class SignalChartControl : FrameworkElement
     }
 
     /// <summary>1-2-5 스텝 올림 (예: 3150 → 4000) — Y축 눈금이 읽기 좋은 값이 되도록.</summary>
-    private static int NiceCeiling(int value)
+    private static int NiceCeiling(double value)
     {
         if (value <= 4) return 4;
         double exp = Math.Pow(10, Math.Floor(Math.Log10(value)));
@@ -534,7 +534,7 @@ public class SignalChartControl : FrameworkElement
         {
             Cursor = Cursors.Hand;
             var seriesPrefix = string.IsNullOrEmpty(p.SeriesName) ? string.Empty : $"{p.SeriesName} · ";   // 그룹 모드 센서명 병기(FR-11)
-            ToolTip = $"{seriesPrefix}{p.Time:MM-dd HH:mm:ss} · {p.ResultText}\n신호 {p.Signal:N0} · {(p.IsActioned ? "조치" : "미조치")}";
+            ToolTip = $"{seriesPrefix}{p.Time:MM-dd HH:mm:ss} · {p.ResultText}\n신호 {Helpers.SignalFormat.Number(p.Signal)} · {(p.IsActioned ? "조치" : "미조치")}";
         }
         else
         {

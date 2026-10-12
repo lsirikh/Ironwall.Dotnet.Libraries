@@ -24,11 +24,11 @@ public class SignalBarWidthConverter : IMultiValueConverter
         if (parameter is string p && double.TryParse(p, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
             total = parsed;
 
-        int? signal = values.Length > 0 ? values[0] as int? : null;
-        int max = values.Length > 1 && values[1] is int m ? m : 0;
+        double? signal = values.Length > 0 ? SignalValue.From(values[0]) : null;
+        double max = values.Length > 1 ? SignalValue.From(values[1]) ?? 0d : 0d;
 
         if (signal is not > 0 || max <= 0) return 0d;
-        return Math.Clamp((double)signal.Value / max, 0d, 1d) * total;
+        return Math.Clamp(signal.Value / max, 0d, 1d) * total;
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
@@ -40,11 +40,28 @@ public class SignalIsMaxConverter : IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
     {
-        int? signal = values.Length > 0 ? values[0] as int? : null;
-        int max = values.Length > 1 && values[1] is int m ? m : 0;
+        double? signal = values.Length > 0 ? SignalValue.From(values[0]) : null;
+        double max = values.Length > 1 ? SignalValue.From(values[1]) ?? 0d : 0d;
         return signal is > 0 && max > 0 && signal.Value >= max;
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
+}
+
+/// <summary>
+/// 바인딩 값 → 신호 수치. 신호는 정수 · 실수 모두라(<c>double?</c>) 형식을 가리지 않고 숫자면 받는다 —
+/// <c>as int?</c> 로만 받으면 실수 신호의 바가 조용히 0 폭이 된다(호스트 미리보기는 아직 <c>int</c> 를 바인딩한다).
+/// </summary>
+internal static class SignalValue
+{
+    public static double? From(object? value) => value switch
+    {
+        double d => d,
+        int i => i,
+        long l => l,
+        float f => f,
+        decimal m => (double)m,
+        _ => null
+    };
 }

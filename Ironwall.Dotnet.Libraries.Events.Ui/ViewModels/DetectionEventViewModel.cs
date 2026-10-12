@@ -55,7 +55,7 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
     //    여기 세터가 아니라 모델 직접 갱신을 유지해야 한다(거짓 dirty → 불필요 PUT 방지).
 
     /// <summary>탐지 신호 크기(detail.signal). null/0(AI)은 뷰에서 "—" 처리.</summary>
-    public int? Signal
+    public double? Signal
     {
         get { return (_model as IDetectionEventModel)!.Signal; }
         set
@@ -96,8 +96,8 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
     /// <summary>신호 표시 여부 — null 또는 0(AI_DETECT)이면 바/값 숨김.</summary>
     public bool HasSignal => Signal is > 0;
 
-    /// <summary>그리드 표시 문자열 — 천 단위 구분, null/0(AI_DETECT)은 "—".</summary>
-    public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
+    /// <summary>그리드 표시 문자열 — 천 단위 구분 · 실수는 소수 그대로, null/0(AI_DETECT)은 "—".</summary>
+    public string SignalText => SignalFormat.Text(Signal);
 
     /// <summary>Signal 파생 표시값 갱신 — 세터가 모델을 바꿨을 때만 호출(그리드 신호 컬럼·미니바 즉시 반영).</summary>
     private void NotifySignalTexts()

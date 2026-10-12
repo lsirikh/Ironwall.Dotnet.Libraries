@@ -8,8 +8,9 @@ public interface IDetectionEventModel : IExEventModel
 
     /// <summary>
     /// 탐지 신호 크기(detail.signal). null=미제공(레거시), 0=AI_DETECT(의미 크기는 confidence).
+    /// <para>서버 규격이 정수 · 실수 모두라(실측 대부분 실수 예 32.2) <c>double?</c> 다 — 정수로 반올림하지 않는다.</para>
     /// </summary>
-    int? Signal { get; set; }
+    double? Signal { get; set; }
 
     /// <summary>AI 추론 모델명(detail.model, 예: "yolov8n").</summary>
     string? AiModel { get; set; }

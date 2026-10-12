@@ -1676,8 +1676,8 @@ public class DetectionDetailDtoTests
             InferenceMs = 42,
             Objects = new List<DetectedObjectDto>
             {
-                new DetectedObjectDto { Label = "person", Confidence = 0.95, Bbox = new List<int> { 100, 200, 50, 80 } },
-                new DetectedObjectDto { Label = "vehicle", Confidence = 0.87, Bbox = new List<int> { 300, 150, 120, 60 } }
+                new DetectedObjectDto { Label = "person", Confidence = 0.95, Bbox = new List<double> { 100, 200, 50, 80 } },
+                new DetectedObjectDto { Label = "vehicle", Confidence = 0.87, Bbox = new List<double> { 300, 150, 120, 60 } }
             }
         };
 
@@ -1737,7 +1737,7 @@ public class DetectionDetailDtoTests
         {
             Label = "person",
             Confidence = 0.92,
-            Bbox = new List<int> { 10, 20, 30, 40 }
+            Bbox = new List<double> { 10, 20, 30, 40 }
         };
 
         // Act
