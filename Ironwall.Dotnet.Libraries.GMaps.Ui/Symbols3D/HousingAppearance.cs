@@ -9,7 +9,7 @@ public static class HousingAppearance
         "TintStrength", typeof(double), typeof(HousingAppearance), new FrameworkPropertyMetadata(.35,
             FrameworkPropertyMetadataOptions.Inherits, (d, e) =>
             { if (d is HousingVisual visual) visual.RefreshMaterials(); },
-            (d, v) => double.IsFinite((double)v) ? Math.Clamp((double)v, 0, 1) : .35));
+            (d, v) => double.IsFinite((double)v) ? Helpers.Numerics.MapNumericFields.TintStrength.Normalize((double)v) : .35));
     public static double GetTintStrength(DependencyObject d) => (double)d.GetValue(TintStrengthProperty);
     public static void SetTintStrength(DependencyObject d, double value) => d.SetValue(TintStrengthProperty, value);
 }

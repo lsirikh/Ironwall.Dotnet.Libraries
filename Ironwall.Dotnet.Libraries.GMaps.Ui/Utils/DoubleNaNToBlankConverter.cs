@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.Windows.Data;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Numerics;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
@@ -21,13 +22,17 @@ public class DoubleNaNToBlankConverter : IValueConverter
     /// <summary>값 뒤에 붙일 단위(예: "m", "°"). NaN(Pending)일 땐 미부착.</summary>
     public string Suffix { get; set; } = string.Empty;
 
+    /// <summary>칸 명세(정수/실수 자리수 · 범위). 있으면 표시는 그 자리수로, 입력(ConvertBack)은 그 범위 · 단위로 잘라 넘긴다.</summary>
+    public NumericFieldSpec? Spec { get; set; }
+
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         double d = value is double dv ? dv : double.NaN;
         if (targetType == typeof(string))
         {
             if (double.IsNaN(d)) return BlankText;
-            var s = string.IsNullOrEmpty(Format) ? d.ToString(culture) : d.ToString(Format, culture);
+            var format = Spec?.Format ?? Format;
+            var s = string.IsNullOrEmpty(format) ? d.ToString(culture) : d.ToString(format, culture);
             return s + Suffix;
         }
         // double 타깃(Slider.Value 등): NaN은 RangeBase 검증에 거부되므로 0.0으로 파킹(표시값은 문자열 쪽이 담당)
@@ -36,9 +41,10 @@ public class DoubleNaNToBlankConverter : IValueConverter
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is double dv) return dv;   // Slider → DP 패스스루
+        if (value is double dv) return Spec?.Normalize(dv) ?? dv;   // Slider → DP 패스스루
         var s = value as string;
         if (string.IsNullOrWhiteSpace(s)) return Binding.DoNothing;   // 빈칸 유지 = 미기록
-        return double.TryParse(s, NumberStyles.Float, culture, out var d) ? d : Binding.DoNothing;
+        if (!double.TryParse(s, NumberStyles.Float, culture, out var d) || double.IsNaN(d)) return Binding.DoNothing;
+        return Spec?.Normalize(d) ?? d;
     }
 }

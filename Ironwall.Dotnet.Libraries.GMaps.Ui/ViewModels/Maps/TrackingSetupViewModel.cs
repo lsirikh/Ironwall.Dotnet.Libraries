@@ -3,6 +3,7 @@ using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Numerics;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Enums;
 
@@ -41,13 +42,14 @@ public sealed class TrackingSetupViewModel : PropertyChangedBase
 
     #region - Bindable (싱글톤 직접 변경 = 즉시 적용) -
     public bool IsTrackingEnabled { get => _model.IsTrackingEnabled; set { _model.IsTrackingEnabled = value; NotifyOfPropertyChange(); } }
-    public double MinVisibleZoom { get => _model.MinVisibleZoom; set { _model.MinVisibleZoom = value; NotifyOfPropertyChange(); } }
-    public int TrailMaxPoints { get => _model.TrailMaxPoints; set { _model.TrailMaxPoints = value; NotifyOfPropertyChange(); } }
-    public int GapThresholdSec { get => _model.GapThresholdSec; set { _model.GapThresholdSec = value; NotifyOfPropertyChange(); } }
-    public int DefaultTtlSec { get => _model.DefaultTtlSec; set { _model.DefaultTtlSec = value; NotifyOfPropertyChange(); } }
-    public int LostTtlSec { get => _model.LostTtlSec; set { _model.LostTtlSec = value; NotifyOfPropertyChange(); } }
-    public double MaxSpeedMs { get => _model.MaxSpeedMs; set { _model.MaxSpeedMs = value; NotifyOfPropertyChange(); } }
-    public int MaxPlaybackHours { get => _model.MaxPlaybackHours; set { _model.MaxPlaybackHours = value; NotifyOfPropertyChange(); } }
+    // 숫자 칸은 MapNumericFields 명세로 잘라 · 반올림해 저장(map-property-numeric-precision) — 음수 · 꼬리 소수 금지
+    public double MinVisibleZoom { get => _model.MinVisibleZoom; set { _model.MinVisibleZoom = MapNumericFields.TrackMinVisibleZoom.Normalize(value); NotifyOfPropertyChange(); } }
+    public int TrailMaxPoints { get => _model.TrailMaxPoints; set { _model.TrailMaxPoints = MapNumericFields.TrackTrailMaxPoints.Normalize(value); NotifyOfPropertyChange(); } }
+    public int GapThresholdSec { get => _model.GapThresholdSec; set { _model.GapThresholdSec = MapNumericFields.TrackGapThresholdSec.Normalize(value); NotifyOfPropertyChange(); } }
+    public int DefaultTtlSec { get => _model.DefaultTtlSec; set { _model.DefaultTtlSec = MapNumericFields.TrackDefaultTtlSec.Normalize(value); NotifyOfPropertyChange(); } }
+    public int LostTtlSec { get => _model.LostTtlSec; set { _model.LostTtlSec = MapNumericFields.TrackLostTtlSec.Normalize(value); NotifyOfPropertyChange(); } }
+    public double MaxSpeedMs { get => _model.MaxSpeedMs; set { _model.MaxSpeedMs = MapNumericFields.TrackMaxSpeedMs.Normalize(value); NotifyOfPropertyChange(); } }
+    public int MaxPlaybackHours { get => _model.MaxPlaybackHours; set { _model.MaxPlaybackHours = MapNumericFields.TrackMaxPlaybackHours.Normalize(value); NotifyOfPropertyChange(); } }
 
     /// <summary>Playback 데이터 소스(로컬 DB / 서버 API). 변경 시 다음 Load부터 반영(라이브, 무재시작).</summary>
     public EnumTrackDataSource DataSource { get => _model.DataSource; set { _model.DataSource = value; NotifyOfPropertyChange(); } }
