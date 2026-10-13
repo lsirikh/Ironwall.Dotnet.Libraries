@@ -42,10 +42,15 @@ public static class FenceKeyModifiers
     /// <summary>
     /// 순수 판정(시험 대상) — 숫자판 자리의 이동 키(화살표 · Home · End · PageUp · PageDown · Insert · Delete)인데 바로 앞 Shift 떼기가 같은 시각(1 ms 안)이면
     /// Windows 가 NumLock 때문에 끼워 넣은 가짜 Shift 떼기다 → Shift 가 눌린 채다.
+    /// <para>"같은 시각" 은 시계 한 눈금(<see cref="FAKE_SHIFT_WINDOW_MS"/>)까지 — 사건 시각(GetMessageTime)은 약 15.6 ms 눈금이라 두 사건이 눈금 경계를 걸치면
+    /// 15~16 ms 로 벌어진다(실창 4회차 WIR-R27-135: Shift+Alt+↑ 는 놓치고 바로 뒤 Shift+Alt+↓ 는 잡았다 — 눈금 걸침 여부가 갈랐다).</para>
     /// </summary>
     public static bool IsNumpadFakeShift(Key key, int keyTimestamp, int? shiftUpTimestamp)
         => key is Key.Up or Key.Down or Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown or Key.Insert or Key.Delete
-           && shiftUpTimestamp is { } up && keyTimestamp - up is >= 0 and <= 1;
+           && shiftUpTimestamp is { } up && keyTimestamp - up is >= 0 and <= FAKE_SHIFT_WINDOW_MS;
+
+    /// <summary>가짜 Shift 떼기로 보는 시각 차(ms) — 시계 한 눈금(약 15.6 ms). 사람이 Shift 를 떼고 이 안에 화살표를 누를 수는 없다.</summary>
+    public const int FAKE_SHIFT_WINDOW_MS = 16;
 
     /// <summary>
     /// 순수 합치기(시험 대상) — WPF 가 알려 준 수정키에 Shift 의 실제 상태를 더한다. 실제로 눌려 있으면 알려 준 값에 Shift 가 없어도 Shift 다.
