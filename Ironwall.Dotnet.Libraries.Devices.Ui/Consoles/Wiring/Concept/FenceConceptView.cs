@@ -481,8 +481,37 @@ public sealed class FenceConceptView : Grid
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
+        // F1 = 이 칸의 "?"(SC-HLP-wir-f1) — 창 뿌리의 명령 경로가 닿지 않아도(포커스 · 범위 등록 순서와 무관하게) 개념도에서 바로 연다
+        if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None && OpenConceptHelp()) { e.Handled = true; return; }
         // 수정키는 누른 순서와 무관하게(Alt 먼저 · Shift 먼저 모두 Alt+Shift) — 헤디드 r21
         if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
+    }
+
+    /// <summary>
+    /// 개념도의 "?" 를 연다 — 등록된 범위(<see cref="Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip.FindFor"/>)가 있으면 그것,
+    /// 없으면(접힌 칸에서 늦게 붙어 범위가 아직 비었을 때) 부모 칸들 안에서 HelpKey 가 <c>Devices.Wiring.Fence.Concept</c> 인 "?" 를 찾아 연다.
+    /// </summary>
+    internal bool OpenConceptHelp()
+    {
+        var tip = Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip.FindFor(this);
+        if (tip is null)
+        {
+            for (DependencyObject? d = this; d is not null && tip is null; d = System.Windows.Media.VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d))
+                tip = FindTip(d);
+        }
+        if (tip is null) return false;
+        tip.Open();
+        return true;
+
+        static Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip? FindTip(DependencyObject root)
+        {
+            foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            {
+                if (child is Ironwall.Dotnet.Libraries.Utils.Consoles.HelpTip { HelpKey: "Devices.Wiring.Fence.Concept" } hit) return hit;
+                if (FindTip(child) is { } deeper) return deeper;
+            }
+            return null;
+        }
     }
 
     /// <summary>

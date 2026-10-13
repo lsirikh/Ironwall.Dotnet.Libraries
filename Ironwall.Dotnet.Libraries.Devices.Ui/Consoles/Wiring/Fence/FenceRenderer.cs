@@ -268,6 +268,7 @@ public sealed class FenceRenderer
         FenceInk.GapText => new(null, null, 0, B(Critical), false, FontWeights.Bold),
         FenceInk.Hit => new(Brushes.Transparent, null, 0),
         FenceInk.Select => new(null, B(Selection), 2.2),
+        FenceInk.SelectInner => new(null, B(Selection), 2.2),
         FenceInk.Draft => new(B(Warning), null, 0),
         FenceInk.Proposal => new(B(Info), null, 0),
         FenceInk.GroupBack => new(B(Alt), B(Divider), 1.2),

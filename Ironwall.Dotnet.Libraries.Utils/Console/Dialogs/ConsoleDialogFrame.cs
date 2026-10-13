@@ -508,7 +508,7 @@ public class ConsoleDialogFrame : ContentControl
         if (TryKeyboardMove(e)) return;
 
         var primaryLive = IsPrimaryEnabled && _primary is { Visibility: Visibility.Visible };
-        switch (DialogKeyRules.Decide(e.Key, primaryLive, IsMultiLineFocused(), IsBusy))
+        switch (DialogKeyRules.Decide(e.Key, primaryLive, IsMultiLineFocused(), IsBusy, IsInnerDragActive(e.OriginalSource as DependencyObject)))
         {
             case DialogKeyAction.Primary:
                 e.Handled = true;
@@ -519,6 +519,19 @@ public class ConsoleDialogFrame : ContentControl
                 RaiseEvent(new RoutedEventArgs(SecondaryInvokedEvent, this));
                 break;
         }
+    }
+
+    /// <summary>
+    /// 몸 안의 그림 · 캔버스가 마우스를 잡고 끄는 중인가 — 그러면 ESC 는 틀이 닫기로 먹지 않고 끄는 요소로 흘려보낸다(터널 다음 단계 · 원위치).
+    /// 틀 자신의 옮기기 손잡이 캡처는 위의 <c>_movePressed</c> 가 따로 다룬다.
+    /// </summary>
+    private bool IsInnerDragActive(DependencyObject? source)
+    {
+        // ① 키를 받는 요소(또는 그 조상)가 끄는 중이라고 말한다
+        for (var d = source; d is not null && !ReferenceEquals(d, this); d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (d is IDialogDragSource { IsDragging: true }) return true;
+        // ② 몸 안 요소가 마우스를 잡고 있고 그 요소가 끄는 중이다(포커스가 다른 칸에 있어도)
+        return Mouse.Captured is IDialogDragSource { IsDragging: true } captured && captured is Visual v && IsAncestorOf(v);
     }
 
     /// <summary>포커스가 줄을 바꿀 수 있는 칸에 있는가 — 거기서의 Enter 는 저장이 아니라 줄바꿈이다.</summary>

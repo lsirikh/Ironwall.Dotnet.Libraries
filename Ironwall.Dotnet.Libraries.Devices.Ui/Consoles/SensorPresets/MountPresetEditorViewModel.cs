@@ -215,13 +215,45 @@ public sealed class MountPresetEditorViewModel : Screen
         RaiseAll();
     }
 
-    /// <summary>화살표 — 앞에서 본 모습 기준 10 cm(<paramref name="fine"/> = Shift 면 1 cm).</summary>
+    /// <summary>화살표 — 앞에서 본 모습 기준 10 cm(<paramref name="fine"/> = Shift 면 1 cm). 상태 줄 = 붙은 곳 · 높이(허공이면 까닭).</summary>
     public void Nudge(int dx, int dy, bool fine)
     {
         var pose = SensorMountResolver.Resolve(_draft, null, _bay);
         var step = fine ? SensorMountResolver.FINE_NUDGE_M : SensorMountResolver.NUDGE_M;
-        _draft = Attached(SensorMountResolver.MoveFreeAttached(_draft, _bay, pose.AlongM + dx * step, pose.HeightM + dy * step, pose.DepthM));
+        var (along, height) = (pose.AlongM + dx * step, pose.HeightM + dy * step);
+        var range = ClampHeightToModel(height);
+        var moved = SensorMountResolver.MoveFreeAttached(_draft, _bay, along, range.Height, pose.DepthM);
+        _draft = moved.Preset;
+        StatusText = range.Note ?? (moved.Attachment is { Clamped: true, Reason: { } reason } ? reason : PlaceText);
         RaiseAll();
+    }
+
+    /// <summary>"메쉬에 붙음 · 1.40 m(자유 위치)" — 화살표 · 수치 칸 뒤 상태 줄.</summary>
+    public string PlaceText
+    {
+        get
+        {
+            var pose = Pose;
+            var where = SensorSnapPoints.Find(_bay, _draft.SnapPoint)?.Label ?? $"{SensorMountResolver.AnchorText(pose.Anchor)}(자유 위치)";
+            return $"{where}에 붙음 · {pose.HeightM.ToString("0.00", CultureInfo.InvariantCulture)} m";
+        }
+    }
+
+    /// <summary>
+    /// 높이를 모델이 붙을 수 있는 물체 범위로(MNT-R28-207 · FR-22) — 바닥(지중)을 허용하지 않는 모델은 땅 위 0.05 m 아래로,
+    /// 바닥만 허용하는 모델은 0 m 위로 가지 않는다(땅속 ↔ 땅 위 갈래를 숫자 하나로 바꾸지 않는다). 잘랐으면 까닭.
+    /// </summary>
+    private (double Height, string? Note) ClampHeightToModel(double height)
+    {
+        var ground = Model.Allows(SensorAnchorKind.Ground);
+        var above = Model.AllowedKinds.Any(k => k != SensorAnchorKind.Ground);
+        if (!ground && height < SensorMountResolver.MIN_ABOVE_GROUND_M)
+            return (SensorMountResolver.MIN_ABOVE_GROUND_M, $"땅속에는 둘 수 없는 모델이라 바닥 위 {SensorMountResolver.MIN_ABOVE_GROUND_M.ToString("0.00", CultureInfo.InvariantCulture)} m 로 맞췄습니다");
+        if (ground && !above && height >= 0)
+            return (-0.01, "바닥(지중)에만 붙는 모델이라 땅속 −0.01 m 로 맞췄습니다");
+        if (ground && !above && height < SensorMountResolver.MIN_BURIED_M)
+            return (SensorMountResolver.MIN_BURIED_M, $"땅속 {Math.Abs(SensorMountResolver.MIN_BURIED_M):0} m 보다 깊게 둘 수 없어 맞췄습니다");
+        return (height, null);
     }
     #endregion
 
@@ -292,11 +324,36 @@ public sealed class MountPresetEditorViewModel : Screen
         var yaw = Read(ref _editYaw, "바라보는 방향");
         var tilt = Read(ref _editTilt, "위아래 각도");
         var bracket = Read(ref _editBracket, "브래킷");
+        // 범위 밖 값은 말없이 자르지 않는다 — 잘라 맞추고 무엇을 어떻게 맞췄는지 상태 줄에(MNT-R28-207 · PRD v1.3 결정)
+        var notes = new List<string>();
+        string N(double v, string format) => v.ToString(format, CultureInfo.InvariantCulture);
+        if (along is { } a0 && (a0 < 0 || a0 > 100)) { notes.Add($"칸 안 가로는 0~100 % — {N(a0, "0.#")} % 를 {N(Math.Clamp(a0, 0, 100), "0")} % 로 맞췄습니다"); along = Math.Clamp(a0, 0, 100); }
+        if (height is { } h0 && ClampHeightToModel(h0) is { Note: { } hn } hr) { notes.Add(hn); height = hr.Height; }
+        if (depth is { } d0 && Math.Abs(d0) > SensorMountResolver.MAX_DEPTH_M)
+        {
+            var dc = Math.Clamp(d0, -SensorMountResolver.MAX_DEPTH_M, SensorMountResolver.MAX_DEPTH_M);
+            notes.Add($"펜스에서 떨어진 거리는 ±{N(SensorMountResolver.MAX_DEPTH_M, "0")} m — {N(d0, "0.##")} m 를 {N(dc, "0.##")} m 로 맞췄습니다");
+            depth = dc;
+        }
+        if (bracket is { } k0 && (k0 < 0 || k0 > SensorMountResolver.MAX_BRACKET_M))
+        {
+            var kc = Math.Clamp(k0, 0, SensorMountResolver.MAX_BRACKET_M);
+            notes.Add($"브래킷은 0~{N(SensorMountResolver.MAX_BRACKET_M, "0")} m — {N(k0, "0.##")} m 를 {N(kc, "0.##")} m 로 맞췄습니다");
+            bracket = kc;
+        }
+        if (yaw is { } y0 && SensorMountResolver.NormalizeYaw(y0) is var yn && Math.Abs(yn - y0) > 0.05)
+            notes.Add($"바라보는 방향은 −180~180° — {N(y0, "0.#")}° 는 {N(yn, "0.#")}° 와 같아 그렇게 적었습니다");
+        if (tilt is { } t0 && (t0 < -90 || t0 > 90))
+            notes.Add($"위아래 각도는 −90~90° — {N(t0, "0.#")}° 를 {N(Math.Clamp(t0, -90, 90), "0")}° 로 맞췄습니다");
+
+        string? attachReason = null;
         if (along is not null || height is not null || depth is not null)
         {
             // 브래킷을 같이 고쳤으면 먼저 적는다 — 펜스에서 떨어진 거리는 브래킷 길이 안에서만(FR-22)
             if (bracket is { } b0) _draft = _draft with { BracketM = Math.Clamp(b0, 0, SensorMountResolver.MAX_BRACKET_M) };
-            _draft = Attached(SensorMountResolver.MoveFreeAttached(_draft, _bay, along is { } a ? a / 100 * _bay.PanelWidthM : null, height, depth));
+            var moved = SensorMountResolver.MoveFreeAttached(_draft, _bay, along is { } a ? a / 100 * _bay.PanelWidthM : null, height, depth);
+            _draft = moved.Preset;
+            if (moved.Attachment is { Clamped: true, Reason: { } reason }) attachReason = reason;
         }
         if (yaw is { } y) _draft = _draft with { YawDeg = SensorMountResolver.NormalizeYaw(y) };
         if (tilt is { } tt) _draft = _draft with { TiltDeg = Math.Clamp(tt, -90, 90) };
@@ -305,11 +362,19 @@ public sealed class MountPresetEditorViewModel : Screen
             _draft = _draft with { BracketM = Math.Clamp(b, 0, SensorMountResolver.MAX_BRACKET_M) };
             // 브래킷을 줄이면 펜스와 거리도 그 안으로(허공 금지)
             var (fixedDraft, att) = SensorMountResolver.Normalize(_draft, _bay);
-            if (att.Clamped) { _draft = fixedDraft; StatusText = att.Reason ?? StatusText; }
+            if (att.Clamped) { _draft = fixedDraft; attachReason = att.Reason ?? attachReason; }
         }
+        if (attachReason is not null) notes.Add(attachReason);
+        if (ok && notes.Count > 0) StatusText = string.Join(" · ", notes);
+        FieldNotice = notes.Count > 0 ? string.Join(" · ", notes) : (ok ? string.Empty : StatusText);
         RaiseAll();
         return ok;
     }
+
+    private string _fieldNotice = string.Empty;
+
+    /// <summary>수치 칸 아래 안내(`MountEditor.FieldNotice`) — 마지막 적용에서 잘라 맞춘 값 · 읽지 못한 칸. 없으면 빈 글자.</summary>
+    public string FieldNotice { get => _fieldNotice; private set => Set(ref _fieldNotice, value); }
     #endregion
 
     #region - Name · save (FR-11 · FR-12) -
