@@ -183,10 +183,10 @@ public sealed partial class WiringViewModel
     /// <summary>지금 자세(한 대일 때).</summary>
     private SensorMountPose? SelectedPose => PresetTargets() is { Count: 1 } one ? PresetPoseOf(one[0]) : null;
 
-    /// <summary>높이 칸(m) — 프리셋 + 따로 고친 값.</summary>
+    /// <summary>높이 칸(m) — 프리셋 + 따로 고친 값. 여러 대면 모두 같을 때 그 값(실창 4회차 MNT-R28-425 — 여러 대를 고르면 칸이 비었다).</summary>
     public string PresetHeightText
     {
-        get => _editPresetHeight ?? (SelectedPose is { } p ? p.HeightM.ToString("0.00", CultureInfo.InvariantCulture) : string.Empty);
+        get => _editPresetHeight ?? (PresetTargets().Select(k => PresetPoseOf(k)?.HeightM.ToString("0.00", CultureInfo.InvariantCulture)).Distinct().ToList() is [{ } one] ? one : string.Empty);
         set { _editPresetHeight = value ?? string.Empty; NotifyOfPropertyChange(); }
     }
 
@@ -440,6 +440,7 @@ public sealed partial class WiringViewModel
             nameof(HasSensorPresets), nameof(HasPresetRow), nameof(PresetModelChoices), nameof(SelectedPresetModel), nameof(PresetMountChoices),
             nameof(SelectedMountPreset), nameof(HasMountOverride), nameof(MountOverrideText), nameof(PresetHeightText), nameof(PresetYawText),
             nameof(PresetAttributeChoices), nameof(SelectedAttributePreset), nameof(PresetSpacingAlertText), nameof(CanOpenPresetManager),
+            nameof(HasRangeSensors),                                            // 속성 프리셋 탐지 거리가 바뀌면 [탐지 범위] 를 켤 수 있는지도(MNT-R28-440)
         }) NotifyOfPropertyChange(name);
     }
     #endregion
