@@ -433,13 +433,47 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         // 겹친 무리만 그 점을 가운데로 나란히 선다(겹치지 않으면 제자리 · 세계 자리는 그대로라 확대하면 붙는 점으로 모인다).
         // 높이가 달라 위아래로 비켜 선 칩(기둥 위 · 기둥 중간)은 겹치지 않으니 같은 무리에 넣지 않는다 — 옆으로 밀면 기둥에서 떨어진다.
         if (scene.IsLayout)
+        {
+            var controllerBox = FenceScene.EndControllerBounds(_projector, _enclosureX);
             foreach (var lane in placed.GroupBy(p => p.Lane).Concat(OverlappingRows(mounted)))
             {
                 var row = lane.Where(p => !p.Chip.FootprintBounds.IsEmpty).OrderBy(p => p.X + p.Chip.FootprintBounds.X).ToList();
                 var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
                 for (var i = 0; i < row.Count; i++)
-                    if (Math.Abs(xs[i] - row[i].X) > 1e-9) Place(row[i].Chip, xs[i]);
+                {
+                    var x = xs[i];
+                    // 붙은 칩은 그 물체 범위 밖으로 밀지 않는다 — 기둥은 제자리, 칸에 붙은 칩은 그 칸 안(실창 4회차: 기둥 1 의 75088 이 기둥 없는 허공 · 제어기 상자 위로 밀렸다).
+                    // 펜스 끝 제어기 상자와 겹치면 그 범위 안에서 펜스 쪽으로 비킨다.
+                    if (row[i].Chip.Kind == FenceChipKind.Sensor && scene.MountRangeOf(row[i].Chip.Key) is { } range)
+                    {
+                        var hit = row[i].Chip.HitBounds;
+                        var nearController = hit.Top < controllerBox.Bottom && controllerBox.Top < hit.Bottom;
+                        // 한 기둥 한 높이에 둘 이상(MNT-R28-610) — 기둥 양옆으로 나란히 세우고 기둥의 고정점에서 몸까지 팔(브래킷)을 그린다(고정점은 기둥 위 그대로)
+                        var mates = range.Lo == range.Hi
+                            ? row.Where(r => r.Chip.Kind == FenceChipKind.Sensor && scene.MountRangeOf(r.Chip.Key) is { } m && m.Lo == m.Hi && Math.Abs(m.Lo - range.Lo) < 0.5).ToList()
+                            : null;
+                        if (mates is { Count: > 1 })
+                        {
+                            var step = mates.Max(r => r.Chip.FootprintBounds.Width) + CHIP_GAP_PX / Math.Max(0.05, _view.Scale);
+                            var first = range.Lo - (mates.Count - 1) / 2.0 * step;
+                            var last = range.Lo + (mates.Count - 1) / 2.0 * step;
+                            var shift = nearController && first + hit.Left < controllerBox.Right && controllerBox.Left < last + hit.Right
+                                ? (_enclosureX < range.Lo ? controllerBox.Right - (first + hit.Left) : controllerBox.Left - (last + hit.Right))
+                                : 0;
+                            x = first + shift + mates.IndexOf(row[i]) * step;
+                            if (row[i].Chip.Picture is { } picture) row[i].Chip.Picture = WithArm(picture, range.Lo - x);
+                        }
+                        else
+                        {
+                            x = Math.Clamp(x, range.Lo, range.Hi);
+                            if (nearController && x + hit.Left < controllerBox.Right && controllerBox.Left < x + hit.Right)
+                                x = Math.Clamp(_enclosureX < x ? controllerBox.Right - hit.Left : controllerBox.Left - hit.Right, range.Lo, range.Hi);
+                        }
+                    }
+                    if (Math.Abs(x - row[i].X) > 1e-9) Place(row[i].Chip, x);
+                }
             }
+        }
 
         // 링의 함체는 단위 목록에 없다 — 케이블 보기일 때만 따로 세운다(끌어서 옮긴다 · 표시만).
         if (shape == WiringShape.Ring && CablesShown)
@@ -476,6 +510,21 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             _chips.Children.Insert(Math.Min(i, _chips.Children.Count), order[i]);
         }
         while (_chips.Children.Count > order.Count) _chips.Children.RemoveAt(_chips.Children.Count - 1);
+    }
+
+    /// <summary>
+    /// 기둥 옆으로 비켜 선 칩의 그림 — 브래킷 고정점을 기둥(칩 원점에서 <paramref name="dx"/>)으로 옮기고 고정점 → 원래 브래킷 시작까지 가로 팔을 잇는다.
+    /// 브래킷이 없는 칩(지중)은 그대로.
+    /// </summary>
+    private static FenceChipPicture WithArm(FenceChipPicture picture, double dx)
+    {
+        var pin = picture.Shapes.FirstOrDefault(s => s.Ink == FenceInk.MountBracket && s.Kind == FenceShapeKind.Ellipse);
+        if (pin is null || Math.Abs(dx) < 1e-9) return picture;
+        var at = pin.Points[0];
+        var post = new Point(at.X + dx, at.Y);
+        var shapes = picture.Shapes.Select(s => ReferenceEquals(s, pin) ? s with { Points = new[] { post } } : s).ToList();
+        shapes.Insert(0, new FenceShape(FenceShapeKind.Line, FenceInk.MountBracket, new[] { post, at }));
+        return picture with { Shapes = shapes };
     }
 
     /// <summary>붙은 칩을 줄 · 세로로 겹치는 무리로 — 세로 범위(칩 사각형 위 · 아래)가 겹쳐 이어지는 것끼리 한 무리.</summary>
