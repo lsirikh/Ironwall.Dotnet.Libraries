@@ -250,7 +250,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
         var flatChanged = _projector.K != (vm.IsFlat ? 0 : 1);
         _projector = vm.IsFlat ? FenceProjector.Flat : FenceProjector.Tilt;
-        _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing);
+        _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing, vm.FencePoseOf);
         _enclosureX = _scene.ControllerX;
         _enclosureGap = _scene.Chain.ControllerGap;
         _grouped = _scene.ShouldGroup(_view.Scale);

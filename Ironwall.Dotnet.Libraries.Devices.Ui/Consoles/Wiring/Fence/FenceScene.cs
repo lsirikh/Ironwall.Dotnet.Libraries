@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
+using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -430,7 +431,30 @@ public static partial class FenceScene
         var q = s.IsBackFacing ? p with { ZOffset = BackFacingOffset(p) } : p;
         Rect? plate = null;
 
-        switch (s.Kind)
+        if (s.DrawShape is SensorShape.Pir)
+        {
+            // PIR(sensor-mount-preset FR-18) — 둥근 렌즈 몸(스마트 상자가 아니다). 몸 가운데 높이는 스마트와 같은 71(칩 올리기 기준을 같이 쓴다).
+            var zb = de / 2 + 8 * k;
+            var c = q.P(0, 71, zb);
+            o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.OliveFront, new[] { c }, 11, 11));
+            o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Pir, new[] { c }, 5, 5));
+            bb = new[] { q.P(-11, 82, zb), q.P(11, 82, zb), q.P(-11, 60, zb), q.P(11, 60, zb) };
+            var pl = coilPlate ?? PlateOff(bb, c.X, PLATE_H, COIL_PLATE_TEXT, zoom, plateAbove, GroundY(p, zb));
+            plate = Plate(o, pl, 20, PLATE_H, big, FenceInk.Number, COIL_PLATE_TEXT, 4, s, zoom);
+        }
+        else if (s.DrawShape is SensorShape.Optical)
+        {
+            // 광케이블(FR-18) — 펜스를 따라 가는 줄(물결 띠). 상자를 그리지 않는다.
+            var z = de / 2 + 2 * k;
+            var band = new List<Point>();
+            for (var i = 0; i <= 8; i++) band.Add(q.P(-30 + 7.5 * i, 71 + (i % 2 == 0 ? 2.5 : -2.5), z));
+            for (var i = 8; i >= 0; i--) band.Add(q.P(-30 + 7.5 * i, 67 + (i % 2 == 0 ? 2.5 : -2.5), z));
+            o.Add(Poly(FenceInk.OliveFront, band.ToArray()));
+            bb = new[] { q.P(-30, 76, z), q.P(30, 76, z), q.P(-30, 62, z), q.P(30, 62, z) };
+            var pl = coilPlate ?? PlateOff(bb, q.P(0, 66, z).X, PLATE_H, COIL_PLATE_TEXT, zoom, plateAbove, GroundY(p, z));
+            plate = Plate(o, pl, 20, PLATE_H, big, FenceInk.Number, COIL_PLATE_TEXT, 4, s, zoom);
+        }
+        else switch (s.Kind)
         {
             case FenceKind.Multi:
             {
@@ -485,9 +509,10 @@ public static partial class FenceScene
                 double zb0 = de / 2, zb1 = de / 2 + 12 * k, zh = de / 2 + 19 * k, zg0 = de / 2 + 3 * k, zg1 = de / 2 + 8 * k;
                 Box(o, q, -6, 43, 50, zg0, zg1, 5, FenceInk.GlandFront, FenceInk.GlandSide, FenceInk.GlandTop);
                 Box(o, q, 6, 43, 50, zg0, zg1, 5, FenceInk.GlandFront, FenceInk.GlandSide, FenceInk.GlandTop);
-                var bw = SensorBodyWidth(26, s.Yaw);
+                var wide = s.DrawShape == SensorShape.Smart2;                    // 스마트2 = 넓은 후드(FR-18)
+                var bw = SensorBodyWidth(wide ? 30 : 26, s.Yaw);
                 Box(o, q, 0, 50, 92, zb0, zb1, bw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
-                Box(o, q, 0, 92, 99, zb0, zh, SensorBodyWidth(32, s.Yaw), FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
+                Box(o, q, 0, 92, 99, zb0, zh, SensorBodyWidth(wide ? 38 : 32, s.Yaw), FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, bw, 50, 92, zb1, new Point(0, 58), 3.2);
                 if (s.IsBackFacing) MeshOver(o, q, bw, 50, 99, zb1);
                 bb = new[] { q.P(-16, 99, zb0), q.P(16, 99, zb0), q.P(-16, 92, zh), q.P(16, 92, zh), q.P(-9, 43, zg1), q.P(9, 43, zg1), q.P(16, 99, zb0 - 1) };

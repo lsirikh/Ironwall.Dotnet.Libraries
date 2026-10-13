@@ -176,7 +176,7 @@ public sealed partial class WiringViewModel
                 !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement),
                 duplicates.Contains(row.Key),
                 row.Facing,
-                row.Yaw);
+                row.Yaw) { ModelShape = PresetShapeOf(row.Key) };
         }
         return result;
     }

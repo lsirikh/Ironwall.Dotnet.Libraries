@@ -28,6 +28,28 @@ public sealed record SensorMountSpec(
     public const double MIN_OFFSET_M = -3.0;
     public const double MAX_OFFSET_M = 3.0;
 
+    #region - 센서 설치 위치 · 속성 프리셋(sensor-mount-preset D1 — 더하기만) -
+    /// <summary>센서 모델 id(<see cref="Presets.SensorModel.Id"/>) — 없으면 장비 종류의 기본 모델.</summary>
+    [JsonProperty("model_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? ModelId { get; init; }
+
+    /// <summary>위치 프리셋 id — 있으면 자리는 "프리셋 + <see cref="MountOverride"/>" 로 계산한다(<see cref="Presets.SensorMountResolver"/>).</summary>
+    [JsonProperty("mount_preset_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? MountPresetId { get; init; }
+
+    /// <summary>그 자리에서만 따로 고친 값(있는 칸만).</summary>
+    [JsonProperty("mount_override", NullValueHandling = NullValueHandling.Ignore)]
+    public Presets.SensorMountOverride? MountOverride { get; init; }
+
+    /// <summary>속성 프리셋 id — 없으면 모델의 ★기본.</summary>
+    [JsonProperty("attr_preset_id", NullValueHandling = NullValueHandling.Ignore)]
+    public int? AttrPresetId { get; init; }
+
+    /// <summary>위치 프리셋으로 서는 센서인가.</summary>
+    [JsonIgnore]
+    public bool HasMountPreset => MountPresetId is > 0;
+    #endregion
+
     /// <summary>기둥에 다는 자리인가(<see cref="Panel"/> 이 기둥 번호).</summary>
     [JsonIgnore]
     public bool IsPostSpot => IsPost(Spot);

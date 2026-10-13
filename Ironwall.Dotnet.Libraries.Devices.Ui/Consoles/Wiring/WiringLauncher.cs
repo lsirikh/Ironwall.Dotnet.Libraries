@@ -9,6 +9,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Signals;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Ironwall.Dotnet.Libraries.Utils.Consoles;
@@ -81,6 +82,32 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         _server = server;
     }
 
+    /// <param name="presets">
+    /// 센서 설치 위치 · 속성 프리셋 저장소(sensor-mount-preset D1) — <c>GMaps.Db</c> 모듈이 등록하면 Autofac 이 이 생성자를 고른다(인자가 더 많은 쪽).
+    /// 없거나 만들다 실패하면 "설치 위치" 프리셋 절만 숨는다.
+    /// </param>
+    public WiringLauncher(IWindowManager windows,
+                          IDeviceApiService api,
+                          IDeviceProviderService providerService,
+                          DeviceProvider devices,
+                          DeviceQueryPolicy policy,
+                          Lazy<ISensorPresetRepository>? presets,
+                          Lazy<ISensorPresetUsageSource>? presetUsage = null,
+                          DeviceGroupProvider? groups = null,
+                          ICatalogService? catalog = null,
+                          ILogService? log = null,
+                          IEventAggregator? eventAggregator = null,
+                          Lazy<IFenceLayoutStore>? fenceStore = null,
+                          WiringServerIdentity? server = null)
+        : this(windows, api, providerService, devices, policy, groups, catalog, log, eventAggregator, fenceStore, server)
+    {
+        _presets = presets;
+        _presetUsage = presetUsage;
+    }
+
+    private readonly Lazy<ISensorPresetRepository>? _presets;
+    private readonly Lazy<ISensorPresetUsageSource>? _presetUsage;
+
     public bool IsAvailable => _policy.IsAxisContract;
 
     public async Task<bool> OpenAsync(IBaseDeviceModel controller)
@@ -99,6 +126,7 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
         var fence = new WiringFenceContext(load.Document, store, new IcmpPingProbe(), key, load);
         var vm = WiringViewModel.ForController(info, seeds, types, apply, this, GroupsFor(), fence, _log);
         AttachLayoutPrefs(vm);
+        await AttachPresetsAsync(vm);
 
         var closedWith = await _windows.ShowDialogAsync(vm, null, WindowSettings(1280, 820, resizable: true));
         return SavedAnything(closedWith, vm);
@@ -139,6 +167,49 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     /// 대화 결과만 보던 종전에는 저장에 성공해도 콘솔이 다시 읽지 않고 "센서 · 결선을 저장했습니다." 도 뜨지 않았다.
     /// </summary>
     internal static bool SavedAnything(bool? closedWith, WiringViewModel vm) => closedWith == true || vm.HasSaved;
+
+    #region - Sensor presets (sensor-mount-preset W1 · W4) -
+    /// <summary>
+    /// 프리셋 저장소를 결선 창에 붙이고 읽는다(<see cref="FENCE_LOAD_TIMEOUT"/> 안) — 없거나 실패하면 절이 숨는다(창은 연다).
+    /// [프리셋 관리] = 센서 모델 창(W1), 편집기(W2) · 저장 확인(W5) · 적용 창도 같은 창 관리자로 띄운다.
+    /// </summary>
+    private async Task AttachPresetsAsync(WiringViewModel vm)
+    {
+        ISensorPresetRepository? repo;
+        ISensorPresetUsageSource? usage = null;
+        try
+        {
+            repo = _presets?.Value;
+            usage = _presetUsage?.Value;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 센서 프리셋 저장소를 쓸 수 없습니다 — 9자리 편집으로 엽니다: {ex.Message}");
+            return;
+        }
+        if (repo is null) return;
+
+        vm.AttachSensorPresets(repo, usage, async () =>
+        {
+            var models = new SensorPresets.SensorModelsViewModel(repo, usage, vm.CurrentPresetUsages)
+            {
+                Confirm = async confirm =>
+                {
+                    await _windows.ShowDialogAsync(confirm, null, WindowSettings(420, 260, resizable: false));
+                    return confirm.Choice;
+                },
+            };
+            if (vm.FenceLayout.Panels.FirstOrDefault() is { } panel) models.Sample = FenceSampleBay.FromPanel(panel);
+            models.OpenEditor = async editor => await _windows.ShowDialogAsync(editor, null, WindowSettings(980, 720, resizable: true)) == true || editor.ChangeCount == 0;
+            await _windows.ShowDialogAsync(models, null, WindowSettings(900, 640, resizable: true));
+        });
+        vm.ShowPresetDialog = dialog => _windows.ShowDialogAsync(dialog, null, WindowSettings(560, 420, resizable: false));
+
+        using var cts = new CancellationTokenSource(FENCE_LOAD_TIMEOUT);
+        try { await vm.LoadSensorPresetsAsync(cts.Token).ConfigureAwait(true); }
+        catch (Exception ex) { _log?.Warning($"[Wiring] 센서 프리셋을 제때 읽지 못했습니다 — 9자리 편집으로 엽니다: {ex.Message}"); }
+    }
+    #endregion
 
     #region - Fence layout (fence-wiring-editor FR-11 · FR-16) -
     /// <summary>로컬 저장소를 꺼낸다 — 등록이 없거나 만들다 실패하면 <c>null</c>(로그 한 줄 · 창은 연다).</summary>

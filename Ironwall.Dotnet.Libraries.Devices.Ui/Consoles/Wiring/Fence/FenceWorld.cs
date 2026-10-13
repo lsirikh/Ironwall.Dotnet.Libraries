@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Model;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,6 +75,12 @@ public sealed record FenceSensor(
     WiringYaw Yaw = WiringYaw.Away)
 {
     public FenceKind Kind => FenceWorld.KindOf(Type);
+
+    /// <summary>센서 모델의 입체 모양(sensor-mount-preset FR-18) — 모델을 모르면 <c>null</c>(장비 종류로 정한다).</summary>
+    public SensorShape? ModelShape { get; init; }
+
+    /// <summary>그릴 모양 — 모델 모양, 없으면 장비 종류(PIR · 광케이블 · 스마트2 는 스마트 상자가 아닌 제 모양).</summary>
+    public SensorShape DrawShape => ModelShape ?? FenceWorld.ShapeOf(Type);
 
     /// <summary>보는 쪽이 있는 센서인가(FR-20 — 기둥에 다는 스마트 복합 · 복합).</summary>
     public bool HasFacing => WiringTopology.SupportsFacing(Type);
@@ -229,6 +236,18 @@ public sealed class FenceWorld
     /// <summary>탐지 반경(m) — 복합 20 · 지진동 15(FR-19).</summary>
     public static double RangeOf(FenceKind kind) => kind switch { FenceKind.Multi => 20, FenceKind.Underground => 15, _ => 0 };
 
+    /// <summary>장비 종류의 기본 모양(모델을 모를 때 · sensor-mount-preset FR-18).</summary>
+    public static SensorShape ShapeOf(EnumDeviceType type) => type switch
+    {
+        EnumDeviceType.Multi => SensorShape.Multi,
+        EnumDeviceType.Fence or EnumDeviceType.Fence_Group => SensorShape.Fence,
+        EnumDeviceType.Underground => SensorShape.Underground,
+        EnumDeviceType.PIR => SensorShape.Pir,
+        EnumDeviceType.OpticalCable or EnumDeviceType.Cable => SensorShape.Optical,
+        EnumDeviceType.SmartSensor2 or EnumDeviceType.SmartMultisensor2 => SensorShape.Smart2,
+        _ => SensorShape.Smart,
+    };
+
     public static FenceKind KindOf(EnumDeviceType type) => type switch
     {
         EnumDeviceType.Multi => FenceKind.Multi,
@@ -293,6 +312,14 @@ public sealed class FenceWorld
     /// (같은 자리 여럿은 옆으로 벌린다), 센서 높이 = 자리 높이(m) × <see cref="Vpm"/>. 구성이 꺼졌거나 망이 없으면 옛 배치.
     /// </summary>
     public static FenceWorld FromLayout(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors, WiringFenceLayout? layout, WiringSpacingTable? spacing = null)
+        => FromLayout(chain, sensors, layout, spacing, null);
+
+    /// <summary>
+    /// <paramref name="poseOf"/>(sensor-mount-preset FR-17) — 위치 프리셋으로 서는 센서의 자세(프리셋 + 따로 고친 값 · 편집기와 같은 계산). 그 센서는
+    /// 가로 = 칸 시작 + 칸 안 몫 × 칸 폭, 높이 = 자세 높이(기둥 위로 뜨거나 바닥을 뚫지 않게 이미 범위 안)로 선다. <c>null</c> 이면 9자리 계산 그대로.
+    /// </summary>
+    public static FenceWorld FromLayout(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors, WiringFenceLayout? layout, WiringSpacingTable? spacing,
+                                        Func<int, SensorMountPose?>? poseOf)
     {
         ArgumentNullException.ThrowIfNull(chain);
         ArgumentNullException.ThrowIfNull(sensors);
@@ -317,6 +344,19 @@ public sealed class FenceWorld
         var twoLanes = layout.HasUpperSensors;
         foreach (var (key, mount) in seats)
         {
+            if (poseOf?.Invoke(key) is { } pose)
+            {
+                // 위치 프리셋 — 편집기와 같은 자세(칸 안 몫 · 높이). 철조망에 붙은 센서는 코일 위(번호판도 코일 위로).
+                var bay = geometry.Panels[SensorMountMigration.BayIndexOf(mount, geometry.Panels.Count, pose.AlongRatio)];
+                var presetKind = sensors.TryGetValue(key, out var ps) ? ps.Kind : FenceKind.Smart;
+                world._x[key] = (bay.StartM + bay.SpanM * pose.AlongRatio) * upm;
+                var presetLift = pose.Anchor == SensorMountAnchor.Ground ? 0 : LiftFor(presetKind, FenceMountSpot.PanelCenter, pose.HeightM * vpm);
+                if (pose.Anchor is SensorMountAnchor.Razor or SensorMountAnchor.RazorLoop && bay.Spec.Style == EnumFenceStyle.ChainLinkRazor)
+                    world._coil[key] = FenceStyleArt.CoilRadius(bay.Spec.HeightM * vpm);
+                world._lift[key] = presetLift;
+                top = Math.Max(top, presetLift + (presetKind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
+                continue;
+            }
             var point = FenceLayoutMath.PointOf(mount, geometry);
             var heightM = FenceLayoutMath.LaneHeightM(mount, geometry, twoLanes);                 // 위 줄 = 꼭대기 위 · 아래 줄 = 망 위(FR-18)
             var stack = stacks[(mount.Lane, FenceLayoutMath.SeatOf(mount))];

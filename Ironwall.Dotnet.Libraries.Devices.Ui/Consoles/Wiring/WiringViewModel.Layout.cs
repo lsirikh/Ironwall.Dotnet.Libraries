@@ -691,6 +691,7 @@ public sealed partial class WiringViewModel
         }) NotifyOfPropertyChange(name);
         RaiseLanePane();
         RaiseGridPicker();
+        RaisePresetPane();
     }
     #endregion
 
@@ -1169,7 +1170,7 @@ public sealed partial class WiringViewModel
             Panels = layout.Panels.ToList(),
             Mounts = layout.Mounts
                 .Where(p => _board.Find(p.Key) is { Id: > 0 })
-                .ToDictionary(p => _board.Find(p.Key)!.Id, p => p.Value with { FacesBack = _board.FacingOf(p.Key) == WiringFacing.Back }),
+                .ToDictionary(p => _board.Find(p.Key)!.Id, p => MigrateMountForSave(p.Key, p.Value with { FacesBack = _board.FacingOf(p.Key) == WiringFacing.Back })),
             Bands = layout.Bands,
             FenceSpacingM = _board.Spacing.FenceMetres,
             ControllerEnd = layout.ControllerEnd,

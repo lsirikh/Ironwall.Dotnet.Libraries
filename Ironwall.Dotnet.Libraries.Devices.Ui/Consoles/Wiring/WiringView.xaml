@@ -2253,6 +2253,113 @@
 												Text="{Binding MountOffsetText, UpdateSourceTrigger=PropertyChanged}" />
 										</StackPanel>
 
+										<!--  설치 위치 프리셋(sensor-mount-preset W4 · FR-15) — 모델 · 위치 프리셋 · 따로 고친 값(주황) · 속성 프리셋. 저장은 [저장하기] 하나로  -->
+										<StackPanel
+											Margin="0,10,0,0"
+											AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset"
+											Visibility="{Binding HasPresetRow, Converter={StaticResource BoolToVisibility}}">
+											<StackPanel Orientation="Horizontal">
+												<TextBlock Style="{StaticResource W.SectionHead}" Text="설치 위치" />
+												<c:HelpTip
+													Margin="6,6,0,0"
+													VerticalAlignment="Center"
+													HelpKey="Devices.Wiring.MountPreset" />
+											</StackPanel>
+											<TextBlock Margin="0,4,0,0" Style="{StaticResource W.Hint}" Text="모델" />
+											<ComboBox
+												Margin="0,2,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Model"
+												AutomationProperties.Name="모델"
+												DisplayMemberPath="Name"
+												ItemsSource="{Binding PresetModelChoices}"
+												SelectedItem="{Binding SelectedPresetModel}" />
+											<TextBlock Margin="0,6,0,0" Style="{StaticResource W.Hint}" Text="위치 프리셋" />
+											<ComboBox
+												Margin="0,2,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Mount"
+												AutomationProperties.Name="위치 프리셋"
+												DisplayMemberPath="Name"
+												ItemsSource="{Binding PresetMountChoices}"
+												SelectedItem="{Binding SelectedMountPreset}" />
+											<Border
+												Margin="0,4,0,0"
+												Padding="6,2"
+												BorderBrush="{DynamicResource StatusWarningBrush}"
+												BorderThickness="1"
+												CornerRadius="3"
+												Visibility="{Binding HasMountOverride, Converter={StaticResource BoolToVisibility}}">
+												<TextBlock
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Override"
+													Foreground="{DynamicResource StatusWarningBrush}"
+													Text="{Binding MountOverrideText}"
+													TextWrapping="Wrap" />
+											</Border>
+											<UniformGrid Margin="0,6,0,0" Columns="2">
+												<StackPanel Margin="0,0,4,0">
+													<TextBlock Style="{StaticResource W.Hint}" Text="높이 (m)" />
+													<TextBox
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Height"
+														AutomationProperties.Name="설치 높이"
+														KeyDown="OnPresetFieldKey"
+														LostKeyboardFocus="OnPresetFieldLostFocus"
+														Style="{StaticResource W.TextBox}"
+														Tag="height"
+														Text="{Binding PresetHeightText, UpdateSourceTrigger=PropertyChanged}" />
+												</StackPanel>
+												<StackPanel Margin="4,0,0,0">
+													<TextBlock Style="{StaticResource W.Hint}" Text="바라보는 방향 (°)" />
+													<TextBox
+														AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Yaw"
+														AutomationProperties.Name="바라보는 방향"
+														KeyDown="OnPresetFieldKey"
+														LostKeyboardFocus="OnPresetFieldLostFocus"
+														Style="{StaticResource W.TextBox}"
+														Tag="yaw"
+														Text="{Binding PresetYawText, UpdateSourceTrigger=PropertyChanged}" />
+												</StackPanel>
+											</UniformGrid>
+											<WrapPanel Margin="0,6,0,0">
+												<Button
+													Margin="0,0,4,4"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Reset"
+													Click="OnPresetReset"
+													Content="프리셋으로"
+													Style="{StaticResource Console.Button}" />
+												<Button
+													Margin="0,0,4,4"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.SaveNew"
+													Click="OnPresetSaveNew"
+													Content="이 값으로 새 프리셋"
+													Style="{StaticResource Console.Button}" />
+												<Button
+													Margin="0,0,4,4"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Apply"
+													Click="OnPresetApply"
+													Content="위치 프리셋 적용…"
+													Style="{StaticResource Console.Button}" />
+												<Button
+													Margin="0,0,4,4"
+													AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Manage"
+													Click="OnPresetManage"
+													Content="프리셋 관리"
+													IsEnabled="{Binding CanOpenPresetManager}"
+													Style="{StaticResource Console.Button}" />
+											</WrapPanel>
+											<TextBlock Margin="0,4,0,0" Style="{StaticResource W.Hint}" Text="속성 프리셋" />
+											<ComboBox
+												Margin="0,2,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Attribute"
+												AutomationProperties.Name="속성 프리셋"
+												DisplayMemberPath="Name"
+												ItemsSource="{Binding PresetAttributeChoices}"
+												SelectedItem="{Binding SelectedAttributePreset}" />
+											<TextBlock
+												Margin="0,4,0,0"
+												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.SpacingAlert"
+												Foreground="{DynamicResource StatusWarningBrush}"
+												Text="{Binding PresetSpacingAlertText}" />
+										</StackPanel>
+
 										<!--  여러 센서(Ctrl 클릭 · FR-07) — 함께 끌거나 한꺼번에 빼기  -->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMultiSelection, Converter={StaticResource BoolToVisibility}}">
 											<Button
