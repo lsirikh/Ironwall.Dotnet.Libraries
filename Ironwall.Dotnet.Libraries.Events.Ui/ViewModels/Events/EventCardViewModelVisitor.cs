@@ -24,6 +24,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public override void Visit(MalfunctionEventCardViewModel viewModel)
         {
         }
+
+        public override void Visit(OperationEventCardViewModel viewModel)
+        {
+        }
         #endregion
         #region - Binding Methods -
         #endregion

@@ -1,7 +1,12 @@
-﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
@@ -24,7 +29,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /// <summary>
 /// 서버가 <c>operation_events</c> INSERT 시 발행하는 Full-DTO(<c>cmd=OPERATION_EVENT</c>, subject <c>sensorway.{unit}.all.event.operation</c>)에서
 /// 개폐 관련 항목만 골라 심볼 형태 축을 갱신한다. 판정 우선순위: <c>detail.door_status</c>(OPEN/CLOSED) → <c>reason</c>(GATE_OPEN/…_DOOR_CLOSED …).
-/// 임계치 경보 등 개폐와 무관한 운영 이벤트는 무시한다(카드는 별도 차수). 서버 미구현 상태에서는 접점 폴백(FR-13 ③)이 같은 상태로 수렴한다.
+/// 임계치 경보 등 개폐와 무관한 운영 이벤트는 지도에 반영하지 않는다. 서버 미구현 상태에서는 접점 폴백(FR-13 ③)이 같은 상태로 수렴한다.
+/// 카드: <see cref="IEventAggregator"/> 를 받은 생성자면 모든 운영 이벤트를 <see cref="OperationEventCardMessage"/> 로도 낸다(operation-event-card PRD).
 /// </summary>
 public class OperationEventNatsSyncService : IOperationEventNatsSyncService, IService
 {
@@ -39,6 +45,23 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
         _natsService = natsService;
         _symbolEventManager = symbolEventManager;
         _tokenStorage = tokenStorage;
+    }
+
+    /// <summary>
+    /// 카드까지 띄우는 생성자 — 받은 운영 이벤트마다 <see cref="OperationEventCardMessage"/> 를 <paramref name="eventAggregator"/> 로 낸다
+    /// (이벤트 패널이 받아 운영 카드로 올린다, operation-event-card PRD §7). <paramref name="deviceProvider"/> 가 있으면 카드 장비를 캐시 장비로 잇는다.
+    /// </summary>
+    public OperationEventNatsSyncService(
+        ILogService? log,
+        INatsService natsService,
+        ISymbolEventManager symbolEventManager,
+        ITokenStorageService? tokenStorage,
+        IEventAggregator? eventAggregator,
+        DeviceProvider? deviceProvider = null)
+        : this(log, natsService, symbolEventManager, tokenStorage)
+    {
+        _eventAggregator = eventAggregator;
+        _deviceProvider = deviceProvider;
     }
     #endregion
 
@@ -62,22 +85,47 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
     #endregion
 
     #region - Processes -
-    private Task OnNatsOperationAsync(MessageArgsModel e)
+    private async Task OnNatsOperationAsync(MessageArgsModel e)
     {
-        if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;   // 로그인 게이팅(DETECT 와 동일)
+        if (_tokenStorage is { IsAuthenticated: false }) return;   // 로그인 게이팅(DETECT 와 동일)
         // 배열 봉투는 항목마다 — 호스트 라우터와 같은 의미(WP-1 ⑰).
         foreach (var envelope in NatsEnvelopeItems.Parse(e.Data, _log, "OPERATION_EVENT"))
-            ProcessEnvelope(envelope);
-        return Task.CompletedTask;
+        {
+            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정(프로브 S21 · S27)
+            if (!NatsEnvelopeItems.IsNotice(envelope, "OPERATION_EVENT")) continue;
+            if (envelope["body"] is not JObject body) continue;
+            ProcessEnvelope(envelope, body);
+            await PublishCardAsync(body);
+        }
     }
 
-    private void ProcessEnvelope(JObject jObj)
+    /// <summary>
+    /// 운영 카드 메시지 — 개폐 · 환경 경보 · 모르는 사유 모두(PRD §1). 본문은 이벤트 콘솔 '운영' 레일과 같은 변환(<see cref="DtoToModelHelper.ToOperationEventModel"/>).
+    /// 서버 번호가 없으면 중복을 가를 수 없어 띄우지 않는다.
+    /// </summary>
+    private async Task PublishCardAsync(JObject body)
+    {
+        if (_eventAggregator is null) return;
+        try
+        {
+            var model = body.ToObject<OperationEventDto>()?.ToOperationEventModel(_deviceProvider);
+            if (model is not { Id: > 0 })
+            {
+                _log?.Info($"OPERATION_EVENT: 서버 번호 없음 — 카드 건너뜀 (reason={body.Value<string>("reason")})");
+                return;
+            }
+            await _eventAggregator.PublishOnCurrentThreadAsync(new OperationEventCardMessage(model));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"OPERATION_EVENT 카드 발행 오류: {ex.Message}");
+        }
+    }
+
+    private void ProcessEnvelope(JObject jObj, JObject body)
     {
         try
         {
-            // cmd 대문자 토큰 · 응답(m_type=RSP) 제외 — 호스트 라우터와 같은 판정(프로브 S21 · S27)
-            if (!NatsEnvelopeItems.IsNotice(jObj, "OPERATION_EVENT")) return;
-            if (jObj["body"] is not JObject body) return;
             if (PerfTrace.IsEnabled)   // 계측: 수신 직후
                 PerfTrace.Mark(PerfStages.NatsReceived, PerfKinds.Operation, body.Value<int?>("id") ?? 0,
                                PerfTrace.Extra(("cmd", "OPERATION_EVENT"), ("envelope", jObj.Value<string>("id")), ("reason", body.Value<string>("reason"))));
@@ -143,5 +191,7 @@ public class OperationEventNatsSyncService : IOperationEventNatsSyncService, ISe
     private readonly INatsService _natsService;
     private readonly ISymbolEventManager _symbolEventManager;
     private readonly ITokenStorageService? _tokenStorage;
+    private readonly IEventAggregator? _eventAggregator;
+    private readonly DeviceProvider? _deviceProvider;
     #endregion
 }

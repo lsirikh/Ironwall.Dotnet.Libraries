@@ -87,7 +87,12 @@ internal sealed class EventMapRig : IDisposable
           {
               lock (Published) Published.Add(message);
               // 카드 패널의 구독 — EntryId 매칭 · "이미 조치됨" 이면 엔트리 즉시 해제(B5)
-              return message is EventEntryEnqueuedMessage enqueued ? Panel!.HandleAsync(enqueued, CancellationToken.None) : Task.CompletedTask;
+              return message switch
+              {
+                  EventEntryEnqueuedMessage enqueued => Panel!.HandleAsync(enqueued, CancellationToken.None),
+                  OperationEventCardMessage operation => Panel!.HandleAsync(operation, CancellationToken.None),   // 운영 카드(operation-event-card)
+                  _ => Task.CompletedTask,
+              };
           });
 
         var setupModel = new EventSetupModel(Setup.Object);
@@ -132,7 +137,7 @@ internal sealed class EventMapRig : IDisposable
         var lookup = withDeviceLookup ? DeviceLookup.Object : null;   // 없으면 캐시 미스 단건 GET 을 하지 않는 옛 규칙
         new DetectionNatsSyncService(Log.Object, nats.Object, Symbols, Queue, Setup.Object, ea.Object, null, Devices, DoorPolicy.Object, lookup).StartService();
         new MalfunctionNatsSyncService(Log.Object, nats.Object, Symbols, Queue, Setup.Object, ea.Object, null, Devices, lookup).StartService();
-        new OperationEventNatsSyncService(Log.Object, nats.Object, Symbols).StartService();
+        new OperationEventNatsSyncService(Log.Object, nats.Object, Symbols, null, ea.Object, Devices).StartService();   // 호스트 배선(EventUiModule)과 같게
         new CameraPtzNatsSyncService(Log.Object, nats.Object, Symbols).StartService();
     }
 
@@ -248,10 +253,10 @@ internal sealed class EventMapRig : IDisposable
     }
 
     /// <summary>서버 OPERATION_EVENT(component-status PATCH 뒤) — 함체 · 통문 개폐.</summary>
-    public Task PublishOperationAsync(int deviceId, string reason, string? doorStatus = null)
+    public Task PublishOperationAsync(int deviceId, string reason, string? doorStatus = null, int eventId = 1, string? envelopeId = null, string? severity = null)
         => PublishRawAsync($$"""
-        { "id": "{{NewEnvelopeId()}}", "m_type": "PUB", "cmd": "OPERATION_EVENT", "from": "server",
-          "body": { "id": 1, "reason": "{{reason}}", "device": {{DeviceRef(deviceId)}},
+        { "id": "{{envelopeId ?? NewEnvelopeId()}}", "m_type": "PUB", "cmd": "OPERATION_EVENT", "from": "server",
+          "body": { "id": {{eventId}}, "reason": "{{reason}}", "device": {{DeviceRef(deviceId)}}, "severity": {{(severity is null ? "null" : $"\"{severity}\"")}},
                     "detail": {{(doorStatus is null ? "null" : $$"""{ "door_status": "{{doorStatus}}" }""")}} } }
         """);
 
