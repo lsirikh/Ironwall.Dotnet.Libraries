@@ -24,7 +24,10 @@ public static class EventCardKind
         _ => null,
     };
 
-    /// <summary>운영 카드 열쇠 — 패널 안의 중복 · 닫힘 기억에만 쓴다(조치보고 · 원격 ACTION_REPORT 대상이 아니라 <see cref="Of(EventCardBaseViewModel?)"/> 에는 넣지 않는다).</summary>
+    /// <summary>
+    /// 운영 카드 열쇠(= 브로커 <c>from_event.category_event</c> "operation") — 패널 안의 중복 · 닫힘 기억 · 조치보고 가드 · 원격 ACTION_REPORT 에 쓴다
+    /// (operation-event-card PRD v1.1). <see cref="Of(EventCardBaseViewModel?)"/> 에는 넣지 않는다 — 종류를 모르는 원격 조치가 운영 카드를 닫지 않게.
+    /// </summary>
     public const string Operation = "operation";
 
     /// <summary>카드 목록 열쇠의 종류 — 탐지 · 장애에 더해 운영. 그 밖이면 <c>null</c>.</summary>
@@ -43,11 +46,14 @@ public static class EventCardKind
     {
         if (string.Equals(categoryEvent, ActionReportKind.Detection, StringComparison.OrdinalIgnoreCase)) return ActionReportKind.Detection;
         if (string.Equals(categoryEvent, ActionReportKind.Malfunction, StringComparison.OrdinalIgnoreCase)) return ActionReportKind.Malfunction;
+        // 운영 이벤트도 조치 대상이다(서버 FR-07). 종전엔 type_event "Operation" 이 탐지로 읽혀 같은 번호의 탐지 카드를 닫을 수 있었다.
+        if (string.Equals(categoryEvent, Operation, StringComparison.OrdinalIgnoreCase)) return Operation;
 
         if (!Enum.TryParse<EnumEventType>(typeEvent, ignoreCase: true, out var type)) return null;
         return type switch
         {
             EnumEventType.Fault => ActionReportKind.Malfunction,
+            EnumEventType.Operation => Operation,
             EnumEventType.Action or EnumEventType.Connection or EnumEventType.None => null,
             _ => ActionReportKind.Detection,
         };

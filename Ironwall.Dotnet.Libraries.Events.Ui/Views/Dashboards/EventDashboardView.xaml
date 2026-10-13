@@ -70,6 +70,14 @@
 				Header="조치 내역 보기"
 				Visibility="{Binding IsActionReported, Converter={StaticResource BoolToVis}}" />
 		</ContextMenu>
+		<!--  운영 행 — 조치보고만(운영 조치 내역 조회 API 가 없어 '조치 내역 보기' 는 두지 않는다, PRD v1.1)  -->
+		<ContextMenu x:Key="OperationRowMenu">
+			<MenuItem
+				AutomationProperties.AutomationId="Console.Events.Row.Report"
+				Command="{Binding Data.OperationPanelViewModel.ReportCommand, Source={StaticResource Proxy}}"
+				CommandParameter="{Binding}"
+				Header="조치보고" />
+		</ContextMenu>
 
 		<!--  장비 칸 — 지워진 장비는 짧은 이름만 보이고 서버 스냅샷 원문은 툴팁으로(완성도 감사 E-4 #3)  -->
 		<Style
@@ -663,22 +671,51 @@
 					</DataGrid.Columns>
 				</DataGrid>
 
-				<!--  운영 내역 — 함체 · 통문 개폐와 함체 환경 경보. 서버가 만든 기록이라 조회만 한다(조치보고 · 끌기 없음)  -->
+				<!--
+					운영 내역 — 함체 · 통문 개폐와 함체 환경 경보. 기록은 고치지 않지만 조치보고는 한다(서버 FR-07,
+					operation-event-card PRD v1.1) — 탐지 · 장애와 같은 손잡이 · 조치 열 · 행 우클릭 '조치보고'.
+				-->
 				<DataGrid
 					AutomationProperties.AutomationId="Console.Events.Grid.Operation"
 					CanUserReorderColumns="False"
 					CanUserSortColumns="False"
 					IsReadOnly="True"
 					ItemsSource="{Binding Rows}"
-					RowStyle="{StaticResource EventRow}"
 					SelectionChanged="OnGridSelectionChanged"
 					SelectionMode="Extended"
 					Style="{StaticResource Console.DataGrid}"
 					Visibility="{Binding IsOperationRail, Converter={StaticResource BoolToVis}}">
 					<b:Interaction.Behaviors>
 						<inner:DataGridScrollEndBehavior Command="{Binding OperationPanelViewModel.LoadMoreCommand}" Threshold="50" />
+						<drag:CaptureDragBehavior
+							DisplayMemberPath="DeviceLabel"
+							Handler="{Binding TrayDrop}"
+							IsDragEnabled="{Binding CanDragToTray}"
+							KeyboardFallback="행을 고른 뒤 툴바의 [트레이에 담기]를 누르세요" />
 					</b:Interaction.Behaviors>
 					<DataGrid.Columns>
+						<DataGridTemplateColumn
+							Width="28"
+							MinWidth="28"
+							CellStyle="{StaticResource Console.DataGrid.Cell.Flush}"
+							CellTemplate="{StaticResource HandleCell}"
+							IsReadOnly="True" />
+						<DataGridTemplateColumn
+							Width="120"
+							MinWidth="120"
+							CellStyle="{StaticResource Console.DataGrid.Cell}"
+							Header="조치">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Border Style="{StaticResource ActionPill}">
+										<StackPanel Orientation="Horizontal">
+											<Ellipse Style="{StaticResource ActionPillDot}" />
+											<TextBlock Style="{StaticResource ActionPillText}" />
+										</StackPanel>
+									</Border>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
 						<DataGridTextColumn
 							Width="160"
 							MinWidth="160"
@@ -724,6 +761,11 @@
 							ElementStyle="{StaticResource Console.DataGrid.CellText}"
 							Header="상세" />
 					</DataGrid.Columns>
+					<DataGrid.RowStyle>
+						<Style BasedOn="{StaticResource EventRow}" TargetType="DataGridRow">
+							<Setter Property="ContextMenu" Value="{StaticResource OperationRowMenu}" />
+						</Style>
+					</DataGrid.RowStyle>
 				</DataGrid>
 
 				<!--  조치 내역  -->

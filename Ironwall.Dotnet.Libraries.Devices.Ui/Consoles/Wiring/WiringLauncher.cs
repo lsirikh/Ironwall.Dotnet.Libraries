@@ -178,7 +178,9 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs, SensorPres
         var (repo, usage) = ResolvePresets();
         if (repo is null) return;
 
-        vm.AttachSensorPresets(repo, usage, () => ShowSensorModelsAsync(repo, usage, vm.CurrentPresetUsages,
+        // 센서 모델 창에서 저장 · 지우면 결선 창이 곧바로 다시 읽는다(창을 닫기 전에도 펜스 보기가 따라 옮겨진다 · MNT-R28-455)
+        var notifying = new SensorPresets.ChangeNotifyingSensorPresetRepository(repo, () => vm.LoadSensorPresetsAsync());
+        vm.AttachSensorPresets(repo, usage, () => ShowSensorModelsAsync(notifying, usage, vm.CurrentPresetUsages,
             vm.FenceLayout.Panels.FirstOrDefault() is { } panel ? FenceSampleBay.FromPanel(panel) : null));
         vm.ShowPresetDialog = dialog => _windows.ShowDialogAsync(dialog, null, WindowSettings(560, 420, resizable: false));
 

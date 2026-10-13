@@ -199,8 +199,8 @@ public sealed class EventDetailViewModel : PropertyChangedBase
     /// <summary>주 버튼 문구 — 중복 조치보고가 허용이라 조치가 있어도 꺼지지 않는다.</summary>
     public string ReportButtonText => EventDetailProjection.ReportButtonText(_rows.Count, _actionCount);
 
-    /// <summary>탐지 · 장애에서만 조치보고가 뜬다(연결에는 <c>action_reported</c> 가 없다).</summary>
-    public bool CanShowReport => _kind is EventDetailKind.Detection or EventDetailKind.Malfunction
+    /// <summary>탐지 · 장애 · 운영에서만 조치보고가 뜬다(연결에는 <c>action_reported</c> 가 없다 · 운영은 서버 FR-07 로 조치 대상).</summary>
+    public bool CanShowReport => _kind is EventDetailKind.Detection or EventDetailKind.Malfunction or EventDetailKind.Operation
                                  && _rows.Count > 0 && _canReport;
 
     /// <summary>
@@ -223,9 +223,9 @@ public sealed class EventDetailViewModel : PropertyChangedBase
 
     private ExEventViewModel? SingleReportable
         => _rows.Count == 1 && _rows[0] is ExEventViewModel ex && ex.Model is { Id: > 0 }
-           && _kind is EventDetailKind.Detection or EventDetailKind.Malfunction ? ex : null;
+           && _kind is EventDetailKind.Detection or EventDetailKind.Malfunction or EventDetailKind.Operation ? ex : null;
 
-    /// <summary>[조치보고] — 한 건 · 저장된 탐지/장애 · 권한이 있을 때.</summary>
+    /// <summary>[조치보고] — 한 건 · 저장된 탐지/장애/운영 · 권한이 있을 때.</summary>
     public bool ShowReportAction => _canReport && SingleReportable is not null;
 
     /// <summary>[N건 트레이에 담기] — 여러 건을 골랐을 때.</summary>

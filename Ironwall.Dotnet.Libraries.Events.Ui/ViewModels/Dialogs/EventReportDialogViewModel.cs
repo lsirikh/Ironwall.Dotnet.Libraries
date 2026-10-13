@@ -77,7 +77,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
             if (message is null || !IsActive || _model is null) return Task.CompletedTask;
             if (_model.Model?.Id != message.EventId
-                || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(_model) != message.Kind) return Task.CompletedTask;
+                || Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.ListKeyOf(_model) != message.Kind) return Task.CompletedTask;   // 운영 창도(PRD v1.1)
 
             // 서버에서 지워졌다(SYNC_DETECTION DELETED) — 메아리일 수 없으니 보내는 중이어도 곧바로 끈다. 보내면 서버가 "없는 이벤트" 로 거절한다.
             if (message.DeletedOnServer)

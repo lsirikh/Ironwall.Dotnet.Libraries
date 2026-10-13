@@ -26,6 +26,12 @@ public static class ActionTrayCandidateFactory
             Label(malfunction.DeviceLabel, malfunction.DateTime),
             malfunction.IsActionReported),
 
+        OperationEventViewModel operation => new ActionTrayCandidate(
+            operation.Model?.Id ?? 0,
+            ActionTrayDrop.KindOperation,
+            Label(operation.DeviceLabel, operation.DateTime),
+            operation.IsActionReported),
+
         // 연결 · 조치 행은 원본이 아니다 — 종류를 비워 두면 판정이 "원본이 아님" 으로 센다.
         ConnectionEventViewModel connection => new ActionTrayCandidate(
             connection.Model?.Id ?? 0, "connection", Label(connection.DeviceLabel, connection.DateTime), false),

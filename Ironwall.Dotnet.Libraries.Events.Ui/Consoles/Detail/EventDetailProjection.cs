@@ -101,7 +101,7 @@ public static class EventDetailProjection
         EventDetailKind.Detection => "탐지 행을 고르면 스냅샷 · 판정 · 조치 내역이 열립니다.",
         EventDetailKind.Malfunction => "장애 행을 고르면 사유 · 고장 구간 · 조치 내역이 열립니다.",
         EventDetailKind.Connection => "연결 행을 고르면 장비 정보가 열립니다. 연결 이벤트에는 조치보고가 없습니다.",
-        EventDetailKind.Operation => "운영 행을 고르면 사유 · 심각도 · 상세 값이 열립니다. 운영 이벤트는 조회만 합니다.",
+        EventDetailKind.Operation => "운영 행을 고르면 사유 · 심각도 · 상세 값이 열립니다.",
         EventDetailKind.Overview => "개요에서는 고를 행이 없습니다. 왼쪽에서 내역을 고르세요.",
         _ => "조치 행을 고르면 원본 이벤트가 함께 열립니다.",
     };

@@ -49,6 +49,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<DetectionThumbnailSyncedMessage>
                                             , IHandle<DetectionDeletedOnServerMessage>
                                             , IHandle<OperationEventCardMessage>
+                                            , IHandle<OperationReportedMessageModel>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -256,8 +257,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         /// <summary>
-        /// 운영 카드를 치운다 — 조치 대상이 아니라 서버 호출 · 조치보고 알림(<see cref="ActionReported"/>) 없이 목록에서만 뺀다.
-        /// 닫힘은 기억해 같은 봉투가 다시 배달돼도 다시 뜨지 않는다(operation-event-card PRD §3 · §5). UI 스레드에서 부를 것.
+        /// 운영 카드를 [닫기] 로 치운다 — 조치 없이 치우기라 서버 호출 · 조치보고 알림(<see cref="ActionReported"/>) 없이 목록에서만 뺀다
+        /// (조치는 [조치보고] 가 따로 한다, PRD v1.1 §3). 닫힘은 기억해 같은 봉투가 다시 배달돼도 다시 뜨지 않는다(§5). UI 스레드에서 부를 것.
         /// </summary>
         public void CloseOperationCard(OperationEventCardViewModel? card)
         {
@@ -536,6 +537,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 report.UpdateData(dataContext, user);
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenEventReportDialogMessageModel() { EventType = "MALFUNCTION" });
             }
+            else if (dataContext is OperationEventCardViewModel operation)
+            {
+                // 운영 조치보고 창(PRD v1.1 §3) — 호스트가 "OPERATION" 을 OperationReportDialogViewModel 로 띄운다.
+                if (!operation.IsReportSupported) return;
+                IoC.Get<OperationReportDialogViewModel>().UpdateData(operation, IoC.Get<IAccountModel>());
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenEventReportDialogMessageModel() { EventType = OperationReportDialogViewModel.EventType });
+            }
             else
             {
                 var report = IoC.Get<DetectionReportDialogViewModel>();
@@ -583,8 +591,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 foreach (var card in cards)
                 {
-                    // 운영 카드는 조치 대상이 아니다 — 서버 조치를 만들지 않고 치우기만 한다(operation-event-card PRD §3).
-                    if (card is OperationEventCardViewModel operation)
+                    // 운영 카드도 서버 조치를 만든다(PRD v1.1 §3) — 단 서버가 운영 조치를 받지 못하는 판본(6.3)이면 종전대로 치우기만.
+                    if (card is OperationEventCardViewModel { IsReportSupported: false } operation)
                     {
                         CloseOperationCard(operation);
                         continue;
@@ -1024,6 +1032,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </param>
         private void ReleaseQueueAndSymbol(EventCardBaseViewModel vm, bool allowDeviceFallback = true)
         {
+            // 운영 카드는 큐에 들어가지 않는다(PRD §4) — 번호로 엔트리를 찾으면 같은 번호의 탐지 엔트리를 뺄 수 있어 아예 건드리지 않는다.
+            if (vm is OperationEventCardViewModel) return;
             var model = vm.Model;
             var kind = EventCardKind.Of(vm);
             if (vm.EntryId == null && model != null)
@@ -1071,6 +1081,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             => HandleReportedAsync(message?.ViewModel);
 
         public Task HandleAsync(MalfunctionReportedMessageModel message, CancellationToken cancellationToken)
+            => HandleReportedAsync(message?.ViewModel);
+
+        /// <summary>운영 카드 조치보고가 서버에 들어갔다 — 탐지 · 장애와 같은 길로 카드를 닫는다(PRD v1.1 §3).</summary>
+        public Task HandleAsync(OperationReportedMessageModel message, CancellationToken cancellationToken)
             => HandleReportedAsync(message?.ViewModel);
 
         /// <summary>
