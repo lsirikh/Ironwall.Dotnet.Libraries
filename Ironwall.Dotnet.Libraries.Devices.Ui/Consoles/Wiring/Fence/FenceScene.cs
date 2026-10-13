@@ -47,6 +47,9 @@ public enum FenceInk
     ConceptCh1, ConceptCh2, ConceptCh2Dash, ConceptFence, ConceptMesh, ConceptPost, ConceptGround, ConceptTick, ConceptTickText,
     ConceptLabelLower, ConceptLabelUpper, ConceptChipLower, ConceptChipUpper, ConceptChipTextLower, ConceptChipTextUpper,
     ConceptVbus, ConceptVbusText, ConceptTarget,
+    // 센서 설치 위치 프리셋(sensor-mount-preset W4) — 붙는 점(반투명 회색 · 다크 흰) · 붙지 않는 점(더 흐림) · 붙을 점(반투명 빨강 — 고리는 SnapRing) ·
+    // 권장 간격 넘음 표지(삼각형 · 빈틈의 마름모와 모양이 다르다) · 그 글자
+    MountDot, MountDotDim, MountHot, SpacingAlertMark, SpacingAlertText,
 }
 
 /// <summary>
@@ -88,8 +91,12 @@ public sealed record FenceChipPicture(IReadOnlyList<FenceShape> Shapes, Rect Hit
     public Rect Footprint => Extent is { } e ? Rect.Union(Hit, e) : Hit;
 }
 
-/// <summary>격자 점 안내의 모습 — 빈 점 · 센서가 있는 점(흐림) · 포인터 아래(크게 + 고리) · 함께 끈 센서가 갈 점(고리) · 갈 수 없음(빈 마름모).</summary>
-public enum FenceSnapState { Free, Occupied, Hot, Member, Blocked }
+/// <summary>
+/// 격자 점 안내의 모습 — 빈 점 · 센서가 있는 점(흐림) · 포인터 아래(크게 + 고리) · 함께 끈 센서가 갈 점(고리) · 갈 수 없음(빈 마름모).
+/// 프리셋 붙는 점(sensor-mount-preset W4): <see cref="Mount"/> = 붙을 수 있는 점(반투명 회색 · 다크 흰) · <see cref="MountDim"/> = 모델이 붙지 않는 점(더 흐림) ·
+/// <see cref="MountHot"/> = 붙을 점(반투명 빨강 + 고리).
+/// </summary>
+public enum FenceSnapState { Free, Occupied, Hot, Member, Blocked, Mount, MountDim, MountHot }
 
 /// <summary>끄는 동안 그리는 격자 점 하나(세계 좌표 · 투영 뒤).</summary>
 public sealed record FenceSnapDot(Point At, FenceSnapState State);
@@ -176,7 +183,7 @@ public static partial class FenceScene
         if (showRange)
             foreach (var (key, x) in world.X)
             {
-                var r = FenceWorld.RangeOf(world.Sensors[key].Kind);
+                var r = FenceWorld.RangeOf(world.Sensors[key]);
                 if (r <= 0) continue;
                 var c = p.P(x, 0, world.Sensors[key].Kind == FenceKind.Underground ? UZ : 0);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Range, new[] { c }, r * u, Math.Max(6, r * u * p.Cz * 0.8)));
@@ -753,12 +760,23 @@ public static partial class FenceScene
                     case FenceSnapState.Occupied:
                         o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapDotDim, new[] { dot.At }, r, r));
                         break;
+                    case FenceSnapState.Mount:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.MountDot, new[] { dot.At }, r * 1.2, r * 1.2));
+                        break;
+                    case FenceSnapState.MountDim:
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.MountDotDim, new[] { dot.At }, r * 0.9, r * 0.9));
+                        break;
+                    case FenceSnapState.MountHot:
+                        // 붙을 점 — 색만이 아니라 고리(모양)로도 가른다(NFR-03)
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapRing, new[] { dot.At }, r * 2.6, r * 2.6));
+                        o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.MountHot, new[] { dot.At }, r * 1.6, r * 1.6));
+                        break;
                     default:
                         o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.SnapDot, new[] { dot.At }, r, r));
                         break;
                 }
             }
-            if (!string.IsNullOrEmpty(snapLabel) && snapDots.FirstOrDefault(d => d.State is FenceSnapState.Hot or FenceSnapState.Blocked) is { } hot)
+            if (!string.IsNullOrEmpty(snapLabel) && snapDots.FirstOrDefault(d => d.State is FenceSnapState.Hot or FenceSnapState.Blocked or FenceSnapState.MountHot) is { } hot)
                 o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillInsert, new[] { new Point(hot.At.X, hot.At.Y - 26) }, Text: snapLabel, FontSize: 11.5));
         }
         return Legible(o, zoom);
@@ -783,6 +801,7 @@ public static partial class FenceScene
         or FenceInk.GroupText or FenceInk.ControllerText or FenceInk.GapText or FenceInk.Pill or FenceInk.PillInsert or FenceInk.FacingTagText
         or FenceInk.GroupSub       // 묶음 카드 안 첫–끝 번호
         or FenceInk.SideLabel
+        or FenceInk.SpacingAlertText   // 권장 간격 넘음(sensor-mount-preset FR-14) — 알림이라 작은 배율에서도 읽혀야 한다
         or FenceInk.DimText;       // 거리(m) — 켰으면 읽혀야 한다(겹치는 것은 FenceDimensions.Thin 이 뺀다)     // "펜스 외부 · 내부" — 보는 쪽(앞 · 뒤)을 읽는 기준이라 작은 배율에서도 남긴다(FR-20)
 
     private static double SafeZoom(double zoom) => zoom > 0.05 ? zoom : 0.05;

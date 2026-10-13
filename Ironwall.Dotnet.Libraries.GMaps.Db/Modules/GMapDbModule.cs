@@ -45,10 +45,20 @@ public class GMapDbModule : Module
             builder.RegisterType<FenceLayoutStore>().As<Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore>()
                 .SingleInstance();
             // 센서 설치 위치 · 속성 프리셋(sensor-mount-preset D1 · D5) — 같은 로컬 DB · 부팅 경로 밖. 결선 창 · 센서 모델 창이 Lazy 로 받는다.
-            //   GOP API 저장소는 자리만(NotSupported) — 설정 SensorPresets.Source 가 생기면 여기서 고른다.
+            //   저장소는 appsettings "SensorPresets": { "Source": "GisDb" | "GopApi" } 로 고른다(없으면 GisDb). GopApi 는 자리만이라 읽기 전용
+            //   (회사 기본 7종을 보이고 편집 단추가 잠긴다 · W1). 쓰임 셈(결선 레이아웃 JSON)은 늘 GIS DB 에서 읽는다.
             builder.RegisterType<GisDbSensorPresetRepository>()
-                .As<Ironwall.Dotnet.Monitoring.Models.Fences.Presets.ISensorPresetRepository>()
+                .AsSelf()
                 .As<Ironwall.Dotnet.Monitoring.Models.Fences.Presets.ISensorPresetUsageSource>()
+                .SingleInstance();
+            builder.Register(c =>
+                {
+                    var context = c.Resolve<IComponentContext>();
+                    return Ironwall.Dotnet.Monitoring.Models.Fences.Presets.SensorPresetRepositoryFactory.Create(
+                        Ironwall.Dotnet.Monitoring.Models.Fences.Presets.SensorPresetSettings.Current,
+                        () => context.Resolve<GisDbSensorPresetRepository>());
+                })
+                .As<Ironwall.Dotnet.Monitoring.Models.Fences.Presets.ISensorPresetRepository>()
                 .SingleInstance();
         }
         catch

@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Utils.Behaviors.Drag;
 using Ironwall.Dotnet.Libraries.Utils.Consoles.Graph;
 using Ironwall.Dotnet.Monitoring.Models.Fences;
+using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -77,6 +78,12 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private FenceGridCell? _snapTarget;
     private IReadOnlyDictionary<int, SensorMountSpec?>? _snapPlan;
     private string? _snapLabel;
+    // 위치 프리셋 끌기(sensor-mount-preset W4) — 잡은 센서 · 포인터 아래 칸 · 그 칸의 붙는 점(그림 좌표) · 붙을 점 · Alt 자유 위치
+    private int? _presetKey;
+    private int _presetBay = -1;
+    private IReadOnlyList<(FencePresetSnapPoint Point, Point At)> _presetPoints = Array.Empty<(FencePresetSnapPoint, Point)>();
+    private FencePresetSnapPoint? _presetTarget;
+    private (double AlongM, double HeightM)? _presetFree;
     private double _renderZoom = 1;
     private Rect? _band;
 
@@ -197,6 +204,18 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     /// <summary>격자 끌기의 알약 글자.</summary>
     internal string? SnapLabel => _snapLabel;
 
+    /// <summary>위치 프리셋 끌기 중인 센서(시험).</summary>
+    internal int? PresetDragKey => _presetKey;
+
+    /// <summary>위치 프리셋 끌기의 붙을 점(시험).</summary>
+    internal FencePresetSnapPoint? PresetTarget => _presetTarget;
+
+    /// <summary>위치 프리셋 끌기의 지금 칸 붙는 점(시험).</summary>
+    internal IReadOnlyList<(FencePresetSnapPoint Point, Point At)> PresetPoints => _presetPoints;
+
+    /// <summary>시험 — Alt(자유 위치)를 키보드 대신 정한다(<c>null</c> 이면 실제 키).</summary>
+    internal bool? ForceFreeMove { get; set; }
+
     /// <summary>빨강 점에 붙는 반경(화면 px).</summary>
     public const double SNAP_RADIUS_PX = 24;
 
@@ -251,6 +270,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var flatChanged = _projector.K != (vm.IsFlat ? 0 : 1);
         _projector = vm.IsFlat ? FenceProjector.Flat : FenceProjector.Tilt;
         _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing, vm.FencePoseOf);
+        _scene.UseSpacingAlerts(vm.FenceSpacingAlerts());          // 권장 간격 넘음(sensor-mount-preset FR-14 · W3 알림)
         _enclosureX = _scene.ControllerX;
         _enclosureGap = _scene.Chain.ControllerGap;
         _grouped = _scene.ShouldGroup(_view.Scale);
@@ -758,8 +778,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                     : _scene.Sensors.TryGetValue(chip.Key, out var s) ? $"{s.Number} {s.Name}" : "센서";
                 _ghost = new DragGhostAdorner(this, layer, label, _dragKeys.Count);
                 layer?.Add(_ghost);
+                // 위치 프리셋으로 서는 센서 한 대 — 그 칸의 붙는 점(sensor-mount-preset W4). 9점 격자보다 먼저.
+                if (_scene.IsLayout && _dragKeys.Count == 1 && chip.Kind == FenceChipKind.Sensor && BeginPresetDrag(GrabbedKey(chip)))
+                {
+                    _action = FenceGestureAction.SnapMove;
+                    UpdateOverlay();
+                }
                 // 펜스 구성 — 9점 격자의 빨강 점에 맞춰 가로 · 세로를 한 번에(축 잠금을 대신한다 · 2026-10-01)
-                if (_scene.IsLayout && BeginSnapDrag(GrabbedKey(chip)))
+                else if (_scene.IsLayout && BeginSnapDrag(GrabbedKey(chip)))
                 {
                     _action = FenceGestureAction.SnapMove;
                     UpdateOverlay();
@@ -819,6 +845,10 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 }
                 return;
             }
+
+            case FenceGestureAction.SnapMove when _presetKey is { } presetKey:
+                MovePresetDrag(vm, presetKey, now);
+                return;
 
             case FenceGestureAction.SnapMove when _press.Chip is { } snapChip:
             {
@@ -903,6 +933,72 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         return true;
     }
 
+    /// <summary>
+    /// 위치 프리셋 끌기 준비(sensor-mount-preset W4) — 프리셋으로 서는 센서면 그 칸의 붙는 점을 미리 센다. 아니면 <c>false</c>(9점 격자로).
+    /// </summary>
+    private bool BeginPresetDrag(int grabbed)
+    {
+        if (ViewModel is not { } vm || !vm.IsPresetMounted(grabbed) || vm.FencePresetBayOf(grabbed) is not { } bay) return false;
+        _presetKey = grabbed;
+        _presetFree = null;
+        LoadPresetBay(vm, grabbed, bay);
+        _presetTarget = null;
+        Cursor = Cursors.SizeAll;
+        vm.NotifyFenceStatus("붙는 점에 놓으면 그 자리로(따로 고친 값) · Alt = 자유 위치 · Tab = 다음 붙는 점 · Esc 취소");
+        return true;
+    }
+
+    /// <summary>칸 <paramref name="bay"/> 의 붙는 점(그림 좌표)을 읽는다 — 칸이 바뀔 때만.</summary>
+    private void LoadPresetBay(WiringViewModel vm, int key, int bay)
+    {
+        if (_scene is null) return;
+        _presetBay = bay;
+        _presetPoints = vm.FencePresetSnapPoints(key, bay).Select(p => (p, FencePresetDrag.PointAt(p, _projector, _scene.Upm, _scene.Vpm))).ToList();
+    }
+
+    /// <summary>위치 프리셋 끌기 — 포인터 아래 칸의 가장 가까운 허용 점에 붙는다(Alt = 붙지 않고 자유 위치). 붙을 점이 바뀔 때만 다시 그린다(NFR-02).</summary>
+    private void MovePresetDrag(WiringViewModel vm, int key, Point now)
+    {
+        if (_scene is null) return;
+        _ghost?.MoveTo(now);
+        var inside = now.X >= 0 && now.Y >= 0 && now.X <= ActualWidth && now.Y <= ActualHeight;
+        if (!inside)
+        {
+            _dropKind = IsRemoveZoneUnder(now) ? DropKind.Remove : DropKind.None;
+            if (_presetTarget is not null || _presetFree is not null) { _presetTarget = null; _presetFree = null; _snapLabel = null; UpdateOverlay(); }
+            return;
+        }
+        _dropKind = DropKind.Chain;
+        var world = ScreenToWorld(now);
+        if (vm.FenceBayAt(world.X / _scene.Upm) is { } bay && bay != _presetBay) LoadPresetBay(vm, key, bay);
+
+        var free = ForceFreeMove ?? (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+        if (free && _scene.Geometry is { } geometry && _presetBay >= 0 && _presetBay < geometry.Panels.Count)
+        {
+            var at = FencePresetDrag.FreeAt(world, _projector, _scene.Upm, _scene.Vpm, geometry.Panels[_presetBay].StartM);
+            if (_presetFree == at && _presetTarget is null) return;
+            _presetFree = at;
+            _presetTarget = null;
+            _snapLabel = $"자유 위치 · 가로 {at.AlongM:0.00} m · 높이 {at.HeightM:0.00} m";
+            vm.NotifyFenceStatus($"{_snapLabel} — 놓으면 확정 · Esc 취소");
+            UpdateOverlay();
+            return;
+        }
+
+        var target = FencePresetDrag.Nearest(_presetPoints, world);
+        if (target == _presetTarget && _presetFree is null) return;
+        _presetFree = null;
+        SetPresetTarget(vm, target);
+    }
+
+    private void SetPresetTarget(WiringViewModel vm, FencePresetSnapPoint? target)
+    {
+        _presetTarget = target;
+        _snapLabel = target?.AttachText;
+        vm.NotifyFenceStatus(_snapLabel is null ? "이 칸에는 붙을 점이 없습니다 — 다른 칸으로 · Esc 취소" : $"{_snapLabel} — 놓으면 확정 · Esc 취소");
+        UpdateOverlay();
+    }
+
     /// <summary>자리의 그림 좌표(투영 뒤 · 철망 면).</summary>
     private Point SnapAt(SensorMountSpec mount, FenceGeometry geometry)
         => _projector.P(FenceLayoutMath.PointOf(mount, geometry).XM * _scene!.Upm, _scene.MountHeight(mount), 0);
@@ -910,6 +1006,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     /// <summary>끄는 동안의 격자 점(보이는 범위만) — 포인터 아래 · 함께 끈 센서가 갈 점 · 갈 수 없음을 모습으로.</summary>
     private IReadOnlyList<FenceSnapDot>? SnapDots()
     {
+        if (_action == FenceGestureAction.SnapMove && _presetKey is not null) return FencePresetDrag.Dots(_presetPoints, _presetTarget);
         if (_action != FenceGestureAction.SnapMove || _snapPoints.Count == 0 || _scene?.Geometry is not { } geometry) return null;
         var left = ScreenToWorld(new Point(-40, 0)).X;
         var right = ScreenToWorld(new Point(ActualWidth + 40, 0)).X;
@@ -952,8 +1049,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var enclosureGap = _enclosureGap;
         var band = _band;
         var snapTarget = _snapTarget;
+        var presetKey = _presetKey;
+        var presetBay = _presetBay;
+        var presetTarget = _presetTarget;
+        var presetFree = _presetFree;
 
         // ① 표지
+        _presetKey = null;
+        _presetBay = -1;
+        _presetPoints = Array.Empty<(FencePresetSnapPoint, Point)>();
+        _presetTarget = null;
+        _presetFree = null;
         _press = null;
         _dragging = false;
         _action = FenceGestureAction.None;
@@ -1034,6 +1140,26 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             case FenceGestureAction.MoveEnclosure:
                 if (!vm.FenceMoveEnclosure(enclosureGap)) Rebuild();
                 break;
+            case FenceGestureAction.SnapMove when chip is not null && presetKey is { } pk:
+            {
+                // 위치 프리셋 끌기 — 놓은 자리는 따로 고친 값(되돌리기 한 걸음 · [프리셋으로] 가 지운다)
+                bool moved;
+                if (drop == DropKind.Remove) moved = vm.FenceUnplace(new[] { pk });
+                else if (drop == DropKind.Chain && presetFree is { } free) moved = vm.FenceMovePresetFree(pk, presetBay, free.AlongM, free.HeightM);
+                else if (drop == DropKind.Chain && presetTarget is { } target)
+                {
+                    if (!vm.IsFenceSelected(pk)) vm.FenceSelect(pk);                   // 먼저 고른다 — 옮긴 뒤 상태 줄을 덮지 않게
+                    moved = vm.FenceSnapPreset(pk, target.Bay, target.Point.Name);
+                }
+                else
+                {
+                    vm.NotifyFenceStatus("제자리 — 붙는 점 가까이에서 놓아야 옮겨집니다");
+                    moved = false;
+                }
+                if (!moved) Rebuild();
+                if (drop != DropKind.Remove) FocusUnitOf(pk);
+                break;
+            }
             case FenceGestureAction.SnapMove when chip is not null:
             {
                 var keys = dragKeys.Count > 0 ? dragKeys.ToList() : chip.Keys.ToList();
@@ -1185,6 +1311,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             return vm.FenceClearSelection();
         }
 
+        // 위치 프리셋 끌기 중 Tab · Shift+Tab — 이 칸의 다음 · 이전 붙는 점(sensor-mount-preset W4 키보드 대안). 끄는 중에만 소비한다.
+        if (key == Key.Tab && _press is not null && _presetKey is not null && _action == FenceGestureAction.SnapMove)
+        {
+            _presetFree = null;
+            SetPresetTarget(vm, FencePresetDrag.Cycle(_presetPoints, _presetTarget, (modifiers & ModifierKeys.Shift) != 0));
+            return true;
+        }
+
         if (key == Key.Z && modifiers == ModifierKeys.Control) { vm.Undo(); return true; }
 
         var alt = key == Key.System;
@@ -1247,6 +1381,14 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             }
             if (keys.Count == 0) return false;
             var up = k == Key.Up;
+            // 위치 프리셋으로 서는 센서만이면 — 높이를 따로 고친 값으로 10 cm(Shift 1 cm · sensor-mount-preset W4 화살표)
+            if (keys.All(vm.IsPresetMounted))
+            {
+                var step = (modifiers & ModifierKeys.Shift) != 0 ? SensorMountResolver.FINE_NUDGE_M : SensorMountResolver.NUDGE_M;
+                vm.FenceNudgePresetHeight(keys, up ? step : -step);
+                if (chip is not null) FocusUnitOf(keys[0]);
+                return true;
+            }
             if ((modifiers & ModifierKeys.Shift) != 0) vm.FenceNudgeHeight(keys, up ? FenceLayoutMath.NUDGE_M : -FenceLayoutMath.NUDGE_M);
             else vm.FenceStepStop(keys, up ? 1 : -1);
             if (chip is not null) FocusUnitOf(keys[0]);
@@ -1286,6 +1428,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelectSensors(chip.Keys);
                 // Ctrl+←/→ = 다음 격자 점(9점 격자 · 망 오른쪽 열 다음은 다음 기둥 · 망) · Alt+Shift+←/→ = 옆 망(기둥)으로 한 칸(보조)
                 if (alt || !_scene.IsLayout) vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
+                // 위치 프리셋으로 서는 센서 한 대 — 다음 · 이전 붙는 점(칸 끝 다음은 옆 칸 · sensor-mount-preset W4)
+                else if (chip.Kind == FenceChipKind.Sensor && vm.FenceDragKeys(first) is { Count: 1 } && vm.IsPresetMounted(first))
+                    vm.FenceStepPresetSnap(first, k == Key.Left ? -1 : 1);
                 else vm.FenceStepGrid(chip.Kind == FenceChipKind.Group ? chip.Keys : vm.FenceDragKeys(first), k == Key.Left ? -1 : 1);
                 FocusUnitOf(first);
                 return true;

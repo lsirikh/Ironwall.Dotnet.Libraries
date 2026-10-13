@@ -114,8 +114,10 @@ public sealed partial class WiringViewModel
         set { if (_showRange == value) return; _showRange = value; NotifyOfPropertyChange(); RaiseFence(); }
     }
 
-    /// <summary>탐지 반경이 있는 센서(복합 · 지진동)가 있는가 — 없으면 [탐지 범위]를 끈다.</summary>
-    public bool HasRangeSensors => _board.Rows.Any(r => FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) > 0);
+    /// <summary>
+    /// 탐지 반경이 있는 센서(복합 · 지진동 · 속성 프리셋에 탐지 거리가 있는 센서)가 있는가 — 없으면 [탐지 범위]를 끈다.
+    /// </summary>
+    public bool HasRangeSensors => _board.Rows.Any(r => (PresetRangeOf(r.Key) ?? FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText)))) > 0);
 
     public void ToggleRange() => ShowRange = !ShowRange && HasRangeSensors;
     #endregion
@@ -176,7 +178,7 @@ public sealed partial class WiringViewModel
                 !WiringSpec.SameWiring(_board.PlacementOf(row.Key), row.BaselinePlacement),
                 duplicates.Contains(row.Key),
                 row.Facing,
-                row.Yaw) { ModelShape = PresetShapeOf(row.Key) };
+                row.Yaw) { ModelShape = PresetShapeOf(row.Key), RangeM = PresetRangeOf(row.Key) };
         }
         return result;
     }
@@ -417,7 +419,7 @@ public sealed partial class WiringViewModel
         ? (IsRing ? "1U 도킹 — 스마트 제어기 + VBUS 제어기" : "제품 사진 준비 중")
         : SelectedFenceRow is { } r
             ? $"{DeviceEnumDisplay.SensorTypeBilingual(r.Facts.TypeText)} · 기본 간격 {_board.Spacing.SpacingOf(WiringTopology.ParseSensorType(r.Facts.TypeText)):0.#}m"
-              + (FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText))) is var range and > 0 ? $" · 탐지 반경 {range:0}m" : string.Empty)
+              + ((PresetRangeOf(r.Key) ?? FenceWorld.RangeOf(FenceWorld.KindOf(WiringTopology.ParseSensorType(r.Facts.TypeText)))) is var range and > 0 ? $" · 탐지 반경 {range:0.#}m" : string.Empty)
               + (HasSelectedPhoto ? string.Empty : " · 제품 사진 준비 중")
             : string.Empty;
 

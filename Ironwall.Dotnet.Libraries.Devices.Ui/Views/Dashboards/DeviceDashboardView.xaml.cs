@@ -353,6 +353,12 @@ public partial class DeviceDashboardView : UserControl
         if (ViewModel is { } vm) await vm.OpenWiringAsync();
     }
 
+    // 센서 모델 창(sensor-mount-preset W1 — 도구줄 [⋯] › 센서 모델).
+    private async void OnOpenSensorModels(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.OpenSensorModelsAsync();
+    }
+
     // N-05: 장비 배정 창.
     private async void OnOpenDeviceAssign(object sender, RoutedEventArgs e)
     {
