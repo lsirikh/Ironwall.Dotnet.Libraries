@@ -5284,6 +5284,7 @@ public partial class MapViewModel : BasePanelViewModel,
         LoadMapTiltFromSettings();      // [map-tilt-25d FR-07] 틸트 kill-switch/각도 복원(파셜, 홈 줌 적용 뒤 Flush, 저장 억제 내장)
         LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
         InitializeInstruments();        // [Map_Instruments] 강풍/탐지장애 EQM 구독+가시성 복원(파셜)
+        InitializeEventFlyTo();         // [event-map-flyto] 이벤트 시 지도 이동 — 큐 구독 + 설정(파셜)
         ScheduleBootViewportResync();
     }
 
@@ -6442,7 +6443,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void NavigateToMarker(IEditableMarker marker)
     {
         if (MainMap == null) return;
-        MainMap.Position = marker.Position;
+        FlyTo(marker.Position, null, 0);   // 공용 이동(0 ms = 순간) — 진행 중 이벤트 비행도 멈춘다
         _log?.Info($"심볼로 이동: {marker.Title}");
     }
 
@@ -8331,7 +8332,7 @@ public partial class MapViewModel : BasePanelViewModel,
         get => _gridSizePx;
         set
         {
-            _gridSizePx = Math.Max(4, Math.Min(50, value));
+            _gridSizePx = Helpers.Numerics.MapNumericFields.GridSizePx.Normalize(value);
             NotifyOfPropertyChange(nameof(GridSizePx));
         }
     }
@@ -9910,8 +9911,8 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (MainMap == null) return;
-            MainMap.Position = new PointLatLng(e.Symbol.Latitude, e.Symbol.Longitude);
-            _log?.Info($"심볼 이동: {e.Symbol.Title} ({e.Symbol.Latitude:F6},{e.Symbol.Longitude:F6})");
+            FlyTo(new PointLatLng(e.Symbol.Latitude, e.Symbol.Longitude), null, 0);   // 공용 이동(0 ms = 순간)
+            _log?.Info($"심볼 이동:{e.Symbol.Title} ({e.Symbol.Latitude:F6},{e.Symbol.Longitude:F6})");
         }
         catch (Exception ex) { _log?.Error($"심볼 이동 실패: {ex.Message}"); }
     }

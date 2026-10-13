@@ -46,7 +46,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {geoMarker.GetType().Name}");
 
-                var binding = CreateTwoWayBinding(nameof(geoMarker.Opacity));
+                var binding = CreateTwoWayBinding(nameof(geoMarker.Opacity), Helpers.Numerics.MapNumericFields.MarkerOpacity);
                 SetBinding(MarkerOpacityProperty, binding);
             }
 
@@ -127,7 +127,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty MarkerOpacityProperty =
             DependencyProperty.Register("MarkerOpacity", typeof(double),
                 typeof(GMapPropertyGeometricControl),
-                new PropertyMetadata(0.0, OnMarkerOpacityChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.0, OnMarkerOpacityChanged, Helpers.Numerics.MapNumericFields.MarkerOpacity.Coerce));
 
         #endregion
         #region - Attributes -

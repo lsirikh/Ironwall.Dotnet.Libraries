@@ -979,13 +979,17 @@ public static class FenceLayoutMath
         var from = GridOf(grabbed);
         var (dx, dy) = (target.Gx - from.Gx, target.Gy - from.Gy);
         var taken = (occupied ?? Enumerable.Empty<(FenceGridCell, FenceLane)>()).ToHashSet();
-        var claimed = new HashSet<(FenceGridCell, FenceLane)>();
+        // 갈 점 → 그 점을 차지한 센서가 떠난 점. 이미 한 점에 같이 있던 센서끼리는 같이 옮겨 가도 된다(간격 유지 — 실창 3회차 SC-FEN24-004:
+        // "망 3 · 담 앞면" 에 둘이 선 채 함께 끌면 서로를 "이미 센서가 있는 점" 으로 막아 아무것도 옮기지 못했다).
+        var claimed = new Dictionary<(FenceGridCell, FenceLane), (FenceGridCell, FenceLane)>();
         foreach (var (key, mount) in moving)
         {
             var cell = GridOf(mount);
             var next = MountAt(new FenceGridCell(cell.Gx + dx, cell.Gy + dy), mount, categoryOf?.Invoke(key) ?? FenceSensorCategory.Other, panels);
             var spotKey = next is null ? default : (GridOf(next), next.Lane);
-            result[key] = next is null || taken.Contains(spotKey) || !claimed.Add(spotKey) ? null : next;
+            var source = (cell, mount.Lane);
+            var free = next is not null && !taken.Contains(spotKey) && (claimed.TryAdd(spotKey, source) || claimed[spotKey] == source);
+            result[key] = free ? next : null;
         }
         return result;
     }

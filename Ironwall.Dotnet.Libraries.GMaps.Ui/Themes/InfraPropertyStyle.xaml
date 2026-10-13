@@ -42,7 +42,7 @@
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
 						<!--  첨부 속성 경로는 Path= 로 적는다 — 위치 인자는 접두사(house:)를 풀지 못해 PathError 였다(결함 P3D-D1 · MAP-126)  -->
-						<Slider Grid.Column="1" Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" IsSnapToTickEnabled="True" TickFrequency="0.01" Value="{Binding Path=SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}"/>
 					</Grid>
 					<Grid Margin="0,5">
 						<Grid.Style>
@@ -63,7 +63,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
-						<Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="설치 높이 (0~100)"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="설치 높이 (0~100, 정수)"/>
 					</Grid>
 
 					<!--  건물 종류 — 늘 보이는 첫 줄이라 3D 하우징 "?"(help-callout H-4)를 끝에 둔다(색상 강도 · 설치 높이 · 층수 잠금의 뜻)  -->

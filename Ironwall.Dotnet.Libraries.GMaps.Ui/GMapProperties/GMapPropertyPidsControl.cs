@@ -72,8 +72,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.IsGroupMode || control.SelectedMarker is not IPidsEditableMarker) return;
                 control.IsGateWidthInherited = false;
                 control._gateWidthCommit.Touch((double)e.OldValue, (double)e.NewValue);
-            }, (_, v) => Helpers.Fence.FenceMath.Quantize(v is double x ? x : Helpers.Fence.FenceDefaults.GateWidthM,
-                    Helpers.Fence.FenceDefaults.GateWidthMinM, Helpers.Fence.FenceDefaults.GateWidthMaxM, Helpers.Fence.FenceDefaults.GateWidthStepM)));
+            }, Helpers.Numerics.MapNumericFields.GateWidthM.Coerce));
         public bool IsGateWidthInherited { get => (bool)GetValue(IsGateWidthInheritedProperty); set => SetValue(IsGateWidthInheritedProperty, value); }
         public static readonly DependencyProperty IsGateWidthInheritedProperty = DependencyProperty.Register(nameof(IsGateWidthInherited), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(true));
 
@@ -348,20 +347,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 SetBinding(FOVColorProperty, fovColorBinding);
 
                 // FOVOpacity 바인딩
-                var fovOpacityBinding = CreateTwoWayBinding(nameof(pidsMarker.FOVOpacity));
+                var fovOpacityBinding = CreateTwoWayBinding(nameof(pidsMarker.FOVOpacity), Helpers.Numerics.MapNumericFields.FOVOpacity);
                 SetBinding(FOVOpacityProperty, fovOpacityBinding);
 
                 // Detection 속성들 바인딩 추가
-                var detectionRangeBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionRange));
+                var detectionRangeBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionRange), Helpers.Numerics.MapNumericFields.DetectionRange);
                 SetBinding(DetectionRangeProperty, detectionRangeBinding);
 
-                var detectionAngleBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionAngle));
+                var detectionAngleBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionAngle), Helpers.Numerics.MapNumericFields.DetectionAngle);
                 SetBinding(DetectionAngleProperty, detectionAngleBinding);
 
-                var detectionBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionBearing));
+                var detectionBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionBearing), Helpers.Numerics.MapNumericFields.DetectionBearing);
                 SetBinding(DetectionBearingProperty, detectionBearingBinding);
 
-                var baseBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.BaseBearing));
+                var baseBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.BaseBearing), Helpers.Numerics.MapNumericFields.BaseBearing);
                 SetBinding(BaseBearingProperty, baseBearingBinding);
                 SetBinding(ModelVariantProperty, CreateTwoWayBinding(nameof(GMapPidsMarker.ModelVariant)));
             }
@@ -509,7 +508,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty DetectionRangeProperty =
             DependencyProperty.Register("DetectionRange", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(30.0, OnDetectionRangeChanged, CoerceDoubleValue));
+                new PropertyMetadata(30.0, OnDetectionRangeChanged, Helpers.Numerics.MapNumericFields.DetectionRange.Coerce));
 
         /// <summary>
         /// 탐지 각도 (도)
@@ -523,7 +522,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty DetectionAngleProperty =
             DependencyProperty.Register("DetectionAngle", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(90.0, OnDetectionAngleChanged, CoerceDoubleValue));
+                new PropertyMetadata(90.0, OnDetectionAngleChanged, Helpers.Numerics.MapNumericFields.DetectionAngle.Coerce));
 
         /// <summary>
         /// 탐지 방향 (도)
@@ -537,7 +536,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty DetectionBearingProperty =
             DependencyProperty.Register("DetectionBearing", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(0.0, OnDetectionBearingChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.0, OnDetectionBearingChanged, Helpers.Numerics.MapNumericFields.DetectionBearing.Coerce));
 
         /// <summary>
         /// 기준 방향 각도 (카메라 물리적 설치 방향, 도)
@@ -551,7 +550,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty BaseBearingProperty =
             DependencyProperty.Register("BaseBearing", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(0.0, OnBaseBearingChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.0, OnBaseBearingChanged, Helpers.Numerics.MapNumericFields.BaseBearing.Coerce));
 
         /// <summary>
         /// FOV 표시 여부 — bool?(3상태): null=그룹 Pending(값 서로 다름, indeterminate 표시).
@@ -593,7 +592,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty FOVOpacityProperty =
             DependencyProperty.Register("FOVOpacity", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(0.8, OnFOVOpacityChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.8, OnFOVOpacityChanged, Helpers.Numerics.MapNumericFields.FOVOpacity.Coerce));
 
         #endregion
 

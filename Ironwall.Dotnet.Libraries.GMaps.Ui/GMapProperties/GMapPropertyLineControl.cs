@@ -55,7 +55,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 var linePatternBinding = CreateTwoWayBinding(nameof(lineMarker.LinePattern));
                 SetBinding(LinePatternProperty, linePatternBinding);
 
-                var lineOpacityBinding = CreateTwoWayBinding(nameof(lineMarker.LineOpacity));
+                var lineOpacityBinding = CreateTwoWayBinding(nameof(lineMarker.LineOpacity), Helpers.Numerics.MapNumericFields.LineOpacity);
                 SetBinding(LineOpacityProperty, lineOpacityBinding);
 
                 // 라인 옵션 바인딩
@@ -141,7 +141,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty LineOpacityProperty =
             DependencyProperty.Register("LineOpacity", typeof(double),
                 typeof(GMapPropertyLineControl),
-                new PropertyMetadata(1.0, OnLineOpacityChanged, CoerceDoubleValue));
+                new PropertyMetadata(1.0, OnLineOpacityChanged, Helpers.Numerics.MapNumericFields.LineOpacity.Coerce));
 
         /// <summary>
         /// 닫힌 경로 여부

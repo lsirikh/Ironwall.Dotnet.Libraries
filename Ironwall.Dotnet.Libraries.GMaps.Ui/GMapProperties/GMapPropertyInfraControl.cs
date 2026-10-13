@@ -93,7 +93,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty FloorCountProperty =
             DependencyProperty.Register("FloorCount", typeof(int),
                 typeof(GMapPropertyInfraControl),
-                new PropertyMetadata(1, OnFloorCountChanged));
+                new PropertyMetadata(1, OnFloorCountChanged, Helpers.Numerics.MapNumericFields.FloorCount.Coerce));
 
         /// <summary>
         /// 지하 층수
@@ -107,7 +107,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty BasementFloorCountProperty =
             DependencyProperty.Register("BasementFloorCount", typeof(int),
                 typeof(GMapPropertyInfraControl),
-                new PropertyMetadata(0, OnBasementFloorCountChanged));
+                new PropertyMetadata(0, OnBasementFloorCountChanged, Helpers.Numerics.MapNumericFields.BasementFloorCount.Coerce));
 
         /// <summary>
         /// 건물 면적
@@ -121,7 +121,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty BuildingAreaProperty =
             DependencyProperty.Register("BuildingArea", typeof(double),
                 typeof(GMapPropertyInfraControl),
-                new PropertyMetadata(100.0, OnBuildingAreaChanged, CoerceDoubleValue));
+                new PropertyMetadata(100.0, OnBuildingAreaChanged, Helpers.Numerics.MapNumericFields.BuildingArea.Coerce));
 
         /// <summary>
         /// 사용 가능한 건물 타입 목록
@@ -174,9 +174,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
                 SetBinding(BuildingTypeProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingType)));
                 SetBinding(BuildingUsageProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingUsage)));
-                SetBinding(FloorCountProperty, CreateTwoWayBinding(nameof(infraMarker.FloorCount)));
-                SetBinding(BasementFloorCountProperty, CreateTwoWayBinding(nameof(infraMarker.BasementFloorCount)));
-                SetBinding(BuildingAreaProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingArea)));
+                SetBinding(FloorCountProperty, CreateTwoWayBinding(nameof(infraMarker.FloorCount), Helpers.Numerics.MapNumericFields.FloorCount));
+                SetBinding(BasementFloorCountProperty, CreateTwoWayBinding(nameof(infraMarker.BasementFloorCount), Helpers.Numerics.MapNumericFields.BasementFloorCount));
+                SetBinding(BuildingAreaProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingArea), Helpers.Numerics.MapNumericFields.BuildingArea));
             }
 
             //System.Diagnostics.Debug.WriteLine("=== Infra SetupSpecificBindings 완료 ===");

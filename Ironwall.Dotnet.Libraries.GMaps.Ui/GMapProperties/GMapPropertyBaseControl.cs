@@ -7,6 +7,7 @@ using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Numerics;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
@@ -98,7 +99,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         public static readonly DependencyProperty TitleSizeProperty =
             DependencyProperty.Register("TitleSize", typeof(double), typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(10.0, OnTitleSizeChanged));
+                new PropertyMetadata(10.0, OnTitleSizeChanged, MapNumericFields.TitleSize.Coerce));
 
 
         /// <summary>
@@ -155,7 +156,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty MarkerAltitudeProperty =
             DependencyProperty.Register("MarkerAltitude", typeof(double),
                 typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(0.0, OnMarkerAltitudeChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.0, OnMarkerAltitudeChanged, MapNumericFields.MarkerAltitude.Coerce));
 
         /// <summary>
         /// 마커 회전 각도
@@ -169,7 +170,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty MarkerBearingProperty =
             DependencyProperty.Register("MarkerBearing", typeof(double),
                 typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(0.0, OnMarkerBearingChanged, CoerceDoubleValue));
+                new PropertyMetadata(0.0, OnMarkerBearingChanged, MapNumericFields.MarkerBearing.Coerce));
 
         /// <summary>
         /// 마커 채우기 색상
@@ -302,7 +303,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         }
         public static readonly DependencyProperty TitleMaxWidthPxProperty =
             DependencyProperty.Register("TitleMaxWidthPx", typeof(double), typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(200.0, OnTitleMaxWidthPxChanged));
+                new PropertyMetadata(200.0, OnTitleMaxWidthPxChanged, MapNumericFields.TitleMaxWidthPx.Coerce));
 
         /// <summary>라벨 폰트 큐레이션 — 한글 Windows 표준 탑재 폰트 위주. 한글 폰트는 한글명, 영문 폰트는 영문명(v2.4).
         /// (라벨 색은 v2.5부터 채우기/테두리와 동일한 AvailableColors 콤보를 그대로 재사용 — 별도 팔레트 없음.)</summary>
@@ -407,7 +408,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         public static readonly DependencyProperty MarkerZoomProperty =
             DependencyProperty.Register(nameof(MarkerZoom), typeof(double),
-                typeof(GMapPropertyBaseControl), new PropertyMetadata(0.0, OnMarkerZoomChanged));
+                typeof(GMapPropertyBaseControl), new PropertyMetadata(0.0, OnMarkerZoomChanged, MapNumericFields.MarkerZoom.Coerce));
 
         /// <summary>최소 줌 슬라이더 상한 — 정책 상한(MaxZoom+0.5, zoom-float-halfstep FR-11/FR-13 캡과 동일).
         /// 기본 20.5(정책 최대 provider Max=20 기준). 상한이 저장값보다 낮으면 슬라이더 클램프가
@@ -935,15 +936,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             // 기본 속성 바인딩
             SetBinding(MarkerTitleProperty, CreateTwoWayBinding(nameof(SelectedMarker.Title)));
-            SetBinding(TitleSizeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleSize)));
+            SetBinding(TitleSizeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleSize), MapNumericFields.TitleSize));
             SetBinding(MarkerWidthProperty, CreateTwoWayBinding(nameof(SelectedMarker.Width)));
             SetBinding(MarkerHeightProperty, CreateTwoWayBinding(nameof(SelectedMarker.Height)));
-            SetBinding(MarkerAltitudeProperty, CreateTwoWayBinding("Altitude"));   // 인터페이스 밖 경로 — 모든 GMapBaseMarker<T> 가 보유
-            SetBinding(MarkerBearingProperty, CreateTwoWayBinding(nameof(SelectedMarker.Bearing)));
+            SetBinding(MarkerAltitudeProperty, CreateTwoWayBinding("Altitude", MapNumericFields.MarkerAltitude));   // 인터페이스 밖 경로 — 모든 GMapBaseMarker<T> 가 보유
+            SetBinding(MarkerBearingProperty, CreateTwoWayBinding(nameof(SelectedMarker.Bearing), MapNumericFields.MarkerBearing));
             SetBinding(MarkerStrokeThicknessProperty, CreateTwoWayBinding(nameof(SelectedMarker.StrokeThickness)));
             SetBinding(ShowShapeProperty, CreateTwoWayBinding(nameof(SelectedMarker.ShowShape)));
             SetBinding(ShowTitleProperty, CreateTwoWayBinding(nameof(SelectedMarker.ShowTitle)));
-            SetBinding(MarkerZoomProperty, CreateTwoWayBinding(nameof(SelectedMarker.Zoom)));
+            SetBinding(MarkerZoomProperty, CreateTwoWayBinding(nameof(SelectedMarker.Zoom), MapNumericFields.MarkerZoom));
 
             // 색상 속성은 EnumColorType이므로 직접 바인딩
             SetBinding(MarkerFillColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.FillColor)));
@@ -955,7 +956,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             SetBinding(TitleFontFamilyNameProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleFontFamily)));
             SetBinding(TitleBoldFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBold)));
             SetBinding(TitleItalicFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleItalic)));
-            SetBinding(TitleMaxWidthPxProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleMaxWidth)));
+            SetBinding(TitleMaxWidthPxProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleMaxWidth), MapNumericFields.TitleMaxWidthPx));
 
             //System.Diagnostics.Debug.WriteLine("SetupCommonBiding 완료");
         }
@@ -968,6 +969,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 Mode = BindingMode.TwoWay,
                 UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
             };
+        }
+
+        /// <summary>숫자 칸용 — 칸의 원시값(강제 전)이 마커에 먼저 쓰이므로 바인딩도 칸 명세로 정규화한다(map-property-numeric-precision).</summary>
+        protected Binding CreateTwoWayBinding(string propertyName, NumericFieldSpec spec)
+        {
+            var binding = CreateTwoWayBinding(propertyName);
+            binding.Converter = spec;
+            return binding;
         }
 
         protected Binding CreateOneWayBinding(string propertyName, IValueConverter converter = null)
