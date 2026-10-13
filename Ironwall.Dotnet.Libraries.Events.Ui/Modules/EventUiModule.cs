@@ -119,7 +119,9 @@ public class EventUiModule : Module
                 c.ResolveOptional<ILogService>(),
                 c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
                 c.Resolve<ISymbolEventManager>(),
-                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),   // 운영 카드 메시지 → 이벤트 패널(operation-event-card PRD §7)
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()   // 카드 장비 = 캐시 장비(구역 · 번호)
             )).As<IOperationEventNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 5)   // OnExit StopAsync → NATS 구독 해제
               .SingleInstance();

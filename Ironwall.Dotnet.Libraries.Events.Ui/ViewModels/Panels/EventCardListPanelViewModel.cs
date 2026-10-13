@@ -48,6 +48,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<EventEntryEnqueuedMessage>
                                             , IHandle<DetectionThumbnailSyncedMessage>
                                             , IHandle<DetectionDeletedOnServerMessage>
+                                            , IHandle<OperationEventCardMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -221,17 +222,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             PerfTrace.Mark(stage, key.Kind, key.EventId, where is null ? null : PerfTrace.Extra(("where", where)));
         }
 
-        /// <summary>카드의 열쇠(종류 + 서버 번호). 탐지 · 장애 카드가 아니거나 번호가 없으면 <c>null</c>.</summary>
+        /// <summary>카드의 열쇠(종류 + 서버 번호). 탐지 · 장애 · 운영 카드가 아니거나 번호가 없으면 <c>null</c>.</summary>
         private static (string Kind, int EventId)? KeyOf(EventCardBaseViewModel? card)
         {
-            var kind = EventCardKind.Of(card);
+            var kind = EventCardKind.ListKeyOf(card);
             var id = card?.Model?.Id ?? 0;
             return kind is null || id <= 0 ? null : (kind, id);
         }
 
         /// <summary>목록에서 종류 + 번호가 같은 카드. UI 스레드에서 부를 것.</summary>
         private EventCardBaseViewModel? FindCard(string kind, int eventId)
-            => ViewModelProvider.FirstOrDefault(c => c.Model?.Id == eventId && EventCardKind.Of(c) == kind);
+            => ViewModelProvider.FirstOrDefault(c => KeyOf(c) == (kind, eventId));
 
         /// <summary>
         /// 이미 조치된 이벤트를 기억한다 — 카드가 아직 묶음 버퍼(150 ms)에 있을 때 조치보고가 먼저 닿으면
@@ -239,14 +240,36 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         private void RememberClosed(string kind, int eventId)
         {
+            if (Remember(kind, eventId)) RaiseActionReported(kind, eventId);
+        }
+
+        /// <summary>닫힌 (종류, 번호)를 기억한다. 처음이면 <c>true</c>.</summary>
+        private bool Remember(string kind, int eventId)
+        {
             lock (_closedGate)
             {
-                if (!_closedKeys.Add((kind, eventId))) return;
+                if (!_closedKeys.Add((kind, eventId))) return false;
                 _closedOrder.Enqueue((kind, eventId));
                 while (_closedOrder.Count > CLOSED_MEMORY) _closedKeys.Remove(_closedOrder.Dequeue());
+                return true;
             }
-            RaiseActionReported(kind, eventId);
         }
+
+        /// <summary>
+        /// 운영 카드를 치운다 — 조치 대상이 아니라 서버 호출 · 조치보고 알림(<see cref="ActionReported"/>) 없이 목록에서만 뺀다.
+        /// 닫힘은 기억해 같은 봉투가 다시 배달돼도 다시 뜨지 않는다(operation-event-card PRD §3 · §5). UI 스레드에서 부를 것.
+        /// </summary>
+        public void CloseOperationCard(OperationEventCardViewModel? card)
+        {
+            if (card == null) return;
+            if (KeyOf(card) is { } key) Remember(key.Kind, key.EventId);
+            RemoveCard(card);
+        }
+
+        /// <summary>운영 카드 [닫기] 단추.</summary>
+        public void OnButtonCloseCard(object sender, RoutedEventArgs e)
+            => CloseOperationCard((e?.OriginalSource as FrameworkElement)?.DataContext as OperationEventCardViewModel
+                                  ?? (sender as FrameworkElement)?.DataContext as OperationEventCardViewModel);
 
         /// <summary>
         /// 이벤트가 조치보고로 닫혔다(종류 · 서버 번호) — 개별(카드 · 창 · 트레이 · 이력) · 전체 · 자동 · 자동복구 · 원격 ACTION_REPORT
@@ -560,6 +583,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 foreach (var card in cards)
                 {
+                    // 운영 카드는 조치 대상이 아니다 — 서버 조치를 만들지 않고 치우기만 한다(operation-event-card PRD §3).
+                    if (card is OperationEventCardViewModel operation)
+                    {
+                        CloseOperationCard(operation);
+                        continue;
+                    }
                     var eventModel = card.Model;
                     var eventId = eventModel?.Id ?? 0;
 
@@ -1149,6 +1178,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             card.ApplyThumbnailUpdate(message.Thumbnail, message.FrameWidth, message.FrameHeight);
             _log?.Info($"[SYNC_DETECTION] 탐지 카드 썸네일 갱신: Event({message.EventId}), frame={message.FrameWidth}x{message.FrameHeight}");
+            return Task.CompletedTask;
+        }
+        /// <summary>
+        /// OPERATION_EVENT 한 건(OperationEventNatsSyncService 발행) → 운영 카드. 탐지 · 장애와 같은 입구(<see cref="EnqueueCard"/>)라
+        /// 묶음 · 상한 · 중복(종류 + 번호) 규칙이 같다(operation-event-card PRD §5).
+        /// </summary>
+        public Task HandleAsync(OperationEventCardMessage message, CancellationToken cancellationToken)
+        {
+            if (message?.Model is { Id: > 0 } model)
+                EnqueueCard(new OperationEventCardViewModel(model));
             return Task.CompletedTask;
         }
         #endregion

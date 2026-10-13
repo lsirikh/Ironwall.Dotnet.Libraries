@@ -24,6 +24,13 @@ public static class EventCardKind
         _ => null,
     };
 
+    /// <summary>운영 카드 열쇠 — 패널 안의 중복 · 닫힘 기억에만 쓴다(조치보고 · 원격 ACTION_REPORT 대상이 아니라 <see cref="Of(EventCardBaseViewModel?)"/> 에는 넣지 않는다).</summary>
+    public const string Operation = "operation";
+
+    /// <summary>카드 목록 열쇠의 종류 — 탐지 · 장애에 더해 운영. 그 밖이면 <c>null</c>.</summary>
+    public static string? ListKeyOf(EventCardBaseViewModel? card)
+        => Of(card) ?? (card is OperationEventCardViewModel ? Operation : null);
+
     /// <summary>큐 엔트리 · 이벤트 유형의 종류 — 장애(Fault)만 장애, 나머지(침입 · 접점 …)는 탐지.</summary>
     public static string Of(EnumEventType eventType)
         => eventType == EnumEventType.Fault ? ActionReportKind.Malfunction : ActionReportKind.Detection;
@@ -63,6 +70,7 @@ public static class EventCardKind
     {
         ActionReportKind.Detection => "Detection",
         ActionReportKind.Malfunction => "Malfunction",
+        Operation => "Operation",
         _ => "Event",
     };
 }

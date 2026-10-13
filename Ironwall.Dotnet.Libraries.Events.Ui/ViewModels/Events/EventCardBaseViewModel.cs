@@ -58,11 +58,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         /// <summary>EventQueueManager의 entryId — Dequeue 호출 시 사용</summary>
         public string? EntryId { get; set; }
         /// <summary>
-        /// 카드 자동화 식별자 — <c>Events.Card.{Detection|Malfunction}.{eventId}</c>(WP-1 ⑫). 종류를 넣는 까닭: 탐지 · 장애 번호가 겹친다.
+        /// 카드 자동화 식별자 — <c>Events.Card.{Detection|Malfunction|Operation}.{eventId}</c>(WP-1 ⑫). 종류를 넣는 까닭: 탐지 · 장애 번호가 겹친다.
         /// 카드 뷰 뿌리가 바인딩으로 단다(x:Name 은 Caliburn 지시자라 쓰지 않는다).
         /// </summary>
         public string AutomationKey
-            => $"Events.Card.{Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.AutomationSegment(Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.Of(this))}.{Model?.Id ?? 0}";
+            => $"Events.Card.{Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.AutomationSegment(Ironwall.Dotnet.Libraries.Events.Ui.Helpers.EventCardKind.ListKeyOf(this))}.{Model?.Id ?? 0}";
         /// <summary>카드의 조치보고 단추 자동화 식별자 — <c>{AutomationKey}.Report</c>.</summary>
         public string ReportAutomationKey => AutomationKey + ".Report";
 
