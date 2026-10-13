@@ -50,6 +50,10 @@ public partial class GMapCustomControl
             // 크기가 아직 없는 지도(배치 전 · 헤드리스)는 영역이 퇴화한다 — 그때는 영역으로 거르지 않는다(전부 센다).
             var hasArea = !area.IsEmpty && area.WidthLng > 0 && area.HeightLat > 0;
             var scale = DigitalZoomScale;
+            // 문 열림 표지: 화면 밖 심볼은 깜빡임을 멈춘다(같은 뷰포트 판정 · 값이 바뀔 때만 상속 값이 내려간다).
+            foreach (var marker in Markers.OfType<GMapPidsMarker>())
+                if (marker.Shape is GMapMarkerPidsControl shape)
+                    DoorOpenMark.SetIsInView(shape, !hasArea || area.Contains(marker.Position));
             int count = 0;
             foreach (var marker in Markers.OfType<GMapPidsMarker>())
             {
