@@ -269,7 +269,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
         var flatChanged = _projector.K != (vm.IsFlat ? 0 : 1);
         _projector = vm.IsFlat ? FenceProjector.Flat : FenceProjector.Tilt;
-        _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing, vm.FencePoseOf);
+        _scene = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing, vm.FencePoseOf, vm.FencePresetBayOf);
         _scene.UseSpacingAlerts(vm.FenceSpacingAlerts());          // 권장 간격 넘음(sensor-mount-preset FR-14 · W3 알림)
         _enclosureX = _scene.ControllerX;
         _enclosureGap = _scene.Chain.ControllerGap;
@@ -407,9 +407,10 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                     _sensorChips[unit.Key] = chip = NewChip(FenceChipKind.Sensor, unit.Key, unit.Keys);
                 var s = scene.Sensors[unit.Key];
                 chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key),
-                                                 scene.PlateAboveOf(unit.Key));
+                                                 scene.PlateAboveOf(unit.Key), scene.MountMarkOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
-                placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
+                // 물체에 붙은 프리셋 센서는 화면 벌리기에서 뺀다 — 옆으로 밀면 기둥 · 망에서 떨어져 허공에 뜬다(FR-22)
+                if (!scene.IsMounted(unit.Key)) placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
                 var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
@@ -718,10 +719,24 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         }
         finally { _arming = false; }
 
-        _press = new Press(button, TargetOf(chip), chip, at, _view, ctrl, shift);
+        // 케이블 보기를 끈 펜스 구성 — 펜스 끝 제어기는 정적 그림이라 칩이 없다. 그 그림을 누르면 함체 끌기와 같은 길(놓으면 반대쪽 끝 · FR-22).
+        var target = chip is null && button == FencePointerButton.Left && !ctrl && !shift && HitsEndController(at) ? FenceTargetKind.Enclosure : TargetOf(chip);
+        _press = new Press(button, target, chip, at, _view, ctrl, shift);
         _dragging = false;
         _action = FenceGestureAction.None;
         _lastPointer = at;
+    }
+
+    /// <summary>캔버스 점이 펜스 끝 제어기 그림(케이블 보기를 껐을 때만 정적 층에 있다) 위인가.</summary>
+    internal bool HitsEndController(Point at)
+        => _scene is { IsLayout: true, Layout: not null } && !CablesShown && FenceScene.EndControllerBounds(_projector, _enclosureX).Contains(ScreenToWorld(at));
+
+    /// <summary>펜스 끝 제어기 그림의 화면 가운데(시험 · 자동화 좌표) — 케이블 보기를 켜면 <c>null</c>(그때는 함체 칩).</summary>
+    internal Point? EndControllerScreenCenter()
+    {
+        if (_scene is not { IsLayout: true, Layout: not null } || CablesShown) return null;
+        var r = FenceScene.EndControllerBounds(_projector, _enclosureX);
+        return WorldToScreen(new Point(r.X + r.Width / 2, r.Y + r.Height / 2));
     }
 
     /// <summary>움직임(캔버스 좌표) — 데드존을 넘으면 끌기를 시작한다.</summary>
@@ -826,6 +841,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 // 두 줄 형상 — 제어기는 펜스 끝에만 선다. 끄는 동안은 따라 움직이고, 놓을 때 반대쪽 절반이면 끝을 바꾼다.
                 _enclosureX = Math.Clamp(ScreenToWorld(now).X, _scene.MinX - 6 * _scene.Upm, _scene.MaxX + 6 * _scene.Upm);
                 if (_controllerChip is not null) Place(_controllerChip, _enclosureX);
+                else DrawStatic();                          // 펜스 끝 제어기(정적 그림)가 포인터를 따라온다
                 var flip = IsOtherEnd(_enclosureX);
                 vm.NotifyFenceStatus(flip ? "제어기 — 놓으면 반대쪽 끝으로(사슬 · 번호 방향이 바뀝니다) · Esc 취소" : "제어기 — 제자리(반대쪽 끝으로 끌면 위치가 바뀝니다)");
                 return;

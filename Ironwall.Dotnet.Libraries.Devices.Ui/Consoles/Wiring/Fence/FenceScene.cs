@@ -50,6 +50,8 @@ public enum FenceInk
     // 센서 설치 위치 프리셋(sensor-mount-preset W4) — 붙는 점(반투명 회색 · 다크 흰) · 붙지 않는 점(더 흐림) · 붙을 점(반투명 빨강 — 고리는 SnapRing) ·
     // 권장 간격 넘음 표지(삼각형 · 빈틈의 마름모와 모양이 다르다) · 그 글자
     MountDot, MountDotDim, MountHot, SpacingAlertMark, SpacingAlertText,
+    // 센서 붙임(sensor-mount-preset FR-22) — 물체 면에서 센서 몸까지 브래킷 · 펜스 끝 제어기(케이블 보기를 꺼도 보인다)
+    MountBracket, EndController,
 }
 
 /// <summary>
@@ -265,7 +267,8 @@ public static partial class FenceScene
 
     /// <summary>기둥에 다는 센서(스마트 · 복합 · 모름)의 x — 솎아도 남길 기둥.</summary>
     public static IEnumerable<double> PostSensorXs(FenceWorld world)
-        => world.Seq.Where(k => world.Sensors.TryGetValue(k, out var s) ? WiringTopology.IsPostMounted(s.Type) : true).Select(k => world.X[k]);
+        => world.Seq.Where(k => world.Sensors.TryGetValue(k, out var s) ? WiringTopology.IsPostMounted(s.Type) : true).Select(k => world.X[k])
+                .Concat(world.PostMountXs);                     // 위치 프리셋으로 기둥에 붙은 센서의 기둥도 남긴다(솎이면 센서가 허공 · FR-22)
 
     /// <summary>
     /// 기둥 LOD(순수) — 이웃 기둥의 화면 간격(세계 간격 × <paramref name="zoom"/>)이 모두 <paramref name="minPx"/> 이상이면 그대로.
@@ -417,7 +420,37 @@ public static partial class FenceScene
     /// </param>
     public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom = 1, double lift = 0, double coil = 0,
                                           bool plateAbove = false)
+        => Sensor(s, shape, p, selected, zoom, lift, coil, plateAbove, null);
+
+    /// <summary>
+    /// 몸 높이 범위(칩 좌표 · 올리기 전 세계 단위) — <see cref="Sensor(FenceSensor, WiringShape, FenceProjector, bool, double, double, double, bool, FenceMountMark?)"/> 가 그리는 몸과 같은 값.
+    /// <paramref name="mounted"/>(위치 프리셋으로 물체에 붙음)면 복합센서는 자기 기둥 없이 볼 마운트부터.
+    /// </summary>
+    public static (double Bottom, double Top) BodySpan(FenceSensor s, bool mounted)
     {
+        ArgumentNullException.ThrowIfNull(s);
+        if (s.DrawShape is SensorShape.Pir) return (60, 82);
+        if (s.DrawShape is SensorShape.Optical) return (62, 76);
+        return s.Kind switch
+        {
+            FenceKind.Multi => mounted ? (H + 20 - BALL_R, H + 48) : (0, H + 48),
+            FenceKind.Fence => (56, 76),
+            FenceKind.Underground => (-48, 6),
+            _ => (43, 99),
+        };
+    }
+
+    /// <summary>복합센서 볼 마운트 반지름(세계 단위).</summary>
+    private const double BALL_R = 4.6;
+
+    /// <summary>
+    /// 센서 칩 — <paramref name="mount"/>(위치 프리셋으로 물체에 붙음 · <see cref="FenceWorld.MountMarkOf"/>)면 복합센서의 자기 기둥을 그리지 않고(펜스 물체에 붙는다),
+    /// 물체 면(깊이 0)의 붙는 높이에서 몸 뒷면까지 브래킷 선을 그린다(sensor-mount-preset FR-22 — 몸이 물체에 닿아 보인다).
+    /// </summary>
+    public static FenceChipPicture Sensor(FenceSensor s, WiringShape shape, FenceProjector p, bool selected, double zoom, double lift, double coil,
+                                          bool plateAbove, FenceMountMark? mount)
+    {
+        var p0 = p;
         if (lift != 0) p = p with { YLift = lift };
         // 코일 위 번호판 자리 — 코일 꼭대기(그림의 코일과 같은 식: 가운데 − 세로 반지름 × 1.02)에서 틈 + 반 판만큼 위
         Point? coilPlate = null;
@@ -466,8 +499,9 @@ public static partial class FenceScene
             case FenceKind.Multi:
             {
                 var zf = de / 2 + 14 * k;
-                Box(o, p, 0, 0, H + 16, -de / 2 - 1, de / 2 + 1, 7, FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop);
-                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Ball, new[] { p.P(0, H + 20, 0) }, 4.6, 4.6));     // 볼 마운트는 기둥 끝에 남는다
+                // 물체에 붙은 복합센서는 펜스 기둥 · 망에 단다 — 자기 기둥을 올려 그리면 기둥 밑이 허공에 뜬다(FR-22 조사 8)
+                if (mount is null) Box(o, p, 0, 0, H + 16, -de / 2 - 1, de / 2 + 1, 7, FenceInk.PostFront, FenceInk.PostSide, FenceInk.PostTop);
+                o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Ball, new[] { p.P(0, H + 20, 0) }, BALL_R, BALL_R));     // 볼 마운트는 기둥 끝에 남는다
                 var mw = SensorBodyWidth(38, s.Yaw);
                 Box(o, q, 0, H + 24, H + 48, de / 2, zf, mw, FenceInk.OliveFront, FenceInk.OliveSide, FenceInk.OliveTop);
                 Lens(o, q, s.Yaw, mw, H + 24, H + 48, zf, new Point(-11, H + 36), 4);
@@ -528,6 +562,16 @@ public static partial class FenceScene
                 plate = Plate(o, pl, 20, PLATE_H, big, FenceInk.Number, COIL_PLATE_TEXT, 4, s, zoom);
                 break;
             }
+        }
+
+        // 브래킷 — 물체 면(깊이 0)의 붙는 높이에서 몸 뒷면까지(몸 밑에 깔리게 맨 앞에 넣는다 · FR-22)
+        if (mount is { Anchor: not SensorMountAnchor.Ground } && s.Kind != FenceKind.Underground)
+        {
+            var zBack = s.DrawShape switch { SensorShape.Pir => de / 2 + 8 * k, SensorShape.Optical => de / 2 + 2 * k, _ => de / 2 };
+            var from = p0.P(0, mount.Height, 0);
+            var to = (s.IsBackFacing ? p0 with { ZOffset = BackFacingOffset(p0) } : p0).P(0, mount.Height, zBack);
+            o.Insert(0, new FenceShape(FenceShapeKind.Line, FenceInk.MountBracket, new[] { from, to }));
+            o.Insert(0, new FenceShape(FenceShapeKind.Ellipse, FenceInk.MountBracket, new[] { from }, 2.2, 2.2));      // 물체에 박힌 고정점
         }
 
         // 적중 · 선택 윤곽 = 몸(아이콘)만 — 번호판은 누르는 자리도, 선택 윤곽(어도너)도 아니다(사용자: "그건 adorner에 안잡히게 해라").

@@ -57,6 +57,24 @@ public sealed class MountPresetEditorViewModel : Screen
         _confirm = confirm;
         _bay = (sample ?? new FenceSampleBay(preset.PanelWidthM, preset.FenceHeightM, preset.SampleHasRazor)).Normalized();
         DisplayName = $"위치 프리셋 편집 · {model.Name}";
+        // 저장된 자리가 허공이면(옛 값 · 손으로 고친 값) 열 때 가장 가까운 물체로 보정해 "바뀜" 으로 보인다 — 저장소엔 [저장] 때만 쓴다(FR-22)
+        var (fixedDraft, att) = SensorMountResolver.Normalize(preset, _bay);
+        if (att.Clamped)
+        {
+            _draft = fixedDraft;
+            _corrected = true;
+            _statusText = $"저장된 자리가 물체에 닿지 않아 고쳤습니다 — {att.Reason}(저장하면 반영)";
+        }
+    }
+
+    /// <summary>열 때 허공 자리를 보정했나(저장 전까지 "바뀜" 하나로 센다).</summary>
+    private bool _corrected;
+
+    /// <summary>자유 위치 결과를 붙임 까닭과 함께 받는다 — 허공이라 끌어 붙였으면 상태 줄에 알린다(FR-22).</summary>
+    private SensorMountPreset Attached((SensorMountPreset Preset, SensorMountAttachment Attachment) moved)
+    {
+        if (moved.Attachment is { Clamped: true, Reason: { } reason }) StatusText = reason;
+        return moved.Preset;
     }
 
     #region - Facts -
@@ -144,7 +162,7 @@ public sealed class MountPresetEditorViewModel : Screen
         _target = free ? null : SnapCandidate(view, along, height, depth);
         _ghost = _target is { } t
             ? SensorMountResolver.SnapTo(_draft, t, _bay)
-            : SensorMountResolver.MoveFree(_draft, _bay, along, height, depth);
+            : Attached(SensorMountResolver.MoveFreeAttached(_draft, _bay, along, height, depth));
         RaiseAll();
     }
 
@@ -200,7 +218,9 @@ public sealed class MountPresetEditorViewModel : Screen
     /// <summary>화살표 — 앞에서 본 모습 기준 10 cm(<paramref name="fine"/> = Shift 면 1 cm).</summary>
     public void Nudge(int dx, int dy, bool fine)
     {
-        _draft = SensorMountResolver.Nudge(_draft, _bay, dx, dy, fine);
+        var pose = SensorMountResolver.Resolve(_draft, null, _bay);
+        var step = fine ? SensorMountResolver.FINE_NUDGE_M : SensorMountResolver.NUDGE_M;
+        _draft = Attached(SensorMountResolver.MoveFreeAttached(_draft, _bay, pose.AlongM + dx * step, pose.HeightM + dy * step, pose.DepthM));
         RaiseAll();
     }
     #endregion
@@ -273,10 +293,20 @@ public sealed class MountPresetEditorViewModel : Screen
         var tilt = Read(ref _editTilt, "위아래 각도");
         var bracket = Read(ref _editBracket, "브래킷");
         if (along is not null || height is not null || depth is not null)
-            _draft = SensorMountResolver.MoveFree(_draft, _bay, along is { } a ? a / 100 * _bay.PanelWidthM : null, height, depth);
+        {
+            // 브래킷을 같이 고쳤으면 먼저 적는다 — 펜스에서 떨어진 거리는 브래킷 길이 안에서만(FR-22)
+            if (bracket is { } b0) _draft = _draft with { BracketM = Math.Clamp(b0, 0, SensorMountResolver.MAX_BRACKET_M) };
+            _draft = Attached(SensorMountResolver.MoveFreeAttached(_draft, _bay, along is { } a ? a / 100 * _bay.PanelWidthM : null, height, depth));
+        }
         if (yaw is { } y) _draft = _draft with { YawDeg = SensorMountResolver.NormalizeYaw(y) };
         if (tilt is { } tt) _draft = _draft with { TiltDeg = Math.Clamp(tt, -90, 90) };
-        if (bracket is { } b) _draft = _draft with { BracketM = Math.Clamp(b, 0, SensorMountResolver.MAX_BRACKET_M) };
+        if (bracket is { } b)
+        {
+            _draft = _draft with { BracketM = Math.Clamp(b, 0, SensorMountResolver.MAX_BRACKET_M) };
+            // 브래킷을 줄이면 펜스와 거리도 그 안으로(허공 금지)
+            var (fixedDraft, att) = SensorMountResolver.Normalize(_draft, _bay);
+            if (att.Clamped) { _draft = fixedDraft; StatusText = att.Reason ?? StatusText; }
+        }
         RaiseAll();
         return ok;
     }
@@ -309,6 +339,7 @@ public sealed class MountPresetEditorViewModel : Screen
             if (Math.Abs(a.TiltDeg - b.TiltDeg) >= 0.5) n++;
             if (Math.Abs(a.BracketM - b.BracketM) >= 0.005) n++;
             if (_name is not null && _name != _saved.Name) n++;
+            if (n == 0 && _corrected && !_draft.SamePlace(_saved)) n++;               // 열 때 보정한 자리(저장하면 반영)
             return n;
         }
     }
@@ -326,8 +357,15 @@ public sealed class MountPresetEditorViewModel : Screen
         RaiseAll();
     }
 
+    /// <summary>저장할 값 — 날 값도 물체에 붙은 값으로 맞춘다(허공 값은 저장되지 않는다 · FR-22).</summary>
     private SensorMountPreset Outgoing()
-        => _draft with { Name = string.IsNullOrWhiteSpace(Name) ? SuggestedName : Name.Trim(), PanelWidthM = _bay.PanelWidthM, FenceHeightM = _bay.FenceHeightM, SampleHasRazor = _bay.HasRazor };
+    {
+        var (fixedDraft, att) = SensorMountResolver.Normalize(_draft, _bay);
+        return (att.Clamped ? fixedDraft : _draft) with
+        {
+            Name = string.IsNullOrWhiteSpace(Name) ? SuggestedName : Name.Trim(), PanelWidthM = _bay.PanelWidthM, FenceHeightM = _bay.FenceHeightM, SampleHasRazor = _bay.HasRazor,
+        };
+    }
 
     /// <summary>
     /// [저장] — 쓰는 센서가 있고 자리가 바뀌면 W5 확인(취소 · 새 프리셋으로 저장 · 저장). 실패하면 화면 값 그대로 · 거짓(NFR-05).
