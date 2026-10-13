@@ -51,6 +51,16 @@ public readonly record struct MountBayProjection(MountView View, double Width, d
         return new Point(x, y);
     }
 
+    /// <summary>
+    /// 센서가 붙은 물체 위 점과 센서 가운데(그림 점) — 지상 센서는 물체 면(펜스와 거리 0)의 같은 가로 · 높이에서 브래킷 끝(센서)까지(sensor-mount-preset FR-22 · 브래킷 선).
+    /// 지중 센서는 둘이 같다(땅속에 묻혀 땅이 물체).
+    /// </summary>
+    public (Point Object, Point Sensor) AttachLine(SensorMountPose pose)
+    {
+        var sensor = ToScreen(pose.AlongM, pose.HeightM, pose.DepthM);
+        return pose.Anchor == SensorMountAnchor.Ground ? (sensor, sensor) : (ToScreen(pose.AlongM, pose.HeightM, 0), sensor);
+    }
+
     /// <summary>그림 점 → 그 그림의 두 축(m) — 앞 (가로, 높이) · 위 (가로, 펜스와 거리) · 옆 (펜스와 거리, 높이).</summary>
     public (double U, double V) FromScreen(Point p)
     {
@@ -138,6 +148,13 @@ public sealed class MountBayCanvas : FrameworkElement
                 {
                     dc.DrawLine(postPen, p.ToScreen(0, 0, 0), p.ToScreen(0, bay.PostTopM, 0));
                     dc.DrawLine(postPen, p.ToScreen(bay.PanelWidthM, 0, 0), p.ToScreen(bay.PanelWidthM, bay.PostTopM, 0));
+                    if (bay.HasRazor)
+                    {
+                        // 철조망 칸 — 기둥 머리의 Y 받침이 코일 꼭대기까지 올라간다(기둥 갈래 센서가 코일 높이에 붙는 물체 · FR-22)
+                        var arm = new Pen(post, 2);
+                        dc.DrawLine(arm, p.ToScreen(0, bay.PostTopM, 0), p.ToScreen(0, bay.TopLimitM, 0));
+                        dc.DrawLine(arm, p.ToScreen(bay.PanelWidthM, bay.PostTopM, 0), p.ToScreen(bay.PanelWidthM, bay.TopLimitM, 0));
+                    }
                     dc.DrawLine(railPen, p.ToScreen(0, bay.FenceHeightM, 0), p.ToScreen(bay.PanelWidthM, bay.FenceHeightM, 0));
                     var mesh = new Pen(ink, 0.5) { DashStyle = DashStyles.Dot };
                     for (var x = 0.25; x < bay.PanelWidthM; x += 0.25) dc.DrawLine(mesh, p.ToScreen(x, 0.05, 0), p.ToScreen(x, bay.FenceHeightM, 0));
@@ -203,6 +220,9 @@ public sealed class MountBayCanvas : FrameworkElement
         var w = Math.Clamp((view == MountView.Side ? size.L : size.W) / 1000 * p.Scale * 3, 8, 60);
         var h = Math.Clamp((view == MountView.Top ? size.L : size.H) / 1000 * p.Scale * 3, 8, 60);
         dc.PushOpacity(opacity);
+        // 브래킷 — 물체 면에서 센서까지 선(펜스에서 떨어져 있어도 허공이 아니라 브래킷 끝이다 · FR-22)
+        var (objectAt, _) = p.AttachLine(pose);
+        if ((objectAt - c).Length > 0.5) dc.DrawLine(new Pen(Res("TextTertiaryBrush", Colors.DimGray), 3) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, objectAt, c);
         switch (vm.Model.Shape)
         {
             case SensorShape.Pir:

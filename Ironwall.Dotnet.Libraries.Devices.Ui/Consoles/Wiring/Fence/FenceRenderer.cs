@@ -283,6 +283,9 @@ public sealed class FenceRenderer
         FenceInk.FacingTag => new(B(Tx2), B(Alt), 1),
         FenceInk.FacingTagText => new(null, null, 0, B(Alt), false, FontWeights.Bold),
         FenceInk.SideLabel => new(null, null, 0, B(Tx2), false, FontWeights.SemiBold),
+        // 센서 붙임(sensor-mount-preset FR-22) — 브래킷 = 기둥 옆면 색 굵은 선(고정점은 같은 색 원) · 펜스 끝 제어기 = 제어기 상자와 같은 칠
+        FenceInk.MountBracket => new(B(PostSide), B(PostSide), 2.4, Cap: PenLineCap.Round),
+        FenceInk.EndController => new(B(Pressed), B(Border), 1.2),
         _ => new(B(Tx1), null, 0),
     };
 
