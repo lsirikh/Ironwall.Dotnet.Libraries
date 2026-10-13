@@ -172,7 +172,11 @@ public sealed partial class WiringViewModel
         {
             var targets = PresetTargets();
             if (targets.Count != 1 || _board.FenceLayout.MountOf(targets[0]) is not { MountPresetId: { } id } m) return string.Empty;
-            return WiringPresetPlan.OverrideText(MountPresetById(id), m, _board.FenceLayout.Panels);
+            var text = WiringPresetPlan.OverrideText(MountPresetById(id), m, _board.FenceLayout.Panels);
+            // 저장된 값이 허공이었으면 보정 까닭을 같이(그림은 이미 붙은 자리 · 저장하면 반영 — FR-22)
+            return WiringPresetPlan.CorrectionOf(m, MountPresetById(id), _board.FenceLayout.Panels) is { } fix && text.Length > 0
+                ? $"{text} · 보정: {fix}(저장하면 반영)"
+                : text;
         }
     }
 
@@ -227,12 +231,25 @@ public sealed partial class WiringViewModel
     {
         var targets = PresetTargets();
         if (targets.Count == 0) return false;
+        var why = AttachReasonOf(targets, change);
         var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) && p.Value.MountPresetId is { } id && MountPresetById(id) is { } preset
                 ? WiringPresetPlan.WithOverride(p.Value, preset, l.Panels, change) : p.Value)));
-        StatusText = ok ? $"설치 위치 — {what} (프리셋에서 바뀜)" : "바뀐 것이 없습니다.";
+        StatusText = ok ? $"설치 위치 — {what} (프리셋에서 바뀜){why}" : why.Length > 0 ? $"바뀐 것이 없습니다{why}" : "바뀐 것이 없습니다.";
         RaisePresetPane();
         return ok;
+    }
+
+    /// <summary>
+    /// 바꾼 자세가 허공이라 물체로 끌어 붙였으면 " — 기둥 높이를 넘어 기둥 꼭대기에 붙였습니다"(첫 대상 기준 · FR-22), 아니면 빈 글자.
+    /// </summary>
+    private string AttachReasonOf(IReadOnlyList<int> targets, Func<SensorMountPose, SensorMountPose> change)
+    {
+        foreach (var key in targets)
+            if (_board.FenceLayout.MountOf(key) is { MountPresetId: { } id } m && MountPresetById(id) is { } preset
+                && WiringPresetPlan.OverrideAttachment(m, preset, _board.FenceLayout.Panels, change) is { Clamped: true, Reason: { } reason })
+                return $" — {reason}";
+        return string.Empty;
     }
 
     /// <summary>[프리셋으로] — 따로 고친 값을 지운다(되돌리기 한 걸음).</summary>
@@ -355,7 +372,7 @@ public sealed partial class WiringViewModel
         var geometry = _board.FenceLayout.Geometry;
         var keys = _board.Chain.Keys.Where(k => _board.FenceLayout.MountOf(k) is not null).ToList();
         double XOf(int k) => FencePoseOf(k) is { } pose
-            ? geometry.Panels[SensorMountMigration.BayIndexOf(_board.FenceLayout.MountOf(k)!, geometry.Panels.Count, pose.AlongRatio)] is var bay ? bay.StartM + bay.SpanM * pose.AlongRatio : 0
+            ? geometry.Panels[FencePresetBayOf(k) ?? SensorMountMigration.BayIndexOf(_board.FenceLayout.MountOf(k)!, geometry.Panels.Count, pose.AlongRatio)] is var bay ? bay.StartM + bay.SpanM * pose.AlongRatio : 0
             : FenceLayoutMath.PointOf(_board.FenceLayout.MountOf(k)!, geometry).XM;
         foreach (var group in keys.GroupBy(ModelIdOfKey))
         {
@@ -409,7 +426,9 @@ public sealed partial class WiringViewModel
     /// <summary>저장할 때 옛 자리 이관(FR-19) — 프리셋을 읽었을 때만.</summary>
     private SensorMountSpec MigrateMountForSave(int key, SensorMountSpec mount)
     {
-        if (!HasSensorPresets || mount.HasMountPreset) return mount;
+        if (!HasSensorPresets) return mount;
+        // 허공 값(옛 값 · 손으로 고친 문서)은 붙은 자리로 고쳐 적는다 — 열 때는 그림만 보정하고, 저장할 때 반영(FR-22)
+        if (mount.HasMountPreset) return WiringPresetPlan.NormalizeOverride(mount, MountPresetById(mount.MountPresetId!.Value), _board.FenceLayout.Panels);
         var modelId = ModelIdOfKey(key);
         return WiringPresetPlan.Migrate(mount, modelId, MountPresetsOf(modelId), _board.FenceLayout.Panels);
     }

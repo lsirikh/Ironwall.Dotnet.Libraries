@@ -150,13 +150,15 @@ public sealed partial class WiringViewModel
     {
         var targets = (keys ?? Array.Empty<int>()).Where(IsPresetMounted).Distinct().ToList();
         if (IsBusy || targets.Count == 0 || !double.IsFinite(deltaM) || deltaM == 0) return false;
+        SensorMountPose Step(SensorMountPose pose) => pose with { HeightM = Math.Round((pose.HeightM + deltaM) * 100) / 100 };
+        var why = AttachReasonOf(targets, Step);
         var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) && p.Value.MountPresetId is { } id && MountPresetById(id) is { } preset
-                ? WiringPresetPlan.WithOverride(p.Value, preset, l.Panels, pose => pose with { HeightM = Math.Round((pose.HeightM + deltaM) * 100) / 100 })
+                ? WiringPresetPlan.WithOverride(p.Value, preset, l.Panels, Step)
                 : p.Value)));
         StatusText = ok
-            ? $"설치 위치 — 높이 {(deltaM > 0 ? "+" : "−")}{Math.Abs(deltaM) * 100:0} cm{(targets.Count == 1 && FencePoseOf(targets[0]) is { } pose ? $" ({pose.HeightM:0.00} m)" : $" · {targets.Count}대")} (프리셋에서 바뀜)"
-            : "더 올리거나 내릴 수 없습니다 — 기둥 꼭대기 · 바닥이 끝입니다.";
+            ? $"설치 위치 — 높이 {(deltaM > 0 ? "+" : "−")}{Math.Abs(deltaM) * 100:0} cm{(targets.Count == 1 && FencePoseOf(targets[0]) is { } pose ? $" ({pose.HeightM:0.00} m)" : $" · {targets.Count}대")} (프리셋에서 바뀜){why}"
+            : why.Length > 0 ? $"더 올리거나 내릴 수 없습니다{why}" : "더 올리거나 내릴 수 없습니다 — 붙은 물체(기둥 · 망 · 담 · 철조망 · 바닥)의 끝입니다.";
         RaisePresetPane();
         return ok;
     }
@@ -167,10 +169,12 @@ public sealed partial class WiringViewModel
         var fromBay = FencePresetBayOf(key) ?? bay;
         var rest = _board.Chain.Keys.Where(k => k != key).ToList();
         var tie = bay >= fromBay ? rest.Append(key).ToList() : rest.Prepend(key).ToList();
+        // 허공 자리면 가장 가까운 물체로 끌어 붙인다(FR-22) — 그 까닭을 상태 줄에(쉬운 말)
+        var why = WiringPresetPlan.MoveAttachment(before, preset, _board.FenceLayout.Panels, bay, alongRatio, heightM, depthM) is { Clamped: true, Reason: { } r } ? $" — {r}" : string.Empty;
         var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => p.Key == key ? WiringPresetPlan.MoveTo(p.Value, preset, l.Panels, bay, alongRatio, heightM, depthM) : p.Value)), tie);
-        StatusText = ok ? $"설치 위치 — {_board.Find(key)?.Display}: 망 {bay + 1} · {what} (프리셋에서 바뀜 · [프리셋으로] 로 되돌림)"
-                        : "제자리 — 바뀐 것이 없습니다.";
+        StatusText = ok ? $"설치 위치 — {_board.Find(key)?.Display}: 망 {bay + 1} · {what} (프리셋에서 바뀜 · [프리셋으로] 로 되돌림){why}"
+                        : $"제자리 — 바뀐 것이 없습니다.{why}";
         RaisePresetPane();
         return ok;
     }

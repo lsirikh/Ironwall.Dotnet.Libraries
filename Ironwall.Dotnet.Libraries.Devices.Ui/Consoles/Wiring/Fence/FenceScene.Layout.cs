@@ -34,7 +34,7 @@ public static partial class FenceScene
         var o = new List<FenceShape>(512);
         var u = world.Upm;
         var v = world.Vpm;
-        var xs = world.X.Values.Append(0).Append(geometry.LengthM * u).Append(showCables ? enclosureX : 0).ToList();
+        var xs = world.X.Values.Append(0).Append(geometry.LengthM * u).Append(enclosureX).ToList();     // 제어기는 케이블 보기와 상관없이 늘 그린다(FR-22)
         var x0 = xs.Min() - 5 * u;
         var x1 = xs.Max() + 5 * u;
         var gz0 = -36 * p.K;
@@ -111,6 +111,8 @@ public static partial class FenceScene
         }
 
         if (showCables) LaneCables(o, world, p);
+        // 케이블 보기를 끄면 함체 칩이 없다 — 펜스 끝 제어기를 정적 그림으로 늘 세운다(사용자 "여기 제어기가 없다" · 끌면 반대쪽 끝으로)
+        else if (world.Layout is { } lay) o.AddRange(EndController(p, enclosureX, lay.ControllerEnd));
 
         if (showRange)
             foreach (var gap in world.RangeGaps())
@@ -240,6 +242,36 @@ public static partial class FenceScene
             var y = layout.LaneOf(key) == FenceLane.Upper ? upperY - 30 : lowerY - 24;
             o.Add(new FenceShape(FenceShapeKind.Pill, FenceInk.PillPort, new[] { p.P(world.X[key], y, cz) }, Text: s.PortText, FontSize: 10));
         }
+    }
+
+    /// <summary>펜스 끝 제어기의 깊이(세계 단위 · 펜스 앞 땅 위).</summary>
+    public const double END_CONTROLLER_Z = 22;
+
+    /// <summary>
+    /// 펜스 끝 제어기(두 줄 형상 · 케이블 보기를 꺼도) — 땅에 선 짧은 기둥 + 제어기 상자 "제어기" + 어느 끝인지 · 끌기 안내. 정적 층이 그린다(x = <paramref name="x"/>).
+    /// </summary>
+    public static IReadOnlyList<FenceShape> EndController(FenceProjector p, double x, FenceControllerEnd end)
+    {
+        var o = new List<FenceShape>(8);
+        var k = p.K;
+        var z0 = END_CONTROLLER_Z - 9 * k;
+        var z1 = END_CONTROLLER_Z + 9 * k;
+        BoxC(o, p, x, 0, 28, END_CONTROLLER_Z - 2 * k, END_CONTROLLER_Z + 2 * k, 6, FenceInk.EndController, FenceInk.ControllerSide, FenceInk.ControllerTop, null);   // 땅에 선 받침(펜스 기둥과 다른 잉크 — 기둥 셈에 섞이지 않게)
+        BoxC(o, p, x, 28, 60, z0, z1, 50, FenceInk.EndController, FenceInk.ControllerSide, FenceInk.ControllerTop, null);
+        var t = p.P(x, 44, z1);
+        o.Add(Text(FenceInk.ControllerText, new Point(t.X, t.Y + 4), "제어기", 11));
+        var cap = p.P(x, 0, z1);
+        o.Add(Text(FenceInk.Caption, new Point(cap.X, cap.Y + 15), end == FenceControllerEnd.Left ? "제어기 · 펜스 왼쪽 끝 — ‹ 끌면 반대쪽 ›" : "제어기 · 펜스 오른쪽 끝 — ‹ 끌면 반대쪽 ›", 10.5));
+        return o;
+    }
+
+    /// <summary>펜스 끝 제어기 상자 · 받침의 그림 범위(누르는 자리 — 끌기 시작).</summary>
+    public static Rect EndControllerBounds(FenceProjector p, double x)
+    {
+        var shapes = EndController(p, x, FenceControllerEnd.Left).Where(s => s.Kind == FenceShapeKind.Polygon).SelectMany(s => s.Points).ToList();
+        var r = new Rect(new Point(shapes.Min(q => q.X), shapes.Min(q => q.Y)), new Point(shapes.Max(q => q.X), shapes.Max(q => q.Y)));
+        r.Inflate(6, 6);
+        return r;
     }
 
     /// <summary>이 줌보다 작으면 윤형 코일 대신 톱니 띠(<see cref="RazorBand"/>).</summary>

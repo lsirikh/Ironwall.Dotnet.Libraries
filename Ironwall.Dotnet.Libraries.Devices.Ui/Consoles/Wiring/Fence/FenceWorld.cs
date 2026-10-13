@@ -112,6 +112,28 @@ public sealed record FenceUnit(int Key, IReadOnlyList<int> Keys, bool IsGroup, b
     public int Count => Keys.Count;
 }
 
+/// <summary>칩이 붙는 물체 자리에 닿는 방식(sensor-mount-preset FR-22).</summary>
+public enum FenceSeatMode
+{
+    /// <summary>몸 가운데를 붙는 높이에 두되 몸이 물체 범위 안에 들게(기둥 옆 · 메쉬 · 담 앞면 · 코일 속 · 바닥).</summary>
+    Within = 0,
+    /// <summary>몸 밑이 붙는 높이에 얹힌다(기둥 꼭대기 · 담 위 · 코일 위).</summary>
+    Sit = 1,
+    /// <summary>몸 위가 붙는 높이에 매달린다(상단 레일).</summary>
+    Hang = 2,
+}
+
+/// <summary>
+/// 위치 프리셋 센서가 붙은 물체 자리(세계 단위 · sensor-mount-preset FR-22) — 칩이 이 점에 닿게 선다(입체 · 평면 같은 값).
+/// </summary>
+/// <param name="X">붙는 점 가로(세계 단위) — 칩 x 와 같다(옆으로 벌리지 않는다).</param>
+/// <param name="Height">그림의 물체 위 붙는 높이(세계 단위) — 기둥 꼭대기면 갓 위, 레일이면 그려진 레일 선.</param>
+/// <param name="Low">물체 범위 아래(세계 단위).</param>
+/// <param name="High">물체 범위 위(세계 단위).</param>
+/// <param name="Anchor">붙는 곳.</param>
+/// <param name="Mode">닿는 방식.</param>
+public sealed record FenceMountMark(double X, double Height, double Low, double High, SensorMountAnchor Anchor, FenceSeatMode Mode);
+
 /// <summary>
 /// "권장 간격 넘음" 한 쌍(sensor-mount-preset FR-14) — 이웃한 같은 모델 센서 둘 · 둘 사이(m) · 속성 프리셋 권장 설치 간격(m).
 /// </summary>
@@ -357,6 +379,14 @@ public sealed class FenceWorld
     /// </summary>
     public static FenceWorld FromLayout(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors, WiringFenceLayout? layout, WiringSpacingTable? spacing,
                                         Func<int, SensorMountPose?>? poseOf)
+        => FromLayout(chain, sensors, layout, spacing, poseOf, null);
+
+    /// <summary>
+    /// <paramref name="bayOf"/> — 프리셋 센서가 서는 칸(뷰모델 <c>FencePresetBayOf</c> · 자세를 계산한 칸과 같다). 없으면 자세의 가로 몫으로 고른다
+    /// (기둥 자리 + 몫 0.5 미만이면 옆 칸으로 잘못 그리던 길 — FR-22 조사 5).
+    /// </summary>
+    public static FenceWorld FromLayout(WiringChain chain, IReadOnlyDictionary<int, FenceSensor> sensors, WiringFenceLayout? layout, WiringSpacingTable? spacing,
+                                        Func<int, SensorMountPose?>? poseOf, Func<int, int?>? bayOf)
     {
         ArgumentNullException.ThrowIfNull(chain);
         ArgumentNullException.ThrowIfNull(sensors);
@@ -381,16 +411,24 @@ public sealed class FenceWorld
         var twoLanes = layout.HasUpperSensors;
         foreach (var (key, mount) in seats)
         {
-            if (poseOf?.Invoke(key) is { } pose)
+            if (poseOf?.Invoke(key) is { } rawPose)
             {
-                // 위치 프리셋 — 편집기와 같은 자세(칸 안 몫 · 높이). 철조망에 붙은 센서는 코일 위(번호판도 코일 위로).
-                var bay = geometry.Panels[SensorMountMigration.BayIndexOf(mount, geometry.Panels.Count, pose.AlongRatio)];
-                var presetKind = sensors.TryGetValue(key, out var ps) ? ps.Kind : FenceKind.Smart;
-                world._x[key] = (bay.StartM + bay.SpanM * pose.AlongRatio) * upm;
-                var presetLift = pose.Anchor == SensorMountAnchor.Ground ? 0 : LiftFor(presetKind, FenceMountSpot.PanelCenter, pose.HeightM * vpm);
+                // 위치 프리셋 — 편집기와 같은 자세(칸 안 몫 · 높이)를 뷰모델과 같은 칸에. 그림도 같은 불변식으로 한 번 더 붙인다(FR-22).
+                var bayIndex = Math.Clamp(bayOf?.Invoke(key) ?? SensorMountMigration.BayIndexOf(mount, geometry.Panels.Count, rawPose.AlongRatio), 0, geometry.Panels.Count - 1);
+                var bay = geometry.Panels[bayIndex];
+                var pose = SensorMountResolver.Clamp(rawPose, FenceSampleBay.FromPanel(bay.Spec));
+                var sensor = sensors.TryGetValue(key, out var ps) ? ps : null;
+                var presetKind = sensor?.Kind ?? FenceKind.Smart;
+                var x = (bay.StartM + bay.SpanM * pose.AlongRatio) * upm;
+                world._x[key] = x;
+                var post = geometry.Posts[Math.Clamp(pose.AlongRatio >= 0.5 ? bay.Index + 1 : bay.Index, 0, geometry.Posts.Count - 1)];
+                var seat = SeatOf(pose, bay.Spec, post.HeightM * vpm + POST_CAP_H, vpm);
+                var span = sensor is null ? (Bottom: 43.0, Top: 99.0) : FenceScene.BodySpan(sensor, mounted: true);
+                var presetLift = presetKind == FenceKind.Underground ? 0 : MountLift(seat.Mode, seat.Height, seat.Low, seat.High, span.Bottom, span.Top);
                 if (pose.Anchor is SensorMountAnchor.Razor or SensorMountAnchor.RazorLoop && bay.Spec.Style == EnumFenceStyle.ChainLinkRazor)
                     world._coil[key] = FenceStyleArt.CoilRadius(bay.Spec.HeightM * vpm);
                 world._lift[key] = presetLift;
+                world._marks[key] = new FenceMountMark(x, seat.Height, seat.Low, seat.High, pose.Anchor, seat.Mode);
                 top = Math.Max(top, presetLift + (presetKind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
                 continue;
             }
@@ -422,9 +460,10 @@ public sealed class FenceWorld
         // 줄마다(위 · 아래 줄은 높이가 달라 서로 겹치지 않는다) 가로 순서를 지킨 채 겹친 것만 칩 폭 + 틈 이상으로 벌린다(무리 가운데는 제자리 평균).
         var chainIndex = chain.Keys.Select((k, i) => (k, i)).ToDictionary(t => t.k, t => t.i);
         var gap = ChipGap(sensors.Values.Where(v => chainIndex.ContainsKey(v.Key)));
+        // 위치 프리셋 센서는 벌리지 않는다 — 옆으로 밀면 기둥 · 망에서 떨어져 허공에 뜬다(헤디드 83169 · FR-22 조사 6).
         foreach (var lane in seats.GroupBy(t => t.Mount.Lane))
         {
-            var ordered = lane.Select(t => t.Key).Where(world._x.ContainsKey).OrderBy(k => world._x[k]).ThenBy(k => chainIndex[k]).ToList();
+            var ordered = lane.Select(t => t.Key).Where(k => world._x.ContainsKey(k) && !world._marks.ContainsKey(k)).OrderBy(k => world._x[k]).ThenBy(k => chainIndex[k]).ToList();
             var apart = Separate(ordered.Select(k => world._x[k]).ToList(), gap);
             for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = apart[i];
         }
@@ -447,6 +486,91 @@ public sealed class FenceWorld
 
     /// <summary>두 줄 형상에서 제어기(함체)를 펜스 끝 바깥에 두는 거리(m).</summary>
     public const double CONTROLLER_LEAD = 5;
+
+    #region - 붙임(sensor-mount-preset FR-22) -
+    private readonly Dictionary<int, FenceMountMark> _marks = new();
+
+    /// <summary>기둥 갓 높이(세계 단위 · <see cref="FenceScene.StaticLayout"/> 의 기둥 갓 h ~ h + 5).</summary>
+    public const double POST_CAP_H = 5;
+
+    /// <summary>철망 상단 레일 선이 펜스 높이에서 내려온 거리(세계 단위 · 그림의 레일 선 h − 8).</summary>
+    public const double RAIL_INSET = 8;
+
+    /// <summary>담 갓 높이(세계 단위 · 담 위 h ~ h + 7).</summary>
+    public const double WALL_CAP_H = 7;
+
+    /// <summary>위치 프리셋 센서가 붙은 물체 자리 — 프리셋으로 서지 않는 센서면 <c>null</c>.</summary>
+    public FenceMountMark? MountMarkOf(int key) => _marks.TryGetValue(key, out var m) ? m : null;
+
+    /// <summary>위치 프리셋으로 서서 물체에 붙은 센서인가 — 옆으로 벌리지 않는다.</summary>
+    public bool IsMounted(int key) => _marks.ContainsKey(key);
+
+    /// <summary>기둥에 붙은 프리셋 센서의 x(세계 단위) — 기둥 솎기가 그 기둥을 남긴다(기둥이 사라져 센서가 뜨지 않게).</summary>
+    public IEnumerable<double> PostMountXs => _marks.Values.Where(m => SensorMountResolver.KindOf(m.Anchor) == SensorAnchorKind.Post).Select(m => m.X);
+
+    /// <summary>
+    /// 자세 → 그림의 물체 위 붙는 자리(세계 단위) — <b>순수</b>. 모델 높이(m × <paramref name="vpm"/>)를 그림에 그려진 물체(기둥 갓 · 레일 선 · 메쉬 · 코일 · 담 갓)에 맞춘다.
+    /// </summary>
+    /// <param name="postTop">그 기둥의 그림 꼭대기(갓 위 · 세계 단위).</param>
+    public static (double Height, double Low, double High, FenceSeatMode Mode) SeatOf(SensorMountPose pose, FencePanelSpec spec, double postTop, double vpm)
+    {
+        ArgumentNullException.ThrowIfNull(pose);
+        ArgumentNullException.ThrowIfNull(spec);
+        var s = spec.Normalized();
+        var h = s.HeightM * vpm;
+        var t = pose.HeightM * vpm;
+        switch (pose.Anchor)
+        {
+            case SensorMountAnchor.Ground:
+                return (t, SensorMountResolver.MIN_BURIED_M * vpm, 0, FenceSeatMode.Within);
+            case SensorMountAnchor.PostTop:
+                return (postTop, postTop, postTop, FenceSeatMode.Sit);
+            case SensorMountAnchor.PostRail or SensorMountAnchor.PostMid or SensorMountAnchor.PostLow:
+                return (Math.Clamp(t, 0, postTop), 0, postTop, FenceSeatMode.Within);
+            case SensorMountAnchor.Rail:
+                return (h - RAIL_INSET, h - RAIL_INSET, h - RAIL_INSET, FenceSeatMode.Hang);
+            case SensorMountAnchor.Razor or SensorMountAnchor.RazorLoop:
+            {
+                // 모델 코일(가운데 · 반지름 m)을 그림 코일(가운데 · 반지름 세계 단위)로 옮긴다 — 코일 꼭대기 점이면 코일 위에 얹힌다
+                var sample = FenceSampleBay.FromPanel(s);
+                var cc = FenceStyleArt.CoilCenterHeight(h);
+                var r = FenceStyleArt.CoilRadius(h);
+                if (pose.HeightM >= sample.CoilTopM - SensorMountSurfaces.EPS_M) return (cc + r, cc + r, cc + r, FenceSeatMode.Sit);
+                var k = sample.CoilRadiusM > 0 ? (pose.HeightM - sample.CoilCenterM) / sample.CoilRadiusM : 0;
+                return (cc + Math.Clamp(k, -1, 1) * r, cc - r, cc + r, FenceSeatMode.Within);
+            }
+            case SensorMountAnchor.WallTop:
+                return (h + WALL_CAP_H, h + WALL_CAP_H, h + WALL_CAP_H, FenceSeatMode.Sit);
+            case SensorMountAnchor.WallFace:
+                return (Math.Clamp(t, 0, h), 0, h, FenceSeatMode.Within);
+            default:
+                return (Math.Clamp(t, RAIL_INSET, h - RAIL_INSET), RAIL_INSET, h - RAIL_INSET, FenceSeatMode.Within);
+        }
+    }
+
+    /// <summary>
+    /// 칩을 올리는 값 — <b>순수</b>. 몸(칩 좌표 <paramref name="bottom"/> ~ <paramref name="top"/>)이 붙는 높이 <paramref name="seat"/> 에 반드시 닿는다:
+    /// 얹힘 = 몸 밑이 그 높이 · 매달림 = 몸 위가 그 높이 · 그 밖 = 몸 가운데를 맞추되 몸이 물체 범위(<paramref name="low"/> ~ <paramref name="high"/>) 안에 들게.
+    /// 지상 물체면 몸이 땅을 뚫지 않는다(닿음이 먼저).
+    /// </summary>
+    public static double MountLift(FenceSeatMode mode, double seat, double low, double high, double bottom, double top)
+    {
+        double lift;
+        switch (mode)
+        {
+            case FenceSeatMode.Sit: lift = seat - bottom; break;
+            case FenceSeatMode.Hang: lift = seat - top; break;
+            default:
+                lift = seat - (bottom + top) / 2;
+                if (top - bottom <= high - low) lift = Math.Clamp(lift, low - bottom, high - top);
+                else lift = (low + high) / 2 - (bottom + top) / 2;
+                break;
+        }
+        lift = Math.Clamp(lift, seat - top, seat - bottom);                // 닿음 — 붙는 높이가 몸 범위 안
+        if (low >= 0 && bottom + lift < 0) lift = Math.Min(-bottom, seat - bottom);   // 땅을 뚫지 않게(닿음은 지킨다)
+        return lift;
+    }
+    #endregion
 
     /// <summary>그 센서 칩 몸 가운데 높이(세계 단위) — 케이블 보기의 줄 선 높이.</summary>
     public double BodyCenterOf(int key)

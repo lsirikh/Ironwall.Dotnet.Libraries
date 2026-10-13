@@ -96,6 +96,53 @@ public static class WiringPresetPlan
     }
 
     /// <summary>
+    /// <see cref="MoveTo"/> 가 요청 자리를 물체에 어떻게 붙였나(sensor-mount-preset FR-22) — 허공이면 <see cref="SensorMountAttachment.Clamped"/> · 까닭(상태 줄).
+    /// </summary>
+    public static SensorMountAttachment? MoveAttachment(SensorMountSpec mount, SensorMountPreset preset, IReadOnlyList<FencePanelSpec> panels, int bayIndex,
+                                                        double alongRatio, double heightM, double? depthM = null)
+    {
+        if (mount is null || preset is null || panels is null || panels.Count == 0) return null;
+        var bay = FenceSampleBay.FromPanel(panels[Math.Clamp(bayIndex, 0, panels.Count - 1)]);
+        var now = SensorMountResolver.Resolve(preset, mount.MountOverride, bay);
+        return SensorMountResolver.Attach(now with { AlongRatio = alongRatio, HeightM = heightM, DepthM = depthM ?? now.DepthM }, bay);
+    }
+
+    /// <summary><see cref="WithOverride"/> 가 바꾼 자세를 물체에 어떻게 붙였나(상태 줄 까닭).</summary>
+    public static SensorMountAttachment? OverrideAttachment(SensorMountSpec mount, SensorMountPreset preset, IReadOnlyList<FencePanelSpec> panels,
+                                                            Func<SensorMountPose, SensorMountPose> change)
+    {
+        if (mount is null || preset is null || change is null || panels is null || panels.Count == 0) return null;
+        var bay = FenceSampleBay.FromPanel(panels[SensorMountMigration.BayIndexOf(mount, panels.Count, preset.AlongRatio)]);
+        return SensorMountResolver.Attach(change(SensorMountResolver.Resolve(preset, mount.MountOverride, bay)), bay);
+    }
+
+    /// <summary>
+    /// 저장된 자리(프리셋 + 따로 고친 값)가 허공이었나 — 열 때 가까운 물체로 보정해 그리고(서버 · DB 엔 몰래 쓰지 않는다) 그 까닭을 "바뀜" 칸에 보인다.
+    /// 붙어 있었으면 <c>null</c>.
+    /// </summary>
+    public static string? CorrectionOf(SensorMountSpec? mount, SensorMountPreset? preset, IReadOnlyList<FencePanelSpec> panels)
+    {
+        if (mount is not { HasMountPreset: true } || preset is null || panels is null || panels.Count == 0) return null;
+        var bay = FenceSampleBay.FromPanel(panels[SensorMountMigration.BayIndexOf(mount, panels.Count, preset.AlongRatio)]);
+        var att = SensorMountResolver.ResolveAttached(preset, mount.MountOverride, bay);
+        return att.Clamped ? att.Reason : null;
+    }
+
+    /// <summary>
+    /// 저장할 때 따로 고친 값을 물체에 붙은 값으로 다시 적는다(FR-22 저장 막기) — 허공 값(옛 값 · 손으로 고친 문서)은 붙은 자리의 차이로 바뀐다.
+    /// 프리셋을 모르거나 고친 값이 없으면 그대로.
+    /// </summary>
+    public static SensorMountSpec NormalizeOverride(SensorMountSpec mount, SensorMountPreset? preset, IReadOnlyList<FencePanelSpec> panels)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        if (preset is null || mount.MountOverride is not { IsEmpty: false } || panels is null || panels.Count == 0) return mount;
+        var bay = FenceSampleBay.FromPanel(panels[SensorMountMigration.BayIndexOf(mount, panels.Count, preset.AlongRatio)]);
+        var att = SensorMountResolver.ResolveAttached(preset, mount.MountOverride, bay);
+        if (!att.Clamped) return mount;
+        return mount with { MountOverride = SensorMountResolver.Diff(preset, att.Pose, bay) };
+    }
+
+    /// <summary>
     /// 칸 하나의 붙는 점과 붙을 수 있나 — 모델이 허용하는 갈래이고, 지중 프리셋이면 바닥 점만 · 그 밖이면 바닥 점 빼고
     /// (따로 고친 값은 붙는 곳 갈래를 바꾸지 못한다 — 갈래를 바꾸려면 다른 프리셋을 고른다).
     /// </summary>
