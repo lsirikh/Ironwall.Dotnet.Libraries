@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+﻿using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.Fence;
+using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
 using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using System;
 using System.Globalization;
@@ -289,15 +290,24 @@ public sealed class MountBayCanvas : FrameworkElement, IDialogDragSource
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
         base.OnPreviewMouseDown(e);
-        if (e.ChangedButton != MouseButton.Left || Editor is not { } vm || IsPreview3D) return;
+        if (e.ChangedButton != MouseButton.Left) return;
+        if (PressAt(e.GetPosition(this))) e.Handled = true;
+    }
+
+    /// <summary>왼쪽 누름(그림 좌표) — 포커스 · 아이콘/손잡이면 캡처. 참 = 누름을 잡았다(시험이 이 길로 부른다).</summary>
+    internal bool PressAt(Point at)
+    {
+        if (Editor is not { } vm || IsPreview3D) return false;
         Focus();
         var p = Projection(vm);
-        var at = e.GetPosition(this);
         var pose = vm.Pose;
         var c = p.ToScreen(pose.AlongM, pose.HeightM, pose.DepthM);
         var handle = View == MountView.Top ? HandleEnd(p, pose) : View == MountView.Side ? TiltEnd(p, pose) : (Point?)null;
-        if (handle is { } h && (h - at).Length <= 9) { _rotating = true; CaptureMouse(); e.Handled = true; return; }
-        if ((c - at).Length <= 22) { _pressed = at; CaptureMouse(); e.Handled = true; }
+        if (handle is { } h && (h - at).Length <= 9) { _rotating = true; CaptureMouse(); return true; }
+        if ((c - at).Length > 22) return false;
+        _pressed = at;
+        CaptureMouse();
+        return true;
     }
 
     /// <summary>
@@ -324,8 +334,11 @@ public sealed class MountBayCanvas : FrameworkElement, IDialogDragSource
         InvalidateVisual();
     }
 
-    /// <summary>끄는 중인가 — 대화창 틀이 읽고 Esc 를 닫기로 먹지 않는다(<see cref="IDialogDragSource"/> · MNT-R28-211).</summary>
-    public bool IsDragging => _dragging || Editor?.IsDragging == true;
+    /// <summary>
+    /// 아이콘 · 손잡이를 누르고 있거나 끄는 중인가 — 대화창 틀이 읽고 Esc 를 닫기로 먹지 않는다(<see cref="IDialogDragSource"/> · MNT-R28-211).
+    /// 누른 채 데드존(8 px) 안이면 아직 끌기가 아니지만 사람은 잡고 있다 — 실창 3회차: 아이콘 옆 5 px 의 붙는 점으로 끈 채 Esc 를 누르자 편집기가 닫혔다.
+    /// </summary>
+    public bool IsDragging => _pressed is not null || _rotating || _dragging || Editor?.IsDragging == true;
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
@@ -384,15 +397,18 @@ public sealed class MountBayCanvas : FrameworkElement, IDialogDragSource
         base.OnPreviewKeyDown(e);
         if (Editor is not { } vm || IsPreview3D) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        // NumLock 가짜 Shift 떼기까지 본다 — Keyboard.Modifiers 만 보면 Shift+↓ 가 10 cm 로 갔다(MNT-R28-216 실창)
+        var shift = FenceKeyModifiers.Of(e).HasFlag(ModifierKeys.Shift);
         switch (key)
         {
             case Key.Escape:
-                // 끄는 중일 때만 소비 — 틀(ConsoleDialogFrame)은 캡처가 안쪽에 있으면 Esc 를 닫기로 먹지 않고 여기로 흘려보낸다(MNT-R28-211)
-                if (_dragging || vm.IsDragging)
+                // 누르고 있거나 끄는 중일 때만 소비 — 틀(ConsoleDialogFrame)은 그때 Esc 를 닫기로 먹지 않고 여기로 흘려보낸다(MNT-R28-211)
+                if (IsDragging)
                 {
+                    if (_pressed is not null && !vm.IsDragging) vm.BeginDrag();     // 데드존 안 누름도 같은 끝맺음("원래 자리로")
                     _dragging = false;
                     _pressed = null;
+                    _rotating = false;
                     vm.CancelDrag();
                     if (IsMouseCaptured) ReleaseMouseCapture();
                     e.Handled = true;
@@ -407,6 +423,13 @@ public sealed class MountBayCanvas : FrameworkElement, IDialogDragSource
             case Key.Up: vm.Nudge(0, 1, shift); e.Handled = true; break;
             case Key.Down: vm.Nudge(0, -1, shift); e.Handled = true; break;
         }
+    }
+
+    /// <summary>Shift 떼기 시각을 적는다 — NumLock 가짜 Shift 떼기 판정(<see cref="FenceKeyModifiers.NoteKeyUp"/> · MNT-R28-216).</summary>
+    protected override void OnPreviewKeyUp(KeyEventArgs e)
+    {
+        base.OnPreviewKeyUp(e);
+        FenceKeyModifiers.NoteKeyUp(e);
     }
     #endregion
 }
