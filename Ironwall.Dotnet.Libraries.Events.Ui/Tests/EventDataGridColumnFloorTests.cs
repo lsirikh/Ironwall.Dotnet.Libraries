@@ -61,10 +61,11 @@ public class EventDataGridColumnFloorTests
         // Act
         var columns = ExtractColumnFloors(xaml).ToList();
 
-        // Assert — 5개 탐지/장애/연결/운영/조치 그리드를 합쳐 32개 열이 있다(2026-10-03 운영 그리드 6열 추가).
+        // Assert — 5개 탐지/장애/연결/운영/조치 그리드를 합쳐 34개 열이 있다(2026-10-03 운영 그리드 6열 추가,
+        // 2026-10-13 운영 조치보고(operation-event-card v1.1)로 운영 그리드에 손잡이 · 조치 2열 추가).
         // U-18: 탐지 그리드의 장비 별 열 바닥은 140 이 아니라 120 이다(고정 합 954 가 1340 표면을 넘어 폭을 줄이고 덜 중요한 열은 접는다) —
         // 별 열은 그리드마다 하나(반올림이 쌓이면 2px 가로 스크롤이 선다), 바닥은 값이 한 줄로 읽히는 폭(80 이상)이다.
-        Assert.Equal(32, columns.Count);
+        Assert.Equal(34, columns.Count);
         var starColumns = columns.Where(c => c.Width.EndsWith("*", StringComparison.Ordinal)).ToList();
         Assert.Equal(5, starColumns.Count);
         foreach (var (width, minWidth) in columns)

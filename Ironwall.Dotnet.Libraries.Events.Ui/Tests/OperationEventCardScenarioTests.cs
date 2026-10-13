@@ -180,8 +180,9 @@ public class OperationEventCardScenarioTests
 
     [Fact]
     [Trait("Scenario", "OPC-011")]
-    public async Task should_clear_operation_card_without_server_action_when_batch_report_runs()
+    public async Task should_report_operation_card_to_server_too_when_batch_report_runs()
     {
+        // v1.1 — 서버 FR-07: 운영도 조치 대상이라 [전체 조치보고] 가 운영 카드에도 서버 조치를 만든다(v1.0 은 치우기만 했다).
         using var rig = new EventMapRig();
         rig.Sensor(1611);
         rig.Device(1612, EnumDeviceType.Gate);
@@ -191,7 +192,7 @@ public class OperationEventCardScenarioTests
 
         await rig.Panel.ExecuteBatchReportAsync();
 
-        Assert.Equal(new[] { detection }, rig.ServerActions);   // 탐지만 서버 조치
+        Assert.Equal(new[] { detection, detection }, rig.ServerActions.OrderBy(i => i));   // 운영 · 탐지 각각 한 건
         Assert.Empty(rig.Panel.ViewModelProvider);
     }
 
@@ -228,7 +229,7 @@ public class OperationEventCardScenarioTests
 
     [Fact]
     [Trait("Scenario", "OPC-014")]
-    public async Task should_mark_operation_card_and_close_button_and_offer_no_report_button()
+    public async Task should_mark_operation_card_with_report_and_close_buttons()
     {
         using var rig = new EventMapRig();
         rig.Device(1615, EnumDeviceType.Gate);
@@ -236,14 +237,17 @@ public class OperationEventCardScenarioTests
 
         Assert.Equal("Events.Card.Operation.52", card.AutomationKey);
         Assert.Equal("Events.Card.Operation.52.Close", card.CloseAutomationKey);
+        Assert.Equal("Events.Card.Operation.52.Report", card.ReportAutomationKey);
 
         var xaml = OperationCardXaml();
         Assert.Contains("AutomationProperties.AutomationId=\"{Binding AutomationKey, Mode=OneWay}\"", xaml);
         Assert.Contains("AutomationProperties.AutomationId=\"{Binding CloseAutomationKey, Mode=OneWay}\"", xaml);
         Assert.Contains("[Action OnButtonCloseCard($source, $eventArgs)]", xaml);
-        Assert.DoesNotContain("ReportAutomationKey", xaml);   // 조치보고 단추 없음(PRD §3)
-        Assert.DoesNotContain("OnButtonAction", xaml);
-        foreach (var kind in new[] { "InformationOutline", "DoorOpen", "AlertOutline", "Close" })
+        // v1.1 — 조치보고 단추가 생겼다(서버가 운영 조치를 받는 판본에서만 보인다).
+        Assert.Contains("AutomationProperties.AutomationId=\"{Binding ReportAutomationKey, Mode=OneWay}\"", xaml);
+        Assert.Contains("[Action OnButtonAction($source, $eventArgs)]", xaml);
+        Assert.Contains("Visibility=\"{Binding IsReportSupported, Mode=OneWay, Converter={StaticResource BoolToVis}}\"", xaml);
+        foreach (var kind in new[] { "InformationOutline", "DoorOpen", "AlertOutline", "Close", "CommentOutline" })
             Assert.True(Enum.TryParse<PackIconKind>(kind, out _), kind);
     }
 

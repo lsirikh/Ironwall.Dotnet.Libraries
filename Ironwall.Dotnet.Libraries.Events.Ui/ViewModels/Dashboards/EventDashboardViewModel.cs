@@ -48,6 +48,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 public class EventDashboardViewModel : BasePanelViewModel
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel>
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.MalfunctionReportedMessageModel>
+                                     , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.OperationReportedMessageModel>
                                      , IHandle<CallCloseEventConsoleMessageModel>
                                      , IHandle<ActionReportTemplatesChangedMessage>
                                      , IHandle<Ironwall.Dotnet.Libraries.Events.Ui.Models.RemoteActionReportedMessage>
@@ -690,8 +691,8 @@ public class EventDashboardViewModel : BasePanelViewModel
     public bool IsOperationRail => _railKey == OperationRailKey && OperationPanelViewModel is not null;
     public bool IsActionRail => _railKey == ActionRailKey;
 
-    /// <summary>탐지 · 장애에서만 핸들을 끌 수 있다 — 연결 · 조치는 조치보고 원본이 아니다.</summary>
-    public bool CanDragToTray => _railKey is DetectionRailKey or MalfunctionRailKey && CanReport;
+    /// <summary>탐지 · 장애 · 운영에서만 핸들을 끌 수 있다 — 연결 · 조치는 조치보고 원본이 아니다(운영은 서버 FR-07 로 조치 대상).</summary>
+    public bool CanDragToTray => _railKey is DetectionRailKey or MalfunctionRailKey or OperationRailKey && CanReport;
 
     /// <summary>
     /// 트레이를 보일 것인가 — <b>담은 것이 있으면 어느 레일에서든 보인다</b>(N-07 R7).
@@ -702,7 +703,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     /// <summary>끌 수 없는 레일에서는 줄이진 요약만 보인다.</summary>
     public bool IsTrayCollapsed => !CanDragToTray && Tray.HasEntries;
 
-    public string TraySummaryText => $"조치 트레이에 {Tray.Count}건이 있습니다. 탐지 · 장애 내역에서 [조치 적용]을 누르세요.";
+    public string TraySummaryText => $"조치 트레이에 {Tray.Count}건이 있습니다. 탐지 · 장애 · 운영 내역에서 [조치 적용]을 누르세요.";
 
     public string ListStatusText
     {
@@ -1270,6 +1271,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         {
             DetectionEventViewModel => DetectionPanelViewModel.ReportCommand,
             MalfunctionEventViewModel => MalfunctionPanelViewModel.ReportCommand,
+            OperationEventViewModel => OperationPanelViewModel?.ReportCommand,
             _ => null,
         };
         if (command?.CanExecute(row) == true) command.Execute(row);
@@ -1504,6 +1506,13 @@ public class EventDashboardViewModel : BasePanelViewModel
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc cref="HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.DetectionReportedMessageModel, CancellationToken)"/>
+    public Task HandleAsync(Ironwall.Dotnet.Libraries.Events.Ui.Models.OperationReportedMessageModel message, CancellationToken cancellationToken)
+    {
+        OnReported(message.ViewModel?.Model?.Id, ActionTrayDrop.KindOperation);
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// 다른 GIS · 운영자가 조치했다(원격 ACTION_REPORT — 카드 목록이 알린다). 서버는 조치 뒤 SYNC_DETECTION 을 내지 않으므로
     /// 이 알림이 콘솔이 아는 유일한 길이다 — 목록에 그 행이 있으면 '조치됨' 으로 두고 로컬 보고와 같은 길로 다시 그린다
@@ -1513,9 +1522,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         if (message is null || message.EventId <= 0) return Task.CompletedTask;
         if (message.DeletedOnServer) return Task.CompletedTask;   // 조치가 아니라 서버 삭제 — '조치됨' 으로 두지 않는다
-        var kind = message.Kind == ActionTrayDrop.KindMalfunction ? ActionTrayDrop.KindMalfunction
-                 : message.Kind == ActionTrayDrop.KindDetection ? ActionTrayDrop.KindDetection
-                 : null;
+        var kind = ActionTrayDrop.IsReportableKind(message.Kind) ? message.Kind : null;
         if (kind is null) return Task.CompletedTask;
 
         var candidate = new ActionTrayCandidate(message.EventId, kind, string.Empty, true);
@@ -1534,7 +1541,12 @@ public class EventDashboardViewModel : BasePanelViewModel
         var candidate = new ActionTrayCandidate(id, kind, string.Empty, true);
         FindOriginRow(candidate)?.Refresh();
         if (SelectedRows.Count == 1 && SelectedRows[0] is ExEventViewModel ex && ex.Model?.Id == id
-            && (kind == ActionTrayDrop.KindDetection ? ex is DetectionEventViewModel : ex is MalfunctionEventViewModel))
+            && kind switch
+            {
+                ActionTrayDrop.KindDetection => ex is DetectionEventViewModel,
+                ActionTrayDrop.KindOperation => ex is OperationEventViewModel,
+                _ => ex is MalfunctionEventViewModel,
+            })
             RefreshDetailAfterReport();
         RefreshRailCounts();
         RaiseListState();
@@ -1561,6 +1573,11 @@ public class EventDashboardViewModel : BasePanelViewModel
         {
             detectionCard = new DetectionEventCardViewModel(_eventAggregator, _log!, (IDetectionEventModel)model);
             result = await detectionCard.SendActionDetailed(content, user, token).ConfigureAwait(true);
+        }
+        else if (candidate.Kind == ActionTrayDrop.KindOperation)
+        {
+            result = await new OperationEventCardViewModel(_eventAggregator, _log!, (Ironwall.Dotnet.Libraries.Events.Ui.Models.OperationEventModel)model)
+                .SendActionDetailed(content, user, token).ConfigureAwait(true);
         }
         else
         {
@@ -1665,6 +1682,10 @@ public class EventDashboardViewModel : BasePanelViewModel
             return DetectionPanelViewModel.ViewModelProvider
                 .FirstOrDefault(r => r.Model?.Id == candidate.EventId)?.Model as IExEventModel;
 
+        if (candidate.Kind == ActionTrayDrop.KindOperation)
+            return OperationPanelViewModel?.ViewModelProvider
+                .FirstOrDefault(r => r.Model?.Id == candidate.EventId)?.Operation;
+
         return MalfunctionPanelViewModel.ViewModelProvider
             .FirstOrDefault(r => r.Model?.Id == candidate.EventId)?.Model as IExEventModel;
     }
@@ -1673,6 +1694,8 @@ public class EventDashboardViewModel : BasePanelViewModel
     private Caliburn.Micro.PropertyChangedBase? FindOriginRow(ActionTrayCandidate candidate)
         => candidate.Kind == ActionTrayDrop.KindDetection
             ? DetectionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == candidate.EventId) as Caliburn.Micro.PropertyChangedBase
+            : candidate.Kind == ActionTrayDrop.KindOperation
+            ? OperationPanelViewModel?.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == candidate.EventId) as Caliburn.Micro.PropertyChangedBase
             : MalfunctionPanelViewModel.ViewModelProvider.FirstOrDefault(r => r.Model?.Id == candidate.EventId) as Caliburn.Micro.PropertyChangedBase;
 
     private string ResolveUserName()
@@ -1706,6 +1729,7 @@ public class EventDashboardViewModel : BasePanelViewModel
     {
         MalfunctionRailKey => MalfunctionPanelViewModel.CanReportRow,
         DetectionRailKey => DetectionPanelViewModel.CanReportRow,
+        OperationRailKey => OperationPanelViewModel?.CanReportRow ?? false,
         _ => false,
     };
     #endregion

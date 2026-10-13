@@ -33,7 +33,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 /// </summary>
 /// <remarks>
 /// 운영 이벤트(<c>GET /api/events/operations</c>)는 API 만 있고 어느 창도 쓰지 않았다 — '운영' 레일을 새로 세웠다.
-/// 운영은 서버가 스스로 만드는 기록이라 조회 전용이다(추가 · 저장 · 삭제 · 조치보고 없음).
+/// 운영은 서버가 스스로 만드는 기록이라 추가 · 저장 · 삭제가 없다. 조치보고는 한다(operation-event-card PRD v1.1).
 /// </remarks>
 [Collection("IoC-Dependent")]
 public class EventConsoleFourKindsTests : IDisposable
@@ -244,12 +244,13 @@ public class EventConsoleFourKindsTests : IDisposable
         Assert.Equal("previous=CLOSED · gate_status=OPEN", FieldText(console, "상세"));
         Assert.All(console.DetailView.Sections.SelectMany(s => s.Fields), f => Assert.False(f.IsEditable));
 
-        // 조회 전용 — 고치기 · 지우기 · 조치보고 · 트레이 끌기가 모두 꺼져 있다.
+        // 기록은 고치지도 지우지도 않는다. 조치보고 · 트레이 끌기는 켜져 있다(operation-event-card PRD v1.1 — 서버 FR-07).
         Assert.False(console.CanEdit);
         Assert.False(console.CanDelete);
-        Assert.False(console.CanReport);
-        Assert.False(console.CanDragToTray);
-        Assert.False(console.DetailView.CanShowReport);
+        Assert.True(console.CanReport);
+        Assert.True(console.CanDragToTray);
+        Assert.True(console.DetailView.CanShowReport);
+        Assert.True(console.DetailView.ShowReportAction);
     }
 
     [Theory]

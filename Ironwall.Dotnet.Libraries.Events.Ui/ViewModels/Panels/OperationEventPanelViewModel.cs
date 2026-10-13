@@ -1,7 +1,12 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
@@ -17,8 +22,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 /// 운영 이벤트 목록(이벤트 콘솔 '운영' 레일) — 함체 · 통문 개폐와 함체 환경 임계 경보를 기간으로 조회한다.
 /// </summary>
 /// <remarks>
-/// <para><b>조회 전용</b>이다. 운영 이벤트는 서버가 매니저 보고로 스스로 만든다 — 추가 · 저장 · 삭제 경로를 두지 않는다
-/// (<c>OperationEventDto</c> 주석: 클라가 POST 하면 같은 사건이 2건이 된다. API 에도 DELETE 가 없다).</para>
+/// <para>이벤트 자체는 <b>조회 전용</b>이다. 운영 이벤트는 서버가 매니저 보고로 스스로 만든다 — 추가 · 저장 · 삭제 경로를 두지 않는다
+/// (<c>OperationEventDto</c> 주석: 클라가 POST 하면 같은 사건이 2건이 된다. API 에도 DELETE 가 없다).
+/// 조치보고는 한다(<see cref="ReportCommand"/> — 서버 FR-07, operation-event-card PRD v1.1).</para>
 /// <para>서버 7.0 미만(운영 6.3.2)에는 경로가 없다 — 오류 팝업 대신 빈 목록과 <see cref="UnsupportedNotice"/> 를 보인다.</para>
 /// <para>조회 · 쪽 넘김 · 기간 캐시 · 쪽 겹침 중복 제거는 연결 목록(<see cref="ConnectionEventPanelViewModel"/>)과 같은 규칙이다.</para>
 /// </remarks>
@@ -31,7 +37,40 @@ public class OperationEventPanelViewModel : BaseDataGridMultiPanelViewModel<Oper
     {
         _providerService = providerService ?? throw new ArgumentNullException(nameof(providerService));
         LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
+        ReportCommand = new SimpleParamCommand(ReportRowAsync);
     }
+
+    #region - 조치보고 (operation-event-card PRD v1.1 §3 — 서버 FR-07: 운영 이벤트도 조치 대상) -
+    /// <summary>조치보고 = 서버 events:edit — 탐지 · 장애 행과 같은 규칙(ActionReportRules).</summary>
+    public bool CanReportRow => ActionReportRules.CanReport(ResolvePermissionService());
+
+    /// <summary>행 우클릭 · 상세 [조치보고] — 탐지 · 장애 행과 같은 길(행과 독립된 임시 카드 → 조치보고 창).</summary>
+    public ICommand ReportCommand { get; }
+
+    private async Task ReportRowAsync(object? param)
+    {
+        if (!CanReportRow)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = ActionReportRules.NO_PERMISSION_TEXT
+            });
+            return;
+        }
+        if (param is not OperationEventViewModel { Operation.Id: > 0 } row) return;
+
+        var card = new OperationEventCardViewModel(_eventAggregator, _log, row.Operation);
+        IoC.Get<OperationReportDialogViewModel>().UpdateData(card, IoC.Get<IAccountModel>());
+        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenEventReportDialogMessageModel { EventType = OperationReportDialogViewModel.EventType });
+    }
+
+    private static IPermissionService? ResolvePermissionService()
+    {
+        try { return IoC.Get<IPermissionService>(); }
+        catch { return null; }
+    }
+    #endregion
 
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
