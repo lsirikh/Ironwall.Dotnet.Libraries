@@ -203,6 +203,43 @@ public partial class WiringView : UserControl
 
     private void OnMountOffsetLostFocus(object sender, KeyboardFocusChangedEventArgs e) => ViewModel?.ApplyMountOffset();
 
+    #region - 설치 위치 프리셋(sensor-mount-preset W4) -
+    private void OnPresetFieldKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || ViewModel is not { } vm) return;
+        ApplyPresetField(vm, sender);
+        e.Handled = true;
+    }
+
+    private void OnPresetFieldLostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (ViewModel is { } vm) ApplyPresetField(vm, sender);
+    }
+
+    private static void ApplyPresetField(WiringViewModel vm, object sender)
+    {
+        if ((sender as FrameworkElement)?.Tag as string == "yaw") vm.ApplyPresetYaw();
+        else vm.ApplyPresetHeight();
+    }
+
+    private void OnPresetReset(object sender, RoutedEventArgs e) => ViewModel?.ResetMountToPreset();
+
+    private async void OnPresetSaveNew(object sender, RoutedEventArgs e)
+    {
+        try { if (ViewModel is { } vm) await vm.SaveMountAsNewPresetAsync(); } catch { /* 안내는 상태줄 — 창은 그대로 */ }
+    }
+
+    private async void OnPresetApply(object sender, RoutedEventArgs e)
+    {
+        try { if (ViewModel is { } vm) await vm.OpenApplyPresetAsync(); } catch { /* 같다 */ }
+    }
+
+    private async void OnPresetManage(object sender, RoutedEventArgs e)
+    {
+        try { if (ViewModel is { } vm) await vm.OpenPresetManagerAsync(); } catch { /* 같다 */ }
+    }
+    #endregion
+
     private void OnMountPanelPrev(object sender, RoutedEventArgs e) => ViewModel?.FenceMoveSelectedToPreviousPanel();
 
     private void OnMountRaise(object sender, RoutedEventArgs e) => ViewModel?.FenceRaiseSelected();

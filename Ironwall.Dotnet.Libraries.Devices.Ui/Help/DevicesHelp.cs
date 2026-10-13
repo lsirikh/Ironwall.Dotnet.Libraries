@@ -19,7 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Help;
 public static partial class DevicesHelp
 {
     public static IReadOnlyList<HelpEntry> Entries { get; } =
-        WiringEntries().Concat(AssemblyEntries()).Concat(ConsoleEntries()).Concat(CameraEntries()).ToArray();
+        WiringEntries().Concat(AssemblyEntries()).Concat(ConsoleEntries()).Concat(CameraEntries()).Concat(SensorPresetEntries()).ToArray();
 
 #pragma warning disable CA2255 // 라이브러리의 모듈 초기화 — 의도적: 설명 목록은 이 어셈블리의 뷰보다 먼저 있어야 하고 DI 와 무관해야 한다.
     [ModuleInitializer]

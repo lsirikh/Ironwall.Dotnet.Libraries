@@ -1,0 +1,48 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.PresetSaveConfirmView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		프리셋 저장 확인(sensor-mount-preset W5 · FR-12) — 쓰는 센서가 있을 때만. 첫 포커스는 [취소](틀의 파괴적이지 않은 쪽) — Enter 실수로 아무 일도 없다.
+	-->
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.SensorPresets.SaveConfirm"
+		Message="{Binding KeepText}"
+		PrimaryAutomationId="Devices.SensorPresets.SaveConfirm.Save"
+		PrimaryInvoked="OnSave"
+		PrimaryText="저장"
+		SecondaryAutomationId="Devices.SensorPresets.SaveConfirm.Cancel"
+		SecondaryInvoked="OnCancel"
+		SecondaryText="취소"
+		Size="Small"
+		Title="프리셋 저장">
+		<dlg:ConsoleDialogFrame.FooterExtra>
+			<Button
+				AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.SaveAsNew"
+				Click="OnSaveAsNew"
+				Content="새 프리셋으로 저장"
+				Style="{DynamicResource Console.Button}" />
+		</dlg:ConsoleDialogFrame.FooterExtra>
+		<StackPanel>
+			<TextBlock AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Message" FontWeight="SemiBold" Text="{Binding Message}" TextWrapping="Wrap" />
+			<ItemsControl Margin="0,8,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Chips" ItemsSource="{Binding Chips}">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<WrapPanel />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border Margin="0,0,6,6" Padding="7,1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9">
+							<TextBlock FontSize="11" Text="{Binding}" />
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>

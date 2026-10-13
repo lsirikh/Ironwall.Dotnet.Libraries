@@ -44,6 +44,12 @@ public class GMapDbModule : Module
             //   장비 콘솔(Devices.Ui)의 결선 창이 Lazy<IFenceLayoutStore> 로 받는다 — 이 모듈이 없으면 로컬 저장 칸만 숨는다.
             builder.RegisterType<FenceLayoutStore>().As<Ironwall.Dotnet.Monitoring.Models.Fences.IFenceLayoutStore>()
                 .SingleInstance();
+            // 센서 설치 위치 · 속성 프리셋(sensor-mount-preset D1 · D5) — 같은 로컬 DB · 부팅 경로 밖. 결선 창 · 센서 모델 창이 Lazy 로 받는다.
+            //   GOP API 저장소는 자리만(NotSupported) — 설정 SensorPresets.Source 가 생기면 여기서 고른다.
+            builder.RegisterType<GisDbSensorPresetRepository>()
+                .As<Ironwall.Dotnet.Monitoring.Models.Fences.Presets.ISensorPresetRepository>()
+                .As<Ironwall.Dotnet.Monitoring.Models.Fences.Presets.ISensorPresetUsageSource>()
+                .SingleInstance();
         }
         catch
         {

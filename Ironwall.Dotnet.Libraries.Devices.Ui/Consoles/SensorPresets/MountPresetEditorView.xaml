@@ -1,0 +1,188 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.MountPresetEditorView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:dlg="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:sp="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		위치 프리셋 편집기(sensor-mount-preset W2) — 왼쪽 = 세 방향 그림(위 · 3D 미리보기 / 앞 · 옆), 오른쪽 = 수치 칸.
+		설명은 머리의 "?"(Devices.SensorPresets.MountEditor). 저장 전 확인(W5)은 뷰모델이 띄운다.
+	-->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="SpBoolToVisibility" />
+	</UserControl.Resources>
+	<dlg:ConsoleDialogFrame
+		Backdrop="{DynamicResource BgBrush}"
+		DialogKey="Devices.SensorPresets.MountEditor"
+		HelpKey="Devices.SensorPresets.MountEditor"
+		Kind="{Binding Model.Name}"
+		Message="{Binding StatusText}"
+		PrimaryAutomationId="Devices.SensorPresets.MountEditor.Save"
+		PrimaryInvoked="OnSave"
+		PrimaryText="저장"
+		SecondaryAutomationId="Devices.SensorPresets.MountEditor.Close"
+		SecondaryInvoked="OnClose"
+		SecondaryText="닫기"
+		Size="Large"
+		Title="위치 프리셋 편집">
+		<dlg:ConsoleDialogFrame.FooterExtra>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock
+					Margin="0,0,8,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Changes"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Text="{Binding ChangeText}" />
+				<Button
+					Margin="0,0,6,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Revert"
+					Click="OnRevert"
+					Content="되돌리기"
+					Style="{DynamicResource Console.Button}" />
+				<Button
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.SaveAsNew"
+					Click="OnSaveAsNew"
+					Content="새 프리셋으로 저장"
+					Style="{DynamicResource Console.Button}" />
+			</StackPanel>
+		</dlg:ConsoleDialogFrame.FooterExtra>
+		<DockPanel>
+			<!--  샘플 조건(FR-04)  -->
+			<WrapPanel Margin="0,0,0,8" DockPanel.Dock="Top">
+				<TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="이름" />
+				<TextBox
+					Width="260"
+					Margin="0,0,6,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Name"
+					AutomationProperties.Name="프리셋 이름"
+					Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+				<Button
+					Margin="0,0,12,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.SuggestName"
+					Click="OnSuggestName"
+					Content="이름 제안"
+					Style="{DynamicResource Console.Button}" />
+				<TextBlock
+					Margin="0,0,12,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Usage"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Text="{Binding UsageText}" />
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="칸 폭 (m)" />
+				<TextBox
+					Width="50"
+					Margin="0,0,8,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.PanelWidth"
+					AutomationProperties.Name="칸 폭"
+					Text="{Binding PanelWidthM, UpdateSourceTrigger=LostFocus}" />
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="펜스 높이 (m)" />
+				<TextBox
+					Width="50"
+					Margin="0,0,8,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FenceHeight"
+					AutomationProperties.Name="펜스 높이"
+					Text="{Binding FenceHeightM, UpdateSourceTrigger=LostFocus}" />
+				<CheckBox
+					Margin="0,0,8,0"
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Razor"
+					Content="철조망 있음"
+					IsChecked="{Binding HasRazor}" />
+				<CheckBox
+					VerticalAlignment="Center"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Wall"
+					Content="담(벽)"
+					IsChecked="{Binding IsWall}" />
+			</WrapPanel>
+
+			<!--  수치 칸(FR-07 · FR-09) — 끌기의 키보드 대안  -->
+			<StackPanel Width="210" Margin="10,0,0,0" DockPanel.Dock="Right" KeyDown="OnFieldKey" LostKeyboardFocus="OnFieldLostFocus">
+				<TextBlock FontWeight="SemiBold" Text="붙는 곳" />
+				<TextBlock Margin="0,2,0,6" AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Snap" Text="{Binding SnapText}" />
+				<TextBlock FontWeight="SemiBold" Text="자리" />
+				<TextBlock Margin="0,4,0,0" Text="칸 안 가로 (%)" />
+				<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Along" AutomationProperties.Name="칸 안 가로" Text="{Binding AlongPercentText, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Margin="0,4,0,0" Text="높이 (m)" />
+				<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Height" AutomationProperties.Name="높이" Text="{Binding HeightText, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Margin="0,4,0,0" Text="펜스에서 떨어진 거리 (m · 밖 −)" />
+				<DockPanel>
+					<TextBlock Margin="6,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Right" Text="{Binding DepthSideText}" />
+					<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Depth" AutomationProperties.Name="펜스에서 떨어진 거리" Text="{Binding DepthText, UpdateSourceTrigger=PropertyChanged}" />
+				</DockPanel>
+				<TextBlock Margin="0,4,0,0" Text="브래킷 (m)" />
+				<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Bracket" AutomationProperties.Name="브래킷" Text="{Binding BracketText, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Text="방향" />
+				<TextBlock Margin="0,4,0,0" Text="바라보는 방향 (°)" />
+				<DockPanel>
+					<TextBlock Margin="6,0,0,0" VerticalAlignment="Center" DockPanel.Dock="Right" Text="{Binding FacingText}" />
+					<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Yaw" AutomationProperties.Name="바라보는 방향" Text="{Binding YawText, UpdateSourceTrigger=PropertyChanged}" />
+				</DockPanel>
+				<WrapPanel Margin="0,4,0,0">
+					<Button Margin="0,0,4,4" AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FaceAlong" Click="OnFaceAlong" Content="펜스 따라 보기" Style="{DynamicResource Console.Button}" />
+					<Button Margin="0,0,4,4" AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FaceOutward" Click="OnFaceOutward" Content="바깥쪽 정면 보기" Style="{DynamicResource Console.Button}" />
+					<Button Margin="0,0,4,4" AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FaceInward" Click="OnFaceInward" Content="안쪽 정면 보기" Style="{DynamicResource Console.Button}" />
+				</WrapPanel>
+				<TextBlock Margin="0,4,0,0" Text="위아래 각도 (° · 아래로 −)" />
+				<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Tilt" AutomationProperties.Name="위아래 각도" Text="{Binding TiltText, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+
+			<!--  세 방향 그림 + 3D 미리보기(FR-08 · FR-10) — 같은 센서 하나  -->
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="1.4*" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="*" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+				<Border Margin="0,0,4,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+					<DockPanel>
+						<TextBlock Margin="6,2" DockPanel.Dock="Top" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="위에서 본 모습" />
+						<sp:MountBayCanvas
+							MinHeight="140"
+							AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.TopView"
+							AutomationProperties.Name="위에서 본 모습"
+							Editor="{Binding}"
+							View="Top" />
+					</DockPanel>
+				</Border>
+				<Border Grid.Column="1" Margin="4,0,0,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+					<DockPanel>
+						<TextBlock Margin="6,2" DockPanel.Dock="Top" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="3D 미리보기 · 결선맵과 같은 계산" />
+						<sp:MountBayCanvas
+							MinHeight="140"
+							AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Preview3D"
+							AutomationProperties.Name="3D 미리보기"
+							Editor="{Binding}"
+							IsPreview3D="True" />
+					</DockPanel>
+				</Border>
+				<Border Grid.Row="1" Margin="0,4,4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+					<DockPanel>
+						<TextBlock Margin="6,2" DockPanel.Dock="Top" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="앞에서 본 모습" />
+						<sp:MountBayCanvas
+							MinHeight="180"
+							AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FrontView"
+							AutomationProperties.Name="앞에서 본 모습"
+							Editor="{Binding}"
+							View="Front" />
+					</DockPanel>
+				</Border>
+				<Border Grid.Row="1" Grid.Column="1" Margin="4,4,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+					<DockPanel>
+						<TextBlock Margin="6,2" DockPanel.Dock="Top" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="옆에서 본 모습(펜스 줄 방향)" />
+						<sp:MountBayCanvas
+							MinHeight="180"
+							AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.SideView"
+							AutomationProperties.Name="옆에서 본 모습"
+							Editor="{Binding}"
+							View="Side" />
+					</DockPanel>
+				</Border>
+			</Grid>
+		</DockPanel>
+	</dlg:ConsoleDialogFrame>
+</UserControl>
