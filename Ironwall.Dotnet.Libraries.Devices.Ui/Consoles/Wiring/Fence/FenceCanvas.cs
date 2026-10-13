@@ -379,6 +379,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         var shape = scene.Shape;
         var order = new List<FenceChip>(units.Count);
         var placed = new List<(FenceChip Chip, double X, FenceLane Lane)>(units.Count);
+        var mounted = new List<(FenceChip Chip, double X, FenceLane Lane)>();
 
         foreach (var unit in units)
         {
@@ -412,8 +413,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 chip.Picture = FenceScene.Sensor(s, shape, _projector, vm.IsFenceSelected(unit.Key), _view.Scale, scene.LiftOf(unit.Key), scene.CoilOf(unit.Key),
                                                  scene.PlateAboveOf(unit.Key), scene.MountMarkOf(unit.Key));
                 Place(chip, scene.X[unit.Key]);
-                // 물체에 붙은 프리셋 센서는 화면 벌리기에서 뺀다 — 옆으로 밀면 기둥 · 망에서 떨어져 허공에 뜬다(FR-22)
+                // 물체에 붙은 프리셋 센서는 9자리 칩 벌리기에서 뺀다 — 옆 칩에 밀려 기둥 · 망에서 떨어져 허공에 뜨지 않게(FR-22). 붙은 칩끼리만 따로 벌린다(아래).
                 if (!scene.IsMounted(unit.Key)) placed.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
+                else mounted.Add((chip, scene.X[unit.Key], scene.Layout?.LaneOf(unit.Key) ?? FenceLane.Lower));
                 var port = s.PortText.Length > 0 ? $", {s.PortText}" : string.Empty;
                 // 뒤를 보는 기둥 센서(FR-20)는 칩의 "뒤" 표지와 같은 말을 이름에도 — 그림 표지는 UIA 로 읽을 수 없다.
                 var facing = s.IsBackFacing ? ", 뒤(펜스 내부)" : string.Empty;
@@ -427,8 +429,11 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
 
         // 화면에서 칩끼리 겹치지 않게(헤디드 r22: 벽돌 한 칸 세 대가 낮은 배율에서 39px 칩이 27px 간격) — 칩 크기는 화면 기준(번호판이 배율에 맞서 커진다)이라
         // 세계 간격만으로는 모자란다. 펜스 구성일 때 줄마다 칩 사각형의 왼쪽 끝을 "가장 넓은 칩 + 화면 4px" 이상으로 벌린다(무리 가운데는 제자리 평균).
+        // 붙은 프리셋 센서끼리도 — 같은 붙는 점(또는 칩 폭보다 가까운 점)에 둘 이상이면 칩이 포개져 하나가 가려졌다(실창 3회차 MNT-R28-610).
+        // 겹친 무리만 그 점을 가운데로 나란히 선다(겹치지 않으면 제자리 · 세계 자리는 그대로라 확대하면 붙는 점으로 모인다).
+        // 높이가 달라 위아래로 비켜 선 칩(기둥 위 · 기둥 중간)은 겹치지 않으니 같은 무리에 넣지 않는다 — 옆으로 밀면 기둥에서 떨어진다.
         if (scene.IsLayout)
-            foreach (var lane in placed.GroupBy(p => p.Lane))
+            foreach (var lane in placed.GroupBy(p => p.Lane).Concat(OverlappingRows(mounted)))
             {
                 var row = lane.Where(p => !p.Chip.FootprintBounds.IsEmpty).OrderBy(p => p.X + p.Chip.FootprintBounds.X).ToList();
                 var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
@@ -471,6 +476,28 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             _chips.Children.Insert(Math.Min(i, _chips.Children.Count), order[i]);
         }
         while (_chips.Children.Count > order.Count) _chips.Children.RemoveAt(_chips.Children.Count - 1);
+    }
+
+    /// <summary>붙은 칩을 줄 · 세로로 겹치는 무리로 — 세로 범위(칩 사각형 위 · 아래)가 겹쳐 이어지는 것끼리 한 무리.</summary>
+    private static IEnumerable<IGrouping<FenceLane, (FenceChip Chip, double X, FenceLane Lane)>> OverlappingRows(List<(FenceChip Chip, double X, FenceLane Lane)> chips)
+    {
+        foreach (var lane in chips.Where(c => !c.Chip.HitBounds.IsEmpty).GroupBy(c => c.Lane))
+        {
+            var row = new List<(FenceChip Chip, double X, FenceLane Lane)>();
+            var bottom = double.NegativeInfinity;
+            foreach (var c in lane.OrderBy(c => c.Chip.HitBounds.Top))
+            {
+                if (row.Count > 0 && c.Chip.HitBounds.Top >= bottom)
+                {
+                    yield return row.GroupBy(r => r.Lane).Single();
+                    row = new();
+                    bottom = double.NegativeInfinity;
+                }
+                row.Add(c);
+                bottom = Math.Max(bottom, c.Chip.HitBounds.Bottom);
+            }
+            if (row.Count > 0) yield return row.GroupBy(r => r.Lane).Single();
+        }
     }
 
     /// <summary>
@@ -1324,7 +1351,15 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     {
         base.OnPreviewKeyDown(e);
         // 수정키는 누른 순서와 무관하게(Alt 먼저 · Shift 먼저 모두 Alt+Shift) — 헤디드 r21
-        if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
+        // 키 사건은 포커스 요소에서 시작한다 — 그 원천이 곧 포커스 칩(포커스를 잡을 수 없는 헤드리스 시험도 같은 길을 탄다)
+        if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), e.OriginalSource as DependencyObject ?? Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
+    }
+
+    /// <summary>Shift 떼기 시각을 적는다 — NumLock 가짜 Shift 떼기 판정(<see cref="FenceKeyModifiers.NoteKeyUp"/> · WIR-R27-135).</summary>
+    protected override void OnPreviewKeyUp(KeyEventArgs e)
+    {
+        base.OnPreviewKeyUp(e);
+        FenceKeyModifiers.NoteKeyUp(e);
     }
 
     /// <summary>

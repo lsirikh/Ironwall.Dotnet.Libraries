@@ -116,6 +116,9 @@ public class GMapUiModule: Module
         builder.RegisterType<PlaybackViewModel>().SingleInstance();
         // 추적 설정 패널(P3-04) — 싱글톤 ITrackingSetupModel 직접 조정(즉시 적용) + 저장
         builder.RegisterType<TrackingSetupViewModel>().SingleInstance();
+        // 이벤트 시 지도 이동(event-map-flyto) — appsettings(AppSettings.MapEventFlyTo) 동기 로드 단일 인스턴스를 지도 · 설정 블록이 함께 쓴다
+        builder.RegisterInstance(MapSettingsHelper.LoadMapEventFlyTo(_log)).AsSelf().SingleInstance();
+        builder.RegisterType<MapEventFlyToSetupViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();
