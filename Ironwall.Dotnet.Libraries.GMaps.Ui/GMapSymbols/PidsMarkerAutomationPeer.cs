@@ -33,7 +33,7 @@ public sealed class PidsMarkerAutomationPeer : FrameworkElementAutomationPeer
     {
         var explicitName = AutomationProperties.GetName(_owner);
         if (!string.IsNullOrEmpty(explicitName)) return explicitName;
-        return SymbolStatusText.AutomationName(_owner.MarkerTitle, _owner.EventStatus, _owner.MarkerState, _owner.DoorIndicator, _owner.ComponentSummary);
+        return SymbolStatusText.AutomationName(_owner.MarkerTitle, _owner.EventStatus, _owner.MarkerState, _owner.DoorStatus, _owner.ComponentSummary);   // 배지(DoorIndicator) 아님 — 3D 도 문 절을 낸다
     }
 
     protected override string GetItemStatusCore() => SymbolStatusText.EventText(_owner.EventStatus);

@@ -1556,9 +1556,12 @@ public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource 
             return null;
         }
 
-        // 우선순위: ZIndex 높은 순 → 면적 작은 순 → 거리 가까운 순
+        // 우선순위: 점 심볼 먼저(구역선 후순위) → ZIndex 높은 순 → 면적 작은 순 → 거리 가까운 순
+        //   구역선(GMapPidsGroupMarker)은 테두리만 그리는데 후보는 화면 bbox 전체로 잡힌다 — ZIndex 만 보면 구역 안의 함체 · 통문 · 카메라를
+        //   우클릭해도 구역 메뉴가 떴다(2026-10-13 실창: 편집 모드=카메라 메뉴, 운영 모드=구역 메뉴). 점 심볼이 없을 때만 구역을 고른다.
         var selected = candidates
-            .OrderByDescending(c => c.zIndex)
+            .OrderBy(c => c.marker is GMapSymbols.GMapPidsGroupMarker ? 1 : 0)
+            .ThenByDescending(c => c.zIndex)
             .ThenBy(c => c.area)
             .ThenBy(c => c.distance)
             .First();
