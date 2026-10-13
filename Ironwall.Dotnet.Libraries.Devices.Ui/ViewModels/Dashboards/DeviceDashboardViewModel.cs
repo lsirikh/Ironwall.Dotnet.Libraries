@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Assembly;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.BulkImport;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.ByComponent;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Dialogs;
@@ -139,6 +140,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         // [ONVIF 검색](카메라 레일) — 검색 · 조회는 서비스, [추가] 는 상세 칸의 새 카메라 Draft 로만 들어온다(등록은 [등록]).
         CameraDiscovery = CreateCameraDiscovery(new WsDiscoveryClient(), new OnvifCameraLookup(log: log));
+
+        // 대량 등록(device-bulk-import) — 미리보기 판은 목록 칸 위 덮개. 서버 쓰기는 판의 [등록] 때만.
+        BulkImport = new BulkImportViewModel(BuildBulkContext, CreateBulkWriter, log);
+        BulkImport.Written += OnBulkWritten;
+        BulkImport.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(BulkImportViewModel.IsBusy) or nameof(BulkImportViewModel.IsOpen)) RefreshBulkToolbar();
+        };
     }
     #endregion
 
@@ -184,6 +193,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         _closeConfirmed = false;
         CameraDiscovery.OnClickCloseButton();
         _externalUpdateWhileEditing = false;
+        BulkImport.Close();   // 싱글턴 — 다음에 열 때 지난 미리보기가 남지 않게(보내던 일은 멈춘다)
         Form.Clear();
         Detail.Reset();
         SearchText = string.Empty;
@@ -247,8 +257,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         if (string.Equals(key, _railKey, StringComparison.Ordinal)) return true;
 
         // 전환 중이거나 저장 · 재조회가 도는 중이면 받지 않는다 — 전환은 패널을 닫는다(목록 비우기 + 진행 중 요청 취소).
-        if (_isSwitching || IsOperationRunning || !Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
+        if (_isSwitching || IsOperationRunning || BulkImport.IsBusy || !Detail.Guard.TryNavigate(ConsoleNavigation.SwitchRail))
         {
+            if (BulkImport.IsBusy) StatusText = BulkBusyText;
             // 바빠서 막은 것은 말한다 — 예전에는 말없이 막아, [등록] 직후 다음 레일을 고른 운영자가 앞 레일에서 [추가]해
             // 다른 카테고리로 장비를 만들었다(GIS 실창 WP-2: '경광등'으로 친 것이 함체로 — api_logs POST devices/enclosures).
             // 미적용 변경으로 막은 것은 상세 바닥 막대가 흔들리며 말한다(여기서 겹쳐 말하지 않는다).
@@ -325,6 +336,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
 
         // 검색 영역은 카메라 레일의 것이다 — 다른 레일로 가면 닫는다(돌던 검색 · 조회도 멈춘다).
         if (!IsCameraRail && CameraDiscovery.IsOpen) CameraDiscovery.OnClickCloseButton();
+        // 대량 등록 미리보기는 그 레일의 파일이다 — 레일을 바꾸면 닫는다(보내는 중이면 레일 이동 자체를 막았다).
+        if (BulkImport.IsOpen && !BulkImport.IsBusy) BulkImport.Close();
+        RefreshBulkToolbar();
 
         NotifyOfPropertyChange(nameof(SelectedRail));
         NotifyOfPropertyChange(nameof(IsByComponent));
@@ -588,6 +602,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         NotifyOfPropertyChange(nameof(CameraDiscoveryBlockedReason));
         NotifyOfPropertyChange(nameof(IsCameraDiscoveryOpen));
         SyncCameraDiscovery();
+        if (BulkImport is not null) RefreshBulkToolbar();   // 생성자 도중(판을 만들기 전)에도 불릴 수 있다
     }
     #endregion
 
@@ -1445,6 +1460,166 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
             }
         }
     }
+    #endregion
+
+    #region - Bulk import · export (device-bulk-import) -
+    /// <summary>미리보기 판(목록 칸 위 덮개).</summary>
+    public BulkImportViewModel BulkImport { get; }
+
+    /// <summary>파일 창 — 시험은 가짜로 바꿔 끼운다(창을 띄우지 않는다).</summary>
+    internal IBulkFilePicker BulkFilePicker { get; set; } = new WpfBulkFilePicker();
+
+    /// <summary>[내보내기] · [양식] · [올리기] 는 7 카테고리 레일에서만(그룹 · 부품으로 찾기에는 없다).</summary>
+    public bool IsBulkVisible => Category is not null && _current is not null;
+
+    /// <summary>[올리기] · 파일 끌어 놓기 — 고칠 권한이 있고 다른 일을 하지 않을 때.</summary>
+    public bool CanBulkImport => IsBulkVisible && DevicePermissionGate.CanEdit() && !IsOperationRunning && !BulkImport.IsBusy;
+
+    public string? BulkImportBlockedReason => !IsBulkVisible ? "장비 목록(레일)을 고른 뒤 올리세요."
+        : !DevicePermissionGate.CanEdit() ? "장비를 고칠 권한이 없습니다."
+        : IsOperationRunning || BulkImport.IsBusy ? "하던 작업이 끝난 뒤에 올릴 수 있습니다."
+        : null;
+
+    /// <summary>[내보내기] · [양식] — 보기만 하는 권한이어도 된다(서버에 쓰지 않는다).</summary>
+    public bool CanBulkExport => IsBulkVisible && !BulkImport.IsBusy;
+
+    /// <summary>미리보기 판이 열려 있다 — 목록 대신 판이 보인다.</summary>
+    public bool IsBulkImportOpen => BulkImport.IsOpen;
+
+    /// <summary>[올리기] — 파일 창에서 고른다(끌어 놓기의 단추 폴백).</summary>
+    public async Task PickAndImportAsync()
+    {
+        if (!CanBulkImport)
+        {
+            StatusText = BulkImportBlockedReason ?? string.Empty;
+            return;
+        }
+        var path = BulkFilePicker.PickOpen();
+        if (path is null) return;
+        await ImportFileAsync(path);
+    }
+
+    /// <summary>파일 끌어 놓기 · [올리기] 공통 — 읽고 판정해 미리보기 판을 연다(서버에는 쓰지 않는다).</summary>
+    public async Task ImportFileAsync(string path)
+    {
+        if (!CanBulkImport)
+        {
+            StatusText = BulkImportBlockedReason ?? string.Empty;
+            return;
+        }
+        if (!IsBulkFile(path))
+        {
+            StatusText = "CSV(.csv) 또는 Excel(.xlsx) 파일만 올릴 수 있습니다.";
+            return;
+        }
+        await BulkImport.OpenFileAsync(path);
+    }
+
+    /// <summary>끌어 놓을 수 있는 파일인가(확장자만 본다 — 내용은 읽을 때).</summary>
+    public static bool IsBulkFile(string? path)
+        => System.IO.Path.GetExtension(path ?? string.Empty).ToLowerInvariant() is ".csv" or ".xlsx";
+
+    /// <summary>[내보내기] — 지금 목록(검색 적용 결과) 또는 전체를 파일로. 비밀번호 칸은 빈칸(FR-03).</summary>
+    public async Task ExportAsync(BulkFileFormat format, bool all)
+    {
+        if (!CanBulkExport || Category is not { } category || _current is null) return;
+        var source = all ? _current.Rows.Cast<object>() : (Rows?.Cast<object>() ?? Enumerable.Empty<object>());
+        var devices = source.Select(ModelOf).OfType<IBaseDeviceModel>().Where(d => d.Id > 0).ToList();
+        var label = BulkColumnCatalog.CategoryLabel(category);
+        var path = BulkFilePicker.PickSave($"{label}_{DateTime.Now:yyyyMMdd_HHmm}", format);
+        if (path is null) return;
+
+        var columns = BulkColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra);
+        var ok = await WriteFileAsync(path, stream => BulkExporter.Write(stream, format, category, columns, BulkExporter.Rows(columns, devices)));
+        StatusText = ok ? $"{label} {devices.Count}대를 파일로 내보냈습니다." : "내보내지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    /// <summary>[양식 받기] — 머리 줄 + 숨은 키 줄 + 예시 1줄(+ Excel 은 선택 칸 목록).</summary>
+    public async Task SaveTemplateAsync(BulkFileFormat format)
+    {
+        if (!CanBulkExport || Category is not { } category) return;
+        var label = BulkColumnCatalog.CategoryLabel(category);
+        var path = BulkFilePicker.PickSave($"{label}_양식", format);
+        if (path is null) return;
+
+        var columns = BulkColumnCatalog.For(category, ContractGate.IsAxisUi, ContractGate.IsUnitEra);
+        var example = BulkExporter.ExampleRow(columns, category, this);
+        var choices = BulkExporter.Choices(columns, category, this);
+        var ok = await WriteFileAsync(path, stream => BulkExporter.Write(stream, format, category, columns, new[] { example }, choices));
+        StatusText = ok ? $"{label} 양식을 저장했습니다." : "양식을 저장하지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    /// <summary>미리보기 판의 [결과 받기].</summary>
+    public async Task SaveBulkResultAsync()
+    {
+        if (!BulkImport.CanSaveResult) return;
+        var path = BulkFilePicker.PickSave(BulkImport.SuggestedResultName, BulkFileFormat.Csv);
+        if (path is null) return;
+        var ok = await WriteFileAsync(path, BulkImport.SaveResult);
+        StatusText = ok ? "결과를 파일로 저장했습니다." : "결과를 저장하지 못했습니다 — 같은 파일이 열려 있으면 닫고 다시 하세요.";
+    }
+
+    private async Task<bool> WriteFileAsync(string path, Action<System.IO.Stream> write)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var stream = new System.IO.FileStream(path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                write(stream);
+            });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[DeviceConsole] 대량 등록 파일 쓰기 실패 — {ex.GetType().Name}");
+            return false;
+        }
+    }
+
+    /// <summary>판정에 쓸 서버 쪽 사실 — 지금 레일 · 계약 · 장비 캐시 · 선택지 · 부대 · 권한.</summary>
+    private BulkImportContext BuildBulkContext() => new()
+    {
+        RailCategory = Category,
+        IsAxisContract = ContractGate.IsAxisUi,
+        IsUnitEra = ContractGate.IsUnitEra,
+        Devices = DeviceProvider.OfType<IBaseDeviceModel>().ToList(),
+        Options = this,
+        Units = UnitDirectory()?.Snapshot() ?? Array.Empty<(int, string)>(),
+        CanEdit = DevicePermissionGate.CanEdit(),
+    };
+
+    private BulkImportWriter CreateBulkWriter()
+    {
+        IDeviceProviderService? provider = null;
+        try { provider = IoC.Get<IDeviceProviderService>(); }
+        catch { /* 컨테이너 미구성(시험) — 등록 뒤 다시 읽기만 건너뛴다 */ }
+        return new BulkImportWriter(_deviceApiService, provider, () => DeviceProvider.OfType<IBaseDeviceModel>().ToList(), _log);
+    }
+
+    /// <summary>판이 서버에 썼다 — 이 목록을 다시 읽는다(쓰기기가 장비 캐시는 이미 다시 읽었다).</summary>
+    private void OnBulkWritten(object? sender, int succeeded)
+    {
+        Caliburn.Micro.Execute.OnUIThread(() =>
+        {
+            StatusText = $"대량 등록 — {BulkImport.ResultSummary()}";
+            RefreshRailCounts();
+            if (!IsOperationRunning) _current?.Reload();
+            RefreshToolbar();
+        });
+    }
+
+    private void RefreshBulkToolbar()
+    {
+        NotifyOfPropertyChange(nameof(IsBulkVisible));
+        NotifyOfPropertyChange(nameof(CanBulkImport));
+        NotifyOfPropertyChange(nameof(BulkImportBlockedReason));
+        NotifyOfPropertyChange(nameof(CanBulkExport));
+        NotifyOfPropertyChange(nameof(IsBulkImportOpen));
+    }
+
+    /// <summary>미리보기 판이 보내는 중에 레일을 골랐다 — 바꾸지 않은 까닭.</summary>
+    public const string BulkBusyText = "대량 등록이 도는 중이라 레일을 바꾸지 않았습니다 — 끝나거나 [멈추기] 뒤 다시 고르세요.";
     #endregion
 
     #region - Selection narrowing -

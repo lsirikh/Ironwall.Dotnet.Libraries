@@ -10,6 +10,9 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.3.0" />
     <PackageReference Include="Caliburn.Micro" Version="4.0.230" />
+    <!-- 장비 대량 등록(device-bulk-import D-7) — 저장소에 이미 쓰는 판본 그대로(Framework · Db 프로젝트와 같다). -->
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
     <PackageReference Include="MaterialDesignColors" Version="5.2.1" />
     <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 	<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
