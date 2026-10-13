@@ -52,6 +52,8 @@ public enum FenceInk
     MountDot, MountDotDim, MountHot, SpacingAlertMark, SpacingAlertText,
     // 센서 붙임(sensor-mount-preset FR-22) — 물체 면에서 센서 몸까지 브래킷 · 펜스 끝 제어기(케이블 보기를 꺼도 보인다)
     MountBracket, EndController,
+    // 선택 윤곽 안쪽 선(SC-FEN24-001) — 칩 사각형 테두리 위 윤곽은 칩 밖 절반이 잘려 안쪽에 선택색이 거의 안 남았다
+    SelectInner,
 }
 
 /// <summary>
@@ -592,7 +594,7 @@ public static partial class FenceScene
 
         var hit = new Rect(box.X - 5, box.Y - 5, box.Width + 10, box.Height + 10);
         o.Insert(0, RectShape(FenceInk.Hit, hit, 0));
-        if (selected) o.Add(RectShape(FenceInk.Select, hit, 8));
+        if (selected) { o.Add(RectShape(FenceInk.Select, hit, 8)); o.Add(RectShape(FenceInk.SelectInner, SelectOutline(hit), 7)); }
         return new FenceChipPicture(Legible(o, zoom), hit) { Extent = new Rect(extent.X - 5, extent.Y - 5, extent.Width + 10, extent.Height + 10) };
     }
 
@@ -740,7 +742,7 @@ public static partial class FenceScene
 
         var hit = new Rect(fl.X - 6, fl.Y - dy - 6, fr.X - fl.X + dx + 12, fr.Y - fl.Y + dy + 12);
         o.Insert(0, RectShape(FenceInk.Hit, hit, 0));
-        if (selected) o.Add(RectShape(FenceInk.Select, hit, 6));
+        if (selected) { o.Add(RectShape(FenceInk.Select, hit, 6)); o.Add(RectShape(FenceInk.SelectInner, SelectOutline(hit), 5)); }
         return new FenceChipPicture(Legible(o, zoom), hit);
     }
     #endregion
@@ -982,6 +984,16 @@ public static partial class FenceScene
     private static FenceShape Poly(FenceInk ink, params Point[] points) => new(FenceShapeKind.Polygon, ink, points);
 
     private static FenceShape Seg(FenceInk ink, Point a, Point b, double opacity = 1) => new(FenceShapeKind.Line, ink, new[] { a, b }, Opacity: opacity);
+
+    /// <summary>선택 윤곽 굵기(<see cref="FenceInk.Select"/> 펜) 만큼 안으로 들인 사각형.</summary>
+    internal const double SELECT_INSET = 2.2;
+
+    /// <summary>
+    /// 선택 윤곽 자리 — 칩 사각형(= 적중 · 배치 사각형)에서 펜 굵기만큼 안쪽. 테두리선 위에 가운데로 그리면 칩 밖 절반이 잘려
+    /// 안쪽엔 1 px 도 안 남아 선택색이 보이지 않았다(SC-FEN24-001 실측 가장자리 선택색 0).
+    /// </summary>
+    internal static Rect SelectOutline(Rect hit)
+        => hit.Width > 2 * SELECT_INSET && hit.Height > 2 * SELECT_INSET ? Rect.Inflate(hit, -SELECT_INSET, -SELECT_INSET) : hit;
 
     private static FenceShape RectShape(FenceInk ink, Rect r, double radius)
         => new(FenceShapeKind.Rect, ink, new[] { r.TopLeft, r.BottomRight }, radius, radius);

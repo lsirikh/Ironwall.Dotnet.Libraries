@@ -25,6 +25,16 @@ public enum DialogKeyAction
 /// </remarks>
 public static class DialogKeyRules
 {
+    /// <summary>
+    /// <see cref="Decide(Key, bool, bool, bool)"/> 에 "몸 안 요소가 마우스를 잡고 끄는 중" 을 더한 판정 — 끄는 중의 ESC · Enter 는 창의 일이 아니다
+    /// (끄는 요소가 받아 원위치 · 확정한다, drag-first ③). 끌지 않을 때는 지금과 같다.
+    /// </summary>
+    public static DialogKeyAction Decide(Key key, bool isPrimaryEnabled, bool focusIsMultiLineText, bool isBusy, bool innerDragActive)
+    {
+        if (innerDragActive && key is Key.Escape or Key.Enter) return DialogKeyAction.None;
+        return Decide(key, isPrimaryEnabled, focusIsMultiLineText, isBusy);
+    }
+
     public static DialogKeyAction Decide(Key key, bool isPrimaryEnabled, bool focusIsMultiLineText, bool isBusy)
     {
         if (key == Key.Escape) return DialogKeyAction.Cancel;

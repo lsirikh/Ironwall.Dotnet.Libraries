@@ -161,6 +161,37 @@ public sealed class FenceChipAutomationPeer : ThumbAutomationPeer
         };
 
     protected override bool IsKeyboardFocusableCore() => true;
+
+    /// <summary>
+    /// 누를 점 — 망 칩은 가운데에 센서 칩이 얹혀(담 앞면 · 망 가운데 센서) 가운데를 누르면 센서가 골라졌다(WIR-R27-109 실측: 망 2칸 선택이 안 됨).
+    /// 다른 칩에 가리지 않는 점을 골라 준다(없으면 기본).
+    /// </summary>
+    protected override Point GetClickablePointCore()
+    {
+        var owner = (FenceChip)Owner;
+        if (owner.Kind == FenceChipKind.Panel && UncoveredPoint(owner) is { } local && PresentationSource.FromVisual(owner) is not null)
+            return owner.PointToScreen(local);
+        return base.GetClickablePointCore();
+    }
+
+    /// <summary>칩 안에서 다른 칩에 가리지 않는 점(칩 좌표) — 가운데부터 아래 · 위 · 옆 순으로 적중 시험. 모두 가리면 <c>null</c>.</summary>
+    internal static Point? UncoveredPoint(FenceChip chip)
+    {
+        if (chip.ActualWidth <= 0 || chip.ActualHeight <= 0 || VisualTreeHelper.GetParent(chip) is not Visual parent) return null;
+        var fractions = new[] { (0.5, 0.5), (0.5, 0.88), (0.5, 0.12), (0.2, 0.5), (0.8, 0.5), (0.2, 0.88), (0.8, 0.88), (0.2, 0.12), (0.8, 0.12) };
+        foreach (var (fx, fy) in fractions)
+        {
+            var local = new Point(chip.ActualWidth * fx, chip.ActualHeight * fy);
+            Point at;
+            try { at = chip.TransformToAncestor(parent).Transform(local); }
+            catch (InvalidOperationException) { return null; }
+            FenceChip? top = null;
+            for (var d = VisualTreeHelper.HitTest(parent, at)?.VisualHit as DependencyObject; d is not null && !ReferenceEquals(d, parent); d = VisualTreeHelper.GetParent(d))
+                if (d is FenceChip c) { top = c; break; }
+            if (ReferenceEquals(top, chip)) return local;
+        }
+        return null;
+    }
 }
 
 /// <summary>

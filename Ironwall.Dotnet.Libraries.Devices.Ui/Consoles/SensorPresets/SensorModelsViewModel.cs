@@ -153,7 +153,9 @@ public sealed class SensorModelsViewModel : Screen
             }
             SelectedMountPreset = MountPresets.FirstOrDefault(r => r.Preset.IsDefault) ?? MountPresets.FirstOrDefault();
             SelectedAttributePreset = AttributePresets.FirstOrDefault(a => a.IsDefault) ?? AttributePresets.FirstOrDefault();
-            foreach (var name in new[] { nameof(ModelHeaderText), nameof(MountTabText), nameof(AttrTabText), nameof(UsingTabText), nameof(CanDeleteModel), nameof(HideText) })
+            _nameDraft = null;                                                                          // 다른 모델을 고르면 고치던 이름은 버린다
+            foreach (var name in new[] { nameof(ModelHeaderText), nameof(MountTabText), nameof(AttrTabText), nameof(UsingTabText), nameof(CanDeleteModel), nameof(HideText),
+                                         nameof(ModelNameText), nameof(CanRenameModel), nameof(IsModelNameReadOnly), nameof(SelectedModelName) })
                 NotifyOfPropertyChange(name);
         }
     }
@@ -216,7 +218,7 @@ public sealed class SensorModelsViewModel : Screen
         _ => new[] { SensorAnchorKind.Post, SensorAnchorKind.Rail, SensorAnchorKind.Razor, SensorAnchorKind.Wall },
     };
 
-    /// <summary>[숨기기] · [보이기] — 기본 모델도 된다.</summary>
+    /// <summary>[숨기기] · [보이기] — 기본 모델도 된다. 고른 모델은 그대로 고른 채(목록 · 이름 칸에 대상 이름이 남는다).</summary>
     public async Task<bool> ToggleHiddenAsync()
     {
         if (!CanEdit || _selectedModel is not { } row) return false;
@@ -224,10 +226,69 @@ public sealed class SensorModelsViewModel : Screen
         {
             await _repository.SaveModelAsync(row.Model with { IsHidden = !row.Model.IsHidden }).ConfigureAwait(true);
             await LoadAsync().ConfigureAwait(true);
+            SelectedModel = Models.FirstOrDefault(r => r.Model.Id == row.Model.Id) ?? SelectedModel;
             StatusText = row.Model.IsHidden ? $"보이게 했습니다 — {row.Model.Name}" : $"숨겼습니다 — {row.Model.Name}";
             return true;
         }).ConfigureAwait(true);
     }
+
+    #region - 이름 (MNT-R28-102) -
+    private string? _nameDraft;
+
+    /// <summary>고른 모델 이름(숨김 표지 없이) — 상태 줄 · 시험이 대상 이름으로 읽는다.</summary>
+    public string SelectedModelName => _selectedModel?.Model.Name ?? string.Empty;
+
+    /// <summary>이름 칸(`Devices.SensorPresets.Models.Name`) — 고치는 중이면 그 글, 아니면 고른 모델 이름.</summary>
+    public string ModelNameText
+    {
+        get => _nameDraft ?? SelectedModelName;
+        set { _nameDraft = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>이름을 고칠 수 있나 — 사용자 추가 모델만(회사 기본 7종은 이름 고정).</summary>
+    public bool CanRenameModel => CanEdit && _selectedModel is { Model.IsBuiltin: false };
+
+    /// <summary>이름 칸 읽기 전용(기본 모델 · 읽기 전용 저장소 · 고른 모델 없음).</summary>
+    public bool IsModelNameReadOnly => !CanRenameModel;
+
+    /// <summary>[+ 모델] 기본 이름 — "새 모델 n"(이미 있는 이름은 건너뛴다).</summary>
+    public string NextNewModelName()
+    {
+        for (var i = Models.Count + 1; ; i++)
+        {
+            var name = $"새 모델 {i}";
+            if (!Models.Any(m => string.Equals(m.Model.Name, name, StringComparison.CurrentCultureIgnoreCase))) return name;
+        }
+    }
+
+    /// <summary>이름 칸 확정(Enter · 칸을 떠날 때) — 빈 이름 · 같은 이름은 거절하고 칸을 원래 이름으로.</summary>
+    public async Task<bool> RenameModelAsync()
+    {
+        var draft = _nameDraft;
+        _nameDraft = null;
+        if (draft is null || _selectedModel is not { } row) { NotifyOfPropertyChange(nameof(ModelNameText)); return false; }
+        var name = draft.Trim();
+        if (name == row.Model.Name) { NotifyOfPropertyChange(nameof(ModelNameText)); return false; }
+        if (!CanRenameModel) { StatusText = "회사 기본 모델은 이름을 바꿀 수 없습니다."; NotifyOfPropertyChange(nameof(ModelNameText)); return false; }
+        if (name.Length == 0) { StatusText = "모델 이름을 적어 주세요."; NotifyOfPropertyChange(nameof(ModelNameText)); return false; }
+        if (Models.Any(m => m.Model.Id != row.Model.Id && string.Equals(m.Model.Name, name, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            StatusText = $"이미 있는 이름입니다 — {name}";
+            NotifyOfPropertyChange(nameof(ModelNameText));
+            return false;
+        }
+        var ok = await Guarded(async () =>
+        {
+            await _repository.SaveModelAsync(row.Model with { Name = name }).ConfigureAwait(true);
+            await LoadAsync().ConfigureAwait(true);
+            SelectedModel = Models.FirstOrDefault(r => r.Model.Id == row.Model.Id) ?? SelectedModel;
+            StatusText = $"이름을 바꿨습니다 — {row.Model.Name} → {name}";
+            return true;
+        }).ConfigureAwait(true);
+        NotifyOfPropertyChange(nameof(ModelNameText));
+        return ok;
+    }
+    #endregion
 
     public string HideText => _selectedModel?.Model.IsHidden == true ? "보이기" : "숨기기";
 

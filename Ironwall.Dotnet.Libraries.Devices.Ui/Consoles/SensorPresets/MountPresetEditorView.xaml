@@ -126,6 +126,13 @@
 				</WrapPanel>
 				<TextBlock Margin="0,4,0,0" Text="위아래 각도 (° · 아래로 −)" />
 				<TextBox AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.Tilt" AutomationProperties.Name="위아래 각도" Text="{Binding TiltText, UpdateSourceTrigger=PropertyChanged}" />
+				<!--  잘라 맞춘 값 · 읽지 못한 칸 안내(MNT-R28-207) — 말없이 자르지 않는다  -->
+				<TextBlock
+					Margin="0,6,0,0"
+					AutomationProperties.AutomationId="Devices.SensorPresets.MountEditor.FieldNotice"
+					Foreground="{DynamicResource StatusWarningBrush}"
+					Text="{Binding FieldNotice}"
+					TextWrapping="Wrap" />
 			</StackPanel>
 
 			<!--  세 방향 그림 + 3D 미리보기(FR-08 · FR-10) — 같은 센서 하나  -->
