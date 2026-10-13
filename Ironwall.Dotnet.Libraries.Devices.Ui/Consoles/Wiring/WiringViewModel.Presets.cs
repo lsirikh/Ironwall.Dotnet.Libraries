@@ -78,8 +78,15 @@ public sealed partial class WiringViewModel
 
     private int ModelIdOfKey(int key) => WiringPresetPlan.ModelIdOf(_board.FenceLayout.MountOf(key), TypeOfKey(key), _presetModels);
 
-    /// <summary>펜스 보기가 그릴 자세 — 위치 프리셋으로 서는 센서만(FR-17).</summary>
+    /// <summary>
+    /// 펜스 보기가 그릴 자세 — 사용자가 고른 위치 프리셋으로 서는 센서만(FR-17 · <see cref="SensorMountSpec.IsPresetChosen"/>).
+    /// 저장 때 이관만 된 자리는 <c>null</c> — 9자리 계산(같은 자리 벌리기 · 줄)으로 그려 기존 키 · 끌기와 어긋나지 않게(2026-10-13 실창 회귀).
+    /// </summary>
     public SensorMountPose? FencePoseOf(int key)
+        => _board.FenceLayout.MountOf(key) is { IsPresetChosen: true } ? PresetPoseOf(key) : null;
+
+    /// <summary>설치 위치 절이 보여 줄 자세 — 이관된 자리도(프리셋 + 차이 = 9자리와 같은 곳).</summary>
+    private SensorMountPose? PresetPoseOf(int key)
         => HasSensorPresets ? WiringPresetPlan.PoseOf(_board.FenceLayout.MountOf(key), _board.FenceLayout.Panels, MountPresetById) : null;
 
     /// <summary>센서의 모델 모양(FR-18) — 모델을 모르면 <c>null</c>(장비 종류 모양).</summary>
@@ -91,6 +98,16 @@ public sealed partial class WiringViewModel
     }
 
     private IReadOnlyList<int> PresetTargets() => MountTargets();
+
+    /// <summary>
+    /// 위치 프리셋 편집 한 걸음 — 이 안에서는 9자리 칸이 같이 바뀌어도 프리셋을 놓지 않는다(<see cref="WiringBoard.KeepMountPresets"/>).
+    /// </summary>
+    private bool EditPresetFence(Func<WiringFenceLayout, WiringFenceLayout> edit, IReadOnlyList<int>? tieOrder = null)
+    {
+        _board.KeepMountPresets = true;
+        try { return EditFence(edit, tieOrder); }
+        finally { _board.KeepMountPresets = false; }
+    }
     #endregion
 
     #region - Install-location section (W4 · FR-15) -
@@ -114,7 +131,7 @@ public sealed partial class WiringViewModel
             if (value is null || value.Id == SelectedPresetModel?.Id) return;
             var preset = DefaultMountPreset(value.Id);
             var targets = PresetTargets();
-            var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => !targets.Contains(p.Key) ? p.Value
+            var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => !targets.Contains(p.Key) ? p.Value
                 : preset is null ? p.Value with { ModelId = value.Id, MountPresetId = null, MountOverride = null }
                 : WiringPresetPlan.Apply(p.Value, preset, l.Panels))));
             StatusText = ok ? $"모델 — {targets.Count}대: {value.Name}" : "바뀐 것이 없습니다.";
@@ -139,7 +156,8 @@ public sealed partial class WiringViewModel
         }
         set
         {
-            if (value is null) return;
+            // 콤보가 목록을 다시 받으며 같은 값을 되써도 적용하지 않는다 — 이관된 자리가 소리 없이 "고른 프리셋" 이 되어 펜스 보기 그림 · 끌기가 바뀌지 않게(2026-10-13 실창 회귀)
+            if (value is null || value.Id == SelectedMountPreset?.Id) return;
             ApplyMountPreset(MountPresetApplyScope.Selected, new Dictionary<int, SensorMountPreset> { [value.ModelId] = value });
         }
     }
@@ -159,7 +177,7 @@ public sealed partial class WiringViewModel
     }
 
     /// <summary>지금 자세(한 대일 때).</summary>
-    private SensorMountPose? SelectedPose => PresetTargets() is { Count: 1 } one ? FencePoseOf(one[0]) : null;
+    private SensorMountPose? SelectedPose => PresetTargets() is { Count: 1 } one ? PresetPoseOf(one[0]) : null;
 
     /// <summary>높이 칸(m) — 프리셋 + 따로 고친 값.</summary>
     public string PresetHeightText
@@ -209,7 +227,7 @@ public sealed partial class WiringViewModel
     {
         var targets = PresetTargets();
         if (targets.Count == 0) return false;
-        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+        var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) && p.Value.MountPresetId is { } id && MountPresetById(id) is { } preset
                 ? WiringPresetPlan.WithOverride(p.Value, preset, l.Panels, change) : p.Value)));
         StatusText = ok ? $"설치 위치 — {what} (프리셋에서 바뀜)" : "바뀐 것이 없습니다.";
@@ -221,7 +239,7 @@ public sealed partial class WiringViewModel
     public bool ResetMountToPreset()
     {
         var targets = PresetTargets();
-        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+        var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) && p.Value.MountPresetId is { } id && MountPresetById(id) is { } preset ? WiringPresetPlan.Apply(p.Value, preset, l.Panels) : p.Value)));
         StatusText = ok ? $"프리셋 자리로 되돌렸습니다 — {targets.Count}대" : "바뀐 것이 없습니다.";
         RaisePresetPane();
@@ -235,7 +253,7 @@ public sealed partial class WiringViewModel
     {
         var targets = PresetTargets();
         if (_presetRepo is null || !_presetRepo.CanWrite || targets.Count != 1 || _board.FenceLayout.MountOf(targets[0]) is not { MountPresetId: { } id } mount
-            || MountPresetById(id) is not { } basePreset || FencePoseOf(targets[0]) is not { } pose) return null;
+            || MountPresetById(id) is not { } basePreset || PresetPoseOf(targets[0]) is not { } pose) return null;
         var bay = FenceSampleBay.FromPanel(_board.FenceLayout.Panels[SensorMountMigration.BayIndexOf(mount, _board.FenceLayout.Panels.Count, basePreset.AlongRatio)]);
         var draft = basePreset with
         {
@@ -267,7 +285,7 @@ public sealed partial class WiringViewModel
         if (presetByModel is null || presetByModel.Count == 0) return 0;
         var targets = WiringPresetPlan.TargetsOf(scope, PresetTargets(), _board.Chain.Keys.Where(k => _board.FenceLayout.MountOf(k) is not null).ToList(), ModelIdOfKey);
         var applied = 0;
-        var ok = EditFence(l =>
+        var ok = EditPresetFence(l =>
         {
             var (mounts, count) = WiringPresetPlan.ApplyToTargets(l.Mounts, targets, presetByModel, ModelIdOfKey, l.Panels);
             applied = count;
@@ -307,9 +325,9 @@ public sealed partial class WiringViewModel
         }
         set
         {
-            if (value is null) return;
+            if (value is null || value.Id == SelectedAttributePreset?.Id) return;                     // 같은 값 되쓰기는 무시(위와 같다)
             var targets = PresetTargets();
-            var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => targets.Contains(p.Key) ? p.Value with { AttrPresetId = value.Id, ModelId = value.ModelId } : p.Value)));
+            var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key, p => targets.Contains(p.Key) ? p.Value with { AttrPresetId = value.Id, ModelId = value.ModelId } : p.Value)));
             StatusText = ok ? $"속성 프리셋 — {targets.Count}대: {value.Name}" : "바뀐 것이 없습니다.";
             RaisePresetPane();
         }

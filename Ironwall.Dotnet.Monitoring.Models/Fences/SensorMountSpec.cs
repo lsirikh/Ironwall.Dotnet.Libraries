@@ -45,9 +45,20 @@ public sealed record SensorMountSpec(
     [JsonProperty("attr_preset_id", NullValueHandling = NullValueHandling.Ignore)]
     public int? AttrPresetId { get; init; }
 
+    /// <summary>
+    /// 사용자가 위치 프리셋을 골라(적용 · 따로 고친 값 · 붙는 점 끌기) 세운 자리인가 — 참일 때만 결선 펜스 보기가 "프리셋 + 따로 고친 값" 으로 그리고 붙는 점 끌기를 쓴다.
+    /// 저장 때 옛 자리를 이관(FR-19)한 자리 · 이 칸이 없는 옛 문서는 9자리 계산이 정본이다(기존 키 · 끌기 계약 — 2026-10-13 실창 회귀).
+    /// </summary>
+    [JsonProperty("mount_preset_chosen", NullValueHandling = NullValueHandling.Ignore)]
+    public bool? MountPresetChosen { get; init; }
+
     /// <summary>위치 프리셋으로 서는 센서인가.</summary>
     [JsonIgnore]
     public bool HasMountPreset => MountPresetId is > 0;
+
+    /// <summary>사용자가 고른 위치 프리셋으로 서는 센서인가(<see cref="MountPresetChosen"/>) — 이관만 된 자리는 거짓.</summary>
+    [JsonIgnore]
+    public bool IsPresetChosen => HasMountPreset && MountPresetChosen == true;
     #endregion
 
     /// <summary>기둥에 다는 자리인가(<see cref="Panel"/> 이 기둥 번호).</summary>

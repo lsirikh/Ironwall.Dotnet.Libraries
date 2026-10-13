@@ -703,6 +703,9 @@ public sealed class WiringBoard
         var before = _fence;
         var next = edit(before);
         if (next is null || !next.IsActive) return false;
+        // 9자리 편집이 프리셋 자리를 옮겼으면 프리셋을 놓는다(그림이 옮긴 곳을 따라가게 · 2026-10-13 실창 회귀). 프리셋 편집 중에는 그대로.
+        if (!KeepMountPresets && WiringPresetPlan.ReleaseMovedPresets(before.Mounts, next.Mounts) is var released && !ReferenceEquals(released, next.Mounts))
+            next = next.WithMounts(released);
         var mounts = next.Mounts.Where(p => Find(p.Key) is not null).Select(p => (p.Key, p.Value)).ToList();
         var order = FenceLayoutMath.ChainOrder(mounts, next.ControllerEnd, tieOrder ?? _chain.Keys);
         var chainChanged = !order.SequenceEqual(_chain.Keys);
@@ -724,6 +727,12 @@ public sealed class WiringBoard
         else if (!NumberingOrderOf(_fence).SequenceEqual(numberingBefore)) Renumber();
         return true;
     }
+
+    /// <summary>
+    /// 위치 프리셋 편집 중인가(sensor-mount-preset — 적용 · 따로 고친 값 · 붙는 점 끌기). 거짓이면 <see cref="ApplyFenceEdit"/> 가 9자리로 옮긴 프리셋 자리의
+    /// 프리셋을 놓는다(<see cref="WiringPresetPlan.ReleaseMovedPresets"/>).
+    /// </summary>
+    internal bool KeepMountPresets { get; set; }
 
     /// <summary>번호 대역을 정한다(<c>null</c> = 자동 번호 끔) — 정하면 바로 위치 순서대로 다시 매긴다(Draft). 바뀐 것이 있으면 <c>true</c>.</summary>
     public bool SetNumberBands(NumberBandSet? bands)
