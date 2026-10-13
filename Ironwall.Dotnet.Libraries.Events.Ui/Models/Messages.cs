@@ -52,4 +52,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Models{
             User = user;
         }
     }
+
+    /// <summary>운영 이벤트 조치보고가 서버에 들어갔다(operation-event-card PRD v1.1 §3) — 카드 목록 · 이벤트 콘솔이 듣는다.</summary>
+    public class OperationReportedMessageModel
+    {
+        public OperationEventCardViewModel ViewModel { get; private set; }
+        public string? Content { get; private set; }
+        public string? User { get; private set; }
+
+        public OperationReportedMessageModel(OperationEventCardViewModel operationEventCardViewModel, string? content, string? user)
+        {
+            ViewModel = operationEventCardViewModel;
+            Content = content;
+            User = user;
+        }
+    }
 }

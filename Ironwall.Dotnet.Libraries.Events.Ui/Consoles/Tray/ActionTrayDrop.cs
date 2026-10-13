@@ -46,6 +46,8 @@ public static class ActionTrayDrop
 
     public const string KindDetection = "detection";
     public const string KindMalfunction = "malfunction";
+    /// <summary>운영 — 서버 FR-07 로 조치 대상(operation-event-card PRD v1.1).</summary>
+    public const string KindOperation = "operation";
 
     /// <summary>
     /// 한 번에 담을 수 있는 최대 건수. 조치 생성에 벌크가 없어 N건이면 N회이고, API 타임아웃(기본 10초)이 곱해진다
@@ -53,9 +55,9 @@ public static class ActionTrayDrop
     /// </summary>
     public const int MaxPerDrop = 50;
 
-    /// <summary>담을 수 있는 종류인가 — 원본(탐지 · 장애)만. 연결에는 <c>action_reported</c> 필드가 없다.</summary>
+    /// <summary>담을 수 있는 종류인가 — 원본(탐지 · 장애 · 운영)만. 연결에는 <c>action_reported</c> 필드가 없다.</summary>
     public static bool IsReportableKind(string? kind)
-        => kind is KindDetection or KindMalfunction;
+        => kind is KindDetection or KindMalfunction or KindOperation;
 
     public static TrayPlan Plan(IEnumerable<ActionTrayCandidate> rows, bool canControl)
         => Plan(rows, canControl, alreadyQueued: 0);
@@ -99,7 +101,7 @@ public static class ActionTrayDrop
             reason = $"조치 트레이가 가득 찼습니다 — 한 번에 {MaxPerDrop}건까지입니다. [조치 적용] 하거나 몇 건을 빼고 다시 담으세요.";
         else if (unique.Count == 0)
             reason = wrongKind > 0 && reportable.Count == 0
-                ? "이 목록의 행은 조치보고 원본이 아닙니다 — 탐지 · 장애에서 고르세요."
+                ? "이 목록의 행은 조치보고 원본이 아닙니다 — 탐지 · 장애 · 운영에서 고르세요."
                 : "저장되지 않은 이벤트입니다 — 저장 후 조치보고할 수 있습니다.";
 
         return new TrayPlan(unique, drafts, wrongKind, overLimit, reason);
