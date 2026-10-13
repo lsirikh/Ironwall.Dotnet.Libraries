@@ -333,6 +333,59 @@ public partial class DeviceDashboardView : UserControl
         menu.IsOpen = true;
     }
 
+    #region - Bulk import · export (device-bulk-import) -
+    /// <summary>[내보내기] · [양식] 단추 — 단추 아래에 형식 메뉴를 펼친다(조립 · 프리셋 메뉴와 같은 방식).</summary>
+    private void OnOpenButtonMenu(object sender, RoutedEventArgs e) => OnOpenAssemblyMenu(sender, e);
+
+    private async void OnBulkImport(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.PickAndImportAsync();
+    }
+
+    private async void OnExportCsv(object sender, RoutedEventArgs e) => await ExportAsync(Consoles.BulkImport.BulkFileFormat.Csv, all: false);
+    private async void OnExportExcel(object sender, RoutedEventArgs e) => await ExportAsync(Consoles.BulkImport.BulkFileFormat.Excel, all: false);
+    private async void OnExportAllCsv(object sender, RoutedEventArgs e) => await ExportAsync(Consoles.BulkImport.BulkFileFormat.Csv, all: true);
+    private async void OnExportAllExcel(object sender, RoutedEventArgs e) => await ExportAsync(Consoles.BulkImport.BulkFileFormat.Excel, all: true);
+
+    private async System.Threading.Tasks.Task ExportAsync(Consoles.BulkImport.BulkFileFormat format, bool all)
+    {
+        if (ViewModel is { } vm) await vm.ExportAsync(format, all);
+    }
+
+    private async void OnTemplateCsv(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.SaveTemplateAsync(Consoles.BulkImport.BulkFileFormat.Csv);
+    }
+
+    private async void OnTemplateExcel(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.SaveTemplateAsync(Consoles.BulkImport.BulkFileFormat.Excel);
+    }
+
+    private async void OnBulkResultSave(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm) await vm.SaveBulkResultAsync();
+    }
+
+    /// <summary>탐색기에서 끌어 온 파일 — .csv · .xlsx 한 개일 때만 "놓을 수 있음" 으로 보인다.</summary>
+    private void OnFileDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;   // 앱 안 끌기(그룹 칩 등)는 건드리지 않는다
+        var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+        var ok = files is { Length: 1 } && DeviceDashboardViewModel.IsBulkFile(files[0]) && ViewModel?.CanBulkImport == true;
+        e.Effects = ok ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnFileDrop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop) || ViewModel is not { } vm) return;
+        e.Handled = true;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files) return;
+        await vm.ImportFileAsync(files[0]);
+    }
+    #endregion
+
     private async void OnOpenAssembly(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm) await vm.OpenAssemblyAsync();
