@@ -167,7 +167,7 @@ public class TrackingPlaybackScenarioTests
         static int Count(string s, string needle) { int n = 0, i = 0; while ((i = s.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; } return n; }
     }
 
-    /// <summary>AUX-015 판정: TTL −5 · 0 은 패널이 그대로 받지만, 소비처(TrackingOverlayManager.cs:80 MinTtlGuard=3)가 3 초로 올려 쓴다.</summary>
+    /// <summary>AUX-015 판정: TTL −5 · 0 은 패널이 1 초로 잘라 받고(2026-10-13 숫자 칸 명세), 소비처(TrackingOverlayManager.cs:80 MinTtlGuard=3)가 3 초로 올려 쓴다.</summary>
     [Theory]
     [InlineData(-5)]
     [InlineData(0)]
@@ -176,7 +176,7 @@ public class TrackingPlaybackScenarioTests
     {
         var setup = new TrackingSetupModel();
         var vm = new TrackingSetupViewModel(setup) { DefaultTtlSec = ttl };
-        Assert.Equal(ttl, setup.DefaultTtlSec);   // 즉시 적용(검증 없음)
+        Assert.Equal(1, setup.DefaultTtlSec);     // 즉시 적용 — 0 · 음수는 칸 명세(MapNumericFields, 최소 1 초)로 잘린다(map-property-numeric-precision)
 
         var clock = new FakeClock();
         var map = Map();

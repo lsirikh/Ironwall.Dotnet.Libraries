@@ -8332,7 +8332,7 @@ public partial class MapViewModel : BasePanelViewModel,
         get => _gridSizePx;
         set
         {
-            _gridSizePx = Math.Max(4, Math.Min(50, value));
+            _gridSizePx = Helpers.Numerics.MapNumericFields.GridSizePx.Normalize(value);
             NotifyOfPropertyChange(nameof(GridSizePx));
         }
     }

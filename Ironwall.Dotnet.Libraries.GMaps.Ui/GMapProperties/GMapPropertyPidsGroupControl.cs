@@ -66,14 +66,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         /// <summary>기둥 간격(m) 슬라이더 값 — 마커 NULL 이면 전역 기본을 보여주고(IsPostSpacingInherited) 사용자가 움직이면 150ms 뒤 마커에 커밋.</summary>
         public double PostSpacingM { get => (double)GetValue(PostSpacingMProperty); set => SetValue(PostSpacingMProperty, value); }
         public static readonly DependencyProperty PostSpacingMProperty = DependencyProperty.Register(nameof(PostSpacingM), typeof(double), typeof(GMapPropertyPidsGroupControl),
-            new PropertyMetadata(Helpers.Fence.FenceDefaults.PostSpacingM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: true), (_, v) => CoerceRange(v, Helpers.Fence.FenceDefaults.PostSpacingMinM, Helpers.Fence.FenceDefaults.PostSpacingMaxM, Helpers.Fence.FenceDefaults.PostSpacingStepM)));
+            new PropertyMetadata(Helpers.Fence.FenceDefaults.PostSpacingM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: true), Helpers.Numerics.MapNumericFields.PostSpacingM.Coerce));
         public bool IsPostSpacingInherited { get => (bool)GetValue(IsPostSpacingInheritedProperty); set => SetValue(IsPostSpacingInheritedProperty, value); }
         public static readonly DependencyProperty IsPostSpacingInheritedProperty = DependencyProperty.Register(nameof(IsPostSpacingInherited), typeof(bool), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(true));
 
         /// <summary>철망 높이(m) 슬라이더 값 — 기둥 간격과 같은 규약.</summary>
         public double FenceHeightM { get => (double)GetValue(FenceHeightMProperty); set => SetValue(FenceHeightMProperty, value); }
         public static readonly DependencyProperty FenceHeightMProperty = DependencyProperty.Register(nameof(FenceHeightM), typeof(double), typeof(GMapPropertyPidsGroupControl),
-            new PropertyMetadata(Helpers.Fence.FenceDefaults.FenceHeightM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: false), (_, v) => CoerceRange(v, Helpers.Fence.FenceDefaults.FenceHeightMinM, Helpers.Fence.FenceDefaults.FenceHeightMaxM, Helpers.Fence.FenceDefaults.FenceHeightStepM)));
+            new PropertyMetadata(Helpers.Fence.FenceDefaults.FenceHeightM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: false), Helpers.Numerics.MapNumericFields.FenceHeightM.Coerce));
         public bool IsFenceHeightInherited { get => (bool)GetValue(IsFenceHeightInheritedProperty); set => SetValue(IsFenceHeightInheritedProperty, value); }
         public static readonly DependencyProperty IsFenceHeightInheritedProperty = DependencyProperty.Register(nameof(IsFenceHeightInherited), typeof(bool), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(true));
 
@@ -84,10 +84,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public System.Windows.Input.ICommand ResetPostSpacingCommand { get; }
         public System.Windows.Input.ICommand ResetFenceHeightCommand { get; }
         public System.Windows.Input.ICommand SetPostSpacingPresetCommand { get; }
-
-        /// <summary>슬라이더 값 정규화(눈금 양자화 + 클램프) — 정본은 <see cref="Helpers.Fence.FenceMath.Quantize"/>(WPF 무의존, 단위테스트 대상).</summary>
-        private static object CoerceRange(object value, double min, double max, double step)
-            => Helpers.Fence.FenceMath.Quantize(value is double d ? d : min, min, max, step);
 
         private bool CanWriteFence => !_isInitializing && !_isClearingBindings && !_syncingFence && !IsGroupEditing && SelectedMarker is IPidsGroupEditableMarker;
 
@@ -229,7 +225,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 var linePatternBinding = CreateTwoWayBinding(nameof(pidsGroupMarker.LinePattern));
                 SetBinding(LinePatternProperty, linePatternBinding);
 
-                var lineOpacityBinding = CreateTwoWayBinding(nameof(pidsGroupMarker.LineOpacity));
+                var lineOpacityBinding = CreateTwoWayBinding(nameof(pidsGroupMarker.LineOpacity), Helpers.Numerics.MapNumericFields.LineOpacity);
                 SetBinding(LineOpacityProperty, lineOpacityBinding);
 
                 // Line 옵션 바인딩
@@ -334,7 +330,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty LineOpacityProperty =
             DependencyProperty.Register("LineOpacity", typeof(double),
                 typeof(GMapPropertyPidsGroupControl),
-                new PropertyMetadata(1.0, OnLineOpacityChanged, CoerceDoubleValue));
+                new PropertyMetadata(1.0, OnLineOpacityChanged, Helpers.Numerics.MapNumericFields.LineOpacity.Coerce));
 
         /// <summary>
         /// 닫힌 경로 여부

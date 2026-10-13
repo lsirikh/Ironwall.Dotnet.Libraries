@@ -65,7 +65,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty ImageOpacityProperty =
             DependencyProperty.Register("ImageOpacity", typeof(double),
                 typeof(GMapPropertyImageControl),
-                new PropertyMetadata(0.8, OnImageOpacityChanged, CoerceOpacityValue));
+                new PropertyMetadata(0.8, OnImageOpacityChanged, Helpers.Numerics.MapNumericFields.ImageOpacity.Coerce));
 
         /// <summary>
         /// 이미지 가시성
@@ -200,7 +200,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             if (SelectedMarker is IImageEditableMarker imageMarker)
             {
                 SetBinding(ImageFilePathProperty, CreateTwoWayBinding(nameof(imageMarker.FilePath)));
-                SetBinding(ImageOpacityProperty, CreateTwoWayBinding(nameof(imageMarker.Opacity)));
+                SetBinding(ImageOpacityProperty, CreateTwoWayBinding(nameof(imageMarker.Opacity), Helpers.Numerics.MapNumericFields.ImageOpacity));
                 SetBinding(ImageVisibilityProperty, CreateTwoWayBinding(nameof(imageMarker.IsVisible)));
                 SetBinding(MaintainAspectRatioProperty, CreateTwoWayBinding(nameof(imageMarker.MaintainAspectRatio)));
 
@@ -293,12 +293,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 imageMarker.MaintainAspectRatio = (bool)e.NewValue;
                 control.OnMarkerPropertyChanged("MaintainAspectRatio", e.OldValue, e.NewValue);
             }
-        }
-
-        private static object CoerceOpacityValue(DependencyObject d, object value)
-        {
-            var opacity = (double)value;
-            return Math.Clamp(opacity, 0.0, 1.0);
         }
 
         #endregion

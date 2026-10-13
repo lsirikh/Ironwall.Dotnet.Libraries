@@ -57,9 +57,10 @@
 							Grid.Column="1"
 							Margin="5,0"
 							VerticalAlignment="Center"
+							IsSnapToTickEnabled="True"
 							Maximum="1.0"
 							Minimum="0.0"
-							TickFrequency="0.05"
+							TickFrequency="0.01"
 							Value="{Binding ImageOpacity}" />
 						<TextBlock
 							Grid.Column="2"
