@@ -70,6 +70,9 @@ internal sealed class EventMapRig : IDisposable
     public List<EnumEventType> SoundPlays { get; } = new();
     public int SoundStops { get; private set; }
     public (int Detection, int Fault) Counts { get; private set; } = (-1, -1);
+    /// <summary>가짜 서버의 계약 세대 — 기본은 운영 이벤트가 있는 8.0. 6.3 으로 바꾸면 운영 조치보고가 숨는다.</summary>
+    public Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract ServerContract { get; set; } = Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract.V8_0;
+    public Mock<Ironwall.Dotnet.Libraries.Api.Services.IServerContractProbe> ContractProbe { get; } = new();
     public SoundAlarmController Sound { get; }
 
     public EventMapRig(bool doorContactFallback = true, bool withDeviceLookup = true)
@@ -91,18 +94,24 @@ internal sealed class EventMapRig : IDisposable
               {
                   EventEntryEnqueuedMessage enqueued => Panel!.HandleAsync(enqueued, CancellationToken.None),
                   OperationEventCardMessage operation => Panel!.HandleAsync(operation, CancellationToken.None),   // 운영 카드(operation-event-card)
+                  OperationReportedMessageModel reported => Panel!.HandleAsync(reported, CancellationToken.None), // 운영 조치보고 성공(v1.1)
                   _ => Task.CompletedTask,
               };
           });
 
         var setupModel = new EventSetupModel(Setup.Object);
         var account = new Mock<IAccountModel>().Object;
+        var guard = new ActionReportGuard();   // 카드(수동) · 패널(전체 · 자동)이 같은 가드를 쓴다 — 호스트 싱글턴과 같게
+        ContractProbe.SetupGet(p => p.Contract).Returns(() => ServerContract);
         IoC.GetInstance = (type, key) =>
         {
             if (type == typeof(IEventAggregator)) return ea.Object;
             if (type == typeof(ILogService)) return Log.Object;
             if (type == typeof(EventSetupModel)) return setupModel;
             if (type == typeof(IAccountModel)) return account;
+            if (type == typeof(IEventApiService)) return EventApi.Object;                 // 운영 카드 조치보고(operation-event-card v1.1)
+            if (type == typeof(IActionReportGuard)) return guard;
+            if (type == typeof(Ironwall.Dotnet.Libraries.Api.Services.IServerContractProbe)) return ContractProbe.Object;
             return null!;
         };
 
@@ -124,7 +133,7 @@ internal sealed class EventMapRig : IDisposable
         DeviceLookup.Setup(l => l.FetchDeviceByIdAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync((string _, int id, CancellationToken _) => ServerDevices.TryGetValue(id, out var d) ? d : null);
 
-        Panel = new EventCardListPanelViewModel(ea.Object, Log.Object, null!, account, EventApi.Object, Symbols, Queue, new ActionReportGuard());
+        Panel = new EventCardListPanelViewModel(ea.Object, Log.Object, null!, account, EventApi.Object, Symbols, Queue, guard);
         Panel.DispatchToUi = (action, _) => { action(); return Task.CompletedTask; };
         Panel.ActionReported += (kind, id) => ActionReported.Add((kind, id));
         Ironwall.Dotnet.Libraries.Events.Ui.Modules.EventUiModule.WireAutoActions(Queue, Panel, null, Log.Object);

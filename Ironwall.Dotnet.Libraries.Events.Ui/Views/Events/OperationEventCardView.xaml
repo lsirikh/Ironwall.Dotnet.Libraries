@@ -16,7 +16,7 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 	</UserControl.Resources>
 
-	<!--  운영 카드 — 탐지 · 장애 카드와 같은 틀(폭 150~224 · 높이 200). 조치 대상이 아니라 조치보고 단추 대신 [닫기], 뒤집기 없음(operation-event-card PRD §2 · §3).  -->
+	<!--  운영 카드 — 탐지 · 장애 카드와 같은 틀(폭 150~224 · 높이 200). 조치보고 단추 + [닫기], 뒤집기 없음(operation-event-card PRD v1.1 §2 · §3).  -->
 	<Grid>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="*" MinWidth="150" MaxWidth="224" />
@@ -111,14 +111,29 @@
 					Margin="0"
 					Style="{StaticResource MaterialDesignLightSeparator}" />
 
-				<!--  바닥 — [닫기] + 시각  -->
+				<!--  바닥 — [조치보고](서버가 운영 조치를 받는 판본만) + [닫기](조치 없이 치우기) + 시각 (PRD v1.1 §3)  -->
 				<Grid Grid.Row="3" Margin="10,4,10,6">
 					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
 						<ColumnDefinition Width="Auto" />
 						<ColumnDefinition Width="*" />
 					</Grid.ColumnDefinitions>
 					<Button
 						Grid.Column="0"
+						Margin="0,0,4,0"
+						VerticalAlignment="Center"
+						md:RippleAssist.IsCentered="True"
+						AutomationProperties.AutomationId="{Binding ReportAutomationKey, Mode=OneWay}"
+						Style="{StaticResource Console.Button.Icon}"
+						ToolTip="조치보고"
+						Visibility="{Binding IsReportSupported, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+						<cal:Message.Attach>
+							[Event Click] = [Action OnButtonAction($source, $eventArgs)]
+						</cal:Message.Attach>
+						<md:PackIcon Kind="CommentOutline" />
+					</Button>
+					<Button
+						Grid.Column="1"
 						VerticalAlignment="Center"
 						md:RippleAssist.IsCentered="True"
 						AutomationProperties.AutomationId="{Binding CloseAutomationKey, Mode=OneWay}"
@@ -130,7 +145,7 @@
 						<md:PackIcon Kind="Close" />
 					</Button>
 					<TextBlock
-						Grid.Column="1"
+						Grid.Column="2"
 						HorizontalAlignment="Right"
 						VerticalAlignment="Center"
 						FontSize="12"
