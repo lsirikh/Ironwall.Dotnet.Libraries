@@ -1,0 +1,50 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.SensorModelsSettingsBlockView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:c="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Consoles;assembly=Ironwall.Dotnet.Libraries.Utils"
+	AutomationProperties.AutomationId="Settings.SensorModels"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	Foreground="{DynamicResource TextPrimaryBrush}">
+	<!--
+		설정 창 레일 "센서 모델" 블록(sensor-mount-preset W1 여는 곳) — 화면에는 상태(저장소 · 요약)와 행동([센서 모델 열기])만,
+		설명은 "?"(Devices.SensorPresets.Settings). 창 안에서 바로 저장되므로 설정 창 저장 막대와는 잇지 않는다.
+	-->
+	<StackPanel>
+		<DockPanel Margin="0,0,0,8">
+			<c:HelpTip
+				Margin="8,0,0,0"
+				VerticalAlignment="Center"
+				DockPanel.Dock="Right"
+				HelpKey="Devices.SensorPresets.Settings"
+				Scope="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}}" />
+			<TextBlock
+				VerticalAlignment="Center"
+				FontWeight="SemiBold"
+				Text="{Binding Title}" />
+		</DockPanel>
+		<TextBlock
+			Margin="0,0,0,4"
+			AutomationProperties.AutomationId="Settings.SensorModels.Source"
+			Foreground="{DynamicResource TextSecondaryBrush}"
+			Text="{Binding SourceText}" />
+		<TextBlock
+			Margin="0,0,0,8"
+			AutomationProperties.AutomationId="Settings.SensorModels.Summary"
+			Foreground="{DynamicResource TextSecondaryBrush}"
+			Text="{Binding SummaryText}" />
+		<Button
+			HorizontalAlignment="Left"
+			AutomationProperties.AutomationId="Settings.SensorModels.Open"
+			Click="OnOpen"
+			Content="센서 모델 열기"
+			IsEnabled="{Binding CanOpen}"
+			Style="{DynamicResource Console.Button}" />
+		<TextBlock
+			Margin="0,6,0,0"
+			AutomationProperties.AutomationId="Settings.SensorModels.Status"
+			Foreground="{DynamicResource TextSecondaryBrush}"
+			Text="{Binding StatusText}"
+			TextWrapping="Wrap" />
+	</StackPanel>
+</UserControl>

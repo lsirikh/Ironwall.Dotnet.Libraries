@@ -82,6 +82,11 @@ public sealed record FenceSensor(
     /// <summary>그릴 모양 — 모델 모양, 없으면 장비 종류(PIR · 광케이블 · 스마트2 는 스마트 상자가 아닌 제 모양).</summary>
     public SensorShape DrawShape => ModelShape ?? FenceWorld.ShapeOf(Type);
 
+    /// <summary>
+    /// 속성 프리셋의 탐지 거리(m · sensor-mount-preset FR-14 "그림" 쓰임) — 없으면 <c>null</c>(종류별 기본 <see cref="FenceWorld.RangeOf(FenceKind)"/>).
+    /// </summary>
+    public double? RangeM { get; init; }
+
     /// <summary>보는 쪽이 있는 센서인가(FR-20 — 기둥에 다는 스마트 복합 · 복합).</summary>
     public bool HasFacing => WiringTopology.SupportsFacing(Type);
 
@@ -105,6 +110,15 @@ public sealed record FenceSensor(
 public sealed record FenceUnit(int Key, IReadOnlyList<int> Keys, bool IsGroup, bool IsController)
 {
     public int Count => Keys.Count;
+}
+
+/// <summary>
+/// "권장 간격 넘음" 한 쌍(sensor-mount-preset FR-14) — 이웃한 같은 모델 센서 둘 · 둘 사이(m) · 속성 프리셋 권장 설치 간격(m).
+/// </summary>
+public sealed record FenceSpacingAlert(int Left, int Right, double Metres, double Limit)
+{
+    /// <summary>표지 글자 — "간격 22.5m · 권장 20m".</summary>
+    public string Text => $"간격 {Metres:0.#}m · 권장 {Limit:0.#}m";
 }
 
 /// <summary>
@@ -235,6 +249,29 @@ public sealed class FenceWorld
 
     /// <summary>탐지 반경(m) — 복합 20 · 지진동 15(FR-19).</summary>
     public static double RangeOf(FenceKind kind) => kind switch { FenceKind.Multi => 20, FenceKind.Underground => 15, _ => 0 };
+
+    /// <summary>
+    /// 센서 한 대의 탐지 반경(m) — 속성 프리셋 탐지 거리(<see cref="FenceSensor.RangeM"/>)가 있으면 그것, 없으면 종류별 기본(sensor-mount-preset FR-14).
+    /// </summary>
+    public static double RangeOf(FenceSensor sensor)
+        => sensor is null ? 0 : sensor.RangeM is { } r ? (double.IsFinite(r) && r > 0 ? r : 0) : RangeOf(sensor.Kind);
+
+    /// <summary>키로 찾은 센서의 탐지 반경(m) — 모르는 키면 0.</summary>
+    public double RangeOfKey(int key) => _sensors.TryGetValue(key, out var s) ? RangeOf(s) : 0;
+
+    private IReadOnlyList<FenceSpacingAlert> _spacingAlerts = Array.Empty<FenceSpacingAlert>();
+
+    /// <summary>"권장 간격 넘음" 쌍(sensor-mount-preset FR-14 · W3 "알림" 쓰임) — 둘 다 이 장면에 있는 쌍만.</summary>
+    public IReadOnlyList<FenceSpacingAlert> SpacingAlerts => _spacingAlerts;
+
+    /// <summary>
+    /// 권장 간격 넘는 쌍을 싣는다(뷰모델 <c>PresetSpacingAlerts</c> — 망 자리 m 로 잰 값). 장면에 없는 센서가 낀 쌍은 버린다.
+    /// </summary>
+    public void UseSpacingAlerts(IEnumerable<FenceSpacingAlert>? alerts)
+        => _spacingAlerts = (alerts ?? Enumerable.Empty<FenceSpacingAlert>()).Where(a => _x.ContainsKey(a.Left) && _x.ContainsKey(a.Right)).ToList();
+
+    /// <summary>알림 표지 x(세계 단위) — 두 센서의 가운데.</summary>
+    public double SpacingAlertX(FenceSpacingAlert alert) => (_x[alert.Left] + _x[alert.Right]) / 2;
 
     /// <summary>장비 종류의 기본 모양(모델을 모를 때 · sensor-mount-preset FR-18).</summary>
     public static SensorShape ShapeOf(EnumDeviceType type) => type switch
@@ -551,8 +588,8 @@ public sealed class FenceWorld
     /// <summary>탐지 빈틈(FR-19) — 이웃한 반경 원 둘이 닿지 않는 구간. (가운데 x, 빈 거리 m, 왼쪽 · 오른쪽 센서).</summary>
     public IReadOnlyList<(double X, double Metres, int Left, int Right)> RangeGaps()
     {
-        var points = _x.Where(p => _sensors.TryGetValue(p.Key, out var s) && RangeOf(s.Kind) > 0)
-                       .Select(p => (Key: p.Key, X: p.Value, R: RangeOf(_sensors[p.Key].Kind)))
+        var points = _x.Where(p => _sensors.TryGetValue(p.Key, out var s) && RangeOf(s) > 0)
+                       .Select(p => (Key: p.Key, X: p.Value, R: RangeOf(_sensors[p.Key])))
                        .OrderBy(p => p.X).ToList();
         var result = new List<(double, double, int, int)>();
         for (var i = 1; i < points.Count; i++)
@@ -565,8 +602,8 @@ public sealed class FenceWorld
     }
 
     /// <summary>탐지 반경이 있는 센서가 있는가 — [탐지 범위] 단추를 켤 수 있는가.</summary>
-    public bool HasRangeSensors => _sensors.Values.Any(s => Chain.Contains(s.Key) && RangeOf(s.Kind) > 0)
-                                   || _sensors.Values.Any(s => RangeOf(s.Kind) > 0);
+    public bool HasRangeSensors => _sensors.Values.Any(s => Chain.Contains(s.Key) && RangeOf(s) > 0)
+                                   || _sensors.Values.Any(s => RangeOf(s) > 0);
     #endregion
 
     #region - Units (FR-18) -

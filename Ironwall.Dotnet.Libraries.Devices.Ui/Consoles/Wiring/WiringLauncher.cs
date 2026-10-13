@@ -35,7 +35,7 @@ public interface IWiringLauncher
 /// <summary>
 /// 창 관리자(<see cref="IWindowManager"/>)로 라이브러리가 직접 창을 연다 — 호스트의 메시지 계약을 늘리지 않는다(조립기 선례).
 /// </summary>
-public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
+public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs, SensorPresets.ISensorPresetLauncher
 {
     private readonly IWindowManager _windows;
     private readonly IDeviceApiService _api;
@@ -175,39 +175,66 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs
     /// </summary>
     private async Task AttachPresetsAsync(WiringViewModel vm)
     {
-        ISensorPresetRepository? repo;
-        ISensorPresetUsageSource? usage = null;
-        try
-        {
-            repo = _presets?.Value;
-            usage = _presetUsage?.Value;
-        }
-        catch (Exception ex)
-        {
-            _log?.Warning($"[Wiring] 센서 프리셋 저장소를 쓸 수 없습니다 — 9자리 편집으로 엽니다: {ex.Message}");
-            return;
-        }
+        var (repo, usage) = ResolvePresets();
         if (repo is null) return;
 
-        vm.AttachSensorPresets(repo, usage, async () =>
-        {
-            var models = new SensorPresets.SensorModelsViewModel(repo, usage, vm.CurrentPresetUsages)
-            {
-                Confirm = async confirm =>
-                {
-                    await _windows.ShowDialogAsync(confirm, null, WindowSettings(420, 260, resizable: false));
-                    return confirm.Choice;
-                },
-            };
-            if (vm.FenceLayout.Panels.FirstOrDefault() is { } panel) models.Sample = FenceSampleBay.FromPanel(panel);
-            models.OpenEditor = async editor => await _windows.ShowDialogAsync(editor, null, WindowSettings(980, 720, resizable: true)) == true || editor.ChangeCount == 0;
-            await _windows.ShowDialogAsync(models, null, WindowSettings(900, 640, resizable: true));
-        });
+        vm.AttachSensorPresets(repo, usage, () => ShowSensorModelsAsync(repo, usage, vm.CurrentPresetUsages,
+            vm.FenceLayout.Panels.FirstOrDefault() is { } panel ? FenceSampleBay.FromPanel(panel) : null));
         vm.ShowPresetDialog = dialog => _windows.ShowDialogAsync(dialog, null, WindowSettings(560, 420, resizable: false));
 
         using var cts = new CancellationTokenSource(FENCE_LOAD_TIMEOUT);
         try { await vm.LoadSensorPresetsAsync(cts.Token).ConfigureAwait(true); }
         catch (Exception ex) { _log?.Warning($"[Wiring] 센서 프리셋을 제때 읽지 못했습니다 — 9자리 편집으로 엽니다: {ex.Message}"); }
+    }
+
+    /// <summary>프리셋 저장소 · 쓰임 셈을 꺼낸다 — 등록이 없거나 만들다 실패하면 <c>null</c>(로그 한 줄 · 입구 · 절만 숨는다).</summary>
+    private (ISensorPresetRepository? Repo, ISensorPresetUsageSource? Usage) ResolvePresets()
+    {
+        try { return (_presets?.Value, _presetUsage?.Value); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Wiring] 센서 프리셋 저장소를 쓸 수 없습니다 — 9자리 편집으로 엽니다: {ex.Message}");
+            return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// 센서 모델 창(W1) — 편집기(W2) · 저장 확인(W5)도 같은 창 관리자로 띄운다. <paramref name="current"/> = 지금 열린 결선 창의 저장 전 쓰임(없으면 저장된 것만).
+    /// </summary>
+    private async Task ShowSensorModelsAsync(ISensorPresetRepository repo, ISensorPresetUsageSource? usage,
+                                             Func<IReadOnlyList<SensorPresetUsage>>? current, FenceSampleBay? sample)
+    {
+        var models = new SensorPresets.SensorModelsViewModel(repo, usage, current)
+        {
+            Confirm = async confirm =>
+            {
+                await _windows.ShowDialogAsync(confirm, null, WindowSettings(420, 260, resizable: false));
+                return confirm.Choice;
+            },
+        };
+        if (sample is not null) models.Sample = sample;
+        models.OpenEditor = async editor => await _windows.ShowDialogAsync(editor, null, WindowSettings(980, 720, resizable: true)) == true || editor.ChangeCount == 0;
+        await _windows.ShowDialogAsync(models, null, WindowSettings(900, 640, resizable: true));
+    }
+
+    /// <inheritdoc/>
+    public bool IsSensorModelsAvailable => _presets is not null && ResolvePresets().Repo is not null;
+
+    /// <summary>장비 창 [⋯] · 설정 창 레일에서 — 결선 창 밖이라 쓰임은 저장된 것만 센다.</summary>
+    public async Task<bool> OpenSensorModelsAsync()
+    {
+        var (repo, usage) = ResolvePresets();
+        if (repo is null) return false;
+        try
+        {
+            await ShowSensorModelsAsync(repo, usage, null, null).ConfigureAwait(true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Wiring] 센서 모델 창을 열지 못했습니다: {ex.Message}");
+            return false;
+        }
     }
     #endregion
 

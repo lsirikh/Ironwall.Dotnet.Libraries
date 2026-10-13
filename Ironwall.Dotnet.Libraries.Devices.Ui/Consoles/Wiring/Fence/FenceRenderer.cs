@@ -226,6 +226,13 @@ public sealed class FenceRenderer
         FenceInk.SnapDotDim => new(B(Color.FromArgb(0x55, Critical.R, Critical.G, Critical.B)), null, 0),
         FenceInk.SnapRing => new(null, B(Critical), 2),
         FenceInk.SnapBlocked => new(B(Surface), B(Warning), 2),
+        // 프리셋 붙는 점(sensor-mount-preset W4) — 글자 토큰을 반투명으로: 라이트 = 회색 점 · 다크 = 흰 점. 붙을 점 = 반투명 위급(빨강) + 고리(SnapRing).
+        FenceInk.MountDot => new(B(Color.FromArgb(0x70, Tx1.R, Tx1.G, Tx1.B)), B(Color.FromArgb(0x99, Surface.R, Surface.G, Surface.B)), 1),
+        FenceInk.MountDotDim => new(B(Color.FromArgb(0x26, Tx1.R, Tx1.G, Tx1.B)), null, 0),
+        FenceInk.MountHot => new(B(Color.FromArgb(0x99, Critical.R, Critical.G, Critical.B)), B(Surface), 1),
+        // 권장 간격 넘음(FR-14) — 경고 토큰 삼각형(빈틈 = 위급 마름모와 모양 · 색 모두 다르다)
+        FenceInk.SpacingAlertMark => new(B(Surface), B(Warning), 2, Join: PenLineJoin.Round),
+        FenceInk.SpacingAlertText => new(null, null, 0, B(Warning), false, FontWeights.Bold),
         FenceInk.Plate => new(B(Alt), B(OliveSide), 0.8),
         FenceInk.Number => new(null, null, 0, B(Tx1), true, FontWeights.Bold),
         FenceInk.NumberSmall => new(null, null, 0, B(Tx1), true, FontWeights.Bold),

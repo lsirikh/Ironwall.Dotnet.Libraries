@@ -1173,6 +1173,21 @@ public class DeviceDashboardViewModel : BasePanelViewModel, IDevicePropertyOptio
         if (await _wiring!.OpenAsync(model)) SelectAfterReload(model.Id, "센서 · 결선을 저장했습니다.");
     }
 
+    /// <summary>
+    /// 센서 모델 입구(sensor-mount-preset W1 "장비 창 도구줄 [⋯] › 센서 모델") — 프리셋 저장소가 있을 때만(GMaps.Db 모듈이 없으면 감춘다).
+    /// 결선 입구와 같은 창 관리자(<see cref="Consoles.SensorPresets.ISensorPresetLauncher"/>)를 쓴다.
+    /// </summary>
+    public bool IsSensorModelsVisible => SensorPresetLauncher?.IsSensorModelsAvailable == true;
+
+    /// <summary>센서 모델 창을 연다(목록 · 프리셋 편집 — 저장은 GIS 로컬 DB · 장비 서버에는 쓰지 않는다).</summary>
+    public async Task OpenSensorModelsAsync()
+    {
+        if (SensorPresetLauncher is not { IsSensorModelsAvailable: true } launcher) return;
+        await launcher.OpenSensorModelsAsync();
+    }
+
+    private Consoles.SensorPresets.ISensorPresetLauncher? SensorPresetLauncher => _wiring as Consoles.SensorPresets.ISensorPresetLauncher;
+
     private readonly Lazy<IWiringLauncher>? _wiringFactory;
     private bool _wiringFailed;
 

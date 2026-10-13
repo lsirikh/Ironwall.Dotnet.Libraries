@@ -65,6 +65,50 @@ public static class WiringPresetPlan
         return mount with { MountOverride = SensorMountResolver.Diff(preset, next, bay) };
     }
 
+    /// <summary>
+    /// 칸 <paramref name="bayIndex"/> 에 그리도록 자리 번호(<see cref="SensorMountSpec.Panel"/>)를 고른다 — <see cref="SensorMountMigration.BayIndexOf"/> 의 거꿀(기둥 자리는
+    /// 프리셋이 기둥 B 면 칸 + 1). 9자리 갈래(Spot)는 그대로 둔다(그 갈래가 칸 고르기 규칙을 정하므로).
+    /// </summary>
+    public static int PanelForBay(SensorMountSpec mount, SensorMountPreset preset, int bayIndex, int panelCount)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        ArgumentNullException.ThrowIfNull(preset);
+        var bay = Math.Clamp(bayIndex, 0, Math.Max(0, panelCount - 1));
+        return mount.IsPostSpot && preset.AlongRatio >= 0.5 ? bay + 1 : bay;
+    }
+
+    /// <summary>
+    /// 결선맵 펜스 보기 끌기(sensor-mount-preset W4) — 센서를 칸 <paramref name="bayIndex"/> 의 (가로 몫 · 높이 · 펜스와 거리)로 옮긴다.
+    /// 프리셋은 그대로이고 프리셋과 다른 값은 "따로 고친 값"으로 남는다(같아지면 지운다 · 기둥 위로 뜨거나 바닥을 뚫지 않게 칸 범위 안으로).
+    /// </summary>
+    public static SensorMountSpec MoveTo(SensorMountSpec mount, SensorMountPreset preset, IReadOnlyList<FencePanelSpec> panels, int bayIndex,
+                                         double alongRatio, double heightM, double? depthM = null)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        ArgumentNullException.ThrowIfNull(preset);
+        if (panels is null || panels.Count == 0) return mount;
+        var bayAt = Math.Clamp(bayIndex, 0, panels.Count - 1);
+        var moved = mount with { Panel = PanelForBay(mount, preset, bayAt, panels.Count) };
+        var bay = FenceSampleBay.FromPanel(panels[bayAt]);
+        var now = SensorMountResolver.Resolve(preset, mount.MountOverride, bay);
+        var next = SensorMountResolver.Clamp(now with { AlongRatio = alongRatio, HeightM = heightM, DepthM = depthM ?? now.DepthM }, bay);
+        return moved with { MountOverride = SensorMountResolver.Diff(preset, next, bay) };
+    }
+
+    /// <summary>
+    /// 칸 하나의 붙는 점과 붙을 수 있나 — 모델이 허용하는 갈래이고, 지중 프리셋이면 바닥 점만 · 그 밖이면 바닥 점 빼고
+    /// (따로 고친 값은 붙는 곳 갈래를 바꾸지 못한다 — 갈래를 바꾸려면 다른 프리셋을 고른다).
+    /// </summary>
+    public static IReadOnlyList<(SensorSnapPoint Point, bool Allowed)> SnapChoices(FenceSampleBay bay, SensorModel? model, SensorMountPreset preset)
+    {
+        ArgumentNullException.ThrowIfNull(bay);
+        ArgumentNullException.ThrowIfNull(preset);
+        var ground = preset.Anchor == SensorMountAnchor.Ground;
+        return SensorSnapPoints.For(bay)
+            .Select(p => (p, (model is null || model.Allows(p.Kind)) && (p.Kind == SensorAnchorKind.Ground) == ground))
+            .ToList();
+    }
+
     /// <summary>범위 안 센서 — 고른 센서 · 그 모델 전체 · 제어기 전체(체인 차례).</summary>
     public static IReadOnlyList<int> TargetsOf(MountPresetApplyScope scope, IReadOnlyList<int> selected, IReadOnlyList<int> chain, Func<int, int> modelOf)
     {

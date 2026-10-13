@@ -179,6 +179,17 @@
 								ToolTipService.ShowOnDisabled="True"
 								Visibility="{Binding IsWiringVisible, Converter={StaticResource BoolToVisibility}}" />
 						</StackPanel>
+							<!--
+								센서 모델(sensor-mount-preset W1 여는 곳) — 프리셋 저장소(GIS 로컬 DB)가 있을 때만. 서버 판본과 무관해 조립기 묶음 밖에 둔다.
+								폭이 모자라면 커널 툴바가 Extra 묶음째 [⋯] 로 옮긴다.
+							-->
+							<Button
+								Margin="8,0,0,0"
+								AutomationProperties.AutomationId="Console.Devices.Toolbar.SensorModels"
+								Click="OnOpenSensorModels"
+								Content="센서 모델"
+								Style="{StaticResource Console.Button}"
+								Visibility="{Binding IsSensorModelsVisible, Converter={StaticResource BoolToVisibility}}" />
 						</StackPanel>
 					</c:ConsoleToolbar.Extra>
 				</c:ConsoleToolbar>

@@ -187,7 +187,18 @@ public class DeviceUiModule : Module
             builder.RegisterInstance(new Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringServerIdentity(() => _apiSetup?.Url))
                    .AsSelf().SingleInstance();
             builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.WiringLauncher>()
-                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher>().SingleInstance();
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.Wiring.IWiringLauncher>()
+                   // 센서 모델 창 입구(sensor-mount-preset W1) — 장비 창 [⋯] · 설정 창 레일 블록이 같은 창 관리자로 연다.
+                   .As<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.ISensorPresetLauncher>().SingleInstance();
+            // 설정 창 레일 "센서 모델" 블록 — 하나만 두고 OpenSensorModelsMessage 를 받는다(호스트는 블록을 끼우거나 메시지만 보내면 된다).
+            //   구독 실패는 삼킨다(입구 하나 때문에 부팅이 멈추지 않게).
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Consoles.SensorPresets.SensorModelsSettingsBlockViewModel>()
+                   .AsSelf().SingleInstance().AutoActivate()
+                   .OnActivated(e =>
+                   {
+                       try { if (e.Context.ResolveOptional<Caliburn.Micro.IEventAggregator>() is { } ea) e.Instance.AttachMessages(ea); }
+                       catch (Exception ex) { _log?.Warning($"[DeviceUi] 센서 모델 메시지 구독 실패(입구만 빠진다): {ex.Message}"); }
+                   });
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();

@@ -75,7 +75,7 @@ public static partial class FenceScene
         if (showRange)
             foreach (var (key, x) in world.X)
             {
-                var r = FenceWorld.RangeOf(world.Sensors[key].Kind);
+                var r = FenceWorld.RangeOf(world.Sensors[key]);         // 속성 프리셋 탐지 거리가 있으면 그것(sensor-mount-preset FR-14)
                 if (r <= 0) continue;
                 var c = p.P(x, 0, world.Sensors[key].Kind == FenceKind.Underground ? UZ : 0);
                 o.Add(new FenceShape(FenceShapeKind.Ellipse, FenceInk.Range, new[] { c }, r * u, Math.Max(6, r * u * p.Cz * 0.8)));
@@ -119,6 +119,8 @@ public static partial class FenceScene
                 o.Add(Poly(FenceInk.GapMark, new Point(c.X, c.Y - 7), new Point(c.X + 6, c.Y), new Point(c.X, c.Y + 7), new Point(c.X - 6, c.Y)));
                 o.Add(Text(FenceInk.GapText, new Point(c.X, c.Y - 12), $"빈틈 {gap.Metres:0}m", 10));
             }
+
+        o.AddRange(SpacingAlertMarks(world, p));
 
         return Legible(o, zoom);
     }
