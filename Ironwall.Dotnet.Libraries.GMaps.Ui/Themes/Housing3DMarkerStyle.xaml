@@ -52,8 +52,20 @@
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
                         <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
                         <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}" Strip="{TemplateBinding ComponentStrip}" IsEmphasized="{TemplateBinding IsComponentEmphasized}" MarkerPixels="{TemplateBinding ComponentScreenPixels}" LabelBox="{TemplateBinding ComponentLabelBox}"/>
+                        <!--  문 열림 표지(좌상단): 열려 있는 동안 공용 시계로 깜빡인다. 문짝 그림(DoorOpen)은 그대로 — 그 위에 얹는다.  -->
+                        <control:DoorOpenMark x:Name="PART_DoorOpenMark" Door="{TemplateBinding DoorStatus}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!--  문 표지 우선순위: 탐지 · 장애 · ERROR 깜빡임이 이긴다 → 문 표지는 깜빡이지 않고 계속 보인다.  -->
+                        <Trigger Property="EventStatus" Value="Detecting">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Fault">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="PART_Housing3D" Property="Highlighted" Value="True"/>
                         </Trigger>
@@ -199,6 +211,7 @@
                             <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_DoorOpenMark" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="IsPreviewMode" Value="True">
                             <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
@@ -206,6 +219,7 @@
                             <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_DoorOpenMark" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <!--  A9: 소프트웨어 렌더(Tier 0 · 원격 데스크톱)에서는 탐지 링을 1개만 — 표시등 색 · 깜빡임은 그대로.  -->
                         <Trigger Property="ReducedPulse" Value="True">
@@ -329,8 +343,20 @@
                         <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
                         <!--  부품 층: 우하단 건강 배지 · 좌하단 문 표시(3D 는 문짝이 위치를 그리므로 구동 중만). 깜빡이지 않는다.  -->
                         <control:ComponentStatusOverlay Health="{TemplateBinding ComponentHealth}" BadgeCount="{TemplateBinding ComponentBadgeCount}" Door="{TemplateBinding DoorIndicator}" ScreenScale="{TemplateBinding MarkerScreenScale}" ShowShape="{TemplateBinding ShowShape}" IsPreview="{TemplateBinding IsPreviewMode}" Strip="{TemplateBinding ComponentStrip}" IsEmphasized="{TemplateBinding IsComponentEmphasized}" MarkerPixels="{TemplateBinding ComponentScreenPixels}" LabelBox="{TemplateBinding ComponentLabelBox}"/>
+                        <!--  문 열림 표지(좌상단): 열려 있는 동안 공용 시계로 깜빡인다.  -->
+                        <control:DoorOpenMark x:Name="PART_DoorOpenMark" Door="{TemplateBinding DoorStatus}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!--  문 표지 우선순위: 탐지 · 장애 · ERROR 깜빡임이 이긴다 → 문 표지는 깜빡이지 않고 계속 보인다.  -->
+                        <Trigger Property="EventStatus" Value="Detecting">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Fault">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Setter TargetName="PART_DoorOpenMark" Property="IsSuppressed" Value="True"/>
+                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.5"/>
                         </Trigger>
@@ -445,6 +471,7 @@
                             <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_DoorOpenMark" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="IsPreviewMode" Value="True">
                             <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
@@ -452,6 +479,7 @@
                             <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_DoorOpenMark" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <!--  A9: 소프트웨어 렌더(Tier 0 · 원격 데스크톱)에서는 탐지 링을 1개만 — 표시등 색 · 깜빡임은 그대로.  -->
                         <Trigger Property="ReducedPulse" Value="True">
