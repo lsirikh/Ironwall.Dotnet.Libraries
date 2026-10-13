@@ -68,6 +68,12 @@ public sealed class CameraPopupHostOptions
     /// <summary>디버그 고장 주입 명령 허용(시험용). 운영에서는 false.</summary>
     public bool EnableDebugCommands { get; set; }
 
+    /// <summary>
+    /// RTSP 서버가 TCP 를 거절(461)할 때 LibVLC 가 UDP 로 갈아타는 것을 허용한다. 기본 false — 갈아타면 호스트가 들어오는
+    /// UDP 포트를 열어 Windows 방화벽 창이 뜨므로 막고, 그 스트림은 실패로 보인다. UDP 로만 되는 카메라가 있을 때만 켠다.
+    /// </summary>
+    public bool AllowRtspUdpFallback { get; set; }
+
     /// <summary>설정 경로를 절대 경로로(순수).</summary>
     /// <remarks>상대 경로가 없으면 실행 폴더 바로 아래 <see cref="DefaultExecutableName"/> 로 폴백한다
     /// (하나의 출력 폴더로 모아 빌드한 개발 · 시험 배치).</remarks>

@@ -196,6 +196,58 @@ public class StreamLoadPolicyTests
     public void should_classify_box_as_large_when_bigger_than_640x480(int width, int height, bool large)
         => Assert.Equal(large, DecodeProfile.IsLarge(width, height));
 
+    // ───────── 들어오는 포트(FW) ─────────
+
+    [Theory]
+    [InlineData("0.0.0.0", true)]           // live555 UDP 갈아타기가 묶던 주소(방화벽 창)
+    [InlineData("192.168.0.10", true)]
+    [InlineData("127.0.0.1", false)]
+    [InlineData("127.5.6.7", false)]
+    [InlineData("::", true)]
+    [InlineData("::1", false)]
+    [InlineData("::ffff:127.0.0.1", false)]
+    [InlineData("fe80::1", true)]
+    public void should_flag_only_non_loopback_ip_when_udp_bind_address_is_checked(string address, bool inbound)
+    {
+        var sockaddr = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(address), 5000).Serialize();
+        var bytes = new byte[sockaddr.Size];
+        for (int i = 0; i < bytes.Length; i++) bytes[i] = sockaddr[i];
+
+        Assert.Equal(inbound, UdpBindGuard.OpensInboundPort(bytes));
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0", "127.0.0.1")]
+    [InlineData("::", "::1")]
+    public void should_keep_family_and_port_when_ephemeral_udp_bind_is_moved_to_loopback(string address, string expected)
+    {
+        var sockaddr = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(address), 0).Serialize();
+        var bytes = new byte[sockaddr.Size];
+        for (int i = 0; i < bytes.Length; i++) bytes[i] = sockaddr[i];
+
+        UdpBindGuard.ToLoopback(bytes);
+
+        var moved = new System.Net.SocketAddress(sockaddr.Family, bytes.Length);
+        for (int i = 0; i < bytes.Length; i++) moved[i] = bytes[i];
+        var endpoint = (System.Net.IPEndPoint)new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0).Create(moved);
+        Assert.Equal((System.Net.IPAddress.Parse(expected), 0), (endpoint.Address, endpoint.Port));
+        Assert.False(UdpBindGuard.OpensInboundPort(bytes));
+    }
+
+    [Fact]
+    public void should_keep_rtsp_udp_fallback_off_by_default_and_round_trip_when_enabled()
+    {
+        var token = PipeNaming.CreateToken();
+        var plain = new HostLaunchArguments { ParentProcessId = 4321, PipeName = PipeNaming.Build(4321, token), Token = token };
+        var allowed = new HostLaunchArguments { ParentProcessId = 4321, PipeName = PipeNaming.Build(4321, token), Token = token, AllowRtspUdpFallback = true };
+
+        Assert.True(HostLaunchArguments.TryParse(plain.ToArgumentList(), out var parsedPlain, out _));
+        Assert.True(HostLaunchArguments.TryParse(allowed.ToArgumentList(), out var parsedAllowed, out _));
+
+        Assert.False(parsedPlain!.AllowRtspUdpFallback);
+        Assert.True(parsedAllowed!.AllowRtspUdpFallback);
+    }
+
     // ───────── 메모리 한도 ─────────
 
     [Theory]
