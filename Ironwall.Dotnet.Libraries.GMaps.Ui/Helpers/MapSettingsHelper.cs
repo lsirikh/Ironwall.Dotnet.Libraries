@@ -106,6 +106,43 @@ public static class MapSettingsHelper
         await SaveSettingAsync("MapInstrumentVisibility", vis, log);
     }
 
+    /// <summary>이벤트 시 지도 이동 설정 저장 (AppSettings.MapEventFlyTo) — event-map-flyto PRD §3. 저장 직전 이동 시간을 다시 정규화한다(0~5000 정수).</summary>
+    public static async Task SaveMapEventFlyToAsync(MapEventFlyToModel flyTo, ILogService? log = default)
+    {
+        flyTo.DurationMs = MapEventFlyToModel.NormalizeDurationMs(flyTo.DurationMs);
+        await SaveSettingAsync("MapEventFlyTo", flyTo, log);
+    }
+
+    /// <summary>
+    /// appsettings(AppSettings.MapEventFlyTo)에서 <b>동기</b> 로드 — DI 등록(startup)용. 키 없거나 실패면 기본값.
+    /// 이동 시간은 여기서 정규화(파일의 9999 · 999.9999 · 음수). 최대 줌은 지도 줌 범위를 아는 MapViewModel 이 자른다.
+    /// </summary>
+    public static MapEventFlyToModel LoadMapEventFlyTo(ILogService? log = default)
+    {
+        try
+        {
+            var fp = GetSettingsFilePath();
+            if (!File.Exists(fp)) return new MapEventFlyToModel();
+            var t = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["MapEventFlyTo"];
+            var model = new MapEventFlyToModel();
+            if (t != null)
+            {
+                model.IsDetectionEnabled = t["IsDetectionEnabled"]?.ToObject<bool>() ?? model.IsDetectionEnabled;
+                model.IsFaultEnabled = t["IsFaultEnabled"]?.ToObject<bool>() ?? model.IsFaultEnabled;
+                // 지도 범위를 아직 모른다 — 정수로만 만들고(넉넉한 0~64, int 넘침 방지) 범위 자르기는 MapViewModel 이 한다.
+                model.MaxZoom = MapEventFlyToModel.NormalizeMaxZoom(t["MaxZoom"]?.ToObject<double>() ?? model.MaxZoom, 0, 64);
+                model.DurationMs = MapEventFlyToModel.NormalizeDurationMs(t["DurationMs"]?.ToObject<double>() ?? model.DurationMs);
+            }
+            log?.Info($"[EventFlyTo] 로드(appsettings.MapEventFlyTo): {model}");
+            return model;
+        }
+        catch (Exception ex)
+        {
+            log?.Warning($"[EventFlyTo] 로드 실패, 기본값 사용: {ex.Message}");
+            return new MapEventFlyToModel();
+        }
+    }
+
     /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>

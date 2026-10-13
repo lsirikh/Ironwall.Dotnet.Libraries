@@ -81,6 +81,9 @@
     <!-- 지도 2.5D 기울이기 설정 모델(map-tilt-25d PRD FR-07, SIM-P002/P003) — 실코드 링크. ILogService 는 실코드, LogEventArgs 는 Stubs/ 최소 스텁(log4net 회피) -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\MapTiltModel.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Base\Services\ILogService.cs" />
+    <!-- 이벤트 시 지도 이동 설정 모델 · 보간/판정 순수 함수(event-map-flyto PRD) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps\Models\MapEventFlyToModel.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Utils\MapFlyToMath.cs" />
   </ItemGroup>
 
   <ItemGroup>
