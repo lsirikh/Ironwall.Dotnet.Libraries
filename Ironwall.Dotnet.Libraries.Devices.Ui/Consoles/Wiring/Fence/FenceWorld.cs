@@ -429,6 +429,10 @@ public sealed class FenceWorld
                     world._coil[key] = FenceStyleArt.CoilRadius(bay.Spec.HeightM * vpm);
                 world._lift[key] = presetLift;
                 world._marks[key] = new FenceMountMark(x, seat.Height, seat.Low, seat.High, pose.Anchor, seat.Mode);
+                // 화면 벌리기가 칩을 옮겨도 되는 가로 범위 — 기둥은 그 한 점, 그 밖(레일 · 메쉬 · 코일 · 담 · 바닥)은 그 칸 안
+                world._mountRange[key] = SensorMountResolver.KindOf(pose.Anchor) == SensorAnchorKind.Post
+                    ? (x, x)
+                    : (Math.Min(x, bay.StartM * upm), Math.Max(x, (bay.StartM + bay.SpanM) * upm));
                 top = Math.Max(top, presetLift + (presetKind == FenceKind.Multi ? FenceProjector.H + 56 : 110));
                 continue;
             }
@@ -504,6 +508,14 @@ public sealed class FenceWorld
 
     /// <summary>위치 프리셋으로 서서 물체에 붙은 센서인가 — 옆으로 벌리지 않는다.</summary>
     public bool IsMounted(int key) => _marks.ContainsKey(key);
+
+    private readonly Dictionary<int, (double Lo, double Hi)> _mountRange = new();
+
+    /// <summary>
+    /// 붙은 센서 칩을 화면에서 옆으로 옮겨도 그 물체 위에 남는 가로 범위(세계 단위) — 기둥이면 그 기둥 한 점, 레일 · 메쉬 · 코일 · 담 · 바닥이면 그 칸.
+    /// 붙지 않은 센서면 <c>null</c>(실창 4회차: 벌리기가 기둥 1 의 칩을 기둥 없는 허공 · 제어기 상자 위로 밀었다).
+    /// </summary>
+    public (double Lo, double Hi)? MountRangeOf(int key) => _mountRange.TryGetValue(key, out var r) ? r : null;
 
     /// <summary>기둥에 붙은 프리셋 센서의 x(세계 단위) — 기둥 솎기가 그 기둥을 남긴다(기둥이 사라져 센서가 뜨지 않게).</summary>
     public IEnumerable<double> PostMountXs => _marks.Values.Where(m => SensorMountResolver.KindOf(m.Anchor) == SensorAnchorKind.Post).Select(m => m.X);
