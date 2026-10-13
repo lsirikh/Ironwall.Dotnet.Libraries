@@ -24,6 +24,8 @@ public partial class FenceView : UserControl
         Loaded += OnLoaded;
         Unloaded += (_, _) => RenderCapability.TierChanged -= OnTierChanged;
         DataContextChanged += OnDataContextChanged;
+        IsVisibleChanged += (_, _) => { if (IsVisible) { ApplySplit(); HookCanvas(); } };
+        HookCanvas();
     }
 
     /// <summary>소프트웨어 렌더링(Tier 0)인가 — 순수 판정.</summary>
@@ -85,12 +87,7 @@ public partial class FenceView : UserControl
         RenderCapability.TierChanged += OnTierChanged;
         OnTierChanged(this, EventArgs.Empty);
         ApplySplit();
-        if (Canvas is { } canvas)
-        {
-            canvas.ViewChanged -= OnViewChanged;
-            canvas.ViewChanged += OnViewChanged;
-            OnViewChanged(canvas, EventArgs.Empty);
-        }
+        HookCanvas();
     }
 
     /// <summary>
@@ -120,13 +117,42 @@ public partial class FenceView : UserControl
     private void OnZoomIn(object sender, RoutedEventArgs e) => Canvas?.ZoomIn();
     private void OnZoomOut(object sender, RoutedEventArgs e) => Canvas?.ZoomOut();
 
+    /// <summary>
+    /// 자손 찾기 — 시각 트리 다음 논리 트리. 결선 창은 센서 단계로 열려 이 뷰가 든 칸이 접힌 채 Loaded 가 오는데, 그때는 템플릿이 안 붙어
+    /// 시각 자식이 0개라 캔버스 · 줌 글을 못 찾아 ViewChanged 를 구독하지 못했다(줌 글 '100%' 고정 · WIR-R27-152/153 실측). 논리 트리는 그때도 있다.
+    /// </summary>
     private static System.Collections.Generic.IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        var seen = new System.Collections.Generic.HashSet<DependencyObject>();
+        foreach (var hit in Visual<T>(root)) if (seen.Add(hit)) yield return hit;
+        foreach (var hit in Logical<T>(root)) if (seen.Add(hit)) yield return hit;
+    }
+
+    private static System.Collections.Generic.IEnumerable<T> Visual<T>(DependencyObject root) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
             if (child is T hit) yield return hit;
-            foreach (var deeper in Descendants<T>(child)) yield return deeper;
+            foreach (var deeper in Visual<T>(child)) yield return deeper;
         }
+    }
+
+    private static System.Collections.Generic.IEnumerable<T> Logical<T>(DependencyObject root) where T : DependencyObject
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            if (child is T hit) yield return hit;
+            foreach (var deeper in Logical<T>(child)) yield return deeper;
+        }
+    }
+
+    /// <summary>캔버스 ViewChanged 구독 — 만들 때 · Loaded · 보이게 될 때(멱등).</summary>
+    private void HookCanvas()
+    {
+        if (Canvas is not { } canvas) return;
+        canvas.ViewChanged -= OnViewChanged;
+        canvas.ViewChanged += OnViewChanged;
+        OnViewChanged(canvas, EventArgs.Empty);
     }
 }

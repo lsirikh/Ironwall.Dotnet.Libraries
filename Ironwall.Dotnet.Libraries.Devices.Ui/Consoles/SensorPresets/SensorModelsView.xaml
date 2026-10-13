@@ -37,11 +37,20 @@
 					<Button Margin="8,0,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Hide" Click="OnToggleHidden" Content="{Binding HideText}" IsEnabled="{Binding CanEdit}" Style="{DynamicResource Console.Button}" />
 					<Button Margin="6,0,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Delete" Click="OnDeleteModel" Content="삭제" IsEnabled="{Binding CanDeleteModel}" Style="{DynamicResource Console.Button}" />
 				</StackPanel>
+				<!--  가상화 끔 — 모델은 많아야 수십 줄이고, 가상화하면 화면 밖 새 줄이 자동화에 보이지 않는다(MNT-R28-102). 고르면 그 줄로 스크롤.  -->
 				<ListBox
 					AutomationProperties.AutomationId="Devices.SensorPresets.Models.List"
 					AutomationProperties.Name="센서 모델 목록"
 					ItemsSource="{Binding Models}"
-					SelectedItem="{Binding SelectedModel}">
+					SelectedItem="{Binding SelectedModel}"
+					SelectionChanged="OnListSelectionChanged"
+					VirtualizingPanel.IsVirtualizing="False">
+					<ListBox.ItemContainerStyle>
+						<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+							<Setter Property="AutomationProperties.AutomationId" Value="{Binding Model.Id, StringFormat=Devices.SensorPresets.Models.Row.{0}}" />
+							<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+						</Style>
+					</ListBox.ItemContainerStyle>
 					<ListBox.ItemTemplate>
 						<DataTemplate>
 							<DockPanel>
@@ -53,6 +62,17 @@
 				</ListBox>
 			</DockPanel>
 			<DockPanel>
+				<!--  모델 이름 — 사용자 추가 모델만 고친다(Enter · 칸을 떠날 때 저장), 회사 기본 7종은 읽기 전용  -->
+				<DockPanel Margin="0,0,0,6" DockPanel.Dock="Top">
+					<TextBlock Margin="0,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left" Text="이름" />
+					<TextBox
+						AutomationProperties.AutomationId="Devices.SensorPresets.Models.Name"
+						AutomationProperties.Name="모델 이름"
+						IsReadOnly="{Binding IsModelNameReadOnly, Mode=OneWay}"
+						KeyDown="OnNameKey"
+						LostKeyboardFocus="OnNameLostFocus"
+						Text="{Binding ModelNameText, UpdateSourceTrigger=PropertyChanged}" />
+				</DockPanel>
 				<TextBlock Margin="0,0,0,6" AutomationProperties.AutomationId="Devices.SensorPresets.Models.Header" DockPanel.Dock="Top" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ModelHeaderText}" />
 				<TabControl AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tabs" SelectedIndex="{Binding SelectedTab}">
 					<TabItem AutomationProperties.AutomationId="Devices.SensorPresets.Models.Tab.Mount" Header="{Binding MountTabText}">
@@ -69,7 +89,16 @@
 								AutomationProperties.Name="위치 프리셋 목록"
 								ItemsSource="{Binding MountPresets}"
 								MouseDoubleClick="OnMountDoubleClick"
-								SelectedItem="{Binding SelectedMountPreset}">
+								SelectedItem="{Binding SelectedMountPreset}"
+								SelectionChanged="OnListSelectionChanged"
+								VirtualizingPanel.IsVirtualizing="False">
+								<!--  행 id = GIS DB 프리셋 id(`.Mount.Row.{id}`) — 자기 행만 지우는 시험 가드(MNT-R28-224)  -->
+								<ListBox.ItemContainerStyle>
+									<Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+										<Setter Property="AutomationProperties.AutomationId" Value="{Binding Preset.Id, StringFormat=Devices.SensorPresets.Models.Mount.Row.{0}}" />
+										<Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+									</Style>
+								</ListBox.ItemContainerStyle>
 								<ListBox.ItemTemplate>
 									<DataTemplate>
 										<DockPanel>

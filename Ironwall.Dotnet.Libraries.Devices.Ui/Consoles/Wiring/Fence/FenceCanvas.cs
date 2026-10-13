@@ -75,6 +75,9 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private IReadOnlyList<int> _dragKeys = Array.Empty<int>();
     // 9점 격자 끌기 — 잡은 센서가 갈 수 있는 점(칸 · 그림 좌표 · 센서 있음) · 포인터 아래 점 · 계획 · 알약 글자
     private IReadOnlyList<(FenceGridCell Cell, Point At, bool Occupied)> _snapPoints = Array.Empty<(FenceGridCell, Point, bool)>();
+
+    /// <summary>격자 끌기 — 누른 자리 → 잡은 센서 자기 점(화면 차이). 포인터 근처에 점이 없을 때 이것으로 다시 찾는다.</summary>
+    private Vector _grabOffset;
     private FenceGridCell? _snapTarget;
     private IReadOnlyDictionary<int, SensorMountSpec?>? _snapPlan;
     private string? _snapLabel;
@@ -878,7 +881,11 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                 }
                 _dropKind = DropKind.Chain;
                 // 화면 반경 안의 가장 가까운 빨강 점 — 바뀔 때만 다시 그린다(NFR-02)
-                var at = FenceGesture.NearestSnap(_snapPoints.Select(p => WorldToScreen(p.At)).ToList(), now, SNAP_RADIUS_PX);
+                var dots = _snapPoints.Select(p => WorldToScreen(p.At)).ToList();
+                var at = FenceGesture.NearestSnap(dots, now, SNAP_RADIUS_PX);
+                // 포인터 근처에 점이 없으면 "잡은 센서의 자기 점 + 끈 만큼" 으로 다시 본다 — 칩 몸(브래킷 · 깊이만큼 떨어짐)을 잡고 끌면
+                // 포인터가 점에서 24 px 넘게 비켜 있어 여러 대 함께 끌기가 늘 제자리였다(SC-FEN24-004 실측).
+                if (at < 0 && _grabOffset != default) at = FenceGesture.NearestSnap(dots, now + _grabOffset, SNAP_RADIUS_PX);
                 FenceGridCell? cell = at >= 0 ? _snapPoints[at].Cell : null;
                 if (cell == _snapTarget) return;
                 _snapTarget = cell;
@@ -942,6 +949,13 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (points.Count == 0) return false;
         var occupied = vm.FenceOccupiedCells(_dragKeys);
         _snapPoints = points.Select(p => (p.Cell, SnapAt(p.Mount, geometry), occupied.Contains((p.Cell, p.Mount.Lane)))).ToList();
+        // 잡은 센서의 자기 점(지금 칸) — 누른 자리에서 그 점까지의 차이(화면). 끄는 동안 포인터 + 이 차이로도 점을 찾는다.
+        _grabOffset = default;
+        if (_press is { } press && vm.FenceGridCellOf(grabbed) is { } own)
+        {
+            var mine = _snapPoints.Where(p => p.Cell == own).Select(p => WorldToScreen(p.At)).ToList();
+            if (mine.Count > 0) _grabOffset = mine.OrderBy(p => (p - press.Start).LengthSquared).First() - press.Start;
+        }
         _snapTarget = null;
         _snapPlan = null;
         _snapLabel = null;
@@ -1084,6 +1098,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _dragKeys = Array.Empty<int>();
         _band = null;
         _snapPoints = Array.Empty<(FenceGridCell, Point, bool)>();
+        _grabOffset = default;
         _snapTarget = null;
         _snapPlan = null;
         _snapLabel = null;

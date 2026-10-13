@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
+﻿using Ironwall.Dotnet.Libraries.Utils.Consoles.Dialogs;
+using Ironwall.Dotnet.Monitoring.Models.Fences.Presets;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -80,7 +81,7 @@ public readonly record struct MountBayProjection(MountView View, double Width, d
 /// 담장 한 칸 그림(W2) — 위 · 앞 · 옆 · 3D 미리보기 중 하나. 붙는 점(회색 점) · 붙을 점(빨강 + 고리) · 흐린 미리보기 · 원래 자리(옅게) · 방향 손잡이.
 /// 끌기는 캡처 방식(데드존 8 · 아이콘을 잡아야 시작 · Esc 원위치 · Alt 자유 위치 · drag-first-ux), 키보드는 Tab · 화살표.
 /// </summary>
-public sealed class MountBayCanvas : FrameworkElement
+public sealed class MountBayCanvas : FrameworkElement, IDialogDragSource
 {
     private const double DEADZONE = 8.0;
 
@@ -209,6 +210,10 @@ public sealed class MountBayCanvas : FrameworkElement
         DrawSensor(dc, p, vm, vm.Pose, body, vm.IsDragging ? 0.55 : 1.0, accent, !IsPreview3D);
 
         if (vm.AttachText is { Length: > 0 } attach && !IsPreview3D) Label(dc, attach, new Point(8, 6), accent);
+
+        // 키보드 포커스 — 점선 테두리(이 그림에서 Tab = 다음 붙는 점 · 화살표 = 10 cm)
+        if (IsKeyboardFocused && !IsPreview3D)
+            dc.DrawRectangle(null, new Pen(accent, 1.5) { DashStyle = DashStyles.Dash }, new Rect(1.5, 1.5, Math.Max(0, ActualWidth - 3), Math.Max(0, ActualHeight - 3)));
     }
 
     /// <summary>센서 아이콘 — 모델 실제 치수(과장 3배)로, 모양마다 다르게. 고른 센서 = 테두리 + 손잡이(모양).</summary>
@@ -295,6 +300,33 @@ public sealed class MountBayCanvas : FrameworkElement
         if ((c - at).Length <= 22) { _pressed = at; CaptureMouse(); e.Handled = true; }
     }
 
+    /// <summary>
+    /// 빈 곳을 눌러도 포커스는 그림에 남긴다 — 처리하지 않으면 바깥 <see cref="System.Windows.Controls.ScrollViewer"/> 가 MouseDown 에서 포커스를 가져가
+    /// Tab 이 붙는 점을 돌지 않고 입력 칸(이름 → 이름 제안 → 칸 폭)으로 빠졌다(MNT-R28-214 실측).
+    /// </summary>
+    protected override void OnMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.ChangedButton != MouseButton.Left || IsPreview3D || Editor is null) return;
+        Focus();
+        e.Handled = true;
+    }
+
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnGotKeyboardFocus(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnLostKeyboardFocus(e);
+        InvalidateVisual();
+    }
+
+    /// <summary>끄는 중인가 — 대화창 틀이 읽고 Esc 를 닫기로 먹지 않는다(<see cref="IDialogDragSource"/> · MNT-R28-211).</summary>
+    public bool IsDragging => _dragging || Editor?.IsDragging == true;
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
@@ -356,7 +388,15 @@ public sealed class MountBayCanvas : FrameworkElement
         switch (key)
         {
             case Key.Escape:
-                if (_dragging) { _dragging = false; _pressed = null; if (IsMouseCaptured) ReleaseMouseCapture(); vm.CancelDrag(); e.Handled = true; }
+                // 끄는 중일 때만 소비 — 틀(ConsoleDialogFrame)은 캡처가 안쪽에 있으면 Esc 를 닫기로 먹지 않고 여기로 흘려보낸다(MNT-R28-211)
+                if (_dragging || vm.IsDragging)
+                {
+                    _dragging = false;
+                    _pressed = null;
+                    vm.CancelDrag();
+                    if (IsMouseCaptured) ReleaseMouseCapture();
+                    e.Handled = true;
+                }
                 break;
             case Key.Tab:
                 vm.NextSnapPoint(shift);

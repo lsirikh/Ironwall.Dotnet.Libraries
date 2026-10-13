@@ -27,9 +27,45 @@ public partial class SensorModelsView : UserControl
 
     private void OnClose(object sender, RoutedEventArgs e) => Run(() => ViewModel?.CloseAsync() ?? System.Threading.Tasks.Task.CompletedTask);
 
-    /// <summary>[+ 모델] — 이름은 "새 모델 n", 종류 · 모양은 스마트로 시작하고 목록에서 고친다.</summary>
+    /// <summary>[+ 모델] — 이름은 "새 모델 n", 종류 · 모양은 스마트로 시작. 만든 뒤 이름 칸에 포커스(바로 고쳐 쓴다 · MNT-R28-102).</summary>
     private void OnAddModel(object sender, RoutedEventArgs e)
-        => Run(async () => { if (ViewModel is { } vm) await vm.AddModelAsync($"새 모델 {vm.Models.Count + 1}", EnumDeviceType.SmartSensor, SensorShape.Smart); });
+        => Run(async () =>
+        {
+            if (ViewModel is not { } vm) return;
+            if (await vm.AddModelAsync(vm.NextNewModelName(), EnumDeviceType.SmartSensor, SensorShape.Smart) is null) return;
+            if (FindById(this, "Devices.SensorPresets.Models.Name") is TextBox box)
+            {
+                box.Focus();
+                box.SelectAll();
+            }
+        });
+
+    /// <summary>목록에서 고른 줄이 보이게 — 새 줄 · 다시 읽은 뒤의 선택이 화면 밖에 있지 않도록.</summary>
+    private void OnListSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox { SelectedItem: { } item } list) list.ScrollIntoView(item);
+    }
+
+    /// <summary>이름 칸 Enter — 저장(창 기본 단추로 새지 않게 소비).</summary>
+    private void OnNameKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || ViewModel is not { } vm) return;
+        e.Handled = true;
+        Run(async () => await vm.RenameModelAsync());
+    }
+
+    private void OnNameLostFocus(object sender, KeyboardFocusChangedEventArgs e) => Run(async () => { if (ViewModel is { } vm) await vm.RenameModelAsync(); });
+
+    private static FrameworkElement? FindById(DependencyObject root, string id)
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement fe && System.Windows.Automation.AutomationProperties.GetAutomationId(fe) == id) return fe;
+            if (FindById(child, id) is { } deeper) return deeper;
+        }
+        return null;
+    }
 
     private void OnToggleHidden(object sender, RoutedEventArgs e) => Run(async () => { if (ViewModel is { } vm) await vm.ToggleHiddenAsync(); });
     private void OnDeleteModel(object sender, RoutedEventArgs e) => Run(async () => { if (ViewModel is { } vm) await vm.DeleteModelAsync(); });
