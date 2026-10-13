@@ -142,7 +142,7 @@
 									<ProgressBar
 										Height="18"
 										Minimum="0" Maximum="100"
-										Value="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}}"
+										Value="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
 										Foreground="{DynamicResource PrimaryBrush}" />
 									<TextBlock
 										HorizontalAlignment="Right"

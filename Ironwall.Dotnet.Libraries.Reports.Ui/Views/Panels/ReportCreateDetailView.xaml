@@ -227,7 +227,7 @@
 			Foreground="{DynamicResource PrimaryBrush}"
 			Maximum="100"
 			Minimum="0"
-			Value="{Binding CreateViewModel.GenProgress}"
+			Value="{Binding CreateViewModel.GenProgress, Mode=OneWay}"
 			Visibility="{Binding CreateViewModel.IsGenerating, Converter={StaticResource BoolToVisibility}}" />
 	</StackPanel>
 </UserControl>

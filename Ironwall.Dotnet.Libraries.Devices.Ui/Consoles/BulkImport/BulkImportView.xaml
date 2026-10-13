@@ -136,7 +136,7 @@
 							AutomationProperties.AutomationId="Devices.BulkImport.Progress"
 							Maximum="{Binding ProgressMaximum}"
 							Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibility}}"
-							Value="{Binding ProgressValue}" />
+							Value="{Binding ProgressValue, Mode=OneWay}" />
 						<TextBlock
 							Margin="0,0,12,0"
 							AutomationProperties.AutomationId="Devices.BulkImport.Status"
