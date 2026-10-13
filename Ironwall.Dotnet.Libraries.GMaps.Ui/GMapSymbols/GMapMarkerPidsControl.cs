@@ -253,6 +253,21 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
             new PropertyMetadata(DoorIndicatorKind.None));
     public static readonly DependencyProperty DoorIndicatorProperty = DoorIndicatorPropertyKey.DependencyProperty;
 
+    /// <summary>
+    /// 알림용 문 상태 — UIA 이름 · 툴팁이 읽는다. <see cref="DoorIndicator"/>(좌하단 배지)와 달리 문짝이 위치를 그리는 3D 에서도
+    /// 열림 · 닫힘을 그대로 낸다(그림에 보이는 것을 글로도 읽을 수 있어야 한다). 문 없는 종류는 None.
+    /// </summary>
+    public DoorIndicatorKind DoorStatus
+    {
+        get => (DoorIndicatorKind)GetValue(DoorStatusProperty);
+        private set => SetValue(DoorStatusPropertyKey, value);
+    }
+
+    private static readonly DependencyPropertyKey DoorStatusPropertyKey =
+        DependencyProperty.RegisterReadOnly(nameof(DoorStatus), typeof(DoorIndicatorKind), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(DoorIndicatorKind.None));
+    public static readonly DependencyProperty DoorStatusProperty = DoorStatusPropertyKey.DependencyProperty;
+
     /// <summary>아이콘 툴팁 — 제목 + (문) + (부품 절). 부품 축도 문도 없으면 제목만(종전과 같다).</summary>
     public string? SymbolToolTip
     {
@@ -394,9 +409,11 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         ComponentHealth = summary.Health;
         ComponentBadgeCount = summary.BadgeCount;
         ComponentStrip = summary.Strip;
-        DoorIndicator = DoorIndicatorRules.Resolve(
-            Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(DeviceType), DoorState, summary.DoorMotion, DoorLeavesShowPosition);
-        SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorIndicator, summary);
+        var hasDoor = Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(DeviceType);
+        DoorIndicator = DoorIndicatorRules.Resolve(hasDoor, DoorState, summary.DoorMotion, DoorLeavesShowPosition);
+        // 글(UIA 이름 · 툴팁)은 배지 규칙과 갈라 낸다 — 3D 는 배지를 빼도 "문 열림/닫힘" 은 읽혀야 한다(2026-10-13 실창: 3D 마커 이름에 문 절 없음).
+        DoorStatus = DoorIndicatorRules.Resolve(hasDoor, DoorState, summary.DoorMotion, leavesShowPosition: false);
+        SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorStatus, summary);
     }
 
     /// <summary>
