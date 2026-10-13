@@ -28,9 +28,11 @@ public sealed record FencePresetSnapPoint(int Bay, SensorSnapPoint Point, bool A
 /// </summary>
 public sealed partial class WiringViewModel
 {
-    /// <summary>위치 프리셋으로 서는 센서인가 — 끌면 9점 격자 대신 붙는 점을 쓴다.</summary>
+    /// <summary>
+    /// 사용자가 고른 위치 프리셋으로 서는 센서인가 — 한 대를 끌면 9점 격자 대신 붙는 점을 쓴다. 저장 때 이관만 된 자리는 거짓(9자리 · 기존 끌기 그대로).
+    /// </summary>
     public bool IsPresetMounted(int key)
-        => HasSensorPresets && _board.FenceLayout.IsActive && _board.FenceLayout.MountOf(key) is { MountPresetId: { } id } && MountPresetById(id) is not null;
+        => HasSensorPresets && _board.FenceLayout.IsActive && _board.FenceLayout.MountOf(key) is { IsPresetChosen: true, MountPresetId: { } id } && MountPresetById(id) is not null;
 
     private SensorMountPreset? PresetOfKey(int key)
         => _board.FenceLayout.MountOf(key) is { MountPresetId: { } id } ? MountPresetById(id) : null;
@@ -148,7 +150,7 @@ public sealed partial class WiringViewModel
     {
         var targets = (keys ?? Array.Empty<int>()).Where(IsPresetMounted).Distinct().ToList();
         if (IsBusy || targets.Count == 0 || !double.IsFinite(deltaM) || deltaM == 0) return false;
-        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+        var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => targets.Contains(p.Key) && p.Value.MountPresetId is { } id && MountPresetById(id) is { } preset
                 ? WiringPresetPlan.WithOverride(p.Value, preset, l.Panels, pose => pose with { HeightM = Math.Round((pose.HeightM + deltaM) * 100) / 100 })
                 : p.Value)));
@@ -165,7 +167,7 @@ public sealed partial class WiringViewModel
         var fromBay = FencePresetBayOf(key) ?? bay;
         var rest = _board.Chain.Keys.Where(k => k != key).ToList();
         var tie = bay >= fromBay ? rest.Append(key).ToList() : rest.Prepend(key).ToList();
-        var ok = EditFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
+        var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => p.Key == key ? WiringPresetPlan.MoveTo(p.Value, preset, l.Panels, bay, alongRatio, heightM, depthM) : p.Value)), tie);
         StatusText = ok ? $"설치 위치 — {_board.Find(key)?.Display}: 망 {bay + 1} · {what} (프리셋에서 바뀜 · [프리셋으로] 로 되돌림)"
                         : "제자리 — 바뀐 것이 없습니다.";

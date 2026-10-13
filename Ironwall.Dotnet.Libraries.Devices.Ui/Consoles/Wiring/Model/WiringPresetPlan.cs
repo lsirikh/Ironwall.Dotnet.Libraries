@@ -44,10 +44,10 @@ public static class WiringPresetPlan
     {
         ArgumentNullException.ThrowIfNull(mount);
         ArgumentNullException.ThrowIfNull(preset);
-        if (panels is null || panels.Count == 0) return mount with { ModelId = preset.ModelId, MountPresetId = preset.Id, MountOverride = null };
+        if (panels is null || panels.Count == 0) return mount with { ModelId = preset.ModelId, MountPresetId = preset.Id, MountOverride = null, MountPresetChosen = true };
         var bayIndex = SensorMountMigration.BayIndexOf(mount, panels.Count, preset.AlongRatio);
         var pose = SensorMountResolver.Resolve(preset, null, FenceSampleBay.FromPanel(panels[bayIndex]));
-        var next = SensorMountMigration.WithPose(mount, bayIndex, pose) with { ModelId = preset.ModelId, MountPresetId = preset.Id, MountOverride = null };
+        var next = SensorMountMigration.WithPose(mount, bayIndex, pose) with { ModelId = preset.ModelId, MountPresetId = preset.Id, MountOverride = null, MountPresetChosen = true };
         return FenceLayoutMath.Normalize(next, panels);
     }
 
@@ -62,7 +62,7 @@ public static class WiringPresetPlan
         var bay = FenceSampleBay.FromPanel(panels[SensorMountMigration.BayIndexOf(mount, panels.Count, preset.AlongRatio)]);
         var now = SensorMountResolver.Resolve(preset, mount.MountOverride, bay);
         var next = SensorMountResolver.Clamp(change(now), bay);
-        return mount with { MountOverride = SensorMountResolver.Diff(preset, next, bay) };
+        return mount with { MountOverride = SensorMountResolver.Diff(preset, next, bay), MountPresetChosen = true };
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public static class WiringPresetPlan
         var bay = FenceSampleBay.FromPanel(panels[bayAt]);
         var now = SensorMountResolver.Resolve(preset, mount.MountOverride, bay);
         var next = SensorMountResolver.Clamp(now with { AlongRatio = alongRatio, HeightM = heightM, DepthM = depthM ?? now.DepthM }, bay);
-        return moved with { MountOverride = SensorMountResolver.Diff(preset, next, bay) };
+        return moved with { MountOverride = SensorMountResolver.Diff(preset, next, bay), MountPresetChosen = true };
     }
 
     /// <summary>
@@ -161,6 +161,29 @@ public static class WiringPresetPlan
             if (Math.Abs(presetAlong - wanted) > 1e-6) overrides = (overrides ?? new SensorMountOverride()) with { AlongRatio = wanted };
         }
         return mount with { ModelId = modelId, MountPresetId = found.Preset.Id, MountOverride = overrides };
+    }
+
+    /// <summary>
+    /// 9자리 편집(격자 끌기 · Ctrl+←/→ · Alt+↑/↓ · 3×3 고르개 · 높이 조정 · 줄 바꾸기 …)이 프리셋 자리의 위치 칸(망 · 자리 · 열 · 높이 조정 · 줄)을
+    /// 바꿨으면 그 센서의 위치 프리셋 · 따로 고친 값 · 고름 표지를 지운다(모델 · 속성 프리셋은 둔다) — 9자리로 그려져 칩이 옮긴 곳에 서고,
+    /// 저장 때 다시 이관된다(FR-19). 프리셋 칸이 같이 바뀐 자리(프리셋 편집)는 건드리지 않는다. 바뀐 것이 없으면 <paramref name="after"/> 그대로.
+    /// </summary>
+    public static IReadOnlyDictionary<int, SensorMountSpec> ReleaseMovedPresets(IReadOnlyDictionary<int, SensorMountSpec>? before, IReadOnlyDictionary<int, SensorMountSpec> after)
+    {
+        ArgumentNullException.ThrowIfNull(after);
+        if (before is null || before.Count == 0) return after;
+        Dictionary<int, SensorMountSpec>? result = null;
+        foreach (var (key, next) in after)
+        {
+            if (next is not { HasMountPreset: true } || !before.TryGetValue(key, out var prev) || prev is null) continue;
+            var presetSame = prev.MountPresetId == next.MountPresetId && Equals(prev.MountOverride, next.MountOverride) && prev.MountPresetChosen == next.MountPresetChosen;
+            var placeMoved = prev.Panel != next.Panel || prev.Spot != next.Spot || prev.Column != next.Column || prev.Lane != next.Lane
+                             || Math.Abs(prev.HeightOffsetM - next.HeightOffsetM) > 1e-9;
+            if (!presetSame || !placeMoved) continue;
+            result ??= new Dictionary<int, SensorMountSpec>(after);
+            result[key] = next with { MountPresetId = null, MountOverride = null, MountPresetChosen = null };
+        }
+        return result ?? after;
     }
 
     /// <summary>"프리셋에서 바뀜: 높이 +0.20 · 방향 60°" — 고친 칸이 없으면 빈 글자.</summary>

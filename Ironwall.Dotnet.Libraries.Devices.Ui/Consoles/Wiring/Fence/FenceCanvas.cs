@@ -1381,14 +1381,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             }
             if (keys.Count == 0) return false;
             var up = k == Key.Up;
-            // 위치 프리셋으로 서는 센서만이면 — 높이를 따로 고친 값으로 10 cm(Shift 1 cm · sensor-mount-preset W4 화살표)
-            if (keys.All(vm.IsPresetMounted))
-            {
-                var step = (modifiers & ModifierKeys.Shift) != 0 ? SensorMountResolver.FINE_NUDGE_M : SensorMountResolver.NUDGE_M;
-                vm.FenceNudgePresetHeight(keys, up ? step : -step);
-                if (chip is not null) FocusUnitOf(keys[0]);
-                return true;
-            }
+            // 위치 프리셋 센서도 같은 계약(2026-10-13 실창 회귀 — 프리셋 높이 키가 이 키를 가로챘었다). 프리셋 높이는 설치 위치 절 높이 칸 · 끄는 중 Tab.
             if ((modifiers & ModifierKeys.Shift) != 0) vm.FenceNudgeHeight(keys, up ? FenceLayoutMath.NUDGE_M : -FenceLayoutMath.NUDGE_M);
             else vm.FenceStepStop(keys, up ? 1 : -1);
             if (chip is not null) FocusUnitOf(keys[0]);
@@ -1427,10 +1420,8 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             {
                 if (!chip.Keys.Any(vm.IsFenceSelected)) vm.FenceSelectSensors(chip.Keys);
                 // Ctrl+←/→ = 다음 격자 점(9점 격자 · 망 오른쪽 열 다음은 다음 기둥 · 망) · Alt+Shift+←/→ = 옆 망(기둥)으로 한 칸(보조)
+                // 위치 프리셋 센서도 9점 격자(2026-10-13 실창 회귀 — 붙는 점 걸음이 가로챘었다 · 붙는 점은 끄는 중 Tab/Shift+Tab)
                 if (alt || !_scene.IsLayout) vm.FenceMoveSelectedByPanels(k == Key.Left ? -1 : 1);
-                // 위치 프리셋으로 서는 센서 한 대 — 다음 · 이전 붙는 점(칸 끝 다음은 옆 칸 · sensor-mount-preset W4)
-                else if (chip.Kind == FenceChipKind.Sensor && vm.FenceDragKeys(first) is { Count: 1 } && vm.IsPresetMounted(first))
-                    vm.FenceStepPresetSnap(first, k == Key.Left ? -1 : 1);
                 else vm.FenceStepGrid(chip.Kind == FenceChipKind.Group ? chip.Keys : vm.FenceDragKeys(first), k == Key.Left ? -1 : 1);
                 FocusUnitOf(first);
                 return true;
