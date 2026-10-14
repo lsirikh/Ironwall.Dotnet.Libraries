@@ -69,23 +69,107 @@ public static class OperationEventText
     }
 
     /// <summary>
-    /// 상세(JSONB)를 "키=값 · 키=값" 한 줄로 편다. 키 이름을 해석하지 않는다 — 사유마다 키가 다르고
-    /// 문서와 배포가 어긋난 자리라(OperationEventDto.Detail 주석) 받은 그대로 보인다. 비었으면 null.
+    /// 상세(JSONB)를 사람이 읽는 한 줄로 편다. 비었으면 null.
+    /// <para>아는 키(브로커 연동설계 §6.7 「detail — 발생 경로별 키」)는 말로 바꾼다:
+    /// 문 · 통문 = <c>previous</c> → <c>state</c>(옛 행은 <c>door_status</c> · <c>gate_status</c>) · <c>device_status</c>(점검 중 · 장비 장애만) /
+    /// 함체 환경 = <c>field</c> · <c>value</c> · <c>threshold</c> · <c>direction</c> → "온도 65℃ — 기준 60℃ 초과" /
+    /// <c>suppressed_schedule_id</c> → "억제 시간 중 발생" / 매니저 문구 <c>display.title</c> · <c>display.message[]</c>(파싱 · 분기하지 않고 보이기만).
+    /// 식별용 키(<c>component</c> · <c>metric_id</c>)는 화면에 내지 않는다.</para>
+    /// <para>모르는 키는 지우지 않고 "키=값" 으로 뒤에 붙인다 — 서버가 키를 늘려도 정보가 사라지지 않게.</para>
     /// </summary>
     public static string? DetailText(JObject? detail)
     {
         if (detail is null || !detail.HasValues) return null;
-        var parts = detail.Properties()
-                          .Select(p => $"{p.Name}={ValueText(p.Value)}")
-                          .ToList();
+        var parts = new List<string>();
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "component", "metric_id" };
+
+        // 매니저가 실은 사람용 문구 — 있으면 맨 앞(이슈 #7 · 21).
+        if (detail["display"] is JObject display)
+        {
+            used.Add("display");
+            var title = display.Value<string>("title");
+            if (!string.IsNullOrWhiteSpace(title)) parts.Add(title.Trim());
+            if (display["message"] is JArray messages)
+                parts.AddRange(messages.Select(m => m.Type == JTokenType.String ? m.Value<string>() : null)
+                                       .Where(m => !string.IsNullOrWhiteSpace(m))!);
+        }
+
+        // 문 · 통문 — 지금 상태(이전 상태).
+        var state = Str(detail, "state") ?? Str(detail, "door_status") ?? Str(detail, "gate_status");
+        if (state is not null)
+        {
+            used.UnionWith(new[] { "state", "door_status", "gate_status", "previous" });
+            var previous = Str(detail, "previous");
+            parts.Add(previous is null ? DoorStateText(state) : $"{DoorStateText(previous)} → {DoorStateText(state)}");
+        }
+        var deviceStatus = Str(detail, "device_status");
+        if (deviceStatus is not null)
+        {
+            used.Add("device_status");
+            if (string.Equals(deviceStatus, "DEACTIVATED", StringComparison.OrdinalIgnoreCase)) parts.Add("장비 점검 중");
+            else if (string.Equals(deviceStatus, "ERROR", StringComparison.OrdinalIgnoreCase)) parts.Add("장비 장애 상태");
+        }
+
+        // 함체 환경 — 계측값과 넘은 경계.
+        var field = Str(detail, "field");
+        if (field is not null && detail["value"] is JToken value && value.Type is JTokenType.Integer or JTokenType.Float)
+        {
+            used.UnionWith(new[] { "field", "value", "threshold", "direction" });
+            var (name, unit) = MetricText(field);
+            var text = $"{name} {Number(value)}{unit}";
+            if (detail["threshold"] is JToken threshold && threshold.Type is JTokenType.Integer or JTokenType.Float)
+            {
+                var direction = Str(detail, "direction");
+                var word = string.Equals(direction, "LOW", StringComparison.OrdinalIgnoreCase) ? "미만" : "초과";
+                text += $" — 기준 {Number(threshold)}{unit} {word}";
+            }
+            parts.Add(text);
+        }
+
+        if (detail["suppressed_schedule_id"] is JToken suppressed && suppressed.Type != JTokenType.Null)
+        {
+            used.Add("suppressed_schedule_id");
+            parts.Add("억제 시간 중 발생");
+        }
+
+        // 모르는 키 — 받은 그대로.
+        parts.AddRange(detail.Properties().Where(p => !used.Contains(p.Name))
+                             .Select(p => $"{p.Name}={ValueText(p.Value)}"));
         return parts.Count == 0 ? null : string.Join(" · ", parts);
+
+        static string? Str(JObject o, string key)
+            => o[key] is JToken t && t.Type == JTokenType.String && !string.IsNullOrWhiteSpace(t.Value<string>()) ? t.Value<string>()!.Trim() : null;
+
+        static string Number(JToken t) => t.Type == JTokenType.Integer
+            ? t.Value<long>().ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : t.Value<double>().ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         static string ValueText(JToken token) => token.Type switch
         {
             JTokenType.Null => "null",
             JTokenType.String => token.Value<string>() ?? string.Empty,
-            JTokenType.Object or JTokenType.Array => token.ToString(Newtonsoft.Json.Formatting.None),
             _ => token.ToString(Newtonsoft.Json.Formatting.None),
         };
     }
+
+    /// <summary>문 위치 상태 글자 — 모르는 값은 원문.</summary>
+    private static string DoorStateText(string state) => state.ToUpperInvariant() switch
+    {
+        "OPEN" or "OPENED" => "열림",
+        "CLOSED" or "CLOSE" => "닫힘",
+        "RUNNING" => "움직이는 중",
+        _ => state,
+    };
+
+    /// <summary>함체 계측 이름 · 단위(서버 <c>device_config.thresholds</c> 의 7개 경계). 모르는 이름은 원문 · 단위 없음.</summary>
+    private static (string Name, string Unit) MetricText(string field) => field.ToLowerInvariant() switch
+    {
+        "temperature" => ("온도", "℃"),
+        "humidity" => ("습도", "%"),
+        "voltage" => ("전압", "V"),
+        "current" => ("전류", "A"),
+        "vibration" => ("진동", ""),
+        "ups_battery_level" => ("UPS 배터리", "%"),
+        _ => (field, ""),
+    };
 }
