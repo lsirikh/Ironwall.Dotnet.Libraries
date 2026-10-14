@@ -31,6 +31,7 @@
 		<dlg:ConsoleDialogFrame
 			x:Name="CardContents"
 			DialogKey="Accounts.Logout"
+			HelpKey="Accounts.Logout"
 			PrimaryText=""
 			SecondaryInvoked="OnSecondaryInvoked"
 			SecondaryText=""
@@ -39,6 +40,20 @@
 
 			<dlg:ConsoleDialogFrame.FooterActions>
 				<StackPanel Orientation="Horizontal">
+					<!--
+						SSO 세션일 때만 — 에이전트에 "all"(이 PC 의 모든 SSO 프로그램 · SSO 세션 종료).
+						되돌릴 수 없는 넓은 동작이라 위험 모양(Danger)으로, 주 동작(오른쪽 끝)에서 떨어진 왼쪽에 둔다.
+					-->
+					<Button
+						x:Name="ClickLogoutAll"
+						Height="34"
+						MinWidth="92"
+						Margin="0,0,24,0"
+						AutomationProperties.AutomationId="Accounts.Logout.LogoutAllButton"
+						cal:Message.Attach="ClickLogoutAll"
+						Content="전체 로그아웃"
+						Style="{StaticResource Console.Button.Danger}"
+						Visibility="{Binding IsSsoSession, Converter={StaticResource BoolToVisibility}}" />
 					<Button
 						x:Name="ClickCancel"
 						Height="34"
@@ -54,16 +69,6 @@
 						cal:Message.Attach="ClickOk"
 						Content="{Binding OkText}"
 						Style="{StaticResource Console.Button.Primary}" />
-					<!--  SSO 세션일 때만 — 에이전트에 "all"(이 PC 의 모든 앱 · SSO 세션 종료)  -->
-					<Button
-						x:Name="ClickLogoutAll"
-						Height="34"
-						MinWidth="92"
-						Margin="8,0,0,0"
-						cal:Message.Attach="ClickLogoutAll"
-						Content="전체 로그아웃"
-						Style="{StaticResource Console.Button}"
-						Visibility="{Binding IsSsoSession, Converter={StaticResource BoolToVisibility}}" />
 				</StackPanel>
 			</dlg:ConsoleDialogFrame.FooterActions>
 
@@ -85,7 +90,7 @@
 					<TextBlock
 						Margin="0,6,0,0"
 						Style="{StaticResource Acct.Hint}"
-						Text="로그아웃하면 로그인 화면으로 돌아갑니다." />
+						Text="{Binding HintText}" />
 				</StackPanel>
 			</DockPanel>
 		</dlg:ConsoleDialogFrame>
