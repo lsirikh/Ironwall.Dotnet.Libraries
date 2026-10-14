@@ -2,6 +2,7 @@ using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Sso;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
@@ -20,11 +21,13 @@ public class LogoutPanelViewModel : BasePanelViewModel
     public LogoutPanelViewModel(IEventAggregator eventAggregator
                                 , ILogService log
                                 , LoginViewModel loginViewModel
-                                , IAuthGateway gateway)
+                                , IAuthGateway gateway
+                                , SsoSessionCoordinator? sso = null)
                                 : base(eventAggregator, log)
     {
         ViewModel = loginViewModel;
         _gateway = gateway;
+        _sso = sso;
     }
     #endregion
     #region - Binding Methods -
@@ -35,6 +38,7 @@ public class LogoutPanelViewModel : BasePanelViewModel
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
         await Task.Delay(TimeSpan.FromSeconds(1));
         await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseAllWindowsMessageModel());
+        if (_sso is not null) await _sso.SignOutAppAsync();   // SSO 세션이면 에이전트에 "이 앱만 로그아웃"(실패해도 진행) — GOP 로그아웃 전에
         await _gateway.LogoutAsync();   // 서버 logout best-effort + 토큰 폐기(Api) / no-op(Db) — G2
         ViewModel.Logout();
     }
@@ -50,5 +54,6 @@ public class LogoutPanelViewModel : BasePanelViewModel
     #endregion
     #region - Attributes -
     private readonly IAuthGateway _gateway;
+    private readonly SsoSessionCoordinator? _sso;
     #endregion
 }
