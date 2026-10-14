@@ -416,6 +416,60 @@ public class OperationEventActionReportScenarioTests
         }
     }
 
+    // ───────────────────────── 카드 [X] = '운영상태 확인' 조치보고 ─────────────────────────
+
+    [Fact]
+    [Trait("Scenario", "OPA-014")]
+    public async Task should_post_operation_check_action_then_close_card_when_x_is_pressed()
+    {
+        using var rig = new EventMapRig();
+        rig.Device(2121, EnumDeviceType.Gate);
+        var bodies = CaptureActions(rig);
+        var card = await ShowOperationCardAsync(rig, 2121, eventId: 81);
+
+        await rig.Panel.CloseOperationCardWithReportAsync(card);
+
+        var body = Assert.Single(bodies);
+        Assert.Equal(81, body.FromEventId);
+        Assert.Equal("운영상태 확인", body.Content);
+        Assert.Empty(Cards(rig));
+        Assert.Equal(81, Assert.Single(NatsReports(rig)).EventId);
+
+        await rig.PublishOperationAsync(2121, "GATE_OPEN", "OPEN", 81, envelopeId: "env-op-81");   // 재배달
+        await rig.Panel.FlushPendingCardsNowAsync();
+        Assert.Empty(Cards(rig));
+    }
+
+    [Fact]
+    [Trait("Scenario", "OPA-015")]
+    public async Task should_keep_card_when_x_report_is_refused_by_server()
+    {
+        using var rig = new EventMapRig();
+        rig.Device(2122, EnumDeviceType.Enclosure);
+        CaptureActions(rig, success: false);
+        var card = await ShowOperationCardAsync(rig, 2122, eventId: 82, reason: "ENCLOSURE_DOOR_OPEN");
+
+        await rig.Panel.CloseOperationCardWithReportAsync(card);
+
+        Assert.Single(Cards(rig));                                     // 조치가 저장되지 않았으니 카드를 남긴다
+        Assert.Empty(NatsReports(rig));
+    }
+
+    [Fact]
+    [Trait("Scenario", "OPA-016")]
+    public async Task should_only_clear_card_without_action_when_x_is_pressed_on_6_3_server()
+    {
+        using var rig = new EventMapRig { ServerContract = Ironwall.Dotnet.Libraries.Api.Services.EnumServerContract.V6_3 };
+        rig.Device(2123, EnumDeviceType.Gate);
+        var bodies = CaptureActions(rig);
+        var card = await ShowOperationCardAsync(rig, 2123, eventId: 83);
+
+        await rig.Panel.CloseOperationCardWithReportAsync(card);
+
+        Assert.Empty(Cards(rig));
+        Assert.Empty(bodies);                                          // 운영 조치를 못 받는 서버엔 보내지 않는다
+    }
+
     private sealed class OpenSink : IHandle<OpenEventReportDialogMessageModel>
     {
         private readonly List<OpenEventReportDialogMessageModel> _seen;

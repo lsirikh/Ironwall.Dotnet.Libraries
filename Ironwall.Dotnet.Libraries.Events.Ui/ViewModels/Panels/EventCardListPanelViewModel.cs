@@ -267,10 +267,48 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             RemoveCard(card);
         }
 
-        /// <summary>운영 카드 [닫기] 단추.</summary>
-        public void OnButtonCloseCard(object sender, RoutedEventArgs e)
-            => CloseOperationCard((e?.OriginalSource as FrameworkElement)?.DataContext as OperationEventCardViewModel
-                                  ?? (sender as FrameworkElement)?.DataContext as OperationEventCardViewModel);
+        /// <summary>운영 카드 [X] 가 보내는 조치 내용.</summary>
+        public const string OPERATION_CHECK_CONTENT = "운영상태 확인";
+
+        /// <summary>
+        /// 운영 카드 [X] — (사용자 2026-10-14) "x를 누르면 자동으로 조치보고 보내고 문구에는 운영상태 확인".
+        /// 서버 조치(<see cref="OPERATION_CHECK_CONTENT"/>)가 저장되면 카드는 조치보고 길로 닫힌다. 저장 실패면 카드를 남기고 알린다.
+        /// 서버가 운영 조치를 받지 못하는 판본(6.3)이면 종전대로 치우기만 한다.
+        /// </summary>
+        public async Task CloseOperationCardWithReportAsync(OperationEventCardViewModel? card)
+        {
+            if (card == null) return;
+            if (!card.IsReportSupported)
+            {
+                CloseOperationCard(card);
+                return;
+            }
+            if (!CanCtrlEvents())
+            {
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "권한 없음",
+                    Explain = ActionReportRules.NO_PERMISSION_TEXT
+                });
+                return;
+            }
+
+            var result = await card.SendActionDetailed(OPERATION_CHECK_CONTENT, ActionReportRules.FormatActor(_userModel)).ConfigureAwait(true);
+            if (result.CanCloseDialog) return;
+
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "조치보고 실패",
+                Explain = string.IsNullOrWhiteSpace(result.Reason)
+                    ? "조치보고를 저장하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도하세요."
+                    : $"조치보고를 저장하지 못했습니다. {result.Reason}"
+            });
+        }
+
+        /// <summary>운영 카드 [X] 단추 — '운영상태 확인' 조치보고 뒤 닫는다.</summary>
+        public async void OnButtonCloseCard(object sender, RoutedEventArgs e)
+            => await CloseOperationCardWithReportAsync((e?.OriginalSource as FrameworkElement)?.DataContext as OperationEventCardViewModel
+                                                       ?? (sender as FrameworkElement)?.DataContext as OperationEventCardViewModel);
 
         /// <summary>
         /// 이벤트가 조치보고로 닫혔다(종류 · 서버 번호) — 개별(카드 · 창 · 트레이 · 이력) · 전체 · 자동 · 자동복구 · 원격 ACTION_REPORT

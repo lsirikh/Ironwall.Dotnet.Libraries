@@ -131,7 +131,7 @@
 						md:RippleAssist.IsCentered="True"
 						AutomationProperties.AutomationId="{Binding CloseAutomationKey, Mode=OneWay}"
 						Style="{StaticResource Console.Button.Icon}"
-						ToolTip="닫기">
+						ToolTip="운영상태 확인 후 닫기">
 						<cal:Message.Attach>
 							[Event Click] = [Action OnButtonCloseCard($source, $eventArgs)]
 						</cal:Message.Attach>
