@@ -468,12 +468,15 @@ public sealed class SsoSessionCoordinator
 
     /// <summary>
     /// 에이전트가 "다시 들어와도 된다"(<c>session-available</c>)고 알렸다 — 기다리던 중이면 창 없이 SSO 로그인한다.
-    /// <para>무시하는 때: 기다리지 않음(사람이 GIS 에서 직접 로그아웃 · 비밀번호로 들어감) · 이미 로그인돼 있음 · 처리 중.
+    /// <para>무시하는 때: 기다리지 않음(사람이 GIS 에서 직접 로그아웃 · 비밀번호로 들어감 — 단 <c>reallowed</c> 는 따라 들어간다) · 이미 로그인돼 있음 · 처리 중.
     /// 힌트일 뿐이라 실패해도 재시도하지 않는다(NoActiveSession 등은 로그인 화면 유지 — SSO 계약).</para>
     /// </summary>
     internal async Task ReturnFromAgentAsync(string reason)
     {
-        if (!IsAwaitingAgentReturn) { _log?.Info($"[SSO] session-available({reason}) — 복귀를 기다리지 않아 무시(GIS 에서 직접 로그아웃 등)"); return; }
+        // reallowed 는 사람이 에이전트에서 **이 앱을** 다시 허용한 것(이 앱에만 온다) — GIS 에서 직접 로그아웃했어도 따라 들어간다.
+        //   login(다른 앱 · 에이전트 로그인 — 모든 구독 앱에 간다)은 직접 로그아웃한 뒤면 무시한다(가이드 06 §6).
+        var reallowed = string.Equals(reason, "reallowed", StringComparison.OrdinalIgnoreCase);
+        if (!IsAwaitingAgentReturn && !reallowed) { _log?.Info($"[SSO] session-available({reason}) — 복귀를 기다리지 않아 무시(GIS 에서 직접 로그아웃 등)"); return; }
         if (_store.IsAuthenticated) { _log?.Info($"[SSO] session-available({reason}) — 이미 로그인돼 있어 무시"); return; }
         if (Interlocked.CompareExchange(ref _returnBusy, 1, 0) != 0) return;
         try

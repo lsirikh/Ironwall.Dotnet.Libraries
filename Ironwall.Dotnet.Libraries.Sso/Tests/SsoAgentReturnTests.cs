@@ -102,6 +102,22 @@ public partial class SsoSessionCoordinatorTests
         Assert.True(sut.IsWatching);   // 구독은 남는다(종료 요청) — 복귀만 하지 않는다
     }
 
+    /// <summary>GIS 에서 직접 로그아웃한 뒤 사람이 에이전트에서 이 앱을 [다시 로그인](reallowed) 하면 — 따라 들어간다.</summary>
+    [Fact]
+    public async Task should_sign_in_on_reallowed_after_manual_gis_logout()
+    {
+        var (sut, _, _, store, life, returned) = WithLifecycle();
+        await sut.TrySignInAsync();
+        life.ForceLogoutOnce(EnumRevokeReason.Manual);   // GIS 로그아웃 단추
+        sut.Disable();
+        sut.CancelAgentReturn();                         // 직접 로그아웃 — 복귀를 기다리지 않는 상태
+
+        await sut.ReturnFromAgentAsync("reallowed");
+
+        Assert.True(store.IsAuthenticated);
+        Assert.Single(returned);
+    }
+
     [Fact]
     public async Task should_ignore_session_available_after_password_login()
     {
