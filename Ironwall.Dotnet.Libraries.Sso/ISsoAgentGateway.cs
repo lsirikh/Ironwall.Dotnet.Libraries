@@ -38,6 +38,12 @@ public interface ISsoAgentGateway
     Task<SsoAgentResult> LogoutAppAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// 에이전트에 "전체 로그아웃" 을 알린다 — SDK <c>LogoutAsync("all")</c>. 이 PC 의 모든 앱과 SSO 세션을 끝낸다.
+    /// 사람이 GIS 로그아웃 창에서 [전체 로그아웃] 을 고를 때만 부른다.
+    /// </summary>
+    Task<SsoAgentResult> LogoutAllAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// 에이전트가 미는 사건을 받기 시작한다 — SDK <c>Watch</c>. 세션이 끝나면 GIS 가 묻지 않아도 안다.
     /// <para>"이 앱만 로그아웃" 은 SSO 세션을 끝내지 않아 back-channel 도 401 도 오지 않는다 — <b>이 구독이 GIS 가 그것을
     /// 아는 유일한 길</b>이다(SSO 회신 2026-10-01 16:55).</para>

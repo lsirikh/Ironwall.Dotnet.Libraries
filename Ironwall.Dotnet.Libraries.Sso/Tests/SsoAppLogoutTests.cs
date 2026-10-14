@@ -22,6 +22,31 @@ public partial class SsoSessionCoordinatorTests
         Assert.False(sut.IsAwaitingAgentReturn);    // 사람이 직접 로그아웃 — 에이전트 쪽 동작으로 되살리지 않는다
     }
 
+    /// <summary>[전체 로그아웃] — "all" 만 부르고 "app" 은 부르지 않는다.</summary>
+    [Fact]
+    public async Task should_tell_agent_all_logout_when_sso_session_logs_out_all()
+    {
+        var (sut, agent, _, _, _) = SignedInWithLifecycle();
+        await sut.TrySignInAsync();
+
+        await sut.SignOutAllAsync();
+
+        Assert.Equal(1, agent.LogoutAllCalls);
+        Assert.Equal(0, agent.LogoutAppCalls);
+        Assert.False(sut.IsEnabled);
+    }
+
+    /// <summary>비밀번호로 들어온 세션은 [전체 로그아웃] 도 에이전트에 알리지 않는다.</summary>
+    [Fact]
+    public async Task should_not_tell_agent_all_logout_when_session_is_not_sso()
+    {
+        var (sut, agent, _, _, _) = SignedInWithLifecycle();
+
+        await sut.SignOutAllAsync();
+
+        Assert.Equal(0, agent.LogoutAllCalls);
+    }
+
     /// <summary>비밀번호로 들어온 세션은 에이전트와 무관 — 알리지 않는다.</summary>
     [Fact]
     public async Task should_not_tell_agent_when_session_is_not_sso()

@@ -20,6 +20,7 @@
 			<ResourceDictionary.MergedDictionaries>
 				<ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Accounts.Ui;component/Views/AccountFormStyles.xaml" />
 			</ResourceDictionary.MergedDictionaries>
+			<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 		</ResourceDictionary>
 	</UserControl.Resources>
 
@@ -51,8 +52,18 @@
 						Height="34"
 						MinWidth="92"
 						cal:Message.Attach="ClickOk"
-						Content="로그아웃"
+						Content="{Binding OkText}"
 						Style="{StaticResource Console.Button.Primary}" />
+					<!--  SSO 세션일 때만 — 에이전트에 "all"(이 PC 의 모든 앱 · SSO 세션 종료)  -->
+					<Button
+						x:Name="ClickLogoutAll"
+						Height="34"
+						MinWidth="92"
+						Margin="8,0,0,0"
+						cal:Message.Attach="ClickLogoutAll"
+						Content="전체 로그아웃"
+						Style="{StaticResource Console.Button}"
+						Visibility="{Binding IsSsoSession, Converter={StaticResource BoolToVisibility}}" />
 				</StackPanel>
 			</dlg:ConsoleDialogFrame.FooterActions>
 
