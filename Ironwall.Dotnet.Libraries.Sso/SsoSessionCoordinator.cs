@@ -140,7 +140,15 @@ public sealed class SsoSessionCoordinator
     /// "SSO 세션 아님" 으로 무시하게(사건 경로의 안내 · 복귀 기다림이 사람의 로그아웃을 덮지 않게).</para>
     /// <para>실패(에이전트 꺼짐 <c>AgentNotRunning</c> · 시간 초과 · 예외)는 기록만 하고 삼킨다 — GIS 로그아웃은 그대로 진행한다.</para>
     /// </summary>
-    public async Task SignOutAppAsync()
+    public Task SignOutAppAsync() => SignOutAsync(all: false);
+
+    /// <summary>
+    /// 사람이 GIS 로그아웃 창에서 <b>전체 로그아웃</b> 을 골랐다 — 에이전트에 SDK <c>LogoutAsync("all")</c> 을 알린다
+    /// (이 PC 의 모든 앱과 SSO 세션을 끝낸다). 조건 · 훅 떼기 · 실패 삼킴은 <see cref="SignOutAppAsync"/> 와 같다.
+    /// </summary>
+    public Task SignOutAllAsync() => SignOutAsync(all: true);
+
+    private async Task SignOutAsync(bool all)
     {
         if (!IsEnabled) { _log?.Info("[SSO] GIS 로그아웃 — SSO 로 로그인한 세션이 아니라 에이전트에 알리지 않는다"); return; }
         Disable();
@@ -148,8 +156,9 @@ public sealed class SsoSessionCoordinator
         try
         {
             using var cts = new CancellationTokenSource(LogoutAppTimeout);
-            var r = await _agent.LogoutAppAsync(cts.Token).ConfigureAwait(false);
-            _log?.Info($"[SSO] GIS 로그아웃 — 에이전트에 이 앱만 로그아웃 알림: {r.Status} {r.Detail}");
+            var r = all ? await _agent.LogoutAllAsync(cts.Token).ConfigureAwait(false)
+                        : await _agent.LogoutAppAsync(cts.Token).ConfigureAwait(false);
+            _log?.Info($"[SSO] GIS 로그아웃 — 에이전트에 {(all ? "전체" : "이 앱만")} 로그아웃 알림: {r.Status} {r.Detail}");
         }
         catch (Exception ex)
         {

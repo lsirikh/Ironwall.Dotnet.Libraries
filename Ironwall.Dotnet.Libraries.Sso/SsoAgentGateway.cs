@@ -59,6 +59,13 @@ public sealed class SsoAgentGateway : ISsoAgentGateway, IDisposable
         return r.Outcome == SsoOutcome.Ok ? new SsoAgentResult(SsoAgentStatus.Ok, null, r.Detail) : Map(r.Outcome, null, r.Detail);
     }
 
+    public async Task<SsoAgentResult> LogoutAllAsync(CancellationToken ct = default)
+    {
+        // "all" = 이 PC 의 모든 앱과 SSO 세션을 끝낸다 — 사람이 [전체 로그아웃] 을 골랐을 때만.
+        var r = await _client.LogoutAsync("all", ct).ConfigureAwait(false);
+        return r.Outcome == SsoOutcome.Ok ? new SsoAgentResult(SsoAgentStatus.Ok, null, r.Detail) : Map(r.Outcome, null, r.Detail);
+    }
+
     public IAsyncDisposable Watch(Action<SsoAgentEvent> onEvent, Action<Exception>? onError = null)
         => _client.Watch(e => onEvent(new SsoAgentEvent(e.Event, e.Reason, e.At)), onError, CancellationToken.None);
 

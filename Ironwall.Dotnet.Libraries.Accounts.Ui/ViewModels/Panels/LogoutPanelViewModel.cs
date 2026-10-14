@@ -30,15 +30,31 @@ public class LogoutPanelViewModel : BasePanelViewModel
         _sso = sso;
     }
     #endregion
+    #region - Overrides -
+    protected override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        // 창이 열릴 때마다 SSO 세션인지 다시 본다(단일 인스턴스 VM) — 단추 구성이 바뀐다
+        NotifyOfPropertyChange(nameof(IsSsoSession));
+        NotifyOfPropertyChange(nameof(OkText));
+    }
+    #endregion
     #region - Binding Methods -
-    public async Task ClickOk()
+    /// <summary>SSO 세션이면 [이 앱만 로그아웃], 아니면 [로그아웃].</summary>
+    public Task ClickOk() => LogoutAsync(all: false);
+
+    /// <summary>SSO 세션에서만 보이는 [전체 로그아웃] — 에이전트에 "all" 을 알린다.</summary>
+    public Task ClickLogoutAll() => LogoutAsync(all: true);
+
+    private async Task LogoutAsync(bool all)
     {
         if (!ViewModel.IsLogin) return;
-        _log?.Info("ClickOk");
+        _log?.Info(all ? "ClickLogoutAll" : "ClickOk");
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
         await Task.Delay(TimeSpan.FromSeconds(1));
         await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseAllWindowsMessageModel());
-        if (_sso is not null) await _sso.SignOutAppAsync();   // SSO 세션이면 에이전트에 "이 앱만 로그아웃"(실패해도 진행) — GOP 로그아웃 전에
+        // SSO 세션이면 에이전트에 "이 앱만" / "전체" 로그아웃(실패해도 진행) — GOP 로그아웃 전에
+        if (_sso is not null) await (all ? _sso.SignOutAllAsync() : _sso.SignOutAppAsync());
         await _gateway.LogoutAsync();   // 서버 logout best-effort + 토큰 폐기(Api) / no-op(Db) — G2
         ViewModel.Logout();
     }
@@ -51,6 +67,9 @@ public class LogoutPanelViewModel : BasePanelViewModel
     #endregion
     #region - Properties -
     public LoginViewModel ViewModel { get; }
+    /// <summary>SSO 로 로그인한 세션인가 — 그때만 [이 앱만 로그아웃] · [전체 로그아웃] 둘을 낸다.</summary>
+    public bool IsSsoSession => _sso?.IsEnabled == true;
+    public string OkText => IsSsoSession ? "이 앱만 로그아웃" : "로그아웃";
     #endregion
     #region - Attributes -
     private readonly IAuthGateway _gateway;

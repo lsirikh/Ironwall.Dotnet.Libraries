@@ -483,6 +483,15 @@ public partial class SsoSessionCoordinatorTests : IDisposable
             return Task.FromResult(LogoutResult);
         }
 
+        /// <summary>"전체 로그아웃" — 부른 횟수를 센다.</summary>
+        public int LogoutAllCalls;
+        public Task<SsoAgentResult> LogoutAllAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref LogoutAllCalls);
+            if (LogoutThrows) throw new IOException("pipe broken");
+            return Task.FromResult(LogoutResult);
+        }
+
         /// <summary>사건 구독 — 마지막 구독의 콜백을 쥐고 시험이 사건을 일으킨다.</summary>
         public Action<SsoAgentEvent>? OnEvent { get; private set; }
         public int WatchOpened { get; private set; }
