@@ -9,7 +9,7 @@
 - [x] 2. 원인 확정(아래 '발견')
 - [x] 3. 수정 — `Producers/UdpBindGuard.cs`(live555 플러그인 IAT 의 ws2_32!bind 가로채기) + 설정 `AllowRtspUdpFallback`(기본 끔)
 - [x] 4. 회귀 시험 FW-000~003 통과(Survival/FirewallPortHostTests.cs) · Host.Tests 단위 시험(OpensInboundPort · ToLoopback · 인자 왕복)
-- [ ] 5. 전체 `dotnet test Ironwall.Dotnet.Libraries.sln` 확인(하네스가 다시 돌린다)
+- [x] 5. CameraPopup.Host.Tests 172/172 · CameraPopup.Tests 290/290 통과(2026-10-14). 전체 sln 실행은 세션 중단으로 못 끝냄 → 하네스 검사가 돌린다
 
 ## 결정
 - 소켓 열거 = 시험에서 `netstat -ano` 파싱(TCP 대기는 상대 주소 0.0.0.0:0/[::]:0 로 — 상태 글자는 언어마다 다름). 200 ms 간격 표본 합집합.
