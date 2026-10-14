@@ -435,18 +435,36 @@ public sealed class LabelAdorner : Adorner, IDisposable
             LabelWidthChanged?.Invoke(_marker, _origOffsetX, _origOffsetY, _origMaxWidth);
     }
 
+    /// <summary>비율 오프셋(이미지 · 라인) 저장 자리수.</summary>
+    private const int RATIO_OFFSET_DIGITS = 4;
+
+    /// <summary>
+    /// 놓는 순간 저장값을 명세 단위로 맞춘다(map-property-numeric-precision PRD — 제목 폭 정수 px).
+    /// 끄는 중 값은 마우스 좌표 그대로라 446.7 · 220.0000000000001 이 DB 에 남았다(실창 r29 5회차 NUM-R29-A6).
+    /// 점 심볼 오프셋=정수 px, 비율 오프셋=소수 4자리.
+    /// </summary>
+    private void SnapStoredValues(bool includeWidth)
+    {
+        var (a, b) = ReadOffset();
+        int digits = IsNormalizedOffset ? RATIO_OFFSET_DIGITS : 0;
+        WriteOffset(Math.Round(a, digits), Math.Round(b, digits));
+        if (includeWidth) _marker.TitleMaxWidth = Math.Round(_marker.TitleMaxWidth);
+    }
+
     /// <summary>드래그 종류별 종료 처리 공용 — Up/캡처손실 공유.</summary>
     private void FinishDrag()
     {
         if (_labelDragging)
         {
             _labelDragging = false;
+            SnapStoredValues(includeWidth: false);
             InvalidateVisual();
             RaiseOffsetChanged();   // lock 밖 발화 — 오프셋 DB 영속 + undo(before=드래그시작 오프셋)
         }
         else if (_widthResizing)
         {
             _widthResizing = false;
+            SnapStoredValues(includeWidth: true);
             InvalidateVisual();
             RaiseWidthChanged();    // (오프셋,폭) 쌍 영속+원자 undo(FR-13)
         }
