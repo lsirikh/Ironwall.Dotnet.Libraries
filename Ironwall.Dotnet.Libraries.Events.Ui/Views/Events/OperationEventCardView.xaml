@@ -97,13 +97,6 @@
 							FontSize="13"
 							Text="{Binding SeverityText, Mode=OneWay}" />
 					</StackPanel>
-					<TextBlock
-						Margin="0,3,0,0"
-						FontSize="11"
-						Opacity="0.6"
-						Text="{Binding DetailText, Mode=OneWay}"
-						TextTrimming="CharacterEllipsis"
-						TextWrapping="NoWrap" />
 				</StackPanel>
 
 				<Separator

@@ -287,6 +287,14 @@ public class OperationEventCardScenarioTests
         symbols.Verify(s => s.SetDoorState(3, EnumDeviceType.Gate, EnumDoorState.Open), Moq.Times.Once);
     }
 
+    [Fact]
+    [Trait("Scenario", "OPC-016")]
+    public void should_not_show_raw_detail_text_when_operation_card_is_rendered()
+    {
+        // (사용자) "운영이벤트에 작은 글씨는 빼라 … 그건 개발자들이 볼거잖아" — state=… previous=… 원문은 카드에 싣지 않는다(콘솔 상세 칸 · 조치보고 창에는 남는다).
+        Assert.DoesNotContain("DetailText", OperationCardXaml());
+    }
+
     private static string OperationCardXaml([CallerFilePath] string here = "")
         => File.ReadAllText(Path.Combine(Path.GetDirectoryName(here)!, "..", "Views", "Events", "OperationEventCardView.xaml"));
 }
