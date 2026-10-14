@@ -246,6 +246,21 @@ public partial class SsoSessionCoordinatorTests : IDisposable
         Assert.Empty(api.Tokens);
     }
 
+    /// <summary>허용 대기 안내는 에이전트 문구 그대로(허용 창 · 관리자 승인 대기 · 거절을 가른다 — SSO 회신 Q-5).</summary>
+    [Theory]
+    [InlineData("관리자 승인을 기다립니다 — 승인되면 에이전트가 알려 드립니다.", "관리자 승인을 기다립니다 — 승인되면 에이전트가 알려 드립니다.")]
+    [InlineData("", "SSO 에이전트 창에서 이 프로그램의 연결을 허용해 주세요.")]
+    public async Task should_show_the_agent_detail_as_guidance_when_consent_is_pending(string detail, string expected)
+    {
+        var sut = new SsoSessionCoordinator(new FakeAgent { Next = SsoAgentResult.Fail(SsoAgentStatus.ConsentRequired, detail) },
+                                            new FakeAccountApi(_ => Ok("x")), new TokenStorageService());
+
+        var r = await sut.TrySignInAsync();
+
+        Assert.Equal(SsoSignInStatus.ConsentPending, r.Status);
+        Assert.Equal(expected, r.Guidance);
+    }
+
     [Theory]
     [InlineData(SsoAgentStatus.NoActiveSession)]
     [InlineData(SsoAgentStatus.NotRegistered)]

@@ -196,11 +196,20 @@ public sealed class SsoSessionCoordinator
         return result;
     }
 
-    /// <summary>허용 대기 동안 다시 묻는 최대 시간 — 에이전트 허용 창 수명(1분) + 여유.</summary>
+    /// <summary>허용 대기 중 <b>빠르게</b> 다시 묻는 시간 — 에이전트 허용 창 수명(1분) + 여유. 사람이 허용 창에 답하는 동안.</summary>
     public static readonly TimeSpan ConsentWaitWindow = TimeSpan.FromSeconds(75);
 
-    /// <summary>허용 대기 동안 다시 묻는 간격.</summary>
+    /// <summary>허용 대기 동안 다시 묻는 간격(빠른 구간).</summary>
     public static readonly TimeSpan ConsentRetryInterval = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// 빠른 구간 뒤에도 계속 기다리는 최대 시간 — 새 판(exe 지문)은 SSO 관리자 승인이 필요하고, 승인은 1분을 넘기기 쉽다.
+    /// SSO 회신(2026-10-14 Q-5): 승인되면 앱에 오는 사건이 없으니 주기적으로 다시 묻고, 승인 뒤 1분 안에 통과한다.
+    /// </summary>
+    public static readonly TimeSpan ConsentApprovalWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>빠른 구간 뒤 다시 묻는 간격.</summary>
+    public static readonly TimeSpan ConsentApprovalInterval = TimeSpan.FromSeconds(15);
 
     /// <summary>
     /// <see cref="TrySignInAsync"/> 가 <see cref="SsoSignInStatus.ConsentPending"/> 이면, 사람이 에이전트 허용 창에 답할 때까지
@@ -216,13 +225,14 @@ public sealed class SsoSessionCoordinator
     {
         if (first.Status != SsoSignInStatus.ConsentPending) return first;
 
-        var limit = window ?? ConsentWaitWindow;
-        var step = interval ?? ConsentRetryInterval;
+        // 값을 주면 그 시간 · 간격 그대로(시험). 주지 않으면 75초는 2초마다, 그 뒤 10분까지는 15초마다(관리자 승인 기다림).
+        var limit = window ?? ConsentApprovalWindow;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var r = first;
         var attempts = 0;
         while (r.Status == SsoSignInStatus.ConsentPending && clock.Elapsed < limit)
         {
+            var step = interval ?? (clock.Elapsed < ConsentWaitWindow ? ConsentRetryInterval : ConsentApprovalInterval);
             await Task.Delay(step, ct).ConfigureAwait(false);
             r = await TrySignInAsync(ct).ConfigureAwait(false);
             attempts++;
@@ -610,7 +620,8 @@ public sealed class SsoSignInResult
         // SSO 3.10.13 통보). 글자 맞추기로 가르지 않고 두 경우 모두 맞는 행동을 말한다.
         SsoSignInStatus.NeedsAgentLogin => "SSO 에이전트에 로그인돼 있지 않거나 이 프로그램이 로그아웃된 상태입니다. [SSO 로 로그인] 을 누르세요.",
         SsoSignInStatus.NeedsAdminRegistration => "이 프로그램이 SSO 에 등록되지 않았습니다. 관리자에게 문의하세요.",
-        SsoSignInStatus.ConsentPending => "SSO 에이전트 창에서 이 프로그램의 연결을 허용해 주세요.",
+        // 에이전트 문구가 사정을 가른다(허용 창을 띄움 · 관리자 승인 대기 · 승인 거절 — SSO 회신 Q-5) — 있으면 그대로 보인다.
+        SsoSignInStatus.ConsentPending => string.IsNullOrWhiteSpace(Message) ? "SSO 에이전트 창에서 이 프로그램의 연결을 허용해 주세요." : Message,
         SsoSignInStatus.TemporarilyUnavailable => "SSO 서버에 잠시 연결할 수 없습니다. 아이디로 로그인하세요.",
         SsoSignInStatus.ExchangeRejected => $"SSO 로그인이 거절되었습니다 — {Message}",
         SsoSignInStatus.Failed => "SSO 로그인에 실패했습니다. 아이디로 로그인하세요.",
