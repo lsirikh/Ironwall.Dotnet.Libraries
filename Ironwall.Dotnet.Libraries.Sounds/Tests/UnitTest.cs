@@ -336,7 +336,7 @@ public class SoundService_PlaybackTests
     /// <summary>실제 소리 파일은 길이를 모른다 — 자동 멈춤은 지속 시간 뒤 도는 한 바퀴가 끝날 때라 넉넉히 둔다.</summary>
     private static readonly TimeSpan RealClipAllowance = TimeSpan.FromSeconds(60);
 
-    [Fact(DisplayName = "SoundService – Detection Sound Playback (Auto Stop)")]
+    [RealSoundFact(DisplayName = "SoundService – Detection Sound Playback (Auto Stop)")]
     [Trait("Scenario", "DEP-221")]
     public async Task Detection_Sound_Playback_AutoStop_Works()
     {
@@ -351,7 +351,7 @@ public class SoundService_PlaybackTests
         await SoundPlaybackScenarios.AutoStopsAfterDurationAsync(iso, EnumEventType.Intrusion, RealClipAllowance);
     }
 
-    [Fact(DisplayName = "SoundService – Malfunction Sound Playback (Manual Stop)")]
+    [RealSoundFact(DisplayName = "SoundService – Malfunction Sound Playback (Manual Stop)")]
     [Trait("Scenario", "DEP-222")]
     public async Task Malfunction_Sound_Playback_ManualStop_Works()
     {
@@ -366,7 +366,7 @@ public class SoundService_PlaybackTests
         await SoundPlaybackScenarios.KeepsPlayingUntilCancelledAsync(iso);
     }
 
-    [Fact(DisplayName = "SoundService – Action Report Sound Playback")]
+    [RealSoundFact(DisplayName = "SoundService – Action Report Sound Playback")]
     [Trait("Scenario", "DEP-224")]
     public async Task ActionReport_Sound_Playback_Works()
     {
@@ -381,7 +381,7 @@ public class SoundService_PlaybackTests
         await SoundPlaybackScenarios.AutoStopsAfterDurationAsync(iso, EnumEventType.Action, RealClipAllowance);
     }
 
-    [Fact(DisplayName = "SoundService – Stop All Sounds with Actual Files")]
+    [RealSoundFact(DisplayName = "SoundService – Stop All Sounds with Actual Files")]
     public async Task Stop_All_Sounds_With_Actual_Files_Works()
     {
 
@@ -406,7 +406,7 @@ public class SoundService_PlaybackTests
         }
     }
 
-    [Fact(DisplayName = "SoundService – Concurrent Playback Prevention")]
+    [RealSoundFact(DisplayName = "SoundService – Concurrent Playback Prevention")]
     [Trait("Scenario", "DEP-223")]
     public async Task Concurrent_Playback_Prevention_Works()
     {
@@ -431,7 +431,7 @@ public class SoundService_QueueTests
 
     public SoundService_QueueTests(SoundServiceFixture fx) => _fx = fx;
 
-    [Fact(DisplayName = "SoundService – Basic Queue Functionality")]
+    [RealSoundFact(DisplayName = "SoundService – Basic Queue Functionality")]
     public async Task Basic_Queue_Functionality_Test()
     {
         // Arrange
@@ -462,7 +462,7 @@ public class SoundService_QueueTests
         await _fx.SoundSvc.StopAllSoundsAsync();
     }
 
-    [Fact(DisplayName = "SoundService – Queue Size Limit and FIFO")]
+    [RealSoundFact(DisplayName = "SoundService – Queue Size Limit and FIFO")]
     public async Task Queue_Size_Limit_And_FIFO_Test()
     {
         // Arrange - 큐 크기를 2로 제한
@@ -517,7 +517,7 @@ public class SoundService_QueueTests
         await _fx.SoundSvc.StopAllSoundsAsync();
     }
 
-    [Fact(DisplayName = "SoundService – Rapid Event Burst with Queue")]
+    [RealSoundFact(DisplayName = "SoundService – Rapid Event Burst with Queue")]
     public async Task Rapid_Event_Burst_With_Queue_Test()
     {
         const int eventCount = 100;
@@ -586,7 +586,7 @@ public class SoundService_QueueTests
         await _fx.SoundSvc.StopAllSoundsAsync();
     }
 
-    [Fact(DisplayName = "SoundService – Queue Processing Performance")]
+    [RealSoundFact(DisplayName = "SoundService – Queue Processing Performance")]
     public async Task Queue_Processing_Performance_Test()
     {
         const int eventCount = 15;
@@ -662,7 +662,7 @@ public class SoundService_QueueTests
         await _fx.SoundSvc.StopAllSoundsAsync();
     }
 
-    [Fact(DisplayName = "SoundService – Queue Clear and Management")]
+    [RealSoundFact(DisplayName = "SoundService – Queue Clear and Management")]
     public async Task Queue_Clear_And_Management_Test()
     {
         // Arrange
@@ -818,7 +818,7 @@ public class SoundService_AudioDeviceTests
 
     public SoundService_AudioDeviceTests(SoundServiceFixture fx) => _fx = fx;
 
-    [Fact(DisplayName = "AudioDevice – Get Available Audio Devices")]
+    [RealSoundFact(DisplayName = "AudioDevice – Get Available Audio Devices")]
     public void Get_Available_Audio_Devices_Test()
     {
         // Act
@@ -877,7 +877,7 @@ public class SoundService_AudioDeviceTests
         });
     }
 
-    [Fact(DisplayName = "AudioDevice – Device Selection and Reset")]
+    [RealSoundFact(DisplayName = "AudioDevice – Device Selection and Reset")]
     public async Task Device_Selection_And_Reset_Test()
     {
         // Arrange
@@ -904,7 +904,7 @@ public class SoundService_AudioDeviceTests
         Debug.WriteLine($"✅ Successfully selected and reset device: {testDevice.Name}");
     }
 
-    [Fact(DisplayName = "AudioDevice – Audio Output Mode Configuration")]
+    [RealSoundFact(DisplayName = "AudioDevice – Audio Output Mode Configuration")]
     public void Audio_Output_Mode_Configuration_Test()
     {
         // Arrange
@@ -928,7 +928,7 @@ public class SoundService_AudioDeviceTests
         _fx.SoundSvc.SetAudioOutputMode(EnumAudioOutputMode.WaveOutEvent);
     }
 
-    [Fact(DisplayName = "AudioDevice – Device Type Compatibility Test")]
+    [RealSoundFact(DisplayName = "AudioDevice – Device Type Compatibility Test")]
     public async Task Device_Type_Compatibility_Test()
     {
         // Arrange
@@ -988,7 +988,7 @@ public class SoundService_AudioDeviceTests
         AnalyzeCompatibilityResults(compatibilityResults);
     }
 
-    [Fact(DisplayName = "AudioDevice – Device Switching During Playback")]
+    [RealSoundFact(DisplayName = "AudioDevice – Device Switching During Playback")]
     public async Task Device_Switching_During_Playback_Test()
     {
         // Arrange
@@ -1064,7 +1064,7 @@ public class SoundService_AudioDeviceTests
         AnalyzeDeviceSwitchingResults(switchingResults);
     }
 
-    [Fact(DisplayName = "AudioDevice – Device Error Handling")]
+    [RealSoundFact(DisplayName = "AudioDevice – Device Error Handling")]
     public async Task Device_Error_Handling_Test()
     {
         // Arrange - 잘못된 장치 정보 생성
@@ -1297,7 +1297,7 @@ public class SoundService_RuntimeDeviceSwitchTests
     public SoundService_RuntimeDeviceSwitchTests(SoundServiceFixture fx) => _fx = fx;
 
 
-    [Fact(DisplayName = "DeviceSwitch – Auto Stop on Device Change")]
+    [RealSoundFact(DisplayName = "DeviceSwitch – Auto Stop on Device Change")]
     public async Task Device_Change_Auto_Stop_Test()
     {
         // Arrange
@@ -1363,7 +1363,7 @@ public class SoundService_RuntimeDeviceSwitchTests
         }
     }
 
-    [Fact(DisplayName = "DeviceSwitch – Multiple Device Changes")]
+    [RealSoundFact(DisplayName = "DeviceSwitch – Multiple Device Changes")]
     public async Task Multiple_Device_Changes_Test()
     {
         var devices = SoundHelper.GetAvailableAudioDevices();
@@ -1411,7 +1411,7 @@ public class SoundService_RuntimeDeviceSwitchTests
         }
     }
 
-    [Fact(DisplayName = "DeviceSwitch – Queue Processing with Device Change")]
+    [RealSoundFact(DisplayName = "DeviceSwitch – Queue Processing with Device Change")]
     public async Task Queue_With_Device_Change_Test()
     {
         var devices = SoundHelper.GetAvailableAudioDevices();
