@@ -1496,8 +1496,11 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             }
             if (keys.Count == 0) return false;
             var up = k == Key.Up;
-            // 위치 프리셋 센서도 같은 계약(2026-10-13 실창 회귀 — 프리셋 높이 키가 이 키를 가로챘었다). 프리셋 높이는 설치 위치 절 높이 칸 · 끄는 중 Tab.
-            if ((modifiers & ModifierKeys.Shift) != 0) vm.FenceNudgeHeight(keys, up ? FenceLayoutMath.NUDGE_M : -FenceLayoutMath.NUDGE_M);
+            // 사람이 고른 위치 프리셋으로 선 센서(모두)는 설치 높이 10 cm · Shift 1 cm(PRD FR-07 v1.1 · 실창 4회차 MNT-R28-425 — 9자리 한 단계로 가 프리셋을 놓았다).
+            // 저장 때 이관만 된 센서는 옛 계약 그대로(2026-10-13 실창 회귀 — 이관 센서를 프리셋 높이 키가 가로챘었다 · SC-FEN-020 · WIR-R27-135).
+            if (keys.All(vm.IsPresetMounted))
+                vm.FenceNudgePresetHeight(keys, ((modifiers & ModifierKeys.Shift) != 0 ? SensorMountResolver.FINE_NUDGE_M : SensorMountResolver.NUDGE_M) * (up ? 1 : -1));
+            else if ((modifiers & ModifierKeys.Shift) != 0) vm.FenceNudgeHeight(keys, up ? FenceLayoutMath.NUDGE_M : -FenceLayoutMath.NUDGE_M);
             else vm.FenceStepStop(keys, up ? 1 : -1);
             if (chip is not null) FocusUnitOf(keys[0]);
             return true;

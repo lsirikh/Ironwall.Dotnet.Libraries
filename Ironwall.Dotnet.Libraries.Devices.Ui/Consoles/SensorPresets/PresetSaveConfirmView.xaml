@@ -11,7 +11,6 @@
 	<dlg:ConsoleDialogFrame
 		Backdrop="{DynamicResource BgBrush}"
 		DialogKey="Devices.SensorPresets.SaveConfirm"
-		Message="{Binding KeepText}"
 		PrimaryAutomationId="Devices.SensorPresets.SaveConfirm.Save"
 		PrimaryInvoked="OnSave"
 		PrimaryText="저장"
@@ -29,7 +28,10 @@
 		</dlg:ConsoleDialogFrame.FooterExtra>
 		<StackPanel>
 			<TextBlock AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Message" FontWeight="SemiBold" Text="{Binding Message}" TextWrapping="Wrap" />
-			<ItemsControl Margin="0,8,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Chips" ItemsSource="{Binding Chips}">
+			<!--
+				칩 = 쓰임 하나씩(Usages) — 글자(Chips)로 묶으면 번호가 같은 두 센서가 UIA 항목 하나로 합쳐져 "N=10 · 칩 9" 가 됐다(실창 4회차 MNT-R28-451).
+			-->
+			<ItemsControl Margin="0,8,0,0" AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Chips" ItemsSource="{Binding Usages}">
 				<ItemsControl.ItemsPanel>
 					<ItemsPanelTemplate>
 						<WrapPanel />
@@ -38,11 +40,18 @@
 				<ItemsControl.ItemTemplate>
 					<DataTemplate>
 						<Border Margin="0,0,6,6" Padding="7,1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9">
-							<TextBlock FontSize="11" Text="{Binding}" />
+							<TextBlock FontSize="11" Text="{Binding ChipText}" />
 						</Border>
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
+			<!--  W5 차례대로 칩 아래 — 좁은 창(S 400)의 버튼 줄에서는 세 단추에 밀려 글이 보이지 않았다(MNT-R28-451 안내 '')  -->
+			<dlg:ConsoleDialogText
+				Margin="0,4,0,0"
+				AutomationProperties.AutomationId="Devices.SensorPresets.SaveConfirm.Note"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="{Binding KeepText}"
+				TextWrapping="Wrap" />
 		</StackPanel>
 	</dlg:ConsoleDialogFrame>
 </UserControl>

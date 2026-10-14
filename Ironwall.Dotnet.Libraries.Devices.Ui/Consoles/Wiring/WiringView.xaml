@@ -2254,9 +2254,11 @@
 										</StackPanel>
 
 										<!--  설치 위치 프리셋(sensor-mount-preset W4 · FR-15) — 모델 · 위치 프리셋 · 따로 고친 값(주황) · 속성 프리셋. 저장은 [저장하기] 하나로  -->
-										<StackPanel
+										<!--  peer 있는 절 — 자동화가 절과 그 안의 칸을 찾는다(MNT-R28-400)  -->
+										<wiring:WiringSectionPanel
 											Margin="0,10,0,0"
 											AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset"
+											AutomationProperties.Name="설치 위치"
 											Visibility="{Binding HasPresetRow, Converter={StaticResource BoolToVisibility}}">
 											<StackPanel Orientation="Horizontal">
 												<TextBlock Style="{StaticResource W.SectionHead}" Text="설치 위치" />
@@ -2353,12 +2355,12 @@
 												DisplayMemberPath="Name"
 												ItemsSource="{Binding PresetAttributeChoices}"
 												SelectedItem="{Binding SelectedAttributePreset}" />
-											<TextBlock
+											<c:ConsoleText
 												Margin="0,4,0,0"
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.SpacingAlert"
 												Foreground="{DynamicResource StatusWarningBrush}"
 												Text="{Binding PresetSpacingAlertText}" />
-										</StackPanel>
+										</wiring:WiringSectionPanel>
 
 										<!--  여러 센서(Ctrl 클릭 · FR-07) — 함께 끌거나 한꺼번에 빼기  -->
 										<StackPanel Margin="0,8,0,0" Visibility="{Binding HasMultiSelection, Converter={StaticResource BoolToVisibility}}">
