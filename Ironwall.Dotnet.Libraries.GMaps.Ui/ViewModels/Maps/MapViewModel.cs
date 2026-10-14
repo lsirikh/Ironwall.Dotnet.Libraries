@@ -9912,7 +9912,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             if (MainMap == null) return;
             FlyTo(new PointLatLng(e.Symbol.Latitude, e.Symbol.Longitude), null, 0);   // 공용 이동(0 ms = 순간)
-            _log?.Info($"심볼 이동:{e.Symbol.Title} ({e.Symbol.Latitude:F6},{e.Symbol.Longitude:F6})");
+            _log?.Info($"심볼 이동: {e.Symbol.Title} ({e.Symbol.Latitude:F6},{e.Symbol.Longitude:F6})");
         }
         catch (Exception ex) { _log?.Error($"심볼 이동 실패: {ex.Message}"); }
     }

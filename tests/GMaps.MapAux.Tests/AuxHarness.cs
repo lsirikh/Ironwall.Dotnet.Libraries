@@ -205,6 +205,7 @@ internal sealed class MapVmRig
         Scenario.SetField(r.Vm, "_log", Mock.Of<ILogService>());
         var ea = new EventAggregator(); ea.SubscribeOnPublishedThread(r.Sink);
         Scenario.SetField(r.Vm, "_eventAggregator", ea);
+        Scenario.SetField(r.Vm, "_flyWatch", new System.Diagnostics.Stopwatch());   // 지도 이동 공용 경로 FlyTo(63ecd628)가 읽는다
 
         var setup = new Mock<Ironwall.Dotnet.Libraries.GMaps.Models.IMainControlWebSetupModel>();
         setup.SetupGet(s => s.IpAddrerssWebServer).Returns(WebIp);

@@ -48,6 +48,7 @@ public class FencePanelUndoSyncTests
         // Redo 도 같은 경로
         UndoableCommandBase.ApplyProperty(marker, "FenceHeightM", 3.5);
         Assert.Equal(3.5, panel.FenceHeightM, 3);
+        panel.FlushDeferredCommits();   // 지연 커밋을 마커가 살아 있을 때 확정(남기면 다음 시험 중에 터져 시험 호스트가 죽는다)
     });
 
     [Fact]
@@ -63,6 +64,7 @@ public class FencePanelUndoSyncTests
         Assert.Null(marker.FenceHeightM);
         Assert.True(panel.IsFenceHeightInherited);
         Assert.Equal(panel.FenceHeightDefault, panel.FenceHeightM, 3);
+        panel.FlushDeferredCommits();   // 지연 커밋을 마커가 살아 있을 때 확정(남기면 다음 시험 중에 터져 시험 호스트가 죽는다)
     });
 
     [Fact]

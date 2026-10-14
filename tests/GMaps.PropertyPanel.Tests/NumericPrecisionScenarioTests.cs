@@ -215,6 +215,7 @@ public class NumericPrecisionScenarioTests
         Assert.Equal(3.3, panel.FenceHeightM);
         Assert.Equal(1, panel.PostSpacingM);
         Assert.Equal(0.3, panel.LineOpacity);
+        panel.FlushDeferredCommits();   // 150 ms 지연 커밋을 마커가 살아 있을 때 확정 — 남기면 다음 시험 중에 터져 시험 호스트가 죽었다(2026-10-14)
     });
 
     // ── NUM-016~018 — 표시 글 · 다른 칸 ──

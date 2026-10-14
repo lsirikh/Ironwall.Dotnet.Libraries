@@ -84,6 +84,7 @@ internal sealed class MapVm
         Scenario.SetField(Vm, "_layerTreeNodes", new System.Collections.ObjectModel.ObservableCollection<Ironwall.Dotnet.Libraries.GMaps.Ui.Models.LayerTreeNode>());
         Scenario.SetField(Vm, "_locateHighlight", new MapLocateHighlight());
         Scenario.SetField(Vm, "_locateRings", new List<LocateRingMarker>());
+        Scenario.SetField(Vm, "_flyWatch", new System.Diagnostics.Stopwatch());   // 지도 이동 공용 경로 FlyTo(63ecd628)가 읽는다
     }
 
     public T Get<T>(string field) => Scenario.GetField<T>(Vm, field);
