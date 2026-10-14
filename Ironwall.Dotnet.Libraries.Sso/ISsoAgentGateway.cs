@@ -35,13 +35,17 @@ public interface ISsoAgentGateway
     /// 이 뒤 다시 들어오려면 사람이 다시 허용해야 한다 — <see cref="SignInInteractiveAsync"/>.
     /// 성공이면 <see cref="SsoAgentStatus.Ok"/>(토큰 없음 — <see cref="SsoAgentResult.IsOk"/> 는 쓰지 않는다).</para>
     /// </summary>
-    Task<SsoAgentResult> LogoutAppAsync(CancellationToken ct = default);
+    /// <remarks>기본 구현은 <see cref="SsoAgentStatus.Unavailable"/> — 이 메서드보다 먼저 만든 구현(호스트 시험의 가짜 에이전트)이 그대로 빌드되게.</remarks>
+    Task<SsoAgentResult> LogoutAppAsync(CancellationToken ct = default)
+        => Task.FromResult(SsoAgentResult.Fail(SsoAgentStatus.Unavailable, "LogoutAppAsync 미구현"));
 
     /// <summary>
     /// 에이전트에 "전체 로그아웃" 을 알린다 — SDK <c>LogoutAsync("all")</c>. 이 PC 의 모든 앱과 SSO 세션을 끝낸다.
     /// 사람이 GIS 로그아웃 창에서 [전체 로그아웃] 을 고를 때만 부른다.
     /// </summary>
-    Task<SsoAgentResult> LogoutAllAsync(CancellationToken ct = default);
+    /// <remarks>기본 구현은 <see cref="SsoAgentStatus.Unavailable"/> — <see cref="LogoutAppAsync"/> 와 같은 이유.</remarks>
+    Task<SsoAgentResult> LogoutAllAsync(CancellationToken ct = default)
+        => Task.FromResult(SsoAgentResult.Fail(SsoAgentStatus.Unavailable, "LogoutAllAsync 미구현"));
 
     /// <summary>
     /// 에이전트가 미는 사건을 받기 시작한다 — SDK <c>Watch</c>. 세션이 끝나면 GIS 가 묻지 않아도 안다.
