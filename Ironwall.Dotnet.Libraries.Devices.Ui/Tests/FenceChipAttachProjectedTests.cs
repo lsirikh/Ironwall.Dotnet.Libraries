@@ -249,4 +249,75 @@ public class FenceChipAttachProjectedTests
         Assert.True(result.Bad.Count == 0, string.Join(Environment.NewLine, result.Bad));
         Assert.True(Rect.Intersect(result.A, result.B) is var o && (o.IsEmpty || o.Width < 0.5), $"칩 겹침 {result.A} ⟷ {result.B}");
     }
+
+    /// <summary>
+    /// 9자리(위치 프리셋 아님) 센서 <paramref name="sensors"/> 대를 제어기 쪽 끝 두 칸 · 기둥 둘에 몰아 둔다(실창 r29 5회차 031 — 섞인 칸 + 끝에 몰린 배치).
+    /// </summary>
+    private static WiringViewModel SeedNine(int sensors, int panels, FenceControllerEnd end, bool flat)
+    {
+        var vm = WiringFenceHeightTests.Build(new string('S', sensors));
+        var specs = Enumerable.Range(0, panels).Select(i => new FencePanelSpec(SeedStyles[i % SeedStyles.Length], null, i % 3 == 1 ? 3.0 : 2.4, 3)).ToArray();
+        var spots = new[] { FenceMountSpot.PostTop, FenceMountSpot.PanelCenter, FenceMountSpot.PostMiddle, FenceMountSpot.PanelBottom };
+        var keys = vm.FenceChain.Keys;
+        var mounts = keys.Select((k, i) =>
+        {
+            var spot = spots[i % spots.Length];
+            var post = spot is FenceMountSpot.PostTop or FenceMountSpot.PostMiddle;
+            var near = i / spots.Length % 2;                                                  // 끝에서 0 · 1 번째 기둥 / 칸
+            var at = end == FenceControllerEnd.Left ? near : (post ? panels - near : panels - 1 - near);
+            return (k, new SensorMountSpec(at, spot));
+        }).ToDictionary(t => t.k, t => t.Item2);
+        Assert.True(vm.Board.ApplyFenceEdit(l => l.WithPanels(specs).WithMounts(mounts)));
+        if (end != vm.FenceLayout.ControllerEnd) Assert.True(vm.Board.ApplyFenceEdit(l => l.WithControllerEnd(end)));
+        Assert.All(keys, k => Assert.False(vm.IsPresetMounted(k), $"9자리 {k}"));
+        if (flat) vm.ChooseFlat();
+        return vm;
+    }
+
+    /// <summary>9자리 칩마다 — 붙는 점 x 가 펜스 시작 ~ 끝 안, 칩 몸이 제어기 상자와 안 겹침, 칩끼리 안 겹침. 어긋난 것을 말로 돌려준다.</summary>
+    private static List<string> CheckNine(WiringViewModel vm, FenceCanvas canvas, string label)
+    {
+        var bad = new List<string>();
+        var p = vm.IsFlat ? FenceProjector.Flat : FenceProjector.Tilt;
+        var world = FenceWorld.FromLayout(vm.FenceChain, vm.FenceSensors(), vm.FenceLayout, vm.FenceSpacing, vm.FencePoseOf, vm.FencePresetBayOf);
+        var start = p.P(0, 0, 0).X;
+        var end = p.P(world.Geometry!.LengthM * world.Upm, 0, 0).X;
+        var controller = FenceScene.EndControllerBounds(p, world.ControllerX);
+        controller.Inflate(-6, -6);
+        var bodies = new List<(string Name, Rect Body)>();
+        foreach (var key in vm.FenceChain.Keys)
+        {
+            if (!canvas.SensorChips.TryGetValue(key, out var chip)) { bad.Add($"{label} · {key}: 칩 없음"); continue; }
+            var anchor = System.Windows.Controls.Canvas.GetLeft(chip) - chip.HitBounds.X;
+            var name = $"{label} · 센서 {vm.FenceSensors()[key].Number}(사슬 {vm.FenceChain.Keys.ToList().IndexOf(key) + 1}/{vm.FenceChain.Keys.Count}) {vm.FenceLayout.MountOf(key)}";
+            if (anchor < start - 0.5 || anchor > end + 0.5) bad.Add($"{name}: 붙는 점 x {anchor:0.0} 이 펜스 {start:0.0}~{end:0.0} 밖(허공)");
+            var body = new Rect(System.Windows.Controls.Canvas.GetLeft(chip), System.Windows.Controls.Canvas.GetTop(chip), chip.Width, chip.Height);
+            if (body.IntersectsWith(controller)) bad.Add($"{name}: 칩 몸 {body} 이 제어기 상자 {controller} 와 겹침");
+            foreach (var (other, rect) in bodies)
+                if (Rect.Intersect(body, rect) is var o && !o.IsEmpty && o.Width >= 0.5 && o.Height >= 0.5) bad.Add($"{name}: 칩 {body} 이 {other} {rect} 와 겹침");
+            bodies.Add((name, body));
+        }
+        return bad;
+    }
+
+    [Theory, Trait("Scenario", "FLT-010")]
+    [InlineData(12, 8, FenceControllerEnd.Left, false, 1200)]
+    [InlineData(12, 8, FenceControllerEnd.Left, true, 640)]
+    [InlineData(12, 8, FenceControllerEnd.Right, false, 640)]
+    [InlineData(12, 8, FenceControllerEnd.Right, true, 1200)]
+    [InlineData(8, 3, FenceControllerEnd.Left, false, 640)]
+    [InlineData(8, 3, FenceControllerEnd.Right, true, 640)]
+    [InlineData(8, 8, FenceControllerEnd.Left, true, 1200)]
+    [InlineData(16, 12, FenceControllerEnd.Left, false, 1200)]
+    [InlineData(16, 12, FenceControllerEnd.Right, true, 1200)]
+    public void should_keep_nine_point_sensor_chips_bunched_at_the_controller_end_on_the_fence_off_the_controller_and_apart(
+        int sensors, int panels, FenceControllerEnd end, bool flat, double width)
+    {
+        var bad = OnSta(() =>
+        {
+            var vm = SeedNine(sensors, panels, end, flat);
+            return CheckNine(vm, Canvas(vm, width, width * 0.45), $"9자리 {sensors}대 · 칸 {panels} · {end} {(flat ? "평면" : "입체")} {width}px");
+        });
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    }
 }

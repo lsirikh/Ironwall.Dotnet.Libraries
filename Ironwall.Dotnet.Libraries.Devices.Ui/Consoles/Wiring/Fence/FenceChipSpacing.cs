@@ -17,12 +17,19 @@ public static class FenceChipSpacing
     /// 이미 떨어진 칩은 그대로다.
     /// </summary>
     public static IReadOnlyList<double> Spread(IReadOnlyList<(double X, double Left, double Width)> chips, double gap)
+        => Spread(chips, gap, double.NegativeInfinity, double.PositiveInfinity, true);
+
+    /// <summary>
+    /// <see cref="Spread(IReadOnlyList{ValueTuple{double, double, double}}, double)"/> 를 칩 사각형 왼쪽 끝 범위 [<paramref name="lo"/>, <paramref name="hi"/>] 안으로
+    /// (<see cref="FenceWorld.Separate(IReadOnlyList{double}, double, double, double, bool)"/> — 다 못 들어가면 겹치지 않음을 지키고 <paramref name="keepLo"/> 쪽 끝만 지킨다).
+    /// </summary>
+    public static IReadOnlyList<double> Spread(IReadOnlyList<(double X, double Left, double Width)> chips, double gap, double lo, double hi, bool keepLo)
     {
         var list = chips ?? Array.Empty<(double, double, double)>();
         if (list.Count == 0) return Array.Empty<double>();
         var widest = list.Max(c => Math.Max(0, c.Width));
         var lefts = list.Select(c => c.X + c.Left).ToList();
-        var spread = FenceWorld.Separate(lefts, widest + Math.Max(0, gap));
+        var spread = FenceWorld.Separate(lefts, widest + Math.Max(0, gap), lo, hi, keepLo);
         return list.Select((c, i) => spread[i] - c.Left).ToList();
     }
 }
