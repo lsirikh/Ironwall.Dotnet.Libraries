@@ -2268,11 +2268,13 @@
 													HelpKey="Devices.Wiring.MountPreset" />
 											</StackPanel>
 											<TextBlock Margin="0,4,0,0" Style="{StaticResource W.Hint}" Text="모델" />
+											<!--  글자 찾기 끔 — 콤보에 포커스가 있을 때 Esc(WM_CHAR 0x1B)가 글자 찾기로 가 ICU 비교가 제어 문자를 무시해 첫 항목을 골랐다(실창 6회차 MNT-R28-401 · 위치 프리셋은 ★기본 적용)  -->
 											<ComboBox
 												Margin="0,2,0,0"
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Model"
 												AutomationProperties.Name="모델"
 												DisplayMemberPath="Name"
+												IsTextSearchEnabled="False"
 												ItemsSource="{Binding PresetModelChoices}"
 												SelectedItem="{Binding SelectedPresetModel}" />
 											<TextBlock Margin="0,6,0,0" Style="{StaticResource W.Hint}" Text="위치 프리셋" />
@@ -2281,6 +2283,7 @@
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Mount"
 												AutomationProperties.Name="위치 프리셋"
 												DisplayMemberPath="Name"
+												IsTextSearchEnabled="False"
 												ItemsSource="{Binding PresetMountChoices}"
 												SelectedItem="{Binding SelectedMountPreset}" />
 											<Border
@@ -2353,6 +2356,7 @@
 												AutomationProperties.AutomationId="Devices.Wiring.Fence.Preset.Attribute"
 												AutomationProperties.Name="속성 프리셋"
 												DisplayMemberPath="Name"
+												IsTextSearchEnabled="False"
 												ItemsSource="{Binding PresetAttributeChoices}"
 												SelectedItem="{Binding SelectedAttributePreset}" />
 											<c:ConsoleText
