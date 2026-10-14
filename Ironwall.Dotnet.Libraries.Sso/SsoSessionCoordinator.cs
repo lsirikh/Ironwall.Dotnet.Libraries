@@ -128,6 +128,35 @@ public sealed class SsoSessionCoordinator
     /// </summary>
     public void CancelAgentReturn() => Interlocked.Exchange(ref _awaitingAgentReturn, 0);
 
+    /// <summary>"이 앱만 로그아웃" 을 에이전트에 알릴 때 기다리는 최대 시간 — 넘으면 포기하고 GIS 로그아웃을 진행한다.</summary>
+    public static readonly TimeSpan LogoutAppTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// 사람이 <b>GIS 안에서</b> 로그아웃했다 — 에이전트에 "이 앱만 로그아웃"(SDK <c>LogoutAsync("app")</c>)을 알린다.
+    /// 에이전트는 앱이 알려야만 「내 프로그램」 줄을 「로그아웃」 으로 바꾼다(SSO 요청 2026-10-14).
+    /// <para>SSO 로 들어온 세션(훅이 꽂혀 있음)일 때만 알린다 — 비밀번호로 들어온 세션은 에이전트와 무관하다.
+    /// GOP 로그아웃 <b>전에</b> 부른다(그 뒤엔 SSO 세션인지 가릴 수 없다).</para>
+    /// <para>훅부터 뗀다 — 에이전트가 이 호출의 답으로 <c>signed-out</c> 사건을 보내도 <see cref="SignOutFromAgentAsync"/> 가
+    /// "SSO 세션 아님" 으로 무시하게(사건 경로의 안내 · 복귀 기다림이 사람의 로그아웃을 덮지 않게).</para>
+    /// <para>실패(에이전트 꺼짐 <c>AgentNotRunning</c> · 시간 초과 · 예외)는 기록만 하고 삼킨다 — GIS 로그아웃은 그대로 진행한다.</para>
+    /// </summary>
+    public async Task SignOutAppAsync()
+    {
+        if (!IsEnabled) { _log?.Info("[SSO] GIS 로그아웃 — SSO 로 로그인한 세션이 아니라 에이전트에 알리지 않는다"); return; }
+        Disable();
+        Interlocked.Exchange(ref _awaitingAgentReturn, 0);   // 사람이 직접 로그아웃 — 에이전트 쪽 동작으로 되살리지 않는다
+        try
+        {
+            using var cts = new CancellationTokenSource(LogoutAppTimeout);
+            var r = await _agent.LogoutAppAsync(cts.Token).ConfigureAwait(false);
+            _log?.Info($"[SSO] GIS 로그아웃 — 에이전트에 이 앱만 로그아웃 알림: {r.Status} {r.Detail}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Info($"[SSO] GIS 로그아웃 — 에이전트 알림 실패(진행): {ex.GetType().Name} {ex.Message}");
+        }
+    }
+
     /// <summary>훅이 지금 이 조정자를 가리키는가.</summary>
     public bool IsEnabled => ReferenceEquals(BearerAuthHandler.SsoReauthenticator, _hook);
 

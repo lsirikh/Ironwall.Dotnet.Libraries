@@ -30,6 +30,14 @@ public interface ISsoAgentGateway
     Task<SsoAgentResult> SignInInteractiveAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// 에이전트에 "이 앱만 로그아웃" 을 알린다 — SDK <c>LogoutAsync("app")</c>. 사람이 GIS 안에서 로그아웃할 때 부른다.
+    /// <para>에이전트는 앱이 <c>/logout</c> 을 부를 때만 그 앱을 「로그아웃」 으로 바꾼다(SSO 요청 2026-10-14).
+    /// 이 뒤 다시 들어오려면 사람이 다시 허용해야 한다 — <see cref="SignInInteractiveAsync"/>.
+    /// 성공이면 <see cref="SsoAgentStatus.Ok"/>(토큰 없음 — <see cref="SsoAgentResult.IsOk"/> 는 쓰지 않는다).</para>
+    /// </summary>
+    Task<SsoAgentResult> LogoutAppAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// 에이전트가 미는 사건을 받기 시작한다 — SDK <c>Watch</c>. 세션이 끝나면 GIS 가 묻지 않아도 안다.
     /// <para>"이 앱만 로그아웃" 은 SSO 세션을 끝내지 않아 back-channel 도 401 도 오지 않는다 — <b>이 구독이 GIS 가 그것을
     /// 아는 유일한 길</b>이다(SSO 회신 2026-10-01 16:55).</para>

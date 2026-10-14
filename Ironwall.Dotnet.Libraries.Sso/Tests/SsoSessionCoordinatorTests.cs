@@ -472,6 +472,17 @@ public partial class SsoSessionCoordinatorTests : IDisposable
             return Interactive is not null ? Interactive(ct) : SignInAsync(ct);
         }
 
+        /// <summary>"이 앱만 로그아웃" — 부른 횟수를 센다. <see cref="LogoutThrows"/> 면 던진다.</summary>
+        public int LogoutAppCalls;
+        public SsoAgentResult LogoutResult { get; init; } = new(SsoAgentStatus.Ok, null, string.Empty);
+        public bool LogoutThrows { get; init; }
+        public Task<SsoAgentResult> LogoutAppAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref LogoutAppCalls);
+            if (LogoutThrows) throw new IOException("pipe broken");
+            return Task.FromResult(LogoutResult);
+        }
+
         /// <summary>사건 구독 — 마지막 구독의 콜백을 쥐고 시험이 사건을 일으킨다.</summary>
         public Action<SsoAgentEvent>? OnEvent { get; private set; }
         public int WatchOpened { get; private set; }
