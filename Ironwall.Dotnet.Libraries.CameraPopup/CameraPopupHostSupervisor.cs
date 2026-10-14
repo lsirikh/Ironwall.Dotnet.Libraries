@@ -350,6 +350,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             Headless = _options.Headless,
             DebugCommands = _options.EnableDebugCommands,
             LogDirectory = _options.HostLogDirectory,
+            AllowRtspUdpFallback = _options.AllowRtspUdpFallback,
         };
         var startInfo = new ProcessStartInfo(path)
         {

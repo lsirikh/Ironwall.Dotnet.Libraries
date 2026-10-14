@@ -78,8 +78,14 @@ public sealed class FakeOnvifCamera : IAsyncDisposable
         return (double.Parse(x, System.Globalization.NumberStyles.Float, inv), double.Parse(y, System.Globalization.NumberStyles.Float, inv), Attr("space"));
     }
 
-    /// <summary>GetStreamUri 가 돌려주는 주소(계정 없음 — 실측 카메라와 같다).</summary>
-    public string StreamUri => $"rtsp://127.0.0.1:{Port}/sub";
+    private string? _streamUri;
+
+    /// <summary>GetStreamUri 가 돌려주는 주소(계정 없음 — 실측 카메라와 같다). 정하면 그 주소(예: 루프백 RTSP 원본).</summary>
+    public string StreamUri
+    {
+        get => _streamUri ?? $"rtsp://127.0.0.1:{Port}/sub";
+        set => _streamUri = value;
+    }
 
     public int Count(string operation) => Requests.Count(r => r.Body.Contains(operation, StringComparison.Ordinal));
 

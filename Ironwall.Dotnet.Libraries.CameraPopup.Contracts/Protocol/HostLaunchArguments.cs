@@ -4,7 +4,7 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 
 /// <summary>
 /// 호스트 실행 인자(순수 함수 — 만들기 · 해석). 감시자와 호스트가 같은 코드로 오간다.
-/// <code>--parent-pid 1234 --pipe ironwall-camhost-1234-… --token … --memory-limit-mb 1536 [--memory-per-stream-mb 24] [--max-opens 8] [--headless] [--debug-commands] [--log-dir …]</code>
+/// <code>--parent-pid 1234 --pipe ironwall-camhost-1234-… --token … --memory-limit-mb 1536 [--memory-per-stream-mb 24] [--max-opens 8] [--headless] [--debug-commands] [--allow-rtsp-udp] [--log-dir …]</code>
 /// </summary>
 public sealed class HostLaunchArguments
 {
@@ -45,6 +45,9 @@ public sealed class HostLaunchArguments
 
     public string? LogDirectory { get; init; }
 
+    /// <summary>RTSP 서버가 TCP 를 거절할 때 UDP 로 갈아타기 허용(들어오는 포트를 열어 방화벽 창이 뜬다). 기본 끔.</summary>
+    public bool AllowRtspUdpFallback { get; init; }
+
     /// <summary><see cref="System.Diagnostics.ProcessStartInfo.ArgumentList"/> 에 넣을 인자 목록.</summary>
     public IReadOnlyList<string> ToArgumentList()
     {
@@ -59,6 +62,7 @@ public sealed class HostLaunchArguments
         };
         if (Headless) list.Add("--headless");
         if (DebugCommands) list.Add("--debug-commands");
+        if (AllowRtspUdpFallback) list.Add("--allow-rtsp-udp");
         if (!string.IsNullOrWhiteSpace(LogDirectory))
         {
             list.Add("--log-dir");
@@ -74,7 +78,7 @@ public sealed class HostLaunchArguments
         error = null;
         int parentPid = 0, memoryMb = DefaultMemoryLimitMb, perStreamMb = DefaultMemoryPerStreamMb, maxOpens = DefaultMaxConcurrentOpens;
         string? pipe = null, token = null, logDir = null;
-        bool headless = false, debug = false;
+        bool headless = false, debug = false, allowUdp = false;
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -98,6 +102,7 @@ public sealed class HostLaunchArguments
                     break;
                 case "--headless": headless = true; break;
                 case "--debug-commands": debug = true; break;
+                case "--allow-rtsp-udp": allowUdp = true; break;
                 case "--log-dir": logDir = Next(); break;
                 default: error = $"알 수 없는 인자: {a}"; return false;
             }
@@ -121,6 +126,7 @@ public sealed class HostLaunchArguments
             Headless = headless,
             DebugCommands = debug,
             LogDirectory = logDir,
+            AllowRtspUdpFallback = allowUdp,
         };
         return true;
     }

@@ -35,6 +35,7 @@ internal sealed class HostRuntime
         _launch = launch;
         _log = log;
         _dispatcher = dispatcher;
+        LibVlcRuntime.AllowRtspUdpFallback = launch.AllowRtspUdpFallback;
         _cameras = CreateCameraServices(log);
         _uiProbe = new UiPumpProbe(dispatcher);
         _uiCommands = new UiCommandQueue(dispatcher, OnUiCommandFailed);
