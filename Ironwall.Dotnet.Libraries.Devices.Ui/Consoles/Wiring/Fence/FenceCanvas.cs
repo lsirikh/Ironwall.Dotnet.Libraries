@@ -86,6 +86,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     private int _presetBay = -1;
     private IReadOnlyList<(FencePresetSnapPoint Point, Point At)> _presetPoints = Array.Empty<(FencePresetSnapPoint, Point)>();
     private FencePresetSnapPoint? _presetTarget;
+    private FencePresetSnapPoint? _presetNearest;   // 마지막 포인터 걸음의 가장 가까운 점 — 바뀌지 않으면 Tab 으로 고른 점을 둔다
     private (double AlongM, double HeightM)? _presetFree;
     private double _renderZoom = 1;
     private Rect? _band;
@@ -1090,6 +1091,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _presetFree = null;
         LoadPresetBay(vm, grabbed, bay);
         _presetTarget = null;
+        _presetNearest = null;
         Cursor = Cursors.SizeAll;
         vm.NotifyFenceStatus("붙는 점에 놓으면 그 자리로(따로 고친 값) · Alt = 자유 위치 · Tab = 다음 붙는 점 · Esc 취소");
         return true;
@@ -1112,7 +1114,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (!inside)
         {
             _dropKind = IsRemoveZoneUnder(now) ? DropKind.Remove : DropKind.None;
-            if (_presetTarget is not null || _presetFree is not null) { _presetTarget = null; _presetFree = null; _snapLabel = null; UpdateOverlay(); }
+            if (_presetTarget is not null || _presetFree is not null) { _presetTarget = null; _presetNearest = null; _presetFree = null; _snapLabel = null; UpdateOverlay(); }
             return;
         }
         _dropKind = DropKind.Chain;
@@ -1126,14 +1128,18 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             if (_presetFree == at && _presetTarget is null) return;
             _presetFree = at;
             _presetTarget = null;
-            _snapLabel = $"자유 위치 · 가로 {at.AlongM:0.00} m · 높이 {at.HeightM:0.00} m";
+            // 알약은 놓으면 설 자리(물체에 붙인 값)를 말한다 — 허공 높이를 말하지 않는다(실창 7회차 MNT-R28-422)
+            var lands = vm.FencePresetFreeAt(key, _presetBay, at.AlongM, at.HeightM)?.Pose;
+            _snapLabel = $"자유 위치 · 가로 {lands?.AlongM ?? at.AlongM:0.00} m · 높이 {lands?.HeightM ?? at.HeightM:0.00} m";
             vm.NotifyFenceStatus($"{_snapLabel} — 놓으면 확정 · Esc 취소");
             UpdateOverlay();
             return;
         }
 
         var target = FencePresetDrag.Nearest(_presetPoints, world);
-        if (target == _presetTarget && _presetFree is null) return;
+        // 가장 가까운 점이 그대로면 Tab 으로 고른 점을 둔다 — 놓기 전 마지막 한두 걸음(손떨림)에 Tab 고름이 사라졌다(실창 7회차 MNT-R28-426 재현)
+        if (target == _presetNearest && _presetFree is null) return;
+        _presetNearest = target;
         _presetFree = null;
         SetPresetTarget(vm, target);
     }
@@ -1206,6 +1212,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         _presetBay = -1;
         _presetPoints = Array.Empty<(FencePresetSnapPoint, Point)>();
         _presetTarget = null;
+        _presetNearest = null;
         _presetFree = null;
         _press = null;
         _dragging = false;
