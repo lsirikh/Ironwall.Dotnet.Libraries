@@ -90,11 +90,20 @@ public sealed partial class WiringViewModel
     /// </summary>
     public bool FenceMovePresetFree(int key, int bay, double alongM, double heightM)
     {
-        if (IsBusy || !IsPresetMounted(key) || bay < 0 || bay >= _board.FenceLayout.Panels.Count) return false;
-        var sample = FenceSampleBay.FromPanel(_board.FenceLayout.Panels[bay]).Normalized();
-        var along = Math.Round(alongM * 100) / 100 / sample.PanelWidthM;
-        var height = Math.Round(heightM * 100) / 100;
-        return MovePreset(key, bay, along, height, null, $"자유 위치 · 가로 {Math.Clamp(along, 0, 1) * sample.PanelWidthM:0.00} m · 높이 {height:0.00} m");
+        if (IsBusy || FencePresetFreeAt(key, bay, alongM, heightM) is not { } at) return false;
+        var pose = at.Pose;
+        return MovePreset(key, bay, pose.AlongRatio, pose.HeightM, null, $"자유 위치 · 가로 {pose.AlongM:0.00} m · 높이 {pose.HeightM:0.00} m", at.Clamped ? at.Reason : null);
+    }
+
+    /// <summary>
+    /// Alt 자유 위치가 실제로 설 자리 — 편집기 Alt 끌기와 같은 규칙(<see cref="SensorMountResolver.MoveFreeAttached"/> · 그 자리에서 가장 가까운 물체 면 · 1 cm).
+    /// 끄는 중 알약과 놓은 자리가 같은 값을 말한다. 프리셋으로 서지 않는 센서 · 범위 밖 칸이면 <c>null</c>.
+    /// </summary>
+    /// <remarks>2026-10-14 실창 7회차 MNT-R28-422 — 붙은 갈래(기둥 꼭대기)로만 끌어 붙여 망 위 허공에 놓으면 프리셋 자리로 되돌아갔고, 알약은 허공 높이(3.28 m)를 말했다.</remarks>
+    public SensorMountAttachment? FencePresetFreeAt(int key, int bay, double alongM, double heightM)
+    {
+        if (!IsPresetMounted(key) || PresetOfKey(key) is not { } preset || bay < 0 || bay >= _board.FenceLayout.Panels.Count) return null;
+        return SensorMountResolver.MoveFreeAttached(preset, FenceSampleBay.FromPanel(_board.FenceLayout.Panels[bay]), alongM, heightM).Attachment;
     }
 
     /// <summary>
@@ -163,17 +172,20 @@ public sealed partial class WiringViewModel
         return ok;
     }
 
-    private bool MovePreset(int key, int bay, double alongRatio, double heightM, double? depthM, string what)
+    private bool MovePreset(int key, int bay, double alongRatio, double heightM, double? depthM, string what, string? reason = null)
     {
         if (_board.FenceLayout.MountOf(key) is not { } before || PresetOfKey(key) is not { } preset) return false;
         var fromBay = FencePresetBayOf(key) ?? bay;
         var rest = _board.Chain.Keys.Where(k => k != key).ToList();
         var tie = bay >= fromBay ? rest.Append(key).ToList() : rest.Prepend(key).ToList();
-        // 허공 자리면 가장 가까운 물체로 끌어 붙인다(FR-22) — 그 까닭을 상태 줄에(쉬운 말)
-        var why = WiringPresetPlan.MoveAttachment(before, preset, _board.FenceLayout.Panels, bay, alongRatio, heightM, depthM) is { Clamped: true, Reason: { } r } ? $" — {r}" : string.Empty;
+        // 허공 자리면 가장 가까운 물체로 끌어 붙인다(FR-22) — 그 까닭을 상태 줄에(쉬운 말). 이미 붙인 자리(Alt 자유 위치)는 부른 쪽이 까닭을 준다.
+        var why = (WiringPresetPlan.MoveAttachment(before, preset, _board.FenceLayout.Panels, bay, alongRatio, heightM, depthM) is { Clamped: true, Reason: { } r } ? r : reason) is { } because
+            ? $" — {because}" : string.Empty;
         var ok = EditPresetFence(l => l.WithMounts(l.Mounts.ToDictionary(p => p.Key,
             p => p.Key == key ? WiringPresetPlan.MoveTo(p.Value, preset, l.Panels, bay, alongRatio, heightM, depthM) : p.Value)), tie);
-        StatusText = ok ? $"설치 위치 — {_board.Find(key)?.Display}: 망 {bay + 1} · {what} (프리셋에서 바뀜 · [프리셋으로] 로 되돌림){why}"
+        // 프리셋 자리와 같은 점(다른 칸의 같은 점 포함)이면 따로 고친 값이 없다 — 속성 칸 "바뀜" 과 같은 말을 한다(실창 7회차 MNT-R28-420-flat)
+        var changed = _board.FenceLayout.MountOf(key)?.MountOverride is { IsEmpty: false };
+        StatusText = ok ? $"설치 위치 — {_board.Find(key)?.Display}: 망 {bay + 1} · {what} ({(changed ? "프리셋에서 바뀜 · [프리셋으로] 로 되돌림" : "프리셋 자리 그대로 · 따로 고친 값 없음")}){why}"
                         : $"제자리 — 바뀐 것이 없습니다.{why}";
         RaisePresetPane();
         return ok;
