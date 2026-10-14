@@ -465,10 +465,11 @@ public sealed class FenceWorld
         var chainIndex = chain.Keys.Select((k, i) => (k, i)).ToDictionary(t => t.k, t => t.i);
         var gap = ChipGap(sensors.Values.Where(v => chainIndex.ContainsKey(v.Key)));
         // 위치 프리셋 센서는 벌리지 않는다 — 옆으로 밀면 기둥 · 망에서 떨어져 허공에 뜬다(헤디드 83169 · FR-22 조사 6).
+        // 9자리 센서는 펜스 시작 ~ 끝 안에서만 벌린다 — 제어기 쪽 끝에 몰린 칩이 펜스 밖 허공으로 밀렸다(실창 r29 5회차 031).
         foreach (var lane in seats.GroupBy(t => t.Mount.Lane))
         {
             var ordered = lane.Select(t => t.Key).Where(k => world._x.ContainsKey(k) && !world._marks.ContainsKey(k)).OrderBy(k => world._x[k]).ThenBy(k => chainIndex[k]).ToList();
-            var apart = Separate(ordered.Select(k => world._x[k]).ToList(), gap);
+            var apart = Separate(ordered.Select(k => world._x[k]).ToList(), gap, 0, geometry.LengthM * upm, layout.ControllerEnd == FenceControllerEnd.Left);
             for (var i = 0; i < ordered.Count; i++) world._x[ordered[i]] = apart[i];
         }
         // 윤형 — 받침(5) + 코일 지름(펜스 높이의 40%) 위까지
@@ -632,6 +633,23 @@ public sealed class FenceWorld
         foreach (var (first, count, sum) in blocks)
             for (var j = 0; j < count; j++) result[first + j] = sum / count + j * minGap;
         return result;
+    }
+
+    /// <summary>
+    /// <see cref="Separate(IReadOnlyList{double}, double)"/> 를 [<paramref name="lo"/>, <paramref name="hi"/>] 안으로 — 범위를 넘은 무리만 순서 · 간격을 지킨 채 안으로 민다(순수 · 시험 대상).
+    /// 범위가 모자라 다 못 들어가면 간격(겹치지 않음)을 지키고 <paramref name="keepLo"/> 쪽(제어기 쪽) 끝만 지킨다 — 넘치는 칩은 제어기 반대쪽으로 나간다(실창 r29 5회차).
+    /// </summary>
+    public static IReadOnlyList<double> Separate(IReadOnlyList<double> xs, double minGap, double lo, double hi, bool keepLo)
+    {
+        var apart = Separate(xs, minGap);
+        // y = x − 자리 × 간격 은 순서대로 커진다 — y 를 범위로 자르면 순서 · 간격이 그대로 남는다
+        var top = hi - (apart.Count - 1) * minGap;
+        return apart.Select((x, i) =>
+        {
+            var y = x - i * minGap;
+            y = top >= lo ? Math.Clamp(y, lo, top) : keepLo ? Math.Max(y, lo) : Math.Min(y, top);
+            return y + i * minGap;
+        }).ToList();
     }
 
     /// <summary>

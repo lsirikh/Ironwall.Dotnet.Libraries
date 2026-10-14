@@ -438,6 +438,17 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             foreach (var lane in placed.GroupBy(p => p.Lane).Concat(OverlappingRows(mounted)))
             {
                 var row = lane.Where(p => !p.Chip.FootprintBounds.IsEmpty).OrderBy(p => p.X + p.Chip.FootprintBounds.X).ToList();
+                var free = row.Count > 0 && !(row[0].Chip.Kind == FenceChipKind.Sensor && scene.IsMounted(row[0].Chip.Key));
+                if (free)
+                {
+                    var spots = FreeSpread(row.Select(p => (p.X, p.Chip.FootprintBounds)).ToList(), scene, controllerBox);
+                    for (var i = 0; i < row.Count; i++)
+                    {
+                        if (Math.Abs(spots[i].X - row[i].X) > 1e-9) Place(row[i].Chip, spots[i].X);
+                        if (spots[i].Dy != 0) Canvas.SetTop(row[i].Chip, Canvas.GetTop(row[i].Chip) + spots[i].Dy);
+                    }
+                    continue;
+                }
                 var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
                 for (var i = 0; i < row.Count; i++)
                 {
@@ -510,6 +521,36 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
             _chips.Children.Insert(Math.Min(i, _chips.Children.Count), order[i]);
         }
         while (_chips.Children.Count > order.Count) _chips.Children.RemoveAt(_chips.Children.Count - 1);
+    }
+
+    /// <summary>
+    /// 9자리 칩(물체에 붙지 않은 칩 · 묶음) 한 줄 벌리기 — 붙는 점 x 는 펜스 시작 ~ 끝 안, 번호판까지 펜스 끝 제어기 상자 밖(실창 r29 5회차 031: 제어기 쪽 끝에 몰린 칩이
+    /// 펜스 밖 허공 · 제어기 위로 밀렸다). 그 배율에서 한 줄에 다 못 들어가면 번갈아 아래 단(망 · 기둥 앞면 쪽)으로 비켜 선다 — 단마다 따로 벌리고
+    /// 단 사이는 칩 그림 높이 + 틈만큼 내린다(9자리 칩은 한 줄이 같은 높이라 옆으로만은 못 벌린다 · PLAN 결정 1).
+    /// </summary>
+    /// <returns>칩마다 놓을 x(세계 단위)와 아래로 내릴 값(캔버스 단위 · 첫 단은 0).</returns>
+    private IReadOnlyList<(double X, double Dy)> FreeSpread(IReadOnlyList<(double X, Rect Footprint)> row, FenceWorld scene, Rect controllerBox)
+    {
+        var end = scene.Geometry!.LengthM * scene.Upm;
+        var controllerLeft = scene.Layout!.ControllerEnd == FenceControllerEnd.Left;
+        var gap = CHIP_GAP_PX / Math.Max(0.05, _view.Scale);
+        // 범위는 칩 사각형 왼쪽 끝으로 — 붙는 점 x ≥ 0 ⇔ 왼쪽 끝 ≥ 왼쪽 오프셋(칩마다 조금 달라 가장 엄한 값을 쓴다)
+        var lo = row.Max(c => c.Footprint.X);
+        var hi = end + row.Min(c => c.Footprint.X);
+        if (controllerLeft && _enclosureX <= 0) lo = Math.Max(lo, controllerBox.Right);
+        else if (!controllerLeft && _enclosureX >= end) hi = Math.Min(hi, controllerBox.Left - row.Max(c => c.Footprint.Width));
+        var step = row.Max(c => c.Footprint.Width) + gap;
+        var tiers = 1;
+        while (tiers < row.Count && (Math.Ceiling(row.Count / (double)tiers) - 1) * step > hi - lo) tiers++;
+        var drop = row.Max(c => c.Footprint.Bottom) - row.Min(c => c.Footprint.Top) + gap;
+        var result = new (double X, double Dy)[row.Count];
+        for (var t = 0; t < tiers; t++)
+        {
+            var members = Enumerable.Range(0, row.Count).Where(i => i % tiers == t).ToList();
+            var xs = FenceChipSpacing.Spread(members.Select(i => (row[i].X, row[i].Footprint.X, row[i].Footprint.Width)).ToList(), gap, lo, hi, controllerLeft);
+            for (var j = 0; j < members.Count; j++) result[members[j]] = (xs[j], t * drop);
+        }
+        return result;
     }
 
     /// <summary>
