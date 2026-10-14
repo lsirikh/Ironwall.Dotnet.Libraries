@@ -435,19 +435,18 @@ public sealed class LabelAdorner : Adorner, IDisposable
             LabelWidthChanged?.Invoke(_marker, _origOffsetX, _origOffsetY, _origMaxWidth);
     }
 
-    /// <summary>비율 오프셋(이미지 · 라인) 저장 자리수.</summary>
-    private const int RATIO_OFFSET_DIGITS = 4;
+    /// <summary>라벨 오프셋 저장 자리수 — 명세에 단위가 없어 끈 거리(소수 px · 비율)는 지키고 부동소수 찌꺼기만 뗀다.</summary>
+    private const int OFFSET_DIGITS = 4;
 
     /// <summary>
-    /// 놓는 순간 저장값을 명세 단위로 맞춘다(map-property-numeric-precision PRD — 제목 폭 정수 px).
+    /// 놓는 순간 저장값을 명세 단위로 맞춘다(map-property-numeric-precision PRD 48행 — 제목 폭 정수 px).
     /// 끄는 중 값은 마우스 좌표 그대로라 446.7 · 220.0000000000001 이 DB 에 남았다(실창 r29 5회차 NUM-R29-A6).
-    /// 점 심볼 오프셋=정수 px, 비율 오프셋=소수 4자리.
+    /// 오프셋은 소수 4자리(정수로 자르면 끈 거리가 바뀌고 x · y 반올림이 끌기 상한을 넘는다 — MapEdit 시험).
     /// </summary>
     private void SnapStoredValues(bool includeWidth)
     {
         var (a, b) = ReadOffset();
-        int digits = IsNormalizedOffset ? RATIO_OFFSET_DIGITS : 0;
-        WriteOffset(Math.Round(a, digits), Math.Round(b, digits));
+        WriteOffset(Math.Round(a, OFFSET_DIGITS), Math.Round(b, OFFSET_DIGITS));
         if (includeWidth) _marker.TitleMaxWidth = Math.Round(_marker.TitleMaxWidth);
     }
 

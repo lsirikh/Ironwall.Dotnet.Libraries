@@ -39,7 +39,7 @@ public class LabelAdornerSnapTests
 
     [Fact]
     [Trait("Scenario", "NUM-LBL-01")]
-    public void should_store_integer_width_and_px_offset_when_point_symbol_label_resize_is_released()
+    public void should_store_integer_width_and_noise_free_offset_when_point_symbol_label_resize_is_released()
     {
         RunSta(() =>
         {
@@ -51,9 +51,9 @@ public class LabelAdornerSnapTests
 
             Snap(AdornerFor(marker), includeWidth: true);
 
-            Assert.Equal(447d, model.TitleMaxWidth);
-            Assert.Equal(220d, model.LabelOffsetX);
-            Assert.Equal(-13d, model.LabelOffsetY);
+            Assert.Equal(447d, model.TitleMaxWidth);       // 명세: 제목 폭 정수 px
+            Assert.Equal(220d, model.LabelOffsetX);        // 부동소수 찌꺼기만 뗀다
+            Assert.Equal(-13.4999, model.LabelOffsetY);    // 끈 거리(소수 px)는 지킨다
         });
     }
 
@@ -71,7 +71,7 @@ public class LabelAdornerSnapTests
             Snap(AdornerFor(marker), includeWidth: false);
 
             Assert.Equal(200d, model.TitleMaxWidth);
-            Assert.Equal(13d, model.LabelOffsetX);
+            Assert.Equal(12.6, model.LabelOffsetX);
         });
     }
 
