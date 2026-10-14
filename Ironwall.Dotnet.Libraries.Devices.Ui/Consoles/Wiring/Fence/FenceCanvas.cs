@@ -1103,6 +1103,10 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         if (_scene is null) return;
         _presetBay = bay;
         _presetPoints = vm.FencePresetSnapPoints(key, bay).Select(p => (p, FencePresetDrag.PointAt(p, _projector, _scene.Upm, _scene.Vpm))).ToList();
+        // 실창 MNT-R28-426(윤형 칸 위인데 코일 점이 없다) 증거 — IRONWALL_DRAG_TRACE 가 있을 때만 쓴다
+        if (DragTrace.IsOn)
+            DragTrace.Write($"[fence-preset] key={key} bay={bay} style={(bay >= 0 && bay < vm.FenceLayout.Panels.Count ? vm.FenceLayout.Panels[bay].Style.ToString() : "?")} " +
+                            $"points=[{string.Join(", ", _presetPoints.Select(t => $"{t.Point.Point.Kind}{(t.Point.Allowed ? "" : "(×)")}:{t.Point.AttachText}"))}]");
     }
 
     /// <summary>위치 프리셋 끌기 — 포인터 아래 칸의 가장 가까운 허용 점에 붙는다(Alt = 붙지 않고 자유 위치). 붙을 점이 바뀔 때만 다시 그린다(NFR-02).</summary>
@@ -1449,6 +1453,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         base.OnPreviewKeyDown(e);
         // 수정키는 누른 순서와 무관하게(Alt 먼저 · Shift 먼저 모두 Alt+Shift) — 헤디드 r21
         // 키 사건은 포커스 요소에서 시작한다 — 그 원천이 곧 포커스 칩(포커스를 잡을 수 없는 헤드리스 시험도 같은 길을 탄다)
+        if (DragTrace.IsOn && e.Key == Key.Tab) DragTrace.Write($"[fence-preset] Tab 이 캔버스에 닿음 · 끄는 중 {_presetKey is not null} · 포커스 {DragTrace.Chain(Keyboard.FocusedElement as DependencyObject, 3)}");
         if (HandleKeyDown(e.Key, e.SystemKey, FenceKeyModifiers.Of(e), e.OriginalSource as DependencyObject ?? Keyboard.FocusedElement as DependencyObject)) e.Handled = true;
     }
 
@@ -1479,6 +1484,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
         {
             _presetFree = null;
             SetPresetTarget(vm, FencePresetDrag.Cycle(_presetPoints, _presetTarget, (modifiers & ModifierKeys.Shift) != 0));
+            if (DragTrace.IsOn) DragTrace.Write($"[fence-preset] Tab bay={_presetBay} → {_presetTarget?.AttachText ?? "(없음)"}");
             return true;
         }
 
