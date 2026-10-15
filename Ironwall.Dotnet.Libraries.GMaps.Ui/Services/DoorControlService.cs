@@ -80,6 +80,7 @@ public class DoorControlService : IDoorControlService
                                 ? BuildFallbackDescription(deviceId, deviceType)
                                 : deviceDescription!,
             RequestedBy = string.IsNullOrWhiteSpace(requestedBy) ? null : requestedBy,
+            RequestedClientId = Brokers.ControlCommandRequester.ClientId(),
             // 서버 규약: ISO 8601 + 오프셋 필수(naive 금지)
             RequestedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz"),
         };

@@ -2128,7 +2128,7 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     // requested_by = 로그인 계정 식별자(login_id). 서버 JWT sub=login_id 이므로 ITokenStorageService.UserId 가 곧 login_id.
-    //   ITokenStorageService 도 IoC lazy(미등록/미로그인 시 null → Windows 사용자명 폴백).
+    //   ITokenStorageService 도 IoC lazy(미등록/미로그인 시 null → requested_by 를 싣지 않는다).
     private ITokenStorageService? _tokenStorage;
     private bool _tokenStorageResolved;
     private ITokenStorageService? ResolveTokenStorage()
@@ -2139,13 +2139,16 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraAim] TokenStorage 미해석(requested_by 폴백): {ex.Message}"); _tokenStorage = null; }
         return _tokenStorage;
     }
-    /// <summary>회전요청 requested_by — 로그인 계정 표시이름(user.name) 우선 → login_id(JWT sub) → Windows 사용자명 폴백.</summary>
-    private string CurrentRequestedBy()
+    /// <summary>
+    /// 제어 명령 requested_by — 로그인 운영자 계정(login_id) → JWT sub(=login_id) 폴백. 둘 다 없으면 null(싣지 않음).
+    /// 회전요청 · 문 개폐 · 카메라 팝업이 같은 값을 쓴다(브로커 v2.0.12 §7 머리 — 방송 · 경광등 서비스와 같은 정의).
+    /// </summary>
+    private string? CurrentRequestedBy()
     {
-        var name = ResolvePermissionService()?.Name;          // 표시이름(로그인 응답 user.name) 우선
-        if (!string.IsNullOrWhiteSpace(name)) return name;
-        var loginId = ResolveTokenStorage()?.UserId;          // JWT sub=login_id 폴백
-        return string.IsNullOrWhiteSpace(loginId) ? Environment.UserName : loginId;
+        var loginId = Services.Brokers.ControlCommandRequester.LoginId(ResolvePermissionService());
+        if (loginId != null) return loginId;
+        var sub = ResolveTokenStorage()?.UserId;              // JWT sub=login_id 폴백
+        return string.IsNullOrWhiteSpace(sub) ? null : sub;
     }
 
     /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>

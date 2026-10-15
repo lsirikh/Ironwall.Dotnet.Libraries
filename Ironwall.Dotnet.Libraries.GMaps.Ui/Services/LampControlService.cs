@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Brokers;
@@ -26,11 +27,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 public class LampControlService : ILampControlService
 {
     #region - Ctors -
-    public LampControlService(IBrokerRequestClient brokerClient, INatsSetupModel natsSetupModel, ILogService? log = null)
+    public LampControlService(IBrokerRequestClient brokerClient, INatsSetupModel natsSetupModel, ILogService? log = null,
+                              IPermissionService? permission = null)
     {
         _brokerClient = brokerClient;
         _natsSetup = natsSetupModel;
         _log = log;
+        _permission = permission;
     }
     #endregion
 
@@ -43,7 +46,7 @@ public class LampControlService : ILampControlService
         if (lampIds is { Count: 0 })
             return InvalidIds(EnumGopCommand.LAMP_CLEAR);
 
-        var body = new LampClearBodyDto { LampIds = lampIds?.ToList() };
+        var body = ControlCommandRequester.Stamp(new LampClearBodyDto { LampIds = lampIds?.ToList() }, _permission);
         return await _brokerClient.RequestAsync(
             BuildSubject("lamp-clear"), EnumGopCommand.LAMP_CLEAR.ToString(), body, ct: ct).ConfigureAwait(false);
     }
@@ -53,7 +56,7 @@ public class LampControlService : ILampControlService
         if (lampIds is not { Count: > 0 })
             return InvalidIds(EnumGopCommand.LAMP_OFF);
 
-        var body = new LampOffBodyDto { LampIds = lampIds.ToList() };
+        var body = ControlCommandRequester.Stamp(new LampOffBodyDto { LampIds = lampIds.ToList() }, _permission);
         return await _brokerClient.RequestAsync(
             BuildSubject("lamp-off"), EnumGopCommand.LAMP_OFF.ToString(), body, ct: ct).ConfigureAwait(false);
     }
@@ -63,7 +66,7 @@ public class LampControlService : ILampControlService
         if (lampIds is not { Count: > 0 })
             return InvalidIds(EnumGopCommand.LAMP_COLOR_SET);
 
-        var body = new LampColorSetBodyDto { LampIds = lampIds.ToList(), Color = color, Mode = mode };
+        var body = ControlCommandRequester.Stamp(new LampColorSetBodyDto { LampIds = lampIds.ToList(), Color = color, Mode = mode }, _permission);
         return await _brokerClient.RequestAsync(
             BuildSubject("lamp-color"), EnumGopCommand.LAMP_COLOR_SET.ToString(), body, ct: ct).ConfigureAwait(false);
     }
@@ -73,7 +76,7 @@ public class LampControlService : ILampControlService
         if (lampIds is not { Count: > 0 })
             return InvalidIds(EnumGopCommand.LAMP_BUZZER_SET);
 
-        var body = new LampBuzzerSetBodyDto { LampIds = lampIds.ToList(), Buzzer = buzzer };
+        var body = ControlCommandRequester.Stamp(new LampBuzzerSetBodyDto { LampIds = lampIds.ToList(), Buzzer = buzzer }, _permission);
         return await _brokerClient.RequestAsync(
             BuildSubject("lamp-buzzer"), EnumGopCommand.LAMP_BUZZER_SET.ToString(), body, ct: ct).ConfigureAwait(false);
     }
@@ -95,5 +98,6 @@ public class LampControlService : ILampControlService
     private readonly IBrokerRequestClient _brokerClient;
     private readonly INatsSetupModel _natsSetup;
     private readonly ILogService? _log;
+    private readonly IPermissionService? _permission;   // requested_by(login_id) 소스 — 미등록이면 싣지 않음
     #endregion
 }

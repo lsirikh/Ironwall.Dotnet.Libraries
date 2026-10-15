@@ -52,6 +52,8 @@ public class CameraAimControlService : ICameraAimControlService
             return BrokerRequestResult.Fail(EnumBrokerFailure.Invalid, "좌표가 유효하지 않습니다.");
         }
 
+        body.RequestedClientId ??= ControlCommandRequester.ClientId();   // v2.0.12 §7 머리 — 명령을 낸 단말
+
         var subject = BuildSubject("ptz");   // 문서 컨벤션: 모든 PTZ 제어는 nvr_manager.ptz
         var result = await _brokerClient.RequestAsync(
                 subject,

@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 
-public class LampBuzzerTestBodyDto
+public class LampBuzzerTestBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("lamp_ids")]
     public List<int> LampIds { get; set; } = new();

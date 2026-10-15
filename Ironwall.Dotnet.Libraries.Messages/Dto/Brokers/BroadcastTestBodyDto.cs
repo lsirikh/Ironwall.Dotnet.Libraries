@@ -5,7 +5,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 /// <summary>
 /// 방송 테스트 Body
 /// </summary>
-public class BroadcastTestBodyDto
+public class BroadcastTestBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("speaker_ids")]
     public List<int> SpeakerIds { get; set; } = new();

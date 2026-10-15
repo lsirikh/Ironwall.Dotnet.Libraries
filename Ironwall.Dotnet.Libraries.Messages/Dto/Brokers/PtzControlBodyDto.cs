@@ -11,7 +11,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 /// - 화면 클릭: camera_id + x + y + pan_tilt_speed
 /// - 정지/보조: camera_id만
 /// </summary>
-public class PtzControlBodyDto
+public class PtzControlBodyDto : ControlCommandBodyDto
 {
     [JsonProperty("camera_id")]
     public int CameraId { get; set; }

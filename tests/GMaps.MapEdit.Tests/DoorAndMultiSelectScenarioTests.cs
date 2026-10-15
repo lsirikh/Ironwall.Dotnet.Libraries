@@ -4,6 +4,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using GMap.NET;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -139,7 +140,8 @@ public class DoorAndMultiSelectScenarioTests
         Assert.Equal(77, (int)Body(env)["device_id"]!);
         Assert.Equal("OPEN", (string?)Body(env)["command"]);
         Assert.Equal("[gate] 북문 통문 (number: 3, id: 77)", (string?)Body(env)["device_description"]);
-        Assert.Equal("시험관리자", (string?)Body(env)["requested_by"]);
+        Assert.Equal("test-admin", (string?)Body(env)["requested_by"]);   // login_id(표시이름 아님 — v2.0.12 §7 머리)
+        Assert.Equal(ClientIdentity.Current, (string?)Body(env)["requested_client_id"]);
         Assert.True(DateTimeOffset.TryParse((string?)Body(env)["requested_at"], out _), "requested_at 은 ISO 8601");
         Assert.Matches(@"[+-]\d\d:\d\d$", (string?)Body(env)["requested_at"]);   // 오프셋 필수
 

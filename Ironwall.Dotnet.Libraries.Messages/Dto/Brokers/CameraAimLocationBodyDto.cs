@@ -48,4 +48,8 @@ public class CameraAimLocationBodyDto
     /// <summary>요청 사용자 ID — 누가 카메라를 움직였는지 감사 추적용.</summary>
     [JsonProperty("requested_by")]
     public string? RequestedBy { get; set; }
+
+    /// <summary>명령을 낸 단말 — 통제DB 세션 client_id(로그인 헤더 X-Client-Id 와 같은 값). 선택(v2.0.12 §7 머리).</summary>
+    [JsonProperty("requested_client_id", NullValueHandling = NullValueHandling.Ignore)]
+    public string? RequestedClientId { get; set; }
 }
