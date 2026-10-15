@@ -22,13 +22,14 @@ namespace GMaps.MapNav.Tests;
 /// <summary>
 /// 위치 · 줌 · 회전 · 기울이기 · 사이트 고정 시나리오 공용 도우미(창 없음).
 /// 지도 컨트롤은 부모 없는 Measure/Arrange + 벤더 <c>InitializeForBackgroundRendering</c> 으로 코어만 시작한다(Loaded 대체 — 창을 띄우지 않는다).
-/// 설정 저장(<c>MapSettingsHelper</c>)은 실행 폴더(<c>AppContext.BaseDirectory</c>)의 appsettings.json 에 쓰므로, 시험 프로젝트의 bin 에 빈 파일을 깔고 거기서 영속을 읽는다(실제 앱 경로 아님).
+/// 설정 저장(<c>MapSettingsHelper</c>)은 실행 폴더(<c>AppContext.BaseDirectory</c>)의 Config\appsettings.json 에 쓰므로, 시험 프로젝트의 bin 에 빈 파일을 깔고 거기서 영속을 읽는다(실제 앱 경로 아님).
 /// </summary>
 internal static class NavKit
 {
     public const double Lat = 37.5, Lng = 127.0;
 
-    public static string SettingsPath => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    /// <summary>정본 설정 파일 경로(Config 폴더는 만들어 둔다).</summary>
+    public static string SettingsPath => AppSettingsLocation.PrepareAppSettingsWrite();
 
     /// <summary>시험용 빈 설정 파일(bin 안) — 저장 경로가 파일을 읽고 덮어쓴다.</summary>
     public static void ResetSettings()

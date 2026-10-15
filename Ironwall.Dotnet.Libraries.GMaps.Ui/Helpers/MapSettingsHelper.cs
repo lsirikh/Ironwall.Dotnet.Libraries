@@ -36,7 +36,6 @@ public static class MapSettingsHelper
         });
     }
     #region - Constants -
-    private const string SETTINGS_FILE_NAME = "appsettings.json";
     private const string APP_SETTINGS_SECTION = "AppSettings";
 
     // 파일 read-modify-write 직렬화 — 동시 저장 시 손실/JSON 손상 방지(기존 무잠금 버그 수정, I-05)
@@ -121,7 +120,7 @@ public static class MapSettingsHelper
     {
         try
         {
-            var fp = GetSettingsFilePath();
+            var fp = AppSettingsLocation.AppSettingsReadPath;
             if (!File.Exists(fp)) return new MapEventFlyToModel();
             var t = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["MapEventFlyTo"];
             var model = new MapEventFlyToModel();
@@ -252,7 +251,7 @@ public static class MapSettingsHelper
     {
         try
         {
-            var fp = GetSettingsFilePath();
+            var fp = AppSettingsLocation.AppSettingsReadPath;
             if (!File.Exists(fp)) return new TrackingSetupModel();
             var model = MapTracking(JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Tracking"]);
             log?.Info($"[TrackingSetup] 로드(appsettings.Tracking): DataSource={model.DataSource}, MaxPlaybackHours={model.MaxPlaybackHours}");
@@ -298,7 +297,7 @@ public static class MapSettingsHelper
         await _fileLock.WaitAsync();
         try
         {
-            var filePath = GetSettingsFilePath();
+            var filePath = AppSettingsLocation.PrepareAppSettingsWrite();
 
             // DebugSaveProcess에서 성공한 로직을 그대로 사용
             var beforeContent = await File.ReadAllTextAsync(filePath);
@@ -366,7 +365,7 @@ public static class MapSettingsHelper
         await _fileLock.WaitAsync();
         try
         {
-            var filePath = GetSettingsFilePath();
+            var filePath = AppSettingsLocation.PrepareAppSettingsWrite();
             var json = await ReadSettingsFileAsync();
             var jObject = JsonConvert.DeserializeObject<JObject>(json) ?? new JObject();
 
@@ -405,7 +404,7 @@ public static class MapSettingsHelper
     /// </summary>
     private static async Task<string> ReadSettingsFileAsync()
     {
-        var filePath = GetSettingsFilePath();
+        var filePath = AppSettingsLocation.AppSettingsReadPath;
 
         if (!File.Exists(filePath))
         {
@@ -415,20 +414,11 @@ public static class MapSettingsHelper
                 [APP_SETTINGS_SECTION] = new JObject()
             };
             var defaultJson = JsonConvert.SerializeObject(defaultSettings, Formatting.Indented);
-            await File.WriteAllTextAsync(filePath, defaultJson);
+            await File.WriteAllTextAsync(AppSettingsLocation.PrepareAppSettingsWrite(), defaultJson);
             return defaultJson;
         }
 
         return await File.ReadAllTextAsync(filePath);
-    }
-
-    /// <summary>
-    /// 설정 파일 경로 반환
-    /// </summary>
-    private static string GetSettingsFilePath()
-    {
-        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        return Path.Combine(baseDir, SETTINGS_FILE_NAME);
     }
 
     /// <summary>
