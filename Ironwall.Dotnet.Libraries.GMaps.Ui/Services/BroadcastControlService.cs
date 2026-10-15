@@ -1,5 +1,4 @@
-﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Brokers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -23,13 +22,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 public class BroadcastControlService : IBroadcastControlService
 {
     #region - Ctors -
-    public BroadcastControlService(INatsService natsService, INatsSetupModel natsSetupModel, IBrokerRequestClient brokerClient,
-                                   IPermissionService? permission = null)
+    public BroadcastControlService(INatsService natsService, INatsSetupModel natsSetupModel, IBrokerRequestClient brokerClient)
     {
         _natsService = natsService;
         _natsSetup = natsSetupModel;
         _brokerClient = brokerClient;
-        _permission = permission;
+    }
+
+    /// <summary>TTS(PUB) 본문에도 보낸 사람 · 단말을 싣는 생성자(G7-4). REQ 낱말은 <see cref="IBrokerRequestClient"/> 가 싣는다.</summary>
+    public BroadcastControlService(INatsService natsService, INatsSetupModel natsSetupModel, IBrokerRequestClient brokerClient, ICommandRequester? requester)
+        : this(natsService, natsSetupModel, brokerClient)
+    {
+        _requester = requester;
     }
     #endregion
 
@@ -42,7 +46,6 @@ public class BroadcastControlService : IBroadcastControlService
             FileGroupId = fileGroupId,
             Repeat = repeat
         };
-        ControlCommandRequester.Stamp(body, _permission);
         return await _brokerClient.RequestAsync(
             BuildSubject("play"), EnumGopCommand.BROADCAST_PLAY.ToString(), body).ConfigureAwait(false);
     }
@@ -54,14 +57,15 @@ public class BroadcastControlService : IBroadcastControlService
             SpeakerIds = [speakerId],
             Message = message
         };
-        ControlCommandRequester.Stamp(body, _permission);
         var msg = body.ToBrokerPublish("TTS", "GIS");
-        await _natsService.PublishAsync(BuildSubject("tts"), JsonConvert.SerializeObject(msg)).ConfigureAwait(false);
+        var json = JsonConvert.SerializeObject(msg);
+        if (_requester != null) json = CommandRequester.Stamp(json, _requester.RequestedBy, _requester.RequestedClientId);
+        await _natsService.PublishAsync(BuildSubject("tts"), json).ConfigureAwait(false);
     }
 
     public async Task<BrokerRequestResult> PublishStopAsync(int speakerId)
     {
-        var body = ControlCommandRequester.Stamp(new BroadcastStopBodyDto { SpeakerIds = [speakerId] }, _permission);
+        var body = new BroadcastStopBodyDto { SpeakerIds = [speakerId] };
         return await _brokerClient.RequestAsync(
             BuildSubject("stop"), EnumGopCommand.BROADCAST_STOP.ToString(), body).ConfigureAwait(false);
     }
@@ -83,7 +87,7 @@ public class BroadcastControlService : IBroadcastControlService
         if (!IsMicCommandSupported)
             return BrokerRequestResult.Fail(EnumBrokerFailure.Invalid, MicNotSupportedMessage);
 
-        var body = ControlCommandRequester.Stamp(new BroadcastMicBodyDto { SpeakerIds = [speakerId] }, _permission);
+        var body = new BroadcastMicBodyDto { SpeakerIds = [speakerId] };
         var command = start ? MicStartCommand : MicStopCommand;
         return await _brokerClient.RequestAsync(
             BuildSubject(start ? "mic-start" : "mic-stop"), command, body).ConfigureAwait(false);
@@ -107,6 +111,6 @@ public class BroadcastControlService : IBroadcastControlService
     private readonly INatsService _natsService;
     private readonly INatsSetupModel _natsSetup;
     private readonly IBrokerRequestClient _brokerClient;
-    private readonly IPermissionService? _permission;   // requested_by(login_id) 소스 — 미등록이면 싣지 않음
+    private readonly ICommandRequester? _requester;
     #endregion
 }

@@ -66,6 +66,13 @@ public class ConnectionAxisDto
     /// </summary>
     [JsonProperty("urls", Order = 9, NullValueHandling = NullValueHandling.Ignore)]
     public object? Urls { get; set; }
+
+    /// <summary>
+    /// 센서가 결선된 <b>제어기 쪽 포트 부품의 key</b>(예: <c>rs485_1</c>) — 서버 8.0.8 이상만 받는다(소속 제어기
+    /// <c>hardware_spec.components</c> 에 없는 key 면 422). 그 전 서버는 <c>extra=forbid</c> 라 실리면 422 — 값이 있을 때만 싣는다.
+    /// </summary>
+    [JsonProperty("port_key", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
+    public string? PortKey { get; set; }
 }
 
 /// <summary>서버 7.0 <c>ConnectionCredentials</c> — 종전 평면 <c>user_name</c>·<c>user_password</c>.</summary>

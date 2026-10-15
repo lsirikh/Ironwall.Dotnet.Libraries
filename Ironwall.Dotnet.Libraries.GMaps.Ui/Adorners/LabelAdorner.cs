@@ -367,7 +367,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 // 이미지·라인: 폭 Δ/2 보상도 비율 도메인에서(가로만 이동, 세로 오프셋 불변). 이미지=U, 라인=X(비율).
                 var (hw, _) = VisualHalfExtents();
                 double baseA = _marker is IImageEditableMarker ? _origOffsetU : _origOffsetX;
-                double newA = (baseA * Math.Max(1e-6, hw) + centerShift) / Math.Max(1e-6, hw);
+                double newA = ClampRatio((baseA * Math.Max(1e-6, hw) + centerShift) / Math.Max(1e-6, hw));
                 if (_marker is IImageEditableMarker imgW) imgW.LabelOffsetU = newA;
                 else _marker.LabelOffsetX = newA;
             }
@@ -394,11 +394,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 var (hw, hh) = VisualHalfExtents();
                 double baseA = _marker is IImageEditableMarker ? _origOffsetU : _origOffsetX;
                 double baseB = _marker is IImageEditableMarker ? _origOffsetV : _origOffsetY;
-                double nx = baseA * hw + dx, ny = baseB * hh + dy;
-                double cap = Math.Max(hw, hh) * IMAGE_LABEL_RADIUS_MULT;
-                double len = Math.Sqrt(nx * nx + ny * ny);
-                if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
-                WriteOffset(nx / Math.Max(1e-6, hw), ny / Math.Max(1e-6, hh));
+                var (a, b) = NormalizedDragOffset(baseA, baseB, hw, hh, dx, dy);
+                WriteOffset(a, b);
             }
             else
             {
@@ -416,6 +413,21 @@ public sealed class LabelAdorner : Adorner, IDisposable
         }
         base.OnMouseMove(e);
     }
+
+    /// <summary>비율 도메인(이미지·라인/PidsGroup) 라벨 끌기 결과 — 시작 비율(baseA·baseB)에 px 델타를 더해 하프익스텐트 비율로 되돌린다.
+    /// 상한=3·max(hw,hh) px(등방) + 축별 비율 ±3. 순수 수식(헤드리스 시험 공유).</summary>
+    internal static (double a, double b) NormalizedDragOffset(double baseA, double baseB, double hw, double hh, double dx, double dy)
+    {
+        double nx = baseA * hw + dx, ny = baseB * hh + dy;
+        double cap = Math.Max(hw, hh) * IMAGE_LABEL_RADIUS_MULT;
+        double len = Math.Sqrt(nx * nx + ny * ny);
+        if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
+        // 등방 px 상한만으론 좁은 축 비율이 3·hw/hh 까지 커진다(가는 울타리는 hh 하한 1px → 비율=px, DbProbe ⓑ) — 축별로도 묶는다.
+        return (ClampRatio(nx / Math.Max(1e-6, hw)), ClampRatio(ny / Math.Max(1e-6, hh)));
+    }
+
+    /// <summary>비율 도메인 오프셋 축별 캡(±IMAGE_LABEL_RADIUS_MULT) — 끌기 · 폭 조절 공용.</summary>
+    private static double ClampRatio(double v) => Math.Clamp(v, -IMAGE_LABEL_RADIUS_MULT, IMAGE_LABEL_RADIUS_MULT);
 
     /// <summary>드래그 완료 통지 — before 쌍의 도메인은 마커 타입 따름(이미지=U/V, 그 외=px). VM/undo가 동일 규약으로 분기(FR-11).</summary>
     private void RaiseOffsetChanged()

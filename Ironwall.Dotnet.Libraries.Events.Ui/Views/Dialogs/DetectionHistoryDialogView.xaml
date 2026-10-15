@@ -71,13 +71,14 @@
 							</Grid>
 						</Border>
 						<ControlTemplate.Triggers>
+							<!--  마우스 올림은 선택보다 앞 — 뒤에 두면 고른 칸 위에서 바탕이 옅어져 흰 글자가 사라졌다  -->
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
 							<Trigger Property="IsChecked" Value="True">
 								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 								<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
 								<Setter TargetName="Cp" Property="TextElement.FontWeight" Value="Bold" />
-							</Trigger>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
 							</Trigger>
 						</ControlTemplate.Triggers>
 					</ControlTemplate>

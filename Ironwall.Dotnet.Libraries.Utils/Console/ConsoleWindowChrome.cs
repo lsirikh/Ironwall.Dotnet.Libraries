@@ -103,9 +103,16 @@ public static class ConsoleWindowChrome
     public static IValueConverter MaximizedInset { get; } = new FuncConverter(v =>
         v is WindowState.Maximized ? SystemParameters.WindowResizeBorderThickness : new Thickness(0));
 
-    /// <summary>최소화 단추 — 크기를 못 바꾸는 창(<see cref="ResizeMode.NoResize"/>)에는 없다. OS 제목 줄과 같다.</summary>
-    public static IValueConverter MinimizeVisibility { get; } = new FuncConverter(v =>
-        v is ResizeMode mode && CaptionButtons(mode).Minimize ? Visibility.Visible : Visibility.Collapsed);
+    /// <summary>
+    /// 최소화 단추 — 크기를 못 바꾸는 창(<see cref="ResizeMode.NoResize"/>)에는 없다. OS 제목 줄과 같다.
+    /// 창(<see cref="Window"/>)을 받으면 작업 표시줄에 안 나오는 창에도 없다(<see cref="ShowsMinimize"/>).
+    /// </summary>
+    public static IValueConverter MinimizeVisibility { get; } = new FuncConverter(v => v switch
+    {
+        Window window => ShowsMinimize(window.ResizeMode, window.ShowInTaskbar),
+        ResizeMode mode => CaptionButtons(mode).Minimize,
+        _ => false,
+    } ? Visibility.Visible : Visibility.Collapsed);
 
     /// <summary>최대화 단추 — 크기를 바꿀 수 있는 창에만.</summary>
     public static IValueConverter MaximizeVisibility { get; } = new FuncConverter(v =>
@@ -136,6 +143,12 @@ public static class ConsoleWindowChrome
         ResizeMode.CanMinimize => (true, false),
         _ => (true, true),
     };
+
+    /// <summary>
+    /// 최소화 단추를 두는가. 작업 표시줄에 안 나오는 창(<see cref="Window.ShowInTaskbar"/> 거짓 — 콘솔 OS 창 대부분)은 최소화하면 갈 곳이 없어
+    /// Windows 가 화면 왼쪽 아래에 클래식 모양의 작은 제목 조각을 그리고, 작업 표시줄로 되찾을 수도 없다 — 그런 창에는 두지 않는다.
+    /// </summary>
+    public static bool ShowsMinimize(ResizeMode mode, bool showInTaskbar) => showInTaskbar && CaptionButtons(mode).Minimize;
 
     /// <summary>
     /// 콘솔 실폭이 도킹 기준에 모자라는 만큼(테두리 몫) — 넓혀야 할 폭. 넓히지 않아야 하면 0.

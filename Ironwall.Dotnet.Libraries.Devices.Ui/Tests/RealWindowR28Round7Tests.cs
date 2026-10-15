@@ -35,7 +35,7 @@ public class RealWindowR28Round7Tests
     public RealWindowR28Round7Tests(ITestOutputHelper output) => _out = output;
 
     #region - Rig -
-    private static T OnSta<T>(Func<T> body)
+    internal static T OnSta<T>(Func<T> body)
     {
         T result = default!;
         Exception? failure = null;
@@ -55,7 +55,7 @@ public class RealWindowR28Round7Tests
     private static string RepoRoot([CallerFilePath] string? thisFile = null)
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", ".."));
 
-    private static void Pump()
+    internal static void Pump()
     {
         var frame = new DispatcherFrame();
         Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => frame.Continue = false));
@@ -72,7 +72,7 @@ public class RealWindowR28Round7Tests
         }
     }
 
-    private static T ById<T>(DependencyObject root, string id) where T : FrameworkElement
+    internal static T ById<T>(DependencyObject root, string id) where T : FrameworkElement
         => Descendants<T>(root).First(e => AutomationProperties.GetAutomationId(e) == id);
 
     /// <summary>
@@ -102,7 +102,7 @@ public class RealWindowR28Round7Tests
     }
 
     /// <summary>결선 창 몸(WiringView.xaml 그대로 — 처리기만 뺀 느슨한 읽기)을 화면 밖 창에 띄운다(<see cref="RealWindowR28Tests"/> 와 같다).</summary>
-    private static T InWindow<T>(WiringViewModel vm, Func<Window, FenceCanvas, T> body)
+    internal static T InWindow<T>(WiringViewModel vm, Func<Window, FenceCanvas, T> body)
     {
         _ = Application.Current;
         vm.UseLayoutPrefs(null, true, (_, _) => { });
@@ -157,7 +157,7 @@ public class RealWindowR28Round7Tests
     }
 
     /// <summary>포커스 요소에 키 하나 — 창 입력 원천의 PreviewKeyDown → KeyDown 차례(<see cref="RealWindowR28Tests"/> 와 같다).</summary>
-    private static bool Press(UIElement target, Key key)
+    internal static bool Press(UIElement target, Key key)
     {
         var source = PresentationSource.FromVisual(target)!;
         var args = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
@@ -169,7 +169,7 @@ public class RealWindowR28Round7Tests
     }
 
     /// <summary>칸 <paramref name="bay"/> 의 붙는 점 <paramref name="name"/> 의 화면 좌표.</summary>
-    private static Point SnapPointOnScreen(WiringViewModel vm, FenceCanvas canvas, int key, int bay, string name)
+    internal static Point SnapPointOnScreen(WiringViewModel vm, FenceCanvas canvas, int key, int bay, string name)
     {
         var point = vm.FencePresetSnapPoints(key, bay).Single(p => p.Point.Name == name);
         return canvas.WorldToScreen(FencePresetDrag.PointAt(point, canvas.Projector, canvas.Scene!.Upm, canvas.Scene.Vpm));

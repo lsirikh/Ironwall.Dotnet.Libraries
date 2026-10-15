@@ -1962,7 +1962,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 deviceId, deviceType, dev?.DeviceName, dev?.DeviceNumber ?? 0);
 
             var ok = await door.PublishDoorCommandAsync(deviceId, deviceType, command,
-                                                        description, CurrentRequestedBy(),
+                                                        description, CurrentOperatorAccount(),
                                                         _cts?.Token ?? CancellationToken.None);
             _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "발행" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
             return ok;
@@ -2128,7 +2128,7 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     // requested_by = 로그인 계정 식별자(login_id). 서버 JWT sub=login_id 이므로 ITokenStorageService.UserId 가 곧 login_id.
-    //   ITokenStorageService 도 IoC lazy(미등록/미로그인 시 null → requested_by 를 싣지 않는다).
+    //   ITokenStorageService 도 IoC lazy(미등록/미로그인 시 null → Windows 사용자명 폴백).
     private ITokenStorageService? _tokenStorage;
     private bool _tokenStorageResolved;
     private ITokenStorageService? ResolveTokenStorage()
@@ -2140,16 +2140,17 @@ public partial class MapViewModel : BasePanelViewModel,
         return _tokenStorage;
     }
     /// <summary>
-    /// 제어 명령 requested_by — 로그인 운영자 계정(login_id) → JWT sub(=login_id) 폴백. 둘 다 없으면 null(싣지 않음).
-    /// 회전요청 · 문 개폐 · 카메라 팝업이 같은 값을 쓴다(브로커 v2.0.12 §7 머리 — 방송 · 경광등 서비스와 같은 정의).
+    /// 운영자 계정(브로커 v2.0.12 §7 머리 · 이슈 #7 G7-4) — login_id → JWT sub(= login_id) → 표시이름. 모두 없으면 null.
+    /// 문 개폐는 이 값을 그대로 싣는다(없으면 칸 생략).
     /// </summary>
-    private string? CurrentRequestedBy()
+    private string? CurrentOperatorAccount()
     {
-        var loginId = Services.Brokers.ControlCommandRequester.LoginId(ResolvePermissionService());
-        if (loginId != null) return loginId;
-        var sub = ResolveTokenStorage()?.UserId;              // JWT sub=login_id 폴백
-        return string.IsNullOrWhiteSpace(sub) ? null : sub;
+        var permission = ResolvePermissionService();
+        return Services.Brokers.CommandRequester.ResolveRequestedBy(permission?.LoginId, ResolveTokenStorage()?.UserId, permission?.Name);
     }
+
+    /// <summary>회전요청 · 카메라 팝업 requested_by — <see cref="CurrentOperatorAccount"/>, 없으면 종전대로 Windows 사용자명 폴백.</summary>
+    private string CurrentRequestedBy() => CurrentOperatorAccount() ?? Environment.UserName;
 
     /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>
     private void OnForceLogoutRequested(EnumRevokeReason reason)
@@ -6477,6 +6478,8 @@ public partial class MapViewModel : BasePanelViewModel,
             if (_enclosureMetricsSync == null) return;
             _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
             _enclosureMetricsSync.MetricsReceived += OnEnclosureMetricsReceived;
+            _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
+            _enclosureMetricsSync.AlertsChanged += OnEnclosureAlertsChanged;
             _ = _enclosureMetricsSync.StartService();
 
             // 새 계측이 끊기면 '오래된 값' 으로 바꾸고, 나중에 생긴 함체 심볼에도 보관해 둔 계측을 싣는다.
@@ -6493,8 +6496,13 @@ public partial class MapViewModel : BasePanelViewModel,
         _enclosureMetricsStaleTimer?.Stop();
         if (_enclosureMetricsSync == null) return;
         _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+        _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
         _ = _enclosureMetricsSync.StopAsync();
     }
+
+    /// <summary>함체 환경 경고가 걸리거나 풀렸다(이슈 #7 Q-4a) — NATS 스레드에서 온다.</summary>
+    private void OnEnclosureAlertsChanged(int enclosureId)
+        => Execute.OnUIThread(() => ApplyEnclosureMetrics(enclosureId));
 
     private void OnEnclosureMetricsTimerTick(object? sender, EventArgs e) => ApplyEnclosureMetrics(null);
 
@@ -6502,7 +6510,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void OnEnclosureMetricsReceived(Services.Enclosure.EnclosureMetricsReading reading)
         => Execute.OnUIThread(() => ApplyEnclosureMetrics(reading.EnclosureId));
 
-    /// <summary>보관된 최신 계측을 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
+    /// <summary>보관된 최신 계측 · 환경 경고를 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
     private void ApplyEnclosureMetrics(int? enclosureId)
     {
         try
@@ -6513,6 +6521,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 if (marker.DeviceType != EnumDeviceType.Enclosure || marker.LinkedDeviceId <= 0) continue;
                 if (enclosureId is { } id && marker.LinkedDeviceId != id) continue;
+                marker.EnclosureAlert = _enclosureMetricsSync.GetAlert(marker.LinkedDeviceId);
                 if (!_enclosureMetricsSync.TryGetLatest(marker.LinkedDeviceId, out var reading)) continue;
                 marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading.ReceivedAt, now) };
             }

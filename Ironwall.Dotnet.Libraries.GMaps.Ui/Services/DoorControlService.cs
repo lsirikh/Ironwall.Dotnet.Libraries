@@ -34,6 +34,13 @@ public class DoorControlService : IDoorControlService
         _natsSetup = natsSetupModel ?? throw new ArgumentNullException(nameof(natsSetupModel));
         _log = log;
     }
+
+    /// <summary>보낸 사람 · 단말(<paramref name="requester"/>)을 본문에 싣는 생성자(G7-4).</summary>
+    public DoorControlService(INatsService natsService, INatsSetupModel natsSetupModel, ILogService? log, Brokers.ICommandRequester? requester)
+        : this(natsService, natsSetupModel, log)
+    {
+        _requester = requester;
+    }
     #endregion
 
     #region - Implementation of Interface -
@@ -79,8 +86,8 @@ public class DoorControlService : IDoorControlService
             DeviceDescription = string.IsNullOrWhiteSpace(deviceDescription)
                                 ? BuildFallbackDescription(deviceId, deviceType)
                                 : deviceDescription!,
-            RequestedBy = string.IsNullOrWhiteSpace(requestedBy) ? null : requestedBy,
-            RequestedClientId = Brokers.ControlCommandRequester.ClientId(),
+            RequestedBy = string.IsNullOrWhiteSpace(requestedBy) ? _requester?.RequestedBy : requestedBy,
+            RequestedClientId = _requester?.RequestedClientId,
             // 서버 규약: ISO 8601 + 오프셋 필수(naive 금지)
             RequestedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz"),
         };
@@ -189,5 +196,6 @@ public class DoorControlService : IDoorControlService
     private readonly INatsService _natsService;
     private readonly INatsSetupModel _natsSetup;
     private readonly ILogService? _log;
+    private readonly Brokers.ICommandRequester? _requester;
     #endregion
 }

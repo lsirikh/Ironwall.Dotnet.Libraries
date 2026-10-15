@@ -88,14 +88,18 @@ public class PtzDragGestureTests
         Assert.Equal(1d / 400d, g.Finish(true)!.Value.ViewX, 6);
     }
 
-    // 2026-10-15 사용자 결정(가로 1/2 = 화면 한 폭)으로 기대값 갱신: 떼면 중심으로 올 점 = 중심 + 2×벡터(가로 1/2 에서 자름),
-    // 화면 밖이면 중심에서 그 방향 가장자리(방향 유지 — 예전에는 축마다 따로 잘라 대각선이 모서리로 갔다).
+    // 2026-10-16 사용자 결정(화살표가 화면 끝까지 = 화면 한 폭)으로 기대값 갱신: 떼면 중심으로 올 점 = 중심 + 화살표(성분마다 화면 하나에서 자름),
+    // 화면 밖이면 중심에서 그 방향 가장자리(방향 유지).
     [Theory]
-    [InlineData(40, -30, 280, 90)]       // 중심(200,150) + 2×(40,−30)
+    [InlineData(40, -30, 240, 120)]      // 중심(200,150) + (40,−30)
     [InlineData(900, 0, 400, 150)]       // 오른쪽 밖 → 가장자리
-    [InlineData(-900, -900, 50, 0)]      // 왼쪽 위 대각선 → 그 방향으로 위 가장자리에 닿는 점
+    [InlineData(-900, -900, 0, 0)]       // 왼쪽 위 화면 밖 → 화면 하나(−400,−300)에서 자름 → 그 방향 모서리
     public void should_place_target_at_center_plus_drag_when_clamped_to_view(double dx, double dy, double x, double y)
-        => Assert.Equal((x, y), PtzDragGesture.TargetPoint(400, 300, dx, dy));
+    {
+        var (tx, ty) = PtzDragGesture.TargetPoint(400, 300, dx, dy);
+        Assert.Equal(x, tx, 9);   // 세로를 폭 단위로 바꾸며(÷ 가로세로비) 생기는 부동소수 끝자리만 허용
+        Assert.Equal(y, ty, 9);
+    }
 }
 
 public class PtzHoldPressTests
@@ -185,13 +189,13 @@ public class PtzDragMathTests
         => Assert.Equal(PtzDragMoveKind.None, PtzDragMath.SelectKind(false, false, false, false, false));
 
     [Fact]
-    public void should_map_quarter_width_drag_to_view_edge_when_fov_space()
+    public void should_map_half_width_drag_to_view_edge_when_fov_space()
     {
-        // 2026-10-15 사용자 결정: 가로 1/2 = 한 폭이므로 가장자리(±1 = 반 화각)는 가로 1/4 끌기(예전 1/2).
-        var (pan, tilt) = PtzDragMath.FovTranslation(0.25, -0.125, -1, 1, -1, 1);
+        // 2026-10-16 사용자 결정: 화면 끝까지(폭 전체) = 한 폭이므로 가장자리(±1 = 반 화각)는 폭 1/2 화살표(10-15 기준에서는 1/4).
+        var (pan, tilt) = PtzDragMath.FovTranslation(0.5, -0.25, -1, 1, -1, 1);
 
-        Assert.Equal(1.0, pan, 6);     // 가로 1/4 = 반 화각 = 가장자리가 중심으로
-        Assert.Equal(0.5, tilt, 6);    // 위로 끌면 틸트 올림(세로도 같은 각도/픽셀: 0.125×h = 0.07×w → 반 높이의 1/2)
+        Assert.Equal(1.0, pan, 6);     // 폭 1/2 = 반 화각 = 가장자리가 중심으로
+        Assert.Equal(0.5, tilt, 6);    // 위로 끌면 틸트 올림(세로는 높이 기준: 높이 1/4 = 반 높이의 1/2)
     }
 
     [Theory]
@@ -204,8 +208,8 @@ public class PtzDragMathTests
     [Fact]
     public void should_move_by_dragged_share_of_field_of_view_when_generic_space_at_wide()
     {
-        // 화면 너비의 절반을 오른쪽으로 → 2026-10-15 사용자 결정으로 화면 한 폭 = 화각 60° 전부(예전 30°) → 360° 가 폭 2 이므로 60/360×2
-        var (pan, tilt) = PtzDragMath.GenericTranslation(0.5, 0, 16d / 9d, 0, Lens, 2, 2, -1, 1, -1, 1);
+        // 화면 너비 전체를 오른쪽으로 → 2026-10-16 사용자 결정으로 화면 끝까지 = 화각 60° 전부 → 360° 가 폭 2 이므로 60/360×2
+        var (pan, tilt) = PtzDragMath.GenericTranslation(1, 0, 16d / 9d, 0, Lens, 2, 2, -1, 1, -1, 1);
 
         Assert.Equal(60d / 360d * 2d, pan, 6);
         Assert.Equal(0, tilt, 9);
@@ -258,10 +262,10 @@ public class PtzDragMathTests
     [Fact]
     public void should_plan_absolute_target_from_tracked_position_when_only_absolute_space()
     {
-        var plan = PtzDragMath.Plan(Spaces(rel: false), At(pan: 0.1, tilt: 0.2), 0.5, 0, 16d / 9d);
+        var plan = PtzDragMath.Plan(Spaces(rel: false), At(pan: 0.1, tilt: 0.2), 1, 0, 16d / 9d);
 
         Assert.Equal(PtzDragMoveKind.Absolute, plan.Kind);
-        Assert.Equal(0.1 + (60d / 360d * 2d), plan.Pan, 6);   // 가로 1/2 = 화면 한 폭 = 60°(2026-10-15 사용자 결정, 예전 30°)
+        Assert.Equal(0.1 + (60d / 360d * 2d), plan.Pan, 6);   // 폭 전체 = 화면 한 폭 = 60°(2026-10-16 사용자 결정)
         Assert.Equal(0.2, plan.Tilt, 6);
     }
 

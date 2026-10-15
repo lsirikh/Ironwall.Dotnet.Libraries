@@ -90,6 +90,7 @@ public class AccountHeadedLeftoverScenarioTests
     private static readonly string[] AccountHelpKeys =
     {
         "Accounts.Console", "Accounts.Permissions", "Accounts.Grants", "Accounts.SessionSetup.Policy", "Accounts.SessionSetup.Concurrency",
+        "Accounts.Logout",   // 로그아웃 창 "?"(LogoutPanelView) — 뒤에 생긴 키, 설명은 AccountsHelp 에 등록돼 있다
     };
 
     [Trait("Scenario", "ACC-032")]

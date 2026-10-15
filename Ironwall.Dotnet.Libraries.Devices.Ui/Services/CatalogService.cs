@@ -92,6 +92,14 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
     }
 
     /// <inheritdoc/>
+    public IReadOnlyList<ComponentTypeInfo> AllComponentTypes(bool includeDeprecated = false)
+    {
+        var snapshot = _snapshot;
+        if (snapshot == null) return Array.Empty<ComponentTypeInfo>();
+        return snapshot.ComponentTypes.Where(t => includeDeprecated || !t.IsDeprecated).ToArray();
+    }
+
+    /// <inheritdoc/>
     public ComponentTypeInfo? Find(string? code)
     {
         var snapshot = _snapshot;
@@ -176,7 +184,7 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
             var response = await _apiService.GetDeviceSpecCatalogAsync(includeInactive: false, token).ConfigureAwait(false);
             if (response.Success && response.Data != null)
             {
-                _snapshot = Snapshot.From(response.Data);   // 참조 하나 교체 — 읽는 쪽은 옛 판이든 새 판이든 일관된 판을 본다
+                _snapshot = Snapshot.From(response.Data, _policy.AttachesComponentsAnywhere);   // 참조 하나 교체 — 읽는 쪽은 옛 판이든 새 판이든 일관된 판을 본다
                 loaded = true;
                 _log?.Info($"[Catalog] 적재 — 카테고리 {_snapshot.TypeAxes.Count} · 어휘 {_snapshot.Vocabularies.Count}");
             }
@@ -225,7 +233,8 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
         /// <summary>코드(대소문자 무시) → 부품 유형. 폐기된 것도 찾힌다.</summary>
         public required IReadOnlyDictionary<string, ComponentTypeInfo> ComponentIndex { get; init; }
 
-        public static Snapshot From(DeviceSpecCatalogDto dto)
+        /// <param name="attachesAnywhere">서버 8.0.8 이상 — 부품은 어느 장비에나 달리고 <c>applies_to</c> 는 즐겨찾기다.</param>
+        public static Snapshot From(DeviceSpecCatalogDto dto, bool attachesAnywhere = false)
         {
             var typeAxes = new Dictionary<EnumDeviceCategory, CatalogTypeAxis>();
             var extraAxes = new Dictionary<EnumDeviceCategory, IReadOnlyList<CatalogExtraAxis>>();
@@ -270,7 +279,7 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
                 vocabularies[name] = ToOptions(entries).Select(o => new VocabularyEntry(o, null)).ToArray();
             }
 
-            var components = ReadComponentTypes(dto);
+            var components = ReadComponentTypes(dto, attachesAnywhere);
             var componentIndex = new Dictionary<string, ComponentTypeInfo>(StringComparer.OrdinalIgnoreCase);
             foreach (var info in components) componentIndex[info.Code] = info;
 
@@ -292,14 +301,14 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
         /// 라벨 비교는 <see cref="StringComparer.Ordinal"/> 이다 — 한글 음절은 코드포인트 순이 곧 가나다 순이고,
         /// 문화권에 따라 팔레트 차례가 달라지면 화면 회귀 단언이 기계마다 갈린다.
         /// </remarks>
-        private static IReadOnlyList<ComponentTypeInfo> ReadComponentTypes(DeviceSpecCatalogDto dto)
+        private static IReadOnlyList<ComponentTypeInfo> ReadComponentTypes(DeviceSpecCatalogDto dto, bool attachesAnywhere)
         {
             var entries = dto.FindVocabulary(DeviceSpecCatalogDto.VOCAB_COMPONENT_TYPE);
             if (entries == null || entries.Count == 0) return Array.Empty<ComponentTypeInfo>();
 
             return entries
                 .Where(e => e != null && !string.IsNullOrWhiteSpace(e.Code))
-                .Select(ComponentCatalogReader.Read)
+                .Select(e => attachesAnywhere ? AsFavorites(ComponentCatalogReader.Read(e), e) : ComponentCatalogReader.Read(e))
                 .GroupBy(t => t.Code, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())                                   // 같은 코드가 두 번 오면 앞의 것(서버 순서)을 쓴다
                 .OrderBy(t => ComponentFamilyRules.PaletteOrder(t.Family))
@@ -307,6 +316,17 @@ public sealed class CatalogService : ICatalogService, IComponentCatalog, Ironwal
                 .ThenBy(t => t.Code, StringComparer.Ordinal)
                 .ToArray();
         }
+
+        /// <summary>
+        /// 8.0.8 읽기 — 어느 장비에나 단다 · <c>applies_to: []</c> 는 "어느 카테고리의 즐겨찾기도 아님"이다
+        /// (null = 전 카테고리 즐겨찾기와 다르다 — 즐겨찾기 해제로 생긴다).
+        /// </summary>
+        private static ComponentTypeInfo AsFavorites(ComponentTypeInfo info, VocabularyEntryDto entry)
+            => info with
+            {
+                AttachesAnywhere = true,
+                AppliesTo = entry.AppliesTo is { Count: 0 } ? Array.Empty<EnumDeviceCategory>() : info.AppliesTo,
+            };
 
         private static IReadOnlyList<CatalogOption> ToOptions(IEnumerable<EnumEntryDto>? entries)
             => (entries ?? Enumerable.Empty<EnumEntryDto>())

@@ -139,6 +139,7 @@ public static class DeviceAxesMapper
             ParentDeviceId = dto.ParentDeviceId,
             Channel = dto.Channel,
             Protocol = NullIfEmpty(dto.Protocol),
+            PortKey = NullIfEmpty(dto.PortKey),
         };
 
         // urls 는 카테고리마다 키가 달라 DTO 가 object 로 받는다 — 역직렬화 직후엔 JObject 다.

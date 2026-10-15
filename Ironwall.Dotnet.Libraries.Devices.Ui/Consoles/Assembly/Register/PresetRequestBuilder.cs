@@ -100,7 +100,7 @@ public static class PresetRequestBuilder
                 var info2 = catalog.Find(type);
                 if (info2 == null)
                     problems.Add($"부품 유형 '{type}'이(가) 목록에 없습니다. 프리셋을 고쳐야 등록할 수 있습니다.");
-                else if (!info2.AppliesToCategory(preset.Category))
+                else if (!info2.CanAttachTo(preset.Category))
                     problems.Add($"부품 유형 '{type}' 은(는) {CategoryText(preset.Category)} 에 달 수 없습니다.");
             }
 

@@ -450,10 +450,18 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                     }
                     continue;
                 }
-                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), CHIP_GAP_PX / Math.Max(0.05, _view.Scale));
+                var gap = CHIP_GAP_PX / Math.Max(0.05, _view.Scale);
+                var xs = FenceChipSpacing.Spread(row.Select(p => (p.X, p.Chip.FootprintBounds.X, p.Chip.FootprintBounds.Width)).ToList(), gap);
+                // 칸(물체) 안에서 다 못 벌린 붙은 칩은 아래 단으로 비켜 선다(실창 8회차 MNT-R28-460: 3 m 칸에 둘이면 4 px 겹쳤다) — 9자리 칩의 단 나누기(FreeSpread)와 같은 규칙.
+                // 위로는 올리지 않는다 · 고정점은 물체 위 그대로, 내려간 몸까지 팔(브래킷)을 잇는다. 같은 줄 칩은 그림 범위(번호판 포함)로 잰다.
+                // 내려간 단(1단 이상)에서는 다른 줄 칩(칩 사각형) · 제어기 상자도 피한다 — 0단은 예전 배치 그대로(MNT-R28-610 나란히).
+                var drop = row.Max(p => p.Chip.FootprintBounds.Bottom) - row.Min(p => p.Chip.FootprintBounds.Top) + gap;
+                var others = _sensorChips.Values.Concat(_groupChips.Values).Where(c => !c.HitBounds.IsEmpty && row.All(r => r.Chip != c)).Select(c => ChipRect(c, c.HitBounds)).ToList();
+                var settled = new List<Rect>();
                 for (var i = 0; i < row.Count; i++)
                 {
                     var x = xs[i];
+                    var armDx = 0.0;
                     // 붙은 칩은 그 물체 범위 밖으로 밀지 않는다 — 기둥은 제자리, 칸에 붙은 칩은 그 칸 안(실창 4회차: 기둥 1 의 75088 이 기둥 없는 허공 · 제어기 상자 위로 밀렸다).
                     // 펜스 끝 제어기 상자와 겹치면 그 범위 안에서 펜스 쪽으로 비킨다.
                     if (row[i].Chip.Kind == FenceChipKind.Sensor && scene.MountRangeOf(row[i].Chip.Key) is { } range)
@@ -473,7 +481,7 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                                 ? (_enclosureX < range.Lo ? controllerBox.Right - (first + hit.Left) : controllerBox.Left - (last + hit.Right))
                                 : 0;
                             x = first + shift + mates.IndexOf(row[i]) * step;
-                            if (row[i].Chip.Picture is { } picture) row[i].Chip.Picture = WithArm(picture, range.Lo - x);
+                            armDx = range.Lo - x;
                         }
                         else
                         {
@@ -482,7 +490,19 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
                                 x = Math.Clamp(_enclosureX < x ? controllerBox.Right - hit.Left : controllerBox.Left - hit.Right, range.Lo, range.Hi);
                         }
                     }
-                    if (Math.Abs(x - row[i].X) > 1e-9) Place(row[i].Chip, x);
+                    var foot = row[i].Chip.FootprintBounds;
+                    var body = row[i].Chip.HitBounds;
+                    var dy = 0.0;
+                    for (var t = 0; t < 64; t++, dy += drop)
+                    {
+                        var mine = new Rect(x + foot.X, foot.Y + dy, foot.Width, foot.Height);
+                        var mineHit = new Rect(x + body.X, body.Y + dy, body.Width, body.Height);
+                        if (!settled.Any(r => Overlaps(mine, r)) && (t == 0 || !others.Any(r => Overlaps(mineHit, r)) && !mineHit.IntersectsWith(controllerBox))) break;
+                    }
+                    settled.Add(new Rect(x + foot.X, foot.Y + dy, foot.Width, foot.Height));
+                    if ((armDx != 0 || dy != 0) && row[i].Chip.Picture is { } picture) row[i].Chip.Picture = WithArm(picture, armDx, dy);
+                    if (Math.Abs(x - row[i].X) > 1e-9 || dy != 0) Place(row[i].Chip, x);
+                    if (dy != 0) Canvas.SetTop(row[i].Chip, Canvas.GetTop(row[i].Chip) + dy);
                 }
             }
         }
@@ -555,19 +575,29 @@ public sealed class FenceCanvas : Grid, IFenceDropSurface
     }
 
     /// <summary>
-    /// 기둥 옆으로 비켜 선 칩의 그림 — 브래킷 고정점을 기둥(칩 원점에서 <paramref name="dx"/>)으로 옮기고 고정점 → 원래 브래킷 시작까지 가로 팔을 잇는다.
-    /// 브래킷이 없는 칩(지중)은 그대로.
+    /// 기둥 옆 · 아래 단으로 비켜 선 칩의 그림 — 브래킷 고정점을 물체 위(칩 원점에서 가로 <paramref name="dx"/> · 칩이 내려간 <paramref name="dy"/> 만큼 위)로 옮기고
+    /// 고정점 → 원래 브래킷 시작까지 팔을 잇는다. 브래킷이 없는 칩(지중)은 그대로.
     /// </summary>
-    private static FenceChipPicture WithArm(FenceChipPicture picture, double dx)
+    private static FenceChipPicture WithArm(FenceChipPicture picture, double dx, double dy = 0)
     {
         var pin = picture.Shapes.FirstOrDefault(s => s.Ink == FenceInk.MountBracket && s.Kind == FenceShapeKind.Ellipse);
-        if (pin is null || Math.Abs(dx) < 1e-9) return picture;
+        if (pin is null || Math.Abs(dx) < 1e-9 && Math.Abs(dy) < 1e-9) return picture;
         var at = pin.Points[0];
-        var post = new Point(at.X + dx, at.Y);
+        var post = new Point(at.X + dx, at.Y - dy);
         var shapes = picture.Shapes.Select(s => ReferenceEquals(s, pin) ? s with { Points = new[] { post } } : s).ToList();
         shapes.Insert(0, new FenceShape(FenceShapeKind.Line, FenceInk.MountBracket, new[] { post, at }));
         return picture with { Shapes = shapes };
     }
+
+    /// <summary>칩 그림 좌표의 사각형 <paramref name="local"/> 을 캔버스 좌표로(칩 원점 = 놓인 자리 − 적중 사각형 오프셋).</summary>
+    private static Rect ChipRect(FenceChip chip, Rect local)
+    {
+        local.Offset(Canvas.GetLeft(chip) - chip.HitBounds.X, Canvas.GetTop(chip) - chip.HitBounds.Y);
+        return local;
+    }
+
+    /// <summary>두 사각형이 반 화소 넘게 겹치나(맞닿음은 겹침 아님).</summary>
+    private static bool Overlaps(Rect a, Rect b) => Rect.Intersect(a, b) is var o && !o.IsEmpty && o.Width >= 0.5 && o.Height >= 0.5;
 
     /// <summary>붙은 칩을 줄 · 세로로 겹치는 무리로 — 세로 범위(칩 사각형 위 · 아래)가 겹쳐 이어지는 것끼리 한 무리.</summary>
     private static IEnumerable<IGrouping<FenceLane, (FenceChip Chip, double X, FenceLane Lane)>> OverlappingRows(List<(FenceChip Chip, double X, FenceLane Lane)> chips)
