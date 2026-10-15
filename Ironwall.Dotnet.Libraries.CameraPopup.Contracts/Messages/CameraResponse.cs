@@ -42,6 +42,15 @@ public sealed class CameraResponse : IIpcMessage
     /// <summary>GetVideoResolution — 메인 스트림 세로(px).</summary>
     public int VideoHeight { get; init; }
 
+    /// <summary>GetPtzMoveStatus — true 움직이는 중 · false 멈춤 · null 카메라가 알려주지 않음(GIS 가 예상 시간으로 어림).</summary>
+    public bool? PtzMoving { get; init; }
+
+    /// <summary>PreparePtz — 카메라 기본 팬틸트 속도(ONVIF DefaultPTZSpeed, 0.1..1). 모르면 null.</summary>
+    public double? DefaultPanTiltSpeed { get; init; }
+
+    /// <summary>PreparePtz — 카메라 기본 줌 속도(0.1..1). 모르면 null.</summary>
+    public double? DefaultZoomSpeed { get; init; }
+
     /// <summary>GIS 쪽에서 실패 응답을 만든다(호스트 없음 · 시간 초과 등).</summary>
     public static CameraResponse Fail(CameraRequest request, string errorCode, string? message = null) => new()
     {

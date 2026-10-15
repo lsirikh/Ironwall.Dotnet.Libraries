@@ -29,4 +29,11 @@ internal interface ITileCameraControl : IDisposable
 
     /// <summary>복귀 프리셋으로. 토큰이 null 이면 제공자의 Home.</summary>
     Task<bool> GotoHomeAsync(string? homePresetToken, CancellationToken ct);
+
+    /// <summary>움직이는 중인가(ONVIF MoveStatus). 모르면 null — 타일이 예상 시간으로 어림한다. 기본 구현은 null.</summary>
+    Task<bool?> GetMoveStatusAsync(CancellationToken ct) => Task.FromResult<bool?>(null);
+
+    /// <summary>카메라 기본 팬틸트 · 줌 속도(0.1..1, ONVIF DefaultPTZSpeed). 모르면 null(타일은 0.5). 기본 구현은 null.</summary>
+    double? DefaultPanTiltSpeed => null;
+    double? DefaultZoomSpeed => null;
 }

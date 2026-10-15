@@ -34,6 +34,11 @@
                     <Ellipse Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
                     <Path Data="M14,5 V23 M5,14 H23" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="2" />
                 </Grid>
+                <!-- 끈 크기(가로 1/2 = 화면 한 폭 = 최대) — 과녁이 화면 밖 가장자리에 붙어도 얼마나 도는지 알 수 있게 -->
+                <Border x:Name="DragAmount" Style="{StaticResource CameraPopup.VideoChip}">
+                    <TextBlock x:Name="DragAmountText" Style="{StaticResource CameraPopup.VideoText}" FontSize="10"
+                               AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.DragAmount}" />
+                </Border>
             </Canvas>
 
             <!-- 위: 손잡이 · 이름 · 태그 -->
@@ -80,7 +85,37 @@
                 </Border>
             </StackPanel>
 
-            <!-- 아래 오른쪽: PTZ 패드(누르는 동안 이동 · 떼면 정지) -->
+            <!-- 아래 오른쪽: 이동 중 표시(작게 — 회전 아이콘 → '이동 완료' 뒤 사라짐) · PTZ 패드(누르는 동안 이동 · 떼면 정지) -->
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom">
+            <Border x:Name="PtzMotionChip" Style="{StaticResource CameraPopup.VideoChip}" HorizontalAlignment="Right" Margin="0,0,6,6"
+                    IsHitTestVisible="False"
+                    AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzMoving}"
+                    AutomationProperties.Name="{Binding PtzMotionText}"
+                    Visibility="{Binding IsPtzMotionVisible, Converter={StaticResource CameraPopup.BoolToVis}}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="10" Height="10" Margin="0,0,4,0" VerticalAlignment="Center" Stretch="None"
+                          Data="M5,1 A4,4 0 1 1 1,5" Stroke="{DynamicResource CameraPopup.VideoTextBrush}" StrokeThickness="1.5"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" RenderTransformOrigin="0.5,0.5"
+                          Visibility="{Binding IsPtzMotionMoving, Converter={StaticResource CameraPopup.BoolToVis}}">
+                        <Path.RenderTransform>
+                            <RotateTransform />
+                        </Path.RenderTransform>
+                        <Path.Triggers>
+                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                         From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Path.Triggers>
+                    </Path>
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="10" Margin="0,0,4,0" Text="✓"
+                               Visibility="{Binding IsPtzMotionDone, Converter={StaticResource CameraPopup.BoolToVis}}" />
+                    <TextBlock Style="{StaticResource CameraPopup.VideoText}" FontSize="10" Text="{Binding PtzMotionText}" />
+                </StackPanel>
+            </Border>
             <Border x:Name="PtzPad" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
                     Background="{DynamicResource CameraPopup.VideoChipBrush}" CornerRadius="{DynamicResource RadiusMedium}" Padding="3"
                     AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad}"
@@ -106,6 +141,7 @@
                             AutomationProperties.AutomationId="{Binding AutomationId, StringFormat={}{0}.PtzPad.Down}" />
                 </UniformGrid>
             </Border>
+            </StackPanel>
         </Grid>
 
         <!-- 선택(누른 타일) = 2px 테두리 — 끌기 삽입 표시(세로 막대)와 모양이 다르다 -->

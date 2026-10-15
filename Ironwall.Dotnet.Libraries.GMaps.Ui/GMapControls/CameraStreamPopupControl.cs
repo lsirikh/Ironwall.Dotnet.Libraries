@@ -39,6 +39,8 @@ public class CameraStreamPopupControl : Control
     private readonly PtzDragGesture _ptzDrag = new();
     private Line? _ptzShaftHalo, _ptzShaft;
     private Grid? _ptzTarget;
+    private Border? _ptzAmount;          // 끈 크기 글자("0.6폭" — 가로 1/2 = 화면 한 폭 = 최대)
+    private TextBlock? _ptzAmountText;
 
     // hold 버튼(방향패드/줌/포커스): 누름=연속이동, 뗌·캡처분실=정지. 눌린 단추의 Tag 로 올바른 모터(PTZ vs Imaging) 정지 라우팅(F-01/02).
     // 영상 드래그(_ptzDrag)와는 별개 상태(F-09). 제스처/파싱은 PtzGestureTag(WPF무의존) 단일 진실원.
@@ -475,6 +477,12 @@ public class CameraStreamPopupControl : Control
         Canvas.SetLeft(_ptzTarget!, tx - (PtzTargetSize / 2));
         Canvas.SetTop(_ptzTarget!, ty - (PtzTargetSize / 2));
         _ptzTarget!.Visibility = Visibility.Visible;
+        // 과녁이 화면 밖이면 가장자리에 붙는다 — 얼마나 도는지는 선 가운데 옆 글자로(영상 안에 머문다).
+        _ptzAmountText!.Text = PtzDragGesture.AmountText(PtzDragGesture.DragMagnitude(_videoRegion.ActualWidth, _videoRegion.ActualHeight,
+            _ptzDrag.CurrentX - _ptzDrag.StartX, _ptzDrag.CurrentY - _ptzDrag.StartY));
+        Canvas.SetLeft(_ptzAmount!, ((_ptzDrag.StartX + _ptzDrag.CurrentX) / 2) + 8);
+        Canvas.SetTop(_ptzAmount!, ((_ptzDrag.StartY + _ptzDrag.CurrentY) / 2) + 8);
+        _ptzAmount!.Visibility = Visibility.Visible;
     }
 
     private void EnsurePtzTargetShapes()
@@ -494,13 +502,22 @@ public class CameraStreamPopupControl : Control
         _ptzTarget.Children.Add(new Path { Data = cross, Stroke = halo, StrokeThickness = 5 });
         _ptzTarget.Children.Add(new Ellipse { Stroke = Brushes.White, StrokeThickness = 2 });
         _ptzTarget.Children.Add(new Path { Data = cross, Stroke = Brushes.White, StrokeThickness = 2 });
+        _ptzAmountText = new TextBlock { Foreground = Brushes.White, FontSize = 10 };
+        _ptzAmount = new Border
+        {
+            Background = halo, CornerRadius = new CornerRadius(3), Padding = new Thickness(4, 1, 4, 1), IsHitTestVisible = false,
+            Child = _ptzAmountText,
+        };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(_ptzAmount, "CameraPopup.PtzDragAmount");
         _ptzOverlay.Children.Add(_ptzShaftHalo);
         _ptzOverlay.Children.Add(_ptzShaft);
         _ptzOverlay.Children.Add(_ptzTarget);
+        _ptzOverlay.Children.Add(_ptzAmount);
     }
 
     private void ClearPtzTarget()
     {
+        if (_ptzAmount != null) _ptzAmount.Visibility = Visibility.Collapsed;
         if (_ptzShaftHalo != null) _ptzShaftHalo.Visibility = Visibility.Collapsed;
         if (_ptzShaft != null) _ptzShaft.Visibility = Visibility.Collapsed;
         if (_ptzTarget != null) _ptzTarget.Visibility = Visibility.Collapsed;

@@ -374,6 +374,140 @@ public class TilePtzInteractionTests
             Assert.Equal(PtzAvailability.NoPermissionReason, rig.Tile.Notice);
         });
 
+    // ───────── 영상 위 휠 줌(지도 팝업과 같은 규칙) ─────────
+
+    private static void Wheel(UIElement target, int delta)
+        => target.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, delta) { RoutedEvent = Mouse.MouseWheelEvent });
+
+    private static async Task<bool> WaitUntilAsync(Func<bool> condition, int ms = 3000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < ms)
+        {
+            if (condition()) return true;
+            await Task.Delay(20);
+        }
+        return condition();
+    }
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-140")]
+    public async Task should_zoom_then_stop_after_pulse_when_wheel_turns_over_video()
+    {
+        Rig? rig = null;
+        _sta.Invoke(() =>
+        {
+            rig = NewRig();
+            rig.Tile.WheelZoomPulse = TimeSpan.FromMilliseconds(60);
+            Wheel(rig.View.VideoImage, 120);
+        });
+
+        Assert.True(await WaitUntilAsync(() => rig!.Calls.Contains("stop")), string.Join(" ", rig!.Calls));
+
+        Assert.Equal(new[] { "move:0,0,0.5", "stop" }, rig.Calls);   // 줌 연속 이동 0.5(카메라 기본 속도 모름) → 펄스 뒤 정지
+        _sta.Invoke(() => Assert.False(rig.Tile.IsPtzMoving));
+    }
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-141")]
+    public async Task should_cancel_earlier_stop_and_stop_once_when_wheel_turns_repeatedly()
+    {
+        Rig? rig = null;
+        _sta.Invoke(() =>
+        {
+            rig = NewRig();
+            rig.Tile.WheelZoomPulse = TimeSpan.FromMilliseconds(250);
+            Wheel(rig.View.VideoImage, 120);
+            Wheel(rig.View.VideoImage, 120);
+            Wheel(rig.View.VideoImage, -120);
+        });
+
+        Assert.True(await WaitUntilAsync(() => rig!.Calls.Contains("stop")), string.Join(" ", rig!.Calls));
+        await Task.Delay(400);
+
+        Assert.Equal(new[] { "move:0,0,0.5", "move:0,0,0.5", "move:0,0,-0.5", "stop" }, rig.Calls);   // 앞 칸의 정지는 취소 — 마지막 칸 뒤 한 번
+    }
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-142")]
+    public void should_show_reason_and_send_nothing_when_wheel_turns_over_fixed_camera()
+        => _sta.Invoke(() =>
+        {
+            var rig = NewRig(ptz: false);
+
+            Wheel(rig.View.VideoImage, 120);
+
+            Assert.Empty(rig.Calls);
+            Assert.Equal(PtzAvailability.FixedCameraReason, rig.Tile.Notice);
+        });
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-143")]
+    public void should_let_wheel_pass_when_it_is_outside_video()
+        => _sta.Invoke(() =>
+        {
+            var rig = NewRig();
+            rig.Tile.TogglePad();
+            var onPad = new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120) { RoutedEvent = Mouse.MouseWheelEvent };
+            var onHandle = new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120) { RoutedEvent = Mouse.MouseWheelEvent };
+
+            rig.View.PadUp.RaiseEvent(onPad);
+            rig.View.DragHandle.RaiseEvent(onHandle);
+
+            Assert.Empty(rig.Calls);
+            Assert.False(onPad.Handled);       // 흘려보낸다(처리하지 않음)
+            Assert.False(onHandle.Handled);
+        });
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-144")]
+    public async Task should_show_moving_then_done_then_hide_when_video_is_dragged()
+    {
+        Rig? rig = null;
+        _sta.Invoke(() =>
+        {
+            rig = NewRig();
+            DragStart(rig, 100, 90);
+            DragTo(rig, 180, 72);
+            DragEnd(rig);
+            Assert.True(rig.Tile.IsPtzMotionMoving);
+            Assert.Equal("이동 중", rig.Tile.PtzMotionText);
+            Assert.Equal(Visibility.Visible, rig.View.PtzMotionChip.Visibility);
+        });
+
+        // 시험 무늬 가짜는 MoveStatus 를 모른다 → 끌기 어림 시간(1.5초) 뒤 '이동 완료' → 잠깐 뒤 사라짐
+        bool done = false, hidden = false;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 6000 && !hidden)
+        {
+            await Task.Delay(50);
+            _sta.Invoke(() =>
+            {
+                done |= rig!.Tile.IsPtzMotionDone && rig.Tile.PtzMotionText == "이동 완료";
+                hidden = done && !rig.Tile.IsPtzMotionVisible;
+            });
+        }
+
+        Assert.True(done, "'이동 완료' 가 보이지 않았다");
+        Assert.True(hidden, "'이동 완료' 뒤 사라지지 않았다");
+    }
+
+    [Fact]
+    [Trait("Scenario", "PTZ-DRAG-145")]
+    public void should_show_drag_amount_in_view_widths_while_dragging()
+        => _sta.Invoke(() =>
+        {
+            var rig = NewRig();
+
+            DragStart(rig, 100, 90);
+            DragTo(rig, 260, 90);   // 160 px = 영상 320 의 1/2 = 한 폭
+
+            Assert.Equal("1폭 · 최대", rig.View.DragAmountText.Text);
+            DragTo(rig, 148, 90);   // 48 px = 160 px(가로 1/2)의 0.3
+            Assert.Equal("0.3폭", rig.View.DragAmountText.Text);
+            DragEnd(rig);
+        });
+
     [Fact]
     public void should_not_start_ptz_drag_when_press_begins_on_reorder_handle()
         => _sta.Invoke(() =>

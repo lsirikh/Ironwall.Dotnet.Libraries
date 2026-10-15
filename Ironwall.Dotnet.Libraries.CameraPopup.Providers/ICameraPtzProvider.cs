@@ -33,6 +33,16 @@ public interface ICameraPtzProvider
     Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct)
         => Task.FromResult(PtzDragOutcome.NotSent("not-supported"));
 
+    /// <summary>속도를 실은 드래그(<paramref name="speed"/> 0.1..1 = 팝업 설정 속도, 0 이하 = 카메라 기본). 기본 구현은 속도를 버린다.</summary>
+    Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, double speed, CancellationToken ct)
+        => DragMoveAsync(cameraId, viewX, viewY, viewAspect, ct);
+
+    /// <summary>움직이는 중인가(true · false), 모르면 null(<see cref="IPtzController.GetMoveStatusAsync"/>). 기본 구현은 null.</summary>
+    Task<bool?> GetMoveStatusAsync(string cameraId, CancellationToken ct) => Task.FromResult<bool?>(null);
+
+    /// <summary>카메라 기본 PTZ 속도(0.1..1, 준비 뒤에만 의미). 모르면 null. 기본 구현은 null.</summary>
+    (double? PanTilt, double? Zoom) GetDefaultSpeeds(string cameraId) => (null, null);
+
     Task<IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(string cameraId, CancellationToken ct);
 
     Task<bool> GotoPresetAsync(string cameraId, string presetToken, CancellationToken ct);

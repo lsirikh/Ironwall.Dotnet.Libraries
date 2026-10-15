@@ -24,6 +24,8 @@ public enum CameraRequestKind
     SetAutoFocus = 9,
     /// <summary>메인 스트림(ONVIF 프로파일 중 해상도 최대) 해상도 — ROI 기준 해상도 채우기.</summary>
     GetVideoResolution = 10,
+    /// <summary>지금 움직이는 중인가(ONVIF GetStatus MoveStatus) — 영상 위 "이동 중 · 이동 완료" 표시. 이동 중에만 짧게 묻는다.</summary>
+    GetPtzMoveStatus = 11,
 }
 
 /// <summary>호스트 응답의 실패 사유 코드(기계 판독용 — 화면 문구는 GIS 가 고른다).</summary>

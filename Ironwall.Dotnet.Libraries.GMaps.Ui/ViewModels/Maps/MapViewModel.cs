@@ -25,6 +25,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.CameraPopup;                       // 팝업 호스트 감시자 · 조작 창구(T-02 — GIS 는 LibVLC/ONVIF 를 부르지 않는다)
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
+using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.CameraPopup;
 using CameraRequestKind = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.CameraRequestKind;
 using CameraErrorCodes = Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol.CameraErrorCodes;
@@ -2181,6 +2182,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 vm.PtzUnavailableReason = CameraStreamPopupViewModel.PtzReason(r.Success, r.PtzCapable, permitted);   // 막혔으면 왜 막혔는지(배지)
                 vm.IsPtzCapable = r.Success && r.PtzCapable && permitted;
                 vm.IsImagingCapable = r.Success && r.ImagingCapable;
+                vm.ApplyCameraDefaultSpeeds(r.DefaultPanTiltSpeed, r.DefaultZoomSpeed);   // 사용자가 속도를 안 바꿨으면 카메라 기본 속도로
                 vm.IsPtzLoading = false;
             }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} ok={r.Success} capable={r.PtzCapable} err={r.ErrorCode} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
@@ -2264,8 +2266,10 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             // 직전 제스처의 대기(휠 줌 펄스의 뒤늦은 정지)를 LWW 취소 — 그 정지가 이 이동을 끊지 않게.
             BeginPtzGesture(vm.CameraId);
-            if (ResolveCameraControl()?.DragMove(vm.CameraId.ToString(), vm.Provider, viewX, viewY, viewAspect) != true)
+            if (ResolveCameraControl()?.DragMove(vm.CameraId.ToString(), vm.Provider, viewX, viewY, viewAspect, vm.PanTiltSpeed) != true)
                 _log?.Warning($"[CameraPopup] PTZ 드래그 이동 미전송 cam={vm.CameraId} — 팝업 호스트 없음.");
+            else
+                vm.BeginPtzMotion(PtzMotionTracker.DragEstimate);
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
@@ -2300,11 +2304,24 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             if (!SendPtzMove(vm, 0, 0, direction * vm.ZoomSpeed)) return;
+            await OnUiAsync(() => vm.BeginPtzMotion(PtzMotionTracker.ZoomEstimate)).ConfigureAwait(false);
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
             if (!ct.IsCancellationRequested) SendPtzStop(vm);
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    /// <summary>이동 중 표시의 판정 한 번 — 호스트에 GetPtzMoveStatus(ONVIF MoveStatus). 호스트 없음 · 실패 · 카메라가 안 알려줌 = null(어림).</summary>
+    private async Task<bool?> ProbePtzMotionAsync(CameraStreamPopupViewModel vm, System.Threading.CancellationToken ct)
+    {
+        var control = ResolveCameraControl();
+        if (control is not { IsAvailable: true }) return null;
+        var r = await control.RequestAsync(new CameraRequest
+        {
+            Kind = CameraRequestKind.GetPtzMoveStatus, CameraId = vm.CameraId.ToString(), Provider = vm.Provider, TimeoutMs = 3000,
+        }, ct).ConfigureAwait(false);
+        return r.Success ? r.PtzMoving : null;
     }
 
     /// <summary>줌 버튼 누름 → 방향 연속 줌 시작(뗄 때까지 계속). 뗌은 OnCameraPopupPtzStop. (FR-PH-01)</summary>
@@ -2716,6 +2733,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // 좌버튼 PTZ 드래그 → IPtzController
+            vm.PtzMotionProbe = ct => ProbePtzMotionAsync(vm, ct);  // 이동 중 표시 — 이동 중에만 호스트에 MoveStatus 를 묻는다
             vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌(펄스)
             vm.ZoomHoldRequested += OnCameraPopupZoomHold;          // 줌 +/- 누름 → 연속 줌(뗌=PtzStop)
             vm.FocusHoldRequested += OnCameraPopupFocusHold;        // 포커스 +/- 누름 → 연속 포커스
@@ -2778,6 +2796,7 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.CloseRequested -= OnCameraPopupCloseRequested;
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
+            vm.CancelPtzMotion();
             vm.PtzZoomRequested -= OnCameraPopupPtzZoom;
             vm.ZoomHoldRequested -= OnCameraPopupZoomHold;
             vm.FocusHoldRequested -= OnCameraPopupFocusHold;

@@ -77,13 +77,45 @@ public sealed class PtzDragGesture
     public static bool IsBeyondDeadZone(double dx, double dy) => (dx * dx) + (dy * dy) > DeadZone * DeadZone;
 
     /// <summary>
-    /// 목표 표시 자리(순수) — 드래그 벡터만큼 화면 중심에서 떨어진 점. 떼면 <b>이 점이 화면 중심으로 온다</b>.
-    /// 상자 밖으로 나가면 가장자리에 붙인다(카메라도 그만큼만 간다 — 한 번에 화면 반 너비까지).
+    /// 끈 길이 기준(사용자 결정 2026-10-15) — m = (dx, dy) ÷ (영상 가로의 1/2). 길이 1 에서 자른다(가로 1/2 보다 길게 끌어도 최대에서 멈춤).
+    /// <b>|m| = 1 → 화면 한 폭(수평 화각 1개)만큼 돈다.</b> 세로도 가로 픽셀로 재므로 각도/픽셀이 가로와 같다.
+    /// 입력은 영상 상자 비율(<see cref="PtzDragVector"/> 와 같은 꼴). 유한하지 않은 값은 0.
+    /// </summary>
+    public static (double X, double Y) WidthVector(double viewX, double viewY, double viewAspect)
+    {
+        double aspect = double.IsFinite(viewAspect) && viewAspect > 0.1 && viewAspect < 10 ? viewAspect : 16d / 9d;
+        double x = double.IsFinite(viewX) ? 2d * viewX : 0d;
+        double y = double.IsFinite(viewY) ? 2d * viewY / aspect : 0d;
+        double length = Math.Sqrt((x * x) + (y * y));
+        return length > 1d ? (x / length, y / length) : (x, y);
+    }
+
+    /// <summary>끈 크기(0..1) — 1 = 최대(가로 1/2 를 끌었다 = 화면 한 폭 회전). 목표 표시 옆 글자에 쓴다.</summary>
+    public static double DragMagnitude(double viewWidth, double viewHeight, double dx, double dy)
+    {
+        if (!(viewWidth > 0) || !(viewHeight > 0)) return 0d;
+        var (mx, my) = WidthVector(dx / viewWidth, dy / viewHeight, viewWidth / viewHeight);
+        return Math.Sqrt((mx * mx) + (my * my));
+    }
+
+    /// <summary>끈 크기 글자(목표 표시 옆) — "0.6폭"(화면 한 폭 = 지금 보이는 화면 너비만큼 돈다), 최대면 "1폭 · 최대".</summary>
+    public static string AmountText(double magnitude)
+        => magnitude >= 0.995 ? "1폭 · 최대" : (Math.Max(0, magnitude)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "폭";
+
+    /// <summary>
+    /// 목표 표시 자리(순수) — 떼면 <b>화면 중심으로 올 점</b> = 중심 + m × 화면 가로(<see cref="WidthVector"/>).
+    /// 끈 길이의 2배 거리라 가로 1/4 를 넘게 끌면 화면 밖이다 — 그때는 중심에서 그 방향으로 가장자리에 붙인다(방향은 유지,
+    /// 크기는 <see cref="DragMagnitude"/> 로 따로 보인다).
     /// </summary>
     public static (double X, double Y) TargetPoint(double viewWidth, double viewHeight, double dx, double dy)
     {
-        double x = Math.Clamp((viewWidth / 2) + dx, 0, Math.Max(0, viewWidth));
-        double y = Math.Clamp((viewHeight / 2) + dy, 0, Math.Max(0, viewHeight));
-        return (x, y);
+        double w = Math.Max(0, viewWidth), h = Math.Max(0, viewHeight);
+        if (!(w > 0) || !(h > 0)) return (w / 2, h / 2);
+        var (mx, my) = WidthVector(dx / w, dy / h, w / h);
+        double tx = mx * w, ty = my * w;
+        double scale = 1d;
+        if (Math.Abs(tx) > w / 2) scale = Math.Min(scale, (w / 2) / Math.Abs(tx));
+        if (Math.Abs(ty) > h / 2) scale = Math.Min(scale, (h / 2) / Math.Abs(ty));
+        return ((w / 2) + (tx * scale), (h / 2) + (ty * scale));
     }
 }
