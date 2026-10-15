@@ -162,8 +162,8 @@ public class PtzDragProviderTests
         // Assert — 쌓이지 않는다: 이미 나간 첫 번째 + 마지막 하나만. 중간 8개는 버려졌다(superseded).
         var moves = camera.PtzCommands.Where(c => c.Op == "RelativeMove").Select(c => FakeOnvifCamera.PanTiltOf(c.Body)!.Value.X).ToList();
         Assert.Equal(2, moves.Count);
-        Assert.Equal(2 * 0.05 * 60d / 360d * 2d, moves[0], 4);   // 가로 비율 × 2 = 화면 폭 몫(2026-10-15 사용자 결정)
-        Assert.Equal(1.00 * 60d / 360d * 2d, moves[1], 4);       // 가로 1/2 = 화면 한 폭 = 60°
+        Assert.Equal(0.05 * 60d / 360d * 2d, moves[0], 4);   // 폭 비율 = 화면 폭 몫(2026-10-16 사용자 결정 — 화면 끝까지 = 한 폭)
+        Assert.Equal(0.50 * 60d / 360d * 2d, moves[1], 4);   // 폭 1/2 = 반 화각 = 30°
         Assert.Equal(2, outcomes.Count(o => o.Sent));
         Assert.Equal(8, outcomes.Count(o => o.Reason == "superseded"));
         Assert.True(outcomes[^1].Sent, "마지막 드래그가 나가지 않았다");

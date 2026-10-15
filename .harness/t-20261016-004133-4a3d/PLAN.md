@@ -58,4 +58,8 @@
 - [x] TileView.xaml/.cs: 화살표(x:Name 그대로 — DragTarget 을 화살촉으로) · 포커스 잃음 취소
 - [x] CameraStreamPopupControl: 화살표 · 포커스 잃음 취소
 - [x] 시험 갱신 · 추가: PTZ-DRAG-101~115(수학 · 화살표), 146(타일 형태 · 놓기 전 0건 · 놓으면 1건), 147(GIS 형태 · 0건/1건)
-- [ ] dotnet test(CameraPopup.Host.Tests · CameraPopup.Tests(RealCamera 제외) · GMaps.Ui 제스처 시험 · 솔루션)
+- [x] 초록: CameraPopup.Tests(RealCamera 제외) 331/331 · CameraPopup.Host.Tests 179/179 · GMaps.Ui CameraPopupPtzGestureTests 15/15
+- [x] 1회차 하네스 검사 시간 초과 — 내 배경 `dotnet test` 3개가 하네스 검사와 겹쳐 돌고 있었다(빌드 잠금 · CPU 경합).
+  그때 Host.Tests 의 DispatcherStarvationTests 4건이 경합으로 실패했으나 단독 8/8 · 프로젝트 전체 179/179 통과(타이밍 민감, 이 변경과 무관).
+  같은 회차에 찾은 실제 결함 1건: PtzDragProviderTests 연속 10건 시험의 값 기대가 옛 기준 그대로 → 새 기준으로 재계산(같은 시나리오 · 같은 정밀도).
+- 배경 시험 프로세스는 남기지 않는다(하네스 검사와 겹치지 않게).
