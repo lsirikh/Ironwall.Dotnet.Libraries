@@ -19,6 +19,8 @@
 - [x] 솔루션 dotnet test(하네스 1회차): 2753 통과 / 1 실패 — CameraPopup.Tests `EventWindowManagerTests.should_return_within_budget_and_not_throw_when_supervisor_is_unavailable`
       '가장 느린 호출 94 ms — 50 ms 예산 초과'(시간 예산 시험 · 솔루션 병렬 실행 부하). 이 작업은 CameraPopup 을 건드리지 않았다.
       `--filter EventWindowManagerTests` 로 따로 돌리니 23/23 통과(180 ms) → 부하 흔들림. 코드 변경 없이 다음 검사에 맡긴다.
+- [x] 하네스 2회차: 솔루션 시험 시간 초과(출력 없음 · 0 통과 0 실패 보고). 코드는 1회차(2753 통과 · 같은 TestDragTrace 포함)와 같다 → 실행 환경 부하로 판단.
+      진단 기록 쓰기는 끌기 중에만(FenceCanvas 칸 바뀜 · Tab, CaptureDragBehavior 끌기 단계) 짧은 한 줄이라 전체 시간에 주는 영향은 작다.
 
 ## 결정
 - 제품 코드는 바꾸지 않는다 — 후보 · 허용 · Tab 라우팅 모두 정상(증거: 위 기록). 칩 배치 코드(FLT-020) 무관.
