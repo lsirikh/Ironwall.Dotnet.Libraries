@@ -278,6 +278,23 @@ public class StreamLoadPolicyTests
         Assert.Equal((2048, 30, 4), (parsed!.MemoryLimitMb, parsed.MemoryPerStreamMb, parsed.MaxConcurrentOpens));
     }
 
+    [Fact]
+    public void should_use_measured_300ms_caching_by_default_and_round_trip_when_caching_is_configured()
+    {
+        // 기본값 — 실측으로 정한 300ms(100 이면 표시 fps 가 떨어졌다)
+        Assert.Contains(":network-caching=300", DecodeProfile.MediaOptions(266, 218, attempt: 0));
+        Assert.Contains(":live-caching=300", DecodeProfile.MediaOptions(266, 218, attempt: 0));
+
+        var token = PipeNaming.CreateToken();
+        var original = new HostLaunchArguments { ParentProcessId = 4321, PipeName = PipeNaming.Build(4321, token), Token = token, NetworkCachingMs = 800 };
+
+        Assert.True(HostLaunchArguments.TryParse(original.ToArgumentList(), out var parsed, out var error), error);
+        Assert.Equal(800, parsed!.NetworkCachingMs);
+        var negative = original.ToArgumentList().Concat(new[] { "--network-caching-ms", "-1" }).ToList();
+        Assert.False(HostLaunchArguments.TryParse(negative, out _, out var negativeError));
+        Assert.Contains("--network-caching-ms", negativeError);
+    }
+
     // ───────── UI 점검 표식(심박과 분리) ─────────
 
     [Fact]

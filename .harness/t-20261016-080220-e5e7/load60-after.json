@@ -1,0 +1,31 @@
+{
+  "headless": true,
+  "seconds": 60,
+  "cores": 32,
+  "total": 60,
+  "finalPlaying": 60,
+  "everPlayed": 60,
+  "allPlayingMs": 4076,
+  "cpuAvgPercentOfAllCores": 4.5,
+  "cpuMaxPercentOfAllCores": 10.2,
+  "cpuSteadyAvg": 4.5,
+  "privateMbAvg": 1016,
+  "privateMbMax": 1062,
+  "restarts": [],
+  "notPlaying": [],
+  "playingTimeline": [
+    "5s=60",
+    "10s=60",
+    "15s=60",
+    "20s=60",
+    "25s=60",
+    "31s=60",
+    "36s=60",
+    "41s=60",
+    "46s=60",
+    "51s=60",
+    "56s=60"
+  ],
+  "listening": [],
+  "hostLogDir": "C:\\Users\\gh\\AppData\\Local\\Temp\\dummycam-tests\\load-host-e97240b7"
+}

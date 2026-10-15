@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <IRONWALL_STREAM_TRACE_LOAD>1</IRONWALL_STREAM_TRACE_LOAD>
+      <IRONWALL_STREAM_TRACE_MEDIAMTX>C:\workspace_app\Ironwall.Dotnet.Libraries\tools\dummy-cameras\bin\mediamtx\v1.21.1\mediamtx.exe</IRONWALL_STREAM_TRACE_MEDIAMTX>
+      <IRONWALL_CAMHOST_EXE>C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261016-080220-e5e7\Ironwall.Dotnet.Libraries.CameraPopup.Host\bin\Release\net8.0-windows\Ironwall.CameraPopupHost.exe</IRONWALL_CAMHOST_EXE>
+      <IRONWALL_STREAM_TRACE_OUT>C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261016-080220-e5e7\.harness\t-20261016-080220-e5e7\trace-es-clk.md</IRONWALL_STREAM_TRACE_OUT>
+      <IRONWALL_EXP_RELEASE_AT_ES>1</IRONWALL_EXP_RELEASE_AT_ES>
+      <IRONWALL_EXP_EXTRA>:clock-jitter=0 :clock-synchro=0</IRONWALL_EXP_EXTRA>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

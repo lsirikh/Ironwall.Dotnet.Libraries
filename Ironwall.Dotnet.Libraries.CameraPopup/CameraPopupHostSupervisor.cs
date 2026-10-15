@@ -347,6 +347,7 @@ public sealed class CameraPopupHostSupervisor : ICameraPopupHost
             MemoryLimitMb = _options.HostMemoryLimitMb,
             MemoryPerStreamMb = Math.Max(0, _options.HostMemoryPerStreamMb),
             MaxConcurrentOpens = Math.Max(1, _options.MaxConcurrentStreamOpens),
+            NetworkCachingMs = Math.Max(0, _options.StreamNetworkCachingMs),
             Headless = _options.Headless,
             DebugCommands = _options.EnableDebugCommands,
             LogDirectory = _options.HostLogDirectory,
