@@ -99,6 +99,12 @@ public sealed class DevicePresetStore
     /// <summary>이 저장소가 보는 파일(펴진 절대 경로).</summary>
     public string FilePath => _path;
 
+    /// <summary>
+    /// 서버 8.0.8 이상인가 — 씨앗을 심거나 손대지 않은 씨앗을 고칠 때 RS485 단자를 담은 표준 제어기를 쓴다
+    /// (<see cref="DevicePresetSeeds.AllFor"/>). 기본 <c>false</c> = 종전 씨앗.
+    /// </summary>
+    public bool SerialPortSeeds { get; init; }
+
     public PresetStoreState State { get; private set; } = PresetStoreState.Ready;
 
     /// <summary>사람에게 보일 한 줄. 알릴 것이 없으면 null.</summary>
@@ -182,7 +188,7 @@ public sealed class DevicePresetStore
             // (카메라 camera_mode "AUTO" → 서버 422, 라이브 하네스 asm.R5a). 파일은 다음 저장 때 같이 고쳐진다.
             _presets.AddRange(presets.Select(p =>
             {
-                var current = DevicePresetSeeds.RefreshIfUntouched(p);
+                var current = DevicePresetSeeds.RefreshIfUntouched(p, SerialPortSeeds);
                 return ReferenceEquals(current, p) ? p : DevicePresetSanitizer.Sanitize(current);
             }));
             Publish();
@@ -231,7 +237,7 @@ public sealed class DevicePresetStore
         _presets.Clear();
         // 씨앗은 파일이 없거나 깨졌을 때만 심는다 — 되쓸 원문이 애초에 없다.
         _unknownEntries.Clear();
-        _presets.AddRange(DevicePresetSeeds.All.Select(DevicePresetSanitizer.Sanitize));
+        _presets.AddRange(DevicePresetSeeds.AllFor(SerialPortSeeds).Select(DevicePresetSanitizer.Sanitize));
         Publish();
 
         var error = Persist();

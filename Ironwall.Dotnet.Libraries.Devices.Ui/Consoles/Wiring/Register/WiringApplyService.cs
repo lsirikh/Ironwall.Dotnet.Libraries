@@ -261,6 +261,9 @@ public sealed class WiringApplyService
         if (!string.IsNullOrWhiteSpace(row.Facts.Zone))
             dto.Geolocation = new GeolocationDto { Location = row.Facts.Zone };
 
+        // 제어기 포트(connection.port_key) — 서버 8.0.8 이상만 받는다. 그 전 서버에는 키 자체를 싣지 않는다(422).
+        if (_policy.AttachesComponentsAnywhere) dto.PortKey = row.Facts.PortKey;
+
         var placement = board.PlacementOf(row.Key);
         if (placement is not null)
             dto.HardwareSpec = new HardwareSpecDto { UseAxisWrite = true, Spec = WiringSpec.Apply(null, placement, board.Shape, row.SupportsFacing) };
@@ -333,6 +336,10 @@ public sealed class WiringApplyService
         if (!string.Equals(serverZone, row.Baseline.Zone, StringComparison.Ordinal))
             return $"구역을 바꿨습니다(\"{row.Baseline.Zone}\" → \"{serverZone}\")";
 
+        var serverPort = server.ReceivedConnection?.PortKey;
+        if (!string.Equals(serverPort ?? string.Empty, row.Baseline.PortKey ?? string.Empty, StringComparison.Ordinal))
+            return $"제어기 포트를 바꿨습니다({row.Baseline.PortKey ?? "없음"} → {serverPort ?? "없음"})";
+
         return null;
     }
 
@@ -379,6 +386,10 @@ public sealed class WiringApplyService
                 note = " (구역은 위치 좌표가 없어 저장하지 않았습니다 — 지도에서 위치를 먼저 잡아 주세요)";
             }
         }
+
+        // 제어기 포트는 바뀌었을 때만 · 서버 8.0.8 이상만 싣는다 — 서버는 port_key 를 보낸 저장에서만 그 포트를 다시 검사한다.
+        if (_policy.AttachesComponentsAnywhere && !string.Equals(row.Facts.PortKey, row.Baseline.PortKey, StringComparison.Ordinal))
+            dto.PortKey = row.Facts.PortKey;
 
         var placement = board.PlacementOf(row.Key);
         if (!WiringSpec.SameWiring(placement, row.BaselinePlacement))
