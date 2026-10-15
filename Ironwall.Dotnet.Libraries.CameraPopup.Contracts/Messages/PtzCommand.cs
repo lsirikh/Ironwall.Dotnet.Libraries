@@ -26,6 +26,9 @@ public sealed class PtzCommand : IIpcMessage
     /// <summary>영상 상자 가로/세로(세로 화각 계산용). 0 이면 16:9 로 본다.</summary>
     public double ViewAspect { get; init; }
 
+    /// <summary><see cref="PtzOperation.DragMove"/>: 팝업 설정 속도(0.1..1). 0 = 카메라 기본 속도.</summary>
+    public double Speed { get; init; }
+
     public string? PresetToken { get; init; }
     public VideoProviderInfo? Provider { get; init; }
 }

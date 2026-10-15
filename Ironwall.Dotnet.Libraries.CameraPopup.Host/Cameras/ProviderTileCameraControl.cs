@@ -87,6 +87,17 @@ internal sealed class ProviderTileCameraControl : ITileCameraControl
         return r?.Success == true;
     }
 
+    public async Task<bool?> GetMoveStatusAsync(CancellationToken ct)
+    {
+        if (PtzUnavailableReason is not null || _cameras.PtzProviderFor(_provider) is not { } provider || !provider.IsPrepared(_cameraId)) return null;
+        try { return await provider.GetMoveStatusAsync(_cameraId, ct).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return null; }
+    }
+
+    public double? DefaultPanTiltSpeed => PtzUnavailableReason is null ? _cameras.PtzProviderFor(_provider)?.GetDefaultSpeeds(_cameraId).PanTilt : null;
+
+    public double? DefaultZoomSpeed => PtzUnavailableReason is null ? _cameras.PtzProviderFor(_provider)?.GetDefaultSpeeds(_cameraId).Zoom : null;
+
     private async Task<CameraResponse?> RequestAsync(CameraRequestKind kind, string? presetToken, CancellationToken ct)
     {
         try

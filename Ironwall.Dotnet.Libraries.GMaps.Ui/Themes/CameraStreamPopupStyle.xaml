@@ -323,6 +323,38 @@
                                     <!--  드래그-PTZ 목표 표시(끈 길이 선 + 떼면 화면 중심으로 올 점의 과녁). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
+                                    <!--  이동 중 표시(영상 오른쪽 아래, 작게) — 끌기 · 휠 이동을 보내면 회전 아이콘 "이동 중", 카메라가 멈췄다고 알려주면(ONVIF MoveStatus)
+                                          ✓ "이동 완료" 를 잠깐 보인 뒤 사라진다. 바탕 · 글자는 위 PTZ 배지와 같다(영상 위 = 테마와 무관한 반투명 검정 + 흰 글자)  -->
+                                    <Border Margin="0,0,6,6" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
+                                            AutomationProperties.AutomationId="GMaps.CameraPopup.PtzMoving"
+                                            AutomationProperties.Name="{Binding PtzMotionText}"
+                                            Visibility="{Binding IsPtzMotionVisible, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="10" Height="10" Margin="0,0,5,0" VerticalAlignment="Center" Stretch="None"
+                                                  Data="M5,1 A4,4 0 1 1 1,5" Stroke="White" StrokeThickness="1.5"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" RenderTransformOrigin="0.5,0.5"
+                                                  Visibility="{Binding IsPtzMotionMoving, Converter={StaticResource BoolToVis}}">
+                                                <Path.RenderTransform>
+                                                    <RotateTransform />
+                                                </Path.RenderTransform>
+                                                <Path.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                                 From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Path.Triggers>
+                                            </Path>
+                                            <TextBlock Margin="0,0,4,0" FontSize="10" Foreground="#FF2ECC71" VerticalAlignment="Center" Text="✓"
+                                                       Visibility="{Binding IsPtzMotionDone, Converter={StaticResource BoolToVis}}" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="{Binding PtzMotionText}" />
+                                        </StackPanel>
+                                    </Border>
+
                                     <!--  PTZ 상태 배지(상단 상태 띠 중앙 — RTSP 헤더 Row0 #FF3F3F46, "Playing"·"스트리밍 HUB"와 같은 높이) — 🟢가능 / 🟠준비중 / ⚪지원안함.
                                           좌=스트리밍 HUB·우=Playing이라 충돌 피해 중앙 배치. IsPtzLoading/IsPtzCapable로 3상태 상호배타. RTSP 컨트롤 위 오버레이라 입력 비간섭(히트테스트 제외)  -->
                                     <!--  🟠 준비중: ONVIF 연결(InitializeFull+GetNode, 첫 오픈 수 초·이후 워밍 즉시) 진행 중  -->

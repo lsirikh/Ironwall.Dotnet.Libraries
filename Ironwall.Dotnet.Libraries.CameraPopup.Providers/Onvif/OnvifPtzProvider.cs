@@ -49,6 +49,14 @@ public sealed class OnvifPtzProvider : ICameraPtzProvider
     public Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, CancellationToken ct)
         => Bounded(_controller.DragMoveAsync(cameraId, viewX, viewY, viewAspect, ct), ct, PtzDragOutcome.NotSent("timeout"));
 
+    public Task<PtzDragOutcome> DragMoveAsync(string cameraId, double viewX, double viewY, double viewAspect, double speed, CancellationToken ct)
+        => Bounded(_controller.DragMoveAsync(cameraId, viewX, viewY, viewAspect, speed, ct), ct, PtzDragOutcome.NotSent("timeout"));
+
+    public Task<bool?> GetMoveStatusAsync(string cameraId, CancellationToken ct)
+        => Bounded(_controller.GetMoveStatusAsync(cameraId, ct), ct, null);
+
+    public (double? PanTilt, double? Zoom) GetDefaultSpeeds(string cameraId) => _controller.GetDefaultSpeeds(cameraId);
+
     private async Task<bool> StopCore(string cameraId, CancellationToken ct)
     {
         await _controller.StopAsync(cameraId, ct).ConfigureAwait(false);

@@ -58,9 +58,10 @@ public class PtzDragProviderTests
         var pt = FakeOnvifCamera.PanTiltOf(only.Body);
         Assert.NotNull(pt);
         Assert.Equal(FakeOnvifCamera.RelGenericUri, pt!.Value.Space);
-        Assert.Equal(0.25 * 60d / 360d * 2d, pt.Value.X, 4);          // 화각 60° 의 1/4 = 15° → 폭 2 가 360°
-        double vfov = PtzDragMath.VerticalFovDeg(60, 16d / 9d);
-        Assert.Equal(0.1 * vfov / 180d * 2d, pt.Value.Y, 4);          // 위로 끌면 +
+        // 2026-10-15 사용자 결정(가로 1/2 = 화면 한 폭): 가로 1/4 = 반 화각 30°(예전 15°) → 폭 2 가 360°
+        Assert.Equal(30d / 360d * 2d, pt.Value.X, 4);
+        // 세로도 가로 픽셀 기준 같은 각도/픽셀: 높이 1/10 = 가로 0.1×9/16 → 2×그 비율 × 60° → 폭 2 가 180°. 위로 끌면 +
+        Assert.Equal(2d * 0.1 * 9d / 16d * 60d / 180d * 2d, pt.Value.Y, 4);
         Assert.DoesNotContain("<Zoom", only.Body.Replace("tt:", string.Empty));   // 줌은 건드리지 않는다
         _output.WriteLine($"drag → RelativeMove in {sw.ElapsedMilliseconds} ms · x={pt.Value.X:F4} y={pt.Value.Y:F4}");
     }
@@ -88,15 +89,17 @@ public class PtzDragProviderTests
         await using var camera = new FakeOnvifCamera { HasRelativeFov = true };
         var (ptz, _) = await PrepareAsync(camera, "fov-1", waitForStatus: false);
 
-        // Act
-        var outcome = await ptz.DragMoveAsync("fov-1", -0.25, 0.5, 16d / 9d, Within(5000));
+        // Act — 2026-10-15 사용자 결정(가로 1/2 = 한 폭)에 맞춰 한 번에 가는 크기(가로 1/8)로 바꿨다(예전 −0.25, 0.5 는 이제 두 번에 나눠 간다).
+        await Task.Delay(400);   // 준비 뒤 배경 위치 읽기가 끝나게(이 카메라는 GetStatus 를 모른다)
+        var outcome = await ptz.DragMoveAsync("fov-1", -0.125, 0.125, 16d / 9d, Within(5000));
+        await Task.Delay(300);   // 나눠 보내는 뒤따름이 없는지 볼 시간
 
-        // Assert — ±1 = 화면 가장자리: 비율 × 2, 아래로 끌면 −
+        // Assert — ±1 = 화면 가장자리(반 화각): 가로 1/8 = 반 화각의 1/2, 세로도 같은 각도/픽셀, 아래로 끌면 −
         Assert.Equal(PtzDragMoveKind.RelativeFov, outcome.Kind);
         var pt = FakeOnvifCamera.PanTiltOf(camera.PtzCommands.Single().Body)!.Value;
         Assert.Equal(FakeOnvifCamera.RelFovUri, pt.Space);
         Assert.Equal(-0.5, pt.X, 4);
-        Assert.Equal(-1.0, pt.Y, 4);
+        Assert.Equal(-0.5, pt.Y, 4);
     }
 
     [Fact]
@@ -106,8 +109,9 @@ public class PtzDragProviderTests
         var (ptz, _) = await PrepareAsync(camera, "abs-1", waitForStatus: true);
         int statusBefore = camera.Count("GetStatus");
 
-        var first = await ptz.DragMoveAsync("abs-1", 0.5, 0, 16d / 9d, Within(5000));
-        var second = await ptz.DragMoveAsync("abs-1", 0.5, 0, 16d / 9d, Within(5000));
+        // 가로 1/4 = 반 화각 30°(2026-10-15 사용자 결정 — 예전 가로 1/2 가 30° 였다. 같은 이동량을 유지해 팬 끝 감기를 피한다)
+        var first = await ptz.DragMoveAsync("abs-1", 0.25, 0, 16d / 9d, Within(5000));
+        var second = await ptz.DragMoveAsync("abs-1", 0.25, 0, 16d / 9d, Within(5000));
 
         // Assert — 기억한 위치 + 이동량, 두 번째는 추적한 위치에서 이어 간다. 드래그 때문에 위치를 다시 읽지 않는다.
         Assert.Equal(PtzDragMoveKind.Absolute, first.Kind);
@@ -158,8 +162,8 @@ public class PtzDragProviderTests
         // Assert — 쌓이지 않는다: 이미 나간 첫 번째 + 마지막 하나만. 중간 8개는 버려졌다(superseded).
         var moves = camera.PtzCommands.Where(c => c.Op == "RelativeMove").Select(c => FakeOnvifCamera.PanTiltOf(c.Body)!.Value.X).ToList();
         Assert.Equal(2, moves.Count);
-        Assert.Equal(0.05 * 60d / 360d * 2d, moves[0], 4);
-        Assert.Equal(0.50 * 60d / 360d * 2d, moves[1], 4);
+        Assert.Equal(2 * 0.05 * 60d / 360d * 2d, moves[0], 4);   // 가로 비율 × 2 = 화면 폭 몫(2026-10-15 사용자 결정)
+        Assert.Equal(1.00 * 60d / 360d * 2d, moves[1], 4);       // 가로 1/2 = 화면 한 폭 = 60°
         Assert.Equal(2, outcomes.Count(o => o.Sent));
         Assert.Equal(8, outcomes.Count(o => o.Reason == "superseded"));
         Assert.True(outcomes[^1].Sent, "마지막 드래그가 나가지 않았다");
