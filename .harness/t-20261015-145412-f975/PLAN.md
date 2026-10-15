@@ -20,7 +20,11 @@
     VM 문구 자체는 그대로(기존 시험이 문구를 단언).
   - L1 노드 그림: 바꾸지 않음(결정 참조).
 - [x] 4. 같은 유형 결함(아래 목록) 고침
-- [ ] dotnet test sln + sln 밖 csproj 통과 확인
+- [x] dotnet test sln + sln 밖 csproj 통과 확인(3회차)
+  - sln: CameraPopup.Tests `PtzDragProviderTests.should_keep_only_the_last_drag_when_ten_drags_arrive_while_camera_is_busy` 1건 실패 —
+    이번 작업이 건드리지 않은 PTZ 드래그 시험이고, 단독 재실행(`--filter PtzDragProviderTests`) 10/10 통과 → 전수 부하 중 타이밍 흔들림.
+    나머지(Utils.Tests 884 · Reports.Ui 365 · Sso 106 등) 통과.
+  - sln 밖: Accounts.Ui.ViewTests 90/90 · Consoles.ViewTests 54/54 통과.
 
 ## 결정
 - L1 노드(군대 부호 틀 + 제대 표지)는 이미 토큰(SurfaceAlt · TintInfo · TextPrimary)으로 그리고, 96/144dpi 픽셀 대조 시험(UnitMapNodeRenderCostTests)이
