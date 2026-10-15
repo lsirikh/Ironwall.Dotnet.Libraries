@@ -89,7 +89,7 @@ internal sealed class ProcessGuard
                 return false;
             }
 
-            p.Kill(entireProcessTree: true);
+            KillTree(entire => p.Kill(entireProcessTree: entire));
             p.WaitForExit(5000);
             WatchdogLog.Info($"프리즈 프로세스 kill 완료 pid={_opt.TargetPid}");
             return true;
@@ -126,6 +126,27 @@ internal sealed class ProcessGuard
     }
     #endregion
     #region - Helpers -
+    /// <summary>
+    /// 대상과 그 자식을 함께 끝낸다. 와치독은 대상(GIS)이 띄운 자식이라 트리째 끝내기는 "호출한 프로세스가 든 트리"로
+    /// 거부된다(InvalidOperationException) — 그러면 대상 본체만 끝낸다. 설치판 10-15 17:29~17:32 프리즈 확정 6회가 전부
+    /// 이 예외로 kill 실패해 Windows '응답 없음' 종료까지 3분 넘게 멈춘 채였다(watchdog.log).
+    /// </summary>
+    /// <returns>트리째 끝냈으면 <c>true</c>, 본체만 끝냈으면 <c>false</c>.</returns>
+    internal static bool KillTree(Action<bool> kill)
+    {
+        try
+        {
+            kill(true);
+            return true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            WatchdogLog.Warn($"트리 kill 불가({ex.Message}) — 대상 본체만 kill");
+            kill(false);
+            return false;
+        }
+    }
+
     private static string SafeMainModulePath(Process p)
     {
         try { return p.MainModule?.FileName ?? string.Empty; }
