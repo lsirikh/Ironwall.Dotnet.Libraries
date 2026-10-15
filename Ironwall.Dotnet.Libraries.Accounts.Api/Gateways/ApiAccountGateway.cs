@@ -114,8 +114,9 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     {
         try
         {
-            if (!File.Exists(PrefsPath)) return Task.FromResult<ILoginModel?>(null);
-            var prefs = JsonConvert.DeserializeObject<LoginPrefs>(File.ReadAllText(PrefsPath));
+            var path = AppSettingsLocation.LoginPrefsReadPath;
+            if (!File.Exists(path)) return Task.FromResult<ILoginModel?>(null);
+            var prefs = JsonConvert.DeserializeObject<LoginPrefs>(File.ReadAllText(path));
             if (prefs is null || !prefs.IsIdSaved || string.IsNullOrEmpty(prefs.Username))
                 return Task.FromResult<ILoginModel?>(null);
             return Task.FromResult<ILoginModel?>(new LoginModel { Username = prefs.Username, IsIdSaved = true });
@@ -129,13 +130,12 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         try
         {
             var prefs = new LoginPrefs { Username = isUsernameSaved ? username : string.Empty, IsIdSaved = isUsernameSaved };
-            File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(prefs));
+            File.WriteAllText(AppSettingsLocation.PrepareLoginPrefsWrite(), JsonConvert.SerializeObject(prefs));
         }
         catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] 아이디 저장 실패: {ex.Message}"); }
         return Task.CompletedTask;
     }
 
-    private static string PrefsPath => Path.Combine(AppContext.BaseDirectory, "login-prefs.json");
     private sealed class LoginPrefs { public string Username { get; set; } = string.Empty; public bool IsIdSaved { get; set; } }
 
     /// <summary>서버 logout best-effort + 토큰 폐기. access_token 서버 블랙리스트 없음(§2.3.3)이라 로컬 Clear 필수(G2).</summary>

@@ -16,9 +16,9 @@ public static class SensorPresetSettings
     public const string SECTION = "SensorPresets";
     public const string KEY_SOURCE = "Source";
 
-    private static readonly Lazy<SensorPresetSource> _current = new(() => ReadFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json")).Source, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<SensorPresetSource> _current = new(() => ReadFile(Ironwall.Dotnet.Libraries.Base.Services.AppSettingsLocation.AppSettingsReadPath).Source, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>이 프로세스의 출처(앱 폴더 appsettings.json · 한 번만 읽는다).</summary>
+    /// <summary>이 프로세스의 출처(앱 폴더 Config\appsettings.json, 없으면 옛 루트 파일 · 한 번만 읽는다).</summary>
     public static SensorPresetSource Current => _current.Value;
 
     /// <summary>파일에서 읽는다 — 파일이 없거나 깨졌으면 GisDb 와 까닭(<c>Error</c>).</summary>
