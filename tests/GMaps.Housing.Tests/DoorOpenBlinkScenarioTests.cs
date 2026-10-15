@@ -62,6 +62,9 @@ public class DoorOpenBlinkScenarioTests
         public Rig()
         {
             DoorOpenMark.ClockWithoutWindow = true;   // 창 없이도 공용 시계를 걸어 본다(이 STA 스레드에만)
+            // PC 의 'Windows 애니메이션 표시'(SystemParameters.ClientAreaAnimation)에 기대지 않는다 — 꺼진 PC 에서 깜빡임 시험 17건이 실패했다(10-16).
+            // 애니메이션 줄이기 시험(DOOR-104)처럼 먼저 정한 값은 지킨다.
+            DoorOpenMark.ReduceMotionOverride ??= false;
             var setup = new Mock<IEventSetupModel>();
             setup.SetupAllProperties();
             setup.Object.TimeDiscardSec = 3600;
@@ -86,7 +89,11 @@ public class DoorOpenBlinkScenarioTests
             SetField(Vm, "_eventQueueManager", Queue);
         }
 
-        public void Dispose() => Queue.Dispose();
+        public void Dispose()
+        {
+            Queue.Dispose();
+            DoorOpenMark.ReduceMotionOverride = null;   // 같은 스레드의 다음 시험에 새지 않게
+        }
 
         /// <summary>문 심볼 하나를 지도에 올린다(제품 CreateMarkerControl 과 같은 갈래 · 테마 토큰 병합) → 장비 목록 도착(재등록 · 부팅 복원).</summary>
         public (GMapPidsMarker Marker, GMapMarkerPidsControl Control) Place(EnumDeviceType type, int deviceId, bool symbol3D, bool dark, string? serverDoor = null)
