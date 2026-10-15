@@ -16,7 +16,9 @@
       포커스: 누르기 전 [프리셋으로] 단추 → 누를 때 칩으로 옮겨져(OnPointerPressed → chip.Focus) Tab 은 캔버스가 받는다(처리 True)
 - [x] Devices.Ui csproj 전체 — 실패 5건(WiringSignalThread · StaCleanup · ConsoleWindowChromeShown ×2 · AssemblyLayoutScenario ASM303 RepeatExpandView)은 모두 STA 시간 초과 · 다크 픽셀 0(부하)
       → 그 5건 + Round8 를 따로 돌리니 20/20 통과 = STA 흔들림(이 변경과 무관). 전체 실행은 10분 넘어 세션 끝에 끊겨 최종 합계 없음.
-- [ ] 솔루션 dotnet test — 이 세션에서 명령이 자동 거부됨(하네스가 턴 뒤에 돌린다)
+- [x] 솔루션 dotnet test(하네스 1회차): 2753 통과 / 1 실패 — CameraPopup.Tests `EventWindowManagerTests.should_return_within_budget_and_not_throw_when_supervisor_is_unavailable`
+      '가장 느린 호출 94 ms — 50 ms 예산 초과'(시간 예산 시험 · 솔루션 병렬 실행 부하). 이 작업은 CameraPopup 을 건드리지 않았다.
+      `--filter EventWindowManagerTests` 로 따로 돌리니 23/23 통과(180 ms) → 부하 흔들림. 코드 변경 없이 다음 검사에 맡긴다.
 
 ## 결정
 - 제품 코드는 바꾸지 않는다 — 후보 · 허용 · Tab 라우팅 모두 정상(증거: 위 기록). 칩 배치 코드(FLT-020) 무관.
