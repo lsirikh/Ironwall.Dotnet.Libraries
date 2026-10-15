@@ -56,6 +56,7 @@ internal sealed class WiredMapRig
         Permission.Setup(p => p.CanEdit("map")).Returns(canEdit);
         Permission.Setup(p => p.CanControl("devices")).Returns(canControl);
         Permission.Setup(p => p.Name).Returns("시험관리자");
+        Permission.Setup(p => p.LoginId).Returns("test-admin");   // 제어 명령 requested_by 는 표시이름이 아니라 login_id(브로커 v2.0.12 §7 머리)
         Scenario.SetField(Vm, "_permissionService", Permission.Object);
         Scenario.SetField(Vm, "_permissionResolved", true);
         Scenario.SetField(Vm, "_nudgePersistGate", new SemaphoreSlim(1, 1));
