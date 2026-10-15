@@ -121,7 +121,7 @@ public class TrackingPlaybackScenarioTests
     [Trait("Scenario", "MAP-084,AUX-014")]
     public void should_restore_defaults_then_persist_and_reload_when_reset_and_save_pressed() => OneSta.StaAsync(async () =>
     {
-        var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");   // 시험 bin 의 사본(앱 설정 아님)
+        var file = Ironwall.Dotnet.Libraries.Base.Services.AppSettingsLocation.PrepareAppSettingsWrite();   // 시험 bin 의 사본(앱 설정 아님)
         string? backup = File.Exists(file) ? File.ReadAllText(file) : null;
         try
         {

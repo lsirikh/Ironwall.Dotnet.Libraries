@@ -43,7 +43,7 @@ public static class Symbol3DFeature
 
     private static Symbol3DSettings Read()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        var path = Ironwall.Dotnet.Libraries.Base.Services.AppSettingsLocation.AppSettingsReadPath;
         var (settings, error) = ReadSettings(path);
         LastDiagnostic = $"{path} → IsEnabled={settings.IsEnabled} · PostSpacing={settings.FencePostSpacingM}m · Height={settings.FenceHeightM}m · ContactFallback={settings.DoorContactFallback}{(error is null ? "" : " · " + error)}";
         if (error is not null) System.Diagnostics.Trace.TraceWarning("Symbol3D settings: {0}", error);
