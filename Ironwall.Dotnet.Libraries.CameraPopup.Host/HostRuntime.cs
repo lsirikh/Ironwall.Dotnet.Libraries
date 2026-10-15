@@ -37,6 +37,7 @@ internal sealed class HostRuntime
         _dispatcher = dispatcher;
         StreamTrace.AttachDispatcher(dispatcher);
         LibVlcRuntime.AllowRtspUdpFallback = launch.AllowRtspUdpFallback;
+        DecodeProfile.NetworkCachingMs = launch.NetworkCachingMs;
         _cameras = CreateCameraServices(log);
         _uiProbe = new UiPumpProbe(dispatcher);
         _uiCommands = new UiCommandQueue(dispatcher, OnUiCommandFailed);

@@ -4,7 +4,7 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
 
 /// <summary>
 /// 호스트 실행 인자(순수 함수 — 만들기 · 해석). 감시자와 호스트가 같은 코드로 오간다.
-/// <code>--parent-pid 1234 --pipe ironwall-camhost-1234-… --token … --memory-limit-mb 1536 [--memory-per-stream-mb 24] [--max-opens 8] [--headless] [--debug-commands] [--allow-rtsp-udp] [--log-dir …]</code>
+/// <code>--parent-pid 1234 --pipe ironwall-camhost-1234-… --token … --memory-limit-mb 1536 [--memory-per-stream-mb 24] [--max-opens 8] [--network-caching-ms 300] [--headless] [--debug-commands] [--allow-rtsp-udp] [--log-dir …]</code>
 /// </summary>
 public sealed class HostLaunchArguments
 {
@@ -18,6 +18,12 @@ public sealed class HostLaunchArguments
 
     /// <summary>한꺼번에 여는(연결 중인) 스트림 수 — 나머지는 줄을 선다(60 개를 한꺼번에 열면 절반이 실패했다, T-09 T7 · 실측: 12 까지 실패 0, 60 이면 50건 실패 뒤 재시도).</summary>
     public const int DefaultMaxConcurrentOpens = 8;
+
+    /// <summary>
+    /// LibVLC 수신 버퍼(<c>:network-caching</c> · <c>:live-caching</c>, ms). 실측(2026-10-16, 960x540 · 12fps · 60 스트림):
+    /// 100 이면 첫 프레임은 그대로(첫 키프레임 대기가 대부분)인데 표시 fps 가 1374 → 858 로 떨어져(늦은 그림 버림) 300 을 유지한다.
+    /// </summary>
+    public const int DefaultNetworkCachingMs = 300;
 
     /// <summary>
     /// 실제 메모리 한도(MB, 순수): 설정 한도와 "바닥 + 스트림 수 × 스트림당" 중 큰 값.
@@ -36,6 +42,7 @@ public sealed class HostLaunchArguments
     public int MemoryLimitMb { get; init; } = DefaultMemoryLimitMb;
     public int MemoryPerStreamMb { get; init; } = DefaultMemoryPerStreamMb;
     public int MaxConcurrentOpens { get; init; } = DefaultMaxConcurrentOpens;
+    public int NetworkCachingMs { get; init; } = DefaultNetworkCachingMs;
 
     /// <summary>창을 실제로 띄우지 않는다(헤드리스 시험). 이벤트 창 상태만 추적한다.</summary>
     public bool Headless { get; init; }
@@ -59,6 +66,7 @@ public sealed class HostLaunchArguments
             "--memory-limit-mb", MemoryLimitMb.ToString(CultureInfo.InvariantCulture),
             "--memory-per-stream-mb", MemoryPerStreamMb.ToString(CultureInfo.InvariantCulture),
             "--max-opens", MaxConcurrentOpens.ToString(CultureInfo.InvariantCulture),
+            "--network-caching-ms", NetworkCachingMs.ToString(CultureInfo.InvariantCulture),
         };
         if (Headless) list.Add("--headless");
         if (DebugCommands) list.Add("--debug-commands");
@@ -76,7 +84,7 @@ public sealed class HostLaunchArguments
     {
         result = null;
         error = null;
-        int parentPid = 0, memoryMb = DefaultMemoryLimitMb, perStreamMb = DefaultMemoryPerStreamMb, maxOpens = DefaultMaxConcurrentOpens;
+        int parentPid = 0, memoryMb = DefaultMemoryLimitMb, perStreamMb = DefaultMemoryPerStreamMb, maxOpens = DefaultMaxConcurrentOpens, cachingMs = DefaultNetworkCachingMs;
         string? pipe = null, token = null, logDir = null;
         bool headless = false, debug = false, allowUdp = false;
 
@@ -100,6 +108,9 @@ public sealed class HostLaunchArguments
                 case "--max-opens":
                     if (!int.TryParse(Next(), NumberStyles.Integer, CultureInfo.InvariantCulture, out maxOpens)) { error = "--max-opens 값 오류"; return false; }
                     break;
+                case "--network-caching-ms":
+                    if (!int.TryParse(Next(), NumberStyles.Integer, CultureInfo.InvariantCulture, out cachingMs)) { error = "--network-caching-ms 값 오류"; return false; }
+                    break;
                 case "--headless": headless = true; break;
                 case "--debug-commands": debug = true; break;
                 case "--allow-rtsp-udp": allowUdp = true; break;
@@ -114,6 +125,7 @@ public sealed class HostLaunchArguments
         if (memoryMb < 1) { error = "--memory-limit-mb 는 1 이상"; return false; }
         if (perStreamMb < 0) { error = "--memory-per-stream-mb 는 0 이상"; return false; }
         if (maxOpens < 1) { error = "--max-opens 는 1 이상"; return false; }
+        if (cachingMs < 0) { error = "--network-caching-ms 는 0 이상"; return false; }
 
         result = new HostLaunchArguments
         {
@@ -123,6 +135,7 @@ public sealed class HostLaunchArguments
             MemoryLimitMb = memoryMb,
             MemoryPerStreamMb = perStreamMb,
             MaxConcurrentOpens = maxOpens,
+            NetworkCachingMs = cachingMs,
             Headless = headless,
             DebugCommands = debug,
             LogDirectory = logDir,

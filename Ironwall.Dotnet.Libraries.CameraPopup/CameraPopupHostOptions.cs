@@ -56,6 +56,9 @@ public sealed class CameraPopupHostOptions
     /// <summary>한꺼번에 "연결 중"일 수 있는 카메라 스트림 수 — 나머지는 줄을 선다(60개 동시 연결 방지).</summary>
     public int MaxConcurrentStreamOpens { get; set; } = HostLaunchArguments.DefaultMaxConcurrentOpens;
 
+    /// <summary>카메라 스트림 수신 버퍼(ms, LibVLC network-caching · live-caching). 줄이면 늦은 그림을 버려 표시 fps 가 떨어진다(실측 — <see cref="HostLaunchArguments.DefaultNetworkCachingMs"/>).</summary>
+    public int StreamNetworkCachingMs { get; set; } = HostLaunchArguments.DefaultNetworkCachingMs;
+
     /// <summary>명령 대기열 상한(FR-28). 넘으면 오래된 것부터 버리고 로그.</summary>
     public int CommandQueueCapacity { get; set; } = 256;
 

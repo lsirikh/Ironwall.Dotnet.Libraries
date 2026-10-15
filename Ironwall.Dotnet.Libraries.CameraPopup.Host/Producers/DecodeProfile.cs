@@ -1,4 +1,6 @@
-﻿namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
+﻿using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+
+namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
 
 /// <summary>
 /// 상자 크기에 맞춘 LibVLC 재생 옵션(순수). 타일 60개를 소프트웨어로 풀어도 버티게 하는 것이 목적이다.
@@ -16,6 +18,9 @@ internal static class DecodeProfile
     /// <summary>이 넓이(픽셀)를 넘으면 "큰 상자" — 640×480 보다 큰 상자.</summary>
     public const int LargeBoxPixels = 640 * 480;
 
+    /// <summary>수신 버퍼(ms) — 호스트 시작 때 실행 인자(<c>--network-caching-ms</c>)로 정한다.</summary>
+    public static int NetworkCachingMs { get; set; } = HostLaunchArguments.DefaultNetworkCachingMs;
+
     public static bool IsLarge(int boxWidth, int boxHeight) => (long)boxWidth * boxHeight > LargeBoxPixels;
 
     /// <param name="attempt">0 = 첫 시도. 1 이상이면 하드웨어 디코딩을 쓰지 않는다(폴백).</param>
@@ -25,8 +30,8 @@ internal static class DecodeProfile
         {
             ":rtsp-tcp",
             ":no-audio",
-            ":network-caching=300",
-            ":live-caching=300",
+            $":network-caching={NetworkCachingMs}",
+            $":live-caching={NetworkCachingMs}",
             ":drop-late-frames",
             ":skip-frames",
         };

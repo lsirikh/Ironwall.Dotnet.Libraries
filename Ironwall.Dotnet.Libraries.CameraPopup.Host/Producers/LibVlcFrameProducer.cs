@@ -14,7 +14,7 @@ namespace Ironwall.Dotnet.Libraries.CameraPopup.Host.Producers;
 /// 스테이징 버퍼 3개를 돌려 쓰며 lock → display 순으로 식별자를 넘긴다. 콜백 안의 예외는 네이티브 경계를 넘으면
 /// 프로세스가 죽으므로 모두 잡는다. 열기 제한 시간(FR-26) 안에 첫 프레임이 없으면 Failed.
 /// <para><b>줄 서기 · 실패 뒤 정리(T-09 T7)</b>: 연결은 <see cref="StreamOpenGate"/> 자리를 얻은 뒤에 시작하고(한꺼번에 60개가 몰리지 않게),
-/// 자리는 첫 프레임 · 실패 · 닫기 때 돌려준다. 실패(열기 시간 초과 · LibVLC 오류 · 끝)하면 <b>플레이어를 바로 멈춘다</b> —
+/// 자리는 첫 트랙(ES) · 첫 프레임 · 실패 · 닫기 때 돌려준다. 실패(열기 시간 초과 · LibVLC 오류 · 끝)하면 <b>플레이어를 바로 멈춘다</b> —
 /// 멈추지 않은 실패 플레이어는 RTSP 스레드가 계속 돌며 코어 하나씩을 태웠다(실측: 실패 29개 ≈ 바쁜 스레드 27개).
 /// 다시 열기는 새 생산자로 한다(창 세션의 자동 재시도).</para>
 /// </summary>
@@ -93,7 +93,13 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
         _cleanupCb = OnCleanup;
         _onError = (_, _) => Fail(StreamState.Failed, "libvlc-error");
         _onEnd = (_, _) => Fail(StreamState.Stalled, "end-reached");
-        _onEsAdded = (_, _) => _trace?.Negotiated();
+        // 첫 트랙(ES) = RTSP DESCRIBE · SETUP 이 끝났다 → 연결 줄 자리를 바로 넘긴다. 그 뒤 첫 프레임까지(키프레임 · 버퍼 대기,
+        // 실측 0.7~1.8초)는 연결 폭주와 무관하다 — 첫 프레임까지 자리를 쥐면 60 스트림의 마지막이 5.5초 줄을 섰다(놓으면 0.05초).
+        _onEsAdded = (_, _) =>
+        {
+            _trace?.Negotiated();
+            ReleaseLease();
+        };
     }
 
     /// <summary>계측 타이머 — 미디어 통계(잠금 안: 닫는 중에는 null 이라 풀린 핸들을 읽지 않는다).</summary>
@@ -208,7 +214,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             _player.SetVideoCallbacks(_lockCb, null, _displayCb);
             _player.EncounteredError += _onError;
             _player.EndReached += _onEnd;
-            if (_trace is not null) _player.ESAdded += _onEsAdded;
+            _player.ESAdded += _onEsAdded;
 
             int timeout = _provider.OpenTimeoutMs > 0 ? _provider.OpenTimeoutMs : DefaultOpenTimeoutMs;
             _openTimer = new Timer(_ =>
