@@ -12,6 +12,7 @@
 - [x] 전수 조사(하위 에이전트, 이 저장소 운영 코드 전체): UI 스레드 동기 대기 · lock+Dispatcher.Invoke 교착 · UI 타이머 API 호출 → **영구 정지를 만드는 경로 없음**(아래 '후보').
 - [x] 진단 기록 추가: `Ironwall.Dotnet.Libraries.Base\Services\Startup\UiStallWatch.cs`(새 공개 형식) + `ConnectionWatchdog.Start` 에서 하트비트 옆에 기동 · Dispose/StopWatching 에서 정지.
 - [x] 시험: `Ironwall.Dotnet.Libraries.Accounts.Api\Tests\UiStallWatchTests.cs` 2건(멈춘 동안 ERROR · 회복 ERROR / 한가할 땐 기록 없음) 통과.
+- [x] 1회차 검사 `dotnet test Ironwall.Dotnet.Libraries.sln` 시간 초과(출력 없음) — 내가 같은 시각 배경에서 전체 시험을 한 번 더 돌려 빌드 · 시험이 겹친 탓으로 판단(내 배경 실행도 `[killed]` 로 출력 없이 끝남). 바뀐 코드(`ConnectionWatchdog`/`UiStallWatch`)를 부르는 시험은 새 2건뿐(grep 확인)이고 두 건 다 대기 상한(5s · 10s)이 있어 매달리지 않는다. → 동시 실행 없이 하네스 검사에 맡긴다.
 - [ ] (사람) 설치판에 이 판을 넣고 다음 '응답 없음' 때 아래 '필요한 추가 증거' 수집.
 
 ## 이번 세션에서 막힌 것
