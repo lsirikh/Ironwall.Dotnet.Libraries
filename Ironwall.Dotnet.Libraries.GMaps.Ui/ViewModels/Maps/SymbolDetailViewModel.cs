@@ -577,6 +577,16 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
                     yield return new("상태", $"{UiKoreanMap.To(device.Status)} · {(device.IsEnable ? "활성화" : "비활성")}", ToneOf(device.Status));
                 else
                     yield return new("상태", Dash);
+
+                // 함체 최신 계측(ENCLOSURE_METRICS) — 상태 탭은 내려 두었으므로(2026-09-09) 기본 탭 맨 밑에 둔다.
+                if (marker.DeviceType == EnumDeviceType.Enclosure && marker is GMapPidsMarker pids)
+                {
+                    if (pids.EnclosureMetrics is { } metrics)
+                        foreach (var (label, value) in EnclosureMetricsText.Rows(metrics, DateTime.Now))
+                            yield return new(label, value, label == "받은 시각" && metrics.IsStale ? "warn" : null);
+                    else
+                        yield return new("계측", "받지 못함");
+                }
                 break;
 
             case SymbolDetailTab.Comm:
@@ -802,6 +812,19 @@ public sealed class SymbolDetailViewModel : PropertyChangedBase, IDisposable, IH
             DoorOpen = _marker.DoorState == EnumDoorState.Open ? 1 : 0;
         else if (e.PropertyName == nameof(GMapPidsMarker.ComponentSummary))
             RefreshComponentTab();   // 부품 관측이 바뀌면 열린 창의 부품 탭도 따라간다(지도만 바뀌면 창이 거짓말을 한다)
+        else if (e.PropertyName == nameof(GMapPidsMarker.EnclosureMetrics))
+            RebuildBasicTab();       // 함체 계측도 열린 창에서 따라간다
+    }
+
+    /// <summary>기본 탭 내용을 다시 만든다(함체 계측 수신 · 오래된 값 전환).</summary>
+    private void RebuildBasicTab()
+    {
+        if (_marker is null) return;
+        var tab = Tabs.FirstOrDefault(t => t.Tab == SymbolDetailTab.Basic);
+        if (tab is null) return;
+        tab.Fields.Clear();
+        foreach (var field in FieldsOf(SymbolDetailTab.Basic, _marker, _marker.LinkedDevice, null, null))
+            tab.Fields.Add(field);
     }
 
     #endregion

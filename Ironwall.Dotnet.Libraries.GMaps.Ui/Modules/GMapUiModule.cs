@@ -59,6 +59,9 @@ public class GMapUiModule: Module
         // BROADCAST_STATUS 수신(FR-24) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(GMapUiModule 에는 IService 기동 블록이 없음).
         builder.RegisterType<Services.Broadcast.BroadcastStatusNatsSyncService>()
                .As<Services.Broadcast.IBroadcastStatusNatsSyncService>().SingleInstance();
+        // ENCLOSURE_METRICS 수신(이슈 #7-20) — 구독 시작·해제는 MapViewModel 활성/비활성이 맡는다(BROADCAST_STATUS 와 같다).
+        builder.RegisterType<Services.Enclosure.EnclosureMetricsNatsSyncService>()
+               .As<Services.Enclosure.IEnclosureMetricsNatsSyncService>().SingleInstance();
         // 카메라 "특정 위치 확인" 회전요청 NATS 발행(GIS→nvr_manager REQ) — Camera_PTZ_AimLocation
         builder.RegisterType<CameraAimControlService>().As<ICameraAimControlService>().SingleInstance();
         // 카메라 팝업 브로커 모드(camera-popup-modes T-07) — 더블클릭 CAMERA_POPUP_OPEN · 설정 POPUP_LAYOUT_GET(GIS→nvr_manager.popup REQ)

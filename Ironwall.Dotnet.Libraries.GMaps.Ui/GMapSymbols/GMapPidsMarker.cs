@@ -402,10 +402,23 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    /// <summary>함체 최신 계측(ENCLOSURE_METRICS) — <b>런타임 전용</b>. 값이 바뀔 때만 통지한다. 호출 스레드: UI.</summary>
+    public Services.Enclosure.EnclosureMetricsReading? EnclosureMetrics
+    {
+        get => _enclosureMetrics;
+        set
+        {
+            if (Equals(_enclosureMetrics, value)) return;
+            _enclosureMetrics = value;
+            OnPropertyChanged(nameof(EnclosureMetrics));
+        }
+    }
+
     #endregion
 
     #region - Attributes -
     private bool _isBroadcasting;
+    private Services.Enclosure.EnclosureMetricsReading? _enclosureMetrics;
     private int _updatePending;   // 0=없음, 1=UI 스레드로 넘긴 갱신 대기 중(Interlocked)
     private Helpers.Components.ComponentHealthSummary _componentSummary = Helpers.Components.ComponentHealthSummary.None;
     private Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceAxesModel? _summarySource;
