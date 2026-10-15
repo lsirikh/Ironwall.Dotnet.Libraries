@@ -766,12 +766,37 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 레거시 px 정리는 이 전환 코드 배포 직후 이미 완료(이후 부팅에서 걸리는 >3 값은 사실상 정상 드래그값).
             // → 제거하여 모든 크기의 유효 드래그 비율값을 보존(라벨 위치 재시작 유지). 재드래그 없이도 향후 손실 차단.
 
+            // ── 라인/PidsGroup 라벨 오프셋 비율 캡(±3) 초과 복구 (2026-10-16 DbProbe '라벨오프셋 도메인잔재(비율)') ──
+            //    위 제거 사유(정상 드래그가 축별 |v|>3 을 만듦)는 LabelAdorner 가 축별 ±3 으로 묶도록 고쳐 사라졌다.
+            //    이제 >3 은 정상 경로로 생길 수 없다 — ⓐ px 레거시 또는 ⓑ 가는 축 클램프 퇴화(비율=px÷1) 잔재뿐.
+            //    저장 당시 투영 하프익스텐트를 DB 가 모르므로 px→비율 환산 근거가 없다 → 쌍을 0(마커 아래 기본 위치)으로.
+            //    WHERE 가 자기제한이라 멱등(2회차부터 0행) · 캡 안 정상 값은 건드리지 않는다.
+            var labelOffsetReset = 0;
+            if (columnMeta["Symbols"] is { } symMeta && symMeta.ContainsKey("LabelOffsetX") && symMeta.ContainsKey("LabelOffsetY"))
+            {
+                try
+                {
+                    labelOffsetReset = await conn.ExecuteAsync(
+                        "UPDATE `Symbols` SET `LabelOffsetX` = 0, `LabelOffsetY` = 0 " +
+                        "WHERE `Category` IN ('AREA_BOUNDARY','PIDS_GROUP') " +
+                        "AND (ABS(COALESCE(`LabelOffsetX`,0)) > 3 OR ABS(COALESCE(`LabelOffsetY`,0)) > 3);");
+                    if (labelOffsetReset > 0)
+                        _log?.Info($"Symbols 라인/PidsGroup 라벨 오프셋 비율 캡 초과 {labelOffsetReset}행 0 으로 복구");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"Symbols 라벨 오프셋 캡 초과 복구 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
             // ── FR-07: 요약 로그 ──
             //    이전에는 "생성/확인 완료" 한 줄뿐이라 성공과 무음 실패가 구분되지 않았다.
             //    적용/스킵/실패 건수를 남겨 '이 DB 가 몇 세대 스키마인가'와 '무엇이 실패했나'를
             //    부팅 로그만으로 판별할 수 있게 한다.
             var unresolved = columnMeta.Where(kv => kv.Value is null).Select(kv => kv.Key).ToList();
-            var summary = $"Symbol 스키마 마이그레이션 완료 — 적용 {applied} / 스킵 {skipped} / 실패 {failed} / 타입교정 {modified} / band시프트 {bandShifted}행";
+            var summary = $"Symbol 스키마 마이그레이션 완료 — 적용 {applied} / 스킵 {skipped} / 실패 {failed} / 타입교정 {modified} / band시프트 {bandShifted}행 / 라벨오프셋복구 {labelOffsetReset}행";
             if (unresolved.Count > 0)
                 summary += $" / 판정불능 테이블: {string.Join(", ", unresolved)}";
 
