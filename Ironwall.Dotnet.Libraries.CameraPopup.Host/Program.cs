@@ -27,6 +27,7 @@ internal static class Program
         var log = new HostLog(launch.LogDirectory);
         HostExit.Initialize(log);
         log.Info($"start parent={launch.ParentProcessId} headless={launch.Headless} debug={launch.DebugCommands} memoryLimitMb={launch.MemoryLimitMb}");
+        Diagnostics.StreamTrace.Start(log);
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {

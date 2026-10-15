@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <IRONWALL_STREAM_TRACE_LOAD>1</IRONWALL_STREAM_TRACE_LOAD>
+      <IRONWALL_STREAM_TRACE_COUNTS>1,4</IRONWALL_STREAM_TRACE_COUNTS>
+      <IRONWALL_STREAM_TRACE_SECONDS>20</IRONWALL_STREAM_TRACE_SECONDS>
+      <IRONWALL_STREAM_TRACE_MEDIAMTX>C:\workspace_app\Ironwall.Dotnet.Libraries\tools\dummy-cameras\bin\mediamtx\v1.21.1\mediamtx.exe</IRONWALL_STREAM_TRACE_MEDIAMTX>
+      <IRONWALL_CAMHOST_EXE>C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261016-003507-cdc1\Ironwall.Dotnet.Libraries.CameraPopup.Host\bin\Release\net8.0-windows\Ironwall.CameraPopupHost.exe</IRONWALL_CAMHOST_EXE>
+      <IRONWALL_STREAM_TRACE_OUT>C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261016-003507-cdc1\.harness\t-20261016-003507-cdc1\trace-probe.md</IRONWALL_STREAM_TRACE_OUT>
+      <IRONWALL_STREAM_TRACE_LOGDIR>C:\workspace_app\Ironwall.Dotnet.Libraries\.harness-worktrees\t-20261016-003507-cdc1\.harness\t-20261016-003507-cdc1\logs-probe</IRONWALL_STREAM_TRACE_LOGDIR>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>
