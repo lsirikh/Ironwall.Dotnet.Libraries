@@ -63,15 +63,16 @@ public static class SymbolStatusText
     }
 
     /// <summary>
-    /// 툴팁 — 제목 한 줄 + (문 한 줄) + (부품 절). 부품 축이 없고 문도 없으면 제목만(종전과 같다).
+    /// 툴팁 — 제목 한 줄 + (문 한 줄) + (부품 절) + (함체 계측 절). 부품 축이 없고 문도 없으면 제목만(종전과 같다).
     /// </summary>
-    public static string ToolTip(string? title, DoorIndicatorKind door, ComponentHealthSummary? components)
+    public static string ToolTip(string? title, DoorIndicatorKind door, ComponentHealthSummary? components, string? metricsSection = null)
     {
-        var lines = new List<string>(3) { title ?? string.Empty };
+        var lines = new List<string>(4) { title ?? string.Empty };
         var doorText = DoorIndicatorRules.Text(door);
         if (doorText.Length > 0) lines.Add(doorText);
         var section = components?.ToToolTipSection();
         if (!string.IsNullOrEmpty(section)) lines.Add(section);
+        if (!string.IsNullOrEmpty(metricsSection)) lines.Add(metricsSection);
         return string.Join(Environment.NewLine, lines);
     }
 }

@@ -268,7 +268,18 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
             new PropertyMetadata(DoorIndicatorKind.None));
     public static readonly DependencyProperty DoorStatusProperty = DoorStatusPropertyKey.DependencyProperty;
 
-    /// <summary>아이콘 툴팁 — 제목 + (문) + (부품 절). 부품 축도 문도 없으면 제목만(종전과 같다).</summary>
+    /// <summary>함체 최신 계측(런타임) — 툴팁 계측 절의 입력.</summary>
+    public Services.Enclosure.EnclosureMetricsReading? EnclosureMetrics
+    {
+        get => (Services.Enclosure.EnclosureMetricsReading?)GetValue(EnclosureMetricsProperty);
+        set => SetValue(EnclosureMetricsProperty, value);
+    }
+
+    public static readonly DependencyProperty EnclosureMetricsProperty =
+        DependencyProperty.Register(nameof(EnclosureMetrics), typeof(Services.Enclosure.EnclosureMetricsReading), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(null));
+
+    /// <summary>아이콘 툴팁 — 제목 + (문) + (부품 절) + (함체 계측). 부품 축도 문도 없으면 제목만(종전과 같다).</summary>
     public string? SymbolToolTip
     {
         get => (string?)GetValue(SymbolToolTipProperty);
@@ -394,7 +405,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         base.OnPropertyChanged(e);
         if (e.Property == ComponentSummaryProperty || e.Property == DoorStateProperty || e.Property == DeviceTypeProperty
-            || e.Property == MarkerTitleProperty)
+            || e.Property == MarkerTitleProperty || e.Property == EnclosureMetricsProperty)
             RefreshComponentPresentation();
         else if (e.Property == IsMouseOverProperty || e.Property == IsSelectedProperty || e.Property == IsComponentCardTargetProperty)
             IsComponentEmphasized = IsMouseOver || IsSelected || IsComponentCardTarget;
@@ -413,7 +424,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DoorIndicator = DoorIndicatorRules.Resolve(hasDoor, DoorState, summary.DoorMotion, DoorLeavesShowPosition);
         // 글(UIA 이름 · 툴팁)은 배지 규칙과 갈라 낸다 — 3D 는 배지를 빼도 "문 열림/닫힘" 은 읽혀야 한다(2026-10-13 실창: 3D 마커 이름에 문 절 없음).
         DoorStatus = DoorIndicatorRules.Resolve(hasDoor, DoorState, summary.DoorMotion, leavesShowPosition: false);
-        SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorStatus, summary);
+        var metrics = EnclosureMetrics is { } reading ? EnclosureMetricsText.ToolTipSection(reading, DateTime.Now) : null;
+        SymbolToolTip = SymbolStatusText.ToolTip(MarkerTitle, DoorStatus, summary, metrics);
     }
 
     /// <summary>
@@ -568,6 +580,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(DetectionBearingProperty, nameof(Marker.DetectionBearing));
         SetupPropertyBinding(IsBroadcastingProperty, nameof(Marker.IsBroadcasting));
         SetupPropertyBinding(ComponentSummaryProperty, nameof(Marker.ComponentSummary), BindingMode.OneWay);   // 런타임 부품 요약
+        SetupPropertyBinding(EnclosureMetricsProperty, nameof(Marker.EnclosureMetrics), BindingMode.OneWay);   // 함체 최신 계측(툴팁)
         SetupPropertyBinding(IsComponentCardTargetProperty, nameof(Marker.IsComponentCardOpen), BindingMode.OneWay);   // 조립 카드 대상(칸 줄 강조)
         // 지도가 센 밀집 값(FR-04) — 심볼 → 이 컨트롤(상속 속성) → 템플릿 안 부품 층
         SetupPropertyBinding(ComponentStatusOverlay.IsStripCrowdedProperty, nameof(Marker.ComponentStripCrowded), BindingMode.OneWay);
