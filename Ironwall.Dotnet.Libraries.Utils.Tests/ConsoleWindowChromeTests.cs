@@ -200,6 +200,29 @@ public class ConsoleWindowChromeTests
         Assert.Equal(maximize, result.Maximize);
     }
 
+    /// <summary>
+    /// 작업 표시줄에 안 나오는 창(부대 편제 · 조립기 · 결선 등 콘솔 OS 창)은 최소화하면 갈 곳이 없어 Windows 가 화면 왼쪽 아래에
+    /// 클래식 모양의 작은 제목 조각을 그린다(사용자 지적 2026-10-15 "디자인 너무 구리다"). 그런 창에는 최소화 단추를 두지 않는다.
+    /// </summary>
+    [Theory]
+    [InlineData(ResizeMode.CanResize, Visibility.Visible)]
+    [InlineData(ResizeMode.CanMinimize, Visibility.Collapsed)]
+    public void should_hide_minimize_when_the_window_is_not_in_the_taskbar(ResizeMode mode, Visibility maximize)
+    {
+        var result = OnSta(() =>
+        {
+            var window = DressedFrameWindow(mode, showInTaskbar: false);
+            return (
+                Minimize: ById(window, ConsoleWindowChrome.MinimizeAutomationId)?.Visibility,
+                Maximize: ById(window, ConsoleWindowChrome.MaximizeAutomationId)?.Visibility,
+                Close: ById(window, ConsoleWindowChrome.CloseAutomationId)?.Visibility);
+        });
+
+        Assert.Equal(Visibility.Collapsed, result.Minimize);
+        Assert.Equal(maximize, result.Maximize);
+        Assert.Equal(Visibility.Visible, result.Close);
+    }
+
     [Fact]
     public void should_close_through_the_os_closing_path_when_the_caption_close_is_invoked()
     {
@@ -300,9 +323,10 @@ public class ConsoleWindowChromeTests
         return (window, frame);
     }
 
-    private static Window DressedFrameWindow(ResizeMode mode)
+    private static Window DressedFrameWindow(ResizeMode mode, bool showInTaskbar = true)
     {
         var (window, frame) = FrameWindow(mode);
+        window.ShowInTaskbar = showInTaskbar;
         var dressed = ConsoleWindowChrome.TryDress(frame);
         Assert.True(dressed, $"입히지 못했다 — getwin={Window.GetWindow(frame) is not null} can={ConsoleWindowChrome.CanDress(window)} root={ConsoleWindowChrome.IsWindowRoot(window, frame)} applied={ConsoleWindowChrome.GetIsApplied(window)} key={window.TryFindResource(ConsoleWindowChrome.WindowTemplateKey)?.GetType().Name}");
         Layout(window);

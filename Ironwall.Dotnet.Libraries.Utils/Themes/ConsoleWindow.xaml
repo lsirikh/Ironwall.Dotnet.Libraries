@@ -5,6 +5,7 @@
 	<!--
 		콘솔 OS 창의 겉 (window-design-inventory B2) — ConsoleWindowChrome.Apply 가 창의 Template 으로 꽂는다.
 		제목 줄 32 · 창 단추 46×32 · 창 테두리 1. 창 단추는 OS 제목 줄과 같게 ResizeMode 를 따른다(NoResize = ✕ 만).
+		작업 표시줄에 안 나오는 창은 최소화 단추가 없다 — 최소화하면 OS 가 클래식 제목 조각을 그린다(ConsoleWindowChrome.ShowsMinimize).
 		규칙: ① 색은 전부 DynamicResource 토큰(캐싱 금지) ② 요소에 이름을 달지 않는다 — 단추는 명령 · 바인딩으로만 배선한다
 		③ 식별자는 peer 가 있는 Button 에만(Console.Window.Minimize/Maximize/Close) ④ 창 단추는 포커스를 받지 않는다 —
 		  다이얼로그 틀의 첫 포커스(취소) · ESC · Enter 판정을 흔들지 않게. 키보드 닫기는 Alt+F4 · 틀의 ✕ 가 맡는다.
@@ -87,7 +88,7 @@
 								CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
 								Style="{StaticResource ConsoleWindow.CaptionButton}"
 								ToolTip="최소화"
-								Visibility="{Binding ResizeMode, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MinimizeVisibility}}">
+								Visibility="{Binding RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static c:ConsoleWindowChrome.MinimizeVisibility}}">
 								<Path
 									Width="10"
 									Height="10"
