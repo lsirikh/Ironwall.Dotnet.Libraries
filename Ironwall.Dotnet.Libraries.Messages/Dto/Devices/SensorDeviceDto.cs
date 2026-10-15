@@ -91,6 +91,13 @@ public class SensorDeviceDto : BaseDeviceDto
     public int? Channel { get; set; }
 
     /// <summary>
+    /// 결선된 제어기 쪽 포트 부품 key(<c>connection.port_key</c> — 서버 8.0.8 이상). 값이 있을 때만 <c>connection</c> 에 실린다 —
+    /// 그 전 서버에는 보내지 않도록 채우는 쪽(결선 저장)이 판본을 본다.
+    /// </summary>
+    [JsonIgnore]
+    public string? PortKey { get; set; }
+
+    /// <summary>
     /// 7.0 <c>connection</c> — 필수가 아니다(<c>SensorCreate.connection: Optional[SensorConnectionAxis]</c>).
     /// IP 가 있으면 IP 축(저장된 방식, 없으면 IP_DIRECT)을 우선하고, 없고 <see cref="Channel"/> 만 있으면
     /// 저장된 채널 방식(<c>CONTROLLER_CONTACT</c> 등), 없으면 RS485 를 싣는다(<see cref="ChannelConnectionType"/>).
@@ -104,9 +111,13 @@ public class SensorDeviceDto : BaseDeviceDto
         get
         {
             var ip = DeviceAxisWrite.NullIfEmpty(IpAddress);
-            if (ip != null) return DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0, storedType: PreservedConnectionType);
-            if (Channel.HasValue) return new ConnectionAxisDto { Type = ChannelConnectionType(PreservedConnectionType), Channel = Channel };
-            return null;
+            var portKey = DeviceAxisWrite.NullIfEmpty(PortKey);
+            ConnectionAxisDto? axis = null;
+            if (ip != null) axis = DeviceAxisWrite.BuildIpConnection(IpAddress, IpPort ?? 0, storedType: PreservedConnectionType);
+            else if (Channel.HasValue) axis = new ConnectionAxisDto { Type = ChannelConnectionType(PreservedConnectionType), Channel = Channel };
+            else if (portKey != null) axis = new ConnectionAxisDto();   // 포트만 고친 PATCH — 병합이라 나머지 접속 칸은 그대로 남는다
+            if (axis != null) axis.PortKey = portKey;
+            return axis;
         }
         set
         {
@@ -115,6 +126,8 @@ public class SensorDeviceDto : BaseDeviceDto
             if (DeviceAxisWrite.NullIfEmpty(value.IpAddress) is { } ip) IpAddress = ip;
             if (value.IpPort is > 0) IpPort = value.IpPort.Value;
             if (value.Channel.HasValue) Channel = value.Channel;
+            // port_key 는 되돌려 담지 않는다(읽기는 ReceivedConnection) — 받은 DTO 를 고쳐 보내는 경로가 port_key 를 다시 실으면
+            // 서버가 그 포트를 다시 검사해 이름만 고친 저장이 422 로 막힐 수 있다.
         }
     }
 

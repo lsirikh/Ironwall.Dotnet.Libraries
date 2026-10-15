@@ -129,6 +129,13 @@ public sealed class DeviceQueryPolicy
     /// 3D 하우징·부품상태·임계치·FOV 가 "설정 안 됨"으로 보인다(422 도 null 도 아닌 조용한 손실).</para>
     /// </remarks>
     public string? View => IsAxisContract ? VIEW_FULL : null;
+
+    /// <summary>
+    /// 부품을 어느 장비에나 달 수 있는가 — 서버 <c>8.0.8</c> <b>이상</b>(카테고리 422 폐지 · <c>applies_to</c> = 즐겨찾기 ·
+    /// 단자 부품 8종 · 센서 <c>connection.port_key</c>). 그 전 서버(6.3.2 · 8.0.6 …)와 판본을 못 읽었으면 <c>false</c>(종전 동작).
+    /// </summary>
+    /// <remarks>세대(<see cref="Contract"/>)는 8.0 까지만 가르므로 판본 원문(<see cref="RawVersion"/>)을 <b>순서 비교</b>한다.</remarks>
+    public bool AttachesComponentsAnywhere => IsAxisContract && IsAtLeast(RawVersion, ComponentsAnywhereSince);
     #endregion
 
     #region - Processes -
@@ -298,6 +305,18 @@ public sealed class DeviceQueryPolicy
             [EnumDeviceLegacyEndpoint.ServerProxySettings]
                 = "GET/PATCH /api/servers/{id}/config 의 server_config.modes",
         };
+
+    /// <summary>부품 카테고리 제한이 풀린 첫 서버 판본(회신 2026-10-03 · 마이그레이션 v135/v136).</summary>
+    private static readonly Version ComponentsAnywhereSince = new(8, 0, 8);
+
+    /// <summary>판본 원문(<c>"8.0.8"</c> · <c>"v8.0.10-rc1"</c>)의 앞 숫자 부분이 <paramref name="since"/> 이상인가. 못 읽으면 <c>false</c>.</summary>
+    private static bool IsAtLeast(string? raw, Version since)
+    {
+        var text = raw?.Trim().TrimStart('v', 'V') ?? string.Empty;
+        var end = 0;
+        while (end < text.Length && (char.IsDigit(text[end]) || text[end] == '.')) end++;
+        return Version.TryParse(text[..end].TrimEnd('.'), out var version) && version >= since;
+    }
 
     /// <summary>프로브 없는 폴백 정책(6.3 = 현행 운영 동작).</summary>
     private static readonly DeviceQueryPolicy Legacy = new();

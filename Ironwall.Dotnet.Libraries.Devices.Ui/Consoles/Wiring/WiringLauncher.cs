@@ -115,7 +115,11 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs, SensorPres
         if (!IsAvailable || controller is null || controller.Id <= 0) return false;
 
         // 종류축 원값(type_controller) 이 결선 모양을 정한다 — SmartController = 링(wiring-fence-view FR-16).
-        var info = new WiringControllerInfo(controller.Id, controller.DeviceNumber, Name(controller), Address(controller), controller.TypeAxisCode);
+        var info = new WiringControllerInfo(controller.Id, controller.DeviceNumber, Name(controller), Address(controller), controller.TypeAxisCode)
+        {
+            // 서버 8.0.8 이상만 센서 connection.port_key 를 받는다 — 그 전 서버는 고를 포트를 내지 않는다(칸은 '—').
+            PortKeys = _policy.AttachesComponentsAnywhere ? PortKeysOf(controller) : Array.Empty<string>(),
+        };
         var seeds = SeedsFor(controller.Id);
         var types = SensorTypeCodes(seeds);
 
@@ -328,7 +332,10 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs, SensorPres
             seeds.Add(new WiringSensorSeed(
                 sensor.Id,
                 connection?.Channel,
-                new SensorFacts(sensor.DeviceNumber, sensor.DeviceName ?? string.Empty, TypeTextOf(sensor), sensor.Location ?? string.Empty),
+                new SensorFacts(sensor.DeviceNumber, sensor.DeviceName ?? string.Empty, TypeTextOf(sensor), sensor.Location ?? string.Empty)
+                {
+                    PortKey = connection?.PortKey,
+                },
                 WiringSpec.Read(spec),
                 WiringSpec.Validate(spec),
                 sensor.DeviceGroups?.ToList(),
@@ -342,6 +349,16 @@ public sealed class WiringLauncher : IWiringLauncher, IWiringDialogs, SensorPres
     }
 
     private static int ControllerIdOf(ISensorDeviceModel sensor) => sensor.Controller?.Id ?? 0;
+
+    /// <summary>센서를 붙일 수 있는 제어기 포트 — 제어기 부품 key 전부(서버는 유형을 묻지 않는다 · 접점 센서는 <c>ci_1</c>).</summary>
+    private static IReadOnlyList<string> PortKeysOf(IBaseDeviceModel controller)
+        => controller.Axes?.HardwareSpec?.Components?
+               .Select(c => c?.Key)
+               .Where(k => !string.IsNullOrWhiteSpace(k))
+               .Select(k => k!)
+               .Distinct(StringComparer.Ordinal)
+               .ToList()
+           ?? (IReadOnlyList<string>)Array.Empty<string>();
 
     /// <summary>센서 링크 상태 — 부품 <c>NETWORK_INTERFACE</c> 의 health(없으면 <c>null</c> = 모름).</summary>
     private static string? LinkHealthOf(IBaseDeviceModel sensor)
