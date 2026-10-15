@@ -6,6 +6,9 @@
 /// </summary>
 public readonly record struct PtzDragVector(double ViewX, double ViewY, double ViewAspect);
 
+/// <summary>화살표 그림 한 장 — 몸통 끝(촉 안쪽) 좌표와 촉 방향(도, 화면 좌표: 0 = 오른쪽 · 90 = 아래).</summary>
+public readonly record struct PtzArrow(double ShaftEndX, double ShaftEndY, double AngleDeg);
+
 /// <summary>
 /// 영상 위 PTZ 드래그 제스처(순수 · WPF 무의존) — 지도 오버레이(GIS)와 이벤트 창 타일(호스트)이 같은 판정을 쓴다.
 /// 캡처 드래그 계약(drag-first-ux): 눌림(<see cref="IsPressed"/>)과 데드존 통과(<see cref="IsDragging"/>)를 분리하고,
@@ -22,7 +25,7 @@ public sealed class PtzDragGesture
 
     public bool IsPressed { get; private set; }
 
-    /// <summary>데드존을 넘었다 — 이때부터 목표 표시를 그리고, 떼면 이동을 보낸다.</summary>
+    /// <summary>데드존을 넘었다 — 이때부터 화살표를 그리고, 떼면 이동을 보낸다(누르는 동안은 보내지 않는다).</summary>
     public bool IsDragging { get; private set; }
 
     public double StartX => _startX;
@@ -77,35 +80,47 @@ public sealed class PtzDragGesture
     public static bool IsBeyondDeadZone(double dx, double dy) => (dx * dx) + (dy * dy) > DeadZone * DeadZone;
 
     /// <summary>
-    /// 끈 길이 기준(사용자 결정 2026-10-15) — m = (dx, dy) ÷ (영상 가로의 1/2). 길이 1 에서 자른다(가로 1/2 보다 길게 끌어도 최대에서 멈춤).
-    /// <b>|m| = 1 → 화면 한 폭(수평 화각 1개)만큼 돈다.</b> 세로도 가로 픽셀로 재므로 각도/픽셀이 가로와 같다.
+    /// 화살표 길이 기준(사용자 결정 2026-10-16 — 10-15 의 "가로 1/2 = 한 폭"을 대체) — 화면 비율: 가로 성분 ÷ 영상 폭, 세로 성분 ÷ 영상 높이,
+    /// 성분마다 ±1(화면 하나)에서 자른다. <b>화살표가 화면 끝까지(폭 전체) = 화면 한 폭(수평 화각 1개)만큼 돈다</b>, 높이 전체 = 수직 화각 1개.
+    /// 돌려주는 값은 폭 단위(세로 = 높이 비율 ÷ 가로세로비) — 각도/픽셀이 가로와 같다.
     /// 입력은 영상 상자 비율(<see cref="PtzDragVector"/> 와 같은 꼴). 유한하지 않은 값은 0.
     /// </summary>
     public static (double X, double Y) WidthVector(double viewX, double viewY, double viewAspect)
     {
         double aspect = double.IsFinite(viewAspect) && viewAspect > 0.1 && viewAspect < 10 ? viewAspect : 16d / 9d;
-        double x = double.IsFinite(viewX) ? 2d * viewX : 0d;
-        double y = double.IsFinite(viewY) ? 2d * viewY / aspect : 0d;
-        double length = Math.Sqrt((x * x) + (y * y));
-        return length > 1d ? (x / length, y / length) : (x, y);
+        double x = double.IsFinite(viewX) ? Math.Clamp(viewX, -1d, 1d) : 0d;
+        double y = double.IsFinite(viewY) ? Math.Clamp(viewY, -1d, 1d) / aspect : 0d;
+        return (x, y);
     }
 
-    /// <summary>끈 크기(0..1) — 1 = 최대(가로 1/2 를 끌었다 = 화면 한 폭 회전). 목표 표시 옆 글자에 쓴다.</summary>
+    /// <summary>화살표 크기 = 화면 비율 벡터(가로 ÷ 폭, 세로 ÷ 높이, 성분마다 ±1 에서 자름)의 길이. 1 = 화면 하나만큼. 화살표 옆 글자에 쓴다.</summary>
     public static double DragMagnitude(double viewWidth, double viewHeight, double dx, double dy)
     {
         if (!(viewWidth > 0) || !(viewHeight > 0)) return 0d;
-        var (mx, my) = WidthVector(dx / viewWidth, dy / viewHeight, viewWidth / viewHeight);
-        return Math.Sqrt((mx * mx) + (my * my));
+        double x = Math.Clamp(dx / viewWidth, -1d, 1d), y = Math.Clamp(dy / viewHeight, -1d, 1d);
+        return double.IsFinite(x) && double.IsFinite(y) ? Math.Sqrt((x * x) + (y * y)) : 0d;
     }
 
-    /// <summary>끈 크기 글자(목표 표시 옆) — "0.6폭"(화면 한 폭 = 지금 보이는 화면 너비만큼 돈다), 최대면 "1폭 · 최대".</summary>
+    /// <summary>화살표 크기 글자 — "0.6화면"(지금 보이는 화면의 0.6배만큼 돈다).</summary>
     public static string AmountText(double magnitude)
-        => magnitude >= 0.995 ? "1폭 · 최대" : (Math.Max(0, magnitude)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "폭";
+        => Math.Max(0, magnitude).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "화면";
 
     /// <summary>
-    /// 목표 표시 자리(순수) — 떼면 <b>화면 중심으로 올 점</b> = 중심 + m × 화면 가로(<see cref="WidthVector"/>).
-    /// 끈 길이의 2배 거리라 가로 1/4 를 넘게 끌면 화면 밖이다 — 그때는 중심에서 그 방향으로 가장자리에 붙인다(방향은 유지,
-    /// 크기는 <see cref="DragMagnitude"/> 로 따로 보인다).
+    /// 화살표 그림(순수) — 시작점(누른 곳) → 끝점(지금 마우스). 몸통은 끝점에서 촉 길이(<paramref name="headLength"/>)만큼 물러난 자리에서 끝나
+    /// 둥근 끝이 촉 끝을 뚫고 나오지 않는다(화살표가 촉보다 짧으면 몸통 없음 = 시작점). 각도 = 화면 좌표(아래 +)의 도, 0 = 오른쪽.
+    /// </summary>
+    public static PtzArrow Arrow(double startX, double startY, double endX, double endY, double headLength)
+    {
+        double dx = endX - startX, dy = endY - startY;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
+        double angle = length > 0 ? Math.Atan2(dy, dx) * 180d / Math.PI : 0d;
+        if (!(length > headLength)) return new PtzArrow(startX, startY, angle);
+        return new PtzArrow(endX - (dx / length * headLength), endY - (dy / length * headLength), angle);
+    }
+
+    /// <summary>
+    /// 목표 자리(순수) — 떼면 <b>화면 중심으로 올 점</b> = 중심 + 화살표(<see cref="WidthVector"/> × 화면 가로).
+    /// 화면 밖이면 중심에서 그 방향으로 가장자리에 붙인다(방향은 유지).
     /// </summary>
     public static (double X, double Y) TargetPoint(double viewWidth, double viewHeight, double dx, double dy)
     {
