@@ -33,6 +33,13 @@ public class BrokerRequestClient : IBrokerRequestClient
         _natsService = natsService ?? throw new ArgumentNullException(nameof(natsService));
         _log = log;
     }
+
+    /// <summary>보낸 사람 · 단말(<paramref name="requester"/>)을 모든 제어 REQ 본문에 싣는 생성자(G7-4).</summary>
+    public BrokerRequestClient(INatsService natsService, ILogService? log, ICommandRequester? requester)
+        : this(natsService, log)
+    {
+        _requester = requester;
+    }
     #endregion
 
     #region - Implementation of Interface -
@@ -52,6 +59,8 @@ public class BrokerRequestClient : IBrokerRequestClient
 
             var msg = body.ToBrokerRequest(command, FROM_GIS);   // m_type=REQ, id=GUID
             var json = msg.ToJson();
+            // 제어 명령 공통 선택 칸(§7 머리 · G7-4) — 보낸 사람 · 단말. 값이 없으면 싣지 않는다.
+            if (_requester != null) json = CommandRequester.Stamp(json, _requester.RequestedBy, _requester.RequestedClientId);
 
             var reply = await _natsService
                 .RequestAsync(subject, json, timeout ?? DefaultTimeout)
@@ -150,5 +159,6 @@ public class BrokerRequestClient : IBrokerRequestClient
     #region - Attributes -
     private readonly INatsService _natsService;
     private readonly ILogService? _log;
+    private readonly ICommandRequester? _requester;
     #endregion
 }

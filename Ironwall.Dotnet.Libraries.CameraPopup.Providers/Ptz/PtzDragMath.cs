@@ -60,14 +60,14 @@ public readonly record struct PtzDragPlan(PtzDragMoveKind Kind, double Pan, doub
 /// <summary>
 /// 드래그 벡터(영상 상자 크기에 대한 비율: 오른쪽 +, 아래 +) → 카메라 이동. WPF · ONVIF 인스턴스 비의존.
 /// <para>계약: 드래그 방향으로 카메라가 돈다(오른쪽으로 끌면 오른쪽을 본다 · 위로 끌면 위를 본다). 크기는
-/// 가로 픽셀 기준(사용자 결정 2026-10-15, <see cref="PtzDragGesture.WidthVector"/>): 가로 1/2 를 끌면 화면 한 폭(수평 화각 1개),
-/// 더 끌어도 거기서 멈춘다 · 짧으면 비례. 세로도 같은 각도/픽셀. 줌이 깊을수록 같은 드래그가 더 적게 움직인다.</para>
+/// 화면 비율 기준(사용자 결정 2026-10-16, <see cref="PtzDragGesture.WidthVector"/>): 화살표가 화면 끝까지(폭 전체) = 화면 한 폭(수평 화각 1개),
+/// 높이 전체 = 수직 화각 1개, 화면 밖은 거기서 멈춘다 · 짧으면 비례. 각도/픽셀은 가로 · 세로가 같다. 줌이 깊을수록 같은 화살표가 더 적게 움직인다.</para>
 /// </summary>
 public static class PtzDragMath
 {
     public const double DefaultAspect = 16d / 9d;
 
-    // 시간 제한 연속 이동 상수 — 위치 · 줌을 모를 때의 대체 수단. 끈 크기(가로 1/2 = 1)에 비례한 시간만큼 설정 속도로 돈다.
+    // 시간 제한 연속 이동 상수 — 위치 · 줌을 모를 때의 대체 수단. 화살표 크기(폭 전체 = 1)에 비례한 시간만큼 설정 속도로 돈다.
     public const int PulseMaxMs = 700;
     public const int PulseMinMs = 120;
     public const double PulseSpeed = 0.6;
@@ -171,8 +171,8 @@ public static class PtzDragMath
     }
 
     /// <summary>
-    /// 화각 상대 공간 이동: ±1 = 화면 가장자리(반 화각)라 한 폭(화각 1개) = 2. 끈 크기 m(<see cref="PtzDragGesture.WidthVector"/>)이 1 이면
-    /// 팬 2 · 틸트 2×가로세로비(세로도 같은 각도/픽셀 — 틸트 1 = 반 높이). 화면 아래(+)로 끌면 틸트 내림(−).
+    /// 화각 상대 공간 이동: ±1 = 화면 가장자리(반 화각)라 한 폭(화각 1개) = 2. 폭 전체 화살표(<see cref="PtzDragGesture.WidthVector"/> x = 1)면
+    /// 팬 2, 높이 전체면 틸트 2(틸트 1 = 반 높이). 화면 아래(+)로 끌면 틸트 내림(−).
     /// 카메라 범위(보통 ±1)를 넘으면 같은 몫으로 <c>Steps</c> 번 나눈다(한 번에 자르면 반 폭밖에 못 간다). 움직일 수 없는 축(범위 0)은 0.
     /// </summary>
     public static (double Pan, double Tilt, int Steps) FovSteps(double viewX, double viewY, double viewAspect,
@@ -241,7 +241,7 @@ public static class PtzDragMath
 
     /// <summary>
     /// 시간 제한 연속 이동(위치 · 줌을 모를 때): 방향 = 드래그 방향, 속도 = 설정 속도(<paramref name="speed"/>),
-    /// 시간 = 끈 크기 m(가로 1/2 = 1, <see cref="PtzDragGesture.WidthVector"/>) × <see cref="PulseMaxMs"/>.
+    /// 시간 = 화살표 크기 m(폭 전체 = 1, <see cref="PtzDragGesture.WidthVector"/>) × <see cref="PulseMaxMs"/>, 대각선도 최대 시간에서 자른다.
     /// 화각을 모르므로 "한 폭"은 속도 × 시간의 어림이다. 아주 짧은 드래그도 <see cref="PulseMinMs"/> 는 움직인다.
     /// </summary>
     public static PtzDragPlan ContinuousPulse(double viewX, double viewY, double viewAspect, double speed = PulseSpeed)
@@ -250,7 +250,7 @@ public static class PtzDragMath
         double magnitude = Math.Sqrt((mx * mx) + (my * my));
         if (magnitude < 1e-6) return new PtzDragPlan(PtzDragMoveKind.None, 0, 0);
         double velocity = Math.Clamp(double.IsFinite(speed) ? speed : PulseSpeed, 0.1, 1d);
-        int ms = Math.Max(PulseMinMs, (int)(magnitude * PulseMaxMs));
+        int ms = Math.Max(PulseMinMs, (int)(Math.Min(1d, magnitude) * PulseMaxMs));
         return new PtzDragPlan(PtzDragMoveKind.ContinuousPulse, mx / magnitude * velocity, -(my / magnitude) * velocity, ms);
     }
 

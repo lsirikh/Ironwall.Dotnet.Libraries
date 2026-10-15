@@ -28,6 +28,13 @@ public class BroadcastControlService : IBroadcastControlService
         _natsSetup = natsSetupModel;
         _brokerClient = brokerClient;
     }
+
+    /// <summary>TTS(PUB) 본문에도 보낸 사람 · 단말을 싣는 생성자(G7-4). REQ 낱말은 <see cref="IBrokerRequestClient"/> 가 싣는다.</summary>
+    public BroadcastControlService(INatsService natsService, INatsSetupModel natsSetupModel, IBrokerRequestClient brokerClient, ICommandRequester? requester)
+        : this(natsService, natsSetupModel, brokerClient)
+    {
+        _requester = requester;
+    }
     #endregion
 
     #region - Implementation of Interface -
@@ -51,7 +58,9 @@ public class BroadcastControlService : IBroadcastControlService
             Message = message
         };
         var msg = body.ToBrokerPublish("TTS", "GIS");
-        await _natsService.PublishAsync(BuildSubject("tts"), JsonConvert.SerializeObject(msg)).ConfigureAwait(false);
+        var json = JsonConvert.SerializeObject(msg);
+        if (_requester != null) json = CommandRequester.Stamp(json, _requester.RequestedBy, _requester.RequestedClientId);
+        await _natsService.PublishAsync(BuildSubject("tts"), json).ConfigureAwait(false);
     }
 
     public async Task<BrokerRequestResult> PublishStopAsync(int speakerId)
@@ -102,5 +111,6 @@ public class BroadcastControlService : IBroadcastControlService
     private readonly INatsService _natsService;
     private readonly INatsSetupModel _natsSetup;
     private readonly IBrokerRequestClient _brokerClient;
+    private readonly ICommandRequester? _requester;
     #endregion
 }

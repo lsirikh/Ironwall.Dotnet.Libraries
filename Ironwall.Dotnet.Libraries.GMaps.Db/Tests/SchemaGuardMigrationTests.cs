@@ -200,6 +200,59 @@ public sealed class SchemaGuardMigrationTests
     }
 
     /// <summary>
+    /// 라인/PidsGroup 라벨 오프셋이 비율 캡(±3)을 넘으면 부팅 때 0 으로 복구 — 캡 안 값은 그대로, 2회 부팅해도 같다(멱등).
+    /// </summary>
+    /// <remarks>
+    /// 로컬 지도 DB 실측(2026-10-16): AREA_BOUNDARY Id 275 (2,-52) px 레거시 · PIDS_GROUP Id 227 (0.1959, 76.8) 가는 축 퇴화.
+    /// 시험 DB 에 시험용 행을 넣고 끝나면 지운다(시험 DB 의 기존 행은 건드리지 않는다).
+    /// </remarks>
+    [Fact]
+    public async Task should_reset_ratio_label_offset_over_cap_and_keep_valid_ones_when_booting()
+    {
+        // Arrange
+        Assert.True(await IsConvergedFixtureAsync(),
+            $"{GMapTestDb.Name} 에 Symbols 데이터가 없습니다.");
+
+        await using var conn = new MySqlConnection(ConnStr);
+        await conn.OpenAsync();
+        const string tag = "__label_cap_test__";
+        const string insertSql =
+            "INSERT INTO Symbols (Title, Latitude, Longitude, Category, LabelOffsetX, LabelOffsetY) " +
+            "VALUES (@tag, 37.4, 126.9, @cat, @x, @y); SELECT LAST_INSERT_ID();";
+        const string offsetSql = "SELECT COALESCE(LabelOffsetX,0) AS X, COALESCE(LabelOffsetY,0) AS Y FROM Symbols WHERE Id=@id;";
+        try
+        {
+            var ids = new[]
+            {
+                await conn.ExecuteScalarAsync<int>(insertSql, new { tag, cat = "AREA_BOUNDARY", x = 2d, y = -52d }),      // 캡 밖(px 레거시)
+                await conn.ExecuteScalarAsync<int>(insertSql, new { tag, cat = "PIDS_GROUP", x = 0.1959, y = -2.9 }),     // 캡 안
+                await conn.ExecuteScalarAsync<int>(insertSql, new { tag, cat = "BASIC_SHAPES", x = 40d, y = -52d }),      // px 도메인 — 대상 아님
+            };
+
+            // Act — 2회 부팅
+            for (var i = 0; i < 2; i++)
+            {
+                var svc = CreateService();
+                using var cts = new CancellationTokenSource();
+                try { await svc.StartService(cts.Token); }
+                finally { await svc.StopService(cts.Token); }
+
+                // Assert
+                var over = await conn.QuerySingleAsync<(double X, double Y)>(offsetSql, new { id = ids[0] });
+                var valid = await conn.QuerySingleAsync<(double X, double Y)>(offsetSql, new { id = ids[1] });
+                var point = await conn.QuerySingleAsync<(double X, double Y)>(offsetSql, new { id = ids[2] });
+                Assert.Equal((0d, 0d), over);
+                Assert.Equal((0.1959, -2.9), valid);
+                Assert.Equal((40d, -52d), point);
+            }
+        }
+        finally
+        {
+            await conn.ExecuteAsync("DELETE FROM Symbols WHERE Title=@tag;", new { tag });
+        }
+    }
+
+    /// <summary>
     /// 마이그레이션 대상 컬럼이 부팅 후 전부 실재해야 한다(가드가 필요한 ALTER 를 빠뜨리지 않았는지).
     /// </summary>
     [Fact]

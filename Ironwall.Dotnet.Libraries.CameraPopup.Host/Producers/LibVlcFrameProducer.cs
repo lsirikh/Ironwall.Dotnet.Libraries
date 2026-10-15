@@ -1,6 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Messages;
 using Ironwall.Dotnet.Libraries.CameraPopup.Contracts.Protocol;
+using Ironwall.Dotnet.Libraries.CameraPopup.Host.Diagnostics;
 using Ironwall.Dotnet.Libraries.CameraPopup.Host.Frames;
 using LibVLCSharp.Shared;
 
@@ -65,6 +66,11 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
     private IntPtr _compose;
     private bool _composeDirty;
 
+    // 단계 계측(IRONWALL_STREAM_TRACE — 꺼져 있으면 null). 스테이징마다 lock 시각을 적어 display 까지의 간격을 잰다.
+    private StreamCounters? _trace;
+    private readonly long[] _lockTicks = new long[StagingCount];
+    private readonly EventHandler<MediaPlayerESAddedEventArgs> _onEsAdded;
+
     /// <param name="openRequestedTicks">열기 요청 시각(<see cref="Environment.TickCount64"/>) — 첫 프레임까지 걸린 시간 기록용. 0 이면 생성 시각.</param>
     /// <param name="openGate">연결 줄(없으면 바로 연다 — 파일 · 시험).</param>
     /// <param name="priority">줄 앞에 선다(사람이 방금 연 오버레이).</param>
@@ -87,6 +93,13 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
         _cleanupCb = OnCleanup;
         _onError = (_, _) => Fail(StreamState.Failed, "libvlc-error");
         _onEnd = (_, _) => Fail(StreamState.Stalled, "end-reached");
+        _onEsAdded = (_, _) => _trace?.Negotiated();
+    }
+
+    /// <summary>계측 타이머 — 미디어 통계(잠금 안: 닫는 중에는 null 이라 풀린 핸들을 읽지 않는다).</summary>
+    private MediaStats? ReadStats()
+    {
+        lock (_gate) { return _media?.Statistics; }
     }
 
     public void Start(IFrameSink sink, Action<StreamState, string?> onState)
@@ -101,6 +114,8 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
     {
         try
         {
+            _trace = StreamTrace.Register(_name, ReadStats);
+            long queuedAt = Environment.TickCount64;
             if (_openGate is not null)
             {
                 if (_openGate.Active >= _openGate.MaxConcurrent) Report(StreamState.Opening, DetailQueued);
@@ -117,6 +132,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
                     return;
                 }
             }
+            _trace?.Queued(Environment.TickCount64 - queuedAt);
             lock (_gate)
             {
                 StartLocked();
@@ -192,6 +208,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             _player.SetVideoCallbacks(_lockCb, null, _displayCb);
             _player.EncounteredError += _onError;
             _player.EndReached += _onEnd;
+            if (_trace is not null) _player.ESAdded += _onEsAdded;
 
             int timeout = _provider.OpenTimeoutMs > 0 ? _provider.OpenTimeoutMs : DefaultOpenTimeoutMs;
             _openTimer = new Timer(_ =>
@@ -200,6 +217,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             }, null, timeout, Timeout.Infinite);
 
             if (_stopped) return;
+            _trace?.PlayCalled();
             if (!_player.Play())
             {
                 // 잠금 안 — 멈추기는 배경에서(Fail 이 다시 잠금을 잡는다).
@@ -258,6 +276,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
         {
             int index = (int)((uint)Interlocked.Increment(ref _lockCounter) % StagingCount);
             Marshal.WriteIntPtr(planes, _staging[index]);
+            if (_trace is not null) _lockTicks[index] = System.Diagnostics.Stopwatch.GetTimestamp();
             return new IntPtr(index + 1); // 0 이 아닌 식별자
         }
         catch
@@ -275,6 +294,7 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             if (index < 0 || index >= StagingCount || _staging[index] == IntPtr.Zero) return;
             var sink = _sink;
             if (sink is null) return;
+            long started = _trace is null ? 0 : System.Diagnostics.Stopwatch.GetTimestamp();
 
             if (_fitWidth == _width && _fitHeight == _height)
             {
@@ -300,8 +320,16 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
                 sink.Write(_compose, _width * 4);
             }
 
+            if (_trace is not null)
+            {
+                long ended = System.Diagnostics.Stopwatch.GetTimestamp();
+                long locked = _lockTicks[index];
+                _trace.Displayed(locked == 0 ? 0 : started - locked, ended - started);
+            }
+
             if (Interlocked.Increment(ref _frames) == 1)
             {
+                _trace?.FirstFrame();
                 _log.Info($"libvlc first frame {_name} after {Environment.TickCount64 - _openRequestedTicks} ms");
                 ReleaseLease();
                 Report(StreamState.Playing, null);
@@ -355,12 +383,14 @@ internal sealed class LibVlcFrameProducer : IFrameProducer
             _player = null;
             _media = null;
         }
+        StreamTrace.Unregister(_trace);
         var stop = Task.Run(() =>
         {
             if (player is not null)
             {
                 player.EncounteredError -= _onError;
                 player.EndReached -= _onEnd;
+                player.ESAdded -= _onEsAdded;
             }
             player?.Stop();
             player?.Dispose();

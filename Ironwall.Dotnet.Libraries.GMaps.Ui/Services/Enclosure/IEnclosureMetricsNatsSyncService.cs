@@ -21,6 +21,12 @@ public interface IEnclosureMetricsNatsSyncService
     /// <summary>함체의 최신 계측 — 받은 적이 없으면 false.</summary>
     bool TryGetLatest(int enclosureId, out EnclosureMetricsReading reading);
 
+    /// <summary>함체 환경 · 부품 판정 경고가 걸리거나 풀렸다(함체 id). NATS 스레드에서 발화한다(이슈 #7 Q-4a).</summary>
+    event System.Action<int>? AlertsChanged;
+
+    /// <summary>함체에 걸린 경고 요약 — 없으면 null.</summary>
+    EnclosureAlertSummary? GetAlert(int enclosureId);
+
     Task StartService(CancellationToken token = default);
     Task StopAsync(CancellationToken token = default);
 }

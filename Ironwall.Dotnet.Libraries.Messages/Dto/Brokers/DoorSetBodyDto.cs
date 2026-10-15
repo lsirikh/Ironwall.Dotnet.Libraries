@@ -47,6 +47,10 @@ public class DoorSetBodyDto
     [JsonProperty("requested_by", NullValueHandling = NullValueHandling.Ignore)]
     public string? RequestedBy { get; set; }
 
+    /// <summary>명령을 낸 단말 — 통제DB 세션 <c>client_id</c>(<c>X-Client-Id</c>). 선택(브로커 v2.0.12 §7 머리).</summary>
+    [JsonProperty("requested_client_id", NullValueHandling = NullValueHandling.Ignore)]
+    public string? RequestedClientId { get; set; }
+
     /// <summary>ISO 8601 — <b>오프셋 필수</b>(서버 datetime-aware 규약). 필수.</summary>
     [JsonProperty("requested_at")]
     public string RequestedAt { get; set; } = string.Empty;

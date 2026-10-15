@@ -42,6 +42,7 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         SetResourceReference(AlertBrushProperty, "StatusWarningBrush");
         SetResourceReference(NeutralBrushProperty, "TextSecondaryBrush");
         SetResourceReference(InkBrushProperty, "TextPrimaryBrush");
+        SetResourceReference(CriticalBrushProperty, "StatusCriticalBrush");
     }
 
     #region Value DPs
@@ -99,6 +100,14 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits | FrameworkPropertyMetadataOptions.AffectsRender));
     public static bool GetIsStripCrowded(DependencyObject d) => (bool)d.GetValue(IsStripCrowdedProperty);
     public static void SetIsStripCrowded(DependencyObject d, bool value) => d.SetValue(IsStripCrowdedProperty, value);
+
+    /// <summary>
+    /// 함체 환경 · 부품 판정 경고(이슈 #7 Q-4a) — 위 가운데 삼각형 "!". 운영 이벤트의 severity 로 칠한다
+    /// (WARNING = 경고색 테두리 · CRITICAL = 위험색 채움). 다른 표시와 자리가 겹치지 않고 깜빡이지 않는다. null 이면 없음.
+    /// </summary>
+    public static readonly DependencyProperty AlertProperty = DependencyProperty.Register(nameof(Alert), typeof(Services.Enclosure.EnclosureAlertSummary),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Services.Enclosure.EnclosureAlertSummary? Alert { get => (Services.Enclosure.EnclosureAlertSummary?)GetValue(AlertProperty); set => SetValue(AlertProperty, value); }
     #endregion
 
     #region Theme brush DPs (DynamicResource)
@@ -117,7 +126,14 @@ public sealed class ComponentStatusOverlay : FrameworkElement
     public static readonly DependencyProperty InkBrushProperty = DependencyProperty.Register(nameof(InkBrush), typeof(Brush),
         typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
     public Brush? InkBrush { get => (Brush?)GetValue(InkBrushProperty); set => SetValue(InkBrushProperty, value); }
+
+    public static readonly DependencyProperty CriticalBrushProperty = DependencyProperty.Register(nameof(CriticalBrush), typeof(Brush),
+        typeof(ComponentStatusOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Brush? CriticalBrush { get => (Brush?)GetValue(CriticalBrushProperty); set => SetValue(CriticalBrushProperty, value); }
     #endregion
+
+    /// <summary>시험용 — 환경 경고 삼각형을 그리는가(크기와 무관 — 경고는 작은 아이콘에서도 보여야 한다).</summary>
+    internal bool IsAlertDrawn => ShowShape && !IsPreview && Alert != null;
 
     /// <summary>시험용 — 지금 크기 · 배율에서 배지를 그리는가.</summary>
     internal bool IsBadgeDrawn => ShowShape && !IsPreview
@@ -165,6 +181,27 @@ public sealed class ComponentStatusOverlay : FrameworkElement
         if (ComponentBadgeLod.ShowsDoor(Door, px)) DrawDoor(dc, h, surface, neutral, ink);
         if (ComponentStripRules.ShowsStrip(Strip, px, GetIsStripCrowded(this), IsEmphasized))
             DrawStrip(dc, w, h, px, Strip!, surface, alert, neutral, ink);
+        if (Alert is { } envAlert) DrawAlert(dc, w, surface, envAlert.IsCritical ? CriticalBrush ?? Brushes.Firebrick : alert, envAlert.IsCritical);
+    }
+
+    /// <summary>위 가운데 경고 삼각형 — 아이콘 위로 <see cref="Overhang"/> 만큼 걸친다. 심각 = 채움 + 바탕색 "!", 경고 = 바탕 채움 + 경고색 테두리 · "!".</summary>
+    private static void DrawAlert(DrawingContext dc, double w, Brush surface, Brush tone, bool critical)
+    {
+        double left = (w - BadgeSize) / 2, top = -Overhang;
+        var triangle = new StreamGeometry();
+        using (var g = triangle.Open())
+        {
+            g.BeginFigure(new Point(left + BadgeSize / 2, top), true, true);
+            g.LineTo(new Point(left + BadgeSize, top + BadgeSize - 1), true, false);
+            g.LineTo(new Point(left, top + BadgeSize - 1), true, false);
+        }
+        triangle.Freeze();
+        dc.DrawGeometry(critical ? tone : surface, new Pen(tone, critical ? 1.0 : 1.5), triangle);
+
+        var mark = critical ? surface : tone;
+        double cx = left + BadgeSize / 2;
+        dc.DrawRectangle(mark, null, new Rect(cx - 0.75, top + 3.5, 1.5, 4.0));   // "!" 막대
+        dc.DrawRectangle(mark, null, new Rect(cx - 0.75, top + 8.3, 1.5, 1.5));   // "!" 점
     }
 
     /// <summary>이름표 높이(px, 마커 좌표) — 아이콘이 64px 미만일 때. 시트 §1안의 17px.</summary>

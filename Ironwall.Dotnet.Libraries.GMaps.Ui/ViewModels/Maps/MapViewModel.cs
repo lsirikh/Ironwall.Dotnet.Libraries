@@ -1962,7 +1962,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 deviceId, deviceType, dev?.DeviceName, dev?.DeviceNumber ?? 0);
 
             var ok = await door.PublishDoorCommandAsync(deviceId, deviceType, command,
-                                                        description, CurrentRequestedBy(),
+                                                        description, CurrentOperatorAccount(),
                                                         _cts?.Token ?? CancellationToken.None);
             _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "발행" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
             return ok;
@@ -2139,14 +2139,18 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraAim] TokenStorage 미해석(requested_by 폴백): {ex.Message}"); _tokenStorage = null; }
         return _tokenStorage;
     }
-    /// <summary>회전요청 requested_by — 로그인 계정 표시이름(user.name) 우선 → login_id(JWT sub) → Windows 사용자명 폴백.</summary>
-    private string CurrentRequestedBy()
+    /// <summary>
+    /// 운영자 계정(브로커 v2.0.12 §7 머리 · 이슈 #7 G7-4) — login_id → JWT sub(= login_id) → 표시이름. 모두 없으면 null.
+    /// 문 개폐는 이 값을 그대로 싣는다(없으면 칸 생략).
+    /// </summary>
+    private string? CurrentOperatorAccount()
     {
-        var name = ResolvePermissionService()?.Name;          // 표시이름(로그인 응답 user.name) 우선
-        if (!string.IsNullOrWhiteSpace(name)) return name;
-        var loginId = ResolveTokenStorage()?.UserId;          // JWT sub=login_id 폴백
-        return string.IsNullOrWhiteSpace(loginId) ? Environment.UserName : loginId;
+        var permission = ResolvePermissionService();
+        return Services.Brokers.CommandRequester.ResolveRequestedBy(permission?.LoginId, ResolveTokenStorage()?.UserId, permission?.Name);
     }
+
+    /// <summary>회전요청 · 카메라 팝업 requested_by — <see cref="CurrentOperatorAccount"/>, 없으면 종전대로 Windows 사용자명 폴백.</summary>
+    private string CurrentRequestedBy() => CurrentOperatorAccount() ?? Environment.UserName;
 
     /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>
     private void OnForceLogoutRequested(EnumRevokeReason reason)
@@ -6474,6 +6478,8 @@ public partial class MapViewModel : BasePanelViewModel,
             if (_enclosureMetricsSync == null) return;
             _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
             _enclosureMetricsSync.MetricsReceived += OnEnclosureMetricsReceived;
+            _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
+            _enclosureMetricsSync.AlertsChanged += OnEnclosureAlertsChanged;
             _ = _enclosureMetricsSync.StartService();
 
             // 새 계측이 끊기면 '오래된 값' 으로 바꾸고, 나중에 생긴 함체 심볼에도 보관해 둔 계측을 싣는다.
@@ -6490,8 +6496,13 @@ public partial class MapViewModel : BasePanelViewModel,
         _enclosureMetricsStaleTimer?.Stop();
         if (_enclosureMetricsSync == null) return;
         _enclosureMetricsSync.MetricsReceived -= OnEnclosureMetricsReceived;
+        _enclosureMetricsSync.AlertsChanged -= OnEnclosureAlertsChanged;
         _ = _enclosureMetricsSync.StopAsync();
     }
+
+    /// <summary>함체 환경 경고가 걸리거나 풀렸다(이슈 #7 Q-4a) — NATS 스레드에서 온다.</summary>
+    private void OnEnclosureAlertsChanged(int enclosureId)
+        => Execute.OnUIThread(() => ApplyEnclosureMetrics(enclosureId));
 
     private void OnEnclosureMetricsTimerTick(object? sender, EventArgs e) => ApplyEnclosureMetrics(null);
 
@@ -6499,7 +6510,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void OnEnclosureMetricsReceived(Services.Enclosure.EnclosureMetricsReading reading)
         => Execute.OnUIThread(() => ApplyEnclosureMetrics(reading.EnclosureId));
 
-    /// <summary>보관된 최신 계측을 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
+    /// <summary>보관된 최신 계측 · 환경 경고를 함체 심볼에 싣는다(<paramref name="enclosureId"/>=null 이면 전부). 호출 스레드: UI.</summary>
     private void ApplyEnclosureMetrics(int? enclosureId)
     {
         try
@@ -6510,6 +6521,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 if (marker.DeviceType != EnumDeviceType.Enclosure || marker.LinkedDeviceId <= 0) continue;
                 if (enclosureId is { } id && marker.LinkedDeviceId != id) continue;
+                marker.EnclosureAlert = _enclosureMetricsSync.GetAlert(marker.LinkedDeviceId);
                 if (!_enclosureMetricsSync.TryGetLatest(marker.LinkedDeviceId, out var reading)) continue;
                 marker.EnclosureMetrics = reading with { IsStale = Helpers.Components.EnclosureMetricsText.IsStale(reading.ReceivedAt, now) };
             }
