@@ -453,12 +453,10 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void RestoreDoorStateFromDevice(IBaseDeviceModel device)
     {
-        var status = device switch
-        {
-            IEnclosureDeviceModel enclosure => enclosure.DoorStatus,
-            IGateDeviceModel gate => gate.GateStatus,
-            _ => null,
-        };
+        // 문 위치 = 관측 축(구동부 → 문 센서) → 옛 스칼라. 7.0+ 서버에는 스칼라가 없어 축을 먼저 본다(이슈 #7 Q-4b).
+        var status = device is IEnclosureDeviceModel or IGateDeviceModel
+            ? Ironwall.Dotnet.Monitoring.Models.Helpers.DoorPosition.Of(device)
+            : null;
         if (status is null) return;
 
         var state = Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.FromServer(status);

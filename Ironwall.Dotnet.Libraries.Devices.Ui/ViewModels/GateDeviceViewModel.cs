@@ -22,19 +22,15 @@ public class GateDeviceViewModel : DeviceViewModel, IGateDeviceViewModel
     #endregion
     #region - Properties -
     /// <summary>
-    /// 문 위치. ① v7.0+ 관측 축의 구동부 상태(<c>OPEN</c>·<c>CLOSED</c>·<c>RUNNING</c>) →
-    /// ② 없으면 6.3 스칼라 <c>gate_status</c> → ③ 그것도 없으면 <see cref="Unknown"/>.
+    /// 문 위치. ① v7.0+ 관측 축의 문 위치 부품 상태 — 구동부(<c>DOOR_ACTUATOR</c>) → 문 센서(<c>DOOR_SENSOR</c>, 구동부 없는 일반 통문) →
+    /// ② 없으면 6.3 스칼라 <c>gate_status</c> → ③ 그것도 없으면 <see cref="Unknown"/>(<see cref="Ironwall.Dotnet.Monitoring.Models.Helpers.DoorPosition.Of"/>).
     /// <para>개폐 <b>명령</b>은 이 값을 바꾸지 않는다 — 매니저의 상태 보고로만 바뀐다. 그래서 읽기 전용이다.</para>
     /// </summary>
     public string DoorPosition
     {
         get
         {
-            var observed = _model.Axes?.FindStatusByType(DoorActuatorType)?.State;
-            if (!string.IsNullOrWhiteSpace(observed)) return observed!;
-
-            var legacy = (_model as IGateDeviceModel)?.GateStatus;
-            return string.IsNullOrWhiteSpace(legacy) ? Unknown : legacy!;
+            return Ironwall.Dotnet.Monitoring.Models.Helpers.DoorPosition.Of(_model) ?? Unknown;
         }
     }
 
